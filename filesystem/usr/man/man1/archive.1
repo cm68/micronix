@@ -1,0 +1,84 @@
+.he "archive (1)                 1/13/82                   archive (1)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+archive - 
+archive maintainer
+
+
+.in -5
+.bd
+USAGE            
+.in +5
+.br
+.bd
+archive {dptux} archname [files]
+.in -5
+.sp 2
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Archive
+maintains a group of files combined into a single archive file.
+The archiver has good protection against
+data loss through disk overflow and
+works equally well with text and non-text files
+(for those systems on which there is a distinction).
+.sp
+Exactly one key character must be specified to
+indicate which action you wish 
+.bd
+archive 
+to perform.
+
+The meanings of the key characters are:
+.sp 2
+.in +10
+.ta 10
+.ti -10
+d	Delete the named files from the archive file.
+If no names are given, the archive is not altered.
+.sp
+.ti -10
+p	Print the named files in the archive.
+Non-printing characters are filtered out.
+.sp
+.ti -10
+t	Print a table of contents of the archive file.
+If no names are given, all files in the archive are tabled.
+If names are given, only those files are tabled.
+.sp
+.ti -10
+u	Update the named files in the archive.
+If the named archive does not exist, it is created.
+If no names are given, all files in the archive are updated.
+If a name is given which is not in the archive,  
+a new archive entry is created and its contents becomes the 
+contents of the named file.
+Otherwise, the contents of archive's entry is replaced
+with the current version of the file.
+.sp
+.ti -10
+x	Extract the named files.
+The files in the archive are copied out to ordinary files of the same name.
+The former contents of the ordinary files are destroyed.
+If no names are given, all files in the archive are extracted.
+In neither case does x alter the archive.
+.bp
+.in -15
+.bd
+EXAMPLES
+.in +5
+.br
+To make an archive:
+.sp
+.ce
+.bd
+archive u newarch.a file1 file2 file3 file4

@@ -1,0 +1,64 @@
+.he "init (1)                     3/18/82                     init (1)" 
+.fo "                              -#-"
+.in 5
+.rm 65
+.bd      
+PROGRAM
+.in +5
+.br
+init
+
+
+.in -5
+.bd
+USAGE          
+.in +5
+.br
+.bd
+/etc/init
+
+
+.in -5
+.bd
+FUNCTION      
+.in +5
+.br
+.bd
+Init
+creates an automatic process
+for each terminal on a which a user may log in.
+
+.bd
+Init
+first brings the system up in single-user mode, 
+with only the console active.
+If there is a password on the "root" account,
+it demands this first. (Therefore, it is a good idea
+to keep a Micronix diskette with an unprotected root
+account, in case the root password is lost.)
+
+When the single user shell exits, 
+.bd
+init
+runs the shell script "/etc/rc" if it exists,
+then reads the file "/etc/ttys", and branches several times
+to create a process for each terminal specified in the file.
+
+When one of init's child processes terminates,
+a new process is generated to take its place.  Normally, this 
+takes place automatically.
+
+The format of the "/etc/tty" file is as follows,
+(one per line):
+.nf
+.bd
+		tty A (9600) (on) (shake)
+.fi
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ttys (5)
+

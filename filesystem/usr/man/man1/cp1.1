@@ -1,0 +1,167 @@
+.he "cp1 (1)                      3/18/82                      cp1 (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd       
+PROGRAM
+.br
+.in +5
+.bd
+cp1 - 
+parse C programs
+
+
+.in -5
+.bd
+USAGE         
+.in +5
+.br
+.bd
+cp1 <flags> <file>
+
+
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Cp1 
+is the parsing pass of the C compiler.
+It accepts a sequential file of
+lexemes from the preprocessor, 
+.bd
+cpp, 
+and writes a sequential file
+of flow graphs and parse trees, suitable for input to a machine-dependent
+code generator, 
+.bd
+cp2.
+The operation of 
+.bd
+cp1 
+is largely independent of any target machine.
+The flag options are:
+.sp
+.in +10
+.ta 10
+.ti -10
+-a	Compile code for machines with separate address and data registers.
+.sp
+.ti -10
+-b#	Enforce storage boundaries according to 
+.bd
+#, 
+which is reduced modulo 4.  
+
+A bound of 0 leaves no holes in structures or 
+auto allocations. 
+
+A bound of 1 (default) requires short, intermediate and 
+longer data to begin on an even bound.  
+
+A bound of 2 is the same
+as 1 except that 4 to 8 bytes of data are forced to a multiple of a
+four-byte boundary.
+
+A bound of 3 is the same as 2, except that eight bytes of data (doubles)
+are forced to a multiple of an eight-byte boundary.
+
+.ti -10
+-c	Ignore case distinctions in testing external identifiers for equality,
+and map all names to lowercase on output.
+By default, case distinctions matter.
+
+.ti -10
+-e	Do not force loading of extern references that are 
+declared, but never defined or used in an expression.  Default is 
+used to load all external references declared.
+
+.ti -10
+-l	Take integers and pointers to be 4-bytes long.  Default is 2-bytes.
+
+.ti -10
+-m	Treat each structure/union as a separate name space, and require 
+.bd
+x.m
+to mean 
+.bd
+x 
+is a structure and 
+.bd
+m 
+one of its members.
+.bp
+.ti -10
+-n#	Ignore characters after the first 
+.bd
+# 
+in testing external identifiers
+for equality.  Default is 7; maximum is 8.
+
+.ti -10
+-o file	Write the output to the specified file and write 
+error messages to 
+STDOUT.  Default is STDOUT for output and STDERR for error messages.
+
+.ti -10
+-r#	Assign no more than 
+.bd
+# 
+variables to registers at any one time,
+where 
+.bd
+# 
+is reduced modulo 4.  Default is three register variables.
+
+.ti -10
+-u	Take "string" as an array of unsigned characters, not an array of 
+characters.
+
+.in -10
+If <file> is present, it is used as the input file instead of the default,
+STDIN.
+On many systems, the 
+.bd
+-o 
+option and <file> are mandatory
+because STDIN and STDOUT
+are interpreted as text files, and hence become corrupted.
+
+
+.in -5
+.bd
+EXAMPLE
+.in +5
+.br
+.bd
+Cp1 
+is usually sandwiched between 
+.bd
+cpp 
+and 
+.bd
+cp2, 
+as in:
+.sp
+.nf
+.bd 3
+		cpp -x -o temp1 file.c
+		cp1 -o temp2 temp1
+		cp2 -o file.mac temp2
+
+
+.fi
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+cpp (1)
+.br
+.ul
+C Compiler User's Manual 
+for language definition.
+
+
+NOTE: This program and documentation are products of Whitesmiths, Ltd.,

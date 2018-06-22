@@ -1,0 +1,110 @@
+.he "cc (1)                       4/18/82                       cc (1)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+cc
+- C and Pascal compiler
+
+
+.in -5
+.bd
+USAGE           
+.in +5
+.br
+.bd
+cc [options] file ...
+
+
+.in -5
+.bd
+FUNCTION    
+.in +5
+.br
+.bd
+Cc
+is the Whitesmiths' C compiler supervisor; it accepts several 
+types of arguments:
+
+Those ending with ".p" are assumed to be Pascal source files and
+are converted to ".c" files.
+Arguments ending with ".c" are taken to be C source files and
+are compiled with each relocatable object module left in the file
+named for the source with ".o" substituted for ".c".
+
+In the same way, arguments whose names end with ".s" are taken to be
+A-natural source files and are compiled to produce an ".o" file.
+
+The following options are meaningful to 
+.bd
+cc:
+
+.in +10
+.ta 10
+.ti -10
+-c	Suppress the loading phase of the compilation, and force 
+object file(s) to be produced for each source file.
+
+.ti -10
+-i name	Passed on to 
+.bd
+cpp, 
+the C compiler preprocessor. Name
+is a prefix to be used on "# include <files>".
+
+.ti -10
+-o file	The result of the compilation will be written on the named file.
+If no "-o" option is given, the output is written to "a.out"
+
+.ti -10
+-lX	Library inclusion.  The file "/lib/libX.a" will be included in
+the linking phase of the compilation.  An example is included below.
+
+.ti -10
+-lS	Use the standard I/O library.  Note that this only affects the
+loading phase of the compilation.  If you use the library, your programs
+should include the line:
+.sp
+.ce
+.bd
+# include <stdio.h>
+.sp 2
+.ti -10
+-cpm	Compile to run under CP/M.
+
+.ti -10
+-ws	Use the Whitesmiths' C library.
+.bp
+.ti -10
+-xN	where N is a number.  Arguments of this type are passed on to
+pass 2 of the compiler; see 
+.bd
+cp2.
+ 
+
+.in -10
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+Kernighan, B.W. and D.M. Ritchie,
+.ul
+The C Programming Language,
+(Prentice-Hall,
+1978).
+.sp 2
+Kernighan, B.W.,
+.ul
+Programming in C - A Tutorial
+.sp 2
+Ritchie, D.M.,
+.ul
+C Reference Manual, 
+(Addison-Wesley, 1976).
+.sp 2
+cpp (1), cp1 (1), cp2 (1), as (1), ld (1), lib (1)

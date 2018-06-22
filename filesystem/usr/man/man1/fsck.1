@@ -1,0 +1,157 @@
+.he "fsck (1)                     4/13/82                     fsck (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd       
+PROGRAM
+.in +5
+.br
+.bd
+fsck 
+- file system check and repair
+.sp 2
+.in -5
+.bd
+USAGE
+.in +5
+.br
+fsck [-t] [-n] filesystem
+.sp 2
+.in -5
+.bd
+FUNCTION    
+.in +5
+.br
+.bd
+Fsck 
+is a complete Micronix file system maintenance package.
+System crashes
+may cause the
+Micronix file systems
+(as well as standard UNIX version 6 file systems)
+to become internally inconsistent
+in potentially dangerous ways to your data.
+It is also possible for the physical device on which
+a file system resides to develop unreadable spots.
+The 
+.bd
+fsck 
+program ratifies these inconsistencies and maintains the file system.
+
+.bd
+NOTE! 
+Do not run
+.bd
+fsck
+on an 
+.ul
+active 
+file system.
+
+If information in the file system is changing
+while 
+.bd
+fsck 
+is taking its "snapshot" of the state of the file system,
+it will get the wrong idea and will try and fix
+things that were not wrong in the first place.
+By typing
+.sp	
+.ti +5
+.bd
+fsck filesystem
+.sp
+where 
+.bd
+filesystem 
+is the name of the device on which the file system
+in question lives, you can bring your file system completely up to par.
+If no specification is made, 
+.bd
+fsck 
+searches for and attempts
+to fix all file system problems.
+.sp 2
+Options:
+.sp
+.in +5
+.ta 5
+.ti -5
+-t	Test all of the blocks on the file system to
+see that each is readable.  Systems on large disks may take some 
+time to complete.
+.sp
+.ti -5
+-n	No changes will be made.  
+.bd
+Fsck 
+will only look and tell you what it would do.
+.sp 2
+.in -5
+.ti -7
+.bd
+Fsck 
+can fix:
+.sp
+.in +5
+.ti -5
+-	Two files claiming the same block.  The block is copied 
+and a copy is given to each file.
+.bp
+.ti -5
+-	File containing a bad block.  An attempt is made to copy 
+the bad block; in any case, a new block is allocated to fill the 
+spot.  The bad block is assigned to a file in the directory 
+"badblocks".
+.sp
+.ti -5
+-	Duplicates in the free list.
+.sp
+.ti -5
+-	Allocated blocks in the free list.
+.sp
+.ti -5
+-	Blocks missing from the free list.
+.sp
+.ti -5
+-	Bad block in the free chain.  The free list is rebuilt from scratch.
+.sp
+.ti -5
+-	File for which there is no directory entry (an orphan). 
+An entry is made in the "lost+found" directory.
+.sp
+.ti -5
+-	Missing directory self link ".".
+.sp
+.ti -5
+-	Missing directory parental link "..".
+.sp
+.ti -5
+-	Disconnected directory. Appropriate links are made to 
+directory names in "lost+found," if necessary.
+.sp
+.ti -5
+-	Imbalanced directory entry - link counts. Resolved in 
+favor of the directory entries, i.e., the link count is changed.
+.sp 2
+.in -5
+.ti -7
+.bd
+Fsck 
+cannot fix:
+.sp
+.in +5
+.ti -5
+-	Bad blocks in the i-list or super block.
+.sp
+.ti -5
+-	Ridiculous numbers in the super block.
+.sp 2
+.in 
+.in 5
+.bd
+SEE ALSO
+.in +5
+.nf
+.br
+filesystem (5), icheck(1), dcheck(1), df (1), ncheck (1)

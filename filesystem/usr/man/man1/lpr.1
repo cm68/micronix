@@ -1,0 +1,126 @@
+.he "lpr (1)                      3/18/82                      lpr (1)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd           
+PROGRAM
+.br
+.in +5
+.bd
+lpr, lprm, lprq
+- line printer spooler
+
+
+.in -5
+.bd
+USAGE           
+.in +5
+.br
+.bd 3
+lpr file(s)
+.br
+lprq
+.br
+lprm
+
+
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+.bd
+Lpr 
+causes each of the named files to be queued for printing.
+If no file names are given, the standard input is used.
+Thus, a printout can be named, dated, and paginated by
+.sp
+.ce
+.bd
+print file | lpr
+.sp
+or it can be formatted by
+.sp
+.ce
+.bd
+form file | lpr
+
+The 
+.bd
+lpr 
+program writes to device 
+.bd
+/dev/lp 
+by default.
+If, however, it sees a file 
+.bd
+/usr/spool/lpr/device, 
+it reads this first. This can contain a device name
+(such as 
+.bd
+/dev/ttyC, 
+if your printer is plugged into
+port C), a baud rate (such as 1200), and possibly
+the word "shake" (to request RS232 hardware handshaking,
+if your printer requires it). All these items are
+separated by any kind of white space.
+
+The name by which this program is invoked is significant.
+If invoked as 
+.bd
+lpr, 
+it uses the directory 
+.bd
+/usr/spool/lpr
+for queuing.
+If it is invoked as, say, 
+.bd
+dpr,
+then it uses 
+.bd
+/usr/spool/dpr 
+for queuing,
+and it looks for 
+.bd
+/usr/spool/dpr/device
+to determine what printer to use.
+This makes it easy to support several different printers
+with several differently named links to the same program.
+
+If its name ends in 
+.bd
+q 
+(such as lprq or dprq),
+it reports on the files still waiting in its queue.
+If its name ends in 
+.bd
+m 
+(such as lprm or dprm),
+it removes all its caller's
+files from its queue.
+
+.bp
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+To setup a 1200 baud printer named "xer" connected to port B, type
+.sp
+.nf
+.bd 6
+        cd /bin
+	ln lpr mpr
+	ln lpr mprm
+	ln lpr mprq
+	mkdir /usr/spool/mpr
+	echo /dev/ttyB 1200 >/usr/spool/mpr/device
+
+
+
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ln (1), form (1), edit (1), print (1)

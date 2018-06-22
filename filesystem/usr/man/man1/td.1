@@ -1,0 +1,161 @@
+.he "td (1)                       4/13/82                       td (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd     
+PROGRAM
+.in +5
+.br
+.bd
+td 
+- tree dump (file backup)
+.sp 2
+.in -5
+.bd
+USAGE
+.in +5
+.br
+td  [-a] [-dN] [-hN] [-i] [-u] [directory] [device]
+.sp 2
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+.bd
+Td 
+provides reasonably convenient back-up service.
+.sp
+.bd
+Td 
+dumps potentially all the files in the named
+directory and in all of its sub-directories recursively.
+.sp
+.bd
+Td 
+is intended to provide the facility to save
+files on floppy diskettes (although it can be used in other ways).
+
+It doesn't matter if your dump won't all fit on one floppy diskette;
+.bd
+td 
+allows you to change diskettes on the fly.
+Each disk is filled to capacity, then the program asks
+for operator service.
+In this sense it does need a bit of babysitting.
+.sp 
+.bd
+Td 
+incorporates the facility to do incremental dumps.
+That is, each new back up contains only files which have
+changed since the last incremental dump.
+It uses a system-wide dump table to remember the times
+directories were dumped.
+
+Before beginning a major dump,
+you should have a stack of formatted
+diskettes.
+These diskettes must be pre-formatted
+but they need not contain file systems.
+.bd
+Td 
+will notice that a diskette has no file system
+and ask you if it should make one.
+It will then call the 
+.bd
+mkfs 
+program for you.
+
+Unlike some other back-up systems, this program's back-ups are in 
+file system
+form, meaning it is easy to look through
+a dump.
+
+Options:
+.sp 2
+.in +5
+.ta 5
+.ti -5
+-a	All. Dump all files. Normally only files under 1000 
+blocks long are dumped.
+.sp
+.ti -5
+-dN	Day. Dump only files newer than N days old.
+.sp
+.ti -5
+-hN	Hour.  Dump only files newer than N hours old. Note: The -d 
+and -h options are additive.
+.bp
+.ti -5
+-i	Incremental.  Dump files changed since the last dump of 
+the directory.
+.sp
+.ti -5
+-u	Update.  Update the central dump table at the conclusion 
+of a successful dump.
+.sp
+.ti -5
+-v	Verbose.  Each file name is printed as it is dumped.
+.sp 2
+.in
+.in 5
+.bd
+EXAMPLES
+.in +5
+.sp
+.ti +5
+.bd
+td . /dev/dja
+
+To do a full dump of the current directory onto a floppy A.
+.sp 2
+.ti +5
+.bd
+td -h2 /b/sally /dev/djb
+
+Dump the last 2 hours work on floppy drive B.
+.sp 2
+.ti +5
+.bd
+td -a / /dev/djb
+
+Full dump of the entire file system.
+.sp 2
+.ti +5
+.bd
+td -i -u newdir /dev/fla
+.sp
+Incremental dump of the directory "newdir" onto floppy drive A
+(but with alternate sectoring).
+.sp 2
+.ti +5
+.bd
+td -d2 -h12 . /dev/dja
+
+Dump of everything that's changed since two and half days ago.
+.bp
+.nf
+.bd 5
+    mount /dev/dja /f
+    cd /f
+    dir
+    cp file /a/fred/restored
+    umount /dev/dja
+.sp
+.fi
+Example procedure to restore a dumped file.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/dtab - the central dump table
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+cptree (1), ncheck (1), mkfs (1)
+

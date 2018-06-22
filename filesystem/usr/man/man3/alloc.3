@@ -1,0 +1,166 @@
+.he "alloc (3)                    3/22/82                    alloc (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE(S)
+.in +5
+.br
+.bd
+alloc, free, realloc, calloc
+- main memory allocator
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd 2
+char *alloc(size)
+.br
+unsigned size;
+.sp
+.bd 2
+free(ptr)
+.br
+char *ptr;
+.sp
+.bd 3
+char *realloc(ptr, size)
+.br
+char *ptr;
+.br
+unsigned size;
+.sp
+.bd 2
+char *calloc(nelem, elsize)
+.br
+unsigned nelem, elsize;
+.sp 2
+.in -5
+.bd
+FUNCTIONS
+.in +5
+.br
+The routines
+.bd
+alloc
+and
+.bd
+free
+provide an easy-to-use memory allocation package.  The
+.bd
+alloc
+routine returns a pointer to a block of at least
+.bd
+size
+bytes long, which begins on a word boundary.
+
+The argument to
+.bd
+free
+is a pointer to a block allocated previously by
+.bd
+alloc.
+This block is available for further allocation; its contents are
+left undisturbed.
+
+.bd
+Alloc 
+allocates the first large reach of free space it finds in its
+circular search from the last allocated or freed block,
+uniting neighboring free blocks as it searches.  If no additional space
+is free, 
+.bd
+alloc
+calls
+.bd
+sbrk
+(see section 2) for more system memory.
+
+Block sizes pointed to by
+.bd
+ptr
+are changed by
+.bd
+realloc
+to 
+.bd
+size
+bytes.  It may also return a pointer to a block, if the block
+ió removed®  Thå valuås oæ thå ne÷ anä olä blocë 
+sizes determine the changes in block contentó; the contents remain
+unchanged up to the lesser value of the old and new sizes.
+ 
+.bd
+Alloc
+contains a valuable search function which may be used to do storage
+compaction.
+.bd
+Realloc works if
+.bd
+ptr
+points to a block that has been freed since the last call of
+.bd
+alloc, realloc
+or
+calloc.
+Compounding sequences of
+.bd
+free, alloc
+and
+realloc 
+thereby augments
+.bd
+alloc's
+search strategy for storage compaction.
+
+Allocation of space for an array of
+.bd
+nelem
+elements of
+.bd
+elsize
+size is done by
+.bd
+calloc.  Each of these routines returns a pointer to a space
+aligned for any type of storage.
+.sp 2
+.in -5
+.bd
+ERRORS
+.in +5
+.br
+Note that chaos results if space assigned by 
+.bd
+alloc
+is overrun, or if a random number is given to
+.bd
+free.
+
+A NULL pointer (0) is returned by
+.bd
+alloc, realloc
+and
+.bd
+calloc
+if no memory is available, or if a corrupt arena is detected that was
+caused by storage outside the bounds of a block.  If user wishes to
+recompile the
+.bd
+alloc
+routine to rigidly check the arena during every transaction, he/she
+is referred to the source code.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The block pointed to by
+.bd
+ptr
+may be destroyed if
+.bd
+realloc
+returns a 0.

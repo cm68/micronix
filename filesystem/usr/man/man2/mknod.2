@@ -1,0 +1,68 @@
+.he "mknod (2)                    3/19/82                    mknod (2)" 
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+mknod
+- make a directory or special file
+.sp 2
+.in -5
+.bd
+C
+.in +5
+mknod(name, mode, addr)
+char *name;
+
+
+.in -5
+.bd
+FUNCTION         
+.in +5
+.fi
+.bd
+Mknod
+creates a new file.  Unlike
+.bd
+creat,
+it may be used
+to create directories and special files;              
+it does not truncate or open files.
+
+The mode of the new file (including the file type bits)
+is taken from the mode argument, and the first address is
+taken from addr. For directories, this address should be
+0, while for special files it should be the device number.
+
+This call is restricted to the super-user.
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+A 0 indicates success, a -1 indicates failure.
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(mknod = 14)
+.br
+.bd
+sys; mknod; name; mode; addr
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The carry flag is cleared on success, or set on failure.

@@ -1,0 +1,65 @@
+.he "copy (1)                     1/13/82                     copy (1)"
+.fo "		                    -#-"		  
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.bd
+copy -
+copy input characters to output
+
+
+.in -5
+.bd
+USAGE        
+.in +5 
+.bd
+copy
+.in -5
+
+
+.bd
+FUNCTION
+.in +5 
+.br
+.bd
+Copy
+simply copies its standard input to its standard output unchanged,
+up to an end of file. 
+
+
+.in -5
+.bd
+EXAMPLE
+.br
+.in +5 
+.nf
+To copy one file to another:
+.sp
+.in +8
+.bd
+copy <source >destination
+.in -8
+
+
+.in -5
+.bd
+NOTES
+.br
+.in +5 
+.fi
+On some systems, (but not Micronix), due to I/O  conventions
+non-text files would be mangled if copied with the above example.
+In this instance, use the 
+.bd
+cp 
+program.
+
+
+.in -5
+.bd
+SEE ALSO
+.br
+.in +5 
+cp (1), concat (1)

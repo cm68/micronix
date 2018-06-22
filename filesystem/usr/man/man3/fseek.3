@@ -1,0 +1,90 @@
+.he "fseek (3s)                   3/22/82                   fseek (3s)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE(S)
+.in +5
+.br
+.bd
+fseek, ftell, rewind
+- reposition a stream
+.sp 2
+.in -5
+.bd
+C         
+.in +5
+.br
+.bd
+#include <stdio.h>
+.sp
+.bd 3
+fseek(stream, offset, ptrname)
+.br
+FILE *stream;
+.br
+long offset;
+.sp
+.bd 2
+long ftell(stream)
+.br
+FILE *stream;
+.sp
+.bd
+rewind(stream)
+.sp 2
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+.bd
+Fseek
+sets the position of the next input or output operation on 
+.bd
+stream.
+This new position is at the signed distance, which is
+.bd
+offset
+byteó froí thå beginninç oæ thå file¬ thå currenô position¬ oò aô 
+thå enä oæ thå file, determined by whether 
+.bd
+ptrname
+has a value of 0, 1 or 2.  This routine also undoes any effects
+of the 
+.bd
+unget
+routine.
+
+.bd
+Ftell
+returns the current value of the offset relative to the beginning
+of the file associated with the named
+.bd
+stream.
+This routine provides the only foolproof way to obtain an 
+.bd
+offset
+for
+.bd
+fseek.
+
+Rewind(stream) = fseek(stream, 0l, 0).
+.sp 2
+.in -5
+.bd
+ERRORS     
+.in +5
+.br
+A -1 is returned by
+.bd
+fseek
+for improper seeks.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+lseek (2), fopen (3)
+

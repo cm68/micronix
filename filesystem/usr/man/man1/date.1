@@ -1,0 +1,69 @@
+.he "date (1)                     3/18/82                     date (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+date
+- print or set the date and time of day
+.sp 2
+.in -5
+.bd
+USAGE          
+.in +5
+.br
+.bd
+date [year] [month] [date] [hour:[minute:[second]]]
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+Only the super-user may set the time.
+If no argument is given, the current date and time are printed.  
+Otherwise, all of the arguments are taken together with the present
+date and time to produce a new date and time.  The systems'
+idea of the time is set.
+
+.bd
+[year], [date], [hour], [minute], 
+and 
+.bd
+[second] 
+are each given
+as decimal numbers.
+
+.bd
+[month] 
+is the name of a month, in English; case is ignored. The first 
+three letters of the name of the month must be given.
+
+If any specification is omitted, the current value of that specification
+is used in its stead.  
+A common error is to attempt to set the day of the week.
+This is not permissable in the command line.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+.nf
+.bd 2
+		date 25 Dec 1983
+.sp
+		date 14:45
+
+
+.fi
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The clock is subject to hardware-induced problems that may cause 
+the time to be off occasionally.

@@ -1,0 +1,47 @@
+.he "ln (1)                       3/18/82                       ln (1)"
+.fo "                               -#-" 
+.in 5
+.rm 65
+.bd
+PROGRAM
+.br
+.in +5
+.bd
+ln
+- make links
+
+
+.in -5
+.bd
+USAGE         
+.br
+.in +5
+.bd
+ln name1 name2
+
+
+.in -5
+.bd
+FUNCTION   
+.br
+.in +5
+A link is made between two files (name1 and name2).
+Therefore, changes made to file name1 affect file name2 and vice-versa. A
+file may have up to 255 links.
+
+
+.in -5
+.bd
+ERRORS
+.in +5
+.br
+Linked files must be on the same file system, otherwise, a "Cross-device
+link" error message is displayed.
+
+
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+rm (1), cp (1), mv (1)
