@@ -1,0 +1,10 @@
+
+This is the /etc/signon file.  It is printed
+each time Micronix is powered up.
+
+You are now in single-user mode, with a shell
+that has super-user permissions. You can set
+the system clock, create new user accounts,
+edit the /etc/ttys file, and so on.  When you
+are ready to go multi-user, type exit.
+

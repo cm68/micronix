@@ -1,0 +1,96 @@
+.he "ptc (1)                      4/15/82                      ptc (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+ptc
+- Pascal to C translator
+.sp 2
+.in -5
+.bd
+USAGE
+.in +5
+.br
+ptc -[flags] <file>
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Ptc
+is a program that accepts as input lines of Pascal text and produces
+as output a corresponding C program which is acceptable to the
+Whitesmiths, Ltd. C compiler.  If <file> is present, it is taken as
+the Pascal program to translate; otherwise input is taken from STDIN.     
+
+The flags are:
+.sp 
+.in +5
+.ta 5
+.ti -5
+-c	Pass comments through to the C program.
+
+.ti -5
+-f	Set the precision for reals to single precision (float).
+Default is double.
+
+.ti -5
+-k	Permit pointer types to be defined using type identifiers from
+outer blocks.  Default is ISO standard, i.e., the type pointed to must
+be defined in the same type declaration as the pointer type definition.
+
+.ti -5
+-m#	Make # the number of bits in MAXINT excluding the sign bit,
+e.g., MAXINT becomes 32767 for -m15, 1 for -m, etc.  Default for
+MAXINT is 32766 [sic].  Acceptable values for # are in the range
+[0, 32).
+
+.ti -5
+-o*	Write the C program to the file * and diagnostics to STDOUT.
+Default is STDOUT for the C program and STDERR for diagnostics.
+
+.ti -5
+-r	Turn off runtime array bounds checks.
+
+.ti -5
+-s#	Make # the number of bits in the maximum allowable set size,
+i.e., the size of all sets whose base type is integer becomes the
+specified power of two.  Acceptable values are in the range [0, 32).
+Default is 8 (256 elements).
+
+.in -5
+The CP/M operating system implementation on the Intel 8080 and Zilog
+Z80 restricts the acceptable value for # to the range [0, 16]; for
+maximum portability, this restriction should be honored.
+
+Identifiers are mapped to uppercase to keep from conflicting with those
+declared as reserved words in C.  Moreover, structure declarations may
+be produced that contain conflicting field declarations; and
+declarations are present for library functions that may not be needed.
+All of these pecadillos are forgiven by the use of appropriate C
+compiler options.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+.bd
+Ptc
+returns success if it produces no diagnostics.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+cc (1), as (1), cp1 (1), cp2 (1), cpp (1)
+
+
+NOTE: This program and documentation are products of Whitesmiths, Ltd.,

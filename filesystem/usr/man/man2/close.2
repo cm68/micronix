@@ -1,0 +1,66 @@
+.he "close (2)		          3/18/82               close (2)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+close 
+- close a file
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+close(descriptor)
+.sp 2
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+Given a file descriptor previously returned by
+.bd
+open, creat,
+or
+.bd
+pipe, close
+closes the associated file.
+A close of all files is automatic on
+.bd
+exit,
+but since processes are limited to 16 simultaneously open files,
+.bd
+close ()
+may be necessary for programs that deal with many files.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+A 0 indicates success, a -1 indicates failure.
+.sp 2
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(close = 6)
+.br
+.bd
+(file descriptor in hl)
+.br
+.bd
+sys; close
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The carry flag is cleared on success, or set on failure.

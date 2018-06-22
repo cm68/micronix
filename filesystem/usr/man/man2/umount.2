@@ -1,0 +1,69 @@
+.he "umount (2)                   3/19/82                   umount (2)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+umount 
+- dismount a file system
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+umount(device)
+.br
+char *device;
+
+
+.in -5
+.bd
+FUNCTION        
+.in +5
+.br
+.bd
+Umount 
+tells the system that the given special file
+should no longer be treated as a file system.
+The file on which the device was mounted reverts
+to its ordinary interpretation.
+
+.bd
+Umount 
+will return an error if there are still any
+active files on the mounted system.
+
+This call is restricted to the super-user.
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+A 0 indicates success, a -1 indicates failure.
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(umount = 22)
+.br
+.bd
+sys; umount; device
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The carry flag is cleared on success, or set on failure.

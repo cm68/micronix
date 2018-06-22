@@ -1,0 +1,79 @@
+.he "mkdir (1)                    3/18/82                    mkdir (1)"
+.fo "                               -#-"  
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+mkdir
+- make directory
+
+
+.in -5
+.bd
+USAGE           
+.in +5
+.br
+.bd
+mkdir newdir ...
+
+
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+.bd
+Mkdir
+creates the specified directory or directories.
+Entries for "." and ".." are created automatically.
+
+
+.in -5
+.bd
+ERRORS     
+.in +5
+.br
+The given directory names must not yet exist.
+.bd
+Mkdir
+requires write permission on the parent directory.
+
+If a multiple element path name is given, 
+.bd
+mkdir
+creates each of the directories in the path leading to
+the desired directory.
+
+It is not possible to remove a directory from the system that 
+contains files;  files must first be removed using the 
+.bd
+rm
+command.
+
+
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+.bd
+mkdir /a/sally
+.bd
+mkdir /usr/spool/mail /usr/spool/lpr
+
+
+Each directory created is accessible to any user.  It is advisable
+to organize your work by keeping related files together in their own,
+separate directories (i.e., mkdir programs, mv *.c programs, etc.).
+
+
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+rm (1)
+

@@ -1,0 +1,91 @@
+.he "make (1)			8/5/82			make (1)"
+.fo "				-#-"
+.rm 64
+.ta 8
+.in 4
+.ti -4
+NAME
+.br
+.bd
+make
+- automated program construction
+
+.ti -4
+SYNOPSIS
+.br
+.bd
+make object ...
+
+.ti -4
+DESCRIPTION
+.br
+The problem of keeping the assembly instructions straight
+for large programs composed of many modules is reduced
+to the one-time job of writing a complete description file.
+
+The
+.bd
+make
+program reads the file
+.ul
+makefile
+in the current directory.
+The makefile consists of a number
+of lines describing interdependencies among
+program modules
+and the actions necessary to contruct these modules.
+Make first reads the makefile and contructs a tree of dependencies
+and update actions
+for each module named on the command line
+(or the first module, if none are named).
+It then walks this tree,
+updating out-of-date modules
+(ie, any module that doesn't exist or
+whose mod time is less recent than any of those
+on which it depends).
+
+Lines in the makefile take the form
+
+.ti +4
+product : ingredients ; action
+
+where product is the name of a program module,
+ingredients is a space seperated list if files upon which
+the product depends,
+and action is a shell command line.
+There is no restriction on the number or order of lines
+describing the same product; all these descriptions are
+integrated into the tree.
+
+.ti -4
+EXAMPLE
+.br
+Here is a simple makefile:
+
+.in +4
+.nf
+all:		prog doc
+
+prog:		prog1.o prog2.o;
+		link -o prog prog1.o prog2.o
+
+prog1.o:	hdr.h prog1.c;
+		cc -c prog1.c
+
+prog2.o:	hdr.h prog2.c;
+		cc -c prog2.c
+
+doc:		doc.frm;
+		form <doc.frm >doc
+
+prog:;		echo new version of prog | mail qc_dept
+
+doc:;		echo new prog doc | mail doc_dept
+.in -4
+.fi
+
+Now the command "make prog" will update the program
+(in case any of the files hdr.h, prog1.c, or prog2.c have changed),
+"make doc" will update the documentation,
+and "make all" will update both.
+In each case, a notice is mailed to the appropriate department.

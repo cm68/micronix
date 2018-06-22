@@ -1,0 +1,5 @@
+umount /dev/fla >& /dev/null
+mount /dev/fla /f -r
+cptree /f / -v
+umount /dev/fla
+echo 

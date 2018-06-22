@@ -1,0 +1,54 @@
+.he "chown (2)		          3/18/82               chown (2)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+chown
+- change owner and group of a file
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+chown(name, owner)
+.br
+char *name;
+.sp 2
+.in -5
+.bd
+FUNCTION         
+.in +5
+.br
+The owner of the file is changed to the low byte of "owner",
+and the group is changed to the high byte.
+Only the super-user may execute this call.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+A 0 indicates success, a -1 indicates failure.
+.sp 2
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(chown = 16)
+.br
+.bd
+sys; chown; name; owner
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The carry flag is cleared on success, or set on failure.

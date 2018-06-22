@@ -1,0 +1,347 @@
+.he "filesystem (5)               3/15/82               filesystem (5)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd 
+FILE
+.in +5
+.br
+.bd
+filesystem 
+- format of UNIX version 6 file systems
+.sp 2
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+Every file system storage volume,
+(hard or floppy disk)
+has a common format for certain vital information.
+Every such volume is divided into a certain number
+of 256 word (512 byte) blocks.
+Block 0 is unused.
+
+Block 1 is the super block.
+Starting from its first word, the format of a super-block is as 
+follows.
+
+.nf
+.bd 9
+struct
+	{
+	unsigned	
+		isize,
+		fsize,
+		nfree,
+		free [100],
+		ninode,
+		inode [100],
+.sp
+.bd 3		
+	char	flock,
+		ilock,
+		fmod;
+.sp
+.bd 2
+	long	time;
+	};
+.sp 2
+.fi
+Isize is the number of blocks devoted to the i-list
+which starts just after the super-block, in block 2.
+
+Fsize is the first block not potentially available for allocation 
+to a file.  These numbers
+are used by the system to check for a bad block number.
+If an impossible block number is allocated 
+from the free list, or is freed,
+a diagnostic is written on the on-line
+console.
+Moreover,
+the free array is cleared
+to prevent further allocation from
+a presumably corrupted free list.
+
+The free list for each volume is maintained as follows.
+The free array contains, in 
+.bd
+free[1], ... , free[nfree-1],
+up to 99 numbers of free blocks.
+.bd
+Free[0] 
+is the block number of the head of a 
+chain of blocks constituting the free list.
+The first word in each free-chain block is the number
+(up to 100) of free-block numbers listed in the next 100 words of 
+the chain member.  The first of these 100 blocks is the link to 
+the next member of the chain.
+.bp
+To allocate a block:
+decrement
+.bd
+nfree 
+and the new block is 
+.bd
+free[nfree].
+
+If the new block number is 0, there are no blocks left and an 
+error is given.
+
+If 
+.bd
+nfree 
+becomes 0, read in the block named by the new block number, replace
+.bd
+nfree 
+by its first word, and copy the block number in the next 100 words
+into the 
+.bd
+free 
+array.
+
+To free a block, check if 
+.bd
+nfree 
+is 100; if so, copy 
+.bd
+nfree 
+and the 
+.bd
+free 
+array into it, write it out, and set 
+.bd
+nfree 
+to 0.
+
+In any event, set 
+.bd
+nfree[nfree]
+to the freed blocks's number and increment 
+.bd
+nfree.
+.sp
+.bd
+Ninode 
+is the number of free i-numbers in the inode array.
+To allocate an i-node:
+If 
+.bd
+ninode 
+is greater than 0, decrement it and return 
+.bd
+inode[ninode].
+
+If
+.bd
+ninode 
+= 0, read the i-list and place
+the number of all free inodes (up to 100) into the 
+.bd
+inode
+array, then try again.  To free an i-node,
+provided 
+.bd
+ninode 
+is less than 100, place its number into 
+.bd
+inode[ninode]
+and increment 
+.bd
+ninode.
+
+If 
+.bd
+ninode 
+is already 100, do not bother to enter the freed i-node into any table.
+This list of i-nodes is used only to speed up the allocation process;
+the information as to whether the inode is really free
+or not is maintained in the inode itself.
+.sp
+.bd
+Flock 
+and 
+.bd
+ilock 
+are flags maintained in the core copy of the file system while it is mounted;
+their values on disk are immaterial.
+The value of 
+.bd
+fmod 
+on disk is likewise immaterial;
+it is used as a flag to indicate
+that the super-block has changed and should be
+copied to the disk during
+the next periodic update of file system information.
+.sp
+.bd
+Time 
+is the last time the super-block of the file system was changed 
+and is a long representation of the number of seconds that have 
+elapsed since midnight
+January 1st 1970 (GMT).
+During a reboot, the time of the super-block for the root file 
+system is used to set the system's idea of the time.
+.sp
+.bd
+I-numbers 
+begin at 1 and the storage for i-nodes begins in block 2.
+Also, i-nodes are 32 bytes long,
+so 16 of them fit into a block.
+Therefore, i-node 
+.bd
+i 
+is located in block 
+.bd
+(i + 31) / 16,
+and begins 
+.bd
+32 * ((i + 31) (mod 16))
+bytes form its start.
+I-node 1 is reserved for
+the root directory of the file system,
+but no other i-number has a built-in meaning.
+Each i-node represents one file.
+The format of an i-node is as follows.
+.sp 
+.nf
+.bd 5
+struct
+	{
+	int	flags;
+	char	nlinks,
+		uid,
+.sp
+.bd 2		
+		gid,
+		size0;
+.sp
+.bd 2
+	int	size1,
+		addr[8],
+.sp
+.bd 3		
+	long	actime,
+		modtime;
+	};
+.sp 2
+The flags are as follows:
+.sp
+.bd 6
+100000	i-node is allocated
+060000	2-bit file type:
+	000000	plain file
+	040000	directory
+	020000	character-type special file
+	060000  block-type special file
+.sp
+.bd 8
+010000	large file
+004000	set user-ID on execution
+002000	ignored
+000400	read permission for owner
+000200	write permission for owner
+000100	execute permission for owner
+000070	read, write, execute permission for group
+000007	read, write, execute permission for others
+.sp
+.fi
+Special files are recognized by their flags, not by i-number.
+
+A block-type special file is
+one which can potentially be mounted as a file system,
+a character-type special file cannot,
+though it is not necessarily character-oriented.
+For special files the high byte of the first
+address word specifies the type of device and
+the low byte specifies one of several devices of that
+type.
+The device type numbers of block and character special files overlap.
+
+The address words of ordinary files and directories contain
+the number of the blocks in the file
+(if it is small)
+or the number of indirect blocks (if the file is large).
+Byte number 
+.bd
+N 
+of a file
+is accessed as follows:
+.bd
+N 
+is divided by 512
+to find its logical block number, use
+.bd
+b
+as an example, in the file.  If the file is small
+.bd
+(flag 010000 is 0),
+.bd
+b 
+must be less than 
+.bd
+8,
+and the physical block number is 
+.bd
+addr[b].
+
+If the file is large, 
+.bd
+b 
+is divided by 256 to yield 
+.bd
+i.
+If 
+.bd
+i 
+is less than 
+.bd
+7,
+then 
+.bd
+addr[i]
+is the physical block number of the indirect block.
+The remainder from the division yields the word in the indirect block
+which contains the number of the block for the sought byte.
+.sp
+If
+.bd
+i 
+is equal to 
+.bd
+7,
+the file has become extra large and 
+.bd
+addr[7] 
+is the address of a first indirect block.
+Each word in this block is the number of a second level indirect
+block;
+each word in the second-level indirect blocks points to a data block.
+Notice that large files
+are not marked by any mode bit, but by having 
+.bd
+addr[7]
+non-zero.
+Even though this scheme allows for more than 
+33,554,432 (256 X 256 X 512) bytes per file,
+the length of files is
+stored in 24 bits.  In practice, a file can be at most 16,777,216
+bytes long.
+
+For block 
+.bd
+b 
+in a file to exist, it is not necessary that all blocks less than 
+.bd
+b 
+exist.  A zero block number in either  address words of the i-node,
+or in an indirect block, indicates that the
+corresponding block has never been allocated.
+This type of missing block reads as if it contained all zero words.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+icheck (1), dcheck (1), fsck (1)

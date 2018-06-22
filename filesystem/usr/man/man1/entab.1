@@ -1,0 +1,65 @@
+.he "entab (1)                    3/18/82                    entab (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+entab
+- replaces blanks by tabs 
+
+
+.in -5
+.bd
+USAGE        
+.in +5
+.bd
+entab
+.in -5
+
+
+.bd
+FUNCTION
+.in +5
+.fi
+.bd
+Entab
+acts as a filter, copying the standard input
+to the standard output unchanged with the exception that
+groups of
+blanks are replaced by a tab where possible.
+.bd
+Entab 
+assumes tabs are every eight positions, at columns
+9, 17, 25, etc.
+.bd
+Entab
+is useful for
+speeding up printing and communication over slow paths,
+or to effect file compression.
+.bd
+Detab
+is its inverse.
+
+
+.in -5
+.bd
+EXAMPLE
+.br
+.in +5
+To compress a file in which there are many spaces:
+.sp
+.in +8
+.bd
+entab <file >output
+.in -8
+
+
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+detab (1)

@@ -1,0 +1,18 @@
+echo
+mkfs -f -2048 /dev/hda
+fsck /dev/hda -t
+mount /dev/hda /b
+chmod 755 /b
+cptree / /b -v
+era /b/dev/root /b/dev/swap
+ln /b/dev/hda /b/dev/root
+ln /b/dev/hda /b/dev/swap
+ddt /b/micronix sB6CB 0 1 0 1 .
+era /b/*init
+era /b/etc/signon
+ln /b/etc/signon2 /b/etc/signon
+era /b/etc/signon2
+umount /dev/hda
+sync
+echo
+echo Hard disk initialization complete.

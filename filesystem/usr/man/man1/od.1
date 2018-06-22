@@ -1,0 +1,63 @@
+.he "od (1)                       3/18/82                       od (1)"
+.fo "                               -#-"    
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+od, hd
+- octal or hex dump
+
+
+.in -5
+.bd
+USAGE         
+.in +5
+.br
+.bd
+od [-bcdox] file
+
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+.bd
+Od
+dumps file in one or more formats.
+If no file name or "-" is given, the standard input is used.
+The following flags are understood:
+
+
+.in +10
+.ta 10
+.ti -10
+-b	Interpret bytes in octal.
+
+.ti -10
+-c	Interpret bytes in ASCII.
+
+.ti -10
+-d	Interpret words in decimal.
+
+.ti -10
+-h	Hex words
+
+.ti -10
+-o	Interpret words in octal (default).
+
+.ti -10
+-x	Interpret bytes in hexadecimal.
+.sp 2
+.in -10
+
+
+.in -5
+.bd
+EXAMPLE
+.sp
+.nf
+	od -bo file
+
