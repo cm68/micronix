@@ -6,6 +6,7 @@
 #define	V_PARSE	0x4
 #define	V_OUT	0x8
 #define	V_TABLE	0x10
+#define	V_SYM	0x20
 
 int bigendian;
 
@@ -111,25 +112,49 @@ struct inst {
 #define bit_set(map, bit) ((map[(bit) / 8] & (1 << ((bit) % 8))) ? 1 : 0)
 #define set_bit(map, bit) map[(bit) / 8] |= (1 << ((bit) % 8))
 
-struct sym {
+/*
+ * a symbol is a name that may be defined or not.
+ * these may be from the object file, or they may be invented labels
+ */
+struct symbol {
 	int offset;
 	int seg;
 	char *name;
-	struct sym *next;
+	struct symbol *next;
 };
 
-char *getsym(int offset);
+/* return the symbol that has this location */
+char *getsymname(int offset);
 
+char *refname(int offset);
+
+/*
+ * a reference is an operand field that is an address
+ * they always have names, either externally known symbols or invented labels
+ */
 struct ref {
-    char *name;
-    struct refchain {
-		char chained;
-        int offset;
-        struct refchain *next;
-    } *head;
+    int offset;			/* where the reference is */
+    struct symbol *sym;		/* what it references */
     struct ref *next;
 };
 
-char *ref(int val);
+char *ref(int val);	/* return the name to print here */
 
 char is_code(int addr);
+
+/*
+ * a segment is a notional hunk of memory
+ */
+struct seg {
+        int module;
+        int base;
+        int len;
+        char type;
+#define S_CODE  1
+#define S_DATA  2
+#define S_COM   3
+        struct seg *next;
+};
+
+struct seg *seglist;
+

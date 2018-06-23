@@ -11,12 +11,25 @@
 #include <stdio.h>
 #include <string.h>
 
-unsigned short segoffset;
-unsigned char binbuf[17];
+extern int verbose;
 
+long start;
+
+struct seg *seglist;
+int high;
+int modcount;
+char *segname[] = { "absolute", "code", "data", "common" };
+
+int segbase[4];
+unsigned short segoffset;
+
+/*
+ * random utility function
+ */
 unsigned char *
 binstr(unsigned short val, char count)
 {
+	static unsigned char binbuf[17];
 	unsigned char *s = binbuf;
 	int i;
 
@@ -33,6 +46,9 @@ binstr(unsigned short val, char count)
 	return binbuf;
 }
 
+/*
+ * the i/o system
+ */
 typedef struct buffer {
 	unsigned char *storage;
 	int cursor;
@@ -42,10 +58,6 @@ typedef struct buffer {
 	int high;
 	char bitoff;
 } buffer_t;
-
-extern int verbose;
-
-long start;
 
 void
 advance(buffer_t *buf)
@@ -88,6 +100,10 @@ get(buffer_t *in)
 	return (c);
 }
 
+/*
+ * the microsoft rel format is built on a bit stream. 
+ * we need to be able to grab variable numbers of bits and maintain a bit cursor.
+ */
 unsigned short
 getbits(buffer_t *in, int len)
 {
@@ -138,6 +154,31 @@ put(buffer_t *out, int where, unsigned char c)
 	out->cursor = where;
 }
 
+int
+ishex(char byte)
+{
+	if ((byte >= '0' && byte <= '9') || 
+		(byte >= 'A' && byte <= 'F') || 
+		(byte >= 'a' && byte <= 'f')) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+int
+readhex(char c)
+{
+	if (c >= '0' && c <= '9') {
+		c -= '0';
+	} else if (c >= 'A' && c <= 'F') {
+		c = 0xa + c - 'A';
+	} else if (c >= 'a' && c <= 'f') {
+		c = 0xa + c - 'a';
+	}
+	return c;
+}
+
 /*
  * get a hex string and decode it into an integer of the appropriate width.
  * adjust the buffer or gripe accordingly, returning a nasty.
@@ -151,12 +192,8 @@ gethex(buffer_t *in, int digits, unsigned char *checksum)
 	int ask = digits;
 	while (digits--) {
 		c = get(in);
-		if (c >= '0' && c <= '9') {
-			c -= '0';
-		} else if (c >= 'A' && c <= 'F') {
-			c = 0xa + c - 'A';
-		} else if (c >= 'a' && c <= 'f') {
-			c = 0xa + c - 'a';
+		if (ishex(c)) {
+			c = readhex(c);
 		} else {
 			printf("malformed hex (0x%x) at %s\n", c, pos(in));
 			return -1;
@@ -174,6 +211,11 @@ gethex(buffer_t *in, int digits, unsigned char *checksum)
 	return (v);
 }
 
+/*
+ * binary file handler for intel hex - only really deal with these two types
+ * :CCAAAA00DdDd...DdXX   CC bytes of data Dd to be placed starting at AAAA - checksum XX
+ * :CCAAAA01XX            eof with start address AAAA
+ */
 int
 do_intel_hex(buffer_t *in, buffer_t *out)
 {
@@ -295,6 +337,11 @@ do_intel_hex(buffer_t *in, buffer_t *out)
 	return (rectype == 0x1) ? 0 : 1;
 }
 
+/*
+ * binary file handler for motorola S-record  - only really deal with these two types
+ * S01CCAAAADdDd...DdXX   CC bytes of data Dd to be placed starting at AAAA - checksum XX
+ * S09AAAAXX              eof and start address AAAA
+ */
 int
 do_motorola_srec(buffer_t *in, buffer_t *out)
 {
@@ -373,33 +420,8 @@ do_motorola_srec(buffer_t *in, buffer_t *out)
 	return (rectype == 0x9) ? 0 : 1;
 }
 
-int
-ishex(char byte)
-{
-	if ((byte >= '0' && byte <= '9') || 
-		(byte >= 'A' && byte <= 'F') || 
-		(byte >= 'a' && byte <= 'f')) {
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-int
-readhex(char c)
-{
-	if (c >= '0' && c <= '9') {
-		c -= '0';
-	} else if (c >= 'A' && c <= 'F') {
-		c = 0xa + c - 'A';
-	} else if (c >= 'a' && c <= 'f') {
-		c = 0xa + c - 'a';
-	}
-	return c;
-}
-
 /*
- * simple hex dump:
+ * binary file handler for simple hex dump:
  * lines consist of [[0x]n[n]*:] [[0x]n[n]*]*
  * the recognizer is that the first significant character must be '0'.
  */
@@ -473,35 +495,6 @@ do_hexdump(buffer_t *in, buffer_t *out)
 	return (1);
 }
 
-char *controltype[] = { "special", "code", "data", "common" };
-
-char *specialtype[] = { 
-	"entry", "common", "progname", "unused3",
-	"unused4", "commonsize", "chainext", "define",
-	"unused8", "extoff", "datasize", "setloc",
-	"chainaddr", "progsize", "endmodule", "end"
-};
-
-#define	S_CODE	1
-#define	S_DATA	2
-#define	S_COM	3
-
-struct seg {
-	int module;
-	int base;
-	int len;
-	char type;
-	struct seg *next;
-};
-
-struct seg *seglist;
-
-int high;
-int modcount;
-
-char *segname[] = { "absolute", "code", "data", "common" };
-struct seg *seg[4];
-
 void
 makeseg(char type, int size)
 {
@@ -514,7 +507,7 @@ makeseg(char type, int size)
 	sp->len = size;
 	sp->next = seglist;
 	high += size;
-	seg[type] = sp;
+	segbase[type] = high;
 	seglist = sp;
 }
 
@@ -543,13 +536,187 @@ is_code(int addr) {
 	}
 }
 
+struct symbol *symbols;
+
+/*
+ * XXX - there could be more than once symbol with the same value
+ * return the first.
+ */
+char *
+getsymname(int offset)
+{
+	char *s = 0;
+	struct symbol *sp;
+
+	for (sp = symbols; sp; sp = sp->next) {
+		if (sp->offset == offset) {
+			s = sp->name;
+			break;
+		}
+	}
+	if (verbose & V_SYM) {
+		printf("getsymname: %d %s\n", offset, s ? s : "undefined");
+	}
+	return s;
+}
+
+/*
+ * register a symbol
+ */
+struct symbol *
+makesym(char *name, int offset)
+{
+	struct symbol *sp;
+
+	if (verbose & V_SYM) {
+		printf("makesym: %s %d\n", name, offset);
+	}
+	for (sp = symbols; sp; sp = sp->next) {
+		if (strcmp(sp->name, name) == 0) {
+			if (sp->offset != offset) {
+				printf("makesym: %s already defined old %d new %d\n",
+					name, sp->offset, offset);
+			}
+			return sp;
+		}
+	}
+	sp = malloc(sizeof(*sp));
+	sp->next = symbols;
+	sp->offset = offset;
+	sp->name = strdup(name);
+	symbols = sp;
+	return (sp);
+}
+
+/*
+ * invent a symbol abd register it
+ */
+struct symbol *
+makelabel(unsigned int offset)
+{
+	static char labbuf[20];
+
+	sprintf(labbuf, "L%x", offset);
+	return makesym(labbuf, offset);
+}
+
+/*
+ * references are operand fields that refer to symbols
+ */
+struct ref *reflist;
+
+char *
+refname(int offset)
+{
+	struct ref *rp;
+	char *s = 0;
+
+	for (rp = reflist; rp; rp = rp->next) {
+		if (rp->offset == offset) {
+			s = rp->sym->name;
+			break;
+		}
+	}
+	if (verbose & V_SYM) {
+		printf("refname: %d %s\n", offset, s ? s : "undefined");
+	}
+	return s;
+}
+
+/*
+ * make a reference to symbol at offset
+ */
+void
+makeref(struct symbol *sym, unsigned int offset)
+{
+	struct ref *rp;
+
+	if (verbose & V_SYM) {
+		printf("makeref: %s at %d\n", sym->name, offset);
+	}
+	rp = malloc(sizeof(*rp));
+	rp->sym = sym;
+	rp->offset = offset;
+	rp->next = reflist;
+	reflist = rp;
+}
+
+/*
+ * microsoft rel file
+ * this is a bit string encoded format with symbols and relocation information
+ * one feature of this binary format is that it employs the operand fields of
+ * instructions to chain together references to the same address, so if 5 jump
+ * instructions all go the same place, they are all chained together.  this
+ * is pretty compact.
+ */
+char *controltype[] = { "special", "code", "data", "common" };
+
+char *specialtype[] = { 
+	"entry", "common", "progname", "unused3",
+	"unused4", "commonsize", "chainext", "define",
+	"unused8", "extoff", "datasize", "setloc",
+	"chainaddr", "progsize", "endmodule", "end"
+};
+
+/*
+ * whenever we get an address chain, we need to chase down the references
+ * once we have built the segments.  we need to track this work to do.
+ */
+struct refchain {
+	struct symbol *sym;
+	int offset;
+	struct refchain *next;
+} *rc_head;
+
+void
+makechain(struct symbol *sp, unsigned short link)
+{
+	struct refchain *rc;
+
+	if (verbose & V_SYM) {
+		printf("makechain: %s at %d\n", sp->name, link);
+	}
+
+	rc = malloc(sizeof(*rc));
+	rc->sym = sp;
+	rc->offset = link;
+	rc->next = rc_head;
+}
+
+/*
+ * process all the reference chains to create individual refs
+ */
+void
+fixup_xrefs(buffer_t *out)
+{
+	int addr;
+	struct refchain *rc;
+
+	/* each chain is a list of references to the same symbol */
+	while ((rc = rc_head)) {
+		printf("chain %s\n", rc->sym->name);
+		while ((addr = rc->offset) != 0) {
+			printf("\tlink %d\n", addr);
+			makeref(rc->sym, addr);
+			rc->offset = out->storage[addr] + (out->storage[addr+1] << 8);
+			out->storage[addr] = out->storage[addr+1] = 0;
+		}
+		rc_head = rc->next;
+		free(rc);
+	}
+		
+}
+
+/*
+ * rel file A fields are 2 bits of segment and 16 bits of value
+ */
 struct value {
 	unsigned char seg;
 	unsigned short val;
 } valdata;
 
 struct value *
-getvalue(buffer_t *in)
+readvalue(buffer_t *in)
 {
 	char seg;
 	unsigned short val;
@@ -560,11 +727,13 @@ getvalue(buffer_t *in)
 	return &valdata;
 }
 
-char symbuf[10];
-
+/*
+ * B fields are 3 bits of symbol length and that many bytes of name
+ */
 char *
 readsym(buffer_t *in)
 {
+	static char symbuf[10];
 	char symlen;
 	char i;
 
@@ -578,159 +747,16 @@ readsym(buffer_t *in)
 	return symbuf;
 }
 
-struct sym *symhead;
-
-char *
-getsym(int offset)
-{
-	struct sym *sp;
-	for (sp = symhead; sp; sp = sp->next) {
-		if (sp->offset == offset) {
-			return sp->name;
-		}
-	}
-	return 0;
-}
-
-void
-makesym(char *name, int offset)
-{
-	struct sym *sp;
-
-	for (sp = symhead; sp; sp = sp->next) {
-		if (strcmp(sp->name, name) == 0) {
-			printf("makesym: dup name def %s\n", name);
-			return;
-		}
-		if (sp->offset == offset) {
-			printf("makesym: dup sym for offset %d, %s %s\n", 
-				offset, name, sp->name);
-				return;
-			return;
-		}
-	}
-	sp = malloc(sizeof(*sp));
-	sp->next = symhead;
-	sp->offset = offset;
-	sp->name = strdup(name);
-	symhead = sp;
-}
-
-int
-ispointer(int offset)
-{
-	return 0;
-}
-
-void
-pointer(char *label, int offset)
-{
-	makesym(label, offset);
-}
-
-struct ref *refhead;
-
-char *
-ref(int offset)
-{
-	struct ref *rp;
-	struct refchain *rc;
-
-	for (rp = refhead; rp; rp = rp->next) {
-		for (rc = rp->head; rc; rc = rc->next) {
-			if (rc->offset == offset) {
-				return rp->name;
-			}
-		}
-	}
-	return 0;
-}
-
-char labbuf[20];
-
-char *
-makelabel(unsigned int offset)
-{
-	sprintf(labbuf, "L%x", offset);
-	return labbuf;
-}
-
-void
-makeref(char *name, unsigned int offset, int chained)
-{
-	struct ref *rp;
-	struct refchain *rc;
-
-	for (rp = refhead; rp; rp = rp->next) {
-		if (strcmp(rp->name, name) == 0) {
-			break;
-		}
-	}
-
-	if (!rp) {
-		rp = malloc(sizeof(*rp));
-		rp->next = refhead;
-		refhead = rp;
-		rp->name = strdup(name);
-		rp->head = 0;
-	}
-
-	for (rc = rp->head; rc; rc = rc->next) {
-		if (rc->offset == offset) {
-			printf("refext: adding duplicate ref %d %x\n",
-				name, offset);
-		return;
-		}
-	}
-	rc = malloc(sizeof(*rc));
-	rc->next = rp->head;
-	rp->head = rc;
-	rc->offset = offset;
-	rc->chained = chained;
-}
-
-void
-fixup_xrefs(buffer_t *out)
-{
-	struct ref *rp;
-	struct refchain *rc, *rn;
-	unsigned short next, addr;
-
-	for (rp = refhead; rp; rp = rp->next) {
-		printf("rh %s\n", rp->name);
-		for (rc = rp->head; rc; rc = rc->next) {
-			printf("rc %x\n", rc->offset);
-			if (!rc->chained)
-				continue;
-			addr = rc->offset;
-			while (addr) {
-				next = out->storage[addr] + (out->storage[addr+1] << 8);
-				printf("rn %x\n", next);
-				if (!next) {
-					break;
-				}
-				printf("clear %x\n", addr);
-				out->storage[addr] = out->storage[addr+1] = 0;
-				addr = next;
-				rn = malloc(sizeof(*rn));
-				rn->next = rp->head;
-				rp->head = rn;
-				rn->offset = next;
-			}
-		}
-	}
-		
-}
-
 int
 do_rel(buffer_t *in, buffer_t *out)
 {
 	unsigned short val;
 	unsigned char control;
 	struct value *valp;
-	char *symp;
+	char *name;
 	char done = 0;
 	char i;
+	struct symbol *sym;
 
 	while (!done) {
 		if (in->cursor > in->size) break;
@@ -738,57 +764,60 @@ do_rel(buffer_t *in, buffer_t *out)
 			control = getbits(in, 2);
 			if (control == 0) {
 				control = getbits(in, 4);
-				symp = 0; 
+				name = 0; 
 				valp = 0;
 				switch (control) {
 				case 0:		// entry symbol NAME
-					symp = readsym(in);
+					name = readsym(in);
 					break;
 				case 1:		// select common block NAME
-					symp = readsym(in);
+					name = readsym(in);
 					break;
 				case 2:		// program name NAME
-					symp = readsym(in);
+					name = readsym(in);
 					break;
 				case 3:		// unused
 				case 4:		// unused
 				case 5:		// define common size VALUE
-					valp = getvalue(in);
-					symp = readsym(in);
+					valp = readvalue(in);
+					name = readsym(in);
 					break;
 				case 6:		// chain external VALUE
-					valp = getvalue(in);
-					symp = readsym(in);
-					if (valp->seg) {
-						makeref(symp, valp->val + seg[valp->seg]->base, 1);
-					}
+					/* entries of this form are the head of a list of references
+					 * to the same external symbol */
+					valp = readvalue(in);
+					name = readsym(in);
+					makechain(name, valp->val + segbase[valp->seg]);
 					break;
 				case 7:		// define entry NAME VALUE
-					valp = getvalue(in);
-					symp = readsym(in);
-					makesym(symp, seg[valp->seg]->base + valp->val);
+					valp = readvalue(in);
+					name = readsym(in);
+					makesym(name, segbase[valp->seg] + valp->val);
 					break;
 				case 8:		// unused
 				case 9:		// external plus offset VALUE
-					valp = getvalue(in);
+					valp = readvalue(in);
+					printf("XXX not handled\n");
 					break;
 				case 0xa:	// define data size VALUE
-					valp = getvalue(in);
+					valp = readvalue(in);
 					makeseg(S_DATA, valp->val);
 					break;
 				case 0xb:	// set location VALUE
-					valp = getvalue(in);
-					out->cursor = seg[valp->seg]->base + valp->val;
+					valp = readvalue(in);
+					out->cursor = segbase[valp->seg] + valp->val;
 					break;
 				case 0xc:	// chain address VALUE
-					valp = getvalue(in);
+					name = makelabel(out->cursor);
+					valp = readvalue(in);
+					makechain(name, valp->val + segbase[valp->seg]);
 					break;
 				case 0xd:	// define program size VALUE
-					valp = getvalue(in);
+					valp = readvalue(in);
 					makeseg(S_CODE, valp->val);
 					break;
 				case 0xe:	// end module VALUE
-					valp = getvalue(in);
+					valp = readvalue(in);
 					modcount++;
 					if (in->bitoff != 0) {
 						in->bitoff = 0;
@@ -802,8 +831,8 @@ do_rel(buffer_t *in, buffer_t *out)
 				}				
 				if (verbose & V_PARSE) {
 					printf("special entry %d %s ", control, specialtype[control]);
-					if (symp) {
-						printf("%s ", symp);
+					if (name) {
+						printf("%s ", name);
 					}
 					if (valp) {
 						printf(" = 0x%x (%s)", valp->val, segname[valp->seg]);
@@ -815,13 +844,11 @@ do_rel(buffer_t *in, buffer_t *out)
 				val = ((val & 0xff) << 8) | ((val >> 8) & 0xff);
 				if (verbose & V_PARSE) {
 					printf("%x rel entry %d %s %x %x\n", 
-						out->cursor, control, controltype[control], seg[control]->base, val);
+						out->cursor, control, controltype[control], segbase[control], val);
 				}
-				val += seg[control]->base;
+				val += segbase[control];
 				
-				symp = makelabel(val);
-				pointer(symp, val);
-				makeref(symp, out->cursor, 0);
+				makeref(makelabel(val), out->cursor);
 				put(out, out->cursor, val & 0xff);
 				put(out, out->cursor, (val >> 8) & 0xff);
 			}
@@ -874,7 +901,7 @@ do_whitesmith(buffer_t *in, buffer_t *out)
 	}
 
 	/* read the symbol table */
-	symtab = (struct sym *)(&in->storage[in->cursor]);
+	symtab = (struct symbol *)(&in->storage[in->cursor]);
 	nsyms = hp->table / sizeof(struct symtab);
 	for (i = 0; i < nsyms; i++) {
 		out->cursor += sizeof(struct symtab);
@@ -887,13 +914,13 @@ do_whitesmith(buffer_t *in, buffer_t *out)
 		addr = out->storage[segoffset] + out->storage[segoffset+1];			
 		switch (rp->type) {
                 case REL_TEXTOFF:
-			makelabel(addr);
+			makeref(makelabel(addr), addr);
                         break;
                 case REL_DATAOFF:
-			makelabel(addr+hp->data);
+			makeref(makelabel(addr+hp->data), addr+hp->data);
                         break;
                 case REL_SYMBOL:
-			makeref(symtab[rp->value].name, segoffset, 0);
+			makeref(&symtab[rp->value], segoffset);
                         break;
 		}
 	}
