@@ -11,7 +11,7 @@
 char *pname;
 extern char *maketest(long *, int *);
 
-char *vopts[] = { "V_BUF", "V_MATCH", "V_PARSE", "V_OUT", "V_TABLE", 0 };
+char *vopts[] = { "V_BUF", "V_MATCH", "V_PARSE", "V_OUT", "V_TABLE", "V_SYM", 0 };
 
 int bigendian = 0;
 int verbose;

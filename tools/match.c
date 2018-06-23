@@ -157,8 +157,8 @@ fmt_operand(char *obuf, struct inst *ip, int opindex)
 					}
 				}
 				if (o->fld->fmt->flags & F_HEX) {
-					if ((sym = ref(ip->addr+(o->fld->bitoff/8)))
-						|| (sym = getsym(val))) {
+					if ((sym = refname(ip->addr+(o->fld->bitoff/8)))
+						|| (sym = getsymname(val))) {
 						sprintf(tbuf, "%s", sym);
 					} else {
 						sprintf(fbuf, "0x%%0%dx", (o->fld->fmt->width + 3) / 4);
@@ -241,7 +241,7 @@ disas(unsigned char *buf, int startaddr, int length)
 	for (offset = startaddr; offset < length; ) {
 		char len;
 
-		sym = getsym(offset);
+		sym = getsymname(offset);
 		if (sym) {
 			printf("%s:\n", sym);
 		}
@@ -260,7 +260,7 @@ disas(unsigned char *buf, int startaddr, int length)
 			len = ip.len;
 			fmt_inst(inst, &ip);
 		} else {
-			char *sym = ref(offset);
+			char *sym = refname(offset);
 			if (sym) {
 				sprintf(inst, "DW %s", sym);
 				len = 2;
