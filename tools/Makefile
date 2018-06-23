@@ -8,8 +8,11 @@ clean:
 	rm -f $(BINS) *.o 
 	rm -rf *.dSYM
 
-nm: nm.c ws.h
-	gcc $(CFLAGS) -g -o nm nm.c
+nm: nm.c ws.h wslib.o
+	gcc $(CFLAGS) -g -o nm nm.c wslib.o
+
+wslib.o: wslib.c ws.h
+	gcc $(CFLAGS) -g -c wslib.c
 
 dumpfs: dumpfs.c fslib.o fs.h
 	gcc $(CFLAGS) -g -o dumpfs dumpfs.c fslib.o
