@@ -1,0 +1,212 @@
+#
+# z80 architecture definition file
+# the sections must be in this order - parser does not do forward references
+#
+# this is set up to assemble for sdas
+#
+ARRAY
+# registers
+r8		"B","C","D","E","H","L","bad","A"
+rps		"BC","DE","HL","AF"
+rp		"BC","DE","HL","SP"
+ixr		"IX","IY"
+half	"H","L"
+mr		"I","R"
+freg	"AF", "AF'"
+f		"F"
+
+# condition codes
+cc		"NZ","Z","NC","C","PO","PE","P","M"
+scc		"NZ","Z","NC","C"
+
+# instructions
+alu8	"ADD","ADC","SUB","SBC","AND","XOR","OR","CP"
+inc		"INC","DEC"
+op7		"RLCA","RRCA","RLA","RRA","DAA","CPL","SCF","CCF"
+rot		"RLC", "RRC", "RL", "RR", "SLA", "SRA", "SLL", "SRL"
+bld		"LDI","LDD", "LDIR", "LDDR"
+bcp		"CPI","CPD", "CPIR", "CPDR"
+bin		"INI","IND", "INIR", "INDR"
+bout	"OTI","OTD", "OTIR", "OTDR"
+a16		"SBC","ADC"
+di		"DI","EI"
+stack	"POP","PUSH"
+decop	"RRD","RLD"
+sret	"RETN","RETI"
+
+FORMAT
+# name	prefix	suffix	width
+indir	"("		")"
+pc8		""		""		16		hex,signed,pcrel,xref
+index	""		""		8		signed
+imm16	""		""		16		hex,xref
+addr	""		""		16		hex,xref
+bit		""		""		3
+i8		""		""		8		hex
+im		""		""		2
+
+FIELDS
+# class is either a format or array
+# name	width	bitoff	dest	class	value
+sreg	3		0		0		r8
+dreg	3		3		0		r8
+sreg1	3		8		0		r8
+dreg1	3		11		0		r8
+alu		3		3		0		alu8
+alu1	3		11		0		alu8
+a16		1		11		0		a16
+pc1		8		8		0		pc8
+ixr		1		5		0		ixr
+ix		8		16		0		index
+imm16	16		8		0		imm16
+imm161	16		16		0		imm16
+addr	16		8		0		addr
+addr1	16		16		0		addr
+rp		2		4		0		rp
+rp1		2		12		0		rp
+rps		2		4		0		rps
+rst		3		3		3		addr
+scc		2		3		0		scc
+cc		3		3		0		cc
+i8		8		8		0		i8
+i81		8		16		0		i8
+i82		8		24		0		i8
+inc		1		3		0		inc
+inci	1		11		0		inc
+inci8	1		8		0		inc
+inc8	1		0		0		inc
+op7		3		3		0		op7
+rp0		1		4		0		rp
+di		1		3		0		di
+stack	1		2		0		stack
+stack1	1		10		0		stack
+rot		3		11		0		rot
+rot2	3		27		0		rot
+bit		3		11		0		bit
+bit2	3		27		0		bit
+sret	1		11		0		sret
+decop	1		11		0		decop
+bld		2		11		0		bld
+bcp		2		11		0		bcp
+bin		2		11		0		bin
+bout	2		11		0		bout
+mr		1		11		0		mr				
+halfs	1		8		0		half
+halfd	1		11		0		half
+
+# pseudo-fields
+f		0		0		0		f		0
+a		0		0		0		r8		7
+c		0		0		0		r8		1
+de		0		0		0		rp		1		
+hl		0		0		0		rp		2
+sp		0		0		0		rp		3
+ind		0		0		0		indir
+af		0		0		0		freg	0
+af1		0		0		0		freg	1
+im0		0		0		0		im		0
+im1		0		0		0		im		1
+im2		0		0		0		im		2
+i0		0		0		0		i8		0
+
+# order is important - first match applies
+# mask		value	 	len op			op0				op1	
+INSTRUCTIONS
+0xc7		0xc7		1	"RST"		rst
+0xff		0x76		1	"HALT"
+0xf8		0x70		1	"LD"		ind,hl			sreg
+0xc7		0x46		1	"LD"		dreg			ind,hl
+0xc0		0x40		1	"LD"		dreg			sreg
+0xff		0x10		2	"DJNZ"		pc1	
+0xc7		0x86		1	alu			a				ind,hl
+0xc0		0x80		1	alu			a				sreg
+0xcf		0x01		3	"LD"		rp				imm16
+0xff		0xd9		1	"EXX"
+0xff		0x00		1	"NOP"
+0xff		0xc9		1	"RET"
+0xff		0xcd		3	"CALL"		addr
+0xff		0xc3		3	"JP"		addr
+0xff		0x18		2	"JR"		pc1
+0xe7		0x20		2	"JR"		scc				pc1
+0xff		0x36		2	"LD"		ind,hl			i8
+0xfe		0x34		1	inc8		ind,hl
+0xc7		0x06		2	"LD"		dreg			i8
+0xc6		0x04		1	inc8		dreg
+0xc7		0x03		1	inc			rp
+0xc7		0x07		1	op7
+0xff		0x08		1	"EX"		af				af1
+0xff		0xeb		1	"EX"		de				hl
+0xff		0xe3		1	"EX"		ind,sp			hl
+0xff		0xe9		1	"JP"		ind,hl
+0xff		0xf9		1	"LD"		sp				hl
+0xcf		0x09		1	"ADD"		hl				rp
+0xef		0x0a		1	"LD"		a				ind,rp0
+0xef		0x02		1	"LD"		ind,rp0			a
+0xff		0x22		1	"LD"		ind,addr		hl
+0xff		0x32		1	"LD"		ind,addr		a
+0xff		0x2a		1	"LD"		hl				ind,addr
+0xff		0x3a		1	"LD"		a				ind,addr
+0xf7		0xf3		1	di
+0xff		0xd3		2	"OUT"		ind,i8			a
+0xff		0xdb		2	"IN"		a				ind,i8
+0xc7		0xc4		3	"CALL"		cc				addr
+0xc7		0xc2		3	"JP"		cc				addr
+0xc7		0xc0		1	"RET"		cc
+0xcb		0xc1		1	stack		rps
+0xc7		0xc6		2	alu			a				i8
+0xc7ff		0x06cb		2	rot			ind,hl
+0xc0ff		0x00cb		2	rot			sreg1
+0xc7ff		0x46cb		2	"BIT"		bit				ind,hl
+0xc0ff		0x40cb		2	"BIT"		bit				sreg1
+0xc7ff		0x86cb		2	"RES"		bit				ind,hl
+0xc0ff		0x80cb		2	"RES"		bit				sreg1
+0xc7ff		0xc6cb		2	"SET"		bit				ind,hl
+0xc0ff		0xc0cb		2	"SET"		bit				sreg1
+
+0xe7ff		0xa0ed		2	bld
+0xe7ff		0xa1ed		2	bcp
+0xe7ff		0xa2ed		2	bin
+0xe7ff		0xa3ed		2	bout
+0xffff		0x44ed		2	"NEG"
+0xf7ff		0x45ed		2	sret
+0xf7ff		0x67ed		2	decop
+0xffff		0x70ed		2	"IN"		f			ind,c
+0xffff		0x71ed		2	"OUT"		ind,c		i0
+0xc7ff		0x40ed		2	"IN"		dreg1		ind,c
+0xc7ff		0x41ed		2	"OUT"		ind,c		dreg1
+0xc7ff		0x42ed		2	a16			hl			rp1
+0xcfff		0x43ed		4	"LD"		rp1			ind,addr1
+0xcfff		0x4bed		4	"LD"		ind,addr1	rp1
+0xffff		0x46ed		2	"IM"		im0
+0xffff		0x56ed		2	"IM"		im1
+0xffff		0x5Eed		2	"IM"		im2
+0xf7ff		0x47ed		2	"LD"		mr			a
+0xf7ff		0x57ed		2	"LD"		a			mr
+
+0xffdf		0xe3dd		2	"EX"		ind,sp		ixr
+0xffdf		0xe9dd		2	"JP"		ind,ixr
+0xfbdf		0xe1dd		2	stack1		ixr
+0xc7df		0x86dd		3	alu1		a			ind,ixr,ix
+0xc0df		0x80dd		2	alu1		a			ixr,halfs
+0xf8df		0x70dd		3	"LD"		ind,ixr,ix	sreg1
+0xf6df		0x64dd		2	"LD"		ixr,halfd	ixr,halfs
+0xf7df		0x66dd		3	"LD"		halfd		ind,ixr,ix
+0xc6df		0x44dd		2	"LD"		dreg1		ixr,halfs
+0xf0df		0x60dd		2	"LD"		ixr,halfd	sreg1
+0xffdf		0x36dd		4	"LD"		ind,ixr,ix	i82
+0xfedf		0x34dd		3	inci8		ind,ixr,ix
+0xf6df		0x26dd		3	"LD"		ixr,halfd	i81	
+0xf6df		0x24dd		2	inci8		ixr,halfd
+0xf7df		0x23dd		2	inci		ixr
+0xcfdf		0x09dd		2	"ADD"		ixr			rp1
+0xffdf		0x21dd		4	"LD"		ixr			imm161
+0xffdf		0x22dd		4	"LD"		ind,addr1	ixr
+0xffdf		0x2add		4	"LD"		ixr			ind,addr1
+0xc7df		0x46dd		3	"LD"		dreg1		ind,ixr,ix
+0xc7df		0x46dd		3	"LD"		ind,ixr,ix	sreg1
+0xffdf      0xf9dd      2   "LD"        sp          ixr
+
+0xc700ffdf	0x0600cbdd	4	rot2		ind,ixr,ix
+0xc700ffdf	0x4600cbdd	4	"BIT"		bit2		ind,ixr,ix
+0xc700ffdf	0x8600cbdd	4	"RES"		bit2		ind,ixr,ix
+0xc700ffdf	0xc600cbdd	4	"SET"		bit2		ind,ixr,ix

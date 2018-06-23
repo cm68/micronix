@@ -1,4 +1,4 @@
-BINS= nm ncheck icheck dcheck dumpfs copyall
+BINS= nm ncheck icheck dcheck dumpfs copyall dis
 
 all: $(BINS)
 
@@ -31,3 +31,18 @@ icheck: fslib.o fs.h icheck.c
 
 copyall: fslib.o fs.h copyall.c
 	gcc $(CFLAGS) -g -o copyall copyall.c fslib.o
+
+dis: dis.o input.o match.o util.o wslib.o
+	gcc $(CFLAGS) -o dis dis.o input.o match.o util.o wslib.o
+
+dis.o: dis.c dis.h
+	gcc $(CFLAGS) -g -c dis.c
+
+input.o: input.c dis.h
+	gcc $(CFLAGS) -g -c input.c
+
+match.o: match.c dis.h
+	gcc $(CFLAGS) -g -c match.c
+
+util.o: util.c dis.h
+	gcc $(CFLAGS) -g -c util.c
