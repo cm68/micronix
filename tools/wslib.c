@@ -50,10 +50,10 @@ binout(unsigned char b)
  *     0 - 127   symbol table entries 43 - 170
  *     128-256   symbol table entries 256 * (n - 128) + 175 + next byte
  */
-struct reloc *
+struct ws_reloc *
 getreloc(char **rp)
 {
-	static struct reloc reloc;
+	static struct ws_reloc reloc;
 	unsigned char control;
 
 	while (1) {

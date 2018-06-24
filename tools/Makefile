@@ -35,7 +35,7 @@ copyall: fslib.o fs.h copyall.c
 	gcc $(CFLAGS) -g -o copyall copyall.c fslib.o
 
 dis: dis.o input.o match.o util.o wslib.o
-	gcc $(CFLAGS) -o dis dis.o input.o match.o util.o wslib.o
+	gcc $(CFLAGS) -g -o dis dis.o input.o match.o util.o wslib.o
 
 dis.o: dis.c dis.h
 	gcc $(CFLAGS) -g -c dis.c
