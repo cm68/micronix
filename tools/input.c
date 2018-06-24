@@ -18,18 +18,19 @@ long start;
 struct seg *seglist;
 int high;
 int modcount;
-char *segname[] = { "absolute", "code", "data", "common" };
 
-int segbase[4];
+char *segname[] = { "absolute", "code", "data", "common", "undef" };
+
+int segbase[5];
 unsigned short segoffset;
 
 /*
  * random utility function
  */
+unsigned char binbuf[17];
 unsigned char *
 binstr(unsigned short val, char count)
 {
-	static unsigned char binbuf[17];
 	unsigned char *s = binbuf;
 	int i;
 
@@ -41,90 +42,53 @@ binstr(unsigned short val, char count)
 		} else {
 			*s++ = '0';
 		}
-		s[1] = '\0';
+		*s = '\0';
 	}
 	return binbuf;
 }
 
 /*
- * the i/o system
+ * the input source
  */
-typedef struct buffer {
-	unsigned char *storage;
-	int cursor;
-	int base;
-	int size;
-	int lineno;
-	int high;
-	char bitoff;
-} buffer_t;
+unsigned char *inbuf;
+unsigned char *inptr;
+unsigned char *inend;
+int bitoff;
 
-void
-advance(buffer_t *buf)
-{
-	if (buf->storage[buf->cursor] == '\n') {
-		buf->lineno++;
-	}
-	buf->cursor++;
-}
-
-char *
-pos(buffer_t *in)
-{
-	static char desc[80];
-	sprintf(desc, "cursor %d line %d", in->cursor, in->lineno);
-	return (desc);
-}
-
-unsigned char
-look(buffer_t *in, int off)
-{
-	char c;
-	if ((in->cursor + off) > in->size) {
-		return 0;
-	}
-	c = in->storage[in->cursor+off];
-	if (verbose & V_BUF) {
-		printf("look %d = %c 0x%x\n", off, c, c);
-	}
-	return (c);
-}
-
-unsigned char
-get(buffer_t *in)
-{
-	unsigned char c = in->storage[in->cursor];
-	if (verbose & V_BUF) {
-		printf("read %c 0x%x\n", c, c);
-	}
-	return (c);
-}
+/*
+ * the output buffer
+ */
+unsigned char *outbuf;
+unsigned short outsize;
+unsigned short outhigh;
 
 /*
  * the microsoft rel format is built on a bit stream. 
  * we need to be able to grab variable numbers of bits and maintain a bit cursor.
  */
 unsigned short
-getbits(buffer_t *in, int len)
+getbits(int len)
 {
 	unsigned short ret = 0;
 	char i;
 	unsigned char v;
 
-	//printf("\ngetbits0: len %d bitoff %d\n", len, in->bitoff);
-
-	v = in->storage[in->cursor];
-//	printf("getbits1: %x\n", v);
+	v = *inptr;
+	/*
+	if (verbose & V_BUF) {
+		unsigned short vv = (inptr[0] << 8) + inptr[1];
+		printf("\ngetbits0: len %d bitoff %d %04x %s\n", len, bitoff, v,
+			binstr(vv, 16));
+	}
+	*/
 	for (i = len - 1; i >= 0; i--) {
-		if ((1 << (7 - in->bitoff)) & v) {
-//			printf("getbits2: set %x\n", i);
+		if ((1 << (7 - bitoff)) & v) {
 			ret |= 1 << i;
 		}
-		in->bitoff++;
-		if (in->bitoff == 8) {
-			advance(in);
-			v = in->storage[in->cursor];
-			in->bitoff = 0;
+		bitoff++;
+		if (bitoff == 8) {
+			v = *++inptr;
+			bitoff = 0;
 		}
 	}
 	if (verbose & V_BUF) {
@@ -133,25 +97,27 @@ getbits(buffer_t *in, int len)
 	return ret;
 }
 
+/*
+ * write to our decoded output buffer - allocate memory if need be
+ */
 void
-put(buffer_t *out, int where, unsigned char c)
+put(int where, unsigned char c)
 {
 	int size;
 
 	if (verbose & V_OUT) {
 		printf("put 0x%02x to 0x%04x\n", c, where);
 	}
-	if (where >= out->size) {
-		/* round up to 64k */
-		size = (where | 0xffff) + 1;
-		out->storage = realloc(out->storage, size);
-		out->size = size;
+	if (where >= outsize) {
+		/* round up to 4k */
+		size = (where | 0xfff) + 1;
+		outbuf = realloc(outbuf, size);
+		outsize = size;
 	}
-	if (where > out->high) {
-		out->high = where;
+	if (where > outhigh) {
+		outhigh = where;
 	}
-	out->storage[where++] = c;
-	out->cursor = where;
+	outbuf[where] = c;
 }
 
 int
@@ -185,21 +151,21 @@ readhex(char c)
  * as a cheesy side effect, optionally calculate the running byte-wide checksum
  */
 int
-gethex(buffer_t *in, int digits, unsigned char *checksum)
+gethex(int digits, unsigned char *checksum)
 {
 	unsigned char c;
 	unsigned int v = 0;
 	int ask = digits;
 	while (digits--) {
-		c = get(in);
+		c = *inptr;
 		if (ishex(c)) {
 			c = readhex(c);
 		} else {
-			printf("malformed hex (0x%x) at %s\n", c, pos(in));
+			printf("malformed hex (0x%x)\n", c);
 			return -1;
 		}
 		v = (v << 4) + c;
-		advance(in);
+		inptr++;
 		/* every 2 bytes, update the checksum */
 		if (checksum && ((digits & 0x1) == 0)) {
 			*checksum = *checksum + v;
@@ -217,36 +183,36 @@ gethex(buffer_t *in, int digits, unsigned char *checksum)
  * :CCAAAA01XX            eof with start address AAAA
  */
 int
-do_intel_hex(buffer_t *in, buffer_t *out)
+do_intel_hex()
 {
 	int rectype;
 	int bc;
 	int addr;
 	unsigned char checksum;
 	int byte;
-	
-	if ((byte = get(in)) != ':') {
-		printf("missing record start (0x%x) at %s\n", byte, pos(in));
+		
+	if ((byte = *inptr) != ':') {
+		printf("missing record start (0x%x)\n", byte);
 		return 0;
 	}
-	advance(in);
+	inptr++;
 
 	checksum = 0;
-	bc = gethex(in, 2, &checksum);
+	bc = gethex(2, &checksum);
 	if (bc == -1) {
-		printf("missing byte count at %s\n", pos(in));
+		printf("missing byte count\n");
 		return 0;
 	}
 
-	addr = gethex(in, 4, &checksum);
+	addr = gethex(4, &checksum);
 	if (addr == -1) {
-		printf("missing address at %s\n", pos(in));
+		printf("missing address\n");
 		return 0;
 	}
 
-	rectype = gethex(in, 2, &checksum);
+	rectype = gethex(2, &checksum);
 	if (addr == -1) {
-		printf("missing record type at %s\n", pos(in));
+		printf("missing record type\n");
 		return 0;
 	}
 
@@ -254,12 +220,12 @@ do_intel_hex(buffer_t *in, buffer_t *out)
 
 	case 0x0:	/* data record */
 		while (bc--) {
-			byte = gethex(in, 2, &checksum);
+			byte = gethex(2, &checksum);
 			if (byte == -1) {
-				printf("missing data byte at %s\n", pos(in));
+				printf("missing data byte\n");
 				return 0;
 			}
-			put(out, addr++, byte);
+			put(addr++, byte);
 		}
 		break;
 
@@ -269,67 +235,65 @@ do_intel_hex(buffer_t *in, buffer_t *out)
 
 	case 0x2:	/* extended segment address record */
 		if (addr != 0) {
-			printf("nonzero address on type 2 at %s\n", pos(in));
+			printf("nonzero address on type 2\n");
 			return 0;
 		}
-		addr = gethex(in, 4, &checksum);
+		addr = gethex(4, &checksum) << 4;
 		if (addr == -1) {
-			printf("missing seg offset at %s\n", pos(in));
+			printf("missing seg offset\n");
 			return 0;
 		}
-		out->base = addr * 16;
 		break;
 
 	case 0x3:	/* start segment address record */
 		if (addr != 0) {
-			printf("nonzero address on type 3 at %s\n", pos(in));
+			printf("nonzero address on type 3\n");
 			return 0;
 		}
-		start = gethex(in, 8, &checksum);
+		start = gethex(8, &checksum);
 		if (start == -1) {
-			printf("missing CS:IP at %s\n", pos(in));
+			printf("missing CS:IP\n");
 			return 0;
 		}
 		break;
 
 	case 0x4:	/* extended linear address record */
-		addr = gethex(in, 4, &checksum);
+		addr = gethex(4, &checksum) << 16;
 		if (addr == -1) {
-			printf("missing seg offset at %s\n", pos(in));
+			printf("missing seg offset\n");
 			return 0;
 		}
-		out->base = addr * 65536;
 		break;
 
 	case 0x5:	/* start linear address record */
 		if (addr != 0) {
-			printf("nonzero address on type 3 at %s\n", pos(in));
+			printf("nonzero address on type 3\n");
 			return 0;
 		}
-		start = gethex(in, 8, &checksum);
+		start = gethex(8, &checksum);
 		if (start == -1) {
-			printf("missing EIP at %s\n", pos(in));
+			printf("missing EIP\n");
 			return 0;
 		}
 		break;
 
 	default:
-		printf("bogus record type (0x%x) at %s\n", rectype, pos(in));
+		printf("bogus record type (0x%x)\n", rectype);
 		return 0;
 	}
 
-	if (gethex(in, 2, &checksum) == -1) {
-		printf("missing checksum at %s\n", pos(in));
+	if (gethex(2, &checksum) == -1) {
+		printf("missing checksum\n");
 		return 0;
 	}
 	if (checksum != 0) {
-		printf("checksum error (0x%x) at %s\n", checksum, pos(in));
+		printf("checksum error (0x%x)\n", checksum);
 		return 0;
 	}
 
 	/* let's swallow line and file ending */
-	while ((byte = get(in)) == '\r' || byte == '\n' || byte == 0x26) {
-		advance(in);
+	while ((byte = *inptr) == '\r' || byte == '\n' || byte == 0x26) {
+		inptr++;
 	}
 	if (byte == 0) {
 		return 0;
@@ -343,7 +307,7 @@ do_intel_hex(buffer_t *in, buffer_t *out)
  * S09AAAAXX              eof and start address AAAA
  */
 int
-do_motorola_srec(buffer_t *in, buffer_t *out)
+do_motorola_srec()
 {
 	int rectype;
 	int bc;
@@ -351,71 +315,71 @@ do_motorola_srec(buffer_t *in, buffer_t *out)
 	unsigned char checksum;
 	int byte;
 	
-	if ((byte = get(in)) != 'S') {
-		printf("missing record start (0x%x) at %s\n", byte, pos(in));
+	if ((byte = *inptr) != 'S') {
+		printf("missing record start (0x%x)\n", byte);
 		return 0;
 	}
-	advance(in);
+	inptr++;
 
-	rectype = gethex(in, 1, &checksum);
+	rectype = gethex(1, &checksum);
 	if (rectype == -1) {
-		printf("missing record type at %s\n", pos(in));
+		printf("missing record type\n");
 		return 0;
 	}
 
 	/* checksum does not include rec type */
 	checksum = 0;
 
-	bc = gethex(in, 2, &checksum);
+	bc = gethex(2, &checksum);
 	if (bc == -1) {
-		printf("missing byte count at %s\n", pos(in));
+		printf("missing byte count\n");
 		return 0;
 	}
 	switch (rectype) {
 
 	case 0x1:	/* 16 bit address data record */
-		addr = gethex(in, 4, &checksum);
+		addr = gethex(4, &checksum);
 		if (addr == -1) {
-			printf("missing address at %s\n", pos(in));
+			printf("missing address\n");
 			return 0;
 		}
 		bc -= 3;
 		while (bc--) {
-			byte = gethex(in, 2, &checksum);
+			byte = gethex(2, &checksum);
 			if (byte == -1) {
-				printf("missing data byte at %s\n", pos(in));
+				printf("missing data byte\n");
 				return 0;
 			}
-			put(out, addr++, byte);
+			put(addr++, byte);
 		}
 		break;
 
 	case 0x9:	/* eof */
-		addr = gethex(in, 4, &checksum);
+		addr = gethex(4, &checksum);
 		if (addr == -1) {
-			printf("missing address at %s\n", pos(in));
+			printf("missing address\n");
 			return 0;
 		}
 		start = addr;
 		break;
 
 	default:
-		printf("bogus record type (0x%x) at %s\n", rectype, pos(in));
+		printf("bogus record type (0x%x)\n", rectype);
 		return 0;
 	}
 
-	if (gethex(in, 2, &checksum) == -1) {
-		printf("missing checksum at %s\n", pos(in));
+	if (gethex(2, &checksum) == -1) {
+		printf("missing checksum\n");
 		return 0;
 	}
 	if (checksum != 0xff) {
-		printf("checksum error (0x%x) at %s\n", checksum, pos(in));
+		printf("checksum error (0x%x)\n", checksum);
 		return 0;
 	}
 
 	/* let's swallow line and file ending */
-	while ((byte = get(in)) == '\r' || byte == '\n' || byte == 0x26) {
-		advance(in);
+	while ((byte = *inptr) == '\r' || byte == '\n' || byte == 0x26) {
+		inptr++;
 	}
 	return (rectype == 0x9) ? 0 : 1;
 }
@@ -426,52 +390,51 @@ do_motorola_srec(buffer_t *in, buffer_t *out)
  * the recognizer is that the first significant character must be '0'.
  */
 int
-do_hexdump(buffer_t *in, buffer_t *out)
+do_hexdump()
 {
 	int byte;
 	unsigned int data = 0;
 	int digits = 0;
+	int location = 0;
 
 	/* swallow newlines tabs and spaces */
 	while (1) {
-		byte = look(in, 0);
+		byte = *inptr;
 		if (byte == '\0') {
 			return (0);
 		} else if (byte == '\n' || byte == '\t' || byte == ' ') {
-			advance(in);
+			inptr++;
 		} else {
 			break;
 		}
 	}
 
 	/* 0x is a benign prefix */
-	if ((look(in,0) == '0') && (look(in,1) == 'x')) {
-		advance(in);
-		advance(in);
+	if ((inptr[0] == '0') && (inptr[1] == 'x')) {
+		inptr += 2;
 	}
 
 	/* let's build a number */
-	while (ishex(look(in,0))) {
+	while (ishex(*inptr)) {
 		data <<= 4;
-		data = data + readhex(get(in));
-		advance(in);
+		data = data + readhex(*inptr++);
 		digits++;
 	} 
 
 	/* ah. we have an address */
-	if (look(in, 0) == ':') {
-		advance(in);
+	if (*inptr == ':') {
+		inptr++;
 		if (verbose & V_PARSE) {
 			printf("address %x\n", data);
 		}
 
-		if (data != out->cursor) {
-			if (data < out->cursor) {
+		if (data != location) {
+			if (data < location) {
 				printf("load address ordering inversion\n");
 				return (0);
 			}
-			while (out->cursor < data) {
-				put(out, out->cursor, 0);
+			while (location < data) {
+				put(location++, 0);
 			}
 		}
 		return (1);
@@ -483,12 +446,12 @@ do_hexdump(buffer_t *in, buffer_t *out)
 		int i;
 		for (i = (digits - 1) * (bigendian * 2); i >= 0; i -= (bigendian * 2)) {
 			byte = (data >> i) & 0xff;
-			put(out, out->cursor, byte);
+			put(location++, byte);
 		}
 	} else {
 		while (digits--) {
 			byte = data & 0xff;
-			put(out, out->cursor, byte);
+			put(location++, byte);
 			data >>= 8;
 		}
 	}
@@ -496,18 +459,17 @@ do_hexdump(buffer_t *in, buffer_t *out)
 }
 
 void
-makeseg(char type, int size)
+makeseg(char type, int addr, int size)
 {
 	struct seg *sp;
 
 	sp = malloc(sizeof(*sp));
 	sp->module = modcount;
 	sp->type = type;
-	sp->base = high;
+	sp->base = addr;
 	sp->len = size;
 	sp->next = seglist;
-	high += size;
-	segbase[type] = high;
+	segbase[type] = addr;
 	seglist = sp;
 }
 
@@ -564,12 +526,12 @@ getsymname(int offset)
  * register a symbol
  */
 struct symbol *
-makesym(char *name, int offset)
+makesym(char *name, int offset, int seg)
 {
 	struct symbol *sp;
 
 	if (verbose & V_SYM) {
-		printf("makesym: %s %d\n", name, offset);
+		printf("makesym: %s %s:%d\n", name, segname[seg], offset);
 	}
 	for (sp = symbols; sp; sp = sp->next) {
 		if (strcmp(sp->name, name) == 0) {
@@ -584,7 +546,27 @@ makesym(char *name, int offset)
 	sp->next = symbols;
 	sp->offset = offset;
 	sp->name = strdup(name);
+	sp->seg = seg;
 	symbols = sp;
+	return (sp);
+}
+
+/*
+ * lookup a symbol
+ */
+struct symbol *
+lookupsym(char *name)
+{
+	struct symbol *sp = 0;
+
+	if (verbose & V_SYM) {
+		printf("lookupsym: %s\n", name);
+	}
+	for (sp = symbols; sp; sp = sp->next) {
+		if (strcmp(sp->name, name) == 0) {
+			break;
+		}
+	}
 	return (sp);
 }
 
@@ -597,7 +579,7 @@ makelabel(unsigned int offset)
 	static char labbuf[20];
 
 	sprintf(labbuf, "L%x", offset);
-	return makesym(labbuf, offset);
+	return makesym(labbuf, offset, S_CODE);
 }
 
 /*
@@ -612,6 +594,9 @@ refname(int offset)
 	char *s = 0;
 
 	for (rp = reflist; rp; rp = rp->next) {
+		if (verbose & V_SYM) {
+			printf("refname: %d %s\n", rp->offset, rp->sym->name);
+		}
 		if (rp->offset == offset) {
 			s = rp->sym->name;
 			break;
@@ -687,7 +672,7 @@ makechain(struct symbol *sp, unsigned short link)
  * process all the reference chains to create individual refs
  */
 void
-fixup_xrefs(buffer_t *out)
+fixup_chains()
 {
 	int addr;
 	struct refchain *rc;
@@ -698,8 +683,8 @@ fixup_xrefs(buffer_t *out)
 		while ((addr = rc->offset) != 0) {
 			printf("\tlink %d\n", addr);
 			makeref(rc->sym, addr);
-			rc->offset = out->storage[addr] + (out->storage[addr+1] << 8);
-			out->storage[addr] = out->storage[addr+1] = 0;
+			rc->offset = outbuf[addr] + (outbuf[addr+1] << 8);
+			outbuf[addr] = outbuf[addr+1] = 0;
 		}
 		rc_head = rc->next;
 		free(rc);
@@ -716,13 +701,13 @@ struct value {
 } valdata;
 
 struct value *
-readvalue(buffer_t *in)
+readvalue()
 {
 	char seg;
 	unsigned short val;
 
-	valdata.seg = getbits(in, 2);
-	val = getbits(in, 16);	
+	valdata.seg = getbits(2);
+	val = getbits(16);	
 	valdata.val = ((val >> 8) & 0xff) | ((val & 0xff) << 8);
 	return &valdata;
 }
@@ -731,7 +716,7 @@ readvalue(buffer_t *in)
  * B fields are 3 bits of symbol length and that many bytes of name
  */
 char *
-readsym(buffer_t *in)
+readsym()
 {
 	static char symbuf[10];
 	char symlen;
@@ -739,16 +724,16 @@ readsym(buffer_t *in)
 
 	symbuf[0] = 0;
 
-	symlen = getbits(in, 3);
+	symlen = getbits(3);
 	for (i = 0; i < symlen; i++) {
-		symbuf[i] = getbits(in, 8);
+		symbuf[i] = getbits(8);
 		symbuf[i+1] = 0;
 	}
 	return symbuf;
 }
 
 int
-do_rel(buffer_t *in, buffer_t *out)
+do_rel()
 {
 	unsigned short val;
 	unsigned char control;
@@ -757,71 +742,73 @@ do_rel(buffer_t *in, buffer_t *out)
 	char done = 0;
 	char i;
 	struct symbol *sym;
+	unsigned short location;
 
 	while (!done) {
-		if (in->cursor > in->size) break;
-		if (getbits(in, 1)) {
-			control = getbits(in, 2);
+		if (inptr > inend) break;
+		if (getbits(1)) {
+			control = getbits(2);
 			if (control == 0) {
-				control = getbits(in, 4);
+				control = getbits(4);
 				name = 0; 
 				valp = 0;
 				switch (control) {
 				case 0:		// entry symbol NAME
-					name = readsym(in);
+					name = readsym();
 					break;
 				case 1:		// select common block NAME
-					name = readsym(in);
+					name = readsym();
 					break;
 				case 2:		// program name NAME
-					name = readsym(in);
+					name = readsym();
 					break;
 				case 3:		// unused
 				case 4:		// unused
 				case 5:		// define common size VALUE
-					valp = readvalue(in);
-					name = readsym(in);
+					valp = readvalue();
+					name = readsym();
 					break;
 				case 6:		// chain external VALUE
 					/* entries of this form are the head of a list of references
 					 * to the same external symbol */
-					valp = readvalue(in);
-					name = readsym(in);
-					makechain(name, valp->val + segbase[valp->seg]);
+					valp = readvalue();
+					name = readsym();
+					sym = makesym(name, 0, S_UNDEF);
+					makechain(sym, valp->val + segbase[valp->seg]);
 					break;
 				case 7:		// define entry NAME VALUE
-					valp = readvalue(in);
-					name = readsym(in);
-					makesym(name, segbase[valp->seg] + valp->val);
+					valp = readvalue();
+					name = readsym();
+					makesym(name, segbase[valp->seg] + valp->val, S_CODE);
 					break;
 				case 8:		// unused
 				case 9:		// external plus offset VALUE
-					valp = readvalue(in);
+					valp = readvalue();
 					printf("XXX not handled\n");
 					break;
 				case 0xa:	// define data size VALUE
-					valp = readvalue(in);
-					makeseg(S_DATA, valp->val);
+					valp = readvalue();
+					makeseg(S_DATA, 0, valp->val);
 					break;
 				case 0xb:	// set location VALUE
-					valp = readvalue(in);
-					out->cursor = segbase[valp->seg] + valp->val;
+					valp = readvalue();
+					location = segbase[valp->seg] + valp->val;
 					break;
 				case 0xc:	// chain address VALUE
-					name = makelabel(out->cursor);
-					valp = readvalue(in);
-					makechain(name, valp->val + segbase[valp->seg]);
+					sym = makelabel(location);
+					valp = readvalue();
+					makechain(sym, valp->val + segbase[valp->seg]);
 					break;
 				case 0xd:	// define program size VALUE
-					valp = readvalue(in);
-					makeseg(S_CODE, valp->val);
+					valp = readvalue();
+					makeseg(S_CODE, 0, valp->val);
 					break;
 				case 0xe:	// end module VALUE
-					valp = readvalue(in);
+					valp = readvalue();
 					modcount++;
-					if (in->bitoff != 0) {
-						in->bitoff = 0;
-						in->cursor++;
+					if (bitoff != 0) {
+						bitoff = 0;
+						inptr++;
 					}
 					break;
 				case 0xf:	// end file
@@ -840,28 +827,55 @@ do_rel(buffer_t *in, buffer_t *out)
 					printf("\n");
 				}
 			} else {
-				val = getbits(in, 16);
+				val = getbits(16);
 				val = ((val & 0xff) << 8) | ((val >> 8) & 0xff);
 				if (verbose & V_PARSE) {
 					printf("%x rel entry %d %s %x %x\n", 
-						out->cursor, control, controltype[control], segbase[control], val);
+						location, control, controltype[control], segbase[control], val);
 				}
 				val += segbase[control];
 				
-				makeref(makelabel(val), out->cursor);
-				put(out, out->cursor, val & 0xff);
-				put(out, out->cursor, (val >> 8) & 0xff);
+				makeref(makelabel(val), location);
+				put(location++, val & 0xff);
+				put(location++, (val >> 8) & 0xff);
 			}
 		} else {
-			val = getbits(in, 8);
+			val = getbits(8);
 			if (verbose & V_PARSE) {
-				printf("%x abs entry %x\n", out->cursor, val);
+				printf("%x abs entry %x\n", location, val);
 			}
-			put(out, out->cursor, val);
+			put(location++, val);
 		}
 	}
-	fixup_xrefs(out);
+	fixup_chains();
 	return (0);
+}
+
+struct obj *wsobj;
+struct ws_symbol *ws_sym;
+
+void
+read_reloc(int seg)
+{
+	unsigned short addr;
+	struct ws_reloc *rp;
+
+	segoffset = segbase[seg];
+
+	while ((rp = getreloc(&inptr))) {
+		addr = outbuf[segoffset] + outbuf[segoffset+1];			
+		switch (rp->type) {
+                case REL_TEXTOFF:
+			makeref(makelabel(addr), addr);
+                        break;
+                case REL_DATAOFF:
+			makeref(makelabel(addr+wsobj->data), addr+wsobj->data);
+                        break;
+                case REL_SYMBOL:
+			makeref(lookupsym(ws_sym[rp->value].name), rp->offset);
+                        break;
+		}
+	}
 }
 
 /*
@@ -869,64 +883,57 @@ do_rel(buffer_t *in, buffer_t *out)
  * after all the relocation
  */
 int
-do_whitesmith(buffer_t *in, buffer_t *out)
+do_whitesmith()
 {
-	struct obj *hp;
 	int i;
-	struct symtab *symtab;
 	int nsyms;
 	char *ip;
-	struct reloc *rp;
 	unsigned short addr;
+	unsigned short location;
+	struct symbol *sym;
+	int seg;
 
-	hp = (struct obj *)(in->storage);		/* header */
+	wsobj = (struct obj *)inptr;		/* header */
 	for (i = 0; i < sizeof(struct obj); i++) {
-		advance(in);
+		inptr++;
 	}
 	
+	location = 0;
 	start = 0;
 
 	/* snarf the text segment */
-	makeseg(S_CODE, hp->text);
-	for (i = 0 ; i < hp->text; i++) {
-		put(out, out->cursor, get(in));
-		advance(in);
+	makeseg(S_CODE, 0, wsobj->text);
+	for (i = 0 ; i < wsobj->text; i++) {
+		put(location++, *inptr++);
 	}
 
+	location = wsobj->text;
+
 	/* read the data segment */
-	makeseg(S_DATA, hp->data);
-	for (i = 0 ; i < hp->data; i++) {
-		put(out, out->cursor, get(in));
-		advance(in);
+	makeseg(S_DATA, wsobj->text, wsobj->data);
+	for (i = 0 ; i < wsobj->data; i++) {
+		put(location++, *inptr++);
 	}
 
 	/* read the symbol table */
-	symtab = (struct symbol *)(&in->storage[in->cursor]);
-	nsyms = hp->table / sizeof(struct symtab);
+	ws_sym = (struct ws_symbol *)inptr;
+	nsyms = wsobj->table / sizeof(*ws_sym);
 	for (i = 0; i < nsyms; i++) {
-		out->cursor += sizeof(struct symtab);
-		if (symtab[i].flag & SF_DEF) {
-			makesym(symtab[i].name, symtab[i].value);
+		inptr += sizeof(*ws_sym);
+		if (ws_sym[i].flag & (SF_TEXT|SF_DEF)) {
+			seg = S_CODE;
+		} else if (ws_sym[i].flag & (SF_DATA|SF_DEF)) {
+			seg = S_DATA;
+		} else {
+			seg = S_UNDEF;
 		}
-	}
-	segoffset = 0;
-	while (rp = getreloc(&ip)) {
-		addr = out->storage[segoffset] + out->storage[segoffset+1];			
-		switch (rp->type) {
-                case REL_TEXTOFF:
-			makeref(makelabel(addr), addr);
-                        break;
-                case REL_DATAOFF:
-			makeref(makelabel(addr+hp->data), addr+hp->data);
-                        break;
-                case REL_SYMBOL:
-			makeref(&symtab[rp->value], segoffset);
-                        break;
-		}
+		sym = makesym(ws_sym[i].name, ws_sym[i].value, seg);
 	}
 
-	/* process the text relocations */
-	/* process the data relocations */
+	/* process the relocations */
+	read_reloc(S_CODE);
+	read_reloc(S_DATA);
+
 	return (0);
 }
 
@@ -939,7 +946,7 @@ struct in_format {
 	char *name;
 	char *match;
 	int matchoff;
-	int (*handler)(buffer_t *in, buffer_t *out);
+	int (*handler)();
 } bin_formats[] = {
 	{ "intel hex", ":", 0, do_intel_hex },
 	{ "motorola S-rec", "S", 0, do_motorola_srec },
@@ -952,8 +959,6 @@ int
 decode(char *src, int size, unsigned char **dest, unsigned long *address)
 {
 	int i;
-	buffer_t *in;
-	buffer_t *out;
 
 	for (i = 0; i < sizeof(bin_formats)/sizeof(bin_formats[0]); i++) {
 		
@@ -967,30 +972,25 @@ decode(char *src, int size, unsigned char **dest, unsigned long *address)
 		if (verbose) {
 			printf("# format: %s\n", bin_formats[i].name);
 		}
-		in = alloca(sizeof(buffer_t));
-		in->storage = (unsigned char *)src;
-		in->cursor = 0;
-		in->base = 0;
-		in->size = size;
-		in->lineno = 1;
-		in->bitoff = 0;
 
-		out = alloca(sizeof(buffer_t));
-		out->storage = 0;
-		out->cursor = 0;
-		out->base = 0;
-		out->high = 0;
-		out->size = 0;
+		inbuf = inptr = (unsigned char *)src;
+		inend = inptr + size;
 
-		while ((*bin_formats[i].handler)(in,out))
+		bitoff = 0;
+
+		outsize = 8192;
+		outbuf = malloc(outsize);
+		outhigh = 0;
+
+		while ((*bin_formats[i].handler)())
 			;
 
 		*address = start;
-		*dest = out->storage;
+		*dest = outbuf;
 		if (verbose) {
-			printf("decoded using %s %d bytes\n", bin_formats[i].name, out->high+1);
+			printf("decoded using %s %d bytes\n", bin_formats[i].name, outhigh+1);
 		}
-		return (out->high + 1);
+		return (outhigh + 1);
 	}
 	return (0);
 }

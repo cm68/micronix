@@ -10,7 +10,7 @@ typedef unsigned int ULONG;
 /*
  * symbol table
  */
-struct symtab {
+struct ws_symbol {
         unsigned short  value;
         unsigned char   flag;
 #define SF_SEG          0x03
@@ -25,7 +25,7 @@ struct symtab {
 /*
  * relocation entry
  */
-struct reloc {
+struct ws_reloc {
 	unsigned short offset;
 	unsigned short value;
 	unsigned char type;
@@ -36,6 +36,6 @@ struct reloc {
 
 #define	REL_EXTEND	43
 
-extern struct reloc *getreloc(char **pp);
+extern struct ws_reloc *getreloc(char **pp);
 extern unsigned short segoffset;
 
