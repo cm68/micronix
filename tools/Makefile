@@ -33,7 +33,7 @@ copyall: fslib.o fs.h copyall.c
 	gcc $(CFLAGS) -g -o copyall copyall.c fslib.o
 
 dis: dis.o input.o match.o util.o wslib.o
-	gcc $(CFLAGS) -o dis dis.o input.o match.o util.o wslib.o
+	gcc $(CFLAGS) -g -o dis dis.o input.o match.o util.o wslib.o
 
 dis.o: dis.c dis.h
 	gcc $(CFLAGS) -g -c dis.c
@@ -46,3 +46,9 @@ match.o: match.c dis.h
 
 util.o: util.c dis.h
 	gcc $(CFLAGS) -g -c util.c
+
+TEST= aztec/LIBC.REL
+TEST= ../whitesmith/C/V2-1/CRTX.O
+
+testdis: dis
+	./dis $(TEST)
