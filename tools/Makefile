@@ -1,12 +1,14 @@
 BINS= nm ncheck icheck dcheck dumpfs copyall dis
 
-all: $(BINS)
+all: test $(BINS)
 
 CFLAGS=-Wno-return-type
 
 clean:
 	rm -f $(BINS) *.o 
 	rm -rf *.dSYM
+
+test: testdis
 
 nm: nm.c ws.h wslib.o
 	gcc $(CFLAGS) -g -o nm nm.c wslib.o
@@ -46,3 +48,7 @@ match.o: match.c dis.h
 
 util.o: util.c dis.h
 	gcc $(CFLAGS) -g -c util.c
+
+testdis: dis
+	./dis test/LIBC.REL
+	./dis test/mw.o
