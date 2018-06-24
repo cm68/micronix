@@ -153,6 +153,7 @@ struct seg {
 #define S_CODE  1
 #define S_DATA  2
 #define S_COM   3
+#define	S_UNDEF	4	/* a hack for undefined symbols */
         struct seg *next;
 };
 

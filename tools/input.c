@@ -18,9 +18,10 @@ long start;
 struct seg *seglist;
 int high;
 int modcount;
-char *segname[] = { "absolute", "code", "data", "common" };
 
-int segbase[4];
+char *segname[] = { "absolute", "code", "data", "common", "undef" };
+
+int segbase[5];
 unsigned short segoffset;
 
 /*
@@ -458,18 +459,17 @@ do_hexdump()
 }
 
 void
-makeseg(char type, int size)
+makeseg(char type, int addr, int size)
 {
 	struct seg *sp;
 
 	sp = malloc(sizeof(*sp));
 	sp->module = modcount;
 	sp->type = type;
-	sp->base = high;
+	sp->base = addr;
 	sp->len = size;
 	sp->next = seglist;
-	high += size;
-	segbase[type] = high;
+	segbase[type] = addr;
 	seglist = sp;
 }
 
@@ -526,12 +526,12 @@ getsymname(int offset)
  * register a symbol
  */
 struct symbol *
-makesym(char *name, int offset)
+makesym(char *name, int offset, int seg)
 {
 	struct symbol *sp;
 
 	if (verbose & V_SYM) {
-		printf("makesym: %s %d\n", name, offset);
+		printf("makesym: %s %s:%d\n", name, segname[seg], offset);
 	}
 	for (sp = symbols; sp; sp = sp->next) {
 		if (strcmp(sp->name, name) == 0) {
@@ -546,7 +546,27 @@ makesym(char *name, int offset)
 	sp->next = symbols;
 	sp->offset = offset;
 	sp->name = strdup(name);
+	sp->seg = seg;
 	symbols = sp;
+	return (sp);
+}
+
+/*
+ * lookup a symbol
+ */
+struct symbol *
+lookupsym(char *name)
+{
+	struct symbol *sp = 0;
+
+	if (verbose & V_SYM) {
+		printf("lookupsym: %s\n", name);
+	}
+	for (sp = symbols; sp; sp = sp->next) {
+		if (strcmp(sp->name, name) == 0) {
+			break;
+		}
+	}
 	return (sp);
 }
 
@@ -559,7 +579,7 @@ makelabel(unsigned int offset)
 	static char labbuf[20];
 
 	sprintf(labbuf, "L%x", offset);
-	return makesym(labbuf, offset);
+	return makesym(labbuf, offset, S_CODE);
 }
 
 /*
@@ -574,6 +594,9 @@ refname(int offset)
 	char *s = 0;
 
 	for (rp = reflist; rp; rp = rp->next) {
+		if (verbose & V_SYM) {
+			printf("refname: %d %s\n", rp->offset, rp->sym->name);
+		}
 		if (rp->offset == offset) {
 			s = rp->sym->name;
 			break;
@@ -750,12 +773,13 @@ do_rel()
 					 * to the same external symbol */
 					valp = readvalue();
 					name = readsym();
-					makechain(name, valp->val + segbase[valp->seg]);
+					sym = makesym(name, 0, S_UNDEF);
+					makechain(sym, valp->val + segbase[valp->seg]);
 					break;
 				case 7:		// define entry NAME VALUE
 					valp = readvalue();
 					name = readsym();
-					makesym(name, segbase[valp->seg] + valp->val);
+					makesym(name, segbase[valp->seg] + valp->val, S_CODE);
 					break;
 				case 8:		// unused
 				case 9:		// external plus offset VALUE
@@ -764,20 +788,20 @@ do_rel()
 					break;
 				case 0xa:	// define data size VALUE
 					valp = readvalue();
-					makeseg(S_DATA, valp->val);
+					makeseg(S_DATA, 0, valp->val);
 					break;
 				case 0xb:	// set location VALUE
 					valp = readvalue();
 					location = segbase[valp->seg] + valp->val;
 					break;
 				case 0xc:	// chain address VALUE
-					name = makelabel(location);
+					sym = makelabel(location);
 					valp = readvalue();
-					makechain(name, valp->val + segbase[valp->seg]);
+					makechain(sym, valp->val + segbase[valp->seg]);
 					break;
 				case 0xd:	// define program size VALUE
 					valp = readvalue();
-					makeseg(S_CODE, valp->val);
+					makeseg(S_CODE, 0, valp->val);
 					break;
 				case 0xe:	// end module VALUE
 					valp = readvalue();
@@ -827,6 +851,33 @@ do_rel()
 	return (0);
 }
 
+struct obj *wsobj;
+struct ws_symbol *ws_sym;
+
+void
+read_reloc(int seg)
+{
+	unsigned short addr;
+	struct ws_reloc *rp;
+
+	segoffset = segbase[seg];
+
+	while ((rp = getreloc(&inptr))) {
+		addr = outbuf[segoffset] + outbuf[segoffset+1];			
+		switch (rp->type) {
+                case REL_TEXTOFF:
+			makeref(makelabel(addr), addr);
+                        break;
+                case REL_DATAOFF:
+			makeref(makelabel(addr+wsobj->data), addr+wsobj->data);
+                        break;
+                case REL_SYMBOL:
+			makeref(lookupsym(ws_sym[rp->value].name), rp->offset);
+                        break;
+		}
+	}
+}
+
 /*
  * the whole object file has been read in, so now just spew the bytes out
  * after all the relocation
@@ -834,63 +885,55 @@ do_rel()
 int
 do_whitesmith()
 {
-	struct obj *hp;
 	int i;
-	struct symtab *symtab;
 	int nsyms;
 	char *ip;
-	struct reloc *rp;
 	unsigned short addr;
 	unsigned short location;
+	struct symbol *sym;
+	int seg;
 
-	hp = (struct obj *)inptr;		/* header */
+	wsobj = (struct obj *)inptr;		/* header */
 	for (i = 0; i < sizeof(struct obj); i++) {
 		inptr++;
 	}
 	
+	location = 0;
 	start = 0;
 
 	/* snarf the text segment */
-	makeseg(S_CODE, hp->text);
-	for (i = 0 ; i < hp->text; i++) {
+	makeseg(S_CODE, 0, wsobj->text);
+	for (i = 0 ; i < wsobj->text; i++) {
 		put(location++, *inptr++);
 	}
 
-	location = hp->text;
+	location = wsobj->text;
 
 	/* read the data segment */
-	makeseg(S_DATA, hp->data);
-	for (i = 0 ; i < hp->data; i++) {
+	makeseg(S_DATA, wsobj->text, wsobj->data);
+	for (i = 0 ; i < wsobj->data; i++) {
 		put(location++, *inptr++);
 	}
 
 	/* read the symbol table */
-	symtab = (struct symbol *)(inptr);
-	nsyms = hp->table / sizeof(struct symtab);
+	ws_sym = (struct ws_symbol *)inptr;
+	nsyms = wsobj->table / sizeof(*ws_sym);
 	for (i = 0; i < nsyms; i++) {
-		inptr += sizeof(struct symtab);
-		if (symtab[i].flag & SF_DEF) {
-			makesym(symtab[i].name, symtab[i].value);
+		inptr += sizeof(*ws_sym);
+		if (ws_sym[i].flag & (SF_TEXT|SF_DEF)) {
+			seg = S_CODE;
+		} else if (ws_sym[i].flag & (SF_DATA|SF_DEF)) {
+			seg = S_DATA;
+		} else {
+			seg = S_UNDEF;
 		}
-	}
-	segoffset = 0;
-	while (rp = getreloc(&ip)) {
-		addr = outbuf[segoffset] + outbuf[segoffset+1];			
-		switch (rp->type) {
-                case REL_TEXTOFF:
-			makeref(makelabel(addr), addr);
-                        break;
-                case REL_DATAOFF:
-			makeref(makelabel(addr+hp->data), addr+hp->data);
-                        break;
-                case REL_SYMBOL:
-			makeref(&symtab[rp->value], segoffset);
-                        break;
-		}
+		sym = makesym(ws_sym[i].name, ws_sym[i].value, seg);
 	}
 
-	/* process the text relocations */
-	/* process the data relocations */
+	/* process the relocations */
+	read_reloc(S_CODE);
+	read_reloc(S_DATA);
+
 	return (0);
 }
 

@@ -8,7 +8,7 @@
 
 int verbose;
 int rflag;
-struct symtab *syms;
+struct ws_symbol *syms;
 int nsyms;
 
 char relocbuf[16384];
@@ -19,7 +19,7 @@ unsigned short segoffset;
 void
 dumprelocs(char *seg)
 {
-	struct reloc *rp;
+	struct ws_reloc *rp;
 
 	segoffset = 0;
 
@@ -51,7 +51,7 @@ nm(char *oname)
 {
 	int object;
 	struct obj head;
-	struct symtab *sym;
+	struct ws_symbol *sym;
 	int i;
 	unsigned short value;
 	unsigned char flag;
@@ -80,8 +80,8 @@ nm(char *oname)
 		printf("no name list\n");
 		exit(1);
 	}
-	syms = malloc(nsyms * sizeof(struct symtab));
-	read(object, syms, nsyms * sizeof(struct symtab));
+	syms = malloc(nsyms * sizeof(*syms));
+	read(object, syms, nsyms * sizeof(*syms));
 
 	sym = syms;
 	for(i = 0; i < nsyms; i++) {
