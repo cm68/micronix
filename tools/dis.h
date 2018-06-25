@@ -126,6 +126,7 @@ struct symbol {
 	struct seg *segp;
 	segoff_t offset;
 	char *name;
+	char invented;
 	struct symbol *next;
 };
 
