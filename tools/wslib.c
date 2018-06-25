@@ -35,7 +35,7 @@ binout(unsigned char b)
  * it returns a pointer to a static reloc structure or null if no more.
  * it's up to the caller to copy out of the static struct
  *
- * segoffset is modified as a side-effect
+ * location is modified as a side-effect
  *
  * relocation control bytes take the following values:
  * 0 : 		end of relocs
@@ -51,7 +51,7 @@ binout(unsigned char b)
  *     128-256   symbol table entries 256 * (n - 128) + 175 + next byte
  */
 struct ws_reloc *
-getreloc(char **rp)
+getreloc(unsigned char **rp)
 {
 	static struct ws_reloc reloc;
 	unsigned char control;
@@ -66,14 +66,14 @@ getreloc(char **rp)
 
 		/* one byte skips */
 		if (control < 32) {
-			segoffset += control;
+			location += control;
 			continue;
 		}
 
 		/* two byte skips */
 		if (control < 64) {
-			segoffset += 32 + (256 * (control - 32));
-			segoffset += *(*rp)++;
+			location += 32 + (256 * (control - 32));
+			location += *(*rp)++;
 			continue;
 		}
 
@@ -88,9 +88,9 @@ getreloc(char **rp)
 
 		/* these are just words that add in the segment base */
 		if (control == REL_TEXTOFF || control == REL_DATAOFF) {
-			reloc.offset = segoffset;
+			reloc.offset = location;
 			reloc.type = control;
-			segoffset += 2;
+			location += 2;
 			reloc.value = 0;
 			return (&reloc);
 		}
@@ -111,10 +111,10 @@ getreloc(char **rp)
 
 		/* return a symbol reference */
 		reloc.type = REL_SYMBOL;
-		reloc.offset = segoffset;
+		reloc.offset = location;
 		reloc.value = control;
 
-		segoffset += 2;
+		location += 2;
 		return (&reloc);
 	}
 }

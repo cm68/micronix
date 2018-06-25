@@ -36,6 +36,6 @@ struct ws_reloc {
 
 #define	REL_EXTEND	43
 
-extern struct ws_reloc *getreloc(char **pp);
-extern unsigned short segoffset;
+extern struct ws_reloc *getreloc(unsigned char **pp);
+extern unsigned short location;
 
