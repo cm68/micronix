@@ -487,6 +487,7 @@ makeseg(int module, seg_t seg, int addr, int size)
 
 	curseg[seg] = sp;
 	seglist = sp;
+	myseg = sp;
 	checksym();
 }
 
@@ -522,6 +523,15 @@ is_code(addr_t addr) {
 }
 
 struct symbol *symbols;
+char *
+symspec(struct symbol *s)
+{
+	static char symbuf[30];
+
+	sprintf(symbuf, "%s.%s:0x%x", 
+		s->name, s->segp->modname, segname[s->segp->type], s->offset);
+	return (symbuf);
+}
 
 /*
  * look up the symbol by the output buffer offset
@@ -580,16 +590,14 @@ makesym(char *name, segoff_t offset, seg_t seg)
 	}
 	for (sp = symbols; sp; sp = sp->next) {
 		if (strcmp(sp->name, name) == 0) {
-			/* if we have seen a definition, don't undef it */
-			if (seg == S_UNDEF) {
-				if (seg != sp->segp->type) {
-					printf("makesym: %s already defined different seg 0x%x new 0x%x\n",
-						name, sp->segp->type, seg);
-				}
-			} else {
-				if (sp->segp->type == S_UNDEF) {
-					goto redef;
-				}
+			/* if was undef, and now def, redefine it */
+			if ((sp->segp->type == S_UNDEF) && (seg != S_UNDEF)) {
+				goto redef;
+			}
+			if ((seg != S_UNDEF) && ((sp->segp->type != seg) || (sp->offset != offset))) {
+				printf("makesym: incompatible redef %s %s.%s:0x%x was %s.%s:0x%x\n", 
+					name, modname, segname[seg], offset,
+					sp->segp->modname, segname[sp->segp->type], sp->offset);
 			}
 			return sp;
 		}
@@ -658,26 +666,33 @@ checksym();
 }
 
 /*
+ * dump out symbols
+ */
+dumpsyms()
+{
+	struct symbol *s;
+	printf("symbols:\n");
+	for (s = symbols; s; s = s->next) {
+		printf("%s\n", symspec(s));
+	}
+}
+
+/*
  * references are operand fields that refer to symbols
  */
 struct ref *reflist;
 
-char *
-refname(addr_t offset)
+struct ref *
+getref(addr_t offset)
 {
 	struct ref *rp;
-	char *s = 0;
 
 	for (rp = reflist; rp; rp = rp->next) {
 		if (rp->offset == offset) {
-			s = rp->sym->name;
-			break;
+			return (rp);
 		}
 	}
-	if (verbose & V_SYM) {
-		printf("refname: 0x%x %s\n", offset, s ? s : "undefined");
-	}
-	return s;
+	return 0;
 }
 
 /*
@@ -688,14 +703,23 @@ makeref(struct symbol *sym, unsigned int offset)
 {
 	struct ref *rp;
 
-	if (verbose & V_SYM) {
-		printf("makeref: %s at 0x%x\n", sym->name, offset);
-	}
 	rp = malloc(sizeof(*rp));
 	rp->sym = sym;
 	rp->offset = offset;
+	rp->bias = 0;
 	rp->next = reflist;
 	reflist = rp;
+}
+
+/*
+ * dump out references
+ */
+dumprefs()
+{
+	struct ref *r;
+	for (r = reflist ; r ; r = r->next) {
+		printf("ref to %s at 0x%x\n", symspec(r->sym), r->offset);
+	}
 }
 
 /*
@@ -705,81 +729,11 @@ makeref(struct symbol *sym, unsigned int offset)
  * instructions to chain together references to the same address, so if 5 jump
  * instructions all go the same place, they are all chained together.  this
  * is pretty compact.
+ * also, chains have the useful property that they always run backwards from
+ * high addresses to low, so we have already scribbled the data into the output
+ * buffer.
+ *
  */
-char *controltype[] = { "special", "code", "data", "common" };
-
-char *specialtype[] = { 
-	"entry", "common", "progname", "unused3",
-	"unused4", "commonsize", "chainext", "define",
-	"unused8", "extoff", "datasize", "setloc",
-	"chainaddr", "progsize", "endmodule", "end"
-};
-
-/*
- * whenever we get an address chain, we need to chase down the references
- * once we have built the segments.  we need to track this work to do.
- * all the chain elements are segment relative
- */
-struct refchain {
-	struct symbol *sym;
-	struct seg *seg;
-	int offset;
-	struct refchain *next;
-} *rc_head;
-
-/*
- * chain to symbol with the address offset
- */
-void
-makechain(struct symbol *sp, unsigned short link, struct segment *seg)
-{
-	struct refchain *rc;
-
-	if (verbose & V_SYM) {
-		printf("makechain: %s at 0x%x\n", sp->name, link);
-	}
-
-	rc = malloc(sizeof(*rc));
- 	rc->seg = seg;
-	rc->sym = sp;
-	rc->offset = link;
-	rc->next = rc_head;
-	rc_head = rc;
-}
-
-/*
- * process all the reference chains to create individual refs
- */
-void
-fixup_chains()
-{
-	int addr;
-	struct refchain *rc;
-
-	checksym();
-	/* each chain is a list of references to the same symbol */
-	while ((rc = rc_head)) {
-		if (verbose & V_SYM) {
-			printf("chain %s\n", rc->sym->name);
-		}
-		while ((addr = rc->offset) != 0) {
-			if (verbose & V_SYM) {
-				printf("\tlink 0x%x\n", addr);
-			}
-			addr += rc->seg->base;
-			makeref(rc->sym, addr);
-			rc->offset = outbuf[addr] + (outbuf[addr+1] << 8);
-			if ((verbose & V_SYM) && rc->offset) {
-				printf("chain to %x\n", rc->offset);
-			}
-			outbuf[addr] = outbuf[addr+1] = 0;
-		}
-		rc_head = rc->next;
-		free(rc);
-	}
-	/* XXX */
-	checksym();
-}
 
 /*
  * rel file A fields are 2 bits of segment and 16 bits of value
@@ -821,6 +775,146 @@ readsym()
 	return symbuf;
 }
 
+/*
+ * walk the chain backwards starting at off in seg, and make a reference to symbol
+ * at each of the links
+ */
+void
+walkchain(struct symbol *s, segoff_t off, struct seg *seg)
+{
+	addr_t addr;
+
+	if (verbose & V_SYM) {
+		printf("chain %s.%s base:0x%x %s.%s 0x%x(0x%x)", 
+			seg->modname, segname[seg->type], seg->base, 
+			s->segp->modname, s->name, 
+			off, off + seg->base);
+	}
+	/* while there are links backwards */
+	while (off) {
+		/* register absolute adddress of the reference to the symbol */
+		addr = off + seg->base;
+		makeref(s, addr);
+
+		/* read the next link */
+		off = outbuf[addr] + (outbuf[addr+1] << 8);
+		if (verbose & V_SYM) {
+			printf(" link 0x%x(0x%x)", off, off + seg->base);
+		}
+		if (off + seg->base > addr) {
+			printf(" chain inversion\n");
+		}
+		outbuf[addr] = outbuf[addr+1] = 0;
+	}
+	if (verbose & V_SYM) {
+		printf("\n");
+	}
+}
+
+char *controltype[] = { "special", "code", "data", "common" };
+
+/*
+ * the bit stream has the following parse:
+ *
+ * <seg> is 2 bits   	0: absolute 1: code 2: data 3:common
+ * <byte> is 8 bits
+ * <word> is 16 bits
+ * <width> is 3 bits
+ * <name> is <width> bytes
+ *
+ * 0 <byte>		absolute data
+ * 1 01 <word>  	program relative
+ * 1 10 <word>  	data relative
+ * 1 11 <word>  	common relative
+ * 1 00 special link
+ *      0000 <width> <name>			entry symbol
+ *      0001 <width> <name>			select common
+ *      0010 <width> <name>			program name
+ *      0011 <width> <name>			library search
+ *      0100 <width> <name>			RFU	
+ *      0101 <seg> <word> <width> <name>	common size
+ *      0110 <seg> <word> <width> <name>	chain external
+ *      0111 <seg> <word> <width> <name>	define symbol
+ *      1000 <seg> <word> <width> <name>	external - offset
+ *      1001 <seg> <word>			external + offset
+ *      1010 <seg> <word>			data size
+ *      1011 <seg> <word>			set location
+ *      1100 <seg> <word>			chain location
+ *      1101 <seg> <word>			code size
+ *      1110 <seg> <word>			end module
+ *      1111					end file
+ */
+
+/*
+ * special link types can have optional items in the bit stream
+ */
+struct speciallink {
+	char *name;
+	char flags;
+#define	CT_A		0x01	/* has A field - a 16 bit value */
+#define	CT_B		0x02	/* has B field - a name */
+#define	CT_UNIMPL	0x80	/* print a message */
+};
+
+struct speciallink speciallink[] = { 
+	"entry", CT_B|CT_UNIMPL,		/* 0 */
+	"common", CT_B|CT_UNIMPL,		/* 1 */
+	"module", CT_B,				/* 2 */
+	"libsearch",CT_B|CT_UNIMPL,		/* 3 */
+	"rfu", CT_B|CT_UNIMPL,			/* 4 */
+	"commonsize", CT_A|CT_B|CT_UNIMPL,	/* 5 */
+	"chainext", CT_A|CT_B,			/* 6 */
+	"symbol", CT_A|CT_B,			/* 7 */
+	"extoffset", CT_A|CT_B|CT_UNIMPL, 	/* 8 */
+	"extoff", CT_A,				/* 9 */
+	"datasize", CT_A,			/* 10 */
+	"setloc", CT_A,				/* 11 */
+	"chainaddr", CT_A|CT_UNIMPL,	 	/* 12 */
+	"progsize", CT_A,		 	/* 13 */
+	"endmodule", CT_A,			/* 14 */
+	"end", 0,				/* 15 */
+};
+
+struct bias {
+	unsigned short addition;
+	unsigned short address;
+	struct bias *next;
+} *biases;
+
+void
+addbias(unsigned short addr, unsigned short bias)
+{
+	struct bias *b;
+
+	b = malloc(sizeof(*b));
+	b->address = addr;
+	b->addition = bias;
+	b->next = biases;
+	biases = b;
+}
+
+void
+fixbias()
+{
+	struct bias *b;
+	unsigned short value;
+	struct ref *rp;
+
+	for (b = biases ; b; b = b->next) {
+		rp = getref(b->address);
+		if (!rp) {
+			printf("no rel for bias\n");
+#ifdef notdef
+			value = (outbuf[b->address] << 8) + outbuf[b->address+1] + b->addition;
+			outbuf[b->address] = (value >> 8) & 0xff;	
+			outbuf[b->address+1] = value & 0xff;	
+#endif
+			continue;
+		}
+		rp->bias = b->addition;
+	}
+}
+
 int
 do_rel()
 {
@@ -834,6 +928,7 @@ do_rel()
 
 	undefs = 0;
 	makeseg(modcount, S_UNDEF, 65536 + undefs, 65536);
+	curseg[S_UNDEF]->modname = "undef";
 
 	location = 0;
 
@@ -844,7 +939,8 @@ do_rel()
 			val = getbits(8);
 			if (verbose & V_PARSE) {
 				if (verbose & V_EXTRA) {
-					printf("0x%x abs entry %x\n", location, val);
+					printf("(%s.%s:0x%x) 0x%x abs entry %x\n", 
+					myseg->modname, segname[myseg->type], location - myseg->base, location, val);
 				}
 			}
 			put(location++, val);
@@ -867,94 +963,80 @@ do_rel()
 				control = getbits(4);
 				name = 0; 
 				valp = 0;
-				switch (control) {
-				case 0:		// entry symbol NAME
+
+				if (speciallink[control].flags & CT_A) {
+					valp = readvalue();
+				}
+				if (speciallink[control].flags & CT_B) {
 					name = readsym();
-					printf("entry name not handled\n");
-					break;
-				case 1:		// select common block NAME
-					name = readsym();
-					printf("select common not handled\n");
-					break;
-				case 2:		// program name NAME
-					name = readsym();
-					if (modname) { free(modname); }
-					modname = strdup(name);
-					break;
-				case 3:		// unused
-				case 4:		// unused
-				case 5:		// define common size VALUE
-					valp = readvalue();
-					name = readsym();
-					printf("define common size not handled\n");
-					break;
-				case 6:		// chain external VALUE
-					/* entries of this form are the head of a list of references
-					 * to the same external symbol */
-					valp = readvalue();
-					name = readsym();
-					sym = makesym(name, 0, S_UNDEF);
-					if (valp->val) {
-						makechain(sym, valp->val, myseg);
-					}
-					break;
-				case 7:		// define entry NAME VALUE
-					valp = readvalue();
-					name = readsym();
-					makesym(name, valp->val, S_CODE);
-					break;
-				case 8:		// unused
-				case 9:		// external plus offset VALUE
-					valp = readvalue();
-					printf("XXX not handled\n");
-					break;
-				case 0xa:	// define data size VALUE
-					valp = readvalue();
-					makeseg(modcount, S_DATA, location, valp->val);
-					location += valp->val;
-					break;
-				case 0xb:	// set location VALUE
-					valp = readvalue();
-					myseg = curseg[valp->seg];
-					location = curseg[valp->seg]->base + valp->val;
-					break;
-				case 0xc:	// chain address VALUE
-					valp = readvalue();
-					sym = makelabel(location - myseg->base, myseg->type);
-					makechain(sym, valp->val, myseg);
-					break;
-				case 0xd:	// define program size VALUE
-					valp = readvalue();
-					makeseg(modcount, S_CODE, location, valp->val);
-					location += valp->val;
-					break;
-				case 0xe:	// end module VALUE
-					valp = readvalue();
-					modcount++;
-					if (bitoff != 0) {
-						bitoff = 0;
-						inptr++;
-					}
-					fixup_chains();
-					break;
-				case 0xf:	// end file
-					done++;
-					break;
-				break;
-				}				
-				if (verbose & V_PARSE) {
-					printf("special entry %d %s ", control, specialtype[control]);
+				}
+
+				if ((verbose & V_PARSE) || (speciallink[control].flags & CT_UNIMPL)) {
+					printf("0x%x special entry %d %s ", 
+						location, control, speciallink[control].name);
 					if (name) {
 						printf("%s ", name);
 					}
 					if (valp) {
 						printf(" = 0x%x (%s)", valp->val, segname[valp->seg]);
 					}
+					if (speciallink[control].flags & CT_UNIMPL) {
+						printf(" not handled");
+					}
 					printf("\n");
 				}
+
+				switch (control) {
+				default:
+					break;
+				case 2:		// program name NAME
+					modname = strdup(name);
+					break;
+				case 6:		// chain external VALUE
+					/* entries of this form are the head of a list of references
+					 * to the same external symbol */
+					sym = makesym(name, 0, S_UNDEF);
+					walkchain(sym, valp->val, myseg);
+					break;
+				case 7:		// define entry NAME VALUE
+					makesym(name, valp->val, S_CODE);
+					break;
+				case 9:		// extoff - add valp to the 16 bits at location
+					addbias(location, valp->val);
+					break;
+				case 0xa:	// define data size VALUE
+					makeseg(modcount, S_DATA, location, valp->val);
+					break;
+				case 0xb:	// set location VALUE
+					myseg = curseg[valp->seg];
+					location = curseg[valp->seg]->base + valp->val;
+					break;
+				case 0xc:	// chain address VALUE
+					sym = makelabel(location - myseg->base, myseg->type);
+					walkchain(sym, valp->val, myseg);
+					break;
+				case 0xd:	// define program size VALUE
+					makeseg(modcount, S_CODE, location, valp->val);
+					break;
+				case 0xe:	// end module VALUE
+					modcount++;
+					if (bitoff != 0) {
+						bitoff = 0;
+						inptr++;
+					}
+					break;
+				case 0xf:	// end file
+					done++;
+					break;
+				break;
+				}				
+
 			}
 		}
 	}
+	if (verbose & V_SYM) dumpsyms();
+	if (verbose & V_REF) dumprefs();
+	fixbias();
 	return (0);
 }
 

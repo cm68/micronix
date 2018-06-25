@@ -13,7 +13,7 @@ extern char *maketest(long *, int *);
 
 char *vopts[] = { 
 	"V_BUF", "V_MATCH", "V_PARSE", "V_OUT", 
-	"V_TABLE", "V_SYM", "V_EXTRA", 0 
+	"V_TABLE", "V_SYM", "V_REF", "V_EXTRA", 0 
 };
 
 int bigendian = 0;
@@ -39,7 +39,7 @@ usage()
 -a --arch=<architecture>\tuse architecture file\n\
 ");
 	for (c = 0; vopts[c]; c++) {
-		printf("%x %s\n", 1 << c, vopts[c]);
+		printf("0x%x %s\n", 1 << c, vopts[c]);
 	}	
 	exit(-1);
 }

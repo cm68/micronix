@@ -7,7 +7,8 @@
 #define	V_OUT	0x8
 #define	V_TABLE	0x10
 #define	V_SYM	0x20
-#define	V_EXTRA	0x40
+#define	V_REF	0x40
+#define	V_EXTRA	0x80
 
 int bigendian;
 
@@ -133,19 +134,19 @@ struct symbol {
 /* return the symbol that has this location */
 char *getsymname(addr_t offset);
 
-char *refname(addr_t offset);
-
 /*
  * a reference is an operand field that is an address
  * they always have names, either externally known symbols or invented labels
+ * they may optionally have a bias added to them
  */
 struct ref {
     addr_t offset;			/* where the reference is */
     struct symbol *sym;		/* what it references */
-    struct ref *next;
+    unsigned short bias;	/* what might be added */
+    struct ref *next;		/* */
 };
 
-char *ref(addr_t val);	/* return the name to print here */
+struct ref *getref(addr_t val);	/* the reference to print here */
 
 int is_code(addr_t addr);
 

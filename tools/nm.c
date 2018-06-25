@@ -11,8 +11,8 @@ int rflag;
 struct ws_symbol *syms;
 int nsyms;
 
-char relocbuf[16384];
-char *relocp;
+unsigned char relocbuf[16384];
+unsigned char *relocp;
 
 unsigned short location;
 
@@ -23,7 +23,7 @@ dumprelocs(char *seg)
 
 	location = 0;
 
-	while (rp = getreloc(&relocp)) {
+	while ((rp = getreloc(&relocp)) != 0) {
 		printf("%s:%04x ", seg, rp->offset);
 		switch (rp->type) {
 		case REL_TEXTOFF:
