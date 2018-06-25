@@ -18,34 +18,12 @@ long start;
 struct seg *seglist;
 int high;
 int modcount;
+char *modname;
 
 char *segname[] = { "absolute", "code", "data", "common", "undef" };
 
-int segbase[5];
-unsigned short segoffset;
-
-/*
- * random utility function
- */
-unsigned char binbuf[17];
-unsigned char *
-binstr(unsigned short val, char count)
-{
-	unsigned char *s = binbuf;
-	int i;
-
-	binbuf[0] = 0;
-
-	for (i = count-1; i >= 0; i--) {
-		if ((val >> i) & 0x1) {
-			*s++ = '1';
-		} else {
-			*s++ = '0';
-		}
-		*s = '\0';
-	}
-	return binbuf;
-}
+struct seg *curseg[5];
+struct seg *myseg;
 
 /*
  * the input source
@@ -61,6 +39,30 @@ int bitoff;
 unsigned char *outbuf;
 unsigned short outsize;
 unsigned short outhigh;
+unsigned short location;
+
+/*
+ * random utility function
+ */
+unsigned char *
+binstr(unsigned short val, char count)
+{
+	static unsigned char binbuf[17];
+	unsigned char *s = binbuf;
+	int i;
+
+	binbuf[0] = 0;
+
+	for (i = count-1; i >= 0; i--) {
+		if ((val >> i) & 0x1) {
+			*s++ = '1';
+		} else {
+			*s++ = '0';
+		}
+		*s = '\0';
+	}
+	return binbuf;
+}
 
 /*
  * the microsoft rel format is built on a bit stream. 
@@ -395,7 +397,8 @@ do_hexdump()
 	int byte;
 	unsigned int data = 0;
 	int digits = 0;
-	int location = 0;
+
+	location = 0;
 
 	/* swallow newlines tabs and spaces */
 	while (1) {
@@ -458,23 +461,36 @@ do_hexdump()
 	return (1);
 }
 
+/*
+ * let's create another segment, which is a region into the output buffer
+ */
 void
-makeseg(char type, int addr, int size)
+makeseg(int module, seg_t seg, int addr, int size)
 {
 	struct seg *sp;
 
+	if (verbose & V_SYM) {
+		printf("makeseg: module: %d(%s) seg: %d(%s) offset: 0x%x size: 0x%x\n",
+			module, modname ? modname:"undef", seg, segname[seg], addr, size);
+	}
+
 	sp = malloc(sizeof(*sp));
-	sp->module = modcount;
-	sp->type = type;
+	sp->module = module;
+	sp->modname = modname;
+	sp->type = seg;
 	sp->base = addr;
 	sp->len = size;
 	sp->next = seglist;
-	segbase[type] = addr;
+
+	curseg[seg] = sp;
 	seglist = sp;
 }
 
+/*
+ * for an output buffer offset, what is the segment
+ */
 struct seg *
-lookup_seg(int addr)
+lookup_seg(addr_t addr)
 {
 	struct seg *sp;
 
@@ -486,8 +502,11 @@ lookup_seg(int addr)
 	return 0;
 }
 
-char
-is_code(int addr) {
+/*
+ * if this is code, we want to disassemble, no?
+ */
+int
+is_code(addr_t addr) {
 	struct seg *sp;
 
 	sp = lookup_seg(addr);
@@ -501,42 +520,52 @@ is_code(int addr) {
 struct symbol *symbols;
 
 /*
- * XXX - there could be more than once symbol with the same value
- * return the first.
+ * look up the symbol by the output buffer offset
+ * this is very likely to be different from the segment offset
  */
 char *
-getsymname(int offset)
+getsymname(addr_t offset)
 {
 	char *s = 0;
 	struct symbol *sp;
+	struct seg *segp;
+
+	/* first, find out what segment this address is */
+	segp = lookup_seg(offset);
+	if (!segp || (segp->type == S_UNDEF)) {
+		printf("getsymname: bogus address 0x%x\n", offset);
+		return (0);
+	}
+	/* subtract off the segment base */
+	offset -= segp->base;
 
 	for (sp = symbols; sp; sp = sp->next) {
-		if (sp->offset == offset) {
+		if ((sp->segp == segp) && (sp->offset == offset)) {
 			s = sp->name;
 			break;
 		}
 	}
-	if (verbose & V_SYM) {
-		printf("getsymname: %d %s\n", offset, s ? s : "undefined");
+	if (s && (verbose & V_SYM)) {
+		printf("getsymname: 0x%x %s\n", offset, s);
 	}
 	return s;
 }
 
 /*
- * register a symbol
+ * register a symbol - this is given a bogus offset if it is an external
  */
 struct symbol *
-makesym(char *name, int offset, int seg)
+makesym(char *name, segoff_t offset, seg_t seg)
 {
 	struct symbol *sp;
 
 	if (verbose & V_SYM) {
-		printf("makesym: %s %s:%d\n", name, segname[seg], offset);
+		printf("makesym: %s %s.%s:0x%x\n", name, modname, segname[seg], offset);
 	}
 	for (sp = symbols; sp; sp = sp->next) {
 		if (strcmp(sp->name, name) == 0) {
 			if (sp->offset != offset) {
-				printf("makesym: %s already defined old %d new %d\n",
+				printf("makesym: %s already defined old 0x%x new 0x%x\n",
 					name, sp->offset, offset);
 			}
 			return sp;
@@ -546,13 +575,13 @@ makesym(char *name, int offset, int seg)
 	sp->next = symbols;
 	sp->offset = offset;
 	sp->name = strdup(name);
-	sp->seg = seg;
+	sp->segp = curseg[seg];
 	symbols = sp;
 	return (sp);
 }
 
 /*
- * lookup a symbol
+ * lookup a symbol by name
  */
 struct symbol *
 lookupsym(char *name)
@@ -574,12 +603,12 @@ lookupsym(char *name)
  * invent a symbol abd register it
  */
 struct symbol *
-makelabel(unsigned int offset)
+makelabel(segoff_t offset, seg_t seg)
 {
 	static char labbuf[20];
 
 	sprintf(labbuf, "L%x", offset);
-	return makesym(labbuf, offset, S_CODE);
+	return makesym(labbuf, offset, seg);
 }
 
 /*
@@ -588,22 +617,19 @@ makelabel(unsigned int offset)
 struct ref *reflist;
 
 char *
-refname(int offset)
+refname(addr_t offset)
 {
 	struct ref *rp;
 	char *s = 0;
 
 	for (rp = reflist; rp; rp = rp->next) {
-		if (verbose & V_SYM) {
-			printf("refname: %d %s\n", rp->offset, rp->sym->name);
-		}
 		if (rp->offset == offset) {
 			s = rp->sym->name;
 			break;
 		}
 	}
 	if (verbose & V_SYM) {
-		printf("refname: %d %s\n", offset, s ? s : "undefined");
+		printf("refname: 0x%x %s\n", offset, s ? s : "undefined");
 	}
 	return s;
 }
@@ -617,7 +643,7 @@ makeref(struct symbol *sym, unsigned int offset)
 	struct ref *rp;
 
 	if (verbose & V_SYM) {
-		printf("makeref: %s at %d\n", sym->name, offset);
+		printf("makeref: %s at 0x%x\n", sym->name, offset);
 	}
 	rp = malloc(sizeof(*rp));
 	rp->sym = sym;
@@ -659,7 +685,7 @@ makechain(struct symbol *sp, unsigned short link)
 	struct refchain *rc;
 
 	if (verbose & V_SYM) {
-		printf("makechain: %s at %d\n", sp->name, link);
+		printf("makechain: %s at 0x%x\n", sp->name, link);
 	}
 
 	rc = malloc(sizeof(*rc));
@@ -681,7 +707,7 @@ fixup_chains()
 	while ((rc = rc_head)) {
 		printf("chain %s\n", rc->sym->name);
 		while ((addr = rc->offset) != 0) {
-			printf("\tlink %d\n", addr);
+			printf("\tlink 0x%x\n", addr);
 			makeref(rc->sym, addr);
 			rc->offset = outbuf[addr] + (outbuf[addr+1] << 8);
 			outbuf[addr] = outbuf[addr+1] = 0;
@@ -732,6 +758,8 @@ readsym()
 	return symbuf;
 }
 
+int undefs;
+
 int
 do_rel()
 {
@@ -742,12 +770,26 @@ do_rel()
 	char done = 0;
 	char i;
 	struct symbol *sym;
-	unsigned short location;
+
+	undefs = 0;
+	makeseg(modcount, S_UNDEF, 65536 + undefs, 65536);
+
+	location = 0;
 
 	while (!done) {
 		if (inptr > inend) break;
-		if (getbits(1)) {
+		/* absolute byte */
+		if (getbits(1) == 0) {
+			val = getbits(8);
+			if (verbose & V_PARSE) {
+				if (verbose & V_EXTRA) {
+					printf("%x abs entry %x\n", location, val);
+				}
+			}
+			put(location++, val);
+		} else {
 			control = getbits(2);
+			/* special link item 1 00 */
 			if (control == 0) {
 				control = getbits(4);
 				name = 0; 
@@ -755,31 +797,36 @@ do_rel()
 				switch (control) {
 				case 0:		// entry symbol NAME
 					name = readsym();
+					printf("entry name not handled\n");
 					break;
 				case 1:		// select common block NAME
 					name = readsym();
+					printf("select common not handled\n");
 					break;
 				case 2:		// program name NAME
 					name = readsym();
+					if (modname) { free(modname); }
+					modname = strdup(name);
 					break;
 				case 3:		// unused
 				case 4:		// unused
 				case 5:		// define common size VALUE
 					valp = readvalue();
 					name = readsym();
+					printf("define common size not handled\n");
 					break;
 				case 6:		// chain external VALUE
 					/* entries of this form are the head of a list of references
 					 * to the same external symbol */
 					valp = readvalue();
 					name = readsym();
-					sym = makesym(name, 0, S_UNDEF);
-					makechain(sym, valp->val + segbase[valp->seg]);
+					sym = makesym(name, undefs++, S_UNDEF);
+					makechain(sym, valp->val + curseg[S_UNDEF]->base);
 					break;
 				case 7:		// define entry NAME VALUE
 					valp = readvalue();
 					name = readsym();
-					makesym(name, segbase[valp->seg] + valp->val, S_CODE);
+					makesym(name, curseg[valp->seg]->base + valp->val, S_CODE);
 					break;
 				case 8:		// unused
 				case 9:		// external plus offset VALUE
@@ -788,20 +835,23 @@ do_rel()
 					break;
 				case 0xa:	// define data size VALUE
 					valp = readvalue();
-					makeseg(S_DATA, 0, valp->val);
+					makeseg(modcount, S_DATA, location, valp->val);
+					location += valp->val;
 					break;
 				case 0xb:	// set location VALUE
 					valp = readvalue();
-					location = segbase[valp->seg] + valp->val;
+					myseg = curseg[valp->seg];
+					location = curseg[valp->seg]->base + valp->val;
 					break;
 				case 0xc:	// chain address VALUE
-					sym = makelabel(location);
 					valp = readvalue();
-					makechain(sym, valp->val + segbase[valp->seg]);
+					sym = makelabel(location - myseg->base, myseg->type);
+					makechain(sym, valp->val + curseg[valp->seg]->base);
 					break;
 				case 0xd:	// define program size VALUE
 					valp = readvalue();
-					makeseg(S_CODE, 0, valp->val);
+					makeseg(modcount, S_CODE, location, valp->val);
+					location += valp->val;
 					break;
 				case 0xe:	// end module VALUE
 					valp = readvalue();
@@ -810,6 +860,7 @@ do_rel()
 						bitoff = 0;
 						inptr++;
 					}
+					done++;
 					break;
 				case 0xf:	// end file
 					done++;
@@ -827,24 +878,17 @@ do_rel()
 					printf("\n");
 				}
 			} else {
+				/* relative entry 1 seg: [ 01 10 11 ] */
 				val = getbits(16);
 				val = ((val & 0xff) << 8) | ((val >> 8) & 0xff);
 				if (verbose & V_PARSE) {
-					printf("%x rel entry %d %s %x %x\n", 
-						location, control, controltype[control], segbase[control], val);
+					printf("0x%x %s relative 0x%x 0x%x\n", 
+						location, controltype[control], curseg[control]->base, val);
 				}
-				val += segbase[control];
-				
-				makeref(makelabel(val), location);
-				put(location++, val & 0xff);
-				put(location++, (val >> 8) & 0xff);
+				makeref(makelabel(val, control), val);
+				put(location++, 0);
+				put(location++, 0);
 			}
-		} else {
-			val = getbits(8);
-			if (verbose & V_PARSE) {
-				printf("%x abs entry %x\n", location, val);
-			}
-			put(location++, val);
 		}
 	}
 	fixup_chains();
@@ -860,16 +904,17 @@ read_reloc(int seg)
 	unsigned short addr;
 	struct ws_reloc *rp;
 
-	segoffset = segbase[seg];
+	location = curseg[seg]->base;
+	myseg = curseg[seg];
 
 	while ((rp = getreloc(&inptr))) {
-		addr = outbuf[segoffset] + outbuf[segoffset+1];			
+		addr = outbuf[location] + outbuf[location+1];			
 		switch (rp->type) {
                 case REL_TEXTOFF:
-			makeref(makelabel(addr), addr);
+			makeref(makelabel(addr, S_CODE), addr);
                         break;
                 case REL_DATAOFF:
-			makeref(makelabel(addr+wsobj->data), addr+wsobj->data);
+			makeref(makelabel(addr+wsobj->data, S_DATA), addr+wsobj->data);
                         break;
                 case REL_SYMBOL:
 			makeref(lookupsym(ws_sym[rp->value].name), rp->offset);
@@ -889,7 +934,6 @@ do_whitesmith()
 	int nsyms;
 	char *ip;
 	unsigned short addr;
-	unsigned short location;
 	struct symbol *sym;
 	int seg;
 
@@ -902,7 +946,7 @@ do_whitesmith()
 	start = 0;
 
 	/* snarf the text segment */
-	makeseg(S_CODE, 0, wsobj->text);
+	makeseg(modcount, S_CODE, 0, wsobj->text);
 	for (i = 0 ; i < wsobj->text; i++) {
 		put(location++, *inptr++);
 	}
@@ -910,7 +954,7 @@ do_whitesmith()
 	location = wsobj->text;
 
 	/* read the data segment */
-	makeseg(S_DATA, wsobj->text, wsobj->data);
+	makeseg(modcount, S_DATA, wsobj->text, wsobj->data);
 	for (i = 0 ; i < wsobj->data; i++) {
 		put(location++, *inptr++);
 	}

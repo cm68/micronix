@@ -14,14 +14,14 @@ int nsyms;
 char relocbuf[16384];
 char *relocp;
 
-unsigned short segoffset;
+unsigned short location;
 
 void
 dumprelocs(char *seg)
 {
 	struct ws_reloc *rp;
 
-	segoffset = 0;
+	location = 0;
 
 	while (rp = getreloc(&relocp)) {
 		printf("%s:%04x ", seg, rp->offset);

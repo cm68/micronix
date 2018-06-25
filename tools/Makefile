@@ -50,5 +50,5 @@ util.o: util.c dis.h
 	gcc $(CFLAGS) -g -c util.c
 
 testdis: dis
-	./dis test/LIBC.REL
+	./dis -v=0x24 test/LIBC.REL
 	./dis test/mw.o

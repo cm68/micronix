@@ -7,6 +7,7 @@
 #define	V_OUT	0x8
 #define	V_TABLE	0x10
 #define	V_SYM	0x20
+#define	V_EXTRA	0x40
 
 int bigendian;
 
@@ -112,50 +113,57 @@ struct inst {
 #define bit_set(map, bit) ((map[(bit) / 8] & (1 << ((bit) % 8))) ? 1 : 0)
 #define set_bit(map, bit) map[(bit) / 8] |= (1 << ((bit) % 8))
 
+typedef unsigned char seg_t;		/* segment type */
+typedef unsigned short addr_t;		/* offset into the output buffer */
+typedef unsigned short segoff_t;	/* offset into the segment */
+
 /*
  * a symbol is a name that may be defined or not.
  * these may be from the object file, or they may be invented labels
+ * either way, symbols are identified by the offset, seg tuple
  */
 struct symbol {
-	int offset;
-	int seg;
+	struct seg *segp;
+	segoff_t offset;
 	char *name;
 	struct symbol *next;
 };
 
 /* return the symbol that has this location */
-char *getsymname(int offset);
+char *getsymname(addr_t offset);
 
-char *refname(int offset);
+char *refname(addr_t offset);
 
 /*
  * a reference is an operand field that is an address
  * they always have names, either externally known symbols or invented labels
  */
 struct ref {
-    int offset;			/* where the reference is */
+    addr_t offset;			/* where the reference is */
     struct symbol *sym;		/* what it references */
     struct ref *next;
 };
 
-char *ref(int val);	/* return the name to print here */
+char *ref(addr_t val);	/* return the name to print here */
 
-char is_code(int addr);
+int is_code(addr_t addr);
 
 /*
  * a segment is a notional hunk of memory
+ * that is a portion of the output buffer
+ * so, for a multi-module image, we will have many code and data
+ * segments, each with a non-overlapping region of the output buffer
+ * that goes from base for len bytes
  */
 struct seg {
         int module;
-        int base;
+		char *modname;
+        addr_t base;
         int len;
-        char type;
+        seg_t type;
 #define S_CODE  1
 #define S_DATA  2
 #define S_COM   3
 #define	S_UNDEF	4	/* a hack for undefined symbols */
         struct seg *next;
 };
-
-struct seg *seglist;
-
