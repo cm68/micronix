@@ -15,3 +15,9 @@ copyall.c:  extract files from a floppy image
 
 dumpfs.c: dump out filesystem structures
 
+dis is a disassembler that can consume:
+	hex dumps, intel hex, microsoft rel, motorola Srecords,
+	whitesmiths's objects
+	moreover, it can disassemble z80, z180, z280, and you can
+	add more architectures by writing a architecture description
+        file.
