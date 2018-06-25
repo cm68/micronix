@@ -61,7 +61,7 @@ getreloc(unsigned char **rp)
 
 		/* no more relocs */
 		if (control == 0) {
-			return (struct reloc *)0;
+			return (struct ws_reloc *)0;
 		}
 
 		/* one byte skips */

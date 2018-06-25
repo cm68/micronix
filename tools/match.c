@@ -111,6 +111,7 @@ decode_inst(unsigned char *pc, struct inst *ip)
 void
 fmt_operand(char *obuf, struct inst *ip, int opindex)
 {
+	struct ref *ref;
 	struct operand *o;
 	int v = ip->opvals[opindex];
 	int val;
@@ -157,9 +158,13 @@ fmt_operand(char *obuf, struct inst *ip, int opindex)
 					}
 				}
 				if (o->fld->fmt->flags & F_HEX) {
-					if ((sym = refname(ip->addr+(o->fld->bitoff/8)))
-						|| (sym = getsymname(val))) {
-						sprintf(tbuf, "%s", sym);
+					if ((ref = getref((ip->addr+(o->fld->bitoff/8))))) {
+						if (ref->bias) {
+							sprintf(tbuf, "%s+%d", ref->sym->name, ref->bias);
+						} else {
+							sprintf(tbuf, "%s", ref->sym->name);
+						}
+//						|| (sym = getsymname(val))) 
 					} else {
 						sprintf(fbuf, "0x%%0%dx", (o->fld->fmt->width + 3) / 4);
 						sprintf(tbuf, fbuf, val);
@@ -213,6 +218,7 @@ fmt_inst(char *obuf, struct inst *ip)
 void
 disas(unsigned char *buf, int startaddr, int length)
 {
+	struct ref *ref;
 	char *sym;
 	char hex[80];
 	char inst[80];
@@ -260,9 +266,13 @@ disas(unsigned char *buf, int startaddr, int length)
 			len = ip.len;
 			fmt_inst(inst, &ip);
 		} else {
-			char *sym = refname(offset);
-			if (sym) {
-				sprintf(inst, "DW %s", sym);
+			ref = getref(offset);
+			if (ref) {
+				if (ref->bias) {
+					sprintf(inst, "DW %s+%d", ref->sym, ref->bias);
+				} else {
+					sprintf(inst, "DW %s", ref->sym);
+				}
 				len = 2;
 			} else {
 				sprintf(inst, "DB 0x%x", buf[offset]);
