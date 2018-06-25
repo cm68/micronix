@@ -8,7 +8,7 @@ filesystem:
 	produced by the tools/copyall program
 
 tools:
-	file system checkers and object file tools
+	file system checkers and object file tools, including a very flexible disassembler
 
 images:
 	floppy images recovered from the net, version 1.4 and 1.3
