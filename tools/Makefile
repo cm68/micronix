@@ -50,5 +50,6 @@ util.o: util.c dis.h
 	gcc $(CFLAGS) -g -c util.c
 
 testdis: dis
-	./dis -v=0x24 test/LIBC.REL
+	./dis test/MON447.HEX
+	./dis test/LIBC.REL
 	./dis test/mw.o

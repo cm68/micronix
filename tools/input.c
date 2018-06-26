@@ -16,6 +16,7 @@ extern int verbose;
 long start;
 
 struct seg *seglist;
+int low;
 int high;
 int modcount;
 char *modname;
@@ -179,130 +180,6 @@ gethex(int digits, unsigned char *checksum)
 		printf("gethex for %d returns 0x%x (0x%x)\n", ask, v, checksum ? *checksum : 0);
 	}
 	return (v);
-}
-
-/*
- * binary file handler for intel hex - only really deal with these two types
- * :CCAAAA00DdDd...DdXX   CC bytes of data Dd to be placed starting at AAAA - checksum XX
- * :CCAAAA01XX            eof with start address AAAA
- */
-int
-do_intel_hex()
-{
-	int rectype;
-	int bc;
-	int addr;
-	unsigned char checksum;
-	int byte;
-		
-	if ((byte = *inptr) != ':') {
-		printf("missing record start (0x%x)\n", byte);
-		return 0;
-	}
-	inptr++;
-
-	checksum = 0;
-	bc = gethex(2, &checksum);
-	if (bc == -1) {
-		printf("missing byte count\n");
-		return 0;
-	}
-
-	addr = gethex(4, &checksum);
-	if (addr == -1) {
-		printf("missing address\n");
-		return 0;
-	}
-
-	rectype = gethex(2, &checksum);
-	if (addr == -1) {
-		printf("missing record type\n");
-		return 0;
-	}
-
-	switch (rectype) {
-
-	case 0x0:	/* data record */
-		while (bc--) {
-			byte = gethex(2, &checksum);
-			if (byte == -1) {
-				printf("missing data byte\n");
-				return 0;
-			}
-			put(addr++, byte);
-		}
-		break;
-
-	case 0x1:	/* eof */
-		start = addr;
-		break;
-
-	case 0x2:	/* extended segment address record */
-		if (addr != 0) {
-			printf("nonzero address on type 2\n");
-			return 0;
-		}
-		addr = gethex(4, &checksum) << 4;
-		if (addr == -1) {
-			printf("missing seg offset\n");
-			return 0;
-		}
-		break;
-
-	case 0x3:	/* start segment address record */
-		if (addr != 0) {
-			printf("nonzero address on type 3\n");
-			return 0;
-		}
-		start = gethex(8, &checksum);
-		if (start == -1) {
-			printf("missing CS:IP\n");
-			return 0;
-		}
-		break;
-
-	case 0x4:	/* extended linear address record */
-		addr = gethex(4, &checksum) << 16;
-		if (addr == -1) {
-			printf("missing seg offset\n");
-			return 0;
-		}
-		break;
-
-	case 0x5:	/* start linear address record */
-		if (addr != 0) {
-			printf("nonzero address on type 3\n");
-			return 0;
-		}
-		start = gethex(8, &checksum);
-		if (start == -1) {
-			printf("missing EIP\n");
-			return 0;
-		}
-		break;
-
-	default:
-		printf("bogus record type (0x%x)\n", rectype);
-		return 0;
-	}
-
-	if (gethex(2, &checksum) == -1) {
-		printf("missing checksum\n");
-		return 0;
-	}
-	if (checksum != 0) {
-		printf("checksum error (0x%x)\n", checksum);
-		return 0;
-	}
-
-	/* let's swallow line and file ending */
-	while ((byte = *inptr) == '\r' || byte == '\n' || byte == 0x26) {
-		inptr++;
-	}
-	if (byte == 0) {
-		return 0;
-	}
-	return (rectype == 0x1) ? 0 : 1;
 }
 
 /*
@@ -1124,6 +1001,143 @@ do_whitesmith()
 	read_reloc(S_DATA);
 
 	return (0);
+}
+
+/*
+ * binary file handler for intel hex - only really deal with these two types
+ * all records have a checksum XX appended
+ * :CCAAAA00DdDd...DdXX   CC bytes of data Dd starting at AAAA
+ * :CCAAAA01XX            eof with start address AAAA
+ * :CCAAAA02SSSSXX   	  segment address SSSS
+ *
+ * because no symbols, we assume that the whole thing is data,
+ * learning about code from a start record and/or a jump table
+ *
+ */
+int
+do_intel_hex()
+{
+	int rectype;
+	int bc;
+	int addr;
+	unsigned char checksum;
+	int byte;
+		
+	if ((byte = *inptr) != ':') {
+		printf("missing record start (0x%x)\n", byte);
+		return 0;
+	}
+	inptr++;
+
+	checksum = 0;
+	bc = gethex(2, &checksum);
+	if (bc == -1) {
+		printf("missing byte count\n");
+		return 0;
+	}
+
+	addr = gethex(4, &checksum);
+	if (addr == -1) {
+		printf("missing address\n");
+		return 0;
+	}
+
+	rectype = gethex(2, &checksum);
+	if (addr == -1) {
+		printf("missing record type\n");
+		return 0;
+	}
+
+	switch (rectype) {
+
+	case 0x0:	/* data record */
+		if (addr < low) {
+			low = addr;
+		}
+		while (bc--) {
+			byte = gethex(2, &checksum);
+			if (byte == -1) {
+				printf("missing data byte\n");
+				return 0;
+			}
+			if (addr > high) {
+				high = addr;
+			}
+			put(addr++, byte);
+		}
+		break;
+
+	case 0x1:	/* eof */
+		start = addr;
+		break;
+
+	case 0x2:	/* extended segment address record */
+		if (addr != 0) {
+			printf("nonzero address on type 2\n");
+			return 0;
+		}
+		addr = gethex(4, &checksum) << 4;
+		if (addr == -1) {
+			printf("missing seg offset\n");
+			return 0;
+		}
+		break;
+
+	case 0x3:	/* start segment address record */
+		if (addr != 0) {
+			printf("nonzero address on type 3\n");
+			return 0;
+		}
+		start = gethex(8, &checksum);
+		if (start == -1) {
+			printf("missing CS:IP\n");
+			return 0;
+		}
+		break;
+
+	case 0x4:	/* extended linear address record */
+		addr = gethex(4, &checksum) << 16;
+		if (addr == -1) {
+			printf("missing seg offset\n");
+			return 0;
+		}
+		break;
+
+	case 0x5:	/* start linear address record */
+		if (addr != 0) {
+			printf("nonzero address on type 3\n");
+			return 0;
+		}
+		start = gethex(8, &checksum);
+		if (start == -1) {
+			printf("missing EIP\n");
+			return 0;
+		}
+		break;
+
+	default:
+		printf("bogus record type (0x%x)\n", rectype);
+		return 0;
+	}
+
+	if (gethex(2, &checksum) == -1) {
+		printf("missing checksum\n");
+		return 0;
+	}
+	if (checksum != 0) {
+		printf("checksum error (0x%x)\n", checksum);
+		return 0;
+	}
+
+	/* let's swallow line and file ending */
+	while ((byte = *inptr) == '\r' || byte == '\n' || byte == 0x26) {
+		inptr++;
+	}
+	if ((byte == 0) || (rectype == 0x01)) {
+		makeseg(modcount++, S_CODE, low, high - low + 1);
+		return (0);
+	} 
+	return (1);
 }
 
 /*
