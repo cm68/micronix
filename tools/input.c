@@ -857,7 +857,7 @@ struct speciallink {
 };
 
 struct speciallink speciallink[] = { 
-	"entry", CT_B|CT_UNIMPL,		/* 0 */
+	"entry", CT_B,				/* 0 */
 	"common", CT_B|CT_UNIMPL,		/* 1 */
 	"module", CT_B,				/* 2 */
 	"libsearch",CT_B|CT_UNIMPL,		/* 3 */
@@ -869,7 +869,7 @@ struct speciallink speciallink[] = {
 	"extoff", CT_A,				/* 9 */
 	"datasize", CT_A,			/* 10 */
 	"setloc", CT_A,				/* 11 */
-	"chainaddr", CT_A|CT_UNIMPL,	 	/* 12 */
+	"chainaddr", CT_A,		 	/* 12 */
 	"progsize", CT_A,		 	/* 13 */
 	"endmodule", CT_A,			/* 14 */
 	"end", 0,				/* 15 */
