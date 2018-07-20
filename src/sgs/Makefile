@@ -12,8 +12,11 @@ clean:
 test: nm
 	./nm tests/mw.o
 
-nm: nm.c $(INCPATH)/ws.h wslib.o
-	gcc $(CFLAGS) -g -o nm nm.c wslib.o
+nm: nm.c $(INCPATH)/ws.h wslib.o z80dis.o
+	gcc $(CFLAGS) -g -o nm nm.c wslib.o z80dis.o
+
+z80dis.o: z80dis.c
+	gcc $(CFLAGS) -g -c z80dis.c
 
 wslib.o: wslib.c $(INCPATH)/ws.h
 	gcc $(CFLAGS) -g -c wslib.c
