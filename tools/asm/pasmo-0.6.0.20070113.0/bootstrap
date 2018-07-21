@@ -1,0 +1,5 @@
+#!/bin/sh -e
+
+aclocal-1.9 -I .
+automake-1.9 --add-missing --copy
+autoconf

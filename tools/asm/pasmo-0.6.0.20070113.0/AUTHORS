@@ -1,0 +1,10 @@
+Author: Julian Albo, "NotFound"
+julian.notfound@gmail.com
+
+Adriano Camargo Rodrigues da Cunha wrote the initial implemntation of
+the listing code, the .PHASE and .DEPHASE directives and other stuff,
+but I rewritted it almost completely during transition to 0.6.0, so
+blame me for all the bugs.
+
+Some parts were rewritten according to bugs reports of the Debian
+community.

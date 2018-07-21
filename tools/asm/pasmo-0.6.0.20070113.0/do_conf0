@@ -1,0 +1,5 @@
+#! /bin/sh
+
+# Config for fast compiling.
+
+./configure "$@" CXXFLAGS="-O0 -g -W -Wall -Wunused"

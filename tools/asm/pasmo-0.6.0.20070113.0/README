@@ -1,0 +1,75 @@
+
+	See english version below.
+
+
+
+	ESPAÑOL.
+
+
+	Pasmo, ensablador Z80/8080 cruzado multiplataforma.
+	(C) 2004-2006 Julián Albo
+
+	Pasmo se suministra sin ningún tipo de garantía.
+	Se permite redistribuir copias de Pasmo bajo los términos de
+	la GNU General Public License.
+	Para más infromación véanse los ficheros COPYING.
+
+	Para descargar actualizaciones o obtener más información:
+	http://www.arrakis.es/~ninsesabe/pasmo/
+
+	Para compilar:
+		./configure
+		make
+
+	Para instalar:
+		make install
+
+	Para compilar con otras opciones:
+		./configure --help
+
+	Documentación: Disponible solamente en inglés, en el fichero
+	pasmodoc.html incluido en este paquete o en el sitio web de
+	Pasmo.
+	La opción --help muestra un resumen de las opciones disponibles.
+	Ver también los ficheros .asm de ejemplo incluidos en el paquete
+	de los fuentes. 
+
+
+Comentarios y críticas a: julian.notfound@gmail.com
+
+
+		*		*		*
+
+
+
+	ENGLISH.
+
+
+	Pasmo, multiplatform Z80/8080 cross-assembler.
+	(C) 2004-2006 Julián Albo
+
+	Pasmo comes with NO WARRANTY, to the extent permitted by law.
+	You may redistribute copies of Pasmo under the terms of the
+	GNU General Public License.
+	For more information about these matters, see the files named
+	COPYING.
+
+	To download updates or obtain more information:
+	http://www.arrakis.es/~ninsesabe/pasmo/
+
+	To compile:
+		./configure
+		make
+
+	To install:
+		make install
+
+	To compile with other options:
+		./configure --help
+
+	Documentation: See the file pasmodoc.html, included in this
+	package or in the Pasmo web site.
+	The --help option shows a summary of the available options.
+	See also the .asm sample files included with the souce package.
+
+Comments and criticisms to: julian.notfound@gmail.com

@@ -1,0 +1,22 @@
+#! /bin/sh
+
+# My usual config for direct compiling.
+
+dirbuild=build
+
+if [ ! -d $dirbuild ]
+then
+	if [ -e $dirbuild ]
+	then
+		echo "$dirbuild exist but is not a directory"
+		exit 1
+	fi
+	mkdir $dirbuild
+fi
+
+cd $dirbuild
+
+../configure \
+	--enable-debug \
+	"$@" \
+	CXXFLAGS="-g -O3 -W -Wall -Wunused"
