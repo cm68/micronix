@@ -629,7 +629,7 @@ dp()
         printf("\n");
 }
 
-dumpmem(unsigned short (*readbyte)(addr), unsigned short addr, unsigned short len)
+dumpmem(unsigned char (*readbyte)(int addr), int addr, unsigned short len)
 {
         int i;
         pcol = 0;

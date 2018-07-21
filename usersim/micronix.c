@@ -10,9 +10,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <dirent.h>
+#include <fcntl.h>
 #include <time.h>
 #include "z80emu.h"
 #include "z80user.h"
+#include <errno.h>
 
 typedef unsigned int ULONG;
 typedef unsigned char UCHAR;
@@ -142,9 +145,15 @@ reloc(unsigned short addr)
 }
 
 unsigned char
-get_byte(unsigned short addr)
+get_byte(int addr)
 {
-	return cp->memory[addr];
+	return cp->memory[addr & 0xffff];
+}
+
+unsigned char
+getsim(int addr)
+{
+	return *(unsigned char *)addr;
 }
 
 dumpinst()
@@ -217,6 +226,109 @@ emulate()
 	} while (!cp->is_done);
 }
 
+
+/*
+ * we have to be very shady about directories, since the v6 directory is directly read, and
+ * the abstract read directory stuff is far in the future.  so what we do when we open a
+ * directory, we translate the entire directory into V6 form and keep the buffer around
+ * until the directory is closed.
+ */
+struct dirfd {
+	unsigned char *buffer;
+	int bufsize;
+	int fd;
+	int offset;
+	struct dirfd *next;
+	int end;
+} *opendirs;
+
+/* a version 6 directory entry */
+struct v6dir {
+	UINT inum;
+	char name[14];
+};
+
+#define	DIRINC	16
+
+/*
+ * open a directory and return the file descriptor
+ */
+int
+dirsnarf(char *name)
+{
+	DIR *dp;
+	struct dirent *de;
+	struct dirfd *df;
+	int i;
+	struct v6dir *v;
+	
+	dp = opendir(name);
+	if (!dp) return -1;	
+
+	df = malloc(sizeof(struct dirfd));
+	df->fd = dirfd(dp);
+	df->bufsize = 0;
+	df->buffer = 0;
+	df->offset = 0;
+	df->end = 0;
+	v = df->buffer;
+	df->next = opendirs;
+	opendirs = df;
+
+	while (1) {
+		de = readdir(dp);
+		if (!de) break;
+		if (df->end + sizeof(*v) > df->bufsize) {
+			df->bufsize += DIRINC;
+			df->buffer = realloc(df->buffer, df->bufsize);
+			bzero(&df->buffer[df->end], DIRINC);
+		}
+		v = (struct v6dir *)&df->buffer[df->end];
+		v->inum = (UINT)(((de->d_ino >> 16) ^ de->d_ino) & 0xffff);
+		strncpy(v->name, de->d_name, 14);
+		v++;
+		df->end += sizeof(*v);
+	}
+	dumpmem(&getsim, df->buffer, df->bufsize);	
+	return (df->fd);
+}
+
+struct dirfd *
+dirget(int fd)
+{
+	struct dirfd *n;
+	for (n = opendirs; n; n = n->next) {
+		if (n->fd == fd) {
+			return (n);
+		}
+	}
+	return (0);
+}
+
+void
+dirclose(int fd)
+{
+	struct dirfd *n, *p;
+	p = 0;
+
+	for (n = opendirs; n; n = n->next) {
+		if (n->fd == fd)
+			break;
+		p = n;
+	}
+	if (!n) {
+		return;
+	}
+	if (p) {
+		p->next = n->next;
+	} else {
+		opendirs = n->next;
+	}
+	closedir(n->fd);
+	free(n->buffer);
+	free(n);
+}
+
 /*
  * micronix system calls are done using the RST8 instruction, which
  * is a one-byte call instruction to location 8, which has a halt instruction
@@ -243,6 +355,7 @@ void SystemCall (MACHINE *cp)
 	struct inode *ip;
 	int i;
 	int fd;
+	struct dirfd *df;
 
 	if (verbose) {
 		dumpcpu();
@@ -287,9 +400,19 @@ void SystemCall (MACHINE *cp)
 		break;
 	case 3:
 		if (trace) printf("read fd:%d %04x %04x\n", fd, addr, addr2);
-		read(fd, &cp->memory[addr], addr2);
-		if (verbose) dumpmem(&get_byte, addr, addr2);
+		if ((df = dirget(fd))) {
+			printf("dirread\n");
+			i = df->bufsize - df->offset;
+			if (addr2 < i) {
+				i = addr2;
+			}
+			bcopy(&df->buffer[df->offset], &cp->memory[addr], i);
+		} else {
+			i = read(fd, &cp->memory[addr], addr2);
+		}
+		if (verbose) dumpmem(&get_byte, addr, i);
 		bytes += 4;
+		cp->state.registers.word[Z80_HL] = i;
 		carry_clear();
 		break;
 	case 4:
@@ -300,11 +423,40 @@ void SystemCall (MACHINE *cp)
 		carry_clear();
 		break;
 	case 5:
-		if (trace) printf("open %s %04x %04x\n", &cp->memory[addr], addr, addr2);
 		bytes += 4;
-		fd = open(&cp->memory[addr], addr);
-		cp->state.registers.word[Z80_HL] = fd;
-		carry_clear();
+		switch (addr2) {
+		case 0:
+			addr2 = O_RDONLY;
+			break;
+		case 1:
+			addr2 = O_WRONLY;
+			break;
+		case 2:
+			addr2 = O_RDWR;
+			break;
+		default:
+			printf("open busted mode %s %04x %04x\n",
+				&cp->memory[addr], addr, addr2);
+			break;
+		}
+		if (!stat(&cp->memory[addr], &sbuf)) {
+			if (S_ISDIR(sbuf.st_mode)) {
+				fd = dirsnarf(&cp->memory[addr]);
+				if (fd == -1) {
+					goto lose;
+				}
+			} else { 
+				fd = open(&cp->memory[addr], addr2);
+			}
+			cp->state.registers.word[Z80_HL] = fd;
+			carry_clear();
+		} else {
+			perror("stat failed\n");
+			lose:
+			cp->state.registers.word[Z80_HL] = errno;
+			carry_set();
+		}
+		if (trace) printf("open %s %04x %04x = %d\n", &cp->memory[addr], addr, addr2, fd);
 		break;
 	case 13:	/* r_time */
 		i = time(0);
@@ -338,6 +490,38 @@ void SystemCall (MACHINE *cp)
 		break;
 	case 19:
 		if (trace) printf("seek fd:%d %04x %04x\n", fd, addr, addr2);
+		i = (short)addr;
+		if (addr2 > 2) {
+			i *= 512;
+			addr2 -= 3;
+		}
+		if ((df = dirget(fd))) {
+			switch (addr2) {
+			case 0:
+				break;
+			case 1:
+				i += df->offset;
+				break;
+			case 2:
+				i += df->end;
+				break;
+			}
+			df->offset = i;
+		} else {
+			switch (addr2) {
+			case 0:
+				i = lseek(fd, i, SEEK_SET);
+				break;
+			case 1:
+				i = lseek(fd, i, SEEK_CUR);
+				break;
+			case 2:
+				i = lseek(fd, i, SEEK_END);
+				break;
+			}
+		}
+		cp->state.registers.word[Z80_HL] = (i >> 16) & 0xffff;
+		carry_clear();
 		bytes += 2;
 		break;
 	case 20:
