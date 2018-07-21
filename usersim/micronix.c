@@ -109,7 +109,7 @@ do_exec(char *filename)
 		fseek(file, 0, SEEK_SET);
 	}
 
-	if (verbose) {
+	if (verbose > 1) {
 	printf("exec header: magic: %x conf: %x symsize: %d text: %d data: %d bss: %d heap: %d textoff: %x dataoff: %x\n",
 		header.ident, header.conf, 
 		header.table, header.text, header.data, 
@@ -234,9 +234,10 @@ emulate()
  * until the directory is closed.
  */
 struct dirfd {
+	DIR *dp;
+	int fd;
 	unsigned char *buffer;
 	int bufsize;
-	int fd;
 	int offset;
 	struct dirfd *next;
 	int end;
@@ -267,6 +268,7 @@ dirsnarf(char *name)
 
 	df = malloc(sizeof(struct dirfd));
 	df->fd = dirfd(dp);
+	df->dp = dp;
 	df->bufsize = 0;
 	df->buffer = 0;
 	df->offset = 0;
@@ -324,7 +326,7 @@ dirclose(int fd)
 	} else {
 		opendirs = n->next;
 	}
-	closedir(n->fd);
+	closedir(n->dp);
 	free(n->buffer);
 	free(n);
 }
@@ -357,7 +359,7 @@ void SystemCall (MACHINE *cp)
 	int fd;
 	struct dirfd *df;
 
-	if (verbose) {
+	if (verbose > 1) {
 		dumpcpu();
 	}
 	calladdr = get_byte(sp) + (get_byte(sp+1) << 8) - 1;
@@ -401,7 +403,6 @@ void SystemCall (MACHINE *cp)
 	case 3:
 		if (trace) printf("read fd:%d %04x %04x\n", fd, addr, addr2);
 		if ((df = dirget(fd))) {
-			printf("dirread\n");
 			i = df->bufsize - df->offset;
 			if (addr2 < i) {
 				i = addr2;
@@ -411,15 +412,16 @@ void SystemCall (MACHINE *cp)
 		} else {
 			i = read(fd, &cp->memory[addr], addr2);
 		}
-		if (verbose) dumpmem(&get_byte, addr, i);
+		if (verbose > 1) dumpmem(&get_byte, addr, i);
 		bytes += 4;
 		cp->state.registers.word[Z80_HL] = i;
 		carry_clear();
 		break;
 	case 4:
 		if (trace) printf("write fd:%d %04x %04x\n", fd, addr, addr2);
-		if (verbose) dumpmem(&get_byte, addr, addr2);
-		write(fd, &cp->memory[addr], addr2);
+		if (verbose > 1) dumpmem(&get_byte, addr, addr2);
+		i = write(fd, &cp->memory[addr], addr2);
+		cp->state.registers.word[Z80_HL] = i;
 		bytes += 4;
 		carry_clear();
 		break;
@@ -458,6 +460,12 @@ void SystemCall (MACHINE *cp)
 			carry_set();
 		}
 		if (trace) printf("open %s %04x %04x = %d\n", &cp->memory[addr], addr, addr2, fd);
+		break;
+	case 6:	/* close */
+		if (trace) printf("close %d\n", fd);
+		dirclose(fd);
+		close(fd);
+		bytes += 2;
 		break;
 	case 13:	/* r_time */
 		i = time(0);
@@ -501,7 +509,8 @@ void SystemCall (MACHINE *cp)
 			ip->size1 = sbuf.st_size & 0xffff;
 			ip->rtime = sbuf.st_atime;
 			ip->wtime = sbuf.st_mtime;
-			dumpmem(&get_byte, addr2, 36);
+			if (verbose > 1)
+				dumpmem(&get_byte, addr2, 36);
 			carry_clear();
 		}
 		bytes += 2;
