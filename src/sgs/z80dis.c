@@ -34,9 +34,9 @@ struct optab base_optab[256] = {
 	{"INC L", 0}, {"DEC L", 0}, {"LD L,%s", OP_IMM8}, {"CPL", 0},
 
 	{"JR NC,%s", 0}, {"LD SP,%s", OP_DATA}, {"LD (%s),A", OP_DATA|OP_IND}, {"INC SP", 0},
-	{"INC (HL)", 0}, {"DEC (HL)", 0}, {"LD (HL),", OP_IMM8}, {"SCF", 0},
+	{"INC (HL)", 0}, {"DEC (HL)", 0}, {"LD (HL),%s", OP_IMM8}, {"SCF", 0},
 	{"JR C,%s", 0}, {"ADD HL,SP", 0}, {"LD A,(%s)", OP_DATA|OP_IND}, {"DEC SP", 0},
-	{"INC A", 0}, {"DEC A", 0}, {"LD A,", OP_IMM8}, {"CCF", 0},
+	{"INC A", 0}, {"DEC A", 0}, {"LD A,%s", OP_IMM8}, {"CCF", 0},
 
 	{"LD B,B", 0}, {"LD B,C", 0}, {"LD B,D", 0}, {"LD B,E", 0},
 	{"LD B,H", 0}, {"LD B,L", 0}, {"LD B,(HL)", 0}, {"LD B,A", 0},
@@ -84,7 +84,7 @@ struct optab base_optab[256] = {
 	{"CALL Z,%s", OP_TEXT}, {"CALL %s", OP_TEXT}, {"ADC A,%s", OP_IMM8}, {"SYS %s", OP_SYS},
 
 	{"RET NC", 0}, {"POP DE", 0}, {"JP NC,%s", OP_TEXT}, {"OUT (%s),A", OP_IMM8|OP_IND},
-	{"CALL NC,", OP_TEXT}, {"PUSH DE", 0}, {"SUB A,", OP_IMM8}, {"RST 10", 0},
+	{"CALL NC,%s", OP_TEXT}, {"PUSH DE", 0}, {"SUB A,%s", OP_IMM8}, {"RST 10", 0},
 	{"RET C", 0}, {"EXX", 0}, {"JP C,%s", OP_TEXT}, {"IN A,(%s)", OP_IMM8|OP_IND},
 	{"CALL C,%s", OP_TEXT}, {0, 0}, {"SBC A,%s", OP_IMM8}, {"RST 18", 0},
 
@@ -477,14 +477,17 @@ format_instr(
 	unsigned short addr,
 	char *outbuf, 			/* where to put the output */
 	unsigned char (*get_byte)(unsigned short addr),	/* how to read bytes */
-	char * (get_symname)(unsigned short offset))
+	char * (*get_sym)(unsigned short offset),
+	unsigned long (*get_reloc)(unsigned short offset))
 {
 	char bcount = 0;
 	unsigned char opcode;
 	char signed_byte;
 	unsigned short value;
+	unsigned long reloc;
+	char reltype;
 
-	char *symname;
+	char *symname = 0;
 	struct optab *o;
 	char i;
 	char valbuf[20];
@@ -570,23 +573,30 @@ format_instr(
 		}
 	}
 
-	if (o->flags & OP_TEXT) {
-		symname = get_symname(addr+bcount);
+	if (o->flags & (OP_TEXT | OP_DATA)) {
+		reloc = (*get_reloc)(addr + bcount);
+		reltype = reloc >> 16;
+		reloc &= 0xffff;
+		switch (reltype) {
+		case 3: /* symbol reference */
+			symname = (*get_sym)(reloc);
+			break;
+		case 0:
+		default:
+			break;
+		}
 		value = (*get_byte)(addr + bcount++);
 		value += (*get_byte)(addr + bcount++) << 8;
 		if (symname) {
-			strcpy(valbuf, symname);
+			if (value) {
+				sprintf(valbuf, "%s+%d", symname, value);
+			} else {
+				strcpy(valbuf, symname);
+			}
 		} else {
 			sprintf(valbuf, "%x", value);
 		}
 	}
-
-	if (o->flags & OP_DATA) {
-		value = (*get_byte)(addr + bcount++);
-		value += (*get_byte)(addr + bcount++) << 8;
-		sprintf(valbuf, "%x", value);
-	}
-
 
 	if (o->flags & (OP_SYS|OP_DATA|OP_TEXT|OP_PC8|OP_IMM8|OP_IDX)) {
 		if ((o->flags & (OP_IMM8|OP_IDX)) == (OP_IMM8|OP_IDX)) {
@@ -601,5 +611,41 @@ format_instr(
 	}
 	// printf("format_instr: %x -> %d\n", addr, bcount);
 	return bcount;
+}
+
+unsigned char pchars[16];
+int pcol;
+
+dp()
+{
+        int i;
+        char c;
+
+        for (i = 0; i < pcol; i++) {
+                c = pchars[i];
+                if ((c <= 0x20) || (c >= 0x7f)) c = '.';
+                printf("%c", c);
+        }
+        printf("\n");
+}
+
+dumpmem(unsigned short (*readbyte)(addr), unsigned short addr, unsigned short len)
+{
+        int i;
+        pcol = 0;
+
+        while (len) {
+                if (pcol == 0) printf("%04x: ", addr);
+                printf("%02x ", pchars[pcol] = (*readbyte)(addr++));
+                len--;
+                if (pcol++ == 15) {
+                        dp();
+                        pcol = 0;
+                }
+        }
+        if (pcol != 0) {
+                for (i = pcol; i < 16; i++) printf("   ");
+                dp();
+        }
 }
 
