@@ -31,6 +31,8 @@ int verbose;
 int trace;
 MACHINE	context;
 
+unsigned short brake;
+
 struct MACHINE *cp;
 
 int 
@@ -39,10 +41,12 @@ main(int argc, char **argv)
 	while (--argc) {
 		argv++;
 		if (**argv == '-') {
-			switch ((*argv)[1]) {
+			while (*++*argv) switch (**argv) {
 			case 'd':
 				--argc;
 				rootdir = *++argv;
+				if (**argv) while ((*argv)[1])
+					(*argv)++;
 				break;
 			case 't':
 				trace++;
@@ -52,11 +56,12 @@ main(int argc, char **argv)
 				trace++;
 				break;
 			default:
-				printf("bad flag %c\n", (*argv)[1]);
+				printf("bad flag %c\n", (**argv));
 				break; 
 			}
 		} else {
 			initfile = *argv;
+			break;
 		}
 	}
 
@@ -96,6 +101,8 @@ do_exec(char *filename)
 		header.textoff = 0x100;
 		header.dataoff = header.textoff + header.text;
 		header.data = 0;
+		header.bss = 0;
+		header.heap = 0;
 		fseek(file, 0, SEEK_SET);
 	}
 
@@ -116,13 +123,20 @@ do_exec(char *filename)
         cp->state.pc = header.textoff;
         cp->state.registers.word[Z80_SP] = 0xefff;
 	cp->is_done = 0;
+	brake = header.dataoff + header.data + header.bss + header.heap;
 	
 	chroot(rootdir);
 	return 0;
 }
 
 char *
-get_symname()
+get_symname(unsigned short addr)
+{
+	return 0;
+}
+
+unsigned short
+reloc(unsigned short addr)
 {
 	return 0;
 }
@@ -137,56 +151,44 @@ dumpinst()
 {
 	char outbuf[40];
 
-	format_instr(cp->state.pc, outbuf, &get_byte, &get_symname);
+	format_instr(cp->state.pc, outbuf, &get_byte, &get_symname, &reloc);
 	printf("%04x: %-30s ", cp->state.pc, outbuf);
+}
+
+carry_set()
+{
+	cp->state.registers.byte[Z80_F] |= Z80_C_FLAG;
+}
+
+carry_clear()
+{
+	cp->state.registers.byte[Z80_F] &= ~Z80_C_FLAG;
 }
 
 dumpcpu()
 {
-	printf("pc:%04x a:%02x bc:%04x de:%04x hl:%04x sp:%04x status:%d\n",
+	unsigned char f;
+
+	printf("pc:%04x a:%02x bc:%04x de:%04x hl:%04x sp:%04x status:%d break:%04x ",
 		cp->state.pc,
 		cp->state.registers.byte[Z80_A],
 		cp->state.registers.word[Z80_BC],
 		cp->state.registers.word[Z80_DE],
 		cp->state.registers.word[Z80_HL],
 		cp->state.registers.word[Z80_SP],
-		cp->state.status);
-}
+		cp->state.status,
+		brake);
 
-unsigned char pchars[16];
-int pcol;
-
-dp()
-{
-	int i;
-	char c;
-
-	for (i = 0; i < pcol; i++) {
-		c = pchars[i];
-		if ((c <= 0x20) || (c >= 0x7f)) c = '.';
-		printf("%c", c);
-	}
+	f = cp->state.registers.byte[Z80_F];
+	
+	if (f & Z80_C_FLAG) printf("C"); else  printf(" ");
+	if (f & Z80_N_FLAG) printf("N"); else  printf(" ");
+	if (f & Z80_X_FLAG) printf("X"); else  printf(" ");
+	if (f & Z80_H_FLAG) printf("H"); else  printf(" ");
+	if (f & Z80_Y_FLAG) printf("Y"); else  printf(" ");
+	if (f & Z80_Z_FLAG) printf("Z"); else  printf(" ");
+	if (f & Z80_S_FLAG) printf("S"); else  printf(" ");
 	printf("\n");
-}
-
-dumpmem(unsigned short addr, unsigned short len)
-{
-	int i;
-	pcol = 0;
-
-	while (len) {
-		if (pcol == 0) printf("%04x: ", addr);
-		printf("%02x ", pchars[pcol] = get_byte(addr++));
-		len--;
-		if (pcol++ == 15) {
-			dp();
-			pcol = 0;
-		}
-	}
-	if (pcol != 0) {
-		for (i = pcol; i < 16; i++) printf("   ");
-		dp();
-	}
 }
 
 /*
@@ -200,7 +202,7 @@ emulate()
 	unsigned char *ip;
 
 	do {
-		if (verbose) {
+		if (verbose > 2) {
 			dumpinst();
 			dumpcpu();
 		}
@@ -242,8 +244,10 @@ void SystemCall (MACHINE *cp)
 	int i;
 	int fd;
 
+	if (verbose) {
+		dumpcpu();
+	}
 	calladdr = get_byte(sp) + (get_byte(sp+1) << 8) - 1;
-	// dumpmem(calladdr, 16);
 
 	if ((code = get_byte(calladdr)) != 0xcf) {
 		printf("halt no syscall %d %x!\n", code, calladdr);
@@ -256,7 +260,6 @@ void SystemCall (MACHINE *cp)
 		bytes += 2;
 		indirect++;
 		calladdr = get_byte(calladdr+2) + (get_byte(calladdr+3) << 8);
-		// dumpmem(calladdr, 16);
 		if ((code = get_byte(calladdr)) != 0xcf) {
 			printf("indir no syscall %d %x!\n", code, calladdr);
 		}
@@ -268,21 +271,52 @@ void SystemCall (MACHINE *cp)
 	addr2 = get_byte(calladdr+4) + (get_byte(calladdr+5) << 8);
 	fd = cp->state.registers.word[Z80_HL];
 
+	if (verbose) {
+		printf("%ssyscall %d %04x %04x %04x\n", 
+			indirect ? "indirect " : "", code,
+			fd, addr, addr2);
+	}
+
 	switch (code) {
 	case 0:
 		printf("double indirect! yarg!\n");
 		break;		
 	case 1:
+		if (trace) printf("exit %04x %04x\n", fd, addr);
 		exit(0);
+		break;
+	case 3:
+		if (trace) printf("read fd:%d %04x %04x\n", fd, addr, addr2);
+		read(fd, &cp->memory[addr], addr2);
+		if (verbose) dumpmem(&get_byte, addr, addr2);
+		bytes += 4;
+		carry_clear();
+		break;
+	case 4:
+		if (trace) printf("write fd:%d %04x %04x\n", fd, addr, addr2);
+		if (verbose) dumpmem(&get_byte, addr, addr2);
+		write(fd, &cp->memory[addr], addr2);
+		bytes += 4;
+		carry_clear();
+		break;
+	case 5:
+		if (trace) printf("open %s %04x %04x\n", &cp->memory[addr], addr, addr2);
+		bytes += 4;
+		fd = open(&cp->memory[addr], addr);
+		cp->state.registers.word[Z80_HL] = fd;
+		carry_clear();
 		break;
 	case 13:	/* r_time */
 		i = time(0);
 		cp->state.registers.word[Z80_DE] = i & 0xffff;
 		cp->state.registers.word[Z80_HL] = (i >> 16) & 0xffff;
+		carry_clear();
 		if (trace) printf("r_time %x %04x %04x\n", i, (i >> 16) & 0xffff, i & 0xffff);
 		break;
 	case 17:	/* sbrk */
 		if (trace) printf("sbrk %04x\n", addr);
+		brake = addr;
+		carry_clear();
 		bytes += 2;
 		break;	
 	case 18:
@@ -299,23 +333,27 @@ void SystemCall (MACHINE *cp)
 		ip->size1 = sbuf.st_size & 0xffff;
 		ip->rtime = sbuf.st_atime;
 		ip->wtime = sbuf.st_mtime;
-		dumpmem(addr2, 36);
-		bytes += 4;
+		dumpmem(&get_byte, addr2, 36);
+		bytes += 2;
+		break;
+	case 19:
+		if (trace) printf("seek fd:%d %04x %04x\n", fd, addr, addr2);
+		bytes += 2;
+		break;
+	case 20:
+		if (trace) printf("getpid fd:%d %04x %04x\n", fd, addr, addr2);
+		cp->state.registers.word[Z80_HL] = getpid();
+		bytes += 2;
+		break;
 	case 32:
 		if (trace) printf("gtty %04x\n", addr);
 		bytes += 2;
 		break;
-	case 4:
-		if (trace) printf("write fd:%d %04x %04x\n", fd, addr, addr2);
-		if (verbose) dumpmem(addr, addr2);
-		write(fd, &cp->memory[addr], addr2);
-		bytes += 4;
-		break;
 
 	default:
-		printf("%ssyscall %d\n", indirect ? "indirect " : "", code);
-		// dumpmem(calladdr, 16);
-		// dumpcpu();
+		printf("unrecognized syscall %d %x\n", code, code);
+		carry_set();
+		break;
 	}
 	
 	/* this is a return */
@@ -325,5 +363,4 @@ void SystemCall (MACHINE *cp)
 	cp->state.pc = get_byte(sp) + (get_byte(sp+1) << 8) + bytes;
 	cp->state.registers.word[Z80_SP] += 2;
 	cp->state.status = 0;
-	// dumpcpu();
 }

@@ -32,36 +32,6 @@ struct reloc {
 #define	SEG_TEXT	0
 #define	SEG_DATA	1
 
-struct reloc *
-lookup(int i)
-{
-	struct reloc *r;
-	for (r = rlhead; r; r = r->next) {
-		if (r->rl.offset == i) {
-			break;
-		}
-	}
-	return r;
-}
-
-void 
-render(char *buf, struct reloc *r, unsigned short value)
-{
-	switch(r->rl.type) {
-	case REL_TEXTOFF:
-		sprintf(buf, "T+%x", value);
-		break;
-	case REL_DATAOFF:
-		sprintf(buf, "D+%x", value);
-		break;
-	case REL_SYMBOL:
-		sprintf(buf, syms[r->rl.value].name);
-		break;
-	default:
-		sprintf(buf, "BZZZT");
-	}
-}
-
 /*
  * the current object header
  */
@@ -75,29 +45,6 @@ int dataoff;
 int endoff;
 int fd;
 
-dumpseg(int bc, int base)
-{
-	unsigned int i;
-	unsigned char b;
-	int c = 0;
-
-	for (i = 0; i < bc; i++) {
-		read(fd, &b, 1);
-		if (c == 0) {
-			printf("%04x: ", i + base);
-		}
-		printf("%02x ", b);	
-		c++;
-		if (c == 16) {
-			c = 0;
-			printf("\n");
-		}
-	}
-	if (c) {
-		printf("\n");
-	}
-}
-
 unsigned char barray[5];
 char blen;
 
@@ -107,15 +54,69 @@ readbyte(unsigned short addr)
 	unsigned char c;
 	lseek(fd, textoff + addr, SEEK_SET);
 	read(fd, &c, 1);
-	barray[blen++] = c;
-
+	if (blen < sizeof(barray)) {
+		barray[blen++] = c;
+	}
 	return c;
 }
 
-char *
-symname(unsigned short addr)
+struct reloc *
+lookup(int i)
 {
+	struct reloc *r;
+	for (r = rlhead; r; r = r->next) {
+		if (r->rl.offset == i) {
+			break;
+		}
+	}
+	return r;
+}
+
+char *
+sym(unsigned short addr)
+{
+	if (addr < nsyms) {
+		return syms[addr].name;
+	}
 	return 0;
+}
+
+char *
+label(unsigned short addr)
+{
+	int i;
+	for (i = 0; i < nsyms; i++) {
+		if ((syms[i].flag & SF_DEF) && (syms[i].value == addr)) {
+			return syms[i].name;
+		}
+	}
+	return 0;
+}
+
+unsigned long
+reloc(unsigned short addr)
+{
+	struct reloc *r;
+	unsigned long ret = 0;
+
+	r = lookup(addr);
+
+	if (!r) return (ret);
+
+	switch(r->rl.type) {
+	case REL_TEXTOFF:
+		ret = (1 << 16) + head.textoff;
+		break;
+	case REL_DATAOFF:
+		ret = (2 << 16) + head.dataoff;
+		break;
+	case REL_SYMBOL:
+		ret = (3 << 16) + r->rl.value;
+		break;
+	default:
+		break;
+	}
+	return ret;
 }
 
 disassem()
@@ -124,25 +125,28 @@ disassem()
 	char outbuf[40];
 	char bbuf[40];
 	int i;
+	char *tag;
 
 	/* dump out hex */
 	lseek(fd, textoff, SEEK_SET);
 	if (verbose) {
 		if (head.text) {
 			printf("text:\n");
-			dumpseg(head.text, head.textoff);
+			dumpmem(&readbyte, head.textoff, head.text);
 		}
 		if (head.data) {
 			printf("data:\n");
-			dumpseg(head.data, head.dataoff);
+			dumpmem(&readbyte, head.dataoff, head.data);
 		}
 	}
-	/* process instructions to build xrefs and generate labels */
 	lseek(fd, textoff, SEEK_SET);
 	location = 0;
 	while (location < head.text) {
 		blen = 0;
-		bc = format_instr(location, outbuf, &readbyte, &symname);
+		bc = format_instr(location, outbuf, &readbyte, &sym, &reloc);
+		if ((tag = label(location))) {
+			printf("%s:\n", tag);
+		}
 		printf("%04x: %-30s", location, outbuf, bbuf);
 		printf(" ; ");
 		for (i = 0; i < sizeof(barray); i++) {
@@ -168,7 +172,7 @@ disassem()
 	}
 	if (head.data) {
 		printf("data:\n");
-		dumpseg(head.data, head.dataoff);
+		dumpmem(&readbyte, head.dataoff, head.data);
 	}
 	/* list */
 }
@@ -373,28 +377,27 @@ char **argv;
 	unsigned short value;
 	unsigned char flag;
 
-	if (--argc > 0 && *argv[1] == '-') {
+	while (--argc) {
 		argv++;
-		while (*++*argv) switch (**argv) {
-		case 'v':
-			verbose++;
-			continue;
-		case 'd':
-			dflag++;
-			continue;
-		case 'r':
-			rflag++;
-			continue;
-		default:
-			continue;
+		if (**argv == '-') {
+			while (*++*argv) switch (**argv) {
+			case 'v':
+				verbose++;
+				continue;
+			case 'd':
+				dflag++;
+				continue;
+			case 'r':
+				rflag++;
+				continue;
+			default:
+				continue;
+			}
+		} else {
+			break;
 		}
-		argc--;
 	}
-	if (argc == 0) {
-		nm("a.out");
-	} else {
-		while (argc--) {
-			nm(*++argv);
-		}
+	while (argc--) {
+		nm(*argv++);
 	}
 }

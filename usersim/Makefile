@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -ansi -pedantic -O2 -fomit-frame-pointer
+CFLAGS = -g
 
 all: micronix
 
@@ -12,13 +12,13 @@ z80emu.o: z80emu.c z80emu.h z80config.h z80user.h \
 	$(CC) $(CFLAGS) -c $<
 
 micronix.o: micronix.c z80emu.h z80config.h
-	$(CC) -Wall -c $<
+	$(CC) $(CFLAGS) -c $<
 
 micronix: micronix.o z80emu.o ../src/sgs/z80dis.o
 	$(CC) micronix.o z80emu.o ../src/sgs/z80dis.o -o $@
 
 test: micronix
-	./micronix -d ../filesystem ../filesystem/bin/pwd
+	./micronix -t -d ../filesystem ../filesystem/bin/pwd
 
 clean:
 	rm -f *.o maketables micronix
