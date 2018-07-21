@@ -1,0 +1,4 @@
+this directory is for source code for components that were re-generated, either by porting the
+version 6 original, or from decompilation or other means.
+
+the eventual goal is a completely native build source tree
