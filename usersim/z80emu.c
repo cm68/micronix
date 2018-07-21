@@ -1193,7 +1193,7 @@ emulate_next_instruction:
 
 #ifdef Z80_CATCH_HALT
 
-                                state->status = Z80_STATUS_FLAG_HALT;
+                                state->status = Z80_STATUS_HALT;
 
 #else
 

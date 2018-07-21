@@ -248,7 +248,7 @@ do_object(int fd, int limit)
 	}
 	if (head.ident != OBJECT) {
 		printf("bad object file magic number %x\n", head.ident);
-		exit(1);
+		return(1);
 	}
 
 	/* mark the file positions */
@@ -258,39 +258,37 @@ do_object(int fd, int limit)
 
 	/* read symbol table */
 	nsyms = head.table / 12;
-	if (nsyms == 0) {
-		printf("no name list\n");
-		exit(1);
-	}
-	syms = malloc(nsyms * sizeof(*syms));
-	read(fd, syms, nsyms * sizeof(*syms));
+	if (nsyms) {
+		syms = malloc(nsyms * sizeof(*syms));
+		read(fd, syms, nsyms * sizeof(*syms));
 
-	sym = syms;
-	for(i = 0; i < nsyms; i++) {
-		printf("%5d %9s: ", i, sym->name);
-		value = sym->value;
-		flag = sym->flag;
+		sym = syms;
+		for(i = 0; i < nsyms; i++) {
+			printf("%5d %9s: ", i, sym->name);
+			value = sym->value;
+			flag = sym->flag;
 
-		printf("%04x ", value);
-		if (flag & SF_GLOBAL)
-			printf("global ");
-		if (flag & SF_DEF)
-			printf("defined ");
-		switch (flag & SF_SEG) {
-		case SF_TEXT:
-			printf("code ");
-			break;
-		case SF_DATA:
-			printf("data ");
-			break;
-		case 0:
-			break;
-		default:
-			printf("unknown segment");
-			break;
+			printf("%04x ", value);
+			if (flag & SF_GLOBAL)
+				printf("global ");
+			if (flag & SF_DEF)
+				printf("defined ");
+			switch (flag & SF_SEG) {
+			case SF_TEXT:
+				printf("code ");
+				break;
+			case SF_DATA:
+				printf("data ");
+				break;
+			case 0:
+				break;
+			default:
+				printf("unknown segment");
+				break;
+			}
+			printf("\n");
+			sym++;
 		}
-		printf("\n");
-		sym++;
 	}
 
 	/* read in the relocs, which are from the symbol table to logical eof  */
@@ -335,8 +333,8 @@ nm(char *oname)
 
 	fd = open(oname, 0);
 	if (fd < 0) {
-		printf("cannot open input\n");
-		exit(1);
+		printf("cannot open %s\n", oname);
+		return(1);
 	}
 	read(fd, &magic, sizeof(magic));
 	if (magic == OBJECT) {
@@ -346,7 +344,7 @@ nm(char *oname)
 		close(fd);
 		return;
 	} else if (magic != 0x75) {
-		printf("bad magic: %x\n", magic);
+		printf("%s: bad magic: %x\n", oname, magic);
 		close(fd);
 		return;
 	}

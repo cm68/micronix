@@ -1,4 +1,4 @@
-BINS= nm ar
+BINS= nm ar size
 INCPATH=../../include
 
 all: $(BINS)
@@ -14,6 +14,9 @@ test: nm
 
 nm: nm.c $(INCPATH)/ws.h wslib.o z80dis.o
 	gcc $(CFLAGS) -g -o nm nm.c wslib.o z80dis.o
+
+size: size.c $(INCPATH)/ws.h wslib.o
+	gcc $(CFLAGS) -g -o size size.c wslib.o
 
 z80dis.o: z80dis.c
 	gcc $(CFLAGS) -g -c z80dis.c
