@@ -289,7 +289,7 @@ dirsnarf(char *name)
 		v++;
 		df->end += sizeof(*v);
 	}
-	dumpmem(&getsim, df->buffer, df->bufsize);	
+	if (verbose > 1) dumpmem(&getsim, df->buffer, df->bufsize);	
 	return (df->fd);
 }
 
@@ -407,6 +407,7 @@ void SystemCall (MACHINE *cp)
 				i = addr2;
 			}
 			bcopy(&df->buffer[df->offset], &cp->memory[addr], i);
+			df->offset += i;
 		} else {
 			i = read(fd, &cp->memory[addr], addr2);
 		}
@@ -472,20 +473,37 @@ void SystemCall (MACHINE *cp)
 		bytes += 2;
 		break;	
 	case 18:
-		if (trace) printf("stat(\"%s\", %04x)\n", &cp->memory[addr], addr2);
-		stat(&cp->memory[addr], &sbuf);
-		ip = (struct inode *)&cp->memory[addr2];
-		ip->dev = sbuf.st_dev;
-		ip->inum = sbuf.st_ino;
-		ip->mode = sbuf.st_mode;
-		ip->nlinks = sbuf.st_nlink;
-		ip->uid = sbuf.st_uid;
-		ip->gid = sbuf.st_gid;
-		ip->size0 = sbuf.st_size >> 16;
-		ip->size1 = sbuf.st_size & 0xffff;
-		ip->rtime = sbuf.st_atime;
-		ip->wtime = sbuf.st_mtime;
-		dumpmem(&get_byte, addr2, 36);
+	case 28:
+		if (code == 28) {
+			if (trace) printf("fstat(%d, %04x)\n", fd, addr);
+			i = fstat(fd, &sbuf);
+			if ((df = dirget(fd))) {
+				sbuf.st_size = df->end;
+			}
+			addr2 = addr;
+		} else {
+			if (trace) printf("stat(\"%s\", %04x)\n", &cp->memory[addr], addr2);
+			i = stat(&cp->memory[addr], &sbuf);
+		}
+		if (i) {
+			perror("stat failed");
+			cp->state.registers.word[Z80_HL] = errno;
+			carry_set();
+		} else {
+			ip = (struct inode *)&cp->memory[addr2];
+			ip->dev = sbuf.st_dev;
+			ip->inum = sbuf.st_ino;
+			ip->mode = sbuf.st_mode;
+			ip->nlinks = sbuf.st_nlink;
+			ip->uid = sbuf.st_uid;
+			ip->gid = sbuf.st_gid;
+			ip->size0 = sbuf.st_size >> 16;
+			ip->size1 = sbuf.st_size & 0xffff;
+			ip->rtime = sbuf.st_atime;
+			ip->wtime = sbuf.st_mtime;
+			dumpmem(&get_byte, addr2, 36);
+			carry_clear();
+		}
 		bytes += 2;
 		break;
 	case 19:
