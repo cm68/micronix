@@ -25,11 +25,19 @@ typedef unsigned short UINT;
 
 #define MAXIMUM_STRING_LENGTH   100
 
-static int	do_exec(char *filename);
+static int	do_exec(int argc, char**argv);
 static void	emulate();
 
-char *rootdir = "../filesystem";
-char *initfile = "/etc/init";
+#define	DEFROOT	"../filesystem"
+
+char *curdir = "/";
+char *rootdir = 0;
+
+char *initfile[] = {
+	"/etc/init",
+	0
+};
+
 int verbose;
 int trace;
 MACHINE	context;
@@ -41,6 +49,8 @@ struct MACHINE *cp;
 int 
 main(int argc, char **argv)
 {
+	char *d;
+
 	while (--argc) {
 		argv++;
 		if (**argv == '-') {
@@ -63,14 +73,28 @@ main(int argc, char **argv)
 				break; 
 			}
 		} else {
-			initfile = *argv;
 			break;
 		}
 	}
+	if (!argc) {
+		argc = 1;
+		argv = initfile;
+	}
 
+	if (!rootdir) {
+		rootdir = DEFROOT;
+	}
+
+	if (*rootdir != "/") {
+		d = malloc(PATH_MAX);
+		getwd(d);
+		strcat(d, "/");
+		strcat(d, rootdir);
+		rootdir = d;
+	}
 	if (verbose) { 
 		printf("verbose %d\n", verbose);
-		printf("emulating %s with root %s\n", initfile, rootdir);
+		printf("emulating %s with root %s\n", argv[0], rootdir);
 	}
 
 	cp = &context;
@@ -78,20 +102,73 @@ main(int argc, char **argv)
 
         cp->state.pc = 0x100;
 
-	if (do_exec(initfile)) {
+	if (do_exec(argc, argv)) {
 		return (EXIT_FAILURE);
 	}
 	emulate();
         return EXIT_SUCCESS;
 }
 
+char *
+get_symname(unsigned short addr)
+{
+	return 0;
+}
+
+unsigned short
+reloc(unsigned short addr)
+{
+	return 0;
+}
+
+unsigned char
+get_byte(int addr)
+{
+	return cp->memory[addr & 0xffff];
+}
+
+/*
+ * translate our sim filename into a native filename
+ * by prepending the root - we need to be a little smart
+ * about this because relative paths need to first have
+ * the current working directory prepended
+ */
+char *fname(char *orig)
+{
+	char namebuf[PATH_MAX];
+	if (*orig == '/') {
+		sprintf(namebuf, "%s/%s", rootdir, orig);
+	} else {
+		sprintf(namebuf, "%s/%s/%s", rootdir, curdir, orig);
+	}
+	if (verbose > 2) printf("fname: %s new: %s\n", orig, namebuf);
+	return (namebuf);
+}
+
+static void
+pushs(unsigned short s)
+{
+	// printf("push %04x\n", s);
+	cp->memory[--cp->state.registers.word[Z80_SP]] = (s >> 8) & 0xff;
+	cp->memory[--cp->state.registers.word[Z80_SP]] = s & 0xff;
+}
+
 static int 
-do_exec(char *filename)
+do_exec(int argc, char **argv)
 {
         FILE   	*file;
 	struct obj header;
+	int i;
+	int ai;
+	unsigned short *ao;
 
-        if ((file = fopen(filename, "rb")) == NULL) {
+	if (verbose > 2) {
+		printf("argc: %d\n", argc);
+		for (i = 0; i < argc; i++) {
+			printf("arg %d = %s\n", i, argv[i]);
+		}
+	}
+        if ((file = fopen(fname(argv[0]), "rb")) == NULL) {
                 fprintf(stderr, "Can't open file!\n");
                 exit(EXIT_FAILURE);
 
@@ -127,27 +204,25 @@ do_exec(char *filename)
         cp->state.registers.word[Z80_SP] = 0xefff;
 	cp->is_done = 0;
 	brake = header.dataoff + header.data + header.bss + header.heap;
-	
-	chroot(rootdir);
-	return 0;
-}
 
-char *
-get_symname(unsigned short addr)
-{
-	return 0;
-}
+	ao = malloc(argc * sizeof(*ao));
 
-unsigned short
-reloc(unsigned short addr)
-{
+	/* now, copy the args to argv and the stack */
+	for (i = 0; i < argc; i++) {
+		ai = argc - (i + 1);
+		ao[ai] = cp->state.registers.word[Z80_SP] 
+			- (strlen(argv[ai]) + 1);
+		cp->state.registers.word[Z80_SP] = ao[ai];
+		// printf("copyout %s to %04x\n", argv[ai], ao[ai]);
+		strcpy(&cp->memory[ao[ai]], argv[ai]);
+	}
+	pushs(0xffff);
+	for (i = 0; i < argc; i++) {
+		pushs(ao[argc - (i+1)]);
+	}
+	pushs(argc);
+	if (verbose > 1) dumpmem(&get_byte, cp->state.registers.word[Z80_SP], 256);
 	return 0;
-}
-
-unsigned char
-get_byte(int addr)
-{
-	return cp->memory[addr & 0xffff];
 }
 
 unsigned char
@@ -358,6 +433,7 @@ void SystemCall (MACHINE *cp)
 	int i;
 	int fd;
 	struct dirfd *df;
+	char *fn;
 
 	if (verbose > 1) {
 		dumpcpu();
@@ -426,6 +502,7 @@ void SystemCall (MACHINE *cp)
 		carry_clear();
 		break;
 	case 5:
+		fn = fname(&cp->memory[addr]);
 		bytes += 4;
 		switch (addr2) {
 		case 0:
@@ -442,14 +519,14 @@ void SystemCall (MACHINE *cp)
 				&cp->memory[addr], addr, addr2);
 			break;
 		}
-		if (!stat(&cp->memory[addr], &sbuf)) {
+		if (!stat(fn, &sbuf)) {
 			if (S_ISDIR(sbuf.st_mode)) {
-				fd = dirsnarf(&cp->memory[addr]);
+				fd = dirsnarf(fn);
 				if (fd == -1) {
 					goto lose;
 				}
 			} else { 
-				fd = open(&cp->memory[addr], addr2);
+				fd = open(fn, addr2);
 			}
 			cp->state.registers.word[Z80_HL] = fd;
 			carry_clear();
@@ -459,7 +536,7 @@ void SystemCall (MACHINE *cp)
 			cp->state.registers.word[Z80_HL] = errno;
 			carry_set();
 		}
-		if (trace) printf("open %s %04x %04x = %d\n", &cp->memory[addr], addr, addr2, fd);
+		if (trace) printf("open(\"%s\", %04x = %d\n", fn, addr2, fd);
 		break;
 	case 6:	/* close */
 		if (trace) printf("close %d\n", fd);
@@ -467,12 +544,19 @@ void SystemCall (MACHINE *cp)
 		close(fd);
 		bytes += 2;
 		break;
+	case 12: /* chdir */
+		fn = fname(&cp->memory[addr]);
+		if (trace) printf("chdir %s\n", fn);
+		curdir = fn;
+		bytes += 2;
+		break;
 	case 13:	/* r_time */
 		i = time(0);
 		cp->state.registers.word[Z80_DE] = i & 0xffff;
 		cp->state.registers.word[Z80_HL] = (i >> 16) & 0xffff;
 		carry_clear();
-		if (trace) printf("r_time %x %04x %04x\n", i, (i >> 16) & 0xffff, i & 0xffff);
+		if (trace) printf("r_time %x %04x %04x\n", 
+			i, (i >> 16) & 0xffff, i & 0xffff);
 		break;
 	case 17:	/* sbrk */
 		if (trace) printf("sbrk %04x\n", addr);
@@ -490,8 +574,9 @@ void SystemCall (MACHINE *cp)
 			}
 			addr2 = addr;
 		} else {
-			if (trace) printf("stat(\"%s\", %04x)\n", &cp->memory[addr], addr2);
-			i = stat(&cp->memory[addr], &sbuf);
+			fn = fname(&cp->memory[addr]);
+			if (trace) printf("stat(\"%s\", %04x)\n", fn, addr2);
+			i = stat(fn, &sbuf);
 		}
 		if (i) {
 			perror("stat failed");
