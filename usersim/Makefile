@@ -18,7 +18,7 @@ micronix: micronix.o z80emu.o ../src/sgs/z80dis.o
 	$(CC) micronix.o z80emu.o ../src/sgs/z80dis.o -o $@
 
 test: micronix
-	./micronix -t -d ../filesystem ../filesystem/bin/pwd
+	./micronix -t -d ../filesystem ../filesystem/bin/ls
 
 clean:
 	rm -f *.o maketables micronix
