@@ -1,4 +1,6 @@
 # micronix
+
+
 Morrow Designs Micronix and tools
 
 directories:
@@ -19,10 +21,17 @@ kernel:
 include:
 	recovered include files 1.61
 
+usersim:
+	Big news:  as of july 23 2018,
+	micronix user mode simulator mostly works.
+	build it on any random unix box (centos is baseline),
+	and run:  sim
+
+	date, ls. man, and so on work pretty well.
+
+
 
 TODO:
-
-make whitesmith's c run on some unix simulator - zxcc 5.7 doesn't work
 
 make the kernel compile - this is unix v6 source code, not a hint
 of ansi.  luckily, the kernel source is k+r version 7 C.
@@ -33,19 +42,4 @@ textual stuff like getting rid of =- and =+, and fixing initializers.
 
 get an object code improver that will fix the pretty bad stuff that
 whitesmith's generates.  
-
-for example, 
-	static unsigned char uc;
-	uc++;
-
-generates:
-
-	ld a,(uc)	; 10 bytes
-	add a,01
-	ld (uc),a
-
-what?  how about:
-
-	ld hl,uc	; 4 bytes
-	inc (hl)
 
