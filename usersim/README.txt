@@ -1,3 +1,18 @@
+23 July 2018
+Curt Mayer
+
+the below is the original readme file.   it is a very high quality z80 simulator
+that I started from to build the micronix environment, allowing the z80 unix
+to come alive again 25 years after its demise.
+
+I enhanced the simulator with a pretty simple but comprehensive disassembler
+and trace facility.
+
+I did not make any changes to the kernel of the instruction simulator at all.
+it is very high quality and plenty fast.
+
+------------------------------------------
+
 z80emu
 Version 1.1.3
 
