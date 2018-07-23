@@ -592,6 +592,7 @@ void SystemCall (MACHINE *cp)
 	switch (code) {
 	case 5: case 8: case 9: case 10: case 11: case 12: 
 	case 14: case 15: case 16: case 18: case 21: case 22:
+	case 33:
 		fn = fname(&cp->memory[arg1]);
 		break;
 	default:
@@ -1012,6 +1013,25 @@ void SystemCall (MACHINE *cp)
 		carry_clear();
 		break;
 
+	case 33:	/* access <name> <mode> */
+		i = 0;
+		if (arg2 & 4) i |= R_OK;
+		if (arg2 & 2) i |= W_OK;
+		if (arg2 & 1) i |= X_OK;
+		i = access(fn, i);
+		if (trace) {
+			pid(); printf("access(%s, %o) = %d\n", 
+				fn, arg2, i);
+		}
+		if (i == -1) {
+			carry_set();
+		} else {
+			carry_clear();
+		}
+		cp->state.registers.word[Z80_HL] = i;
+		break;
+		if (trace) {
+		}
 	case 34:	/* nice */
 		if (trace) {
 			pid(); printf("nice\n");
