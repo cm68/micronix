@@ -1,6 +1,11 @@
 /* micronix.
  * this emulates the micronix user mode
  *
+ * Copyright (c) 2018, Curt Mayer
+ * do whatever you want, just don't claim you wrote it.
+ * warrantee:  madness!  nope.
+ *
+ * plugs into the z80emu code from:
  * Copyright (c) 2012, 2016 Lin Ke-Fong
  * Copyright (c) 2012 Chris Pressey
  *
