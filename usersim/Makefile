@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -g
 
-all: micronix
+all: sim
 
 tables.h: maketables.c
 	$(CC) -Wall $< -o maketables
@@ -14,7 +14,7 @@ z80emu.o: z80emu.c z80emu.h z80config.h z80user.h \
 micronix.o: micronix.c z80emu.h z80config.h
 	$(CC) $(CFLAGS) -c $<
 
-micronix: micronix.o z80emu.o ../src/sgs/z80dis.o
+sim: micronix.o z80emu.o ../src/sgs/z80dis.o
 	$(CC) micronix.o z80emu.o ../src/sgs/z80dis.o -o $@
 
 test: micronix

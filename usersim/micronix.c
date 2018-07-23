@@ -25,10 +25,12 @@ typedef unsigned short UINT;
 
 #define MAXIMUM_STRING_LENGTH   100
 
-static int	do_exec(int argc, char**argv);
+static int	do_exec(char *name, char**argv);
 static void	emulate();
 
 #define	DEFROOT	"../filesystem"
+
+int mypid;
 
 char *curdir = "/";
 char *rootdir = 0;
@@ -46,10 +48,30 @@ unsigned short brake;
 
 struct MACHINE *cp;
 
+/*
+ * translate our sim filename into a native filename
+ * by prepending the root - we need to be a little smart
+ * about this because relative paths need to first have
+ * the current working directory prepended
+ */
+char *fname(char *orig)
+{
+	char namebuf[PATH_MAX];
+	if (*orig == '/') {
+		sprintf(namebuf, "%s/%s", rootdir, orig);
+	} else {
+		sprintf(namebuf, "%s/%s/%s", rootdir, curdir, orig);
+	}
+	if (verbose > 2) printf("fname: %s new: %s\n", orig, namebuf);
+	return (namebuf);
+}
+
 int 
 main(int argc, char **argv)
 {
 	char *d;
+	char **argvec;
+	int i;
 
 	while (--argc) {
 		argv++;
@@ -102,9 +124,19 @@ main(int argc, char **argv)
 
         cp->state.pc = 0x100;
 
-	if (do_exec(argc, argv)) {
+	/* build argvec */
+	argvec = malloc((argc + 1) * sizeof(char *));
+	for (i = 0; i < argc; i++) {
+		argvec[i] = argv[i];
+	}
+	argvec[i] = 0;
+
+	if (do_exec(fname(argvec[0]), argvec)) {
 		return (EXIT_FAILURE);
 	}
+	free(argvec);
+	mypid = getpid();
+
 	emulate();
         return EXIT_SUCCESS;
 }
@@ -121,28 +153,17 @@ reloc(unsigned short addr)
 	return 0;
 }
 
+unsigned short
+get_word(int addr)
+{
+	return cp->memory[addr & 0xffff] + 
+		(cp->memory[(addr+1) & 0xffff] << 8);
+}
+
 unsigned char
 get_byte(int addr)
 {
 	return cp->memory[addr & 0xffff];
-}
-
-/*
- * translate our sim filename into a native filename
- * by prepending the root - we need to be a little smart
- * about this because relative paths need to first have
- * the current working directory prepended
- */
-char *fname(char *orig)
-{
-	char namebuf[PATH_MAX];
-	if (*orig == '/') {
-		sprintf(namebuf, "%s/%s", rootdir, orig);
-	} else {
-		sprintf(namebuf, "%s/%s/%s", rootdir, curdir, orig);
-	}
-	if (verbose > 2) printf("fname: %s new: %s\n", orig, namebuf);
-	return (namebuf);
 }
 
 static void
@@ -153,24 +174,29 @@ pushs(unsigned short s)
 	cp->memory[--cp->state.registers.word[Z80_SP]] = s & 0xff;
 }
 
+/*
+ * this is the exec function - slightly different from the standard unix
+ */
 static int 
-do_exec(int argc, char **argv)
+do_exec(char *name, char **argv)
 {
         FILE   	*file;
 	struct obj header;
 	int i;
 	int ai;
 	unsigned short *ao;
+	int argc;
 
-	if (verbose > 2) {
-		printf("argc: %d\n", argc);
-		for (i = 0; i < argc; i++) {
-			printf("arg %d = %s\n", i, argv[i]);
+	/* count our args from the null-terminated list */
+	for (argc = 0; argv[argc]; argc++) {
+		if (verbose > 2) {
+			printf("arg %d = %s\n", argc, argv[argc]);
 		}
 	}
-        if ((file = fopen(fname(argv[0]), "rb")) == NULL) {
-                fprintf(stderr, "Can't open file!\n");
-                exit(EXIT_FAILURE);
+
+        if ((file = fopen(name, "rb")) == NULL) {
+                printf("Can't open file %s!\n", name);
+		return(errno);
 
         }
         fseek(file, 0, SEEK_SET);
@@ -249,10 +275,14 @@ carry_clear()
 	cp->state.registers.byte[Z80_F] &= ~Z80_C_FLAG;
 }
 
+pid()
+{
+	printf("%d: ", mypid);
+}
+
 dumpcpu()
 {
 	unsigned char f;
-
 	printf("pc:%04x a:%02x bc:%04x de:%04x hl:%04x sp:%04x status:%d break:%04x ",
 		cp->state.pc,
 		cp->state.registers.byte[Z80_A],
@@ -287,6 +317,7 @@ emulate()
 
 	do {
 		if (verbose > 2) {
+			pid();
 			dumpinst();
 			dumpcpu();
 		}
@@ -406,6 +437,25 @@ dirclose(int fd)
 	free(n);
 }
 
+char *signame[] = {
+	"bogus",
+	"hup",
+	"int",
+	"quit",
+	"ill",
+	"trace",
+	"bg",
+	"rec",
+	"fpe",
+	"kill",
+	"bus",
+	"segv",
+	"sysarg",
+	"pipeerr",
+	"alarm",
+	"term"
+};
+
 /*
  * micronix system calls are done using the RST8 instruction, which
  * is a one-byte call instruction to location 8, which has a halt instruction
@@ -434,13 +484,17 @@ void SystemCall (MACHINE *cp)
 	int fd;
 	struct dirfd *df;
 	char *fn;
+	char **argvec;
 
 	if (verbose > 1) {
+		pid();
 		dumpcpu();
 	}
 	calladdr = get_byte(sp) + (get_byte(sp+1) << 8) - 1;
 
 	if ((code = get_byte(calladdr)) != 0xcf) {
+		pid();
+		dumpcpu();
 		printf("halt no syscall %d %x!\n", code, calladdr);
 		return;
 	}
@@ -463,6 +517,7 @@ void SystemCall (MACHINE *cp)
 	fd = cp->state.registers.word[Z80_HL];
 
 	if (verbose) {
+		pid();
 		printf("%ssyscall %d %04x %04x %04x\n", 
 			indirect ? "indirect " : "", code,
 			fd, addr, addr2);
@@ -470,14 +525,47 @@ void SystemCall (MACHINE *cp)
 
 	switch (code) {
 	case 0:
+		pid();
 		printf("double indirect! yarg!\n");
 		break;		
-	case 1:
-		if (trace) printf("exit %04x %04x\n", fd, addr);
+	case 1: /* exit */
+		if (trace) {
+			pid();
+			printf("exit %04x %04x\n", fd, addr);
+		}
 		exit(0);
 		break;
-	case 3:
-		if (trace) printf("read fd:%d %04x %04x\n", fd, addr, addr2);
+	case 2: /* fork */
+		if (trace) {
+			pid();
+			printf("fork\n");
+		}
+		i = fork();
+		if (i) {
+			if (trace) {
+				pid();
+				printf("child pid=%d\n", i);
+			}
+			cp->state.registers.word[Z80_HL] = i;
+			i = get_byte(sp) + get_byte(sp+1) << 8;
+			i += 3;
+			cp->memory[sp] = i & 0xff;
+			cp->memory[sp+1] = (i >> 8) & 0xff;
+		} else {
+			mypid = getpid();
+			if (trace) {
+				pid();
+				printf("child process\n", i);
+			}
+			cp->state.registers.word[Z80_HL] = 0;
+		}
+		carry_clear();
+		break;
+	case 3: /* read */
+		if (trace) {
+			pid();
+			printf("read fd:%d %04x %04x\n", fd, addr, addr2);
+		}
 		if ((df = dirget(fd))) {
 			i = df->bufsize - df->offset;
 			if (addr2 < i) {
@@ -493,15 +581,21 @@ void SystemCall (MACHINE *cp)
 		cp->state.registers.word[Z80_HL] = i;
 		carry_clear();
 		break;
-	case 4:
-		if (trace) printf("write fd:%d %04x %04x\n", fd, addr, addr2);
+	case 4: /* write */
+		if (trace) {
+			pid();
+			printf("write fd:%d %04x %04x\n", fd, addr, addr2);
+		}
 		if (verbose > 1) dumpmem(&get_byte, addr, addr2);
 		i = write(fd, &cp->memory[addr], addr2);
 		cp->state.registers.word[Z80_HL] = i;
 		bytes += 4;
 		carry_clear();
 		break;
-	case 5:
+	case 5: /* open */
+		if (trace) {
+			pid();
+		}
 		fn = fname(&cp->memory[addr]);
 		bytes += 4;
 		switch (addr2) {
@@ -539,14 +633,47 @@ void SystemCall (MACHINE *cp)
 		if (trace) printf("open(\"%s\", %04x = %d\n", fn, addr2, fd);
 		break;
 	case 6:	/* close */
-		if (trace) printf("close %d\n", fd);
+		if (trace) {
+			pid();
+			printf("close %d\n", fd);
+		}
 		dirclose(fd);
 		close(fd);
 		bytes += 2;
 		break;
+	case 11: /* exec */
+		fn = fname(&cp->memory[addr]);
+		if (trace) {
+			pid();
+			printf("exec %s %04x\n", fn, addr2);
+			dumpmem(&get_byte, addr2, 32);
+		}
+		/* let's count our args */
+		i = 0;
+		while (get_word(addr2 + (i * 2))) i++;
+		argvec = malloc((i + 1) * sizeof (char *));
+		i = 0;
+		for (i = 0; (addr = get_word(addr2 + (i * 2))); i++) {
+			argvec[i] = strdup(&cp->memory[addr]);
+		}
+		argvec[i] = 0;	
+		if (do_exec(fn, argvec)) {
+			carry_set();
+			break;
+		}
+		for (i = 0; argvec[i]; i++) {
+			free(argvec[i]);
+		}
+		free(argvec);
+		carry_clear();
+		break;
+
 	case 12: /* chdir */
 		fn = fname(&cp->memory[addr]);
-		if (trace) printf("chdir %s\n", fn);
+		if (trace) {
+			pid();
+			printf("chdir %s\n", fn);
+		}
 		curdir = fn;
 		bytes += 2;
 		break;
@@ -555,11 +682,17 @@ void SystemCall (MACHINE *cp)
 		cp->state.registers.word[Z80_DE] = i & 0xffff;
 		cp->state.registers.word[Z80_HL] = (i >> 16) & 0xffff;
 		carry_clear();
-		if (trace) printf("r_time %x %04x %04x\n", 
-			i, (i >> 16) & 0xffff, i & 0xffff);
+		if (trace) {
+			pid();
+			printf("r_time %x %04x %04x\n", 
+				i, (i >> 16) & 0xffff, i & 0xffff);
+		}
 		break;
 	case 17:	/* sbrk */
-		if (trace) printf("sbrk %04x\n", addr);
+		if (trace) {
+			pid();
+			printf("sbrk %04x\n", addr);
+		}
 		brake = addr;
 		carry_clear();
 		bytes += 2;
@@ -567,7 +700,10 @@ void SystemCall (MACHINE *cp)
 	case 18:
 	case 28:
 		if (code == 28) {
-			if (trace) printf("fstat(%d, %04x)\n", fd, addr);
+			if (trace) {
+				pid();
+				printf("fstat(%d, %04x)\n", fd, addr);
+			}
 			i = fstat(fd, &sbuf);
 			if ((df = dirget(fd))) {
 				sbuf.st_size = df->end;
@@ -575,7 +711,10 @@ void SystemCall (MACHINE *cp)
 			addr2 = addr;
 		} else {
 			fn = fname(&cp->memory[addr]);
-			if (trace) printf("stat(\"%s\", %04x)\n", fn, addr2);
+			if (trace) {
+				pid();
+				printf("stat(\"%s\", %04x)\n", fn, addr2);
+			}
 			i = stat(fn, &sbuf);
 		}
 		if (i) {
@@ -601,7 +740,10 @@ void SystemCall (MACHINE *cp)
 		bytes += 2;
 		break;
 	case 19:
-		if (trace) printf("seek fd:%d %04x %04x\n", fd, addr, addr2);
+		if (trace) {
+			pid();
+			printf("seek fd:%d %04x %04x\n", fd, addr, addr2);
+		}
 		i = (short)addr;
 		if (addr2 > 2) {
 			i *= 512;
@@ -637,16 +779,48 @@ void SystemCall (MACHINE *cp)
 		bytes += 2;
 		break;
 	case 20:
-		if (trace) printf("getpid fd:%d %04x %04x\n", fd, addr, addr2);
+		if (trace) {
+			pid();
+			printf("getpid fd:%d %04x %04x\n", fd, addr, addr2);
+		}
 		cp->state.registers.word[Z80_HL] = getpid();
-		bytes += 2;
+		carry_clear();
+		break;
+	case 24:
+		if (trace) {
+			pid();
+			printf("getuid %04x %04x\n", fd, addr, addr2);
+		}
+		cp->state.registers.word[Z80_HL] = getuid();
+		carry_clear();
+		break;
+	case 36:
+		if (trace) {
+			pid();
+			printf("sync\n");
+		}
+		carry_clear();
 		break;
 	case 32:
-		if (trace) printf("gtty %04x\n", addr);
+		if (trace) {
+			pid();
+			printf("gtty %04x\n", addr);
+		}
 		bytes += 2;
+		carry_clear();
 		break;
-
+	case 48:
+		i = addr;
+		if (i > 15) i = 0;
+		if (trace) {
+			pid();
+			printf("signal %s %04x %04x\n", 
+				signame[i], addr, addr2);
+		}
+		carry_clear();
+		break;
 	default:
+		pid();
 		printf("unrecognized syscall %d %x\n", code, code);
 		carry_set();
 		break;
