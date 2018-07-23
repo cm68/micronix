@@ -542,7 +542,8 @@ void SystemCall (MACHINE *cp)
 
 	struct stat sbuf;
 	int i;
-
+	int p[2];
+	
 	struct inode *ip;
 	struct dirfd *df;
 	char *fn;
@@ -741,11 +742,17 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 8:	/* creat <name> <mode> */
+		i = creat(fn, arg2);
 		if (trace) {
-			pid(); printf("XXX - creat(%s, %o) = %d\n", 
+			pid(); printf("creat(%s, %o) = %d\n", 
 				fn, arg2, i);
 		}
-		carry_set();
+		if (i == -1) {
+			carry_set();
+		} else {
+			carry_clear();
+		}
+		cp->state.registers.word[Z80_HL] = i;
 		break;
 
 	case 9:	/* link <old> <new> */
@@ -757,10 +764,15 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 10:	/* unlink <file> */
+		i = unlink(fn);
 		if (trace) {
-			pid(); printf("XXX - unlink(%s)\n", fn);
+			pid(); printf("unlink(%s) = %d\n", fn, i);
 		}
-		carry_set();
+		if (i != 0) {
+			carry_set();
+		} else {
+			carry_clear();
+		}
 		break;
 
 	case 11: /* exec */
@@ -1030,19 +1042,34 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 41:
+		i = dup(fd);
 		if (trace) {
 			pid();
-			printf("XXX - dup %d\n", fd);
+			printf("dup(%d) = %d\n", fd, i);
 		}
-		carry_set();
+		if (i != -1) {
+			cp->state.registers.word[Z80_HL] = i;
+			carry_clear();
+		} else {
+			carry_set();
+		}
 		break;
 
 	case 42:
 		if (trace) {
 			pid();
-			printf("XXX - pipe\n");
+			printf("pipe() ");
 		}
-		carry_set();
+		if ((i = pipe(p))) {
+			if (trace) printf("failed\n");
+			carry_set();
+		} else {
+			if (trace) printf(" = (in: %d, out: %d)\n",
+				p[0], p[1]);
+			cp->state.registers.word[Z80_HL] = p[0];
+			cp->state.registers.word[Z80_DE] = p[1];
+			carry_clear();
+		}
 		break;
 
 	case 48:
