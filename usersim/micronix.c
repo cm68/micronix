@@ -22,6 +22,9 @@
 #include "z80user.h"
 #include <errno.h>
 #include <termios.h>
+#include <unistd.h>
+#include <limits.h>
+#include <string.h>
 
 typedef unsigned int ULONG;
 typedef unsigned char UCHAR;
@@ -33,13 +36,14 @@ typedef unsigned short UINT;
 #define MAXIMUM_STRING_LENGTH   100
 
 static int	do_exec(char *name, char**argv);
+extern void dumpmem(unsigned char (*get)(int a), int addr, int len);
 static void	emulate();
 
 #define	DEFROOT	"../filesystem"
 
 int mypid;
 
-char curdir[100] = "";
+char curdir[100] = ".";
 char *rootdir = 0;
 
 char *initfile[] = {
@@ -53,8 +57,11 @@ int trace;
 MACHINE	context;
 
 unsigned short brake;
+int breakpoint;
 
 struct MACHINE *cp;
+
+char namebuf[PATH_MAX];
 
 /*
  * translate our sim filename into a native filename
@@ -64,14 +71,11 @@ struct MACHINE *cp;
  */
 char *fname(char *orig)
 {
-	char namebuf[PATH_MAX];
 	if (*orig == '/') {
 		sprintf(namebuf, "%s/%s", rootdir, orig);
-	} else {
-		sprintf(namebuf, "%s/%s/%s", rootdir, curdir, orig);
+		return (namebuf);
 	}
-	if (verbose > 2) printf("fname: %s new: %s\n", orig, namebuf);
-	return (namebuf);
+	return (orig);
 }
 
 char *
@@ -93,6 +97,7 @@ put_word(unsigned short addr, unsigned short value)
 	cp->memory[addr+1] = value >> 8;
 }
 
+void
 put_byte(unsigned short addr, unsigned char value)
 {
 	cp->memory[addr] = value;
@@ -127,6 +132,8 @@ pop()
 	return (i);
 }
 
+FILE *mytty;
+
 int 
 main(int argc, char **argv)
 {
@@ -135,7 +142,13 @@ main(int argc, char **argv)
 	char **argvec;
 	int i;
 
-	setvbuf(stdout, 0, _IONBF, 0);
+	/*
+	 * we might be piping the simulator.  let's get an open file for our debug output
+	 * and monitor functions
+	 */
+	mytty = fopen("/dev/tty", "r+");
+	setvbuf(mytty, 0, _IONBF, 0);
+	stdout = stderr = stdin = mytty;
 
 	while (--argc) {
 		argv++;
@@ -164,6 +177,9 @@ main(int argc, char **argv)
 			case 'v':
 				verbose++;
 				break;
+			case 'b':
+				breakpoint++;
+				break;
 			default:
 				printf("bad flag %c\n", (**argv));
 				break; 
@@ -181,7 +197,7 @@ main(int argc, char **argv)
 		rootdir = DEFROOT;
 	}
 
-	if (*rootdir != "/") {
+	if (*rootdir != '/') {
 		d = malloc(PATH_MAX);
 		getwd(d);
 		strcat(d, "/");
@@ -318,19 +334,8 @@ dumpcpu()
 	unsigned char f;
 	char outbuf[40];
 
-	pid();
 	format_instr(cp->state.pc, outbuf, &get_byte, &get_symname, &reloc);
 	printf("%04x: %-20s ", cp->state.pc, outbuf);
-	printf("pc:%04x a:%02x bc:%04x de:%04x hl:%04x sp:%04x (%04x) status:%d break:%04x ",
-		cp->state.pc,
-		cp->state.registers.byte[Z80_A],
-		cp->state.registers.word[Z80_BC],
-		cp->state.registers.word[Z80_DE],
-		cp->state.registers.word[Z80_HL],
-		cp->state.registers.word[Z80_SP],
-		get_word(cp->state.registers.word[Z80_SP]),
-		cp->state.status,
-		brake);
 
 	f = cp->state.registers.byte[Z80_F];
 	
@@ -341,7 +346,136 @@ dumpcpu()
 	if (f & Z80_Y_FLAG) printf("Y"); else  printf(" ");
 	if (f & Z80_Z_FLAG) printf("Z"); else  printf(" ");
 	if (f & Z80_S_FLAG) printf("S"); else  printf(" ");
-	printf("\n");
+
+	printf(" a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x brk:%04x ",
+		cp->state.registers.byte[Z80_A],
+		cp->state.registers.word[Z80_BC],
+		cp->state.registers.word[Z80_DE],
+		cp->state.registers.word[Z80_HL],
+		cp->state.registers.word[Z80_IX],
+		cp->state.registers.word[Z80_IY],
+		cp->state.registers.word[Z80_SP],
+		get_word(cp->state.registers.word[Z80_SP]),
+		brake);
+
+	printf(" \n");
+}
+
+unsigned short breaks[10] = {
+	0xffff, 0xffff, 0xffff, 0xffff, 0xffff,
+	0xffff, 0xffff, 0xffff, 0xffff, 0xffff
+};
+
+int
+breakpoint_at(unsigned short addr)
+{
+	char c;
+	for (c = 0; c < sizeof(breaks)/sizeof(breaks[0]); c++) {
+		if (breaks[c] == addr) {
+			return c;
+		}
+	}
+	return -1;
+}
+
+void
+monitor()
+{
+	char cmdline[100];
+	char c;
+	int i;
+	int j;
+	int k;
+	char *s;
+
+	while (1) {
+	more:
+		if ((c = breakpoint_at(cp->state.pc)) != -1) {
+			pid();
+			printf("break %d at %04x\n", c, cp->state.pc);
+		}
+		printf("%d >>> ", mypid);
+		s = fgets(cmdline, sizeof(cmdline), stdin);
+		if (*s) {
+			s[strlen(s)-1] = 0;
+		}
+		c = *s++;
+		while (*s && (*s == ' ')) s++;
+		switch(c) {
+		case 'r':
+			dumpcpu();
+			break;
+		case 's':
+			dumpcpu();
+			return;
+		case 'g':
+			breakpoint = 0;
+			return;
+		case 'q':
+			exit(1);
+			return;
+		case 'b':
+			j = -1;
+			k = 0;
+			if (*s == '-') {
+				s++;
+				k = 1;
+			}
+			while (*s && (*s == ' ')) s++;
+			if (*s) {
+				while (*s) {
+					while (*s && (*s == ' ')) s++;
+					i = strtol(s, &s, 16);
+					j = -1;
+					for (c = 0; c < sizeof(breaks)/sizeof(breaks[0]); c++) {
+						if ((j == -1) && (breaks[c] == 0xffff)) j = c;
+						if (breaks[c] == i) {
+							if (k) {
+								printf("cleared");
+								breaks[c] = 0xffff;
+							} else {
+								printf("already set");
+							}
+							printf(" at %d\n", c);
+						}
+					}
+					if (!k) {
+						if (j == -1) {
+							printf("no more breakpoints\n");
+							goto more;
+						}
+						breaks[j] = i;
+					}
+				}
+			} else {
+				for (c = 0; c < sizeof(breaks)/sizeof(breaks[0]); c++) {
+					if (breaks[c] == 0xffff)
+						continue;
+					printf("%d %04x%s\n", 
+						c, breaks[c], k ? " cleared" : "");
+					if (k) {
+						breaks[c] = 0xffff;
+					}
+					j = c;
+				}
+				if (j == -1) printf("no breakpoints\n");
+			}
+			break;
+		case 'h':
+			printf("commands:\n");
+			printf("r: dump cpu state\n");
+			printf("g: continue\n");
+			printf("s: single step\n");
+			printf("q: exit\n");
+			printf("b: [-] <nnnn> ... breakpoint\n");
+			break;
+		default:
+			printf("unknown command %c\n", c);
+			break;
+		case 0:
+			break;
+		}
+	}
 }
 
 /*
@@ -353,10 +487,17 @@ static void
 emulate()
 {
 	unsigned char *ip;
+	int i;
 
 	do {
+		if (breakpoint_at(cp->state.pc) != -1) {
+			breakpoint = 1;
+		}
+		if (breakpoint) {
+			monitor();
+		}
 		if (inst) {
-			dumpcpu();
+			pid(); dumpcpu();
 		}
 		/*
                  * the second arg is the number of cycles we are allowing 
@@ -397,7 +538,7 @@ struct v6dir {
 /*
  * open a directory and return the file descriptor
  */
-int
+unsigned short
 dirsnarf(char *name)
 {
 	DIR *dp;
@@ -693,7 +834,7 @@ void SystemCall (MACHINE *cp)
 		if (!stat(fn, &sbuf)) {
 			if (S_ISDIR(sbuf.st_mode)) {
 				fd = dirsnarf(fn);
-				if (fd == -1) {
+				if (fd == 0xffff) {
 					goto lose;
 				}
 			} else { 
@@ -807,6 +948,7 @@ void SystemCall (MACHINE *cp)
 			pid(); printf("chdir(%s)\n", fn);
 		}
 		strcpy(curdir, fn);
+		chdir(fn);
 		break;
 	case 13:	/* time */
 		i = time(0);
@@ -925,7 +1067,7 @@ void SystemCall (MACHINE *cp)
 			}
 		}
 		if (trace) {
-			pid(); printf("seek(%d, %d, %d) = i\n", 
+			pid(); printf("seek(%d, %d, %d) = %d\n", 
 				fd, arg1, arg2, i);
 		}
 		cp->state.registers.word[Z80_HL] = (i >> 16) & 0xffff;
