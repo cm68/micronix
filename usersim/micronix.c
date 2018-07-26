@@ -403,39 +403,69 @@ dumpcpu()
 	printf(" \n");
 }
 
-unsigned short breaks[10] = {
-	0xffff, 0xffff, 0xffff, 0xffff, 0xffff,
-	0xffff, 0xffff, 0xffff, 0xffff, 0xffff
+/*
+ * breakpoints and watchpoints are handled using the same data structure
+ */
+struct point {
+	unsigned short addr;
+	int value;
+	struct point *next;
 };
 
+struct point *breaks;
+struct point *watches;
+
 int
-breakpoint_at(unsigned short addr)
+watchpoint_hit()
 {
-	char c;
-	for (c = 0; c < sizeof(breaks)/sizeof(breaks[0]); c++) {
-		if (breaks[c] == addr) {
-			return c;
+	struct point *p;
+	int n;
+
+	for (p = watches; p; p = p->next) {
+		if (p->value == -1) {
+			p->value = get_byte(p->addr);
+		}
+		n = get_byte(p->addr);
+		if (n != p->value) {
+			printf("value %02x at %04x changed to %02x\n",
+				p->value, p->addr, n);
+			p->value = n;
+			return (1);
 		}
 	}
-	return -1;
+	return (0);
+}
+
+struct point *
+point_at(struct point **head, unsigned short addr, struct point **pp)
+{
+	struct point *p;
+	if (pp)
+		*pp = 0;
+	for (p = *head; p; p = p->next) {
+		if (p->addr ==addr) {
+			break;
+		}
+		if (pp) {
+			*pp = p;
+		}
+	}
+	return p;
 }
 
 void
 monitor()
 {
+	struct point *p, *prev, **head;
 	char cmdline[100];
+	char l;
 	char c;
 	int i;
-	int j;
-	int k;
+	int delete;
 	char *s;
 
 	while (1) {
 	more:
-		if ((c = breakpoint_at(cp->state.pc)) != -1) {
-			pid();
-			printf("break %d at %04x\n", c, cp->state.pc);
-		}
 		printf("%d >>> ", mypid);
 		s = fgets(cmdline, sizeof(cmdline), stdin);
 		if (*s) {
@@ -443,7 +473,26 @@ monitor()
 		}
 		c = *s++;
 		while (*s && (*s == ' ')) s++;
+		head = &breaks;
 		switch(c) {
+		case 'd':
+			while (*s && (*s == ' ')) s++;
+			i = strtol(s, &s, 16);
+			dumpmem(&get_byte, i, 256);
+			break;
+		case 'l':
+			while (*s && (*s == ' ')) s++;
+			if (*s) {
+				i = strtol(s, &s, 16);
+			} else {
+				i = cp->state.pc;
+			}
+			for (l = 0; l < 5; l++) {
+				c = format_instr(i, cmdline, &get_byte, &get_symname, &reloc);
+				printf("%04x: %-20s\n", i, cmdline);
+				i += c;
+			}
+			break;
 		case 'r':
 			dumpcpu();
 			break;
@@ -456,60 +505,57 @@ monitor()
 		case 'q':
 			exit(1);
 			return;
-		case 'b':
-			j = -1;
-			k = 0;
+		case 'w':	/* w [-] <addr> <addr> ... */
+			head = &watches;
+		case 'b':	/* b [-] <addr> <addr> ... */
+			delete = 0;
+			i = -1;
 			if (*s == '-') {
 				s++;
-				k = 1;
+				delete = 1;
 			}
-			while (*s && (*s == ' ')) s++;
-			if (*s) {
-				while (*s) {
-					while (*s && (*s == ' ')) s++;
-					i = strtol(s, &s, 16);
-					j = -1;
-					for (c = 0; c < sizeof(breaks)/sizeof(breaks[0]); c++) {
-						if ((j == -1) && (breaks[c] == 0xffff)) j = c;
-						if (breaks[c] == i) {
-							if (k) {
-								printf("cleared");
-								breaks[c] = 0xffff;
-							} else {
-								printf("already set");
-							}
-							printf(" at %d\n", c);
-						}
+			while (*s) {
+				i = strtol(s, &s, 16);
+				p = point_at(head, i, &prev);
+				if (p && delete) {
+					if (prev) {
+						prev->next = p->next;
+					} else {
+						*head = p->next;
 					}
-					if (!k) {
-						if (j == -1) {
-							printf("no more breakpoints\n");
-							goto more;
-						}
-						breaks[j] = i;
+					free(p);
+				} else if ((!p) && (!delete)) {
+					p = malloc(sizeof(*p));
+					p->addr = i;
+					p->next = *head;
+					*head = p;
+				}
+				while (*s && (*s == ' ')) s++;
+			}
+			if (i == -1) {
+				if (delete) {
+					while ((p = *head)) {
+						*head = p->next;
+						free(p);
+					}
+				} else {
+					for (p = *head; p; p = p->next) {
+						printf("%04x\n", p->addr);
 					}
 				}
-			} else {
-				for (c = 0; c < sizeof(breaks)/sizeof(breaks[0]); c++) {
-					if (breaks[c] == 0xffff)
-						continue;
-					printf("%d %04x%s\n", 
-						c, breaks[c], k ? " cleared" : "");
-					if (k) {
-						breaks[c] = 0xffff;
-					}
-					j = c;
-				}
-				if (j == -1) printf("no breakpoints\n");
 			}
 			break;
+		case '?':
 		case 'h':
 			printf("commands:\n");
-			printf("r: dump cpu state\n");
+			printf("l <addr> :list\n");
+			printf("d <addr> :dump memory\n");
+			printf("p dump cpu state\n");
 			printf("g: continue\n");
 			printf("s: single step\n");
 			printf("q: exit\n");
-			printf("b: [-] <nnnn> ... breakpoint\n");
+			printf("b [-] <nnnn> ... :breakpoint\n");
+			printf("w [-] <nnnn> ... :watchpoint\n");
 			break;
 		default:
 			printf("unknown command %c\n", c);
@@ -530,9 +576,16 @@ emulate()
 {
 	unsigned char *ip;
 	int i;
-
+	
 	do {
-		if (breakpoint_at(cp->state.pc) != -1) {
+		if (watchpoint_hit()) {
+			breakpoint = 1;
+		}
+		if (point_at(&breaks, cp->state.pc, 0)) {
+			if (point_at(&breaks, cp->state.pc, 0)) {
+				pid();
+				printf("break at %04x\n", cp->state.pc);
+			}
 			breakpoint = 1;
 		}
 		if (breakpoint) {
