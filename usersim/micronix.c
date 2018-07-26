@@ -463,6 +463,7 @@ monitor()
 	int i;
 	int delete;
 	char *s;
+	int lastaddr = -1;
 
 	while (1) {
 	more:
@@ -477,20 +478,34 @@ monitor()
 		switch(c) {
 		case 'd':
 			while (*s && (*s == ' ')) s++;
-			i = strtol(s, &s, 16);
+			if (*s) {
+				i = strtol(s, &s, 16);
+			} else {
+				if (lastaddr == -1) {
+					i = cp->state.registers.word[Z80_SP];
+				} else {
+					i = lastaddr;
+				}
+			}
 			dumpmem(&get_byte, i, 256);
+			lastaddr = (i + 256) & 0xfff;
 			break;
 		case 'l':
 			while (*s && (*s == ' ')) s++;
 			if (*s) {
 				i = strtol(s, &s, 16);
 			} else {
-				i = cp->state.pc;
+				if (lastaddr == -1) {
+					i = cp->state.pc;
+				} else {
+					i = lastaddr;
+				}
 			}
 			for (l = 0; l < 5; l++) {
 				c = format_instr(i, cmdline, &get_byte, &get_symname, &reloc);
 				printf("%04x: %-20s\n", i, cmdline);
 				i += c;
+				lastaddr = i & 0xfff;
 			}
 			break;
 		case 'r':
