@@ -51,9 +51,17 @@ char *initfile[] = {
 	0
 };
 
-int inst;
+#define	V_SYS	1	/* trace system calls */
+#define V_MEM	2	/* dump out reads/writes */
+#define	V_SYS1	4	/* trace system call low level */
+#define	V_EXEC	8	/* exec args */
+#define	V_INST	16	/* instructions */
+	
+char *vopts[] = {
+	"V_SYS", "V_MEM", "V_SYS1", "V_EXEC", "V_INST", 0
+};
 int verbose;
-int trace;
+
 MACHINE	context;
 
 unsigned short brake;
@@ -132,60 +140,81 @@ pop()
 	return (i);
 }
 
+#define	TTY_FD	64
+
 FILE *mytty;
+
+void
+usage(char *complaint, char *p)
+{
+	int i;
+
+	printf("%s", complaint);
+	printf("usage: %s [<options>] [program [<program options>]]\n", p);
+	printf("\t-d <root dir>\n");
+	printf("\t-b\t\tstart with breakpoint\n");
+	printf("\t-v <verbosity>\n");
+	for (i = 0; vopts[i]; i++) {
+		printf("\t%x %s\n", 1 << i, vopts[i]);
+	}       
+	exit(1);	
+}
 
 int 
 main(int argc, char **argv)
 {
 	char *progname = argv[0];
-	char *d;
+	char *s;
 	char **argvec;
 	int i;
 
 	/*
 	 * we might be piping the simulator.  let's get an open file for our debug output
-	 * and monitor functions
+	 * and monitor functions.  finally, let's make sure the file descriptor is out of
+	 * range of the file descriptors our emulation uses.
 	 */
 	mytty = fopen("/dev/tty", "r+");
+	dup2(fileno(mytty), TTY_FD);
+	mytty = fdopen(TTY_FD, "r+");
 	setvbuf(mytty, 0, _IONBF, 0);
 	stdout = stderr = stdin = mytty;
-
-	while (--argc) {
+	argc--;
+	
+	while (argc) {
+		argc--;
 		argv++;
-		if (**argv == '-') {
-			while (*++*argv) switch (**argv) {
+
+		s = *argv;
+
+		/* end of flagged options */
+		if (*s++ != '-')
+			break;
+
+		while (*s) {
+			switch (*s++) {
 			case 'h':
-				printf("usage: %s [<options>] program\n", 
-					progname);
-				printf("\t-d <root dir>\n");
-				printf("\t-i trace instructions\n");
-				printf("\t-t trace system calls\n");
-				printf("\t-v increase verbosity\n");
-				exit(1);	
+				usage("", progname);
 			case 'd':
-				--argc;
+				if (!argc--) {
+					usage("directory not specified\n", progname);
+				}
 				rootdir = *++argv;
-				if (**argv) while ((*argv)[1])
-					(*argv)++;
-				break;
-			case 'i':
-				inst++;
-				break;
-			case 't':
-				trace++;
+				s = "";
 				break;
 			case 'v':
-				verbose++;
+				if (!argc--) {
+					usage("verbosity not specified \n", progname);
+				}
+				verbose = strtol(*++argv, 0, 0);
+				s = "";
 				break;
 			case 'b':
 				breakpoint++;
 				break;
 			default:
-				printf("bad flag %c\n", (**argv));
+				printf("bad flag %c\n", (*s));
 				break; 
 			}
-		} else {
-			break;
 		}
 	}
 	if (!argc) {
@@ -197,17 +226,27 @@ main(int argc, char **argv)
 		rootdir = DEFROOT;
 	}
 
+	/* if our rootdir is relative, we need to make it absolute */
 	if (*rootdir != '/') {
-		d = malloc(PATH_MAX);
-		getwd(d);
-		strcat(d, "/");
-		strcat(d, rootdir);
-		rootdir = d;
+		s = malloc(PATH_MAX);
+		getwd(s);
+		strcat(s, "/");
+		strcat(s, rootdir);
+		rootdir = s;
 	}
-	if (verbose+trace+inst) { 
-		printf("verbose %d trace %d inst %d\n", verbose, trace, inst);
+	if (verbose) {
+		printf("verbose %x ",verbose);
+		for (i = 0; vopts[i]; i++) {
+			if (verbose & (1 << i)) {
+				printf("%s ", vopts[i]);
+			}
+		}
+		printf("\n");
 		printf("emulating %s with root %s\n", argv[0], rootdir);
 	}
+
+	strcpy(curdir, rootdir);
+	chdir(rootdir);
 
 	cp = &context;
         Z80Reset(&cp->state);
@@ -243,9 +282,12 @@ do_exec(char *name, char **argv)
 	unsigned short *ao;
 	int argc;
 
+	if (verbose & V_EXEC) {
+		pid(); printf("exec %s\n", name);
+	}
 	/* count our args from the null-terminated list */
 	for (argc = 0; argv[argc]; argc++) {
-		if (verbose > 2) {
+		if (verbose & V_EXEC) {
 			printf("arg %d = %s\n", argc, argv[argc]);
 		}
 	}
@@ -267,7 +309,7 @@ do_exec(char *name, char **argv)
 		fseek(file, 0, SEEK_SET);
 	}
 
-	if (verbose) {
+	if (verbose & V_SYS1) {
 	printf("exec header: magic: %x conf: %x symsize: %d text: %d data: %d bss: %d heap: %d textoff: %x dataoff: %x\n",
 		header.ident, header.conf, 
 		header.table, header.text, header.data, 
@@ -304,7 +346,7 @@ do_exec(char *name, char **argv)
 	}
 	push(argc);
 	push(header.textoff);	
-	if (verbose > 1) dumpmem(&get_byte, cp->state.registers.word[Z80_SP], 256);
+	if (verbose & V_SYS1) dumpmem(&get_byte, cp->state.registers.word[Z80_SP], 256);
 	return 0;
 }
 
@@ -496,7 +538,7 @@ emulate()
 		if (breakpoint) {
 			monitor();
 		}
-		if (inst) {
+		if (verbose & V_INST) {
 			pid(); dumpcpu();
 		}
 		/*
@@ -575,7 +617,7 @@ dirsnarf(char *name)
 		v++;
 		df->end += sizeof(*v);
 	}
-	if (verbose > 1) dumpmem(&getsim, df->buffer, df->bufsize);	
+	if (verbose & V_SYS1) dumpmem(&getsim, df->buffer, df->bufsize);	
 	return (df->fd);
 }
 
@@ -691,7 +733,7 @@ void SystemCall (MACHINE *cp)
 	char **argvec;
 	struct termios ti;
 
-	if (trace && (verbose > 1)) {
+	if (verbose & V_SYS) {
 		pid();
 		dumpcpu();
 	}
@@ -721,7 +763,7 @@ void SystemCall (MACHINE *cp)
 		code = get_byte(sc+1);
 	}
 
-	if (verbose > 1) dumpmem(&get_byte, sc, argbytes[code] + 1);
+	if (verbose & V_SYS1) dumpmem(&get_byte, sc, argbytes[code] + 1);
 
 	/* let's build some common args */
 	arg1 = get_word(sc+2);
@@ -740,7 +782,7 @@ void SystemCall (MACHINE *cp)
 		break;
 	}
 
-	if (trace && verbose) {
+	if (verbose & V_SYS1) {
 		pid();
 		printf("%ssyscall %d %04x %04x %04x\n", 
 			indirect ? "indirect " : "", 
@@ -756,26 +798,26 @@ void SystemCall (MACHINE *cp)
 		break;		
 
 	case 1:		/* exit (hl) */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("exit %04x\n", fd);
 		}
 		exit(fd);
 		break;
 
 	case 2:		/* fork */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("fork\n");
 		}
 		i = fork();
 		if (i) {
-			if (trace) {
+			if (verbose & V_SYS) {
 				pid(); printf("child pid=%d\n", i);
 			}
 			cp->state.registers.word[Z80_HL] = i;
 			push(pop() + 3);
 		} else {
 			mypid = getpid();
-			if (trace) {
+			if (verbose & V_SYS) {
 				pid(); printf("child process\n", i);
 			}
 			cp->state.registers.word[Z80_HL] = 0;
@@ -794,22 +836,22 @@ void SystemCall (MACHINE *cp)
 		} else {
 			i = read(fd, &cp->memory[arg1], arg2);
 		}
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("read(%d, %04x, %d) = %d\n", 
 				fd, arg1, arg2, i);
 		}
-		if (verbose > 1) dumpmem(&get_byte, arg1, i);
+		if (verbose & V_SYS1) dumpmem(&get_byte, arg1, i);
 		cp->state.registers.word[Z80_HL] = i;
 		carry_clear();
 		break;
 
 	case 4: /* write (hl), buffer, len */
 		i = write(fd, &cp->memory[arg1], arg2);
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("write(%d, %04x, %d) = %d\n", 
 				fd, arg1, arg2, i);
 		}
-		if (verbose > 1) dumpmem(&get_byte, arg1, arg2);
+		if (verbose & V_SYS1) dumpmem(&get_byte, arg1, arg2);
 		cp->state.registers.word[Z80_HL] = i;
 		carry_clear();
 		break;
@@ -847,13 +889,13 @@ void SystemCall (MACHINE *cp)
 			cp->state.registers.word[Z80_HL] = errno;
 			carry_set();
 		}
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("open(\"%s\", %04x)=%d\n", fn, arg2, fd);
 		}
 		break;
 
 	case 6:	/* close */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("close %d\n", fd);
 		}
 		dirclose(fd);
@@ -862,15 +904,15 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 7: /* wait */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("wait\n", fd);
 		}
 		if ((i = wait(&fd)) == -1) {
-			pid(); printf("no children\n");
+			if (verbose & V_SYS) { pid(); printf("no children\n"); }
 			carry_set();
 			break;
 		}
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("wait ret %x\n", fd);
 		}
 		cp->state.registers.byte[Z80_D] = WEXITSTATUS(fd);
@@ -885,7 +927,7 @@ void SystemCall (MACHINE *cp)
 
 	case 8:	/* creat <name> <mode> */
 		i = creat(fn, arg2);
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("creat(%s, %o) = %d\n", 
 				fn, arg2, i);
 		}
@@ -898,7 +940,7 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 9:	/* link <old> <new> */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("XXX - link(%s, %s)\n", 
 				fn, fname(&cp->memory[arg2]));
 		}
@@ -907,7 +949,7 @@ void SystemCall (MACHINE *cp)
 
 	case 10:	/* unlink <file> */
 		i = unlink(fn);
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("unlink(%s) = %d\n", fn, i);
 		}
 		if (i != 0) {
@@ -918,9 +960,9 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 11: /* exec */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("exec(%s %04x)\n", fn, arg2);
-			if (verbose) dumpmem(&get_byte, arg2, 32);
+			if (verbose & V_SYS1) dumpmem(&get_byte, arg2, 32);
 		}
 		/* let's count our args */
 		i = 0;
@@ -944,7 +986,10 @@ void SystemCall (MACHINE *cp)
 
 	case 12: /* chdir <ptr to name> */
 		fn = &cp->memory[arg1];
-		if (trace) {
+		if (*fn == '/') {
+			fn = fname(&cp->memory[arg1]);
+		}
+		if (verbose & V_SYS) {
 			pid(); printf("chdir(%s)\n", fn);
 		}
 		strcpy(curdir, fn);
@@ -955,14 +1000,14 @@ void SystemCall (MACHINE *cp)
 		cp->state.registers.word[Z80_DE] = i & 0xffff;
 		cp->state.registers.word[Z80_HL] = (i >> 16) & 0xffff;
 		carry_clear();
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("r_time %x %04x %04x\n", 
 				i, (i >> 16) & 0xffff, i & 0xffff);
 		}
 		break;
 	case 14:	/* mknod <name> mode dev (dev == 0) for dir */
 		fn = fname(&cp->memory[arg1]);
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid();
 			printf("XXX - mknod(%s, %o, %x)\n", fn, arg2, arg3);
 		}
@@ -971,7 +1016,7 @@ void SystemCall (MACHINE *cp)
 
 	case 15:	/* chmod <name> <mode> */
 		fn = fname(&cp->memory[arg1]);
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid();
 			printf("XXX - chmod(%s, %o)\n", fn, arg2);
 		}
@@ -980,7 +1025,7 @@ void SystemCall (MACHINE *cp)
 
 	case 16:	/* chown <name> <mode> */
 		fn = fname(&cp->memory[arg1]);
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid();
 			printf("XXX - chown(%s %04x)\n", fn, arg2);
 		}
@@ -988,7 +1033,7 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 17:	/* sbrk <addr> */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid();
 			printf("sbrk(%04x)\n", arg1);
 		}
@@ -999,7 +1044,7 @@ void SystemCall (MACHINE *cp)
 	case 18:	/* stat fn buf */
 	case 28:	/* fstat fd buf */
 		if (code == 28) {
-			if (trace) {
+			if (verbose & V_SYS) {
 				pid(); printf("fstat(%d, %04x)\n", fd, arg1);
 			}
 			i = fstat(fd, &sbuf);
@@ -1008,7 +1053,7 @@ void SystemCall (MACHINE *cp)
 			}
 			arg2 = arg1;
 		} else {
-			if (trace) {
+			if (verbose & V_SYS) {
 				pid(); printf("stat(\"%s\", %04x)\n", fn, arg2);
 			}
 			i = stat(fn, &sbuf);
@@ -1029,7 +1074,7 @@ void SystemCall (MACHINE *cp)
 			ip->size1 = sbuf.st_size & 0xffff;
 			ip->rtime = sbuf.st_atime;
 			ip->wtime = sbuf.st_mtime;
-			if (verbose > 1)
+			if (verbose & V_SYS1)
 				dumpmem(&get_byte, arg2, 36);
 			carry_clear();
 		}
@@ -1066,7 +1111,7 @@ void SystemCall (MACHINE *cp)
 				break;
 			}
 		}
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("seek(%d, %d, %d) = %d\n", 
 				fd, arg1, arg2, i);
 		}
@@ -1075,7 +1120,7 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 20:	/* getpid */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("getpid\n");
 		}
 		cp->state.registers.word[Z80_HL] = getpid();
@@ -1083,7 +1128,7 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 21:	/* mount */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("XXX - mount(%s %s)\n", 
 				fn, fname(&cp->memory[arg2]));
 		}
@@ -1091,21 +1136,21 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 22:	/* umount */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("XXX - umount(%s)\n", fn);
 		}
 		carry_set();
 		break;
 
 	case 23:	/* setuid */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("setuid %d\n", fd);
 		}
 		carry_set();
 		break;
 
 	case 24:	/* getuid */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("getuid\n");
 		}
 		cp->state.registers.word[Z80_HL] = getuid();
@@ -1113,7 +1158,7 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 25:	/* stime */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("XXX - stime(%04x, %04x)\n", 
 				fd, cp->state.registers.word[Z80_DE]);
 		}
@@ -1121,14 +1166,14 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 31:	/* stty */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("XXX - stty %d %04x\n", fd, arg1);
 		}
 		carry_set();
 		break;
 
 	case 32:	/* gtty */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("gtty %d %04x\n", fd, arg1);
 		}
 		if (tcgetattr(fd, &ti)) {
@@ -1161,7 +1206,7 @@ void SystemCall (MACHINE *cp)
 		if (arg2 & 2) i |= W_OK;
 		if (arg2 & 1) i |= X_OK;
 		i = access(fn, i);
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("access(%s, %o) = %d\n", 
 				fn, arg2, i);
 		}
@@ -1172,17 +1217,17 @@ void SystemCall (MACHINE *cp)
 		}
 		cp->state.registers.word[Z80_HL] = i;
 		break;
-		if (trace) {
+		if (verbose & V_SYS) {
 		}
 	case 34:	/* nice */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("nice\n");
 		}
 		carry_clear();
 		break;
 
 	case 35:	/* sleep */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("sleep %d\n", fd);
 		}
 		sleep(fd);
@@ -1190,14 +1235,14 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 36:	/* sync */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("sync\n");
 		}
 		carry_clear();
 		break;
 
 	case 37:	/* kill <pid in hl> signal */
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid(); printf("XXX - kill %d %d\n", fd, arg1);
 		}
 		carry_set();
@@ -1205,7 +1250,7 @@ void SystemCall (MACHINE *cp)
 
 	case 41:
 		i = dup(fd);
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid();
 			printf("dup(%d) = %d\n", fd, i);
 		}
@@ -1218,15 +1263,15 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 42:
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid();
 			printf("pipe() ");
 		}
 		if ((i = pipe(p))) {
-			if (trace) printf("failed\n");
+			if (verbose & V_SYS) printf("failed\n");
 			carry_set();
 		} else {
-			if (trace) printf(" = (in: %d, out: %d)\n",
+			if (verbose & V_SYS) printf(" = (in: %d, out: %d)\n",
 				p[0], p[1]);
 			cp->state.registers.word[Z80_HL] = p[0];
 			cp->state.registers.word[Z80_DE] = p[1];
@@ -1237,7 +1282,7 @@ void SystemCall (MACHINE *cp)
 	case 48:
 		i = arg1;
 		if (i > 15) i = 0;
-		if (trace) {
+		if (verbose & V_SYS) {
 			pid();
 			printf("signal(%s, %04x, %04x)\n", 
 				signame[i], arg1, arg2);
