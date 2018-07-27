@@ -424,7 +424,7 @@ dumpcpu()
 	char outbuf[40];
 	char *s;
 
-	format_instr(cp->state.pc, outbuf, &get_byte, &get_symname, &reloc);
+	format_instr(cp->state.pc, outbuf, &get_byte, &lookup_sym, &reloc);
 	s = lookup_sym(cp->state.pc);
 	if (s) {
 		printf("%s\n", s);
@@ -555,7 +555,7 @@ monitor()
 				}
 			}
 			for (l = 0; l < LISTLINES; l++) {
-				c = format_instr(i, cmdline, &get_byte, &get_symname, &reloc);
+				c = format_instr(i, cmdline, &get_byte, &lookup_sym, &reloc);
 				s = lookup_sym(i);
 				if (s) {
 					printf("%s\n", s);
