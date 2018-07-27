@@ -32,6 +32,7 @@ typedef unsigned short UINT;
 #include "../kernel/inode.h"
 #include "../include/obj.h"
 
+#define	LISTLINES	8
 #define	STACKTOP	0xffff
 #define MAXIMUM_STRING_LENGTH   100
 
@@ -269,6 +270,40 @@ main(int argc, char **argv)
         return EXIT_SUCCESS;
 }
 
+struct symbol {
+	char *name;
+	int value;
+	char type;
+	struct symbol *next;
+};
+struct symbols *syms;
+
+char *
+lookup_sym(int value)
+{
+	struct symbol *s;
+
+	for (s = syms; s; s = s->next) {
+		if (s->value == value)
+			return s->name;
+	}
+	return 0;
+}
+
+void
+add_sym(char *name, int type, int value)
+{
+	struct symbol *s;
+
+	printf("add_sym %x %x %s\n", type,  value, name);
+	s = malloc(sizeof(*s));
+	s->name = strdup(name);
+	s->value = value;
+	s->type = type;
+	s->next = syms;
+	syms = s;	
+}
+
 /*
  * this is the exec function - slightly different from the standard unix
  */
@@ -281,6 +316,11 @@ do_exec(char *name, char **argv)
 	int ai;
 	unsigned short *ao;
 	int argc;
+	struct fsym {
+		unsigned short v;
+		unsigned char t;
+		char name[9];
+	} fsym;
 
 	if (verbose & V_EXEC) {
 		pid(); printf("exec %s\n", name);
@@ -319,7 +359,14 @@ do_exec(char *name, char **argv)
 
 	fread(cp->memory + header.textoff, 1, header.text, file);
 	fread(cp->memory + header.dataoff, 1, header.data, file);
-
+	if (header.table) {
+		printf("got %d symbols\n", header.table);
+		for (i = 0; i < header.table / sizeof(fsym); i++) {
+			fread(&fsym, 1, sizeof(fsym), file);
+			add_sym(&fsym.name, fsym.t, fsym.v);			
+		}
+		printf("read %d symbols\n", i);
+	}
         fclose(file);
 
         cp->state.registers.word[Z80_SP] = STACKTOP;
@@ -375,8 +422,13 @@ dumpcpu()
 {
 	unsigned char f;
 	char outbuf[40];
+	char *s;
 
 	format_instr(cp->state.pc, outbuf, &get_byte, &get_symname, &reloc);
+	s = lookup_sym(cp->state.pc);
+	if (s) {
+		printf("%s\n", s);
+	}
 	printf("%04x: %-20s ", cp->state.pc, outbuf);
 
 	f = cp->state.registers.byte[Z80_F];
@@ -453,6 +505,8 @@ point_at(struct point **head, unsigned short addr, struct point **pp)
 	return p;
 }
 
+int lastaddr = -1;
+
 void
 monitor()
 {
@@ -463,7 +517,6 @@ monitor()
 	int i;
 	int delete;
 	char *s;
-	int lastaddr = -1;
 
 	while (1) {
 	more:
@@ -501,8 +554,12 @@ monitor()
 					i = lastaddr;
 				}
 			}
-			for (l = 0; l < 5; l++) {
+			for (l = 0; l < LISTLINES; l++) {
 				c = format_instr(i, cmdline, &get_byte, &get_symname, &reloc);
+				s = lookup_sym(i);
+				if (s) {
+					printf("%s\n", s);
+				}
 				printf("%04x: %-20s\n", i, cmdline);
 				i += c;
 				lastaddr = i & 0xfff;
