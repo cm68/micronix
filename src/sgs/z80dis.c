@@ -587,6 +587,12 @@ format_instr(
 		}
 		value = (*get_byte)(addr + bcount++);
 		value += (*get_byte)(addr + bcount++) << 8;
+		if (!symname) {
+			symname = (*get_sym)(value);
+			if (symname) {
+				value = 0;
+			}
+		}
 		if (symname) {
 			if (value) {
 				sprintf(valbuf, "%s+%d", symname, value);
