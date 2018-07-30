@@ -1202,7 +1202,20 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 12: /* chdir <ptr to name> */
-		strcpy(curdir, fn);
+		/* again, because of chroot being privileged, we need
+		 * to do some pretty sleazy stuff */
+		if (*fn == '/') {
+			strcpy(namebuf, fn);
+		} else {
+			sprintf(namebuf, "%s/%s", curdir, fn);
+		}
+		sprintf(workbuf, "%s/%s", rootdir, namebuf);
+		realpath(workbuf, namebuf);
+		if (strncmp(namebuf, rootdir, strlen(rootdir)) == 0) {
+			strcpy(curdir, &namebuf[strlen(rootdir)]);
+		} else {
+			strcpy(curdir, "");
+		}
 		carry_clear();
 		break;
 	case 13:	/* time */
