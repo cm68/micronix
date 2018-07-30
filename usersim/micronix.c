@@ -44,7 +44,7 @@ static void	emulate();
 
 int mypid;
 
-char curdir[100] = ".";
+char curdir[100] = "";
 char *rootdir = 0;
 
 char *initfile[] = {
@@ -52,14 +52,15 @@ char *initfile[] = {
 	0
 };
 
-#define	V_SYS	1	/* trace system calls */
-#define V_MEM	2	/* dump out reads/writes */
-#define	V_SYS1	4	/* trace system call low level */
-#define	V_EXEC	8	/* exec args */
-#define	V_INST	16	/* instructions */
-#define	V_ASYS	32	/* even small syscalls */	
+#define	V_SYS	(1 << 0)	/* trace system calls */
+#define	V_DATA	(1 << 1)	/* dump bulk data from system calls */
+#define	V_EXEC	(1 << 2)	/* exec args */
+#define	V_INST	(1 << 3)	/* instructions */
+#define	V_ASYS	(1 << 4)	/* even small syscalls */	
+#define	V_SYS0	(1 << 5)	/* dump raw syscall args */
+
 char *vopts[] = {
-	"V_SYS", "V_MEM", "V_SYS1", "V_EXEC", "V_INST", "V_ASYS", 0
+	"V_SYS", "V_DATA", "V_EXEC", "V_INST", "V_ASYS", "V_SYS0", 0
 };
 int verbose;
 
@@ -71,20 +72,28 @@ int breakpoint;
 struct MACHINE *cp;
 
 char namebuf[PATH_MAX];
+char workbuf[PATH_MAX];
 
 /*
  * translate our sim filename into a native filename
  * by prepending the root - we need to be a little smart
  * about this because relative paths need to first have
  * the current working directory prepended
+ * this needs to be hella complicated because chroot is privileged - wtf
  */
-char *fname(char *orig)
+char *
+fname(char *orig)
 {
-	if (*orig == '/') {
-		sprintf(namebuf, "%s/%s", rootdir, orig);
-		return (namebuf);
+	/* empty path is . */
+	if (strlen(orig) == 0) {
+		strcpy(workbuf, rootdir);
+	} else if (*orig == '/') {
+		sprintf(workbuf, "%s/%s", rootdir, orig);
+	} else {
+		sprintf(workbuf, "%s/%s/%s", rootdir, curdir, orig);
 	}
-	return (orig);
+	realpath(workbuf, namebuf);
+	return (namebuf);
 }
 
 char *
@@ -168,7 +177,7 @@ char stop[64];
 int 
 main(int argc, char **argv)
 {
-	char *progname = argv[0];
+	char *progname = *argv++;
 	char *s;
 	char **argvec;
 	int i;
@@ -181,43 +190,44 @@ main(int argc, char **argv)
 	mytty = fopen("/dev/tty", "r+");
 	dup2(fileno(mytty), TTY_FD);
 	mytty = fdopen(TTY_FD, "r+");
-	setvbuf(mytty, 0, _IONBF, 0);
+	setvbuf(mytty, 0, _IOLBF, 0);
 	stdout = stderr = stdin = mytty;
+
 	argc--;
 	
 	while (argc) {
-		argc--;
-		argv++;
-
 		s = *argv;
 
 		/* end of flagged options */
 		if (*s++ != '-')
 			break;
 
+		argv++;
+		argc--;
+
+		/* s is the flagged arg string */
 		while (*s) {
 			switch (*s++) {
 			case 'h':
 				usage("", progname);
+				break;
 			case 'd':
 				if (!argc--) {
 					usage("directory not specified\n", progname);
 				}
-				rootdir = *++argv;
-				s = "";
+				rootdir = *argv++;
 				break;
 			case 'v':
 				if (!argc--) {
 					usage("verbosity not specified \n", progname);
 				}
-				verbose = strtol(*++argv, 0, 0);
-				s = "";
+				verbose = strtol(*argv++, 0, 0);
 				break;
 			case 's':
 				if (!argc--) {
 					usage("stop syscall list not specified \n", progname);
 				}
-				s = *++argv;
+				s = *argv++;
 				i = strtol(s, &s, 0);
 				if ((i > sizeof(stop)) || (i < 0))
 					continue;
@@ -243,11 +253,11 @@ main(int argc, char **argv)
 
 	/* if our rootdir is relative, we need to make it absolute */
 	if (*rootdir != '/') {
-		s = malloc(PATH_MAX);
-		getwd(s);
-		strcat(s, "/");
-		strcat(s, rootdir);
-		rootdir = s;
+		getwd(workbuf);
+		strcat(workbuf, "/");
+		strcat(workbuf, rootdir);
+		realpath(workbuf, namebuf);
+		rootdir = strdup(namebuf);
 	}
 	if (verbose) {
 		printf("verbose %x ",verbose);
@@ -259,9 +269,6 @@ main(int argc, char **argv)
 		printf("\n");
 		printf("emulating %s with root %s\n", argv[0], rootdir);
 	}
-
-	strcpy(curdir, rootdir);
-	chdir(rootdir);
 
 	cp = &context;
         Z80Reset(&cp->state);
@@ -360,10 +367,11 @@ do_exec(char *name, char **argv)
 		header.data = 0;
 		header.bss = 0;
 		header.heap = 0;
+		header.table = 0;
 		fseek(file, 0, SEEK_SET);
 	}
 
-	if (verbose & V_SYS1) {
+	if (verbose & V_EXEC) {
 	printf("exec header: magic: %x conf: %x symsize: %d text: %d data: %d bss: %d heap: %d textoff: %x dataoff: %x\n",
 		header.ident, header.conf, 
 		header.table, header.text, header.data, 
@@ -407,7 +415,7 @@ do_exec(char *name, char **argv)
 	}
 	push(argc);
 	push(header.textoff);	
-	if (verbose & V_SYS1) dumpmem(&get_byte, cp->state.registers.word[Z80_SP], 256);
+	/* if (verbose & V_DATA) dumpmem(&get_byte, cp->state.registers.word[Z80_SP], 256); */
 	return 0;
 }
 
@@ -783,7 +791,7 @@ dirsnarf(char *name)
 		v++;
 		df->end += sizeof(*v);
 	}
-	if (verbose & V_SYS1) dumpmem(&getsim, df->buffer, df->bufsize);	
+	if (verbose & V_DATA) dumpmem(&getsim, df->buffer, df->bufsize);	
 	return (df->fd);
 }
 
@@ -851,7 +859,7 @@ char *signame[] = {
 struct syscall {
 	char argbytes;
 	char *name;
-	char flag;
+	short flag;
 #define	SF_NAME		1
 #define	SF_NAME2	2
 #define	SF_FD		4
@@ -859,12 +867,14 @@ struct syscall {
 #define	SF_ARG2		16
 #define	SF_ARG3		32
 #define	SF_ARG4		64
+#define	SF_BUF		128
+#define	SF_SMALL	256
 } syscalls[] = {
 /* 0  */	{3, "indir", SF_ARG1 },
-/* 1  */	{1, "exit", 0 },
+/* 1  */	{1, "exit", SF_FD },
 /* 2  */	{1, "fork", 0 },
-/* 3  */	{5, "read", SF_FD|SF_ARG1|SF_ARG2 },
-/* 4  */	{5, "write", SF_FD|SF_ARG1|SF_ARG2 },
+/* 3  */	{5, "read", SF_FD|SF_ARG1|SF_ARG2|SF_BUF },
+/* 4  */	{5, "write", SF_FD|SF_ARG1|SF_ARG2|SF_BUF },
 /* 5  */	{5, "open", SF_NAME|SF_ARG2 },
 /* 6  */	{1, "close", SF_FD },
 /* 7  */	{1, "wait", 0 },
@@ -877,7 +887,7 @@ struct syscall {
 /* 14  */	{7, "mknod", SF_NAME|SF_ARG2|SF_ARG3 },
 /* 15  */	{5, "chmod", SF_NAME|SF_ARG2 }, 
 /* 16  */	{5, "chown", SF_NAME|SF_ARG2 },
-/* 17  */	{3, "sbrk", SF_ARG1 },
+/* 17  */	{3, "sbrk", SF_ARG1|SF_SMALL },
 /* 18  */	{5, "stat", SF_NAME|SF_ARG2 },
 /* 19  */	{5, "seek", SF_FD|SF_ARG1|SF_ARG2 },
 /* 20  */	{1, "getpid", 0 },
@@ -901,7 +911,7 @@ struct syscall {
 /* 38  */	{1, "csw", 0 },
 /* 39  */	{1, "ssw", 0 },
 /* 40 */	{1, "bad", 0 },	
-/* 41 */	{1, "dup", 0 },
+/* 41 */	{1, "dup", SF_FD },
 /* 42 */	{1, "pipe", 0 },
 /* 43 */	{3, "times", 0 },
 /* 44 */	{9, "profil", SF_ARG1|SF_ARG2|SF_ARG3|SF_ARG4 },
@@ -912,6 +922,8 @@ struct syscall {
 /* 49 */	{3, "lock", SF_FD|SF_ARG1 },
 /* 50 */	{1, "unlock", SF_FD },
 };
+
+char *filename;
 
 /*
  * micronix system calls are done using the RST8 instruction, which
@@ -956,7 +968,7 @@ void SystemCall (MACHINE *cp)
 
 	stopnow = verbose;
 
-	if (verbose & V_SYS1) {
+	if (verbose & V_SYS0) {
 		pid();
 		dumpcpu();
 	}
@@ -965,8 +977,11 @@ void SystemCall (MACHINE *cp)
 	sc = pop();
 	push(sc);
 
+	/* point at the rst1 instruction */
+	sc -= 1; 
+
 	/* make sure that we came here from a rst1 */
-	if ((code = get_byte(sc - 1)) != 0xcf) {
+	if ((code = get_byte(sc)) != 0xcf) {
 		pid();
 		dumpcpu();
 		printf("halt no syscall %d %x!\n", code, sc);
@@ -974,16 +989,16 @@ void SystemCall (MACHINE *cp)
 	}
 
 	/* get the function code */
-	code = get_byte(sc);
+	code = get_byte(sc + 1);
 
 	/* this is an indirect call - the argument points at a syscall */
 	if (code == 0) {
 		indirect++;
-		sc = get_word(sc + 1);
+		sc = get_word(sc + 2);
 		if ((code = get_byte(sc)) != 0xcf) {
 			printf("indir no syscall %d %x!\n", code, sc);
 		}
-		code = get_byte(sc+1);
+		code = get_byte(sc + 1);
 	}
 
 	/* if this is a system call we are interested in, deal with it */
@@ -996,7 +1011,10 @@ void SystemCall (MACHINE *cp)
 
 	sp = &syscalls[code];
 
-	if (verbose & V_SYS1) dumpmem(&get_byte, sc, sp->argbytes + 1);
+	if (verbose & V_SYS0) {
+		printf("%10s %3d ", sp->name, cp->state.registers.word[Z80_HL]);
+		dumpmem(&get_byte, sc, sp->argbytes + 1);
+	}
 
 	if (sp->flag & (SF_ARG1|SF_NAME)) arg1 = get_word(sc+2);
 	if (sp->flag & (SF_ARG2|SF_NAME2)) arg2 = get_word(sc+4);
@@ -1006,19 +1024,19 @@ void SystemCall (MACHINE *cp)
 	if (sp->flag & SF_NAME) fn = &cp->memory[arg1];
 	if (sp->flag & SF_NAME2) fn2 = &cp->memory[arg2];
 
-	if (verbose & V_SYS) {
+	if ((verbose & V_SYS) && (!(sp->flag & SF_SMALL) || (verbose & V_ASYS))) {
 		pid(); printf("%s(", sp->name);
-		i = sp->flag;
+		i = sp->flag & (SF_FD|SF_ARG1|SF_NAME|SF_ARG2|SF_NAME2|SF_ARG2|SF_ARG3|SF_ARG4);
 #define F(b, f, a) \
 	if (i & (b)) { i ^= (b) ; printf(f,a,i?",":""); }
-	F(SF_FD, "%d%s", fd);
-	F(SF_ARG1, "%04x%s", arg1);
-	F(SF_NAME, "%s%s", fn);
-	F(SF_ARG2, "%04x%s", arg2);
-	F(SF_NAME2, "%s%s", fn2);
-	F(SF_ARG3, "%04x%s", arg3);
-	F(SF_ARG4, "%04x%s", arg4);
-	printf(") ", sp->name);
+		F(SF_FD, "%d%s", fd);
+		F(SF_ARG1, "%04x%s", arg1);
+		F(SF_NAME, "\"%s\"%s", fn);
+		F(SF_ARG2, "%04x%s", arg2);
+		F(SF_NAME2, "\"%s\"%s", fn2);
+		F(SF_ARG3, "%04x%s", arg3);
+		F(SF_ARG4, "%04x%s", arg4);
+		printf(") ", sp->name);
 	}
 
 	/* let's fixup the return address from the table */
@@ -1036,15 +1054,9 @@ void SystemCall (MACHINE *cp)
 	case 2:		/* fork */
 		ret = fork();
 		if (ret) {
-			if (verbose & V_SYS) {
-				pid(); printf("child pid=%d\n", i);
-			}
 			push(pop() + 3);
 		} else {
 			mypid = getpid();
-			if (verbose & V_SYS) {
-				pid(); printf("child process\n", i);
-			}
 		}
 		carry_clear();
 		break;
@@ -1052,7 +1064,7 @@ void SystemCall (MACHINE *cp)
 	case 3: /* read (hl), buffer, len */
 		if ((df = dirget(fd))) {
 			ret = df->bufsize - df->offset;
-			if (arg2 < i) {
+			if (arg2 < ret) {
 				ret = arg2;
 			}
 			bcopy(&df->buffer[df->offset], &cp->memory[arg1], ret);
@@ -1060,13 +1072,11 @@ void SystemCall (MACHINE *cp)
 		} else {
 			ret = read(fd, &cp->memory[arg1], arg2);
 		}
-		if (verbose & V_SYS1) dumpmem(&get_byte, arg1, ret);
 		carry_clear();
 		break;
 
 	case 4: /* write (hl), buffer, len */
 		ret = write(fd, &cp->memory[arg1], arg2);
-		if (verbose & V_SYS1) dumpmem(&get_byte, arg1, arg2);
 		carry_clear();
 		break;
 
@@ -1087,26 +1097,36 @@ void SystemCall (MACHINE *cp)
 				fn, arg1, arg2);
 			break;
 		}
-		if (!stat(fn, &sbuf)) {
+		filename = fname(fn);
+		if (!stat(filename, &sbuf)) {
 			if (S_ISDIR(sbuf.st_mode)) {
-				ret = dirsnarf(fn);
+				ret = dirsnarf(filename);
 				if (ret == 0xffff) {
 					ret = errno;
+					printf("dirsnarf lose\n");
 					goto lose;
 				}
 			} else { 
-				ret = open(fn, arg2);
+				ret = open(filename, arg2);
+				if (ret == -1) {
+					perror(filename);
+					goto lose;
+				}
 			}
 			carry_clear();
 		} else {
+			perror(filename);
 			lose:
 			carry_set();
 		}
 		break;
 
 	case 6:	/* close */
-		dirclose(fd);
-		close(fd);
+		if (dirget(fd)) {
+			dirclose(fd);
+		} else {
+			close(fd);
+		}
 		carry_clear();
 		break;
 
@@ -1132,8 +1152,9 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 8:	/* creat <name> <mode> */
-		ret = creat(fn, arg2);
-		if (i == -1) {
+		ret = creat(filename = fname(fn), arg2);
+		if (ret == -1) {
+			perror(filename);
 			carry_set();
 		} else {
 			carry_clear();
@@ -1145,8 +1166,9 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 10:	/* unlink <file> */
-		ret = unlink(fn);
-		if (i != 0) {
+		ret = unlink(filename = fname(fn));
+		if (ret != 0) {
+			perror(filename);
 			carry_set();
 		} else {
 			carry_clear();
@@ -1163,7 +1185,7 @@ void SystemCall (MACHINE *cp)
 			argvec[i] = strdup(&cp->memory[arg1]);
 		}
 		argvec[i] = 0;	
-		ret = do_exec(fn, argvec);
+		ret = do_exec(fname(fn), argvec);
 		if (ret) {
 			carry_set();
 		} else {
@@ -1176,12 +1198,8 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 12: /* chdir <ptr to name> */
-		fn = &cp->memory[arg1];
-		if (*fn == '/') {
-			fn = fname(&cp->memory[arg1]);
-		}
 		strcpy(curdir, fn);
-		chdir(fn);
+		carry_clear();
 		break;
 	case 13:	/* time */
 		i = time(0);
@@ -1202,6 +1220,7 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 17:	/* sbrk <addr> */
+		ret = brake;
 		brake = arg1;
 		carry_clear();
 		break;
@@ -1215,7 +1234,11 @@ void SystemCall (MACHINE *cp)
 			}
 			arg2 = arg1;
 		} else {
-			ret = stat(fn, &sbuf);
+			ret = stat(filename = fname(fn), &sbuf);
+			if (ret) {
+				dumpmem(&get_byte, arg1, 20);
+				perror(filename);
+			}
 		}
 		if (ret) {
 			ret = errno;
@@ -1232,7 +1255,7 @@ void SystemCall (MACHINE *cp)
 			ip->size1 = sbuf.st_size & 0xffff;
 			ip->rtime = sbuf.st_atime;
 			ip->wtime = sbuf.st_mtime;
-			if (verbose & V_SYS1)
+			if (verbose & V_DATA)
 				dumpmem(&get_byte, arg2, 36);
 			carry_clear();
 		}
@@ -1305,6 +1328,7 @@ void SystemCall (MACHINE *cp)
 
 	case 32:	/* gtty */
 		if (tcgetattr(fd, &ti)) {
+			/* perror("gtty"); */
 			carry_set();
 			break;
 		}
@@ -1333,7 +1357,7 @@ void SystemCall (MACHINE *cp)
 		if (arg2 & 4) i |= R_OK;
 		if (arg2 & 2) i |= W_OK;
 		if (arg2 & 1) i |= X_OK;
-		ret = access(fn, i);
+		ret = access(fname(fn), i);
 		if (ret == -1) {
 			carry_set();
 		} else {
@@ -1391,8 +1415,12 @@ void SystemCall (MACHINE *cp)
 	}
 	
 	cp->state.registers.word[Z80_HL] = ret;
-	if (verbose & V_SYS) {
-		printf(" = %04x\n", ret);
+	if ((verbose & V_SYS) && (!(sp->flag & SF_SMALL) || (verbose & V_ASYS))) {
+		if ((code == 2) && (ret == 0)) { printf("\n%d: fork() ", mypid); }
+		printf(" = %04x%s\n", ret, (cp->state.registers.byte[Z80_F] & Z80_C_FLAG) ? " FAILED" : "");
+	}
+	if ((verbose & V_DATA) && (sp->flag & SF_BUF)) {
+		dumpmem(&get_byte, arg1, ret);
 	}
 	cp->state.pc = pop();
 	cp->state.status = 0;
