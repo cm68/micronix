@@ -96,6 +96,12 @@ fname(char *orig)
 	return (namebuf);
 }
 
+void
+pid()
+{
+	printf("%d: ", mypid);
+}
+
 char *
 get_symname(unsigned short addr)
 {
@@ -253,7 +259,7 @@ main(int argc, char **argv)
 
 	/* if our rootdir is relative, we need to make it absolute */
 	if (*rootdir != '/') {
-		getwd(workbuf);
+		getcwd(workbuf, sizeof(workbuf));
 		strcat(workbuf, "/");
 		strcat(workbuf, rootdir);
 		realpath(workbuf, namebuf);
@@ -297,7 +303,7 @@ struct symbol {
 	char type;
 	struct symbol *next;
 };
-struct symbols *syms;
+struct symbol *syms;
 
 char *
 lookup_sym(int value)
@@ -385,7 +391,7 @@ do_exec(char *name, char **argv)
 		printf("got %d symbols\n", header.table);
 		for (i = 0; i < header.table / sizeof(fsym); i++) {
 			fread(&fsym, 1, sizeof(fsym), file);
-			add_sym(&fsym.name, fsym.t, fsym.v);			
+			add_sym(fsym.name, fsym.t, fsym.v);			
 		}
 		printf("read %d symbols\n", i);
 	}
@@ -425,21 +431,19 @@ getsim(int addr)
 	return *(unsigned char *)addr;
 }
 
+void
 carry_set()
 {
 	cp->state.registers.byte[Z80_F] |= Z80_C_FLAG;
 }
 
+void
 carry_clear()
 {
 	cp->state.registers.byte[Z80_F] &= ~Z80_C_FLAG;
 }
 
-pid()
-{
-	printf("%d: ", mypid);
-}
-
+void
 dumpcpu()
 {
 	unsigned char f;
@@ -624,7 +628,7 @@ monitor()
 			return (0);
 		case 'q':
 			exit(1);
-			return;
+			return (0);
 		case 'w':	/* w [-] <addr> <addr> ... */
 			head = &watches;
 		case 'b':	/* b [-] <addr> <addr> ... */
@@ -773,7 +777,7 @@ dirsnarf(char *name)
 	df->buffer = 0;
 	df->offset = 0;
 	df->end = 0;
-	v = df->buffer;
+	v = (struct v6dir *)df->buffer;
 	df->next = opendirs;
 	opendirs = df;
 
@@ -905,9 +909,9 @@ struct syscall {
 /* 32  */	{3, "gtty", SF_FD|SF_ARG1 },
 /* 33  */	{5, "access", SF_NAME|SF_ARG2 },
 /* 34  */	{1, "nice", 0 },
-/* 35  */	{1, "sleep", 0 },
+/* 35  */	{1, "sleep", SF_FD },
 /* 36 */	{1, "sync", 0 },
-/* 37  */	{3, "kill", SF_ARG1 },
+/* 37  */	{3, "kill", SF_FD|SF_ARG1 },
 /* 38  */	{1, "csw", 0 },
 /* 39  */	{1, "ssw", 0 },
 /* 40 */	{1, "bad", 0 },	
@@ -1036,7 +1040,7 @@ void SystemCall (MACHINE *cp)
 		F(SF_NAME2, "\"%s\"%s", fn2);
 		F(SF_ARG3, "%04x%s", arg3);
 		F(SF_ARG4, "%04x%s", arg4);
-		printf(") ", sp->name);
+		printf(") ");
 	}
 
 	/* let's fixup the return address from the table */
@@ -1132,7 +1136,7 @@ void SystemCall (MACHINE *cp)
 
 	case 7: /* wait */
 		if (verbose & V_SYS) {
-			pid(); printf("wait\n", fd);
+			pid(); printf("wait\n");
 		}
 		if ((ret = wait(&fd)) == -1) {
 			if (verbose & V_SYS) { pid(); printf("no children\n"); }
