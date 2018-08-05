@@ -1046,6 +1046,10 @@ void SystemCall (MACHINE *cp)
 	/* let's fixup the return address from the table */
 	push(pop() + syscalls[indirect ? 0 : code].argbytes);
 
+	/* let's make the assumption that all calls fail */
+	carry_set();
+	// carry_clear();
+
 	switch (code) {
 	case 0:	/* double indirect is a no-op */
 		pid(); printf("double indirect syscall!\n");
@@ -1076,12 +1080,22 @@ void SystemCall (MACHINE *cp)
 		} else {
 			ret = read(fd, &cp->memory[arg1], arg2);
 		}
-		carry_clear();
+		if (ret == -1) {
+			ret = errno;
+			carry_set();
+		} else {
+			carry_clear();
+		}
 		break;
 
 	case 4: /* write (hl), buffer, len */
 		ret = write(fd, &cp->memory[arg1], arg2);
-		carry_clear();
+		if (ret == -1) {
+			ret = errno;
+			carry_set();
+		} else {
+			carry_clear();
+		}
 		break;
 
 	case 5: /* open */
@@ -1121,6 +1135,7 @@ void SystemCall (MACHINE *cp)
 		} else {
 			perror(filename);
 			lose:
+			ret = errno;
 			carry_set();
 		}
 		break;
@@ -1144,7 +1159,7 @@ void SystemCall (MACHINE *cp)
 			break;
 		}
 		if (verbose & V_SYS) {
-			pid(); printf("wait ret %x\n", fd);
+			pid(); printf("wait ret %x %x\n", ret, fd);
 		}
 		cp->state.registers.byte[Z80_D] = WEXITSTATUS(fd);
 		cp->state.registers.byte[Z80_E] = 0;
@@ -1159,6 +1174,7 @@ void SystemCall (MACHINE *cp)
 		ret = creat(filename = fname(fn), arg2);
 		if (ret == -1) {
 			perror(filename);
+			ret = errno;
 			carry_set();
 		} else {
 			carry_clear();
@@ -1173,6 +1189,7 @@ void SystemCall (MACHINE *cp)
 		ret = unlink(filename = fname(fn));
 		if (ret != 0) {
 			perror(filename);
+			ret = errno;
 			carry_set();
 		} else {
 			carry_clear();
@@ -1191,6 +1208,7 @@ void SystemCall (MACHINE *cp)
 		argvec[i] = 0;	
 		ret = do_exec(fname(fn), argvec);
 		if (ret) {
+			ret = errno;
 			carry_set();
 		} else {
 			carry_clear();
@@ -1211,12 +1229,19 @@ void SystemCall (MACHINE *cp)
 		}
 		sprintf(workbuf, "%s/%s", rootdir, namebuf);
 		realpath(workbuf, namebuf);
-		if (strncmp(namebuf, rootdir, strlen(rootdir)) == 0) {
-			strcpy(curdir, &namebuf[strlen(rootdir)]);
+		ret = stat(filename = workbuf, &sbuf);
+		if (ret || !(S_ISDIR(sbuf.st_mode))) {
+			ret = 20;
+			carry_set();
 		} else {
-			strcpy(curdir, "");
+			/* we are good to go - strip out root again */
+			if (strncmp(namebuf, rootdir, strlen(rootdir)) == 0) {
+				strcpy(curdir, &namebuf[strlen(rootdir)]);
+			} else {
+				strcpy(curdir, "");
+			}
+			carry_clear();
 		}
-		carry_clear();
 		break;
 	case 13:	/* time */
 		i = time(0);
@@ -1401,10 +1426,11 @@ void SystemCall (MACHINE *cp)
 
 	case 41:
 		ret = dup(fd);
-		if (ret != -1) {
-			carry_clear();
-		} else {
+		if (ret == -1) {
+			ret = 0;
 			carry_set();
+		} else {
+			carry_clear();
 		}
 		break;
 
@@ -1442,4 +1468,8 @@ void SystemCall (MACHINE *cp)
 	cp->state.pc = pop();
 	cp->state.status = 0;
 	verbose = stopnow;
+	if (cp->state.registers.word[Z80_HL] == 0xffff) {
+		printf("code = %d\n", code);
+		dumpcpu();
+	}
 }
