@@ -1,6 +1,5 @@
 # micronix
 
-
 Morrow Designs Micronix and tools
 
 directories:
@@ -28,8 +27,29 @@ usersim:
 	and run:  sim
 
 	date, ls. man, and so on work pretty well.
+	
+	as of Aug 1, almost everything works.
 
+compiler woes:
 
+	it turns out that the whitesmith's C compiler is very lame in one
+	important way:  BSS symbols never get allocated in the object file.
+	that means that code like
+
+	int foo;
+	bar() { foo = 9; }
+
+	does not link.  this is craptastic beyond belief.
+	the only workaround is to modify the source to move foo to data
+	by giving an explicit = 0;
+
+	accordingly, I'm porting a compiler that does not have this lossage.
+	software toolworks c/80 is the only reasonably complete native compiler
+	I have found.   porting it is non-trivial.
+
+decomp:
+	a decompiler that knows about code flow, system calls, and
+        with the goal of generating recompilable C
 
 TODO:
 
