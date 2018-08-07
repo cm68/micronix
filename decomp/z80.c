@@ -3,48 +3,23 @@
  */
 #include "decomp.h"
 
-char *reg8[] = {"b", "c", "d", "e", "h", "l", "mem8(hl)", "a"};
-char *rp[] = {"bc", "de", "hl", "sp"};
-char *rp1[] = {"bc", "de", "hl", "af"};
-char *op8[] = {"+=", "+= CF +", "-=", "-= CF +", "&=", "^=", "|=", "=="};
-char *indreg[] = {"ix", "iy"};
-char *condition[] = {"!Z", "Z", "!CF", "CF", "!PV", "PV", "!M", "M"};
-char *rot[] = {"rlc", "rrc", "rl", "rr", "sla", "sra", "sll", "srl"};
+char *reg8[] = { "b", "c", "d", "e", "h", "l", "(hl)", "a" };
+char *rp[] = { "bc", "de", "hl", "sp" };
+char *rp1[] = { "bc", "de", "hl", "af" };
+char *op8[] = { "add", "adc", "sub", "sbc", "and", "xor ", "or", "cp" };
+char *indreg[] = { "ix", "iy" };
+char *condition[] = { "nz", "z", "nc", "c", "v", "nv", "p", "m" };
+char *rot[] = { "rlc", "rrc", "rl", "rr", "sla", "sra", "sll", "srl" };
 char *regname[] = {
     "b", "c", "d", "e", "h", "l", "a", 
-    "bc", "de", "hl", "ix", "iy", "sp",
+    "bc", "de", "hl", "ix", "iy", "sp", "af",
     "zflag", "cflag", "vflag", "mflag"
-
 };
 
-struct expr *
-a_expr(op_t op, struct expr *operand)
-{
-    struct expr *e = 
-        expr(assign, 0, 0, 
-            expr(reg, E_BYTE, areg, 0, 0),
-            operand);
-    return (e);
-}
-
-struct expr *
-hl_expr(op_t op, struct expr *operand)
-{
-    struct expr *e = 
-        expr(assign, 0, 0, 
-            expr(reg, E_WORD, hlreg, 0, 0),
-            operand);
-    return (e);
-}
-
-int
-do_call(unsigned short pc, unsigned short dest)
-{
-    unsigned char extra;
-
-    extra = is_special(dest);
-    return extra;
-}
+/* translation table from register selector to register number */
+char rt8[] = { breg, creg, dreg, ereg, hreg, lreg, -1, areg };
+char rt16[] = { bcreg, dereg, hlreg, spreg };
+char rtsp[] = { bcreg, dereg, hlreg, afreg };
 
 /*
  * crack an instruction
@@ -66,6 +41,7 @@ do_instr(struct inst *i)
     unsigned char sr;           /* bcdehl.a */
     unsigned char dr;           /* bcdehl.a */
     unsigned char ir;           /* 0 = ix, 1 = iy */
+    struct expr *e;
 
     pc = i->addr;
     buf = i->dis;
@@ -110,7 +86,6 @@ do_instr(struct inst *i)
                 expr(rshift, E_BYTE|E_FLAGS, 0,
                     expr(reg, E_BYTE, areg, 0, 0),
                     expr(constant, 0, 1, 0, 0)));
-        i->mop[0] = a_expr(rshift, expr(constant, 0, 1, 0, 0));
         return 0;
     case 0x10:
         sprintf(buf, "djnz %", reladdr(pc, arg8));
@@ -214,12 +189,16 @@ do_instr(struct inst *i)
                 expr(reg, E_BIT, cflag, 0, 0),
                 expr(not, E_BIT, 0, expr(reg, E_BIT, cflag, 0, 0), 0));
         return 0;
-#ifdef notdef
     case 0x22:
-        sprintf(buf, "mem16(%s) = hl;", addr(arg16));
+        sprintf(buf, "ld (%s),hl", addr(arg16));
+        i->mop[0] = 
+            expr(assign, 0, 0, 
+                expr(memory, E_WORD, 0,
+                    expr(constant, 0, arg16, 0, 0), 
+                    0),
+                expr(reg, E_WORD, hlreg, 0, 0));
         i->len = 3;
         return 0;
-#endif
     case 0x2a:
         sprintf(buf, "ld hl,(%s)", addr(arg16));
         i->mop[0] = 
@@ -230,16 +209,26 @@ do_instr(struct inst *i)
                     0));
         i->len = 3;
         return 0;
-#ifdef notdef
     case 0x32:
-        sprintf(buf, "mem8(%s) = a;", addr(arg16));
+        sprintf(buf, "ld (%s),a", addr(arg16));
+        i->mop[0] = 
+            expr(assign, 0, 0, 
+                expr(memory, E_BYTE, 0,
+                    expr(constant, 0, arg16, 0, 0), 
+                    0),
+                expr(reg, E_BYTE, areg, 0, 0));
         i->len = 3;
         return 0;
     case 0x3a:
-        sprintf(buf, "a = mem8(%s);", addr(arg16));
+        sprintf(buf, "ld a,(%s)", addr(arg16));
+        i->mop[0] = 
+            expr(assign, 0, 0, 
+                expr(reg, E_BYTE, areg, 0, 0),
+                expr(memory, E_BYTE, 0,
+                    expr(constant, 0, arg16, 0, 0), 
+                    0));
         i->len = 3;
         return 0;
-#endif
     case 0xc3:
         sprintf(buf, "jp %s;", addr(arg16));
         addlabel(arg16, 0);
@@ -249,11 +238,11 @@ do_instr(struct inst *i)
         i->len = 3;
         return 1;
     case 0xc9:
-        sprintf(buf, "ret;");
+        sprintf(buf, "ret");
         i->mop[0] = expr(ret, E_WORD, 0, 0, 0);
         return 1;
     case 0xcd:
-        sprintf(buf, "call %s;", addr(arg16));
+        sprintf(buf, "call %s", addr(arg16));
         i->len = 3;
         addlabel(arg16, 0);
         xref(arg16, i->addr);
@@ -261,7 +250,7 @@ do_instr(struct inst *i)
                         expr(constant, 0, arg16, 0, 0), 0);
         return 0;
     case 0x76:
-        sprintf(buf, "halt;");
+        sprintf(buf, "halt");
         return 1;
 #ifdef notdef
     case 0xd3:
@@ -281,6 +270,8 @@ do_instr(struct inst *i)
 #endif
     case 0xe9:
         sprintf(buf, "jp (hl);");
+        i->mop[0] = expr(jump, E_WORD, 0, 
+                        expr(reg, E_WORD, hlreg, 0, 0), 0);
         return 1;
 #ifdef notdef
     case 0xeb:
@@ -310,7 +301,7 @@ do_instr(struct inst *i)
         sprintf(buf, "ld %s,%s", rp[r2], const16(arg16));
         i->mop[0] = 
             expr(assign, E_WORD, 0, 
-                expr(reg, E_WORD, bcreg + r2, 0, 0),
+                expr(reg, E_WORD, rt16[r2], 0, 0),
                 expr(constant, 0, arg16, 0, 0));
         i->len = 3;
         return 0;
@@ -320,63 +311,123 @@ do_instr(struct inst *i)
         i->mop[0] = 
             expr(assign, 0, 0, 
                 expr(memory, E_BYTE, 0,
-                    expr(reg, E_WORD, bcreg + r2, 0, 0), 
+                    expr(reg, E_WORD, rt16[r2], 0, 0), 
                     0),
                 expr(reg, E_BYTE, areg, 0, 0));
         return 0;
     }
-#ifdef notdef
     if ((opcode & 0xcf) == 0x03) {
-        sprintf(buf, "%s += 1;", rp[r2]);
-        return 1;
-    }
-    if ((opcode & 0xc7) == 0x04) {
-        sprintf(buf, "%s += 1;", reg8[dr]);
-        return 1;
-    }
-    if ((opcode & 0xc7) == 0x05) {
-        sprintf(buf, "%s -= 1;", reg8[dr]);
-        return 1;
-    }
-#endif
-    if ((opcode & 0xc7) == 0x06) {
-        sprintf(buf, "ld %s,%s", reg8[dr], const8(arg8));
+        sprintf(buf, "inc %s", rp[r2]);
         i->mop[0] = 
             expr(assign, 0, 0, 
-                expr(reg, E_BYTE, sr, 0, 0),
+                expr(reg, E_WORD, rt16[r2], 0, 0),
+                expr(add, E_WORD, 0,
+                    expr(reg, E_WORD, rt16[r2], 0, 0),
+                    expr(constant, 0, 1, 0, 0)));
+        return 0;
+    }
+    if ((opcode & 0xc7) == 0x04) {
+        sprintf(buf, "inc %s", reg8[dr]);
+        if (dr == 6) {
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(memory, E_BYTE, 0,
+                        expr(reg, E_WORD, hlreg, 0, 0), 0),
+                    expr(add, E_BYTE|E_FLAGS, 0,
+                        expr(memory, E_BYTE, 0,
+                            expr(reg, E_WORD, hlreg, 0, 0), 0),
+                        expr(constant, 0, 1, 0, 0)));
+        } else {
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(reg, E_BYTE, rt8[dr], 0, 0),
+                    expr(add, E_BYTE|E_FLAGS, 0,
+                        expr(reg, E_BYTE, rt8[dr], 0, 0),
+                        expr(constant, 0, 1, 0, 0)));
+        }
+        return 0;
+    }
+    if ((opcode & 0xc7) == 0x05) {
+        sprintf(buf, "dec %s", reg8[dr]);
+        if (dr == 6) {
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(memory, E_BYTE, 0,
+                        expr(reg, E_WORD, hlreg, 0, 0), 0),
+                    expr(sub, E_BYTE|E_FLAGS, 0,
+                        expr(memory, E_BYTE, 0,
+                            expr(reg, E_WORD, hlreg, 0, 0), 0),
+                        expr(constant, 0, 1, 0, 0)));
+        } else {
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(reg, E_BYTE, rt8[dr], 0, 0),
+                    expr(sub, E_BYTE|E_FLAGS, 0,
+                        expr(reg, E_BYTE, rt8[dr], 0, 0),
+                        expr(constant, 0, 1, 0, 0)));
+        }
+        return 0;
+    }
+    if ((opcode & 0xc7) == 0x06) {
+        sprintf(buf, "ld %s,%s", reg8[dr], const8(arg8));
+        if (dr == 6) {
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(memory, E_BYTE, 0,
+                        expr(reg, E_WORD, hlreg, 0, 0), 0),
+                    expr(constant, 0, 1, 0, 0));
+        } else {
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(reg, E_BYTE, rt8[dr], 0, 0),
                 expr(constant, E_BYTE, arg8, 0, 0));
+        }
         i->len = 2;
         return 0;
     }
-#ifdef notdef
     if ((opcode & 0xcf) == 0x09) {
-        sprintf(buf, "hl += %s;", rp[r2]);
-        return 1;
+        sprintf(buf, "add hl,%s", rp[r2]);
+        i->mop[0] = 
+            expr(assign, 0, 0, 
+                expr(reg, E_WORD, hlreg, 0, 0),
+                expr(add, E_WORD, 0,
+                    expr(reg, E_WORD, hlreg, 0, 0),
+                    expr(reg, E_WORD, rt16[r2], 0, 0)));
+        return 0;
     }
-#endif
     if ((opcode & 0xcf) == 0x0a) {
         sprintf(buf, "ld a,(%s)", rp[r2]);
         i->mop[0] = 
             expr(assign, 0, 0, 
                 expr(reg, E_BYTE, areg, 0, 0),
                 expr(memory, E_BYTE, 0,
-                    expr(reg, E_WORD, bcreg + r2, 0, 0), 
+                    expr(reg, E_WORD, rt16[r2], 0, 0), 
                     0));
         return 0;
     }
-#ifdef notdef
     if ((opcode & 0xcf) == 0x0b) {
-        sprintf(buf, "%s -= 1;", rp[r2]);
-        return 1;
+        sprintf(buf, "dec %s", rp[r2]);
+        i->mop[0] = 
+            expr(assign, 0, 0, 
+                expr(reg, E_WORD, rt16[r2], 0, 0),
+                expr(sub, E_WORD, 0,
+                    expr(reg, E_WORD, rt16[r2], 0, 0),
+                    expr(constant, 0, 1, 0, 0)));
+        return 0;
     }
+#ifdef notdef
     if ((opcode & 0xc7) == 0xc0) {
         sprintf(buf, "if %s { ret; };", condition[dr]);
         return 1;
     }
+#endif
     if ((opcode & 0xcf) == 0xc1) {
         sprintf(buf, "pop %s;", rp1[r2]);
-        return 1;
+        i->mop[0] = 
+            expr(pop, 0, 0, expr(reg, E_WORD, rtsp[r2], 0, 0), 0);
+        return 0;
     }
+#ifdef notdef
     if ((opcode & 0xc7) == 0xc2) {
         sprintf(buf, "if %s { jp %s; };", condition[dr], addr(arg16));
         i->len = 3;
@@ -388,10 +439,13 @@ do_instr(struct inst *i)
         i->len = 3;
         return 3;
     }
+#endif
     if ((opcode & 0xcf) == 0xc5) {
         sprintf(buf, "push %s;", rp1[r2]);
-        return 1;
+        i->mop[0] = 
+            expr(push, 0, 0, expr(reg, E_WORD, rtsp[r2], 0, 0), 0);
     }
+#ifdef notdef
     if ((opcode & 0xc7) == 0xc6) {
         sprintf(buf, "a %s %s;", op8[dr], const8(arg8));
         i->len = 2;
@@ -399,53 +453,171 @@ do_instr(struct inst *i)
     }
     if ((opcode & 0xc7) == 0xc7) {
         sprintf(buf, "call %s;", addr(dr * 8));
-        return 1 + do_call(pc, arg16);
+        sp = special(arg16);
+        if (sp->extra) {
+            i->len = 3 + sp->extra;
+        } else {
+            i->len = 3;
+        return 0;
     }
+#endif
     if ((opcode & 0xc0) == 0x40) {
-        sprintf(buf, "%s = %s;", reg8[dr], reg8[sr]);
-        return 1;
+        sprintf(buf, "ld %s,%s;", reg8[dr], reg8[sr]);
+        if (dr == 6) {
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(memory, E_BYTE, 0,
+                        expr(reg, E_WORD, hlreg, 0, 0), 0),
+                    expr(reg, 0, rt8[sr], 0, 0));
+        } else if (sr == 6) {
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(reg, 0, rt8[dr], 0, 0),
+                    expr(memory, E_BYTE, 0,
+                        expr(reg, E_WORD, hlreg, 0, 0), 0));
+        } else {
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(reg, E_BYTE, rt8[dr], 0, 0),
+                    expr(reg, E_BYTE, rt8[sr], 0, 0));
+        }
+        return 0;
     }
     if ((opcode & 0xc0) == 0x80) {
-        sprintf(buf, "a %s %s;", op8[dr], reg8[sr]);
-        return 1;
+        sprintf(buf, "%s a,%s", op8[dr], reg8[sr]);
+        if (sr == 6) {
+            e = expr(memory, E_BYTE, 0,
+                expr(reg, E_WORD, hlreg, 0, 0), 0);
+        } else {
+            e = expr(reg, 0, rt8[sr], 0, 0);
+        }
+        switch (dr) {
+            case 0:
+                 e = expr(add, E_BYTE|E_FLAGS, 0,
+                    expr(reg, E_BYTE, areg, 0, 0), e);
+                break;
+            case 1:
+                 e = expr(add, E_BYTE|E_FLAGS, 0,
+                    expr(reg, E_BYTE, areg, 0, 0),
+                    expr(add, E_BYTE, 0,
+                        expr(reg, E_BIT, cflag, 0, 0),
+                        e));
+                break;
+            case 2:
+                 e = expr(sub, E_BYTE|E_FLAGS, 0,
+                    expr(reg, E_BYTE, areg, 0, 0), e);
+                break;
+            case 3:
+                 e = expr(sub, E_BYTE|E_FLAGS, 0,
+                    expr(reg, E_BYTE, areg, 0, 0),
+                    expr(add, E_BYTE, 0,
+                        expr(reg, E_BIT, cflag, 0, 0),
+                        e));
+                break;
+            default:
+                break;
+        }
+        i->mop[0] = 
+            expr(assign, 0, 0, expr(reg, E_BYTE, areg, 0, 0), e);
+        return 0;
     }
     if (opcode == 0xed) {
         opcode = getmem(pc + 1);
         i->opcode |= (opcode << 8);
         r2 = (opcode >> 4) & 0x3;
         arg16 = getmem(pc + 2) + (getmem(pc + 3) << 8);
-        if ((opcode & 0xcf) == 0x42) {
-            sprintf(buf, "hl -= CF + %s;", rp[r2]);
         i->len = 2;
-            return 2;
+        if ((opcode & 0xcf) == 0x42) {
+            sprintf(buf, "sbc hl,%s", rp[r2]);
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(reg, E_WORD, hlreg, 0, 0),
+                expr(sub, E_WORD, 0,
+                    expr(reg, E_WORD, hlreg, 0, 0),
+                    expr(add, E_WORD, 0,
+                        expr(reg, E_BIT, cflag, 0, 0),
+                        expr(reg, E_WORD, rt16[r2], 0, 0))));
+            return 0;
         }
         if ((opcode & 0xcf) == 0x43) {
-            sprintf(buf, "mem16(%s) = %s;", addr(arg16), rp[r2]);
+            sprintf(buf, "ld (%s),%s", addr(arg16), rp[r2]);
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(memory, E_WORD, 0,
+                        expr(constant, 0, arg16, 0, 0), 
+                        0),
+                    expr(reg, E_WORD, rt16[r2], 0, 0));
             return 4;
         }
         if ((opcode & 0xcf) == 0x4a) {
-            sprintf(buf, "hl += CF + %s;", rp[r2]);
-        i->len = 2;
-            return 2;
+            sprintf(buf, "adc hl,%s", rp[r2]);
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(reg, E_WORD, hlreg, 0, 0),
+                expr(add, E_WORD, 0,
+                    expr(reg, E_WORD, hlreg, 0, 0),
+                    expr(add, E_WORD, 0,
+                        expr(reg, E_BIT, cflag, 0, 0),
+                        expr(reg, E_WORD, rt16[r2], 0, 0))));
+            return 0;
         }
         if ((opcode & 0xcf) == 0x4b) {
-            sprintf(buf, "%s = mem16(%s);", rp[r2], addr(arg16));
-            return 4;
+            sprintf(buf, "ld %s,(%s)", rp[r2], addr(arg16));
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(reg, E_WORD, rt16[r2], 0, 0),
+                    expr(memory, E_WORD, 0,
+                        expr(constant, 0, arg16, 0, 0), 
+                        0));
+            i->len = 4;
+            return 0;
         }
         switch (opcode) {
         case 0xb0:
-            sprintf(buf, "mem8(de) = mem8(hl); de += 1; hl += 1 ; bc -= 1; sf16 bc ; if PV { jp %s }", addr(pc));
-        i->len = 2;
-            return 2;
+            sprintf(buf, "ldir", addr(pc));
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(memory, E_WORD, 0, expr(reg, E_WORD, dereg, 0, 0), 0),
+                    expr(memory, E_WORD, 0, expr(reg, E_WORD, hlreg, 0, 0), 0));
+            i->mop[1] = 
+                expr(assign, 0, 0, 
+                    expr(reg, E_WORD, dereg, 0, 0),
+                    expr(add, E_WORD, 0,
+                        expr(reg, E_WORD, dereg, 0, 0),
+                        expr(constant, 0, 1, 0, 0)));
+            i->mop[2] = 
+                expr(assign, 0, 0, 
+                    expr(reg, E_WORD, hlreg, 0, 0),
+                    expr(add, E_WORD, 0,
+                        expr(reg, E_WORD, hlreg, 0, 0),
+                        expr(constant, 0, 1, 0, 0)));
+            i->mop[3] = 
+                expr(assign, 0, 0, 
+                    expr(reg, E_WORD, bcreg, 0, 0),
+                    expr(sub, E_WORD|E_FLAGS, 0,
+                        expr(reg, E_WORD, bcreg, 0, 0),
+                        expr(constant, 0, 1, 0, 0)));
+            i->mop[4] = 
+                expr(cond, 0, 0,
+                    expr(reg, E_BIT, zflag, 0, 0),
+                    expr(jump, E_WORD, 0, 
+                        expr(constant, 0, reloff(pc, -2), 0, 0), 0));
+            return 0;
         case 0x44:
-            sprintf(buf, "a = -a;");
-        i->len = 2;
-            return 2;
+            sprintf(buf, "neg");
+            i->mop[0] = 
+                expr(assign, 0, 0, 
+                    expr(reg, E_BYTE, areg, 0, 0),
+                    expr(sub, E_BYTE|E_FLAGS, 0,
+                        expr(constant, 0, 0, 0, 0),
+                        expr(reg, E_BYTE, areg, 0, 0)));
+            return 0;
         }
         sprintf(buf, "----------undef ed %x", opcode);
         i->len = 2;
-        return 2;
+        return 0;
     }
+#ifdef notdef
     if (opcode == 0xcb) {
         opcode = getmem(pc + 1);
         i->opcode |= (opcode << 8);

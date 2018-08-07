@@ -21,8 +21,8 @@ testvec: z80test
 	./z80test >testvec
 
 test: decomp
-	./decomp -l 0x122 -l 0x195 -l 0x1e6 -l 0x1ef -l 0x225 -l 0x5a8 -l 0x692 testvec
-	# ./decomp -c 0x8982=2 P1.COM
+	./decomp -v 2 -l 0x122 -l 0x195 -l 0x1e6 -l 0x1ef -l 0x225 -l 0x5a8 -l 0x692 testvec
+	# ./decomp -c 0x8982=2,1 -c 0x8a6e=0,1 P1.COM
 
 commit:
 	git commit

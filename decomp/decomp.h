@@ -43,7 +43,7 @@ struct codelabel {
 
 typedef enum regno { 
     breg, creg, dreg, ereg, hreg, lreg, areg, 
-    bcreg, dereg, hlreg, ixreg, iyreg, spreg,
+    bcreg, dereg, hlreg, ixreg, iyreg, spreg, afreg, 
     zflag, cflag, vflag, mflag
 } regno_t;
 
@@ -105,6 +105,15 @@ struct inst {
 #define	I_ZF	0x02		/* affects zero */
 #define	I_FL	(I_CF|I_ZF)
     struct expr *mop[MAXOPS];
+};
+
+/*
+ * whenever we detect compiler-specific markers, we generate these
+ * that are used to track arguments and returns
+ */
+struct function {
+    struct block *head;
+    struct function *next;
 };
 
 extern int do_inst(struct inst *);
