@@ -14,4 +14,94 @@ and the expressions we eventually want to emit are 3 operand.
 
 then, group the basic blocks into higher level statements
 
+inside a basic block, the idea to is to repeatedly merge and eliminate:
+
+	ld h,byte(a+1)   ->  hl = word(a)
+	ld l,byte(a)
+
+	ld bc,word(a)   ->   add hl,word(a)
+	add hl,bc
+
+	ld hl,word(a)	->   inc word(a)
+	inc hl
+	ld word(a)
+
+	for all register pairs
+
+the z80 is relatively register poor and non-orthogonal, so we will often
+see ex de,hl ... code ... ex de,hl.  we'll just run through the bracketed
+code and change the expressions to use de instead of hl and vice versa, and
+remove the exchanges.
+
+	ex de,hl	->   add de,bc
+	add hl,bc
+	ex de,hl
+
+less common, since bc has no exchange: note the net stack delta of 0.
+
+	push hl
+	push bc
+	pop  hl
+	pop  bc
+	... code
+	push bc
+	push hl
+	pop bc
+	pop hl
+
+as far as function scope, one of the things to do is identify
+argument references.   these take 2 forms, depending on if there is
+a frame pointer.   some compilers use DE, and hitech uses IX.
+so, code that looks like
+
+	ld d,(ix+7)	-> ld de,arg(0)
+	ld e,(ix+6)
+
+since we know that ix contains entry_sp - 2, we can know that this 
+is where the arg is contained.  with other compilers, we may have
+a frame pointer, in which the same logic applies.  if however, we
+have a compiler that does not use a fp, and the sp is dynamically
+modified by pushes, etc.  we need to track the current sp since
+function entry.
+
+	ld hl,6		-> ld de,arg(0)
+	add hl,sp
+	ld e,(hl)
+	inc hl
+	ld d,(hl)
+
+	push de
+	ld hl,8		-> ld de,arg(0)
+	add hl,sp
+	ld e,(hl)
+	inc hl
+	ld d,(hl)
+
+
+as far as data types, memory contents are read using either byte or word 
+instructions.  this may not be dispositive, since the byte accesses are likely
+to be because of the poverty of addressing modes. below, clearly foo is a word.
+
+	ld hl,foo	->   unsigned short foo;
+	ld a,(hl)	     if (foo)
+	inc hl
+	or (hl)
+	jr z,bar
+
+function argument stacking is on shaky ground with z80 compilers;  small-c
+derived compilers just punt and stack their arguments in reverse order.
+when emitting function call arguments, we need to walk the stack backwards 
+and emit the expression trees in stack up order.
+
+so, if the eventual destination of a calculation is the stack, attach the
+expression tree to the function call.
+
+	ld hl,1		->	ret = foo(2,1);
+	push hl
+	ld hl,2
+	push hl
+	call foo
+	pop bc
+	pop bc
+	ld (ret),hl
 
