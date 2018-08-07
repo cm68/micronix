@@ -1,5 +1,17 @@
 let's decompile z80 machine code into a tree of basic blocks
-that contain a list of register transfer instructions
+that contain a list of expressions.
+then, walk the tree and output the source code.  easy peasy.
 
+find the basic blocks, which are defined as code that have no
+internal labels.
+
+within each basic block, combine calculations into a list of
+statements, usually assignments.  these often can be function
+calls where the right hand expression is thrown away.
+
+the major hair here is that the z80 is a two operand machine,
+and the expressions we eventually want to emit are 3 operand.
+
+then, group the basic blocks into higher level statements
 
 
