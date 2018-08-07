@@ -1,6 +1,7 @@
 /*
  * vim: set tabstop=4 shiftwidth=4 expandtab:
  */
+#include <stdio.h>
 #include <fcntl.h>
 #include "decomp.h"
 
@@ -31,7 +32,7 @@ usage(char *complaint, char *p)
     printf("%s", complaint);
     printf("usage: %s [<options>] [program [<program options>]]\n", p);
     printf("\t-v <verbosity>\n");
-    printf("\t-c call[=bytes]\n");
+    printf("\t-c call[=bytes,type]\n");
     printf("\t-l label\n");
     for (i = 0; vopts[i]; i++) {
         printf("\t%x %s\n", 1 << i, vopts[i]);
@@ -39,20 +40,36 @@ usage(char *complaint, char *p)
     exit(1);
 }
 
+struct function *functions;
+void
+dump_functions()
+{
+    struct function *f;
+    struct addrlist *r;
+
+    for (f = functions; f; f = f->next) {
+        printf("function at %x\n", f->head->addr);
+        for (r = f->head->label->refs; r; r = r->next) {
+            printf("referenced from %x\n", r->addr);
+        }
+    }
+}
+
 struct special {
     unsigned short addr;
     unsigned char extra;
+    unsigned char type;
     struct special *next;
 } *specials;
 
-bool
-is_special(unsigned short dest)
+struct special *
+special(unsigned short dest)
 {
     struct special *sp;
 
     for (sp = specials; sp; sp = sp->next) {
         if (sp->addr == dest) {
-            return sp->extra;
+            return sp;
         }
     }
     return 0;
@@ -278,10 +295,14 @@ dump_block(struct block *b)
 {
     struct inst *i;
     struct expr **ep;
+    struct addrlist *r;
 
     printf("%04x:\n", b->addr);
+    for (r = b->label->refs; r; r = r->next) {
+        printf("referenced from %x\n", r->addr);
+    }
     for (i = b->chain; i; i = i->next) {
-        printf("\n\t%s\n", i->dis);
+        printf("\n\t%s %x\n", i->dis, i->opcode);
         for (ep = i->mop; *ep; ep++) {
             dump_expr(*ep, 0);
         }
@@ -338,9 +359,10 @@ main(int argc, char **argv)
     struct special *sp;
     struct codelabel *c;
     struct block *b;
+    struct function *f;
     char *s;
     int pass;
-
+    
     progname = *argv++;
     argc--;
 
@@ -373,10 +395,16 @@ main(int argc, char **argv)
                 }
                 s = *argv++;
                 sp = malloc(sizeof(*sp));
+                sp->type = 0;
+                sp->extra = 0;
                 sp->addr = strtol(s, &s, 0);
                 if (*s == '=') {
                     s++;
                     sp->extra = strtol(s, &s, 0);
+                    if (*s == ',') {
+                        s++;
+                        sp->type = strtol(s, &s, 0);
+                    }
                 } else {
                     sp->extra = 2;
                 }
@@ -395,6 +423,16 @@ main(int argc, char **argv)
                 break;
             }
         }
+    }
+
+    if (verbose) {
+        for (i = 0; vopts[i]; i++) {
+            if (verbose & (1 << i)) {
+                printf("%s ", vopts[i]);
+            }
+        }
+        printf("\n");
+        setvbuf(stdout, 0, _IONBF, 0);
     }
 
     if (argc) {
@@ -420,7 +458,7 @@ main(int argc, char **argv)
     addlabel(0x100, 0);
 
     for (sp = specials; sp; sp = sp->next) {
-        printf("special %x %d\n", sp->addr, sp->extra);
+        printf("special %x %d %d\n", sp->addr, sp->extra, sp->type);
     }
     for (c = codelabels; c; c = c->next) {
         printf("label %x\n", c->addr);
@@ -442,7 +480,18 @@ main(int argc, char **argv)
         break_block(b);
     }
  
-    /* dump the blocks */
+    /* let's find the C function prolog blocks */
+    for (b = blocks; b; b = b->next) {
+        if ((sp = special(b->addr))) {
+            f = malloc(sizeof(*f));
+            f->head = b;
+            f->next = functions;
+            functions = f;
+        }
+    }
+
+    dump_functions();
+ 
     for (b = blocks; b; b = b->next) {
         dump_block(b);
     }
