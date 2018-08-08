@@ -58,9 +58,10 @@ char *initfile[] = {
 #define	V_INST	(1 << 3)	/* instructions */
 #define	V_ASYS	(1 << 4)	/* even small syscalls */	
 #define	V_SYS0	(1 << 5)	/* dump raw syscall args */
+#define	V_ERROR	(1 << 6)	/* perror on system calls */
 
 char *vopts[] = {
-	"V_SYS", "V_DATA", "V_EXEC", "V_INST", "V_ASYS", "V_SYS0", 0
+	"V_SYS", "V_DATA", "V_EXEC", "V_INST", "V_ASYS", "V_SYS0", "V_ERROR", 0
 };
 int verbose;
 
@@ -1048,6 +1049,7 @@ void SystemCall (MACHINE *cp)
 
 	/* let's make the assumption that all calls fail */
 	carry_set();
+
 	// carry_clear();
 
 	switch (code) {
@@ -1127,13 +1129,13 @@ void SystemCall (MACHINE *cp)
 			} else { 
 				ret = open(filename, arg2);
 				if (ret == -1) {
-					perror(filename);
+					if (verbose & V_ERROR) perror(filename);
 					goto lose;
 				}
 			}
 			carry_clear();
 		} else {
-			perror(filename);
+			if (verbose & V_ERROR) perror(filename);
 			lose:
 			ret = errno;
 			carry_set();
@@ -1173,7 +1175,7 @@ void SystemCall (MACHINE *cp)
 	case 8:	/* creat <name> <mode> */
 		ret = creat(filename = fname(fn), arg2);
 		if (ret == -1) {
-			perror(filename);
+			if (verbose & V_ERROR) perror(filename);
 			ret = errno;
 			carry_set();
 		} else {
@@ -1182,13 +1184,21 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 9:	/* link <old> <new> */
-		carry_set();
+		filename = strdup(fname(fn));
+		ret = link(filename, fname(fn2));
+		if (ret != 0) {
+			if (verbose & V_ERROR) perror(filename);
+			ret = -1;
+		} else {
+			carry_clear();
+		}
+		free(filename);
 		break;
 
 	case 10:	/* unlink <file> */
 		ret = unlink(filename = fname(fn));
 		if (ret != 0) {
-			perror(filename);
+			if (verbose & V_ERROR) perror(filename);
 			ret = errno;
 			carry_set();
 		} else {
@@ -1278,8 +1288,7 @@ void SystemCall (MACHINE *cp)
 		} else {
 			ret = stat(filename = fname(fn), &sbuf);
 			if (ret) {
-				dumpmem(&get_byte, arg1, 20);
-				perror(filename);
+				if (verbose & V_ERROR) perror(filename);
 			}
 		}
 		if (ret) {
@@ -1468,7 +1477,7 @@ void SystemCall (MACHINE *cp)
 	cp->state.pc = pop();
 	cp->state.status = 0;
 	verbose = stopnow;
-	if (cp->state.registers.word[Z80_HL] == 0xffff) {
+	if ((verbose & V_SYS) && (cp->state.registers.word[Z80_HL] == 0xffff)) {
 		printf("code = %d\n", code);
 		dumpcpu();
 	}
