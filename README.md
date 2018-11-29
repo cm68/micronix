@@ -1,4 +1,9 @@
 # micronix
+#
+# for a blast from the past, go to usersim and type make
+# finally, run sim.
+# you now are running micronix 1.4 shell and can do a lot
+#
 
 Morrow Designs Micronix and tools
 
