@@ -1,0 +1,5 @@
+dcheck
+ncheck
+icheck
+*.o
+*.dSYM/
