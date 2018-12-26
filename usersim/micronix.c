@@ -1344,6 +1344,7 @@ void SystemCall (MACHINE *cp)
 			}
 		}
 		ret = (i >> 16) & 0xffff;
+		ret = 0;
 		carry_clear();
 		break;
 
@@ -1381,6 +1382,7 @@ void SystemCall (MACHINE *cp)
 		if (tcgetattr(fd, &ti)) {
 			/* perror("gtty"); */
 			carry_set();
+			carry_clear();	// we do gtty on everything!
 			break;
 		}
 		i = 0;
