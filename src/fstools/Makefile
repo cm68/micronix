@@ -1,7 +1,7 @@
 INCPATH=../../include
-BINS= ncheck icheck dcheck dumpfs
+BINS= ncheck icheck dcheck dumpfs copyall
 
-all: test $(BINS)
+all: $(BINS)
 
 CFLAGS=-Wno-return-type -I$(INCPATH)
 
@@ -26,4 +26,7 @@ ncheck: fslib.o fs.h ncheck.c
 
 icheck: fslib.o fs.h icheck.c
 	gcc $(CFLAGS) -g -o icheck icheck.c fslib.o
+
+copyall: fslib.o fs.h copyall.c
+	gcc $(CFLAGS) -g -o copyall copyall.c fslib.o
 

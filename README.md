@@ -10,11 +10,22 @@ Morrow Designs Micronix and tools
 directories:
 
 filesystem:
+	the filesystem.dist, with local edits for functionality.
+	the eventual goal is to have this directory a self-building tree
+	with source
+
+filesystem.dist:
 	recovered filesystems from images contained in the images directory.
 	produced by the tools/copyall program
 
+src/fstools:
+	file system checkers, dumper and extractor
+
+src/sgs:
+	object file tools, including an overachieving nm
+	
 tools:
-	file system checkers and object file tools, including a very flexible disassembler
+	other random work in progress. including a very flexible disassembler
 
 images:
 	floppy images recovered from the net, version 1.4 and 1.3
@@ -35,6 +46,26 @@ usersim:
 	
 	as of Aug 1, almost everything works.
 
+hitechc:
+	the hitech c compiler.  this is not capable of running yet, but if the
+	cp/m libc gets removed via binary jiggery-pokery, and replaced with
+	a z80, micronix one, then we are in business with the most modern native
+	c compiler in existence.
+
+qc:
+	plan B, if the hitech c effort is too large.  this compiler is a bit lame,
+	as it is small-c derived, so args get pushed wrong, no ansi, etc. 
+	but it is native, and it is source.
+
+v6, v7:
+	oh, yeah.  this is the real mc-coy.  this is useful for reference and
+	tool source grabbing.  the porting to micronix is simple, if tedious.
+	the include files are subtly different.
+
+docs:
+	almost everything I could find on the micronix hardware, and miscellaneous
+	morrow stuff that may be useful.
+
 compiler woes:
 
 	it turns out that the whitesmith's C compiler is very lame in one
@@ -54,9 +85,14 @@ compiler woes:
 
 decomp:
 	a decompiler that knows about code flow, system calls, and
-        with the goal of generating recompilable C
+        with the goal of generating recompilable C.  very much a WIP.
 
-TODO:
+fullsim:
+	the beginnings of a mpz80 simulator
+
+sim:
+	a bunch of 8 bit simulators for cribbing ideas/code from.
+	these all are licensed by thier original authors, so...
 
 make the kernel compile - this is unix v6 source code, not a hint
 of ansi.  luckily, the kernel source is k+r version 7 C.
@@ -66,5 +102,5 @@ sources from actual unix version 6.  this will require a lot of
 textual stuff like getting rid of =- and =+, and fixing initializers.
 
 get an object code improver that will fix the pretty bad stuff that
-whitesmith's generates.  
+whitesmith's generates. 
 
