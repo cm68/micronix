@@ -1,0 +1,90 @@
+.he "grep (1)                     3/18/82                     grep (1)"
+.fo "                               -#-" 
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+grep
+- find instances of a regular expression in a 
+.nf
+       stream
+.fi
+
+
+.in -5
+.bd
+USAGE          
+.in +5
+.bd
+grep [-c] [-i] [-l] [-n] [-v] pattern [filename...]
+.br
+.in -5
+
+
+.bd
+FUNCTION
+.in +5
+.fi
+Lines in each of the named files matching the regular expression
+"pattern"
+are written on the standard output.
+The rules for regular expressions
+are 
+as in 
+.bd
+edit.
+.sp
+The
+following flags are meaningful in the command line:
+
+
+.ta 10
+.in +10
+.ti -10
+-c	Only a count of matching lines is printed for each file.
+.ti -10
+.sp
+-i	The case of letters is ignored in comparisons.
+.sp
+.ti -10
+-l	The names of files containing matching lines
+are listed once, one on a line.
+.sp
+.ti -10
+-n	Each matching line is preceded by its line number in its
+respective file.
+.sp
+.ti -10
+-v	All lines
+.ul
+not
+matching the pattern are printed.
+.br
+.in -10
+
+
+.in -5
+.bd
+EXAMPLE
+.br
+.in +5
+.nf
+To search for occurrences of a string in a file:
+.sp
+.ce
+.bd
+grep string file
+
+
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+edit (1), change (1)
+
+
+

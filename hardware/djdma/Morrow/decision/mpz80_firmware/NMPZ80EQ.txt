@@ -1,0 +1,76 @@
+
+
+              P I N    A S S I G N M E N T S
+
+1.  /MEMRQ   ( I0 )           20.  VCC
+2.  /IORQ    ( I1 )           19.  OUT    ( B9 )
+3.  /RDSTB   ( I2 )           18.  INP    ( B8 )
+4.  NULLBUS  ( I3 )           17.  INTA   ( B7 )
+5.  /REFRESH ( I4 )           16.  /WO    ( B6 )
+6.  /M1      ( I5 )           15.  /BEGIN ( B5 )
+7.   02      ( I6 )           14.  INST   ( B4 )
+8.   S0      ( I7 )           13.  MEMR   ( B3 )
+9.   S1      ( BI0 )          12.  ENINT  ( B2 )
+10. GND                       11.  /WM1   ( B1 )
+
+
+
+                 E Q U A T I O N S
+
+
+SMEMR     =         / /MEMRQ  *  / /RDSTB   *   / NULLBUS
+
+
+INST      =         / /MEMRQ  *   / /M1     *   / NULLBUS     
+
+
+BEGIN     =         / /MEMRQ  *  / /RDSTB                 ( MEMORY READ )
+               +    / /MEMRQ  *    /RDSTB  *   /REFRESH   ( MEMORY WRITE )
+               +    / /IORQ   *   / 02                    ( I/O CYCLE )
+               +    / /MEMRQ  *  /REFRESH                 ( MEMORY CYCLE )   
+
+
+/WO       =         / /MEMRQ  *  /REFRESH  *  /RDSTB  *   / NULLBUS 
+               +    / /IORQ   *  /RDSTB    *  /M1     *   / NULLBUS
+               
+                    
+INTA      =         / /M1     *   / /IORQ  *  / NULLBUS           
+               +     INTA     *    / INST   *   ENINT    *  / NULLBUS
+
+
+ENINT     =           /MEMRQ
+               +    / /RDSTB
+               +      / 02
+
+ 
+INP       =         / /IORQ   *   / /RDSTB    *   / NULLBUS
+
+
+OUT       =         / /IORQ   *     /RDSTB    *   / INST  *   / NULLBUS
+
+
+/WM1      =          / /M1     *   / /MEMRQ                ( WAIT ON M1 )
+                     / /M1     *   / /IORQ                 ( WAIT ON INTA )
+                     / /MEMRQ  *     /REFRESH   *  / S0    ( WAIT ON MEMORY )
+                     / /IORQ   *     / S1                  ( WAIT ON I/O ) 
+     
+
+
+
+NOTES ON CURRENT ARTWORK REGARDING 82S153 ADDITION:
+
+1. LIFT PIN 11 OF CHIP TO DISCONNECT ARTWORK TRACE BETWEEN 11 AND 12
+   (PIN 12 IS NOW USED AS AN INTERNAL FEEDBACK ONLY)
+
+2.  JUMPER /WM1 (TERM B1,  PIN 11) OUTPUT TO /M1 INPUT OF 74LS175 
+    ON BOARD FOR WAIT STATES INSTEAD OF CURRENT SETUP.
+
+3.  REMOVE THE 74S10 USED TO INVERT BEGIN OUT OF 82S153 AND JUST 
+    USE THE INVERTED BEGIN INSTEAD.
+
+4.   PROVIDE  FOR JUMPERS TO PINS 8 AND 9 OF 82S153 TO GROND THEM 
+     FOR THE OPTIONAL WAIT ON MEMORY AND I/O CYCLES.   THESE PINS 
+     SHOULD BE TIED HIGH THROUGH 4.7k PULLUPS.
+
+
+

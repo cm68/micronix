@@ -1,0 +1,154 @@
+.in 5
+.rm 65
+.he "ps (1)                       5/18/82                       ps (1)"
+.fo "                               -#-"
+.bd
+NAME
+.in +5
+.br
+.bd
+ps
+- process status
+.sp 2
+.in -5
+.bd
+SYNOPSIS
+.in +5
+.br
+ps [alx]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Ps
+prints information about processes 
+currently
+running on the system.
+
+Any user is allowed to know the command name other
+users are running.
+The actual data being processed is not a 
+matter of public record, however.
+.sp
+.bd
+Ps
+can be very useful in tracking down errant processes
+and terminating them.
+.sp 
+Options:
+.sp 2
+.in +5
+.ta 5
+.ti -5
+a	All. Print information about all processes
+associated with a terminal.
+.sp
+.ti -5
+l	Long format.  Print detailed information
+on each process.
+.sp
+.ti -5
+x	Print information about all processes 
+not associated with a terminal.
+.sp
+.in -5
+
+The following is a description of each possible column in the output 
+from
+.bd
+ps.
+.sp 2
+STATE represents the current state of the program.
+Within the state field the following flags 
+may show up:
+.sp
+.in +5
+.ta 5
+.ti -5
+Al	Alive.
+The process has not yet terminated.
+.sp
+.ti -5
+Aw	Awake.  The process is not waiting for a slow event and may
+be run immediately.
+.sp
+.ti -5
+Ld	Loaded.  The process has been loaded into memory.
+.sp
+.ti -5
+Lk	Locked.  The image of this process is currently locked
+in main memory.
+.sp
+.ti -5
+Sw	Swapped.
+The image of this process currently resides on the swap device.
+.sp
+.ti -5
+Sy	System.
+This process is in its system phase.
+.in -5
+.sp
+.ti -5
+UID	User ID number.  Number identifying the user running the process.
+.sp
+.ti -5
+PID	Process ID.
+The identifying number of the process.
+.sp
+.ti -5
+PPID	Parent's process ID.
+The identifying number of the parent process.
+.sp
+.ti -5
+CPU	The CPU priority of the process.
+.sp
+.ti -5
+PRI	The run-time priority of the process.
+.sp
+.ti -5
+NICE	The user settable priority of the process.
+.sp
+.ti -5
+WCHAN	The address of the event on which this process is
+sleeping.
+.sp
+.ti -5
+TTY	The name of the controlling tty for this process.
+.sp
+.ti -5
+COMMAND	The name of the command. (Usually a
+close approximation of what was entered from the keyboard.)
+.sp 2
+.in
+.in 5
+.bd
+EXAMPLE
+.br
+.in +5
+To kill your runaway process from another terminal:
+.sp
+.ta 5
+.in +5
+.ti -5
+1)	Log in.
+.sp
+.ti -5
+2)	Type "ps".
+.sp
+.ti -5
+3)	Locate the process of interest in the resulting printout.
+.sp
+.ti -5
+4)	Type "kill process ID number"; ex: "kill 7"
+.sp 2
+.in
+.in 5
+.bd
+SEE ALSO
+.in +5
+.br
+sh(1),
+signal(2)

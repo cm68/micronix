@@ -1,0 +1,68 @@
+.he  "clean (1)                   6/18/82		       clean (1)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+clean -
+clean CP/M format text files
+
+
+.in -5
+.bd
+USAGE          
+.in +5
+.br
+.bd
+clean [-u] file ...
+
+
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+.bd
+Clean
+removes return characters from each of the named files and
+truncates the file upon encountering a CP/M end-of-file character
+(^Z).
+.sp
+The "cleaning" is done in place. 
+To clean a file for general Micronix use,
+enter the 
+.bd
+clean file 
+command.
+
+The -u option reverses the process.
+It stands for "unclean".
+Use 
+.sp
+.ti +10
+.bd
+clean -u file
+
+to make a file suitable for CP/M programs to look at.
+
+
+.in -5
+.bd
+EXAMPLE
+.in +5
+.br
+To import a CP/M text file, enter
+.sp
+.ce
+.bd
+far /dev/dja -x file; clean file
+
+
+.in -5
+SEE ALSO
+.br
+.in +5
+far (1)

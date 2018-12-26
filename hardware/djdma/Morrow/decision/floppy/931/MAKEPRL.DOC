@@ -1,0 +1,71 @@
+ NAME
+    MAKEPRL - make a .PRL file from absolute hex files
+
+
+SYNOPSIS
+    MAKEPRL [-s hex number] [-o output file] hex1 hex2
+
+
+DESCRIPTION
+    MAKEPRL   is   used   to  create  .PRL  files   suitable  for 
+    loading by the INSTALL program (see  INSTALL.DOC).   The for
+    mat  for  .PRL files can be found in PRL.DOC. 
+
+    The -s option is used for entering the reserved buffer space.   
+    (The   reserved   buffer   space  is  entered   as  a  16-bit 
+    number   in   addresses  4  and  5   of   the   header,   see 
+    PRL.DOC).  
+
+    The   -o option is the output file specifier.   If no  output 
+    file is specified, the name  from  hex1  is taken  with  .PRL 
+    type  extension added.  If the output file does not  have   a  
+    type  extension the  default .PRL is  added.  
+
+    The   next   two  arguments  must  be  specified.  The  first 
+    argument is  the  hex  file  input with  an  origin at 0. The 
+    second  is  the second hex file input with an origin  at  100 
+    hex.  If the hex files do not have a type extension,   '.hx0'  
+    and  '.hx1'  are  added respectively.
+
+
+EXAMPLES
+    To  create  a .PRL file of the hard disk I/O drivers,   begin 
+    with  the  assembly  language source.  Assemble  it  at  ori
+    gin   0  and rename the hex output (with a .'hx0' extension.)  
+    Then assemble  it  again  with an origin of 100  hex.   (Con
+    sult your assembler manual on how to do this.  With some  as
+    semblers,  you  must  re-edit the source file and change  the 
+    'org' statement).  After  you  have assembled the source with 
+    an origin of 100 hex,  rename it with a '.hx1' extension. Now 
+    you are ready to use  the  MAKEPRL  program.  
+
+    This   is   an example of a typical way to do  the  procedure 
+    described above.  The example   assumes   that   the   source  
+    is  configured correctly.
+
+          mac hd+dj                          
+          ren hd+dj.hx0=hd+dj.hex
+          mac hd+dj $+r
+          ren hd+dj.hx1=hd+dj.hex
+          makeprl -o hd+dj.prl hd+dj.hx0 hd+dj.hx1
+
+
+     In the MAKEPRL line it is not required that you specify
+     the output or add type extensions because  the  program
+     uses defaults. The MAKEPRL line could be written:
+          makeprl hd+dj hd+dj
+
+    This  form does the same as the first but is quicker to type.
+
+    The specification for the -s  option  must  be  a  four digit 
+    hex number.
+
+
+FILES
+     MAKEPRL.COM    MAKEPRL program
+     MAKEPRL.DOC    This document.
+     
+     
+makeprl.doc 3/17/81 ldk
+
+

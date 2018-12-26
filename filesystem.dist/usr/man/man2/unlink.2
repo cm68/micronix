@@ -1,0 +1,69 @@
+.he "unlink (2)                   3/19/82                   unlink (2)"      
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+unlink 
+- remove a directory entry
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+unlink(name)
+.br
+char *name;
+
+
+.in -5
+.bd
+FUNCTION            
+.in +5
+.br
+.bd
+Unlink 
+removes the indicated entry from its directory.
+If this was the last link to the file, the file is
+removed and its space is freed. If the file was open
+in any process, this removal is delayed until the file
+is closed, even though its last directory entry
+has disappeared.
+
+In order to unlink a file, a user must have write
+permission on its directory. Write permission is not
+required on the file itself. Only the super-user
+can unlink a directory.
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+A 0 indicates success, a -1 indicates failure.
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(unlink = 10)
+.br
+.bd
+sys; unlink; name
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The carry flag is cleared on success, or set on failure.

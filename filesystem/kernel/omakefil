@@ -1,0 +1,150 @@
+
+# Whitesmith's
+
+AS = cpm a80
+CPP = cpm cpp
+CP1 = cpm cp1
+CP2 = cpm cp2
+CC = cpm c80
+LD = cpm lnk
+NULL = /dev/null
+RM = rm -f
+CL = clean -u
+ADDR = -tb0x1000 
+
+LOW = l1.o l2.o l3.o l4.o
+
+.s.o:
+	-$(CL) < $*.s > a1.tmp
+	$(AS) -O $*.o a1.tmp < $(NULL)
+	$(RM) a1.tmp
+
+.c.o:
+	-$(CL) < $*.c > c0.tmp
+	$(CPP) -O c1.tmp -X c0.tmp < $(NULL)
+	$(CP1) -M -O c2.tmp -B0 -U c1.tmp < $(NULL)
+	$(CP2) -O $*.s -X0 c2.tmp < $(NULL)
+	$(AS) -O $*.o $*.s < $(NULL)
+	$(RM) $*.s c0.tmp c1.tmp c2.tmp
+
+
+unix:	$(LOW) io.o high.o
+unix:;	$(LD) $(ADDR) -R -O unix $(LOW) io.o -lm.a high.o
+
+L1=uhdr.o access.o balloc.o cio.o create.o exec.o fio.o fork.o
+L2=ialloc.o iget.o imap.o link.o user.o malloc.o mem.o mount.o
+L3=name.o open.o queue.o rdwri.o reg.o sig.o sleep.o sub8.o
+L4=subc.o swap.o sys1.o sys2.o system.o time.o trap.o tty.o uio.o
+
+l1.o: $(L1)
+	$(LD) $(ADDR) -d -o $@ $(L1)
+
+l2.o: $(L2)
+	$(LD) $(ADDR) -d -o $@ $(L2)
+
+l3.o: $(L3)
+	$(LD) $(ADDR) -d -o $@ $(L3)
+
+l4.o: $(L4)
+	$(LD) $(ADDR) -d -o $@ $(L4)
+
+IO=con.o dj.o memdev.o intrpt.o mio.o multio.o mw.o
+
+io.o:$(IO)
+	$(LD) $(ADDR) -d -o io.o $(IO)
+
+high.o:	main.o cus.o inits.o
+	$(LD) $(ADDR) -d -o high.o main.o cus.o inits.o
+
+main.o:	main.c buf.h con.h file.h inode.h mount.h proc.h sys.h
+
+access.o: access.c inode.h mount.h proc.h sys.h
+
+balloc.o: balloc.c buf.h proc.h	sup.h sys.h
+
+cio.o: cio.c con.h file.h inode.h proc.h sys.h
+
+con.o: con.c con.h proc.h sys.h
+
+create.o: create.c inode.h proc.h sys.h
+
+cus.o:	cus.c sys.h
+exec.o:	exec.c buf.h inode.h obj.h proc.h sys.h
+
+fio.o: fio.c buf.h con.h inode.h proc.h	sys.h
+
+fork.o:	fork.c con.h file.h inode.h proc.h sys.h
+
+ialloc.o: ialloc.c buf.h inode.h proc.h	sup.h sys.h
+
+iget.o:	iget.c buf.h inode.h mount.h proc.h sys.h
+
+imap.o:	imap.c buf.h inode.h proc.h sys.h
+
+inits.o:	inits.s
+
+intrpt.o: intrpt.s
+
+dj.o: dj.c buf.h con.h proc.h sys.h
+
+link.o:	link.c inode.h proc.h sys.h
+
+# lock.o:	lock.c inode.h proc.h sys.h lock.h file.h
+
+malloc.o: malloc.c buf.h con.h sup.h sys.h proc.h
+
+mem.o: mem.s
+
+memdev.o: memdev.c proc.h sys.h
+
+mio.o: mio.s
+
+mount.o: mount.c buf.h inode.h mount.h proc.h sup.h sys.h
+
+multio.o: multio.c proc.h sys.h	tty.h
+
+mw.o: mw.c buf.h con.h proc.h sys.h
+
+name.o:	name.c buf.h inode.h proc.h sys.h
+
+open.o:	open.c con.h file.h inode.h proc.h sys.h 
+
+queue.o: queue.c proc.h	sys.h tty.h
+
+rdwri.o: rdwri.c file.h	inode.h	proc.h sys.h
+
+reg.o:	reg.c proc.h sys.h
+
+sig.o: sig.c proc.h sys.h tty.h
+
+sleep.o: sleep.c proc.h	sys.h
+
+sub8.o:	sub8.s
+
+subc.o:	subc.c proc.h sys.h
+
+swap.o:	swap.c buf.h con.h proc.h sys.h
+
+sys1.o:	sys1.c file.h inode.h proc.h sys.h
+
+sys2.o:	sys2.c file.h inode.h proc.h sys.h
+
+system.o: system.c proc.h sys.h
+
+time.o:	time.c proc.h sys.h
+
+trap.o:	trap.c proc.h sys.h
+
+tty.o: tty.c proc.h sys.h tty.h
+
+uhdr.o:	uhdr.s
+
+uio.o: uio.c buf.h con.h proc.h	sup.h sys.h
+
+user.o:	user.c proc.h sys.h
+	-$(CL) < $*.c > c0.tmp
+	$(CPP) -O c1.tmp -X c0.tmp < $(NULL)
+	$(CP1) -M -O c2.tmp -B0 -U c1.tmp < $(NULL)
+	$(CP2) -O $*.s -X7 c2.tmp < $(NULL)
+	$(AS) -O $*.o $*.s < $(NULL)
+	$(RM) $*.s c0.tmp c1.tmp c2.tmp

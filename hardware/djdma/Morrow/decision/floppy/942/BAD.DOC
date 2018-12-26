@@ -1,0 +1,123 @@
+NAME
+     bad -- bad spot utility program
+
+SYNOPSIS
+     bad
+
+DESCRIPTION
+    The hard disk format program "formathd" has an option to test
+    the disk, leaving a map of any bad spots for future reference.
+    (See formathd for the exact location and format of this map.)
+
+    "bad" is a menu style utility program for dealing 
+    with this map and prohibiting CP/M file systems from
+    accessing the bad locations. There are
+    basically three seperate functions performed by "bad": 
+
+	1) read and display the bad map contents, 
+
+	2) add sectors to the bad map
+
+ 	3) read the bad map and write CP/M directory entries to allocate
+           the bad spots to a CP/M file.
+
+    All three bad functions work on CP/M logical drives, as opposed
+    to physical drive units. When a drive is specified in a command
+    the drive type is determined by examining the file "vitals.bad"
+    on the currently logged drive. If the drive type can not be
+    determined then an error is reported.
+
+
+    Each line in the vitals file consists of fields describing
+    the type of drive and where the bad map information may be located. 
+    The first line of
+    the vitals file is reserved for titling information.
+    The fields are:
+
+		cpmspt - The number of CP/M sectors per CP/M track
+		cpmdsm - The disk size maximum (see DPH and DPB)
+		mapcyl - The cylinder where the bad map lives
+		maphed - The head where the bad map lives
+		mapsec - The sector where the bad map lives
+		maplen - The number of physical sectors the bad map
+			 occupies
+		ncyls  - The number of physical cylinders on the drive
+		nheds  - The number of physical heads on the drive
+		nsecs  - The number of physical sectors on the drive
+		secsize- The physical sector size
+		name   - A short english description of the drive
+
+Following are more detailed descriptions of the sub-functions
+of the bad program.
+
+
+	get	Reads the bad map and displays the contents on the
+		console. The format of the output is:
+
+		track	head	sector
+		...
+
+		for each entry in the bad map.
+		You are asked if you'd like copy of the bad
+		sectors list in a file.  If you enter a file
+		name, a file is produces containing this list.
+		If you simply press return, no file is produced.
+
+
+	put	You are prompted for track, head, sector
+		triplets in the form:
+
+		track	#
+		head	#
+		sector	#
+		...
+
+		until you answer that you have no more sectors
+		to enter.  The updated bad map is then written
+		back on to the disk.
+
+	fix	Reads a bad map from the specified drive and creates
+		CP/M directory entries which effectively allocate the
+		bad spot on the disk to the new file. The file is
+		hidden form the user by placing it in user 15 and
+		making it a system file with write protection. No
+		attempt should be made to read or write the file. All
+		such created files are given the name "BADSPOTS".
+
+		You will be notified if one of your files contains
+		a bad spot.  The proper way to proceed in this case
+		is to save as much of the file as possible by 
+		copying into another file, then erase the original
+		file, then press ^C to ensure the integrity of 
+		the in memery CP/M disk allocation bit-map.
+
+
+
+    The hard disk is shipped from the factory with any necessary badspot
+    files already installed. (Shugart and Memorex do not guarantee freedom
+    from bad spots, although they do guarantee a certain maximum, and an
+    error-free track 0.) So ordinarily, the hard disk user will not need
+    these programs.
+
+    If a new bad spot developes, there are two ways to proceed. The most
+    time consuming is to back up the disk, run the formathd program, run
+    fixbad, and then restore the disk. Alternatively, if you know the hard
+    disk track, head, and sector number of the new bad spot, you can run
+    putbad to add the new bad spot to the map and then run fixbad.
+
+
+BUGS
+    It is very difficult to discover the track, head, and sector number
+    of a bad spot when Cpm's only error message is "Bdos error on drive
+    e: bad sector". Suppliers of Cpm should arrange for more informative
+    error messages.
+
+    It is impossible to patch a bad spot which lies in the area of a CP/M
+    directory. The only possible way of dealing with this problem is to
+    have the CP/M CBIOS handle the bad sector sparing.
+
+    If a bad spot is already allocated to a file there an error message
+    to that effect is issued. This means that the bad spot is still
+    a potential hazard. The best way around this problem is to fix
+    drives with no other files.
+

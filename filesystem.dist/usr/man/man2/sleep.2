@@ -1,0 +1,64 @@
+.he "sleep (2)                    3/19/82                    sleep (2)"  
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+sleep 
+- stop execution for an interval
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+sleep(seconds)
+
+
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+The calling process is suspended for at least
+the given number of seconds.
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The call returns after the given number of seconds.
+A 0 indicates success, a -1 indicates failure.
+The only cause of failure is an early return
+caused by a caught signal.
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+sleep = 35)
+.br
+.bd
+(seconds in hl)
+.br
+.bd
+sys; sleep
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The carry flag is cleared on success, or set on failure.
+The only cause of failure is an early return
+caused by a caught signal.

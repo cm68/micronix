@@ -1,0 +1,194 @@
+.in 5
+.rm 65
+.he "find (1)                     6/25/82                     find (1)"
+.fo "                               -#-"
+.bd              
+NAME
+.in +5
+.bd
+.br
+find 
+- find files
+.sp 2
+.in -5
+.bd
+SYNOPSIS
+.in +5
+.br
+find pathname-list expression
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Find 
+searches each of the given pathnames for files matching the 
+given expression.
+If the pathname of a directory is given, 
+all files in that directory and all of its subdirectories
+(recursively)
+are searched.
+
+The expression above is built from constructions
+like the following:
+.sp
+.bd
+.ti -3
+-name filename
+.br
+True if the filename argument matched the current file name.
+Normal shell argument syntax may be used if escaped
+(watch out for '[', '?', '*', '^').
+
+Examples: '-name a.out' would match all files named "a.out".
+'-name "*.o" ' would match all files in the tree whose
+name ends in ".o"
+.sp
+.bd
+.ti -3
+-perm onum
+.br
+Where onum is an octal number.
+True if the file's permission flags match the given number.
+
+Example: ' -perm 777 ' would match all files whose permissions
+are "wide open".
+.sp
+.bd
+.ti -3
+-type c
+.br
+True if the type of the file c, where c is b, c, d or f for block special,
+character special directory or play file.
+
+Example: ' -type f '.
+.sp
+.ti -3
+.bd
+-links
+.br
+True if the file has n links.
+
+Example: '-links 1' would consider only files with exactly one
+link.
+.sp
+.ti -3
+.bd
+-user name
+.br
+True if the file belongs to the user uname (login name or numeric 
+user ID).
+
+Example: ' -user root ' would screen all files except those owned
+by root.
+.bp
+.ti -3
+.bd
+-group name
+.br
+True if the file belongs to group gname (group name or numeric
+group ID).
+
+Example: '-group sales' would consider only files in group "sales".
+.sp
+.ti -3
+.bd
+-size n
+.br
+True if the file is n blocks long (512 bytes per block).
+.sp
+.ti -3
+.bd
+-inum n 
+.br
+True if the file has inode number n.
+.sp
+.ti -3
+.bd
+-atime n 
+.br
+True if the file has been accessed in n days.
+.sp
+.ti -3
+.bd
+-mtime n
+.br
+True if the
+file has been modified in n days.
+.sp
+.ti -3
+.bd
+-exec command
+.br
+Always true.
+If the command is complex it must be enclosed in quotes (").
+If the sequence {} occurs in the command, the current
+filename will be substituted for it.
+.sp
+.ti -3
+.bd
+-ok command
+.br
+Like -exec except that the generated command is written on the the 
+standard output,
+then the standard input is read and the command executed only upon the
+response 'y'.
+In other words, you are asked if it's ok to execute the command.
+Expect to see something like: < rm /a/smith/books/3.1 > ok ?
+.sp
+.ti -3
+.bd
+-print
+.br
+Print the file name.
+Always true,
+causes the current pathname to be printed.
+(Note that 'find' does its work silently and if you don't
+tell it otherwise, nothing will be printed.)
+.sp
+.ti -3
+.bd
+-newer file
+.br
+True if the current file has been modified more recently than
+the argument file.
+
+If two of the above constructions appear one after the other,
+then the effect is a logical AND of the two.
+That is, a primitive will be processed only if all
+of the previous primitives were successful.
+.bp
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+To remove all files named a.out
+that have not been accessed in a week
+.sp
+.nf
+find / -name a.out -atime +7 -exec "rm {}"
+.sp
+.fi
+To simply list the names of all the file in a hierarchy:
+.sp
+.ti +5
+find . -print
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/passwd - to look up user names.
+
+/etc/group - to look up group names.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+sh (1), filsys (5)

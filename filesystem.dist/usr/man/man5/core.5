@@ -1,0 +1,64 @@
+.he "core (5)                      3/17/82                    core (5)"            
+.fo "                                -#-" 
+.in 5
+.rm 65
+.bd
+FILE
+.in +5
+.bd
+core 
+- core dump file
+.sp 2
+.in -5
+.bd
+FUNCTION    
+.in +5
+.br
+A core file is produced by the system as a result of certain fatal signals;
+the offending program is then terminated.
+The file produced is named "core" in the current directory of the
+dumped program at the time of the fatal signal.  The format of the
+core dump file is as follows:
+
+The first 65,536 bytes are simply a "snapshot" of the program as it
+appeared in memory at the critical instant.  Following this "memory image"
+is certain other pertinent information, mostly the contents of the
+Z80's registers:
+.sp 
+.in +4
+.ta 4
+Task:	Micronix task number
+.br
+Mask:	The MPZ80 permission mode
+.br
+PC:	Program counter
+.br
+SP:	Stack pointer
+.br
+.ti -10
+Registers:
+.br  
+af	   
+.br
+bc 	  
+.br
+de 	  
+.br
+hl           
+.br
+zir 	   
+.br
+zix        
+.br  
+ziy
+.br
+zaf
+.br
+zbc
+.br
+zde
+.br
+zhl
+.sp 
+.in -4
+This section assumes previous knowledge of the Z80 processor.

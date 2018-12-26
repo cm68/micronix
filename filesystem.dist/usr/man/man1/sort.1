@@ -1,0 +1,123 @@
+.he "sort (1)                     8/4/82                     sort (1)"
+.fo "                              -#-" 
+.in 10
+.rm 65
+.bd
+.ti -5
+PROGRAM
+.br
+.bd
+sort
+- sort text files
+
+
+.ti -5
+.bd
+USAGE         
+.br
+.bd
+sort [-bdfnrutx] [+column] [-o output] [input ...]
+
+.ti -5
+.bd
+FUNCTION
+.br
+.bd
+
+All of the named input files are sorted together.
+
+If no input file names are given, then the standard input is used instead.
+
+The result is written to the standard output unless an output file 
+name is given (with the -o option).
+
+The default sorting key is the entire line.
+
+Ordering is lexicographic, by bytes, in machine collating sequence.
+
+The following optional flags may be used 
+to influence the sorting.
+
+
+.in +14
+.ti -8
++N	Sort by the Nth column over from the left.
+Default is column 0.
+
+.ti -8
+-b	Ignore leading blanks (spaces and tabs) in comparisons.
+
+.ti -8
+-d	Dictionary order, only letters, digits and blanks are
+significant in comparisons.
+
+.ti -8
+-f	Ignore case in comparisons.
+
+.ti -8
+-i	Ignore non-ascii characters.
+
+.ti -8
+-n	Sort by integral number.
+Fields are ordered by numerical value.
+
+.ti -8
+-o file	Send the output to the named file
+"sort file -o file" will work.
+
+.ti -8
+-r	Reverse.  Sort backwards.
+
+.ti -8
+-tx	Tab character is set to the character x.
+
+
+.in -10
+'-' options listed above may be combined.
+
+That is 
+
+	sort -b -d -f -i
+
+is the same as
+
+	sort -bdfi
+
+
+.bd
+Sort
+can be used on arbitrarily large files.
+It is limited only by the amount of temporary file space it can consume.
+
+
+.ti -5
+EXAMPLES
+.br
+
+
+A simple example, to see what a file looks like once sorted:
+
+	sort file
+
+
+To sort by the second column:
+
+	sort +1 file
+
+To sort a list of numbers:
+
+	sort -n file
+
+To sort a file in place:
+
+	sort file -o file
+
+To sort the password file by numerical user id
+
+	sort +2 -t: -n /etc/passwd
+
+.ti -5
+SEE ALSO
+.br
+
+unique (1)

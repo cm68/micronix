@@ -1,0 +1,8 @@
+#!/bin/sh
+
+rm -f disks/drive[abi].dsk
+ln disks/library/cpm2-1.dsk disks/drivea.dsk
+ln disks/library/cpm2-2.dsk disks/driveb.dsk
+ln ws.dsk disks/drivei.dsk
+
+./cpmsim $*

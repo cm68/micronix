@@ -1,0 +1,46 @@
+.he "overstrike (1)               3/18/82               overstrike (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+overstrike
+- converts back spaces to multiple lines
+
+
+.in -5
+.bd
+USAGE         
+.in +5
+.br
+.bd
+overstrike
+.in -5
+
+
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Overstrike
+copies the standard input to the standard output.
+When it encounters a back space, it replaces it by a "return"
+and an appropriate number of spaces,
+thus eliminating backward motion in the middle of a line.
+
+
+.in -5
+.bd
+EXAMPLE
+.br
+.in +5
+To prepare a file for printing on a device which does not understand
+back spaces:
+.sp
+.in +8
+.bd
+overstrike <file >output

@@ -1,0 +1,109 @@
+.he "stty (1)                     3/15/82                     stty (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+stty 
+- set typewriter (terminal) options
+.sp 2
+.in -5
+.bd
+USAGE          
+.in +5
+.br
+stty [option ...]
+.sp 2
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+.bd
+Stty 
+sets certain I/O options on the current output typewriter.
+With no arguments,
+it reports the current settings of the options which differ
+from the default settings.
+
+The following are options:
+.sp 2
+.in +10
+.ta 10
+.ti -10
+raw	Raw mode input (no erase, kill, interrupt, quit, 
+EOT, parity bit, passed).
+
+.ti -10
+-raw	Negate raw mode.
+
+.ti -10
+cooked	Same as -raw; default is cooked mode.
+
+.ti -10
+-nl	Allow carriage return for new-line, and
+output CR-LF for carriage return or new-line; default is -nl mode.
+
+.ti -10
+nl	Accept only new-line to end lines.
+
+.ti -10
+echo	Echo back every character typed; echo is asserted by default.
+
+.ti -10
+-echo	Do not echo characters.
+
+.ti -10
+lcase	Map upper case to lower case.
+
+.ti -10
+-lcase	Do not map case; default.
+
+.ti -10
+-tabs	Replace tabs by spaces when printing; default.
+
+.ti -10
+tabs	Preserve tabs.
+
+.ti -10
+erase	Set erase character to "c"; default erase or backspace
+character is "H" (^H).  
+
+.ti -10
+kill c	Set kill character to "c"; default kill or line delete
+character is "X" (^X).
+.bp
+.ti -10
+shake	Do hardware handshaking using the clear-to-send (RS232 CTS) pin.
+
+.ti -10
+-shake	No handshaking; hardware handshaking is off be default.
+
+.ti -10
+data8	Keep all 8 bits of input data.
+
+.ti -10
+-data8	Keep only 7 bits of input data. This is the default.
+
+.ti -10
+data7	Same as -data8: Keep only 7 bits of input data; default.
+
+.in -10
+.nf
+Baud Rates: 50 75 110 134 150 200 300 600
+            1200 1800 2400 4800 9600 19200
+.fi
+
+Set typewriter baud rate to number given, if possible.
+
+Micronix presently has no built-in delays.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+stty (2)

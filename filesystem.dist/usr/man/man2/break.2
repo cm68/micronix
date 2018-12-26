@@ -1,0 +1,84 @@
+.he "break (2)			  3/18/82               break (2)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+break, brk, sbrk
+- change core allocation
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+char * brk(addr)
+.br
+char * sbrk(addr)
+.sp 2
+.in -5
+.bd
+FUNCTION    
+.in +5
+.fi
+.br
+.bd
+Brk
+sets the system's idea of the lowest memory location
+not used by the program (called the "break")
+to addr (which may be rounded up to suit
+memory management hardware).
+The old break is returned.
+
+Locations greater than or equal to the break
+and less than the stack pointer are not in
+the address space of the program.
+These locations may be overwritten by the system,
+and may cause memory faults if accessed.
+The system will refuse to set the break above the stack pointer,
+but a program is free to move its stack pointer below the
+break.
+
+.bd
+Sbrk
+adds incr more bytes to the program's data space
+and returns a pointer to the start of the new area.
+
+When a program begins execution via
+.bd
+exec
+(2), its break is set to the top of its program and data storage
+areas.  Thus, only programs that must dynamically allocate
+data space need to use these calls.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The old break is returned on success.
+A -1 is returned if the request would require more memory
+than the system limit, or if it would move the break across
+the stack pointer.
+.sp 2
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(break = 17)
+.br
+.bd
+sys; break; addr
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+Only success or failure is returned,
+by clearing or setting the carry flag, respectively.
