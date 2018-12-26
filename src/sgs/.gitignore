@@ -1,0 +1,6 @@
+*.o
+nm
+ar
+size
+hitech
+*.dSYM/
