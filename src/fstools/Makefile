@@ -6,10 +6,13 @@ all: $(BINS)
 CFLAGS=-Wno-return-type -I$(INCPATH)
 
 clean:
-	rm -f $(BINS) *.o 
+	rm -f *.o 
 	rm -rf *.dSYM
 
-test:
+clobber: clean
+	rm -f $(BINS)
+	
+test: ncheck
 	./ncheck tests/1014*
 
 dumpfs: dumpfs.c fslib.o fs.h
