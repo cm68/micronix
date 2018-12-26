@@ -1,0 +1,86 @@
+
+case 5:
+# line 39 "gram.y"
+ {
+	    while( --nlefts >= 0)
+		{
+		leftp = lefts[nlefts];
+		if(leftp->septype == 0)
+			leftp->septype = sepc;
+		else if(leftp->septype != sepc)
+			fprintf(stderr, "Inconsistent rules lines for `%s'\n",
+				leftp->namep);
+		else if(sepc==ALLDEPS && *(leftp->namep)!='.' && yypvt[-0].yshblock!=0)
+			{
+			for(lp=leftp->linep; lp->nxtlineblock!=0; lp=lp->nxtlineblock)
+			    if(lp->shp)
+				fprintf(stderr, "Multiple rules lines for `%s'\n",
+				    leftp->namep);
+			}
+
+		lp = ALLOC(lineblock);
+		lp->nxtlineblock = NULL;
+		lp->depp = yypvt[-1].ydepblock;
+		lp->shp = yypvt[-0].yshblock;
+
+		if(! unequal(leftp->namep, ".SUFFIXES") && yypvt[-1].ydepblock==0)
+			leftp->linep = 0;
+		else if(leftp->linep == 0)
+			leftp->linep = lp;
+		else	{
+			for(lpp = leftp->linep; lpp->nxtlineblock;
+				lpp = lpp->nxtlineblock) ;
+				if(sepc==ALLDEPS && leftp->namep[0]=='.')
+					lpp->shp = 0;
+			lpp->nxtlineblock = lp;
+			}
+		}
+	} break;
+case 7:
+# line 77 "gram.y"
+ { lefts[0] = yypvt[-0].ynameblock; nlefts = 1; } break;
+case 8:
+# line 78 "gram.y"
+ { lefts[nlefts++] = yypvt[-0].ynameblock;
+	    	if(nlefts>NLEFTS) fatal("Too many lefts"); } break;
+case 9:
+# line 83 "gram.y"
+{
+		char junk[10];
+		sprintf(junk, "%d", yylineno);
+		fatal1("Must be a separator on rules line %s", junk);
+		} break;
+case 11:
+# line 91 "gram.y"
+ { prevdep = 0;  yyval.ydepblock = 0; } break;
+case 12:
+# line 92 "gram.y"
+ {
+			  pp = ALLOC(depblock);
+			  pp->nxtdepblock = NULL;
+			  pp->depname = yypvt[-0].ynameblock;
+			  if(prevdep == 0) yyval.ydepblock = pp;
+			  else  prevdep->nxtdepblock = pp;
+			  prevdep = pp;
+			  } break;
+case 13:
+# line 102 "gram.y"
+ { sepc = ALLDEPS; } break;
+case 14:
+# line 103 "gram.y"
+ { sepc = SOMEDEPS; } break;
+case 15:
+# line 106 "gram.y"
+ {yyval.yshblock = 0; } break;
+case 16:
+# line 107 "gram.y"
+ { yyval.yshblock = yypvt[-0].yshblock; } break;
+case 17:
+# line 110 "gram.y"
+ { yyval.yshblock = yypvt[-0].yshblock;  prevshp = yypvt[-0].yshblock; } break;
+case 18:
+# line 111 "gram.y"
+ { yyval.yshblock = yypvt[-1].yshblock;
+			prevshp->nxtshblock = yypvt[-0].yshblock;
+			prevshp = yypvt[-0].yshblock;
+			} break;
