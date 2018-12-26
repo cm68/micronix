@@ -17,8 +17,11 @@ micronix.o: micronix.c z80emu.h z80config.h
 sim: micronix.o z80emu.o ../src/sgs/z80dis.o
 	$(CC) micronix.o z80emu.o ../src/sgs/z80dis.o -o $@
 
-test: micronix
-	./micronix -t -d ../filesystem ../filesystem/bin/ls
+test: sim
+	./sim -d ../filesystem ../filesystem/bin/ls
 
 clean:
 	rm -f *.o maketables micronix
+
+clobber:	clean
+	rm -f sim
