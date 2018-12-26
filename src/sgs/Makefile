@@ -26,3 +26,6 @@ wslib.o: wslib.c $(INCPATH)/ws.h
 
 ar: ar.c 
 	gcc $(CFLAGS) -g -o ar ar.c
+
+hitech: hitech.c 
+	gcc $(CFLAGS) -g -o hitech hitech.c
