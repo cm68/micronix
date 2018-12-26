@@ -1,0 +1,66 @@
+.he "link (2)                     3/19/82                     link (2)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+link
+- link to a file
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+link(old, new)
+.br
+char *old, *new;
+
+
+.in -5
+.bd
+FUNCTION        
+.in +5
+.fi
+A link to "old" is created, with the name "new".
+Either name may be an arbitrary pathname.
+
+"New" must not already exist,
+its directory must be writable,
+and it must be on the same device as "old".
+"Old" must not be a directory
+(unless the user is the super-user),
+and must not have more than 254 links.
+.nf
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.fi
+A 0 indicates success, a -1 indicates failure.
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(link = 9)
+.br
+.bd
+sys; link; old; new
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The carry flag is cleared on success, or set on failure.

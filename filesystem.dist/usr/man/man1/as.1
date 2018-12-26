@@ -1,0 +1,171 @@
+.he "as (1)                        4/13/82                      as (1)"
+.fo "				     -#-"
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+as -
+A-Natural assembler
+.in -5
+.sp 2
+.bd
+USAGE       
+.in +5
+.br
+.bd
+as <flags> <file>
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+As
+assembles A-natural narrative assembly language for the Intel 8080 to
+Whitesmith's format for relocatable object images.  Since the output of the
+8080 code generator p2 is A-Natural, as is required to produce relocatable 
+images suitable for binding with the 
+.bd
+ld 
+(link editor) program.
+
+The flags are:
+
+.in +10
+.ta 10
+.ti -10
+-i	Produces a map of local symbols to STDOUT.
+
+.ti -10
+-o	Filename may be specified.  Writes the output to the 
+specified file and writes error messages to STDOUT.  Default is 
+STDOUT for output and STDERR for error messages, which may lead
+to corruption of the output on those systems that distinguish between
+text and binary files.  Under some circumstances,
+an input filename can take the place of this option, as explained below.
+
+.in -10
+If <files> are present, they are concatenated in order and used as the 
+input file instead of the default STDIN.
+
+If -o is absent, and one or more files are present, and the first filename
+begins with '8', then 
+.bd
+as 
+behaves as if -o was specified using the first
+filename, but with the trailing '8' changed to 'r'. Thus,
+
+.ti +4
+.bd
+as file.8
+.br
+
+is the same as
+
+.ti +4
+.bd
+as -o file.r file.8
+.br
+
+A relocatable object image consists of a four-word header, a symbol table,
+a text segment and a data segment; all "words" are two-byte integers written
+less significant byte first.
+.bp
+The header consists of the value 0406,
+the number of symbol table entries, the number of bytes of object code
+defined by the text segment,
+and the number of bytes defined by the data segment.
+
+Each symbol table entry consists of a flag byte, a seven-byte name padded with
+trailing nulls, and a value word. Meaningful flag values are 
+.sp
+.in +4
+.bd 4
+3 - undefined
+.br
+4 - defined absolute
+.br
+5 - defined text relative
+.br
+6 - defined data relative
+.sp
+.in -4
+To this is added 010 if the symbol is to be globally known,
+which is always the case in modules produced by 
+.bd
+as.
+
+Both text and data segments have the same form - a sequence of load items,
+each of which defines one or more object bytes.  A load item that begins
+with a positive byte (n) calls for loading unchanged the following (n)
+bytes in order.
+.sp
+If the load item begins with byte (n), such that
+.sp
+.ce
+.bd
+m = n >> 3 & 017
+.sp
+and 
+.sp
+.ce
+.bd
+(m != 0),
+.sp
+the word following it is relocated at (n & 7).
+Additional bytes are loaded unchanged.
+.sp
+Relocation consists of adding the 
+start address of the text segment, if
+.ce
+.sp
+.bd
+(m == 1),
+.sp
+or adding the start
+address of the data segment, minus the length of the text segment if  
+.sp
+.ce
+.bd
+(m == 2),
+.sp
+or adding the value of the symbol whose index is  
+.sp
+.ce
+.bd
+(m == 3).
+
+If (m == 0), then the byte following is taken as m
+and the word following
+that byte is relocated by adding the value of the symbol whose
+index is (m + 13).
+.bp
+As before, (n & 7), as additional bytes, are then loaded unchanged.
+
+The text segment is relocated relative to location zero,
+while the data segment
+is relocated relative to the end of the text segment.
+Thus,
+both segments can be simply loaded in order, using their combined lengths as
+the total segment length.  Note that the lengths presented in the header
+are for the object code loaded,
+not for the number of relocation bytes required to specify the code.
+.sp
+In a valid load module, each segment consists
+of a an integral number of load items.
+
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+anat (1), ld (1), lib (1), cc (1), cp1 (1), cp2 (1)
+
+
+NOTE: This program and documentation are products of Whitesmiths, 
+Ltd., and are sold separately.
+

@@ -1,0 +1,69 @@
+DJDMA Documentation (23_Jun_83)
+
+     Thå DJDMÁ ió á high-performancå floppù disë controller® Parô 
+oæ itó namå comeó froí thå facô thaô iô useó Direcô Memorù Accesó 
+tehniqueó  tï achievå higè datá transfeò rates®  Typically¬  thió 
+wilì  meaî thaô youò systeí wilì ruî faster®  Iô alsï allowó  yoõ 
+access to a wide variety of disk drive and media format types.
+      Mosô  oæ ouò useró aquirå á DJDMÁ aó parô oæ á  system®  Sï 
+thå  informatioî needeä tï operatå thå DJDMÁ aó parô oæ á  systeí 
+ió  locateä iî thå firsô fe÷ sections®  Thió parô oæ  thå  manuaì 
+wilì  telì yoõ wherå alì oæ thå interestinç thingó oî thå  actuaì 
+boarä  areº  likå  wherå dï yoõ pluç iî thå  drivå  cables»  And¬ 
+things like how to format a disk.
+     Somå  oæ ouò useró arå integratinç thå DJDMÁ intï systemó oæ 
+theiò  own®  Foò  thoså  oæ yoõ iî  thió  category¬  you'lì  finä 
+information on the programming command set of the DJDMA and 
+.paŠ     Intro
+          -What is it
+          -What kinds of people use this device
+          -What the manual contains
+               -System installation
+               -System integration
+
+     System installation
+          General Installation
+               A look at the board
+               Setting up the jacks
+               plugging in the board and the cables
+          Bootstrapping
+          Common Problems
+          Formatting Disks
+               stand alone format program
+
+     System Integration
+          Using the DJDMA to bring up a system
+               The serial port and its limitations
+          Programming philosophy
+               The command channel
+               Groups of commands
+                    initial setup
+                    disk i/o
+                    program control instructions
+                    serial port i/o
+                    extended commands
+          Programming the DJDMA
+               an example
+          The DJDMA's response to errors
+          Some things to watch out for
+               the differences between drives
+               losinç thå channel
+               data overrun
+
+     Technical Description
+          Major functions of the board
+          An overview of the chip group functions
+
+     Appendicies
+          Summary of the standard board setup
+          Error Code Summary
+          Probable causes of errors (returned status)
+          Command Summary
+          Programming Commands
+          Defaults
+               Drive
+               Media
+          the foibles of DMA
+          how the bootstrap works
+          Listing of djl
+

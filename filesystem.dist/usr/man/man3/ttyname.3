@@ -1,0 +1,89 @@
+.he "ttyname (3)                  3/24/82                  ttyname (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE(S)
+.in +5
+.br
+.bd
+ttyname, isatty, ttyslot
+- find name of a terminal
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+char *ttyname(fildes)
+.sp
+.bd
+isatty(fildes)
+.sp
+.bd
+ttyslot()
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Ttyname 
+returns a pointer to the null-terminated path name of
+the terminal associated with
+.bd
+fildes,
+the file descriptor.
+
+.bd
+Isatty
+returns a 1 if the file descriptor is associated with a terminal; 
+a 0 is returned if it isn't.
+
+.bd
+Ttyslot
+returns the number of the entry in the
+.bd
+ttys
+file (see Section 5) for the control terminal of the current process.
+.sp 2
+.in -5
+.bd
+ERRORS
+.in +5
+.br
+.bd
+Ttyname
+returns a 0 (NULL pointer) if the file descriptor does not describe
+a terminal that exists in the "/dev" directory.
+
+.bd
+Ttyslot
+returns a 0 if the "/etc/ttys" directory is inaccessible, or if
+it can't determine the control terminal.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+Return values point to static data whose content is overwritten
+by each call.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/dev/*
+.br
+/etc/ttys
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+??ioctl (2), ttys (5)

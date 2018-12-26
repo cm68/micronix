@@ -1,0 +1,15 @@
+
+the superblock contains a list of 100 free inodes, and when it is depleted, the filesystem
+searches the inode blocks for free inodes to repopulate it.  these inodes are allocated
+from the end first, which means that we don't need to move the list. 
+
+this is actually fairly efficient, since we only search the inode list every 100 file
+allocates.  ialloc.c
+
+the block free list is differently managed. see http://man.cat-v.org/unix-6th/5/fs
+but, the first entry is the head of a list of indirect free blocks, and the remainder
+is a list of free block numbers.  they are allocated from the end.
+when it gets emptied, read the block number in entry 0 into the array and set the count to 100.
+
+balloc.c:
+

@@ -1,0 +1,11 @@
+cpmspt	cpmdsm	mapcyl	maphed	mapsec	maplen	ncyls	nheds	nsecs	secsize	name (20)
+336     1269    0       1       20      2       244     4       21      512     M10 Drive A
+336     1280    0       1       20      2       244     4       21      512     M10 Drive B
+672     2015    0       1       20      2       244     8       21      512     M20 Drive A or B
+672     1028    0       1       20      2       244     8       21      512     M20 Drive C
+672     2036    0       1       20      2       244     8       21      512     M20 Drive A or B
+1024    1973    0       0       31      2       202     8       32      512     M26 Drive A, B, or C
+1024    2015    0       0       31      2       202     8       32      512     M26 Drive A or B
+1024    2047    0       0       31      2       202     8       32      512     M26 Drive C
+
+

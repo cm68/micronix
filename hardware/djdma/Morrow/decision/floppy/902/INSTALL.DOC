@@ -1,0 +1,94 @@
+NAME
+    INSTALL  - integrate new device drivers into  CP/M,  Revision 
+               1.3.
+
+SYNOPSIS
+    INSTALL - string newbios address [ prlfile2 address2 ... ]
+
+DESCRIPTION
+    INSTALL  integrates new device drivers into an existing  CP/M 
+    2.x system.  "Newbios" is a skeletal CP/M BIOS module in .PRL 
+    format  (see the PRL.DOC  file) containing the  new  drivers. 
+    INSTALL  first loads "newbios" at the given address  (usually 
+    the  top of CP/M),  then patches it into the existing BIOS by 
+    exchanging  the addresses of the 17 jump vectors  that  begin 
+    each  BIOS.  If  additional  .PRL files are given,  they  are 
+    loaded at the requested addresses with no patching.  Finally, 
+    INSTALL  prints 
+
+       (top of newbios) + (newbios buffer size, if any) + 1 
+
+    as  the  "new load address".   Additional drivers can now  be 
+    installed at this address.
+
+    The  flagged  argument  (-string) is copied to 80H  and  left 
+    there for examination by the newly installed "Newbios",  or a 
+    NULL  if  no flagged argument is present.  The  BIOS  modules 
+    provided  here  use this as an initial  drive  specification, 
+    i.e.,  -c  specifies  that the newly  installed  BIOS  should 
+    respond to drives C.
+
+    The  CP/M system must be standard:  its BIOS must begin  with 
+    the jump table as defined in the "CP/M 2.0 Alteration Guide", 
+    and  it must store the address of this table at location 1 in 
+    memory.
+
+    A "skeletal" BIOS module begins with the same jump table, but 
+    may leave some of the required functions unimplemented.   The 
+    corresponding jump vectors are left as jump-to-selfs.
+
+EXAMPLES
+    To install the 14 inch hard disk (M26) as drives C,  D, and E 
+    in  a  48K  CP/M (assuming that you have memory  above  48K), 
+    execute
+
+        INSTALL -C M26.prl C000
+
+    Here,  M26.prl is the "skeletal BIOS" (provided with INSTALL) 
+    containing the 14 inch hard disk drivers,  and C000 (hex  for 
+    48K)  is the top of CP/M.   If you only have 48K of memory in 
+.pa
+    your system,  you will first have to move your CP/M  downward 
+    to make room.  At this writing, the 14 inch hard disk drivers 
+    required approximately 3.5K bytes,  (see FILES below), so you 
+    should construct a 44K CP/M, and type
+
+        INSTALL -C M26.prl B000
+
+    (B000 is 44K in hex.) If you don't know how to move your CP/M 
+    downward, see  your system manual.  The required  program  is 
+    usually called "MOVCPM".
+
+    To  install  the Disk Jockey as drives L and M in a 44K  CP/M 
+    (with at least 48K of memory), type
+
+        INSTALL dj.prl  B000  djram.prl  E400
+
+    Here,  "dj.prl" contains the Disk Jockey 2D drivers,  B000 is 
+    the  top  of  the  44K  CP/M  (the  drivers  require  3.25K), 
+    "djram.prl"  is updated controller firmware to be loaded into 
+    the controller RAM, and E400 is the address of the controller 
+    RAM. (If you have a non-standard controller, use the control-
+    ler address +400 hex.)
+
+    To  install both the 14 inch hard disk and the  Disk  Jockey 
+    drives, you could first install one, then the other on top of 
+    it  (at the printed "new load address").  This would  require 
+    6.75K of memory above CP/M. As a better alternative, there is 
+    a combined driver package that requires only 5K of memory. To 
+    use it,  configure a 43K CP/M (assuming 48K of memory, or use 
+    available memory minus 5K), and type
+
+        INSTALL M26+dj.prl  AC00  djram.prl  E400
+
+BUGS
+    Addresses must be specified in 4-digit hex (with no leading 0 
+    and no trailing H).  INSTALL should also accept octal and  X-
+    notation.
+
+    When the Disk Jockey drivers are first accessed,  they locate 
+    the  controller by searching memory for a certain pattern  in 
+    the controller ROM.  The search is done carefully, but never-
+    theless, might clobber someone's memory-mapped I/O.
+
+

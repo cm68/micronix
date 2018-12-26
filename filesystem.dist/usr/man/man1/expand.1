@@ -1,0 +1,62 @@
+.he "expand  (1)                  3/18/82                   expand (1)"
+.fo "                               -#-"    
+.in 5
+.rm 65
+.bd
+PROGRAM
+.br
+.in +5
+.bd
+expand
+- uncompress files
+
+
+.in -5
+.bd
+USAGE        
+.br
+.in +5
+.bd
+expand [ input [ output ] ]
+.in -5
+.sp 2
+.bd
+FUNCTION
+.br
+.in +5
+.fi
+.bd
+Expand
+reverses the effects of
+.bd
+compress.
+.bd
+Expand
+is not guaranteed to do anything sensible with input
+which is not the result of a 
+.bd
+compress 
+run. The first named file is expanded and written into the second named file.
+If no file names are given, standard input and output are used.
+If only one file name is given, the named file is used for input,
+and its expansion is written to the standard output.
+.sp 2
+.in -5
+.bd
+EXAMPLE
+.br
+.in +5
+.nf
+A (Micronix) do-nothing pipeline:
+.sp
+.in +8
+.bd
+ ...   | compress | expand | ...
+.in -8
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+compress (1) 

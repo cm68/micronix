@@ -1,0 +1,16 @@
+expand casmlib.cx
+expand cc1.cx
+expand cc2.cx
+expand cc3.cx
+expand cc4.cx
+expand cc5.cx
+expand cc6.cx
+expand cc7.cx
+expand cc8.cx
+expand cc9.cx
+expand cdisklib.cx
+expand cglbdecl.cx
+expand cglbdef.cx
+expand cutilib.cx
+expand qreset.cx
+

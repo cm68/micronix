@@ -1,0 +1,87 @@
+.he "open (2)                     3/19/82                     open (2)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+open
+- open a file for reading or writing
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+open(name, mode)
+.br
+.bd
+char *name;
+
+
+.in -5
+.bd
+FUNCTION       
+.in +5
+.br
+The named file is opened for
+.nf
+
+.in +4
+.bd 3
+reading	(mode 0),
+writing	(mode 1), or
+both	(mode 2).
+.in -4
+
+.fi
+The returned file descriptor should be saved
+for subsequent calls to 
+.bd
+read, 
+.bd
+write, 
+and 
+.bd
+close.
+
+There is a limit of 16 open files per process.
+.nf
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.fi
+A non-negative return indicates success, a -1 indicates failure.
+On success, a file descriptor (small non-negative number)
+is returned.
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(open = 5)
+.br
+.bd
+sys; open; name; mode
+.br
+.bd
+(file descriptor in hl)
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The carry flag is cleared on success, or set on failure.
+On success, a file descriptor is returned in hl.

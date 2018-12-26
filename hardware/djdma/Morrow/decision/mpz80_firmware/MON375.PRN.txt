@@ -1,0 +1,2102 @@
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1
+'(c) 1981 Morrow Designs'
+
+                                        subttl	'(c) 1981 Morrow Designs'
+                                	title   'MPZ-80  MON3.75-M FIRMWARE'
+                                	.z80
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;* Decision one CPU firmware, for the Morrow Designs / Thinker	*
+                                ;* Toys Decision one computer.	The monitor routine looks for	*
+                                ;* the power on jump addresses on CPU switches which determine 	*
+                                ;* address to begin execution (top 5 switches).	 I/O is through	*
+                                ;* the Wunderbus I/O motherboard UART 1.  Base address of the	*
+                                ;* I/O is assumed to be standard (beginning at port 48H).	*
+                                ;* If top five switches are 'On', a hard disk is assumed to be	*
+                                ;* the disk device and Boothd is executed.  Enter diagnostic	*
+                                ;* mode by grounding pin 13 of header at 12C.			*
+                                ;*								*
+                                ;* Revised 12/28/82	-	Fixed PIC initialization	*	
+                                ;*								*
+                                ;* Revised 8/27/82	-	M16 home and load constants	*
+                                ;*				changed.  group equ changed to 	*
+                                ;*				add int en bit high.		*
+                                ;*								*
+                                ;* Bobby Dale Gifford and Bob Groppo        			*
+                                ;* 10/20/81							*
+                                ;*								*
+                                ;****************************************************************
+                                
+                                	org	0		;Local Ram in task zero
+  0000                          nop	equ	0
+  00C3                          jmpop	equ	0c3h		;Jump instruction op-code
+  00CD                          callop	equ	0cdh		;z80 call instruction opcode
+  002B                          t1mask	equ	2bh		;unlimited mask... no traps enabled
+  002B                          t0mask	equ	2bh		;unlimited mask	
+  0036                          ssmode	equ	036h		;single step mode mask
+  001A                          hstrap	equ	1Ah		;allow traps on halts and stops, interrupts
+                                				;- masked out in task 0 (temporary)
+  0001                          window	equ	01h		;task 0 window at location 10000
+  000D                          ACR	equ	0Dh		;carriage return
+  000A                          ALF	equ	0Ah		;line feed
+  0020                          ASP	equ	' '		;space
+  000C                          AFF	equ	0Ch		;form feed
+  0007                          BEl	equ	07H		;bell
+  0008                          BSP	equ	08H		;backspace
+  0019                          mskofst	equ	19h		;offset to get to user's mask reg. contents
+  0017                          spofst	equ	17h		;offset to stack pointer of user
+  0015                          afofst	equ	15h		;offset to user Af register
+  0013                          hlofst	equ	13h		;offset to user h,l register
+  0011                          deofst	equ	11h		;offset to d,e
+  000F                          bcofst	equ	0Fh		;offset to b,c
+  000D                          pcofst	equ	0Dh		;offset to the users pc register
+  0076                          nxtbyte	equ	076h		;byte after a halt
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;*		   Wunderbus I/O equates:			*
+                                ;*								*
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-1
+'(c) 1981 Morrow Designs'
+
+                                ;****************************************************************
+                                	
+  0048                          base	equ	048h		;I/O base address of wunderbus ports
+  0008                          group0	equ	08h
+  0009                          group1	equ	09h		;serial port 1
+  000A                          group2	equ	0Ah		;serial	port 2
+  000B                          group3	equ	0Bh		;serial port 3
+  004F                          grpctl	equ	base+7		;I/O group select port
+                                
+                                ;	UART equates
+                                
+  0048                          dll	equ	base		;divisor latch lsb
+  0049                          dlm	equ	base+1		;divisor latch msb
+  0049                          ier	equ	base+1		;interupt enable register
+  004B                          lcr	equ	base+3		;line control register
+  004C                          mcr	equ	base+4		;modem control register
+  004D                          lsr	equ	base+5		;line status register
+  0048                          rbr	equ	base		;read data buffer
+  0048                          thr	equ	base		;transmitter data buffer
+  0080                          dlab	equ	80h		;divisor latch access bit
+  0020                          thre	equ	20h		;status line TBE
+  0001                          dr	equ	01		;line status DR bit
+  0001                          wls0	equ	01		;word length select bit 0
+  0002                          wls1	equ	02		;word length select bit 1 (for 8 bit word)
+  0004                          stb	equ	04		;stop bit count (2 stop bits)
+  0000                          imask	equ	00		;non interupt mode
+  0010                          loop	equ	010h		;UART loop mode
+                                
+                                ;	PIC equates
+                                
+  0010                          init	equ	010h		;bit high to initialize the PIC
+  004C                          icw1	equ	base + 4	;PIC initialization control word 1
+  004D                          icw2	equ	base + 5	;PIC initialization control word 2
+  004D                          icw3	equ	base + 5	;PIC initialization control word 3
+  004D                          icw4	equ	base + 5	;PIC initialization control word 4
+  004D                          ocw1	equ	base + 5	;PIC interrupt mask register
+  004C                          ocw2	equ	base + 4	;PIC EOI register
+  00FF                          picmask equ	0ffh		;mask to turn all interrupts off
+  0008                          ltim	equ	08h		;level triggered mode
+  0004                          adi4	equ	04h		;call address intervals = 4
+  0000                          adi8	equ	00h		;call address intervals = 8
+  0002                          sngl	equ	02		;sole system PIC
+  0001                          ic4	equ	01h		;icw4 access bit
+  0000                          lovect	equ	0		;call vectors begin at 0
+  0000                          hivect	equ	0		;call vectors begin at 0
+  0000                          normal	equ	0		;Master/Reg. nest/unbuffered/no AEOI/8085				; -normal setting of OCW4 for Morrow Software
+  0020                          eoi	equ	20h		;non-specific EOI constant
+  001F                          ivalu	equ	init OR ltim OR adi4 OR sngl OR ic4 OR lovect
+                                ;****************************************************************
+                                ;*								*
+                                ;*	HDC Winchester controller equates			*
+                                ;*								*
+                                ;****************************************************************
+                                
+  000D                          revnum	equ	13		
+  0050                          ioaddr	equ	120Q
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-2
+'(c) 1981 Morrow Designs'
+
+  0050                          contrl	equ	ioaddr
+  0050                          status	equ	ioaddr
+  0053                          data	equ	ioaddr+3
+  0052                          functn	equ	ioaddr+2
+  0051                          commd	equ	ioaddr+1
+  0051                          secstat equ	ioaddr+1
+  0001                          dread	equ	1
+  0001                          sector	equ	1
+  0002                          opdone	equ	2
+  0004                          complt	equ	4
+  0008                          header	equ	10Q
+  0005                          drenbl	equ	5
+  0007                          dskrun	equ	7
+  0020                          ready	equ	40Q
+  0080                          system	equ	200Q
+  00F8                          stepo	equ	370Q
+  00FC                          drivea	equ	374Q
+  0001                          trk0	equ	1
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;*	DJ-DMA Equates						*
+                                ;*								*
+                                ;****************************************************************
+                                
+  104A                          djstat	equ	104ah		;adjusted channel address of status byte
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;*  	     DMA Winchester Controller Equates			*
+                                ;*								*
+                                ;****************************************************************
+  0099                          cyl	equ	153		;number cylinders for Seagate ST-506
+  0004                          heads	equ	  4		;number heads for Seagate ST-506
+  001E                          stpdly	equ	 01eh		;15 msec for Seagate ST-506
+  00C8                          hdsetl	equ	 0C8h		;20 msec for Seagate ST-506
+  0007                          secsiz	equ	  7		;1024 byte sectors for CPM
+  0000                          readat	equ	  0		;DMA controller read sector opcode
+  0001                          write	equ	  1		;DMA controller write sector opcode
+  0002                          rhead	equ	  2		;DMA controller read header opcode
+  0003                          format	equ	  3		;DMA controller format track opcode
+  0004                          const	equ	  4		;load drive constants command
+  0005                          sense	equ	  5		;return drive status command
+  0006                          noop	equ	  6		;command used when seeking
+  0054                          dmarst	equ	 54h		;DMA controller reset port
+  0055                          attn	equ	 55h		;DMA controller Attention port
+  0010                          stepout	equ	 10h		;Step direction to track 0
+  0000                          stepin	equ	  0		;Step direction away from track 0
+  0001                          track0	equ	  1		;track 0 status
+  0002                          wfault	equ	  2		;write fault condition from drive
+  0004                          dready	equ	  4		;drive ready status
+  0008                          sekcmp	equ	  8		;seek complete status
+  0011                          hdspt	equ	 17		;number of sectors per track
+  1050                          iopb	equ	1050h		;pointer to the channel
+  1080                          chan	equ	1080h		;actual channel
+  1083                          select	equ	chan + 3	;select byte in channel
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-3
+'(c) 1981 Morrow Designs'
+
+  1084                          dmaddr	equ	chan + 4	;24 bit dma address location
+  1087                          arg	equ	chan + 7	;beginning of four arguments to commands
+  108B                          cmmd	equ	chan + 11	;actual command location
+  108C                          statis	equ	chan + 12	;controller return status location 
+  108D                          link	equ	chan + 13	;link field address for next command
+  1100                          bootad	equ	1100h		;dma address for first sector from hddma
+  00FF                          good	equ	0ffh		;good status result
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;* Decision One Ram variables, visible only to task 0.		*
+                                ;*								*
+                                ;****************************************************************
+                                
+  0000'                         ram	equ	$			;Local RAM, visible only to task 0
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;* Supervisor entry point, this jump must be inserted into the	*
+                                ;* CPU's ram by the supervisor for subsequent entry to the	*
+                                ;* supervisor when traps occur.					*
+                                ;*								*
+                                ;****************************************************************
+                                
+  0000'   C3 0000'              super:	jp	super			;Supervisor entry point
+  0003'   C3 0003'              user:	jp	user			;(7) User entry point
+                                
+  0006'   00                    ctask:	db	0			;Current task
+  0007'   00                    cmask:	db	0			;Current mask contents
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;* Task save areas. Each of the tasks 1-15 have one of these	*
+                                ;* structures associated with it.  When tskbase returns, HL	*
+                                ;* will point to u.ir for that task + 0 offset.        		*
+                                ;*								*
+                                ;*             offset						*
+                                ;*	u.ir    +0	Interrupt register	(1 byte)	*
+                                ;*	u.ix	+1	Index registers		(2 bytes)	*
+                                ;*	u.iy	+3				(2 bytes)	*
+                                ;*	u.abc	+5	Alternate registers	(2 bytes)	*
+                                ;*	u.ade	+7				(2 bytes)	*
+                                ;*	u.ahl	+9				(2 bytes)	*
+                                ;*	u.aaf	+B				(2 bytes)	*
+                                ;*	u.pc	+D	Task PC			(2 bytes)	*
+                                ;*	u.bc	+F	Task registers		(2 bytes)	*
+                                ;*	u.de	+11				(2 bytes)	*
+                                ;*	u.hl	+13				(2 bytes)	*
+                                ;*	u.af	+15				(2 bytes)	*
+                                ;*	u.sp	+17	Stack pointer		(2 bytes)	*
+                                ;*	u.mask	+19	Mask register contents.	(1 bytes)	*
+                                ;*								*
+                                ;****************************************************************
+                                
+  001A                          tasksiz	equ	26
+  0008'                         tasks:	ds	tasksiz		;Task 1
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-4
+'(c) 1981 Morrow Designs'
+
+  0022'                         	ds	tasksiz		;Task 2
+  003C'                         	ds	tasksiz		;Task 3
+  0056'                         	ds	tasksiz		;Task 4
+  0070'                         	ds	tasksiz		;Task 5
+  008A'                         	ds	tasksiz		;Task 6
+  00A4'                         	ds	tasksiz		;Task 7
+  00BE'                         	ds	tasksiz		;Task 8
+  00D8'                         	ds	tasksiz		;Task 9
+  00F2'                         	ds	tasksiz		;Task 10
+  010C'                         	ds	tasksiz		;Task 11
+  0126'                         	ds	tasksiz		;Task 12
+  0140'                         	ds	tasksiz		;Task 13
+  015A'                         	ds	tasksiz		;Task 14
+  0174'                         	ds	tasksiz		;Task 15
+                                
+                                
+  018E'   00                    u.save:	db	0		;Start of user save area
+  018F'   00                    u.ir:	db	0		;Temporary user interrupt reg. save
+  0190'   0000 0000             	dw	0,0,0,0,0,0	;ix,iy,bc',de',hl',af'
+  0194'   0000 0000             
+  0198'   0000 0000             
+  019C'   0000                  u.pc:	dw	0		;Temporary user pc storage
+  019E'   0000 0000             	dw	0,0,0		;bc,de,hl
+  01A2'   0000                  
+  01A4'   0000                  u.af:	dw	0		;Temporary user af storage
+  01A6'   0000                  u.sp:   dw      0               ;temporary user stack storage
+  01A8'   0000                  u.mask:	dw	0		;temporary mask storage
+  01AA'                         gobuff	equ	$
+  01AA'                         	ds	14		;task boot buffer
+  01B8'                         ersav	equ	$	
+  01B8'                               	ds	200h-(ersav-ram);Fill out the ram
+  0200'                         stack	equ	$		;End of local ram
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;* The following map is used to hold an image of the current	*
+                                ;* memory map for all tasks.					*
+                                ;*								*
+                                ;****************************************************************
+                                
+  0200'                         map:	ds	200h			;Task Memory map image
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;* Decision One local I/O map, the following registers are	*
+                                ;* memory mapped into task 0, and are always visible to task	*
+                                ;* zero only.							*
+                                ;*								*
+                                ;****************************************************************
+                                
+  0400'                         locio	equ	$			;Local I/O, visible only to task 0
+  0400'                         trpadd:	ds	0			;Trapp address register (read)
+  0400'                         dspseg:	ds	1			;Display segment register (write)
+  0401'                         keybd:	ds	0			;Key board register (read)
+  0401'                         dspcol:	ds	1			;Display column register (write)
+  0402'                         switch:	ds	0			;CPU switch port (read)
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-5
+'(c) 1981 Morrow Designs'
+
+  0402'                         task:	ds	1			;Task register (write)
+  0403'                         stats:	ds	0			;Trap status register (read)
+  0403'                         mask:	ds	1			;Task mask register (write)
+  0404'                         elocio	equ	$			;End of local I/O
+                                
+  0404'                         	ds	200h-(elocio-locio)	;Fill out local I/O
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;* The following ram is the actual memory map, it can only be	*
+                                ;* written into, so an image is kept in the local ram.		*
+                                ;*								*
+                                ;****************************************************************
+                                
+  0600'                         mapram:	ds	200h			;Memory Map RAM, visible only to task 0
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;* Decision One prom routines, usable by the supervisor task	*
+                                ;* only after a reset but not accessible by any other tasks.	*
+                                ;*								*
+                                ;****************************************************************
+                                
+  0800'                         rom0	equ	$			;Local ROM, visible only to task 0
+                                					;and is visible only during RESET
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;* Reset is executed only once. Currently, reset forms an	*
+                                ;* identity map for task zero to occupy the first 64K of main	*
+                                ;* memory, allows task 0 to have unlimited priviledges. Task1   *
+                                ;* occupies the first 64K, unlimited access and the traps are  	*
+                                ;* set for halts or a stop. All other task maps are initialized *
+                                ;* starting at bank 2 to bank 15. (e.g. task 15 has bank 15).	*
+                                ;* If swithches are set with S1 through S7 off and S8 on, the   *
+                                ;* power on jump address will be F800. If switch 6 is on, the	*
+                                ;* program will jump to the monitor regardless of the state	*
+                                ;* of the other switches.  If S1 - S5 are all 'ON' a MORROW	*
+                                ;* hard disk is assumed and the 'Boothd' program is executed.	*
+                                ;* If pin 2 of 15D is lifted, the diag nostic mode is entered.	*
+                                ;*								*
+                                ;****************************************************************
+                                
+                                
+                                ; Check all the readable registers
+                                
+                                
+  0800'   D3 FF                 regrd:  out	(0ffh),a		;sync
+  0802'   21 0400'              	ld	hl,trpadd
+  0805'   7E                    	ld	a,(hl)			;read trap address reg @ 400h
+  0806'   23                    	inc	hl			
+  0807'   7E                    	ld	a,(hl)			;read keyboard reg @ 401h
+  0808'   23                    	inc	hl
+  0809'   7E                    	ld	a,(hl)			;read switch reg @ 402h
+  080A'   23                    	inc	hl
+  080B'   7E                    	ld	a,(hl)			;read trap status reg @ 403h
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-6
+'(c) 1981 Morrow Designs'
+
+  080C'   18 4C                 	jr	getsw
+                                
+                                
+                                
+                                ; Check all the writable registers
+                                
+  080E'   AF                    regwr:	xor	a			;loop till switch not 00
+  080F'   D3 FF                 regwr1:	out	(0ffh),a		;sync
+  0811'   32 0403'              	ld	(mask),a		;write to the mask register
+  0814'   32 0401'              	ld	(dspcol),a		;write to the display column register
+  0817'   32 0400'              	ld	(dspseg),a		;write to the display segment reg.
+  081A'   2F                    	cpl	
+  081B'   FE FF                 	cp	0ffh
+  081D'   28 F0                 	jr	z,regwr1
+  081F'   18 39                 	jr	getsw
+                                
+                                
+                                ; Check the Map RAMs
+                                
+  0821'   AF                    tmap:   xor	a			;write to map ram / protection ram
+  0822'   21 0600'              	ld	hl,mapram
+  0825'   D3 FF                 	out	(0ffh),a		;sync
+  0827'   77                    	ld	(hl),a			;write location 600,0
+  0828'   23                    	inc	hl
+  0829'   77                    	ld	(hl),a			;write 601,0
+  082A'   2F                    	cpl
+  082B'   77                    	ld	(hl),a			;write 601,0ffh
+  082C'   2B                    	dec	hl
+  082D'   77                    	ld	(hl),a			;write 600,0ffh
+  082E'   21 07FE'              	ld	hl,mapram + 01feh
+  0831'   77                    	ld	(hl),a			;write 7fe,0ff
+  0832'   23                    	inc	hl
+  0833'   77                    	ld	(hl),a			;write 7ff,0ff
+  0834'   2F                    	cpl
+  0835'   77                    	ld	(hl),a			;write 7ff,00
+  0836'   2B                    	dec	hl
+  0837'   77                    	ld	(hl),a			;write 7fe,00
+  0838'   18 20                 	jr	getsw
+                                
+                                
+                                ; Check the R/W RAMs
+                                
+                                
+  083A'   21 0000               tram:	ld	hl,0000h		;write to read/write ram
+  083D'   D3 FF                 	out	(0ffh),a
+  083F'   AF                    tram1:	xor	a
+  0840'   77                    	ld	(hl),a			;write a 00 to ram 
+  0841'   BE                    	cp	(hl)			;read it back
+  0842'   2F                    	cpl
+  0843'   77                    	ld	(hl),a			;write an ffh to ram 
+  0844'   BE                    	cp	(hl)			;read it back
+  0845'   CB 44                 	bit	0,h
+  0847'   20 11                 	jr	nz,getsw
+  0849'   21 03FF               	ld	hl,03ffh
+  084C'   18 F1                 	jr      tram1			;write to 3ffh a ffh
+                                
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-7
+'(c) 1981 Morrow Designs'
+
+                                
+                                ; Check the Floating Point Processor
+                                
+                                
+  084E'   AF                    tfpp:   xor	a			;check FPP
+  084F'   D3 FF                 	out	(0ffh),a		;sync
+  0851'   32 0C00               	ld	(0c00h),a		;write a 00 to location C00h
+  0854'   32 0C08               	ld	(0c08h),a		;write a 00 to location C08h
+  0857'   3A 0C00               	ld	a,(0c00h)		;read c00h
+                                
+                                
+  085A'   3A 0401'              getsw:	ld	a,(keybd)		
+  085D'   CB 4F                 	bit	1,a
+  085F'   CA 08E3'              reset:	jp	z,reset0		;go to the montior if  low
+  0862'   3A 0402'              	ld	a,(switch)
+  0865'   CB 57                 	bit	2,a
+  0867'   CA 08E3'              	jp	z,reset0		;go to the monitor if S6 is on
+  086A'   E6 70                 	and	070h			;strip insignificant bits
+  086C'   CB 0F                 	rrc	a			;4 byte offset
+  086E'   CB 0F                 	rrc	a
+  0870'   21 0BD0'              	ld	hl,jtable		;point to beginning of table
+  0873'   85                    	add	a,l
+  0874'   6F                    	ld	l,a
+  0875'   E9                    	jp	(hl)
+                                
+                                ; Check the S-100 bus addr and data lines
+                                
+                                
+  0876'   3E F0                 tbus:   ld	a,0f0h
+  0878'   32 0402'              	ld	(task),a		;force upper task bits high
+  087B'   3E FF                 	ld	a,0ffh			;init the T0 map
+  087D'   32 061E               	ld	(61eh),a
+  0880'   3E 03                 	ld	a,03
+  0882'   32 061F               	ld	(61fh),a
+  0885'   32 0603               	ld	(603h),a
+  0888'   AF                    	xor	a
+  0889'   32 0602               	ld	(602h),a
+  088C'   D3 FF                 	out	(0ffh),a		;sync
+  088E'   32 FFFF               	ld	(0ffffh),a		;write - bus addresses A0-23 are high
+  0891'   32 0402'              	ld	(task),a		;upper task bits low
+  0894'   32 1000               	ld	(1000h),a		;write - bus addresses A0-23 are low
+  0897'   3E F0                 	ld	a,0f0h
+  0899'   32 0402'              	ld	(task),a		;force upper task bits high
+  089C'   3A FFFF               	ld	a,(0ffffh)		;read  - bus addresses A0-23 are high
+  089F'   AF                    	xor	a
+  08A0'   32 0402'              	ld	(task),a		;force upper task bits low
+  08A3'   3A 1000               	ld	a,(1000h)		;read  - bus addresses A0-23 are low
+  08A6'   18 B2                 	jr	getsw
+                                
+                                
+  08A8'   3E A0                 ntbus:  ld	a,0A0h
+  08AA'   32 0402'              	ld	(task),a		;force upper task bits high
+  08AD'   3E AA                         ld	a,0aah			;init the T0 map
+  08AF'   32 061E               	ld	(61eh),a
+  08B2'   3E 03                 	ld	a,03
+  08B4'   32 061F               	ld	(61fh),a
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-8
+'(c) 1981 Morrow Designs'
+
+  08B7'   32 0603               	ld	(603h),a
+  08BA'   3E 55                 	ld	a,55h
+  08BC'   32 0602               	ld	(602h),a
+  08BF'   D3 FF                 	out	(0ffh),a		;sync
+  08C1'   3E AA                 	ld	a,0aah
+  08C3'   32 FAAA               	ld	(0faaah),a		;write - bus addresses A0-23 = AAAAAA
+  08C6'   3E 50                 	ld	a,50h
+  08C8'   32 0402'              	ld	(task),a		;upper task bits low = 5
+  08CB'   3E 55                 	ld	a,55h
+  08CD'   32 1555               	ld	(1555h),a		;write - bus addresses A0-23 are low
+  08D0'   3E A0                 	ld	a,0A0h
+  08D2'   32 0402'              	ld	(task),a		;force upper task bits high
+  08D5'   3A FAAA               	ld	a,(0faaah)		;read  - bus addresses A0-23 are high
+  08D8'   3E 50                 	ld	a,050h
+  08DA'   32 0402'              	ld	(task),a		;force upper task bits low
+  08DD'   3A 1555               	ld	a,(1555h)		;read  - bus addresses A0-23 are low
+  08E0'   C3 085A'              	jp	getsw
+                                
+                                	
+                                ; Initialize the maps and jump vectors
+                                
+                                
+  08E3'   CD 08EF'              reset0: call	reset1
+  08E6'   CD 0B2B'              	call	uartst
+  08E9'   CD 0922'              	call	setup
+  08EC'   C3 01AA'              	jp	gobuff
+                                
+  08EF'   21 0000'              reset1:	ld	hl,super		;initialize 'super' to the monitor...
+  08F2'   2B                    settle:	dec	hl			;wait for the hardware to settle down
+  08F3'   7D                    	ld	a,l
+  08F4'   B4                    	or	h
+  08F5'   20 FB                 	jr	nz,settle
+  08F7'   36 C3                 	ld	(hl),jmpop		;- this will be overwritten by the
+  08F9'   23                    	inc	hl			;- supervisor but all traps in the 
+  08FA'   36 12                 	ld	(hl),012h		;- meantime will fall into the monitor.
+  08FC'   23                    	inc 	hl
+  08FD'   36 08                 	ld	(hl),08h
+                                
+  08FF'   AF                    reslop: xor	a
+  0900'   0E 03                 	ld	c,3			;New access priviledges
+  0902'   47                    reslp2: ld	b,a			;New allocation = segment #
+  0903'   CD 0B18'              	call	rstmap			;Allocate it
+  0906'   3C                    	inc	a			;Next segment #
+  0907'   E6 0F                 	and	0fh			;Check if all done
+  0909'   20 F7                 	jr	nz,reslp2		;Continue until done
+  090B'   3E 10                         LD	A,10h			;write new task and segment
+  090D'   06 00                 	LD	B,0			;TASK 1 gets first 64K of memory
+  090F'   CD 0B18'              reslp1: call    rstmap			;Give TASK 1 a full 64k of space
+  0912'   04                    	inc	B			
+  0913'   3C                    	inc	A			
+  0914'   FE 20                 	cp      20h			
+  0916'   20 F7                 	jr	nz,reslp1						
+  0918'   47                    fmap:	ld	b,a			;fill all the tasks' maps
+  0919'   CD 0B18'              	call	rstmap
+  091C'   3C                    	inc	a
+  091D'   FE 00                 	cp	0h
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-9
+'(c) 1981 Morrow Designs'
+
+  091F'   20 F7                 	jr	nz,fmap
+  0921'   C9                    	ret
+                                
+                                	
+                                
+  0922'   AF                    setup:	xor	a
+  0923'   32 0602'              	ld	(mapram + 2),a		;a window for DMA device commands
+  0926'   32 0202'              	ld	(map + 2),a		;update the image map
+  0929'   32 01B8'              	ld	(ersav),a		;null the error save byte
+  092C'   3E 1A                 	ld	a,hstrap		;initialize the mask register
+  092E'   32 0403'              	ld	(mask),a		; -to trap on halts and stops
+  0931'   32 0007'              	ld	(cmask),a
+                                
+                                ;	Following code checks for ram in system
+                                
+  0934'   21 FFFF               	ld	hl,0ffffh		;top of ram
+  0937'   3E F0                 ramchk:	ld	a,0f0h
+  0939'   A4                    	and	h
+  093A'   28 12                 	jr	z,badram		;dont go below task0,seg1	
+  093C'   77                    	ld	(hl),a			;check it with a 00h
+  093D'   BE                    	cp	(hl)			
+  093E'   28 03                 	jr	z,nexchk
+  0940'   2B                    	dec	hl			;try the next location
+  0941'   18 F4                 	jr	ramchk
+  0943'   2F                    nexchk:	cpl	
+  0944'   77                    	ld	(hl),a			;check it with an ff (might be ROM)
+  0945'   BE                    	cp	(hl)
+  0946'   22 01B9'              	ld	(ersav + 1),hl		;store it away for printing
+  0949'   28 11                 	jr	z,tstsw					
+  094B'   2B                    	dec	hl			;try next location
+  094C'   18 E9                 	jr	ramchk
+                                
+  094E'   21 0BAD               badram: ld	hl,0badh
+  0951'   22 01B9'              	ld	(ersav + 1),hl
+  0954'   3E 4D                 	ld	a,'M'
+  0956'   32 01B8'              	ld	(ersav),a
+  0959'   C3 0A6B'              	jp 	allerr			;if no ram force entry to monitor
+                                
+  095C'   3A 0402'              tstsw:	ld	a,(switch)		;get contents of switch
+  095F'   E6 F8                 	and	0f8h			;Ignore irrelevent bits
+  0961'   57                    	ld	d,a			;d & e contain jump address
+  0962'   1E 00                 	ld	e,0H
+  0964'   FE 00                 	cp	0			;boot hard disk if switches are all on
+  0966'   CA 0AA3'              	jp	z,boothd
+  0969'   FE 08                 	cp	08h			;If switch 5 is off others are on
+  096B'   CA 09F7'              	jp	z,nuboot		; - boot DMA controller
+  096E'   FE 10                 	cp	10h			;If switches 4 is off, others on
+  0970'   28 57                 	jr	z,djdma			; - boot the DJ-DMA floppy device
+                                
+  0972'   3A 0402'              check:	ld	a,(switch)		;test monitor switch
+  0975'   CB 57                 	bit  	2,a
+  0977'   3E 01                 	ld	a,1			;normal task number
+  0979'   ED 53 0015            	ld	(15h),de		;initialize the t1 pc save area
+  097D'   32 0006'              	ld	(ctask),a
+  0980'   20 04                 	jr	nz,nutask		;jump if boot desired
+                                
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-10
+'(c) 1981 Morrow Designs'
+
+  0982'   AF                    montor:	xor	a			;monitor task number
+  0983'   11 0916               	ld	de,cold			;monitor location
+                                
+  0986'   21 01AA'              nutask: ld	hl,gobuff		;Write a routine to switch to new task
+  0989'   36 3E                 	ld	(hl),03eh		;- because when the task register is
+  098B'   23                    	inc	hl			;- written into, the lower half of the
+  098C'   77                    	ld	(hl),a			;- prom goes away.
+  098D'   23                    	inc	hl
+  098E'   36 32                 	ld	(hl),032h
+  0990'   23                    	inc	hl
+  0991'   36 02                 	ld	(hl),02h
+  0993'   23                    	inc	hl
+  0994'   36 04                 	ld	(hl),04h
+  0996'   23                    	inc	hl
+  0997'   36 00                 	ld	(hl),nop		;6 nops for countdown sequence
+  0999'   23                    	inc	hl
+  099A'   36 00                 	ld	(hl),nop
+  099C'   23                    	inc	hl
+  099D'   36 00                 	ld	(hl),nop
+  099F'   23                    	inc	hl
+  09A0'   36 00                 	ld	(hl),nop
+  09A2'   23                    	inc	hl
+  09A3'   36 00                 	ld	(hl),nop
+  09A5'   23                    	inc	hl
+  09A6'   36 00                 	ld	(hl),nop
+  09A8'   23                    	inc	hl
+  09A9'   36 C3                 	ld	(hl),0c3h		;the jump op code
+  09AB'   23                    	inc	hl
+  09AC'   73                    	ld	(hl),e
+  09AD'   23                    	inc	hl
+  09AE'   72                    	ld	(hl),d
+                                
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;*	Wunderbuss I/O and Mult I/O PIC initialization	rou-	*
+                                ;*	tine.  Interrupt vectors = restart locations.		*
+                                ;*								*
+                                ;****************************************************************
+                                
+  09AF'   AF                    picset:	xor     a
+  09B0'   D3 4F                 	out	(grpctl),a
+  09B2'   3E 1F                 	ld	a,ivalu			;sngl,level,4 byte address
+  09B4'   D3 4C                 	out	(icw1),a		;initialize the first word
+  09B6'   3E 00                 	ld	a,hivect
+  09B8'   D3 4D                 	out	(icw2),a		;initialize the second word
+  09BA'   3E 00                 	ld	a,normal
+  09BC'   D3 4D                 	out	(icw4),a		;initialize the forth word
+  09BE'   3E FF                 	ld	a,picmask
+  09C0'   D3 4D                 	out	(ocw1),a		;mask all interrupts
+  09C2'   3E 20                 	ld	a,eoi			;send PIC an End of Interrupt word
+  09C4'   D3 4C                 	out	(ocw2),a		;clear the master interrupt requests
+  09C6'   D3 4C                 	out	(ocw2),a		;clear the slaves interrupt requests
+  09C8'   C9                    	ret
+                                
+                                
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-11
+'(c) 1981 Morrow Designs'
+
+                                ;****************************************************************
+                                ;*								*
+                                ;* DJ-DMA floppy disk boot routine (5.25 or 8 inch).		*
+                                ;*								*
+                                ;****************************************************************
+                                
+  09C9'   26 10                 djdma:	ld	h,10h			; wait byte for 1 minute 
+  09CB'   01 0000               djlop0:	ld	bc,0000h
+  09CE'   3A 104A               djloop:	ld	a,(djstat)		;read the status back
+  09D1'   FE 40                 	cp	040h
+  09D3'   ED 5B 1048            	ld	de,(djstat - 2)		;d & e point to cold boot loader
+  09D7'   28 99                 	jr	z,check			;if good status continue set gobuff
+  09D9'   FE FF                 	cp	0ffh			; - else loop for good status
+  09DB'   28 14                 	jr	z,nstat			;if 0ffh then force to a zero
+  09DD'   0B                    	dec	bc
+  09DE'   78                    	ld	a,b
+  09DF'   B1                    	or	c
+  09E0'   20 EC                 	jr	nz,djloop
+  09E2'   25                    	dec	h
+  09E3'   20 E6                 	jr	nz,djlop0		;continue looping till a minute elapses
+                                
+                                ;	DJ-DMA not responding correctly
+                                
+  09E5'   0E 46                 	ld	c,'F'
+  09E7'   3A 104A               	ld	a,(djstat)
+  09EA'   47                    	ld	b,a			;save the error status
+  09EB'   3A 1048               	ld	a,(djstat - 2)
+  09EE'   57                    	ld	d,a
+  09EF'   18 71                 	jr	derror			;go to error--controller not
+                                					; - responding
+                                
+  09F1'   AF                    nstat: 	xor	a
+  09F2'   32 104A               	ld	(djstat),a		;null status byte ... signal DJ-DMA
+  09F5'   18 D7                 	jr	djloop
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;* Hard Disk Boot program for the DMA Winchester Controller.	*
+                                ;*								*
+                                ;****************************************************************
+                                
+  09F7'   01 0010               nuboot:	ld	bc,endboot - bootbl	;byte count
+  09FA'   21 0BB3'              	ld	hl,bootbl		;source
+  09FD'   11 1080               	ld	de,chan			;destination
+  0A00'   ED B0                 	ldir				;move the command
+  0A02'   21 1050               	ld	hl,iopb			;point to default channel addr
+  0A05'   36 80                 	ld	(hl),80h		;fill in the command channel address
+  0A07'   AF                    	xor	a
+  0A08'   23                    	inc	hl			; -located at 50h to point to channel
+  0A09'   77                    	ld	(hl),a			; -at 80h.
+  0A0A'   23                    	inc	hl
+  0A0B'   77                    	ld	(hl),a
+  0A0C'   D3 54                 	out	(dmarst),a		;send the controller a reset
+  0A0E'   11 0010               	ld	de,010h
+                                
+  0A11'   15                    hdrl:	dec	d			;wait for controller to process reset
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-12
+'(c) 1981 Morrow Designs'
+
+  0A12'   20 FD                 	jr	nz,hdrl
+  0A14'   CD 0A3E'              	call	cloop
+                                
+  0A17'   21 FFFF               home:	ld	hl,-1  			;seek to home
+  0A1A'   22 1081                       ld      (chan + 1),hl           ; - with ffff steps
+  0A1D'   3E 06                 	ld	a,noop
+  0A1F'   32 108B               	ld	(statis - 1),a		;null command 
+  0A22'   3E 01                 	ld	a,1
+  0A24'   32 108C               	ld	(statis),a		;set up the status byte
+  0A27'   CD 0A3E'              	call	cloop
+                                	
+  0A2A'   11 1080               rdata: 	ld	de,chan			;destination
+  0A2D'   01 000D               	ld	bc,endrd - rdtbl	;byte count
+  0A30'   21 0BC3'              	ld	hl,rdtbl		;source
+  0A33'   ED B0                 	ldir				;move the read sector command
+  0A35'   CD 0A3E'              	call	cloop
+  0A38'   11 0100               	ld	de,0100h		;point to beginning of DMA boot prog.
+  0A3B'   C3 0972'              	jp	check
+                                
+                                
+                                ; cloop1 = 9.6 us
+                                
+                                			
+  0A3E'   0E 20                 cloop:	ld	c,020h
+  0A40'   D3 55                 cloop0:	out	(attn),a
+  0A42'   11 0000               	ld	de,0000h
+  0A45'   3A 108C               cloop1: ld	a,(statis)		;check drive status
+  0A48'   FE FF                 	cp	0ffh			;an FF means command completed
+  0A4A'   C8                    	ret	z
+  0A4B'   1B                    	dec	de			;wait for controller to respond
+  0A4C'   7B                    	ld	a,e
+  0A4D'   B2                    	or	d
+  0A4E'   20 F5                 	jr	nz,cloop1		;give it time to respond
+                                					;end cloop1
+                                
+                                ;	Fall through to here on any error
+                                
+  0A50'   3A 108C               	ld	a,(statis)
+  0A53'   FE 01                 	cp	01h
+  0A55'   20 03                 	jr	nz,cloop2	
+  0A57'   0D                    	dec	c			;give it 10 tries if not rdy error
+  0A58'   20 E6                 	jr	nz,cloop0		; - about 20 seconds
+                                
+  0A5A'   D1                    cloop2:	pop	de			;re-align the stack pointer
+  0A5B'   47                    	ld	b,a
+  0A5C'   0E 48                 	ld	c,'H'
+  0A5E'   3A 108B               	ld	a,(cmmd)
+  0A61'   57                    	ld	d,a
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;*  Enter here if DISK controllers don't respond correctly.	*
+                                ;*  Routine alters gobuff to point to the monitor cout routine.	*	
+                                ;*								*
+                                ;****************************************************************
+                                
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-13
+'(c) 1981 Morrow Designs'
+
+  0A62'                         derror:	
+  0A62'   79                    	ld	a,c
+  0A63'   21 01B8'              	ld	hl,ersav
+  0A66'   77                    	ld	(hl),a			;store c for later
+  0A67'   23                    	inc	hl
+  0A68'   70                    	ld	(hl),b			;error status
+  0A69'   23                    	inc	hl
+  0A6A'   72                    	ld	(hl),d			;command causing error 
+  0A6B'   AF                    allerr:	xor	a
+  0A6C'   32 0006'              	ld	(ctask),a
+  0A6F'   11 0916               	ld	de,cold			;pointer to error print
+  0A72'   ED 53 0015            	ld	(15h),de		;save the pointer in t1 pc
+  0A76'   C3 0986'              	jp	nutask			
+                                	
+                                
+                                	
+                                ;****************************************************************
+                                ;*								*
+                                ;* Hard Disk Boot program for Decision 1 EPROM.			*
+                                ;* For M26, M10, and M20.					*
+                                ;*						11/4/81  BJG	*
+                                ;****************************************************************
+                                
+  0A79'   11 0000               hdclop:	ld	de,0000h
+  0A7C'   DB 50                 hdlop1: in	a,(status)
+  0A7E'   A0                    	and	b
+  0A7F'   C0                    	ret	nz
+  0A80'   1B                    	dec	de
+  0A81'   7A                    	ld	a,d
+  0A82'   B3                    	or	e
+  0A83'   20 F7                 	jr	nz,hdlop1
+  0A85'   18 12                 	jr	hdcerr
+                                
+  0A87'   26 10                 wait:	ld	h,010h
+  0A89'   11 0000               wait0:	ld	de,0
+  0A8C'   DB 50                 wait1:	in	a,(status)
+  0A8E'   A0                    	and	b
+  0A8F'   C8                    	ret	z
+  0A90'   1B                    	dec	de
+  0A91'   7A                    	ld	a,d
+  0A92'   B3                    	or	e
+  0A93'   20 F7                 	jr	nz,wait1
+  0A95'   25                    	dec	h
+  0A96'   20 F1                 	jr	nz,wait0
+  0A98'   E1                    	pop	hl			;re-align the stack pointer
+  0A99'   0E 44                 hdcerr: ld	c,'D'			; D for HDCA error flag
+  0A9B'   DB 50                 	in	a,(status)		;get the primary status
+  0A9D'   47                    	ld	b,a
+  0A9E'   DB 51                 	in	a,(secstat)		;get the secondary status
+  0AA0'   57                    	ld	d,a
+  0AA1'   18 BF                 	jr	derror
+                                	
+  0AA3'   3E FC                 boothd:	ld	a,drivea		;select
+  0AA5'   D3 52                 	out	(functn),a		;    drive A
+  0AA7'   3E 05                 	ld	a,drenbl		;turn on drive
+  0AA9'   D3 50                 	out	(contrl),a		;    command register
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-14
+'(c) 1981 Morrow Designs'
+
+                                
+  0AAB'   06 20                 rloop:	ld	b,ready
+  0AAD'   CD 0A87'              	call	wait
+  0AB0'   3E 07                 	ld	a,dskrun		;enable the
+  0AB2'   D3 50                 	out	(contrl),a		;    controller
+                                
+  0AB4'   DB 50                 waitz:	in	a,(status)		;test for heads at track 0
+  0AB6'   1F                    	rra
+  0AB7'   30 0F                 	jr	nc,sdone
+  0AB9'   3E F8                 	ld	a,stepo			;execute
+  0ABB'   D3 52                 	out	(functn),a		;    the
+  0ABD'   3E FC                 	ld	a,drivea		;    step out
+  0ABF'   D3 52                 	out	(functn),a		;    command
+                                
+  0AC1'   06 04                 waitc:  ld	b,complt
+  0AC3'   CD 0A79'              	call	hdclop
+  0AC6'   18 EC                 	jr	waitz
+                                
+  0AC8'   DB 50                 sdone:	in	a,(status)		;get an image
+  0ACA'   4F                    	ld	c,a			;    of the status reg
+                                
+  0ACB'   DB 50                 iwait1: in	a,(status)		;wait for
+  0ACD'   91                    	sub	c			;    the index pulse
+  0ACE'   28 FB                 	jr	z,iwait1		;    to arrive
+                                
+  0AD0'   DB 50                 iwait2: in	a,(status)		;wait for the
+  0AD2'   91                    	sub	c			;    next index pulse
+  0AD3'   20 FB                 	jr	nz,iwait2		;test for head settle
+                                
+  0AD5'   DB 50                 iwait3:	in	a,(status)
+  0AD7'   91                    	sub	c
+  0AD8'   28 FB                 	jr	z,iwait3
+  0ADA'   3E 08                 	ld	a,header		;reset the
+  0ADC'   D3 51                 	out	(commd),a		;    buffer pointer
+  0ADE'   AF                    	xor	a			;    to header area
+  0ADF'   D3 53                 	out	(data),a		;head 0
+  0AE1'   D3 53                 	out	(data),a		;track 0
+  0AE3'   3C                    	inc	a			;sector 1
+  0AE4'   D3 53                 	out	(data),a		    
+  0AE6'   3E 80                 	ld	a,system		;system key
+  0AE8'   D3 53                 	out	(data),a
+  0AEA'   3E 01                 	ld	a,dread			;issue a
+  0AEC'   D3 51                 	out	(commd),a		;    read command
+                                
+  0AEE'   06 02                 waitd:	ld	b,opdone
+  0AF0'   CD 0A79'              	call	hdclop
+  0AF3'   DB 53                 	in	a,(data)		;low order byte of
+  0AF5'   6F                    	ld	l,a			;    bootstrap address
+  0AF6'   5F                    	ld	e,a
+  0AF7'   DB 53                 	in	a,(data)		;high order byte of
+  0AF9'   67                    	ld	h,a			;    bootstrap address
+  0AFA'   57                    	ld	d,a
+  0AFB'   E6 F0                 	and	0f0h			;check for 1st segment of task0
+  0AFD'   28 11                 	jr	z,dxloop
+  0AFF'   AF                    	xor	a
+  0B00'   32 0602'              	ld	(mapram + 2),a		;T0 map is as normal with no window
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-15
+'(c) 1981 Morrow Designs'
+
+                                
+                                
+  0B03'   DB 53                 lloop:	in	a,(data)		;load
+  0B05'   12                    	ld	(de),a			;    the
+  0B06'   1C                    	inc	e			;    bootstrap
+  0B07'   20 FA                 	jr	nz,lloop
+  0B09'   54                    	ld	d,h			;save the boot addr for later
+  0B0A'   5D                    	ld	e,l
+  0B0B'   3E 01                 	ld	a,01
+  0B0D'   C3 0972'              	jp	check
+                                
+  0B10'   7A                    dxloop: ld	a,d
+  0B11'   E6 0F                 	and	0fh			;strip the segment #
+  0B13'   F6 10                 	or	010h			; force the load into seg 0 task 1
+  0B15'   57                    	ld	d,a
+  0B16'   18 EB                 	jr	lloop
+                                
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;* Rstmap writes the tasks memory allocation vectors. Upon	*
+                                ;* entry the registers must contain:				*
+                                ;*	a = task number / task segment number to update		*
+                                ;*          high nibble = task #    low nibble = segment #	*
+                                ;*	b = New allocation vector				*
+                                ;*	c = New allocation access				*
+                                ;*								*	
+                                ;* Routine calculates the expression  600+(Accumulator) x 2 	*
+                                ;* where accumulator contents are as listed above.  All arit-   * 	
+                                ;* hmetic and numbers are in Hex				*
+                                ;*  						 		*
+                                ;****************************************************************
+                                
+  0B18'   6F                    rstmap:	ld	l,a             ;Get task and segment numbers       
+  0B19'   26 00                         ld	h,0h    
+  0B1B'   29                    	add	hl,hl           ;multiply times 2       
+  0B1C'   EB                            ex	de,hl  		;save calculated offset in D,E
+  0B1D'   21 0600'                      ld	hl,mapram       ;point to beginning of ram map
+  0B20'   CD 0B26'                      call    rstmxx            
+  0B23'   21 0200'              	ld	hl,map		;point to image map at 200
+  0B26'   19                    rstmxx:	add	hl,de		;add offset to selected map
+  0B27'   70                    	ld	(hl),b          ;write the allocation vector to ram
+  0B28'   23                    	inc	hl		;point to access ram
+  0B29'   71                    	ld	(hl),c          ;write access attributes to ram
+  0B2A'   C9                    	ret
+                                
+                                ;********************************************************
+                                ;*							*
+                                ;*  The following code intitializes the I/O for		*
+                                ;*  the Decision 1 Motherboard and the Mult I/O.	*
+                                ;*  							*
+                                ;********************************************************
+                                
+                                
+  0B2B'   16 03                 uartst:	ld	d,3			;start with uart 3
+  0B2D'   7A                    uarts0:	ld	a,d
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-16
+'(c) 1981 Morrow Designs'
+
+  0B2E'   D3 4F                 	out   	(grpctl),a
+  0B30'   AF                    	xor 	a
+  0B31'   D3 4D                 	out	(lsr),a			;clear line status register 
+  0B33'   D3 49                 	out 	(ier),a			;initialialize interupt mask (off)
+  0B35'   15                    	dec	d
+  0B36'   20 F5                 	jr	nz,uarts0
+  0B38'   D3 4F                 	out 	(grpctl),a		;select sense switch port
+  0B3A'   DB 49                 	in	a,(base+1)		
+  0B3C'   07                    	rlca
+  0B3D'   07                    	rlca
+  0B3E'   07                    	rlca
+  0B3F'   E6 07                 	and	07h			;mask insignificant bits
+  0B41'   FE 07                 	cp	07h			;all off?
+  0B43'   16 00                 	ld	d,0
+  0B45'   28 0B                 	jr	z,default		;default if all off
+  0B47'   21 0BA5'              	ld	hl,btable		;point to baud rate table
+  0B4A'   87                    	add 	a,a
+  0B4B'   5F                    	ld	e,a
+  0B4C'   19                    	add 	hl,de			;offset to selected baud rate
+  0B4D'   4E                    	ld	c,(hl)
+  0B4E'   23                    	inc	hl
+  0B4F'   46                    	ld	b,(hl)			;bc = baud rate divisor value (D)
+  0B50'   18 03                 	jr	setit
+                                
+  0B52'                         default:
+  0B52'   01 000C               	ld	bc,12			;default baud rate is 9600
+                                
+  0B55'   14                    setit:	inc	d
+  0B56'   7A                    	ld	a,d
+  0B57'   D3 4F                 	out	(grpctl),a
+  0B59'   3E 87                 	ld	a,dlab+wls1+wls0+stb
+  0B5B'   D3 4B                 	out 	(lcr),a			;divisor access bit is on
+  0B5D'   78                    	ld	a,b
+  0B5E'   D3 49                 	out 	(dlm),a			;load high divisor register
+  0B60'   79                    	ld	a,c
+  0B61'   D3 48                 	out 	(dll),a			;load low divisor register
+  0B63'   3E 07                 	ld	a,wls1+wls0+stb
+  0B65'   D3 4B                 	out 	(lcr),a			;divisor access bit is off
+  0B67'   3E 10                         ld	a,loop			;clear the shift register
+  0B69'   D3 4C                 	out	(mcr),a			; - by looping back.
+  0B6B'   DB 48                 	in	a,(rbr)			;clear receiver buffer
+  0B6D'   AF                    	xor	a
+  0B6E'   D3 48                 	out	(thr),a			;clear transmitter buffer
+  0B70'   CD 0B9E'              	call	begin0
+  0B73'   DB 48                 	in	a,(rbr)
+  0B75'   AF                    	xor	a
+  0B76'   D3 48                 	out	(thr),a
+  0B78'   CD 0B9E'              	call	begin0			;two times to make sure
+  0B7B'   DB 4D                 rduart:	in	a,(lsr)
+  0B7D'   E6 01                 	and	dr 			;check for data available
+  0B7F'   28 FA                 	jr	z,rduart
+  0B81'   DB 48                 	in	a,(rbr)			;intitialize receiver buffer
+  0B83'   FE 00                 	cp	0
+  0B85'   28 0F                 	jr	z,contin		;jump if UARTS good
+                                
+  0B87'   F5                    urterr:	push 	af
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-17
+'(c) 1981 Morrow Designs'
+
+  0B88'   3E 55                 	ld	a,'U'
+  0B8A'   32 01B8'              	ld	(ersav),a		;Uart error
+  0B8D'   7A                    	ld	a,d			
+  0B8E'   32 01BA'              	ld	(ersav + 2),a		;Uart # saved
+  0B91'   F1                    	pop	af
+  0B92'   32 01B9'              	ld	(ersav + 1),a		;bad character saved
+  0B95'   AF                    	xor	a
+                                
+  0B96'   D3 4C                 contin:	out	(mcr),a
+  0B98'   7A                    	ld	a,d
+  0B99'   FE 03                 	cp	3			;initialize all three uarts
+  0B9B'   C8                    	ret	z
+  0B9C'   18 B7                 	jr	setit
+                                
+  0B9E'   DB 4D                 begin0:	in	a,(lsr)
+  0BA0'   E6 20                 	and	thre
+  0BA2'   28 FA                 	jr	z,begin0
+  0BA4'   C9                    	ret
+                                
+                                
+                                ;  Baud rate selection table for Mult I/o or WB I/O
+                                
+  0BA5'   0417                  btable:	dw	1047			;110 baud		0 0 0
+  0BA7'   0180                  	dw	384			;300 baud		0 0 1
+  0BA9'   0060                  	dw	96			;1200 baud		0 1 0
+  0BAB'   0030                  	dw	48			;2400 baud		0 1 1
+  0BAD'   0018                  	dw	24			;4800 baud		1 0 0
+  0BAF'   000C                  	dw	12			;9600 baud		1 0 1
+  0BB1'   0006                  	dw	6			;19200 baud		1 1 0
+                                
+                                ; Load constants command for the DMA Winchester controller
+                                
+  0BB3'   10                    bootbl: db	10h			;direction out
+  0BB4'   00                    	db	0			;low steps
+  0BB5'   00                    	db	0			;high steps
+  0BB6'   3C                    	db	03ch			;select drive 0
+  0BB7'   00                    	db	0			;low dma address
+  0BB8'   01                    	db	01			;high dma address
+  0BB9'   00                    	db	0			;extended dma address
+  0BBA'   00                    	db	0			;argument 0
+  0BBB'   1E                    	db	stpdly			;argument 1
+  0BBC'   C8                    	db	hdsetl			;argument 2
+  0BBD'   07                    	db	secsiz			;argument 3
+  0BBE'   04                    	db	const			;load constants opcode
+  0BBF'   00                    	db	0			;clear status byte
+  0BC0'   80                    	db	80h			;low link address
+  0BC1'   00                    	db	0			;high link address
+  0BC2'   00                    	db	0			;extended link address
+                                
+  0BC3'                         endboot equ	$
+                                
+                                ; Read sector 1, head 0, cyl 0  command for the HD-DMA:
+                                
+  0BC3'   00                    rdtbl:	db	0			;no seek
+  0BC4'   00                    	db	0
+  0BC5'   00                    	db	0
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-18
+'(c) 1981 Morrow Designs'
+
+  0BC6'   7C                    	db	07ch			;select drive 0, head 0 
+  0BC7'   00                    	db	0			;dma address of 100h
+  0BC8'   01                    	db	1
+  0BC9'   00                    	db	0
+  0BCA'   00                    	db	0			;low byte cylinder
+  0BCB'   00                    	db	0			;high byte cylinder
+  0BCC'   00                    	db	0			;head 0
+  0BCD'   00                    	db	0			;sector 1
+  0BCE'   00                    	db	0			;read command
+  0BCF'   00                    	db	0			;clear status
+                                
+  0BD0'                         endrd 	equ	$
+                                
+                                
+                                ; Dispatch table for the on-board diagnostic routines
+                                
+  0BD0'                         jtable	equ 	$
+  0BD0'   C3 0800'              	jp	regrd			;test all the readable registers
+  0BD3'   00                    	db	0
+  0BD4'   C3 080E'              	jp	regwr			;check all the writable registers but
+                                 					; -task register
+  0BD7'   00                    	db	0
+  0BD8'   C3 0821'              	jp	tmap			;check map rams
+  0BDB'   00                    	db	0
+  0BDC'   C3 083A'              	jp	tram			;check read/write ram
+  0BDF'   00                    	db 	0
+  0BE0'   C3 084E'              	jp	tfpp			;check fpp
+  0BE3'   00                    	db	0
+  0BE4'   C3 0876'              	jp	tbus			;check bus read/write addresses
+  0BE7'   00                    	db	0
+  0BE8'   C3 08A8'              	jp	ntbus			;R/W bus with 055h and 0aah
+  0BEB'   00                    	db	0
+  0BEC'   18 0B                 	jr	start			;yet to be defined
+                                	
+                                	
+  0BEE'                         ecode0  equ	$			;End of reset prom code
+                                
+  0BEE'                         	ds	3f0h-(ecode0-rom0)	;Fill out the prom
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;* The following special piece of code is where the user task	*
+                                ;* begins executing when a reset trap occurs. 			*
+                                ;*								*
+                                ;****************************************************************
+                                
+  0BF0'   21 104A               	ld	hl,djstat
+  0BF3'   3E 00                 	ld	a,0h
+  0BF5'   32 0602'              	ld	(mapram + 2),a		;t0 map points to t1 map seg 0
+  0BF8'   3C                    	inc	a
+  0BF9'   31 0200'              start:	ld	sp,stack
+  0BFC'   C3 085A'              	jp	getsw 		        ;power-on or reset jump
+  0BFF'   00                    	nop				;Fill out the prom.
+  0C00'                         erom0   equ	$
+                                
+  0C00'                         	ds	400h-(erom0-rom0)
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-19
+'(c) 1981 Morrow Designs'
+
+                                
+                                	.phase 800h  
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;*	This code is usuable by the supervisor task (task0)    	*
+                                ;*	but is not accessible to any other tasks. Any trap	*
+                                ;*      other than a reset will enable this half of the eprom	*
+                                ;*	as well.						*
+                                ;*								*
+                                ;****************************************************************
+                                
+                                
+  0800                          	rom1	equ	$
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;*          ===>>  J U M P   T A B L E   <<===			*
+                                ;*								*
+                                ;****************************************************************
+                                
+  0800    C3 081B               svtrap:	jp	trappd			;trap routine, check out reason why
+  0803    C3 085D               tskbse:	jp	tskbase			;Return task base pointer
+  0806    C3 08EB               nmap:	jp	putmap			;set up new allocation vector, access 
+  0809    C3 087B               gotsk:	jp	gotask			;switch to new task
+  080C    C3 08B9               getmap:	jp	gtmap			;get the old allocation vector, access
+  080F    C3 08C5               dupmap:	jp	dpmap			;copy user vector into T0 window
+  0812    C3 0902               what:	jp	monitor			;debugger/monitor called 'MON'
+  0815    C3 086D               restr: 	jp	restor			;restore task 0 map to normal condition
+  0818    C3 0878               otask:	jp	oldtask			;jumps to last task before trap
+                                 	
+                                
+                                	
+  081B    11 FFF1               trappd:	ld	de,-15			;back up the users pc
+  081E    2A 019C'              	ld 	hl,(u.pc)
+  0821    19                    	add	hl,de
+  0822    22 019C'              	ld	(u.pc),hl		;save the users original pc
+  0825    08                    	ex 	Af,Af'			;save auxilary registers
+  0826    D9                    	exx
+  0827    F5                    	push	Af
+  0828    E5                    	push	hl
+  0829    D5                    	push	de
+  082A    C5                    	push	bc
+  082B    FD E5                 	push	iy
+  082D    DD E5                 	push	ix
+  082F    ED 57                 	ld	a,i			;get interupt register
+  0831    F5                    	push	af			;save it
+  0832    3A 0006'              	ld	a,(ctask)		;get current task number
+  0835    31 0200'              	ld	sp,stack
+  0838    CD 0803               	call    tskbse			;get base of task save area
+  083B    E5                    	push	hl			;save the bottom of task save area
+  083C    EB                    	ex	de,hl			;de = bottom task_ save
+  083D    21 018F'              	ld	hl,u.ir			;hl = bottom of temp_ save
+  0840    01 001A               	ld      bc,tasksiz		;repeat count
+  0843    C5                    	push	bc			;save for register print routine
+  0844    ED B0                 	ldir   				;move registers from temporary store
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-20
+'(c) 1981 Morrow Designs'
+
+                                					;to task_ store area
+  0846    2A 0403'              	ld	hl,(stats)		;get status bits
+  0849    E5                    	push	hl
+  084A    CB 55                 	bit	2,l			;was the trap a halt?
+  084C    C2 0000'              	jp	nz,super
+  084F    CD 080F               	call	dupmap			;copy users map into task 0
+  0852    2A 019C'              	ld	hl,(u.pc)		;hl has users adjusted pc 
+  0855    7E                    	ld 	a,(hl)			;a = adjusted pc contents
+  0856    FE 76                 	cp	nxtbyte			;was it an 76 in next byte??
+  0858    C2 0000'              	jp      nz,super		;jump if not an 76 to supervisor
+  085B    23                    	inc	hl			;HL point to address after 2nd halt
+  085C    E9                    	jp	(hl)			;jump to byte following the halt 76 
+                                					; - but now in task 0...
+                                
+                                           
+                                
+                                ;****************************************************************
+                                ;*								*
+                                ;*   Tskbase returns with H & L pointing to the first address	*
+                                ;*   in the user's task save area.  User is designated by 	*
+                                ;*   register A upon entry.					*	
+                                ;*								*
+                                ;****************************************************************
+                                
+                                
+                                
+  085D                          tskbase:	
+  085D    21 FFEE'              	ld	hl,tasks-tasksiz	;no task zero save area
+  0860    11 001A               	ld	de,tasksiz		;size of save area
+  0863    E6 0F                 	and 	0fh			;mask off upper bits
+  0865    20 01                 	jr	nz,tsklp		;task 0 and 1 share the same area
+  0867    3C                    	inc	a
+  0868    19                    tsklp:	add     hl,de			
+  0869    3D                    	dec	a			
+  086A    20 FC                 	jr	nz,tsklp		
+  086C    C9                    	ret
+                                		
+                                
+                                		
+                                ;********************************************************
+                                ;*							*
+                                ;*   Restore will restore Task 0's map with its old 	*
+                                ;*   values.  This assumes that if the map for task 0   *
+                                ;*   has been changed, that only the actual map had 	*
+                                ;*   been changed and that the image map was left in	*
+                                ;*   the condition before the change occurred.		*
+                                ;*							*
+                                ;********************************************************
+                                
+                                
+  086D    21 0200'              restor:	ld 	hl,map			;point to beginning of map image
+  0870    11 0600'              	ld	de,mapram		;point to beginning of actual map
+  0873    01 001F               	ld	bc,01Fh			;all of task 0 map 
+  0876    ED B0                 	ldir
+                                
+                                
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-21
+'(c) 1981 Morrow Designs'
+
+                                ;****************************************************************
+                                ;*								*
+                                ;*	Gotask restores all the task's registers  and then	*
+                                ;*	switches to that task.                 			*
+                                ;*								*
+                                ;****************************************************************
+                                
+  0878                          oldtask:
+  0878    3A 0006'              	ld	a,(ctask)
+  087B    32 0006'              gotask:	ld	(ctask),a		;save new task number
+  087E    CD 085D               	call	tskbase 		;get address of task save area
+  0881    11 018F'              	ld	de,u.ir			;base of save area
+  0884    31 018E'              	ld	sp,u.save
+  0887    01 001A               	ld	bc,tasksiz		;repeat count
+  088A    ED B0                 	ldir				;move the registers
+  088C    F1                    	pop	Af			;get back the interupt register
+  088D    ED 47                 	ld	i,a			;restore it
+  088F    DD E1                 	pop	ix			;restore auxilliary registers
+  0891    FD E1                 	pop	iy
+  0893    C1                    	pop	bc
+  0894    D1                    	pop	de
+  0895    E1                    	pop	hl
+  0896    F1                    	pop	af
+  0897    08                    	ex      Af,Af'
+  0898    D9                    	exx
+  0899    E1                    	pop	hl			;get pc register
+  089A    22 0004'              	ld	(user+1),hl		;put in jump instruction
+  089D    C1                    	pop	bc			;restore primary registers
+  089E    3E C3                 	ld	a,jmpop			;lay down the jump instruction
+  08A0    32 0003'              	ld	(user),a		;
+  08A3    3A 01A8'              	ld	a,(u.mask)		;get back the old mask for that task
+  08A6    32 0007'              	ld	(cmask),a
+  08A9    2A 0006'              	ld	hl,(ctask)		;get the task/mask for swapping
+  08AC    22 0402'              	ld	(task),hl		;begin count, eigth instruction
+                                					; is in the user's space
+  08AF    D1                    	pop	de			;(1) restore primary registers
+  08B0    E1                    	pop	hl			;(2)
+  08B1    F1                    	pop	af			;(3)
+  08B2    ED 7B 01A6'           	ld      sp,(u.sp)		;(4) (5)
+  08B6    C3 0003'              	jp	user			;(6)
+                                					; 7th instruction is @ 003 task 0
+                                	
+                                					
+                                ;********************************************************
+                                ;*							*
+                                ;*  The following code will return with:		*
+                                ;*      Register A = task #/ segment #			*
+                                ;*	Register B = old allocation vector		*
+                                ;*	Register C = old access	priviledges		*
+                                ;*  Upon entry, it expects the A register to have	*
+                                ;*  the desired task# / segment #. Consider this to be	*
+                                ;*  opposite of the putmap routine.			*
+                                ;*							*
+                                ;********************************************************
+                                
+  08B9    CD 08FD               gtmap:	call	tsmod		;get task and segment numbers
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-22
+'(c) 1981 Morrow Designs'
+
+  08BC    EB                    	ex	de,hl		;save calculated offset in de
+  08BD    21 0200'              	ld	hl,map		;point to beginning of map ram image
+  08C0    19                    	add	hl,de		;add offset to get desired map
+  08C1    46                    	ld	b,(HL)		;get old allocation vector
+  08C2    23                    	inc	hl		;offset to access map
+  08C3    4E                    	ld	c,(HL)		;get old access priviledges
+  08C4    C9                    	ret 	
+                                		
+                                
+                                
+                                ;********************************************************
+                                ;*							*
+                                ;*	This routine copies the most recently trapped	*
+                                ;*	user's map into task0 actual map and gives T0   *
+                                ;*      unlimited privilidges with this memory. The	*
+                                ;*      T0 image map is not altered.			*
+                                ;*							*
+                                ;********************************************************
+                                
+  08C5    3A 0006'              dpmap:	ld	a,(ctask)
+  08C8    CB 07                 	rlc	a
+  08CA    CB 07                 	rlc	a
+  08CC    CB 07                 	rlc	a
+  08CE    CB 07                 	rlc	a
+  08D0    CD 08B9               dpmap0: call    gtmap    		;return with values in b,c
+  08D3    0E 03                 	ld	c,03h			;unlimied access priviledges
+  08D5    F5                    	push	af
+  08D6    E6 0F                 	and	0fh			;force task # to be 0
+  08D8    CD 08FD               	call	tsmod
+  08DB    11 0600'              	ld	de,mapram		;point to T0 actual map
+  08DE    19                    	add	hl,de
+  08DF    70                    	ld	(hl),b			;new access vector
+  08E0    23                    	inc	hl
+  08E1    71                    	ld	(hl),c			;new priviledges
+  08E2    F1                    	pop	af
+  08E3    3C                    	inc	a			;next map location
+  08E4    4F                    	ld	c,a
+  08E5    E6 0F                 	and	0fh			
+  08E7    C8                    	ret	z			;do it 16 times for all segments
+  08E8    79                    	ld	a,c
+  08E9    18 E5                 	jr	dpmap0
+                                
+                                			
+                                ;********************************************************
+                                ;*							*
+                                ;*  Putmap updates a task's allocation vectors and	*
+                                ;*  access atributes.  Upon entry, registers must	*
+                                ;*  contain:						*
+                                ;*	a = task # / task segment # to update		*
+                                ;*	    high nibble = task#, low nibble = segment#	*
+                                ;*	b = new allocation vector			*
+                                ;*	c = new access privilidges			*
+                                ;*							*
+                                ;*  Routine calculates the expression 600 + (a) X 2	*
+                                ;*  where a is as listed above.  All arithmetic and	*
+                                ;*  numbers are in Hex.					*
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-23
+'(c) 1981 Morrow Designs'
+
+                                ;*							*
+                                ;********************************************************
+                                
+  08EB    CD 08FD               putmap:	call	tsmod			;get task and sec #
+  08EE    EB                    	ex 	de,hl			;save calculated offset in de
+  08EF    21 0600'              	ld	hl,mapram		;point to beginning of ram map
+  08F2    CD 08F8               	call 	putmxx			
+  08F5    21 0200'              	ld	hl,map			;point to beginning of image map
+  08F8    19                    putmxx: add	hl,de			;add offset to selected map
+  08F9    70                    	ld	(hl),b			;write the allocation vector
+  08FA    23                    	inc	hl			;point to access attribute ram
+  08FB    71                    	ld	(hl),c			;write new access atributes
+  08FC    C9                    	ret
+                                
+  08FD    6F                    tsmod: 	ld	l,a			;get task / seg number
+  08FE    26 00                 	ld	h,0
+  0900    29                    	add	hl,hl 			;multiply times two
+  0901    C9                    	ret
+                                	
+                                ;********************************************************	
+                                ;*							*
+                                ;*  The following routines make up the debugging tool	*
+                                ;*  called UPMON1.  It is a modified version of the 	*
+                                ;*  code in the lower half of the EPROM.       		*	
+                                ;*							*
+                                ;********************************************************
+                                
+                                
+  0902                          monitor:
+  0902    CD 0A04               	call	ucrlf
+  0905    E1                    	pop	hl			;print the stats and trap address
+  0906    CD 0AC6               	call	uladr			;print the task and mask
+  0909    D1                    	pop 	de			;get task size
+  090A    1B                    	dec	de			
+  090B    E1                    	pop	hl			;get the bottom of task save area
+  090C    E5                    	push	hl
+  090D    19                    	add	hl,de
+  090E    EB                    	ex	de,hl
+  090F    E1                    	pop	hl
+  0910    01 0923               	ld	bc,ustart
+  0913    C5                    	push	bc
+  0914    18 34                 	jr	udi0			;print out the registers
+                                
+  0916    3A 01B8'              cold:	ld	a,(ersav)		;retrieve the error byte if any
+  0919    4F                    	ld	c,a
+  091A    CD 0A37               	call	ucout1			;print it
+  091D    2A 01B9'              	ld	hl,(ersav + 1)		;retrieve disk command
+  0920    CD 0AC6               	call	uladr
+                                
+  0923    31 0200'              ustart:	ld	sp,stack
+  0926    11 0923               	LD	DE,USTART		;monitor begins here
+  0929    D5                    	PUSH	DE
+  092A    CD 0A04               	CALL	UCRLF
+  092D    0E 3A                 	LD	C,':'
+  092F    CD 0A37               	CALL	ucout1
+  0932    CD 0B0A               USTAR0:	CALL	UTI
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-24
+'(c) 1981 Morrow Designs'
+
+  0935    B7                    	OR	A
+  0936    28 FA                 	JR	Z,USTAR0
+  0938    FE 7B                 	CP	'z'+1
+  093A    D2 0A23               	JP	NC,UERROR
+  093D    0E 02                 	LD	C,002H
+  093F    FE 44                 	CP	'D'
+  0941    28 04                 	JR	Z,udisp
+  0943    FE 64                 	cp	'd'
+  0945    20 19                 	jr	nz,ufill
+                                
+                                ;
+                                ;	DISPLAY MEMORY XXXX TO XXXX
+                                ;
+                                ;
+  0947    CD 09FF               UDISP:	CALL	UEXLF
+  094A    CD 0A04               UDI0:	CALL	UCRLF
+  094D    CD 0AC6               	CALL	ULADR
+  0950    06 10                 	LD	B,010H
+  0952    CD 0A35               UDI1:	CALL	UBLK
+  0955    7E                    	LD	A,(HL)
+  0956    CD 0ACB               	CALL	ULBYTE
+  0959    CD 0AA2               	CALL	UHILOX
+  095C    10 F4                 	DJNZ	UDI1
+  095E    18 EA                 	JR	UDI0
+                                ;
+                                ;
+                                ;
+                                ;	FILL MEMORY XXXX TO XXXX WITH XX
+                                ;
+                                ;
+                                ;
+  0960    FE 46                 UFILL:	CP	'F'
+  0962    28 04                 	JR	z,ufill0
+  0964    FE 66                 	cp	'f'
+  0966    20 0C                 	jr	nz,ugoto
+  0968    CD 0A70               ufill0:	CALL	UEXPR3
+  096B    71                    UFI0:	LD	(HL),C
+  096C    CD 0AA8               	CALL	UHILO
+  096F    30 FA                 	JR	NC,UFI0
+  0971    D1                    	POP	DE
+  0972    18 AF                 	JR	USTART
+                                ;
+                                ;
+                                ;	GOTO (EXECUTE) XXXX
+                                ;
+                                ;
+  0974    FE 47                 UGOTO:	CP	'G'
+  0976    28 04                 	JR	Z,ugoto0
+  0978    FE 67                 	cp	'g'
+  097A    20 08                 	jr	nz,umtest
+  097C    CD 0A7B               ugoto0:	CALL	UEXPR1
+  097F    CD 0A04               	CALL	UCRLF
+  0982    E1                    	POP	HL
+  0983    E9                    	JP	(HL)
+                                ;
+                                ;
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-25
+'(c) 1981 Morrow Designs'
+
+                                ;	TEST MEMORY XXXX TO XXXX
+                                ;
+                                ;
+  0984    FE 54                 UMTEST:	CP	'T'
+  0986    28 04                 	JR	Z,ut10
+  0988    FE 74                 	cp	't'
+  098A    20 1C                 	jr	nz,umove
+  098C    CD 09FF               ut10:	CALL	UEXLF
+  098F    7E                    UT1:	LD	A,(HL)
+  0990    47                    	LD	B,A
+  0991    2F                    	CPL
+  0992    77                    	LD	(HL),A
+  0993    AE                    	XOR	(HL)
+  0994    28 0C                 	JR	Z,UT2
+  0996    D5                    	PUSH	DE
+  0997    5F                    	LD	E,A
+  0998    CD 0A32               	CALL	UHLSP
+  099B    CD 0B41               	CALL	UQI1
+  099E    CD 0A04               	CALL	UCRLF
+  09A1    D1                    	POP	DE
+  09A2    70                    UT2:	LD	(HL),B
+  09A3    CD 0AA2               	CALL	UHILOX
+  09A6    18 E7                 	JR	UT1
+                                ;
+                                ;
+                                ;	MOVE DATA FROM XXXX TO XXXX
+                                ;
+                                ;
+  09A8    FE 4D                 UMOVE:	CP	'M'
+  09AA    28 04                 	JR	Z,umvo0
+  09AC    FE 6D                 	cp	'm'
+  09AE    20 12                 	jr	nz,usubs
+  09B0    CD 0A70               umvo0:	CALL	UEXPR3
+  09B3    7E                    UMV0:	LD	A,(HL)
+  09B4    02                    	LD	(BC),A
+  09B5    03                    	INC	BC
+  09B6    CD 0AA2               	CALL	UHILOX
+  09B9    18 F8                 	JR	UMV0
+  09BB    DD 77 00              USTORE:	LD	(IX+00H),A
+  09BE    DD 23                 	INC	IX
+  09C0    1D                    	DEC	E
+  09C1    C9                    	RET
+                                ;
+                                ;
+                                ;	EXAMINE AND/OR REPLACE MEMORY DATA
+                                ;
+                                ;
+  09C2    FE 53                 USUBS:	CP	'S'
+  09C4    28 05                 	JR	Z,usuo0
+  09C6    FE 73                 	cp	's'
+  09C8    C2 0AB2               	jp	nz,uhexn
+  09CB    CD 0A7B               usuo0:	CALL	UEXPR1
+  09CE    CD 0AFE               	CALL	UQCHK
+  09D1    DA 0A23               	JP	C,UERROR
+  09D4    E1                    	POP	HL
+  09D5    7E                    USU0:	LD	A,(HL)
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-26
+'(c) 1981 Morrow Designs'
+
+  09D6    CD 0ACB               	CALL	ULBYTE
+  09D9    0E 2D                 	LD	C,02DH
+  09DB    CD 0AF8               	CALL	UCOPCK
+  09DE    D8                    	RET	C
+  09DF    28 10                 	JR	Z,USU1
+  09E1    E5                    	PUSH	HL
+  09E2    21 0000               	LD	HL,0
+  09E5    0E 01                 	LD	C,001H
+  09E7    CD 0A83               	CALL	UEX1
+  09EA    D1                    	POP	DE
+  09EB    E1                    	POP	HL
+  09EC    73                    	LD	(HL),E
+  09ED    78                    	LD	A,B
+  09EE    FE 0D                 	CP	00DH
+  09F0    C8                    	RET	Z
+  09F1    23                    USU1:	INC	HL
+  09F2    CD 0A04               	CALL	UCRLF
+  09F5    E5                    	PUSH	HL
+  09F6    CD 0AC6               	CALL	ULADR
+  09F9    CD 0A35               	CALL	UBLK
+  09FC    E1                    	POP	HL
+  09FD    18 D6                 	JR	USU0
+                                ;
+                                ;
+  09FF    CD 0A7D               UEXLF:	CALL 	UEXPR
+  0A02    D1                    	POP	DE
+  0A03    E1                    	POP	HL
+                                ;	CR/LF OUTPUT
+                                ;
+                                ;
+  0A04    E5                    UCRLF:	PUSH	HL
+  0A05    C5                    	PUSH	BC
+  0A06    0E 0D                 	LD	C,0DH
+  0A08    CD 0A37               	CALL	ucout1
+  0A0B    0E 0A                 	LD	C,0AH
+  0A0D    CD 0A37               	CALL	ucout1
+  0A10    C1                    	POP	BC
+  0A11    E1                    	POP	HL
+  0A12    CD 0A52               	CALL	UCSTS
+  0A15    B7                    	OR	A
+  0A16    C8                    	RET	Z
+                                ;
+                                ;	CHECK FOR CONTROL CHARACTER
+                                ;
+                                ;
+  0A17    CD 0A44               UCCHK:	CALL	ucon1
+  0A1A    E6 7F                 	AND	07FH
+  0A1C    FE 13                 	CP	013H	;CONTROL-S
+  0A1E    28 F7                 	JR	Z,UCCHK
+  0A20    FE 03                 	CP	003H	;CONTROL-C
+  0A22    C0                    	RET	NZ
+  0A23    CD 0ADA               UERROR:	CALL	UMEMSIZ
+  0A26    11 0A23               	LD	DE,UERROR
+  0A29    D5                    	PUSH	DE
+  0A2A    0E 3F                 	LD	C,'?'
+  0A2C    CD 0A37               	CALL	ucout1
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-27
+'(c) 1981 Morrow Designs'
+
+  0A2F    C3 0923               	JP	USTART
+  0A32    CD 0AC6               UHLSP:	CALL	ULADR
+                                ;
+                                ;	PRINT SPACE CHARACTER
+                                ;
+  0A35    0E 20                 UBLK:	LD	C,020H
+                                
+                                
+                                ;********************************************************
+                                ;*							*
+                                ;*  Console I/O routines for the Wunderbus I/O.  These	*
+                                ;*  routines assume that the uart divisor latch has 	*
+                                ;*  previously set (either on power up or in routine 	*
+                                ;*  executed before a trap to this routine occurred.    *
+                                ;*  The character to output should be in the 'C' reg-	*
+                                ;*  ister, the character received is returned in the	*
+                                ;*  'A' register.  UCSTS returns with zero flag set	*
+                                ;*  when no character is waiting in the UART buffer,	*
+                                ;*  or with A = FFh if a character is waiting.		*
+                                ;*							*
+                                ;********************************************************	
+                                
+                                
+  0A37    CD 0A5D               ucout1:	call	uconinit
+  0A3A    DB 4D                 ucout2:	in	a,(lsr)			;get uart status
+  0A3C    E6 20                 	and	thre
+  0A3E    28 FA                 	jr	z,ucout2		;loop until tbe
+  0A40    79                    	ld	a,c
+  0A41    D3 48                 	out	(thr),a			;output the data to uart
+  0A43    C9                    	ret
+                                
+  0A44    CD 0A5D               ucon1:	call	uconinit
+  0A47    DB 4D                 ucon2:	in	a,(lsr)			;get uart status
+  0A49    E6 01                 	and	dr
+  0A4B    28 FA                 	jr	z,ucon2			;wait until receive data available
+  0A4D    DB 48                 	in	a,(rbr)			;read the uart data register
+  0A4F    E6 7F                 	and	07fh			;strip parity
+  0A51    C9                    	ret
+                                
+  0A52    CD 0A5D               ucsts:	call	uconinit		
+  0A55    DB 4D                 	in	a,(lsr)			;read uart status
+  0A57    E6 01                 	and	dr
+  0A59    C8                    	ret	z			;return zero set if no character
+  0A5A    3E FF                 	ld	a,0ffh
+  0A5C    C9                    	ret				;return a = ffh if character waiting
+                                
+  0A5D                          uconinit:
+  0A5D    3E 09                 	ld	a,group1
+  0A5F    D3 4F                 	out   	(grpctl),a		;set up for UART 1
+  0A61    3E 07                 	ld	a,wls0+wls1+stb		
+  0A63    D3 4B                 	out 	(lcr),a			;8 bit word, 2 bit stop bits
+  0A65    C9                    	ret		
+                                
+                                
+                                
+                                ;	CONVERT HEX TO ASCII
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-28
+'(c) 1981 Morrow Designs'
+
+                                
+  0A66    E6 0F                 UCONV:	AND	00fh
+  0A68    C6 90                 	ADD	A,090H
+  0A6A    27                    	DAA
+  0A6B    CE 40                 	ADC	A,040H
+  0A6D    27                    	DAA
+  0A6E    4F                    	LD	C,A
+  0A6F    C9                    	RET
+                                ;
+                                ;	GET PARAMETERS 1,2,OR 3
+                                ;
+  0A70    0C                    UEXPR3:	INC	C
+  0A71    CD 0A7D               	CALL	UEXPR
+  0A74    CD 0A04               	CALL	UCRLF
+  0A77    C1                    	POP	BC
+  0A78    D1                    	POP	DE
+  0A79    E1                    	POP	HL
+  0A7A    C9                    	RET
+  0A7B    0E 01                 UEXPR1:	LD	C,001H
+  0A7D    21 0000               UEXPR:	LD	HL,0
+  0A80    CD 0B0A               UEX0:	CALL	UTI
+  0A83    47                    UEX1:	LD	B,A
+  0A84    CD 0ADE               	CALL	UNIBBLE
+  0A87    38 08                 	JR	C,UEX2
+  0A89    29                    	ADD	HL,HL
+  0A8A    29                    	ADD	HL,HL
+  0A8B    29                    	ADD	HL,HL
+  0A8C    29                    	ADD	HL,HL
+  0A8D    B5                    	OR	L
+  0A8E    6F                    	LD	L,A
+  0A8F    18 EF                 	JR	UEX0
+  0A91    E3                    UEX2:	EX	(SP),HL
+  0A92    E5                    	PUSH	HL
+  0A93    78                    	LD	A,B
+  0A94    CD 0AFE               	CALL	UQCHK
+  0A97    30 02                 	JR	NC,UEX3
+  0A99    0D                    	DEC	C
+  0A9A    C8                    	RET	Z
+  0A9B    C2 0A23               UEX3:	JP	NZ,UERROR
+  0A9E    0D                    	DEC	C
+  0A9F    20 DC                 	JR	NZ,UEXPR
+  0AA1    C9                    	RET
+  0AA2    CD 0AA8               UHILOX:	CALL	UHILO
+  0AA5    D0                    	RET	NC
+  0AA6    D1                    	POP	DE
+  0AA7    C9                    	RET
+  0AA8    23                    UHILO:	INC	HL
+  0AA9    7C                    	LD	A,H
+  0AAA    B5                    	OR	L
+  0AAB    37                    	SCF
+  0AAC    C8                    	RET	Z
+  0AAD    7B                    	LD	A,E
+  0AAE    95                    	SUB	L
+  0AAF    7A                    	LD	A,D
+  0AB0    9C                    	SBC	A,H
+  0AB1    C9                    	RET
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-29
+'(c) 1981 Morrow Designs'
+
+                                ;
+                                ;	HEXADECIMAL ARITHMETIC
+                                ;
+  0AB2    FE 48                 UHEXN:	CP	'H'
+  0AB4    28 04                 	JR	Z,uhexd
+  0AB6    FE 68                 	cp	'h'
+  0AB8    20 6A                 	jr	nz,uport
+  0ABA    CD 09FF               uhexd:	CALL	UEXLF
+  0ABD    E5                    	PUSH	HL
+  0ABE    19                    	ADD	HL,DE
+  0ABF    CD 0A32               	CALL	UHLSP
+  0AC2    E1                    	POP	HL
+  0AC3    B7                    	OR	A
+  0AC4    ED 52                 	SBC	HL,DE
+                                ;
+                                ;	CONVERT HL REGISTER TO ASCII
+                                ;
+  0AC6    7C                    ULADR:	LD	A,H
+  0AC7    CD 0ACB               	CALL	ULBYTE
+  0ACA    7D                    	LD	A,L
+                                ;
+                                ;	CONVERT A REGISTER TO ASCII
+                                ;
+  0ACB    F5                    ULBYTE:	PUSH	AF
+  0ACC    0F                    	RRCA
+  0ACD    0F                    	RRCA
+  0ACE    0F                    	RRCA
+  0ACF    0F                    	RRCA
+  0AD0    CD 0AD4               	CALL	UDBLC
+  0AD3    F1                    	POP	AF
+  0AD4    CD 0A66               UDBLC:	CALL	UCONV
+  0AD7    C3 0A37               	JP	ucout1			;checked
+                                
+  0ADA                          UMEMSIZ:
+  0ADA    2A 0200'              	LD	HL,(STACK)
+  0ADD    C9                    	RET
+                                
+  0ADE                          UNIBBLE:
+  0ADE    FE 61                 	cp	'a'			;is it less than lower case 'a'?
+  0AE0    38 06                 	jr	c,unibok		;take jump if so
+  0AE2    FE 7B                 	cp	'z'+1			;less than a lower case 'z'?
+  0AE4    3F                    	ccf				;set carry and return if > 'z'
+  0AE5    D8                    	ret	c
+  0AE6    D6 20                 	sub	' '			;convert to upper case
+  0AE8    D6 30                 unibok:	SUB	030H
+  0AEA    D8                    	RET	C
+  0AEB    FE 17                 	cp	017h
+  0AED    3F                    	ccf
+  0AEE    D8                    	RET	C
+  0AEF    FE 0A                 	CP	00AH
+  0AF1    3F                    	CCF
+  0AF2    D0                    	RET	NC
+  0AF3    D6 07                 	SUB	007H
+  0AF5    FE 0A                 	CP	00AH
+  0AF7    C9                    	RET
+  0AF8    CD 0A37               UCOPCK:	CALL	ucout1
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-30
+'(c) 1981 Morrow Designs'
+
+  0AFB    CD 0B0A               UPCHK:	CALL	UTI
+                                ;
+                                ;	CHARACTER CHECK
+                                ;
+  0AFE    FE 20                 UQCHK:	CP	020H
+  0B00    C8                    	RET	Z
+  0B01    FE 2C                 	CP	02CH
+  0B03    C8                    	RET	Z
+  0B04    FE 0D                 	CP	00DH
+  0B06    37                    	SCF
+  0B07    C8                    	RET	Z
+  0B08    3F                    	CCF
+  0B09    C9                    	RET
+                                ;
+                                ;	ECHO CONSOLE
+                                ;
+  0B0A    CD 0A44               UTI:	CALL	ucon1
+  0B0D    3C                    	INC	A
+  0B0E    C8                    	RET	Z
+  0B0F    3D                    	DEC	A
+  0B10    E6 7F                 	AND	07FH
+  0B12    C8                    	RET	Z
+  0B13    FE 00                 	CP	000H
+  0B15    C8                    	RET	Z
+  0B16    FE 4E                 	CP	04EH
+  0B18    C8                    	RET	Z
+  0B19    FE 6E                 	CP	06EH
+  0B1B    C8                    	RET	Z
+  0B1C    C5                    	PUSH	BC
+  0B1D    4F                    	LD	C,A
+  0B1E    CD 0A37               	CALL	ucout1
+  0B21    79                    	LD	A,C
+  0B22    C1                    	POP	BC
+  0B23    C9                    	RET
+                                
+                                ;
+                                ;	READ/WRITE TO I/O PORT
+                                ;
+  0B24    FE 4F                 UPORT:	CP	'O'
+  0B26    28 2A                 	JR	Z,UQOUT
+  0B28    FE 6F                 	CP 	'o'
+  0B2A    28 26                 	jr	z,uqout
+  0B2C    FE 49                 	CP	'I'
+  0B2E    28 06                 	JR	Z,uin
+  0B30    FE 69                 	cp	'i'
+  0B32    28 02                 	jr	z,uin
+  0B34    18 24                 	JR	UVERIFY
+  0B36    CD 0A7B               UIN:	CALL	UEXPR1
+  0B39    0E 0A                 	LD	C,0AH
+  0B3B    CD 0A37               	CALL	ucout1
+  0B3E    C1                    	POP	BC
+  0B3F    ED 58                 UQ0:	IN	E,(C)
+  0B41    06 08                 UQI1:	LD	B,008H
+  0B43    CD 0A35               	CALL	UBLK
+  0B46    CB 23                 UQI2:	SLA	E
+  0B48    3E 18                 	LD	A,018H
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-31
+'(c) 1981 Morrow Designs'
+
+  0B4A    8F                    	ADC	A,A
+  0B4B    4F                    	LD	C,A
+  0B4C    CD 0A37               	CALL	ucout1
+  0B4F    10 F5                 	DJNZ	UQI2
+  0B51    C9                    	RET
+  0B52    CD 0A7D               UQOUT:	CALL	UEXPR
+  0B55    D1                    	POP	DE
+  0B56    C1                    	POP	BC
+  0B57    ED 59                 	OUT	(C),E
+  0B59    C9                    	RET
+                                ;
+                                ;
+                                ;
+                                ;
+                                ;	VERIFY MEMORY XXXX TO XXXX WITH XXXX
+                                ;
+  0B5A                          UVERIFY:
+  0B5A    FE 56                 	CP	'V'
+  0B5C    28 04                 	JR	Z,uver0
+  0B5E    FE 76                 	cp	'v'
+  0B60    20 12                 	jr	nz,uretrn
+  0B62    CD 0A70               uver0:	call 	uexpr3
+  0B65    0A                    UVERIO:	LD	A,(BC)
+  0B66    BE                    	CP	(HL)
+  0B67    28 05                 	JR	Z,U..B
+  0B69    C5                    	PUSH	BC
+  0B6A    CD 0BDE               	CALL	UCERR
+  0B6D    C1                    	POP	BC
+  0B6E    03                    U..B:	INC	BC
+  0B6F    CD 0AA2               	CALL	UHILOX
+  0B72    18 F1                 	JR	UVERIO
+                                
+                                
+                                
+                                ;	Return to task which just trapped with old pc and registers restored
+                                
+  0B74    FE 43                 uretrn:	cp	'C'
+  0B76    28 04                 	jr	z,uretr1
+  0B78    FE 63                 	cp	'c'	
+  0B7A    20 11                 	jr	nz,ucontr
+  0B7C    3A 0006'              uretr1:	ld	a,(ctask)
+  0B7F    CD 085D               	call	tskbase
+  0B82    11 0019               	ld	de,mskofst
+  0B85    19                    	add	hl,de
+  0B86    7E                    	ld	a,(hl)
+  0B87    F6 08                 	or	08h
+  0B89    77                    	ld	(hl),a
+  0B8A    C3 0818               	jp	otask
+                                
+                                
+                                ;	Return to trapped task, execute next instruction and trap back
+                                
+  0B8D    FE 55                 ucontr:	cp	'U'
+  0B8F    28 04                 	jr	z,ucont1
+  0B91    FE 75                 	cp	'u'
+  0B93    20 11                 	jr	nz,uboot
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-32
+'(c) 1981 Morrow Designs'
+
+  0B95    3A 0006'              ucont1:	ld	a,(ctask)
+  0B98    CD 085D               	call	tskbase
+  0B9B    11 0019               	ld	de,mskofst
+  0B9E    19                    	add	hl,de
+  0B9F    7E                    	ld	a,(hl)
+  0BA0    E6 F6                 	and	0f6h			;force mask for stop and run enble low
+  0BA2    77                    	ld	(hl),a
+  0BA3    C3 0818               	jp	otask	
+                                
+                                ;	Jump to the cpu switch address into task specified by CTASK
+                                
+  0BA6    FE 42                 uboot:	cp	'B'
+  0BA8    28 05                 	jr	z,uboot1
+  0BAA    FE 62                 	cp	'b'
+  0BAC    C2 0A23               	jp	nz,uerror
+  0BAF    3A 0006'              uboot1:	ld	a,(ctask)
+  0BB2    CD 085D               	call	tskbase
+  0BB5    E5                    	push	hl
+  0BB6    3A 0402'              	ld	a,(switch)
+  0BB9    E6 F8                 	and	0f8h
+  0BBB    FE 00                 	cp	0			;check for a HDCA hard disk boot
+  0BBD    CA 0BD2               	jp	z,uboot2
+  0BC0    FE 08                 	cp	08h			;check for DMA hard disk boot
+  0BC2    CA 0BD2               	jp	z,uboot2
+  0BC5    FE 10                 	cp	010h			;check for DJ-DMA
+  0BC7    CA 0BD2               	jp	z,uboot2
+  0BCA    11 000D               	ld	de,pcofst
+  0BCD    19                    	add	hl,de
+  0BCE    36 00                 	ld	(hl),0
+  0BD0    23                    	inc	hl
+  0BD1    77                    	ld	(hl),a
+  0BD2    3A 0007'              uboot2: ld	a,(cmask)
+  0BD5    E1                    	pop	hl
+  0BD6    11 0019               	ld	de,mskofst
+  0BD9    19                    	add	hl,de
+  0BDA    77                    	ld	(hl),a
+  0BDB    C3 0878               	jp	oldtask
+                                
+                                
+                                
+                                ;	MEMORY MISMATCH PRINTOUT
+                                ;
+  0BDE    47                    UCERR:	LD	B,A
+  0BDF    CD 0A32               	CALL	UHLSP
+  0BE2    7E                    	LD	A,(HL)
+  0BE3    CD 0ACB               	CALL	ULBYTE
+  0BE6    CD 0A35               	CALL	UBLK
+  0BE9    78                    	LD	A,B
+  0BEA    CD 0ACB               	CALL	ULBYTE
+  0BED    C3 0A04               	JP	UCRLF
+                                ;
+                                
+                                
+  0BF0                          ecode1	equ	$
+  0BF0                          	ds	3f0h-(ecode1-rom1)
+                                
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	1-33
+'(c) 1981 Morrow Designs'
+
+                                ;********************************************************
+                                ;*   							*
+                                ;*   The following piece of code is where the user	*
+                                ;*   task begins execution whenever a trap occurs.	*
+                                ;*   The users registers and sp are saved in the 	*
+                                ;*   temporary users store area.			*
+                                ;*							*
+                                ;********************************************************
+                                
+  0BF0    00                    	nop				;must be a nop to void instruction
+  0BF1    ED 73 01A6'           	ld 	(u.sp),sp		;save the users stack pointer
+  0BF5    31 01A6'              	ld	sp,u.sp			;set sp to the temporary save area
+  0BF8    F5                    	push	Af			;save the users registers in temp area
+  0BF9    E5                    	push	hl
+  0BFA    D5                    	push	de
+  0BFB    C5                    	push	bc
+  0BFC    CD 0800               	call 	svtrap			;go to supervisor trap, pc is save
+                                
+                                
+  0BFF    76                    	halt				;to allow halts in task 0
+  0C00                          erom1	equ	$						
+  0C00                          	ds	400h-(erom1-rom1)
+                                	
+                                
+                                
+  0C00                          fpp0:	ds	8
+  0C08                          fpp1:	ds	1
+                                
+                                	end
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	S
+'(c) 1981 Morrow Designs'
+
+Macros:
+
+Symbols:
+000D 	ACR             0004 	ADI4            0000 	ADI8            
+000C 	AFF             0015 	AFOFST          000A 	ALF             
+0A6B'	ALLERR          1087 	ARG             0020 	ASP             
+0055 	ATTN            094E'	BADRAM          0048 	BASE            
+000F 	BCOFST          0B9E'	BEGIN0          0007 	BEL             
+1100 	BOOTAD          0BB3'	BOOTBL          0AA3'	BOOTHD          
+0008 	BSP             0BA5'	BTABLE          00CD 	CALLOP          
+1080 	CHAN            0972'	CHECK           0A3E'	CLOOP           
+0A40'	CLOOP0          0A45'	CLOOP1          0A5A'	CLOOP2          
+0007'	CMASK           108B 	CMMD            0916 	COLD            
+0051 	COMMD           0004 	COMPLT          0004 	CONST           
+0B96'	CONTIN          0050 	CONTRL          0006'	CTASK           
+0099 	CYL             0053 	DATA            0B52'	DEFAULT         
+0011 	DEOFST          0A62'	DERROR          09C9'	DJDMA           
+09CE'	DJLOOP          09CB'	DJLOP0          104A 	DJSTAT          
+0080 	DLAB            0048 	DLL             0049 	DLM             
+1084 	DMADDR          0054 	DMARST          08C5 	DPMAP           
+08D0 	DPMAP0          0001 	DR              0001 	DREAD           
+0004 	DREADY          0005 	DRENBL          00FC 	DRIVEA          
+0007 	DSKRUN          0401'	DSPCOL          0400'	DSPSEG          
+080F 	DUPMAP          0B10'	DXLOOP          0BEE'	ECODE0          
+0BF0 	ECODE1          0404'	ELOCIO          0BC3'	ENDBOOT         
+0BD0'	ENDRD           0020 	EOI             0C00'	EROM0           
+0C00 	EROM1           01B8'	ERSAV           0918'	FMAP            
+0003 	FORMAT          0C00 	FPP0            0C08 	FPP1            
+0052 	FUNCTN          080C 	GETMAP          085A'	GETSW           
+01AA'	GOBUFF          00FF 	GOOD            087B 	GOTASK          
+0809 	GOTSK           0008 	GROUP0          0009 	GROUP1          
+000A 	GROUP2          000B 	GROUP3          004F 	GRPCTL          
+08B9 	GTMAP           0A99'	HDCERR          0A79'	HDCLOP          
+0A7C'	HDLOP1          0A11'	HDRL            00C8 	HDSETL          
+0011 	HDSPT           0008 	HEADER          0004 	HEADS           
+0000 	HIVECT          0013 	HLOFST          0A17'	HOME            
+001A 	HSTRAP          0001 	IC4             004C 	ICW1            
+004D 	ICW2            004D 	ICW3            004D 	ICW4            
+0049 	IER             0000 	IMASK           0010 	INIT            
+0050 	IOADDR          1050 	IOPB            001F 	IVALU           
+0ACB'	IWAIT1          0AD0'	IWAIT2          0AD5'	IWAIT3          
+00C3 	JMPOP           0BD0'	JTABLE          0401'	KEYBD           
+004B 	LCR             108D 	LINK            0B03'	LLOOP           
+0400'	LOCIO           0010 	LOOP            0000 	LOVECT          
+004D 	LSR             0008 	LTIM            0200'	MAP             
+0600'	MAPRAM          0403'	MASK            004C 	MCR             
+0902 	MONITOR         0982'	MONTOR          0019 	MSKOFST         
+0943'	NEXCHK          0806 	NMAP            0006 	NOOP            
+0000 	NOP             0000 	NORMAL          09F1'	NSTAT           
+08A8'	NTBUS           09F7'	NUBOOT          0986'	NUTASK          
+0076 	NXTBYTE         004D 	OCW1            004C 	OCW2            
+0878 	OLDTASK         0002 	OPDONE          0818 	OTASK           
+000D 	PCOFST          00FF 	PICMASK         09AF'	PICSET          
+08EB 	PUTMAP          08F8 	PUTMXX          0000'	RAM             
+0937'	RAMCHK          0048 	RBR             0A2A'	RDATA           
+'MPZ-80  MON3.75-M FIRMWARE'	MACRO-80 3.44	09-Dec-81	PAGE	S-1
+'(c) 1981 Morrow Designs'
+
+0BC3'	RDTBL           0B7B'	RDUART          0000 	READAT          
+0020 	READY           0800'	REGRD           080E'	REGWR           
+080F'	REGWR1          085F'	RESET           08E3'	RESET0          
+08EF'	RESET1          08FF'	RESLOP          090F'	RESLP1          
+0902'	RESLP2          086D 	RESTOR          0815 	RESTR           
+000D 	REVNUM          0002 	RHEAD           0AAB'	RLOOP           
+0800'	ROM0            0800 	ROM1            0B18'	RSTMAP          
+0B26'	RSTMXX          0AC8'	SDONE           0007 	SECSIZ          
+0051 	SECSTAT         0001 	SECTOR          0008 	SEKCMP          
+1083 	SELECT          0005 	SENSE           0B55'	SETIT           
+08F2'	SETTLE          0922'	SETUP           0002 	SNGL            
+0017 	SPOFST          0036 	SSMODE          0200'	STACK           
+0BF9'	START           108C 	STATIS          0403'	STATS           
+0050 	STATUS          0004 	STB             0000 	STEPIN          
+00F8 	STEPO           0010 	STEPOUT         001E 	STPDLY          
+0000'	SUPER           0800 	SVTRAP          0402'	SWITCH          
+0080 	SYSTEM          002B 	T0MASK          002B 	T1MASK          
+0402'	TASK            0008'	TASKS           001A 	TASKSIZ         
+0876'	TBUS            084E'	TFPP            0048 	THR             
+0020 	THRE            0821'	TMAP            0001 	TRACK0          
+083A'	TRAM            083F'	TRAM1           081B 	TRAPPD          
+0001 	TRK0            0400'	TRPADD          085D 	TSKBASE         
+0803 	TSKBSE          0868 	TSKLP           08FD 	TSMOD           
+095C'	TSTSW           0B6E 	U..B            01A4'	U.AF            
+018F'	U.IR            01A8'	U.MASK          019C'	U.PC            
+018E'	U.SAVE          01A6'	U.SP            0B2D'	UARTS0          
+0B2B'	UARTST          0A35 	UBLK            0BA6 	UBOOT           
+0BAF 	UBOOT1          0BD2 	UBOOT2          0A17 	UCCHK           
+0BDE 	UCERR           0A44 	UCON1           0A47 	UCON2           
+0A5D 	UCONINIT        0B95 	UCONT1          0B8D 	UCONTR          
+0A66 	UCONV           0AF8 	UCOPCK          0A37 	UCOUT1          
+0A3A 	UCOUT2          0A04 	UCRLF           0A52 	UCSTS           
+0AD4 	UDBLC           094A 	UDI0            0952 	UDI1            
+0947 	UDISP           0A23 	UERROR          0A80 	UEX0            
+0A83 	UEX1            0A91 	UEX2            0A9B 	UEX3            
+09FF 	UEXLF           0A7D 	UEXPR           0A7B 	UEXPR1          
+0A70 	UEXPR3          096B 	UFI0            0960 	UFILL           
+0968 	UFILL0          0974 	UGOTO           097C 	UGOTO0          
+0ABA 	UHEXD           0AB2 	UHEXN           0AA8 	UHILO           
+0AA2 	UHILOX          0A32 	UHLSP           0B36 	UIN             
+0AC6 	ULADR           0ACB 	ULBYTE          0ADA 	UMEMSIZ         
+09A8 	UMOVE           0984 	UMTEST          09B3 	UMV0            
+09B0 	UMVO0           0ADE 	UNIBBLE         0AE8 	UNIBOK          
+0AFB 	UPCHK           0B24 	UPORT           0B3F 	UQ0             
+0AFE 	UQCHK           0B41 	UQI1            0B46 	UQI2            
+0B52 	UQOUT           0B7C 	URETR1          0B74 	URETRN          
+0B87'	URTERR          0003'	USER            0932 	USTAR0          
+0923 	USTART          09BB 	USTORE          09D5 	USU0            
+09F1 	USU1            09C2 	USUBS           09CB 	USUO0           
+098F 	UT1             098C 	UT10            09A2 	UT2             
+0B0A 	UTI             0B62 	UVER0           0B5A 	UVERIFY         
+0B65 	UVERIO          0A87'	WAIT            0A89'	WAIT0           
+0A8C'	WAIT1           0AC1'	WAITC           0AEE'	WAITD           
+0AB4'	WAITZ           0002 	WFAULT          0812 	WHAT            
+0001 	WINDOW          0001 	WLS0            0002 	WLS1            
+0001 	WRITE           
+
+
+
+No Fatal error(s)
+
+

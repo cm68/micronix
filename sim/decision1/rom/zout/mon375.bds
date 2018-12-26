@@ -1,0 +1,3297 @@
+binary-debuggable-source
+0000 0000 f mon375.s
+0000 0000 s         ; subttl	'(c) 1981 Morrow Designs'
+0000 0000 s 	; title   'MPZ-80  MON3.75-M FIRMWARE'
+0000 0000 s 	.z80
+0000 0000 s 
+0000 0000 s ;****************************************************************
+0000 0000 s ;*								*
+0000 0000 s ;* Decision one CPU firmware, for the Morrow Designs / Thinker	*
+0000 0000 s ;* Toys Decision one computer.	The monitor routine looks for	*
+0000 0000 s ;* the power on jump addresses on CPU switches which determine 	*
+0000 0000 s ;* address to begin execution (top 5 switches).	 I/O is through	*
+0000 0000 s ;* the Wunderbus I/O motherboard UART 1.  Base address of the	*
+0000 0000 s ;* I/O is assumed to be standard (beginning at port 48H).	*
+0000 0000 s ;* If top five switches are 'On', a hard disk is assumed to be	*
+0000 0000 s ;* the disk device and Boothd is executed.  Enter diagnostic	*
+0000 0000 s ;* mode by grounding pin 13 of header at 12C.			*
+0000 0000 s ;*								*
+0000 0000 s ;* Revised 12/28/82	-	Fixed PIC initialization	*	
+0000 0000 s ;*								*
+0000 0000 s ;* Revised 8/27/82	-	M16 home and load constants	*
+0000 0000 s ;*				changed.  group equ changed to 	*
+0000 0000 s ;*				add int en bit high.		*
+0000 0000 s ;*								*
+0000 0000 s ;* Bobby Dale Gifford and Bob Groppo        			*
+0000 0000 s ;* 10/20/81							*
+0000 0000 s ;*								*
+0000 0000 s ;****************************************************************
+0000 0000 s 
+0000 0000 s 	org	0		;Local Ram in task zero
+0000 0000 s nop	equ	0
+0000 0000 s jmpop	equ	0c3h		;Jump instruction op-code
+0000 0000 s callop	equ	0cdh		;z80 call instruction opcode
+0000 0000 s t1mask	equ	2bh		;unlimited mask... no traps enabled
+0000 0000 s t0mask	equ	2bh		;unlimited mask	
+0000 0000 s ssmode	equ	036h		;single step mode mask
+0000 0000 s hstrap	equ	1Ah		;allow traps on halts and stops, interrupts
+0000 0000 s 				;- masked out in task 0 (temporary)
+0000 0000 s window	equ	01h		;task 0 window at location 10000
+0000 0000 s ACR	equ	0Dh		;carriage return
+0000 0000 s ALF	equ	0Ah		;line feed
+0000 0000 s ASP	equ	' '		;space
+0000 0000 s AFF	equ	0Ch		;form feed
+0000 0000 s BEl	equ	07H		;bell
+0000 0000 s BSP	equ	08H		;backspace
+0000 0000 s mskofst	equ	19h		;offset to get to user's mask reg. contents
+0000 0000 s spofst	equ	17h		;offset to stack pointer of user
+0000 0000 s afofst	equ	15h		;offset to user Af register
+0000 0000 s hlofst	equ	13h		;offset to user h,l register
+0000 0000 s deofst	equ	11h		;offset to d,e
+0000 0000 s bcofst	equ	0Fh		;offset to b,c
+0000 0000 s pcofst	equ	0Dh		;offset to the users pc register
+0000 0000 s nxtbyte	equ	076h		;byte after a halt
+0000 0000 s 
+0000 0000 s ;****************************************************************
+0000 0000 s ;*								*
+0000 0000 s ;*		   Wunderbus I/O equates:			*
+0000 0000 s ;*								*
+0000 0000 s ;****************************************************************
+0000 0000 s base	equ	048h		;I/O base address of wunderbus ports
+0000 0000 s group0	equ	08h
+0000 0000 s group1	equ	09h		;serial port 1
+0000 0000 s group2	equ	0Ah		;serial	port 2
+0000 0000 s group3	equ	0Bh		;serial port 3
+0000 0000 s grpctl	equ	base+7		;I/O group select port
+0000 0000 s 
+0000 0000 s ;	UART equates
+0000 0000 s 
+0000 0000 s dll	equ	base		;divisor latch lsb
+0000 0000 s dlm	equ	base+1		;divisor latch msb
+0000 0000 s ier	equ	base+1		;interupt enable register
+0000 0000 s lcr	equ	base+3		;line control register
+0000 0000 s mcr	equ	base+4		;modem control register
+0000 0000 s lsr	equ	base+5		;line status register
+0000 0000 s rbr	equ	base		;read data buffer
+0000 0000 s thr	equ	base		;transmitter data buffer
+0000 0000 s dlab	equ	80h		;divisor latch access bit
+0000 0000 s thre	equ	20h		;status line TBE
+0000 0000 s dr	equ	01		;line status DR bit
+0000 0000 s wls0	equ	01		;word length select bit 0
+0000 0000 s wls1	equ	02		;word length select bit 1 (for 8 bit word)
+0000 0000 s stb	equ	04		;stop bit count (2 stop bits)
+0000 0000 s imask	equ	00		;non interupt mode
+0000 0000 s loop	equ	010h		;UART loop mode
+0000 0000 s 
+0000 0000 s ;	PIC equates
+0000 0000 s 
+0000 0000 s init	equ	010h		;bit high to initialize the PIC
+0000 0000 s icw1	equ	base + 4	;PIC initialization control word 1
+0000 0000 s icw2	equ	base + 5	;PIC initialization control word 2
+0000 0000 s icw3	equ	base + 5	;PIC initialization control word 3
+0000 0000 s icw4	equ	base + 5	;PIC initialization control word 4
+0000 0000 s ocw1	equ	base + 5	;PIC interrupt mask register
+0000 0000 s ocw2	equ	base + 4	;PIC EOI register
+0000 0000 s picmask equ	0ffh		;mask to turn all interrupts off
+0000 0000 s ltim	equ	08h		;level triggered mode
+0000 0000 s adi4	equ	04h		;call address intervals = 4
+0000 0000 s adi8	equ	00h		;call address intervals = 8
+0000 0000 s sngl	equ	02		;sole system PIC
+0000 0000 s ic4	equ	01h		;icw4 access bit
+0000 0000 s lovect	equ	0		;call vectors begin at 0
+0000 0000 s hivect	equ	0		;call vectors begin at 0
+0000 0000 s normal	equ	0		;Master/Reg. nest/unbuffered/no AEOI/8085					; -normal setting of OCW4 for Morrow Software
+0000 0000 s eoi	equ	20h		;non-specific EOI constant
+0000 0000 s ivalu	equ	init OR ltim OR adi4 OR sngl OR ic4 OR lovect
+0000 0000 s ;****************************************************************
+0000 0000 s ;*								*
+0000 0000 s ;*	HDC Winchester controller equates			*
+0000 0000 s ;*								*
+0000 0000 s ;****************************************************************
+0000 0000 s 
+0000 0000 s revnum	equ	13		
+0000 0000 s ioaddr	equ	120Q
+0000 0000 s contrl	equ	ioaddr
+0000 0000 s status	equ	ioaddr
+0000 0000 s data	equ	ioaddr+3
+0000 0000 s functn	equ	ioaddr+2
+0000 0000 s commd	equ	ioaddr+1
+0000 0000 s secstat equ	ioaddr+1
+0000 0000 s dread	equ	1
+0000 0000 s sector	equ	1
+0000 0000 s opdone	equ	2
+0000 0000 s complt	equ	4
+0000 0000 s header	equ	10Q
+0000 0000 s drenbl	equ	5
+0000 0000 s dskrun	equ	7
+0000 0000 s ready	equ	40Q
+0000 0000 s system	equ	200Q
+0000 0000 s stepo	equ	370Q
+0000 0000 s drivea	equ	374Q
+0000 0000 s trk0	equ	1
+0000 0000 s 
+0000 0000 s ;****************************************************************
+0000 0000 s ;*								*
+0000 0000 s ;*	DJ-DMA Equates						*
+0000 0000 s ;*								*
+0000 0000 s ;****************************************************************
+0000 0000 s 
+0000 0000 s djstat	equ	104ah		;adjusted channel address of status byte
+0000 0000 s 
+0000 0000 s ;****************************************************************
+0000 0000 s ;*								*
+0000 0000 s ;*  	     DMA Winchester Controller Equates			*
+0000 0000 s ;*								*
+0000 0000 s ;****************************************************************
+0000 0000 s cyl	equ	153		;number cylinders for Seagate ST-506
+0000 0000 s heads	equ	  4		;number heads for Seagate ST-506
+0000 0000 s stpdly	equ	 01eh		;15 msec for Seagate ST-506
+0000 0000 s hdsetl	equ	 0C8h		;20 msec for Seagate ST-506
+0000 0000 s secsiz	equ	  7		;1024 byte sectors for CPM
+0000 0000 s readat	equ	  0		;DMA controller read sector opcode
+0000 0000 s write	equ	  1		;DMA controller write sector opcode
+0000 0000 s rhead	equ	  2		;DMA controller read header opcode
+0000 0000 s format	equ	  3		;DMA controller format track opcode
+0000 0000 s const	equ	  4		;load drive constants command
+0000 0000 s sense	equ	  5		;return drive status command
+0000 0000 s noop	equ	  6		;command used when seeking
+0000 0000 s dmarst	equ	 54h		;DMA controller reset port
+0000 0000 s attn	equ	 55h		;DMA controller Attention port
+0000 0000 s stepout	equ	 10h		;Step direction to track 0
+0000 0000 s stepin	equ	  0		;Step direction away from track 0
+0000 0000 s track0	equ	  1		;track 0 status
+0000 0000 s wfault	equ	  2		;write fault condition from drive
+0000 0000 s dready	equ	  4		;drive ready status
+0000 0000 s sekcmp	equ	  8		;seek complete status
+0000 0000 s hdspt	equ	 17		;number of sectors per track
+0000 0000 s iopb	equ	1050h		;pointer to the channel
+0000 0000 s chan	equ	1080h		;actual channel
+0000 0000 s select	equ	chan + 3	;select byte in channel
+0000 0000 s dmaddr	equ	chan + 4	;24 bit dma address location
+0000 0000 s arg	equ	chan + 7	;beginning of four arguments to commands
+0000 0000 s cmmd	equ	chan + 11	;actual command location
+0000 0000 s statis	equ	chan + 12	;controller return status location 
+0000 0000 s link	equ	chan + 13	;link field address for next command
+0000 0000 s bootad	equ	1100h		;dma address for first sector from hddma
+0000 0000 s good	equ	0ffh		;good status result
+0000 0000 s 
+0000 0000 s ;****************************************************************
+0000 0000 s ;*								*
+0000 0000 s ;* Decision One Ram variables, visible only to task 0.		*
+0000 0000 s ;*								*
+0000 0000 s ;****************************************************************
+0000 0000 s 
+0000 0000 s ram	equ	$			;Local RAM, visible only to task 0
+0000 0000 s 
+0000 0000 s ;****************************************************************
+0000 0000 s ;*								*
+0000 0000 s ;* Supervisor entry point, this jump must be inserted into the	*
+0000 0000 s ;* CPU's ram by the supervisor for subsequent entry to the	*
+0000 0000 s ;* supervisor when traps occur.					*
+0000 0000 s ;*								*
+0000 0000 s ;****************************************************************
+0000 0000 s 
+0000 0000 d c30000
+0000 0000 s super:	jp	super			;Supervisor entry point
+0003 0003 d c30300
+0003 0003 s user:	jp	user			;(7) User entry point
+0006 0006 s 
+0006 0006 d 00
+0006 0006 s ctask:	db	0			;Current task
+0007 0007 d 00
+0007 0007 s cmask:	db	0			;Current mask contents
+0008 0008 s 
+0008 0008 s ;****************************************************************
+0008 0008 s ;*								*
+0008 0008 s ;* Task save areas. Each of the tasks 1-15 have one of these	*
+0008 0008 s ;* structures associated with it.  When tskbase returns, HL	*
+0008 0008 s ;* will point to u.ir for that task + 0 offset.        		*
+0008 0008 s ;*								*
+0008 0008 s ;*             offset						*
+0008 0008 s ;*	u.ir    +0	Interrupt register	(1 byte)	*
+0008 0008 s ;*	u.ix	+1	Index registers		(2 bytes)	*
+0008 0008 s ;*	u.iy	+3				(2 bytes)	*
+0008 0008 s ;*	u.abc	+5	Alternate registers	(2 bytes)	*
+0008 0008 s ;*	u.ade	+7				(2 bytes)	*
+0008 0008 s ;*	u.ahl	+9				(2 bytes)	*
+0008 0008 s ;*	u.aaf	+B				(2 bytes)	*
+0008 0008 s ;*	u.pc	+D	Task PC			(2 bytes)	*
+0008 0008 s ;*	u.bc	+F	Task registers		(2 bytes)	*
+0008 0008 s ;*	u.de	+11				(2 bytes)	*
+0008 0008 s ;*	u.hl	+13				(2 bytes)	*
+0008 0008 s ;*	u.af	+15				(2 bytes)	*
+0008 0008 s ;*	u.sp	+17	Stack pointer		(2 bytes)	*
+0008 0008 s ;*	u.mask	+19	Mask register contents.	(1 bytes)	*
+0008 0008 s ;*								*
+0008 0008 s ;****************************************************************
+0008 0008 s 
+0008 0008 s tasksiz	equ	26
+0008 0008 s tasks:	ds	tasksiz		;Task 1
+0022 0022 s 	ds	tasksiz		;Task 2
+003c 003c s 	ds	tasksiz		;Task 3
+0056 0056 s 	ds	tasksiz		;Task 4
+0070 0070 s 	ds	tasksiz		;Task 5
+008a 008a s 	ds	tasksiz		;Task 6
+00a4 00a4 s 	ds	tasksiz		;Task 7
+00be 00be s 	ds	tasksiz		;Task 8
+00d8 00d8 s 	ds	tasksiz		;Task 9
+00f2 00f2 s 	ds	tasksiz		;Task 10
+010c 010c s 	ds	tasksiz		;Task 11
+0126 0126 s 	ds	tasksiz		;Task 12
+0140 0140 s 	ds	tasksiz		;Task 13
+015a 015a s 	ds	tasksiz		;Task 14
+0174 0174 s 	ds	tasksiz		;Task 15
+018e 018e s 
+018e 018e s 
+018e 018e d 00
+018e 018e s u.save:	db	0		;Start of user save area
+018f 018f d 00
+018f 018f s u.ir:	db	0		;Temporary user interrupt reg. save
+0190 0190 d 000000000000000000000000
+0190 0190 s 	dw	0,0,0,0,0,0	;ix,iy,bc',de',hl',af'
+019c 019c d 0000
+019c 019c s u.pc:	dw	0		;Temporary user pc storage
+019e 019e d 000000000000
+019e 019e s 	dw	0,0,0		;bc,de,hl
+01a4 01a4 d 0000
+01a4 01a4 s u.af:	dw	0		;Temporary user af storage
+01a6 01a6 d 0000
+01a6 01a6 s u.sp:   dw      0               ;temporary user stack storage
+01a8 01a8 d 0000
+01a8 01a8 s u.mask:	dw	0		;temporary mask storage
+01aa 01aa s gobuff	equ	$
+01aa 01aa s 	ds	14		;task boot buffer
+01b8 01b8 s ersav	equ	$	
+01b8 01b8 s       	ds	200h-(ersav-ram);Fill out the ram
+0200 0200 s stack	equ	$		;End of local ram
+0200 0200 s 
+0200 0200 s ;****************************************************************
+0200 0200 s ;*								*
+0200 0200 s ;* The following map is used to hold an image of the current	*
+0200 0200 s ;* memory map for all tasks.					*
+0200 0200 s ;*								*
+0200 0200 s ;****************************************************************
+0200 0200 s 
+0200 0200 s map:	ds	200h			;Task Memory map image
+0400 0400 s 
+0400 0400 s ;****************************************************************
+0400 0400 s ;*								*
+0400 0400 s ;* Decision One local I/O map, the following registers are	*
+0400 0400 s ;* memory mapped into task 0, and are always visible to task	*
+0400 0400 s ;* zero only.							*
+0400 0400 s ;*								*
+0400 0400 s ;****************************************************************
+0400 0400 s 
+0400 0400 s locio	equ	$			;Local I/O, visible only to task 0
+0400 0400 s trpadd:	ds	0			;Trapp address register (read)
+0400 0400 s dspseg:	ds	1			;Display segment register (write)
+0401 0401 s keybd:	ds	0			;Key board register (read)
+0401 0401 s dspcol:	ds	1			;Display column register (write)
+0402 0402 s switch:	ds	0			;CPU switch port (read)
+0402 0402 s task:	ds	1			;Task register (write)
+0403 0403 s stats:	ds	0			;Trap status register (read)
+0403 0403 s mask:	ds	1			;Task mask register (write)
+0404 0404 s elocio	equ	$			;End of local I/O
+0404 0404 s 
+0404 0404 s 	ds	200h-(elocio-locio)	;Fill out local I/O
+0600 0600 s 
+0600 0600 s ;****************************************************************
+0600 0600 s ;*								*
+0600 0600 s ;* The following ram is the actual memory map, it can only be	*
+0600 0600 s ;* written into, so an image is kept in the local ram.		*
+0600 0600 s ;*								*
+0600 0600 s ;****************************************************************
+0600 0600 s 
+0600 0600 s mapram:	ds	200h			;Memory Map RAM, visible only to task 0
+0800 0800 s 
+0800 0800 s ;****************************************************************
+0800 0800 s ;*								*
+0800 0800 s ;* Decision One prom routines, usable by the supervisor task	*
+0800 0800 s ;* only after a reset but not accessible by any other tasks.	*
+0800 0800 s ;*								*
+0800 0800 s ;****************************************************************
+0800 0800 s 
+0800 0800 s rom0	equ	$			;Local ROM, visible only to task 0
+0800 0800 s 					;and is visible only during RESET
+0800 0800 s 
+0800 0800 s ;****************************************************************
+0800 0800 s ;*								*
+0800 0800 s ;* Reset is executed only once. Currently, reset forms an	*
+0800 0800 s ;* identity map for task zero to occupy the first 64K of main	*
+0800 0800 s ;* memory, allows task 0 to have unlimited priviledges. Task1   *
+0800 0800 s ;* occupies the first 64K, unlimited access and the traps are  	*
+0800 0800 s ;* set for halts or a stop. All other task maps are initialized *
+0800 0800 s ;* starting at bank 2 to bank 15. (e.g. task 15 has bank 15).	*
+0800 0800 s ;* If swithches are set with S1 through S7 off and S8 on, the   *
+0800 0800 s ;* power on jump address will be F800. If switch 6 is on, the	*
+0800 0800 s ;* program will jump to the monitor regardless of the state	*
+0800 0800 s ;* of the other switches.  If S1 - S5 are all 'ON' a MORROW	*
+0800 0800 s ;* hard disk is assumed and the 'Boothd' program is executed.	*
+0800 0800 s ;* If pin 2 of 15D is lifted, the diag nostic mode is entered.	*
+0800 0800 s ;*								*
+0800 0800 s ;****************************************************************
+0800 0800 s 
+0800 0800 s 
+0800 0800 s ; Check all the readable registers
+0800 0800 s 
+0800 0800 s 
+0800 0800 d d3ff
+0800 0800 s regrd:  out	(0ffh),a		;sync
+0802 0802 d 210004
+0802 0802 s 	ld	hl,trpadd
+0805 0805 d 7e
+0805 0805 s 	ld	a,(hl)			;read trap address reg @ 400h
+0806 0806 d 23
+0806 0806 s 	inc	hl			
+0807 0807 d 7e
+0807 0807 s 	ld	a,(hl)			;read keyboard reg @ 401h
+0808 0808 d 23
+0808 0808 s 	inc	hl
+0809 0809 d 7e
+0809 0809 s 	ld	a,(hl)			;read switch reg @ 402h
+080a 080a d 23
+080a 080a s 	inc	hl
+080b 080b d 7e
+080b 080b s 	ld	a,(hl)			;read trap status reg @ 403h
+080c 080c d 184c
+080c 080c s 	jr	getsw
+080e 080e s 
+080e 080e s 
+080e 080e s 
+080e 080e s ; Check all the writable registers
+080e 080e s 
+080e 080e d af
+080e 080e s regwr:	xor	a			;loop till switch not 00
+080f 080f d d3ff
+080f 080f s regwr1:	out	(0ffh),a		;sync
+0811 0811 d 320304
+0811 0811 s 	ld	(mask),a		;write to the mask register
+0814 0814 d 320104
+0814 0814 s 	ld	(dspcol),a		;write to the display column register
+0817 0817 d 320004
+0817 0817 s 	ld	(dspseg),a		;write to the display segment reg.
+081a 081a d 2f
+081a 081a s 	cpl	
+081b 081b d feff
+081b 081b s 	cp	0ffh
+081d 081d d 28f0
+081d 081d s 	jr	z,regwr1
+081f 081f d 1839
+081f 081f s 	jr	getsw
+0821 0821 s 
+0821 0821 s 
+0821 0821 s ; Check the Map RAMs
+0821 0821 s 
+0821 0821 d af
+0821 0821 s tmap:   xor	a			;write to map ram / protection ram
+0822 0822 d 210006
+0822 0822 s 	ld	hl,mapram
+0825 0825 d d3ff
+0825 0825 s 	out	(0ffh),a		;sync
+0827 0827 d 77
+0827 0827 s 	ld	(hl),a			;write location 600,0
+0828 0828 d 23
+0828 0828 s 	inc	hl
+0829 0829 d 77
+0829 0829 s 	ld	(hl),a			;write 601,0
+082a 082a d 2f
+082a 082a s 	cpl
+082b 082b d 77
+082b 082b s 	ld	(hl),a			;write 601,0ffh
+082c 082c d 2b
+082c 082c s 	dec	hl
+082d 082d d 77
+082d 082d s 	ld	(hl),a			;write 600,0ffh
+082e 082e d 21fe07
+082e 082e s 	ld	hl,mapram + 01feh
+0831 0831 d 77
+0831 0831 s 	ld	(hl),a			;write 7fe,0ff
+0832 0832 d 23
+0832 0832 s 	inc	hl
+0833 0833 d 77
+0833 0833 s 	ld	(hl),a			;write 7ff,0ff
+0834 0834 d 2f
+0834 0834 s 	cpl
+0835 0835 d 77
+0835 0835 s 	ld	(hl),a			;write 7ff,00
+0836 0836 d 2b
+0836 0836 s 	dec	hl
+0837 0837 d 77
+0837 0837 s 	ld	(hl),a			;write 7fe,00
+0838 0838 d 1820
+0838 0838 s 	jr	getsw
+083a 083a s 
+083a 083a s 
+083a 083a s ; Check the R/W RAMs
+083a 083a s 
+083a 083a s 
+083a 083a d 210000
+083a 083a s tram:	ld	hl,0000h		;write to read/write ram
+083d 083d d d3ff
+083d 083d s 	out	(0ffh),a
+083f 083f d af
+083f 083f s tram1:	xor	a
+0840 0840 d 77
+0840 0840 s 	ld	(hl),a			;write a 00 to ram 
+0841 0841 d be
+0841 0841 s 	cp	(hl)			;read it back
+0842 0842 d 2f
+0842 0842 s 	cpl
+0843 0843 d 77
+0843 0843 s 	ld	(hl),a			;write an ffh to ram 
+0844 0844 d be
+0844 0844 s 	cp	(hl)			;read it back
+0845 0845 d cb44
+0845 0845 s 	bit	0,h
+0847 0847 d 2011
+0847 0847 s 	jr	nz,getsw
+0849 0849 d 21ff03
+0849 0849 s 	ld	hl,03ffh
+084c 084c d 18f1
+084c 084c s 	jr      tram1			;write to 3ffh a ffh
+084e 084e s 
+084e 084e s ; Check the Floating Point Processor
+084e 084e s 
+084e 084e s 
+084e 084e d af
+084e 084e s tfpp:   xor	a			;check FPP
+084f 084f d d3ff
+084f 084f s 	out	(0ffh),a		;sync
+0851 0851 d 32000c
+0851 0851 s 	ld	(0c00h),a		;write a 00 to location C00h
+0854 0854 d 32080c
+0854 0854 s 	ld	(0c08h),a		;write a 00 to location C08h
+0857 0857 d 3a000c
+0857 0857 s 	ld	a,(0c00h)		;read c00h
+085a 085a s 
+085a 085a s 
+085a 085a d 3a0104
+085a 085a s getsw:	ld	a,(keybd)		
+085d 085d d cb4f
+085d 085d s 	bit	1,a
+085f 085f d cae308
+085f 085f s reset:	jp	z,reset0		;go to the montior if  low
+0862 0862 d 3a0204
+0862 0862 s 	ld	a,(switch)
+0865 0865 d cb57
+0865 0865 s 	bit	2,a
+0867 0867 d cae308
+0867 0867 s 	jp	z,reset0		;go to the monitor if S6 is on
+086a 086a d e670
+086a 086a s 	and	070h			;strip insignificant bits
+086c 086c d cb0f
+086c 086c s 	rrc	a			;4 byte offset
+086e 086e d cb0f
+086e 086e s 	rrc	a
+0870 0870 d 21d00b
+0870 0870 s 	ld	hl,jtable		;point to beginning of table
+0873 0873 d 85
+0873 0873 s 	add	a,l
+0874 0874 d 6f
+0874 0874 s 	ld	l,a
+0875 0875 d e9
+0875 0875 s 	jp	(hl)
+0876 0876 s 
+0876 0876 s ; Check the S-100 bus addr and data lines
+0876 0876 s 
+0876 0876 s 
+0876 0876 d 3ef0
+0876 0876 s tbus:   ld	a,0f0h
+0878 0878 d 320204
+0878 0878 s 	ld	(task),a		;force upper task bits high
+087b 087b d 3eff
+087b 087b s 	ld	a,0ffh			;init the T0 map
+087d 087d d 321e06
+087d 087d s 	ld	(61eh),a
+0880 0880 d 3e03
+0880 0880 s 	ld	a,03
+0882 0882 d 321f06
+0882 0882 s 	ld	(61fh),a
+0885 0885 d 320306
+0885 0885 s 	ld	(603h),a
+0888 0888 d af
+0888 0888 s 	xor	a
+0889 0889 d 320206
+0889 0889 s 	ld	(602h),a
+088c 088c d d3ff
+088c 088c s 	out	(0ffh),a		;sync
+088e 088e d 32ffff
+088e 088e s 	ld	(0ffffh),a		;write - bus addresses A0-23 are high
+0891 0891 d 320204
+0891 0891 s 	ld	(task),a		;upper task bits low
+0894 0894 d 320010
+0894 0894 s 	ld	(1000h),a		;write - bus addresses A0-23 are low
+0897 0897 d 3ef0
+0897 0897 s 	ld	a,0f0h
+0899 0899 d 320204
+0899 0899 s 	ld	(task),a		;force upper task bits high
+089c 089c d 3affff
+089c 089c s 	ld	a,(0ffffh)		;read  - bus addresses A0-23 are high
+089f 089f d af
+089f 089f s 	xor	a
+08a0 08a0 d 320204
+08a0 08a0 s 	ld	(task),a		;force upper task bits low
+08a3 08a3 d 3a0010
+08a3 08a3 s 	ld	a,(1000h)		;read  - bus addresses A0-23 are low
+08a6 08a6 d 18b2
+08a6 08a6 s 	jr	getsw
+08a8 08a8 s 
+08a8 08a8 s 
+08a8 08a8 d 3ea0
+08a8 08a8 s ntbus:  ld	a,0A0h
+08aa 08aa d 320204
+08aa 08aa s 	ld	(task),a		;force upper task bits high
+08ad 08ad d 3eaa
+08ad 08ad s         ld	a,0aah			;init the T0 map
+08af 08af d 321e06
+08af 08af s 	ld	(61eh),a
+08b2 08b2 d 3e03
+08b2 08b2 s 	ld	a,03
+08b4 08b4 d 321f06
+08b4 08b4 s 	ld	(61fh),a
+08b7 08b7 d 320306
+08b7 08b7 s 	ld	(603h),a
+08ba 08ba d 3e55
+08ba 08ba s 	ld	a,55h
+08bc 08bc d 320206
+08bc 08bc s 	ld	(602h),a
+08bf 08bf d d3ff
+08bf 08bf s 	out	(0ffh),a		;sync
+08c1 08c1 d 3eaa
+08c1 08c1 s 	ld	a,0aah
+08c3 08c3 d 32aafa
+08c3 08c3 s 	ld	(0faaah),a		;write - bus addresses A0-23 = AAAAAA
+08c6 08c6 d 3e50
+08c6 08c6 s 	ld	a,50h
+08c8 08c8 d 320204
+08c8 08c8 s 	ld	(task),a		;upper task bits low = 5
+08cb 08cb d 3e55
+08cb 08cb s 	ld	a,55h
+08cd 08cd d 325515
+08cd 08cd s 	ld	(1555h),a		;write - bus addresses A0-23 are low
+08d0 08d0 d 3ea0
+08d0 08d0 s 	ld	a,0A0h
+08d2 08d2 d 320204
+08d2 08d2 s 	ld	(task),a		;force upper task bits high
+08d5 08d5 d 3aaafa
+08d5 08d5 s 	ld	a,(0faaah)		;read  - bus addresses A0-23 are high
+08d8 08d8 d 3e50
+08d8 08d8 s 	ld	a,050h
+08da 08da d 320204
+08da 08da s 	ld	(task),a		;force upper task bits low
+08dd 08dd d 3a5515
+08dd 08dd s 	ld	a,(1555h)		;read  - bus addresses A0-23 are low
+08e0 08e0 d c35a08
+08e0 08e0 s 	jp	getsw
+08e3 08e3 s 
+08e3 08e3 s 	
+08e3 08e3 s ; Initialize the maps and jump vectors
+08e3 08e3 s 
+08e3 08e3 s 
+08e3 08e3 d cdef08
+08e3 08e3 s reset0: call	reset1
+08e6 08e6 d cd2b0b
+08e6 08e6 s 	call	uartst
+08e9 08e9 d cd2209
+08e9 08e9 s 	call	setup
+08ec 08ec d c3aa01
+08ec 08ec s 	jp	gobuff
+08ef 08ef s 
+08ef 08ef d 210000
+08ef 08ef s reset1:	ld	hl,super		;initialize 'super' to the monitor...
+08f2 08f2 d 2b
+08f2 08f2 s settle:	dec	hl			;wait for the hardware to settle down
+08f3 08f3 d 7d
+08f3 08f3 s 	ld	a,l
+08f4 08f4 d b4
+08f4 08f4 s 	or	h
+08f5 08f5 d 20fb
+08f5 08f5 s 	jr	nz,settle
+08f7 08f7 d 36c3
+08f7 08f7 s 	ld	(hl),jmpop		;- this will be overwritten by the
+08f9 08f9 d 23
+08f9 08f9 s 	inc	hl			;- supervisor but all traps in the 
+08fa 08fa d 3612
+08fa 08fa s 	ld	(hl),012h		;- meantime will fall into the monitor.
+08fc 08fc d 23
+08fc 08fc s 	inc 	hl
+08fd 08fd d 3608
+08fd 08fd s 	ld	(hl),08h
+08ff 08ff s 
+08ff 08ff d af
+08ff 08ff s reslop: xor	a
+0900 0900 d 0e03
+0900 0900 s 	ld	c,3			;New access priviledges
+0902 0902 d 47
+0902 0902 s reslp2: ld	b,a			;New allocation = segment #
+0903 0903 d cd180b
+0903 0903 s 	call	rstmap			;Allocate it
+0906 0906 d 3c
+0906 0906 s 	inc	a			;Next segment #
+0907 0907 d e60f
+0907 0907 s 	and	0fh			;Check if all done
+0909 0909 d 20f7
+0909 0909 s 	jr	nz,reslp2		;Continue until done
+090b 090b d 3e10
+090b 090b s         LD	A,10h			;write new task and segment
+090d 090d d 0600
+090d 090d s 	LD	B,0			;TASK 1 gets first 64K of memory
+090f 090f d cd180b
+090f 090f s reslp1: call    rstmap			;Give TASK 1 a full 64k of space
+0912 0912 d 04
+0912 0912 s 	inc	B			
+0913 0913 d 3c
+0913 0913 s 	inc	A			
+0914 0914 d fe20
+0914 0914 s 	cp      20h			
+0916 0916 d 20f7
+0916 0916 s 	jr	nz,reslp1						
+0918 0918 d 47
+0918 0918 s fmap:	ld	b,a			;fill all the tasks' maps
+0919 0919 d cd180b
+0919 0919 s 	call	rstmap
+091c 091c d 3c
+091c 091c s 	inc	a
+091d 091d d fe00
+091d 091d s 	cp	0h
+091f 091f d 20f7
+091f 091f s 	jr	nz,fmap
+0921 0921 d c9
+0921 0921 s 	ret
+0922 0922 s 
+0922 0922 s 	
+0922 0922 s 
+0922 0922 d af
+0922 0922 s setup:	xor	a
+0923 0923 d 320206
+0923 0923 s 	ld	(mapram + 2),a		;a window for DMA device commands
+0926 0926 d 320202
+0926 0926 s 	ld	(map + 2),a		;update the image map
+0929 0929 d 32b801
+0929 0929 s 	ld	(ersav),a		;null the error save byte
+092c 092c d 3e1a
+092c 092c s 	ld	a,hstrap		;initialize the mask register
+092e 092e d 320304
+092e 092e s 	ld	(mask),a		; -to trap on halts and stops
+0931 0931 d 320700
+0931 0931 s 	ld	(cmask),a
+0934 0934 s 
+0934 0934 s ;	Following code checks for ram in system
+0934 0934 s 
+0934 0934 d 21ffff
+0934 0934 s 	ld	hl,0ffffh		;top of ram
+0937 0937 d 3ef0
+0937 0937 s ramchk:	ld	a,0f0h
+0939 0939 d a4
+0939 0939 s 	and	h
+093a 093a d 2812
+093a 093a s 	jr	z,badram		;dont go below task0,seg1	
+093c 093c d 77
+093c 093c s 	ld	(hl),a			;check it with a 00h
+093d 093d d be
+093d 093d s 	cp	(hl)			
+093e 093e d 2803
+093e 093e s 	jr	z,nexchk
+0940 0940 d 2b
+0940 0940 s 	dec	hl			;try the next location
+0941 0941 d 18f4
+0941 0941 s 	jr	ramchk
+0943 0943 d 2f
+0943 0943 s nexchk:	cpl	
+0944 0944 d 77
+0944 0944 s 	ld	(hl),a			;check it with an ff (might be ROM)
+0945 0945 d be
+0945 0945 s 	cp	(hl)
+0946 0946 d 22b901
+0946 0946 s 	ld	(ersav + 1),hl		;store it away for printing
+0949 0949 d 2811
+0949 0949 s 	jr	z,tstsw					
+094b 094b d 2b
+094b 094b s 	dec	hl			;try next location
+094c 094c d 18e9
+094c 094c s 	jr	ramchk
+094e 094e s 
+094e 094e d 21ad0b
+094e 094e s badram: ld	hl,0badh
+0951 0951 d 22b901
+0951 0951 s 	ld	(ersav + 1),hl
+0954 0954 d 3e4d
+0954 0954 s 	ld	a,'M'
+0956 0956 d 32b801
+0956 0956 s 	ld	(ersav),a
+0959 0959 d c36b0a
+0959 0959 s 	jp 	allerr			;if no ram force entry to monitor
+095c 095c s 
+095c 095c d 3a0204
+095c 095c s tstsw:	ld	a,(switch)		;get contents of switch
+095f 095f d e6f8
+095f 095f s 	and	0f8h			;Ignore irrelevent bits
+0961 0961 d 57
+0961 0961 s 	ld	d,a			;d & e contain jump address
+0962 0962 d 1e00
+0962 0962 s 	ld	e,0H
+0964 0964 d fe00
+0964 0964 s 	cp	0			;boot hard disk if switches are all on
+0966 0966 d caa30a
+0966 0966 s 	jp	z,boothd
+0969 0969 d fe08
+0969 0969 s 	cp	08h			;If switch 5 is off others are on
+096b 096b d caf709
+096b 096b s 	jp	z,nuboot		; - boot DMA controller
+096e 096e d fe10
+096e 096e s 	cp	10h			;If switches 4 is off, others on
+0970 0970 d 2857
+0970 0970 s 	jr	z,djdma			; - boot the DJ-DMA floppy device
+0972 0972 s 
+0972 0972 d 3a0204
+0972 0972 s check:	ld	a,(switch)		;test monitor switch
+0975 0975 d cb57
+0975 0975 s 	bit  	2,a
+0977 0977 d 3e01
+0977 0977 s 	ld	a,1			;normal task number
+0979 0979 d ed531500
+0979 0979 s 	ld	(15h),de		;initialize the t1 pc save area
+097d 097d d 320600
+097d 097d s 	ld	(ctask),a
+0980 0980 d 2004
+0980 0980 s 	jr	nz,nutask		;jump if boot desired
+0982 0982 s 
+0982 0982 d af
+0982 0982 s montor:	xor	a			;monitor task number
+0983 0983 d 111609
+0983 0983 s 	ld	de,cold			;monitor location
+0986 0986 s 
+0986 0986 d 21aa01
+0986 0986 s nutask: ld	hl,gobuff		;Write a routine to switch to new task
+0989 0989 d 363e
+0989 0989 s 	ld	(hl),03eh		;- because when the task register is
+098b 098b d 23
+098b 098b s 	inc	hl			;- written into, the lower half of the
+098c 098c d 77
+098c 098c s 	ld	(hl),a			;- prom goes away.
+098d 098d d 23
+098d 098d s 	inc	hl
+098e 098e d 3632
+098e 098e s 	ld	(hl),032h
+0990 0990 d 23
+0990 0990 s 	inc	hl
+0991 0991 d 3602
+0991 0991 s 	ld	(hl),02h
+0993 0993 d 23
+0993 0993 s 	inc	hl
+0994 0994 d 3604
+0994 0994 s 	ld	(hl),04h
+0996 0996 d 23
+0996 0996 s 	inc	hl
+0997 0997 d 3600
+0997 0997 s 	ld	(hl),nop		;6 nops for countdown sequence
+0999 0999 d 23
+0999 0999 s 	inc	hl
+099a 099a d 3600
+099a 099a s 	ld	(hl),nop
+099c 099c d 23
+099c 099c s 	inc	hl
+099d 099d d 3600
+099d 099d s 	ld	(hl),nop
+099f 099f d 23
+099f 099f s 	inc	hl
+09a0 09a0 d 3600
+09a0 09a0 s 	ld	(hl),nop
+09a2 09a2 d 23
+09a2 09a2 s 	inc	hl
+09a3 09a3 d 3600
+09a3 09a3 s 	ld	(hl),nop
+09a5 09a5 d 23
+09a5 09a5 s 	inc	hl
+09a6 09a6 d 3600
+09a6 09a6 s 	ld	(hl),nop
+09a8 09a8 d 23
+09a8 09a8 s 	inc	hl
+09a9 09a9 d 36c3
+09a9 09a9 s 	ld	(hl),0c3h		;the jump op code
+09ab 09ab d 23
+09ab 09ab s 	inc	hl
+09ac 09ac d 73
+09ac 09ac s 	ld	(hl),e
+09ad 09ad d 23
+09ad 09ad s 	inc	hl
+09ae 09ae d 72
+09ae 09ae s 	ld	(hl),d
+09af 09af s 
+09af 09af s 
+09af 09af s ;****************************************************************
+09af 09af s ;*								*
+09af 09af s ;*	Wunderbuss I/O and Mult I/O PIC initialization	rou-	*
+09af 09af s ;*	tine.  Interrupt vectors = restart locations.		*
+09af 09af s ;*								*
+09af 09af s ;****************************************************************
+09af 09af s 
+09af 09af d af
+09af 09af s picset:	xor     a
+09b0 09b0 d d34f
+09b0 09b0 s 	out	(grpctl),a
+09b2 09b2 d 3e1f
+09b2 09b2 s 	ld	a,ivalu			;sngl,level,4 byte address
+09b4 09b4 d d34c
+09b4 09b4 s 	out	(icw1),a		;initialize the first word
+09b6 09b6 d 3e00
+09b6 09b6 s 	ld	a,hivect
+09b8 09b8 d d34d
+09b8 09b8 s 	out	(icw2),a		;initialize the second word
+09ba 09ba d 3e00
+09ba 09ba s 	ld	a,normal
+09bc 09bc d d34d
+09bc 09bc s 	out	(icw4),a		;initialize the forth word
+09be 09be d 3eff
+09be 09be s 	ld	a,picmask
+09c0 09c0 d d34d
+09c0 09c0 s 	out	(ocw1),a		;mask all interrupts
+09c2 09c2 d 3e20
+09c2 09c2 s 	ld	a,eoi			;send PIC an End of Interrupt word
+09c4 09c4 d d34c
+09c4 09c4 s 	out	(ocw2),a		;clear the master interrupt requests
+09c6 09c6 d d34c
+09c6 09c6 s 	out	(ocw2),a		;clear the slaves interrupt requests
+09c8 09c8 d c9
+09c8 09c8 s 	ret
+09c9 09c9 s 
+09c9 09c9 s 
+09c9 09c9 s ;****************************************************************
+09c9 09c9 s ;*								*
+09c9 09c9 s ;* DJ-DMA floppy disk boot routine (5.25 or 8 inch).		*
+09c9 09c9 s ;*								*
+09c9 09c9 s ;****************************************************************
+09c9 09c9 s 
+09c9 09c9 d 2610
+09c9 09c9 s djdma:	ld	h,10h			; wait byte for 1 minute 
+09cb 09cb d 010000
+09cb 09cb s djlop0:	ld	bc,0000h
+09ce 09ce d 3a4a10
+09ce 09ce s djloop:	ld	a,(djstat)		;read the status back
+09d1 09d1 d fe40
+09d1 09d1 s 	cp	040h
+09d3 09d3 d ed5b4810
+09d3 09d3 s 	ld	de,(djstat - 2)		;d & e point to cold boot loader
+09d7 09d7 d 2899
+09d7 09d7 s 	jr	z,check			;if good status continue set gobuff
+09d9 09d9 d feff
+09d9 09d9 s 	cp	0ffh			; - else loop for good status
+09db 09db d 2814
+09db 09db s 	jr	z,nstat			;if 0ffh then force to a zero
+09dd 09dd d 0b
+09dd 09dd s 	dec	bc
+09de 09de d 78
+09de 09de s 	ld	a,b
+09df 09df d b1
+09df 09df s 	or	c
+09e0 09e0 d 20ec
+09e0 09e0 s 	jr	nz,djloop
+09e2 09e2 d 25
+09e2 09e2 s 	dec	h
+09e3 09e3 d 20e6
+09e3 09e3 s 	jr	nz,djlop0		;continue looping till a minute elapses
+09e5 09e5 s 
+09e5 09e5 s ;	DJ-DMA not responding correctly
+09e5 09e5 s 
+09e5 09e5 d 0e46
+09e5 09e5 s 	ld	c,'F'
+09e7 09e7 d 3a4a10
+09e7 09e7 s 	ld	a,(djstat)
+09ea 09ea d 47
+09ea 09ea s 	ld	b,a			;save the error status
+09eb 09eb d 3a4810
+09eb 09eb s 	ld	a,(djstat - 2)
+09ee 09ee d 57
+09ee 09ee s 	ld	d,a
+09ef 09ef d 1871
+09ef 09ef s 	jr	derror			;go to error--controller not
+09f1 09f1 s 					; - responding
+09f1 09f1 s 
+09f1 09f1 d af
+09f1 09f1 s nstat: 	xor	a
+09f2 09f2 d 324a10
+09f2 09f2 s 	ld	(djstat),a		;null status byte ... signal DJ-DMA
+09f5 09f5 d 18d7
+09f5 09f5 s 	jr	djloop
+09f7 09f7 s 
+09f7 09f7 s ;****************************************************************
+09f7 09f7 s ;*								*
+09f7 09f7 s ;* Hard Disk Boot program for the DMA Winchester Controller.	*
+09f7 09f7 s ;*								*
+09f7 09f7 s ;****************************************************************
+09f7 09f7 s 
+09f7 09f7 d 011000
+09f7 09f7 s nuboot:	ld	bc,endboot - bootbl	;byte count
+09fa 09fa d 21b30b
+09fa 09fa s 	ld	hl,bootbl		;source
+09fd 09fd d 118010
+09fd 09fd s 	ld	de,chan			;destination
+0a00 0a00 d edb0
+0a00 0a00 s 	ldir				;move the command
+0a02 0a02 d 215010
+0a02 0a02 s 	ld	hl,iopb			;point to default channel addr
+0a05 0a05 d 3680
+0a05 0a05 s 	ld	(hl),80h		;fill in the command channel address
+0a07 0a07 d af
+0a07 0a07 s 	xor	a
+0a08 0a08 d 23
+0a08 0a08 s 	inc	hl			; -located at 50h to point to channel
+0a09 0a09 d 77
+0a09 0a09 s 	ld	(hl),a			; -at 80h.
+0a0a 0a0a d 23
+0a0a 0a0a s 	inc	hl
+0a0b 0a0b d 77
+0a0b 0a0b s 	ld	(hl),a
+0a0c 0a0c d d354
+0a0c 0a0c s 	out	(dmarst),a		;send the controller a reset
+0a0e 0a0e d 111000
+0a0e 0a0e s 	ld	de,010h
+0a11 0a11 s 
+0a11 0a11 d 15
+0a11 0a11 s hdrl:	dec	d			;wait for controller to process reset
+0a12 0a12 d 20fd
+0a12 0a12 s 	jr	nz,hdrl
+0a14 0a14 d cd3e0a
+0a14 0a14 s 	call	cloop
+0a17 0a17 s 
+0a17 0a17 d 21ffff
+0a17 0a17 s home:	ld	hl,-1  			;seek to home
+0a1a 0a1a d 228110
+0a1a 0a1a s         ld      (chan + 1),hl           ; - with ffff steps
+0a1d 0a1d d 3e06
+0a1d 0a1d s 	ld	a,noop
+0a1f 0a1f d 328b10
+0a1f 0a1f s 	ld	(statis - 1),a		;null command 
+0a22 0a22 d 3e01
+0a22 0a22 s 	ld	a,1
+0a24 0a24 d 328c10
+0a24 0a24 s 	ld	(statis),a		;set up the status byte
+0a27 0a27 d cd3e0a
+0a27 0a27 s 	call	cloop
+0a2a 0a2a s 	
+0a2a 0a2a d 118010
+0a2a 0a2a s rdata: 	ld	de,chan			;destination
+0a2d 0a2d d 010d00
+0a2d 0a2d s 	ld	bc,endrd - rdtbl	;byte count
+0a30 0a30 d 21c30b
+0a30 0a30 s 	ld	hl,rdtbl		;source
+0a33 0a33 d edb0
+0a33 0a33 s 	ldir				;move the read sector command
+0a35 0a35 d cd3e0a
+0a35 0a35 s 	call	cloop
+0a38 0a38 d 110001
+0a38 0a38 s 	ld	de,0100h		;point to beginning of DMA boot prog.
+0a3b 0a3b d c37209
+0a3b 0a3b s 	jp	check
+0a3e 0a3e s 
+0a3e 0a3e s 
+0a3e 0a3e s ; cloop1 = 9.6 us
+0a3e 0a3e s 
+0a3e 0a3e s 			
+0a3e 0a3e d 0e20
+0a3e 0a3e s cloop:	ld	c,020h
+0a40 0a40 d d355
+0a40 0a40 s cloop0:	out	(attn),a
+0a42 0a42 d 110000
+0a42 0a42 s 	ld	de,0000h
+0a45 0a45 d 3a8c10
+0a45 0a45 s cloop1: ld	a,(statis)		;check drive status
+0a48 0a48 d feff
+0a48 0a48 s 	cp	0ffh			;an FF means command completed
+0a4a 0a4a d c8
+0a4a 0a4a s 	ret	z
+0a4b 0a4b d 1b
+0a4b 0a4b s 	dec	de			;wait for controller to respond
+0a4c 0a4c d 7b
+0a4c 0a4c s 	ld	a,e
+0a4d 0a4d d b2
+0a4d 0a4d s 	or	d
+0a4e 0a4e d 20f5
+0a4e 0a4e s 	jr	nz,cloop1		;give it time to respond
+0a50 0a50 s 					;end cloop1
+0a50 0a50 s 
+0a50 0a50 s ;	Fall through to here on any error
+0a50 0a50 s 
+0a50 0a50 d 3a8c10
+0a50 0a50 s 	ld	a,(statis)
+0a53 0a53 d fe01
+0a53 0a53 s 	cp	01h
+0a55 0a55 d 2003
+0a55 0a55 s 	jr	nz,cloop2	
+0a57 0a57 d 0d
+0a57 0a57 s 	dec	c			;give it 10 tries if not rdy error
+0a58 0a58 d 20e6
+0a58 0a58 s 	jr	nz,cloop0		; - about 20 seconds
+0a5a 0a5a s 
+0a5a 0a5a d d1
+0a5a 0a5a s cloop2:	pop	de			;re-align the stack pointer
+0a5b 0a5b d 47
+0a5b 0a5b s 	ld	b,a
+0a5c 0a5c d 0e48
+0a5c 0a5c s 	ld	c,'H'
+0a5e 0a5e d 3a8b10
+0a5e 0a5e s 	ld	a,(cmmd)
+0a61 0a61 d 57
+0a61 0a61 s 	ld	d,a
+0a62 0a62 s 
+0a62 0a62 s ;****************************************************************
+0a62 0a62 s ;*								*
+0a62 0a62 s ;* Enter here if DISK controllers don't respond correctly.	*
+0a62 0a62 s ;* Routine alters gobuff to point to the monitor cout routine.	*	
+0a62 0a62 s ;*								*
+0a62 0a62 s ;****************************************************************
+0a62 0a62 s 
+0a62 0a62 s derror:	
+0a62 0a62 d 79
+0a62 0a62 s 	ld	a,c
+0a63 0a63 d 21b801
+0a63 0a63 s 	ld	hl,ersav
+0a66 0a66 d 77
+0a66 0a66 s 	ld	(hl),a			;store c for later
+0a67 0a67 d 23
+0a67 0a67 s 	inc	hl
+0a68 0a68 d 70
+0a68 0a68 s 	ld	(hl),b			;error status
+0a69 0a69 d 23
+0a69 0a69 s 	inc	hl
+0a6a 0a6a d 72
+0a6a 0a6a s 	ld	(hl),d			;command causing error 
+0a6b 0a6b d af
+0a6b 0a6b s allerr:	xor	a
+0a6c 0a6c d 320600
+0a6c 0a6c s 	ld	(ctask),a
+0a6f 0a6f d 111609
+0a6f 0a6f s 	ld	de,cold			;pointer to error print
+0a72 0a72 d ed531500
+0a72 0a72 s 	ld	(15h),de		;save the pointer in t1 pc
+0a76 0a76 d c38609
+0a76 0a76 s 	jp	nutask			
+0a79 0a79 s 	
+0a79 0a79 s 
+0a79 0a79 s 	
+0a79 0a79 s ;****************************************************************
+0a79 0a79 s ;*								*
+0a79 0a79 s ;* Hard Disk Boot program for Decision 1 EPROM.			*
+0a79 0a79 s ;* For M26, M10, and M20.					*
+0a79 0a79 s ;*						11/4/81  BJG	*
+0a79 0a79 s ;****************************************************************
+0a79 0a79 s 
+0a79 0a79 d 110000
+0a79 0a79 s hdclop:	ld	de,0000h
+0a7c 0a7c d db50
+0a7c 0a7c s hdlop1: in	a,(status)
+0a7e 0a7e d a0
+0a7e 0a7e s 	and	b
+0a7f 0a7f d c0
+0a7f 0a7f s 	ret	nz
+0a80 0a80 d 1b
+0a80 0a80 s 	dec	de
+0a81 0a81 d 7a
+0a81 0a81 s 	ld	a,d
+0a82 0a82 d b3
+0a82 0a82 s 	or	e
+0a83 0a83 d 20f7
+0a83 0a83 s 	jr	nz,hdlop1
+0a85 0a85 d 1812
+0a85 0a85 s 	jr	hdcerr
+0a87 0a87 s 
+0a87 0a87 d 2610
+0a87 0a87 s wait:	ld	h,010h
+0a89 0a89 d 110000
+0a89 0a89 s wait0:	ld	de,0
+0a8c 0a8c d db50
+0a8c 0a8c s wait1:	in	a,(status)
+0a8e 0a8e d a0
+0a8e 0a8e s 	and	b
+0a8f 0a8f d c8
+0a8f 0a8f s 	ret	z
+0a90 0a90 d 1b
+0a90 0a90 s 	dec	de
+0a91 0a91 d 7a
+0a91 0a91 s 	ld	a,d
+0a92 0a92 d b3
+0a92 0a92 s 	or	e
+0a93 0a93 d 20f7
+0a93 0a93 s 	jr	nz,wait1
+0a95 0a95 d 25
+0a95 0a95 s 	dec	h
+0a96 0a96 d 20f1
+0a96 0a96 s 	jr	nz,wait0
+0a98 0a98 d e1
+0a98 0a98 s 	pop	hl			;re-align the stack pointer
+0a99 0a99 d 0e44
+0a99 0a99 s hdcerr: ld	c,'D'			; D for HDCA error flag
+0a9b 0a9b d db50
+0a9b 0a9b s 	in	a,(status)		;get the primary status
+0a9d 0a9d d 47
+0a9d 0a9d s 	ld	b,a
+0a9e 0a9e d db51
+0a9e 0a9e s 	in	a,(secstat)		;get the secondary status
+0aa0 0aa0 d 57
+0aa0 0aa0 s 	ld	d,a
+0aa1 0aa1 d 18bf
+0aa1 0aa1 s 	jr	derror
+0aa3 0aa3 s 
+0aa3 0aa3 d 3efc
+0aa3 0aa3 s boothd:	ld	a,drivea		;select
+0aa5 0aa5 d d352
+0aa5 0aa5 s 	out	(functn),a		;    drive A
+0aa7 0aa7 d 3e05
+0aa7 0aa7 s 	ld	a,drenbl		;turn on drive
+0aa9 0aa9 d d350
+0aa9 0aa9 s 	out	(contrl),a		;    command register
+0aab 0aab s 
+0aab 0aab d 0620
+0aab 0aab s rloop:	ld	b,ready
+0aad 0aad d cd870a
+0aad 0aad s 	call	wait
+0ab0 0ab0 d 3e07
+0ab0 0ab0 s 	ld	a,dskrun		;enable the
+0ab2 0ab2 d d350
+0ab2 0ab2 s 	out	(contrl),a		;    controller
+0ab4 0ab4 s 
+0ab4 0ab4 d db50
+0ab4 0ab4 s waitz:	in	a,(status)		;test for heads at track 0
+0ab6 0ab6 d 1f
+0ab6 0ab6 s 	rra
+0ab7 0ab7 d 300f
+0ab7 0ab7 s 	jr	nc,sdone
+0ab9 0ab9 d 3ef8
+0ab9 0ab9 s 	ld	a,stepo			;execute
+0abb 0abb d d352
+0abb 0abb s 	out	(functn),a		;    the
+0abd 0abd d 3efc
+0abd 0abd s 	ld	a,drivea		;    step out
+0abf 0abf d d352
+0abf 0abf s 	out	(functn),a		;    command
+0ac1 0ac1 s 
+0ac1 0ac1 d 0604
+0ac1 0ac1 s waitc:  ld	b,complt
+0ac3 0ac3 d cd790a
+0ac3 0ac3 s 	call	hdclop
+0ac6 0ac6 d 18ec
+0ac6 0ac6 s 	jr	waitz
+0ac8 0ac8 s 
+0ac8 0ac8 d db50
+0ac8 0ac8 s sdone:	in	a,(status)		;get an image
+0aca 0aca d 4f
+0aca 0aca s 	ld	c,a			;    of the status reg
+0acb 0acb s 
+0acb 0acb d db50
+0acb 0acb s iwait1: in	a,(status)		;wait for
+0acd 0acd d 91
+0acd 0acd s 	sub	c			;    the index pulse
+0ace 0ace d 28fb
+0ace 0ace s 	jr	z,iwait1		;    to arrive
+0ad0 0ad0 s 
+0ad0 0ad0 d db50
+0ad0 0ad0 s iwait2: in	a,(status)		;wait for the
+0ad2 0ad2 d 91
+0ad2 0ad2 s 	sub	c			;    next index pulse
+0ad3 0ad3 d 20fb
+0ad3 0ad3 s 	jr	nz,iwait2		;test for head settle
+0ad5 0ad5 s 
+0ad5 0ad5 d db50
+0ad5 0ad5 s iwait3:	in	a,(status)
+0ad7 0ad7 d 91
+0ad7 0ad7 s 	sub	c
+0ad8 0ad8 d 28fb
+0ad8 0ad8 s 	jr	z,iwait3
+0ada 0ada d 3e08
+0ada 0ada s 	ld	a,header		;reset the
+0adc 0adc d d351
+0adc 0adc s 	out	(commd),a		;    buffer pointer
+0ade 0ade d af
+0ade 0ade s 	xor	a			;    to header area
+0adf 0adf d d353
+0adf 0adf s 	out	(data),a		;head 0
+0ae1 0ae1 d d353
+0ae1 0ae1 s 	out	(data),a		;track 0
+0ae3 0ae3 d 3c
+0ae3 0ae3 s 	inc	a			;sector 1
+0ae4 0ae4 d d353
+0ae4 0ae4 s 	out	(data),a		    
+0ae6 0ae6 d 3e80
+0ae6 0ae6 s 	ld	a,system		;system key
+0ae8 0ae8 d d353
+0ae8 0ae8 s 	out	(data),a
+0aea 0aea d 3e01
+0aea 0aea s 	ld	a,dread			;issue a
+0aec 0aec d d351
+0aec 0aec s 	out	(commd),a		;    read command
+0aee 0aee s 
+0aee 0aee d 0602
+0aee 0aee s waitd:	ld	b,opdone
+0af0 0af0 d cd790a
+0af0 0af0 s 	call	hdclop
+0af3 0af3 d db53
+0af3 0af3 s 	in	a,(data)		;low order byte of
+0af5 0af5 d 6f
+0af5 0af5 s 	ld	l,a			;    bootstrap address
+0af6 0af6 d 5f
+0af6 0af6 s 	ld	e,a
+0af7 0af7 d db53
+0af7 0af7 s 	in	a,(data)		;high order byte of
+0af9 0af9 d 67
+0af9 0af9 s 	ld	h,a			;    bootstrap address
+0afa 0afa d 57
+0afa 0afa s 	ld	d,a
+0afb 0afb d e6f0
+0afb 0afb s 	and	0f0h			;check for 1st segment of task0
+0afd 0afd d 2811
+0afd 0afd s 	jr	z,dxloop
+0aff 0aff d af
+0aff 0aff s 	xor	a
+0b00 0b00 d 320206
+0b00 0b00 s 	ld	(mapram + 2),a		;T0 map is as normal with no window
+0b03 0b03 s 
+0b03 0b03 s 
+0b03 0b03 d db53
+0b03 0b03 s lloop:	in	a,(data)		;load
+0b05 0b05 d 12
+0b05 0b05 s 	ld	(de),a			;    the
+0b06 0b06 d 1c
+0b06 0b06 s 	inc	e			;    bootstrap
+0b07 0b07 d 20fa
+0b07 0b07 s 	jr	nz,lloop
+0b09 0b09 d 54
+0b09 0b09 s 	ld	d,h			;save the boot addr for later
+0b0a 0b0a d 5d
+0b0a 0b0a s 	ld	e,l
+0b0b 0b0b d 3e01
+0b0b 0b0b s 	ld	a,01
+0b0d 0b0d d c37209
+0b0d 0b0d s 	jp	check
+0b10 0b10 s 
+0b10 0b10 d 7a
+0b10 0b10 s dxloop: ld	a,d
+0b11 0b11 d e60f
+0b11 0b11 s 	and	0fh			;strip the segment #
+0b13 0b13 d f610
+0b13 0b13 s 	or	010h			; force the load into seg 0 task 1
+0b15 0b15 d 57
+0b15 0b15 s 	ld	d,a
+0b16 0b16 d 18eb
+0b16 0b16 s 	jr	lloop
+0b18 0b18 s 
+0b18 0b18 s 
+0b18 0b18 s ;****************************************************************
+0b18 0b18 s ;*								*
+0b18 0b18 s ;* Rstmap writes the tasks memory allocation vectors. Upon	*
+0b18 0b18 s ;* entry the registers must contain:				*
+0b18 0b18 s ;*	a = task number / task segment number to update		*
+0b18 0b18 s ;*          high nibble = task #    low nibble = segment #	*
+0b18 0b18 s ;*	b = New allocation vector				*
+0b18 0b18 s ;*	c = New allocation access				*
+0b18 0b18 s ;*								*	
+0b18 0b18 s ;* Routine calculates the expression  600+(Accumulator) x 2 	*
+0b18 0b18 s ;* where accumulator contents are as listed above.  All arit-   * 	
+0b18 0b18 s ;* hmetic and numbers are in Hex				*
+0b18 0b18 s ;*  						 		*
+0b18 0b18 s ;****************************************************************
+0b18 0b18 s 
+0b18 0b18 d 6f
+0b18 0b18 s rstmap:	ld	l,a             ;Get task and segment numbers       
+0b19 0b19 d 2600
+0b19 0b19 s         ld	h,0h    
+0b1b 0b1b d 29
+0b1b 0b1b s 	add	hl,hl           ;multiply times 2       
+0b1c 0b1c d eb
+0b1c 0b1c s         ex	de,hl  		;save calculated offset in D,E
+0b1d 0b1d d 210006
+0b1d 0b1d s         ld	hl,mapram       ;point to beginning of ram map
+0b20 0b20 d cd260b
+0b20 0b20 s         call    rstmxx            
+0b23 0b23 d 210002
+0b23 0b23 s 	ld	hl,map		;point to image map at 200
+0b26 0b26 d 19
+0b26 0b26 s rstmxx:	add	hl,de		;add offset to selected map
+0b27 0b27 d 70
+0b27 0b27 s 	ld	(hl),b          ;write the allocation vector to ram
+0b28 0b28 d 23
+0b28 0b28 s 	inc	hl		;point to access ram
+0b29 0b29 d 71
+0b29 0b29 s 	ld	(hl),c          ;write access attributes to ram
+0b2a 0b2a d c9
+0b2a 0b2a s 	ret
+0b2b 0b2b s 
+0b2b 0b2b s ;********************************************************
+0b2b 0b2b s ;*							*
+0b2b 0b2b s ;*  The following code intitializes the I/O for		*
+0b2b 0b2b s ;*  the Decision 1 Motherboard and the Mult I/O.	*
+0b2b 0b2b s ;*  							*
+0b2b 0b2b s ;********************************************************
+0b2b 0b2b s 
+0b2b 0b2b s 
+0b2b 0b2b d 1603
+0b2b 0b2b s uartst:	ld	d,3			;start with uart 3
+0b2d 0b2d d 7a
+0b2d 0b2d s uarts0:	ld	a,d
+0b2e 0b2e d d34f
+0b2e 0b2e s 	out   	(grpctl),a
+0b30 0b30 d af
+0b30 0b30 s 	xor 	a
+0b31 0b31 d d34d
+0b31 0b31 s 	out	(lsr),a			;clear line status register 
+0b33 0b33 d d349
+0b33 0b33 s 	out 	(ier),a			;initialialize interupt mask (off)
+0b35 0b35 d 15
+0b35 0b35 s 	dec	d
+0b36 0b36 d 20f5
+0b36 0b36 s 	jr	nz,uarts0
+0b38 0b38 d d34f
+0b38 0b38 s 	out 	(grpctl),a		;select sense switch port
+0b3a 0b3a d db49
+0b3a 0b3a s 	in	a,(base+1)		
+0b3c 0b3c d 07
+0b3c 0b3c s 	rlca
+0b3d 0b3d d 07
+0b3d 0b3d s 	rlca
+0b3e 0b3e d 07
+0b3e 0b3e s 	rlca
+0b3f 0b3f d e607
+0b3f 0b3f s 	and	07h			;mask insignificant bits
+0b41 0b41 d fe07
+0b41 0b41 s 	cp	07h			;all off?
+0b43 0b43 d 1600
+0b43 0b43 s 	ld	d,0
+0b45 0b45 d 280b
+0b45 0b45 s 	jr	z,default		;default if all off
+0b47 0b47 d 21a50b
+0b47 0b47 s 	ld	hl,btable		;point to baud rate table
+0b4a 0b4a d 87
+0b4a 0b4a s 	add 	a,a
+0b4b 0b4b d 5f
+0b4b 0b4b s 	ld	e,a
+0b4c 0b4c d 19
+0b4c 0b4c s 	add 	hl,de			;offset to selected baud rate
+0b4d 0b4d d 4e
+0b4d 0b4d s 	ld	c,(hl)
+0b4e 0b4e d 23
+0b4e 0b4e s 	inc	hl
+0b4f 0b4f d 46
+0b4f 0b4f s 	ld	b,(hl)			;bc = baud rate divisor value (D)
+0b50 0b50 d 1803
+0b50 0b50 s 	jr	setit
+0b52 0b52 s 
+0b52 0b52 s default:
+0b52 0b52 d 010c00
+0b52 0b52 s 	ld	bc,12			;default baud rate is 9600
+0b55 0b55 s 
+0b55 0b55 d 14
+0b55 0b55 s setit:	inc	d
+0b56 0b56 d 7a
+0b56 0b56 s 	ld	a,d
+0b57 0b57 d d34f
+0b57 0b57 s 	out	(grpctl),a
+0b59 0b59 d 3e87
+0b59 0b59 s 	ld	a,dlab+wls1+wls0+stb
+0b5b 0b5b d d34b
+0b5b 0b5b s 	out 	(lcr),a			;divisor access bit is on
+0b5d 0b5d d 78
+0b5d 0b5d s 	ld	a,b
+0b5e 0b5e d d349
+0b5e 0b5e s 	out 	(dlm),a			;load high divisor register
+0b60 0b60 d 79
+0b60 0b60 s 	ld	a,c
+0b61 0b61 d d348
+0b61 0b61 s 	out 	(dll),a			;load low divisor register
+0b63 0b63 d 3e07
+0b63 0b63 s 	ld	a,wls1+wls0+stb
+0b65 0b65 d d34b
+0b65 0b65 s 	out 	(lcr),a			;divisor access bit is off
+0b67 0b67 d 3e10
+0b67 0b67 s         ld	a,loop			;clear the shift register
+0b69 0b69 d d34c
+0b69 0b69 s 	out	(mcr),a			; - by looping back.
+0b6b 0b6b d db48
+0b6b 0b6b s 	in	a,(rbr)			;clear receiver buffer
+0b6d 0b6d d af
+0b6d 0b6d s 	xor	a
+0b6e 0b6e d d348
+0b6e 0b6e s 	out	(thr),a			;clear transmitter buffer
+0b70 0b70 d cd9e0b
+0b70 0b70 s 	call	begin0
+0b73 0b73 d db48
+0b73 0b73 s 	in	a,(rbr)
+0b75 0b75 d af
+0b75 0b75 s 	xor	a
+0b76 0b76 d d348
+0b76 0b76 s 	out	(thr),a
+0b78 0b78 d cd9e0b
+0b78 0b78 s 	call	begin0			;two times to make sure
+0b7b 0b7b d db4d
+0b7b 0b7b s rduart:	in	a,(lsr)
+0b7d 0b7d d e601
+0b7d 0b7d s 	and	dr 			;check for data available
+0b7f 0b7f d 28fa
+0b7f 0b7f s 	jr	z,rduart
+0b81 0b81 d db48
+0b81 0b81 s 	in	a,(rbr)			;intitialize receiver buffer
+0b83 0b83 d fe00
+0b83 0b83 s 	cp	0
+0b85 0b85 d 280f
+0b85 0b85 s 	jr	z,contin		;jump if UARTS good
+0b87 0b87 s 
+0b87 0b87 d f5
+0b87 0b87 s urterr:	push 	af
+0b88 0b88 d 3e55
+0b88 0b88 s 	ld	a,'U'
+0b8a 0b8a d 32b801
+0b8a 0b8a s 	ld	(ersav),a		;Uart error
+0b8d 0b8d d 7a
+0b8d 0b8d s 	ld	a,d			
+0b8e 0b8e d 32ba01
+0b8e 0b8e s 	ld	(ersav + 2),a		;Uart # saved
+0b91 0b91 d f1
+0b91 0b91 s 	pop	af
+0b92 0b92 d 32b901
+0b92 0b92 s 	ld	(ersav + 1),a		;bad character saved
+0b95 0b95 d af
+0b95 0b95 s 	xor	a
+0b96 0b96 s 
+0b96 0b96 d d34c
+0b96 0b96 s contin:	out	(mcr),a
+0b98 0b98 d 7a
+0b98 0b98 s 	ld	a,d
+0b99 0b99 d fe03
+0b99 0b99 s 	cp	3			;initialize all three uarts
+0b9b 0b9b d c8
+0b9b 0b9b s 	ret	z
+0b9c 0b9c d 18b7
+0b9c 0b9c s 	jr	setit
+0b9e 0b9e s 
+0b9e 0b9e d db4d
+0b9e 0b9e s begin0:	in	a,(lsr)
+0ba0 0ba0 d e620
+0ba0 0ba0 s 	and	thre
+0ba2 0ba2 d 28fa
+0ba2 0ba2 s 	jr	z,begin0
+0ba4 0ba4 d c9
+0ba4 0ba4 s 	ret
+0ba5 0ba5 s 
+0ba5 0ba5 s 
+0ba5 0ba5 s ;  Baud rate selection table for Mult I/o or WB I/O
+0ba5 0ba5 s 
+0ba5 0ba5 d 1704
+0ba5 0ba5 s btable:	dw	1047			;110 baud		0 0 0
+0ba7 0ba7 d 8001
+0ba7 0ba7 s 	dw	384			;300 baud		0 0 1
+0ba9 0ba9 d 6000
+0ba9 0ba9 s 	dw	96			;1200 baud		0 1 0
+0bab 0bab d 3000
+0bab 0bab s 	dw	48			;2400 baud		0 1 1
+0bad 0bad d 1800
+0bad 0bad s 	dw	24			;4800 baud		1 0 0
+0baf 0baf d 0c00
+0baf 0baf s 	dw	12			;9600 baud		1 0 1
+0bb1 0bb1 d 0600
+0bb1 0bb1 s 	dw	6			;19200 baud		1 1 0
+0bb3 0bb3 s 
+0bb3 0bb3 s ; Load constants command for the DMA Winchester controller
+0bb3 0bb3 s 
+0bb3 0bb3 d 10
+0bb3 0bb3 s bootbl: db	10h			;direction out
+0bb4 0bb4 d 00
+0bb4 0bb4 s 	db	0			;low steps
+0bb5 0bb5 d 00
+0bb5 0bb5 s 	db	0			;high steps
+0bb6 0bb6 d 3c
+0bb6 0bb6 s 	db	03ch			;select drive 0
+0bb7 0bb7 d 00
+0bb7 0bb7 s 	db	0			;low dma address
+0bb8 0bb8 d 01
+0bb8 0bb8 s 	db	01			;high dma address
+0bb9 0bb9 d 00
+0bb9 0bb9 s 	db	0			;extended dma address
+0bba 0bba d 00
+0bba 0bba s 	db	0			;argument 0
+0bbb 0bbb d 1e
+0bbb 0bbb s 	db	stpdly			;argument 1
+0bbc 0bbc d c8
+0bbc 0bbc s 	db	hdsetl			;argument 2
+0bbd 0bbd d 07
+0bbd 0bbd s 	db	secsiz			;argument 3
+0bbe 0bbe d 04
+0bbe 0bbe s 	db	const			;load constants opcode
+0bbf 0bbf d 00
+0bbf 0bbf s 	db	0			;clear status byte
+0bc0 0bc0 d 80
+0bc0 0bc0 s 	db	80h			;low link address
+0bc1 0bc1 d 00
+0bc1 0bc1 s 	db	0			;high link address
+0bc2 0bc2 d 00
+0bc2 0bc2 s 	db	0			;extended link address
+0bc3 0bc3 s 
+0bc3 0bc3 s endboot equ	$
+0bc3 0bc3 s 
+0bc3 0bc3 s ; Read sector 1, head 0, cyl 0  command for the HD-DMA:
+0bc3 0bc3 s 
+0bc3 0bc3 d 00
+0bc3 0bc3 s rdtbl:	db	0			;no seek
+0bc4 0bc4 d 00
+0bc4 0bc4 s 	db	0
+0bc5 0bc5 d 00
+0bc5 0bc5 s 	db	0
+0bc6 0bc6 d 7c
+0bc6 0bc6 s 	db	07ch			;select drive 0, head 0 
+0bc7 0bc7 d 00
+0bc7 0bc7 s 	db	0			;dma address of 100h
+0bc8 0bc8 d 01
+0bc8 0bc8 s 	db	1
+0bc9 0bc9 d 00
+0bc9 0bc9 s 	db	0
+0bca 0bca d 00
+0bca 0bca s 	db	0			;low byte cylinder
+0bcb 0bcb d 00
+0bcb 0bcb s 	db	0			;high byte cylinder
+0bcc 0bcc d 00
+0bcc 0bcc s 	db	0			;head 0
+0bcd 0bcd d 00
+0bcd 0bcd s 	db	0			;sector 1
+0bce 0bce d 00
+0bce 0bce s 	db	0			;read command
+0bcf 0bcf d 00
+0bcf 0bcf s 	db	0			;clear status
+0bd0 0bd0 s 
+0bd0 0bd0 s endrd 	equ	$
+0bd0 0bd0 s 
+0bd0 0bd0 s 
+0bd0 0bd0 s ; Dispatch table for the on-board diagnostic routines
+0bd0 0bd0 s 
+0bd0 0bd0 s jtable	equ 	$
+0bd0 0bd0 d c30008
+0bd0 0bd0 s 	jp	regrd			;test all the readable registers
+0bd3 0bd3 d 00
+0bd3 0bd3 s 	db	0
+0bd4 0bd4 d c30e08
+0bd4 0bd4 s 	jp	regwr			;check all the writable registers but
+0bd7 0bd7 s  					; -task register
+0bd7 0bd7 d 00
+0bd7 0bd7 s 	db	0
+0bd8 0bd8 d c32108
+0bd8 0bd8 s 	jp	tmap			;check map rams
+0bdb 0bdb d 00
+0bdb 0bdb s 	db	0
+0bdc 0bdc d c33a08
+0bdc 0bdc s 	jp	tram			;check read/write ram
+0bdf 0bdf d 00
+0bdf 0bdf s 	db 	0
+0be0 0be0 d c34e08
+0be0 0be0 s 	jp	tfpp			;check fpp
+0be3 0be3 d 00
+0be3 0be3 s 	db	0
+0be4 0be4 d c37608
+0be4 0be4 s 	jp	tbus			;check bus read/write addresses
+0be7 0be7 d 00
+0be7 0be7 s 	db	0
+0be8 0be8 d c3a808
+0be8 0be8 s 	jp	ntbus			;R/W bus with 055h and 0aah
+0beb 0beb d 00
+0beb 0beb s 	db	0
+0bec 0bec d 180b
+0bec 0bec s 	jr	start			;yet to be defined
+0bee 0bee s 	
+0bee 0bee s 	
+0bee 0bee s ecode0  equ	$			;End of reset prom code
+0bee 0bee s 
+0bee 0bee s 	ds	3f0h-(ecode0-rom0)	;Fill out the prom
+0bf0 0bf0 s 
+0bf0 0bf0 s ;****************************************************************
+0bf0 0bf0 s ;*								*
+0bf0 0bf0 s ;* The following special piece of code is where the user task	*
+0bf0 0bf0 s ;* begins executing when a reset trap occurs. 			*
+0bf0 0bf0 s ;*								*
+0bf0 0bf0 s ;****************************************************************
+0bf0 0bf0 d 214a10
+0bf0 0bf0 s 	ld	hl,djstat
+0bf3 0bf3 d 3e00
+0bf3 0bf3 s 	ld	a,0h
+0bf5 0bf5 d 320206
+0bf5 0bf5 s 	ld	(mapram + 2),a		;t0 map points to t1 map seg 0
+0bf8 0bf8 d 3c
+0bf8 0bf8 s 	inc	a
+0bf9 0bf9 d 310002
+0bf9 0bf9 s start:	ld	sp,stack
+0bfc 0bfc d c35a08
+0bfc 0bfc s 	jp	getsw 		        ;power-on or reset jump
+0bff 0bff d 00
+0bff 0bff s 	nop				;Fill out the prom.
+0c00 0c00 s erom0   equ	$
+0c00 0c00 s 
+0c00 0c00 s 	ds	400h-(erom0-rom0)
+0c00 0c00 s 
+0800 0c00 s 	.phase 800h  
+0800 0c00 s 
+0800 0c00 s ;****************************************************************
+0800 0c00 s ;*								*
+0800 0c00 s ;*	This code is usuable by the supervisor task (task0)    	*
+0800 0c00 s ;*	but is not accessible to any other tasks. Any trap	*
+0800 0c00 s ;*      other than a reset will enable this half of the eprom	*
+0800 0c00 s ;*	as well.						*
+0800 0c00 s ;*								*
+0800 0c00 s ;****************************************************************
+0800 0c00 s 
+0800 0c00 s 
+0800 0c00 s 	rom1	equ	$
+0800 0c00 s 
+0800 0c00 s ;****************************************************************
+0800 0c00 s ;*								*
+0800 0c00 s ;*          ===>>  J U M P   T A B L E   <<===			*
+0800 0c00 s ;*								*
+0800 0c00 s ;****************************************************************
+0800 0c00 s 
+0800 0c00 d c31b08
+0800 0c00 s svtrap:	jp	trappd			;trap routine, check out reason why
+0803 0c03 d c35d08
+0803 0c03 s tskbse:	jp	tskbase			;Return task base pointer
+0806 0c06 d c3eb08
+0806 0c06 s nmap:	jp	putmap			;set up new allocation vector, access 
+0809 0c09 d c37b08
+0809 0c09 s gotsk:	jp	gotask			;switch to new task
+080c 0c0c d c3b908
+080c 0c0c s getmap:	jp	gtmap			;get the old allocation vector, access
+080f 0c0f d c3c508
+080f 0c0f s dupmap:	jp	dpmap			;copy user vector into T0 window
+0812 0c12 d c30209
+0812 0c12 s what:	jp	monitor			;debugger/monitor called 'MON'
+0815 0c15 d c36d08
+0815 0c15 s restr: 	jp	restor			;restore task 0 map to normal condition
+0818 0c18 d c37808
+0818 0c18 s otask:	jp	oldtask			;jumps to last task before trap
+081b 0c1b s  	
+081b 0c1b s 
+081b 0c1b s 	
+081b 0c1b d 11f1ff
+081b 0c1b s trappd:	ld	de,-15			;back up the users pc
+081e 0c1e d 2a9c01
+081e 0c1e s 	ld 	hl,(u.pc)
+0821 0c21 d 19
+0821 0c21 s 	add	hl,de
+0822 0c22 d 229c01
+0822 0c22 s 	ld	(u.pc),hl		;save the users original pc
+0825 0c25 d 08
+0825 0c25 s 	ex 	Af,Af'			;save auxilary registers
+0826 0c26 d d9
+0826 0c26 s 	exx
+0827 0c27 d f5
+0827 0c27 s 	push	Af
+0828 0c28 d e5
+0828 0c28 s 	push	hl
+0829 0c29 d d5
+0829 0c29 s 	push	de
+082a 0c2a d c5
+082a 0c2a s 	push	bc
+082b 0c2b d fde5
+082b 0c2b s 	push	iy
+082d 0c2d d dde5
+082d 0c2d s 	push	ix
+082f 0c2f d ed57
+082f 0c2f s 	ld	a,i			;get interupt register
+0831 0c31 d f5
+0831 0c31 s 	push	af			;save it
+0832 0c32 d 3a0600
+0832 0c32 s 	ld	a,(ctask)		;get current task number
+0835 0c35 d 310002
+0835 0c35 s 	ld	sp,stack
+0838 0c38 d cd0308
+0838 0c38 s 	call    tskbse			;get base of task save area
+083b 0c3b d e5
+083b 0c3b s 	push	hl			;save the bottom of task save area
+083c 0c3c d eb
+083c 0c3c s 	ex	de,hl			;de = bottom task_ save
+083d 0c3d d 218f01
+083d 0c3d s 	ld	hl,u.ir			;hl = bottom of temp_ save
+0840 0c40 d 011a00
+0840 0c40 s 	ld      bc,tasksiz		;repeat count
+0843 0c43 d c5
+0843 0c43 s 	push	bc			;save for register print routine
+0844 0c44 d edb0
+0844 0c44 s 	ldir   				;move registers from temporary store
+0846 0c46 s 					;to task_ store area
+0846 0c46 d 2a0304
+0846 0c46 s 	ld	hl,(stats)		;get status bits
+0849 0c49 d e5
+0849 0c49 s 	push	hl
+084a 0c4a d cb55
+084a 0c4a s 	bit	2,l			;was the trap a halt?
+084c 0c4c d c20000
+084c 0c4c s 	jp	nz,super
+084f 0c4f d cd0f08
+084f 0c4f s 	call	dupmap			;copy users map into task 0
+0852 0c52 d 2a9c01
+0852 0c52 s 	ld	hl,(u.pc)		;hl has users adjusted pc 
+0855 0c55 d 7e
+0855 0c55 s 	ld 	a,(hl)			;a = adjusted pc contents
+0856 0c56 d fe76
+0856 0c56 s 	cp	nxtbyte			;was it an 76 in next byte??
+0858 0c58 d c20000
+0858 0c58 s 	jp      nz,super		;jump if not an 76 to supervisor
+085b 0c5b d 23
+085b 0c5b s 	inc	hl			;HL point to address after 2nd halt
+085c 0c5c d e9
+085c 0c5c s 	jp	(hl)			;jump to byte following the halt 76 
+085d 0c5d s 					; - but now in task 0...
+085d 0c5d s 
+085d 0c5d s            
+085d 0c5d s 
+085d 0c5d s ;****************************************************************
+085d 0c5d s ;*								*
+085d 0c5d s ;*   Tskbase returns with H & L pointing to the first address	*
+085d 0c5d s ;*   in the user's task save area.  User is designated by 	*
+085d 0c5d s ;*   register A upon entry.					*	
+085d 0c5d s ;*								*
+085d 0c5d s ;****************************************************************
+085d 0c5d s 
+085d 0c5d s 
+085d 0c5d s 
+085d 0c5d s tskbase:	
+085d 0c5d d 21eeff
+085d 0c5d s 	ld	hl,tasks-tasksiz	;no task zero save area
+0860 0c60 d 111a00
+0860 0c60 s 	ld	de,tasksiz		;size of save area
+0863 0c63 d e60f
+0863 0c63 s 	and 	0fh			;mask off upper bits
+0865 0c65 d 2001
+0865 0c65 s 	jr	nz,tsklp		;task 0 and 1 share the same area
+0867 0c67 d 3c
+0867 0c67 s 	inc	a
+0868 0c68 d 19
+0868 0c68 s tsklp:	add     hl,de			
+0869 0c69 d 3d
+0869 0c69 s 	dec	a			
+086a 0c6a d 20fc
+086a 0c6a s 	jr	nz,tsklp		
+086c 0c6c d c9
+086c 0c6c s 	ret
+086d 0c6d s 		
+086d 0c6d s 
+086d 0c6d s 		
+086d 0c6d s ;********************************************************
+086d 0c6d s ;*							*
+086d 0c6d s ;*   Restore will restore Task 0's map with its old 	*
+086d 0c6d s ;*   values.  This assumes that if the map for task 0   *
+086d 0c6d s ;*   has been changed, that only the actual map had 	*
+086d 0c6d s ;*   been changed and that the image map was left in	*
+086d 0c6d s ;*   the condition before the change occurred.		*
+086d 0c6d s ;*							*
+086d 0c6d s ;********************************************************
+086d 0c6d s 
+086d 0c6d s 
+086d 0c6d d 210002
+086d 0c6d s restor:	ld 	hl,map			;point to beginning of map image
+0870 0c70 d 110006
+0870 0c70 s 	ld	de,mapram		;point to beginning of actual map
+0873 0c73 d 011f00
+0873 0c73 s 	ld	bc,01Fh			;all of task 0 map 
+0876 0c76 d edb0
+0876 0c76 s 	ldir
+0878 0c78 s 
+0878 0c78 s 
+0878 0c78 s ;****************************************************************
+0878 0c78 s ;*								*
+0878 0c78 s ;*	Gotask restores all the task's registers  and then	*
+0878 0c78 s ;*	switches to that task.                 			*
+0878 0c78 s ;*								*
+0878 0c78 s ;****************************************************************
+0878 0c78 s 
+0878 0c78 s oldtask:
+0878 0c78 d 3a0600
+0878 0c78 s 	ld	a,(ctask)
+087b 0c7b d 320600
+087b 0c7b s gotask:	ld	(ctask),a		;save new task number
+087e 0c7e d cd5d08
+087e 0c7e s 	call	tskbase 		;get address of task save area
+0881 0c81 d 118f01
+0881 0c81 s 	ld	de,u.ir			;base of save area
+0884 0c84 d 318e01
+0884 0c84 s 	ld	sp,u.save
+0887 0c87 d 011a00
+0887 0c87 s 	ld	bc,tasksiz		;repeat count
+088a 0c8a d edb0
+088a 0c8a s 	ldir				;move the registers
+088c 0c8c d f1
+088c 0c8c s 	pop	Af			;get back the interupt register
+088d 0c8d d ed47
+088d 0c8d s 	ld	i,a			;restore it
+088f 0c8f d dde1
+088f 0c8f s 	pop	ix			;restore auxilliary registers
+0891 0c91 d fde1
+0891 0c91 s 	pop	iy
+0893 0c93 d c1
+0893 0c93 s 	pop	bc
+0894 0c94 d d1
+0894 0c94 s 	pop	de
+0895 0c95 d e1
+0895 0c95 s 	pop	hl
+0896 0c96 d f1
+0896 0c96 s 	pop	af
+0897 0c97 d 08
+0897 0c97 s 	ex      Af,Af'
+0898 0c98 d d9
+0898 0c98 s 	exx
+0899 0c99 d e1
+0899 0c99 s 	pop	hl			;get pc register
+089a 0c9a d 220400
+089a 0c9a s 	ld	(user+1),hl		;put in jump instruction
+089d 0c9d d c1
+089d 0c9d s 	pop	bc			;restore primary registers
+089e 0c9e d 3ec3
+089e 0c9e s 	ld	a,jmpop			;lay down the jump instruction
+08a0 0ca0 d 320300
+08a0 0ca0 s 	ld	(user),a		;
+08a3 0ca3 d 3aa801
+08a3 0ca3 s 	ld	a,(u.mask)		;get back the old mask for that task
+08a6 0ca6 d 320700
+08a6 0ca6 s 	ld	(cmask),a
+08a9 0ca9 d 2a0600
+08a9 0ca9 s 	ld	hl,(ctask)		;get the task/mask for swapping
+08ac 0cac d 220204
+08ac 0cac s 	ld	(task),hl		;begin count, eigth instruction
+08af 0caf s 					; is in the user's space
+08af 0caf d d1
+08af 0caf s 	pop	de			;(1) restore primary registers
+08b0 0cb0 d e1
+08b0 0cb0 s 	pop	hl			;(2)
+08b1 0cb1 d f1
+08b1 0cb1 s 	pop	af			;(3)
+08b2 0cb2 d ed7ba601
+08b2 0cb2 s 	ld      sp,(u.sp)		;(4) (5)
+08b6 0cb6 d c30300
+08b6 0cb6 s 	jp	user			;(6)
+08b9 0cb9 s 					; 7th instruction is @ 003 task 0
+08b9 0cb9 s 	
+08b9 0cb9 s ;********************************************************
+08b9 0cb9 s ;*							*
+08b9 0cb9 s ;*  The following code will return with:		*
+08b9 0cb9 s ;*      Register A = task #/ segment #			*
+08b9 0cb9 s ;*	Register B = old allocation vector		*
+08b9 0cb9 s ;*	Register C = old access	priviledges		*
+08b9 0cb9 s ;*  Upon entry, it expects the A register to have	*
+08b9 0cb9 s ;*  the desired task# / segment #. Consider this to be	*
+08b9 0cb9 s ;*  opposite of the putmap routine.			*
+08b9 0cb9 s ;*							*
+08b9 0cb9 s ;********************************************************
+08b9 0cb9 s 
+08b9 0cb9 d cdfd08
+08b9 0cb9 s gtmap:	call	tsmod		;get task and segment numbers
+08bc 0cbc d eb
+08bc 0cbc s 	ex	de,hl		;save calculated offset in de
+08bd 0cbd d 210002
+08bd 0cbd s 	ld	hl,map		;point to beginning of map ram image
+08c0 0cc0 d 19
+08c0 0cc0 s 	add	hl,de		;add offset to get desired map
+08c1 0cc1 d 46
+08c1 0cc1 s 	ld	b,(HL)		;get old allocation vector
+08c2 0cc2 d 23
+08c2 0cc2 s 	inc	hl		;offset to access map
+08c3 0cc3 d 4e
+08c3 0cc3 s 	ld	c,(HL)		;get old access priviledges
+08c4 0cc4 d c9
+08c4 0cc4 s 	ret 	
+08c5 0cc5 s 		
+08c5 0cc5 s 
+08c5 0cc5 s 
+08c5 0cc5 s ;********************************************************
+08c5 0cc5 s ;*							*
+08c5 0cc5 s ;*	This routine copies the most recently trapped	*
+08c5 0cc5 s ;*	user's map into task0 actual map and gives T0   *
+08c5 0cc5 s ;*      unlimited privilidges with this memory. The	*
+08c5 0cc5 s ;*      T0 image map is not altered.			*
+08c5 0cc5 s ;*							*
+08c5 0cc5 s ;********************************************************
+08c5 0cc5 s 
+08c5 0cc5 d 3a0600
+08c5 0cc5 s dpmap:	ld	a,(ctask)
+08c8 0cc8 d cb07
+08c8 0cc8 s 	rlc	a
+08ca 0cca d cb07
+08ca 0cca s 	rlc	a
+08cc 0ccc d cb07
+08cc 0ccc s 	rlc	a
+08ce 0cce d cb07
+08ce 0cce s 	rlc	a
+08d0 0cd0 d cdb908
+08d0 0cd0 s dpmap0: call    gtmap    		;return with values in b,c
+08d3 0cd3 d 0e03
+08d3 0cd3 s 	ld	c,03h			;unlimied access priviledges
+08d5 0cd5 d f5
+08d5 0cd5 s 	push	af
+08d6 0cd6 d e60f
+08d6 0cd6 s 	and	0fh			;force task # to be 0
+08d8 0cd8 d cdfd08
+08d8 0cd8 s 	call	tsmod
+08db 0cdb d 110006
+08db 0cdb s 	ld	de,mapram		;point to T0 actual map
+08de 0cde d 19
+08de 0cde s 	add	hl,de
+08df 0cdf d 70
+08df 0cdf s 	ld	(hl),b			;new access vector
+08e0 0ce0 d 23
+08e0 0ce0 s 	inc	hl
+08e1 0ce1 d 71
+08e1 0ce1 s 	ld	(hl),c			;new priviledges
+08e2 0ce2 d f1
+08e2 0ce2 s 	pop	af
+08e3 0ce3 d 3c
+08e3 0ce3 s 	inc	a			;next map location
+08e4 0ce4 d 4f
+08e4 0ce4 s 	ld	c,a
+08e5 0ce5 d e60f
+08e5 0ce5 s 	and	0fh			
+08e7 0ce7 d c8
+08e7 0ce7 s 	ret	z			;do it 16 times for all segments
+08e8 0ce8 d 79
+08e8 0ce8 s 	ld	a,c
+08e9 0ce9 d 18e5
+08e9 0ce9 s 	jr	dpmap0
+08eb 0ceb s 
+08eb 0ceb s ;********************************************************
+08eb 0ceb s ;*							*
+08eb 0ceb s ;*  Putmap updates a task's allocation vectors and	*
+08eb 0ceb s ;*  access atributes.  Upon entry, registers must	*
+08eb 0ceb s ;*  contain:						*
+08eb 0ceb s ;*	a = task # / task segment # to update		*
+08eb 0ceb s ;*	    high nibble = task#, low nibble = segment#	*
+08eb 0ceb s ;*	b = new allocation vector			*
+08eb 0ceb s ;*	c = new access privilidges			*
+08eb 0ceb s ;*							*
+08eb 0ceb s ;*  Routine calculates the expression 600 + (a) X 2	*
+08eb 0ceb s ;*  where a is as listed above.  All arithmetic and	*
+08eb 0ceb s ;*  numbers are in Hex.					*
+08eb 0ceb s ;*							*
+08eb 0ceb s ;********************************************************
+08eb 0ceb s 
+08eb 0ceb d cdfd08
+08eb 0ceb s putmap:	call	tsmod			;get task and sec #
+08ee 0cee d eb
+08ee 0cee s 	ex 	de,hl			;save calculated offset in de
+08ef 0cef d 210006
+08ef 0cef s 	ld	hl,mapram		;point to beginning of ram map
+08f2 0cf2 d cdf808
+08f2 0cf2 s 	call 	putmxx			
+08f5 0cf5 d 210002
+08f5 0cf5 s 	ld	hl,map			;point to beginning of image map
+08f8 0cf8 d 19
+08f8 0cf8 s putmxx: add	hl,de			;add offset to selected map
+08f9 0cf9 d 70
+08f9 0cf9 s 	ld	(hl),b			;write the allocation vector
+08fa 0cfa d 23
+08fa 0cfa s 	inc	hl			;point to access attribute ram
+08fb 0cfb d 71
+08fb 0cfb s 	ld	(hl),c			;write new access atributes
+08fc 0cfc d c9
+08fc 0cfc s 	ret
+08fd 0cfd s 
+08fd 0cfd d 6f
+08fd 0cfd s tsmod: 	ld	l,a			;get task / seg number
+08fe 0cfe d 2600
+08fe 0cfe s 	ld	h,0
+0900 0d00 d 29
+0900 0d00 s 	add	hl,hl 			;multiply times two
+0901 0d01 d c9
+0901 0d01 s 	ret
+0902 0d02 s 	
+0902 0d02 s ;********************************************************	
+0902 0d02 s ;*							*
+0902 0d02 s ;*  The following routines make up the debugging tool	*
+0902 0d02 s ;*  called UPMON1.  It is a modified version of the 	*
+0902 0d02 s ;*  code in the lower half of the EPROM.       		*	
+0902 0d02 s ;*							*
+0902 0d02 s ;********************************************************
+0902 0d02 s 
+0902 0d02 s 
+0902 0d02 s monitor:
+0902 0d02 d cd040a
+0902 0d02 s 	call	ucrlf
+0905 0d05 d e1
+0905 0d05 s 	pop	hl			;print the stats and trap address
+0906 0d06 d cdc60a
+0906 0d06 s 	call	uladr			;print the task and mask
+0909 0d09 d d1
+0909 0d09 s 	pop 	de			;get task size
+090a 0d0a d 1b
+090a 0d0a s 	dec	de			
+090b 0d0b d e1
+090b 0d0b s 	pop	hl			;get the bottom of task save area
+090c 0d0c d e5
+090c 0d0c s 	push	hl
+090d 0d0d d 19
+090d 0d0d s 	add	hl,de
+090e 0d0e d eb
+090e 0d0e s 	ex	de,hl
+090f 0d0f d e1
+090f 0d0f s 	pop	hl
+0910 0d10 d 012309
+0910 0d10 s 	ld	bc,ustart
+0913 0d13 d c5
+0913 0d13 s 	push	bc
+0914 0d14 d 1834
+0914 0d14 s 	jr	udi0			;print out the registers
+0916 0d16 s 
+0916 0d16 d 3ab801
+0916 0d16 s cold:	ld	a,(ersav)		;retrieve the error byte if any
+0919 0d19 d 4f
+0919 0d19 s 	ld	c,a
+091a 0d1a d cd370a
+091a 0d1a s 	call	ucout1			;print it
+091d 0d1d d 2ab901
+091d 0d1d s 	ld	hl,(ersav + 1)		;retrieve disk command
+0920 0d20 d cdc60a
+0920 0d20 s 	call	uladr
+0923 0d23 s 
+0923 0d23 d 310002
+0923 0d23 s ustart:	ld	sp,stack
+0926 0d26 d 112309
+0926 0d26 s 	LD	DE,USTART		;monitor begins here
+0929 0d29 d d5
+0929 0d29 s 	PUSH	DE
+092a 0d2a d cd040a
+092a 0d2a s 	CALL	UCRLF
+092d 0d2d d 0e3a
+092d 0d2d s 	LD	C,':'
+092f 0d2f d cd370a
+092f 0d2f s 	CALL	ucout1
+0932 0d32 d cd0a0b
+0932 0d32 s USTAR0:	CALL	UTI
+0935 0d35 d b7
+0935 0d35 s 	OR	A
+0936 0d36 d 28fa
+0936 0d36 s 	JR	Z,USTAR0
+0938 0d38 d fe7b
+0938 0d38 s 	CP	'z'+1
+093a 0d3a d d2230a
+093a 0d3a s 	JP	NC,UERROR
+093d 0d3d d 0e02
+093d 0d3d s 	LD	C,002H
+093f 0d3f d fe44
+093f 0d3f s 	CP	'D'
+0941 0d41 d 2804
+0941 0d41 s 	JR	Z,udisp
+0943 0d43 d fe64
+0943 0d43 s 	cp	'd'
+0945 0d45 d 2019
+0945 0d45 s 	jr	nz,ufill
+0947 0d47 s 
+0947 0d47 s ;
+0947 0d47 s ;	DISPLAY MEMORY XXXX TO XXXX
+0947 0d47 s ;
+0947 0d47 s ;
+0947 0d47 d cdff09
+0947 0d47 s UDISP:	CALL	UEXLF
+094a 0d4a d cd040a
+094a 0d4a s UDI0:	CALL	UCRLF
+094d 0d4d d cdc60a
+094d 0d4d s 	CALL	ULADR
+0950 0d50 d 0610
+0950 0d50 s 	LD	B,010H
+0952 0d52 d cd350a
+0952 0d52 s UDI1:	CALL	UBLK
+0955 0d55 d 7e
+0955 0d55 s 	LD	A,(HL)
+0956 0d56 d cdcb0a
+0956 0d56 s 	CALL	ULBYTE
+0959 0d59 d cda20a
+0959 0d59 s 	CALL	UHILOX
+095c 0d5c d 10f4
+095c 0d5c s 	DJNZ	UDI1
+095e 0d5e d 18ea
+095e 0d5e s 	JR	UDI0
+0960 0d60 s ;
+0960 0d60 s ;
+0960 0d60 s ;
+0960 0d60 s ;	FILL MEMORY XXXX TO XXXX WITH XX
+0960 0d60 s ;
+0960 0d60 s ;
+0960 0d60 s ;
+0960 0d60 d fe46
+0960 0d60 s UFILL:	CP	'F'
+0962 0d62 d 2804
+0962 0d62 s 	JR	z,ufill0
+0964 0d64 d fe66
+0964 0d64 s 	cp	'f'
+0966 0d66 d 200c
+0966 0d66 s 	jr	nz,ugoto
+0968 0d68 d cd700a
+0968 0d68 s ufill0:	CALL	UEXPR3
+096b 0d6b d 71
+096b 0d6b s UFI0:	LD	(HL),C
+096c 0d6c d cda80a
+096c 0d6c s 	CALL	UHILO
+096f 0d6f d 30fa
+096f 0d6f s 	JR	NC,UFI0
+0971 0d71 d d1
+0971 0d71 s 	POP	DE
+0972 0d72 d 18af
+0972 0d72 s 	JR	USTART
+0974 0d74 s ;
+0974 0d74 s ;
+0974 0d74 s ;	GOTO (EXECUTE) XXXX
+0974 0d74 s ;
+0974 0d74 s ;
+0974 0d74 d fe47
+0974 0d74 s UGOTO:	CP	'G'
+0976 0d76 d 2804
+0976 0d76 s 	JR	Z,ugoto0
+0978 0d78 d fe67
+0978 0d78 s 	cp	'g'
+097a 0d7a d 2008
+097a 0d7a s 	jr	nz,umtest
+097c 0d7c d cd7b0a
+097c 0d7c s ugoto0:	CALL	UEXPR1
+097f 0d7f d cd040a
+097f 0d7f s 	CALL	UCRLF
+0982 0d82 d e1
+0982 0d82 s 	POP	HL
+0983 0d83 d e9
+0983 0d83 s 	JP	(HL)
+0984 0d84 s ;
+0984 0d84 s ;
+0984 0d84 s ;	TEST MEMORY XXXX TO XXXX
+0984 0d84 s ;
+0984 0d84 s ;
+0984 0d84 d fe54
+0984 0d84 s UMTEST:	CP	'T'
+0986 0d86 d 2804
+0986 0d86 s 	JR	Z,ut10
+0988 0d88 d fe74
+0988 0d88 s 	cp	't'
+098a 0d8a d 201c
+098a 0d8a s 	jr	nz,umove
+098c 0d8c d cdff09
+098c 0d8c s ut10:	CALL	UEXLF
+098f 0d8f d 7e
+098f 0d8f s UT1:	LD	A,(HL)
+0990 0d90 d 47
+0990 0d90 s 	LD	B,A
+0991 0d91 d 2f
+0991 0d91 s 	CPL
+0992 0d92 d 77
+0992 0d92 s 	LD	(HL),A
+0993 0d93 d ae
+0993 0d93 s 	XOR	(HL)
+0994 0d94 d 280c
+0994 0d94 s 	JR	Z,UT2
+0996 0d96 d d5
+0996 0d96 s 	PUSH	DE
+0997 0d97 d 5f
+0997 0d97 s 	LD	E,A
+0998 0d98 d cd320a
+0998 0d98 s 	CALL	UHLSP
+099b 0d9b d cd410b
+099b 0d9b s 	CALL	UQI1
+099e 0d9e d cd040a
+099e 0d9e s 	CALL	UCRLF
+09a1 0da1 d d1
+09a1 0da1 s 	POP	DE
+09a2 0da2 d 70
+09a2 0da2 s UT2:	LD	(HL),B
+09a3 0da3 d cda20a
+09a3 0da3 s 	CALL	UHILOX
+09a6 0da6 d 18e7
+09a6 0da6 s 	JR	UT1
+09a8 0da8 s ;
+09a8 0da8 s ;
+09a8 0da8 s ;	MOVE DATA FROM XXXX TO XXXX
+09a8 0da8 s ;
+09a8 0da8 s ;
+09a8 0da8 d fe4d
+09a8 0da8 s UMOVE:	CP	'M'
+09aa 0daa d 2804
+09aa 0daa s 	JR	Z,umvo0
+09ac 0dac d fe6d
+09ac 0dac s 	cp	'm'
+09ae 0dae d 2012
+09ae 0dae s 	jr	nz,usubs
+09b0 0db0 d cd700a
+09b0 0db0 s umvo0:	CALL	UEXPR3
+09b3 0db3 d 7e
+09b3 0db3 s UMV0:	LD	A,(HL)
+09b4 0db4 d 02
+09b4 0db4 s 	LD	(BC),A
+09b5 0db5 d 03
+09b5 0db5 s 	INC	BC
+09b6 0db6 d cda20a
+09b6 0db6 s 	CALL	UHILOX
+09b9 0db9 d 18f8
+09b9 0db9 s 	JR	UMV0
+09bb 0dbb d dd7700
+09bb 0dbb s USTORE:	LD	(IX+00H),A
+09be 0dbe d dd23
+09be 0dbe s 	INC	IX
+09c0 0dc0 d 1d
+09c0 0dc0 s 	DEC	E
+09c1 0dc1 d c9
+09c1 0dc1 s 	RET
+09c2 0dc2 s ;
+09c2 0dc2 s ;
+09c2 0dc2 s ;	EXAMINE AND/OR REPLACE MEMORY DATA
+09c2 0dc2 s ;
+09c2 0dc2 s ;
+09c2 0dc2 d fe53
+09c2 0dc2 s USUBS:	CP	'S'
+09c4 0dc4 d 2805
+09c4 0dc4 s 	JR	Z,usuo0
+09c6 0dc6 d fe73
+09c6 0dc6 s 	cp	's'
+09c8 0dc8 d c2b20a
+09c8 0dc8 s 	jp	nz,uhexn
+09cb 0dcb d cd7b0a
+09cb 0dcb s usuo0:	CALL	UEXPR1
+09ce 0dce d cdfe0a
+09ce 0dce s 	CALL	UQCHK
+09d1 0dd1 d da230a
+09d1 0dd1 s 	JP	C,UERROR
+09d4 0dd4 d e1
+09d4 0dd4 s 	POP	HL
+09d5 0dd5 d 7e
+09d5 0dd5 s USU0:	LD	A,(HL)
+09d6 0dd6 d cdcb0a
+09d6 0dd6 s 	CALL	ULBYTE
+09d9 0dd9 d 0e2d
+09d9 0dd9 s 	LD	C,02DH
+09db 0ddb d cdf80a
+09db 0ddb s 	CALL	UCOPCK
+09de 0dde d d8
+09de 0dde s 	RET	C
+09df 0ddf d 2810
+09df 0ddf s 	JR	Z,USU1
+09e1 0de1 d e5
+09e1 0de1 s 	PUSH	HL
+09e2 0de2 d 210000
+09e2 0de2 s 	LD	HL,0
+09e5 0de5 d 0e01
+09e5 0de5 s 	LD	C,001H
+09e7 0de7 d cd830a
+09e7 0de7 s 	CALL	UEX1
+09ea 0dea d d1
+09ea 0dea s 	POP	DE
+09eb 0deb d e1
+09eb 0deb s 	POP	HL
+09ec 0dec d 73
+09ec 0dec s 	LD	(HL),E
+09ed 0ded d 78
+09ed 0ded s 	LD	A,B
+09ee 0dee d fe0d
+09ee 0dee s 	CP	00DH
+09f0 0df0 d c8
+09f0 0df0 s 	RET	Z
+09f1 0df1 d 23
+09f1 0df1 s USU1:	INC	HL
+09f2 0df2 d cd040a
+09f2 0df2 s 	CALL	UCRLF
+09f5 0df5 d e5
+09f5 0df5 s 	PUSH	HL
+09f6 0df6 d cdc60a
+09f6 0df6 s 	CALL	ULADR
+09f9 0df9 d cd350a
+09f9 0df9 s 	CALL	UBLK
+09fc 0dfc d e1
+09fc 0dfc s 	POP	HL
+09fd 0dfd d 18d6
+09fd 0dfd s 	JR	USU0
+09ff 0dff s ;
+09ff 0dff s ;
+09ff 0dff d cd7d0a
+09ff 0dff s UEXLF:	CALL 	UEXPR
+0a02 0e02 d d1
+0a02 0e02 s 	POP	DE
+0a03 0e03 d e1
+0a03 0e03 s 	POP	HL
+0a04 0e04 s ;	CR/LF OUTPUT
+0a04 0e04 s ;
+0a04 0e04 s ;
+0a04 0e04 d e5
+0a04 0e04 s UCRLF:	PUSH	HL
+0a05 0e05 d c5
+0a05 0e05 s 	PUSH	BC
+0a06 0e06 d 0e0d
+0a06 0e06 s 	LD	C,0DH
+0a08 0e08 d cd370a
+0a08 0e08 s 	CALL	ucout1
+0a0b 0e0b d 0e0a
+0a0b 0e0b s 	LD	C,0AH
+0a0d 0e0d d cd370a
+0a0d 0e0d s 	CALL	ucout1
+0a10 0e10 d c1
+0a10 0e10 s 	POP	BC
+0a11 0e11 d e1
+0a11 0e11 s 	POP	HL
+0a12 0e12 d cd520a
+0a12 0e12 s 	CALL	UCSTS
+0a15 0e15 d b7
+0a15 0e15 s 	OR	A
+0a16 0e16 d c8
+0a16 0e16 s 	RET	Z
+0a17 0e17 s ;
+0a17 0e17 s ;	CHECK FOR CONTROL CHARACTER
+0a17 0e17 s ;
+0a17 0e17 s ;
+0a17 0e17 d cd440a
+0a17 0e17 s UCCHK:	CALL	ucon1
+0a1a 0e1a d e67f
+0a1a 0e1a s 	AND	07FH
+0a1c 0e1c d fe13
+0a1c 0e1c s 	CP	013H	;CONTROL-S
+0a1e 0e1e d 28f7
+0a1e 0e1e s 	JR	Z,UCCHK
+0a20 0e20 d fe03
+0a20 0e20 s 	CP	003H	;CONTROL-C
+0a22 0e22 d c0
+0a22 0e22 s 	RET	NZ
+0a23 0e23 d cdda0a
+0a23 0e23 s UERROR:	CALL	UMEMSIZ
+0a26 0e26 d 11230a
+0a26 0e26 s 	LD	DE,UERROR
+0a29 0e29 d d5
+0a29 0e29 s 	PUSH	DE
+0a2a 0e2a d 0e3f
+0a2a 0e2a s 	LD	C,'?'
+0a2c 0e2c d cd370a
+0a2c 0e2c s 	CALL	ucout1
+0a2f 0e2f d c32309
+0a2f 0e2f s 	JP	USTART
+0a32 0e32 d cdc60a
+0a32 0e32 s UHLSP:	CALL	ULADR
+0a35 0e35 s ;
+0a35 0e35 s ;	PRINT SPACE CHARACTER
+0a35 0e35 s ;
+0a35 0e35 d 0e20
+0a35 0e35 s UBLK:	LD	C,020H
+0a37 0e37 s 
+0a37 0e37 s 
+0a37 0e37 s ;********************************************************
+0a37 0e37 s ;*							*
+0a37 0e37 s ;*  Console I/O routines for the Wunderbus I/O.  These	*
+0a37 0e37 s ;*  routines assume that the uart divisor latch has 	*
+0a37 0e37 s ;*  previously set (either on power up or in routine 	*
+0a37 0e37 s ;*  executed before a trap to this routine occurred.    *
+0a37 0e37 s ;*  The character to output should be in the 'C' reg-	*
+0a37 0e37 s ;*  ister, the character received is returned in the	*
+0a37 0e37 s ;*  'A' register.  UCSTS returns with zero flag set	*
+0a37 0e37 s ;*  when no character is waiting in the UART buffer,	*
+0a37 0e37 s ;*  or with A = FFh if a character is waiting.		*
+0a37 0e37 s ;*							*
+0a37 0e37 s ;********************************************************	
+0a37 0e37 s 
+0a37 0e37 s 
+0a37 0e37 d cd5d0a
+0a37 0e37 s ucout1:	call	uconinit
+0a3a 0e3a d db4d
+0a3a 0e3a s ucout2:	in	a,(lsr)			;get uart status
+0a3c 0e3c d e620
+0a3c 0e3c s 	and	thre
+0a3e 0e3e d 28fa
+0a3e 0e3e s 	jr	z,ucout2		;loop until tbe
+0a40 0e40 d 79
+0a40 0e40 s 	ld	a,c
+0a41 0e41 d d348
+0a41 0e41 s 	out	(thr),a			;output the data to uart
+0a43 0e43 d c9
+0a43 0e43 s 	ret
+0a44 0e44 s 
+0a44 0e44 d cd5d0a
+0a44 0e44 s ucon1:	call	uconinit
+0a47 0e47 d db4d
+0a47 0e47 s ucon2:	in	a,(lsr)			;get uart status
+0a49 0e49 d e601
+0a49 0e49 s 	and	dr
+0a4b 0e4b d 28fa
+0a4b 0e4b s 	jr	z,ucon2			;wait until receive data available
+0a4d 0e4d d db48
+0a4d 0e4d s 	in	a,(rbr)			;read the uart data register
+0a4f 0e4f d e67f
+0a4f 0e4f s 	and	07fh			;strip parity
+0a51 0e51 d c9
+0a51 0e51 s 	ret
+0a52 0e52 s 
+0a52 0e52 d cd5d0a
+0a52 0e52 s ucsts:	call	uconinit		
+0a55 0e55 d db4d
+0a55 0e55 s 	in	a,(lsr)			;read uart status
+0a57 0e57 d e601
+0a57 0e57 s 	and	dr
+0a59 0e59 d c8
+0a59 0e59 s 	ret	z			;return zero set if no character
+0a5a 0e5a d 3eff
+0a5a 0e5a s 	ld	a,0ffh
+0a5c 0e5c d c9
+0a5c 0e5c s 	ret				;return a = ffh if character waiting
+0a5d 0e5d s 
+0a5d 0e5d s uconinit:
+0a5d 0e5d d 3e09
+0a5d 0e5d s 	ld	a,group1
+0a5f 0e5f d d34f
+0a5f 0e5f s 	out   	(grpctl),a		;set up for UART 1
+0a61 0e61 d 3e07
+0a61 0e61 s 	ld	a,wls0+wls1+stb		
+0a63 0e63 d d34b
+0a63 0e63 s 	out 	(lcr),a			;8 bit word, 2 bit stop bits
+0a65 0e65 d c9
+0a65 0e65 s 	ret		
+0a66 0e66 s 
+0a66 0e66 s 
+0a66 0e66 s 
+0a66 0e66 s ;	CONVERT HEX TO ASCII
+0a66 0e66 s 
+0a66 0e66 d e60f
+0a66 0e66 s UCONV:	AND	00fh
+0a68 0e68 d c690
+0a68 0e68 s 	ADD	A,090H
+0a6a 0e6a d 27
+0a6a 0e6a s 	DAA
+0a6b 0e6b d ce40
+0a6b 0e6b s 	ADC	A,040H
+0a6d 0e6d d 27
+0a6d 0e6d s 	DAA
+0a6e 0e6e d 4f
+0a6e 0e6e s 	LD	C,A
+0a6f 0e6f d c9
+0a6f 0e6f s 	RET
+0a70 0e70 s ;
+0a70 0e70 s ;	GET PARAMETERS 1,2,OR 3
+0a70 0e70 s ;
+0a70 0e70 d 0c
+0a70 0e70 s UEXPR3:	INC	C
+0a71 0e71 d cd7d0a
+0a71 0e71 s 	CALL	UEXPR
+0a74 0e74 d cd040a
+0a74 0e74 s 	CALL	UCRLF
+0a77 0e77 d c1
+0a77 0e77 s 	POP	BC
+0a78 0e78 d d1
+0a78 0e78 s 	POP	DE
+0a79 0e79 d e1
+0a79 0e79 s 	POP	HL
+0a7a 0e7a d c9
+0a7a 0e7a s 	RET
+0a7b 0e7b d 0e01
+0a7b 0e7b s UEXPR1:	LD	C,001H
+0a7d 0e7d d 210000
+0a7d 0e7d s UEXPR:	LD	HL,0
+0a80 0e80 d cd0a0b
+0a80 0e80 s UEX0:	CALL	UTI
+0a83 0e83 d 47
+0a83 0e83 s UEX1:	LD	B,A
+0a84 0e84 d cdde0a
+0a84 0e84 s 	CALL	UNIBBLE
+0a87 0e87 d 3808
+0a87 0e87 s 	JR	C,UEX2
+0a89 0e89 d 29
+0a89 0e89 s 	ADD	HL,HL
+0a8a 0e8a d 29
+0a8a 0e8a s 	ADD	HL,HL
+0a8b 0e8b d 29
+0a8b 0e8b s 	ADD	HL,HL
+0a8c 0e8c d 29
+0a8c 0e8c s 	ADD	HL,HL
+0a8d 0e8d d b5
+0a8d 0e8d s 	OR	L
+0a8e 0e8e d 6f
+0a8e 0e8e s 	LD	L,A
+0a8f 0e8f d 18ef
+0a8f 0e8f s 	JR	UEX0
+0a91 0e91 d e3
+0a91 0e91 s UEX2:	EX	(SP),HL
+0a92 0e92 d e5
+0a92 0e92 s 	PUSH	HL
+0a93 0e93 d 78
+0a93 0e93 s 	LD	A,B
+0a94 0e94 d cdfe0a
+0a94 0e94 s 	CALL	UQCHK
+0a97 0e97 d 3002
+0a97 0e97 s 	JR	NC,UEX3
+0a99 0e99 d 0d
+0a99 0e99 s 	DEC	C
+0a9a 0e9a d c8
+0a9a 0e9a s 	RET	Z
+0a9b 0e9b d c2230a
+0a9b 0e9b s UEX3:	JP	NZ,UERROR
+0a9e 0e9e d 0d
+0a9e 0e9e s 	DEC	C
+0a9f 0e9f d 20dc
+0a9f 0e9f s 	JR	NZ,UEXPR
+0aa1 0ea1 d c9
+0aa1 0ea1 s 	RET
+0aa2 0ea2 d cda80a
+0aa2 0ea2 s UHILOX:	CALL	UHILO
+0aa5 0ea5 d d0
+0aa5 0ea5 s 	RET	NC
+0aa6 0ea6 d d1
+0aa6 0ea6 s 	POP	DE
+0aa7 0ea7 d c9
+0aa7 0ea7 s 	RET
+0aa8 0ea8 d 23
+0aa8 0ea8 s UHILO:	INC	HL
+0aa9 0ea9 d 7c
+0aa9 0ea9 s 	LD	A,H
+0aaa 0eaa d b5
+0aaa 0eaa s 	OR	L
+0aab 0eab d 37
+0aab 0eab s 	SCF
+0aac 0eac d c8
+0aac 0eac s 	RET	Z
+0aad 0ead d 7b
+0aad 0ead s 	LD	A,E
+0aae 0eae d 95
+0aae 0eae s 	SUB	L
+0aaf 0eaf d 7a
+0aaf 0eaf s 	LD	A,D
+0ab0 0eb0 d 9c
+0ab0 0eb0 s 	SBC	A,H
+0ab1 0eb1 d c9
+0ab1 0eb1 s 	RET
+0ab2 0eb2 s ;
+0ab2 0eb2 s ;	HEXADECIMAL ARITHMETIC
+0ab2 0eb2 s ;
+0ab2 0eb2 d fe48
+0ab2 0eb2 s UHEXN:	CP	'H'
+0ab4 0eb4 d 2804
+0ab4 0eb4 s 	JR	Z,uhexd
+0ab6 0eb6 d fe68
+0ab6 0eb6 s 	cp	'h'
+0ab8 0eb8 d 206a
+0ab8 0eb8 s 	jr	nz,uport
+0aba 0eba d cdff09
+0aba 0eba s uhexd:	CALL	UEXLF
+0abd 0ebd d e5
+0abd 0ebd s 	PUSH	HL
+0abe 0ebe d 19
+0abe 0ebe s 	ADD	HL,DE
+0abf 0ebf d cd320a
+0abf 0ebf s 	CALL	UHLSP
+0ac2 0ec2 d e1
+0ac2 0ec2 s 	POP	HL
+0ac3 0ec3 d b7
+0ac3 0ec3 s 	OR	A
+0ac4 0ec4 d ed52
+0ac4 0ec4 s 	SBC	HL,DE
+0ac6 0ec6 s ;
+0ac6 0ec6 s ;	CONVERT HL REGISTER TO ASCII
+0ac6 0ec6 s ;
+0ac6 0ec6 d 7c
+0ac6 0ec6 s ULADR:	LD	A,H
+0ac7 0ec7 d cdcb0a
+0ac7 0ec7 s 	CALL	ULBYTE
+0aca 0eca d 7d
+0aca 0eca s 	LD	A,L
+0acb 0ecb s ;
+0acb 0ecb s ;	CONVERT A REGISTER TO ASCII
+0acb 0ecb s ;
+0acb 0ecb d f5
+0acb 0ecb s ULBYTE:	PUSH	AF
+0acc 0ecc d 0f
+0acc 0ecc s 	RRCA
+0acd 0ecd d 0f
+0acd 0ecd s 	RRCA
+0ace 0ece d 0f
+0ace 0ece s 	RRCA
+0acf 0ecf d 0f
+0acf 0ecf s 	RRCA
+0ad0 0ed0 d cdd40a
+0ad0 0ed0 s 	CALL	UDBLC
+0ad3 0ed3 d f1
+0ad3 0ed3 s 	POP	AF
+0ad4 0ed4 d cd660a
+0ad4 0ed4 s UDBLC:	CALL	UCONV
+0ad7 0ed7 d c3370a
+0ad7 0ed7 s 	JP	ucout1			;checked
+0ada 0eda s 
+0ada 0eda s UMEMSIZ:
+0ada 0eda d 2a0002
+0ada 0eda s 	LD	HL,(STACK)
+0add 0edd d c9
+0add 0edd s 	RET
+0ade 0ede s 
+0ade 0ede s UNIBBLE:
+0ade 0ede d fe61
+0ade 0ede s 	cp	'a'			;is it less than lower case 'a'?
+0ae0 0ee0 d 3806
+0ae0 0ee0 s 	jr	c,unibok		;take jump if so
+0ae2 0ee2 d fe7b
+0ae2 0ee2 s 	cp	'z'+1			;less than a lower case 'z'?
+0ae4 0ee4 d 3f
+0ae4 0ee4 s 	ccf				;set carry and return if > 'z'
+0ae5 0ee5 d d8
+0ae5 0ee5 s 	ret	c
+0ae6 0ee6 d d620
+0ae6 0ee6 s 	sub	' '			;convert to upper case
+0ae8 0ee8 d d630
+0ae8 0ee8 s unibok:	SUB	030H
+0aea 0eea d d8
+0aea 0eea s 	RET	C
+0aeb 0eeb d fe17
+0aeb 0eeb s 	cp	017h
+0aed 0eed d 3f
+0aed 0eed s 	ccf
+0aee 0eee d d8
+0aee 0eee s 	RET	C
+0aef 0eef d fe0a
+0aef 0eef s 	CP	00AH
+0af1 0ef1 d 3f
+0af1 0ef1 s 	CCF
+0af2 0ef2 d d0
+0af2 0ef2 s 	RET	NC
+0af3 0ef3 d d607
+0af3 0ef3 s 	SUB	007H
+0af5 0ef5 d fe0a
+0af5 0ef5 s 	CP	00AH
+0af7 0ef7 d c9
+0af7 0ef7 s 	RET
+0af8 0ef8 d cd370a
+0af8 0ef8 s UCOPCK:	CALL	ucout1
+0afb 0efb d cd0a0b
+0afb 0efb s UPCHK:	CALL	UTI
+0afe 0efe s ;
+0afe 0efe s ;	CHARACTER CHECK
+0afe 0efe s ;
+0afe 0efe d fe20
+0afe 0efe s UQCHK:	CP	020H
+0b00 0f00 d c8
+0b00 0f00 s 	RET	Z
+0b01 0f01 d fe2c
+0b01 0f01 s 	CP	02CH
+0b03 0f03 d c8
+0b03 0f03 s 	RET	Z
+0b04 0f04 d fe0d
+0b04 0f04 s 	CP	00DH
+0b06 0f06 d 37
+0b06 0f06 s 	SCF
+0b07 0f07 d c8
+0b07 0f07 s 	RET	Z
+0b08 0f08 d 3f
+0b08 0f08 s 	CCF
+0b09 0f09 d c9
+0b09 0f09 s 	RET
+0b0a 0f0a s ;
+0b0a 0f0a s ;	ECHO CONSOLE
+0b0a 0f0a s ;
+0b0a 0f0a d cd440a
+0b0a 0f0a s UTI:	CALL	ucon1
+0b0d 0f0d d 3c
+0b0d 0f0d s 	INC	A
+0b0e 0f0e d c8
+0b0e 0f0e s 	RET	Z
+0b0f 0f0f d 3d
+0b0f 0f0f s 	DEC	A
+0b10 0f10 d e67f
+0b10 0f10 s 	AND	07FH
+0b12 0f12 d c8
+0b12 0f12 s 	RET	Z
+0b13 0f13 d fe00
+0b13 0f13 s 	CP	000H
+0b15 0f15 d c8
+0b15 0f15 s 	RET	Z
+0b16 0f16 d fe4e
+0b16 0f16 s 	CP	04EH
+0b18 0f18 d c8
+0b18 0f18 s 	RET	Z
+0b19 0f19 d fe6e
+0b19 0f19 s 	CP	06EH
+0b1b 0f1b d c8
+0b1b 0f1b s 	RET	Z
+0b1c 0f1c d c5
+0b1c 0f1c s 	PUSH	BC
+0b1d 0f1d d 4f
+0b1d 0f1d s 	LD	C,A
+0b1e 0f1e d cd370a
+0b1e 0f1e s 	CALL	ucout1
+0b21 0f21 d 79
+0b21 0f21 s 	LD	A,C
+0b22 0f22 d c1
+0b22 0f22 s 	POP	BC
+0b23 0f23 d c9
+0b23 0f23 s 	RET
+0b24 0f24 s ;
+0b24 0f24 s ;	READ/WRITE TO I/O PORT
+0b24 0f24 s ;
+0b24 0f24 d fe4f
+0b24 0f24 s UPORT:	CP	'O'
+0b26 0f26 d 282a
+0b26 0f26 s 	JR	Z,UQOUT
+0b28 0f28 d fe6f
+0b28 0f28 s 	CP 	'o'
+0b2a 0f2a d 2826
+0b2a 0f2a s 	jr	z,uqout
+0b2c 0f2c d fe49
+0b2c 0f2c s 	CP	'I'
+0b2e 0f2e d 2806
+0b2e 0f2e s 	JR	Z,uin
+0b30 0f30 d fe69
+0b30 0f30 s 	cp	'i'
+0b32 0f32 d 2802
+0b32 0f32 s 	jr	z,uin
+0b34 0f34 d 1824
+0b34 0f34 s 	JR	UVERIFY
+0b36 0f36 d cd7b0a
+0b36 0f36 s UIN:	CALL	UEXPR1
+0b39 0f39 d 0e0a
+0b39 0f39 s 	LD	C,0AH
+0b3b 0f3b d cd370a
+0b3b 0f3b s 	CALL	ucout1
+0b3e 0f3e d c1
+0b3e 0f3e s 	POP	BC
+0b3f 0f3f d ed58
+0b3f 0f3f s UQ0:	IN	E,(C)
+0b41 0f41 d 0608
+0b41 0f41 s UQI1:	LD	B,008H
+0b43 0f43 d cd350a
+0b43 0f43 s 	CALL	UBLK
+0b46 0f46 d cb23
+0b46 0f46 s UQI2:	SLA	E
+0b48 0f48 d 3e18
+0b48 0f48 s 	LD	A,018H
+0b4a 0f4a d 8f
+0b4a 0f4a s 	ADC	A,A
+0b4b 0f4b d 4f
+0b4b 0f4b s 	LD	C,A
+0b4c 0f4c d cd370a
+0b4c 0f4c s 	CALL	ucout1
+0b4f 0f4f d 10f5
+0b4f 0f4f s 	DJNZ	UQI2
+0b51 0f51 d c9
+0b51 0f51 s 	RET
+0b52 0f52 d cd7d0a
+0b52 0f52 s UQOUT:	CALL	UEXPR
+0b55 0f55 d d1
+0b55 0f55 s 	POP	DE
+0b56 0f56 d c1
+0b56 0f56 s 	POP	BC
+0b57 0f57 d ed59
+0b57 0f57 s 	OUT	(C),E
+0b59 0f59 d c9
+0b59 0f59 s 	RET
+0b5a 0f5a s ;
+0b5a 0f5a s ;
+0b5a 0f5a s ;
+0b5a 0f5a s ;
+0b5a 0f5a s ;	VERIFY MEMORY XXXX TO XXXX WITH XXXX
+0b5a 0f5a s ;
+0b5a 0f5a s UVERIFY:
+0b5a 0f5a d fe56
+0b5a 0f5a s 	CP	'V'
+0b5c 0f5c d 2804
+0b5c 0f5c s 	JR	Z,uver0
+0b5e 0f5e d fe76
+0b5e 0f5e s 	cp	'v'
+0b60 0f60 d 2012
+0b60 0f60 s 	jr	nz,uretrn
+0b62 0f62 d cd700a
+0b62 0f62 s uver0:	call 	uexpr3
+0b65 0f65 d 0a
+0b65 0f65 s UVERIO:	LD	A,(BC)
+0b66 0f66 d be
+0b66 0f66 s 	CP	(HL)
+0b67 0f67 d 2805
+0b67 0f67 s 	JR	Z,U..B
+0b69 0f69 d c5
+0b69 0f69 s 	PUSH	BC
+0b6a 0f6a d cdde0b
+0b6a 0f6a s 	CALL	UCERR
+0b6d 0f6d d c1
+0b6d 0f6d s 	POP	BC
+0b6e 0f6e d 03
+0b6e 0f6e s U..B:	INC	BC
+0b6f 0f6f d cda20a
+0b6f 0f6f s 	CALL	UHILOX
+0b72 0f72 d 18f1
+0b72 0f72 s 	JR	UVERIO
+0b74 0f74 s 
+0b74 0f74 s ;	Return to task which just trapped with old pc and registers restored
+0b74 0f74 s 
+0b74 0f74 d fe43
+0b74 0f74 s uretrn:	cp	'C'
+0b76 0f76 d 2804
+0b76 0f76 s 	jr	z,uretr1
+0b78 0f78 d fe63
+0b78 0f78 s 	cp	'c'	
+0b7a 0f7a d 2011
+0b7a 0f7a s 	jr	nz,ucontr
+0b7c 0f7c d 3a0600
+0b7c 0f7c s uretr1:	ld	a,(ctask)
+0b7f 0f7f d cd5d08
+0b7f 0f7f s 	call	tskbase
+0b82 0f82 d 111900
+0b82 0f82 s 	ld	de,mskofst
+0b85 0f85 d 19
+0b85 0f85 s 	add	hl,de
+0b86 0f86 d 7e
+0b86 0f86 s 	ld	a,(hl)
+0b87 0f87 d f608
+0b87 0f87 s 	or	08h
+0b89 0f89 d 77
+0b89 0f89 s 	ld	(hl),a
+0b8a 0f8a d c31808
+0b8a 0f8a s 	jp	otask
+0b8d 0f8d s 
+0b8d 0f8d s 
+0b8d 0f8d s ;	Return to trapped task, execute next instruction and trap back
+0b8d 0f8d s 
+0b8d 0f8d d fe55
+0b8d 0f8d s ucontr:	cp	'U'
+0b8f 0f8f d 2804
+0b8f 0f8f s 	jr	z,ucont1
+0b91 0f91 d fe75
+0b91 0f91 s 	cp	'u'
+0b93 0f93 d 2011
+0b93 0f93 s 	jr	nz,uboot
+0b95 0f95 d 3a0600
+0b95 0f95 s ucont1:	ld	a,(ctask)
+0b98 0f98 d cd5d08
+0b98 0f98 s 	call	tskbase
+0b9b 0f9b d 111900
+0b9b 0f9b s 	ld	de,mskofst
+0b9e 0f9e d 19
+0b9e 0f9e s 	add	hl,de
+0b9f 0f9f d 7e
+0b9f 0f9f s 	ld	a,(hl)
+0ba0 0fa0 d e6f6
+0ba0 0fa0 s 	and	0f6h			;force mask for stop and run enble low
+0ba2 0fa2 d 77
+0ba2 0fa2 s 	ld	(hl),a
+0ba3 0fa3 d c31808
+0ba3 0fa3 s 	jp	otask	
+0ba6 0fa6 s 
+0ba6 0fa6 s ;	Jump to the cpu switch address into task specified by CTASK
+0ba6 0fa6 s 
+0ba6 0fa6 d fe42
+0ba6 0fa6 s uboot:	cp	'B'
+0ba8 0fa8 d 2805
+0ba8 0fa8 s 	jr	z,uboot1
+0baa 0faa d fe62
+0baa 0faa s 	cp	'b'
+0bac 0fac d c2230a
+0bac 0fac s 	jp	nz,uerror
+0baf 0faf d 3a0600
+0baf 0faf s uboot1:	ld	a,(ctask)
+0bb2 0fb2 d cd5d08
+0bb2 0fb2 s 	call	tskbase
+0bb5 0fb5 d e5
+0bb5 0fb5 s 	push	hl
+0bb6 0fb6 d 3a0204
+0bb6 0fb6 s 	ld	a,(switch)
+0bb9 0fb9 d e6f8
+0bb9 0fb9 s 	and	0f8h
+0bbb 0fbb d fe00
+0bbb 0fbb s 	cp	0			;check for a HDCA hard disk boot
+0bbd 0fbd d cad20b
+0bbd 0fbd s 	jp	z,uboot2
+0bc0 0fc0 d fe08
+0bc0 0fc0 s 	cp	08h			;check for DMA hard disk boot
+0bc2 0fc2 d cad20b
+0bc2 0fc2 s 	jp	z,uboot2
+0bc5 0fc5 d fe10
+0bc5 0fc5 s 	cp	010h			;check for DJ-DMA
+0bc7 0fc7 d cad20b
+0bc7 0fc7 s 	jp	z,uboot2
+0bca 0fca d 110d00
+0bca 0fca s 	ld	de,pcofst
+0bcd 0fcd d 19
+0bcd 0fcd s 	add	hl,de
+0bce 0fce d 3600
+0bce 0fce s 	ld	(hl),0
+0bd0 0fd0 d 23
+0bd0 0fd0 s 	inc	hl
+0bd1 0fd1 d 77
+0bd1 0fd1 s 	ld	(hl),a
+0bd2 0fd2 d 3a0700
+0bd2 0fd2 s uboot2: ld	a,(cmask)
+0bd5 0fd5 d e1
+0bd5 0fd5 s 	pop	hl
+0bd6 0fd6 d 111900
+0bd6 0fd6 s 	ld	de,mskofst
+0bd9 0fd9 d 19
+0bd9 0fd9 s 	add	hl,de
+0bda 0fda d 77
+0bda 0fda s 	ld	(hl),a
+0bdb 0fdb d c37808
+0bdb 0fdb s 	jp	oldtask
+0bde 0fde s 
+0bde 0fde s 
+0bde 0fde s 
+0bde 0fde s ;	MEMORY MISMATCH PRINTOUT
+0bde 0fde s ;
+0bde 0fde d 47
+0bde 0fde s UCERR:	LD	B,A
+0bdf 0fdf d cd320a
+0bdf 0fdf s 	CALL	UHLSP
+0be2 0fe2 d 7e
+0be2 0fe2 s 	LD	A,(HL)
+0be3 0fe3 d cdcb0a
+0be3 0fe3 s 	CALL	ULBYTE
+0be6 0fe6 d cd350a
+0be6 0fe6 s 	CALL	UBLK
+0be9 0fe9 d 78
+0be9 0fe9 s 	LD	A,B
+0bea 0fea d cdcb0a
+0bea 0fea s 	CALL	ULBYTE
+0bed 0fed d c3040a
+0bed 0fed s 	JP	UCRLF
+0bf0 0ff0 s ;
+0bf0 0ff0 s 
+0bf0 0ff0 s 
+0bf0 0ff0 s ecode1	equ	$
+0bf0 0ff0 s 	ds	3f0h-(ecode1-rom1)
+0bf0 0ff0 s 
+0bf0 0ff0 s ;********************************************************
+0bf0 0ff0 s ;*   							*
+0bf0 0ff0 s ;*   The following piece of code is where the user	*
+0bf0 0ff0 s ;*   task begins execution whenever a trap occurs.	*
+0bf0 0ff0 s ;*   The users registers and sp are saved in the 	*
+0bf0 0ff0 s ;*   temporary users store area.			*
+0bf0 0ff0 s ;*							*
+0bf0 0ff0 s ;********************************************************
+0bf0 0ff0 s 
+0bf0 0ff0 d 00
+0bf0 0ff0 s 	nop				;must be a nop to void instruction
+0bf1 0ff1 d ed73a601
+0bf1 0ff1 s 	ld 	(u.sp),sp		;save the users stack pointer
+0bf5 0ff5 d 31a601
+0bf5 0ff5 s 	ld	sp,u.sp			;set sp to the temporary save area
+0bf8 0ff8 d f5
+0bf8 0ff8 s 	push	Af			;save the users registers in temp area
+0bf9 0ff9 d e5
+0bf9 0ff9 s 	push	hl
+0bfa 0ffa d d5
+0bfa 0ffa s 	push	de
+0bfb 0ffb d c5
+0bfb 0ffb s 	push	bc
+0bfc 0ffc d cd0008
+0bfc 0ffc s 	call 	svtrap			;go to supervisor trap, pc is save
+0bff 0fff s 
+0bff 0fff s 
+0bff 0fff d 76
+0bff 0fff s 	halt				;to allow halts in task 0
+0c00 1000 s erom1	equ	$						
+0c00 1000 s 	ds	400h-(erom1-rom1)
+0c00 1000 s 	
+0c00 1000 s 
+0c00 1000 s 
+0c00 1000 s fpp0:	ds	8
+0c00 1000 d 0000000000000000
+0c08 1008 s fpp1:	ds	1
+0c08 1008 d 00
+0c09 1009 s 
+0c09 1009 s 	end
+0001 v dr
+0001 v ic4
+0b3f a uq0
+098f a ut1
+09a2 a ut2
+000c v aff
+000a v alf
+0007 v bel
+0b6e a u..b
+000d v acr
+1087 v arg
+0048 v dll
+0049 v dlm
+0020 v eoi
+0200 a map
+0049 v ier
+004b v lcr
+004c v mcr
+0000 v ram
+0020 v asp
+0008 v bsp
+0048 v rbr
+0099 v cyl
+0004 v stb
+098c a ut10
+0b36 a uin
+0000 v nop
+0048 v thr
+004d v lsr
+0b0a a uti
+0004 v adi4
+0000 v adi8
+01a4 a u.af
+094a a udi0
+0952 a udi1
+004c v icw1
+004d v icw2
+004d v icw3
+004d v icw4
+019c a u.pc
+096b a ufi0
+004d v ocw1
+004c v ocw2
+0c00 a fpp0
+0c08 a fpp1
+018f a u.ir
+0800 v rom0
+0800 v rom1
+0001 v trk0
+0b41 a uqi1
+0a83 a uex1
+0a80 a uex0
+0a91 a uex2
+0001 v wls0
+0002 v wls1
+01a6 a u.sp
+09b3 a umv0
+0a9b a uex3
+0b46 a uqi2
+09d5 a usu0
+09f1 a usu1
+0080 v dlab
+0053 v data
+0048 v base
+1080 v chan
+108b v cmmd
+0916 a cold
+0918 a fmap
+00ff v good
+1050 v iopb
+0a11 a hdrl
+0403 a mask
+0a17 a home
+108d v link
+0806 a nmap
+0a35 a ublk
+0821 a tmap
+0020 v thre
+0010 v init
+0002 v sngl
+0008 v ltim
+0055 v attn
+0402 a task
+083a a tram
+0010 v loop
+084e a tfpp
+0006 v noop
+0a87 a wait
+0876 a tbus
+0003 a user
+0812 a what
+0c00 v erom0
+0c00 v erom1
+083f a tram1
+0a89 a wait0
+0a8c a wait1
+0a44 a ucon1
+0a47 a ucon2
+0b62 a uver0
+09b0 a umvo0
+09cb a usuo0
+0972 a check
+0001 v dread
+09c9 a djdma
+0002 v rhead
+0004 v heads
+0ad4 a udblc
+0a2a a rdata
+0bd0 v endrd
+0a17 a ucchk
+0007 a cmask
+0051 v commd
+0401 a keybd
+08c5 a dpmap
+0800 a regrd
+0000 v imask
+0020 v ready
+0006 a ctask
+0200 v stack
+0400 v locio
+0bc3 a rdtbl
+0ac8 a sdone
+0ac1 a waitc
+0a3e a cloop
+0005 v sense
+0aee a waitd
+08b9 a gtmap
+001f v ivalu
+01b8 v ersav
+0011 v hdspt
+085f a reset
+0818 a otask
+00c3 v jmpop
+0004 v const
+0008 a tasks
+080e a regwr
+085a a getsw
+00f8 v stepo
+0001 v write
+08a8 a ntbus
+09f1 a nstat
+0000 a super
+0403 a stats
+0922 a setup
+0aab a rloop
+0ab4 a waitz
+0b03 a lloop
+0b55 a setit
+0b9e a begin0
+0bf9 a start
+0bee v ecode0
+0809 a gotsk
+0815 a restr
+0868 a tsklp
+08fd a tsmod
+0a04 a ucrlf
+0ac6 a uladr
+0947 a udisp
+0960 a ufill
+09ff a uexlf
+08d0 a dpmap0
+0974 a ugoto
+0aa8 a uhilo
+0001 v track0
+095c a tstsw
+09a8 a umove
+0a7c a hdlop1
+09cb a djlop0
+0a32 a uhlsp
+09c2 a usubs
+0968 a ufill0
+0a40 a cloop0
+0a45 a cloop1
+01a8 a u.mask
+002b v t0mask
+002b v t1mask
+018e a u.save
+08e3 a reset0
+08ef a reset1
+0a5a a cloop2
+0acb a iwait1
+090f a reslp1
+080f a regwr1
+0902 a reslp2
+0ad0 a iwait2
+0ad5 a iwait3
+0ab2 a uhexn
+0008 v group0
+0009 v group1
+000a v group2
+000b v group3
+0b2d a uarts0
+0a37 a ucout1
+0932 a ustar0
+097c a ugoto0
+0a7b a uexpr1
+0afe a uqchk
+094e a badram
+0a70 a uexpr3
+0008 v header
+0ba5 a btable
+0a7d a uexpr
+1084 v dmaddr
+0a52 a ucsts
+0a3a a ucout2
+0a66 a uconv
+0aba a uhexd
+0000 v readat
+0bd0 v jtable
+0050 v ioaddr
+0b24 a uport
+0afb a upchk
+0937 a ramchk
+0005 v drenbl
+0a99 a hdcerr
+0004 v dready
+1100 v bootad
+00cd v callop
+00fc v drivea
+01aa v gobuff
+0404 v elocio
+0400 a trpadd
+1083 v select
+000f v bcofst
+0600 a mapram
+0015 v afofst
+0000 v hivect
+0011 v deofst
+0002 v opdone
+00c8 v hdsetl
+0008 v sekcmp
+0000 v normal
+104a v djstat
+0036 v ssmode
+004f v grpctl
+0000 v lovect
+0052 v functn
+000d v pcofst
+0013 v hlofst
+0001 v sector
+001a v hstrap
+0050 v contrl
+0004 v complt
+0007 v secsiz
+0003 v format
+0007 v dskrun
+0001 v window
+0054 v dmarst
+0000 v stepin
+0002 v wfault
+108c v statis
+000d v revnum
+0400 a dspseg
+0017 v spofst
+001e v stpdly
+0401 a dspcol
+0402 a switch
+0b2b a uartst
+0050 v status
+0080 v system
+08f2 a settle
+08ff a reslop
+0b18 a rstmap
+0943 a nexchk
+0a6b a allerr
+0aa3 a boothd
+09f7 a nuboot
+0986 a nutask
+0982 a montor
+09af a picset
+09ce a djloop
+0a62 a derror
+0bb3 a bootbl
+0a79 a hdclop
+0b10 a dxloop
+0b7b a rduart
+0b26 a rstmxx
+0b96 a contin
+0b87 a urterr
+0800 a svtrap
+081b a trappd
+0803 a tskbse
+08eb a putmap
+087b a gotask
+080c a getmap
+080f a dupmap
+086d a restor
+08f8 a putmxx
+0923 a ustart
+0a23 a uerror
+0acb a ulbyte
+0aa2 a uhilox
+0984 a umtest
+09bb a ustore
+0af8 a ucopck
+0ae8 a unibok
+0b52 a uqout
+0b74 a uretrn
+0b65 a uverio
+0bde a ucerr
+0b7c a uretr1
+0b8d a ucontr
+0b95 a ucont1
+0ba6 a uboot
+0baf a uboot1
+0bd2 a uboot2
+0bf0 v ecode1
+0ade a unibble
+0b52 a default
+00ff v picmask
+0bc3 v endboot
+085d a tskbase
+0878 a oldtask
+0051 v secstat
+0019 v mskofst
+0902 a monitor
+001a v tasksiz
+0ada a umemsiz
+0b5a a uverify
+0076 v nxtbyte
+0010 v stepout
+0a5d a uconinit

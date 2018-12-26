@@ -1,0 +1,64 @@
+.he "wtmp (5)                      3/15/82                    wtmp (5)"
+.fo "                                -#-"
+.in 5
+.rm 65
+.bd
+FILE
+.in +5
+.br
+.bd
+wtmp 
+- user login history
+.sp 2
+.in -5
+.bd
+FUNCTION       
+.in +5
+.br
+This file records all logins and logouts.
+Its format is like 
+.bd
+utmp
+(5) with these exceptions:
+A null user name indicates a logout on the associated typewriter.
+Furthermore, the typewriter name 
+.bd
+~
+indicates the system was rebooted at the indicated time;
+the adjacent pair of entries with typewriter names
+.bd
+|
+and 
+.bd
+}
+indicate the system-maintained time just before and just
+after a 
+.bd
+date 
+command changed the systems' idea of the time.
+.bd
+Wtmp 
+is maintained by 
+.bd
+login 
+(1) and 
+.bd
+init 
+(1).  Neither of these programs creates the file,
+so if is is removed, record-keeping is turned off.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/usr/adm/wtmp
+.br
+/include/utmp.h
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+utmp (5), login (1), init (1), who (1)

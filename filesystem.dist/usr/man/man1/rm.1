@@ -1,0 +1,51 @@
+.he "rm (1)                       6/25/82                       rm (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+rm
+- remove files (directories)
+
+
+.in -5
+.bd
+USAGE             
+.in +5
+.br
+.bd
+rm [-r] file ...
+
+
+.in -5
+.bd
+FUNCTION       
+.br
+.in +5
+Each of the named files is removed, if possible.
+It is also used also to remove directories; files must be removed first,
+however.
+
+The -r option removes entire
+hierarchies of files.
+This means all files, subdirectories, directories, etc. will be
+permanently erased,
+which means that
+this option is quite 
+.ul
+dangerous!
+When run interactively, this program asks if it may proceed with the requests,
+however, offering some amount of protection, but still, take care when
+using this command.
+
+
+.in -5
+.bd
+ERRORS      
+.in +5
+.br
+It is not possible to remove non-empty directories.
+
