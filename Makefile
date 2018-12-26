@@ -4,6 +4,9 @@
 all:
 	cd usersim ; make
 
+test: all
+	cd usersim ; ./sim
+
 clean:
 	for dir in usersim tools src/sgs src/fstools ; do \
 		(cd $$dir ; make clean) \
