@@ -5,8 +5,11 @@ all: test $(BINS)
 CFLAGS=-Wno-return-type
 
 clean:
-	rm -f $(BINS) *.o 
+	rm -f *.o 
 	rm -rf *.dSYM
+
+clobber: clean
+	rm -f $(BINS)
 
 test: testdis
 
@@ -35,3 +38,4 @@ testdis: dis
 	./dis test/MON447.HEX
 	./dis test/LIBC.REL
 	./dis test/mw.o
+

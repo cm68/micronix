@@ -6,8 +6,11 @@ all: $(BINS)
 CFLAGS=-Wno-return-type -I$(INCPATH)
 
 clean:
-	rm -f $(BINS) *.o 
+	rm -f *.o 
 	rm -rf *.dSYM
+
+clobber: clean
+	rm -f $(BINS)
 
 test: nm
 	./nm tests/mw.o
