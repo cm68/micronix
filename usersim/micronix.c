@@ -454,7 +454,11 @@ dumpcpu()
 {
 	unsigned char f;
 	char outbuf[40];
+	char fbuf[9];
 	char *s;
+	int i;
+
+	strcpy(fbuf, "        ");
 
 	format_instr(cp->state.pc, outbuf, &get_byte, &lookup_sym, &reloc);
 	s = lookup_sym(cp->state.pc);
@@ -465,15 +469,16 @@ dumpcpu()
 
 	f = cp->state.registers.byte[Z80_F];
 	
-	if (f & Z80_C_FLAG) printf("C"); else  printf(" ");
-	if (f & Z80_N_FLAG) printf("N"); else  printf(" ");
-	if (f & Z80_X_FLAG) printf("X"); else  printf(" ");
-	if (f & Z80_H_FLAG) printf("H"); else  printf(" ");
-	if (f & Z80_Y_FLAG) printf("Y"); else  printf(" ");
-	if (f & Z80_Z_FLAG) printf("Z"); else  printf(" ");
-	if (f & Z80_C_FLAG) printf("S"); else  printf(" ");
+	if (f & Z80_C_FLAG) fbuf[0] = 'C';
+	if (f & Z80_N_FLAG) fbuf[1] = 'N';
+	if (f & Z80_X_FLAG) fbuf[2] = 'X';
+	if (f & Z80_H_FLAG) fbuf[3] = 'H';
+	if (f & Z80_Y_FLAG) fbuf[4] = 'Y';
+	if (f & Z80_Z_FLAG) fbuf[5] = 'Z';
+	if (f & Z80_C_FLAG) fbuf[6] = 'S';
 
-	printf(" a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x brk:%04x ",
+	printf(" %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x brk:%04x\n",
+		fbuf, 
 		cp->state.registers.byte[Z80_A],
 		cp->state.registers.word[Z80_BC],
 		cp->state.registers.word[Z80_DE],
@@ -483,8 +488,6 @@ dumpcpu()
 		cp->state.registers.word[Z80_SP],
 		get_word(cp->state.registers.word[Z80_SP]),
 		brake);
-
-	printf(" \n");
 }
 
 /*
@@ -987,14 +990,21 @@ void SystemCall (MACHINE *cp)
 	sc = pop();
 	push(sc);
 
-	/* point at the rst1 instruction */
+	/*
+	 * upm can't use the rst1, since cp/m uses that memory.
+	 * so, it does a call (0xcd) to the halt instruction.
+	 * all our other code uses rst1.
+	 * so, either: sc[0] == 0xcf or sc[-2] == 0xcd
+	 * the hack is that in the second case, sc[0] is part of
+	 * the high part of the address of the halt.
+	 */
 	sc -= 1; 
 
 	/* make sure that we came here from a rst1 */
-	if ((code = get_byte(sc)) != 0xcf) {
+	if (((get_byte(sc)) != 0xcf) && (get_byte(sc - 2) != 0xcd)) {
 		pid();
 		dumpcpu();
-		printf("halt no syscall %d %x!\n", code, sc);
+		printf("halt no syscall %x!\n", sc);
 		exit(1);
 	}
 
