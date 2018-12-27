@@ -1,0 +1,272 @@
+
+
+
+
+
+                IINNTTRROODDUUCCTTIIOONN TTOO SSYYSSTTEEMM CCAALLLLSS
+     
+     
+     This  section of the manual lists all Micronix system calls.
+     The syntax for these calls is in most cases  identical  with
+     that  for Unix Version 6 system calls, differing only in the
+     assembly language register names. For most purposes, Section
+     II of the Unix V6 Programmer's  Manual  can  be  used  as  a
+     reference in place of this one.
+     
+     Call  syntax  for  both  C  and  assembly language is given.
+     Familiarity with one of  these  languages  is  necessary  to
+     understand this section.
+     
+     Many system calls take a file name. This can be an arbitrary
+     path name, of unlimited length, but it must be terminated by
+     a   0-byte,   and  the  calling  process  must  have  search
+     permission on all directories in the path.
+     
+     An error during a system  call  never  causes  an  automatic
+     error  message, but an error number is always available (see
+     below), and the program can request a standard error message
+     if it wants [see ppeerrrroorr (3)].
+     
+     
+                            CC SSyysstteemm CCaallllss
+     
+     The type of declarations given for system call arguments are
+     not  meant  to  be  copied  literally;   they   are   simply
+     indications  of  how  the system will treat the arguments. A
+     string, for example, is always  acceptable  in  place  of  a
+     ((cchhaarr  **))  argument. When no declaration is given, an iinntt is
+     expected.
+     
+     From C, an error is indicated  by  an  otherwise  impossible
+     return  value.  This  is usually -1; the individual sections
+     specify the details. The error number is always left in  the
+     external  variable,  eerrrrnnoo..  This variable is not cleared on
+     successful  calls,  so  that  it  remains  available  across
+     message writes, etc.
+     
+     
+                    AAsssseemmbbllyy LLaanngguuaaggee SSyysstteemm CCaallllss
+     
+     Syntax   is  given  for  A-Natural  (Whitesmith's)  assembly
+     language.  Translation  to  Intel  or  Zilog  mneumonics  is
+     straightforward.  For  example,  the  cchhmmoodd  system  call in
+     A-Natural is
+             
+     ssyyss;; cchhmmoodd;; nnaammee;; mmooddee
+
+
+
+
+		               -1-
+
+
+
+
+
+
+
+     In Intel assembly language, this looks like
+             
+             ddbb ssyyss
+             ddbb cchhmmoodd
+             ddww nnaammee
+             ddww mmooddee
+
+
+     The "sys" byte that begins each system call is a synonym for
+     "restart 1". The names of the calls themselves are  synonyms
+     for  1-byte  quantities  that can be found in the individual
+     sections,  or  by  inspecting   or   including   the   files
+     /include/an.h   and   /include/intel.h.  Succeeding  in-line
+     arguments, if any, are always 2-byte  quantities.  A  "name"
+     argument is always a pointer to a null-terminated string.
+     
+     Registers  are preserved across system calls, except for the
+     error flag and error number (see below), and for any  return
+     values  (see  the  individual  sections).  For  the  sake of
+     portability, however, it is unwise to depend on this.
+     
+     From assembly language, an  error  is  always  indicated  by
+     turning  on  the  carry  bit  of the condition flags. Thus a
+     system call can be followed by  a  jc  (jump  on  carry)  to
+     handle  an  error  return,  or  a  jnc (jump on no carry) to
+     handle an error-free return. The error number is returned in
+     register hl.
+     
+     
+                            EErrrroorr NNuummbbeerrss
+     
+     Following is a list of error numbers,  their  names  in  the
+     system  source  code,  the  standard error message available
+     thru ppeerrrroorr,, and a short explanation.
+     
+     00    ((nnoott uusseedd))
+          
+     11    EEPPEERRMM     NNoott ssuuppeerr uusseerr
+          The current user was attempting something reserved  for
+          the super-user.
+          
+     22    EENNOOEENNTT    NNoo ssuucchh ffiillee oorr ddiirreeccttoorryy
+          The last component of a path name does not exist.
+          
+     33    EESSRRCCHH     NNoo ssuucchh pprroocceessss
+          The  process  whose number was given to ssiiggnnaall does not
+          exist, or is already dead.
+          
+     44    EEIINNTTRR     IInntteerrrruupptteedd ssyysstteemm ccaallll
+          A slow system call (such as read or write on a tty, but
+          never on a disk) was interrupted by a caught signal.
+
+
+
+
+		               -2-
+
+
+
+
+
+
+
+     55    EEIIOO       II//OO eerrrroorr
+          A physical I/O error occurred during a read or write.
+          
+     66    EENNXXIIOO     NNoo ssuucchh ddeevviiccee oorr aaddddrreessss
+          An I/O call was  made  to  a  non-existent  device,  or
+          beyond the limits of the device.
+          
+     77    EE22BBIIGG     AArrgg lliisstt ttoooo lloonngg
+          A  call  to  eexxeecc was made with an argument list longer
+          than 512 bytes.
+          
+     88    EENNOOEEXXEECC   EExxeecc ffoorrmmaatt eerrrroorr
+          An attempt was made to execute  an  inappropriate  file
+          (such  as a directory or special file), even though the
+          user had execute permission on the file.
+          
+     99    EEBBAADDFF     BBaadd ffiillee nnuummbbeerr
+          A file descriptor refers to no open file, or a read  or
+          write  request  is  made  to a file not opened for that
+          activity.
+          
+     1100   EECCHHIILLDD    NNoo cchhiillddrreenn
+          There were no child processes to wwaaiitt for.
+          
+     1111   EEAAGGAAIINN    NNoo mmoorree pprroocceesssseess
+          FFoorrkk found the system process table temporarily full.
+          
+     1122   EENNOOMMEEMM    NNoott eennoouugghh ccoorree
+          During an eexxeecc or bbrreeaakk,, the  program  asked  for  more
+          core  than  the  system  could  supply.  This  is not a
+          temporary condition: the  maximum  program  size  is  a
+          system parameter.
+          
+     1133   EEAACCCCEESS    PPeerrmmiissssiioonn ddeenniieedd
+          The  user  attempted  a  file  access  forbidden by the
+          file's permission bits.
+          
+     1144   EESSYYSS      SSyysstteemm eerrrroorr
+          The system has detected an "impossible"  error,  caused
+          by corrupted disk, memory, or a system bug, but not yet
+          severe  enough  to warrant a panic stop. This should be
+          reported.
+          
+     1155   EENNOOTTBBLLKK   BBlloocckk ddeevviiccee rreeqquuiirreedd
+          A plain file or a directory was  given  where  a  block
+          device was required, (in mmoouunntt,, for example).
+          
+     1166   EEBBUUSSYY     DDeevviiccee bbuussyy
+          An  attempt was made to mount a device that was already
+          mounted, to unmount a device on which there was an open
+          file or a current directory, or to open a one-user-only
+          device that is already busy.
+
+
+
+
+		               -3-
+
+
+
+
+
+
+
+     1177   EEEEXXIISSTT    FFiillee eexxiissttss
+          The new file name passed to lliinnkk or  mmkknnoodd  is  already
+          taken.
+          
+     1188   EEXXDDEEVV     CCrroossss--ddeevviiccee lliinnkk
+          A link to a file on another device was attempted.
+          
+     1199   EENNOODDEEVV    NNoo ssuucchh ddeevviiccee
+          An attempt was made to open a non-existent device.
+          
+     2200   EENNOOTTDDIIRR   NNoott aa ddiirreeccttoorryy
+          A  non-directory  was  specified  where a directory was
+          required, as an intermediate component in a path  name,
+          for example, or as an argument to cchhddiirr
+          
+     2211   EEIISSDDIIRR    IIss aa ddiirreeccttoorryy
+          An attempt was made to write on a directory.
+          
+     2222   EEIINNVVAALL    IInnvvaalliidd aarrgguummeenntt
+          An  invalid  argument  was  given  to  a  system  call:
+          currently, unmounting a non-mounted device,  mentioning
+          an unknown signal in ssiiggnnaall,, or invoking a non-existing
+          system  call.  Ordinarily,  the latter case generates a
+          fatal signal; the error is returned only if the  signal
+          is caught or ignored.
+          
+     2233   EENNFFIILLEE    FFiillee ttaabbllee oovveerrffllooww
+          The system's table of open files is temporarily full.
+          
+     2244   EEMMFFIILLEE    TToooo mmaannyy ooppeenn ffiilleess
+          Only 16 files can be open per process
+          
+     2255   EENNOOTTTTYY    NNoott aa ttyyppeewwrriitteerr
+          The  file mentioned to ssttttyy or ggttttyy is not a typewriter
+          or other character-device.
+          
+     2266   EETTXXTTBBSSYY   TTeexxtt ffiillee bbuussyy
+          Not currently used.
+          
+     2277   EEFFBBIIGG     FFiillee ttoooo bbiigg
+          The user attempted to extend a file beyond the  maximum
+          size of 2^24 bytes.
+          
+     2288   EENNOOSSPPCC    NNoo ssppaaccee lleefftt oonn ddeevviiccee
+          The disk's free space has been exhausted.
+          
+     2299   EESSPPIIPPEE    IIlllleeggaall sseeeekk
+          A seek was issued to a pipe.
+          
+     3300   EERROOFFSS     RReeaadd--oonnllyy ffiillee ssyysstteemm
+          An  attempt  was  made  to  write  to  a device mounted
+          read-only.
+
+
+
+
+		               -4-
+
+
+
+
+
+
+
+     3311   EEMMLLIINNKK    TToooo mmaannyy lliinnkkss
+          The program attempted to make a 256th link to a file.
+          
+     3322   EEPPIIPPEE     BBrrookkeenn ppiippee
+          The program  wrote  on  a  pipe  that  had  no  reader.
+          Ordinarily  this generates a fatal signal; the error is
+          returned if the signal is caught or ignored.
+
+
+
+
+		               -5-
+
+

@@ -1,0 +1,114 @@
+
+
+ps (1)                       5/18/82                       ps (1)
+
+
+     NNAAMMEE
+          ppss - process status
+
+
+     SSYYNNOOPPSSIISS
+          ps [alx]
+
+
+     DDEESSCCRRIIPPTTIIOONN
+          PPss prints information about processes currently running
+          on the system.
+          
+          Any  user  is  allowed  to  know the command name other
+          users are running. The actual data being  processed  is
+          not a matter of public record, however.
+
+          PPss can be very useful in tracking down errant processes
+          and terminating them.
+
+          Options:
+
+
+          a    All.   Print   information   about  all  processes
+               associated with a terminal.
+
+          l    Long format. Print detailed  information  on  each
+               process.
+
+          x    Print   information   about   all   processes  not
+               associated with a terminal.
+
+          
+          The following is a description of each possible  column
+          in the output from ppss..
+
+
+          STATE  represents  the  current  state  of the program.
+          Within the state field the following flags may show up:
+
+          Al   Alive. The process has not yet terminated.
+
+          Aw   Awake. The process is not waiting for a slow event
+               and may be run immediately.
+
+          Ld   Loaded. The process has been loaded into memory.
+
+          Lk   Locked. The image of  this  process  is  currently
+               locked in main memory.
+
+          Sw   Swapped.  The  image  of  this  process  currently
+               resides on the swap device.
+
+          Sy   System. This process is in its system phase.
+
+
+
+                               -1-
+
+
+
+
+ps (1)                       5/18/82                       ps (1)
+
+
+     UID  User ID number. Number identifying the user running the
+          process.
+
+     PID  Process ID. The identifying number of the process.
+
+     PPID Parent's process ID.  The  identifying  number  of  the
+          parent process.
+
+     CPU  The CPU priority of the process.
+
+     PRI  The run-time priority of the process.
+
+     NICE The user settable priority of the process.
+
+     WCHAN     The  address of the event on which this process is
+          sleeping.
+
+     TTY  The name of the controlling tty for this process.
+
+     COMMAND   The  name  of  the  command.  (Usually   a   close
+          approximation of what was entered from the keyboard.)
+
+
+     EEXXAAMMPPLLEE
+          To kill your runaway process from another terminal:
+
+          1)   Log in.
+
+          2)   Type "ps".
+
+          3)   Locate  the  process  of interest in the resulting
+               printout.
+
+          4)   Type "kill process ID number"; ex: "kill 7"
+
+
+     SSEEEE AALLSSOO
+          sh(1), signal(2)
+
+
+
+
+                               -2-
+
+

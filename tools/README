@@ -21,3 +21,6 @@ dis is a disassembler that can consume:
 	moreover, it can disassemble z80, z180, z280, and you can
 	add more architectures by writing a architecture description
         file.
+
+makeman.sh:
+	populate the cat* tree with the processed man pages, suitable for more

@@ -1,0 +1,108 @@
+
+
+djdma (4)                   4/18/82                     djdma (4)
+
+
+     DDEEVVIICCEE
+          ddjjddmmaa - Morrow Designs' Disk Jockey Direct
+                  Memory Access floppy disk controller
+          
+          
+     FFUUNNCCTTIIOONN
+          The DJDMA provides access for up to eight 8 inch and/or
+          5  1/4 inch floppy disk drives (limited to four of each
+          type). At present, there may  be  only  one  controller
+          board per system.
+          
+          Diskettes   used   with  MOS  must  be  formatted.  The
+          following formats are supported. They are  listed  with
+          the number of blocks per disk (a block is 512 bytes).
+          
+          Inches  Format
+          
+              8 - 128 byte sectors, single-sided, 487 blocks
+              8 - 128 byte sectors, double-sided, 975 blocks* 
+              8 - 256 byte sectors, single-sided, 975 blocks
+              8 - 256 byte sectors, double-sided, 1950 blocks
+              8 - 512 byte sectors, single-sided, 1125 blocks
+              8 - 512 byte sectors, double-sided, 2250 blocks
+              8 - 1024 byte sectors, single-sided, 1200 blocks
+              8 - 1024 byte sectors, double-sided, 2400 blocks
+          
+              5 1/4 - 256 byte sectors, single-sided, 35 track, 160 blocks
+              5 1/4 - 512 byte sectors, single-sided, 35 track, 330 blocks
+              5 1/4 - 512 byte sectors, double-sided, 35 track, 660 blocks
+          
+              5 1/4 - 512 byte sectors, single-sided, 40 track, 380 blocks
+              5 1/4 - 512 byte sectors, double-sided, 40 track, 760 blocks
+              5 1/4 - 512 byte sectors, single-sided, 80 track, 780 blocks
+              5 1/4 - 512 byte sectors, double-sided, 80 track, 1560 blocks
+          
+              * not recommended
+          
+          Note that because of reserved tracks (usually the first
+          two), the available space is reduced slightly.
+          
+          All  8  inch  formats  are standard 77 track. While you
+          gain approximately 7% in additional capacity with  1024
+          byte  sectors on an 8 inch floppy diskette, the loss in
+          transfer speed is considerable. The optimum choice  for
+          Micronix  floppy  diskettes  is  512-bytes,  single  or
+          double.
+          
+          The   other   formats   are   included   for   backward
+          compatibility.  Alternate  sectoring  is  optional  and
+          available by selecting  the  appropriate  minor  device
+          number  from  the  table below. (Alternate sectoring is
+          recommended because it doubles the reading  speed,  but
+          does not make much difference in writing speed.)
+          
+
+
+                             -1-
+
+
+
+
+djdma (4)                   4/18/82                     djdma (4)
+
+
+          Note  that  alternate  and non-alternate sectored media
+          are incompatible (i.e., the sectors appear  scrambled).
+          The  ffaarr  utility  (see  Section  1)  can  read  a CP/M
+          formatted diskette under either alternate  or  straight
+          sectoring, however.
+          
+          The minor device numbers correspond as follows:
+          
+                   0    8" - drive 0
+                 1      8" - drive 1
+                 2      8" - drive 2
+                 3      8" - drive 3
+          
+                 4      5 1/4" - drive 0
+                 5      5 1/4" - drive 1
+                 6      5 1/4" - drive 2
+                 7      5 1/4" - drive 3
+          
+                 8      8" - drive 0 with alternate sectoring
+                 9      8" - drive 1 with alternate sectoring
+                10      8" - drive 2 with alternate sectoring
+                11      8" - drive 3 with alternate sectoring
+          
+                12      5 1/4" - drive 0 with alternate sectoring
+                13      5 1/4" - drive 1 with alternate sectoring
+                14      5 1/4" - drive 2 with alternate sectoring
+                15      5 1/4" - drive 3 with alternate sectoring
+          
+          
+          Note that there are 96-track 5 1/4" drives and 48-track
+          5  1/4"  drives. For example, if you have only 48 track
+          drives, you cannot
+
+
+
+
+                             -2-
+
+

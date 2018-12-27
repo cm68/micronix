@@ -1,0 +1,46 @@
+
+
+crypt (1)                    4/12/82                    crypt (1)
+
+
+     PPRROOGGRRAAMM
+          ccrryypptt -- ffiillee eennccrryyppttiioonn
+
+
+     UUSSAAGGEE
+          crypt key
+
+
+     FFUUNNCCTTIIOONN
+          CCrryypptt  reads  from its standard input and writes to its
+          standard output, encrypting as it  goes,  according  to
+          the key. CCrryypptt is its own inverse; to read an encrypted
+          file, all you need to know is the key word.
+          
+          Note:  this  is  not  a  very  sophisticated encryption
+          scheme (NSA would have it overnight).
+          
+          You can increase the complexity of  the  encryption  by
+          using  multiple  passes of ccrryypptt,, each with a different
+          keyword.
+
+
+     EEXXAAMMPPLLEESS
+          To encrypt a file:
+
+                ccrryypptt bbaannddeerrssnnaattcchh << ffiillee >> eennccrryypptteedd
+
+          To read the encrypted file
+
+                ccrryypptt bbaannddeerrssnnaattcchh << eennccrryypptteedd
+
+          Encrypt a file with three keywords:
+
+             ccrryypptt hhoonneeyybbeeee << ffiillee || ccrryypptt BBeeaauummoonntt || ccrryypptt oossccaarr >> eennccrryypptteedd
+
+
+
+
+                               -1-
+
+

@@ -1,0 +1,107 @@
+
+
+io (4)                       7/19/82                       io (4)
+
+
+     DDEEVVIICCEE
+          iioo - Z80 I/O space device
+
+
+     DDEESSCCRRIIPPTTIIOONN
+          Under   a   multi-user  operating  system,  it  is  not
+          acceptable to allow user programs  to  execute  certain
+          instructions   in   an   unregulated   way.   The   Z80
+          instructions "in" and "out" fall into this category. It
+          is, however, desirable to  be  able  to  perform  these
+          operations in special circumstances.
+          
+          The  "io"  device  allows  users  to access the Z80 I/O
+          ports through the file system. Reading from the  device
+          causes   the   results   of  "in"  instructions  to  be
+          transferred to the user's memory space.
+          
+          Writing to the device causes "out" instructions  to  be
+          executed using the data in the user's memory space.
+          
+          Seeking   on  the  device  sets  the  I/O  address  for
+          subsequent reading/inputting or writing/outputting.
+          
+          There are two classes of I/O device. One allows  access
+          to  all of I/O space. The other allows access only to a
+          single port.
+          
+          Note that it would  be  extremely  easy  to  crash  the
+          system   through  this  avenue,  and  it  is  therefore
+          recommended  that  the  "/dev/io"   file   be   heavily
+          protected, perhaps mode 0 and owned by root.
+          
+          Examples are in order:
+
+               To input a value from port 10:
+
+                ff == ooppeenn ((""//ddeevv//iioo"",, 00));;
+               
+                seek (f, 10, 0);
+               
+                read (f, &data, 1);
+
+          The  operation  of  the  I/O device is dependent on the
+          minor device number of the special file associated with
+          it.
+          
+          All 256 possible minor device numbers (0  -  255)  have
+          meaning.
+          
+          When accessed through minor device zero, it is possible
+          to  select  which  I/O  ports  you  access. This is the
+          meaning of a seek on the io device file.  For  example,
+          seeking  to location 87 will cause subsequent reads and
+          writes to the file to be interpreted as  references  to
+
+
+                               -1-
+
+
+
+
+io (4)                       7/19/82                       io (4)
+
+
+          io port 87.
+          
+          Unlike other devices, the file offset does not progress
+          with  reads  and  writes.  It  may  only  be changed by
+          seeking. It was thought that this arrangement was  more
+          in  the  spirit  of  I/O  space  accesses than the more
+          Micronix-like alternative.
+          
+          Non-zero minor device numbers limit access to that  one
+          I/O  port whose address is the same as the minor device
+          number. It is therefore  possible  to  have  I/O  space
+          selectively  protected, while giving any user access to
+          some certain port.
+          
+          For example, if you wanted  to  allow  free  access  to
+          ports  77  and  78 by any user on the system, you would
+          issue the following commands:
+          
+                mknod /dev/io77 c 3 77
+          
+                mknod /dev/io78 c 3 77
+          
+                chmod a=rwx /dev/io77 /dev/io78
+          
+          
+          If the minor device  number  is  not  zero,  seeks  are
+          simply ignored.
+          
+          
+     FFIILLEESS
+          /dev/io - the device file
+
+
+
+
+                               -2-
+
+

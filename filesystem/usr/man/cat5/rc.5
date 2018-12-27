@@ -1,0 +1,32 @@
+
+
+rc (5)                       3/16/82                       rc (5)
+
+
+     FFIILLEE
+          rrcc - multi-user start-up file
+
+
+     FFUUNNCCTTIIOONN
+          The   iinniitt   (initialization)  program  looks  for  the
+          "/etc/rc" file  just  before  entering  the  multi-user
+          mode.  If  such a file is found, and is readable, it is
+          run as a shell script. That is, each of the commands in
+          the file is executed as if from the keyboard.
+          
+          Typically, it  is  used  to  clean  out  the  temporary
+          directory,  remove locked files, start up daemons, etc.
+          The user may place whatever he desires in the file.
+
+
+     FFIILLEESS
+          /etc/rc
+          
+          
+
+
+
+
+                               -1-
+
+

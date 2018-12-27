@@ -1,0 +1,37 @@
+
+
+wtmp (5)                      3/15/82                    wtmp (5)
+
+
+     FFIILLEE
+          wwttmmpp - user login history
+
+
+     FFUUNNCCTTIIOONN
+          This file records all logins and logouts. Its format is
+          like  uuttmmpp  (5) with these exceptions: A null user name
+          indicates  a  logout  on  the  associated   typewriter.
+          Furthermore, the typewriter name ~~ indicates the system
+          was  rebooted  at the indicated time; the adjacent pair
+          of entries with typewriter names || and }}  indicate  the
+          system-maintained  time  just  before  and just after a
+          ddaattee command changed the systems'  idea  of  the  time.
+          WWttmmpp  is  maintained by llooggiinn (1) and iinniitt (1). Neither
+          of these  programs  creates  the  file,  so  if  is  is
+          removed, record-keeping is turned off.
+
+
+     FFIILLEESS
+          /usr/adm/wtmp
+          /include/utmp.h
+
+
+     SSEEEE AALLSSOO
+          utmp (5), login (1), init (1), who (1)
+
+
+
+
+                                -1-
+
+

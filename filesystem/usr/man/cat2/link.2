@@ -1,0 +1,43 @@
+
+
+link (2)                     3/19/82                     link (2)
+
+
+     NNAAMMEE
+          lliinnkk - link to a file
+          
+          
+     CC
+          link(old, new)
+          char *old, *new;
+          
+          
+     FFUUNNCCTTIIOONN
+          A link to "old" is created, with the name "new". Either
+          name may be an arbitrary pathname.
+          
+          "New"  must  not  already  exist, its directory must be
+          writable, and it must be on the same device  as  "old".
+          "Old"  must  not be a directory (unless the user is the
+          super-user), and must not have more than 254 links.
+          
+          
+     RREETTUURRNNSS
+          A 0 indicates success, a -1 indicates failure.
+          
+          
+     AASSSSEEMMBBLLEERR
+          ((lliinnkk == 99))
+          ssyyss;; lliinnkk;; oolldd;; nneeww
+          
+          
+     RREETTUURRNNSS
+          The carry  flag  is  cleared  on  success,  or  set  on
+          failure.
+
+
+
+
+				    -1-
+
+

@@ -1,0 +1,159 @@
+
+
+as (1)                        4/13/82                      as (1)
+
+
+     PPRROOGGRRAAMM
+          aass -- A-Natural assembler
+
+
+     UUSSAAGGEE
+          aass <<ffllaaggss>> <<ffiillee>>
+
+
+     FFUUNNCCTTIIOONN
+          AAss  assembles A-natural narrative assembly language for
+          the Intel 8080 to Whitesmith's format  for  relocatable
+          object  images.  Since  the  output  of  the  8080 code
+          generator p2 is A-Natural, as is  required  to  produce
+          relocatable  images  suitable  for  binding with the lldd
+          (link editor) program.
+          
+          The flags are:
+          
+          -i        Produces a map of local symbols to STDOUT.
+                    
+          -o        Filename may be specified. Writes the  output
+                    to   the  specified  file  and  writes  error
+                    messages to STDOUT.  Default  is  STDOUT  for
+                    output  and  STDERR for error messages, which
+                    may lead to corruption of the output on those
+                    systems that  distinguish  between  text  and
+                    binary  files.  Under  some circumstances, an
+                    input filename can take  the  place  of  this
+                    option, as explained below.
+                    
+          If  <files> are present, they are concatenated in order
+          and used as the  input  file  instead  of  the  default
+          STDIN.
+          
+          If -o is absent, and one or more files are present, and
+          the  first filename begins with '8', then aass behaves as
+          if -o was specified using the first filename, but  with
+          the trailing '8' changed to 'r'. Thus,
+          
+              aass ffiillee..88
+          
+          is the same as
+          
+              aass --oo ffiillee..rr ffiillee..88
+          
+          A  relocatable  object  image  consists  of a four-word
+          header, a symbol table,  a  text  segment  and  a  data
+          segment; all "words" are two-byte integers written less
+          significant byte first.
+
+
+
+
+				     -1-
+
+
+
+
+as (1)                        4/13/82                      as (1)
+
+
+          The  header  consists  of the value 0406, the number of
+          symbol table entries, the number  of  bytes  of  object
+          code  defined  by  the  text segment, and the number of
+          bytes defined by the data segment.
+          
+          Each symbol table entry consists  of  a  flag  byte,  a
+          seven-byte name padded with trailing nulls, and a value
+          word. Meaningful flag values are
+
+              33 -- uunnddeeffiinneedd
+              44 -- ddeeffiinneedd aabbssoolluuttee
+              55 -- ddeeffiinneedd tteexxtt rreellaattiivvee
+              66 -- ddeeffiinneedd ddaattaa rreellaattiivvee
+
+          To  this  is  added 010 if the symbol is to be globally
+          known, which is always the case in modules produced  by
+          aass..
+          
+          Both  text  and  data  segments  have the same form - a
+          sequence of load items, each of which  defines  one  or
+          more  object  bytes.  A  load  item  that begins with a
+          positive byte  (n)  calls  for  loading  unchanged  the
+          following (n) bytes in order.
+
+          If the load item begins with byte (n), such that
+
+                             mm == nn >>>> 33 && 001177
+
+          and
+
+                                 ((mm !!== 00)),,
+
+          the  word  following  it  is  relocated  at  (n  &  7).
+          Additional bytes are loaded unchanged.
+
+          Relocation consists of adding the start address of  the
+          text segment, if
+
+                                 ((mm ==== 11)),,
+
+          or  adding the start address of the data segment, minus
+          the length of the text segment if
+
+                                 ((mm ==== 22)),,
+
+          or adding the value of the symbol whose index is
+
+                                 ((mm ==== 33))..
+          
+          If (m == 0), then the byte following is taken as m  and
+          the word following that byte is relocated by adding the
+          value of the symbol whose index is (m + 13).
+
+
+
+
+				     -2-
+
+
+
+
+as (1)                        4/13/82                      as (1)
+
+
+          As  before,  (n  &  7),  as  additional bytes, are then
+          loaded unchanged.
+          
+          The text segment  is  relocated  relative  to  location
+          zero,  while  the data segment is relocated relative to
+          the end of the text segment. Thus, both segments can be
+          simply loaded in order, using their combined lengths as
+          the  total  segment  length.  Note  that  the   lengths
+          presented in the header are for the object code loaded,
+          not  for  the  number  of  relocation bytes required to
+          specify the code.
+
+          In a valid load module, each segment consists of  a  an
+          integral number of load items.
+          
+     SSEEEE AALLSSOO
+          anat (1), ld (1), lib (1), cc (1), cp1 (1), cp2 (1)
+          
+          
+          NOTE:  This  program  and documentation are products of
+          Whitesmiths, Ltd., and are sold separately.
+          
+
+
+
+
+				     -3-
+
+

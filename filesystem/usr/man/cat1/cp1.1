@@ -1,0 +1,114 @@
+
+
+cp1 (1)                      3/18/82                      cp1 (1)
+
+
+     PPRROOGGRRAAMM
+          ccpp11 -- parse C programs
+          
+          
+     UUSSAAGGEE
+          ccpp11 <<ffllaaggss>> <<ffiillee>>
+          
+          
+     FFUUNNCCTTIIOONN
+          CCpp11 is the parsing pass of the C compiler. It accepts a
+          sequential  file of lexemes from the preprocessor, ccpppp,,
+          and writes a sequential file of flow graphs  and  parse
+          trees,  suitable  for input to a machine-dependent code
+          generator,  ccpp22..  The  operation  of  ccpp11  is   largely
+          independent  of  any  target  machine. The flag options
+          are:
+
+          -a        Compile  code  for  machines  with   separate
+                    address and data registers.
+
+          -b#       Enforce  storage  boundaries  according to ##,,
+                    which is reduced modulo 4.
+                    
+                    A bound of 0 leaves no holes in structures or
+                    auto allocations.
+                    
+                    A  bound  of  1  (default)  requires   short,
+                    intermediate  and  longer data to begin on an
+                    even bound.
+                    
+                    A bound of 2 is the same as 1 except  that  4
+                    to  8  bytes of data are forced to a multiple
+                    of a four-byte boundary.
+                    
+                    A bound of 3 is the same as  2,  except  that
+                    eight bytes of data (doubles) are forced to a
+                    multiple of an eight-byte boundary.
+                    
+          -c        Ignore  case distinctions in testing external
+                    identifiers for equality, and map  all  names
+                    to  lowercase  on  output.  By  default, case
+                    distinctions matter.
+                    
+          -e        Do not force  loading  of  extern  references
+                    that  are declared, but never defined or used
+                    in an expression. Default is used to load all
+                    external references declared.
+                    
+          -l        Take integers  and  pointers  to  be  4-bytes
+                    long. Default is 2-bytes.
+                    
+          -m        Treat each structure/union as a separate name
+                    space,  and  require  xx..mm  to  mean  xx  is  a
+                    structure and mm one of its members.
+
+
+                               -1-
+
+
+
+
+cp1 (1)                      3/18/82                      cp1 (1)
+
+
+          -n#       Ignore  characters  after  the  first  ##   in
+                    testing  external  identifiers  for equality.
+                    Default is 7; maximum is 8.
+                    
+          -o file   Write the output to the  specified  file  and
+                    write  error  messages  to STDOUT. Default is
+                    STDOUT  for  output  and  STDERR  for   error
+                    messages.
+                    
+          -r#       Assign  no more than ## variables to registers
+                    at any one time, where ## is reduced modulo 4.
+                    Default is three register variables.
+                    
+          -u        Take  "string"  as  an  array   of   unsigned
+                    characters, not an array of characters.
+                    
+          If  <file>  is  present,  it  is used as the input file
+          instead of the default, STDIN. On many systems, the  --oo
+          option  and  <file>  are  mandatory  because  STDIN and
+          STDOUT are interpreted as text files, and hence  become
+          corrupted.
+          
+          
+     EEXXAAMMPPLLEE
+          CCpp11 is usually sandwiched between ccpppp and ccpp22,, as in:
+
+                              ccpppp --xx --oo tteemmpp11 ffiillee..cc
+                              ccpp11 --oo tteemmpp22 tteemmpp11
+                              ccpp22 --oo ffiillee..mmaacc tteemmpp22
+          
+          
+     SSEEEE AALLSSOO
+          cpp (1)
+          _C _C_o_m_p_i_l_e_r _U_s_e_r'_s _M_a_n_u_a_l for language definition.
+          
+          
+          NOTE:  This  program  and documentation are products of
+          Whitesmiths, Ltd.,
+
+
+
+
+                               -2-
+
+

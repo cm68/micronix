@@ -1,0 +1,46 @@
+
+
+comm (1)                     3/18/82                     comm (1)
+
+
+     PPRROOGGRRAAMM
+          ccoommmm -- print lines in common
+          
+          
+     UUSSAAGGEE
+          ccoommmm [[--112233]] ffiillee11 [[ffiillee22]]
+          
+          
+     FFUUNNCCTTIIOONN
+          CCoommmm  prints  lines  unique  to the first named file in
+          column 1, lines unique to  the  second  named  file  in
+          column  2,  and lines common to both files in column 3.
+          Leading blank space is removed for  printing  purposes.
+          The  files  must  be  sorted. If no second file name is
+          given, the standard input is used for the second file.
+          
+          Flags 1, 2, or 3 suppress printing of the corresponding
+          columns. Thus ccoommmm --1122 prints only the lines common  to
+          the  two files; ccoommmm --1133 prints only the lines that are
+          unique to the second file; ccoommmm --112233 prints nothing.
+          
+          
+     EEXXAAMMPPLLEESS
+          To find spelling mistakes
+          
+               ttrraannsslliitt AA--ZZ aa--zz <<iinnppuutt >>tt11      
+               ttrraannsslliitt ^^aa--zz @@4400 <<tt11 >>tt22
+               ttrraannsslliitt @@1122@@4400 @@1122 <<tt22 >>tt33
+               ssoorrtt <<tt33 >>tt44
+               ccoommmm --1133 ddiiccttiioonnaarryy <<tt44 >>mmiissttaakkeess
+               
+               
+     NNOOTTEESS
+          Only works with sorted inputs.
+
+
+
+
+			            -1-
+
+

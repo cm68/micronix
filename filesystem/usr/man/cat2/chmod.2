@@ -1,0 +1,57 @@
+
+
+chmod (2)		          3/18/82               chmod (2)
+
+
+     NNAAMMEE
+          cchhmmoodd - change mode of file
+
+
+     CC
+          chmod(name, mode)
+          char *name;
+
+
+     FFUUNNCCTTIIOONN
+          The  mode  of  the  file  is set as indicated. Only the
+          owner of a file, or  the  super-user,  may  change  the
+          mode.  Modes  are  constructed  by  ORing together some
+          combination of the following (octal) values:
+          
+                  44000000  SSeett uusseerr iidd oonn eexxeeccuuttiioonn
+                  22000000  SSeett ggrroouupp iidd oonn eexxeeccuuttiioonn
+                  11000000  CCuurrrreennttllyy iiggnnoorreedd
+                  00440000  RReeaadd bbyy oowwnneerr
+                  00220000  WWrriittee bbyy oowwnneerr
+                  00110000  EExxeeccuuttee ((oorr sseeaarrcchh ddiirreeccttoorryy)) bbyy oowwnneerr
+                  00007700  RReeaadd,, wwrriittee,, eexxeeccuuttee ((sseeaarrcchh)) bbyy ggrroouupp
+                  00000077  RReeaadd,, wwrriittee,, eexxeeccuuttee ((sseeaarrcchh)) bbyy ootthheerrss
+          
+          When a file with the set-user-id flag is executed,  the
+          effective user ID of the process is set to the owner of
+          the  file.  (In  this  way,  for  instance,  a spelling
+          program could use a secret dictionary.)
+          
+          For security reasons, whenever a  file  is  opened  for
+          writing, its set-id flags are cleared.
+
+
+     RREETTUURRNNSS
+          A 0 indicates success, a -1 indicates failure.
+
+
+     AASSSSEEMMBBLLEERR
+          ((cchhmmoodd == 1155))
+          ssyyss;; cchhmmoodd;; nnaammee;; mmooddee
+
+
+     RREETTUURRNNSS
+          The  carry  flag  is  cleared  on  success,  or  set on
+          failure.
+
+
+
+
+				    -1-
+
+

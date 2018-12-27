@@ -1,0 +1,46 @@
+
+
+mknod (2)                    3/19/82                    mknod (2)
+
+
+     NNAAMMEE
+          mmkknnoodd - make a directory or special file
+
+
+     CC
+          mknod(name, mode, addr) char *name;
+          
+          
+     FFUUNNCCTTIIOONN
+          MMkknnoodd  creates a new file. Unlike ccrreeaatt,, it may be used
+          to create directories and special files;  it  does  not
+          truncate or open files.
+          
+          The mode of the new file (including the file type bits)
+          is  taken from the mode argument, and the first address
+          is taken  from  addr.  For  directories,  this  address
+          should  be  0, while for special files it should be the
+          device number.
+          
+          This call is restricted to the super-user.
+          
+          
+     RREETTUURRNNSS
+          A 0 indicates success, a -1 indicates failure.
+          
+          
+     AASSSSEEMMBBLLEERR
+          ((mmkknnoodd == 1144))
+          ssyyss;; mmkknnoodd;; nnaammee;; mmooddee;; aaddddrr
+          
+          
+     RREETTUURRNNSS
+          The carry  flag  is  cleared  on  success,  or  set  on
+          failure.
+
+
+
+
+				    -1-
+
+

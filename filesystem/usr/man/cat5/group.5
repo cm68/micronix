@@ -1,0 +1,49 @@
+
+
+group (5)                     3/15/82                   group (5)
+
+
+     FFIILLEE
+          ggrroouupp - the group file
+
+
+     FFUUNNCCTTIIOONN
+          Each  user  name  is  associated  with  a group number.
+          Associated with each file is  a  user  ID  number  (the
+          owner  of the file) and a group ID number (the group of
+          the  file).  These  numbers  are  used  in   permission
+          determinations.
+          
+          The  relationship  between  group  numbers and names is
+          established by the group file. The format of the  group
+          file is as follows:
+
+             Each line of the file defines one group name.
+             
+             The group name is followed by a colon, then followed
+             by the encrypted group password, if one exists. This
+             is  followed  by  a  colon, which is followed by the
+             group number (in  decimal),  followed  by  a  colon,
+             followed  by  the  group  comment  field  which  may
+             contain anything you desire, or nothing at all.
+
+
+          Here is a sample group file:
+
+                 ssaalleess::::44::
+                 ssttoocckk::::55::
+
+
+          Normally group 0 is reserved for the  super-user  only.
+          The nneewwuusseerr program makes additions to this file.
+
+
+     SSEEEE AALLSSOO
+          passwd(5)
+
+
+
+
+                                -1-
+
+

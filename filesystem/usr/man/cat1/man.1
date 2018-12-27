@@ -1,0 +1,56 @@
+
+
+man (1)                      6/28/82                      man (1)
+
+
+     PPRROOGGRRAAMM
+          mmaann - on line manual
+          
+          
+     UUSSAAGGEE
+          mmaann [[NN]] ttooppiicc ......
+          
+          
+     FFUUNNCCTTIIOONN
+          MMaann  prints documentation (if it exists) for each named
+          topic. Complete on-line documentation  is  resident  on
+          the Micronix system.
+          
+          MMaann is the same program as hheellpp,, execpt that when it is
+          called  as  "man"  it  omits  searching  /usr/help, and
+          searches /usr/man/man0, ...,  /usr/man/man9  in  order.
+          These  are the directories containing the corresponding
+          sections of the Micronix Reference Manual:
+          
+                /usr/man/man1   Programs
+                /usr/man/man2   System Entries
+                /usr/man/man3   Libraries and subroutines
+                /usr/man/man4   Devices
+                /usr/man/man5   File formats
+                /usr/man/man6   Other programs (such as CP/M programs)
+          
+          
+          The "N" option directs mmaann to the corresponding section
+          of the manual.
+          
+          
+     EEXXAAMMPPLLEE
+          The command line
+          
+                  mmaann mmaann
+          
+          prints this page.
+          
+          
+          Entering
+          
+                  mmaann 22 ssttttyy
+          
+          prints the stty.2 file instead of stty.1.
+
+
+
+
+                               -1-
+
+

@@ -1,0 +1,86 @@
+
+
+du (1)                      5/4/82                         du (1)
+
+
+     PPRROOGGRRAAMM
+          dduu - disk usage
+
+
+     UUSSAAGGEE
+          du [-a] [-s] [name ...]
+
+
+     FFUUNNCCTTIIOONN
+          DDuu  find  the amount of storage space used by the files
+          whose names are given. If a directory  name  is  given,
+          then  the  disk  usage is reported for all the files in
+          the directory and the same is done for  each  directory
+          on down the tree.
+          
+          If  and  when disk space becomes an issue, this program
+          can be very useful at showing you where all  your  disk
+          space is going.
+          
+          If there are several links to a file, the space used by
+          the file is counted only once.
+          
+          Space  used  by  directories themselves is not counted,
+          nor are indirect blocks, as these are considered system
+          overhead and in any event do not amount to more than  a
+          few percent.
+          
+          The  program  doesn't  know  about  files with holes in
+          them: they are counted as if all the holes were filled.
+
+          Options:
+          
+          -a   All. Normally a total block count is produced only
+               for each directory. With the -a option in  effect,
+               a   block   count   is  produced  for  each  file,
+               regardless.
+               
+          -s   Summary. Only a grand total is printed.
+
+
+     EEXXAAMMPPLLEESS
+          To find out just how much space you are  using,  simply
+          enter:
+
+               dduu --ss
+          
+          To  find  out which directory has that enormous file in
+          it:
+
+               dduu
+          
+          To get the name of the offending file itself:
+
+               dduu --aa
+
+
+                             -1-
+
+
+
+
+du (1)                      5/4/82                         du (1)
+
+
+          
+          To get an overview of the top of the file system:
+
+               dduu --ss //**
+
+
+     SSEEEE AALLSSOO
+          df (1), ls (1)
+          
+          
+
+
+
+
+                             -2-
+
+

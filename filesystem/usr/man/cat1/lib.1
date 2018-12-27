@@ -1,0 +1,143 @@
+
+
+lib (1)                      3/18/82                      lib (1)
+
+
+     PPRROOGGRRAAMM
+          lliibb - maintains Whitesmith's format libraries
+          
+          
+     UUSSAAGGEE
+          lliibb llffiillee [[ffllaaggss]] [[ffiilleess]]
+          
+          
+     FFUUNNCCTTIIOONN
+          LLiibb  performs  all  functions  necessary  to  build and
+          maintain object module libraries. It can also  be  used
+          to  collect  arbitrary  files into one bucket. LLffiillee is
+          the name of an existing library file or, in the case of
+          replace (-r), the name of the library to be created.
+          
+          The flags are:
+          
+          -d        Delete the zero or more named files from  the
+                    library.
+                    
+          -r        Replace  the  zero  or more named files in an
+                    existing library  or,  if  no  library  llffiillee
+                    exists, create a library with the named files
+                    in the specified order.
+                    
+                    Named  files  that  are  not  present  in the
+                    library are appended to the end in the  order
+                    specified.
+                    
+          -t        Lists  files in the library in the order they
+                    occur. If any files  are  named,  only  those
+                    named and present are listed.
+                    
+          -x        Extract  any  named files that are present in
+                    the library into files of the same  name.  If
+                    no files are named, all files are extracted.
+                    
+          -v        Be   verbose   about   it.   Files   retained
+                    unmodified are each listed with  a  preceding
+                    "c".  Those  deleted  are  preceded by a "d",
+                    those replaced are preceded  by  an  "r"  and
+                    those  appended to the end are preceded by an
+                    "a". For the --tt option, each file  is  listed
+                    with its length in bytes.
+                    
+          -6        Create  a file with UNIX v. 6 format, if none
+                    exists. Effective only with --rr..
+                    
+          -7        Create a file with UNIX v. 7 format, if  none
+                    exists. Effective only with --rr..
+
+
+
+
+                               -1-
+
+
+
+
+lib (1)                      3/18/82                      lib (1)
+
+
+          At  most,  one  of  the flags [drtx] may be present. If
+          none are present, --tt is assumed. Similarly, at most one
+          of the flags  [67]  should  be  present.  If  none  are
+          present,  Whitesmith's  library  file format is assumed
+          when a new library is created by --rr..
+          
+          The Whitesmith's library format consists of a  two-byte
+          header   having   the   value   0177565,  written  less
+          significant  byte  first,  followed  by  zero  or  more
+          entries.
+          
+          Each  entry  consists of a fourteen-byte name, followed
+          by a two-byte unsigned file length,  also  stored  less
+          significant  byte  first, followed by the file contents
+          proper. If a name begins with a null byte, it is  taken
+          as the end of the library file.
+          
+          Note  that this differs in several small ways from UNIX
+          v.  6  format,  which  has  a  header  of  0177555,  an
+          eight-byte   name,  six  bytes  of  miscellaneous  UNIX
+          specific file attributes, and a two-byte  file  length.
+          Moreover,  a  file whose length is odd is followed by a
+          null padding byte in the UNIX format, but no padding is
+          used in standard library format.
+          
+          UNIX  v.7  format  is  characterized  by  a  header  of
+          0177545,  a  fourteen-byte  name,  six  bytes  of  UNIX
+          specific file attributes, and a four-byte  length.  Odd
+          length files are also padded to even.
+          
+          
+     RREETTUURRNNSS
+          LLiibb  returns  success  if  no problems are encountered,
+          else failure. In most failures,  an  error  message  is
+          printed to STDERR and the library file is not modified.
+          Output  from  the  --tt  flag,  and  verbose remarks, are
+          written to STDERR.
+          
+          
+     EEXXAAMMPPLLEE
+          To build a library and check its contents:
+          
+                  lliibb cclliibb --rr oonnee..oo ttwwoo..oo tthhrreeee..oo
+                  
+                  lliibb ccllbb --ttvv
+          
+
+
+
+
+                               -2-
+
+
+
+
+lib (1)                      3/18/82                      lib (1)
+
+
+     NNOOTTEESS
+          If all files are deleted from a  library,  a  vestigial
+          file  remains.  Modifying  UNIX  v.6 or UNIX v.7 format
+          files causes all attributes of all file entries  to  be
+          zeroed.
+          
+          It does not check for large files (over 65534 bytes).
+          
+          
+          NOTE:  This  program  and documentation are products of
+          Whitesmiths, Ltd., and are sold separately with the
+
+
+
+
+                               -3-
+
+

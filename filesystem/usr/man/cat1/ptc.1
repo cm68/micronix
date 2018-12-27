@@ -1,0 +1,92 @@
+
+
+ptc (1)                      4/15/82                      ptc (1)
+
+
+     PPRROOGGRRAAMM
+          ppttcc - Pascal to C translator
+
+
+     UUSSAAGGEE
+          ptc -[flags] <file>
+
+
+     FFUUNNCCTTIIOONN
+          PPttcc  is a program that accepts as input lines of Pascal
+          text and produces as output a corresponding  C  program
+          which   is   acceptable  to  the  Whitesmiths,  Ltd.  C
+          compiler. If <file> is present,  it  is  taken  as  the
+          Pascal  program  to translate; otherwise input is taken
+          from STDIN.
+          
+          The flags are:
+
+          -c   Pass comments through to the C program.
+               
+          -f   Set the precision for reals  to  single  precision
+               (float). Default is double.
+               
+          -k   Permit  pointer  types  to  be  defined using type
+               identifiers from  outer  blocks.  Default  is  ISO
+               standard,  i.e.,  the  type  pointed  to  must  be
+               defined  in  the  same  type  declaration  as  the
+               pointer type definition.
+               
+          -m#  Make  # the number of bits in MAXINT excluding the
+               sign bit, e.g., MAXINT becomes 32767 for  -m15,  1
+               for  -m,  etc.  Default for MAXINT is 32766 [sic].
+               Acceptable values for # are in the range [0, 32).
+               
+          -o*  Write the C program to the file * and  diagnostics
+               to STDOUT. Default is STDOUT for the C program and
+               STDERR for diagnostics.
+               
+          -r   Turn off runtime array bounds checks.
+               
+          -s#  Make # the number of bits in the maximum allowable
+               set  size,  i.e.,  the size of all sets whose base
+               type is integer becomes  the  specified  power  of
+               two.  Acceptable  values are in the range [0, 32).
+               Default is 8 (256 elements).
+               
+          The CP/M operating system implementation on  the  Intel
+          8080 and Zilog Z80 restricts the acceptable value for #
+          to  the  range  [0,  16]; for maximum portability, this
+          restriction should be honored.
+          
+          Identifiers  are  mapped  to  uppercase  to  keep  from
+          conflicting with those declared as reserved words in C.
+          Moreover,  structure  declarations may be produced that
+
+
+                               -1-
+
+
+
+
+ptc (1)                      4/15/82                      ptc (1)
+
+
+          contain    conflicting    field    declarations;    and
+          declarations are present for library functions that may
+          not  be needed. All of these pecadillos are forgiven by
+          the use of appropriate C compiler options.
+
+
+     RREETTUURRNNSS
+          PPttcc returns success if it produces no diagnostics.
+
+
+     SSEEEE AALLSSOO
+          cc (1), as (1), cp1 (1), cp2 (1), cpp (1)
+          
+          
+          NOTE: This program and documentation  are  products  of
+          Whitesmiths, Ltd.,
+
+
+
+
+                               -2-
+
+

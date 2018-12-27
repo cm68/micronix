@@ -1,0 +1,94 @@
+
+
+cp2 (1)                      4/15/82                      cp2 (1)
+
+
+     PPRROOGGRRAAMM
+          ccpp22 - generate code for 8080 C programs
+
+
+     UUSSAAGGEE
+          cp2 -[flags] <file>
+
+
+     FFUUNNCCTTIIOONN
+          CCpp22  is  the code generating pass of the C compiler. It
+          accepts a sequential file  of  flow  graphs  and  parse
+          trees   from  ccpp11  and  writes  a  sequential  file  of
+          A-Natural  statements,  suitable  for  input   to   the
+          A-Natural assembler, aass..
+          
+          As   much   as   possible,   the   compiler   generates
+          free-standing code;  but  for  those  operations  which
+          cannot  be done compactly, it generates inline calls to
+          a set of machine-dependent library routines.  The  8080
+          runtime  library  is  documented in Section IV of the C
+          Reference Manual.
+          
+          The flags are:
+
+
+          -p   Emit profiler calls on entry to each function.  No
+               profiler is currently provided for the 8080.
+               
+          -o * Write  the  output  file  *  and  write  the error
+               messages to STDOUT. Default is STDOUT  for  output
+               and STDERR for error messages.
+               
+          -x#  Map  the  three  virtual  sections,  for Functions
+               (04), Literals (02), and Variables  (01),  to  the
+               physical  sections Code (bit is one) and Data (bit
+               is zero). thus, "-x4" is for separate  I/D  space,
+               "-x6"  is  for  ROM/RAM  code,  and  "-x7"  is for
+               compiling tables into ROM. Default is 6.
+               
+          If <file> is present, it is  used  as  the  input  file
+          instead  of  the default STDIN. On many systems, <file>
+          is mandatory because STDIN is  interpreted  as  a  text
+          file, and hence becomes corrupted.
+          
+          Files  output from ccpp11 for use with 8080 code generator
+          should be generated with: "-b0" to eliminate  holes  in
+          structures  and  auto  allocation,  and  "-n8" for full
+          length external names. A boundary of "-b1" (default) is
+          also acceptable if compact storage  is  less  important
+          than   compatibility  with  data  structures  on  other
+          machines. Note that use of the ccpp11 flags "-b2",  "-b3",
+          or  "-1"  will  produce  bizarre behavior and incorrect
+          code in ccpp22,, often with no meaningful diagnostics.
+          
+
+
+                               -1-
+
+
+
+
+cp2 (1)                      4/15/82                      cp2 (1)
+
+
+          Wherever possible, labels  in  the  emitted  code  each
+          contain  a  comment  which  gives  the source line from
+          which the code immediately following obtains.
+
+
+     EEXXAAMMPPLLEE
+          ccpp22 usually follows ccpppp and ccpp11 as follows:
+
+               ccpppp --xx --oo tteemmpp11 ffiillee..cc
+               ccpp11 --bb00 --nn88 --oo tteemmpp22..8800 tteemmpp11
+               ccpp22 --oo ffiillee..ss tteemmpp22
+
+
+     SSEEEE AALLSSOO
+          as (1), cp1 (1), cc (1), cpp (1)
+          
+          NOTE: This program and documentation  are  products  of
+          Whitesmiths, Ltd.,
+
+
+
+
+                               -2-
+
+

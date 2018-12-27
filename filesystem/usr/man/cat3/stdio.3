@@ -1,0 +1,105 @@
+
+
+stdio (3s)                    3/22/82                  stdio (3s)
+
+
+     SSUUBBRROOUUTTIINNEESS
+          ssttddiioo - standard buffered I/O package
+
+
+     CC
+          ##iinncclluuddee <<ssttddiioo..hh>>
+
+          FFIILLEE **ssttddiinn;;
+          FFIILLEE **ssttddoouutt;;
+          FFIILLEE **ssttddeerrrr;;
+
+
+     FFUUNNCCTTIIOONN
+          This   section   describes   two   levels  of  buffered
+          input/output utilities: 1) in-line macros designated by
+          (3),  and  2)  higher  level  standard  I/O   utilities
+          designated by (3s) or (3m).
+          
+          The  in-line  macros,  ggeettcc  and ppuuttcc handle characters
+          quickly.
+          
+          Routines such as ggeettss,, ffggeettss,, pprriinnttff,, ffpprriinnttff,,  ffwwrriittee,,
+          ffrreeaadd,,  ppuuttss  and  ssccaannff  and  ffssccaannff  use  the in-line
+          macros; both levels may be freely intermixed.
+          
+          Files with this type of associated buffering are called
+          ssttrreeaammss and are declared to be a pointer to  a  defined
+          type   FFIILLEE..  FFooppeenn  (3)  has  the  ability  to  create
+          descriptive data for streams. It returns a  pointer  to
+          designate  the  stream  in  all  further  transactions.
+          Normally, there are three open  streams  with  constant
+          pointers declared in the iinncclluuddee file associated with a
+          standard open file:
+
+              ssttddiinn - standard input file
+              ssttddoouutt - standard output file
+              ssttddeerrrr - standard error file
+
+
+          A constant "pointer" (NULL 0) designates no stream.
+
+          An  integer  constant  (end  of  file,  or  EOF  -1) is
+          returned upon error by any integer functions that  deal
+          with streams or upon end of file.
+          
+          Routines  that use the I/O package must have the header
+          file with the pertinent macro definitions  (<stdio.h>).
+          The  iinncclluuddee  file declares all functions and constants
+          described in the sections designated by (3s); they need
+          no further declaration.
+
+
+
+
+                               -1-
+
+
+
+
+stdio (3s)                    3/22/82                  stdio (3s)
+
+
+          The following  constants  and  functions  are  used  as
+          macros:
+
+                  ffeeooff ffeerrrroorr ffiilleennoo ggeettcc ggeettcchhaarr ppuuttcc
+
+          It is dangerous to redeclare these names.
+
+
+     EERRRROORRSS
+          The EEOOFF value is consistently returned, indicating that
+          a  FFIILLEE  pointer  has  not been initialized with ffooppeenn..
+          This means that input or output has been  attempted  on
+          an  output  or  input  stream,  or  that a FFIILLEE pointer
+          designates corrupt FFIILLEE data.
+          
+          This use of the standard library has  been  changed  to
+          line  buffer  output  to  a  terminal  by  default.  It
+          attempts to flush  the  output  whenever  a  rreeaadd  (see
+          Section  2)  from  the  standard input is necessary. In
+          most cases, this makes the utility more efficient.  The
+          actions  themselves  should be transparent unless it is
+          used with programs which use standard I/O routines  _a_n_d
+          rreeaadd (2) to read from the standard input.
+          
+          When  large  amounts  of  computation  are  done  after
+          outputting  part  of  a  line  to  a  terminal,  it  is
+          necessary  to  fffflluusshh  (3)  the  standard output before
+          continuing on so that the output appears.
+
+
+     AALLSSOO RREEAADD
+
+
+
+
+                               -2-
+
+

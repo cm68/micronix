@@ -1,0 +1,48 @@
+
+
+directory (5)                 3/15/82               directory (5)
+
+
+     FFIILLEE
+          ddiirreeccttoorryy - the format of directories.
+
+
+     FFUUNNCCTTIIOONN
+          Micronix  uses  the  standard  UNIX version 6 directory
+          format. A  directory  behaves  like  an  ordinary  file
+          except  that  a  user may write into a file, but cannot
+          write into a directory.
+          
+          A directory is distinguished from a file by  a  bit  in
+          the  flag  word  of its i-node entry. Directory entries
+          are 16 bytes long. The first word is  the  i-number  of
+          the file, represented by the entry if non-zero.
+          
+          If the first word is zero, the entry is empty.
+          
+          Bytes   2   through  15  of  the  entry  represent  the
+          14-character file name, null padded on the right. These
+          bytes are not cleared for empty slots.
+          
+          By convention, the first two entries in each  directory
+          are  for  "."  and  "..". The first is an entry for the
+          directory  itself.  The  second  is  for   the   parent
+          directory.
+          
+          The  meaning of ".." is modified for the root directory
+          of the master file system and for the root  directories
+          of  removable file systems. In the first case, there is
+          no parent, and in  the  second,  the  system  does  not
+          permit  off-device  references.  In both cases ".." has
+          the same meaning as ".".
+
+
+     AALLSSOO RREEAADD
+          filesystem (5)
+
+
+
+
+                                -1-
+
+

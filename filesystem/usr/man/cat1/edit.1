@@ -1,0 +1,466 @@
+
+
+edit (1)                     3/18/82                     edit (1)
+
+
+     PPRROOGGRRAAMM
+          eeddiitt - text editor
+
+
+
+     UUSSAAGGEE
+          eeddiitt [[ffiillee]]
+          
+          
+     FFUUNNCCTTIIOONN
+          EEddiitt is a line-oriented text editor which operates on a
+          temporary  _c_o_p_y  of  the  file  it  is  editing so that
+          changes made have no effect on the file until a w(rite)
+          command is issued. The copy of the  text  being  edited
+          resides in a temporary file called the _b_u_f_f_e_r.
+
+          Commands  to  edit have a simple and regular structure:
+          zero or more addresses followed  by  a  single  command
+          character,  possibly  followed  by  parameters  to  the
+          command. Missing addresses  are  supplied  by  default.
+          Certain  commands  allow  the  addition  of text to the
+          buffer (i - insert, c - change, a - append,  etc.,  see
+          below).  Input  governed  by  these  commands is merely
+          collected; no additional  commands  are  recognized  in
+          this mode.
+          
+          To  get  back to normal command mode, type a period (.)
+          alone at the beginning of a line.
+
+          EEddiitt supports a  limited  form  of  regular  expression
+          notation.  A _r_e_g_u_l_a_r _e_x_p_r_e_s_s_i_o_n is used in commands and
+          addresses to refer to patterns in the  text.  Following
+          are the specifications for regular expressions:
+
+          1.        Any  character  except  a  special  character
+                    matches  itself.  These   are   the   regular
+                    expression  delimiters:  {{  }},,  [[  ]],,  ??,, and
+                    sometimes %%,, **,, and $$..
+
+          2.        A ?? matches any character (except newline).
+
+          3.        A @@ followed by any character except ((  or  ))
+                    matches that character.
+
+          4.        A  string  enclosed in [[ and ]] (or [[^^ and ]] )
+                    matches any character in, or not in, the  set
+                    consisting  of  the  characters of the string
+                    (example: [abc] matches a, b,  or  c).  If  a
+                    substring  of  the  form  aa--bb  with  aa  and bb
+                    letters or digits within the brackets, it  is
+                    understood  to  mean  the  set  of characters
+                    spanned by the two limits.  (Examples:  [0-9]
+                    matches any digit; [a-zA-Z] matches any upper
+                    or lower letters.)
+
+
+                               -1-
+
+
+
+
+edit (1)                     3/18/82                     edit (1)
+
+
+          5.        A regular expression of forms 1-4 followed by
+                    **  matches  a  contiguous  run  of  0 or more
+                    occurrences   of   the   preceding    regular
+                    expression.  (Examples:  ** matches any number
+                    of spaces (including zero);  ??**  matches  the
+                    entire line (any number of occurrences of any
+                    character).
+
+          6.        A  regular  expression  enclosed  in  {{ and }}
+                    matches what the regular expression  matches.
+                    [It  also  has  side  effects  -  see the ss -
+                    (substitute) command below.]
+
+          7.        The  concatenation  of  regular   expressions
+                    matches the concatenation of what is matched.
+
+          8.        A  %%  as  the  first  character  of a regular
+                    expression restricts matches to the left  end
+                    of  the  line.  A  $$  as  the  last character
+                    similarly limits matches to the right end  of
+                    the line.
+
+          9.        A  regular  expression  matches  the  longest
+                    among the left-most of possible matches.
+
+           10.      An empty regular expression stands for a copy
+                    of the last regular expression encountered.
+
+
+          To understand addressing in eeddiitt,, you need to know that
+          at any time, eeddiitt remembers a _c_u_r_r_e_n_t _l_i_n_e. In general,
+          the current line is set to the last  line  affected  by
+          the previous line. The current line is initially set to
+          the last line of the file. Addresses are constructed as
+          follows:
+
+              A ((..)) addresses the current line.
+
+              A $$ addresses the last line.
+
+              A  decimal number (n) addresses the nth line of the
+              buffer.
+
+              A regular expression enclosed in  //  addresses  the
+              line  found  by  searching _f_o_r_w_a_r_d from the current
+              line for the first line, which is  matched  by  the
+              regular  expression. If necessary, the search wraps
+              around to the beginning of the buffer.
+
+              A regular expression enclosed in  \\  addresses  the
+              line  as  above,  except  that  search is _b_a_c_k_w_a_r_d_s
+              through the file.
+
+
+
+                               -2-
+
+
+
+
+edit (1)                     3/18/82                     edit (1)
+
+
+              Two addresses separated by a ++ or --  addresses  the
+              line in the buffer which is the sum (or difference)
+              of  the  two addresses. (Example: 2+1 addresses the
+              third line of the buffer.)
+
+              If an address begins  with  ++  or  --,,  addition  or
+              subtraction  is  taken  with respect to the current
+              line (i.e, -5 is equivalent to .-5).
+
+              An address consisting entirely of  minus  signs  or
+              entirely  of  plus  signs is taken to mean the line
+              forward or behind the current line by as many lines
+              as plus or minus signs.  (Example:  "--"  addresses
+              the line before last.)
+
+
+          Commands may require one, two or no addresses. Commands
+          which  require  no  addresses regard the presence of an
+          address as an error. Commands  which  accept  addresses
+          assume  default  addresses  if  too  few  addresses are
+          given.
+
+          Addresses are separated by a ,,.. The second address of a
+          two address sequence must correspond to  the  following
+          line. (Example: 3,2 is an illegal address list.) A %% is
+          shorthand for 11,,$$..
+
+          In  the  following  list  of eeddiitt commands, the default
+          addresses are shown in parentheses. The parentheses are
+          not part of the address, but are used to show that  the
+          given  addresses are the defaults. Most commands may be
+          followed by a "p"  meaning  that  the  line  is  to  be
+          printed  after  the  operation  is performed. With many
+          commands this happens automatically.
+
+
+
+
+                               -3-
+
+
+
+
+edit (1)                     3/18/82                     edit (1)
+
+
+          ((..)) aa
+          <<tteexxtt>>
+          ((..))
+
+              The given  text  (which  may  be  excessively  long
+              and/or  consist  of many lines) is a(ppended) after
+              the present line and before the next line if  there
+              is  one. 0 is legal as an address for this command;
+              the text is placed at the beginning of the buffer.
+
+
+          ((..,,..)) cc
+          <<tteexxtt>>
+          ((..))
+
+              The c(hange) command first  deletes  the  addressed
+              lines,  then  accepts  text  which  replaces  these
+              lines.
+
+
+          ((..,,..)) dd
+          <<tteexxtt>>
+          ((..))
+          
+              The addressed lines are d(eleted) from the  buffer.
+              (Example: 1,$d completely erases the buffer.)
+
+
+          ee[[!!]] [[ffiilleennaammee]]
+              
+              The  e(nter)  command causes the entire contents of
+              the buffer to be deleted, then the named file to be
+              read in. If you are finished editing one  file  and
+              wish  to  switch to another, use eenntteerr.. If the file
+              you are presently working on has not been  written,
+              a diagnostic is printed. This is intended to reduce
+              the  possibility  of  accidental  loss of work. The
+              optional exclamation point  overrides  this  safety
+              feature.
+
+
+          ff [[ffiilleennaammee]]
+              
+              The remembered f(ilename) is printed. If a filename
+              is given, the remembered filename is changed to it.
+
+
+
+
+                               -4-
+
+
+
+
+edit (1)                     3/18/82                     edit (1)
+
+
+          ((11,,$$)) gg//rreegguullaarr eexxpprreessssiioonn//ccoommmmaanndd
+              
+              G(lobal).  First, every line in the buffer matching
+              the regular expression is  marked.  Then  for  each
+              marked  line,  the  command  is  executed  with ((..))
+              initially set to that line.
+
+
+          ((..)) ii <<tteexxtt>> ((..))
+              
+              The  given  text  is  i(nserted)  just  before  the
+              addressed  line.  This  command differs from aappppeenndd
+              (above) only in the placement of the text.
+
+
+          ((..,,..++11)) jj
+              
+              The j(oin) command joins the addressed lines into a
+              single line. In any case, an  additional  space  is
+              inserted  between the text of the formerly separate
+              lines.
+
+
+          ((..,,..)) ll
+              
+              The addressed lines are l(isted) in an  unambiguous
+              way.  Control  characters  are displayed as a caret
+              ("^")   followed   by   the   upper   case   letter
+              corresponding   to  the  control  character.  Dirty
+              characters (with the sign bit set) are displayed as
+              three-digit octal preceded by a back slashes ("\").
+
+
+          ((..,,..)) mm aa
+              
+              The m(ove) command repositions the addressed  lines
+              after the line referred to by the address "a".
+
+
+          nn[[!!]]
+              
+              Edit the n(ext) file, if any, in the argument list.
+              This  is  an  easy  way  to  edit  a group of files
+              without  having  to  remember   all   their   names
+              yourself.  If  the  exclamation point is given, the
+              command is forced. (Example: edit a b c d e; ...  n
+              ... n ...)
+
+
+
+
+                               -5-
+
+
+
+
+edit (1)                     3/18/82                     edit (1)
+
+
+          ((..,,..)) pp[[ll]][[==]]
+              
+              The  addressed lines are p(rinted) in the specified
+              format. The  "l"  means  to  print  in  the  manner
+              described  in  the "l" command (above). The == means
+              to number the lines. Note that the printing  format
+              remains in effect until it is changed again.
+
+
+          qq[[!!]]
+              
+              Use  the  q(uit)  command  to  terminate an editing
+              session. No automatic write of the file is done.  A
+              diagnostic  is  printed  if  the  buffer  has  been
+              changed since the last write command. This  feature
+              offers some degree of protection against accidental
+              loss   of  work.  The  optional  exclamation  point
+              immediately following the "q" overrides this safety
+              feature, (i.e., quit impetuously).
+
+
+          ((..))rr [[ffiilleennaammee]]
+              
+              The r(ead) command reads in the  named  file  after
+              the  addressed  line.  If no filename is given, the
+              remembered  filename  is  used.  The  filename   is
+              remembered   if  there  is  as  yet  no  remembered
+              filename. Address "0" is legal for this command and
+              causes  the  named  file  to  be  read  in  at  the
+              beginning of the buffer.
+
+
+          ((..,,..))ss//rreegguullaarr eexxpprreessssiioonn//rreeppllaacceemmeenntt//[[gg]]
+              
+              In the s(ubstitute) command, each addressed line is
+              searched   for   strings   matching   the   regular
+              expression. An optional "g" (global) may follow the
+              substitute command. In the presence of  a  "g"  all
+              occurrences  of matched strings are replaced by the
+              given replacement text. In the  absence  of  a  "g"
+              only  the  first  matched  string  in  each line is
+              replaced. It is an error for  the  substitution  to
+              fail on all addressed lines.
+
+              An  && appearing in the replacement text is replaced
+              by the  string  matching  the  regular  expression.
+              (Example:  s/toves/slithy  &/  would change "toves"
+              into "slithy toves".) @@nn where it  is  a  digit  (1
+              through   9)   is   replaced  by  the  nth  regular
+              subexpression  enclosed  in  }}  and  {{..  When  nest
+              parenthesized  regular sub-expressions are present,
+              n  is  determined  by  counting  occurrences  of  {{
+              starting from the left.
+              
+
+
+                               -6-
+
+
+
+
+edit (1)                     3/18/82                     edit (1)
+
+
+              These  regular sub-expressions tagged by number can
+              be  extremely  useful   in   automating   otherwise
+              impossible       editing      tasks.      (Example:
+              ss//{{[[AA--ZZ]][[aa--zz]]**}},, {{[[AA--ZZ]][[aa--zz]]**}}//@@22,,@@11// would convert
+              a  list  of   people's   names   from:   "lastname,
+              firstname" to "firstname lastname".)
+              
+              Lines   may   be   split  by  substituting  newline
+              characters into them. @@nn in the replacement pattern
+              is understood to mean newline.
+              
+              If no replacement pattern is  given,  the  previous
+              replacement pattern is used, (i.e., "s/pattern").
+              
+              If  neither  pattern  is  given,  then the previous
+              substitute command  is  re-executed,  (i.e.,  "s").
+              This feature saves a lot of time.
+
+
+          ((..,,..))tt aa
+              
+              The  t(ranscribe)  command  works  exactly like the
+              mmoovvee command, except that a copy of  the  addressed
+              lines  is  placed  after  the line corresponding to
+              address "a".
+
+
+          uu
+              UUnnddoo previous command; only works if file is  still
+              in buffer.
+
+
+          ((11,,$$)) ww[[!!]] [[ffiilleennaammee]]
+              The  addressed  lines  are w(ritten) onto the named
+              file. If no file  name  is  given,  the  remembered
+              name, if any, is used. If the named file exists and
+              is   not  the  remembered  file,  a  diagnostic  is
+              printed. This is  intended  to  prevent  accidental
+              overwriting   of   valuable   files.  The  optional
+              exclamation point immediately following  the  write
+              command character suppresses this safety feature.
+
+
+          ((11,,$$)) xx//rreegguullaarr eexxpprreessssiioonn//ccoommmmaanndd
+              
+              Exactly like the global command (above) except that
+              all  lines  _n_o_t matching the regular expression are
+              affected.
+
+
+
+
+                               -7-
+
+
+
+
+edit (1)                     3/18/82                     edit (1)
+
+
+          ((..++11)) zz [[NN]]
+              
+              Print the next nn lines (default 22). The value nn is
+              sticky, in that it becomes the  default  value  for
+              future  scroll  commands.  This  command  is  quite
+              useful for marching your way through text.
+
+
+          (($$)) ==[[ll]]
+              
+              Lines are printed  with  line  number.  If  [l]  is
+              given, then the line is additionally printed in the
+              style  described  in the "l" command (above). Lines
+              are printed out with numbers until the "=" sign  is
+              entered again.
+
+
+          << ffiillee
+              
+              The  named  file is read as further input for edit.
+              The command may contain further << commands.
+
+
+          ((..++11,,..++11)) <<nneewwlliinnee>>
+              
+              An address alone on a line causes the text  of  the
+              addressed line to be printed. A blank line alone is
+              equivalent  to  aanndd  iiss uusseeffuull ffoorr stepping through
+              text.
+              
+              
+         NNOOTTEESS
+              Sending a ^C character to eeddiitt under CP/M  (Digital
+              Research)  will  cause your work to be ungracefully
+              lost (but this is not a problem under Micronix).
+              
+              
+         SSEEEE AALLSSOO
+              Kernighan, Brian  W.  and  P.J.  Plauger,  _S_o_f_t_w_a_r_e
+              _T_o_o_l_s, (Addison-Wesley, 1976).
+              
+
+
+
+
+                               -8-
+
+

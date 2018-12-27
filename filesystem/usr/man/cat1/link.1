@@ -1,0 +1,260 @@
+
+
+link (1)                     4/14/82                     link (1)
+
+
+     PPRROOGGRRAAMM
+          lliinnkk - combine object files
+
+
+     UUSSAAGGEE
+          link -[flags] <files>
+
+
+     FFUUNNCCTTIIOONN
+          LLiinnkk  combines  relocatable  object  files  in standard
+          format for any target machine, selectively loading from
+          libraries of such files made with  lliibb,,  to  create  an
+          executable  image  for  stand-alone  execution,  or for
+          input to other binary reformatters.
+          
+          The flags are:
+          
+          -a   Make  all  relocation  items   and   all   symbols
+               absolute.  Used  to  prerelocate code that will be
+               linked elsewhere, and is not to be relocated.
+               
+          -c   Suppress code output (.text and .data),  and  make
+               all  symbols  absolute. Used to make a module that
+               only  defines   symbol   values   for   specifying
+               addresses in shared libraries, etc.
+               
+           -db##    Set data bias to the long integer ##. Default
+               is  end  of  text  section, rounded up to required
+               storage boundary for the target machine.
+               
+          -dr# Round data bias up to ensure  that  there  are  at
+               least  #  low-order  binary  zeros  in  its value.
+               Ignored if -db## is specified.
+               
+          -d   Do not define bss symbols,  and  do  not  complain
+               about  undefined  symbols. Used for partial links,
+               i.e., if the output module is to be input to lliinnkk..
+               
+          -eb* If the symbol * is referenced, make  it  equal  to
+               the first unused location past the bss area.
+
+
+
+
+                               -1-
+
+
+
+
+link (1)                     4/14/82                     link (1)
+
+
+          ed*  If  the  symbol  * is referenced, make it equal to
+               the first unused  location  past  the  initialized
+               data area.
+               
+          et*  If  the  symbol  * is referenced, make it equal to
+               the first unused location past the text area.
+               
+          -h   Suppress headers in output file.  This  should  be
+               specified  only  for  stand-alone  modules such as
+               bootstraps.
+               
+          -l*  Append library name to the  end  of  the  list  of
+               files  to  be  linked,  where  the library name is
+               formed by appending * to  "/lib/lib".  Up  to  ten
+               such  names  may  be  specified as flags; they are
+               appended in the order specified.
+               
+          -o*  Write output module to file *. Default is xeq.
+               
+          -r   Suppress  relocation  bits.  This  should  not  be
+               specified  if  the output module is to be input to
+               lliinnkk..
+               
+          -tb##     Set text bias to the long integer ##. Default
+               is location zero.
+               
+          -t   Suppress  symbol  table.  This   should   not   be
+               specified  if  the output module is to be input to
+               lliinnkk..
+               
+          -u*  Enter the symbol * into the  symbol  table  as  an
+               undefined   public  reference,  usually  to  force
+               loading of selected modules from a library.
+               
+          -x*  Specify placement in  the  output  module  of  the
+               input  .text  and 1-weighted bit, .data. If either
+               bit is set, the corresponding sections are put  in
+               the  text segment output; otherwise they go in the
+               data segment. The default value used, predictably,
+               is 2.
+               
+          The bss section is always assumed to  follow  the  data
+          section  in  both  the  input  and  output files. It is
+          perfectly permissible for text  and  data  sections  to
+          overlap,  as  far  as  lliinnkk  is  concerned;  the target
+          machine may or may not make sense of this situation (as
+          with separate instruction and data spaces).
+          
+          The specified <files> are linked in order; if a file is
+          in library format, it is searched once  from  start  to
+          end.  Only  those  library  modules  are included which
+          define public symbols for  which  there  are  currently
+          outstanding  unsatisfied  references.  Hence, libraries
+          must be carefully ordered, or rescanned, to ensure that
+
+
+                               -2-
+
+
+
+
+link (1)                     4/14/82                     link (1)
+
+
+          all references are resolved. By  special  dispensation,
+          flags  of  the  form  "-1*"  may  be interspersed among
+          <files>. These call for the corresponding libraries  to
+          be  searched  at  the  points  specified in the list of
+          files. No space may  occur  after  the  "-1",  in  this
+          usage.
+          
+          _F_i_l_e _F_o_r_m_a_t
+          
+          A   relocatable  object  image  consists  of  a  header
+          followed by a text segment, a data segment, the  symbol
+          table, and relocation information.
+          
+          The  header  consists of an identification byte 0x99, a
+          configuration byte, a short unsigned int containing the
+          number of symbol table bytes,  and  six  unsigned  ints
+          giving:  the  number of bytes of object code defined by
+          the text segment, the number of bytes needed by the bss
+          segment, the number of  bytes  needed  for  stack  plus
+          heap,  the  text segment offset. Byte order and size of
+          all  ints  in  the  header  are   determined   by   the
+          configuration byte.
+          
+          The  configuration byte contains all information needed
+          to fully represent the header and remaining information
+          in the  file.  Its  value  val  defines  the  following
+          fields:  ((val  &  07)  <<  1)  +  1  is  the number of
+          characters in the symbol  table  name  field,  so  that
+          values  [0, 8) provide for odd lengths in the range [1,
+          15]. If (val & 010) then ints are four bytes; otherwise
+          they are two bytes.  If  (val  *  020)  then  ints  are
+          represented  least  significant  byte  first, otherwise
+          most significant byte first; order  is  assumed  purely
+          ascending  or  purely  descending. (val & 0140) >> 5 is
+          the strongest for bounds that are multiples of 0, 2, 4,
+          8 bytes. If (val & 0200) no relocation  information  is
+          present in this file.
+          
+          Relocation  information consists of two successive byte
+          streams, one for the text segment and one for the  data
+          segment,  each  terminated  by  a  zero  control  byte.
+          Control bytes in the range  [1,  31]  cause  that  many
+          bytes in the corresponding segment to be skipped; bytes
+          in the range [32, 63] skip 32 bytes, plus 256 times the
+          control  byte  minus  32,  plus  the  number  of  bytes
+          specified by the relocation byte following.
+          
+          All other control bytes control relocation of the  next
+          short  or long int in the corresponding segment. If the
+          1-weighted bit is set in such a control  byte,  then  a
+          change  in  load  bias must be subtracted from the int.
+          The 2-weighted bit is  set  if  a  long  int  is  being
+          relocated  instead  of  a  short  int. The value of the
+          control  byte  right-shifted  two  places,  minus   16,
+
+
+                               -3-
+
+
+
+
+link (1)                     4/14/82                     link (1)
+
+
+          constitutes a "symbol code".
+          
+          A symbol code of 47 is replaced by a code obtained from
+          the  byte  or bytes following in the relocation stream.
+          If the next byte is less than 128, the symbol  code  is
+          its  value  plus  47.  Otherwise, the code is that byte
+          minus 128, times 256, plus 175 plus the  value  of  the
+          next relocation byte after that one.
+          
+          A  symbol code of zero calls for no further relocation;
+          1 means that a change in the text bias must be added; 3
+          means that a change in bss bias must  be  added.  Other
+          symbol  codes  call  for  the  value symbol table entry
+          indexed by the symbol code minus 4 to be added  to  the
+          item.
+          
+          Each symbol table entry consists of a value int, a flag
+          byte, and a name padded with trailing NULLs. Meaningful
+          flag   values  are  o  for  undefined,  4  for  defined
+          absolute, 5 for defined text relative,  6  for  defined
+          data  relative, and 7 for defined bss relative. To this
+          is added 010 if the symbol is to be globally known.  If
+          a  symbol  still undefined after linking has a non-zero
+          value, lliinnkk assigns the symbol a unique  area,  in  the
+          bss  segment,  whose  length is specified by the value,
+          and considers the symbol defined. This occurs  only  if
+          -d has not been given.
+
+
+     RREETTUURRNNSS
+          LLiinnkk  returns  success if no error messages are printed
+          to STDOUT, that is, if no undefined symbols remain  and
+          if  all reads and writes succeed; otherwise, it returns
+          failure.
+
+
+     EEXXAAMMPPLLEE
+          To load the C program echo.o with separate  I/D  spaces
+          for Micronix (UNIX/V6):
+
+               %% lliinnkk --11cc..1111 --rrtt --ddbb00 //lliibb//CCrrttss..oo eecchhoo..oo;; ttaaoouutt
+          
+          or with read-only text section:
+
+               %% lliinnkk --11cc..1111 --rrtt --ddrr1133 //lliibb//CCrrttss..oo eecchhoo..oo;; ttaaoouutt
+
+
+
+
+                               -4-
+
+
+
+
+link (1)                     4/14/82                     link (1)
+
+
+          And to load the 8080 version of echo under CP/M:
+
+          AA::lliinnkk --hhrrtt --ttbb00xx00110000 aa::cchhddrr..oo eecchhoo..oo aa::cclliibb..aa aa::mmlliibb..aa
+
+
+     SSEEEE AALLSSOO
+          hex  (1),  lib  (1), lord (1), obj (1), cc (1), as (1),
+          cp1 (1), cp2 (1), cpp (1)
+          
+          NOTE: This program and documentation  are  products  of
+          Whitesmiths, Ltd.,
+
+
+
+
+                               -5-
+
+

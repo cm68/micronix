@@ -1,0 +1,94 @@
+
+
+stat (2)                     3/19/82                     stat (2)
+
+
+     NNAAMMEE
+          ssttaatt - get the status of a named file
+          
+          
+     CC
+          stat(name, buf)
+          char *name;
+          struct stat *buf;
+          
+          
+     FFUUNNCCTTIIOONN
+          SSttaatt  is identical to ffssttaatt,, except that it operates on
+          named files rather than open-file descriptors.  Buf  is
+          the  address  of  a  36  byte  buffer,  into  which the
+          following information is placed:
+          
+          ssttrruucctt ssttaatt
+                {{
+          cchhaarr  mmiinnoorr,,          //** mmiinnoorr ddeevviiccee **//
+                mmaajjoorr;;          //** mmaajjoorr ddeevviiccee **//
+          iinntt   iinnuummbbeerr,,        //** iinnooddee nnuummbbeerr **//
+                ffllaaggss;;          //** sseeee bbeellooww **//
+          cchhaarr  nnlliinnkkss,,         //** nnuummbbeerr ooff lliinnkkss **//
+                uuiidd,,            //** uusseerr iidd ooff oowwnneerr **//
+                ggiidd,,            //** ggrroouupp iidd ooff oowwnneerr **//
+                ssiizzee00;;          //** hhiigghh bbyyttee ooff ssiizzee **//
+          iinntt   ssiizzee11,,          //** llooww wwoorrdd ooff ssiizzee **//
+                aaddddrr[[88]];;        //** bblloocckk nnuummbbeerrss **//
+          lloonngg  aaccttiimmee,,         //** ttiimmee ooff llaasstt aacccceessss **//
+                mmooddttiimmee;;        //** "" llaasstt mmooddiiffiiccaattiioonn **//
+                }};;
+          
+          The flags are as follows (values in octal):
+          
+           110000000000               iinnooddee iiss aallllooccaatteedd
+                 006600000000         22--bbiitt ffiillee ttyyppee
+                 000000000000         ppllaaiinn ffiillee
+                 004400000000         ddiirreeccttoorryy
+                 002200000000         cchhaarraacctteerr--ssppeecciiaall ffiillee
+           006600000000               bblloocckk--ssppeecciiaall ffiillee
+           001100000000               llaarrggee ffiillee
+           000044000000               sseett uusseerr--iidd oonn eexxeeccuuttiioonn
+           000022000000               sseett ggrroouupp--iidd oonn eexxeeccuuttiioonn
+           000011000000               oonnee wwrriitteerr oonnllyy
+           000000440000               rreeaadd ((oowwnneerr))
+           000000220000               wwrriittee ((oowwnneerr))
+           000000110000               eexxeeccuuttee oorr sseeaarrcchh ddiirreeccttoorryy ((oowwnneerr))
+           000000007700               rreeaadd,, wwrriittee,, eexxeeccuuttee ((ggrroouupp))
+           000000000077               rreeaadd,, wwrriittee,, eexxeeccuuttee ((ootthheerrss))
+          
+          
+          The one-writer-only bit allows the file to be open  for
+          writing in no more than one process at a time.
+          
+
+
+				    -1-
+
+
+
+
+stat (2)                     3/19/82                     stat (2)
+
+
+          It  is  not  necessary  to  have read permission on the
+          file, but all directories leading to the file  must  be
+          searchable.
+          
+          
+     RREETTUURRNNSS
+          A 0 indicates success, a -1 indicates failure.
+          
+          
+     AASSSSEEMMBBLLEERR
+          ((ssttaatt == 1188))
+          ssttaatt;; nnaammee;; bbuuff
+          
+          
+     RREETTUURRNNSS
+          The  carry  flag  is  cleared  on  success,  or  set on
+          failure. On  success,  the  status  is  placed  in  the
+          36-byte area pointed at by buf.
+
+
+
+
+				    -2-
+
+
