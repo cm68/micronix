@@ -38,15 +38,12 @@ include:
 	recovered include files 1.61
 
 usersim:
-	Big news:  as of july 23 2018,
-	micronix user mode simulator mostly works.
+	micronix user mode simulator mostly works, including upm, the cp/m
+	emulator.  some of the system calls are still not real (mknod!?)
+
 	build it on any random unix box (centos is baseline),
 	and run:  sim
-
-	date, ls. man, and so on work pretty well.
 	
-	as of Aug 1, almost everything works.
-
 hitechc:
 	the hitech c compiler.  this is not capable of running yet, but if the
 	cp/m libc gets removed via binary jiggery-pokery, and replaced with
