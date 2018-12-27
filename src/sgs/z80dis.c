@@ -630,9 +630,9 @@ dp()
         for (i = 0; i < pcol; i++) {
                 c = pchars[i];
                 if ((c <= 0x20) || (c >= 0x7f)) c = '.';
-                printf("%c", c);
+                fprintf(stdout, "%c", c);
         }
-        printf("\n");
+        fprintf(stdout, "\n");
 }
 
 dumpmem(unsigned char (*readbyte)(int addr), int addr, unsigned short len)
@@ -641,8 +641,8 @@ dumpmem(unsigned char (*readbyte)(int addr), int addr, unsigned short len)
         pcol = 0;
 
         while (len) {
-                if (pcol == 0) printf("%04x: ", addr);
-                printf("%02x ", pchars[pcol] = (*readbyte)(addr++));
+                if (pcol == 0) fprintf(stdout, "%04x: ", addr);
+                fprintf(stdout, "%02x ", pchars[pcol] = (*readbyte)(addr++));
                 len--;
                 if (pcol++ == 15) {
                         dp();
@@ -650,7 +650,7 @@ dumpmem(unsigned char (*readbyte)(int addr), int addr, unsigned short len)
                 }
         }
         if (pcol != 0) {
-                for (i = pcol; i < 16; i++) printf("   ");
+                for (i = pcol; i < 16; i++) fprintf(stdout, "   ");
                 dp();
         }
 }

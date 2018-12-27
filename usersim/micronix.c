@@ -42,7 +42,8 @@ static void	emulate();
 
 #define	DEFROOT	"../filesystem"
 
-int am_root= 0;
+int debug_terminal;
+int am_root;
 int mypid;
 
 char curdir[100] = "";
@@ -170,6 +171,7 @@ usage(char *complaint, char *p)
 	printf("%s", complaint);
 	printf("usage: %s [<options>] [program [<program options>]]\n", p);
 	printf("\t-r\trun as root\n");
+	printf("\t-t\topen a debug terminal window\n");
 	printf("\t-d <root dir>\n");
 	printf("\t-b\t\tstart with breakpoint\n");
 	printf("\t-v <verbosity>\n");
@@ -190,17 +192,7 @@ main(int argc, char **argv)
 	char *s;
 	char **argvec;
 	int i;
-
-	/*
-	 * we might be piping the simulator.  let's get an open file for our debug output
-	 * and monitor functions.  finally, let's make sure the file descriptor is out of
-	 * range of the file descriptors our emulation uses.
-	 */
-	mytty = fopen("/dev/tty", "r+");
-	dup2(fileno(mytty), TTY_FD);
-	mytty = fdopen(TTY_FD, "r+");
-	setvbuf(mytty, 0, _IOLBF, 0);
-	stdout = stderr = stdin = mytty;
+	char *ttyname;
 
 	argc--;
 	
@@ -219,6 +211,9 @@ main(int argc, char **argv)
 			switch (*s++) {
 			case 'h':
 				usage("", progname);
+				break;
+			case 't':
+				debug_terminal = 1;
 				break;
 			case 'r':
 				am_root = 1;
@@ -262,6 +257,50 @@ main(int argc, char **argv)
 	if (!rootdir) {
 		rootdir = DEFROOT;
 	}
+	mypid = getpid();
+
+	/*
+	 * we might be piping the simulator.  let's get an open file for our debug output
+	 * and monitor functions.  finally, let's make sure the file descriptor is out of
+	 * range of the file descriptors our emulation uses.
+	 * this is so that we can debug interactive stuff that might be writing/reading from
+	 * stdin, and we want all our debug output to go to a different terminal, one that
+	 * isn't running a shell.  
+	 * also, if we specified to open a debug window, let's connect the emulator's file
+	 * descriptors to an xterm or something.
+	 */
+	if (debug_terminal) {
+		char *cmd = malloc(100);
+		int pipefd[2];
+
+		pipe(&pipefd);
+		sprintf(cmd, 
+			"tty > /proc/%d/fd/%d ; while test -d /proc/%d ; do sleep 1 ; done",
+			mypid, pipefd[1], mypid);
+		printf("command %s\n", cmd);
+		if (fork()) {
+			ttyname = malloc(100);
+			i = read(pipefd[0], ttyname, 100);
+			if (i == -1) {
+				perror("pipe");
+			}
+			ttyname[strlen(ttyname)-1] = 0;
+		} else {
+			execlp("xterm", "xterm", "-e", "bash", "-c", cmd, (char *)0); 
+		}
+	} else {
+		ttyname = "/dev/tty";
+	}
+	printf("ttyname $%s$\n", ttyname);	
+	mytty = fopen(ttyname, "r+");
+	if (!mytty) {
+		perror(ttyname);
+		exit(errno);
+	}
+	dup2(fileno(mytty), TTY_FD);
+	mytty = fdopen(TTY_FD, "r+");
+	setvbuf(mytty, 0, _IOLBF, 0);
+	stdout = stderr = stdin = mytty;
 
 	/* if our rootdir is relative, we need to make it absolute */
 	if (*rootdir != '/') {
@@ -296,7 +335,6 @@ main(int argc, char **argv)
 		return (EXIT_FAILURE);
 	}
 	free(argvec);
-	mypid = getpid();
 
         cp->state.pc = pop();
 	emulate();
@@ -463,9 +501,9 @@ dumpcpu()
 	format_instr(cp->state.pc, outbuf, &get_byte, &lookup_sym, &reloc);
 	s = lookup_sym(cp->state.pc);
 	if (s) {
-		printf("%s\n", s);
+		fprintf(stdout,"%s\n", s);
 	}
-	printf("%04x: %-20s ", cp->state.pc, outbuf);
+	fprintf(stdout,"%04x: %-20s ", cp->state.pc, outbuf);
 
 	f = cp->state.registers.byte[Z80_F];
 	
@@ -477,7 +515,8 @@ dumpcpu()
 	if (f & Z80_Z_FLAG) fbuf[5] = 'Z';
 	if (f & Z80_C_FLAG) fbuf[6] = 'S';
 
-	printf(" %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x brk:%04x\n",
+	fprintf(stdout,
+	" %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x brk:%04x\n",
 		fbuf, 
 		cp->state.registers.byte[Z80_A],
 		cp->state.registers.word[Z80_BC],
@@ -514,7 +553,7 @@ watchpoint_hit()
 		}
 		n = get_byte(p->addr);
 		if (n != p->value) {
-			printf("value %02x at %04x changed to %02x\n",
+			fprintf("value %02x at %04x changed to %02x\n",
 				p->value, p->addr, n);
 			p->value = n;
 			return (1);
@@ -555,7 +594,7 @@ monitor()
 
 	while (1) {
 	more:
-		printf("%d >>> ", mypid);
+		fprintf(stdout, "%d >>> ", mypid);
 		s = fgets(cmdline, sizeof(cmdline), stdin);
 		if (*s) {
 			s[strlen(s)-1] = 0;
@@ -569,10 +608,10 @@ monitor()
 			while (*s && (*s == ' ')) s++;
 			if (!*s) {
 				for (i = 0; i < sizeof(stop); i++) {
-					if ((i % 16) == 0) printf("\n%02d: ", i);
-					printf("%03d ", stop[i]);
+					if ((i % 16) == 0) fprintf(stdout,"\n%02d: ", i);
+					fprintf(stdout,"%03d ", stop[i]);
 				}
-				printf("\n");
+				fprintf(stdout, "\n");
 			}
 			if (*s == '-') {
 				s++;
@@ -620,9 +659,9 @@ monitor()
 				c = format_instr(i, cmdline, &get_byte, &lookup_sym, &reloc);
 				s = lookup_sym(i);
 				if (s) {
-					printf("%s\n", s);
+					fprintf(stdout, "%s\n", s);
 				}
-				printf("%04x: %-20s\n", i, cmdline);
+				fprintf(stdout, "%04x: %-20s\n", i, cmdline);
 				i += c;
 				lastaddr = i & 0xfff;
 			}
@@ -673,26 +712,26 @@ monitor()
 					}
 				} else {
 					for (p = *head; p; p = p->next) {
-						printf("%04x\n", p->addr);
+						fprintf(stdout, "%04x\n", p->addr);
 					}
 				}
 			}
 			break;
 		case '?':
 		case 'h':
-			printf("commands:\n");
-			printf("l <addr> :list\n");
-			printf("d <addr> :dump memory\n");
-			printf("p dump cpu state\n");
-			printf("g: continue\n");
-			printf("s: single step\n");
-			printf("q: exit\n");
-			printf("b [-] <nnnn> ... :breakpoint\n");
-			printf("w [-] <nnnn> ... :watchpoint\n");
-			printf("c [-] <nn> :system call trace\n");
+			fprintf(stdout, "commands:\n");
+			fprintf(stdout, "l <addr> :list\n");
+			fprintf(stdout, "d <addr> :dump memory\n");
+			fprintf(stdout, "r dump cpu state\n");
+			fprintf(stdout, "g: continue\n");
+			fprintf(stdout, "s: single step\n");
+			fprintf(stdout, "q: exit\n");
+			fprintf(stdout, "b [-] <nnnn> ... :breakpoint\n");
+			fprintf(stdout, "w [-] <nnnn> ... :watchpoint\n");
+			fprintf(stdout, "c [-] <nn> :system call trace\n");
 			break;
 		default:
-			printf("unknown command %c\n", c);
+			fprintf(stdout, "unknown command %c\n", c);
 			break;
 		case 0:
 			break;
