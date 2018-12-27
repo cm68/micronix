@@ -17,7 +17,3 @@ you would expect:
 /bin/ps:
 	opens /dev/mem and grunges around. uh, no.
 
-/bin/upm:
-	the cp/m simulator is interesting and currently not working.
-	for some reason, it was distributed with symbols, which may be useful
-	to disassemble/decompile it.
