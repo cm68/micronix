@@ -1,0 +1,192 @@
+
+
+form (1)                     3/18/82                     form (1)
+
+
+     PPRROOGGRRAAMM
+          ffoorrmm - format text
+          
+          
+     UUSSAAGGEE
+          ffoorrmm [[--tt]] [[--oo oouuttppuutt]] [[ffiillee ...... ]]
+     
+     
+     DDEESSCCRRIIPPTTIIOONN
+          FFoorrmm  is  a  general  purpose  text formatter with text
+          filling, underline,  indenting,  centering,  and  other
+          useful  capabilities.  This document was prepared using
+          ffoorrmm..
+
+          The standard input is read and formatted  according  to
+          instructions  embedded in the input file; the result is
+          written to the standard output.
+          
+          If a list of files names is given, they are used as the
+          input. If "-o" followed by a file name appears  on  the
+          command line, then the output is written into the named
+          file.
+          
+          If "-t" appears on the command line, then the output is
+          made more suitable for a glass tty, i.e. long sequences
+          of blank lines are avoided.
+
+          Input  consists of text lines interspersed with command
+          lines destined to be printed
+          
+          If the first character of a line is a period (.),  ffoorrmm
+          attempts  to  interpret  the  line as a command; in any
+          case, the text of such lines will not  appear  verbatim
+          in the output.
+
+          The following commands are implemented:
+
+
+           ..bbdd nn
+          
+          Cause  the next (or number of given) line(s) of text to
+          be double-striked for bold face appearance. (Default is
+          1.) Printer must have double-strike ability,  otherwise
+          oovveerrssttrriikkee (Section 1) must be implemented.
+          
+          
+           ..bbpp nn
+          
+          Begin  page number n. Jump to the top of the next page.
+          Set the page number to n (default is  sequential  order
+          beginning with 1).
+
+
+           ..bbrr
+
+
+                               -1-
+
+
+
+
+form (1)                     3/18/82                     form (1)
+
+
+          
+          Cause break. The next input line will begin at the left
+          margin.
+
+
+
+
+                               -2-
+
+
+
+
+form (1)                     3/18/82                     form (1)
+
+
+           ..ccee nn
+          
+          Center  the  next  (or  number of given) input line(s).
+          Default is next line only.
+
+
+           ..ffii
+          
+          Set filled text mode. All text lines will be filled out
+          with blanks if necessary so that the  right  margin  is
+          justified. Fill mode is the initial default condition.
+
+
+           ..ffoo TTEEXXTT
+          
+          Set  the  footer. The specified text will be printed at
+          the bottom of each page.
+
+
+           ..hhee TTEEXXTT
+          
+          Set the header. The specified text will be  printed  at
+          the top of each following page.
+
+
+           ..iinn nn
+          
+          Set  the  indent.  The indent is set to the nth column.
+          The command ".in 0" is interpreted to mean  no  indent.
+          Default is 0.
+
+
+           ..llss nn
+          
+          Set the line spacing to n lines. The command ".ls 2" is
+          interpreted  to  mean double space. The line spacing is
+          set to 1 (default) initially.
+
+
+           ..nnff
+          
+          No fill. Turns off  fill  mode;  lines  are  no  longer
+          justified.
+
+
+           ..ppll nn
+          
+          Page length. The page length is set to n lines long. If
+          no  number  (n) is specified, the page length is set to
+          66 lines (default).
+
+
+
+
+                               -3-
+
+
+
+
+form (1)                     3/18/82                     form (1)
+
+
+           ..rrmm nn
+          
+          Right margin. The right margin is set at column  n.  If
+          no  number  (n)  is  specified,  it is set at column 60
+          (default).
+
+
+           ..sspp nn
+          
+          Space down n lines. If no number (n) is given, spaces 1
+          line (default).
+
+
+           ..ttaa nn
+          
+          Set the tab. Value  (n)  determines  amount  of  tabbed
+          spaces.  Entered with ^I sequence or TAB key. When used
+          with next (.ti) command, produces "hanging" paragraphs.
+          
+          
+           ..ttii nn
+          
+          Temporary indent. The indent is set to a value (n)  for
+          the  next line only. This is quite useful for numbering
+          paragraphs - a  negative  value  produces  a  "hanging"
+          paragraph.
+
+
+           ..uull nn
+          
+          Cause the next (or number of given) input line(s) to be
+          underlined.   The  default  is  1.  Printer  must  have
+          double-strike capability. If not,  see  the  oovveerrssttrriikkee
+          program  (Section  1)  for instructions on implementing
+          this program.
+          
+          
+     SSEEEE AALLSSOO
+          edit (1),
+
+
+
+
+                               -4-
+
+

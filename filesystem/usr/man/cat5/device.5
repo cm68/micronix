@@ -1,0 +1,50 @@
+
+
+device (5)                    3/17/82                  device (5)
+
+
+     FFIILLEE
+          ddeevviiccee - printer spooler device description file
+
+
+     FFUUNNCCTTIIOONN
+          The  line  printer  spooler  program  searches  for and
+          follows the directives found in this file. The file  is
+          entered  free-form,  that  is,  order  and  spacing  of
+          specifiers given within this file are unimportant.
+          
+          The following is a list of specifiers that may appear:
+
+
+             A baud rate given as a decimal number. Example  baud
+             rates:  9600,  1200, 300, 110, etc. All the standard
+             baud rates are supported. The default baud  rate  is
+             9600.
+
+             An  indication to use hardware handshaking, i.e., to
+             transmit  only  when  the   clear-to-send   pin   is
+             asserted.  The indicator is simply the word "shake".
+             By default, clear-to-send is ignored.
+
+             The name of the device to which to send the  spooled
+             files  for printing. This must be the full path name
+             of a character special  file.  Examples:  /dev/ttyA,
+             /dev/ttyB,  /dev/ttyC,  /dev/pprA,  /dev/ttyD,  etc.
+             Default is /dev/lp.
+
+
+     FFIILLEESS
+          /usr/spool/*/device
+
+
+     EEXXAAMMPPLLEE
+          A complete typical "device" file follows:
+
+              //ddeevv//ttttyycc 11220000
+
+
+
+
+                                -1-
+
+

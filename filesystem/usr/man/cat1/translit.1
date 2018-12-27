@@ -1,0 +1,92 @@
+
+
+translit (1)                 6/25/82                 translit (1)
+
+
+     PPRROOGGRRAAMM
+          ttrraannsslliitt - transliterates characters
+          
+          
+     UUSSAAGGEE
+          ttrraannsslliitt ffrroomm [[ttoo]]
+     
+     
+     FFUUNNCCTTIIOONN
+          Translit  can  be  used  to perform a variety of useful
+          character  mapping  functions.  TTrraannsslliitt  modifies  its
+          input   on  a  character-by-character  basis.  TTrraannsslliitt
+          changes  each  character  in  its  ffrroomm  set   to   the
+          corresponding one in its ttoo set. If there is no ttoo set,
+          the  effect  is  to  remove each character found in the
+          ffrroomm set. If the ttoo set has fewer characters  than  the
+          ffrroomm  set, the last character in the ttoo set is repeated
+          as many times as needed to fill out the ttoo set.
+
+          Notation of the form x-y may be used as  shorthand  set
+          notation to mean all the characters lexically between x
+          and  y,  where  x and y are letters of the same case or
+          both digits.
+
+          If ^^ is the first character of the ffrroomm  specification,
+          it  is  understood  to  mean  all characters _n_o_t in the
+          following specification.
+
+          Notation of the form @@337777 (an "at" sign followed by  up
+          to  three  digits  of  octal)  may  be  used to specify
+          characters by ASCII value.
+
+          If the ffrroomm set contains fewer characters than  the  ttoo
+          set,  or  if the ^^ is used as above, the last character
+          of the ttoo set is sufficiently replicated  to  fill  the
+          ffrroomm  set  to  the  size  of  the  ttoo set. Furthermore,
+          contiguous characters which are elements of the ttoo  set
+          for  which there is no explicit corresponding character
+          in the ttoo set are collapsed to a single  occurrence  of
+          the last character in the specification for the ttoo set.
+
+     EEXXAAMMPPLLEESS
+          To replace all occurrences of x by y:
+
+                  ttrraannsslliitt xx yy <<iinnppuutt >>oouuttppuutt
+
+          To change x to y and y to x:
+
+                  ttrraannsslliitt xxyy yyxx <<iinnppuutt >>oouuttppuutt
+
+
+
+
+                               -1-
+
+
+
+
+translit (1)                 6/25/82                 translit (1)
+
+
+          To delete all occurrences of A:
+
+                  ttrraannsslliitt AA <<iinnppuutt >>oouuttppuutt
+
+          To map all lower case into upper case:
+
+                  ttrraannsslliitt aa--zz AA--ZZ <<iinnppuutt >>oouuttppuutt
+
+          To put one white space separated symbol per line:
+          
+                  ttrraannsslliitt @@4400@@1111@@1122 @@1122 <<iinn >>oouutt
+
+
+     SSEEEE AALLSSOO
+          change (1), edit (1)
+
+
+     NNOOTTEE
+          TTrraannsslliitt is analogous to the UNIX ttrr program.
+
+
+
+
+                               -2-
+
+

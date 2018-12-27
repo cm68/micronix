@@ -1,0 +1,216 @@
+
+
+scanf (3s)                   3/24/82                   scanf (3s)
+
+
+     SSUUBBRROOUUTTIINNEE((SS))
+          ssccaannff,, ffssccaannff,, ssssccaannff - formatted input conversion
+
+
+     CC
+          ##iinncclluuddee <<ssttddiioo..hh>>
+
+          ssccaannff((ffoorrmmaatt [[,, ppooiinntteerr]]......))
+          cchhaarr **ffoorrmmaatt;;
+
+          ffssccaannff((ssttrreeaamm,, ffoorrmmaatt [[,, ppooiinntteerr]]......))
+          FFIILLEE **ssttrreeaamm;;
+          cchhaarr **ffoorrmmaatt;;
+
+          ssssccaannff((ss,, ffoorrmmaatt [[,, ppooiinntteerr]]......))
+          cchhaarr **ss,, **ffoorrmmaatt;;
+
+
+     FFUUNNCCTTIIOONN
+          SSccaannff reads from ssttddiinn,, the standard input stream.
+          
+          FFssccaannff reads from the named input, ssttrreeaamm..
+          
+          SSssccaannff reads from the ss character string.
+          
+          Each  of  these functions read and interpret characters
+          according to a format, then store the  results  in  its
+          argument.  A control string ffoorrmmaatt and a set of ppooiinntteerr
+          arguments  indicating  where  the  converted  input  is
+          stored  are arguments expected by these routines. These
+          are described below.
+
+
+              Blanks, tabs  or  newlines,  which  match  optional
+              white space in the input.
+              
+              Any  ordinary  character  besides % that must match
+              the next character of the input stream.
+              
+              Optional conversion specifications,  which  consist
+              of an assignment suppressing character (*), maximum
+              field  width number, a conversion character and the
+              % character.
+              
+          The  control   string   usually   contains   conversion
+          specifications  that  direct interpretation of the next
+          input  field.   Unless   assignment   suppression   was
+          indicated (using the * character), the result is placed
+          in   the  variable  pointed  to  by  the  corresponding
+          argument.
+          
+          An input field is a string of non-space characters. The
+          field extends to the next inappropriate  character,  or
+          until the field width (if specified) is exhausted.
+
+
+                               -1-
+
+
+
+
+scanf (3s)                   3/24/82                   scanf (3s)
+
+
+          
+          The  interpretation  of the input field is indicated by
+          the   conversion   character.   Corresponding   pointer
+          arguments  are usually of a restricted type. A list and
+          description of legal conversion characters follows:
+
+
+             %%
+              A  single  percent  sign  (%)   is   expected.   No
+              assignment is done.
+
+             dd
+              Decimal integer is expected. Corresponding argument
+              should be integer pointer.
+
+             oo
+              Octal   integer  expected.  Corresponding  argument
+              should be integer pointer.
+
+             xx
+              Hexadecimal   integer    expected.    Corresponding
+              argument should be integer pointer.
+
+             ss
+              Character  string  expected. Corresponding argument
+              should be a character pointer pointing to an  array
+              of characters. Array must be large enough to accept
+              string  and terminating "\0" character that will be
+              added. A space character or newline terminates  the
+              input field.
+
+             cc
+              Character  expected.  Corresponding argument should
+              be a character pointer. The normal  skip-over-space
+              characters  are  suppressed.  Use "%ls" to read the
+              next non-space character.
+              
+              Corresponding argument should refer to a  character
+              array  and  indicate number of characters read if a
+              field width is given.
+
+             ee,, ff
+              Floating point number is expected.  Next  field  is
+              converted  and  stored  through  the  corresponding
+              argument which should be a pointer to a ffllooaatt..
+              
+              The  format  for  floating  point  numbers  is   an
+              optionally signed string of digits that may contain
+              a  decimal  point  followed by an optional exponent
+              field consisting  of  E  (or  e),  followed  by  an
+              optionally signed integer.
+
+
+
+
+                               -2-
+
+
+
+
+scanf (3s)                   3/24/82                   scanf (3s)
+
+
+             [[
+              Left bracket indicates a string not to be delimited
+              by  space  characters.  The  string  is  defined by
+              characters followed by a right bracket. A ^^ as  the
+              first  character after the left bracket defines the
+              input  field  as  all  characters  in  the  set  of
+              characters  following  the  ^^ sign. Absence of this
+              sign means the input field is  all  the  characters
+              within  the  brackets.  Corresponding argument must
+              point to a character array.
+
+
+          The conversion characters dd,, oo  and  xx  may  be  either
+          capitalized  or  preceded  by  an  ll to indicate that a
+          pointer to lloonngg rather than  iinntt  is  in  the  argument
+          list.  If  these are preceded by hh,, indicates a pointer
+          to sshhoorrtt rather than iinntt..
+          
+          The  ee  and  ff  conversion  characters  may   also   be
+          capitalized  or  preceded by ll to indicate a pointer to
+          ddoouubbllee rather than ffllooaatt..
+          
+          SSccaannff returns the number of  input  items  successfully
+          matched  and  assigned. This may also be used to decide
+          how many items were actually found. The constant end of
+          file is returned upon end of input. This  is  different
+          from  0, which may be interpreted to mean no conversion
+          was done. If conversion was intended, it was frustrated
+          by an inappropriate  character  in  the  input.  As  an
+          example:
+
+                  iinntt ii;; ffllooaatt xx;; cchhaarr nnaammee[[5500]];;
+                  ssccaannff((""%%dd%%ff%%ss"",, &&ii,, &&xx,, nnaammee));;
+
+          with the input
+
+                  2255 5544..3322EE--11 MMccCClleeaarryy
+
+          assigns  to  ii  the  value  25, xx the value 5.432. Name
+          contains "mccleary\0". Another example:
+
+                  iinntt ii;; ffllooaatt xx;; cchhaarr nnaammee[[5500]];;
+                  ssccaannff((""%%22dd%%ff%%**dd%%[[11223344556677889900]]"",, &&ii,, &&xx,, nnaammee
+
+          with the input
+
+                  5566778899 00112233 5566aa7722
+
+          assigns 56 to ii,, 789.0 to xx,, skips  "0123"  and  places
+          the  string  "56\0"  in  nnaammee.. The next call to ggeettcchhaarr
+          will return "a".
+
+
+
+
+                               -3-
+
+
+
+
+scanf (3s)                   3/24/82                   scanf (3s)
+
+
+     EERRRROORRSS
+          The success of matches and suppressed  assignments  can
+          be determined only indirectly.
+
+
+     NNOOTTEESS
+          In  cases  of missing or illegal data, ssccaannff returns an
+          end of file on end of input.
+
+
+     AALLSSOO RREEAADD
+          atof (3), getc (3), printf (3)
+          
+          
+
+
+
+
+                               -4-
+
+

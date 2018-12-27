@@ -1,0 +1,98 @@
+
+
+far (1)                      6/25/82                      far (1)
+
+
+     PPRROOGGRRAAMM
+          ffaarr - floppy archiver
+          
+          
+     UUSSAAGGEE
+          ffaarr ddeevviiccee [[ffllaaggss]] [[ffiilleess]]
+          
+          
+     FFUUNNCCTTIIOONN
+          FFaarr   provides   a  simple  interface  to  CP/M  floppy
+          diskettes. Device is  assumed  to  be  the  name  of  a
+          Micronix  special  file (such as /dev/fla) containing a
+          CP/M  diskette.  Names  such   as   /dev/fla   may   be
+          abbreviated as fla.
+          
+          The flags are:
+          
+          --dd        DDeelleettee..  Delete  the  named  files  from  the
+                    floppy diskette. If no file names are  given,
+                    no action is taken.
+                    
+          --pp        PPrriinntt..
+                    Each named file is sent to the standard output.   
+                    
+          --rr        RReeppllaaccee..  Each  named  file  is copied _t_o the
+                    floppy. If no file names are given, no action
+                    is taken. If a file  already  exists  on  the
+                    floppy, it is silently overwritten.
+                    
+          --tt        TTaabbllee..  Print  a  table  of  contents  of the
+                    floppy diskette. If any files are named, only
+                    those named and present are listed.
+                    
+          --xx        EExxttrraacctt.. Each named file is copied  _f_r_o_m  the
+                    diskette  _t_o  the current Micronix directory.
+                    If  no  file  names  are  given,  _t_h_e  _e_n_t_i_r_e
+                    _c_o_n_t_e_n_t_s of the diskette is extracted.
+                    
+          --vv        VVeerrbboossee..  Be verbose about it. Each operation
+                    is printed along with the affected file name.
+                    Files deleted are preceded by  a  "d",  those
+                    replaced   are  preceded  by  an  "r",  those
+                    extracted are preceded by "x".
+                    
+          At most, one of the flags  -  dd,,  tt,,  rr,,  xx  -  may  be
+          present. If none are present, --tt is assumed.
+          
+          The  file  list may contain wild card matching patterns
+          to be applied to the set of  file  names  in  the  CP/M
+          diskette's directory.
+          
+          The  rules  for file name matching patterns are exactly
+          the same as those for the shell (see sh (I)).
+          
+
+
+                               -1-
+
+
+
+
+far (1)                      6/25/82                      far (1)
+
+
+          
+     EEXXAAMMPPLLEESS
+          You receive a new CP/M software package in the mail  on
+          diskette and want to run it under Micronix.
+
+
+          To  copy  its contents to Micronix, insert the diskette
+          into floppy drive A and type:
+          
+                                ffaarr ffllaa --xxvv
+          
+          To copy a file from a diskette, changing  its  name  in
+          the process:
+          
+                       ffaarr ddjjaa --pp ffiilleennaammee >> nneewwnnaammee
+          
+          
+          To  copy  only  the  ".doc"  files  over  from  a  CP/M
+          mini-floppy:
+          
+                            ffaarr mmffaa --xxvv ""**..ddoocc""
+          
+
+
+
+
+                               -2-
+
+

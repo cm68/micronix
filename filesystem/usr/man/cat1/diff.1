@@ -1,0 +1,79 @@
+
+
+diff (1)                   6/25/82                      diff (1)
+
+
+     PPRROOGGRRAAMM
+          ddiiffff - find differences in lines of text files
+          
+          
+     UUSSAAGGEE
+          ddiiffff [[--ee]] ffiillee11 ffiillee22
+          
+          
+     FFUUNNCCTTIIOONN
+          DDiiffff  is  a  file comparator intended for use with text
+          files. It attempts to find a minimal set of differences
+          between lines of the given files.
+          
+          Differences are reported by lines of the form
+          
+                  NN aa RR,,SS
+                  
+                  NN,,MM dd RR
+                  
+                  NN,,MM cc RR,,SS
+                  
+          Where N and M are line numbers in file1; R  and  S  are
+          line numbers in file2.
+          
+          Following  each  line  of  this  type  is a list of the
+          affected lines in file1 marked by "<" and a list of the
+          affected lines in file2 marked by ">".
+          
+          If the --ee flag is given, the output takes the format of
+          a command script for eeddiitt to change the first file into
+          the second.
+          
+          
+     EERRRROORRSS
+          There are limitations on the size of files. An "Out  of
+          memory"  error message is printed if the problem is too
+          large.
+          
+          Spurious blanks lines are sometimes generated in output
+          produced under the -e option.
+
+
+     EEXXAAMMPPLLEE
+              ddiiffff aappppllee ppeeaarr
+
+              44 aa 77,, 99
+              >> AA tteexxtt lliinnee
+              >> aannootthheerr tteexxtt lliinnee
+              >> aa tthhiirrdd tteexxtt lliinnee
+
+
+
+
+
+                              -1-
+
+
+
+
+diff (1)                   6/25/82                      diff (1)
+
+
+          means that one of the changes required is to add  lines
+          after line number 4 in the first file.
+          
+          After the addition is done, the lines will become lines
+          7 thru 9 in the second file.
+
+
+
+
+                              -2-
+
+

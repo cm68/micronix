@@ -1,0 +1,46 @@
+
+
+access (2)		          3/18/81              access (2)
+
+
+     NNAAMMEE
+          aacccceessss - test file access permissions
+
+
+     CC
+          access(name, mode)
+          char *name;
+          int mode;
+
+
+     FFUUNNCCTTIIOONN
+          Permission  to  access the named file, in the specified
+          mode, is tested. The test is based on the real user and
+          group IDs, rather than the effective  IDs,  so  that  a
+          set-user-id  program  may  test  the permissions of its
+          invoker. Mode is the _s_u_m of any of the following:
+          
+                  44  rreeaadd
+                  22  wwrriittee
+                  11  eexxeeccuuttee
+          
+     RREETTUURRNNSS
+          AAcccceessss returns a 0 if permission is granted, -1 if not.
+
+
+     AASSSSEEMMBBLLEERR
+          ((aacccceessss == 3333))
+          ssyyss;; aacccceessss;; nnaammee;; mmooddee
+
+
+     RREETTUURRNNSS
+          AAcccceessss  returns  with  the  error  bit  clear  if   the
+          permissions  are  granted, or with the error bit set if
+          they are not.
+
+
+
+
+			           -1-
+
+

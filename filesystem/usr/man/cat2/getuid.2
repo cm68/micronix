@@ -1,0 +1,43 @@
+
+
+getuid (2)                   3/25/82                   getuid (2)
+
+
+     NNAAMMEE
+          ggeettuuiidd - get user IDs
+          
+          
+     CC
+          getuid()
+          
+          
+     FFUUNNCCTTIIOONN
+          GGeettuuiidd  returns  the  real  user  IDs  of  the  current
+          process. The real group ID is in the high byte  of  the
+          returned  word.  The  real  user ID is in the low byte.
+          (The  real  IDs  identify  the  individual,  while  the
+          effective  IDs determine his current access privileges.
+          See the eexxeecc and cchhmmoodd system calls for a discussion.)
+          
+          
+     RREETTUURRNNSS
+          GGeettuuiidd returns the real user IDs:
+          high byte = group ID, low byte = user ID.
+          
+          
+     AASSSSEEMMBBLLEERR
+          ((ggeettuuiidd == 2244))
+          ssyyss;; ggeettuuiidd
+          ((IIDDss iinn hhll))
+          
+          
+     RREETTUURRNNSS
+          GGeettuuiidd returns the real process IDs:
+          hhiigghh bbyyttee == ggrroouupp IIDD,, llooww bbyyttee == uusseerr IIDD..
+
+
+
+
+				    -1-
+
+

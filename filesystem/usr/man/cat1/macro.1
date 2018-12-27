@@ -1,0 +1,55 @@
+
+
+ macro (1)                   3/18/82                    macro (1)
+
+
+     PPRROOGGRRAAMM
+          mmaaccrroo - macro expansion
+          
+          
+     UUSSAAGGEE
+          mmaaccrroo
+     
+     
+     FFUUNNCCTTIIOONN
+          The  standard  input  is copied to the standard output,
+          with macros expanded along the way. After  encountering
+          a line of the form:
+
+                  ddeeffiinnee((ttookkeenn,,ssttrriinngg))
+
+          the  token will be replaced by the string everywhere it
+          appears.  A   token   is   a   contiguous   string   of
+          alphanumerics  delimited  by  non-alphanumerics.  Macro
+          exansions are  applied  recursively  [i.e.  define(a,b)
+          define(b,c)  is  equivalent to define(a,c)]. Macros may
+          be defined with arguments. If the sequence $n  where  n
+          is  a  digit  occurs in the defining string, $n will be
+          replaced by the nth argument. $1 is the first argument.
+          In  an  instance  where  a  macro  has  fewer  than   n
+          arguments,  $n  is  replaced by the null string, (i.e.,
+          simply ignored). An example:
+
+                  ddeeffiinnee((aadddd,, $$11 ++ $$22 ++ $$33))
+                  aadddd((ffiirrssttaarrgg,, sseeccoonnddaarrgg,, tthhiirrddaarrgg))
+
+          would produce:
+
+                  ffiirrssttaarrgg ++ sseeccoonnddaarrgg ++ tthhiirrddaarrgg
+
+
+     EEXXAAMMPPLLEE
+          As a language preprocessor stage:
+
+                  mmaaccrroo <<pprrooggrraamm >>ttmm11
+
+
+     SSEEEE AALLSSOO
+          include (1), ratfor (1)
+
+
+
+
+                               -1-
+
+

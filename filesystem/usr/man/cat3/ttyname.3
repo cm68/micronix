@@ -1,0 +1,58 @@
+
+
+ttyname (3)                  3/24/82                  ttyname (3)
+
+
+     SSUUBBRROOUUTTIINNEE((SS))
+          ttttyynnaammee,, iissaattttyy,, ttttyysslloott - find name of a terminal
+
+
+     CC
+          cchhaarr **ttttyynnaammee((ffiillddeess))
+
+          iissaattttyy((ffiillddeess))
+
+          ttttyysslloott(())
+
+
+     FFUUNNCCTTIIOONN
+          TTttyynnaammee  returns  a pointer to the null-terminated path
+          name of the terminal associated with ffiillddeess,,  the  file
+          descriptor.
+          
+          IIssaattttyy returns a 1 if the file descriptor is associated
+          with a terminal; a 0 is returned if it isn't.
+          
+          TTttyysslloott  returns  the  number  of the entry in the ttttyyss
+          file (see Section 5) for the control  terminal  of  the
+          current process.
+
+
+     EERRRROORRSS
+          TTttyynnaammee   returns  a  0  (NULL  pointer)  if  the  file
+          descriptor does not describe a terminal that exists  in
+          the "/dev" directory.
+          
+          TTttyysslloott  returns  a  0  if the "/etc/ttys" directory is
+          inaccessible, or if  it  can't  determine  the  control
+          terminal.
+
+
+     NNOOTTEESS
+          Return  values  point  to  static data whose content is
+          overwritten by each call.
+
+
+     FFIILLEESS
+          /dev/*
+          /etc/ttys
+
+
+     AALLSSOO RREEAADD
+
+
+
+
+                               -1-
+
+

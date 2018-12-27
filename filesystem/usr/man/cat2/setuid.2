@@ -1,0 +1,42 @@
+
+
+setuid (2)                   3/19/82                   setuid (2)
+
+
+     NNAAMMEE
+          sseettuuiidd - set process user IDs
+          
+          
+     CC
+          setuid(uid)
+          
+          
+     FFUUNNCCTTIIOONN
+          This  call  sets  the  real  group and user IDs and the
+          effective group and user IDs. The group IDs are set  to
+          the high byte of the argument, and the user IDs are set
+          to  the  low  byte.  This  call  can be used to set the
+          effective IDs to the real IDs. Only the  super-user  is
+          permitted to change the real IDs.
+          
+          
+     RREETTUURRNNSS
+          A 0 indicates success, a -1 indicates failure.
+          
+          
+     AASSSSEEMMBBLLEERR
+          ((sseettuuiidd == 2233))
+          ((uuiidd iinn hhll))
+          ssyyss;; sseettuuiidd;;
+          
+          
+     RREETTUURRNNSS
+          The  carry  flag  is  cleared  on  success,  or  set on
+          failure.
+
+
+
+
+				    -1-
+
+

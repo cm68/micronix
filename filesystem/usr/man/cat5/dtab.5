@@ -1,0 +1,48 @@
+
+
+dtab (5)                     4/14/82                     dtab (5)
+
+
+     FFIILLEE
+          ddttaabb - the dump table
+
+
+     FFUUNNCCTTIIOONN
+          Information on the times of a dump are kept in the file
+          "/etc/dtab."  This  is  a non-ASCII file presently used
+          only by ttdd (1). Each entry in ddttaabb is eight bytes  long
+          and takes the form:
+          
+          
+               ssttrruucctt ddttaabb
+                {{
+                iinntt     ddeevviiccee,,
+                        iinnooddee;;
+               
+                lloonngg    ddaattee;;
+                }};;
+
+
+          There  is  an entry in ddttaabb for each directory that has
+          been dumped by ttdd.. Device  is  the  major/minor  device
+          number  of  the  directory  in  question  (major device
+          number in the high byte, minor in the low byte).  Inode
+          is  the inode number of the directory. Date is the time
+          of the last recorded dump of the directory in  question
+          expressed  as a 4-byte quantity representing the number
+          of seconds elapsed since Jan. 1, 1970 at midnight.
+
+
+     FFIILLEESS
+          /include/dtab.h
+
+
+     AALLSSOO RREEAADD
+          td (1)
+
+
+
+
+                               -1-
+
+

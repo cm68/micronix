@@ -1,0 +1,188 @@
+
+
+exec (2)                     3/19/82                exec (2)
+
+
+     NNAAMMEE
+          eexxeecc - execute a program
+
+
+     CC
+          execv(name, argv)
+          char *name;
+          char *argv[];
+          
+          execl(name, arg0, arg1, ..., argn, 0)
+          char *name, *arg0, *arg1, ..., *argn;
+
+
+     FFUUNNCCTTIIOONN
+          EExxeecc  overlays  the  calling  core image with the named
+          file, then transfers to the beginning of the  new  core
+          image.  There  can be no return from a successful eexxeecc::
+          the calling core image is lost.
+          
+          Exec does not create a new process - the  same  process
+          continues  with  the  new core image. Previously opened
+          files remain open (so standard  input  and  output  are
+          preserved),  and ignored signals remain ignored. Caught
+          signals, however, are reset to their default behavior.
+          
+          Each  process  has  "real"  user  and  group  IDs   and
+          "effective"  user  and group IDs. The real IDs identify
+          the  user;  the  effective  IDs  determine  the  access
+          privileges.  If  a  file does not have "set-user-id" or
+          "set-group-id" mode [see cchhmmoodd,, (2)],  then  eexxeecc  sets
+          all   IDs,   real  and  effective,  to  the  individual
+          executing the file. If the file does have either  mode,
+          eexxeecc  sets  the corresponding effective ID to the owner
+          of the executed file. The real  IDs  remain  unchanged.
+          This  allows  a  user  to  write  a  program that takes
+          advantage of his own access privileges (rather than its
+          invoker's privileges).
+          
+          In order to be executed, a file must have  one  of  the
+          execute  permission  bits set, even for the super-user.
+          The system expects one of  two  file  formats.  If  the
+          first byte is hex 99, then the first 16 bytes are taken
+          to be a header with the following structure
+
+
+
+
+                               -1-
+
+
+
+
+exec (2)                     3/19/82                exec (2)
+
+
+          struct header
+                  {
+                  char     ident,         /* hex 99 */
+                           conf;          /* not used by exec */
+                  unsigned tablsize,      /* not used by exec */
+                           textsize,      /* bytes in text segment */
+                           datasize,      /* bytes in data segment */
+                           bss_size,      /* bytes in bss segment */
+                           heapsize,      /* minimum stack + heap */
+                           textoff,       /* text segment offset */
+                           dataoff;       /* data segment offset */
+                  };
+
+          (This  header  structure  is  produced  by Whitesmith's
+          compilers.) The rest of the file is assumed to  contain
+          textsize  bytes  of text, followed by datasize bytes of
+          data. Text is loaded at address textoff, data is loaded
+          at  address  dataoff,  and  bss  space   is   allocated
+          following  the  data.  The  break is set at the highest
+          location in the text or data + bss segments.
+          
+          If the first byte of the file is not hex 99,  then  the
+          file  is  taken  to  be  pure  object  code origined at
+          address 256 (100 hex). The brake is  set  to  the  file
+          size.
+          
+          In  any  case,  the  program must meet the maximum-size
+          restriction (currently 65024 bytes), and it must keep a
+          "halt" instruction (the system-call trap) at address 8.
+          (This is supplied by the system, unless the text offset
+          is <= 8.)
+          
+          C offers two different interfaces  to  eexxeecc..  EExxeeccll  is
+          useful  when  a known file is being executed with known
+          arguments. The arguments are all string  pointers.  Any
+          number  of arguments may be given, but the last must be
+          a 0.
+          
+          When the number of arguments is not known  in  advance,
+          eexxeeccvv  is  handy.  Pointers to the argument strings are
+          collected into a list, a null pointer  is  appended  to
+          mark  the end of the list, and eexxeeccvv is called with the
+          address of the list.
+          
+          Currently, the total number of bytes  in  the  argument
+          strings (including the terminating nulls) is limited to
+          512.
+          
+          It is conventional to repeat the name of the file being
+          executed  as  the  first argument, so that programs can
+          use the name with which they are invoked.
+
+
+
+
+                               -2-
+
+
+
+
+exec (2)                     3/19/82                exec (2)
+
+
+          When a C program is executed, it begins as follows:
+          
+          mmaaiinn((aarrggcc,, aarrggvv))
+                  iinntt aarrggcc;;
+                  cchhaarr ****aarrggvv;;
+          
+          where aarrggcc is the argument count, and aarrggvv is a list of
+          pointers   to   the   argument   strings    themselves.
+          Conventionally,  aarrggcc  is at least 1 and aarrggvv[[00]] is the
+          program name. As delivered by the system, argv[argc] ==
+          -1, so that aarrggvv cannot be  used  directly  in  another
+          eexxeeccvv until aarrggvv[[aarrggcc]] is set to 0.
+
+
+     RREETTUURRNNSS
+          Any  return  is  an  error  return.  In  that case, the
+          calling image is not lost and  can  continue.  Possible
+          errors  include:  the  file  cannot be found, is not an
+          ordinary file, is not executable, is too  big,  or  the
+          argument list is too long.
+
+
+     AASSSSEEMMBBLLEERR
+          ((eexxeecc == 1111))
+          ssyyss;; eexxeecc;; nnaammee;; aarrggvv
+          
+          
+
+
+
+
+                               -3-
+
+
+
+
+exec (2)                     3/19/82                exec (2)
+
+
+          AArrggvv  is  the address of a list of string pointers. The
+          last pointer must be 0. When the file starts execution,
+          core is set up as follows:
+          
+          
+          ((ttoopp ooff uusseerr ccoorree))
+          aarrggnn::   ssttrriinngg\\00
+                  ......
+          aarrgg00::   ssttrriinngg\\00
+                  --11
+                  aarrggnn
+                  ......
+                  aarrgg00
+          sspp -->>   aarrggcc
+
+
+     RREETTUURRNNSS
+          If eexxeecc returns at  all,  the  carry  flag  is  set  to
+          indicate an error.
+
+
+
+
+                               -4-
+
+

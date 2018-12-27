@@ -1,0 +1,50 @@
+
+
+pipe (2)                     3/19/82                     pipe (2)
+
+
+     NNAAMMEE
+          ppiippee - create an inter-process channel
+          
+          
+     CC
+          ppiippee((ddeessccrriippttoorr))
+          iinntt ddeessccrriippttoorr[[22]];;
+          ((rreeaadd ddeessccrriippttoorr == ddeessccrriippttoorr[[00]]))
+          ((wwrriittee ddeessccrriippttoorr == ddeessccrriippttoorr[[11]]))
+          
+          
+     FFUUNNCCTTIIOONN
+          PPiippee  returns  two file descriptors that can be used to
+          communicate between  processes  created  by  subsequent
+          ffoorrkk   calls.   When   the   pipe   is   written  using
+          descriptor[1],  up  to  4096  bytes  of  data  will  be
+          buffered  before  the  writing  process is suspended. A
+          read using descriptor[0] will pick up the data.
+          
+          Read calls on an empty pipe with no writers will return
+          an end-of-file (i.e., 0 bytes read). Write calls  under
+          similar conditions will generate a signal.
+          
+          
+     RREETTUURRNNSS
+          A 0 indicates success, a -1 indicates failure.
+          
+          
+     AASSSSEEMMBBLLEERR
+          ((ppiippee == 4422))
+          ssyyss;; ppiippee
+          ((rreeaadd ddeessccrriippttoorr iinn hhll))
+          ((wwrriittee ddeessccrriippttoorr iinn ddee))
+          
+          
+     RREETTUURRNNSS
+          The  carry  flag  is  cleared  on  success,  or  set on
+          failure.
+
+
+
+
+				    -1-
+
+

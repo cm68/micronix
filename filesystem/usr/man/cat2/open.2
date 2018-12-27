@@ -1,0 +1,50 @@
+
+
+open (2)                     3/19/82                     open (2)
+
+
+     NNAAMMEE
+          ooppeenn - open a file for reading or writing
+          
+          
+     CC
+          ooppeenn((nnaammee,, mmooddee))
+          cchhaarr **nnaammee;;
+          
+          
+     FFUUNNCCTTIIOONN
+          The named file is opened for
+          
+              rreeaaddiinngg   ((mmooddee 00)),,
+              wwrriittiinngg   ((mmooddee 11)),, oorr
+              bbootthh      ((mmooddee 22))..
+          
+          The  returned  file  descriptor  should  be  saved  for
+          subsequent calls to rreeaadd,, wwrriittee,, and cclloossee..
+          
+          There is a limit of 16 open files per process.
+          
+          
+     RREETTUURRNNSS
+          A non-negative return indicates success, a -1 indicates
+          failure.  On  success,   a   file   descriptor   (small
+          non-negative number) is returned.
+          
+          
+     AASSSSEEMMBBLLEERR
+          ((ooppeenn == 55))
+          ssyyss;; ooppeenn;; nnaammee;; mmooddee
+          ((ffiillee ddeessccrriippttoorr iinn hhll))
+          
+          
+     RREETTUURRNNSS
+          The  carry  flag  is  cleared  on  success,  or  set on
+          failure. On success, a file descriptor is  returned  in
+          hl.
+
+
+
+
+				    -1-
+
+

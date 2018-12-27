@@ -1,0 +1,42 @@
+
+
+utmp (5)                        3/15/82                  utmp (5)
+
+
+     FFIILLEE
+          uuttmmpp - user information
+
+
+     FFUUNNCCTTIIOONN
+          This  file offers information on who is currently using
+          Micronix. The file is binary. Each entry  is  described
+          in the structure illustrated below:
+
+          ssttrruucctt uuttmmpp
+                {{    
+                cchhaarr lliinnee[[88]],,   //** ttyyppeewwrriitteerr nnaammee **//
+                     nnaammee[[88]];;   //** llooggiinn nnaammee **//
+
+                lloonngg    ttiimmee;;   //** llooggiinn ttiimmee **//
+                }};;
+          
+          
+          Line is the name of ttttyy (null padded) on which the user
+          is  logged  in.  Name  is the (null padded) name of the
+          user  who  logged  in.  Time  is  the  time  of  login,
+          expressed  as a 32-bit quantity representing the number
+          of seconds since  the  epoch  (midnight,  January  1st,
+          1970).
+     FFIILLEESS
+          /etc/utmp
+          /include/utmp.h
+
+
+     SSEEEE AALLSSOO
+
+
+
+
+                                 -1-
+
+

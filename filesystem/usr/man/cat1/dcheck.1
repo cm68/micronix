@@ -1,0 +1,47 @@
+
+
+dcheck (1)                   3/18/82                   dcheck (1)
+
+
+     PPRROOGGRRAAMM
+          ddcchheecckk - file system directory consistency check
+          
+          
+     UUSSAAGGEE
+          ddcchheecckk [[--ff]] ffiillee ssyysstteemm ........
+          
+          
+     FFUUNNCCTTIIOONN
+          DDcchheecckk  reads  the  directories  in  a  file system and
+          compares the link-counts in each i-node with the number
+          of directory entries by which it is referenced.
+          
+          
+     EERRRROORRSS
+          When a file turns up for which the link-count  and  the
+          number  of  directory  entries  disagree,  the relevant
+          facts are reported. A dangerous situation  occurs  when
+          there  are  more  entries  than  links;  if entries are
+          removed, the link-count drops to 0  and  the  remaining
+          entries point to thin air - they should be removed.
+          
+          When there are more links than entries, some disk space
+          may  be  wasted  but the situation is not dangerous. If
+          the --ff option is given, ddcchheecckk will try to  ratify  the
+          situation.
+          
+          
+     NNOOTTEESS
+          Extraneous  diagnostics  may  be  produced if ddcchheecckk is
+          applied to an active file system.
+          
+          
+     SSEEEE AALLSSOO
+          fsck (1), ncheck (1), icheck (1)
+
+
+
+
+                               -1-
+
+

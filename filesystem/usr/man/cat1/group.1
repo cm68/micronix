@@ -1,0 +1,64 @@
+
+
+group (1)                    4/18/82                    group (1)
+
+
+     PPRROOGGRRAAMM
+          ggrroouupp - examine or change the group of a list of files
+
+
+     UUSSAAGGEE
+          group [-name] file ...
+
+
+     FFUUNNCCTTIIOONN
+          Associated  with  each Micronix file is a group number.
+          The group number is  used  to  determine  group  access
+          permission. If you are running a single user, informal,
+          or  very  low user-population system, the whole concept
+          of groups may be irrelevant to you.
+          
+          The ggrroouupp command can be used to view the  group  names
+          of  files.  The  relationship  of  group names to group
+          numbers   is   entirely   established   by   the   file
+          "/etc/group" [see ggrroouupp (5)].
+
+          GGrroouupp prints the group name for each file given. If the
+          file's  group  number  has no name, the group number is
+          printed in decimal instead.
+          
+          If the first argument to ggrroouupp is a group name preceded
+          by a hyphen, ggrroouupp attempts to change the group of each
+          of the named files to the given name.
+
+
+     EEXXAAMMPPLLEESS
+
+               ggrroouupp ffiillee11 ffiillee22 ffiillee33
+          
+          to discover which group each of these files belongs to.
+
+
+               ggrroouupp ffiillee11 ffiillee22 ffiillee33
+          
+          to discover which group each of these file belongs to.
+
+
+               ggrroouupp --ssaalleess ffiillee11 ffiillee22 ffiillee33
+          
+          to "give" each of the files to the group named "sales."
+
+
+     SSEEEE AALLSSOO
+          group (5)
+
+
+     FFIILLEESS
+          /etc/group - group name <-> group number relationships
+          
+
+
+
+                               -1-
+
+

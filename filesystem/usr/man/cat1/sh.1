@@ -1,0 +1,514 @@
+
+
+sh (1)                       4/18/82                       sh (1)
+
+
+     PPRROOGGRRAAMM
+          sshh
+          
+          
+     UUSSAAGGEE
+          sshh [[--vv]] [[--cc ccoommmmaanndd]]
+          
+          
+     FFUUNNCCTTIIOONN
+          The sshheellll establishes an interface between the user and
+          the  Micronix operating system. It is a general purpose
+          command interpreter and it  should  be  noted  at  this
+          point  that  the  sshheellll  is  just  another  process  to
+          Micronix; it is by no means the final word  in  command
+          interpreters.  The  user  may wish to write his/her own
+          command interpreter. That is to say, the sshheellll  is  not
+          part  of  the  operating  system,  but merely serves to
+          provide convenient access to the system's facilities.
+          
+          The Micronix command interpreter,  or  sshheellll,,  provides
+          convenient access to the Micronix system facilities. It
+          is intended to be simple, even transparent, to use.
+          
+          In  normal operation, the sshheellll enters interactive mode
+          and  successively  reads,  interprets,   and   executes
+          commands.
+          
+          When  it  receives  a  line  of  input, the sshheellll first
+          breaks it into "words". Normally a word is a cluster of
+          symbols surrounded by white space. Certain symbols have
+          special meaning to the sshheellll,, i.e.  characters  in  the
+          set << >> && || `` "" (( ))..
+          
+          When   encountered,   they  are  treated  as  separated
+          entities, regardless of  the  presence  or  absence  of
+          surrounding white space.
+          
+          
+          SShheellll FFeeaattuurreess::
+          
+          
+          CCoommmmaanndd EExxeeccuuttiioonn..
+          
+          The first word of a command has special meaning for the
+          sshheellll..  It  expects this word to be the "command name".
+          When it encounters a word which it does not  recognize,
+          the sshheellll assumes it refers to a program, which it then
+          attempts to find and execute.
+          
+          
+          PPaatthh SSeeaarrcchhiinngg..
+          
+          If  it  fails  to  find the command, it prints an error
+          message. The sshheellll searches for commands in a series of
+
+
+                               -1-
+
+
+
+
+sh (1)                       4/18/82                       sh (1)
+
+
+          pre-specified directories called the "search path". The
+          default search path is  ".",  "/bin",  "/usr/bin".  The
+          sshheellll''ss current idea of the search path may be examined
+          or  changed  by  the  built-in "path" command discussed
+          below. If the first word of  a  command  contains  a  //
+          (slash)  character,  then  the  normal  path  searching
+          mechanism is disabled and the sshheellll attempts to execute
+          the exact name specified.
+          
+          
+          DDiirreeccttoorryy HHaasshhiinngg..
+          
+          The sshheellll internalizes the contents of the  directories
+          in  the  search  path,  so  that  in  order to locate a
+          command, it does not need to refer to the file  system.
+          This  function  is  intended  to  be  transparent.  If,
+          however, a program is added or removed to  one  of  the
+          directories  in  the  search  path  in  the middle of a
+          session, (normally a very rare occurrence) the  sshheellll''ss
+          internal  tables  will disagree. In this case it may be
+          necessary to enter the command's name  twice,  (causing
+          the  sshheellll  to  remake its internal tables). There is a
+          significant speed payoff to this way of doing things.
+
+
+          II//OO RReeddiirreeccttiioonn
+          
+          There  is  the  concept  of  standard  input,  standard
+          output, and standard error.
+          
+          An  accepted  way  to  fashion programs is to have them
+          read from the standard input,  write  to  the  standard
+          output,  and  send error or other transient messages to
+          the standard error.
+          
+          By default, each process is set up so that its standard
+          input  is  read  from  the  controlling  terminal   and
+          standard  output and error are written to the terminal.
+          The sshheellll has provision to change this. You may arrange
+          to have input and/or output read from/written to  files
+          or  other  processes instead. In the following example,
+          the command is read from the file.
+          
+                ccoommmmaanndd << ffiillee
+
+
+
+
+                               -2-
+
+
+
+
+sh (1)                       4/18/82                       sh (1)
+
+
+          IInnppuutt RReeddiirreeccttiioonn..
+          
+          Arrangements may also be made  so  that  the  command's
+          standard input becomes the file:
+          
+                ccoommmmaanndd >> ffiillee
+          
+                ccoommmmaanndd >>>> ffiillee
+          
+                ccoommmmaanndd >>&& ffiillee
+          
+                ccoommmmaanndd >>>>&& ffiillee
+          
+          
+          OOuuttppuutt RReeddiirreeccttiioonn..
+          
+          In  the  first form, (>), the command's standard output
+          is sent to the  named  file,  destroying  its  previous
+          contents.  The second form, (>>), _a_p_p_e_n_d_s the command's
+          output to the _e_n_d of the named file. In the third form,
+          (>&), _b_o_t_h the standard output and the  standard  error
+          are  sent  to the named file. The last form is the same
+          as the third, except the option is appended to the  end
+          of the named file.
+          An expression of the form ""((aa >> bb)) >>&& cc"" can be used to
+          split the output from the command a, standard output to
+          file b, standard error to file c.
+          
+          
+          PPiippeess..
+          
+          Commands  may  be piped together, that is, the standard
+          output  of  one  process  can  be  "connected"  to  the
+          standard  input  of  another.  The  processes  are  run
+          concurrently.  A  "|"  (vertical  bar)  is  the  symbol
+          denoting a pipe. The following command line
+          
+                pprriinntt ffiillee || llpprr,,
+          
+          would send the output of the print command to the input
+          of the llpprr command.
+          
+          The  sshheellll  has  its  own  syntax for a linear array of
+          pipes, limited in length only by the maximum  available
+          number of processes. As an example:
+          
+                ccaatt ffiillee  ffiinndd wwoorrdd11 || ffiinndd wwoorrdd22 || wwoorrddss
+          
+                ccoommmm11 || ccoommmm22 || ccoommmm33 || ccoommmm55 || ...... eettcc..
+          
+          
+          AAssyynncchhrroonnoouuss CCoommmmaannddss..
+          
+          It  is  possible to run a command asynchronously, or in
+
+
+                               -3-
+
+
+
+
+sh (1)                       4/18/82                       sh (1)
+
+
+          the background. Normally, a  command  is  run  and  the
+          sshheellll  waits  for  it  to  finish  before prompting for
+          additional input. When a command is run asynchronously,
+          however,  the  sshheellll  does  not   wait,   but   returns
+          immediately,  while  the  command  continues to execute
+          parallel to the sshheellll.. With  this  facility,  a  single
+          user  on  a single terminal can be doing several things
+          at once. A pipeline followed by  an  ampersand  on  the
+          command  line  causes  all  of  the  processes  in  the
+          pipeline to be run asynchronously. When an asynchronous
+          command completes  or  is  abnormally  terminated,  the
+          sshheellll  gives notification. The process ID is given when
+          the asynchronous process is dispatched.
+          
+          Example:
+          
+                llss --ll&&
+          
+          
+          AArrgguummeenntt EExxppaannssiioonn..
+          
+          All words in the command line are subject to expansion.
+          Words are expanded with the following characters:
+          
+                **  ??  [[......]]  [[^^......]] 
+          
+          If a word contains any of these  constructions,  it  is
+          evaluated as a pattern to be matched against the set of
+          extant  file  names.  That  is,  the given word will be
+          replaced by the list of all file names it matches.
+          
+          Following are the rules for pattern matching.
+          
+          *         This  character  is  "wild  card"  of  sorts,
+                    matching  any  number  of characters, and any
+                    character, including zero.
+                    
+          ?         Matches any single character.
+                    
+          [ ... ]   Matches any single  character  listed  within
+                    the brackets.
+                    
+          [^...]    Matches  any  single character NOT within the
+                    brackets.
+                    
+          x         Ordinary characters match themselves.
+                    
+                    
+          Matching  patterns  may  be   composed   of   arbitrary
+          arrangements of the above constructs.
+          
+          If  a  string  of  characters  is enclosed in quotation
+          marks ("), all argument expansion is disabled.
+
+
+
+                               -4-
+
+
+
+
+sh (1)                       4/18/82                       sh (1)
+
+
+          If a string of characters is enclosed in grave  accents
+          (`),  that string is interrupted as a command, executed
+          and replaced by the output of the  command  and  broken
+          into words.
+          
+          Within  braces ([]) there may appear expressions of the
+          form X-Y, meaning that all of the characters between  X
+          and Y are inclusive.
+          
+          Example:
+          
+                    [[AA--ZZaa--zz]] 
+          
+          would match any single upper or lower case letter.
+          
+          
+          GGrroouuppiinngg ooff CCoommmmaannddss
+          
+          Commands  may  be grouped together arbitrarily by using
+          parenthesis.  When   enclosed   in   parentheses,   any
+          arbitrary command or series of commands is treated as a
+          simple command.
+          
+          Example:
+          
+                    ((ccdd aa;; ccoommmm11)) || ((ccdd bb;; ccoommmm22))
+          
+          would  run  the first part of the pipeline in directory
+          "a" and the second in directory "b".
+          
+          Parenthetical expressions  may  be  nested.  There  are
+          limits  on  the  maximum  number  of processes allowed,
+          however.
+          
+          To run a series of  commands  in  the  background,  for
+          example;
+          
+                    ((ccoommmm11;; ccoommmm22;; ccoommmm33))&&
+          
+          
+          SSeeqquueennttiiaall EExxeeccuuttiioonn OOppeerraattoorr
+          
+          More  than  one  command  may  be  put  on  a  line  by
+          separating the command with semicolons (;)
+          
+          Example
+                    ccoommmmaanndd11;; ccoommmmaanndd22
+          
+          The commands are executed  sequentially  in  the  order
+          given (left to right).
+
+
+
+
+                               -5-
+
+
+
+
+sh (1)                       4/18/82                       sh (1)
+
+
+          BBuuiilltt--IInn CCoommmmaannddss
+          
+          There are a number of commands internal to the sshheellll::
+          
+          
+          aalliiaass
+          
+          aalliiaass nnaammee11 nnaammee22
+
+          aalliiaass nnaammee33 ""aa ccoommpplleexx ccoommmmaanndd wwiitthh eemmbbeeddddeedd ssppaacceess""
+          
+          Aliasing  provides  the  facility  to rename or develop
+          abbreviations for commands. The first form  prints  the
+          current list of aliases in effect. The others introduce
+          a new alias. After these alias commands have been typed
+          to the shell, giving the command "name1" will result in
+          issuing  the  command  name2.  That is to say the right
+          hand word or group of  words  is  substituted  for  the
+          left. Use uunnaalliiaass (see below) to turn off an alias.
+          
+          How to use aalliiaass::
+          
+          If  you  find you frequently type a long and cumbersome
+          command, you should consider setting up  an  alias  for
+          it.
+          
+          Some often-used commands are:
+          
+               ffaarr //ddeevv//ffllaa --xxvv
+               mmoouunntt //ddeevv//ffllaa //ff
+               uummoouunntt //ddeevv//ffllaa
+          
+          TToo  sseett  uupp  aalliiaass,,  edit  the  .sh  ffiillee  iinn yyoouurr hhoommee
+          ddiirreeccttoorryy ((tthhee ddiirreeccttoorryy iinn  wwhhiicchh  yyoouu  ffiinndd  yyoouurrsseellff
+          wwhheenn you first log in). Add lines like the following:
+          
+               aalliiaass xx ""ffaarr //ddeevv//ffllaa --xxvv""
+               aalliiaass mm ""mmoouunntt //ddeevv//ffllaa //ff""
+               aalliiaass uu ""uummoouunntt //ddeevv//ffllaa""
+               
+          NNeexxtt  ttiimmee  yyoouu  lloogg iinn,, all of these "aliases" will be
+          automatically set in the shell. You may type  just  the
+          one letter abbreviation for the long command.
+          
+          You  may  view  the  alias  table by typing "alias". An
+          "alias" is eliminated with uunnaalliiaass..
+          
+          Note that this feature may also be used to smooth  over
+          trivial name differences found in different systems. If
+          you  are  used  to typing something else for one of the
+          commands, make yourself an "alias."
+
+
+
+
+                               -6-
+
+
+
+
+sh (1)                       4/18/82                       sh (1)
+
+
+          cchhddiirr ((ccdd))
+          
+          cchhddiirr nnaammee
+          
+          These change the current directory. Micronix  maintains
+          the  concept  of  a  current  directory. The first form
+          changes the current directory  to  the  home  directory
+          (described below). The second form changes to the named
+          directory.  The command, ccdd is synonymous to cchhddiirr,, and
+          is easier to type.
+          
+          
+          ddiirr
+          
+          ddiirr nnaammee
+          
+          ddiirr nnaammeess
+          
+          The "dir" is short for "directory". The first form list
+          the files in the current directory.  The  second  lists
+          the  files  in  the directory, "name". The third prints
+          the list of names. All forms print their display in  an
+          easily read, alphabetized and columnar form.
+          
+          
+          eecchhoo
+          
+          eecchhoo aarrggss
+          
+          The  first  command toggles the sshheellll''ss command echoing
+          feature. The second prints the arguments.
+          
+          
+          hhoommee
+          
+          hhoommee nnaammee
+          
+          These commands examine or change  the  home  directory.
+          The  first form prints the sshheellll''ss currently remembered
+          home directory name.
+          
+          
+          kkiillll NN
+          
+          kkiillll nnaammee
+          
+          The first version kills the process whose numerical  id
+          is  N. (Id's are reported by the ps command, and by the
+          shell when a  background  process  is  initiated.)  The
+          second version kills the process with the given command
+          name  (the name by which the process was invoked, which
+          is also reported by ps).
+          
+          
+
+
+                               -7-
+
+
+
+
+sh (1)                       4/18/82                       sh (1)
+
+
+          nniiccee NN ccoommmmaanndd ......
+          
+          Nice runs the following command in a way that is "nice"
+          to other users on the system, ie, at low priority.  The
+          larger  the  value  of  N  (up  to  127), the lower the
+          scheduling priority will be. Conversely, the super-user
+          can be "mean" by specifying a negative nice (to  -128).
+          A  nice of 4 is recommended to keep background programs
+          inconspicuous.
+          
+          
+          pprroommpptt wwoorrdd
+          
+          This command changes the sshheellll''ss prompt. The prompt  is
+          changed  to  the given word. The default prompt is %% or
+          ##;; the ## prompt indicates super-user.
+          
+          
+          ssoouurrccee ffiillee
+          
+          The sshheellll takes its next  input  from  the  named  file
+          instead  of  the  standard  input. Input is again taken
+          from standard input upon reaching the end of the  file.
+          A  "source"  may  be  nested, that is, a named file may
+          contain another source command.
+          
+          
+          ssyynncc
+          
+          This command calls the ssyynncc system call  (mass  storage
+          synchronization,  see  Section  2). It insures that all
+          information  destined  for  mass  storage  devices   is
+          actually  written  out.  SSyynncc  should  always be called
+          before bringing the system down to insure the integrity
+          of the file system(s).
+          
+          
+          ttyyppee ffiillee((ss))
+          
+          The contents of each of the  named  files  are  printed
+          verbatim on the standard output.
+          
+          
+          uunnaalliiaass nnaammee
+          
+          The given name is removed from the alias table.
+          
+          
+          wwaaiitt
+          
+          This  command  causes a wait until all all asynchronous
+          processes  (if  any)  have  completed.  WWaaiitt   may   be
+          prematurely  interrupted  by  pressing  the  RUB-OUT or
+          DELETE key.
+
+
+                               -8-
+
+
+
+
+sh (1)                       4/18/82                       sh (1)
+
+
+          
+
+
+
+
+                               -9-
+
+

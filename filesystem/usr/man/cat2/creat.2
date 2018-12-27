@@ -1,0 +1,54 @@
+
+
+creat (2)		          3/18/82               creat (2)
+
+
+     NNAAMMEE
+          ccrreeaatt - create a new file (or truncate an old one)
+
+
+     CC
+          creat(name, mode)
+          char *name;
+
+
+     FFUUNNCCTTIIOONN
+          If the file does not exist, and if the parent directory
+          is  writable, it is created with the given mode. If the
+          file does exist and is writable, it is truncated  to  0
+          length,  and  its  mode  and owner remain unchanged. In
+          either case, the file is opened for writing only, and a
+          file descriptor is returned.
+          
+          See cchhmmoodd (2) for the construction of modes. Note  that
+          the  file is opened for writing, even if the given mode
+          does not allow writing. This can be used as  a  locking
+          mechanism,  in that another program will not be able to
+          create the same file.
+          
+          CCrreeaatt is subject to the limit  of  16  open  files  per
+          process.
+
+
+     RREETTUURRNNSS
+          CCrreeaatt(())  returns  a  file descriptor (a small, positive
+          number) on success, or a -1 on failure.
+
+
+     AASSSSEEMMBBLLEERR
+          ((ccrreeaatt == 88))
+          ssyyss;; ccrreeaatt;; nnaammee;; mmooddee
+          ((ffiillee ddeessccrriippttoorr iinn hhll))
+
+
+     RREETTUURRNNSS
+          The carry  flag  is  cleared  on  success,  or  set  on
+          failure.  If  successful, a file descriptor is returned
+          in hl.
+
+
+
+
+				    -1-
+
+

@@ -1,0 +1,35 @@
+
+
+indir (2)                    3/19/82                    indir (2)
+
+
+     NNAAMMEE
+          iinnddiirr - indirect system call
+          
+          
+     AASSSSEEMMBBLLEERR
+          ((iinnddiirr == 00))
+          ssyyss;; iinnddiirr;; ssyyssccaallll
+          
+          
+     FFUUNNCCTTIIOONN
+          The  system  call  at the location syscall is executed.
+          Execution resumes after the iinnddiirr call.
+          
+          The main purpose of  iinnddiirr  is  to  allow  programs  to
+          construct system calls in their data segments, avoiding
+          modifications to their code.
+          
+          The  system  call  at syscall must begin with the "sys"
+          byte. An iinnddiirr executed indirectly is a no-op.
+          
+          
+     RREETTUURRNNSS
+          The returns depend on the indirectly executed call.
+
+
+
+
+				    -1-
+
+

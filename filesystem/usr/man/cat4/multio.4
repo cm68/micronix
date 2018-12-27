@@ -1,0 +1,94 @@
+
+
+multio (4)                   3/16/82                   multio (4)
+
+
+     DDEEVVIICCEE
+          mmuullttiioo - Morrow Designs Mult/IO board interface
+
+
+     FFUUNNCCTTIIOONN
+          The  Micronix mmuullttiioo interface supports all features of
+          the Mult/IO and Wunderbuss  I/O  boards.  It  will  run
+          unchanged  in  rack  mount  or  table top models of the
+          Decision I.
+          
+          The  Mult/IO  board   has   three   ACEs   (Asyncronous
+          Communication  Elements)  and  1  parallel port for I/O
+          device connection. The ACEs  communicate  via  standard
+          RS232 serial interface. The parallel port is a standard
+          Diablo (50-pin daisy-wheel) interface.
+          
+          Each Mult/IO board must have its I/O port addresses set
+          by  means  of switches on the circuit board. For proper
+          operation, the base I/O address must be  48  (hex)  for
+          the first Mult/IO board.
+          
+          In  a  Micronix system in which there are possibly many
+          Mult/IO boards,  the  boards  form  a  series.  In  the
+          Decision   I   Table  Top  model,  the  Wunderbuss  I/O
+          motherboard functions  as  the  first  of  the  series.
+          Micronix   expects  to  find  the  Mult/IO  boards  (or
+          Wunderbuss) as I/O (hex)  locations  48,  58,  68,  78,
+          88,...
+          
+          Minor  device  numbers  0-3  refer to the Mult/IO board
+          addresses at I/O location 48 hex.
+          
+          Minor device numbers 4-7 refer  to  the  Mult/IO  board
+          addresses at location 58 hex, and so on with 68, 78 ...
+          
+          The  first  minor  device  number of each group of four
+          refers to the parallel printer  on  that  board.  Minor
+          device   numbers  0,  4,  8,  etc.  refer  to  parallel
+          printers.
+          
+          Bytes sent to the  parallel  printer  device  have  the
+          following format:
+
+             Bit-0  is the least significant bit and bit-7 is the
+             most significant bit in this discussion.
+             
+             If bit-7 is clear, the the byte is taken to  mean  a
+             character to be printed. Otherwise, if bit-7 is set,
+             the byte indicates a motion command.
+             
+             If bit-6 is set, the byte indicates vertical motion.
+             
+             If  bit-5  is  set,  the  byte  indicates  backwards
+             motion.
+
+
+                               -1-
+
+
+
+
+multio (4)                   3/16/82                   multio (4)
+
+
+             
+             Bits 0 - 4 (the low order 5 bits) are  taken  to  be
+             the magnitude of motion desired.
+
+          The  unit of motion is 1/120" for horizontal motion and
+          1/48" for vertical motion.
+          
+          If you want to move farther  than  31  increments,  you
+          must send a series of motion bytes.
+          
+          These  are  accumulated and optimized, then sent all at
+          once.
+          
+          Note  that  this  scheme  allows  elaborate  high-level
+          interface. Even several different interfaces, each with
+          its  own  set of escape sequences or what have you, all
+          translate to common Mult/IO parallel printer motion and
+          print byte formats.
+
+
+
+
+                               -2-
+
+

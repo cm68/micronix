@@ -1,0 +1,49 @@
+
+
+gets (3s)                    3/22/82                    gets (3s)
+
+
+     SSUUBBRROOUUTTIINNEE((SS))
+          ggeettss,, ffggeettss - get a string from a stream
+
+
+     CC
+          ##iinncclluuddee <<ssttddiioo..hh>>
+
+          cchhaarr **ggeettss((ss))
+          cchhaarr **ss;;
+
+          cchhaarr **ffggeettss((ss,, nn,, ssttrreeaamm))
+          FFIILLEE **ssttrreeaamm;;
+
+
+     FFUUNNCCTTIIOONN
+          GGeettss  reads  a  string  into  ss from the standard input
+          stream,  ssttddiinn..  A  newline  character  terminates  the
+          string.  This  character  is  replaced  in  ss by a NULL
+          character; ggeettss returns its argument.
+          
+          FFggeettss  reads  nn--11  characters  (or  up  to  a   newline
+          character)  from  the  ssttrreeaamm into the ss string. A NULL
+          character follows the last character read into ss;; ffggeettss
+          returns its first argument.
+
+
+     EERRRROORRSS
+          Both ggeettss and ffggeettss return the constant pointer  (NULL)
+          upon an error or at end of file.
+
+
+     NNOOTTEESS
+          To  maintain  backward compatibility, ffggeettss maintains a
+          newline, ggeettss deletes a newline.
+
+
+     AALLSSOO RREEAADD
+
+
+
+
+                               -1-
+
+

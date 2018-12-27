@@ -1,0 +1,46 @@
+
+
+nice (2)                     7/19/82                     nice (2)
+
+
+     NNAAMMEE
+          nniiccee - set process priority
+          
+          
+     CC
+          nice(arg)
+          
+          
+     FFUUNNCCTTIIOONN
+          The  "nice"  of  a  process  is  the  opposite  of  its
+          intuitive "priority" -- the "nicer" it is, the less cpu
+          time it hogs. This systen entry sets the  nice  of  the
+          calling  process  to  the  given  argument. Nice values
+          range from -128 to 127; the normal value is 0. Only the
+          super-user can set a negative nice (== high  priority).
+          Long  running  background  programs  should be run at a
+          positive nice as a favor to other users.
+          
+          A process' nice is passed to its children via the  ffoorrkk
+          system call.
+          
+     RREETTUURRNNSS
+          A 0 indicates success, a -1 indicates failure.
+          
+          
+     AASSSSEEMMBBLLEERR
+          ((nniiccee == 3344))
+          ((nniiccee vvaalluuee iinn hhll))
+          ssyyss;; nniiccee;;
+          
+          
+     RREETTUURRNNSS
+          The  carry  flag  is  cleared  on  success,  or  set on
+          failure.
+
+
+
+
+				    -1-
+
+

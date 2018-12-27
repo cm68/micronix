@@ -1,0 +1,142 @@
+
+
+td (1)                       4/13/82                       td (1)
+
+
+     PPRROOGGRRAAMM
+          ttdd - tree dump (file backup)
+
+
+     UUSSAAGGEE
+          td [-a] [-dN] [-hN] [-i] [-u] [directory] [device]
+
+
+     FFUUNNCCTTIIOONN
+          TTdd provides reasonably convenient back-up service.
+
+          TTdd  dumps  potentially  all  the  files  in  the  named
+          directory   and   in   all   of   its   sub-directories
+          recursively.
+
+          TTdd is intended to provide the facility to save files on
+          floppy  diskettes  (although  it  can  be used in other
+          ways).
+          
+          It doesn't matter if your dump won't  all  fit  on  one
+          floppy  diskette;  ttdd allows you to change diskettes on
+          the fly. Each disk is  filled  to  capacity,  then  the
+          program  asks  for  operator  service. In this sense it
+          does need a bit of babysitting.
+
+          TTdd incorporates the facility to do  incremental  dumps.
+          That  is,  each  new  back up contains only files which
+          have changed since the last incremental dump. It uses a
+          system-wide  dump   table   to   remember   the   times
+          directories were dumped.
+          
+          Before  beginning a major dump, you should have a stack
+          of  formatted  diskettes.  These  diskettes   must   be
+          pre-formatted  but  they need not contain file systems.
+          TTdd will notice that a diskette has no file  system  and
+          ask  you  if  it should make one. It will then call the
+          mmkkffss program for you.
+          
+          Unlike  some  other  back-up  systems,  this  program's
+          back-ups are in file system form, meaning it is easy to
+          look through a dump.
+          
+          Options:
+
+
+          -a   All.  Dump  all  files.  Normally only files under
+               1000 blocks long are dumped.
+
+          -dN  Day. Dump only files newer than N days old.
+
+          -hN  Hour. Dump only files  newer  than  N  hours  old.
+               Note: The -d and -h options are additive.
+
+
+
+
+                               -1-
+
+
+
+
+td (1)                       4/13/82                       td (1)
+
+
+          -i   Incremental.  Dump  files  changed  since the last
+               dump of the directory.
+
+          -u   Update. Update  the  central  dump  table  at  the
+               conclusion of a successful dump.
+
+          -v   Verbose.  Each  file  name  is  printed  as  it is
+               dumped.
+
+
+     EEXXAAMMPPLLEESS
+
+               ttdd .. //ddeevv//ddjjaa
+          
+          To do a full dump  of  the  current  directory  onto  a
+          floppy A.
+
+
+               ttdd --hh22 //bb//ssaallllyy //ddeevv//ddjjbb
+          
+          Dump the last 2 hours work on floppy drive B.
+
+
+               ttdd --aa // //ddeevv//ddjjbb
+          
+          Full dump of the entire file system.
+
+
+               ttdd --ii --uu nneewwddiirr //ddeevv//ffllaa
+
+          Incremental  dump of the directory "newdir" onto floppy
+          drive A (but with alternate sectoring).
+
+
+               ttdd --dd22 --hh1122 .. //ddeevv//ddjjaa
+          
+          Dump of everything that's changed since  two  and  half
+          days ago.
+
+
+
+
+                               -2-
+
+
+
+
+td (1)                       4/13/82                       td (1)
+
+
+              mmoouunntt //ddeevv//ddjjaa //ff
+              ccdd //ff
+              ddiirr
+              ccpp ffiillee //aa//ffrreedd//rreessttoorreedd
+              uummoouunntt //ddeevv//ddjjaa
+
+          Example procedure to restore a dumped file.
+
+
+     FFIILLEESS
+          /etc/dtab - the central dump table
+
+
+     SSEEEE AALLSSOO
+          cptree (1), ncheck (1), mkfs (1)
+          
+
+
+
+
+                               -3-
+
+

@@ -1,0 +1,74 @@
+
+
+fopen (3s)                   3/22/82                   fopen (3s)
+
+
+     SSUUBBRROOUUTTIINNEE((SS))
+          ffooppeenn,, ffrreeooppeenn,, ffddooppeenn - open a stream
+
+
+     CC
+          ##iinncclluuddee <<ssttddiioo..hh>>
+
+          FFIILLEE **ffooppeenn((ffiilleennaammee,, ttyyppee))
+          cchhaarr **ffiilleennaammee,, **ttyyppee;;
+
+          FFIILLEE ffrreeooppeenn((ffiilleennaammee,, ttyyppee,, ssttrreeaamm))
+          cchhaarr **ffiilleennaammee,, **ttyyppee;;
+          FFIILLEE **ssttrreeaamm;;
+
+          FFIILLEE **ffddooppeenn((ffiillddeess,, ttyyppee))
+          cchhaarr **ttyyppee;;
+
+
+     FFUUNNCCTTIIOONN
+          FFooppeenn  opens  the  file  specified  by  "filename"  and
+          associates it with a stream. It returns a pointer to be
+          used to identify the stream in subsequent operations.
+
+          TTyyppee is a character containing  one  of  the  following
+          values:
+
+                  aa - append; begin new writing, or begin at end
+                      of current writing.
+
+                  rr - open for reading
+
+                  ww - create for writing
+
+
+          FFrreeooppeenn  substitutes the named file in place of an open
+          stream; it returns the original value  of  ssttrreeaamm..  The
+          original  value  of  ssttrreeaamm is closed. This routine may
+          also be used  to  attach  preopened  constant  names  -
+          ssttddiinn,, ssttddoouutt,, ssttddeerrrr,, - to specified files.
+          
+          FFddooppeenn  associates  a  stream  with  a  file descriptor
+          obtained from ccrreeaatt,, dduupp,, ooppeenn or ppiippee (see section 2).
+          The ttyyppee of the stream must agree with the mode of  the
+          open file.
+
+
+
+
+                               -1-
+
+
+
+
+fopen (3s)                   3/22/82                   fopen (3s)
+
+
+     NNOOTTEESS
+          If  ffiilleennaammee  cannot  be  accessed,  ffooppeenn  and ffrreeooppeenn
+          return the NULL pointer.
+
+
+     AALLSSOO RREEAADD
+
+
+
+
+                               -2-
+
+

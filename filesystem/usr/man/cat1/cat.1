@@ -1,0 +1,49 @@
+
+
+cat (1) 	     		 3/18/82                       cat (1)
+
+
+     PPRROOGGRRAAMM
+          ccaatt - concatenate and print
+          
+          
+     UUSSAAGGEE
+          ccaatt [[--nn]] ffiillee ......
+          
+          
+     FFUUNNCCTTIIOONN
+          CCaatt reads each file in the order given and writes it to
+          the standard output. Thus,
+          
+                                 ccaatt ffiillee
+          
+          prints the file and
+          
+                          ccaatt ffiillee11 ffiillee22 >> ffiillee33
+          
+          concatenates  the first two files and places the result
+          in the third. If no files are given or if "-" is  given
+          as  a  file name, ccaatt reads the standard input up to an
+          end-of-file.
+          
+          If the --nn option is given, the lines are numbered.
+          
+          
+     NNOOTTEESS
+          Beware of
+                               ccaatt aa bb >> aa 
+          
+          and
+                                ccaatt aa bb >> bb
+          
+          they destroy the input files before reading them!
+          
+          
+     SSEEEE AALLSSOO
+
+
+
+
+				   -1-
+
+

@@ -1,0 +1,51 @@
+
+
+ferror (3s)                  3/22/82                  ferror (3s)
+
+
+     SSUUBBRROOUUTTIINNEE((SS))
+          ffeeooff,,   ffeerrrroorr,,   cclleeaarreerrrr,,   ffiilleennoo  -  stream  status
+          inquiries
+
+
+     CC
+          ##iinncclluuddee <<ssttddiioo..hh>>
+
+          ffeeooff((ssttrreeaamm))
+          FFIILLEE **ssttrreeaamm;;
+
+          ffeerrrroorr((ssttrreeaamm))
+          FFIILLEE **ssttrreeaamm
+
+          cclleeaarreerrrr((ssttrreeaamm))
+          FFIILLEE **ssttrreeaamm
+
+          ffiilleennoo((ssttrreeaamm))
+          FFIILLEE **ssttrreeaamm
+
+
+     FFUUNNCCTTIIOONN
+          The following functions are implemented as  macros  and
+          cannot be redeclared:
+          
+          FFeeooff  returns a non-zero when an end of file is read on
+          the named input stream; otherwise a zero is returned.
+          
+          FFeerrrroorr returns a non-zero when an  error  occurs  while
+          reading  or  writing  the  named  ssttrreeaamm.. EErrrroorr mmuusstt bbee
+          cclleeaarreedd bbyy cclleeaarreerrrr or the error indication lasts until
+          the stream is closed. A zero is returned  if  no  error
+          occurs.
+          
+          FFiilleennoo  returns  an  integer file descriptor associated
+          with ssttrreeaamm [see ooppeenn (2)].
+
+
+     AALLSSOO RREEAADD
+
+
+
+
+                               -1-
+
+

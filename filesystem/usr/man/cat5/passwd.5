@@ -1,0 +1,55 @@
+
+
+passwd (5)                     3/15/82                 passwd (5)
+
+
+     FFIILLEE
+          ppaasssswwdd - password file
+
+
+     FFUUNNCCTTIIOONN
+          The  name passwd has become a misnomer, but is commonly
+          found in UNIX documentation and we hesitate  to  change
+          it here.
+
+          PPaasssswwdd contains the following information:
+
+             name (login name, no upper case letters)
+             encrypted password
+             numerical user ID
+             numerical group ID
+             comment
+             home directory
+             command   interpreter  program  name  with  optional
+             arguments
+
+          This is an ASCII file. Each field  within  each  user's
+          entry  is separated from the next by a colon. Each user
+          is separated from the next  by  a  newline.  This  file
+          resides in the "/etc" directory.
+          
+          The  first entry of the password file contains an entry
+          for the super-user account. The name of this account is
+          traditionally "root," but may be  renamed  to  anything
+          the user wishes.
+
+
+     EEXXAAMMPPLLEE
+          rroooott::::00::00::ssuuppeerr:://:://bbiinn//sshh
+
+          ssaallllyy::::1100::11::ssaallllyy:://aa//ssaallllyy:://bbiinn//uuppmm aa:://ccppmm mmbbaassiicc
+
+
+     FFIILLEESS
+          /etc/passwd
+
+
+     SSEEEE AALLSSOO
+          login (5), passwd (5), group (5)
+
+
+
+
+                                 -1-
+
+
