@@ -328,7 +328,7 @@ add_sym(char *name, int type, int value)
 {
 	struct symbol *s;
 
-	printf("add_sym %x %x %s\n", type,  value, name);
+	// printf("add_sym %x %x %s\n", type,  value, name);
 	s = malloc(sizeof(*s));
 	s->name = strdup(name);
 	s->value = value;
@@ -394,12 +394,12 @@ do_exec(char *name, char **argv)
 	fread(cp->memory + header.textoff, 1, header.text, file);
 	fread(cp->memory + header.dataoff, 1, header.data, file);
 	if (header.table) {
-		printf("got %d symbols\n", header.table);
+		// printf("got %d symbols\n", header.table);
 		for (i = 0; i < header.table / sizeof(fsym); i++) {
 			fread(&fsym, 1, sizeof(fsym), file);
 			add_sym(fsym.name, fsym.t, fsym.v);			
 		}
-		printf("read %d symbols\n", i);
+		// printf("read %d symbols\n", i);
 	}
         fclose(file);
 
