@@ -42,6 +42,7 @@ static void	emulate();
 
 #define	DEFROOT	"../filesystem"
 
+int am_root= 0;
 int mypid;
 
 char curdir[100] = "";
@@ -168,6 +169,7 @@ usage(char *complaint, char *p)
 
 	printf("%s", complaint);
 	printf("usage: %s [<options>] [program [<program options>]]\n", p);
+	printf("\t-r\trun as root\n");
 	printf("\t-d <root dir>\n");
 	printf("\t-b\t\tstart with breakpoint\n");
 	printf("\t-v <verbosity>\n");
@@ -217,6 +219,9 @@ main(int argc, char **argv)
 			switch (*s++) {
 			case 'h':
 				usage("", progname);
+				break;
+			case 'r':
+				am_root = 1;
 				break;
 			case 'd':
 				if (!argc--) {
@@ -1184,6 +1189,18 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 9:	/* link <old> <new> */
+		/*
+		 * special case code when doing a mkdir:  
+		 * our applications put links to . and .. in the
+		 * directory, and we need to ignore these system calls
+		 */
+		i = strlen(fn2);
+		if ((strcmp(&fn2[i-3], "/..") == 0) || 
+			(strcmp(&fn2[i-2], "/.") == 0)) {
+			carry_clear();
+			ret = 0;
+			break;
+		}
 		filename = strdup(fname(fn));
 		ret = link(filename, fname(fn2));
 		if (ret != 0) {
@@ -1196,8 +1213,25 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 10:	/* unlink <file> */
+		/*
+		 * special case code when doing a rmdir
+		 */
+		i = strlen(fn);
+		if ((strcmp(&fn[i-3], "/..") == 0) || 
+		(strcmp(&fn[i-2], "/.") == 0)) {
+			carry_clear();
+			ret = 0;
+			break;
+		}
 		ret = unlink(filename = fname(fn));
 		if (ret != 0) {
+			if (errno == EISDIR) {
+				ret = rmdir(filename);
+				if (ret == 0) {
+					carry_clear();
+					break;
+				}
+			}
 			if (verbose & V_ERROR) perror(filename);
 			ret = errno;
 			carry_set();
@@ -1260,7 +1294,19 @@ void SystemCall (MACHINE *cp)
 		carry_clear();
 		break;
 	case 14:	/* mknod <name> mode dev (dev == 0) for dir */
-		carry_set();
+		if (arg3 == 0) {
+			arg2 &= 0777;
+			ret = mkdir(filename = fname(fn), arg2);
+			if (ret == -1) {
+				if (verbose & V_ERROR) perror(filename);
+				ret = errno;
+				carry_set();
+			} else {
+				carry_clear();
+			}
+		} else {
+			carry_set();
+		}
 		break;
 
 	case 15:	/* chmod <name> <mode> */
@@ -1269,6 +1315,9 @@ void SystemCall (MACHINE *cp)
 
 	case 16:	/* chown <name> <mode> */
 		carry_set();
+		if (am_root) {
+			carry_clear();
+		}
 		break;
 
 	case 17:	/* sbrk <addr> */
@@ -1367,6 +1416,7 @@ void SystemCall (MACHINE *cp)
 
 	case 24:	/* getuid */
 		ret = getuid();
+		if (am_root) ret = 0;
 		carry_clear();
 		break;
 
@@ -1376,6 +1426,7 @@ void SystemCall (MACHINE *cp)
 
 	case 31:	/* stty */
 		carry_set();
+		carry_clear();
 		break;
 
 	case 32:	/* gtty */
