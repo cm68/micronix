@@ -52,7 +52,7 @@ unsigned char
 readbyte(unsigned short addr)
 {
 	unsigned char c;
-	lseek(fd, textoff + addr, SEEK_SET);
+	lseek(fd, textoff + addr - head.textoff, SEEK_SET);
 	read(fd, &c, 1);
 	if (blen < sizeof(barray)) {
 		barray[blen++] = c;
@@ -74,15 +74,6 @@ lookup(int i)
 
 char *
 sym(unsigned short addr)
-{
-	if (addr < nsyms) {
-		return syms[addr].name;
-	}
-	return 0;
-}
-
-char *
-label(unsigned short addr)
 {
 	int i;
 	for (i = 0; i < nsyms; i++) {
@@ -140,11 +131,11 @@ disassem()
 		}
 	}
 	lseek(fd, textoff, SEEK_SET);
-	location = 0;
-	while (location < head.text) {
+	location = head.textoff;
+	while (location < head.textoff + head.text) {
 		blen = 0;
 		bc = format_instr(location, outbuf, &readbyte, &sym, &reloc);
-		if ((tag = label(location))) {
+		if ((tag = sym(location))) {
 			printf("%s:\n", tag);
 		}
 		printf("%04x: %-30s", location, outbuf, bbuf);
