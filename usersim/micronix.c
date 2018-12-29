@@ -45,6 +45,7 @@ static void	emulate();
 int debug_terminal;
 int am_root;
 int mypid;
+FILE *mytty;
 
 char curdir[100] = "";
 char *rootdir = 0;
@@ -102,7 +103,7 @@ fname(char *orig)
 void
 pid()
 {
-	printf("%d: ", mypid);
+	fprintf(mytty,"%d: ", mypid);
 }
 
 char *
@@ -161,25 +162,23 @@ pop()
 
 #define	TTY_FD	64
 
-FILE *mytty;
-
 void
 usage(char *complaint, char *p)
 {
 	int i;
 
-	printf("%s", complaint);
-	printf("usage: %s [<options>] [program [<program options>]]\n", p);
-	printf("\t-r\trun as root\n");
-	printf("\t-t\topen a debug terminal window\n");
-	printf("\t-d <root dir>\n");
-	printf("\t-b\t\tstart with breakpoint\n");
-	printf("\t-v <verbosity>\n");
-	printf("\t-s [<syscall>[=<count>]\n");
+	fprintf(stderr,"%s", complaint);
+	fprintf(stderr,"usage: %s [<options>] [program [<program options>]]\n", p);
+	fprintf(stderr,"\t-r\trun as root\n");
+	fprintf(stderr,"\t-t\topen a debug terminal window\n");
+	fprintf(stderr,"\t-d <root dir>\n");
+	fprintf(stderr,"\t-b\t\tstart with breakpoint\n");
+	fprintf(stderr,"\t-v <verbosity>\n");
+	fprintf(stderr,"\t-s [<syscall>[=<count>]\n");
 	for (i = 0; vopts[i]; i++) {
-		printf("\t%x %s\n", 1 << i, vopts[i]);
+		fprintf(stderr,"\t%x %s\n", 1 << i, vopts[i]);
 	}       
-	exit(1);	
+	exit(1);
 }
 
 /* system calls to stop on */
@@ -244,7 +243,7 @@ main(int argc, char **argv)
 				breakpoint++;
 				break;
 			default:
-				printf("bad flag %c\n", (*s));
+				usage("unrecognized option", progname);
 				break; 
 			}
 		}
@@ -277,7 +276,6 @@ main(int argc, char **argv)
 		sprintf(cmd, 
 			"tty > /proc/%d/fd/%d ; while test -d /proc/%d ; do sleep 1 ; done",
 			mypid, pipefd[1], mypid);
-		printf("command %s\n", cmd);
 		if (fork()) {
 			ttyname = malloc(100);
 			i = read(pipefd[0], ttyname, 100);
@@ -291,7 +289,6 @@ main(int argc, char **argv)
 	} else {
 		ttyname = "/dev/tty";
 	}
-	printf("ttyname $%s$\n", ttyname);	
 	mytty = fopen(ttyname, "r+");
 	if (!mytty) {
 		perror(ttyname);
@@ -300,7 +297,6 @@ main(int argc, char **argv)
 	dup2(fileno(mytty), TTY_FD);
 	mytty = fdopen(TTY_FD, "r+");
 	setvbuf(mytty, 0, _IOLBF, 0);
-	stdout = stderr = stdin = mytty;
 
 	/* if our rootdir is relative, we need to make it absolute */
 	if (*rootdir != '/') {
@@ -311,14 +307,14 @@ main(int argc, char **argv)
 		rootdir = strdup(namebuf);
 	}
 	if (verbose) {
-		printf("verbose %x ",verbose);
+		fprintf(mytty, "verbose %x ",verbose);
 		for (i = 0; vopts[i]; i++) {
 			if (verbose & (1 << i)) {
-				printf("%s ", vopts[i]);
+				fprintf(mytty,"%s ", vopts[i]);
 			}
 		}
-		printf("\n");
-		printf("emulating %s with root %s\n", argv[0], rootdir);
+		fprintf(mytty,"\n");
+		fprintf(mytty,"emulating %s with root %s\n", argv[0], rootdir);
 	}
 
 	cp = &context;
@@ -394,17 +390,17 @@ do_exec(char *name, char **argv)
 	} fsym;
 
 	if (verbose & V_EXEC) {
-		pid(); printf("exec %s\n", name);
+		pid(); fprintf(mytty,"exec %s\n", name);
 	}
 	/* count our args from the null-terminated list */
 	for (argc = 0; argv[argc]; argc++) {
 		if (verbose & V_EXEC) {
-			printf("arg %d = %s\n", argc, argv[argc]);
+			fprintf(mytty,"arg %d = %s\n", argc, argv[argc]);
 		}
 	}
 
         if ((file = fopen(name, "rb")) == NULL) {
-                printf("Can't open file %s!\n", name);
+                fprintf(mytty,"Can't open file %s!\n", name);
 		return(errno);
         }
         fseek(file, 0, SEEK_SET);
@@ -422,7 +418,7 @@ do_exec(char *name, char **argv)
 	}
 
 	if (verbose & V_EXEC) {
-	printf("exec header: magic: %x conf: %x symsize: %d text: %d data: %d bss: %d heap: %d textoff: %x dataoff: %x\n",
+	fprintf(mytty,"exec header: magic: %x conf: %x symsize: %d text: %d data: %d bss: %d heap: %d textoff: %x dataoff: %x\n",
 		header.ident, header.conf, 
 		header.table, header.text, header.data, 
 		header.bss, header.heap, 
@@ -501,9 +497,9 @@ dumpcpu()
 	format_instr(cp->state.pc, outbuf, &get_byte, &lookup_sym, &reloc);
 	s = lookup_sym(cp->state.pc);
 	if (s) {
-		fprintf(stdout,"%s\n", s);
+		fprintf(mytty,"%s\n", s);
 	}
-	fprintf(stdout,"%04x: %-20s ", cp->state.pc, outbuf);
+	fprintf(mytty,"%04x: %-20s ", cp->state.pc, outbuf);
 
 	f = cp->state.registers.byte[Z80_F];
 	
@@ -515,7 +511,7 @@ dumpcpu()
 	if (f & Z80_Z_FLAG) fbuf[5] = 'Z';
 	if (f & Z80_C_FLAG) fbuf[6] = 'S';
 
-	fprintf(stdout,
+	fprintf(mytty,
 	" %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x brk:%04x\n",
 		fbuf, 
 		cp->state.registers.byte[Z80_A],
@@ -594,8 +590,8 @@ monitor()
 
 	while (1) {
 	more:
-		fprintf(stdout, "%d >>> ", mypid);
-		s = fgets(cmdline, sizeof(cmdline), stdin);
+		fprintf(mytty, "%d >>> ", mypid);
+		s = fgets(cmdline, sizeof(cmdline), mytty);
 		if (*s) {
 			s[strlen(s)-1] = 0;
 		}
@@ -608,10 +604,10 @@ monitor()
 			while (*s && (*s == ' ')) s++;
 			if (!*s) {
 				for (i = 0; i < sizeof(stop); i++) {
-					if ((i % 16) == 0) fprintf(stdout,"\n%02d: ", i);
-					fprintf(stdout,"%03d ", stop[i]);
+					if ((i % 16) == 0) fprintf(mytty,"\n%02d: ", i);
+					fprintf(mytty,"%03d ", stop[i]);
 				}
-				fprintf(stdout, "\n");
+				fprintf(mytty, "\n");
 			}
 			if (*s == '-') {
 				s++;
@@ -659,9 +655,9 @@ monitor()
 				c = format_instr(i, cmdline, &get_byte, &lookup_sym, &reloc);
 				s = lookup_sym(i);
 				if (s) {
-					fprintf(stdout, "%s\n", s);
+					fprintf(mytty, "%s\n", s);
 				}
-				fprintf(stdout, "%04x: %-20s\n", i, cmdline);
+				fprintf(mytty, "%04x: %-20s\n", i, cmdline);
 				i += c;
 				lastaddr = i & 0xfff;
 			}
@@ -712,26 +708,26 @@ monitor()
 					}
 				} else {
 					for (p = *head; p; p = p->next) {
-						fprintf(stdout, "%04x\n", p->addr);
+						fprintf(mytty, "%04x\n", p->addr);
 					}
 				}
 			}
 			break;
 		case '?':
 		case 'h':
-			fprintf(stdout, "commands:\n");
-			fprintf(stdout, "l <addr> :list\n");
-			fprintf(stdout, "d <addr> :dump memory\n");
-			fprintf(stdout, "r dump cpu state\n");
-			fprintf(stdout, "g: continue\n");
-			fprintf(stdout, "s: single step\n");
-			fprintf(stdout, "q: exit\n");
-			fprintf(stdout, "b [-] <nnnn> ... :breakpoint\n");
-			fprintf(stdout, "w [-] <nnnn> ... :watchpoint\n");
-			fprintf(stdout, "c [-] <nn> :system call trace\n");
+			fprintf(mytty, "commands:\n");
+			fprintf(mytty, "l <addr> :list\n");
+			fprintf(mytty, "d <addr> :dump memory\n");
+			fprintf(mytty, "r dump cpu state\n");
+			fprintf(mytty, "g: continue\n");
+			fprintf(mytty, "s: single step\n");
+			fprintf(mytty, "q: exit\n");
+			fprintf(mytty, "b [-] <nnnn> ... :breakpoint\n");
+			fprintf(mytty, "w [-] <nnnn> ... :watchpoint\n");
+			fprintf(mytty, "c [-] <nn> :system call trace\n");
 			break;
 		default:
-			fprintf(stdout, "unknown command %c\n", c);
+			fprintf(mytty, "unknown command %c\n", c);
 			break;
 		case 0:
 			break;
@@ -757,7 +753,7 @@ emulate()
 		if (point_at(&breaks, cp->state.pc, 0)) {
 			if (point_at(&breaks, cp->state.pc, 0)) {
 				pid();
-				printf("break at %04x\n", cp->state.pc);
+				fprintf(mytty,"break at %04x\n", cp->state.pc);
 			}
 			breakpoint = 1;
 		}
@@ -1043,7 +1039,7 @@ void SystemCall (MACHINE *cp)
 	if (((get_byte(sc)) != 0xcf) && (get_byte(sc - 2) != 0xcd)) {
 		pid();
 		dumpcpu();
-		printf("halt no syscall %x!\n", sc);
+		fprintf(mytty,"halt no syscall %x!\n", sc);
 		exit(1);
 	}
 
@@ -1055,7 +1051,7 @@ void SystemCall (MACHINE *cp)
 		indirect++;
 		sc = get_word(sc + 2);
 		if ((code = get_byte(sc)) != 0xcf) {
-			printf("indir no syscall %d %x!\n", code, sc);
+			fprintf(mytty,"indir no syscall %d %x!\n", code, sc);
 		}
 		code = get_byte(sc + 1);
 	}
@@ -1071,7 +1067,8 @@ void SystemCall (MACHINE *cp)
 	sp = &syscalls[code];
 
 	if (verbose & V_SYS0) {
-		printf("%10s %3d ", sp->name, cp->state.registers.word[Z80_HL]);
+		fprintf(mytty,"%10s %3d ", 
+				sp->name, cp->state.registers.word[Z80_HL]);
 		dumpmem(&get_byte, sc, sp->argbytes + 1);
 	}
 
@@ -1084,10 +1081,10 @@ void SystemCall (MACHINE *cp)
 	if (sp->flag & SF_NAME2) fn2 = &cp->memory[arg2];
 
 	if ((verbose & V_SYS) && (!(sp->flag & SF_SMALL) || (verbose & V_ASYS))) {
-		pid(); printf("%s(", sp->name);
+		pid(); fprintf(mytty,"%s(", sp->name);
 		i = sp->flag & (SF_FD|SF_ARG1|SF_NAME|SF_ARG2|SF_NAME2|SF_ARG2|SF_ARG3|SF_ARG4);
 #define F(b, f, a) \
-	if (i & (b)) { i ^= (b) ; printf(f,a,i?",":""); }
+	if (i & (b)) { i ^= (b) ; fprintf(mytty,f,a,i?",":""); }
 		F(SF_FD, "%d%s", fd);
 		F(SF_ARG1, "%04x%s", arg1);
 		F(SF_NAME, "\"%s\"%s", fn);
@@ -1095,7 +1092,7 @@ void SystemCall (MACHINE *cp)
 		F(SF_NAME2, "\"%s\"%s", fn2);
 		F(SF_ARG3, "%04x%s", arg3);
 		F(SF_ARG4, "%04x%s", arg4);
-		printf(") ");
+		fprintf(mytty,") ");
 	}
 
 	/* let's fixup the return address from the table */
@@ -1108,7 +1105,7 @@ void SystemCall (MACHINE *cp)
 
 	switch (code) {
 	case 0:	/* double indirect is a no-op */
-		pid(); printf("double indirect syscall!\n");
+		pid(); fprintf(mytty,"double indirect syscall!\n");
 		break;		
 
 	case 1:		/* exit (hl) */
@@ -1167,7 +1164,7 @@ void SystemCall (MACHINE *cp)
 			break;
 		default:
 			pid();
-			printf("open busted mode %s %04x %04x\n",
+			fprintf(mytty,"open busted mode %s %04x %04x\n",
 				fn, arg1, arg2);
 			break;
 		}
@@ -1177,7 +1174,7 @@ void SystemCall (MACHINE *cp)
 				ret = dirsnarf(filename);
 				if (ret == 0xffff) {
 					ret = errno;
-					printf("dirsnarf lose\n");
+					fprintf(mytty,"dirsnarf lose\n");
 					goto lose;
 				}
 			} else { 
@@ -1207,15 +1204,17 @@ void SystemCall (MACHINE *cp)
 
 	case 7: /* wait */
 		if (verbose & V_SYS) {
-			pid(); printf("wait\n");
+			pid(); fprintf(mytty,"wait\n");
 		}
 		if ((ret = wait(&fd)) == -1) {
-			if (verbose & V_SYS) { pid(); printf("no children\n"); }
+			if (verbose & V_SYS) { 
+				pid(); fprintf(mytty,"no children\n"); 
+			}
 			carry_set();
 			break;
 		}
 		if (verbose & V_SYS) {
-			pid(); printf("wait ret %x %x\n", ret, fd);
+			pid(); fprintf(mytty,"wait ret %x %x\n", ret, fd);
 		}
 		cp->state.registers.byte[Z80_D] = WEXITSTATUS(fd);
 		cp->state.registers.byte[Z80_E] = 0;
@@ -1563,15 +1562,18 @@ void SystemCall (MACHINE *cp)
 		break;
 	default:
 		pid();
-		printf("unrecognized syscall %d %x\n", code, code);
+		fprintf(mytty,"unrecognized syscall %d %x\n", code, code);
 		carry_set();
 		break;
 	}
 	
 	cp->state.registers.word[Z80_HL] = ret;
 	if ((verbose & V_SYS) && (!(sp->flag & SF_SMALL) || (verbose & V_ASYS))) {
-		if ((code == 2) && (ret == 0)) { printf("\n%d: fork() ", mypid); }
-		printf(" = %04x%s\n", ret, (cp->state.registers.byte[Z80_F] & Z80_C_FLAG) ? " FAILED" : "");
+		if ((code == 2) && (ret == 0)) { 
+			fprintf(mytty,"\n%d: fork() ", mypid); 
+		}
+		fprintf(mytty," = %04x%s\n", 
+			ret, (cp->state.registers.byte[Z80_F] & Z80_C_FLAG) ? " FAILED" : "");
 	}
 	if ((verbose & V_DATA) && (sp->flag & SF_BUF)) {
 		dumpmem(&get_byte, arg1, ret);
@@ -1580,7 +1582,44 @@ void SystemCall (MACHINE *cp)
 	cp->state.status = 0;
 	verbose = stopnow;
 	if ((verbose & V_SYS) && (cp->state.registers.word[Z80_HL] == 0xffff)) {
-		printf("code = %d\n", code);
+		fprintf(mytty,"code = %d\n", code);
 		dumpcpu();
 	}
 }
+
+unsigned char pchars[16];
+int pcol;
+
+dp()
+{
+        int i;
+        char c;
+
+        for (i = 0; i < pcol; i++) {
+                c = pchars[i];
+                if ((c <= 0x20) || (c >= 0x7f)) c = '.';
+                fprintf(mytty, "%c", c);
+        }
+        fprintf(mytty, "\n");
+}
+
+dumpmem(unsigned char (*readbyte)(int addr), int addr, unsigned short len)
+{
+        int i;
+        pcol = 0;
+
+        while (len) {
+                if (pcol == 0) fprintf(mytty, "%04x: ", addr);
+                fprintf(mytty, "%02x ", pchars[pcol] = (*readbyte)(addr++));
+                len--;
+                if (pcol++ == 15) {
+                        dp();
+                        pcol = 0;
+                }
+        }
+        if (pcol != 0) {
+                for (i = pcol; i < 16; i++) fprintf(mytty, "   ");
+                dp();
+        }
+}
+
