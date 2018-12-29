@@ -619,6 +619,7 @@ format_instr(
 	return bcount;
 }
 
+#ifdef notdef
 unsigned char pchars[16];
 int pcol;
 
@@ -654,4 +655,4 @@ dumpmem(unsigned char (*readbyte)(int addr), int addr, unsigned short len)
                 dp();
         }
 }
-
+#endif
