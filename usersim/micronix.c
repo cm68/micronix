@@ -1058,27 +1058,119 @@ struct syscall {
 /* 50 */	{1, "unlock", SF_FD },
 };
 
-struct bits {
+/*
+ * data structures to control terminal interface
+ */
+struct tcmods {
+	tcflag_t iflag;
+	tcflag_t oflag;
+	tcflag_t cflag;
+	tcflag_t lflag;
+};
+
+struct termios ti;
+
+/*
+ * this table contains tcsetattr data for each of the tty driver mode
+ * bits.  when setting a bit using stty, we have the ability to clear
+ * and set bits in each of the 4 mode words in the termios structure,
+ * and when clearing one, the same.  this is fully general, and avoids
+ * jiggery-pokery in the actual stty call
+ */
+
+struct ttybits {
 	char *name;
 	unsigned short bitmask;
+	struct tcmods setclr;
+	struct tcmods setset;
+	struct tcmods clrclr;
+	struct tcmods clrset;
+} ttybits[] = {
+#ifdef notdef
+	{ "cts",	0100000,	// use cts for hardware handshake
+		{ 0, 0, 0, 0 }, 
+		{ 0, 0, 0, 0 },
+		{ 0, 0, 0, 0 }, 
+		{ 0, 0, 0, 0 }},
+	{ "8bit",	0040000, 	// use 8 bits on input
+		{ ISTRIP, 0, 0, 0 }, 
+		{ 0, 0, 0, 0 },
+		{ 0, 0, 0, 0 }, 
+		{ ISTRIP, 0, 0, 0 }},
+	// { "cbreak",	0020000 },
+	// { "more",	0010000 },
+#endif
+	{ "raw",	0000040,	// raw input mode - no controls
+		{ INLCR|IGNCR|ICRNL|IXOFF|IXON, OPOST, 
+		  0, ECHO|ECHONL|ICANON|ISIG }, // raw
+		{ 0, 0, 0, 0 },
+		{ 0, 0, 0, 0 }, 				     //cooked
+		{ INLCR|ICRNL, OPOST|ONLCR, 0, ECHO|ECHONL|ICANON|ISIG|IEXTEN }}, 
+#ifdef notdef
+	{ "crlf",	0000020,
+		{ 0, 0, 0, 0 }, 
+		{ 0, 0, 0, 0 },
+		{ 0, 0, 0, 0 }, 
+		{ 0, 0, 0, 0 }},
+#endif
+	{ "echo",	0000010,
+		{ 0, 0, 0, 0 }, 
+		{ 0, 0, 0, ECHO|ECHOE },
+		{ 0, 0, 0, ECHO|ECHOE }, 
+		{ 0, 0, 0, 0 }},
+#ifdef notdef
+	{ "lcase",	0000004,
+		{ IUCLC, OLCUC, 0, 0 }, 
+		{ 0, 0, 0, 0 },
+		{ 0, 0, 0, 0 }, 
+		{ ISTRIP, OLCUC, 0, 0 }},
+	{ "tabs",	0000002,
+		{ IUCLC, OLCUC, 0, 0 }, 
+		{ 0, 0, 0, 0 },
+		{ 0, 0, 0, 0 }, 
+		{ ISTRIP, OLCUC, 0, 0 }},
+#endif
+	{ 0, 0,
+		{ 0, 0, 0, 0 }, 
+		{ 0, 0, 0, 0 },
+		{ 0, 0, 0, 0 }, 
+		{ 0, 0, 0, 0 }}
 };
 
-struct bits ttybits[] = {
-	{ "cts",	0100000 },
-	{ "8bit",	0040000 },
-	{ "raw",	0000040 },
-	{ "crlf",	0000020 },
-	{ "echo",	0000010 },
-	{ "tabs",	0000002 },
-	{ 0, 0 }
-};
+#ifdef notdef
 
-bitdump(struct bits *bp, unsigned short v)
+		i = get_word(arg1+4);
+		if (i & 040) {
+			ti.c_lflag &= ~(ICANON|ISIG);
+		} else {
+			ti.c_lflag |= (ICANON|ISIG);
+		}
+		if (i & 020) {
+			ti.c_iflag |= ICRNL;
+			ti.c_oflag |= ONLCR;
+		} else {
+			ti.c_iflag &= ~ICRNL;
+			ti.c_oflag &= ~ONLCR;
+		}
+		if (i & 010) {
+			ti.c_lflag |= (ECHO|ECHOE|ECHOK);
+		} else {
+			ti.c_lflag &= ~(ECHO|ECHOE|ECHOK);
+		}
+		if (i & 02) {
+			ti.c_oflag |= XTABS;
+		} else {
+			ti.c_oflag ^= ~TABDLY;
+		}
+#endif
+
+bitdump(unsigned short v)
 {
-	int i;
-	for (i = 0; bp[i].name; i++) {
-		if (bp[i].bitmask & v) {
-			fprintf(mytty, "%s ", bp[i].name);
+	struct ttybits *tb;
+
+	for (tb = ttybits; tb->name; tb++) {
+		if (tb->bitmask & v) {
+			fprintf(mytty, "%s ", tb->name);
 		}
 	}
 }
@@ -1101,15 +1193,133 @@ cchar(char *s, char c)
 	}
 }
 
-ti_dump(char *s, unsigned short a)
+/*
+ * dump out the micronix tty vector
+ */
+tty_dump(char *s, unsigned short a)
 {
 	char c;
 	fprintf(mytty, "%s in: %s out: %s ", 
 		s, baud[get_byte(a)], baud[get_byte(a+1)]);
 	cchar("erase", get_byte(a+2));
 	cchar("kill", get_byte(a+3));
-	bitdump(&ttybits, get_word(a+4));
+	bitdump(get_word(a+4));
 	fprintf(mytty, "\n");
+}
+
+/*
+ * the termios struct names
+ */
+struct tidbits {
+	char *name;
+	tcflag_t bit;
+};
+
+struct tidbits iflags[] = {
+	"IGNBRK", IGNBRK,
+	"BRKINT", BRKINT,
+	"IGNPAR", IGNPAR,
+	"PARMRK", PARMRK,
+	"ISTRIP", ISTRIP,
+	"INLCR", INLCR,
+	"IGNCR", IGNCR,
+	"ICRNL", ICRNL,
+	"IUCLC", IUCLC,
+	"IXON", IXON,
+	"IXANY", IXANY,
+	"IXOFF", IXOFF,
+	"IMAXBEL", IMAXBEL,
+	"IUTF8", IUTF8,
+	0, 0
+};
+
+struct tidbits oflags[] = {
+	"OPOST", OPOST,
+	"OLCUC", OLCUC,
+	"ONLCR", ONLCR,
+	"OCRNL", OCRNL,
+	"ONOCR", ONOCR,
+	"ONLRET", ONLRET,
+	"XTABS", XTABS,
+	0, 0
+};
+
+struct tidbits cflags[] = {
+	0, 0
+};
+
+struct tidbits lflags[] = {
+	"ISIG", ISIG,
+	"ICANON", ICANON,
+	"XCASE", XCASE,
+	"ECHO", ECHO,
+	"ECHOE", ECHOE,
+	"ECHOK", ECHOK,
+	"ECHONL", ECHONL,
+	"ECHOCTL", ECHOCTL,
+	"ECHOPRT", ECHOPRT,
+	"ECHOKE", ECHOKE,
+	0, 0
+};
+
+tbdump(char *s, struct tidbits *tb, tcflag_t v)
+{
+	fprintf(mytty, "%s: 0%06o ", s, v);
+	while (tb->name) {
+		if (tb->bit & v) {
+			fprintf(mytty, "%s ", tb->name);
+		}
+		tb++;
+	}
+	fprintf(mytty, "\n");
+}
+
+
+/*
+ * dump out the termios struct
+ */
+ti_dump()
+{
+	tbdump("ibits", iflags, ti.c_iflag);
+	tbdump("obits", oflags, ti.c_oflag);
+	tbdump("cbits", cflags, ti.c_cflag);
+	tbdump("lbits", lflags, ti.c_lflag);
+}
+
+void
+settimode(unsigned short mode)
+{
+	int i;
+	struct ttybits *tb;
+
+#ifdef notdef
+	ti_dump();
+	fprintf(mytty, "settimode: %06o\n", mode);
+#endif
+	for (tb = ttybits; tb->name; tb++) {
+		if (tb->bitmask & mode) {
+			ti.c_iflag &= ~tb->setclr.iflag;
+			ti.c_oflag &= ~tb->setclr.oflag;
+			ti.c_cflag &= ~tb->setclr.cflag;
+			ti.c_lflag &= ~tb->setclr.lflag;
+			ti.c_iflag |= tb->setset.iflag;
+			ti.c_oflag |= tb->setset.oflag;
+			ti.c_cflag |= tb->setset.cflag;
+			ti.c_lflag |= tb->setset.lflag;
+		} else {
+			ti.c_iflag &= ~tb->clrclr.iflag;
+			ti.c_oflag &= ~tb->clrclr.oflag;
+			ti.c_cflag &= ~tb->clrclr.cflag;
+			ti.c_lflag &= ~tb->clrclr.lflag;
+			ti.c_iflag |= tb->clrset.iflag;
+			ti.c_oflag |= tb->clrset.oflag;
+			ti.c_cflag |= tb->clrset.cflag;
+			ti.c_lflag |= tb->clrset.lflag;
+		}
+	}
+#ifdef notdef
+	ti_dump();
+#endif
 }
 
 char *filename;
@@ -1152,7 +1362,6 @@ void SystemCall (MACHINE *cp)
 	struct inode *ip;
 	struct dirfd *df;
 	char **argvec;
-	struct termios ti;
 	int stopnow;
 	struct syscall *sp;
 
@@ -1625,34 +1834,15 @@ nolog:
 
 	case 31:	/* stty */
 		if (verbose & V_SYS) {
-			ti_dump("stty", arg1);
+			tty_dump("stty", arg1);
 		}
 		tcgetattr(fd, &ti);
-		i = get_word(arg1+4);
-		if (i & 040) {
-			ti.c_lflag &= ~(ICANON|ISIG);
-		} else {
-			ti.c_lflag |= (ICANON|ISIG);
-		}
-		if (i & 020) {
-			ti.c_iflag |= ICRNL;
-			ti.c_oflag |= ONLCR;
-		} else {
-			ti.c_iflag &= ~ICRNL;
-			ti.c_oflag &= ~ONLCR;
-		}
-		if (i & 010) {
-			ti.c_lflag |= (ECHO|ECHOE|ECHOK);
-		} else {
-			ti.c_lflag &= ~(ECHO|ECHOE|ECHOK);
-		}
-		if (i & 02) {
-			ti.c_oflag |= XTABS;
-		} else {
-			ti.c_oflag ^= ~TABDLY;
-		}
+		settimode(get_word(arg1+4));
 		ti.c_cc[VERASE] = get_byte(arg1+2);
 		ti.c_cc[VKILL] = get_byte(arg1+3);
+		if (verbose & V_SYS) {
+			ti_dump();
+		}
 		tcsetattr(fd, TCSANOW, &ti);
 		carry_set();
 		carry_clear();
@@ -1683,7 +1873,8 @@ nolog:
 		put_byte(arg1+3, ti.c_cc[VKILL]);
 		put_word(arg1+4, i);
 		if (verbose & V_SYS) {
-			ti_dump("gtty", arg1);
+			tty_dump("gtty", arg1);
+			// ti_dump();
 		}
 		carry_clear();
 		break;
@@ -1786,6 +1977,7 @@ nolog:
 		}
 		if ((arg2 == 0) || (arg2 == 1)) {
 			handler = arg2 ? SIG_IGN : SIG_DFL;
+#ifdef notdef
 			if (verbose & V_SYS) {
 				pid();
 				fprintf(mytty, "signal %s %s\n", signame[arg1],
@@ -1795,6 +1987,7 @@ nolog:
 			pid();
 			fprintf(mytty, "signal %s %x\n", 
 				signame[arg1], signal_handler[arg1]);
+#endif
 		}
 		if (i) {
 			signal(i, handler);
