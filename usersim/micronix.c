@@ -12,19 +12,23 @@
  * This code is free, do whatever you want with it.
  */
 
+#define	_GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <dirent.h>
-#include <fcntl.h>
 #include <time.h>
 #include "z80emu.h"
 #include "z80user.h"
 #include <errno.h>
 #include <termios.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <string.h>
+#include <sys/time.h>
+#include <signal.h>
 
 typedef unsigned int ULONG;
 typedef unsigned char UCHAR;
@@ -103,7 +107,7 @@ fname(char *orig)
 void
 pid()
 {
-	fprintf(mytty,"%d: ", mypid);
+	fprintf(mytty, "%d: ", mypid);
 }
 
 char *
@@ -335,6 +339,72 @@ main(int argc, char **argv)
         cp->state.pc = pop();
 	emulate();
         return EXIT_SUCCESS;
+}
+
+/*
+ * signal stuff
+ */
+unsigned short signalled;
+unsigned short signal_handler[16];
+
+schedule_signal(unsigned short a)
+{
+	signalled |= (1 << a);
+}
+
+/*
+ * tty io signals are done in a fairly lame way - we poll on an alarm
+ */
+void
+alarm_handler(int i)
+{
+	fd_set rfd;
+	struct timeval tv;
+
+	// fprintf(mytty, "sigalarm!\n");
+
+	tv.tv_usec = 0;
+	tv.tv_sec = 0;
+	FD_ZERO(&rfd);
+	FD_SET(0, &rfd);
+
+	if (select(1, &rfd, 0, 0, &tv)) {
+		schedule_signal(7);
+	}
+}
+
+void
+int_handler()
+{
+	schedule_signal(2);
+}
+
+void
+quit_handler()
+{
+	schedule_signal(3);
+}
+
+void
+bg_handler()
+{
+	schedule_signal(6);
+}
+
+struct itimerval timer;
+
+void
+set_itv_usec(int v) 
+{
+	timer.it_value.tv_sec = 0;
+	timer.it_value.tv_usec = v;
+	timer.it_interval.tv_sec = 0;
+	timer.it_interval.tv_usec = v;
+}
+
+void
+set_alarm() {
+	setitimer(ITIMER_REAL, &timer, 0);
 }
 
 struct symbol {
@@ -745,7 +815,7 @@ emulate()
 {
 	unsigned char *ip;
 	int i;
-	
+
 	do {
 		if (watchpoint_hit()) {
 			breakpoint = 1;
@@ -768,6 +838,21 @@ emulate()
                  * the emulator to run
                  */
                 Z80Emulate(&cp->state, 1, &context);
+		/*
+		 * if we have a signal to deliver, do it now
+		 */
+		if (signalled) {
+			for (i = 0; i < 16; i++) {
+				if ((1 << i) & signalled) {
+					break;
+				}
+			}
+			fprintf(mytty, "invoking signal %x\n", 
+				signal_handler[i]);
+			push(cp->state.pc);
+        		cp->state.pc = signal_handler[i];
+			signalled &= ~(1 << i);
+		}
 		if (cp->state.status == Z80_STATUS_HALT) {
 			SystemCall(&context);
 		}
@@ -887,7 +972,7 @@ char *signame[] = {
 	"ill",
 	"trace",
 	"bg",
-	"rec",
+	"termio",
 	"fpe",
 	"kill",
 	"bus",
@@ -971,6 +1056,60 @@ struct syscall {
 /* 50 */	{1, "unlock", SF_FD },
 };
 
+struct bits {
+	char *name;
+	unsigned short bitmask;
+};
+
+struct bits ttybits[] = {
+	{ "cts",	0100000 },
+	{ "8bit",	0040000 },
+	{ "raw",	0000040 },
+	{ "crlf",	0000020 },
+	{ "echo",	0000010 },
+	{ "tabs",	0000002 },
+	{ 0, 0 }
+};
+
+bitdump(struct bits *bp, unsigned short v)
+{
+	int i;
+	for (i = 0; bp[i].name; i++) {
+		if (bp[i].bitmask & v) {
+			fprintf(mytty, "%s ", bp[i].name);
+		}
+	}
+}
+
+char *baud[] = {
+	"1200", "50", "75", "110",
+	"134.5", "150", "200", "300",
+	"600", "1200", "1800", "2400",
+	"4800", "9600", "19200", "1200"
+};
+
+cchar(char *s, char c)
+{
+	if (c == 0x7f) {
+		fprintf(mytty, "%s: DEL ", s);
+	} else if (c < ' ') {
+		fprintf(mytty, "%s: ^%c ", s, c + '@');
+	} else {
+		fprintf(mytty, "%s: %c ", s, c);
+	}
+}
+
+ti_dump(char *s, unsigned short a)
+{
+	char c;
+	fprintf(mytty, "%s in: %s out: %s ", 
+		s, baud[get_byte(a)], baud[get_byte(a+1)]);
+	cchar("erase", get_byte(a+2));
+	cchar("kill", get_byte(a+3));
+	bitdump(&ttybits, get_word(a+4));
+	fprintf(mytty, "\n");
+}
+
 char *filename;
 
 /*
@@ -1005,6 +1144,7 @@ void SystemCall (MACHINE *cp)
 
 	struct stat sbuf;
 	int i;
+	sighandler_t handler;
 	int p[2];
 	
 	struct inode *ip;
@@ -1080,6 +1220,13 @@ void SystemCall (MACHINE *cp)
 	if (sp->flag & SF_NAME) fn = &cp->memory[arg1];
 	if (sp->flag & SF_NAME2) fn2 = &cp->memory[arg2];
 
+	/* what's with these zero length writes? */
+	if ((code == 4) && (arg2 == 0)) {
+		goto nolog;
+		verbose = -1;
+		breakpoint = 1;
+	}
+
 	if ((verbose & V_SYS) && (!(sp->flag & SF_SMALL) || (verbose & V_ASYS))) {
 		pid(); fprintf(mytty,"%s(", sp->name);
 		i = sp->flag & (SF_FD|SF_ARG1|SF_NAME|SF_ARG2|SF_NAME2|SF_ARG2|SF_ARG3|SF_ARG4);
@@ -1094,6 +1241,7 @@ void SystemCall (MACHINE *cp)
 		F(SF_ARG4, "%04x%s", arg4);
 		fprintf(mytty,") ");
 	}
+nolog:
 
 	/* let's fixup the return address from the table */
 	push(pop() + syscalls[indirect ? 0 : code].argbytes);
@@ -1118,6 +1266,7 @@ void SystemCall (MACHINE *cp)
 			push(pop() + 3);
 		} else {
 			mypid = getpid();
+			set_alarm();
 		}
 		carry_clear();
 		break;
@@ -1473,6 +1622,36 @@ void SystemCall (MACHINE *cp)
 		break;
 
 	case 31:	/* stty */
+		if (verbose & V_SYS) {
+			ti_dump("stty", arg1);
+		}
+		tcgetattr(fd, &ti);
+		i = get_word(arg1+4);
+		if (i & 040) {
+			ti.c_lflag &= ~(ICANON|ISIG);
+		} else {
+			ti.c_lflag |= (ICANON|ISIG);
+		}
+		if (i & 020) {
+			ti.c_iflag |= ICRNL;
+			ti.c_oflag |= ONLCR;
+		} else {
+			ti.c_iflag &= ~ICRNL;
+			ti.c_oflag &= ~ONLCR;
+		}
+		if (i & 010) {
+			ti.c_lflag |= (ECHO|ECHOE|ECHOK);
+		} else {
+			ti.c_lflag &= ~(ECHO|ECHOE|ECHOK);
+		}
+		if (i & 02) {
+			ti.c_oflag |= XTABS;
+		} else {
+			ti.c_oflag ^= ~TABDLY;
+		}
+		ti.c_cc[VERASE] = get_byte(arg1+2);
+		ti.c_cc[VKILL] = get_byte(arg1+3);
+		tcsetattr(fd, TCSANOW, &ti);
 		carry_set();
 		carry_clear();
 		break;
@@ -1498,9 +1677,12 @@ void SystemCall (MACHINE *cp)
 
 		put_byte(arg1, ti.c_ispeed);
 		put_byte(arg1+1, ti.c_ospeed);
-		put_byte(arg1+2, ti.c_cc[VERASE]);	
+		put_byte(arg1+2, ti.c_cc[VERASE]);
 		put_byte(arg1+3, ti.c_cc[VKILL]);
 		put_word(arg1+4, i);
+		if (verbose & V_SYS) {
+			ti_dump("gtty", arg1);
+		}
 		carry_clear();
 		break;
 
@@ -1555,9 +1737,66 @@ void SystemCall (MACHINE *cp)
 		}
 		break;
 
-	case 48:
-		i = arg1;
-		if (i > 15) i = 0;
+	case 48:	/* set signal handler */
+		if (arg1 > 15) {
+			fprintf(mytty, "signal %d out of range\n", arg1);
+			carry_set();
+			ret = -1;	
+			arg1 = 0;
+			break;
+		}
+		ret = signal_handler[arg1];
+
+		i = 0;
+		switch (arg1) {
+		case 2:	// interrupt
+			signal_handler[2] = arg2;
+			handler = int_handler;
+			i = SIGINT;
+			break;
+		case 3: // quit
+			i = SIGQUIT;
+			signal_handler[3] = arg2;
+			handler = quit_handler;
+			break;
+		case 6: // bg
+			signal_handler[6] = arg2;
+			i = SIGTSTP;
+			handler = bg_handler;
+			break;
+		case 7: // termio
+			set_itv_usec(0);
+			set_alarm();
+			signal_handler[7] = arg2;
+			i = SIGALRM;
+			handler = alarm_handler;
+			if (arg2 > 1) {
+				set_itv_usec(200 * 1000);
+				set_alarm();
+			}
+			break;
+		default:
+			if ((arg2 != 0) && (arg2 != 1)) {
+				fprintf(mytty, "unimplemented signal %s\n", 
+					signame[arg1]);
+			}
+			break;
+		}
+		if ((arg2 == 0) || (arg2 == 1)) {
+			handler = arg2 ? SIG_IGN : SIG_DFL;
+			if (verbose & V_SYS) {
+				pid();
+				fprintf(mytty, "signal %s %s\n", signame[arg1],
+					arg2 ? "ignore" : "default");
+			}
+		} else if (verbose & V_SYS) {
+			pid();
+			fprintf(mytty, "signal %s %x\n", 
+				signame[arg1], signal_handler[arg1]);
+		}
+		if (i) {
+			signal(i, handler);
+		}
 		carry_clear();
 		break;
 	default:
@@ -1568,6 +1807,9 @@ void SystemCall (MACHINE *cp)
 	}
 	
 	cp->state.registers.word[Z80_HL] = ret;
+	if ((code == 4) && (arg2 == 0)) {
+		goto nolog2;
+	}
 	if ((verbose & V_SYS) && (!(sp->flag & SF_SMALL) || (verbose & V_ASYS))) {
 		if ((code == 2) && (ret == 0)) { 
 			fprintf(mytty,"\n%d: fork() ", mypid); 
@@ -1575,6 +1817,7 @@ void SystemCall (MACHINE *cp)
 		fprintf(mytty," = %04x%s\n", 
 			ret, (cp->state.registers.byte[Z80_F] & Z80_C_FLAG) ? " FAILED" : "");
 	}
+	nolog2:
 	if ((verbose & V_DATA) && (sp->flag & SF_BUF)) {
 		dumpmem(&get_byte, arg1, ret);
 	}
