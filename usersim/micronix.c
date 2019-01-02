@@ -847,8 +847,10 @@ emulate()
 					break;
 				}
 			}
-			fprintf(mytty, "invoking signal %x\n", 
-				signal_handler[i]);
+			if (verbose & V_SYS) {
+				fprintf(mytty, "invoking signal %x\n", 
+					signal_handler[i]);
+			}
 			push(cp->state.pc);
         		cp->state.pc = signal_handler[i];
 			signalled &= ~(1 << i);
