@@ -120,18 +120,42 @@ f A, B, C
 .sp
 The portion of the file which
 lies between addresses A and B (inclusive)
-is overwritten with a flood of the charac
-Repacking the units in their original container provides the best 
-protection during shipping.
+is overwritten with a flood of the character C.
+.sp
+If C is large, then the low order byte of C is used.
 
- -  Enclosed  in  the Decision I box is a contents list  for  the 
-    system you have ordered.  This list contains the serial  num
-    bers of all devices in your system. Please check the contents 
-    of  the the containers to verify all components have been re
-    ceived.  Most systems are shipped in more than one container, 
-    but  the Decision I box always contains the  system  contents 
-    dsubstitute 
-command allows you to examine and optionallly change the file on a 
+Example:
+.nf
+.sp
+.bd
+	f 0, 3000, e5
+.fi
+.sp
+writes E5s from 0 to 3000 hex.
+.sp 2
+.ti -3
+.bd
+r filename (Read)
+.sp
+The file on which ddt is operating is changed to filename if possible.
+.nf
+Examples:
+
+	r new
+	r /usrsrc/cmd/pbx.c
+	r /etc/dtab
+	r a/b
+.sp 2
+.fi
+.ti -3
+.bd
+s (address) Substitute
+.sp
+Takes 0 or 1 arguments.  if no argument is given, the currently remembered file address is used.
+the 
+.bd
+substitute
+command allows you to examine and optionally change the file on a 
 byte-by-byte basis.
 After entering the 
 .bd
