@@ -75,7 +75,7 @@ int verbose;
 MACHINE	context;
 
 unsigned short brake;
-int breakpoint;
+volatile int breakpoint;
 
 struct MACHINE *cp;
 
@@ -102,6 +102,13 @@ fname(char *orig)
 	}
 	realpath(workbuf, namebuf);
 	return (namebuf);
+}
+
+void
+stop_handler()
+{
+	fprintf(mytty, "breakpoint signal\n");
+	breakpoint = 1;
 }
 
 void
@@ -301,6 +308,7 @@ main(int argc, char **argv)
 	dup2(fileno(mytty), TTY_FD);
 	mytty = fdopen(TTY_FD, "r+");
 	setvbuf(mytty, 0, _IOLBF, 0);
+	signal(SIGUSR1, stop_handler);
 
 	/* if our rootdir is relative, we need to make it absolute */
 	if (*rootdir != '/') {
