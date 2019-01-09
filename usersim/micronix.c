@@ -1977,10 +1977,12 @@ nolog:
 			}
 			break;
 		default:
+#ifdef notdef
 			if ((arg2 != 0) && (arg2 != 1)) {
-				fprintf(mytty, "unimplemented signal %s\n", 
-					signame[arg1]);
+				fprintf(mytty, "unimplemented signal %s %x\n", 
+					signame[arg1], arg2);
 			}
+#endif
 			break;
 		}
 		if ((arg2 == 0) || (arg2 == 1)) {
