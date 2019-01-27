@@ -41,7 +41,7 @@ typedef unsigned short UINT;
 #define MAXIMUM_STRING_LENGTH   100
 
 static int	do_exec(char *name, char**argv);
-extern void dumpmem(unsigned char (*get)(int a), int addr, int len);
+extern void dumpmem(unsigned char (*get)(int a), void *addr, int len);
 static void	emulate();
 
 #define	DEFROOT	"../filesystem"
@@ -544,7 +544,7 @@ do_exec(char *name, char **argv)
 }
 
 unsigned char
-getsim(int addr)
+getsim(void *addr)
 {
 	return *(unsigned char *)addr;
 }
@@ -2051,7 +2051,7 @@ dp()
         fprintf(mytty, "\n");
 }
 
-dumpmem(unsigned char (*readbyte)(int addr), int addr, unsigned short len)
+dumpmem(unsigned char (*readbyte)(void *addr), void *addr, unsigned short len)
 {
         int i;
         pcol = 0;
