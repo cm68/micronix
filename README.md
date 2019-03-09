@@ -103,3 +103,7 @@ textual stuff like getting rid of =- and =+, and fixing initializers.
 get an object code improver that will fix the pretty bad stuff that
 whitesmith's generates. 
 
+this github is prettily referenced in my cybernecromancy site:
+
+https://retro.zen-room.org/morrow-micronix/user-mode-simulator
+
