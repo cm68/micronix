@@ -84,9 +84,10 @@ compiler woes:
 decomp:
 	a decompiler that knows about code flow, system calls, and
         with the goal of generating recompilable C.  very much a WIP.
+	probably throw away now that ghidra exists.
 
 fullsim:
-	the beginnings of a mpz80 simulator
+	the beginnings of a mpz80 simulator.  WIP.
 
 sim:
 	a bunch of 8 bit simulators for cribbing ideas/code from.
