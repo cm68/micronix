@@ -3,7 +3,7 @@ INCPATH=../../include
 
 all: $(BINS)
 
-CFLAGS=-Wno-return-type -I$(INCPATH)
+CFLAGS=-Wno-format-security -Wno-return-type -I$(INCPATH)
 
 clean:
 	rm -f *.o 
