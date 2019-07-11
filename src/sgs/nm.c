@@ -123,11 +123,15 @@ disassem()
 	if (verbose) {
 		if (head.text) {
 			printf("text:\n");
+#ifdef notdef
 			dumpmem(&readbyte, head.textoff, head.text);
+#endif
 		}
 		if (head.data) {
 			printf("data:\n");
+#ifdef notdef
 			dumpmem(&readbyte, head.dataoff, head.data);
+#endif
 		}
 	}
 	lseek(fd, textoff, SEEK_SET);
@@ -163,7 +167,9 @@ disassem()
 	}
 	if (head.data) {
 		printf("data:\n");
+#ifdef notdef
 		dumpmem(&readbyte, head.dataoff, head.data);
+#endif
 	}
 	/* list */
 }
