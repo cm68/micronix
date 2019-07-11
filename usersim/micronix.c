@@ -186,6 +186,7 @@ usage(char *complaint, char *p)
 	fprintf(stderr,"\t-b\t\tstart with breakpoint\n");
 	fprintf(stderr,"\t-v <verbosity>\n");
 	fprintf(stderr,"\t-s [<syscall>[=<count>]\n");
+	fprintf(stderr,"\t-t <syscall>\n");
 	for (i = 0; vopts[i]; i++) {
 		fprintf(stderr,"\t%x %s\n", 1 << i, vopts[i]);
 	}       
@@ -194,6 +195,7 @@ usage(char *complaint, char *p)
 
 /* system calls to stop on */
 char stop[64];
+char trace[64];
 
 int 
 main(int argc, char **argv)
@@ -242,13 +244,23 @@ main(int argc, char **argv)
 				break;
 			case 's':
 				if (!argc--) {
-					usage("stop syscall list not specified \n", progname);
+					usage("stop syscall not specified \n", progname);
 				}
 				s = *argv++;
 				i = strtol(s, &s, 0);
 				if ((i > sizeof(stop)) || (i < 0))
 					continue;
 				stop[i] = 1;
+				break;
+			case 't':
+				if (!argc--) {
+					usage("trace syscall not specified \n", progname);
+				}
+				s = *argv++;
+				i = strtol(s, &s, 0);
+				if ((i > sizeof(stop)) || (i < 0))
+					continue;
+				trace[i] = 1;
 				break;
 			case 'b':
 				breakpoint++;
@@ -1415,12 +1427,15 @@ void SystemCall (MACHINE *cp)
 		code = get_byte(sc + 1);
 	}
 
+	savemode = verbose;
 	/* if this is a system call we are interested in, deal with it */
-	if (stop[code]) {
+	if (trace[code] || stop[code]) {
 		pid();
 		dumpcpu();
 		verbose = -1;
-		breakpoint = 1;
+		if (stop[code]) {
+			breakpoint = 1;
+		}
 	}
 
 	sp = &syscalls[code];
@@ -1536,7 +1551,11 @@ nolog:
 				fn, arg1, arg2);
 			break;
 		}
+		/* magic filenames */
 		filename = fname(fn);
+		if (strcmp(fn,"/dev/console") == 0) {
+			filename = "/dev/tty";
+		}
 		if (!stat(filename, &sbuf)) {
 			if (S_ISDIR(sbuf.st_mode)) {
 				ret = dirsnarf(filename);
