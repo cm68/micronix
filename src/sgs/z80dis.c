@@ -3,7 +3,9 @@
  */
 
 #include <stdio.h>
-#include <strings.h>
+#include <string.h>
+
+#include "z80dis.h"
 
 struct optab {
 	char *op;
@@ -619,7 +621,7 @@ format_instr(
 	return bcount;
 }
 
-#ifdef notdef
+#ifdef define_dumpmem
 unsigned char pchars[16];
 int pcol;
 
