@@ -46,6 +46,7 @@ static void	emulate();
 
 #define	DEFROOT	"../filesystem"
 
+int savemode;
 int debug_terminal;
 int am_root;
 int mypid;
@@ -181,7 +182,7 @@ usage(char *complaint, char *p)
 	fprintf(stderr,"%s", complaint);
 	fprintf(stderr,"usage: %s [<options>] [program [<program options>]]\n", p);
 	fprintf(stderr,"\t-r\trun as root\n");
-	fprintf(stderr,"\t-t\topen a debug terminal window\n");
+	fprintf(stderr,"\t-T\topen a debug terminal window\n");
 	fprintf(stderr,"\t-d <root dir>\n");
 	fprintf(stderr,"\t-b\t\tstart with breakpoint\n");
 	fprintf(stderr,"\t-v <verbosity>\n");
@@ -224,7 +225,7 @@ main(int argc, char **argv)
 			case 'h':
 				usage("", progname);
 				break;
-			case 't':
+			case 'T':
 				debug_terminal = 1;
 				break;
 			case 'r':
