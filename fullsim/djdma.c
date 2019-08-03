@@ -142,7 +142,7 @@ static int need_intack;
  * start the channel
  */
 static void
-pulse_djdma(portaddr p, portdata v)
+pulse_djdma(portaddr p, byte v)
 {
     int i;
     struct djcmd *cmd;
@@ -153,7 +153,7 @@ pulse_djdma(portaddr p, portdata v)
          * if the last command was setintr, we are still "running" that command
          * until we get this pulse.  fill in the status and advance
          */
-        writemem(channel + 1, S_NORMAL);
+        physwrite(channel + 1, S_NORMAL);
         channel += 2;
         need_intack = 0;
     } else {
@@ -167,7 +167,7 @@ pulse_djdma(portaddr p, portdata v)
      * run channel commands until we are told to stop
      */
     while (djdma_running) {
-        code = readmem(channel);
+        code = physread(channel);
         for (i = 0; i < (sizeof(djcmd) / sizeof(djcmd[0])); i++) {
             if (djcmd[i].code == code) {
                 cmd = &djcmd[i];
@@ -180,7 +180,7 @@ pulse_djdma(portaddr p, portdata v)
             printf("djdma command %d %x %s\n", code, code, cmd->name);
             i = (cmd->handler)();
             if (cmd->status) {
-                writemem(channel + cmd->status, i);
+                physwrite(channel + cmd->status, i);
             }
             channel += cmd->increment;
         }
@@ -193,9 +193,9 @@ pulse_djdma(portaddr p, portdata v)
 static unsigned char
 setdma()
 {
-    dmaaddr = readmem(channel + 1) + 
-        (readmem(channel + 2) << 8) +
-        (readmem(channel + 3) << 16);
+    dmaaddr = physread(channel + 1) + 
+        (physread(channel + 2) << 8) +
+        (physread(channel + 3) << 16);
     return 0;
 }
 
@@ -205,9 +205,9 @@ setdma()
 static unsigned char
 setchannel()
 {
-    resetchannel = readmem(channel + 1) + 
-        (readmem(channel + 2) << 8) +
-        (readmem(channel + 3) << 16);
+    resetchannel = physread(channel + 1) + 
+        (physread(channel + 2) << 8) +
+        (physread(channel + 3) << 16);
     return 0;
 }
 
@@ -227,9 +227,9 @@ djhalt()
 static unsigned char
 branch()
 {
-    channel = readmem(channel + 1) + 
-        (readmem(channel + 2) << 8) +
-        (readmem(channel + 3) << 16);
+    channel = physread(channel + 1) + 
+        (physread(channel + 2) << 8) +
+        (physread(channel + 3) << 16);
     return 0;
 }
 
@@ -246,11 +246,11 @@ readsec()
     unsigned char status;
     int bytes;
 
-    trk = readmem(channel + 1);
-    sec = readmem(channel + 2);
+    trk = physread(channel + 1);
+    sec = physread(channel + 2);
     side = sec & 0x80;
     sec &= 0x7f;
-    drive = readmem(channel + 3);
+    drive = physread(channel + 3);
 
     /* read drive, getfdprmtrk, sec, side into dmaaddr */
     if (imdp[drive]) {
@@ -295,7 +295,7 @@ sense()
 {
     unsigned char drive;
 
-    drive = readmem(channel + 1);
+    drive = physread(channel + 1);
     /* XXX - fill out drive status */
     return S_NORMAL;
 }
@@ -308,7 +308,7 @@ setretry()
 {
     unsigned char drive;
 
-    retrylimit = readmem(channel + 1);
+    retrylimit = physread(channel + 1);
     return 0;
 }
 
@@ -320,7 +320,7 @@ setdrive()
 {
     unsigned char drive;
 
-    drive = readmem(channel + 1);
+    drive = physread(channel + 1);
     return S_NORMAL;
 }
 
@@ -410,7 +410,10 @@ djdma_init()
 {
 	register_output(DJDMA_PORT, &pulse_djdma);
     imdp[0] = load_imd("DRIVE_A.IMD");
-    return 1;
+    if (!imdp[0]) {
+        return 1;
+    }
+    return 0;
 }
 
 /*

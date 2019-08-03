@@ -98,51 +98,18 @@ extern "C" {
  * "traps" to simulate system calls. 
  */
 
-#define Z80_READ_BYTE(address, x)                                       \
-{                                                                       \
-        (x) = ((MACHINE *) context)->memory[(address) & 0xffff];	\
-}
-
+#define Z80_READ_BYTE(address, x) (x) = get_byte(address & 0xffff)
 #define Z80_FETCH_BYTE(address, x)		Z80_READ_BYTE((address), (x))
-
-#define Z80_READ_WORD(address, x)                                       \
-{                                                                       \
-	unsigned char	*memory;					\
-									\
-	memory = ((MACHINE *) context)->memory;				\
-        (x) = memory[(address) & 0xffff]                                \
-                | (memory[((address) + 1) & 0xffff] << 8);              \
-}
-
+#define Z80_READ_WORD(address, x) (x) = get_word(address & 0xffff)
 #define Z80_FETCH_WORD(address, x)		Z80_READ_WORD((address), (x))
 
-#define Z80_WRITE_BYTE(address, x)                                      \
-{                                                                       \
-        ((MACHINE *) context)->memory[(address) & 0xffff] = (x);	\
-}
-
-#define Z80_WRITE_WORD(address, x)                                      \
-{                                                                       \
-	unsigned char	*memory;					\
-									\
-	memory = ((MACHINE *) context)->memory;				\
-        memory[(address) & 0xffff] = (x); 				\
-        memory[((address) + 1) & 0xffff] = (x) >> 8; 			\
-}
+#define Z80_WRITE_BYTE(address, x) put_byte(address & 0xffff, (x))
+#define Z80_WRITE_WORD(address, x) put_word(address & 0xffff, (x))                                     \
 
 #define Z80_READ_WORD_INTERRUPT(address, x)	Z80_READ_WORD((address), (x))
-
 #define Z80_WRITE_WORD_INTERRUPT(address, x)	Z80_WRITE_WORD((address), (x))
-
-#define Z80_INPUT_BYTE(port, x)                                         \
-{                                                                       \
-        x = input(port);						\
-}
-
-#define Z80_OUTPUT_BYTE(port, x)                                        \
-{                                                                       \
-        output(port, x);						\
-}
+#define Z80_INPUT_BYTE(port, x) (x) = input(port)
+#define Z80_OUTPUT_BYTE(port, x) output(port, (x));						\
 
 #ifdef __cplusplus
 }

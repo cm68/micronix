@@ -563,7 +563,7 @@ format_instr(
 	if (o->flags & OP_IMM8) {
 		opcode = (*get_byte)(addr + bcount++);
 		value = opcode;
-		sprintf(valbuf, "%d", value);
+		sprintf(valbuf, "0x%x", value);
 	}
 
 	if (o->flags & OP_PC8) {

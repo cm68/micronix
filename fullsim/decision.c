@@ -60,12 +60,17 @@ int verbose;
 MACHINE context;
 
 /*
+ * the S100 bus memory space
+ */
+byte physmem[16*1024*1024];
+
+/*
  * mpz80 cpu registers and local ram
  */
-char local_ram[1024];
-char regs[1024];
-char eprom[1024];
-char fpp[1024];
+byte local_ram[1024];
+byte regs[1024];
+byte eprom[1024];
+byte fpp[1024];
 
 /*
  * mon4.47 and mon 3.75 both were distributed on 2732A's, which are 4kb
@@ -78,7 +83,7 @@ char fpp[1024];
  * designed for, which is why they did the upgrade.  it may be better to
  * go back to the 2kb part, since AT28C16's are gettable in 120ns.
  */
-char rom_image[4096];
+byte rom_image[4096];
 
 #define FPSEG   0x400
 #define FPCOL   0x401
@@ -113,46 +118,128 @@ pid()
     fprintf(mytty, "%d: ", mypid);
 }
 
-char *
-get_symname(unsigned short addr)
-{
-    return 0;
-}
-
 unsigned short
 reloc(unsigned short addr)
 {
     return 0;
 }
 
-/*
- * task 0 has the low 4k mapped to MPZ80 control and status registers
- */
+struct sym {
+    char *name;
+    vaddr value;
+    struct syms *next;
+} *syms;
+
 void
-supervisor_read(unsigned short addr)
+add_sym(char *name, vaddr v)
+{
+    struct sym *s;
+    s = malloc(sizeof(*s));
+    s->next = syms;
+    syms = s;
+    s->name = strdup(name);
+    s->value = v;
+}
+
+char *
+lookup_sym(unsigned short addr)
+{
+    struct sym *s = syms;
+
+    while (s) {
+        if (s->value == addr) {
+            return (s->name);
+        }
+        s = s->next;
+    }
+    return 0;
+}
+
+void
+load_symfile(char *s)
+{
+    FILE *sf;
+    int v;
+    char namebuf[20];
+
+    sf = fopen(s, "r");
+    if (!sf) return;
+    while (fscanf(sf, "%x %s", &v, namebuf) == 2) {
+        add_sym(namebuf, v);
+    }
+    fclose(sf);
+}
+
+/*
+ * access memory in the 24 bit S100 space using a physical address
+ */
+byte 
+physread(paddr p)
 {
 }
 
 void
-supervisor_write(unsigned short addr, unsigned char value)
+physwrite(paddr p, byte v)
+{
+}
+
+/*
+ * bulk move to physical memory
+ */
+copyout(byte *buf, paddr pa, int len)
+{
+}
+
+/*
+ * bulk move from physical memory
+ */
+copyin(byte *buf, paddr pa, int len)
+{
+}
+
+/*
+ * task 0 has the low 4k mapped to MPZ80 control and status registers
+ */
+byte
+supervisor_read(vaddr addr)
+{
+}
+
+void
+supervisor_write(vaddr addr, byte value)
+{
+}
+
+/*
+ * access the reset-time memory map
+ */
+byte
+boot_read(vaddr a)
+{
+    a &= 0xfff;
+    return rom_image[a];
+}
+
+void
+boot_write(vaddr a, byte v)
 {
 }
 
 /*
  * access memory through the memory mapping ram, with permissions checking
  */
-void
-task_read(unsigned short addr)
+unsigned char
+task_read(vaddr addr)
 {
 }
 
 void
-task_write(unsigned short addr, unsigned char value)
+task_write(vaddr addr, unsigned char value)
 {
 }
 
-void (*memwrite) (unsigned short addr, unsigned char value);
-unsigned char (*memread) (unsigned short addr);
+void (*memwrite) (vaddr addr, unsigned char value);
+unsigned char (*memread) (vaddr addr);
 
 /*
  * used by the emulator to do all translated memory operations
@@ -185,6 +272,25 @@ get_byte(unsigned short addr)
     return (*memread) (addr);
 }
 
+void
+supervisor()
+{
+    memwrite = supervisor_write;
+    memread = supervisor_read;
+}
+
+task()
+{
+    memwrite = task_write;
+    memread = task_read;
+}
+
+resetmem()
+{
+    memwrite = boot_write;
+    memread = boot_read;
+}
+
 static void
 push(unsigned short s)
 {
@@ -205,27 +311,35 @@ pop()
 inhandler input_handler[256];
 outhandler output_handler[256];
 
+byte
+undef_in(portaddr p)
+{
+    printf("input from undefined port %x\n", p);
+    return 0xff;
+}
+
+void
+undef_out(portaddr p, byte v)
+{
+    printf("output to  undefined port %x -> %x\n", p, v);
+}
+
 void
 register_input(portaddr portnum, inhandler func)
 {
+    if (func != undef_in) {
+        printf("input port %x registered\n", portnum);
+    }
     input_handler[portnum] = func;
 }
 
 void
 register_output(portaddr portnum, outhandler func)
 {
+    if (func != undef_out) {
+        printf("output port %x registered\n", portnum);
+    }
     output_handler[portnum] = func;
-}
-
-portdata
-undef_in(portaddr p)
-{
-    return 0xff;
-}
-
-void
-undef_out(portaddr p, portdata v)
-{
 }
 
 void
@@ -240,15 +354,15 @@ ioinit()
 }
 
 void
-output(portaddr p, portdata v)
+output(portaddr p, byte v)
 {
-    (*output_handler) (p, v);
+    (*output_handler[p]) (p, v);
 }
 
-portdata
+byte
 input(portaddr p)
 {
-    return (*input_handler) (p);
+    return (*input_handler[p]) (p);
 }
 
 #define MAXDRIVERS 4
@@ -341,10 +455,24 @@ main(int argc, char **argv)
     if (argc) {
         bootrom = *argv;
     } else {
-        bootrom = "MPZ80-Mon-3.73_FB34.bin";
-        bootrom = "MPZ80-Mon-3.75_0706.bin";
-        bootrom = "MPZ80-Mon-4.47_F4F6.bin";
+        bootrom = "mon447.bin";
+        load_symfile("mon447.sym");
     }
+
+    /*
+     * load the boot rom
+     */
+    fd = open(bootrom, O_RDONLY);
+    if (!fd) {
+        perror(bootrom);
+        exit(errno);
+    }
+    i = read(fd, &rom_image, sizeof(rom_image));
+    if (i < 0) {
+        perror(bootrom);
+        exit(errno);
+    }
+    close(fd);
 
     mypid = getpid();
 
@@ -377,7 +505,7 @@ main(int argc, char **argv)
             execlp("xterm", "xterm", "-e", "bash", "-c", cmd, (char *) 0);
         }
     } else {
-        ttyname = "/dev/tty";
+        ttyname = "/dev/stdout";
     }
     mytty = fopen(ttyname, "r+");
     if (!mytty) {
@@ -400,6 +528,9 @@ main(int argc, char **argv)
         fprintf(mytty, "emulating %s\n", argv[0]);
     }
 
+    ioinit();
+    resetmem();
+
     /*
      * run the driver startup hooks
      */
@@ -412,31 +543,11 @@ main(int argc, char **argv)
         }
     }
 
-    for (i = 0; i < 256; i++) {
-        if (input_handler[i]) {
-            printf("input port %x registered\n", i);
-        }
-        if (output_handler[i]) {
-            printf("output port %x registered\n", i);
-        }
-    }
- 
-    /*
-     * load the boot rom
-     */
-    fd = open(bootrom, O_RDONLY);
-    if (!fd) {
-        perror(bootrom);
-        exit(errno);
-    }
-    i = read(fd, &rom_image, sizeof(rom_image));
-    if (i < 0) {
-        perror(bootrom);
-        exit(errno);
-    }
-    close(fd);
+    dumpmem(&get_byte, 0, 256);
+
     cp = &context;
     Z80Reset(&cp->state);
+
     cp->state.pc = 0;
 
     emulate();
@@ -458,12 +569,6 @@ void
 set_alarm()
 {
     setitimer(ITIMER_REAL, &timer, 0);
-}
-
-char *
-lookup_sym(int i)
-{
-    return 0;
 }
 
 void
