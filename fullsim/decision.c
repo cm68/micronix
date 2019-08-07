@@ -65,17 +65,34 @@ MACHINE context;
 byte physmem[16*1024*1024];
 
 /*
+ * memory map
+ */
+#define LOCAL   0x400
+#define MAP     0x600
+#define EPROM   0x800
+#define FPU     0xc00
+
+/*
  * mpz80 cpu registers and local ram
  */
-byte local_ram[1024];
-byte regs[1024];
-byte eprom[1024];
-byte fpp[1024];
+byte local_ram[0x400];      // used for register save areas and map shadow  - 0x000 - 0x3ff
+byte maps[0x200];           // map registers write only                     - 0x600 - 0x7ff
+byte eprom[0x400];          // half at a time                               - 0x800 - 0xbff
+byte fpu[0x400];            // floating point processor                     - 0xc00 - 0xfff
+
+byte fpseg;
+byte fpcol;
+byte taskreg;
+byte maskreg;
+
+byte trapreg;
+byte keybreg;
+byte switchreg;
+byte trapstat;
 
 /*
  * mon4.47 and mon 3.75 both were distributed on 2732A's, which are 4kb
- * devices. the rom image file contains 2 copies of this source, assembled
- * org'd at 0x800.
+ * devices. the rom image file contains 2 copies, org'd at 0x800.
  * the monitor has 2 1k sections, both of which are assembled for 0x800-0xbff
  * the lowest is only enabled after a reset until the trap register is written
  * which then enables the high half.  kind of a waste of half the chip, but
@@ -85,14 +102,151 @@ byte fpp[1024];
  */
 byte rom_image[4096];
 
-#define FPSEG   0x400
-#define FPCOL   0x401
-#define TASK    0x402
-#define MASK    0x403
-#define TRAP    0x400
-#define KEYB    0x401
-#define SWT     0x402
-#define STAT    0x403
+/*
+ * board registers
+ */
+/* write */
+#define FPSEG   0x400       // front panel segment
+#define FPCOL   0x401       // front panel column
+#define TASK    0x402       // task register
+#define MASK    0x403       // mask register
+/* read */
+#define TRAP    0x400       // trap address register
+#define KEYB    0x401       // front panel keyboard
+#define SWT     0x402       // switch register
+#define STAT    0x403       // trap status register
+
+/*
+ * copy the appropriate half of the rom into the executable address space
+ * this is rare, so it's ok to make slow.
+ */
+void
+setrom(int page)
+{
+    static int last = 0xff;
+    if (last != page) {
+        printf("enable page %d of eprom\n", page);
+        memcpy(eprom, &rom_image[page * 0x400], 0x400);
+        last = page;
+    }
+}
+
+/*
+ * access memory through the memory mapping ram, with permissions checking
+ */
+unsigned char
+task_read(vaddr addr)
+{
+    byte taskid = taskreg & 0xf;
+    byte page = (addr & 0xf000) >> 12;
+    byte pte = (taskid << 5) + (page << 1);
+    paddr pa = ((taskreg & 0xf0) << 16) | (maps[pte] << 12) + (addr & 0xfff);
+    byte attr = maps[pte + 1];
+
+    return physmem[pa];
+}
+
+void
+task_write(vaddr addr, unsigned char value)
+{
+    byte taskid = taskreg & 0xf;
+    byte page = (addr & 0xf000) >> 12;
+    byte pte = (taskid << 5) + (page << 1);
+    paddr pa = ((taskreg & 0xf0) << 16) | (maps[pte] << 12) + (addr & 0xfff);
+    byte attr = maps[pte + 1];
+
+    physmem[pa] = value;
+}
+
+/*
+ * task 0 has the low 4k mapped to MPZ80 control and status registers
+ * otherwise, goes through mmu.
+ */
+char *rregname[] = { "trap", "keyb", "switch", "trapstat" };
+
+byte
+supervisor_read(vaddr addr)
+{
+    byte retval;
+
+    if (addr > 0x1000) {
+        retval = task_read(addr);
+    } else if (addr < LOCAL) {
+        retval = local_ram[addr];
+    } else if (addr < MAP) {
+        switch (addr) {
+        case TRAP:
+            retval = trapreg;
+            break;
+        case KEYB:
+            retval = keybreg;
+            break;
+        case SWT:
+            retval = switchreg;
+            break;
+        case STAT:
+            retval = trapstat;
+            break;
+        default:
+            printf("unknown local reg %x read\n", addr);
+            return 0;
+        }
+        printf("mpz80: read %s register %x\n", rregname[addr & 0x03], retval);
+    } else if (addr < EPROM) {
+        printf("illegal map register read\n");
+        return 0;
+    } else if (addr < FPU) {
+        retval = eprom[addr & 0x3ff];
+    } else {
+        retval = fpu[addr & 0x3ff];
+    }
+    return retval;
+}
+
+char *pattr[] = { "no access", "r/o", "execute", "full" };
+char *wregname[] = { "fpseg", "fpcol", "trap", "mask" };
+
+void
+supervisor_write(vaddr addr, byte value)
+{
+    if (addr > 0x1000) {
+        task_write(addr, value);
+        return;
+    } else if (addr < LOCAL) {
+        local_ram[addr] = value;
+    } else if (addr < MAP) {
+        switch(addr) {
+        case FPSEG:
+            break;
+        case FPCOL:
+            break;
+        case TASK:
+            setrom(1);
+            break;
+        case MASK:
+            break;
+        default:
+            printf("unknown local reg %x read\n", addr);
+            return;
+        }
+        printf("mpz80: %s write %x\n", wregname[addr & 0x3], value);
+    } else if (addr < EPROM) {
+        paddr offset = addr & 0x1ff;
+        byte task = (addr >> 5) & 0xf;
+        byte page = (addr >> 1) & 0xf;
+
+        printf("map register %x write %x task %d page %x ", addr, value, task, page);
+        if (addr & 0x01) {
+            printf("%s %s\n", value & 0x8 ? "r10" : "", pattr[value & 0x7]);
+        } else {
+            printf("physical 0x%2x000\n", value);
+        }
+    } else if (addr < FPU) {
+        printf("write to eprom\n");
+    } else {
+        fpu[addr & 0x3ff] = value;
+    }
+}
 
 /*
  * whenever a trap happens, this address is forced onto the address bus
@@ -197,47 +351,6 @@ copyin(byte *buf, paddr pa, int len)
 {
 }
 
-/*
- * task 0 has the low 4k mapped to MPZ80 control and status registers
- */
-byte
-supervisor_read(vaddr addr)
-{
-}
-
-void
-supervisor_write(vaddr addr, byte value)
-{
-}
-
-/*
- * access the reset-time memory map
- */
-byte
-boot_read(vaddr a)
-{
-    a &= 0xfff;
-    return rom_image[a];
-}
-
-void
-boot_write(vaddr a, byte v)
-{
-}
-
-/*
- * access memory through the memory mapping ram, with permissions checking
- */
-unsigned char
-task_read(vaddr addr)
-{
-}
-
-void
-task_write(vaddr addr, unsigned char value)
-{
-}
-
 void (*memwrite) (vaddr addr, unsigned char value);
 unsigned char (*memread) (vaddr addr);
 
@@ -283,12 +396,6 @@ task()
 {
     memwrite = task_write;
     memread = task_read;
-}
-
-resetmem()
-{
-    memwrite = boot_write;
-    memread = boot_read;
 }
 
 static void
@@ -529,7 +636,8 @@ main(int argc, char **argv)
     }
 
     ioinit();
-    resetmem();
+    supervisor();
+    setrom(0);
 
     /*
      * run the driver startup hooks
@@ -548,7 +656,9 @@ main(int argc, char **argv)
     cp = &context;
     Z80Reset(&cp->state);
 
-    cp->state.pc = 0;
+    // mpz80 sort of forces this at reset by unconditionally enabling
+    // the eprom and the address bits to sequence for 16 bytes
+    cp->state.pc = 0xbf0;
 
     emulate();
     exit(0);
