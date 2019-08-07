@@ -2,7 +2,7 @@ CC = gcc
 DEBUG = -g
 CFLAGS = $(DEBUG)
 
-DRIVERS=djdma.o imd.o multio.o
+DRIVERS=djdma.o imd.o multio.o hdcdma.o hdca.o
 
 all: hsim
 
@@ -21,6 +21,12 @@ multio.o: multio.c sim.h
 	$(CC) $(CFLAGS) -c $<
 
 djdma.o: djdma.c sim.h
+	$(CC) $(CFLAGS) -c $<
+
+hdcdma.o: hdcdma.c sim.h
+	$(CC) $(CFLAGS) -c $<
+
+hdca.o: hdca.c sim.h
 	$(CC) $(CFLAGS) -c $<
 
 imd: imd.c
