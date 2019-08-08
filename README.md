@@ -107,3 +107,14 @@ this github is prettily referenced in my cybernecromancy site:
 
 https://retro.zen-room.org/morrow-micronix/user-mode-simulator
 
+----------------
+
+the full decision 1 simulator is getting close to booting.
+to do:
+
+1) write the hdc-dma simulator
+2) write the trap code
+3) write the serial port simulator
+
+the memory mapping, reset and i/o abstraction are done.
+
