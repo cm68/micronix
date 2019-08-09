@@ -405,14 +405,43 @@ djexec()
     return S_NORMAL;
 }
 
+byte lowmem_save[38];
+byte bootstrap[] = {
+    0x21, 0x4a, 0x00,   //      ld hl, 004a
+    0x36, 0x00,         //      ld (hl), 0
+    0x7e,               // loop:ld a, (hl)
+    0xb7,               //      or a,a
+    0xca, 0x3d, 0x00,   //      jp z, loop
+    0xfe, 0x40,         //      cp a,0x40
+    0xc2, 0x3d, 0x00,   //      jp nz, loop
+    0xc3, 0x80, 0x00,   //      jp 80
+    0xff                //      db ff
+};
+
+/*
+ * hook up the registers and do reset processing
+ * this runs the load sector 0 to physical memory 0
+ */
 static int
 djdma_init()
 {
+    int i;
+
 	register_output(DJDMA_PORT, &pulse_djdma);
     imdp[0] = load_imd("DRIVE_A.IMD");
     if (!imdp[0]) {
         return 1;
     }
+    for (i = 0; i < 38; i++) {
+        lowmem_save[i] = physread(i);
+        physwrite(i, 0);
+    }
+    for (i = 0; i < sizeof(bootstrap); i++) {
+        physwrite(i + 0x38, bootstrap[i]);
+    }
+    imd_read(imdp[0], 0, 1, 1, 0, secbuf);
+    copyout(secbuf, 0x80, 0x80);
+    physwrite(0x4a, 0x40);
     return 0;
 }
 

@@ -351,11 +351,13 @@ load_symfile(char *s)
 byte 
 physread(paddr p)
 {
+    return physmem[p];
 }
 
 void
 physwrite(paddr p, byte v)
 {
+    physmem[p] = v;
 }
 
 /*
@@ -363,6 +365,10 @@ physwrite(paddr p, byte v)
  */
 copyout(byte *buf, paddr pa, int len)
 {
+    int i;
+    for (i = 0; i < len; i++) {
+        physwrite(pa+i, buf[i]);
+    }
 }
 
 /*
@@ -370,6 +376,10 @@ copyout(byte *buf, paddr pa, int len)
  */
 copyin(byte *buf, paddr pa, int len)
 {
+    int i;
+    for (i = 0; i < len; i++) {
+        buf[i] = physread(pa+i);
+    }
 }
 
 void (*memwrite) (vaddr addr, unsigned char value);
@@ -497,6 +507,9 @@ input(portaddr p)
     return (*input_handler[p]) (p);
 }
 
+/*
+ * these driver hooks are called at reset time
+ */
 #define MAXDRIVERS 4
 int (*startup_hook[MAXDRIVERS])();
 
@@ -688,6 +701,7 @@ main(int argc, char **argv)
         }
     }
 
+    /* presumably, this is the reset address */
     dumpmem(&get_byte, 0, 256);
 
     cp = &context;
@@ -872,6 +886,8 @@ monitor()
             s++;
         head = &breaks;
         switch (c) {
+        case 'x':
+            exit(0);
         case 'c':
             c = 1;
             while (*s && (*s == ' '))
