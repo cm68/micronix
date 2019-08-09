@@ -1,6 +1,15 @@
 /*
  * global definitions for simulator
  */
+
+/*
+ * trace flags
+ */
+#define V_IO    (1 << 0)        // trace I/O instructions
+#define V_INST  (1 << 1)        // instructions
+#define V_IOR   (1 << 2)        // trace I/O registration
+#define V_MAP   (1 << 2)        // address mapping
+
 typedef unsigned char byte;
 
 typedef unsigned long paddr;	// 24 bit physical address

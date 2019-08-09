@@ -1,4 +1,3 @@
-
 /* Morrow decision 1
  * this emulates the MPZ80
  *
@@ -30,6 +29,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <signal.h>
+#include <unistd.h>
 
 #include "sim.h"
 
@@ -46,13 +46,10 @@ static void emulate();
 
 int debug_terminal;
 int mypid;
-FILE *mytty;
-
-#define	V_IO	(1 << 0)        /* trace I/O instructions */
-#define	V_INST	(1 << 1)        /* instructions */
+char *mytty;
 
 char *vopts[] = {
-    "V_IO", "V_INST", 0
+    "V_IO", "V_INST", "V_IOR", "V_MAP", 0
 };
 
 int verbose;
@@ -80,15 +77,6 @@ byte maps[0x200];           // map registers write only                     - 0x
 byte eprom[0x400];          // half at a time                               - 0x800 - 0xbff
 byte fpu[0x400];            // floating point processor                     - 0xc00 - 0xfff
 
-byte fpseg;
-byte fpcol;
-byte taskreg;
-byte maskreg;
-
-byte trapreg;
-byte keybreg;
-byte switchreg;
-byte trapstat;
 
 /*
  * mon4.47 and mon 3.75 both were distributed on 2732A's, which are 4kb
@@ -106,14 +94,38 @@ byte rom_image[4096];
  * board registers
  */
 /* write */
+byte fpseg;
 #define FPSEG   0x400       // front panel segment
+
+byte fpcol;
 #define FPCOL   0x401       // front panel column
+
+byte taskreg;
 #define TASK    0x402       // task register
+
+byte maskreg;
 #define MASK    0x403       // mask register
+
+
 /* read */
+byte trapreg;
 #define TRAP    0x400       // trap address register
-#define KEYB    0x401       // front panel keyboard
-#define SWT     0x402       // switch register
+
+byte keybreg;
+#define KEYB    0x401       // front panel keyboard connector 12C
+#define     KB_UNUSED   0x01        // P1 - 12
+#define     KB_MON      0x02        // P1 - 13 if low, jump to monitor
+
+// this register is negated:  if the switch is on, the value reads low
+byte switchreg;
+#define SWT     0x402       // switch register board location 16D
+#define     SW_NOMON    0x04        // S6 - if high, no minotaur
+#define     SW_JUMP     0xf8        // S1 - S5 negated jump address
+#define     SW_DJDMA    0x10        // boot djdma
+#define     SW_HDDMA    0x08        // boot hdcdma
+#define     SW_HDCA     0x00        // boot hdca
+
+byte trapstat;
 #define STAT    0x403       // trap status register
 
 /*
@@ -125,7 +137,8 @@ setrom(int page)
 {
     static int last = 0xff;
     if (last != page) {
-        printf("enable page %d of eprom\n", page);
+        if (verbose & V_MAP)
+            printf("enable page %d of eprom\n", page);
         memcpy(eprom, &rom_image[page * 0x400], 0x400);
         last = page;
     }
@@ -235,11 +248,13 @@ supervisor_write(vaddr addr, byte value)
         byte task = (addr >> 5) & 0xf;
         byte page = (addr >> 1) & 0xf;
 
-        printf("map register %x write %x task %d page %x ", addr, value, task, page);
-        if (addr & 0x01) {
-            printf("%s %s\n", value & 0x8 ? "r10" : "", pattr[value & 0x7]);
-        } else {
-            printf("physical 0x%2x000\n", value);
+        if (verbose & V_MAP) {
+            printf("map register %x write %x task %d page %x ", addr, value, task, page);
+            if (addr & 0x01) {
+                printf("%s %s\n", value & 0x8 ? "r10" : "", pattr[value & 0x7]);
+            } else {
+                printf("physical 0x%2x000\n", value);
+            }
         }
     } else if (addr < FPU) {
         printf("write to eprom\n");
@@ -260,16 +275,22 @@ struct MACHINE *cp;
 int stop[10];
 
 void
+stop_cpu()
+{
+    breakpoint = 1;
+}
+
+void
 stop_handler()
 {
-    fprintf(mytty, "breakpoint signal\n");
+    printf("breakpoint signal\n");
     breakpoint = 1;
 }
 
 void
 pid()
 {
-    fprintf(mytty, "%d: ", mypid);
+    printf("%d: ", mypid);
 }
 
 unsigned short
@@ -422,12 +443,14 @@ byte
 undef_in(portaddr p)
 {
     printf("input from undefined port %x\n", p);
+    stop_cpu();
     return 0xff;
 }
 
 void
 undef_out(portaddr p, byte v)
 {
+    stop_cpu();
     printf("output to  undefined port %x -> %x\n", p, v);
 }
 
@@ -435,7 +458,8 @@ void
 register_input(portaddr portnum, inhandler func)
 {
     if (func != undef_in) {
-        printf("input port %x registered\n", portnum);
+        if (verbose & V_IOR)
+            printf("input port %x registered\n", portnum);
     }
     input_handler[portnum] = func;
 }
@@ -444,7 +468,8 @@ void
 register_output(portaddr portnum, outhandler func)
 {
     if (func != undef_out) {
-        printf("output port %x registered\n", portnum);
+        if (verbose & V_IOR)
+            printf("output port %x registered\n", portnum);
     }
     output_handler[portnum] = func;
 }
@@ -515,7 +540,7 @@ main(int argc, char **argv)
     char *s;
     char **argvec;
     int i;
-    char *ttyname;
+    char *ptyname;
     char *bootrom;
     int fd;
 
@@ -582,6 +607,7 @@ main(int argc, char **argv)
     close(fd);
 
     mypid = getpid();
+    mytty = strdup(ttyname(0));
 
     /*
      * we might be piping the simulator.  let's get an open file for our debug 
@@ -598,47 +624,58 @@ main(int argc, char **argv)
         int pipefd[2];
 
         pipe(pipefd);
+        // we need to capture the tty name so we can send output to it
         sprintf(cmd,
             "tty > /proc/%d/fd/%d ; while test -d /proc/%d ; do sleep 1 ; done",
             mypid, pipefd[1], mypid);
-        if (fork()) {
-            ttyname = malloc(100);
-            i = read(pipefd[0], ttyname, 100);
-            if (i == -1) {
-                perror("pipe");
-            }
-            ttyname[strlen(ttyname) - 1] = 0;
-        } else {
-            execlp("xterm", "xterm", "-e", "bash", "-c", cmd, (char *) 0);
+        if (!fork()) {
+            execlp("xterm", "xterm", "-fn", "8x13", "-e", "bash", "-c", cmd, (char *) 0);
         }
-    } else {
-        ttyname = "/dev/stdout";
+        ptyname = malloc(100);
+        i = read(pipefd[0], ptyname, 100);
+        if (i == -1) {
+            perror("pipe");
+        }
+        // build a filename, null terminated at the newline
+        ptyname[i] = 0;
+        for (i = 0; i < strlen(ptyname); i++) {
+            if (ptyname[i] == '\n') {
+                ptyname[i] = 0;
+                break;
+            }
+        }
+        stdout = freopen(ptyname, "r+", stdout);
+        stdin = freopen(ptyname, "r+", stdin);
+        if (!stdout) {
+            fprintf(stderr, "freopen of %s as stdout failed %d\n", ptyname, errno);
+            exit(0);
+        }
+        if (!stdin) {
+            fprintf(stdin, "freopen of %s as stdin failed %d\n", ptyname, errno);
+            exit(0);
+        }
     }
-    mytty = fopen(ttyname, "r+");
-    if (!mytty) {
-        perror(ttyname);
-        exit(errno);
-    }
-    dup2(fileno(mytty), TTY_FD);
-    mytty = fdopen(TTY_FD, "r+");
-    setvbuf(mytty, 0, _IOLBF, 0);
-    signal(SIGUSR1, stop_handler);
 
     if (verbose) {
-        fprintf(mytty, "verbose %x ", verbose);
+        printf("verbose %x ", verbose);
         for (i = 0; vopts[i]; i++) {
             if (verbose & (1 << i)) {
-                fprintf(mytty, "%s ", vopts[i]);
+                printf("%s ", vopts[i]);
             }
         }
-        fprintf(mytty, "\n");
-        fprintf(mytty, "emulating %s\n", argv[0]);
+        printf("\n");
+        printf("emulating %s\n", argv[0]);
     }
 
+    signal(SIGUSR1, stop_handler);
     ioinit();
     supervisor();
     setrom(0);
 
+    // set diagnostic, monitor or boot mode
+    switchreg = SW_DJDMA;
+    keybreg = 0xff;
+     
     /*
      * run the driver startup hooks
      */
@@ -695,9 +732,9 @@ dumpcpu()
     format_instr(cp->state.pc, outbuf, &get_byte, &lookup_sym, &reloc);
     s = lookup_sym(cp->state.pc);
     if (s) {
-        fprintf(mytty, "%s\n", s);
+        printf("%s\n", s);
     }
-    fprintf(mytty, "%04x: %-20s ", cp->state.pc, outbuf);
+    printf("%04x: %-20s ", cp->state.pc, outbuf);
 
     f = cp->state.registers.byte[Z80_F];
 
@@ -716,7 +753,7 @@ dumpcpu()
     if (f & Z80_C_FLAG)
         fbuf[6] = 'S';
 
-    fprintf(mytty,
+    printf(
         " %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x\n",
         fbuf,
         cp->state.registers.byte[Z80_A],
@@ -783,6 +820,27 @@ point_at(struct point **head, unsigned short addr, struct point **pp)
 
 int lastaddr = -1;
 
+/*
+ * read a complete command from the terminal
+ * this hides the line buffering stuff that might be happening, and iterates until we get
+ * a newline
+ */
+void
+read_commandline(char *s)
+{
+    char c;
+    int i;
+
+    while (1) {
+        i = fread(&c, 1, 1, stdin);
+        *s++ = c;
+        if (c == '\n') {
+            *s = 0;
+            return; 
+        }
+    }
+}
+
 int
 monitor()
 {
@@ -796,12 +854,20 @@ monitor()
 
     while (1) {
       more:
-        fprintf(mytty, "%d >>> ", mypid);
-        s = fgets(cmdline, sizeof(cmdline), mytty);
+        printf("%d >>> ", mypid);
+        
+        read_commandline(cmdline);
+        s = cmdline;
+        // if there is anything there, null terminate it
         if (*s) {
             s[strlen(s) - 1] = 0;
         }
+        // skip whitespace
+        while (*s && (*s == ' '))
+            s++;
+        // get the command character
         c = *s++;
+        // skip whitespace
         while (*s && (*s == ' '))
             s++;
         head = &breaks;
@@ -813,10 +879,10 @@ monitor()
             if (!*s) {
                 for (i = 0; i < sizeof(stop); i++) {
                     if ((i % 16) == 0)
-                        fprintf(mytty, "\n%02d: ", i);
-                    fprintf(mytty, "%03d ", stop[i]);
+                        printf("\n%02d: ", i);
+                    printf("%03d ", stop[i]);
                 }
-                fprintf(mytty, "\n");
+                printf("\n");
             }
             if (*s == '-') {
                 s++;
@@ -866,9 +932,9 @@ monitor()
                 c = format_instr(i, cmdline, &get_byte, &lookup_sym, &reloc);
                 s = lookup_sym(i);
                 if (s) {
-                    fprintf(mytty, "%s\n", s);
+                    printf("%s\n", s);
                 }
-                fprintf(mytty, "%04x: %-20s\n", i, cmdline);
+                printf("%04x: %-20s\n", i, cmdline);
                 i += c;
                 lastaddr = i & 0xfff;
             }
@@ -920,26 +986,26 @@ monitor()
                     }
                 } else {
                     for (p = *head; p; p = p->next) {
-                        fprintf(mytty, "%04x\n", p->addr);
+                        printf("%04x\n", p->addr);
                     }
                 }
             }
             break;
         case '?':
         case 'h':
-            fprintf(mytty, "commands:\n");
-            fprintf(mytty, "l <addr> :list\n");
-            fprintf(mytty, "d <addr> :dump memory\n");
-            fprintf(mytty, "r dump cpu state\n");
-            fprintf(mytty, "g: continue\n");
-            fprintf(mytty, "s: single step\n");
-            fprintf(mytty, "q: exit\n");
-            fprintf(mytty, "b [-] <nnnn> ... :breakpoint\n");
-            fprintf(mytty, "w [-] <nnnn> ... :watchpoint\n");
-            fprintf(mytty, "c [-] <nn> :system call trace\n");
+            printf("commands:\n");
+            printf("l <addr> :list\n");
+            printf("d <addr> :dump memory\n");
+            printf("r dump cpu state\n");
+            printf("g: continue\n");
+            printf("s: single step\n");
+            printf("q: exit\n");
+            printf("b [-] <nnnn> ... :breakpoint\n");
+            printf("w [-] <nnnn> ... :watchpoint\n");
+            printf("c [-] <nn> :system call trace\n");
             break;
         default:
-            fprintf(mytty, "unknown command %c\n", c);
+            printf("unknown command %c\n", c);
             break;
         case 0:
             break;
@@ -963,7 +1029,7 @@ emulate()
         if (point_at(&breaks, cp->state.pc, 0)) {
             if (point_at(&breaks, cp->state.pc, 0)) {
                 pid();
-                fprintf(mytty, "break at %04x\n", cp->state.pc);
+                printf("break at %04x\n", cp->state.pc);
             }
             breakpoint = 1;
         }
@@ -997,9 +1063,9 @@ dp()
         c = pchars[i];
         if ((c <= 0x20) || (c >= 0x7f))
             c = '.';
-        fprintf(mytty, "%c", c);
+        printf("%c", c);
     }
-    fprintf(mytty, "\n");
+    printf("\n");
 }
 
 void
@@ -1011,8 +1077,8 @@ dumpmem(unsigned char (*readbyte) (int addr), int addr, int len)
 
     while (len) {
         if (pcol == 0)
-            fprintf(mytty, "%04x: ", addr);
-        fprintf(mytty, "%02x ", pchars[pcol] = (*readbyte) (addr++));
+            printf("%04x: ", addr);
+        printf("%02x ", pchars[pcol] = (*readbyte) (addr++));
         len--;
         if (pcol++ == 15) {
             dp();
@@ -1021,7 +1087,7 @@ dumpmem(unsigned char (*readbyte) (int addr), int addr, int len)
     }
     if (pcol != 0) {
         for (i = pcol; i < 16; i++)
-            fprintf(mytty, "   ");
+            printf("   ");
         dp();
     }
 }
