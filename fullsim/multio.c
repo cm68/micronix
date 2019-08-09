@@ -131,7 +131,7 @@ rd_linestat(portaddr p)
     }
 
     retval = LSR_TBE | (bytes ? LSR_DR : 0);
-    printf("multio: read linestat %x\n", retval);
+    // printf("multio: read linestat %x\n", retval);
     return retval;
 }
 
@@ -246,17 +246,27 @@ psend(char *s)
 }
 
 extern char *mytty;
+static struct termios original_tio;
+
+static void
+exit_hook()
+{
+    tcsetattr(terminal_fd, TCSANOW, &original_tio);
+}
 
 static int
 multio_init()
 {
     struct termios tio;
 
+    atexit(exit_hook);
+
     terminal_fd = open(mytty, O_RDWR);
     if (terminal_fd == -1) {
         perror("terminal");
     }
 
+    tcgetattr(terminal_fd, &original_tio);
     tcgetattr(terminal_fd, &tio);
     cfmakeraw(&tio);
     tcsetattr(terminal_fd, TCSANOW, &tio);
