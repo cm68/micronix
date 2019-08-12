@@ -42,14 +42,14 @@ typedef unsigned short UINT;
 #define MAXIMUM_STRING_LENGTH   100
 
 extern void dumpmem(unsigned char (*get) (int a), int addr, int len);
-static void emulate();
+static void emulate_z80();
 
 int debug_terminal;
 int mypid;
 char *mytty;
 
 char *vopts[] = {
-    "V_IO", "V_INST", "V_IOR", "V_MAP", 0
+    "V_IO", "V_INST", "V_IOR", "V_MAP", "V_DJDMA", "V_MIO", "V_HDCA", "V_MPZ", "V_IMD", 0
 };
 
 int verbose;
@@ -100,6 +100,8 @@ byte fpseg;
 byte fpcol;
 #define FPCOL   0x401       // front panel column
 
+byte taskctr;               // countdown for context switch
+byte next_taskreg;          // taskreg after countdown
 byte taskreg;
 #define TASK    0x402       // task register
 
@@ -144,46 +146,56 @@ setrom(int page)
     }
 }
 
-/*
- * access memory through the memory mapping ram, with permissions checking
- */
-unsigned char
-task_read(vaddr addr)
-{
-    byte taskid = taskreg & 0xf;
-    byte page = (addr & 0xf000) >> 12;
-    byte pte = (taskid << 5) + (page << 1);
-    paddr pa = ((taskreg & 0xf0) << 16) | (maps[pte] << 12) + (addr & 0xfff);
-    byte attr = maps[pte + 1];
-
-    return physmem[pa];
-}
-
-void
-task_write(vaddr addr, unsigned char value)
-{
-    byte taskid = taskreg & 0xf;
-    byte page = (addr & 0xf000) >> 12;
-    byte pte = (taskid << 5) + (page << 1);
-    paddr pa = ((taskreg & 0xf0) << 16) | (maps[pte] << 12) + (addr & 0xfff);
-    byte attr = maps[pte + 1];
-
-    physmem[pa] = value;
-}
-
-/*
- * task 0 has the low 4k mapped to MPZ80 control and status registers
- * otherwise, goes through mmu.
- */
 char *rregname[] = { "trap", "keyb", "switch", "trapstat" };
 
-byte
-supervisor_read(vaddr addr)
+void
+printmap(int task)
 {
-    byte retval;
+    int i;
+    
+    task &= 0xf;
+    for (i = 0; i < 16; i++) {
+        printf("0x%04x 0x%06x\n", i << 12, 
+            maps[(task * 32) + (i << 1)] << 12);
+    }
+}
 
-    if (addr > 0x1000) {
-        retval = task_read(addr);
+unsigned char
+memread(vaddr addr)
+{
+    byte taskid;
+    byte page;
+    byte pte;
+    paddr pa;
+    byte attr;
+    byte retval;
+    static vaddr lastfetch = 0;
+
+    // the task register starts a countdown for instruction fetches
+    if (taskctr != 0) {
+        // only count m1 cycles
+        if (addr == context.state.pc) {
+            // the emulator reads the instruction twice sometimes!
+            if (lastfetch != addr) {
+                if (verbose & V_MPZ) printf("taskctr decrement %x\n", addr);
+                taskctr--;
+                lastfetch = addr;
+            }
+        }
+        if (taskctr == 0) {
+            if (verbose & V_MPZ) printf("switching taskreg\n");
+            taskreg = next_taskreg;
+        }
+    }
+
+    taskid = taskreg & 0xf;
+    page = (addr & 0xf000) >> 12;
+    pte = (taskid << 5) + (page << 1);
+    pa = ((taskreg & 0xf0) << 16) | (maps[pte] << 12) + (addr & 0xfff);
+    attr = maps[pte + 1];
+
+    if ((taskid != 0) || (addr > 0x1000)) {
+        retval = physmem[pa];
     } else if (addr < LOCAL) {
         retval = local_ram[addr];
     } else if (addr < MAP) {
@@ -201,12 +213,12 @@ supervisor_read(vaddr addr)
             retval = trapstat;
             break;
         default:
-            printf("unknown local reg %x read\n", addr);
+            if (verbose & V_MPZ) printf("unknown local reg %x read\n", addr);
             return 0;
         }
-        printf("mpz80: read %s register %x\n", rregname[addr & 0x03], retval);
+        if (verbose & V_MPZ) printf("mpz80: read %s register %x\n", rregname[addr & 0x03], retval);
     } else if (addr < EPROM) {
-        printf("illegal map register read\n");
+        if (verbose & V_MPZ) printf("illegal map register read\n");
         return 0;
     } else if (addr < FPU) {
         retval = eprom[addr & 0x3ff];
@@ -220,14 +232,29 @@ char *pattr[] = { "no access", "r/o", "execute", "full" };
 char *wregname[] = { "fpseg", "fpcol", "trap", "mask" };
 
 void
-supervisor_write(vaddr addr, byte value)
+memwrite(vaddr addr, unsigned char value)
 {
-    if (addr > 0x1000) {
-        task_write(addr, value);
+    byte taskid = taskreg & 0xf;
+    byte page = (addr & 0xf000) >> 12;
+    byte pte = (taskid << 5) + (page << 1);
+    paddr pa = ((taskreg & 0xf0) << 16) | (maps[pte] << 12) + (addr & 0xfff);
+    byte attr = maps[pte + 1];
+
+    // access to physical memory through mapping ram
+    if ((taskid != 0) || (addr > 0x1000)) {
+        physmem[pa] = value;
         return;
-    } else if (addr < LOCAL) {
+    }
+
+    // access to 1k on-board ram
+    if (addr < LOCAL) {
         local_ram[addr] = value;
-    } else if (addr < MAP) {
+        return;
+
+    }
+
+    // access to local I/O registers
+    if (addr < MAP) {
         switch(addr) {
         case FPSEG:
             break;
@@ -235,15 +262,21 @@ supervisor_write(vaddr addr, byte value)
             break;
         case TASK:
             setrom(1);
+            taskctr = 7;
+            next_taskreg = value;
             break;
         case MASK:
             break;
         default:
-            printf("unknown local reg %x read\n", addr);
+            if (verbose & V_MPZ) printf("unknown local reg %x read\n", addr);
             return;
         }
-        printf("mpz80: %s write %x\n", wregname[addr & 0x3], value);
-    } else if (addr < EPROM) {
+        if (verbose & V_MPZ) printf("mpz80: %s write %x\n", wregname[addr & 0x3], value);
+        return;
+    }
+
+    // access to mapping ram
+    if (addr < EPROM) {
         paddr offset = addr & 0x1ff;
         byte task = (addr >> 5) & 0xf;
         byte page = (addr >> 1) & 0xf;
@@ -256,11 +289,18 @@ supervisor_write(vaddr addr, byte value)
                 printf("physical 0x%2x000\n", value);
             }
         }
-    } else if (addr < FPU) {
-        printf("write to eprom\n");
-    } else {
-        fpu[addr & 0x3ff] = value;
+        maps[offset] = value;
+        return;
+
     }
+    // write to eprom ?!
+    if (addr < FPU) {
+        if (verbose & V_MPZ) printf("write to eprom\n");
+        return;
+    }
+
+    // write to fpu registers
+    fpu[addr & 0x3ff] = value;
 }
 
 /*
@@ -382,9 +422,6 @@ copyin(byte *buf, paddr pa, int len)
     }
 }
 
-void (*memwrite) (vaddr addr, unsigned char value);
-unsigned char (*memread) (vaddr addr);
-
 /*
  * used by the emulator to do all translated memory operations
  * this code could break the emulation flow, depending on permissions
@@ -394,39 +431,26 @@ unsigned char (*memread) (vaddr addr);
 void
 put_word(unsigned short addr, unsigned short value)
 {
-    (*memwrite) (addr, value);
-    (*memwrite) (addr + 1, value >> 8);
+    memwrite(addr, value);
+    memwrite(addr + 1, value >> 8);
 }
 
 void
 put_byte(unsigned short addr, unsigned char value)
 {
-    (*memwrite) (addr, value);
+    memwrite(addr, value);
 }
 
 unsigned short
 get_word(unsigned short addr)
 {
-    return ((*memread) (addr) + ((*memread) (addr + 1) << 8));
+    return memread(addr) + (memread(addr + 1) << 8);
 }
 
 unsigned char
 get_byte(unsigned short addr)
 {
-    return (*memread) (addr);
-}
-
-void
-supervisor()
-{
-    memwrite = supervisor_write;
-    memread = supervisor_read;
-}
-
-task()
-{
-    memwrite = task_write;
-    memread = task_read;
+    return memread(addr);
 }
 
 static void
@@ -537,6 +561,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "%s", complaint);
     fprintf(stderr, "usage: %s [<options>] [program [<program options>]]\n",
         p);
+    fprintf(stderr, "\t-d\t<drive file>\n");
     fprintf(stderr, "\t-t\topen a debug terminal window\n");
     fprintf(stderr, "\t-b\t\tstart with breakpoint\n");
     fprintf(stderr, "\t-v <verbosity>\n");
@@ -545,6 +570,8 @@ usage(char *complaint, char *p)
     }
     exit(1);
 }
+
+char *boot_drive = "DRIVE_A.IMD";
 
 int
 main(int argc, char **argv)
@@ -578,6 +605,12 @@ main(int argc, char **argv)
             switch (*s++) {
             case 't':
                 debug_terminal = 1;
+                break;
+            case 'd':
+                if (!argc--) {
+                    usage("drive file\n", progname);
+                }
+                boot_drive = strdup(*argv++);
                 break;
             case 'v':
                 if (!argc--) {
@@ -682,7 +715,7 @@ main(int argc, char **argv)
 
     signal(SIGUSR1, stop_handler);
     ioinit();
-    supervisor();
+    taskreg = 0;
     setrom(0);
 
     // set diagnostic, monitor or boot mode
@@ -702,7 +735,7 @@ main(int argc, char **argv)
     }
 
     /* presumably, this is the reset address */
-    dumpmem(&get_byte, 0, 256);
+    // dumpmem(&get_byte, 0, 256);
 
     cp = &context;
     Z80Reset(&cp->state);
@@ -711,7 +744,7 @@ main(int argc, char **argv)
     // the eprom and the address bits to sequence for 16 bytes
     cp->state.pc = 0xbf0;
 
-    emulate();
+    emulate_z80();
     exit(0);
 }
 
@@ -917,6 +950,16 @@ monitor()
                 }
             }
             break;
+        case 'm':
+            while (*s && (*s == ' '))
+                s++;
+            if (*s) {
+                i = strtol(s, &s, 16);
+            } else {
+                i = taskreg & 0xf;
+            }
+            printmap(i);
+            break;
         case 'd':
             while (*s && (*s == ' '))
                 s++;
@@ -1033,7 +1076,7 @@ monitor()
  * this is the cpu emulator for the MPZ80
  */
 static void
-emulate()
+emulate_z80()
 {
     unsigned char *ip;
     int i;
@@ -1080,6 +1123,7 @@ dp()
         if ((c <= 0x20) || (c >= 0x7f))
             c = '.';
         printf("%c", c);
+        if ((i % 4) == 3) { printf(" "); }
     }
     printf("\n");
 }
@@ -1095,6 +1139,7 @@ dumpmem(unsigned char (*readbyte) (int addr), int addr, int len)
         if (pcol == 0)
             printf("%04x: ", addr);
         printf("%02x ", pchars[pcol] = (*readbyte) (addr++));
+        if ((pcol % 4) == 3) { printf(" "); }
         len--;
         if (pcol++ == 15) {
             dp();

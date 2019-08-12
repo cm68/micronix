@@ -29,11 +29,12 @@ hdcdma.o: hdcdma.c sim.h
 hdca.o: hdca.c sim.h
 	$(CC) $(CFLAGS) -c $<
 
-imd: imd.c
+imd: imd.c sim.h
 	$(CC) $(CFLAGS) -o imd imd.c
 
 hsim: decision.o z80emu.o $(DRIVERS) ../src/sgs/z80dis.o
 	$(CC) $(DEBUG) -o hsim decision.o z80emu.o $(DRIVERS) ../src/sgs/z80dis.o
+	pkill hsim
 
 
 clean:

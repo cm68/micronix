@@ -76,10 +76,12 @@ static const int OVERFLOW_TABLE[4] = {
 
 };
 
+#ifdef notdef
 static int	emulate (Z80_STATE * state, 
 			int opcode,
 			int elapsed_cycles, int number_cycles,
 			void *context);
+#endif
 
 void Z80Reset (Z80_STATE *state)
 {
@@ -150,6 +152,7 @@ void Z80Reset (Z80_STATE *state)
         state->fd_register_table[14] = &state->registers.word[Z80_IY];        
 }
 
+#ifdef notdef
 int Z80Interrupt (Z80_STATE *state, int data_on_bus, void *context)
 {
         state->status = 0;
@@ -230,45 +233,30 @@ int Z80NonMaskableInterrupt (Z80_STATE *state, void *context)
         
         return elapsed_cycles + 11;
 }
+#endif
 
-int Z80Emulate (Z80_STATE *state, int number_cycles, void *context)
+int 
+Z80Emulate (Z80_STATE *state, int number_cycles, void *context)
 {
-        int     elapsed_cycles, pc, opcode;
+        int     elapsed_cycles;
+	int	pc;
+	int	opcode;
+        int	r;
 
-        state->status = 0;
+	state->status = 0;
 	elapsed_cycles = 0;
-	pc = state->pc;
-        Z80_FETCH_BYTE(pc, opcode);
-        state->pc = pc + 1;
-
-        return emulate(state, opcode, elapsed_cycles, number_cycles, context);
-}
-
-/* Actual emulation function. opcode is the first opcode to emulate, this is 
- * needed by Z80Interrupt() for interrupt mode 0.
- */
-
-static int emulate (Z80_STATE * state, 
-	int opcode, 
-	int elapsed_cycles, int number_cycles, 
-	void *context)
-{
-        int	pc, r;
 
         pc = state->pc;
         r = state->r & 0x7f;
-        goto start_emulation;
 
         for ( ; ; ) {   
+//		check for interrupt here and process accordingly
 
                 void    **registers; 
                 int     instruction;
 
                 Z80_FETCH_BYTE(pc, opcode);
                 pc++;
-
-start_emulation:                
-
                 registers = state->register_table;
 
 emulate_next_opcode:
