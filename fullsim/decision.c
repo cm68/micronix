@@ -355,6 +355,20 @@ add_sym(char *name, vaddr v)
     s->value = v;
 }
 
+int
+find_symbol(char *ls)
+{
+    struct sym *s = syms;
+
+    while (s) {
+        if (strcasecmp(s->name, ls) == 0) {
+            return (s->value);
+        }
+        s = s->next;
+    }
+    return -1;
+}
+
 char *
 lookup_sym(unsigned short addr)
 {
@@ -375,10 +389,21 @@ load_symfile(char *s)
     FILE *sf;
     int v;
     char namebuf[20];
+    char kbuf[20];
+    char linebuf[100];
 
     sf = fopen(s, "r");
     if (!sf) return;
-    while (fscanf(sf, "%x %s", &v, namebuf) == 2) {
+    while (1) {
+        if (fgets(linebuf, sizeof(linebuf), sf) == 0) {
+            break;
+        }
+        if (sscanf(linebuf, "%s %s 0x%x", kbuf, namebuf, &v) != 3) {
+            if (sscanf(linebuf, "%x %s", &v, namebuf) != 2) {
+                break;
+            }
+        }
+        printf("adding symbol %s : %x\n", namebuf, v);
         add_sym(namebuf, v);
     }
     fclose(sf);
@@ -598,6 +623,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "usage: %s [<options>] [program [<program options>]]\n",
         p);
     fprintf(stderr, "\t-d\t<drive file>\n");
+    fprintf(stderr, "\t-d\t<symbol file>\n");
     fprintf(stderr, "\t-t\topen a debug terminal window\n");
     fprintf(stderr, "\t-b\t\tstart with breakpoint\n");
     fprintf(stderr, "\t-v <verbosity>\n");
@@ -608,6 +634,7 @@ usage(char *complaint, char *p)
 }
 
 char *boot_drive = "DRIVE_A.IMD";
+char *symfile;
 
 int
 main(int argc, char **argv)
@@ -648,6 +675,12 @@ main(int argc, char **argv)
                 }
                 boot_drive = strdup(*argv++);
                 break;
+            case 's':
+                if (!argc--) {
+                    usage("symfile\n", progname);
+                }
+                symfile = strdup(*argv++);
+                break;
             case 'v':
                 if (!argc--) {
                     usage("verbosity not specified \n", progname);
@@ -670,7 +703,8 @@ main(int argc, char **argv)
         bootrom = *argv;
     } else {
         bootrom = "mon447.bin";
-        load_symfile("mon447.sym");
+        if (!symfile)
+            symfile = "mon447.sym";
     }
 
     /*
@@ -711,7 +745,7 @@ main(int argc, char **argv)
             "tty > /proc/%d/fd/%d ; while test -d /proc/%d ; do sleep 1 ; done",
             mypid, pipefd[1], mypid);
         if (!fork()) {
-            execlp("xterm", "xterm", "-fn", "8x13", "-e", "bash", "-c", cmd, (char *) 0);
+            execlp("xterm", "xterm", "-geometry", "120x40", "-fn", "8x13", "-e", "bash", "-c", cmd, (char *) 0);
         }
         ptyname = malloc(100);
         i = read(pipefd[0], ptyname, 100);
@@ -755,7 +789,7 @@ main(int argc, char **argv)
     setrom(0);
 
     // set diagnostic, monitor or boot mode
-    switchreg = SW_DJDMA; // | SW_NOMON;
+    switchreg = SW_DJDMA | SW_NOMON;
     keybreg = 0;
 
     /*
@@ -773,6 +807,7 @@ main(int argc, char **argv)
     /* presumably, this is the reset address */
     // dumpmem(&get_byte, 0, 256);
 
+    load_symfile(symfile);
     cp = &context;
     Z80Reset(&cp->state);
 
@@ -924,6 +959,32 @@ read_commandline(char *s)
     }
 }
 
+void
+skipwhite(char **s)
+{
+    while (**s && **s == ' ') {
+        (*s)++;
+    }
+}
+
+int
+getaddress(char **s)
+{
+    char wordbuf[20];
+    char *wp;
+    int i = -1;
+
+    wp = wordbuf;
+    while (**s && **s != ' ') {
+        *wp++ = *(*s)++;
+        *wp = 0;
+    }
+    if ((i = find_symbol(wordbuf)) == -1) {
+        i = strtol(wordbuf, &wp, 16);
+    }
+    return i;
+}
+
 int
 monitor()
 {
@@ -945,22 +1006,16 @@ monitor()
         if (*s) {
             s[strlen(s) - 1] = 0;
         }
-        // skip whitespace
-        while (*s && (*s == ' '))
-            s++;
+        skipwhite(&s);
         // get the command character
         c = *s++;
         // skip whitespace
-        while (*s && (*s == ' '))
-            s++;
+        skipwhite(&s);
         head = &breaks;
         switch (c) {
-        case 'x':
-            exit(0);
-        case 'c':
+        case 'c':                   // system call trace
             c = 1;
-            while (*s && (*s == ' '))
-                s++;
+            skipwhite(&s);
             if (!*s) {
                 for (i = 0; i < sizeof(stop); i++) {
                     if ((i % 16) == 0)
@@ -986,9 +1041,8 @@ monitor()
                 }
             }
             break;
-        case 'm':
-            while (*s && (*s == ' '))
-                s++;
+        case 'm':                   // dump map
+            skipwhite(&s);
             if (*s) {
                 i = strtol(s, &s, 16);
             } else {
@@ -996,11 +1050,10 @@ monitor()
             }
             printmap(i);
             break;
-        case 'd':
-            while (*s && (*s == ' '))
-                s++;
+        case 'd':                   // dump memory
+            skipwhite(&s);
             if (*s) {
-                i = strtol(s, &s, 16);
+                i = getaddress(&s);
             } else {
                 if (lastaddr == -1) {
                     i = cp->state.registers.word[Z80_SP];
@@ -1011,11 +1064,10 @@ monitor()
             dumpmem(&get_byte, i, 256);
             lastaddr = (i + 256) & 0xfff;
             break;
-        case 'l':
-            while (*s && (*s == ' '))
-                s++;
+        case 'l':                   // list
+            skipwhite(&s);
             if (*s) {
-                i = strtol(s, &s, 16);
+                i = getaddress(&s);
             } else {
                 if (lastaddr == -1) {
                     i = cp->state.pc;
@@ -1031,20 +1083,21 @@ monitor()
                 }
                 printf("%04x: %-20s\n", i, cmdline);
                 i += c;
-                lastaddr = i & 0xfff;
+                lastaddr = i & 0xffff;
             }
             break;
-        case 'r':
+        case 'r':               // dump registers
             dumpcpu();
             break;
         case 's':
-            dumpcpu();
-            return (1);
+            return (1);         // single step
         case 'g':
             return (0);
+        case 'x':               // exit
         case 'q':
             exit(1);
             return (0);
+        // watchpoint and breakpoint
         case 'w':              /* w [-] <addr> <addr> ... */
             head = &watches;
         case 'b':              /* b [-] <addr> <addr> ... */
@@ -1055,7 +1108,8 @@ monitor()
                 delete = 1;
             }
             while (*s) {
-                i = strtol(s, &s, 16);
+                skipwhite(&s);
+                i = getaddress(&s);
                 p = point_at(head, i, &prev);
                 if (p && delete) {
                     if (prev) {
@@ -1081,7 +1135,12 @@ monitor()
                     }
                 } else {
                     for (p = *head; p; p = p->next) {
-                        printf("%04x\n", p->addr);
+                        s = lookup_sym(p->addr);
+                        if (s) {
+                            printf("%04x %s\n", p->addr, s);
+                        } else {
+                            printf("%04x\n", p->addr);
+                        }
                     }
                 }
             }
@@ -1092,8 +1151,10 @@ monitor()
             printf("l <addr> :list\n");
             printf("d <addr> :dump memory\n");
             printf("r dump cpu state\n");
+            printf("m [taskid] : dump mapping\n");
             printf("g: continue\n");
             printf("s: single step\n");
+            printf("x: exit\n");
             printf("q: exit\n");
             printf("b [-] <nnnn> ... :breakpoint\n");
             printf("w [-] <nnnn> ... :watchpoint\n");
@@ -1141,6 +1202,7 @@ emulate_z80()
             breakpoint = 1;
         }
         if (breakpoint) {
+            dumpcpu();
             breakpoint = monitor();
         }
         if (verbose & V_INST) {
