@@ -49,7 +49,7 @@ int mypid;
 char *mytty;
 
 char *vopts[] = {
-    "V_IO", "V_INST", "V_IOR", "V_MAP", "V_DJDMA", "V_MIO", "V_HDCA", "V_MPZ", "V_IMD", 0
+    "V_IO", "V_INST", "V_IOR", "V_MAP", "V_DJDMA", "V_MIO", "V_HDCA", "V_MPZ", "V_IMD", "V_BIO", 0
 };
 
 int verbose;
@@ -154,6 +154,7 @@ printmap(int task)
     int i;
     
     task &= 0xf;
+    printf("task %d map\n", task);
     for (i = 0; i < 16; i++) {
         printf("0x%04x 0x%06x\n", i << 12, 
             maps[(task * 32) + (i << 1)] << 12);
@@ -230,7 +231,6 @@ memread(vaddr addr)
 
 char *pattr[] = { "no access", "r/o", "execute", "full" };
 char *wregname[] = { "fpseg", "fpcol", "trap", "mask" };
-
 void
 memwrite(vaddr addr, unsigned char value)
 {
@@ -250,7 +250,6 @@ memwrite(vaddr addr, unsigned char value)
     if (addr < LOCAL) {
         local_ram[addr] = value;
         return;
-
     }
 
     // access to local I/O registers
@@ -262,7 +261,7 @@ memwrite(vaddr addr, unsigned char value)
             break;
         case TASK:
             setrom(1);
-            taskctr = 7;
+            taskctr = 8;
             next_taskreg = value;
             break;
         case MASK:
@@ -572,6 +571,24 @@ register_poll_hook(void (*func)())
     exit(2);
 }
 
+char patspace[100];
+
+char *
+bitdef(byte v, char**defs)
+{
+    int i;
+
+    patspace[0] = 0;
+
+    for (i = 0; i < 8; i++) {
+        if ((v & (1 << i)) && defs[i]) {
+            strcat(patspace, defs[i]);
+            strcat(patspace, " ");
+        }
+    }
+    return patspace;
+}
+
 void
 usage(char *complaint, char *p)
 {
@@ -738,8 +755,8 @@ main(int argc, char **argv)
     setrom(0);
 
     // set diagnostic, monitor or boot mode
-    switchreg = SW_DJDMA;
-    keybreg = 0xff;
+    switchreg = SW_DJDMA; // | SW_NOMON;
+    keybreg = 0;
 
     /*
      * run the driver startup hooks
