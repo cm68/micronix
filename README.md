@@ -109,12 +109,18 @@ https://retro.zen-room.org/morrow-micronix/user-mode-simulator
 
 ----------------
 
-the full decision 1 simulator is getting close to booting.
+the full decision 1 simulator is getting close to running.
+
+cp/m boots the dj-dma images, but with some wierdness reporting
+empty sectors as bad directory entries.  this may actually be an
+emulator bug, since e5 is in the directory.
+
 to do:
 
 1) write the hdc-dma simulator
 2) write the trap code
-3) write the serial port simulator
+3) add floppy write support
+4) add interrupts
 
 the memory mapping, reset and i/o abstraction are done.
 
