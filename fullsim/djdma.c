@@ -129,9 +129,9 @@ char *sb3_bits[] = {
     "", "serin", "DSDD8", "", "index", "trk0", "wprot", "rdy"
 };
 
-static paddr resetchannel;  // the 24 bit channel command pointer
-static paddr channel;       // the 24 bit channel command pointer
-static paddr dmaaddr;       // the 24 bit dma address
+static paddr resetchannel = DEF_CCA;    // the 24 bit channel command pointer
+static paddr channel = DEF_CCA;         // the 24 bit channel command pointer
+static paddr dmaaddr;                   // the 24 bit dma address
 static int retrylimit = 10;
 static int djdma_running = 0;
 static char secbuf[2048];
@@ -166,7 +166,9 @@ pulse_djdma(portaddr p, byte v)
     /*
      * run channel commands until we are told to stop
      */
+    cmd = 0;
     while (djdma_running) {
+        if (verbose & V_DJDMA) printf("djdma: fetch channel 0x%x\n", channel);
         code = physread(channel);
         for (i = 0; i < (sizeof(djcmd) / sizeof(djcmd[0])); i++) {
             if (djcmd[i].code == code) {
@@ -175,9 +177,9 @@ pulse_djdma(portaddr p, byte v)
         }
         if (!cmd) {
             djdma_running = 0;
-            printf("unknown djdma command %d %x\n", code, code);
+            if (verbose & V_DJDMA) printf("djdma: unknown command %d %x\n", code, code);
         } else {
-            printf("djdma command %d %x %s\n", code, code, cmd->name);
+            if (verbose & V_DJDMA) printf("djdma: command %d %x %s\n", code, code, cmd->name);
             i = (cmd->handler)();
             if (cmd->status) {
                 physwrite(channel + cmd->status, i);
@@ -196,6 +198,7 @@ setdma()
     dmaaddr = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
+    if (verbose & V_DJDMA) printf("djdma setdma %x\n", dmaaddr);
     return 0;
 }
 
@@ -208,6 +211,7 @@ setchannel()
     resetchannel = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
+    if (verbose & V_DJDMA) printf("djdma setchannel %x\n", resetchannel);
     return 0;
 }
 
@@ -230,6 +234,7 @@ branch()
     channel = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
+    if (verbose & V_DJDMA) printf("djdma: branch %x\n", channel);
     return 0;
 }
 
@@ -247,14 +252,16 @@ readsec()
     int bytes;
 
     trk = physread(channel + 1);
-    sec = physread(channel + 2);
+    sec = physread(channel + 2) + 1;
     side = sec & 0x80;
     sec &= 0x7f;
     drive = physread(channel + 3);
 
+    if (verbose & V_DJDMA) printf("djdma: read sector drive:%d track:%d sec:%d side:%d\n",
+        drive, trk, sec, side);
     /* read drive, getfdprmtrk, sec, side into dmaaddr */
     if (imdp[drive]) {
-        bytes = imd_read(imdp[drive], trk, sec, side, drive, secbuf);
+        bytes = imd_read(imdp[drive], drive, trk, side, sec, secbuf);
         if (bytes > 0) {
             copyout(secbuf, dmaaddr, bytes);
             status = S_NORMAL;    
@@ -275,6 +282,7 @@ static unsigned char
 setintr()
 {
     need_intack = 1;
+    if (verbose & V_DJDMA) printf("djdma: setintr\n");
     return 0;
 }
 
@@ -284,6 +292,7 @@ setintr()
 static unsigned char
 writesec()
 {
+    if (verbose & V_DJDMA) printf("djdma: writesec\n");
     return S_PROT;
 }
 
@@ -296,7 +305,14 @@ sense()
     unsigned char drive;
 
     drive = physread(channel + 1);
-    /* XXX - fill out drive status */
+    if (verbose & V_DJDMA) printf("djdma: sense drive:%d\n", drive);
+    physwrite(channel + 2, 
+        // SB1_HARD SB1_FIVE SB1_MTRCON SB1_NORDY SB1_NOHDLD
+        SB1_DD | SB1_HDLD);
+    physwrite(channel + 3, // SB2_128 SB2_256 SB2_512 
+        SB2_1024);
+    physwrite(channel + 4, // SB3_SERIN SB3_TRK0 SB3_WPROT SB3_DSDD8 | 
+        SB3_INDEX | SB3_RDY);
     return S_NORMAL;
 }
 
@@ -309,6 +325,7 @@ setretry()
     unsigned char drive;
 
     retrylimit = physread(channel + 1);
+    if (verbose & V_DJDMA) printf("djdma: setretry %d\n", retrylimit);
     return 0;
 }
 
@@ -321,6 +338,7 @@ setdrive()
     unsigned char drive;
 
     drive = physread(channel + 1);
+    if (verbose & V_DJDMA) printf("djdma: set drive:%d\n", drive);
     return S_NORMAL;
 }
 
@@ -330,6 +348,39 @@ setdrive()
 static unsigned char
 readtrk()
 {
+    unsigned char drive;
+    unsigned char side;
+    unsigned char trk;
+    paddr sectab;
+    int secs;
+    int secsize;
+    int i;
+    int bytes;
+
+    trk = physread(channel + 1);
+    side = physread(channel + 2);
+    drive = physread(channel + 3);
+    sectab = 
+        physread(channel + 4) + 
+        (physread(channel + 5) << 8) +
+        (physread(channel + 6) << 16);
+    imd_trkinfo(imdp[drive], trk, &secs, &secsize);
+
+    if (verbose & V_DJDMA) printf("djdma: readtrk drive:%d trk:%d side:%x sectab:%x secs:%d\n", drive, trk, side, sectab, secs);
+    for (i = 0; i < secs; i++) {
+        if (physread(sectab + i) == 0xff) {
+            continue;
+        }
+        bytes = imd_read(imdp[drive], drive, trk, side, i + 1, secbuf);
+        if (bytes > 0) {
+
+            copyout(secbuf, dmaaddr + secsize * i, bytes);
+            if (verbose & V_DJDMA) printf("copyout to %x for %d\n", dmaaddr + secsize * i, bytes);
+            physwrite(sectab + i, S_NORMAL);
+        } else {
+            physwrite(sectab + i, S_NOREAD);
+        }
+    }
     return S_NORMAL;
 }
 
@@ -339,6 +390,7 @@ readtrk()
 static unsigned char
 writetrk()
 {
+    if (verbose & V_DJDMA) printf("djdma: writetrk\n");
     return S_NORMAL;
 }
 
@@ -348,6 +400,7 @@ writetrk()
 static unsigned char
 settrk()
 {
+    if (verbose & V_DJDMA) printf("djdma: set tracks\n");
     return S_NORMAL;
 }
 
@@ -369,17 +422,25 @@ serin()
     return S_NORMAL;
 }
 
+extern int terminal_fd;
+
 /*
  * serial out
  */
 static unsigned char
 serout()
 {
+    byte outch;
+
+    outch = physread(channel + 1);
+    write(terminal_fd, outch, 1);
     return S_NORMAL;
 }
 
 /*
  * set djdma memory
+ * this is used by the bios to set drive speed, settling time, track count
+ * this is a shitty API
  */
 static unsigned char
 write_djmem()
@@ -418,6 +479,8 @@ byte bootstrap[] = {
     0xff                //      db ff
 };
 
+extern char *boot_drive;
+
 /*
  * hook up the registers and do reset processing
  * this runs the load sector 0 to physical memory 0
@@ -428,10 +491,11 @@ djdma_init()
     int i;
 
 	register_output(DJDMA_PORT, &pulse_djdma);
-    imdp[0] = load_imd("DRIVE_A.IMD");
+    imdp[0] = load_imd(boot_drive);
     if (!imdp[0]) {
         return 1;
     }
+    // dump_imd(imdp[0]);
     for (i = 0; i < 38; i++) {
         lowmem_save[i] = physread(i);
         physwrite(i, 0);
@@ -439,7 +503,7 @@ djdma_init()
     for (i = 0; i < sizeof(bootstrap); i++) {
         physwrite(i + 0x38, bootstrap[i]);
     }
-    imd_read(imdp[0], 0, 1, 1, 0, secbuf);
+    imd_read(imdp[0], 0, 0, 0, 1, secbuf);
     copyout(secbuf, 0x80, 0x80);
     physwrite(0x4a, 0x40);
     return 0;

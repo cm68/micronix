@@ -126,9 +126,11 @@ main(int argc, char **argv)
 		if (c == 0x1a) break;
 		write(1, &c, 1);
 	}
+	if (argc < 2) {
 	/* output tracks */
 	while (do_track()) 
 		;
+	}
 	exit (0);
 }
 

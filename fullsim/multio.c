@@ -55,20 +55,20 @@ static byte loopc;
 static byte 
 rd_clock(portaddr p)
 {
-    printf("multio: read clock\n");
+    if (verbose & V_MIO) printf("multio: read clock\n");
 }
 
 /* port 0x4c */
 static byte 
 rd_pic_port_0(portaddr p)
 {
-    printf("multio: read pic0\n");
+    if (verbose & V_MIO) printf("multio: read pic0\n");
 }
 
 static byte 
 rd_pic_port_1(portaddr p)
 {
-    printf("multio: read pic1\n");
+    if (verbose & V_MIO) printf("multio: read pic1\n");
 }
 
 static byte 
@@ -77,41 +77,41 @@ rd_rxb(portaddr p)
     byte retval;
     if (loop) {
         if (loop < 2) {
-            printf("read unwritten loopback\n");
+            if (verbose & V_MIO) printf("read unwritten loopback\n");
         }
         loop = 1;
         retval = loopc;
     } else {
         if (read(terminal_fd, &retval, 1) != 1) {
-            printf("multio: rd_rxb failed\n");
+            if (verbose & V_MIO) printf("multio: rd_rxb failed\n");
         }
     }
-    printf("multio: read rxb = %d\n", retval);
+    if (verbose & V_MIO) printf("multio: read rxb = %d\n", retval);
     return retval;
 }
 
 static byte 
 rd_inte(portaddr p)
 {
-    printf("multio: read inte\n");
+    if (verbose & V_MIO) printf("multio: read inte\n");
 }
 
 static byte 
 rd_inti(portaddr p)
 {
-    printf("multio: read inti\n");
+    if (verbose & V_MIO) printf("multio: read inti\n");
 }
 
 static byte 
 rd_linectl(portaddr p)
 {
-    printf("multio: read linectl\n");
+    if (verbose & V_MIO) printf("multio: read linectl\n");
 }
 
 static byte 
 rd_mdmctl(portaddr p)
 {
-    printf("multio: read mdmctl\n");
+    if (verbose & V_MIO) printf("multio: read mdmctl\n");
 }
 
 static byte 
@@ -138,25 +138,25 @@ rd_linestat(portaddr p)
 static byte 
 rd_mdmstat(portaddr p)
 {
-    printf("multio: read mdmstat\n");
+    if (verbose & V_MIO) printf("multio: read mdmstat\n");
 }
 
 static void
 wr_clock(portaddr p, byte v)
 {
-    printf("multio: write clock %x\n", v);
+    if (verbose & V_MIO) printf("multio: write clock %x\n", v);
 }
 
 static void
 wr_pic_port_0(portaddr p, byte v)
 {
-    printf("multio: write pic0 %x\n", v);
+    if (verbose & V_MIO) printf("multio: write pic0 %x\n", v);
 }
 
 static void
 wr_pic_port_1(portaddr p, byte v)
 {
-    printf("multio: write pic1 %x\n", v);
+    if (verbose & V_MIO) printf("multio: write pic1 %x\n", v);
 }
 
 static void
@@ -168,25 +168,25 @@ wr_txb(portaddr p, byte v)
     } else {
         write(terminal_fd, &v, 1);
     }
-    printf("multio: write txb %x %d %c\n", v, v, v);
+    if (verbose & V_MIO) printf("multio: write txb %x %d %c\n", v, v, v);
 }
 
 static void
 wr_inte(portaddr p, byte v)
 {
-    printf("multio: write inte %x\n", v);
+    if (verbose & V_MIO) printf("multio: write inte %x\n", v);
 }
 
 static void
 wr_linectl(portaddr p, byte v)
 {
-    printf("multio: write linectl %x\n", v);
+    if (verbose & V_MIO) printf("multio: write linectl %x\n", v);
 }
 
 static void
 wr_linestat(portaddr p, byte v)
 {
-    printf("multio: write linestat %x\n", v);
+    if (verbose & V_MIO) printf("multio: write linestat %x\n", v);
 }
 
 static void
@@ -197,7 +197,7 @@ wr_mdmctl(portaddr p, byte v)
     } else {
         loop = 0;
     }
-    printf("multio: write mdmctl %x\n", v);
+    if (verbose & V_MIO) printf("multio: write mdmctl %x\n", v);
 }
 
 
@@ -207,7 +207,7 @@ wr_mdmctl(portaddr p, byte v)
 void
 multio_select(portaddr p, byte v)
 {
-    printf("multio: write group select %x\n", v);
+    if (verbose & V_MIO) printf("multio: write group select %x\n", v);
 
     group = v & GROUP_MASK;
     switch (group) {

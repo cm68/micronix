@@ -16,11 +16,8 @@
  * a data code:  0: no data 1: secsize bytes 2: a fill byte
  */
 
+#include "sim.h"
 #include <fcntl.h>
-
-#ifdef printing
-void hexdump(char *addr, unsigned short len);
-#endif
 
 int imd_fd = 0;
 
@@ -44,6 +41,9 @@ struct imd_trk {
     char *headmap;
     char **data;
 };
+
+static void hexdump(char *addr, unsigned short len);
+static void dump_track(struct imd *imd, int t);
 
 /*
  * read the imd file for track data and build the data structure
@@ -117,7 +117,7 @@ load_imd(char *fname)
 {
     struct imd *ip;
     char c = 0;
-    int clen;
+    int clen = 0;
     struct imd_trk *t[256];
     
     imd_fd = open(fname, O_RDONLY);
@@ -144,6 +144,15 @@ load_imd(char *fname)
     return ip;
 }
 
+void
+imd_trkinfo(void *vp, int trk, int *secs, int *secsize)
+{
+    struct imd *ip = (struct imd *)vp;
+    struct imd_trk *tp = ip->track[trk];
+    *secs = tp->fixed.nsec;
+    *secsize = tp->secsize;
+}
+
 /*
  * copy the data from a sector in imd to a buffer
  * return the number of bytes
@@ -152,11 +161,37 @@ int
 imd_read(void *vp, int drive, int trk, int side, int sec, char *buf)
 {
     struct imd *ip = (struct imd *)vp;
+    struct imd_trk *tp = ip->track[trk];
+    int i;
+    int mysec = -1;
 
+    if (side) {
+        printf("side nonzero\n");
+        verbose |= V_IMD;
+        stop_cpu();
+    }
+    if (verbose & V_IMD) printf("imd_read drive %d trk %d side %d sec %d\n",
+        drive, trk, side, sec);
+    if (tp->secmap) {
+        for (i = 0; i < tp->fixed.nsec; i++) {
+            if (tp->secmap[i] == sec) {
+                mysec = i;
+            }
+        }
+    }
+    if (mysec == -1) {
+        if (verbose & V_IMD) {
+            printf("imd_read: sector not found %d\n", sec);
+            dump_track(ip, trk);
+        }
+        return 0;
+    }
+    memcpy(buf, tp->data[mysec], tp->secsize); 
+    if (verbose & V_IMD) hexdump(buf, tp->secsize);
+    return (tp->secsize);
 }
 
-#ifdef printing
-void
+static void
 dump_secmap(char *label, char *m, int s)
 {
     int i;
@@ -172,57 +207,62 @@ dump_secmap(char *label, char *m, int s)
     printf("\n");
 }
 
+static void
+dump_track(struct imd *imd, int t)
+{
+    struct imd_trk *tp = imd->track[t];
+    int s;
+
+    printf("track %d\n", t);
+    printf("mode: %x\n", tp->fixed.mode);
+    printf("cyl: %d\n", tp->fixed.cyl);
+    printf("head: %x\n", tp->fixed.head);
+    printf("nsec: %d\n", tp->fixed.nsec);
+    printf("size: %x\n", tp->fixed.size);
+    printf("secsize: %d\n", tp->secsize);
+    dump_secmap("secmap", tp->secmap, tp->fixed.nsec);
+    dump_secmap("cylmap", tp->cylmap, tp->fixed.nsec);
+    dump_secmap("headmap", tp->headmap, tp->fixed.nsec);
+
+#ifdef notdef
+    for (s = 0; s < tp->fixed.nsec; s++) {
+        printf("sector: %d\n", s);
+        if (tp->data[s]) {
+            hexdump(tp->data[s], tp->secsize);
+        } else {
+            printf("absent\n");
+        }
+    }
+#endif
+}
+
 void
 dump_imd(struct imd *imd)
 {
-    struct imd_trk *tp;
-    int s;
     int t;
 
     printf("comment: %s\n", imd->comment);
     printf("%d tracks\n", imd->tracks);
 
     for (t = 0; t < imd->tracks; t++) {
-        printf("track %d\n", t);
-        tp = imd->track[t];
-
-        printf("mode: %x\n", tp->fixed.mode);
-        printf("cyl: %d\n", tp->fixed.cyl);
-        printf("head: %x\n", tp->fixed.head);
-        printf("nsec: %d\n", tp->fixed.nsec);
-        printf("size: %x\n", tp->fixed.size);
-        printf("secsize: %d\n", tp->secsize);
-        dump_secmap("secmap", tp->secmap, tp->fixed.nsec);
-        dump_secmap("cylmap", tp->cylmap, tp->fixed.nsec);
-        dump_secmap("headmap", tp->headmap, tp->fixed.nsec);
-        for (s = 0; s < tp->fixed.nsec; s++) {
-            printf("sector: %d\n", s);
-            if (tp->data[s]) {
-                hexdump(tp->data[s], tp->secsize);
-            } else {
-                printf("absent\n");
-            }
-        }
+        dump_track(imd, t);
    }
 }
-#endif
 
 #ifdef standalone
 main(int argc, char **argv)
 {
     struct imd *ip;
     ip = (struct imd *)load_imd("/dev/stdin");
-#ifdef printing
     dump_imd(ip);
-#endif
     exit(0);
 }
 #endif
 
-#ifdef printing
-unsigned char pchars[16];
-int pcol;
+static unsigned char pchars[16];
+static int pcol;
 
+static
 dp()
 {
     int i;
@@ -237,6 +277,7 @@ dp()
     printf("\n");
 }
 
+static
 void
 hexdump(char *addr, unsigned short len)
 {
@@ -262,7 +303,6 @@ hexdump(char *addr, unsigned short len)
         dp();
     }
 }
-#endif
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
