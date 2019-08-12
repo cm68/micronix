@@ -15,6 +15,9 @@
  */
 
 #include "sim.h"
+#include <sys/ioctl.h>
+
+extern int terminal_fd;
 
 #define	DJDMA_PORT	0xef	// djdma command start port
 #define	DEF_CCA		0x50	// djdma default channel command address
@@ -413,16 +416,47 @@ settiming()
     return S_NORMAL;
 }
 
+int poll_enabled = 1;
+
+static void
+djdma_poll_func()
+{
+    int bytes;
+    char conschar;
+
+    if (poll_enabled) {
+        // if have not read the last character, no point in checking
+        if (physread(0x3f) == S_NORMAL) {
+            return;
+        }
+        ioctl(terminal_fd, FIONREAD, &bytes);
+        if (bytes) {
+            if (read(terminal_fd, &conschar, 1) != 1) {
+                printf("djdma_poll_func: read problem\n");
+                return;
+            }
+            physwrite(SERDATA, conschar);
+            physwrite(SERFLAG, S_NORMAL);
+        }
+    }
+}
+
 /*
  * serial in
  */
 static unsigned char
 serin()
 {
+    switch (physread(channel + 1)) {
+    case 0:
+        poll_enabled = 0;
+        break;
+    case 1:
+        poll_enabled = 1;
+        break;
+    }
     return S_NORMAL;
 }
-
-extern int terminal_fd;
 
 /*
  * serial out
@@ -433,7 +467,7 @@ serout()
     byte outch;
 
     outch = physread(channel + 1);
-    write(terminal_fd, outch, 1);
+    write(terminal_fd, &outch, 1);
     return S_NORMAL;
 }
 
@@ -490,6 +524,7 @@ djdma_init()
 {
     int i;
 
+    register_poll_hook(&djdma_poll_func);
 	register_output(DJDMA_PORT, &pulse_djdma);
     imdp[0] = load_imd(boot_drive);
     if (!imdp[0]) {

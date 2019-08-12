@@ -537,6 +537,11 @@ input(portaddr p)
 #define MAXDRIVERS 4
 int (*startup_hook[MAXDRIVERS])();
 
+/*
+ * this gets called between instructions
+ */
+void (*poll_hook[MAXDRIVERS])();
+
 #define	TTY_FD	64
 
 void
@@ -547,6 +552,20 @@ register_startup_hook(int (*func)())
     for (i = 0; i < MAXDRIVERS; i++) {
         if (!startup_hook[i]) {
             startup_hook[i] = func;
+            return;
+        }
+    }
+    exit(2);
+}
+
+void
+register_poll_hook(void (*func)())
+{
+    int i;
+
+    for (i = 0; i < MAXDRIVERS; i++) {
+        if (!poll_hook[i]) {
+            poll_hook[i] = func;
             return;
         }
     }
@@ -721,7 +740,7 @@ main(int argc, char **argv)
     // set diagnostic, monitor or boot mode
     switchreg = SW_DJDMA;
     keybreg = 0xff;
-     
+
     /*
      * run the driver startup hooks
      */
@@ -1082,6 +1101,18 @@ emulate_z80()
     int i;
 
     do {
+
+        /*
+         * run the driver poll hooks
+         */
+        for (i = 0; i < MAXDRIVERS; i++) {
+            if (poll_hook[i]) {
+                (*poll_hook[i])();
+            } else {
+                break;
+            }
+        }
+
         if (watchpoint_hit()) {
             breakpoint = 1;
         }
