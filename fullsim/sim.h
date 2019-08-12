@@ -14,6 +14,7 @@
 #define V_HDCA  (1 << 6)        // HDCA
 #define V_MPZ   (1 << 7)        // MPZ80
 #define V_IMD   (1 << 8)        // IMD processing
+#define V_BIO   (1 << 9)        // block io
 
 extern int verbose;
 
@@ -46,3 +47,4 @@ extern byte input(portaddr p);
 int imd_read(void *ip, int drive, int trk, int side, int sec, char *buf);
 void *load_imd(char *fname);
 void imd_trkinfo(void *vp, int trk, int *secs, int *secsize);
+char *bitdef(byte v, char**desc);

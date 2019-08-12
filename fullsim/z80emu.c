@@ -2562,6 +2562,7 @@ emulate_next_instruction:
                         case ED_PREFIX: {
 
                                 registers = state->register_table;
+        			state->pc = pc;
                                 Z80_FETCH_BYTE(pc, opcode);
                                 pc++;
                                 instruction = ED_INSTRUCTION_TABLE[opcode];

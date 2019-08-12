@@ -255,11 +255,29 @@ readsec()
     int bytes;
 
     trk = physread(channel + 1);
-    sec = physread(channel + 2) + 1;
+    sec = physread(channel + 2);
     side = sec & 0x80;
     sec &= 0x7f;
     drive = physread(channel + 3);
 
+#ifdef notdef
+    if (trk > 1) switch (sec) {
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+    case 8:
+    }
+#endif
+
+    if (verbose & V_BIO) {
+        printf("djdma: read sector drive:%d track:%d sec:%d side:%d\n",
+            drive, trk, sec, side);
+    }
     if (verbose & V_DJDMA) printf("djdma: read sector drive:%d track:%d sec:%d side:%d\n",
         drive, trk, sec, side);
     /* read drive, getfdprmtrk, sec, side into dmaaddr */
@@ -417,6 +435,7 @@ settiming()
 }
 
 int poll_enabled = 1;
+int poll_registered;
 
 static void
 djdma_poll_func()
@@ -466,6 +485,10 @@ serout()
 {
     byte outch;
 
+    if (!poll_registered) {
+        register_poll_hook(&djdma_poll_func);
+        poll_registered = 1;
+    }
     outch = physread(channel + 1);
     write(terminal_fd, &outch, 1);
     return S_NORMAL;
@@ -524,7 +547,6 @@ djdma_init()
 {
     int i;
 
-    register_poll_hook(&djdma_poll_func);
 	register_output(DJDMA_PORT, &pulse_djdma);
     imdp[0] = load_imd(boot_drive);
     if (!imdp[0]) {
