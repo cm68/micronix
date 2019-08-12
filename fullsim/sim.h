@@ -30,6 +30,7 @@ extern inhandler input_handler[256];
 extern outhandler output_handler[256];
 
 extern void register_startup_hook(int (*hookfunc)());
+extern void register_poll_hook(void (*hookfunc)());
 extern void register_input(portaddr portnum, inhandler func);
 extern void register_output( portaddr portnum, outhandler func);
 
