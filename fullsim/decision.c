@@ -521,7 +521,16 @@ dump_port_handler(portaddr p, byte v)
         dumpbuf[i] = memread(i);
     }
     write(fd, dumpbuf, ALLMEM);
-    close(fd);    
+    write(fd, &cp->state.pc, 2);
+    write(fd, &cp->state.registers.byte[Z80_A], 1);
+    write(fd, &cp->state.registers.byte[Z80_F], 1);
+    write(fd, &cp->state.registers.word[Z80_BC], 2);
+    write(fd, &cp->state.registers.word[Z80_DE], 2);
+    write(fd, &cp->state.registers.word[Z80_HL], 2);
+    write(fd, &cp->state.registers.word[Z80_SP], 2);
+    write(fd, &cp->state.registers.word[Z80_IX], 2);
+    write(fd, &cp->state.registers.word[Z80_IY], 2);
+    close(fd);
 }
 
 byte
