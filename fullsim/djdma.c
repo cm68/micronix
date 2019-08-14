@@ -537,6 +537,7 @@ byte bootstrap[] = {
 };
 
 extern char *boot_drive;
+extern char *b_drive;
 
 /*
  * hook up the registers and do reset processing
@@ -552,6 +553,13 @@ djdma_init()
     if (!imdp[0]) {
         return 1;
     }
+    if (b_drive) {
+        imdp[1] = load_imd(b_drive);
+        if (!imdp[1]) {
+            return 1;
+        }
+    }
+
     // dump_imd(imdp[0]);
     for (i = 0; i < 38; i++) {
         lowmem_save[i] = physread(i);

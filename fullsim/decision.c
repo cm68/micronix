@@ -130,6 +130,9 @@ byte switchreg;
 byte trapstat;
 #define STAT    0x403       // trap status register
 
+#define EXIT_PORT   0
+#define DUMP_PORT   1
+
 /*
  * copy the appropriate half of the rom into the executable address space
  * this is rare, so it's ok to make slow.
@@ -403,7 +406,7 @@ load_symfile(char *s)
                 break;
             }
         }
-        printf("adding symbol %s : %x\n", namebuf, v);
+        // printf("adding symbol %s : %x\n", namebuf, v);
         add_sym(namebuf, v);
     }
     fclose(sf);
@@ -496,6 +499,30 @@ pop()
 
 inhandler input_handler[256];
 outhandler output_handler[256];
+
+void
+exit_port_handler(portaddr p, byte v)
+{
+    printf("exit port tickled %x\n", v);
+    exit(0);
+}
+
+#define ALLMEM  64*1024
+static char dumpbuf[ALLMEM];
+void
+dump_port_handler(portaddr p, byte v)
+{
+    int fd;
+    int i;
+
+    printf("dump port tickled %x\n", v);
+    fd = creat("dumpfile", 0777);
+    for (i = 0; i < ALLMEM; i++) {
+        dumpbuf[i] = memread(i);
+    }
+    write(fd, dumpbuf, ALLMEM);
+    close(fd);    
+}
 
 byte
 undef_in(portaddr p)
@@ -635,6 +662,7 @@ usage(char *complaint, char *p)
 
 char *boot_drive = "DRIVE_A.IMD";
 char *symfile;
+char *b_drive;
 
 int
 main(int argc, char **argv)
@@ -646,6 +674,7 @@ main(int argc, char **argv)
     char *ptyname;
     char *bootrom;
     int fd;
+    int drives = 0;
 
     argc--;
 
@@ -673,7 +702,12 @@ main(int argc, char **argv)
                 if (!argc--) {
                     usage("drive file\n", progname);
                 }
-                boot_drive = strdup(*argv++);
+                if (drives) {
+                    b_drive = strdup(*argv++);
+                } else {
+                    boot_drive = strdup(*argv++);
+                    drives++;
+                }
                 break;
             case 's':
                 if (!argc--) {
@@ -785,6 +819,8 @@ main(int argc, char **argv)
 
     signal(SIGUSR1, stop_handler);
     ioinit();
+    register_output(EXIT_PORT, exit_port_handler);
+    register_output(DUMP_PORT, dump_port_handler);
     taskreg = 0;
     setrom(0);
 
@@ -978,6 +1014,23 @@ getaddress(char **s)
     while (**s && **s != ' ') {
         *wp++ = *(*s)++;
         *wp = 0;
+    }
+    if (wordbuf[0] == '%') {
+        if (strcasecmp(&wordbuf[1], "hl") == 0) {
+            return cp->state.registers.word[Z80_HL];
+        }
+        if (strcasecmp(&wordbuf[1], "bc") == 0) {
+            return cp->state.registers.word[Z80_BC];
+        }
+        if (strcasecmp(&wordbuf[1], "de") == 0) {
+            return cp->state.registers.word[Z80_DE];
+        }
+        if (strcasecmp(&wordbuf[1], "sp") == 0) {
+            return cp->state.registers.word[Z80_SP];
+        }
+        if (strcasecmp(&wordbuf[1], "tos") == 0) {
+            return get_word(cp->state.registers.word[Z80_SP]);
+        }
     }
     if ((i = find_symbol(wordbuf)) == -1) {
         i = strtol(wordbuf, &wp, 16);
