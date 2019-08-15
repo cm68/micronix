@@ -418,12 +418,14 @@ load_symfile(char *s)
 byte 
 physread(paddr p)
 {
+    p &= 0xffffff;
     return physmem[p];
 }
 
 void
 physwrite(paddr p, byte v)
 {
+    p &= 0xffffff;
     physmem[p] = v;
 }
 
@@ -531,6 +533,28 @@ dump_port_handler(portaddr p, byte v)
     write(fd, &cp->state.registers.word[Z80_IX], 2);
     write(fd, &cp->state.registers.word[Z80_IY], 2);
     close(fd);
+}
+
+#define INPUT_PORT 2
+
+static int inp_fd = -1;
+static char pip_input_handler(portaddr p)
+{
+    byte buf = 0x1a;
+
+    if (inp_fd == -1) {
+        inp_fd = open("file.inp", O_RDONLY);
+    }
+    if (inp_fd >= 0) {
+        read(inp_fd, &buf, 1);
+    }
+    if (buf == 0x1a) {
+        if (inp_fd >= 0) {
+            close(inp_fd);
+        }
+        inp_fd = -1;
+    }
+    return buf;
 }
 
 byte
@@ -837,6 +861,7 @@ main(int argc, char **argv)
     ioinit();
     register_output(EXIT_PORT, exit_port_handler);
     register_output(DUMP_PORT, dump_port_handler);
+    register_input(INPUT_PORT, pip_input_handler);
     taskreg = 0;
     setrom(0);
 
