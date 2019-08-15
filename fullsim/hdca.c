@@ -179,9 +179,8 @@ wr_hdca_cmd(portaddr p, byte v)
         ramptr = 0;
         psr &= ~PSR_OPDONE;
         break;
-    case 1: printf("hdca cmd: read sector with header bytes: %d %d %d %d\n",
-            track, head, sector, key);
-        printf("offset 0x%x\n", offset);
+    case 1: // printf("hdca cmd: read sector with header bytes: %d %d %d %d\n",
+            // track, head, sector, key);
         lseek(drivefd, offset, SEEK_SET);
         read(drivefd, &buffer[2], 510);
         read(drivefd, &buffer[0], 2);
@@ -190,9 +189,8 @@ wr_hdca_cmd(portaddr p, byte v)
         break;
     case 3: // printf("hdca cmd: read header\n");
         break;
-    case 5: printf("hdca cmd: write sector with header bytes: %d %d %d %d\n",
-            track, head, sector, key);
-        printf("offset 0x%d\n", offset);
+    case 5: // printf("hdca cmd: write sector with header bytes: %d %d %d %d\n",
+            // track, head, sector, key);
         lseek(drivefd, offset, SEEK_SET);
         write(drivefd, &buffer, 512);
         psr |= PSR_OPDONE;
