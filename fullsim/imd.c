@@ -168,7 +168,7 @@ imd_read(void *vp, int drive, int trk, int side, int sec, char *buf)
     if (side) {
         printf("side nonzero\n");
         verbose |= V_IMD;
-        stop_cpu();
+        stop();
     }
     if (verbose & V_IMD) printf("imd_read drive %d trk %d side %d sec %d\n",
         drive, trk, side, sec);
