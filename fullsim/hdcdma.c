@@ -7,7 +7,7 @@
  * everything being done synchronously.
  *
  * this will be complicated in that a channel command may set an interrupt
- * line.  this just changes the sense of what the output to DJDMA_PORT
+ * line.  this just changes the sense of what the output to HDCDMA_PORT
  * does to an intack, which causes the next channel command in series
  * to be fetched.
  * so, all work in this driver happens in response to, and in series with, 
@@ -15,413 +15,301 @@
  */
 
 #include "sim.h"
+#include <fcntl.h>
 
-#define	HDCDMA_PORT 	0x55	// hdcdma command start port
-#define	HDCDMA_RESET	0xe4	// hdcdma command start port
+#define	HDCDMA_PORT 	0x55	// hdcdma attention port
+#define	HDCDMA_RESET	0x54	// hdcdma reset port
 
-#define	DEF_CCA		0x50	// djdma default channel command address
+#define	DEF_CCA     0x50	    // hdcdma default channel command address
 
-#ifdef notdef
-/*
- * command codes for the djdma.   these are found at the CCA
- * and are variable length
- */
-
-static unsigned char setdma(), readsec(), writesec(), sense(),
-    setintr(), setretry(), setdrive(), settiming(),
-    readtrk(), writetrk(), serin(), serout(),
-    djhalt(), branch(), setchannel(), settrk(),
-    read_djmem(), write_djmem(), djexec();
-
-static struct djcmd {
-    unsigned char code;             // command byte
-    unsigned char increment;        // how much to adjust channel
-    unsigned char status;           // location to write status
-    unsigned char (*handler)();     // handler
-    char *name;
-} djcmd[] = {
-    { 0x23, 4, 0, setdma, "set dma address" },
-    { 0x20, 5, 4, readsec, "read sector" },
-    { 0x21, 5, 4, writesec, "write sector" },
-    { 0x22, 6, 5, sense, "sense drive status" },
-    { 0x24, 0, 0, setintr, "set interrupt request" },
-    { 0x28, 2, 0, setretry, "set error retry count" },
-    { 0x2e, 3, 2, setdrive, "set logical drive" },
-    { 0x2f, 2, 0, settiming, "set drive timing" },
-    { 0x29, 8, 7, readtrk, "read track" },
-    { 0x2a, 8, 7, writetrk, "write track" },
-    { 0x2b, 3, 2, serout, "serial output" },
-    { 0x2c, 2, 0, serin, "serial input enable" },
-    { 0x25, 2, 1, djhalt, "controller halt" },
-    { 0x26, 0, 0, branch, "branch in channel" },
-    { 0x27, 4, 0, setchannel, "set channel address" },
-    { 0x2d, 4, 3, settrk, "set track size" },
-    { 0xa0, 8, 0, read_djmem, "read controller memory" },
-    { 0xa1, 8, 0, write_djmem, "write controller memory" },
-    { 0xa2, 3, 0, djexec, "execute controller" }
-};
+#define DRIVES  4
+static int drive[DRIVES];       // file descriptor
+static int track[DRIVES];       // where are we - used for format and seek
+static int secsz[DRIVES];       // sector size from specify/format
 
 /*
- * command status and error codes
+ * the in-ram format for a hdc-dma command block
  */
-#define S_NORMAL    0x40
-#define S_ILLREQ    0x80
-#define S_ILLDRV    0x81
-#define S_UNREADY   0x82
-#define S_ILLTRK    0x83
-#define S_NOREAD    0x84
-#define S_NOSYNC    0x85
-#define S_HDRCRC    0x86
-#define S_BADSEEK   0x87
-#define S_NOHDR0     0x88
-#define S_NOHDR1    0x89
-#define S_NOHDR2    0x8a
-#define S_NOHDR3    0x8b
-#define S_NOHDR4    0x8c
-#define S_NOHDR5    0x8d
-#define S_DATACRC   0x8e
-#define S_ILLSEC    0x8f
-#define S_PROT      0x90
-#define S_DMAERR    0x91
-#define S_CHANERR   0x92
+struct hdc_cmd {
+    byte seldir;        // select drive and direction
+#define DRV_MASK    0x03
+#define STEP_DOWN   0x10
+    byte step_low;      // step count
+    byte step_high;
+   
+    byte selhd;         // select drive, head, low, precomp
+#define HEAD_MASK   0x1c
+#define HEAD_SHIFT  2
+#define HEAD_CMP    0x7     // complement bits
+#define LOW_CURR    0x40
+#define PRECOMP     0x80
 
-static char *djdma_err[] = {
-    "illegal request", "illegal drive select", "drive not ready", 
-    "illegal track number", "unreadable media", "no sync byte", "header crc",
-    "seek error", "sector header miscompare 0", "sector header miscompare 1",
-    "sector header miscompare 2", "sector header miscompare 3", 
-    "sector header miscompare 4", "sector header miscompare 5",
-    "data crc", "illegal sector number", "write protected", "lost data",
-    "lost command"
-};
+    byte dma_low;       // dma address
+    byte dma_mid;
+    byte dma_high;
 
-/*
- * get drive sense bytes
- */
-/* drive characteristic byte */
-#define SB1_HARD    0x02    // hard sectored
-#define SB1_FIVE    0x04    // 5.25 inch, else 8 inch
-#define SB1_MTRCON  0x08    // has motor control
-#define SB1_DD      0x10    // double density
-#define SB1_NORDY   0x20    // no drive ready signal
-#define SB1_NOHDLD  0x40    // no head load signal
-#define SB1_HDLD    0x80    // head is loaded
+    /*
+     * the next 4 bytes are used differently for the read/write, 
+     * format and specify commands
+     */
+    byte arg0;
+    byte arg1;
+    byte arg2;
+    byte arg3;
 
-char *sb1_bits[] = {
-    "", "hard sectored", "5.25 inch", "had motor control",
-    "double density", "no drive ready", "no head load", "head loaded"
-};
+    /*
+     * for read/write, the arg bytes really are match bytes for the 4 byte sector header
+     * however, since i need to map the cyl/head/sector to a data file, i enforce a match
+     * with the above selhd bits, the track #, and the bytes here
+     */
+#define cyl_low     arg0
+#define cyl_high    arg1
+#define head        arg2
+#define sector      arg3
 
-/* sector length byte */
-#define SB2_128     0       // 128 bytes
-#define SB2_256     1       // 256 bytes
-#define SB2_512     2       // 512 bytes
-#define SB2_1024    3       // 1024 bytes
+    /*
+     * format is a different story - the arg bytes are used to set formatting informatio
+     */
+#define gap3        arg0    // gap3 size
+#define sptneg      arg1    // negated sector count
+#define fseccode     arg2    // a size code 
+#define     FSECSIZE(k) 128 * (((k) ^ 0xff) + 1);
+#define fill        arg3    // fill byte
 
-/* drive status byte */
-#define SB3_SERIN   0x02    // serial input data bit
-#define SB3_DSDD8   0x04    // double sided, double density 8"
-#define SB3_INDEX   0x10    // index hole
-#define SB3_TRK0    0x20    // track 0
-#define SB3_WPROT   0x40    // write protect
-#define SB3_RDY     0x80    // drive ready line
+    /*
+     * the specify command is used to tell about the drive
+     */
+#define steprate    arg1    // units of 100 microseconds 0 = buffered
+#define INTERRUPT   0x80    // assert interrupt after command
+#define settle      arg2    // head settle in microseconds
+#define sseccode     arg3   // a size code
+#define     SSECSIZE(k) 128 * ((k) + 1)
 
-char *sb3_bits[] = {
-    "", "serin", "DSDD8", "", "index", "trk0", "wprot", "rdy"
-};
+    byte opcode;
+#define OP_READ     0       // read data
+#define OP_WRITE    1       // write data
+#define OP_RHEAD    2       // read header
+#define OP_FMT      3       // format track
+#define OP_SPEC     4       // specify constants
+#define OP_SENSE    5       // sense drive status
+#define OP_NOP      6       // nothing
 
-static paddr resetchannel;  // the 24 bit channel command pointer
-static paddr channel;       // the 24 bit channel command pointer
+    byte status;
+#define BUSY        0x00    // drive busy
+#define UNREADY     0x01    // drive not ready
+#define NOHDR       0x04    // header not found
+#define NODATA      0x05    // data not found
+#define OVERRUN     0x06    // data overrun
+#define DATACRC     0x07    // data crc error
+#define WRFAULT     0x08    // write fault
+#define HDRCRC      0x09    // header crc error
+#define BADCMD      0xA0    // illegal command
+#define GOOD        0xff    // good completion
+
+    /*
+     * the sense command returns a bitmask in here instead of the following codes
+     * these are active LOW
+     */
+#define SS_TRK0     0x01    // at track 0
+#define SS_WFLT     0x02    // write fault
+#define SS_RDY      0x04    // drive ready
+#define SS_SDONE    0x08    // seek done
+#define SS_INDEX    0x10    // toggles each rev
+#define SS_DONE     0xe0    // set after command
+
+    byte link_low;          // next command link
+    byte link_mid;
+    byte link_high;
+} command;
+
+static int channel_reset = 1;
+static paddr channel;       // channel command address
 static paddr dmaaddr;       // the 24 bit dma address
-static int retrylimit = 10;
-static int djdma_running = 0;
 static char secbuf[2048];
-static void *imdp[8];
-static int need_intack;
+static int enable_intr;
 
+/*
+ * these are hugely wasteful, so I am opting for a minimum of 512
+ * for sector sizes, total sectors per track
+ * 128      56
+ * 256      32
+ * 512      17
+ * 1024     9
+ * 2048     4
+ */
+#define SPT     17 
+#define HEADS   8
+#define SECLEN  2048
+#define TRACKS  2048
+
+#define secoff(s, h, t) \
+    (SECLEN * (((((t) * HEADS) + (h)) * SPT) + (s)))
+    
+static char *sense_b[] = { "trk0", "wfault", "ready", "seekcomplete", "index", 0, 0, 0 };
+static char *cmdname[] = { "read", "write", "readhead", "format", "specify", "sense", "nop" };
 /*
  * start the channel
  */
 static void
-pulse_djdma(portaddr p, byte v)
+attention(portaddr p, byte v)
 {
+    int offset;
+    byte status;
+    paddr link;
+    byte drv;
+    int steps;
+    int secsize;
     int i;
-    struct djcmd *cmd;
-    unsigned char code;
+    int drivefd;
+    int head;
 
-    if (need_intack) {
-        /*
-         * if the last command was setintr, we are still "running" that command
-         * until we get this pulse.  fill in the status and advance
-         */
-        physwrite(channel + 1, S_NORMAL);
-        channel += 2;
-        need_intack = 0;
+    if (channel_reset) {
+        channel_reset = 0;
+        channel = physread(DEF_CCA) + (physread(DEF_CCA+1) << 8) + (physread(DEF_CCA+2) << 16);
+    }
+
+    printf("hdcdma: ");
+
+    copyin(&command, channel, sizeof(command));
+    if ((command.opcode >= 0) && (command.opcode <= OP_NOP)) {
+        printf("%s\n", cmdname[command.opcode]);
     } else {
-        /*
-         * fetch from the reset channel address
-         */
-        channel = resetchannel;
+        printf("unknown command %d\n", command.opcode);
     }
-    djdma_running = 1;    
-    /*
-     * run channel commands until we are told to stop
-     */
-    while (djdma_running) {
-        code = physread(channel);
-        for (i = 0; i < (sizeof(djcmd) / sizeof(djcmd[0])); i++) {
-            if (djcmd[i].code == code) {
-                cmd = &djcmd[i];
-            }
-        }
-        if (!cmd) {
-            djdma_running = 0;
-            printf("unknown djdma command %d %x\n", code, code);
+
+    drv= command.seldir & DRV_MASK;
+    drivefd = drive[drv];
+    steps = command.step_low + (command.step_high << 8);
+    dmaaddr = command.dma_low + (command.dma_mid << 8) + (command.dma_high << 16);
+    link = command.link_low + (command.link_mid << 8) + (command.link_high << 16);
+    secsize = secsz[drv];
+    head = ((command.selhd & HEAD_MASK) >> HEAD_SHIFT) ^ HEAD_CMP;
+    printf("drive: %d track: %d step: %d %s head: %x %s%s",
+        drv, track[drv], steps,
+        command.seldir & STEP_DOWN ? "down" : "up", 
+        head,
+        command.selhd & LOW_CURR ? "lowcurr " : "", 
+        command.selhd & PRECOMP ? "precomp " : "");
+    printf("args %x %x %x %x ", command.arg0, command.arg1, command.arg2, command.arg3);
+    printf("dmaaddr: 0x%x link 0x%x secsize %d\n", dmaaddr, link, secsize);
+
+    if (command.seldir & STEP_DOWN) {
+        if (track[drv] >= steps) {
+            track[drv] -= steps;
         } else {
-            printf("djdma command %d %x %s\n", code, code, cmd->name);
-            i = (cmd->handler)();
-            if (cmd->status) {
-                physwrite(channel + cmd->status, i);
-            }
-            channel += cmd->increment;
-        }
-    }
-}
-
-/*
- * set the dma address from the channel, little-endian, no status
- */
-static unsigned char
-setdma()
-{
-    dmaaddr = physread(channel + 1) + 
-        (physread(channel + 2) << 8) +
-        (physread(channel + 3) << 16);
-    return 0;
-}
-
-/*
- * set the default channel address from the channel, little-endian, no status
- */
-static unsigned char
-setchannel()
-{
-    resetchannel = physread(channel + 1) + 
-        (physread(channel + 2) << 8) +
-        (physread(channel + 3) << 16);
-    return 0;
-}
-
-/*
- * end a channel command stream
- */
-static unsigned char
-djhalt()
-{
-    djdma_running = 0;
-    return S_NORMAL;
-}
-
-/*
- * branch in channel - change the fetch address for the channel program
- */
-static unsigned char
-branch()
-{
-    channel = physread(channel + 1) + 
-        (physread(channel + 2) << 8) +
-        (physread(channel + 3) << 16);
-    return 0;
-}
-
-/*
- * read a sector specifiec in 3 address bytes in channel.  1 status byte
- */
-static unsigned char
-readsec()
-{
-    unsigned char trk;
-    unsigned char sec;
-    unsigned char drive;
-    unsigned char side;
-    unsigned char status;
-    int bytes;
-
-    trk = physread(channel + 1);
-    sec = physread(channel + 2);
-    side = sec & 0x80;
-    sec &= 0x7f;
-    drive = physread(channel + 3);
-
-    /* read drive, getfdprmtrk, sec, side into dmaaddr */
-    if (imdp[drive]) {
-        bytes = imd_read(imdp[drive], trk, sec, side, drive, secbuf);
-        if (bytes > 0) {
-            copyout(secbuf, dmaaddr, bytes);
-            status = S_NORMAL;    
-        } else {
-            status = S_NOREAD;
+            track[drv] = 0;
         }
     } else {
-        status = S_ILLDRV;
+        track[drv] += steps;
     }
-    return status;
-}
-
-/*
- * generate an interrupt.  the next output pulse is an intack, and does
- * not start the channel.
- */
-static unsigned char
-setintr()
-{
-    need_intack = 1;
-    return 0;
-}
-
-/*
- * write a sector using data at the dma address to (trk, sec, drive)
- */
-static unsigned char
-writesec()
-{
-    return S_PROT;
-}
-
-/*
- * sense drive status
- */
-static unsigned char
-sense()
-{
-    unsigned char drive;
-
-    drive = physread(channel + 1);
-    /* XXX - fill out drive status */
-    return S_NORMAL;
-}
-
-/*
- * set retry limit
- */
-static unsigned char
-setretry()
-{
-    unsigned char drive;
-
-    retrylimit = physread(channel + 1);
-    return 0;
-}
-
-/*
- * set logical drive
- */
-static unsigned char
-setdrive()
-{
-    unsigned char drive;
-
-    drive = physread(channel + 1);
-    return S_NORMAL;
-}
-
-/*
- * read track
- */
-static unsigned char
-readtrk()
-{
-    return S_NORMAL;
-}
-
-/*
- * write track
- */
-static unsigned char
-writetrk()
-{
-    return S_NORMAL;
-}
-
-/*
- * set track count
- */
-static unsigned char
-settrk()
-{
-    return S_NORMAL;
-}
-
-/*
- * set drive timing
- */
-static unsigned char
-settiming()
-{
-    return S_NORMAL;
-}
-
-/*
- * serial in
- */
-static unsigned char
-serin()
-{
-    return S_NORMAL;
-}
-
-/*
- * serial out
- */
-static unsigned char
-serout()
-{
-    return S_NORMAL;
-}
-
-/*
- * set djdma memory
- */
-static unsigned char
-write_djmem()
-{
-    return S_NORMAL;
-}
-
-/*
- * read djdma memory
- */
-static unsigned char
-read_djmem()
-{
-    return S_NORMAL;
-}
-
-/*
- * execute controller code
- */
-static unsigned char
-djexec()
-{
-    return S_NORMAL;
-}
+    i = command.cyl_low + (command.cyl_high << 8);
+    offset = secoff(command.sector, command.head, track[drv]);
+ 
+    switch (command.opcode) {
+    case OP_READ:
+        if (track[drv] != i) {
+            printf("track lossage %d != %d\n", track[drv], i);
+        }
+        lseek(drivefd, offset, SEEK_SET);
+        read(drivefd, &secbuf, secsize);
+        copyout(&secbuf, dmaaddr, secsize);
+        command.status = GOOD;
+        break;
+    case OP_WRITE:
+        if (track[drv] != i) {
+            printf("track lossage %d != %d\n", track[drv], i);
+        }
+        lseek(drivefd, offset, SEEK_SET);
+        copyin(&secbuf, dmaaddr, secsize);
+        write(drivefd, &secbuf, secsize);
+        command.status = GOOD;
+        break;
+    case OP_RHEAD:
+        command.status = GOOD;
+        break;
+    case OP_FMT:                                // format a whole track
+        secsize = FSECSIZE(command.fseccode);
+        printf("gap3: %d scnt: %d secsize: %d fill: %x\n",
+            command.gap3, command.sptneg ^ 0xff, secsize, command.fill);
+        for (i = 0; i < secsize; i++) {
+            secbuf[i] = command.fill;
+        }
+        for (i = 0; i < (command.sptneg ^ 0xff); i++) {
+            offset = secoff(i, head, track[drv]);
+            lseek(drivefd, offset, SEEK_SET);
+            write(drivefd, &secbuf, secsize);
+        }
+        command.status = GOOD;
+        break;
+    case OP_SPEC:
+        printf("steprate: %d ms ", command.steprate & 0x7f);
+        if (command.steprate & INTERRUPT) {
+            printf("interrupt requested ");
+        }
+        printf("settle: %d ms ", command.settle & 0x7f);
+        secsize = SSECSIZE(command.sseccode);
+        printf("secsize %d\n", secsize);
+        secsz[drv] = secsize; 
+        command.status = GOOD;
+        break;
+    case OP_SENSE:
+        command.status = SS_DONE | SS_WFLT;
+        if (track[drv] != 0) {
+            command.status |= SS_TRK0;
+        }
+        printf("sense: %x %s\n", command.status, bitdef(command.status ^ 0xff, sense_b));
+        break;
+    case OP_NOP:
+        command.status = GOOD;
+        break;
+    default:
+        command.status = BADCMD;
+        break;
+    }
+    copyout(&command, channel, sizeof(command));
+#ifdef notdef
+    if (enable_intr) {
+        irq(HDCDMA_INTR);
+    }
 #endif
+    channel = link;
+}
 
+/*
+ * reset the hdc-dma
+ */
 static void
-pulse_hdcdma(portaddr p, byte v)
+reset(portaddr p, byte v)
 {
+    printf("hdcdma: reset\n");
+    channel_reset = 1;
 }
 
 static void
-reset_hdcdma(portaddr p, byte v)
+open_drive(int id)
 {
+    int fd;
+    char drivename[20];
+
+    sprintf(drivename, "hdcdma-%d", id);
+    fd = open(drivename, O_CREAT|O_RDWR, 0777);
+    /* lseek(fd, secoff(SPT, HEADS, TRACKS), SEEK_SET);
+    write(fd, &fd, 1);
+    */
+    drive[id] = fd;
 }
 
+     
 static int
 hdcdma_init()
 {
-	register_output(HDCDMA_PORT, &pulse_hdcdma);
-	register_output(HDCDMA_RESET, &reset_hdcdma);
+    int i;
+
+	register_output(HDCDMA_PORT, &attention);
+	register_output(HDCDMA_RESET, &reset);
+    for (i = 0; i < DRIVES; i++) {
+        open_drive(i);
+    }
     return 0;
 }
 
