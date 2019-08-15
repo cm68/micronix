@@ -42,7 +42,7 @@ struct imd_trk {
     char **data;
 };
 
-static void hexdump(char *addr, unsigned short len);
+void hexdump(char *addr, unsigned short len);
 static void dump_track(struct imd *imd, int t);
 
 /*
@@ -277,7 +277,6 @@ dp()
     printf("\n");
 }
 
-static
 void
 hexdump(char *addr, unsigned short len)
 {
