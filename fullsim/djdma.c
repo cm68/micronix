@@ -260,20 +260,6 @@ readsec()
     sec &= 0x7f;
     drive = physread(channel + 3);
 
-#ifdef notdef
-    if (trk > 1) switch (sec) {
-    case 0:
-    case 1:
-    case 2:
-    case 3:
-    case 4:
-    case 5:
-    case 6:
-    case 7:
-    case 8:
-    }
-#endif
-
     if (verbose & V_BIO) {
         printf("djdma: read sector drive:%d track:%d sec:%d side:%d\n",
             drive, trk, sec, side);
@@ -284,6 +270,7 @@ readsec()
     if (imdp[drive]) {
         bytes = imd_read(imdp[drive], drive, trk, side, sec, secbuf);
         if (bytes > 0) {
+            // hexdump(secbuf, bytes);
             copyout(secbuf, dmaaddr, bytes);
             status = S_NORMAL;    
         } else {

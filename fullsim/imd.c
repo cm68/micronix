@@ -97,6 +97,7 @@ get_track()
 
             if (c == 2) {
                 if (read(imd_fd, &c, 1) != 1)
+                    return 0;
                 memset(tp->data[s], c, tp->secsize);
             } else {
                 if (read(imd_fd, tp->data[s], tp->secsize) != tp->secsize)
@@ -179,6 +180,8 @@ imd_read(void *vp, int drive, int trk, int side, int sec, char *buf)
             }
         }
     }
+    // printf("translated sector %d to %d\n", sec, mysec);
+    // dump_track(ip, trk);
     if (mysec == -1) {
         if (verbose & V_IMD) {
             printf("imd_read: sector not found %d\n", sec);
@@ -224,7 +227,6 @@ dump_track(struct imd *imd, int t)
     dump_secmap("cylmap", tp->cylmap, tp->fixed.nsec);
     dump_secmap("headmap", tp->headmap, tp->fixed.nsec);
 
-#ifdef notdef
     for (s = 0; s < tp->fixed.nsec; s++) {
         printf("sector: %d\n", s);
         if (tp->data[s]) {
@@ -233,7 +235,6 @@ dump_track(struct imd *imd, int t)
             printf("absent\n");
         }
     }
-#endif
 }
 
 void
