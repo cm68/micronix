@@ -261,7 +261,7 @@ rd_hdca_data(portaddr p)
 {
     byte v = buffer[ramptr];
     // printf("hdca: input data (%d) %d\n", ramptr, v);
-    ramptr++;
+    ramptr = (ramptr + 1) & 0x1ff;
     return v;
 }
 
