@@ -314,10 +314,10 @@ volatile int breakpoint;
 
 struct MACHINE *cp;
 
-int stop[10];
+int stops[10];
 
 void
-stop_cpu()
+stop()
 {
     breakpoint = 1;
 }
@@ -537,14 +537,14 @@ byte
 undef_in(portaddr p)
 {
     printf("input from undefined port %x\n", p);
-    stop_cpu();
+    stop();
     return 0xff;
 }
 
 void
 undef_out(portaddr p, byte v)
 {
-    stop_cpu();
+    stop();
     printf("output to  undefined port %x -> %x\n", p, v);
 }
 
@@ -659,7 +659,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "usage: %s [<options>] [program [<program options>]]\n",
         p);
     fprintf(stderr, "\t-d\t<drive file>\n");
-    fprintf(stderr, "\t-d\t<symbol file>\n");
+    fprintf(stderr, "\t-s\t<symbol file>\n");
     fprintf(stderr, "\t-t\topen a debug terminal window\n");
     fprintf(stderr, "\t-b\t\tstart with breakpoint\n");
     fprintf(stderr, "\t-v <verbosity>\n");
@@ -813,6 +813,13 @@ main(int argc, char **argv)
             fprintf(stdin, "freopen of %s as stdin failed %d\n", ptyname, errno);
             exit(0);
         }
+    } else {
+        stdout = freopen("logfile", "w+", stdout);
+        if (!stdout) {
+            perror("lose");
+        }
+        setvbuf(stdout, 0, _IONBF, 0);
+        printf("log file\n");
     }
 
     if (verbose) {
@@ -1079,10 +1086,10 @@ monitor()
             c = 1;
             skipwhite(&s);
             if (!*s) {
-                for (i = 0; i < sizeof(stop); i++) {
+                for (i = 0; i < sizeof(stops); i++) {
                     if ((i % 16) == 0)
                         printf("\n%02d: ", i);
-                    printf("%03d ", stop[i]);
+                    printf("%03d ", stops[i]);
                 }
                 printf("\n");
             }
@@ -1098,8 +1105,8 @@ monitor()
                     i = -i;
                     c = 0;
                 }
-                if (i < sizeof(stop)) {
-                    stop[i] = c;
+                if (i < sizeof(stops)) {
+                    stops[i] = c;
                 }
             }
             break;
