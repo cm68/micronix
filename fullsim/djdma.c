@@ -16,6 +16,7 @@
 
 #include "sim.h"
 #include <sys/ioctl.h>
+#include <stdio.h>
 
 extern int terminal_fd;
 
@@ -300,8 +301,37 @@ setintr()
 static unsigned char
 writesec()
 {
-    if (verbose & V_DJDMA) printf("djdma: writesec\n");
-    return S_PROT;
+    unsigned char trk;
+    unsigned char sec;
+    unsigned char drive;
+    unsigned char side;
+    unsigned char status;
+    int bytes;
+
+    trk = physread(channel + 1);
+    sec = physread(channel + 2);
+    side = sec & 0x80;
+    sec &= 0x7f;
+    drive = physread(channel + 3);
+
+    if (verbose & V_BIO) {
+        printf("djdma: write sector drive:%d track:%d sec:%d side:%d\n",
+            drive, trk, sec, side);
+    }
+    if (verbose & V_DJDMA) printf("djdma: write sector drive:%d track:%d sec:%d side:%d\n",
+        drive, trk, sec, side);
+    if (imdp[drive]) {
+        copyin(secbuf, dmaaddr, bytes);
+        bytes = imd_write(imdp[drive], drive, trk, side, sec, secbuf);
+        if (bytes > 0) {
+            status = S_NORMAL;    
+        } else {
+            status = S_PROT;
+        }
+    } else {
+        status = S_ILLDRV;
+    }
+    return status;
 }
 
 /*
@@ -523,9 +553,7 @@ byte bootstrap[] = {
     0xff                //      db ff
 };
 
-extern char *boot_drive;
-extern char *b_drive;
-
+extern char **drivenames;
 /*
  * hook up the registers and do reset processing
  * this runs the load sector 0 to physical memory 0
@@ -534,20 +562,21 @@ static int
 djdma_init()
 {
     int i;
+    char **s;
 
 	register_output(DJDMA_PORT, &pulse_djdma);
-    imdp[0] = load_imd(boot_drive);
-    if (!imdp[0]) {
-        return 1;
-    }
-    if (b_drive) {
-        imdp[1] = load_imd(b_drive);
-        if (!imdp[1]) {
-            return 1;
+
+    if (drivenames) {
+        for (i = 0; drivenames[i]; i++) {
+            imdp[i] = load_imd(drivenames[i]);
+            if (!imdp[i]) {
+                printf("djdma_init: could not open %s\n",
+                    drivenames[i]);
+                return 1;
+            }
         }
     }
 
-    // dump_imd(imdp[0]);
     for (i = 0; i < 38; i++) {
         lowmem_save[i] = physread(i);
         physwrite(i, 0);

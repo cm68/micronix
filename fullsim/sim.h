@@ -16,8 +16,6 @@
 #define V_IMD   (1 << 8)        // IMD processing
 #define V_BIO   (1 << 9)        // block io
 
-extern int verbose;
-
 typedef unsigned char byte;
 
 typedef unsigned long paddr;	// 24 bit physical address
@@ -30,6 +28,7 @@ typedef void (*outhandler)(portaddr port, byte val);
 extern inhandler input_handler[256];
 extern outhandler output_handler[256];
 
+extern void register_prearg_hook(int (*hookfunc)());
 extern void register_startup_hook(int (*hookfunc)());
 extern void register_poll_hook(void (*hookfunc)());
 extern void register_input(portaddr portnum, inhandler func);
@@ -48,3 +47,12 @@ int imd_read(void *ip, int drive, int trk, int side, int sec, char *buf);
 void *load_imd(char *fname);
 void imd_trkinfo(void *vp, int trk, int *secs, int *secsize);
 char *bitdef(byte v, char**desc);
+void dumpmem(unsigned char (*readbyte) (long addr), long addr, int len);
+
+/*
+ * global variables
+ */
+extern int verbose;
+extern int rom_size;
+extern char *rom_image;
+extern char *bootrom;

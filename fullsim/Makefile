@@ -3,6 +3,7 @@ DEBUG = -g
 CFLAGS = $(DEBUG)
 
 DRIVERS=djdma.o imd.o multio.o hdcdma.o hdca.o
+CPU=mpz80.o
 
 all: hsim
 
@@ -17,7 +18,10 @@ z80emu.o: z80emu.c z80emu.h z80config.h z80user.h \
 util.o:	util.c sim.h
 	$(CC) $(CFLAGS) -c $<
 
-decision.o: decision.c z80emu.h z80config.h sim.h
+mpz80.o: mpz80.c
+	$(CC) $(CFLAGS) -c $<
+
+hsim.o: hsim.c z80emu.h z80config.h sim.h
 	$(CC) $(CFLAGS) -c $<
 
 multio.o: multio.c sim.h
@@ -38,8 +42,8 @@ imd: imd.c sim.h util.o
 imdd: imdd.c
 	$(CC) -DSTAND $(CFLAGS) -o imdd imdd.c
 
-hsim: decision.o z80emu.o util.o $(DRIVERS) ../src/sgs/z80dis.o
-	$(CC) $(DEBUG) -o hsim decision.o z80emu.o util.o $(DRIVERS) ../src/sgs/z80dis.o
+hsim: hsim.o $(CPU) z80emu.o util.o $(DRIVERS) ../src/sgs/z80dis.o
+	$(CC) $(DEBUG) -o hsim hsim.o $(CPU) z80emu.o util.o $(DRIVERS) ../src/sgs/z80dis.o
 	pkill hsim
 
 rmdelta:

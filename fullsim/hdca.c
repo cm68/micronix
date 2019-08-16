@@ -5,6 +5,7 @@
 
 #include "sim.h"
 #include <fcntl.h>
+#include <stdio.h>
 
 /*
  * drive geometry
@@ -32,13 +33,10 @@ struct drivetype {
 #define secoff(s, h, t) \
     (512 * (((((t) * HEADS) + (h)) * SPT) + (s)))
 
-/*
- * drive state
- */
 #define DRIVES  4
 
-static int drive[DRIVES];     // file descriptor
-static int track[DRIVES];       // where are we - used for format and seek
+static int drive[DRIVES];       // file descriptor for data file
+static int track[DRIVES];       // head location
 
 /*
  * the hdca has 1k of ram, 512 for data, and 512 for headers
