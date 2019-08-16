@@ -50,7 +50,7 @@ rmdelta:
 	rm -f *-delta
 
 clean: rmdelta
-	rm -f *.o maketables hsim
+	rm -f *.o maketables hsim dumpfile logfile file.inp
 
 clobber:	clean
-	rm -f sim
+	rm -f sim imd imdd hdca-[0-3] hdcdma-[0-3]
