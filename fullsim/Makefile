@@ -14,6 +14,9 @@ z80emu.o: z80emu.c z80emu.h z80config.h z80user.h \
 	instructions.h macros.h tables.h
 	$(CC) $(CFLAGS) -c $<
 
+util.o:	util.c sim.h
+	$(CC) $(CFLAGS) -c $<
+
 decision.o: decision.c z80emu.h z80config.h sim.h
 	$(CC) $(CFLAGS) -c $<
 
@@ -29,15 +32,20 @@ hdcdma.o: hdcdma.c sim.h
 hdca.o: hdca.c sim.h
 	$(CC) $(CFLAGS) -c $<
 
-imd: imd.c sim.h
-	$(CC) $(CFLAGS) -o imd imd.c
+imd: imd.c sim.h util.o
+	$(CC) -DSTAND $(CFLAGS) -o imd imd.c
 
-hsim: decision.o z80emu.o $(DRIVERS) ../src/sgs/z80dis.o
-	$(CC) $(DEBUG) -o hsim decision.o z80emu.o $(DRIVERS) ../src/sgs/z80dis.o
+imdd: imdd.c
+	$(CC) -DSTAND $(CFLAGS) -o imdd imdd.c
+
+hsim: decision.o z80emu.o util.o $(DRIVERS) ../src/sgs/z80dis.o
+	$(CC) $(DEBUG) -o hsim decision.o z80emu.o util.o $(DRIVERS) ../src/sgs/z80dis.o
 	pkill hsim
 
+rmdelta:
+	rm -f *-delta
 
-clean:
+clean: rmdelta
 	rm -f *.o maketables hsim
 
 clobber:	clean
