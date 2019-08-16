@@ -13,11 +13,7 @@
 #ifndef __Z80USER_INCLUDED__
 #define __Z80USER_INCLUDED__
 
-typedef struct MACHINE {
-	Z80_STATE	state;
-	unsigned char	memory[1 << 20];
-	int 		is_done;
-} MACHINE;
+typedef Z80_STATE MACHINE;
 
 #ifdef __cplusplus
 extern "C" {

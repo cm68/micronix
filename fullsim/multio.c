@@ -10,6 +10,7 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <fcntl.h>
+#include <stdio.h>
 
 int terminal_fd;
 

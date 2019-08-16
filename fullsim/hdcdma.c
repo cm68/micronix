@@ -16,6 +16,7 @@
 
 #include "sim.h"
 #include <fcntl.h>
+#include <stdio.h>
 
 #define	HDCDMA_PORT 	0x55	// hdcdma attention port
 #define	HDCDMA_RESET	0x54	// hdcdma reset port
