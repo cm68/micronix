@@ -2,10 +2,10 @@ CC = gcc
 DEBUG = -g
 CFLAGS = $(DEBUG)
 
-DRIVERS=djdma.o imd.o multio.o hdcdma.o hdca.o
+DRIVERS=djdma.o imd.o multio.o hddma.o hdca.o
 CPU=mpz80.o
 
-all: hsim
+all: hsim imd imdd
 
 tables.h: maketables.c
 	$(CC) -Wall $< -o maketables
@@ -30,14 +30,14 @@ multio.o: multio.c sim.h
 djdma.o: djdma.c sim.h
 	$(CC) $(CFLAGS) -c $<
 
-hdcdma.o: hdcdma.c sim.h
+hddma.o: hddma.c sim.h
 	$(CC) $(CFLAGS) -c $<
 
 hdca.o: hdca.c sim.h
 	$(CC) $(CFLAGS) -c $<
 
 imd: imd.c sim.h util.o
-	$(CC) -DSTAND $(CFLAGS) -o imd imd.c
+	$(CC) -DSTAND $(CFLAGS) -o imd imd.c util.o
 
 imdd: imdd.c
 	$(CC) -DSTAND $(CFLAGS) -o imdd imdd.c
@@ -46,11 +46,14 @@ hsim: hsim.o $(CPU) z80emu.o util.o $(DRIVERS) ../src/sgs/z80dis.o
 	$(CC) $(DEBUG) -o hsim hsim.o $(CPU) z80emu.o util.o $(DRIVERS) ../src/sgs/z80dis.o
 	pkill hsim
 
-rmdelta:
-	rm -f *-delta
+rmmerge:
+	rm -f *-merge 
 
-clean: rmdelta
+rmdelta:
+	rm -f *-delta 
+
+clean: rmdelta rmmerge
 	rm -f *.o maketables hsim dumpfile logfile file.inp
 
 clobber:	clean
-	rm -f sim imd imdd hdca-[0-3] hdcdma-[0-3]
+	rm -f sim imd imdd hdca-[0-3] hddma-[0-3]

@@ -321,6 +321,7 @@ writesec()
     if (verbose & V_DJDMA) printf("djdma: write sector drive:%d track:%d sec:%d side:%d\n",
         drive, trk, sec, side);
     if (imdp[drive]) {
+        imd_trkinfo(imdp[drive], trk, 0, &bytes);
         copyin(secbuf, dmaaddr, bytes);
         bytes = imd_write(imdp[drive], drive, trk, side, sec, secbuf);
         if (bytes > 0) {

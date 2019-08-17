@@ -15,6 +15,7 @@
 #define V_MPZ   (1 << 7)        // MPZ80
 #define V_IMD   (1 << 8)        // IMD processing
 #define V_BIO   (1 << 9)        // block io
+#define V_HDDMA (1 << 10)        // block io
 
 typedef unsigned char byte;
 

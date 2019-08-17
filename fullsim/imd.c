@@ -20,13 +20,48 @@
  * contains tracks that overlay the data from the IMD file, and loading the IMD
  * initially first reads the baseline and then overlays the newly written data
  * that is tagged with the parent.  not entirely satisfactory.
+ *
+ * the format of the delta file is brute force and wasteful:
+ * one byte for every potential sector on the disk
+ * 80 * 32 = 2560 bytes,
+ *  32 bytes being the dirty sector indication
+ * 80 * 32 * 1024 bytes of the actual data, where each sector
+ *  1024 being every potential sector.
+ * so calculating the delta offset is trivial
  */
+
+/* imd data codes */
+#define IMD_ABSENT  0
+#define IMD_DATA    1
+#define IMD_FILL    2
+#define IMD_EOC     0x1a
+
+/* layout of the delta file */
+#define MAXSECSIZE  1024
+#define MAXTRACKS   80          // 0 - 79
+#define MAXSECTORS  32          // 0 - 31
+
+#define DELTA_SIZE      MAXTRACKS * MAXSECTORS
+#define DIRTY_OFF(t,s)  (((t) * MAXSECTORS) + (s))
+#define DELTA_OFF(t,s)  DELTA_SIZE + (MAXSECSIZE * DIRTY_OFF(t,s))
+#define MAXDELTA        DELTA_OFF(MAXTRACKS, 0)
+
+#define DELTA_NO    0           // use the original
+#define DELTA_YES   1           // delta has newer
 
 #include "sim.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef STAND
+int verbose;
+void stop()
+{
+}
+
+#endif
 
 /*
  * this is our handle for the read/write .imd file support
@@ -36,6 +71,7 @@ struct imd {
     int tracks;                 // how many tracks
     struct imd_trk **track;     // array of tracks
     int delta_fd;               // file descriptor for writes
+    char delta_map[DELTA_SIZE]; // the dirty map
 };
 
 /*
@@ -44,12 +80,6 @@ struct imd {
  * entirely.  so each track can have it's own format and size.  handle this.
  * this is strongly derived from dave dunfield's file format.  kudos to him for doing
  * the hard work of inventing this abstraction.
- *
- * the delta file is a sparse array of variable length track data, where one track
- * follows another without a gap.  each track consists of nsec bytes of dirty flags
- * for each sector, and immediately followed by all the sector data, whether dirty
- * or not.  in this way, every delta file is at least as large as the full virtual
- * size of the disk, even those sectors not present or written.
  *
  * however, in memory, we just scribble on the same place as the original data.
  * this means that we only read the delta once.
@@ -68,10 +98,6 @@ struct imd_trk {
     char *cylmap;
     char *headmap;
     char **data;
-    int deltaoff;               // the file offset of the deltas
-    char *deltamap;
-#define DELTA_NO    0           // use the original
-#define DELTA_YES   1           // delta has newer
 };
 
 static void
@@ -189,8 +215,6 @@ get_track(int fd)
     return tp;
 }
 
-#define MAXTRACKS   256
-
 /*
  * load an imd file and return the struct
  */
@@ -201,10 +225,10 @@ load_imd(char *fname)
     char c = 0;
     int clen = 0;
     int fd;
-    char delta[100];
-    int offset;
     struct imd_trk *tp;
     int t;
+    int offset;
+    char delta[100];
 
     fd = open(fname, O_RDONLY);
     // what's the size of the comment?
@@ -212,19 +236,17 @@ load_imd(char *fname)
         if (read(fd, &c, 1) != 1)
             return 0;
         clen++;
-    } while (c != 0x1a);
+    } while (c != IMD_EOC);
 
     // make space for the imd header and copy the comment
     ip = malloc(sizeof(*ip));
-    ip->comment = malloc(clen);
+    ip->comment = malloc(clen + 1);
     
     lseek(fd, 0, SEEK_SET);
     read(fd, ip->comment, clen);
-    ip->comment[clen-1] = 0;
+    ip->comment[clen] = 0;
     ip->track = malloc(sizeof(struct imd_trk *) * MAXTRACKS);
 
-    // we need to size the delta file
-    offset=0;
     // read all the tracks in
     for (t = 0; t < MAXTRACKS; t++) {
         ip->track[t] = tp = get_track(fd);
@@ -232,34 +254,29 @@ load_imd(char *fname)
             break;
         } 
         tp->track = t;
-        tp->deltaoff = offset;
-        // space for the sector and flag
-        offset += tp->fixed.nsec * (tp->secsize + 1);
     }    
     ip->tracks = t;
     ip->track = realloc(ip->track, sizeof(struct imd_trk *) * ip->tracks);
     close(fd);
-    printf("imd: read in %d tracks deltasize %d\n", t, offset);
     
     // now, create the delta file or read it - make sure it's full sized
     sprintf(delta, "%s-delta", fname);
     fd = open(delta, O_RDWR|O_CREAT, 0777);
-    lseek(fd, offset, SEEK_SET);
+    c = 0;
+    lseek(fd, MAXDELTA, SEEK_SET);
     write(fd, &c, 1);
     fsync(fd);
     ip->delta_fd = fd;
 
-    for (t = 0; t < ip->tracks; t++) {
+    /* read the delta map */
+    lseek(fd, 0, SEEK_SET);
+    read(fd, &ip->delta_map, DELTA_SIZE);
+
+    for (t = 0; t < MAXTRACKS; t++) {
         tp = ip->track[t];
-        tp->deltamap = malloc(tp->fixed.nsec);
-        for (c = 0; c < tp->fixed.nsec; c++) {
-            tp->deltamap[c] = DELTA_NO;
-        }
-        lseek(fd, tp->deltaoff, SEEK_SET);
-        read(fd, tp->deltamap, tp->fixed.nsec);
-        for (c = 0; c < tp->fixed.nsec; c++) {
-            if (tp->deltamap[c] == DELTA_YES) {
-                offset = tp->deltaoff + tp->fixed.nsec + (c * tp->secsize);
+        for (c = 0; c < MAXSECTORS; c++) {
+            if (ip->delta_map[DIRTY_OFF(t,c)] == DELTA_YES) {
+                offset = DELTA_OFF(t,c);
                 if (verbose & V_BIO) printf("imd_load_delta trk %d side %d sec %d offset %d\n",
                     t, 0, c, offset);
                 lseek(fd, offset, SEEK_SET);
@@ -278,8 +295,8 @@ imd_trkinfo(void *vp, int trk, int *secs, int *secsize)
 {
     struct imd *ip = (struct imd *)vp;
     struct imd_trk *tp = ip->track[trk];
-    *secs = tp->fixed.nsec;
-    *secsize = tp->secsize;
+    if (secs) *secs = tp->fixed.nsec;
+    if (secsize) *secsize = tp->secsize;
 }
 
 /*
@@ -338,10 +355,10 @@ imd_write(void *vp, int drive, int trk, int side, int osec, char *buf)
         tp->data[tsec] = malloc(tp->secsize);
     }
     memcpy(tp->data[tsec], buf, tp->secsize); 
-    lseek(ip->delta_fd, tp->deltaoff+tsec, SEEK_SET);
+    lseek(ip->delta_fd, DIRTY_OFF(trk, tsec), SEEK_SET);
     c = DELTA_YES;
     write(ip->delta_fd, &c, 1);
-    offset = tp->deltaoff + tp->fixed.nsec + (tsec * tp->secsize);
+    offset = DELTA_OFF(trk, tsec);
     if (verbose & V_BIO) printf("imd_write drive %d trk %d side %d osec %d tsec %d offset %d\n",
         drive, trk, side, osec, tsec, offset);
     lseek(ip->delta_fd, offset, SEEK_SET);
@@ -372,8 +389,9 @@ imd_read(void *vp, int drive, int trk, int side, int osec, char *buf)
     return (tp->secsize);
 }
 
+#ifdef STAND
 void
-dump_imd(struct imd *imd)
+dump_imd(struct imd *imd, char *filename)
 {
     int t;
 
@@ -385,12 +403,121 @@ dump_imd(struct imd *imd)
    }
 }
 
-#ifdef STAND
+/*
+ * write out a new imd file that contains the data for the old data plus the delta
+ */
+void
+merge_imd(struct imd *imd, char *filename)
+{
+    char merge[100];
+    struct imd_trk *tp;
+    int trk;
+    int sec;
+    int i;
+    char value;
+    char type;
+    char *buf;
+    int fd;
+ 
+    sprintf(merge, "%s-merge", filename);
+    fd = open(merge, O_RDWR|O_CREAT, 0777);
+    write(fd, imd->comment, strlen(imd->comment) - 1);
+    value = IMD_EOC;
+    write(fd, &value, 1);
+    for (trk = 0; trk < imd->tracks; trk++) {
+        tp = imd->track[trk];    
+        write(fd, &tp->fixed, sizeof(tp->fixed));
+        if (tp->secmap) write(fd, tp->secmap, tp->fixed.nsec);
+        if (tp->cylmap) write(fd, tp->cylmap, tp->fixed.nsec);
+        if (tp->headmap) write(fd, tp->headmap, tp->fixed.nsec);
+        for (sec = 0; sec < tp->fixed.nsec; sec++) {
+            buf = tp->data[sec];
+            if (buf) {
+                type = IMD_FILL;
+                value = buf[0];
+                for (i = 0; i < tp->secsize; i++) {
+                    if (buf[i] != value) {
+                        type = IMD_DATA;
+                        break;
+                    }
+                }
+                write(fd, &type, 1);
+                if (type == IMD_FILL) {
+                    write(fd, &value, 1);
+                } else {
+                    write(fd, buf, tp->secsize);
+                }
+            } else {
+                type = IMD_ABSENT;
+                write(fd, &type, 1);                
+            }
+        }    
+    }
+    close(fd);
+}
+
+char *progname;
+
+void
+usage(char c)
+{
+    if (c) printf("unknown option %c\n", c);
+    printf("usage: %s [options] <imd file> ...\n", progname);
+    printf("\t-m\tmerge deltas\n");
+    printf("\t-d\tdump data\n");
+    exit(1);
+}
+
+int
 main(int argc, char **argv)
 {
     struct imd *ip;
-    ip = (struct imd *)load_imd("/dev/stdin");
-    dump_imd(ip);
+    char *s;
+    int dump = 0;
+    int merge = 0;
+
+    progname = *argv++;
+    argc--;
+
+    while (argc) {
+        s = *argv;
+        if (*s++ != '-')
+            break;
+        argv++;
+        argc--;
+        while (*s) {
+            switch(*s) {
+            case 'd':
+                dump++;
+                break;
+            case 'm':
+                merge++;
+                break;
+            case 'h':
+                usage(0);
+                break;
+            default:
+                usage(*s);
+                break;
+            }
+            s++;
+        }
+    }
+
+    while (argc--) {
+        printf("%s\n", *argv);
+        ip = (struct imd *)load_imd(*argv);
+        if (!ip) {
+            printf("can't load %s\n", *argv);
+            exit(1);
+        }
+        if (!(dump || merge)) {
+            printf("%s\n", ip->comment);
+        }
+        if (dump) dump_imd(ip, *argv);
+        if (merge) merge_imd(ip, *argv);
+        argv++;
+    }
     exit(0);
 }
 #endif

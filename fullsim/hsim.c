@@ -54,7 +54,9 @@ char *mytty;
 
 // needs to be sync'd with sim.h
 char *vopts[] = {
-    "V_IO", "V_INST", "V_IOR", "V_MAP", "V_DJDMA", "V_MIO", "V_HDCA", "V_MPZ", "V_IMD", "V_BIO", 0
+    "V_IO", "V_INST", "V_IOR", "V_MAP", 
+    "V_DJDMA", "V_MIO", "V_HDCA", "V_MPZ", 
+    "V_IMD", "V_BIO", "V_HDDMA", 0
 };
 
 int verbose;
@@ -513,8 +515,6 @@ main(int argc, char **argv)
                 } 
                 drivenames[i] = strdup(*argv++);
                 drivenames[i+1] = 0;
-                for (i = 0; drivenames[i]; i++)
-                    printf("drivenames %d %s\n", i, drivenames[i]); 
                 break;
             case 'b':
                 if (!argc--) {
