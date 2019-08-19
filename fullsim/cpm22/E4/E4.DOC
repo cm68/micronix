@@ -1,0 +1,478 @@
+Morro÷ Designó Decisioî ± CBIOS Revisioî E.´
+
+This Revision differs from previous revisions as follows:
+
+     1.©  Thå  CBIOÓ ió largeò bù abouô 0.5k¬  leavinç á  TPÁ  oæ 
+     abouô  54k®  Supporô  haó  beeî addeä foò  5.2µ  incè  soft-
+     sectoreä diskettes¬ botè singlå anä doublå sideä witè Morro÷ 
+     Designó  Micro-Decisioî format®  Thió ió availablå onlù  foò 
+     thå  DJ/DMÁ diskettå controlleró shippeä witè EPROMÓ  lableä 
+     2.µ oò higher® Earlieò controlleró requirå firmwarå changes® 
+     Thå   FORMATDJ.COÍ  prograí  haó  beeî  renameä  FDJ.COÍ  tï 
+     distinguisè  iô froí erarlieò versions®  Iô accomodateó  thå 
+     ne÷ formats.
+
+     2.©  Multiï anä WBIÏ Characteò Devicå Driveró  arå  supplieä 
+     witè supporô foò thå Centronicó Port¬  whicè shareó hardwarå 
+     witè  thå existinç Diablï Hytypå Port®   Á speciaì cablå  ió 
+     requireä   foò   interfacå  tï  Centronicó   Devices®    Thå 
+     Centronicó Porô ió assigneä tï thå PUNº devicå driver® Á ne÷ 
+     program¬  SWAP.COÍ  ió provideä tï swağ thå  LSTº  anä  PUNº 
+     driveró  tï allo÷ thå Centronicó Porô tï bå useä aó thå LSTº 
+     device®   Otheò assignmentó maù alsï bå made®   Thå  prograí 
+     haó á helğ message¬ invokå as:
+
+	SWAP<cr>
+
+     Notå  thaô  SWAĞ wilì refuså tï functioî iæ youò CBIOS  doeó 
+     not have Multio drivers.
+
+     3.©  Multiï  anä WBIÏ Characteò Deviceó  arå  banë  switcheä 
+     undeò  controì  oæ á porô ¨ aô base+· © whicè  contaiî  bitó 
+     otheò thaî thoså requireä tï selecô thå banë desired®  Theså 
+     otheò  bitó arå meanô foò systeí control¬  anä changinç theí 
+     wilì causå thå systeí tï crash®  Thus¬ iæ yoõ wanô tï selecô 
+     á devicå otheò thaî thå onå iî uså bù thå system¬ yoõ maù dï 
+     so¬  buô  yoõ musô noô alteò thå statå oæ thå  grouğ  selecô 
+     port®   Sincå  thió porô ió writå only¬  yoõ caî onlù obtaiî 
+     thå  contentó oæ thå systeí bitó bù accessinç  thå  system'ó 
+     copù  oæ itó lasô writå tï thaô port®   Locatinç thió singlå 
+     bytå  withiî thå bioó requireä knowledgå oæ  severaì  'Magiã 
+     Numbers§ iî earlieò releaseó oæ thå bios®  Thå ne÷ characteò 
+     driveró  iî revisioî E.´ wilì returî á pointeò tï thå  grouğ 
+     bytå iî registeò [DEİ followinç anù singlå characteò servicå 
+     requesô  froí  BDOS®   Thaô  is¬  youò  applicatioî  prograí 
+     runninç iî thå TPÁ caî finä thå grouğ bytå aó follows:
+
+mvi	c,0BH		;check console status, real safe, no one will notice
+call	5		;have BDOS do it.
+xchg			;pointer to group was in [DE], now in [HL]
+shld	savegp		;save the group address.
+
+
+Later, the same program may select a device as follows (for serial port 2)
+
+lhld	savegpŠmov	a,m		;read group bits
+ori	2		;0=parallel, 1=console, 2=unused serial, 3=list serial
+out	4fh		;this is the address of the group select port
+;noteº  froí  thå application'ó point-of-view¬  thå grouğ bytå ió read-only.
+;also, you must re-select the port each time you wish to use the device since
+;the CBIOS will switch to another port to select its devices.
+
+     4.©  Thå  MOVCPM.COÍ prograí supplieä witè earlieò  releaseó 
+     containeä  á driveò foò thå selecteä hard-disë aó  thå  lasô 
+     drivå  iî  thå system¬  anä thå signoî banneò ofteî diä  noô 
+     identifù thå drivå type®   Thå intenô haä beeî tï providå  á 
+     floppù  disë whicè waó bootable¬  anä whicè coulä bå useä tï 
+     sysgeî thå hard-disë witè onå oæ thå otheò MOVCPÍ  programs¬ 
+     onå  whicè woulä makå thå hard-disë thå primarù drivå oî thå 
+     system®   Unfortunately¬  somå users¬  anä manù  technicianó 
+     here¬  goô  intï troublå wheî theù trieä tï booô theså diskó 
+     anä  immediatelù PIĞ programó tï thå  hard-disk®  Hard-diskó 
+     varù iî storagå placemenô oî alì buô thå outer-mosô  tracks® 
+     Iæ  youò systeí haó á HDC/DMÁ controlleò witè aî M1° oò  M1¶ 
+     drive¬  yoõ maù onlù uså thå bootablå diskettå tï SYSGEÎ thå 
+     hard-disk¬ yoõ maù noô transfeò datá oò ruî programó becauså 
+     thå  bootablå  diskettå containó driveró foò thå Mµ  drives®  
+     Thió  releaså  identifieó  iô  aó  such®
+
+     5.©   Youò  distributioî  disketteó  contaiî  severaì  fileó 
+     dealinç  witè  thå CBIOS foò youò system®  Iæ  yoõ  neeä  tï 
+     changå thå characteristicó oæ youò system¬  yoõ wilì neeä tï 
+     know about the following items:
+
+     First¬  youò disketteó arå markeä witè á numbeò iî thå uppeò 
+     right-hanä  corner¬  somethinç  likå  #90´  oò  #901®   Thió 
+     identifieó  thå  collectioî  oæ deviceó  supporteä  iî  youò 
+     CBIOS¬  anä ió reallù jusô á factorù parô number®  Somewherå 
+     oî  mù desk¬  therå ió á masteò lisô oæ SoftWarå  (SW©  parô 
+     numbers¬  alonç witè thå deviceó supporteä bù eacè one®   Mù 
+     desë haó á permanenô OUT-OF-SPACÅ ERROR¬  sï É keeğ thå reaì 
+     lisô oî mù disk®  Youò disë haó á copù oæ thå pertinanô parô 
+     oæ  thió masteò lisô iî á grouğ oæ fileó beginninç witè  thå 
+     letteró 'SW'.
+
+     Second¬   youò  disë  containó  severaì  variationó  oî  thå 
+     MOVCPM.COÍ  program®  Trù 'DIÒ MOVCPM*.COM'®   Notå thaô thå 
+     numberó  iî thå namå arå relateä tï thå filå  extensionó  iî 
+     thå  'SW§  files®   Exampleº  oî thå diskó foò Factorù  Parô 
+     Numbeò #904¬ therå arå files:
+
+	MOVCPM.COM		SW904.000
+	MOVCPM5.COM		SW904.005
+	MOVCPM10.COM		SW904.010
+	MOVCPM16.COM		SW904.016
+
+     Thå  'SW§  fileó  arå thå actuaì equatå fileó  useä  iî  thå 
+     Masterinç  Laâ aô Morro÷ Designó tï creatå  thå  MOVCPM*.COÍ 
+     files.
+Š
+
+     Third¬ therå arå fileó witè names:
+
+	ABOOT.A			ABOOT.B
+	CBIOS.A			CBIOS.B
+
+     Theså pieceó oæ prograí arå likå epoxy¬  Parô A¬ anä Parô B®  
+     Yoõ caî combinå theí witè thå followinç commands:
+
+	PIP ABOOT.ASM=ABOOT.A,ABOOT.B
+	PIP CBIOS.ASM=CBIOS.A,CBIOS.B
+
+     Combineä  thió  way¬   yoõ  havå  á  CBIOS  whicè  bearó  nï 
+     similaritù tï thå onå yoõ neeä foò youò system®   Thå Parô Á 
+     pieceó  contaiî alì oæ thå commentó relatinç tï thå  EQUateó 
+     requireä  tï makå thå assemblù timå conditionó generatå  thå 
+     codå requireä foò á collectioî oæ hardware®   Iî general¬ aî 
+     EQUatå  iî  Parô  Á  wilì  causå á sectioî  oæ  codå  tï  bå 
+     assembleä  iî Parô B®  Foò instance¬  thå  EQUatå  'mforder§ 
+     telló  Parô Â tï makå thå mini-floppyó show-uğ aó driveó  Aº 
+     thrõ  whateveò ió iî 'maxmf'¬  anä tï assemblå thå warm-booô 
+     codå  foò thå mini-floppy®   Sï tï generatå á CBIOS  witè  á 
+     speciaì  configuration¬  alì  É  havå  tï  dï  herå  iî  thå 
+     Masterinç Lab¬  ió tï fiddlå arounä witè thå equateó iî Parô 
+     A¬  theî  adä  partó  Á anä B¬  anä voila¬  á ne÷  CBIOS  ió 
+     created®  Becauså É havå alì sortó oæ configurations¬ É havå 
+     removeä thå commentó froí Parô A¬  fiddleä witè thå equates¬ 
+     anä assigneä meaningfuì nameó tï them¬  'SW9xx.0yy§ wherå xø 
+     ió aî arbitrarù parô number¬  anä yù ió relateä tï thå warm-
+     booô  drivå size®   Yoõ havå á copù oæ thå S× fileó useä  tï 
+     makå  youò  MOVCPÍ  files®   Iæ yoõ eveò neeä  tï  makå  anù 
+     changeó tï youò CBIOS¬  oò iæ yoõ simplù wisè tï makå á nicå 
+     listinç  foò  reference¬  yoõ shoulä ediô  thå  CBIOS.Á  anä 
+     ABOOT.Á files¬  anä makå thå EQUateó therå matcè thå equateó 
+     iî thå S× files®   Theî changå thå firsô equate¬ 'ABSASM§ tï 
+     matcè  thå assembleò yoõ wilì bå using¬  aó indicateä iî thå 
+     sourcå file®   Yoõ havå youò choicå oæ eitheò MAC¬  oò RMAC® 
+     Wå  dï noô uså thå ASÍ assembleò supplieä witè CP/Í  becauså 
+     iô  haó  aî insufficienô  conditionaì  assemblù  capability® 
+     These assemblers are available from most dealers.
+     
+
+     Iæ yoõ arå usinç thå MAÃ assembler¬ yoõ wilì neeä tï declarå 
+     thå lengtè oæ thå CBIOS ..® 
+
+     é î   á ä ö á î ã å   ï æ   á ó ó å í â ì ù ¡ ¡ ¡ 
+
+     Iæ thå lengtè oæ youò CBIOS ió likelù tï changå sï mucè thaô 
+     yoõ  caî noô estimatå itó lengtè accuratelù iî advance¬  yoõ 
+     maù seô BIOSLÎ tï somå arbitrarilù largå value¬ anä assemblå 
+     it®   Looë iî thå symboì filå foò thå valuå  'BIOSLEN'¬  anä 
+     assemblå  á seconä timå usinç thió value®  Thå actuaì lengtè 
+     oæ  thå  CBIOS containeä iî á MOVCPM.COÍ filå caî  bå  founä 
+     undeò DDÔ oò SIÄ aó follows:Š
+     
+	SID MOVCPM.COM<cr>
+	S103<cr>
+	;the value displayed is the BIOSLN.
+
+     Yoõ  shoulä  enteò  thió  valuå iî thå  sourcå  filå  beforå 
+     assembly®  Foò  youò reference¬  whilå undeò DDÔ oò  SID¬  á 
+     LOCATEÄ   copù  oæ  FDOÓ  haó  thå   followinç   interestinç 
+     addresses:
+
+	ABOOT	0900H
+	CCP	0B00H
+	BDOS	1300H
+	BIOS	2100H
+	END:	SIGNON MESSAGE TEXT
+
+
+Reconfiguring a System
+
+     Tï reconfigurå thå CP/Í systeí foò youò particulaò hardware¬ 
+     yoõ  neeä  thå  MAÃ  assembleò  (noô  includeä  witè  systeí 
+     software© tï assemblå thå CBIOS.ASÍ anä ABOOT.ASÍ files.
+
+     Manù parameteró oæ thå CBIOS caî bå modifieä bù changinç thå 
+     valuå  oæ  certaiî keù variableó whicè arå useä  durinç  thå 
+     assembly® Foò example¬ thå labeì MSIZÅ ió useä tï adjusô thå 
+     memorù sizå oæ thå reconfigureä CP/M®  Thå followinç lisô oæ 
+     equateó werå pulleä ouô oæ thå CBIOS tï givå yoõ aî ideá  oæ 
+     thå optionó availablå iî thå CBIOS.ASÍ file®   Refeò tï thå 
+     CBIOS.ASÍ  filå  iæ yoõ wanô tï seå á fulì explanatioî  foò 
+     somå oæ theså equates.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                  List of Equates - CBIOS.ASM
+
+maxhd	equ	0	;Set to number of HDCA3 hard disk drives
+maxmw	equ	1	;Set to number of HDDMA hard disks
+maxfd	equ	0	;Set to number of 2D/B floppiesŠmaxdm	equ	2	;Set to number of DJ DMA floppies 8"
+maxmf	equ	2	;Set to number of DJ DMA floppies 5 1/4"
+
+hdorder	equ	0	;Set the order of logical drives ELSE 0 
+mworder	equ	1	;   if not included
+fdorder	equ	0
+dmorder	equ	2
+mforder	equ	3
+			;HDC3 controller disk drives. Set only 1
+M26	equ	0	;Shugart SA4000
+M20	equ	0	;Fujitsu M2302B
+M10F	equ	0	;Fujitsu M2301B
+M10M	equ	0	;Memorex
+
+			;HDDMA controller disk drives. Set only 1
+cm5619	equ	0	;CMI CM-5619
+st412	equ	1	;Seagate ST-412
+st506	equ	0	;Seagate ST-506
+
+     Makå á copù oæ thå .ASÍ files¬ theî ediô thå CBIOS.ASÍ filå 
+     foò  youò  desireä  systeí  configuration®    Thió  involveó 
+     changinç  thå numberó followinç thå eqõ portioî oæ thå  filå 
+     tï  reflecô  thå numbeò oæ drives¬  theiò ordeò  withiî  thå 
+     system¬  thå  drivå  type¬  etc®   Uså thå  followinç  aó  á 
+     guidelinå foò assemblinç thå files:
+
+          A>MAC CBIOS<cr>
+
+          A>MAC ABOOT<cr> 
+
+     Oncå  thå  CBIOS.ASÍ anä ABOOT.ASÍ fileó havå beeî  editeä 
+     anä  re-assembled¬  thå followinç procedurå maù bå  useä  tï 
+     incorporatå thå ne÷ driveró intï CP/M, enter the command:
+
+          A>TYPÅ ABOOT.PRN<cr>
+
+     watcè foò thå labeì "OFFSET¢ iî thå listing¬  anä recorä itó 
+     value. Next, the command:
+
+          A>TYPÅ CBIOS.PRN<cr>  
+
+     watcè foò thå labeì "OFFSETC¢ iî thå listing¬ anä recorä itó 
+     value.
+
+     Iæ  yoõ  modifieä  thå  BIOSLN¬  theî yoõ  musô  modifù  thå 
+     MOVCPM.COÍ prograí tï creatå á CP/Í systeí thaô matcheó  thå 
+     ne÷  CBIOS'ó length®   Thå followinç procedurå wilì  perforí 
+     thió modification.
+          
+
+           A>DDÔ MOVCPM.COM<cr>
+
+           -S103<cr>
+
+     Locatioî  10³  containó  thå  BIOSLÎ valuå  foò  thå  MOVCPÍ Š     program® Now¬ type:
+
+          0103 15 xx<cr>
+          0104 43 .<cr>
+
+     wherå xø ió thå firsô twï digitó oæ BIOSLÎ anä presó RETURN®  
+     Foò  instance¬  foò á BIOSLÎ oæ 1800¬  typå iî  18<cr>¬  anä 
+     exit:
+
+          -G0<cr>
+
+     Nexô enter:
+
+          A>SAVÅ 5³ MOVCPM.COM<cr>
+
+     tï savå thå reconfigureä MOVCPÍ program¬ and
+	
+          A>MOVCPÍ xø *<cr>
+
+     wherå   xø  ió  thå  MSIZÅ  valuå  thaô  yoõ  assembleä  thå 
+     CBIOS.ASÍ filå with¬ then
+	
+          A>SAVÅ 4¸ CPMxx.COM<cr>
+
+     witè xø aó above.
+
+
+     Agaiî enteò DDT¬ thió timå witè thå ne÷ CP/Í systeí file:
+
+          A>DDÔ CPMxx.COM<cr>
+          -ICBIOS.HEX<cr>
+          -Rnnnn<cr>
+
+     Wherå  nnnî  ió thå valuå oæ OFFSETÃ noteä  abovå  froí  thå 
+     listing¬ and:
+
+          -IABOOT.HEX<cr>
+          -Rmmmm<cr>
+
+     Wherå  mmmí ió thå OFFSEÔ valuå obtaineä from the listing.
+     Now exit from DDT as before:
+
+          G0<cr>
+
+          and enter:
+
+          A>SAVÅ 4¸ CPMxx.COM<cr>
+
+     witè xø aó above¬ anä then
+
+           A>SYSGEN<cr>
+
+    SYSGEN returns
+
+          Morrow Designs SYSGEN version 4.xŠ          Source drive name (or <RETURN> if in memory)
+
+     Answeò  bù  pressinç thå RETURÎ key®   (Aô  thió  poinô  thå 
+     sourcå foò thå ne÷  systeí ió iî RAÍ memory¬ noô oî thå disë 
+     wherå yoõ wanô it)®  Thå return:
+
+          Destination drive name (or <RETURN> to warm boot)
+
+     Enteò thå destinatioî drivå - Á througè P®  Bå carefuì abouô 
+     whicè driveó (harä disë oò floppy© arå driveó A¬  B¬ etc¬ aó 
+     thió  steğ  destroyó  thå originaì CP/Í oî  thå  destinatioî 
+     drive.
+
+     Tï completå thió process¬ presó thå RETURÎ keù twice:
+
+          Destination on (drive):, type <RETURN> to warm boot)
+          Function complete
+
+          Destination drive name (or <RETURN> to warm boot)
+
+     Reseô  thå systeí anä dï á "colä boot.¢  Thå  systeí  headeò 
+     displayó youò ne÷ systeí sizå now.
+
+
+
+MOVCPM
+    
+     Iæ  youò systeí doeó noô neeä anù re-configuration¬  yoõ maù 
+     uså thå MOVCPÍ prograí aó iô is®  Aó mentioneä  above¬  mosô 
+     systemó arå supplieä witè morå thaî onå copù oæ MOVCPM¬  onå 
+     foò eacè oæ severaì possiblå configurations® Usually¬ á useò 
+     wilì  bå  interesteä  iî  onlù twï oæ  thå  MOVCPÍ  programó 
+     supplied¬ MOVCPM.COM¬ whicè wilì boot-uğ froí diskettes¬ anä 
+     MOVCPMn.COÍ  ¨  wherå î ió thå harä disë typå ©  whicè  wilì 
+     boot-uğ oî thå harä disk®   Althougè thå factorù haó alreadù 
+     donå  thå  following¬  yoõ wilì bå interesteä iî  caså  youò 
+     systeí  eveò requireó service®   Youò originaì copù oæ  CP/Í 
+     camå  froí á diskettå ¨ iô ió youò CP/Í Masteò Disë  )¬  anä 
+     was placed onto the hard disk as follows:
+
+          MOVCPM * *<cr>
+          ( movcpm prints some stuff )
+          SYSGEN<cr>
+          ( see paragraph above for sysgen operation )
+
+     Iô ió importanô tï notå thaô thå CPÕ boarä haó somå switcheó 
+     whicè  selecô whicè drivå wilì bå useä  foò  cold-boot®   Aó 
+     shippeä froí thå factory¬  thå diskettå driveó wilì bå used®  
+     Onå  maù  alteò thå settingó oæ theså switcheó tï  makå  thå 
+     harä  disë  thå primarù drive¬  oò onå maù uså  thå  prograí 
+     BOOTMW for this purpose.  Try the following:
+
+          ( reset the system and re-boot )
+          BOOTMW<cr>
+Š     No÷  reaä thå signoî banner®  Iô indicateó thaô thå  primarù 
+     drivå  ¨  drivå Aº  © ió á harä disk¬  anä iô indicateó  itó 
+     size® Alsï notå thaô thå disketteó havå beeî re-assigneä anä 
+     havå differenô drivå names® Typå DIR¬ anä havå á looë aô thå 
+     contentó  oæ  thió  drive®   Thå samå  fileó  founä  oî  thå 
+     distributioî disë shoulä bå oî thå harä disk®  No÷ trù usinç 
+     thå  MOVCPÍ prograí tï makå thå disketteó thå primarù driveó 
+     again:
+
+          MOVCPM 48<cr>
+          ¨ thió makeó á 48ë systeí likå thå onå oî thå diskettå)
+          -- or --
+          MOVCPM<cr>
+          ¨  whicè makeó á 64ë systeí which will not re-boot )
+     
+     Thå  relocateä  CP/Í  wilì  begiî  executing,  however¬  thå 
+     relocateä CP/Í ió highlù unstable®  Iî particular¬ iæ á warí 
+     booô  occurs¬  thå systeí maù noô re-booô properly®  Thió ió 
+     noô á buç iî thå MOVCPM.COÍ program¬ buô ratheò á differencå 
+     iî  thå  lengtè  oæ thå originaì anä  relocateä  CP/M's®  Wå 
+     recommenä  thaô  yoõ uså thå FDÊ prograí explaineä  nexô  tï 
+     initializå  á ne÷ diskette¬  theî practicå usinç MOVCPÍ  anä 
+     SYSGEÎ  tï creatå ne÷ "systeí disks,¢ anä verifù  thaô  theù 
+     will boot correctly.
+
+FDJ.COM
+
+     Thå commanä filå FDJ.COÍ formató anä initializeó botè µ  1/´ 
+     anä ¸ incè disketteó foò thå DJDMÁ floppù disë controller.
+
+     Thió   prograí   ió  menu-driveî  anä  ió   thereforå   selæ 
+     explanatory®  Simplù enter
+
+          A>FDJ<cr>
+
+     anä follo÷ thå instructions.
+
+     Morro÷  hard-sectoreä  5.2µ  incè  end-useò  disketteó   arå 
+     double-sided¬ double-densitù witè 3µ cylinderó ¨ 7° trackó © 
+     eacè havinç teî 512-bytå sectoró ¨ selectioî "D¢ )®  Yoõ caî 
+     read/writå  thå  single-sideä  variatioî oæ thå abovå  ¨  3µ 
+     trackó )¬ aó welì aó thå single-densitù ¨ 256-bytå sectoró © 
+     variantó  oæ thå above®  Hard-sectoreä ¸ incè disketteó  arå 
+     not supported.
+
+     Morro÷   soft-sectoreä  5.2µ  incè  end-useò  disketteó  arå 
+     double-sided¬  double-densitù witè 4° cylinderó eacè  havinç 
+     fivå  1024-bytå sectoró peò surfacå ¨ selectioî "B¢ )®   Thå 
+     single-sideä varianô ió alsï supported¬ whilå single-densitù 
+     ió not.
+
+     Morro÷  soft-sectoreä ¸ incè end-useò disketteó  arå  eitheò 
+     single-sideä  oò  double-sideä  dependinç upoî thå  typå  oæ 
+     driveó  supplieä witè thå system®   Botè arå  double-densitù 
+     witè  7· cylinders¬  anä fouò 1024-bytå sectoró peò  surfacå   Š     (selectioî "G")®   Twï otheò double-densitù formató maù alsï 
+     bå reaä anä written®  Theù are¬ 256-bytå anä 512-bytå singlå 
+     anä  doublå sideä formató witè 2¶ anä 1µ sectoró peò surfacå 
+     respectively ( part of selection "I" ).
+
+     Morro÷   alsï  supportó  thå  commoî  "CP/Í   Single-Densitù 
+     Exchangå Format¢ whicè ió single-sided¬  single-densitù witè 
+     7· tracks¬  eacè witè twenty-siø 128-bytå sectoró (selectioî 
+     "F").  
+
+FORMATHD and FORMATMW
+
+     Iæ  iô  ió  desireä tï formaô thå  harä  disk¬  thå  prograí 
+     FORMATHD.COÍ  (¸ anä 1´ incè harä disks© oò FORMATMW.COÍ  (µ 
+     1/´ incè harä disks© shoulä bå used.
+
+
+CAUTION!
+     Uså cautioî witè thå harä disë formaô programsº   Theù eraså 
+     thå  datá oî thå harä disë anä iô caî noô bå  recovered®  Iæ 
+     yoõ havå tï formaô thå disk¬ thinë abouô whaô ió oî thå harä 
+     disë beforå proceeding.
+
+
+
+
+BOOTHD
+
+     Thå  prograí BOOTHD.COÍ containó á booô strağ loadeò foò thå 
+     HDCÁ  harä disë controller®  BOOTHD.COÍ coulä bå  programmeä 
+     intï  á PROÍ sï thaô yoõ coulä booô directlù ontï  thå  harä 
+     diskó withouô havinç tï botheò witè thå floppies.
+
+
+BOOTMW
+
+     Thå  prograí BOOTMW.COÍ containó á booô strağ loadeò foò thå 
+     HDC/DMÁ harä disë controller.
+
+     Thå Morro÷ Designó MPZ8° CPÕ carä haó botè BOOTHÄ anä BOOTM× 
+     encodeä  iî  itó PROM®   Refeò tï thå MPZ8° manuaì  foò  thå 
+     propeò switcè settings.
+
+
+
+
