@@ -313,6 +313,7 @@ mpz80_init()
 {
     bootrom = "mon447.bin";
     rom_size = 4096;
+    switchreg = SW_HDDMA | SW_NOMON;    // set diagnostic, monitor or boot mode
     switchreg = SW_DJDMA | SW_NOMON;    // set diagnostic, monitor or boot mode
     keybreg = 0;
     taskreg = 0;
