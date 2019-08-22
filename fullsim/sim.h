@@ -44,9 +44,10 @@ extern void output(portaddr p, byte v);
 
 extern byte input(portaddr p);
 
-int imd_read(void *ip, int drive, int trk, int side, int sec, char *buf);
+int imd_write(void *ip, int drive, int cyl, int head, int sec, char *buf);
+int imd_read(void *ip, int drive, int cyl, int head, int sec, char *buf);
 void *load_imd(char *fname);
-void imd_trkinfo(void *vp, int trk, int *secs, int *secsize);
+void imd_trkinfo(void *vp, int cyl, int head, int *secs, int *secsize);
 char *bitdef(byte v, char**desc);
 void dumpmem(unsigned char (*readbyte) (long addr), long addr, int len);
 

@@ -25,6 +25,30 @@ extern int terminal_fd;
 #define SERDATA     0x3e    // djdma serial input location
 #define SERFLAG     0x3f    // djdma serial input ack location
 
+typedef unsigned char byte;
+typedef unsigned short word;
+
+/*
+ * this is the data structure contained in DJDMA memory
+ * let's maintain our state here, too.  just like DJDMA-25 does
+ */
+#define DPARAM      0x1340
+
+struct dparam {
+    byte tracks;    // cylinders plus 1
+    byte current;   // 0xff - unknown
+    byte pattern;   // has drive select bit, starting with 0x80
+    byte logical;   // logical drive number 0 - 7
+    word step;      // step time
+    word headload;  // head load time
+    word motor;     // motor on delay
+    word settle;    // ste p settle time
+    byte firstsec;  // first sector's number
+    byte spt;       // user spec - spt
+    byte dcb;       // drive config byte
+    byte precomp;   // track for write precomp
+} dparams[8];
+
 /*
  * command codes for the djdma.   these are found at the CCA
  * and are variable length
@@ -130,7 +154,7 @@ char *sb1_bits[] = {
 #define SB3_RDY     0x80    // drive ready line
 
 char *sb3_bits[] = {
-    "", "serin", "DSDD8", "", "index", "trk0", "wprot", "rdy"
+    "", "serin", "dsdd", "", "index", "trk0", "wprot", "rdy"
 };
 
 static paddr resetchannel = DEF_CCA;    // the 24 bit channel command pointer
@@ -172,7 +196,7 @@ pulse_djdma(portaddr p, byte v)
      */
     cmd = 0;
     while (djdma_running) {
-        if (verbose & V_DJDMA) printf("djdma: fetch channel 0x%x\n", channel);
+        // if (verbose & V_DJDMA) printf("djdma: fetch channel 0x%x\n", channel);
         code = physread(channel);
         for (i = 0; i < (sizeof(djcmd) / sizeof(djcmd[0])); i++) {
             if (djcmd[i].code == code) {
@@ -202,7 +226,7 @@ setdma()
     dmaaddr = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
-    if (verbose & V_DJDMA) printf("djdma setdma %x\n", dmaaddr);
+    if (verbose & V_DJDMA) printf("\tsetdma %x\n", dmaaddr);
     return 0;
 }
 
@@ -215,7 +239,7 @@ setchannel()
     resetchannel = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
-    if (verbose & V_DJDMA) printf("djdma setchannel %x\n", resetchannel);
+    if (verbose & V_DJDMA) printf("\tsetchannel %x\n", resetchannel);
     return 0;
 }
 
@@ -238,7 +262,7 @@ branch()
     channel = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
-    if (verbose & V_DJDMA) printf("djdma: branch %x\n", channel);
+    if (verbose & V_DJDMA) printf("\tbranch %x\n", channel);
     return 0;
 }
 
@@ -248,28 +272,27 @@ branch()
 static unsigned char
 readsec()
 {
-    unsigned char trk;
+    unsigned char cyl;
     unsigned char sec;
     unsigned char drive;
-    unsigned char side;
+    unsigned char head;
     unsigned char status;
     int bytes;
 
-    trk = physread(channel + 1);
+    cyl = physread(channel + 1);
     sec = physread(channel + 2);
-    side = sec & 0x80;
+    head = sec & 0x80 ? 1 : 0;
     sec &= 0x7f;
     drive = physread(channel + 3);
 
-    if (verbose & V_BIO) {
-        printf("djdma: read sector drive:%d track:%d sec:%d side:%d\n",
-            drive, trk, sec, side);
+    if (verbose & (V_BIO|V_DJDMA)) {
+        printf("\tread sector drive:%d cylinder:%d sec:%d head:%d\n",
+            drive, cyl, sec, head);
     }
-    if (verbose & V_DJDMA) printf("djdma: read sector drive:%d track:%d sec:%d side:%d\n",
-        drive, trk, sec, side);
-    /* read drive, getfdprmtrk, sec, side into dmaaddr */
+    dparams[drive].current = cyl;
+    /* read drive, getfdprmtrk, sec, head into dmaaddr */
     if (imdp[drive]) {
-        bytes = imd_read(imdp[drive], drive, trk, side, sec, secbuf);
+        bytes = imd_read(imdp[drive], drive, cyl, head, sec, secbuf);
         if (bytes > 0) {
             // hexdump(secbuf, bytes);
             copyout(secbuf, dmaaddr, bytes);
@@ -291,39 +314,38 @@ static unsigned char
 setintr()
 {
     need_intack = 1;
-    if (verbose & V_DJDMA) printf("djdma: setintr\n");
+    if (verbose & V_DJDMA) printf("\tsetintr\n");
     return 0;
 }
 
 /*
- * write a sector using data at the dma address to (trk, sec, drive)
+ * write a sector using data at the dma address to (cyl, sec, drive)
  */
 static unsigned char
 writesec()
 {
-    unsigned char trk;
+    unsigned char cyl;
     unsigned char sec;
     unsigned char drive;
-    unsigned char side;
+    unsigned char head;
     unsigned char status;
     int bytes;
 
-    trk = physread(channel + 1);
+    cyl = physread(channel + 1);
     sec = physread(channel + 2);
-    side = sec & 0x80;
+    head = sec & 0x80 ? 1 : 0;
     sec &= 0x7f;
     drive = physread(channel + 3);
 
-    if (verbose & V_BIO) {
-        printf("djdma: write sector drive:%d track:%d sec:%d side:%d\n",
-            drive, trk, sec, side);
+    if (verbose & (V_BIO|V_DJDMA)) {
+        printf("\twrite sector drive:%d cyl:%d sec:%d head:%d\n",
+            drive, cyl, sec, head);
     }
-    if (verbose & V_DJDMA) printf("djdma: write sector drive:%d track:%d sec:%d side:%d\n",
-        drive, trk, sec, side);
+    dparams[drive].current = cyl;
     if (imdp[drive]) {
-        imd_trkinfo(imdp[drive], trk, 0, &bytes);
+        imd_trkinfo(imdp[drive], cyl, head, 0, &bytes);
         copyin(secbuf, dmaaddr, bytes);
-        bytes = imd_write(imdp[drive], drive, trk, side, sec, secbuf);
+        bytes = imd_write(imdp[drive], drive, cyl, head, sec, secbuf);
         if (bytes > 0) {
             status = S_NORMAL;    
         } else {
@@ -342,16 +364,58 @@ static unsigned char
 sense()
 {
     unsigned char drive;
+    int secsize;
+    int nsecs;
+    int secsize2;
+    int nsecs2;
+    byte dcb;       // drive characteristics byte
+    byte slc;       // sector length code
+    byte dsb;       // drive status byte
 
     drive = physread(channel + 1);
-    if (verbose & V_DJDMA) printf("djdma: sense drive:%d\n", drive);
-    physwrite(channel + 2, 
-        // SB1_HARD SB1_FIVE SB1_MTRCON SB1_NORDY SB1_NOHDLD
-        SB1_DD | SB1_HDLD);
-    physwrite(channel + 3, // SB2_128 SB2_256 SB2_512 
-        SB2_1024);
-    physwrite(channel + 4, // SB3_SERIN SB3_TRK0 SB3_WPROT SB3_DSDD8 | 
-        SB3_INDEX | SB3_RDY);
+
+    // look at track 1 to determine density and sidedness - a hack
+    imd_trkinfo(imdp[drive], 1, 0, &nsecs, &secsize);
+
+    imd_trkinfo(imdp[drive], 1, 1, &nsecs2, &secsize2);
+
+    // SB1_DS SB1_HDLD SB1_HARD SB1_FIVE SB1_MTRCON SB1_NORDY SB1_NOHDLD
+    // SB2_128 SB2_256 SB2_512 SB2_1024
+    // SB3_INDEX SB3_RDY SB3_SERIN SB3_TRK0 SB3_WPROT SB3_DSDD8
+
+    switch(secsize) {
+    case 128:
+        dcb = SB1_HDLD;
+        slc = SB2_128;
+        dsb = SB3_INDEX | SB3_RDY;
+        break;
+    case 512:
+        dcb = SB1_DD | SB1_HDLD;
+        slc = SB2_512;
+        dsb = SB3_INDEX | SB3_RDY;
+        break;
+    case 1024:
+        dcb = SB1_DD | SB1_HDLD;
+        slc = SB2_1024;
+        dsb = SB3_INDEX | SB3_RDY;
+        break;
+    default:
+        printf("fung wha secsize %d nsecs %d\n", secsize, nsecs);
+    }
+    if (secsize2 > 0) {
+        dsb |= SB3_DSDD8;
+    }
+    if (dparams[drive].current == 0) {
+        dsb |= SB3_TRK0;
+    }
+    physwrite(channel + 2, dcb);
+    physwrite(channel + 3, slc);
+    physwrite(channel + 4, dsb);
+
+    if (verbose & V_DJDMA) {
+        printf("\tsense drive:%d dcb:%x (%s) slc:%x dsb:%x (%s)\n", 
+            drive, dcb, bitdef(dcb, sb1_bits), slc, dsb, bitdef(dsb, sb3_bits));
+    } 
     return S_NORMAL;
 }
 
@@ -364,7 +428,7 @@ setretry()
     unsigned char drive;
 
     retrylimit = physread(channel + 1);
-    if (verbose & V_DJDMA) printf("djdma: setretry %d\n", retrylimit);
+    if (verbose & V_DJDMA) printf("\tsetretry %d\n", retrylimit);
     return 0;
 }
 
@@ -377,7 +441,7 @@ setdrive()
     unsigned char drive;
 
     drive = physread(channel + 1);
-    if (verbose & V_DJDMA) printf("djdma: set drive:%d\n", drive);
+    if (verbose & V_DJDMA) printf("\tset drive:%d\n", drive);
     return S_NORMAL;
 }
 
@@ -388,33 +452,36 @@ static unsigned char
 readtrk()
 {
     unsigned char drive;
-    unsigned char side;
-    unsigned char trk;
+    unsigned char head;
+    unsigned char cyl;
     paddr sectab;
     int secs;
     int secsize;
     int i;
     int bytes;
 
-    trk = physread(channel + 1);
-    side = physread(channel + 2);
+    cyl = physread(channel + 1);
+    head = physread(channel + 2);
     drive = physread(channel + 3);
     sectab = 
         physread(channel + 4) + 
         (physread(channel + 5) << 8) +
         (physread(channel + 6) << 16);
-    imd_trkinfo(imdp[drive], trk, &secs, &secsize);
+    imd_trkinfo(imdp[drive], cyl, head, &secs, &secsize);
 
-    if (verbose & V_DJDMA) printf("djdma: readtrk drive:%d trk:%d side:%x sectab:%x secs:%d\n", drive, trk, side, sectab, secs);
+    dparams[drive].current = cyl;
+
+    if (verbose & V_DJDMA) printf("\treadtrk drive:%d cyl:%d head:%x sectab:%x secs:%d\n", 
+        drive, cyl, head, sectab, secs);
     for (i = 0; i < secs; i++) {
         if (physread(sectab + i) == 0xff) {
             continue;
         }
-        bytes = imd_read(imdp[drive], drive, trk, side, i + 1, secbuf);
+        bytes = imd_read(imdp[drive], drive, cyl, head, i + 1, secbuf);
         if (bytes > 0) {
 
             copyout(secbuf, dmaaddr + secsize * i, bytes);
-            if (verbose & V_DJDMA) printf("copyout to %x for %d\n", dmaaddr + secsize * i, bytes);
+            // if (verbose & V_DJDMA) printf("\tcopyout to %x for %d\n", dmaaddr + secsize * i, bytes);
             physwrite(sectab + i, S_NORMAL);
         } else {
             physwrite(sectab + i, S_NOREAD);
@@ -429,7 +496,27 @@ readtrk()
 static unsigned char
 writetrk()
 {
-    if (verbose & V_DJDMA) printf("djdma: writetrk\n");
+    unsigned char drive;
+    unsigned char head;
+    unsigned char cyl;
+    paddr sectab;
+    int secs;
+    int secsize;
+
+    cyl = physread(channel + 1);
+    head = physread(channel + 2);
+    drive = physread(channel + 3);
+    sectab = 
+        physread(channel + 4) + 
+        (physread(channel + 5) << 8) +
+        (physread(channel + 6) << 16);
+    imd_trkinfo(imdp[drive], cyl, head, &secs, &secsize);
+
+    dparams[drive].current = cyl;
+
+    if (verbose & V_DJDMA) printf("\twritetrk\n");
+    if (verbose & V_DJDMA) printf("\treadtrk drive:%d cyl:%d head:%x sectab:%x secs:%d\n", 
+        drive, cyl, head, sectab, secs);
     return S_NORMAL;
 }
 
@@ -439,7 +526,13 @@ writetrk()
 static unsigned char
 settrk()
 {
-    if (verbose & V_DJDMA) printf("djdma: set tracks\n");
+    byte drive;
+    byte tracks;
+
+    drive = physread(channel + 1);
+    tracks = physread(channel + 2);
+
+    if (verbose & V_DJDMA) printf("\tset tracks drive: %d tracks: %d\n", drive, tracks);
     return S_NORMAL;
 }
 
@@ -449,6 +542,11 @@ settrk()
 static unsigned char
 settiming()
 {
+    byte timing;
+
+    timing = physread(channel + 1);
+
+    if (verbose & V_DJDMA) printf("\tset drive timing: %d\n", timing);
     return S_NORMAL;
 }
 
@@ -520,6 +618,27 @@ serout()
 static unsigned char
 write_djmem()
 {
+    paddr source;
+    vaddr dest;
+    vaddr count;
+    int i;
+
+    source = physread(channel + 1) + (physread(channel + 2) << 8) + (physread(channel + 3) << 16);
+    count = physread(channel + 4) + physread(channel + 5); 
+    dest = physread(channel + 6) + (physread(channel + 7) << 8); 
+    
+    if (dest < DPARAM || (dest + count - DPARAM) > sizeof(dparams)) {
+        printf("\twrite_djmem 0x%x outside of DPARAM\n");
+        return;
+    }
+    dest -= DPARAM;
+    for (i = 0; i < count; i++) {
+        ((char *)dparams)[dest + i] = physread(source + i);
+    }
+    if (verbose & V_DJDMA) {
+        printf("\twrite mem %x from %x for %d\n", dest, source, count);
+        printf("\tdrive %d set %s\n", dest / 16, (dest % 16) == 0 ? "tracks" : "timing");
+    }
     return S_NORMAL;
 }
 
@@ -529,6 +648,17 @@ write_djmem()
 static unsigned char
 read_djmem()
 {
+    paddr source;
+    vaddr dest;
+    vaddr count;
+
+    source = physread(channel + 1) + (physread(channel + 2) << 8) + (physread(channel + 3) << 16);
+    count = physread(channel + 4) + physread(channel + 5); 
+    dest = physread(channel + 6) + (physread(channel + 7) << 8); 
+
+    if (verbose & V_DJDMA) {
+        printf("\tread mem %x from %x for %d\n", dest, source, count);
+    }
     return S_NORMAL;
 }
 

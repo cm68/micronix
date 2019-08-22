@@ -8,22 +8,29 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-char patspace[100];
+#define PSIZE   50
+char patspace[PSIZE * 2];
+char patoff;
 
 char *
 bitdef(unsigned char v, char**defs)
 {
     int i;
+    char *patptr;
+    int sep = 0;
 
-    patspace[0] = 0;
+    patptr = &patspace[PSIZE * patoff];
+    patoff ^= 1;
+    *patptr = 0;
 
     for (i = 0; i < 8; i++) {
         if ((v & (1 << i)) && defs[i]) {
-            strcat(patspace, defs[i]);
-            strcat(patspace, " ");
+            if (sep++) 
+                strcat(patptr, ",");
+            strcat(patptr, defs[i]);
         }
     }
-    return patspace;
+    return patptr;
 }
 
 /*
