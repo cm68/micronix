@@ -56,7 +56,7 @@ imdd: imdd.c
 
 d1: hsim.o $(D1_CPU) z80emu.o util.o imd.o $(D1_DRIVERS) ../src/sgs/z80dis.o
 	$(CC) $(DEBUG) -o d1 hsim.o $(D1_CPU) imd.o z80emu.o util.o $(D1_DRIVERS) ../src/sgs/z80dis.o
-	pkill d1
+	-pkill d1
 
 cpro: hsim.o $(CP_CPU) z80emu.o util.o imd.o $(CP_DRIVERS) ../src/sgs/z80dis.o
 	$(CC) $(DEBUG) -o cpro hsim.o $(CP_CPU) imd.o z80emu.o util.o $(CP_DRIVERS) ../src/sgs/z80dis.o
