@@ -2542,11 +2542,11 @@ dmsrw:	sta	dmrwcm			;Set the disk command byte
  	cmc				;else
 	ret				;	return (carry_cleared=NO_ERROR)
 
-;Seô floppù drivå parameters®
+;Set floppy drive parameters.
 ;----------------------------
-;	1) Thió routinå inspectó thå DPARAÍ tablå anä iæ thå á drivå
-;	   haó noô beeî calibrateä previouslù then thaô driveó tracë
-;	   count¬ steppinç rate¬ anä heaä settlå timå are loaded.
+;	1) This routine inspects the DPARAM table and if the A drive
+;	   had not been calibrated previously then that drives track
+;	   count, stepping rate, and head settle time are loaded.
 ;
 dmparm:	mvi	a,8			;Eight drives
 	lxi	d,1340h			;Controllers drive parameter address
