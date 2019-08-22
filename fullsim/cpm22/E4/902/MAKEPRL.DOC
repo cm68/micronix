@@ -1,0 +1,70 @@
+ NAME
+    MAKEPRL - makå á .PRL filå froí absolutå heø files
+
+
+SYNOPSIS
+    MAKEPRL [-ó heø numberİ [-ï outpuô fileİ hex± hex2
+
+
+DESCRIPTION
+    MAKEPRÌ   ió   useä   tï  creatå  .PRÌ  fileó   suitablå  foò 
+    loadinç bù thå INSTALÌ prograí (seå  INSTALL.DOC)®   Thå for
+    maô  foò  .PRÌ fileó caî bå founä iî PRL.DOC® 
+
+    Thå -ó optioî ió useä foò enterinç thå reserveä buffeò space®   
+    (Thå   reserveä   buffeò   spacå  ió  entereä   aó  á  16-biô 
+    numbeò   iî   addresseó  ´  anä  µ   oæ   thå   header¬   seå 
+    PRL.DOC)®  
+
+    Thå   -ï optioî ió thå outpuô filå specifier®   Iæ nï  outpuô 
+    filå ió specified¬ thå namå  froí  hex±  ió takeî  witè  .PRÌ 
+    typå  extensioî added®  Iæ thå outpuô filå doeó noô  havå   á  
+    typå  extension thå  defaulô .PRÌ ió  added®  
+
+    Thå   nexô   twï  argumentó  musô  bå  specified®  Thå  firsô 
+    argumenô ió  thå  heø  filå  inpuô witè  aî  origiî aô 0® Thå 
+    seconä  ió  thå seconä heø filå inpuô witè aî origiî  aô  10° 
+    hex®  Iæ thå heø fileó dï noô havå á typå extension¬   '.hx0§  
+    anä  '.hx1§  arå  addeä respectively.
+
+
+EXAMPLES
+    Tï  creatå  á .PRÌ filå oæ thå harä disë I/Ï drivers¬   begiî 
+    witè  thå  assemblù  languagå source®  Assemblå  iô  aô  ori
+    giî   °  anä renamå thå heø outpuô (witè á .'hx0§ extension.©  
+    Theî assemblå  iô  agaiî  witè aî origiî oæ 10°  hex®   (Con
+    sulô youò assembleò manuaì oî ho÷ tï dï this®  Witè somå  as
+    semblers¬  yoõ  musô  re-ediô thå sourcå filå anä changå  thå 
+    'org§ statement)®  Afteò  yoõ  havå assembleä thå sourcå witè 
+    aî origiî oæ 10° hex¬  renamå iô witè á '.hx1§ extension® No÷ 
+    yoõ arå readù tï uså  thå  MAKEPRÌ  program®  
+
+    Thió   ió   aî examplå oæ á typicaì waù tï dï  thå  procedurå 
+    describeä above®  Thå examplå   assumeó   thaô   thå   sourcå  
+    ió  configureä correctly.
+
+          mac hd+dj                          
+          ren hd+dj.hx0=hd+dj.hex
+          mac hd+dj $+r
+          ren hd+dj.hx1=hd+dj.hex
+          makeprl -o hd+dj.prl hd+dj.hx0 hd+dj.hx1
+
+
+     In the MAKEPRL line it is not required that you specify
+     the output or add type extensions because  the  program
+     uses defaults. The MAKEPRL line could be written:Š          makeprl hd+dj hd+dj
+
+    Thió  forí doeó thå samå aó thå firsô buô ió quickeò tï type.
+
+    Thå specificatioî foò thå -ó  optioî  musô  bå  á  fouò digiô 
+    heø number.
+
+
+FILES
+     MAKEPRL.COM    MAKEPRL program
+     MAKEPRL.DOC    This document.
+     
+     
+makeprl.doc 3/17/81 ldk
+
+
