@@ -12,6 +12,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 
+int trace_multio;
+
 int terminal_fd;
 
 #define	MULTIO_PORT	0x48	// multio standard port
@@ -61,7 +63,7 @@ static byte dlm;
 static byte 
 rd_clock(portaddr p)
 {
-    if (verbose & V_MIO) printf("multio: read clock\n");
+    if (trace & trace_multio) printf("multio: read clock\n");
     return 0;
 }
 
@@ -69,14 +71,14 @@ rd_clock(portaddr p)
 static byte 
 rd_pic_port_0(portaddr p)
 {
-    if (verbose & V_MIO) printf("multio: read pic0\n");
+    if (trace & trace_multio) printf("multio: read pic0\n");
     return 0;
 }
 
 static byte 
 rd_pic_port_1(portaddr p)
 {
-    if (verbose & V_MIO) printf("multio: read pic1\n");
+    if (trace & trace_multio) printf("multio: read pic1\n");
     return 0;
 }
 
@@ -91,7 +93,7 @@ rd_rxb(portaddr p)
     }
     if (loop) {
         if (loop < 2) {
-            if (verbose & V_MIO) printf("read unwritten loopback\n");
+            if (trace & trace_multio) printf("read unwritten loopback\n");
         }
         loop = 1;
         retval = loopc;
@@ -99,13 +101,13 @@ rd_rxb(portaddr p)
         ioctl(terminal_fd, FIONREAD, &bytes);
         if (bytes) {
             if (read(terminal_fd, &retval, 1) != 1) {
-                if (verbose & V_MIO) printf("multio: rd_rxb failed\n");
+                if (trace & trace_multio) printf("multio: rd_rxb failed\n");
             }
         } else {
             retval = 0;
         }
     }
-    if (verbose & V_MIO) printf("multio: read rxb = %d\n", retval);
+    if (trace & trace_multio) printf("multio: read rxb = %d\n", retval);
     return retval;
 }
 
@@ -115,28 +117,28 @@ rd_inte(portaddr p)
     if (dlab) {
         return dlm;
     }
-    if (verbose & V_MIO) printf("multio: read inte\n");
+    if (trace & trace_multio) printf("multio: read inte\n");
     return 0;
 }
 
 static byte 
 rd_inti(portaddr p)
 {
-    if (verbose & V_MIO) printf("multio: read inti\n");
+    if (trace & trace_multio) printf("multio: read inti\n");
     return 0;
 }
 
 static byte 
 rd_linectl(portaddr p)
 {
-    if (verbose & V_MIO) printf("multio: read linectl\n");
+    if (trace & trace_multio) printf("multio: read linectl\n");
     return 0;
 }
 
 static byte 
 rd_mdmctl(portaddr p)
 {
-    if (verbose & V_MIO) printf("multio: read mdmctl\n");
+    if (trace & trace_multio) printf("multio: read mdmctl\n");
     return 0;
 }
 
@@ -164,26 +166,26 @@ rd_linestat(portaddr p)
 static byte 
 rd_mdmstat(portaddr p)
 {
-    if (verbose & V_MIO) printf("multio: read mdmstat\n");
+    if (trace & trace_multio) printf("multio: read mdmstat\n");
     return 0;
 }
 
 static void
 wr_clock(portaddr p, byte v)
 {
-    if (verbose & V_MIO) printf("multio: write clock %x\n", v);
+    if (trace & trace_multio) printf("multio: write clock %x\n", v);
 }
 
 static void
 wr_pic_port_0(portaddr p, byte v)
 {
-    if (verbose & V_MIO) printf("multio: write pic0 %x\n", v);
+    if (trace & trace_multio) printf("multio: write pic0 %x\n", v);
 }
 
 static void
 wr_pic_port_1(portaddr p, byte v)
 {
-    if (verbose & V_MIO) printf("multio: write pic1 %x\n", v);
+    if (trace & trace_multio) printf("multio: write pic1 %x\n", v);
 }
 
 static void
@@ -199,7 +201,7 @@ wr_txb(portaddr p, byte v)
     } else {
         write(terminal_fd, &v, 1);
     }
-    if (verbose & V_MIO) printf("multio: write txb %x %d %c\n", v, v, v);
+    if (trace & trace_multio) printf("multio: write txb %x %d %c\n", v, v, v);
 }
 
 static char *w_inte_bits[] = { "READAVAIL", "TXHOLDEMPTY", "RLINESTAT", "MDMSTAT", 0, 0, 0, 0 };
@@ -211,7 +213,7 @@ wr_inte(portaddr p, byte v)
         dlm = v;
         return;
     }
-    if (verbose & V_MIO) {
+    if (trace & trace_multio) {
         printf("multio: write inte %x %s\n", v, bitdef(v, w_inte_bits));
     }
 }
@@ -226,7 +228,7 @@ wr_linectl(portaddr p, byte v)
     } else {    
         dlab = 0;
     }
-    if (verbose & V_MIO) printf("multio: write linectl %x %s\n", v, bitdef(v, w_linec_bits));
+    if (trace & trace_multio) printf("multio: write linectl %x %s\n", v, bitdef(v, w_linec_bits));
 }
 
 static char *w_lines_bits[] = { "DR", "OE", "PE", "FE", "BI", "THRE", "TEMT", 0 };
@@ -234,7 +236,7 @@ static char *w_lines_bits[] = { "DR", "OE", "PE", "FE", "BI", "THRE", "TEMT", 0 
 static void
 wr_linestat(portaddr p, byte v)
 {
-    if (verbose & V_MIO) printf("multio: write linestat %x %s\n", v, bitdef(v, w_lines_bits));
+    if (trace & trace_multio) printf("multio: write linestat %x %s\n", v, bitdef(v, w_lines_bits));
 }
 
 static char *w_mdmc_bits[] = { "DTR", "RTS", "OUT1", "OUT2", "LOOP", 0, 0, 0 };
@@ -247,7 +249,7 @@ wr_mdmctl(portaddr p, byte v)
     } else {
         loop = 0;
     }
-    if (verbose & V_MIO) printf("multio: write mdmctl %x %s\n", v, bitdef(v, w_mdmc_bits));
+    if (trace & trace_multio) printf("multio: write mdmctl %x %s\n", v, bitdef(v, w_mdmc_bits));
 }
 
 /*
@@ -256,8 +258,15 @@ wr_mdmctl(portaddr p, byte v)
 void
 multio_select(portaddr p, byte v)
 {
+    static int lastgroup = -1;
+
     group = v & GROUP_MASK;
-    if (verbose & V_MIO) printf("multio: write group select %x\n", group);
+    if (trace & trace_multio) printf("multio: write group select %x\n", group);
+
+    if (group == lastgroup)
+        return;
+
+    lastgroup = group;
 
     switch (group) {
     case 0:
@@ -334,6 +343,7 @@ __attribute__((constructor))
 void
 register_multio_driver()
 {
+    trace_multio = register_trace("multio");
     register_startup_hook(multio_init);
 }
 

@@ -30,6 +30,9 @@ typedef void (*outhandler)(portaddr port, byte val);
 extern inhandler input_handler[256];
 extern outhandler output_handler[256];
 
+// tracing level
+extern int register_trace(char *description);
+
 // callbacks
 extern void register_mon_cmd(char c, char *help, int (*handler)(char **p));
 extern void register_usage_hook(void (*hookfunc)());
@@ -63,12 +66,12 @@ void skipwhite(char **sp);
 /*
  * global simulator variables
  */
-extern int breakpoint;		// set nonzero to debug
-extern int verbose;		// the V_ flags above
-
+extern int trace;		// bitmask of subsystems to trace
 extern int rom_size;		// set this nonzero to read
 extern char *rom_image;		// binary from
 extern char *rom_filename;	// here
+
+extern int trace_bio;		// multiple drivers trace block i/o
 
 #define	CONF_SET	0x80000000	// config specified
 extern int config_sw;

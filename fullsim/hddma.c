@@ -30,6 +30,9 @@ static int drive[DRIVES];       // file descriptor
 static int track[DRIVES];       // where are we - used for format and seek
 static int secsz[DRIVES];       // sector size from specify/format
 
+int trace_hddma;
+extern int trace_bio;
+
 /*
  * the in-ram format for a hd-dma command block
  */
@@ -171,11 +174,11 @@ attention(portaddr p, byte v)
         channel = physread(DEF_CCA) + (physread(DEF_CCA+1) << 8) + (physread(DEF_CCA+2) << 16);
     }
 
-    if (verbose & V_HDDMA) printf("hddma: ");
+    if (trace & trace_hddma) printf("hddma: ");
 
     copyin(&command, channel, sizeof(command));
     if ((command.opcode >= 0) && (command.opcode <= OP_NOP)) {
-        if (verbose & V_HDDMA) printf("%s\n", cmdname[command.opcode]);
+        if (trace & trace_hddma) printf("%s\n", cmdname[command.opcode]);
     } else {
         printf("unknown command %d\n", command.opcode);
     }
@@ -187,7 +190,7 @@ attention(portaddr p, byte v)
     link = command.link_low + (command.link_mid << 8) + (command.link_high << 16);
     secsize = secsz[drv];
     head = ((command.selhd & HEAD_MASK) >> HEAD_SHIFT) ^ HEAD_CMP;
-    if (verbose & V_HDDMA) {
+    if (trace & trace_hddma) {
         printf("drive: %d track: %d step: %d %s head: %x %s%s",
             drv, track[drv], steps, command.seldir & STEP_DOWN ? "down" : "up", 
             head, command.selhd & LOW_CURR ? "lowcurr " : "", 
@@ -216,7 +219,7 @@ attention(portaddr p, byte v)
         lseek(drivefd, offset, SEEK_SET);
         read(drivefd, &secbuf, secsize);
         copyout(&secbuf, dmaaddr, secsize);
-        if (verbose & V_BIO) hexdump(secbuf, secsize);
+        if (trace & V_BIO) hexdump(secbuf, secsize);
         command.status = GOOD;
         break;
     case OP_WRITE:
@@ -225,7 +228,7 @@ attention(portaddr p, byte v)
         }
         lseek(drivefd, offset, SEEK_SET);
         copyin(&secbuf, dmaaddr, secsize);
-        if (verbose & V_BIO) hexdump(secbuf, secsize);
+        if (trace & V_BIO) hexdump(secbuf, secsize);
         write(drivefd, &secbuf, secsize);
         command.status = GOOD;
         break;
@@ -234,7 +237,7 @@ attention(portaddr p, byte v)
         break;
     case OP_FMT:                                // format a whole track
         secsize = FSECSIZE(command.fseccode);
-        if (verbose & V_HDDMA)
+        if (trace & trace_hddma)
             printf("gap3: %d scnt: %d secsize: %d fill: %x\n",
                 command.gap3, command.sptneg ^ 0xff, secsize, command.fill);
         for (i = 0; i < secsize; i++) {
@@ -248,7 +251,7 @@ attention(portaddr p, byte v)
         command.status = GOOD;
         break;
     case OP_SPEC:
-        if (verbose & V_HDDMA) {
+        if (trace & trace_hddma) {
             printf("steprate: %d ms ", command.steprate & 0x7f);
             if (command.steprate & INTERRUPT) {
                 printf("interrupt requested ");
@@ -265,7 +268,7 @@ attention(portaddr p, byte v)
         if (track[drv] != 0) {
             command.status |= SS_TRK0;
         }
-        if (verbose & V_HDDMA)
+        if (trace & trace_hddma)
             printf("sense: %x %s\n", command.status, bitdef(command.status ^ 0xff, sense_b));
         break;
     case OP_NOP:
@@ -290,7 +293,7 @@ attention(portaddr p, byte v)
 static void
 reset(portaddr p, byte v)
 {
-    if (verbose & V_HDDMA)
+    if (trace & trace_hddma)
         printf("hddma: reset\n");
     channel_reset = 1;
 }
@@ -331,6 +334,7 @@ __attribute__((constructor))
 void
 register_hddma_driver()
 {
+    trace_hddma = register_trace("hddma");
     register_startup_hook(hddma_init);
 }
 
