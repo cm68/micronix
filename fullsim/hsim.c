@@ -69,27 +69,21 @@ MACHINE cpu;
  */
 byte physmem[16*1024*1024];
 
-volatile int breakpoint;
+volatile int inst_countdown = -1;
 
 int stops[10];
 
 void
 stop()
 {
-    breakpoint = 1;
+    inst_countdown = 0;
 }
 
 void
 stop_handler()
 {
     printf("breakpoint signal\n");
-    breakpoint = 1;
-}
-
-void
-pid()
-{
-    printf("%d: ", mypid);
+    stop();
 }
 
 unsigned short
@@ -215,46 +209,41 @@ copyin(byte *buf, paddr pa, int len)
  * is abstracted out. 
  */
 void
-put_word(unsigned short addr, unsigned short value)
+put_word(vaddr addr, word value)
 {
     memwrite(addr, value);
     memwrite(addr + 1, value >> 8);
 }
 
 void
-put_byte(unsigned short addr, unsigned char value)
+put_byte(vaddr addr, byte value)
 {
     memwrite(addr, value);
 }
 
-unsigned short
-get_word(unsigned short addr)
+word
+get_word(vaddr addr)
 {
     return memread(addr) + (memread(addr + 1) << 8);
 }
 
-unsigned char
-get_byte(unsigned short addr)
+byte
+get_byte(vaddr addr)
 {
     return memread(addr);
 }
 
-unsigned char 
-get_vbyte(long addr)
-{
-}
-
 static void
-push(unsigned short s)
+push(word s)
 {
     cpu.registers.word[Z80_SP] -= 2;
     put_word(cpu.registers.word[Z80_SP], s);
 }
 
-static unsigned short
+static word
 pop()
 {
-    unsigned short i;
+    word i;
 
     i = get_word(cpu.registers.word[Z80_SP]);
     cpu.registers.word[Z80_SP] += 2;
@@ -385,9 +374,24 @@ input(portaddr p)
  */
 #define MAXDRIVERS 8
 
+void (*poll_hook[MAXDRIVERS])();        // this gets called between instructions
 int (*prearg_hook[MAXDRIVERS])();       // called just before arg processing
 int (*startup_hook[MAXDRIVERS])();      // called just before emulation
-void (*poll_hook[MAXDRIVERS])();        // this gets called between instructions
+void (*usage_hook[MAXDRIVERS])();       // called inside usage()
+
+void
+register_poll_hook(void (*func)())
+{
+    int i;
+
+    for (i = 0; i < MAXDRIVERS; i++) {
+        if (!poll_hook[i]) {
+            poll_hook[i] = func;
+            return;
+        }
+    }
+    exit(2);
+}
 
 void
 register_prearg_hook(int (*func)())
@@ -418,13 +422,13 @@ register_startup_hook(int (*func)())
 }
 
 void
-register_poll_hook(void (*func)())
+register_usage_hook(void (*func)())
 {
     int i;
 
     for (i = 0; i < MAXDRIVERS; i++) {
-        if (!poll_hook[i]) {
-            poll_hook[i] = func;
+        if (!usage_hook[i]) {
+            usage_hook[i] = func;
             return;
         }
     }
@@ -437,23 +441,28 @@ usage(char *complaint, char *p)
     int i;
 
     fprintf(stderr, "%s", complaint);
-    fprintf(stderr, "usage: %s [<options>]\n",
-        p);
-    fprintf(stderr, "\t-d\t<drive file> (may be repeated)\n");
+    fprintf(stderr, "usage: %s [<options>] <drive file> ...\n", p);
     fprintf(stderr, "\t-b\t<boot rom file>\n");
+    fprintf(stderr, "\t-c\t<configuration switch value>\n");
     fprintf(stderr, "\t-t\topen a debug terminal window\n");
     fprintf(stderr, "\t-s\t\tstop before execution\n");
     fprintf(stderr, "\t-v <verbosity>\n");
     for (i = 0; vopts[i]; i++) {
         fprintf(stderr, "\t%x %s\n", 1 << i, vopts[i]);
     }
+    for (i = 0; i < MAXDRIVERS; i++) {
+        if (usage_hook[i]) {
+            (*usage_hook[i])();
+        }
+    }
     exit(1);
 }
 
 char **drivenames;
-char *bootrom;
+char *rom_filename;
 char *rom_image;
 int rom_size;
+int config_sw = 0;
 
 int
 main(int argc, char **argv)
@@ -501,26 +510,17 @@ main(int argc, char **argv)
             case 't':
                 debug_terminal = 1;
                 break;
-            case 'd':
+            case 'c':
                 if (!argc--) {
-                    usage("drive file\n", progname);
+                    usage("configuration switch value missing\n", progname);
                 }
-                if (!drivenames) {
-                    drivenames = malloc(sizeof(char *) * 2);
-                    i = 0;
-                } else {
-                    for (i = 0; drivenames[i]; i++)
-                        ;
-                    drivenames = realloc(drivenames, sizeof(char *) * (i + 2));
-                } 
-                drivenames[i] = strdup(*argv++);
-                drivenames[i+1] = 0;
+                config_sw = strtol(*argv++, 0, 0) | CONF_SET;
                 break;
             case 'b':
                 if (!argc--) {
                     usage("boot rom name missing\n", progname);
                 }
-                bootrom = strdup(*argv++);
+                rom_filename = strdup(*argv++);
                 break;
             case 'v':
                 if (!argc--) {
@@ -529,13 +529,28 @@ main(int argc, char **argv)
                 verbose = strtol(*argv++, 0, 0);
                 break;
             case 's':
-                breakpoint++;
+                inst_countdown = 0;
                 break;
             default:
                 usage("unrecognized option", progname);
                 break;
             }
         }
+    }
+
+    // the rest of the arguments are drive names
+    while (*argv) {
+        if (!drivenames) {
+            drivenames = malloc(sizeof(char *) * 2);
+            i = 0;
+        } else {
+            for (i = 0; drivenames[i]; i++)
+                ;
+            drivenames = realloc(drivenames, sizeof(char *) * (i + 2));
+        } 
+        drivenames[i] = strdup(*argv++);
+        drivenames[i+1] = 0;
+        break;
     }
 
     if (!drivenames) {
@@ -549,28 +564,28 @@ main(int argc, char **argv)
      */
     if (rom_size) {
         rom_image = malloc(rom_size);
-        fd = open(bootrom, O_RDONLY);
+        fd = open(rom_filename, O_RDONLY);
         if (!fd) {
-            perror(bootrom);
+            perror(rom_filename);
             exit(errno);
         }
         i = read(fd, rom_image, rom_size);
         if (i < 0) {
-            perror(bootrom);
+            perror(rom_filename);
             exit(errno);
         }
         close(fd);
-        bootrom = strdup(bootrom);
-        i = strlen(bootrom);
+        rom_filename = strdup(rom_filename);
+        i = strlen(rom_filename);
         // if there's a similarly named symfile, use it
-        if (bootrom[i-4] == '.') {
-            strcpy(&bootrom[i-3], "sym");
-            load_symfile(bootrom);
+        if (rom_filename[i-4] == '.') {
+            strcpy(&rom_filename[i-3], "sym");
+            load_symfile(rom_filename);
         }
     }
 
-    mypid = getpid();
     mytty = strdup(ttyname(0));
+    mypid = getpid();
 
     /*
      * we might be piping the simulator.  let's get an open file for our debug 
@@ -592,13 +607,18 @@ main(int argc, char **argv)
             "tty > /proc/%d/fd/%d ; while test -d /proc/%d ; do sleep 1 ; done ; sleep 60",
             mypid, pipefd[1], mypid);
         if (!fork()) {
-            execlp("xterm", "xterm", "-geometry", "120x40", "-fn", "8x13", "-e", "bash", "-c", cmd, (char *) 0);
+            execlp("xterm", "xterm", 
+                "-geometry", "120x40", 
+                "-fn", "8x13", 
+                "-e", "bash", 
+                "-c", cmd, (char *) 0);
         }
         ptyname = malloc(100);
         i = read(pipefd[0], ptyname, 100);
         if (i == -1) {
             perror("pipe");
         }
+
         // build a filename, null terminated at the newline
         ptyname[i] = 0;
         for (i = 0; i < strlen(ptyname); i++) {
@@ -678,7 +698,7 @@ set_alarm()
 void
 dumpcpu()
 {
-    unsigned char f;
+    byte f;
     char outbuf[40];
     char fbuf[9];
     char *s;
@@ -724,60 +744,6 @@ dumpcpu()
 }
 
 /*
- * breakpoints and watchpoints are handled using the same data structure
- */
-struct point
-{
-    vaddr addr;
-    byte value;
-    struct point *next;
-};
-
-struct point *breaks;
-struct point *watches;
-
-int
-watchpoint_hit()
-{
-    struct point *p;
-    byte n;
-
-    for (p = watches; p; p = p->next) {
-        if (p->value == -1) {
-            p->value = get_byte(p->addr);
-        }
-        n = get_byte(p->addr);
-        if (n != p->value) {
-            printf("value %02x at %04x changed to %02x\n",
-                p->value, p->addr, n);
-            p->value = n;
-            return (1);
-        }
-    }
-    return (0);
-}
-
-struct point *
-point_at(struct point **head, unsigned short addr, struct point **pp)
-{
-    struct point *p;
-
-    if (pp)
-        *pp = 0;
-    for (p = *head; p; p = p->next) {
-        if (p->addr == addr) {
-            break;
-        }
-        if (pp) {
-            *pp = p;
-        }
-    }
-    return p;
-}
-
-int lastaddr = -1;
-
-/*
  * read a complete command from the terminal
  * this hides the line buffering stuff that might be happening, and iterates until we get
  * a newline
@@ -798,6 +764,9 @@ read_commandline(char *s)
     }
 }
 
+/*
+ * utility functions for the command processors
+ */
 int
 getaddress(char **s)
 {
@@ -834,14 +803,49 @@ getaddress(char **s)
 }
 
 /*
- * command line processor for monitor/debugger
- * this might want to have plugins, too, for board-specific regs
+ * all the command processors take a pointer to the pointer to the input string
+ * and we have skipped any white space.  if we're at the end of the command,
+ * we're pointing at a null.
+ * all command processors assume that we are going to do another command.  if
+ * we want to return to the simulation, we need to return from monitor.
+ * that's the convention we use.  so, if our command returns 1, then we are
+ * going to simulate some more.
  */
-int
+int lastaddr = -1;
+char cmdline[100];
+
+#define MONCMDS 25
+
+struct moncmd {
+    char cmd;
+    char *help;
+    int (*handler)(char **cmdlinep);
+};
+
+extern struct moncmd moncmds[];
+
+void
+register_mon_cmd(char c, char *help, int (*handler)(char **p))
+{
+    int i;
+    for (i = 0; i < MONCMDS; i++) {
+        if ((moncmds[i].cmd == 'c') || (moncmds[i].cmd == 0)) {
+            moncmds[i].cmd = c;
+            moncmds[i].help = help;
+            moncmds[i].handler = handler;
+            return;
+        }
+    }
+}
+
+/*
+ * command line processor for monitor/debugger
+ * the whole thing is plugin-driven
+ */
+void
 monitor()
 {
     struct point *p, *prev, **head;
-    char cmdline[100];
     char l;
     char c;
     int i;
@@ -849,8 +853,7 @@ monitor()
     char *s;
 
     while (1) {
-      more:
-        printf("%d >>> ", mypid);
+        printf(">>> ");
         
         read_commandline(cmdline);
         s = cmdline;
@@ -863,176 +866,254 @@ monitor()
         c = *s++;
         // skip whitespace
         skipwhite(&s);
-        head = &breaks;
-        switch (c) {
-        case 'c':                   // system call trace
-            c = 1;
-            skipwhite(&s);
-            if (!*s) {
-                for (i = 0; i < sizeof(stops); i++) {
-                    if ((i % 16) == 0)
-                        printf("\n%02d: ", i);
-                    printf("%03d ", stops[i]);
+        for (i = 0; i < MONCMDS; i++) {
+            if (moncmds[i].cmd == c) {
+                if ((*moncmds[i].handler)(&s)) {
+                    lastaddr = -1;
+                    return;
                 }
-                printf("\n");
+                break;
             }
-            if (*s == '-') {
-                s++;
-                c = 0;
-            }
-            if (*s) {
-                i = strtol(s, &s, 16);
-            }
-            if (i) {
-                if (i < 0) {
-                    i = -i;
-                    c = 0;
-                }
-                if (i < sizeof(stops)) {
-                    stops[i] = c;
-                }
-            }
-            break;
-#ifdef notdef
-        case 'm':                   // dump map
-            skipwhite(&s);
-            if (*s) {
-                i = strtol(s, &s, 16);
-            } else {
-                i = taskreg & 0xf;
-            }
-            printmap(i);
-            break;
-#endif
-        case 'd':                   // dump memory
-            skipwhite(&s);
-            if (*s) {
-                i = getaddress(&s);
-            } else {
-                if (lastaddr == -1) {
-                    i = cpu.registers.word[Z80_SP];
-                } else {
-                    i = lastaddr;
-                }
-            }
-            dumpmem(&get_vbyte, i, 256);
-            lastaddr = (i + 256) & 0xfff;
-            break;
-        case 'l':                   // list
-            skipwhite(&s);
-            if (*s) {
-                i = getaddress(&s);
-            } else {
-                if (lastaddr == -1) {
-                    i = cpu.pc;
-                } else {
-                    i = lastaddr;
-                }
-            }
-            for (l = 0; l < LISTLINES; l++) {
-                c = format_instr(i, cmdline, &get_byte, &lookup_sym, &reloc);
-                s = lookup_sym(i);
-                if (s) {
-                    printf("%s\n", s);
-                }
-                printf("%04x: %-20s\n", i, cmdline);
-                i += c;
-                lastaddr = i & 0xffff;
-            }
-            break;
-        case 'r':               // dump registers
-            dumpcpu();
-            break;
-        case 's':
-            return (1);         // single step
-        case 'g':
-            return (0);
-        case 'x':               // exit
-        case 'q':
-            exit(1);
-            return (0);
-        // watchpoint and breakpoint
-        case 'w':              /* w [-] <addr> <addr> ... */
-            head = &watches;
-        case 'b':              /* b [-] <addr> <addr> ... */
-            delete = 0;
-            i = -1;
-            if (*s == '-') {
-                s++;
-                delete = 1;
-            }
-            while (*s) {
-                skipwhite(&s);
-                i = getaddress(&s);
-                p = point_at(head, i, &prev);
-                if (p && delete) {
-                    if (prev) {
-                        prev->next = p->next;
-                    } else {
-                        *head = p->next;
-                    }
-                    free(p);
-                } else if ((!p) && (!delete)) {
-                    p = malloc(sizeof(*p));
-                    p->addr = i;
-                    p->next = *head;
-                    *head = p;
-                }
-                while (*s && (*s == ' '))
-                    s++;
-            }
-            if (i == -1) {
-                if (delete) {
-                    while ((p = *head)) {
-                        *head = p->next;
-                        free(p);
-                    }
-                } else {
-                    for (p = *head; p; p = p->next) {
-                        s = lookup_sym(p->addr);
-                        if (s) {
-                            printf("%04x %s\n", p->addr, s);
-                        } else {
-                            printf("%04x\n", p->addr);
-                        }
-                    }
-                }
-            }
-            break;
-        case '?':
-        case 'h':
-            printf("commands:\n");
-            printf("l <addr> :list\n");
-            printf("d <addr> :dump memory\n");
-            printf("r dump cpu state\n");
-#ifdef notdef
-            printf("m [taskid] : dump mapping\n");
-#endif
-            printf("g: continue\n");
-            printf("s: single step\n");
-            printf("x: exit\n");
-            printf("q: exit\n");
-            printf("b [-] <nnnn> ... :breakpoint\n");
-            printf("w [-] <nnnn> ... :watchpoint\n");
-            printf("c [-] <nn> :system call trace\n");
-            break;
-        default:
+        }
+        if (i == MONCMDS) {
             printf("unknown command %c\n", c);
-            break;
-        case 0:
-            break;
         }
     }
 }
 
+#ifdef notdef
+// system call trace for micronix
+void
+scall_trace(char **sp)
+{
+    char c;
+    int i;
+
+    c = 1;
+    skipwhite(sp);
+    if (!**sp) {
+        for (i = 0; i < sizeof(stops); i++) {
+            if ((i % 16) == 0)
+                printf("\n%02d: ", i);
+            printf("%03d ", stops[i]);
+        }
+        printf("\n");
+    }
+    if (**sp == '-') {
+        (*sp)++;
+        c = 0;
+    }
+    if (**sp) {
+        i = getaddress(sp);
+    }
+    if (i) {
+        if (i < 0) {
+            i = -i;
+            c = 0;
+        }
+        if (i < sizeof(stops)) {
+            stops[i] = c;
+        }
+    }
+    return 0;
+}
+#endif
+
+int
+list_cmd(char **sp)
+{
+    int i;
+    int l;
+    int c;
+    char *s;
+
+    if (**sp) {
+        i = getaddress(sp);
+    } else {
+        if (lastaddr == -1) {
+            i = cpu.pc;
+        } else {
+            i = lastaddr;
+        }
+    }
+    for (l = 0; l < LISTLINES; l++) {
+        c = format_instr(i, cmdline, &get_byte, &lookup_sym, &reloc);
+        s = lookup_sym(i);
+        if (s) {
+            printf("%s\n", s);
+        }
+        printf("%04x: %-20s\n", i, cmdline);
+        i += c;
+        lastaddr = i & 0xffff;
+    }
+    return 0;
+}
+
 /*
- * this is the cpu emulator
+ * breakpoints and are done with an 8k bitmap
+ */
+char breaks[8192];          // if set, stop
+int nbreaks = 0;            // number of breakpoints
+
+int
+breakpoint_at(vaddr a)
+{
+    if (nbreaks && (breaks[a / 8] & (1 << (a % 8)))) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+int
+break_cmd(char **sp)
+{
+    int i;
+    int b;
+    vaddr addr;
+    int delete = 0;
+ 
+    if (!**sp) {
+        printf("%d breakpoints\n", nbreaks);
+        if (!nbreaks) {
+            return;
+        }
+        for (i = 0; i < 8192; i++) {
+            if (breaks[i]) {
+                for (b = 0; b < 8; b++) {
+                    if (breaks[i] & (1 << b)) {
+                        char *s;
+                        addr = i * 8 + b;
+                        s = lookup_sym(addr);
+                        if (s) {
+                            printf("%04x %s\n", addr, s);
+                        } else {
+                            printf("%04x\n", addr);
+                        }
+                    } 
+                }
+            }
+        }
+        return;
+    }
+    if (**sp == '-') {
+        (*sp)++;
+        delete = 1;
+    }
+
+    i = 0;
+    while (**sp) {
+        skipwhite(sp);
+        addr = getaddress(sp);
+        if (delete) {
+            if (breakpoint_at(addr)) nbreaks--;
+            breaks[addr/8] &= ~(1 << (addr % 8));
+        } else {
+            if (!breakpoint_at(addr)) nbreaks++;
+            breaks[addr/8] |= (1 << (addr % 8));
+        }
+        i++;
+    }
+    if (delete && !i) {
+        for (i = 0; i < 8192; i++) {
+            breaks[i] = 0;
+            nbreaks = 0;
+        }
+    }
+    return 0;
+}
+
+int
+dump_cmd(char **p)
+{
+    vaddr i;
+
+    if (**p) {
+        i = getaddress(p);
+    } else {
+        if (lastaddr == -1) {
+            i = cpu.registers.word[Z80_SP];
+        } else {
+            i = lastaddr;
+        }
+    }
+    dumpmem(&get_byte, i, 256);
+    lastaddr = (i + 256) & 0xffff;
+    return 0;
+}
+
+int
+step_cmd(char **sp)
+{
+    int i = 1;
+    if (**sp) {
+        i = strtol(*sp, sp, 16);
+    }
+    inst_countdown = i;
+    return 1;
+}
+
+int
+go_cmd(char **sp)
+{
+    if (**sp) {
+        cpu.pc = strtol(*sp, sp, 16);
+    }
+    inst_countdown = -1;
+    return 1;
+}
+
+int
+exit_cmd(char **sp)
+{
+    exit(1);
+}
+
+int
+regs_cmd(char **sp)
+{
+    dumpcpu();
+    return 0;
+}
+
+int
+help_cmd(char **sp)
+{
+    int i;
+    printf("commands:\n");
+    for (i = 0; i < MONCMDS; i++) {
+        if (moncmds[i].help) {
+            putchar(moncmds[i].cmd);
+            puts(moncmds[i].help);
+        }
+    }
+    return 0;
+}
+
+struct moncmd moncmds[MONCMDS] = {
+    { 'l', " [addr]\tlist instructions", list_cmd },
+    { 'b', "[-][<addr>] [...]\tadd or delete breakpoint", break_cmd },
+    { 'd', " [addr]\tdump memory", dump_cmd },
+    { 's', " [inst count]\tstep", step_cmd },
+    { 'g', " [address]\tgo", go_cmd },
+    { 'r', "\tdump registers", regs_cmd },
+    { 'q', "\tquit", exit_cmd },
+    { 'x', "\texit", exit_cmd },
+    { 'h', "\thelp", help_cmd },
+    { '?', "\thelp", help_cmd },
+    { 0, 0, 0 }
+};
+
+/*
+ * this is the cpu emulator main loop
  */
 static void
 emulate_z80()
 {
     unsigned char *ip;
     int i;
+
+    setjmp(&inst_start);
 
     while (1) {
 
@@ -1046,32 +1127,23 @@ emulate_z80()
                 break;
             }
         }
-
-        if (watchpoint_hit()) {
-            breakpoint = 1;
+        if (breakpoint_at(cpu.pc)) {
+            printf("break at %04x\n", cpu.pc);
+            inst_countdown = 0;
         }
-        if (point_at(&breaks, cpu.pc, 0)) {
-            if (point_at(&breaks, cpu.pc, 0)) {
-                pid();
-                printf("break at %04x\n", cpu.pc);
-            }
-            breakpoint = 1;
-        }
-        if (breakpoint) {
-            dumpcpu();
-            breakpoint = monitor();
-        }
-        if (verbose & V_INST) {
-            pid();
+        if ((verbose & V_INST) || (inst_countdown == 0)) {
             dumpcpu();
         }
-        /*
-         * the second arg is the number of cycles we are allowing 
-         * the emulator to run
-         */
-        // setjmp(&inst_start);
+        if (inst_countdown == 0) {
+            monitor();
+            continue;
+        }
 
+        // run for 1 instruction so we get control to check for breakpoints
         Z80Emulate(&cpu, 1, &cpu);
+        if (inst_countdown != -1) {
+            inst_countdown--;
+        }
     }
 }
 

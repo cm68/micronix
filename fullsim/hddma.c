@@ -216,6 +216,7 @@ attention(portaddr p, byte v)
         lseek(drivefd, offset, SEEK_SET);
         read(drivefd, &secbuf, secsize);
         copyout(&secbuf, dmaaddr, secsize);
+        if (verbose & V_BIO) hexdump(secbuf, secsize);
         command.status = GOOD;
         break;
     case OP_WRITE:
@@ -224,6 +225,7 @@ attention(portaddr p, byte v)
         }
         lseek(drivefd, offset, SEEK_SET);
         copyin(&secbuf, dmaaddr, secsize);
+        if (verbose & V_BIO) hexdump(secbuf, secsize);
         write(drivefd, &secbuf, secsize);
         command.status = GOOD;
         break;

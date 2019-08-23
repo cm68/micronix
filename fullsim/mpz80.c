@@ -122,6 +122,7 @@ setrom(int page)
 }
 
 char *rregname[] = { "trap", "keyb", "switch", "trapstat" };
+char *pattr[] = { "no access", "r/o", "execute", "full" };
 
 #ifdef notdef
 /*
@@ -146,17 +147,34 @@ trap()
 }
 #endif
 
-void
-printmap(int task)
+// dump out memory map
+int
+map_cmd(char **sp)
 {
     int i;
-    
-    task &= 0xf;
+    byte task;
+    byte attr;
+    int page;
+
+    skipwhite(sp);
+    if (**sp) {
+        i = strtol(*sp, sp, 16);
+    } else {
+        i = taskreg & 0xf;
+    }
+
+    task = i & 0xf;
+
     printf("task %d map\n", task);
     for (i = 0; i < 16; i++) {
-        printf("0x%04x 0x%06x\n", i << 12, 
-            maps[(task * 32) + (i << 1)] << 12);
+        page = task * 32 + (i << 1);
+        attr = maps[page + 1];
+        printf("0x%04x 0x%06x %s%s\n",
+            i << 12, 
+            maps[page] << 12,
+            pattr[attr & 0x3], (attr & 0x4) ? " r10" : "");
     }
+    return 0;
 }
 
 unsigned char
@@ -227,7 +245,6 @@ memread(vaddr addr)
     return retval;
 }
 
-char *pattr[] = { "no access", "r/o", "execute", "full" };
 char *wregname[] = { "fpseg", "fpcol", "trap", "mask" };
 void
 memwrite(vaddr addr, unsigned char value)
@@ -281,7 +298,7 @@ memwrite(vaddr addr, unsigned char value)
         if (verbose & V_MAP) {
             printf("map register %x write %x task %d page %x ", addr, value, task, page);
             if (addr & 0x01) {
-                printf("%s %s\n", value & 0x8 ? "r10" : "", pattr[value & 0x7]);
+                printf("%s %s\n", value & 0x8 ? "r10" : "", pattr[value & 0x3]);
             } else {
                 printf("physical 0x%2x000\n", value);
             }
@@ -305,13 +322,24 @@ memwrite(vaddr addr, unsigned char value)
  */
 #define	TRAPADDR	0xBF0
 
+void
+mpz80_usage()
+{
+    printf("config switch values:\n");
+    printf("\t0x04 - no monitor entry\n");
+    printf("\t0xf8 - start address mask\n");
+    printf("\t0x00 - boot hdca\n");
+    printf("\t0x08 - boot hddma\n");
+    printf("\t0x10 - boot djdma\n");
+}
+
 /*
  * this sets up our emulator settings before we do argument processing
  */
 int
 mpz80_init()
 {
-    bootrom = "mon447.bin";
+    rom_filename = "mon447.bin";
     rom_size = 4096;
     switchreg = SW_HDDMA | SW_NOMON;    // set diagnostic, monitor or boot mode
     switchreg = SW_DJDMA | SW_NOMON;    // set diagnostic, monitor or boot mode
@@ -324,7 +352,11 @@ int
 mpz80_startup()
 {
     setrom(0);
+    if (config_sw & CONF_SET) {
+        switchreg = config_sw & 0xff;   // could be multiple bytes of config
+    }
     cpu.pc = TRAPADDR;
+    return 0;
 }
 
 /*
@@ -337,6 +369,8 @@ register_mpz80_driver()
 {
     register_prearg_hook(mpz80_init);
     register_startup_hook(mpz80_startup);
+    register_usage_hook(mpz80_usage);
+    register_mon_cmd('m', "[task]\tdump memory map\n", map_cmd);
 }
 
 
