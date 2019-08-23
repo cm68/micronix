@@ -14,11 +14,12 @@
 #define V_HDCA  (1 << 6)        // HDCA
 #define V_MPZ   (1 << 7)        // MPZ80
 #define V_IMD   (1 << 8)        // IMD processing
-#define V_BIO   (1 << 9)        // block io
-#define V_HDDMA (1 << 10)        // block io
+#define V_BIO   (1 << 9)        // dump disk blocks
+#define V_HDDMA (1 << 10)       // block io
 
+// anything in the simulator has one of these types
 typedef unsigned char byte;
-
+typedef unsigned short word;
 typedef unsigned long paddr;	// 24 bit physical address
 typedef unsigned short vaddr;	// 16 bit virtual address
 typedef byte portaddr;
@@ -29,11 +30,14 @@ typedef void (*outhandler)(portaddr port, byte val);
 extern inhandler input_handler[256];
 extern outhandler output_handler[256];
 
+// callbacks
+extern void register_mon_cmd(char c, char *help, int (*handler)(char **p));
+extern void register_usage_hook(void (*hookfunc)());
 extern void register_prearg_hook(int (*hookfunc)());
 extern void register_startup_hook(int (*hookfunc)());
 extern void register_poll_hook(void (*hookfunc)());
 extern void register_input(portaddr portnum, inhandler func);
-extern void register_output( portaddr portnum, outhandler func);
+extern void register_output(portaddr portnum, outhandler func);
 
 extern void ioinit();
 extern void output(portaddr p, byte v);
@@ -44,17 +48,27 @@ extern void output(portaddr p, byte v);
 
 extern byte input(portaddr p);
 
-int imd_write(void *ip, int drive, int cyl, int head, int sec, char *buf);
-int imd_read(void *ip, int drive, int cyl, int head, int sec, char *buf);
+// virtual floppy load/read/write/inquire functions
 void *load_imd(char *fname);
+int imd_read(void *ip, int drive, int cyl, int head, int sec, char *buf);
+int imd_write(void *ip, int drive, int cyl, int head, int sec, char *buf);
 void imd_trkinfo(void *vp, int cyl, int head, int *secs, int *secsize);
+
+// useful utility functions
 char *bitdef(byte v, char**desc);
-void dumpmem(unsigned char (*readbyte) (long addr), long addr, int len);
+void dumpmem(unsigned char (*readbyte) (vaddr addr), vaddr addr, int len);
+void hexdump(void *addr, int len);
+void skipwhite(char **sp);
 
 /*
- * global variables
+ * global simulator variables
  */
-extern int verbose;
-extern int rom_size;
-extern char *rom_image;
-extern char *bootrom;
+extern int breakpoint;		// set nonzero to debug
+extern int verbose;		// the V_ flags above
+
+extern int rom_size;		// set this nonzero to read
+extern char *rom_image;		// binary from
+extern char *rom_filename;	// here
+
+#define	CONF_SET	0x80000000	// config specified
+extern int config_sw;

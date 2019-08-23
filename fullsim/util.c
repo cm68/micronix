@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "sim.h"
 
 #define PSIZE   50
 char patspace[PSIZE * 2];
@@ -46,6 +47,7 @@ skipwhite(char **s)
 
 /*
  * formatted memory dumper subroutines
+ * we are exclusively interested in 16 bit offsets
  */
 unsigned char pchars[16];
 int pcol;
@@ -66,12 +68,12 @@ dp()
 }
 
 void
-dumpmem(unsigned char (*readbyte) (long addr), long addr, int len)
+dumpmem(unsigned char (*readbyte) (vaddr addr), vaddr addr, int len)
 {
     int i;
 
     pcol = 0;
-
+ 
     while (len) {
         if (pcol == 0)
             printf("%04x: ", addr);
@@ -90,23 +92,23 @@ dumpmem(unsigned char (*readbyte) (long addr), long addr, int len)
     }
 }
 
-/*
- * if sizeof(long) != sizeof(char *) lose big
- */
-static unsigned char
-getbyte(long addr)
+char *baseaddr;
+
+static byte
+getbyte(vaddr addr)
 {
-    return *(unsigned char *)addr;
+    return baseaddr[addr];
 }
 
+/*
+ * use this to dump out from our (linux) address space
+ * a relative block
+ */
 void
-hexdump(unsigned char *addr, unsigned short len)
+hexdump(void *addr, int len)
 {
-    if (sizeof(long) != sizeof(unsigned char *)) {
-        printf("the horror, the horror.\n");
-        exit(1);
-    }
-    dumpmem(getbyte, (long)addr, len);
+    baseaddr = addr;
+    dumpmem(getbyte, 0, len);
 }
 
 /*
