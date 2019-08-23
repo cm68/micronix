@@ -111,16 +111,22 @@ https://retro.zen-room.org/morrow-micronix/user-mode-simulator
 
 the full decision 1 simulator is getting close to running.
 
-cp/m boots the dj-dma images, but with some wierdness reporting
-empty sectors as bad directory entries.  this may actually be an
-emulator bug, since e5 is in the directory.
+cp/m boots the dj-dma images, the hdc-dma works, the hdca works
+all with write support.  some odd cases like hdca and hddma boot
+are still broken.
 
-to do:
+the simulator has been sanitized a lot to allow growing into
+a more useful tool, allowing debug of additional device drivers
+that morrow never saw, like the disk3, scsi, etc.
 
-1) write the hdc-dma simulator
-2) write the trap code
-3) add floppy write support
-4) add interrupts
+the debugger supports board-specific plugins, and breakpoints
+work well to chase problems down.
+
+left to do:
+
+1) implement mpz80 traps
+2) add interrupts
+3) boot from hdca and hdcdma
 
 the memory mapping, reset and i/o abstraction are done.
 
