@@ -58,16 +58,20 @@
 #define DELTA_NO    0           // use the original
 #define DELTA_YES   1           // delta has newer
 
-int create_delta = 1;
-
-#include "sim.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "sim.h"
+
+int create_delta = 1;
+int trace_imd;
 
 #ifdef STAND
-int verbose;
+
+int trace;
+int trace_bio;
+
 void stop()
 {
 }
@@ -306,7 +310,7 @@ imd_load(char *fname)
                 for (sec = 0; sec < SECTORS; sec++) {
                     if (ip->delta_map[DIRTY_OFF(cyl, head, sec)] == DELTA_YES) {
                         offset = DELTA_OFF(cyl, head, sec);
-                        if (verbose & V_BIO) printf("imd_load_delta cyl %d head %d sec %d offset %d\n",
+                        if (trace & trace_bio) printf("imd_load_delta cyl %d head %d sec %d offset %d\n",
                             cyl, head, sec, offset);
                         lseek(fd, offset, SEEK_SET);
                         if (!tp->data[sec]) {
@@ -356,7 +360,7 @@ translate_sector(struct imd_trk *tp, int sec, int head)
 #ifdef notdef
     if (head) {
         printf("head nonzero\n");
-        verbose |= V_IMD;
+        trace |= trace_imd;
         stop();
     }
 #endif
@@ -369,7 +373,7 @@ translate_sector(struct imd_trk *tp, int sec, int head)
     }
     if (mysec == -1) {
         printf("imd: translate sector not found %d\n", sec);
-        if (verbose & V_IMD) {
+        if (trace & trace_imd) {
             dump_track(tp);
         }
         return 0;
@@ -405,11 +409,11 @@ imd_write(void *vp, int drive, int cyl, int head, int osec, char *buf)
     c = DELTA_YES;
     write(ip->delta_fd, &c, 1);
     offset = DELTA_OFF(cyl, head, tsec);
-    if (verbose & V_BIO) printf("imd_write drive %d cyl %d head %d tsec %d osec %d offset %d\n",
+    if (trace & trace_bio) printf("imd_write drive %d cyl %d head %d tsec %d osec %d offset %d\n",
         drive, cyl, head, tsec, osec, offset);
     lseek(ip->delta_fd, offset, SEEK_SET);
     write(ip->delta_fd, buf, tp->secsize);
-    if (verbose & V_BIO) hexdump(buf, tp->secsize);
+    if (trace & trace_bio) hexdump(buf, tp->secsize);
     return (tp->secsize);
 }
 
@@ -427,11 +431,11 @@ imd_read(void *vp, int drive, int cyl, int head, int osec, char *buf)
 
     tsec = translate_sector(tp, osec, head);
 
-    if (verbose & V_BIO) printf("imd_read drive %d cyl %d head %d tsec %d osec %d\n",
+    if (trace & trace_bio) printf("imd_read drive %d cyl %d head %d tsec %d osec %d\n",
         drive, cyl, head, tsec, osec);
     
     memcpy(buf, tp->data[tsec], tp->secsize); 
-    if (verbose & V_BIO) hexdump(buf, tp->secsize);
+    if (trace & trace_bio) hexdump(buf, tp->secsize);
     return (tp->secsize);
 }
 
@@ -606,6 +610,17 @@ main(int argc, char **argv)
         argv++;
     }
     exit(0);
+}
+#else
+/*
+ * this grammar makes the compiler call this function before main()
+ * this means we can add drivers by just adding them to the link
+ */
+__attribute__((constructor))
+void
+register_imd_driver()
+{
+    trace_imd = register_trace("imd");
 }
 #endif
 
