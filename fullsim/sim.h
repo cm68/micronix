@@ -49,7 +49,7 @@ extern void output(portaddr p, byte v);
 extern byte input(portaddr p);
 
 // virtual floppy load/read/write/inquire functions
-void *load_imd(char *fname);
+void *imd_load(char *fname);
 int imd_read(void *ip, int drive, int cyl, int head, int sec, char *buf);
 int imd_write(void *ip, int drive, int cyl, int head, int sec, char *buf);
 void imd_trkinfo(void *vp, int cyl, int head, int *secs, int *secsize);

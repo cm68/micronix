@@ -234,7 +234,7 @@ get_track(int fd)
  * load an imd file and return the struct
  */
 void *
-load_imd(char *fname)
+imd_load(char *fname)
 {
     struct imd *ip;
     int clen = 0;
@@ -589,7 +589,7 @@ main(int argc, char **argv)
 
     while (argc--) {
         printf("%s\n", *argv);
-        ip = (struct imd *)load_imd(*argv);
+        ip = (struct imd *)imd_load(*argv);
         if (!ip) {
             printf("can't load %s\n", *argv);
             exit(1);

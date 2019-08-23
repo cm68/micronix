@@ -550,7 +550,6 @@ main(int argc, char **argv)
         } 
         drivenames[i] = strdup(*argv++);
         drivenames[i+1] = 0;
-        break;
     }
 
     if (!drivenames) {
@@ -609,7 +608,7 @@ main(int argc, char **argv)
         if (!fork()) {
             execlp("xterm", "xterm", 
                 "-geometry", "120x40", 
-                "-fn", "8x13", 
+                "-fn", "8x13bold", 
                 "-e", "bash", 
                 "-c", cmd, (char *) 0);
         }
@@ -1139,8 +1138,19 @@ emulate_z80()
             continue;
         }
 
-        // run for 1 instruction so we get control to check for breakpoints
-        Z80Emulate(&cpu, 1, &cpu);
+        /*
+         * if we know we aren't debugging, don't bother to pop up here
+         * otherwise, run for 1 instruction so we get control to check for breakpoints
+         */
+#ifdef notdef
+        if ((nbreaks == 0) && (inst_countdown == -1) && !(verbose & V_INST)) {
+            i = 1000000;
+        } else {
+            i = 1;
+        }
+#endif
+        i = 1;
+        Z80Emulate(&cpu, i, &cpu);
         if (inst_countdown != -1) {
             inst_countdown--;
         }

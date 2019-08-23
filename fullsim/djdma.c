@@ -699,7 +699,7 @@ djdma_init()
 
     if (drivenames) {
         for (i = 0; drivenames[i]; i++) {
-            imdp[i] = load_imd(drivenames[i]);
+            imdp[i] = imd_load(drivenames[i]);
             if (!imdp[i]) {
                 printf("djdma_init: could not open %s\n",
                     drivenames[i]);
