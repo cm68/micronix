@@ -18,6 +18,9 @@
 #include <sys/ioctl.h>
 #include <stdio.h>
 
+int trace_djdma;
+extern int trace_bio;
+
 extern int terminal_fd;
 
 #define	DJDMA_PORT	0xef	// djdma command start port
@@ -196,7 +199,7 @@ pulse_djdma(portaddr p, byte v)
      */
     cmd = 0;
     while (djdma_running) {
-        // if (verbose & V_DJDMA) printf("djdma: fetch channel 0x%x\n", channel);
+        // if (trace & trace_djdma) printf("djdma: fetch channel 0x%x\n", channel);
         code = physread(channel);
         for (i = 0; i < (sizeof(djcmd) / sizeof(djcmd[0])); i++) {
             if (djcmd[i].code == code) {
@@ -205,9 +208,9 @@ pulse_djdma(portaddr p, byte v)
         }
         if (!cmd) {
             djdma_running = 0;
-            if (verbose & V_DJDMA) printf("djdma: unknown command %d %x\n", code, code);
+            if (trace & trace_djdma) printf("djdma: unknown command %d %x\n", code, code);
         } else {
-            if (verbose & V_DJDMA) printf("djdma: command %d %x %s\n", code, code, cmd->name);
+            if (trace & trace_djdma) printf("djdma: command %d %x %s\n", code, code, cmd->name);
             i = (cmd->handler)();
             if (cmd->status) {
                 physwrite(channel + cmd->status, i);
@@ -226,7 +229,7 @@ setdma()
     dmaaddr = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
-    if (verbose & V_DJDMA) printf("\tsetdma %x\n", dmaaddr);
+    if (trace & trace_djdma) printf("\tsetdma %x\n", dmaaddr);
     return 0;
 }
 
@@ -239,7 +242,7 @@ setchannel()
     resetchannel = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
-    if (verbose & V_DJDMA) printf("\tsetchannel %x\n", resetchannel);
+    if (trace & trace_djdma) printf("\tsetchannel %x\n", resetchannel);
     return 0;
 }
 
@@ -262,7 +265,7 @@ branch()
     channel = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
-    if (verbose & V_DJDMA) printf("\tbranch %x\n", channel);
+    if (trace & trace_djdma) printf("\tbranch %x\n", channel);
     return 0;
 }
 
@@ -285,7 +288,7 @@ readsec()
     sec &= 0x7f;
     drive = physread(channel + 3);
 
-    if (verbose & (V_BIO|V_DJDMA)) {
+    if (trace & (trace_bio|trace_djdma)) {
         printf("\tread sector drive:%d cylinder:%d sec:%d head:%d\n",
             drive, cyl, sec, head);
     }
@@ -314,7 +317,7 @@ static unsigned char
 setintr()
 {
     need_intack = 1;
-    if (verbose & V_DJDMA) printf("\tsetintr\n");
+    if (trace & trace_djdma) printf("\tsetintr\n");
     return 0;
 }
 
@@ -337,7 +340,7 @@ writesec()
     sec &= 0x7f;
     drive = physread(channel + 3);
 
-    if (verbose & (V_BIO|V_DJDMA)) {
+    if (trace & (V_BIO|trace_djdma)) {
         printf("\twrite sector drive:%d cyl:%d sec:%d head:%d\n",
             drive, cyl, sec, head);
     }
@@ -412,7 +415,7 @@ sense()
     physwrite(channel + 3, slc);
     physwrite(channel + 4, dsb);
 
-    if (verbose & V_DJDMA) {
+    if (trace & trace_djdma) {
         printf("\tsense drive:%d dcb:%x (%s) slc:%x dsb:%x (%s)\n", 
             drive, dcb, bitdef(dcb, sb1_bits), slc, dsb, bitdef(dsb, sb3_bits));
     } 
@@ -428,7 +431,7 @@ setretry()
     unsigned char drive;
 
     retrylimit = physread(channel + 1);
-    if (verbose & V_DJDMA) printf("\tsetretry %d\n", retrylimit);
+    if (trace & trace_djdma) printf("\tsetretry %d\n", retrylimit);
     return 0;
 }
 
@@ -441,7 +444,7 @@ setdrive()
     unsigned char drive;
 
     drive = physread(channel + 1);
-    if (verbose & V_DJDMA) printf("\tset drive:%d\n", drive);
+    if (trace & trace_djdma) printf("\tset drive:%d\n", drive);
     return S_NORMAL;
 }
 
@@ -471,7 +474,7 @@ readtrk()
 
     dparams[drive].current = cyl;
 
-    if (verbose & V_DJDMA) printf("\treadtrk drive:%d cyl:%d head:%x sectab:%x secs:%d\n", 
+    if (trace & trace_djdma) printf("\treadtrk drive:%d cyl:%d head:%x sectab:%x secs:%d\n", 
         drive, cyl, head, sectab, secs);
     for (i = 0; i < secs; i++) {
         if (physread(sectab + i) == 0xff) {
@@ -481,7 +484,7 @@ readtrk()
         if (bytes > 0) {
 
             copyout(secbuf, dmaaddr + secsize * i, bytes);
-            // if (verbose & V_DJDMA) printf("\tcopyout to %x for %d\n", dmaaddr + secsize * i, bytes);
+            // if (trace & trace_djdma) printf("\tcopyout to %x for %d\n", dmaaddr + secsize * i, bytes);
             physwrite(sectab + i, S_NORMAL);
         } else {
             physwrite(sectab + i, S_NOREAD);
@@ -514,8 +517,8 @@ writetrk()
 
     dparams[drive].current = cyl;
 
-    if (verbose & V_DJDMA) printf("\twritetrk\n");
-    if (verbose & V_DJDMA) printf("\treadtrk drive:%d cyl:%d head:%x sectab:%x secs:%d\n", 
+    if (trace & trace_djdma) printf("\twritetrk\n");
+    if (trace & trace_djdma) printf("\treadtrk drive:%d cyl:%d head:%x sectab:%x secs:%d\n", 
         drive, cyl, head, sectab, secs);
     return S_NORMAL;
 }
@@ -532,7 +535,7 @@ settrk()
     drive = physread(channel + 1);
     tracks = physread(channel + 2);
 
-    if (verbose & V_DJDMA) printf("\tset tracks drive: %d tracks: %d\n", drive, tracks);
+    if (trace & trace_djdma) printf("\tset tracks drive: %d tracks: %d\n", drive, tracks);
     return S_NORMAL;
 }
 
@@ -546,7 +549,7 @@ settiming()
 
     timing = physread(channel + 1);
 
-    if (verbose & V_DJDMA) printf("\tset drive timing: %d\n", timing);
+    if (trace & trace_djdma) printf("\tset drive timing: %d\n", timing);
     return S_NORMAL;
 }
 
@@ -635,7 +638,7 @@ write_djmem()
     for (i = 0; i < count; i++) {
         ((char *)dparams)[dest + i] = physread(source + i);
     }
-    if (verbose & V_DJDMA) {
+    if (trace & trace_djdma) {
         printf("\twrite mem %x from %x for %d\n", dest, source, count);
         printf("\tdrive %d set %s\n", dest / 16, (dest % 16) == 0 ? "tracks" : "timing");
     }
@@ -656,7 +659,7 @@ read_djmem()
     count = physread(channel + 4) + physread(channel + 5); 
     dest = physread(channel + 6) + (physread(channel + 7) << 8); 
 
-    if (verbose & V_DJDMA) {
+    if (trace & trace_djdma) {
         printf("\tread mem %x from %x for %d\n", dest, source, count);
     }
     return S_NORMAL;
@@ -730,6 +733,7 @@ void
 register_djdma_driver()
 {
     register_startup_hook(djdma_init);
+    trace_djdma = register_trace("djdma");
 }
 
 /*

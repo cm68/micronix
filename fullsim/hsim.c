@@ -52,6 +52,13 @@ int debug_terminal;
 int mypid;
 char *mytty;
 
+int trace;
+int trace_inst;
+int trace_bio;
+int trace_ior;
+int trace_io;
+
+#ifdef notdef
 // needs to be sync'd with sim.h
 char *vopts[] = {
     "V_IO", "V_INST", "V_IOR", "V_MAP", 
@@ -60,6 +67,33 @@ char *vopts[] = {
 };
 
 int verbose;
+#endif
+
+int trace;
+int trace_bio;
+int trace_ior;
+int trace_inst;
+
+char *tracenames[32];
+int traces;
+
+int
+register_trace(char *name)
+{
+    tracenames[traces] = name;
+    return 1 << traces++;
+}
+
+struct {
+    char *name;
+    int *valuep;
+} def_traces[] = {
+    {"inst", &trace_inst },
+    {"bio", &trace_bio },
+    {"ior", &trace_ior },
+    {"io", &trace_io },
+    { 0, 0 }
+} ;
 
 jmp_buf inst_start;
 MACHINE cpu;
@@ -329,7 +363,7 @@ void
 register_input(portaddr portnum, inhandler func)
 {
     if (func != undef_in) {
-        if (verbose & V_IOR)
+        if (trace & trace_ior)
             printf("input port %x registered\n", portnum);
     }
     input_handler[portnum] = func;
@@ -339,7 +373,7 @@ void
 register_output(portaddr portnum, outhandler func)
 {
     if (func != undef_out) {
-        if (verbose & V_IOR)
+        if (trace & trace_ior)
             printf("output port %x registered\n", portnum);
     }
     output_handler[portnum] = func;
@@ -359,13 +393,19 @@ ioinit()
 void
 output(portaddr p, byte v)
 {
+    if (trace & trace_io) printf("io: output 0x%x to 0x%x\n", v, p);
     (*output_handler[p]) (p, v);
 }
 
 byte
 input(portaddr p)
 {
-    return (*input_handler[p]) (p);
+    byte v;
+
+    v = (*input_handler[p])(p);
+
+    if (trace & trace_io) printf("io: input 0x%x got 0x%x\n", p, v);
+    return v;
 }
 
 /*
@@ -444,11 +484,11 @@ usage(char *complaint, char *p)
     fprintf(stderr, "usage: %s [<options>] <drive file> ...\n", p);
     fprintf(stderr, "\t-b\t<boot rom file>\n");
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
-    fprintf(stderr, "\t-t\topen a debug terminal window\n");
+    fprintf(stderr, "\t-x\topen a debug terminal window\n");
     fprintf(stderr, "\t-s\t\tstop before execution\n");
-    fprintf(stderr, "\t-v <verbosity>\n");
-    for (i = 0; vopts[i]; i++) {
-        fprintf(stderr, "\t%x %s\n", 1 << i, vopts[i]);
+    fprintf(stderr, "\t-t <tracebits>\n");
+    for (i = 0; tracenames[i]; i++) {
+        fprintf(stderr, "\t%x %s\n", 1 << i, tracenames[i]);
     }
     for (i = 0; i < MAXDRIVERS; i++) {
         if (usage_hook[i]) {
@@ -507,7 +547,7 @@ main(int argc, char **argv)
          */
         while (*s) {
             switch (*s++) {
-            case 't':
+            case 'x':
                 debug_terminal = 1;
                 break;
             case 'c':
@@ -522,11 +562,11 @@ main(int argc, char **argv)
                 }
                 rom_filename = strdup(*argv++);
                 break;
-            case 'v':
+            case 't':
                 if (!argc--) {
-                    usage("verbosity not specified \n", progname);
+                    usage("trace not specified \n", progname);
                 }
-                verbose = strtol(*argv++, 0, 0);
+                trace = strtol(*argv++, 0, 0);
                 break;
             case 's':
                 inst_countdown = 0;
@@ -603,14 +643,27 @@ main(int argc, char **argv)
         pipe(pipefd);
         // we need to capture the tty name so we can send output to it
         sprintf(cmd,
-            "tty > /proc/%d/fd/%d ; while test -d /proc/%d ; do sleep 1 ; done ; sleep 60",
+            "bash -c 'tty > /proc/%d/fd/%d ; while test -d /proc/%d ; do sleep 1 ; done ; sleep 60'",
             mypid, pipefd[1], mypid);
         if (!fork()) {
+            // try terminals in order of preference
+            execlp("xfce-terminal", "xfce4-terminal", 
+                "--command", cmd, 
+                (char *) 0);
+
+            execlp("mate-terminal", "mate-terminal", 
+                "--command", cmd, 
+                (char *) 0);
+
+            unlink("logfile");
+
             execlp("xterm", "xterm", 
                 "-geometry", "120x40", 
                 "-fn", "8x13bold", 
+                "-l", "-lf", "logfile",
                 "-e", "bash", 
-                "-c", cmd, (char *) 0);
+                "-c", cmd, 
+                (char *) 0);
         }
         ptyname = malloc(100);
         i = read(pipefd[0], ptyname, 100);
@@ -645,11 +698,11 @@ main(int argc, char **argv)
         printf("log file\n");
     }
 
-    if (verbose) {
-        printf("verbose %x ", verbose);
-        for (i = 0; vopts[i]; i++) {
-            if (verbose & (1 << i)) {
-                printf("%s ", vopts[i]);
+    if (trace) {
+        printf("trace %x ", trace);
+        for (i = 0; tracenames[i]; i++) {
+            if (trace & (1 << i)) {
+                printf("%s ", tracenames[i]);
             }
         }
         printf("\n");
@@ -1063,6 +1116,29 @@ go_cmd(char **sp)
 }
 
 int
+trace_cmd(char **sp)
+{
+    int k = trace;
+    char *s = "trace set to:\n";
+    int i;
+
+    if (**sp == '?') {
+        s = "trace can be:\n";
+        k = -1;
+    } else if (**sp) {
+        trace = strtol(*sp, sp, 16);
+        k = trace;
+    } 
+    printf(s);
+    for (i = 0; tracenames[i]; i++) {
+        if (k & (1 << i)) {
+            printf("\t%x %s\n", 1 << i, tracenames[i]);
+        }
+    }
+    return 0;
+}
+
+int
 exit_cmd(char **sp)
 {
     exit(1);
@@ -1096,6 +1172,7 @@ struct moncmd moncmds[MONCMDS] = {
     { 's', " [inst count]\tstep", step_cmd },
     { 'g', " [address]\tgo", go_cmd },
     { 'r', "\tdump registers", regs_cmd },
+    { 't', "trace\tset trace", trace_cmd },
     { 'q', "\tquit", exit_cmd },
     { 'x', "\texit", exit_cmd },
     { 'h', "\thelp", help_cmd },
@@ -1130,7 +1207,7 @@ emulate_z80()
             printf("break at %04x\n", cpu.pc);
             inst_countdown = 0;
         }
-        if ((verbose & V_INST) || (inst_countdown == 0)) {
+        if ((trace & trace_inst) || (inst_countdown == 0)) {
             dumpcpu();
         }
         if (inst_countdown == 0) {
@@ -1143,7 +1220,7 @@ emulate_z80()
          * otherwise, run for 1 instruction so we get control to check for breakpoints
          */
 #ifdef notdef
-        if ((nbreaks == 0) && (inst_countdown == -1) && !(verbose & V_INST)) {
+        if ((nbreaks == 0) && (inst_countdown == -1) && !(trace & trace_inst)) {
             i = 1000000;
         } else {
             i = 1;
@@ -1154,6 +1231,15 @@ emulate_z80()
         if (inst_countdown != -1) {
             inst_countdown--;
         }
+    }
+}
+
+__attribute__((constructor))
+init_trace()
+{
+    int i;
+    for (i = 0; def_traces[i].name; i++) {
+        *def_traces[i].valuep = register_trace(def_traces[i].name);
     }
 }
 

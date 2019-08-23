@@ -102,6 +102,9 @@ byte switchreg;
 #define     SW_HDDMA    0x08        // boot hdcdma
 #define     SW_HDCA     0x00        // boot hdca
 
+int trace_mpz80;
+int trace_map;
+
 byte trapstat;
 #define STAT    0x403       // trap status register
 
@@ -114,7 +117,7 @@ setrom(int page)
 {
     static int last = 0xff;
     if (last != page) {
-        if (verbose & V_MAP)
+        if (trace & trace_map)
             printf("enable page %d of eprom\n", page);
         memcpy(eprom, rom_image + (page * 0x400), 0x400);
         last = page;
@@ -194,13 +197,13 @@ memread(vaddr addr)
         if (addr == cpu.pc) {
             // the emulator reads the instruction twice sometimes!
             if (lastfetch != addr) {
-                if (verbose & V_MPZ) printf("taskctr decrement %x\n", addr);
+                if (trace & trace_mpz80) printf("taskctr decrement %x\n", addr);
                 taskctr--;
                 lastfetch = addr;
             }
         }
         if (taskctr == 0) {
-            if (verbose & V_MPZ) printf("switching taskreg\n");
+            if (trace & trace_mpz80) printf("switching taskreg\n");
             taskreg = next_taskreg;
         }
     }
@@ -230,12 +233,12 @@ memread(vaddr addr)
             retval = trapstat;
             break;
         default:
-            if (verbose & V_MPZ) printf("unknown local reg %x read\n", addr);
+            if (trace & trace_mpz80) printf("unknown local reg %x read\n", addr);
             return 0;
         }
-        if (verbose & V_MPZ) printf("mpz80: read %s register %x\n", rregname[addr & 0x03], retval);
+        if (trace & trace_mpz80) printf("mpz80: read %s register %x\n", rregname[addr & 0x03], retval);
     } else if (addr < EPROM) {
-        if (verbose & V_MPZ) printf("illegal map register read\n");
+        if (trace & trace_mpz80) printf("illegal map register read\n");
         return 0;
     } else if (addr < FPU) {
         retval = eprom[addr & 0x3ff];
@@ -282,10 +285,10 @@ memwrite(vaddr addr, unsigned char value)
         case MASK:
             break;
         default:
-            if (verbose & V_MPZ) printf("unknown local reg %x read\n", addr);
+            if (trace & trace_mpz80) printf("unknown local reg %x read\n", addr);
             return;
         }
-        if (verbose & V_MPZ) printf("mpz80: %s write %x\n", wregname[addr & 0x3], value);
+        if (trace & trace_mpz80) printf("mpz80: %s write %x\n", wregname[addr & 0x3], value);
         return;
     }
 
@@ -295,7 +298,7 @@ memwrite(vaddr addr, unsigned char value)
         byte task = (addr >> 5) & 0xf;
         byte page = (addr >> 1) & 0xf;
 
-        if (verbose & V_MAP) {
+        if (trace & trace_map) {
             printf("map register %x write %x task %d page %x ", addr, value, task, page);
             if (addr & 0x01) {
                 printf("%s %s\n", value & 0x8 ? "r10" : "", pattr[value & 0x3]);
@@ -309,7 +312,7 @@ memwrite(vaddr addr, unsigned char value)
     }
     // write to eprom ?!
     if (addr < FPU) {
-        if (verbose & V_MPZ) printf("write to eprom\n");
+        if (trace & trace_mpz80) printf("write to eprom\n");
         return;
     }
 
@@ -367,6 +370,9 @@ __attribute__((constructor))
 void
 register_mpz80_driver()
 {
+    trace_mpz80 = register_trace("mpz80");
+    trace_map = register_trace("map");
+
     register_prearg_hook(mpz80_init);
     register_startup_hook(mpz80_startup);
     register_usage_hook(mpz80_usage);
