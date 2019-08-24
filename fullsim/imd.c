@@ -390,14 +390,21 @@ imd_write(void *vp, int drive, int cyl, int head, int osec, char *buf)
 {
     struct imd *ip = (struct imd *)vp;
     int trk = trknum(cyl, head);
-    struct imd_trk *tp = ip->tracks[trk];
+    struct imd_trk *tp;
     char c;
     int offset;
     int tsec;       // translated sector
 
+    if ((cyl >= ip->cyls) || (head >= ip->heads)) {
+        printf("imd: bogus write %d:%d with %d:%d\n", cyl, head, ip->cyls, ip->heads);
+        return 0;
+    }
+
     if (!ip->delta_fd) {
         return 0;
     }
+
+    tp = ip->tracks[trk];
     tsec = translate_sector(tp, osec, head);
 
     /* could be an absent block */
@@ -426,14 +433,24 @@ imd_read(void *vp, int drive, int cyl, int head, int osec, char *buf)
 {
     struct imd *ip = (struct imd *)vp;
     int trk = trknum(cyl, head);
-    struct imd_trk *tp = ip->tracks[trk];
+    struct imd_trk *tp;
     int tsec;
 
+    if ((cyl >= ip->cyls) || (head >= ip->heads)) {
+        printf("imd: bogus read %d:%d with %d:%d\n", cyl, head, ip->cyls, ip->heads);
+        return 0;
+    }
+    tp = ip->tracks[trk];
     tsec = translate_sector(tp, osec, head);
 
     if (trace & trace_bio) printf("imd_read drive %d cyl %d head %d tsec %d osec %d\n",
         drive, cyl, head, tsec, osec);
     
+    // if reading an absent block, supply zeros
+    if (!tp->data[tsec]) {
+        tp->data[tsec] = malloc(tp->secsize);
+        bzero(tp->data[tsec], tp->secsize);
+    }
     memcpy(buf, tp->data[tsec], tp->secsize); 
     if (trace & trace_bio) hexdump(buf, tp->secsize);
     return (tp->secsize);
