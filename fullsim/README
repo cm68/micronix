@@ -1,2 +1,2 @@
-
+booting from hddma now works.  see the comment at the beginning of hddma.c about booting.  subtle.
 

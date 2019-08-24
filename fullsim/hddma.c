@@ -14,6 +14,12 @@
  * an output instruction, which may be in an interrupt handler
  *
  * this controller is also called the hdc-dma, hdcdma, etc.
+ *
+ * booting/formatting/sysgen problems:
+ * mon447: reads 512 sector, which fails on a 1k (cp/m) formatted disk
+ * mon375: reads 1024 sector, which fails on a 512 (micronix) formatted disk
+ * to make the mon447 work with cp/m, if and only if we are reading block
+ * 0 of the disk, we ignore the sector size set to 512 aud use 1024 instead
  */
 
 #include "sim.h"
@@ -70,8 +76,8 @@ struct hd_cmd {
      */
 #define cyl_low     arg0
 #define cyl_high    arg1
-#define head        arg2
-#define sector      arg3
+#define hd          arg2
+#define sec         arg3
 
     /*
      * format is a different story - the arg bytes are used to set formatting informatio
@@ -189,6 +195,12 @@ attention(portaddr p, byte v)
     dmaaddr = command.dma_low + (command.dma_mid << 8) + (command.dma_high << 16);
     link = command.link_low + (command.link_mid << 8) + (command.link_high << 16);
     secsize = secsz[drv];
+    // special boot hack
+    if ((command.opcode == OP_READ) && 
+        (drv == 0) && (command.sec == 0) && 
+        (command.hd == 0) && (track[drv] == 0)) {
+        secsize = 1024;
+    }
     head = ((command.selhd & HEAD_MASK) >> HEAD_SHIFT) ^ HEAD_CMP;
     if (trace & trace_hddma) {
         printf("drive: %d track: %d step: %d %s head: %x %s%s",
@@ -209,7 +221,7 @@ attention(portaddr p, byte v)
         track[drv] += steps;
     }
     i = command.cyl_low + (command.cyl_high << 8);
-    offset = secoff(command.sector, command.head, track[drv]);
+    offset = secoff(command.sec, command.hd, track[drv]);
  
     switch (command.opcode) {
     case OP_READ:
@@ -251,6 +263,7 @@ attention(portaddr p, byte v)
         command.status = GOOD;
         break;
     case OP_SPEC:
+        secsize = SSECSIZE(command.sseccode);
         if (trace & trace_hddma) {
             printf("steprate: %d ms ", command.steprate & 0x7f);
             if (command.steprate & INTERRUPT) {
@@ -259,7 +272,6 @@ attention(portaddr p, byte v)
             printf("settle: %d ms ", command.settle & 0x7f);
             printf("secsize %d\n", secsize);
         }
-        secsize = SSECSIZE(command.sseccode);
         secsz[drv] = secsize; 
         command.status = GOOD;
         break;
