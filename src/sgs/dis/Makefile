@@ -16,7 +16,10 @@ CFLAGS=$(PROTO) $(FLAVOR) $(DEBUG)
 
 LINTFLAGS=$(FLAVOR) -abchx
 
-all: disas
+all: disas dump
+
+dump:	dump.c
+	$(CC) $(CFLAGS) dump.c $(LDFLAGS) -o dump
 
 disas: disas.c
 	$(CC) $(CFLAGS) disas.c $(LDFLAGS) -o disas
@@ -36,5 +39,5 @@ test:	disas
 	./disas -a 0x100 -e 0x18b DDT.COM >DDTSTART.ASM
 	./disas -s 0x100 -a 0 -f DDT.SYM DDT.COM >DDTEND.ASM
 
-install:	disas
-	sudo cp disas /usr/local/bin
+install:	disas dump
+	sudo cp dump disas /usr/local/bin
