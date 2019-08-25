@@ -1,6 +1,10 @@
 /*
  * the multio driver is both for the onboard I/O on the multio card
- * and the wunderbus I/O, which are roughly equivalent
+ * and the wunderbus I/O, which are generally equivalent.
+ *
+ * differences are small: in group 0, base+1 is a dip switch
+ * and base+4 are input and output for a parallel port,
+ * base +6 output controls the parallel port
  *
  * this has rtc, serial ports and an interrupt controller, 
  * and some parallel stuff
@@ -11,6 +15,7 @@
 #include <termios.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <time.h>
 
 int trace_multio;
 
@@ -59,12 +64,25 @@ static byte dlab;
 static byte dll;
 static byte dlm;
 
-/* port 0x4a */
-static byte 
-rd_clock(portaddr p)
+char *
+printable(char v)
 {
-    if (trace & trace_multio) printf("multio: read clock\n");
-    return 0;
+    static char sbuf[10];
+
+    if (v >= ' ' && v < 0x7f) {
+        sprintf(sbuf, "%c", v);
+    } else switch(v) {
+    case '\n':  return "\\n";
+    case '\t':  return "\\t";
+    case '\r':  return "\\r";
+    case '\b':  return "\\b";
+    case 0:    return "NULL";
+    case 26:    return "^Z";
+    default:
+        sprintf(sbuf, "%x %d", v, v);
+        break; 
+    }
+    return sbuf;
 }
 
 /* port 0x4c */
@@ -107,7 +125,7 @@ rd_rxb(portaddr p)
             retval = 0;
         }
     }
-    if (trace & trace_multio) printf("multio: read rxb = %d\n", retval);
+    if (trace & trace_multio) printf("multio: read rxb = %s\n", printable(retval));
     return retval;
 }
 
@@ -170,10 +188,97 @@ rd_mdmstat(portaddr p)
     return 0;
 }
 
+/*
+ * the clock is bit-banged, a 1990 clock/calendar chip.
+ */
+#define CLK_DATA    0x01    // the data shifts in and out here
+#define CLK_SHIFT   0x02    // the shift register strobe
+#define CLK_CMD     0x1c    // command bits
+#define     CC_SHOLD    0x00    // shift register hold
+#define     CC_ENSR     0x04    // enable shift register
+#define     CC_SET      0x08    // load clock from shift register
+#define     CC_GET      0x0c    // read clock to shift register
+#define     CC_64HZ     0x10
+#define     CC_256HZ    0x14
+#define     CC_2kKHZ    0x18
+#define     CC_32HZ     0x1c
+#define CLK_SETCMD  0x20    // strobe the command
+
+#define  bcd(h,l)    ((((h) & 0xf) << 4) | ((l) & 0xf))
+
+/*
+ * the real time clock is latched this 40 bit structure
+ */
+byte rtc[5] = { 0x25, 0x34, 0x12, 0x25, 0x76 };
+int rtcptr;
+static byte last_wrclock;
+time_t now;
+
+char *wclk_bits[] = { "DATA", "DSTROBE", 0, 0, 0, "CSTROBE", 0, 0 };
+char *clk_cmd[] = { "SHOLD", "ENSR", "SET", "GET", "64Hz", "256Hz", "2kHz", "32Hz" };
+/*
+ * the bit banging works like this:
+ * the program sets strobe low, with command set, 
+ * then it sets it high, again with the same command,
+ * then it sets it low again
+ * I'm going to be lazy and only notice the high to low transitions
+ */
 static void
 wr_clock(portaddr p, byte v)
 {
-    if (trace & trace_multio) printf("multio: write clock %x\n", v);
+    struct tm *tm;
+
+    if (trace & trace_multio) {
+        printf("multio: write clock %x %s %s\n", 
+            v, clk_cmd[(v & CLK_CMD) >> 2], bitdef(v, wclk_bits));
+    }
+
+    // if falling edge on CSTROBE and command the same, do a command
+    if ((!(v & CLK_SETCMD)) && (last_wrclock & CLK_SETCMD) &&
+        ((v & CLK_CMD) == (last_wrclock & CLK_CMD))) {
+        switch (v & CLK_CMD) {
+        case CC_SHOLD:      // do nothing with shift register
+            break;
+        case CC_ENSR:       // reset shift register
+            rtcptr = 0;
+            break;
+        case CC_SET:        // set time - no, we not going to do that
+            break; 
+        case CC_GET:        // read the unix time and populate the array
+            now = time(&now);
+            tm = localtime(&now);
+            rtc[0] = bcd(tm->tm_sec / 10, tm->tm_sec % 10);
+            rtc[1] = bcd(tm->tm_min / 10, tm->tm_min % 10);
+            rtc[2] = bcd(tm->tm_hour / 10, tm->tm_hour % 10);
+            rtc[3] = bcd(tm->tm_mday / 10, tm->tm_mday % 10);
+            rtc[4] = bcd(tm->tm_mon, tm->tm_wday);
+            break;
+        case CC_64HZ:
+        case CC_256HZ:
+        case CC_2kKHZ:
+        case CC_32HZ:
+            break;
+        }
+    }
+
+    // if falling edge on DSTROBE and command the same, advance the data bit pointer
+    if ((!(v & CLK_SHIFT)) && (last_wrclock & CLK_SHIFT) &&
+        ((v & CLK_CMD) == (last_wrclock & CLK_CMD))) {
+        if (++rtcptr == 40) {
+            rtcptr = 0;
+        }
+    }
+    last_wrclock = v;
+}
+
+static byte 
+rd_clock(portaddr p)
+{
+    byte v;
+
+    v = (rtc[rtcptr / 8] >> (rtcptr % 8)) & 1;
+    if (trace & trace_multio) printf("multio: read clock %x\n", v);
+    return v;
 }
 
 static void
@@ -201,7 +306,7 @@ wr_txb(portaddr p, byte v)
     } else {
         write(terminal_fd, &v, 1);
     }
-    if (trace & trace_multio) printf("multio: write txb %x %d %c\n", v, v, v);
+    if (trace & trace_multio) printf("multio: write txb %s\n", printable(v));
 }
 
 static char *w_inte_bits[] = { "READAVAIL", "TXHOLDEMPTY", "RLINESTAT", "MDMSTAT", 0, 0, 0, 0 };
@@ -252,6 +357,41 @@ wr_mdmctl(portaddr p, byte v)
     if (trace & trace_multio) printf("multio: write mdmctl %x %s\n", v, bitdef(v, w_mdmc_bits));
 }
 
+static byte
+rd_daisy(portaddr p)
+{
+    byte ret;
+
+    ret = 0;
+    if (trace & trace_multio) printf("multio: read daisy %x = 0x%x\n", p, ret);
+    return ret;
+}
+
+static void
+wr_daisy0(portaddr p, byte v)
+{
+    if (trace & trace_multio) printf("multio: write daisy0 %x\n", v);
+}
+
+static void
+wr_daisy1(portaddr p, byte v)
+{
+    if (trace & trace_multio) printf("multio: write daisy1 %x\n", v);
+}
+
+static byte
+undef_inreg(portaddr p)
+{
+    if (trace & trace_multio) printf("multio: read to %x+%x undefined\n", MULTIO_PORT, p - MULTIO_PORT);
+    return 0;
+}
+
+static void
+undef_outreg(portaddr p, byte v)
+{
+    if (trace & trace_multio) printf("multio: write 0x%x to undefined %x+%x\n", v, MULTIO_PORT, p - MULTIO_PORT);
+}
+
 /*
  * write the port select register
  */
@@ -270,12 +410,21 @@ multio_select(portaddr p, byte v)
 
     switch (group) {
     case 0:
+        register_input(MULTIO_PORT + 0, &rd_daisy);
+        register_input(MULTIO_PORT + 1, &undef_inreg);
         register_input(MULTIO_PORT + 2, &rd_clock);
+        register_input(MULTIO_PORT + 3, &undef_inreg);
         register_input(MULTIO_PORT + 4, &rd_pic_port_0);
         register_input(MULTIO_PORT + 5, &rd_pic_port_1);
+        register_input(MULTIO_PORT + 6, &undef_inreg);
+
+        register_output(MULTIO_PORT + 0, &wr_daisy0);
+        register_output(MULTIO_PORT + 1, &wr_daisy1);
         register_output(MULTIO_PORT + 2, &wr_clock);
+        register_output(MULTIO_PORT + 3, &undef_outreg);
         register_output(MULTIO_PORT + 4, &wr_pic_port_0);
         register_output(MULTIO_PORT + 5, &wr_pic_port_1);
+        register_output(MULTIO_PORT + 6, &undef_outreg);
         break; 
     case 1:
     case 2:
@@ -287,11 +436,14 @@ multio_select(portaddr p, byte v)
         register_input(MULTIO_PORT + 4, &rd_mdmctl);
         register_input(MULTIO_PORT + 5, &rd_linestat);
         register_input(MULTIO_PORT + 6, &rd_mdmstat);
+
         register_output(MULTIO_PORT + 0, &wr_txb);
         register_output(MULTIO_PORT + 1, &wr_inte);
+        register_output(MULTIO_PORT + 2, &undef_outreg);
         register_output(MULTIO_PORT + 3, &wr_linectl);
         register_output(MULTIO_PORT + 4, &wr_mdmctl);
-        register_output(MULTIO_PORT + 5, &wr_linestat);
+        register_output(MULTIO_PORT + 5, &undef_outreg);
+        register_output(MULTIO_PORT + 6, &undef_outreg);
         break;
     }
 }
