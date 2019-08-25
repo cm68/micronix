@@ -112,8 +112,7 @@ https://retro.zen-room.org/morrow-micronix/user-mode-simulator
 the full decision 1 simulator is getting close to running.
 
 cp/m boots the dj-dma images, the hdc-dma works, the hdca works
-all with write support.  some odd cases like hdca and hddma boot
-are still broken.
+all with write support.
 
 the simulator has been sanitized a lot to allow growing into
 a more useful tool, allowing debug of additional device drivers
@@ -126,7 +125,6 @@ left to do:
 
 1) implement mpz80 traps
 2) add interrupts
-3) boot from hdca and hdcdma
 
 the memory mapping, reset and i/o abstraction are done.
 
