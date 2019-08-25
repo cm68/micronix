@@ -85,7 +85,122 @@ printable(char v)
     return sbuf;
 }
 
-/* port 0x4c */
+static char *icw1_bits[] = { "icw4need", "single", "interval4", "level", "icw1", 0, 0, 0 };
+static char *ocw2_bits[] = { 0, 0, 0, 0, 0, "eoi", "spec", "rotate" };
+static char *ocw3_bits[] = { "ris", "rr", "poll", "ocw3", 0, "smm", "esmm", 0, 0 };
+static char *icw4_bits[] = { "8086", "autoeoi", "master", "buffered", "special", 0, 0, 0 };
+static char *nobits[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+/*
+ * we've got an 8259, which has 2 registers at MULTIO_PORT+4 and MULTIO_PORT+5
+ */
+#define PIC0_ICW1   0x10
+#define PIC0_OCW3   0x08
+
+byte icw1;
+#define ICW1_I4     0x01        // icw4 needed
+#define ICW1_SNG    0x02        // single, no cascade
+#define ICW1_ADI    0x04        // address interval = 4
+#define ICW1_LTIM   0x08        // level triggered mode
+#define ICW1_VECL   0xe0        // bits 7-5 of interrupt vector
+
+byte icw2;
+byte icw3;
+byte icw4;
+
+byte ocw2;
+#define OCW2_LEVEL  0x07        // level mask
+#define OCW2_CMD    0xe0        // command mask
+
+byte ocw3;
+#define OCW3_RIS    0x01        // register to read
+#define OCW3_RR     0x02        // register to read
+#define OCW3_POLL   0x04        // poll command
+#define OCW3_SMM    0x20        // set special mask mode
+#define OCW3_ESMM   0x40        // affect special mask mode
+
+byte isr;           // in-service register
+byte imask;         // interrupt mask register
+byte intreq;        // interrupt request register
+
+int pic_state = 0;
+#define PS_UNDEF    0
+#define PS_ICW2     1
+#define PS_ICW3     2
+#define PS_ICW4     3
+#define PS_READY    4
+
+static void
+wr_pic_port_0(portaddr p, byte v)
+{
+    char *bdec;
+    char *rname;
+
+    if (v & PIC0_ICW1) {            // ICW1
+        bdec = icw1_bits;
+        rname = "icw1";
+        pic_state = PS_ICW2;
+        icw1 = v;
+    } else if (v & PIC0_OCW3) {     // OCW3
+        bdec = ocw3_bits;
+        rname = "ocw3";
+        ocw3 = v;
+    } else {                        // OCW2
+        bdec = ocw2_bits;
+        rname = "ocw2";
+        ocw2 = v;
+    }
+
+    if (trace & trace_multio) {
+        printf("multio: write pic0 %x %s: %s\n", v, rname, bitdef(v, bdec));
+    }
+}
+
+static void
+wr_pic_port_1(portaddr p, byte v)
+{
+    char *bdec;
+    char *reg;
+
+    switch (pic_state) {
+    case PS_ICW2:
+        reg = "icw2";
+        icw2 = v;
+        bdec = nobits;
+        if (!(icw1 & ICW1_SNG)) {
+            pic_state = PS_ICW3;
+        } else if (icw1 & ICW1_I4) {
+            pic_state = PS_ICW4;
+        }
+        break;
+    case PS_ICW3:
+        reg = "icw3";
+        icw3 = v;
+        bdec = nobits;
+        if (icw1 & ICW1_I4) {
+            pic_state = PS_ICW4;
+        } else {
+            pic_state = PS_READY;
+        }
+        break;
+    case PS_ICW4:
+        reg = "icw4";
+        icw4 = v;
+        bdec = icw4_bits;
+        pic_state = PS_READY;
+        break;
+    case PS_READY:
+        reg = "imask";
+        imask = v;
+        bdec = nobits;
+        break;
+    default:
+        reg = "unknown";
+        bdec = nobits;
+    }
+    if (trace & trace_multio) printf("multio: write pic1 %s %x, %x\n", reg, v);
+}
+
 static byte 
 rd_pic_port_0(portaddr p)
 {
@@ -279,18 +394,6 @@ rd_clock(portaddr p)
     v = (rtc[rtcptr / 8] >> (rtcptr % 8)) & 1;
     if (trace & trace_multio) printf("multio: read clock %x\n", v);
     return v;
-}
-
-static void
-wr_pic_port_0(portaddr p, byte v)
-{
-    if (trace & trace_multio) printf("multio: write pic0 %x\n", v);
-}
-
-static void
-wr_pic_port_1(portaddr p, byte v)
-{
-    if (trace & trace_multio) printf("multio: write pic1 %x\n", v);
 }
 
 static void
