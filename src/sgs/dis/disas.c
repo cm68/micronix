@@ -482,6 +482,9 @@ char **argv;
 
     if (argc) {
         name = *argv;
+        if (strcasecmp(name + strlen(name) - 4, ".com") == 0) {
+            if (!startaddr) startaddr = 0x100;
+        }
     } else {
         name = "/dev/stdin";
     }
