@@ -39,8 +39,10 @@ typedef unsigned int ULONG;
 typedef unsigned char UCHAR;
 typedef unsigned short UINT;
 
-#define EXIT_PORT   0
-#define DUMP_PORT   1
+#define EXIT_PORT   0   // output to here ends the simulator
+#define DUMP_PORT   1   // output to here makes a memory dump with registers
+#define INPUT_PORT  2   // this is for patching into pip for import
+#define OUTPUT_PORT 2   // this is for patching into pip for export
 
 #define	LISTLINES	8
 #define	STACKTOP	0xffff
@@ -321,8 +323,21 @@ dump_port_handler(portaddr p, byte v)
     free(dumpbuf);
 }
 
-#define INPUT_PORT 2
-
+/*
+ * to use the following output ports with pip,  patch it using ddt
+ * 0103 jmp 10a
+ * 0106 jmp 110
+ * 0109 nop
+ * 010a in 2
+ * 010c sta 109
+ * 010f ret
+ * 0110 mov a,c
+ * 0111 out 2
+ * 0113 ret
+ * 
+/*
+ * pip from INP: calls to 0x103 to get a bype of data into 0x109
+ */
 static int inp_fd = -1;
 static byte 
 pip_input_handler(portaddr p)
@@ -342,6 +357,26 @@ pip_input_handler(portaddr p)
         inp_fd = -1;
     }
     return buf;
+}
+
+/*
+ * pip to OUT: calls to 0x106 with character in C
+ */
+static int out_fd = -1;
+
+static void
+pip_output_handler(portaddr p, byte v)
+{
+    if (out_fd == -1) {
+        out_fd = creat("file.out", 0777);
+    }
+    if (out_fd >= 0) {
+        write(out_fd, &v, 1);
+        if (v == 0x1a) {
+            close(out_fd);
+            out_fd = -1;
+        }
+    }
 }
 
 byte
@@ -647,11 +682,14 @@ main(int argc, char **argv)
             mypid, pipefd[1], mypid);
         if (!fork()) {
             // try terminals in order of preference
-            execlp("xfce-terminal", "xfce4-terminal", 
+            execlp("xfce4-terminal", "xfce4-terminal", 
+                "--disable-server",
                 "--command", cmd, 
                 (char *) 0);
 
             execlp("mate-terminal", "mate-terminal", 
+                "--sm-client-disable",
+                "--disable-factory",
                 "--command", cmd, 
                 (char *) 0);
 
@@ -713,6 +751,7 @@ main(int argc, char **argv)
     register_output(EXIT_PORT, exit_port_handler);
     register_output(DUMP_PORT, dump_port_handler);
     register_input(INPUT_PORT, pip_input_handler);
+    register_output(OUTPUT_PORT, pip_output_handler);
 
     Z80Reset(&cpu);
 
@@ -1212,7 +1251,6 @@ emulate_z80()
         }
         if (inst_countdown == 0) {
             monitor();
-            continue;
         }
 
         /*
