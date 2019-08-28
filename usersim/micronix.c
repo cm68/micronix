@@ -582,7 +582,7 @@ dumpcpu()
 	char fbuf[9];
 	char *s;
 	int i;
-
+	//            01234567
 	strcpy(fbuf, "        ");
 
 	format_instr(cp->state.pc, outbuf, &get_byte, &lookup_sym, &reloc);
@@ -596,11 +596,12 @@ dumpcpu()
 	
 	if (f & Z80_C_FLAG) fbuf[0] = 'C';
 	if (f & Z80_N_FLAG) fbuf[1] = 'N';
-	if (f & Z80_X_FLAG) fbuf[2] = 'X';
-	if (f & Z80_H_FLAG) fbuf[3] = 'H';
-	if (f & Z80_Y_FLAG) fbuf[4] = 'Y';
-	if (f & Z80_Z_FLAG) fbuf[5] = 'Z';
-	if (f & Z80_C_FLAG) fbuf[6] = 'S';
+	if (f & Z80_PV_FLAG) fbuf[2] = 'V';
+	if (f & Z80_X_FLAG) fbuf[3] = 'X';
+	if (f & Z80_H_FLAG) fbuf[4] = 'H';
+	if (f & Z80_Y_FLAG) fbuf[5] = 'Y';
+	if (f & Z80_Z_FLAG) fbuf[6] = 'Z';
+	if (f & Z80_S_FLAG) fbuf[7] = 'S';
 
 	fprintf(mytty,
 	" %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x brk:%04x\n",
