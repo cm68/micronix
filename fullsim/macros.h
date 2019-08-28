@@ -15,18 +15,16 @@
 #define SYX_FLAGS       (Z80_S_FLAG | Z80_Y_FLAG | Z80_X_FLAG)
 #define HC_FLAGS        (Z80_H_FLAG | Z80_C_FLAG)
 
-#define A               (state->registers.byte[Z80_A])
-#define F               (state->registers.byte[Z80_F])
-#define B               (state->registers.byte[Z80_B])
-#define C               (state->registers.byte[Z80_C])
+#define A               (cpu.registers.byte[Z80_A])
+#define F               (cpu.registers.byte[Z80_F])
+#define B               (cpu.registers.byte[Z80_B])
+#define C               (cpu.registers.byte[Z80_C])
 
-#define AF              (state->registers.word[Z80_AF])
-#define BC              (state->registers.word[Z80_BC])
-#define DE              (state->registers.word[Z80_DE])
-#define HL              (state->registers.word[Z80_HL])
-#define SP              (state->registers.word[Z80_SP])
-
-#define HL_IX_IY        *((unsigned short *) registers[6])
+#define AF              (cpu.registers.word[Z80_AF])
+#define BC              (cpu.registers.word[Z80_BC])
+#define DE              (cpu.registers.word[Z80_DE])
+#define HL              (cpu.registers.word[Z80_HL])
+#define SP              (cpu.registers.word[Z80_SP])
 
 /* Opcode decoding macros.  Y() is bits 5-3 of the opcode, Z() is bits 2-0,
  * P() bits 5-4, and Q() bits 4-3.
@@ -42,7 +40,7 @@
  */
 
 #define R(r)            *((unsigned char *) (registers[(r)]))
-#define S(s)            *((unsigned char *) state->register_table[(s)])
+#define S(s)            *((unsigned char *) cpu.register_table[(s)])
 #define RR(rr)          *((unsigned short *) registers[(rr) + 8])
 #define SS(ss)          *((unsigned short *) registers[(ss) + 12])
 #define CC(cc)          ((F ^ XOR_CONDITION_TABLE[(cc)])                \
@@ -105,7 +103,7 @@
                                                 
 #define READ_INDIRECT_HL(x)                                             \
 {                                                                       \
-        if (registers == state->register_table) {			\
+        if (registers == cpu.register_table) {			\
                                                                         \
                 READ_BYTE(HL, (x));                                     \
                                                                         \
@@ -124,7 +122,7 @@
 
 #define WRITE_INDIRECT_HL(x)                                            \
 {                                                                       \
-        if (registers == state->register_table) {			\
+        if (registers == cpu.register_table) {			\
                                                                         \
                 WRITE_BYTE(HL, (x));                                    \
                                                                         \

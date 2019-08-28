@@ -8,7 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "z80emu.h"
+#include "z80.h"
 
 /* Encoding for indirect or indexed 8-bit memory operands. */
 

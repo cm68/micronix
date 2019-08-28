@@ -19,8 +19,6 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <time.h>
-#include "z80emu.h"
-#include "z80user.h"
 #include <errno.h>
 #include <termios.h>
 #include <unistd.h>
@@ -33,6 +31,7 @@
 
 #include <setjmp.h>
 
+#include "z80.h"
 #include "sim.h"
 
 extern MACHINE cpu;
