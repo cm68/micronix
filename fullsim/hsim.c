@@ -19,8 +19,6 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <time.h>
-#include "z80emu.h"
-#include "z80user.h"
 #include <errno.h>
 #include <termios.h>
 #include <unistd.h>
@@ -33,6 +31,7 @@
 
 #include <setjmp.h>
 
+#include "z80.h"
 #include "sim.h"
 
 typedef unsigned int ULONG;
@@ -60,22 +59,6 @@ int trace_bio;
 int trace_ior;
 int trace_io;
 
-#ifdef notdef
-// needs to be sync'd with sim.h
-char *vopts[] = {
-    "V_IO", "V_INST", "V_IOR", "V_MAP", 
-    "V_DJDMA", "V_MIO", "V_HDCA", "V_MPZ", 
-    "V_IMD", "V_BIO", "V_HDDMA", 0
-};
-
-int verbose;
-#endif
-
-int trace;
-int trace_bio;
-int trace_ior;
-int trace_inst;
-
 char *tracenames[32];
 int traces;
 
@@ -98,7 +81,7 @@ struct {
 } ;
 
 jmp_buf inst_start;
-MACHINE cpu;
+volatile MACHINE cpu;
 
 /*
  * the S100 bus memory space
@@ -245,45 +228,39 @@ copyin(byte *buf, paddr pa, int len)
  * is abstracted out. 
  */
 void
-put_word(vaddr addr, word value)
+put_word(word addr, word value)
 {
+    cpu.m1 = clear;
     memwrite(addr, value);
     memwrite(addr + 1, value >> 8);
 }
 
 void
-put_byte(vaddr addr, byte value)
+put_byte(word addr, byte value)
 {
+    cpu.m1 = clear;
     memwrite(addr, value);
 }
 
 word
-get_word(vaddr addr)
+get_word(word addr)
 {
+    cpu.m1 = clear;
     return memread(addr) + (memread(addr + 1) << 8);
 }
 
 byte
-get_byte(vaddr addr)
+get_byte(word addr)
 {
+    cpu.m1 = clear;
     return memread(addr);
 }
 
-static void
-push(word s)
+byte
+get_opcode(word addr)
 {
-    cpu.registers.word[Z80_SP] -= 2;
-    put_word(cpu.registers.word[Z80_SP], s);
-}
-
-static word
-pop()
-{
-    word i;
-
-    i = get_word(cpu.registers.word[Z80_SP]);
-    cpu.registers.word[Z80_SP] += 2;
-    return (i);
+    cpu.m1 = set;
+    return memread(addr);
 }
 
 inhandler input_handler[256];
@@ -311,14 +288,14 @@ dump_port_handler(portaddr p, byte v)
     }
     write(fd, dumpbuf, ALLMEM);
     write(fd, &cpu.pc, 2);
-    write(fd, &cpu.registers.byte[Z80_A], 1);
-    write(fd, &cpu.registers.byte[Z80_F], 1);
-    write(fd, &cpu.registers.word[Z80_BC], 2);
-    write(fd, &cpu.registers.word[Z80_DE], 2);
-    write(fd, &cpu.registers.word[Z80_HL], 2);
-    write(fd, &cpu.registers.word[Z80_SP], 2);
-    write(fd, &cpu.registers.word[Z80_IX], 2);
-    write(fd, &cpu.registers.word[Z80_IY], 2);
+    write(fd, &cpu.regs.reg8[Z80_A], 1);
+    write(fd, &cpu.regs.reg8[Z80_F], 1);
+    write(fd, &cpu.regs.reg16[Z80_BC], 2);
+    write(fd, &cpu.regs.reg16[Z80_DE], 2);
+    write(fd, &cpu.regs.reg16[Z80_HL], 2);
+    write(fd, &cpu.regs.reg16[Z80_SP], 2);
+    write(fd, &cpu.regs.reg16[Z80_IX], 2);
+    write(fd, &cpu.regs.reg16[Z80_IY], 2);
     close(fd);
     free(dumpbuf);
 }
@@ -804,12 +781,14 @@ dumpcpu()
     }
     printf("%04x: %-20s ", cpu.pc, outbuf);
 
-    f = cpu.registers.byte[Z80_F];
+    f = cpu.regs.reg8[Z80_F];
 
     if (f & Z80_C_FLAG)
         fbuf[0] = 'C';
     if (f & Z80_N_FLAG)
         fbuf[1] = 'N';
+    if (f & Z80_PV_FLAG)
+        fbuf[2] = 'V';
     if (f & Z80_X_FLAG)
         fbuf[2] = 'X';
     if (f & Z80_H_FLAG)
@@ -818,20 +797,20 @@ dumpcpu()
         fbuf[4] = 'Y';
     if (f & Z80_Z_FLAG)
         fbuf[5] = 'Z';
-    if (f & Z80_C_FLAG)
+    if (f & Z80_S_FLAG)
         fbuf[6] = 'S';
 
     printf(
         " %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x\n",
         fbuf,
-        cpu.registers.byte[Z80_A],
-        cpu.registers.word[Z80_BC],
-        cpu.registers.word[Z80_DE],
-        cpu.registers.word[Z80_HL],
-        cpu.registers.word[Z80_IX],
-        cpu.registers.word[Z80_IY],
-        cpu.registers.word[Z80_SP],
-        get_word(cpu.registers.word[Z80_SP]));
+        cpu.regs.reg8[Z80_A],
+        cpu.regs.reg16[Z80_BC],
+        cpu.regs.reg16[Z80_DE],
+        cpu.regs.reg16[Z80_HL],
+        cpu.regs.reg16[Z80_IX],
+        cpu.regs.reg16[Z80_IY],
+        cpu.regs.reg16[Z80_SP],
+        get_word(cpu.regs.reg16[Z80_SP]));
 }
 
 /*
@@ -872,19 +851,19 @@ getaddress(char **s)
     }
     if (wordbuf[0] == '%') {
         if (strcasecmp(&wordbuf[1], "hl") == 0) {
-            return cpu.registers.word[Z80_HL];
+            return cpu.regs.reg16[Z80_HL];
         }
         if (strcasecmp(&wordbuf[1], "bc") == 0) {
-            return cpu.registers.word[Z80_BC];
+            return cpu.regs.reg16[Z80_BC];
         }
         if (strcasecmp(&wordbuf[1], "de") == 0) {
-            return cpu.registers.word[Z80_DE];
+            return cpu.regs.reg16[Z80_DE];
         }
         if (strcasecmp(&wordbuf[1], "sp") == 0) {
-            return cpu.registers.word[Z80_SP];
+            return cpu.regs.reg16[Z80_SP];
         }
         if (strcasecmp(&wordbuf[1], "tos") == 0) {
-            return get_word(cpu.registers.word[Z80_SP]);
+            return get_word(cpu.regs.reg16[Z80_SP]);
         }
     }
     if ((i = find_symbol(wordbuf)) == -1) {
@@ -1123,7 +1102,7 @@ dump_cmd(char **p)
         i = getaddress(p);
     } else {
         if (lastaddr == -1) {
-            i = cpu.registers.word[Z80_SP];
+            i = cpu.regs.reg16[Z80_SP];
         } else {
             i = lastaddr;
         }
@@ -1265,7 +1244,7 @@ emulate_z80()
         }
 #endif
         i = 1;
-        Z80Emulate(&cpu, i, &cpu);
+        Z80Emulate(i);
         if (inst_countdown != -1) {
             inst_countdown--;
         }
