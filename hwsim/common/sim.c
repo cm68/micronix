@@ -50,24 +50,26 @@
 #define N_FLAG  0x02
 #define C_FLAG  0x01
 
-#define PC_REG      (*cpu.pc_ptr)
-#define SP_REG      (*cpu.pc_ptr)
-#define A_REG       (*cpu.a_ptr)
-#define F_REG       (*cpu.a_ptr)
-#define B_REG       (*cpu.a_ptr)
-#define C_REG       (*cpu.a_ptr)
-#define D_REG       (*cpu.a_ptr)
-#define E_REG       (*cpu.a_ptr)
-#define H_REG       (*cpu.a_ptr)
-#define L_REG       (*cpu.a_ptr)
-#define BC_REG      (*cpu.bc_ptr)
-#define DE_REG      (*cpu.de_ptr)
-#define HL_REG      (*cpu.hl_ptr)
-#define IX_REG      (*cpu.ix_ptr)
-#define IY_REG      (*cpu.iy_ptr)
-#define I_REG       (*cpu.i_ptr)
-#define R_REG       (*cpu.i_ptr)
-#define BUS_REG     (*cpu.bus)
+#define PC_REG      (*cpureg.pc_ptr)
+#define SP_REG      (*cpureg.pc_ptr)
+#define A_REG       (*cpureg.a_ptr)
+#define F_REG       (*cpureg.a_ptr)
+#define B_REG       (*cpureg.a_ptr)
+#define C_REG       (*cpureg.a_ptr)
+#define D_REG       (*cpureg.a_ptr)
+#define E_REG       (*cpureg.a_ptr)
+#define H_REG       (*cpureg.a_ptr)
+#define L_REG       (*cpureg.a_ptr)
+#define IX_REG      (*cpureg.ix_ptr)
+#define IY_REG      (*cpureg.iy_ptr)
+#define I_REG       (*cpureg.i_ptr)
+#define R_REG       (*cpureg.i_ptr)
+#define BUS_STATUS  (*cpureg.status)
+#define BUS_CONTROL (*cpureg.control)
+
+#define BC_REG  ((B_REG << 8) | C_REG)
+#define DE_REG  ((D_REG << 8) | E_REG)
+#define HL_REG  ((H_REG << 8) | L_REG)
 
 #define EXIT_PORT   0   // output to here ends the simulator
 #define DUMP_PORT   1   // output to here makes a memory dump with registers
@@ -78,7 +80,7 @@
 #define	STACKTOP	0xffff
 #define MAXIMUM_STRING_LENGTH   100
 
-struct cpuregs cpu;
+struct cpuregs cpureg;
 
 int terminal_fd;
 int debug_terminal;
@@ -219,17 +221,22 @@ dump_port_handler(portaddr p, byte v)
     write(fd, dumpbuf, ALLMEM);
     write(fd, &PC_REG, 2);
     write(fd, &SP_REG, 2);
-    write(fd, &A_REG, 1);
     write(fd, &F_REG, 1);
-    write(fd, &BC_REG, 2);
-    write(fd, &DE_REG, 2);
-    write(fd, &HL_REG, 2);
+    write(fd, &A_REG, 1);
+    write(fd, &B_REG, 1);
+    write(fd, &C_REG, 1);
+    write(fd, &D_REG, 1);
+    write(fd, &E_REG, 1);
+    write(fd, &H_REG, 1);
+    write(fd, &L_REG, 1);
     write(fd, &IX_REG, 2);
     write(fd, &IY_REG, 2);
     write(fd, &I_REG, 2);
     write(fd, &R_REG, 2);
-    write(fd, &BUS_REG, 1);
-    write(fd, cpu.bitmask, 4);
+    write(fd, &BUS_STATUS, 1);
+    write(fd, cpureg.sbits, sizeof(cpureg.sbits));
+    write(fd, &BUS_CONTROL, 1);
+    write(fd, cpureg.cbits, sizeof(cpureg.cbits));
     close(fd);
     free(dumpbuf);
 }
@@ -420,6 +427,7 @@ dumpcpu()
     char fbuf[9];
     char *s;
     int i;
+    word bc, de, hl;
 
     strcpy(fbuf, "        ");
 
@@ -1059,7 +1067,7 @@ main(int argc, char **argv)
     signal(SIGUSR1, stop_handler);
 
     setup_sim_ports();
-    z80_init(&cpu);
+    z80_init(&cpureg);
 
     // another driver hook
     for (i = 0; i < MAXDRIVERS; i++) {
