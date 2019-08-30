@@ -1,0 +1,21 @@
+I've split out the source tree so I can build different machine simulators, and keep the
+abstractions simple and pluggable.  in particular, I've given up on the instruction sim
+I had been using because of the gnarlyness of adding interrupts and traps, since it did
+not handle M1 cycles correctly, and I lost patience with the idiomatic C he employed
+once I get the z80pack simulator plugged in and find the right simulator abstraction,
+I'll probably port it back to the old z80 simulator
+
+this simulator is intended to be a simulation at the behavioral level of the target system,
+with a few simplifications: all I/O happens right now, and we don't have any concurrency.
+
+device drivers are again, behavioral, and we don't simulate things we don't use.
+
+the debugger looks a lot like an in-circuit emulator, and it will grow to the point where it
+can be used to debug the micronix kernel.
+
+added the ability to import and export text to the simulated environment via port 2.
+this interfaces via  files named file.inp and file.out.
+pip can be patched to use inp: and out: to send and receive a file. this patch is trivial, and is
+documented in hsim.c
+
+the clock now works, at least the 1990 is simulated for reading.  setting, forget it.
