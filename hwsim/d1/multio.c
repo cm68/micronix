@@ -11,6 +11,9 @@
  */
 
 #include "sim.h"
+#include "util.h"
+#include <unistd.h>
+#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <fcntl.h>
@@ -133,8 +136,8 @@ int pic_state = 0;
 static void
 wr_pic_port_0(portaddr p, byte v)
 {
-    char *bdec;
-    char *rname;
+    char **bdec;
+    byte *rname;
 
     if (v & PIC0_ICW1) {            // ICW1
         bdec = icw1_bits;
@@ -159,8 +162,8 @@ wr_pic_port_0(portaddr p, byte v)
 static void
 wr_pic_port_1(portaddr p, byte v)
 {
-    char *bdec;
-    char *reg;
+    char **bdec;
+    byte *reg;
 
     switch (pic_state) {
     case PS_ICW2:
@@ -198,7 +201,7 @@ wr_pic_port_1(portaddr p, byte v)
         reg = "unknown";
         bdec = nobits;
     }
-    if (trace & trace_multio) printf("multio: write pic1 %s %x, %x\n", reg, v);
+    if (trace & trace_multio) printf("multio: write pic1 %s %x, %s\n", reg, v, bitdef(v, bdec));
 }
 
 static byte 

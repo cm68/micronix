@@ -23,6 +23,9 @@
  */
 
 #include "sim.h"
+#include "util.h"
+#include <sys/types.h>
+#include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
 
@@ -137,7 +140,7 @@ struct hd_cmd {
 static int channel_reset = 1;
 static paddr channel;       // channel command address
 static paddr dmaaddr;       // the 24 bit dma address
-static char secbuf[2048];
+static byte secbuf[2048];
 static int enable_intr;
 
 /*
@@ -182,7 +185,7 @@ attention(portaddr p, byte v)
 
     if (trace & trace_hddma) printf("hddma: ");
 
-    copyin(&command, channel, sizeof(command));
+    copyin((byte *)&command, channel, sizeof(command));
     if ((command.opcode >= 0) && (command.opcode <= OP_NOP)) {
         if (trace & trace_hddma) printf("%s\n", cmdname[command.opcode]);
     } else {
@@ -230,8 +233,8 @@ attention(portaddr p, byte v)
         }
         lseek(drivefd, offset, SEEK_SET);
         read(drivefd, &secbuf, secsize);
-        copyout(&secbuf, dmaaddr, secsize);
-        if (trace & V_BIO) hexdump(secbuf, secsize);
+        copyout(secbuf, dmaaddr, secsize);
+        if (trace & trace_bio) hexdump(secbuf, secsize);
         command.status = GOOD;
         break;
     case OP_WRITE:
@@ -239,8 +242,8 @@ attention(portaddr p, byte v)
             printf("track lossage %d != %d\n", track[drv], i);
         }
         lseek(drivefd, offset, SEEK_SET);
-        copyin(&secbuf, dmaaddr, secsize);
-        if (trace & V_BIO) hexdump(secbuf, secsize);
+        copyin(secbuf, dmaaddr, secsize);
+        if (trace & trace_bio) hexdump(secbuf, secsize);
         write(drivefd, &secbuf, secsize);
         command.status = GOOD;
         break;
@@ -290,7 +293,7 @@ attention(portaddr p, byte v)
         command.status = BADCMD;
         break;
     }
-    copyout(&command, channel, sizeof(command));
+    copyout((byte *)&command, channel, sizeof(command));
 #ifdef notdef
     if (enable_intr) {
         irq(HDDMA_INTR);

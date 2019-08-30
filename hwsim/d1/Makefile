@@ -4,7 +4,6 @@ CFLAGS = $(DEBUG) -I../common
 
 TARGETS=d1
 DRIVERS=djdma.o multio.o hddma.o hdca.o mpz80.o
-DRIVERS=djdma.o
 CPUSIM=../z80pack/z80.o
 
 all: $(TARGETS)
@@ -29,7 +28,7 @@ d1: $(DRIVERS) $(SIM)
 	-pkill d1
 
 clean:
-	rm -f *.o dumpfile logfile file.inp file.out
+	rm -f *.o dumpfile logfile file.inp file.out make.out
 
 clobber:	clean
 	rm -f $(TARGETS)

@@ -4,6 +4,9 @@
  */
 
 #include "sim.h"
+#include "util.h"
+#include <unistd.h>
+#include <strings.h>
 #include <fcntl.h>
 #include <stdio.h>
 
