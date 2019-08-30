@@ -4,14 +4,10 @@
  * global definitions for simulator
  */
 
-// the instruction set simulator
-void z80_reset();
-void z80_run();
-
 // anything in the simulator has one of these types
 typedef unsigned char byte;
 typedef unsigned short word;
-typedef unsigned long paddr;	// 24 bit physical address
+typedef unsigned int paddr;	// 24 bit physical address
 typedef unsigned short vaddr;	// 16 bit virtual address
 typedef byte portaddr;
 
@@ -90,6 +86,10 @@ struct cpuregs {
 };
 
 extern struct cpuregs cpu;
+
+// the instruction set simulator
+void z80_init(struct cpuregs *cpup);
+void z80_run();
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

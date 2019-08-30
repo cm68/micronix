@@ -1,3 +1,4 @@
+AR = ar
 CC = gcc
 DEBUG = -g
 CFLAGS = $(DEBUG)
@@ -5,7 +6,10 @@ CFLAGS = $(DEBUG)
 OBJECTS = util.o sim.o imdlib.o dis.o s100.o simple.o
 TOOLS = imd
 
-all: $(OBJECTS) $(TOOLS)
+all: $(TOOLS) libsim.a
+
+libsim.a:	$(OBJECTS)
+	$(AR) -rv libsim.a $(OBJECTS)
 
 simple.o: simple.c
 	$(CC) $(CFLAGS) -c simple.c
@@ -32,4 +36,4 @@ clean:
 	rm -f *.o 
 
 clobber:	clean
-	rm -f $(OBJECTS) $(TOOLS) make.out
+	rm -f libsim.a $(OBJECTS) $(TOOLS) make.out
