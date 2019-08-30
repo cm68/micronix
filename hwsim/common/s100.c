@@ -7,7 +7,13 @@
 #include <stdio.h>
 #include "sim.h"
 
-int trace_ior;
+/*
+ * input port function pointers
+ */
+outhandler output_handler[256];
+inhandler input_handler[256];
+
+int trace_ior;                  // i/o registration trace
 
 /*
  * the S100 bus memory space
@@ -70,8 +76,6 @@ get_word(word addr)
 {
     return get_byte(addr) + (get_byte(addr + 1) << 8);
 }
-
-outhandler output_handler[256];
 
 byte
 undef_in(portaddr p)

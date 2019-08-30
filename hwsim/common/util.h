@@ -8,6 +8,8 @@ void dumpmem(unsigned char (*readbyte) (unsigned short addr), unsigned short add
 int register_trace(char *name);
 void hexdump(void *addr, int len);
 
+extern char *tracenames[];
+
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

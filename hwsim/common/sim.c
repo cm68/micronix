@@ -78,6 +78,9 @@
 #define	STACKTOP	0xffff
 #define MAXIMUM_STRING_LENGTH   100
 
+struct cpuregs cpu;
+
+int terminal_fd;
 int debug_terminal;
 int mypid;
 char *mytty;
@@ -87,16 +90,6 @@ int trace_inst;
 int trace_bio;
 int trace_ior;
 int trace_io;
-
-char *tracenames[32];
-int traces;
-
-int
-register_trace(char *name)
-{
-    tracenames[traces] = name;
-    return 1 << traces++;
-}
 
 struct {
     char *name;
@@ -1066,7 +1059,7 @@ main(int argc, char **argv)
     signal(SIGUSR1, stop_handler);
 
     setup_sim_ports();
-    z80_reset();
+    z80_init(&cpu);
 
     // another driver hook
     for (i = 0; i < MAXDRIVERS; i++) {
