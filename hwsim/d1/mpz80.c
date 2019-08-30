@@ -5,10 +5,6 @@
  * do whatever you want, just don't claim you wrote it.
  * warrantee:  madness!  nope.
  *
- * plugs into the z80emu code from:
- * Copyright (c) 2012, 2016 Lin Ke-Fong
- * Copyright (c) 2012 Chris Pressey
- *
  * This code is free, do whatever you want with it.
  */
 
@@ -31,8 +27,8 @@
 
 #include <setjmp.h>
 
-#include "z80.h"
 #include "sim.h"
+#include "util.h"
 
 // extern MACHINE cpu;
 extern byte physmem[];
@@ -108,6 +104,13 @@ byte trapstat;
 #define STAT    0x403       // trap status register
 
 /*
+ * these count down bus cycles of a certain kind to facilitate task switches
+ * and implement the trap function
+ */
+int trapcount;
+int taskcount;
+
+/*
  * copy the appropriate half of the rom into the executable address space
  * this is rare, so it's ok to make slow.
  */
@@ -125,29 +128,6 @@ setrom(int page)
 
 char *rregname[] = { "trap", "keyb", "switch", "trapstat" };
 char *pattr[] = { "no access", "r/o", "execute", "full" };
-
-#ifdef notdef
-/*
- * this function does executes all the machinery needed to do the MPZ80's
- * trap function.  this can be called from any of the emulation and ends in
- * a longjmp to our main instruction loop with the registers set up to run
- * the rom code that saves what needs to be saved, etc.
- *
- * the MPZ80 actually does something tricky:  the first 15 memory reads are
- * satisfied from 0xbf0 - 0xbff.  we don't actually modify the PC at all.
- * that is for the code at 0xbf0 to do.  the Z80 still thinks it is executing
- * at it's normal PC.
- * so, setting the trap really just modifies the location where instructions
- * are really being fetched from, not the PC itself.
- * but since the task register also got reset, all the memory writes go to
- * to supervisor space
- */
-void
-trap()
-{
-    longjmp(trap_load, 1);
-}
-#endif
 
 // dump out memory map
 int
@@ -180,6 +160,21 @@ map_cmd(char **sp)
 }
 
 /*
+ * the MPZ80 actually does something tricky:  the first 15 M1 reads are
+ * satisfied from 0xbf0 - 0xbff.  we don't actually modify the PC at all, 
+ * it just merrily counts as usual, and we feed it opcodes from bf0-bff in rom.
+ * the Z80 still thinks it is executing at it's normal PC.
+ * but since the task register also got reset, all the memory writes go to
+ * to supervisor space
+ */
+void
+trap()
+{
+    taskreg = 0;
+    trapcount = 16;
+}
+
+/*
  * the mpz80 inhibits reads and writes for a fixed number of memory cycles after a trap
  * it also lets some instructions fetch from task 0 when doing a task switch
  */
@@ -194,16 +189,15 @@ memread(vaddr addr)
     byte retval;
     static vaddr lastfetch = 0;
 
+    // if we are trapping, ignore the passed in address
+    if (trapcount) {
+        addr = 0xbf0 + 15 - trapcount;
+    }
+
     // the task register starts a countdown for instruction fetches
     if (taskctr != 0) {
-        // only count m1 cycles
-        if (addr == cpu.pc) {
-            // the emulator reads the instruction twice sometimes!
-            if (lastfetch != addr) {
-                if (trace & trace_mpz80) printf("taskctr decrement %x\n", addr);
-                taskctr--;
-                lastfetch = addr;
-            }
+        if (*cpu.bus & M1) {
+            taskctr--;
         }
         if (taskctr == 0) {
             if (trace & trace_mpz80) printf("switching taskreg\n");
@@ -218,7 +212,7 @@ memread(vaddr addr)
     attr = maps[pte + 1];
 
     if ((taskid != 0) || (addr > 0x1000)) {
-        retval = physmem[pa];
+        retval = physread(pa);
     } else if (addr < LOCAL) {
         retval = local_ram[addr];
     } else if (addr < MAP) {
@@ -263,7 +257,7 @@ memwrite(vaddr addr, unsigned char value)
 
     // access to physical memory through mapping ram
     if ((taskid != 0) || (addr > 0x1000)) {
-        physmem[pa] = value;
+        physwrite(pa, value);
         return;
     }
 
@@ -361,7 +355,7 @@ mpz80_startup()
     if (config_sw & CONF_SET) {
         switchreg = config_sw & 0xff;   // could be multiple bytes of config
     }
-    cpu.pc = TRAPADDR;
+    trap();
     return 0;
 }
 
