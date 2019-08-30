@@ -30,9 +30,6 @@
 #include "sim.h"
 #include "util.h"
 
-// extern MACHINE cpu;
-extern byte physmem[];
-
 /*
  * memory map
  */
@@ -196,7 +193,7 @@ memread(vaddr addr)
 
     // the task register starts a countdown for instruction fetches
     if (taskctr != 0) {
-        if (*cpu.bus & M1) {
+        if (*(cpureg.status) & S_M1) {
             taskctr--;
         }
         if (taskctr == 0) {

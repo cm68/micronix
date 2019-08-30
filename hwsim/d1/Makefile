@@ -4,7 +4,6 @@ CFLAGS = $(DEBUG) -I../common
 
 TARGETS=d1
 DRIVERS=djdma.o multio.o hddma.o hdca.o mpz80.o
-CPUSIM=../z80pack/z80.o
 
 all: $(TARGETS)
 
@@ -24,7 +23,7 @@ hdca.o: hdca.c
 	$(CC) $(CFLAGS) -c hdca.c
 
 d1: $(DRIVERS) $(SIM)
-	$(CC) $(DEBUG) -o d1 $(DRIVERS) $(SIM) -L../common -lsim
+	$(CC) $(DEBUG) -o d1 $(DRIVERS) $(SIM) -L../common -lsim -L../z80 -lz80
 	-pkill d1
 
 clean:
