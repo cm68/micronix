@@ -68,24 +68,26 @@ struct cpuregs {
     byte *e_ptr;
     byte *h_ptr;
     byte *l_ptr;
-    word *bc_ptr;
-    word *de_ptr;
-    word *hl_ptr;
     word *sp_ptr;
     word *ix_ptr;
     word *iy_ptr;
     word *pc_ptr;
     byte *i_ptr;
     byte *r_ptr;
-    byte *bus;
-    byte bitmask[4];
-#define M1      0           // which bit is set in bus for M1
-#define INTA    1           // which bit is set in buf for INTACK
-#define INT     2           // which bit to set for INT
-#define NMI     3           // which bit to set for NMI
+    byte *control;
+    byte cbits[3];
+#define C_RESET   0           // reset
+#define C_NMI     1           // non maskable interrupt
+#define C_INT     2           // maskable interrupt
+
+    byte *status;
+    byte sbits[5];
+#define S_M1      0           // instruction fetch
+#define S_INTA    1           // interrupt vector fetch
+#define S_HLTA    2           // halt ack
 };
 
-extern struct cpuregs cpu;
+extern struct cpuregs cpureg;
 
 // the instruction set simulator
 void z80_init(struct cpuregs *cpup);
