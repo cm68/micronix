@@ -193,7 +193,7 @@ memread(vaddr addr)
 
     // the task register starts a countdown for instruction fetches
     if (taskctr != 0) {
-        if (*(cpureg.status) & S_M1) {
+        if (z80_get_reg8(status_reg) & S_M1) {
             taskctr--;
         }
         if (taskctr == 0) {
