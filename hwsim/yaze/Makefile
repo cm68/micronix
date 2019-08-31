@@ -3,7 +3,7 @@ DEBUG = -g
 CFLAGS = $(DEBUG) -I../common
 
 OBJECTS= yaze.o shim.o
-LIB=libyaze.a
+LIB=libz80.a
 
 all: $(LIB)
 

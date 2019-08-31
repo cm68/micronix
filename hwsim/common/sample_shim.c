@@ -73,13 +73,13 @@ memwrt(unsigned short addr, unsigned char value)
 unsigned char
 io_in(unsigned char addr_low, unsigned char addr_hi)
 {
-        return input(addr_low);
+        return input(addr_low + (addr_hi << 8));
 }
 
 void
 io_out(unsigned char addr_low, unsigned char addr_hi, unsigned char value)
 {
-        output(addr_low, value);
+        output(addr_low + (addr_hi << 8), value);
 }
 
 /*
