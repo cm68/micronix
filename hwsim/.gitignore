@@ -1,0 +1,4 @@
+tags
+*.o
+*.dSYM/
+make,out
