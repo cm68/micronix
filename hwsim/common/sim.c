@@ -50,27 +50,6 @@
 #define N_FLAG  0x02
 #define C_FLAG  0x01
 
-#define PC_REG      (*cpureg.pc_ptr)
-#define SP_REG      (*cpureg.pc_ptr)
-#define A_REG       (*cpureg.a_ptr)
-#define F_REG       (*cpureg.a_ptr)
-#define B_REG       (*cpureg.a_ptr)
-#define C_REG       (*cpureg.a_ptr)
-#define D_REG       (*cpureg.a_ptr)
-#define E_REG       (*cpureg.a_ptr)
-#define H_REG       (*cpureg.a_ptr)
-#define L_REG       (*cpureg.a_ptr)
-#define IX_REG      (*cpureg.ix_ptr)
-#define IY_REG      (*cpureg.iy_ptr)
-#define I_REG       (*cpureg.i_ptr)
-#define R_REG       (*cpureg.i_ptr)
-#define BUS_STATUS  (*cpureg.status)
-#define BUS_CONTROL (*cpureg.control)
-
-#define BC_REG  ((B_REG << 8) | C_REG)
-#define DE_REG  ((D_REG << 8) | E_REG)
-#define HL_REG  ((H_REG << 8) | L_REG)
-
 #define EXIT_PORT   0   // output to here ends the simulator
 #define DUMP_PORT   1   // output to here makes a memory dump with registers
 #define INPUT_PORT  2   // this is for patching into pip for import
@@ -79,8 +58,6 @@
 #define	LISTLINES	8
 #define	STACKTOP	0xffff
 #define MAXIMUM_STRING_LENGTH   100
-
-struct cpuregs cpureg;
 
 int terminal_fd;
 int debug_terminal;
@@ -205,12 +182,17 @@ exit_port_handler(portaddr p, byte v)
     exit(0);
 }
 
+#define dumpreg8(rn) r = z80_get_reg8(rn) ; write(fd, &r, 1)
+#define dumpreg16(rn) rr = z80_get_reg16(rn) ; write(fd, &rr, 2)
+
 #define ALLMEM  64*1024
 void
 dump_port_handler(portaddr p, byte v)
 {
     int fd;
     int i;
+    byte r;
+    word rr;
     char *dumpbuf = malloc(ALLMEM);
 
     printf("dump port tickled %x\n", v);
@@ -219,24 +201,20 @@ dump_port_handler(portaddr p, byte v)
         dumpbuf[i] = get_word(i);
     }
     write(fd, dumpbuf, ALLMEM);
-    write(fd, &PC_REG, 2);
-    write(fd, &SP_REG, 2);
-    write(fd, &F_REG, 1);
-    write(fd, &A_REG, 1);
-    write(fd, &B_REG, 1);
-    write(fd, &C_REG, 1);
-    write(fd, &D_REG, 1);
-    write(fd, &E_REG, 1);
-    write(fd, &H_REG, 1);
-    write(fd, &L_REG, 1);
-    write(fd, &IX_REG, 2);
-    write(fd, &IY_REG, 2);
-    write(fd, &I_REG, 2);
-    write(fd, &R_REG, 2);
-    write(fd, &BUS_STATUS, 1);
-    write(fd, cpureg.sbits, sizeof(cpureg.sbits));
-    write(fd, &BUS_CONTROL, 1);
-    write(fd, cpureg.cbits, sizeof(cpureg.cbits));
+    dumpreg16(pc_reg);
+    dumpreg16(sp_reg);
+    dumpreg16(bc_reg);
+    dumpreg16(de_reg);
+    dumpreg16(hl_reg);
+    dumpreg16(ix_reg);
+    dumpreg16(iy_reg);
+    dumpreg8(a_reg);
+    dumpreg8(f_reg);
+    dumpreg8(i_reg);
+    dumpreg8(r_reg);
+    dumpreg8(irr_reg);
+    dumpreg8(control_reg);
+    dumpreg8(status_reg);
     close(fd);
     free(dumpbuf);
 }
@@ -427,18 +405,21 @@ dumpcpu()
     char fbuf[9];
     char *s;
     int i;
-    word bc, de, hl;
+    word pc, sp;
 
     strcpy(fbuf, "        ");
 
-    format_instr(PC_REG, outbuf, &get_byte, &lookup_sym, &reloc);
-    s = lookup_sym(PC_REG);
+    pc = z80_get_reg16(pc_reg);
+    sp = z80_get_reg16(sp_reg);
+
+    format_instr(pc, outbuf, &get_byte, &lookup_sym, &reloc);
+    s = lookup_sym(pc);
     if (s) {
         printf("%s\n", s);
     }
-    printf("%04x: %-20s ", PC_REG, outbuf);
+    printf("%04x: %-20s ", pc, outbuf);
 
-    f = F_REG;
+    f = z80_get_reg8(f_reg);
 
     if (f & C_FLAG)
         fbuf[0] = 'C';
@@ -460,7 +441,9 @@ dumpcpu()
     printf(
         " %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x\n",
         fbuf,
-        A_REG, BC_REG, DE_REG, HL_REG, IX_REG, IY_REG, SP_REG, get_word(SP_REG));
+        z80_get_reg8(a_reg), 
+        z80_get_reg16(bc_reg), z80_get_reg16(de_reg), z80_get_reg16(hl_reg), 
+        z80_get_reg16(ix_reg), z80_get_reg16(iy_reg), sp, get_word(sp));
 }
 
 /*
@@ -501,28 +484,28 @@ getaddress(char **s)
     }
     if (wordbuf[0] == '%') {
         if (strcasecmp(&wordbuf[1], "bc") == 0) {
-            return BC_REG;
+            return z80_get_reg16(bc_reg);
         }
         if (strcasecmp(&wordbuf[1], "de") == 0) {
-            return DE_REG;
+            return z80_get_reg16(de_reg);
         }
         if (strcasecmp(&wordbuf[1], "hl") == 0) {
-            return HL_REG;
+            return z80_get_reg16(hl_reg);
         }
         if (strcasecmp(&wordbuf[1], "ix") == 0) {
-            return IX_REG;
+            return z80_get_reg16(ix_reg);
         }
         if (strcasecmp(&wordbuf[1], "iy") == 0) {
-            return IY_REG;
+            return z80_get_reg16(iy_reg);
         }
         if (strcasecmp(&wordbuf[1], "pc") == 0) {
-            return IY_REG;
+            return z80_get_reg16(pc_reg);
         }
         if (strcasecmp(&wordbuf[1], "sp") == 0) {
-            return SP_REG;
+            return z80_get_reg16(sp_reg);
         }
         if (strcasecmp(&wordbuf[1], "tos") == 0) {
-            return get_word(SP_REG);
+            return get_word(z80_get_reg16(sp_reg));
         }
     }
     if ((i = find_symbol(wordbuf)) == -1) {
@@ -660,7 +643,7 @@ list_cmd(char **sp)
         i = getaddress(sp);
     } else {
         if (lastaddr == -1) {
-            i = PC_REG;
+            i = z80_get_reg16(pc_reg);
         } else {
             i = lastaddr;
         }
@@ -786,7 +769,7 @@ int
 go_cmd(char **sp)
 {
     if (**sp) {
-        PC_REG = strtol(*sp, sp, 16);
+        z80_set_reg16(pc_reg, strtol(*sp, sp, 16));
     }
     inst_countdown = -1;
     return 1;
@@ -1067,7 +1050,7 @@ main(int argc, char **argv)
     signal(SIGUSR1, stop_handler);
 
     setup_sim_ports();
-    z80_init(&cpureg);
+    z80_init();
 
     // another driver hook
     for (i = 0; i < MAXDRIVERS; i++) {
@@ -1094,8 +1077,8 @@ main(int argc, char **argv)
                 break;
             }
         }
-        if (breakpoint_at(PC_REG)) {
-            printf("break at %04x\n", PC_REG);
+        if (breakpoint_at(z80_get_reg16(pc_reg))) {
+            printf("breakpoint\n");
             inst_countdown = 0;
         }
         if ((trace & trace_inst) || (inst_countdown == 0)) {

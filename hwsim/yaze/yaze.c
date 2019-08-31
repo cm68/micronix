@@ -55,13 +55,13 @@ volatile int stopsim;
 #endif
 
 #define POP(x)	do {							\
-	FASTREG y = RAM_pp(SP);						\
-	x = y + (RAM_pp(SP) << 8);					\
+	FASTREG y = GetBYTE(SP++);					\
+	x = y + (GetBYTE(SP++) << 8);					\
 } while (0)
 
 #define PUSH(x) do {							\
-	mm_RAM(SP) = (x) >> 8;						\
-	mm_RAM(SP) = x;							\
+	PutBYTE(--SP, x >> 8);						\
+	PutBYTE(--SP, x);						\
 } while (0)
 
 #define JPC(cond) PC = cond ? GetWORD(PC) : PC+2
@@ -130,7 +130,7 @@ simz80(FASTREG PC)
 #else
     while (1) {
 #endif
-    switch(RAM_pp(PC)) {
+    switch(GetOpCode(PC++)) {
 	case 0x00:			/* NOP */
 		break;
 	case 0x01:			/* LD BC,nnnn */
@@ -160,7 +160,7 @@ simz80(FASTREG PC)
 			((temp == 0x7f) << 2) | 2;
 		break;
 	case 0x06:			/* LD B,nn */
-		Sethreg(BC, GetBYTE_pp(PC));
+		Sethreg(BC, GetBYTE(PC++));
 		break;
 	case 0x07:			/* RLCA */
 		AF = ((AF >> 7) & 0x0128) | ((AF << 1) & ~0x1ff) |
@@ -203,7 +203,7 @@ simz80(FASTREG PC)
 			((temp == 0x7f) << 2) | 2;
 		break;
 	case 0x0E:			/* LD C,nn */
-		Setlreg(BC, GetBYTE_pp(PC));
+		Setlreg(BC, GetBYTE(PC++));
 		break;
 	case 0x0F:			/* RRCA */
 		temp = hreg(AF);
@@ -241,7 +241,7 @@ simz80(FASTREG PC)
 			((temp == 0x7f) << 2) | 2;
 		break;
 	case 0x16:			/* LD D,nn */
-		Sethreg(DE, GetBYTE_pp(PC));
+		Sethreg(DE, GetBYTE(PC++));
 		break;
 	case 0x17:			/* RLA */
 		AF = ((AF << 8) & 0x0100) | ((AF >> 7) & 0x28) | ((AF << 1) & ~0x01ff) |
@@ -282,7 +282,7 @@ simz80(FASTREG PC)
 			((temp == 0x7f) << 2) | 2;
 		break;
 	case 0x1E:			/* LD E,nn */
-		Setlreg(DE, GetBYTE_pp(PC));
+		Setlreg(DE, GetBYTE(PC++));
 		break;
 	case 0x1F:			/* RRA */
 		temp = hreg(AF);
@@ -322,7 +322,7 @@ simz80(FASTREG PC)
 			((temp == 0x7f) << 2) | 2;
 		break;
 	case 0x26:			/* LD H,nn */
-		Sethreg(HL, GetBYTE_pp(PC));
+		Sethreg(HL, GetBYTE(PC++));
 		break;
 	case 0x27:			/* DAA */
 		acu = hreg(AF);
@@ -388,7 +388,7 @@ simz80(FASTREG PC)
 			((temp == 0x7f) << 2) | 2;
 		break;
 	case 0x2E:			/* LD L,nn */
-		Setlreg(HL, GetBYTE_pp(PC));
+		Setlreg(HL, GetBYTE(PC++));
 		break;
 	case 0x2F:			/* CPL */
 		AF = (~AF & ~0xff) | (AF & 0xc5) | ((~AF >> 8) & 0x28) | 0x12;
@@ -425,7 +425,7 @@ simz80(FASTREG PC)
 			((temp == 0x7f) << 2) | 2;
 		break;
 	case 0x36:			/* LD (HL),nn */
-		PutBYTE(HL, GetBYTE_pp(PC));
+		PutBYTE(HL, GetBYTE(PC++));
 		break;
 	case 0x37:			/* SCF */
 		AF = (AF&~0x3b)|((AF>>8)&0x28)|1;
@@ -467,7 +467,7 @@ simz80(FASTREG PC)
 			((temp == 0x7f) << 2) | 2;
 		break;
 	case 0x3E:			/* LD A,nn */
-		Sethreg(AF, GetBYTE_pp(PC));
+		Sethreg(AF, GetBYTE(PC++));
 		break;
 	case 0x3F:			/* CCF */
 		AF = (AF&~0x3b)|((AF>>8)&0x28)|((AF&1)<<4)|(~AF&1);
@@ -1195,7 +1195,7 @@ simz80(FASTREG PC)
 		PUSH(BC);
 		break;
 	case 0xC6:			/* ADD A,nn */
-		temp = GetBYTE_pp(PC);
+		temp = GetBYTE(PC++);
 		acu = hreg(AF);
 		sum = acu + temp;
 		cbits = acu ^ temp ^ sum;
@@ -1318,7 +1318,7 @@ simz80(FASTREG PC)
 		CALLC(1);
 		break;
 	case 0xCE:			/* ADC A,nn */
-		temp = GetBYTE_pp(PC);
+		temp = GetBYTE(PC++);
 		acu = hreg(AF);
 		sum = acu + temp + TSTFLAG(C);
 		cbits = acu ^ temp ^ sum;
@@ -1340,7 +1340,7 @@ simz80(FASTREG PC)
 		JPC(!TSTFLAG(C));
 		break;
 	case 0xD3:			/* OUT (nn),A */
-		Output(GetBYTE_pp(PC), hreg(AF));
+		Output(GetBYTE(PC++), hreg(AF));
 		break;
 	case 0xD4:			/* CALL NC,nnnn */
 		CALLC(!TSTFLAG(C));
@@ -1349,7 +1349,7 @@ simz80(FASTREG PC)
 		PUSH(DE);
 		break;
 	case 0xD6:			/* SUB nn */
-		temp = GetBYTE_pp(PC);
+		temp = GetBYTE(PC++);
 		acu = hreg(AF);
 		sum = acu - temp;
 		cbits = acu ^ temp ^ sum;
@@ -1377,13 +1377,13 @@ simz80(FASTREG PC)
 		JPC(TSTFLAG(C));
 		break;
 	case 0xDB:			/* IN A,(nn) */
-		Sethreg(AF, Input(GetBYTE_pp(PC)));
+		Sethreg(AF, Input(GetBYTE(PC++)));
 		break;
 	case 0xDC:			/* CALL C,nnnn */
 		CALLC(TSTFLAG(C));
 		break;
 	case 0xDD:			/* DD prefix */
-		switch (op = GetBYTE_pp(PC)) {
+		switch (op = GetOpCode(PC++)) {
 		case 0x09:			/* ADD IX,BC */
 			IX &= 0xffff;
 			BC &= 0xffff;
@@ -1431,7 +1431,7 @@ simz80(FASTREG PC)
 				((temp == 0x7f) << 2) | 2;
 			break;
 		case 0x26:			/* LD IXH,nn */
-			Sethreg(IX, GetBYTE_pp(PC));
+			Sethreg(IX, GetBYTE(PC++));
 			break;
 		case 0x29:			/* ADD IX,IX */
 			IX &= 0xffff;
@@ -1466,10 +1466,10 @@ simz80(FASTREG PC)
 				((temp == 0x7f) << 2) | 2;
 			break;
 		case 0x2E:			/* LD IXL,nn */
-			Setlreg(IX, GetBYTE_pp(PC));
+			Setlreg(IX, GetBYTE(PC++));
 			break;
 		case 0x34:			/* INC (IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr)+1;
 			PutBYTE(adr, temp);
 			AF = (AF & ~0xfe) | (temp & 0xa8) |
@@ -1478,7 +1478,7 @@ simz80(FASTREG PC)
 				((temp == 0x80) << 2);
 			break;
 		case 0x35:			/* DEC (IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr)-1;
 			PutBYTE(adr, temp);
 			AF = (AF & ~0xfe) | (temp & 0xa8) |
@@ -1487,8 +1487,8 @@ simz80(FASTREG PC)
 				((temp == 0x7f) << 2) | 2;
 			break;
 		case 0x36:			/* LD (IX+dd),nn */
-			adr = IX + (signed char) GetBYTE_pp(PC);
-			PutBYTE(adr, GetBYTE_pp(PC));
+			adr = IX + (signed char) GetBYTE(PC++);
+			PutBYTE(adr, GetBYTE(PC++));
 			break;
 		case 0x39:			/* ADD IX,SP */
 			IX &= 0xffff;
@@ -1506,7 +1506,7 @@ simz80(FASTREG PC)
 			Sethreg(BC, lreg(IX));
 			break;
 		case 0x46:			/* LD B,(IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			Sethreg(BC, GetBYTE(adr));
 			break;
 		case 0x4C:			/* LD C,IXH */
@@ -1516,7 +1516,7 @@ simz80(FASTREG PC)
 			Setlreg(BC, lreg(IX));
 			break;
 		case 0x4E:			/* LD C,(IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			Setlreg(BC, GetBYTE(adr));
 			break;
 		case 0x54:			/* LD D,IXH */
@@ -1526,7 +1526,7 @@ simz80(FASTREG PC)
 			Sethreg(DE, lreg(IX));
 			break;
 		case 0x56:			/* LD D,(IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			Sethreg(DE, GetBYTE(adr));
 			break;
 		case 0x5C:			/* LD E,H */
@@ -1536,7 +1536,7 @@ simz80(FASTREG PC)
 			Setlreg(DE, lreg(IX));
 			break;
 		case 0x5E:			/* LD E,(IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			Setlreg(DE, GetBYTE(adr));
 			break;
 		case 0x60:			/* LD IXH,B */
@@ -1558,7 +1558,7 @@ simz80(FASTREG PC)
 			Sethreg(IX, lreg(IX));
 			break;
 		case 0x66:			/* LD H,(IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			Sethreg(HL, GetBYTE(adr));
 			break;
 		case 0x67:			/* LD IXH,A */
@@ -1583,38 +1583,38 @@ simz80(FASTREG PC)
 			/* nop */
 			break;
 		case 0x6E:			/* LD L,(IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			Setlreg(HL, GetBYTE(adr));
 			break;
 		case 0x6F:			/* LD IXL,A */
 			Setlreg(IX, hreg(AF));
 			break;
 		case 0x70:			/* LD (IX+dd),B */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, hreg(BC));
 			break;
 		case 0x71:			/* LD (IX+dd),C */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, lreg(BC));
 			break;
 		case 0x72:			/* LD (IX+dd),D */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, hreg(DE));
 			break;
 		case 0x73:			/* LD (IX+dd),E */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, lreg(DE));
 			break;
 		case 0x74:			/* LD (IX+dd),H */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, hreg(HL));
 			break;
 		case 0x75:			/* LD (IX+dd),L */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, lreg(HL));
 			break;
 		case 0x77:			/* LD (IX+dd),A */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, hreg(AF));
 			break;
 		case 0x7C:			/* LD A,IXH */
@@ -1624,7 +1624,7 @@ simz80(FASTREG PC)
 			Sethreg(AF, lreg(IX));
 			break;
 		case 0x7E:			/* LD A,(IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			Sethreg(AF, GetBYTE(adr));
 			break;
 		case 0x84:			/* ADD A,IXH */
@@ -1648,7 +1648,7 @@ simz80(FASTREG PC)
 				((cbits >> 8) & 1);
 			break;
 		case 0x86:			/* ADD A,(IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr);
 			acu = hreg(AF);
 			sum = acu + temp;
@@ -1679,7 +1679,7 @@ simz80(FASTREG PC)
 				((cbits >> 8) & 1);
 			break;
 		case 0x8E:			/* ADC A,(IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr);
 			acu = hreg(AF);
 			sum = acu + temp + TSTFLAG(C);
@@ -1710,7 +1710,7 @@ simz80(FASTREG PC)
 				((cbits >> 8) & 1);
 			break;
 		case 0x96:			/* SUB (IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr);
 			acu = hreg(AF);
 			sum = acu - temp;
@@ -1741,7 +1741,7 @@ simz80(FASTREG PC)
 				((cbits >> 8) & 1);
 			break;
 		case 0x9E:			/* SBC A,(IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr);
 			acu = hreg(AF);
 			sum = acu - temp - TSTFLAG(C);
@@ -1762,7 +1762,7 @@ simz80(FASTREG PC)
 				((sum == 0) << 6) | partab[sum];
 			break;
 		case 0xA6:			/* AND (IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			sum = ((AF >> 8) & GetBYTE(adr)) & 0xff;
 			AF = (sum << 8) | (sum & 0xa8) | 0x10 |
 				((sum == 0) << 6) | partab[sum];
@@ -1776,7 +1776,7 @@ simz80(FASTREG PC)
 			AF = (sum << 8) | (sum & 0xa8) | ((sum == 0) << 6) | partab[sum];
 			break;
 		case 0xAE:			/* XOR (IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			sum = ((AF >> 8) ^ GetBYTE(adr)) & 0xff;
 			AF = (sum << 8) | (sum & 0xa8) | ((sum == 0) << 6) | partab[sum];
 			break;
@@ -1789,7 +1789,7 @@ simz80(FASTREG PC)
 			AF = (sum << 8) | (sum & 0xa8) | ((sum == 0) << 6) | partab[sum];
 			break;
 		case 0xB6:			/* OR (IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			sum = ((AF >> 8) | GetBYTE(adr)) & 0xff;
 			AF = (sum << 8) | (sum & 0xa8) | ((sum == 0) << 6) | partab[sum];
 			break;
@@ -1816,7 +1816,7 @@ simz80(FASTREG PC)
 				(cbits & 0x10) | ((cbits >> 8) & 1);
 			break;
 		case 0xBE:			/* CP (IX+dd) */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr);
 			AF = (AF & ~0x28) | (temp & 0x28);
 			acu = hreg(AF);
@@ -1828,7 +1828,7 @@ simz80(FASTREG PC)
 				(cbits & 0x10) | ((cbits >> 8) & 1);
 			break;
 		case 0xCB:			/* CB prefix */
-			adr = IX + (signed char) GetBYTE_pp(PC);
+			adr = IX + (signed char) GetBYTE(PC++);
 			switch ((op = GetBYTE(PC)) & 7) {
 			    /*
 			     * default: supresses compiler warning: "warning:
@@ -1941,7 +1941,7 @@ simz80(FASTREG PC)
 		}
 		break;
 	case 0xDE:			/* SBC A,nn */
-		temp = GetBYTE_pp(PC);
+		temp = GetBYTE(PC++);
 		acu = hreg(AF);
 		sum = acu - temp - TSTFLAG(C);
 		cbits = acu ^ temp ^ sum;
@@ -1972,7 +1972,7 @@ simz80(FASTREG PC)
 		PUSH(HL);
 		break;
 	case 0xE6:			/* AND nn */
-		sum = ((AF >> 8) & GetBYTE_pp(PC)) & 0xff;
+		sum = ((AF >> 8) & GetBYTE(PC++)) & 0xff;
 		AF = (sum << 8) | (sum & 0xa8) | 0x10 |
 			((sum == 0) << 6) | partab[sum];
 		break;
@@ -1995,7 +1995,7 @@ simz80(FASTREG PC)
 		CALLC(TSTFLAG(P));
 		break;
 	case 0xED:			/* ED prefix */
-		switch (op = GetBYTE_pp(PC)) {
+		switch (op = GetOpCode(PC++)) {
 		case 0x40:			/* IN B,(C) */
 			temp = Input(lreg(BC));
 			Sethreg(BC, temp);
@@ -2255,15 +2255,15 @@ simz80(FASTREG PC)
 			PC += 2;
 			break;
 		case 0xA0:			/* LDI */
-			acu = GetBYTE_pp(HL);
-			PutBYTE_pp(DE, acu);
+			acu = GetBYTE(HL++);
+			PutBYTE(DE++, acu);
 			acu += hreg(AF);
 			AF = (AF & ~0x3e) | (acu & 8) | ((acu & 2) << 4) |
 				(((--BC & 0xffff) != 0) << 2);
 			break;
 		case 0xA1:			/* CPI */
 			acu = hreg(AF);
-			temp = GetBYTE_pp(HL);
+			temp = GetBYTE(HL++);
 			sum = acu - temp;
 			cbits = acu ^ temp ^ sum;
 			AF = (AF & ~0xfe) | (sum & 0x80) | (!(sum & 0xff) << 6) |
@@ -2285,15 +2285,15 @@ simz80(FASTREG PC)
 			SETFLAG(Z, hreg(BC) == 0);
 			break;
 		case 0xA8:			/* LDD */
-			acu = GetBYTE_mm(HL);
-			PutBYTE_mm(DE, acu);
+			acu = GetBYTE(HL--);
+			PutBYTE(DE--, acu);
 			acu += hreg(AF);
 			AF = (AF & ~0x3e) | (acu & 8) | ((acu & 2) << 4) |
 				(((--BC & 0xffff) != 0) << 2);
 			break;
 		case 0xA9:			/* CPD */
 			acu = hreg(AF);
-			temp = GetBYTE_mm(HL);
+			temp = GetBYTE(HL--);
 			sum = acu - temp;
 			cbits = acu ^ temp ^ sum;
 			AF = (AF & ~0xfe) | (sum & 0x80) | (!(sum & 0xff) << 6) |
@@ -2321,8 +2321,8 @@ simz80(FASTREG PC)
 			if (BC == 0)
 			    BC = 0x10000;
 			do {
-				acu = GetBYTE_pp(HL);
-				PutBYTE_pp(DE, acu);
+				acu = GetBYTE(HL++);
+				PutBYTE(DE++, acu);
 			} while (--BC);
 			acu += hreg(AF);
 			AF = (AF & ~0x3e) | (acu & 8) | ((acu & 2) << 4);
@@ -2333,7 +2333,7 @@ simz80(FASTREG PC)
 			if (BC == 0)
 			    BC = 0x10000;
 			do {
-				temp = GetBYTE_pp(HL);
+				temp = GetBYTE(HL++);
 				op = --BC != 0;
 				sum = acu - temp;
 			} while (op && sum != 0);
@@ -2368,8 +2368,8 @@ simz80(FASTREG PC)
 			if (BC == 0)
 			    BC = 0x10000;
 			do {
-				acu = GetBYTE_mm(HL);
-				PutBYTE_mm(DE, acu);
+				acu = GetBYTE(HL--);
+				PutBYTE(DE--, acu);
 			} while (--BC);
 			acu += hreg(AF);
 			AF = (AF & ~0x3e) | (acu & 8) | ((acu & 2) << 4);
@@ -2380,7 +2380,7 @@ simz80(FASTREG PC)
 			if (BC == 0)
 			    BC = 0x10000;
 			do {
-				temp = GetBYTE_mm(HL);
+				temp = GetBYTE(HL--);
 				op = --BC != 0;
 				sum = acu - temp;
 			} while (op && sum != 0);
@@ -2414,7 +2414,7 @@ simz80(FASTREG PC)
 		}
 		break;
 	case 0xEE:			/* XOR nn */
-		sum = ((AF >> 8) ^ GetBYTE_pp(PC)) & 0xff;
+		sum = ((AF >> 8) ^ GetBYTE(PC++)) & 0xff;
 		AF = (sum << 8) | (sum & 0xa8) | ((sum == 0) << 6) | partab[sum];
 		break;
 	case 0xEF:			/* RST 28H */
@@ -2439,7 +2439,7 @@ simz80(FASTREG PC)
 		PUSH(AF);
 		break;
 	case 0xF6:			/* OR nn */
-		sum = ((AF >> 8) | GetBYTE_pp(PC)) & 0xff;
+		sum = ((AF >> 8) | GetBYTE(PC++)) & 0xff;
 		AF = (sum << 8) | (sum & 0xa8) | ((sum == 0) << 6) | partab[sum];
 		break;
 	case 0xF7:			/* RST 30H */
@@ -2461,7 +2461,7 @@ simz80(FASTREG PC)
 		CALLC(TSTFLAG(S));
 		break;
 	case 0xFD:			/* FD prefix */
-		switch (op = GetBYTE_pp(PC)) {
+		switch (op = GetOpCode(PC++)) {
 		case 0x09:			/* ADD IY,BC */
 			IY &= 0xffff;
 			BC &= 0xffff;
@@ -2509,7 +2509,7 @@ simz80(FASTREG PC)
 				((temp == 0x7f) << 2) | 2;
 			break;
 		case 0x26:			/* LD IYH,nn */
-			Sethreg(IY, GetBYTE_pp(PC));
+			Sethreg(IY, GetBYTE(PC++));
 			break;
 		case 0x29:			/* ADD IY,IY */
 			IY &= 0xffff;
@@ -2544,10 +2544,10 @@ simz80(FASTREG PC)
 				((temp == 0x7f) << 2) | 2;
 			break;
 		case 0x2E:			/* LD IYL,nn */
-			Setlreg(IY, GetBYTE_pp(PC));
+			Setlreg(IY, GetBYTE(PC++));
 			break;
 		case 0x34:			/* INC (IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr)+1;
 			PutBYTE(adr, temp);
 			AF = (AF & ~0xfe) | (temp & 0xa8) |
@@ -2556,7 +2556,7 @@ simz80(FASTREG PC)
 				((temp == 0x80) << 2);
 			break;
 		case 0x35:			/* DEC (IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr)-1;
 			PutBYTE(adr, temp);
 			AF = (AF & ~0xfe) | (temp & 0xa8) |
@@ -2565,8 +2565,8 @@ simz80(FASTREG PC)
 				((temp == 0x7f) << 2) | 2;
 			break;
 		case 0x36:			/* LD (IY+dd),nn */
-			adr = IY + (signed char) GetBYTE_pp(PC);
-			PutBYTE(adr, GetBYTE_pp(PC));
+			adr = IY + (signed char) GetBYTE(PC++);
+			PutBYTE(adr, GetBYTE(PC++));
 			break;
 		case 0x39:			/* ADD IY,SP */
 			IY &= 0xffff;
@@ -2584,7 +2584,7 @@ simz80(FASTREG PC)
 			Sethreg(BC, lreg(IY));
 			break;
 		case 0x46:			/* LD B,(IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			Sethreg(BC, GetBYTE(adr));
 			break;
 		case 0x4C:			/* LD C,IYH */
@@ -2594,7 +2594,7 @@ simz80(FASTREG PC)
 			Setlreg(BC, lreg(IY));
 			break;
 		case 0x4E:			/* LD C,(IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			Setlreg(BC, GetBYTE(adr));
 			break;
 		case 0x54:			/* LD D,IYH */
@@ -2604,7 +2604,7 @@ simz80(FASTREG PC)
 			Sethreg(DE, lreg(IY));
 			break;
 		case 0x56:			/* LD D,(IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			Sethreg(DE, GetBYTE(adr));
 			break;
 		case 0x5C:			/* LD E,H */
@@ -2614,7 +2614,7 @@ simz80(FASTREG PC)
 			Setlreg(DE, lreg(IY));
 			break;
 		case 0x5E:			/* LD E,(IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			Setlreg(DE, GetBYTE(adr));
 			break;
 		case 0x60:			/* LD IYH,B */
@@ -2636,7 +2636,7 @@ simz80(FASTREG PC)
 			Sethreg(IY, lreg(IY));
 			break;
 		case 0x66:			/* LD H,(IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			Sethreg(HL, GetBYTE(adr));
 			break;
 		case 0x67:			/* LD IYH,A */
@@ -2661,38 +2661,38 @@ simz80(FASTREG PC)
 			/* nop */
 			break;
 		case 0x6E:			/* LD L,(IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			Setlreg(HL, GetBYTE(adr));
 			break;
 		case 0x6F:			/* LD IYL,A */
 			Setlreg(IY, hreg(AF));
 			break;
 		case 0x70:			/* LD (IY+dd),B */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, hreg(BC));
 			break;
 		case 0x71:			/* LD (IY+dd),C */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, lreg(BC));
 			break;
 		case 0x72:			/* LD (IY+dd),D */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, hreg(DE));
 			break;
 		case 0x73:			/* LD (IY+dd),E */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, lreg(DE));
 			break;
 		case 0x74:			/* LD (IY+dd),H */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, hreg(HL));
 			break;
 		case 0x75:			/* LD (IY+dd),L */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, lreg(HL));
 			break;
 		case 0x77:			/* LD (IY+dd),A */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			PutBYTE(adr, hreg(AF));
 			break;
 		case 0x7C:			/* LD A,IYH */
@@ -2702,7 +2702,7 @@ simz80(FASTREG PC)
 			Sethreg(AF, lreg(IY));
 			break;
 		case 0x7E:			/* LD A,(IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			Sethreg(AF, GetBYTE(adr));
 			break;
 		case 0x84:			/* ADD A,IYH */
@@ -2726,7 +2726,7 @@ simz80(FASTREG PC)
 				((cbits >> 8) & 1);
 			break;
 		case 0x86:			/* ADD A,(IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr);
 			acu = hreg(AF);
 			sum = acu + temp;
@@ -2757,7 +2757,7 @@ simz80(FASTREG PC)
 				((cbits >> 8) & 1);
 			break;
 		case 0x8E:			/* ADC A,(IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr);
 			acu = hreg(AF);
 			sum = acu + temp + TSTFLAG(C);
@@ -2788,7 +2788,7 @@ simz80(FASTREG PC)
 				((cbits >> 8) & 1);
 			break;
 		case 0x96:			/* SUB (IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr);
 			acu = hreg(AF);
 			sum = acu - temp;
@@ -2819,7 +2819,7 @@ simz80(FASTREG PC)
 				((cbits >> 8) & 1);
 			break;
 		case 0x9E:			/* SBC A,(IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr);
 			acu = hreg(AF);
 			sum = acu - temp - TSTFLAG(C);
@@ -2840,7 +2840,7 @@ simz80(FASTREG PC)
 				((sum == 0) << 6) | partab[sum];
 			break;
 		case 0xA6:			/* AND (IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			sum = ((AF >> 8) & GetBYTE(adr)) & 0xff;
 			AF = (sum << 8) | (sum & 0xa8) | 0x10 |
 				((sum == 0) << 6) | partab[sum];
@@ -2854,7 +2854,7 @@ simz80(FASTREG PC)
 			AF = (sum << 8) | (sum & 0xa8) | ((sum == 0) << 6) | partab[sum];
 			break;
 		case 0xAE:			/* XOR (IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			sum = ((AF >> 8) ^ GetBYTE(adr)) & 0xff;
 			AF = (sum << 8) | (sum & 0xa8) | ((sum == 0) << 6) | partab[sum];
 			break;
@@ -2867,7 +2867,7 @@ simz80(FASTREG PC)
 			AF = (sum << 8) | (sum & 0xa8) | ((sum == 0) << 6) | partab[sum];
 			break;
 		case 0xB6:			/* OR (IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			sum = ((AF >> 8) | GetBYTE(adr)) & 0xff;
 			AF = (sum << 8) | (sum & 0xa8) | ((sum == 0) << 6) | partab[sum];
 			break;
@@ -2894,7 +2894,7 @@ simz80(FASTREG PC)
 				(cbits & 0x10) | ((cbits >> 8) & 1);
 			break;
 		case 0xBE:			/* CP (IY+dd) */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			temp = GetBYTE(adr);
 			AF = (AF & ~0x28) | (temp & 0x28);
 			acu = hreg(AF);
@@ -2906,7 +2906,7 @@ simz80(FASTREG PC)
 				(cbits & 0x10) | ((cbits >> 8) & 1);
 			break;
 		case 0xCB:			/* CB prefix */
-			adr = IY + (signed char) GetBYTE_pp(PC);
+			adr = IY + (signed char) GetBYTE(PC++);
 			switch ((op = GetBYTE(PC)) & 7) {
 			    /*
 			     * default: supresses compiler warning: "warning:
@@ -3020,7 +3020,7 @@ simz80(FASTREG PC)
 		}
 		break;
 	case 0xFE:			/* CP nn */
-		temp = GetBYTE_pp(PC);
+		temp = GetBYTE(PC++);
 		AF = (AF & ~0x28) | (temp & 0x28);
 		acu = hreg(AF);
 		sum = acu - temp;

@@ -58,40 +58,28 @@ extern int trace_bio;		// multiple drivers trace block i/o
 #define	CONF_SET	0x80000000	// config specified
 extern int config_sw;
 
-// this gets filled in by the cpu simulator
-struct cpuregs {
-    byte *f_ptr;
-    byte *a_ptr;
-    byte *b_ptr;
-    byte *c_ptr;
-    byte *d_ptr;
-    byte *e_ptr;
-    byte *h_ptr;
-    byte *l_ptr;
-    word *sp_ptr;
-    word *ix_ptr;
-    word *iy_ptr;
-    word *pc_ptr;
-    byte *i_ptr;
-    byte *r_ptr;
-    byte *control;
-    byte cbits[3];
-#define C_RESET   0           // reset
-#define C_NMI     1           // non maskable interrupt
-#define C_INT     2           // maskable interrupt
-
-    byte *status;
-    byte sbits[5];
-#define S_M1      0           // instruction fetch
-#define S_INTA    1           // interrupt vector fetch
-#define S_HLTA    2           // halt ack
-};
-
-extern struct cpuregs cpureg;
-
-// the instruction set simulator
-void z80_init(struct cpuregs *cpup);
+// the instruction set simulator interface
+void z80_init();
 void z80_run();
+
+enum reg8 { a_reg, f_reg, b_reg, c_reg, d_reg, e_reg, h_reg, l_reg, i_reg, r_reg, irr_reg, control_reg, status_reg };
+enum reg16 { pc_reg, sp_reg, bc_reg, de_reg, hl_reg, ix_reg, iy_reg };
+
+// control register bits
+#define C_NMI   0x01
+#define C_INT   0x02
+#define C_RESET 0x04
+
+// status register bits
+#define S_M1    0x01
+#define S_HLTA  0x02
+#define S_INTA  0x04
+
+byte z80_get_reg8(enum reg8 r8);
+word z80_get_reg16(enum reg16 r16);
+
+void z80_set_reg8(enum reg8 r8, byte v);
+void z80_set_reg16(enum reg16, word v);
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
