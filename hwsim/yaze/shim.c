@@ -1,10 +1,10 @@
 /*
- * glue shim for z80pack cpu simulator and hwsim
+ * glue shim for yaze cpu simulator and hwsim
  */
 
 #include "../common/sim.h"
-#include "sim.h"
-#include "simglb.h"
+#include "shim.h"
+#include "yaze.h"
 
 byte cpu_control;
 #define	CPU_NMI		0x01
@@ -51,7 +51,7 @@ z80_run()
 		int_int = 1;
 	}
 
-	cpu_z80();
+	simz80(PC);
 
 	if (cpu_state & RESET) {
 		cpu_control |= C_RESET;
@@ -71,15 +71,13 @@ z80_run()
 }
 
 BYTE
-memrdr(unsigned short addr)
+GetOpCode(unsigned short addr)
 {
-	return get_byte(addr);
-}
-
-BYTE
-memwrt(unsigned short addr, BYTE value)
-{
-	put_byte(addr, value);
+	byte temp;
+	cpu_status = CPU_M1;
+	temp = get_byte(addr);
+	cpu_status &= ~CPU_M1;
+	return (temp);
 }
 
 BYTE

@@ -3,16 +3,17 @@ CC = gcc
 DEBUG = -g
 CFLAGS = $(DEBUG)
 
-OBJECTS = util.o sim.o imdlib.o dis.o s100.o simple.o
+EXTRAS = sample_shim.o sample_cpu.o
+OBJECTS = util.o sim.o imdlib.o dis.o s100.o
 TOOLS = imd
 
-all: $(TOOLS) libsim.a
+all: $(TOOLS) libsim.a $(EXTRAS)
 
 libsim.a:	$(OBJECTS)
 	$(AR) -rv libsim.a $(OBJECTS)
 
-simple.o: simple.c
-	$(CC) $(CFLAGS) -c simple.c
+sample_cpu.o: sample_cpu.c
+	$(CC) $(CFLAGS) -c sample_cpu.c
 
 dis.o: dis.c dis.h
 	$(CC) $(CFLAGS) -c dis.c
@@ -29,6 +30,9 @@ s100.o: s100.c sim.h
 sim.o: sim.c sim.h util.h imd.h dis.h
 	$(CC) $(CFLAGS) -c sim.c
 
+sample_shim.o: sim.h sample_shim.c
+	$(CC) $(CFLAGS) -c sample_shim.c
+
 imd: imd.c imd.h imdlib.o util.o
 	$(CC) -DSTAND $(CFLAGS) -o imd imd.c util.o imdlib.o
 
@@ -36,4 +40,4 @@ clean:
 	rm -f *.o 
 
 clobber:	clean
-	rm -f libsim.a $(OBJECTS) $(TOOLS) make.out
+	rm -f libsim.a $(OBJECTS) $(EXTRAS) $(TOOLS) make.out
