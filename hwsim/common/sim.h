@@ -9,7 +9,7 @@ typedef unsigned char byte;
 typedef unsigned short word;
 typedef unsigned int paddr;	// 24 bit physical address
 typedef unsigned short vaddr;	// 16 bit virtual address
-typedef byte portaddr;
+typedef word portaddr;
 
 typedef byte (*inhandler)(portaddr port);
 typedef void (*outhandler)(portaddr port, byte val);

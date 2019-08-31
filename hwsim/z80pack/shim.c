@@ -2,6 +2,7 @@
  * glue shim for z80pack cpu simulator and hwsim
  */
 
+#include <stdio.h>
 #include "../common/sim.h"
 #include "sim.h"
 #include "simglb.h"
@@ -46,7 +47,7 @@ z80_get_reg8(enum reg8 r8)
 {
     switch (r8) {
     default:
-        printf("i don't know about an 8 bit register %d\"n, r16);
+        printf("unknown 8 bit register %d\n", r8);
         return 0;
     }
 }
@@ -56,7 +57,7 @@ z80_get_reg16(enum reg16 r16)
 {
     switch (r16) {
     default:
-        printf("i don't know about a 16 bit register %d\"n, r16);
+        printf("unknown 16 bit register %d\n", r16);
         return 0;
     }
 }
@@ -66,7 +67,7 @@ z80_set_reg8(enum reg8 r8, byte v)
 {
     switch (r8) {
     default:
-        printf("i don't know about an 8 bit register %d\"n, r16);
+        printf("unknown 8 bit register %d\n", r8);
     }
 }
 
@@ -75,7 +76,7 @@ z80_set_reg16(enum reg16 r16, word v)
 {
     switch (r16) {
     default:
-        printf("i don't know about a 16 bit register %d\"n, r16);
+        printf("unknown 16 bit register %d\n", r16);
     }
 }
 

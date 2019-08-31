@@ -8,7 +8,7 @@
 #include "sim.h"
 
 /*
- * input port function pointers
+ * input port function pointers - we only decode the low 8 bits of the address
  */
 outhandler output_handler[256];
 inhandler input_handler[256];
@@ -80,6 +80,7 @@ get_word(word addr)
 byte
 undef_in(portaddr p)
 {
+    p &= 0xff;
     printf("input from undefined port %x\n", p);
     return 0xff;
 }
@@ -87,12 +88,15 @@ undef_in(portaddr p)
 void
 undef_out(portaddr p, byte v)
 {
+    p &= 0xff;
     printf("output to  undefined port %x -> %x\n", p, v);
 }
 
 void
 register_input(portaddr portnum, inhandler func)
 {
+    portnum &= 0xff;
+
     if (func != undef_in) {
         if (trace & trace_ior)
             printf("input port %x registered\n", portnum);
@@ -103,6 +107,8 @@ register_input(portaddr portnum, inhandler func)
 void
 register_output(portaddr portnum, outhandler func)
 {
+    portnum &= 0xff;
+
     if (func != undef_out) {
         if (trace & trace_ior)
             printf("output port %x registered\n", portnum);
