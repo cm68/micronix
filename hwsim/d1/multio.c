@@ -278,6 +278,7 @@ rd_mdmctl(portaddr p)
     return 0;
 }
 
+char *ls_bits[] = { "DR" , "OVER", "PERR", "FERR", "BRK", "TBE", "TE", 0 };
 static byte 
 rd_linestat(portaddr p)
 {
@@ -295,7 +296,7 @@ rd_linestat(portaddr p)
     }
 
     retval = LSR_TBE | (bytes ? LSR_DR : 0);
-    // printf("multio: read linestat %x\n", retval);
+    if (trace & trace_multio) printf("multio: read linestat %x %s\n", retval, bitdef(retval, ls_bits));
     return retval;
 }
 

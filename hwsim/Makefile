@@ -2,7 +2,7 @@
 # different z80 emulators
 #
 EMULATORS = chips zeta yaze z80pack
-DIRS = common d1 $(EMULATORS)
+DIRS = common $(EMULATORS) d1
 
 all:
 	for i in $(DIRS) ; do (cd $$i ; make -k) ; done

@@ -29,9 +29,11 @@ extern byte get_byte(word addr);
 extern void output(portaddr p, byte v);
 extern byte input(portaddr p);
 
-// memory access - defined by bus
+// raw memory and i/o access - defined by bus
 extern byte physread(paddr addr);
 extern void physwrite(paddr addr, byte value);
+extern void s100_output(portaddr p, byte v);
+extern byte s100_input(portaddr p);
 
 // register callbacks for plugging drivers - these can be in constructors
 extern void register_mon_cmd(char c, char *help, int (*handler)(char **p));
@@ -54,6 +56,7 @@ extern char *rom_image;		// binary from
 extern char *rom_filename;	// here
 
 extern int trace_bio;		// multiple drivers trace block i/o
+extern int running;
 
 #define	CONF_SET	0x80000000	// config specified
 extern int config_sw;
