@@ -85,7 +85,6 @@ byte maskreg;
 #define     MASK_IO     0x40
 #define     MASK_ZIO    0x80
 static char *mask_bits[] = { "stop", "aux", "tint", "step", "halt", "sint", "io", "zio" };
-#define MASK_INVERT     0 // (MASK_STOP | MASK_AUX | MASK_TINT | MASK_STEP | MASK_HALT | MASK_SINT | MASK_IO | MASK_ZIO)
 
 /* read */
 byte trapreg;
@@ -96,7 +95,6 @@ byte keybreg;
 #define     KB_UNUSED   0x01        // P1 - 12
 #define     KB_DIAG     0x02        // P1 - 13 if high, run diagnostics
 static char *keyb_bits[] = { 0, "diag", 0, 0, 0, 0, 0, 0 };
-#define KEYB_INVERT 0
 
 // this register is negated:  if the switch is on, the value reads low
 byte switchreg;
@@ -109,7 +107,6 @@ byte switchreg;
 #define     SW_RESET    0x01
 #define     SW_IPEND    0x02
 static char *swt_bits[] = { "reset", "ipend", "monitor", 0, 0, 0, 0, 0 };
-#define SWT_INVERT  (SW_RESET | SW_NOMON)
 
 int trace_mpz80;
 int trace_map;
@@ -125,7 +122,6 @@ byte trapstat;
 #define     ST_R10      0x40
 #define     ST_READ     0x80
 static char *stat_bits[] = { "void", "iorq", "halt", "int", "stop", "aux", "r10", "read" };
-#define STAT_INVERT     (ST_VOID | ST_IORQ | ST_HALT | ST_INT | ST_STOP | ST_AUX | ST_READ)
 
 /*
  * these count down bus cycles of a certain kind to facilitate task switches
@@ -226,7 +222,6 @@ get_byte(vaddr addr)
     byte attr;
     byte retval;
     char **bitsp;
-    byte invert;
 
     top:
 
@@ -267,29 +262,25 @@ get_byte(vaddr addr)
         case TRAP:
             bitsp = nullbits;
             retval = trapreg;
-            invert = 0;
             break;
         case KEYB:
             bitsp = keyb_bits;
             retval = keybreg;
-            invert = 0;
             break;
         case SWT:
             bitsp = swt_bits;
-            invert = SWT_INVERT;
             retval = switchreg;
             break;
         case STAT:
             bitsp = stat_bits;
             retval = trapstat;
-            invert = STAT_INVERT;
             break;
         default:
             if (trace & trace_mpz80) printf("unknown local reg %x read\n", addr);
             return 0;
         }
         if (trace & trace_mpz80) printf("mpz80: read %s register %x %s\n",
-             rregname[addr & 0x03], retval, bitdef(invert ^ retval, bitsp));
+             rregname[addr & 0x03], retval, bitdef(retval, bitsp));
     } else if (addr < EPROM) {
         if (trace & trace_mpz80) printf("illegal map register read\n");
         return 0;
@@ -311,7 +302,6 @@ put_byte(vaddr addr, unsigned char value)
     paddr pa;
     byte attr;
     char **bitsp;
-    byte invert;
 
     getpte(addr, &pa, &attr);
 
@@ -331,22 +321,18 @@ put_byte(vaddr addr, unsigned char value)
     if (addr < MAP) {
         switch(addr) {
         case FPSEG:
-            invert = 0;
             bitsp = nullbits;
             break;
         case FPCOL:
-            invert = 0;
             bitsp = nullbits;
             break;
         case TASK:
             setrom(1);
             taskctr = 8;
             next_taskreg = value;
-            invert = 0;
             bitsp = nullbits;
             break;
         case MASK:
-            invert = MASK_INVERT;
             bitsp = mask_bits; 
             maskreg = value;
             break;
@@ -355,7 +341,7 @@ put_byte(vaddr addr, unsigned char value)
             return;
         }
         if (trace & trace_mpz80) printf("mpz80: %s write %x %s\n", 
-            wregname[addr & 0x3], value, bitdef(invert ^ value, bitsp));
+            wregname[addr & 0x3], value, bitdef(value, bitsp));
         return;
     }
 
