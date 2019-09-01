@@ -30,14 +30,18 @@ tags:
 disas.o: Makefile
 
 clean:
-	rm -f disas *.o core mon.out gmon.out DDTSTART.ASM DDTEND.ASM
+	rm -f *.o core mon.out gmon.out DDTSTART.ASM DDTEND.ASM DDT.hex
 
 lint:
 	$(LINT) $(LINTFLAGS) disas.c
 
-test:	disas
+test:	disas dump
 	./disas -a 0x100 -e 0x18b DDT.COM >DDTSTART.ASM
 	./disas -s 0x100 -a 0 -f DDT.SYM DDT.COM >DDTEND.ASM
+	./dump DDT.COM
 
 install:	disas dump
 	sudo cp dump disas /usr/local/bin
+
+clobber: clean
+	rm -f dump disas
