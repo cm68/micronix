@@ -92,6 +92,20 @@ undef_out(portaddr p, byte v)
     printf("output to  undefined port %x -> %x\n", p, v);
 }
 
+byte
+s100_input(portaddr p)
+{
+    p &= 0xff;
+    return (*input_handler[p])(p);
+}
+
+void
+s100_output(portaddr p, byte v)
+{
+    p &= 0xff;
+    (*output_handler[p])(p, v);
+}
+
 void
 register_input(portaddr portnum, inhandler func)
 {

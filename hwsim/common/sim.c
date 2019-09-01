@@ -63,6 +63,7 @@ int terminal_fd;
 int debug_terminal;
 int mypid;
 char *mytty;
+int running;
 
 int trace;
 int trace_inst;
@@ -1099,7 +1100,9 @@ main(int argc, char **argv)
             i = 1;
         }
 #endif
+        running = 1;
         z80_run();
+        running = 0;
         if (inst_countdown != -1) {
             inst_countdown--;
         }

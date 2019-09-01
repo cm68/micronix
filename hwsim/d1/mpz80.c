@@ -83,7 +83,7 @@ byte trapreg;
 byte keybreg;
 #define KEYB    0x401       // front panel keyboard connector 12C
 #define     KB_UNUSED   0x01        // P1 - 12
-#define     KB_MON      0x02        // P1 - 13 if low, jump to monitor
+#define     KB_DIAG     0x02        // P1 - 13 if high, run diagnostics
 
 // this register is negated:  if the switch is on, the value reads low
 byte switchreg;
@@ -106,6 +106,7 @@ byte trapstat;
  */
 int trapcount;
 int taskcount;
+word trapaddr;
 
 /*
  * copy the appropriate half of the rom into the executable address space
@@ -168,7 +169,8 @@ void
 trap()
 {
     taskreg = 0;
-    trapcount = 16;
+    trapcount = 15;
+    trapaddr = z80_get_reg16(pc_reg);
 }
 
 /*
@@ -176,7 +178,7 @@ trap()
  * it also lets some instructions fetch from task 0 when doing a task switch
  */
 unsigned char
-memread(vaddr addr)
+get_byte(vaddr addr)
 {
     byte taskid;
     byte page;
@@ -188,7 +190,17 @@ memread(vaddr addr)
 
     // if we are trapping, ignore the passed in address
     if (trapcount) {
-        addr = 0xbf0 + 15 - trapcount;
+        int offset = addr - trapaddr;
+        if (offset > 16) {
+            if (running) {
+                printf("bizarre offset in trap %x %x %x\n", trapaddr, addr, offset);
+            }
+        } else {
+            addr = 0xbf0 + offset;
+        }
+        if (running) {
+            trapcount--;
+        }
     }
 
     // the task register starts a countdown for instruction fetches
@@ -244,7 +256,7 @@ memread(vaddr addr)
 
 char *wregname[] = { "fpseg", "fpcol", "trap", "mask" };
 void
-memwrite(vaddr addr, unsigned char value)
+put_byte(vaddr addr, unsigned char value)
 {
     byte taskid = taskreg & 0xf;
     byte page = (addr & 0xf000) >> 12;
@@ -314,6 +326,18 @@ memwrite(vaddr addr, unsigned char value)
     fpu[addr & 0x3ff] = value;
 }
 
+byte
+input(portaddr p)
+{
+    return s100_input(p);
+}
+
+void
+output(portaddr p, byte v)
+{
+    s100_output(p, v);
+}
+
 /*
  * whenever a trap happens, this address is forced onto the address bus
  */
@@ -352,6 +376,7 @@ mpz80_startup()
     if (config_sw & CONF_SET) {
         switchreg = config_sw & 0xff;   // could be multiple bytes of config
     }
+    z80_set_reg16(pc_reg, 0);
     trap();
     return 0;
 }
