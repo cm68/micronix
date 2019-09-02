@@ -167,7 +167,7 @@ load_symfile(char *s)
         }
         if (sscanf(linebuf, "%s %s 0x%x", kbuf, namebuf, &v) != 3) {
             if (sscanf(linebuf, "%x %s", &v, namebuf) != 2) {
-                break;
+                continue;
             }
         }
         // printf("adding symbol %s : %x\n", namebuf, v);

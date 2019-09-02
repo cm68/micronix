@@ -21,9 +21,10 @@ char patoff;
  * byte bitoff formatter.
  * usage:  char *foo = { "0", "1", "2", "3", 0, "5", "6", "7" };
  *  printf("%s %s\n", bitdef(0xa, foo), bitdef(0x83, foo));
+ * null pointer for defs is fine.
  */
 char *
-bitdef(unsigned char v, char**defs)
+bitdef(unsigned char v, char **defs)
 {
     int i;
     char *patptr;
@@ -33,12 +34,14 @@ bitdef(unsigned char v, char**defs)
     patoff = (patoff + 1) % NPATS;
     *patptr = 0;
 
-    for (i = 0; i < 8; i++) {
-        if ((v & (1 << i)) && defs[i]) {
-            if (sep++) {
-                strcat(patptr, ",");
+    if (defs) {
+        for (i = 0; i < 8; i++) {
+            if ((v & (1 << i)) && defs[i]) {
+                if (sep++) {
+                    strcat(patptr, ",");
+                }
+                strcat(patptr, defs[i]);
             }
-            strcat(patptr, defs[i]);
         }
     }
     return patptr;
