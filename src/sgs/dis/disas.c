@@ -158,7 +158,7 @@ getword()
 }
 
 /*
- * process a symbol table
+ * process a control file
  */
 char *symfile;
 
@@ -271,7 +271,7 @@ snarfval(char *s)
 }
 
 /*
- * we've got a pretty permissive format for the symbol file, 
+ * we've got a pretty permissive format for the symbol/control file, 
  *
  * 'define' name value
  * name 'equ' value
@@ -283,6 +283,8 @@ snarfval(char *s)
  * 'code' value
  *
  * 'jump' value length
+ *
+ * 'start' value
  */
 void
 load_symfile()
@@ -329,6 +331,9 @@ load_symfile()
                 } else if (strcasecmp(n, "word") == 0) {
                     n = 0;
                     flags = WORD;
+                } else if (strcasecmp(n, "start") == 0) {
+                    startaddr = v1;
+                    continue;
                 }
             }
             break;
@@ -408,7 +413,16 @@ usage(char *s)
 		"\t[-s <skip>]\tbytes to skip in input\n",
 		"\t[-c <code addr> ... ]\tplaces that are code\n",
 		"\t[-d <data addr> ... ]\tplaces that are data\n",
-		"\t[-f <symbolfile>\n");
+		"\t[-f <controlfile>\tcan contain:\n");
+    fprintf(stderr, "%s%s%s%s%s%s%s%s",
+        "\t\tdefine <name> <addr>\n",
+        "\t\t<name> equ <addr>\n",
+        "\t\twords <addr> <length>\n",
+        "\t\tbytes <addr> <length>\n",
+        "\t\t<name> code <addr>\n",
+        "\t\tcode <addr>\n",
+        "\t\tjump <addr> <length>\n",
+        "\t\tstart <addr>\n");
     exit(1);
 }
 
@@ -470,7 +484,7 @@ char **argv;
 			break;
 
 		case 'f':	/* symbol file */
-			if (!--argc) usage("missing symbol file name\n");
+			if (!--argc) usage("missing control file name\n");
             symfile = *argv++;
 			break;
 
@@ -482,11 +496,18 @@ char **argv;
 
     if (argc) {
         name = *argv;
-        if (strcasecmp(name + strlen(name) - 4, ".com") == 0) {
-            if (!startaddr) startaddr = 0x100;
-        }
     } else {
         name = "/dev/stdin";
+    }
+
+    if (strcasecmp(&name[strlen(name) - 4], ".com") == 0) {
+        symfile = strdup(name);
+        strcpy(&symfile[strlen(symfile) - 4], (name[strlen(name)-1] == 'm') ? ".sym" : ".SYM");
+        load_symfile();
+    }
+
+    if (strcasecmp(name + strlen(name) - 4, ".com") == 0) {
+        if (!startaddr) startaddr = 0x100;
     }
 
     // if startaddr = 0x100, assume cp/m, define some symbols
@@ -527,8 +548,6 @@ char **argv;
         endaddr = startaddr + codelen;
     }
 	fclose(file);
-
-    load_symfile();
 
 	if (debug) {
 		fprintf(stderr, "tracing code\n");

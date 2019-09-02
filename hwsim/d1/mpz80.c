@@ -31,12 +31,14 @@
 #include "util.h"
 
 /*
- * memory map
+ * memory map of the 0 page
  */
-#define LOCAL   0x400
-#define MAP     0x600
-#define EPROM   0x800
-#define FPU     0xc00
+#define RAM         0x000       // 1k of ram
+#define REGS        0x400       // registers
+#define MAP         0x600       // map ram
+#define EPROM       0x800       // half of the eprom
+#define FPU         0xc00       // 9511/9512
+#define LOCAL       0x1000      // everything below here is on board
 
 /*
  * mpz80 cpu registers and local ram
@@ -44,7 +46,9 @@
 byte local_ram[0x400];      // used for register save areas and map shadow  - 0x000 - 0x3ff
 byte maps[0x200];           // map registers write only                     - 0x600 - 0x7ff
 byte eprom[0x400];          // half at a time                               - 0x800 - 0xbff
-byte fpu[0x400];            // floating point processor                     - 0xc00 - 0xfff
+byte fpu_data;              //                                              - c08
+byte fpu_cmd;               //                                              - c00
+byte fpu_status;            //                                              - c00
 
 /*
  * mon4.47 and mon 3.75 both were distributed on 2732A's, which are 4kb
@@ -69,7 +73,6 @@ byte fpseg;
 byte fpcol;
 #define FPCOL   0x401       // front panel column
 
-byte taskctr;               // countdown for context switch
 byte next_taskreg;          // taskreg after countdown
 byte taskreg;
 #define TASK    0x402       // task register
@@ -85,6 +88,8 @@ byte maskreg;
 #define     MASK_IO     0x40
 #define     MASK_ZIO    0x80
 static char *mask_bits[] = { "stop", "aux", "tint", "step", "halt", "sint", "io", "zio" };
+static byte *wregp[] = { &fpseg, &fpcol, &next_taskreg, &maskreg };
+static char **wregbits[] = { 0, 0, 0, mask_bits };
 
 /* read */
 byte trapreg;
@@ -110,6 +115,7 @@ static char *swt_bits[] = { "reset", "ipend", "monitor", 0, 0, 0, 0, 0 };
 
 int trace_mpz80;
 int trace_map;
+int trace_mem;
 
 byte trapstat;
 #define STAT    0x403       // trap status register
@@ -123,13 +129,24 @@ byte trapstat;
 #define     ST_READ     0x80
 static char *stat_bits[] = { "void", "iorq", "halt", "int", "stop", "aux", "r10", "read" };
 
+static char **rregbits[] = { 0, keyb_bits, swt_bits, stat_bits };
+static char *rregname[] = { "trap", "keyb", "switch", "trapstat" };
+static byte *rregp[] = { &trapreg, &keybreg, &switchreg, &trapstat };
+
 /*
- * these count down bus cycles of a certain kind to facilitate task switches
- * and implement the trap function
+ * fpu is given little more than a tickle here
  */
-int trapcount;
-int taskcount;
-word trapaddr;
+static char *fpustatb[] = { 0, "expover", "expunder", "diveerr", 0, "zero", "sign", "busy" };
+static char *fpucmd[] = { 
+    "CLR", "SADD", "SSUB", "SMUL", "SDIV", "CHSS", "PTOS", "POPS",  // 00 - 07
+    "XCHS", 0, 0, 0, 0, 0, 0, 0,                                    // 08 - 0F
+    0, 0, 0, 0, 0, 0, 0, 0,                                         // 10 - 17
+    0, 0, 0, 0, 0, 0, 0, 0,                                         // 18 - 1F
+    0, 0, 0, 0, 0, 0, 0, 0,                                         // 20 - 27
+    0, "DAD", "DSUB", "DMUL", "DDIV", "CHSD", "PTOD", "POPD",       // 28 - 2F
+    0, 0, 0, 0, 0, 0, 0, 0,                                         // 30 - 37
+    0, 0, 0, 0, 0, 0, 0, 0                                          // 38 - 3F
+};
 
 /*
  * copy the appropriate half of the rom into the executable address space
@@ -148,7 +165,6 @@ setrom(int page)
 }
 
 char *wregname[] = { "fpseg", "fpcol", "trap", "mask" };
-char *rregname[] = { "trap", "keyb", "switch", "trapstat" };
 char *pattr[] = { "no access", "r/o", "execute", "full" };
 
 // dump out memory map
@@ -188,7 +204,31 @@ map_cmd(char **sp)
  * the Z80 still thinks it is executing at it's normal PC.
  * but since the task register also got reset, all the memory writes go to
  * to supervisor space
+ *
+ * to makes things even clearer, I'm going to call various state flags by the
+ * name used in the mpz80 manual.
+ *
  */
+
+/*
+ * these count down bus cycles of a certain kind to facilitate task switches
+ * and implement the trap function
+ */
+
+int trapcount;
+word trapaddr;
+
+/*
+ * a counter set by writing the task register and decremented by M1
+ * if nonzero, also inhibits interrupt detection and traps
+ */
+static byte delay;
+
+/*
+ * task 0 is accessing less than 0x1000.  null bus cycles go out to the bus.
+ */
+static byte local;
+
 void
 trap()
 {
@@ -198,6 +238,9 @@ trap()
     trapaddr = z80_get_reg16(pc_reg);
 }
 
+/*
+ * do a virtual lookup of address and return the physical address and page attributes
+ */
 static void
 getpte(word addr, paddr *paddrp, byte *attrp)
 {
@@ -209,6 +252,8 @@ getpte(word addr, paddr *paddrp, byte *attrp)
     *attrp = maps[pte + 1];
 }
 
+static int prefix;      // was the last M1 a prefix instruction
+
 /*
  * the mpz80 inhibits reads and writes for a fixed number of memory cycles after a trap
  * it also lets some instructions fetch from task 0 when doing a task switch
@@ -216,83 +261,106 @@ getpte(word addr, paddr *paddrp, byte *attrp)
 unsigned char
 get_byte(vaddr addr)
 {
-    byte page;
-    byte pte;
-    paddr pa;
     byte attr;
     byte retval;
-    char **bitsp;
 
-    top:
+    vaddr orig = addr;
+    paddr pa = addr;
+    char *seg = "";
+    char *regname = "";
+    char *desc = "";
 
     // if we are trapping, ignore the passed in address
     if (trapcount) {
-        int offset = addr - trapaddr;
-        if (offset > 16) {
-            if (running) {
-                printf("bizarre offset in trap %x %x %x\n", trapaddr, addr, offset);
-            }
+        if (running) {
+            addr = 0xbf0 + (15 - trapcount);
         } else {
-            addr = 0xbf0 + offset;
+            if ((addr - trapaddr) < 16) {
+                addr = 0xbf0 + (addr - trapaddr);
+            }
         }
         if (running) {
+        if (trace & trace_mpz80) printf("mpz80: trap %x replaced by %x\n", orig, addr);
             trapcount--;
         }
     }
 
     // the task register starts a countdown for instruction fetches
-    if (taskctr != 0) {
+    if (delay != 0) {
         if (z80_get_reg8(status_reg) & S_M1) {
-            taskctr--;
+            delay--;
         }
-        if (taskctr == 0) {
+        if (delay == 0) {
             if (trace & trace_mpz80) printf("switching taskreg\n");
             taskreg = next_taskreg;
         }
     }
 
-    getpte(addr, &pa, &attr);
+    local = ((taskreg & 0xf) == 0) && (addr < 0x1000);
 
-    if (((taskreg & 0xf) != 0) || (addr > 0x1000)) {
+    if (!local) {                           // if we are accessing mapped ram
+        getpte(addr, &pa, &attr);
+        seg = "mapped:";
         retval = physread(pa);
-    } else if (addr < LOCAL) {
+    } else switch (addr & 0xe00) {
+    case RAM: case RAM + 0x200:             // 1k static ram
+        seg = "ram:";
+        pa = addr;
         retval = local_ram[addr];
-    } else if (addr < MAP) {
-        switch (addr) {
-        case TRAP:
-            bitsp = nullbits;
-            retval = trapreg;
-            break;
-        case KEYB:
-            bitsp = keyb_bits;
-            retval = keybreg;
-            break;
-        case SWT:
-            bitsp = swt_bits;
-            retval = switchreg;
-            break;
-        case STAT:
-            bitsp = stat_bits;
-            retval = trapstat;
-            break;
-        default:
-            if (trace & trace_mpz80) printf("unknown local reg %x read\n", addr);
-            return 0;
+        break;
+    case REGS:                              // on board registers, only 2 bits decoded
+        seg = "regs:";
+        pa = addr & 3;
+        regname = rregname[pa];
+        retval = *rregp[pa];
+        desc = bitdef(retval, rregbits[pa]);
+        break;
+    case MAP:                               // the map registers don't allow read
+        printf("illegal map register read\n");
+        break;
+    case EPROM: case EPROM + 0x200:         // eprom
+        pa = addr - EPROM;
+        seg = "eprom:";
+        retval = eprom[pa];
+        break;
+    case FPU:                               // fpu has 2 registers
+        seg = "fpu:";
+        pa = (addr >> 3) & 1;
+        if (pa) {
+            regname = "status";
+            desc = bitdef(fpu_status, fpustatb);
+            retval = fpu_status;
+        } else {
+            regname = "data";
+            retval = fpu_data;
         }
-        if (trace & trace_mpz80) printf("mpz80: read %s register %x %s\n",
-             rregname[addr & 0x03], retval, bitdef(retval, bitsp));
-    } else if (addr < EPROM) {
-        if (trace & trace_mpz80) printf("illegal map register read\n");
-        return 0;
-    } else if (addr < FPU) {
-        retval = eprom[addr & 0x3ff];
-    } else {
-        retval = fpu[addr & 0x3ff];
+        break;
     }
-    if ((z80_get_reg8(status_reg) & S_M1) && (retval == 0x76) && (maskreg & MASK_HALT)) {
+
+    /*
+     * when we encounter a halt instruction with M1 and are not in task 0, we return a NOP to the
+     * emulation.  the next M1 after this starts executing at 0xbf0 by disabling the address bus
+     * and driving the fetch via a counter
+     */
+    if (((taskreg & 0xf) != 0) && 
+        (z80_get_reg8(status_reg) & S_M1) && 
+        (retval == 0x76) && 
+        (!prefix) && (maskreg & MASK_HALT)) {
         trap();
-        goto top;
+        seg = "nop:";
+        retval = 0;
     }
+
+    if (running && (z80_get_reg8(status_reg) & S_M1) && 
+        ((retval == 0xED) || (retval == 0xDD) || (retval == 0xFD) || (retval == 0xCB))) {
+        prefix = 1;
+    } else {
+        prefix = 0;
+    }
+
+    if (running && (trace & trace_mem)) {
+        printf("mem: read %04x (%s%06x) %s got %02x %s\n", orig, seg, pa, regname, retval, desc);
+    } 
     return retval;
 }
 
@@ -301,56 +369,41 @@ put_byte(vaddr addr, unsigned char value)
 {
     paddr pa;
     byte attr;
-    char **bitsp;
+    byte local;
+    char **bitsp = 0;
+    char *seg = "";
+    char *regname = "";
+    char *desc = "";
+    char *cmd;
+ 
+    local = ((taskreg & 0xf) == 0) && (addr < 0x1000);
 
-    getpte(addr, &pa, &attr);
-
-    // access to physical memory through mapping ram
-    if (((taskreg & 0xf) != 0) || (addr > 0x1000)) {
+    if (!local) {                           // mapped ram
+        seg = "mapped:";
+        getpte(addr, &pa, &attr);
         physwrite(pa, value);
-        return;
-    }
-
-    // access to 1k on-board ram
-    if (addr < LOCAL) {
+    } else switch(addr & 0xe00) {
+    case RAM: case RAM + 0x200:             // 1k static ram
+        seg = "ram:";
+        pa = addr;
         local_ram[addr] = value;
-        return;
-    }
-
-    // access to local I/O registers
-    if (addr < MAP) {
-        switch(addr) {
-        case FPSEG:
-            bitsp = nullbits;
-            break;
-        case FPCOL:
-            bitsp = nullbits;
-            break;
-        case TASK:
+        break;
+    case REGS:                              // on-board registers, 2 bits decoded
+        seg = "regs:";
+        pa = addr & 3;
+        desc = bitdef(value, wregbits[pa]);
+        regname = wregname[pa];
+        *wregp[pa] = value;
+        if ((addr & (REGS | 0x3)) == TASK) {
             setrom(1);
-            taskctr = 8;
-            next_taskreg = value;
-            bitsp = nullbits;
-            break;
-        case MASK:
-            bitsp = mask_bits; 
-            maskreg = value;
-            break;
-        default:
-            if (trace & trace_mpz80) printf("unknown local reg %x read\n", addr);
-            return;
+            delay = 8;
         }
-        if (trace & trace_mpz80) printf("mpz80: %s write %x %s\n", 
-            wregname[addr & 0x3], value, bitdef(value, bitsp));
-        return;
-    }
-
-    // access to mapping ram
-    if (addr < EPROM) {
+        break;
+    case MAP:                               // access to mapping ram
+        seg = "maps:";
         paddr offset = addr & 0x1ff;
         byte task = (addr >> 5) & 0xf;
         byte page = (addr >> 1) & 0xf;
-
         if (trace & trace_map) {
             printf("map register %x write %x task %d page %x ", addr, value, task, page);
             if (addr & 0x01) {
@@ -360,17 +413,27 @@ put_byte(vaddr addr, unsigned char value)
             }
         }
         maps[offset] = value;
-        return;
-
+        break;
+    case EPROM: case EPROM + 0x200:         // fung wha?!
+        printf("write to eprom\n");
+        break;
+    case FPU:                               // write to fpu registers
+        seg = "fpu:";
+        pa = (addr >> 3) & 1;
+        if (pa) {
+            regname = "command";
+            desc = fpucmd[value];
+            if (!cmd) cmd = "";
+            fpu_cmd = value;
+        } else {
+            regname = "data";
+            fpu_data = value;
+        }
+        break;
     }
-    // write to eprom ?!
-    if (addr < FPU) {
-        if (trace & trace_mpz80) printf("write to eprom\n");
-        return;
-    }
-
-    // write to fpu registers
-    fpu[addr & 0x3ff] = value;
+    if (running && (trace & trace_mem)) {
+        printf("mem: write %04x (%s%06x) %s put %02x %s\n", addr, seg, pa, regname, value, desc);
+    } 
 }
 
 byte
@@ -438,6 +501,7 @@ register_mpz80_driver()
 {
     trace_mpz80 = register_trace("mpz80");
     trace_map = register_trace("map");
+    trace_mem = register_trace("mem");
 
     register_prearg_hook(mpz80_init);
     register_startup_hook(mpz80_startup);
