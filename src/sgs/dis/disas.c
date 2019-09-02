@@ -500,11 +500,11 @@ char **argv;
         name = "/dev/stdin";
     }
 
-    if (strcasecmp(&name[strlen(name) - 4], ".com") == 0) {
+    if (!symfile && (strcasecmp(&name[strlen(name) - 4], ".com") == 0)) {
         symfile = strdup(name);
         strcpy(&symfile[strlen(symfile) - 4], (name[strlen(name)-1] == 'm') ? ".sym" : ".SYM");
-        load_symfile();
     }
+    load_symfile();
 
     if (strcasecmp(name + strlen(name) - 4, ".com") == 0) {
         if (!startaddr) startaddr = 0x100;
@@ -566,7 +566,7 @@ char **argv;
 	}
 
 	tracing = 0;
-	header();
+	header(name);
 	disas();
 
 	exit(0);
@@ -795,9 +795,9 @@ int pos;
 	}
 }
 
-header()
+header(char *name)
 {
-	printf(";\tdisas version %d\n", VERSION);
+	printf(";\n;\tdisas version %d\n;\t%s\n;\n", VERSION, name);
     dump_symbols();
 	printf("\n\torg\t0%xh\n\n", startaddr);
 }
