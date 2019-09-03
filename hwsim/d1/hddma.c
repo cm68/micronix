@@ -29,6 +29,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 
+#define HDDMA_INTERRUPT vi_0
+
 #define	HDDMA_PORT 	0x55	// hddma attention port
 #define	HDDMA_RESET	0x54	// hddma reset port
 
@@ -178,6 +180,8 @@ attention(portaddr p, byte v)
     int drivefd;
     int head;
 
+    set_interrupt(HDDMA_INTERRUPT, int_clear);
+
     if (channel_reset) {
         channel_reset = 0;
         channel = physread(DEF_CCA) + (physread(DEF_CCA+1) << 8) + (physread(DEF_CCA+2) << 16);
@@ -269,9 +273,7 @@ attention(portaddr p, byte v)
         secsize = SSECSIZE(command.sseccode);
         if (trace & trace_hddma) {
             printf("steprate: %d ms ", command.steprate & 0x7f);
-            if (command.steprate & INTERRUPT) {
-                printf("interrupt requested ");
-            }
+            enable_intr = (command.steprate & INTERRUPT) ? 1 : 0;
             printf("settle: %d ms ", command.settle & 0x7f);
             printf("secsize %d\n", secsize);
         }
@@ -294,12 +296,10 @@ attention(portaddr p, byte v)
         break;
     }
     copyout((byte *)&command, channel, sizeof(command));
-#ifdef notdef
-    if (enable_intr) {
-        irq(HDDMA_INTR);
-    }
-#endif
     channel = link;
+    if (enable_intr) {
+        set_interrupt(HDDMA_INTERRUPT, int_set);
+    }
 }
 
 /*

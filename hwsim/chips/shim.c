@@ -16,6 +16,8 @@ z80_t z80;
  */
 uint64_t 
 z80_tick(int num_ticks, uint64_t pins, void* user_data) {
+    if (intline_level[interrupt] == int_set) pins |= Z80_INT;
+    if (intline_level[nmi] == int_set) pins |= Z80_NMI;
     if (pins & Z80_MREQ) {
         if (pins & Z80_RD) {
             if (pins & Z80_M1) {
@@ -28,7 +30,9 @@ z80_tick(int num_ticks, uint64_t pins, void* user_data) {
             put_byte(Z80_GET_ADDR(pins), Z80_GET_DATA(pins));
         }
     } else if (pins & Z80_IORQ) {
-        if (pins & Z80_RD) {
+        if (pins & Z80_M1) {            
+            Z80_SET_DATA(pins, intack());
+        } else if (pins & Z80_RD) {
             Z80_SET_DATA(pins, input(Z80_GET_ADDR(pins)));
         } else if (pins & Z80_WR) {
             output(Z80_GET_ADDR(pins), Z80_GET_DATA(pins));

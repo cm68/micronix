@@ -130,6 +130,59 @@ register_output(portaddr portnum, outhandler func)
     output_handler[portnum] = func;
 }
 
+int_level intline_level[12];
+
+void (*int_handler[12])(int_line signal, int_level level);
+byte (*intack_handler)();
+byte (*intvec_handler)();
+
+byte
+intvec()
+{
+    if (!intvec_handler) {
+        printf("unregistered intvec called - 0xff returned\n");
+        return 0xff;
+    } 
+    return (*intvec_handler)();
+}
+
+void
+register_intvec(byte (*handler)())
+{
+    intvec_handler = handler;
+}
+
+byte
+intack()
+{
+    if (!intack_handler) {
+        printf("unregistered intack called - 0xff returned\n");
+        return 0xff;
+    } 
+    return (*intack_handler)();
+}
+
+void
+register_intack(byte (*handler)())
+{
+    intack_handler = handler;
+}
+
+void
+register_interrupt(int_line signal, void (*handler)(int_line signal, int_level level))
+{
+    int_handler[signal] = handler;
+}
+
+void
+set_interrupt(int_line signal, int_level level)
+{
+    if (!int_handler[signal]) {
+        return;
+    }
+    (*int_handler[signal])(signal, level);
+}
+
 __attribute__((constructor))
 void
 io_init()

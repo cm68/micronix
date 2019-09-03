@@ -3,8 +3,8 @@ CC = gcc
 DEBUG = -g
 CFLAGS = $(DEBUG)
 
-EXTRAS = sample_shim.o sample_cpu.o
-OBJECTS = util.o sim.o imdlib.o dis.o s100.o
+EXTRAS = sample_shim.o sample_cpu.o terminal
+OBJECTS = util.o sim.o imdlib.o dis.o s100.o terminal.o
 TOOLS = imd
 
 all: $(TOOLS) libsim.a $(EXTRAS)
@@ -29,6 +29,12 @@ s100.o: s100.c sim.h
 
 sim.o: sim.c sim.h util.h imd.h dis.h
 	$(CC) $(CFLAGS) -c sim.c
+
+terminal.o: terminal.c sim.h
+	$(CC) $(CFLAGS) -c terminal.c
+
+terminal: terminal.c sim.h
+	$(CC) $(CFLAGS) -DSTAND -o terminal terminal.c
 
 sample_shim.o: sim.h sample_shim.c
 	$(CC) $(CFLAGS) -c sample_shim.c
