@@ -974,61 +974,26 @@ main(int argc, char **argv)
      * emulator's file descriptors to an xterm or something.
      */
     if (debug_terminal) {
-        char *cmd = malloc(100);
-        int pipefd[2];
+        char namebuf[100];
+        int debugin;
+        int debugout;
 
-        pipe(pipefd);
-        // we need to capture the tty name so we can send output to it
-        sprintf(cmd,
-            "bash -c 'tty > /proc/%d/fd/%d ; while test -d /proc/%d ; do sleep 1 ; done ; sleep 60'",
-            mypid, pipefd[1], mypid);
-        if (!fork()) {
-            // try terminals in order of preference
-            execlp("xfce4-terminal", "xfce4-terminal", 
-                "--disable-server",
-                "--command", cmd, 
-                (char *) 0);
+        open_terminal(0, &debugin, &debugout, 1);
 
-            execlp("mate-terminal", "mate-terminal", 
-                "--sm-client-disable",
-                "--disable-factory",
-                "--command", cmd, 
-                (char *) 0);
-
-            unlink("logfile");
-
-            execlp("xterm", "xterm", 
-                "-geometry", "120x40", 
-                "-fn", "8x13bold", 
-                "-l", "-lf", "logfile",
-                "-e", "bash", 
-                "-c", cmd, 
-                (char *) 0);
-        }
-        ptyname = malloc(100);
-        i = read(pipefd[0], ptyname, 100);
-        if (i == -1) {
-            perror("pipe");
-        }
-
-        // build a filename, null terminated at the newline
-        ptyname[i] = 0;
-        for (i = 0; i < strlen(ptyname); i++) {
-            if (ptyname[i] == '\n') {
-                ptyname[i] = 0;
-                break;
-            }
-        }
-        stdout = freopen(ptyname, "r+", stdout);
-        stdin = freopen(ptyname, "r+", stdin);
-        if (!stdout) {
-            fprintf(stderr, "freopen of %s as stdout failed %d\n", ptyname, errno);
-            exit(0);
-        }
+        sprintf(namebuf, "/proc/%d/fd/%d", getpid(), debugin);
+        stdin = freopen(namebuf, "r+", stdin);
         if (!stdin) {
-            fprintf(stdin, "freopen of %s as stdin failed %d\n", ptyname, errno);
+            fprintf(stderr, "fdopen of stdin failed %d\n", errno);
             exit(0);
         }
+
+        sprintf(namebuf, "/proc/%d/fd/%d", getpid(), debugout);
+        stdout = freopen(namebuf, "r+", stdout);
+        if (!stdout) {
+            fprintf(stderr, "fdopen of stdout failed %d\n", errno);
+            exit(0);
+        }
+        setvbuf(stdout, 0, _IONBF, 0);
     } else {
         stdout = freopen("logfile", "w+", stdout);
         if (!stdout) {
@@ -1038,6 +1003,8 @@ main(int argc, char **argv)
         printf("log file\n");
     }
 
+    printf("this is a test\n");
+    fprintf(stdout, "this is another\n");
     if (trace) {
         printf("trace %x ", trace);
         for (i = 0; tracenames[i]; i++) {

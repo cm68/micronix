@@ -127,6 +127,8 @@ byte trapstat;
 #define     ST_AUX      0x20
 #define     ST_R10      0x40
 #define     ST_READ     0x80
+#define ST_RESET    (ST_VOID | ST_IORQ | ST_HALT | ST_INT | ST_STOP | ST_AUX | ST_READ)
+
 static char *stat_bits[] = { "void", "iorq", "halt", "int", "stop", "aux", "r10", "read" };
 
 static char **rregbits[] = { 0, keyb_bits, swt_bits, stat_bits };
@@ -216,7 +218,6 @@ map_cmd(char **sp)
  */
 
 int trapcount;
-word trapaddr;
 
 /*
  * a counter set by writing the task register and decremented by M1
@@ -230,12 +231,12 @@ static byte delay;
 static byte local;
 
 void
-trap()
+trap(byte trapbits)
 {
-    if (trace & trace_mpz80) printf("trap\n");
+    if (trace & trace_mpz80) printf("trap %x %s\n", trapbits, bitdef(trapbits, stat_bits));
     taskreg = 0;
     trapcount = 15;
-    trapaddr = z80_get_reg16(pc_reg);
+    trapstat = trapbits;
 }
 
 /*
@@ -253,6 +254,8 @@ getpte(word addr, paddr *paddrp, byte *attrp)
 }
 
 static int prefix;      // was the last M1 a prefix instruction
+inst_disabled = 0;
+extern int trace_inst;
 
 /*
  * the mpz80 inhibits reads and writes for a fixed number of memory cycles after a trap
@@ -271,17 +274,16 @@ get_byte(vaddr addr)
     char *desc = "";
 
     // if we are trapping, ignore the passed in address
-    if (trapcount) {
-        if (running) {
-            addr = 0xbf0 + (15 - trapcount);
-        } else {
-            if ((addr - trapaddr) < 16) {
-                addr = 0xbf0 + (addr - trapaddr);
-            }
+    if (trapcount && running) {
+        if (trace & trace_inst) {
+            inst_disabled = 1;
+            trace &= ~trace_inst;
         }
-        if (running) {
+        addr = 0xbf0 + (15 - trapcount);
         if (trace & trace_mpz80) printf("mpz80: trap %x replaced by %x\n", orig, addr);
-            trapcount--;
+        trapcount--;
+        if (inst_disabled && !trapcount) {
+            trace |= trace_inst;
         }
     }
 
@@ -346,7 +348,7 @@ get_byte(vaddr addr)
         (z80_get_reg8(status_reg) & S_M1) && 
         (retval == 0x76) && 
         (!prefix) && (maskreg & MASK_HALT)) {
-        trap();
+        trap(ST_RESET & ~ST_HALT);
         seg = "nop:";
         retval = 0;
     }
@@ -487,7 +489,7 @@ mpz80_startup()
         switchreg = config_sw & 0xff;   // could be multiple bytes of config
     }
     z80_set_reg16(pc_reg, 0);
-    trap();
+    trap(ST_RESET);
     return 0;
 }
 

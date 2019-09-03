@@ -48,6 +48,35 @@ extern void register_input(portaddr portnum, inhandler func);
 extern void register_output(portaddr portnum, outhandler func);
 
 /*
+ * drivers call set_interrupt on vectored lines
+ * interrupt controller registers for handlers on vectored line and intvec.
+ * cpu registers for intack and registers for int and nmi
+ * chip simulator calls intack and looks at nmi and int line state
+ */
+typedef enum { vi_0, vi_1, vi_2, vi_3, vi4, vi_5, vi_6, vi_7, interrupt, nmi, errorint, pwrfail } int_line;
+typedef enum { int_set, int_clear } int_level;
+
+// called by interrupt controller
+void register_interrupt(int_line signal, void (*handler)(int_line signal, int_level level));
+void register_intvec(byte (*handler)());
+
+// called by cpu card
+void register_intack(byte (*handler)());
+byte intvec();
+
+// called by cpu simulator
+byte intack();
+
+// called by driver
+void set_interrupt(int_line signal, int_level level);
+
+// maintained by interrupt handlers
+extern int_level intline_level[12];
+
+// terminal creates an xterm that generates a signal when something is ready to read
+extern void open_terminal(int signum, int *infdp, int *outfdp, int cooked);
+
+/*
  * global simulator variables
  */
 extern int trace;		// bitmask of subsystems to trace

@@ -26,6 +26,8 @@ extern int trace_bio;
 
 extern int terminal_fd;
 
+#define DJDMA_INTERRUPT vi_1
+
 #define	DJDMA_PORT	0xef	// djdma command start port
 #define	DEF_CCA		0x50	// djdma default channel command address
 #define SERDATA     0x3e    // djdma serial input location
@@ -190,6 +192,7 @@ pulse_djdma(portaddr p, byte v)
         physwrite(channel + 1, S_NORMAL);
         channel += 2;
         need_intack = 0;
+        set_interrupt(DJDMA_INTERRUPT, int_clear);
     } else {
         /*
          * fetch from the reset channel address
@@ -321,6 +324,7 @@ setintr()
 {
     need_intack = 1;
     if (trace & trace_djdma) printf("\tsetintr\n");
+    set_interrupt(DJDMA_INTERRUPT, int_set);
     return 0;
 }
 

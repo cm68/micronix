@@ -10,6 +10,14 @@
 #include <fcntl.h>
 #include <stdio.h>
 
+#define HDCA_INTERRUPT  vi_0        // same as hddma!
+
+byte int_state;
+byte last_int_state;
+
+#define INT_A   0x01    // driven by PSR_OPDONE and reset by new command
+#define INT_B   0x02    // driven by R1_SDONE and reset by input from intclr
+
 /*
  * drive geometry
  * we don't really use this, it's just for show.
@@ -43,6 +51,7 @@ int trace_hdca;
 
 static int drive[DRIVES];       // file descriptor for data file
 static int track[DRIVES];       // head location
+static int stepping[DRIVES];    // are in middle of step
 
 /*
  * the hdca has 1k of ram, 512 for data, and 512 for headers
@@ -62,6 +71,7 @@ int rampage;
 /*
  * port numbers and functions
  */
+#define HDCA_PORT       0x50
 #define	HDCA_CONTROL 	0x50        // write control
 #define	HDCA_CMD        0x51        // write command
 #define	HDCA_FUNC       0x52        // write selects/step
@@ -101,7 +111,7 @@ static byte cmd;
 // 0x51 - secondary status register
 #define R1_REV      0xc0    // board revision
 #define R1_DATACRC  0x02    // data crc error
-#define R1_SDONE    0x01    // command done (irq?)
+#define R1_SDONE    0x01    // seek done 
 static byte ssr;
 
 // 0x52 HDCA function register
@@ -116,6 +126,24 @@ static byte ssr;
 #define FUNC_DRIVE      0x03
 #define FUNC_HEAD       0xf0
 static byte func;
+
+
+/*
+ * see if we need to assert or deassert the interrupt line
+ * we need to assert it if we go from int_state == 0
+ * we need to deassert it if we go to int_state == 0
+ */
+void
+check_interrupt()
+{
+    if ((!last_int_state) && int_state) {
+        set_interrupt(HDCA_INTERRUPT, int_set);
+    }
+    if ((last_int_state) && !int_state) {
+        set_interrupt(HDCA_INTERRUPT, int_clear);
+    }
+    last_int_state = int_state;
+}
 
 /*
  * we need to make index toggle intelligently.
@@ -147,7 +175,6 @@ wr_hdca_control(portaddr p, byte v)
         psr |= PSR_NFAULT;
     }
     control = v;
-    psr = PSR_HALT | PSR_NFAULT | PSR_COMPLT | PSR_OPDONE;
 }
 
 static void
@@ -177,18 +204,18 @@ wr_hdca_cmd(portaddr p, byte v)
     int key = buffer[HEADER+3];
     int offset = secoff(track, head, sector);
 
+    psr &= ~PSR_OPDONE;
+
     switch (v) {
     case 0: 
         if (trace & trace_hdca) printf("hdca cmd: set ram pointer to sector\n");
         rampage = SECTOR;
         ramptr = 0;
-        psr &= ~PSR_OPDONE;
         break;
     case 8: 
         if (trace & trace_hdca) printf("hdca cmd: set ram pointer to header\n");
         rampage = HEADER;
         ramptr = 0;
-        psr &= ~PSR_OPDONE;
         break;
     case 1:
         if (trace & trace_hdca) printf("hdca cmd: read sector with header bytes: %d %d %d %d\n",
@@ -232,6 +259,12 @@ wr_hdca_cmd(portaddr p, byte v)
         printf("hdca cmd: unknown command\n");
         break;
     }
+    if (psr & PSR_OPDONE) {
+        int_state |= INT_A;
+    } else {
+        int_state &= ~INT_A;
+    }
+    check_interrupt();
     if (trace & trace_hdca) printf("hdca: cmd -> 0x%x\n", v);
 }
 
@@ -243,6 +276,8 @@ wr_hdca_func(portaddr p, byte v)
     byte head;
     byte drive;
     byte step;
+    int i;
+    int stepped = 0;
 
     if (trace & trace_hdca) printf("hdca: func -> 0x%x %s\n", v, bitdef(v, func_b));
     dir_lower = v & FUNC_DIR ? 1 : 0;
@@ -250,18 +285,35 @@ wr_hdca_func(portaddr p, byte v)
     drive = (v & FUNC_DRIVE);
     step = (v & FUNC_STEP) ? 1 : 0;
     if (trace & trace_hdca) printf("\tdrive: %d head: %d step %s %d\n", drive, head, dir_lower ? "lower" : "higher", step);
-    if ((func & FUNC_STEP) == 0) {
-        if (step) {
-            if (dir_lower) {
-                track[drive]--;
-            } else {
-                track[drive]++;
-            }
-            psr |= PSR_COMPLT;
-            if (trace & trace_hdca) printf("step drive %d to track %d\n", drive, track[drive]);
-            indextoggle = 1;
+    if (stepping[drive] && step) {  // did the step line rise
+        if (dir_lower) {
+            track[drive]--;
+        } else {
+            track[drive]++;
         }
+        if (trace & trace_hdca) printf("step drive %d to track %d\n", drive, track[drive]);
+        indextoggle = 1;
+        stepped = 1;
     }
+
+    if (!step) {                    // the step line fell
+        stepping[drive] = 1;
+        psr &= ~PSR_COMPLT;
+    }
+    for (i = 0; i < DRIVES; i++) {  // if any drives are seeking, clear PSR_COMPLT
+        if (stepping[i]) break;
+    }
+    if (i == DRIVES) {              // if all drives done, and we stepped, raise interrupt maybe
+        psr |= PSR_COMPLT;
+        if (stepped) {
+            ssr |= R1_SDONE;
+            int_state |= INT_B;
+            check_interrupt();
+        }
+    } else {
+        psr &= PSR_COMPLT;
+    }
+
     psr &= ~PSR_NTRK0;
     if (track[drive] != 0) {
         psr |= PSR_NTRK0;
@@ -298,6 +350,9 @@ static byte
 rd_hdca_intclr(portaddr p)
 {
     if (trace & trace_hdca) printf("hdca: input intclr\n");
+    ssr &= ~R1_SDONE;
+    int_state &= ~INT_B;
+    check_interrupt();
     return 0xff;
 }
 
@@ -314,6 +369,8 @@ hdca_init()
 	register_input(HDCA_SSR, &rd_hdca_ssr);
 	register_input(HDCA_INT, &rd_hdca_intclr);
 	register_input(HDCA_DATA, &rd_hdca_data);
+
+    psr = PSR_HALT | PSR_NFAULT | PSR_COMPLT | PSR_OPDONE;
 
     for (i = 0; i < DRIVES; i++) {
         open_drive(i);
