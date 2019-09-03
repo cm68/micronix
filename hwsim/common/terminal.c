@@ -178,8 +178,8 @@ main(int argc, char **argv)
     signal(SIG1, sig_handler);
     signal(SIG2, sig_handler);
 
-    open_terminal(SIG1, &i1, &o1);
-    open_terminal(SIG2, &i2, &o2);
+    open_terminal(SIG1, &i1, &o1, 0);
+    open_terminal(SIG2, &i2, &o2, 0);
 
     while (1) {
         write(o1, "out 1\n", 6);
