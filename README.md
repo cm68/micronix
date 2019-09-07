@@ -107,24 +107,20 @@ this github is prettily referenced in my cybernecromancy site:
 
 https://retro.zen-room.org/morrow-micronix/user-mode-simulator
 
-----------------
+-----------------------
 
 the full decision 1 simulator is getting close to running.
-
-cp/m boots the dj-dma images, the hdc-dma works, the hdca works
-all with write support.
-
-the simulator has been sanitized a lot to allow growing into
-a more useful tool, allowing debug of additional device drivers
-that morrow never saw, like the disk3, scsi, etc.
 
 the debugger supports board-specific plugins, and breakpoints
 work well to chase problems down.
 
-left to do:
+cp/m works well, and micronix is getting very close.
 
-1) implement mpz80 traps
-2) add interrupts
+there were several rewrites of the hw simulator, and I went through
+quite a bit of gyrations to make the z80 cpu simulator part pluggable,
+with different simulators being possible.
 
-the memory mapping, reset and i/o abstraction are done.
+the simulator has been sanitized a lot to allow growing into
+a more useful tool, allowing debug of additional device drivers
+that morrow never saw, like the disk3, scsi, etc.
 
