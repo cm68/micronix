@@ -86,8 +86,28 @@ decomp:
         with the goal of generating recompilable C.  very much a WIP.
 	probably throw away now that ghidra exists.
 
-fullsim:
-	the beginnings of a mpz80 simulator.  WIP.
+hwsim:
+	most of hardware level mpz80 simulator capable of running the
+	micronix kernel.  it includes the ability to load+run the monitor
+	roms, both version 4.47 and 3.75, load symbol tables, has an ICE-like
+	debugger with breakpoints, single step, disassembler, and so on.
+	furthermore, it has a modular architecture that allows plugging in 
+	different chip simulators.
+
+	cp/m works well, and micronix is getting very close, with interrupt
+	controller, trapping, memory mapping, disk reading and writing for
+	all 3 controllers (djdma, hdc-dma, and hdca).
+
+	there's a means for importing and exporting data to cp/m via the
+	inp: and out: devices in pip, so hex files can be shipped to get
+	programs in and out.
+
+	the djdma simulator reads IMD files directly, and writes produce
+	a delta file that is loaded at the next startup, so there's no
+	modification of the original IMD.  the imd utility can generate
+	a merged IMD file that contains any changes.
+
+	finally, I've started on a skeleton for other platforms like compupro.
 
 sim:
 	a bunch of 8 bit simulators for cribbing ideas/code from.
@@ -106,21 +126,4 @@ whitesmith's generates.
 this github is prettily referenced in my cybernecromancy site:
 
 https://retro.zen-room.org/morrow-micronix/user-mode-simulator
-
------------------------
-
-the full decision 1 simulator is getting close to running.
-
-the debugger supports board-specific plugins, and breakpoints
-work well to chase problems down.
-
-cp/m works well, and micronix is getting very close.
-
-there were several rewrites of the hw simulator, and I went through
-quite a bit of gyrations to make the z80 cpu simulator part pluggable,
-with different simulators being possible.
-
-the simulator has been sanitized a lot to allow growing into
-a more useful tool, allowing debug of additional device drivers
-that morrow never saw, like the disk3, scsi, etc.
 
