@@ -1314,6 +1314,23 @@ uint32_t z80_exec(z80_t* cpu, uint32_t num_ticks) {
                 _T(2);
                 switch (_G_IM()) {
                 case 0:
+/*
+ * begin special hack for i8259 in mode 0
+ */			
+		    if (int_vec == 0xcd) {	// get 2 more bytes
+			    uint8_t low, high;
+                       	    uint16_t sp = _G_SP();
+			    _TWM(4,Z80_M1|Z80_IORQ);
+			    low = _GD();
+			    _T(2);	
+			    _TWM(4,Z80_M1|Z80_IORQ);
+			    high = _GD();
+			    _MW(--sp,pc>>8);
+			    _MW(--sp,pc);
+			    _S_SP(sp);
+			    pc = (high << 8)|low;
+			    _S_WZ(pc);
+		    }
                     break;
                 case 1:
                     {

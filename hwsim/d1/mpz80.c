@@ -40,6 +40,8 @@
 #define FPU         0xc00       // 9511/9512
 #define LOCAL       0x1000      // everything below here is on board
 
+static int_level int_s100;      // the actual interrupt line on the bus
+
 /*
  * mpz80 cpu registers and local ram
  */
@@ -87,7 +89,7 @@ byte maskreg;
 #define     MASK_SINT   0x20
 #define     MASK_IO     0x40
 #define     MASK_ZIO    0x80
-static char *mask_bits[] = { "stop", "aux", "tint", "step", "halt", "sint", "io", "zio" };
+static char *mask_bits[] = { "nostop", "aux", "notint", "run", "nohalt", "sint", "noio", "zio" };
 static byte *wregp[] = { &fpseg, &fpcol, &next_taskreg, &maskreg };
 static char **wregbits[] = { 0, 0, 0, mask_bits };
 
@@ -240,6 +242,32 @@ trap(byte trapbits)
 }
 
 /*
+ * register state changes could cause delayed interrupts to become deliverable
+ * check if we can assert the int pin
+ */
+void
+interrupt_check()
+{
+    if (int_s100 == int_clear) {
+        return;
+    }
+    if (taskreg & 0xf) {
+        if (maskreg & MASK_TINT) {      // no user interrupts, trap!
+            trap(ST_RESET & ~ST_INT);
+            return;
+        }
+    } else {
+        if (maskreg & MASK_SINT) {   // block interrupts
+            return;
+        }
+    }
+    if (trace & trace_mpz80) {
+        printf("assert int_pin\n");
+    }
+    int_pin = int_set;
+}
+
+/*
  * do a virtual lookup of address and return the physical address and page attributes
  */
 static void
@@ -254,7 +282,7 @@ getpte(word addr, paddr *paddrp, byte *attrp)
 }
 
 static int prefix;      // was the last M1 a prefix instruction
-inst_disabled = 0;
+int inst_disabled = 0;
 extern int trace_inst;
 
 /*
@@ -282,6 +310,9 @@ get_byte(vaddr addr)
         addr = 0xbf0 + (15 - trapcount);
         if (trace & trace_mpz80) printf("mpz80: trap %x replaced by %x\n", orig, addr);
         trapcount--;
+        if (trapcount == 0) {
+            interrupt_check();
+        }
         if (inst_disabled && !trapcount) {
             trace |= trace_inst;
         }
@@ -293,8 +324,9 @@ get_byte(vaddr addr)
             delay--;
         }
         if (delay == 0) {
-            if (trace & trace_mpz80) printf("switching taskreg\n");
+            if (trace & trace_mpz80) printf("switching taskreg to %02x\n", next_taskreg);
             taskreg = next_taskreg;
+            interrupt_check();          // this may cause an interrupt
         }
     }
 
@@ -306,6 +338,7 @@ get_byte(vaddr addr)
         retval = physread(pa);
     } else switch (addr & 0xe00) {
     case RAM: case RAM + 0x200:             // 1k static ram
+        local = 0;
         seg = "ram:";
         pa = addr;
         retval = local_ram[addr];
@@ -321,6 +354,7 @@ get_byte(vaddr addr)
         printf("illegal map register read\n");
         break;
     case EPROM: case EPROM + 0x200:         // eprom
+        local = 0;
         pa = addr - EPROM;
         seg = "eprom:";
         retval = eprom[pa];
@@ -360,7 +394,7 @@ get_byte(vaddr addr)
         prefix = 0;
     }
 
-    if (running && (trace & trace_mem)) {
+    if (running && ((trace & trace_mem) || (local && (trace & trace_mpz80)))) {
         printf("mem: read %04x (%s%06x) %s got %02x %s\n", orig, seg, pa, regname, retval, desc);
     } 
     return retval;
@@ -386,6 +420,7 @@ put_byte(vaddr addr, unsigned char value)
         physwrite(pa, value);
     } else switch(addr & 0xe00) {
     case RAM: case RAM + 0x200:             // 1k static ram
+        local = 0;
         seg = "ram:";
         pa = addr;
         local_ram[addr] = value;
@@ -400,6 +435,7 @@ put_byte(vaddr addr, unsigned char value)
             setrom(1);
             delay = 8;
         }
+        interrupt_check();
         break;
     case MAP:                               // access to mapping ram
         seg = "maps:";
@@ -433,7 +469,7 @@ put_byte(vaddr addr, unsigned char value)
         }
         break;
     }
-    if (running && (trace & trace_mem)) {
+    if (running && ((trace & trace_mem) || (local && (trace & trace_mpz80)))) {
         printf("mem: write %04x (%s%06x) %s put %02x %s\n", addr, seg, pa, regname, value, desc);
     } 
 }
@@ -481,6 +517,34 @@ mpz80_init()
     return 0;
 }
 
+// the bus just asserted or de-asserted the actual interrupt line
+void
+mpz80_intr(int_line signal, int_level level)
+{
+    if (trace & trace_mpz80) {
+        printf("mpz80: mpz80_intr called with int line %s\n", 
+            (level == int_set) ? "set" : "clear");
+    } 
+    int_s100 = level;
+
+    // there are a number of times when we delay the interrupt or do something special.
+    if (level == int_set) {
+        interrupt_check();
+    }
+}
+
+intvec
+mpz80_intack()
+{
+    intvec vector;
+    vector = get_intvec();
+
+    if (trace & trace_mpz80) {
+        printf("mpz80: mpz80_intack returns 0x%08x\n", vector);
+    } 
+    return vector;
+}
+
 int
 mpz80_startup()
 {
@@ -489,6 +553,8 @@ mpz80_startup()
         switchreg = config_sw & 0xff;   // could be multiple bytes of config
     }
     z80_set_reg16(pc_reg, 0);
+    register_intack(mpz80_intack);
+    register_interrupt(interrupt, mpz80_intr);
     trap(ST_RESET);
     return 0;
 }

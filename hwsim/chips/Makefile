@@ -10,7 +10,7 @@ all: $(LIB)
 $(LIB):	$(OBJECTS)
 	ar -rv $(LIB) $(OBJECTS)
 
-shim.o: shim.c
+shim.o: shim.c z80.h
 	$(CC) $(CFLAGS) -c $<
 
 clean:

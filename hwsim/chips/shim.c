@@ -10,14 +10,20 @@ byte status;
 z80_desc_t context;
 z80_t z80;
 
+static intvec ackvec;
+
 /*
  * this simulator is pretty magic in that it actually simulates what happens on the Z80's pins
  * and we get a callback to run machine cycles
  */
 uint64_t 
 z80_tick(int num_ticks, uint64_t pins, void* user_data) {
-    if (intline_level[interrupt] == int_set) pins |= Z80_INT;
-    if (intline_level[nmi] == int_set) pins |= Z80_NMI;
+    if (int_pin == int_set) {
+        pins |= Z80_INT;
+    }
+    if (nmi_pin == int_set) {
+        pins |= Z80_NMI;
+    }
     if (pins & Z80_MREQ) {
         if (pins & Z80_RD) {
             if (pins & Z80_M1) {
@@ -31,7 +37,18 @@ z80_tick(int num_ticks, uint64_t pins, void* user_data) {
         }
     } else if (pins & Z80_IORQ) {
         if (pins & Z80_M1) {            
-            Z80_SET_DATA(pins, intack());
+            byte count;
+            unsigned int bits;
+            byte iack;
+            if (!ackvec) {
+                ackvec = get_intack();
+            }
+            iack = ackvec & 0xff;
+            count = (ackvec >> 24) - 1;
+            bits = ackvec & 0xffffff;
+            bits >>= 8;
+            ackvec = (count << 24) | bits;
+            Z80_SET_DATA(pins, iack);
         } else if (pins & Z80_RD) {
             Z80_SET_DATA(pins, input(Z80_GET_ADDR(pins)));
         } else if (pins & Z80_WR) {

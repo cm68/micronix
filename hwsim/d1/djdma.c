@@ -24,7 +24,8 @@
 int trace_djdma;
 extern int trace_bio;
 
-extern int terminal_fd;
+extern int terminal_fd_in;
+extern int terminal_fd_out;
 
 #define DJDMA_INTERRUPT vi_1
 
@@ -210,6 +211,7 @@ pulse_djdma(portaddr p, byte v)
         for (i = 0; i < (sizeof(djcmd) / sizeof(djcmd[0])); i++) {
             if (djcmd[i].code == code) {
                 cmd = &djcmd[i];
+                break;
             }
         }
         if (!cmd) {
@@ -217,7 +219,7 @@ pulse_djdma(portaddr p, byte v)
             if (trace & trace_djdma) printf("djdma: unknown command %d %x\n", code, code);
         } else {
             if (trace & trace_djdma) printf("djdma: command %d %x %s\n", code, code, cmd->name);
-            i = (cmd->handler)();
+            i = (*cmd->handler)();
             if (cmd->status) {
                 physwrite(channel + cmd->status, i);
             }
@@ -323,6 +325,7 @@ static unsigned char
 setintr()
 {
     need_intack = 1;
+    djdma_running = 0;
     if (trace & trace_djdma) printf("\tsetintr\n");
     set_interrupt(DJDMA_INTERRUPT, int_set);
     return 0;
@@ -574,9 +577,9 @@ djdma_poll_func()
         if (physread(0x3f) == S_NORMAL) {
             return;
         }
-        ioctl(terminal_fd, FIONREAD, &bytes);
+        ioctl(terminal_fd_in, FIONREAD, &bytes);
         if (bytes) {
-            if (read(terminal_fd, &conschar, 1) != 1) {
+            if (read(terminal_fd_in, &conschar, 1) != 1) {
                 printf("djdma_poll_func: read problem\n");
                 return;
             }
@@ -616,7 +619,7 @@ serout()
         poll_registered = 1;
     }
     outch = physread(channel + 1);
-    write(terminal_fd, &outch, 1);
+    write(terminal_fd_out, &outch, 1);
     return S_NORMAL;
 }
 

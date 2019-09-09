@@ -59,10 +59,11 @@
 #define	STACKTOP	0xffff
 #define MAXIMUM_STRING_LENGTH   100
 
-int terminal_fd;
+#define LOGFILE     "logfile"
+
 int debug_terminal;
+int log_output;
 int mypid;
-char *mytty;
 int running;
 
 int trace;
@@ -158,6 +159,7 @@ load_symfile(char *s)
     char namebuf[20];
     char kbuf[20];
     char linebuf[100];
+    int i = 0;
 
     sf = fopen(s, "r");
     if (!sf) return;
@@ -170,9 +172,10 @@ load_symfile(char *s)
                 continue;
             }
         }
-        // printf("adding symbol %s : %x\n", namebuf, v);
         add_sym(namebuf, v);
+        i++;
     }
+    printf("added %d symbols from %s\n", i, s);
     fclose(sf);
 }
 
@@ -361,9 +364,10 @@ usage(char *complaint, char *p)
     fprintf(stderr, "usage: %s [<options>] <drive file> ...\n", p);
     fprintf(stderr, "\t-b\t<boot rom file>\n");
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
+    fprintf(stderr, "\t-S\t<symbol file file>\n");
     fprintf(stderr, "\t-x\topen a debug terminal window\n");
-    fprintf(stderr, "\t-s\t\tstop before execution\n");
-    fprintf(stderr, "\t-t <tracebits>\n");
+    fprintf(stderr, "\t-t\t<tracebits>\n");
+    fprintf(stderr, "\t-l\tproduce logfile\n");
     for (i = 0; tracenames[i]; i++) {
         fprintf(stderr, "\t%x %s\n", 1 << i, tracenames[i]);
     }
@@ -377,6 +381,7 @@ usage(char *complaint, char *p)
 
 char **drivenames;
 char *rom_filename;
+char *sym_filename;
 char *rom_image;
 int rom_size;
 int config_sw = 0;
@@ -884,7 +889,11 @@ main(int argc, char **argv)
          */
         while (*s) {
             switch (*s++) {
+            case 'l':
+                log_output = 1;
+                break;
             case 'x':
+                inst_countdown = 0;
                 debug_terminal = 1;
                 break;
             case 'c':
@@ -898,6 +907,12 @@ main(int argc, char **argv)
                     usage("boot rom name missing\n", progname);
                 }
                 rom_filename = strdup(*argv++);
+                break;
+            case 'S':
+                if (!argc--) {
+                    usage("symfile name missing\n", progname);
+                }
+                sym_filename = strdup(*argv++);
                 break;
             case 't':
                 if (!argc--) {
@@ -954,13 +969,16 @@ main(int argc, char **argv)
         rom_filename = strdup(rom_filename);
         i = strlen(rom_filename);
         // if there's a similarly named symfile, use it
-        if (rom_filename[i-4] == '.') {
-            strcpy(&rom_filename[i-3], "sym");
-            load_symfile(rom_filename);
+        if (!sym_filename && (rom_filename[i-4] == '.')) {
+            sym_filename = strdup(rom_filename);
+            strcpy(&sym_filename[i-3], "sym");
         }
     }
 
-    mytty = strdup(ttyname(0));
+    if (sym_filename) {
+        load_symfile(sym_filename);
+    }
+
     mypid = getpid();
 
     /*
@@ -978,7 +996,7 @@ main(int argc, char **argv)
         int debugin;
         int debugout;
 
-        open_terminal(0, &debugin, &debugout, 1);
+        open_terminal("debug", 0, &debugin, &debugout, 1, log_output ? LOGFILE : 0);
 
         sprintf(namebuf, "/proc/%d/fd/%d", getpid(), debugin);
         stdin = freopen(namebuf, "r+", stdin);
@@ -995,7 +1013,7 @@ main(int argc, char **argv)
         }
         setvbuf(stdout, 0, _IONBF, 0);
     } else {
-        stdout = freopen("logfile", "w+", stdout);
+        stdout = freopen(LOGFILE, "w+", stdout);
         if (!stdout) {
             perror("lose");
         }
@@ -1003,8 +1021,6 @@ main(int argc, char **argv)
         printf("log file\n");
     }
 
-    printf("this is a test\n");
-    fprintf(stdout, "this is another\n");
     if (trace) {
         printf("trace %x ", trace);
         for (i = 0; tracenames[i]; i++) {

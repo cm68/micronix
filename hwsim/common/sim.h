@@ -52,29 +52,37 @@ extern void register_output(portaddr portnum, outhandler func);
  * interrupt controller registers for handlers on vectored line and intvec.
  * cpu registers for intack and registers for int and nmi
  * chip simulator calls intack and looks at nmi and int line state
+ * vectors can be up to 3 bytes long, filled from low end first.
+ * so, a call to 1234 will be encoded as 0x031234cd
  */
-typedef enum { vi_0, vi_1, vi_2, vi_3, vi4, vi_5, vi_6, vi_7, interrupt, nmi, errorint, pwrfail } int_line;
-typedef enum { int_set, int_clear } int_level;
+#define INTLEN_SHIFT    24
+#define INTA_LEN        (3 << INTLEN_SHIFT)
+typedef unsigned int intvec;
+
+typedef enum { vi_0, vi_1, vi_2, vi_3, vi_4, vi_5, vi_6, vi_7, interrupt, nmi, errorint, pwrfail } int_line;
+typedef enum { int_clear, int_set } int_level;
 
 // called by interrupt controller
 void register_interrupt(int_line signal, void (*handler)(int_line signal, int_level level));
-void register_intvec(byte (*handler)());
 
 // called by cpu card
-void register_intack(byte (*handler)());
-byte intvec();
+void register_intvec(intvec (*handler)());
+void register_intack(intvec (*handler)());
+
+intvec get_intvec();
 
 // called by cpu simulator
-byte intack();
+intvec get_intack();
 
 // called by driver
 void set_interrupt(int_line signal, int_level level);
 
 // maintained by interrupt handlers
-extern int_level intline_level[12];
+extern int_level int_pin;
+extern int_level nmi_pin;
 
 // terminal creates an xterm that generates a signal when something is ready to read
-extern void open_terminal(int signum, int *infdp, int *outfdp, int cooked);
+extern void open_terminal(char *name, int signum, int *infdp, int *outfdp, int cooked, char *logfile);
 
 /*
  * global simulator variables

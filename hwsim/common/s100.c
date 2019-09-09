@@ -130,40 +130,47 @@ register_output(portaddr portnum, outhandler func)
     output_handler[portnum] = func;
 }
 
-int_level intline_level[12];
+int_level int_pin;
+int_level nmi_pin;
 
 void (*int_handler[12])(int_line signal, int_level level);
-byte (*intack_handler)();
-byte (*intvec_handler)();
+intvec (*intack_handler)();
+intvec (*intvec_handler)();
 
-byte
-intvec()
+intvec
+get_intvec()
 {
-    if (!intvec_handler) {
-        printf("unregistered intvec called - 0xff returned\n");
-        return 0xff;
-    } 
-    return (*intvec_handler)();
+    intvec vector = 0x000000ff;
+
+    if (intvec_handler) {
+        vector = (*intvec_handler)();
+    } else {
+        printf("unregistered get_intvec called - 0x%08x returned\n", vector);
+    }
+    return vector;
 }
 
 void
-register_intvec(byte (*handler)())
+register_intvec(intvec (*handler)())
 {
     intvec_handler = handler;
 }
 
-byte
-intack()
+intvec
+get_intack()
 {
-    if (!intack_handler) {
-        printf("unregistered intack called - 0xff returned\n");
-        return 0xff;
-    } 
-    return (*intack_handler)();
+    intvec vector = 0x000000ff;
+
+    if (intack_handler) {
+        vector = (*intack_handler)();
+    } else { 
+        printf("unregistered get_intack called - 0x%08x returned\n", vector);
+    }
+    return vector;
 }
 
 void
-register_intack(byte (*handler)())
+register_intack(intvec (*handler)())
 {
     intack_handler = handler;
 }
