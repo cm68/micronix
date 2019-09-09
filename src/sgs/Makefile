@@ -1,9 +1,10 @@
 BINS= nm ar size
 INCPATH=../../include
+DEBUG=-g
 
 all: $(BINS)
 
-CFLAGS=-Wno-format-security -Wno-return-type -I$(INCPATH)
+CFLAGS=-Wno-format-security -Wno-return-type -I$(INCPATH) $(DEBUG)
 
 clean:
 	rm -f *.o 

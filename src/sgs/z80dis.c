@@ -2,6 +2,8 @@
  * a z80 disassembler - brute force
  */
 
+#define define_dumpmem
+
 #include <stdio.h>
 #include <string.h>
 
