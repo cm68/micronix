@@ -386,21 +386,173 @@ char *rom_image;
 int rom_size;
 int config_sw = 0;
 
-struct itimerval timer;
+/*
+ * various things in the simulator will want to have timers popping and getting
+ * callouts.  linux has a create_timer facility for this, which is hugely
+ * complicated and non-portable.  screw that.  setitimer/sigalarm it is.
+ * the recurring timeouts are handled in exactly the same way. when
+ * the old one pops, we schedule the next.
+ */
+struct timeout {
+    struct timeval when;    
+    struct timeval interval;    // if recurring
+    void (*handler)();
+};
 
-void
-set_itv_usec(int v)
+struct itimerval timer;
+struct timeval tv;
+
+#define MILLION 1000000
+#define MAXTIMEOUTS 10
+
+struct timeout timeouts[MAXTIMEOUTS];
+
+#define BEFORE(tv1, tv2) \
+       (((tv1).tv_sec < (tv2).tv_sec) || \
+        (((tv1).tv_sec == (tv2).tv_sec) && ((tv1).tv_usec < (tv2).tv_usec)))
+
+#define ISSET(tv) \
+    ((tv).tv_sec || (tv).tv_usec)
+
+/*
+ * go through the timeout list and start the timer if there is a need
+ * this can be called inside the signal handler, so we need protection
+ */
+static void
+timeout_sched()
 {
-    timer.it_value.tv_sec = 0;
-    timer.it_value.tv_usec = v;
-    timer.it_interval.tv_sec = 0;
-    timer.it_interval.tv_usec = v;
+    int i;
+    struct timeout *tp;
+
+    // put the elephant in cairo
+    tv.tv_sec = tv.tv_usec = 0;
+
+    // now find the how long to wait for the next pop
+    for (i = 0; i < MAXTIMEOUTS; i++) {
+        tp = &timeouts[i];
+        if (!tp->handler) continue;
+        if ((tv.tv_sec == 0) || BEFORE(tp->when, tv)) {
+            tv = tp->when;
+        }
+    }
+    timer.it_interval.tv_sec = timer.it_interval.tv_usec = 0;
+    if (tv.tv_sec != 0) {
+        timer.it_value = tv;
+        setitimer(ITIMER_REAL, &timer, 0);
+    } else {
+        timer.it_value.tv_sec = timer.it_value.tv_usec = 0;
+        setitimer(ITIMER_REAL, &timer, 0);
+    }
+}
+
+static void
+timeval_add(struct timeval *acc, struct timeval *inc)
+{
+    acc->tv_sec += inc->tv_sec;
+    acc->tv_usec += inc->tv_usec;
+    while (acc->tv_usec >= MILLION) {
+        acc->tv_usec -= MILLION;
+        acc->tv_sec++;
+    }
+}
+
+/*
+ * this signal handler gets called every time our timer pops.
+ * it is responsible for calling any expired timers
+ * and arming any new timer.
+ */
+static void
+timeout_handler()
+{
+    int i;
+    struct timeout *tp;
+
+    // loop through all the timers, delivering callouts as needed
+    for (i = 0; i < MAXTIMEOUTS; i++) {
+        tp = &timeouts[i];
+
+    again:
+        if (!tp->handler) continue;
+
+        gettimeofday(&tv, 0);
+
+        // deliver any expired callouts.
+        if (BEFORE(tp->when, tv)) {
+            (*tp->handler)();
+
+            // increment any recurring timers and maybe deliver again
+            if (ISSET(tp->interval)) {
+                timeval_add(&tp->when, &tp->interval);
+                goto again;
+            }
+
+            tp->handler = 0;
+        }
+    }
+    timeout_sched();
 }
 
 void
-set_alarm()
+recurring_timeout(int hertz, void (*function)())
 {
-    setitimer(ITIMER_REAL, &timer, 0);
+    int i;
+    struct timeout *tp;
+
+    for (i = 0; i < MAXTIMEOUTS; i++) {
+        tp = &timeouts[i];
+        if (tp->handler)
+            continue;
+        tp->interval.tv_usec = MILLION/hertz;
+        tp->interval.tv_sec = 0;
+        tp->handler = function;
+        gettimeofday(&tp->when, 0);
+        timeval_add(&tp->when, &tp->interval);
+        timeout_sched();
+        return;
+    }
+    printf("timeout overflow");
+    exit(3);
+}
+
+/*
+ * call function in usec_from_now
+ */
+void
+timeout(int usec_from_now, void (*function)())
+{
+    int i;
+    struct timeout *tp;
+    
+    for (i = 0; i < MAXTIMEOUTS; i++) {
+        tp = &timeouts[i];
+        if (tp->handler)
+            continue;
+        tv.tv_usec = usec_from_now;
+        tv.tv_sec = 0;
+        tp->interval.tv_usec = tp->interval.tv_sec = 0;
+        tp->handler = function;
+        gettimeofday(&tp->when, 0);
+        timeval_add(&tp->when, &tv);
+        timeout_sched();
+        return;
+    }
+    printf("timeout overflow");
+    exit(3);
+}
+
+void
+cancel_timeout(void (*handler)())
+{
+    int i;
+    struct timeout *tp;
+    
+    for (i = 0; i < MAXTIMEOUTS; i++) {
+        tp = &timeouts[i];
+        if (tp->handler == handler) {
+            tp->handler = 0;
+        }
+	}
+    timeout_sched();
 }
 
 void

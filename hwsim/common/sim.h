@@ -84,6 +84,11 @@ extern int_level nmi_pin;
 // terminal creates an xterm that generates a signal when something is ready to read
 extern void open_terminal(char *name, int signum, int *infdp, int *outfdp, int cooked, char *logfile);
 
+// generally useful timed callout facility
+void timeout(int usec, void (*function)());
+void recurring_timeout(int hertz, void (*function)());
+void cancel_timeout(void (*function)());
+
 /*
  * global simulator variables
  */
