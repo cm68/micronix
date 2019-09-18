@@ -29,7 +29,7 @@ kill_terminal_children()
  * i fork 2 child processes., one for the xterm and 1 for a poller process
  */
 void
-open_terminal(int signum, int *in_p, int *out_p, int cooked)
+open_terminal(char *name, int signum, int *in_p, int *out_p, int cooked, char *logfile)
 {
     char *cmd = malloc(100);
     int infd;
@@ -55,24 +55,32 @@ open_terminal(int signum, int *in_p, int *out_p, int cooked)
         mypid, pipe_up[1], mypid);
     pid = fork();
     if (!pid) {     // xterm child
+#ifdef notdef
         // try terminals in order of preference
         execlp("xfce4-terminal", "xfce4-terminal", 
+            "-T", name,
             "--disable-server",
             "--command", cmd, 
             (char *) 0);
 
         execlp("mate-terminal", "mate-terminal", 
+            "-t", name,
             "--sm-client-disable",
             "--disable-factory",
             "--command", cmd, 
             (char *) 0);
-
-        unlink("logfile");
-
+#endif
+        if (logfile) {
+            unlink(logfile);
+        } else {
+            logfile = "/dev/null";
+        }
+        
         execlp("xterm", "xterm", 
+            "-T", name,
             "-geometry", "120x40", 
             "-fn", "8x13bold", 
-            "-l", "-lf", "logfile",
+            "-l", "-lf", logfile,
             "-e", "bash", 
             "-c", cmd, 
             (char *) 0);
@@ -178,8 +186,8 @@ main(int argc, char **argv)
     signal(SIG1, sig_handler);
     signal(SIG2, sig_handler);
 
-    open_terminal(SIG1, &i1, &o1, 0);
-    open_terminal(SIG2, &i2, &o2, 0);
+    open_terminal("foo1", SIG1, &i1, &o1, 0, 0);
+    open_terminal("foo2", SIG2, &i2, &o2, 0, 0);
 
     while (1) {
         write(o1, "out 1\n", 6);
