@@ -278,6 +278,10 @@ main(int argc, char **argv)
 	}
 
 	if (!rootdir) {
+		rootdir = getenv("MICRONIX_ROOT");
+	}
+
+	if (!rootdir) {
 		rootdir = DEFROOT;
 	}
 	mypid = getpid();
@@ -2055,7 +2059,7 @@ nolog:
 		dumpcpu();
 	}
 }
-
+#ifdef notdef
 unsigned char pchars[16];
 int pcol;
 
@@ -2091,4 +2095,4 @@ dumpmem(unsigned char (*readbyte)(void *addr), void *addr, unsigned short len)
                 dp();
         }
 }
-
+#endif
