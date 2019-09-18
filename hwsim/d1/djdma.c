@@ -28,6 +28,7 @@ extern int terminal_fd_in;
 extern int terminal_fd_out;
 
 #define DJDMA_INTERRUPT vi_1
+#define DJDMA_INT_DELAY (30 * 1000)
 
 #define	DJDMA_PORT	0xef	// djdma command start port
 #define	DEF_CCA		0x50	// djdma default channel command address
@@ -317,6 +318,12 @@ readsec()
     return status;
 }
 
+static void
+post_djdma_int()
+{
+    set_interrupt(DJDMA_INTERRUPT, int_set);
+}
+
 /*
  * generate an interrupt.  the next output pulse is an intack, and does
  * not start the channel.
@@ -327,7 +334,7 @@ setintr()
     need_intack = 1;
     djdma_running = 0;
     if (trace & trace_djdma) printf("\tsetintr\n");
-    set_interrupt(DJDMA_INTERRUPT, int_set);
+    timeout(DJDMA_INT_DELAY, post_djdma_int);
     return 0;
 }
 
