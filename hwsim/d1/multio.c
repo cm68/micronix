@@ -434,6 +434,12 @@ rd_mdmstat(portaddr p)
 
 #define  bcd(h,l)    ((((h) & 0xf) << 4) | ((l) & 0xf))
 
+void
+clock_handler()
+{
+    set_interrupt(vi_7, int_set);
+}
+
 /*
  * the real time clock is latched this 40 bit structure
  */
@@ -496,10 +502,7 @@ wr_clock(portaddr p, byte v)
             break;
         }
         if (rate != 0) {
-            struct itimerval itimer;
-            itimer.it_interval.tv_sec = 0;
-            itimer.it_interval.tv_usec = 1000000/rate;
-            setitimer(ITIMER_REAL, &itimer, 0);
+            recurring_timeout(rate, clock_handler);
         }
     }
 
@@ -517,6 +520,8 @@ static byte
 rd_clock(portaddr p)
 {
     byte v;
+
+    set_interrupt(vi_7, int_clear);
 
     v = (rtc[rtcptr / 8] >> (rtcptr % 8)) & 1;
     if (trace & trace_multio) printf("multio: read clock %x\n", v);
@@ -711,12 +716,6 @@ reg_intbit(int_line signal, char *name)
 }
 
 void
-sigalrm_handler(int sig)
-{
-    set_interrupt(vi_7, int_set);
-}
-
-void
 sigio_handler(int sig)
 {
     int i;
@@ -754,7 +753,6 @@ multio_init()
         termmask = (config_sw >> 8) & 0x7;
     }
 
-    signal(SIGALRM, sigalrm_handler);
     signal(SIGIO, sigio_handler);
 
     // if terminal 0 is not an xterm, use mytty - this requires poll child to get SIGIO
