@@ -754,44 +754,6 @@ monitor()
     }
 }
 
-#ifdef notdef
-// system call trace for micronix
-void
-scall_trace(char **sp)
-{
-    char c;
-    int i;
-
-    c = 1;
-    skipwhite(sp);
-    if (!**sp) {
-        for (i = 0; i < sizeof(stops); i++) {
-            if ((i % 16) == 0)
-                printf("\n%02d: ", i);
-            printf("%03d ", stops[i]);
-        }
-        printf("\n");
-    }
-    if (**sp == '-') {
-        (*sp)++;
-        c = 0;
-    }
-    if (**sp) {
-        i = getaddress(sp);
-    }
-    if (i) {
-        if (i < 0) {
-            i = -i;
-            c = 0;
-        }
-        if (i < sizeof(stops)) {
-            stops[i] = c;
-        }
-    }
-    return 0;
-}
-#endif
-
 int
 list_cmd(char **sp)
 {
