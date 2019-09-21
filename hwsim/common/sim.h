@@ -85,8 +85,8 @@ extern int_level nmi_pin;
 extern void open_terminal(char *name, int signum, int *infdp, int *outfdp, int cooked, char *logfile);
 
 // generally useful timed callout facility
-void timeout(int usec, void (*function)());
-void recurring_timeout(int hertz, void (*function)());
+void timeout(char *name, int usec, void (*function)());
+void recurring_timeout(char *name, int hertz, void (*function)());
 void cancel_timeout(void (*function)());
 
 /*
@@ -119,6 +119,9 @@ enum reg16 { pc_reg, sp_reg, bc_reg, de_reg, hl_reg, ix_reg, iy_reg };
 #define S_M1    0x01
 #define S_HLTA  0x02
 #define S_INTA  0x04
+
+#define IFF1    0x01
+#define IFF2    0x02
 
 byte z80_get_reg8(enum reg8 r8);
 word z80_get_reg16(enum reg16 r16);

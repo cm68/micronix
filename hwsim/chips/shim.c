@@ -77,6 +77,8 @@ byte
 z80_get_reg8(enum reg8 r8)
 {
     switch (r8) {
+    case irr_reg:
+        return (z80_iff1(&z80) ? IFF1 : 0) | (z80_iff2(&z80) ? IFF2 : 0);
     case a_reg:
         return z80_a(&z80);
     case f_reg:
