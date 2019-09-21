@@ -999,6 +999,7 @@ help_cmd(char **sp)
     for (i = 0; i < MONCMDS; i++) {
         if (moncmds[i].help) {
             putchar(moncmds[i].cmd);
+            puts(" ");
             puts(moncmds[i].help);
         }
     }

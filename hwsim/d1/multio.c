@@ -24,6 +24,8 @@
 #include <signal.h>
 #include <string.h>
 
+extern int_level int_s100;
+
 int trace_multio;
 int trace_uart;
 int trace_noclock;
@@ -158,6 +160,8 @@ byte imr;           // interrupt mask register
 byte irr;           // interrupt request register
 byte isr;           // in-service register
 
+byte irq;           // actual interrupt line on s100
+
 int pic_state = 0;
 #define PS_UNDEF    0
 #define PS_ICW2     1
@@ -165,11 +169,28 @@ int pic_state = 0;
 #define PS_ICW4     3
 #define PS_READY    4
 
+int
+multio_dump(char **p)
+{
+    printf("multio dump: group %d\n", group);
+    printf("pic_state: %d\n", pic_state);
+    printf("icw1: %x %s\n", icw1, bitdef(icw1, icw1_bits));
+    printf("ocw2: %x %s\n", ocw2, bitdef(ocw2, ocw2_bits));
+    printf("ocw3: %x %s\n", ocw3, bitdef(ocw3, ocw3_bits));
+    printf("icw4: %x %s\n", icw4, bitdef(icw4, icw1_bits));
+    printf("imr: %x %s\n", imr, bitdef(imr, intbits));
+    printf("irr: %x %s\n", irr, bitdef(irr, intbits));
+    printf("isr: %x %s\n", isr, bitdef(isr, intbits));
+    printf("irq: %x int_s100: %d int_pin: %d\n", irq, int_s100, int_pin);
+    return 0;
+}
+
 // return the highest bit set
 static byte 
 highest(byte b)
 {
-    byte mask;
+    byte mask = 0x80;
+
     while (mask) {
         if (mask & b) break;
         mask >>= 1;
@@ -182,6 +203,7 @@ wr_pic_port_0(portaddr p, byte v)
 {
     char **bdec;
     byte *rname;
+    byte high;
 
     if (v & PIC0_ICW1) {            // ICW1
         bdec = icw1_bits;
@@ -299,8 +321,10 @@ vi_handler(int_line signal, int_level level)
 
     // if any unmasked interrupts are high, assert int
     if (irr & ~imr) {
+        irq = 1;
         set_interrupt(interrupt, int_set);
     } else {
+        irq = 0;
         set_interrupt(interrupt, int_clear);
     }
 }
@@ -323,6 +347,7 @@ multio_intvec()
     }
     if (!mask) {
         printf("lose: multio_intvec no interrupt irr %x imr %x\n", irr, imr);
+        multio_dump(0);
         return 0;
     }
 
@@ -841,6 +866,7 @@ multio_init()
     register_interrupt(vi_7, vi_handler);               // clock
 
     register_intvec(multio_intvec);
+    register_mon_cmd('M', "\tdump multio state", multio_dump);
 
     return 0;
 }
