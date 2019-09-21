@@ -103,6 +103,8 @@ byte keybreg;
 #define     KB_DIAG     0x02        // P1 - 13 if high, run diagnostics
 static char *keyb_bits[] = { 0, "diag", 0, 0, 0, 0, 0, 0 };
 
+extern void syscall_at(word pc);
+
 // this register is negated:  if the switch is on, the value reads low
 byte switchreg;
 #define SWT     0x402       // switch register board location 16D
@@ -118,6 +120,7 @@ static char *swt_bits[] = { "reset", "ipend", "monitor", 0, 0, 0, 0, 0 };
 int trace_mpz80;
 int trace_map;
 int trace_mem;
+int trace_syscall;
 
 byte trapstat;
 #define STAT    0x403       // trap status register
@@ -286,6 +289,22 @@ static int prefix;      // was the last M1 a prefix instruction
 int inst_disabled = 0;
 extern int trace_inst;
 
+byte
+fubyte(word addr)
+{
+    paddr pa;
+    byte attr;
+
+    getpte(addr, &pa, &attr);
+    return physread(pa);
+}
+
+word
+fuword(word addr)
+{
+    return fubyte(addr) + (fubyte(addr+1) << 8);
+}
+
 /*
  * the mpz80 inhibits reads and writes for a fixed number of memory cycles after a trap
  * it also lets some instructions fetch from task 0 when doing a task switch
@@ -383,6 +402,8 @@ get_byte(vaddr addr)
         (z80_get_reg8(status_reg) & S_M1) && 
         (retval == 0x76) && 
         (!prefix) && (maskreg & MASK_HALT)) {
+        // system calls are a rst8
+        if ((z80_get_reg16(pc_reg) == 8) && (trace & trace_syscall)) syscall_at(fuword(z80_get_reg16(sp_reg)));
         trap(ST_RESET & ~ST_HALT);
         seg = "nop:";
         retval = 0;
@@ -567,6 +588,7 @@ register_mpz80_driver()
     trace_mpz80 = register_trace("mpz80");
     trace_map = register_trace("map");
     trace_mem = register_trace("mem");
+    trace_syscall = register_trace("syscall");
 
     register_prearg_hook(mpz80_init);
     register_startup_hook(mpz80_startup);
