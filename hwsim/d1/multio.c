@@ -26,6 +26,7 @@
 
 int trace_multio;
 int trace_uart;
+int trace_noclock;
 
 struct terminal {
     int outfd;
@@ -502,7 +503,9 @@ wr_clock(portaddr p, byte v)
             break;
         }
         if (rate != 0) {
-            recurring_timeout(rate, clock_handler);
+            if (!(trace & trace_noclock)) {
+                recurring_timeout("multio_clock", rate, clock_handler);
+            }
         }
     }
 
@@ -853,6 +856,7 @@ register_multio_driver()
     myttyname = strdup(ttyname(0));
     trace_multio = register_trace("multio");
     trace_uart = register_trace("uart");
+    trace_noclock = register_trace("noclock");
     register_startup_hook(multio_init);
 }
 

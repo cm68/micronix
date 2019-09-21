@@ -71,6 +71,8 @@ int trace_inst;
 int trace_bio;
 int trace_ior;
 int trace_io;
+int trace_symbols;
+int trace_timer;
 
 struct {
     char *name;
@@ -80,10 +82,13 @@ struct {
     {"bio", &trace_bio },
     {"ior", &trace_ior },
     {"io", &trace_io },
+    {"symbols", &trace_symbols },
+    {"timer", &trace_timer },
     { 0, 0 }
 } ;
 
 volatile int inst_countdown = -1;
+int next_break;
 
 int stops[10];
 
@@ -166,6 +171,9 @@ load_symfile(char *s)
     while (1) {
         if (fgets(linebuf, sizeof(linebuf), sf) == 0) {
             break;
+        }
+        if (linebuf[0] == '#') {
+            continue;
         }
         if (sscanf(linebuf, "%s %s 0x%x", kbuf, namebuf, &v) != 3) {
             if (sscanf(linebuf, "%x %s", &v, namebuf) != 2) {
@@ -394,25 +402,22 @@ int config_sw = 0;
  * the old one pops, we schedule the next.
  */
 struct timeout {
+    char *name;
     struct timeval when;    
     struct timeval interval;    // if recurring
     void (*handler)();
 };
 
+static void timeout_handler();
+
 struct itimerval timer;
 struct timeval tv;
+struct timeval now;
 
 #define MILLION 1000000
 #define MAXTIMEOUTS 10
 
 struct timeout timeouts[MAXTIMEOUTS];
-
-#define BEFORE(tv1, tv2) \
-       (((tv1).tv_sec < (tv2).tv_sec) || \
-        (((tv1).tv_sec == (tv2).tv_sec) && ((tv1).tv_usec < (tv2).tv_usec)))
-
-#define ISSET(tv) \
-    ((tv).tv_sec || (tv).tv_usec)
 
 /*
  * go through the timeout list and start the timer if there is a need
@@ -431,28 +436,21 @@ timeout_sched()
     for (i = 0; i < MAXTIMEOUTS; i++) {
         tp = &timeouts[i];
         if (!tp->handler) continue;
-        if ((tv.tv_sec == 0) || BEFORE(tp->when, tv)) {
+        if ((tv.tv_sec == 0) || timercmp(&tp->when, &tv, <=)) {
             tv = tp->when;
         }
     }
     timer.it_interval.tv_sec = timer.it_interval.tv_usec = 0;
     if (tv.tv_sec != 0) {
-        timer.it_value = tv;
+        gettimeofday(&now, 0);
+        timersub(&tv, &now, &timer.it_value);
         setitimer(ITIMER_REAL, &timer, 0);
+        if (trace & trace_timer) printf("arming itimer\n");
+        signal(SIGALRM, timeout_handler);
     } else {
         timer.it_value.tv_sec = timer.it_value.tv_usec = 0;
         setitimer(ITIMER_REAL, &timer, 0);
-    }
-}
-
-static void
-timeval_add(struct timeval *acc, struct timeval *inc)
-{
-    acc->tv_sec += inc->tv_sec;
-    acc->tv_usec += inc->tv_usec;
-    while (acc->tv_usec >= MILLION) {
-        acc->tv_usec -= MILLION;
-        acc->tv_sec++;
+        if (trace & trace_timer) printf("disarming itimer\n");
     }
 }
 
@@ -467,6 +465,7 @@ timeout_handler()
     int i;
     struct timeout *tp;
 
+    if (trace & trace_timer) write(1, "timeout_handler called\n", 24);
     // loop through all the timers, delivering callouts as needed
     for (i = 0; i < MAXTIMEOUTS; i++) {
         tp = &timeouts[i];
@@ -477,12 +476,13 @@ timeout_handler()
         gettimeofday(&tv, 0);
 
         // deliver any expired callouts.
-        if (BEFORE(tp->when, tv)) {
+        if (timercmp(&tp->when, &tv, <=)) {
+            if (trace & trace_timer) printf("timer callout %s\n", tp->name);
             (*tp->handler)();
 
             // increment any recurring timers and maybe deliver again
-            if (ISSET(tp->interval)) {
-                timeval_add(&tp->when, &tp->interval);
+            if (timerisset(&tp->interval)) {
+                timeradd(&tp->when, &tp->interval, &tp->when);
                 goto again;
             }
 
@@ -493,7 +493,7 @@ timeout_handler()
 }
 
 void
-recurring_timeout(int hertz, void (*function)())
+recurring_timeout(char *name, int hertz, void (*function)())
 {
     int i;
     struct timeout *tp;
@@ -505,8 +505,9 @@ recurring_timeout(int hertz, void (*function)())
         tp->interval.tv_usec = MILLION/hertz;
         tp->interval.tv_sec = 0;
         tp->handler = function;
+        tp->name = name;
         gettimeofday(&tp->when, 0);
-        timeval_add(&tp->when, &tp->interval);
+        timeradd(&tp->when, &tp->interval, &tp->when);
         timeout_sched();
         return;
     }
@@ -518,7 +519,7 @@ recurring_timeout(int hertz, void (*function)())
  * call function in usec_from_now
  */
 void
-timeout(int usec_from_now, void (*function)())
+timeout(char *name, int usec_from_now, void (*function)())
 {
     int i;
     struct timeout *tp;
@@ -531,8 +532,9 @@ timeout(int usec_from_now, void (*function)())
         tv.tv_sec = 0;
         tp->interval.tv_usec = tp->interval.tv_sec = 0;
         tp->handler = function;
+        tp->name = name;
         gettimeofday(&tp->when, 0);
-        timeval_add(&tp->when, &tv);
+        timeradd(&tp->when, &tv, &tp->when);
         timeout_sched();
         return;
     }
@@ -560,7 +562,7 @@ dumpcpu()
 {
     byte f;
     char outbuf[40];
-    char fbuf[9];
+    char fbuf[10];
     char *s;
     int i;
     word pc, sp;
@@ -572,9 +574,8 @@ dumpcpu()
 
     format_instr(pc, outbuf, &get_byte, &lookup_sym, &reloc);
     s = lookup_sym(pc);
-    if (s) {
-        printf("%s\n", s);
-    }
+    if (!s) s = "";
+    printf("%-10s", s);
     printf("%04x: %-20s ", pc, outbuf);
 
     f = z80_get_reg8(f_reg);
@@ -595,13 +596,15 @@ dumpcpu()
         fbuf[5] = 'Z';
     if (f & S_FLAG)
         fbuf[6] = 'S';
+    if (z80_get_reg8(irr_reg) & IFF1)
+        fbuf[8] = 'I';
 
     printf(
-        " %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x\n",
+        " %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x %04x %04x\n",
         fbuf,
         z80_get_reg8(a_reg), 
         z80_get_reg16(bc_reg), z80_get_reg16(de_reg), z80_get_reg16(hl_reg), 
-        z80_get_reg16(ix_reg), z80_get_reg16(iy_reg), sp, get_word(sp));
+        z80_get_reg16(ix_reg), z80_get_reg16(iy_reg), sp, get_word(sp), get_word(sp+2), get_word(sp+4));
 }
 
 /*
@@ -912,6 +915,25 @@ dump_cmd(char **p)
     return 0;
 }
 
+/*
+ * we do something gnarly here:  we'll call the instruction formatter to find out how many bytes are used
+ * by this instruction, and put a temporary breakpoint just after it.
+ */
+int
+next_cmd(char **sp)
+{
+    char outbuf[40];
+    word pc;
+    int i;
+
+    pc = z80_get_reg16(pc_reg);
+
+    i = format_instr(pc, outbuf, &get_byte, &lookup_sym, &reloc);
+    next_break = pc + i;
+
+    return 1;
+}
+
 int
 step_cmd(char **sp)
 {
@@ -988,6 +1010,7 @@ struct moncmd moncmds[MONCMDS] = {
     { 'b', "[-][<addr>] [...]\tadd or delete breakpoint", break_cmd },
     { 'd', " [addr]\tdump memory", dump_cmd },
     { 's', " [inst count]\tstep", step_cmd },
+    { 'n', "\tstep over", next_cmd },
     { 'g', " [address]\tgo", go_cmd },
     { 'r', "\tdump registers", regs_cmd },
     { 't', "trace\tset trace", trace_cmd },
@@ -1202,6 +1225,7 @@ main(int argc, char **argv)
      * the main emulation loop
      */
     while (1) {
+        word pc = z80_get_reg16(pc_reg);
 
         /*
          * run the driver poll hooks
@@ -1213,11 +1237,15 @@ main(int argc, char **argv)
                 break;
             }
         }
-        if (breakpoint_at(z80_get_reg16(pc_reg))) {
+        if (next_break == pc) {
+            inst_countdown = 0;
+            next_break = -1;
+        }
+        if (breakpoint_at(pc)) {
             printf("breakpoint\n");
             inst_countdown = 0;
         }
-        if ((trace & trace_inst) || (inst_countdown == 0)) {
+        if ((trace & trace_inst) || (inst_countdown == 0) || ((trace & trace_symbols) && lookup_sym(pc))) {
             dumpcpu();
         }
         if (inst_countdown == 0) {

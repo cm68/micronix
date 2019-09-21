@@ -81,7 +81,7 @@ static struct djcmd {
     { 0x20, 5, 4, readsec, "read sector" },
     { 0x21, 5, 4, writesec, "write sector" },
     { 0x22, 6, 5, sense, "sense drive status" },
-    { 0x24, 0, 0, setintr, "set interrupt request" },
+    { 0x24, 0, 1, setintr, "set interrupt request" },
     { 0x28, 2, 0, setretry, "set error retry count" },
     { 0x2e, 3, 2, setdrive, "set logical drive" },
     { 0x2f, 2, 0, settiming, "set drive timing" },
@@ -189,9 +189,8 @@ pulse_djdma(portaddr p, byte v)
     if (need_intack) {
         /*
          * if the last command was setintr, we are still "running" that command
-         * until we get this pulse.  fill in the status and advance
+         * until we get this pulse.  just advance the channel, since we already posted the status.
          */
-        physwrite(channel + 1, S_NORMAL);
         channel += 2;
         need_intack = 0;
         set_interrupt(DJDMA_INTERRUPT, int_clear);
@@ -318,15 +317,17 @@ readsec()
     return status;
 }
 
+#ifdef DELAYED_DJINT
 static void
 post_djdma_int()
 {
     set_interrupt(DJDMA_INTERRUPT, int_set);
 }
+#endif
 
 /*
  * generate an interrupt.  the next output pulse is an intack, and does
- * not start the channel.
+ * not start the channel.  the doc is definitely ambiguous, but we generate the status immediately.
  */
 static unsigned char
 setintr()
@@ -334,8 +335,12 @@ setintr()
     need_intack = 1;
     djdma_running = 0;
     if (trace & trace_djdma) printf("\tsetintr\n");
-    timeout(DJDMA_INT_DELAY, post_djdma_int);
-    return 0;
+#ifdef DELAYED_DJINT
+    timeout("djdma_setintr", DJDMA_INT_DELAY, post_djdma_int);
+#else
+    set_interrupt(DJDMA_INTERRUPT, int_set);
+#endif
+    return S_NORMAL;
 }
 
 /*
