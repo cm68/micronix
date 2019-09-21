@@ -40,7 +40,7 @@
 #define FPU         0xc00       // 9511/9512
 #define LOCAL       0x1000      // everything below here is on board
 
-static int_level int_s100;      // the actual interrupt line on the bus
+int_level int_s100;      // the actual interrupt line on the bus
 
 /*
  * mpz80 cpu registers and local ram
@@ -249,6 +249,7 @@ void
 interrupt_check()
 {
     if (int_s100 == int_clear) {
+        int_pin = int_clear;
         return;
     }
     if (taskreg & 0xf) {
@@ -526,11 +527,7 @@ mpz80_intr(int_line signal, int_level level)
             (level == int_set) ? "set" : "clear");
     } 
     int_s100 = level;
-
-    // there are a number of times when we delay the interrupt or do something special.
-    if (level == int_set) {
-        interrupt_check();
-    }
+    interrupt_check();
 }
 
 intvec
@@ -574,7 +571,7 @@ register_mpz80_driver()
     register_prearg_hook(mpz80_init);
     register_startup_hook(mpz80_startup);
     register_usage_hook(mpz80_usage);
-    register_mon_cmd('m', "[task]\tdump memory map\n", map_cmd);
+    register_mon_cmd('m', "[task]\tdump memory map", map_cmd);
 }
 
 
