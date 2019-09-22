@@ -36,6 +36,7 @@ int trace_noclock;
  * there's one of these for every ACE.
  */
 struct ace {
+    char *name;
     int outfd;
     int infd;
     byte lcr;           // line control
@@ -84,6 +85,16 @@ struct ace {
 #define     INTI_RDAV   0x4     // rx char available
 #define     INTI_TXE    0x2     // tx buffer empty
 #define     INTI_MDM    0x0     // modem status change
+
+// modem status
+#define MSR_DCTS    0x01
+#define MSR_DDSR    0x02
+#define MSR_TERI    0x04
+#define MSR_DDCD    0x08
+#define MSR_CTS     0x10
+#define MSR_DSR     0x20
+#define MSR_RI      0x40
+#define MSR_DCD     0x80
 
 // group select             base + 7    0x4f
 #define GROUP_MASK  0x03    
@@ -379,12 +390,11 @@ uart_interrupt_check(struct ace *ap)
 {
     int bytes;
 
+    ioctl(ap->infd, FIONREAD, &bytes);
+
     ap->inti = INTI_NOINT;
-    if (ap->inte & INTE_RDAV) {
-        ioctl(ap->infd, FIONREAD, &bytes);
-        if (bytes) {
-            ap->inti = INTI_RDAV;
-        }
+    if ((ap->inte & INTE_RDAV) && bytes) {
+        ap->inti = INTI_RDAV;
     } else if (ap->inte & INTE_TXE) {
         ap->inti = INTI_TXE;
     }
@@ -393,6 +403,12 @@ uart_interrupt_check(struct ace *ap)
     } else {
         set_interrupt(ap->vector, int_set);
     }
+}
+
+static void
+ace_init(struct ace *ap)
+{
+    ap->msr = MSR_CTS | MSR_DSR /* | MSR_RI */ | MSR_DCD;
 }
 
 /*
@@ -412,7 +428,7 @@ rd_rxb(portaddr p)
     }
     if (acep->mcr & MCR_LOOP) {
         if (!acep->loop) {
-            if (trace & trace_uart) printf("uart: read unwritten loopback\n");
+            if (trace & trace_uart) printf("%s: read unwritten loopback\n", acep->name);
         }
         acep->loop = 0;
         retval = acep->loopc;
@@ -422,7 +438,7 @@ rd_rxb(portaddr p)
         ioctl(acep->infd, FIONREAD, &bytes);
         if (bytes) {
             if (read(acep->infd, &retval, 1) != 1) {
-                if (trace & trace_uart) printf("uart: rd_rxb failed\n");
+                if (trace & trace_uart) printf("%s: rd_rxb failed\n", acep->name);
             }
         } else {
             retval = 0;
@@ -432,7 +448,7 @@ rd_rxb(portaddr p)
     uart_interrupt_check(acep);
 
     if (trace & trace_uart) {
-        printf("uart: read rxb = %s%s\n",
+        printf("%s: read rxb = %s%s\n", acep->name,
             acep->mcr & MCR_LOOP ? "(loopback) " : "", printable(retval));
     }
     return retval;
@@ -456,7 +472,7 @@ wr_txb(portaddr p, byte v)
         write(acep->outfd, &v, 1);
     }
     if (trace & trace_uart) {
-        printf("uart: write txb %s%s\n", 
+        printf("%s: write txb %s%s\n", acep->name,
             acep->mcr & MCR_LOOP ? "(loopback) " : "", printable(v));
     }
 }
@@ -473,7 +489,7 @@ rd_inte(portaddr p)
         return acep->dlm;
     }
     if (trace & trace_uart) {
-        printf("uart: read inte %x %s\n", acep->inte, bitdef(acep->inte, inte_bits));
+        printf("%s: read inte %x %s\n", acep->name, acep->inte, bitdef(acep->inte, inte_bits));
     }
     return acep->inte;
 }
@@ -487,8 +503,9 @@ wr_inte(portaddr p, byte v)
     }
     acep->inte = v;
     if (trace & trace_uart) {
-        printf("uart: write inte %x %s\n", v, bitdef(v, inte_bits));
+        printf("%s: write inte %x %s\n", acep->name, acep->inte, bitdef(acep->inte, inte_bits));
     }
+    uart_interrupt_check(acep);
 }
 
 /*
@@ -500,7 +517,7 @@ static byte
 rd_lcr(portaddr p)
 {
     if (trace & trace_uart) {
-        printf("uart: read lcr %x %s\n", acep->lcr, bitdef(acep->lcr, lcr_bits));
+        printf("%s: read lcr %x %s\n", acep->name, acep->lcr, bitdef(acep->lcr, lcr_bits));
     }
     return acep->lcr;
 }
@@ -510,7 +527,7 @@ wr_lcr(portaddr p, byte v)
 {
     acep->lcr = v;
     if (trace & trace_uart) {
-        printf("uart: write lcr %x %s\n", acep->lcr, bitdef(acep->lcr, lcr_bits));
+        printf("%s: write lcr %x %s\n", acep->name, acep->lcr, bitdef(acep->lcr, lcr_bits));
     }
 }
 
@@ -532,7 +549,7 @@ rd_lsr(portaddr p)
     acep->lsr |= LSR_TXE | (bytes ? LSR_DR : 0);
 
     if (trace & trace_uart) {
-        printf("uart: read linestat %x %s\n", acep->lsr, bitdef(acep->lsr, lsr_bits));
+        printf("%s: read linestat %x %s\n", acep->name, acep->lsr, bitdef(acep->lsr, lsr_bits));
     }
     return acep->lsr;
 }
@@ -541,7 +558,7 @@ rd_lsr(portaddr p)
 static void
 wr_lsr(portaddr p, byte v)
 {
-    if (trace & trace_uart) printf("uart: write linestat %x %s\n", v, bitdef(v, lsr_bits));
+    if (trace & trace_uart) printf("%s: write linestat %x %s\n", acep->name, v, bitdef(v, lsr_bits));
 }
 
 /*
@@ -553,7 +570,7 @@ static byte
 rd_mcr(portaddr p)
 {
     if (trace & trace_uart) {
-        printf("uart: read mdmctl %x %s\n", acep->mcr, bitdef(acep->mcr, mcr_bits));
+        printf("%s: read mdmctl %x %s\n", acep->name, acep->mcr, bitdef(acep->mcr, mcr_bits));
     }
     return acep->mcr;
 }
@@ -567,7 +584,7 @@ wr_mcr(portaddr p, byte v)
     }
     acep->mcr = v;
     if (trace & trace_uart) {
-        printf("uart: write mdmctl %x %s\n", acep->mcr, bitdef(acep->mcr, mcr_bits));
+        printf("%s: write mdmctl %x %s\n", acep->name, acep->mcr, bitdef(acep->mcr, mcr_bits));
     }
 }
 
@@ -583,9 +600,9 @@ static byte
 rd_inti(portaddr p)
 {
     if (trace & trace_uart) {
-        printf("uart: read inti\n");
+        printf("%s: read inti %x\n", acep->name, acep->inti);
     }
-    return 0;
+    return acep->inti;
 }
 
 static char *msr_bits[] = { "DCTS", "DDSR", "TERI", "DDCD", "CTS", "DSR", "RI", "DCD" };
@@ -593,9 +610,9 @@ static byte
 rd_msr(portaddr p)
 {
     if (trace & trace_uart) {
-        printf("uart: read mdmstat %x %s\n", acep->msr, bitdef(acep->msr, msr_bits));
+        printf("%s: read mdmstat %x %s\n", acep->name, acep->msr, bitdef(acep->msr, msr_bits));
     }
-    return 0;
+    return acep->msr;
 }
 
 // it is unclear from the chip doc what happens when you write this register
@@ -605,7 +622,7 @@ wr_msr(portaddr p, byte v)
     acep->msr = v;
 
     if (trace & trace_uart) {
-        printf("uart: write mdmstat %x %s\n", acep->msr, bitdef(acep->msr, msr_bits));
+        printf("%s: write mdmstat %x %s\n", acep->name, acep->msr, bitdef(acep->msr, msr_bits));
     }
 }
 
@@ -941,6 +958,12 @@ multio_init()
         if (termmask & (1 << i)) {
             sprintf(tname, "multio-%d", i);
             open_terminal(tname, SIGIO, &ace[i].infd, &ace[i].outfd, 0, 0);
+            sprintf(tname, "uart%d", i);
+            ace_init(&ace[i]);
+            ace[i].name = strdup(tname);
+            reg_intbit(vi_3 + i, ace[i].name);
+            register_interrupt(vi_3 + i, vi_handler);
+            ace[i].vector = vi_3 + i;
         }
     }
 
@@ -953,21 +976,6 @@ multio_init()
     reg_intbit(vi_7, "clock");
     register_interrupt(vi_0, vi_handler);               // hdca and hddma
     register_interrupt(vi_1, vi_handler);               // djdma
-    if (ace[0].infd != -1) {
-        reg_intbit(vi_3, "uart1");
-        register_interrupt(vi_3, vi_handler);
-        ace[0].vector = vi_3;
-    }
-    if (ace[1].infd != -1) {
-        reg_intbit(vi_4, "uart2");
-        register_interrupt(vi_4, vi_handler);
-        ace[1].vector = vi_4;
-    }
-    if (ace[2].infd != -1) {
-        reg_intbit(vi_5, "uart3");
-        register_interrupt(vi_5, vi_handler);
-        ace[2].vector = vi_4;
-    }
     register_interrupt(vi_7, vi_handler);               // clock
 
     register_intvec(multio_intvec);
