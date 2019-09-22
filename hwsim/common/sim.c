@@ -88,7 +88,7 @@ struct {
 } ;
 
 volatile int inst_countdown = -1;
-int next_break;
+int next_break = -1;
 
 int stops[10];
 
@@ -395,6 +395,23 @@ int rom_size;
 int config_sw = 0;
 
 /*
+ * linux signal() is too flaky to even comtemplate.
+ */
+sighandler_t
+mysignal(int signum, sighandler_t handler)
+{
+    struct sigaction new;
+    struct sigaction old;
+
+    new.sa_handler = handler;
+    new.sa_flags = SA_RESTART;
+    sigemptyset(&new.sa_mask);
+
+    sigaction(signum, &new, &old);
+    return (old.sa_handler);
+}
+
+/*
  * various things in the simulator will want to have timers popping and getting
  * callouts.  linux has a create_timer facility for this, which is hugely
  * complicated and non-portable.  screw that.  setitimer/sigalarm it is.
@@ -446,7 +463,7 @@ timeout_sched()
         timersub(&tv, &now, &timer.it_value);
         setitimer(ITIMER_REAL, &timer, 0);
         if (trace & trace_timer) printf("arming itimer\n");
-        signal(SIGALRM, timeout_handler);
+        mysignal(SIGALRM, timeout_handler);
     } else {
         timer.it_value.tv_sec = timer.it_value.tv_usec = 0;
         setitimer(ITIMER_REAL, &timer, 0);
@@ -1151,6 +1168,7 @@ main(int argc, char **argv)
         }
         setvbuf(stdout, 0, _IONBF, 0);
     } else {
+        inst_countdown = -1;
         stdout = freopen(LOGFILE, "w+", stdout);
         if (!stdout) {
             perror("lose");
@@ -1169,7 +1187,7 @@ main(int argc, char **argv)
         printf("\n");
     }
 
-    signal(SIGUSR1, stop_handler);
+    mysignal(SIGUSR1, stop_handler);
 
     setup_sim_ports();
     z80_init();

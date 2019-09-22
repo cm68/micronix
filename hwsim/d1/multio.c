@@ -30,62 +30,74 @@ int trace_multio;
 int trace_uart;
 int trace_noclock;
 
-struct terminal {
+#define HZ_1    0x800
+
+/*
+ * there's one of these for every ACE.
+ */
+struct ace {
     int outfd;
     int infd;
-} terminals[3];
+    byte lcr;           // line control
+    byte lsr;           // line status register
+    byte mcr;           // modem control character
+    byte msr;           // modem status character
+    byte dll;           // baud rate lo
+    byte dlm;           // baud rate hi
+    byte inte;          // interrupt enables
+    byte loop;          // loopback count 
+    byte loopc;         // loopback character
+    byte inti;          // interrupt id
+    int_line vector;    // assert when something happens
+} ace[3];
 
 #define	MULTIO_PORT	0x48	// multio standard port
 
-/*
- * the multio select port is used to enable one of 4 groups and other functions
- */
-#define GROUP_MASK  0x03
-#define MEM_BANK    0x04
-#define INTENA      0x08
-#define PREST       0x10
-#define PAROUT      0x20
-
-#define GRP0        0x00    // pports, clock, pic
-#define GRP1        0x01    // serial 1
-#define GRP2        0x02    // serial 2
-#define GRP3        0x03    // serial 3
-
-// linestat
+// linestat                 base + 5    0x4d
 #define LSR_DR      0x01    // input data ready
 #define LSR_OVER    0x02    // input data overrun
 #define LSR_PERR    0x04    // input parity error
 #define LSR_FERR    0x08    // input framing error
 #define LSR_BRK     0x10    // break
-#define LSR_TBE     0x20    // transmit buffer empty
+#define LSR_TXE     0x20    // transmit buffer empty
 #define LSR_TE      0x40    // transmitter empty
 
-// modem control register
+// modem control            base + 4    0x4c
 #define MCR_DTR     0x01    // data terminal ready
 #define MCR_RTS     0x02    // request to send
 #define MCR_LOOP    0x10    // loopback
 
-// line control register
+// line control             base + 3    0x4b
 #define LCR_82      0x07    // 8 data bits, 2 stop bits
 #define LCR_DLAB    0x80    // accessio baud in inte, txb
 
-// interrupt enable register
+// interrupt enable         base + 1    0x49
 #define INTE_RDAV   0x01    // read available
 #define INTE_TXE    0x02    // tx hold empty
 #define INTE_RLINE  0x04    // read line status change
 #define INTE_MDM    0x08    // modem status change
 
-static byte group;
+// interrupt identify       base + 2    0x4a
+#define INTI_NOINT  0x01    // no interrupt
+#define INTI_MASK   0x06    // mask of interrupt causes
+#define     INTI_RSTAT  0x6     // reciever status
+#define     INTI_RDAV   0x4     // rx char available
+#define     INTI_TXE    0x2     // tx buffer empty
+#define     INTI_MDM    0x0     // modem status change
 
-/* read/write baud rate */
-static byte dlab[3];
-static byte dll[3];
-static byte dlm[3];
-static byte inte[3];
-static byte loop[3];        // has a character been written to loopback
-static byte loopc[3];       // if so, what is it
-static byte mcr[3];
-static byte lcr[3];
+// group select             base + 7    0x4f
+#define GROUP_MASK  0x03    
+#define MEM_BANK    0x04
+#define INTENA      0x08
+#define PREST       0x10
+#define PAROUT      0x20
+#define GRP0        0x00    // pports, clock, pic
+#define GRP1        0x01    // serial 1
+#define GRP2        0x02    // serial 2
+#define GRP3        0x03    // serial 3
+
+static byte group;
+static struct ace *acep;
 
 char *
 printable(char v)
@@ -357,89 +369,244 @@ multio_intvec()
     return (iv);
 }
 
+/*
+ * set the state of the interrupt line appropriately conditioned on enable bits
+ * these are prioritized
+ * we only implement TXE and RDAV.
+ */
+void
+uart_interrupt_check(struct ace *ap)
+{
+    int bytes;
+
+    ap->inti = INTI_NOINT;
+    if (ap->inte & INTE_RDAV) {
+        ioctl(ap->infd, FIONREAD, &bytes);
+        if (bytes) {
+            ap->inti = INTI_RDAV;
+        }
+    } else if (ap->inte & INTE_TXE) {
+        ap->inti = INTI_TXE;
+    }
+    if (ap->inti == INTI_NOINT) {
+        set_interrupt(ap->vector, int_clear);
+    } else {
+        set_interrupt(ap->vector, int_set);
+    }
+}
+
+/*
+ * recieve buffer.  
+ * the selftest uses the loopback function, so we need to handle it.
+ * while loopback is set in the mcr, then we return any character written to txb.
+ * if LCR_DLAB is set, access to lsb of baud rate divisor
+ */
 static byte 
-rd_rxb(portaddr p)
+rd_rxb(portaddr p) 
 {
     byte retval;
     int bytes;
 
-    if (dlab[group - 1]) {
-        return dll[group - 1];
+    if (acep->lcr & LCR_DLAB) {
+        return acep->dll;
     }
-    if (mcr[group - 1] & MCR_LOOP) {
-        if (!loop[group - 1]) {
+    if (acep->mcr & MCR_LOOP) {
+        if (!acep->loop) {
             if (trace & trace_uart) printf("uart: read unwritten loopback\n");
         }
-        loop[group - 1] = 0;
-        retval = loopc[group - 1];
+        acep->loop = 0;
+        retval = acep->loopc;
+    } else if (acep->infd == -1) {
+        retval = 0;
     } else {
-        ioctl(terminals[group - 1].infd, FIONREAD, &bytes);
+        ioctl(acep->infd, FIONREAD, &bytes);
         if (bytes) {
-            if (read(terminals[group - 1].infd, &retval, 1) != 1) {
+            if (read(acep->infd, &retval, 1) != 1) {
                 if (trace & trace_uart) printf("uart: rd_rxb failed\n");
             }
         } else {
             retval = 0;
         }
     }
-    if (trace & trace_uart) printf("uart: read rxb = %s\n", printable(retval));
+    // if we set a read interrupt, maybe clear it
+    uart_interrupt_check(acep);
+
+    if (trace & trace_uart) {
+        printf("uart: read rxb = %s%s\n",
+            acep->mcr & MCR_LOOP ? "(loopback) " : "", printable(retval));
+    }
     return retval;
 }
 
+/*
+ * transmitter buffer
+ * if LCR_DLAB is set, access to lsb of baud rate divisor
+ */
+static void
+wr_txb(portaddr p, byte v) 
+{
+    if (acep->lcr & LCR_DLAB) {
+        acep->dll = v;
+        return;
+    }
+    if (acep->mcr & MCR_LOOP) {
+        acep->loopc = v;
+        acep->loop = 1;
+    } else if (acep->outfd != -1) {
+        write(acep->outfd, &v, 1);
+    }
+    if (trace & trace_uart) {
+        printf("uart: write txb %s%s\n", 
+            acep->mcr & MCR_LOOP ? "(loopback) " : "", printable(v));
+    }
+}
+
+/*
+ * interrupt enable register
+ * if LCR_DLAB is set, access to msb of baud rate divisor
+ */
+static char *inte_bits[] = { "READAVAIL", "TXHOLDEMPTY", "RLINESTAT", "MDMSTAT", 0, 0, 0, 0 };
 static byte 
 rd_inte(portaddr p)
 {
-    if (dlab[group - 1]) {
-        return dlm[group - 1];
+    if (acep->lcr & LCR_DLAB) {
+        return acep->dlm;
     }
-    if (trace & trace_uart) printf("uart: read inte\n");
-    return 0;
+    if (trace & trace_uart) {
+        printf("uart: read inte %x %s\n", acep->inte, bitdef(acep->inte, inte_bits));
+    }
+    return acep->inte;
 }
 
+static void
+wr_inte(portaddr p, byte v)
+{
+    if (acep->lcr & LCR_DLAB) {
+        acep->dlm = v;
+        return;
+    }
+    acep->inte = v;
+    if (trace & trace_uart) {
+        printf("uart: write inte %x %s\n", v, bitdef(v, inte_bits));
+    }
+}
+
+/*
+ * line control register
+ * contains the divisor access bit that changes the meaning of txb,rxb,and inte
+ */
+static char *lcr_bits[] = { "WLS0", "WLS1", "STB", "PEN", "EPS", "STP", "SBRK", "DLAB" };
+static byte 
+rd_lcr(portaddr p)
+{
+    if (trace & trace_uart) {
+        printf("uart: read lcr %x %s\n", acep->lcr, bitdef(acep->lcr, lcr_bits));
+    }
+    return acep->lcr;
+}
+
+static void
+wr_lcr(portaddr p, byte v)
+{
+    acep->lcr = v;
+    if (trace & trace_uart) {
+        printf("uart: write lcr %x %s\n", acep->lcr, bitdef(acep->lcr, lcr_bits));
+    }
+}
+
+/*
+ * line status register.
+ */
+char *lsr_bits[] = { "DR" , "OVER", "PERR", "FERR", "BRK", "TXE", "TE", 0 };
+static byte 
+rd_lsr(portaddr p)
+{
+    int bytes = 0;
+
+    if (acep->mcr & MCR_LOOP) {
+        bytes = acep->loop;
+    } else if (acep->infd != -1) {
+        ioctl(acep->infd, FIONREAD, &bytes);
+    }
+    acep->lsr = 0;
+    acep->lsr |= LSR_TXE | (bytes ? LSR_DR : 0);
+
+    if (trace & trace_uart) {
+        printf("uart: read linestat %x %s\n", acep->lsr, bitdef(acep->lsr, lsr_bits));
+    }
+    return acep->lsr;
+}
+
+// the chip docs say this register is not well defined for write.
+static void
+wr_lsr(portaddr p, byte v)
+{
+    if (trace & trace_uart) printf("uart: write linestat %x %s\n", v, bitdef(v, lsr_bits));
+}
+
+/*
+ * modem control register.
+ * contains the loopback enable
+ */
+static char *mcr_bits[] = { "DTR", "RTS", "OUT1", "OUT2", "LOOP", 0, 0, 0 };
+static byte 
+rd_mcr(portaddr p)
+{
+    if (trace & trace_uart) {
+        printf("uart: read mdmctl %x %s\n", acep->mcr, bitdef(acep->mcr, mcr_bits));
+    }
+    return acep->mcr;
+}
+
+static void
+wr_mcr(portaddr p, byte v)
+{
+    // if a new set of loopback
+    if ((v & MCR_LOOP) && !(acep->mcr & MCR_LOOP)) {
+        acep->loop = 0;
+    }
+    acep->mcr = v;
+    if (trace & trace_uart) {
+        printf("uart: write mdmctl %x %s\n", acep->mcr, bitdef(acep->mcr, mcr_bits));
+    }
+}
+
+/*
+ * the interrupt identify register indicates which interrupt causes are pending
+ * each of the 4 interrupts are reset differently: (in order)
+ * 110 - reciever line error or break  - read the lsr
+ * 100 - reciever data available - read the rxd
+ * 010 - transmitter buffer empty - writing the tx or reading this cause from inti
+ * 000 - CTS, DSR, RI, DCD - read msr
+ */
 static byte 
 rd_inti(portaddr p)
 {
-    if (trace & trace_uart) printf("uart: read inti\n");
-    return 0;
-}
-
-static byte 
-rd_linectl(portaddr p)
-{
-    if (trace & trace_uart) printf("uart: read linectl\n");
-    return 0;
-}
-
-static byte 
-rd_mdmctl(portaddr p)
-{
-    if (trace & trace_uart) printf("uart: read mdmctl\n");
-    return 0;
-}
-
-char *ls_bits[] = { "DR" , "OVER", "PERR", "FERR", "BRK", "TBE", "TE", 0 };
-static byte 
-rd_linestat(portaddr p)
-{
-    int bytes = 0;
-    byte retval;
-
-    if (mcr[group - 1] & MCR_LOOP) {
-        bytes = loop[group - 1];
-    } else {
-        ioctl(terminals[group - 1].infd, FIONREAD, &bytes);
+    if (trace & trace_uart) {
+        printf("uart: read inti\n");
     }
-
-    retval = LSR_TBE | (bytes ? LSR_DR : 0);
-    if (trace & trace_uart) printf("uart: read linestat %x %s\n", retval, bitdef(retval, ls_bits));
-    return retval;
+    return 0;
 }
 
+static char *msr_bits[] = { "DCTS", "DDSR", "TERI", "DDCD", "CTS", "DSR", "RI", "DCD" };
 static byte 
-rd_mdmstat(portaddr p)
+rd_msr(portaddr p)
 {
-    if (trace & trace_uart) printf("uart: read mdmstat\n");
+    if (trace & trace_uart) {
+        printf("uart: read mdmstat %x %s\n", acep->msr, bitdef(acep->msr, msr_bits));
+    }
     return 0;
+}
+
+// it is unclear from the chip doc what happens when you write this register
+static void 
+wr_msr(portaddr p, byte v)
+{
+    acep->msr = v;
+
+    if (trace & trace_uart) {
+        printf("uart: write mdmstat %x %s\n", acep->msr, bitdef(acep->msr, msr_bits));
+    }
 }
 
 /*
@@ -455,7 +622,7 @@ rd_mdmstat(portaddr p)
 #define     CC_64HZ     0x10
 #define     CC_256HZ    0x14
 #define     CC_2kKHZ    0x18
-#define     CC_32HZ     0x1c
+#define     CC_32HZ     0x1c    // really test mode
 #define CLK_SETCMD  0x20    // strobe the command
 
 #define  bcd(h,l)    ((((h) & 0xf) << 4) | ((l) & 0xf))
@@ -523,9 +690,12 @@ wr_clock(portaddr p, byte v)
         case CC_2kKHZ:
             rate = 2048;
             break;
-        case CC_32HZ:
+        case CC_32HZ:           // test mode in the real chip. tricky.
             rate = 32;
             break;
+        }
+        if ((config_sw & CONF_SET) && (config_sw & HZ_1)) {
+            rate = 1;
         }
         if (rate != 0) {
             if (!(trace & trace_noclock)) {
@@ -554,69 +724,6 @@ rd_clock(portaddr p)
     v = (rtc[rtcptr / 8] >> (rtcptr % 8)) & 1;
     if (trace & trace_multio) printf("multio: read clock %x\n", v);
     return v;
-}
-
-static void
-wr_txb(portaddr p, byte v)
-{
-    if (dlab[group - 1]) {
-        dll[group - 1] = v;
-        return;
-    }
-    if (mcr[group - 1] & MCR_LOOP) {
-        loopc[group - 1] = v;
-        loop[group - 1] = 1;
-    } else {
-        write(terminals[group - 1].outfd, &v, 1);
-    }
-    if (trace & trace_uart) printf("uart: write txb %s\n", printable(v));
-}
-
-static char *w_inte_bits[] = { "READAVAIL", "TXHOLDEMPTY", "RLINESTAT", "MDMSTAT", 0, 0, 0, 0 };
-
-static void
-wr_inte(portaddr p, byte v)
-{
-    if (dlab[group - 1]) {
-        dlm[group - 1] = v;
-        return;
-    }
-    if (trace & trace_uart) {
-        printf("uart: write inte %x %s\n", v, bitdef(v, w_inte_bits));
-    }
-}
-
-static char *w_linec_bits[] = { "WLS0", "WLS1", "STB", "PEN", "EPS", "STP", "SBRK", "DLAB" };
-
-static void
-wr_linectl(portaddr p, byte v)
-{
-    if (v & LCR_DLAB) {
-        dlab[group - 1] = 1;
-    } else {    
-        dlab[group - 1] = 0;
-    }
-    if (trace & trace_uart) printf("uart: write linectl %x %s\n", v, bitdef(v, w_linec_bits));
-}
-
-static char *w_lines_bits[] = { "DR", "OE", "PE", "FE", "BI", "THRE", "TEMT", 0 };
-
-static void
-wr_linestat(portaddr p, byte v)
-{
-    if (trace & trace_uart) printf("uart: write linestat %x %s\n", v, bitdef(v, w_lines_bits));
-}
-
-static char *w_mdmc_bits[] = { "DTR", "RTS", "OUT1", "OUT2", "LOOP", 0, 0, 0 };
-
-static void
-wr_mdmctl(portaddr p, byte v)
-{
-    if ((v & MCR_LOOP) && !(mcr[group - 1] & MCR_LOOP)) {
-        loop[group - 1] = 0;
-    }
-    mcr[group - 1] = v;
-    if (trace & trace_uart) printf("uart: write mdmctl %x %s\n", v, bitdef(v, w_mdmc_bits));
 }
 
 static byte
@@ -654,7 +761,7 @@ undef_outreg(portaddr p, byte v)
     if (trace & trace_multio) printf("multio: write 0x%x to undefined %x+%x\n", v, MULTIO_PORT, p - MULTIO_PORT);
 }
 
-static char *gsel_bits[] = { 0, 0, "membank", "intena", "printreset", "parstb", 0, 0 };
+static char *group_bits[] = { 0, 0, "membank", "intena", "printreset", "parstb", 0, 0 };
 
 /*
  * write the port select register
@@ -669,13 +776,14 @@ multio_select(portaddr p, byte v)
     if (group == lastgroup)
         return;
 
-    if (trace & trace_multio) printf("multio: write group select %x %s\n", group, bitdef(v, gsel_bits));
-
-
     lastgroup = group;
 
+    if (trace & trace_multio) {
+        printf("multio: write group select %x %s\n", group, bitdef(v, group_bits));
+    }
+
     switch (group) {
-    case 0:
+    case GRP0:  // parallel port, clock, pic
         register_input(MULTIO_PORT + 0, &rd_daisy);
         register_input(MULTIO_PORT + 1, &undef_inreg);
         register_input(MULTIO_PORT + 2, &rd_clock);
@@ -692,36 +800,28 @@ multio_select(portaddr p, byte v)
         register_output(MULTIO_PORT + 5, &wr_pic_port_1);
         register_output(MULTIO_PORT + 6, &undef_outreg);
         break; 
-    case 1:
-    case 2:
-    case 3:
+    case GRP1:  // serial ports
+    case GRP2:
+    case GRP3:
+        acep = &ace[group - 1];
         register_input(MULTIO_PORT + 0, &rd_rxb);
         register_input(MULTIO_PORT + 1, &rd_inte);
         register_input(MULTIO_PORT + 2, &rd_inti);
-        register_input(MULTIO_PORT + 3, &rd_linectl);
-        register_input(MULTIO_PORT + 4, &rd_mdmctl);
-        register_input(MULTIO_PORT + 5, &rd_linestat);
-        register_input(MULTIO_PORT + 6, &rd_mdmstat);
+        register_input(MULTIO_PORT + 3, &rd_lcr);
+        register_input(MULTIO_PORT + 4, &rd_mcr);
+        register_input(MULTIO_PORT + 5, &rd_lsr);
+        register_input(MULTIO_PORT + 6, &rd_msr);
 
         register_output(MULTIO_PORT + 0, &wr_txb);
         register_output(MULTIO_PORT + 1, &wr_inte);
         register_output(MULTIO_PORT + 2, &undef_outreg);
-        register_output(MULTIO_PORT + 3, &wr_linectl);
-        register_output(MULTIO_PORT + 4, &wr_mdmctl);
-        register_output(MULTIO_PORT + 5, &undef_outreg);
-        register_output(MULTIO_PORT + 6, &undef_outreg);
+        register_output(MULTIO_PORT + 3, &wr_lcr);
+        register_output(MULTIO_PORT + 4, &wr_mcr);
+        register_output(MULTIO_PORT + 5, &wr_lsr);
+        register_output(MULTIO_PORT + 6, &wr_msr);
         break;
     }
 }
-
-/*
-psend(char *s)
-{
-    while (*s) {
-        wr_txb(0, *s++);
-    }
-}
-*/
 
 int terminal_fd_in;
 int terminal_fd_out;
@@ -747,18 +847,12 @@ void
 sigio_handler(int sig)
 {
     int i;
-    int chars;
  
     for (i = 0; i < 3; i++) {
-        if (terminals[i].infd == -1) {
+        if (ace[i].infd == -1) {
             continue;
         }
-        if (inte[i] & INTE_RDAV) {
-            ioctl(terminals[i].infd, FIONREAD, &chars);
-            if (chars) {
-                set_interrupt(vi_3 + i, int_set);
-            }
-        }
+        uart_interrupt_check(&ace[i]);
     }
 }
 
@@ -774,14 +868,18 @@ multio_init()
     atexit(exit_hook);
 
     for (i = 0; i < 3; i++) {
-        terminals[i].infd = -1;
+        ace[i].infd = -1;
     }
 
     if (config_sw & CONF_SET) {
         termmask = (config_sw >> 8) & 0x7;
     }
 
-    signal(SIGIO, sigio_handler);
+    mysignal(SIGIO, sigio_handler);
+
+    for (i = 0; i < 3; i++) {
+        ace[i].infd = ace[i].outfd = -1;
+    }
 
     // if terminal 0 is not an xterm, use mytty - this requires poll child to get SIGIO
     if (!(termmask & 0x1)) {
@@ -834,41 +932,56 @@ multio_init()
                 }
             }
         }
-        terminals[0].infd = pipe_up[0];
-        terminals[0].outfd = pipe_down[1];
+        ace[0].infd = pipe_up[0];
+        ace[0].outfd = pipe_down[1];
     }
 
     // create xterms
     for (i = 0; i < 3; i++) {
         if (termmask & (1 << i)) {
             sprintf(tname, "multio-%d", i);
-            open_terminal(tname, SIGIO, &terminals[i].infd, &terminals[i].outfd, 0, 0);
+            open_terminal(tname, SIGIO, &ace[i].infd, &ace[i].outfd, 0, 0);
         }
     }
 
-    terminal_fd_in = terminals[0].infd;
-    terminal_fd_out = terminals[0].outfd;
+    terminal_fd_in = ace[0].infd;
+    terminal_fd_out = ace[0].outfd;
 
 	register_output(MULTIO_PORT+7, &multio_select);
     reg_intbit(vi_0, "hd");
     reg_intbit(vi_1, "djdma");
-    reg_intbit(vi_3, "uart1");
-    reg_intbit(vi_4, "uart2");
-    reg_intbit(vi_5, "uart3");
     reg_intbit(vi_7, "clock");
     register_interrupt(vi_0, vi_handler);               // hdca and hddma
     register_interrupt(vi_1, vi_handler);               // djdma
-    // register_interrupt(vi_2, vi_handler);               // unused
-    register_interrupt(vi_3, vi_handler);               // uart
-    register_interrupt(vi_4, vi_handler);               // uart
-    register_interrupt(vi_5, vi_handler);               // uart
-    // register_interrupt(vi_6, vi_handler);               // unused
+    if (ace[0].infd != -1) {
+        reg_intbit(vi_3, "uart1");
+        register_interrupt(vi_3, vi_handler);
+        ace[0].vector = vi_3;
+    }
+    if (ace[1].infd != -1) {
+        reg_intbit(vi_4, "uart2");
+        register_interrupt(vi_4, vi_handler);
+        ace[1].vector = vi_4;
+    }
+    if (ace[2].infd != -1) {
+        reg_intbit(vi_5, "uart3");
+        register_interrupt(vi_5, vi_handler);
+        ace[2].vector = vi_4;
+    }
     register_interrupt(vi_7, vi_handler);               // clock
 
     register_intvec(multio_intvec);
     register_mon_cmd('M', "\tdump multio state", multio_dump);
 
     return 0;
+}
+
+void
+multio_usage()
+{
+    printf("config switch values:\n");
+    printf("\t0x0700 - xterm tty enable mask\n");
+    printf("\t0x0800 - 1 hz clock\n");
 }
 
 /*
@@ -883,6 +996,7 @@ register_multio_driver()
     trace_multio = register_trace("multio");
     trace_uart = register_trace("uart");
     trace_noclock = register_trace("noclock");
+    register_usage_hook(multio_usage);
     register_startup_hook(multio_init);
 }
 
