@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "sim.h"
+
 static int npids;
 static int *pids;
 
@@ -46,6 +48,8 @@ open_terminal(char *name, int signum, int *in_p, int *out_p, int cooked, char *l
     char c;
     fd_set readfds;
     int fds;
+    char *args[30];
+    char **argp;
 
     pipe(pipe_up);
 
@@ -72,18 +76,27 @@ open_terminal(char *name, int signum, int *in_p, int *out_p, int cooked, char *l
 #endif
         if (logfile) {
             unlink(logfile);
-        } else {
-            logfile = "/dev/null";
         }
         
-        execlp("xterm", "xterm", 
-            "-T", name,
-            "-geometry", "120x40", 
-            "-fn", "8x13bold", 
-            "-l", "-lf", logfile,
-            "-e", "bash", 
-            "-c", cmd, 
-            (char *) 0);
+        argp = args;
+        *argp++ = "xterm";
+        *argp++ = "-T";
+        *argp++ = name;
+        *argp++ = "-geometry"; 
+        *argp++ = "120x40"; 
+        *argp++ = "-fn"; 
+        *argp++ = "8x13bold"; 
+        if (logfile) {
+            *argp++ = "-l"; 
+            *argp++ = "-lf"; 
+            *argp++ = logfile;
+        }
+        *argp++ = "-e"; 
+        *argp++ = "bash"; 
+        *argp++ = "-c"; 
+        *argp++ = cmd;
+        *argp++ = (char *) 0;
+        execvp("xterm", args);
     }
     ptyname = malloc(100);
     i = read(pipe_up[0], ptyname, 100);
@@ -156,6 +169,12 @@ int i2, o2;
 #define SIG1    SIGRTMIN+5
 #define SIG2    SIGRTMIN+6
 
+sighandler_t 
+mysignal(int signum, sighandler_t handler)
+{
+    return (signal(signum, handler));
+}
+
 void 
 sig_handler(int signum)
 {
@@ -183,8 +202,8 @@ int
 main(int argc, char **argv)
 {
 
-    signal(SIG1, sig_handler);
-    signal(SIG2, sig_handler);
+    mysignal(SIG1, sig_handler);
+    mysignal(SIG2, sig_handler);
 
     open_terminal("foo1", SIG1, &i1, &o1, 0, 0);
     open_terminal("foo2", SIG2, &i2, &o2, 0, 0);

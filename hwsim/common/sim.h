@@ -89,6 +89,10 @@ void timeout(char *name, int usec, void (*function)());
 void recurring_timeout(char *name, int hertz, void (*function)());
 void cancel_timeout(void (*function)());
 
+// linux freaking signal madness
+typedef void (*sighandler_t)(int);
+sighandler_t mysignal(int signum, sighandler_t handler);
+
 /*
  * global simulator variables
  */
