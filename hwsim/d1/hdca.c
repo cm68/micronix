@@ -14,7 +14,6 @@
 #define HDCA_INTERRUPT  vi_0        // same as hddma!
 
 byte int_state;
-byte last_int_state;
 
 #define INT_A   0x01    // driven by PSR_OPDONE and reset by new command
 #define INT_B   0x02    // driven by R1_SDONE and reset by input from intclr
@@ -128,6 +127,37 @@ static byte ssr;
 #define FUNC_HEAD       0xf0
 static byte func;
 
+void
+set_hd_interrupt(int is_hdca, int_level level)
+{
+    static int vector_line;
+    static int_level last_level;
+
+    if (is_hdca) {
+        if (level == int_set) {
+            vector_line |= 1;
+        } else {
+            vector_line &= ~1;
+        }
+    } else {
+        if (level == int_set) {
+            vector_line |= 2;
+        } else {
+            vector_line &= ~2;
+        }
+    }
+    if (last_level)
+    if (vector_line) {
+        level = int_set;
+    } else {
+        level = int_clear;
+    }
+
+    if (level != last_level) {
+        set_interrupt(HDCA_INTERRUPT, level);
+        last_level = level;
+    }
+}
 
 /*
  * see if we need to assert or deassert the interrupt line
@@ -138,13 +168,7 @@ void
 check_interrupt()
 {
 	printf("hdca: check_interrupt\n");
-    if ((!last_int_state) && int_state) {
-        set_interrupt(HDCA_INTERRUPT, int_set);
-    }
-    if ((last_int_state) && !int_state) {
-        set_interrupt(HDCA_INTERRUPT, int_clear);
-    }
-    last_int_state = int_state;
+    set_hd_interrupt(1, int_state ? int_set : int_clear);
 }
 
 /*

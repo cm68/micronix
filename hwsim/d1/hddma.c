@@ -148,6 +148,8 @@ static paddr dmaaddr;       // the 24 bit dma address
 static byte secbuf[2048];
 static int enable_intr;
 
+extern void set_hd_interrupt(int is_hdca, int_level level);
+
 /*
  * these are hugely wasteful, so I am opting for a minimum of 512
  * for sector sizes, total sectors per track
@@ -196,7 +198,7 @@ attention(portaddr p, byte v)
     int i;
     int head;
 
-    set_interrupt(HDDMA_INTERRUPT, int_clear);
+    set_hd_interrupt(0, int_clear);
 
     if (channel_reset) {
         channel_reset = 0;
@@ -331,7 +333,14 @@ attention(portaddr p, byte v)
     copyout((byte *)&command, channel, sizeof(command));
     channel = link;
     if (enable_intr) {
-        set_interrupt(HDDMA_INTERRUPT, int_set);
+        if (trace & trace_hddma) {
+            printf("\thddma: set interrupt\n");
+        }
+        set_hd_interrupt(0, int_set);
+    } else {
+        if (trace & trace_hddma) {
+            printf("\thddma: no interrupt\n");
+        }
     }
 }
 
