@@ -951,6 +951,12 @@ multio_init()
         }
         ace[0].infd = pipe_up[0];
         ace[0].outfd = pipe_down[1];
+
+        ace_init(&ace[0]);
+        ace[0].name = "tty";
+        reg_intbit(vi_3, ace[0].name);
+        register_interrupt(vi_3, vi_handler);
+        ace[0].vector = vi_3;
     }
 
     // create xterms

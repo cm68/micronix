@@ -4,7 +4,7 @@ DEBUG = -g
 CFLAGS = $(DEBUG)
 
 EXTRAS = sample_shim.o sample_cpu.o terminal
-OBJECTS = util.o sim.o imdlib.o dis.o s100.o terminal.o
+OBJECTS = util.o sim.o imdlib.o dis.o s100.o terminal.o harddisk.o
 TOOLS = imd
 
 all: $(TOOLS) libsim.a $(EXTRAS)
@@ -17,6 +17,9 @@ sample_cpu.o: sample_cpu.c
 
 dis.o: dis.c dis.h
 	$(CC) $(CFLAGS) -c dis.c
+
+harddisk.o: imd.h harddisk.c
+	$(CC) $(CFLAGS) -c harddisk.c
 
 imdlib.o: imd.h util.h
 	$(CC) $(CFLAGS) -c imdlib.c
