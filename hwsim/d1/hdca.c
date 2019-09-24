@@ -1,6 +1,7 @@
 /*
  * the hdca is the port-mapped, non-dma hard drive controller
  * used in the M10, M20 and M26
+ * 512 byte sectors are inherent in the controller
  */
 
 #include "sim.h"
@@ -49,7 +50,7 @@ int trace_hdca;
 
 #define DRIVES  4
 
-static int drive[DRIVES];       // file descriptor for data file
+static void *handle[DRIVES];       // file descriptor for data file
 static int track[DRIVES];       // head location
 static int stepping[DRIVES];    // are in middle of step
 
@@ -136,6 +137,7 @@ static byte func;
 void
 check_interrupt()
 {
+	printf("hdca: check_interrupt\n");
     if ((!last_int_state) && int_state) {
         set_interrupt(HDCA_INTERRUPT, int_set);
     }
@@ -178,31 +180,35 @@ wr_hdca_control(portaddr p, byte v)
 }
 
 static void
-open_drive(int id)
+select_drive(int id)
 {
     int fd;
     char drivename[20];
 
+    if (handle[id]) {
+    	return;
+    }
     sprintf(drivename, "hdca-%d", id);
-    fd = open(drivename, O_CREAT|O_RDWR, 0777);
-#ifdef notdef
-    lseek(fd, secoff(SPT, HEADS, TRACKS), SEEK_SET);
-    write(fd, &fd, 1);
-#endif
-    drive[id] = fd;
+    handle[id] = drive_open(drivename);
+    drive_sectorsize(handle[id], SECLEN);
 }
 
-char secbuf[512];
+/*
+ * this is where we do actual disk read/writes to/from
+ */
+char iobuf[512];
 
 static void
 wr_hdca_cmd(portaddr p, byte v)
 {
-    int drivefd = drive[func & FUNC_DRIVE];
+    int drv = func & FUNC_DRIVE;
     int head = buffer[HEADER+0];
     int track = buffer[HEADER+1];
     int sector = buffer[HEADER+2];
     int key = buffer[HEADER+3];
-    int offset = secoff(track, head, sector);
+    int ret;
+
+    select_drive(drv);
 
     psr &= ~PSR_OPDONE;
 
@@ -220,13 +226,14 @@ wr_hdca_cmd(portaddr p, byte v)
     case 1:
         if (trace & trace_hdca) printf("hdca cmd: read sector with header bytes: %d %d %d %d\n",
             track, head, sector, key);
-        lseek(drivefd, offset, SEEK_SET);
-        read(drivefd, &buffer[2], 510);
-        read(drivefd, &buffer[0], 2);
+        ret = drive_read(handle[drv], track, head, sector, iobuf);
+        if (ret != SECLEN) {
+        	printf("read fail drv: %d c: %d h: %d s: %d ret: %d\n", drv, track, head, sector, ret);
+        }
+        bcopy(&iobuf[0], &buffer[2], 510);
+        bcopy(&iobuf[510], &buffer[0], 2);
         if (trace & trace_bio) {
-            bcopy(&buffer[2], &secbuf[0], 510);
-            bcopy(&buffer[0], &secbuf[510], 2);  
-            hexdump(secbuf, 512);
+            hexdump(iobuf, 512);
         }
         psr |= PSR_OPDONE;
         psr &= ~PSR_HALT;
@@ -239,8 +246,10 @@ wr_hdca_cmd(portaddr p, byte v)
     case 5: 
         if (trace & trace_hdca) printf("hdca cmd: write sector with header bytes: %d %d %d %d\n",
             track, head, sector, key);
-        lseek(drivefd, offset, SEEK_SET);
-        write(drivefd, &buffer, 512);
+        ret = drive_write(handle[drv], track, head, sector, buffer);
+        if (ret != SECLEN) {
+        	printf("write fail drv: %d c: %d h: %d s: %d ret: %d\n", drv, track, head, sector, ret);
+        }
         if (trace & trace_bio) hexdump(buffer, 512);
         psr |= PSR_OPDONE;
         psr &= ~PSR_HALT;
@@ -299,6 +308,8 @@ wr_hdca_func(portaddr p, byte v)
     if (!step) {                    // the step line fell
         stepping[drive] = 1;
         psr &= ~PSR_COMPLT;
+    } else {
+    	stepping[drive] = 0;
     }
     for (i = 0; i < DRIVES; i++) {  // if any drives are seeking, clear PSR_COMPLT
         if (stepping[i]) break;
@@ -311,7 +322,7 @@ wr_hdca_func(portaddr p, byte v)
             check_interrupt();
         }
     } else {
-        psr &= PSR_COMPLT;
+        psr &= ~PSR_COMPLT;
     }
 
     psr &= ~PSR_NTRK0;
@@ -372,9 +383,6 @@ hdca_init()
 
     psr = PSR_HALT | PSR_NFAULT | PSR_COMPLT | PSR_OPDONE;
 
-    for (i = 0; i < DRIVES; i++) {
-        open_drive(i);
-    }
     return 0;
 }
 

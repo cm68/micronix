@@ -155,7 +155,7 @@ syscall_at(word sc)
 	unsigned char code;
 	char indirect = 0;
 
-	word fd;		/* from hl */
+	word fd;	/* from hl */
 	word arg1;	/* first arg */
 	word arg2;	/* second arg */
 	word arg3;	/* third arg */
@@ -197,8 +197,7 @@ syscall_at(word sc)
 	}
 
 	sp = &syscalls[code];
-	printf("micronix syscall %10s %3d ", sp->name, z80_get_reg16(hl_reg));
-	dumpmem(&fubyte, sc, sp->argbytes + 1);
+	printf("micronix ");
 
 	if (sp->flag & (SF_ARG1|SF_NAME)) arg1 = fuword(sc+2);
 	if (sp->flag & (SF_ARG2|SF_NAME2)) arg2 = fuword(sc+4);
@@ -207,141 +206,63 @@ syscall_at(word sc)
 	if (sp->flag & SF_FD) fd = z80_get_reg16(hl_reg);
 	if (sp->flag & SF_NAME) fn = getname(arg1);
 	if (sp->flag & SF_NAME2) fn2 = getname(arg2);
-#ifdef notdef
-
-	/* what's with these zero length writes? */
-	if ((code == 4) && (arg2 == 0)) {
-		goto nolog;
-		verbose = -1;
-		breakpoint = 1;
-	}
-
-	if ((verbose & V_SYS) && (!(sp->flag & SF_SMALL) || (verbose & V_ASYS))) {
-		pid(); fprintf(mytty,"%s(", sp->name);
-		i = sp->flag & (SF_FD|SF_ARG1|SF_NAME|SF_ARG2|SF_NAME2|SF_ARG2|SF_ARG3|SF_ARG4);
-#define F(b, f, a) \
-	if (i & (b)) { i ^= (b) ; fprintf(mytty,f,a,i?",":""); }
-		F(SF_FD, "%d%s", fd);
-		F(SF_ARG1, "%04x%s", arg1);
-		F(SF_NAME, "\"%s\"%s", fn);
-		F(SF_ARG2, "%04x%s", arg2);
-		F(SF_NAME2, "\"%s\"%s", fn2);
-		F(SF_ARG3, "%04x%s", arg3);
-		F(SF_ARG4, "%04x%s", arg4);
-		fprintf(mytty,") ");
-	}
-nolog:
-#endif
 
 	switch (code) {
 	case 0:	/* double indirect is a no-op */
 		printf("double indirect syscall!\n");
 		break;		
-
 	case 1:		/* exit (hl) */
 		printf("exit %d\n", fd);
 		break;
-
 	case 2:		/* fork */
 		printf("fork\n");
 		break;
-
 	case 3: /* read (hl), buffer, len */
 		printf("read(%d, %x, %d)\n", fd, arg1, arg2);
 		break;
-
 	case 4: /* write (hl), buffer, len */
 		printf("write(%d, %x, %d)\n", fd, arg1, arg2);
+		dumpmem(&fubyte, arg1, arg2);
 		break;
-
 	case 5: /* open */
 		printf("open(\"%s\", %x)\n", fn, arg2);
 		break;
-
 	case 6:	/* close */
 		printf("close(%d)\n", fd);
 		break;
 	case 7: /* wait */
 		printf("wait(%d)\n", fd);
 		break;
-
 	case 8:	/* creat <name> <mode> */
 		printf("creat(\"%s\", %x)\n", fn, arg2);
 		break;
-
 	case 9:	/* link <old> <new> */
 		printf("link(\"%s\", \"%s\")\n", fn, fn2);
 		break;
-
 	case 10:	/* unlink <file> */
 		printf("unlink(\"%s\")\n", fn);
 		break;
-
 	case 11: /* exec */
 		printf("exec(\"%s\")\n", fn);
 		break;
-#ifdef notdef
-
 	case 12: /* chdir <ptr to name> */
-		/* again, because of chroot being privileged, we need
-		 * to do some pretty sleazy stuff */
-		if (*fn == '/') {
-			strcpy(namebuf, fn);
-		} else {
-			sprintf(namebuf, "%s/%s", curdir, fn);
-		}
-		sprintf(workbuf, "%s/%s", rootdir, namebuf);
-		realpath(workbuf, namebuf);
-		ret = stat(filename = workbuf, &sbuf);
-		if (ret || !(S_ISDIR(sbuf.st_mode))) {
-			ret = 20;
-			carry_set();
-		} else {
-			/* we are good to go - strip out root again */
-			if (strncmp(namebuf, rootdir, strlen(rootdir)) == 0) {
-				strcpy(curdir, &namebuf[strlen(rootdir)]);
-			} else {
-				strcpy(curdir, "");
-			}
-			carry_clear();
-		}
+		printf("chdir(\"%s\")\n", fn);
 		break;
 	case 13:	/* time */
-		i = time(0);
-		cp->state.registers.word[Z80_DE] = i & 0xffff;
-		ret = (i >> 16) & 0xffff;
-		carry_clear();
+		printf("time()\n");
 		break;
 	case 14:	/* mknod <name> mode dev (dev == 0) for dir */
-		if (arg3 == 0) {
-			arg2 &= 0777;
-			ret = mkdir(filename = fname(fn), arg2);
-			if (ret == -1) {
-				if (verbose & V_ERROR) perror(filename);
-				ret = errno;
-				carry_set();
-			} else {
-				carry_clear();
-			}
-		} else {
-			carry_set();
-		}
+		printf("mknod(\"%s\", %x, %x)\n", fn, arg2, arg3);
 		break;
-#endif
 	case 15:	/* chmod <name> <mode> */
 		printf("chmod(\"%s\", %x)\n", fn, arg2);
 		break;
-
 	case 16:	/* chown <name> <mode> */
 		printf("chown(\"%s\", %x)\n", fn, arg2);
 		break;
-#ifdef notdef
 	case 17:	/* sbrk <addr> */
-		ret = brake;
-		brake = arg1;
-		carry_clear();
+		printf("sbrk(%x)\n", arg1);
 		break;
-#endif
 	case 18:	/* stat fn buf */
 		printf("stat(\"%s\", %x\n", fn, arg2);
 		break;
@@ -351,134 +272,51 @@ nolog:
 	case 19:	/* seek fd where mode */
 		printf("seek(%d, %d, %d)\n", fd, arg1, arg2);
 		break;
-
-#ifdef notdef
 	case 20:	/* getpid */
-		ret = getpid();
-		carry_clear();
+		printf("getpid()\n");
 		break;
-
 	case 21:	/* mount */
-		carry_set();
+		printf("mount(\"%s\", \"%s\")\n", fn, fn2);
 		break;
-
 	case 22:	/* umount */
-		carry_set();
+		printf("umount(\"%s\")\n", fn);
 		break;
-
 	case 23:	/* setuid */
-		carry_set();
+		printf("setuid(%x)\n", fd);
 		break;
-
 	case 24:	/* getuid */
-		ret = getuid();
-		if (am_root) ret = 0;
-		carry_clear();
+		printf("getuid()\n");
 		break;
-
 	case 25:	/* stime */
-		carry_set();
+		printf("stime()\n");
 		break;
-
 	case 31:	/* stty */
-		if (verbose & V_SYS) {
-			tty_dump("stty", arg1);
-		}
-		tcgetattr(fd, &ti);
-		settimode(get_word(arg1+4));
-		ti.c_cc[VERASE] = get_byte(arg1+2);
-		ti.c_cc[VKILL] = get_byte(arg1+3);
-		if (verbose & V_SYS) {
-			ti_dump();
-		}
-		tcsetattr(fd, TCSANOW, &ti);
-		carry_set();
-		carry_clear();
+		printf("stty(%d, %x)\n", fd, arg1);
 		break;
-
 	case 32:	/* gtty */
-		if (tcgetattr(fd, &ti)) {
-			/* perror("gtty"); */
-			carry_set();
-			carry_clear();	// we do gtty on everything!
-			break;
-		}
-		i = 0;
-		if (!(ti.c_iflag & ISTRIP))
-			i |= 040000;
-		if (ti.c_iflag & ICRNL)
-			i |= 020;
-		if (ti.c_lflag & ECHO)
-			i |= 010;
-		if (!(ti.c_lflag & ICANON))
-			i |= 040;
-		if (ti.c_oflag & TABDLY)
-			i |= 002;
-
-		put_byte(arg1, ti.c_ispeed);
-		put_byte(arg1+1, ti.c_ospeed);
-		put_byte(arg1+2, ti.c_cc[VERASE]);
-		put_byte(arg1+3, ti.c_cc[VKILL]);
-		put_word(arg1+4, i);
-		if (verbose & V_SYS) {
-			tty_dump("gtty", arg1);
-			// ti_dump();
-		}
-		carry_clear();
+		printf("gtty(%d, %x)\n", fd, arg1);
 		break;
-
 	case 33:	/* access <name> <mode> */
-		i = 0;
-		if (arg2 & 4) i |= R_OK;
-		if (arg2 & 2) i |= W_OK;
-		if (arg2 & 1) i |= X_OK;
-		ret = access(fname(fn), i);
-		if (ret == -1) {
-			carry_set();
-		} else {
-			carry_clear();
-		}
+		printf("access(\"%s\", %x)\n", fn, arg2);
 		break;
-
 	case 34:	/* nice */
-		carry_clear();
+		printf("nice(%d)\n", fd);
 		break;
-
 	case 35:	/* sleep */
-		sleep(fd);
-		carry_clear();
+		printf("sleep(%x)\n", fd);
 		break;
-
 	case 36:	/* sync */
-		carry_clear();
+		printf("sync()\n");
 		break;
-
 	case 37:	/* kill <pid in hl> signal */
-		carry_set();
+		printf("kill(%d, %d)\n", fd, arg1);
 		break;
-
 	case 41:
-		ret = dup(fd);
-		if (ret == -1) {
-			ret = 0;
-			carry_set();
-		} else {
-			carry_clear();
-		}
+		printf("dup(%d)\n", fd);
 		break;
-
 	case 42:
-		if ((i = pipe(p))) {
-			ret = errno;
-			carry_set();
-		} else {
-			ret = p[0];
-			cp->state.registers.word[Z80_DE] = p[1];
-			carry_clear();
-		}
+		printf("pipe()\n");
 		break;
-#endif
-
 	case 48:	/* set signal handler */
 		printf("signal(%d, %x)\n", arg1, arg2);
 		break;
@@ -486,41 +324,5 @@ nolog:
 		printf("unrecognized syscall %d %x\n", code, code);
 		break;
 	}
+	dumpmem(&fubyte, sc, sp->argbytes + 1);
 }
-#ifdef notdef
-unsigned char pchars[16];
-int pcol;
-
-dp()
-{
-        int i;
-        char c;
-
-        for (i = 0; i < pcol; i++) {
-                c = pchars[i];
-                if ((c <= 0x20) || (c >= 0x7f)) c = '.';
-                fprintf(mytty, "%c", c);
-        }
-        fprintf(mytty, "\n");
-}
-
-dumpmem(unsigned char (*readbyte)(void *addr), void *addr, unsigned short len)
-{
-        int i;
-        pcol = 0;
-
-        while (len) {
-                if (pcol == 0) fprintf(mytty, "%04x: ", addr);
-                fprintf(mytty, "%02x ", pchars[pcol] = (*readbyte)(addr++));
-                len--;
-                if (pcol++ == 15) {
-                        dp();
-                        pcol = 0;
-                }
-        }
-        if (pcol != 0) {
-                for (i = pcol; i < 16; i++) fprintf(mytty, "   ");
-                dp();
-        }
-}
-#endif

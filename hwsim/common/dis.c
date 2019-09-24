@@ -497,18 +497,26 @@ format_instr(
 	char valbuf[20];
 	char disp[6];
 
+	char o1, o2, o3, o4;
+
+	o1 = o2 = o3 = o4 = 0xff;
+
+	o1 = 
 	opcode = (*get_byte)(addr + bcount++);
 
 	switch (opcode) {
 	case 0xcb:
+		o2 = 
 		opcode = (*get_byte)(addr + bcount++);
 		o = &cb_optab[opcode];
 		break;
 	case 0xed:
+		o2 = 
 		opcode = (*get_byte)(addr + bcount++);
 		o = &ed_optab[opcode];
 		break;
 	case 0xdd:
+		o2 = 
 		opcode = (*get_byte)(addr + bcount++);
 		if (opcode == 0xcb) {
 			opcode = (*get_byte)(addr + bcount++);
@@ -518,6 +526,7 @@ format_instr(
 		}
 		break;
 	case 0xfd:
+		o2 = 
 		opcode = (*get_byte)(addr + bcount++);
 		if (opcode == 0xcb) {
 			opcode = (*get_byte)(addr + bcount++);
@@ -536,6 +545,7 @@ format_instr(
 	 */
 
 	if (o->flags & OP_SYS) {	/* micronix system call RST8 - variable length */
+		o3 = 
 		opcode = (*get_byte)(addr + bcount++);
 		for (i = sizeof(sc) / sizeof(sc[0]) - 1; i >= 0; i--) {
 			if (sc[i].n == opcode) {
@@ -563,6 +573,7 @@ format_instr(
 	}
 
 	if (o->flags & OP_IMM8) {
+		o4 =
 		opcode = (*get_byte)(addr + bcount++);
 		value = opcode;
 		sprintf(valbuf, "0x%x", value);
@@ -617,7 +628,11 @@ format_instr(
 			sprintf(outbuf, o->op, valbuf);
 		}
 	} else {
-		strcpy(outbuf, o->op);
+		if (o->op) {
+			strcpy(outbuf, o->op);
+		} else {
+			sprintf(outbuf, "foo: %x %x %x %x", o1, o2, o3, o4);
+		}
 	}
 	// printf("format_instr: %x -> %d\n", addr, bcount);
 	return bcount;
