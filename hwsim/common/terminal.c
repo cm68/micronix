@@ -50,7 +50,14 @@ open_terminal(char *name, int signum, int *in_p, int *out_p, int cooked, char *l
     int fds;
     char *args[30];
     char **argp;
-
+    char *fontsize=getenv("TERMINAL_FONTSIZE");
+    char *geometry=getenv("TERMINAL_GEOMETRY");
+    if (!geometry) {
+        geometry = "120x60";
+    }
+    if (!fontsize) {
+        fontsize = "12";
+    }
     pipe(pipe_up);
 
     // we need to capture the tty name so we can send output to it
@@ -83,9 +90,11 @@ open_terminal(char *name, int signum, int *in_p, int *out_p, int cooked, char *l
         *argp++ = "-T";
         *argp++ = name;
         *argp++ = "-geometry"; 
-        *argp++ = "120x40"; 
-        *argp++ = "-fn"; 
-        *argp++ = "8x13bold"; 
+        *argp++ = geometry; 
+        *argp++ = "-fa"; 
+        *argp++ = "Monospace"; 
+        *argp++ = "-fs"; 
+        *argp++ = fontsize;
         if (logfile) {
             *argp++ = "-l"; 
             *argp++ = "-lf"; 
