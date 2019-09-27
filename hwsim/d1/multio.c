@@ -52,7 +52,8 @@ struct ace {
     int_line vector;    // assert when something happens
 } ace[3];
 
-#define	MULTIO_PORT	0x48	// multio standard port
+#define	MULTIO_MASTER	0x48	// multio master standard port
+#define	MULTIO_SLAVE	0x58	// multio slave standard port
 
 // linestat                 base + 5    0x4d
 #define LSR_DR      0x01    // input data ready
@@ -148,7 +149,7 @@ static char *nobits[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 #define IRQ7    0x80        // clock interrupt
 
 /*
- * we've got an 8259, which has 2 registers at MULTIO_PORT+4 and MULTIO_PORT+5
+ * we've got an 8259, which has 2 registers at MULTIO_MASTER+4 and MULTIO_MASTER+5
  */
 #define PIC0_ICW1   0x10
 #define PIC0_OCW3   0x08
@@ -768,14 +769,14 @@ wr_daisy1(portaddr p, byte v)
 static byte
 undef_inreg(portaddr p)
 {
-    if (trace & trace_multio) printf("multio: read to %x+%x undefined\n", MULTIO_PORT, p - MULTIO_PORT);
+    if (trace & trace_multio) printf("multio: read to %x+%x undefined\n", MULTIO_MASTER, p - MULTIO_MASTER);
     return 0;
 }
 
 static void
 undef_outreg(portaddr p, byte v)
 {
-    if (trace & trace_multio) printf("multio: write 0x%x to undefined %x+%x\n", v, MULTIO_PORT, p - MULTIO_PORT);
+    if (trace & trace_multio) printf("multio: write 0x%x to undefined %x+%x\n", v, MULTIO_MASTER, p - MULTIO_MASTER);
 }
 
 static char *group_bits[] = { 0, 0, "membank", "intena", "printreset", "parstb", 0, 0 };
@@ -801,43 +802,59 @@ multio_select(portaddr p, byte v)
 
     switch (group) {
     case GRP0:  // parallel port, clock, pic
-        register_input(MULTIO_PORT + 0, &rd_daisy);
-        register_input(MULTIO_PORT + 1, &undef_inreg);
-        register_input(MULTIO_PORT + 2, &rd_clock);
-        register_input(MULTIO_PORT + 3, &undef_inreg);
-        register_input(MULTIO_PORT + 4, &rd_pic_port_0);
-        register_input(MULTIO_PORT + 5, &rd_pic_port_1);
-        register_input(MULTIO_PORT + 6, &undef_inreg);
+        register_input(MULTIO_MASTER + 0, &rd_daisy);
+        register_input(MULTIO_MASTER + 1, &undef_inreg);
+        register_input(MULTIO_MASTER + 2, &rd_clock);
+        register_input(MULTIO_MASTER + 3, &undef_inreg);
+        register_input(MULTIO_MASTER + 4, &rd_pic_port_0);
+        register_input(MULTIO_MASTER + 5, &rd_pic_port_1);
+        register_input(MULTIO_MASTER + 6, &undef_inreg);
 
-        register_output(MULTIO_PORT + 0, &wr_daisy0);
-        register_output(MULTIO_PORT + 1, &wr_daisy1);
-        register_output(MULTIO_PORT + 2, &wr_clock);
-        register_output(MULTIO_PORT + 3, &undef_outreg);
-        register_output(MULTIO_PORT + 4, &wr_pic_port_0);
-        register_output(MULTIO_PORT + 5, &wr_pic_port_1);
-        register_output(MULTIO_PORT + 6, &undef_outreg);
+        register_output(MULTIO_MASTER + 0, &wr_daisy0);
+        register_output(MULTIO_MASTER + 1, &wr_daisy1);
+        register_output(MULTIO_MASTER + 2, &wr_clock);
+        register_output(MULTIO_MASTER + 3, &undef_outreg);
+        register_output(MULTIO_MASTER + 4, &wr_pic_port_0);
+        register_output(MULTIO_MASTER + 5, &wr_pic_port_1);
+        register_output(MULTIO_MASTER + 6, &undef_outreg);
         break; 
     case GRP1:  // serial ports
     case GRP2:
     case GRP3:
         acep = &ace[group - 1];
-        register_input(MULTIO_PORT + 0, &rd_rxb);
-        register_input(MULTIO_PORT + 1, &rd_inte);
-        register_input(MULTIO_PORT + 2, &rd_inti);
-        register_input(MULTIO_PORT + 3, &rd_lcr);
-        register_input(MULTIO_PORT + 4, &rd_mcr);
-        register_input(MULTIO_PORT + 5, &rd_lsr);
-        register_input(MULTIO_PORT + 6, &rd_msr);
+        register_input(MULTIO_MASTER + 0, &rd_rxb);
+        register_input(MULTIO_MASTER + 1, &rd_inte);
+        register_input(MULTIO_MASTER + 2, &rd_inti);
+        register_input(MULTIO_MASTER + 3, &rd_lcr);
+        register_input(MULTIO_MASTER + 4, &rd_mcr);
+        register_input(MULTIO_MASTER + 5, &rd_lsr);
+        register_input(MULTIO_MASTER + 6, &rd_msr);
 
-        register_output(MULTIO_PORT + 0, &wr_txb);
-        register_output(MULTIO_PORT + 1, &wr_inte);
-        register_output(MULTIO_PORT + 2, &undef_outreg);
-        register_output(MULTIO_PORT + 3, &wr_lcr);
-        register_output(MULTIO_PORT + 4, &wr_mcr);
-        register_output(MULTIO_PORT + 5, &wr_lsr);
-        register_output(MULTIO_PORT + 6, &wr_msr);
+        register_output(MULTIO_MASTER + 0, &wr_txb);
+        register_output(MULTIO_MASTER + 1, &wr_inte);
+        register_output(MULTIO_MASTER + 2, &undef_outreg);
+        register_output(MULTIO_MASTER + 3, &wr_lcr);
+        register_output(MULTIO_MASTER + 4, &wr_mcr);
+        register_output(MULTIO_MASTER + 5, &wr_lsr);
+        register_output(MULTIO_MASTER + 6, &wr_msr);
         break;
     }
+}
+
+byte
+rd_fake_daisy(portaddr p)
+{
+    return 0xff;
+}
+
+/*
+ * this is for the second multio in a system, not present in ours
+ */
+void
+multio_slave_select(portaddr p, byte v)
+{
+    register_input(MULTIO_SLAVE + 0, &rd_fake_daisy);
+    return;
 }
 
 int terminal_fd_in;
@@ -976,7 +993,8 @@ multio_init()
     terminal_fd_in = ace[0].infd;
     terminal_fd_out = ace[0].outfd;
 
-	register_output(MULTIO_PORT+7, &multio_select);
+	register_output(MULTIO_MASTER+7, &multio_select);
+	register_output(MULTIO_SLAVE+7, &multio_slave_select);
     reg_intbit(vi_0, "hd");
     reg_intbit(vi_1, "djdma");
     reg_intbit(vi_7, "clock");
