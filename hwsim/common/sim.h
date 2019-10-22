@@ -65,6 +65,9 @@ typedef enum { int_clear, int_set } int_level;
 // called by interrupt controller
 void register_interrupt(int_line signal, void (*handler)(int_line signal, int_level level));
 
+// test to see if we are in the kernel
+int super();
+
 // called by cpu card
 void register_intvec(intvec (*handler)());
 void register_intack(intvec (*handler)());
@@ -85,9 +88,9 @@ extern int_level nmi_pin;
 extern void open_terminal(char *name, int signum, int *infdp, int *outfdp, int cooked, char *logfile);
 
 // generally useful timed callout facility
-void timeout(char *name, int usec, void (*function)());
-void recurring_timeout(char *name, int hertz, void (*function)());
-void cancel_timeout(void (*function)());
+void timeout(char *name, int usec, void (*function)(int a), int arg);
+void recurring_timeout(char *name, int hertz, void (*function)(int a), int arg);
+void cancel_timeout(void (*function)(), int arg);
 
 // linux freaking signal madness
 typedef void (*sighandler_t)(int);
