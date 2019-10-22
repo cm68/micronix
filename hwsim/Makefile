@@ -1,7 +1,7 @@
 #
 # different z80 emulators
 #
-EMULATORS = chips zeta yaze z80pack
+EMULATORS = chips #  zeta yaze z80pack
 DIRS = common $(EMULATORS) d1
 
 all:
