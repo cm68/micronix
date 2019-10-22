@@ -7,7 +7,7 @@ void skipwhite(char **s);
 void dumpmem(unsigned char (*readbyte) (unsigned short addr), unsigned short addr, int len);
 int register_trace(char *name);
 void hexdump(void *addr, int len);
-
+void message(char *m);
 extern char *tracenames[];
 
 /*

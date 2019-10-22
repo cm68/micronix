@@ -7,6 +7,7 @@
 
 #define	_GNU_SOURCE
 
+#include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -104,6 +105,14 @@ dumpmem(unsigned char (*readbyte) (unsigned short addr), unsigned short addr, in
             printf("   ");
         dp();
     }
+}
+
+void
+message(char *s)
+{
+    int i;
+    i = strlen(s);
+    write(1, s, i);
 }
 
 /*
