@@ -202,8 +202,6 @@ sig_handler(int signum)
             read(i2, &c, 1);
             write(o1, &c, 1);
         }
-    } else {
-        fprintf(stderr, "sig_handler signal %d\n", signum);
     }
 }
 
