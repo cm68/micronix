@@ -319,7 +319,7 @@ readsec()
 
 #ifdef DELAYED_DJINT
 static void
-post_djdma_int()
+post_djdma_int(int a)
 {
     set_interrupt(DJDMA_INTERRUPT, int_set);
 }
@@ -336,7 +336,7 @@ setintr()
     djdma_running = 0;
     if (trace & trace_djdma) printf("\tsetintr\n");
 #ifdef DELAYED_DJINT
-    timeout("djdma_setintr", DJDMA_INT_DELAY, post_djdma_int);
+    timeout("djdma_setintr", DJDMA_INT_DELAY, post_djdma_int, 0);
 #else
     set_interrupt(DJDMA_INTERRUPT, int_set);
 #endif
