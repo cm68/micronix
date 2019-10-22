@@ -204,6 +204,12 @@ map_cmd(char **sp)
     return 0;
 }
 
+int 
+super()
+{
+    return (taskreg & 0xf) == 0;
+}
+
 /*
  * the MPZ80 actually does something tricky:  the first 15 M1 reads are
  * satisfied from 0xbf0 - 0xbff.  we don't actually modify the PC at all, 
@@ -255,7 +261,7 @@ interrupt_check()
         int_pin = int_clear;
         return;
     }
-    if (taskreg & 0xf) {
+    if (!super()) {
         if (maskreg & MASK_TINT) {      // no user interrupts, trap!
             trap(ST_RESET & ~ST_INT);
             return;
@@ -350,7 +356,7 @@ get_byte(vaddr addr)
         }
     }
 
-    local = ((taskreg & 0xf) == 0) && (addr < 0x1000);
+    local = super() && (addr < 0x1000);
 
     if (!local) {                           // if we are accessing mapped ram
         getpte(addr, &pa, &attr);
@@ -398,7 +404,7 @@ get_byte(vaddr addr)
      * emulation.  the next M1 after this starts executing at 0xbf0 by disabling the address bus
      * and driving the fetch via a counter
      */
-    if (((taskreg & 0xf) != 0) && 
+    if ((!super()) && 
         (z80_get_reg8(status_reg) & S_M1) && 
         (retval == 0x76) && 
         (!prefix) && (maskreg & MASK_HALT)) {
@@ -434,7 +440,7 @@ put_byte(vaddr addr, unsigned char value)
     char *desc = "";
     char *cmd;
  
-    local = ((taskreg & 0xf) == 0) && (addr < 0x1000);
+    local = super() && (addr < 0x1000);
 
     if (!local) {                           // mapped ram
         seg = "mapped:";
