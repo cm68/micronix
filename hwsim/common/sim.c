@@ -101,7 +101,7 @@ stop()
 void
 stop_handler()
 {
-    printf("breakpoint signal\n");
+    // printf("breakpoint signal\n");
     stop();
 }
 
@@ -146,6 +146,8 @@ char *
 lookup_sym(unsigned short addr)
 {
     struct sym *s = syms;
+
+    if (!super()) return 0;
 
     while (s) {
         if (s->value == addr) {
@@ -394,6 +396,20 @@ char *rom_image;
 int rom_size;
 int config_sw = 0;
 
+sigset_t mysignalmask;
+
+void
+mysigblock()
+{
+    sigprocmask(SIG_BLOCK, &mysignalmask, 0);
+}
+
+void
+mysigunblock()
+{
+    sigprocmask(SIG_UNBLOCK, &mysignalmask, 0);
+}
+
 /*
  * linux signal() is too flaky to even comtemplate.
  */
@@ -402,6 +418,8 @@ mysignal(int signum, sighandler_t handler)
 {
     struct sigaction new;
     struct sigaction old;
+
+    sigaddset(&mysignalmask, signum);
 
     new.sa_handler = handler;
     new.sa_flags = SA_RESTART;
@@ -422,7 +440,8 @@ struct timeout {
     char *name;
     struct timeval when;    
     struct timeval interval;    // if recurring
-    void (*handler)();
+    void (*handler)(int a);
+    int arg;                    // argument to pass handler
 };
 
 static void timeout_handler();
@@ -482,7 +501,7 @@ timeout_handler()
     int i;
     struct timeout *tp;
 
-    if (trace & trace_timer) write(1, "timeout_handler called\n", 24);
+    // if (trace & trace_timer) write(1, "timeout_handler called\n", 24);
     // loop through all the timers, delivering callouts as needed
     for (i = 0; i < MAXTIMEOUTS; i++) {
         tp = &timeouts[i];
@@ -494,8 +513,8 @@ timeout_handler()
 
         // deliver any expired callouts.
         if (timercmp(&tp->when, &tv, <=)) {
-            if (trace & trace_timer) printf("timer callout %s\n", tp->name);
-            (*tp->handler)();
+            // if (trace & trace_timer) printf("timer callout %s\n", tp->name);
+            (*tp->handler)(tp->arg);
 
             // increment any recurring timers and maybe deliver again
             if (timerisset(&tp->interval)) {
@@ -504,13 +523,14 @@ timeout_handler()
             }
 
             tp->handler = 0;
+            tp->arg = 0;
         }
     }
     timeout_sched();
 }
 
 void
-recurring_timeout(char *name, int hertz, void (*function)())
+recurring_timeout(char *name, int hertz, void (*function)(int a), int a)
 {
     int i;
     struct timeout *tp;
@@ -523,6 +543,7 @@ recurring_timeout(char *name, int hertz, void (*function)())
         tp->interval.tv_sec = 0;
         tp->handler = function;
         tp->name = name;
+        tp->arg = a;
         gettimeofday(&tp->when, 0);
         timeradd(&tp->when, &tp->interval, &tp->when);
         timeout_sched();
@@ -536,7 +557,7 @@ recurring_timeout(char *name, int hertz, void (*function)())
  * call function in usec_from_now
  */
 void
-timeout(char *name, int usec_from_now, void (*function)())
+timeout(char *name, int usec_from_now, void (*function)(int a), int arg)
 {
     int i;
     struct timeout *tp;
@@ -550,6 +571,7 @@ timeout(char *name, int usec_from_now, void (*function)())
         tp->interval.tv_usec = tp->interval.tv_sec = 0;
         tp->handler = function;
         tp->name = name;
+        tp->arg = arg;
         gettimeofday(&tp->when, 0);
         timeradd(&tp->when, &tv, &tp->when);
         timeout_sched();
@@ -560,15 +582,16 @@ timeout(char *name, int usec_from_now, void (*function)())
 }
 
 void
-cancel_timeout(void (*handler)())
+cancel_timeout(void (*handler)(), int arg)
 {
     int i;
     struct timeout *tp;
     
     for (i = 0; i < MAXTIMEOUTS; i++) {
         tp = &timeouts[i];
-        if (tp->handler == handler) {
+        if (tp->handler == handler && tp->arg == arg) {
             tp->handler = 0;
+            tp->arg = 0;
         }
 	}
     timeout_sched();
@@ -1245,7 +1268,9 @@ main(int argc, char **argv)
         }
 #endif
         running = 1;
+        mysigblock();
         z80_run();
+        mysigunblock();
         running = 0;
         if (inst_countdown != -1) {
             inst_countdown--;
