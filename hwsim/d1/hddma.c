@@ -32,7 +32,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-#define HDDMA_INTERRUPT vi_0
+#define HDDMA_INTERRUPT 0
 
 #define	HDDMA_PORT 	0x55	// hddma attention port
 #define	HDDMA_RESET	0x54	// hddma reset port
@@ -148,8 +148,6 @@ static paddr dmaaddr;       // the 24 bit dma address
 static byte secbuf[2048];
 static int enable_intr;
 
-extern void set_hd_interrupt(int is_hdca, int_level level);
-
 /*
  * these are hugely wasteful, so I am opting for a minimum of 512
  * for sector sizes, total sectors per track
@@ -198,7 +196,7 @@ attention(portaddr p, byte v)
     int i;
     int head;
 
-    set_hd_interrupt(0, int_clear);
+    set_vi(HDDMA_INTERRUPT, 1, 0);
 
     if (channel_reset) {
         channel_reset = 0;
@@ -336,7 +334,7 @@ attention(portaddr p, byte v)
         if (trace & trace_hddma) {
             printf("\thddma: set interrupt\n");
         }
-        set_hd_interrupt(0, int_set);
+        set_vi(HDDMA_INTERRUPT, 1, 1);
     } else {
         if (trace & trace_hddma) {
             printf("\thddma: no interrupt\n");
@@ -366,6 +364,21 @@ hddma_init()
     return 0;
 }
 
+static int
+hddma_setup()
+{
+    trace_hddma = register_trace("hddma");
+    return 0;
+}
+
+struct driver hddma_driver = {
+    "hddma",
+    0,
+    &hddma_setup,
+    &hddma_init,
+    0
+};
+
 /*
  * this grammar makes the compiler call this function before main()
  * this means we can add drivers by just adding them to the link
@@ -374,8 +387,7 @@ __attribute__((constructor))
 void
 register_hddma_driver()
 {
-    trace_hddma = register_trace("hddma");
-    register_startup_hook(hddma_init);
+    register_driver(&hddma_driver);
 }
 
 /*

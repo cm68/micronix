@@ -40,8 +40,6 @@
 #define FPU         0xc00       // 9511/9512
 #define LOCAL       0x1000      // everything below here is on board
 
-int_level int_s100;      // the actual interrupt line on the bus
-
 /*
  * mpz80 cpu registers and local ram
  */
@@ -227,7 +225,6 @@ super()
  * these count down bus cycles of a certain kind to facilitate task switches
  * and implement the trap function
  */
-
 int trapcount;
 
 /*
@@ -252,17 +249,22 @@ trap(byte trapbits)
 
 /*
  * register state changes could cause delayed interrupts to become deliverable
- * check if we can assert the int pin
+ * check if we can assert the int pin - the s100 interrupt line is controlled by
+ * the pic, and the z80 interrupt line is controlled by us.
  */
 void
 interrupt_check()
 {
-    if (int_s100 == int_clear) {
-        int_pin = int_clear;
+    if (!int_line) {
+        if (trace & trace_mpz80) {
+            printf("clear int_pin\n");
+        }
+        int_pin = 0;
         return;
     }
     if (!super()) {
         if (maskreg & MASK_TINT) {      // no user interrupts, trap!
+            // this goes to supervisor, which will assert int_pin later
             trap(ST_RESET & ~ST_INT);
             return;
         }
@@ -274,7 +276,7 @@ interrupt_check()
     if (trace & trace_mpz80) {
         printf("assert int_pin\n");
     }
-    int_pin = int_set;
+    int_pin = 1;
 }
 
 /*
@@ -519,6 +521,30 @@ output(portaddr p, byte v)
  */
 #define	TRAPADDR	0xBF0
 
+// the bus just changed the s100 interrupt line
+void
+mpz80_intr(int value)
+{
+    if (trace & trace_mpz80) {
+        printf("mpz80: mpz80_intr(%d)\n", value);
+    } 
+    int_line = value;
+    interrupt_check();
+}
+
+int
+mpz80_startup()
+{
+    setrom(0);
+    if (config_sw & CONF_SET) {
+        switchreg = config_sw & 0xff;   // could be multiple bytes of config
+    }
+    z80_set_reg16(pc_reg, 0);
+    int_change = mpz80_intr;
+    trap(ST_RESET);
+    return 0;
+}
+
 void
 mpz80_usage()
 {
@@ -533,8 +559,8 @@ mpz80_usage()
 /*
  * this sets up our emulator settings before we do argument processing
  */
-int
-mpz80_init()
+int 
+mpz80_setup()
 {
     rom_filename = "mon447.bin";
     rom_size = 4096;
@@ -542,46 +568,22 @@ mpz80_init()
     switchreg = SW_DJDMA | SW_NOMON;    // set diagnostic, monitor or boot mode
     keybreg = 0;
     taskreg = 0;
+
+    trace_mpz80 = register_trace("mpz80");
+    trace_map = register_trace("map");
+    trace_mem = register_trace("mem");
+    trace_syscall = register_trace("syscall");
+    register_mon_cmd('m', "[task]\tdump memory map", map_cmd);
     return 0;
 }
 
-// the bus just asserted or de-asserted the actual interrupt line
-void
-mpz80_intr(int_line signal, int_level level)
-{
-    if (trace & trace_mpz80) {
-        printf("mpz80: mpz80_intr called with int line %s\n", 
-            (level == int_set) ? "set" : "clear");
-    } 
-    int_s100 = level;
-    interrupt_check();
-}
-
-intvec
-mpz80_intack()
-{
-    intvec vector;
-    vector = get_intvec();
-
-    if (trace & trace_mpz80) {
-        printf("mpz80: mpz80_intack returns 0x%08x\n", vector);
-    } 
-    return vector;
-}
-
-int
-mpz80_startup()
-{
-    setrom(0);
-    if (config_sw & CONF_SET) {
-        switchreg = config_sw & 0xff;   // could be multiple bytes of config
-    }
-    z80_set_reg16(pc_reg, 0);
-    register_intack(mpz80_intack);
-    register_interrupt(interrupt, mpz80_intr);
-    trap(ST_RESET);
-    return 0;
-}
+struct driver mpz80_driver = {
+    "mpz80",
+    &mpz80_usage,
+    &mpz80_setup,
+    &mpz80_startup,
+    0
+};
 
 /*
  * this grammar makes the compiler call this function before main()
@@ -591,17 +593,8 @@ __attribute__((constructor))
 void
 register_mpz80_driver()
 {
-    trace_mpz80 = register_trace("mpz80");
-    trace_map = register_trace("map");
-    trace_mem = register_trace("mem");
-    trace_syscall = register_trace("syscall");
-
-    register_prearg_hook(mpz80_init);
-    register_startup_hook(mpz80_startup);
-    register_usage_hook(mpz80_usage);
-    register_mon_cmd('m', "[task]\tdump memory map", map_cmd);
+    register_driver(&mpz80_driver);
 }
-
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
