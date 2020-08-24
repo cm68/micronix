@@ -61,6 +61,8 @@
 
 #define LOGFILE     "logfile"
 
+int program_counter;
+
 int debug_terminal;
 int log_output;
 int mypid;
@@ -304,65 +306,19 @@ setup_sim_ports()
  */
 #define MAXDRIVERS 8
 
+struct driver *drivers[MAXDRIVERS];
+/*
 void (*poll_hook[MAXDRIVERS])();        // this gets called between instructions
 int (*prearg_hook[MAXDRIVERS])();       // called just before arg processing
 int (*startup_hook[MAXDRIVERS])();      // called just before emulation
 void (*usage_hook[MAXDRIVERS])();       // called inside usage()
+*/
+int ndrivers;
 
 void
-register_poll_hook(void (*func)())
+register_driver(struct driver *d)
 {
-    int i;
-
-    for (i = 0; i < MAXDRIVERS; i++) {
-        if (!poll_hook[i]) {
-            poll_hook[i] = func;
-            return;
-        }
-    }
-    exit(2);
-}
-
-void
-register_prearg_hook(int (*func)())
-{
-    int i;
-
-    for (i = 0; i < MAXDRIVERS; i++) {
-        if (!prearg_hook[i]) {
-            prearg_hook[i] = func;
-            return;
-        }
-    }
-    exit(2);
-}
-
-void
-register_startup_hook(int (*func)())
-{
-    int i;
-
-    for (i = 0; i < MAXDRIVERS; i++) {
-        if (!startup_hook[i]) {
-            startup_hook[i] = func;
-            return;
-        }
-    }
-    exit(2);
-}
-
-void
-register_usage_hook(void (*func)())
-{
-    int i;
-
-    for (i = 0; i < MAXDRIVERS; i++) {
-        if (!usage_hook[i]) {
-            usage_hook[i] = func;
-            return;
-        }
-    }
-    exit(2);
+    drivers[ndrivers++] = d;
 }
 
 void
@@ -372,6 +328,7 @@ usage(char *complaint, char *p)
 
     fprintf(stderr, "%s", complaint);
     fprintf(stderr, "usage: %s [<options>] <drive file> ...\n", p);
+    fprintf(stderr, "\t-h\thelp\n");
     fprintf(stderr, "\t-b\t<boot rom file>\n");
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
     fprintf(stderr, "\t-S\t<symbol file file>\n");
@@ -381,9 +338,9 @@ usage(char *complaint, char *p)
     for (i = 0; tracenames[i]; i++) {
         fprintf(stderr, "\t%x %s\n", 1 << i, tracenames[i]);
     }
-    for (i = 0; i < MAXDRIVERS; i++) {
-        if (usage_hook[i]) {
-            (*usage_hook[i])();
+    for (i = 0; i < ndrivers; i++) {
+        if (drivers[i]->usage_hook) {
+            (*drivers[i]->usage_hook)();
         }
     }
     exit(1);
@@ -603,11 +560,13 @@ dumpcpu()
     byte f;
     char outbuf[40];
     char fbuf[10];
+    char ibuf[10];
     char *s;
     int i;
     word pc, sp;
 
     strcpy(fbuf, "        ");
+    strcpy(ibuf, "        ");
 
     pc = z80_get_reg16(pc_reg);
     sp = z80_get_reg16(sp_reg);
@@ -615,9 +574,6 @@ dumpcpu()
     format_instr(pc, outbuf, &get_byte, &lookup_sym, &reloc);
     s = lookup_sym(pc);
     if (!s) s = "";
-    printf("%-10s", s);
-    printf("%04x: %-20s ", pc, outbuf);
-
     f = z80_get_reg8(f_reg);
 
     if (f & C_FLAG)
@@ -639,12 +595,13 @@ dumpcpu()
     if (z80_get_reg8(irr_reg) & IFF1)
         fbuf[8] = 'I';
 
+    if (s) printf("%-10s\n", s);
     printf(
-        " %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x %04x %04x\n",
-        fbuf,
-        z80_get_reg8(a_reg), 
+        "%s %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x",
+        fbuf, ibuf, z80_get_reg8(a_reg),
         z80_get_reg16(bc_reg), z80_get_reg16(de_reg), z80_get_reg16(hl_reg), 
-        z80_get_reg16(ix_reg), z80_get_reg16(iy_reg), sp, get_word(sp), get_word(sp+2), get_word(sp+4));
+        z80_get_reg16(ix_reg), z80_get_reg16(iy_reg), sp);
+    printf(" pc:%04x: %-20s\n", pc, outbuf);
 }
 
 /*
@@ -1033,16 +990,17 @@ main(int argc, char **argv)
     int i;
     char *ptyname;
     int fd;
+    int ret;
 
     /*
      * run the driver startup hooks before argument processing
      * to set defaults, etc before command line options get to
      * override them
      */
-    for (i = 0; i < MAXDRIVERS; i++) {
-        if (prearg_hook[i]) {
-            if ((*prearg_hook[i])()) {
-                printf("prearg hook %d failed\n", i);
+    for (i = 0; i < ndrivers; i++) {
+        if (drivers[i]->prearg_hook) {
+            if ((ret = (*drivers[i]->prearg_hook)())) {
+                printf("prearg hook %s error %d\n", drivers[i]->name, ret);
                 exit(1);
             }
         }
@@ -1101,6 +1059,9 @@ main(int argc, char **argv)
             case 's':
                 inst_countdown = 0;
                 break;
+            case 'h':
+                usage("", progname);
+                break;
             default:
                 usage("unrecognized option", progname);
                 break;
@@ -1126,35 +1087,6 @@ main(int argc, char **argv)
         drivenames = malloc(sizeof(char *) * 2);
         drivenames[0] = "DRIVE_A.IMD";
         drivenames[1] = 0;
-    }
-
-    /*
-     * load the boot rom if there is one
-     */
-    if (rom_size) {
-        rom_image = malloc(rom_size);
-        fd = open(rom_filename, O_RDONLY);
-        if (!fd) {
-            perror(rom_filename);
-            exit(errno);
-        }
-        i = read(fd, rom_image, rom_size);
-        if (i < 0) {
-            perror(rom_filename);
-            exit(errno);
-        }
-        close(fd);
-        rom_filename = strdup(rom_filename);
-        i = strlen(rom_filename);
-        // if there's a similarly named symfile, use it
-        if (!sym_filename && (rom_filename[i-4] == '.')) {
-            sym_filename = strdup(rom_filename);
-            strcpy(&sym_filename[i-3], "sym");
-        }
-    }
-
-    if (sym_filename) {
-        load_symfile(sym_filename);
     }
 
     mypid = getpid();
@@ -1210,46 +1142,73 @@ main(int argc, char **argv)
         printf("\n");
     }
 
+    /*
+     * load the boot rom if there is one
+     */
+    if (rom_size) {
+        rom_image = malloc(rom_size);
+        fd = open(rom_filename, O_RDONLY);
+        if (!fd) {
+            perror(rom_filename);
+            exit(errno);
+        }
+        i = read(fd, rom_image, rom_size);
+        if (i < 0) {
+            perror(rom_filename);
+            exit(errno);
+        }
+        close(fd);
+        i = strlen(rom_filename);
+        // if there's a similarly named symfile, use it
+        if (!sym_filename && (rom_filename[i-4] == '.')) {
+            sym_filename = strdup(rom_filename);
+            strcpy(&sym_filename[i-3], "sym");
+        }
+    }
+
+    if (sym_filename) {
+        load_symfile(sym_filename);
+    }
+
     mysignal(SIGUSR1, stop_handler);
 
     setup_sim_ports();
     z80_init();
 
     // another driver hook
-    for (i = 0; i < MAXDRIVERS; i++) {
-        if (startup_hook[i]) {
-            if ((*startup_hook[i])()) {
-                printf("startup hook %d failed\n", i);
+    for (i = 0; i < ndrivers; i++) {
+        if (drivers[i]->startup_hook) {
+            if ((ret = (*drivers[i]->startup_hook)())) {
+                printf("startup hook %s error %d\n", drivers[i]->name, ret);
                 exit(1);
             }
         }
+        printf("%s loaded\n", drivers[i]->name);
     }
 
     /*
      * the main emulation loop
      */
     while (1) {
-        word pc = z80_get_reg16(pc_reg);
+        program_counter = z80_get_reg16(pc_reg);
 
         /*
          * run the driver poll hooks
          */
-        for (i = 0; i < MAXDRIVERS; i++) {
-            if (poll_hook[i]) {
-                (*poll_hook[i])();
-            } else {
-                break;
+        for (i = 0; i < ndrivers; i++) {
+            if (drivers[i]->poll_hook) {
+                (*drivers[i]->poll_hook)();
             }
         }
-        if (next_break == pc) {
+        if (next_break == program_counter) {
             inst_countdown = 0;
             next_break = -1;
         }
-        if (breakpoint_at(pc)) {
+        if (breakpoint_at(program_counter)) {
             printf("breakpoint\n");
             inst_countdown = 0;
         }
-        if ((trace & trace_inst) || (inst_countdown == 0) || ((trace & trace_symbols) && lookup_sym(pc))) {
+        if ((trace & trace_inst) || (inst_countdown == 0) || ((trace & trace_symbols) && lookup_sym(program_counter))) {
             dumpcpu();
         }
         if (inst_countdown == 0) {
