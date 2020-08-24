@@ -37,52 +37,51 @@ extern byte s100_input(portaddr p);
 
 // register callbacks for plugging drivers - these can be in constructors
 extern void register_mon_cmd(char c, char *help, int (*handler)(char **p));
-extern void register_usage_hook(void (*hookfunc)());
-extern void register_prearg_hook(int (*hookfunc)());
-extern void register_startup_hook(int (*hookfunc)());
-extern void register_poll_hook(void (*hookfunc)());
 extern int register_trace(char *tracename);
+
+/* a driver registers one of these */
+struct driver {
+    char *name;
+    void (*usage_hook)();
+    int (*prearg_hook)();               // register trace points and extensions
+    int (*startup_hook)();
+    int (*poll_hook)();
+};
+
+extern void register_driver(struct driver *d);
 
 // call these from the startup hook
 extern void register_input(portaddr portnum, inhandler func);
 extern void register_output(portaddr portnum, outhandler func);
 
 /*
- * drivers call set_interrupt on vectored lines
- * interrupt controller registers for handlers on vectored line and intvec.
- * cpu registers for intack and registers for int and nmi
- * chip simulator calls intack and looks at nmi and int line state
- * vectors can be up to 3 bytes long, filled from low end first.
- * so, a call to 1234 will be encoded as 0x031234cd
+ * actual control line at the bus
  */
-#define INTLEN_SHIFT    24
-#define INTA_LEN        (3 << INTLEN_SHIFT)
-typedef unsigned int intvec;
+extern unsigned char vi_lines;      // mask: vi0 = 0x1, etc
+extern int int_line;
+extern int nmi_line;
 
-typedef enum { vi_0, vi_1, vi_2, vi_3, vi_4, vi_5, vi_6, vi_7, interrupt, nmi, errorint, pwrfail } int_line;
-typedef enum { int_clear, int_set } int_level;
+/*
+ * control line at the cpu pin - the cpu card could have a mask
+ * this is used by the chip sim
+ */
+extern int int_pin;
+extern int nmi_pin;
 
-// called by interrupt controller
-void register_interrupt(int_line signal, void (*handler)(int_line signal, int_level level));
+// called by driver to assert or clear vectored interrupt line
+void set_vi(int signal, int card, int value);
 
-// test to see if we are in the kernel
+void (*vi_change)(unsigned char new);
+unsigned char (*get_intack)();
+
+/* the cpu registers a hook that gets called when the bus int line changed */
+void (*int_change)(int value);
+
+// set if symbols are valid
 int super();
 
-// called by cpu card
-void register_intvec(intvec (*handler)());
-void register_intack(intvec (*handler)());
-
-intvec get_intvec();
-
-// called by cpu simulator
-intvec get_intack();
-
-// called by driver
-void set_interrupt(int_line signal, int_level level);
-
-// maintained by interrupt handlers
-extern int_level int_pin;
-extern int_level nmi_pin;
+// called by cpu simulator to get an intack byte
+unsigned char int_ack();
 
 // terminal creates an xterm that generates a signal when something is ready to read
 extern void open_terminal(char *name, int signum, int *infdp, int *outfdp, int cooked, char *logfile);
