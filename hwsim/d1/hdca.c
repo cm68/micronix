@@ -11,7 +11,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-#define HDCA_INTERRUPT  vi_0        // same as hddma!
+#define HDCA_INTERRUPT  0        // same as hddma!
 
 byte int_state;
 
@@ -127,48 +127,14 @@ static byte ssr;
 #define FUNC_HEAD       0xf0
 static byte func;
 
-void
-set_hd_interrupt(int is_hdca, int_level level)
-{
-    static int vector_line;
-    static int_level last_level;
-
-    if (is_hdca) {
-        if (level == int_set) {
-            vector_line |= 1;
-        } else {
-            vector_line &= ~1;
-        }
-    } else {
-        if (level == int_set) {
-            vector_line |= 2;
-        } else {
-            vector_line &= ~2;
-        }
-    }
-    if (last_level)
-    if (vector_line) {
-        level = int_set;
-    } else {
-        level = int_clear;
-    }
-
-    if (level != last_level) {
-        set_interrupt(HDCA_INTERRUPT, level);
-        last_level = level;
-    }
-}
-
 /*
- * see if we need to assert or deassert the interrupt line
- * we need to assert it if we go from int_state == 0
- * we need to deassert it if we go to int_state == 0
+ * set the interrupt line accordingly
  */
 void
 check_interrupt()
 {
 	printf("hdca: check_interrupt\n");
-    set_hd_interrupt(1, int_state ? int_set : int_clear);
+    set_vi(HDCA_INTERRUPT, 0, int_state ? 1 : 0);
 }
 
 /*
@@ -410,6 +376,21 @@ hdca_init()
     return 0;
 }
 
+static int
+hdca_setup()
+{
+    trace_hdca = register_trace("hdca");
+    return 0;
+}
+
+struct driver hdca_driver = {
+    "hdca",
+    0,
+    hdca_setup,
+    hdca_init,
+    0
+};
+
 /*
  * this grammar makes the compiler call this function before main()
  * this means we can add drivers by just adding them to the link
@@ -418,8 +399,7 @@ __attribute__((constructor))
 void
 register_hdca_driver()
 {
-    trace_hdca = register_trace("hdca");
-    register_startup_hook(hdca_init);
+    register_driver(&hdca_driver);
 }
 
 /*

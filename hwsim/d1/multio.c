@@ -25,14 +25,28 @@
 #include <string.h>
 #include <errno.h>
 
-extern int_level int_s100;
-
 int trace_multio;
 int trace_uart;
 int trace_noclock;
 int trace_intr;
 
 #define HZ_1    0x800
+
+#define BAUD    38400
+#define TX_USEC (1000000 / (BAUD / 10))
+
+typedef unsigned long long u64;
+
+u64
+now64()
+{
+    struct timeval tv;
+    u64 u64useconds;
+
+    gettimeofday(&tv,NULL);
+    u64useconds = (1000000*tv.tv_sec) + tv.tv_usec;
+    return u64useconds;
+}
 
 /*
  * there's one of these for every ACE.
@@ -51,8 +65,9 @@ struct ace {
     byte loop;          // loopback count 
     byte loopc;         // loopback character
     byte inti;          // interrupt id
-    int_line vector;    // assert when something happens
+    int vi_line;        // assert when something happens
     byte txpend;        // we have a write in flight
+    u64 txpend_until;   // how long we wait before resetting tx
     int line;
 } ace[3];
 
@@ -116,6 +131,14 @@ struct ace {
 
 static byte group;
 static struct ace *acep;
+
+/*
+ * the 8259 will send 3 bytes in response to an interrupt ack.
+ * the first is a 0xcd, then the high, then the low bytes of the service routine
+ * we have a 0xff as the first byte, which is a broken intack vector.
+ */
+unsigned char vector[4];
+unsigned vcount = 4;
 
 char *
 printable(char v)
@@ -200,7 +223,6 @@ byte irr;           // interrupt request register
 byte isr;           // in-service register
 
 
-byte intin;         // actual interrupt line on s100
 int priority;       // interrupt with current highest priority
 
 int pic_state = 0;
@@ -211,9 +233,9 @@ int pic_state = 0;
 #define PS_READY    4
 
 void
-reg_intbit(int_line signal, char *name)
+reg_intbit(int viline, char *name)
 {
-    intbits[signal] = name;
+    intbits[viline] = name;
 }
 
 int
@@ -229,8 +251,11 @@ multio_dump(char **p)
     printf("\tirr: %02x %s\n", irr, bitdef(irr, intbits));
     printf("\tisr: %02x %s\n", isr, bitdef(isr, intbits));
     printf("\tirq: %02x %s\n", irq, bitdef(irq, intbits));
+    printf("\tvecbase: %04x\n", (icw1 & ICW1_VECL) + (icw2 << 8));
     printf("\tpriority: %d %02x\n", priority, 1 << priority);
-    printf("\tintin: %02x int_s100: %d int_pin: %d\n", intin, int_s100, int_pin);
+    printf("\tint_line: %d int_pin: %d vi_lines %02x\n", int_line, int_pin, vi_lines);
+    printf("\tvcount: %d vector %02x %02x %02x %02x\n",
+        vcount, vector[0], vector[1], vector[2], vector[3]);
     return 0;
 }
 
@@ -238,13 +263,16 @@ int
 bitnum(byte m)
 {
     int i;
+    int b;
 
     for (i = 0; i < 8; i++) {
-        if (m & (1 << i)) {
-            if (m != (1 << i)) {
+        b = (priority + i) % 8;
+        if (m & (1 << b)) {
+            if (m != (1 << b)) {
                 printf("bitnum multiple bits %02x\n", m);
+                multio_dump(0);
             }
-            return i;
+            return b;
         }
     }
     printf("bitnum for no bits set\n");
@@ -277,10 +305,11 @@ wr_pic_port_0(portaddr p, byte v)
         case OCW2_NSEOIR:
             intlevel = bitnum(isr);
             priority = (intlevel + 1) % 8;
-            // fall through
-        case OCW2_NSEOI:
-            isr = 0;
+            isr ^= (1 << intlevel);
             break;
+        case OCW2_NSEOI:
+        default:
+            printf("pic bogus write command\n");
         }
     }
 
@@ -350,43 +379,46 @@ rd_pic_port_1(portaddr p)
 }
 
 /*
+ * based on the irr, imr and isr, set the s100 int line
+ */
+void
+multio_set_int_line()
+{
+    int line;
+
+    // if any unmasked interrupts are high, assert int
+    if (irr & ~(imr | isr)) {
+        line = 1;
+    } else {
+        line = 0;
+    }
+    if (trace & trace_multio) printf("multio: set int %d %x %x %x\n", line, irr, imr, isr);
+    (*int_change)(line);
+}
+
+/*
  * set the level of the interrupt line
  * this set irr in the interrupt controller and possibly sets the s100 
  * interrupt line the s100 interrupt line is reset by the interrupt 
  * vector generation.
  */
 void
-vi_handler(int_line signal, int_level level)
+multio_vi_change(unsigned char new)
 {
-    byte mask;
+    byte mask = vi_lines ^ new;
 
     if (trace & trace_multio) {
-#ifdef notdef
-        printf("multio: vi_handler %d %s %s\n", 
-            signal, intbits[signal], (level == int_set) ? "set" : "clear");
-#endif
+        printf("multio: vi_changed lines:%x new:%x diff:%x\n", 
+            vi_lines, new, mask);
     }
 
-    switch(signal) {
-    case vi_0:  mask = IRQ0; break;
-    case vi_1:  mask = IRQ1; break;
-    case vi_2:  mask = IRQ2; break;
-    case vi_3:  mask = IRQ3; break;
-    case vi_4:  mask = IRQ4; break;
-    case vi_5:  mask = IRQ5; break;
-    case vi_6:  mask = IRQ6; break;
-    case vi_7:  mask = IRQ7; break;
-    default:
-        printf("vi_handler unhandled signal %d %s\n", 
-            signal, (level == int_set) ? "set" : "clear");
+    if (mask == 0) {
         return;
     }
+    vi_lines = new;
 
-    // if no state change, don't do anything
-    if ((level == int_clear) && !(irq & mask)) return;
-    if ((level == int_set) && (irq & mask)) return;
-
-    if (level == int_set) {
+    // if raising interrupt
+    if (new & mask) {
         // if level, unconditional. if edge, need false initial state
         if ((icw1 & ICW1_LTIM) || (!(irq & mask))) {
             irr |= mask;
@@ -396,41 +428,22 @@ vi_handler(int_line signal, int_level level)
         irr &= ~mask;
         irq &= ~mask;
     }
-
-    // if any unmasked interrupts are high, assert int
-    if (irr & ~(imr | isr)) {
-        intin = 1;
-        set_interrupt(interrupt, int_set);
-    } else {
-        intin = 0;
-        set_interrupt(interrupt, int_clear);
-    }
-
-    if (trace & trace_intr) {
-#ifdef notdef
-        printf("intr: vi_%d %s %s intin: %s\n", 
-            signal, (level == int_set) ? "set" : "clear", intbits[signal], intin ? "set" : "clear");
-#else
-        message("multio: vi_handler ");
-        message(intbits[signal]);
-        message((level == int_set) ? " set\n" : " clear\n");
-#endif
-    }
+    multio_set_int_line();
 }
 
-
-// run an interrupt ack cycle and return the vector byte(s) to the cpu card
-intvec
-multio_getvector()
+/*
+ * build the interrupt ack vector
+ */
+void
+multio_buildvector()
 {
     int level;
     int found;
     byte mask;
-    intvec iv;
+    int vecaddr;
 
     if (trace & trace_multio) {
-        printf("multio_getvector:\n");
-        multio_dump(0);
+        printf("multio_buildvector:\n");
     }
     /*
      * find the interrupt request line, starting from the current highest
@@ -453,29 +466,58 @@ multio_getvector()
     if (found == -1) {
         printf("lose: no unmasked request found!\n");
         multio_dump(0);
-        return 0;
+        vcount = 0;         // send them to rst7
+        return;
     }
 
     // if isr is set, then we are already servicing an interrupt
-    isr |= mask; 
-    iv = INTA_LEN | (VECTOR(found) << 8) | 0xcd;
-    irr &= ~mask;
+    isr |= mask;        // add it to ISR
+    
+    vecaddr = (icw1 & ICW1_VECL) + (found * ((icw1 & ICW1_ADI) ? 4 : 8)) + (icw2 << 8);
 
-    if (irr & ~(imr | isr)) {
-        intin = 1;
-        set_interrupt(interrupt, int_set);
-    } else {
-        intin = 0;
-        set_interrupt(interrupt, int_clear);
-    }
+    vector[0] = 0xff;
+    vector[1] = 0xcd;
+    vector[2] = vecaddr & 0xff;
+    vector[3] = (vecaddr >> 8) & 0xff;
+    vcount = 1;
+
+    irr &= ~mask;       // remove it from IRR
+
+    multio_set_int_line();
 
     if (trace & trace_multio) printf("multio: vector %d (%s) multio_intvec %08x\n",
-         found, intbits[found], iv);
+         found, intbits[found], vecaddr);
     if (trace & trace_intr) {
         printf("vectoring to %02x %s handler at 0x%04x\n", 
-            1 << found, intbits[found], VECTOR(found));
+            1 << found, intbits[found], vecaddr);
     }
-    return (iv);
+}
+
+/*
+ * return a byte of interrupt acknowledge. called by the chip simulator
+ * this needs to implement the 8259 state machine
+ */
+unsigned char multio_intack()
+{
+    if (vcount == 4) {
+        multio_buildvector();
+    } 
+    return vector[vcount++];
+}
+
+/*
+ * if we've had a tx pending long enough, set txempty
+ */
+int
+tx_empty(struct ace *ap)
+{
+    if (ap->txpend) {
+        if (ap->txpend_until < now64()) {
+            return 1;
+        }
+        return 0;
+    }
+    return 1;
 }
 
 /*
@@ -497,12 +539,18 @@ uart_interrupt_check(int i)
         message("uart_interrupt_check ioctl error\n");
     }
 
+    // if we've had a tx pending long enough, set txempty
+    if (tx_empty(ap)) {
+        ap->lsr |= LSR_TXE;
+    }
+
     ap->inti = INTI_NOINT;
     if ((ap->inte & INTE_RDAV) && bytes) {
         ap->inti = INTI_RDAV;
     } else if (ap->inte & INTE_TXE) {
-        if (!ap->txpend) {
+        if (ap->lsr & LSR_TXE) {
             ap->inti = INTI_TXE;
+            ap->txpend = 0;
         }
     }
 #ifdef notdef
@@ -512,23 +560,22 @@ uart_interrupt_check(int i)
     }
 #endif
     if (ap->inti == INTI_NOINT) {
-        set_interrupt(ap->vector, int_clear);
+        set_vi(ap->vi_line, 0, 0);
     } else {
-        set_interrupt(ap->vector, int_set);
+        set_vi(ap->vi_line, 0, 1);
     }
 }
 
 static void
-ace_init(int i, char *name, int_line vector)
+ace_init(int i, char *name, int vi_line)
 {
     struct ace *ap = &ace[i];
 
     ap->msr = MSR_CTS | MSR_DSR /* | MSR_RI */ | MSR_DCD;
     ap->line = i;
     ap->name = name;
-    ap->vector = vector;
-    reg_intbit(vector, ap->name);
-    register_interrupt(vector, vi_handler);
+    ap->vi_line = vi_line;
+    reg_intbit(vi_line, ap->name);
     ap->infd = -1;
     ap->outfd = -1;
 }
@@ -577,22 +624,6 @@ rd_rxb(portaddr p)
 }
 
 /*
- * a timeout is set to call this after TXE_TIMEOUT
- */
-void
-txe_set(int i)
-{
-    struct ace *ap = &ace[i - 1];
-
-    if (trace & trace_uart) {
-        printf("txe_set: %s %d\n", ap->name, i);
-    }
-    ap->lsr |= LSR_TXE;
-    ap->txpend = 0;
-    uart_interrupt_check(ap->line);
-}
-
-/*
  * transmitter buffer
  * if LCR_DLAB is set, access to lsb of baud rate divisor
  */
@@ -613,11 +644,8 @@ wr_txb(portaddr p, byte v)
         printf("%s: write txb %s%s\n", acep->name,
             acep->mcr & MCR_LOOP ? "(loopback) " : "", printable(v));
     }
-    if (acep->outfd != -1) {
-        acep->txpend = 1;
-        timeout("uart_txe", TXE_TIMEOUT, txe_set, group);
-        uart_interrupt_check(acep->line);
-    }
+    acep->txpend = 1;
+    acep->txpend_until = now64() + TX_USEC;
 }
 
 /*
@@ -687,6 +715,9 @@ rd_lsr(portaddr p)
         ioctl(acep->infd, FIONREAD, &bytes);
     }
     acep->lsr = 0;
+    if (tx_empty(acep)) {
+        acep->txpend = 0;
+    }
     acep->lsr |= ((acep->txpend == 0) ? LSR_TXE : 0) | (bytes ? LSR_DR : 0);
 
     if (trace & trace_uart) {
@@ -742,11 +773,19 @@ wr_mcr(portaddr p, byte v)
 static byte 
 rd_inti(portaddr p)
 {
+    unsigned char v;
+
     if (trace & trace_uart) {
         printf("%s: read inti %02x %s\n", 
             acep->name, acep->inti, bitdef(acep->inti, inti_bits));
     }
-    return acep->inti;
+    v = acep->inti; 
+    if (v == INTI_TXE) {
+        acep->txpend = 0;
+        acep->inti = INTI_NOINT;
+        set_vi(acep->vi_line, 0, 0);
+    }
+    return v;
 }
 
 static byte 
@@ -791,7 +830,7 @@ wr_msr(portaddr p, byte v)
 void
 clock_handler()
 {
-    set_interrupt(vi_7, int_set);
+    set_vi(7, 0, 1);
 }
 
 /*
@@ -879,7 +918,7 @@ rd_clock(portaddr p)
 {
     byte v;
 
-    set_interrupt(vi_7, int_clear);
+    set_vi(7, 0, 0);
 
     v = (rtc[rtcptr / 8] >> (rtcptr % 8)) & 1;
     if (trace & trace_multio) printf("multio: read clock %02x\n", v);
@@ -1013,8 +1052,12 @@ exit_hook()
     tcsetattr(termfd, TCSANOW, &original_tio);
 }
 
-void
-sigio_handler(int sig)
+/*
+ * between instructions, let's check if anything has happened that we need to react
+ * to.
+ */
+int
+multio_poll()
 {
     int i;
  
@@ -1024,6 +1067,7 @@ sigio_handler(int sig)
         }
         uart_interrupt_check(i);
     }
+    return 0;
 }
 
 static int
@@ -1045,11 +1089,9 @@ multio_init()
         termmask = (config_sw >> 8) & 0x7;
     }
 
-    mysignal(SIGIO, sigio_handler);
-
     for (i = 0; i < 3; i++) {
         sprintf(tname, "uart%d", i);
-        ace_init(i, strdup(tname), vi_3 + i);
+        ace_init(i, strdup(tname), 3 + i);
     }
 
     // if terminal 0 is not an xterm, use mytty - this requires poll child to get SIGIO
@@ -1093,7 +1135,6 @@ multio_init()
                     if (i > sizeof(buf)) i = sizeof(buf);
                     i = read(termfd, buf, i);
                     write(pipe_up[1], buf, i);
-                    kill(mypid, SIGIO);
                 }
                 ioctl(pipe_down[0], FIONREAD, &i);
                 if (i) {
@@ -1111,7 +1152,7 @@ multio_init()
     for (i = 0; i < 3; i++) {
         if (termmask & (1 << i)) {
             sprintf(tname, "multio-%d", i);
-            open_terminal(tname, SIGIO, &ace[i].infd, &ace[i].outfd, 0, 0);
+            open_terminal(tname, 0, &ace[i].infd, &ace[i].outfd, 0, 0);
         }
     }
 
@@ -1120,28 +1161,45 @@ multio_init()
 
 	register_output(MULTIO_MASTER+7, &multio_select);
 	register_output(MULTIO_SLAVE+7, &multio_slave_select);
-    reg_intbit(vi_0, "hd");
-    reg_intbit(vi_1, "djdma");
-    reg_intbit(vi_2, "slave");
-    reg_intbit(vi_7, "clock");
-    register_interrupt(vi_0, vi_handler);               // hdca and hddma
-    register_interrupt(vi_1, vi_handler);               // djdma
-    register_interrupt(vi_2, vi_handler);               // slave
-    register_interrupt(vi_7, vi_handler);               // clock
 
-    register_intvec(multio_getvector);
+    vi_change = &multio_vi_change;
+    get_intack = &multio_intack;
+
+    reg_intbit(0, "hd");
+    reg_intbit(1, "djdma");
+    reg_intbit(2, "slave");
+    reg_intbit(7, "clock");
     register_mon_cmd('M', "\tdump multio state", multio_dump);
 
     return 0;
 }
 
-void
+static int
+multio_setup()
+{
+    myttyname = strdup(ttyname(0));
+    trace_multio = register_trace("multio");
+    trace_uart = register_trace("uart");
+    trace_noclock = register_trace("noclock");
+    trace_intr = register_trace("intr");
+    return 0;
+}
+
+static void
 multio_usage()
 {
     printf("config switch values:\n");
     printf("\t0x0700 - xterm tty enable mask\n");
     printf("\t0x0800 - 1 hz clock\n");
 }
+
+struct driver multio_driver = {
+    "multio",
+    &multio_usage,
+    &multio_setup,
+    &multio_init,
+    &multio_poll
+};
 
 /*
  * this grammar makes the compiler call this function before main()
@@ -1151,15 +1209,9 @@ __attribute__((constructor))
 void
 register_multio_driver()
 {
-    myttyname = strdup(ttyname(0));
-    trace_multio = register_trace("multio");
-    trace_uart = register_trace("uart");
-    trace_noclock = register_trace("noclock");
-    trace_intr = register_trace("intr");
-    register_usage_hook(multio_usage);
-    register_startup_hook(multio_init);
-}
+        register_driver(&multio_driver);
+    }
 
-/*
- * vim: tabstop=4 shiftwidth=4 expandtab:
- */
+    /*
+     * vim: tabstop=4 shiftwidth=4 expandtab:
+     */

@@ -27,7 +27,7 @@ extern int trace_bio;
 extern int terminal_fd_in;
 extern int terminal_fd_out;
 
-#define DJDMA_INTERRUPT vi_1
+#define DJDMA_INTERRUPT 1
 #define DJDMA_INT_DELAY (30 * 1000)
 
 #define	DJDMA_PORT	0xef	// djdma command start port
@@ -68,7 +68,7 @@ static unsigned char setdma(), readsec(), writesec(), sense(),
     setintr(), setretry(), setdrive(), settiming(),
     readtrk(), writetrk(), serin(), serout(),
     djhalt(), branch(), setchannel(), settrk(),
-    read_djmem(), write_djmem(), djexec();
+    read_djmem(), write_djmem(), djexec(), djunknown();
 
 static struct djcmd {
     unsigned char code;             // command byte
@@ -97,6 +97,7 @@ static struct djcmd {
     { 0xa1, 8, 0, write_djmem, "write controller memory" },
     { 0xa2, 3, 0, djexec, "execute controller" }
 };
+struct djcmd unknown = { 0, 0, 0, djunknown, "unknown command" };
 
 /*
  * command status and error codes
@@ -145,8 +146,8 @@ static char *djdma_err[] = {
 #define SB1_HDLD    0x80    // head is loaded
 
 char *sb1_bits[] = {
-    "", "hard sectored", "5.25 inch", "had motor control",
-    "double density", "no drive ready", "no head load", "head loaded"
+    "", "hard", "5.25", "motor control",
+    "dd", "no ready", "no head load", "head loaded"
 };
 
 /* sector length byte */
@@ -176,6 +177,13 @@ static char secbuf[2048];
 static void *imdp[8];
 static int need_intack;
 
+static unsigned char
+djunknown()
+{
+    djdma_running = 0;
+    return 0;
+}
+
 /*
  * start the channel
  */
@@ -193,7 +201,7 @@ pulse_djdma(portaddr p, byte v)
          */
         channel += 2;
         need_intack = 0;
-        set_interrupt(DJDMA_INTERRUPT, int_clear);
+        set_vi(DJDMA_INTERRUPT, 0, 0);
     } else {
         /*
          * fetch from the reset channel address
@@ -204,27 +212,23 @@ pulse_djdma(portaddr p, byte v)
     /*
      * run channel commands until we are told to stop
      */
-    cmd = 0;
     while (djdma_running) {
-        // if (trace & trace_djdma) printf("djdma: fetch channel 0x%x\n", channel);
+        if (trace & trace_djdma) printf("djdma: 0x%x ", channel);
         code = physread(channel);
+        cmd = &unknown;
         for (i = 0; i < (sizeof(djcmd) / sizeof(djcmd[0])); i++) {
             if (djcmd[i].code == code) {
                 cmd = &djcmd[i];
                 break;
             }
         }
-        if (!cmd) {
-            djdma_running = 0;
-            if (trace & trace_djdma) printf("djdma: unknown command %d %x\n", code, code);
-        } else {
-            if (trace & trace_djdma) printf("djdma: command %d %x %s\n", code, code, cmd->name);
-            i = (*cmd->handler)();
-            if (cmd->status) {
-                physwrite(channel + cmd->status, i);
-            }
-            channel += cmd->increment;
+        if (trace & trace_djdma) printf("%d %x %s ", code, code, cmd->name);
+        i = (*cmd->handler)();
+        if (trace & trace_djdma) printf(" = %x\n", i);
+        if (cmd->status) {
+            physwrite(channel + cmd->status, i);
         }
+        channel += cmd->increment;
     }
 }
 
@@ -237,7 +241,7 @@ setdma()
     dmaaddr = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
-    if (trace & trace_djdma) printf("\tsetdma %x\n", dmaaddr);
+    if (trace & trace_djdma) printf("%x", dmaaddr);
     return 0;
 }
 
@@ -250,7 +254,7 @@ setchannel()
     resetchannel = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
-    if (trace & trace_djdma) printf("\tsetchannel %x\n", resetchannel);
+    if (trace & trace_djdma) printf("%x", resetchannel);
     return 0;
 }
 
@@ -273,7 +277,7 @@ branch()
     channel = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
-    if (trace & trace_djdma) printf("\tbranch %x\n", channel);
+    if (trace & trace_djdma) printf("%x", channel);
     return 0;
 }
 
@@ -297,7 +301,7 @@ readsec()
     drive = physread(channel + 3);
 
     if (trace & (trace_bio|trace_djdma)) {
-        printf("\tread sector drive:%d cylinder:%d sec:%d head:%d\n",
+        printf("drive:%d cylinder:%d sec:%d head:%d",
             drive, cyl, sec, head);
     }
     dparams[drive].current = cyl;
@@ -321,7 +325,7 @@ readsec()
 static void
 post_djdma_int(int a)
 {
-    set_interrupt(DJDMA_INTERRUPT, int_set);
+    set_vi(DJDMA_INTERRUPT, 0, 1);
 }
 #endif
 
@@ -334,11 +338,10 @@ setintr()
 {
     need_intack = 1;
     djdma_running = 0;
-    if (trace & trace_djdma) printf("\tsetintr\n");
 #ifdef DELAYED_DJINT
     timeout("djdma_setintr", DJDMA_INT_DELAY, post_djdma_int, 0);
 #else
-    set_interrupt(DJDMA_INTERRUPT, int_set);
+    set_vi(DJDMA_INTERRUPT, 0, 1);
 #endif
     return S_NORMAL;
 }
@@ -363,7 +366,7 @@ writesec()
     drive = physread(channel + 3);
 
     if (trace & (trace_bio|trace_djdma)) {
-        printf("\twrite sector drive:%d cyl:%d sec:%d head:%d\n",
+        printf("drive:%d cyl:%d sec:%d head:%d",
             drive, cyl, sec, head);
     }
     dparams[drive].current = cyl;
@@ -438,7 +441,7 @@ sense()
     physwrite(channel + 4, dsb);
 
     if (trace & trace_djdma) {
-        printf("\tsense drive:%d dcb:%x (%s) slc:%x dsb:%x (%s)\n", 
+        printf("drive:%d dcb:%x (%s) slc:%x dsb:%x (%s)", 
             drive, dcb, bitdef(dcb, sb1_bits), slc, dsb, bitdef(dsb, sb3_bits));
     } 
     return S_NORMAL;
@@ -453,7 +456,7 @@ setretry()
     unsigned char drive;
 
     retrylimit = physread(channel + 1);
-    if (trace & trace_djdma) printf("\tsetretry %d\n", retrylimit);
+    if (trace & trace_djdma) printf("%d", retrylimit);
     return 0;
 }
 
@@ -466,7 +469,7 @@ setdrive()
     unsigned char drive;
 
     drive = physread(channel + 1);
-    if (trace & trace_djdma) printf("\tset drive:%d\n", drive);
+    if (trace & trace_djdma) printf("%d", drive);
     return S_NORMAL;
 }
 
@@ -496,7 +499,7 @@ readtrk()
 
     dparams[drive].current = cyl;
 
-    if (trace & trace_djdma) printf("\treadtrk drive:%d cyl:%d head:%x sectab:%x secs:%d\n", 
+    if (trace & trace_djdma) printf("drive:%d cyl:%d head:%x sectab:%x secs:%d", 
         drive, cyl, head, sectab, secs);
     for (i = 0; i < secs; i++) {
         if (physread(sectab + i) == 0xff) {
@@ -539,8 +542,7 @@ writetrk()
 
     dparams[drive].current = cyl;
 
-    if (trace & trace_djdma) printf("\twritetrk\n");
-    if (trace & trace_djdma) printf("\treadtrk drive:%d cyl:%d head:%x sectab:%x secs:%d\n", 
+    if (trace & trace_djdma) printf("drive:%d cyl:%d head:%x sectab:%x secs:%d", 
         drive, cyl, head, sectab, secs);
     return S_NORMAL;
 }
@@ -557,7 +559,7 @@ settrk()
     drive = physread(channel + 1);
     tracks = physread(channel + 2);
 
-    if (trace & trace_djdma) printf("\tset tracks drive: %d tracks: %d\n", drive, tracks);
+    if (trace & trace_djdma) printf("drive:%d tracks:%d", drive, tracks);
     return S_NORMAL;
 }
 
@@ -571,48 +573,46 @@ settiming()
 
     timing = physread(channel + 1);
 
-    if (trace & trace_djdma) printf("\tset drive timing: %d\n", timing);
+    if (trace & trace_djdma) printf("%d", timing);
     return S_NORMAL;
 }
 
-int poll_enabled = 1;
-int poll_registered;
+int serial_poll = 0;
 
-static void
+static int
 djdma_poll_func()
 {
     int bytes;
     char conschar;
 
-    if (poll_enabled) {
-        // if have not read the last character, no point in checking
-        if (physread(0x3f) == S_NORMAL) {
-            return;
-        }
+    // if serial polling and there is space
+    if (serial_poll && (physread(SERFLAG) != S_NORMAL)) {
         ioctl(terminal_fd_in, FIONREAD, &bytes);
         if (bytes) {
             if (read(terminal_fd_in, &conschar, 1) != 1) {
                 printf("djdma_poll_func: read problem\n");
-                return;
+                return 1;
             }
             physwrite(SERDATA, conschar);
             physwrite(SERFLAG, S_NORMAL);
         }
     }
+    return 0;
 }
 
 /*
- * serial in
+ * serial in - this function enables a poll of any serial data into fixed 0x00003e
+ * if 0x00003f is not 0x40.  that's the handshake for the serial data.
  */
 static unsigned char
 serin()
 {
     switch (physread(channel + 1)) {
     case 0:
-        poll_enabled = 0;
+        serial_poll = 0;
         break;
     case 1:
-        poll_enabled = 1;
+        serial_poll = 1;
         break;
     }
     return S_NORMAL;
@@ -626,10 +626,6 @@ serout()
 {
     byte outch;
 
-    if (!poll_registered) {
-        register_poll_hook(&djdma_poll_func);
-        poll_registered = 1;
-    }
     outch = physread(channel + 1);
     write(terminal_fd_out, &outch, 1);
     return S_NORMAL;
@@ -661,8 +657,8 @@ write_djmem()
         ((char *)dparams)[dest + i] = physread(source + i);
     }
     if (trace & trace_djdma) {
-        printf("\twrite mem %x from %x for %d\n", dest, source, count);
-        printf("\tdrive %d set %s\n", dest / 16, (dest % 16) == 0 ? "tracks" : "timing");
+        printf("write mem %x from %x for %d ", dest, source, count);
+        printf("drive %d set %s", dest / 16, (dest % 16) == 0 ? "tracks" : "timing");
     }
     return S_NORMAL;
 }
@@ -682,7 +678,7 @@ read_djmem()
     dest = physread(channel + 6) + (physread(channel + 7) << 8); 
 
     if (trace & trace_djdma) {
-        printf("\tread mem %x from %x for %d\n", dest, source, count);
+        printf("read mem %x from %x for %d", dest, source, count);
     }
     return S_NORMAL;
 }
@@ -746,6 +742,21 @@ djdma_init()
     return 0;
 }
 
+int
+djdma_setup()
+{
+    trace_djdma = register_trace("djdma");
+    return 0;
+}
+
+struct driver djdma_driver = {
+    "djdma",
+    0,                  // usage
+    &djdma_setup,       // prearg
+    &djdma_init,        // startup
+    &djdma_poll_func,   // poll
+};
+
 /*
  * this grammar makes the compiler call this function before main()
  * this means we can add drivers by just adding them to the link
@@ -754,8 +765,7 @@ __attribute__((constructor))
 void
 register_djdma_driver()
 {
-    register_startup_hook(djdma_init);
-    trace_djdma = register_trace("djdma");
+    register_driver(&djdma_driver);
 }
 
 /*
