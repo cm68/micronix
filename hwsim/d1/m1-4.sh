@@ -1,26 +1,27 @@
 #!/bin/bash -f
-x=
-trace=
-while getopts "xht:c:" opt ; do
+x=""
+tflag=""
+while getopts "xt:c:" opt ; do
 	case "$opt" in
 	x) x=-x
 	;;
-	h) help=-h
-	;;
 	c) conf="$OPTARG"
 	;;
-	t) trace="$OPTARG"
+	t) tflag="$OPTARG"
 	;;
 	esac
 done
 shift "$((OPTIND -1))"
-if ! [ -z $trace ] ; then
-	trarg="-t $trace"
+if ! [ -z $tflag ] ; then
+	trarg="-t $tflag"
 fi
 if ! [ -z $conf ] ; then
 	confarg="-c $conf"
 fi
+disk=../disks/1010-8_stand-alone.IMD
 
 export TERMINAL_FONTSIZE=14
-./d1 -l $help $x -S micronix.sym $confarg $trarg ../disks/1010-8_stand-alone.IMD
+echo "file ./d1" >.gdbargs
+echo "set args -l $x -S micronix.sym $confarg $trarg $disk" >> .gdbargs
+./d1 -l $x -S micronix.sym $confarg $trarg $disk
 stty cooked echo echoe
