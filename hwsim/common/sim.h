@@ -104,7 +104,7 @@ int drive_read(void *dhandle, int cyl, int head, int sec, char *buf);
 /*
  * global simulator variables
  */
-extern int trace;		// bitmask of subsystems to trace
+extern int traceflags;		// bitmask of subsystems to trace
 extern int rom_size;		// set this nonzero to read
 extern char *rom_image;		// binary from
 extern char *rom_filename;	// here
