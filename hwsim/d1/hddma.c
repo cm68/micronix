@@ -203,7 +203,7 @@ attention(portaddr p, byte v)
         channel = physread(DEF_CCA) + (physread(DEF_CCA+1) << 8) + (physread(DEF_CCA+2) << 16);
     }
 
-    if (trace & trace_hddma) printf("hddma: ");
+    trace(trace_hddma, "hddma: ");
 
     copyin((byte *)&command, channel, sizeof(command));
 
@@ -215,18 +215,20 @@ attention(portaddr p, byte v)
     link = command.link_low + (command.link_mid << 8) + (command.link_high << 16);
     head = ((command.selhd & HEAD_MASK) >> HEAD_SHIFT) ^ HEAD_CMP;
 
-    if (trace & trace_hddma) {
+    if (traceflags & trace_hddma) {
     	if ((command.opcode >= 0) && (command.opcode <= OP_NOP)) {
-    		printf("%s ", cmdname[command.opcode]);
+    		logc("%s ", cmdname[command.opcode]);
 		} else {
-			printf("unknown command %d ", command.opcode);
+			logc("unknown command %d ", command.opcode);
 		}
-        printf("drive: %d track: %d step: %d %s head: %x %s%s",
+        logc("drive: %d track: %d step: %d %s head: %x %s%s",
             drv, curcyl[drv], steps, command.seldir & STEP_DOWN ? "down" : "up",
             head, command.selhd & LOW_CURR ? "lowcurr " : "", 
             command.selhd & PRECOMP ? "precomp " : "");
-        printf("args %x %x %x %x ", command.arg0, command.arg1, command.arg2, command.arg3);
-        printf("dmaaddr: 0x%x link 0x%x secsize %d\n", dmaaddr, link, secsize[drv]);
+        logc("args %x %x %x %x ", 
+            command.arg0, command.arg1, command.arg2, command.arg3);
+        logc("dmaaddr: 0x%x link 0x%x secsize %d\n", 
+            dmaaddr, link, secsize[drv]);
     }
 
     // do the stepping that can be in every command
@@ -243,11 +245,11 @@ attention(portaddr p, byte v)
     switch (command.opcode) {
     case OP_READ:
         if (curcyl[drv] != (command.cyl_low + (command.cyl_high << 8))) {
-            printf("\ttrack lossage %d != %d\n", curcyl[drv], i);
+            logc("\ttrack lossage %d != %d\n", curcyl[drv], i);
         }
         i = drive_read(handle[drv], curcyl[drv], command.hd, command.sec, (char *)&secbuf);
         if (i != secsize[drv]) {
-        	printf("\tread sector size mismatch %d expected %d\n", i, secsize[i]);
+        	logc("\tread sector size mismatch %d expected %d\n", i, secsize[i]);
         }
         copyout(secbuf, dmaaddr, i);
 #ifdef notdef
@@ -255,19 +257,19 @@ attention(portaddr p, byte v)
     	// do boot magic here
     	}
 #endif
-        if (trace & trace_bio) hexdump(secbuf, i);
+        if (traceflags & trace_bio) hexdump(secbuf, i);
         command.status = GOOD;
         break;
     case OP_WRITE:
         if (curcyl[drv] != (command.cyl_low + (command.cyl_high << 8))) {
-            printf("\ttrack lossage %d != %d\n", curcyl[drv], i);
+            logc("\ttrack lossage %d != %d\n", curcyl[drv], i);
         }
         copyin(secbuf, dmaaddr, secsize[drv]);
         i = drive_write(handle[drv], curcyl[drv], command.hd, command.sec, (char *)&secbuf);
         if (i != secsize[drv]) {
-        	printf("\twrite sector size mismatch %d expected %d\n", i, secsize[i]);
+        	logc("\twrite sector size mismatch %d expected %d\n", i, secsize[i]);
         }
-        if (trace & trace_bio) hexdump(secbuf, i);
+        if (traceflags & trace_bio) hexdump(secbuf, i);
         command.status = GOOD;
         break;
     case OP_RHEAD:
@@ -276,15 +278,14 @@ attention(portaddr p, byte v)
     case OP_FMT:                                // format a whole track
     	i = FSECSIZE(command.fseccode);
         secsize[drv] = drive_sectorsize(handle[drv], i);
-        if (trace & trace_hddma)
-            printf("\tgap3: %d scnt: %d secsize: %d fill: %x\n",
+        tracec(trace_hddma, "\tgap3: %d scnt: %d secsize: %d fill: %x\n",
                 command.gap3, command.sptneg ^ 0xff, i, command.fill);
         for (i = 0; i < secsize[drv]; i++) {
             secbuf[i] = command.fill;
         }
         for (i = 0; i < (command.sptneg ^ 0xff); i++) {
         	if (drive_write(handle[drv], curcyl[drv], head, i, (char *)secbuf) != secsize[drv]) {
-        		printf("\tformat data fill write error\n");
+        		logc("\tformat data fill write error\n");
         	}
         }
         command.status = GOOD;
@@ -295,20 +296,20 @@ attention(portaddr p, byte v)
         case 0: case 1: case 3: case 7: case 0xf:
             break;
         default:
-            if (trace & trace_hddma) {
-                printf("\tbogus sector size code: %x\n", command.sseccode);
-            }
+            tracec(trace_hddma, "\tbogus sector size code: %x\n", 
+                command.sseccode);
             break;
         }
         command.sseccode = 3;
         i = SSECSIZE(command.sseccode);
-        if (trace & trace_hddma) {
-            printf("\tsteprate: %d ms ", command.steprate & 0x7f);
-            printf("settle: %d ms ", command.settle & 0x7f);
-            printf("secsize %d\n", i);
+        if (traceflags & trace_hddma) {
+            logc("\tsteprate: %d ms ", command.steprate & 0x7f);
+            logc("settle: %d ms ", command.settle & 0x7f);
+            logc("secsize %d\n", i);
         }
         if (i != secsize[drv]) {
-        	printf("\tdrive %d sectorsize mismatch on specify %d expected %d\n", drv, i, secsize[drv]);
+        	logc("\tdrive %d sectorsize mismatch on specify %d expected %d\n", 
+                drv, i, secsize[drv]);
         }
         // secsz[drv] = secsize;
         command.status = GOOD;
@@ -318,8 +319,8 @@ attention(portaddr p, byte v)
         if (curcyl[drv] != 0) {
             command.status |= SS_TRK0;
         }
-        if (trace & trace_hddma)
-            printf("\tsense: %x %s\n", command.status, bitdef(command.status ^ 0xff, sense_b));
+        trace(trace_hddma, "\tsense: %x %s\n", 
+            command.status, bitdef(command.status ^ 0xff, sense_b));
         break;
     case OP_NOP:
         command.status = GOOD;
@@ -331,14 +332,10 @@ attention(portaddr p, byte v)
     copyout((byte *)&command, channel, sizeof(command));
     channel = link;
     if (enable_intr) {
-        if (trace & trace_hddma) {
-            printf("\thddma: set interrupt\n");
-        }
+        trace(trace_hddma, "\thddma: set interrupt\n");
         set_vi(HDDMA_INTERRUPT, 1, 1);
     } else {
-        if (trace & trace_hddma) {
-            printf("\thddma: no interrupt\n");
-        }
+        trace(trace_hddma, "\thddma: no interrupt\n");
     }
 }
 
@@ -348,9 +345,7 @@ attention(portaddr p, byte v)
 static void
 reset(portaddr p, byte v)
 {
-    if (trace & trace_hddma) {
-        printf("hddma: reset\n");
-    }
+    trace(trace_hddma, "hddma: reset\n");
     channel_reset = 1;
 }
      

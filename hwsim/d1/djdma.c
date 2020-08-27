@@ -213,7 +213,7 @@ pulse_djdma(portaddr p, byte v)
      * run channel commands until we are told to stop
      */
     while (djdma_running) {
-        if (trace & trace_djdma) printf("djdma: 0x%x ", channel);
+        trace(trace_djdma, "djdma: 0x%x ", channel);
         code = physread(channel);
         cmd = &unknown;
         for (i = 0; i < (sizeof(djcmd) / sizeof(djcmd[0])); i++) {
@@ -222,9 +222,9 @@ pulse_djdma(portaddr p, byte v)
                 break;
             }
         }
-        if (trace & trace_djdma) printf("%d %x %s ", code, code, cmd->name);
+        tracec(trace_djdma, "%d %x %s ", code, code, cmd->name);
         i = (*cmd->handler)();
-        if (trace & trace_djdma) printf(" = %x\n", i);
+        tracec(trace_djdma, " = %x\n", i);
         if (cmd->status) {
             physwrite(channel + cmd->status, i);
         }
@@ -241,7 +241,7 @@ setdma()
     dmaaddr = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
-    if (trace & trace_djdma) printf("%x", dmaaddr);
+    tracec(trace_djdma, "%x", dmaaddr);
     return 0;
 }
 
@@ -254,7 +254,7 @@ setchannel()
     resetchannel = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
-    if (trace & trace_djdma) printf("%x", resetchannel);
+    tracec(trace_djdma, "%x", resetchannel);
     return 0;
 }
 
@@ -277,7 +277,7 @@ branch()
     channel = physread(channel + 1) + 
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
-    if (trace & trace_djdma) printf("%x", channel);
+    tracec(trace_djdma, "%x", channel);
     return 0;
 }
 
@@ -300,10 +300,8 @@ readsec()
     sec &= 0x7f;
     drive = physread(channel + 3);
 
-    if (trace & (trace_bio|trace_djdma)) {
-        printf("drive:%d cylinder:%d sec:%d head:%d",
+    tracec(trace_bio|trace_djdma, "drive:%d cylinder:%d sec:%d head:%d",
             drive, cyl, sec, head);
-    }
     dparams[drive].current = cyl;
     /* read drive, getfdprmtrk, sec, head into dmaaddr */
     if (imdp[drive]) {
@@ -365,10 +363,8 @@ writesec()
     sec &= 0x7f;
     drive = physread(channel + 3);
 
-    if (trace & (trace_bio|trace_djdma)) {
-        printf("drive:%d cyl:%d sec:%d head:%d",
-            drive, cyl, sec, head);
-    }
+    tracec(trace_bio|trace_djdma, "drive:%d cyl:%d sec:%d head:%d",
+        drive, cyl, sec, head);
     dparams[drive].current = cyl;
     if (imdp[drive]) {
         imd_trkinfo(imdp[drive], cyl, head, 0, &bytes);
@@ -440,10 +436,8 @@ sense()
     physwrite(channel + 3, slc);
     physwrite(channel + 4, dsb);
 
-    if (trace & trace_djdma) {
-        printf("drive:%d dcb:%x (%s) slc:%x dsb:%x (%s)", 
-            drive, dcb, bitdef(dcb, sb1_bits), slc, dsb, bitdef(dsb, sb3_bits));
-    } 
+    tracec(trace_djdma, "drive:%d dcb:%x (%s) slc:%x dsb:%x (%s)", 
+        drive, dcb, bitdef(dcb, sb1_bits), slc, dsb, bitdef(dsb, sb3_bits));
     return S_NORMAL;
 }
 
@@ -456,7 +450,7 @@ setretry()
     unsigned char drive;
 
     retrylimit = physread(channel + 1);
-    if (trace & trace_djdma) printf("%d", retrylimit);
+    tracec(trace_djdma, "%d", retrylimit);
     return 0;
 }
 
@@ -469,7 +463,7 @@ setdrive()
     unsigned char drive;
 
     drive = physread(channel + 1);
-    if (trace & trace_djdma) printf("%d", drive);
+    tracec(trace_djdma, "%d", drive);
     return S_NORMAL;
 }
 
@@ -499,7 +493,7 @@ readtrk()
 
     dparams[drive].current = cyl;
 
-    if (trace & trace_djdma) printf("drive:%d cyl:%d head:%x sectab:%x secs:%d", 
+    tracec(trace_djdma, "drive:%d cyl:%d head:%x sectab:%x secs:%d", 
         drive, cyl, head, sectab, secs);
     for (i = 0; i < secs; i++) {
         if (physread(sectab + i) == 0xff) {
@@ -542,7 +536,7 @@ writetrk()
 
     dparams[drive].current = cyl;
 
-    if (trace & trace_djdma) printf("drive:%d cyl:%d head:%x sectab:%x secs:%d", 
+    tracec(trace_djdma, "drive:%d cyl:%d head:%x sectab:%x secs:%d", 
         drive, cyl, head, sectab, secs);
     return S_NORMAL;
 }
@@ -559,7 +553,7 @@ settrk()
     drive = physread(channel + 1);
     tracks = physread(channel + 2);
 
-    if (trace & trace_djdma) printf("drive:%d tracks:%d", drive, tracks);
+    tracec(trace_djdma, "drive:%d tracks:%d", drive, tracks);
     return S_NORMAL;
 }
 
@@ -573,7 +567,7 @@ settiming()
 
     timing = physread(channel + 1);
 
-    if (trace & trace_djdma) printf("%d", timing);
+    tracec(trace_djdma, "%d", timing);
     return S_NORMAL;
 }
 
@@ -656,10 +650,9 @@ write_djmem()
     for (i = 0; i < count; i++) {
         ((char *)dparams)[dest + i] = physread(source + i);
     }
-    if (trace & trace_djdma) {
-        printf("write mem %x from %x for %d ", dest, source, count);
-        printf("drive %d set %s", dest / 16, (dest % 16) == 0 ? "tracks" : "timing");
-    }
+    tracec(trace_djdma, "write mem %x from %x for %d ", dest, source, count);
+    tracec(trace_djdma, "drive %d set %s", 
+        dest / 16, (dest % 16) == 0 ? "tracks" : "timing");
     return S_NORMAL;
 }
 
@@ -677,9 +670,7 @@ read_djmem()
     count = physread(channel + 4) + physread(channel + 5); 
     dest = physread(channel + 6) + (physread(channel + 7) << 8); 
 
-    if (trace & trace_djdma) {
-        printf("read mem %x from %x for %d", dest, source, count);
-    }
+    tracec(trace_djdma, "read mem %x from %x for %d", dest, source, count);
     return S_NORMAL;
 }
 

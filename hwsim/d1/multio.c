@@ -29,24 +29,11 @@ int trace_multio;
 int trace_uart;
 int trace_noclock;
 int trace_intr;
+int trace_intack;
 
 #define HZ_1    0x800
 
-#define BAUD    38400
-#define TX_USEC (1000000 / (BAUD / 10))
-
-typedef unsigned long long u64;
-
-u64
-now64()
-{
-    struct timeval tv;
-    u64 u64useconds;
-
-    gettimeofday(&tv,NULL);
-    u64useconds = (1000000*tv.tv_sec) + tv.tv_usec;
-    return u64useconds;
-}
+#define BAUDCLOCK   1843200L
 
 /*
  * there's one of these for every ACE.
@@ -55,6 +42,10 @@ struct ace {
     char *name;
     int outfd;
     int infd;
+
+    // the chip's registers
+    byte rxb;           // rx buffer
+    byte txb;           // tx buffer
     byte lcr;           // line control
     byte lsr;           // line status register
     byte mcr;           // modem control character
@@ -62,13 +53,20 @@ struct ace {
     byte dll;           // baud rate lo
     byte dlm;           // baud rate hi
     byte inte;          // interrupt enables
-    byte loop;          // loopback count 
-    byte loopc;         // loopback character
     byte inti;          // interrupt id
-    int vi_line;        // assert when something happens
-    byte txpend;        // we have a write in flight
-    u64 txpend_until;   // how long we wait before resetting tx
+
+    byte int_state;     // these are a latched interrupt cause
+#define IS_RX           0x01
+#define  IS_TX           0x02
+
+    int vi_line;        // what line to yank on
+
+    // do not deliver characters any faster than the baud rate
+    u64 rxwait;         // rx only when
+    u64 txpend;         // tx done when
+
     int line;
+    u64 chartime;       // shift time through the uart
 } ace[3];
 
 #define TXE_TIMEOUT     5000     // how long to wait before setting LSR_TXE
@@ -101,12 +99,11 @@ struct ace {
 #define INTE_MDM    0x08    // modem status change
 
 // interrupt identify       base + 2    0x4a
-#define INTI_NOINT  0x01    // no interrupt
-#define INTI_MASK   0x06    // mask of interrupt causes
-#define     INTI_RSTAT  0x6     // reciever status
-#define     INTI_RDAV   0x4     // rx char available
-#define     INTI_TXE    0x2     // tx buffer empty
-#define     INTI_MDM    0x0     // modem status change
+#define INTI_MDM    0x0     // modem status change
+#define INTI_NOINT  0x1     // no interrupt
+#define INTI_TXE    0x2     // tx buffer empty
+#define INTI_RDAV   0x4     // rx char available
+#define INTI_RSTAT  0x6     // reciever status
 
 // modem status
 #define MSR_DCTS    0x01
@@ -129,16 +126,8 @@ struct ace {
 #define GRP2        0x02    // serial 2
 #define GRP3        0x03    // serial 3
 
+// the group select register
 static byte group;
-static struct ace *acep;
-
-/*
- * the 8259 will send 3 bytes in response to an interrupt ack.
- * the first is a 0xcd, then the high, then the low bytes of the service routine
- * we have a 0xff as the first byte, which is a broken intack vector.
- */
-unsigned char vector[4];
-unsigned vcount = 4;
 
 char *
 printable(char v)
@@ -161,6 +150,7 @@ printable(char v)
     return sbuf;
 }
 
+static char *group_bits[] = { 0, 0, "membank", "intena", "printreset", "parstb", 0, 0 };
 static char *intbits[] = { "", "", "", "", "", "", "", "" };
 static char *icw1_bits[] = { "icw4need", "single", "interval4", "level", "icw1", 0, 0, 0 };
 static char *ocw2_bits[] = { 0, 0, 0, 0, 0, "eoi", "spec", "rotate" };
@@ -216,8 +206,6 @@ byte ocw3;
 #define OCW3_SMM    0x20        // set special mask mode
 #define OCW3_ESMM   0x40        // affect special mask mode
 
-byte irq;           // interrupt input register
-
 byte imr;           // interrupt mask register (enables are low)
 byte irr;           // interrupt request register
 byte isr;           // in-service register
@@ -238,24 +226,39 @@ reg_intbit(int viline, char *name)
     intbits[viline] = name;
 }
 
+/*
+ * the 8259 will send 3 bytes in response to an interrupt ack.
+ * the first is a 0xcd, then the high, then the low bytes of the service routine
+ * we have a 0xff as the first byte, which is a broken intack vector.
+ */
+unsigned char vector[3];
+#define IV_FILLED   0
+#define IV_1SENT    1
+#define IV_2SENT    2
+#define IV_EMPTY    3
+#define IV_INVALID  4
+
+int ivecstate = IV_INVALID;
+char *ivs_name[] = { "filled", "1", "2", "empty", "invalid" };
+unsigned char iv_isrbit;
+
 int
 multio_dump(char **p)
 {
-    printf("multio dump: group %d\n", group);
-    printf("\tpic_state: %d\n", pic_state);
-    printf("\ticw1: %02x %s\n", icw1, bitdef(icw1, icw1_bits));
-    printf("\tocw2: %02x %s\n", ocw2, bitdef(ocw2, ocw2_bits));
-    printf("\tocw3: %02x %s\n", ocw3, bitdef(ocw3, ocw3_bits));
-    printf("\ticw4: %02x %s\n", icw4, bitdef(icw4, icw4_bits));
-    printf("\timr: %02x %s\n", (~imr) & 0xff, bitdef(~imr, intbits));
-    printf("\tirr: %02x %s\n", irr, bitdef(irr, intbits));
-    printf("\tisr: %02x %s\n", isr, bitdef(isr, intbits));
-    printf("\tirq: %02x %s\n", irq, bitdef(irq, intbits));
-    printf("\tvecbase: %04x\n", (icw1 & ICW1_VECL) + (icw2 << 8));
-    printf("\tpriority: %d %02x\n", priority, 1 << priority);
-    printf("\tint_line: %d int_pin: %d vi_lines %02x\n", int_line, int_pin, vi_lines);
-    printf("\tvcount: %d vector %02x %02x %02x %02x\n",
-        vcount, vector[0], vector[1], vector[2], vector[3]);
+    log("multio dump: group %d\n", group);
+    log("\tpic_state: %d\n", pic_state);
+    log("\ticw1: %02x %s\n", icw1, bitdef(icw1, icw1_bits));
+    log("\tocw2: %02x %s\n", ocw2, bitdef(ocw2, ocw2_bits));
+    log("\tocw3: %02x %s\n", ocw3, bitdef(ocw3, ocw3_bits));
+    log("\ticw4: %02x %s\n", icw4, bitdef(icw4, icw4_bits));
+    log("\timr: %02x %s\n", (~imr) & 0xff, bitdef(~imr, intbits));
+    log("\tirr: %02x %s\n", irr, bitdef(irr, intbits));
+    log("\tisr: %02x %s\n", isr, bitdef(isr, intbits));
+    log("\tvecbase: %04x\n", (icw1 & ICW1_VECL) + (icw2 << 8));
+    log("\tpriority: %d %02x\n", priority, 1 << priority);
+    log("\tint_line: %d int_pin: %d vi_lines %02x\n", int_line, int_pin, vi_lines);
+    log("\tivecstate: %s isrbit: %02x vector %02x %02x %02x\n",
+        ivs_name[ivecstate], iv_isrbit, vector[0], vector[1], vector[2]);
     return 0;
 }
 
@@ -269,15 +272,28 @@ bitnum(byte m)
         b = (priority + i) % 8;
         if (m & (1 << b)) {
             if (m != (1 << b)) {
-                printf("bitnum multiple bits %02x\n", m);
+                log("bitnum multiple bits %02x\n", m);
                 multio_dump(0);
             }
             return b;
         }
     }
-    printf("bitnum for no bits set\n");
+    log("bitnum for no bits set\n");
     multio_dump(0);
     return 0;
+}
+
+struct ace *
+select_ace()
+{
+    int line = group & GROUP_MASK;
+    
+    if (line) {
+        line--;
+    } else {
+        log("select_ace: group 0\n");
+    }
+    return &ace[line];
 }
 
 static void
@@ -293,6 +309,9 @@ wr_pic_port_0(portaddr p, byte v)
         pic_state = PS_ICW2;
         icw1 = v;
         priority = 0;
+        if (!(icw1 & ICW1_LTIM)) {
+            log("multio:  edge triggered not supported\n");
+        } 
     } else if (v & PIC0_OCW3) {     // OCW3
         bdec = ocw3_bits;
         rname = "ocw3";
@@ -304,18 +323,21 @@ wr_pic_port_0(portaddr p, byte v)
         switch (ocw2 & OCW2_CMD) {
         case OCW2_NSEOIR:
             intlevel = bitnum(isr);
+            trace(trace_multio, "multio: NSEOIR isr:%02x lvl:%d pri:%d\n", 
+                isr, intlevel, priority);
             priority = (intlevel + 1) % 8;
             isr ^= (1 << intlevel);
             break;
         case OCW2_NSEOI:
+            isr = 0;
+            break;
         default:
-            printf("pic bogus write command\n");
+            log("pic bogus ocw2 write command %x\n", ocw2);
         }
     }
 
-    if (trace & trace_multio) {
-        printf("multio: write pic0 %02x %s: %s\n", v, rname, bitdef(v, bdec));
-    }
+    trace(trace_multio, "multio: write pic0 %02x %s: %s %x\n", 
+        v, rname, bitdef(v, bdec), isr);
 }
 
 static void
@@ -361,20 +383,21 @@ wr_pic_port_1(portaddr p, byte v)
         reg = "unknown";
         bdec = nobits;
     }
-    if (trace & trace_multio) printf("multio: write pic1 %s %02x, %s\n", reg, v, bitdef(v, bdec));
+    trace(trace_multio, "multio: write pic1 %s %02x, %s\n", 
+        reg, v, bitdef(v, bdec));
 }
 
 static byte 
 rd_pic_port_0(portaddr p)
 {
-    if (trace & trace_multio) printf("multio: read pic0\n");
+    trace(trace_multio, "multio: read pic0\n");
     return 0;
 }
 
 static byte 
 rd_pic_port_1(portaddr p)
 {
-    if (trace & trace_multio) printf("multio: read pic1\n");
+    trace(trace_multio, "multio: read pic1\n");
     return 0;
 }
 
@@ -386,13 +409,14 @@ multio_set_int_line()
 {
     int line;
 
-    // if any unmasked interrupts are high, assert int
-    if (irr & ~(imr | isr)) {
+    // if any unmasked, unserviced interrupts are high, assert int
+    if ((irr & ~imr) & ~isr) {
         line = 1;
     } else {
         line = 0;
     }
-    if (trace & trace_multio) printf("multio: set int %d %x %x %x\n", line, irr, imr, isr);
+    trace(trace_multio, "multio: %s imr:%x irr:%x isr:%x\n", 
+        line ? "set":"clear", imr, irr, isr);
     (*int_change)(line);
 }
 
@@ -407,163 +431,215 @@ multio_vi_change(unsigned char new)
 {
     byte mask = vi_lines ^ new;
 
-    if (trace & trace_multio) {
-        printf("multio: vi_changed lines:%x new:%x diff:%x\n", 
+    trace(trace_multio, "multio: vi_changed lines:%x new:%x diff:%x\n", 
             vi_lines, new, mask);
-    }
 
     if (mask == 0) {
+        log("multio: vi_change no change new:%02x prev:%02x\n", new, vi_lines);
         return;
     }
     vi_lines = new;
 
     // if raising interrupt
     if (new & mask) {
-        // if level, unconditional. if edge, need false initial state
-        if ((icw1 & ICW1_LTIM) || (!(irq & mask))) {
-            irr |= mask;
-        }
-        irq |= mask;
+        irr |= mask;
     } else {
         irr &= ~mask;
-        irq &= ~mask;
     }
     multio_set_int_line();
-}
-
-/*
- * build the interrupt ack vector
- */
-void
-multio_buildvector()
-{
-    int level;
-    int found;
-    byte mask;
-    int vecaddr;
-
-    if (trace & trace_multio) {
-        printf("multio_buildvector:\n");
-    }
-    /*
-     * find the interrupt request line, starting from the current highest
-     * priority
-     */
-    found = -1;
-    level = priority;
-    do {
-        mask = 1 << level;
-
-        // if we have an unmasked request, we found our request
-        if ((mask & irr) && !(mask & imr)) {
-            found = level;
-            break;
-        }
-        level = (level + 1) % 8;
-    } while (level != priority);
-
-    // we didn't find a cause for our interrupt
-    if (found == -1) {
-        printf("lose: no unmasked request found!\n");
-        multio_dump(0);
-        vcount = 0;         // send them to rst7
-        return;
-    }
-
-    // if isr is set, then we are already servicing an interrupt
-    isr |= mask;        // add it to ISR
-    
-    vecaddr = (icw1 & ICW1_VECL) + (found * ((icw1 & ICW1_ADI) ? 4 : 8)) + (icw2 << 8);
-
-    vector[0] = 0xff;
-    vector[1] = 0xcd;
-    vector[2] = vecaddr & 0xff;
-    vector[3] = (vecaddr >> 8) & 0xff;
-    vcount = 1;
-
-    irr &= ~mask;       // remove it from IRR
-
-    multio_set_int_line();
-
-    if (trace & trace_multio) printf("multio: vector %d (%s) multio_intvec %08x\n",
-         found, intbits[found], vecaddr);
-    if (trace & trace_intr) {
-        printf("vectoring to %02x %s handler at 0x%04x\n", 
-            1 << found, intbits[found], vecaddr);
-    }
 }
 
 /*
  * return a byte of interrupt acknowledge. called by the chip simulator
  * this needs to implement the 8259 state machine
+ * when sending the last byte of the vector, we set the isr
+ * for that vector.
  */
-unsigned char multio_intack()
+unsigned char
+multio_intack()
 {
-    if (vcount == 4) {
-        multio_buildvector();
-    } 
-    return vector[vcount++];
-}
+    int level;
+    byte mask;
+    int vecaddr;
+    unsigned char i;
 
-/*
- * if we've had a tx pending long enough, set txempty
- */
-int
-tx_empty(struct ace *ap)
-{
-    if (ap->txpend) {
-        if (ap->txpend_until < now64()) {
-            return 1;
+    trace(trace_intack, "multio_intack: ivecstate=%d %s\n", 
+        ivecstate, ivs_name[ivecstate]);
+
+    // the vector is empty, so let's calculate it
+    if (ivecstate == IV_EMPTY) {
+        /*
+         * find the interrupt request line, starting from the current highest
+         * priority
+         */
+        for (i = 0; i < 8; i++) {
+            level = (priority + i) % 8;
+            mask = 1 << level;
+
+            // if we have an unmasked request, we found our request
+            if ((mask & irr) && !(mask & imr)) {
+                break;
+            }
         }
-        return 0;
+
+        // we didn't find a cause for our interrupt
+        if (i == 8) {
+            log("lose: no unmasked request found!\n");
+            multio_dump(0);
+            ivecstate = IV_INVALID;
+            iv_isrbit = 0;
+        } else {
+            iv_isrbit = mask;
+            vecaddr = (icw1 & ICW1_VECL) + (level * ((icw1 & ICW1_ADI) ? 4 : 8)) + (icw2 << 8);
+            vector[0] = 0xcd;
+            vector[1] = vecaddr & 0xff;
+            vector[2] = (vecaddr >> 8) & 0xff;
+            ivecstate = IV_FILLED;
+            trace(trace_multio, "multio: vector %d (%s) %04x\n",
+                    level, intbits[level], vecaddr);
+            trace(trace_intr, "vectoring to %02x %s handler at 0x%04x\n", 
+                    mask, intbits[level], vecaddr);
+        }
     }
-    return 1;
+
+    switch (ivecstate) {
+    case IV_INVALID:
+        ivecstate = IV_EMPTY;
+        i = 0xff;
+        break;
+    case IV_FILLED:
+        ivecstate++;
+        i = vector[0];
+        break;
+    case IV_1SENT:
+        ivecstate++;
+        i =  vector[1];
+        break;
+    case IV_2SENT:
+        ivecstate = IV_EMPTY;
+        i =  vector[2];
+        break;
+    default:
+        log("bad ivecstate %d\n", ivecstate);
+        i =  0xff;
+        iv_isrbit = 0;
+        ivecstate = IV_EMPTY;
+        break;
+    }
+
+    // if we just sent the last ivec byte, set the isr bit
+    if (ivecstate == IV_EMPTY) {
+        isr |= iv_isrbit;
+        // clear the interrupt if there are no more enabled
+        multio_set_int_line();
+    }
+    return i;
 }
 
 /*
- * set the state of the interrupt line appropriately conditioned on enable bits
- * these are prioritized
- * we only implement TXE and RDAV.
+ * manage the inti register, and the corresponding vi line
+ * this is based on the conditions of the enables and the
+ * lsr
  */
 void
-uart_interrupt_check(int i)
+multio_set_inti(struct ace *ap)
 {
-    struct ace *ap = &ace[i];
-    int bytes;
+    unsigned char before = ap->inti;
 
-    if (ap->infd == -1) {
-        return;
-    }
-
-    if (ioctl(ap->infd, FIONREAD, &bytes) == -1) {
-        message("uart_interrupt_check ioctl error\n");
-    }
-
-    // if we've had a tx pending long enough, set txempty
-    if (tx_empty(ap)) {
-        ap->lsr |= LSR_TXE;
-    }
-
-    ap->inti = INTI_NOINT;
-    if ((ap->inte & INTE_RDAV) && bytes) {
+    if ((ap->inte & INTE_RDAV) && (ap->lsr & LSR_DR)) {
         ap->inti = INTI_RDAV;
-    } else if (ap->inte & INTE_TXE) {
-        if (ap->lsr & LSR_TXE) {
-            ap->inti = INTI_TXE;
+    } else if ((ap->inte & INTE_TXE) && (ap->lsr & LSR_TXE)) {
+        ap->inti = INTI_TXE;
+    } else {
+        ap->inti = INTI_NOINT;
+    }
+
+    // only call set_vi on a change
+    if ((before == INTI_NOINT) && (ap->inti != INTI_NOINT)) {
+        set_vi(ap->vi_line, 0, 1);
+    } else if ((before != INTI_NOINT) && (ap->inti == INTI_NOINT)) {
+        set_vi(ap->vi_line, 0, 0);
+    }
+}
+
+/*
+ * the uart registers hold truth all the time.   any dynamic changes to the registers,
+ * like txready, rxready, etc, are updated by a poll. all interrupts are generated from the poll
+ */
+int
+multio_uart_poll(struct ace *ap)
+{
+    int bytes;
+    int error;
+    long long now;
+
+    now = now64();
+
+    // if we are shifting a character out.
+    if (ap->txpend) {
+        // has it been shifted out yet?
+        if (now >= ap->txpend) {
+            ap->lsr |= LSR_TXE;
             ap->txpend = 0;
+            multio_set_inti(ap);
+
+            // if we are in loopback mode, the output character now appears in the input register
+            if (ap->mcr & MCR_LOOP) {
+                ap->rxb = ap->txb;
+                ap->lsr |= LSR_TXE | LSR_DR;
+                multio_set_inti(ap);
+            }
         }
     }
+    
+    // let's not try to read from a non-connected terminal
+    if (ap->infd == -1) {
+        return 0;
+    }
+
+    // let's not recieve characters any faster than the recieve baud rate
+    if (now < ap->rxwait) {
 #ifdef notdef
-    if (trace & trace_uart) {
-        printf("uart_interrupt_check %s inte: %02x inti: %02x %s txpend: %d bytes: %d\n",
-            ap->name, ap->inte, ap->inti, bitdef(ap->inti, inti_bits), ap->txpend, bytes);
-    }
+        trace(trace_uart, "early poll ret %lld %lld %lld\n", 
+            now, ap->rxwait, ap->rxwait - now);
 #endif
-    if (ap->inti == INTI_NOINT) {
-        set_vi(ap->vi_line, 0, 0);
-    } else {
-        set_vi(ap->vi_line, 0, 1);
+        return 0;
     }
+
+    // let's not do a reciever overrun
+    if (ap->lsr & LSR_DR) {
+#ifdef notdef
+        trace(trace_uart, "rx overrun\n", now, ap->rxwait);
+#endif
+        return 0;
+    }
+
+    // test to see if there are any input characters
+    if ((error = ioctl(ap->infd, FIONREAD, &bytes)) != 0) {
+        log("multio_uart_poll: FIONREAD ioctl failed: %d\n",
+            error);
+        return 0;
+    }
+
+    // got any?
+    if (bytes == 0) {
+        return 0;
+    }
+
+    // lets get one
+    if ((bytes = read(ap->infd, &ap->rxb, 1)) != 1) {
+        log("multio_uart_poll: read failed: %d\n",
+            bytes);
+        return 0;
+    }
+
+    ap->lsr |= LSR_DR;
+    
+    // and let's let the simulator know
+    if (ap->inte & INTE_RDAV) {
+        multio_set_inti(ap);
+    }
+    return 0;
 }
 
 static void
@@ -572,54 +648,42 @@ ace_init(int i, char *name, int vi_line)
     struct ace *ap = &ace[i];
 
     ap->msr = MSR_CTS | MSR_DSR /* | MSR_RI */ | MSR_DCD;
-    ap->line = i;
+    ap->lsr = LSR_TXE;
     ap->name = name;
     ap->vi_line = vi_line;
+    ap->rxwait = now64();
     reg_intbit(vi_line, ap->name);
     ap->infd = -1;
     ap->outfd = -1;
+    ap->line = i;
 }
 
 /*
  * recieve buffer.  
- * the selftest uses the loopback function, so we need to handle it.
- * while loopback is set in the mcr, then we return any character written to txb.
  * if LCR_DLAB is set, access to lsb of baud rate divisor
  */
 static byte 
 rd_rxb(portaddr p) 
 {
-    byte retval;
-    int bytes;
+    struct ace *ap = select_ace();
+    unsigned char retval;
 
-    if (acep->lcr & LCR_DLAB) {
-        return acep->dll;
+    if (ap->lcr & LCR_DLAB) {
+        return ap->dll;
     }
-    if (acep->mcr & MCR_LOOP) {
-        if (!acep->loop) {
-            if (trace & trace_uart) printf("%s: read unwritten loopback\n", acep->name);
-        }
-        acep->loop = 0;
-        retval = acep->loopc;
-    } else if (acep->infd == -1) {
-        retval = 0;
+
+    // only read valid data if DR, else return null */
+    if (ap->lsr & LSR_DR) {
+        retval = ap->rxb;
+
+        ap->lsr &= ~LSR_DR;
+        ap->rxwait = now64() + ap->chartime;
+        multio_set_inti(ap);
     } else {
-        ioctl(acep->infd, FIONREAD, &bytes);
-        if (bytes) {
-            if (read(acep->infd, &retval, 1) != 1) {
-                if (trace & trace_uart) printf("%s: rd_rxb failed\n", acep->name);
-            }
-        } else {
-            retval = 0;
-        }
+        retval = 0;
     }
-    // if we set a read interrupt, maybe clear it
-    uart_interrupt_check(acep->line);
-
-    if (trace & trace_uart) {
-        printf("%s: read rxb = %s%s\n", acep->name,
-            acep->mcr & MCR_LOOP ? "(loopback) " : "", printable(retval));
-    }
+    trace(trace_uart, "%s: read rxb = %s%s\n",
+         ap->name, ap->mcr & MCR_LOOP ? "(loopback) " : "", printable(retval));
     return retval;
 }
 
@@ -630,22 +694,33 @@ rd_rxb(portaddr p)
 static void
 wr_txb(portaddr p, byte v) 
 {
-    if (acep->lcr & LCR_DLAB) {
-        acep->dll = v;
+    struct ace *ap = select_ace();
+
+    if (ap->lcr & LCR_DLAB) {
+        trace(trace_uart, "%s: write dll %02x\n", ap->name, v);
+        ap->dll = v;
         return;
     }
-    if (acep->mcr & MCR_LOOP) {
-        acep->loopc = v;
-        acep->loop = 1;
-    } else if (acep->outfd != -1) {
-        write(acep->outfd, &v, 1);
+
+    if (v == '?') {
+        printf("el bizarro");
+        while (1) ;
     }
-    if (trace & trace_uart) {
-        printf("%s: write txb %s%s\n", acep->name,
-            acep->mcr & MCR_LOOP ? "(loopback) " : "", printable(v));
+
+    // detect overrun
+    if (!(ap->lsr & LSR_TXE)) {
+        log("multio: send overrun on line %d\n", ap->line);
     }
-    acep->txpend = 1;
-    acep->txpend_until = now64() + TX_USEC;
+
+    ap->txpend = now64() + ap->chartime;
+    ap->txb = v;
+    ap->lsr &= ~LSR_TXE;
+
+    if (((ap->mcr & MCR_LOOP) == 0) && (ap->outfd != -1)) {
+        write(ap->outfd, &v, 1);
+    }
+    trace(trace_uart, "%s: write txb %s%s\n", 
+        ap->name, ap->mcr & MCR_LOOP ? "(loopback) " : "", printable(v));
 }
 
 /*
@@ -655,27 +730,30 @@ wr_txb(portaddr p, byte v)
 static byte 
 rd_inte(portaddr p)
 {
-    if (acep->lcr & LCR_DLAB) {
-        return acep->dlm;
+    struct ace *ap = select_ace();
+
+    if (ap->lcr & LCR_DLAB) {
+        return ap->dlm;
     }
-    if (trace & trace_uart) {
-        printf("%s: read inte %02x %s\n", acep->name, acep->inte, bitdef(acep->inte, inte_bits));
-    }
-    return acep->inte;
+    trace(trace_uart, "%s: read inte %02x %s\n", 
+        ap->name, ap->inte, bitdef(ap->inte, inte_bits));
+    return ap->inte;
 }
 
 static void
 wr_inte(portaddr p, byte v)
 {
-    if (acep->lcr & LCR_DLAB) {
-        acep->dlm = v;
+    struct ace *ap = select_ace();
+
+    if (ap->lcr & LCR_DLAB) {
+        trace(trace_uart, "%s: write dlm %02x\n", ap->name, v);
+        ap->dlm = v;
         return;
     }
-    acep->inte = v;
-    if (trace & trace_uart) {
-        printf("%s: write inte %02x %s\n", acep->name, acep->inte, bitdef(acep->inte, inte_bits));
-    }
-    uart_interrupt_check(acep->line);
+    ap->inte = v;
+    trace(trace_uart, "%s: write inte %02x %s\n", 
+        ap->name, ap->inte, bitdef(ap->inte, inte_bits));
+    multio_set_inti(ap);
 }
 
 /*
@@ -685,55 +763,55 @@ wr_inte(portaddr p, byte v)
 static byte 
 rd_lcr(portaddr p)
 {
-    if (trace & trace_uart) {
-        printf("%s: read lcr %02x %s\n", acep->name, acep->lcr, bitdef(acep->lcr, lcr_bits));
-    }
-    return acep->lcr;
+    struct ace *ap = select_ace();
+
+    trace(trace_uart, "%s: read lcr %02x %s\n", 
+        ap->name, ap->lcr, bitdef(ap->lcr, lcr_bits));
+    return ap->lcr;
 }
 
 static void
 wr_lcr(portaddr p, byte v)
 {
-    acep->lcr = v;
-    if (trace & trace_uart) {
-        printf("%s: write lcr %02x %s\n", acep->name, acep->lcr, bitdef(acep->lcr, lcr_bits));
+    struct ace *ap = select_ace();
+
+    // when resetting LCR_DLAB, calculate the character shift time
+    if ((ap->lcr & LCR_DLAB) && !(v & LCR_DLAB)) {
+        ap->chartime = (((ap->dlm << 8) + ap->dll) * 16 * 1000000L * 10);
+        ap->chartime /= BAUDCLOCK;
+        trace(trace_uart, "%s: set baud rate %d %lld\n", 
+            ap->name, (ap->dlm << 8) + ap->dll, ap->chartime);
     }
+    ap->lcr = v;
+    trace(trace_uart, "%s: write lcr %02x %s\n", 
+        ap->name, ap->lcr, bitdef(ap->lcr, lcr_bits));
 }
 
-static byte last_lsr[3];
 /*
  * line status register.
  */
 static byte 
 rd_lsr(portaddr p)
 {
-    int bytes = 0;
-
-    if (acep->mcr & MCR_LOOP) {
-        bytes = acep->loop;
-    } else if (acep->infd != -1) {
-        ioctl(acep->infd, FIONREAD, &bytes);
+    struct ace *ap = select_ace();
+    static unsigned char last[3];
+    // if it changed, maybe log it
+    if (ap->lsr != last[ap->line]) {
+        trace(trace_uart, "%s: read linestat %02x %s\n", 
+            ap->name, ap->lsr, bitdef(ap->lsr, lsr_bits));
     }
-    acep->lsr = 0;
-    if (tx_empty(acep)) {
-        acep->txpend = 0;
-    }
-    acep->lsr |= ((acep->txpend == 0) ? LSR_TXE : 0) | (bytes ? LSR_DR : 0);
-
-    if (trace & trace_uart) {
-        if (last_lsr[group - 1] != acep->lsr) {
-            printf("%s: read linestat %02x %s\n", acep->name, acep->lsr, bitdef(acep->lsr, lsr_bits));
-            last_lsr[group - 1] = acep->lsr;
-        }
-    }
-    return acep->lsr;
+    last[ap->line] = ap->lsr;
+    return ap->lsr;
 }
 
 // the chip docs say this register is not well defined for write.
 static void
 wr_lsr(portaddr p, byte v)
 {
-    if (trace & trace_uart) printf("%s: write linestat %02x %s\n", acep->name, v, bitdef(v, lsr_bits));
+    struct ace *ap = select_ace();
+
+    trace(trace_uart, "%s: write linestat %02x %s\n", 
+        ap->name, v, bitdef(v, lsr_bits));
 }
 
 /*
@@ -743,23 +821,21 @@ wr_lsr(portaddr p, byte v)
 static byte 
 rd_mcr(portaddr p)
 {
-    if (trace & trace_uart) {
-        printf("%s: read mdmctl %02x %s\n", acep->name, acep->mcr, bitdef(acep->mcr, mcr_bits));
-    }
-    return acep->mcr;
+    struct ace *ap = select_ace();
+
+    trace(trace_uart, "%s: read mdmctl %02x %s\n", 
+        ap->name, ap->mcr, bitdef(ap->mcr, mcr_bits));
+    return ap->mcr;
 }
 
 static void
 wr_mcr(portaddr p, byte v)
 {
-    // if a new set of loopback
-    if ((v & MCR_LOOP) && !(acep->mcr & MCR_LOOP)) {
-        acep->loop = 0;
-    }
-    acep->mcr = v;
-    if (trace & trace_uart) {
-        printf("%s: write mdmctl %02x %s\n", acep->name, acep->mcr, bitdef(acep->mcr, mcr_bits));
-    }
+    struct ace *ap = select_ace();
+
+    ap->mcr = v;
+    trace(trace_uart, "%s: write mdmctl %02x %s\n", 
+        ap->name, ap->mcr, bitdef(ap->mcr, mcr_bits));
 }
 
 /*
@@ -773,40 +849,39 @@ wr_mcr(portaddr p, byte v)
 static byte 
 rd_inti(portaddr p)
 {
-    unsigned char v;
+    struct ace *ap = select_ace();
 
-    if (trace & trace_uart) {
-        printf("%s: read inti %02x %s\n", 
-            acep->name, acep->inti, bitdef(acep->inti, inti_bits));
+    trace(trace_uart, "%s: read inti %02x %s\n", 
+        ap->name, ap->inti, bitdef(ap->inti, inti_bits));
+
+    /* XXX - this is probably busted */
+    if (ap->inti == INTI_TXE) {
+        ap->inti = INTI_NOINT;
+        set_vi(ap->vi_line, 0, 0);
     }
-    v = acep->inti; 
-    if (v == INTI_TXE) {
-        acep->txpend = 0;
-        acep->inti = INTI_NOINT;
-        set_vi(acep->vi_line, 0, 0);
-    }
-    return v;
+    return ap->inti;
 }
 
 static byte 
 rd_msr(portaddr p)
 {
-    if (trace & trace_uart) {
-        printf("%s: read mdmstat %02x %s\n", 
-            acep->name, acep->msr, bitdef(acep->msr, msr_bits));
-    }
-    return acep->msr;
+    struct ace *ap = select_ace();
+
+    trace(trace_uart, "%s: read mdmstat %02x %s\n", 
+        ap->name, ap->msr, bitdef(ap->msr, msr_bits));
+    return ap->msr;
 }
 
 // it is unclear from the chip doc what happens when you write this register
 static void 
 wr_msr(portaddr p, byte v)
 {
-    acep->msr = v;
+    struct ace *ap = select_ace();
 
-    if (trace & trace_uart) {
-        printf("%s: write mdmstat %02x %s\n", acep->name, acep->msr, bitdef(acep->msr, msr_bits));
-    }
+    ap->msr = v;
+
+    trace(trace_uart, "%s: write mdmstat %02x %s\n", 
+        ap->name, ap->msr, bitdef(ap->msr, msr_bits));
 }
 
 /*
@@ -827,10 +902,12 @@ wr_msr(portaddr p, byte v)
 
 #define  bcd(h,l)    ((((h) & 0xf) << 4) | ((l) & 0xf))
 
+int clock_happened;
+
 void
 clock_handler()
 {
-    set_vi(7, 0, 1);
+    clock_happened = 1;
 }
 
 /*
@@ -855,10 +932,8 @@ wr_clock(portaddr p, byte v)
     struct tm *tm;
     int rate = 0;
 
-    if (trace & trace_multio) {
-        printf("multio: write clock %02x %s %s\n", 
-            v, clk_cmd[(v & CLK_CMD) >> 2], bitdef(v, wclk_bits));
-    }
+    trace(trace_multio, "multio: write clock %02x %s %s\n", 
+        v, clk_cmd[(v & CLK_CMD) >> 2], bitdef(v, wclk_bits));
 
     // if falling edge on CSTROBE and command the same, do a command
     if ((!(v & CLK_SETCMD)) && (last_wrclock & CLK_SETCMD) &&
@@ -897,7 +972,7 @@ wr_clock(portaddr p, byte v)
             rate = 1;
         }
         if (rate != 0) {
-            if (!(trace & trace_noclock)) {
+            if (!(traceflags & trace_noclock)) {
                 recurring_timeout("multio_clock", rate, clock_handler, 0);
             }
         }
@@ -918,10 +993,11 @@ rd_clock(portaddr p)
 {
     byte v;
 
+    v = (rtc[rtcptr / 8] >> (rtcptr % 8)) & 1;
+    trace(trace_multio, "multio: read clock %02x\n", v);
+
     set_vi(7, 0, 0);
 
-    v = (rtc[rtcptr / 8] >> (rtcptr % 8)) & 1;
-    if (trace & trace_multio) printf("multio: read clock %02x\n", v);
     return v;
 }
 
@@ -931,36 +1007,42 @@ rd_daisy(portaddr p)
     byte ret;
 
     ret = 0;
-    if (trace & trace_multio) printf("multio: read daisy %02x = 0x%02x\n", p, ret);
+    trace(trace_multio, "multio: read daisy %02x = 0x%02x\n", p, ret);
     return ret;
 }
 
 static void
 wr_daisy0(portaddr p, byte v)
 {
-    if (trace & trace_multio) printf("multio: write daisy0 %02x\n", v);
+    trace(trace_multio, "multio: write daisy0 %02x\n", v);
 }
 
 static void
 wr_daisy1(portaddr p, byte v)
 {
-    if (trace & trace_multio) printf("multio: write daisy1 %02x\n", v);
+    trace(trace_multio, "multio: write daisy1 %02x\n", v);
+}
+
+byte
+rd_switch(portaddr p)
+{
+    return 0xff;
 }
 
 static byte
 undef_inreg(portaddr p)
 {
-    if (trace & trace_multio) printf("multio: read to %02x+%02x undefined\n", MULTIO_MASTER, p - MULTIO_MASTER);
+    trace(trace_multio, "multio: read to %02x+%02x undefined\n", 
+        MULTIO_MASTER, p - MULTIO_MASTER);
     return 0;
 }
 
 static void
 undef_outreg(portaddr p, byte v)
 {
-    if (trace & trace_multio) printf("multio: write 0x%02x to undefined %02x+%02x\n", v, MULTIO_MASTER, p - MULTIO_MASTER);
+    trace(trace_multio, "multio: write 0x%02x to undefined %02x+%02x\n", 
+        v, MULTIO_MASTER, p - MULTIO_MASTER);
 }
-
-static char *group_bits[] = { 0, 0, "membank", "intena", "printreset", "parstb", 0, 0 };
 
 /*
  * write the port select register
@@ -977,14 +1059,13 @@ multio_select(portaddr p, byte v)
 
     lastgroup = group;
 
-    if (trace & trace_multio) {
-        printf("multio: write group select %02x %s\n", group, bitdef(v, group_bits));
-    }
+    trace(trace_multio, "multio: write group select %02x %s\n", 
+        group, bitdef(v, group_bits));
 
     switch (group) {
     case GRP0:  // parallel port, clock, pic
         register_input(MULTIO_MASTER + 0, &rd_daisy);
-        register_input(MULTIO_MASTER + 1, &undef_inreg);
+        register_input(MULTIO_MASTER + 1, &rd_switch);
         register_input(MULTIO_MASTER + 2, &rd_clock);
         register_input(MULTIO_MASTER + 3, &undef_inreg);
         register_input(MULTIO_MASTER + 4, &rd_pic_port_0);
@@ -1002,7 +1083,6 @@ multio_select(portaddr p, byte v)
     case GRP1:  // serial ports
     case GRP2:
     case GRP3:
-        acep = &ace[group - 1];
         register_input(MULTIO_MASTER + 0, &rd_rxb);
         register_input(MULTIO_MASTER + 1, &rd_inte);
         register_input(MULTIO_MASTER + 2, &rd_inti);
@@ -1062,10 +1142,13 @@ multio_poll()
     int i;
  
     for (i = 0; i < 3; i++) {
-        if (ace[i].infd == -1) {
-            continue;
-        }
-        uart_interrupt_check(i);
+        multio_uart_poll(&ace[i]);
+    }
+
+    if (clock_happened) {
+        clock_happened = 0;
+        log(" ---- clock --- \n\n");
+        set_vi(7, 0, 1);
     }
     return 0;
 }
@@ -1182,6 +1265,7 @@ multio_setup()
     trace_uart = register_trace("uart");
     trace_noclock = register_trace("noclock");
     trace_intr = register_trace("intr");
+    trace_intack = register_trace("intack");
     return 0;
 }
 
