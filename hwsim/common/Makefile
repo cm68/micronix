@@ -1,7 +1,8 @@
 AR = ar
 CC = gcc
 DEBUG = -g
-CFLAGS = $(DEBUG)
+CFLAGS = $(DEBUG) -Wno-builtin-declaration-mismatch
+
 
 EXTRAS = sample_shim.o sample_cpu.o terminal
 OBJECTS = util.o sim.o imdlib.o dis.o s100.o terminal.o harddisk.o

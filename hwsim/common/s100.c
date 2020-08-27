@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include "sim.h"
+#include "util.h"
 
 /*
  * bus lines of interest - reflects the current actual state of the lines
@@ -183,8 +184,7 @@ register_input(portaddr portnum, inhandler func)
     portnum &= 0xff;
 
     if (func != undef_in) {
-        if (trace & trace_ior)
-            printf("input port %x registered\n", portnum);
+        trace(trace_ior, "input port %x registered\n", portnum);
     }
     input_handler[portnum] = func;
 }
@@ -195,8 +195,7 @@ register_output(portaddr portnum, outhandler func)
     portnum &= 0xff;
 
     if (func != undef_out) {
-        if (trace & trace_ior)
-            printf("output port %x registered\n", portnum);
+        trace(trace_ior, "output port %x registered\n", portnum);
     }
     output_handler[portnum] = func;
 }

@@ -68,7 +68,8 @@ int log_output;
 int mypid;
 int running;
 
-int trace;
+int traceflags;
+
 int trace_inst;
 int trace_bio;
 int trace_ior;
@@ -438,12 +439,12 @@ timeout_sched()
         gettimeofday(&now, 0);
         timersub(&tv, &now, &timer.it_value);
         setitimer(ITIMER_REAL, &timer, 0);
-        if (trace & trace_timer) printf("arming itimer\n");
+        if (traceflags & trace_timer) printf("arming itimer\n");
         mysignal(SIGALRM, timeout_handler);
     } else {
         timer.it_value.tv_sec = timer.it_value.tv_usec = 0;
         setitimer(ITIMER_REAL, &timer, 0);
-        if (trace & trace_timer) printf("disarming itimer\n");
+        if (traceflags & trace_timer) printf("disarming itimer\n");
     }
 }
 
@@ -917,7 +918,7 @@ go_cmd(char **sp)
 int
 trace_cmd(char **sp)
 {
-    int k = trace;
+    int k = traceflags;
     char *s = "trace set to:\n";
     int i;
 
@@ -925,8 +926,8 @@ trace_cmd(char **sp)
         s = "trace can be:\n";
         k = -1;
     } else if (**sp) {
-        trace = strtol(*sp, sp, 16);
-        k = trace;
+        traceflags = strtol(*sp, sp, 16);
+        k = traceflags;
     } 
     puts(s);
     for (i = 0; tracenames[i]; i++) {
@@ -1054,7 +1055,7 @@ main(int argc, char **argv)
                 if (!argc--) {
                     usage("trace not specified \n", progname);
                 }
-                trace = strtol(*argv++, 0, 0);
+                traceflags = strtol(*argv++, 0, 0);
                 break;
             case 's':
                 inst_countdown = 0;
@@ -1132,10 +1133,10 @@ main(int argc, char **argv)
         printf("log file\n");
     }
 
-    if (trace) {
-        printf("trace %x ", trace);
+    if (traceflags) {
+        printf("trace %x ", traceflags);
         for (i = 0; tracenames[i]; i++) {
-            if (trace & (1 << i)) {
+            if (traceflags & (1 << i)) {
                 printf("%s ", tracenames[i]);
             }
         }
@@ -1208,7 +1209,7 @@ main(int argc, char **argv)
             printf("breakpoint\n");
             inst_countdown = 0;
         }
-        if ((trace & trace_inst) || (inst_countdown == 0) || ((trace & trace_symbols) && lookup_sym(program_counter))) {
+        if ((traceflags & trace_inst) || (inst_countdown == 0) || ((traceflags & trace_symbols) && lookup_sym(program_counter))) {
             dumpcpu();
         }
         if (inst_countdown == 0) {
@@ -1220,7 +1221,7 @@ main(int argc, char **argv)
          * if we know we aren't debugging, don't bother to pop up here
          * otherwise, run for 1 instruction so we get control to check for breakpoints
          */
-        if ((nbreaks == 0) && (inst_countdown == -1) && !(trace & trace_inst)) {
+        if ((nbreaks == 0) && (inst_countdown == -1) && !(traceflags & trace_inst)) {
             i = 1000000;
         } else {
             i = 1;

@@ -13,7 +13,6 @@
 #include "imd.h"
 #include "util.h"
 
-extern int trace;
 extern int trace_bio;
 
 int trace_imd;
@@ -211,7 +210,7 @@ imd_load(char *fname, int drive, int create_delta)
                 for (sec = 0; sec < SECTORS; sec++) {
                     if (ip->delta_map[DIRTY_OFF(cyl, head, sec)] == DELTA_YES) {
                         offset = DELTA_OFF(cyl, head, sec);
-                        if (trace & trace_bio) printf("imd_load_delta cyl %d head %d sec %d offset %d\n",
+                        trace(trace_bio, "imd_load_delta cyl %d head %d sec %d offset %d\n",
                             cyl, head, sec, offset);
                         lseek(fd, offset, SEEK_SET);
                         if (!tp->data[sec]) {
@@ -274,7 +273,7 @@ translate_sector(struct imd_trk *tp, int sec, int head)
     }
     if (mysec == -1) {
         printf("imd: translate sector not found %d\n", sec);
-        if (trace & trace_imd) {
+        if (traceflags & trace_imd) {
             imd_dump_track(tp);
         }
         return 0;
@@ -317,11 +316,11 @@ imd_write(void *vp, int cyl, int head, int osec, char *buf)
     c = DELTA_YES;
     write(ip->delta_fd, &c, 1);
     offset = DELTA_OFF(cyl, head, tsec);
-    if (trace & trace_bio) printf("imd_write drive %d cyl %d head %d tsec %d osec %d offset %d\n",
+    trace(trace_bio, "imd_write drive %d cyl %d head %d tsec %d osec %d offset %d\n",
         ip->drive, cyl, head, tsec, osec, offset);
     lseek(ip->delta_fd, offset, SEEK_SET);
     write(ip->delta_fd, buf, tp->secsize);
-    if (trace & trace_bio) hexdump(buf, tp->secsize);
+    if (traceflags & trace_bio) hexdump(buf, tp->secsize);
     return (tp->secsize);
 }
 
@@ -344,7 +343,7 @@ imd_read(void *vp, int cyl, int head, int osec, char *buf)
     tp = ip->tracks[trk];
     tsec = translate_sector(tp, osec, head);
 
-    if (trace & trace_bio) printf("imd_read drive %d cyl %d head %d tsec %d osec %d\n",
+    trace(trace_bio, "imd_read drive %d cyl %d head %d tsec %d osec %d\n",
         ip->drive, cyl, head, tsec, osec);
     
     // if reading an absent block, supply zeros
@@ -353,7 +352,7 @@ imd_read(void *vp, int cyl, int head, int osec, char *buf)
         bzero(tp->data[tsec], tp->secsize);
     }
     memcpy(buf, tp->data[tsec], tp->secsize); 
-    if (trace & trace_bio) hexdump(buf, tp->secsize);
+    if (traceflags & trace_bio) hexdump(buf, tp->secsize);
     return (tp->secsize);
 }
 
