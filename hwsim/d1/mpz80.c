@@ -162,8 +162,7 @@ setrom(int page)
 {
     static int last = 0xff;
     if (last != page) {
-        if (trace & trace_map)
-            printf("enable page %d of eprom\n", page);
+        trace(trace_map, "enable page %d of eprom\n", page);
         memcpy(eprom, rom_image + (page * 0x400), 0x400);
         last = page;
     }
@@ -241,7 +240,7 @@ static byte local;
 void
 trap(byte trapbits)
 {
-    if (trace & trace_mpz80) printf("trap %x %s\n", trapbits, bitdef(trapbits, stat_bits));
+    trace(trace_mpz80, "trap %x %s\n", trapbits, bitdef(trapbits, stat_bits));
     taskreg = 0;
     trapcount = 15;
     trapstat = trapbits;
@@ -256,9 +255,7 @@ void
 interrupt_check()
 {
     if (!int_line) {
-        if (trace & trace_mpz80) {
-            printf("clear int_pin\n");
-        }
+        trace(trace_mpz80, "clear int_pin\n");
         int_pin = 0;
         return;
     }
@@ -273,9 +270,7 @@ interrupt_check()
             return;
         }
     }
-    if (trace & trace_mpz80) {
-        printf("assert int_pin\n");
-    }
+    trace(trace_mpz80, "assert int_pin\n");
     int_pin = 1;
 }
 
@@ -331,18 +326,18 @@ get_byte(vaddr addr)
 
     // if we are trapping, ignore the passed in address
     if (trapcount && running) {
-        if (trace & trace_inst) {
+        if (traceflags & trace_inst) {
             inst_disabled = 1;
-            trace &= ~trace_inst;
+            traceflags &= ~trace_inst;
         }
         addr = 0xbf0 + (15 - trapcount);
-        if (trace & trace_mpz80) printf("mpz80: trap %x replaced by %x\n", orig, addr);
+        trace(trace_mpz80, "mpz80: trap %x replaced by %x\n", orig, addr);
         trapcount--;
         if (trapcount == 0) {
             interrupt_check();
         }
         if (inst_disabled && !trapcount) {
-            trace |= trace_inst;
+            traceflags |= trace_inst;
         }
     }
 
@@ -352,7 +347,7 @@ get_byte(vaddr addr)
             delay--;
         }
         if (delay == 0) {
-            if (trace & trace_mpz80) printf("switching taskreg to %02x\n", next_taskreg);
+            trace(trace_mpz80, "switching taskreg to %02x\n", next_taskreg);
             taskreg = next_taskreg;
             interrupt_check();          // this may cause an interrupt
         }
@@ -411,7 +406,9 @@ get_byte(vaddr addr)
         (retval == 0x76) && 
         (!prefix) && (maskreg & MASK_HALT)) {
         // system calls are a rst8
-        if ((z80_get_reg16(pc_reg) == 8) && (trace & trace_syscall)) syscall_at(fuword(z80_get_reg16(sp_reg)));
+        if ((z80_get_reg16(pc_reg) == 8) && (traceflags & trace_syscall)) {
+            syscall_at(fuword(z80_get_reg16(sp_reg)));
+        }
         trap(ST_RESET & ~ST_HALT);
         seg = "nop:";
         retval = 0;
@@ -424,8 +421,10 @@ get_byte(vaddr addr)
         prefix = 0;
     }
 
-    if (running && ((trace & trace_mem) || (local && (trace & trace_mpz80)))) {
-        printf("mem: read %04x (%s%06x) %s got %02x %s\n", orig, seg, pa, regname, retval, desc);
+    if ((running && ((traceflags & trace_mem)) || 
+        (local && (traceflags & trace_mpz80)))) {
+        log("mem: read %04x (%s%06x) %s got %02x %s\n", 
+            orig, seg, pa, regname, retval, desc);
     } 
     return retval;
 }
@@ -472,12 +471,12 @@ put_byte(vaddr addr, unsigned char value)
         paddr offset = addr & 0x1ff;
         byte task = (addr >> 5) & 0xf;
         byte page = (addr >> 1) & 0xf;
-        if (trace & trace_map) {
-            printf("map register %x write %x task %d page %x ", addr, value, task, page);
+        if (traceflags & trace_map) {
+            log("map register %x write %x task %d page %x ", addr, value, task, page);
             if (addr & 0x01) {
-                printf("%s %s\n", value & 0x8 ? "r10" : "", pattr[value & 0x3]);
+                logc("%s %s\n", value & 0x8 ? "r10" : "", pattr[value & 0x3]);
             } else {
-                printf("physical 0x%2x000\n", value);
+                logc("physical 0x%2x000\n", value);
             }
         }
         maps[offset] = value;
@@ -499,8 +498,9 @@ put_byte(vaddr addr, unsigned char value)
         }
         break;
     }
-    if (running && ((trace & trace_mem) || (local && (trace & trace_mpz80)))) {
-        printf("mem: write %04x (%s%06x) %s put %02x %s\n", addr, seg, pa, regname, value, desc);
+    if ((running && ((traceflags & trace_mem)) || 
+        (local && (traceflags & trace_mpz80)))) {
+        log("mem: write %04x (%s%06x) %s put %02x %s\n", addr, seg, pa, regname, value, desc);
     } 
 }
 
@@ -525,9 +525,7 @@ output(portaddr p, byte v)
 void
 mpz80_intr(int value)
 {
-    if (trace & trace_mpz80) {
-        printf("mpz80: mpz80_intr(%d)\n", value);
-    } 
+    trace(trace_mpz80, "mpz80: mpz80_intr(%d)\n", value);
     int_line = value;
     interrupt_check();
 }

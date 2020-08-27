@@ -1,6 +1,6 @@
 CC = gcc
 DEBUG = -g
-CFLAGS = $(DEBUG) -I../common
+CFLAGS = $(DEBUG) -I../common -Wno-builtin-declaration-mismatch
 Z80SIM = ../chips
 Z80LIB = -L$(Z80SIM) -lz80
 SIMLIBS = $(Z80SIM)/libz80.a ../common/libsim.a

@@ -133,7 +133,7 @@ static byte func;
 void
 check_interrupt()
 {
-	printf("hdca: check_interrupt\n");
+	trace(trace_hdca, "hdca: check_interrupt\n");
     set_vi(HDCA_INTERRUPT, 0, int_state ? 1 : 0);
 }
 
@@ -154,7 +154,7 @@ rd_hdca_psr(portaddr p)
         // toggle index
         psr ^= PSR_ILEVEL;
     }
-    if (trace & trace_hdca) printf("hdca: input primary status %x %s\n", psr, bitdef(psr, psr_b));
+    trace(trace_hdca, "hdca: input primary status %x %s\n", psr, bitdef(psr, psr_b));
     return psr;
 }
 
@@ -162,7 +162,7 @@ static char *control_b[] = { "frenbl", "run", "dskclk", "wprot", 0, 0, 0, 0 };
 static void
 wr_hdca_control(portaddr p, byte v)
 {
-    if (trace & trace_hdca) printf("hdca: control -> 0x%x %s\n", v, bitdef(v, control_b));
+    trace(trace_hdca, "hdca: control -> 0x%x %s\n", v, bitdef(v, control_b));
     if (!(psr & PSR_NFAULT) && (v & CONT_WPROT) && !(control & CONT_WPROT)) {
         psr |= PSR_NFAULT;
     }
@@ -204,25 +204,26 @@ wr_hdca_cmd(portaddr p, byte v)
 
     switch (v) {
     case 0: 
-        if (trace & trace_hdca) printf("hdca cmd: set ram pointer to sector\n");
+        trace(trace_hdca, "hdca cmd: set ram pointer to sector\n");
         rampage = SECTOR;
         ramptr = 0;
         break;
     case 8: 
-        if (trace & trace_hdca) printf("hdca cmd: set ram pointer to header\n");
+        trace(trace_hdca, "hdca cmd: set ram pointer to header\n");
         rampage = HEADER;
         ramptr = 0;
         break;
     case 1:
-        if (trace & trace_hdca) printf("hdca cmd: read sector with header bytes: %d %d %d %d\n",
+        trace(trace_hdca, "hdca cmd: read sector with header bytes: %d %d %d %d\n",
             track, head, sector, key);
         ret = drive_read(handle[drv], track, head, sector, iobuf);
         if (ret != SECLEN) {
-        	printf("read fail drv: %d c: %d h: %d s: %d ret: %d\n", drv, track, head, sector, ret);
+        	log("read fail drv: %d c: %d h: %d s: %d ret: %d\n", 
+                drv, track, head, sector, ret);
         }
         bcopy(&iobuf[0], &buffer[2], 510);
         bcopy(&iobuf[510], &buffer[0], 2);
-        if (trace & trace_bio) {
+        if (traceflags & trace_bio) {
             hexdump(iobuf, 512);
         }
         psr |= PSR_OPDONE;
@@ -231,21 +232,22 @@ wr_hdca_cmd(portaddr p, byte v)
         ramptr = 0;             // points at the last 2 bytes of the sector!
         break;
     case 3:
-        if (trace & trace_hdca) printf("hdca cmd: read header\n");
+        trace(trace_hdca, "hdca cmd: read header\n");
         break;
     case 5: 
-        if (trace & trace_hdca) printf("hdca cmd: write sector with header bytes: %d %d %d %d\n",
+        trace(trace_hdca, "hdca cmd: write sector with header bytes: %d %d %d %d\n",
             track, head, sector, key);
         ret = drive_write(handle[drv], track, head, sector, buffer);
         if (ret != SECLEN) {
-        	printf("write fail drv: %d c: %d h: %d s: %d ret: %d\n", drv, track, head, sector, ret);
+        	log("write fail drv: %d c: %d h: %d s: %d ret: %d\n", 
+                drv, track, head, sector, ret);
         }
-        if (trace & trace_bio) hexdump(buffer, 512);
+        if (traceflags & trace_bio) hexdump(buffer, 512);
         psr |= PSR_OPDONE;
         psr &= ~PSR_HALT;
         break;
     case 7:
-        if (trace & trace_hdca) printf("hdca cmd: write header bytes: %d %d %d %d\n",
+        trace(trace_hdca, "hdca cmd: write header bytes: %d %d %d %d\n",
             track, head, sector, key);
         if (sector == 1) {
             indextoggle = 1;
@@ -255,7 +257,7 @@ wr_hdca_cmd(portaddr p, byte v)
         psr |= PSR_OPDONE;
         break;
     default:
-        printf("hdca cmd: unknown command\n");
+        log("hdca cmd: unknown command\n");
         break;
     }
     if (psr & PSR_OPDONE) {
@@ -264,7 +266,7 @@ wr_hdca_cmd(portaddr p, byte v)
         int_state &= ~INT_A;
     }
     check_interrupt();
-    if (trace & trace_hdca) printf("hdca: cmd -> 0x%x\n", v);
+    trace(trace_hdca, "hdca: cmd -> 0x%x\n", v);
 }
 
 static char *func_b[] = { "drv0", "drv1", "step", "dir", "hd0", "hd1", "hd2", "hd3" };
@@ -278,19 +280,20 @@ wr_hdca_func(portaddr p, byte v)
     int i;
     int stepped = 0;
 
-    if (trace & trace_hdca) printf("hdca: func -> 0x%x %s\n", v, bitdef(v, func_b));
+    trace(trace_hdca, "hdca: func -> 0x%x %s\n", v, bitdef(v, func_b));
     dir_lower = v & FUNC_DIR ? 1 : 0;
     head = ((v & FUNC_HEAD) >> 4) ^ 0xf;
     drive = (v & FUNC_DRIVE);
     step = (v & FUNC_STEP) ? 1 : 0;
-    if (trace & trace_hdca) printf("\tdrive: %d head: %d step %s %d\n", drive, head, dir_lower ? "lower" : "higher", step);
+    trace(trace_hdca, "\tdrive: %d head: %d step %s %d\n", 
+        drive, head, dir_lower ? "lower" : "higher", step);
     if (stepping[drive] && step) {  // did the step line rise
         if (dir_lower) {
             track[drive]--;
         } else {
             track[drive]++;
         }
-        if (trace & trace_hdca) printf("step drive %d to track %d\n", drive, track[drive]);
+        trace(trace_hdca, "step drive %d to track %d\n", drive, track[drive]);
         indextoggle = 1;
         stepped = 1;
     }
@@ -343,14 +346,14 @@ char *ssr_b[] = { "sdone", "retry", "r0", "r1", 0, 0, 0, 0 };
 static byte
 rd_hdca_ssr(portaddr p)
 {
-    if (trace & trace_hdca) printf("hdca: input secondary status %x %s\n", ssr, bitdef(ssr, ssr_b));
+    trace(trace_hdca, "hdca: input secondary status %x %s\n", ssr, bitdef(ssr, ssr_b));
     return ssr;
 }
 
 static byte
 rd_hdca_intclr(portaddr p)
 {
-    if (trace & trace_hdca) printf("hdca: input intclr\n");
+    trace(trace_hdca, "hdca: input intclr\n");
     ssr &= ~R1_SDONE;
     int_state &= ~INT_B;
     check_interrupt();
