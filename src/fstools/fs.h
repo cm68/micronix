@@ -25,6 +25,16 @@ extern int verbose;
 extern int image;
 extern char *mytime();
 extern struct dsknod *iget();
-extern int number();
-extern struct dir *dread(struct dsknod *ip, int off);
 
+extern void lose(char *s);
+extern int readblk(int blkno, char *buf);
+extern int fileread(struct dsknod *ip, int offset, char *buf);
+extern int filewrite(struct dsknod *ip, int offset, char *buf);
+extern void idump(int ino, struct dsknod *ip);
+extern void dump(unsigned char *buf, int size);
+extern void dumpsb(struct sup *sb);
+extern void secdump(unsigned char *buf);
+extern UINT secmap(UINT blkno);
+extern int bmap(struct dsknod *ip, int offset, int alloc);
+extern int lookup(struct dsknod *ip, char *name);
+extern struct dir *getdirent(struct dsknod *ip, int index);
