@@ -1316,6 +1316,9 @@ uint32_t z80_exec(z80_t* cpu, uint32_t num_ticks) {
                 case 0:
 /*
  * begin special hack for i8259 in mode 0
+ * note that this is actually broken:  a real Z80 does not run the next two bus cycles with IORQ.
+ * this is done to force the interrupt controller to get the traffic.  a real z80 cpu card or interrupt
+ * controller has to play games to jam the right bytes from the interrupt vector instead of reading memory.
  */			
 		    if (int_vec == 0xcd) {	// get 2 more bytes
 			    uint8_t low, high;

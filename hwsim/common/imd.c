@@ -13,7 +13,7 @@
 #include "imd.h"
 #include "util.h"
 
-int trace;
+int traceflags;
 int trace_bio;
 
 void
