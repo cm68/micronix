@@ -1,8 +1,15 @@
 
 /*
- * this is the V6 dcheck
- * it simply does a pass through all directories, counting file references.
- * then, it does another pass verifying that the link count is the same as the reference count
+ * a command line micronix filesystem reader/writer/lister
+ * the interface really needs to look like tar
+ *
+ * mar -xf <image> micronix       - extract /micronix
+ * mar -rf <image> micronix       - replace or add /micronix
+ * mar -df <image> micronix       - delete /micronix
+ * mar -tf <image> [file list]    - list of files
+ * mar -cf <image> [ <size> ]     - create an empty filesystem 
+ *
+ * with the usual -v option for verbosity
  */
 #include <stdlib.h>
 #include <unistd.h>
@@ -20,6 +27,8 @@ char **command;
 
 int ls();
 int cat();
+int emptycmd();
+int infocmd();
 int dumpcmd();
 int readcmd();
 int writecmd();
@@ -33,6 +42,8 @@ struct cmdtab
     int (*handler)(int n, char **a);
     char *usage;
 } cmds[] = {
+    {"empty", emptycmd, "empty <file>" },
+    {"info", infocmd, "info <file>" },
     {"dump", dumpcmd, "dump <file>" },
     {"ls", ls, "ls [-a] <path>" },
     {"cat", cat, "cat <file>" },
@@ -356,8 +367,6 @@ writecmd(int c, char **a)
         return 2;
     }
 
-    return 0;
-
     filefree(ip);
     i = 0;
     do {
@@ -397,6 +406,58 @@ rmcmd(int c, char **a)
 
     fileunlink(*a);
     writesuper();
+    return 0;
+}
+
+int 
+infocmd(int c, char **a)
+{
+    struct dsknod *ip;
+    struct dir *dp;
+    int i;
+    int size;
+    char buf[512];
+    int valid;
+    int infd;
+    char *dirname;
+    char *filename;
+
+    a++;
+    c--;
+
+    if (c != 1) {
+        return -1;
+    }
+
+    ip = namei(*a);
+    idump(ip);
+
+    return 0;
+}
+
+int 
+emptycmd(int c, char **a)
+{
+    struct dsknod *ip;
+    struct dir *dp;
+    int i;
+    int size;
+    char buf[512];
+    int valid;
+    int infd;
+    char *dirname;
+    char *filename;
+
+    a++;
+    c--;
+
+    if (c != 1) {
+        return -1;
+    }
+
+    ip = namei(*a);
+    filefree(ip);
+
     return 0;
 }
 

@@ -377,6 +377,8 @@ idump(struct dsknod *ip)
     if (!(ip->mode & IALLOC))
         return;
 
+    ilist("", ip);
+
     ft = (ip->mode & ITYPE) >> 13;
     printf("inode %5d: %6o %d %s\n", ino, ip->mode, ft, itype[ft & 3]);
 
@@ -395,28 +397,32 @@ idump(struct dsknod *ip)
 
         printf("\tmaj: %d min: %d\n", maj, min);
     } else {
-        printf("\tblocks:\n\t\t");
+        printf("\tblocklist:\n\t\t");
         for (i = 0; i < 8; i++) {
             printf("%d ", ip->addr[i]);
-            if (ip->mode & ILARGE) {
-                if (!ip->addr[i])
-                    continue;
-                printf("indirect\n");
-                readblk(ip->addr[i], (char *) indir);
-                blocklist(indir);
-            }
-        }
-        if ((ip->mode & ILARGE) && ip->addr[7]) {
-            printf("double indirect\n");
-            readblk(ip->addr[7], (char *) dindir);
-            blocklist(dindir);
-            for (i = 0; i < 256; i++) {
-                printf("indirect %d\n", i);
-                readblk(dindir[i], (char *) indir);
-                blocklist(indir);
-            }
         }
         printf("\n");
+        if (ip->mode & ILARGE) {
+            for (i = 0; i < 7; i++) {
+                if (ip->addr[i]) {
+                    printf("indirect %d\n", ip->addr[i]);
+                    readblk(ip->addr[i], (char *) indir);
+                    blocklist(indir);
+                }
+            }
+            if (ip->addr[7]) {
+                printf("double indirect\n");
+                readblk(ip->addr[7], (char *) dindir);
+                blocklist(dindir);
+                for (i = 0; i < 256; i++) {
+                    printf("indirect %d\n", i);
+                    if (dindir[i]) {
+                        readblk(dindir[i], (char *) indir);
+                        blocklist(indir);
+                    }
+                }
+            }
+        }
     }
     if ((ip->mode & ITYPE) == IDIR) {
         for (i = 0; i < 8; i++) {
@@ -652,7 +658,9 @@ bmap(struct dsknod *ip, int offset, int alloc)
         blkzero((char *)iblk);
         for (i = 0; i < 8; i++) {
             iblk[i] = ip->addr[i];
+            ip->addr[i] = 0;
         }
+        ip->addr[0] = iblkno;
         ip->mode |= ILARGE;
         writeblk(iblkno, (char *)iblk);
         iput(ip);     
@@ -680,7 +688,7 @@ bmap(struct dsknod *ip, int offset, int alloc)
         aa = ip->addr;
     }
 
-    // a hole
+    // an indirect hole
     if (aa[iindex] == 0) {
         if (!alloc) {
             return 0;
@@ -698,6 +706,10 @@ bmap(struct dsknod *ip, int offset, int alloc)
         readblk(iblkno, (char *)iblk);
     }
 
+    if ((iblk[lblk % 256] == 0) && alloc) {
+        iblk[lblk % 256] = balloc();
+        writeblk(iblkno, (char *)iblk);
+    }
     return iblk[lblk % 256];
 }
 
@@ -733,6 +745,9 @@ filefree(struct dsknod *ip)
 {
     int i, j;
 
+    if (ip->mode & IIO) {
+        return;
+    }
     if (!(ip->mode & ILARGE)) {
         for (i = 0; i < 8; i++) {
             if (ip->addr[i]) {
@@ -756,6 +771,7 @@ filefree(struct dsknod *ip)
         writeblk(ip->addr[7], (char *)iiblk);
     }
 done:
+    ip->mode &= ~ILARGE;
     ip->size0 = 0;
     ip->size1 = 0;
     iput(ip);
