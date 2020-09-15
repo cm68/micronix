@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
 #include "fs.h"
@@ -29,7 +30,6 @@ main(int argc, char **argv)
     int i;
     int k;
     struct dsknod *ip;
-    struct sup *fs;
     int *lp = 0;
 
     while (--argc) {
@@ -67,8 +67,7 @@ main(int argc, char **argv)
     if ((image = open(*argv, O_RDONLY)) < 0)
         lose("open");
 
-    readblk(1, fsbuf);
-    fs = (struct sup *) fsbuf;
+    readsuper();
 
     dumpsb(fs);
 
@@ -98,14 +97,15 @@ main(int argc, char **argv)
         for (k = 0; blist[k] != -1; k++) {
             i = blist[k];
             ip = iget(i);
-            idump(i, ip);
+            idump(ip);
+            ifree(ip);
         }
     } else {
         for (i = 1; i < fs->isize * I_PER_BLK; i++) {
             ip = iget(i);
-            idump(i, ip);
+            idump(ip);
+            ifree(ip);
         }
-
     }
     return (0);
 }

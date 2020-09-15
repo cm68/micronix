@@ -123,7 +123,6 @@ main(int argc, char **argv)
     int i;
     int d;
     struct dsknod *ip;
-    struct sup *fs;
     struct dir *dp;
     struct dfile *df;
     char *s;
@@ -161,8 +160,7 @@ main(int argc, char **argv)
     if ((image = open(*argv, O_RDONLY)) < 0)
         lose("open");
 
-    readblk(1, fsbuf);
-    fs = (struct sup *) fsbuf;
+    readsuper();
 
     df = dfname(1, mountpt);
     df->up = df;
