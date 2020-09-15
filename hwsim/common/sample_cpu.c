@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include "sim.h"
+#include "util.h"
 
 int trace_io;
 
@@ -25,7 +26,7 @@ put_byte(word addr, byte value)
 void
 output(portaddr p, byte v)
 {
-    if (trace & trace_io) printf("io: output 0x%x to 0x%x\n", v, p);
+    trace(trace_io, "io: output 0x%x to 0x%x\n", v, p);
     (*output_handler[p]) (p, v);
 }
 
@@ -36,7 +37,7 @@ input(portaddr p)
 
     v = (*input_handler[p])(p);
 
-    if (trace & trace_io) printf("io: input 0x%x got 0x%x\n", p, v);
+    trace(trace_io, "io: input 0x%x got 0x%x\n", p, v);
     return v;
 }
 

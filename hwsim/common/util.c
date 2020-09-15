@@ -11,12 +11,28 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <time.h>
+#include <sys/time.h>
 #include "sim.h"
 
 #define PSIZE   80          // max string containing bitdefs
 #define NPATS   2           // and 2 per printf
 char patspace[PSIZE * NPATS];
 char patoff;
+
+typedef unsigned long long u64;
+
+u64
+now64()
+{
+    struct timeval tv;
+    u64 u64useconds;
+
+    gettimeofday(&tv,NULL);
+    u64useconds = (1000000L * tv.tv_sec) + tv.tv_usec;
+    return u64useconds;
+}
 
 /*
  * byte bitoff formatter.
@@ -107,12 +123,19 @@ dumpmem(unsigned char (*readbyte) (unsigned short addr), unsigned short addr, in
     }
 }
 
+static u64 lasttime;
+
 void
-message(char *s)
+ptime()
 {
-    int i;
-    i = strlen(s);
-    write(1, s, i);
+    u64 now, diff;
+
+    now = now64();
+    if (lasttime == 0) lasttime = now;
+    diff = now - lasttime;
+    lasttime = now;
+
+    printf("%7lld ", diff);
 }
 
 /*
@@ -126,6 +149,56 @@ register_trace(char *name)
 {
     tracenames[traces] = name;
     return 1 << traces++;
+}
+
+// unconditionally log with timestamp  (just log)
+void
+log(const char *format, ...)
+{
+    va_list args;
+
+    ptime();
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+}
+
+// unconditionally log with no timestamp (log line continuation)
+void
+logc(const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+}
+
+// conditionally log with time stamp  (trace line)
+void
+trace(int bits, const char *format, ...)
+{
+    if (traceflags & bits) {
+        va_list args;
+
+        ptime();
+        va_start(args, format);
+        vprintf(format, args);
+        va_end(args);
+    }
+}
+
+// conditionally log with no time stamp (trace line continuation)
+void
+tracec(int bits, const char *format, ...)
+{
+    if (traceflags & bits) {
+        va_list args;
+
+        va_start(args, format);
+        vprintf(format, args);
+        va_end(args);
+    }
 }
 
 char *baseaddr;
