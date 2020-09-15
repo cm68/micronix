@@ -6,18 +6,13 @@
  */
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include "fs.h"
 
 #define	NINODE	16 * 64
 
 struct dsknod inode[NINODE];
-union
-{
-    struct sup sbl;
-    char buf[512];
-} sblu;
 
-#define sblock sblu.sbl
 
 int sflg;
 int headpr;
@@ -56,7 +51,7 @@ pass1(struct dsknod *ip)
 void
 pass2(struct dsknod *ip)
 {
-    register i;
+    int i;
 
     i = ino;
     if ((ip->mode & IALLOC) == 0 && ecount[i] == 0)
@@ -81,9 +76,10 @@ check(file)
     }
     headpr = 0;
     printf("%s:\n", file);
-    sync();
-    readblk(1, (char *) &sblock);
-    nfiles = sblock.isize * 16;
+
+    readsuper();
+
+    nfiles = fs->isize * 16;
     for (ino = 1; ino < nfiles; ino++)
         ecount[ino] = 0;
     for (ino = 1; ino < nfiles; ino++) {
@@ -94,7 +90,9 @@ check(file)
     }
 }
 
+int
 main(argc, argv)
+    int argc;
     char **argv;
 {
     char **p;

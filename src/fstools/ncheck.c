@@ -5,13 +5,6 @@
 
 #define NINODE	16*64
 
-union {
-    struct sup sbl;
-    char buf[512];
-} sblu;
-
-#define	sblock sblu.sbl
-
 struct dsknod inode[NINODE];
 
 int sflg;
@@ -20,7 +13,7 @@ int aflg;
 #define	NI	20
 #define	NDIRS	787
 
-int pass1(), pass2(), pass3();
+void pass1(), pass2(), pass3();
 
 int iilist[NI] = { -1 };
 
@@ -32,7 +25,7 @@ struct htab
 } htab[NDIRS];
 
 int nhent = 10;
-int (*pass[])() = { pass1, pass2, pass3 };
+void (*pass[])() = { pass1, pass2, pass3 };
 
 char *lasts;
 int ino;
@@ -52,9 +45,10 @@ check(file)
         return;
     }
     printf("%s:\n", file);
-    sync();
-    readblk(1, (char *)&sblock);
-    nfiles = sblock.isize * I_PER_BLK;
+
+    readsuper();
+
+    nfiles = fs->isize * I_PER_BLK;
     for (i = 0; i < NDIRS; i++)
         htab[i].hino = 0;
     for (pno = 0; pno < 3; pno++) {
@@ -64,6 +58,7 @@ check(file)
     }
 }
 
+void
 pass1(struct dsknod *ip)
 {
     if ((ip->mode & IALLOC) == 0 || (ip->mode & ITYPE) != IDIR)
@@ -71,6 +66,16 @@ pass1(struct dsknod *ip)
     hlookup(ino, 1);
 }
 
+int
+dotname(struct dir *dp)
+{
+    if (dp->name[0] == '.')
+        if (dp->name[1] == 0 || dp->name[1] == '.' && dp->name[2] == 0)
+            return (1);
+    return (0);
+}
+
+void
 pass2(ip)
     struct dsknod *ip;
 {
@@ -95,6 +100,26 @@ pass2(ip)
     }
 }
 
+void
+pname(int i, int lev)
+{
+    struct htab *hp;
+
+    if (i == 1)
+        return;
+    if ((hp = hlookup(i, 0)) == 0) {
+        printf("???");
+        return;
+    }
+    if (lev > 10) {
+        printf("...");
+        return;
+    }
+    pname(hp->hpino, ++lev);
+    printf("/%.14s", hp->hname);
+}
+
+void
 pass3(ip)
     struct dsknod *ip;
 {
@@ -121,34 +146,8 @@ pass3(ip)
     }
 }
 
-dotname(struct dir *dp)
-{
-    if (dp->name[0] == '.')
-        if (dp->name[1] == 0 || dp->name[1] == '.' && dp->name[2] == 0)
-            return (1);
-    return (0);
-}
-
-pname(i, lev)
-{
-    struct htab *hp;
-
-    if (i == 1)
-        return;
-    if ((hp = hlookup(i, 0)) == 0) {
-        printf("???");
-        return;
-    }
-    if (lev > 10) {
-        printf("...");
-        return;
-    }
-    pname(hp->hpino, ++lev);
-    printf("/%.14s", hp->hname);
-}
-
 struct htab *
-hlookup(i, ef)
+hlookup(int i, int ef)
 {
     struct htab *hp;
 

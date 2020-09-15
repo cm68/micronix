@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 
 #include "fs.h"
@@ -17,13 +18,14 @@ char *filesystem;
 int nerror;
 char **command;
 
-char superblock[512];
-struct sup *fs;
-
 int ls();
 int cat();
 int dumpcmd();
 int readcmd();
+int writecmd();
+int rmcmd();
+int mkdircmd();
+int rmdircmd();
 
 struct cmdtab
 {
@@ -33,8 +35,12 @@ struct cmdtab
 } cmds[] = {
     {"dump", dumpcmd, "dump <file>" },
     {"ls", ls, "ls [-a] <path>" },
+    {"cat", cat, "cat <file>" },
     {"read", readcmd, "read <src> <dest>" },
-    {"cat", cat, "cat <file>" }
+    {"write", writecmd, "write <src> <dest>" },
+    {"rm", rmcmd, "rm <file>" },
+    {"mkdir", mkdircmd, "mkdir <directory>" },
+    {"rmdir", rmdircmd, "rmdir <directory>" }
 };
 
 void
@@ -88,8 +94,8 @@ main(argc, argv)
         printf("can't open %s\n", filesystem);
         exit(errno);
     }
-    readblk(1, superblock);
-    fs = (struct sup *) &superblock;
+
+    readsuper();
 
     if (verbose) {
         dumpsb(fs);
@@ -115,142 +121,30 @@ main(argc, argv)
     return (nerror);
 }
 
-#define	LS_A	1
-#define	LS_L	2
-
-#define	DENTS	(512 / 16)
-
-void
-printperm(int m, int set)
-{
-    char mb[4];
-
-    strcpy(mb, "---");
-    if (m & 0x4)
-        mb[0] = 'r';
-    if (m & 0x2)
-        mb[1] = 'w';
-    if (m & 0x1)
-        mb[2] = set ? 's' : 'x';
-    printf("%s", mb);
-}
-
-void
-ilist(char *name, int inum, int opts)
-{
-    struct dsknod *ip = iget(inum);
-
-    printf("%5d ", inum);
-    printf("%c", "-cdb"[(ip->mode >> 13) & 3]);
-    printperm(ip->mode >> 6, ip->mode & ISETUID);
-    printperm(ip->mode >> 3, ip->mode & ISETGID);
-    printperm(ip->mode, 0);
-    printf("%3d ", ip->nlinks);
-    printf("%3d %3d ", ip->uid, ip->gid);
-    if (ip->mode & IIO) {
-        printf("%3d,%3d ", (ip->addr[0] >> 8) & 0xff, ip->addr[0] & 0xff);
-    } else {
-        printf("%7d ", (ip->size0 << 16) + ip->size1);
-    }
-    printf("%14s\n", name);
-    free(ip);
-}
-
-#ifdef notdef
-struct dir *
-getdirent(struct dsknod *ip, int i)
-{
-    static struct dir dirbuf[DENTS];
-    static int dblk = -1;
-    int b;
-
-    b = i / DENTS;
-    i %= DENTS;
-
-    if (dblk != ip->addr[b]) {
-        dblk = ip->addr[b];
-        readblk(dblk, (char *) dirbuf);
-    }
-    return &dirbuf[i];
-}
-
-int
-lookup(struct dsknod *ip, char *name)
-{
-    int i;
-    struct dir *dp;
-
-    if ((ip->mode & ITYPE) != IDIR) {
-        return 0;
-    }
-
-    for (i = 0; i < ((ip->size0 << 16) + ip->size1) / 16; i++) {
-        dp = getdirent(ip, i);
-        if (strncmp(dp->name, name, 14) == 0) {
-            // printf("%5d: %14s\n", dp->inum, dp->name);
-            return dp->inum;
-        }
-    }
-    return 0;
-}
-#endif
-
-char dirname[20];
-int dino;
-
-struct dsknod *
-walkpath(char *name)
-{
-    char *s;
-    struct dsknod *ip;
-
-    dino = 1;
-    ip = iget(dino);
-
-    while (*name) {
-
-        s = dirname;
-        while (*name == '/')
-            name++;
-        while (*name && *name != '/') {
-            *s++ = *name++;
-        }
-        *s = 0;
-        if (strlen(dirname) == 0)
-            break;
-        dino = lookup(ip, dirname);
-        if (!dino) {
-            return 0;
-        }
-        free(ip);
-        ip = iget(dino);
-    }
-    return ip;
-}
-
 void
 list(char *name, int opts)
 {
-    struct dsknod *ip;
+    struct dsknod *ip, *f;
     struct dir *dp;
     int i;
 
-    ip = walkpath(name);
+    ip = namei(name);
     if (!ip) {
+        printf("%s: not found\n", name);
         return;
     }
 
     if ((ip->mode & ITYPE) == IDIR) {
         for (i = 0; i < ((ip->size0 << 16) + ip->size1) / 16; i++) {
             dp = getdirent(ip, i);
-            if (dp->name[0] == '.' && !(opts & LS_A))
-                continue;
-            ilist(dp->name, dp->inum, opts);
+            f = iget(dp->inum);
+            ilist(dp->name, f);
+            ifree(f);
         }
     } else {
-        ilist(dirname, dino, opts);
+        ilist(name, ip);
     }
-    free(ip);
+    ifree(ip);
 }
 
 int
@@ -272,12 +166,6 @@ ls(int c, char **a)
         s++;
         while (*s) {
             switch (o = *s++) {
-            case 'l':
-                opts |= LS_L;
-                break;
-            case 'a':
-                opts |= LS_A;
-                break;
             default:
                 printf("unknown option %c\n", o);
                 break;
@@ -306,12 +194,14 @@ catfile(char *name, int opts)
     char buf[512];
     int valid;
 
-    ip = walkpath(name);
+    ip = namei(name);
     if (!ip) {
+        printf("%s: not found\n", name);
         return;
     }
 
     if ((ip->mode & ITYPE) == IDIR) {
+        printf("%s: is directory\n", name);
         return;
     }
 
@@ -320,7 +210,7 @@ catfile(char *name, int opts)
         valid = fileread(ip, i, buf);
         write(1, buf, valid);
     }
-    free(ip);
+    ifree(ip);
 }
 
 int
@@ -350,12 +240,14 @@ dumpfile(char *name, int opts)
     char buf[512];
     int valid;
 
-    ip = walkpath(name);
+    ip = namei(name);
     if (!ip) {
+        printf("%s: not found\n", name);
         return;
     }
 
     if ((ip->mode & ITYPE) == IDIR) {
+        printf("%s: is directory\n", name);
         return;
     }
 
@@ -364,7 +256,7 @@ dumpfile(char *name, int opts)
         valid = fileread(ip, i, buf);
         dump(buf, valid);
     }
-    free(ip);
+    ifree(ip);
 }
 
 int
@@ -399,12 +291,16 @@ readcmd(int c, char **a)
     c--;
 
     if (c != 2) {
-        printf("read <src> <dest>\n");
-        return 1;
+        return -1;
     }
 
-    ip = walkpath(*a++);
-    if (!ip || ((ip->mode & ITYPE) != IORD)) {
+    ip = namei(*a++);
+    if (!ip) {
+        printf("can't find file\n");
+        return 2;
+    }
+
+    if ((ip->mode & ITYPE) != IORD) {
         printf("need regular file\n");
         return 2;
     }
@@ -416,9 +312,104 @@ readcmd(int c, char **a)
         valid = fileread(ip, i, buf);
         write(outfd, buf, valid);
     }
-    free(ip);
+    ifree(ip);
     close(outfd);
     return 0;
+}
+
+int
+writecmd(int c, char **a)
+{
+    struct dsknod *ip;
+    struct dir *dp;
+    int i;
+    int size;
+    char buf[512];
+    int valid;
+    int infd;
+    char *destname;
+
+    a++;
+    c--;
+
+    if (c != 2) {
+        return -1;
+    }
+
+    infd = open(*a, O_RDONLY);
+    if (infd < 0) {
+        printf("can't open %s for reading %d\n", *a, errno);
+    }
+    
+    destname = *++a;
+    ip = namei(destname);
+    if (!ip) {
+        printf("can't find file %s\n", destname);
+        ip = filecreate(destname);
+        if (!ip) {
+            return 2;
+        }
+    }
+
+    if ((ip->mode & ITYPE) != IORD) {
+        printf("need regular file\n");
+        return 2;
+    }
+
+    return 0;
+
+    filefree(ip);
+    i = 0;
+    do {
+        valid = read(infd, buf, 512);
+        if (filewrite(ip, i, buf) != 512) {
+            printf("write failed\n");
+        }
+        i += valid;
+    } while (valid == 512);
+    ip->size0 = i >> 16;
+    ip->size1 = i & 0xffff;
+    iput(ip);
+    close(infd);
+    writesuper();
+    return 0;
+}
+
+int 
+rmcmd(int c, char **a)
+{
+    struct dsknod *ip;
+    struct dir *dp;
+    int i;
+    int size;
+    char buf[512];
+    int valid;
+    int infd;
+    char *dirname;
+    char *filename;
+
+    a++;
+    c--;
+
+    if (c != 1) {
+        return -1;
+    }
+
+    fileunlink(*a);
+    writesuper();
+    return 0;
+}
+
+int 
+rmdircmd(int c, char **a)
+{
+    return 1;
+}
+
+int 
+mkdircmd(int c, char **a)
+{
+    return 1;
 }
 
 /*

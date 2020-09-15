@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "fs.h"
 
@@ -12,14 +13,6 @@ struct dsknod inode[NINODE];
 
 #define	BMAPSIZE	8192
 #define	MAXBLK		(BMAPSIZE * 8)
-
-union
-{
-    struct sup sbl;
-    char buf[512];
-} sblu;
-
-#define sblock sblu.sbl
 
 int sflg;
 
@@ -39,11 +32,34 @@ int blist[10] = { -1 };
 int nerror;
 unsigned char bitmap[BMAPSIZE];
 
+void pass1(struct dsknod *ip);
+
+int chk(UINT blkno, UINT lblkno, char *mesg);
+
+void
+makefree()
+{
+    int i;
+
+    fs->nfree = 0;
+    fs->ninode = 0;
+    fs->flock = 0;
+    fs->ilock = 0;
+    fs->time = 0;
+    bfree(0);
+    for (i = fs->fsize - 1; i >= fs->isize + 2; i--) {
+        if ((bitmap[(i >> 3)] & (1 << (i & 0x7))) == 0)
+            bfree(i);
+    }
+    writesuper();
+}
+
 void
 check(file)
     char *file;
 {
     int i, j, k;
+    struct dsknod *ip;
 
     image = open(file, sflg ? 2 : 0);
     if (image < 0) {
@@ -68,33 +84,24 @@ check(file)
      */
     for (i = 0; i < BMAPSIZE; i++)
         bitmap[i] = 0;
-    sync();
 
     /*
      * process all the inodes 
      */
-    readblk(1, (char *)&sblock);
-    for (ino = 1; ino < sblock.isize * I_PER_BLK; ino++) {
-        pass1(iget(ino));
-    }
-
-    sync();
-    readblk(1, (char *)&sblock);
-    /*
-     * rebuild the freelist 
-     */
-    if (sflg) {
-        makefree();
-        return;
+    readsuper();
+    for (ino = 1; ino < fs->isize * I_PER_BLK; ino++) {
+        ip = iget(ino);
+        pass1(ip);
+        ifree(ip);
     }
 
     if (verbose > 2)
-        printf("freehead: %d\n", sblock.free[0]);
+        printf("freehead: %d\n", fs->free[0]);
 
     /*
      * check for freelist dups 
      */
-    while (i = alloc()) {
+    while (i = balloc()) {
         if (chk(i, 0, "free"))
             break;
         nfree++;
@@ -105,6 +112,14 @@ check(file)
     }
 
     /*
+     * rebuild the freelist 
+     */
+    if (sflg) {
+        makefree();
+        return;
+    }
+
+    /*
      * count the allocated blocks in the bitmap 
      */
     j = 0;
@@ -112,8 +127,8 @@ check(file)
         for (k = bitmap[i]; k; k >>= 1)
             j++;
     }
-    if (j != sblock.fsize - sblock.isize + 3)
-        printf("missing %5d %5d\n", j, sblock.fsize - sblock.isize + 3);
+    if (j != fs->fsize - fs->isize + 3)
+        printf("missing %5d %5d\n", j, fs->fsize - fs->isize + 3);
     printf("spcl  %6d\n", nspcl);
     printf("files %6d\n", nfile);
     printf("large %6d\n", nlarg);
@@ -128,11 +143,12 @@ check(file)
     close(image);
 }
 
+void
 pass1(struct dsknod *ip)
 {
     UINT buf[256];              // indirect block
     UINT vbuf[256];             // double indirect
-    register i, j;
+    int i, j;
 
     if (!(ip->mode & IALLOC))
         return;
@@ -148,7 +164,7 @@ pass1(struct dsknod *ip)
         nfile++;
 
     if (verbose)
-        idump(ino, ip);
+        idump(ip);
 
     if ((ip->mode & ILARGE) != 0) {
         nlarg++;
@@ -157,9 +173,9 @@ pass1(struct dsknod *ip)
                 nindir++;
                 if (chk(ip->addr[i], i * 256, "indirect"))
                     continue;
-                readblk(ip->addr[i], buf);
+                readblk(ip->addr[i], (UCHAR *)buf);
                 if (verbose)
-                    secdump(buf);
+                    secdump((UCHAR *)buf);
                 for (j = 0; j < 256; j++)
                     if (buf[j] != 0)
                         chk(buf[j], i * 256 + j, "data (large)");
@@ -168,17 +184,17 @@ pass1(struct dsknod *ip)
             nvlarg++;
             if (chk(ip->addr[7], 7 * 256, "indirect"))
                 return;
-            readblk(ip->addr[7], buf);
+            readblk(ip->addr[7], (UCHAR *)buf);
             if (verbose)
-                secdump(buf);
+                secdump((UCHAR *)buf);
             for (i = 0; i < 256; i++)
                 if (buf[i] != 0) {
                     nvindir++;
                     if (chk(buf[i], (7 + i) * 256, "2nd indirect"))
                         continue;
-                    readblk(buf[i], vbuf);
+                    readblk(buf[i], (UCHAR *)vbuf);
                     if (verbose)
-                        secdump(vbuf);
+                        secdump((UCHAR *)vbuf);
                     for (j = 0; j < 256; j++)
                         if (vbuf[j])
                             chk(vbuf[j], (7 + i) * 256 + j,
@@ -196,6 +212,7 @@ pass1(struct dsknod *ip)
 /*
  * check to see if a block is in the allocation bitmap
  */
+int
 chk(blkno, lblkno, mesg)
     UINT blkno;
     UINT lblkno;
@@ -208,7 +225,7 @@ chk(blkno, lblkno, mesg)
     if (ino)
         nused++;
 
-    if (blkno < sblock.isize + 2 || blkno >= sblock.fsize) {
+    if (blkno < fs->isize + 2 || blkno >= fs->fsize) {
         printf("%d bad; inode=%d, lblkno=%d class=%s\n", blkno, ino, lblkno,
             mesg);
         return (1);
@@ -232,75 +249,13 @@ chk(blkno, lblkno, mesg)
     return (0);
 }
 
-alloc()
-{
-    register b, i;
-    UINT buf[256];
-
-    i = --sblock.nfree;
-    if (i < 0 || i >= 100) {
-        printf("bad freeblock\n");
-        return (0);
-    }
-    b = sblock.free[i];
-
-    if (b == 0)
-        return (0);
-
-    if (sblock.nfree <= 0) {
-
-        readblk(b, &buf);
-        if (verbose > 2)
-            secdump(&buf);
-        sblock.nfree = buf[0];
-        for (i = 0; i < 100; i++)
-            sblock.free[i] = buf[i + 1];
-    }
-    return (b);
-}
-
-bfree(blkno)
-{
-    register i;
-    UINT buf[256];
-
-    if (sblock.nfree >= 100) {
-        buf[0] = sblock.nfree;
-        for (i = 0; i < 100; i++)
-            buf[i + 1] = sblock.free[i];
-        sblock.nfree = 0;
-        writeblk(blkno, buf);
-    }
-    sblock.free[sblock.nfree++] = blkno;
-}
-
-makefree()
-{
-    register i;
-
-    sblock.nfree = 0;
-    sblock.ninode = 0;
-    sblock.flock = 0;
-    sblock.ilock = 0;
-    sblock.time = 0;
-    bfree(0);
-    for (i = sblock.fsize - 1; i >= sblock.isize + 2; i--) {
-        if ((bitmap[(i >> 3)] & (1 << (i & 0x7))) == 0)
-            bfree(i);
-    }
-    writeblk(1, &sblock);
-    close(image);
-    sync();
-    return;
-}
-
 int
 main(argc, argv)
     int argc;
     char **argv;
 {
-    register char **p;
-    register int n, *lp;
+    char **p;
+    int n, *lp;
 
     while (--argc) {
         argv++;
