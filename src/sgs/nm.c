@@ -6,9 +6,15 @@
  */
 
 #include "ws.h"
+#include "util.h"
+#include "disz80.h"
+
 #include <fcntl.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <malloc.h>
 
-
+int traceflags;
 int verbose;
 int rflag;
 int dflag;
@@ -48,11 +54,8 @@ int dataoff;
 int endoff;
 int fd;
 
-unsigned char barray[5];
-char blen;
-
-unsigned char
-readbyte(unsigned short addr)
+char
+readbyte(int addr)
 {
     unsigned char c;
 
@@ -64,9 +67,6 @@ readbyte(unsigned short addr)
         return 0;
     }
     read(fd, &c, 1);
-    if (blen < sizeof(barray)) {
-        barray[blen++] = c;
-    }
     return c;
 }
 
@@ -83,24 +83,44 @@ lookup(int i)
     return r;
 }
 
+/*
+ * output a symbol name for an address, unless it's a relocation
+ * in which case the low 16 bits are a symbol number
+ */
 char *
-sym(unsigned short addr)
+sym(int addr)
 {
     int i;
 
+    switch (RELTYPE(addr)) {
+    case RL_SYMBOL:
+        if (RELNUM(addr) < nsyms) {
+            return syms[RELNUM(addr)].name;
+        } else {
+            return "badsym";
+        }
+        break;
+    default:
+        break;
+    }
+#ifdef notdef
     for (i = 0; i < nsyms; i++) {
         if ((syms[i].flag & SF_DEF) && (syms[i].value == addr)) {
             return syms[i].name;
         }
     }
+#endif
     return 0;
 }
 
-unsigned long
-reloc(unsigned short addr)
+int labels;
+char label[65536];
+
+int
+reloc(int addr)
 {
     struct reloc *r;
-    unsigned long ret = 0;
+    int ret = 0;
 
     r = lookup(addr);
 
@@ -109,13 +129,13 @@ reloc(unsigned short addr)
 
     switch (r->rl.type) {
     case REL_TEXTOFF:
-        ret = (1 << 16) + head.textoff;
+        ret = (RL_TEXT << 16) + head.textoff;
         break;
     case REL_DATAOFF:
-        ret = (2 << 16) + head.dataoff;
+        ret = (RL_DATA << 16) + head.dataoff;
         break;
     case REL_SYMBOL:
-        ret = (3 << 16) + r->rl.value;
+        ret = (RL_SYMBOL << 16) + r->rl.value;
         break;
     default:
         break;
@@ -123,13 +143,14 @@ reloc(unsigned short addr)
     return ret;
 }
 
+void
 disassem()
 {
     int bc;
-    char outbuf[40];
-    char bbuf[40];
+    char outbuf[100];
     int i;
     char *tag;
+    unsigned char barray[5];
 
     /*
      * dump out hex 
@@ -154,22 +175,24 @@ disassem()
     lseek(fd, textoff, SEEK_SET);
     location = head.textoff;
     while (location < head.textoff + head.text) {
-        blen = 0;
-        bc = format_instr(location, outbuf, &readbyte, &sym, &reloc);
+        bc = format_instr(location, outbuf, &readbyte, &sym, &reloc, &mnix_sc);
         if ((tag = sym(location))) {
             printf("%s:\n", tag);
         }
-        printf("%04x: %-30s", location, outbuf, bbuf);
+        for (i = 0; i < bc; i++) {
+            barray[i] = readbyte(location + i);
+        }
+        printf("%04x: %-30s", location, outbuf);
         printf(" ; ");
         for (i = 0; i < sizeof(barray); i++) {
-            if (i < blen) {
+            if (i < bc) {
                 printf("%02x ", barray[i]);
             } else {
                 printf("   ");
             }
         }
         for (i = 0; i < sizeof(barray); i++) {
-            if (i < blen) {
+            if (i < bc) {
                 if ((barray[i] <= 0x20) || (barray[i] >= 0x7f)) {
                     printf(".");
                 } else {
@@ -194,6 +217,7 @@ disassem()
                     break;
                 }
             }
+            fflush(stdout);
             dumpmem(&readbyte, location, i - location);
             location = i;
         }
@@ -202,6 +226,8 @@ disassem()
      * list 
      */
 }
+
+void
 outimage()
 {
     int i;
