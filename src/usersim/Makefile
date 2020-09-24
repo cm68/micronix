@@ -1,7 +1,13 @@
-CC = gcc
-CFLAGS = -g
+INCLUDE = -I../../include -I../include
 
-all: sim
+OBJECTS = z80emu.o micronix.o
+TARGETS = sim
+LDFLAGS = -L../lib -lsim
+
+include ../Makefile.inc
+
+sim: $(OBJECTS) ../lib/libsim.a
+	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $(LDFLAGS)
 
 tables.h: maketables.c
 	$(CC) -Wall $< -o maketables
@@ -9,19 +15,9 @@ tables.h: maketables.c
 
 z80emu.o: z80emu.c z80emu.h z80config.h z80user.h \
 	instructions.h macros.h tables.h
-	$(CC) $(CFLAGS) -c $<
 
 micronix.o: micronix.c z80emu.h z80config.h
-	$(CC) $(CFLAGS) -c $<
-
-sim: micronix.o z80emu.o ../src/sgs/z80dis.o
-	$(CC) micronix.o z80emu.o ../src/sgs/z80dis.o -o $@
 
 test: sim
-	./sim -d ../filesystem ../filesystem/bin/ls
+	./sim -d ../../filesystem ../../filesystem/bin/ls
 
-clean:
-	rm -f *.o maketables micronix
-
-clobber:	clean
-	rm -f sim
