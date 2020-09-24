@@ -489,7 +489,7 @@ fsinfo(int c, char **a)
     k = 0;
     while ((b = fl[fi]) != 0) {
         if (!fi) {
-            readblk(fs, b, buf);
+            readblk(fs, b, (char *)buf);
             fi = buf[0] - 1;
             bcopy(&buf[1], fl, sizeof(fl));
             printf(" ...");
