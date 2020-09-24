@@ -89,6 +89,7 @@ mnix_sc(int addr, char (*gb)(int a), char *dest)
 	int iaddr;
 	int ret;
 
+	addr &= 0xffff;
 	sc = (*gb)(addr + 1);
 	if ((sc < 0) || (sc > sizeof(syscalls) / sizeof(syscalls[0]))) {
 		sprintf(dest, "unknown %x\n", sc);
@@ -99,6 +100,7 @@ mnix_sc(int addr, char (*gb)(int a), char *dest)
 	sprintf(dest, "%s ", syscalls[sc].name);
 	if (sc == 0) {
 		iaddr = ((*gb)(addr + 3) << 8) + ((*gb)(addr + 2) & 0xff);
+		iaddr &= 0xffff;
 		if (((*gb)(iaddr) & 0xff) != 0xcf) {
 			sprintf(dest, "(0x%x)\n", iaddr);
 			return ret;
