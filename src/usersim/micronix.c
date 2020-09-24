@@ -29,22 +29,23 @@
 #include <string.h>
 #include <sys/time.h>
 #include <signal.h>
+#include "disz80.h"
+#include "util.h"
 
 typedef unsigned int ULONG;
 typedef unsigned char UCHAR;
 typedef unsigned short UINT;
-#include "../kernel/inode.h"
-#include "../include/obj.h"
+#include "inode.h"
+#include "obj.h"
 
 #define	LISTLINES	8
 #define	STACKTOP	0xffff
 #define MAXIMUM_STRING_LENGTH   100
 
 static int	do_exec(char *name, char**argv);
-extern void dumpmem(unsigned char (*get)(int a), void *addr, int len);
 static void	emulate();
 
-#define	DEFROOT	"../filesystem"
+#define	DEFROOT	"../../filesystem"
 
 int savemode;
 int debug_terminal;
@@ -119,39 +120,43 @@ pid()
 }
 
 char *
-get_symname(unsigned short addr)
+get_symname(int addr)
 {
 	return 0;
 }
 
-unsigned short
-reloc(unsigned short addr)
+int
+reloc(int addr)
 {
 	return 0;
 }
 
 void
-put_word(unsigned short addr, unsigned short value)
+put_word(int addr, int value)
 {
-	cp->memory[addr] = value;
-	cp->memory[addr+1] = value >> 8;
+	addr &= 0xffff;
+	cp->memory[addr] = value & 0xff;
+	cp->memory[addr+1] = (value >> 8) & 0xff;
 }
 
 void
-put_byte(unsigned short addr, unsigned char value)
+put_byte(int addr, char value)
 {
+	addr &= 0xffff;
 	cp->memory[addr] = value;
 }
 
-unsigned short
-get_word(unsigned short addr)
+short
+get_word(int addr)
 {
+	addr &= 0xffff;
 	return cp->memory[addr] + (cp->memory[addr+1] << 8);
 }
 
-unsigned char
-get_byte(unsigned short addr)
+char
+get_byte(int addr)
 {
+	addr &= 0xffff;
 	return cp->memory[addr];
 }
 
@@ -195,8 +200,8 @@ usage(char *complaint, char *p)
 }
 
 /* system calls to stop on */
-char stop[64];
-char trace[64];
+char sys_stop[64];
+char sys_trace[64];
 
 int 
 main(int argc, char **argv)
@@ -249,9 +254,9 @@ main(int argc, char **argv)
 				}
 				s = *argv++;
 				i = strtol(s, &s, 0);
-				if ((i > sizeof(stop)) || (i < 0))
+				if ((i > sizeof(sys_stop)) || (i < 0))
 					continue;
-				stop[i] = 1;
+				sys_stop[i] = 1;
 				break;
 			case 't':
 				if (!argc--) {
@@ -259,9 +264,9 @@ main(int argc, char **argv)
 				}
 				s = *argv++;
 				i = strtol(s, &s, 0);
-				if ((i > sizeof(stop)) || (i < 0))
+				if ((i > sizeof(sys_stop)) || (i < 0))
 					continue;
-				trace[i] = 1;
+				sys_trace[i] = 1;
 				break;
 			case 'b':
 				breakpoint++;
@@ -300,7 +305,7 @@ main(int argc, char **argv)
 		char *cmd = malloc(100);
 		int pipefd[2];
 
-		pipe(&pipefd);
+		pipe(pipefd);
 		sprintf(cmd, 
 			"tty > /proc/%d/fd/%d ; while test -d /proc/%d ; do sleep 1 ; done",
 			mypid, pipefd[1], mypid);
@@ -372,6 +377,7 @@ main(int argc, char **argv)
 unsigned short signalled;
 unsigned short signal_handler[16];
 
+void
 schedule_signal(unsigned short a)
 {
 	signalled |= (1 << a);
@@ -560,7 +566,7 @@ do_exec(char *name, char **argv)
 	return 0;
 }
 
-unsigned char
+char
 getsim(void *addr)
 {
 	return *(unsigned char *)addr;
@@ -589,7 +595,8 @@ dumpcpu()
 	//            01234567
 	strcpy(fbuf, "        ");
 
-	format_instr(cp->state.pc, outbuf, &get_byte, &lookup_sym, &reloc);
+	format_instr(cp->state.pc, outbuf, 
+		&get_byte, &lookup_sym, &reloc, &mnix_sc);
 	s = lookup_sym(cp->state.pc);
 	if (s) {
 		fprintf(mytty,"%s\n", s);
@@ -617,7 +624,7 @@ dumpcpu()
 		cp->state.registers.word[Z80_IX],
 		cp->state.registers.word[Z80_IY],
 		cp->state.registers.word[Z80_SP],
-		get_word(cp->state.registers.word[Z80_SP]),
+		get_word(cp->state.registers.word[Z80_SP]) & 0xffff,
 		brake);
 }
 
@@ -645,7 +652,7 @@ watchpoint_hit()
 		}
 		n = get_byte(p->addr);
 		if (n != p->value) {
-			fprintf("value %02x at %04x changed to %02x\n",
+			fprintf(mytty, "value %02x at %04x changed to %02x\n",
 				p->value, p->addr, n);
 			p->value = n;
 			return (1);
@@ -699,9 +706,9 @@ monitor()
 			c = 1;
 			while (*s && (*s == ' ')) s++;
 			if (!*s) {
-				for (i = 0; i < sizeof(stop); i++) {
+				for (i = 0; i < sizeof(sys_stop); i++) {
 					if ((i % 16) == 0) fprintf(mytty,"\n%02d: ", i);
-					fprintf(mytty,"%03d ", stop[i]);
+					fprintf(mytty,"%03d ", sys_stop[i]);
 				}
 				fprintf(mytty, "\n");
 			}
@@ -717,8 +724,8 @@ monitor()
 					i = -i;
 					c = 0;
 				}
-				if (i < sizeof(stop)) {
-					stop[i] = c;
+				if (i < sizeof(sys_stop)) {
+					sys_stop[i] = c;
 				}
 			}
 			break;
@@ -748,7 +755,8 @@ monitor()
 				}
 			}
 			for (l = 0; l < LISTLINES; l++) {
-				c = format_instr(i, cmdline, &get_byte, &lookup_sym, &reloc);
+				c = format_instr(i, cmdline, 
+					&get_byte, &lookup_sym, &reloc, &mnix_sc);
 				s = lookup_sym(i);
 				if (s) {
 					fprintf(mytty, "%s\n", s);
@@ -1017,10 +1025,14 @@ char *signame[] = {
  * already been advanced over. we minimally need to bump again by 1, for
  * the function code.
  */
-struct syscall {
+extern struct syscall {
 	char argbytes;
 	char *name;
 	short flag;
+} syscalls[];
+
+#ifdef notdef
+#endif
 #define	SF_NAME		1
 #define	SF_NAME2	2
 #define	SF_FD		4
@@ -1030,6 +1042,7 @@ struct syscall {
 #define	SF_ARG4		64
 #define	SF_BUF		128
 #define	SF_SMALL	256
+#ifdef notdef
 } syscalls[] = {
 /* 0  */	{3, "indir", SF_ARG1 },
 /* 1  */	{1, "exit", SF_FD },
@@ -1083,6 +1096,7 @@ struct syscall {
 /* 49 */	{3, "lock", SF_FD|SF_ARG1 },
 /* 50 */	{1, "unlock", SF_FD },
 };
+#endif
 
 /*
  * data structures to control terminal interface
@@ -1413,7 +1427,7 @@ void SystemCall (MACHINE *cp)
 	sc -= 1; 
 
 	/* make sure that we came here from a rst1 */
-	if (((get_byte(sc)) != 0xcf) && (get_byte(sc - 2) != 0xcd)) {
+	if (((get_byte(sc) & 0xff) != 0xcf) && ((get_byte(sc - 2) & 0xff) != 0xcd)) {
 		pid();
 		dumpcpu();
 		fprintf(mytty,"halt no syscall %x!\n", sc);
@@ -1435,11 +1449,11 @@ void SystemCall (MACHINE *cp)
 
 	savemode = verbose;
 	/* if this is a system call we are interested in, deal with it */
-	if (trace[code] || stop[code]) {
+	if (sys_trace[code] || sys_stop[code]) {
 		pid();
 		dumpcpu();
 		verbose = -1;
-		if (stop[code]) {
+		if (sys_stop[code]) {
 			breakpoint = 1;
 		}
 	}
@@ -2059,40 +2073,3 @@ nolog:
 		dumpcpu();
 	}
 }
-#ifdef notdef
-unsigned char pchars[16];
-int pcol;
-
-dp()
-{
-        int i;
-        char c;
-
-        for (i = 0; i < pcol; i++) {
-                c = pchars[i];
-                if ((c <= 0x20) || (c >= 0x7f)) c = '.';
-                fprintf(mytty, "%c", c);
-        }
-        fprintf(mytty, "\n");
-}
-
-dumpmem(unsigned char (*readbyte)(void *addr), void *addr, unsigned short len)
-{
-        int i;
-        pcol = 0;
-
-        while (len) {
-                if (pcol == 0) fprintf(mytty, "%04x: ", addr);
-                fprintf(mytty, "%02x ", pchars[pcol] = (*readbyte)(addr++));
-                len--;
-                if (pcol++ == 15) {
-                        dp();
-                        pcol = 0;
-                }
-        }
-        if (pcol != 0) {
-                for (i = pcol; i < 16; i++) fprintf(mytty, "   ");
-                dp();
-        }
-}
-#endif
