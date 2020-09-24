@@ -14,13 +14,7 @@
 #include <libdsk.h>
 #endif
 
-#ifdef USE_LIBIMD
 #include "imd.h"
-#endif
-
-#if !defined(USE_LIBDSK) && !defined(USE_LIBIMD)
-#define USE_IMAGE
-#endif
 
 int spt = 15;
 int altsec = 1;
@@ -38,16 +32,17 @@ struct image {
         char superblock[512];
     } sb;
     int superdirty;
-#ifdef USE_IMAGE
+    int driver;
     int fd;
-#endif
-#ifdef USE_LIBIMD
     void *drive;
-#endif
 #ifdef USE_LIBDSK
     DSK_PDRIVER *drive;
 #endif
 };
+
+#define DRIVER_IMAGE    1
+#define DRIVER_IMD      2
+#define DRIVER_LIBDSK   3
 
 void
 closefs(struct sup *arg)
@@ -58,15 +53,20 @@ closefs(struct sup *arg)
         writeblk(arg, 1, i->sb.superblock);
     }
     i->superdirty = 0;
-#ifdef USE_IMAGE
-    close(i->fd);
-#endif
-#ifdef USE_LIBIMD
-    imd_close(i->drive);
-#endif
+    switch (i->driver) {
+    case DRIVER_LIBDSK:
 #ifdef USE_LIBDSK
-    dsk_close(i->drive);
+        dsk_close(i->drive);
 #endif
+        break;
+    case DRIVER_IMD:
+        imd_close(i->drive);
+        break;
+    case DRIVER_IMAGE:
+    default:
+        close(i->fd);
+        break;
+    }
 }
 
 void
@@ -80,25 +80,46 @@ openfs(char *filesystem, struct sup **fsp)
 {
     int ret;
     struct image *i = malloc(sizeof(struct image));
+    char *ext;
 
-#ifdef USE_LIBIMD
-    ret = imd_load(filesystem, 0, 1);
-    i->drive = ret;
-#endif
-#ifdef USE_IMAGE
-    ret = open(filesystem, O_RDWR);
-    i->fd = ret;
-#endif
+    i->driver = DRIVER_IMAGE;
+    ext = strrchr(filesystem, '.');
+    if (ext) {
+        if (strcasecmp(ext, ".imd") == 0) {
+            i->driver = DRIVER_IMD;
+        } else if (strcasecmp(ext, ".image") == 0) {
+            i->driver = DRIVER_IMAGE;
+        }
+    }
+
+    switch (i->driver) {
+    case DRIVER_LIBDSK:
 #ifdef USE_LIBDSK
-    ret = dsk_open(drive, filesystem, 0, 0);
+        ret = dsk_open(drive, filesystem, 0, 0);
 #endif
-    if (ret > 0) {
+        break;
+    case DRIVER_IMD:
+        i->drive = imd_load(filesystem, 0, 1);
+        if (i->drive) {
+            ret = 0;
+        } else {
+            ret = -1;
+        }
+        break;
+    case DRIVER_IMAGE:
+    default:
+        ret = open(filesystem, O_RDWR);
+        i->fd = ret;
+        break;
+    } 
+ 
+    if (ret >= 0) {
         *fsp = (struct sup *)i;
         on_exit(closefs_hook, (void *)i);
+        readblk(*fsp, 1, i->sb.superblock);
     } else {
         free((struct sup *)i);
     }
-    readblk(*fsp, 1, i->sb.superblock);
     return ret;
 }
 
@@ -121,34 +142,29 @@ secmap(UINT blkno)
     return (trk * spt + sec);
 }
 
-#ifdef USE_LIBIMD
 int secsize;
 int secs;
 void
-blktopos(int drive, int blkno, int *cyl, int *head, int *sec)
+blktopos(void *drive, int blkno, int *cyl, int *head, int *sec)
 {
     int trk;
-    int realblk;
 
     if (secsize == 0) {
         imd_trkinfo(drive, 2, 0, &secs, &secsize);
-        trace(trace_bio, "secs %d secsize %d\n", secs, secsize);
+        trace(trace_fs, "secs %d secsize %d\n", secs, secsize);
     }
     if (secsize != 512) {
         printf("secsize: %d\n", secsize);
         lose("not a filesystem");
     }
 
-    realblk = secmap(blkno);
-
-    *sec = (realblk % secs) + 1;
-    trk = realblk / secs;
+    *sec = (blkno % secs) + 1;
+    trk = blkno / secs;
     *head = 0;
     *cyl = 2 + trk;
-    trace(trace_bio, "blkno:%d realblk:%d cyl:%d head:%d sec:%d\n", 
-        blkno, realblk, *cyl, *head, *sec);
+    trace(trace_fs, "blkno:%d cyl:%d head:%d sec:%d\n", 
+        blkno, *cyl, *head, *sec);
 }
-#endif
 
 /*
  * get the contents of a block
@@ -170,20 +186,22 @@ readblk(struct sup *fs, int blkno, char *buf)
     realblk = secmap(blkno);
     trace(trace_fs, "readblk: %d -> %d\n", blkno, realblk);
 
-#ifdef USE_IMAGE
-    if (lseek(i->fd, 512 * realblk, SEEK_SET) < 0)
-        lose("readblk seek");
-    if (read(i->fd, buf, 512) != 512)
-        lose("readblk");
-#endif
-#ifdef USE_LIBIMD
-    blktopos(i->drive, realblk, &cyl, &head, &sec); 
-    ret = imd_read(i->drive, cyl, head, sec, buf);
-    if (ret != 512) {
-        printf("read lose %d\n", ret);
-        lose("imd_read");
+    if (i->driver == DRIVER_IMAGE) {
+        if (lseek(i->fd, 512 * realblk, SEEK_SET) < 0)
+            lose("readblk seek");
+        if (read(i->fd, buf, 512) != 512)
+            lose("readblk");
+        if (traceflags & trace_fs) {
+            hexdump(buf, 512);
+        }
+    } else if (i->driver == DRIVER_IMD) {
+        blktopos(i->drive, realblk, &cyl, &head, &sec); 
+        ret = imd_read(i->drive, cyl, head, sec, buf);
+        if (ret != 512) {
+            printf("read lose %d\n", ret);
+            lose("imd_read");
+        }
     }
-#endif
     return 0;
 }
 
@@ -206,24 +224,21 @@ writeblk(struct sup *fs, int blkno, char *buf)
     realblk = secmap(blkno);
     trace(trace_fs, "writeblk: %d -> %d\n", blkno, realblk);
 
-#ifdef USE_IMAGE
-    if (lseek(i->fd, 512 * realblk, SEEK_SET) < 0)
-        lose("writeblk seek");
-    if ((ret = write(i->fd, buf, 512)) != 512) {
-        printf("write ret %d\n", ret);
-        lose("writeblk");
+    if (i->driver == DRIVER_IMAGE) {
+        if (lseek(i->fd, 512 * realblk, SEEK_SET) < 0)
+            lose("writeblk seek");
+        if ((ret = write(i->fd, buf, 512)) != 512) {
+            printf("write ret %d\n", ret);
+            lose("writeblk");
+        }
+    } else if (i->driver == DRIVER_IMD) {
+        blktopos(i->drive, realblk, &cyl, &head, &sec); 
+        ret = imd_write(i->drive, cyl, head, sec, buf);
+        if (ret != 512) {
+            printf("write lose %d\n", ret);
+            lose("imd_write");
+        }
     }
-#endif
-
-#ifdef USE_LIBIMD
-    blktopos(i->drive, realblk, &cyl, &head, &sec); 
-    ret = imd_write(i->drive, cyl, head, sec, buf);
-    if (ret != 512) {
-        printf("write lose %d\n", ret);
-        lose("imd_write");
-    }
-#endif
-
     return 0;
 }
 
@@ -470,9 +485,6 @@ isummary(char *name, struct dsknod *dp)
         printf("%3d,%3d ", (dp->addr[0] >> 8) & 0xff, dp->addr[0] & 0xff);
     } else {
         printf("%7d ", filesize(dp));
-        for (i = 0; i < 8; i++) {
-            printf("%d ", dp->addr[i]);
-        }
     }
     printf("%14s\n", name);
 }
