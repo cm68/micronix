@@ -1,0 +1,27 @@
+this directory contains tools that manipulate objects, filesystems, images
+and so on.
+
+ar:
+	manipulate object archive
+
+disas:
+	disassembler with pizzazz.
+
+dump:
+	generate intel hex files
+
+imd: 
+	manipulate dave dunfield's disk images
+
+nm: 
+	dump out whitesmith's objects, including disassembly, headers, symbols
+	even handle archives
+
+size: 
+	dump out whitesmith's header
+
+hitech:
+	dump out hitech c object
+
+readall:
+	extract all files from an image
