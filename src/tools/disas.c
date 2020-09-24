@@ -44,6 +44,7 @@ Configuration notes:
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <malloc.h>
 
@@ -103,7 +104,9 @@ typedef unsigned char byte;
 #define	LIMIT	72
 
 void trace();
-int disas();
+void header();
+int dis();
+void disas();
 void main();
 void clear();
 void outs();
@@ -112,6 +115,8 @@ void tab();
 void outval();
 char *lookup();
 int tcmp();
+int instr(word addr, int size);
+int code_addr(int v);
 
 /*
  * variables
@@ -259,6 +264,7 @@ lookup_sym(int addr)
     return 0;
 }
 
+void
 dump_symbols()
 {
     struct sym *s;
@@ -614,6 +620,7 @@ int addr;
 	}
 }
 
+void
 disas()
 {
 	int left = codelen;
@@ -824,6 +831,7 @@ int pos;
 	}
 }
 
+void
 header(char *name)
 {
 	printf(";\n;\tdisas version %d\n;\t%s\n;\n", VERSION, name);
@@ -885,6 +893,7 @@ reg_target(word v, byte flags)
 	targets[ntarg++].addr = v;
 }
 
+int
 code_addr(v)
 int v;
 {
@@ -1495,7 +1504,7 @@ dis_op:
 #ifdef Z280
 				if (am_code != AM_DD) {
 #else
-				if (am_code == NULL) {
+				if (am_code == AM_NULL) {
 #endif
 					outop("JP");
 					outjpt(OUT_JP);
@@ -1571,7 +1580,7 @@ dis_op:
 
 		case 0xC4:
 #ifdef Z80
-			if (am_code == NULL) {
+			if (am_code == AM_NULL) {
 #endif
 				outop("CALL");
 				outcc((op >> 3) & 0x07);
