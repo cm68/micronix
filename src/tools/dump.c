@@ -3,8 +3,11 @@
  */
 #undef	DEBUG
 
+#include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+#include <stdio.h>
+#include <malloc.h>
 
 unsigned char inbuf[16]
 #ifdef DEBUG
@@ -92,6 +95,7 @@ dump(char *name)
 	close(outfd);
 }
 
+int
 main(int argc, char **argv)
 {
 #ifdef DEBUG
