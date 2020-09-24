@@ -13,8 +13,6 @@
 #include "imd.h"
 #include "util.h"
 
-extern int trace_bio;
-
 int trace_imd;
 
 static void
@@ -52,6 +50,7 @@ imd_dump_track(struct imd_trk *tp)
     for (s = 0; s < tp->fixed.nsec; s++) {
         printf("sector: %d\n", s);
         if (tp->data[s]) {
+            fflush(stdout);
             hexdump(tp->data[s], tp->secsize);
         } else {
             printf("absent\n");
@@ -221,7 +220,7 @@ imd_load(char *fname, int drive, int create_delta)
                 for (sec = 0; sec < SECTORS; sec++) {
                     if (ip->delta_map[DIRTY_OFF(cyl, head, sec)] == DELTA_YES) {
                         offset = DELTA_OFF(cyl, head, sec);
-                        trace(trace_bio, "imd_load_delta cyl %d head %d sec %d offset %d\n",
+                        trace(trace_imd, "imd_load_delta cyl %d head %d sec %d offset %d\n",
                             cyl, head, sec, offset);
                         lseek(fd, offset, SEEK_SET);
                         if (!tp->data[sec]) {
@@ -327,11 +326,11 @@ imd_write(void *vp, int cyl, int head, int osec, char *buf)
     c = DELTA_YES;
     write(ip->delta_fd, &c, 1);
     offset = DELTA_OFF(cyl, head, tsec);
-    trace(trace_bio, "imd_write drive %d cyl %d head %d tsec %d osec %d offset %d\n",
+    trace(trace_imd, "imd_write drive %d cyl %d head %d tsec %d osec %d offset %d\n",
         ip->drive, cyl, head, tsec, osec, offset);
     lseek(ip->delta_fd, offset, SEEK_SET);
     write(ip->delta_fd, buf, tp->secsize);
-    if (traceflags & trace_bio) hexdump(buf, tp->secsize);
+    if (traceflags & trace_imd) hexdump(buf, tp->secsize);
     return (tp->secsize);
 }
 
@@ -354,7 +353,7 @@ imd_read(void *vp, int cyl, int head, int osec, char *buf)
     tp = ip->tracks[trk];
     tsec = translate_sector(tp, osec, head);
 
-    trace(trace_bio, "imd_read drive %d cyl %d head %d tsec %d osec %d\n",
+    trace(trace_imd, "imd_read drive %d cyl %d head %d tsec %d osec %d\n",
         ip->drive, cyl, head, tsec, osec);
     
     // if reading an absent block, supply zeros
@@ -363,7 +362,7 @@ imd_read(void *vp, int cyl, int head, int osec, char *buf)
         bzero(tp->data[tsec], tp->secsize);
     }
     memcpy(buf, tp->data[tsec], tp->secsize); 
-    if (traceflags & trace_bio) hexdump(buf, tp->secsize);
+    if (traceflags & trace_imd) hexdump(buf, tp->secsize);
     return (tp->secsize);
 }
 
