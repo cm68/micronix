@@ -1,2 +1,15 @@
 destdir
 testfs
+*.a
+*.o
+ar
+dcheck
+disas 
+dump
+icheck 
+imd 
+mnix 
+ncheck 
+nm 
+readall 
+size

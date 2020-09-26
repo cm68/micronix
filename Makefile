@@ -9,7 +9,8 @@ test: src/usersim/sim
 
 unpack:
 	cd src/tools; make
-	for i in disks/*.image ; do src/tools/readall $$i ; done
+	for i in disks/*.image ; do src/tools/readall -d filesystem $$i ; done
+	cp -r src/kernel filesystem/usr/src/sys
 
 clean:
 	for dir in usersim tools src/sgs src/fstools ; do \
