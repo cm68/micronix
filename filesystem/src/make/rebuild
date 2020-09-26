@@ -1,8 +1,0 @@
-
-cc -c ident.c
-cc -c main.c
-cc -c doname.c
-cc -c misc.c
-cc -c files.c
-cc -c y.tab.c
-cc -o make main.o ident.o doname.o misc.o files.o y.tab.o

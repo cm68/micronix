@@ -1,5 +1,0 @@
-cc -c y1.c
-cc -c y2.c
-cc -c y3.c
-cc -c y4.c
-cc -o yacc y*.o
