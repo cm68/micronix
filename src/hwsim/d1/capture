@@ -1,0 +1,47 @@
+Micronix DJDMA loader
+Files:
+micronix
+core
+File to boot: micronix
+Loading
+Entering
+
+Micronix 1.4  
+Copyright 1981 Gary Fitts
+
+512K memory
+14 cache blocks
+17 processes
+disks: hdca(rev4)  djdma  hddma  
+root dev: djdma/8
+swap dev: nodev/0
+
+Welcome to Micronix. The stand-alone floppy system that
+you are now running is designed to initialize your hard
+disk, and to perform surgery on it if necessary. Please
+do not attempt to run multiple users yet. To initialize
+your hard disk:
+
+        IF YOU HAVE                        TYPE
+an m5  with the HDDMA controller        source m5init
+an m10 with the HDDMA controller        source m10init
+an m16 with the HDDMA controller        source m16init
+any drive with the HDCA controller      source hdinit
+
+Then boot Micronix from the hard disk. If you have any
+questions, please read the Installation section of the
+Micronix User's Manual.
+
+# source m5init
+mkfs -f -1024 /dev/m5a
+Device size: 10404 blocks
+File system size: 9380 blocks
+Function complete.
+fsck /dev/m5a -t
+Checking /dev/m5a:
+Hunting for bad blocks
+Will take about 1 minutes
+Bad block: 3619
+fsck: Bad system call; Core Dumped
+# 
+

@@ -1,0 +1,748 @@
+10922 execve("./terminal", ["./terminal"], 0x7ffc9c547f68 /* 50 vars */) = 0
+10922 brk(NULL)                         = 0x5578380d7000
+10922 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10922 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+10922 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+10922 fstat(3, {st_mode=S_IFREG|0644, st_size=101958, ...}) = 0
+10922 mmap(NULL, 101958, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7f7dcacf3000
+10922 close(3)                          = 0
+10922 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10922 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+10922 read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\260\34\2\0\0\0\0\0"..., 832) = 832
+10922 fstat(3, {st_mode=S_IFREG|0755, st_size=2030544, ...}) = 0
+10922 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f7dcacf1000
+10922 mmap(NULL, 4131552, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f7dca6f4000
+10922 mprotect(0x7f7dca8db000, 2097152, PROT_NONE) = 0
+10922 mmap(0x7f7dcaadb000, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1e7000) = 0x7f7dcaadb000
+10922 mmap(0x7f7dcaae1000, 15072, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7f7dcaae1000
+10922 close(3)                          = 0
+10922 arch_prctl(ARCH_SET_FS, 0x7f7dcacf24c0) = 0
+10922 mprotect(0x7f7dcaadb000, 16384, PROT_READ) = 0
+10922 mprotect(0x557836948000, 4096, PROT_READ) = 0
+10922 mprotect(0x7f7dcad0c000, 4096, PROT_READ) = 0
+10922 munmap(0x7f7dcacf3000, 101958)    = 0
+10922 rt_sigaction(SIGRT_7, {sa_handler=0x557836748611, sa_mask=[RT_7], sa_flags=SA_RESTORER|SA_RESTART, sa_restorer=0x7f7dca732f20}, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+10922 rt_sigaction(SIGRT_8, {sa_handler=0x557836748611, sa_mask=[RT_8], sa_flags=SA_RESTORER|SA_RESTART, sa_restorer=0x7f7dca732f20}, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+10922 brk(NULL)                         = 0x5578380d7000
+10922 brk(0x5578380f8000)               = 0x5578380f8000
+10922 getpid()                          = 10922
+10922 pipe([3, 4])                      = 0
+10922 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f7dcacf2790) = 10923
+10922 read(3,  <unfinished ...>
+10923 execve("/home/curt/bin/xterm", ["xterm", "-T", "foo1", "-geometry", "120x60", "-fa", "Monospace", "-fs"], 0x7ffdd63b5f18 /* 50 vars */) = -1 ENOENT (No such file or directory)
+10923 execve("/usr/local/sbin/xterm", ["xterm", "-T", "foo1", "-geometry", "120x60", "-fa", "Monospace", "-fs"], 0x7ffdd63b5f18 /* 50 vars */) = -1 ENOENT (No such file or directory)
+10923 execve("/usr/local/bin/xterm", ["xterm", "-T", "foo1", "-geometry", "120x60", "-fa", "Monospace", "-fs"], 0x7ffdd63b5f18 /* 50 vars */) = -1 ENOENT (No such file or directory)
+10923 execve("/usr/sbin/xterm", ["xterm", "-T", "foo1", "-geometry", "120x60", "-fa", "Monospace", "-fs"], 0x7ffdd63b5f18 /* 50 vars */) = -1 ENOENT (No such file or directory)
+10923 execve("/usr/bin/xterm", ["xterm", "-T", "foo1", "-geometry", "120x60", "-fa", "Monospace", "-fs"], 0x7ffdd63b5f18 /* 50 vars */) = 0
+10923 brk(NULL)                         = 0x558ed32c8000
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 5
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=101958, ...}) = 0
+10923 mmap(NULL, 101958, PROT_READ, MAP_PRIVATE, 5, 0) = 0x7fb9fde4b000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libXft.so.2", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0 >\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=85264, ...}) = 0
+10923 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fb9fde49000
+10923 mmap(NULL, 2180456, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fda28000
+10923 mprotect(0x7fb9fda3c000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fdc3b000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x13000) = 0x7fb9fdc3b000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libfontconfig.so.1", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0n\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=281984, ...}) = 0
+10923 mmap(NULL, 2377736, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fd7e3000
+10923 mprotect(0x7fb9fd821000, 2097152, PROT_NONE) = 0
+10923 mmap(0x7fb9fda21000, 28672, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x3e000) = 0x7fb9fda21000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libXaw.so.7", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\220h\1\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=471808, ...}) = 0
+10923 mmap(NULL, 2568280, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fd56f000
+10923 mprotect(0x7fb9fd5d8000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fd7d7000, 45056, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x68000) = 0x7fb9fd7d7000
+10923 mmap(0x7fb9fd7e2000, 88, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7fb9fd7e2000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libXmu.so.6", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\240]\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=102824, ...}) = 0
+10923 mmap(NULL, 2199096, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fd356000
+10923 mprotect(0x7fb9fd36e000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fd56d000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x17000) = 0x7fb9fd56d000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libXt.so.6", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0201\1\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=425552, ...}) = 0
+10923 mmap(NULL, 2523872, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fd0ed000
+10923 mprotect(0x7fb9fd14f000, 2097152, PROT_NONE) = 0
+10923 mmap(0x7fb9fd34f000, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x62000) = 0x7fb9fd34f000
+10923 mmap(0x7fb9fd355000, 736, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7fb9fd355000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libX11.so.6", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\300\207\1\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=1277384, ...}) = 0
+10923 mmap(NULL, 3374392, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fcdb5000
+10923 mprotect(0x7fb9fcee8000, 2097152, PROT_NONE) = 0
+10923 mmap(0x7fb9fd0e8000, 20480, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x133000) = 0x7fb9fd0e8000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libXinerama.so.1", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\360\n\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=10376, ...}) = 0
+10923 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fb9fde47000
+10923 mmap(NULL, 2105640, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fcbb2000
+10923 mprotect(0x7fb9fcbb4000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fcdb3000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x1000) = 0x7fb9fcdb3000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libXpm.so.4", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0 )\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=72520, ...}) = 0
+10923 mmap(NULL, 2167664, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fc9a0000
+10923 mprotect(0x7fb9fc9b1000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fcbb0000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x10000) = 0x7fb9fcbb0000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libICE.so.6", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0F\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=97952, ...}) = 0
+10923 mmap(NULL, 2207584, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fc785000
+10923 mprotect(0x7fb9fc79c000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fc99b000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x16000) = 0x7fb9fc99b000
+10923 mmap(0x7fb9fc99d000, 12128, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7fb9fc99d000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libutempter.so.0", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0P\t\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=10160, ...}) = 0
+10923 mmap(NULL, 2105376, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fc582000
+10923 mprotect(0x7fb9fc583000, 2097152, PROT_NONE) = 0
+10923 mmap(0x7fb9fc783000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x1000) = 0x7fb9fc783000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libtinfo.so.5", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\220\311\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=170784, ...}) = 0
+10923 mmap(NULL, 2267936, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fc358000
+10923 mprotect(0x7fb9fc37d000, 2097152, PROT_NONE) = 0
+10923 mmap(0x7fb9fc57d000, 20480, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x25000) = 0x7fb9fc57d000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\260\34\2\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0755, st_size=2030544, ...}) = 0
+10923 mmap(NULL, 4131552, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fbf67000
+10923 mprotect(0x7fb9fc14e000, 2097152, PROT_NONE) = 0
+10923 mmap(0x7fb9fc34e000, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x1e7000) = 0x7fb9fc34e000
+10923 mmap(0x7fb9fc354000, 15072, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7fb9fc354000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libfreetype.so.6", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\360\267\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=735704, ...}) = 0
+10923 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fb9fde45000
+10923 mmap(NULL, 2830840, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fbcb3000
+10923 mprotect(0x7fb9fbd60000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fbf5f000, 32768, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0xac000) = 0x7fb9fbf5f000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libXrender.so.1", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0`\32\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=39448, ...}) = 0
+10923 mmap(NULL, 2134632, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fbaa9000
+10923 mprotect(0x7fb9fbab2000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fbcb1000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x8000) = 0x7fb9fbcb1000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libexpat.so.1", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0@8\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=202880, ...}) = 0
+10923 mmap(NULL, 2298016, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fb877000
+10923 mprotect(0x7fb9fb8a6000, 2097152, PROT_NONE) = 0
+10923 mmap(0x7fb9fbaa6000, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x2f000) = 0x7fb9fbaa6000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libpthread.so.0", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0000b\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0755, st_size=144976, ...}) = 0
+10923 mmap(NULL, 2221184, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fb658000
+10923 mprotect(0x7fb9fb672000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fb871000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x19000) = 0x7fb9fb871000
+10923 mmap(0x7fb9fb873000, 13440, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7fb9fb873000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libXext.so.6", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\2205\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=73640, ...}) = 0
+10923 mmap(NULL, 2169496, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fb446000
+10923 mprotect(0x7fb9fb457000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fb656000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x10000) = 0x7fb9fb656000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libSM.so.6", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\300\33\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=30960, ...}) = 0
+10923 mmap(NULL, 2126192, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fb23e000
+10923 mprotect(0x7fb9fb245000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fb444000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x6000) = 0x7fb9fb444000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fb9fde43000
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libxcb.so.1", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0P\261\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=162232, ...}) = 0
+10923 mmap(NULL, 2257576, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fb016000
+10923 mprotect(0x7fb9fb03c000, 2097152, PROT_NONE) = 0
+10923 mmap(0x7fb9fb23c000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x26000) = 0x7fb9fb23c000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libdl.so.2", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0P\16\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=14560, ...}) = 0
+10923 mmap(NULL, 2109712, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fae12000
+10923 mprotect(0x7fb9fae15000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fb014000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x2000) = 0x7fb9fb014000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libbsd.so.0", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0P4\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=80104, ...}) = 0
+10923 mmap(NULL, 2179152, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fabfd000
+10923 mprotect(0x7fb9fac10000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fae0f000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x12000) = 0x7fb9fae0f000
+10923 mmap(0x7fb9fae11000, 80, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7fb9fae11000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libpng16.so.16", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\340D\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=202672, ...}) = 0
+10923 mmap(NULL, 2297872, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fa9cb000
+10923 mprotect(0x7fb9fa9fc000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fabfb000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x30000) = 0x7fb9fabfb000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libz.so.1", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\220\37\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=116960, ...}) = 0
+10923 mmap(NULL, 2212016, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fa7ae000
+10923 mprotect(0x7fb9fa7ca000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fa9c9000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x1b000) = 0x7fb9fa9c9000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libuuid.so.1", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0@\26\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=27112, ...}) = 0
+10923 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fb9fde41000
+10923 mmap(NULL, 2122112, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fa5a7000
+10923 mprotect(0x7fb9fa5ad000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fa7ac000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x5000) = 0x7fb9fa7ac000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libXau.so.6", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0P\16\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=14456, ...}) = 0
+10923 mmap(NULL, 2109720, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fa3a3000
+10923 mprotect(0x7fb9fa3a5000, 2097152, PROT_NONE) = 0
+10923 mmap(0x7fb9fa5a5000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x2000) = 0x7fb9fa5a5000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libXdmcp.so.6", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\20\21\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=22616, ...}) = 0
+10923 mmap(NULL, 2117760, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9fa19d000
+10923 mprotect(0x7fb9fa1a2000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fa3a1000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x4000) = 0x7fb9fa3a1000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/librt.so.1", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\"\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=31680, ...}) = 0
+10923 mmap(NULL, 2128864, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9f9f95000
+10923 mprotect(0x7fb9f9f9c000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9fa19b000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x6000) = 0x7fb9fa19b000
+10923 close(5)                          = 0
+10923 access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+10923 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libm.so.6", O_RDONLY|O_CLOEXEC) = 5
+10923 read(5, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\200\272\0\0\0\0\0\0"..., 832) = 832
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=1700792, ...}) = 0
+10923 mmap(NULL, 3789144, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 5, 0) = 0x7fb9f9bf7000
+10923 mprotect(0x7fb9f9d94000, 2093056, PROT_NONE) = 0
+10923 mmap(0x7fb9f9f93000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 5, 0x19c000) = 0x7fb9f9f93000
+10923 close(5)                          = 0
+10923 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fb9fde3f000
+10923 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fb9fde3d000
+10923 arch_prctl(ARCH_SET_FS, 0x7fb9fde3dbc0) = 0
+10923 mprotect(0x7fb9fc34e000, 16384, PROT_READ) = 0
+10923 mprotect(0x7fb9f9f93000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fb871000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fa19b000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fae0f000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fa3a1000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fa5a5000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fa7ac000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fa9c9000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fabfb000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fb014000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fb23c000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fc99b000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fb444000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fd0e8000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fb656000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fbaa6000, 8192, PROT_READ) = 0
+10923 mprotect(0x7fb9fbcb1000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fbf5f000, 28672, PROT_READ) = 0
+10923 mprotect(0x7fb9fc57d000, 16384, PROT_READ) = 0
+10923 mprotect(0x7fb9fc783000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fcbb0000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fcdb3000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fd34f000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fd56d000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fd7d7000, 4096, PROT_READ) = 0
+10923 mprotect(0x7fb9fda21000, 8192, PROT_READ) = 0
+10923 mprotect(0x7fb9fdc3b000, 4096, PROT_READ) = 0
+10923 mprotect(0x558ed1319000, 28672, PROT_READ) = 0
+10923 mprotect(0x7fb9fde64000, 4096, PROT_READ) = 0
+10923 munmap(0x7fb9fde4b000, 101958)    = 0
+10923 set_tid_address(0x7fb9fde3de90)   = 10923
+10923 set_robust_list(0x7fb9fde3dea0, 24) = 0
+10923 rt_sigaction(SIGRTMIN, {sa_handler=0x7fb9fb65dcb0, sa_mask=[], sa_flags=SA_RESTORER|SA_SIGINFO, sa_restorer=0x7fb9fb66a890}, NULL, 8) = 0
+10923 rt_sigaction(SIGRT_1, {sa_handler=0x7fb9fb65dd50, sa_mask=[], sa_flags=SA_RESTORER|SA_RESTART|SA_SIGINFO, sa_restorer=0x7fb9fb66a890}, NULL, 8) = 0
+10923 rt_sigprocmask(SIG_UNBLOCK, [RTMIN RT_1], NULL, 8) = 0
+10923 prlimit64(0, RLIMIT_STACK, NULL, {rlim_cur=8192*1024, rlim_max=RLIM64_INFINITY}) = 0
+10923 brk(NULL)                         = 0x558ed32c8000
+10923 brk(0x558ed32e9000)               = 0x558ed32e9000
+10923 geteuid()                         = 1000
+10923 getegid()                         = 1000
+10923 getuid()                          = 1000
+10923 getgid()                          = 1000
+10923 setuid(1000)                      = 0
+10923 ioctl(0, TCGETS, {B38400 opost isig icanon echo ...}) = 0
+10923 sysinfo({uptime=772689, loads=[576, 19232, 27872], totalram=33593585664, freeram=8490627072, sharedram=570916864, bufferram=2797678592, totalswap=2147479552, freeswap=2147479552, procs=724, totalhigh=0, freehigh=0, mem_unit=1}) = 0
+10923 openat(AT_FDCWD, "/usr/share/X11/locale/locale.alias", O_RDONLY) = 5
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=82752, ...}) = 0
+10923 read(5, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"..., 4096) = 4096
+10923 read(5, "IN.UTF-8\nbo_IN.utf8\t\t\t\t\tbo_IN.UT"..., 4096) = 4096
+10923 read(5, "o\t\t\t\t\tde_DE.ISO8859-15\nde_DE.885"..., 4096) = 4096
+10923 read(5, "\t\t\t\t\ten_ZA.ISO8859-1\nen_ZA.88591"..., 4096) = 4096
+10923 read(5, "S\t\t\t\t\t\teu_ES.ISO8859-1\neu_ES.iso"..., 4096) = 4096
+10923 read(5, ".iso88591\t\t\t\t\tgv_GB.ISO8859-1\ngv"..., 4096) = 4096
+10923 read(5, "ri\nkw\t\t\t\t\t\tkw_GB.ISO8859-1\nkw_GB"..., 4096) = 4096
+10923 read(5, "O8859-15\nno@nynorsk\t\t\t\t\tny_NO.IS"..., 4096) = 4096
+10923 read(5, "F-8\nsr_YU@cyrillic\t\t\t\t\tsr_RS.UTF"..., 4096) = 4096
+10923 read(5, "\t\t\t\tyi_US.CP1255\nyi_US.MICROSOFT"..., 4096) = 4096
+10923 read(5, "ond word is full locale name.\n#\n"..., 4096) = 4096
+10923 read(5, "O8859-1\nbr_FR.iso88591:\t\t\t\t\tbr_F"..., 4096) = 4096
+10923 read(5, "\nde_DE:\t\t\t\t\t\tde_DE.ISO8859-1\nde_"..., 4096) = 4096
+10923 read(5, "5:\t\t\t\t\ten_US.ISO8859-15\nen_US.IS"..., 4096) = 4096
+10923 read(5, "59-1\net_EE.iso88594:\t\t\t\t\tet_EE.I"..., 4096) = 4096
+10923 read(5, "_ES.ISO8859-1\ngl_ES.iso88591:\t\t\t"..., 4096) = 4096
+10923 read(5, "KH.UTF-8\nkm_KH.utf8:\t\t\t\t\tkm_KH.U"..., 4096) = 4096
+10923 read(5, ".ISO8859-1\nno_NO.iso88591:\t\t\t\t\tn"..., 4096) = 4096
+10923 read(5, "d_ET:                        sid"..., 4096) = 4096
+10923 read(5, "z_UZ.UTF-8\nuz_UZ.UTF-8@cyrillic:"..., 4096) = 4096
+10923 read(5, "ro_RO.ISO8859-2\nrumanian:\t\t\t\t\tro"..., 4096) = 832
+10923 read(5, "", 4096)                 = 0
+10923 close(5)                          = 0
+10923 openat(AT_FDCWD, "/usr/share/X11/locale/locale.dir", O_RDONLY) = 5
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=40631, ...}) = 0
+10923 read(5, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"..., 4096) = 4096
+10923 read(5, "iso8859-1/XLC_LOCALE\t\t\tes_CR.ISO"..., 4096) = 4096
+10923 read(5, "1/XLC_LOCALE\t\t\tno_NO.ISO8859-15\n"..., 4096) = 4096
+10923 read(5, "\t\tas_IN.UTF-8\nen_US.UTF-8/XLC_LO"..., 4096) = 4096
+10923 read(5, "LOCALE\t\t\tku_TR.UTF-8\nen_US.UTF-8"..., 4096) = 4096
+10923 close(5)                          = 0
+10923 access("/usr/share/X11/locale/C/XLC_LOCALE", R_OK) = 0
+10923 openat(AT_FDCWD, "/usr/share/X11/locale/C/XLC_LOCALE", O_RDONLY) = 5
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=696, ...}) = 0
+10923 read(5, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"..., 4096) = 696
+10923 read(5, "", 4096)                 = 0
+10923 close(5)                          = 0
+10923 openat(AT_FDCWD, "/usr/share/X11/locale/locale.alias", O_RDONLY) = 5
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=82752, ...}) = 0
+10923 read(5, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"..., 4096) = 4096
+10923 read(5, "IN.UTF-8\nbo_IN.utf8\t\t\t\t\tbo_IN.UT"..., 4096) = 4096
+10923 read(5, "o\t\t\t\t\tde_DE.ISO8859-15\nde_DE.885"..., 4096) = 4096
+10923 read(5, "\t\t\t\t\ten_ZA.ISO8859-1\nen_ZA.88591"..., 4096) = 4096
+10923 read(5, "S\t\t\t\t\t\teu_ES.ISO8859-1\neu_ES.iso"..., 4096) = 4096
+10923 read(5, ".iso88591\t\t\t\t\tgv_GB.ISO8859-1\ngv"..., 4096) = 4096
+10923 read(5, "ri\nkw\t\t\t\t\t\tkw_GB.ISO8859-1\nkw_GB"..., 4096) = 4096
+10923 read(5, "O8859-15\nno@nynorsk\t\t\t\t\tny_NO.IS"..., 4096) = 4096
+10923 read(5, "F-8\nsr_YU@cyrillic\t\t\t\t\tsr_RS.UTF"..., 4096) = 4096
+10923 read(5, "\t\t\t\tyi_US.CP1255\nyi_US.MICROSOFT"..., 4096) = 4096
+10923 read(5, "ond word is full locale name.\n#\n"..., 4096) = 4096
+10923 read(5, "O8859-1\nbr_FR.iso88591:\t\t\t\t\tbr_F"..., 4096) = 4096
+10923 read(5, "\nde_DE:\t\t\t\t\t\tde_DE.ISO8859-1\nde_"..., 4096) = 4096
+10923 read(5, "5:\t\t\t\t\ten_US.ISO8859-15\nen_US.IS"..., 4096) = 4096
+10923 read(5, "59-1\net_EE.iso88594:\t\t\t\t\tet_EE.I"..., 4096) = 4096
+10923 read(5, "_ES.ISO8859-1\ngl_ES.iso88591:\t\t\t"..., 4096) = 4096
+10923 read(5, "KH.UTF-8\nkm_KH.utf8:\t\t\t\t\tkm_KH.U"..., 4096) = 4096
+10923 read(5, ".ISO8859-1\nno_NO.iso88591:\t\t\t\t\tn"..., 4096) = 4096
+10923 read(5, "d_ET:                        sid"..., 4096) = 4096
+10923 read(5, "z_UZ.UTF-8\nuz_UZ.UTF-8@cyrillic:"..., 4096) = 4096
+10923 read(5, "ro_RO.ISO8859-2\nrumanian:\t\t\t\t\tro"..., 4096) = 832
+10923 read(5, "", 4096)                 = 0
+10923 close(5)                          = 0
+10923 openat(AT_FDCWD, "/usr/share/X11/locale/locale.dir", O_RDONLY) = 5
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=40631, ...}) = 0
+10923 read(5, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"..., 4096) = 4096
+10923 read(5, "iso8859-1/XLC_LOCALE\t\t\tes_CR.ISO"..., 4096) = 4096
+10923 read(5, "1/XLC_LOCALE\t\t\tno_NO.ISO8859-15\n"..., 4096) = 4096
+10923 read(5, "\t\tas_IN.UTF-8\nen_US.UTF-8/XLC_LO"..., 4096) = 4096
+10923 read(5, "LOCALE\t\t\tku_TR.UTF-8\nen_US.UTF-8"..., 4096) = 4096
+10923 close(5)                          = 0
+10923 access("/usr/share/X11/locale/C/XLC_LOCALE", R_OK) = 0
+10923 openat(AT_FDCWD, "/usr/share/X11/locale/C/XLC_LOCALE", O_RDONLY) = 5
+10923 fstat(5, {st_mode=S_IFREG|0644, st_size=696, ...}) = 0
+10923 read(5, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"..., 4096) = 696
+10923 read(5, "", 4096)                 = 0
+10923 close(5)                          = 0
+10923 socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0) = 5
+10923 connect(5, {sa_family=AF_UNIX, sun_path=@"/tmp/.X11-unix/X0"}, 20) = 0
+10923 getpeername(5, {sa_family=AF_UNIX, sun_path=@"/tmp/.X11-unix/X0"}, [124->20]) = 0
+10923 uname({sysname="Linux", nodename="nook", ...}) = 0
+10923 access("/home/curt/.Xauthority", R_OK) = 0
+10923 openat(AT_FDCWD, "/home/curt/.Xauthority", O_RDONLY) = 6
+10923 fstat(6, {st_mode=S_IFREG|0600, st_size=649, ...}) = 0
+10923 read(6, "\1\0\0\4nook\0\00212\0\22MIT-MAGIC-COOKIE-1"..., 4096) = 649
+10923 read(6, "", 4096)                 = 0
+10923 close(6)                          = 0
+10923 getsockname(5, {sa_family=AF_UNIX}, [124->2]) = 0
+10923 fcntl(5, F_GETFL)                 = 0x2 (flags O_RDWR)
+10923 fcntl(5, F_SETFL, O_RDWR|O_NONBLOCK) = 0
+10923 fcntl(5, F_SETFD, FD_CLOEXEC)     = 0
+10923 poll([{fd=5, events=POLLIN|POLLOUT}], 1, -1) = 1 ([{fd=5, revents=POLLOUT}])
+10923 writev(5, [{iov_base="l\0\v\0\0\0\22\0\20\0\0\0", iov_len=12}, {iov_base="", iov_len=0}, {iov_base="MIT-MAGIC-COOKIE-1", iov_len=18}, {iov_base="\0\0", iov_len=2}, {iov_base="\330\334Z\313\303\262\372\216\364-\371\253e\212\225l", iov_len=16}, {iov_base="", iov_len=0}], 6) = 48
+10923 recvfrom(5, 0x558ed32cdaa0, 8, 0, NULL, NULL) = -1 EAGAIN (Resource temporarily unavailable)
+10923 poll([{fd=5, events=POLLIN}], 1, -1) = 1 ([{fd=5, revents=POLLIN}])
+10923 recvfrom(5, "\1\0\v\0\0\0g\2", 8, 0, NULL, NULL) = 8
+10923 recvfrom(5, "\320\253\265\0\0\0`\5\377\377\37\0\0\1\0\0\24\0\377\377\1\7\0\0  \10\377\0\0\0\0"..., 2460, 0, NULL, NULL) = 2460
+10923 poll([{fd=5, events=POLLIN|POLLOUT}], 1, -1) = 1 ([{fd=5, revents=POLLOUT}])
+10923 writev(5, [{iov_base="b\0\5\0\f\0\0\0BIG-REQUESTS", iov_len=20}], 1) = 20
+10923 poll([{fd=5, events=POLLIN}], 1, -1) = 1 ([{fd=5, revents=POLLIN}])
+10923 recvmsg(5, {msg_name=NULL, msg_namelen=0, msg_iov=[{iov_base="\1\0\1\0\0\0\0\0\1\205\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", iov_len=4096}], msg_iovlen=1, msg_controllen=0, msg_flags=0}, 0) = 32
+10923 poll([{fd=5, events=POLLIN|POLLOUT}], 1, -1) = 1 ([{fd=5, revents=POLLOUT}])
+10923 writev(5, [{iov_base="\205\0\1\0", iov_len=4}], 1) = 4
+10923 poll([{fd=5, events=POLLIN}], 1, -1) = 1 ([{fd=5, revents=POLLIN}])
+10923 recvmsg(5, {msg_name=NULL, msg_namelen=0, msg_iov=[{iov_base="\1\0\2\0\0\0\0\0\377\377?\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", iov_len=4096}], msg_iovlen=1, msg_controllen=0, msg_flags=0}, 0) = 32
+10923 recvmsg(5, {msg_namelen=0}, 0)    = -1 EAGAIN (Resource temporarily unavailable)
+10923 poll([{fd=5, events=POLLIN|POLLOUT}], 1, -1) = 1 ([{fd=5, revents=POLLOUT}])
+10923 writev(5, [{iov_base="7\0\5\0\0\0`\5\\\1\0\0\10\0\0\0\377\377\377\0\24\0\6\0\\\1\0\0\27\0\0\0"..., iov_len=44}, {iov_base=NULL, iov_len=0}, {iov_base="", iov_len=0}], 3) = 44
+10923 poll([{fd=5, events=POLLIN}], 1, -1) = 1 ([{fd=5, revents=POLLIN}])
+10923 recvmsg(5, {msg_name=NULL, msg_namelen=0, msg_iov=[{iov_base="\1\10\4\0!\0\0\0\37\0\0\0\0\0\0\0\202\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., iov_len=4096}], msg_iovlen=1, msg_controllen=0, msg_flags=0}, 0) = 164
+10923 recvmsg(5, {msg_namelen=0}, 0)    = -1 EAGAIN (Resource temporarily unavailable)
+10923 poll([{fd=5, events=POLLIN|POLLOUT}], 1, -1) = 1 ([{fd=5, revents=POLLOUT}])
+10923 writev(5, [{iov_base="b\0\5\0\t\0`\5", iov_len=8}, {iov_base="XKEYBOARD", iov_len=9}, {iov_base="\0\0\0", iov_len=3}], 3) = 20
+10923 poll([{fd=5, events=POLLIN}], 1, -1) = 1 ([{fd=5, revents=POLLIN}])
+10923 recvmsg(5, {msg_name=NULL, msg_namelen=0, msg_iov=[{iov_base="\1\0\5\0\0\0\0\0\1\207U\211\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", iov_len=4096}], msg_iovlen=1, msg_controllen=0, msg_flags=0}, 0) = 32
+10923 recvmsg(5, {msg_namelen=0}, 0)    = -1 EAGAIN (Resource temporarily unavailable)
+10923 recvmsg(5, {msg_namelen=0}, 0)    = -1 EAGAIN (Resource temporarily unavailable)
+10923 poll([{fd=5, events=POLLIN|POLLOUT}], 1, -1) = 1 ([{fd=5, revents=POLLOUT}])
+10923 writev(5, [{iov_base="\207\0\2\0\1\0\0\0", iov_len=8}, {iov_base=NULL, iov_len=0}, {iov_base="", iov_len=0}], 3) = 8
+10923 poll([{fd=5, events=POLLIN}], 1, -1) = 1 ([{fd=5, revents=POLLIN}])
+10923 recvmsg(5, {msg_name=NULL, msg_namelen=0, msg_iov=[{iov_base="\1\1\6\0\0\0\0\0\1\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", iov_len=4096}], msg_iovlen=1, msg_controllen=0, msg_flags=0}, 0) = 32
+10923 recvmsg(5, {msg_namelen=0}, 0)    = -1 EAGAIN (Resource temporarily unavailable)
+10923 recvmsg(5, {msg_namelen=0}, 0)    = -1 EAGAIN (Resource temporarily unavailable)
+10923 poll([{fd=5, events=POLLIN|POLLOUT}], 1, -1) = 1 ([{fd=5, revents=POLLOUT}])
+10923 writev(5, [{iov_base="\20\0\5\0\v\0\0\0Custom Init\0", iov_len=20}, {iov_base=NULL, iov_len=0}, {iov_base="", iov_len=0}], 3) = 20
+10923 poll([{fd=5, events=POLLIN}], 1, -1) = 1 ([{fd=5, revents=POLLIN}])
+10923 recvmsg(5, {msg_name=NULL, msg_namelen=0, msg_iov=[{iov_base="\1\0\7\0\0\0\0\0\25\2\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", iov_len=4096}], msg_iovlen=1, msg_controllen=0, msg_flags=0}, 0) = 32
+10923 recvmsg(5, {msg_namelen=0}, 0)    = -1 EAGAIN (Resource temporarily unavailable)
+10923 recvmsg(5, {msg_namelen=0}, 0)    = -1 EAGAIN (Resource temporarily unavailable)
+10923 poll([{fd=5, events=POLLIN|POLLOUT}], 1, -1) = 1 ([{fd=5, revents=POLLOUT}])
+10923 writev(5, [{iov_base="\20\0\5\0\v\0\0\0Custom Data\0", iov_len=20}, {iov_base=NULL, iov_len=0}, {iov_base="", iov_len=0}], 3) = 20
+10923 poll([{fd=5, events=POLLIN}], 1, -1) = 1 ([{fd=5, revents=POLLIN}])
+10923 recvmsg(5, {msg_name=NULL, msg_namelen=0, msg_iov=[{iov_base="\1\0\10\0\0\0\0\0\26\2\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", iov_len=4096}], msg_iovlen=1, msg_controllen=0, msg_flags=0}, 0) = 32
+10923 recvmsg(5, {msg_namelen=0}, 0)    = -1 EAGAIN (Resource temporarily unavailable)
+10923 recvmsg(5, {msg_namelen=0}, 0)    = -1 EAGAIN (Resource temporarily unavailable)
+10923 openat(AT_FDCWD, "/usr/lib/locale/locale-archive", O_RDONLY|O_CLOEXEC) = 6
+10923 fstat(6, {st_mode=S_IFREG|0644, st_size=3004224, ...}) = 0
+10923 mmap(NULL, 3004224, PROT_READ, MAP_PRIVATE, 6, 0) = 0x7fb9f9919000
+10923 close(6)                          = 0
+10923 openat(AT_FDCWD, "/usr/share/X11/locale/locale.alias", O_RDONLY) = 6
+10923 fstat(6, {st_mode=S_IFREG|0644, st_size=82752, ...}) = 0
+10923 read(6, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"..., 4096) = 4096
+10923 read(6, "IN.UTF-8\nbo_IN.utf8\t\t\t\t\tbo_IN.UT"..., 4096) = 4096
+10923 read(6, "o\t\t\t\t\tde_DE.ISO8859-15\nde_DE.885"..., 4096) = 4096
+10923 read(6, "\t\t\t\t\ten_ZA.ISO8859-1\nen_ZA.88591"..., 4096) = 4096
+10923 read(6, "S\t\t\t\t\t\teu_ES.ISO8859-1\neu_ES.iso"..., 4096) = 4096
+10923 read(6, ".iso88591\t\t\t\t\tgv_GB.ISO8859-1\ngv"..., 4096) = 4096
+10923 read(6, "ri\nkw\t\t\t\t\t\tkw_GB.ISO8859-1\nkw_GB"..., 4096) = 4096
+10923 read(6, "O8859-15\nno@nynorsk\t\t\t\t\tny_NO.IS"..., 4096) = 4096
+10923 read(6, "F-8\nsr_YU@cyrillic\t\t\t\t\tsr_RS.UTF"..., 4096) = 4096
+10923 read(6, "\t\t\t\tyi_US.CP1255\nyi_US.MICROSOFT"..., 4096) = 4096
+10923 read(6, "ond word is full locale name.\n#\n"..., 4096) = 4096
+10923 read(6, "O8859-1\nbr_FR.iso88591:\t\t\t\t\tbr_F"..., 4096) = 4096
+10923 read(6, "\nde_DE:\t\t\t\t\t\tde_DE.ISO8859-1\nde_"..., 4096) = 4096
+10923 read(6, "5:\t\t\t\t\ten_US.ISO8859-15\nen_US.IS"..., 4096) = 4096
+10923 read(6, "59-1\net_EE.iso88594:\t\t\t\t\tet_EE.I"..., 4096) = 4096
+10923 read(6, "_ES.ISO8859-1\ngl_ES.iso88591:\t\t\t"..., 4096) = 4096
+10923 read(6, "KH.UTF-8\nkm_KH.utf8:\t\t\t\t\tkm_KH.U"..., 4096) = 4096
+10923 read(6, ".ISO8859-1\nno_NO.iso88591:\t\t\t\t\tn"..., 4096) = 4096
+10923 read(6, "d_ET:                        sid"..., 4096) = 4096
+10923 read(6, "z_UZ.UTF-8\nuz_UZ.UTF-8@cyrillic:"..., 4096) = 4096
+10923 read(6, "ro_RO.ISO8859-2\nrumanian:\t\t\t\t\tro"..., 4096) = 832
+10923 read(6, "", 4096)                 = 0
+10923 close(6)                          = 0
+10923 openat(AT_FDCWD, "/usr/share/X11/locale/locale.alias", O_RDONLY) = 6
+10923 fstat(6, {st_mode=S_IFREG|0644, st_size=82752, ...}) = 0
+10923 read(6, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"..., 4096) = 4096
+10923 read(6, "IN.UTF-8\nbo_IN.utf8\t\t\t\t\tbo_IN.UT"..., 4096) = 4096
+10923 read(6, "o\t\t\t\t\tde_DE.ISO8859-15\nde_DE.885"..., 4096) = 4096
+10923 read(6, "\t\t\t\t\ten_ZA.ISO8859-1\nen_ZA.88591"..., 4096) = 4096
+10923 read(6, "S\t\t\t\t\t\teu_ES.ISO8859-1\neu_ES.iso"..., 4096) = 4096
+10923 read(6, ".iso88591\t\t\t\t\tgv_GB.ISO8859-1\ngv"..., 4096) = 4096
+10923 read(6, "ri\nkw\t\t\t\t\t\tkw_GB.ISO8859-1\nkw_GB"..., 4096) = 4096
+10923 read(6, "O8859-15\nno@nynorsk\t\t\t\t\tny_NO.IS"..., 4096) = 4096
+10923 read(6, "F-8\nsr_YU@cyrillic\t\t\t\t\tsr_RS.UTF"..., 4096) = 4096
+10923 read(6, "\t\t\t\tyi_US.CP1255\nyi_US.MICROSOFT"..., 4096) = 4096
+10923 read(6, "ond word is full locale name.\n#\n"..., 4096) = 4096
+10923 read(6, "O8859-1\nbr_FR.iso88591:\t\t\t\t\tbr_F"..., 4096) = 4096
+10923 read(6, "\nde_DE:\t\t\t\t\t\tde_DE.ISO8859-1\nde_"..., 4096) = 4096
+10923 close(6)                          = 0
+10923 openat(AT_FDCWD, "/usr/share/X11/locale/locale.dir", O_RDONLY) = 6
+10923 fstat(6, {st_mode=S_IFREG|0644, st_size=40631, ...}) = 0
+10923 read(6, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"..., 4096) = 4096
+10923 read(6, "iso8859-1/XLC_LOCALE\t\t\tes_CR.ISO"..., 4096) = 4096
+10923 read(6, "1/XLC_LOCALE\t\t\tno_NO.ISO8859-15\n"..., 4096) = 4096
+10923 read(6, "\t\tas_IN.UTF-8\nen_US.UTF-8/XLC_LO"..., 4096) = 4096
+10923 read(6, "LOCALE\t\t\tku_TR.UTF-8\nen_US.UTF-8"..., 4096) = 4096
+10923 read(6, "AE.ISO8859-6\niso8859-6/XLC_LOCAL"..., 4096) = 4096
+10923 read(6, ".ISO8859-1\niso8859-1/XLC_LOCALE:"..., 4096) = 4096
+10923 read(6, "LC_LOCALE:\t\t\toc_FR.ISO8859-1\niso"..., 4096) = 4096
+10923 read(6, "LE:\t\t\tbe_BY.UTF-8@latin\nen_US.UT"..., 4096) = 4096
+10923 close(6)                          = 0
+10923 access("/usr/share/X11/locale/en_US.UTF-8/XLC_LOCALE", R_OK) = 0
+10923 openat(AT_FDCWD, "/usr/share/X11/locale/en_US.UTF-8/XLC_LOCALE", O_RDONLY) = 6
+10923 fstat(6, {st_mode=S_IFREG|0644, st_size=4254, ...}) = 0
+10923 read(6, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"..., 4096) = 4096
+10923 read(6, "R\n}\n \n#\tcs20 class\ncs15\t{\n\tside\t"..., 4096) = 158
+10923 read(6, "", 4096)                 = 0
+10923 close(6)                          = 0
+10923 brk(0x558ed330b000)               = 0x558ed330b000
+10923 poll([{fd=5, events=POLLIN|POLLOUT}], 1, -1) = 1 ([{fd=5, revents=POLLOUT}])
+10923 writev(5, [{iov_base="\20\1\6\0\20\0\0\0SCREEN_RESOURCES", iov_len=24}, {iov_base=NULL, iov_len=0}, {iov_base="", iov_len=0}], 3) = 24
+10923 poll([{fd=5, events=POLLIN}], 1, -1) = 1 ([{fd=5, revents=POLLIN}])
+10923 recvmsg(5, {msg_name=NULL, msg_namelen=0, msg_iov=[{iov_base="\1\0\t\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", iov_len=4096}], msg_iovlen=1, msg_controllen=0, msg_flags=0}, 0) = 32
+10923 recvmsg(5, {msg_namelen=0}, 0)    = -1 EAGAIN (Resource temporarily unavailable)
+10923 recvmsg(5, {msg_namelen=0}, 0)    = -1 EAGAIN (Resource temporarily unavailable)
+10923 uname({sysname="Linux", nodename="nook", ...}) = 0
+10923 openat(AT_FDCWD, "/home/curt/.Xdefaults-nook", O_RDONLY) = -1 ENOENT (No such file or directory)
+10923 access("/home/curt/en_US.UTF-8/XTerm-color", R_OK) = -1 ENOENT (No such file or directory)
+10923 access("/home/curt/en/XTerm-color", R_OK) = -1 ENOENT (No such file or directory)
+10923 access("/home/curt/XTerm-color", R_OK) = -1 ENOENT (No such file or directory)
+10923 access("/home/curt/en_US.UTF-8/XTerm", R_OK) = -1 ENOENT (No such file or directory)
+10923 access("/home/curt/en/XTerm", R_OK) = -1 ENOENT (No such file or directory)
+10923 access("/home/curt/XTerm", R_OK)  = -1 ENOENT (No such file or directory)
+10923 access("/usr/lib/X11/en_US.UTF-8/app-defaults/XTerm", R_OK) = -1 ENOENT (No such file or directory)
+10923 access("/usr/lib/X11/en/app-defaults/XTerm", R_OK) = -1 ENOENT (No such file or directory)
+10923 access("/usr/lib/X11/app-defaults/XTerm", R_OK) = -1 ENOENT (No such file or directory)
+10923 access("/etc/X11/en_US.UTF-8/app-defaults/XTerm-color", R_OK) = -1 ENOENT (No such file or directory)
+10923 access("/etc/X11/en/app-defaults/XTerm-color", R_OK) = -1 ENOENT (No such file or directory)
+10923 access("/etc/X11/app-defaults/XTerm-color", R_OK) = 0
+10923 stat("/etc/X11/app-defaults/XTerm-color", {st_mode=S_IFREG|0644, st_size=6207, ...}) = 0
+10923 openat(AT_FDCWD, "/etc/X11/app-defaults/XTerm-color", O_RDONLY) = 6
+10923 fstat(6, {st_mode=S_IFREG|0644, st_size=6207, ...}) = 0
+10923 read(6, "! $XTermId: XTerm-col.ad,v 1.22 "..., 6207) = 6207
+10923 close(6)                          = 0
+10923 openat(AT_FDCWD, "/etc/X11/app-defaults/XTerm", O_RDONLY) = 6
+10923 fstat(6, {st_mode=S_IFREG|0644, st_size=10332, ...}) = 0
+10923 read(6, "! $XTermId: XTerm.ad,v 1.102 201"..., 10332) = 10332
+10923 close(6)                          = 0
+10923 socket(AF_UNIX, SOCK_STREAM, 0)   = 6
+10923 getsockopt(6, SOL_SOCKET, SO_SNDBUF, [212992], [4]) = 0
+10923 uname({sysname="Linux", nodename="nook", ...}) = 0
+10923 connect(6, {sa_family=AF_UNIX, sun_path=@"/tmp/.ICE-unix/1111"}, 22) = 0
+10923 fcntl(6, F_SETFD, FD_CLOEXEC)     = 0
+10923 write(6, "\0\1\0\0\0\0\0\0", 8)   = 8
+10923 read(6, "\0\1\0}\0\0\0\0", 8)     = 8
+10923 access("/home/curt/.ICEauthority", R_OK) = 0
+10923 openat(AT_FDCWD, "/home/curt/.ICEauthority", O_RDONLY) = 7
+10923 fstat(7, {st_mode=S_IFREG|0600, st_size=620, ...}) = 0
+10923 read(7, "\0\3ICE\0\0\0\37local/nook:@/tmp/.ICE-u"..., 4096) = 620
+10923 read(7, "", 4096)                 = 0
+10923 close(7)                          = 0
+10923 write(6, "\0\2\1\1\6\0\0\0\0\0\0\0\0\0\0\0\3\0MIT\0\0\0\3\0001.0\0\0\0"..., 56) = 56
+10923 read(6, "\0\3\0}\1\0\0\0", 8)     = 8
+10923 read(6, "\0\0\0\0\0\0\0\0", 8)    = 8
+10923 access("/home/curt/.ICEauthority", R_OK) = 0
+10923 openat(AT_FDCWD, "/home/curt/.ICEauthority", O_RDONLY) = 7
+10923 fstat(7, {st_mode=S_IFREG|0600, st_size=620, ...}) = 0
+10923 read(7, "\0\3ICE\0\0\0\37local/nook:@/tmp/.ICE-u"..., 4096) = 620
+10923 close(7)                          = 0
+10923 write(6, "\0\4\1\1\3\0\0\0\20\0\0\0\0\0\0\0\230\31\10\330\257\275\326n&\223a\357r\330\0351", 32) = 32
+10923 read(6, "\0\6\0}\2\0\0\0", 8)     = 8
+10923 read(6, "\3\0MIT\0\0\0\3\0001.0lon", 16) = 16
+10923 access("/home/curt/.ICEauthority", R_OK) = 0
+10923 openat(AT_FDCWD, "/home/curt/.ICEauthority", O_RDONLY) = 7
+10923 fstat(7, {st_mode=S_IFREG|0600, st_size=620, ...}) = 0
+10923 read(7, "\0\3ICE\0\0\0\37local/nook:@/tmp/.ICE-u"..., 4096) = 620
+10923 read(7, "", 4096)                 = 0
+10923 close(7)                          = 0
+10923 write(6, "\0\7\1\0\7\0\0\0\1\1\0\0\0\0\0\0\4\0XSMP\326n\3\0MIT\330\0351"..., 64) = 64
+10923 read(6, "\0\3\0}\1\0\0\0", 8)     = 8
+10923 read(6, "\0\0MIT\0\0\0", 8)       = 8
+10923 access("/home/curt/.ICEauthority", R_OK) = 0
+10923 openat(AT_FDCWD, "/home/curt/.ICEauthority", O_RDONLY) = 7
+10923 fstat(7, {st_mode=S_IFREG|0600, st_size=620, ...}) = 0
+10923 read(7, "\0\3ICE\0\0\0\37local/nook:@/tmp/.ICE-u"..., 4096) = 620
+10923 close(7)                          = 0
+10923 write(6, "\0\4\1\0\3\0\0\0\20\0\0\0\0\0\0\0\230\31\10\330\257\275\326n&\223a\357r\330\0351", 32) = 32
+10923 read(6, "\0\10\0\1\3\0\0\0", 8)   = 8
+10923 read(6, "\r\0xfce4-sessionn\6\0004.12.1", 24) = 24
+10923 write(6, "\1\1\1\0\1\0\0\0\0\0\0\0\0\0\0\0", 16) = 16
+10923 read(6, "\1\2\0\1\6\0\0\0", 8)    = 8
+10923 read(6, "%\0\0\00025ea4a9b3-de22-4227-a90e-a4f"..., 48) = 48
+10923 getpid()                          = 10923
+10923 write(6, "\1\f\1\0D\0\0\0\5\0\0\0\0\0\0\0\f\0\0\0CloneCommand"..., 552) = 552
+10923 getpid()                          = 10923
+10923 mkdir("/tmp/xtermYxnVWN", 0700)   = 0
+10923 openat(AT_FDCWD, "/tmp/xtermYxnVWN/index.theme", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 7
+10923 fstat(7, {st_mode=S_IFREG|0664, st_size=0, ...}) = 0
+10923 write(7, "[Icon Theme]\n", 13)    = 13
+10923 close(7)                          = 0
+10923 setresgid(-1, 1000, -1)           = 0
+10923 write(2, "xterm: ", 7)            = 7
+10923 write(2, "bad command line option \"-fs\"\r\n\n", 32) = 32
+10923 write(2, "usage:  xterm", 13)     = 13
+10923 write(2, " [-/+132]", 9)          = 9
+10923 write(2, " [-C]", 5)              = 5
+10923 write(2, " [-Sccn]", 8)           = 8
+10923 write(2, " [-T string]", 12)      = 12
+10923 write(2, " [-/+ah]", 8)           = 8
+10923 write(2, " [-/+ai]", 8)           = 8
+10923 write(2, " [-/+aw]", 8)           = 8
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-b number]", 12)      = 12
+10923 write(2, " [-baudrate rate]", 17) = 17
+10923 write(2, " [-/+bc]", 8)           = 8
+10923 write(2, " [-bcf milliseconds]", 20) = 20
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-bcn milliseconds]", 20) = 20
+10923 write(2, " [-bd color]", 12)      = 12
+10923 write(2, " [-/+bdc]", 9)          = 9
+10923 write(2, " [-bg color]", 12)      = 12
+10923 write(2, " [-bw number]", 13)     = 13
+10923 write(2, " [-/+cb]", 8)           = 8
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-cc classrange]", 17) = 17
+10923 write(2, " [-/+cjk_width]", 15)   = 15
+10923 write(2, " [-class string]", 16)  = 16
+10923 write(2, " [-/+cm]", 8)           = 8
+10923 write(2, " [-/+cn]", 8)           = 8
+10923 write(2, " [-cr color]", 12)      = 12
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-/+cu]", 8)           = 8
+10923 write(2, " [-/+dc]", 8)           = 8
+10923 write(2, " [-display displayname]", 23) = 23
+10923 write(2, " [-e command args ...]", 22) = 22
+10923 write(2, " [-fa pattern]", 14)    = 14
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-fb fontname]", 15)   = 15
+10923 write(2, " [-/+fbb]", 9)          = 9
+10923 write(2, " [-/+fbx]", 9)          = 9
+10923 write(2, " [-fd pattern]", 14)    = 14
+10923 write(2, " [-fg color]", 12)      = 12
+10923 write(2, " [-fi fontname]", 15)   = 15
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-fn fontname]", 15)   = 15
+10923 write(2, " [-fs size]", 11)       = 11
+10923 write(2, " [-/+fullscreen]", 16)  = 16
+10923 write(2, " [-fw fontname]", 15)   = 15
+10923 write(2, " [-fwb fontname]", 16)  = 16
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-fx fontname]", 15)   = 15
+10923 write(2, " [%geom]", 8)           = 8
+10923 write(2, " [#geom]", 8)           = 8
+10923 write(2, " [-geometry geom]", 17) = 17
+10923 write(2, " [-help]", 8)           = 8
+10923 write(2, " [-/+hm]", 8)           = 8
+10923 write(2, " [-/+hold]", 10)        = 10
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-iconic]", 10)        = 10
+10923 write(2, " [-/+ie]", 8)           = 8
+10923 write(2, " [-/+im]", 8)           = 8
+10923 write(2, " [-into windowId]", 17) = 17
+10923 write(2, " [-/+itc]", 9)          = 9
+10923 write(2, " [-/+j]", 7)            = 7
+10923 write(2, " [-/+k8]", 8)           = 8
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-kt keyboardtype]", 19) = 19
+10923 write(2, " [-/+l]", 7)            = 7
+10923 write(2, " [-/+lc]", 8)           = 8
+10923 write(2, " [-lcc path]", 12)      = 12
+10923 write(2, " [-leftbar]", 11)       = 11
+10923 write(2, " [-lf filename]", 15)   = 15
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-/+ls]", 8)           = 8
+10923 write(2, " [-/+maximized]", 15)   = 15
+10923 write(2, " [-/+mb]", 8)           = 8
+10923 write(2, " [-mc milliseconds]", 19) = 19
+10923 write(2, " [-/+mesg]", 10)        = 10
+10923 write(2, " [-/+mk_width]", 14)    = 14
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-ms color]", 12)      = 12
+10923 write(2, " [-n string]", 12)      = 12
+10923 write(2, " [-name string]", 15)   = 15
+10923 write(2, " [-nb number]", 13)     = 13
+10923 write(2, " [-/+nul]", 9)          = 9
+10923 write(2, " [-/+pc]", 8)           = 8
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-/+pob]", 9)          = 9
+10923 write(2, " [-report-charclass]", 20) = 20
+10923 write(2, " [-report-colors]", 17) = 17
+10923 write(2, " [-report-fonts]", 16)  = 16
+10923 write(2, " [-rightbar]", 12)      = 12
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-/+rv]", 8)           = 8
+10923 write(2, " [-/+rvc]", 9)          = 9
+10923 write(2, " [-/+rw]", 8)           = 8
+10923 write(2, " [-/+s]", 7)            = 7
+10923 write(2, " [-/+samename]", 14)    = 14
+10923 write(2, " [-/+sb]", 8)           = 8
+10923 write(2, " [-selbg color]", 15)   = 15
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-selfg color]", 15)   = 15
+10923 write(2, " [-/+sf]", 8)           = 8
+10923 write(2, " [-sh number]", 13)     = 13
+10923 write(2, " [-/+si]", 8)           = 8
+10923 write(2, " [-/+sk]", 8)           = 8
+10923 write(2, " [-sl number]", 13)     = 13
+10923 write(2, " [-/+sm]", 8)           = 8
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-/+sp]", 8)           = 8
+10923 write(2, " [-/+t]", 7)            = 7
+10923 write(2, " [-ti termid]", 13)     = 13
+10923 write(2, " [-title string]", 16)  = 16
+10923 write(2, " [-tm string]", 13)     = 13
+10923 write(2, " [-tn name]", 11)       = 11
+10923 write(2, " [-/+u8]", 8)           = 8
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-/+uc]", 8)           = 8
+10923 write(2, " [-/+ulc]", 9)          = 9
+10923 write(2, " [-/+ulit]", 10)        = 10
+10923 write(2, " [-/+ut]", 8)           = 8
+10923 write(2, " [-/+vb]", 8)           = 8
+10923 write(2, " [-version]", 11)       = 11
+10923 write(2, " [-/+wc]", 8)           = 8
+10923 write(2, " [-/+wf]", 8)           = 8
+10923 write(2, "\r\n   ", 5)            = 5
+10923 write(2, " [-xrm resourcestring]", 22) = 22
+10923 write(2, " [-ziconbeep percent]", 21) = 21
+10923 write(2, "\r\n\nType xterm -help for a full d"..., 46) = 46
+10923 stat("/tmp/xtermYxnVWN", {st_mode=S_IFDIR|0700, st_size=4096, ...}) = 0
+10923 unlink("/tmp/xtermYxnVWN/index.theme") = 0
+10923 rmdir("/tmp/xtermYxnVWN")         = 0
+10923 exit_group(1)                     = ?
+10923 +++ exited with 1 +++
+10922 <... read resumed> 0x5578380d72d0, 100) = ? ERESTARTSYS (To be restarted if SA_RESTART is set)
+10922 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=10923, si_uid=1000, si_status=1, si_utime=0, si_stime=0} ---
+10922 read(3, 0x5578380d72d0, 100)      = ? ERESTARTSYS (To be restarted if SA_RESTART is set)
+10922 --- SIGINT {si_signo=SIGINT, si_code=SI_KERNEL} ---
+10922 +++ killed by SIGINT +++

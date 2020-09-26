@@ -1,0 +1,3752 @@
+;=======================================================================
+TITLE	DJDMA (Rev 2.049 Rel_2.3 9_Aug_83) Copyright 1983 Morrow Designs
+;=======================================================================
+
+	.Z80		;Written in Z80 Assembly Language
+	ASEG		;Absolute Code Segment
+	ORG	0	;Starting Address is Zero
+
+;----------------------------------------------------------------------
+;System Equates
+;--------------
+;
+	; Constants
+MAXHS5	EQU	10	;Maximum number of sectors on a 5" hard sectored disk
+HLDLY	EQU	50	;Head Load Delay Time (50ms)
+MODLY	EQU	1000	;Motor On Delay Time (1 Sec)
+
+	;Addresses
+STACK	EQU	1030H	;Base of Normal Stack Area
+STKSAV	EQU	132EH	;Stack save during READS/WRITES - Deselect time MAIN
+MONRAM	EQU	13C7H	;Base of the Monitor Ram Area (extends to 13EF)
+
+	; Drive Parameter Table flag definitions
+BASEIY	EQU	1340H	;Base of the (IY area) drive parameter tables
+YFLAG	EQU	0Eh	;Drive Configuration Byte offset
+@VER	EQU	0	;	1 = Sector Header has been verified
+@HRD	EQU	1	;	1 = Media is Hard Sectored
+@5IN	EQU	2	;	1 = Drive size is five inch
+@MOC	EQU	3	;	1 = Motor has on/off control
+@DBL	EQU	4	;	1 = Media is Double Density
+@NRC	EQU	5	;	1 = Drive doesn't have testable ready line
+@NHC	EQU	6	;	1 = Drive can't unload Heads
+@HDL	EQU	7	;	1 = Heads are currently loaded
+
+	; System Status flag definitions
+BASEIX	EQU	13F0H	;Base of the (IX area) System status and control area
+XFLAG	EQU	0Eh	;System Status Byte offset
+@SER	EQU	0	;	1 = Serial_Input_Status = Active
+@MON	EQU	1	;	1 = Monitor_Status = Active
+@MOT	EQU	2	;	1 = Motor_Status = Active
+@SCT	EQU	3	;	1 = Sector Count is Calibrated
+@HOL	EQU	4	;	1 = Sector/Index Hole has been processed
+@FHF	EQU	5	;	1 = First hole found
+
+	PAGE	64	;Page Length is 64 Lines
+
+; Table of Contents
+;------------------
+;
+;	Misc Vectors, Routines and Tables
+;		ENTPOC	- Reset Entry
+;		PATC21	- VCO test
+;		ENTIRQ	- Maskable Interrupt Vector
+;		MULT	- Multiply DE * B and return result in HL
+;		IPLPAT	- Handshake Routine for Bootstrapping
+;		WFLAG	- Wait for selected bit in the status reg to assert
+;		ENTNMI	- Non-Maskable Interrupt Entry
+;		SPT8S	- 8" Default Soft Sectored Default Sectors/Track Table
+;		SPT5S	- 5" Default Soft Sectored Number of Sectors/Track
+;		SPT5H	- 5" Default Hard Sectored Number of Sectors/Track
+;		RPOINT	- Entry Vector Tables for Sector R/W Routines
+;		BRANCH	- Vector table
+;		LOADHL	- Load the HL register pair
+;		DSPTCH	- General Purpose Dispatch Routine
+;		SDELAY	- Delay while counting Sector/Index holes
+;		DLY1MS	- Delay 1 millisecond
+;		DLYnMS	- Delay n milliseconds
+;		CSTART	- Start the Controller
+;		CSTOP	- Stop the Controller
+;
+;	Major Entry Routines
+;		POC	- Power on Clear (Reset) Entry
+;		REXEC	- Normal Command Completion Re:Entry Point
+;		EXEC	- Normal Entry point after an Non-Maskable_Interrupt
+;		TRMCER	- Termination by Channel Error
+;		TRMHLT	- Termination by Halt (HALTC) or Illegal Command
+;		TRMIRQ	- Termination by Set Interrupt Request Command (INTRQC)
+;		MAIN	- Main Entry Point to Controller
+;
+;	Controller Commands
+;		SETCRC	- Set CRC Error Retry Count
+;		SETLFT	- Set Head Unload Time-Out
+;		TRACKZ	- Set Track Size
+;		SETDP	- Set The Disk's Parameters
+;		SETMP	- Set The Media's Parameters
+;		LOGICAL	- Change Logical Drives
+;		SETDMA	- Set DMA Address
+;		SETCCW	- Set Channel Command Word Address
+;		SETCAW	- Branch in Channel
+;		HALTC	- Halt Controller
+;		INTRQC	- Set Interrupt Request
+;		SEROUT	- Output to Serial Port
+;		SRENBL	- Seial Input Enable
+;		DUMPM	- Dump Controller Memory
+;		LOADM	- Load Controller Memory
+;		GOMEM	- Execute Controller Routine
+;		GSTAT	- Sense Drive Status
+;		WRSECT	- Write a Sector
+;		RDSECT	- Read a Sector
+;		WTRACK	- Write a Track
+;		RTRACK	- Read a Track
+		PAGE
+;
+;	Disk Read/Write Support Subroutines
+;		PREP	- Prepare Selected Disk for Reading or Writing
+;		CDISK	- Change Drive Parameter Tables & Decalibrate Drive
+;		SIMAKE	- Get New Drive Constants Table & do a Test Read
+;		SECTOR	- Read/Compare a Sector Header
+;		HOME	- Home the Disk Head(s)
+;		SEEK	- Seek Routine
+;		STP	- Step the disk head once
+;		FSECT	- Find a Sector (Soft Sectored Disk)
+;		SETXFR	- Setup the DMA Address for Disk Transfer
+;		READS	- Read a Sector (5" or 8" Soft Sectored)
+;		WRITES	- Write a Sector (5" or 8" Soft Sectored)
+;		FSECT5	- Find a Sector (Hard Sectored Disk)
+;		READ5	- Read a Sector (5" Hard Sectored)
+;		WRITE5	- Write a Sector (5" Hard Sectored)
+;
+;	Channel Read/Write Routines
+;		RDCH	- Read a Block from the Host's Memory
+;		WRCH	- Write a Block to the Host's Memory
+;		RBYTE	- Read a Byte from the Host's Memory
+;		WBYTE	- Write a Byte to the Host's Memory
+;		CASTOR	- Store the Channel Address
+;		RCMD	- Setup for a Read from the Host's Memory
+;		WCMD	- Setup for a Write from the Host's Memory
+;		INCIO	- Read/Write to Channel & Increment Address
+;		RESTOR	- Restore the Channel Command Address
+;
+;	Serial Input/Output Routines
+;		HSPIN	- Hang until Serial Input is Active
+;		SPIN	- Input a Character from the Serial Port
+;		SPOUT	- Output a Charactor to the Serial Port
+;
+;	Internal Monitor
+;		MONTR	- Monitor main line
+;		GETC	- Get a Character
+;		GO	- Go Execute a Subroutine
+;		WRITE	- Write to Controller Memory
+;		PRINT	- Print the Contents of Controller Memory
+;		CMDTBL	- Command Table for Monitor
+;		ERROR	- Error and Prompt Strings for Monitor
+;
+;	Disk Sector/Index Synchronization Routines
+;		HSYNC	- Hard Sectored Disk Sector/Index Synchronization
+;		COUNT	- Count Sector/Index Holes
+;		DRVOFF	- Deselect the current drive and turn off the motor
+;		DESEL	- Deselect the current drive (but not the motor)
+;		MOTOFF	- Turn off the motor on line
+;
+;	Other Tables
+;		CTABLE	- Command Table
+;		RTBL	- Disk Read Vector Table
+;		WTBL	- Disk Write Vector Table
+;		SECT8	- Drive Constants Tables
+;		DRIVE8	- Initial Values for 8" Drive Parameter Tables
+;		DRIVE5	- Initial Values for 5" Drive Parameter Tables
+;		CONST	- Initial Values for Drive's Scratchpad Area
+		PAGE
+
+;**********************************************************************
+; Reset entry
+;************
+;	-Execution begins here after a reset or power_on_clear
+;
+ENTPOC:	JP	POC
+
+;----------------------------------------------------------------------
+; VCO test
+;---------
+;
+PATC21: LD	IX,BASEIX
+	LD	IY,(BASEIX)
+	LD	A,40H		;Set mode to read disk data
+	LD	(4007H),A
+	LD	A,64H		;Single Density 5 1/4"
+	LD	(4006H),A
+	CALL	HSPIN		;Wait for input to go active
+	LD	A,44H		;Single Density 8"
+	LD	(4006H),A
+	CALL	HSPIN		;Wait for input to go active
+	LD	A,04H		;Double Density 8"
+	LD	(4006H),A
+	CALL	HSPIN		;Wait for input to go active
+	LD	A,44H		;Single Density 8"
+	LD	(4006H),A
+	CALL	HSPIN		;Wait for input to go active
+	LD	A,64H		;Single Density 5 1/4"
+	LD	(4006H),A
+	JP	HSPIN		;Wait for input to go active
+
+;**********************************************************************
+; Maskable Interrupt entry
+;*************************
+;	1) Execution begins here after any maskable interrupts (caused
+;	   by 'data rq' still being hi when 'bus stb' is issued)
+;
+ENTIRQ:	JP	1000H		;branch to interrupt jump vector
+
+;----------------------------------------------------------------------
+; Multiply DE * B and return result in HL
+;----------------------------------------
+;
+MULT:	LD	HL,0		;Result:= Zero
+	OR	A		;If (Parameter eq null)
+	RET	Z		;	Return (no parameter = zero flag set)
+	LD	B,A		;B:= Multiplier
+MULTLP:	ADD	HL,DE		;Repeat Add increment (DE) to the result (HL)
+	DJNZ	MULTLP		;Until (Multiplier eq zero)
+	RET			;(Note that the zero flag is still cleared)
+	PAGE
+
+;----------------------------------------------------------------------
+; Handshake Routine for Bootstrapping
+;------------------------------------
+; 	This is the handshake routine that is moved into the host computer's
+; memory starting at location 38H.
+;
+IPLPAT:	;This label is used to reference the following handshake routine.
+
+	.PHASE 038H
+HNDSHK:	LD	HL,HFLG		;HL:= Pointer to Flag
+	LD	(HL),0		;Flag:= 0
+HLP1:	LD	A,(HL)		;Repeat
+	OR	A		;	(get Flag)
+	JP	Z,HLP1		;Until (Flag ne zero)
+	CP	40H		;If (Flag ne Normal_Completion)
+	JP	NZ,HLP1		;	GOTO Loop
+	JP	80H		;GOTO Cold Boot Loader
+HFLG:	DB	0FFH		;THIS IS A FLAG TO THE LOADER
+	.DEPHASE
+
+;----------------------------------------------------------------------
+; Wait for the selected bit in the status register to go high
+;------------------------------------------------------------
+;	1) Enter this routine with the DE pair equal to the max.time delay
+;	   and the L reg set as a mask for the appropriate bit in the status
+;	   register
+;	2) Each iteration takes 13.75us
+;
+WFLAG:	DEC	DE		;Repeat
+	LD	A,D		;	delay:= delay - 1
+	OR	E		;	if (delay eq 0)
+	RET	Z		;		error exit w/zero flag set
+	LD	A,(4003H)	;	A:= status register
+	AND	L		;	if (chosen_bit eq active)
+	JR	Z,WFLAG		;
+	RET			;		exit zero flag clear (no error)
+
+	DS	66H - $, 0FFH
+;**********************************************************************
+; Non-Maskable Interrupt entry
+;*****************************
+;	-Execution begins here after an out 0EFh instruction
+;
+ENTNMI:	EXX
+	EX	AF,AF'		;save machine status
+	POP	DE		;get the program counter
+	LD	HL,-COUNT
+	ADD	HL,DE		;test of PC is in the COUNT routine
+	LD	HL,EXEC		;command processing routine
+	PUSH	HL
+	JR	NC,SWBANK	;carry => PC in COUNT routine
+	PUSH	DE		;first finish the COUNT routine
+SWBANK:	EXX
+	EX	AF,AF'		;restore machine status
+	RET
+	PAGE
+
+;----------------------------------------------------------------------
+; Sector Size Table
+;------------------
+;	1) These tables are used by the read track command to 1) figure out
+;	   the default number of sectors per track given a sector size/data
+;	   density and 2) to determine the lowest numbered sector.
+;
+	; 8" Soft Sectored Formats
+SPT8S:	DB	26d, 1		;26 sectors per track (Single Density)
+	DB	26d, 1		;26    "     "    "   (Double Density)
+	DB	15d, 1		;15    "     "    "   (Micronix Standard)
+	DB	08d, 1		;8     "     "    "   (CPM system Standard)
+
+	; 5" Soft Sectored Format
+SPT5S:	DB	05d, 1		;5 Sectors per Track (Micro-Decision)
+
+	; 5" Hard Sectored Format
+SPT5H:	DB	10d, 0		;10 Sectors per Track (North Star)
+
+;----------------------------------------------------------------------
+; Entry Vector Tables for Sector Read and Write Routines
+;-------------------------------------------------------
+;
+RPOINT:	DW	RZRO		;Read (Soft Sectored) Routine Entry Points
+	DW	RONE
+	DW	RTWO
+WPOINT:	DW	WLOOP		;Write (Soft Sectored) Routine Entry Points
+	DW	WONE
+	DW	WTWO
+
+	DS	0A0H - $, 0FFH ;Put this table at 0A0h for formatdj.com
+;----------------------------------------------------------------------
+; Vector Table
+;-------------
+;
+BRANCH:	JP	HOME		;Home the Disk Heads
+	JP	SEEK		;Seek to a track
+	JP	CDISKA		;Get the current disk parameter table
+	JP	HPATCH		;Get in sync with a disk
+	JP	IMLOAD		;Re:Initialize
+
+HPATCH:	BIT	7,(IX+0AH)
+	JP	Z,HSYNC
+	RES	@SCT,(IX+XFLAG)
+	JP	HSYNC
+
+;----------------------------------------------------------------------
+; Load the HL register pair
+;--------------------------
+;
+LOADHL:	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	RET
+	PAGE
+
+;----------------------------------------------------------------------
+; General Purpose Dispatch Routine
+;---------------------------------
+;
+DSPTCH:	JP	(HL)		;Goto the address given in the HL pair
+
+;----------------------------------------------------------------------
+; Delay while counting Sector/Index holes
+;----------------------------------------
+;	1) The DE register pair contains the delay count. A count of 22 hex
+;	   is equal to 1 millisecond.
+;	2) Each iteration of the loop takes about 45.45us. 12us are spent
+;	   here with the remaining 33.45us spent in the count routine.
+;	3) See the table in the Documentation Section (currently at the end
+;	   of this file) for a list of pre-calculated values of SDELAY
+;	   in milliseconds
+;
+SDELAY:	PUSH	HL
+SDLP1:	CALL	COUNT		;Repeat
+	DEC	DE		;	count any sector holes
+	LD	A,E		;	time_delay:= time_delay - 1
+	OR	D
+	JR	NZ,SDLP1	;until (time_delay eq 0)
+	POP	HL		;recover the pointer
+	RET
+
+;----------------------------------------------------------------------
+; Delay one millisecond
+;----------------------
+;	1) This routine delays one millisecond before returning.
+;	2) None of the registers are altered.
+;
+DLY1MS:	PUSH	BC
+	LD	B,200d		;Time delay:= 1 ms
+DSSLLP:	LD	A,A		;Repeat NOP
+	DJNZ	DSSLLP		;Until (Time delay eq 0)
+	POP	BC
+	RET
+
+;----------------------------------------------------------------------
+; Delay N milliseconds
+;---------------------
+;	1) This routine calls the DLY1MS routine 'DE' times.
+;	2) If the DE pair is zero then there is no delay.
+;	3) Register Usage:
+;		A  -> General Purpose
+;		DE -> Initially the number of milliseconds, returned = 0
+;
+DLYnMS:	LD	A,D		;While (Delay ne 0)
+	OR	E
+	RET	Z		;	(return)
+D10LP:	CALL	DLY1MS		;	Call delay 1 millisecond
+	DEC	DE		;	Delay_Count:= Delay_Count - 1
+	JR	DLYnMS
+	PAGE
+
+;----------------------------------------------------------------------
+; Start the Controller
+;---------------------
+;
+CSTART:	LD	A,(1311H)
+	LD	(4007H),A	;Set up the controller clocks etc
+	LD	A,(1310H)
+	LD	(4006H),A	;Start the controller
+	RET
+
+;----------------------------------------------------------------------
+; Stop the controller
+;--------------------
+;
+CSTOP:	PUSH	HL		;Save hl pair
+	LD	HL,(1310H)	;control bytes for 4006 and 4007
+	LD	H,0		;turn off the clocks and write gate
+	SET	1,L		;set controller idle byte
+	LD	(4006H),HL	;send command to controller
+	POP	HL		;Restore hl pair
+	RET			;exit without zero flag set (no error)
+	PAGE
+;======================================================================
+; Power on Clear (Reset) Entry
+;=============================
+;
+	; Primary register Initialization
+POC:	IM	1		;force restart 7 on interrupt
+	LD	(4000H),A	;reset the interrupt flip-flop
+	LD	SP,STACK	;initialize the stack pointer
+	LD	HL,0FFFFH
+	LD	(4004H),HL	;initialize the drive ports
+	LD	A,0C3H		;initialize the interrupt vector
+	LD	(1000H),A	;	(jump instruction)
+	LD	HL,0
+	LD	(1001H),HL	;	(to the reset entry for now)
+
+	; Move Read/Write table and Drive Constants Tables into RAM
+	LD	HL,RTBL
+	LD	DE,1290H
+	LD	BC,DRIVE8-RTBL
+	LDIR			;load constants from ROM
+
+	; Move Drive Parameter tables into RAM
+	LD	DE,BASEIY	;pointer to start of drive tables
+	LD	B,2		;number of types of drives
+	XOR	A		;start drive numbering with zero
+	EX	AF,AF'		;save the drive number
+FTLOOP:	LD	A,80H		;select bit for drive zero
+	LD	C,4		;number of drives of a givin type
+TILOOP:	PUSH	HL		;save the ROM pointer
+	PUSH	BC		;save the two counts
+	LD	BC,0EH		;length of drive table minus two
+	LDI			;move the 1st byte of the table
+	LDI			;move the 2nd byte of the table
+	PUSH	AF		;save the select bit
+	XOR	(HL)		;merge with basic drive pattern
+	LD	(DE),A		;store pattern in table
+	POP	AF		;recover the select bit
+	RRCA			;shift right for next drive
+	INC	DE		;advance the RAM pointer
+	INC	HL		;advance the ROM pointer
+	EX	AF,AF'		;recover the drive number
+	LD	(DE),A		;store the drive number
+	INC	A		;advance the drive number
+	EX	AF,AF'		;save the drive number
+	INC	DE		;advance the RAM pointer
+	LDIR			;load the rest of the table
+	POP	BC		;recover the counts
+	DEC	C		;decrement the drive count
+	JR	Z,DISCRD	;zero => ROM pointer to advance
+	POP	HL		;recover the old ROM pointer
+	JR	TILOOP		;load the next drive table
+DISCRD:	EX	(SP),HL		;new ROM pointer to TOS
+	POP	HL		;discard the old ROM pointer
+	DJNZ	FTLOOP		;test for both drive types loaded
+	PAGE
+
+	; Move Global Constants Table into RAM
+	LD	DE,BASEIX	;pointer to start of global constants
+	LD	BC,10H		;total number of global constants
+	LDIR			;initialize global constants from ROM
+
+	; Initialize command addresses
+	LD	A,0
+	LD	HL,50H		;pointer to host command byte addr.
+	LD	(13C0H),HL	;Current_Command_Pointer:= 50h
+	LD	(13C2H),A
+	LD	(13C4H),HL	;Initial_Command_Pointer:= 50h
+	LD	(13C6H),A
+
+	; Misc Initialization
+	LD	IX,BASEIX	;initialize index registers
+	LD	IY,(BASEIX)
+	LD	A,6
+	LD	(1310H),A	;Initialize port 4006's memory image
+
+	; Test for Bootstrapping
+	LD	A,(4003H)	;If (terminal/shunt is present)
+	AND	2
+	JP	NZ,IMLOAD
+	LD	A,(4005H)	;	set channel to cycle steal mode
+	SET	@MON,(IX+XFLAG)	;	Monitor_Status:= Active
+	RES	@SER,(IX+XFLAG)	;	Serial_Input_Status:= Inactive
+	JP	MAIN		;	do not do boot-strap - goto main
+
+	; Begin the Bootstrap Process
+IMLOAD:	LD	IX,BASEIX	;initialize index registers
+	LD	IY,(BASEIX)
+	LD	SP,STACK
+
+	; Wait one second for the bus to settle down.
+	LD	DE,1000		;Delay:= 1 second
+	CALL	DLYnMS		;Do Delay
+
+	; Move the first 38 loctions of main memory into controller ram
+	XOR	A
+	LD	B,A
+	LD	C,A		;Main_mem_start<BC>:= Location 0
+	EX	AF,AF'		;Extended_Page<AF'>:= 0
+	LD	DE,38H		;Byte_Count<DE>:= 38h
+	LD	HL,STACK	;Controller_Memory_Start<HL>:= 1030h
+	PUSH	HL
+	PUSH	DE		;(save Byte_Count and Controller_Memory_Start)
+	CALL	RDCH		;Move main-memory -> controller-memory
+	PAGE
+
+	; Zero the first 38 locations of main memory
+	LD	DE,3813H	;D:=38(start addr), E:=13(length handshake rtn)
+	CALL	WCMD		;Set channel to write
+	XOR	A
+	LD	C,A		;Main_mem_start:= 0
+
+MZLOAD:	CALL	INCIO		;Repeat Write a zero
+	DEC	D		;	Counter:= Counter + 1
+	JR	NZ,MZLOAD	;Until (Counter eq 0)
+
+	; Move the Handshake routine (HNDSHK) into main memory
+	LD	HL,IPLPAT	;Controller_Memory_Start<HL>:= start handshake
+	CALL	CWRITE		;Move controller-memory -> main-memory
+
+	LD	A,(4005H)	;STOP cycle stealing
+
+	CALL	RCMD		;Set channel to read
+	DEC	BC		;Move Main_mem_start back to point at flag
+
+	; Wait for the Main CPU to write a zero to the flag location
+WPZERO:	OUT	(C),A
+	LD	A,(4002H)
+	OR	A
+	JR	NZ,WPZERO
+
+	; Restore the first 38 bytes of main memory
+	LD	C,A		;Main_mem_start<BC>:= Location 0
+	POP	DE		;Byte_Count<DE>:= 38h
+	POP	HL		;Controller_Memory_Start<HL>:= 1030h
+	CALL	WRCH		;Move controller-memory -> main memory
+	PAGE
+
+BSTART:	LD	HL,1320H
+	LD	B,5
+	LD	(HL),80H	;Lo_Byte_DMA_Address:= 80h
+DPLOAD:	INC	HL		;Repeat
+	LD	(HL),0		;	set remainder of DMA_Address:=0
+	DJNZ	DPLOAD		;	Set track,side & sector = 0
+
+	LD	DE,4004H	;DE:= 8" Drive control port
+	LD	BC,104H		;B:=1(side sel), C:=4(drive select)
+
+	; Bootstrap
+TESTDR:	LD	A,0FFH
+	LD	(DE),A		;Deselect the current drive
+	LD	(IY+1),A	;DeCalibrate the current drive
+
+	LD	A,B		;Select the port address
+	XOR	E
+	LD	E,A
+
+	LD	A,4		;Select the drive
+	XOR	C
+	LD	C,A
+
+	PUSH	BC		;(Current start-sector and drive)
+	PUSH	DE		;(Current port address
+
+	CALL	LOGCAL		;Set the logical drive number
+	CALL	CDISK		;Install the new drive's parameters
+	CALL	PREP		;Prepare for a disk access
+
+	POP	DE
+	POP	BC
+	JR	Z,TESTDR	;If any errors then return to selecting a drive
+
+	LD	A,(IY+0CH)
+	LD	(1324H),A	;Set Sector Number:= lowest sector number
+	CALL	RDSECT		;Read 1st Sector on Track 0 Side 0
+	JR	NZ,BSTART
+
+	BIT	@HRD,(IY+YFLAG)
+	CALL	NZ,HSYNC
+
+	LD	A,40H		;A:= Bootstrap completion code
+	LD	BC,HFLG		;BC:= Pointer to Main Memory
+	OUT	(C),A		;Main_Memory:= operation complete
+
+	RES	@MON,(IX+XFLAG)	;Monitor_Status:= Inactive
+	SET	@SER,(IX+XFLAG)	;Serial_Input_Status:= Active
+	JP	MAIN		;Goto Start of Main Loop
+	PAGE
+
+; Normal command completion re:entry point
+;-----------------------------------------
+;
+REXEC:	PUSH	AF		;save the status
+	CALL	COUNT		;check for sector hole
+	POP	AF		;recover the status
+	OR	A		;set/reset the zero flag
+	CALL	NZ,WBYTE	;zero => no status to be reported
+
+; Normal Entry point after an Non-Maskable_Interrupt
+;---------------------------------------------------
+;
+EXEC:	LD	A,(1310H)	;port 4006 control byte
+	AND	0FEH		;strip off the interrupt bit
+	LD	(1310H),A	;restore the control byte
+	SET	1,A		;Controller_stop_bit:= set
+	LD	(4006H),A
+
+	PAGE
+;----------------------------------------------------------------------
+; Start of Command Lookup
+;------------------------
+;	1) Note that data overrun errors will cause the command processing
+;	   to restart at RELOOK.
+;
+RELOOK:	LD	SP,STACK	;initialize the command stack pointer
+	LD	HL,RELOOK
+	LD	(1001H),HL	;Interrupt_Vector:= Retry lookup command
+	EI			;enable interrupts
+	CALL	RBYTE		;Read the next command from main memory
+	LD	A,(4002H)	;get the data from the channel
+	LD	HL,CTABLE-4	;command table pointer
+	LD	DE,4		;entry length
+LOOKUP:	ADD	HL,DE		;repeat	advance the table pointer
+	PUSH	AF		;	save the new command
+	LD	A,(HL)		;	command entry
+	CP	80H		;	compare with end of table
+	JP	Z,TRMHLT	;	illegal command error exit
+	POP	AF		;	recover new command
+	CP	(HL)		;	compare with table entry
+	JR	NZ,LOOKUP	;until (command found)
+
+	LD	DE,REXEC	;Get address of normal termination as return
+	PUSH	DE		;Put return address on stack
+
+	INC	HL		;Get address of the command
+	LD	E,(HL)		;(low byte)
+	INC	HL
+	LD	D,(HL)		;(high byte)
+	PUSH	DE		;Put command execution address on stack
+
+	INC	HL		;Pointer:= number of parameters byte
+	LD	E,(HL)		;length of command argument list
+	LD	D,0
+	LD	HL,1323H	;HL:= Pointer to the Parameter save area
+	PUSH	HL		;Save Pointer in the Parameter save area
+	CALL	CREAD		;read the arguments from main memory
+	CALL	CASTOR		;save the current channel address
+
+	LD	HL,TRMCER	;Interrupt_Vector:= data_error
+	LD	(1001H),HL	;update the interrupt vector
+
+	POP	HL		;recover Pointer to the Parameter save area
+	LD	C,(HL)		;C:= parameter #1
+	INC	HL
+	LD	B,(HL)		;B:= parameter #2
+	INC	HL
+	LD	A,(HL)
+	EX	AF,AF'		;A':= parameter #3
+	INC	HL
+	LD	E,(HL)		;E:= parameter #4
+	INC	HL
+	LD	D,(HL)		;D:= parameter #5
+	INC	HL		;L:= parameter #6
+	CALL	LOADHL		;H:= parameter #7
+	RET			;Execute the command
+	PAGE
+
+;----------------------------------------------------------------------
+; Command String Termination Entries
+;-----------------------------------
+
+; Termination by Channel Error
+;-----------------------------
+;
+TRMCER:	LD	A,91H		;data type channel error code
+	LD	SP,STACK	;adjust the stack pointer
+	LD	(4000H),A	;clear the interrupt
+	CALL	CSTOP		;Insure that the controller is stopped
+	EI			;enable interrupts again
+
+; Termination by Halt (HALTC) or Illegal Command
+;-----------------------------------------------
+;
+TRMHLT:	EX	AF,AF'		;save the completion code
+	LD	BC,(13C4H)	;Initial command address - low word
+	LD	A,(13C6H)	;Initial command address - extended page
+	EX	AF,AF'		;save the address - high page
+
+; Termination by Set Interrupt Request Command (INTRQC)
+;------------------------------------------------------
+;
+TRMIRQ:	PUSH	AF		;save the completion code
+	EXX			;save the new address - low word
+	LD	BC,(13C0H)	;current command address - low word
+	LD	A,(13C2H)	;current command address - extended page
+	EXX			;save current command address - low word
+	CALL	CASTOR		;update current command address
+	EXX			;recover old address - low word
+	EX	AF,AF'		;save old address - high page
+	POP	AF		;recover completion code
+	CALL	WCMD		;set up channel for writing
+	CALL	INCIO		;write the status code
+	CALL	RCMD		;set up the channel for reading
+	CALL	INCIO		;do a dummy read for interrupts
+	PAGE
+
+;----------------------------------------------------------------------
+; Main Loop
+;----------
+;
+MAIN:	LD	SP,STACK	;Initialize the stack pointer
+	LD	IX,BASEIX	;Pointer to global constants
+	LD	IY,(BASEIX)	;Pointer to current drive table
+	LD	HL,0
+	LD	(STKSAV),HL	;Set the drive select time out constant
+
+MNLP1:	BIT	@MOT,(IX+XFLAG)	;Loop	If (Motor_Status eq active)
+	JR	Z,MSKP1
+	CALL	COUNT
+	LD	HL,(STKSAV)	;		Time-Out:= Time-Out - 1
+	DEC	HL
+	LD	(STKSAV),HL
+	LD	A,H		;		If (Time-Out eq 0)
+	OR	L
+	CALL	Z,DRVOFF	;			Deselect the drive
+
+MSKP1:	BIT	@SER,(IX+XFLAG)	;	If (serial port is active)
+	JR	Z,MSKP2
+
+	CALL	SPIN		;		If (character present)
+	JR	NZ,MNLP1
+	XOR	A		;		    If (BRK_CHR eq true)
+	OR	C
+	JR	NZ,MSKP10
+	INC	(IX+0FH)	;			Increment break count
+	JR	NZ,MSKP10	;			If (count eq MAX)
+	RES	@SER,(IX+XFLAG)	;				Disable input
+MSKP10:	XOR	A		;		Extended page
+	EX	AF,AF'
+	LD	A,C		;		Get the character
+	LD	BC,3EH		;		Address for character
+	CALL	WCMD
+	CALL	INCIO		;		Write character into memory
+	LD	A,40H		;		Completion code
+	CALL	INCIO
+	JR	MNLP1
+
+MSKP2:	BIT	@MON,(IX+XFLAG)	;	Else If (the monitor is active)
+	CALL	NZ,MONTR	;		Call the internal Monitor
+	JR	MAIN
+	PAGE
+
+;======================================================================
+; SET CRC ERROR RETRY COUNT
+;==========================
+;	1) This constant determines the number of retries that will be
+;	   made when a CRC error (either in the sector header or the data
+;	   field) is encountered in a SECTOR read/write.
+;	2) The default is 10 decimal.
+;
+SETCRC:	LD	(IX+0CH),C	;Set the Retry Counter Initial Value
+	XOR	A		;Return_Status:= None
+	RET
+
+;======================================================================
+; Set Head Unload Time-Out
+;=========================
+;	1) This constant determines the number of revolutions made by a
+;	   disk before it is deselected (see the subroutine COUNT).
+;	2) The default is 16 decimal.
+;
+SETLFT:	LD	(IX+0DH),C	;Set Head Unload Counter
+	XOR	A		;Return_Status:= None
+	RET
+
+;======================================================================
+; SET TRACK SIZE
+;===============
+;	1) This routine sets the maximum track number (actually the
+;	   highest track number plus one).
+;	2) Notice that CDISK is used to set the IY register to point
+;	   to the start of the drive's parameter table. CDISK will return
+;	   with the zero flag cleared if the drive number was out of range.
+;
+TRACKZ:	LD	A,C		;drive value
+	LD	(1325H),A	;Current_Drive_Number:= Updated
+
+	PUSH	BC		;Save the New Track Size
+	CALL	CDISK		;IY:= Base of current drive parameter table
+	POP	BC		;Restore the Track Size
+	RET	NZ		;If (Drive number eq non-Existant) Error Return
+
+	LD	(IY+0),B	;load new track value
+	LD	A,40H		;completion code
+	RET
+	PAGE
+
+;======================================================================
+; SET DRIVE PARAMETERS
+;=====================
+;	1) This routine sets characteristics that are unique to a certain
+;	   kind of drive. The parameters are
+;		1) Drive Number (C reg & 1323h)
+;		2) Step Rate (1324h)
+;		3) Step Settle Time (1325h)
+;		4) Head Load Delay (1326h)
+;		5) Motor On Delay (1327h)
+;	2) Notice that CDISKA is used to set the IY reg to the start of the
+;	   chosen drive's Parameter Table.
+;
+SETDP:	LD	A,C		;A:= Drive_Number
+	CALL	CDISKA		;Select new DPT and set IY to its start
+	RET	NZ		;If (drive eq non-existant) Return Error
+
+	LD	DE,22H		;Scale factor:= 1_m.s.
+	LD	A,(1324H)	;A:= Step_Rate
+	CALL	MULT
+	JR	Z,SETSK1	;If (parameter ne null)
+	LD	(IY+4),L
+	LD	(IY+5),H	;	Set the Step Rate
+
+SETSK1:	LD	A,(1325H)	;A:= Step_Settle_Time
+	CALL	MULT
+	JR	Z,SETSK2	;If (parameter ne null)
+	LD	(IY+0AH),L
+	LD	(IY+0BH),H	;	Set the Step Settle Time
+
+SETSK2:	LD	A,(1326H)	;A:= Head_Load_Delay_Time
+	OR	A
+	JR	Z,SETSK3	;If (parameter ne null)
+	LD	(IY+6),A
+	LD	(IY+7),0	;	Set the Head Load Delay Time
+
+SETSK3:	LD	DE,10		;Scale Factor:= 10_m.s.
+	LD	A,(1327H)	;A:= Motor_On_Delay_Time
+	CALL	MULT
+	JR	Z,SETSK4	;If (parameter ne null)
+	LD	(IY+8),L
+	LD	(IY+9),H	;	Set the Motor_On_Delay_Time
+SETSK4:	LD	A,40H		;Return Status equal Normal Completion
+	RET
+	PAGE
+
+;======================================================================
+; SET MEDIA PARAMETERS
+;=====================
+;	1) This command sets the parameters that are specific to the media
+;	   in the drive. The parameters are
+;		1) Drive number (C reg)
+;		2) Starting Track of Write Precompensation (B' reg)
+;		3) Highest Track (A' reg)
+;		4) First Sector's Number (E reg)
+;		5) Total number of sectors per track (D reg)
+;
+SETMP:	LD	A,C		;A:= Drive_Number
+	EXX
+	CALL	CDISKA		;Select new DPT and set IY to its start
+	EXX
+	RET	NZ		;If (drive eq non-existant) Return Error
+
+	LD	(IY+0FH),B	;Save the starting track of precomp.
+	EX	AF,AF'
+	OR	A
+	JR	Z,SMPSK1	;If (Track Number Parameter is Non-Zero)
+	LD	(IY),A		;	Save the new Highest Track Number
+
+SMPSK1:	LD	A,E		;If (Sectors per track/Starting Sector given)
+	OR	D
+	JR	Z,SMPSK2
+
+	LD	A,E
+	AND	00000001B	;	(Insure that the sector number = 0 ! 1)
+	OR	10000000B	;	Set the MSB to indicate user spec
+	LD	(IY+0CH),A	;	Save the first sector's number
+	LD	(IY+0DH),D	;	Save the number of sectors per track
+
+SMPSK2:	LD	A,40H		;Normal Completion Code
+	RET
+	PAGE
+
+;======================================================================
+; CHANGE LOGICAL DRIVES
+;======================
+;	1) This routine command changes the logical ordering of the 8"
+;	   and 5" drives. This is done by changing the drive number that
+;	   is kept for each drive in its Drive Parameter Table (DPT). The
+;	   DPT's for 8" drives come first in memory (starting at location
+;	   BASEIY) and are immediatly followed by the 5" DPT's. The drive
+;	   number is the fourth byte of any given DPT (which are 10h bytes
+;	   long).
+;	2) The drive number of the first 8" drive is returned 'ored' with
+;	   the status
+;
+LOGCAL:	LD	HL,BASEIY+3	;HL:= pointer to drive number in first DPT
+	LD	A,(HL)		;current logical drive number for 1st 8" drive
+	EX	AF,AF'		;save
+	LD	DE,10H		;table length
+	LD	B,8		;drive count
+	LD	A,4		;mask
+	AND	C		;mask the data
+LOGCAW:	LD	(HL),A		;load the count
+	INC	A		;advance the count
+	AND	7		;modulo 8
+	ADD	HL,DE		;advance the pointer
+	DJNZ	LOGCAW		;decrease the count
+	EX	AF,AF'		;recover original logical drive number
+	OR	40H		;merge completion code
+	RET			;exit with no status report
+
+;======================================================================
+; SET DMA ADDRESS
+;================
+;
+SETDMA:	LD	(1320H),BC	;initialize low order 16 bits of DMA
+	EX	AF,AF'
+	LD	(1322H),A	;initialize high order 8 bits of DMA
+	XOR	A		;zero => no status reported
+	RET
+
+;======================================================================
+; SET CHANNEL COMMAND WORD ADDRESS
+;=================================
+;
+SETCCW:	LD	(13C4H),BC	;low order 16 bits of channel address
+	EX	AF,AF'
+	LD	(13C6H),A	;high order 8 bits of channel address
+	XOR	A
+	RET
+	PAGE
+
+;======================================================================
+; BRANCH IN CHANNEL
+;==================
+;
+SETCAW:	CALL	CASTOR		;store the new channel address
+	XOR	A
+	RET
+
+;======================================================================
+; HALT CONTROLLER
+;================
+;
+HALTC:	LD	A,40H		;normal completion code
+	JP	TRMHLT		;restore the CCWA and idle
+
+;======================================================================
+; SET INTERRUPT REQUEST
+;======================
+;
+INTRQC:	LD	A,(1310H)	;port 4006 control byte
+	SET	0,A		;Interrupt_request_bit:= set
+	LD	(1310H),A	;restore the control byte
+	SET	1,A		;Controller_stop_bit:= set
+	LD	(4006H),A	;generate an interrupt request
+	LD	A,(13C2H)	;extended page byte
+	EX	AF,AF'
+	LD	BC,(13C0H)	;channel address - low word
+	CALL	INCR3		;do a 24 bit increment
+	LD	A,40H		;completion code
+	JP	TRMIRQ		;update channel address & write code
+
+;======================================================================
+; OUTPUT TO SERIAL PORT
+;======================
+;
+SEROUT:	LD	A,C		;ASCII character to accumulator
+	CALL	SPOUT		;transmit the character
+	LD	A,40H		;completion code
+	RET			;exit
+
+;======================================================================
+; SERIAL INPUT ENABLE
+;====================
+;	1) Parameter 1 is in the C register and is equal to:
+;		0 - if the serial port is to be disabled
+;		1 - if the serial port is to be enabled
+;
+SRENBL:	RES	@SER,(IX+XFLAG)	;Serial_Input_Enabled:= False
+	BIT	@SER,C		;If (Serial_Input is to be enabled)
+	JR	Z,SRESKP
+	SET	@SER,(IX+XFLAG)	;	Serial_Input_Enabled:= true
+
+SRESKP:	XOR	A
+	RET			;return with no status report
+	PAGE
+
+;======================================================================
+; DUMP CONTROLLER MEMORY
+;=======================
+;
+DUMPM:	CALL	WCMD		;set up channel for writing
+	CALL	CWRITE		;transfer data from controller to host
+	XOR	A
+	RET
+
+;======================================================================
+; LOAD CONTROLLER MEMORY
+;=======================
+;
+LOADM:	CALL	CREAD		;transfer data from host to controller
+	XOR	A		;set zero flag for no status report
+	RET
+
+;======================================================================
+; EXECUTE CONTROLLER ROUTINE
+;===========================
+;
+GOMEM:	PUSH	BC		;put branch address on the stack
+	RET			;branch to desired routine
+
+;======================================================================
+; SENSE DRIVE STATUS
+;===================
+;
+GSTAT:	LD	A,C		;drive number
+	LD	(1325H),A	;set up for CDISK routine
+	CALL	CDISK		;change drives if necessary
+	JR	NZ,STPUSH	;illegal drive condition
+	LD	A,(IY+1)	;get current track value
+	CP	0FFH
+	JR	NZ,STOTRK
+	LD	A,1
+STOTRK:	LD	(1323H),A	;Jam the 'new track register' to track 1
+	LD	(1324H),A	;(Make sure we select side zero - MSB = 0)
+
+	CALL	PREP		;ready the drive for data transfer
+	JR	Z,STPUSH	;zero => error drive access
+	LD	A,40H		;normal completion code
+
+STPUSH:	PUSH	AF		;save completion code
+	LD	A,(IY+YFLAG)	;drive configuration byte from DPT
+	CALL	WBYTE		;send byte to the channel
+
+	LD	A,(1319H)	;sector length code
+	CALL	WBYTE
+
+	LD	A,(4003H)	;status byte
+	CALL	WBYTE
+	POP	AF		;recover completion code
+	RET
+	PAGE
+
+;======================================================================
+; Read/Write a Sector
+;====================
+;
+	; Begin 'write sector' command
+WRSECT:	LD	C,8		;offset into transfer function table
+	JR	RDSECT+2
+
+	; Begin 'read sector' command
+RDSECT:	LD	C,0
+	CALL	CDISK		;change the drive if required
+	RET	NZ		;non-existant drive error exit
+	LD	B,0AH		;retry count for header reads
+PRLOOP:	PUSH	BC		;save the parameters
+	CALL	PREP		;select drive, load head, test header
+	POP	BC		;recover the parameters
+	JR	NZ,PREPOK	;non-zero => no errors
+	CP	8DH		;test for CRC error in header read
+	RET	NZ		;zero => CRC error in sector header
+	DJNZ	PRLOOP		;test for 10 retrys
+	RET			;error exit
+
+PREPOK:	LD	A,(1324H)	;load the new sector
+	LD	B,A		;save the side bit
+	AND	7FH		;strip off the side select bit
+	LD	(1318H),A	;initialize the sector number in sector image
+	LD	A,80H		;side bit mask
+	AND	B
+	RLCA			;move side bit into bit 0
+	LD	(1317H),A	;initialize side byte in sector image
+	SET	@VER,(IY+YFLAG)	;set the no verify flag
+	CALL	WCMD		;assume a read sector command
+	LD	B,80H		;B:= Read/Write Control Bit
+	XOR	A
+	OR	C		;C not equal to zero for write
+	JR	Z,LOADCH	;zero => disk READ - channel write
+	LD	A,(4003H)
+	AND	40H		;	test for diskette write protected
+	LD	B,A		;	initialize read/write bit
+	LD	A,90H		;	write protect error code
+	RET	NZ		;	Write Protect Error Exit
+	PAGE
+
+	CALL	RCMD		;prepare for channel read (disk write)
+LOADCH:	LD	A,(1310H)	;port 4006 control byte
+	AND	7FH		;strip off old read/write flag
+	OR	B		;merge new read/write flag
+	LD	(1310H),A	;update port 4006 control byte
+	LD	D,0
+	LD	E,C		;offset into function table (0 or 8)
+	LD	HL,1290H	;function table pointer
+     	ADD	HL,DE		;add offset for read or write
+	BIT	@HRD,(IY+YFLAG)	;If (drive eq hard-sectored)
+	JR	Z,FCLOOP
+	LD	DE,2		;	offset the vector to hard-sectored
+	ADD	HL,DE
+FCLOOP:	CALL	LOADHL		;get the dispatch address
+	LD	B,(IX+0CH)	;B:= retry_count for data field CRC errors
+	LD	C,4		;A:= retry_count for missing data ID marks
+TRLOOP:	PUSH	BC		;Repeat
+	PUSH	HL		;	save the pointer and count
+	CALL	DSPTCH		;	execute the routine
+	POP	HL
+	POP	BC
+	JR	NZ,TESTER	;	If (there were no errors)
+	CALL	CSTOP		;		Stop the controller
+	CALL	DLY1MS		;		Delay 1 Millisecond
+	LD	A,40H		;		A:= Normal completion code
+	RET			;		Normal Exit
+TESTER:	CP	93H		;	If (error code = NO data field ID mark)
+	JR	NZ,TRCNT
+	DEC	C		;		If (retry_count - 1 NE 0)
+	JR	NZ,TRLOOP	;			Retry
+TRCNT:	CP	8EH		;	If (Other error) or (NO data ID mark)
+	RET	NZ		;		error exit (zero flag cleared)
+	DJNZ	TRLOOP
+	RET			;Error Exit hard CRC error
+	PAGE
+
+;======================================================================
+; Read/Write Track
+;=================
+;
+	; Begin 'write track' command
+WTRACK:	LD	C,8		;offset into function table
+	JR	RTRACK+2
+
+	; Begin 'read track' command
+RTRACK:	LD	C,0
+
+	CALL	CDISK		;change drives if necessary
+	RET	NZ		;drive select error exit
+	RES	@VER,(IY+YFLAG)	;clear the no verify bit
+	LD	B,0AH		;retry count for sector headers
+PELOOP:	PUSH	BC		;save the parameters
+	CALL	PREP		;find the current sector
+	POP	BC		;recover the parameters
+	JR	NZ,CLRVFY	;no error in prep routine
+	CP	8DH		;header CRC error
+	RET	NZ		;error exit
+	DJNZ	PELOOP		;try again
+	RET			;error exit
+
+CLRVFY:	SET	@VER,(IY+YFLAG)	;set the no verify bit
+	LD	HL,(1320H)	;low order word of DMA address
+	LD	(13E0H),HL	;save in upper memory
+	LD	A,(1322H)	;extended page of DMA address
+	LD	(13E2H),A	;save also in upper memory
+	LD	A,(1324H)	;get the side bit
+	LD	B,80H		;side bit mask
+	AND	B		;strip off low order bits
+	RLCA			;shift to bit 0 of accumulator
+	LD	(1317H),A	;update side byte in header image
+	BIT	3,C		;test the read/write flag
+	JR	Z,RWFLAG	;zero => READ track command
+	LD	A,(4003H)	;	get the drive status
+	AND	40H		;	strip off write protect status
+	LD	B,A		;	zero out B for read/write flag
+	LD	A,90H		;	write protect error code
+	RET	NZ		;	write protect error exit
+
+RWFLAG:	LD	A,(1310H)	;port 4006 control byte
+	AND	7FH		;strip off old R/W flag
+	OR	B		;merge new flag
+	LD	(1310H),A	;restore the control byte
+
+	LD	D,0
+	LD	E,C		;DE:= read/write offset into table (0 or 8)
+	LD	HL,1290H	;function table pointer
+     	ADD	HL,DE		;add offset for read or write
+	BIT	@HRD,(IY+YFLAG)	;If (drive eq hard-sectored)
+	JR	Z,FCODE
+	INC	HL		;	offset the vector to hard-sectored
+	INC	HL
+FCODE:	CALL	LOADHL		;Function_Address -> HL
+	PAGE
+
+	LD	B,(IY+0DH)	;B:= Sectors_per_Track
+	LD	A,(IY+0CH)	;D:= 1st Sector's Number
+	AND	00000001B	;(Mask off the 'Active User Spec Flag')
+	LD	D,A
+
+	INC	B		;Sector_Count:= Sectors_per_Track + 1
+	LD	C,B		;Highest_Sector+1:= Sector_Count
+	LD	A,D		;If (Starting_Sector is 0)
+	OR	A
+	JR	NZ,TTLOOP
+	LD	A,(IX+0AH)
+	LD	(1318H),A	;	Sector_Register:= Current_Sector_Number
+	DEC	C		;	Highest_Sector+1:= Highest_Sector+1 - 1
+
+TTLOOP:	DJNZ	TCONT		;reduce the sector count
+	LD	HL,(13E0H)	;	original DMA address
+	LD	(1320H),HL
+	LD	A,(13E2H)
+	LD	(1322H),A	;	restore the old DMA address
+	CALL	CSTOP		;	Stop the controller
+	CALL	DLY1MS		;	Delay 1 Millisecond before returning
+	LD	A,40H		;	completion code
+	RET			;	track operation complete
+
+TCONT:	LD	A,(1318H)	;get the old sector value
+	INC	A
+	CP	C		;If (Current_Sector+1 eq Last_Sector+1)
+	JR	NZ,LOADSE
+	LD	A,D		;	Current_Sector:= First_Sector
+LOADSE:	LD	(1318H),A	;update the sector value
+
+	SUB	D		;Adjust Sector Offset
+	EXX			;save the register bank
+	LD	E,A		;offset to E
+	LD	D,A		;count to D
+	OR	A		;set the zero flag
+	LD	HL,(13E0H)	;base DMA address
+	LD	A,(13E2H)
+	LD	BC,(132AH)	;sector length
+	JR	Z,DMASTO	;zero => no offset needed
+DMLOOP:	ADD	HL,BC
+	ADC	A,0		;	take care of page overflow
+	DEC	D		;	reduce the sector count
+	JR	NZ,DMLOOP
+DMASTO:	LD	(1320H),HL	;load current DMA pointer
+	LD	(1322H),A
+	PAGE
+
+	LD	HL,(1326H)	;get address of sector table
+	LD	A,(1328H)
+	ADD	HL,DE		;(E still = offset, D now = 0)
+	ADC	A,0		;form offset into sector table
+	EX	AF,AF'
+	LD	B,H
+	LD	C,L		;set up channel address
+	CALL	RCMD
+	CALL	INCIO		;read the table entry
+	LD	A,(4002H)
+	EXX			;restore the registers
+	INC	A		;test the table entry
+	JR	Z,TTLOOP	;skip current sector
+	CP	81H
+	JR	Z,TTLOOP+2	;abort command at this point
+	BIT	3,E		;test the read/write flag
+	CALL	Z,WCMD		;zero => read track command
+	PUSH	BC
+	PUSH	DE
+	PUSH	HL		;save the registers
+	EXX
+	EX	(SP),HL		;put sector table pointer on the stack
+	PUSH	HL		;save the function pointer
+	EX	AF,AF'		;extended page of table pointer
+	PUSH	AF
+	CALL	DSPTCH		;read or write the sector
+	JR	NZ,SVSTAT	;zero => no error
+	LD	A,40H
+SVSTAT:	EX	AF,AF'
+	POP	AF		;recover page byte of table pointer
+	POP	HL		;recover function pointer
+	POP	BC		;sector table pointer
+	EX	AF,AF'		;recover the status
+	CALL	WCMD
+	CALL	INCIO		;report the status
+	POP	DE
+	POP	BC		;recover the other registers
+	JP	TTLOOP		;transfer the next sector
+	PAGE
+
+;----------------------------------------------------------------------
+; Prepare the Currently selected disk for reading or writing
+;-----------------------------------------------------------
+;
+	; Select the Drive
+PREP:	LD	(IX+0BH),0	;reset the index count
+	LD	C,(IY+YFLAG)	;C:= Drive_Configuration_Byte
+	LD	B,(IY+2)	;B:= Drive_Pattern
+	SET	1,B		;clear the side select bit
+	LD	A,(1324H)	;load the sector/side byte
+	RLA			;side bit to the carry
+	JR	NC,PSKP1	;carry => side select to be active
+
+	RES	1,B		;select side 1
+PSKP1:	LD	DE,4004H	;Drive_Control_Port:= 5" drive (4004h)
+	LD	A,0FFH
+	BIT	@5IN,C
+	JR	NZ,PSKP3	;If (drive-size .eq. 8")
+
+	INC	DE		;	Drive_Control_Port:= 8" drive (4005h)
+	LD	A,(1323H)	;	get the new track
+	SUB	2BH		;	carry = 0 if track >= 43
+	SBC	A,A		;	ripple the carry through the acc.
+	OR	11111110B	;	mask to the low write current bit
+
+PSKP3:	AND	B		;merge mask with drive pattern
+	LD	(IY+2),A	;update drive pattern byte
+	OR	00001100B	;turn off the step command
+	LD	(DE),A		;select the drive
+
+	; Start the drive (Do the Head-Load/Motor-On delays)
+	LD	E,(IY+6)
+	LD	D,(IY+7)	;DE:= Head_Load_Delay
+	LD	A,E
+	OR	D		;	If (Head_Load_Delay eq 0)
+	JR	NZ,PSKP4	;		(set delay to default)
+	LD	DE,HLDLY	;		Head_Load_Delay:=50ms
+
+PSKP4:	BIT	@HDL,C		;If (Heads are currently UNloaded)
+	JR	NZ,PSKP5	;	zero => head not loaded => read header
+	RES	@VER,C		;	clear the no verify bit
+
+PSKP5:	BIT	@NHC,C		;test for the head always loaded
+	JR	Z,PSKP6		;zero => head can physically unload
+	SET	@HDL,C		;	set the head loaded bit
+	PAGE
+
+PSKP6:	BIT	@MOC,C		;If (Drive has motor control)
+	JR	Z,PSKP7
+	BIT	@MOT,(IX+XFLAG)	;	If (Motor_Status eq Active)
+	JR	NZ,PSKP7
+	RES	@HDL,C		;		clear the head loaded flag
+
+	LD	E,(IY+8)
+	LD	D,(IY+9)	;		DE:= Motor_on_Delay
+	LD	A,E
+	OR	D		;		If (motor_on_delay eq 0)
+	JR	NZ,PSKP7	;			(set delay to default)
+	LD	DE,MODLY	;			motor_on_delay:=1_sec
+
+PSKP7:	BIT	@HDL,C		;If (Head_Status eq not currently loaded)
+	JR	NZ,PSKP8
+	CALL	DLYnMS		;	DELAY for head load or motor on
+	RES	@VER,C		;	force a read sector header operation
+
+PSKP8:	SET	@HDL,C		;Head_Stauts:= loaded
+	SET	@MOT,(IX+XFLAG)	;Motor_Statue:= Acitve
+	LD	DE,8000H	;Delay:= .45 sec
+	LD	L,10000000b	;Mask:= Drive ready flag
+	BIT	@NRC,C		;If (drive has a ready line to test)
+	CALL	Z,WFLAG		;	Test the ready line
+	JR	NZ,PSKP9	;	If (Drive Not Ready)
+
+NREXIT:	LD	A,82H		;		drive not ready error code
+	CALL	DESEL		;		Deselect the drive
+	CP	A		;		set zero flag to indicate error
+	RET			;		error exit
+
+PSKP9:	LD	(IY+YFLAG),C	;update the drive configuration byte
+
+	; Move the heads (if necessary)
+	LD	A,(IY+1)	;get the current track
+	INC	A		;test for the head(s) calibrated
+	JR	NZ,PSKP10	;zero => heads not calibrated
+	CALL	HOME		;	If (Drive won't Home)
+	JP	NZ,NREXIT	;		GOTO Error Exit
+
+PSKP10:	LD	A,(1323H)	;If (Desired track ne current track)
+	CALL	SEEK		;	move the heads to the desired track
+	JP	NC,PSKP12	;	If (desired track out of bounds)
+
+	CP	A		;		Set the error flag
+	RET			;		Error Return
+
+PSKP12:	BIT	@VER,(IY+YFLAG)	;If (Track_Number doesn't have to be verified)
+	RET	NZ		;	exit without error
+	PAGE
+
+ 	; Determine the Media's Density
+	LD	HL,12A0H	;HL:= offset to 8" SS
+	BIT	@5IN,(IY+YFLAG)	;If (drive = 5")
+	JR	Z,PSKP13
+
+	RES	@HRD,(IY+YFLAG)	;	Hard_Sectored _Flag:= False
+	LD	B,2		;	Hole_Count:= 2
+PLOP1:	LD	DE,640H		;	Repeat	Delay:= 22ms
+	LD	L,00010000B	;		Mask:= Index
+	CALL	WFLAG		;		If (Flag is not active)
+	LD	HL,12C0H	;			(HL:= offset to 5" SS)
+	JR	Z,PSKP13	;			Break
+	LD	DE,1B4H		;		Delay:= 6ms
+	LD	L,00010000B	;		Mask:= Index
+PLOP2:	CALL	WFLAG		;		Repeat	Look for a hole
+	JR	NZ,PLOP2	;		Until (Hole no longer active)
+	DJNZ	PLOP1		;	Until (2 holes have passed)
+
+	LD	HL,12E0H	;	HL:= offset to 5" HS
+	RES	@SCT,(IX+XFLAG)	;	Sector_Count_Calibrated:= False
+	SET	@HRD,(IY+YFLAG)	;	Hard_Sectored_Flag:= True
+
+PSKP13:	LD	DE,0		;sector image offset:= Single density
+	BIT	@5IN,(IY+YFLAG)	;If (drive size is 5") or (track number not 0)
+	JR	NZ,PSKP14	;	(skip if 5")
+
+	LD	A,(IY+1)	
+	OR	A
+	JR	Z,PSKP15	;	(skip on track zero)
+
+PSKP14:	BIT	@DBL,(IY+YFLAG)	;	If (Density currently equal Double)
+	JR	Z,PSKP15
+	LD	E,10H		;		adjust entry to double density
+PSKP15:	ADD	HL,DE
+
+	LD	B,6		;Retries:= 6
+SIMAGL:	CALL	CSTOP		;Repeat	reset the disk controller
+	PUSH	HL
+	PUSH	DE		;	save the parameters
+	PUSH	BC
+	CALL	SIMAKE		;	create sector image and do test read
+	CALL	CSTOP		;	Stop the controller
+	POP	BC
+	POP	DE
+	POP	HL
+	JR	NZ,PSKP16	;	zero => the test read is no good
+	JP	C,NREXIT	;	carry => hard sectored drive not ready
+	LD	A,10H
+	XOR	L		;	change entry into sector image table
+	LD	L,A		;	update the HL register pair
+	DJNZ	SIMAGL		;Until (Retries - 1 eq 0)
+
+	LD	A,84H		;	media unreadable error code
+BMEXIT:	CP	A		;	set the error flag
+	RET			;	error exit
+	PAGE
+
+	; Set the Density Flag
+PSKP16:	BIT	@HRD,(IY+YFLAG)	;If (Media is hard sectored) or (Track ne 0)
+	JR	NZ,PSKP17	;	(skip on hard sectored)
+	LD	A,(IY+1)
+	OR	A
+	JR	Z,PSKP18	;	(skip on track 0)
+
+PSKP17:	SET	@DBL,(IY+YFLAG)	;	Density_Flag:= Double
+	LD	A,(131AH)
+	OR	A
+	JR	NZ,PSKP18	;	If (media is Single Density)
+
+	RES	@DBL,(IY+YFLAG)	;		Density_Flag:= Single
+
+	; If media is soft sectored then verify the track number
+PSKP18:	BIT	@HRD,(IY+YFLAG)	;If (Media is Soft Sectored)
+	JR	NZ,PSKP20
+
+	LD	B,8		;	Retry_Count:= 8
+RHLOOP:	PUSH	IX		;	Repeat
+	LD	IX,SCTRDS	;		Sector_vector:= read header
+	CALL	SECTOR		;		Read header into sector image
+	POP	IX		;		If (read was ok)
+	JR	Z,PSKP19	;			Break
+	DJNZ	RHLOOP		;	Until (Retry_Count - 1 eq 0)
+
+	CP	A		;		set the error flag
+	RET			;		error exit
+
+PSKP19:	LD	A,(1316H)	;	If (Current track ne Desired Track)
+	CP	(IY+1)
+	JR	Z,PSKP20
+
+	RES	@VER,(IY+YFLAG)	;		Heads calibrated flag:= false
+	LD	(IY+1),0FFH	;		Decalibrate head(s)
+	LD	A,87H		;		seek error code
+	CP	A		;		set the error flag
+	RET			;		error exit
+
+	; Check that the sector length code is in bounds
+PSKP20:	LD	A,(1319H)	;If (Sector Number is out of range)
+	CP	4
+	JR	C,PSKP21
+	LD	A,85H		;	Error:= Sector Number out of range
+	CP	A
+	RET			;	Error_Return
+	PAGE
+
+	; Figure the starting sector and the number of sectors per track
+PSKP21:	BIT	7,(IY+0CH)	;If (Starting_Sector and SPT are NOT specified)
+	JR	NZ,PSKP23
+
+	LD	HL,SPT5H	;	HL:= 5" Hard Sectored Tables
+	BIT	@HRD,(IY+YFLAG)	;	If (Drive Soft Sectored)
+	JR	NZ,PSKP22
+
+	LD	HL,SPT5S	;		HL:= 5" Soft Sectored SPT
+	BIT	@5IN,(IY+YFLAG)
+	JR	NZ,PSKP22	;		If (Drive size is 8")
+
+	LD	HL,SPT8S	;			HL:= 8" SPT Table
+	LD	A,(1319H)	;			A:= Sector Size Code
+	SLA	A		;			Offset:= Offset * 2
+	LD	E,A		;			Adjust Offset
+	LD	D,0
+	ADD	HL,DE		;			calculate entry
+PSKP22:	LD	A,(HL)
+	LD	(IY+0DH),A	;	Set the Number of Sectors_per_Track
+	INC	HL
+	LD	A,(HL)
+	LD	(IY+0CH),A	;	Set the Starting Sector's Number
+
+	; Figure the number of bytes per sector
+PSKP23:	LD	A,(1319H)	;Accm:= Sector Length Code
+	LD	HL,40H
+SIZE:	ADD	HL,HL		;double previous value
+	SUB	1
+	JR	NC,SIZE
+	LD	(132AH),HL	;update the DMA length registers
+	
+	CALL	CSTOP		;Stop the controller
+	RET
+	PAGE
+
+;----------------------------------------------------------------------
+; Change Drive Parameter Tables & Decalibrate Drive
+;--------------------------------------------------
+;	1) Entry a CDISK makes the drive whose number is stored at 1325h
+;	   the current drive. Entry at CDISKA makes current the drive whose
+;	   number is passed in the accumulator current. This entails
+;		-Setting current drive parameter table (DPT) pointer (IY reg)
+;		-Setting the DPT save location (13F0h)
+;		-Resetting the head loaded bit on the new drive
+;		-Setting the sector decalibrated flag
+;	2) If the drive was within range (0 - 7) then the z-flag is returned
+;	   cleared else its returned set and the accm is equal to 81h.
+;
+CDISK:	LD	A,(1325H)	;load new drive number
+CDISKA:	CP	(IY+3)		;If (new_drive_number eq current_drive_number)
+	RET	Z		;	Normal Return (zero flag set)
+
+	; Find Current Drive's Parameter Table
+	CALL	DESEL		;Deselect the current drive but not the motor
+	LD	B,8		;B:= total available drives
+	LD	DE,10H		;DE:= drive table length
+	LD	IY,1330H	;IY:= drive table pointer
+CDLOOP:	ADD	IY,DE		;Repeat advance table pointer
+	CP	(IY+3)		;	If (drive number eq parameter table)
+	JR	Z,DFOUND	;		goto drive found
+	DJNZ	CDLOOP		;Until (all parameter tables have been checked)
+
+	; Drive not found
+	LD	IY,(BASEIX)	;restore the original drive table pointer
+	LD	A,81H		;A:= illegal drive error code
+	RET			;Error Return (zero flag cleared)
+
+	; Drive Found
+DFOUND:	LD	(BASEIX),IY	;update the drive table pointer
+	RET			;Normal Return (zero flag set)
+	PAGE
+
+;----------------------------------------------------------------------
+; Get a New Drive Constants Table Table and Do a test read
+;---------------------------------------------------------
+;	1) This routine moves a Drive Constants Table into the current
+;	   drive constants area (@ 1310h), sets the starting track of
+;	   write pre-compensation and then does a test read.
+;	2) This program is only called by PREP (around SILOOP).
+;	3) If the test read was successful then the carry is returned
+;	   cleared.
+;
+	;Move the Current Disk Parameter Table to 1310h
+SIMAKE:	LD	DE,1310H	;target of image
+	LD	BC,10H		;length of image
+	LDIR			;move the data
+
+	LD	A,(IY+0FH)	;If (Starting track of precomp is specified)
+	OR	A
+	JR	Z,SISKIP
+	LD	(1312H),A	;	Set starting track of pre-compensation
+
+SISKIP:	BIT	@HRD,(IY+YFLAG)	;test for hard sectored media
+	JR	Z,HOLEOK	;If (Disk is Hard Sectored)
+	CALL	HSYNC		;	find a hole
+	SCF			;	if (hole not found)
+	RET	Z		;		Return Error (Carry Set)
+
+HOLEOK:	LD	B,14		;delay past edge of hole
+	DJNZ	HOLEOK+2	;cycle
+	LD	HL,(1310H)	;control bytes for 4006 & 4007
+	SET	1,L		;controller idle bit
+	LD	(4006H),HL	;set controller parameters
+	RES	1,L		;clear controller idle bit
+	LD	(4006H),HL	;start the disk controller
+
+	LD	L,1		;controller ID found bit
+	LD	DE,0D80H	;time out delay for controller
+	BIT	@HRD,(IY+YFLAG)	;test for hard sectored media
+	JR	Z,SISKP1	;If (disk is hard sectored)
+	LD	D,0		;	shorten the delay
+
+SISKP1:	CALL	WFLAG		;Look for ID bit until time-out
+	RET
+	PAGE
+
+;----------------------------------------------------------------------
+; Read/Compare a Sector Header
+;-----------------------------
+;	1) The BC register pair is preserved.
+;	2) The alternate register set is preserved.
+;	3) The IX register must be pointing to either:
+;		SCTCMP - to compare the disk sector ID to the sector
+;			 image ID block.
+;		SCTRDS - to read the disk sector ID block into the
+;			 sector image ID block.
+;	4) An error return clears the Zero flag (non-zero value)
+;
+SECTOR: PUSH	BC		;Save BC register pair
+	LD	A,(1311H)
+	LD	C,A		;4007 control byte to C
+	LD	B,4		;header length to B
+	LD	HL,1316H	;pointer to start of sector header area
+	LD	DE,4001H	;pointer to controller data port
+
+	EX	AF,AF'
+	PUSH	AF		;Save the alternate accm/flag set
+	LD	A,9		;Alternate_accm:= Retry_count (actually 8)
+	EX	AF,AF'
+
+	EXX
+	PUSH	BC		;Save the alternalte reg. set
+	PUSH	DE
+	PUSH	HL
+
+SCTRTY:	EX	AF,AF'		;Repeat
+	DEC	A		;	Retry_Count:= Retry_Count -1
+	JR	Z,SCTER1	;	If (Retry_Count .le. 0)
+	EX	AF,AF'		;	Save Retry_Count
+	LD	BC,0010H	;	Time_delay:= max
+	LD	DE,4001H	;	Pointer:= disk_data
+	LD	HL,4003H	;	Pointer:= disk_status
+
+	CALL	CSTOP		;	stop controller & set clock speed
+	CALL	CSTART		;	Start the controller
+
+	LD	A,(IY+YFLAG)
+	AND	00000110B	;	If drive is 5" soft sectored
+	CP	00000100B	;	(bit2=1=5"drive, bit1=1=hard_sectored)
+	JR	Z,SCTLP2	;	Skip to 5" Read Header ID byte
+
+	; Read the Header ID Byte from an 8" disk
+SCTLP1:	DJNZ	SCTSK1		;	Repeat  If (primary-timer != 0)
+	BIT	0,(HL)		;			If (attn/err == active)
+	JR	NZ,SCTSK2	;				Break
+	DEC	C		;			If (secondary-timer == 0)
+	JR	Z,SCTRTY	;				GOTO RETRY
+SCTSK1:	BIT	0,(HL)		;		If (attn/err == active)
+	JR	Z,SCTLP1	;			Break
+SCTSK2:	NOP			;	This is a time pad
+	LD	A,(DE)		;	Read disk data
+	EXX
+	JP	(IX)		;	Goto either SCTCMP or SCTRDS
+
+	; Read the Header ID Byte from a 5" disk
+SCTLP2:	DJNZ	SCTSK3		;	Repeat  If (primary-timer != 0)
+	BIT	0,(HL)		;			If (attn/err == active)
+	JR	NZ,SCTSK4	;				Break
+	DEC	C		;			If (secondary-timer == 0)
+	JR	Z,SCTRTY	;				GOTO RETRY
+SCTSK3:	BIT	0,(HL)		;		If (attn/err == active)
+	JR	Z,SCTLP2	;			Break
+SCTSK4:	LD	B,5
+SCTLP3:	DJNZ	SCTLP3		;	This is a time pad
+	LD	A,(DE)		;	Read disk data
+	EXX
+	JP	(IX)		;	Goto either SCTCMP or SCTRDS
+
+	;Compare the track number through Sector number to sector image
+SCTCLP:	LD	A,(DE)		;Repeat
+SCTCMP:	CP	(HL)		;	If (Disk_Data.ne.Image(Pointer)
+	JP	NZ,SCTER2	;		goto Error Exit
+	INC	HL		;	Pointer:= Pointer + 1
+	DJNZ	SCTCLP		;Until (counter.eq.0)
+	JR	SCTCNT
+
+	;Read the track number through Sector number to sector image
+SCTRLP:	LD	A,(DE)		;Repeat
+SCTRDS:	LD	(HL),A		;	Image(Pointer):= Disk_Data
+	INC	HL		;	Pointer:= Pointer + 1
+	DJNZ	SCTRLP		;Until (counter.eq.0)
+
+	;Read the CRC bytes through first two ID gap bytes and check the CRC
+SCTCNT:	LD	A,(DE)		;read first CRC data byte
+	NOP
+	NOP
+	LD	A,(DE)		;read second CRC data byte
+	LD	A,C
+	AND	0EFH		;CRC error control byte
+	LD	(4007H),A	;issue the command
+	LD	A,(DE)		;sync with data - 1st FF/4E
+	LD	A,C		;(c is the disk_control byte)
+	LD	(4007H),A	;stop CRC error captures
+	LD	A,(4003H)	;get the status byte
+	CPL
+	BIT	0,A		;zero => no CRC error
+	LD	A,(DE)		;Read the 2nd FF/4E
+	JR	NZ,SCTER2	;If (Error .eq. true) Goto Error Exit
+
+	EXX			;Restore alternate register set
+	POP	HL
+	POP	DE
+	POP	BC
+	EXX
+
+	LD	A,(DE)		;Read the 3rd FF/4E
+	EX	AF,AF'		;Restore the alternate accm
+	POP	AF
+	EX	AF,AF'
+
+	POP	BC		;Restore BC register pair
+	LD	A,(DE)		;Read the 4th FF/4E
+	RET
+
+	; Error Return for Missing Header ID Byte
+SCTER1:	LD	L,15H		;(Error code = 88h = 15h + 73h)
+
+	; Error Return form Sector Header Compare
+SCTER2:	EXX
+	POP	HL		;Restore alternate register set
+	POP	DE
+	POP	BC
+	EXX
+
+	EX	AF,AF'		;Restore the Alt_Accm.
+	POP	AF
+	EX	AF,AF'
+
+	LD	A,L		;Generte the Error Code
+	ADD	A,73H		;(88=no-ID-byte; 89-8C=Compare errors; 8D=CRC)
+SCTSK5:	OR	A		;Error_Flag:= set
+
+	POP	BC
+	RET			;Return
+	PAGE
+
+;----------------------------------------------------------------------
+; Home the disk heads
+;--------------------
+;	1) This routine Homes the disk head
+;	2) The current track number is reset to zero and the track verified
+;	   flag is set to false.
+;	3) If the head is over track zero then the head is stepped out 4 times
+;	   and then homed (insures that heads sitting at track -2 will home).
+;	4) If a 5 1/4" drive fails to find track zero then a second attempt
+;	   is made at a slower step rate.
+;	5) The z-flag is set if track 0 was found else its cleared (error-94H).
+;	6) After the settle delay the t-0 flag is rechecked before returning.
+;	7) Register Usage
+;		A  -> General Purpose
+;		B  -> Step Count
+;		DE -> Settle Constant (See SETTLE) and Slow step rate
+;		HL -> Disk Status Port and Current step rate
+;
+HOME:	RES	@VER,(IY+YFLAG)	;Sector Header Verified:= false
+	LD	(IY+1),0	;Current track:= 0
+	LD	HL,4003H	;HL:= Pointer to Disk Status Port
+	BIT	5,(HL)		;If (track zero flag is true)
+	JR	Z,HOMLP1
+	LD	A,0		;	Direction:= Step_In (away from home)
+	LD	B,4		;	Step_Count:= 4
+HOMLP0:	CALL	STP		;	Repeat Step in
+	DJNZ	HOMLP0		;	Until (4 steps IN have been taken)
+HOMLP1:	LD	A,8		;Direction:= Step_Out (towards home)
+	LD	B,0		;Step-count:= 256 (default for 8" drives)
+	BIT	@5IN,(IY+YFLAG)
+	JR	Z,HOMLP2	;If (Drive is 5")
+	LD	B,64H		;	Step_count:= 100
+HOMLP2:	CALL	STP		;Repeat get the drive pattern
+	BIT	5,(HL)		;	If (track zero flag is active)
+	JP	Z,HOMSK1
+	CALL	SETTLE		;		Do settle delay
+	BIT	5,(HL)		;		If (track zero flag isn't true)
+	JR	Z,HOMLP1	;			GOTO Home the heads
+	CP	A		;		Else	Set the zero flag
+	RET			;			Normal Return
+HOMSK1:	DJNZ	HOMLP2		;Until (Step_count .eq. 0)
+	BIT	@5IN,(IY+YFLAG)	;If (drive_size .eq. 5) and (step rate ne slow)
+	JR	Z,NOTHOM
+	LD	DE,554H		;	DE:= Slow_Step_Rate (40ms)
+	PUSH	HL
+	LD	L,(IY+4)
+	LD	H,(IY+5)	;	HL:= Current_Step_rate
+	OR	A		;	(Clear the Carry Flag)
+	SBC	HL,DE		;
+	POP	HL
+	LD	(IY+4),E
+	LD	(IY+5),D	;	Step_rate:= slow (40ms)
+	JR	NZ,HOMLP1	;	Try to Home a again at a slower rate
+NOTHOM:	DEC	(IY+1)		;decalibrate & set error flag
+	LD	A,94H		;Error_Code:= Drive won't home
+	RET			;Error Return (zero flag cleared)
+	PAGE
+
+;----------------------------------------------------------------------
+; Seek Routine
+;-------------
+;	1) This routine seeks to the track passed in the ACCM.
+;	2) If the track number is in bounds then the head is moved over it and
+;	   the carry flag is cleared Else, the carry is SET to indicate ERRORS.
+;	3) Register Usage:
+;		A  - Enter equal desired Track, becomes Current Step Pattern
+;		B  - Current_Track and Absolute Number of Steps
+;
+SEEK:	CP	(IY+1)		;If (Desired_Track eq Current_Track)
+	RET	Z		;	Exit
+
+	RES	@VER,(IY+YFLAG)	;clear the no verify bit
+	CP	(IY+0)		;	If (new track out of bounds)
+	JR	C,SEKSK1
+
+	CCF			;		Set the Error Flag
+	LD	A,83H		;		improper track value error code
+	RET			;		Error Exit
+
+SEKSK1:	LD	B,(IY+1)	;B:= Current Track
+	LD	(IY+1),A	;Current Track:= Updated
+	SUB	B		;find the difference
+	JR	NC,SEKSK2	;carry => must compliment
+	CPL
+	INC	A
+SEKSK2:	LD	B,A		;C:= absolute difference
+
+	SBC	A,A		;ripple the carry throughout A (A:=0 ! A:=FF)
+	AND	8		;isolate the direction bit
+	OR	(IY+2)		;merge with direction bit
+
+SEKLP1:	CALL	STP		;Repeat Step the Heads
+	DJNZ	SEKLP1		;Until (Step_Count eq 0)
+
+SETTLE:	LD	E,(IY+0AH)
+	LD	D,(IY+0BH)	;DE:= settling time
+	CALL	SDELAY		;Do Settle Delay
+	RET
+	PAGE
+
+;----------------------------------------------------------------------
+; Step the Disk Head Once
+;------------------------
+; Description:
+;		This routine steps the head once. The direction is passed
+;	in the A register (8=Step_Out, 0=Step_In).
+; Notes:
+;	1) None of the registers are altered in this routine (See SDELAY and
+;	   COUNT for possible register alteration).
+;
+STP:	PUSH	DE		;(Save the DE pair and the accm)
+	PUSH	AF
+	AND	8		;Remove all but the direction bit
+
+	LD	DE,4005H	;BC:= 4005 (8"-drive control port)
+	BIT	@5IN,(IY+YFLAG)
+	JR	Z,STPSK1	;If (drive is 5")
+	DEC	DE		;	BC:= 4004 (5"-drive control port)
+
+STPSK1:	OR	(IY+2)		;Combine direction bit with drive pattern
+	LD	(DE),A		;start the step command
+	XOR	4		;toggle the step bit
+	LD	(DE),A		;finish the step command
+
+	LD	E,(IY+4)
+	LD	D,(IY+5)	;DE:= step_delay
+	CALL	SDELAY		;Do step delay
+
+	POP	AF
+	POP	DE		;(Restore the DE pair and the accm)
+	RET
+	PAGE
+
+;======================================================================
+; Find a Sector Header (soft sectored)
+;=====================================
+;	1) This routine is called by both the soft sectored read and write
+;	   routines.
+;	2) The HL pair is set to the start of WPOINT or RPOINT by the calling
+;	   routine. These tables contain vectors used in the actual read/write
+;	   routines.
+;
+FSECT:	PUSH	HL		;save the read/write pointer	
+	CALL	SETXFR		;setup transfer parameters
+	POP	HL		;restore the pointer
+
+	XOR	A		;clear the accumulator and flags
+	OR	E		;set the flags for leftover bytes
+	LD	A,0A1H		;CRC control byte code
+	EX	AF,AF'		;save for the end of the command
+
+	LD	E,D		;number of initial bytes to e
+	LD	D,0
+	ADD	HL,DE		;form the table entry (into RPOINT/WPOINT)
+	ADD	HL,DE
+	LD	E,(HL)		;get dispatch address from table
+	INC	HL
+	LD	D,(HL)
+	PUSH	DE
+	POP	IX		;dispatch address to IX
+
+	LD	B,(IY+0DH)
+	SLA	B		;Retries:= (Number of sectors per track) * 2
+FSLOOP:	PUSH	IX		;Repeat
+	LD	IX,SCTCMP	;	Sector_vector:= compare w/sector image
+	CALL	SECTOR		;	If (disk_image .eq. memory_image)
+	POP	IX
+	RET	Z		;		return
+
+	CP	88H		;	If (error .eq. No ID Byte Found)
+	JR	Z,FSCNT		;		retry
+	CP	8BH		;	If (error .eq. sector_number)
+	JR	Z,FSCNT		;		retry
+	CP	8DH		;	If (error .eq. CRC Error)
+	RET	NZ		;		retry
+
+FSCNT:	DJNZ	FSLOOP		;Until (Retry count .eq. zero)
+	OR	A		;reset the error (zero) flag
+	RET			;error exit
+	PAGE
+
+;----------------------------------------------------------------------
+; Setup the DMA address for a disk transfer
+;------------------------------------------
+;
+SETXFR:	CALL	RCMD		;set up the channel to do reads
+	LD	BC,(1320H)	;get the DMA address
+	LD	DE,(132AH)	;get the DMA byte count
+	LD	A,(1322H)	;get the extended page address
+	EX	AF,AF'		;save the accumulator
+	LD	HL,132CH	;data storage pointer
+	LD	A,2		;page overflow value
+	ADD	A,C		;test for a two byte page
+	LD	A,0
+	JR	NC,ADJUST	;carry => 1 or 2 bytes to page end
+	SUB	C		;calculate the count
+	PUSH	AF		;save on the stack
+LOOP22:	CALL	INCIO		;do channel read and inc. DMA addr.
+	DEC	DE		;decrement the DMA count
+	LD	A,(4002H)	;get the channel data
+	LD	(HL),A		;put the data in the buffer
+	INC	HL		;advance the buffer pointer
+	XOR	A		;clear the accumulator
+	OR	C		;test for page boundary
+	JR	NZ,LOOP22	;zero => page boundary found
+	POP	AF		;adjust the stack
+
+ADJUST:	PUSH	AF		;save the byte count for exit
+	CALL	INCIO		;do the read before the transfer
+	DEC	BC		;adjust the DMA address
+	LD	HL,1330H	;parameter buffer pointer
+	XOR	A
+	OR	E		;test for full page count
+	JR	NZ,PTEST	;zero => full page transfers
+	SUB	C		;calculate left over bytes
+	LD	E,C		;save left over in E
+	JR	SDATA		;go fill the parameter buffer
+
+PTEST:	XOR	A
+	OR	C		;test for even page boundary
+	JR	Z,SDATA		;zero => full page transfers
+	SUB	E		;difference between data & addr.
+	JR	C,SDATA		;carry => no negation
+	LD	E,A		;leftover in E
+	LD	A,C		;starting amount in A
+	NEG			;2s compliment
+
+LOOPD:	CALL	STORE		;write the parameters
+	XOR	A		;full page code
+SDATA:	DEC	D		;reduce the page count
+	JP	P,LOOPD		;more pages left
+	LD	A,E		;leftover bytes
+	CP	3		;test for less than three
+	JR	C,EMARK		;carry => leftover less than three
+	CALL	STORE		;leftover bytes parameters to buffer
+	LD	E,0		;adjust E
+	PAGE
+
+EMARK:	POP	AF		;recover the front-end count
+	LD	D,A		;save in D
+	LD	A,2
+	CALL	STORE		;write an end mark in buffer
+	EX	AF,AF'
+	LD	A,3FH		;get ready for the zero flag
+	LD	B,A		;prevent B from overflowing
+	EX	AF,AF'
+	CP	E		;test for two bytes leftover
+	CALL	C,STORE		;store the parameters
+	EX	AF,AF'
+	INC	A		;the zero flag
+	EX	AF,AF'
+	LD	A,0A2H		;CRC control code
+	CALL	STORE		;store the control codes
+	INC	A		;adjust the accumulator
+STORE:	DEC	A		;adjust the byte count
+	EX	AF,AF'
+	LD	(HL),A		;extended page addr to buffer
+	EX	AF,AF'
+	INC	HL		;advance the pointer
+	LD	(HL),A		;byte count less one to buffer
+	INC	HL		;advance the pointer
+	INC	B		;advance the DMA page byte
+	RET	NZ		;zero => 65K overflow
+	EX	AF,AF'
+	INC	A		;advance the extended page addr.
+	EX	AF,AF'
+	RET
+	PAGE
+
+;----------------------------------------------------------------------
+; Read a sector 5" or 8" Soft Sectored
+;-------------------------------------
+;	1) Note the use of the flag register in this routine. Before entering
+;	   this body of code the Z_Flag is set to tell how many bytes are
+;	   going to be transferred. In the first part of this routine the
+;	   carry flag is added to the flag register to indicate the data
+;	   density and consequently how many data address marks to read.
+;	2) The alternate register set is preserved.
+;	3) The alternate accm is modified.
+;
+READS:	LD	HL,RPOINT	;read table entry pointer
+	CALL	FSECT		;locate current sector
+	RET	NZ		;	error exit - sector not found
+
+	CALL	WCMD		;prepare for channel write (disk read)
+	CALL	CSTOP		;reset the disk controller
+
+	EXX
+	PUSH	BC		;Save the alternate reg. set
+	PUSH	DE
+	PUSH	HL
+	LD	B,00H		;B:= time delay
+	LD	DE,4001H	;DE:= read disk data location
+	LD	HL,4003H	;HL:= disk status
+	EXX
+
+	LD	A,(1311H)	;load the 4007 mode control byte
+	SET	2,A		;change to sync byte to data header
+	LD	(4007H),A	;update port 4007
+	LD	B,2DH		;Delay:= 144us + 16us
+RDLP0:	DJNZ	RDLP0		;Wait (5 bytes in single density)
+
+	LD	(STKSAV),SP	;save the stack pointer
+	LD	SP,1330H	;transfer parameter pointer
+	LD	BC,(1320H)	;load the DMA address
+	POP	HL		;byte count to h - extended page to l
+	DEC	H		;adjust the count for the loop
+	LD	A,L
+	LD	(4002H),A	;initialize the extended page register
+	EXX
+	PAGE
+
+	LD	A,(IY+YFLAG)
+	AND	00000110B	;If drive is 5" soft sectored
+	CP	00000100B	;(bit2=1=5"drive, bit1=1=hard_sectored)
+	LD	A,(1310H)	
+	LD	(4006H),A	;(start the controller looking for A.M.)
+	JR	Z,RDLP2		;Skip to the 5" read-the-address-mark routine
+
+	; Find the address mark on an 8" disk
+RDLP1:	DJNZ	RDSKP1		;Repeat
+	EXX			;	If (time-out == .true.)
+	LD	A,93H		;		accm:= error code
+	OR	A		;		error_flag:= set
+	JP	RDRTN		;		exit
+RDSKP1:	BIT	0,(HL)		;	Accm:= attn/err
+	JR	Z,RDLP1		;Until (attn/err == active)
+	NOP			;(Small time pad for single density)
+	LD	A,(DE)		;READ data
+	EXX			;Restore the original reg set
+	JP	(IX)		;Goto RTWO, RONE or RZRO
+
+	; Find the address mark on a 5" disk
+RDLP2:	DJNZ	RDSKP2		;Repeat
+	EXX			;	If (time-out == .true.)
+	LD	A,93H		;		accm:= error code
+	OR	A		;		error_flag:= set
+	JP	RDRTN		;		exit
+RDSKP2:	BIT	0,(HL)		;	Accm:= attn/err
+	JR	Z,RDLP2		;Until (attn/err == active)
+	LD	B,5
+RDLP3:	DJNZ	RDLP3		;Wait an extra 8us before reading the data
+	LD	A,(DE)		;READ data
+	EXX			;Restore the original reg set
+	JP	(IX)		;Goto RTWO, RONE or RZRO
+	PAGE
+
+RTWO:	OUT	(C),A		;write to the channel
+	INC	BC		;advance the DMA address pointer
+	LD	A,(DE)		;get the first/second data byte
+
+RONE:	OUT	(C),A
+	INC	BC
+
+RLOOP:	LD	A,(DE)		;read data from the disk
+RZRO:	OUT	(C),A		;write data to the DMA channel
+	INC	BC		;advance the DMA address pointer
+	DEC	H		;decrement the byte count
+	JR	NZ,RLOOP
+
+	LD	A,(DE)		;read next to last data byte
+	POP	HL		;get the new block count and page
+	OUT	(C),A		;write next to last byte to channel
+	INC	BC		;advance the counter
+	DEC	H		;test for last block to transfer
+	LD	A,(DE)		;read the last byte
+	OUT	(C),A		;last byte to the channel
+	INC	BC		;increment the DMA address
+	LD	A,L
+	LD	(4002H),A	;update the extended page register
+	JP	NZ,RLOOP	;drop back to the block loop
+
+	EX	AF,AF'		;flag for extra bytes
+	LD	A,(DE)		;read data/CRC from disk
+	JR	Z,LASTR		;zero flag means no extra bytes
+	OUT	(C),A		;data to the channel
+	INC	BC
+	POP	AF		;flag to indicate two extra bytes
+	LD	A,(DE)		;disk data/CRC byte
+	JR	Z,LASTR		;again - zero flag means no byte
+	OUT	(C),A
+	LD	A,(DE)		;read first CRC byte
+LASTR:	LD	A,(DE)		;read second CRC byte
+	LD	A,(131BH)	;CRC error mode byte
+	LD	(4007H),A
+	LD	A,(DE)		;get in sync with error flag
+	LD	A,(1311H)	;control byte for 4007
+	LD	(4007H),A	;turn off error mode
+	LD	A,(4003H)	;status byte
+	CPL
+	BIT	0,A		;set zero flag if no CRC error
+	LD	A,8EH		;data field CRC error code
+RDRTN:	LD	IX,BASEIX	;restore the IX register
+	LD	SP,(STKSAV)	;restore the stack pointer
+	EXX
+	POP	HL		;Restore the original reg. set
+	POP	DE
+	POP	BC
+	EXX
+	JP	CSTOP		;turn off the controller
+	PAGE
+
+;----------------------------------------------------------------------
+; Write a Sector (5" or 8" Soft sectoring)
+;-----------------------------------------
+;
+;	1) The DE pair is set up in SECTOR (called by FSECT) to point
+;	   to location 4001h.
+;	2) The HL pair is also set up in SECTOR. Initially the HL reg.
+;	   pair points to the start of the sector image. Once the header
+;	   has been successfully read the HL pair is left pointing to
+;	   the density byte (131Ah) which is 0 for single density and
+;	   one for double density.
+;
+WRITES:	LD	HL,WPOINT	;write table entry pointer
+	CALL	FSECT		;locate the current sector
+	RET	NZ		;sector not found if zero flag not set
+	LD	A,(DE)		;<5th FF/4E>
+	LD	(STKSAV),SP	;save the stack pointer
+	LD	SP,1330H	;transfer parameters pointer
+	LD	A,(HL)		;get the density byte
+	RRA			;save the density flag in the carry
+	LD	A,(DE)		;<6th FF/4E>
+	POP	BC		;byte count (b) & extended page (c)
+	DEC	B		;adjust for the prefetch of data
+	LD	HL,400BH	;page 40 & 4E field count for dbl den
+	LD	A,(DE)		;<7th FF/4E>
+	EXX			;change register banks
+	LD	DE,4001H	;DMA data port
+	LD	HL,4002H	;extended page port
+	LD	BC,(1320H)	;get the DMA address
+	LD	A,(DE)		;<8th FF/4E>
+	INC	BC		;adjust for the prefetch of data
+	EXX			;change register banks again
+	JR	C,DOUBLE	;If (media is single density)
+	LD	L,6		;	port 4006 - control port of 82S105
+	LD	A,(DE)		;	<9th FF>
+	LD	A,(DE)		;	<10th FF>
+	LD	A,(131EH)	;	control byte for 4006
+	OR	2
+	LD	(HL),A		;	turn controller off
+	INC	L
+	LD	(HL),80H	;	switch clocks and turn on write gate
+	DEC	L
+	AND	0FDH
+	LD	(HL),A		;	turn controller back on
+	LD	A,0AAH		;	half byte of zero
+	LD	L,0CH		;	half-zero count
+LOOP1:	LD	(DE),A		;	write half a zero
+	DEC	L
+	JR	NZ,LOOP1
+
+	; Write the Sync-Byte
+	LD	L,2		;	HL now points to the extended page reg.
+	LD	A,81H
+	LD	(4007H),A	;	enable the CRC generator
+	LD	A,0F5H		;	first half of FB
+	LD	(DE),A
+	LD	A,91H		
+	LD	(4007H),A	;	change controller to normal data
+	LD	A,6FH		;	second half of FB
+	LD	(DE),A
+	JP	(IX)		;	dispatch to write data routine
+				;Else (media is double density)
+DOUBLE:	LD	A,(DE)		;	<9th - 19th 4E>
+	DEC	L
+	JR	NZ,DOUBLE	
+
+	LD	A,(DE)		;	<20th 4E>
+
+	; Set the Write Pre-Compensation
+	LD	A,(1312H)	;	Get the Starting Track of Write Precomp
+	CP	(IY+1)		;	compare with present track
+	SBC	A,A		;	extend the carry to the accumulator
+	AND	10H		;	mask off the write precompensation bit
+	LD	L,A		;	save the result in L
+	LD	A,(DE)		;	<21th 4E>
+	LD	A,(131EH)	;	get controller command byte
+	AND	0EFH		;	mask off old precompensation bit
+	OR	L		;	merge new precomp bit
+	OR	2		;	controller disable bit
+	LD	L,6		;	HL now points to port 4006
+	LD	(HL),A		;	set precomp. & turn off controller
+	INC	L
+	LD	(HL),80H	;	change clocks and turn on write gate
+	AND	0FDH
+	DEC	L
+	LD	(HL),A		;	turn the controller back on
+	LD	A,0AAH		;	one half of a byte of zero
+	LD	L,16H
+LOOP2:	LD	(DE),A		;	write 22 half zeros
+	DEC	L
+	JR	NZ,LOOP2
+
+	;Write the Sync-Bytes
+	LD	(DE),A		;	23rd half zero
+	LD	L,7		;	HL points to mode port again
+	LD	(DE),A		;	write 24th half zero
+	LD	(HL),81H	;	enable the CRC generator
+	EX	DE,HL
+	LD	(HL),44H	;	write first half of A1
+	LD	(HL),89H	;	write second half of A1
+	LD	(HL),44H
+	LD	(HL),89H
+	LD	(HL),44H
+	LD	A,91H		;	normal data mode byte
+	LD	(DE),A
+	LD	(HL),89H
+	EX	DE,HL
+	LD	L,2		;	HL now points to extended page reg.
+	LD	A,0FBH		;	ID byte for data record
+	LD	(DE),A
+	JP	(IX)		;	dispatch to write routine
+	PAGE
+
+WTWO:	EXX
+	LD	A,(132CH)	;get the first byte of data
+	INC	BC		;advance the DMA address
+	LD	(DE),A		;write to the disk
+	LD	A,(132DH)	;get the second byte of data
+	JR	WONEP
+WONE:	EXX
+	LD	A,(132CH)	;get the first byte of data
+WONEP:	INC	BC		;advance the DMA address
+	LD	(DE),A		;write the second/first byte to the disk
+	EXX
+WLOOP:	EXX
+	LD	A,(HL)		;get data from the DMA channel
+	OUT	(C),A		;start a new DMA cycle
+	INC	BC		;increment the DMA address
+	LD	(DE),A		;write the data to the disk
+	EXX			;swap register banks for byte count
+	DJNZ	WLOOP
+	POP	BC		;get the new byte count & extended page
+	EXX
+	LD	A,(HL)		;get next to last data byte
+	OUT	(C),A		;start the last DMA cycle
+	LD	(DE),A		;write next to last data to disk
+	INC	BC		;advance DMA address pointer across page
+	EXX
+	LD	(HL),C		;load extended page register w/new value
+	DEC	B		;test for block transfers done
+	EXX
+	LD	A,(HL)		;get the last data byte
+	OUT	(C),A		;start first DMA cycle of new block
+	LD	(DE),A		;write the last data byte to the disk
+	INC	BC		;advance the DMA address pointer
+	JR	NZ,WLOOP+1	;jump back to block transfer loop
+
+	EX	AF,AF'		;flag to indicate extra bytes to xfer
+	JR	Z,DONE
+	POP	AF		;flag to indicate two extra bytes
+	LD	A,(HL)		;channel data
+	LD	(DE),A		;write to the disk
+	OUT	(C),A		;start next DMA cycle
+	JR	Z,DONE-1	;exit if only one extra byte
+	LD	A,(HL)		;get last data byte from channel reg.
+	OUT	(C),A		;extra DMA cycle for lost data INTR
+	LD	(DE),A		;write last byte to the disk
+	POP	AF		;control byte for port 4007
+DONE:	LD	(4007H),A	;mode to write the CRC data bytes
+	LD	(DE),A		;first CRC data byte
+	LD	(DE),A		;second CRC data byte
+	LD	A,91H		;normal data mode byte
+	LD	(4007H),A
+	XOR	A
+	LD	(DE),A		;flush the registers with a zero
+	LD	IX,BASEIX	;restore the IX register
+	LD	SP,(STKSAV)	;restore the stack pointer
+	LD	A,8EH		;data field CRC error code
+	JP	CSTOP		;turn off the controller
+	PAGE
+
+;======================================================================
+; Find a Sector (hard sectored disk)
+;===================================
+;	1) This routine does both the common initialization for the 5" hard
+;	   sectored read and write routines as well as finding the desired
+;	   sector on the disk.
+;	2) If the disk is not turning or the desired sector is greater than
+;	   the maximum number of sectors on a 5" hard sectored disk (MAXHS5)
+;	   then the carry is returned set.
+;
+FSECT5:	CALL	CSTOP		;stop the controller
+
+	; Setup the Alternate Register Set
+	LD	D,0		;read routine check byte
+	LD	HL,4002H	;channel data/extended page pointer
+	LD	A,(1322H)	;extended page byte
+	LD	E,A		;initialize extended page register
+	LD	(HL),A		;initialize channel extended page
+	LD	BC,(1320H)	;initialize DMA address pointer
+	EXX			;save in shadow register bank
+
+	; Find the Desired Sector
+	LD	B,MAXHS5	;Counter:= Max number of sectors on a 5" disk
+FS5LP:	PUSH	BC
+	CALL	HSYNC		;repeat
+	POP	BC		;	if (disk not turining)
+	JR	Z,FS5ERR	;		break
+
+	LD	A,(1318H)	;	if (desired sector eq current sector)
+	CP	(IX+0AH)
+	JR	Z,FS5SKP	;		Goto Final Initialization
+
+	DJNZ	FS5LP		;Until (Max sector count reached)
+FS5ERR:	SCF			;set the error flag
+	RET			;Exit error
+
+	; Final Initialization
+FS5SKP:	LD	DE,4001H	;channel data/extended page pointer
+	LD	C,0		;write routine check register
+	RES	@FHF,(IX+XFLAG)
+	RET			;return with carry flag cleared
+	PAGE
+
+;----------------------------------------------------------------------
+; Read a 5" disk (hard sectored)
+;-------------------------------
+;
+READ5:	CALL	FSECT5		;find the sector if drive is ready
+	RET	C		;error exit - diskette not turning
+	LD	B,2CH
+RSTALL:	DJNZ	RSTALL		;preamble delay
+	CALL	CSTART		;Start the controller
+
+	LD	B,0		;single density byte count
+	LD	A,(131AH)	;get the density bit
+	OR	A		;set the zero flag
+	EX	AF,AF'		;Save the flag
+
+	; Find the data field address mark
+	LD	A,(1310H)
+	LD	(4006H),A	;Start the controller looking for an ADDR mark
+R5LP1:	LD	A,(4003H)	;Repeat
+	BIT	4,A		;	If (index hole has passed)
+	JR	NZ,R5SKP1
+	LD	A,93H		;		Error_Code:= missing ADDR mark
+	OR	A		;		set error flag
+	RET			;		Error Return
+R5SKP1:	BIT	0,A		;Until (Address mark found)
+	JR	Z,R5LP1
+
+	EX	AF,AF'
+	JR	Z,R5SKP2	;If (drive is double density)
+	LD	A,(DE)		;	Read second data field address mark
+R5SKP2:	EX	(SP),HL		;delay
+	EX	(SP),HL		;delay
+	EX	AF,AF'		;save the flags (specifically the density)
+
+R5LOOP:	LD	A,(DE)		;Repeat	Repeat	read data from disk
+	EXX			;		exchange register banks
+	OUT	(C),A		;		transfer data to the DMA channel
+	XOR	D
+ 	RLCA	
+	LD	D,A		;		update the check byte
+	INC	BC		;		advance the DMA pointer
+	LD	A,B
+	OR	C		;		test for 65K page overflow
+	JR	NZ,REAOK
+	INC	E		;		advance extended page pointer
+REAOK:	LD	(HL),E		;		update extended page register
+	EXX			;		swap the register banks
+	DJNZ	R5LOOP		;	Until (block is transfered)
+
+	XOR	A		;	clear the zero flag
+	EX	AF,AF'		;	swap the flags (to find out if its DD)
+	JR	NZ,R5LOOP	;Until (the whole sector has been read)
+
+	LD	A,(DE)		;read the check byte
+	EXX			;get the check byte
+	XOR	D		;calculate error check byte
+	LD	A,8EH		;data field CRC error code
+	JP	CSTOP		;turn off the controller
+	PAGE
+
+;----------------------------------------------------------------------
+; Write a sector (5" hard sectored)
+;----------------------------------
+;
+WRITE5: CALL	FSECT5		;find the sector if drive is ready
+	RET	C		;diskette not turning in drive
+	LD	B,11H		;single density preamble length
+	LD	A,(131AH)	;density byte
+	RRA			;density bit to the carry flag
+	LD	A,(1310H)
+	SET	1,A		;Set controller to inactive
+	LD	(4006H),A
+	LD	A,90H		;control byte for port 4007
+	LD	(4007H),A	;turn on write gate
+	LD	A,(1310H)
+	JR	NC,CSTR		;carry => media is double density
+
+	; Set Write Pre-comp and adjust preamble length if double density
+	LD	A,(1312H)	;Get the starting track of write pre-comp
+	LD	L,A
+	LD	A,(IY+1)	;If (current track ge 22)
+	CP	L
+	LD	A,24H		;	(A:= pre-comp + DD Control Byte)
+	JR	C,W5SKP1	;	If (Current track ge start wrt-pre-cmp)
+	OR	10H		;		set write precompensation bit
+W5SKP1:	LD	(4006H),A	;	Setup the controller
+	LD	B,20H		;	adjust the preamble length
+	RES	1,A
+
+	; Write the Preamble
+CSTR:	LD	(4006H),A	;start the controller
+	XOR	A		;clear the accumulator
+
+ZEROW:	LD	(DE),A		;write the preamble
+	EX	(SP),HL		;delay
+	EX	(SP),HL		;delay
+	DJNZ	ZEROW
+
+	LD	HL,4002H	;channel data/extended page pointer
+	LD	B,A		;single density byte count
+	LD	A,(131AH)	;get the density byte
+	OR	A		;set the flags
+	LD	A,0FBH		;sync byte
+	JR	Z,LASTS		;non-zero => double density
+	LD	(DE),A		;	write the first sync byte
+	EX	(SP),HL		;	delay
+	EX	(SP),HL		;	delay
+LASTS:	LD	(DE),A		;write the last sync byte
+	PAGE
+
+	; Write the Data
+	EX	AF,AF'		;save the flags
+W5LOOP:	EXX			;exchange the register banks
+	OUT	(C),A		;start the data channel
+	INC	BC		;advance the DMA address
+	LD	A,B
+	OR	C		;test for 65K page overflow
+	JR	NZ,WEAOK	;zero => advance extended page
+	INC	E
+WEAOK:	LD	(HL),E		;update the extended page register
+	EXX			;exchange register banks
+
+	LD	A,(HL)		;get the channel data
+	LD	(DE),A		;write data to the disk
+	XOR	C
+	RLCA			;update the check byte
+	LD	C,A
+	DJNZ	W5LOOP		;test first/second half of data done
+	XOR	A		;set the zero flag
+	EX	AF,AF'		;exchange the accumulator
+
+	JR	NZ,W5LOOP	;test for transfer done
+	LD	A,C		;get the data check byte
+	LD	(DE),A		;write to the disk
+	EX	(SP),HL		;delay
+	EX	(SP),HL		;delay
+	XOR	A
+	LD	(DE),A		;write a trailing zero
+	EX	(SP),HL		;delay
+	EX	(SP),HL		;delay
+	LD	(DE),A		;delay until previous byte written
+	JP	CSTOP		;stop controller and exit
+	PAGE
+
+;======================================================================
+; Commands for Reading and Writing to Main Memory
+;================================================
+
+; Read a Block of the Host's Memory into the Controller's Memory
+;---------------------------------------------------------------
+;
+RDCH:	CALL	RCMD
+CREAD:	LD	A,E
+	OR	D		;test for block transfered
+	RET	Z
+	CALL	INCIO		;do a DMA cycle
+	LD	A,(4002H)	;get the DMA channel data
+	LD	(HL),A		;store data at pointer
+	INC	HL		;advance the pointer
+	DEC	DE		;decrement the data block count
+	JR	CREAD
+
+; Write a Block of Controller Memory to the Host's Memory
+;--------------------------------------------------------
+;
+WRCH:	CALL	WCMD
+CWRITE:	LD	A,E
+	OR	D		;test for block transfered
+	RET	Z
+	LD	A,(HL)		;get the memory data
+	INC	HL		;advance the pointer
+	CALL	INCIO		;do a DMA cycle
+	DEC	DE		;decrement the block count
+	JR	CWRITE
+
+; Read/Write a Byte from/to Main Memory and Increment the Channel Address
+;------------------------------------------------------------------------
+;
+RBYTE:	CALL	RCMD		;Set the channel up for reading
+	JR	RWBYTE
+WBYTE:	CALL	WCMD		;set the channel up for writing
+RWBYTE:	EX	AF,AF'		;save the accumulator
+	LD	A,(13C2H)	;get the extended page
+	EX	AF,AF'		;restore the accumulator
+	LD	BC,(13C0H)	;load lower channel address
+	CALL	INCIO		;do the channel command & increment
+
+; Channel Address Store
+;----------------------
+;
+CASTOR:	EX	AF,AF'
+	LD	(13C2H),A	;save new extended page
+	LD	(13C0H),BC	;save new lower address
+	EX	AF,AF'		;recover the accumulator
+	RET
+	PAGE
+
+; Setup for a Read from the Host's Memory
+;----------------------------------------
+;
+RCMD:	PUSH	AF		;save the accumulator
+	LD	A,0A1H		;S-100 status byte for reading
+	PUSH	AF		;save the status
+	LD	A,(1310H)	;memory image of 4006 cmd. port
+	AND	7FH		;force channel read/write bit to read
+	JR	EXCMD
+
+; Setup for a Write into the Host's Memory
+;-----------------------------------------
+;
+WCMD:	PUSH	AF		;save the accumulator
+	LD	A,1		;S-100 status byte for writing
+	PUSH	AF
+	LD	A,(1310H)
+	OR	80H		;force channel read/write bit to write
+
+EXCMD:	LD	(1310H),A	;update memory image of port 4006
+	SET	1,A		;Controller_stop_bit:= set
+	LD	(4006H),A	;update command port 4006
+	POP	AF		;recover the status byte
+	LD	(4003H),A	;update the S-100 status register
+	POP	AF		;recover the accumulator
+	RET
+
+; Read/Write to/from Host Memory and increment Host address (in A & BC)
+;----------------------------------------------------------------------
+;
+INCIO:	EX	AF,AF'		;get extended page value
+	LD	(4002H),A	;initialize extended page register
+	EX	AF,AF'		;recover the data
+	OUT	(C),A		;Read/Write Data to/from Host Memory (BC=Addr)
+INCR3:	INC	C		;advanve the LSB of DMA address
+	RET	NZ
+	INC	B		;advance the MSB of DMA address
+	RET	NZ
+	EX	AF,AF'
+	INC	A		;advance the extended page value
+	EX	AF,AF'
+	RET
+
+; Diagnostic Routine - Restore the channel command address
+;---------------------------------------------------------
+;
+RESTOR:	LD	BC,(13C4H)	;get the channel command address
+	EX	AF,AF'		;save the accumulator
+	LD	A,(13C6H)	;extended page of address
+	JP	CASTOR+1	;restore the channel command address
+	PAGE
+
+;----------------------------------------------------------------------
+; Input a Character from the Serial Port
+;---------------------------------------
+;	1) This routine returns Non-Zero if it didn't get a character.
+;	2) Notice the routine COUNT is constantly called.
+;	3) Register Usage
+;		A  - General Purpose/Returned Character
+;		B  - Bit Cell Timer
+;		C  - Bit Count/Returned Character
+;		HL - Pointer to Disk Status Port
+;
+	; Entry Point 1 - Hang Until a character is present
+HSPIN:	CALL	SPIN		;Repeat
+	JR	NZ,HSPIN	;Until (Character present)
+	RET
+
+	; Entry Point 2 - Get character (if present) and return
+SPIN:	CALL	COUNT		;look for index/sector hole
+	LD	HL,4003H	;HL:= Pointer to the Disk Status Port
+	BIT	1,(HL)		;If (serial port not active)
+	RET	NZ		;	Return
+
+	LD	BC,0A08H	;Else (B:=Half_Bit_Time, C:=Bit_Count)
+INLP1:	DJNZ	INLP1		;	wait half a bit time
+	BIT	1,(HL)		;	If (serial port no longer active)
+	JR	NZ,SPIN		;		Go back and count another hole
+
+INLP2:	LD	B,19H		;Repeat (9600 baud cell time)
+INLP3:	DJNZ	INLP3		;	wait one cell time
+	SCF			;	assume a 1 bit is present
+	BIT	1,(HL)		;	If (bit is NOT a 1)
+	JR	NZ,INSKP1
+	CCF			;		clear the bit to a zero
+INSKP1:	RRA			;	shift new bit into the accumulator
+	DEC	C		;	Bit_Count:= Bit_Count - 1
+	JR	NZ,INLP2	;Until (Bit_Count eq 0)
+	LD	C,A		;C:= Character
+	RET
+	PAGE
+
+;----------------------------------------------------------------------
+; Output a Character to the Serial Port
+;--------------------------------------
+;	3) Register Usage
+;		A  - General Purpose
+;		B  - Bit Cell Timer
+;		C  - Save of the character to output
+;		H  - Save of the character to output
+;		L  - Bit cell count
+;		IX - 13F0 => Current Drive scratch pad area
+;
+SPOUT:	PUSH	AF
+	LD	A,(1310H)
+	SET	1,A		;Set the controller stop bit
+	LD	(IX+6H),A	;memory image of 4006 to 1310
+	POP	AF
+	OR	80H		;append a rest bit
+	LD	C,A		;save the character in C
+	CALL	COUNT		;look for index/sector hole
+	LD	A,C		;restore the character
+	AND	7FH		;make character into 7 bit ASCII
+	LD	H,A		;save ASCII character in H
+	LD	A,8		;start bit
+
+	LD	L,0BH		;total bit count of character
+OLOOP:	ADD	A,(IX+6)	;merge with port 4006 image
+	LD	(4006H),A	;send bit to the serial port
+	XOR	A		;clear the accumulator
+	LD	B,18H		;9600 baud cell delay time
+BTIME:	DJNZ	BTIME		;wait one cell time
+	SRA	C		;get the next serial bit from C
+	CCF			;compliment the carry
+	RLA
+	RLA
+	RLA
+	RLA			;rotate carry to serial bit
+	DEC	L		;decrement the bit count
+	JR	NZ,OLOOP	;0 => character done
+
+	LD	C,H		;restore the ASCII character to C
+	JP	COUNT
+
+	PAGE
+;======================================================================
+; Internal Monitor
+;=================
+;
+MONTR:	LD	(MONRAM),SP	;Save the stack pointer
+MONE2:	LD	SP,MONRAM+15H	;Stack_Pointer:= Start of Monitor stack
+	LD	DE,PROMT	;Pointer:= Start of Prompt
+MONE3:	LD	A,(DE)		;Repeat Get next character of Prompt string
+	CALL	SPOUT		;	Print character
+	INC	DE		;	Pointer:= Pointer + 1
+	LD	A,(DE)		;	Get_Next_Character
+	OR	A
+	JR	NZ,MONE3	;Until (Character eq 0)
+
+	LD	DE,0		;Argument:= 0
+MONLP1:	CALL	GETC		;Repeat
+	JR	C,MONCMD	;	if (character eq command)
+	LD	B,4		;		goto Identify_a_Command
+SHIFT:	SLA	E		;	else
+	RL	D		;		move new nibble into arg. reg.
+	DJNZ	SHIFT
+	ADD	A,E
+	LD	E,A
+	JR	MONLP1
+
+; Identify a command
+;-------------------
+;	1) This routine checks if the input is a proper command (upper-
+;	   case G (go-execute), P (print), or W (write)).
+;	2) If the command is identified then control is transferred to
+;	   the following routine (FOUND)
+;
+MONCMD:	LD	B,3		;Counter:= Max number of commands
+	LD	HL,CMDTBL	;Pointer:= Command_Table_Base
+MONLP2:	CP	(HL)		;While (char ne command)
+	INC	HL		;		pointer:= (start of vector)
+	JR	Z,FOUND		;		goto Execute_a_Command
+	INC	HL
+	INC	HL		;	Pointer:= Pointer+2 (start next entry)
+	DJNZ	MONLP2		;Until (all commands checked)
+	LD	DE,ERROR	;Pointer:= start of error prompt string
+	JR	MONE3		;Goto monitor output prompt string
+
+; Execute a command
+;------------------
+;	1) If a command was identified by CMD then the HL pair is left
+;	   pointing to the execution vector in the command table (CMDTBL).
+;
+FOUND:	LD	A,(HL)		;Move the vector into the HL pair
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	JP	(HL)		;Execute the command (GO, WRITE or PRINT)
+	PAGE
+
+;----------------------------------------------------------------------
+; Go Execute a Routine
+;---------------------
+;	1) This routine executes a routine in controller memory (execution
+;	   address is sent in the DE register pair).
+;	2) Both the Normal and Alternate register loaded from and saved to:
+;   MONRAM+15H	13DC F	- AF		13E6 IY	- IY
+;		13DD A			13E7 IY
+;		13DE B	- BC		13E8 F	- AF'
+;		13DF C			13E9 A
+;		13E0 E	- DE		13EA C	- BC'
+;		13E1 D			13EB B
+;		13E2 L	- HL		13EC E	- DE'
+;		13E3 H			13ED D
+;		13E4 IX	- IX		13EE L	- HL'
+;		13E5 IX			13EF H
+;
+GO:	LD	HL,SRETRN	;SRETRN is return address after cmnd finishes
+	PUSH	HL		;Put return address on stack (13DA & 13DB)
+	PUSH	DE		;Put Execution address on stack (13D8 & 13D9)
+	LD	SP,MONRAM+15H	;Stack_Pointer:= start of register save area
+	POP	AF		;Setup Registers
+	POP	BC
+	POP	DE
+	POP	HL
+	POP	IX
+	POP	IY
+	EX	AF,AF'
+	POP	AF
+	EX	AF,AF'
+	EXX
+	POP	BC
+	POP	DE
+	POP	HL
+	EXX
+	LD	SP,MONRAM+11H	;Stack Pointer to Execution Address
+	RET			;Execute the command
+SRETRN:	LD	SP,MONRAM+29H	;Stack_Pointer:= End of register save area
+	EXX			;Restore registers
+	PUSH	HL
+	PUSH	DE
+	PUSH	BC
+	EXX
+	EX	AF,AF'
+	PUSH	AF
+	EX	AF,AF'
+	PUSH	IY
+	PUSH	IX
+	PUSH	HL
+	PUSH	DE
+	PUSH	BC
+	PUSH	AF
+	JP	MONE2		;Goto The Idle loop
+	PAGE
+
+;----------------------------------------------------------------------
+; Write To Controller Memory
+;---------------------------
+;
+WRITE:	CALL	FORMAT		;Print newline followed by starting location
+WRLOOP:	LD	A,20H		;Repeat
+	CALL	SPOUT		;	Print a space
+	CALL	GETC		;	If (current character isn't hex)
+	JR	C,LEAVE		;		Return
+	RLCA			;	Move current character into m.s.n
+	RLCA
+	RLCA
+	RLCA
+	LD	C,A		;	Save the character
+	EXX
+	CALL	GETC		;	Get the l.s.n
+	EXX			;	If (current character isn't hex)
+LEAVE:	JP	C,MONE2		;		Return
+	ADD	A,C		;	Combine the two halves of the number
+	LD	(DE),A		;	Store number at current location
+	INC	DE		;	Pointer:= Pointer + 1
+	LD	A,E
+	AND	0FH
+	JR	NZ,WRLOOP	;Until (l.s.b of location is zero)
+	JR	WRITE		;GOTO Start a new line
+	PAGE
+
+;----------------------------------------------------------------------
+; Print the contents of controller memory
+;----------------------------------------
+;
+PRINT:	CALL	FORMAT		;Repeat	New line followed by starting address
+PRNLP1:	LD	A,20H		;	Repeat
+	CALL	SPOUT		;		Print a space
+	LD	A,(DE)
+	CALL	PUTL		;		Print m.s.n of current location
+	LD	A,(DE)
+	CALL	PUTR		;		Print l.s.n of current location
+	INC	DE
+	LD	A,E
+	AND	0FH
+	JR	NZ,PRNLP1	;	Until (the l.s.n of address is zero)
+	CALL	HSPIN		;	Wait for a character from serial port
+	CALL	SPOUT		;	Echo the character to the serial port
+	LD	A,C
+	CP	20H
+	JR	Z,PRINT		;Until (input character is not a space)
+	JP	MONE2		;GOTO Monitor
+
+FORMAT:	LD	A,0DH		;Output a carriage return - line feed
+	CALL	SPOUT
+	LD	A,0AH
+	CALL	SPOUT
+	LD	A,D
+	CALL	PUTL		;Print most-signifigant nibble of m.s.d
+	LD	A,D
+	CALL	PUTR		;Print least-signifigant nibble of m.s.d
+	LD	A,E
+	CALL	PUTL		;Print most-signifigant nibble of l.s.d
+	LD	A,E
+	JR	PUTR		;Print least-signifigant nibble of l.s.d
+
+PUTL:	RRCA			;Print the Left half of the accm as ascii-hex
+	RRCA
+	RRCA
+	RRCA
+
+PUTR:	AND	0FH		;Print the Right half of the accm as ascii-hex
+	ADD	A,'0'
+	CP	':'		;If (number is lt ascii-hex)
+JOUT:	JP	C,SPOUT		;	Print it
+	SUB	0F9H		;Else add offset (makes A-F print properly)
+	JR	JOUT		;	Print it
+
+	PAGE
+;----------------------------------------------------------------------
+; Get a Character
+;----------------
+;	1) This routine returns with a character in the accm.
+;	2) If the character is a hex digit then it is translated into
+;	   binary.
+;	3) If the character is NOT hexadecimal then the carry is returned set
+;
+GETC:	CALL	HSPIN		;Wait for a character from the serial port
+	CALL	SPOUT		;Echo the character to the serial port
+	LD	A,C
+	CP	'0'		;If (Character lt the smallest number)
+	RET	C		;	Return
+	CP	'G'		;If (Character gt the largest alpha)
+	CCF			;	(adjust the return status)
+	RET	C		;	Return
+	LD	B,'0'		;Offset:= Number
+	CP	':'		;If (Character gt the largeset number)
+	JR	C,MHEX
+	CP	'A'		;	If (Character lt smallest alpha)
+	RET	C		;		Return
+	LD	B,37H		;	Offset:= alpha
+MHEX:	SUB	B		;convert ascii character into hex
+	RET			;Return
+
+;----------------------------------------------------------------------
+; Command table for Monitor
+;--------------------------
+;
+CMDTBL:	DB	'G'		;Go Execute a Subroutine
+	DW	GO
+	DB	'P'		;Print Controller Memory
+	DW	PRINT
+	DB	'W'		;Write to Controller Memory
+	DW	WRITE
+
+;----------------------------------------------------------------------
+; Error and Prompt strings for Monitor
+;-------------------------------------
+;
+ERROR:	DB	'?'		;Question Mark
+PROMT:	DB	0DH		;Carriage Return
+	DB	0AH		;Line Feed
+	DB	':'		;Colon
+	DB	0		;End of String
+	PAGE
+
+;----------------------------------------------------------------------
+; Hard Sectored Disk Sector/Index Synchronization
+;------------------------------------------------
+; General Description:
+;		This routine Keeps track of the sector counts for 5" hard
+;	disks. The program HANGS, calling COUNT looking for a Sector/Index
+;	hole or until a	Time-Out (about 3.11 seconds) occurs. If current
+;	sector isn't known (decalibrated = bit-7 set) then a synchronization
+;	process takes place.
+;		Initial synchronization with the disk occurs directly after
+;	counting 2 successive hole with a delay of 12ms or less between them
+;	(the program can get fooled by two counts greater than 24 ms). The
+;	sector following these two closely spaced holes is sector 0.
+; Notes:
+;	1) Each iteration takes about 47.45us. 14us here and 33.45 in COUNT.
+;	2) If the disk isn't turning then the Z-Flag is returned set.
+;	3) The constant MAXHS5 is the max. number of sectors on a 5" (hs) disk.
+;	4) Register Usage:
+;		A  - General Purpose
+;		B  - Hole Count
+;		DE - Time_Delay
+;		HL - Pointer to Disk Status Register (4003h - setup in COUNT)
+;
+	; Look for an index/sector hole
+HSYNC:	LD	DE,0		;Time_Delay:= Max_Delay
+	CALL	COUNT		;while (Hole ne Found)
+	JR	NZ,TSYNC
+	INC	DE		;	Time_Delay:= Time_Delay + 1
+	LD	A,D
+	OR	E		;	if (Time_Delay eq 0)
+	JR	NZ,HSYNC+2	;		(Disk not turning)
+	RET			;		error exit w/zero flag set
+
+TSYNC:	BIT	@SCT,(IX+XFLAG)	;If (sector count eq uncalibrated)
+	JR	NZ,SLEAVE	;
+				;	Repeat
+ISYNC:	LD	B,2		;		Short_Counts:= 2
+	LD	DE,0		;		Time_Delay:= Max_Delay
+HSLOOP:	CALL	COUNT		;		While (Hole ne Found)
+	JR	NZ,HFOUND
+	INC	DE		;			Time_Delay:=Time_Dely+1
+	LD	A,D		;
+	OR	E		;			If (Time_Delay eq 0)
+	JR	NZ,HSLOOP
+	RET			;				exit Error
+HFOUND:	BIT	1,D		;	if (delay le 12.15ms) (or gt 24.3ms)
+	JR	NZ,ISYNC	;		go reset short delay count
+				;	if (only one short delay counted)
+	DJNZ	ISYNC+2		;		go check for 2nd short count
+				;	Else
+	LD	(IX+0AH),0	;		Sector_Count:= 0
+	SET	@SCT,(IX+XFLAG)	;		Sector_Calibrated:= true
+SLEAVE:	LD	A,MAXHS5	;if (index hole eq found)
+	CP	(IX+0AH)	;
+	JR	Z,HSYNC		;	go back & wait for sector zero
+	RET			;exit without error
+	PAGE
+
+;----------------------------------------------------------------------
+; Count Sector/Index Holes
+;-------------------------
+;	1) This routine returns with the zero flag cleared if a new hole
+;	   was found.
+;	2) If the maximum number of index holes has been counted then the
+;	   drive is deselected. Deselection is done by jumping to the
+;	   deselect routine. This is done to avoide premature termination
+;	   (see ENTNMI).
+;	3) Register Usage:
+;		A  -> General purpose
+;		HL -> Pointer (4003h-4005h) (Left Pointing to 4003)
+;
+COUNT:	LD	HL,4003H	;HL:= Pointer to status register
+	BIT	4,(HL)		;if (index/sector_bit eq inactive)
+	JR	NZ,SIHIGH	;
+	SET	@HOL,(IX+XFLAG)	;	hole_processed:= false
+	RET			;	exit (hole not found)
+
+SIHIGH:	BIT	@HOL,(IX+XFLAG)	;if (hole_processed eq true)
+	RET	Z		;	exit (hole found but already processed)
+
+	RES	@HOL,(IX+XFLAG)	;hole_processed:= true
+	BIT	@HRD,(IY+YFLAG)	;if (media eq hard_sectored)
+	JR	Z,ICOUNT	;
+
+	INC	(IX+0AH)	;	sector_count:= sector_count + 1
+	LD	A,MAXHS5	;	(max_sectors = last sector number + 1)
+
+	BIT	@FHF,(IX+XFLAG)	;	If (first hole found is true)
+	JR	Z,SIDLE
+	INC	A		;		max_sectors:= max_sectors + 1
+
+SIDLE:	SET	@FHF,(IX+XFLAG)	;	Set first hole found to true
+	SUB	(IX+0AH)	;	if (sector ne 0)
+	RET	NZ		;		exit (hole found & not sect 0)
+	LD	(IX+0AH),A	;	sector_count:= 0
+
+ICOUNT:	INC	(IX+0BH)	;index_count:= index_count + 1
+	LD	A,(IX+0DH)	;A:= max revs before drive deselect
+	SUB	(IX+0BH)	;if (index_count EQ max revs before deselect)
+	JP	Z,DRVOFF	;	deselect the drive (DO NOT CALL)
+	RET
+	PAGE
+
+;----------------------------------------------------------------------
+; Turn off the current drive
+;---------------------------
+;	1) This routine sets the drive's status inactive and then turns
+;	   the motor.
+;
+DRVOFF:	CALL	DESEL		;Set the drive status to inactive
+	CALL	MOTOFF		;Turn off the motor
+	RET
+
+;----------------------------------------------------------------------
+; Deselect the Drive but not the motor
+;-------------------------------------
+;	1) This routine set the status of the current drive to inactive.
+;	2) To turn off the motor line you must call MOTOFF.
+;	3) Register Usage:
+;		HL -> Pointer to Drive Control Port
+;
+DESEL:	PUSH	AF		;Save the accm and the flags
+	LD	A,11111110B	;Setup to Deselect everything but the motor
+	LD	HL,4004H
+	BIT	@5IN,(IY+YFLAG)	;if (drive_control_port ne 5")
+	JR	NZ,DESKP1
+
+	INC	L		;	(move pointer to 8" control port 4005h)
+DESKP1º	BIT	@MOT,(IX+XFLAG)	;If (Motor_Staus eq Inactive)
+	JR	NZ,DESKP2
+
+	LD	A,11111111B	;	Setup to Deselect everything
+DESKP2:	LÄ	(HL),A		;Deselect
+
+	RES	@HDL,(IY+YFLAG)	;Head_loaded:= False
+	RES	@SCT,(IX+XFLAG)	;Sector_Count_Calibrated:= False
+	POP	AF		;Restore the accm and the flags
+	RET
+
+;----------------------------------------------------------------------
+; Turn off the motor line
+;------------------------
+;	1) Register Usage:
+;		HL -> Pointer to Drive Control Port (left pointing to 4003)
+
+MOTOFF:	LD	HL,4004H	;HL:= 5" Drive control port (4004h)
+MOSKP1:	LD	(HL),11111111B	;deselect the drive
+	LD	L,3		;HL:= Disk status port (4003h)
+
+	RES	@MOT,(IX+XFLAG)	;Motor_Status:= Inactive
+	RET
+	PAGE
+
+;======================================================================
+; COMMAND TABLE
+;==============
+;	1) the byte count at the end of each title line tells how many
+;	   bytes the total command takes. This includes both the command
+;	   code (always present) and the status (sometimes present).
+;	2) The parameters are enumerated following each title line.
+;	3) Commands are grouped according to function.
+;
+;----------------------------------------------------------------------
+;Initial Setup Commands:
+;-----------------------
+;
+;Set CRC Error Retry Count (2 bytes)
+;	1 - retry count + 1
+;
+CTABLE:	DB	28H
+	DW	SETCRC
+	DB	1
+
+;Unload Head Timeout (2 bytes)
+;	1 - count
+;
+	DB	2FH
+	DW	SETLFT
+	DB	1
+
+;Set Track Size (4 bytes)
+;	1 - drive
+;	2 - highest track
+;
+	DB	2DH
+	DW	TRACKZ
+	DB	2
+	PAGE
+
+;Set Drive Parameters
+;	1 - drive
+;	2 - step rate
+;	3 - step settle time
+;	4 - head load delay time
+;	5 - motor on delay time
+;
+	DB	30H
+	DW	SETDP
+	DB	5
+
+;Set Media Parameters
+;	1 - drive
+;	2 - starting track of write pre-compensation
+;	3 - highest track number
+;	4 - first sector's number
+;	5 - total number of sectors per track
+;
+	DB	31H
+	DW	SETMP
+	DB	5
+
+;Change Logical Drives (3 bytes)
+;	1 - mask
+;
+	DB	2EH
+	DW	LOGCAL
+	DB	1
+ 
+;Set DMA Address (4 bytes)
+;	1 - New DMA Address low byte
+;	2 -  "   "     "    med byte
+;	3 -  "   "     "    high byte
+;
+	DB	23H
+	DW	SETDMA
+	DB	3
+
+;Set Channel Command Word Address (4 bytes)
+;	1 - New Channel Command Address low byte
+;	2 -  "     "       "       "    med byte
+;	3 -  "     "       "       "    high byte
+;
+	DB	27H
+	DW	SETCCW
+	DB	3
+	PAGE
+
+;----------------------------------------------------------------------
+; Disk Access Commands
+;---------------------
+;
+;Sense Drive Status (6 bytes)
+;	1 - drive
+;
+	DB	22H
+	DW	GSTAT
+	DB	1
+
+;Read Sector (5 bytes)
+;	1 - track
+;	2 - side/sector
+;	3 - drive
+;
+	DB	20H
+	DW	RDSECT
+	DB	3
+
+;Write Sector (5 bytes)
+;	1 - track
+;	2 - side/sector
+;	3 - drive
+;
+	DB	21H
+	DW	WRSECT
+	DB	3
+
+;Read Track (5 bytes)
+;	1 - track
+;	2 - side
+;	3 - drive
+;	4 - sector table low byte
+;	5 -  "       "   med byte
+;	6 -  "       "   high byte
+;
+	DB	29H
+	DW	RTRACK
+	DB	6
+
+;Write Track (8 bytes)
+;	1 - track
+;	2 - side
+;	3 - drive
+;	4 - sector table low byte
+;	5 -  "       "    med byte
+;	6 -  "         "  high byte
+;
+	DB	2AH
+	DW	WTRACK
+	DB	6
+	PAGE
+
+;----------------------------------------------------------------------
+; Controlling Process Execution
+;------------------------------
+;
+;Branch in Channel (4 bytes)
+;	1 - New Channel Address low byte
+;	2 -  "     "      "     med byte
+;	3 -  "     "      "     high byte
+;
+	DB	26H
+	DW	SETCAW
+	DB	3
+
+;Halt Controller (2 bytes)
+;	0  - No Parameters
+;
+	DB	25H
+	DW	HALTC
+	DB	0
+
+;Set Interrupt Request (2 bytes)
+;	0 - No Parameters
+;
+	DB	24H
+	DW	INTRQC
+	DB	0
+	PAGE
+
+;----------------------------------------------------------------------
+; Other Commands
+;---------------
+;
+;Output to Serial Port (3 bytes)
+;	1 - ASCII character
+;
+	DB	2BH
+	DW	SEROUT
+	DB	1
+
+;Serial Input Enable (2 bytes)
+;	1 - mask
+;
+	DB	2CH
+	DW	SRENBL
+	DB	1
+
+;Dump Controller Memory (8 bytes)
+;	1 - main memory lo byte
+;	2 -  "     "    med byte
+;	3 -  "     "    high byte
+;	4 - number of bytes to transfer low cnt
+;	5 -   "    "   "    "    "      high cnt
+;	6 - address in controller memory low byte
+;	7 -    "     "     "         "   high byte
+;
+	DB	0A0H
+	DW	DUMPM
+	DB	7
+
+;Load Controller Memory (8 bytes)
+;	1 - main memory lo byte
+;	2 -  "     "    med byte
+;	3 -  "     "    high byte
+;	4 - number of bytes to transfer low cnt
+;	5 -    "    "   "    "    "     high cnt
+;	6 - address in controller memory low byte
+;	7 -    "     "     "         "   high byte
+;
+	DB	0A1H
+	DW	LOADM
+	DB	7
+
+;Execute Controller Routine (4 bytes)
+;	1 - Execution Address low byte
+;	2 -    "        "     high byte
+;	3 -    "        "     status
+;
+	DB	0A2H
+	DW	GOMEM
+	DB	2
+;
+	DB	80H		;End of Table
+	PAGE
+
+;======================================================================
+; Tables That are Moved into the controller's ram
+;================================================
+
+; Vector Table (loaded into memory starting at location 1290H)
+;=============================================================
+;
+RTBL:	DW	READS	;Vector to Soft Sectored Read a Sector Routine
+	DW	READ5	;Vector to Hard Sectored Read a Sector Routine
+	DW	0	;Spare
+	DW	0	;Spare
+WTBL:	DW	WRITES	;Vector to Soft Sectored Write a Sector Routine
+	DW	WRITE5	;Vector to Hard Sectored Write a Sector Routine
+	DW	0	;Spare
+	DW	0	;Spare
+
+; 8" Soft Sectored Drive constants
+;=================================
+
+; 8" drive single density [addr = 12A0]
+;--------------------------------------
+SECT8:	DB	44H	;port 4006 control byte
+	DB	73H	;port 4007 control byte
+	DB	43	;Default Starting Track of Write Pre-Compensation
+	DB	0	;not used
+	DB	0	;not used
+	DB	0	;not used
+	DB	0	;track number
+	DB	0	;side number
+	DB	0	;sector number
+	DB	0	;sector length code
+	DB	0	;single density ID byte
+	DB	63H	;port 4007 CRC control byte
+	DB	0	;not used
+	DB	0	;not used
+	DB	44H	;Port 4006 write control byte
+	DB	0H	;not used
+
+; 8" drive double density [addr = 12B0]
+;--------------------------------------
+	DB	4	;port 4006 control byte
+	DB	70H	;port 4007 control byte
+	DB	43	;Default Starting Track of Write Pre-Compensation
+	DB	0	;not used
+	DB	0	;not used
+	DB	0	;not used
+	DB	0	;track number
+	DB	0	;side number
+	DB	0	;sector number
+	DB	0	;sector length code
+	DB	1	;double density ID byte
+	DB	61H	;port 4007 CRC control byte
+	DB	0	;not used
+	DB	0	;not used
+	DB	4H	;Port 4006 write control byte
+	DB	0H	;not used
+	PAGE
+
+; 5" Soft Sectored Drive Constants
+;=================================
+
+; 5" drive single density (soft sectored) [addr = 12C0]
+;------------------------------------------------------
+	DB	64H	;port 4006 control byte
+	DB	7BH	;port 4007 control byte
+	DB	17	;Default Starting Track of Write Pre-Compensation
+	DB	0	;not used
+	DB	0	;not used
+	DB	0	;not used
+	DB	0	;track number
+	DB	0	;side number
+	DB	0	;sector number
+	DB	0	;sector length code
+	DB	0	;double density flag
+	DB	63H	;checksum control code
+	DB	0	;not used
+	DB	0	;not used
+	DB	64H	;Port 4006 write control byte
+	DB	0H	;not used
+
+; 5" drive double density (soft sectored) [addr = 12D0]
+;------------------------------------------------------
+	DB	54H	;port 4006 control byte
+	DB	70H	;port 4007 control byte
+	DB	17	;Default Starting Track of Write Pre-Compensation
+	DB	0	;not used
+	DB	0	;not used
+	DB	0	;not used
+	DB	0	;track number
+	DB	0	;side number
+	DB	0	;sector number
+	DB	0	;double density flag
+	DB	1	;sector length code
+	DB	60H	;checksum control
+	DB	0	;not used
+	DB	0	;not used
+	DB	24H	;Port 4006 write control byte FM=false & MINI=true
+	DB	0H	;not used
+	PAGE
+
+;5" Hard sectored Drive Constants
+;================================
+
+; 5" drive single density (hard sectored) [addr = 12E0]
+;------------------------------------------------------
+SECT5:	DB	64H	;port 4006 control byte
+	DB	73H	;port 4007 control byte
+	DB	17	;Default Starting Track of Write Pre-Compensation
+	DB	0	;not used
+	DB	0	;not used
+	DB	0	;not used
+	DB	0	;track number (not used in this format)
+	DB	0	;side number (not used in this format)
+	DB	0	;sector number (not used in this format)
+	DB	1	;sector length code
+	DB	0	;double density flag
+	DB	73H	;checksum control byte
+	DB	0	;not used
+	DB	0	;not used
+	DB	64H	;Port 4006 write control byte
+	DB	0H	;not used
+
+; 5" drive double density (hard sectored) [addr = 12F0]
+;------------------------------------------------------
+	DB	54H	;port 4006 control byte
+	DB	7BH	;port 4007 control byte
+	DB	17	;Default Starting Track of Write Pre-Compensation
+	DB	0	;not used
+	DB	0	;not used
+	DB	0	;not used
+	DB	0	;track number (not used in this format)
+	DB	0	;side number (not used in this format)
+	DB	0	;sector number (not used in this format)
+	DB	2	;sector length code
+	DB	1	;double density flag
+	DB	7BH	;checksum control byte
+	DB	0	;not used
+	DB	0	;not used
+	DB	54H	;Port 4006 write control byte
+	DB	0H	;not used
+
+	PAGE
+; Drive parameter tables (loaded starting at location BASEIY)
+;============================================================
+
+; 8" drive table
+DRIVE8:	DB	4DH	;high track + 1
+	DB	0FFH	;current track
+	DB	0F3H	;drive pattern
+;		-	;Logical drive Number (Inserted by Reset routine)
+	DB	11H	;Step Time (LSB)
+	DB	1	;Step Time (MSB)
+	DB	0	;Head Load Delay Time (LSB) Default set in PREP to 50ms
+	DB	0	;Head Load Delay Time (MSB)
+	DB	0	;Motor on Delay Time (LSB) Default set in PREP to .5sec
+	DB	0	;Motor on Delay Time (MSB)
+	DB	11H	;Step Settle Time (LSB)
+	DB	1	;Step Settle Time (MSB)
+	DB	0H	;First Sector's Number
+	DB	0H	;User's Specification - Number of sectors per track
+	DB	10H	;default drive configuration byte
+	DB	0	;User's Specification - Starting track of Write Precomp
+
+; 5" drive table
+DRIVE5:	DB	28H	;high track + 1
+	DB	0FFH	;current track
+	DB	0F2H	;drive pattern
+;	-	-	;Logical drive Number (Inserted by Reset routine)
+	DB	0CCH	;Step Time (LSB)
+	DB	0	;Step Time (MSB)
+	DB	0	;Head Load Delay Time (LSB) Default set in PREP to 50ms
+	DB	0	;Head Load Delay Time (MSB)
+	DB	0	;Motor on Delay Time (LSB) Default set in PREP to .5sec
+	DB	0	;Motor on Delay Time (MSB)
+	DB	0	;Step Settle Time (LSB)
+	DB	2	;Step Settle Time (MSB)
+	DB	0H	;User's Specification - First Sector's Number
+	DB	0H	;User's Specification - Number of sectors per track +1
+	DB	3CH	;default drive configuration byte (2EH = hard sect.)
+	DB	0	;User's Specification - Starting track of Write Precomp
+
+; System Status and Control Area (loaded into memory at 13F0h)
+CONST:	DB	40H	;current drive table pointer LSB
+	DB	13H	;current drive table pointer MSB
+	DB	0	;Not Used
+	DB	0	;Not Used
+	DB	0	;Not Used
+	DB	0	;Not Used
+	DB	6	;port 4006 memory image
+	DB	0	;Not Used
+	DB	0	;Not Used
+	DB	0	;Not Used
+	DB	0	;sector count - sector_decalibrated_flag
+	DB	0	;index count
+	DB	0AH	;Retries on CRC error
+	DB	16H	;Max. number of revolutions before drive deselected
+	DB	0	;System Status Byte
+	DB	0	;break character count
+	DS	1000H - $, 0FFH
+	PAGE
+
+;======================================================================
+; MEMORY LAYOUT
+;==============
+;
+;----------------------------------------------------------------------
+; Stack
+;------
+;
+;	1000 - 102F
+;
+;----------------------------------------------------------------------
+; User Area
+;----------
+;
+;	1030 - 128F
+;
+;----------------------------------------------------------------------
+; Read/Write Vector Tables
+;-------------------------
+;
+;	1290 - 1297	RTBL
+;	1298 - 129F	WTBL
+;
+;----------------------------------------------------------------------
+; Drive constants Tables (see SECT8 and SECT5 for table definitions)
+;-------------------------------------------------------------------
+;
+;	12A0  8" single density
+;	12B0  8" double    "
+;	12C0  5" single    "    soft sectored
+;	12D0  5" double    "     "   sectored
+;	12E0  5" single    "    hard sectored
+;	12F0  5" double    "     "   sectored
+;
+;	Each drive table is organized as follows:
+;		...0  port 4006 control byte
+;		...1  port 4007 control byte
+;		...2  Default Starting Track of Write Pre-Compensation
+;		...3  not used
+;		...4  not used
+;		...5  not used
+;		...6  track number
+;		...7  side number
+;		...8  sector number
+;		...9  sector length code
+;		...A  double density ID byte
+;		...B  port 4007 CRC control byte
+;		...C  not used
+;		...D  not used
+;		...E  Port 4006 write control byte
+;		...F  not used
+;
+;	1300 - 130F Not used
+	PAGE
+
+;----------------------------------------------------------------------
+; Current Drive's Constants
+;--------------------------
+;	1) This area is loaded by CDISK from the Drive Constants Tables
+;
+;	1310  port 4006 read control byte
+;	1311  port 4007 control byte
+;	1312  Starting Track of Write Pre-Compensation
+;	1313  not used
+;	1314  not used
+;	1315  not used
+;	1316  track number
+;	1317  0/1 (side 0/ side 1)
+;	1318  sector number
+;	1319  sector length code (0-128, 1-256, 2-512, 3-1024)
+;	131A  0/1 (single density/double density)
+;	131B  port 4007 CRC control code
+;	131C  not used
+;	131D  not used
+;	131E  port 4006 write control byte
+;	131F  not used
+;
+;----------------------------------------------------------------------
+; DMA Pointer
+;------------
+;
+;	1320  DMA address LSB
+;	1321  DMA address MSB
+;	1322  DMA address extended page
+;
+;----------------------------------------------------------------------
+; Parameter Save Area (See EXEC)
+;-------------------------------
+;
+;	1323  track number
+;	1324  sector number (side number in high order bit)
+;	1325  drive number
+;
+;----------------------------------------------------------------------
+; Misc Storage
+;-------------
+;
+;	1326  status address LSB
+;	1327  status address MSB
+;	1328  status address extended page
+;	1329  next command
+;	132A  DMA byte count LSB
+;	132B  DMA byte count MSB
+;	132C  data byte
+;	132D  data byte
+;	132E  STKSAV stack pointer location during READS and WRITES (lsb)
+;	132F           "     "        "       "      "    "    "    (msb)
+;
+	PAGE
+;----------------------------------------------------------------------
+; Transfer Parameter Buffer
+;--------------------------
+;	1330	block#1 extended page address
+;		block#1 byte count less one
+;			    .
+;			    .
+;			    .
+;		block#k extended page address
+;		block#k byte count less one
+;		extended page address
+;		1 (signal to stop block transfers)
+; (conditional)	40/3F (zero flag set/zero flag not set)
+; (conditional) A1/0 (port 4007 CRC control code/nop)
+;		40 (zero flag set)
+;		A1 (port 4007 CRC control)
+;
+;----------------------------------------------------------------------
+; Drive Parameter Tables (DPT)
+;-----------------------------
+;	1340 - 134F  Physical Drive A  Logical drive 0/4 (first 8" drive)
+;	1350 - 135F     "       "   B     "      "   1/5
+;	1360 - 136F     "       "   C     "      "   2/6
+;	1370 - 137F     "       "   D     "      "   3/7
+;	1380 - 138F     "       "   E     "      "   4/0 (first 5.25" drive)
+;	1390 - 139F     "       "   F     "      "   5/1
+;	13A0 - 13AF     "       "   G     "      "   6/2
+;	13B0 - 13BF     "       "   H     "      "   7/3
+;
+;	Each DPT is organized as follows:
+;		...0  maximum track value plus one
+;		...1  current track (FF if heads not calibrated)
+;		...2  drive pattern for port 4004/4005
+;		...3  logical drive number
+;		...4  Step Time (LSB)
+;		...5  Step Time (MSB)
+;		...6  Head Load Delay Time (LSB)
+;		...7  Head Load Delay Time (MSB)
+;		...8  Motor on Delay Time (LSB)
+;		...9  Motor on Delay Time (MSB)
+;		...A  Step Settle Time (LSB)
+;		...B  Step Settle Time (MSB)
+;		...C  User Specified Lowest Sector Number
+;		...D  User Specified Number of Sectors per Track + 1
+;		...E  drive configuration byte
+;			bit 0  1 = (@VER) Sector Header has been verified
+;			 "  1  1 = (@HRD) Media is Hard Sectored
+;			 "  2  1 = (@5IN) Drive is five inch (4004 = 5" port)
+;			 "  3  1 = (@MOC) Motor has on/off control
+;			 "  4  1 = (@DBL) Media is Double Density
+;			 "  5  1 = (@NRC) Drive doesn't have ready line
+;			 "  6  1 = (@NHC) Drive can't unload Heads
+;			 "  7  1 = (@HDL) Heads are currently loaded
+;		...F  User Specified Starting Track of Write Precompensation
+;
+	PAGE
+;----------------------------------------------------------------------
+; Channel Command Pointers and Stack Areas
+;-----------------------------------------
+;
+;	13C0  current command pointer LSB
+;	13C1     "       "       "    MSB
+;	13C2     "       "       "    extended page
+;	13C3  Not Used (was = retry constant)
+;	13C4  Initial command pointer address LSB
+;	13C5     "       "       "       "    MSB
+;	13C6     "       "       "       "    extended page
+;
+;	13C7 - 13D7  Stack Space used during monitor GO: command execution
+;	13D8 & 13D9  Monitor Execution address (see GO:)
+;	13DA & 13DB  Monitor 'Normal Return' address (see GO:)
+;
+;	13DC  Stack for Monitor, after any Errors, a halt or interrupt request
+;
+; Monitor Save locations for registers (see GO: in monitor)
+; ---------------------------------------------------------
+;	13DC F	- AF	13E2 L	- HL	13E8 F	- AF'	13EE L	- HL'
+;	13DD A		13E3 H		13E9 A		13EF H
+;	13DE B	- BC	13E4 IX	- IX	13EA C	- BC'
+;	13DF C		13E5 IX		13EB B
+;	13E0 E	- DE	13E6 IY	- IY	13EC E	- DE'
+;	13E1 D		13E7 IY		13ED D
+;
+;----------------------------------------------------------------------
+; System Status and Control Area
+;-------------------------------
+;
+;	13F0  current drive pointer LSB
+;	13F1  current drive pointer MSB
+;	13F2  Not Used
+;	13F3  Not Used
+;	13F4  Not Used
+;	13F5  Not Used
+;	13F6  memory image of port 4006 - ONLY USED BY SEROUT
+;	13F7  Not Used
+;	13F8  Not Used
+;	13F9  Not Used
+;	13FA  sector count
+;	13FB  index count
+;	13FC  Max. number of retries on encountering a CRC error
+;	13FD  Max. number of revolutions before drive deselected
+;	13FE  (XFLAG) System Status Byte
+;		bit 0	1 = (@SER) Serial_Input_Status = Active
+;		 "  1	1 = (@MON) Monitor_Status = Active
+;		 "  2	1 = (@MOT) Motor_Status = Active
+;		 "  3	1 = (@SCT) Sector Count is Calibrated
+;		 "  4	1 = (@HOL) Sector/Index Hole has been processed
+;		 "  5	1 = (@FHF) First hole found
+;	13FF  break character count
+	PAGE
+;----------------------------------------------------------------------
+; TIMING CONSTANTS FOR THE SDELAY ROUTINE (MSB first)
+;----------------------------------------------------
+;	1) Any constants used in the HOME routine should be unique in
+;	   the lsb (1 digit in the lsb causes roughly a 3% change)
+;
+;		time msb lsb
+;		1ms - 00 22 (hex)
+;		3ms - 00 66
+;		5ms - 00 AA
+;		6ms - 00 CC
+;		8ms - 01 11
+;	       15ms - 02 00
+;	       20ms - 02 AB
+;	       26ms - 03 74
+;	       30ms - 04 01
+;	       40ms - 05 54
+;
+;----------------------------------------------------------------------
+; ERROR CODE SUMMARY
+;-------------------
+;	40 - Normal completion code - no error in operation
+;	80 - Host issued improper command code
+;	81 - Host issued improper disk drive number
+;	82 - Drive Not Ready
+;	83 - Track number out of range for selected drive
+;	84 - Unreadable Media
+;	85 - Sector Length code is too large
+;	86 . Not used (was = Error in sector header scan)
+;	87 - Seek error
+;	88 - Missing Sector Header ID (Sync) Byte
+;	89 - Track number mis-match
+;	8A - Side number (0=bottom or first) mis-match
+;	8B - Sector number mis-match
+;	8C - Sector length mis-match
+;	8D - CRC error in Sector Header
+;	8E - CRC error in Data Field
+;	8F - Host issued improper sector number for current media
+;	90 - Diskette is write protected
+;	91 - Lost data - DMA channel did not respond in time
+;	92 - Lost command - channel did not respond in time
+;	93 - Time-out waiting for data ID mark
+;	94 - Heads failed to move to the home position
+
+	END
+

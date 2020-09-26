@@ -1,0 +1,2 @@
+file ./d1
+set args -l  -S micronix.sym   ../disks/1010-8_stand-alone.IMD

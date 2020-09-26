@@ -1,0 +1,45 @@
+;head file for sw901, movcpm10.com
+absasm	equ	0		;set 0 for rmac, set 1 for mac
+msize	equ	48		;Memory size of target CP/M
+nostand	equ	1		;Set to 1 for non-standard mode
+
+contyp	equ	4		;Console type
+cbaud	equ	12		;Console Baud Rate
+lsttyp	equ	1		;List Device type
+lbaud	equ	96		;List Device Baud Rate
+
+dmorder	equ	2		;DJDMA floppies (8")
+mforder	equ	3		;DJDMA floppies (5 1/4")
+fdorder	equ	0		;DJ2D/B floppies (8" only)
+mworder	equ	1		;HDDMA hard disks
+hdorder	equ	0		;HDCA hard disk drives
+
+maxdm	equ	2		;DJDMA floppies (8")
+maxmf	equ	2		;DJDMA floppies (5 1/4")
+maxfd	equ	0		;DJ2D/B floppies (8" only)
+maxmw	equ	1		;HDDMA hard disks
+maxhd	equ	0		;HDCA hard disk drive
+
+st506	equ	0		;Seagate ST-506
+st412	equ	1		;Seagate ST-412
+cm5619	equ	0		;CMI CM-5619
+m10f	equ	0		;Fujitsu M2301B
+m10m	equ	0		;Memorex
+m20	equ	0		;Fujitsu M2302B
+m26	equ	0		;Shugart SA4000
+
+mfslow	equ	0		;1 = sa200 slow stepping
+fdorig	equ	0f800h		;Origin of DJ2D/B Disk Jockey PROM
+wmdrive	equ	0		;CP/M logical drive for warm boot from.
+mwquiet	equ	0		;1=no m-type for hddma banner
+
+	if	maxmw ne 0
+badsiz	equ	32		;Number of badmap entries for HDDMA
+	else			;(Only HDDMA drives use the bad map)
+badsiz	equ	1		;Leave one entry as filler
+	endif
+true	equ	1
+false	equ	0
+micron	equ	0
+	page
+

@@ -1,0 +1,3 @@
+disas -s 0xf00 -a 0x1000 STOP.COM >STOP.ASM
+disas -s 0xf00 -a 0x1000 FILMAP0.COM >FILMAP0.ASM
+disas -s 0xf00 -a 0x1000 TINT.COM >TINT.ASM

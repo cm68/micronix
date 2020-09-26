@@ -1,0 +1,13 @@
+binary-debuggable-source
+0000 0000 s ; a comment
+0000 0000 d 
+0000 0000 s foo	macro	abc,def
+0000 0000 d 00
+0000 0000 s 	nop
+0001 0001 d 
+0001 0001 s 	endm
+0001 0001 d 
+0001 0001 s 	foo
+0001 0001 d 
+0001 0001 s 	end	0
+0000 e

@@ -1,0 +1,6 @@
+/* config_version.h.in */
+
+#undef VERSION
+#undef PACKAGE_VERSION
+#undef PACKAGE_STRING
+#undef PACKAGE_BUGREPORT

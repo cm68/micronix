@@ -1,0 +1,54 @@
+Initiaì documentatioî foò thå formatmw.coí command®  Thió commanä 
+wilì format/verify/tesô harä disë driveó thaô arå connecteä tï 
+thå Morro÷ Designó Harä Disë DMÁ controller.
+
+Usage:
+
+	formatmw drive-type [arguments]
+
+Wherå drivå typå ió á requireä worä thaô describeó thå drivå 
+beinç formatted.  Possible values are as follows:
+
+	ampex		Ampex corporation DF516 drive.
+	cmi		Computer Memories Inc. CM5616 drive.
+	quantum		Quantum corporation Q2040 drive.
+	seagate		Seagate Technology ST-506 drive.
+
+The optional arguments are:
+
+drive #		Specifù á physicaì drivå (0-3© tï bå formatted®  
+                Defaulô ió drivå 0.
+
+head #		Specifù á physicaì heaä tï bå formatted®  
+                Normallù alì thå headó arå formatted/tested®  Iæ 
+                yoõ wanô tï checë ouô jusô onå heaä theî includå 
+                thió argument®  Consulô thå manufactureó manuaì 
+                foò theî allowablå heaä numbers.
+
+size #		Specifù thå sectoò size®  Legaì valueó arå 128¬ 
+                256¬ 512¬ 1024¬ anä 204¸ bytes®  Thå defaulô ió 
+                51² bytes®  Noteº Morro÷ Designó CP/Í requireó 
+                102´ bytå sectors.
+
+skew #		Specifù thå skewinç factoò tï bå used®  Defaulô 
+                ió 3.
+
+test		Invokå á disë tesô routine®  Thió routinå writeó 
+                variouó patternó oî thå disë anä theî verifieó 
+                them.
+
+track #		Specifù á particulaò cylindeò tï bå 
+                formatted/tested®  Consulô witè thå manufactureó 
+                specificationó foò legaì cylindeò values.
+
+Anù combinatioî oæ optionaì argumentó caî bå combineä foò 
+variouó affects.  Some common command usage:
+
+	formatmw seagate size 1024
+
+	Format drive 0 for a CP/M environment.
+
+	formatmw seagate drive 2
+
+	Format drive 2 for a UNIX environment.
+

@@ -19,12 +19,20 @@ filesystem.dist:
 	recovered filesystems from images contained in the images directory.
 	produced by the tools/copyall program
 
-src/fstools:
+src/tools:
 	file system checkers, dumper and extractor
-
-src/sgs:
 	object file tools, including an overachieving nm
+
+src/lib:
+	libraries for file system, disassembly, and random utility
 	
+src/usersim:
+	micronix user mode simulator mostly works, including upm, the cp/m
+	emulator.  some of the system calls are still not real (mknod!?)
+
+	build it on any random unix box (centos is baseline),
+	and run:  sim
+
 tools:
 	other random work in progress. including a very flexible disassembler
 
@@ -37,13 +45,6 @@ kernel:
 include:
 	recovered include files 1.61
 
-usersim:
-	micronix user mode simulator mostly works, including upm, the cp/m
-	emulator.  some of the system calls are still not real (mknod!?)
-
-	build it on any random unix box (centos is baseline),
-	and run:  sim
-	
 hitechc:
 	the hitech c compiler.  this is not capable of running yet, but if the
 	cp/m libc gets removed via binary jiggery-pokery, and replaced with

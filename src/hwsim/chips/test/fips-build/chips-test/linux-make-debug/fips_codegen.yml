@@ -1,0 +1,127 @@
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/tests/disks/fdd-test.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/tests/disks/fdd-test.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/tests/roms/zex-dump.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/tests/roms/zex-dump.h'
+  env:
+    target_platform: 'linux'
+- generator: nestestlog.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/tests/nestest/nestest.log.txt'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/tests/nestest/nestestlog.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/tests/nestest/dump.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/tests/nestest/dump.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/tests/testsuite-2.15/bin/dump.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/tests/testsuite-2.15/bin/dump.h'
+  env:
+    target_platform: 'linux'
+- generator: fuse.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/tests/fuse/fuse.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/tests/fuse/fuse.h'
+  env:
+    target_platform: 'linux'
+- generator: SokolShader.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/common/shaders.glsl'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/fips-build/chips-test/linux-make-debug/examples/common/shaders.glsl.h'
+  args: {slang: 'glsl330', compiler: 'GNU' }
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/atom-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/atom-roms.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/c64-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/c64-roms.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/cpc-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/cpc-roms.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/kc85-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/kc85-roms.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/z1013-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/z1013-roms.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/z9001-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/z9001-roms.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/zx-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/zx-roms.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/bombjack-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/bombjack-roms.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/pacman-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/pacman-roms.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/pengo-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/pengo-roms.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/lc80-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/lc80-roms.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/cp4-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/cp4-roms.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/c1541-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/c1541-roms.h'
+  env:
+    target_platform: 'linux'
+- generator: embed.py
+  in: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/vic20-roms.yml'
+  out_src: null
+  out_hdr: '/home/curt/src/micronix/hwsim/chips/chips-test/examples/roms/vic20-roms.h'
+  env:
+    target_platform: 'linux'

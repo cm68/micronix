@@ -1,0 +1,21 @@
+Determining if the function __atomic_fetch_add_4 exists failed with the following output:
+Change Dir: /home/curt/src/micronix/hwsim/chips/fips-build/chips-test/linux-make-debug/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_43f4f/fast"
+/usr/bin/make -f CMakeFiles/cmTC_43f4f.dir/build.make CMakeFiles/cmTC_43f4f.dir/build
+make[1]: Entering directory '/home/curt/src/micronix/hwsim/chips/fips-build/chips-test/linux-make-debug/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_43f4f.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -fPIC -pthread -fno-strict-aliasing -Wno-multichar -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -Wno-ignored-qualifiers -Wno-missing-field-initializers -DCHECK_FUNCTION_EXISTS=__atomic_fetch_add_4   -o CMakeFiles/cmTC_43f4f.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.13/Modules/CheckFunctionExists.c
+<command-line>: warning: conflicting types for built-in function ‘__atomic_fetch_add_4’; expected ‘unsigned int(volatile void *, unsigned int,  int)’ [-Wbuiltin-declaration-mismatch]
+<command-line>: note: in definition of macro ‘CHECK_FUNCTION_EXISTS’
+Linking C executable cmTC_43f4f
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_43f4f.dir/link.txt --verbose=1
+/usr/bin/cc -fPIC -pthread -fno-strict-aliasing -Wno-multichar -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -Wno-ignored-qualifiers -Wno-missing-field-initializers -DCHECK_FUNCTION_EXISTS=__atomic_fetch_add_4    -rdynamic CMakeFiles/cmTC_43f4f.dir/CheckFunctionExists.c.o  -o cmTC_43f4f 
+/usr/bin/ld: CMakeFiles/cmTC_43f4f.dir/CheckFunctionExists.c.o: in function `main':
+CheckFunctionExists.c:(.text+0x14): undefined reference to `__atomic_fetch_add_4'
+collect2: error: ld returned 1 exit status
+make[1]: *** [CMakeFiles/cmTC_43f4f.dir/build.make:87: cmTC_43f4f] Error 1
+make[1]: Leaving directory '/home/curt/src/micronix/hwsim/chips/fips-build/chips-test/linux-make-debug/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_43f4f/fast] Error 2
+
+
