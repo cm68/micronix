@@ -1,2 +1,0 @@
-	if (!tty->mstate & DILcount && !tty->outque.count && !tty->nextc)
-

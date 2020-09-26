@@ -1,3 +1,0 @@
-cpp -d unix -i /include/ -x -o t.1 t.c
-cp1 -b0 -e -u -m -o t.2 t.1
-cp2 -o t.s t.2
