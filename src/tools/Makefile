@@ -13,3 +13,4 @@ $(TARGETS): ../lib/libsim.a
 
 test: nm
 	./nm tests/mw.o
+
