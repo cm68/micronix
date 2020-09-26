@@ -1,23 +1,26 @@
 #
 # this is just a top-level makefile to build the simulator
 #
-all:
+
+all: src/usersim/sim
+
+src/usersim/sim src/tools/readall:
 	cd src ; make
 
-test: src/usersim/sim
-	cd src/usersim ; ./sim
+test: filesystem  src/usersim/sim
+	src/usersim/sim
 
-unpack:
-	cd src/tools; make
+filesystem: src/tools/readall
 	for i in disks/*.image ; do src/tools/readall -d filesystem $$i ; done
 	cp -r src/kernel filesystem/usr/src/sys
 
 clean:
-	for dir in usersim tools src/sgs src/fstools ; do \
+	for dir in src ; do \
 		(cd $$dir ; make clean) \
 	done
 
 clobber:
-	for dir in usersim tools src/sgs src/fstools ; do \
+	for dir in src ; do \
 		(cd $$dir ; make clobber) \
 	done
+	rm -rf filesystem

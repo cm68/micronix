@@ -40,7 +40,7 @@ typedef unsigned short UINT;
 static int do_exec(char *name, char **argv);
 static void emulate();
 
-#define	DEFROOT	"../../filesystem"
+#define	DEFROOT	"filesystem"
 
 int savemode;
 int debug_terminal;
