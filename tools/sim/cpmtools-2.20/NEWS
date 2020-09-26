@@ -1,3 +1,0 @@
-Changes since 2.19:
-
-o  Fixed bug in cpmfs leading to wrongly allocated blocks

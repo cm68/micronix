@@ -1,7 +1,0 @@
-#! /bin/sh
-
-# My usual config for direct compiling without debugging info.
-
-./configure \
-	"$@" \
-	CXXFLAGS="-g -O3 -W -Wall -Wunused"
