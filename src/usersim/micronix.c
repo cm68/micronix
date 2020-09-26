@@ -541,6 +541,9 @@ do_exec(char *name, char **argv)
     }
 
     /* reset all signal handlers */
+    set_itv_usec(0);
+    set_alarm();
+
     for (i = 0; i < 16; i++) {
         signal_handler[i] = 0;
         signal(i, SIG_DFL);
