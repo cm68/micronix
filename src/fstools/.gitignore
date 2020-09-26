@@ -1,7 +1,0 @@
-dumpfs
-copyall
-dcheck
-ncheck
-icheck
-*.o
-*.dSYM/
