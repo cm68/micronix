@@ -1,0 +1,77 @@
+                        FORMATMW Program
+
+Thå FORMATM× prograí formats¬ verifieó anä testó harä disë driveó 
+thaô arå connecteä tï á Morro÷ Designó Harä Disë DMÁ controller.
+
+Usage:
+
+	formatmw drive-type [arguments]
+
+wherå  drive-typå  ió  á requireä namå thaô describeó  thå  drivå 
+beinç formatted®  Possiblå drive-typeó anä argumentó follow:
+
+
+DRIVE-TYPE			COMPANY			     1K SECTORS 
+
+"cmi", "m16", "cm5619"		Computer Memories Inc.		16,524
+
+"seagate", "m5", "st506"	Seagate Technology.		 5,508
+"st412", "m10"							11,016
+
+
+Optional arguments:
+
+
+drive #		   Specifù   á   physicaì  drivå  (0-3©   tï   bå 
+                   formatted®  Defaulô ió drivå 0.
+
+head  # 	   Specifù á physicaì heaä tï bå  formatted®   Bù 
+                   default¬  alì  thå  headó  arå  formatteä  anä 
+                   tested®   Iæ  yoõ  wanô tï checë ouô onå  heaä 
+                   only¬  includå  thió  argument®   Consulô  thå 
+                   manufacturer'ó  manuaì foò thå allowablå  heaä 
+                   numbers.
+
+nosoft		   Wheî  thió flaç ió specifieä theî sofô  erroró 
+                   thaô occurå durinç formattinç oò testinç  wilì 
+                   bå  reporteä buô noô addeä tï thå baä spoô mað 
+                   beinç  built®   Thió flaç ió  useä  primarillù 
+                   durinç  drivå evaluatioî anä allowó CP/Í  tesô 
+                   programó  tï  geô á shoô aô marginaì  sectors®  
+                   Thió flaç maù alsï bå useä wheî thå thå driveó 
+                   baä spoô mað overflows®  Eg®  Entrieó wilì noô 
+                   be "wasted" on soft errors.
+
+size #		   Specifù  thå  sectoò size®   Legaì valueó  arå 
+                   128¬  256¬ 512¬ 1024¬ anä 204¸ bytes®  Defaulô 
+                   ió  102´ bytes®   Noteº  Useró oæ  thå  Morro÷ 
+                   Designó multi-useò operatinç system¬ Micronix¬ 
+                   arå  requireä  tï formaô theiò diskó witè  51² 
+                   bytå sectors.
+
+skew #             Specifù   thå  skewinç  factoò  tï  bå   used®  
+                   Defaulô ió 3®  Á ske÷ factoò oæ ¶ ió suggesteä 
+                   for Micronix.Š
+test		   Invokå  á  disë tesô  routine®   Thió  routinå 
+                   writeó  variouó patternó oî thå disë anä  theî 
+                   verifieó them.
+
+track #		   Specifù  á particulaò cylindeò tï bå formatteä 
+                   anä  tested®  Consulô witè thå  manufacturer'ó 
+                   specificationó foò legaì cylindeò values.
+
+Anù combinatioî oæ optionaì argumentó caî bå combineä foò variouó 
+affects®  
+
+Commoî commanä usage includes:
+
+
+    A>formatmw m5
+
+formats drive 0 for a CP/M environment.
+
+
+    A>formatmw m16 drive 2 size 512 skew 6
+
+formats drive 2 for a UNIX environment.
+

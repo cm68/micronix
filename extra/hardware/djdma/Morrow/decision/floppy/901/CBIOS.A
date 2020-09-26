@@ -1,0 +1,192 @@
+;**********************************************************************
+Title 'CBIOS-CP/M_2.2 Rev_E.4 07_Sep_83  Copyright 1983 Morrow Designs'
+;**********************************************************************
+;
+;The following drivers are included in this CBIOS.
+;-------------------------------------------------
+;
+; Console Devices:
+;	CDRV0	Prom Patch (4 Jumps: conin, conout, const & conint)
+;	CDRV1	Patch Area (128 bytes)
+;	CDRV2	Multi I/O or Decision I driver
+;	CDRV3	2D/B driver
+;	CDRV4	DJDMA serial port
+;	CDRV5	Switchboard serial port
+;	CDRV6	North Star motherboard (2 serial + 1 parallel)
+;
+; List Devices:
+;	LDRV0	Prom Patch (3 Jumps: lstout, lstost & lstset)
+;	LDRV1	Patch Area (128 bytes)
+;	LDRV2	Multio_Rev3-4 or Wunderbuss i/o Serial, no protocol
+;	LDRV3	Multio_Rev3-4 or Wunderbuss i/o Serial, Clear To Send protocol
+;	LDRV4	Multio_Rev3-4 or Wunderbuss i/o Serial, Data Set Ready protocol
+;	LDRV5	Multio_Rev3-4 or Wunderbuss i/o Serial, Xon/Xoff protocol
+;
+; Disk systems:
+;	DDRV1	DJDMA floppy disk controller with 8 and 5 1/4 inch disks.
+;	DDRV2	DJ 2D/B floppy disk controller with 8 inch disks.
+;	DDRV3	HDDMA 5, 10, 16, megabyte hard disk systems.
+;	DDRV3	HDCA 10, 20 and 26 megabyte hard disks.
+;
+; Note:	Floppy systems diskette (drive A:) has to have 1024 byte
+;	sectors in order for the cold and warm boot loaders to
+;	work.  Be sure to format all new system diskettes with
+;	1024 byte sectors.  The system diskette can be either
+;	single or double sided.  The sector size on normal (non
+;	A: drive) diskettes is not restricted.  Thus if you have
+;	a diskette with software that is supposed to run on the
+;	A: drive then you should mount the diskette in the B:
+;	drive and then PIP it over to a 1024 byte sector
+;	system diskette.
+	page
+
+;*****************************
+;Begin User Configuration Area
+;*****************************
+
+absasm	equ	1		;set 0 for rmac, set 1 for mac
+;
+;General System Considerations
+;=============================
+;Memory Size
+;-----------
+;	1) The following equate sets the memory size in kilobytes. For
+;	   example, 48 denotes a 48k system while 64 equals a 64k system.
+;
+msize	equ	48		;Memory size of target CP/M
+biosln	equ	13h		;BIOS length.  Also in ABOOT&.ASM
+
+;Non-Standard Flag
+;-----------------
+;	If this CBIOS is used with the CP/M 2.2 system that is shipped on
+;	a Morrow Designs diskette then NOSTAND can be set to 1.  This
+;	will allow the CBIOS to use various data areas found inside of
+;	the CP/M 2.2 BDOS.  If the CBIOS is used with a different
+;	operating system then NOSTAND should be set to 0.
+;
+nostand	equ	0		;Set to 1 for non-standard mode
+
+;Define the console and printer environments
+;===========================================
+;	The following is a list of possible baud rates and the decimal
+;	value needed for the cbaud and lbaud definitions
+;
+;	  Baud Rate	cbaud/lbaud	Baud Rate	cbaud/lbaud
+;		 50	2304		     2000	58
+;		 75	1536		     2400	48
+;		110	1047		     3600	32
+;		134.5	 857		     4800	24
+;		150	 768		     7200	16
+;		300	 384		     9600	12
+;		600	 192		    19200	 6
+;	       1200	  96		    38400	 3
+;	       1800	  64		    56000	 2
+;
+;Define the console driver to be used.
+;-------------------------------------
+;	CONTYP is:	0	Nothing, used for patching to PROM's.
+;			1	Provide for 128 bytes of patch space.
+;			2	Multi I/O or Decision I driver.
+;			3	2D/B driver.
+;			4	DJDMA serial port
+;			5	Switchboard serial port
+;			6	North Star motherboard (2 serial + 1 parallel)
+;
+contyp	equ	2		;Console type
+cbaud	equ	12		;Console Baud Rate
+
+;Define the list driver to be used
+;---------------------------------
+;	LSTTYP is:	0	Nothing, used for patching to PROM's.
+;			1	Provide for 128 bytes of patch space.
+;			2	Multio/Wbio serial, no protocol.
+;			3	Multio/Wbio serial, Clear To Send protocol.
+;			4	Multio/Wbio serial, Data Set Ready protocol.
+;			5	Multio/Wbio serial, Xon/Xoff protocol.
+;
+;	Note:	The Wunderbuss i/o board (Wbio) used in the Decision 1 is
+;		functionally identical to the Multio.
+;
+lsttyp	equ	3		;List Device type
+lbaud	equ	96		;List Device Baud Rate
+	page
+
+;Setup Disk System
+;=================
+;
+;Select the Number of each type of disk drive
+;--------------------------------------------
+;	1) This following table tells the system the types and numbers of drives
+;	   that are active.
+;	2) Drives that are not present should be set to zero.
+;	3) An example: If you have 2-8" drives using a DJDMA and one disk
+;	   attached to an HDDMA controller you would set maxdm = 2 and
+;	   maxmw = 1, with all other selections set to zero.
+;
+maxdm	equ	2		;DJDMA floppies (8")
+maxmf	equ	2		;DJDMA floppies (5 1/4")
+maxfd	equ	0		;DJ2D/B floppies (8" only)
+maxmw	equ	0		;HDDMA hard disks
+maxhd	equ	0		;HDCA hard disk drives
+
+;Set the Logical Ordering of the drives
+;--------------------------------------
+;	1) You must assign an 'order number' for each drive type selected
+;	   in the previous set of equates. Drive types that WERE NOT selected
+;	   in the previous set of equates must be set to zero in this set.
+;	2) Numbering must start with 1 and be continious.
+;	3) An example: Suppose that your system consists of two DJDMA_8"
+;	   drives and four DJDMA_1/4" drives along with one drive attached to
+;	   an HDDMA controller; Furthermore, suppose that you set dmorder to
+;	   3, mforder to 2 and mworder to 1. The HDDMA would be your A: drive.
+;	   The 8" drives would be the B: and C: drives; And, finally, the D:,
+;	   E:, F:, and G: drives would be assigned to the 5_1/4" DJDMA drives.
+;
+dmorder	equ	1		;DJDMA floppies (8")
+mforder	equ	2		;DJDMA floppies (5 1/4")
+fdorder	equ	0		;DJ2D/B floppies (8" only)
+mworder	equ	0		;HDDMA hard disks
+hdorder	equ	0		;HDCA hard disk drives
+
+;HDDMA controller disk drives
+;----------------------------
+;	1) If the HDDMA controller has been selected then you must choose one
+;	   (and only one) of the following drive types.
+;
+st506	equ	0		;Seagate ST-506
+st412	equ	0		;Seagate ST-412
+cm5619	equ	0		;CMI CM-5619
+
+;HDCA controller disk drives
+;---------------------------
+;	1) If the HDCA controller has been selected then you must choose one
+;	   (and only one) of the following drive types.
+;
+m10f	equ	0		;Fujitsu M2301B
+m10m	equ	0		;Memorex
+m20	equ	0		;Fujitsu M2302B
+m26	equ	0		;Shugart SA4000
+
+;DJDMA controller equates
+;------------------------
+;
+mfslow	equ	0		;set true if slow stepping 5-1/4" floppy
+
+;DJ2D/B controller equates
+;-------------------------
+;
+fdorig	equ	0f800h		;Origin of DJ2D/B Disk Jockey PROM
+
+;Misc Considerations
+;-------------------
+wmdrive	equ	0		;CP/M logical drive number to warm boot from.
+mwquiet	equ	0		;Set for no names printed on login (HDDMA only)
+
+	if	maxmw ne 0
+badsiz	equ	32		;Number of badmap entries for HDDMA
+
+	else			;(Only HDDMA drives use the bad map)
+badsiz	equ	1		;Leave one entry as filler
+	endif
+	page
+

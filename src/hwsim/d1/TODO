@@ -1,0 +1,5 @@
+the HDDMA and the HDCA both share vi_0;
+
+that means that the assertion is a wire-or of both of them.
+the HDCA clearing it won't necessarily clear the interrupt, since the HDDMA might also have the level up.
+

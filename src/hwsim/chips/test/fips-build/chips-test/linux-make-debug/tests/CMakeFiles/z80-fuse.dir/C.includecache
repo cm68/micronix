@@ -1,0 +1,42 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/curt/src/micronix/hwsim/chips/chips-test/tests/fuse/fuse.h
+
+/home/curt/src/micronix/hwsim/chips/chips-test/tests/test.h
+stdio.h
+-
+stdbool.h
+-
+assert.h
+-
+
+/home/curt/src/micronix/hwsim/chips/chips-test/tests/z80-fuse.c
+chips/z80.h
+/home/curt/src/micronix/hwsim/chips/chips-test/tests/chips/z80.h
+test.h
+/home/curt/src/micronix/hwsim/chips/chips-test/tests/test.h
+stdio.h
+-
+stdint.h
+-
+stdbool.h
+-
+fuse/fuse.h
+/home/curt/src/micronix/hwsim/chips/chips-test/tests/fuse/fuse.h
+
+/home/curt/src/micronix/hwsim/chips/chips/chips/z80.h
+stdint.h
+-
+stdbool.h
+-
+string.h
+-
+assert.h
+-
+

@@ -1,0 +1,15 @@
+code 0x1024
+code 0x1100
+statusmask equ 0x403
+RESTR equ 0x815
+WHAT equ 0x812
+
+superlo equ 0x0001
+superhi equ 0x0002
+
+ctask equ 0x0006
+cmask equ 0x0007
+
+pcsavelo equ 0x0015
+pcsavehi equ 0x0016
+umask equ 0x0021

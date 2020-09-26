@@ -1,0 +1,3495 @@
+/*	parser.yxx
+	Revision 26-nov-2006
+*/
+
+
+%{
+
+#include "pasmoimpl.h"
+#include "machine.h"
+#include "parseraux.h"
+
+namespace pasmo {
+namespace impl {
+
+namespace parser {
+
+inline Oper getop (const Token & tok)
+{
+	return static_cast <Oper> (tok.num () );
+}
+
+inline bool isparenexp (const Token & tok)
+{
+	return tok.num () != 0;
+}
+
+inline void checkugly (Machine & mach, const Token & tok)
+{
+	if (isparenexp (tok) )
+		mach.ugly ();
+}
+
+} /* namespace parser */
+
+%}
+
+%pure-parser
+
+%parse-param {Machine & mach}
+%lex-param   {Machine & mach}
+
+%defines
+
+/*
+%expect 2
+*/
+
+%token TOK_BracketOnly
+
+%token TypeUndef
+%token TypeEndLine
+%token TypeComment
+
+%token TypeNumber
+%token TypeLiteral
+%token TypeIdentifier
+%token TypeMacroName
+%token TypeMacroArg
+
+%token TypeEndOfINCLUDE
+%token TypeNoFileINCLUDE
+%token TypeWhiteSpace
+
+%token TypeMOD
+%token TypeSHL
+%token TypeSHR
+%token TypeNOT
+%token TypeEQ
+%token TypeLT
+%token TypeLE
+%token TypeGT
+%token TypeGE
+%token TypeNE
+%token TypeNUL
+%token TypeDEFINED
+%token TypeHIGH
+%token TypeLOW
+
+%token TypeShlOp      "<<"
+%token TypeShrOp      ">>"
+%token TypeLeOp       "<="
+%token TypeGeOp       ">="
+%token TypeNeOp       "!="
+%token TypeBoolAnd    "&&"
+%token TypeBoolOr     "||"
+%token TypeSharpSharp "##"
+
+%token TypeADC
+%token TypeADD
+%token TypeAND
+%token TypeBIT
+%token TypeCALL
+%token TypeCCF
+%token TypeCP
+%token TypeCPD
+%token TypeCPDR
+%token TypeCPI
+%token TypeCPIR
+%token TypeCPL
+%token TypeDAA
+%token TypeDEC
+%token TypeDI
+%token TypeDJNZ
+%token TypeEI
+%token TypeEX
+%token TypeEXX
+%token TypeHALT
+%token TypeIM
+%token TypeIN
+%token TypeINC
+%token TypeIND
+%token TypeINDR
+%token TypeINI
+%token TypeINIR
+%token TypeJP
+%token TypeJR
+%token TypeLD
+%token TypeLDD
+%token TypeLDDR
+%token TypeLDI
+%token TypeLDIR
+%token TypeNEG
+%token TypeNOP
+%token TypeOR
+%token TypeOTDR
+%token TypeOTIR
+%token TypeOUT
+%token TypeOUTD
+%token TypeOUTI
+%token TypePOP
+%token TypePUSH
+%token TypeRES
+%token TypeRET
+%token TypeRETI
+%token TypeRETN
+%token TypeRL
+%token TypeRLA
+%token TypeRLC
+%token TypeRLCA
+%token TypeRLD
+%token TypeRR
+%token TypeRRA
+%token TypeRRC
+%token TypeRRCA
+%token TypeRRD
+%token TypeRST
+%token TypeSBC
+%token TypeSCF
+%token TypeSET
+%token TypeSLA
+%token TypeSLL
+%token TypeSRA
+%token TypeSRL
+%token TypeSUB
+%token TypeXOR
+
+%token TypeA
+%token TypeAF
+%token TypeAFp
+%token TypeB
+%token TypeBC
+%token TypeD
+%token TypeE
+%token TypeDE
+%token TypeH
+%token TypeL
+%token TypeHL
+%token TypeSP
+%token TypeIX
+%token TypeIXH
+%token TypeIXL
+%token TypeIY
+%token TypeIYH
+%token TypeIYL
+%token TypeI
+%token TypeR
+
+%token TypeNZ
+%token TypeZ
+%token TypeNC
+%token TypeC
+%token TypePO
+%token TypePE
+%token TypeP
+%token TypeM
+
+%token TypeASEG
+%token TypeCOMMON
+%token TypeCSEG
+%token TypeDB
+%token TypeDEFB
+%token TypeDEFL
+%token TypeDEFM
+%token TypeDEFS
+%token TypeDEFW
+%token TypeDS
+%token TypeDSEG
+%token TypeDW
+%token TypeELSE
+%token TypeEND
+%token TypeENDIF
+%token TypeENDM
+%token TypeENDP
+%token TypeEQU
+%token TypeEXITM
+%token TypeEXTRN
+%token TypeIF
+%token TypeIF1
+%token TypeIF2
+%token TypeIFDEF
+%token TypeIFNDEF
+%token TypeINCBIN
+%token TypeINCLUDE
+%token TypeIRP
+%token TypeIRPC
+%token TypeLOCAL
+%token TypeMACRO
+%token TypeORG
+%token TypePROC
+%token TypePUBLIC
+%token TypeREPT
+
+%token Type_8080
+%token Type_8086
+%token Type_DEPHASE
+%token Type_ERROR
+%token Type_PHASE
+%token Type_SHIFT
+%token Type_WARNING
+%token Type_Z80
+
+%token TypeAND_8080
+%token TypeOR_8080
+%token TypeXOR_8080
+%token TypeM_8080
+%token TypePSW_8080
+%token TypeSET_8080
+
+%token TypeADC_8080
+%token TypeADD_8080
+%token TypeACI_8080
+%token TypeADI_8080
+%token TypeANA_8080
+%token TypeANI_8080
+%token TypeCALL_8080
+%token TypeCC_8080
+%token TypeCM_8080
+%token TypeCMA_8080
+%token TypeCMC_8080
+%token TypeCMP_8080
+%token TypeCNC_8080
+%token TypeCNZ_8080
+%token TypeCP_8080
+%token TypeCPE_8080
+%token TypeCPI_8080
+%token TypeCPO_8080
+%token TypeCZ_8080
+%token TypeDAD_8080
+%token TypeDCR_8080
+%token TypeDCX_8080
+%token TypeHLT_8080
+%token TypeIN_8080
+%token TypeINR_8080
+%token TypeINX_8080
+%token TypeJC_8080
+%token TypeJM_8080
+%token TypeJMP_8080
+%token TypeJNC_8080
+%token TypeJNZ_8080
+%token TypeJP_8080
+%token TypeJPE_8080
+%token TypeJPO_8080
+%token TypeJZ_8080
+%token TypeLDA_8080
+%token TypeLDAX_8080
+%token TypeLHLD_8080
+%token TypeLXI_8080
+%token TypeMVI_8080
+%token TypeMOV_8080
+%token TypeORA_8080
+%token TypeORI_8080
+%token TypeOUT_8080
+%token TypePCHL_8080
+%token TypePOP_8080
+%token TypePUSH_8080
+%token TypeRAL_8080
+%token TypeRAR_8080
+%token TypeRLC_8080
+%token TypeRC_8080
+%token TypeRRC_8080
+%token TypeRET_8080
+%token TypeRM_8080
+%token TypeRNC_8080
+%token TypeRNZ_8080
+%token TypeRP_8080
+%token TypeRPE_8080
+%token TypeRPO_8080
+%token TypeRST_8080
+%token TypeRZ_8080
+%token TypeSBB_8080
+%token TypeSBI_8080
+%token TypeSHLD_8080
+%token TypeSPHL_8080
+%token TypeSTA_8080
+%token TypeSTAX_8080
+%token TypeSTC_8080
+%token TypeSUB_8080
+%token TypeSUI_8080
+%token TypeXCHG_8080
+%token TypeXRA_8080
+%token TypeXRI_8080
+%token TypeXTHL_8080
+
+/*
+	Operators with defined priority
+*/
+
+%left TypeHIGH TypeLOW
+
+%left TypeBoolOr
+
+%left TypeBoolAnd
+
+%left TypeOR TypeOR_8080 '|' TypeXOR TypeXOR_8080
+
+%left TypeAND TypeAND_8080 '&'
+
+%left TypeNOT '~' '!'
+
+%left TypeEQ TypeNE TypeLT TypeLE TypeGT TypeGE '=' "!="
+	'<' '>' "<=" ">="
+
+%left '-' '+'
+
+%left '*' '/' TypeMOD '%' TypeSHL TypeSHR "<<" ">>"
+
+
+%start pasmo_exp
+
+%{
+
+namespace parser {
+
+const address value_0= address (0);
+const address value_1= address (1);
+
+#define GENVALADDR(r) \
+	const address val ## r= static_cast <address> (r)
+
+GENVALADDR (TypeA);
+GENVALADDR (TypeC);
+GENVALADDR (TypeBC);
+GENVALADDR (TypeDE);
+GENVALADDR (TypeHL);
+GENVALADDR (TypeM);
+GENVALADDR (TypeNC);
+GENVALADDR (TypeNZ);
+GENVALADDR (TypeP);
+GENVALADDR (TypePE);
+GENVALADDR (TypePO);
+GENVALADDR (TypeZ);
+GENVALADDR (regA);
+GENVALADDR (regB);
+GENVALADDR (regC);
+GENVALADDR (regD);
+GENVALADDR (regE);
+GENVALADDR (regH);
+GENVALADDR (regL);
+GENVALADDR (reg_HL_);
+GENVALADDR (regAF);
+GENVALADDR (regBC);
+GENVALADDR (regDE);
+GENVALADDR (regHL);
+GENVALADDR (regSP);
+GENVALADDR (flagNZ);
+GENVALADDR (flagZ);
+GENVALADDR (flagNC);
+GENVALADDR (flagC);
+GENVALADDR (flagPO);
+GENVALADDR (flagPE);
+GENVALADDR (flagP);
+GENVALADDR (flagM);
+GENVALADDR (prefixNone);
+GENVALADDR (prefixIX);
+GENVALADDR (prefixIY);
+GENVALADDR (tiADCA);
+GENVALADDR (tiADDA);
+GENVALADDR (tiAND);
+GENVALADDR (tiCP);
+GENVALADDR (tiOR);
+GENVALADDR (tiSBCA);
+GENVALADDR (tiSUB);
+GENVALADDR (tiXOR);
+GENVALADDR (codeBIT);
+GENVALADDR (codeLD_A_I);
+GENVALADDR (codeLD_A_R);
+GENVALADDR (codeLD_I_A);
+GENVALADDR (codeLD_R_A);
+GENVALADDR (codeRES);
+GENVALADDR (codeRL);
+GENVALADDR (codeRLC);
+GENVALADDR (codeRR);
+GENVALADDR (codeRRC);
+GENVALADDR (codeSET);
+GENVALADDR (codeSLA);
+GENVALADDR (codeSLL);
+GENVALADDR (codeSRA);
+GENVALADDR (codeSRL);
+
+#undef GENVALADDR
+
+inline void addregIXH (Machine & mach)
+{
+	mach.addcode (valregH);
+	mach.addcode (valprefixIX);
+}
+
+inline void addregIXL (Machine & mach)
+{
+	mach.addcode (valregL);
+	mach.addcode (valprefixIX);
+}
+
+inline void addregIYH (Machine & mach)
+{
+	mach.addcode (valregH);
+	mach.addcode (valprefixIY);
+}
+
+inline void addregIYL (Machine & mach)
+{
+	mach.addcode (valregL);
+	mach.addcode (valprefixIY);
+}
+
+} /* namespace parser */
+
+using namespace parser;
+
+%}
+
+%%
+
+/*
+	Operators with several forms
+*/
+
+.mod.: TypeMOD | '%';
+.shl.: TypeSHL | TypeShlOp;
+.shr.: TypeSHR | TypeShrOp;
+.eq.:  TypeEQ  | '=';
+.ne.:  TypeNE  | TypeNeOp;
+.lt.:  TypeLT  | '<';
+.gt.:  TypeGT  | '>';
+.le.:  TypeLE  | TypeLeOp;
+.ge.:  TypeGE  | TypeGeOp;
+.and.: TypeAND | TypeAND_8080 | '&';
+.or.:  TypeOR  | TypeOR_8080  | '|';
+.not.: TypeNOT | '~';
+.xor.: TypeXOR | TypeXOR_8080;
+
+
+pasmo_exp:
+	| pasmoinstruc { YYACCEPT; }
+	| TypeEQU      { mach.errmsg ("EQU without label"); }
+	| TypeDEFL     { mach.errmsg ("DEFL without label"); }
+	| error        { badinstruction (mach, $1); }
+;
+
+pasmoinstruc:
+	instruction
+	| TOK_BracketOnly br_instruction
+;
+
+instruction:
+	instLabel
+	| instMACROnolabel
+	| instMacroName
+	| nolabelinstruction
+;
+
+br_instruction:
+	br_instLabel
+	| instMACROnolabel
+	| br_instMacroName
+	| br_nolabelinstruction
+;
+
+nolabelinstruction:
+	common_instruction
+	| instADC
+	| instADD
+	| instAND
+	| instBIT
+	| instCALL
+	| instCP
+	| instDEC
+	| instEX
+	| instIN
+	| instINC
+	| instJP
+	| instLD
+	| instOR
+	| instOUT
+	| instRES
+	| instRL
+	| instRLC
+	| instRR
+	| instRRC
+	| instSBC
+	| instSET
+	| instSLA
+	| instSLL
+	| instSRA
+	| instSRL
+	| instSUB
+	| instXOR
+;
+
+br_nolabelinstruction:
+	common_instruction
+	| br_instADC
+	| br_instADD
+	| br_instAND
+	| br_instBIT
+	| br_instCALL
+	| br_instCP
+	| br_instDEC
+	| br_instEX
+	| br_instIN
+	| br_instINC
+	| br_instJP
+	| br_instLD
+	| br_instOR
+	| br_instOUT
+	| br_instRES
+	| br_instRL
+	| br_instRLC
+	| br_instRR
+	| br_instRRC
+	| br_instSBC
+	| br_instSET
+	| br_instSLA
+	| br_instSLL
+	| br_instSRA
+	| br_instSRL
+	| br_instSUB
+	| br_instXOR
+;
+
+common_instruction:
+	TypeEndLine { mach.addcode (OpEmpty); }
+	| instASEG
+	| instCSEG
+	| instDSEG
+	| instCOMMON
+	| instDEFB
+	| instDEFS
+	| instDEFW
+	| instELSE
+	| instEND
+	| instENDIF
+	| instENDM
+	| instENDP
+	| instEXITM
+	| instEXTRN
+	| instIF
+	| instIF1
+	| instIF2
+	| instIFDEF
+	| instIFNDEF
+	| instINCBIN
+	| instINCLUDE
+	| instNoFileINCLUDE
+	| instEndOfINCLUDE
+	| instIRP
+	| instIRPC
+	| instLOCAL
+	| instORG
+	| instPROC
+	| instPUBLIC
+	| instREPT
+
+	| inst_8080
+	| inst_8086
+	| inst_DEPHASE
+	| inst_ERROR
+	| inst_PHASE
+	| inst_SHIFT
+	| inst_WARNING
+	| inst_Z80
+
+	| instNoArgs
+	| instDJNZ
+	| instIM
+	| instJR
+	| instPOP
+	| instPUSH
+	| instRET
+	| instRST
+
+	| instACI_8080
+	| instADC_8080
+	| instADD_8080
+	| instADI_8080
+	| instANA_8080
+	| instANI_8080
+	| instCALL_8080
+	| instCMP_8080
+	| instCPI_8080
+	| instCM_8080
+	| instCC_8080
+	| instCNC_8080
+	| instCNZ_8080
+	| instCP_8080
+	| instCPE_8080
+	| instCPO_8080
+	| instCZ_8080
+	| instDAD_8080
+	| instDCR_8080
+	| instDCX_8080
+	| instLHLD_8080
+	| instIN_8080
+	| instINR_8080
+	| instINX_8080
+	| instJMP_8080
+	| instJC_8080
+	| instJM_8080
+	| instJNC_8080
+	| instJNZ_8080
+	| instJP_8080
+	| instJPE_8080
+	| instJPO_8080
+	| instJZ_8080
+	| instLDA_8080
+	| instLDAX_8080
+	| instLXI_8080
+	| instMOV_8080
+	| instMVI_8080
+	| instORA_8080
+	| instORI_8080
+	| instOUT_8080
+	| instPOP_8080
+	| instPUSH_8080
+	| instRST_8080
+	| instSBB_8080
+	| instSBI_8080
+	| instSHLD_8080
+	| instSTA_8080
+	| instSTAX_8080
+	| instSUB_8080
+	| instSUI_8080
+	| instXRA_8080
+	| instXRI_8080
+	| instXTHL_8080
+;
+
+/**********************************************************
+		Label
+***********************************************************/
+
+instLabel:
+	TypeIdentifier
+		{
+			mach.addlabel ($1.identifier () );
+			mach.expectmacro ();
+		}
+		labeled
+;
+
+br_instLabel:
+	TypeIdentifier
+		{
+			mach.addlabel ($1.identifier () );
+			mach.expectmacro ();
+		}
+		br_labeled
+;
+
+labeled:
+	instEQU
+	| instDEFL
+	| instSET_8080
+	| instMACRO
+	| ':' { mach.expectmacro (); } label_colon
+	| label_nocolon
+;
+
+br_labeled:
+	instEQU
+	| instDEFL
+	| instSET_8080
+	| instMACRO
+	| ':' { mach.expectmacro (); } br_label_colon
+	| br_label_nocolon
+;
+
+label_colon:
+	instEQU
+	| instDEFL
+	| instSET_8080
+	| { mach.addcode (OpGenLabel); } label_colon_inst
+;
+
+br_label_colon:
+	instEQU
+	| instDEFL
+	| instSET_8080
+	| { mach.addcode (OpGenLabel); } br_label_colon_inst
+;
+
+label_colon_inst:
+	TypeMacroName { mach.addmacroname ($1); } MacroArgs
+	| nolabelinstruction
+	| error        { badinstruction (mach, $1); }
+;
+
+br_label_colon_inst:
+	TypeMacroName { mach.addmacroname ($1); } MacroArgs
+	| br_nolabelinstruction
+	| error        { badinstruction (mach, $1); }
+;
+
+label_nocolon: { mach.addcode (OpGenLabel); } afterlabel;
+
+br_label_nocolon: { mach.addcode (OpGenLabel); } br_afterlabel;
+
+afterlabel:
+	| TypeMacroName { mach.addmacroname ($1); } MacroArgs
+	| nolabelinstruction
+	| error { badinstruction (mach, $1); }
+;
+
+br_afterlabel:
+	TypeMacroName { mach.addmacroname ($1); } MacroArgs
+	| br_nolabelinstruction
+	| error { badinstruction (mach, $1); }
+;
+
+/**********************************************************
+		Macro expansion
+***********************************************************/
+
+instMacroName:
+	TypeMacroName
+		{ mach.addmacroname ($1); }
+		MacroNameArgs
+;
+
+br_instMacroName:
+	TypeMacroName
+		{ mach.addmacroname ($1); }
+		br_MacroNameArgs
+;
+
+MacroNameArgs:
+	':' { mach.cancelmacroname (); } nolabelinstruction
+	| TypeMACRO { mach.redefmacro (); } MACROargs
+	| MacroArgs 
+;
+
+br_MacroNameArgs:
+	':' { mach.cancelmacroname (); } br_nolabelinstruction
+	| TypeMACRO { mach.redefmacro (); } MACROargs
+	| MacroArgs
+;
+
+MacroArgs: MacroArgList { mach.addcode (OpExpandMacro); };
+
+MacroArgList:
+	TypeEndLine
+	| ',' { mach.addcode (OpMacroArg); } MacroArgList
+	| '%' { mach.nomacroargs (); } MacroArgValue
+	| TypeMacroArg
+		{
+			mach.addmacroitem ($1);
+			mach.addcode (OpMacroArg);
+		}
+		MacroAfterArg
+	| error
+		{
+			mach.addmacroitem ($1);
+			yyclearin;
+		}
+		MacroMore
+;
+
+MacroMore:
+	TypeEndLine { mach.addcode (OpMacroArg); }
+	| ',' { mach.addcode (OpMacroArg); } MacroArgList
+	| error
+		{
+			mach.addmacroitem (Token (TypeWhiteSpace) );
+			mach.addmacroitem ($1);
+			yyclearin;
+		}
+		MacroMore
+;
+
+MacroArgValue:
+	exp { mach.addcode (OpMacroValue); } MacroAfterValue
+	| error { mach.errmsg ("Value argument expected"); }
+;
+
+MacroAfterValue:
+	TypeEndLine
+	| requireComma { mach.macroargs (); } MacroArgList
+;
+
+MacroAfterArg:
+	TypeEndLine
+	| requireComma MacroArgList
+;
+
+/**********************************************************
+
+		Directives
+
+***********************************************************/
+
+/**********************************************************
+		ASEG directive
+***********************************************************/
+
+instASEG: TypeASEG requireEndLine { mach.addcode (OpASEG); };
+
+/**********************************************************
+		CSEG directive
+***********************************************************/
+
+instCSEG: TypeCSEG requireEndLine { mach.addcode (OpCSEG); };
+
+/**********************************************************
+		DSEG directive
+***********************************************************/
+
+instDSEG: TypeDSEG requireEndLine { mach.addcode (OpDSEG); };
+
+/**********************************************************
+		COMMON directive
+***********************************************************/
+
+instCOMMON: TypeCOMMON { unimplemented (mach, $1); };
+
+/**********************************************************
+		DEFB directive
+***********************************************************/
+
+instDEFB: .defb. defblist { mach.addcode (OpDEFBend); };
+
+defblist:
+	/*
+	TypeLiteral TypeEndLine
+		{
+			//mach.addcode (OpDEFBliteral);
+			//mach.addcodeliteral ($1.literal () );
+			mach.addcodeliteral ($1.literal () );
+			mach.addcode (OpDEFBnum);
+		}
+	| TypeLiteral ','
+		{
+			//mach.addcode (OpDEFBliteral);
+			//mach.addcodeliteral ($1.literal () );
+			mach.addcodeliteral ($1.literal () );
+			mach.addcode (OpDEFBnum);
+		}
+		defblist
+	*/
+	exp TypeEndLine { mach.addcode (OpDEFBnum); }
+	| exp ',' { mach.addcode (OpDEFBnum); } defblist
+	| exp error { badnextarg (mach, $2); }
+	| error { badDEFB (mach, $1); }
+;
+
+/**********************************************************
+		DEFL directive
+***********************************************************/
+
+instDEFL: TypeDEFL DEFLargs;
+instSET_8080: TypeSET_8080 DEFLargs;
+
+DEFLargs:
+	| exp requireEndLine { mach.addcode (OpDEFL); }
+	| error { badDEFL (mach, $1); }
+;
+
+/**********************************************************
+		DEFS directive
+***********************************************************/
+
+instDEFS: .defs. DEFS_args requireEndLine;
+
+DEFS_args:
+	exp DEFS_count_arg;
+	| error { badDEFS (mach, $1); }
+;
+
+DEFS_count_arg:
+	TypeEndLine { mach.addcode (OpDEFS); }
+	| check_next_arg DEFS_value
+;
+
+DEFS_value:
+	exp requireEndLine { mach.addcode (OpDEFSvalue); }
+	| error { badDEFS_value (mach, $1); }
+;
+
+/**********************************************************
+		DEFW directive
+***********************************************************/
+
+instDEFW: .defw. DEFWargs { mach.addcode (OpDEFWend); };
+
+DEFWargs: DEFWitem DEFWmore;
+
+DEFWmore:
+	TypeEndLine
+	| check_next_arg DEFWargs
+;
+
+DEFWitem:
+	exp { mach.addcode (OpDEFWnum); }
+	| error { badDEFW (mach, $1); }
+;
+
+/**********************************************************
+		ELSE directive
+***********************************************************/
+
+instELSE: TypeELSE requireEndLine { mach.addcode (OpELSE); };
+
+/**********************************************************
+		END directive
+***********************************************************/
+
+instEND: TypeEND ENDargs;
+
+ENDargs:
+	TypeEndLine       { mach.addcode (OpEND); }
+	| exp requireEndLine { mach.addcode (OpENDn); }
+	| error { badEND (mach, $1); }
+;
+
+/**********************************************************
+		ENDIF directive
+***********************************************************/
+
+instENDIF: TypeENDIF requireEndLine { mach.addcode (OpENDIF); };
+
+/**********************************************************
+		ENDM directive
+***********************************************************/
+
+instENDM: TypeENDM requireEndLine { mach.addcode (OpENDM); };
+
+/**********************************************************
+		ENDP directive
+***********************************************************/
+
+instENDP: TypeENDP requireEndLine { mach.addcode (OpENDP); };
+
+/**********************************************************
+		EQU directive
+***********************************************************/
+
+instEQU: TypeEQU EQUargs;
+
+EQUargs:
+	| exp requireEndLine { mach.addcode (OpEQU); }
+	| error { badEQU (mach, $1); }
+;
+
+/**********************************************************
+		EXITM directive
+***********************************************************/
+
+instEXITM: TypeEXITM requireEndLine { mach.addcode (OpEXITM); };
+
+/**********************************************************
+		EXTRN directive
+***********************************************************/
+
+instEXTRN: TypeEXTRN VarList { mach.addcode (OpEXTRN); };
+
+/**********************************************************
+		IF directive
+***********************************************************/
+
+instIF: TypeIF IFarg requireEndLine;
+
+IFarg:
+	exp { mach.addcode (OpIF); }
+	| error { badIF (mach, $1); }
+;
+
+/**********************************************************
+		IF1 directive
+***********************************************************/
+
+instIF1: TypeIF1 requireEndLine { mach.addcode (OpIF1); };
+
+/**********************************************************
+		IF2 directive
+***********************************************************/
+
+instIF2: TypeIF2 requireEndLine { mach.addcode (OpIF2); };
+
+/**********************************************************
+		IFDEF directive
+***********************************************************/
+
+instIFDEF:  TypeIFDEF  requireIdentifier requireEndLine
+		{
+			mach.addcode (OpIFDEF);
+			mach.addcode ($2.identifier () );
+		}
+;
+
+/**********************************************************
+		IFNDEF directive
+***********************************************************/
+
+instIFNDEF: TypeIFNDEF requireIdentifier requireEndLine
+		{
+			mach.addcode (OpIFNDEF);
+			mach.addcode ($2.identifier () );
+		}
+;
+
+/**********************************************************
+		INCBIN directive
+***********************************************************/
+
+instINCBIN: TypeINCBIN requireLiteral requireEndLine
+	{
+		mach.addcode (OpINCBIN);
+		mach.addcodeliteral ($2.literal () );
+	}
+;
+
+/**********************************************************
+		INCLUDE directive
+***********************************************************/
+
+instINCLUDE: TypeINCLUDE requireLiteral requireEndLine
+	{ mach.addcode (OpINCLUDE); }
+;
+
+instNoFileINCLUDE: TypeNoFileINCLUDE requireLiteral requireEndLine
+	{ mach.errmsg ("Can't open INCLUDE file: " + $2.raw () ); }
+;
+
+instEndOfINCLUDE: TypeEndOfINCLUDE requireEndLine
+	{ mach.addcode (OpEndINCLUDE); }
+;
+
+/**********************************************************
+		IRP directive
+***********************************************************/
+
+instIRP: TypeIRP IRPargs;
+
+IRPargs:
+	TypeIdentifier requireComma IRParglist
+		{
+			mach.addcode (OpIRP);
+			mach.addcodeliteral ($1.identifier () );
+		}
+	| error { badIRP (mach, $1); }
+;
+
+IRParglist:
+	'<' { mach.macroargs (); } IRPmacroarglist
+	| TypeEndLine { mach.addcode (OpMacroArg); }
+	| ',' { mach.addcode (OpMacroArg); } IRPnextitem
+	| error
+		{
+			mach.addmacroitem ($1);
+			yyclearin;
+		}
+		IRPnextitem
+;
+
+IRPnextitem:
+	TypeEndLine { mach.addcode (OpMacroArg); }
+	| check_next_arg { mach.addcode (OpMacroArg); } IRPitem
+;
+
+IRPitem:
+	TypeEndLine { mach.addcode (OpMacroArg); }
+	| error
+		{
+			mach.addmacroitem ($1);
+			yyclearin;
+		}
+		IRPnextitem
+;
+
+IRPmacroarglist:
+	| TypeEndLine { mach.errmsg ("Macro arg list unclosed in IRP"); }
+	| '>'
+	| TypeMacroArg
+		{
+			mach.addmacroitem ($1);
+			mach.addcode (OpMacroArg);
+		}
+		IRPmacronextitem
+	| ','
+		{ mach.addcode (OpMacroArg); }
+		IRPmacroarglist
+	| error
+		{
+			mach.addmacroitem ($1);
+			mach.addcode (OpMacroArg);
+			yyclearin;
+		}
+		IRPmacronextitem;
+;
+
+IRPmacronextitem:
+	',' IRPmacroarglist
+	| '>'
+	| error { mach.unexpected ($1, "in IRP args, ',' or '>' expected"); }
+;
+
+/**********************************************************
+		IRPC directive
+***********************************************************/
+
+instIRPC: TypeIRPC IRPCargs;
+
+IRPCargs:
+	requireIdentifier requireComma
+		{
+			mach.addcode (OpIRPC);
+			mach.addcodeliteral ($1.identifier () );
+			mach.macroargs ();
+		}
+		IRPCvalue;
+;
+
+IRPCvalue:
+	TypeLiteral      { mach.addcodeliteral ($1.literal () ); }
+	| TypeMacroArg   { mach.addcodeliteral ($1.macroarg () ); }
+	| TypeIdentifier { mach.addcodeliteral ($1.identifier () ); }
+	| TypeNumber     { mach.addcodeliteral ($1.numstr () ); }
+/*
+	| error          { badIRPC (mach, $1); }
+*/
+	| error          { mach.addcodeliteral ($1.raw () ); }
+;
+
+/**********************************************************
+		LOCAL directive
+***********************************************************/
+
+instLOCAL: TypeLOCAL VarList { mach.addcode (OpLOCAL); };
+
+/**********************************************************
+		MACRO directive
+***********************************************************/
+
+instMACRO: TypeMACRO { mach.addcode (OpMACRO); } MACROargs;
+
+instMACROnolabel: TypeMACRO MACROnolabelname;
+
+
+MACROnolabelname:
+	TypeIdentifier
+		{
+			mach.addlabel ($1.identifier () );
+			mach.addcode (OpMACRO);
+		}
+		MACROnolabelargs
+;
+
+MACROnolabelargs:
+	TypeEndLine { mach.addcode (OpMACROend); }
+	| requireComma MACROargs
+;
+
+MACROargs:
+	TypeEndLine { mach.addcode (OpMACROend); }
+	| MACROitem MACROmoreargs;
+;
+
+MACROmoreargs:
+	TypeEndLine { mach.addcode (OpMACROend); }
+	| requireComma MACROitem MACROmoreargs
+;
+
+MACROitem:
+	TypeIdentifier    { mach.addcodeliteral ($1.identifier () ); }
+	| token_with_name { mach.addcodeliteral ($1.raw () ); }
+	| error           { badMACROitem (mach, $1); }
+;
+
+/**********************************************************
+		ORG directive
+***********************************************************/
+
+instORG: TypeORG ORGarg requireEndLine
+
+ORGarg:
+	exp { mach.addcode (OpORG); }
+	| error { badORG (mach, $1); }
+;
+
+/**********************************************************
+		PROC directive
+***********************************************************/
+
+instPROC: TypePROC requireEndLine { mach.addcode (OpPROC); };
+
+/**********************************************************
+		PUBLIC directive
+***********************************************************/
+
+instPUBLIC: TypePUBLIC VarList { mach.addcode (OpPUBLIC); };
+
+/**********************************************************
+		REPT directive
+***********************************************************/
+
+instREPT:
+	TypeREPT REPT_count;
+
+REPT_count:
+	exp REPT_count_args
+	| error { badREPT (mach, $1); }
+;
+
+REPT_count_args:
+	TypeEndLine
+		{
+			mach.addcode (value_0);
+			mach.addcode (value_1);
+			mach.addcode (OpREPT);
+			mach.addcodeliteral (std::string () );
+		}
+	| check_next_arg REPT_var
+;
+
+REPT_var:
+	TypeIdentifier REPT_var_args
+		{
+			mach.addcode (OpREPT);
+			mach.addcodeliteral ($1.identifier () );
+		}
+	| error { badREPT_var (mach, $1); }
+;
+
+REPT_var_args:
+	TypeEndLine
+		{
+			mach.addcode (value_0);
+			mach.addcode (value_1);
+		}
+	| check_next_arg REPT_initial
+;
+
+REPT_initial:
+	exp REPT_initial_arg
+	| error { badREPT_initial (mach, $1); }
+;
+
+REPT_initial_arg:
+	TypeEndLine { mach.addcode (value_1); }
+	| check_next_arg REPT_step
+;
+
+REPT_step:
+	exp requireEndLine
+	| error { badREPT_step (mach, $1); }
+;
+
+/**********************************************************
+
+		Dot directives
+
+***********************************************************/
+
+/**********************************************************
+		.8080 directive
+***********************************************************/
+
+inst_8080: Type_8080 requireEndLine { mach.addcode (Op_8080); };
+
+/**********************************************************
+		.8086 directive
+***********************************************************/
+
+inst_8086: Type_8086 { unimplemented (mach, $1); };
+
+/**********************************************************
+		.DEPHASE directive
+***********************************************************/
+
+inst_DEPHASE: Type_DEPHASE requireEndLine { mach.addcode (Op_DEPHASE); };
+
+/**********************************************************
+		.ERROR directive
+***********************************************************/
+
+inst_ERROR: Type_ERROR args_ERROR;
+
+args_ERROR:
+	TypeLiteral requireEndLine
+		{
+			mach.addcode (Op_ERROR);
+			mach.addcodeliteral ($1.literal () );
+		}
+	| error { badErrorOrWarning (mach, $1, $0); }
+;
+
+/**********************************************************
+		.PHASE directive
+***********************************************************/
+
+inst_PHASE: Type_PHASE _phase;
+
+_phase:
+	exp requireEndLine { mach.addcode (Op_PHASE); }
+	| error { bad_PHASE (mach, $1); }
+;
+
+/**********************************************************
+		.SHIFT directive
+***********************************************************/
+
+inst_SHIFT: Type_SHIFT requireEndLine { mach.addcode (Op_SHIFT); };
+
+/**********************************************************
+		.WARNING directive
+***********************************************************/
+
+inst_WARNING: Type_WARNING args_WARNING;
+
+args_WARNING:
+	TypeLiteral requireEndLine
+		{
+			mach.addcode (Op_WARNING);
+			mach.addcodeliteral ($1.literal () );
+		}
+	| error { badErrorOrWarning (mach, $1, $0); }
+;
+
+/**********************************************************
+		.Z80 directive
+***********************************************************/
+
+inst_Z80: Type_Z80 requireEndLine { mach.addcode (Op_Z80); };
+
+/**********************************************************
+
+		Code instructions
+
+***********************************************************/
+
+/**********************************************************
+		Instructions without arguments
+***********************************************************/
+
+instNoArgs:
+	token_instruction_without_args requireEndLine
+		{
+			mach.addcode (static_cast <address> ($1.type () ) );
+			mach.addcode (OpNoargInst);
+		}
+;
+
+/**********************************************************
+		ACI 8080 instruction
+***********************************************************/
+
+instACI_8080: TypeACI_8080 { mach.addcode (valtiADCA); } likeADI;
+
+/**********************************************************
+		ADC instruction
+***********************************************************/
+
+instADC:    TypeADC ADCargs;
+br_instADC: TypeADC br_ADCargs;
+
+ADCargs:
+	TypeA requireComma { mach.addcode (valtiADCA); } likeADD_A_arg
+	| TypeHL requireComma ADC_HL_arg requireEndLine
+	| error { badADC (mach, $1); }
+;
+
+br_ADCargs:
+	TypeA requireComma { mach.addcode (valtiADCA); } br_likeADD_A_arg
+	| TypeHL requireComma ADC_HL_arg requireEndLine
+	| error { badADC (mach, $1); }
+;
+
+ADC_HL_arg:
+	regBCDEHLSP_code { mach.addcode (OpADC_HL); }
+	| error { badADC_HL (mach, $1); }
+;
+
+/**********************************************************
+		ADD instruction
+***********************************************************/
+
+instADD:    TypeADD ADDargs;
+br_instADD: TypeADD br_ADDargs;
+
+ADDargs:
+	TypeA requireComma { mach.addcode (valtiADDA); } likeADD_A_arg
+	| com_ADDargs
+	| error { badADD (mach, $1); }
+;
+
+br_ADDargs:
+	TypeA requireComma { mach.addcode (valtiADDA); } br_likeADD_A_arg
+	| com_ADDargs
+	| error { badADD (mach, $1); }
+;
+
+com_ADDargs:
+	TypeHL requireComma ADD_HL_arg requireEndLine
+		{ mach.addcode (OpADD_HL); }
+	| TypeIX requireComma ADD_IX_arg requireEndLine
+		{ mach.addcode (OpADD_IX); }
+	| TypeIY requireComma ADD_IY_arg requireEndLine
+		{ mach.addcode (OpADD_IY); }
+;
+
+ADD_HL_arg:
+	regBCDEHLSP_code
+	| error { badADD_HL (mach, $1); }
+;
+
+ADD_IX_arg:
+	regBCDESP_code
+	| TypeIX { mach.addcode (valregHL); }
+	| error { badADD_IX (mach, $1); }
+;
+
+ADD_IY_arg:
+	regBCDESP_code
+	| TypeIY { mach.addcode (valregHL); }
+	| error { badADD_IY (mach, $1); }
+;
+
+/**********************************************************
+		ADC 8080 instruction
+***********************************************************/
+
+instADC_8080: TypeADC_8080 { mach.addcode (valtiADCA); } likeADD_8080;
+
+/**********************************************************
+		ADD 8080 instruction
+***********************************************************/
+
+instADD_8080: TypeADD_8080 { mach.addcode (valtiADDA); } likeADD_8080;
+
+/**********************************************************
+		ADI 8080 instruction
+***********************************************************/
+
+instADI_8080: TypeADI_8080 { mach.addcode (valtiADDA); } likeADI;
+
+/**********************************************************
+		AND instruction
+***********************************************************/
+
+instAND:    TypeAND { mach.addcode (valtiAND); } likeCParg;
+br_instAND: TypeAND { mach.addcode (valtiAND); } br_likeCParg;
+
+/**********************************************************
+		ANA 8080 instruction
+***********************************************************/
+
+instANA_8080: TypeANA_8080 { mach.addcode (valtiAND); } likeADD_8080;
+
+/**********************************************************
+		ANI 8080 instruction
+***********************************************************/
+
+instANI_8080: TypeANI_8080 { mach.addcode (valtiAND); } likeADI;
+
+/**********************************************************
+		BIT instruction
+***********************************************************/
+
+instBIT:    TypeBIT { mach.addcode (valcodeBIT); } BIT_exp likeBIT_second;
+br_instBIT: TypeBIT { mach.addcode (valcodeBIT); } BIT_exp br_likeBIT_second;
+
+/**********************************************************
+		CALL instruction
+***********************************************************/
+
+instCALL:    TypeCALL CALLargs    requireEndLine;
+br_instCALL: TypeCALL br_CALLargs requireEndLine;
+
+CALLargs:
+	flag_val requireComma CALL_flag
+	| exp
+		{
+			checkugly (mach, $1);
+			mach.addcode (OpCALL);
+		}
+	| error { badCALL (mach, $1); }
+;
+
+br_CALLargs:
+	flag_val requireComma br_CALL_flag;
+	| exp { mach.addcode (OpCALL); }
+	| error { badCALL (mach, $1); }
+;
+
+CALL_flag:
+	exp
+		{
+			checkugly (mach, $1);
+			mach.addcode (OpCALL_flag);
+		}
+	| error { badCALL_flag (mach, $1, $-2); }
+;
+
+br_CALL_flag:
+	exp  { mach.addcode (OpCALL_flag); }
+	| error { badCALL_flag (mach, $1, $-2); }
+;
+
+/**********************************************************
+		CALL 8080 instruction
+***********************************************************/
+
+instCALL_8080: TypeCALL_8080 CALL_8080args requireEndLine;
+
+CALL_8080args:
+	exp { mach.addcode (OpCALL); }
+	| error { badCALL (mach, $1); }
+;
+
+/**********************************************************
+		Cflag 8080 instructions
+***********************************************************/
+
+instCC_8080:  TypeCC_8080  { mach.addcode (valflagC); }  Cflag_arg;
+instCM_8080:  TypeCM_8080  { mach.addcode (valflagM); }  Cflag_arg;
+instCNC_8080: TypeCNC_8080 { mach.addcode (valflagNC); } Cflag_arg;
+instCNZ_8080: TypeCNZ_8080 { mach.addcode (valflagNZ); } Cflag_arg;
+instCP_8080:  TypeCP_8080  { mach.addcode (valflagP); }  Cflag_arg;
+instCPE_8080: TypeCPE_8080 { mach.addcode (valflagPE); } Cflag_arg;
+instCPO_8080: TypeCPO_8080 { mach.addcode (valflagPO); } Cflag_arg;
+instCZ_8080:  TypeCZ_8080  { mach.addcode (valflagZ); }  Cflag_arg;
+
+Cflag_arg:
+	exp requireEndLine { mach.addcode (OpCALL_flag); }
+	| error { badCflag (mach, $1, $-1); }
+;
+
+/**********************************************************
+		CMP 8080 instruction
+***********************************************************/
+
+instCMP_8080: TypeCMP_8080 { mach.addcode (valtiCP); } likeADD_8080;
+
+/**********************************************************
+		CPI 8080 instruction
+***********************************************************/
+
+instCPI_8080: TypeCPI_8080 { mach.addcode (valtiCP); } likeADI;
+
+/**********************************************************
+		CP instruction
+***********************************************************/
+
+instCP:    TypeCP { mach.addcode (valtiCP); } likeCParg;
+br_instCP: TypeCP { mach.addcode (valtiCP); } br_likeCParg;
+
+/**********************************************************
+		DAD 8080 instruction
+***********************************************************/
+
+instDAD_8080: TypeDAD_8080 DADarg { mach.addcode (OpADD_HL); } requireEndLine;
+
+DADarg:
+	regdouble8080
+	| error { badDAD (mach, $1); }
+;
+
+/**********************************************************
+		DEC instruction
+***********************************************************/
+
+instDEC:    TypeDEC { mach.addcode (value_0); } likeINC_arg;
+br_instDEC: TypeDEC { mach.addcode (value_0); } br_likeINC_arg;
+
+/**********************************************************
+		DCR 8080 instruction
+***********************************************************/
+
+instDCR_8080: TypeDCR_8080 { mach.addcode (value_0); } likeINR;
+
+/**********************************************************
+		DCX 8080 instruction
+***********************************************************/
+
+instDCX_8080: TypeDCX_8080 { mach.addcode (value_0); } likeINX;
+
+/**********************************************************
+		DJNZ instruction
+***********************************************************/
+
+instDJNZ: TypeDJNZ DJNZarg
+
+DJNZarg:
+	exp requireEndLine { mach.addcode (OpDJNZ); }
+	| error { badDJNZarg (mach, $1); }
+;
+
+/**********************************************************
+		EX instruction
+***********************************************************/
+
+instEX:    TypeEX EX_args    requireEndLine;
+br_instEX: TypeEX br_EX_args requireEndLine;
+
+EX_args:
+	com_EX_args
+	| par_indSP EX_indSP
+	| '(' error { badEX_paren (mach, $2); }
+	| error { badEX (mach, $1); }
+;
+
+br_EX_args:
+	com_EX_args
+	| error { badEX (mach, $1); }
+;
+
+com_EX_args:
+	TypeAF requireComma EX_AF_arg
+	| TypeDE requireComma EX_DE_arg
+	| br_indSP EX_indSP
+	| '[' error { badEX_bracket (mach, $2); }
+;
+
+/* EX AF, AF' */
+
+EX_AF_arg:
+	TypeAFp { mach.addcode (OpEX_AF_AFP); }
+	| error { badEX_AF (mach, $1); }
+;
+
+/* EX DE, HL */
+
+EX_DE_arg:
+	TypeHL { mach.addcode (OpEX_DE_HL); }
+	| error { badEX_DE (mach, $1); }
+;
+
+/* EX [SP], HL , EX [SP], IX , EX [SP], IY */
+
+EX_indSP: requireComma EX_indSP_arg;
+
+EX_indSP_arg:
+	TypeHL   { mach.addcode (OpEX_indSP_HL); }
+	| TypeIX { mach.addcode (OpEX_indSP_IX); }
+	| TypeIY { mach.addcode (OpEX_indSP_IY); }
+	| error  { badEX_indsp (mach, $1); }
+;
+
+/**********************************************************
+		IM instruction
+***********************************************************/
+
+instIM: TypeIM IMarg requireEndLine
+
+IMarg:
+	exp { mach.addcode (OpIM); }
+	| error { badIM (mach, $1); }
+;
+
+/**********************************************************
+		IN instruction
+***********************************************************/
+
+instIN:    TypeIN INargs    requireEndLine;
+br_instIN: TypeIN br_INargs requireEndLine;
+
+INargs:
+	regNoA_IN IN_r_arg
+	| TypeA requireComma IN_A_arg
+	| error { badIN (mach, $1); }
+;
+
+br_INargs:
+	regNoA_IN br_IN_r_arg
+	| TypeA requireComma br_IN_A_arg;
+	| error { badIN (mach, $1); }
+;
+
+regNoA_IN: regsimpleNoA_code requireComma { $$= $1; };
+
+/* IN r, [C] */
+
+IN_r_arg:
+	'['   IN_r_bracket
+	| '(' IN_r_paren
+	| error { badIN_r (mach, $1, $-0); }
+;
+
+br_IN_r_arg:
+	'[' IN_r_bracket
+	| error { badbr_IN_r (mach, $1, $-0); }
+;
+
+IN_r_paren:   requireC requireClose   IN_r_indCend;
+IN_r_bracket: requireC requireBrClose IN_r_indCend;
+
+IN_r_indCend: requireEndLine { mach.addcode (OpIN_r_indC); };
+
+/* IN A, [C] , IN A, [n] */
+
+IN_A_arg:
+	'[' IN_A_bracket
+	| '(' IN_A_paren
+	| error { badIN_A (mach, $1); }
+;
+
+br_IN_A_arg:
+	'[' IN_A_bracket
+	| error { badbr_IN_A (mach, $1); }
+;
+
+IN_A_bracket:
+	TypeC requireBrClose IN_A_C_end
+	| exp requireBrClose IN_A_exp_end
+	| error { badIN_A_bracket (mach, $1); }
+;
+
+IN_A_paren:
+	TypeC requireClose IN_A_C_end
+	| exp requireClose IN_A_exp_end
+	| error { badIN_A_paren (mach, $1); }
+;
+
+IN_A_C_end:   requireEndLine { mach.addcode (OpIN_A_indC_); };
+IN_A_exp_end: requireEndLine { mach.addcode (OpIN_A_indn); };
+
+/**********************************************************
+		INC instruction
+***********************************************************/
+
+instINC:    TypeINC { mach.addcode (value_1); } likeINC_arg;
+br_instINC: TypeINC { mach.addcode (value_1); } br_likeINC_arg;
+
+/**********************************************************
+		IN 8080 instruction
+***********************************************************/
+
+instIN_8080: TypeIN_8080 IN_8080arg requireEndLine;
+
+IN_8080arg:
+	exp { mach.addcode (OpIN_A_indn); }
+	| error { badIN_8080 (mach, $1); }
+;
+
+/**********************************************************
+		INR 8080 instruction
+***********************************************************/
+
+instINR_8080: TypeINR_8080 { mach.addcode (value_1); } likeINR;
+
+/**********************************************************
+		INX 8080 instruction
+***********************************************************/
+
+instINX_8080: TypeINX_8080 { mach.addcode (value_1); } likeINX;
+
+/**********************************************************
+		JMP 8080 instruction
+***********************************************************/
+
+instJMP_8080: TypeJMP_8080 JMParg requireEndLine;
+
+JMParg:
+	exp { mach.addcode (OpJP); }
+	| error { badJParg (mach, $1); }
+;
+
+/**********************************************************
+		Jflag 8080 instructions
+***********************************************************/
+
+instJC_8080:  TypeJC_8080  { mach.addcode (valflagC); } Jflag_arg;
+instJNC_8080: TypeJNC_8080 { mach.addcode (valflagNC); } Jflag_arg;
+instJNZ_8080: TypeJNZ_8080 { mach.addcode (valflagNZ); } Jflag_arg;
+instJM_8080:  TypeJM_8080  { mach.addcode (valflagM); }  Jflag_arg;
+instJP_8080:  TypeJP_8080  { mach.addcode (valflagP); }  Jflag_arg;
+instJPE_8080: TypeJPE_8080 { mach.addcode (valflagPE); } Jflag_arg;
+instJPO_8080: TypeJPO_8080 { mach.addcode (valflagPO); } Jflag_arg;
+instJZ_8080:  TypeJZ_8080  { mach.addcode (valflagZ); }  Jflag_arg;
+
+Jflag_arg: exp requireEndLine { mach.addcode (OpJP_flag); }
+	| error { badCflag (mach, $1, $-1); }
+;
+
+/**********************************************************
+		JP instruction
+***********************************************************/
+
+instJP:    TypeJP JParg    requireEndLine;
+br_instJP: TypeJP br_JParg requireEndLine;
+
+JParg:
+	JP_flag
+	| '[' JP_bracket
+	| par_indHL { mach.addcode (OpJP_indHL); }
+	| par_indIX { mach.addcode (OpJP_indIX); }
+	| par_indIY { mach.addcode (OpJP_indIY); }
+	| exp
+		{
+			checkugly (mach, $1);
+			mach.addcode (OpJP);
+		}
+	| '(' any_but_HL_IX_IY_exp { badJPparen (mach, $2); }
+	| error     { badJParg (mach, $1); }
+;
+
+br_JParg:
+	br_JP_flag
+	| '[' JP_bracket
+	| exp   { mach.addcode (OpJP); }
+	| error { badbr_JParg (mach, $1); }
+;
+
+JP_bracket:
+	HLBrClose   { mach.addcode (OpJP_indHL); }
+	| IXBrClose { mach.addcode (OpJP_indIX); }
+	| IYBrClose { mach.addcode (OpJP_indIY); }
+	| error    { badJPbracket (mach, $1); }
+;
+
+JP_flag:    flag_val requireComma JP_flag_arg;
+br_JP_flag: flag_val requireComma br_JP_flag_arg;
+
+JP_flag_arg:
+	exp
+		{
+			checkugly (mach, $1);
+			mach.addcode (OpJP_flag);
+		}
+	| error { badJPflag_arg (mach, $1); }
+;
+
+br_JP_flag_arg:
+	exp     { mach.addcode (OpJP_flag); }
+	| error { badJPflag_arg (mach, $1); }
+;
+
+/**********************************************************
+		JR instruction
+***********************************************************/
+
+instJR: TypeJR JRarg requireEndLine;
+
+JRarg:
+	jr_flag_val requireComma JR_flag_arg
+	| exp   { mach.addcode (OpJR); }
+	| error { badJRarg (mach, $1); }
+;
+
+JR_flag_arg:
+	exp     { mach.addcode (OpJR_flag); }
+	| error { badJRflag_arg (mach, $1); }
+;
+
+/**********************************************************
+		LD instruction
+***********************************************************/
+
+instLD:    TypeLD LDargs;
+br_instLD: TypeLD br_LDargs;
+
+LDargs:
+	com_LDargs
+	| TypeA requireComma LD_A_args
+	| regsimpleNoHLA_code requireComma LD_r_arg requireEndLine
+	| regsimpleHL_code requireComma LD_HorL requireEndLine
+	| LD_undoc requireEndLine
+	| LD_rr
+	| TypeSP requireComma LD_SP_arg
+	| par_indHL requireComma LD_indHL_arg
+	| par_indBC LD_indBCorDE { mach.addcode (OpLD_indBC); }
+	| par_indDE LD_indBCorDE { mach.addcode (OpLD_indDE); }
+	| par_indIXYdesp_pref requireComma LD_idesp_arg requireEndLine
+	| '(' exp requireClose requireComma LD_indexp_arg
+	| error { badLD (mach, $1); }
+;
+
+br_LDargs:
+	com_LDargs
+	| TypeA requireComma br_LD_A_args
+	| regsimpleNoHLA_code requireComma br_LD_r_arg requireEndLine
+	| regsimpleHL_code requireComma br_LD_HorL requireEndLine
+	| br_LD_undoc requireEndLine
+	| br_LD_rr
+	| TypeSP requireComma br_LD_SP_arg
+	| error { badLD (mach, $1); }
+;
+
+com_LDargs:
+	TypeI   { mach.addcode (OpLD_I_A); } requireComma LD_IorR
+	| TypeR { mach.addcode (OpLD_R_A); } requireComma LD_IorR
+	| br_indHL requireComma LD_indHL_arg
+	| br_indBC LD_indBCorDE { mach.addcode (OpLD_indBC); }
+	| br_indDE LD_indBCorDE { mach.addcode (OpLD_indDE); }
+	| br_indIXYdesp_pref requireComma LD_idesp_arg requireEndLine
+	| br_exp_br requireComma LD_indexp_arg
+;
+
+LD_IorR:
+	TypeA requireEndLine
+	| error { badLD_IorR (mach, $1, $-2); }
+;
+
+LD_idesp_arg:
+	regsimple_code { mach.addcode (OpLD_idesp_r); }
+	| exp          { mach.addcode (OpLD_idesp_n); }
+;	
+
+LD_undoc:
+	regundocix requireComma LD_undocix_arg
+	| regundociy requireComma LD_undociy_arg
+;
+
+br_LD_undoc:
+	regundocix requireComma br_LD_undocix_arg
+	| regundociy requireComma br_LD_undociy_arg
+;
+
+LD_undocix_arg:
+	LD_undoc_rx
+	| LD_undoc_exp
+	| error { badLD_undocix (mach, $1, $-1); }
+;
+
+LD_undociy_arg:
+	LD_undoc_ry
+	| LD_undoc_exp
+	| error { badLD_undociy (mach, $1, $-1); }
+;
+
+br_LD_undocix_arg:
+	LD_undoc_rx
+	| exp { mach.addcode (OpLD_undoc_n); }
+	| error { badLD_undocix (mach, $1, $-1); }
+;
+
+br_LD_undociy_arg:
+	LD_undoc_ry
+	| exp { mach.addcode (OpLD_undoc_n); }
+	| error { badLD_undociy (mach, $1, $-1); }
+;
+
+LD_undoc_rx:
+	regsimpleorundocX_code { mach.addcode (OpLD_undoc_r); }
+;
+
+LD_undoc_ry:
+	regsimpleorundocY_code { mach.addcode (OpLD_undoc_r); }
+;
+
+LD_undoc_exp: exp
+		{
+			checkugly (mach, $1);
+			mach.addcode (OpLD_undoc_n);
+		}
+;
+
+LD_r_arg:
+	LD_anyr_arg
+	| regundoc       { mach.addcode (OpLD_r_undoc); }
+	| error { badLDr (mach, $1); }
+;
+
+br_LD_r_arg:
+	br_LD_anyr_arg
+	| regundoc       { mach.addcode (OpLD_r_undoc); }
+	| error { badLDr (mach, $1); }
+;
+
+LD_r_bracket:
+	bracket_indIXYdesp_pref { mach.addcode (OpLD_r_idesp); }
+	| HLBrClose             { mach.addcode (OpLD_r_indHL); }
+	| error { mach.unexpected ($1, "after LD r,["); }
+;
+
+LD_HorL:
+	LD_anyr_arg
+	| regundoc { mach.errmsg ("Invalid register combination"); }
+;
+
+br_LD_HorL:
+	br_LD_anyr_arg
+	| regundoc { mach.errmsg ("Invalid register combination"); }
+;
+
+LD_anyr_arg:
+	com_LD_anyr_arg
+	| par_indIXYdesp_pref { mach.addcode (OpLD_r_idesp); }
+	| par_indHL           { mach.addcode (OpLD_r_indHL); }
+	| exp
+		{
+			checkugly (mach, $1);
+			mach.addcode (OpLD_r_n);
+		}
+;
+
+br_LD_anyr_arg:
+	com_LD_anyr_arg
+	| exp { mach.addcode (OpLD_r_n); }
+;
+
+com_LD_anyr_arg:
+	'[' LD_r_bracket;
+	| regsimple_code { mach.addcode (OpLD_r_r); }
+;
+
+LD_A_args:
+	com_LD_A_args
+	| par_indIXYdesp_pref      { mach.addcode (OpLD_A_idesp); }
+	| par_indBC requireEndLine { mach.addcode (OpLD_A_indBC); }
+	| par_indDE requireEndLine { mach.addcode (OpLD_A_indDE); }
+	| par_indHL requireEndLine { mach.addcode (OpLD_A_indHL); }
+	| exp requireEndLine
+		{
+			if (isparenexp ($1) )
+				mach.addcode (OpLD_A_indexp);
+			else
+			{
+				mach.addcode (OpLD_A_n);
+			}
+		}
+	| error { badLD_A (mach, $1); };
+;
+
+br_LD_A_args:
+	com_LD_A_args
+	| exp requireEndLine { mach.addcode (OpLD_A_n); }
+;	
+
+com_LD_A_args:
+	LD_A_IorR requireEndLine
+	| regsimple_code requireEndLine { mach.addcode (OpLD_A_r); }
+	| regundoc requireEndLine       { mach.addcode (OpLD_A_undoc); }
+	| br_indIXYdesp_pref            { mach.addcode (OpLD_A_idesp); }
+	| br_indBC requireEndLine       { mach.addcode (OpLD_A_indBC); }
+	| br_indDE requireEndLine       { mach.addcode (OpLD_A_indDE); }
+	| br_indHL requireEndLine       { mach.addcode (OpLD_A_indHL); }
+	| '[' exp requireBrClose requireEndLine
+		{
+			mach.addcode (OpLD_A_indexp);
+		}
+	| '[' error { badLD_A_bracket (mach, $2); }
+;
+
+LD_A_IorR:
+	TypeI { mach.addcode (OpLD_A_I); }
+	| TypeR { mach.addcode (OpLD_A_R); }
+;
+
+LD_indHL_arg:
+	regsimple_code requireEndLine { mach.addcode (OpLD_indHL_r); }
+	| exp requireEndLine { mach.addcode (OpLD_indHL_n); }
+;
+
+LD_indBCorDE: requireComma requireA requireEndLine;
+
+LD_rr:
+	TypeHL requireComma LD_HL_arg
+	| regBCDE_code requireComma LD_rr_arg
+	| regIXY_pref requireComma LD_IXY_arg
+;
+
+br_LD_rr:
+	TypeHL requireComma br_LD_HL_arg
+	| regBCDE_code requireComma br_LD_rr_arg
+	| regIXY_pref requireComma br_LD_IXY_arg
+;
+
+LD_HL_arg:
+	'[' LD_HL_bracket
+	| exp requireEndLine
+		{
+			if (isparenexp ($1) )
+				mach.addcode (OpLD_HL_indexp);
+			else
+				mach.addcode (OpLD_HL_nn);
+		}
+	| error { mach.unexpected ($1, "as second argument of LD rr"); }
+;
+
+LD_rr_arg:
+	'[' LD_rr_bracket
+	| exp requireEndLine
+		{
+			if (isparenexp ($1) )
+				mach.addcode (OpLD_rr_indexp);
+			else
+				mach.addcode (OpLD_rr_nn);
+		}
+	| error { mach.unexpected ($1, "as second argument of LD rr"); }
+;
+
+br_LD_HL_arg:
+	'[' LD_HL_bracket
+	| exp requireEndLine { mach.addcode (OpLD_HL_nn); }
+;
+
+br_LD_rr_arg:
+	'[' LD_rr_bracket
+	| exp requireEndLine { mach.addcode (OpLD_rr_nn); }
+;
+
+LD_HL_bracket:
+	exp requireBrClose requireEndLine { mach.addcode (OpLD_HL_indexp); }
+	| error { mach.unexpected ($1, "in 'LD rr, ['"); }
+;
+
+LD_rr_bracket:
+	exp requireBrClose requireEndLine { mach.addcode (OpLD_rr_indexp); }
+	| error { mach.unexpected ($1, "in 'LD rr, ['"); }
+;
+
+LD_IXY_arg:
+	'[' LD_IXY_bracket
+	| exp requireEndLine
+		{
+			if (isparenexp ($1) )
+				mach.addcode (OpLD_IXY_indexp);
+			else
+				mach.addcode (OpLD_IXY_nn);
+		}
+	| error { mach.unexpected ($1, "as second argument of LD IXY"); }
+;
+
+br_LD_IXY_arg:
+	'[' LD_IXY_bracket
+	| exp requireEndLine { mach.addcode (OpLD_IXY_nn); }
+;
+
+LD_IXY_bracket:
+	exp requireBrClose requireEndLine { mach.addcode (OpLD_IXY_indexp); }
+	| error { mach.unexpected ($1, "in 'LD IXY, ['"); }
+;
+
+LD_SP_arg:
+	com_LD_SP_arg requireEndLine
+	| exp requireEndLine
+		{
+			if (isparenexp ($1) )
+				mach.addcode (OpLD_SP_indexp);
+			else
+				mach.addcode (OpLD_SP_nn);
+		}
+;
+
+br_LD_SP_arg:
+	com_LD_SP_arg requireEndLine
+	| exp requireEndLine
+		{
+			mach.addcode (OpLD_SP_nn);
+		}
+;
+
+com_LD_SP_arg:
+	TypeHL      { mach.addcode (OpLD_SP_HL); };
+	| TypeIX    { mach.addcode (OpLD_SP_IX); };
+	| TypeIY    { mach.addcode (OpLD_SP_IY); };
+	| br_exp_br { mach.addcode (OpLD_SP_indexp); }
+;
+
+LD_indexp_arg:
+	TypeA    { mach.addcode (OpLD_indexp_A); }
+	| TypeBC { mach.addcode (OpLD_indexp_BC); }
+	| TypeDE { mach.addcode (OpLD_indexp_DE); }
+	| TypeHL { mach.addcode (OpLD_indexp_HL); }
+	| TypeSP { mach.addcode (OpLD_indexp_SP); }
+	| TypeIX { mach.addcode (OpLD_indexp_IX); }
+	| TypeIY { mach.addcode (OpLD_indexp_IY); }
+;
+
+/**********************************************************
+		LDA 8080 instruction
+***********************************************************/
+
+instLDA_8080: TypeLDA_8080 LDAarg requireEndLine;
+
+LDAarg:
+	exp     { mach.addcode (OpLD_A_indexp); }
+	| error { badLDA (mach, $1); };
+;
+
+/**********************************************************
+		LDAX 8080 instruction
+***********************************************************/
+
+instLDAX_8080: TypeLDAX_8080 LDAXarg requireEndLine;
+
+LDAXarg:
+	TypeB   { mach.addcode (OpLD_A_indBC); }
+	| TypeD { mach.addcode (OpLD_A_indDE); }
+	| error { badLDAX (mach, $1); }
+;
+
+/**********************************************************
+		LHLD 8080 instruction
+***********************************************************/
+
+instLHLD_8080: TypeLHLD_8080 LHLDarg requireEndLine;
+
+LHLDarg:
+	exp     { mach.addcode (OpLD_HL_indexp); }
+	| error { badLHLD (mach, $1); }
+;
+	
+/**********************************************************
+		LXI 8080 instruction
+***********************************************************/
+
+instLXI_8080: TypeLXI_8080 LXIargs requireEndLine;
+
+LXIargs:
+	regdoubleBorDorSP requireComma LXI_rr_arg
+	| TypeH requireComma LXI_H_arg
+	| error { badLXI (mach, $1); }
+;
+
+LXI_H_arg:
+	exp { mach.addcode (OpLD_HL_nn); }
+	| error { badLXI_rr (mach, $1); }
+;
+
+LXI_rr_arg:
+	exp { mach.addcode (OpLD_rr_nn); }
+	| error { badLXI_rr (mach, $1); }
+;
+
+/**********************************************************
+		MOV 8080 instruction
+***********************************************************/
+
+instMOV_8080: TypeMOV_8080 MOVargs requireEndLine;
+
+MOVargs:
+	/*regsimple8080noM requireComma MOV_noM_arg*/
+	regsimple_code requireComma MOV_noM_arg
+	| regM_8080 requireComma MOV_M_arg
+	| error { badMOV (mach, $1); }
+
+MOV_noM_arg:
+	regsimple8080 { mach.addcode (OpLD_r_r); }
+	| error { badMOV_r (mach, $1); }
+;
+
+MOV_M_arg:
+	/*regsimple8080noM { mach.addcode (OpLD_r_r); }*/
+	regsimple_code { mach.addcode (OpLD_r_r); }
+	| error { badMOV_M (mach, $1); }
+;
+
+/**********************************************************
+		MVI 8080 instruction
+***********************************************************/
+
+instMVI_8080: TypeMVI_8080 MVIargs requireEndLine;
+
+MVIargs: regsimple8080 requireComma MVI_r
+	| error { badLD (mach, $1); }
+;
+
+MVI_r: exp { mach.addcode (OpLD_r_n); }
+	| error { badLDr (mach, $1); }
+;
+
+/**********************************************************
+		OR instruction
+***********************************************************/
+
+instOR:    TypeOR { mach.addcode (valtiOR); } likeCParg;
+br_instOR: TypeOR { mach.addcode (valtiOR); } br_likeCParg;
+
+/**********************************************************
+		ORA 8080 instruction
+***********************************************************/
+
+instORA_8080: TypeORA_8080 { mach.addcode (valtiOR); } likeADD_8080;
+
+/**********************************************************
+		ORI 8080 instruction
+***********************************************************/
+
+instORI_8080: TypeORI_8080 { mach.addcode (valtiOR); } likeADI;
+
+/**********************************************************
+		OUT instruction
+***********************************************************/
+
+instOUT:    TypeOUT OUTargs    requireEndLine;
+br_instOUT: TypeOUT br_OUTargs requireEndLine;
+
+OUTargs:
+	'[' OUTbracket
+	| '(' OUTparen
+	| error { badOUTarg (mach, $1); } 
+;
+
+br_OUTargs:
+	'[' OUTbracket
+	| error { badbr_OUTarg (mach, $1); } 
+;
+
+OUTbracket:
+	TypeC requireBrClose requireComma OUT_c_
+	| exp requireBrClose OUT_exp_
+	| error { badOUTbracket (mach, $1); }
+;
+
+OUTparen:
+	TypeC requireClose requireComma OUT_c_
+	| exp requireClose OUT_exp_
+	| error { badOUTparen (mach, $1); }
+;
+
+OUT_c_:
+	regsimple_code { mach.addcode (OpOUT_C_); }
+	| error { badOUTc_arg (mach, $1); }
+;
+
+OUT_exp_: requireComma requireA { mach.addcode (OpOUT_n_); };
+
+/**********************************************************
+		OUT 8080 instruction
+***********************************************************/
+
+instOUT_8080: TypeOUT_8080 OUT_8080arg requireEndLine;
+
+OUT_8080arg:
+	exp { mach.addcode (OpOUT_n_); }
+	| error { badOUTarg (mach, $1); } 
+;
+
+/**********************************************************
+		POP instruction
+***********************************************************/
+
+instPOP: TypePOP { mach.addcode (value_0); } likePUSH;
+
+/**********************************************************
+		POP 8080 instruction
+***********************************************************/
+
+instPOP_8080: TypePOP_8080 { mach.addcode (value_0); } likePUSH_8080;
+
+/**********************************************************
+		PUSH instruction
+***********************************************************/
+
+instPUSH: TypePUSH { mach.addcode (value_1); } likePUSH;
+
+/**********************************************************
+		PUSH 8080 instruction
+***********************************************************/
+
+instPUSH_8080: TypePUSH_8080 { mach.addcode (value_1); } likePUSH_8080;
+
+/**********************************************************
+		RET instruction
+***********************************************************/
+
+instRET: TypeRET RET_arg;
+
+RET_arg:
+	TypeEndLine { mach.addcode (OpRET); }
+	| flag_val requireEndLine { mach.addcode (OpRET_flag); }
+	| error { badRET (mach, $1); }
+;
+
+/**********************************************************
+		RES instruction
+***********************************************************/
+
+instRES:    TypeRES { mach.addcode (valcodeRES); } BIT_exp likeBIT_second;
+br_instRES: TypeRES { mach.addcode (valcodeRES); } BIT_exp br_likeBIT_second;
+
+/**********************************************************
+		RL instruction
+***********************************************************/
+
+instRL:    TypeRL { mach.addcode (valcodeRL); } likeRL_arg;
+br_instRL: TypeRL { mach.addcode (valcodeRL); } br_likeRL_arg;
+
+/**********************************************************
+		RLC instruction
+***********************************************************/
+
+instRLC:    TypeRLC { mach.addcode (valcodeRLC); } likeRL_arg;
+br_instRLC: TypeRLC { mach.addcode (valcodeRLC); } br_likeRL_arg;
+
+/**********************************************************
+		RR instruction
+***********************************************************/
+
+instRR:    TypeRR { mach.addcode (valcodeRR); } likeRL_arg;
+br_instRR: TypeRR { mach.addcode (valcodeRR); } br_likeRL_arg;
+
+/**********************************************************
+		RRC instruction
+***********************************************************/
+
+instRRC:    TypeRRC { mach.addcode (valcodeRRC); } likeRL_arg;
+br_instRRC: TypeRRC { mach.addcode (valcodeRRC); } br_likeRL_arg;
+
+/**********************************************************
+		RST instruction
+***********************************************************/
+
+instRST: TypeRST RSTarg;
+
+RSTarg:
+	exp requireEndLine { mach.addcode (OpRST); }
+	| error { badRSTarg (mach, $1); }
+;
+
+/**********************************************************
+		RST_8080 instruction
+***********************************************************/
+
+instRST_8080: TypeRST_8080 RST_8080arg;
+
+RST_8080arg:
+	exp requireEndLine { mach.addcode (OpRST); }
+	| error { badRSTarg (mach, $1); }
+;
+
+/**********************************************************
+		SBB 8080 instruction
+***********************************************************/
+
+instSBB_8080: TypeSBB_8080 { mach.addcode (valtiSBCA); } likeADD_8080;
+
+/**********************************************************
+		SBI 8080 instruction
+***********************************************************/
+
+instSBI_8080: TypeSBI_8080 { mach.addcode (valtiSBCA); } likeADI;
+
+/**********************************************************
+		SBC instruction
+***********************************************************/
+
+instSBC:    TypeSBC SBC_args;
+br_instSBC: TypeSBC br_SBC_args;
+
+SBC_args:
+	TypeA requireComma { mach.addcode (valtiSBCA); } likeADD_A_arg
+	| TypeHL requireComma SBC_HL_arg
+	| error { badSBCarg (mach, $1); }
+;
+
+br_SBC_args:
+	TypeA requireComma { mach.addcode (valtiSBCA); } br_likeADD_A_arg
+	| TypeHL requireComma SBC_HL_arg
+	| error { badSBCarg (mach, $1); }
+;
+
+SBC_HL_arg:
+	regBCDEHLSP_code requireEndLine { mach.addcode (OpSBC_HL); }
+	| error { badSBChl_arg (mach, $1); }
+;
+
+/**********************************************************
+		SET instruction
+***********************************************************/
+
+instSET:    TypeSET { mach.addcode (valcodeSET); } BIT_exp likeBIT_second;
+br_instSET: TypeSET { mach.addcode (valcodeSET); } BIT_exp br_likeBIT_second;
+
+/**********************************************************
+		SHLD 8080 instruction
+***********************************************************/
+
+instSHLD_8080: TypeSHLD_8080 SHLDargs requireEndLine;
+
+SHLDargs:
+	exp { mach.addcode (OpLD_indexp_HL); }
+	| error { badSHLD (mach, $1); }
+;
+
+/**********************************************************
+		SLA instruction
+***********************************************************/
+
+instSLA:    TypeSLA { mach.addcode (valcodeSLA); } likeRL_arg;
+br_instSLA: TypeSLA { mach.addcode (valcodeSLA); } br_likeRL_arg;
+
+/**********************************************************
+		SLL instruction
+***********************************************************/
+
+instSLL:    TypeSLL { mach.addcode (valcodeSLL); } likeRL_noundoc;
+br_instSLL: TypeSLL { mach.addcode (valcodeSLL); } br_likeRL_noundoc;
+
+/**********************************************************
+		SRA instruction
+***********************************************************/
+
+instSRA:    TypeSRA { mach.addcode (valcodeSRA); } likeRL_arg;
+br_instSRA: TypeSRA { mach.addcode (valcodeSRA); } br_likeRL_arg;
+
+/**********************************************************
+		SRL instruction
+***********************************************************/
+
+instSRL:    TypeSRL { mach.addcode (valcodeSRL); } likeRL_arg;
+br_instSRL: TypeSRL { mach.addcode (valcodeSRL); } br_likeRL_arg;
+
+/**********************************************************
+		STA 8080 instruction
+***********************************************************/
+
+instSTA_8080: TypeSTA_8080 STAarg requireEndLine;
+
+STAarg:
+	exp
+		{
+			/*mach.addcode (valTypeA);*/
+			mach.addcode (OpLD_indexp_A);
+		}
+	| error { badSTA (mach, $1); }
+;
+
+/**********************************************************
+		STAX 8080 instruction
+***********************************************************/
+
+instSTAX_8080: TypeSTAX_8080 STAXarg requireEndLine;
+
+STAXarg:
+	TypeB   { mach.addcode (OpLD_indBC); }
+	| TypeD { mach.addcode (OpLD_indDE); }
+	| error { mach.unexpected ($1, "as STAX arg"); }
+;
+
+/**********************************************************
+		SUB instruction
+***********************************************************/
+
+instSUB:    TypeSUB { mach.addcode (valtiSUB); } likeCParg;
+br_instSUB: TypeSUB { mach.addcode (valtiSUB); } br_likeCParg;
+
+/**********************************************************
+		SUB 8080 instruction
+***********************************************************/
+
+instSUB_8080: TypeSUB_8080 { mach.addcode (valtiSUB); } likeADD_8080;
+
+/**********************************************************
+		SUI 8080 instruction
+***********************************************************/
+
+instSUI_8080: TypeSUI_8080 { mach.addcode (valtiSUB); } likeADI;
+
+/**********************************************************
+		XOR instruction
+***********************************************************/
+
+instXOR:    TypeXOR { mach.addcode (valtiXOR); } likeCParg;
+br_instXOR: TypeXOR { mach.addcode (valtiXOR); } br_likeCParg;
+
+/**********************************************************
+		XRA 8080 instruction
+***********************************************************/
+
+instXRA_8080: TypeXRA_8080 { mach.addcode (valtiXOR); } likeADD_8080;
+
+/**********************************************************
+		XRI 8080 instruction
+***********************************************************/
+
+instXRI_8080: TypeXRI_8080 { mach.addcode (valtiXOR); } likeADI;
+
+/**********************************************************
+		XTHL 8080 instruction
+***********************************************************/
+
+instXTHL_8080: TypeXTHL_8080 requireEndLine
+	{ mach.addcode (OpEX_indSP_HL); }
+;
+
+/**********************************************************
+
+		Common to several instructions
+
+***********************************************************/
+
+/**********************************************************
+		Identifier list in EXTRN, LOCAL, PUBLIC.
+***********************************************************/
+
+VarList: VarListItem VarListMore;
+
+VarListMore:
+	TypeEndLine
+	| check_next_arg VarList
+;
+
+VarListItem:
+	TypeIdentifier
+		{
+			mach.addcode (OpAddVarItem);
+			mach.addcodeliteral ($1.identifier () );
+		}
+	| error { badIdentifier (mach, $1); }
+;
+
+/**********************************************************
+		Like 8080 ADD arguments
+***********************************************************/
+
+likeADD_8080:
+	regsimple8080 requireEndLine { mach.addcode (OpCP_r); }
+	| error { badLikeADD_8080 (mach, $1, $-1); }
+;
+
+/**********************************************************
+		Like 8080 ADI arguments
+***********************************************************/
+
+likeADI:
+	exp requireEndLine { mach.addcode (OpCP_n); }
+	| error { badLikeADI (mach, $1, $-1); }
+;
+
+/**********************************************************
+		Like ADD A arguments
+***********************************************************/
+
+likeADD_A_arg:
+	likeCP_or_ADD_arg
+	| exp requireEndLine
+		{
+			checkugly (mach, $1);
+			mach.addcode (OpCP_n);
+		}
+	| '(' any_but_HL_IX_IY_exp { badLikeADD_A_paren (mach, $2, $-3); }
+	| '[' error  { badLikeADD_A_bracket (mach, $2, $-3); }
+	| error { badLikeADD_A_arg (mach, $1, $-3); }
+;
+
+br_likeADD_A_arg:
+	br_likeCP_or_ADD_arg
+	| '[' error  { badLikeADD_A_bracket (mach, $2, $-3); }
+	| error { badLikeADD_A_arg (mach, $1, $-3); }
+;
+
+/**********************************************************
+		Like CP arguments
+***********************************************************/
+
+likeCParg:
+	likeCP_or_ADD_arg
+	| exp requireEndLine
+		{
+			checkugly (mach, $1);
+			mach.addcode (OpCP_n);
+		}
+	| '(' any_but_HL_IX_IY_exp { badLikeCP_paren (mach, $2, $-1); }
+	| '[' error  { badLikeCP_bracket (mach, $2, $-1); }
+	| error { badLikeCP_arg (mach, $1, $-1); }
+;
+
+br_likeCParg:
+	br_likeCP_or_ADD_arg
+	| '[' error  { badLikeCP_bracket (mach, $2, $-1); }
+	| error { badLikeCP_arg (mach, $1, $-1); }
+;
+
+/**********************************************************
+		Like CP or ADD arguments
+***********************************************************/
+
+likeCP_or_ADD_arg:
+	com_likeCP_or_ADD_arg
+	| par_indHL requireEndLine           { mach.addcode (OpCP_indHL); }
+	| par_indIXYdesp_pref requireEndLine { mach.addcode (OpCP_idesp); }
+;
+
+br_likeCP_or_ADD_arg:
+	com_likeCP_or_ADD_arg
+	| exp requireEndLine { mach.addcode (OpCP_n); }
+;
+
+com_likeCP_or_ADD_arg:
+	regsimple_code requireEndLine       { mach.addcode (OpCP_r); }
+	| regundoc requireEndLine           { mach.addcode (OpCP_undoc); }
+	| br_indHL requireEndLine           { mach.addcode (OpCP_indHL); }
+	| br_indIXYdesp_pref requireEndLine { mach.addcode (OpCP_idesp); }
+;
+
+/**********************************************************
+		Like INC arguments
+***********************************************************/
+
+likeINC_arg:
+	com_likeINC_arg requireEndLine
+	| likeINC_paren requireEndLine
+	| error { badINCarg (mach, $1, $-1); }
+;
+
+br_likeINC_arg:
+	com_likeINC_arg requireEndLine
+	| error { badINCarg (mach, $1, $-1); }
+;
+
+com_likeINC_arg:
+	likeINC_r
+	| likeINC_double
+	| likeINC_undoc
+	| likeINC_bracket
+;
+
+/* INC A , INC B , INC C , INC D , INC E , INC H , INC L */
+
+likeINC_r: regsimple_code { mach.addcode (OpINC_r); };
+
+/* INC BC , INC DE , INC HL , INC SP , INC IX , INC IY */
+
+likeINC_double:
+	regBCDEHLSP_code { mach.addcode (OpINC_rr); }
+	| TypeIX { mach.addcode (OpINC_IX); }
+	| TypeIY { mach.addcode (OpINC_IY); }
+;
+
+/* INC IXH , INC IXL , INC IYH , INC IYL */
+
+likeINC_undoc:
+	regundoc { mach.addcode (OpINC_undoc); }
+;
+
+/* INC [HL], INC [IX+des] , INC [IY+des] */
+
+likeINC_bracket: '[' likeINC_bracketarg;
+
+likeINC_bracketarg:
+	HLBrClose                 { mach.addcode (OpINC_indHL); }
+	| bracket_indIXYdesp_pref { mach.addcode (OpINC_idesp); }
+	| error { badINCbracket (mach, $1, $-2); }
+;
+
+/* INC (HL) , INC (IX+des) , INC (IY+des) */
+
+likeINC_paren: '(' likeINC_parenarg;
+
+likeINC_parenarg:
+	HLClose                 { mach.addcode (OpINC_indHL); }
+	| paren_indIXYdesp_pref { mach.addcode (OpINC_idesp); }
+	| error { badINCparen (mach, $1, $-2); }
+;
+
+/**********************************************************
+		Like INR 8080 argument
+***********************************************************/
+
+likeINR: 
+	regsimple8080 requireEndLine { mach.addcode (OpINC_r); }
+	| error { badLikeINR (mach, $1, $-1); }
+;
+
+/**********************************************************
+		Like INX 8080 argument
+***********************************************************/
+
+likeINX:
+	regdouble8080 requireEndLine { mach.addcode (OpINC_rr); }
+	| error { badLikeINX (mach, $1, $-1); }
+;
+
+/**********************************************************
+		Like PUSH argument
+***********************************************************/
+
+likePUSH:
+	likePUSH_arg requireEndLine
+	| error          { badLikePUSH (mach, $1, $-1); }
+;
+
+likePUSH_arg:
+	regAFBCDEHL_code { mach.addcode (OpPUSH_rr); }
+	| TypeIX         { mach.addcode (OpPUSH_IX); }
+	| TypeIY         { mach.addcode (OpPUSH_IY); }
+;
+
+/**********************************************************
+		Like PUSH 8080 argument
+***********************************************************/
+
+likePUSH_8080:
+	regdouble8080PSW requireEndLine { mach.addcode (OpPUSH_rr); }
+	| error { badLikePUSH (mach, $1, $-1); }
+;
+
+/**********************************************************
+		Like RL arguments
+***********************************************************/
+
+likeRL_arg:
+	likeRLorBIT_arg requireEndLine
+	| '(' error { badLikeRLparen   (mach, $2, $-1); }
+	| '[' error { badLikeRLbracket (mach, $2, $-1); }
+	| error     { badLikeRLarg     (mach, $1, $-1); }
+;
+
+br_likeRL_arg:
+	br_likeRLorBIT_arg requireEndLine
+	| '[' error { badLikeRLbracket (mach, $2, $-1); }
+	| error     { badLikeRLarg     (mach, $1, $-1); }
+;
+
+likeRL_noundoc:
+	likeRLorBIT_noundoc requireEndLine
+	| '(' error { badLikeRLparen       (mach, $2, $-1); }
+	| '[' error { badLikeRLbracket     (mach, $2, $-1); }
+	| error     { badLikeRLarg_noundoc (mach, $1, $-1); }
+;
+
+br_likeRL_noundoc:
+	br_likeRLorBIT_noundoc requireEndLine
+	| '[' error { badLikeRLbracket     (mach, $2, $-1); }
+	| error     { badLikeRLarg_noundoc (mach, $1, $-1); }
+;
+
+/**********************************************************
+		Like BIT arguments
+***********************************************************/
+
+BIT_exp:
+	exp requireComma { mach.addcode (OpEvalBitInst); }
+	| error { badLikeBITarg (mach, $1, $0); }
+;
+
+likeBIT_second:
+	likeRLorBIT_noundoc requireEndLine
+	| '(' error { badLikeBITn_paren   (mach, $2, $-2); }
+	| '[' error { badLikeBITn_bracket (mach, $2, $-2); }
+	| error     { badLikeBITn_arg     (mach, $1, $-2); }
+;
+
+br_likeBIT_second:
+	br_likeRLorBIT_noundoc requireEndLine
+	| '[' error { badLikeBITn_bracket (mach, $2, $-2); }
+	| error     { badLikeBITn_arg     (mach, $1, $-2); }
+;
+
+/**********************************************************
+		Like RL or BIT arguments
+***********************************************************/
+
+likeRLorBIT_arg:
+	com_likeRLorBIT_arg
+	| par_indHL           { mach.addcode (OpRL_indhl); }
+	| par_indIXYdesp_pref { mach.addcode (OpRL_idesp); }
+;
+
+br_likeRLorBIT_arg:
+	com_likeRLorBIT_arg
+;
+
+com_likeRLorBIT_arg:
+	regsimple_code       { mach.addcode (OpRL_r); }
+	| br_indHL           { mach.addcode (OpRL_indhl); }
+	| br_indIXYdesp_pref { mach.addcode (OpRL_idesp); }
+	| regundoc           { mach.addcode (OpRL_undoc); }
+;
+
+likeRLorBIT_noundoc:
+	com_likeRLorBIT_noundoc
+	| par_indHL           { mach.addcode (OpRL_indhl); }
+	| par_indIXYdesp_pref { mach.addcode (OpRL_idesp); }
+;
+
+br_likeRLorBIT_noundoc:
+	com_likeRLorBIT_noundoc
+;
+
+com_likeRLorBIT_noundoc:
+	regsimple_code       { mach.addcode (OpRL_r); }
+	| br_indHL           { mach.addcode (OpRL_indhl); }
+	| br_indIXYdesp_pref { mach.addcode (OpRL_idesp); }
+;
+
+/**********************************************************
+
+		Auxiliar
+
+***********************************************************/
+
+requireEndLine:
+	TypeEndLine
+	| error { mach.expected (Token (TypeEndLine), $1); }
+;
+
+requireComma:
+	','
+	| error { mach.expected (Token (TypeComma), $1); }
+;
+
+check_next_arg:
+	','
+	| error { badnextarg (mach, $1); }
+;
+
+requireClose:
+	')'
+	| error { mach.expected (Token (TypeClose), $1); }
+;
+
+requireBrClose:
+	']'
+	| error { mach.expected (Token (TypeCloseBracket), $1); }
+;
+
+requireCloseExp:
+	')'
+	| error { badexpr (mach, $1); }
+;
+
+requireBrCloseExp:
+	']'
+	| error { badexpr (mach, $1); }
+;
+
+requireIdentifier:
+	TypeIdentifier
+	| error { mach.expected (Token (TypeIdentifier), $1); }
+;
+
+requireA:
+	TypeA
+	| error { mach.expected (Token (TypeA), $1); }
+;
+
+requireC:
+	TypeC
+	| error { mach.expected (Token (TypeC), $1); }
+;
+
+requireLiteral:
+	TypeLiteral
+	| error { mach.expected (Token (TypeLiteral), $1); }
+;
+
+flag_val:
+	jr_flag_val
+	| TypePO { mach.addcode (valflagPO); }
+	| TypePE { mach.addcode (valflagPE); }
+	| TypeP  { mach.addcode (valflagP); }
+	| TypeM  { mach.addcode (valflagM); }
+;
+
+jr_flag_val:
+	TypeNZ   { mach.addcode (valflagNZ); }
+	| TypeZ  { mach.addcode (valflagZ); }
+	| TypeNC { mach.addcode (valflagNC); }
+	| TypeC  { mach.addcode (valflagC); }
+;
+
+
+regsimple8080:
+	regsimple_code
+	| regM_8080
+;	
+
+regsimple_code:
+	regsimpleA_code
+	| regsimpleNoA_code
+;
+
+regM_8080: TypeM_8080 { mach.addcode (valreg_HL_); };
+
+
+regsimpleNoA_code:
+	regsimpleNoHLA_code
+	| regsimpleHL_code
+;
+
+regsimpleHL_code:
+	TypeH   { mach.addcode (valregH); }
+	| TypeL { mach.addcode (valregL); }
+;
+
+regsimpleNoHL_code:
+	regsimpleNoHLA_code
+	| regsimpleA_code
+;
+
+regsimpleA_code: TypeA { mach.addcode (valregA); };
+
+regsimpleNoHLA_code:
+	TypeB   { mach.addcode (valregB); }
+	| TypeC { mach.addcode (valregC); }
+	| TypeD { mach.addcode (valregD); }
+	| TypeE { mach.addcode (valregE); }
+;
+
+regundocix:
+	TypeIXH   { addregIXH (mach); }
+	| TypeIXL { addregIXL (mach); }
+;
+
+regundociy:
+	TypeIYH   { addregIYH (mach); }
+	| TypeIYL { addregIYL (mach); }
+;
+
+regundoc:
+	regundocix
+	| regundociy
+;
+
+regundocX_code:
+	TypeIXH		{ mach.addcode (valregH); }
+	| TypeIXL	{ mach.addcode (valregL); }
+;
+
+regundocY_code:
+	TypeIYH		{ mach.addcode (valregH); }
+	| TypeIYL	{ mach.addcode (valregL); }
+;
+
+regsimpleorundocX_code:
+	regundocX_code
+	| regsimpleNoHL_code
+;
+
+regsimpleorundocY_code:
+	regundocY_code
+	| regsimpleNoHL_code
+;
+
+regBCDEHLSP_code:
+	regBCDEHL_code
+	| regSP_code
+;
+
+regdouble8080:
+	regdouble8080common
+	| regSP_code
+;
+
+regdouble8080PSW:
+	regdouble8080common
+	| TypePSW_8080 { mach.addcode (valregAF); }
+	| TypeA        { mach.addcode (valregAF); }
+;
+
+regdouble8080common:
+	regdoubleBorD
+	| TypeH  { mach.addcode (valregHL); }
+;
+
+regdoubleBorDorSP:
+	regdoubleBorD
+	| regSP_code
+;
+
+regdoubleBorD:
+	TypeB    { mach.addcode (valregBC); }
+	| TypeD  { mach.addcode (valregDE); }
+;
+
+regBCDESP_code:
+	regBCDE_code
+	| regSP_code
+;
+
+regAFBCDEHL_code:
+	regBCDEHL_code
+	| TypeAF { mach.addcode (valregAF); }
+;
+
+regBCDEHL_code:
+	regBCDE_code
+	| TypeHL { mach.addcode (valregHL); }
+;
+
+regBCDE_code:
+	TypeBC   { mach.addcode (valregBC); }
+	| TypeDE { mach.addcode (valregDE); }
+;
+
+regSP_code: TypeSP { mach.addcode (valregSP); }
+
+br_exp_br: '[' exp requireBrCloseExp;
+
+par_indBC: '(' TypeBC requireClose;
+br_indBC:  '[' TypeBC requireBrClose;
+par_indDE: '(' TypeDE requireClose;
+br_indDE:  '[' TypeDE requireBrClose;
+par_indHL: '(' TypeHL requireClose;
+br_indHL:  '[' TypeHL requireBrClose;
+par_indSP: '(' TypeSP requireClose;
+br_indSP:  '[' TypeSP requireBrClose;
+par_indIX: '(' TypeIX requireClose;
+par_indIY: '(' TypeIY requireClose;
+
+HLClose:   TypeHL requireClose;
+HLBrClose: TypeHL requireBrClose;
+IXBrClose: TypeIX requireBrClose;
+IYBrClose: TypeIY requireBrClose;
+
+regIXY_pref:
+	TypeIX   { mach.addcode (valprefixIX); }
+	| TypeIY { mach.addcode (valprefixIY); }
+;
+
+bracket_indIXYdesp_pref:
+	regIXY_pref br_tailIXYdesp
+;
+
+paren_indIXYdesp_pref:
+	regIXY_pref par_tailIXYdesp
+;
+
+br_indIXYdesp_pref:
+	'[' regIXY_pref br_tailIXYdesp
+;
+
+par_indIXYdesp_pref:
+	'(' regIXY_pref par_tailIXYdesp
+;
+
+par_tailIXYdesp:
+	')'                    { mach.addcode (0); }
+	| '+' exp requireClose
+	| '-' exp requireClose { mach.addcode (OpUnMinus); }
+	| error { mach.unexpected ($1, "'+', '-' or ')' expected"); }
+;
+
+br_tailIXYdesp:
+	']'                      { mach.addcode (0); }
+	| '+' exp requireBrClose
+	| '-' exp requireBrClose { mach.addcode (OpUnMinus); }
+	| error { mach.unexpected ($1, "'+', '-' or ']' expected"); }
+;
+
+/**********************************************************
+
+		Expressions
+
+***********************************************************/
+
+exp: condexp;
+
+condexp:
+	base
+	| base '?' conditional { $$= value_0; }
+;
+
+conditional:
+	exp condarg;
+	| error { badcond (mach, $1); }
+;
+
+condarg:
+	':' condarg2;
+	| error { badcond2 (mach, $1); }
+;
+
+condarg2:
+	condexp { mach.addcode (OpConditional); }
+	| error { badcond3 (mach, $1); }
+;
+
+base:
+	paren
+		{ $$= value_1; }
+	| primary
+		{ $$= value_0; }
+	| base '*'     base
+		{ mach.addcode (OpMul); $$= value_0; }
+	| base '/'     base
+		{ mach.addcode (OpDiv); $$= value_0; }
+	| base .mod.   base %prec '%'
+		{ mach.addcode (OpMod); $$= value_0; }
+	| base .shl.   base %prec "<<"
+		{ mach.addcode (OpShl); $$= value_0; }
+	| base .shr.   base %prec ">>"
+		{ mach.addcode (OpShr); $$= value_0; }
+	| base '+'     base
+		{ mach.addcode (OpAdd); $$= value_0; }
+	| base '-'     base
+		{ mach.addcode (OpSub); $$= value_0; }
+	| base .eq.    base %prec '='
+		{ mach.addcode (OpEqual); $$= value_0; }
+	| base .ne.    base %prec "!="
+		{ mach.addcode (OpNotEqual); $$= value_0; }
+	| base .le.    base %prec "<="
+		{ mach.addcode (OpLessEqual); $$= value_0; }
+	| base .lt.    base %prec '<'
+		{ mach.addcode (OpLessThan); $$= value_0; }
+	| base .gt.    base %prec '>'
+		{ mach.addcode (OpGreaterThan); $$= value_0; }
+	| base .ge.    base %prec ">="
+		{ mach.addcode (OpGreaterEqual); $$= value_0; }
+	| '+'          base %prec '!'
+		{ mach.addcode (OpUnPlus); $$= value_0; }
+	| '-'          base %prec '!'
+		{ mach.addcode (OpUnMinus); $$= value_0; }
+	| .not.        base %prec '~'
+		{ mach.addcode (OpNot); $$= value_0; }
+	| '!'          base
+		{ mach.addcode (OpBoolNot); $$= value_0; }
+	| base .and.   base %prec '&'
+		{ mach.addcode (OpAnd); $$= value_0; }
+	| base .or.    base %prec '|'
+		{ mach.addcode (OpOr); $$= value_0; }
+	| base .xor.   base %prec TypeXOR
+		{ mach.addcode (OpXor); $$= value_0; }
+	| base "&&"    base
+		{ mach.addcode (OpBoolAnd); $$= value_0; }
+	| base "||"    base
+		{ mach.addcode (OpBoolOr); $$= value_0; }
+	| TypeHIGH     base
+		{ mach.addcode (OpHigh); $$= value_0; }
+	| TypeLOW      base
+		{ mach.addcode (OpLow); $$= value_0; }
+
+	/* Handle error conditions */
+
+	| base '*'     error            { badexpr (mach, $3); }
+	| base '/'     error            { badexpr (mach, $3); }
+	| base .mod.   error %prec '%'  { badexpr (mach, $3); }
+	| base .shl.   error %prec "<<" { badexpr (mach, $3); }
+	| base .shr.   error %prec ">>" { badexpr (mach, $3); }
+	| base '+'     error            { badexpr (mach, $3); }
+	| base '-'     error            { badexpr (mach, $3); }
+	| base .eq.    error %prec '='  { badexpr (mach, $3); }
+	| base .ne.    error %prec "!=" { badexpr (mach, $3); }
+	| base .le.    error %prec "<=" { badexpr (mach, $3); }
+	| base .lt.    error %prec '<'  { badexpr (mach, $3); }
+	| base .gt.    error %prec '>'  { badexpr (mach, $3); }
+	| base .ge.    error %prec ">=" { badexpr (mach, $3); }
+	| '+'          error %prec '!'  { badexpr (mach, $2); }
+	| '-'          error %prec '!'  { badexpr (mach, $2); }
+	| .not.        error %prec '~'  { badexpr (mach, $2); }
+	| '!'          error            { badexpr (mach, $2); }
+	| base .and.   error %prec '&'  { badexpr (mach, $3); }
+	| base .or.    error %prec '|'  { badexpr (mach, $3); }
+	| base .xor.   error            { badexpr (mach, $3); }
+	| base "&&"    error            { badexpr (mach, $3); }
+	| base "||"    error            { badexpr (mach, $3); }
+	| TypeHIGH     error            { badexpr (mach, $2); }
+	| TypeLOW      error            { badexpr (mach, $2); }
+;
+
+paren:
+	'(' exp requireCloseExp
+	| '(' error { badexpr (mach, $2); }
+;
+
+primary:
+	TypeNumber       { mach.addcode ($1.num () ); }
+	| TypeIdentifier { mach.addcode ($1.identifier () ); }
+	| TypeLiteral    { mach.addcodeliteral ($1.literal () ); }
+	| '$'            { mach.addcode (OpDollar); }
+	| TypeDEFINED DEFINEDarg
+	| TypeNUL NULarg
+;
+
+DEFINEDarg:
+	TypeIdentifier
+		{
+			mach.addcode ($1.identifier () );
+			mach.addcode (OpDefined);
+		}
+	| error { badDEFINEDarg (mach, $1); }
+;
+
+NULarg:
+	TypeEndLine { mach.addcode (addrTRUE); }
+	| error     { mach.addcode (addrFALSE); yyclearin; } eatline
+;
+
+eatline:
+	TypeEndLine
+	| error { yyclearin; } eatline
+;
+
+/**********************************************************
+
+		Groups of tokens
+
+***********************************************************/
+
+any_but_HL_IX_IY_exp:
+	TypeEndLine
+	| reg_but_HL_IX_IY_notflag
+	| token_flag
+	| binary_op
+	| token_directive
+	| token_instruction_notoperator
+;
+
+token_with_name:
+	reg_not_flag
+	| token_flag
+	| token_directive
+	| token_instruction_notoperator
+	| op_name
+;
+
+reg_not_flag:
+	reg_but_HL_IX_IY_notflag
+	| TypeHL | TypeIX | TypeIY
+;
+
+reg_but_HL_IX_IY_notflag:
+	TypeA | TypeB | TypeD | TypeE | TypeH | TypeL
+	| TypeI | TypeR
+	| TypeIXH | TypeIXL | TypeIYH | TypeIYL
+	| TypeAF | TypeBC | TypeDE | TypeSP
+;
+
+binary_op: binary_op_noname | binary_op_name;
+
+op_name: binary_op_name | unary_op_name;
+
+binary_op_noname:
+	'*' | '/'
+	| '%' | "<<" | ">>"
+	| '=' | "!=" | "<=" | '<' | ">=" | '>'
+	| '&' | '|'  | "&&" | "||"
+;
+
+binary_op_name:
+	TypeMOD | TypeSHL | TypeSHR
+	| TypeEQ | TypeNE | TypeLE | TypeLT | TypeGE | TypeGT
+	| TypeAND | TypeOR | TypeXOR
+;
+
+/*
+unary_op: '+' | '-' | .not. | '!' | TypeHIGH | TypeLOW;
+
+any_op: unary_op | binary_op;
+*/
+
+unary_op_name: TypeHIGH | TypeLOW;
+
+token_flag:
+	token_jr_flag
+	| TypePO | TypePE | TypeP | TypeM
+;
+
+token_jr_flag: TypeNZ | TypeZ | TypeNC | TypeC;
+
+token_directive:
+	.defb. | .defw. | .defs.
+	| TypeELSE
+	| TypeEND
+	| TypeENDIF
+	| TypeENDM
+	| TypeENDP
+	| TypeEQU
+	| TypeEXTRN
+	| TypeDEFL
+	| TypeIF
+	| TypeIF1
+	| TypeIF2
+	| TypeIFDEF
+	| TypeIFNDEF
+	| TypeINCBIN
+	| TypeINCLUDE
+	| TypeIRP
+	| TypeIRPC
+	| TypeLOCAL
+	| TypeMACRO
+	| TypeORG
+	| TypePROC
+	| TypePUBLIC
+	| TypeREPT
+	| TypeEXITM
+	| Type_8080
+	| Type_DEPHASE
+	| Type_ERROR
+	| Type_PHASE
+	| Type_SHIFT
+	| Type_WARNING
+	| Type_Z80
+;
+
+.defb.: TypeDEFB | TypeDB | TypeDEFM;
+
+.defw.: TypeDEFW | TypeDW;
+
+.defs.: TypeDEFS | TypeDS;
+
+token_instruction_notoperator:
+	token_instruction_with_args_notoperator
+	| token_instruction_without_args
+;
+
+/*
+token_instruction:
+	token_instruction_with_args
+	| token_instruction_without_args
+;
+
+token_instruction_with_args:
+	token_instruction_with_args_notoperator
+	| TypeAND | TypeOR | TypeXOR
+;
+*/
+
+token_instruction_with_args_notoperator:
+	TypeADC   | TypeADD  | TypeBIT | TypeCALL | TypeCP
+	| TypeDEC | TypeDJNZ | TypeEX  | TypeIM   | TypeIN
+	| TypeINC | TypeJP   | TypeJR  | TypeLD   | TypeOUT
+	| TypePOP | TypePUSH | TypeRES | TypeRET  | TypeRL
+	| TypeRLC | TypeRR   | TypeRRC | TypeRST  | TypeSBC
+	| TypeSET | TypeSLA  | TypeSLL | TypeSRA  | TypeSRL
+	| TypeSUB
+;
+
+token_instruction_without_args:
+	TypeCCF   
+	| TypeCPD
+	| TypeCPDR
+	| TypeCPI
+	| TypeCPIR
+	| TypeCPL
+	| TypeDAA
+	| TypeDI
+	| TypeEI
+	| TypeEXX
+	| TypeHALT
+	| TypeIND
+	| TypeINDR
+	| TypeINI
+	| TypeINIR
+	| TypeLDD
+	| TypeLDDR
+	| TypeLDI
+	| TypeLDIR
+	| TypeNEG
+	| TypeNOP
+	| TypeOTDR
+	| TypeOTIR
+	| TypeOUTD
+	| TypeOUTI
+	| TypeSCF
+	| TypeRETI
+	| TypeRETN
+	| TypeRLA
+	| TypeRLCA
+	| TypeRLD
+	| TypeRRA
+	| TypeRRCA
+	| TypeRRD
+
+	| TypeCMA_8080
+	| TypeCMC_8080
+	| TypeHLT_8080
+	| TypePCHL_8080
+	| TypeRAL_8080
+	| TypeRAR_8080
+	| TypeRC_8080
+	| TypeRET_8080
+	| TypeRLC_8080
+	| TypeRM_8080
+	| TypeRNC_8080
+	| TypeRNZ_8080
+	| TypeRP_8080
+	| TypeRPE_8080
+	| TypeRPO_8080
+	| TypeRRC_8080
+	| TypeRZ_8080
+	| TypeSPHL_8080
+	| TypeSTC_8080
+	| TypeXCHG_8080
+;
+
+%%
+
+} /* namespace impl */
+} /* namespace pasmo */
+
+/* End of parser.yxx */

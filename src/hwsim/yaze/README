@@ -1,0 +1,6 @@
+yaze:
+
+this simulator does all the block instructions wrong.
+they are NOT block instructions. they are single steps with an implied relative jump
+the difference is that interrupts can occur between steps, and that there are M1 cycles
+for the instruction fetch for each iteration.

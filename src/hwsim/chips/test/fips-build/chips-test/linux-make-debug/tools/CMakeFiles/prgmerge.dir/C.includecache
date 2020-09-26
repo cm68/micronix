@@ -1,0 +1,42 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/curt/src/micronix/hwsim/chips/chips-test/tools/getopt.c
+getopt.h
+/home/curt/src/micronix/hwsim/chips/chips-test/tools/getopt.h
+stdio.h
+-
+stdarg.h
+-
+string.h
+-
+strings.h
+-
+ctype.h
+-
+
+/home/curt/src/micronix/hwsim/chips/chips-test/tools/getopt.h
+stddef.h
+-
+
+/home/curt/src/micronix/hwsim/chips/chips-test/tools/prgmerge.c
+stdio.h
+-
+stdint.h
+-
+stdbool.h
+-
+stdlib.h
+-
+string.h
+-
+assert.h
+-
+getopt.h
+/home/curt/src/micronix/hwsim/chips/chips-test/tools/getopt.h
+

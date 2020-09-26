@@ -1,0 +1,2 @@
+/usr/bin/ar qc libroms.a  CMakeFiles/roms.dir/dummy.c.o
+/usr/bin/ranlib libroms.a

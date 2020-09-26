@@ -1,0 +1,16 @@
+#! /bin/sh
+
+# My usual config for mingw cross compiling.
+
+HOST=i586-mingw32msvc
+
+if [ ! -d mingw ]
+then
+	mkdir mingw
+fi
+
+cd mingw
+
+../configure --build=`../config.guess` --host=$HOST \
+	"$@" \
+	CXXFLAGS="-O3 -W -Wall -Wunused"
