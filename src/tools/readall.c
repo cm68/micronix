@@ -109,6 +109,7 @@ dofile(char *name, struct dsknod *ip)
     }
 
     sprintf(namebuf, "%s%s", destname, name);
+    unlink(namebuf);
     if ((fd = open(namebuf, O_CREAT | O_RDWR | O_TRUNC)) < 0) {
         perror(namebuf);
     }
@@ -122,6 +123,7 @@ dofile(char *name, struct dsknod *ip)
         write(fd, buf, (size - off > 512) ? 512 : size - off);
     }
     close(fd);
+    chmod(namebuf, ip->mode & 0777);
 }
 
 int
