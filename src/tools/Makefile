@@ -1,4 +1,4 @@
-INCLUDE = -I../include -I../../include
+INCLUDE = -I../include -I../kernel
 
 TARGETS = \
 	ar nm size imd disas dump \
