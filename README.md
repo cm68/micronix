@@ -3,8 +3,22 @@ for a blast from the past, type:
  make test
 
  you now are running micronix 1.4 shell and can do a lot
+ including:
+
+	cd /usr/src/sys
+	make
+
+or, for a quite strange experience,
+
+    src/usersim/sim bin/man sh | less
+
+	(run the simulated z80 micronix man program on sh, and pipe it to linux less)
 
 ---------------------
+
+this document is obsolete, as I've changed the directory structure radically,
+with source code in src, and almost every work in progress thing moved to
+./extra
 
 Morrow Designs Micronix and tools
 
