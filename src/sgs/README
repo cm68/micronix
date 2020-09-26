@@ -1,2 +1,0 @@
-this directory contains tools that interact with the whitesmiths software generation system.
-this should include all the usual tools from unix, like nm, size, cc, ld, etc.

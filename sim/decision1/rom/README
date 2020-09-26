@@ -1,3 +1,0 @@
-the 2 mpz80 roms here are modified to be assembled by pasmo
-into intel hex files suitable for loading into the simulator
-
