@@ -35,6 +35,10 @@ struct image {
     int driver;
     int fd;
     void *drive;
+    char dt;
+    int major;
+    int minor;
+    int altsec;
 #ifdef USE_LIBDSK
     DSK_PDRIVER *drive;
 #endif
@@ -76,6 +80,24 @@ closefs_hook(int i, void *arg)
 }
 
 int
+devnum(char *name, char *dtp, int *majorp, int *minorp)
+{
+    char linkbuf[80];
+
+    int i;
+    i = readlink(name, linkbuf, sizeof(linkbuf));
+    if (i == -1) {
+        return ENOENT;
+    } else {
+        linkbuf[i] = '\0';
+    }
+    if ((i = sscanf(linkbuf, "%cdev(%d,%d)", dtp, majorp, minorp)) != 3) {
+        return ENOENT;
+    }
+    return 0;
+}
+
+int
 openfs(char *filesystem, struct sup **fsp)
 {
     int ret;
@@ -114,6 +136,13 @@ openfs(char *filesystem, struct sup **fsp)
     } 
  
     if (ret >= 0) {
+        i->dt = ' ';
+        i->altsec = 0;
+        devnum(filesystem, &i->dt, &i->major, &i->minor);
+        if ((i->dt == 'b') && (i->major == 2) && (i->minor & 0x8)) {
+            printf("setting altsec\n");
+            i->altsec = 1;
+        }
         *fsp = (struct sup *)i;
         on_exit(closefs_hook, (void *)i);
         readblk(*fsp, 1, i->sb.superblock);
@@ -127,12 +156,13 @@ openfs(char *filesystem, struct sup **fsp)
  * do sector skew
  */
 UINT
-secmap(UINT blkno)
+secmap(struct sup *fs, UINT blkno)
 {
     int trk = blkno / spt;
     int sec = blkno % spt;
+    struct image *i = (struct image *)fs;
 
-    if (altsec) {
+    if (i->altsec) {
         sec <<= 1;
         if (!(spt & 1) && sec >= spt) {
             sec++;
@@ -183,7 +213,7 @@ readblk(struct sup *fs, int blkno, char *buf)
         return 0;
     }
 
-    realblk = secmap(blkno);
+    realblk = secmap(fs, blkno);
     trace(trace_fs, "readblk: %d -> %d\n", blkno, realblk);
 
     if (i->driver == DRIVER_IMAGE) {
@@ -221,7 +251,7 @@ writeblk(struct sup *fs, int blkno, char *buf)
         return 0;
     }
 
-    realblk = secmap(blkno);
+    realblk = secmap(fs, blkno);
     trace(trace_fs, "writeblk: %d -> %d\n", blkno, realblk);
 
     if (i->driver == DRIVER_IMAGE) {

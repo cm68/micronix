@@ -92,7 +92,7 @@ struct openfile {
     int minor;
     char dt;
     int special;        // is a special file needing sector hackery
-    int offset;         // notional file offset
+    long offset;         // notional file offset
     int filesize;
 } files[64];
 
@@ -123,11 +123,12 @@ seekfile(int fd)
     int sec;
     int blkno;
     int blkoff;
-    int new;
+    long new;
 
 
     if ((files[fd].dt == 'b') && (files[fd].offset > files[fd].filesize)) {
-        return ENXIO;
+        errno = ENXIO;
+        return -1;
     }
 
     if ((files[fd].dt != 'b') || 
@@ -1639,13 +1640,11 @@ SystemCall(MACHINE * cp)
             bcopy(&df->buffer[df->offset], &cp->memory[arg1], ret);
             df->offset += ret;
         } else {
-            if (!seekfile(fd)) {
+            if ((ret = seekfile(fd)) == 0) {
                 ret = read(fd, &cp->memory[arg1], arg2);
-            } else {
-                ret = ENXIO;
             }
         }
-        if (ret == -1) {
+        if (ret == 0xffff) {
             ret = errno;
             carry_set();
         } else {
@@ -1655,12 +1654,10 @@ SystemCall(MACHINE * cp)
         break;
 
     case 4:                    /* write (hl), buffer, len */
-        if (!seekfile(fd)) {
+        if ((ret = seekfile(fd)) == 0) {
             ret = write(fd, &cp->memory[arg1], arg2);
-        } else {
-            ret = ENXIO;
         }
-        if (ret == -1) {
+        if (ret == 0xffff) {
             ret = errno;
             carry_set();
         } else {
@@ -1711,7 +1708,9 @@ SystemCall(MACHINE * cp)
                 files[ret].dt = 'r';
                 devnum(filename, &files[ret].dt,
                     &files[ret].major, &files[ret].minor);
-                files[ret].filesize = sbuf.st_size;
+                if (files[ret].dt == 'b') {
+                    files[ret].filesize = sbuf.st_size;
+                }
             }
             carry_clear();
         } else {
@@ -1996,7 +1995,11 @@ SystemCall(MACHINE * cp)
         break;
 
     case 19:                   /* seek fd where mode */
-        i = (short) arg1;
+        if (arg2 % 3) {
+            i = (short) arg1;
+        } else {
+            i = (unsigned short) arg1;
+        }
         if (arg2 > 2) {
             i *= 512;
             arg2 -= 3;
