@@ -35,6 +35,7 @@ int rmcmd();
 int mkdircmd();
 int rmdircmd();
 int fsinfo();
+int iinfo();
 
 struct cmdtab
 {
@@ -42,6 +43,7 @@ struct cmdtab
     int (*handler)(int n, char **a);
     char *usage;
 } cmds[] = {
+    {"inode", iinfo, "inode <inum>" },
     {"fsinfo", fsinfo, "fsinfo" },
     {"empty", emptycmd, "empty <file>" },
     {"info", infocmd, "info <file>" },
@@ -129,6 +131,24 @@ main(argc, argv)
     }
     closefs(fs);
     return (nerror);
+}
+
+int
+iinfo(int c, char **a)
+{
+    int inum;
+    struct dsknod *ip;
+    char *na[20];
+
+    if (!c) return 1;
+    inum = atoi(*++a);
+
+    ip = iget(fs, inum);
+    if (!ip) return 2;
+    sprintf(na, "inum %d\n", inum);
+    isummary(na, ip);
+    ifree(ip); 
+    return 0;
 }
 
 void
