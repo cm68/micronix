@@ -84,18 +84,39 @@ char namebuf[PATH_MAX];
 char workbuf[PATH_MAX];
 
 /*
- * colossal hack for floppy image files -
- * if a file has the sticky bit set, then swizzle
+ * colossal hack for special files
  * the file offset to do alternate sector skew
  */
 struct openfile {
+    int major;
+    int minor;
+    char dt;
     int special;        // is a special file needing sector hackery
-    int offset;        // notional file offset
+    int offset;         // notional file offset
+    int filesize;
 } files[64];
 
 #define SPT 15
 
-void
+int
+devnum(char *name, char *dtp, int *majorp, int *minorp)
+{
+    char linkbuf[80];
+
+    int i;
+    i = readlink(name, linkbuf, sizeof(linkbuf));
+    if (i == -1) {
+        return ENOENT;
+    } else {
+        linkbuf[i] = '\0';
+    }
+    if ((i = sscanf(linkbuf, "%cdev(%d,%d)", dtp, majorp, minorp)) != 3) {
+        return ENOENT;
+    }
+    return 0;
+}
+
+int
 seekfile(int fd)
 {
     int trk;
@@ -104,9 +125,16 @@ seekfile(int fd)
     int blkoff;
     int new;
 
-    if (!files[fd].special) {
+
+    if ((files[fd].dt == 'b') && (files[fd].offset > files[fd].filesize)) {
+        return ENXIO;
+    }
+
+    if ((files[fd].dt != 'b') || 
+        (files[fd].major != 2) || 
+        ((files[fd].minor & 0x8) == 0)) {
         lseek(fd, files[fd].offset, SEEK_SET);
-        return;
+        return 0;
     }
     
     blkno = files[fd].offset / 512;
@@ -127,6 +155,7 @@ seekfile(int fd)
         new, trk, sec);
 #endif
     lseek(fd, new, SEEK_SET);
+    return 0;
 }
 
 /*
@@ -139,6 +168,8 @@ seekfile(int fd)
 char *
 fname(char *orig)
 {
+    char *slash;
+
     /*
      * empty path is . 
      */
@@ -149,7 +180,15 @@ fname(char *orig)
     } else {
         sprintf(workbuf, "%s/%s/%s", rootdir, curdir, orig);
     }
+    /*
+     * now we get really stupid. we use symlinks on the last component
+     * to fake out cdev and bdevs, so only resolve up to that point
+     */
+    slash = strrchr(workbuf, '/');
+    *slash = '\0'; 
     realpath(workbuf, namebuf);
+    *slash = '/';
+    strcat(namebuf, slash);
     return (namebuf);
 }
 
@@ -1600,8 +1639,11 @@ SystemCall(MACHINE * cp)
             bcopy(&df->buffer[df->offset], &cp->memory[arg1], ret);
             df->offset += ret;
         } else {
-            seekfile(fd);
-            ret = read(fd, &cp->memory[arg1], arg2);
+            if (!seekfile(fd)) {
+                ret = read(fd, &cp->memory[arg1], arg2);
+            } else {
+                ret = ENXIO;
+            }
         }
         if (ret == -1) {
             ret = errno;
@@ -1613,8 +1655,11 @@ SystemCall(MACHINE * cp)
         break;
 
     case 4:                    /* write (hl), buffer, len */
-        seekfile(fd);
-        ret = write(fd, &cp->memory[arg1], arg2);
+        if (!seekfile(fd)) {
+            ret = write(fd, &cp->memory[arg1], arg2);
+        } else {
+            ret = ENXIO;
+        }
         if (ret == -1) {
             ret = errno;
             carry_set();
@@ -1662,11 +1707,11 @@ SystemCall(MACHINE * cp)
                         perror(filename);
                     goto lose;
                 }
-                files[ret].special = 0;
                 files[ret].offset = 0;
-                if (sbuf.st_mode & S_ISVTX) {
-                    files[ret].special = 1;
-                }
+                files[ret].dt = 'r';
+                devnum(filename, &files[ret].dt,
+                    &files[ret].major, &files[ret].minor);
+                files[ret].filesize = sbuf.st_size;
             }
             carry_clear();
         } else {
@@ -1883,8 +1928,19 @@ SystemCall(MACHINE * cp)
                 sbuf.st_size = df->end;
             }
             arg2 = arg1;
+            if ((files[fd].dt == 'c') || (files[fd].dt == 'b')) {
+                files[fd].filesize = sbuf.st_size;
+                sbuf.st_mode &= ~S_IFMT;
+                sbuf.st_mode |=
+                    (files[fd].dt == 'c') ? S_IFCHR : S_IFBLK;
+                ip = (struct inode *) &cp->memory[arg2];
+                ip->addr[0] = ((files[fd].major & 0xff) << 8) | 
+                    (files[fd].minor & 0xff);
+            }
         } else {
-            ret = stat(filename = fname(fn), &sbuf);
+            filename = fname(fn);
+            // ret = stat(filename, &sbuf);
+            ret = lstat(filename, &sbuf);
             if (ret) {
                 if (verbose & V_ERROR)
                     perror(filename);
@@ -1893,22 +1949,50 @@ SystemCall(MACHINE * cp)
         if (ret) {
             ret = errno;
             carry_set();
-        } else {
-            ip = (struct inode *) &cp->memory[arg2];
-            ip->dev = sbuf.st_dev;
-            ip->inum = sbuf.st_ino;
-            ip->mode = sbuf.st_mode;
-            ip->nlinks = sbuf.st_nlink;
-            ip->uid = sbuf.st_uid;
-            ip->gid = sbuf.st_gid;
-            ip->size0 = sbuf.st_size >> 16;
-            ip->size1 = sbuf.st_size & 0xffff;
-            ip->rtime = sbuf.st_atime;
-            ip->wtime = sbuf.st_mtime;
-            if (verbose & V_DATA)
-                dumpmem(&get_byte, arg2, 36);
-            carry_clear();
+            break;
         }
+        ip = (struct inode *) &cp->memory[arg2];
+        ip->dev = sbuf.st_dev;
+        ip->inum = sbuf.st_ino;
+        ip->nlinks = sbuf.st_nlink;
+        ip->uid = sbuf.st_uid;
+        ip->gid = sbuf.st_gid;
+        ip->size0 = sbuf.st_size >> 16;
+        ip->size1 = sbuf.st_size & 0xffff;
+        ip->rtime = sbuf.st_atime;
+        ip->wtime = sbuf.st_mtime;
+        ip->mode = (sbuf.st_mode & 07777) | /* IALLOC | */
+            ((sbuf.st_size > (8 * 512)) ? ILARGE : 0);
+        switch (sbuf.st_mode & S_IFMT) {
+        case S_IFDIR:
+            ip->mode |= IDIR;
+            break;
+        case S_IFREG:
+            break;
+        case S_IFLNK:
+            {
+            char dt; int Maj, Min;
+            if ((ret = devnum(filename, &dt, &Maj, &Min)) != 0) {
+                carry_set();
+                break;
+            }
+            ip->addr[0] = ((Maj & 0xff) << 8) | (Min & 0xff);
+            ip->mode |= ((dt == 'c') ? ICIO : IBIO);
+            }
+            break;
+        case S_IFCHR:
+            ip->mode |= ICIO;
+            break;
+        case S_IFBLK:
+            ip->mode |= IBIO;
+            break;
+        default:
+            break;
+        }
+        // ip->mode = sbuf.st_mode;
+        if (verbose & V_DATA)
+            dumpmem(&get_byte, arg2, 36);
+        carry_clear();
         break;
 
     case 19:                   /* seek fd where mode */
