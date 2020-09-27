@@ -17,7 +17,6 @@
 #include "imd.h"
 
 int spt = 15;
-int altsec = 1;
 
 int traceflags;
 int trace_fs;
@@ -103,7 +102,8 @@ openfs(char *filesystem, struct sup **fsp)
     int ret;
     struct image *i = malloc(sizeof(struct image));
     char *ext;
-
+    struct stat sbuf;
+    
     i->driver = DRIVER_IMAGE;
     ext = strrchr(filesystem, '.');
     if (ext) {
@@ -140,8 +140,13 @@ openfs(char *filesystem, struct sup **fsp)
         i->altsec = 0;
         devnum(filesystem, &i->dt, &i->major, &i->minor);
         if ((i->dt == 'b') && (i->major == 2) && (i->minor & 0x8)) {
-            printf("setting altsec\n");
             i->altsec = 1;
+        }
+        if (i->dt == ' ') {
+            stat(filesystem, &sbuf);
+            if (sbuf.st_mode & S_ISVTX) {
+                i->altsec = 1;
+            }    
         }
         *fsp = (struct sup *)i;
         on_exit(closefs_hook, (void *)i);

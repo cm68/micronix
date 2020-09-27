@@ -98,6 +98,7 @@ struct openfile {
 
 #define SPT 15
 
+#ifdef notdef
 int
 devnum(char *name, char *dtp, int *majorp, int *minorp)
 {
@@ -115,6 +116,7 @@ devnum(char *name, char *dtp, int *majorp, int *minorp)
     }
     return 0;
 }
+#endif
 
 int
 seekfile(int fd)

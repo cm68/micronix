@@ -12,6 +12,7 @@ test: filesystem  src/usersim/sim
 
 filesystem: src/tools/readall
 	for i in disks/*.image ; do src/tools/readall -d filesystem $$i ; done
+	mkdir -p filesystem/usr/src/sys
 	cp -r src/kernel filesystem/usr/src/sys
 
 clean:
