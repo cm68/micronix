@@ -47,6 +47,7 @@ int debug_terminal;
 int am_root;
 int mypid;
 FILE *mytty;
+int logfd;
 
 char curdir[100] = "";
 char *rootdir = 0;
@@ -68,6 +69,8 @@ char *vopts[] = {
     "V_SYS", "V_DATA", "V_EXEC", "V_INST", "V_ASYS", "V_SYS0", "V_ERROR", 0
 };
 
+char *seekoff[] = { "SET", "CUR", "END" };
+
 int verbose;
 
 MACHINE context;
@@ -79,6 +82,52 @@ struct MACHINE *cp;
 
 char namebuf[PATH_MAX];
 char workbuf[PATH_MAX];
+
+/*
+ * colossal hack for floppy image files -
+ * if a file has the sticky bit set, then swizzle
+ * the file offset to do alternate sector skew
+ */
+struct openfile {
+    int special;        // is a special file needing sector hackery
+    int offset;        // notional file offset
+} files[64];
+
+#define SPT 15
+
+void
+seekfile(int fd)
+{
+    int trk;
+    int sec;
+    int blkno;
+    int blkoff;
+    int new;
+
+    if (!files[fd].special) {
+        lseek(fd, files[fd].offset, SEEK_SET);
+        return;
+    }
+    
+    blkno = files[fd].offset / 512;
+    blkoff = files[fd].offset % 512;
+
+    trk = blkno / SPT;
+    sec = blkno % SPT;
+    sec *= 2;
+    if (!(SPT & 1) && sec >= SPT) sec++;    // always false
+
+    sec %= SPT;
+
+    new = (((trk * SPT) + sec) * 512) + blkoff;
+#ifdef notdef
+    fprintf(mytty, "special: %d (%d) = %d:(%d, %d) -> %d:(%d, %d)\n", 
+        files[fd].offset, blkoff, 
+        blkno, blkno / SPT, blkno % SPT,
+        new, trk, sec);
+#endif
+    lseek(fd, new, SEEK_SET);
+}
 
 /*
  * translate our sim filename into a native filename
@@ -334,6 +383,7 @@ main(int argc, char **argv)
     }
     dup2(fileno(mytty), TTY_FD);
     mytty = fdopen(TTY_FD, "r+");
+    logfd = fileno(mytty);
     setvbuf(mytty, 0, _IOLBF, 0);
     signal(SIGUSR1, stop_handler);
 
@@ -961,7 +1011,7 @@ struct dirfd
     int offset;
     struct dirfd *next;
     int end;
-}    *opendirs;
+} *opendirs;
 
 /*
  * a version 6 directory entry 
@@ -1550,22 +1600,26 @@ SystemCall(MACHINE * cp)
             bcopy(&df->buffer[df->offset], &cp->memory[arg1], ret);
             df->offset += ret;
         } else {
+            seekfile(fd);
             ret = read(fd, &cp->memory[arg1], arg2);
         }
         if (ret == -1) {
             ret = errno;
             carry_set();
         } else {
+            files[fd].offset += ret;
             carry_clear();
         }
         break;
 
     case 4:                    /* write (hl), buffer, len */
+        seekfile(fd);
         ret = write(fd, &cp->memory[arg1], arg2);
         if (ret == -1) {
             ret = errno;
             carry_set();
         } else {
+            files[fd].offset += ret;
             carry_clear();
         }
         break;
@@ -1608,6 +1662,11 @@ SystemCall(MACHINE * cp)
                         perror(filename);
                     goto lose;
                 }
+                files[ret].special = 0;
+                files[ret].offset = 0;
+                if (sbuf.st_mode & S_ISVTX) {
+                    files[ret].special = 1;
+                }
             }
             carry_clear();
         } else {
@@ -1625,6 +1684,8 @@ SystemCall(MACHINE * cp)
         } else {
             close(fd);
         }
+        files[fd].special = 0;
+        files[fd].offset = 0;
         carry_clear();
         break;
 
@@ -1871,15 +1932,16 @@ SystemCall(MACHINE * cp)
         } else {
             switch (arg2) {
             case 0:
-                i = lseek(fd, i, SEEK_SET);
                 break;
             case 1:
-                i = lseek(fd, i, SEEK_CUR);
+                i += files[fd].offset;
                 break;
             case 2:
-                i = lseek(fd, i, SEEK_END);
+                fstat(fd, &sbuf);
+                i += sbuf.st_size;
                 break;
             }
+            files[fd].offset = i;
         }
         ret = (i >> 16) & 0xffff;
         ret = 0;
@@ -2108,6 +2170,7 @@ SystemCall(MACHINE * cp)
   nolog2:
     if ((verbose & V_DATA) && (sp->flag & SF_BUF)) {
         dumpmem(&get_byte, arg1, ret);
+        fflush(stdout);
     }
     cp->state.pc = pop();
     cp->state.status = 0;
