@@ -104,6 +104,8 @@ dofile(char *name, struct dsknod *ip)
     int size = ip->size1 + (ip->size0 << 16);
     char buf[512];
 
+    tracec(verbose, "regular file %s (length %d)\n", name, size);
+
     if (dryrun) {
         return;
     }
@@ -124,6 +126,32 @@ dofile(char *name, struct dsknod *ip)
     }
     close(fd);
     chmod(namebuf, ip->mode & 0777);
+}
+
+/*
+ * colossal hack: character and block special files
+ * are done as symbolic links with special form:
+ * cdev(major,minor) or bdev(major,minor)
+ * zero flexibility in format. major and minor are ascii decimal
+ */
+void
+dospecial(char *name, struct dsknod *ip)
+{
+    char linkname[20];
+
+    sprintf(linkname, "%cdev(%d,%d)", 
+        ((ip->mode & ITYPE) == IBIO) ? 'b' :'c',
+        (ip->addr[0] >> 8) & 0xff,
+        ip->addr[0] & 0xff);
+
+    tracec(verbose, "special file %s %s\n", name, linkname);
+
+    if (dryrun)
+        return;
+
+    sprintf(namebuf, "%s%s", destname, name);
+    unlink(namebuf);
+    symlink(linkname, namebuf);
 }
 
 int
@@ -234,15 +262,19 @@ main(int argc, char **argv)
         ip = iget(fs, i);
         if (!(ip->mode & IALLOC))
             continue;
-        if ((ip->mode & ITYPE) != IORD)
-            continue;
-        /*
-         * only allocated ifreg 
-         */
+
         df = dfget(i);
-        s = df->fullname;
-        tracec(verbose, "regular file %d %s (length %d)\n", i, s, ip->size1);
-        dofile(df->fullname, ip);
+        switch (ip->mode & ITYPE) {
+        case IDIR:
+            continue;
+        case IORD:
+            dofile(df->fullname, ip);
+            break;
+        case IBIO:
+        case ICIO:
+            dospecial(df->fullname, ip);
+            break;
+        }
     }
 }
 
