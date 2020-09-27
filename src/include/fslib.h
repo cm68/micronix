@@ -40,7 +40,7 @@ extern void isummary(char *name, struct dsknod *ip);
 extern void dump(unsigned char *buf, int size);
 extern void dumpsb(struct sup *sb);
 extern void secdump(unsigned char *buf);
-extern UINT secmap(UINT blkno);
+extern UINT secmap(struct sup *fs, UINT blkno);
 extern int bmap(struct dsknod *ip, int offset, int alloc);
 extern struct dsknod *namei(struct sup *f, char *name);
 extern struct dir *getdirent(struct dsknod *ip, int index);
