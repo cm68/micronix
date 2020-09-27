@@ -48,12 +48,12 @@ imd_dump_track(struct imd_trk *tp)
     dump_secmap("headmap", tp->headmap, tp->fixed.nsec);
 
     for (s = 0; s < tp->fixed.nsec; s++) {
-        printf("sector: %d\n", s);
         if (tp->data[s]) {
+            printf("sector: %d\n", s);
             fflush(stdout);
             hexdump(tp->data[s], tp->secsize);
         } else {
-            printf("absent\n");
+            printf("sector: %d absent\n", s);
         }
     }
 }
