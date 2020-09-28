@@ -1888,19 +1888,31 @@ SystemCall(MACHINE * cp)
         carry_clear();
         break;
     case 14:                   /* mknod <name> mode dev (dev == 0) for dir */
-        if (arg3 == 0) {
-            arg2 &= 0777;
-            ret = mkdir(filename = fname(fn), arg2);
-            if (ret == -1) {
-                if (verbose & V_ERROR)
-                    perror(filename);
-                ret = errno;
-                carry_set();
-            } else {
-                carry_clear();
-            }
-        } else {
+        filename = fname(fn);
+        printf("mknod %s %o %x\n", filename, arg2, arg3); fflush(stdout);
+        switch (arg2 & ITYPE) {
+        case IDIR:
+            ret = mkdir(filename, arg2 & 0777);
+            break;
+        case IBIO:
+        case ICIO:
+            sprintf(workbuf, "%cdev(%d,%d)", 
+                ((arg2 & ITYPE) == IBIO) ? 'b' : 'c',
+                (arg3 >> 8) & 0xff, arg3 & 0xff);
+            ret = symlink(workbuf, filename);
+        printf("make dev %s %s %o %x = %d\n", filename, workbuf, arg2, arg3, ret); fflush(stdout);
+            break;
+        default:
+            ret = -1;
+            errno = EIO;
+        }
+        if (ret == -1) {
+            if (verbose & V_ERROR)
+                perror(filename);
+            ret = errno;
             carry_set();
+        } else {
+            carry_clear();
         }
         break;
 
