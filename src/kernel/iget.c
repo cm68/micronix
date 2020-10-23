@@ -7,6 +7,8 @@
 #include "buf.h"
 #include "proc.h"
 
+struct inode ilist[];
+
 /*
  * Return a pointer to a locked inode.
  * Errors: bad inumber, ilist is full.

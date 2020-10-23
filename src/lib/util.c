@@ -12,8 +12,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
+#include <sys/errno.h>
 
 #include "util.h"
 
@@ -113,7 +115,7 @@ dp()
 }
 
 void
-dumpmem(char (*readbyte)(int addr), int addr, int len)
+dumpmem(char (*readbyte)(unsigned short addr), unsigned short addr, int len)
 {
     int i;
     char c;
@@ -144,7 +146,7 @@ dumpmem(char (*readbyte)(int addr), int addr, int len)
 static char *hexdump_baseaddr;
 
 static char
-getbyte(int addr)
+getbyte(unsigned short addr)
 {
     return hexdump_baseaddr[addr];
 }
@@ -242,6 +244,24 @@ tracec(int bits, const char *format, ...)
         vdprintf(logfd, format, args);
         va_end(args);
     }
+}
+
+int
+devnum(char *name, char *dtp, int *majorp, int *minorp)
+{
+    char linkbuf[80];
+
+    int i;
+    i = readlink(name, linkbuf, sizeof(linkbuf));
+    if (i == -1) {
+        return ENOENT;
+    } else {
+        linkbuf[i] = '\0';
+    }
+    if ((i = sscanf(linkbuf, "%cdev(%d,%d)", dtp, majorp, minorp)) != 3) {
+        return ENOENT;
+    }
+    return 0;
 }
 
 /*

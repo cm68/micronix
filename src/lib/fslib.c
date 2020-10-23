@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/stat.h>
 #include "fslib.h"
 #include "util.h"
 
@@ -76,24 +77,6 @@ void
 closefs_hook(int i, void *arg)
 {
     closefs(arg);
-}
-
-int
-devnum(char *name, char *dtp, int *majorp, int *minorp)
-{
-    char linkbuf[80];
-
-    int i;
-    i = readlink(name, linkbuf, sizeof(linkbuf));
-    if (i == -1) {
-        return ENOENT;
-    } else {
-        linkbuf[i] = '\0';
-    }
-    if ((i = sscanf(linkbuf, "%cdev(%d,%d)", dtp, majorp, minorp)) != 3) {
-        return ENOENT;
-    }
-    return 0;
 }
 
 int

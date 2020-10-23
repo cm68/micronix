@@ -42,7 +42,7 @@ struct inode
     struct mount *mount;        /* mounted on this inode */
     ULONG size;                 /* for computational convenience */
     UINT time;                  /* "time" of last reference */
-} ilist[];
+};
 
 /*
  * Mode bits.

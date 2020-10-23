@@ -1,5 +1,6 @@
 CC = gcc 
-GCCFLAGS = -m32 -Wno-builtin-declaration-mismatch -fdiagnostics-color=always
+#GCCFLAGS = -m32 -Wno-builtin-declaration-mismatch -fdiagnostics-color=always
+GCCFLAGS = -Wno-builtin-declaration-mismatch -fdiagnostics-color=always -Wformat-overflow=0
 DEBUG = -g
 CFLAGS = $(DEBUG) $(INCLUDE) $(GCCFLAGS) $(DEFINES)
 

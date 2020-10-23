@@ -10,6 +10,7 @@
 
 extern int rootdev;
 extern long seconds;
+extern struct inode ilist[];
 
 /*
  * Mount system call

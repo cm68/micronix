@@ -22,6 +22,7 @@
 #include <limits.h>
 #include <string.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 #include <signal.h>
 #include "disz80.h"
 #include "util.h"
@@ -97,26 +98,6 @@ struct openfile {
 } files[64];
 
 #define SPT 15
-
-#ifdef notdef
-int
-devnum(char *name, char *dtp, int *majorp, int *minorp)
-{
-    char linkbuf[80];
-
-    int i;
-    i = readlink(name, linkbuf, sizeof(linkbuf));
-    if (i == -1) {
-        return ENOENT;
-    } else {
-        linkbuf[i] = '\0';
-    }
-    if ((i = sscanf(linkbuf, "%cdev(%d,%d)", dtp, majorp, minorp)) != 3) {
-        return ENOENT;
-    }
-    return 0;
-}
-#endif
 
 int
 seekfile(int fd)
@@ -215,7 +196,7 @@ get_symname(int addr)
 }
 
 int
-reloc(int addr)
+reloc(symaddr_t addr)
 {
     return 0;
 }
@@ -243,7 +224,7 @@ get_word(int addr)
 }
 
 char
-get_byte(int addr)
+get_byte(unsigned short addr)
 {
     addr &= 0xffff;
     return cp->memory[addr];
@@ -543,14 +524,14 @@ set_alarm()
 struct symbol
 {
     char *name;
-    int value;
+    symaddr_t value;
     char type;
     struct symbol *next;
 };
 struct symbol *syms;
 
 char *
-lookup_sym(int value)
+lookup_sym(symaddr_t value)
 {
     struct symbol *s;
 
@@ -688,7 +669,7 @@ do_exec(char *name, char **argv)
 }
 
 char
-getsim(void *addr)
+getsim(long addr)
 {
     return *(unsigned char *) addr;
 }
@@ -1109,7 +1090,7 @@ dirsnarf(char *name)
         df->end += sizeof(*v);
     }
     if (verbose & V_DATA)
-        dumpmem(&getsim, df->buffer, df->bufsize);
+        hexdump(df->buffer, df->bufsize);
     return (df->fd);
 }
 
@@ -1281,6 +1262,7 @@ struct ttybits
         {0, 0, 0, 0}}
 };
 
+void
 bitdump(unsigned short v)
 {
     struct ttybits *tb;
@@ -1299,6 +1281,7 @@ char *baud[] = {
     "4800", "9600", "19200", "1200"
 };
 
+void
 cchar(char *s, char c)
 {
     if (c == 0x7f) {
@@ -1313,6 +1296,7 @@ cchar(char *s, char c)
 /*
  * dump out the micronix tty vector
  */
+void
 tty_dump(char *s, unsigned short a)
 {
     char c;
@@ -1381,6 +1365,7 @@ struct tidbits lflags[] = {
     0, 0
 };
 
+void
 tbdump(char *s, struct tidbits *tb, tcflag_t v)
 {
     fprintf(mytty, "%s: 0%06o ", s, v);
@@ -1396,6 +1381,7 @@ tbdump(char *s, struct tidbits *tb, tcflag_t v)
 /*
  * dump out the termios struct
  */
+void
 ti_dump()
 {
     tbdump("ibits", iflags, ti.c_iflag);
@@ -1639,7 +1625,7 @@ SystemCall(MACHINE * cp)
             if (arg2 < ret) {
                 ret = arg2;
             }
-            bcopy(&df->buffer[df->offset], &cp->memory[arg1], ret);
+            memcpy(&cp->memory[arg1], &df->buffer[df->offset], ret);
             df->offset += ret;
         } else {
             if ((ret = seekfile(fd)) == 0) {
@@ -1740,23 +1726,24 @@ SystemCall(MACHINE * cp)
             pid();
             fprintf(mytty, "wait\n");
         }
-        if ((ret = wait(&fd)) == -1) {
+        if ((ret = wait(&i)) == -1) {
             if (verbose & V_SYS) {
                 pid();
                 fprintf(mytty, "no children\n");
             }
+            ret = ECHILD;
             carry_set();
             break;
         }
         if (verbose & V_SYS) {
             pid();
-            fprintf(mytty, "wait ret %x %x\n", ret, fd);
+            fprintf(mytty, "wait ret %x %x\n", ret, i);
         }
-        cp->state.registers.byte[Z80_D] = WEXITSTATUS(fd);
+        cp->state.registers.byte[Z80_D] = WEXITSTATUS(i);
         cp->state.registers.byte[Z80_E] = 0;
-        if (WIFSIGNALED(fd)) {
+        if (WIFSIGNALED(i)) {
             cp->state.registers.byte[Z80_D] = 1;
-            cp->state.registers.byte[Z80_E] = WTERMSIG(fd);
+            cp->state.registers.byte[Z80_E] = WTERMSIG(i);
         }
         carry_clear();
         break;
@@ -2098,8 +2085,8 @@ SystemCall(MACHINE * cp)
             /*
              * perror("gtty"); 
              */
+            ret = ENOTTY;
             carry_set();
-            carry_clear();      // we do gtty on everything!
             break;
         }
         i = 0;
@@ -2123,6 +2110,7 @@ SystemCall(MACHINE * cp)
             tty_dump("gtty", arg1);
             // ti_dump();
         }
+        ret = 0;
         carry_clear();
         break;
 

@@ -138,7 +138,7 @@ iinfo(int c, char **a)
 {
     int inum;
     struct dsknod *ip;
-    char *na[20];
+    char na[20];
 
     if (!c) return 1;
     inum = atoi(*++a);
