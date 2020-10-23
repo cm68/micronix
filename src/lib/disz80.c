@@ -456,12 +456,12 @@ struct optab ed_optab[256] = {
  */
 int					/* how many bytes we consumed */
 format_instr(
-	int addr,
+	unsigned short addr,
 	char *outbuf, 			/* where to put the output */
-	char (*get_byte)(int addr),	/* how to read bytes */
-	char * (*get_sym)(int offset),
-	int (*get_reloc)(int offset),
-	int (*sc)(int addr, char (*gb)(int a), char *out))
+	char (*get_byte)(unsigned short addr),	/* how to read bytes */
+	char * (*get_sym)(symaddr_t offset),
+	int (*get_reloc)(symaddr_t offset),
+	int (*sc)(unsigned short addr, char (*gb)(unsigned short a), char *out))
 {
 	char bcount = 0;
 	unsigned char opcode;

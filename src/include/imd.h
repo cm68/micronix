@@ -102,6 +102,7 @@ struct imd_trk {
     char **data;
 };
 
+extern void imd_close(void *vp);
 extern void *imd_load(char *fname, int drive, int create_delta);
 extern void imd_trkinfo(void *vp, int cyl, int head, int *secs, int *secsize);
 extern int imd_write(void *vp, int cyl, int head, int osec, char *buf);

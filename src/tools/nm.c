@@ -16,6 +16,7 @@
 
 int traceflags;
 int verbose;
+int sflag = 1;
 int rflag;
 int dflag;
 int xflag;
@@ -55,7 +56,7 @@ int endoff;
 int fd;
 
 char
-readbyte(int addr)
+readbyte(unsigned short addr)
 {
     unsigned char c;
 
@@ -88,7 +89,7 @@ lookup(int i)
  * in which case the low 16 bits are a symbol number
  */
 char *
-sym(int addr)
+sym(symaddr_t addr)
 {
     int i;
 
@@ -117,7 +118,7 @@ int labels;
 char label[65536];
 
 int
-reloc(int addr)
+reloc(symaddr_t addr)
 {
     struct reloc *r;
     int ret = 0;
@@ -152,26 +153,6 @@ disassem()
     char *tag;
     unsigned char barray[5];
 
-    /*
-     * dump out hex 
-     */
-    lseek(fd, textoff, SEEK_SET);
-    if (verbose) {
-        if (head.text) {
-#ifdef notdef
-            printf("text:\n");
-
-            dumpmem(&readbyte, head.textoff, head.text);
-#endif
-        }
-        if (head.data) {
-#ifdef notdef
-            printf("data:\n");
-
-            dumpmem(&readbyte, head.dataoff, head.data);
-#endif
-        }
-    }
     lseek(fd, textoff, SEEK_SET);
     location = head.textoff;
     while (location < head.textoff + head.text) {
@@ -338,31 +319,33 @@ do_object(int fd, int limit)
         read(fd, syms, nsyms * sizeof(*syms));
 
         sym = syms;
-        for (i = 0; i < nsyms; i++) {
-            printf("%5d %9s: ", i, sym->name);
-            value = sym->value;
-            flag = sym->flag;
+        if (sflag) {
+            for (i = 0; i < nsyms; i++) {
+                printf("%5d %9s: ", i, sym->name);
+                value = sym->value;
+                flag = sym->flag;
 
-            printf("%04x ", value);
-            if (flag & SF_GLOBAL)
-                printf("global ");
-            if (flag & SF_DEF)
-                printf("defined ");
-            switch (flag & SF_SEG) {
-            case SF_TEXT:
-                printf("code ");
-                break;
-            case SF_DATA:
-                printf("data ");
-                break;
-            case 0:
-                break;
-            default:
-                printf("unknown segment");
-                break;
+                printf("%04x ", value);
+                if (flag & SF_GLOBAL)
+                    printf("global ");
+                if (flag & SF_DEF)
+                    printf("defined ");
+                switch (flag & SF_SEG) {
+                case SF_TEXT:
+                    printf("code ");
+                    break;
+                case SF_DATA:
+                    printf("data ");
+                    break;
+                case 0:
+                    break;
+                default:
+                    printf("unknown segment");
+                    break;
+                }
+                printf("\n");
+                sym++;
             }
-            printf("\n");
-            sym++;
         }
     }
 
@@ -445,6 +428,19 @@ nm(char *oname)
     }
 }
 
+void
+usage(char *p)
+{
+    fprintf(stderr, "usage: %s <flags> [<objects>]\n", p);
+    fprintf(stderr, "\t-h\tthis help\n");
+    fprintf(stderr, "\t-v\tincrease verbosity\n");
+    fprintf(stderr, "\t-d\tdisassemble\n");
+    fprintf(stderr, "\t-x\toutput object to imagefile\n");
+    fprintf(stderr, "\t-r\tdump relocations\n");
+    fprintf(stderr, "\t-n\tno symbols\n");
+    
+}
+
 int
 main(argc, argv)
     int argc;
@@ -453,12 +449,19 @@ main(argc, argv)
     int i;
     unsigned short value;
     unsigned char flag;
+    char *pname = argv[0];
 
     while (--argc) {
         argv++;
         if (**argv == '-') {
             while (*++*argv)
                 switch (**argv) {
+                case 'n':
+                    sflag= 0;
+                    continue;
+                case 'h':
+                    usage(pname);
+                    continue;
                 case 'v':
                     verbose++;
                     continue;

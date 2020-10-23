@@ -14,15 +14,17 @@
 #define	RL_DATA		3
 #define	RELNUM(i)	((i) & 0xffff)
 
+typedef unsigned int symaddr_t;
+
 /*
  * format an instruction and return the bytes consumed
  */
 int format_instr(
-	int addr, 
+	unsigned short addr, 
 	char *outbuf,
-	char (*get_byte)(int addr),		
-	char *(*get_sym)(int symaddr),
-	int (*get_reloc)(int offset),
-	int (*syscall)(int addr, char (*gb)(int a), char *d));
+	char (*get_byte)(unsigned short addr),		
+	char *(*get_sym)(symaddr_t symaddr),
+	int (*get_reloc)(symaddr_t offset),
+	int (*syscall)(unsigned short addr, char (*gb)(unsigned short a), char *d));
 
-extern int mnix_sc(int addr, char (*gb)(int a), char *d);
+extern int mnix_sc(unsigned short addr, char (*gb)(unsigned short a), char *d);
