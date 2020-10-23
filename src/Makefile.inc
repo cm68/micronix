@@ -1,8 +1,12 @@
+#
+# set this for a 32 bit build.  if you don't specify, it will use the native one
+#MACHINE = -m32
+
 CC = gcc 
-#GCCFLAGS = -m32 -Wno-builtin-declaration-mismatch -fdiagnostics-color=always
-GCCFLAGS = -Wno-builtin-declaration-mismatch -fdiagnostics-color=always -Wformat-overflow=0
+WARNS = -Wno-builtin-declaration-mismatch -Wformat-overflow=0
+GCCFLAGS = $(MACHINE) -fdiagnostics-color=always
 DEBUG = -g
-CFLAGS = $(DEBUG) $(INCLUDE) $(GCCFLAGS) $(DEFINES)
+CFLAGS = $(DEBUG) $(INCLUDE) $(WARNS) $(GCCFLAGS) $(DEFINES)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
