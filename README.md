@@ -3,7 +3,7 @@ for a blast from the past, type:
  make test
 
  you now are running micronix 1.4 shell and can do a lot
- including:
+ including: (this builds the recovered 1.61 kernel)
 
 	cd /usr/src/sys
 	make
@@ -15,10 +15,6 @@ or, for a quite strange experience,
 	(run the simulated z80 micronix man program on sh, and pipe it to linux less)
 
 ---------------------
-
-this document is obsolete, as I've changed the directory structure radically,
-with source code in src, and almost every work in progress thing moved to
-./extra
 
 Morrow Designs Micronix and tools
 
@@ -43,7 +39,7 @@ src/lib:
 src/usersim:
 	micronix user mode simulator mostly works, including upm, the cp/m
 	emulator.  some of the system calls are still not real and always
-	fail.  
+	fail.  however, you will find it quite solid. 
 
 	however, I used an interesting method (hack, really)
 	to fake out special files.  special files are a symlink containing
@@ -134,8 +130,7 @@ extra/sim:
 	a bunch of 8 bit simulators for cribbing ideas/code from.
 	these all are licensed by thier original authors, so...
 
-make the kernel compile - this is unix v6 source code, not a hint
-of ansi.  luckily, the kernel source is k+r version 7 C.
+TODO:
 
 replace all the missing utility and application source with the
 sources from actual unix version 6.  this will require a lot of

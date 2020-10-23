@@ -2042,7 +2042,7 @@ SystemCall(MACHINE * cp)
         break;
 
     case 20:                   /* getpid */
-        ret = getpid();
+        ret = getpid() & 0x7fff;
         carry_clear();
         break;
 
