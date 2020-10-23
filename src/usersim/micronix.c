@@ -186,7 +186,7 @@ stop_handler()
 void
 pid()
 {
-    fprintf(mytty, "%d: ", mypid);
+    fprintf(mytty, "%x: ", mypid);
 }
 
 char *
@@ -1611,6 +1611,7 @@ SystemCall(MACHINE * cp)
     case 2:                    /* fork */
         ret = fork();
         if (ret) {
+            ret &= 0x7fff;
             push(pop() + 3);
         } else {
             mypid = getpid();
@@ -1739,12 +1740,16 @@ SystemCall(MACHINE * cp)
             pid();
             fprintf(mytty, "wait ret %x %x\n", ret, i);
         }
-        cp->state.registers.byte[Z80_D] = WEXITSTATUS(i);
-        cp->state.registers.byte[Z80_E] = 0;
-        if (WIFSIGNALED(i)) {
+        if (WIFEXITED(i)) {
+            cp->state.registers.byte[Z80_D] = WEXITSTATUS(i);
+            cp->state.registers.byte[Z80_E] = 0;
+        } else if (WIFSIGNALED(i)) {
             cp->state.registers.byte[Z80_D] = 1;
             cp->state.registers.byte[Z80_E] = WTERMSIG(i);
+        } else {
+            fprintf(mytty, "waitfuck %x\n", i);
         }
+        ret &= 0x7fff;
         carry_clear();
         break;
 
