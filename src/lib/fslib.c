@@ -122,7 +122,8 @@ openfs(char *filesystem, struct sup **fsp)
         i->dt = ' ';
         i->altsec = 0;
         devnum(filesystem, &i->dt, &i->major, &i->minor);
-        if ((i->dt == 'b') && (i->major == 2) && (i->minor & 0x8)) {
+        if ((i->driver == DRIVER_IMD) || 
+            ((i->dt == 'b') && (i->major == 2) && (i->minor & 0x8))) {
             i->altsec = 1;
         }
         if (i->dt == ' ') {
