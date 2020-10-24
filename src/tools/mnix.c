@@ -99,6 +99,10 @@ main(argc, argv)
         }
     }
 
+    if (!argc) {
+        usage();
+        exit(0);
+    }
     if (!filesystem) {
         filesystem = "testfs";
     }
@@ -115,10 +119,6 @@ main(argc, argv)
         dumpsb(fs);
     }
 
-    if (!argc) {
-        usage();
-        exit(0);
-    }
     nerror = -1;
     for (i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++) {
         if (strcmp(cmds[i].name, *argv) == 0) {
