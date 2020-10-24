@@ -41,18 +41,21 @@ Configuration notes:
 	if qsort is not present in your libc (yuck!), edit the source
 	file to #undef BINARY_SEARCH. this will slow down the disassembly
 	somewhat.
+
+    23 oct 2020 - added whitesmith's object support
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <malloc.h>
+#include "ws.h"
 
 /*
  * word should be at least 16 bits unsigned,
  * byte should be at least 8 bits unsigned
  */
-typedef unsigned int word;
+typedef unsigned short word;
 typedef unsigned char byte;
 
 /*
@@ -76,7 +79,7 @@ typedef unsigned char byte;
 #define	VERSION	3
 
 #ifndef BUFLEN
-#define	BUFLEN	32*1024
+#define	BUFLEN	64*1024
 #endif
 
 #ifndef TARGETS
@@ -99,9 +102,10 @@ typedef unsigned char byte;
  */
 #define	OPCODE	8
 #define	OPERAND	13
-#define	ASCII	32
-#define	HEX	44
-#define	LIMIT	72
+#define	ADDR	32
+#define	ASCII	38
+#define	HEX	50
+#define	LIMIT	78
 
 void trace();
 void header();
@@ -113,10 +117,11 @@ void outs();
 void flush();
 void tab();
 void outval();
-char *lookup();
+char *lookup(word v, int *flagsp);
 int tcmp();
 int instr(word addr, int size);
 int code_addr(int v);
+char *addr_name(word a);
 
 /*
  * variables
@@ -131,8 +136,12 @@ char *linep;
 char col;
 char codeseg;
 
+struct obj obj;
+int symlen;
+
 byte codebuf[BUFLEN];
 int codelen;
+static char tbuf[30];
 
 word address;
 word skip;
@@ -183,6 +192,12 @@ getbyte()
     v = codebuf[instaddr - startaddr];
     instaddr++;
     return v;
+}
+
+word
+wordat(word addr)
+{
+    return (codebuf[1 + addr - startaddr] << 8) + codebuf[addr - startaddr];
 }
 
 word
@@ -251,7 +266,7 @@ add_sym(char *name, int v)
 }
 
 char *
-lookup_sym(int addr)
+lookup_sym(word addr)
 {
     struct sym *s = syms;
 
@@ -262,6 +277,29 @@ lookup_sym(int addr)
         s = s->next;
     }
     return 0;
+}
+
+char anbuf[50];
+char *abptr;
+
+char *
+addrname(word addr)
+{
+    char *s;
+    unsigned int v = addr;
+
+    if (abptr == anbuf) {
+        abptr = &anbuf[25];
+    } else {
+        abptr = anbuf;
+    }
+    s = lookup_sym(addr);
+    if (s) {
+        sprintf(abptr, "%s (0x%04x)", s, v);
+    } else {
+        sprintf(abptr, "0x%04x", v);
+    }
+    return abptr;
 }
 
 void
@@ -466,6 +504,7 @@ main(argc, argv)
 int argc;
 char **argv;
 {
+    int v;
 	int i;
 	int size;
     char o;
@@ -553,50 +592,90 @@ char **argv;
         add_sym("tpa", 0x100);
     }
 
-	reg_target(startaddr, CODE|REF);
-
 	if ((file = fopen(name, "rb")) == NULL) {
 		perror(name);
 		exit(1);
 	}
 
-	if (debug) {
-		fprintf(stderr, "start address 0x%x\n", startaddr);
-	}
+    if (fread(&obj, sizeof(obj), 1, file) != 1) {
+        fprintf(stderr, "magic number read failed");
+        exit(1);
+    }
+    if (obj.ident == OBJECT) {
+        symlen = ((obj.conf & 7) << 1) + 1;
+        fseek(file, sizeof(obj), 0);
+        if (fread(&codebuf[obj.textoff], 1, obj.text, file) != obj.text) {
+            fprintf(stderr, "code read failed\n");
+            exit(1);
+        }
+        if (fread(&codebuf[obj.dataoff], 1, obj.data, file) != obj.data) {
+            fprintf(stderr, "data read failed\n");
+            exit(1);
+        }
+        for (i = 0; i < obj.table / (symlen + 3); i++) {
+            if (fread(line, symlen + 3, 1, file) != 1) {
+                fprintf(stderr, "symbol %d read failed\n", i);
+                exit(1);
+            }
+            o = line[2];
+            v = (line[0] + (line[1] << 8)) & 0xffff;
+            add_sym(&line[3], v);
+            if (o == 0xd) {
+                reg_target(v, CODE);
+            } else if (o == 0xe) {
+				reg_target(v, REF);
+            }
+        }
+        startaddr = 0;
+        codelen = endaddr = obj.dataoff + obj.data;
+        reg_target(obj.textoff, CODE);
+    } else {
 
-	if (skip) {
-		if (debug) {
-			fprintf(stderr, "skipping %d bytes\n", skip);
-		}
-		if (fseek(file, (long) skip, 0) != 0) {
-			fprintf(stderr, "%s: Can't skip\n", name);
-			exit(1);
-		}
-	}
 
-	size = BUFLEN;
-	if (endaddr - startaddr < size) {
-		size = endaddr - startaddr;
-	}
-	codelen = fread(codebuf, 1, size, file);
-    if (startaddr + codelen < endaddr) {
-        endaddr = startaddr + codelen;
+        if (debug) {
+            fprintf(stderr, "start address 0x%x\n", startaddr);
+        }
+
+        if (skip) {
+            if (debug) {
+                fprintf(stderr, "skipping %d bytes\n", skip);
+            }
+            if (fseek(file, (long) skip, 0) != 0) {
+                fprintf(stderr, "%s: Can't skip\n", name);
+                exit(1);
+            }
+        }
+    
+        size = BUFLEN;
+        if (endaddr - startaddr < size) {
+            size = endaddr - startaddr;
+        }
+        codelen = fread(codebuf, 1, size, file);
+        if (startaddr + codelen < endaddr) {
+            endaddr = startaddr + codelen;
+        }
+        reg_target(startaddr, CODE|REF);
     }
 	fclose(file);
 
-	if (debug) {
-		fprintf(stderr, "tracing code\n");
-	}
-	tracing = 1;
-	for (i = 0; i <= ntarg; i++) {
-		if (targets[i].flags & CODE) {
-			trace(targets[i].addr);
-		}
-	}
+    for (tracing = 5; tracing; tracing--) {
+        if (debug) {
+            fprintf(stderr, "tracing %d code %d\n", tracing, ntarg);
+        }
+        for (i = 0; i <= ntarg; i++) {
+            if (targets[i].flags & CODE) {
+                fprintf(stderr, "trace %d code at %s\n", i,
+                    addrname(targets[i].addr));
+                trace(targets[i].addr);
+            }
+        }
+    }
 
 	if (debug) {
+		fprintf(stderr, "%d targets\n", ntarg);
 		for (i = 0; i < ntarg; i++) {
-            fprintf(stderr, "%x: %s\n", targets[i].addr, fdump(targets[i].flags));
+            fprintf(stderr, "%5d %s: %s\n", i, 
+                addrname(targets[i].addr), fdump(targets[i].flags));
         }
 	}
 
@@ -607,12 +686,16 @@ char **argv;
 	exit(0);
 }
 
+word trace_addr;
+
 void
 trace(addr)
 int addr;
 {
 	jumped = 0;
 	while (!jumped) {
+        trace_addr = addr;
+
 		clear();
         if ((addr < startaddr) || (addr > endaddr))
             return;
@@ -626,6 +709,8 @@ disas()
 	int left = codelen;
 	word addr = startaddr;
 	int len;
+
+    codeseg = 0;
 
 	while (left > 0) {
 		len = instr(addr, left);
@@ -762,8 +847,12 @@ int size;
 	tab(OPCODE);
 	outs(linebuf);
 
+    tab(ADDR);
+    sprintf(tbuf, "; %04x", addr);
+    outs(tbuf);
+
 	tab(ASCII);
-	outs("; ");
+	outs(" ");
 
 	for (i = 0; i < len; i++) {
 		c = codebuf[addr + i - startaddr];
@@ -835,6 +924,15 @@ void
 header(char *name)
 {
 	printf(";\n;\tdisas version %d\n;\t%s\n;\n", VERSION, name);
+    if (obj.ident == OBJECT) {
+	    printf(";\twhitesmiths type %x symlen %d %s\n", 
+            obj.conf, symlen, (obj.conf & 0200) ? "norelocs" : "");
+	    printf(";\tsymbols: %d text: %x(%x) data: %x(%x) bss: %x\n", 
+            obj.table / (symlen + 3), 
+            obj.textoff, obj.text,
+            obj.dataoff, obj.data,
+            obj.bss);
+    }
     dump_symbols();
 	printf("\n\torg\t0%xh\n\n", startaddr);
 }
@@ -847,9 +945,8 @@ struct target *xp, *yp;
 }
 
 char *
-lookup(word v, byte *flagsp)
+lookup(word v, int *flagsp)
 {
-	static char tbuf[30];
 	int i;
     char *s;
 
@@ -875,12 +972,13 @@ reg_target(word v, byte flags)
 {
 	int i;
 
-    // printf("registered target %x as %s\n", v, fdump(flags));
+    printf("registered target %s as %s from %s\n", 
+        addrname(v), fdump(flags), addrname(trace_addr));
 
 	for (i = 0; i < ntarg; i++) {
 		if (targets[i].addr == v) {
+            printf("already there %s\n", fdump(targets[i].flags));
             targets[i].flags |= flags;
-            // printf("already there\n");
 			return;
         }
 	}
@@ -918,7 +1016,9 @@ int out;
 {
 	char buf[11];		/* (PC+xxxxH) is the longest */
 	char *s = 0;
-    byte flags;
+    int flags;
+    int i;
+    word swaddr;
 
 	switch (out) {
 
@@ -941,14 +1041,32 @@ int out;
 	case OUT_NN:
 	case OUT_JP:
 	case OUT_CALL:
+		s = lookup(value, &flags);
 		if (tracing) {
             if (out == OUT_NNW) {
                 reg_target(value, WORD|REF);
             } else {
+                if (s && (strcmp(s, "c.switch") == 0)) {
+                    if (codebuf[(trace_addr - startaddr) - 3] == 0x21) {
+                        swaddr = wordat(trace_addr - 2);
+                        fprintf(stderr, "switch table at %x\n", swaddr);
+                        while (1) {
+                            i = wordat(swaddr);
+                            reg_target(swaddr, WORD|REF);
+                            reg_target(swaddr+2, WORD|REF);
+                            if (i != 0) {
+                                reg_target(i, CODE|REF);
+                                swaddr += 4;
+                            } else {
+                                reg_target(wordat(swaddr + 2), CODE|REF);
+                                break;
+                            }
+                        }
+                    }
+                }
                 reg_target(value, (out != OUT_NN) ? CODE|REF : REF);
             }
 		} else {
-			s = lookup(value, &flags);
 			if (s) {
 				sprintf(buf, "%s", s);
 			} else {
