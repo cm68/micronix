@@ -5,23 +5,9 @@
  * the function code.
  */
 #include "disz80.h"
+#include "mnix.h"
 #include <stdio.h>
 #include <string.h>
-
-struct syscall {
-	char argbytes;
-	char *name;
-	short flag;
-};
-#define	SF_NAME		1
-#define	SF_NAME2	2
-#define	SF_FD		4
-#define	SF_ARG1		8
-#define	SF_ARG2		16
-#define	SF_ARG3		32
-#define	SF_ARG4		64
-#define	SF_BUF		128
-#define	SF_SMALL	256
 
 struct syscall syscalls[] = {
 /* 0  */	{3, "indir", SF_ARG1 },
@@ -115,4 +101,23 @@ mnix_sc(unsigned short addr, char (*gb)(unsigned short a), char *dest)
 	}
 	return ret;
 }
+
+char *signame[] = {
+	"bogus",
+	"hup",
+	"int",
+	"quit",
+	"ill",
+	"trace",
+	"bg",
+	"termio",
+	"fpe",
+	"kill",
+	"bus",
+	"segv",
+	"sysarg",
+	"pipeerr",
+	"alarm",
+	"term"
+};
 
