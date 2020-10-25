@@ -10,7 +10,7 @@ extern u64 now64();
 extern char *bitdef(u8 v, char**defs);
 void skipwhite(char **s);
 
-void dumpmem(char (*readbyte)(u16 addr), u16 addr, int len);
+void dumpmem(unsigned char (*readbyte)(u16 addr), u16 addr, int len);
 void hexdump(void *addr, int len);
 
 int register_trace(char *name);
@@ -19,8 +19,8 @@ extern int traceflags;
 
 extern int logfd;
 
-void Log(const char *format, ...);
-void Logc(const char *format, ...);
+void l(const char *format, ...);
+void lc(const char *format, ...);
 void trace(int bits, const char *format, ...);
 void tracec(int bits, const char *format, ...);
 

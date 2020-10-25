@@ -458,10 +458,10 @@ int					/* how many bytes we consumed */
 format_instr(
 	unsigned short addr,
 	char *outbuf, 			/* where to put the output */
-	char (*get_byte)(unsigned short addr),	/* how to read bytes */
+	unsigned char (*get_byte)(unsigned short addr),	/* how to read bytes */
 	char * (*get_sym)(symaddr_t offset),
-	int (*get_reloc)(symaddr_t offset),
-	int (*sc)(unsigned short addr, char (*gb)(unsigned short a), char *out))
+	unsigned int (*get_reloc)(symaddr_t offset),
+	int (*sc)(unsigned short addr, unsigned char (*gb)(unsigned short a), char *out))
 {
 	char bcount = 0;
 	unsigned char opcode;

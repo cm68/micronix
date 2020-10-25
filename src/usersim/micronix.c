@@ -1,8 +1,11 @@
 /*
- * micronix. this emulates the micronix user mode Copyright (c) 2018, Curt
- * Mayer do whatever you want, just don't claim you wrote it. warrantee:
- * madness! nope. plugs into the z80emu code from: Copyright (c) 2012, 2016
- * Lin Ke-Fong Copyright (c) 2012 Chris Pressey This code is free, do
+ * micronix. this emulates the micronix user mode 
+ * Copyright (c) 2018, Curt Mayer 
+ * do whatever you want, just don't claim you wrote it. 
+ * warrantee: madness! nope. 
+ * plugs into the z80emu code from: 
+ *  Copyright (c) 2012, 2016 * Lin Ke-Fong 
+ *  Copyright (c) 2012 Chris Pressey This code is free, do
  * whatever you want with it. 
  */
 
@@ -196,7 +199,7 @@ get_symname(int addr)
     return 0;
 }
 
-int
+unsigned int
 reloc(symaddr_t addr)
 {
     return 0;
@@ -211,20 +214,20 @@ put_word(int addr, int value)
 }
 
 void
-put_byte(int addr, char value)
+put_byte(int addr, unsigned char value)
 {
     addr &= 0xffff;
     cp->memory[addr] = value;
 }
 
-short
+unsigned short
 get_word(int addr)
 {
     addr &= 0xffff;
     return cp->memory[addr] + (cp->memory[addr + 1] << 8);
 }
 
-char
+unsigned char
 get_byte(unsigned short addr)
 {
     addr &= 0xffff;

@@ -245,19 +245,19 @@ unsigned char iv_isrbit;
 int
 multio_dump(char **p)
 {
-    Log("multio dump: group %d\n", group);
-    Log("\tpic_state: %d\n", pic_state);
-    Log("\ticw1: %02x %s\n", icw1, bitdef(icw1, icw1_bits));
-    Log("\tocw2: %02x %s\n", ocw2, bitdef(ocw2, ocw2_bits));
-    Log("\tocw3: %02x %s\n", ocw3, bitdef(ocw3, ocw3_bits));
-    Log("\ticw4: %02x %s\n", icw4, bitdef(icw4, icw4_bits));
-    Log("\timr: %02x %s\n", (~imr) & 0xff, bitdef(~imr, intbits));
-    Log("\tirr: %02x %s\n", irr, bitdef(irr, intbits));
-    Log("\tisr: %02x %s\n", isr, bitdef(isr, intbits));
-    Log("\tvecbase: %04x\n", (icw1 & ICW1_VECL) + (icw2 << 8));
-    Log("\tpriority: %d %02x\n", priority, 1 << priority);
-    Log("\tint_line: %d int_pin: %d vi_lines %02x\n", int_line, int_pin, vi_lines);
-    Log("\tivecstate: %s isrbit: %02x vector %02x %02x %02x\n",
+    l("multio dump: group %d\n", group);
+    l("\tpic_state: %d\n", pic_state);
+    l("\ticw1: %02x %s\n", icw1, bitdef(icw1, icw1_bits));
+    l("\tocw2: %02x %s\n", ocw2, bitdef(ocw2, ocw2_bits));
+    l("\tocw3: %02x %s\n", ocw3, bitdef(ocw3, ocw3_bits));
+    l("\ticw4: %02x %s\n", icw4, bitdef(icw4, icw4_bits));
+    l("\timr: %02x %s\n", (~imr) & 0xff, bitdef(~imr, intbits));
+    l("\tirr: %02x %s\n", irr, bitdef(irr, intbits));
+    l("\tisr: %02x %s\n", isr, bitdef(isr, intbits));
+    l("\tvecbase: %04x\n", (icw1 & ICW1_VECL) + (icw2 << 8));
+    l("\tpriority: %d %02x\n", priority, 1 << priority);
+    l("\tint_line: %d int_pin: %d vi_lines %02x\n", int_line, int_pin, vi_lines);
+    l("\tivecstate: %s isrbit: %02x vector %02x %02x %02x\n",
         ivs_name[ivecstate], iv_isrbit, vector[0], vector[1], vector[2]);
     return 0;
 }
@@ -272,13 +272,13 @@ bitnum(byte m)
         b = (priority + i) % 8;
         if (m & (1 << b)) {
             if (m != (1 << b)) {
-                Log("bitnum multiple bits %02x\n", m);
+                l("bitnum multiple bits %02x\n", m);
                 multio_dump(0);
             }
             return b;
         }
     }
-    Log("bitnum for no bits set\n");
+    l("bitnum for no bits set\n");
     multio_dump(0);
     return 0;
 }
@@ -291,7 +291,7 @@ select_ace()
     if (line) {
         line--;
     } else {
-        Log("select_ace: group 0\n");
+        l("select_ace: group 0\n");
     }
     return &ace[line];
 }
@@ -310,7 +310,7 @@ wr_pic_port_0(portaddr p, byte v)
         icw1 = v;
         priority = 0;
         if (!(icw1 & ICW1_LTIM)) {
-            Log("multio:  edge triggered not supported\n");
+            l("multio:  edge triggered not supported\n");
         } 
     } else if (v & PIC0_OCW3) {     // OCW3
         bdec = ocw3_bits;
@@ -332,7 +332,7 @@ wr_pic_port_0(portaddr p, byte v)
             isr = 0;
             break;
         default:
-            Log("pic bogus ocw2 write command %x\n", ocw2);
+            l("pic bogus ocw2 write command %x\n", ocw2);
         }
     }
 
@@ -435,7 +435,7 @@ multio_vi_change(unsigned char new)
             vi_lines, new, mask);
 
     if (mask == 0) {
-        Log("multio: vi_change no change new:%02x prev:%02x\n", new, vi_lines);
+        l("multio: vi_change no change new:%02x prev:%02x\n", new, vi_lines);
         return;
     }
     vi_lines = new;
@@ -484,7 +484,7 @@ multio_intack()
 
         // we didn't find a cause for our interrupt
         if (i == 8) {
-            Log("lose: no unmasked request found!\n");
+            l("lose: no unmasked request found!\n");
             multio_dump(0);
             ivecstate = IV_INVALID;
             iv_isrbit = 0;
@@ -520,7 +520,7 @@ multio_intack()
         i =  vector[2];
         break;
     default:
-        Log("bad ivecstate %d\n", ivecstate);
+        l("bad ivecstate %d\n", ivecstate);
         i =  0xff;
         iv_isrbit = 0;
         ivecstate = IV_EMPTY;
@@ -616,7 +616,7 @@ multio_uart_poll(struct ace *ap)
 
     // test to see if there are any input characters
     if ((error = ioctl(ap->infd, FIONREAD, &bytes)) != 0) {
-        Log("multio_uart_poll: FIONREAD ioctl failed: %d\n",
+        l("multio_uart_poll: FIONREAD ioctl failed: %d\n",
             error);
         return 0;
     }
@@ -628,7 +628,7 @@ multio_uart_poll(struct ace *ap)
 
     // lets get one
     if ((bytes = read(ap->infd, &ap->rxb, 1)) != 1) {
-        Log("multio_uart_poll: read failed: %d\n",
+        l("multio_uart_poll: read failed: %d\n",
             bytes);
         return 0;
     }
@@ -709,7 +709,7 @@ wr_txb(portaddr p, byte v)
 
     // detect overrun
     if (!(ap->lsr & LSR_TXE)) {
-        Log("multio: send overrun on line %d\n", ap->line);
+        l("multio: send overrun on line %d\n", ap->line);
     }
 
     ap->txpend = now64() + ap->chartime;
@@ -1147,7 +1147,7 @@ multio_poll()
 
     if (clock_happened) {
         clock_happened = 0;
-        Log(" ---- clock --- \n\n");
+        l(" ---- clock --- \n\n");
         set_vi(7, 0, 1);
     }
     return 0;

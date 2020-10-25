@@ -39,7 +39,8 @@
 #include "sim.h"
 #include "util.h"
 #include "imd.h"
-#include "dis.h"
+#include "disz80.h"
+#include "mnix.h"
 
 #define S_FLAG  0x80
 #define Z_FLAG  0x40
@@ -67,6 +68,7 @@ int debug_terminal;
 int log_output;
 int mypid;
 int running;
+int listing;
 
 int traceflags;
 
@@ -109,7 +111,7 @@ stop_handler()
 }
 
 unsigned int
-reloc(unsigned short addr)
+reloc(unsigned int addr)
 {
     return 0;
 }
@@ -146,9 +148,10 @@ find_symbol(char *ls)
 }
 
 char *
-lookup_sym(unsigned short addr)
+lookup_sym(unsigned int symaddr)
 {
     struct sym *s = syms;
+    unsigned short addr = symaddr & 0xffff;
 
     if (!super()) return 0;
 
@@ -561,22 +564,24 @@ dumpcpu()
     byte f;
     char outbuf[40];
     char fbuf[10];
-    char ibuf[10];
     char *s;
     int i;
     word pc, sp;
 
-    strcpy(fbuf, "        ");
-    strcpy(ibuf, "        ");
+    memset(fbuf, ' ', sizeof(fbuf));
+    fbuf[sizeof(fbuf) - 1] = 0;
 
     pc = z80_get_reg16(pc_reg);
     sp = z80_get_reg16(sp_reg);
 
-    format_instr(pc, outbuf, &get_byte, &lookup_sym, &reloc);
-    s = lookup_sym(pc);
-    if (!s) s = "";
-    f = z80_get_reg8(f_reg);
+    listing = 1;
+    format_instr(pc, outbuf, &get_byte, &lookup_sym, &reloc, &mnix_sc);
+    listing = 0;
 
+    s = lookup_sym(pc);
+    if (s) printf("%-10s\n", s);
+
+    f = z80_get_reg8(f_reg);
     if (f & C_FLAG)
         fbuf[0] = 'C';
     if (f & N_FLAG)
@@ -596,10 +601,9 @@ dumpcpu()
     if (z80_get_reg8(irr_reg) & IFF1)
         fbuf[8] = 'I';
 
-    if (s) printf("%-10s\n", s);
     printf(
-        "%s %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x",
-        fbuf, ibuf, z80_get_reg8(a_reg),
+        "%s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x",
+        fbuf, z80_get_reg8(a_reg),
         z80_get_reg16(bc_reg), z80_get_reg16(de_reg), z80_get_reg16(hl_reg), 
         z80_get_reg16(ix_reg), z80_get_reg16(iy_reg), sp);
     printf(" pc:%04x: %-20s\n", pc, outbuf);
@@ -770,7 +774,7 @@ list_cmd(char **sp)
         }
     }
     for (l = 0; l < LISTLINES; l++) {
-        c = format_instr(i, cmdline, &get_byte, &lookup_sym, &reloc);
+        c = format_instr(i, cmdline, &get_byte, &lookup_sym, &reloc, &mnix_sc);
         s = lookup_sym(i);
         if (s) {
             printf("%s\n", s);
@@ -888,7 +892,7 @@ next_cmd(char **sp)
 
     pc = z80_get_reg16(pc_reg);
 
-    i = format_instr(pc, outbuf, &get_byte, &lookup_sym, &reloc);
+    i = format_instr(pc, outbuf, &get_byte, &lookup_sym, &reloc, &mnix_sc);
     next_break = pc + i;
 
     return 1;

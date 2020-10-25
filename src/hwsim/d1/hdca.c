@@ -218,7 +218,7 @@ wr_hdca_cmd(portaddr p, byte v)
             track, head, sector, key);
         ret = drive_read(handle[drv], track, head, sector, iobuf);
         if (ret != SECLEN) {
-        	Log("read fail drv: %d c: %d h: %d s: %d ret: %d\n", 
+        	l("read fail drv: %d c: %d h: %d s: %d ret: %d\n", 
                 drv, track, head, sector, ret);
         }
         bcopy(&iobuf[0], &buffer[2], 510);
@@ -239,7 +239,7 @@ wr_hdca_cmd(portaddr p, byte v)
             track, head, sector, key);
         ret = drive_write(handle[drv], track, head, sector, buffer);
         if (ret != SECLEN) {
-        	Log("write fail drv: %d c: %d h: %d s: %d ret: %d\n", 
+        	l("write fail drv: %d c: %d h: %d s: %d ret: %d\n", 
                 drv, track, head, sector, ret);
         }
         if (traceflags & trace_bio) hexdump(buffer, 512);
@@ -257,7 +257,7 @@ wr_hdca_cmd(portaddr p, byte v)
         psr |= PSR_OPDONE;
         break;
     default:
-        Log("hdca cmd: unknown command\n");
+        l("hdca cmd: unknown command\n");
         break;
     }
     if (psr & PSR_OPDONE) {

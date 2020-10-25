@@ -115,7 +115,7 @@ dp()
 }
 
 void
-dumpmem(char (*readbyte)(unsigned short addr), unsigned short addr, int len)
+dumpmem(unsigned char (*readbyte)(unsigned short addr), unsigned short addr, int len)
 {
     int i;
     char c;
@@ -143,9 +143,9 @@ dumpmem(char (*readbyte)(unsigned short addr), unsigned short addr, int len)
     }
 }
 
-static char *hexdump_baseaddr;
+static unsigned char *hexdump_baseaddr;
 
-static char
+static unsigned char
 getbyte(unsigned short addr)
 {
     return hexdump_baseaddr[addr];
@@ -185,7 +185,7 @@ ptime()
 
 // unconditionally log with timestamp  (just log)
 void
-log(const char *format, ...)
+l(const char *format, ...)
 {
     va_list args;
 
@@ -197,7 +197,7 @@ log(const char *format, ...)
 
 // unconditionally log with no timestamp (log line continuation)
 void
-logc(const char *format, ...)
+lc(const char *format, ...)
 {
     va_list args;
 
