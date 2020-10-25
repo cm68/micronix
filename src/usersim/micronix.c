@@ -88,6 +88,7 @@ struct MACHINE *cp;
 char namebuf[PATH_MAX];
 char workbuf[PATH_MAX];
 
+#define MAXFILE 63
 /*
  * colossal hack for special files
  * the file offset to do alternate sector skew
@@ -99,7 +100,7 @@ struct openfile {
     int special;        // is a special file needing sector hackery
     long offset;         // notional file offset
     int filesize;
-} files[64];
+} files[MAXFILE + 1];
 
 #define SPT 15
 
@@ -112,6 +113,10 @@ seekfile(int fd)
     int blkoff;
     long new;
 
+    if ((fd < 0) || (fd > MAXFILE)) {
+        errno = EBADF;
+        return -1;
+    }
 
     if ((files[fd].dt == 'b') && (files[fd].offset > files[fd].filesize)) {
         errno = ENXIO;
@@ -1689,7 +1694,7 @@ SystemCall(MACHINE * cp)
             pid();
             fprintf(mytty, "wait\n");
         }
-        if ((ret = wait(&i)) == -1) {
+        if ((ret = wait(&i)) == 0xffff) {
             if (verbose & V_SYS) {
                 pid();
                 fprintf(mytty, "no children\n");
@@ -1963,6 +1968,11 @@ SystemCall(MACHINE * cp)
         break;
 
     case 19:                   /* seek fd where mode */
+        if ((fd < 0) || (fd > MAXFILE)) {
+            ret = EBADF;
+            carry_set();
+            break;
+        }
         if (arg2 % 3) {
             i = (short) arg1;
         } else {
