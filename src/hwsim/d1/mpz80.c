@@ -30,6 +30,8 @@
 #include "sim.h"
 #include "util.h"
 
+extern int listing;
+
 /*
  * memory map of the 0 page
  */
@@ -101,7 +103,9 @@ byte keybreg;
 #define     KB_DIAG     0x02        // P1 - 13 if high, run diagnostics
 static char *keyb_bits[] = { 0, "diag", 0, 0, 0, 0, 0, 0 };
 
+#ifdef notdef
 extern void syscall_at(word pc);
+#endif
 
 // this register is negated:  if the switch is on, the value reads low
 byte switchreg;
@@ -227,6 +231,11 @@ super()
 int trapcount;
 
 /*
+ * the program counter when the trap hit
+ */
+int trapaddr;
+
+/*
  * a counter set by writing the task register and decremented by M1
  * if nonzero, also inhibits interrupt detection and traps
  */
@@ -240,9 +249,10 @@ static byte local;
 void
 trap(byte trapbits)
 {
-    trace(trace_mpz80, "trap %x %s\n", trapbits, bitdef(trapbits, stat_bits));
+    trace(trace_mpz80, "trap 0x%x %s\n", trapbits, bitdef(trapbits, stat_bits));
     taskreg = 0;
     trapcount = 15;
+    trapaddr = z80_get_reg16(pc_reg);
     trapstat = trapbits;
 }
 
@@ -324,6 +334,29 @@ get_byte(vaddr addr)
     char *regname = "";
     char *desc = "";
 
+    /*
+     * if we are in the middle of a trap sequence, we ignore the proffered address and
+     * substitute memory addresses from the rom.
+     * an added wrinkle is that if we are running, we count the memory fetches to stop
+     * the trap sequence after 15.
+     * if we are dumping out the the instruction using the disassembler, we also do the
+     * remapping but DONT count down.
+     */
+#if 1
+    // if we are trapping, ignore the passed in address
+    if (trapcount) {
+        if ((orig >= trapaddr) && (orig <= (trapaddr + 15))) {
+            addr = 0xbf0 + (orig - trapaddr);
+            //trace(trace_mpz80, "mpz80: trap %x replaced by %x\n", orig, addr);
+            if (running) {
+                trapcount--;
+            }
+        }
+        if (trapcount == 0) {
+            interrupt_check();
+        }
+    }
+#else
     // if we are trapping, ignore the passed in address
     if (trapcount && running) {
         if (traceflags & trace_inst) {
@@ -340,6 +373,8 @@ get_byte(vaddr addr)
             traceflags |= trace_inst;
         }
     }
+
+#endif
 
     // the task register starts a countdown for instruction fetches
     if (delay != 0) {
@@ -405,10 +440,12 @@ get_byte(vaddr addr)
         (z80_get_reg8(status_reg) & S_M1) && 
         (retval == 0x76) && 
         (!prefix) && (maskreg & MASK_HALT)) {
+#ifdef notdef
         // system calls are a rst8
         if ((z80_get_reg16(pc_reg) == 8) && (traceflags & trace_syscall)) {
             syscall_at(fuword(z80_get_reg16(sp_reg)));
         }
+#endif
         trap(ST_RESET & ~ST_HALT);
         seg = "nop:";
         retval = 0;
@@ -423,7 +460,7 @@ get_byte(vaddr addr)
 
     if ((running && ((traceflags & trace_mem)) || 
         (local && (traceflags & trace_mpz80)))) {
-        Log("mem: read %04x (%s%06x) %s got %02x %s\n", 
+        l("mem: read %04x (%s%06x) %s got %02x %s\n", 
             orig, seg, pa, regname, retval, desc);
     } 
     return retval;
@@ -472,11 +509,11 @@ put_byte(vaddr addr, unsigned char value)
         byte task = (addr >> 5) & 0xf;
         byte page = (addr >> 1) & 0xf;
         if (traceflags & trace_map) {
-            Log("map register %x write %x task %d page %x ", addr, value, task, page);
+            l("map register %x write %x task %d page %x ", addr, value, task, page);
             if (addr & 0x01) {
-                Logc("%s %s\n", value & 0x8 ? "r10" : "", pattr[value & 0x3]);
+                lc("%s %s\n", value & 0x8 ? "r10" : "", pattr[value & 0x3]);
             } else {
-                Logc("physical 0x%2x000\n", value);
+                lc("physical 0x%2x000\n", value);
             }
         }
         maps[offset] = value;
@@ -500,7 +537,7 @@ put_byte(vaddr addr, unsigned char value)
     }
     if ((running && ((traceflags & trace_mem)) || 
         (local && (traceflags & trace_mpz80)))) {
-        Log("mem: write %04x (%s%06x) %s put %02x %s\n", addr, seg, pa, regname, value, desc);
+        l("mem: write %04x (%s%06x) %s put %02x %s\n", addr, seg, pa, regname, value, desc);
     } 
 }
 

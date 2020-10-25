@@ -22,9 +22,9 @@ typedef unsigned int symaddr_t;
 int format_instr(
 	unsigned short addr, 
 	char *outbuf,
-	char (*get_byte)(unsigned short addr),		
+	unsigned char (*get_byte)(unsigned short addr),		
 	char *(*get_sym)(symaddr_t symaddr),
-	int (*get_reloc)(symaddr_t offset),
-	int (*syscall)(unsigned short addr, char (*gb)(unsigned short a), char *d));
+	unsigned int (*get_reloc)(symaddr_t offset),
+	int (*syscall)(unsigned short addr, unsigned char (*gb)(unsigned short a), char *d));
 
-extern int mnix_sc(unsigned short addr, char (*gb)(unsigned short a), char *d);
+extern int mnix_sc(unsigned short addr, unsigned char (*gb)(unsigned short a), char *d);

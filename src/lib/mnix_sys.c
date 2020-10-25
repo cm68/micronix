@@ -67,7 +67,7 @@ struct syscall syscalls[] = {
  * format a system call with args
  */
 int
-mnix_sc(unsigned short addr, char (*gb)(unsigned short a), char *dest)
+mnix_sc(unsigned short addr, unsigned char (*gb)(unsigned short a), char *dest)
 {
 	char sc;
 	int i;

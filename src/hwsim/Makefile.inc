@@ -1,8 +1,9 @@
 AR = ar
 CC = gcc
 DEBUG = -g
-CCFLAGS = -Wno-builtin-declaration-mismatch -fdiagnostics-color=always
-CFLAGS = $(DEBUG) -I../common -Wno-builtin-declaration-mismatch -fdiagnostics-color=always
+WARNS = -Wno-builtin-declaration-mismatch -fdiagnostics-color=always
+INCLUDES = -I../../include -I../common
+CFLAGS = $(DEBUG) $(INCLUDES) $(WARNS)
 
 %.a: %.o
 	$(AR) -rv $@ $?

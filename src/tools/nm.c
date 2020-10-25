@@ -55,7 +55,7 @@ int dataoff;
 int endoff;
 int fd;
 
-char
+unsigned char
 readbyte(unsigned short addr)
 {
     unsigned char c;
@@ -117,7 +117,7 @@ sym(symaddr_t addr)
 int labels;
 char label[65536];
 
-int
+unsigned int
 reloc(symaddr_t addr)
 {
     struct reloc *r;

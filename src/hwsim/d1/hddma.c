@@ -217,17 +217,17 @@ attention(portaddr p, byte v)
 
     if (traceflags & trace_hddma) {
     	if ((command.opcode >= 0) && (command.opcode <= OP_NOP)) {
-    		Logc("%s ", cmdname[command.opcode]);
+    		lc("%s ", cmdname[command.opcode]);
 		} else {
-			Logc("unknown command %d ", command.opcode);
+			lc("unknown command %d ", command.opcode);
 		}
-        Logc("drive: %d track: %d step: %d %s head: %x %s%s",
+        lc("drive: %d track: %d step: %d %s head: %x %s%s",
             drv, curcyl[drv], steps, command.seldir & STEP_DOWN ? "down" : "up",
             head, command.selhd & LOW_CURR ? "lowcurr " : "", 
             command.selhd & PRECOMP ? "precomp " : "");
-        Logc("args %x %x %x %x ", 
+        lc("args %x %x %x %x ", 
             command.arg0, command.arg1, command.arg2, command.arg3);
-        Logc("dmaaddr: 0x%x link 0x%x secsize %d\n", 
+        lc("dmaaddr: 0x%x link 0x%x secsize %d\n", 
             dmaaddr, link, secsize[drv]);
     }
 
@@ -245,11 +245,11 @@ attention(portaddr p, byte v)
     switch (command.opcode) {
     case OP_READ:
         if (curcyl[drv] != (command.cyl_low + (command.cyl_high << 8))) {
-            Logc("\ttrack lossage %d != %d\n", curcyl[drv], i);
+            lc("\ttrack lossage %d != %d\n", curcyl[drv], i);
         }
         i = drive_read(handle[drv], curcyl[drv], command.hd, command.sec, (char *)&secbuf);
         if (i != secsize[drv]) {
-        	Logc("\tread sector size mismatch %d expected %d\n", i, secsize[i]);
+        	lc("\tread sector size mismatch %d expected %d\n", i, secsize[i]);
         }
         copyout(secbuf, dmaaddr, i);
 #ifdef notdef
@@ -262,12 +262,12 @@ attention(portaddr p, byte v)
         break;
     case OP_WRITE:
         if (curcyl[drv] != (command.cyl_low + (command.cyl_high << 8))) {
-            Logc("\ttrack lossage %d != %d\n", curcyl[drv], i);
+            lc("\ttrack lossage %d != %d\n", curcyl[drv], i);
         }
         copyin(secbuf, dmaaddr, secsize[drv]);
         i = drive_write(handle[drv], curcyl[drv], command.hd, command.sec, (char *)&secbuf);
         if (i != secsize[drv]) {
-        	Logc("\twrite sector size mismatch %d expected %d\n", i, secsize[i]);
+        	lc("\twrite sector size mismatch %d expected %d\n", i, secsize[i]);
         }
         if (traceflags & trace_bio) hexdump(secbuf, i);
         command.status = GOOD;
@@ -285,7 +285,7 @@ attention(portaddr p, byte v)
         }
         for (i = 0; i < (command.sptneg ^ 0xff); i++) {
         	if (drive_write(handle[drv], curcyl[drv], head, i, (char *)secbuf) != secsize[drv]) {
-        		Logc("\tformat data fill write error\n");
+        		lc("\tformat data fill write error\n");
         	}
         }
         command.status = GOOD;
@@ -303,12 +303,12 @@ attention(portaddr p, byte v)
         command.sseccode = 3;
         i = SSECSIZE(command.sseccode);
         if (traceflags & trace_hddma) {
-            Logc("\tsteprate: %d ms ", command.steprate & 0x7f);
-            Logc("settle: %d ms ", command.settle & 0x7f);
-            Logc("secsize %d\n", i);
+            lc("\tsteprate: %d ms ", command.steprate & 0x7f);
+            lc("settle: %d ms ", command.settle & 0x7f);
+            lc("secsize %d\n", i);
         }
         if (i != secsize[drv]) {
-        	Logc("\tdrive %d sectorsize mismatch on specify %d expected %d\n", 
+        	lc("\tdrive %d sectorsize mismatch on specify %d expected %d\n", 
                 drv, i, secsize[drv]);
         }
         // secsz[drv] = secsize;
