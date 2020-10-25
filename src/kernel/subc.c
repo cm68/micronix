@@ -37,7 +37,7 @@ prdev(s, dev)
  */
 
 pr(fmt, args)
-    fast char *fmt;
+    char *fmt;
     int args;                   /* may have any number of args */
 {
     int *argp;
@@ -46,8 +46,7 @@ pr(fmt, args)
     if (csw() & 1)              /* supress messages if switch 1 is set */
         return;
 
-    argp = fmt;
-    argp++;
+    argp = &args;
     while ((c = *fmt++) != '\0') {
         if (c != '%') {
             console(c);
