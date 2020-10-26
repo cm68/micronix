@@ -606,7 +606,7 @@ dumpcpu()
         fbuf, z80_get_reg8(a_reg),
         z80_get_reg16(bc_reg), z80_get_reg16(de_reg), z80_get_reg16(hl_reg), 
         z80_get_reg16(ix_reg), z80_get_reg16(iy_reg), sp);
-    printf(" pc:%04x: %-20s\n", pc, outbuf);
+    printf(" pc:%04x %-20s\n", pc, outbuf);
 }
 
 /*

@@ -1,15 +1,30 @@
 INCLUDE = -I../include -I../kernel
 
-TARGETS = \
+SIMTARGETS = \
 	ar nm size imd disas dump \
 	mnix dcheck icheck ncheck readall
 	#mar  hitech
 
 LDFLAGS = -L../lib -lsim
+GENERATED = doc.inl zmac.c doc
+TARGETS = $(SIMTARGETS) zmac
 
 include ../Makefile.inc
 
-$(TARGETS): ../lib/libsim.a
+$(SIMTARGETS): ../lib/libsim.a
+
+zmac: zmac.o mio.o doc.o zi80dis.o
+	$(CXX) -Wall $(CXXFLAGS) -o zmac zmac.o mio.o doc.o zi80dis.o
+
+doc.o: doc.inl
+
+doc.inl: doc.c doc.txt
+	$(CC) -Wall -DMK_DOC -o doc doc.c
+	./doc >/dev/null
+	rm -f ./doc
+
+zmac.c: zmac.y
+	bison --output=zmac.c zmac.y
 
 test: nm disas
 	./nm tests/mw.o

@@ -1,10 +1,6 @@
-
-
-	subttl	'(c) 1981 Morrow Designs'
-	title   'MPZ-80  MON4.47 FIRMWARE'
-
+        ; subttl	'(c) 1981 Morrow Designs'
+	title   'MPZ-80  MON3.75-M FIRMWARE'
 	.z80
-	aseg
 
 ;****************************************************************
 ;*								*
@@ -15,20 +11,14 @@
 ;* the Wunderbus I/O motherboard UART 1.  Base address of the	*
 ;* I/O is assumed to be standard (beginning at port 48H).	*
 ;* If top five switches are 'On', a hard disk is assumed to be	*
-;* the disk device and Boothd is executed.			*
+;* the disk device and Boothd is executed.  Enter diagnostic	*
+;* mode by grounding pin 13 of header at 12C.			*
 ;*								*
-;*  Revised  3/24/82    -       Restore maps before power on    *
-;*				jump with switch 6 off for cold *
-;*				boot of MOS.			*
+;* Revised 12/28/82	-	Fixed PIC initialization	*	
 ;*								*
-;*  Revised 12/28/82	-	Fixed PIC init routine		*
-;*								*
-;*  Revised 11/15/82    -      added nop to wrtask for correct  *
-;* 			       delay count			* 
-;*								*	
-;*  Revised 8/27/82	-	M16 home and load constants	*
-;*				changed. group0-3 equates now	*
-;*				set int en bit high.		*	
+;* Revised 8/27/82	-	M16 home and load constants	*
+;*				changed.  group equ changed to 	*
+;*				add int en bit high.		*
 ;*								*
 ;* Bobby Dale Gifford and Bob Groppo        			*
 ;* 10/20/81							*
@@ -36,11 +26,8 @@
 ;****************************************************************
 
 	org	0		;Local Ram in task zero
-
-tempstk equ	0200h		;temporary stack
 nop	equ	0
-gobuff	equ	01b0h		;location of task switch routine on 'RESET'
-jmpop	equ	0c3h		;Jump unstruction op-code
+jmpop	equ	0c3h		;Jump instruction op-code
 callop	equ	0cdh		;z80 call instruction opcode
 t1mask	equ	2bh		;unlimited mask... no traps enabled
 t0mask	equ	2bh		;unlimited mask	
@@ -62,19 +49,17 @@ deofst	equ	11h		;offset to d,e
 bcofst	equ	0Fh		;offset to b,c
 pcofst	equ	0Dh		;offset to the users pc register
 nxtbyte	equ	076h		;byte after a halt
-ersav	equ	regsav + 2	;temporary error save area
 
 ;****************************************************************
 ;*								*
 ;*		   Wunderbus I/O equates:			*
 ;*								*
 ;****************************************************************
-	
 base	equ	048h		;I/O base address of wunderbus ports
 group0	equ	08h
 group1	equ	09h		;serial port 1
-group2	equ	0ah		;serial	port 2
-group3	equ	0bh		;serial port 3
+group2	equ	0Ah		;serial	port 2
+group3	equ	0Bh		;serial port 3
 grpctl	equ	base+7		;I/O group select port
 
 ;	UART equates
@@ -106,18 +91,16 @@ icw4	equ	base + 5	;PIC initialization control word 4
 ocw1	equ	base + 5	;PIC interrupt mask register
 ocw2	equ	base + 4	;PIC EOI register
 picmask equ	0ffh		;mask to turn all interrupts off
-ltim	equ	018h		;ICW access + level triggered mode
+ltim	equ	08h		;level triggered mode
 adi4	equ	04h		;call address intervals = 4
 adi8	equ	00h		;call address intervals = 8
 sngl	equ	02		;sole system PIC
 ic4	equ	01h		;icw4 access bit
 lovect	equ	0		;call vectors begin at 0
 hivect	equ	0		;call vectors begin at 0
-normal	equ	0ch		;Master/Reg. nest/buffered/no AEOI/8085
-				; -normal setting of OCW4 for Morrow Software
+normal	equ	0		;Master/Reg. nest/unbuffered/no AEOI/8085					; -normal setting of OCW4 for Morrow Software
 eoi	equ	20h		;non-specific EOI constant
 ivalu	equ	init OR ltim OR adi4 OR sngl OR ic4 OR lovect
-
 ;****************************************************************
 ;*								*
 ;*	HDC Winchester controller equates			*
@@ -162,7 +145,7 @@ cyl	equ	153		;number cylinders for Seagate ST-506
 heads	equ	  4		;number heads for Seagate ST-506
 stpdly	equ	 01eh		;15 msec for Seagate ST-506
 hdsetl	equ	 0C8h		;20 msec for Seagate ST-506
-secsiz	equ	  3		;512 byte sectors for Micronix
+secsiz	equ	  7		;1024 byte sectors for CPM
 readat	equ	  0		;DMA controller read sector opcode
 write	equ	  1		;DMA controller write sector opcode
 rhead	equ	  2		;DMA controller read header opcode
@@ -190,8 +173,6 @@ link	equ	chan + 13	;link field address for next command
 bootad	equ	1100h		;dma address for first sector from hddma
 good	equ	0ffh		;good status result
 
-
-
 ;****************************************************************
 ;*								*
 ;* Decision One Ram variables, visible only to task 0.		*
@@ -213,50 +194,67 @@ user:	jp	user			;(7) User entry point
 
 ctask:	db	0			;Current task
 cmask:	db	0			;Current mask contents
-cstack:	dw	0			;temporary save stack
-u.sp:	dw	0
-u.pc:	dw	0
-u.de:	dw	0
-u.hl:	dw	0
-u.af:	dw	0
 
-begsav	equ	$
-regsav:	dw	0			;address of beginning of reg save area
-	ds	1Ch
+;****************************************************************
+;*								*
+;* Task save areas. Each of the tasks 1-15 have one of these	*
+;* structures associated with it.  When tskbase returns, HL	*
+;* will point to u.ir for that task + 0 offset.        		*
+;*								*
+;*             offset						*
+;*	u.ir    +0	Interrupt register	(1 byte)	*
+;*	u.ix	+1	Index registers		(2 bytes)	*
+;*	u.iy	+3				(2 bytes)	*
+;*	u.abc	+5	Alternate registers	(2 bytes)	*
+;*	u.ade	+7				(2 bytes)	*
+;*	u.ahl	+9				(2 bytes)	*
+;*	u.aaf	+B				(2 bytes)	*
+;*	u.pc	+D	Task PC			(2 bytes)	*
+;*	u.bc	+F	Task registers		(2 bytes)	*
+;*	u.de	+11				(2 bytes)	*
+;*	u.hl	+13				(2 bytes)	*
+;*	u.af	+15				(2 bytes)	*
+;*	u.sp	+17	Stack pointer		(2 bytes)	*
+;*	u.mask	+19	Mask register contents.	(1 bytes)	*
+;*								*
+;****************************************************************
 
-monstk	equ	$			;monitor stack area
-
-	ds	(200h - 01eh) - monstk
-;********************************************************
-;*							*
-;*	Initialized stack at 200h contents		*
-;*							*
-;********************************************************
-
-retstk: dw	0		;return address from call to monitor or super
-tskmsk:	dw	0
-t.pc:	dw	0
-t.sp: 	dw	0		;users stack pointer
-t.af:	dw	0		;primary A & f register save
-t.bc:	dw	0		;primary b & c register save
-t.de:	dw	0		;primary d & e register save
-t.hl:	dw	0		;primary h & l register save
-t.int:	dw	0		;interrupt register register save
-t.ix:	dw	0		; ix register save
-t.iy:	dw	0		; iy register save
-t.af1:	dw	0		; alternate A & f register save
-t.bc1:	dw	0		; alternate b & c register save
-t.de1:  dw	0		; alternate d & e register save
-t.hl1:  dw 	0		; alternate h & l register save
+tasksiz	equ	26
+tasks:	ds	tasksiz		;Task 1
+	ds	tasksiz		;Task 2
+	ds	tasksiz		;Task 3
+	ds	tasksiz		;Task 4
+	ds	tasksiz		;Task 5
+	ds	tasksiz		;Task 6
+	ds	tasksiz		;Task 7
+	ds	tasksiz		;Task 8
+	ds	tasksiz		;Task 9
+	ds	tasksiz		;Task 10
+	ds	tasksiz		;Task 11
+	ds	tasksiz		;Task 12
+	ds	tasksiz		;Task 13
+	ds	tasksiz		;Task 14
+	ds	tasksiz		;Task 15
 
 
-
+u.save:	db	0		;Start of user save area
+u.ir:	db	0		;Temporary user interrupt reg. save
+	dw	0,0,0,0,0,0	;ix,iy,bc',de',hl',af'
+u.pc:	dw	0		;Temporary user pc storage
+	dw	0,0,0		;bc,de,hl
+u.af:	dw	0		;Temporary user af storage
+u.sp:   dw      0               ;temporary user stack storage
+u.mask:	dw	0		;temporary mask storage
+gobuff	equ	$
+	ds	14		;task boot buffer
+ersav	equ	$	
+      	ds	200h-(ersav-ram);Fill out the ram
+stack	equ	$		;End of local ram
 
 ;****************************************************************
 ;*								*
 ;* The following map is used to hold an image of the current	*
-;* memory map for all tasks.  this is because the actual map    *
-;* ram does not support read operations				*
+;* memory map for all tasks.					*
 ;*								*
 ;****************************************************************
 
@@ -295,7 +293,7 @@ mapram:	ds	200h			;Memory Map RAM, visible only to task 0
 ;****************************************************************
 ;*								*
 ;* Decision One prom routines, usable by the supervisor task	*
-;* but not accessible by any other tasks.			*
+;* only after a reset but not accessible by any other tasks.	*
 ;*								*
 ;****************************************************************
 
@@ -315,7 +313,7 @@ rom0	equ	$			;Local ROM, visible only to task 0
 ;* program will jump to the monitor regardless of the state	*
 ;* of the other switches.  If S1 - S5 are all 'ON' a MORROW	*
 ;* hard disk is assumed and the 'Boothd' program is executed.	*
-;* If pin 13 of 12C is grounded, the diagnostic mode is entered.*
+;* If pin 2 of 15D is lifted, the diag nostic mode is entered.	*
 ;*								*
 ;****************************************************************
 
@@ -333,6 +331,7 @@ regrd:  out	(0ffh),a		;sync
 	inc	hl
 	ld	a,(hl)			;read trap status reg @ 403h
 	jr	getsw
+
 
 
 ; Check all the writable registers
@@ -387,12 +386,13 @@ tram1:	xor	a
 	ld	hl,03ffh
 	jr      tram1			;write to 3ffh a ffh
 
-
 ; Check the Floating Point Processor
+
 
 tfpp:   xor	a			;check FPP
 	out	(0ffh),a		;sync
 	ld	(0c00h),a		;write a 00 to location C00h
+	ld	(0c08h),a		;write a 00 to location C08h
 	ld	a,(0c00h)		;read c00h
 
 
@@ -413,9 +413,8 @@ reset:	jp	z,reset0		;go to the montior if  low
 ; Check the S-100 bus addr and data lines
 
 
-tbus:   ld	hl,task
-	ld	a,0f0h
-	ld	(hl),a			;force upper task bits high
+tbus:   ld	a,0f0h
+	ld	(task),a		;force upper task bits high
 	ld	a,0ffh			;init the T0 map
 	ld	(61eh),a
 	ld	a,03
@@ -425,20 +424,19 @@ tbus:   ld	hl,task
 	ld	(602h),a
 	out	(0ffh),a		;sync
 	ld	(0ffffh),a		;write - bus addresses A0-23 are high
-	ld	(hl),a			;upper task bits low
+	ld	(task),a		;upper task bits low
 	ld	(1000h),a		;write - bus addresses A0-23 are low
-	or	0f0h
-	ld	(hl),a			;force upper task bits high
+	ld	a,0f0h
+	ld	(task),a		;force upper task bits high
 	ld	a,(0ffffh)		;read  - bus addresses A0-23 are high
 	xor	a
-	ld	(hl),a		 	;force upper task bits low
+	ld	(task),a		;force upper task bits low
 	ld	a,(1000h)		;read  - bus addresses A0-23 are low
 	jr	getsw
 
 
-ntbus:  ld	hl,task
-	ld	a,0A0h
-	ld	(hl),a			;force upper task bits high
+ntbus:  ld	a,0A0h
+	ld	(task),a		;force upper task bits high
         ld	a,0aah			;init the T0 map
 	ld	(61eh),a
 	ld	a,03
@@ -447,17 +445,17 @@ ntbus:  ld	hl,task
 	ld	a,55h
 	ld	(602h),a
 	out	(0ffh),a		;sync
-	cpl
+	ld	a,0aah
 	ld	(0faaah),a		;write - bus addresses A0-23 = AAAAAA
 	ld	a,50h
-	ld	(hl),a			;upper task bits low = 5
-	or	05h
+	ld	(task),a		;upper task bits low = 5
+	ld	a,55h
 	ld	(1555h),a		;write - bus addresses A0-23 are low
 	ld	a,0A0h
-	ld	(hl),a			;force upper task bits high
+	ld	(task),a		;force upper task bits high
 	ld	a,(0faaah)		;read  - bus addresses A0-23 are high
 	ld	a,050h
-	ld	(hl),a			;force upper task bits low
+	ld	(task),a		;force upper task bits low
 	ld	a,(1555h)		;read  - bus addresses A0-23 are low
 	jp	getsw
 
@@ -471,17 +469,15 @@ reset0: call	reset1
 	jp	gobuff
 
 reset1:	ld	hl,super		;initialize 'super' to the monitor...
-settle:	dec	hl			;wait for hardware to settle down
+settle:	dec	hl			;wait for the hardware to settle down
 	ld	a,l
 	or	h
 	jr	nz,settle
 	ld	(hl),jmpop		;- this will be overwritten by the
 	inc	hl			;- supervisor but all traps in the 
-	ld	(hl),00h		;- meantime will fall into the monitor.
+	ld	(hl),012h		;- meantime will fall into the monitor.
 	inc 	hl
-	ld	(hl),10h
-	ld	hl,map
-	ld	(cstack),hl		;initialize a temporary stack
+	ld	(hl),08h
 
 reslop: xor	a
 	ld	c,3			;New access priviledges
@@ -505,15 +501,16 @@ fmap:	ld	b,a			;fill all the tasks' maps
 	ret
 
 	
+
 setup:	xor	a
 	ld	(mapram + 2),a		;a window for DMA device commands
-	ld	(map + 2),a		;image map updated
+	ld	(map + 2),a		;update the image map
 	ld	(ersav),a		;null the error save byte
 	ld	a,hstrap		;initialize the mask register
 	ld	(mask),a		; -to trap on halts and stops
 	ld	(cmask),a
 
-;	Following code checks for presence of any ram in system
+;	Following code checks for ram in system
 
 	ld	hl,0ffffh		;top of ram
 ramchk:	ld	a,0f0h
@@ -552,12 +549,9 @@ tstsw:	ld	a,(switch)		;get contents of switch
 check:	ld	a,(switch)		;test monitor switch
 	bit  	2,a
 	ld	a,1			;normal task number
-	ld	(u.pc),de		;initialize the  pc save area
+	ld	(15h),de		;initialize the t1 pc save area
 	ld	(ctask),a
-	jr	z,montor		;jump if monitor desired
-	ld	(mapram + 2),a
-	ld	(map + 2),a		;restore the maps
-	jr	nutask
+	jr	nz,nutask		;jump if boot desired
 
 montor:	xor	a			;monitor task number
 	ld	de,cold			;monitor location
@@ -601,7 +595,7 @@ nutask: ld	hl,gobuff		;Write a routine to switch to new task
 
 picset:	xor     a
 	out	(grpctl),a
-	ld	a,ivalu
+	ld	a,ivalu			;sngl,level,4 byte address
 	out	(icw1),a		;initialize the first word
 	ld	a,hivect
 	out	(icw2),a		;initialize the second word
@@ -673,12 +667,13 @@ nuboot:	ld	bc,endboot - bootbl	;byte count
 hdrl:	dec	d			;wait for controller to process reset
 	jr	nz,hdrl
 	call	cloop
-home:	ld	hl,-1			;seek to home
-	ld	(chan + 1),hl		;- with ffff step pulses
+
+home:	ld	hl,-1  			;seek to home
+        ld      (chan + 1),hl           ; - with ffff steps
 	ld	a,noop
-	ld	(statis - 1),a		;null the command byte
+	ld	(statis - 1),a		;null command 
 	ld	a,1
-	ld	(statis),a		;initialize the status byte
+	ld	(statis),a		;set up the status byte
 	call	cloop
 	
 rdata: 	ld	de,chan			;destination
@@ -688,6 +683,9 @@ rdata: 	ld	de,chan			;destination
 	call	cloop
 	ld	de,0100h		;point to beginning of DMA boot prog.
 	jp	check
+
+
+; cloop1 = 9.6 us
 
 			
 cloop:	ld	c,020h
@@ -699,7 +697,8 @@ cloop1: ld	a,(statis)		;check drive status
 	dec	de			;wait for controller to respond
 	ld	a,e
 	or	d
-	jr	nz,cloop1		;give it a couple seconds to respond
+	jr	nz,cloop1		;give it time to respond
+					;end cloop1
 
 ;	Fall through to here on any error
 
@@ -710,15 +709,15 @@ cloop1: ld	a,(statis)		;check drive status
 	jr	nz,cloop0		; - about 20 seconds
 
 cloop2:	pop	de			;re-align the stack pointer
-	ld	c,'H'			;save the device
-	ld	b,a			;save the status
-	ld	a,(cmmd)		;save the command
+	ld	b,a
+	ld	c,'H'
+	ld	a,(cmmd)
 	ld	d,a
 
 ;****************************************************************
 ;*								*
-;*  Enter here if DISK controllers don't respond correctly.	*
-;*  Routine alters gobuff to point to the monitor cout routine.	*	
+;* Enter here if DISK controllers don't respond correctly.	*
+;* Routine alters gobuff to point to the monitor cout routine.	*	
 ;*								*
 ;****************************************************************
 
@@ -730,11 +729,10 @@ derror:
 	ld	(hl),b			;error status
 	inc	hl
 	ld	(hl),d			;command causing error 
-
 allerr:	xor	a
 	ld	(ctask),a
 	ld	de,cold			;pointer to error print
-	ld	(u.pc),de		;save the pointer in t1 pc
+	ld	(15h),de		;save the pointer in t1 pc
 	jp	nutask			
 	
 
@@ -774,7 +772,7 @@ hdcerr: ld	c,'D'			; D for HDCA error flag
 	in	a,(secstat)		;get the secondary status
 	ld	d,a
 	jr	derror
-	
+
 boothd:	ld	a,drivea		;select
 	out	(functn),a		;    drive A
 	ld	a,drenbl		;turn on drive
@@ -888,6 +886,7 @@ rstmxx:	add	hl,de		;add offset to selected map
 ;*  							*
 ;********************************************************
 
+
 uartst:	ld	d,3			;start with uart 3
 uarts0:	ld	a,d
 	out   	(grpctl),a
@@ -978,7 +977,7 @@ btable:	dw	1047			;110 baud		0 0 0
 
 ; Load constants command for the DMA Winchester controller
 
-bootbl: db	10h			;direction --> track 0
+bootbl: db	10h			;direction out
 	db	0			;low steps
 	db	0			;high steps
 	db	03ch			;select drive 0
@@ -1047,18 +1046,16 @@ ecode0  equ	$			;End of reset prom code
 ;* begins executing when a reset trap occurs. 			*
 ;*								*
 ;****************************************************************
-
 	ld	hl,djstat
 	ld	a,0h
 	ld	(mapram + 2),a		;t0 map points to t1 map seg 0
 	inc	a
-start:	ld	sp,map
+start:	ld	sp,stack
 	jp	getsw 		        ;power-on or reset jump
 	nop				;Fill out the prom.
 erom0   equ	$
 
 	ds	400h-(erom0-rom0)
-
 
 	.phase 800h  
 
@@ -1081,105 +1078,79 @@ erom0   equ	$
 ;****************************************************************
 
 svtrap:	jp	trappd			;trap routine, check out reason why
-tskbse: jp	what			;vestigial
+tskbse:	jp	tskbase			;Return task base pointer
 nmap:	jp	putmap			;set up new allocation vector, access 
 gotsk:	jp	gotask			;switch to new task
 getmap:	jp	gtmap			;get the old allocation vector, access
-dupmap: jp	what			;vestigial
+dupmap:	jp	dpmap			;copy user vector into T0 window
 what:	jp	monitor			;debugger/monitor called 'MON'
 restr: 	jp	restor			;restore task 0 map to normal condition
-oldtask:
-	jp	gotsk			;jumps to last task before trap
-wrtask: jp	writsk			;writes value in CTASK to task register
-wratsk:	jp	atask			;writes value in 'A' to  task register
+otask:	jp	oldtask			;jumps to last task before trap
+ 	
 
 	
 trappd:	ld	de,-15			;back up the users pc
-	pop	hl
+	ld 	hl,(u.pc)
 	add	hl,de
-	ld	(u.pc),hl
-	ld	a,(ctask)
-	cp	0
-	jp	z,suptrap
-	pop	de
-	pop	hl
-	pop	Af
-	ld	sp,(cstack)		;set up reg_save stack in supervisor
-alltrp:	ex 	Af,Af'			;save user's auxiliary registers
+	ld	(u.pc),hl		;save the users original pc
+	ex 	Af,Af'			;save auxilary registers
 	exx
+	push	Af
 	push	hl
 	push	de
 	push	bc
-	push	Af
 	push	iy
 	push	ix
 	ld	a,i			;get interupt register
 	push	af			;save it
-	ex	Af,Af'
-	exx
-	push	hl			;- and save all user registers
-	push	de
-	push	bc
-	push	Af
-	ld	hl,(ctask)		;save the task and mask
-	ld	de,(u.sp)		;get the user's stack pointer
-	ld	bc,(u.pc)
-	push	de			;save the user's stack pointer
-	push	bc			;save the user's program counter
-	push	hl			;save the current task and mask
-	ld	(regsav),sp		;beginning address of reg save area
-					; - saved here.
+	ld	a,(ctask)		;get current task number
+	ld	sp,stack
+	call    tskbse			;get base of task save area
+	push	hl			;save the bottom of task save area
+	ex	de,hl			;de = bottom task_ save
+	ld	hl,u.ir			;hl = bottom of temp_ save
+	ld      bc,tasksiz		;repeat count
+	push	bc			;save for register print routine
+	ldir   				;move registers from temporary store
+					;to task_ store area
+	ld	hl,(stats)		;get status bits
+	push	hl
+	bit	2,l			;was the trap a halt?
+	jp	nz,super
+	call	dupmap			;copy users map into task 0
+	ld	hl,(u.pc)		;hl has users adjusted pc 
+	ld 	a,(hl)			;a = adjusted pc contents
+	cp	nxtbyte			;was it an 76 in next byte??
+	jp      nz,super		;jump if not an 76 to supervisor
+	inc	hl			;HL point to address after 2nd halt
+	jp	(hl)			;jump to byte following the halt 76 
+					; - but now in task 0...
 
-	;Stop switch calls the monitor - return will restore to "CTASK"
+           
 
-	ld	a,l			;get the trapped task #
-	cp	0
-	jr	z,gowhat		;if trap was in task 0, go to monitor
-	ld	a,(stats)
-	bit	4,a
-	jr	nz,gosupr		;go to super unless it was a stop trap 
-
-gowhat:	xor 	a
-	ld	(ctask),a
-	call	what
-	jr	gotask
-
-suptrap:
-	pop	de
-	pop	hl
-	pop	Af
-	ld	sp,(u.sp)
-	jp	alltrp	
-
-	;Call the supervisor - a return will restore the task in "CTASK"
-gosupr:	xor	a
-	ld	(ctask),a
-	call	super		
-	jr	gotask
+;****************************************************************
+;*								*
+;*   Tskbase returns with H & L pointing to the first address	*
+;*   in the user's task save area.  User is designated by 	*
+;*   register A upon entry.					*	
+;*								*
+;****************************************************************
 
 
-;********************************************************
-;*							*
-;*  Writsk will take the value in CTASK and write it	*
-;*  to the TASK register.  It then waits 6 instructions	*
-;*  for the hardware delay and returns with traps set 	*
-;*  and operation in the task selected.	 The 'A' re-	*
-;*  gister is not preserved, all others untouched.	*
-;*							*
-;********************************************************
 
-writsk:	ld	a,(ctask)
-atask:	ld	(task),a        ;update the task register and count   
-	nop			; - 7 instructions to delay for the 
-	nop			; - hardware swap counter.
-	nop
-	nop
-	nop
-	nop
-	nop
+tskbase:	
+	ld	hl,tasks-tasksiz	;no task zero save area
+	ld	de,tasksiz		;size of save area
+	and 	0fh			;mask off upper bits
+	jr	nz,tsklp		;task 0 and 1 share the same area
+	inc	a
+tsklp:	add     hl,de			
+	dec	a			
+	jr	nz,tsklp		
 	ret
+		
 
-
+		
 ;********************************************************
 ;*							*
 ;*   Restore will restore Task 0's map with its old 	*
@@ -1196,6 +1167,7 @@ restor:	ld 	hl,map			;point to beginning of map image
 	ld	bc,01Fh			;all of task 0 map 
 	ldir
 
+
 ;****************************************************************
 ;*								*
 ;*	Gotask restores all the task's registers  and then	*
@@ -1203,41 +1175,41 @@ restor:	ld 	hl,map			;point to beginning of map image
 ;*								*
 ;****************************************************************
 
-gotask:	ld	hl,0			;init hl for normal entry
-	add	hl,sp
-ntask:	ld	sp,hl
-	pop	hl
-	ld	(ctask),hl		;get back CTASK and CMASK
-	pop	hl
-	ld	(u.pc),hl		;get back the user's pc
-	pop	hl
-	ld	(u.sp),hl		;get back the user's sp
-	pop	Af			;get back the primary registers
-	pop	bc
-	pop	de
-	pop	hl
-	ex	Af,Af'
-	exx
-	pop	Af			;get back the interrupt register
+oldtask:
+	ld	a,(ctask)
+gotask:	ld	(ctask),a		;save new task number
+	call	tskbase 		;get address of task save area
+	ld	de,u.ir			;base of save area
+	ld	sp,u.save
+	ld	bc,tasksiz		;repeat count
+	ldir				;move the registers
+	pop	Af			;get back the interupt register
 	ld	i,a			;restore it
 	pop	ix			;restore auxilliary registers
 	pop	iy
-	ld	hl,(u.pc)		
-bcomnd:	ld	(user + 1),hl		;form jump to user's pc value @ user
-	ld	a,jmpop
-	ld	(user),a
-	pop	Af			;restore the alternate registers
 	pop	bc
 	pop	de
-	ld	hl,(ctask)
-	ld	(task),hl		;write the new task and mask
 	pop	hl
-	ex	Af,Af'
+	pop	af
+	ex      Af,Af'
 	exx
-	ld	sp,(u.sp)
-	jp	user
+	pop	hl			;get pc register
+	ld	(user+1),hl		;put in jump instruction
+	pop	bc			;restore primary registers
+	ld	a,jmpop			;lay down the jump instruction
+	ld	(user),a		;
+	ld	a,(u.mask)		;get back the old mask for that task
+	ld	(cmask),a
+	ld	hl,(ctask)		;get the task/mask for swapping
+	ld	(task),hl		;begin count, eigth instruction
+					; is in the user's space
+	pop	de			;(1) restore primary registers
+	pop	hl			;(2)
+	pop	af			;(3)
+	ld      sp,(u.sp)		;(4) (5)
+	jp	user			;(6)
+					; 7th instruction is @ 003 task 0
 	
-					
 ;********************************************************
 ;*							*
 ;*  The following code will return with:		*
@@ -1250,9 +1222,7 @@ bcomnd:	ld	(user + 1),hl		;form jump to user's pc value @ user
 ;*							*
 ;********************************************************
 
-gtmap:	ld	l,a		;get task and segment numbers
-	ld	h,0h		
-	add	hl,hl		;multiply times 2
+gtmap:	call	tsmod		;get task and segment numbers
 	ex	de,hl		;save calculated offset in de
 	ld	hl,map		;point to beginning of map ram image
 	add	hl,de		;add offset to get desired map
@@ -1261,7 +1231,40 @@ gtmap:	ld	l,a		;get task and segment numbers
 	ld	c,(HL)		;get old access priviledges
 	ret 	
 		
-			
+
+
+;********************************************************
+;*							*
+;*	This routine copies the most recently trapped	*
+;*	user's map into task0 actual map and gives T0   *
+;*      unlimited privilidges with this memory. The	*
+;*      T0 image map is not altered.			*
+;*							*
+;********************************************************
+
+dpmap:	ld	a,(ctask)
+	rlc	a
+	rlc	a
+	rlc	a
+	rlc	a
+dpmap0: call    gtmap    		;return with values in b,c
+	ld	c,03h			;unlimied access priviledges
+	push	af
+	and	0fh			;force task # to be 0
+	call	tsmod
+	ld	de,mapram		;point to T0 actual map
+	add	hl,de
+	ld	(hl),b			;new access vector
+	inc	hl
+	ld	(hl),c			;new priviledges
+	pop	af
+	inc	a			;next map location
+	ld	c,a
+	and	0fh			
+	ret	z			;do it 16 times for all segments
+	ld	a,c
+	jr	dpmap0
+
 ;********************************************************
 ;*							*
 ;*  Putmap updates a task's allocation vectors and	*
@@ -1278,9 +1281,7 @@ gtmap:	ld	l,a		;get task and segment numbers
 ;*							*
 ;********************************************************
 
-putmap:	ld	l,a			;get task and segment number
-	ld	h,0h			;
-	add	hl,hl			;multiply times 2
+putmap:	call	tsmod			;get task and sec #
 	ex 	de,hl			;save calculated offset in de
 	ld	hl,mapram		;point to beginning of ram map
 	call 	putmxx			
@@ -1291,27 +1292,34 @@ putmxx: add	hl,de			;add offset to selected map
 	ld	(hl),c			;write new access atributes
 	ret
 
+tsmod: 	ld	l,a			;get task / seg number
+	ld	h,0
+	add	hl,hl 			;multiply times two
+	ret
 	
 ;********************************************************	
 ;*							*
 ;*  The following routines make up the debugging tool	*
-;*  monitor  						*
+;*  called UPMON1.  It is a modified version of the 	*
+;*  code in the lower half of the EPROM.       		*	
 ;*							*
 ;********************************************************
 
+
 monitor:
-	ld	(monstk -2),sp		;save stack for 'u' & 'c' commands
-	ld	iy,(monstk-2)
-	ld	sp,monstk
-	ld	hl,(regsav)		;get the stack location
-	ld	de,27			;number of saved registers
+	call	ucrlf
+	pop	hl			;print the stats and trap address
+	call	uladr			;print the task and mask
+	pop 	de			;get task size
+	dec	de			
+	pop	hl			;get the bottom of task save area
 	push	hl
 	add	hl,de
 	ex	de,hl
 	pop	hl
 	ld	bc,ustart
 	push	bc
-	jp	udi0			;print out the registers
+	jr	udi0			;print out the registers
 
 cold:	ld	a,(ersav)		;retrieve the error byte if any
 	ld	c,a
@@ -1319,8 +1327,8 @@ cold:	ld	a,(ersav)		;retrieve the error byte if any
 	ld	hl,(ersav + 1)		;retrieve disk command
 	call	uladr
 
-ustart:	ld	sp,monstk
-	LD	DE,USTART
+ustart:	ld	sp,stack
+	LD	DE,USTART		;monitor begins here
 	PUSH	DE
 	CALL	UCRLF
 	LD	C,':'
@@ -1356,6 +1364,7 @@ UDI1:	CALL	UBLK
 ;	FILL MEMORY XXXX TO XXXX WITH XX
 ;
 ;
+;
 UFILL:	CP	'F'
 	JR	z,ufill0
 	cp	'f'
@@ -1365,7 +1374,7 @@ UFI0:	LD	(HL),C
 	CALL	UHILO
 	JR	NC,UFI0
 	POP	DE
-	JP	USTART
+	JR	USTART
 ;
 ;
 ;	GOTO (EXECUTE) XXXX
@@ -1429,7 +1438,7 @@ USTORE:	LD	(IX+00H),A
 ;
 ;
 USUBS:	CP	'S'
-	JP	Z,usuo0
+	JR	Z,usuo0
 	cp	's'
 	jp	nz,uhexn
 usuo0:	CALL	UEXPR1
@@ -1639,6 +1648,7 @@ UDBLC:	CALL	UCONV
 	JP	ucout1			;checked
 
 UMEMSIZ:
+	LD	HL,(STACK)
 	RET
 
 UNIBBLE:
@@ -1694,7 +1704,6 @@ UTI:	CALL	ucon1
 	LD	A,C
 	POP	BC
 	RET
-
 ;
 ;	READ/WRITE TO I/O PORT
 ;
@@ -1748,69 +1757,66 @@ U..B:	INC	BC
 	CALL	UHILOX
 	JR	UVERIO
 
-
-
 ;	Return to task which just trapped with old pc and registers restored
-;	All registers are saved!!
 
 uretrn:	cp	'C'
 	jr	z,uretr1
 	cp	'c'	
 	jr	nz,ucontr
-uretr1:	ld	sp,iy			;get back the user save stack
-	pop	de			; ... the return address
-	pop	hl			; ... Ctask/Cmask
-	ld	a,h
-	or	08h			;set the run bit for 'run'
-	ld	h,a
-	push	hl			;restore the stack
-	push	de
-	ret				;return to user through 'gotask'
+uretr1:	ld	a,(ctask)
+	call	tskbase
+	ld	de,mskofst
+	add	hl,de
+	ld	a,(hl)
+	or	08h
+	ld	(hl),a
+	jp	otask
 
 
 ;	Return to trapped task, execute next instruction and trap back
-;	All registers are saved but the mask is changed!!
 
 ucontr:	cp	'U'
 	jr	z,ucont1
 	cp	'u'
 	jr	nz,uboot
-ucont1:	ld	sp,iy			;get back the user save stack
-	pop	de			;... the return address
-        pop	hl			;... CTASK/CMASK
-	ld	a,h
+ucont1:	ld	a,(ctask)
+	call	tskbase
+	ld	de,mskofst
+	add	hl,de
+	ld	a,(hl)
 	and	0f6h			;force mask for stop and run enble low
-	ld	h,a
-	push	hl			;restore the stack
-	push	de
-	ret				;return to user through 'gotask'
+	ld	(hl),a
+	jp	otask	
 
 ;	Jump to the cpu switch address into task specified by CTASK
-;	No registers are preserved!!
 
 uboot:	cp	'B'
 	jr	z,uboot1
 	cp	'b'
 	jp	nz,uerror
-uboot1:	ex	Af,Af'
-	exx
-	xor	a
-	inc	a
-	ld	(mapram + 2),a		;restore the actual map
-	ld	(map + 2),a		;restore map image 
+uboot1:	ld	a,(ctask)
+	call	tskbase
+	push	hl
 	ld	a,(switch)
 	and	0f8h
-	cp	0			;HDCA Boot?
-	jr	z,uboot2		
-	cp	8			;HD-DMA Boot?
-	jr	z,uboot2
-	cp	10h			;DJ-DMA Boot?
-	jr	z,uboot2
-	ld	h,a			;Memory Address jump
-	ld	l,0
-	jp	bcomnd
-uboot2: ld	hl,(u.pc)		;get the boot address for controllers
-	jp	bcomnd
+	cp	0			;check for a HDCA hard disk boot
+	jp	z,uboot2
+	cp	08h			;check for DMA hard disk boot
+	jp	z,uboot2
+	cp	010h			;check for DJ-DMA
+	jp	z,uboot2
+	ld	de,pcofst
+	add	hl,de
+	ld	(hl),0
+	inc	hl
+	ld	(hl),a
+uboot2: ld	a,(cmask)
+	pop	hl
+	ld	de,mskofst
+	add	hl,de
+	ld	(hl),a
+	jp	oldtask
+
 
 
 ;	MEMORY MISMATCH PRINTOUT
@@ -1823,13 +1829,11 @@ UCERR:	LD	B,A
 	LD	A,B
 	CALL	ULBYTE
 	JP	UCRLF
+;
 
 
 ecode1	equ	$
-	ds	3edh - (ecode1-rom1)
-
-serial:	dw	0ffffh			;Micronix serialization word
-	db	0ffh
+	ds	3f0h-(ecode1-rom1)
 
 ;********************************************************
 ;*   							*
@@ -1840,17 +1844,17 @@ serial:	dw	0ffffh			;Micronix serialization word
 ;*							*
 ;********************************************************
 
-	nop				;must be nop to void a halt
+	nop				;must be a nop to void instruction
 	ld 	(u.sp),sp		;save the users stack pointer
-	ld	sp,begsav	     	;set sp to the temporary save area
-	push	af	
+	ld	sp,u.sp			;set sp to the temporary save area
+	push	Af			;save the users registers in temp area
 	push	hl
 	push	de
-	nop
-	call	trappd			;go to supervisor trap via temp
-	halt				;halt here allows T0 to halt
+	push	bc
+	call 	svtrap			;go to supervisor trap, pc is save
 
 
+	halt				;to allow halts in task 0
 erom1	equ	$						
 	ds	400h-(erom1-rom1)
 	

@@ -39,10 +39,10 @@ struct ciovec ciosw[] = {
 /*
  * Globals
  */
-UINT rootdev = 0x0308;          /* m16 drive A */
-UINT swapdev = 0x0308;          /* m16 drive A */
+UINT rootdev = 0x0208;          /* djdma alternate sectoring drive 0 */
+UINT swapdev = 0x0000;          /* m16 drive A */
 
-UINT swapsize = 2048;           /* no. of swap blocks if rootdev != swapdev */
+UINT swapsize = 0;           /* no. of swap blocks if rootdev != swapdev */
 UINT swapaddr = 18448;          /* block number of first swap block , if " */
 
 UINT nbdev = sizeof(biosw) / sizeof(struct biovec);

@@ -1,4 +1,4 @@
-DIRS = lib tools usersim
+DIRS = lib tools usersim hwsim
 
 all:
 	for i in $(DIRS) ; do \
