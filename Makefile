@@ -21,7 +21,7 @@ filesystem: src/tools/readall
 
 newkernel: filesystem src/usersim/sim
 	for i in src/kernel/* ; do \
-		if ! cmp -s $$i filesystem/usr/src/sys/`basename $$i` ; then \
+		if [ -f $$i ] && ! cmp -s $$i filesystem/usr/src/sys/`basename $$i` ; then \
 			echo different: $$i ; \
 			cp $$i filesystem/usr/src/sys ; \
 		fi ; \

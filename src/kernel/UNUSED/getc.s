@@ -10,7 +10,7 @@
 /	char block[14];
 /	};
 
-       /*
+   /*
 /	* Terminal circular queue
 /	*/
 /struct que
@@ -42,7 +42,7 @@ _getc:
 /	if (q->count && (((int) (q->first) & 15) || qfree (q)))
 /		{
 		L2:
-		(*hl© - 1;
+		(*hl) - 1;
 /		q->count--;
 
 
@@ -77,7 +77,7 @@ _getc:
 	L3:
 	call _ei;
 
-/	eé ();
+/	ei ();
 
 	ret;
 /	return c;
@@ -105,7 +105,7 @@ qrelse(q)
 		hl - 1;
 		a = l & 0xf0 -> l;
 
-/		â ½ ((int)â - 1© ¦ ~15;
+/		b = ((int)b - 1) & ~15;
 
 		hl + 1;
 
@@ -182,4 +182,3 @@ qinit (q)
 	q->first = 0;
 	q->last	 = 0;
 	}
-
