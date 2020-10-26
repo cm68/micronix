@@ -15,8 +15,9 @@ test: filesystem  src/usersim/sim
 
 filesystem: src/tools/readall
 	for i in disks/*.image ; do src/tools/readall -d filesystem $$i ; done
-	mkdir -p filesystem/usr/src/sys
+	mkdir -p filesystem/usr/src/sys filesystem/usr/src/cmd
 	cp -r src/kernel/* filesystem/usr/src/sys
+	cp -r src/cmd/* filesystem/usr/src/cmd
 	echo "cd /usr/src/sys ; make unix ; make unix ; make unix" > filesystem/rebuild
 
 newkernel: filesystem src/usersim/sim
