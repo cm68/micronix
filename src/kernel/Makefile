@@ -1,3 +1,4 @@
+build.h: 
 
 unix:	low.o io.o high.o
 unix:;	link -tb0x1000 -r -o unix low.o io.o -lm.a high.o
@@ -14,6 +15,8 @@ high.o:	main.o cus.o inits.o
 	link -tb0x1000 -d -o high.o main.o cus.o inits.o
 
 main.o:	main.c buf.h con.h file.h inode.h mount.h proc.h sys.h
+	cc -o makedate makedate.c -lS
+	./makedate >build.h
 	cc -c -x0 main.c
 
 access.o: access.c inode.h mount.h proc.h sys.h

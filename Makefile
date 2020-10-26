@@ -17,7 +17,7 @@ filesystem: src/tools/readall
 	for i in disks/*.image ; do src/tools/readall -d filesystem $$i ; done
 	mkdir -p filesystem/usr/src/sys
 	cp -r src/kernel/* filesystem/usr/src/sys
-	echo "cd /usr/src/sys ; make" > filesystem/rebuild
+	echo "cd /usr/src/sys ; make unix ; make unix ; make unix" > filesystem/rebuild
 
 newkernel: filesystem src/usersim/sim
 	for i in src/kernel/* ; do \
@@ -26,6 +26,7 @@ newkernel: filesystem src/usersim/sim
 			cp $$i filesystem/usr/src/sys ; \
 		fi ; \
 	done
+	rm -f filesystem/usr/src/sys/high.o filesystem/usr/src/sys/main.o filesystem/usr/src/sys/unix
 	-./sim /bin/sh rebuild
 	cp filesystem/usr/src/sys/unix kernels/micronix.new
 	cd kernels ; make

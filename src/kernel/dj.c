@@ -547,7 +547,7 @@ djint()
      */
 
     if (djtaken) {              /* a djexec command */
-        ack();
+        djack();
         wakeup(djcomm);
         return;
     }
@@ -606,7 +606,7 @@ djint()
              * is serviced
              */
 
-            ack();
+            djack();
 
             if (!qtail)
                 goto request;
@@ -653,7 +653,7 @@ djint()
                 addr += togo;
                 sec++;
                 off = 0;
-                ack();
+                djack();
                 goto nextsec;
             }
 
@@ -677,7 +677,7 @@ djint()
       kwrite:
         copy(curbuf->data, kbuf + off, togo);
 
-        ack();                  /* acknowledge old int. */
+        djack();                  /* acknowledge old int. */
 
         /*
          * an int. on our line could happen now
@@ -1146,8 +1146,7 @@ readone()
  * tell the PIC we're done with the current interrupt
  */
 
-static
-ack()
+djack()
 {
     if (!haltstat)
         return;

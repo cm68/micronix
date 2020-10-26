@@ -9,6 +9,8 @@
 #include "buf.h"
 #include "con.h"
 
+#include "build.h"
+
 /*
  * static initialization.
  */
@@ -114,9 +116,12 @@ pinit()
  */
 plogo()
 {
-    pr("\nRedux\n");
-    pr("Micronix 1.61\n");
+    pr("\nMicronix 1.61\n");
+#ifdef BUILD_DATE
+    pr(BUILD_DATE);
+#else
     pr("Created 11/9/83\n");
+#endif
     pr("Copyright 1983 Gary Fitts\n\n");
 }
 
