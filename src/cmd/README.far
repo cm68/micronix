@@ -1,0 +1,52 @@
+
+
+					June 10, 1983
+
+
+The Decision I - Micronix system is now able to read the following
+diskette formats:
+
+Note: all 8 inch formats are soft sectored.
+
+	8", 1024 bps, dsdd,		Morrow
+	8", 1024 bps, ssdd,		Morrow
+
+	8", 512 bps, dsdd,		Morrow
+	8", 512 bps, ssdd,		Morrow
+
+	8", 256 bps, dsdd,		Morrow
+	8", 256 bps, ssdd,		Morrow
+
+	8", 128 bps, sssd, industry standard for 8" CP/M
+
+
+10 hole hard sectored Northstar style formats:
+
+	5", 512 bps, dsdd, 35 track
+	5", 512 bps, dsdd, 40 track
+	5", 512 bps, ssdd, 40 track
+
+	5", 512 bps, ssdd, 35 track, CP/M 1.4
+	5", 512 bps, ssdd, 35 track, CP/M 2.0 and later
+
+	5", 256 bps, sssd, 35 track
+
+Note: all soft 5" formats are 40 track.
+
+	5", 1024 bps, ssdd, Morrow Micro Decision single
+	5", 1024 bps, ssdd, Osborne
+	5", 1024 bps, dsdd, Morrow Micro Decision double
+
+	5",  512 bps, ssdd, IBM-PC with CP/M 86
+	5",  256 bps, ssdd, Osborne
+	5",  128 bps, ssdd, Xerox 820
+
+And Micronix file systems may be created on any of these
+formats.
+
+
+bps	stands for bytes per sector.
+dsdd	stands for double sided double density
+dssd	stands for doulbe sided single density
+ssdd	stands for single sided double density
+sssd	stands for single sided single density
