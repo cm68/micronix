@@ -15,3 +15,5 @@ readall
 size
 zmac
 test
+zmac.c
+doc.inl
