@@ -3,7 +3,7 @@ logfile
 dumpfile
 file.out
 file.inp
-DRIVE_A.IMD-delta
+*-delta
 d1
 hdca-0
 hdca-1
@@ -13,4 +13,7 @@ hddma-0
 hddma-1
 hddma-2
 hddma-3
-
+.last
+.gdbargs
+mon*.sym
+mon*.bin

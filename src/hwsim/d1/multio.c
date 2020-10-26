@@ -702,11 +702,6 @@ wr_txb(portaddr p, byte v)
         return;
     }
 
-    if (v == '?') {
-        printf("el bizarro");
-        while (1) ;
-    }
-
     // detect overrun
     if (!(ap->lsr & LSR_TXE)) {
         l("multio: send overrun on line %d\n", ap->line);

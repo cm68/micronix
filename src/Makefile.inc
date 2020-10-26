@@ -20,4 +20,4 @@ clean:
 	rm -f *.o dumpfile logfile file.inp file.out make.out
 
 clobber:	clean
-	rm -f $(TARGETS)
+	rm -f $(TARGETS) $(GENERATED)

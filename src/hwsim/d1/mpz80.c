@@ -434,7 +434,12 @@ get_byte(vaddr addr)
     /*
      * when we encounter a halt instruction with M1 and are not in task 0, we return a NOP to the
      * emulation.  the next M1 after this starts executing at 0xbf0 by disabling the address bus
-     * and driving the fetch via a counter
+     * and driving the fetch via a counter.
+     *
+     * this logic is strictly speaking a hack, in that the returned value, NOP, really is the
+     * byte at rom 0xbf0, and not a literal 0; that fetch is not a special case at all, it's just
+     * the first byte fetched in the trap sequence.  making that code path flow clean is not
+     * that easy, so the brute force here will have to do. - XXX
      */
     if ((!super()) && 
         (z80_get_reg8(status_reg) & S_M1) && 

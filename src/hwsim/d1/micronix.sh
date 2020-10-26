@@ -56,15 +56,16 @@ echo "kernel=$kernel" >> .last
 symfile=$root/kernels/$kernel.sym
 
 disk=$root/disks/boot.IMD
-rm -f $disk-delta
+cp $disk ./boot.IMD
+rm ./boot.IMD-delta
 
-$root/src/tools/mnix -f $disk write $root/kernels/$kernel /micronix
+$root/src/tools/mnix -f ./boot.IMD write $root/kernels/$kernel /micronix
 
 export TERMINAL_FONTSIZE=14
 
 rm -f core
 
 echo "file ./d1" >.gdbargs
-echo "set args -l $x -S $symfile $confarg $trarg $disk" >> .gdbargs
-./d1 -l $x -S $symfile $confarg $trarg $disk
+echo "set args -l $x -S $symfile $confarg $trarg ./boot.IMD" >> .gdbargs
+./d1 -l $x -S $symfile $confarg $trarg ./boot.IMD
 stty cooked echo echoe

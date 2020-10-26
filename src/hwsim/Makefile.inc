@@ -16,5 +16,5 @@ all: $(TARGETS)
 clean:
 	rm -f *.o dumpfile logfile file.inp file.out make.out
 
-clobber:	clean
-	rm -f $(TARGETS)
+clobber::	clean
+	rm -f $(TARGETS) $(GENERATED)
