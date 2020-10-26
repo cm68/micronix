@@ -66,6 +66,8 @@ export TERMINAL_FONTSIZE=14
 
 rm -f core
 
+echo "running with $trarg"
+
 echo "file ./d1" >.gdbargs
 echo "set args -l $x -S $symfile $confarg $trarg ./boot.IMD" >> .gdbargs
 ./d1 -l $x -S $symfile $confarg $trarg ./boot.IMD
