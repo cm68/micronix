@@ -114,8 +114,9 @@ pinit()
  */
 plogo()
 {
-    pr("\nMicronix 1.61 \n");
-    pr("Created 11/9/83 \n");
+    pr("\nRedux\n");
+    pr("Micronix 1.61\n");
+    pr("Created 11/9/83\n");
     pr("Copyright 1983 Gary Fitts\n\n");
 }
 
