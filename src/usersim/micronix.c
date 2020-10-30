@@ -670,6 +670,7 @@ do_exec(char *name, char **argv)
     }
     push(argc);
     push(header.textoff);
+    free(ao);
     /*
      * if (verbose & V_DATA) dumpmem(&get_byte,
      * cp->state.registers.word[Z80_SP], 256); 
@@ -1915,6 +1916,7 @@ SystemCall(MACHINE * cp)
                     (files[fd].minor & 0xff);
             }
         } else {
+            // hexdump(fn, strlen(fn));
             filename = fname(fn);
             // ret = stat(filename, &sbuf);
             ret = lstat(filename, &sbuf);

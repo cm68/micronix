@@ -96,8 +96,6 @@ debugmode()
     struct target *t;
     struct dep *d;
     struct command *cmd;
-    char *ListTime();
-    char time[20];
     int i;
 
     /*
@@ -114,7 +112,6 @@ debugmode()
         /*
          * tell which file we're talking about 
          */
-        ListTime(t->modified, time);
         fprintf(stderr, "\nFile(%s): Modified(%lu)\n  depends on:",
             t->name, t->modified);
 
