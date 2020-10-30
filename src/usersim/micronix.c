@@ -1396,6 +1396,11 @@ settimode(unsigned short mode)
 }
 
 char *filename;
+long
+swizzle(long in)
+{
+    return ((in >> 16) & 0xffff) | ((in & 0xffff) << 16);
+}
 
 /*
  * micronix system calls are done using the RST8 instruction, which
@@ -1931,8 +1936,8 @@ SystemCall(MACHINE * cp)
         ip->gid = sbuf.st_gid;
         ip->size0 = sbuf.st_size >> 16;
         ip->size1 = sbuf.st_size & 0xffff;
-        ip->rtime = sbuf.st_atime;
-        ip->wtime = sbuf.st_mtime;
+        ip->rtime = swizzle(sbuf.st_atime);
+        ip->wtime = swizzle(sbuf.st_mtime);
         ip->mode = (sbuf.st_mode & 07777) | /* IALLOC | */
             ((sbuf.st_size > (8 * 512)) ? ILARGE : 0);
         switch (sbuf.st_mode & S_IFMT) {
