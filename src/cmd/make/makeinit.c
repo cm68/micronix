@@ -115,8 +115,8 @@ debugmode()
          * tell which file we're talking about 
          */
         ListTime(t->modified, time);
-        fprintf(stderr, "\nFile(%s): Modified(%s)\n  depends on:",
-            t->name, time);
+        fprintf(stderr, "\nFile(%s): Modified(%lu)\n  depends on:",
+            t->name, t->modified);
 
         /*
          * display the dependencies 
@@ -157,7 +157,7 @@ add_to(s)
     char *s;
 {
     struct work *w;             /* ptr to this 'do' record */
-    extern dolist;              /* list of names to 'make' */
+    extern struct work *dolist; /* list of names to 'make' */
     char *lc();                 /* convert to lowercase */
 
     /*

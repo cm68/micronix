@@ -192,17 +192,13 @@ make(s)                         /* returns the modified date/time */
     char *cmd;
     long tt;
 
-    /*
-     * look for the definition 
-     */
+    if (debug) printf("making: %s\n", s);
+
     for (t = targets; t; t = t->next) {
         if (!strcmp(t->name, s))
             break;
     }
 
-    /*
-     * don't know how to make it 
-     */
     if (!t) {
         knowhow = FALSE;
         latest = FileTime(s);
@@ -210,20 +206,24 @@ make(s)                         /* returns the modified date/time */
             /*
              * doesn't exist but don't know how to make it 
              */
-            fprintf(stderr, "make: can't make %s.\n", s);
+            fprintf(stderr, "make: don't know how to make %s.\n", s);
             exit(1);
-        } else
+        } else {
+            if (debug) printf("%s exists but i don't have a recipe or dependencies\n", s);
             return (latest);
+        }
     }
 
     /*
      * if file is up to date 
      */
-    if (t->current)
+    if (t->current) {
+        if (debug) printf("current\n");
         /*
          * return actual modification time 
          */
         return (t->modified);
+    }
 
     /*
      * make sure everything it depends on is up to date 
@@ -240,9 +240,12 @@ make(s)                         /* returns the modified date/time */
      * grunge through the dependencies
      */
     for (d = t->need; d; d = d->next) {
+        if (debug) printf("%s depends on %s\n", t->name, d->name);
         tt = make(d->name);
         if (tt > latest) latest = tt;
         if (FileTime(d->name) > t->modified) {
+            if (debug) 
+                printf("let us build %s because > %s: %lu\n", d->name, t->name, t->modified);
             if (!(mod =
                     realloc(mod,
                         strlen(mod) + strlen(d->name) + 2)))
@@ -291,6 +294,7 @@ make(s)                         /* returns the modified date/time */
          * file has now been modified 
          */
         t->modified = CurrTime();
+        if (debug) printf("set time of %s to %lu\n", t->name, t->modified);
         t->current = TRUE;
         if (t->recipe) {
             madesomething = TRUE;

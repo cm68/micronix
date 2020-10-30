@@ -9,8 +9,10 @@
 #endif
 #include	"make.h"
 
+extern unsigned long FileTime();
 extern struct target *targets;
 extern struct macro *macros;
+extern char debug;
 
 int lineno = 1;
 
@@ -80,6 +82,8 @@ int report;
     struct macro *m;
     struct dep *d;
     int i;
+    unsigned long ft;
+    char *semi;
 
     /*
      * try to open specified file 
@@ -94,9 +98,13 @@ int report;
 
     /*
      * process the file 
+     * there's one syntactic oddity:
+     * lines of the form:  foo.o : foo.c ; cc -c foo.c
+     * are valid, even with no dependencies 
      */
     while (readline(infile)) {
 
+        semi = NULL;
         p = inbuf;
  
         /*
@@ -149,12 +157,19 @@ int report;
             break;
 
         /*
-         * grammar: <target> [target] ... : <dependency> [<dependency>] ...
+         * grammar: <target> [target] ... : [<dependency> ...] [; recipe ]
          */
         case TARGET:
             rt = NULL;
             tcnt = 0;
 
+            /*
+             * put a null at the semicolon, and we'll handle after as recipe
+             */
+            if ((semi = index(inbuf, ';'))) {
+                *semi++ = '\0';
+            }
+            
             /* expand any macros in the targets or dependencies */
             expand(inbuf, "", "");
             p = exbuf;
@@ -188,7 +203,16 @@ int report;
                     if (!(t->name = strdup(namebuf)))
                         OutOfMem();
                     t->current = FALSE;
-                    t->modified = FileTime(t->name);
+                    ft = FileTime(t->name);
+                    t->modified = ft;
+                    if (debug)
+                        fprintf(stderr, "set time of %s to %lu\n", 
+#ifdef notdef
+                        namebuf, 
+#else
+                        t->name,
+#endif
+                        ft);
                     t->next = targets;
                     targets = t;
                 }
@@ -230,7 +254,12 @@ int report;
                 }
             }
 
-            break;
+            if (semi) {
+                p = semi;
+                /* fall through */
+            } else {
+                break;
+            }
 
         /*
          * these are all attached to the current targets
