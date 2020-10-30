@@ -35,7 +35,7 @@ FileTime(fname)
  
     i = stat(fname, &statb);
     if (i < 0) {
-        if (debug)
+        if (debug > 1)
             printf("stat error %s %d\n", fname, errno);
         return 0L;
     }
@@ -44,7 +44,7 @@ FileTime(fname)
 #else
     rv = statb.modtime;
 #endif
-    if (debug) 
+    if (debug > 1) 
         printf("stat of file %s returns %lu\n", fname, rv);
     return rv;
 

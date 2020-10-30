@@ -36,7 +36,7 @@ init(argc, argv)
                 /*
                  * show everything on the next 'make' file 
                  */
-                debug = TRUE;
+                debug++;
                 break;
 
             case 'F':

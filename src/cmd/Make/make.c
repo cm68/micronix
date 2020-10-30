@@ -5,9 +5,10 @@
  *      When    Who     Description
  * 06 Aug 85    TGM     Module created
  * 27 Aug 85    TGM     Released for use
- *
  * 29 Oct 20    CMM     substantially rewritten for correctness,
  *                      unix portability and speed, suffixes
+ * 30 Oct 20    CMM     runs on micronix, upward compatible
+ *                      with stock make
  * make.c
  */
 #include	"make.h"

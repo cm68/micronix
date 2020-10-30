@@ -108,7 +108,7 @@ int report;
         p = inbuf;
  
         i = linetype();
-        if (debug) {
+        if (debug > 1) {
             printf("linetype: %d %s\n", i, inbuf);
         }
 
@@ -210,7 +210,7 @@ int report;
                     t->current = FALSE;
                     ft = FileTime(t->name);
                     t->modified = ft;
-                    if (debug)
+                    if (debug > 1)
                         fprintf(stderr, "set time of %s to %lu\n", 
 #ifdef notdef
                         namebuf, 

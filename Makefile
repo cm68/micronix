@@ -22,11 +22,12 @@ filesystem: src/tools/readall
 
 cmds: filesystem src/usersim/sim
 	find src/cmd -type f \! -path \*unused\* | \
-		grep -v \.o$$ | while read i ; do \
+		grep -v \.o$$ | grep -v \.swp | while read i ; do \
 		if [ ! -d $$(dirname filesystem/usr/$$i) ] ; then \
 			mkdir -p $$(dirname filesystem/usr/$$i) ; \
 		fi ; \
 		if [ ! -f filesystem/usr/$$i ] ; then \
+			echo new: $$i ; \
 			cp $$i filesystem/usr/$$i ; \
 		fi ; \
 		if ! cmp -s $$i filesystem/usr/$$i ; then \
