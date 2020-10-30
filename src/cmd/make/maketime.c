@@ -4,14 +4,15 @@
  * maketime.c
  */
 #include	"make.h"
-
-#ifdef unix
-#include <sys/types.h>
-#include <sys/stat.h>
+#ifndef linux
+extern int errno;
+#include <stdio.h>
+#include <stat.h>
 #endif
 
-#ifdef micronix
-#include <inode.h>
+#ifdef linux
+#include <sys/types.h>
+#include <sys/stat.h>
 #endif
 
 /*
@@ -22,12 +23,17 @@ FileTime(fname)
     char *fname;                /* filename to get time of */
 {
 
-#ifdef unix
     struct stat statb;
     int i;
     
     i = stat(fname, &statb);
+    if (i < 0) {
+        printf("stat error\n", errno);
+    }
+#ifdef linux
     return statb.st_mtim.tv_sec;
+#else
+    return statb.modtime;
 #endif
 
 #ifdef CPM
@@ -128,6 +134,7 @@ ListTime(val, dp)
     unsigned long val;          /* internal date/time */
     register char *dp;          /* formatted string ptr */
 {
+    sprintf(dp, "%x %x", (val >> 16) & 0xffff, val & 0xffff);
 #ifdef CPM
     register char *sp;
     static struct idate

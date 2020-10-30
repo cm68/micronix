@@ -22,9 +22,6 @@ init(argc, argv)
     int i;                      /* parameter index */
     boolean usedefault = TRUE;  /* assume dflt file */
     boolean readmakefile();     /* process a 'make' file */
-    char toupper();             /* convert char to upper */
-    void add_to();              /* add name to 'do' list */
-    void usage();               /* explain how to use */
 
     /*
      * scan thru all supplied parameters 
@@ -47,7 +44,7 @@ init(argc, argv)
                  * use a special 'make' file 
                  */
                 if (++i < argc) {
-                    if (readmakefile(argv[i]) == FALSE)
+                    if (readmakefile(argv[i], 1) == FALSE)
                         exit(1);
                     usedefault = FALSE;
                 } else
@@ -82,8 +79,8 @@ init(argc, argv)
         /*
          * read the default file if not 
          */
-        if (readmakefile("Makefile") == FALSE) {
-            if (readmakefile("makefile") == FALSE) {
+        if (readmakefile("makefile", 0) == FALSE) {
+            if (readmakefile("Makefile", 1) == FALSE) {
                 exit(1);
             }
         }
@@ -93,7 +90,6 @@ init(argc, argv)
 /*
  * display all definitions 
  */
-void
 debugmode()
 {
     struct macro *m;
@@ -118,8 +114,9 @@ debugmode()
         /*
          * tell which file we're talking about 
          */
+        ListTime(t->modified, time);
         fprintf(stderr, "\nFile(%s): Modified(%s)\n  depends on:",
-            t->name, ListTime(t->modified, time));
+            t->name, time);
 
         /*
          * display the dependencies 
@@ -146,7 +143,6 @@ debugmode()
 /*
  * explain how to use make 
  */
-void
 usage()
 {
     fprintf(stderr,
@@ -157,14 +153,12 @@ usage()
 /*
  * add_to : add name to do_list 
  */
-void
 add_to(s)
     char *s;
 {
     struct work *w;             /* ptr to this 'do' record */
     extern dolist;              /* list of names to 'make' */
     char *lc();                 /* convert to lowercase */
-    void chain();               /* chain structure to next */
 
     /*
      * get a pointer to newly allocated structure 

@@ -25,11 +25,46 @@ boolean execute = TRUE;         /* build submit file */
 boolean debug = FALSE;          /* not in debug mode */
 boolean silent = FALSE;         /* show commands */
 
-boolean knowhow;                /* know how to make file */
-boolean madesomething;          /* actually made a file */
+boolean knowhow = 0;                /* know how to make file */
+boolean madesomething = 0;          /* actually made a file */
 
 #ifdef CPM
 FILE *mfp;                      /* 'make' submit file pointer */
+#endif
+
+#ifndef linux
+char *
+index(s, c)
+char *s;
+char c;
+{
+    while (*s) {
+        if (*s == c) return s;
+        s++;
+    }
+    return 0;
+}
+
+char *
+malloc(i)
+int i;
+{
+    char *r;
+
+    r = alloc(i);
+    return r;
+}
+
+char *
+strdup(s)
+char *s;
+{
+    int i = strlen(s);
+    char *r;
+    r = malloc(i);
+    strcpy(r, s); 
+    return r;
+}
 #endif
 
 /*
@@ -50,8 +85,6 @@ main(argc, argv)
     char *argv[];
 {
     long make();                /* 'make' files */
-    void init();                /* initialization code */
-    void debugmode();           /* show data structures */
     FILE *fopen();              /* standard file-open */
     struct target *t;
 
@@ -111,7 +144,7 @@ main(argc, argv)
         /*
          * try to make something 
          */
-        (void) make(dolist->name);
+        make(dolist->name);
         if (!madesomething) {
             if (knowhow)
                 fprintf(stderr, "make: %s is up to date.\n", dolist->name);
@@ -248,7 +281,7 @@ make(s)                         /* returns the modified date/time */
 
                 if (*cmd == '@')
                     ++cmd;
-/* XXX - system of cmd */
+                system(cmd);
 #ifdef CPM
                 fprintf(mfp, "%s\n", cmd);
 #endif
