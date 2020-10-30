@@ -8,6 +8,7 @@ SIMTARGETS = \
 LDFLAGS = -L../lib -lsim
 GENERATED = doc.inl zmac.c doc
 TARGETS = $(SIMTARGETS) zmac
+CXXFLAGS= $(MACHINE)
 
 include ../Makefile.inc
 

@@ -1,0 +1,182 @@
+   make - maintain program groups                                  page 1
+
+
+   NAME
+        make - maintain program groups
+
+   SYNTAX
+        make [ options ] ... [ -f makefile ] ... file ...
+
+   DESCRIPTION
+        Make  executes  commands in makefile to update one  or  more 
+        target names.  Name is typically a program.  If no -f option 
+        is present,  the default name 'makefile' is used.  More than 
+        one -f option may appear.
+
+        Make  updates a target if it depends on dependent files that 
+        have been modified since the target was last modified, or if 
+        the target does not exist.
+
+        Makefile  contains  a  sequence  of  entries  that   specify 
+        dependencies.  The  first  line  of  an entry  is  a  blank-
+        separated  list of targets,  then a colon,  then a  list  of 
+        dependent files.  All following lines that begin with a tab, 
+        are commands to be executed to update the target.  If a name 
+        appears  on the left of more than one 'colon' line,  then it 
+        depends  on  all of the names on the right of the  colon  on 
+        those lines,  but only one command sequence may be specified 
+        for it.
+
+        Sharp and newline surround comments.
+
+        If an input line is too long to fit on a single line it  may 
+        be continued by use of a backslash '\' as the last character 
+        on the line.
+
+        Makefile  entries of the form 'string1 = string2' are  macro 
+        definitions.    Subsequent  appearances  of  $(string1)  are 
+        replaced by string2.  If string1 is a single character,  the 
+        parentheses are optional.
+
+        Certain  macros  change  value as commands are  placed  into 
+        'execmake.sub'. They are:
+
+            $* - is the prefix of the target name,
+            $@ - is the full target name, and
+            $? - is the list of dependents newer than the target.
+
+        Finally, '$$' represent a single '$'.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   make - maintain program groups                                  page 2
+
+
+
+
+        A few examples follow:
+
+             # comments go here and are ignored.
+             macro = definition
+                  [a blank line is also ignored]
+             target-1 [target-2] : [dependent list] [\]
+                  [command line-1]
+                  [command line-2]
+                       .
+                       .
+                  [command line-N]
+
+        The following makefile says that 'pgm' depends on two  files 
+        'a.o' and 'b.o',  and that they in turn depend on '.c' files 
+        and a common file 'incl'.
+
+             pgm : a.o b.o
+                  ln a.o b.o -lc -o pgm
+             a.o : incl a.c
+                  cc -c a.c
+             b.o : incl b.c
+                  cc -c b.c
+
+        The following is an alternate version of the above file.
+
+             OBJECTS = a.o b.o
+             pgm : $(OBJECTS)
+                  ln $(OBJECTS) -lc -o pgm
+             $(OBJECTS) : incl
+             a.o : a.c
+                  cc a.c
+             b.o : b.c
+                  cc b.c
+
+        The  final example is the most compact and is still  another 
+        version of the same makefile.
+
+             OBJECTS = a.o b.o
+             pgm : $(OBJECTS)
+                  ln $(OBJECTS) -lc -o pgm
+             $(OBJECTS) : $*.c incl
+                  cc $*.c
+
+
+        if first character of the command is '@', the command is not
+		echoed.
+
+
+
+
+
+   make - maintain program groups                                  page 3
+
+
+
+
+        Other options:
+
+             -d   Display a detailed description of what was
+                  processed in the 'makefile'.
+
+             -n   Trace and print, but do not execute the commands
+                  needed to update the targets.
+
+   FILES
+        makefile     - the default input file
+
+
+   NOTES
+
+        Make is written in Aztec C version 1.06d.
+
+        Please send any comments/corrections to
+             Tom Morris
+             1252 Collier Dr.
+             San Leandro, CA 94577
+
+                  or
+
+             Tom Morris  at Potpourri  (408) 378-7474
+                         or ZeeMachine (408) 245-1420
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
