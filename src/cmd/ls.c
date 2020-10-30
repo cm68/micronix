@@ -36,6 +36,9 @@ struct lbuf {
 	long	lmtime;
 };
 
+int fc = 0;
+
+int xflg = 1;
 int	aflg = 0;
 int dflg = 0;
 int lflg = 0;
@@ -65,57 +68,6 @@ long	nblock();
 
 #define	ISARG	0100000
 
-#ifdef notdef
-int (*cmpfunc)() = 0;
-int cmpsize = 0;
-
-comp(i, j, base)
-int i;
-int j;
-char *base;
-{
-	int ret;
-
-	ret = (*cmpfunc)(base + (i * cmpsize), base + (j * cmpsize));
-	printf("base %x comparing %d and %d = %d\n", base, i, j, ret);
-	return ret;
-}
-
-exch(i, j, base)
-int i;
-int j;
-char *base;
-{
-	char *a, *b, t;
-	int s;
-
-	a = base + (i * cmpsize);
-	b = base + (j * cmpsize);
-
-	printf("base %x exchanging %d %x and %d %x\n", base, i, a, j, b);
-#ifdef notdef
-	for (s = 0; s < cmpsize; s++) {
-		t = *a;
-		*a++ = *b;
-		*b++ = t;
-	}
-#endif
-}
-
-qsort(base, nmemb, size, compar)
-char *base;
-int nmemb;
-int size;
-int (*compar)();
-{
-	cmpsize = size;
-	cmpfunc = compar;
-
-	printf("qsort: base %x nmemb %d size %d\n", base, nmemb, size);
-	sort(nmemb, comp, exch, base); 
-}
-#endif
-
 main(argc, argv)
 char *argv[];
 {
@@ -139,6 +91,7 @@ char *argv[];
 			continue;
 
 		case 's':
+			xflg = 0;
 			sflg++;
 			statreq++;
 			continue;
@@ -152,6 +105,7 @@ char *argv[];
 			continue;
 
 		case 'l':
+			xflg = 0;
 			lflg++;
 			statreq++;
 			continue;
@@ -174,6 +128,7 @@ char *argv[];
 			continue;
 
 		case 'i':
+			xflg = 0;
 			iflg++;
 			continue;
 
@@ -214,8 +169,10 @@ char *argv[];
 	for (epp=firstp; epp<slastp; epp++) {
 		ep = *epp;
 		if (ep->ltype=='d' && dflg==0 || fflg) {
-			if (argc>1)
+			if (argc>1) {
 				printf("\n%s:\n", ep->ln.namep);
+				fc = 0;
+			}
 			lastp = slastp;
 			readdir(ep->ln.namep);
 			if (fflg==0)
@@ -226,6 +183,9 @@ char *argv[];
 				pentry(*ep1);
 		} else 
 			pentry(ep);
+	}
+	if (fc) {
+		printf("\n");
 	}
 	exit(0);
 }
@@ -240,6 +200,14 @@ struct lbuf *ap;
 	register struct lbuf *p;
 	register char *cp;
 
+	if (xflg) {
+		printf("%-14s ", ap->ln.lname);
+		if (++fc == 4) {
+			printf("\n");
+			fc = 0;
+		}
+		return;
+	}
 	p = ap;
 	if (p->lnum == -1)
 		return;
@@ -314,6 +282,19 @@ long size;
 	return((size + 511) >> 9);
 }
 
+pmode(aflag) {
+	putchar((aflag & 0400) ? 'r' : '-');
+	putchar((aflag & 0200) ? 'w' : '-');
+	putchar((aflag & 0100) ? ((aflag & S_SUID) ? 's' : 'x') : '-');
+	putchar((aflag & 0040) ? 'r' : '-');
+	putchar((aflag & 0020) ? 'w' : '-');
+	putchar((aflag & 0010) ? ((aflag & S_SGID) ? 's' : 'x') : '-');
+	putchar((aflag & 0004) ? 'r' : '-');
+	putchar((aflag & 0002) ? 'w' : '-');
+	putchar((aflag & 0001) ? ((aflag & S_STICKY) ? 's' : 'x') : '-');
+}
+
+#ifdef notdef
 int	m1[] = { 1, S_IREAD >> 0, 'r', '-' };
 int	m2[] = { 1, S_IWRITE>>0, 'w', '-' };
 int	m3[] = { 2, S_SUID, 's', S_IEXEC>>0, 'x', '-' };
@@ -345,6 +326,7 @@ register int *pairp;
 		pairp++;
 	putchar(*pairp);
 }
+#endif
 
 char *
 makename(dir, file)
