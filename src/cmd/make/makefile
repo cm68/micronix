@@ -12,3 +12,9 @@ makeinit.o: makeinit.c
 
 maketime.o: maketime.c
 	cc -c maketime.c
+
+install:
+	mv /bin/make /bin/mk
+	cp Make /bin/make
+
+clean : ; rm *.o

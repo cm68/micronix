@@ -13,29 +13,40 @@ extern int errno;
 #ifdef linux
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <errno.h>
 #endif
+
+extern char debug;
+struct stat statb
+#ifndef linux
+ = 0
+#endif
+;
 
 /*
  * get last update time 
  */
 unsigned long
 FileTime(fname)
-    char *fname;                /* filename to get time of */
+    char *fname;
 {
-
-    struct stat statb;
     int i;
-    
+    unsigned long rv;
+ 
     i = stat(fname, &statb);
     if (i < 0) {
-        printf("stat error %s %d\n", fname, errno);
+        if (debug)
+            printf("stat error %s %d\n", fname, errno);
+        return 0L;
     }
-    printf("stat of file %s returns %lu\n", fname, statb.modtime);
 #ifdef linux
-    return statb.st_mtim.tv_sec;
+    rv = statb.st_mtim.tv_sec;
 #else
-    return statb.modtime;
+    rv = statb.modtime;
 #endif
+    if (debug) 
+        printf("stat of file %s returns %lu\n", fname, rv);
+    return rv;
 
 #ifdef CPM
     unsigned long tolong();     /* convert 'time' to long */
@@ -74,7 +85,8 @@ CurrTime()
 {
     unsigned long tt;
     time(&tt);
-    printf("curtime returns %lu\n", tt);
+    if (debug) 
+        printf("curtime returns %lu\n", tt);
     return tt;
 #ifdef CPM
     unsigned long tolong();     /* convert time */

@@ -21,7 +21,8 @@ filesystem: src/tools/readall
 	echo "cd /usr/src/$1 ; make ; make ; make " > filesystem/rebuild
 
 cmds: filesystem src/usersim/sim
-	find src/cmd -type f \! -path \*unused\* | while read i ; do \
+	find src/cmd -type f \! -path \*unused\* | \
+		grep -v \.o$$ | while read i ; do \
 		if [ ! -d $$(dirname filesystem/usr/$$i) ] ; then \
 			mkdir -p $$(dirname filesystem/usr/$$i) ; \
 		fi ; \
