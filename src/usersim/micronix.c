@@ -167,7 +167,7 @@ fname(char *orig)
      * empty path is . 
      */
     if (strlen(orig) == 0) {
-        strcpy(workbuf, rootdir);
+        sprintf(workbuf, "%s/%s", rootdir, curdir);
     } else if (*orig == '/') {
         sprintf(workbuf, "%s/%s", rootdir, orig);
     } else {

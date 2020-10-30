@@ -18,8 +18,23 @@ filesystem: src/tools/readall
 	mkdir -p filesystem/usr/src/sys filesystem/usr/src/cmd
 	cp -r src/kernel/* filesystem/usr/src/sys
 	cp -r src/cmd/* filesystem/usr/src/cmd
-	echo "cd /usr/src/sys ; make unix ; make unix ; make unix" > filesystem/rebuild
+	echo "cd /usr/src/$1 ; make ; make ; make " > filesystem/rebuild
 
+cmds: filesystem src/usersim/sim
+	find src/cmd -type f \! -path \*unused\* | while read i ; do \
+		if [ ! -d $$(dirname filesystem/usr/$$i) ] ; then \
+			mkdir -p $$(dirname filesystem/usr/$$i) ; \
+		fi ; \
+		if [ ! -f filesystem/usr/$$i ] ; then \
+			cp $$i filesystem/usr/$$i ; \
+		fi ; \
+		if ! cmp -s $$i filesystem/usr/$$i ; then \
+			echo different: $$i ; \
+			cp $$i filesystem/usr/$$i ; \
+		fi ; \
+	done
+#	-./sim /bin/sh rebuild cmd
+	
 newkernel: filesystem src/usersim/sim
 	for i in src/kernel/* ; do \
 		if [ -f $$i ] && ! cmp -s $$i filesystem/usr/src/sys/`basename $$i` ; then \
@@ -28,7 +43,7 @@ newkernel: filesystem src/usersim/sim
 		fi ; \
 	done
 	rm -f filesystem/usr/src/sys/high.o filesystem/usr/src/sys/main.o filesystem/usr/src/sys/unix
-	-./sim /bin/sh rebuild
+	-./sim /bin/sh rebuild sys
 	cp filesystem/usr/src/sys/unix kernels/micronix.new
 	cd kernels ; make
 	
