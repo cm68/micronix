@@ -61,7 +61,7 @@ char *s;
 {
     int i = strlen(s);
     char *r;
-    r = malloc(i);
+    r = malloc(i+1);
     strcpy(r, s); 
     return r;
 }

@@ -107,10 +107,15 @@ int report;
         semi = NULL;
         p = inbuf;
  
+        i = linetype();
+        if (debug) {
+            printf("linetype: %d %s\n", i, inbuf);
+        }
+
         /*
          * check for definitions and macros 
          */
-        switch (linetype()) {
+        switch (i) {
 
         /* grammar: <whitespace> [# comment] */
         case COMMENT:
