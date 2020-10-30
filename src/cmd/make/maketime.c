@@ -28,8 +28,9 @@ FileTime(fname)
     
     i = stat(fname, &statb);
     if (i < 0) {
-        printf("stat error\n", errno);
+        printf("stat error %s %d\n", fname, errno);
     }
+    printf("stat of file %s returns %lu\n", fname, statb.modtime);
 #ifdef linux
     return statb.st_mtim.tv_sec;
 #else
@@ -71,9 +72,10 @@ FileTime(fname)
 unsigned long
 CurrTime()
 {
-#ifdef unix
-    return time(0);
-#endif
+    unsigned long tt;
+    time(&tt);
+    printf("curtime returns %lu\n", tt);
+    return tt;
 #ifdef CPM
     unsigned long tolong();     /* convert time */
     char time[4];               /* working area */
