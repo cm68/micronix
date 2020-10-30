@@ -4,7 +4,9 @@
  * makeread.c
  */
 #include	<stdio.h>
+#ifdef nodef
 #include	<ctype.h>
+#endif
 #include	"make.h"
 
 extern struct target *targets;
@@ -17,8 +19,16 @@ int lineno = 1;
  * input and macro expansions in the parse path are in fixed length static arrays
  * dependency trees and macro definitions are malloc'd.
  */
-char inbuf[1024];       /* input buffer */
-char exbuf[1024];       /* macro expanded */
+char inbuf[1024]
+#ifndef linux
+= 0
+#endif
+;        /* input buffer */
+char exbuf[1024]
+#ifndef linux
+= 0
+#endif
+;       /* macro expanded */
 
 /*
  * a definition line can have up to NDEFS targets before the colon
@@ -26,14 +36,19 @@ char exbuf[1024];       /* macro expanded */
 #define NDEFS   32
 
 #define NLEN
-char namebuf[NLEN];
+char namebuf[NLEN]
+#ifndef linux
+= 0
+#endif
+;
 
 /*
  * place a name into the namebuf
  * updating the incoming pointer
  * return pointing at a delimiter:  null, space, : or = 
  */
-snagname(char **in)
+snagname(in)
+char **in;
 {
     char c;
     char *s = namebuf;
@@ -51,8 +66,9 @@ snagname(char **in)
 /*
  * read the makefile 
  */
-readmakefile(s)
+readmakefile(s, report)
     char *s;                    /* filename to read */
+int report;
 {
     FILE *infile;               /* fp for input file */
     char *p;                    /* input line pointer */
@@ -69,7 +85,8 @@ readmakefile(s)
      * try to open specified file 
      */
     if ((infile = fopen(s, "r")) == 0) {
-        fprintf(stderr, "make: unable to open %s.\n", s);
+        if (report)
+            fprintf(stderr, "make: unable to open %s.\n", s);
         return (FALSE);
     }
 
