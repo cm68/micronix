@@ -16,7 +16,7 @@ maketime.o: maketime.c
 hexdump.o: hexdump.c
 	cc -c hexdump.c
 
-install:
+install: Make
 	mv /bin/make /bin/mk
 	cp Make /bin/make
 

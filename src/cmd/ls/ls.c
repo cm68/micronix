@@ -37,7 +37,7 @@ struct lbuf {
 };
 
 int fc = 0;
-
+int maxn = 0;
 int xflg = 1;
 int	aflg = 0;
 int dflg = 0;
@@ -170,22 +170,22 @@ char *argv[];
 		ep = *epp;
 		if (ep->ltype=='d' && dflg==0 || fflg) {
 			if (argc>1) {
-				printf("\n%s:\n", ep->ln.namep);
+				if (epp != firstp) printf("\n");
+				printf("%s:\n", ep->ln.namep);
 				fc = 0;
 			}
 			lastp = slastp;
-			readdir(ep->ln.namep);
+			maxn = readdir(ep->ln.namep);
 			if (fflg==0)
 				qsort(slastp,lastp - slastp,sizeof *lastp,compar);
 			if (lflg || sflg)
 				printf("total %D\n", tblocks);
-			for (ep1=slastp; ep1<lastp; ep1++)
+			for (ep1=slastp; ep1<lastp; ep1++) {
 				pentry(*ep1);
+			}
+			if (xflg && fc) printf("\n");
 		} else 
 			pentry(ep);
-	}
-	if (fc) {
-		printf("\n");
 	}
 	exit(0);
 }
@@ -199,10 +199,13 @@ struct lbuf *ap;
 	register t;
 	register struct lbuf *p;
 	register char *cp;
+	char fbuf[10];
 
 	if (xflg) {
-		printf("%-14s ", ap->ln.lname);
-		if (++fc == 4) {
+		t = 72 / maxn;
+		sprintf(fbuf, "%%-%ds ", maxn);
+		printf(fbuf, ap->ln.lname);
+		if (++fc == t) {
 			printf("\n");
 			fc = 0;
 		}
@@ -348,12 +351,14 @@ char *dir, *file;
 	return(dfile);
 }
 
+int
 readdir(dir)
 char *dir;
 {
 	static struct dir dentry;
 	register int j;
 	register struct lbuf *ep;
+	int maxl = 0;
 
 	if ((dirf = fopen(dir, "r")) == NULL) {
 		printf("%s unreadable\n", dir);
@@ -374,8 +379,11 @@ char *dir;
 			ep->lnum = dentry.ino;
 		for (j=0; j<DIRSIZ; j++)
 			ep->ln.lname[j] = dentry.name[j];
+		j = strlen(dentry.name);
+		if (j > maxl) maxl = j;
 	}
 	fclose(dirf);
+	return maxl;
 }
 
 struct lbuf *
