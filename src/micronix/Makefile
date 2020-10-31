@@ -1,4 +1,5 @@
 #
 # this makefile is used to bootstrap the new make
 #
-all : ; sh cmd/Make/bootstrap
+all : /usr/src/cmd/Make/bootstrap 
+	sh -v /usr/src/cmd/Make/bootstrap
