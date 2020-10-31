@@ -13,8 +13,9 @@ src/usersim/sim src/tools/readall:
 test: filesystem  src/usersim/sim
 	src/usersim/sim
 
+DISKS = disks/dist/101*.IMD disks/dist/1070*
 filesystem: src/tools/readall
-	for i in disks/*.image ; do src/tools/readall -d filesystem $$i ; done
+	for i in $(DISKS) ; do src/tools/readall -d filesystem $$i ; done
 	mkdir -p filesystem/usr/src/sys filesystem/usr/src/cmd
 	cp -r src/micronix/* filesystem/usr/src
 	echo "path /bin /usr/bin" > filesystem/.sh
