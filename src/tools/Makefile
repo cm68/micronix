@@ -1,4 +1,4 @@
-INCLUDE = -I../include -I../kernel
+INCLUDE = -I../include -I../micronix/sys
 
 SIMTARGETS = \
 	ar nm size imd disas dump \
