@@ -1,5 +1,5 @@
-Make: make.o makeinit.o makeread.o maketime.o hexdump.o
-	cc -o Make make.o makeinit.o makeread.o maketime.o hexdump.o -lS
+Make: make.o makeinit.o makeread.o maketime.o
+	cc -v -o Make make.o makeinit.o makeread.o maketime.o -lS
 
 make.o: make.c
 	cc -c make.c
@@ -12,9 +12,6 @@ makeinit.o: makeinit.c
 
 maketime.o: maketime.c
 	cc -c maketime.c
-
-hexdump.o: hexdump.c
-	cc -c hexdump.c
 
 install: Make
 	mv /bin/make /bin/mk

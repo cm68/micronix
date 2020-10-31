@@ -29,6 +29,16 @@ filesystem:
 disks:
 	floppy images recovered from the net, version 1.4 and 1.3
 
+src/micronix:
+	the source tree for things that are to be built natively, including
+    libraries, commands and the kernel.
+
+src/micronix/kernel:
+	recovered kernel source for micronix 1.61, with include files
+	the formatting of the original source was really quirky and archaic,
+	so I re-indented it to a more K&R like style.
+	it is NOT ansi, and compiles on whitesmith's C.
+
 src/tools:
 	file system checkers, dumper and extractor
 	object file tools, including an overachieving nm
@@ -74,12 +84,6 @@ src/hwsim:
 	a merged IMD file that contains any changes.
 
 	finally, I've started on a skeleton for other platforms like compupro.
-
-src/kernel:
-	recovered kernel source for micronix 1.61, with include files
-	the formatting of the original source was really quirky and archaic,
-	so I re-indented it to a more K&R like style.
-	it is NOT ansi, and compiles on whitesmith's C.
 
 src/include:
 	library include files for the emulation
