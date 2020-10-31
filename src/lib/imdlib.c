@@ -74,22 +74,27 @@ get_track(int fd)
     
     // make space for and read the track header
     tp = malloc(sizeof(*tp));
-    if (read(fd, tp, sizeof(tp->fixed)) != sizeof(tp->fixed))
+    if (read(fd, tp, sizeof(tp->fixed)) != sizeof(tp->fixed)) {
+bomb:
+        free(tp);
         return 0;
+    }
 
     tp->secsize = 0x80 << tp->fixed.size;
 
     // make space for and read the sector map
     nsec = tp->fixed.nsec;
     tp->secmap = malloc(nsec);
-    if (read(fd, tp->secmap, nsec) != nsec)
-        return 0;
+    if (read(fd, tp->secmap, nsec) != nsec) {
+        goto bomb;
+    }
 
     // if there's a cylinder map, make space and read it in
     if (tp->fixed.head & 0x80) {
         tp->cylmap = malloc(nsec);
-        if (read(fd, tp->cylmap, nsec) != nsec)
-            return 0;
+        if (read(fd, tp->cylmap, nsec) != nsec) {
+            goto bomb;
+        }
     } else {
         tp->cylmap = 0;
     }
@@ -97,8 +102,9 @@ get_track(int fd)
     // if there's a headmap, make space and read it in
     if (tp->fixed.head & 0x40) {
         tp->headmap = malloc(nsec);
-        if (read(fd, tp->headmap, nsec) != nsec)
-            return 0;
+        if (read(fd, tp->headmap, nsec) != nsec) {
+            goto bomb;
+        }
     } else {
         tp->headmap = 0;
     }
@@ -111,19 +117,21 @@ get_track(int fd)
     /* read a sector byte type and build the sector */
     for (s = 0; s < nsec; s++) {
 
-        if (read(fd, &c, 1) != 1)
-            return 0;
+        if (read(fd, &c, 1) != 1) {
+            goto bomb;
+        }
         if (c) {
             tp->data[s] = malloc(tp->secsize);
 
             if (c == 2) {   // type 2 is a sector full of the next single byte
                 if (read(fd, &c, 1) != 1) {
-                    return 0;
+                    goto bomb;
                 }
                 memset(tp->data[s], c, tp->secsize);
             } else {        // anything else is a sector full of data
-                if (read(fd, tp->data[s], tp->secsize) != tp->secsize)
-                    return 0;
+                if (read(fd, tp->data[s], tp->secsize) != tp->secsize) {
+                    goto bomb;
+                }
             }
         } else {            // type 0 is an absent sector
             tp->data[s] = 0;
@@ -177,6 +185,8 @@ imd_load(char *fname, int drive, int create_delta)
     read(fd, ip->comment, clen);
     ip->comment[clen] = 0;
     ip->drive = drive;
+    ip->cyls = 0;
+    ip->heads = 0;
 
     // read all the tracks in and squirrel them away, accumulating cyl/head counts
     while ((tp = get_track(fd)) != 0) {
@@ -234,6 +244,7 @@ imd_load(char *fname, int drive, int create_delta)
     } else {
         memset(ip->delta_map, 0, DELTA_SIZE);
     }
+    free(namebuf);
     return ip;
 }
 
