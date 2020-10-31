@@ -181,20 +181,5 @@ lc(s)                           /* convert string to lower case */
 }
 
 /*
- * ok, let's look through the suffix rules to see if any of them can be made
- * to match any targets that we don't have a recipe for.
- */
-suffixes()
-{
-    struct target *t;
-    struct dep *d;
-
-    for (t = targets; t; t = t->next) {
-        if (*t->name != '%')
-            continue;
-    }
-}
-
-/*
  * vim: tabstop=4 shiftwidth=4 expandtab: 
  */

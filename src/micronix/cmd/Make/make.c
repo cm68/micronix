@@ -6,7 +6,7 @@
  * 06 Aug 85    TGM     Module created
  * 27 Aug 85    TGM     Released for use
  * 29 Oct 20    CMM     substantially rewritten for correctness,
- *                      unix portability and speed, suffixes
+ *                      unix portability and speed
  * 30 Oct 20    CMM     runs on micronix, upward compatible
  *                      with stock make
  * make.c
@@ -93,11 +93,6 @@ main(argc, argv)
      * go initialize data structures 
      */
     init(argc, argv);
-
-    /*
-     * process magic suffix rules
-     */
-    suffixes();
 
     /*
      * display structures if desired 
@@ -195,6 +190,9 @@ make(s)                         /* returns the modified date/time */
 
     if (debug) printf("making: %s\n", s);
 
+    /*
+     * run through the explict targets and see if we find a rule
+     */
     for (t = targets; t; t = t->next) {
         if (!strcmp(t->name, s))
             break;

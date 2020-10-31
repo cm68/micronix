@@ -1,20 +1,17 @@
-Make: make.o makeinit.o makeread.o maketime.o
+OBJECTS = make.o makeinit.o makeread.o maketime.o
+
+Make: $(OBJECTS)
 	cc -v -o Make make.o makeinit.o makeread.o maketime.o -lS
 
+$(OBJECTS) : $*.c
+	cc -c $*.c
+
 make.o: make.c
-	cc -c make.c
-
-makeread.o: makeread.c
-	cc -c makeread.c
-
-makeinit.o: makeinit.c
-	cc -c makeinit.c
-
-maketime.o: maketime.c
-	cc -c maketime.c
 
 install: Make
 	mv /bin/make /bin/mk
 	cp Make /bin/make
 
 clean : ; rm *.o
+
+update :  ; cd ../.. ; make update
