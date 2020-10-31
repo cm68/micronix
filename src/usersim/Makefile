@@ -1,4 +1,4 @@
-INCLUDE = -I../include -I../kernel
+INCLUDE = -I../include -I../micronix/sys
 
 OBJECTS = z80emu.o micronix.o
 TARGETS = sim
