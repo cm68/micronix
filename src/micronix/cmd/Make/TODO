@@ -1,0 +1,19 @@
+things that should be easy to add:
+
+automatically defined macros like
+
+UNIX
+MICRONIX
+LINUX
+CPM
+
+which enables:
+
+parse time conditional
+
+ifdef $(MACRONAME)
+ifndef $(MACRONAME)
+endif
+
+include <filename>
+
