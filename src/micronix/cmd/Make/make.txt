@@ -1,4 +1,4 @@
-   make - maintain program groups                                  page 1
+   make - maintain program groups                                
 
 
    NAME
@@ -47,28 +47,6 @@
 
         Finally, '$$' represent a single '$'.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-   make - maintain program groups                                  page 2
-
-
-
-
         A few examples follow:
 
              # comments go here and are ignored.
@@ -116,15 +94,6 @@
         if first character of the command is '@', the command is not
 		echoed.
 
-
-
-
-
-   make - maintain program groups                                  page 3
-
-
-
-
         Other options:
 
              -d   Display a detailed description of what was
@@ -135,21 +104,18 @@
 
    FILES
         makefile     - the default input file
-
+		Makefile	 - we try this second
 
    NOTES
 
-        Make is written in Aztec C version 1.06d.
+		Original Author, circa 1985 or so.  I have no idea how current this is.
 
-        Please send any comments/corrections to
-             Tom Morris
-             1252 Collier Dr.
-             San Leandro, CA 94577
+        Tom Morris
+        1252 Collier Dr.
+        San Leandro, CA 94577
 
-                  or
-
-             Tom Morris  at Potpourri  (408) 378-7474
-                         or ZeeMachine (408) 245-1420
+        Tom Morris  at Potpourri  (408) 378-7474
+                    or ZeeMachine (408) 245-1420
 
 
 

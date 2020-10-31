@@ -37,8 +37,14 @@ char exbuf[1024]
  */
 #define NDEFS   32
 
-#define NLEN
+#define NLEN    32
 char namebuf[NLEN]
+#ifndef linux
+= 0
+#endif
+;
+
+char workbuf[NLEN]
 #ifndef linux
 = 0
 #endif
@@ -70,7 +76,7 @@ char **in;
  */
 readmakefile(s, report)
     char *s;                    /* filename to read */
-int report;
+    int report;
 {
     FILE *infile;               /* fp for input file */
     char *p;                    /* input line pointer */
@@ -84,6 +90,7 @@ int report;
     int i;
     unsigned long ft;
     char *semi;
+    char *w;
 
     /*
      * try to open specified file 
@@ -176,7 +183,11 @@ int report;
             }
             
             /* expand any macros in the targets or dependencies */
-            expand(inbuf, "", "");
+            expand(inbuf, 0, 0);
+
+            if (debug > 1) 
+                printf("expanded: %s\n", exbuf);
+
             p = exbuf;
 
             /* we know there is a colon, so guaranteed to terminate */
@@ -252,7 +263,24 @@ int report;
                     }
                     if (!(d = (struct dep *) calloc(1, sizeof(struct dep))))
                         OutOfMem();
-                    if (!(d->name = strdup(namebuf)))
+
+                    /*
+                     * we do a little magic here if the dependency looks like $*<something>
+                     * in that we substitute the target prefix in for the $*
+                     * this turns  foo.o : $*.c into foo.o : foo.c
+                     * this is useful when you have a target list
+                     */
+                    w = namebuf;
+                    if ((namebuf[0] == '$') && (namebuf[1] == '*')) {
+                        strcpy(workbuf, lt[i]->name);
+                        if (debug > 1)
+                            printf("magic: pat: %s target: %s\n", namebuf, workbuf);
+                        for (w = workbuf; *w && (*w != '.'); w++)
+                            ;
+                        strcpy(w, &namebuf[2]);
+                        w = workbuf;
+                    }
+                    if (!(d->name = strdup(w)))
                         OutOfMem();
                     d->next = lt[i]->need;
                     lt[i]->need = d;
@@ -303,6 +331,7 @@ int report;
              * unrecognized line 
              */
             fprintf(stderr, "make: unrecognized line %d\n", lineno);
+            fprintf(stderr, inbuf);
             break;
         }
     }
@@ -357,18 +386,28 @@ expand(str, name, mod)
                 break;
 
             case '@':          /* $@ = copy 'make' name */
-                for (c = name; *c;)
-                    *c1++ = *c++;
+                if (name) {
+                    for (c = name; *c;)
+                        *c1++ = *c++;
+                } else {
+                    *c1++ = '$'; *c1++ = '@';
+                }
                 break;
 
             case '*':          /* $* = copy 'make' name prefix */
-                for (c = name; *c && *c != '.';)
-                    *c1++ = *c++;
+                if (name) {
+                    for (c = name; *c && *c != '.';)
+                        *c1++ = *c++;
+                } else {
+                    *c1++ = '$'; *c1++ = '*';
+                }
                 break;
 
             case '?':          /* $? = copy the cause of the make */
-                for (c = mod; *c;)
-                    *c1++ = *c++;
+                if (mod) {
+                    for (c = mod; *c;)
+                        *c1++ = *c++;
+                }
                 break;
 
             case '(':          /* $(xx) = a long macro definition */
