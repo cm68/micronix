@@ -121,7 +121,6 @@ dofile(char *name, struct dsknod *ip)
         fileread(ip, off, buf);
         if (traceflags & extra) {
             printf("\noffset %d logical block %d\n", off, off / 512);
-            hexdump(buf, size - off);
         }
         write(fd, buf, (size - off > 512) ? 512 : size - off);
     }
