@@ -1,10 +1,9 @@
-build.h: 
 
 unix:	low.o io.o high.o
 unix:;	link -tb0x1000 -r -o unix low.o io.o -lm.a high.o
 
-low.o:	uhdr.o access.o	balloc.o cio.o create.o	exec.o fio.o fork.o
-low.o:	ialloc.o iget.o	imap.o link.o user.o malloc.o mem.o mount.o
+low.o:	uhdr.o access.o balloc.o cio.o create.o exec.o fio.o fork.o
+low.o:	ialloc.o iget.o imap.o link.o user.o malloc.o mem.o mount.o
 low.o:	name.o open.o queue.o rdwri.o reg.o sig.o sleep.o sub8.o
 low.o:	subc.o swap.o sys1.o sys2.o system.o time.o trap.o tty.o uio.o
 	link -tb0x1000 -d -o low.o uhdr.o access.o balloc.o cio.o create.o exec.o fio.o fork.o ialloc.o iget.o imap.o link.o user.o malloc.o mem.o mount.o name.o open.o queue.o rdwri.o reg.o sig.o sleep.o sub8.o subc.o swap.o sys1.o sys2.o system.o time.o trap.o tty.o uio.o 
@@ -14,15 +13,19 @@ io.o:	con.o dj.o memdev.o intrpt.o mio.o multio.o mw.o
 high.o:	main.o cus.o inits.o
 	link -tb0x1000 -d -o high.o main.o cus.o inits.o
 
-main.o:	main.c buf.h con.h file.h inode.h mount.h proc.h sys.h
+makedate: makedate.c
 	cc -o makedate makedate.c -lS
+
+build.h: makedate
 	./makedate >build.h
+
+main.o:	main.c buf.h con.h file.h inode.h mount.h proc.h sys.h build.h
 	cc -c -x0 main.c
 
 access.o: access.c inode.h mount.h proc.h sys.h
 	cc -c access.c
 
-balloc.o: balloc.c buf.h proc.h	sup.h sys.h
+balloc.o: balloc.c buf.h proc.h sup.h sys.h
 	cc -c balloc.c
 
 cio.o: cio.c con.h file.h inode.h proc.h sys.h
@@ -40,13 +43,13 @@ cus.o:	cus.c sys.h
 exec.o:	exec.c buf.h inode.h obj.h proc.h sys.h
 	cc -c exec.c
 
-fio.o: fio.c buf.h con.h inode.h proc.h	sys.h
+fio.o: fio.c buf.h con.h inode.h proc.h sys.h
 	cc -c fio.c
 
 fork.o:	fork.c con.h file.h inode.h proc.h sys.h
 	cc -c fork.c
 
-ialloc.o: ialloc.c buf.h inode.h proc.h	sup.h sys.h
+ialloc.o: ialloc.c buf.h inode.h proc.h sup.h sys.h
 	cc -c ialloc.c
 
 iget.o:	iget.c buf.h inode.h mount.h proc.h sys.h
@@ -85,7 +88,7 @@ mio.o: mio.s
 mount.o: mount.c buf.h inode.h mount.h proc.h sup.h sys.h
 	cc -c mount.c
 
-multio.o: multio.c proc.h sys.h	tty.h
+multio.o: multio.c proc.h sys.h tty.h
 	cc -cz multio.c
 
 mw.o: mw.c buf.h con.h proc.h sys.h
@@ -97,10 +100,10 @@ name.o:	name.c buf.h inode.h proc.h sys.h
 open.o:	open.c con.h file.h inode.h proc.h sys.h 
 	cc -c open.c
 
-queue.o: queue.c proc.h	sys.h tty.h
+queue.o: queue.c proc.h sys.h tty.h
 	cc -c queue.c
 
-rdwri.o: rdwri.c file.h	inode.h	proc.h sys.h
+rdwri.o: rdwri.c file.h inode.h proc.h sys.h
 	cc -c rdwri.c
 
 reg.o:	reg.c proc.h sys.h
@@ -109,7 +112,7 @@ reg.o:	reg.c proc.h sys.h
 sig.o: sig.c proc.h sys.h tty.h
 	cc -cz sig.c
 
-sleep.o: sleep.c proc.h	sys.h
+sleep.o: sleep.c proc.h sys.h
 	cc -c sleep.c
 
 sub8.o:	sub8.s
