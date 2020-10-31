@@ -49,7 +49,7 @@ static void emulate();
 
 int savemode;
 int debug_terminal;
-int am_root;
+int am_root = 1;
 int mypid;
 FILE *mytty;
 int logfd;
