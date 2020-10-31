@@ -1,13 +1,15 @@
 micronix is pretty cool, but there are some things that don't quite work the way
 you would expect:
 
+usersim:
+	sometimes the shell gets confused trying to run the contents of the
+    current directory as a script.  this does not seem to happen when running
+	as root
+
 /bin/sh: 
 	very primitive.  
 	no variables.  no environment.  no conditionals or loops.
 	does pipes and redirection and background processes
-
-/bin/make:
-	no variables.  this makes every makefile a brute force kind of thing.
 
 /bin/more:
 	does not do the right thing with pipes.  it reads stdin for the prompt
