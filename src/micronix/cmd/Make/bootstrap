@@ -1,6 +1,8 @@
+cd /usr/src/cmd/Make
 cc -c make.c
 cc -c makeread.c
 cc -c makeinit.c
 cc -c maketime.c
 cc -o Make make.o makeread.o makeinit.o maketime.o -lS
+mv /bin/make /bin/mk
 cp Make /bin/make
