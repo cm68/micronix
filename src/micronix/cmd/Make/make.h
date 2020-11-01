@@ -8,14 +8,6 @@
 #define	TRUE	1
 #define	FALSE	0
 
-#ifdef CPM
-/*
- * cp/m has no notion of exec, so we put our commands in a script file,
- * and invoke submit to run them.  unix has a much more robust facility
- */
-#define	EXECFILE "execmake.sub" /* the created submit file */
-#endif
-
 typedef char boolean;
 
 /*

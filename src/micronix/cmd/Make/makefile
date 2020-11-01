@@ -1,3 +1,6 @@
+#
+# a makefile to make the make that replaces the micronix make
+#
 OBJECTS = make.o makeinit.o makeread.o maketime.o
 
 Make: $(OBJECTS)
