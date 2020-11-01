@@ -78,7 +78,7 @@ imap.c: sys.h inode.h buf.h proc.h
 link.c: sys.h inode.h proc.h
 lock.c: sys.h inode.h proc.h file.h lock.h
 main.c: sys.h inode.h mount.h proc.h file.h buf.h con.h build.h
-makedate.c: <std.h> <time.h>
+makedate.c: /include/std.h /include/time.h
 malloc.c: sys.h proc.h buf.h sup.h con.h
 memdev.c: sys.h proc.h con.h
 mount.c: sys.h inode.h mount.h proc.h buf.h sup.h
