@@ -29,10 +29,6 @@ boolean silent = FALSE;         /* show commands */
 boolean knowhow = 0;                /* know how to make file */
 boolean madesomething = 0;          /* actually made a file */
 
-#ifdef CPM
-FILE *mfp;                      /* 'make' submit file pointer */
-#endif
-
 #ifndef linux
 char *
 index(s, c)
@@ -100,18 +96,6 @@ main(argc, argv)
     if (debug)
         debugmode();
 
-#ifdef CPM
-    /*
-     * create submit file 
-     */
-    if ((mfp = fopen(EXECFILE, "w")) == 0) {
-        fprintf(stderr, "make: can't create %s.\n", EXECFILE);
-        exit(1);
-    }
-    if (silent)
-        fprintf(mfp, "put console output to file null [system]\n");
-#endif
-
     if (!targets) {
         fprintf(stderr, "no targets\n");
         exit(1);
@@ -150,27 +134,6 @@ main(argc, argv)
         }
         dolist = dolist->next;
     }
-
-#ifdef CPM
-    /*
-     * finish up the command file 
-     */
-    if (silent)
-        fprintf(mfp, "put console output to console\n");
-    fprintf(mfp, "erase %s\n", EXECFILE);
-    fclose(mfp);
-
-    /*
-     * see if we made anything 
-     */
-    if (execute && madesomething) {
-        /*
-         * chain to command file 
-         */
-        sprintf(0x0080, "SUBMIT %s\r", EXECFILE);
-        bdos(47, 0);
-    }
-#endif
 }
 
 long
@@ -276,17 +239,16 @@ make(s)                         /* returns the modified date/time */
          */
         howp = t->recipe;
         for (howp = t->recipe; howp; howp = howp->next) {
+            if (debug) printf("pre: %s s: %s mod: %s\n", howp->text, s, mod);
             expand(howp->text, s, mod);
             cmd = exbuf;
-            if ((*cmd != '@') || !execute) {
+            if (*cmd != '@') {
                 printf("%s\n", exbuf);
-
+            }
+            if (execute) {
                 if (*cmd == '@')
                     ++cmd;
                 system(cmd);
-#ifdef CPM
-                fprintf(mfp, "%s\n", cmd);
-#endif
             }
         }
         /*

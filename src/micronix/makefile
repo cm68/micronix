@@ -20,7 +20,8 @@ all:
 #
 update:
 	find . -type f \! -path \*UNUSED\* | \
-        grep -v \.o$$ | grep -v \.swp | while read i ; do \
+        grep -v \.gitignore | grep -v \.o$$ | grep -v \.swp | \
+		while read i ; do \
 		dest=../../filesystem/usr/src/$$i ; \
         if [ ! -d $$(dirname $$dest) ] ; then \
 			echo new dir: $$(dirname $$dest) ; \

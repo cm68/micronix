@@ -96,14 +96,34 @@ debugmode()
     struct target *t;
     struct dep *d;
     struct command *cmd;
-    int i;
+    char *s;
+    int i, j;
 
     /*
      * first do the macro definitions 
      */
     fprintf(stderr, "\nMacros:\n");
-    for (m = macros; m; m = m->next)
-        fprintf(stderr, "\t%s = %.60s\n", m->name, m->text);
+    for (m = macros; m; m = m->next) {
+        fprintf(stderr, "\t$%s$ = ", m->name);
+        s = m->text;
+        for (s = m->text; *s ; s += j) {
+            for (j = 0, i = 0;; i++) {
+                if (s[i] == '\0') {
+                    j = i; 
+                    break;
+                }
+                if (s[i] == ' ') {
+                    j = i;
+                }
+                if (i > 60) break;
+            }
+            i = s[j];
+            s[j] = '\0';
+            fprintf(stderr, "%s%s\n", 
+                (s != m->text) ? "\t\t" : "", s);
+            s[j] = i;
+        }
+    }
 
     /*
      * now do the target definitions 

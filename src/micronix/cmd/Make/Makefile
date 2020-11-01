@@ -1,4 +1,5 @@
-# makefile for building 'make' and 'touch'
+#
+# makefile for building make on linux
 
 CFLAGS = -fdiagnostics-color=always -g
 

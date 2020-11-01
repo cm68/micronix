@@ -9,6 +9,8 @@
 #endif
 #include	"make.h"
 
+extern boolean knowhow;
+
 extern unsigned long FileTime();
 extern struct target *targets;
 extern struct macro *macros;
@@ -16,39 +18,41 @@ extern char debug;
 
 int lineno = 1;
 
+#ifdef linux
+#define INIT0
+#else
+#define INIT0 = 0
+#endif
+
 /*
  * a word about memory management:
- * input and macro expansions in the parse path are in fixed length static arrays
- * dependency trees and macro definitions are malloc'd.
+ * input and macro expansions in the parse path are in fixed length
+ * static arrays; dependency trees and macro definitions are malloc'd.
  */
-char inbuf[1024]
-#ifndef linux
-= 0
-#endif
-;        /* input buffer */
-char exbuf[1024]
-#ifndef linux
-= 0
-#endif
-;       /* macro expanded */
+#define MAXLINE 1024
+char inbuf[MAXLINE] INIT0;       /* input buffer */
+char exbuf[MAXLINE] INIT0;       /* macro expanded */
 
 /*
  * a definition line can have up to NDEFS targets before the colon
  */
-#define NDEFS   32
+#define NDEFS   100
 
 #define NLEN    32
-char namebuf[NLEN]
-#ifndef linux
-= 0
-#endif
-;
+char namebuf[NLEN] INIT0;
+char workbuf[NLEN] INIT0;
 
-char workbuf[NLEN]
-#ifndef linux
-= 0
-#endif
-;
+/*
+ * all whitespace inside a line is identical. 
+ * a tab at the start of a line is significant
+ */
+whitespace(c)
+char c;
+{
+    if ((c == ' ') || (c == '\t'))
+        return 1;
+    return 0;
+}
 
 /*
  * place a name into the namebuf
@@ -63,7 +67,8 @@ char **in;
 
     while (1) {
         c = **in;
-        if ((c == '\0') || ( c == ':') || (c == '=') || (c == ' '))
+        if ((c == '\0') || ( c == ':') || 
+            (c == '=') || (c == ' ') || ( c == '\t'))
             break;
         (*in)++;
         *s++ = c;
@@ -111,9 +116,17 @@ readmakefile(s, report)
      */
     while (readline(infile)) {
 
+        /* a # anywhere in the line becomes a line end */
+        for (p = inbuf; *p; p++) {
+            if (*p == '#') {
+                *p = 0;
+                break;
+            }
+        }
+
         semi = NULL;
         p = inbuf;
- 
+         
         i = linetype();
         if (debug > 1) {
             printf("linetype: %d %s\n", i, inbuf);
@@ -163,7 +176,7 @@ readmakefile(s, report)
              * copy in macro definition - we know there is an '=' in the line
              */
             p = index(p, '=') + 1;
-            while (isspace(*p)) p++;
+            while (whitespace(*p)) p++;
             if (!(m->text = strdup(p)))
                 OutOfMem();
             break;
@@ -195,7 +208,7 @@ readmakefile(s, report)
 
                 snagname(&p);
 
-                while (isspace(*p)) p++;
+                while (whitespace(*p)) p++;
 
                 /*
                  * search to see if we know anything about this target
@@ -237,13 +250,13 @@ readmakefile(s, report)
             } while (*p != ':');
 
             p++;
-            while (isspace(*p)) p++;
+            while (whitespace(*p)) p++;
 
             /*
              * now go thru all of the dependencies
              */
             while (*p) {
-                while (isspace(*p)) p++;
+                while (whitespace(*p)) p++;
 
                 if (*p == '\0') break;
 
@@ -304,7 +317,7 @@ readmakefile(s, report)
                 break;
             }
 
-            while (isspace(*p)) ++p;
+            while (whitespace(*p)) ++p;
 
             /*
              * if there is something there, allocate mem and copy 
@@ -346,120 +359,125 @@ expand(str, name, mod)
     char *name;                 /* name we're making */
     char *mod;                  /* names that caused make */
 {
-    char *c, *c1, *c2;          /* working buffer pointers */
-    char *mp, mac[32];          /* macroo expansion ptr, buffer */
+    char mac[32];               /* macro name */
     char *index();              /* locate character function */
-    struct macro *macp;        /* working macro struct ptr */
+    struct macro *macp;         /* working macro struct ptr */
+    char inbuf[MAXLINE];
+    char expanded;
+    char *s;
+    char *dest;
+    char *src;
 
     /*
-     * see if any expansion needed 
+     * since macros can contain macros, we need to loop
+     * this extra buffer copying is not ideal
      */
-    if (!index(str, '$')) {
-        strcpy(exbuf, str);
-        return;
-    }
+    strcpy(exbuf, str);
 
-    /*
-     * let's get the show on the road 
-     */
-    c1 = exbuf;
-    c2 = str;
+    do {
 
-    /*
-     * while there is any data left... 
-     */
-    while (*c2) {
-        if (*c2 != '$')
-            *c1++ = *c2++;
-        else {
-            /*
-             * assume there is no true macro definition 
-             */
-            mac[0] = NULL;
+        expanded = 0;
 
-            /*
-             * decode the character following the '$' 
-             */
-            switch (*++c2) {
-            case '$':          /* $$ = just a dollar sign */
-                *c1++ = '$';
-                break;
+        strcpy(inbuf, exbuf);
 
-            case '@':          /* $@ = copy 'make' name */
-                if (name) {
-                    for (c = name; *c;)
-                        *c1++ = *c++;
-                } else {
-                    *c1++ = '$'; *c1++ = '@';
-                }
-                break;
+        /*
+         * let's get the show on the road 
+         */
+        dest = exbuf;
+        src = inbuf;
 
-            case '*':          /* $* = copy 'make' name prefix */
-                if (name) {
-                    for (c = name; *c && *c != '.';)
-                        *c1++ = *c++;
-                } else {
-                    *c1++ = '$'; *c1++ = '*';
-                }
-                break;
-
-            case '?':          /* $? = copy the cause of the make */
-                if (mod) {
-                    for (c = mod; *c;)
-                        *c1++ = *c++;
-                }
-                break;
-
-            case '(':          /* $(xx) = a long macro definition */
-                for (mp = mac; *++c2 != ')'; *mp++ = *c2);      /* copy the
-                                                                 * macro name 
-                                                                 * (up to
-                                                                 * ')') */
-                *mp = NULL;     /* terminate macro name */
-                break;
-
-            default:           /* $<other> = a short macro definition */
-                mac[0] = *c2;   /* move in the macro definition */
-                mac[1] = NULL;  /* terminate the string */
-                break;
-            }
-
-            /*
-             * bypass the character which caused the termination 
-             */
-            ++c2;
-
-            /*
-             * expand macro if one has been defined 
-             */
-            if (strlen(mac)) {
+        /*
+         * while there is any data left... 
+         */
+        while (*src) {
+            if (*src != '$')
+                *dest++ = *src++;
+            else {
                 /*
-                 * look for matching macro definition 
+                 * assume there is no true macro definition 
                  */
-                macp = macros;
-                while (macp) {
-                    /*
-                     * look for matching string name 
-                     */
-                    if (!strcmp(macp->name, mac)) {
-                        mp = macp->text;
-                        /*
-                         * copy in macro definition 
-                         */
-                        while (*mp)
-                            *c1++ = *mp++;
-                        break;
+                mac[0] = '\0';
+
+                /*
+                 * decode the character following the '$' 
+                 */
+                switch (*++src) {
+                case '$':          /* $$ = just a dollar sign */
+                    *dest++ = '$';
+                    break;
+
+                case '@':          /* $@ = copy 'make' name */
+                    if (name) {
+                        for (s = name; *s;)
+                            *dest++ = *s++;
+                        expanded = 1;
+                    } else {
+                        *dest++ = '$'; *dest++ = '@';
                     }
-                    macp = macp->next;
+                    break;
+
+                case '*':          /* $* = copy 'make' name prefix */
+                    if (name) {
+                        for (s = name; *s && *s != '.';)
+                            *dest++ = *s++;
+                        expanded = 1;
+                    } else {
+                        *dest++ = '$'; *dest++ = '*';
+                    }
+                    break;
+
+                case '?':          /* $? = copy the cause of the make */
+                    if (mod) {
+                        for (s = mod; *s;)
+                            *dest++ = *s++;
+                        expanded = 1;
+                    }
+                    break;
+
+                case '(':          /* $(xx) = a long macro definition */
+                    /* copy the macro name (up to ')') */
+                    s = mac;
+                    src++; 
+                    while (*src != ')') {
+                        if (!*src) {
+                            fprintf(stderr, "unterminated macro call\n");
+                            fprintf(stderr, "%s\n", inbuf);
+                            *dest = '\0';
+                            return;
+                        }
+                        *s++ = *src++;
+                    }
+                    *s = '\0';
+                    break;
+
+                default:           /* $<other> = a short macro definition */
+                    mac[0] = *src;
+                    mac[1] = '\0';
+                    break;
+                }
+
+                src++;
+
+                /*
+                 * expand macro
+                 */
+                if (strlen(mac)) {
+                    for (macp = macros; macp; macp = macp->next) {
+                        if (strcmp(macp->name, mac) == 0) {
+                            for (s = macp->text; *s;) {
+                                *dest++ = *s++;
+                            }
+                            expanded = 1;
+                            break;
+                        }
+                    }
                 }
             }
         }
-    }
 
-    /*
-     * terminate the EXPANDED string 
-     */
-    *c1 = NULL;
+        *dest = '\0';
+
+    } while (expanded);
 }
 
 /*
@@ -490,6 +508,14 @@ readline(fp)
         }
         lineno++;
 
+        /*
+         * extremely cheesy hack - on a continuation line, 
+         * if the first character is a tab, change it to a space
+         */
+        if ((p != inbuf) && (*p == '\t')) {
+            *p = ' ';
+        }
+
         i = strlen(inbuf);
 
         /*
@@ -504,7 +530,7 @@ readline(fp)
             return 1;
         }
 
-        p = &inbuf[i - 1];
+        p = &inbuf[i - 2];
     }
     fprintf(stderr, "line %d: too long\n", lineno);
     return 0;
@@ -525,7 +551,7 @@ linetype()
      * decode buffer type... simple rules 
      */
     /* empty line and comments */
-    if (*cp == NULL || *cp == '#')
+    if (*cp == '\0' || *cp == '#')
         return (COMMENT);
 
     /* starting tab is a recipe line */
@@ -533,7 +559,7 @@ linetype()
         return (RECIPE);
 
     /* leading non-tab is an error */
-    else if (isspace(*cp))
+    else if (*cp == ' ')
         return (UNKNOWN);
 
     /* look for an equals sign */
@@ -541,6 +567,7 @@ linetype()
         return MACRO;
     }
 
+    /* do we have a target */
     if (index(cp, ':')) {
         return TARGET;
     }
