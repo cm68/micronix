@@ -664,8 +664,10 @@ char **argv;
         }
         for (i = 0; i <= ntarg; i++) {
             if (targets[i].flags & CODE) {
-                fprintf(stderr, "trace %d code at %s\n", i,
-                    addrname(targets[i].addr));
+                if (debug) {
+                    fprintf(stderr, "trace %d code at %s\n", i,
+                        addrname(targets[i].addr));
+                }
                 trace(targets[i].addr);
             }
         }
@@ -972,12 +974,15 @@ reg_target(word v, byte flags)
 {
 	int i;
 
-    printf("registered target %s as %s from %s\n", 
-        addrname(v), fdump(flags), addrname(trace_addr));
-
+    if (debug) {
+        printf("registered target %s as %s from %s\n", 
+            addrname(v), fdump(flags), addrname(trace_addr));
+    }
 	for (i = 0; i < ntarg; i++) {
 		if (targets[i].addr == v) {
-            printf("already there %s\n", fdump(targets[i].flags));
+            if (debug) {
+                printf("already there %s\n", fdump(targets[i].flags));
+            }
             targets[i].flags |= flags;
 			return;
         }

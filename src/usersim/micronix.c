@@ -56,6 +56,9 @@ int logfd;
 
 char curdir[100] = "";
 char *rootdir = 0;
+int rootinode;
+
+struct stat sbuf;
 
 char *initfile[] = {
     "/bin/sh",
@@ -428,6 +431,8 @@ main(int argc, char **argv)
         strcat(workbuf, rootdir);
         realpath(workbuf, namebuf);
         rootdir = strdup(namebuf);
+        lstat(rootdir, &sbuf);
+        rootinode = sbuf.st_ino;
     }
     if (verbose) {
         fprintf(mytty, "verbose %x ", verbose);
@@ -1068,6 +1073,15 @@ dirsnarf(char *name)
     struct dirfd *df;
     int i;
     struct v6dir *v;
+    int is_root_dir = 0;
+
+    for (i = 0; rootdir[i] == name[i]; i++)
+        ;
+    if ((strcmp(&name[i], "/.") == 0) ||
+        (strcmp(&name[i], "/..") == 0) ||
+        (strcmp(&name[i], "/") == 0)) {
+        is_root_dir = 1;
+    }
 
     dp = opendir(name);
     if (!dp)
@@ -1094,7 +1108,12 @@ dirsnarf(char *name)
             bzero(&df->buffer[df->end], DIRINC);
         }
         v = (struct v6dir *) &df->buffer[df->end];
-        v->inum = (UINT) (((de->d_ino >> 16) ^ de->d_ino) & 0xffff);
+        v->inum = (UINT) de->d_ino & 0xffff;
+        if (v->inum == 2) v->inum = 1;
+        if ((de->d_ino == rootinode) || 
+            (is_root_dir && (strcmp(de->d_name, "..") == 0))) {
+            v->inum = 2;
+        }
         strncpy(v->name, de->d_name, 14);
         v++;
         df->end += sizeof(*v);
@@ -1434,7 +1453,6 @@ SystemCall(MACHINE * cp)
     char *fn2;
     unsigned short ret;
 
-    struct stat sbuf;
     int i;
     sighandler_t handler;
     int p[2];
@@ -1919,6 +1937,11 @@ SystemCall(MACHINE * cp)
             // hexdump(fn, strlen(fn));
             filename = fname(fn);
             // ret = stat(filename, &sbuf);
+            for (i = 0; rootdir[i] == filename[i]; i++)
+                ;
+            if (strcmp(&filename[i], "/..") == 0) {
+                filename[i+2] = '\0';
+            }
             ret = lstat(filename, &sbuf);
             if (ret) {
                 if (verbose & V_ERROR)
@@ -1930,9 +1953,17 @@ SystemCall(MACHINE * cp)
             carry_set();
             break;
         }
+
         ip = (struct inode *) &cp->memory[arg2];
+
+        if (sbuf.st_ino == rootinode) {
+            ip->inum = 2;
+        } else {
+            ip->inum = sbuf.st_ino & 0xffff;
+            if (ip->inum == 2) ip->inum = 1;
+        }
         ip->dev = sbuf.st_dev;
-        ip->inum = sbuf.st_ino;
+        // ip->inum = sbuf.st_ino;
         ip->nlinks = sbuf.st_nlink;
         ip->uid = sbuf.st_uid;
         ip->gid = sbuf.st_gid;

@@ -17,6 +17,8 @@
 #define S_IEXEC		01         /* execute permission */
 #define	DIRSIZ		14
 
+#define WIDTH 80
+
 #define	NFILES	1024
 FILE	*pwdf = 0, *dirf = 0;
 /* char	stdbuf[BUFSIZ]; */
@@ -202,7 +204,7 @@ struct lbuf *ap;
 	char fbuf[10];
 
 	if (xflg) {
-		t = 72 / maxn;
+		t = WIDTH / (maxn + 1);
 		sprintf(fbuf, "%%-%ds ", maxn);
 		printf(fbuf, ap->ln.lname);
 		if (++fc == t) {
