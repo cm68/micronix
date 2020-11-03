@@ -1872,7 +1872,6 @@ SystemCall(MACHINE * cp)
         break;
     case 14:                   /* mknod <name> mode dev (dev == 0) for dir */
         filename = fname(fn);
-        printf("mknod %s %o %x\n", filename, arg2, arg3); fflush(stdout);
         switch (arg2 & ITYPE) {
         case IDIR:
             ret = mkdir(filename, arg2 & 0777);
