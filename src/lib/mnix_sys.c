@@ -60,7 +60,8 @@ struct syscall syscalls[] = {
 /* 47 */	{1, "bad", 0 },
 /* 48 */	{5, "signal", SF_ARG1|SF_ARG2 },
 /* 49 */	{3, "lock", SF_FD|SF_ARG1 },
-/* 50 */	{1, "unlock", SF_FD }
+/* 50 */	{1, "unlock", SF_FD },
+			{0, 0, 0}
 };
 
 /*
@@ -77,7 +78,7 @@ mnix_sc(unsigned short addr, unsigned char (*gb)(unsigned short a), char *dest)
 
 	addr &= 0xffff;
 	sc = (*gb)(addr + 1);
-	if ((sc < 0) || (sc > sizeof(syscalls) / sizeof(syscalls[0]))) {
+	if ((sc < 0) || (sc >= sizeof(syscalls) / sizeof(syscalls[0]))) {
 		sprintf(dest, "unknown %x\n", sc);
 		return 0;
 	}

@@ -10,6 +10,7 @@
 #
 
 all:
+	cd include ; make
 	cd lib ; make
 	cd cmd ; make
 	cd sys ; make
@@ -19,7 +20,7 @@ all:
 # the micronix shell cannot handle this syntax at all
 #
 update:
-	find . -type f \! -path \*UNUSED\* | \
+	@find . -type f \! -path \*UNUSED\* | \
         grep -v \.gitignore | grep -v \.o$$ | grep -v \.swp | \
 		while read i ; do \
 		dest=../../filesystem/usr/src/$$i ; \
