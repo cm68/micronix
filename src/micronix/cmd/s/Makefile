@@ -1,3 +1,7 @@
+#
+# S is too big to build with whitesmith's c, because the code quality
+# is just not good enough.
+#
 #OBJEXT = o
 OBJEXT = obj
 
