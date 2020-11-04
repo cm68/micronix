@@ -10,10 +10,10 @@
 #
 
 all:
-	cd include ; make
-	cd lib ; make
-	cd cmd ; make
-	cd sys ; make
+	cd include ; make install
+	cd lib ; make install
+	cd cmd ; make install
+	cd sys ; make install
 
 #
 # the update rule is used when inside the source tree in the simulator

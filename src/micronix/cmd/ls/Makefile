@@ -1,7 +1,7 @@
 all:	ls
 
 ls : ls.c
-	cc -o ls ls.c ../../lib/libc/qsort.o -lS
+	cc -o ls ls.c -lS
 
 install: ls
 	cp ls /bin/ls
