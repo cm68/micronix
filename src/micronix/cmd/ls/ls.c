@@ -182,10 +182,32 @@ char *argv[];
 				qsort(slastp,lastp - slastp,sizeof *lastp,compar);
 			if (lflg || sflg)
 				printf("total %D\n", tblocks);
-			for (ep1=slastp; ep1<lastp; ep1++) {
-				pentry(*ep1);
+			if (!xflg) {
+				for (ep1=slastp; ep1 < lastp; ep1++) {
+					pentry(*ep1);
+				}
+			} else {
+				char fbuf[10];
+				char cols = WIDTH / (maxn + 1);
+				char lines = ((lastp - slastp) + (cols - 1)) / cols;
+				char j;
+#ifdef notdef
+				char total = lastp - slastp;
+				for (i = 0; i < total; i++) {
+					printf("%s ", slastp[i]->ln.lname);
+				}
+				printf("\ntotal %d lines %d cols %d maxn %d WIDTH %d\n",
+					total, lines, cols, maxn, WIDTH);
+#endif
+				sprintf(fbuf, "%%-%ds ", maxn);
+				for (i = 0; i < lines; i++) {
+					for (j = 0; j < cols; j++) {
+						ep1 = &slastp[i + (j * lines)];
+						printf(fbuf, (*ep1)->ln.lname);
+					}
+					printf("\n");
+				}
 			}
-			if (xflg && fc) printf("\n");
 		} else 
 			pentry(ep);
 	}
@@ -201,12 +223,9 @@ struct lbuf *ap;
 	register t;
 	register struct lbuf *p;
 	register char *cp;
-	char fbuf[10];
 
 	if (xflg) {
 		t = WIDTH / (maxn + 1);
-		sprintf(fbuf, "%%-%ds ", maxn);
-		printf(fbuf, ap->ln.lname);
 		if (++fc == t) {
 			printf("\n");
 			fc = 0;
