@@ -274,11 +274,18 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-d <root dir>\n");
     fprintf(stderr, "\t-b\t\tstart with breakpoint\n");
     fprintf(stderr, "\t-v <verbosity>\n");
+    for (i = 0; vopts[i]; i++) {
+        fprintf(stderr, "\t%2x %-8s", 1 << i, vopts[i]);
+        if ((i % 4) == 3) fprintf(stderr, "\n");
+    }
+    if ((i % 4) != 0) fprintf(stderr, "\n");
     fprintf(stderr, "\t-s [<syscall>[=<count>]\n");
     fprintf(stderr, "\t-t <syscall>\n");
-    for (i = 0; vopts[i]; i++) {
-        fprintf(stderr, "\t%x %s\n", 1 << i, vopts[i]);
+    for (i = 0; syscalls[i].name; i++) {
+        fprintf(stderr, "\t%2d %-8s", i, syscalls[i].name);
+        if ((i % 4) == 3) fprintf(stderr, "\n");
     }
+    if ((i % 4) != 0) fprintf(stderr, "\n");
     exit(1);
 }
 
@@ -640,12 +647,13 @@ do_exec(char *name, char **argv)
     fread(cp->memory + header.textoff, 1, header.text, file);
     fread(cp->memory + header.dataoff, 1, header.data, file);
     if (header.table) {
-        // printf("got %d symbols\n", header.table);
+        if (verbose & V_EXEC) {
+            printf("got %d symbols\n", header.table / sizeof(fsym));
+        }
         for (i = 0; i < header.table / sizeof(fsym); i++) {
             fread(&fsym, 1, sizeof(fsym), file);
             add_sym(fsym.name, fsym.t, fsym.v);
         }
-        // printf("read %d symbols\n", i);
     }
     fclose(file);
 
@@ -902,8 +910,15 @@ monitor()
             dumpcpu();
             break;
         case 's':
+            while (*s && (*s == ' '))
+                s++;
+            if (*s) {
+                i = strtol(s, &s, 16);
+            } else {
+                i = 1;
+            }
             dumpcpu();
-            return (1);
+            return (i);
         case 'g':
             return (0);
         case 'q':
@@ -994,10 +1009,11 @@ emulate()
             }
             breakpoint = 1;
         }
-        if (breakpoint) {
+        if (breakpoint == 1) {
             breakpoint = monitor();
         }
-        if (verbose & V_INST) {
+        if ((verbose & V_INST) || (breakpoint > 1)) {
+            if (breakpoint) breakpoint--;
             pid();
             dumpcpu();
         }
