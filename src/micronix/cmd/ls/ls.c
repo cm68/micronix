@@ -38,6 +38,7 @@ struct lbuf {
 	long	lmtime;
 };
 
+int errors = 0;
 int fc = 0;
 int maxn = 0;
 int xflg = 1;
@@ -211,7 +212,7 @@ char *argv[];
 		} else 
 			pentry(ep);
 	}
-	exit(0);
+	exit(errors ? 1 : 0);
 }
 
 pentry(ap)
@@ -383,7 +384,8 @@ char *dir;
 
 	if ((dirf = fopen(dir, "r")) == NULL) {
 		printf("%s unreadable\n", dir);
-		return;
+		errors++;
+		return 0;
 	}
 	tblocks = 0;
 	for(;;) {
@@ -422,6 +424,7 @@ char *file;
 	if (rep==NULL) {
 		fprintf(stderr, "ls: out of memory\n");
 		nomocore = 1;
+		errors++;
 		return(NULL);
 	}
 	if (lastp >= &flist[NFILES]) {
@@ -430,6 +433,7 @@ char *file;
 		if (msg==0) {
 			fprintf(stderr, "ls: too many files\n");
 			msg++;
+			errors++;
 		}
 	}
 	*lastp++ = rep;
@@ -437,11 +441,12 @@ char *file;
 	rep->lnum = 0;
 	rep->ltype = '-';
 	if (argfl || statreq) {
-		if (stat(file, &statb)<0) {
+		if (stat(file, &statb) < 0) {
 			printf("%s not found\n", file);
 			statb.inumber = -1;
 			statb.size0 = statb.size1 = 0;
 			statb.flags = 0;
+			errors++;
 			if (argfl) {
 				lastp--;
 				return(0);
