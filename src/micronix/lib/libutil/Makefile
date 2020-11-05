@@ -6,4 +6,7 @@ install: all
 	lib /lib/libutil.a -rv $(OBJECTS)
 
 hexdump.o: hexdump.c
-	cc -c hexdump.o
+	cc -c hexdump.c
+
+clean: 
+	rm $(OBJECTS)

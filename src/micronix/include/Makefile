@@ -1,4 +1,6 @@
+INCLUDES = setjmp.h types.h
+
 all:
 
 install:
-	cp setjmp.h /include
+	cp $(INCLUDES) /include

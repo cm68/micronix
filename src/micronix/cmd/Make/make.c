@@ -136,6 +136,68 @@ main(argc, argv)
     }
 }
 
+#define MAXARGS 50
+
+/*
+ * this function replaces system(), which fires off a subshell
+ * that's just a silly waste of time and memory
+ * the hard part is globbing
+ */
+char *paths[] = {
+    "/bin",
+    "/usr/bin",
+    0
+};
+
+int
+docmd(s)
+char *s;
+{
+    int ret;
+#ifdef USE_SYSTEM
+    ret = system(s);
+#else
+    int child;
+    int status;
+    int pid = 0;
+    char *args[MAXARGS];
+    register unsigned char i;
+    char *fn = s;
+    char path[30];
+
+    child = fork();
+    if (child == 0) {
+
+        nice(0);
+        for (i = 0; i < MAXARGS; i++) {
+            args[i] = s;
+            /* skip to null or space */
+            while (*s && (*s != ' ')) {
+                s++;
+            }
+            if (*s) {
+                *s++ = '\0';
+            }
+            if (!*s)
+                break;
+        }
+        args[++i] = 0;
+        for (i = 0; paths[i]; i++) {
+            sprintf(path, "%s/%s", paths[i], fn);
+            execv(path, args);
+        }
+        fprintf(stderr, "could not locate %s\n", fn);
+        exit(1);
+    } else {
+        while (pid != child) {
+            pid = wait(&status);
+        }
+        ret = status >> 8;
+    } 
+#endif
+    return (ret);
+}
+
 long
 make(s)                         /* returns the modified date/time */
     char *s;
@@ -150,6 +212,7 @@ make(s)                         /* returns the modified date/time */
     char *mod;                  /* list of files needing 'making' */
     char *cmd;
     long tt;
+    int ret;
 
     if (debug) printf("making: %s\n", s);
 
@@ -248,7 +311,7 @@ make(s)                         /* returns the modified date/time */
             if (execute) {
                 if (*cmd == '@')
                     ++cmd;
-                system(cmd);
+                ret = docmd(cmd);
             }
         }
         /*

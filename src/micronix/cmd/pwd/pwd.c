@@ -24,7 +24,7 @@ prname()
     path[off] = '\n';
 	write(1, root, 1);
     write(1, path, off + 1);
-    exit();
+    exit(0);
 }
 
 /*
@@ -94,6 +94,7 @@ main()
 
 		chdir(dotdot);
 	}
+	exit(0);
 }
 
 #ifdef notdef
