@@ -1,9 +1,20 @@
 this is a port/cut down of the stevie text editor to morrow micronix
 
+memory is tight: sprintf should go.
+
 the one major feature added is the automatic sizing of the screen
 using ANSI answerback.
 
-I stripped out stdio to make it tighter.
+SPEED NOTES:
+note that this is a brute force, single buffer, in memory editor.
+it slows down as the file gets bigger, since all changes to the
+file mean all of memory gets shoved around.
+
+this could maybe be improved by using nulls to denote holes in
+the buffer that get created by deletion, and insertions create a bunch
+of holes prospectively.  when space wants to be allocated, you would
+scan forward, collecting nulls; only if you don't find enough would you
+end up doing a big move.
 
 original readme.txt:
 
