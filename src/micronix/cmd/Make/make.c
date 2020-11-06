@@ -154,9 +154,6 @@ docmd(s)
 char *s;
 {
     int ret;
-#ifdef USE_SYSTEM
-    ret = system(s);
-#else
     int child;
     int status;
     int pid = 0;
@@ -164,6 +161,17 @@ char *s;
     register unsigned char i;
     char *fn = s;
     char path[30];
+    char *p;
+
+    /* if there's a something a simple exec can't do, use system() */
+    for (p = s; *p; p++) {
+        if ((*p == '*') || (*p == ';'))
+            break;
+    }
+    if (*p) {
+        ret = system(s);
+        return ret;
+    }
 
     child = fork();
     if (child == 0) {
@@ -194,7 +202,6 @@ char *s;
         }
         ret = status >> 8;
     } 
-#endif
     return (ret);
 }
 

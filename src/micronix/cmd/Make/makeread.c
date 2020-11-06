@@ -293,6 +293,13 @@ readmakefile(s, report)
                         strcpy(w, &namebuf[2]);
                         w = workbuf;
                     }
+                    /* if we have foo.o: foo.o, just skip it */
+                    if (strcmp(d->name, lt[i]->name) == 0) {
+                        if (debug > 1)
+                            printf("circular dependency line %d: %s\n",
+                                lineno, d->name);
+                        continue;
+                    }
                     if (!(d->name = strdup(w)))
                         OutOfMem();
                     d->next = lt[i]->need;
