@@ -201,7 +201,7 @@ inschar(c)
     }
     *Curschar++ = c;
     Fileend++;
-    CHANGED;
+    Changed = 1;
 }
 
 insstr(s)
@@ -225,7 +225,7 @@ insstr(s)
     for (k = 0; k < n; k++)
         *Curschar++ = *s++;
     Fileend += n;
-    CHANGED;
+    Changed = 1;
 }
 
 appchar(c)
@@ -248,7 +248,7 @@ appchar(c)
     }
     *(++Curschar) = c;
     Fileend++;
-    CHANGED;
+    Changed = 1;
 }
 
 canincrease(n)
@@ -290,7 +290,7 @@ delchar()
     if (*Curschar == '\n' && Curschar > Filemem && *(Curschar - 1) != '\n')
         Curschar--;
     Fileend--;
-    CHANGED;
+    Changed = 1;
 }
 
 delword(deltrailing)
@@ -403,7 +403,7 @@ delline(nlines)
         while (p < Fileend)
             *q++ = *p++;
         Fileend -= nchars;
-        CHANGED;
+        Changed = 1;
 
         /*
          * If we delete the last line in the file, back up 

@@ -174,7 +174,7 @@ main(argc, argv)
      */
     if (Rows < 3 || Columns < 16) {
         write(2, "terminal size error\n", 20); 
-        windexit(0);
+        windexit(2);
     }
 
     Tabstop = 8;
@@ -383,7 +383,7 @@ filealloc()
 {
     if ((Filemem = malloc((unsigned) FILELENG)) == NULL) {
         write(2, "file memory allocation failure\n", 32);
-        exit(1);
+        windexit(1);
     }
     Filemax = Filemem + FILELENG;
 }
@@ -426,7 +426,7 @@ readfile(fname, fromp, nochangename)
     if (size + fromp > Filemax) {
         sprintf(buff, "cannot insert file (limit is %d)!\n", FILELENG);
         write(2, buff, strlen(buff));
-        exit(1);
+        windexit(1);
     }
 
     if ((fd = open(fname, 0)) < 0) {
@@ -444,6 +444,8 @@ readfile(fname, fromp, nochangename)
     Fileend = Fileend + size;
     p = Fileend;
     for (n = size; n; n--) {
+        if (p - size == Filemem)
+            break;
         *p = *(p - size);
         p--;
     }
