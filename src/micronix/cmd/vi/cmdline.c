@@ -101,7 +101,7 @@ readcmdline(firstc)
     if (strcmp(cmd, "w") == 0) {
         if (arg == NULL) {
             writeit(Filename);
-            UNCHANGED;
+            Changed = 0;
         } else
             writeit(arg);
         return;
@@ -125,7 +125,7 @@ readcmdline(firstc)
              * clear mem and read file 
              */
             Fileend = Topchar = Curschar = Filemem;
-            UNCHANGED;
+            Changed = 0;
             p = nextline(Curschar);
             readfile(Filename, Fileend, 0);
             updatescreen();
@@ -153,7 +153,7 @@ readcmdline(firstc)
         pp = nextline(Curschar);
         readfile(arg, pp, 1);
         updatescreen();
-        CHANGED;
+        Changed = 1;
         return;
     }
     if (strcmp(cmd, ".=") == 0) {
@@ -246,7 +246,7 @@ writeit(fname)
     message(buff);
 
     if ((fd = open(fname, 1)) < 0) {
-        if (fd = creat(fname, 0777) < 0) {
+        if ((fd = creat(fname, 0777)) < 0) {
             message("Unable to open file!");
             return (0);
         }
@@ -258,7 +258,7 @@ writeit(fname)
     message(buff);
     close(fd);
 
-    UNCHANGED;
+    Changed = 0;
     return (1);
 }
 

@@ -10,7 +10,6 @@ struct termios save_term;
 #else
 #include <types.h>
 #include <sgtty.h>
-
 struct sgtty save_sbuf INIT;
 #endif
 
@@ -122,7 +121,7 @@ windclear()
 
 windgetc()
 {
-    while (read(0, controlbuf, 1) != 1);
+    read(0, controlbuf, 1);
     return controlbuf[0];
 }
 
