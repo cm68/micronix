@@ -1,0 +1,9 @@
+find size of screen:
+
+send esc [ 99;99 H
+
+get back
+
+esc [ LINES ; COLUMNS R
+
+
