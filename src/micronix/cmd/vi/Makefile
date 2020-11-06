@@ -1,4 +1,4 @@
-   #OBJECTS = window.o normal.o misccmds.o linefunc.o hexchars.o cmdline.o \
+OBJECTS = window.o normal.o misccmds.o linefunc.o cmdline.o \
 	edit.o main.o
 
 vi: $(OBJECTS)

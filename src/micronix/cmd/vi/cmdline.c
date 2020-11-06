@@ -255,9 +255,9 @@ writeit(fname)
     n = Fileend - Filemem;
     write(fd, Filemem, n);
     sprintf(buff, "\"%s\" %d characters", fname, n);
+    message(buff);
     close(fd);
 
-    message(buff);
     UNCHANGED;
     return (1);
 }

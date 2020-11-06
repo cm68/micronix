@@ -243,40 +243,25 @@ filetonext()
          * array is reversed. 
          */
 
-        if (nextra > 0)
+        if (nextra > 0) {
             c = extra[--nextra];
-        else {
+        } else {
             c = (unsigned) (0xff & (*memp++));
-            /*
-             * when getting a character from the file, we 
-             * may have to turn it into something else on 
-             * the way to putting it into 'Nextscreen'. 
-             */
-            if (c == '\t') {
-                strcpy(extra, "        ");
-                /*
-                 * tab amount depends on current column 
-                 */
-                nextra = ((Tabstop - 1) - col % Tabstop);
-                c = ' ';
-            }
-#ifdef notdef
-            else if ((n = chars[c].ch_size) > 1) {
-                char *p;
-
-                nextra = 0;
-                p = chars[c].ch_str;
-                /*
-                 * copy 'ch-str'ing into 'extra' in reverse 
-                 */
-                while (n > 1)
-                    extra[nextra++] = p[--n];
-                c = p[0];
-            }
-#endif
         }
 
-        if (c == '\n') {
+        /*
+         * when getting a character from the file, we 
+         * may have to turn it into something else on 
+         * the way to putting it into 'Nextscreen'. 
+         */
+        if (c == '\t') {
+            strcpy(extra, "        ");
+            /*
+            * tab amount depends on current column 
+            */
+            nextra = ((Tabstop - 1) - col % Tabstop);
+            c = ' ';
+        } else if (c == '\n') {
             row++;
             /*
              * get pointer to start of next row 
@@ -289,6 +274,18 @@ filetonext()
                 *screenp++ = ' ';
             col = 0;
             continue;
+        } else if (c < 27) {
+            extra[0] = c + '@';
+            c = '^';
+            nextra = 1;
+        } else if ((c < ' ') || (c > 0x7e)) {
+            unsigned char v = c;
+            c = '\\';
+
+            for (nextra = 0; nextra < 3; nextra++) {
+                extra[nextra] = (v & 7) + '0';
+                v >>= 3;
+            }
         }
 
         /*
