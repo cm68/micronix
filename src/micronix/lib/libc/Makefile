@@ -1,15 +1,18 @@
-OBJECTS = qsort.o setjmp.o 
+ASOBJS = setjmp.o
+COBJS = qsort.o malloc.o strdup.o index.o
+
+OBJECTS = $(ASOBJS) $(COBJS)
 
 all: $(OBJECTS)
 
 install: all
 	lib /lib/libS.a -rv $(OBJECTS)
 	
-qsort.o: qsort.c
-	cc -c qsort.c
+$(COBJS): $*.c
+	cc -c $*.c
 
-setjmp.o: setjmp.s
-	as -o setjmp.o setjmp.s
+$(ASOBJS): $*.s
+	as -o $*.o $*.s
 
 clean:
-	rm *.o
+	rm $(OBJECTS)
