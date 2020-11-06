@@ -1,5 +1,5 @@
 /*
- * STevie - ST editor for VI enthusiasts.     ...Tim Thompson...twitch!tjt...
+ * edit commands
  */
 
 #include "stevie.h"
@@ -41,9 +41,6 @@ edit()
         case NORMAL:
             /*
              * We're in the normal (non-insert) mode. 
-             */
-
-            /*
              * Pick up any leading digits and compute 'Prenum' 
              */
             if ((Prenum > 0 && isdigit(c)) || (isdigit(c) && c != '0')) {
@@ -65,14 +62,8 @@ edit()
 
                 /*
                  * If we're past the end of the file, (which should 
-                 */
-                /*
                  * only happen when we're editing a new file or a 
-                 */
-                /*
                  * file that doesn't have a newline at the end of 
-                 */
-                /*
                  * the line), add a newline automatically. 
                  */
                 if (Curschar >= Fileend) {
@@ -93,8 +84,6 @@ edit()
                 Undelchars = Ninsert;
                 /*
                  * Undobuff[0] = '\0'; 
-                 */
-                /*
                  * construct the Redo buffer 
                  */
                 p = Redobuff;
@@ -105,7 +94,7 @@ edit()
                 *p = '\0';
                 updatescreen();
                 break;
-            case '\b':
+            case '\177': case '\b':     /* backspace and DEL */
                 if (Curschar <= Insstart)
                     beep();
                 else {
@@ -123,46 +112,9 @@ edit()
                     updatescreen();
                 }
                 break;
-            case '\030':       /* control-x */
-                {
-                    int wasnewline = 0;
-                    char *p1;
-
-                    p1 = Curschar;
-                    if (*Curschar == '\n')
-                        wasnewline = 1;
-                    inschar('[');
-                    inschar('x');
-                    cursupdate();
-                    updatescreen();
-                    c1 = gethexchar();
-                    inschar(c1);
-                    cursupdate();
-                    updatescreen();
-                    c2 = gethexchar();
-                    Curschar = p1;
-                    delchar();
-                    delchar();
-                    delchar();
-                    c = 16 * hextoint(c1) + hextoint(c2);
-                    if (Debug)
-                        printf("(c=%d)", c);
-                    if (wasnewline)
-                        Curschar++;
-                    inschar(c);
-                    Ninsert++;
-                    *Insptr++ = c;
-                    updatescreen();
-                    break;
-                }
-            case '\017':
-                break;
-            case 0x0A:         /* <CR> */
-                insertchar(0x0A);
-                c = 0x0D;
-                /*
-                 * This is SUPPOSED to fall down into 'default' 
-                 */
+            case '\r':                  /* CR becomes NL */
+                c = '\n';
+                /* fall through */
             default:
                 insertchar(c);
                 break;
@@ -184,8 +136,6 @@ insertchar(c)
     } else {
         /*
          * If there's any pending input, grab 
-         */
-        /*
          * it all at once. 
          */
         p = Insptr;
@@ -202,6 +152,7 @@ insertchar(c)
     updatescreen();
 }
 
+#ifdef notdef
 gethexchar()
 {
     int c;
@@ -220,6 +171,7 @@ gethexchar()
     }
     return (c);
 }
+#endif
 
 getout()
 {
@@ -233,6 +185,7 @@ cursupdate()
 {
     char *p;
     int inc, c, nlines;
+    extern int Tabstop;
 
     /*
      * special case: file is completely empty 
@@ -243,15 +196,11 @@ cursupdate()
         nlines = cntlines(Curschar, Topchar);
         /*
          * if the cursor is above the top of 
-         */
-        /*
          * the screen, put it at the top of the screen.. 
          */
         Topchar = Curschar;
         /*
          * ... and, if we weren't very close to begin with, 
-         */
-        /*
          * we scroll so that the line is close to the middle. 
          */
         if (nlines > Rows / 3)
@@ -259,11 +208,7 @@ cursupdate()
         else {
             /*
              * make sure we have the current line completely 
-             */
-            /*
              * on the screen, by setting Topchar to the 
-             */
-            /*
              * beginning of the current line (in a strange way). 
              */
             if ((p = prevline(Topchar)) != NULL && (p = nextline(p)) != NULL) {
@@ -275,8 +220,6 @@ cursupdate()
         nlines = cntlines(Botchar, Curschar);
         /*
          * If the cursor is off the bottom of the screen, 
-         */
-        /*
          * put it at the top of the screen.. 
          */
         Topchar = Curschar;
@@ -292,7 +235,7 @@ cursupdate()
 
     Cursrow = Curscol = Cursvcol = 0;
     for (p = Topchar; p < Curschar; p++) {
-        c = *p;
+        c = *p & 0xff;
         if (c == '\n') {
             Cursrow++;
             Curscol = Cursvcol = 0;
@@ -300,11 +243,17 @@ cursupdate()
         }
         /*
          * A tab gets expanded, depending on the current column 
+         * the width of a character representation
+         * tab gets expanded, ^A - ^Z, and \ooo for everying else odd
          */
         if (c == '\t')
-            inc = (8 - (Curscol) % 8);
+            inc = (Tabstop - (Curscol) % Tabstop);
+        else if (c < 27)
+            inc = 2;
+        else if ((c < ' ') || (c > 0x7e))
+            inc = 4;
         else
-            inc = chars[(unsigned) (c & 0xff)].ch_size;
+            inc = 1;
         Curscol += inc;
         Cursvcol += inc;
         if (Curscol >= Columns) {
@@ -392,15 +341,11 @@ oneup(n)
     Curschar = p;
     /*
      * This makes sure Topchar gets updated so the complete line 
-     */
-    /*
      * is one the screen. 
      */
     cursupdate();
     /*
      * try to advance to the same (virtual) column 
-     */
-    /*
      * that we were at before. 
      */
     Curschar = coladvance(p, savevcol);
@@ -427,8 +372,6 @@ onedown(n)
     }
     /*
      * try to advance to the same (virtual) column 
-     */
-    /*
      * that we were at before. 
      */
     Curschar = coladvance(p, Cursvcol);

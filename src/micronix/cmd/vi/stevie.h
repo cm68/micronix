@@ -42,13 +42,8 @@
 #define NULL 0
 #endif
 
-struct charinfo
-{
-    char ch_size;
-    char *ch_str;
-};
-
-extern struct charinfo chars[];
+#define	MAXROWS		60
+#define	MAXCOLS		80
 
 extern int State;
 extern int Rows;
