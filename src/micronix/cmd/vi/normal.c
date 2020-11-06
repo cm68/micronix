@@ -182,6 +182,12 @@ normal(c)
         resetundo();
         startinsert("i");
         break;
+    case 'O':
+        openbeforecmd();
+        updatescreen();
+        resetundo();
+        startinsert("O");
+        break;
     case 'o':
         opencmd();
         updatescreen();
@@ -315,13 +321,7 @@ normal(c)
     case 'r':
         nchar = vgetc();
         resetundo();
-        if (nchar == '\n' || 
-#ifdef notdef
-(!Binary && nchar == '\r')) 
-#else
-(nchar == '\r')) 
-#endif
-{
+        if (nchar == '\n' || (nchar == '\r')) {
             /*
              * Replacing a char with a newline breaks the 
              * line in two, and is special. 

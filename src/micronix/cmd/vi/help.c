@@ -51,6 +51,7 @@ help()
     [#]dd       Delete 1 (or #) lines\n\
     C           Change rest of line\n");
     longline("\
+    O           Open line (<ESC> to exit)\n\
     cw          Change word\n\
     cc          Change line\n\
     r           Replace single character\n\

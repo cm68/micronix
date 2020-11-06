@@ -5,11 +5,8 @@
 #include "stevie.h"
 
 /*
- * opencmd
- *
- * Add a blank line below the current line.
+ * opencmd - Add a blank line below the current line.
  */
-
 opencmd()
 {
     /*
@@ -22,6 +19,22 @@ opencmd()
      */
     if (Curschar >= Fileend)
         Curschar = Fileend - 1;
+    /*
+     * Add the blank line 
+     */
+    appchar('\n');
+}
+
+/*
+ * opencmd - Add a blank line before the current line.
+ */
+openbeforecmd()
+{
+    /*
+     * get to the beginning of the current line 
+     */
+    while (Curschar > Filemem && (*Curschar) != '\n')
+        Curschar--;
     /*
      * Add the blank line 
      */
@@ -275,16 +288,12 @@ delchar()
         return;
     /*
      * Delete the character at Curschar by shifting everything 
-     */
-    /*
      * in the file down. 
      */
     for (p = Curschar + 1; p < Fileend; p++)
         *(p - 1) = *p;
     /*
      * If we just took off the last character of a non-blank line, 
-     */
-    /*
      * we don't want to end up positioned at the newline. 
      */
     if (*Curschar == '\n' && Curschar > Filemem && *(Curschar - 1) != '\n')
@@ -310,8 +319,6 @@ delword(deltrailing)
     if (issepchar(c) && !isspace(c)) {
         /*
          * If we're on a non-space separator, remove 
-         */
-        /*
          * the separators and any following space. 
          */
         while (issepchar(c) && !isspace(c)) {
@@ -328,11 +335,7 @@ delword(deltrailing)
         while (!issepchar(*Curschar) && *Curschar != '\n') {
             /*
              * If the next char is a newline, we note 
-             */
-            /*
              * that fact here, because delchar() won't 
-             */
-            /*
              * position us there afterword. 
              */
             if (*(Curschar + 1) == '\n')
@@ -373,8 +376,6 @@ delline(nlines)
     if (*Curschar != '\n') {
         /*
          * back up to the previous newline (or the beginning 
-         */
-        /*
          * of the file. 
          */
         while (Curschar > Filemem) {
@@ -394,8 +395,6 @@ delline(nlines)
             p++, nchars++);
         /*
          * Delete the characters of the line 
-         */
-        /*
          * by moving everything else in the file down. 
          */
         q = Curschar;
