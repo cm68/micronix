@@ -22,6 +22,7 @@ all:
 update:
 	@find . -type f \! -path \*UNUSED\* | \
         grep -v \.gitignore | grep -v \.o$$ | grep -v \.swp | \
+		grep -v core | grep -v logfile | \
 		while read i ; do \
 		dest=../../filesystem/usr/src/$$i ; \
         if [ ! -d $$(dirname $$dest) ] ; then \
