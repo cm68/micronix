@@ -152,27 +152,6 @@ insertchar(c)
     updatescreen();
 }
 
-#ifdef notdef
-gethexchar()
-{
-    int c;
-
-    for (;;) {
-        windgoto(Cursrow, Curscol);
-        windrefresh();
-        c = vgetc();
-        if (hextoint(c) >= 0)
-            break;
-        message("Expecting a hexidecimal character (0-9 or a-f)");
-        beep();
-        /*
-         * sleep(1); 
-         */
-    }
-    return (c);
-}
-#endif
-
 getout()
 {
     windgoto(Rows - 1, 0);

@@ -241,6 +241,7 @@ writeit(fname)
     char buff[128];
     char *p;
     int n;
+    int w;
 
     sprintf(buff, "Writing %s...", fname);
     message(buff);
@@ -253,11 +254,13 @@ writeit(fname)
     }
 
     n = Fileend - Filemem;
-    write(fd, Filemem, n);
+    w = write(fd, Filemem, n);
     sprintf(buff, "\"%s\" %d characters", fname, n);
     message(buff);
     close(fd);
-
+    if (w != n) {
+        logmsg("write lose");
+    }
     Changed = 0;
     return (1);
 }
