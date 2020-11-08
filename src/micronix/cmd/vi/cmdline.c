@@ -193,6 +193,94 @@ badcmd()
     message("Unrecognized command");
 }
 
+/*
+ * these functions are used to update the message line, which
+ * i've defined as a command box, which is also used for transient
+ * message text, and a status region.
+ *
+ * the status region:
+ * L = 4 digits of line #, 
+ * C = 3 digits of column
+ * P = a file percentage or Top/Bot
+ * S = 4 digits of mem space left
+ * LLLL CCC SSSS PPP
+ *
+ */
+struct statline {
+    char lineno[4];
+    char pad0;
+    char colno[3];
+    char pad1;
+    char spacebytes[5];
+    char pad2;
+    char position[3];
+    char end;
+} statline INIT;
+
+statinit()
+{
+    statline.pad0 = statline.pad1 = statline.pad2 = ' ';
+    statline.end = '\0';
+}
+
+#ifdef linux
+#define cpybuf memcpy
+#endif
+
+ifmt(s, scale, val)
+char *s;
+int scale;
+int val;
+{
+    int d;
+#ifdef notdef
+    extern char controlbuf[];
+
+    sprintf(controlbuf, "ifmt %d %d", scale, val);
+    logmsg(controlbuf);
+#endif
+
+    do {
+        d = val / scale;
+        val -= d * scale;
+        *s++ = d + '0';
+        scale /= 10;
+    } while (scale);
+}
+
+status()
+{
+    int i;
+
+    int freespace = Filemax - Fileend;
+    int totalspace = Filemax - Filemem;
+    int usedspace = Fileend - Filemem;
+    int cursoff = Curschar - Filemem;
+
+#ifdef notdef
+    sprintf(controlbuf, "status f: %d t: %d u: %d c: %d", 
+        freespace, totalspace, usedspace, cursoff);
+    logmsg(controlbuf);
+#endif
+
+    if (Curschar == Filemem) {
+        cpybuf(statline.position, "Top", 3);
+    } else if (Curschar == (Fileend - 1)) {
+        cpybuf(statline.position, "Bot", 3);
+    } else if (usedspace == 0) {
+        cpybuf(statline.position, "Emp", 3);
+    } else {
+        i = ((Curschar - Filemem) * 100L) / usedspace;
+        cpybuf(statline.position, "00%", 3);
+        ifmt(statline.position, 10, i);
+    }
+    ifmt(statline.lineno, 1000, Cursrow + Topline);
+    ifmt(statline.colno, 100, Cursvcol);
+    ifmt(statline.spacebytes, 10000, freespace);
+    windgoto(Rows - 1, Columns - 19);
+    windstr(&statline);
+}
+
 gotocmd(clr, fresh, firstc)
 {
     int n;
@@ -230,8 +318,11 @@ message(s)
     if ((p = strchr(s, '\0')) != NULL && *p == '\n')
         *p = '\0';
     windstr(s);
+    status();
     lastmess = strdup(s);
+#ifdef notdef
     logmsg(s);
+#endif
 }
 
 writeit(fname)
