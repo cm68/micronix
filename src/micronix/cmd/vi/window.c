@@ -1,5 +1,6 @@
 /*
- * STevie - ST editor for VI enthusiasts.    ...Tim Thompson...twitch!tjt...
+ * this file contains all the terminal specific things needed to render
+ * and manage the screen
  */
 
 #include "stevie.h"
@@ -13,7 +14,7 @@ struct termios save_term;
 struct sgtty save_sbuf INIT;
 #endif
 
-char controlbuf[20] INIT;
+char controlbuf[30] INIT;
 
 extern int Columns;
 extern int Rows;
@@ -46,47 +47,54 @@ windinit()
     stty(0, &sbuf);
 #endif
 
+
+	/*
+	 * get rows and columns from the terminal:
+	 * go the the right bottom by sending absurd coordinates
+	 * and then asking where the cursor is
+	 */
 	write(1, "\033[6l", 4);             /* set absolute addressing */
     write(1, "\033[999;999H", 10);      /* send to extreme corner */
     write(1, "\033[6n", 4);             /* we're the hakawi */
 
+    /*
+     * read the current actual cursor position
+	 * 	ESC [ NN ; YY R
+     */
     for (i = 0;; i++) {
         read(0, &controlbuf[i], 1);
         if (controlbuf[i] == 'R') {
             break;
         }
     }
-    controlbuf[0] = 'E';
+#ifdef notdef
     controlbuf[++i] = '\0';
-
+    controlbuf[0] = 'E';
     logmsg(controlbuf);
+#endif
 
     for (i = 2; controlbuf[i] != ';'; i++);
 
     Rows = atoi(&controlbuf[2]);
     Columns = atoi(&controlbuf[i+1]);
-    sprintf(controlbuf, "%d %d\n", Rows, Columns);
-    logmsg(controlbuf);
 
-	/*
-	 * get rows and columns from the terminal:
-	 * go the the right bottom by sending absurd coordinates
-	 * and then asking where the cursor is
-	 *
-	 * send the terminal an 
-	 * 	ESC [ 999 ; 999 H
-	 * and then a 
-	 * 	ESC [ 6 n
-	 * the terminal will then answer with
-	 * 	ESC [ NN ; YY R
-	 */
+#ifdef notdef
+    sprintf(controlbuf, "parsed terminal size: %d %d\n", Rows, Columns);
+    logmsg(controlbuf);
+#endif
+
     if (Columns < 60 || Columns > 200)
         Columns = 80;
     if (Rows < 16 || Rows > 80)
         Rows = 24;
 
     if (Rows > MAXROWS) Rows = MAXROWS;
-    if (Columns > MAXCOLS) Rows = MAXCOLS;
+    if (Columns > MAXCOLS) Columns = MAXCOLS;
+
+#ifdef notdef
+    sprintf(controlbuf, "set terminal size: %d %d\n", Rows, Columns);
+    logmsg(controlbuf);
+#endif
 }
 
 /*
@@ -111,12 +119,15 @@ windexit(r)
 }
 
 /*
- * Clear the screen 
- * and set the origin mode
+ * Clear the screen, also:
+ *  set the origin mode
+ *  go home
+ *  the scrolling region
  */
 windclear()
 {
-	write(1, "\033[6l\033[2J\033[H", 11);
+    sprintf(controlbuf, "\033[6l\033[2J\033[H\033[1;%dr", Rows);
+    write(1, controlbuf, strlen(controlbuf));
 }
 
 windgetc()

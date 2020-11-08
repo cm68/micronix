@@ -34,6 +34,7 @@ edit()
          * printf("Curschar=(%d,%d) row/col=(%d,%d)",
          * Curschar,*Curschar,Cursrow,Curscol); 
          */
+        status();
         windgoto(Cursrow, Curscol);
         windrefresh();
         c = vgetc();

@@ -56,6 +56,11 @@ char *Fileend INIT;
 char *Topchar INIT;
 
 /*
+ * the line number corresponding to Topchar
+ */
+int Topline INIT;
+
+/*
  * Pointer to the byte in Filemem which is
  * just off the bottom of the screen. 
  */
@@ -164,9 +169,12 @@ main(argc, argv)
 
     Filename = strdup(argv[1]);
     
+#ifdef notdef
     sprintf(xxbuf, "filename: %s in %s\n", Filename, argv[1]);
     logmsg(xxbuf);
+#endif
 
+    statinit();
     windinit();
 
     /*
@@ -437,9 +445,11 @@ readfile(fname, fromp, nochangename)
     /*
      * let's make a hole
      */
+#ifdef notdef
     sprintf(buff, "space: %d used: %d offset: %d size: %d",
         Filemax - Filemem, Fileend - Filemem, fromp - Filemem, size);
     logmsg(buff);
+#endif
 
     Fileend = Fileend + size;
     p = Fileend;

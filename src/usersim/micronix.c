@@ -50,6 +50,7 @@ static void emulate();
 int savemode;
 int debug_terminal;
 int am_root = 1;
+int rootpid;
 int mypid;
 FILE *mytty;
 int logfd;
@@ -385,7 +386,7 @@ main(int argc, char **argv)
     if (!rootdir) {
         rootdir = DEFROOT;
     }
-    mypid = getpid();
+    rootpid = mypid = getpid();
 
     /*
      * we might be piping the simulator.  let's get an open file for our debug output
@@ -1618,7 +1619,7 @@ SystemCall(MACHINE * cp)
     case 2:                    /* fork */
         ret = fork();
         if (ret) {
-            ret &= 0x7fff;
+            ret = (ret - rootpid) & 0x3fff;
             push(pop() + 3);
         } else {
             mypid = getpid();
@@ -1756,7 +1757,7 @@ SystemCall(MACHINE * cp)
         } else {
             fprintf(mytty, "waitfuck %x\n", i);
         }
-        ret &= 0x7fff;
+        ret = (ret - rootpid) & 0x3fff;
         carry_clear();
         break;
 
@@ -2067,7 +2068,7 @@ SystemCall(MACHINE * cp)
         break;
 
     case 20:                   /* getpid */
-        ret = getpid() & 0x7fff;
+        ret = (getpid() - rootpid) & 0x3fff;
         carry_clear();
         break;
 
