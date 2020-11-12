@@ -39,8 +39,6 @@ prevline(curr)
 
     /*
      * If we are currently positioned on a '\n', 
-     */
-    /*
      * we are on a blank line.  Adjust accordingly. 
      */
     if (*curr == '\n')
@@ -104,10 +102,7 @@ coladvance(p, col)
         }
         p++;
         /*
-         * Don't go past the end of 
-         */
-        /*
-         * the file or the line. 
+         * Don't go past the end of the file or the line. 
          */
         if (p == Fileend || *p == '\n') {
             p--;
@@ -149,8 +144,6 @@ dosearch(dir, str)
         cursupdate();
         /*
          * if we're backing up, we make sure the line we're on 
-         */
-        /*
          * is on the screen. 
          */
         Curschar = savep = p;
@@ -223,8 +216,6 @@ bcksearch(str)
 
     /*
      * make sure str isn't empty before getting pointer to 
-     */
-    /*
      * its last character. 
      */
     if (leng == 0)

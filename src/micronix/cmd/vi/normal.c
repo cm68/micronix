@@ -17,65 +17,63 @@ normal(c)
     int nchar, n;
 
     switch (c) {
-    case '\014':
+
+    case CONTROL('L'):
         screenclear();
         updatescreen();
         break;
-    case 04:
-        /*
-         * control-d 
-         */
+
+    case CONTROL('D'):
         if (!onedown(10))
             beep();
         break;
-    case 025:
-        /*
-         * control-u 
-         */
+
+    case CONTROL('U'):
         if (!oneup(10))
             beep();
         break;
-    case 06:
-        /*
-         * control-f 
-         */
+
+    case CONTROL('F'):
         if (!onedown(Rows))
             beep();
         break;
-    case 02:
-        /*
-         * control-b 
-         */
+
+    case CONTROL('B'):
         if (!oneup(Rows))
             beep();
         break;
-    case '\007':
+
+    case CONTROL('G'):
         fileinfo();
         break;
+
     case 'G':
         gotoline(Prenum);
         break;
+
     case 'l':
         if (!oneright())
             beep();
         break;
+
     case 'h':
         if (!oneleft())
             beep();
         break;
+
     case 'k':
         if (!oneup(1))
             beep();
         break;
+
     case 'j':
         if (!onedown(1))
             beep();
         break;
+
     case 'b':
         /*
          * If we're on the first character of a word, force 
-         */
-        /*
          * an initial backup. 
          */
         if (!issepchar(*Curschar) && Curschar > Filemem
@@ -85,8 +83,6 @@ normal(c)
         if (!issepchar(*Curschar)) {
             /*
              * If we start in the middle of a word, back 
-             */
-            /*
              * up until we hit a separator. 
              */
             while (Curschar > Filemem && !issepchar(*Curschar))
@@ -109,12 +105,11 @@ normal(c)
                 Curschar++;
         }
         break;
+
     case 'w':
         if (issepchar(*Curschar)) {
             /*
              * If we're on a separator, we advance to 
-             */
-            /*
              * the next non-separator char. 
              */
             while ((p = Curschar + 1) < Fileend) {
@@ -125,8 +120,6 @@ normal(c)
         } else {
             /*
              * If we're in the middle of a word, we 
-             */
-            /*
              * advance to the next word-separator. 
              */
             while ((p = Curschar + 1) < Fileend) {
@@ -141,18 +134,24 @@ normal(c)
                 Curschar++;
         }
         break;
+
     case '$':
         while (oneright());
         break;
+
+#ifdef XXX
+    case '{':
+    case '}':
+#endif
+
     case '0':
     case '^':
         beginline();
         break;
+
     case 'x':
         /*
          * Can't do it if we're on a blank line.  (Actually it 
-         */
-        /*
          * does work, but we want to match the real 'vi'...) 
          */
         if (*Curschar == '\n')
@@ -169,6 +168,7 @@ normal(c)
             updatescreen();
         }
         break;
+
     case 'a':
         /*
          * Works just like an 'i'nsert on the next character. 
@@ -178,22 +178,26 @@ normal(c)
         resetundo();
         startinsert("a");
         break;
+
     case 'i':
         resetundo();
         startinsert("i");
         break;
+
     case 'O':
         openbeforecmd();
         updatescreen();
         resetundo();
         startinsert("O");
         break;
+
     case 'o':
         opencmd();
         updatescreen();
         resetundo();
         startinsert("o");
         break;
+
     case 'd':
         nchar = vgetc();
         n = (Prenum == 0 ? 1 : Prenum);
@@ -212,8 +216,6 @@ normal(c)
             updatescreen();
             /*
              * If we have backed xyzzy, then we deleted the 
-             */
-            /*
              * last line(s) in the file. 
              */
             if (Curschar < Uncurschar) {
@@ -232,6 +234,7 @@ normal(c)
             break;
         }
         break;
+
     case 'c':
         nchar = vgetc();
         switch (nchar) {
@@ -258,6 +261,7 @@ normal(c)
             break;
         }
         break;
+
     case 'y':
         nchar = vgetc();
         switch (nchar) {
@@ -268,6 +272,7 @@ normal(c)
             beep();
         }
         break;
+
     case '>':
         nchar = vgetc();
         n = (Prenum == 0 ? 1 : Prenum);
@@ -280,6 +285,7 @@ normal(c)
             beep();
         }
         break;
+
     case '<':
         nchar = vgetc();
         n = (Prenum == 0 ? 1 : Prenum);
@@ -292,32 +298,35 @@ normal(c)
             beep();
         }
         break;
+
     case '?':
     case '/':
     case ':':
         readcmdline(c);
         break;
+
     case 'n':
         repsearch();
         break;
+
     case 'C':
     case 'D':
         p = Curschar;
         while (Curschar >= p)
             delchar();
         updatescreen();
-        resetundo();            /* This should really go above the */
         /*
+         * This should really go above the
          * delchars above, and the undobuff should 
-         */
-        /*
          * be constructed by them. 
          */
+        resetundo();
         if (c == 'C') {
             Curschar++;
             startinsert("C");
         }
         break;
+
     case 'r':
         nchar = vgetc();
         resetundo();
@@ -360,12 +369,15 @@ normal(c)
         addtobuff(Redobuff, 'r', nchar, NULL);
         updatescreen();
         break;
+
     case 'p':
         putline(0);
         break;
+
     case 'P':
         putline(1);
         break;
+
     case 'J':
         for (p = Curschar; *p != '\n' && p < (Fileend - 1); p++);
         if (p >= (Fileend - 1)) {
@@ -380,9 +392,11 @@ normal(c)
         addtobuff(Redobuff, 'J', NULL);
         updatescreen();
         break;
+
     case '.':
         stuffin(Redobuff);
         break;
+
     case 'u':
         if (Uncurschar != NULL && *Undobuff != '\0') {
             Curschar = Uncurschar;
@@ -393,8 +407,6 @@ normal(c)
             Curschar = Uncurschar;
             /*
              * construct the next Undobuff and Redobuff, which 
-             */
-            /*
              * will re-insert the characters we're deleting. 
              */
             p = Undobuff;
@@ -406,8 +418,6 @@ normal(c)
             }
             /*
              * Finish constructing Uncursbuff, and Uncurschar 
-             */
-            /*
              * is left unchanged. 
              */
             *p++ = *q++ = '\033';
@@ -418,6 +428,7 @@ normal(c)
             updatescreen();
         }
         break;
+
     default:
         beep();
         break;
@@ -491,4 +502,3 @@ resetundo()
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab: 
  */
-

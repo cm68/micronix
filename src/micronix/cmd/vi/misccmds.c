@@ -202,8 +202,6 @@ inschar(c)
 
     /*
      * Move everything in the file over to make 
-     */
-    /*
      * room for the new char. 
      */
     if (!canincrease(1))
@@ -225,8 +223,6 @@ insstr(s)
 
     /*
      * Move everything in the file over to make 
-     */
-    /*
      * room for the new string. 
      */
     if (!canincrease(n))
@@ -248,8 +244,6 @@ appchar(c)
 
     /*
      * Move everything in the file over to make 
-     */
-    /*
      * room for the new char. 
      */
     if (!canincrease(1))
