@@ -337,11 +337,10 @@ writeit(fname)
     sprintf(buff, "Writing %s...", fname);
     message(buff);
 
-    if ((fd = open(fname, 1)) < 0) {
-        if ((fd = creat(fname, 0777)) < 0) {
-            message("Unable to open file!");
-            return (0);
-        }
+	unlink(fname);
+	if ((fd = creat(fname, 0777)) < 0) {
+		message("Unable to create file!");
+        return (0);
     }
 
     n = Fileend - Filemem;
@@ -350,7 +349,8 @@ writeit(fname)
     message(buff);
     close(fd);
     if (w != n) {
-        logmsg("write lose");
+		sprintf(buff, "write lose %d %d", w, n);
+        logmsg(buff);
     }
     Changed = 0;
     return (1);
@@ -368,4 +368,3 @@ filemess(s)
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab: 
  */
-
