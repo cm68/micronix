@@ -4,93 +4,129 @@
 
 #include "stevie.h"
 
+char cmdbuf[100] INIT;
+char msgbuf[80] INIT;
+
 readcmdline(firstc)
     int firstc;                 /* either ':', '/', or '?' */
 {
     int c;
-    char buff[100];
-    char *p, *q, *cmd, *arg;
-    extern int Tabstop;
+    char *p, *cmd;
 
     gotocmd(1, 1, firstc);
-    p = buff;
-    if (firstc != ':')
-        *p++ = firstc;
+    cmd = cmdbuf;
+    if (firstc != ':') {
+        *cmd++ = firstc;
+        *cmd = '\0';
+    }
+
     /*
-     * collect the command string, handling '\b' and @ 
+     * collect the command string, handling editing
      */
     for (;;) {
         c = vgetc();
+
+        /* end of command */
         if (c == '\n' || c == '\r')
             break;
-        if (c == '\b') {
-            if (p > buff) {
-                p--;
-                /*
-                 * I know this is gross, but it has the 
-                 * advantage of relying only on 'gotocmd' 
-                 */
-                gotocmd(1, 0, firstc == ':' ? ':' : 0);
-                for (q = buff; q < p; q++)
-                    windputc(*q);
-                windrefresh();
-            }
+
+        /* backspace or DEL */
+        if (c == '\b' || c == 0x7f) {
+            if (cmd <= cmdbuf)
+                continue;
+
+            cmd--;
+            /*
+             * I know this is gross, but it has the 
+             * advantage of relying only on 'gotocmd' 
+             */
+            gotocmd(1, 0, firstc == ':' ? ':' : 0);
+            for (p = cmdbuf; p < cmd; p++)
+                windputc(*p);
+            windrefresh();
             continue;
         }
-        if (c == '@') {
-            p = buff;
+
+        /* line kill */
+        if (c == CONTROL('U')) {
+            cmd = cmdbuf;
             gotocmd(1, 1, firstc);
             continue;
         }
         windputc(c);
         windrefresh();
-        *p++ = c;
+        *cmd++ = c;
+        *cmd = '\0';
     }
-    *p = '\0';
+    docmdline(cmdbuf);
+}
+
+/*
+ * broken out as a function so we can run commands from strings
+ * and from the command line
+ */
+docmdline(cmd)
+char *cmd;
+{
+    extern int Tabstop;
+    char *s;
+    char c;
+    int i;
+    char *arg;
 
     /*
      * skip any initial white space 
      */
-    for (cmd = buff; isspace(*cmd); cmd++);
+    while (isspace(*cmd)) {
+        cmd++;
+    }
+
+    c = *cmd;
 
     /*
      * search commands 
      */
-    c = *cmd;
     if (c == '/' || c == '?') {
         cmd++;
+        /*
+         * the command was '//' or '??' 
+         */
         if (*cmd == c) {
-            /*
-             * the command was '//' or '??' 
-             */
             repsearch();
             return;
         }
         /*
          * If there is a matching '/' or '?' at the end, toss it 
          */
-        p = strchr(cmd, '\0');
-        if (*(--p) == c)
-            *p = '\0';
+        i = strlen(cmd);
+        if (i && (cmd[i - 1] == c)) {
+            cmd[i - 1] = '\0';
+        }
         dosearch(c == '/' ? FORWARD : BACKWARD, cmd);
         return;
     }
 
-    /*
-     * isolate the command and find any argument 
-     */
-    for (p = cmd; *p != '\0' && !isspace(*p); p++);
-    if (*p == '\0')
-        arg = NULL;
-    else {
-        *p = '\0';
-        while (*(++p) != '\0' && isspace(*p));
-        arg = p;
-        if (*arg == '\0')
-            arg = NULL;
+    /* skip over non-white space */
+    for (arg = cmd; *arg != '\0' && !isspace(*arg); arg++)
+        ;
+
+    /* if there is any arg, find its start */
+    if (*arg) {
+        *arg++ = '\0';
+
+        /* skip over white space */
+        while (*arg != '\0' && isspace(*arg))
+            arg++;
     }
-    if (strcmp(cmd, "q!") == 0)
+
+    /*
+     * at this point, cmd is a null-terminated string, and arg is also.
+     * both do not start with white space. *arg may be null.
+     */
+    if (strcmp(cmd, "q!") == 0) {
         getout();
+    }
+
     if (strcmp(cmd, "q") == 0) {
         if (Changed)
             message("File not written out.  Use 'q!' to override.");
@@ -98,91 +134,98 @@ readcmdline(firstc)
             getout();
         return;
     }
+
     if (strcmp(cmd, "w") == 0) {
-        if (arg == NULL) {
+        if (!*arg) {
             writeit(Filename);
             Changed = 0;
-        } else
+        } else {
             writeit(arg);
+        }
         return;
     }
+
     if (strcmp(cmd, "wq") == 0) {
         if (writeit(Filename))
             getout();
         return;
     }
-    if (strcmp(cmd, "f") == 0 && arg == NULL) {
-        fileinfo();
+
+    if (strcmp(cmd, "f") == 0) {
+        if (!*arg) {
+            Filename = strdup(arg);
+            filemess("");
+        } else {
+            fileinfo();
+        }
         return;
     }
+
     if (strcmp(cmd, "e") == 0 || strcmp(cmd, "e!") == 0) {
         if (cmd[1] != '!' && Changed) {
             message("File not written out.  Use 'e!' to override.");
         } else {
-            if (arg != NULL)
+            if (*arg) {
+                free(Filename);
                 Filename = strdup(arg);
+            }
             /*
              * clear mem and read file 
              */
             Fileend = Topchar = Curschar = Filemem;
             Changed = 0;
-            p = nextline(Curschar);
+            nextline(Curschar);
             readfile(Filename, Fileend, 0);
             updatescreen();
         }
         return;
     }
-    if (strcmp(cmd, "f") == 0) {
-        Filename = strdup(arg);
-        filemess("");
-        return;
-    }
-    if (strcmp(cmd, "r") == 0 || strcmp(cmd, ".r") == 0) {
-        char *pp;
 
-        if (arg == NULL) {
+    if (strcmp(cmd, "r") == 0 || strcmp(cmd, ".r") == 0) {
+        if (!*arg) {
             badcmd();
             return;
         }
-        /*
-         * find the beginning of the next line and 
-         */
-        /*
-         * read file in there 
-         */
-        pp = nextline(Curschar);
-        readfile(arg, pp, 1);
+        /* go to the next line and read file in there */
+        readfile(arg, nextline(Curschar), 1);
         updatescreen();
         Changed = 1;
         return;
     }
+
     if (strcmp(cmd, ".=") == 0) {
-        char messbuff[80];
-
-        sprintf(messbuff, "line %d   character %d",
+        sprintf(msgbuf, "line %d   character %d",
             cntlines(Filemem, Curschar), 1 + (int) (Curschar - Filemem));
-        message(messbuff);
+        message(msgbuf);
         return;
     }
-    if (strcmp(cmd, "$=") == 0) {
-        char messbuff[8];
 
-        sprintf(messbuff, "%d", cntlines(Filemem, Fileend) - 1);
-        message(messbuff);
+    if (strcmp(cmd, "$=") == 0) {
+        sprintf(msgbuf, "%d", cntlines(Filemem, Fileend) - 1);
+        message(msgbuf);
         return;
     }
+
     if (strcmp(cmd, "set") == 0) {
-        if (arg == NULL) {
+        if (!*arg) {
             badcmd();
-        } else if (strcmp(arg, "tab8") == 0) {
-            Tabstop = 8;
-            updatescreen();
-        } else if (strcmp(arg, "tab4") == 0) {
-            Tabstop = 4;
-            updatescreen();
-        } else {
-            badcmd();
+            return;
         }
+
+        if (strncmp(arg, "tabstop", 7) == 0) {
+            if (arg[7] == '=') {
+                Tabstop = atoi(&arg[8]);
+                if (Tabstop > 8 || Tabstop < 1) {
+                    Tabstop = 8;
+                }
+                updatescreen();
+            } else {
+                sprintf(msgbuf, "tabstop=%d", Tabstop);
+                message(msgbuf);
+            }
+            return;
+        }
+        badcmd();
         return;
     }
     badcmd();
@@ -233,12 +276,6 @@ int scale;
 int val;
 {
     int d;
-#ifdef notdef
-    extern char controlbuf[];
-
-    sprintf(controlbuf, "ifmt %d %d", scale, val);
-    logmsg(controlbuf);
-#endif
 
     do {
         d = val / scale;
@@ -257,12 +294,6 @@ status()
     int usedspace = Fileend - Filemem;
     int cursoff = Curschar - Filemem;
 
-#ifdef notdef
-    sprintf(controlbuf, "status f: %d t: %d u: %d c: %d", 
-        freespace, totalspace, usedspace, cursoff);
-    logmsg(controlbuf);
-#endif
-
     if (Curschar == Filemem) {
         cpybuf(statline.position, "Top", 3);
     } else if (Curschar == (Fileend - 1)) {
@@ -274,7 +305,7 @@ status()
         cpybuf(statline.position, "00%", 3);
         ifmt(statline.position, 10, i);
     }
-    ifmt(statline.lineno, 1000, Cursrow + Topline);
+    ifmt(statline.lineno, 1000, Topline);
     ifmt(statline.colno, 100, Cursvcol);
     ifmt(statline.spacebytes, 10000, freespace);
     windgoto(Rows - 1, Columns - 19);

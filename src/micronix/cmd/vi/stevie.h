@@ -53,3 +53,6 @@ char *malloc(), *strchr(), *strcpy();
 
 char *nextline(), *prevline(), *coladvance(), *ssearch();
 char *fwdsearch(), *bcksearch();
+
+#define CONTROL(c) ((c) - 0x40)
+

@@ -15,6 +15,7 @@ edit()
      * position the display and the cursor at the top of the file. 
      */
     Topchar = Filemem;
+    Topline = 1;
     Curschar = Filemem;
     Cursrow = Curscol = 0;
 
@@ -172,8 +173,10 @@ cursupdate()
      */
     if (Fileend == Filemem) {
         Topchar = Curschar = Filemem;
+        Topline = 1;
     } else if (Curschar < Topchar) {
         nlines = cntlines(Curschar, Topchar);
+        Topline -= nlines;
         /*
          * if the cursor is above the top of 
          * the screen, put it at the top of the screen.. 
@@ -203,6 +206,7 @@ cursupdate()
          * put it at the top of the screen.. 
          */
         Topchar = Curschar;
+        Topline += nlines;
         /*
          * ... and back up 
          */
@@ -256,6 +260,7 @@ scrolldown(nlines)
         if ((p = prevline(Topchar)) == NULL)
             break;
         Topchar = p;
+        Topline--;
     }
 }
 

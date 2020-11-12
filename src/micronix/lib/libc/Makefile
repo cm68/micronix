@@ -1,5 +1,5 @@
 ASOBJS = setjmp.o
-COBJS = qsort.o malloc.o strdup.o index.o
+COBJS = qsort.o malloc.o strdup.o index.o strncmp.o atoi.o
 
 OBJECTS = $(ASOBJS) $(COBJS)
 
