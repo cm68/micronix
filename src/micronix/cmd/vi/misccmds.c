@@ -405,7 +405,7 @@ delline(nlines)
         Changed = 1;
 
         /*
-         * If we delete the last line in the file, back up 
+         * If we delete the last line in the file, back up the cursor
          */
         if (Curschar >= Fileend) {
             if ((Curschar = prevline(Curschar)) == NULL)
@@ -434,4 +434,3 @@ strchr(s, c)
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab: 
  */
-

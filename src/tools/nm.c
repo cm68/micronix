@@ -37,7 +37,7 @@ struct reloc {
     unsigned short seg;
     struct ws_reloc rl;
     struct reloc *next;
-} *rlhead;
+} *rlhead, *rltail;
 
 #define	SEG_TEXT	0
 #define	SEG_DATA	1
@@ -237,8 +237,12 @@ makerelocs(unsigned char seg)
         r->rl.offset = rp->offset;
         r->rl.value = rp->value;
         r->rl.type = rp->type;
-        r->next = rlhead;
-        rlhead = r;
+        if (rlhead) {
+            rltail->next = r;
+            rltail = r;
+        } else {
+            rlhead = rltail = r;
+        }
     }
 }
 
@@ -325,7 +329,7 @@ do_object(int fd, int limit)
                 value = sym->value;
                 flag = sym->flag;
 
-                printf("%04x ", value);
+                printf("%04x %02x ", value, flag);
                 if (flag & SF_GLOBAL)
                     printf("global ");
                 if (flag & SF_DEF)

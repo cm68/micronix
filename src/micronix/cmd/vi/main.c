@@ -152,6 +152,7 @@ main(argc, argv)
 {
     char xxbuf[200];
 
+	unlink("logfile");
     while (argc > 1 && argv[1][0] == '-') {
         switch (argv[1][1]) {
         case 'd':
