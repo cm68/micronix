@@ -337,7 +337,6 @@ writeit(fname)
     sprintf(buff, "Writing %s...", fname);
     message(buff);
 
-	unlink(fname);
 	if ((fd = creat(fname, 0777)) < 0) {
 		message("Unable to create file!");
         return (0);
