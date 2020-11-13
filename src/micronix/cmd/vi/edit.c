@@ -301,6 +301,29 @@ beginline()
     while (oneleft());
 }
 
+/*
+ * go up n blocks
+ */
+upblock(n)
+{
+    char *p;
+
+    if (n == 0) n = 1;
+    p = Curschar;
+
+    while (n--) {
+        while ((p = prevline(p)) != NULL) {
+            if (*p == '\n') break;
+        }
+        if (p) {
+            Curschar = p;
+        } else {
+            Curschar = Filemem;
+            break;
+        }
+    }
+}
+
 oneup(n)
 {
     char *p, *np;
@@ -335,6 +358,29 @@ oneup(n)
      */
     Curschar = coladvance(p, savevcol);
     return (1);
+}
+
+/*
+ * go down n blocks
+ */
+downblock(n)
+{
+    char *p;
+
+    if (n == 0) n = 1;
+    p = Curschar;
+
+    while (n--) {
+        while ((p = nextline(p)) != NULL) {
+            if (*p == '\n') break;
+        }
+        if (p) {
+            Curschar = p;
+        } else {
+            Curschar = Fileend - 1;
+            break;
+        }
+    }
 }
 
 onedown(n)

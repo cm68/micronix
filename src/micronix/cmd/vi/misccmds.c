@@ -64,13 +64,11 @@ cntlines(pbegin, pend)
 
 fileinfo()
 {
-    char buff[128];
-
-    sprintf(buff, "\"%s\"%s line %d of %d",
+    sprintf(msgbuf, "\"%s\"%s line %d of %d",
         Filename,
         Changed ? " [Modified]" : "",
         cntlines(Filemem, Curschar), cntlines(Filemem, Fileend) - 1);
-    message(buff);
+    message(msgbuf);
 }
 
 gotoline(n)

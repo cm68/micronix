@@ -150,8 +150,6 @@ main(argc, argv)
     int argc;
     char **argv;
 {
-    char xxbuf[200];
-
 	unlink("logfile");
     while (argc > 1 && argv[1][0] == '-') {
         switch (argv[1][1]) {
@@ -170,11 +168,6 @@ main(argc, argv)
 
     Filename = strdup(argv[1]);
     
-#ifdef notdef
-    sprintf(xxbuf, "filename: %s in %s\n", Filename, argv[1]);
-    logmsg(xxbuf);
-#endif
-
     statinit();
     windinit();
 
@@ -409,15 +402,14 @@ readfile(fname, fromp, nochangename)
     int nochangename;           /* if 1, don't change the Filename */
 {
     int fd;
-    char buff[128];
     char *p;
     int c, n;
     int unprint = 0;
     struct stat sbuf;
     int size;
 
-    sprintf(buff, "Reading %s...", fname);
-    message(buff);
+    sprintf(msgbuf, "Reading %s...", fname);
+    message(msgbuf);
 
     if (!nochangename)
         Filename = strdup(fname);
@@ -433,8 +425,8 @@ readfile(fname, fromp, nochangename)
     size = sbuf.size1;
 #endif
     if (size + fromp > Filemax) {
-        sprintf(buff, "cannot insert file (limit is %d)!\n", FILELENG);
-        write(2, buff, strlen(buff));
+        sprintf(msgbuf, "cannot insert file (limit is %d)!\n", FILELENG);
+        write(2, msgbuf, strlen(msgbuf));
         windexit(1);
     }
 
@@ -447,9 +439,9 @@ readfile(fname, fromp, nochangename)
      * let's make a hole
      */
 #ifdef notdef
-    sprintf(buff, "space: %d used: %d offset: %d size: %d",
+    sprintf(msgbuf, "space: %d used: %d offset: %d size: %d",
         Filemax - Filemem, Fileend - Filemem, fromp - Filemem, size);
-    logmsg(buff);
+    logmsg(msgbuf);
 #endif
 
     Fileend = Fileend + size;
@@ -462,63 +454,80 @@ readfile(fname, fromp, nochangename)
     }
     c = read(fd, fromp, size);
 
-    sprintf(buff, "\"%s\" %d characters", fname, size);
-    message(buff);
+    sprintf(msgbuf, "\"%s\" %d characters", fname, size);
+    message(msgbuf);
     close(fd);
     return (0);
 }
 
+/*
+ * this buffer is where characters are inserted by the editor to
+ * be read from by the command input loop.   so if, for example,
+ * I issue the command cwfoo<esc>, this gets jammed into the redo buffer.
+ * and then advance my search to the next word, and type ., the redo
+ * buffer contents get shoved into getcbuff.
+ * when vgetc gets called, this command is repeated as if I typed it.
+ */
 static char getcbuff[1024] INIT;
-static char *getcnext = NULL;
+static char *getcnext = getcbuff;
 
+/*
+ * append s to getcbuff.  
+ * if getcnext is not set, set it to the buffer start
+ */
 stuffin(s)
     char *s;
 {
-    if (getcnext == NULL) {
-        strcpy(getcbuff, s);
-        getcnext = getcbuff;
-    } else
-        strcat(getcbuff, s);
+    strcat(getcbuff, s);
 }
 
+/*
+ * rather lame but useful character appender.
+ * sort of varargs-ish.  stop as soon as we see a null.
+ */
 addtobuff(s, c1, c2, c3, c4, c5, c6)
     char *s;
     char c1, c2, c3, c4, c5, c6;
 {
-    char *p = s;
-
-    if ((*p++ = c1) == '\0')
+    if ((*s++ = c1) == '\0')
         return;
-    if ((*p++ = c2) == '\0')
+    if ((*s++ = c2) == '\0')
         return;
-    if ((*p++ = c3) == '\0')
+    if ((*s++ = c3) == '\0')
         return;
-    if ((*p++ = c4) == '\0')
+    if ((*s++ = c4) == '\0')
         return;
-    if ((*p++ = c5) == '\0')
+    if ((*s++ = c5) == '\0')
         return;
-    if ((*p++ = c6) == '\0')
+    if ((*s++ = c6) == '\0')
         return;
 }
 
+/*
+ * this is the input getter.  empty getcnext first, then go to
+ * read the keyboard.
+ */
 vgetc()
 {
-    if (getcnext != NULL) {
-        int nextc = *getcnext++;
+    char nc = *getcnext;
 
-        if (*getcnext == '\0') {
-            *getcbuff = '\0';
-            getcnext = NULL;
-        }
-        return (nextc);
+    if (nc == '\0') {
+        return (windgetc());
     }
-    return (windgetc());
+    if (*++getcnext == '\0') {
+        getcnext = getcbuff;
+        getcbuff[0] = '\0';
+    }
+    return (nc);
 }
 
 vpeekc()
 {
-    if (getcnext != NULL)
-        return (*getcnext);
+    char nc = *getcnext;
+
+    if (nc)
+        return (nc);
+
     return (-1);
 }
 
@@ -530,7 +539,7 @@ vpeekc()
 
 anyinput()
 {
-    if (getcnext != NULL)
+    if (*getcnext)
         return (1);
     return (0);
 }
