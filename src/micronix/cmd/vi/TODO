@@ -1,9 +1,15 @@
-find size of screen:
+1) generalize commands
 
-send esc [ 99;99 H
+the real vi does things like wipe, yank, delete, indent, etc
+with a following key that is a movement command.  so >} should
+indent the next block. doubling the command is shortcut for the line.
+so dd is delete line 
+   >> is indent line
 
-get back
+so, instead of all the special case code in normal.c that looks at the
+next character literally and then has brute force code, these commands
+should set a marker, do the movement, and then apply the operator between
+the marker and the cursor.
 
-esc [ LINES ; COLUMNS R
-
+2) read modeline at end of file to set tabstop
 
