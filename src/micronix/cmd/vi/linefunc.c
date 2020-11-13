@@ -120,9 +120,11 @@ ssearch(dir, str)
     int dir;                    /* FORWARD or BACKWARD */
     char *str;
 {
-    if (laststr != NULL)
-        free(laststr);
-    laststr = strdup(str);
+    if (laststr != str) {
+        if (laststr)
+            free(laststr);
+        laststr = strdup(str);
+    }
     lastdir = dir;
     if (dir == BACKWARD)
         return (bcksearch(str));

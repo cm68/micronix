@@ -45,7 +45,7 @@ extern int Prenum;
 extern int Debug;
 extern int Changed;
 
-extern char Redobuff[], Undobuff[], Insbuff[];
+extern char Redobuff[], Undobuff[], Insbuff[], msgbuf[], cmdbuf[];
 extern char *Uncurschar, *Insptr;
 extern int Ninsert, Undelchars;
 

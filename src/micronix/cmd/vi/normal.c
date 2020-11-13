@@ -18,56 +18,71 @@ normal(c)
 
     switch (c) {
 
-    case CONTROL('L'):
-        screenclear();
-        updatescreen();
+    case '.':
+        stuffin(Redobuff);
         break;
 
-    case CONTROL('D'):
-        if (!onedown(10))
-            beep();
+    case '?':
+    case '/':
+    case ':':
+        readcmdline(c);
         break;
 
-    case CONTROL('U'):
-        if (!oneup(10))
-            beep();
+    case '0':
+    case '^':
+        beginline();
         break;
 
-    case CONTROL('F'):
-        if (!onedown(Rows))
+    case '$':
+        while (oneright());
+        break;
+
+    case '{':
+        upblock(Prenum);
+        break;
+
+    case '}':
+        downblock(Prenum);
+        break;
+
+    case '>':
+        nchar = vgetc();
+        n = (Prenum == 0 ? 1 : Prenum);
+        switch (nchar) {
+        case '>':
+            tabinout(0, n);
+            updatescreen();
+            break;
+        default:
             beep();
+        }
+        break;
+
+    case '<':
+        nchar = vgetc();
+        n = (Prenum == 0 ? 1 : Prenum);
+        switch (nchar) {
+        case '<':
+            tabinout(1, n);
+            updatescreen();
+            break;
+        default:
+            beep();
+        }
+        break;
+
+    case 'a':
+        /*
+         * Works just like an 'i'nsert on the next character. 
+         */
+        if (Curschar < (Fileend - 1))
+            Curschar++;
+        resetundo();
+        startinsert("a");
         break;
 
     case CONTROL('B'):
         if (!oneup(Rows))
-            beep();
-        break;
-
-    case CONTROL('G'):
-        fileinfo();
-        break;
-
-    case 'G':
-        gotoline(Prenum);
-        break;
-
-    case 'l':
-        if (!oneright())
-            beep();
-        break;
-
-    case 'h':
-        if (!oneleft())
-            beep();
-        break;
-
-    case 'k':
-        if (!oneup(1))
-            beep();
-        break;
-
-    case 'j':
-        if (!onedown(1))
             beep();
         break;
 
@@ -106,96 +121,54 @@ normal(c)
         }
         break;
 
-    case 'w':
-        if (issepchar(*Curschar)) {
-            /*
-             * If we're on a separator, we advance to 
-             * the next non-separator char. 
-             */
-            while ((p = Curschar + 1) < Fileend) {
-                Curschar = p;
-                if (!issepchar(*Curschar))
-                    break;
-            }
-        } else {
-            /*
-             * If we're in the middle of a word, we 
-             * advance to the next word-separator. 
-             */
-            while ((p = Curschar + 1) < Fileend) {
-                Curschar = p;
-                if (issepchar(*Curschar))
-                    break;
-            }
-            /*
-             * Now go past any trailing white space 
-             */
-            while (isspace(*Curschar) && (Curschar + 1) < Fileend)
-                Curschar++;
-        }
-        break;
-
-    case '$':
-        while (oneright());
-        break;
-
-#ifdef XXX
-    case '{':
-    case '}':
-#endif
-
-    case '0':
-    case '^':
-        beginline();
-        break;
-
-    case 'x':
-        /*
-         * Can't do it if we're on a blank line.  (Actually it 
-         * does work, but we want to match the real 'vi'...) 
-         */
-        if (*Curschar == '\n')
-            beep();
-        else {
-            addtobuff(Redobuff, 'x', NULL);
-            /*
-             * To undo it, we insert the same character back. 
-             */
+    case 'c':
+        nchar = vgetc();
+        switch (nchar) {
+        case 'c':
             resetundo();
-            addtobuff(Undobuff, 'i', *Curschar, '\033', NULL);
-            Uncurschar = Curschar;
-            delchar();
+            /*
+             * Go to the beginning of the line 
+             */
+            beginline();
+            yankline(1);
+            /*
+             * delete everything but the newline 
+             */
+            while (*Curschar != '\n')
+                delchar();
+            startinsert("cc");
             updatescreen();
+            break;
+        case 'w':
+            resetundo();
+            delword(0);
+            startinsert("cw");
+            updatescreen();
+            break;
         }
         break;
 
-    case 'a':
+    case 'C':
+    case 'D':
+        p = Curschar;
+        while (Curschar >= p)
+            delchar();
+        updatescreen();
         /*
-         * Works just like an 'i'nsert on the next character. 
+         * This should really go above the
+         * delchars above, and the undobuff should 
+         * be constructed by them. 
          */
-        if (Curschar < (Fileend - 1))
+        resetundo();
+        if (c == 'C') {
             Curschar++;
-        resetundo();
-        startinsert("a");
+            startinsert("C");
+        }
         break;
 
-    case 'i':
-        resetundo();
-        startinsert("i");
-        break;
-
-    case 'O':
-        openbeforecmd();
-        updatescreen();
-        resetundo();
-        startinsert("O");
-        break;
-
-    case 'o':
-        opencmd();
-        updatescreen();
-        resetundo();
-        startinsert("o");
+    case CONTROL('D'):
+        if (!onedown(10))
+            beep();
         break;
 
     case 'd':
@@ -235,96 +208,89 @@ normal(c)
         }
         break;
 
-    case 'c':
-        nchar = vgetc();
-        switch (nchar) {
-        case 'c':
-            resetundo();
-            /*
-             * Go to the beginning of the line 
-             */
-            beginline();
-            yankline(1);
-            /*
-             * delete everything but the newline 
-             */
-            while (*Curschar != '\n')
-                delchar();
-            startinsert("cc");
-            updatescreen();
-            break;
-        case 'w':
-            resetundo();
-            delword(0);
-            startinsert("cw");
-            updatescreen();
-            break;
-        }
-        break;
-
-    case 'y':
-        nchar = vgetc();
-        switch (nchar) {
-        case 'y':
-            yankline(Prenum == 0 ? 1 : Prenum);
-            break;
-        default:
+    case CONTROL('F'):
+        if (!onedown(Rows))
             beep();
-        }
         break;
 
-    case '>':
-        nchar = vgetc();
-        n = (Prenum == 0 ? 1 : Prenum);
-        switch (nchar) {
-        case '>':
-            tabinout(0, n);
-            updatescreen();
-            break;
-        default:
+    case CONTROL('G'):
+        fileinfo();
+        break;
+
+    case 'G':
+        gotoline(Prenum);
+        break;
+
+
+    case 'h':
+        if (!oneleft())
             beep();
-        }
         break;
 
-    case '<':
-        nchar = vgetc();
-        n = (Prenum == 0 ? 1 : Prenum);
-        switch (nchar) {
-        case '<':
-            tabinout(1, n);
-            updatescreen();
-            break;
-        default:
+    case 'i':
+        resetundo();
+        startinsert("i");
+        break;
+
+    case 'J':
+        for (p = Curschar; *p != '\n' && p < (Fileend - 1); p++);
+        if (p >= (Fileend - 1)) {
             beep();
+            break;
         }
+        Curschar = p;
+        delchar();
+        resetundo();
+        Uncurschar = Curschar;
+        addtobuff(Undobuff, 'i', '\n', '\033', NULL);
+        addtobuff(Redobuff, 'J', NULL);
+        updatescreen();
         break;
 
-    case '?':
-    case '/':
-    case ':':
-        readcmdline(c);
+    case 'j':
+        if (!onedown(1))
+            beep();
+        break;
+
+    case 'k':
+        if (!oneup(1))
+            beep();
+        break;
+
+    case CONTROL('L'):
+        screenclear();
+        updatescreen();
+        break;
+
+    case 'l':
+        if (!oneright())
+            beep();
         break;
 
     case 'n':
         repsearch();
         break;
 
-    case 'C':
-    case 'D':
-        p = Curschar;
-        while (Curschar >= p)
-            delchar();
+    case 'O':
+        openbeforecmd();
         updatescreen();
-        /*
-         * This should really go above the
-         * delchars above, and the undobuff should 
-         * be constructed by them. 
-         */
         resetundo();
-        if (c == 'C') {
-            Curschar++;
-            startinsert("C");
-        }
+        startinsert("O");
+        break;
+
+    case 'o':
+        opencmd();
+        updatescreen();
+        resetundo();
+        startinsert("o");
+        break;
+
+    case 'p':
+        putline(0);
+        break;
+
+    case 'P':
+        putline(1);
         break;
 
     case 'r':
@@ -370,31 +336,58 @@ normal(c)
         updatescreen();
         break;
 
-    case 'p':
-        putline(0);
-        break;
-
-    case 'P':
-        putline(1);
-        break;
-
-    case 'J':
-        for (p = Curschar; *p != '\n' && p < (Fileend - 1); p++);
-        if (p >= (Fileend - 1)) {
-            beep();
-            break;
+    case 'w':
+        if (issepchar(*Curschar)) {
+            /*
+             * If we're on a separator, we advance to 
+             * the next non-separator char. 
+             */
+            while ((p = Curschar + 1) < Fileend) {
+                Curschar = p;
+                if (!issepchar(*Curschar))
+                    break;
+            }
+        } else {
+            /*
+             * If we're in the middle of a word, we 
+             * advance to the next word-separator. 
+             */
+            while ((p = Curschar + 1) < Fileend) {
+                Curschar = p;
+                if (issepchar(*Curschar))
+                    break;
+            }
+            /*
+             * Now go past any trailing white space 
+             */
+            while (isspace(*Curschar) && (Curschar + 1) < Fileend)
+                Curschar++;
         }
-        Curschar = p;
-        delchar();
-        resetundo();
-        Uncurschar = Curschar;
-        addtobuff(Undobuff, 'i', '\n', '\033', NULL);
-        addtobuff(Redobuff, 'J', NULL);
-        updatescreen();
         break;
 
-    case '.':
-        stuffin(Redobuff);
+    case 'x':
+        /*
+         * Can't do it if we're on a blank line.  (Actually it 
+         * does work, but we want to match the real 'vi'...) 
+         */
+        if (*Curschar == '\n')
+            beep();
+        else {
+            addtobuff(Redobuff, 'x', NULL);
+            /*
+             * To undo it, we insert the same character back. 
+             */
+            resetundo();
+            addtobuff(Undobuff, 'i', *Curschar, '\033', NULL);
+            Uncurschar = Curschar;
+            delchar();
+            updatescreen();
+        }
+        break;
+
+    case CONTROL('U'):
+        if (!oneup(10))
+            beep();
         break;
 
     case 'u':
@@ -426,6 +419,17 @@ normal(c)
              * Undelchars has been reset to 0 
              */
             updatescreen();
+        }
+        break;
+
+    case 'y':
+        nchar = vgetc();
+        switch (nchar) {
+        case 'y':
+            yankline(Prenum == 0 ? 1 : Prenum);
+            break;
+        default:
+            beep();
         }
         break;
 
