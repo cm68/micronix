@@ -1,9 +1,9 @@
 /*
  * sig.c 
  */
-#include "sys.h"
-#include "proc.h"
-#include "tty.h"
+#include <sys.h>
+#include <proc.h>
+#include <tty.h>
 
 #define TERMIN	0               /* code for terminate */
 #define IGNORE	1               /* code for ignore */

@@ -1,11 +1,11 @@
 /*
  * cio.c 
  */
-#include "sys.h"
-#include "con.h"
-#include "file.h"
-#include "inode.h"
-#include "proc.h"
+#include <sys.h>
+#include <con.h>
+#include <file.h>
+#include <inode.h>
+#include <proc.h>
 
 /*
  * Access ciosw to open a character device

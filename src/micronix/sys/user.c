@@ -1,8 +1,8 @@
 /*
  * user.c 
  */
-#include "sys.h"
-#include "proc.h"
+#include <sys.h>
+#include <proc.h>
 
 /*
  * Location of user structure.

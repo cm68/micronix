@@ -1,10 +1,10 @@
 /*
  * sys2.c 
  */
-#include "sys.h"
-#include "inode.h"
-#include "proc.h"
-#include "file.h"
+#include <sys.h>
+#include <inode.h>
+#include <proc.h>
+#include <file.h>
 
 extern long seconds;
 

@@ -1,8 +1,8 @@
 /*
  * system.c 
  */
-#include "sys.h"
-#include "proc.h"
+#include <sys.h>
+#include <proc.h>
 
 extern char resched;
 

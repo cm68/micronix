@@ -5,7 +5,11 @@
 #ifdef linux
 #define	INIT
 #else
+#ifdef HI_TECH_C
+#define	INIT
+#else
 #define	INIT = 0
+#endif
 #endif
 
 #define NULL 0

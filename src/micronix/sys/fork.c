@@ -1,11 +1,11 @@
 /*
  * fork.c 
  */
-#include "sys.h"
-#include "inode.h"
-#include "proc.h"
-#include "file.h"
-#include "con.h"
+#include <sys.h>
+#include <inode.h>
+#include <proc.h>
+#include <file.h>
+#include <con.h>
 
 extern struct proc *initproc, *swapproc;
 

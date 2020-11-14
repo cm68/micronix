@@ -38,10 +38,10 @@
  *
  */
 
-#include "sys.h"
-#include "buf.h"
-#include "con.h"
-#include "proc.h"
+#include <sys.h>
+#include <buf.h>
+#include <con.h>
+#include <proc.h>
 
 #define	DJINTERVAL	(10 * HERTZ)
 #define	DJTHRESHHOLD	2

@@ -1,10 +1,10 @@
 /*
  * balloc.c 
  */
-#include "sys.h"
-#include "buf.h"
-#include "sup.h"
-#include "proc.h"
+#include <sys.h>
+#include <buf.h>
+#include <sup.h>
+#include <proc.h>
 
 /*
  * Allocate a disk block from the device freelist.

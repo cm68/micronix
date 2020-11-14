@@ -104,7 +104,7 @@ debugmode()
      */
     fprintf(stderr, "\nMacros:\n");
     for (m = macros; m; m = m->next) {
-        fprintf(stderr, "\t$%s$ = ", m->name);
+        fprintf(stderr, "%s = ", m->name);
         s = m->text;
         for (s = m->text; *s ; s += j) {
             for (j = 0, i = 0;; i++) {
@@ -120,7 +120,7 @@ debugmode()
             i = s[j];
             s[j] = '\0';
             fprintf(stderr, "%s%s\n", 
-                (s != m->text) ? "\t\t" : "", s);
+                (s != m->text) ? "\t" : "", s);
             s[j] = i;
         }
     }

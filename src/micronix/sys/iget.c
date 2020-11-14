@@ -1,11 +1,11 @@
 /*
  * iget.c 
  */
-#include "sys.h"
-#include "inode.h"
-#include "mount.h"
-#include "buf.h"
-#include "proc.h"
+#include <sys.h>
+#include <inode.h>
+#include <mount.h>
+#include <buf.h>
+#include <proc.h>
 
 struct inode ilist[];
 

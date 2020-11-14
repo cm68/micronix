@@ -1,10 +1,10 @@
 /*
  * sys1.c 
  */
-#include "sys.h"
-#include "inode.h"
-#include "file.h"
-#include "proc.h"
+#include <sys.h>
+#include <inode.h>
+#include <file.h>
+#include <proc.h>
 
 /*
  * Break system call

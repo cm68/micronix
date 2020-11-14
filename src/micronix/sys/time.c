@@ -1,8 +1,8 @@
 /*
  * time.c 
  */
-#include "sys.h"
-#include "proc.h"
+#include <sys.h>
+#include <proc.h>
 
 long seconds = 0;               /* system time */
 int revel = 0;                  /* seconds to revelie for sleep system call */

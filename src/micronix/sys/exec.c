@@ -1,11 +1,11 @@
 /*
  * exec.c 
  */
-#include "sys.h"
-#include "inode.h"
-#include "proc.h"
-#include "buf.h"
-#include "obj.h"
+#include <sys.h>
+#include <inode.h>
+#include <proc.h>
+#include <buf.h>
+#include <obj.h>
 
 #define NBLKS	4               /* max argument blocks */
 #define NODEV	-1              /* see con.c */

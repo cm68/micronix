@@ -174,11 +174,21 @@ readmakefile(s, report)
 
             /*
              * copy in macro definition - we know there is an '=' in the line
+             * replace redundant white space in macro def with a space
              */
             p = index(p, '=') + 1;
             while (whitespace(*p)) p++;
-            if (!(m->text = strdup(p)))
+            if (!(m->text = calloc(1, strlen(p))))
                 OutOfMem();
+            for (w = m->text; *p;) {
+                if (whitespace(*p)) {
+                    *w++ = ' ';
+                    while (whitespace(*p)) p++;
+                } else {
+                    *w++ = *p++;
+                }
+            }
+            *w = '\0';
             break;
 
         /*
@@ -514,14 +524,6 @@ readline(fp)
             return 0;
         }
         lineno++;
-
-        /*
-         * extremely cheesy hack - on a continuation line, 
-         * if the first character is a tab, change it to a space
-         */
-        if ((p != inbuf) && (*p == '\t')) {
-            *p = ' ';
-        }
 
         i = strlen(inbuf);
 

@@ -1,9 +1,9 @@
 /*
  * link.c 
  */
-#include "sys.h"
-#include "inode.h"
-#include "proc.h"
+#include <sys.h>
+#include <inode.h>
+#include <proc.h>
 
 /*
  * Link system call

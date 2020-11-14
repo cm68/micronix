@@ -12,7 +12,17 @@
  * make.c
  */
 #include	"make.h"
+
 #include	<stdio.h>
+
+#ifdef linux
+#include <sys/types.h>
+#include <sys/stat.h>
+#else
+#include <stat.h>
+#endif
+
+extern struct stat statb;
 
 /*
  * global data definitions 
@@ -144,6 +154,7 @@ main(argc, argv)
  * the hard part is globbing
  */
 char *paths[] = {
+    ".",
     "/bin",
     "/usr/bin",
     0
@@ -165,7 +176,7 @@ char *s;
 
     /* if there's a something a simple exec can't do, use system() */
     for (p = s; *p; p++) {
-        if ((*p == '*') || (*p == ';'))
+        if ((*p == '*') || (*p == ';') || (*p == '>') || (*p == '<'))
             break;
     }
     if (*p) {
@@ -192,6 +203,8 @@ char *s;
         args[++i] = 0;
         for (i = 0; paths[i]; i++) {
             sprintf(path, "%s/%s", paths[i], fn);
+            if (access(path, 1) == -1) continue;
+            if (stat(path, &statb) == -1) continue;
             execv(path, args);
         }
         fprintf(stderr, "could not locate %s\n", fn);
@@ -315,30 +328,30 @@ make(s)                         /* returns the modified date/time */
             if (*cmd != '@') {
                 printf("%s\n", exbuf);
             }
-            if (execute) {
-                if (*cmd == '@')
-                    ++cmd;
-                ret = docmd(cmd);
+                if (execute) {
+                    if (*cmd == '@')
+                        ++cmd;
+                    ret = docmd(cmd);
+                }
+            }
+            /*
+             * file has now been modified 
+             */
+            t->modified = CurrTime();
+            if (debug) printf("set time of %s to %lu\n", t->name, t->modified);
+            t->current = TRUE;
+            if (t->recipe) {
+                madesomething = TRUE;
             }
         }
+
         /*
-         * file has now been modified 
+         * return the update file time 
          */
-        t->modified = CurrTime();
-        if (debug) printf("set time of %s to %lu\n", t->name, t->modified);
-        t->current = TRUE;
-        if (t->recipe) {
-            madesomething = TRUE;
-        }
+        free(mod);
+        return (t->modified);
     }
 
     /*
-     * return the update file time 
+     * vim: tabstop=4 shiftwidth=4 expandtab: 
      */
-    free(mod);
-    return (t->modified);
-}
-
-/*
- * vim: tabstop=4 shiftwidth=4 expandtab: 
- */
