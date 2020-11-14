@@ -32,8 +32,18 @@ disks:
 src/micronix:
 	the source tree for things that are to be built natively, including
     libraries, commands and the kernel.
-
-src/micronix/kernel:
+	this is gradually being fleshed out with replacements for the micronix
+	utilities that I don't have source for, namely all of them.
+	notable additions:  
+		a much better make, 
+		an in-memory, ansi-only, vi subset derived from stevie
+		2.11's ls
+		a working pwd, rm, mknod
+		
+src/micronix/lib:
+	additions and replacements for the whitesmith's library.
+		
+src/micronix/sys:
 	recovered kernel source for micronix 1.61, with include files
 	the formatting of the original source was really quirky and archaic,
 	so I re-indented it to a more K&R like style.
