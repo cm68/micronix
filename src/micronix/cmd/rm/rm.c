@@ -1,183 +1,160 @@
-/*
- * version 6 rm ported to micronix
- */
+int errcode = 0;
+
 #include <stdio.h>
 #include <stat.h>
-#include <sgtty.h>
+#include <dir.h>
 
-int fflag = 0;
-int rflag = 0;
-int iflag = 0;
-char *pn = 0;
-
-struct sgtty saved = 0;
-struct sgtty new = 0;
-
-#ifdef notdef
-unlink(s)
-char *s;
-{
-	printf("unlink %s\n", s);
-	return 0;	
-}
-#endif
-
-usage()
-{
-	fprintf(stderr, "usage:\n%s [-<flags>] path ...\n", pn);
-	fprintf(stderr, "\t-f\tforce remove\n");
-	fprintf(stderr, "\t-i\tinquire per file\n");
-	fprintf(stderr, "\t-r\trecurse into directories\n");
-	exit(1);
-}
-
-char buf[256] = 0;
+char *sprintf();
 
 main(argc, argv)
     char *argv[];
 {
-    char *arg;
+    register char *arg;
+    int fflg, iflg, rflg;
 
-	pn = argv[0];
-
-    while (--argc > 0) {
-
+    fflg = 0;
+    if (isatty(0) == 0)
+        fflg++;
+    iflg = 0;
+    rflg = 0;
+    if (argc > 1 && argv[1][0] == '-') {
         arg = *++argv;
-        if (*arg == '-') {
-			arg++;
-			while (*arg) {
-				switch (*arg) {
-				case 'f':
-					fflag++;
-					arg++;
-					break;
-				case 'r':
-					rflag++;
-					arg++;
-					break;
-				case 'i':
-					iflag++;
-					arg++;
-					break;
-				case 'h':
-					usage();
-					break;
-				default:
-					fprintf(stderr, "unknown flag %c", *arg); 
-					usage();
-					break;
-				}
+        argc--;
+        while (*++arg != '\0')
+            switch (*arg) {
+            case 'f':
+                fflg++;
+                break;
+            case 'i':
+                iflg++;
+                break;
+            case 'r':
+                rflg++;
+                break;
+            default:
+                printf("rm: unknown option %s\n", *argv);
+                exit(1);
             }
-			continue;
-        }
-        rm(arg);
     }
-	exit(0);
+    while (--argc > 0) {
+        if (!strcmp(*++argv, "..")) {
+            fprintf(stderr, "rm: cannot remove `..'\n");
+            continue;
+        }
+        rm(*argv, fflg, rflg, iflg, 0);
+    }
+
+    exit(errcode);
 }
 
-prompt(n)
-char *n;
+rm(arg, fflg, rflg, iflg, level)
+    char arg[];
 {
-	int ret = 1;
+    struct stat buf;
+    struct dir direct;
+    char name[100];
+    int d;
 
-	if (iflag) {
-		ret = 0;
-
-		write(1, n, strlen(n));
-		gtty(0, &saved);
-		gtty(0, &new);
-		new.mode |= RAW;
-		stty(0, &new);	
-		write(1, ": ", 2);
-		if (read(0, buf, 1) == 1) {
-			buf[0] |= 0x20;
-			write(1, "\n\r", 2);
-			/* upper or lower case 'y' suffices */
-			if (buf[0] == 'y') {
-				ret = 1;
-			}
-		}
-		stty(0, &saved);
-	}
-	return ret;
-}
-
-rm(arg)
-char *arg;
-{
-    char *p;
-    struct stat sbuf;
-    int pid;
-	int status;
-
-    if (stat(arg, &sbuf)) {
-        printf("%s: non existent\n", arg);
+    if (stat(arg, &buf)) {
+        if (fflg == 0) {
+            printf("rm: %s nonexistent\n", arg);
+            ++errcode;
+        }
         return;
     }
-
-	if (!prompt(arg)) {
-		return;
-	}
-
-	/*
-	 * directories are odd - we need to unlink . and ..
-	 * and then the actual name, but only if the link count
-	 * is 2.
-	 */
-    if ((sbuf.flags & S_TYPE) == S_ISDIR) {
-
-		/*
-		 * if the link count is not 2, we might recurse
-		 */
-        if (rflag && sbuf.nlinks != 2) {
-			printf("recurse into %s\n", arg);
-
-            pid = fork();
-            if (pid == -1) {
-                printf("%s: fork failed\n", arg);
-				exit(2);
-            }
-            if (pid) {
-				/* parent */
-                while (wait(&status) != pid)
-					;
+    if ((buf.flags & S_TYPE) == S_ISDIR) {
+        if (rflg) {
+            if (access(arg, 02) < 0) {
+                if (fflg == 0)
+                    printf("%s not changed\n", arg);
+                errcode++;
                 return;
             }
-            if (chdir(arg)) {
-                printf("%s: cannot chdir\n", arg);
-                exit(3);
+            if (iflg && level != 0) {
+                printf("directory %s: ", arg);
+                if (!yes())
+                    return;
             }
-            p = 0;
-			sprintf(buf, "%s -r%s *", pn, fflag ? "f" : "");
-			fprintf(stderr, "%s\n", buf);
-			system(buf);
-			exit(0);
+            if ((d = open(arg, 0)) < 0) {
+                printf("rm: %s: cannot read\n", arg);
+                exit(1);
+            }
+            while (read(d, (char *) &direct,
+                    sizeof(direct)) == sizeof(direct)) {
+                if (direct.ino != 0 && !dotname(direct.name)) {
+                    sprintf(name, "%s/%.14s", arg, direct.name);
+                    rm(name, fflg, rflg, iflg, level + 1);
+                }
+            }
+            close(d);
+            errcode += rmdir(arg, iflg);
+            return;
         }
-
-		/*
-		 * the link count had better be 2 now.
-		 */
-    	if (stat(arg, &sbuf)) {
-			printf("%s: non existent\n", arg);
-			return;
-		}
-		if (sbuf.nlinks != 2) {
-			printf("%s: directory not empty\n", arg);
-			return;
-		}
-
-		sprintf(buf, "%s/..", arg);
-		unlink(buf);
-		buf[strlen(buf) - 1] = '\0';
-		unlink(buf);
-		unlink(arg);
+        printf("rm: %s directory\n", arg);
+        ++errcode;
         return;
     }
 
-    if (unlink(arg)) {
-        if (!fflag) {
-			printf("%s: not removed\n", arg);
-		}
-		printf("unlink perm problem\n");
+    if (iflg) {
+        printf("%s: ", arg);
+        if (!yes())
+            return;
+    } else if (!fflg) {
+        if (access(arg, 02) < 0) {
+            printf("rm: %s %o mode ", arg, buf.flags & 0777);
+            if (!yes())
+                return;
+        }
     }
+    if (unlink(arg) && (fflg == 0 || iflg)) {
+        printf("rm: %s not removed\n", arg);
+        ++errcode;
+    }
+}
+
+dotname(s)
+    char *s;
+{
+    if (s[0] == '.')
+        if (s[1] == '.')
+            if (s[2] == '\0')
+                return (1);
+            else
+                return (0);
+        else if (s[1] == '\0')
+            return (1);
+    return (0);
+}
+
+rmdir(f, iflg)
+    char *f;
+{
+    int status, i;
+	char namebuf[100];
+	sprintf(namebuf, "%s/..", f);
+	status = 0;
+
+    if (dotname(f))
+        return (0);
+    if (iflg) {
+        printf("%s: ", f);
+        if (!yes())
+            return (0);
+    }
+	status += unlink(namebuf);
+	i = strlen(namebuf);
+	namebuf[i] = '\0';
+	status += unlink(namebuf);
+	status += unlink(f);
+	return status;
+}
+
+yes()
+{
+    int i, b;
+
+    i = b = getchar();
+    while (b != '\n' && b != EOF)
+        b = getchar();
+    return (i == 'y');
 }
