@@ -1,9 +1,9 @@
 /*
  * omultio.c 
  */
-#include "sys.h"
-#include "tty.h"
-#include "proc.h"
+#include <sys.h>
+#include <tty.h>
+#include <proc.h>
 
 #define NMIO    4               /* number of mult I/O ports */
 #define MBASE 0x48

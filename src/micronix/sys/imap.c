@@ -1,10 +1,10 @@
 /*
  * imap.c 
  */
-#include "sys.h"
-#include "inode.h"
-#include "buf.h"
-#include "proc.h"
+#include <sys.h>
+#include <inode.h>
+#include <buf.h>
+#include <proc.h>
 
 /*
  * Return the physical block number for logical block log,

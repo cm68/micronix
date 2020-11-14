@@ -1,11 +1,11 @@
 /*
  * fio.c 
  */
-#include "sys.h"
-#include "inode.h"
-#include "buf.h"
-#include "con.h"
-#include "proc.h"
+#include <sys.h>
+#include <inode.h>
+#include <buf.h>
+#include <con.h>
+#include <proc.h>
 
 extern long seconds;
 

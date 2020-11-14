@@ -2,10 +2,10 @@
 /*
  * access.c
  */
-#include "sys.h"
-#include "inode.h"
-#include "mount.h"
-#include "proc.h"
+#include <sys.h>
+#include <inode.h>
+#include <mount.h>
+#include <proc.h>
 
 #define SUPERID 0               /* Id of superuser */
 

@@ -1,13 +1,13 @@
 /*
  * main.c 
  */
-#include "sys.h"
-#include "inode.h"
-#include "mount.h"
-#include "proc.h"
-#include "file.h"
-#include "buf.h"
-#include "con.h"
+#include <sys.h>
+#include <inode.h>
+#include <mount.h>
+#include <proc.h>
+#include <file.h>
+#include <buf.h>
+#include <con.h>
 
 #include "build.h"
 

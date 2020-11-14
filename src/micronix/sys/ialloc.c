@@ -1,11 +1,11 @@
 /*
  * ialloc.c 
  */
-#include "sys.h"
-#include "inode.h"
-#include "proc.h"
-#include "buf.h"
-#include "sup.h"
+#include <sys.h>
+#include <inode.h>
+#include <proc.h>
+#include <buf.h>
+#include <sup.h>
 
 extern long seconds;
 

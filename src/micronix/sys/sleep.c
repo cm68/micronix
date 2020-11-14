@@ -1,8 +1,8 @@
 /*
  * sleep.c 
  */
-#include "sys.h"
-#include "proc.h"
+#include <sys.h>
+#include <proc.h>
 
 extern char memwant, swapping;
 extern struct proc *swapproc;

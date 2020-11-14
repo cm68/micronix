@@ -1,8 +1,8 @@
 /*
  * con.c 
  */
-#include "sys.h"
-#include "con.h"
+#include <sys.h>
+#include <con.h>
 
 /*
  * The block io switch is an array of

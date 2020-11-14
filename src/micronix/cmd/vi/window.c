@@ -9,9 +9,12 @@
 #include <termios.h>
 struct termios save_term;
 #else
+#ifdef CPM
+#else
 #include <types.h>
 #include <sgtty.h>
 struct sgtty save_sbuf INIT;
+#endif
 #endif
 
 char controlbuf[30] INIT;

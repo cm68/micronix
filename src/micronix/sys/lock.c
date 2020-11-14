@@ -1,11 +1,11 @@
 /*
  * lock.c 
  */
-#include "sys.h"
-#include "inode.h"
-#include "proc.h"
-#include "file.h"
-#include "lock.h"
+#include <sys.h>
+#include <inode.h>
+#include <proc.h>
+#include <file.h>
+#include <lock.h>
 
 struct lock llist[NLOCK] = { 0 };
 

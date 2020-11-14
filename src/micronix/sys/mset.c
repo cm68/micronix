@@ -1,7 +1,7 @@
 /*
  * mset.c 
  */
-#include "tty.h"
+#include <tty.h>
 
 #define lowbyte(a) (a)
 #define highbyte(a) ((a) >> 8)

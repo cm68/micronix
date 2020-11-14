@@ -1,12 +1,12 @@
 /*
  * mount.c 
  */
-#include "sys.h"
-#include "inode.h"
-#include "mount.h"
-#include "proc.h"
-#include "buf.h"
-#include "sup.h"
+#include <sys.h>
+#include <inode.h>
+#include <mount.h>
+#include <proc.h>
+#include <buf.h>
+#include <sup.h>
 
 extern int rootdev;
 extern long seconds;

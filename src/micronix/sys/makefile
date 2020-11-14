@@ -1,4 +1,5 @@
 
+INC = /include
 HIGH_AS	= inits.o
 IO_AS	= intrpt.o mio.o
 LOW_AS	= uhdr.o mem.o sub8.o
@@ -14,6 +15,7 @@ HIGH_C = main.o cus.o
 LOW_OFILES = $(LOW_AS) $(LOW_C)
 IO_OFILES = $(IO_C) $(IO_AS)
 HIGH_OFILES = $(HIGH_C) $(HIGH_AS)
+CFLAGS = -i/include
 
 unix : low.o io.o high.o
 	link -tb0x1000 -r -o unix low.o io.o -lm.a high.o
@@ -22,10 +24,10 @@ $(AS_OBJS) : $*.s
 	as $*.s
 
 $(HIGH_C) : $*.c
-	cc -c -x0 $*.c
+	cc $(CFLAGS) -c -x0 $*.c
 
 $(LOW_C) $(IO_C) : $*.c
-	cc -c $*.c
+	cc $(CFLAGS) -c $*.c
 
 low.o: $(LOW_OFILES)
 	link -tb0x1000 -d -o low.o $(LOW_OFILES)
@@ -40,15 +42,15 @@ makedate: makedate.c
 	cc -o makedate makedate.c -lS
 
 build.h: makedate
-	./makedate >build.h
+	./makedate
 
 #
 # include file dependencies
 #
-user.o:	user.c proc.h sys.h
-	cc -c -x7 user.c
+user.o:	user.c
+	cc $(CFLAGS) -c -x7 user.c
 
-install:
+install: unix
 
 clean:
 	rm *.o unix
@@ -62,43 +64,43 @@ clean:
 # END { printf("\n") }
 # '
 
-access.c: sys.h inode.h mount.h proc.h
-balloc.c: sys.h buf.h sup.h proc.h
-cio.c: sys.h con.h file.h inode.h proc.h
-con.c: sys.h con.h
-create.c: sys.h inode.h proc.h
-cus.c: sys.h tty.h
-dj.c: sys.h buf.h con.h proc.h
-exec.c: sys.h inode.h proc.h buf.h obj.h
-fio.c: sys.h inode.h buf.h con.h proc.h
-fork.c: sys.h inode.h proc.h file.h con.h
-ialloc.c: sys.h inode.h proc.h buf.h sup.h
-iget.c: sys.h inode.h mount.h buf.h proc.h
-imap.c: sys.h inode.h buf.h proc.h
-link.c: sys.h inode.h proc.h
-lock.c: sys.h inode.h proc.h file.h lock.h
-main.c: sys.h inode.h mount.h proc.h file.h buf.h con.h build.h
-makedate.c: /include/std.h /include/time.h
-malloc.c: sys.h proc.h buf.h sup.h con.h
-memdev.c: sys.h proc.h con.h
-mount.c: sys.h inode.h mount.h proc.h buf.h sup.h
-mset.c: tty.h
-multio.c: sys.h tty.h proc.h
-mw.c: sys.h buf.h proc.h con.h
-name.c: sys.h buf.h proc.h inode.h
-open.c: sys.h inode.h proc.h file.h con.h
-queue.c: sys.h tty.h proc.h
-rdwri.c: sys.h inode.h file.h proc.h
-reg.c: sys.h proc.h
-sig.c: sys.h proc.h tty.h
-sleep.c: sys.h proc.h
-subc.c: sys.h con.h
-swap.c: sys.h proc.h buf.h con.h
-sys1.c: sys.h inode.h file.h proc.h
-sys2.c: sys.h inode.h proc.h file.h
-system.c: sys.h proc.h
-time.c: sys.h proc.h
-trap.c: sys.h proc.h
-tty.c: sys.h tty.h proc.h
-uio.c: sys.h proc.h buf.h con.h sup.h
-user.c: sys.h proc.h
+access.c: $(INC)/sys.h $(INC)/inode.h $(INC)/mount.h $(INC)/proc.h
+balloc.c: $(INC)/sys.h $(INC)/buf.h $(INC)/sup.h $(INC)/proc.h
+cio.c: $(INC)/sys.h $(INC)/con.h $(INC)/file.h $(INC)/inode.h $(INC)/proc.h
+con.c: $(INC)/sys.h $(INC)/con.h
+create.c: $(INC)/sys.h $(INC)/inode.h $(INC)/proc.h
+cus.c: $(INC)/sys.h $(INC)/tty.h
+dj.c: $(INC)/sys.h $(INC)/buf.h $(INC)/con.h $(INC)/proc.h
+exec.c: $(INC)/sys.h $(INC)/inode.h $(INC)/proc.h $(INC)/buf.h $(INC)/obj.h
+fio.c: $(INC)/sys.h $(INC)/inode.h $(INC)/buf.h $(INC)/con.h $(INC)/proc.h
+fork.c: $(INC)/sys.h $(INC)/inode.h $(INC)/proc.h $(INC)/file.h $(INC)/con.h
+ialloc.c: $(INC)/sys.h $(INC)/inode.h $(INC)/proc.h $(INC)/buf.h $(INC)/sup.h
+iget.c: $(INC)/sys.h $(INC)/inode.h $(INC)/mount.h $(INC)/buf.h $(INC)/proc.h
+imap.c: $(INC)/sys.h $(INC)/inode.h $(INC)/buf.h $(INC)/proc.h
+link.c: $(INC)/sys.h $(INC)/inode.h $(INC)/proc.h
+lock.c: $(INC)/sys.h $(INC)/inode.h $(INC)/proc.h $(INC)/file.h $(INC)/lock.h
+main.c: $(INC)/sys.h $(INC)/inode.h $(INC)/mount.h $(INC)/proc.h $(INC)/file.h $(INC)/buf.h $(INC)/con.h build.h
+makedate.c: $(INC)/std.h $(INC)/time.h
+malloc.c: $(INC)/sys.h $(INC)/proc.h $(INC)/buf.h $(INC)/sup.h $(INC)/con.h
+memdev.c: $(INC)/sys.h $(INC)/proc.h $(INC)/con.h
+mount.c: $(INC)/sys.h $(INC)/inode.h $(INC)/mount.h $(INC)/proc.h $(INC)/buf.h $(INC)/sup.h
+mset.c: $(INC)/tty.h
+multio.c: $(INC)/sys.h $(INC)/tty.h $(INC)/proc.h
+mw.c: $(INC)/sys.h $(INC)/buf.h $(INC)/proc.h $(INC)/con.h
+name.c: $(INC)/sys.h $(INC)/buf.h $(INC)/proc.h $(INC)/inode.h
+open.c: $(INC)/sys.h $(INC)/inode.h $(INC)/proc.h $(INC)/file.h $(INC)/con.h
+queue.c: $(INC)/sys.h $(INC)/tty.h $(INC)/proc.h
+rdwri.c: $(INC)/sys.h $(INC)/inode.h $(INC)/file.h $(INC)/proc.h
+reg.c: $(INC)/sys.h $(INC)/proc.h
+sig.c: $(INC)/sys.h $(INC)/proc.h $(INC)/tty.h
+sleep.c: $(INC)/sys.h $(INC)/proc.h
+subc.c: $(INC)/sys.h $(INC)/con.h
+swap.c: $(INC)/sys.h $(INC)/proc.h $(INC)/buf.h $(INC)/con.h
+sys1.c: $(INC)/sys.h $(INC)/inode.h $(INC)/file.h $(INC)/proc.h
+sys2.c: $(INC)/sys.h $(INC)/inode.h $(INC)/proc.h $(INC)/file.h
+system.c: $(INC)/sys.h $(INC)/proc.h
+time.c: $(INC)/sys.h $(INC)/proc.h
+trap.c: $(INC)/sys.h $(INC)/proc.h
+tty.c: $(INC)/sys.h $(INC)/tty.h $(INC)/proc.h
+uio.c: $(INC)/sys.h $(INC)/proc.h $(INC)/buf.h $(INC)/con.h $(INC)/sup.h
+user.c: $(INC)/sys.h $(INC)/proc.h

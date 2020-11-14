@@ -1,10 +1,10 @@
 /*
  * rdwri.c 
  */
-#include "sys.h"
-#include "inode.h"
-#include "file.h"
-#include "proc.h"
+#include <sys.h>
+#include <inode.h>
+#include <file.h>
+#include <proc.h>
 
 /*
  * The pipe size at which the writing process is suspended.

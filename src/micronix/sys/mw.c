@@ -8,10 +8,10 @@
  * See the HD-DMA manual for more information.
  */
 
-#include "sys.h"
-#include "buf.h"
-#include "proc.h"
-#include "con.h"
+#include <sys.h>
+#include <buf.h>
+#include <proc.h>
+#include <con.h>
 
 #define NDRIVES 4               /* Number of drives. See mws[] below. */
 #define SECSIZE 3               /* Sector size (512 bytes) */
