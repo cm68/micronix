@@ -14,7 +14,10 @@ extern boolean knowhow;
 extern unsigned long FileTime();
 extern struct target *targets;
 extern struct macro *macros;
+
+#ifdef DEBUG
 extern char debug;
+#endif
 
 int lineno = 1;
 
@@ -101,9 +104,11 @@ readmakefile(s, report)
      * try to open specified file 
      */
     if ((infile = fopen(s, "r")) == 0) {
-        if (report)
+        if (report) {
             fprintf(stderr, "make: unable to open %s.\n", s);
-        return (FALSE);
+            exit(1);
+        }
+        return 0;
     }
 
     rt = NULL;
@@ -128,9 +133,11 @@ readmakefile(s, report)
         p = inbuf;
          
         i = linetype();
+#ifdef DEBUG
         if (debug > 1) {
             printf("linetype: %d %s\n", i, inbuf);
         }
+#endif
 
         /*
          * check for definitions and macros 
@@ -178,7 +185,7 @@ readmakefile(s, report)
              */
             p = index(p, '=') + 1;
             while (whitespace(*p)) p++;
-            if (!(m->text = calloc(1, strlen(p))))
+            if (!(m->text = calloc(1, strlen(p)+1)))
                 OutOfMem();
             for (w = m->text; *p;) {
                 if (whitespace(*p)) {
@@ -189,6 +196,12 @@ readmakefile(s, report)
                 }
             }
             *w = '\0';
+#ifdef DEBUG
+            if (debug > 1) {
+                printf("macdef %s\n", m->name);
+                hexdump(m->text, strlen(m->text));
+            }
+#endif
             break;
 
         /*
@@ -208,9 +221,12 @@ readmakefile(s, report)
             /* expand any macros in the targets or dependencies */
             expand(inbuf, 0, 0);
 
-            if (debug > 1) 
+#ifdef DEBUG
+            if (debug > 1) {
                 printf("expanded: %s\n", exbuf);
-
+                /* hexdump(exbuf, strlen(exbuf)); */
+            }
+#endif 
             p = exbuf;
 
             /* we know there is a colon, so guaranteed to terminate */
@@ -233,7 +249,7 @@ readmakefile(s, report)
                  */
                 if (tcnt == NDEFS) {
                     fprintf(stderr, "too many definitions on line %d\n", lineno);
-                    return (FALSE);
+                    return (0);
                 }
 
                 if (!t) {
@@ -244,14 +260,10 @@ readmakefile(s, report)
                     t->current = FALSE;
                     ft = FileTime(t->name);
                     t->modified = ft;
+#ifdef DEBUG
                     if (debug > 1)
-                        fprintf(stderr, "set time of %s to %lu\n", 
-#ifdef notdef
-                        namebuf, 
-#else
-                        t->name,
+                        fprintf(stderr, "set time of %s to %lu\n", t->name, ft);
 #endif
-                        ft);
                     t->next = targets;
                     targets = t;
                 }
@@ -272,6 +284,7 @@ readmakefile(s, report)
 
                 snagname(&p);
 
+                /* printf("dep: %s(%d)\n", namebuf, strlen(namebuf)); */
                 /* add them to each entry in the lt array */
                 for (i = 0; i < tcnt; i++) {
                     /* make sure it's not already there */
@@ -284,8 +297,6 @@ readmakefile(s, report)
                         /* might want to complain - it will use the first recipe */
                         continue;
                     }
-                    if (!(d = (struct dep *) calloc(1, sizeof(struct dep))))
-                        OutOfMem();
 
                     /*
                      * we do a little magic here if the dependency looks like $*<something>
@@ -296,20 +307,24 @@ readmakefile(s, report)
                     w = namebuf;
                     if ((namebuf[0] == '$') && (namebuf[1] == '*')) {
                         strcpy(workbuf, lt[i]->name);
+#ifdef DEBUG
                         if (debug > 1)
                             printf("magic: pat: %s target: %s\n", namebuf, workbuf);
+#endif
                         for (w = workbuf; *w && (*w != '.'); w++)
                             ;
                         strcpy(w, &namebuf[2]);
                         w = workbuf;
                     }
+
                     /* if we have foo.o: foo.o, just skip it */
-                    if (strcmp(d->name, lt[i]->name) == 0) {
-                        if (debug > 1)
-                            printf("circular dependency line %d: %s\n",
-                                lineno, d->name);
+                    if (strcmp(w, lt[i]->name) == 0) {
+                        printf("circular dependency line %d: %s\n",
+                            lineno, d->name);
                         continue;
                     }
+                    if (!(d = (struct dep *) calloc(1, sizeof(struct dep))))
+                        OutOfMem();
                     if (!(d->name = strdup(w)))
                         OutOfMem();
                     d->next = lt[i]->need;
@@ -365,7 +380,29 @@ readmakefile(s, report)
             break;
         }
     }
-    return (TRUE);
+    return (1);
+}
+
+char *
+mactext(mname)
+char *mname;
+{
+    struct macro *macp;
+    char *ret = 0;
+
+    for (macp = macros; macp; macp = macp->next) {
+        if (strcmp(macp->name, mname) == 0) {
+            ret = macp->text;
+            break;
+        }
+    }
+#ifdef DEBUG
+    if (debug > 1) {
+        printf("mactext: %s\n", mname, ret ? ret : "undefined");
+        if (ret) hexdump(ret, strlen(ret));
+    }
+#endif
+    return ret;
 }
 
 /*
@@ -378,12 +415,19 @@ expand(str, name, mod)
 {
     char mac[32];               /* macro name */
     char *index();              /* locate character function */
-    struct macro *macp;         /* working macro struct ptr */
-    char inbuf[MAXLINE];
     char expanded;
     char *s;
+    char *mtext;
     char *dest;
     char *src;
+    char c;
+
+#ifdef DEBUG
+    if (debug > 1) {
+        printf("\nexpand \"%s\" name: \"%s\" mod: \"%s\"\n", 
+            str, name?name:"", mod?mod:"");
+    }
+#endif
 
     /*
      * since macros can contain macros, we need to loop
@@ -397,6 +441,13 @@ expand(str, name, mod)
 
         strcpy(inbuf, exbuf);
 
+#ifdef DEBUG
+        if (debug > 1) {
+            printf("expand pass\n");
+            hexdump(inbuf, strlen(inbuf));
+        }
+#endif
+
         /*
          * let's get the show on the road 
          */
@@ -407,93 +458,91 @@ expand(str, name, mod)
          * while there is any data left... 
          */
         while (*src) {
-            if (*src != '$')
+
+            if (*src != '$') {
                 *dest++ = *src++;
-            else {
-                /*
-                 * assume there is no true macro definition 
-                 */
-                mac[0] = '\0';
+                *dest = '\0';
+                continue;
+            }
 
-                /*
-                 * decode the character following the '$' 
-                 */
-                switch (*++src) {
-                case '$':          /* $$ = just a dollar sign */
-                    *dest++ = '$';
-                    break;
+            /*
+             * now we know we have a '$'.
+             */
+            mtext = 0;
+            src++;
+            c = *src++;
 
-                case '@':          /* $@ = copy 'make' name */
-                    if (name) {
-                        for (s = name; *s;)
-                            *dest++ = *s++;
-                        expanded = 1;
-                    } else {
-                        *dest++ = '$'; *dest++ = '@';
+            switch (c) {
+            case '$':          /* $$ = just a dollar sign */
+                mtext = "$$";
+                break;
+
+            case '@':          /* $@ = copy 'make' name */
+                if (name) {
+                    mtext = name;
+                } else {
+                    mtext = "$@";
+                }
+                break;
+
+            case '*':          /* $* = copy 'make' name prefix */
+                if (name) {
+                    mtext = mac;
+                    s = name;
+                    while (*s && *s != '.') {
+                        *mtext++ = *s++;
                     }
-                    break;
+                    *mtext = '\0'; 
+                    mtext = mac;
+                } else {
+                    mtext = "$*";
+                }
+                break;
 
-                case '*':          /* $* = copy 'make' name prefix */
-                    if (name) {
-                        for (s = name; *s && *s != '.';)
-                            *dest++ = *s++;
-                        expanded = 1;
-                    } else {
-                        *dest++ = '$'; *dest++ = '*';
-                    }
-                    break;
+            case '?':          /* $? = copy the cause of the make */
+                if (mod) {
+                    mtext = mod;
+                } else {
+                    mtext = "$?";
+                }
+                break;
 
-                case '?':          /* $? = copy the cause of the make */
-                    if (mod) {
-                        for (s = mod; *s;)
-                            *dest++ = *s++;
-                        expanded = 1;
+            case '(':          /* $(xx) = a long macro definition */
+                s = mac;
+                *s = '\0';
+                while (*src != ')') {
+                    if (!*src) {
+                        fprintf(stderr, "unterminated macro call\n");
+                        fprintf(stderr, "%s\n", inbuf);
+                        *dest = '\0';
+                        return;
                     }
-                    break;
-
-                case '(':          /* $(xx) = a long macro definition */
-                    /* copy the macro name (up to ')') */
-                    s = mac;
-                    src++; 
-                    while (*src != ')') {
-                        if (!*src) {
-                            fprintf(stderr, "unterminated macro call\n");
-                            fprintf(stderr, "%s\n", inbuf);
-                            *dest = '\0';
-                            return;
-                        }
-                        *s++ = *src++;
-                    }
+                    *s++ = *src++;
                     *s = '\0';
-                    break;
-
-                default:           /* $<other> = a short macro definition */
-                    mac[0] = *src;
-                    mac[1] = '\0';
-                    break;
                 }
-
                 src++;
+                mtext = mactext(mac);
+                if (mtext) expanded++;
+                break;
 
-                /*
-                 * expand macro
-                 */
-                if (strlen(mac)) {
-                    for (macp = macros; macp; macp = macp->next) {
-                        if (strcmp(macp->name, mac) == 0) {
-                            for (s = macp->text; *s;) {
-                                *dest++ = *s++;
-                            }
-                            expanded = 1;
-                            break;
-                        }
-                    }
+            default:           /* $<other> = a short macro definition */
+                mac[0] = c;
+                mac[1] = '\0';
+                mtext = mactext(mac);
+                if (mtext) expanded++;
+                break;
+            }
+
+            /*
+             * expand macro
+             */
+            if (mtext) {
+                while (*mtext) {
+                    *dest++ = *mtext++;
                 }
+                *dest = '\0';
             }
         }
-
-        *dest = '\0';
-
     } while (expanded);
 }
 
