@@ -1,11 +1,11 @@
 /*
  * uio.c 
  */
-#include <sys.h>
-#include <proc.h>
-#include <buf.h>
-#include <con.h>
-#include <sup.h>
+#include <sys/sys.h>
+#include <sys/proc.h>
+#include <sys/buf.h>
+#include <sys/con.h>
+#include <sys/sup.h>
 
 extern long seconds;            /* see clock.c */
 UCHAR nbuf;                     /* initialized in binit(), main.c */

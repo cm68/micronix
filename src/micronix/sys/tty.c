@@ -1,9 +1,9 @@
 /*
  * otty.c 
  */
-#include <sys.h>
-#include <tty.h>
-#include <proc.h>
+#include <sys/sys.h>
+#include <sys/tty.h>
+#include <sys/proc.h>
 
 /*
  * Open a tty. Called by the device open routine.

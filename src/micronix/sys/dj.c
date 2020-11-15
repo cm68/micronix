@@ -2,13 +2,15 @@
  * dj.c 
  */
 
+#include <sys/sys.h>
+#include <sys/buf.h>
+#include <sys/con.h>
+#include <sys/proc.h>
+
 /*
  * Micronix driver for Disk Jockey DMA
  * 
- *      Len Edmondson
- *      Morrow Designs
- *          1982
- *
+ *      Len Edmondson, Morrow Designs  1982
  * 
  * The minor device number is interpreted as follows:
  *
@@ -28,7 +30,6 @@
  *                      2 - SA400
  *                      3 - Tandon (reserved)
  *
- *
  *                      8" types
  *                      ----------
  *                      0 - SA800
@@ -37,12 +38,6 @@
  *                      3 - SA800 (reserved)
  *
  */
-
-#include <sys.h>
-#include <buf.h>
-#include <con.h>
-#include <proc.h>
-
 #define	DJINTERVAL	(10 * HERTZ)
 #define	DJTHRESHHOLD	2
 

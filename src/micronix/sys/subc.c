@@ -1,8 +1,8 @@
 /*
  * subc.c 
  */
-#include <sys.h>
-#include <con.h>
+#include <sys/sys.h>
+#include <sys/con.h>
 
 /*
  * panic stop

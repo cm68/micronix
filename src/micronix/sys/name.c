@@ -1,10 +1,10 @@
 /*
  * name.c 
  */
-#include <sys.h>
-#include <buf.h>
-#include <proc.h>
-#include <inode.h>
+#include <sys/sys.h>
+#include <sys/buf.h>
+#include <sys/proc.h>
+#include <sys/inode.h>
 
 extern struct inode *rootdir;
 

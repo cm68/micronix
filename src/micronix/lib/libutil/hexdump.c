@@ -2,8 +2,14 @@
  * formatted memory dumper subroutines
  * we are exclusively interested in 16 bit offsets
  */
-static char pchars[16] = 0;
-static int pcol = 0;
+#ifdef linux
+#define	INIT
+#else
+#define	INIT	= 0
+#endif
+
+static char pchars[16] INIT;
+static int pcol INIT;
 
 /*
  * dump out the sanitized ascii
@@ -15,7 +21,7 @@ dumpascii()
 
     for (i = 0; i < pcol; i++) {
         c = pchars[i];
-        if ((c <= 0x20) || (c >= 0x7f))
+        if ((c < 0x20) || (c >= 0x7f))
             c = '.';
         printf("%c", c);
         if ((i % 4) == 3) { printf(" "); }
@@ -47,8 +53,10 @@ int len;
         }
     }
     if (pcol != 0) {
-        for (i = pcol; i < 16; i++)
+        for (i = pcol; i < 16; i++) {
+			if ((i % 4) == 3) { printf(" "); }
             printf("   ");
+		}
         dumpascii();
     }
 }

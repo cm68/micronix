@@ -24,6 +24,7 @@ update:
         grep -v \.gitignore | grep -v \.o$$ | grep -v \.swp | \
 		grep -v core | grep -v logfile | \
 		while read i ; do \
+		if file $$i | grep -q ELF ; then continue ; fi ; \
 		dest=../../filesystem/usr/src/$$i ; \
         if [ ! -d $$(dirname $$dest) ] ; then \
 			echo new dir: $$(dirname $$dest) ; \

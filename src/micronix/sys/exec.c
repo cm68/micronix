@@ -1,10 +1,10 @@
 /*
  * exec.c 
  */
-#include <sys.h>
-#include <inode.h>
-#include <proc.h>
-#include <buf.h>
+#include <sys/sys.h>
+#include <sys/inode.h>
+#include <sys/proc.h>
+#include <sys/buf.h>
 #include <obj.h>
 
 #define NBLKS	4               /* max argument blocks */
