@@ -1,6 +1,7 @@
 /*
  * ialloc.c 
  */
+#include <types.h>
 #include <sys/sys.h>
 #include <sys/inode.h>
 #include <sys/proc.h>

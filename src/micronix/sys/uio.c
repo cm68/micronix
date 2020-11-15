@@ -1,6 +1,7 @@
 /*
  * uio.c 
  */
+#include <types.h>
 #include <sys/sys.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
@@ -17,7 +18,7 @@ struct buf *btop;               /* ditto */
  */
 struct buf *
 bget(blk, dev)
-    uns blk, dev;
+    UCHAR blk, dev;
 {
     fast struct buf *b, *f;
 
@@ -77,7 +78,7 @@ block(b)
  */
 struct buf *
 bread(blk, dev)
-    uns blk, dev;
+    UINT blk, dev;
 {
     fast struct buf *b;
 
@@ -101,7 +102,7 @@ bread(blk, dev)
  * Read a block asyncronously. Used for read-ahead by iread (fio.c)
  */
 aread(blk, dev)
-    uns blk, dev;
+    UINT blk, dev;
 {
     fast struct buf *b;
 
@@ -120,7 +121,7 @@ aread(blk, dev)
  */
 struct buf *
 getsb(dev)
-    uns dev;
+    UINT dev;
 {
     struct buf *b;
 
@@ -193,7 +194,7 @@ brelse(b)
 unsigned
 btime()
 {
-    static uns count = 0;
+    static UINT count = 0;
     static struct buf *b;
 
     di();
@@ -258,7 +259,7 @@ strat(bp)
  * Access a block device open routine.
  */
 bopen(dev, mode)
-    uns dev, mode;
+    UINT dev, mode;
 {
     (*biosw[bmajor(dev)].open) (dev, mode);
 }
@@ -267,7 +268,7 @@ bopen(dev, mode)
  * Access a block device close routine.
  */
 bclose(dev, mode)
-    uns dev, mode;
+    UINT dev, mode;
 {
     (*biosw[bmajor(dev)].close) (dev, mode);
 }
@@ -277,9 +278,9 @@ bclose(dev, mode)
  */
 unsigned
 bmajor(dev)
-    uns dev;
+    UINT dev;
 {
-    static uns maj;
+    static UINT maj;
 
     if ((maj = dev >> 8) >= nbdev)
         maj = 0;                /* nodev, sets b->error = ENXIO */
@@ -355,7 +356,7 @@ geterror(b)
  * this is going on (as long as there is only one inode).
  */
 bflush(dev)
-    uns dev;
+    UINT dev;
 {
     fast struct buf *b;
 

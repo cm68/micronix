@@ -7,8 +7,12 @@
 #include <unistd.h>
 #include <strings.h>
 
-#include "fslib.h"
-#include "util.h"
+#include "../micronix/include/types.h"
+#include "../micronix/include/sys/sup.h"
+#include "../micronix/include/sys/dir.h"
+#include "../micronix/include/sys/inode.h"
+#include "../include/fslib.h"
+#include "../include/util.h"
 
 #define	NB	10
 

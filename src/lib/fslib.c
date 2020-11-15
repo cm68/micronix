@@ -7,15 +7,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/stat.h>
-#include "fslib.h"
-#include "util.h"
+
+#include "../micronix/include/types.h"
+#include "../micronix/include/sys/dir.h"
+#include "../micronix/include/sys/sup.h"
+#include "../micronix/include/sys/inode.h"
+
+#include "../include/fslib.h"
+#include "../include/util.h"
+#include "../include/imd.h"
 
 #ifdef USE_LIBDSK
 #include <libdsk.h>
 #endif
 
-#include "imd.h"
 
 int spt = 15;
 
@@ -338,7 +343,7 @@ dirdump(char *buf, int size)
     if (size > 512)
         size = 512;
     for (dp = (struct dir *) buf; dp < (struct dir *) &buf[size]; dp++) {
-        printf("%5d: %14s\n", dp->inum, dp->name);
+        printf("%5d: %14s\n", dp->ino, dp->name);
     }
 }
 
@@ -661,7 +666,7 @@ lookup(struct dsknod *dp, char *name)
     dirp = getdir(dp);
     for (i = 0 ; i < entries ; i++) {
         if (strncmp(dirp[i].name, name, 14) == 0) {
-            inum = dirp[i].inum;
+            inum = dirp[i].ino;
             break;
         }
     }
@@ -964,7 +969,7 @@ fileunlink(struct sup *fs, char *name)
     dirp = getdir(dp);
     for (i = 0 ; i < entries; i++) {
         if (strncmp(dirp[i].name, name, 14) == 0) {
-            inum = dirp[i].inum;
+            inum = dirp[i].ino;
             break;
         }
     }

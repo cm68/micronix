@@ -1,5 +1,3 @@
-INCLUDE = -I../include -I../micronix/sys
-
 SIMTARGETS = \
 	ar nm size imd disas dump \
 	mnix dcheck icheck ncheck readall

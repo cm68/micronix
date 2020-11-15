@@ -4,8 +4,8 @@
  * already been advanced over. we minimally need to bump again by 1, for
  * the function code.
  */
-#include "disz80.h"
-#include "mnix.h"
+#include "../include/disz80.h"
+#include "../include/mnix.h"
 #include <stdio.h>
 #include <string.h>
 

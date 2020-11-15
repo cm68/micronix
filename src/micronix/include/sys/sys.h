@@ -72,11 +72,8 @@
 /*
  * Types
  */
-#define fast		register
-#define UINT		unsigned int
-#define uns		unsigned int
-#define UCHAR		unsigned char
-#define ULONG		unsigned long
+#define fast register
+
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

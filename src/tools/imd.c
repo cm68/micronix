@@ -10,8 +10,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "imd.h"
-#include "util.h"
+#include "../include/imd.h"
+#include "../include/util.h"
 
 int traceflags;
 int trace_bio;

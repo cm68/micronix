@@ -5,14 +5,16 @@
  * just for grins, it can disassemble too.
  */
 
-#include "ws.h"
-#include "util.h"
-#include "disz80.h"
-
 #include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <malloc.h>
+
+#include "../micronix/include/types.h"
+#include "../micronix/include/obj.h"
+#include "../include/ws.h"
+#include "../include/util.h"
+#include "../include/disz80.h"
 
 int traceflags;
 int verbose;

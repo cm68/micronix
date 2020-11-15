@@ -1,3 +1,8 @@
+#ifdef linux
+ error error error error
+ this file should never, ever be included by linux code
+#endif
+
 # define	_BUFSIZE	512
 # define	 BUFSIZ		512
 # define	_NFILE		16
