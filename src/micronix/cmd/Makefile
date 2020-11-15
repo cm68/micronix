@@ -8,7 +8,7 @@ install :
 	cd rm ; make install
 	cd vi ; make install
 	cd mknod ; make install
-	cp reset /bin/reset
+	cp/cp reset /bin/reset
 
 clean : 
 	cd Make ; make clean

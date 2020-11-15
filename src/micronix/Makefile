@@ -3,3 +3,4 @@
 #
 all : /usr/src/cmd/Make/bootstrap 
 	sh -v /usr/src/cmd/Make/bootstrap
+	/bin/make

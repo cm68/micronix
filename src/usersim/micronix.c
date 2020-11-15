@@ -35,8 +35,11 @@ typedef unsigned int ULONG;
 typedef unsigned char UCHAR;
 typedef unsigned short UINT;
 
-#include "inode.h"
-#include "obj.h"
+/*
+ * include files from micronix source
+ */
+#include "../micronix/include/sys/inode.h"
+#include "../micronix/include/obj.h"
 
 #define	LISTLINES	8
 #define	STACKTOP	0xffff
@@ -1916,7 +1919,12 @@ SystemCall(MACHINE * cp)
         break;
 
     case 15:                   /* chmod <name> <mode> */
-        carry_set();
+        filename = fname(fn);
+        if (chmod(filename, arg2 & 07777) != 0) {
+            ret = errno;
+            carry_set();
+        }
+        carry_clear();
         break;
 
     case 16:                   /* chown <name> <mode> */
