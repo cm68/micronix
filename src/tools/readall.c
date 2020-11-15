@@ -2,9 +2,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/stat.h>
-#include "fslib.h"
-#include "util.h"
+
+#include "../micronix/include/types.h"
+#include "../micronix/include/sys/sup.h"
+#include "../micronix/include/sys/dir.h"
+#include "../micronix/include/sys/inode.h"
+#include "../include/fslib.h"
+#include "../include/util.h"
 
 struct sup *fs;
 int dryrun;
@@ -225,10 +229,11 @@ main(int argc, char **argv)
                 continue;
             if (strcmp(dp->name, "..") == 0)
                 continue;
-            df = dfname(dp->inum, dp->name);
+            df = dfname(dp->ino, dp->name);
             df->up = pd;
         }
     }
+    exit(0);
     /*
      * resolve names 
      */

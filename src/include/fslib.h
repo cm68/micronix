@@ -6,20 +6,8 @@
 #define	INODE_TO_BLK(i)	(INODES_START + (i / I_PER_BLK))
 #define	INODE_OFF(i)	(i % I_PER_BLK)
 
-typedef unsigned char UCHAR;
-typedef unsigned short UINT;
-typedef unsigned int ULONG;
-
-#include "inode.h"
-#include "sup.h"
-
 #include <fcntl.h>
 #include <time.h>
-
-struct dir {
-	UINT inum;
-	UCHAR name[14];
-};
 
 extern int openfs(char *name, struct sup **f);
 extern void closefs(struct sup *f);

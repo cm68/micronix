@@ -10,8 +10,8 @@
 #include <string.h>
 #include <fcntl.h>
 
-#include "imd.h"
-#include "util.h"
+#include "../include/imd.h"
+#include "../include/util.h"
 
 int trace_imd;
 

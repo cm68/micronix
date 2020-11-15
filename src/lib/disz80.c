@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "disz80.h"
+#include "../include/disz80.h"
 
 struct optab {
 	char *op;

@@ -1,11 +1,6 @@
 /*
  * whitesmith's object file
  */
-typedef unsigned char UCHAR;
-typedef unsigned short UINT;
-typedef unsigned int ULONG;
-
-#include "obj.h"
 
 /*
  * symbol table

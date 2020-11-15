@@ -1,8 +1,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "fslib.h"
-#include "util.h"
+
+#include "../micronix/include/types.h"
+#include "../micronix/include/sys/sup.h"
+#include "../micronix/include/sys/dir.h"
+#include "../micronix/include/sys/inode.h"
+#include "../include/fslib.h"
+#include "../include/util.h"
 
 extern int trace_fs;
 int verbose;
@@ -91,9 +96,9 @@ pass2(ip)
         return;
 
     for (doff = 0; (dp = getdirent(ip, doff)) != 0; doff++) {
-        if (dp->inum == 0)
+        if (dp->ino == 0)
             continue;
-        if ((hp = hlookup(dp->inum, 0)) == 0)
+        if ((hp = hlookup(dp->ino, 0)) == 0)
             continue;
         if (dotname(dp))
             continue;
@@ -134,16 +139,16 @@ pass3(ip)
         return;
 
     for (doff = 0; (dp = getdirent(ip, doff)) != 0; doff++) {
-        if (dp->inum == 0)
+        if (dp->ino == 0)
             continue;
         if (aflg == 0 && dotname(dp))
             continue;
         for (ilp = iilist; *ilp >= 0; ilp++)
-            if (*ilp == dp->inum)
+            if (*ilp == dp->ino)
                 break;
-        if (ilp > iilist && *ilp != dp->inum)
+        if (ilp > iilist && *ilp != dp->ino)
             continue;
-        printf("%d	", dp->inum);
+        printf("%d	", dp->ino);
         pname(ino, 0);
         printf("/%.14s\n", dp->name);
     }

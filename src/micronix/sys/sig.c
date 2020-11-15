@@ -1,6 +1,7 @@
 /*
  * sig.c 
  */
+#include <types.h>
 #include <sys/sys.h>
 #include <sys/proc.h>
 #include <sys/tty.h>

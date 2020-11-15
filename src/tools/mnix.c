@@ -17,8 +17,12 @@
 #include <strings.h>
 #include <errno.h>
 
-#include "fslib.h"
-#include "util.h"
+#include "../micronix/include/types.h"
+#include "../micronix/include/sys/sup.h"
+#include "../micronix/include/sys/inode.h"
+#include "../micronix/include/sys/dir.h"
+#include "../include/fslib.h"
+#include "../include/util.h"
 
 char *filesystem;
 int nerror;
@@ -167,7 +171,7 @@ list(char *name, int opts)
     if ((ip->mode & ITYPE) == IDIR) {
         for (i = 0; i < ((ip->size0 << 16) + ip->size1) / 16; i++) {
             dp = getdirent(ip, i);
-            f = iget(fs, dp->inum);
+            f = iget(fs, dp->ino);
             isummary(dp->name, f);
             ifree(f);
         }

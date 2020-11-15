@@ -1,6 +1,7 @@
 /*
  * trap.c 
  */
+#include <types.h>
 #include <sys/sys.h>
 #include <sys/proc.h>
 

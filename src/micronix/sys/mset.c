@@ -1,6 +1,7 @@
 /*
  * mset.c 
  */
+#include <types.h>
 #include <sys/tty.h>
 
 #define lowbyte(a) (a)

@@ -4,10 +4,13 @@
  * just for grins, it can disassemble too.
  */
 
-#include "ws.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
+
+#include "../micronix/include/types.h"
+#include "../micronix/include/obj.h"
+#include "../include/ws.h"
 
 int verbose;
 int rflag;

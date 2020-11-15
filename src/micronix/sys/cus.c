@@ -1,6 +1,7 @@
 /*
  * cus.c 
  */
+#include <types.h>
 #include <sys/sys.h>
 #include <sys/tty.h>
 

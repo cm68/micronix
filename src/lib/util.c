@@ -17,7 +17,7 @@
 #include <sys/time.h>
 #include <sys/errno.h>
 
-#include "util.h"
+#include "../include/util.h"
 
 int logfd = 1;
 

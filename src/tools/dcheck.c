@@ -8,7 +8,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-#include "fslib.h"
+
+#include "../micronix/include/types.h"
+#include "../micronix/include/sys/sup.h"
+#include "../micronix/include/sys/inode.h"
+#include "../micronix/include/sys/dir.h"
+#include "../include/fslib.h"
 
 int traceflags;
 int headpr;
@@ -46,15 +51,15 @@ pass1(struct dsknod *ip)
 
     // read every directory entry
     for (doff = 0; (dp = getdirent(ip, doff)) != 0; doff++) {
-        if (dp->inum == 0)
+        if (dp->ino == 0)
             continue;
         // if we are trying to find an inode name, print it
         for (i = 0; iilist[i] != -1; i++) {
-            if (iilist[i] == dp->inum) {
-                printf("%5d %d/%.14s\n", dp->inum, ino, dp->name);
+            if (iilist[i] == dp->ino) {
+                printf("%5d %d/%.14s\n", dp->ino, ino, dp->name);
             }
         }
-        ecount[dp->inum]++;
+        ecount[dp->ino]++;
     }
 }
 

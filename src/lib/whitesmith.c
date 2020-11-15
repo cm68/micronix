@@ -2,7 +2,7 @@
  * library for dealing with whitesmith's object file
  */
 #include <stdio.h>
-#include "ws.h"
+#include "../include/ws.h"
 
 /*
  * a binary output function callable from printf.

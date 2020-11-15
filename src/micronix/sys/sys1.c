@@ -1,6 +1,7 @@
 /*
  * sys1.c 
  */
+#include <types.h>
 #include <sys/sys.h>
 #include <sys/inode.h>
 #include <sys/file.h>
@@ -69,7 +70,7 @@ chmod(name, mode)
  */
 chown(name, owner)
     char *name;
-    uns owner;
+    UINT owner;
 {
     fast struct inode *ip;
 

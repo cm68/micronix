@@ -49,7 +49,10 @@ Configuration notes:
 #include <stdlib.h>
 #include <string.h>
 #include <malloc.h>
-#include "ws.h"
+
+#include "../micronix/include/types.h"
+#include "../micronix/include/obj.h"
+#include "../include/ws.h"
 
 /*
  * word should be at least 16 bits unsigned,

@@ -1,6 +1,7 @@
 /*
  * balloc.c 
  */
+#include <types.h>
 #include <sys/sys.h>
 #include <sys/buf.h>
 #include <sys/sup.h>

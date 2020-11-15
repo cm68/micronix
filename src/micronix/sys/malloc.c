@@ -5,6 +5,7 @@
  * Allocate and free primary and secondary memory
  */
 
+#include <types.h>
 #include <sys/sys.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
