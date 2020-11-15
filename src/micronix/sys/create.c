@@ -1,9 +1,9 @@
 /*
  * create.c 
  */
-#include <sys.h>
-#include <inode.h>
-#include <proc.h>
+#include <sys/sys.h>
+#include <sys/inode.h>
+#include <sys/proc.h>
 
 /*
  * Creat system call.

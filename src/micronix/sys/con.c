@@ -1,8 +1,8 @@
 /*
  * con.c 
  */
-#include <sys.h>
-#include <con.h>
+#include <sys/sys.h>
+#include <sys/con.h>
 
 /*
  * The block io switch is an array of
@@ -10,8 +10,8 @@
  * Device 0 must be nodev.
  */
 struct biovec biosw[] = {
-    &nodev, &nulldev, &nulldev, /* 0 = no device */
-    &nodev, &nodev, &nodev,     /* 1 = HDCA */
+    &nodev, &nulldev, &nulldev,         /* 0 = no device */
+    &nodev, &nodev, &nodev,             /* 1 = HDCA - removed, obsolete */
     &djopen, &djclose, &djstrat,        /* 2 = DJ-DMA */
     &mwopen, &mwclose, &mwstrat,        /* 3 = HD-DMA */
 };

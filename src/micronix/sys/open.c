@@ -1,11 +1,11 @@
 /*
  * open.c 
  */
-#include <sys.h>
-#include <inode.h>
-#include <proc.h>
-#include <file.h>
-#include <con.h>
+#include <sys/sys.h>
+#include <sys/inode.h>
+#include <sys/proc.h>
+#include <sys/file.h>
+#include <sys/con.h>
 
 /*
  * Open system call.

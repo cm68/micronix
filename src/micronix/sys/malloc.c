@@ -5,11 +5,11 @@
  * Allocate and free primary and secondary memory
  */
 
-#include <sys.h>
-#include <proc.h>
-#include <buf.h>
-#include <sup.h>
-#include <con.h>
+#include <sys/sys.h>
+#include <sys/proc.h>
+#include <sys/buf.h>
+#include <sys/sup.h>
+#include <sys/con.h>
 
 #define NONE    0               /* Decision cpu memory-access bits */
 #define FULL    3

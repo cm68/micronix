@@ -2,6 +2,10 @@
  * queue.c 
  */
 
+#include <sys/sys.h>
+#include <sys/tty.h>
+#include <sys/proc.h>
+
 /*
  * queue protocol
  *
@@ -28,10 +32,6 @@
  *
  *      A queue shall be no longer than TTYHOG
  */
-
-#include <sys.h>
-#include <tty.h>
-#include <proc.h>
 
 #define calign(a)	 (((unsigned int) (a) - 1) & ~15)       /* PORT */
 

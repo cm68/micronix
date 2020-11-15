@@ -1,8 +1,8 @@
 /*
  * cus.c 
  */
-#include <sys.h>
-#include <tty.h>
+#include <sys/sys.h>
+#include <sys/tty.h>
 
 /*
  * Initialize custom hardware. Called from main().

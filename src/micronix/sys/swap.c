@@ -1,10 +1,10 @@
 /*
  * swap.c 
  */
-#include <sys.h>
-#include <proc.h>
-#include <buf.h>
-#include <con.h>
+#include <sys/sys.h>
+#include <sys/proc.h>
+#include <sys/buf.h>
+#include <sys/con.h>
 
 char memwant = NO;              /* someone wants memory, so look for a
                                  * swapout */

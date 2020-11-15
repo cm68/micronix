@@ -1,9 +1,9 @@
 /*
  * memdev.c 
  */
-#include <sys.h>
-#include <proc.h>
-#include <con.h>
+#include <sys/sys.h>
+#include <sys/proc.h>
+#include <sys/con.h>
 
 /*
  * kread() and kwrite() comprise the memory device.
