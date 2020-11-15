@@ -6,11 +6,18 @@
 #include	<stdio.h>
 #include	"make.h"
 
-extern boolean debug;
+#ifdef linux
+#define INIT
+#else
+#define INIT = 0
+#endif
+
+char debug INIT;
 extern boolean execute;
 
 extern struct target *targets;
 extern struct macro *macros;
+char *makefile = 0;
 
 /*
  * initialize structures 
@@ -20,7 +27,6 @@ init(argc, argv)
     char *argv[];
 {
     int i;                      /* parameter index */
-    boolean usedefault = TRUE;  /* assume dflt file */
     boolean readmakefile();     /* process a 'make' file */
 
     /*
@@ -33,35 +39,21 @@ init(argc, argv)
              */
             switch (toupper(argv[i][1])) {
             case 'D':
-                /*
-                 * show everything on the next 'make' file 
-                 */
                 debug++;
                 break;
 
             case 'F':
-                /*
-                 * use a special 'make' file 
-                 */
                 if (++i < argc) {
-                    if (readmakefile(argv[i], 1) == FALSE)
-                        exit(1);
-                    usedefault = FALSE;
+                    makefile = argv[1];
                 } else
                     usage();
                 break;
 
             case 'N':
-                /*
-                 * this is only a dry run 
-                 */
                 execute = FALSE;
                 break;
 
             default:
-                /*
-                 * give a hint at how to use 
-                 */
                 usage();
                 break;
             }
@@ -72,25 +64,21 @@ init(argc, argv)
             add_to(argv[i]);
     }
 
-    /*
-     * check if any files were read 
-     */
-    if (usedefault) {
-        /*
-         * read the default file if not 
-         */
-        if (readmakefile("makefile", 0) == FALSE) {
-            if (readmakefile("Makefile", 1) == FALSE) {
-                exit(1);
-            }
-        }
+    if (makefile) {
+        readmakefile(makefile, 1);
+    } else {
+        if (readmakefile("makefile", 0)) return;
+        readmakefile("Makefile", 1);
+    }
+    if (debug) {
+        dumpdefs();
     }
 }
 
 /*
  * display all definitions 
  */
-debugmode()
+dumpdefs()
 {
     struct macro *m;
     struct target *t;
@@ -123,6 +111,7 @@ debugmode()
                 (s != m->text) ? "\t" : "", s);
             s[j] = i;
         }
+        /* hexdump(m->text, strlen(m->text)); */
     }
 
     /*
@@ -140,7 +129,8 @@ debugmode()
          */
         i = 0;
         for (d = t->need; d; d = d->next) {
-            fprintf(stderr, "%c%s", (i == 0 ? '\t' : ' '), d->name);
+            fprintf(stderr, "%c%s(%d)", 
+                (i == 0 ? '\t' : ' '), d->name, strlen(d->name));
             if ((i += strlen(d->name) + 1) > 44) {
                 if (d->next)
                     fprintf(stderr, "\n\t");

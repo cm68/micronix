@@ -32,8 +32,11 @@ struct macro *macros = NULL;
 struct work *dolist = NULL;
 extern char exbuf[];
 
+#ifdef DEBUG
+extern char debug;
+#endif
+
 boolean execute = TRUE;         /* build submit file */
-boolean debug = FALSE;          /* not in debug mode */
 boolean silent = FALSE;         /* show commands */
 
 boolean knowhow = 0;                /* know how to make file */
@@ -99,12 +102,6 @@ main(argc, argv)
      * go initialize data structures 
      */
     init(argc, argv);
-
-    /*
-     * display structures if desired 
-     */
-    if (debug)
-        debugmode();
 
     if (!targets) {
         fprintf(stderr, "no targets\n");
@@ -234,14 +231,18 @@ make(s)                         /* returns the modified date/time */
     long tt;
     int ret;
 
-    if (debug) printf("making: %s\n", s);
+#ifdef DEBUG
+    if (debug > 1) 
+        printf("making: %s\n", s);
+#endif
 
     /*
      * run through the explict targets and see if we find a rule
      */
     for (t = targets; t; t = t->next) {
-        if (!strcmp(t->name, s))
+        if (!strcmp(t->name, s)) {
             break;
+        }
     }
 
     if (!t) {
@@ -251,10 +252,13 @@ make(s)                         /* returns the modified date/time */
             /*
              * doesn't exist but don't know how to make it 
              */
-            fprintf(stderr, "make: don't know how to make %s.\n", s);
+            fprintf(stderr, "make: don't know how to make %s\n", s);
             exit(1);
         } else {
-            if (debug) printf("%s exists but i don't have a recipe or dependencies\n", s);
+#ifdef DEBUG
+            if (debug > 1) 
+                printf("%s exists but no recipe or dependencies\n", s);
+#endif
             return (latest);
         }
     }
@@ -263,7 +267,10 @@ make(s)                         /* returns the modified date/time */
      * if file is up to date 
      */
     if (t->current) {
-        if (debug) printf("current\n");
+#ifdef DEBUG
+        if (debug > 1) 
+            printf("current\n");
+#endif
         /*
          * return actual modification time 
          */
@@ -285,12 +292,18 @@ make(s)                         /* returns the modified date/time */
      * grunge through the dependencies
      */
     for (d = t->need; d; d = d->next) {
-        if (debug) printf("%s depends on %s\n", t->name, d->name);
+#ifdef DEBUG
+        if (debug > 1) 
+            printf("%s depends on %s\n", t->name, d->name);
+#endif
         tt = make(d->name);
         if (tt > latest) latest = tt;
         if (FileTime(d->name) > t->modified) {
-            if (debug) 
-                printf("let us build %s because > %s: %lu\n", d->name, t->name, t->modified);
+#ifdef DEBUG
+            if (debug > 1) 
+                printf("let us build %s because > %s: %lu\n", 
+                    d->name, t->name, t->modified);
+#endif
             if (!(mod =
                     realloc(mod,
                         strlen(mod) + strlen(d->name) + 2)))
@@ -322,7 +335,10 @@ make(s)                         /* returns the modified date/time */
          */
         howp = t->recipe;
         for (howp = t->recipe; howp; howp = howp->next) {
-            if (debug) printf("pre: %s s: %s mod: %s\n", howp->text, s, mod);
+#ifdef DEBUG
+            if (debug > 1) 
+                printf("pre: %s s: %s mod: %s\n", howp->text, s, mod);
+#endif
             expand(howp->text, s, mod);
             cmd = exbuf;
             if (*cmd != '@') {
@@ -338,7 +354,10 @@ make(s)                         /* returns the modified date/time */
              * file has now been modified 
              */
             t->modified = CurrTime();
-            if (debug) printf("set time of %s to %lu\n", t->name, t->modified);
+#ifdef DEBUG
+            if (debug > 1) 
+                printf("set time of %s to %lu\n", t->name, t->modified);
+#endif
             t->current = TRUE;
             if (t->recipe) {
                 madesomething = TRUE;

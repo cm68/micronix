@@ -4,24 +4,26 @@
  * maketime.c
  */
 #include	"make.h"
+
 #ifndef linux
 extern int errno;
 #include <stdio.h>
 #include <stat.h>
+#define INIT = 0
 #endif
 
 #ifdef linux
+#define INIT
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
 #endif
 
+#ifdef DEBUG
 extern char debug;
-struct stat statb
-#ifndef linux
- = 0
 #endif
-;
+
+struct stat statb INIT;
 
 /*
  * get last update time 
@@ -35,8 +37,6 @@ FileTime(fname)
  
     i = stat(fname, &statb);
     if (i < 0) {
-        if (debug > 1)
-            printf("stat error %s %d\n", fname, errno);
         return 0L;
     }
 #ifdef linux
@@ -44,8 +44,10 @@ FileTime(fname)
 #else
     rv = statb.modtime;
 #endif
+#ifdef DEBUG
     if (debug > 1) 
         printf("stat of file %s returns %lu\n", fname, rv);
+#endif
     return rv;
 }
 
@@ -57,8 +59,10 @@ CurrTime()
 {
     unsigned long tt;
     time(&tt);
-    if (debug) 
+#ifdef DEBUG
+    if (debug > 1) 
         printf("curtime returns %lu\n", tt);
+#endif
     return tt;
 }
 
