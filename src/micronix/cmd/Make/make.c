@@ -32,17 +32,25 @@ struct macro *macros = NULL;
 struct work *dolist = NULL;
 extern char exbuf[];
 
-#ifdef DEBUG
-extern char debug;
-#endif
+char execute = 1;               /* actually build stuff */
+char silent = 0;                /* show commands */
 
-boolean execute = TRUE;         /* build submit file */
-boolean silent = FALSE;         /* show commands */
-
-boolean knowhow = 0;                /* know how to make file */
-boolean madesomething = 0;          /* actually made a file */
+char knowhow = 0;               /* know how to make file */
+char madesomething = 0;         /* actually made a file */
 
 #ifndef linux
+char *
+strdup(s)
+char *s;
+{
+    char *d;
+    int i;
+    i = strlen(s);
+    d = calloc(1, i+1);
+    strcpy(d, s);
+    return d;
+}
+
 char *
 index(s, c)
 char *s;
@@ -55,26 +63,6 @@ char c;
     return 0;
 }
 
-char *
-malloc(i)
-int i;
-{
-    char *r;
-
-    r = alloc(i);
-    return r;
-}
-
-char *
-strdup(s)
-char *s;
-{
-    int i = strlen(s);
-    char *r;
-    r = malloc(i+1);
-    strcpy(r, s); 
-    return r;
-}
 #endif
 
 /*
@@ -114,8 +102,7 @@ main(argc, argv)
     if (!dolist) {
         if (!(dolist = (struct work *) calloc(1, sizeof(struct work))))
             OutOfMem();
-        for (t = targets; t->next; t = t->next)
-            ;        
+        for (t = targets; t->next; t = t->next);
         if (!(dolist->name = strdup(t->name)))
             OutOfMem();
     }
@@ -127,7 +114,7 @@ main(argc, argv)
         /*
          * haven't made anything yet 
          */
-        madesomething = FALSE;
+        madesomething = 0;
         /*
          * try to make something 
          */
@@ -159,7 +146,7 @@ char *paths[] = {
 
 int
 docmd(s)
-char *s;
+    char *s;
 {
     int ret;
     int child;
@@ -171,7 +158,9 @@ char *s;
     char path[30];
     char *p;
 
-    /* if there's a something a simple exec can't do, use system() */
+    /*
+     * if there's a something a simple exec can't do, use system() 
+     */
     for (p = s; *p; p++) {
         if ((*p == '*') || (*p == ';') || (*p == '>') || (*p == '<'))
             break;
@@ -187,7 +176,9 @@ char *s;
         nice(0);
         for (i = 0; i < MAXARGS; i++) {
             args[i] = s;
-            /* skip to null or space */
+            /*
+             * skip to null or space 
+             */
             while (*s && (*s != ' ')) {
                 s++;
             }
@@ -200,8 +191,10 @@ char *s;
         args[++i] = 0;
         for (i = 0; paths[i]; i++) {
             sprintf(path, "%s/%s", paths[i], fn);
-            if (access(path, 1) == -1) continue;
-            if (stat(path, &statb) == -1) continue;
+            if (access(path, 1) == -1)
+                continue;
+            if (stat(path, &statb) == -1)
+                continue;
             execv(path, args);
         }
         fprintf(stderr, "could not locate %s\n", fn);
@@ -211,7 +204,7 @@ char *s;
             pid = wait(&status);
         }
         ret = status >> 8;
-    } 
+    }
     return (ret);
 }
 
@@ -222,19 +215,12 @@ make(s)                         /* returns the modified date/time */
     struct target *t;
     struct dep *d;
     struct command *howp;
-    unsigned long latest;       /* current 'latest' file time */
-    unsigned long FileTime();   /* return file 'modified' time */
-    unsigned long CurrTime();   /* return 'current' time */
+    long latest;                /* current 'latest' file time */
     char *expand();             /* expand macros */
     char *mod;                  /* list of files needing 'making' */
     char *cmd;
     long tt;
     int ret;
-
-#ifdef DEBUG
-    if (debug > 1) 
-        printf("making: %s\n", s);
-#endif
 
     /*
      * run through the explict targets and see if we find a rule
@@ -246,7 +232,7 @@ make(s)                         /* returns the modified date/time */
     }
 
     if (!t) {
-        knowhow = FALSE;
+        knowhow = 0;
         latest = FileTime(s);
         if (latest == 0) {
             /*
@@ -255,22 +241,23 @@ make(s)                         /* returns the modified date/time */
             fprintf(stderr, "make: don't know how to make %s\n", s);
             exit(1);
         } else {
-#ifdef DEBUG
-            if (debug > 1) 
+            if (verbose > 2)
                 printf("%s exists but no recipe or dependencies\n", s);
-#endif
             return (latest);
         }
     }
+
+    if (verbose > 1)
+        printf("making: %s\n", s);
 
     /*
      * if file is up to date 
      */
     if (t->current) {
-#ifdef DEBUG
-        if (debug > 1) 
+
+        if (verbose > 1)
             printf("current\n");
-#endif
+
         /*
          * return actual modification time 
          */
@@ -292,21 +279,23 @@ make(s)                         /* returns the modified date/time */
      * grunge through the dependencies
      */
     for (d = t->need; d; d = d->next) {
-#ifdef DEBUG
-        if (debug > 1) 
+        unsigned long tv;
+
+        if (verbose > 1)
             printf("%s depends on %s\n", t->name, d->name);
-#endif
+
         tt = make(d->name);
-        if (tt > latest) latest = tt;
-        if (FileTime(d->name) > t->modified) {
-#ifdef DEBUG
-            if (debug > 1) 
-                printf("let us build %s because > %s: %lu\n", 
-                    d->name, t->name, t->modified);
-#endif
-            if (!(mod =
-                    realloc(mod,
-                        strlen(mod) + strlen(d->name) + 2)))
+        tv = FileTime(d->name);
+        if (tt > latest)
+            latest = tt;
+        if (tv > t->modified) {
+
+            if (verbose > 1)
+                printf("build %s because %s is newer (%s < %s)\n",
+                    t->name, d->name, 
+                    PTime(t->modified), PTime(tv));
+
+            if (!(mod = realloc(mod, strlen(mod) + strlen(d->name) + 2)))
                 OutOfMem();
 
             /*
@@ -321,56 +310,50 @@ make(s)                         /* returns the modified date/time */
     /*
      * has dependencies therefore we know how 
      */
-    knowhow = TRUE;
+    knowhow = 1;
 
     /*
      * if necessary, execute all of the commands to make it 
-     */
-    /*
      * if ( out of date ) || ( depends on nothing ) 
      */
     if ((latest > t->modified) || (!t->need)) {
         /*
          * make these guys 
          */
-        howp = t->recipe;
         for (howp = t->recipe; howp; howp = howp->next) {
-#ifdef DEBUG
-            if (debug > 1) 
-                printf("pre: %s s: %s mod: %s\n", howp->text, s, mod);
-#endif
+
             expand(howp->text, s, mod);
             cmd = exbuf;
             if (*cmd != '@') {
                 printf("%s\n", exbuf);
             }
-                if (execute) {
-                    if (*cmd == '@')
-                        ++cmd;
-                    ret = docmd(cmd);
-                }
-            }
-            /*
-             * file has now been modified 
-             */
-            t->modified = CurrTime();
-#ifdef DEBUG
-            if (debug > 1) 
-                printf("set time of %s to %lu\n", t->name, t->modified);
-#endif
-            t->current = TRUE;
-            if (t->recipe) {
-                madesomething = TRUE;
+            if (execute) {
+                if (*cmd == '@')
+                    ++cmd;
+                ret = docmd(cmd);
             }
         }
-
         /*
-         * return the update file time 
+         * file has now been modified 
          */
-        free(mod);
-        return (t->modified);
+        t->modified = CurrTime();
+
+        if (verbose > 1)
+            printf("set time of %s to (%s)\n", t->name, PTime(t->modified));
+
+        t->current = 1;
+        if (t->recipe) {
+            madesomething = 1;
+        }
     }
 
     /*
-     * vim: tabstop=4 shiftwidth=4 expandtab: 
+     * return the update file time 
      */
+    free(mod);
+    return (t->modified);
+}
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab: 
+ */

@@ -4,20 +4,45 @@
  * make.h
  */
 
-#define	INMAX	132             /* longest line read */
-#define	TRUE	1
-#define	FALSE	0
+#ifdef linux
+#define INIT
+#else
+#define INIT = 0
+#endif
 
-typedef char boolean;
+extern char *PTime();
+extern long FileTime();
+extern long CurrTime();
+
+#ifndef linux
+extern char *strdup();
+#endif
+
+/*
+ * verbosity:
+ * 0: print commands executed
+ * 1: dump out definitions
+ * 2: trace make reasons
+ * 3: kitchen sink
+ * 4: truly extreme
+ */
+extern char verbose;
 
 /*
  * makefile record types
+ * whitesmith's c predates enum!
  */
-#define	UNKNOWN	0               /* unknown record */
-#define	TARGET	1               /* target record */
-#define	RECIPE	2               /* how to make record */
-#define	MACRO	3               /* macro definition record */
-#define	COMMENT	4               /* a line to ignore */
+#ifdef linux
+enum rectype {
+    UNKNOWN, TARGET, RECIPE, MACRO, COMMENT
+};
+#else
+#define UNKNOWN 0
+#define TARGET  1
+#define RECIPE  2
+#define MACRO   3
+#define COMMENT 4
+#endif
 
 /*
  * a build target, along with all it's dependencies
@@ -27,8 +52,8 @@ typedef char boolean;
  */
 struct target {
     char *name;
-    boolean current;
-    unsigned long modified;
+    char current;                       /* we made it */
+    long modified;
     struct dep *need;
     struct command *recipe;
     struct target *next;

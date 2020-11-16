@@ -6,18 +6,12 @@
 #include	<stdio.h>
 #include	"make.h"
 
-#ifdef linux
-#define INIT
-#else
-#define INIT = 0
-#endif
-
-char debug INIT;
-extern boolean execute;
+char verbose INIT;
+extern char execute;
 
 extern struct target *targets;
 extern struct macro *macros;
-char *makefile = 0;
+char *makefile INIT;
 
 /*
  * initialize structures 
@@ -27,30 +21,29 @@ init(argc, argv)
     char *argv[];
 {
     int i;                      /* parameter index */
-    boolean readmakefile();     /* process a 'make' file */
 
     /*
      * scan thru all supplied parameters 
      */
-    for (i = 1; i < argc; ++i) {
+    for (i = 1; i < argc; i++) {
         if (argv[i][0] == '-') {
             /*
              * decode this option 
              */
             switch (toupper(argv[i][1])) {
-            case 'D':
-                debug++;
+            case 'V':
+                verbose++;
                 break;
 
             case 'F':
                 if (++i < argc) {
-                    makefile = argv[1];
+                    makefile = argv[i];
                 } else
                     usage();
                 break;
 
             case 'N':
-                execute = FALSE;
+                execute = 0;
                 break;
 
             default:
@@ -67,10 +60,10 @@ init(argc, argv)
     if (makefile) {
         readmakefile(makefile, 1);
     } else {
-        if (readmakefile("makefile", 0)) return;
-        readmakefile("Makefile", 1);
+        if (!readmakefile("makefile", 0))
+            readmakefile("Makefile", 1);
     }
-    if (debug) {
+    if (verbose) {
         dumpdefs();
     }
 }
@@ -121,16 +114,16 @@ dumpdefs()
         /*
          * tell which file we're talking about 
          */
-        fprintf(stderr, "\nFile(%s): Modified(%lu)\n  depends on:",
-            t->name, t->modified);
+        fprintf(stderr, "\nFile(%s): Modified(%s)\n  depends on:",
+            t->name, PTime(t->modified));
 
         /*
          * display the dependencies 
          */
         i = 0;
         for (d = t->need; d; d = d->next) {
-            fprintf(stderr, "%c%s(%d)", 
-                (i == 0 ? '\t' : ' '), d->name, strlen(d->name));
+            fprintf(stderr, "%c%s", 
+                (i == 0 ? '\t' : ' '), d->name);
             if ((i += strlen(d->name) + 1) > 44) {
                 if (d->next)
                     fprintf(stderr, "\n\t");
@@ -153,7 +146,7 @@ dumpdefs()
 usage()
 {
     fprintf(stderr,
-        "usage: make [-d] [-n] [-f makefile] [filename ...]\n");
+        "usage: make [-v] [-n] [-f makefile] [target ...]\n");
     exit(1);
 }
 

@@ -9,23 +9,14 @@
 #endif
 #include	"make.h"
 
-extern boolean knowhow;
+extern char knowhow;
 
-extern unsigned long FileTime();
 extern struct target *targets;
 extern struct macro *macros;
 
-#ifdef DEBUG
-extern char debug;
-#endif
+extern char verbose;
 
 int lineno = 1;
-
-#ifdef linux
-#define INIT0
-#else
-#define INIT0 = 0
-#endif
 
 /*
  * a word about memory management:
@@ -33,8 +24,8 @@ int lineno = 1;
  * static arrays; dependency trees and macro definitions are malloc'd.
  */
 #define MAXLINE 1024
-char inbuf[MAXLINE] INIT0;       /* input buffer */
-char exbuf[MAXLINE] INIT0;       /* macro expanded */
+char inbuf[MAXLINE] INIT;       /* input buffer */
+char exbuf[MAXLINE] INIT;       /* macro expanded */
 
 /*
  * a definition line can have up to NDEFS targets before the colon
@@ -42,8 +33,8 @@ char exbuf[MAXLINE] INIT0;       /* macro expanded */
 #define NDEFS   100
 
 #define NLEN    32
-char namebuf[NLEN] INIT0;
-char workbuf[NLEN] INIT0;
+char namebuf[NLEN] INIT;
+char workbuf[NLEN] INIT;
 
 /*
  * all whitespace inside a line is identical. 
@@ -96,7 +87,7 @@ readmakefile(s, report)
     struct macro *m;
     struct dep *d;
     int i;
-    unsigned long ft;
+    long ft;
     char *semi;
     char *w;
 
@@ -133,11 +124,9 @@ readmakefile(s, report)
         p = inbuf;
          
         i = linetype();
-#ifdef DEBUG
-        if (debug > 1) {
+        if (verbose > 2) {
             printf("linetype: %d %s\n", i, inbuf);
         }
-#endif
 
         /*
          * check for definitions and macros 
@@ -196,12 +185,10 @@ readmakefile(s, report)
                 }
             }
             *w = '\0';
-#ifdef DEBUG
-            if (debug > 1) {
+            if (verbose > 2) {
                 printf("macdef %s\n", m->name);
-                hexdump(m->text, strlen(m->text));
+                /* hexdump(m->text, strlen(m->text)); */
             }
-#endif
             break;
 
         /*
@@ -221,12 +208,10 @@ readmakefile(s, report)
             /* expand any macros in the targets or dependencies */
             expand(inbuf, 0, 0);
 
-#ifdef DEBUG
-            if (debug > 1) {
+            if (verbose > 2) {
                 printf("expanded: %s\n", exbuf);
                 /* hexdump(exbuf, strlen(exbuf)); */
             }
-#endif 
             p = exbuf;
 
             /* we know there is a colon, so guaranteed to terminate */
@@ -248,7 +233,7 @@ readmakefile(s, report)
                  * create a NEW definition record 
                  */
                 if (tcnt == NDEFS) {
-                    fprintf(stderr, "too many definitions on line %d\n", lineno);
+                    fprintf(stderr, "line %d\: too many definitions", lineno);
                     return (0);
                 }
 
@@ -257,13 +242,12 @@ readmakefile(s, report)
                         OutOfMem();
                     if (!(t->name = strdup(namebuf)))
                         OutOfMem();
-                    t->current = FALSE;
+                    t->current = 0;
                     ft = FileTime(t->name);
                     t->modified = ft;
-#ifdef DEBUG
-                    if (debug > 1)
-                        fprintf(stderr, "set time of %s to %lu\n", t->name, ft);
-#endif
+                    if (verbose > 1)
+                        fprintf(stderr, "set time of %s to (%s)\n", 
+                            t->name, PTime(ft));
                     t->next = targets;
                     targets = t;
                 }
@@ -307,10 +291,8 @@ readmakefile(s, report)
                     w = namebuf;
                     if ((namebuf[0] == '$') && (namebuf[1] == '*')) {
                         strcpy(workbuf, lt[i]->name);
-#ifdef DEBUG
-                        if (debug > 1)
+                        if (verbose > 2)
                             printf("magic: pat: %s target: %s\n", namebuf, workbuf);
-#endif
                         for (w = workbuf; *w && (*w != '.'); w++)
                             ;
                         strcpy(w, &namebuf[2]);
@@ -396,12 +378,10 @@ char *mname;
             break;
         }
     }
-#ifdef DEBUG
-    if (debug > 1) {
+    if (verbose > 2) {
         printf("mactext: %s\n", mname, ret ? ret : "undefined");
-        if (ret) hexdump(ret, strlen(ret));
+        /* if (ret) hexdump(ret, strlen(ret)); */
     }
-#endif
     return ret;
 }
 
@@ -422,12 +402,10 @@ expand(str, name, mod)
     char *src;
     char c;
 
-#ifdef DEBUG
-    if (debug > 1) {
+    if (verbose > 2) {
         printf("\nexpand \"%s\" name: \"%s\" mod: \"%s\"\n", 
             str, name?name:"", mod?mod:"");
     }
-#endif
 
     /*
      * since macros can contain macros, we need to loop
@@ -441,12 +419,10 @@ expand(str, name, mod)
 
         strcpy(inbuf, exbuf);
 
-#ifdef DEBUG
-        if (debug > 1) {
+        if (verbose > 3) {
             printf("expand pass\n");
-            hexdump(inbuf, strlen(inbuf));
+            /* hexdump(inbuf, strlen(inbuf)); */
         }
-#endif
 
         /*
          * let's get the show on the road 

@@ -31,6 +31,7 @@ extern void secdump(unsigned char *buf);
 extern UINT secmap(struct sup *fs, UINT blkno);
 extern int bmap(struct dsknod *ip, int offset, int alloc);
 extern struct dsknod *namei(struct sup *f, char *name);
+extern struct dir *getdir(struct dsknod *ip);
 extern struct dir *getdirent(struct dsknod *ip, int index);
 extern int balloc(struct sup *f);
 extern void bfree(struct sup *f, int b);

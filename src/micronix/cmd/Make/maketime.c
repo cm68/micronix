@@ -9,18 +9,14 @@
 extern int errno;
 #include <stdio.h>
 #include <stat.h>
-#define INIT = 0
 #endif
 
 #ifdef linux
-#define INIT
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <time.h>
+#include <string.h>
 #include <errno.h>
-#endif
-
-#ifdef DEBUG
-extern char debug;
 #endif
 
 struct stat statb INIT;
@@ -28,12 +24,12 @@ struct stat statb INIT;
 /*
  * get last update time 
  */
-unsigned long
+long
 FileTime(fname)
-    char *fname;
+char *fname;
 {
     int i;
-    unsigned long rv;
+    long rv;
  
     i = stat(fname, &statb);
     if (i < 0) {
@@ -44,37 +40,55 @@ FileTime(fname)
 #else
     rv = statb.modtime;
 #endif
-#ifdef DEBUG
-    if (debug > 1) 
-        printf("stat of file %s returns %lu\n", fname, rv);
-#endif
+    if (verbose > 2) 
+        printf("stat of file %s returns %s\n", fname, PTime(rv));
     return rv;
 }
 
 /*
  * return current system time 
  */
-unsigned long
+long
 CurrTime()
 {
-    unsigned long tt;
+    long tt;
     time(&tt);
-#ifdef DEBUG
-    if (debug > 1) 
-        printf("curtime returns %lu\n", tt);
-#endif
+    if (verbose > 2) 
+        printf("curtime returns %s\n", PTime(tt));
     return tt;
 }
 
+#ifdef linux
+#define cpybuf(d,s,l)  memcpy(d,s,l)
+#endif
+
 /*
- * convert time to external 
+ * convert time to printable.
+ * since we could call this multiple times in a printf, rotate static buffers
  */
+char timebuf[100] INIT;
+char *tbuf = timebuf;
+
 char *
-ListTime(val, dp)
-    unsigned long val;          /* internal date/time */
-    register char *dp;          /* formatted string ptr */
+PTime(val)
+long val;
 {
-    sprintf(dp, "%x %x", (val >> 16) & 0xffff, val & 0xffff);
+    char *s;
+
+    if (val == 0) {
+        return "0";
+    } 
+
+    if (tbuf == timebuf)
+        tbuf = &timebuf[sizeof(timebuf)/2];
+    else
+        tbuf = timebuf;
+
+    s = ctime(&val);
+    cpybuf(&tbuf[0], &s[4], 12); /* mmm dd HH:MM */
+    tbuf[12] = '\0';
+
+    return tbuf;
 }
 
 /*
