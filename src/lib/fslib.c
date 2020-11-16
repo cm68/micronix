@@ -84,8 +84,8 @@ closefs_hook(int i, void *arg)
     closefs(arg);
 }
 
-int
-openfs(char *filesystem, struct sup **fsp)
+int 
+openfsrw(char *filesystem, struct sup **fsp, int writable)
 {
     int ret;
     struct image *i = malloc(sizeof(struct image));
@@ -109,7 +109,7 @@ openfs(char *filesystem, struct sup **fsp)
 #endif
         break;
     case DRIVER_IMD:
-        i->drive = imd_load(filesystem, 0, 1);
+        i->drive = imd_load(filesystem, 0, writable);
         if (i->drive) {
             ret = 0;
         } else {
@@ -118,7 +118,7 @@ openfs(char *filesystem, struct sup **fsp)
         break;
     case DRIVER_IMAGE:
     default:
-        ret = open(filesystem, O_RDWR);
+        ret = open(filesystem, writable ? O_RDWR : O_RDONLY);
         i->fd = ret;
         break;
     } 
@@ -144,6 +144,12 @@ openfs(char *filesystem, struct sup **fsp)
         free((struct sup *)i);
     }
     return ret;
+}
+
+int
+openfs(char *filesystem, struct sup **fsp)
+{
+    return openfsrw(filesystem, fsp, 0);
 }
 
 /*

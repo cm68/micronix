@@ -66,43 +66,43 @@ clean:
 # END { printf("\n") }
 # '
 
-access.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h
-balloc.c: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/sup.h $(SYS)/proc.h
-cio.c: $(SYS)/sys.h $(SYS)/con.h $(SYS)/file.h $(SYS)/inode.h $(SYS)/proc.h
-con.c: $(SYS)/sys.h $(SYS)/con.h
-create.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h
-cus.c: $(SYS)/sys.h $(SYS)/tty.h
-dj.c: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h
-exec.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/buf.h $(INC)/obj.h
-fio.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h
-fork.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/con.h
-ialloc.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/sup.h
-iget.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/buf.h $(SYS)/proc.h
-imap.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/buf.h $(SYS)/proc.h
-link.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h
-lock.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/lock.h
-main.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/buf.h $(SYS)/con.h build.h
-makedate.c: $(INC)/std.h $(INC)/time.h
-malloc.c: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/sup.h $(SYS)/con.h
-memdev.c: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/con.h
-mount.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/sup.h
-mset.c: $(SYS)/tty.h
-multio.c: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
-mw.c: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h
-name.c: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/inode.h
-open.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/con.h
-queue.c: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
-rdwri.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/file.h $(SYS)/proc.h
-reg.c: $(SYS)/sys.h $(SYS)/proc.h
-sig.c: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/tty.h
-sleep.c: $(SYS)/sys.h $(SYS)/proc.h
-subc.c: $(SYS)/sys.h $(SYS)/con.h
-swap.c: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/con.h
-sys1.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/file.h $(SYS)/proc.h
-sys2.c: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/file.h
-system.c: $(SYS)/sys.h $(SYS)/proc.h
-time.c: $(SYS)/sys.h $(SYS)/proc.h
-trap.c: $(SYS)/sys.h $(SYS)/proc.h
-tty.c: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
-uio.c: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/sup.h
-user.c: $(SYS)/sys.h $(SYS)/proc.h
+access.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h
+balloc.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/sup.h $(SYS)/proc.h
+cio.o: $(SYS)/sys.h $(SYS)/con.h $(SYS)/file.h $(SYS)/inode.h $(SYS)/proc.h
+con.o: $(SYS)/sys.h $(SYS)/con.h
+create.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h
+cus.o: $(SYS)/sys.h $(SYS)/tty.h
+dj.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h
+exec.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/buf.h $(INC)/obj.h
+fio.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h
+fork.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/con.h
+ialloc.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/sup.h
+iget.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/buf.h $(SYS)/proc.h
+imap.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/buf.h $(SYS)/proc.h
+link.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h
+lock.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/lock.h
+main.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/buf.h $(SYS)/con.h build.h
+makedate.o: $(INC)/std.h $(INC)/time.h
+malloc.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/sup.h $(SYS)/con.h
+memdev.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/con.h
+mount.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/sup.h
+mset.o: $(SYS)/tty.h
+multio.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
+mw.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h
+name.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/inode.h
+open.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/con.h
+queue.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
+rdwri.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/file.h $(SYS)/proc.h
+reg.o: $(SYS)/sys.h $(SYS)/proc.h
+sig.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/tty.h
+sleep.o: $(SYS)/sys.h $(SYS)/proc.h
+subc.o: $(SYS)/sys.h $(SYS)/con.h
+swap.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/con.h
+sys1.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/file.h $(SYS)/proc.h
+sys2.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/file.h
+system.o: $(SYS)/sys.h $(SYS)/proc.h
+time.o: $(SYS)/sys.h $(SYS)/proc.h
+trap.o: $(SYS)/sys.h $(SYS)/proc.h
+tty.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
+uio.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/sup.h
+user.o: $(SYS)/sys.h $(SYS)/proc.h

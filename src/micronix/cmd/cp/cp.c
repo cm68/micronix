@@ -127,7 +127,10 @@ copy(from, to)
 
     exists = stat(to, &stto) == 0;
     if (exists) {
-        if (stfrom.st_dev == stto.st_dev && stfrom.st_ino == stto.st_ino) {
+        if (stfrom.st_dev == stto.st_dev && 
+			stfrom.st_ino == stto.st_ino &&
+			stfrom.size1 == stto.size1 &&
+			stfrom.flags == stto.flags) {
             fprintf(stderr,
                 "cp: %s and %s are identical (not copied).\n", from, to);
             close(fold);

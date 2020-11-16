@@ -4,7 +4,7 @@
 OBJECTS = make.o makeinit.o makeread.o maketime.o
 
 Make: $(OBJECTS)
-	cc -v -o Make make.o makeinit.o makeread.o maketime.o -lutil -lS
+	cc -o Make make.o makeinit.o makeread.o maketime.o -lutil -lS
 
 $(OBJECTS) : $*.c
 	cc -c $*.c
