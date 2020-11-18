@@ -300,6 +300,24 @@ char sys_stop[64];
 char sys_trace[64];
 
 int
+get_syscall(char **sp)
+{
+    int i;
+    for (i = 0; i < strlen(*sp); i++)
+        (*sp)[i] = tolower((*sp)[i]);
+
+    if (**sp >= 'a' && **sp <= 'z') {
+        for (i = 0; syscalls[i].name; i++) {
+            if (strcmp(*sp, syscalls[i].name) == 0) {
+                *sp += strlen(*sp);
+                return i;
+            }
+        }
+        return -1;
+    }
+    return strtol(*sp, &sp, 0);
+}
+int
 main(int argc, char **argv)
 {
     char *progname = *argv++;
@@ -344,35 +362,41 @@ main(int argc, char **argv)
                 break;
             case 'v':
                 if (!argc--) {
-                    usage("verbosity not specified \n", progname);
+                    usage("verbosity not specified\n", progname);
                 }
                 verbose = strtol(*argv++, 0, 0);
                 break;
             case 's':
                 if (!argc--) {
-                    usage("stop syscall not specified \n", progname);
+                    usage("stop syscall not specified\n", progname);
+                    break;
                 }
                 s = *argv++;
-                i = strtol(s, &s, 0);
-                if ((i > sizeof(sys_stop)) || (i < 0))
-                    continue;
+                i = get_syscall(&s);
+                if ((i > sizeof(sys_stop)) || (i < 0)) {
+                    usage("unrecognized system call\n", progname);
+                    break;
+                }
                 sys_stop[i] = 1;
                 break;
             case 't':
                 if (!argc--) {
-                    usage("trace syscall not specified \n", progname);
+                    usage("trace syscall not specified\n", progname);
+                    break;
                 }
                 s = *argv++;
-                i = strtol(s, &s, 0);
-                if ((i > sizeof(sys_stop)) || (i < 0))
-                    continue;
+                i = get_syscall(&s);
+                if ((i > sizeof(sys_stop)) || (i < 0)) {
+                    usage("unrecognized system call\n", progname);
+                    break;
+                }
                 sys_trace[i] = 1;
                 break;
             case 'b':
                 breakpoint++;
                 break;
             default:
-                usage("unrecognized option", progname);
+                usage("unrecognized option\n", progname);
                 break;
             }
         }
@@ -1699,7 +1723,7 @@ SystemCall(MACHINE * cp)
                 }
             } else {
                 ret = open(filename, arg2);
-                if (ret == -1) {
+                if (ret == 0xffff) {
                     if (verbose & V_ERROR)
                         perror(filename);
                     goto lose;
