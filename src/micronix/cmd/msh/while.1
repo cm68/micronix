@@ -1,0 +1,172 @@
+.he "while (1)                     5/31/77                  while(1)"
+.fo ""
+.rm 65
+.in 10
+.ti -5
+.bd
+PROGRAM
+.br
+while - shell iteration command
+.sp
+.ti -5
+.br
+USAGE
+.br
+.bd
+while
+expr
+.br
+commands ... (may include
+.bd 
+break
+or
+.bd 
+continue
+)
+.br
+.bd 
+end
+.SH 
+.sp
+.ti -5
+FUNCTION
+.br
+.bd 
+While
+evaluates the expression
+.bd 
+expr,
+which is similar to (and a superset of) the expression described in
+.bd 
+"if(1)."
+If the expression is true,
+.bd 
+while
+does nothing, permitting the command(s) on following lines to be
+read and executed by the Shell.
+If the expression is false, the input file is effectively searched
+for the matching
+.I 
+end
+command, and the Shell resumes execution of the command(s) on the line
+following the
+.I 
+end.
+The
+.I 
+while-end
+grouping may be nested up to three levels deep.
+.sp
+In addition to the type of expression permitted by
+.I 
+if,
+.I 
+while
+treats a single, nonnull argument as a true expression,
+and treats a single null argument or lack of arguments as a false
+expression.
+.sp
+The
+.I 
+break
+command terminates the nearest enclosing
+.I 
+while-end
+group, causing execution to resume after the nearest succeeding
+unmatched
+.I 
+end.
+Exit from
+.I 
+n
+levels is obtained by writing
+.I 
+n
+.I 
+break
+commands on the same line.
+.PP
+The
+.I 
+continue
+command causes execution to resume at a preceding
+.I 
+while,
+i.e., the
+.I 
+while
+that begins the smallest loop
+containing the
+.I 
+continue.
+.sp
+A common loop is that of processing arguments one at a time: see
+.I 
+shift(1).
+.sp
+The following is a shell procedure that is also a filter.
+It reads a line at a time from the standard input
+that existed when the procedure was invoked, exiting on end-of-file.
+.sp
+.nf
+while 1
+	= a <-- exit
+	commands using $a ...
+end
+.fi
+.sp
+.ti -5
+.bd 
+SEE ALSO
+.br
+goto(1), if(1), onintr(1), sh(1), shift(1), switch(1)
+.sp
+.ti -5
+.br 
+DIAGNOSTICS
+.br
+.nf
+while: missing end
+while: >3 levels
+while: syntax errors like those of if.
+break: missing end
+break: used outside loop
+continue: used outside loop
+end: used outside loop
+.fi
+.sp
+.ti -5
+.br
+BUGS
+.br
+A
+.I 
+goto
+may be used to terminate one or more
+.I 
+while-end
+groupings.
+Those who use it to branch into a loop will
+receive appropriately peculiar results.
+.sp
+When an interrupt is caught and transfer to a label caused by use of
+.I 
+onintr(I),
+all currently effective
+.I 
+while-end
+loops are cancelled, i.e., the
+.I 
+onintr
+performs a
+.I 
+goto
+that breaks all loops.
+.sp
+Neither
+.I 
+while
+nor
+.I 
+end
+may be hidden behind semicolons or used within other commands.

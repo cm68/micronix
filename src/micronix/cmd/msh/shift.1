@@ -1,0 +1,71 @@
+.he "shift(1)                        5/31/77                shift(1)"
+.fo ""
+.rm 65
+.in 10
+.ti -5
+.bd
+PROGRAM
+.br
+shift - adjust Shell arguments
+.sp
+.ti -5
+.bd
+USAGE
+.bd 
+shift
+[ digit ]
+.sp
+.ti -5
+.bd
+FUNCTION
+.br
+.bd 
+Shift
+is used in Shell command files to shift the
+argument list left by 1,
+so that old
+.bd 
+$2
+can now be referred to by
+.bd 
+$1
+and so forth.
+.bd 
+Shift
+is useful to iterate over several arguments
+to a command file.
+.sp
+For example, the command file
+.sp
+.nf
+while "$1"
+	pr -3 $1
+	shift
+end
+.fi
+.sp
+prints each of its arguments in 3-column format.
+.sp
+.it 
+Shift
+is executed within the Shell.
+.sp
+The optional argument causes
+.it 
+shift
+to leave shell arguments numbered lower than
+.it 
+$digit
+alone on shifts;
+.it 
+shift
+alone and
+.it 
+"shift 1"
+are identical in effect.
+.sp
+.ti -6
+.bd
+SEE ALSO
+.br
+sh(1)
