@@ -1,0 +1,54 @@
+.he "goto (1)                      5/31/77                    goto (1)"
+.fo ""
+.rm 65
+.in 10
+.ti -5
+.bd
+PROGRAM
+.br
+.bd
+goto
+-  command transfer
+.sp
+.ti -5
+.bd 
+USAGE
+.br
+.bd
+goto
+label
+.br
+.sp
+.ti -5 
+.bd
+FUNCTION
+.br
+.bd
+Goto
+is allowed only when the Shell
+is taking commands from a file.
+.sp
+The file is searched from the beginning
+for a line beginning with `:' followed by one
+or more spaces followed by the
+.bd 
+label.
+.sp
+If such a line is found, the
+.bd 
+goto
+command returns.
+.sp
+Since the read pointer in the command file points to the
+line after the label,
+the effect is to cause the Shell to transfer to the
+labelled line.
+.sp
+`:' is a do-nothing
+command that is ignored by the Shell and only serves to place a label.
+.sp
+.ti -5
+.bd
+SEE ALSO
+.br
+sh(1)

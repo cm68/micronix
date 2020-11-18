@@ -1,0 +1,59 @@
+SWITCH(I)                                                            SWITCH(I)
+
+
+
+NNAAMMEE
+       switch  shell multi-way branch command
+
+SSYYNNOOPPSSIISS
+       sswwiittcchh arg
+       : label1
+            commands...
+            bbrreeaakkssww
+       . . .
+       : labeln
+            commands...
+            bbrreeaakkssww
+       :: ddeeffaauulltt
+            commands...
+       eennddssww
+
+DDEESSCCRRIIPPTTIIOONN
+       _S_w_i_t_c_h searches forward in the input file for the first one of:
+
+       1.   a  label  that  pattern-matches _a_r_g_.  The pattern-matching used is
+       that of the Shell in generating argument  lists.   2.   the  label  _d_e_‐
+       _f_a_u_l_t_.  3.   a matching _e_n_d_s_w command.
+
+       The  Shell  resumes reading commands from the next line after the loca‐
+       tion where the search stopped.  Thus, _s_w_i_t_c_h supplies a `case' or `com‐
+       puted  goto' statement similar to that of C.  Because `:' is ignored by
+       the Shell, several labels may occur in order, so that the same sequence
+       of commands is executed for several different values of _a_r_g_.
+
+       The  _b_r_e_a_k_s_w  command searches forward to the next unmatched _e_n_d_s_w_, and
+       is normally used at the end of the sequence of commands following  each
+       label.  It may be omitted to allow common code to be shared among label
+       values.  Several _b_r_e_a_k_s_w commands may be written on the  same  line  to
+       exit from that many levels of nested _s_w_i_t_c_h_e_n_d_s_w pairs.
+
+       The  optional  label _d_e_f_a_u_l_t should be placed last, since _s_w_i_t_c_h always
+       stops upon discovering it.  The construct can be nested: any labels en‐
+       closed by a _s_w_i_t_c_h_-_e_n_d_s_w pair are ignored by an outer _s_w_i_t_c_h_.  The most
+       common use of _s_w_i_t_c_h is to process `flag' arguments in a  shell  proce‐
+       dure.
+
+SSEEEE AALLSSOO
+       if(I), sh(I), while(I)
+
+DDIIAAGGNNOOSSTTIICCSS
+       switch: missing endsw
+       breaksw: missing endsw
+
+BBUUGGSS
+       None  of  these  commands  should  be hidden behind semicolons.  Nested
+       groups hidden behind _i_f or _e_l_s_e may also cause trouble.
+
+
+
+                                    5/31/77                          SWITCH(I)

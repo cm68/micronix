@@ -1,0 +1,44 @@
+.he "exit (1)                      5/31/77                   exit(1)"
+.fo ""
+.rm 65
+.in 10
+.ti -5
+.bd
+PROGRAM
+.br
+.bd
+exit
+- terminate command file
+.sp
+.ti -5
+.bd
+USAGE
+.br
+.bd 
+exit
+[ integer ]
+.sp
+.ti -5
+.bd 
+FUNCTION
+.br
+.bd 
+Exit
+performs a
+.bd 
+seek
+to the end of its standard input file.
+Thus, if it is invoked inside
+a file of commands, upon return from
+.bd exit
+the shell will
+discover an end-of-file and terminate.
+.sp
+The optional argument will be returned to the shell
+as the exit status code.
+.sp
+.ti -5
+.bd
+SEE ALSO
+.br
+if(1), goto(1), sh(1)

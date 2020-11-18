@@ -12,6 +12,7 @@ msh.sym : msh.c
 
 install: msh
 	cp msh /bin/msh
-	cp msh.1 /usr/man/man1/msh.1
+	cp *.1 /usr/man/man1/
 
 clean: ; /bin/rm msh *.o
+

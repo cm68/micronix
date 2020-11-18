@@ -1,0 +1,151 @@
+.he "switch(1)                       5/31/77                  switch(1)"
+.fo ""
+.ta 5
+.rm 65
+.in 10
+.ti -5
+.bd
+PROGRAM
+.br
+.bd
+switch
+- shell multi-way branch command
+.sp
+.ti -5
+.bd
+USAGE
+.br
+.bd
+switch
+arg
+.br
+: label1
+.in +5
+.br
+commands...
+.br
+breaksw
+.br
+. . .
+.br
+.in -5
+: labeln
+.in +5
+.br
+commands...
+.br
+.bd
+breaksw
+.br
+.in -5
+.bd
+: default
+.br
+.in +5
+commands...
+.br
+.in -5
+.bd
+endsw
+.sp
+.ti -5
+.bd
+DESCRIPTION
+.br
+.bd
+Switch
+searches forward in the input file for the first one of:
+.sp
+1.	a label that pattern-matches
+.bd 
+arg.
+.in +5
+The pattern-matching used is that of the Shell in
+generating argument lists.
+.in -5
+.br
+2.	the label
+.bd 
+default.
+.br
+3.	a matching
+.bd 
+endsw
+command.
+.sp
+The Shell resumes reading commands from the next line after the location
+where the search stopped.
+Thus,
+.bd 
+switch
+supplies a `case' or `computed goto' statement
+similar to that of C.
+.sp
+Because `:' is ignored by the Shell, several labels may occur in order,
+so that the same sequence of commands is
+executed for several different values of
+.bd 
+arg.
+.sp
+The
+.bd 
+breaksw
+command searches forward to the next unmatched
+.bd 
+endsw,
+and is normally used at the end of the sequence of commands
+following each label.
+It may be omitted to allow common code to be shared among label values.
+.sp
+Several
+.bd 
+breaksw
+commands may be written on the same line to exit from that many levels
+of nested
+.bd 
+switch-endsw
+pairs.
+.sp
+The optional label
+.bd 
+default
+should be placed last,
+since
+.bd 
+switch
+always stops upon discovering it.
+The construct can be nested: any labels enclosed by a
+.bd 
+switch-endsw
+pair are ignored by an outer
+.bd 
+switch.
+.sp
+The most common use of
+.bd 
+switch
+is to process `flag' arguments in a shell procedure.
+.sp
+.ti -5
+SEE ALSO
+.br
+if(1), sh(1), while(1)
+.sp
+.ti -5
+DIAGNOSTICS
+.br
+switch: missing endsw
+.br
+breaksw: missing endsw
+.sp
+.ti -5
+BUGS
+.br
+None of these commands should be hidden behind semicolons.
+Nested groups hidden behind
+.bd 
+if
+or
+.bd
+else
+may also cause trouble.

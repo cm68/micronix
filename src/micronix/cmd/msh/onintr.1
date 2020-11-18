@@ -1,0 +1,52 @@
+.he "onintr(1)                      5/31/77                 onintr(1)"
+.fo ""
+.rm 65
+.in 10
+.ti -5
+.bd
+PROGRAM
+.br
+onintr - handle interrupts in shell files
+.sp
+.ti -5
+.bd
+USAGE
+.br
+.bd 
+onintr
+[ label ]
+.sp
+.ti -5
+.bd
+FUNCTION
+.br
+The
+.bd 
+onintr
+command catches interrupts received while the Shell
+is reading from a file.
+.sp
+After the interrupt, and after any active process has completed,
+the Shell procedure is transferred to the label specified.
+Unless another
+.bd 
+onintr
+command is processed, the next interrupt
+will kill the Shell.
+.sp
+The command without a label turns interrupts back on.
+.sp
+The special case ``onintr -'' causes interrupts to be totally
+ignored,
+both by the Shell itself and by
+subsequent commands invoked by the Shell.
+.sp
+.bd 
+Onintr
+is executed within the Shell.
+.sp
+.ti -5
+.bd
+SEE ALSO
+.br
+sh(1)

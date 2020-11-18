@@ -1,0 +1,68 @@
+WHILE(I)                                                              WHILE(I)
+
+
+
+NNAAMMEE
+       while  shell iteration command
+
+SSYYNNOOPPSSIISS
+       expr
+            commands... (may include _b_r_e_a_k or _c_o_n_t_i_n_u_e_)
+
+DDEESSCCRRIIPPTTIIOONN
+       _W_h_i_l_e  evaluates the expression _e_x_p_r_, which is similar to (and a super‐
+       set of) the expression described in _i_f_(_I_)_.  If the expression is  true,
+       _w_h_i_l_e  does nothing, permitting the command(s) on following lines to be
+       read and executed by the Shell.  If the expression is false, the  input
+       file  is  effectively  searched  for  the matching _e_n_d command, and the
+       Shell resumes execution of the command(s) on  the  line  following  the
+       _e_n_d_.  The _w_h_i_l_e_-_e_n_d grouping may be nested up to three levels deep.
+
+       In  addition  to the type of expression permitted by _i_f_, _w_h_i_l_e treats a
+       single, nonnull argument as a true expression, and treats a single null
+       argument or lack of arguments as a false expression.
+
+       The  _b_r_e_a_k  command  terminates  the nearest enclosing _w_h_i_l_e_-_e_n_d group,
+       causing execution to resume after the nearest succeeding unmatched _e_n_d_.
+       Exit  from _n levels is obtained by writing _n _b_r_e_a_k commands on the same
+       line.
+
+       The _c_o_n_t_i_n_u_e command causes execution to resume at a  preceding  _w_h_i_l_e_,
+       i.e., the _w_h_i_l_e that begins the smallest loop containing the _c_o_n_t_i_n_u_e_.
+
+       A  common  loop  is  that  of  processing  arguments one at a time: see
+       _s_h_i_f_t_(_I_)_.
+
+       The following is a shell procedure that is also a filter.  It  reads  a
+       line  at a time from the standard input that existed when the procedure
+       was invoked, exiting on end-of-file.
+
+       while 1
+            = a <--  exit
+            commands using $a ...
+       end
+
+SSEEEE AALLSSOO
+       goto(I), if(I), onintr(I), sh(I), shift(I), switch(I)
+
+DDIIAAGGNNOOSSTTIICCSS
+       while: missing end
+       while: >3 levels
+       while: syntax errors like those of if.
+       break: missing end
+       break: used outside loop
+       continue: used outside loop
+       end: used outside loop
+
+BBUUGGSS
+       A _g_o_t_o may be used to terminate one or more _w_h_i_l_e_-_e_n_d groupings.  Those
+       who  use  it  to branch into a loop will receive appropriately peculiar
+       results.  When an interrupt is caught and transfer to a label caused by
+       use  of  _o_n_i_n_t_r_(_I_)_,  all  currently  effective _w_h_i_l_e_-_e_n_d loops are can‐
+       celled, i.e., the _o_n_i_n_t_r performs a _g_o_t_o that breaks all  loops.   Nei‐
+       ther _w_h_i_l_e nor _e_n_d may be hidden behind semicolons or used within other
+       commands.
+
+
+
+                                    5/31/77                           WHILE(I)

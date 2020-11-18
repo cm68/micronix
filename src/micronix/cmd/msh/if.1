@@ -1,0 +1,291 @@
+.he "if (1)                            5/31/77                  if (1)"
+.fo ""
+.rm 65
+.in 10
+.ti -5
+.bd
+PROGRAM
+.br
+.bd
+if
+-  conditional command
+.sp
+.ti -5
+.bd
+USAGE
+.br
+.bd 
+if
+expr command [ arg ... ]
+.sp
+.bd
+if
+expr
+.bd
+then
+.br
+	command(s)
+.br
+	...
+.br
+[
+.bd
+else
+[ command ]
+.br
+	... ]
+.br
+.bd
+endif
+.sp
+.bd
+test
+expr
+.sp
+.ti -5
+.bd
+FUNCTION
+.br
+.bd
+If
+evaluates the expression
+.bd
+expr.
+In the first form above, if
+.bd
+expr
+is true, the given
+.bd
+command
+is executed with the given arguments.
+The command may be another
+.bd
+if.
+.sp
+In the second form, if
+.bd
+expr
+is true, the commands
+between the
+.bd
+then
+and the next unmatched
+.bd
+else
+or
+.bd
+endif
+are  executed.
+If
+.bd
+expr
+is false, the commands after
+.bd
+then
+are skipped, and the commands after the optional
+.bd
+else
+are executed.
+Zero or one commands may be written on the same line as the
+.bd
+else.
+In particular,
+.bd
+if
+may be used this way.
+The pseudo commands
+.bd
+else
+and
+.bd
+endif
+(whichever occurs first)
+must not be hidden behind semicolons or other commands.
+This form may be nested: every
+.bd
+then
+needs a matching
+.bd
+endif.
+.sp
+.bd
+Test
+is an entry to
+.bd
+if
+that evaluates the expression and returns exit code 0 if it is true,
+and code 1 if it is false or in error.
+.sp
+The following primitives are used to construct
+the
+.bd
+ expr:
+.sp
+-r file	true if the file exists and is readable.
+.sp
+-w file	true if the file exists and is writable.
+.sp
+-s file	true if the file exists and has a size greater than zero.
+.sp
+-f file	true if the file exists and is an ordinary file.
+.sp
+-d file	true if the file exists and is a directory.
+.sp
+-z s1	true if the length of string
+.bd
+s1
+is zero.
+.sp
+-n s1	true if the length of string
+.bd
+s1
+is nonzero.
+.sp
+s1 = s2	true if the strings
+.bd
+s1
+and
+.bd
+s2
+are equal.
+.sp
+s1 != s2	true if the strings
+.bd
+s1
+and
+.bd
+s2
+are not equal.
+.sp
+n1 -eq n2
+.br
+n1 -ne n2
+.br
+n1 -gt n2
+.br
+n1 -ge n2
+.br
+n1 -lt n2
+.br
+n1 -le n2	true if the stated algebraic relationship exists.
+The arguments
+.bd
+n1
+and
+.bd
+n2
+must be integers.
+.sp
+{ command }	The bracketed command is executed to obtain the
+exit status.  Status zero is considered
+.bd
+true.
+The command must
+.bd
+not
+be another
+.bd
+if.
+.sp
+These primaries may be combined with the
+following operators:
+.sp
+!	unary negation operator
+.sp
+-a	binary
+.bd
+and
+operator
+.sp
+-o	binary
+.bd
+or
+operator
+.sp
+( expr )	parentheses for grouping.
+.sp
+.bd
+-a
+has higher precedence than
+.bd
+-o.
+.sp
+Notice that all the operators and flags are separate
+arguments to
+.bd
+if
+and hence must be surrounded by spaces.
+Notice also that parentheses are meaningful
+to the Shell and must be escaped.
+.sp
+.ti -5
+.bd
+EXIT CODES
+.br
+0 - true expression, no error.
+.br
+1 - false condition or error.
+.sp
+.ti -5
+.bd
+SEE ALSO
+.br
+exit(1), goto(1), sh(1), switch(1), while(1), exit(2)
+.sp
+.ti -5
+.bd 
+DIAGNOSTICS
+.br
+if:missing endif
+.br
+if:syntax error:
+value
+.br
+if:non-numeric arg:
+value
+.br
+if:no command:
+name
+.br
+else:missing endif
+.sp
+.bd
+Test
+may issue any of the
+.bd
+if
+messages above, except the first.
+.sp
+.ti -5
+.bd
+BUGS
+.br
+In general,
+.bd
+if,
+.bd 
+else,
+.bd 
+endif,
+and
+.bd
+test
+must not be hidden behind semicolons on a command line.
+.sp
+Many of the effects are obtained by
+searching the input file and adjusting the read pointer appropriately.
+Thus, including any of these commands in a part of the file intended to be read
+by a command other than the shell may cause strange results
+if they are encountered while searching.
+.sp
+These commands ignore redirection or piping of their standard
+input or output.
+.sp
+Commands executed by
+.bd
+if
+or
+.bd 
+test
+may be affected by redirections,
+but this practice is undesirable and should be avoided.
