@@ -1,0 +1,731 @@
+.th SH I 5/31/77
+.sh NAME
+sh  \*-  shell (command interpreter)
+.sh SYNOPSIS
+.bd sh
+[
+.bd \*-v
+] [
+.bd \*-
+] [
+.bd \*-ct
+]
+[ name [ arg1 ... ] ]
+.sh DESCRIPTION
+.it Sh
+is the standard command interpreter.
+It is the program which reads and arranges the execution of
+the command lines typed by most users.
+It may itself be called as a command to interpret
+files of commands.
+Before discussing the arguments to the Shell
+when it is
+used as a command, the structure of command
+lines themselves will be given.
+.s3
+.bd "Commands."
+Each command is a sequence of non-blank command arguments
+separated by blanks.
+The
+first argument specifies the name of a command to be
+executed.
+Except for certain types of special
+arguments discussed below, the arguments
+other than the command name are passed
+without interpretation to the invoked
+command.
+.s3
+By default, if the first argument is the name of an executable
+file, it is invoked;
+otherwise the string ``/bin/'' is prepended to the argument.
+(In this way most standard commands,
+which reside in ``/bin'', are found.)
+If no such command is found,
+the string ``/usr'' is further prepended
+(to give ``/usr/bin/command'') and another attempt
+is made to execute the resulting
+file.
+(Certain lesser-used commands
+live in ``/usr/bin''.)
+If a command name contains a ``/'',
+it is invoked as is, and no prepending ever occurs.
+This standard command search sequence may be changed by the user.
+See the description of the Shell variable ``$p'' below.
+.s3
+If a non-directory file exists that matches the command name and has executable
+mode,
+but not the form of an executable program
+(does not begin with the proper magic number)
+then it is assumed to be an ASCII file of commands
+and a new Shell is created to execute it.
+See ``Argument passing'' below.
+.s3
+If the file cannot be found,
+a diagnostic is printed.
+.s3
+.bd "Command lines."
+One or more commands separated by ``\*v'' or ``^'' constitute a
+chain of
+.it filters,
+or a
+.it pipeline.
+The standard output of each command but the last
+is taken
+as the standard input of the next command.
+Each command is run as a separate process, connected
+by pipes (see
+.it pipe\^\c
+(II)) to its neighbors.
+A command line contained in
+parentheses ``( )'' may appear in place of a simple command
+as a filter.
+.s3
+A
+.it "command line"
+consists of one or
+more pipelines separated, and perhaps terminated by ``\fB;\fR'' or ``&'',
+or separated by ``\*v\|\*v'' or ``&&''.
+The semicolon designates sequential execution.
+The ampersand causes the following pipeline to be executed
+without waiting for the preceding pipeline to finish.
+The process id of the preceding pipeline is reported, so that
+it may be used if necessary for a subsequent
+.it wait
+or
+.it kill.
+A pipeline following ``&&'' is executed only if the preceding
+pipeline completed successfully (exit code zero),
+while that following ``\*v\|\*v'' is executed only if the preceding one did
+.it not
+execute successfully (exit code non-zero).
+The exit code tested is that of the last command
+in the pipeline.
+The ``&&'' operator has higher precedence.
+.s3
+.bd "Termination Reporting."
+If a command (not followed by ``&'') terminates abnormally,
+a message is printed.
+(All terminations other than exit and interrupt
+are considered abnormal).
+Termination reports for commands followed by ``&''
+are given upon receipt of the first
+command subsequent to the termination of
+the command,
+or when a
+.it wait
+is executed.
+The following is a list of the abnormal
+termination messages:
+.s3
+.nf
+	Bus error
+	Trace/BPT trap
+	Illegal instruction
+	IOT trap
+	EMT trap
+	Bad system call
+	Quit
+	Floating exception
+	Memory violation
+	Killed
+	Broken Pipe
+	Alarm clock
+	Terminated
+.s3
+.fi
+If a core image is produced,
+``\*- Core dumped'' is appended to the appropriate message.
+.s3
+.bd "Redirection of I/O."
+There are three character sequences that cause the immediately following string
+to be interpreted as a special argument to the Shell itself.
+Such an argument may
+appear anywhere among
+the arguments of a simple command, or before or after
+a parenthesized command list, and is associated with that
+command or command list.
+.s3
+An argument of the form ``<arg'' causes the file
+``arg''
+to be used as the standard input (file descriptor 0) of the associated command.
+.s3
+An argument of the form ``>arg'' causes file ``arg'' to be used
+as the standard output (file descriptor 1) for the associated command.
+``Arg'' is created if it did not exist, and in any case is truncated
+at the outset.
+.s3
+An argument of the form ``>>arg'' causes file ``arg'' to be used as the
+standard output for the associated command.
+If ``arg''
+did not exist, it is created; if it did exist,
+the command output is appended to the file.
+.s3
+For example, either of the command lines
+.s3
+	ls >junk; cat tail >>junk
+.br
+	( ls; cat tail ) >junk
+.s3
+creates, on file ``junk'', a listing of the working directory, followed immediately
+by the contents of file ``tail''.
+.s3
+Either of the constructs ``>arg'' or ``>>arg''
+associated with any but the last command of a pipeline
+is ineffectual, as is ``<arg'' in any but the first.
+.s3
+In commands called by the Shell,
+file descriptor 2 refers to the standard output of the
+Shell regardless of any redirection of standard output.
+Thus filters may write diagnostics
+to a location
+where they have a chance to be seen.
+.s3
+A redirection of the form ``<\*-\*-'' requests input from the standard
+input that existed when the instance of the Shell was created.
+This permits a command file to be treated as a filter.
+The procedure ``lower'' could be
+used in a pipeline to convert characters to lower case:
+.s3
+.in +5n
+tr "[A\*-Z]" "[a\*-z]" <\*-\*-
+.in -5n
+.s3
+A typical invocation might be:
+.s3
+.in +5n
+reform \*-8 \*-c <prnt0 \*v lower >prnt0a
+.in -5n
+.s3
+.bd "Generation of argument lists."
+If any argument contains any of the characters ``?'',
+``*'' or ``['', it is treated specially as follows.
+The current directory is searched for files which
+.it match
+the given argument.
+.s3
+The character ``*'' in an argument matches any string of characters
+in a file name (including the null string).
+.s3
+The character ``?'' matches any
+single non-null character in a file name.
+.s3
+Square brackets ``[...]'' specify
+a class of characters which
+matches any single file name character in the class.
+Within the brackets,
+each ordinary character is taken
+to be a member of the class.
+A pair of characters separated by ``\*-'' places
+in the class
+each character lexically greater than or equal to
+the first and less than or equal to the second
+member of the pair.
+.s3
+Other characters match only the same character in
+the file name.
+.s3
+If an argument starts with ``*'', ``?'', or ``['',
+that argument will not match any file name that starts with
+``\fB.\fP''.
+.s3
+For example, ``*'' matches all file names;
+``?'' matches all one-character file names; ``[ab]*.s'' matches
+all file names beginning with ``a'' or ``b'' and ending with ``.s'';
+``?[zi\*-m]'' matches all two-character file names ending
+with ``z'' or the letters ``i'' through ``m''.
+None of these examples match names that start with ``\fB.\fP''.
+.s3
+If the argument with ``*'' or ``?'' also contains a ``/'', a slightly
+different procedure is used:  instead of the current directory,
+the directory used is the one obtained
+by taking the unmodified argument to the ``/'' preceding the first ``*?[''.
+The matching process matches the remainder of the argument
+after this ``/'' against the files in the derived directory.
+For example: ``/usr/dmr/a*.s'' matches
+all files in directory ``/usr/dmr'' which begin
+with ``a'' and end with ``.s''.
+.s3
+In any event, a list of names is obtained which match
+the argument.
+This list is sorted into alphabetical order,
+and the resulting sequence of arguments replaces the
+single argument containing the ``*'', ``['', or ``?''.
+The same process is carried out for each argument
+(the resulting lists are
+.it not
+merged)
+and finally the command is called with the resulting list of
+arguments.
+.s3
+If a command has one argument with ``*'', ``?'', or ``['', a
+diagnostic is printed if no file names match that argument.
+If a command has several such arguments, a diagnostic
+is only printed if they
+.it all
+fail to match any files.
+.s3
+.bd "Quoting."
+The character ``\\'' causes the immediately following character
+to lose any special meaning it may have to the Shell;  in this
+way ``<'', ``>'', and other characters meaningful to the
+Shell may be passed as part of arguments.
+A special case of this feature allows the continuation of commands
+onto more than one line:  a new-line preceded by ``\\'' is translated
+into a blank.
+.s3
+A sequence of characters enclosed in single quotes (\*a) is taken literally,
+with no substitution or special processing whatsoever.
+.s3
+Sequences of characters enclosed in double quotes (") are
+also taken literally, except that ``\\'', ``"'', and ``$'' are handled specially.
+The sequences ``\\"'' and ``\\$'' yield ``"'' and ``$'', respectively.
+The sequence ``\\x'', where ``x'' is any character except ``"'' or
+``$'', yields ``\\x''.
+A ``$'' within a quoted string is
+processed in the same manner as a ``$'' that is not in a quoted string
+(see below),
+unless it is preceded by a ``\\''.
+For example:
+.s3
+.in +5n
+ls  \*v  pr \*-h "\\\\"My directory\\"\\$"
+.in -5n
+.s3
+causes a directory listing to be produced
+by
+.it ls,
+and passed on to
+.it pr
+to be
+printed with the heading ``\\"My directory"$''.
+Quotes permit the inclusion of blanks in
+the heading, which is a single argument to
+.it pr.
+Note that ``\\'' inside quotes disappears only when preceding ``$'' or ``"''.
+.s3
+.bd "Argument passing."
+When the Shell is invoked as a command, it has additional
+string processing capabilities.
+Recall that the form in which the Shell is invoked is
+.s3
+.in +5n
+sh [
+.bd \*-v
+] [ name [ arg1 ... ] ]
+.in -5n
+.s3
+The
+.it name
+is the name of a file which is read and
+interpreted.
+If not given, this subinstance of the Shell
+continues to read the standard input file.
+.s3
+In command lines in the file
+(and also in command input),
+character sequences of the form ``$N'', where
+.it N
+is a digit,
+are replaced by the
+\fIn\fRth argument to the invocation
+of the Shell (\c
+.it argn\c
+).
+``$0'' is replaced by
+.it name.
+Shell variables (``$a'' \- ``$z''), described below, are replaced in the same way.
+.s3
+The special argument ``$*'' is a name for the
+.it current
+sequence of all arguments
+from ``$1'' through the last argument, each argument separated from the
+previous by a single blank.
+.s3
+The special argument ``$$'' is the ASCII representation of the
+unique process number of the current Shell.
+This string is useful for creating temporary file names
+within command files.
+.s3
+The sequence ``$x'', where ``x'' is any character except one of the
+38 characters mentioned above, is taken to refer to a variable ``x'' whose
+value is the null string.
+All substitution on a command line occurs
+.it before
+the line is interpreted:
+no action that alters the value of any variable can have any
+effect on a reference to that variable that occurs on the
+.it same
+line.
+.s3
+The argument \fB\*-t,\fP used alone, causes
+.it sh
+to read the standard input for a single line, execute
+it as a command, and then exit.
+It is useful for interactive programs
+which allow users to execute
+system commands.
+.s3
+The argument \fB\*-c\fP (used with one following argument)
+causes the next argument to be taken as a command
+line and executed.
+No new-line need be present, but new-line characters
+are treated appropriately.
+This facility is useful as an alternative to
+\fB\*-t\fP where the caller has already read
+some of the characters of the command to be executed.
+.s3
+The argument \fB\*-v\fP (``verbose'') causes every command line to be printed after
+all substitution occurs, but before execution.
+Each argument is preceded by a single blank.
+When given, the \fB\*-v\fP must be the first argument.
+.s3
+Used alone, the argument ``\*-'' suppresses prompting,
+and is commonly used when piping commands into the Shell:
+.s3
+.in +5n
+ls  \*v  sed "s/.*/echo &:;cat &/"  \*v  sh \*-
+.in -5n
+.s3
+prints all files in a directory, each prefaced by its name.
+.s3
+.bd "Initialization."
+When the Shell is invoked under the name ``\*-'' (as it is when you login),
+it attempts to read the file ``.profile'' in the current directory and
+execute the commands found there.
+When it finishes with ``.profile'', the Shell
+prompts the user for input as usual.
+Typical files contain commands to set terminal tabs and modes,
+initialize values of Shell variables, look at mail, etc.
+.s3
+.bd "End of file."
+An end-of-file in the Shell's input causes it to exit.
+A side effect of this fact means that the way to
+log out from UNIX is to type an EOT.
+.s3
+.bd "Command file errors; interrupts."
+Any Shell-detected error, or an interrupt signal,
+during the execution of a command file
+causes the Shell to cease execution of that file.
+(Except after
+.it onintr;
+see below.)
+.s3
+Processes that are created with ``&'' ignore interrupts.
+Also if such a process has not redirected its
+input with a ``<'',
+its input is automatically redirected to come from the
+zero length file ``/dev/null''.
+.s3
+.bd "Special commands."
+The following commands are treated specially by the Shell.
+These commands generally do not work when named as arguments to
+programs like
+.it time,
+.it if,
+or
+.it nohup
+because in these cases they are not invoked directly by the Shell.
+.s3
+.it chdir
+and
+.it cd
+are done without
+spawning a new process by executing
+.it chdir\^\c
+(II).
+.s3
+.it login
+is done by executing
+``/bin/login'' without creating a new process.
+.s3
+.it wait
+is done without spawning a new process by
+executing
+.it wait\^\c
+(II).
+.s3
+.it shift
+[
+.it integer
+]
+is done by manipulating the arguments
+to the Shell.
+In the normal case,
+.it shift
+has the effect of decrementing the Shell argument names by one
+(``$1'' disappears, ``$2'' becomes ``$1'', etc.).
+When the optional
+.it integer
+is given, only arguments equal to or greater than
+that number are shifted.
+.s3
+``\fB:\fR'' is simply ignored.
+.s3
+``=''
+.it name
+[
+.it arg1
+[
+.it arg2
+] ]
+.br
+The single character Shell variable
+.it (name)
+is assigned
+a value, either
+from the optional argument(s), or from standard input.
+If a single argument is given, its value is used.
+If a second argument is included, its value is used only if the
+first argument has a null value.
+This permits a simple way of setting up
+default values for arguments:
+.s3
+.in +5n
+= a "$1" default
+.in -5n
+.s3
+causing default to be used if ``$1'' is null or omitted entirely.
+.s3
+Such variables are referred to later with a ``$'' prefix.
+The variables ``$a'' through ``$m'' are guaranteed to be initialized
+to null, and will never have special meanings.
+The variables ``$n'' through ``$z'' are
+.ul
+not
+guaranteed to be initialized to null, and may,
+at some time in the future,
+acquire
+special meanings.
+Currently, these variables have predefined meanings:
+.s3
+.lp +5 5
+$n	is the argument count to the Shell command.
+.s3
+.br
+.lp +5 5
+$p	contains the Shell directory search
+sequence for command execution.
+Alternatives are separated by ``:''.
+The default initial value is:
+.br
+		= p ":/bin:/usr/bin"
+.br
+which executes from the current directory (the null pathname),
+then from ``/bin'', then from ``/usr/bin'', as described above.
+For the super-user,
+the value is:
+.br
+		= p "/bin:/etc:/"
+.br
+Using the same syntax, users may choose their own sequence by storing it
+in a file named ``.path'' in their login directory.
+The ``.path'' information is available to
+successive Shells; the ``$p'' value is not.
+If the ``.path'' file contains a second line,
+it is interpreted as the name of the Shell to be invoked
+to interpret Shell procedures.
+(See ``$z'' below).
+.s3
+.br
+.lp +5 5
+$r	is the exit status code of the preceding command.
+``0'' is the normal return from most commands.
+.s3
+.br
+.lp +5 5
+$s	is your login directory.
+.br
+.s3
+.br
+.lp +5 5
+$t	is your login tty letter.
+.s3
+.lp +5 5
+$w	is your file system name (first component of ``$s'').
+.s3
+.br
+.lp +5 5
+$z	is the name of the program to be invoked when a Shell
+procedure is to be executed.
+Its default value is ``/bin/sh'',
+but it can be overridden by supplying a second line in the
+``.path'' file.
+It can be used to achieve
+consistent use of a specific Shell during periods when several distinct
+Shells are present in the system.
+For safety in the presence of change,
+use ``$z'' as a command rather than ``sh''.
+.s3
+.i0
+No substitution of variables (or arguments) occurs within single quotes (\*a).
+Within double quotes ("), a variable string is substituted unchanged,
+even if it contains characters (``"'', ``\\'', or ``$'') that might otherwise
+be treated specially.
+In particular, the argument ``$1'' can be passed unchanged to another
+command by using ``"$1"''.
+Outside quotes, substituted characters
+possess the same special meanings they have as if typed directly.
+.s3
+To illustrate,
+suppose that the shell procedure ``mine'' is called with two arguments:
+.s3
+.in +5n
+sh  mine  \*aa; echo "$2"\*a  \*a"\*a
+.in -5n
+.s3
+Then sample commands in ``mine'' and their output are as follows:
+.s3
+.in +5n
+.if n .ta 20
+.if t .ta 2i
+.nf
+echo \*a$1\*a	$1
+echo "$1"	a; echo "$2"
+echo $1	a
+	$2
+echo $2a"	a
+echo "$2a"	"a
+echo $2	syntax error
+.fi
+.in -5n
+.s3
+The appearance of the string ``$2'' (rather than ``"'') occurs because
+the Shell performs only one level of substitution,
+i.e., no rescanning is done.
+.s3
+.i0
+.it onintr
+[
+.it label
+]
+.br
+Causes control to pass to the label named
+(using a
+.it goto
+command)
+if the Shell command file
+is interrupted.
+After such a transfer, interrupts are re-enabled.
+.it Onintr
+without an argument also enables interrupts.
+The special label ``\*-'' will cause any number of interrupts to be ignored.
+.s3
+.it next
+[
+.it name
+]
+.br
+This command causes
+.it name
+to become the standard input.
+Current input is never effectively resumed.
+If the argument is omitted, your terminal keyboard is assumed.
+.s3
+.it pump
+[ \*-[\c
+.it subchar\c
+] ] [
+.bd +
+] [
+.it eofstr
+]
+.br
+This command reads its standard input until it finds
+.it eofstr
+(defaults to ``!'' if not specified) alone on a line.
+It normally substitutes the values
+of arguments and variables (marked with ``$'' as usual).
+If ``\*-'' is given alone, substitution is suppressed,
+and
+.it ``\*-subchar''
+causes
+.it subchar
+to be used in place of ``$'' as the indicator character for substitution.
+Escaping is handled as in quoted strings:
+the indicator character may be escaped by preceding it by ``\\''.
+Otherwise, ``\\'' and other characters are transmitted unchanged.
+If ``+'' is used, leading tabs in the input are thrown away,
+allowing indentation.
+This command may be used interactively and in pipelines.
+.s3
+.it opt
+[
+.bd \*-v
+] [
+.bd +v
+] [
+.bd \*-p
+.it prompt-str
+]
+.br
+The argument
+.bd \*-v
+turns on tracing, in the same
+style as a
+.bd \*-v
+argument for the Shell.
+The argument
+.bd +v
+turns it off.
+The argument
+.bd \*-p
+causes the next argument string to be used as the prompt
+string for an interactive shell.
+.s3
+.it "Commands implementing control structure."
+Control structure is provided by a set of commands
+that happen currently to be built into the Shell,
+although no guarantee is given that this will remain so.
+They are documented separately as follows:
+.s3
+.in +5n
+if(I) \*- if, else, endif, and test.
+.br
+switch(I) \*- switch, breaksw, endsw.
+.br
+while(I) \*- while, end, break, continue.
+.br
+goto(I) \*- goto.
+.br
+exit(I) \*- exit.
+.in -5n
+.sh FILES
+/etc/sha, for shell accounting.
+.br
+/dev/null as a source of end-of-file.
+.br
+\&.path in login directory to initialize $p and name of Shell.
+.br
+\&.profile in login directory for general initialization.
+.sh "SEE ALSO"
+.it "The UNIX Time-Sharing System"
+by D. M. Ritchie and K. Thompson,
+CACM, July, 1974,
+which gives the theory of operation of the
+Shell.
+.br
+.it "PWB/UNIX Shell Tutorial"
+by J. R. Mashey.
+.br
+chdir(I), equals(I), exit(I), expr(I),
+fd2(I),
+if(I),
+login(I), loginfo(I), onintr(I), pump(I),
+shift(I), switch(I), wait(I), while(I),
+pexec(III),
+sha(V),
+glob(VIII)
+.sh "EXIT CODE"
+If an error occurs in a command file, the Shell returns the exit
+value ``1'' to the parent process.
+Otherwise, the current value of the Shell variable
+.it $r
+is returned.
+Execution of a command file is terminated by an error.
+.sh BUGS
+There is no built-in way to redirect the diagnostic output;
+.it "fd2(I)"
+must be used.
+.br
+A single command line is limited to 1000 total characters,
+50 arguments, and approximately 20 operators.
