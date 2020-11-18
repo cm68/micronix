@@ -15,7 +15,7 @@
 #include	<errno.h>
 #include <setjmp.h>
 
-#define NOFILE	15              /* max open files per process */
+#define NOPEN	15              /* max open files per process */
 
 #define	INTR	2
 #define	QUIT	3
@@ -131,7 +131,12 @@ char onelflg INIT;
 char rflg INIT;
 int exitcode INIT;
 char exitstr[6] INIT;
+
+/*
+ * our 26 variables
+ */
 char *seta[26] INIT;
+
 char *endcore INIT;
 char *endptr INIT;
 int oldintr INIT;               /* save INTR state existing at start */
@@ -348,7 +353,7 @@ main(argc, argv)
         rflg++;
     if (*p == '-')
         proflag++;
-    for (f = 3; f < NOFILE; f++)
+    for (f = 3; f < NOPEN; f++)
         close(f);
     oldfil0 = dup(0);           /* save for pipe into, .profile */
     promp = "% ";
@@ -1441,18 +1446,26 @@ toend()
     return;
 }
 
+/*
+ * look up p in command table. return index or -1
+ */
 lookup(p)
-    register char *p;
+    char *p;
 {
-    register char *q;
-    register i;
+    char *q;
+    int i;
 
-    for (i = 0; q = comint[i]; i++)
+    for (i = 0; q = comint[i]; i++) {
         if (eq(p, q))
             return (i);
+	}
     return -1;
 }
 
+/*
+ * loop on trying to fork.  
+ * if there are no processes, wait for a bit and try again
+ */
 dofork()
 {
     register wt, i;
@@ -1472,7 +1485,6 @@ dofork()
 
 fclean()
 {
-
 #ifdef notdef
     if (acctf)
         close(acctf);
@@ -1672,8 +1684,10 @@ err(s)
 
     prs(s);
     prs("\n");
+
     if (onelflg == 0 && arginp == 0)
         bflush();
+
     setxcod(1);
 }
 
@@ -1688,12 +1702,12 @@ reset()
 }
 
 prs(s)
-    register char *s;
+    char *s;
 {
     if (s == 0)
         return;
-    while (*s)
-        putc(*s++);
+
+	write(2, s, strlen(s));
 }
 
 putc(c)
@@ -1701,8 +1715,11 @@ putc(c)
     write(2, &c, 1);
 }
 
+/*
+ * true if any 'c' in s
+ */
 any(c, s)
-    register char c, *s;
+    char c, *s;
 {
 
     while (*s)
@@ -1711,8 +1728,11 @@ any(c, s)
     return (0);
 }
 
+/*
+ * true if strings equal
+ */
 eq(s1, s2)
-    register char *s1, *s2;
+    char *s1, *s2;
 {
 
     if (s1 == 0 || s2 == 0)
@@ -1943,31 +1963,37 @@ setxcod(code)
     return;
 }
 
-copy(source, sink)
-    register char *source, *sink;
+/*
+ * high-bit stripping string copy
+ */
+copy(src, dst)
+    char *src, *dst;
 {
-    while (*sink++ = *source++ & 0177);
+    while (*dst++ = *src++ & 0177);
 }
 
 /*
- *      copyn: copy at most n bytes from source to sink.
+ * copyn: copy at most n bytes from source to sink.
  */
-copyn(source, sink, n)
-    register char *source, *sink;
+copyn(src, dst, n)
+    char *src, *dst;
     int n;
 {
-    register i;
-
-    for (i = 0; i < n; i++)
-        if (!(*sink++ = *source++))
+    while (n--) {
+        if (!(*dst++ = *src++))
             break;
+	}
 }
 
+/*
+ * integer to decimal ascii in a 5 byte field.
+ */
 itoa(n)
+int n;
 {
-    register char *cp;
+    char *cp;
     static char *str[12];
-    int i;
+    char i;
 
     for (i = 4; i >= 0; i--) {
         *cp = (n % 10) + '0';
