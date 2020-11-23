@@ -1,0 +1,21 @@
+------------------
+
+there is some profoundly troubling code in here that clearly was
+put there to optimize the code that whitesmith's was emitting:
+
+declaring scalar types static when the compiler runs out of registers
+will result in faster, smaller and very very broken code if the function
+being called could have more than one process running in it due to sleeping
+on a disk i/o.
+
+these 2 processes will step on each other horribly.
+
+ANY static declarations in any functions are very suspect, and either
+need a lock, with all the deadlock possiblities that implies, or we
+need to just KNOW that it, and any functions it calls, cannot ever sleep.
+
+
+tracking this down is simply a matter of searching for the string 'static'.
+
+--------------------
+
