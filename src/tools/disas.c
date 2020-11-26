@@ -43,16 +43,23 @@ Configuration notes:
 	somewhat.
 
     23 oct 2020 - added whitesmith's object support
+    23 nov 2020 - added special detection of hitech's ncsv call
+    24 nov 2020 - added support for hitech's object file format
+
+    the theory for relocatable objects is that we load segments
+    into their own discontiguous spaces, and put unresolved symbols
+    into their own segment.  that way everybody has an address in the
+    listing.  also, no segment goes at 0
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <malloc.h>
 
 #include "../micronix/include/types.h"
 #include "../micronix/include/obj.h"
 #include "../include/ws.h"
+#include "../include/hitech.h"
 
 /*
  * word should be at least 16 bits unsigned,
@@ -139,6 +146,31 @@ char *linep;
 char col;
 char codeseg;
 
+int segs = 0;
+#define SEG_ZERO    0
+#define SEG_TEXT    1
+#define SEG_DATA    2
+#define SEG_BSS     3
+#define SEG_UNDEF   4
+
+int
+nametoseg(char *s)
+{
+    if (!strcmp(s, "text")) return SEG_TEXT;
+    if (!strcmp(s, "data")) return SEG_DATA;
+    if (!strcmp(s, "bss")) return SEG_BSS;
+    return SEG_ZERO;
+}
+
+word segaddr[5] = {
+    0, 0, 0, 0, 0 
+};
+
+static char *hirectype[] = { 
+    "UNK0", "BLOCK", "UNK2", "RELOC", "SYM", "UNK5", "END"
+};
+
+struct hitechobj hihdr;
 struct obj obj;
 int symlen;
 
@@ -148,6 +180,7 @@ static char tbuf[30];
 
 word address;
 word skip;
+
 word startaddr = 0;
 word endaddr = 0xffff;
 
@@ -159,8 +192,8 @@ word endaddr = 0xffff;
 void reg_target(word v, byte flags);
 
 struct target {
-	word addr;
-	char flags;
+word addr;
+char flags;
 } targets[TARGETS];
 int ntarg;
 
@@ -168,9 +201,25 @@ char jumped;
 
 int debug;
 
+int hitech;
+
+short jraddr;
+
+word startup;
+word getarg;
+word ncsv;
+
 char *progname;
 
 word instaddr;
+word inst_start;
+
+short zcrtpat[]= {
+    0x2a, 0x06, 0x00, 0xf9, 0x11, -1, -1, 0xb7,
+    0x21, -1, -1, 0xed, 0x52, 0x4d, 0x44, 0x0b,
+    0x6b, 0x62, 0x13, 0x36, 0x00, 0xed, 0xb0, 0x21,
+    -1, -1, 0xe5, 0x21, 0x80, 0x00, 0x4e, 0x23
+};
 
 static char fbuf[20];
 char *
@@ -189,24 +238,122 @@ getbyte()
 {
     byte v;
 
-    if (instaddr < startaddr) {
-        return 0;
-    }
-    v = codebuf[instaddr - startaddr];
+    v = codebuf[instaddr];
     instaddr++;
     return v;
+}
+
+byte
+byteat(word addr)
+{
+    return codebuf[addr];
 }
 
 word
 wordat(word addr)
 {
-    return (codebuf[1 + addr - startaddr] << 8) + codebuf[addr - startaddr];
+    return (codebuf[addr + 1] << 8) + codebuf[addr];
 }
+
+setword(word addr, word new)
+{
+    codebuf[addr] = new & 0xff;
+    codebuf[addr+1] = (new >> 8) & 0xff;
+}
+
+/*
+ * match pattern p against memory b for len
+ */
+int
+patmatch(short *p, word b, int len)
+{
+    while (len--) {
+        if (*p == -1) {
+            p++; b++; continue;
+        }
+        if (*p++ != byteat(b++)) return 0;
+    }
+    return 1;
+}
+
+struct hireloc {
+    word addr;
+    unsigned char type;
+    char *name;
+    char *next;
+};
+
+struct hireloc *hirelocs;
+
+void
+addhireloc(word addr, unsigned char type, char *name)
+{
+    struct hireloc *hr;
+
+    hr = malloc(sizeof(*hr));
+    if (!hr) {
+        fprintf(stderr, "malloc failed");
+        exit(1);
+    }
+    hr->addr = addr;
+    hr->type = type;
+    hr->name = strdup(name);
+    hr->next = hirelocs;
+    hirelocs = hr;
+    printf("reloc at %x type %d name %s\n", hr->addr, hr->type, hr->name);
+}
+
+dohirelocs()
+{
+    struct hireloc *hr, *hn;
+    word dw;
+    word off;
+
+    for (hr = hirelocs; hr;) {
+        dw = wordat(hr->addr); 
+        if (hr->type == HTREL_SYM) {
+            off = find_symbol(hr->name);
+        } else if (hr->type == HTREL_SEG) {
+            off = segaddr[nametoseg(hr->name)];
+        } else {
+            fprintf(stderr, "bogus reloc type %x\n", hr->type);
+            exit(1);
+        }
+        dw += off;
+        setword(hr->addr, dw);
+
+        hn = hr->next;
+        free(hr->name);
+        free(hr);
+        hr = hn;
+    }
+}
+
+/*
+ * read a null-terminated string
+ */
+int
+higetstr(char *sbuf)
+{
+    int i = 0;
+    char c;
+
+    while (!feof(file)) {
+        c = fgetc(file);
+        sbuf[i++] = c;
+        if (!c) return i;
+    }
+    fprintf(stderr, "end of file reading string\n");
+    exit (1);
+}
+
+word lastword;
 
 word
 getword()
 {
-    return getbyte() + (getbyte() << 8);
+    lastword = getbyte() + (getbyte() << 8);
+    return lastword;
 }
 
 /*
@@ -484,6 +631,7 @@ usage(char *s)
 		s, progname,
 		"[options] <filename>\n",
 		"options:\n",
+		"\t[-v\tincrease verbosity\n",
 		"\t[-a <startaddr>]\tassume start address\n",
 		"\t[-e <endaddr>]\tassume end address\n",
 		"\t[-s <skip>]\tbytes to skip in input\n",
@@ -511,6 +659,7 @@ char **argv;
 	int i;
 	int size;
     char o;
+    word addr;
 
     stderr = stdout;
 
@@ -527,8 +676,8 @@ char **argv;
         argv++;
 
 		switch (o) {
-		case 'D':	/* debug */
-			debug = 1;
+		case 'v':	/* debug */
+			debug++;
 			break;
 
 		case 'a':	/* start address */
@@ -565,7 +714,7 @@ char **argv;
             symfile = *argv++;
 			break;
 
-		case 'h':
+        case 'h':
 		default:
 			usage("");
 		}
@@ -600,13 +749,22 @@ char **argv;
 		exit(1);
 	}
 
+    rewind(file);
     if (fread(&obj, sizeof(obj), 1, file) != 1) {
-        fprintf(stderr, "magic number read failed");
+        fprintf(stderr, "whitesmith's header read failed");
         exit(1);
     }
+
+    rewind(file);
+    if (fread(&hihdr, sizeof(hihdr), 1, file) != 1) {
+        fprintf(stderr, "hitech header read failed");
+        exit(1);
+    }
+
     if (obj.ident == OBJECT) {
+        /* read in the whitesmith's object file */
         symlen = ((obj.conf & 7) << 1) + 1;
-        fseek(file, sizeof(obj), 0);
+        rewind(file);
         if (fread(&codebuf[obj.textoff], 1, obj.text, file) != obj.text) {
             fprintf(stderr, "code read failed\n");
             exit(1);
@@ -632,12 +790,151 @@ char **argv;
         startaddr = 0;
         codelen = endaddr = obj.dataoff + obj.data;
         reg_target(obj.textoff, CODE);
+    } else if (hihdr.magic == HITECH_MAGIC) {
+        /*
+         * read in the hitech object file
+         */
+        struct hipre hipre;
+        struct hiblkrec hiblkrec;
+        struct hisymrec hisymrec;
+        struct hirelrec hirelrec;
+        struct hiunkrec hiunkrec;
+        char segbuf[20];
+        char symbuf[20];
+        int i;
+        int j;
+        int curseg;
+
+        hitech++;
+        startaddr = 0x100;
+        endaddr = startaddr;
+
+        curseg = 0;
+        for (i = 0; i < 4 ; i++) {
+            segaddr[i] = 0;
+        }
+        segs = 0;
+
+        do {
+            if (fread(&hipre, sizeof(hipre), 1, file) != 1) {
+                fprintf(stderr, "record prefix unreadable\n");
+                exit(1);
+            }
+            i = hipre.reclen;
+            printf("record type %d (%s) len %d\n", 
+                hipre.code, hirectype[hipre.code], hipre.reclen);
+            switch (hipre.code) {
+            case HIREC_END:
+                break;
+            case HIREC_BLK:
+                if (fread(&hiblkrec, sizeof(hiblkrec), 1, file) != 1) {
+                    fprintf(stderr, "block record header unreadable\n");
+                    exit(1);
+                }
+                i -= sizeof(hiblkrec);
+                i -= higetstr(segbuf);
+                if (strcmp(segbuf, "text") == 0) {
+                    curseg = SEG_TEXT;
+                    segaddr[curseg] = startaddr;
+                    segs |= (1 << SEG_TEXT);
+                    if (segs != (1 << SEG_TEXT)) {
+                        fprintf(stderr, "segment inversion\n");
+                        exit(1);
+                    }
+                } else if (strcmp(segbuf, "data") == 0) {
+                    curseg = SEG_DATA;
+                    segs |= (1 << SEG_DATA);
+                    if (hiblkrec.addr == 0) {
+                        segaddr[curseg] = (endaddr + 255) & 0xff00;
+                    }
+                } else if (strcmp(segbuf, "bss") == 0) {
+                    curseg = SEG_BSS;
+                    segs |= (1 << SEG_BSS);
+                    if (hiblkrec.addr == 0) {
+                        segaddr[curseg] = (endaddr + 255) & 0xff00;
+                    }
+                    endaddr += hiblkrec.addr;
+                    if (i) {
+                        fprintf(stderr, "bss nonzero block length\n");
+                        exit(1);
+                    }
+                } else {
+                    fprintf(stderr, "unknown segment\n");
+                    exit(1);
+                }
+                if (!i) break;
+                if (fread(&codebuf[segaddr[curseg] + hiblkrec.addr], 
+                        i, 1, file) != 1) {
+                    fprintf(stderr, "block record payload unreadable\n");
+                    exit(1);
+                }
+                codelen = endaddr = segaddr[curseg] + hiblkrec.addr + i;
+                break;
+            case HIREC_RELOC:
+                while (i) {
+                    if (fread(&hirelrec, sizeof(hirelrec), 1, file) != 1) {
+                        fprintf(stderr, "reloc record unreadable\n");
+                        exit(1);
+                    }
+                    i -= sizeof(hirelrec);
+                    i -= higetstr(symbuf);
+                    addhireloc(hirelrec.addr + hiblkrec.addr + segaddr[curseg], 
+                        hirelrec.flags, symbuf);
+                }
+                break;
+            case HIREC_SYM:
+                curseg = SEG_UNDEF;
+                segaddr[curseg] = (endaddr + 255) & 0xff00;
+                segs |= (1 << SEG_UNDEF);
+                j = segaddr[curseg];
+
+                while (i) {
+                    if (fread(&hisymrec, sizeof(hisymrec), 1, file) != 1) {
+                        fprintf(stderr, "reloc record unreadable\n");
+                        exit(1);
+                    }
+                    i -= sizeof(hisymrec);
+                    i -= higetstr(segbuf);
+                    i -= higetstr(symbuf);
+                    if (hisymrec.flags == HTSYM_DEF) {
+                        addr = segaddr[nametoseg(segbuf)] + hisymrec.addr;
+                        add_sym(symbuf, addr);
+                        if (strcmp(segbuf, "text") == 0) {
+                            reg_target(addr, CODE);
+                        }
+                    } else if (hisymrec.flags == HTSYM_UNDEF) {
+                        if (!strcmp(symbuf, "ncsv")) {
+                            ncsv = j;
+                        }
+                        add_sym(symbuf, j++);
+                    } else {
+                        fprintf(stderr, "unknown symbol %s %s type %x\n",
+                            segbuf, symbuf, hisymrec.flags);
+                        exit(1);
+                    }
+                }
+                break;
+            default:
+            case HIREC_UNK0:
+                break;
+            case HIREC_UNK2:
+                if (fread(&hiunkrec, sizeof(hiunkrec), 1, file) != 1) {
+                    fprintf(stderr, "reloc record unreadable\n");
+                    exit(1);
+                }
+                i -= sizeof(hiunkrec);
+                i -= higetstr(segbuf);
+                break;
+            }
+        } while (hipre.code != HIREC_END);
+        dohirelocs();
     } else {
-
-
+        /* read in the raw binary */
         if (debug) {
             fprintf(stderr, "start address 0x%x\n", startaddr);
         }
+
+        rewind(file);
 
         if (skip) {
             if (debug) {
@@ -653,13 +950,22 @@ char **argv;
         if (endaddr - startaddr < size) {
             size = endaddr - startaddr;
         }
-        codelen = fread(codebuf, 1, size, file);
+        codelen = fread(&codebuf[startaddr], 1, size, file);
         if (startaddr + codelen < endaddr) {
             endaddr = startaddr + codelen;
         }
         reg_target(startaddr, CODE|REF);
     }
 	fclose(file);
+
+    if (patmatch(zcrtpat, 0x100, sizeof(zcrtpat) / 2)) {
+        hitech++;
+        startup = wordat(0x12a);
+        getarg = wordat(startup+1);
+        ncsv = wordat(getarg+1);
+        if (debug) printf("ncsv at %04x\n", ncsv);
+        add_sym("ncsv", ncsv);
+    }
 
     for (tracing = 5; tracing; tracing--) {
         if (debug) {
@@ -860,7 +1166,7 @@ int size;
 	outs(" ");
 
 	for (i = 0; i < len; i++) {
-		c = codebuf[addr + i - startaddr];
+		c = codebuf[addr + i];
 		if (c > ' ' && c < 0x7f) {
 			*linep++ = c;
 		} else {
@@ -872,7 +1178,7 @@ int size;
 	tab(HEX);
 	flush();
 	for (i = 0; i < len; i++) {
-		printf("%02x ", codebuf[addr + i - startaddr]);
+		printf("%02x ", codebuf[addr + i]);
 	}
 	printf("\n");
 	if (jumped) {
@@ -938,6 +1244,9 @@ header(char *name)
             obj.dataoff, obj.data,
             obj.bss);
     }
+    if (hitech) {
+	    printf(";\thitech C detected\n;\n"); 
+    }
     dump_symbols();
 	printf("\n\torg\t0%xh\n\n", startaddr);
 }
@@ -977,19 +1286,19 @@ reg_target(word v, byte flags)
 {
 	int i;
 
-    if (debug) {
-        printf("registered target %s as %s from %s\n", 
-            addrname(v), fdump(flags), addrname(trace_addr));
-    }
+    if (v >= segaddr[SEG_UNDEF])
+        return;
 	for (i = 0; i < ntarg; i++) {
 		if (targets[i].addr == v) {
-            if (debug) {
-                printf("already there %s\n", fdump(targets[i].flags));
-            }
             targets[i].flags |= flags;
 			return;
         }
 	}
+
+    if (debug) {
+        printf("registered target %s as %s from %s\n", 
+            addrname(v), fdump(flags), addrname(trace_addr));
+    }
 
 	if (ntarg+1 == TARGETS) {
 		fprintf(stderr,"target table overflow\n");
@@ -1043,7 +1352,7 @@ int out;
 		break;
 
 	case OUT_JR:
-		value += address;
+		value = jraddr;
 
     case OUT_NNW:
 	case OUT_NN:
@@ -1054,8 +1363,9 @@ int out;
             if (out == OUT_NNW) {
                 reg_target(value, WORD|REF);
             } else {
+                /* do whitesmith's switch statement */
                 if (s && (strcmp(s, "c.switch") == 0)) {
-                    if (codebuf[(trace_addr - startaddr) - 3] == 0x21) {
+                    if (codebuf[(trace_addr) - 3] == 0x21) {
                         swaddr = wordat(trace_addr - 2);
                         fprintf(stderr, "switch table at %x\n", swaddr);
                         while (1) {
@@ -1297,6 +1607,7 @@ int len;
 	if (disp >= 0x80)
 		disp += -0x100;	/* cryptic but portable */
 
+    jraddr = inst_start + disp + len;
 	outval(len + disp, OUT_JR);
 }
 
@@ -1362,6 +1673,7 @@ int addr;
 {
 	word op;
 
+    inst_start = addr;
 	instaddr = addr;    // mark our start
 
 	am_code = AM_NULL;
@@ -1727,6 +2039,9 @@ dis_op:
 				if (op == 0xCD) {
 					outop("CALL");
 					outjpt(OUT_CALL);
+                    if (hitech && lastword == ncsv) {
+                        outs(","); outnn(OUT_NN); 
+                    }
 				} else if (op == 0xED) {
 					dis_ED();
 				} else {
