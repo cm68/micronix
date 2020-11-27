@@ -1,12 +1,12 @@
-struct dump
-	{
-	UCOUNT	isize,
-		fsize;
+/*
+ * XXX - what is this used for
+ */
+struct dump {
+	UINT isize;
+	UINT fsize;
 
-	ULONG	date,
-		ddate;
+	UINT32 date;
+	UINT32 ddate;
 
-	UCOUNT	tsize;
-	};
-
-
+	UINT	tsize;
+};

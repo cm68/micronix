@@ -7,7 +7,9 @@
 /*
  * cp
  */
+#include <types.h>
 #include <stdio.h>
+#include <sys/fs.h>
 #include <sys/stat.h>
 #include <sys/dir.h>
 #include <dirent.h>
@@ -129,8 +131,9 @@ copy(from, to)
     if (exists) {
         if (stfrom.st_dev == stto.st_dev && 
 			stfrom.st_ino == stto.st_ino &&
-			stfrom.size1 == stto.size1 &&
-			stfrom.flags == stto.flags) {
+			stfrom.d.size0 == stto.d.size0 && 
+			stfrom.d.size1 == stto.d.size0 && 
+			stfrom.st_mode == stto.st_mode) {
             fprintf(stderr,
                 "cp: %s and %s are identical (not copied).\n", from, to);
             close(fold);

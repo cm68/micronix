@@ -1,6 +1,7 @@
 
 # define equal(a,b) cmpstr(a,b)
 # define scopy(a,b) cpystr(b,a)
+
 # define NEWLINE '\n'
 # define RETURN  '\r'
 
@@ -51,40 +52,38 @@
 # define RECSIZE	128
 # define CHARMASK	127
 
-struct fcb
-	{
-	TEXT	drive,
-		
-		filename [8],
-		filetype [3],
+/*
+ * cp/m file control block
+ */
+struct fcb {
+	char drive;
+	char filename [8];
+	char filetype [3];
 
-		ex,
+	UINT8 ex;
+	UINT8 s1;
+	UINT8 s2;
+	UINT8 rcount;
 
-		s1,
-		s2,
+	UINT8 dn [16];
+	UINT8 cr;
 
-		rcount,
+	UINT8  [3];
+};
 
-		dn [16],
+/*
+ * libc stdio for cp/m
+ */
+struct file {
+	UINT8 mode;		/* READ WRITE UPDATE */
 
-		cr,
+	UINT32 offset;
 
-		random  [3];
-	};
+	UINT8 type;		/* CONSOLE READER PUNCH LIST DISK CLOSED */
 
-
-struct file
-	{
-	TINY	mode;	/* READ WRITE UPDATE */
-
-	ULONG	offset;
-
-	TINY 	type;	/* CONSOLE READER PUNCH LIST DISK CLOSED */
-
-	BYTES	rsize;
+	UINT rsize;
 
 	struct fcb fcb;
-	};
-
+};
 
 struct file _files [NFILES];

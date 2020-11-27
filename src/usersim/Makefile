@@ -1,4 +1,3 @@
-INCLUDE = -I../include
 
 OBJECTS = z80emu.o micronix.o
 TARGETS = sim

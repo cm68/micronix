@@ -3,9 +3,8 @@
 #include <stdlib.h>
 
 #include "../micronix/include/types.h"
-#include "../micronix/include/sys/sup.h"
+#include "../micronix/include/sys/fs.h"
 #include "../micronix/include/sys/dir.h"
-#include "../micronix/include/sys/inode.h"
 #include "../include/fslib.h"
 #include "../include/util.h"
 
@@ -13,7 +12,7 @@ extern int trace_fs;
 int verbose;
 int extra;
 
-struct sup *fs;
+struct super *fs;
 int sflg;
 int aflg;
 
@@ -69,7 +68,7 @@ check(file)
 void
 pass1(struct dsknod *ip)
 {
-    if ((ip->mode & IALLOC) == 0 || (ip->mode & ITYPE) != IDIR)
+    if ((ip->mode & D_ALLOC) == 0 || (ip->mode & D_IFMT) != D_IFDIR)
         return;
     hlookup(ino, 1);
 }
@@ -92,7 +91,7 @@ pass2(ip)
     struct dir *dp;
     int i;
 
-    if ((ip->mode & IALLOC) == 0 || (ip->mode & ITYPE) != IDIR)
+    if ((ip->mode & D_ALLOC) == 0 || (ip->mode & D_IFMT) != D_IFDIR)
         return;
 
     for (doff = 0; (dp = getdirent(ip, doff)) != 0; doff++) {
@@ -135,7 +134,7 @@ pass3(ip)
     struct dir *dp;
     int *ilp;
 
-    if ((ip->mode & IALLOC) == 0 || (ip->mode & ITYPE) != IDIR)
+    if ((ip->mode & D_ALLOC) == 0 || (ip->mode & D_IFMT) != D_IFDIR)
         return;
 
     for (doff = 0; (dp = getdirent(ip, doff)) != 0; doff++) {

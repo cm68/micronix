@@ -3,13 +3,14 @@
  */
 
 typedef struct {
-	TEXT *p_buf;
-	BYTES p_size;
-	TEXT p_mode;
-	UTINY p_fd;
-	} PFILE;
+	char *p_buf;
+	int p_size;
+	char p_mode;
+	unsigned char p_fd;
+} PFILE;
 
-/*	modes
+/*
+ * modes
  */
 #define P_EOF	0
 #define P_EOLN	1

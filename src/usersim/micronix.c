@@ -16,29 +16,33 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <time.h>
-#include "z80emu.h"
-#include "z80user.h"
 #include <errno.h>
 #include <termios.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <limits.h>
 #include <string.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <signal.h>
-#include "disz80.h"
-#include "util.h"
-#include "mnix.h"
 
-typedef unsigned int ULONG;
-typedef unsigned char UCHAR;
-typedef unsigned short UINT;
+#include "z80emu.h"
+#include "z80user.h"
+
+#include "../micronix/include/types.h"
+#include "../micronix/include/sys/fs.h"
+
+#include "../include/disz80.h"
+#include "../include/util.h"
+#include "../include/mnix.h"
+#include "../include/fslib.h"
+
+#ifdef __APPLE__
+    typedef void (*sighandler_t)(int);
+#endif
 
 /*
  * include files from micronix source
  */
-#include "../micronix/include/sys/inode.h"
 #include "../micronix/include/obj.h"
 
 #define	LISTLINES	8
@@ -50,6 +54,7 @@ static void emulate();
 
 #define	DEFROOT	"filesystem"
 
+int traceflags;
 int savemode;
 int debug_terminal;
 int am_root = 1;
@@ -1358,7 +1363,9 @@ struct tidbits iflags[] = {
     "INLCR", INLCR,
     "IGNCR", IGNCR,
     "ICRNL", ICRNL,
+#ifndef __APPLE__
     "IUCLC", IUCLC,
+#endif
     "IXON", IXON,
     "IXANY", IXANY,
     "IXOFF", IXOFF,
@@ -1369,12 +1376,16 @@ struct tidbits iflags[] = {
 
 struct tidbits oflags[] = {
     "OPOST", OPOST,
+#ifndef __APPLE__
     "OLCUC", OLCUC,
+#endif
     "ONLCR", ONLCR,
     "OCRNL", OCRNL,
     "ONOCR", ONOCR,
     "ONLRET", ONLRET,
+#ifndef __APPLE__
     "XTABS", XTABS,
+#endif
     0, 0
 };
 
@@ -1385,7 +1396,9 @@ struct tidbits cflags[] = {
 struct tidbits lflags[] = {
     "ISIG", ISIG,
     "ICANON", ICANON,
+#ifndef __APPLE__
     "XCASE", XCASE,
+#endif
     "ECHO", ECHO,
     "ECHOE", ECHOE,
     "ECHOK", ECHOK,
@@ -1501,7 +1514,7 @@ SystemCall(MACHINE * cp)
     sighandler_t handler;
     int p[2];
 
-    struct inode *ip;
+    struct statb *ip;
     struct dirfd *df;
     char **argvec;
     int stopnow;
@@ -1691,21 +1704,7 @@ SystemCall(MACHINE * cp)
         break;
 
     case 5:                    /* open */
-        switch (arg2) {
-        case 0:
-            arg2 = O_RDONLY;
-            break;
-        case 1:
-            arg2 = O_WRONLY;
-            break;
-        case 2:
-            arg2 = O_RDWR;
-            break;
-        default:
-            pid();
-            fprintf(mytty, "open busted mode %s %04x %04x\n", fn, arg1, arg2);
-            break;
-        }
+        /* the unix modes and the micronix modes are compatible */
         /*
          * magic filenames 
          */
@@ -1916,14 +1915,14 @@ SystemCall(MACHINE * cp)
         break;
     case 14:                   /* mknod <name> mode dev (dev == 0) for dir */
         filename = fname(fn);
-        switch (arg2 & ITYPE) {
-        case IDIR:
+        switch (arg2 & D_IFMT) {
+        case D_IFDIR:
             ret = mkdir(filename, arg2 & 0777);
             break;
-        case IBIO:
-        case ICIO:
+        case D_IFBLK:
+        case D_IFCHR:
             sprintf(workbuf, "%cdev(%d,%d)", 
-                ((arg2 & ITYPE) == IBIO) ? 'b' : 'c',
+                ((arg2 & D_IFMT) == D_IFBLK) ? 'b' : 'c',
                 (arg3 >> 8) & 0xff, arg3 & 0xff);
             ret = symlink(workbuf, filename);
         printf("make dev %s %s %o %x = %d\n", filename, workbuf, arg2, arg3, ret); fflush(stdout);
@@ -1977,8 +1976,8 @@ SystemCall(MACHINE * cp)
                 sbuf.st_mode &= ~S_IFMT;
                 sbuf.st_mode |=
                     (files[fd].dt == 'c') ? S_IFCHR : S_IFBLK;
-                ip = (struct inode *) &cp->memory[arg2];
-                ip->addr[0] = ((files[fd].major & 0xff) << 8) | 
+                ip = (struct statb *) &cp->memory[arg2];
+                ip->d.addr[0] = ((files[fd].major & 0xff) << 8) | 
                     (files[fd].minor & 0xff);
             }
         } else {
@@ -2002,7 +2001,7 @@ SystemCall(MACHINE * cp)
             break;
         }
 
-        ip = (struct inode *) &cp->memory[arg2];
+        ip = (struct statb *) &cp->memory[arg2];
 
         if (sbuf.st_ino == rootinode) {
             ip->inum = 2;
@@ -2012,18 +2011,18 @@ SystemCall(MACHINE * cp)
         }
         ip->dev = sbuf.st_dev;
         // ip->inum = sbuf.st_ino;
-        ip->nlinks = sbuf.st_nlink;
-        ip->uid = sbuf.st_uid;
-        ip->gid = sbuf.st_gid;
-        ip->size0 = sbuf.st_size >> 16;
-        ip->size1 = sbuf.st_size & 0xffff;
-        ip->rtime = swizzle(sbuf.st_atime);
-        ip->wtime = swizzle(sbuf.st_mtime);
-        ip->mode = (sbuf.st_mode & 07777) | /* IALLOC | */
-            ((sbuf.st_size > (8 * 512)) ? ILARGE : 0);
+        ip->d.nlink = sbuf.st_nlink;
+        ip->d.uid = sbuf.st_uid;
+        ip->d.gid = sbuf.st_gid;
+        ip->d.size0 = sbuf.st_size >> 16;
+        ip->d.size1 = sbuf.st_size & 0xffff;
+        ip->d.actime = swizzle(sbuf.st_atime);
+        ip->d.modtime = swizzle(sbuf.st_mtime);
+        ip->d.mode = (sbuf.st_mode & 07777) | /* IALLOC | */
+            ((sbuf.st_size > (8 * 512)) ? D_LARGE : 0);
         switch (sbuf.st_mode & S_IFMT) {
         case S_IFDIR:
-            ip->mode |= IDIR;
+            ip->d.mode |= D_IFDIR;
             break;
         case S_IFREG:
             break;
@@ -2034,15 +2033,15 @@ SystemCall(MACHINE * cp)
                 carry_set();
                 break;
             }
-            ip->addr[0] = ((Maj & 0xff) << 8) | (Min & 0xff);
-            ip->mode |= ((dt == 'c') ? ICIO : IBIO);
+            ip->d.addr[0] = ((Maj & 0xff) << 8) | (Min & 0xff);
+            ip->d.mode |= ((dt == 'c') ? D_IFCHR : D_IFBLK);
             }
             break;
         case S_IFCHR:
-            ip->mode |= ICIO;
+            ip->d.mode |= D_IFCHR;
             break;
         case S_IFBLK:
-            ip->mode |= IBIO;
+            ip->d.mode |= D_IFBLK;
             break;
         default:
             break;

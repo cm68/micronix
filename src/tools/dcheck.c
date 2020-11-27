@@ -10,8 +10,7 @@
 #include <unistd.h>
 
 #include "../micronix/include/types.h"
-#include "../micronix/include/sys/sup.h"
-#include "../micronix/include/sys/inode.h"
+#include "../micronix/include/sys/fs.h"
 #include "../micronix/include/sys/dir.h"
 #include "../include/fslib.h"
 
@@ -31,7 +30,7 @@ int nfiles;
 
 char *ecount;
 
-struct sup *fs;
+struct super *fs;
 
 /*
  * given a directory inode, increment the link count on the inumber in ecount
@@ -43,10 +42,10 @@ pass1(struct dsknod *ip)
     struct dir *dp;
     int i;
 
-    if ((ip->mode & IALLOC) == 0)
+    if ((ip->mode & D_ALLOC) == 0)
         return;
 
-    if ((ip->mode & ITYPE) != IDIR)
+    if ((ip->mode & D_IFMT) != D_IFDIR)
         return;
 
     // read every directory entry
@@ -72,15 +71,15 @@ pass2(struct dsknod *ip)
     int i;
 
     i = ino;
-    if ((ip->mode & IALLOC) == 0 && ecount[i] == 0)
+    if ((ip->mode & D_ALLOC) == 0 && ecount[i] == 0)
         return;
-    if (ip->nlinks == ecount[i] && ip->nlinks != 0)
+    if (ip->nlink == ecount[i] && ip->nlink != 0)
         return;
     if (headpr == 0) {
         printf("entries	link cnt\n");
         headpr++;
     }
-    printf("%d	%d	%d\n", ino, ecount[i], ip->nlinks);
+    printf("%d	%d	%d\n", ino, ecount[i], ip->nlink);
 }
 
 void

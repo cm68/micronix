@@ -7,11 +7,14 @@
  * 	  1981
  *
  *	C library
+ *
+ * XXX - and where is this used
  */
 
 # define NFIOS 16
 
-FIO	stdin,
-	stdout;
+FIO	stdin;
+FIO	stdout;
+FIO	stderr;
 
 FIO *_fios [NFIOS];	/* table of inited FIO's */

@@ -103,6 +103,34 @@ mnix_sc(unsigned short addr, unsigned char (*gb)(unsigned short a), char *dest)
 	return ret;
 }
 
+/*
+ * format a system call - don't follow indirection
+ */
+int
+mnix_scpr(unsigned short addr, unsigned char (*gb)(unsigned short a), char *dest)
+{
+	char sc;
+	int i;
+	char nbuf[6];
+	int iaddr;
+	int ret;
+
+	addr &= 0xffff;
+	sc = (*gb)(addr + 1);
+	if ((sc < 0) || (sc >= sizeof(syscalls) / sizeof(syscalls[0]))) {
+		sprintf(dest, "unknown %x\n", sc);
+		return 0;
+	}
+	ret = syscalls[sc].argbytes;
+
+	sprintf(dest, "%s ", syscalls[sc].name);
+	for (i = 1; i < syscalls[sc].argbytes; i++) {
+		sprintf(nbuf, "%02x ", (*gb)(addr + i + 1) & 0xff);
+		strcat(dest, nbuf);
+	}
+	return ret;
+}
+
 char *signame[] = {
 	"bogus",
 	"hup",

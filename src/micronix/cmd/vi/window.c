@@ -12,7 +12,7 @@ struct termios save_term;
 #ifdef CPM
 #else
 #include <types.h>
-#include <sgtty.h>
+#include <sys/sgtty.h>
 struct sgtty save_sbuf INIT;
 #endif
 #endif

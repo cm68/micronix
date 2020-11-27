@@ -6,15 +6,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include "../micronix/include/types.h"
-#include "../micronix/include/sys/sup.h"
+#include "../micronix/include/sys/fs.h"
 #include "../micronix/include/sys/dir.h"
-#include "../micronix/include/sys/inode.h"
 #include "../include/fslib.h"
 #include "../include/util.h"
 
-struct sup *fs;
+struct super *fs;
 int dryrun;
 int verbose;
 int extra;
@@ -22,6 +22,9 @@ int extra;
 char *strdup();
 
 char *destname = "destdir";
+
+void dofile(char *name, struct dsknod *ip);
+void dospecial(char *name, struct dsknod *ip);
 
 /*
  * given the inumber of a directory, process all the files
@@ -37,7 +40,7 @@ dive(struct dsknod *dip, char *name)
 
     tracec(verbose, "directory %s (length %d)\n", name, filesize(dip));
 
-    if ((dip->mode & ITYPE) != IDIR) {
+    if ((dip->mode & D_IFMT) != D_IFDIR) {
         lose("not directory");
     }
 
@@ -52,22 +55,22 @@ dive(struct dsknod *dip, char *name)
 
     for (i = 0; i < entries; i++) {
         ip = iget(fs, dp[i].ino);
-        if (!(ip->mode & IALLOC))
+        if (!(ip->mode & D_ALLOC))
             continue;
 
         sprintf(namebuf, "%s/%s", name, dp[i].name);
 
-        switch (ip->mode & ITYPE) {
-        case IDIR:
+        switch (ip->mode & D_IFMT) {
+        case D_IFDIR:
             if (strcmp(dp[i].name, ".") == 0) continue;
             if (strcmp(dp[i].name, "..") == 0) continue;
             dive(ip, namebuf);
             continue;
-        case IORD:
+        case D_IFREG:
             dofile(namebuf, ip);
             break;
-        case IBIO:
-        case ICIO:
+        case D_IFBLK:
+        case D_IFCHR:
             dospecial(namebuf, ip);
             break;
         }
@@ -116,7 +119,7 @@ dospecial(char *name, struct dsknod *ip)
     char linkname[20];
 
     sprintf(linkname, "%cdev(%d,%d)", 
-        ((ip->mode & ITYPE) == IBIO) ? 'b' :'c',
+        ((ip->mode & D_IFMT) == D_IFBLK) ? 'b' :'c',
         (ip->addr[0] >> 8) & 0xff,
         ip->addr[0] & 0xff);
 

@@ -2,6 +2,8 @@
  * library for dealing with whitesmith's object file
  */
 #include <stdio.h>
+#include "../micronix/include/types.h"
+#include "../micronix/include/obj.h"
 #include "../include/ws.h"
 
 /*

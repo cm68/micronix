@@ -1,69 +1,43 @@
 /*
- * inode.h 
+ * sys/inode.h
+ * 
+ * this include file is strictly for the use of the kernel. it defines the
+ * in-core inode
  */
-/*
- * Disk inode structure. See below for the structure
- * used inside the kernel.
- */
-struct dsknod
-{
-    UINT mode;                  /* see below */
-    char nlinks;                /* number of directory links */
-    UCHAR uid;                  /* user id of owner */
-    UCHAR gid;                  /* group id of owner */
-    UCHAR size0;                /* high byte of 24-bit size */
-    UINT size1;                 /* low word of 24-bit size */
-    UINT addr[8];               /* block numbers or device number */
-    ULONG rtime;                /* time of last read */
-    ULONG wtime;                /* time of last write */
-};
 
-/*
- * Internal inode structure.
- * (The stat system calls know the order of the first 36 bytes.)
- */
-struct inode
-{
-    UINT dev;                   /* device number */
-    UINT inum;                  /* inumber */
+struct inode {
+    struct stat statb;          /* returned to user with stat(2) */
 
-    UINT mode;                  /* see below */
-    UCHAR nlinks;               /* number of directory links */
-    UCHAR uid;                  /* user id of owner */
-    UCHAR gid;                  /* group id of owner */
-    UCHAR size0;                /* high byte of 24-bit size */
-    UINT size1;                 /* low word of 24-bit size */
-    UINT addr[8];               /* block numbers or device number */
-    ULONG rtime;                /* time of last read */
-    ULONG wtime;                /* time of last write */
-
-    UCHAR flags;                /* see below */
-    char count;                 /* count of in-core references */
+    UINT8 flags;                /* see below */
+    UINT8 count;                /* count of in-core references */
     struct mount *mount;        /* mounted on this inode */
-    ULONG size;                 /* for computational convenience */
+    UINT32 size;                /* for computational convenience */
     UINT time;                  /* "time" of last reference */
 };
 
 /*
- * Mode bits.
+ * access macros so the kernel can get simply at the composite type. note
+ * that the stat struct contains a disk inode, so it's 2 deep. even deeper if
+ * you count the dev_t.
  */
-#define IALLOC	0100000         /* inode is allocated */
-#define ITYPE	 060000         /* 2-bit file type mask */
-#define	 IIO	 020000         /* mask to identify io files */
-#define	 IBIO	 060000         /* block-type io file */
-#define	 ICIO	 020000         /* char-type io file */
-#define	 IDIR	 040000         /* directory */
-#define	 IORD	 000000         /* ordinary file */
-#define ILARGE	 010000         /* large-file addressing */
-#define ISETUID	  04000         /* set user-id on execution */
-#define ISETGID	  02000         /* set group-id on execution */
-#define I1WRITE	  01000         /* allow only one writer */
-#define IOWNER	   0700         /* owner permisions mask */
-#define IGROUP	    070         /* group permissions mask */
-#define IOTHER	     07         /* other permissions mask */
-#define	 IREAD	     04         /* read permission */
-#define	 IWRITE	     02         /* write permission */
-#define	 IEXEC	     01         /* execute permission */
+#define i_dev   statb.dev_u.dev_s
+#define i_minor statb.dev_u.dev_b.minor_b
+#define i_major statb.dev_u.dev_b.major_b
+#define i_inum  statb.ino
+#define i_mode  statb.d.mode
+#define i_nlink statb.d.nlink
+#define i_uid   statb.d.uid
+#define i_gid   statb.d.gid
+#define i_size0 statb.d.size0
+#define i_size1 statb.d.size1
+#define i_addr  statb.d.addr
+#define i_rtime statb.d.actime
+#define i_mtime statb.d.modtime
+#define i_flags flags
+#define i_count count
+#define i_mount mount
+#define i_size  size
+#define i_time  time
 
 /*
  * Flag bits
@@ -74,6 +48,7 @@ struct inode
 #define IRONLY	8               /* device is mounted read-only */
 #define IWRLOCK 16              /* do not open for writing */
 #define IPIPE	32              /* delay disk write of full blocks */
+
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

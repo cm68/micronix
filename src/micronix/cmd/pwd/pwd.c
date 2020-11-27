@@ -1,6 +1,8 @@
+#include <types.h>
 #include <std.h>
-#include <stat.h>
-#include <dir.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
+#include <sys/dir.h>
 
 char dot[] = ".";
 char dotdot[] = "..";
@@ -81,11 +83,11 @@ main()
 			if ((n = read(file, &dirent, 16)) < 16) {
 				prname();
 			}
-		} while (dirent.ino != statbuf.inumber);
+		} while (dirent.ino != statbuf.st_ino);
 
 		close(file);
 
-		if (dirent.ino == rootstat.inumber) {
+		if (dirent.ino == rootstat.st_ino) {
 			prname();
 		}
 
