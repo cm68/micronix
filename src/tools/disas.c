@@ -202,6 +202,7 @@ char jumped;
 int debug;
 
 int hitech;
+int micronix;
 
 short jraddr;
 
@@ -660,7 +661,6 @@ char **argv;
 	int size;
     char o;
     word addr;
-
     stderr = stdout;
 
 	progname = *argv;
@@ -762,9 +762,13 @@ char **argv;
     }
 
     if (obj.ident == OBJECT) {
-        /* read in the whitesmith's object file */
-        symlen = ((obj.conf & 7) << 1) + 1;
+        int j;
         rewind(file);
+        fseek(file, sizeof(obj), 0);
+
+         /* read in the whitesmith's object file */
+        symlen = ((obj.conf & 7) << 1) + 1;
+        
         if (fread(&codebuf[obj.textoff], 1, obj.text, file) != obj.text) {
             fprintf(stderr, "code read failed\n");
             exit(1);
@@ -773,6 +777,10 @@ char **argv;
             fprintf(stderr, "data read failed\n");
             exit(1);
         }
+        segaddr[SEG_UNDEF] = 
+            ((obj.dataoff + obj.data + obj.bss) + 255) & 0xff00;
+        j = segaddr[SEG_UNDEF];
+
         for (i = 0; i < obj.table / (symlen + 3); i++) {
             if (fread(line, symlen + 3, 1, file) != 1) {
                 fprintf(stderr, "symbol %d read failed\n", i);
@@ -780,16 +788,24 @@ char **argv;
             }
             o = line[2];
             v = (line[0] + (line[1] << 8)) & 0xffff;
-            add_sym(&line[3], v);
-            if (o == 0xd) {
+            switch (o) {
+            case 0xd:
+                add_sym(&line[3], v);
                 reg_target(v, CODE);
-            } else if (o == 0xe) {
+                break;
+            case 0xe:
+                add_sym(&line[3], v);
 				reg_target(v, REF);
+                break;
+            case 0x8:
+                add_sym(&line[3], j++);
+                break;
             }
         }
         startaddr = 0;
         codelen = endaddr = obj.dataoff + obj.data;
         reg_target(obj.textoff, CODE);
+        micronix++;
     } else if (hihdr.magic == HITECH_MAGIC) {
         /*
          * read in the hitech object file
@@ -1245,8 +1261,9 @@ header(char *name)
             obj.bss);
     }
     if (hitech) {
-	    printf(";\thitech C detected\n;\n"); 
+	    printf(";\thitech C detected\n"); 
     }
+    printf(";\n");
     dump_symbols();
 	printf("\n\torg\t0%xh\n\n", startaddr);
 }
@@ -1286,7 +1303,7 @@ reg_target(word v, byte flags)
 {
 	int i;
 
-    if (v >= segaddr[SEG_UNDEF])
+    if (segaddr[SEG_UNDEF] && (v >= segaddr[SEG_UNDEF]))
         return;
 	for (i = 0; i < ntarg; i++) {
 		if (targets[i].addr == v) {
@@ -2076,8 +2093,15 @@ dis_op:
 
 		case 0xC7:
 			if (am_code == AM_NULL) {
-				outop("RST");
-				outval(op & 0x38, OUT_RST);
+                char sbuf[100];
+                if (op == 0xcf && micronix) {
+                    outop("SYS");
+                    instaddr += mnix_scpr(inst_start, byteat, sbuf);
+                    outs(sbuf);
+                } else {
+                    outop("RST");
+                    outval(op & 0x38, OUT_RST);
+                }
 			} else
 				outs("?");
 			break;
