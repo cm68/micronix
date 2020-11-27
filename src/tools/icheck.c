@@ -8,9 +8,8 @@
 #include <strings.h>
 
 #include "../micronix/include/types.h"
-#include "../micronix/include/sys/sup.h"
+#include "../micronix/include/sys/fs.h"
 #include "../micronix/include/sys/dir.h"
-#include "../micronix/include/sys/inode.h"
 #include "../include/fslib.h"
 #include "../include/util.h"
 
@@ -40,7 +39,7 @@ int nerror;
 void pass(struct dsknod *ip);
 int blockcheck(int blkno, char *mesg);
 
-struct sup *fs;
+struct super *fs;
 
 int bmapsize;
 unsigned char *bitmap; 
@@ -172,15 +171,15 @@ pass(struct dsknod *ip)
     int size;
     int b;
 
-    if (!(ip->mode & IALLOC))
+    if (!(ip->mode & D_ALLOC))
         return;
 
-    if (ip->mode & IIO) {
+    if (ip->mode & D_IIO) {
         nspcl++;
         return;
     }
 
-    if ((ip->mode & ITYPE) == IDIR)
+    if ((ip->mode & D_IFMT) == D_IFDIR)
         ndir++;
     else
         nfile++;
@@ -193,7 +192,7 @@ pass(struct dsknod *ip)
         }
     }
 
-    if (!(ip->mode & ILARGE)) {
+    if (!(ip->mode & D_LARGE)) {
         return;
     }
 
@@ -212,7 +211,7 @@ pass(struct dsknod *ip)
 
     blockcheck(b, "double indirect");
     nvlarg++;
-    readblk(fs, b, (UCHAR *)buf);
+    readblk(fs, b, (UINT8 *)buf);
     for (i = 0; i < 256; i++) {
         b = buf[i];
         if (!b) {

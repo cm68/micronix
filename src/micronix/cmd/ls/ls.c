@@ -5,9 +5,11 @@
 /*
 #include <sys/param.h>
 */
+#include <types.h>
 #include <stdio.h>
-#include <stat.h>
-#include <dir.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
+#include <sys/dir.h>
 
 #define	major(x)	(((x) >> 8) & 0xff)
 #define	minor(x)	((x) & 0xff)
@@ -308,15 +310,18 @@ long size;
 }
 
 pmode(aflag) {
+
+	char c = (aflag & S_1WRITE) ? 'l' : 'w';
+
 	putchar((aflag & 0400) ? 'r' : '-');
-	putchar((aflag & 0200) ? 'w' : '-');
-	putchar((aflag & 0100) ? ((aflag & S_SUID) ? 's' : 'x') : '-');
+	putchar((aflag & 0200) ? c : '-');
+	putchar((aflag & 0100) ? ((aflag & S_ISUID) ? 's' : 'x') : '-');
 	putchar((aflag & 0040) ? 'r' : '-');
-	putchar((aflag & 0020) ? 'w' : '-');
-	putchar((aflag & 0010) ? ((aflag & S_SGID) ? 's' : 'x') : '-');
+	putchar((aflag & 0020) ? c : '-');
+	putchar((aflag & 0010) ? ((aflag & S_ISGID) ? 's' : 'x') : '-');
 	putchar((aflag & 0004) ? 'r' : '-');
-	putchar((aflag & 0002) ? 'w' : '-');
-	putchar((aflag & 0001) ? ((aflag & S_STICKY) ? 's' : 'x') : '-');
+	putchar((aflag & 0002) ? c : '-');
+	putchar((aflag & 0001) ? 'x' : '-');
 }
 
 #ifdef notdef
@@ -443,43 +448,43 @@ char *file;
 	if (argfl || statreq) {
 		if (stat(file, &statb) < 0) {
 			printf("%s not found\n", file);
-			statb.inumber = -1;
-			statb.size0 = statb.size1 = 0;
-			statb.flags = 0;
+			statb.st_ino = -1;
+			statb.d.size0 = statb.d.size1 = 0;
+			statb.st_mode = 0;
 			errors++;
 			if (argfl) {
 				lastp--;
 				return(0);
 			}
 		}
-		rep->lnum = statb.inumber;
-		rep->lsize = statb.size1 + (statb.size0 << 16);
-		switch(statb.flags & S_TYPE) {
+		rep->lnum = statb.st_ino;
+		rep->lsize = statb.d.size1 + (statb.d.size0 << 16);
+		switch(statb.st_mode & S_IFMT) {
 
-		case S_ISDIR:
+		case S_IFDIR:
 			rep->ltype = 'd';
 			break;
 
-		case S_ISBLOCK:
+		case S_IFBLK:
 			rep->ltype = 'b';
-			rep->lsize = statb.addr[0];
+			rep->lsize = statb.st_addr[0];
 			break;
 
-		case S_ISCHAR:
+		case S_IFCHR:
 			rep->ltype = 'c';
-			rep->lsize = statb.addr[0];
+			rep->lsize = statb.st_addr[0];
 			break;
 		}
-		rep->lflags = statb.flags & ~S_TYPE;
-		rep->luid = statb.uid;
-		rep->lgid = statb.gid;
-		rep->lnl = statb.nlinks;
+		rep->lflags = statb.st_mode & ~S_IFMT;
+		rep->luid = statb.st_uid;
+		rep->lgid = statb.st_gid;
+		rep->lnl = statb.st_nlink;
 		if(uflg)
-			rep->lmtime = statb.actime;
+			rep->lmtime = statb.st_rtime;
 		else if (cflg)
-			rep->lmtime = statb.modtime;
+			rep->lmtime = statb.st_mtime;
 		else
-			rep->lmtime = statb.modtime;
+			rep->lmtime = statb.st_mtime;
 		tblocks += nblock(rep->lsize);
 	}
 	return(rep);

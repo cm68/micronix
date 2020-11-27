@@ -1,3 +1,5 @@
+#include <types.h>
+#include <sys/dir.h>
 #include <dirent.h>
 
 DIR *

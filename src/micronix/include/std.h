@@ -2,6 +2,9 @@
  * pseudo storage classes
  */
 
+/* awful brain damage */
+
+#ifdef notdef
 
 # define AFAST	register
 # define FAST	register
@@ -24,6 +27,7 @@ typedef unsigned BYTES;
 typedef unsigned char UTINY;
 typedef unsigned long ULONG;
 typedef unsigned short UCOUNT;
+#endif
 
 /*
  * system parameters
@@ -35,7 +39,6 @@ typedef unsigned short UCOUNT;
 # define YES		1
 # define NO		0
 # define NULL	0
-# define FOREVER	for (;;)
 # define BUFSIZE	512
 # define BWRITE	-1
 # define READ	0
@@ -64,14 +67,13 @@ typedef unsigned short UCOUNT;
 
 /*
  * the file IO structure
+ * used by the whitesmith's flavor of stdio
  */
-
-typedef struct fio
-	{
-	FILE _fd;
-	BYTES _nleft;
-	COUNT _fmode;
-	TEXT *_pnext;
-	TEXT *_buf;
-	BYTES _size;	/* buffer size */
-	} FIO;
+typedef struct fio {
+	UINT8 _fd;
+	UINT _nleft;
+	UINT _fmode;
+	char *_pnext;
+	char *_buf;
+	UINT _size;	/* buffer size */
+} FIO;

@@ -1,8 +1,10 @@
 int errcode = 0;
 
 #include <stdio.h>
-#include <stat.h>
-#include <dir.h>
+#include <types.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
+#include <sys/dir.h>
 
 char *sprintf();
 
@@ -62,7 +64,7 @@ rm(arg, fflg, rflg, iflg, level)
         }
         return;
     }
-    if ((buf.flags & S_TYPE) == S_ISDIR) {
+    if ((buf.st_mode & S_IFMT) == S_IFDIR) {
         if (rflg) {
             if (access(arg, 02) < 0) {
                 if (fflg == 0)
@@ -101,7 +103,7 @@ rm(arg, fflg, rflg, iflg, level)
             return;
     } else if (!fflg) {
         if (access(arg, 02) < 0) {
-            printf("rm: %s %o mode ", arg, buf.flags & 0777);
+            printf("rm: %s %o mode ", arg, buf.st_mode & 0777);
             if (!yes())
                 return;
         }

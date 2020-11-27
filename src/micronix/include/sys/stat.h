@@ -1,54 +1,85 @@
-struct stat {
-	
-	/*
-	 * micronix has the dev_t unpacked, v7+ wants it packed
-	 */
-	union {
-		struct {
-			unsigned char minor_b;
-			unsigned char major_b;
-		} dev_b;
-		unsigned short dev_s;
-	} dev_u;
-#define	minor	dev_b.minor_b
-#define	major	dev_b.major_b
-
-	UCOUNT	inumber,
-		flags;
-
-	UTINY	nlinks,
-		uid,
-		gid,
-		size0;
-
-	UCOUNT	size1;
-
-	UCOUNT	addr[8];
-
-	ULONG	actime,
-		modtime;
-	};
-
-
-# define S_ALLOC	0100000
-# define S_TYPE		0060000
-# define S_PLAIN	0000000
-# define S_ISDIR	0040000
-# define S_ISCHAR	0020000
-# define S_ISBLOCK	0060000
-# define S_LARGE	0010000
-# define S_SUID		0004000
-# define S_SGID		0002000
-# define S_STICKY	0001000
-# define S_PERM		0000777
+/*
+ * sys/stat.h
+ * 
+ * v6 did not have a well-defined system interface contract, where utilities
+ * like ls.c had their own copy of the stat structure in their code. needless
+ * to say, this is not great software engineering.  in fact, v7 was the first
+ * version where the notion of include files as an interface contract was
+ * implemented to any great deal.
+ * 
+ * we adopt this model with enthusiasm; there's one source of truth, and it's in
+ * the include files.
+ *
+ * anybody that includes this also needs to include sys/fs.h
+ * to get struct dsknod
+ */
 
 /*
- * compatibility macros for v7+
+ * this structure is passed to the kernel when asking about a file micronix
+ * has the dev_t unpacked, v7+ wants it packed
  */
-#define	S_IFMT		S_TYPE
-#define	S_IFDIR		S_ISDIR
+struct stat {
+    union {
+        struct {
+            UINT8 minor_b;
+            UINT8 major_b;
+        }      dev_b;
+        UINT dev_s;
+    }     dev_u;
+    UINT ino;
+    struct dsknod d;
+};
 
+/*
+ * these are all used as access macros to get at this composite type as a
+ * bonus, they are also the v7 fields, so v7 utilities port much easier
+ */
 #define	st_dev		dev_u.dev_s
-#define	st_ino		inumber
-#define	st_mode		flags
-#define	st_ino		inumber
+#define	st_ino		ino
+#define	st_mode		d.mode
+#define	st_nlink	d.nlink
+#define	st_uid		d.uid
+#define	st_gid		d.gid
+#define	st_size0	d.size0
+#define	st_size1	d.size1
+#define	st_addr		d.addr
+#define	st_rtime	d.actime
+#define	st_mtime	d.modtime
+
+/*
+ * v7 names the fields differently, maybe they didn't trust their c compiler
+ * to deal with 2 structures having the same name with different offsets.
+ * struct elements are each different namespaces, so this isn't required by
+ * c.
+ * 
+ * also, note that v7 has a 32 bit file size, and reuses S_LARGE to define some
+ * new file types.  porting will need to deal with this.
+ */
+
+#define S_ALLOC		0100000 /* inode is allocated */
+
+#define S_IFMT		0060000 /* inode type */
+#define S_IFREG		0000000 /* a file */
+#define S_IIO		0020000 /* io nodes have this set */
+#define S_IFCHR		0020000 /* cdev */
+#define S_IFDIR		0040000 /* directory */
+#define S_IFBLK		0060000 /* bdev */
+
+#define S_LARGE		0010000 /* large file addressing */
+#define S_ISUID		0004000 /* set uid */
+#define S_ISGID		0002000 /* set gid */
+#define S_1WRITE	0001000 /* exclusive write (!) */
+
+#define S_PERM		0000777 /* permissions masks */
+
+#define	IOWNER		0000700
+#define	IGROUP		0000070
+#define	IOTHER		0000007
+
+#define	IREAD			04
+#define	IWRITE			02
+#define	IEXEC			01
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

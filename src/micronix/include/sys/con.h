@@ -1,17 +1,16 @@
 /*
- * con.h 
+ * sys/con.h - the device driver switch tables
  */
+
 /*
- * A block io vector is a list of 3 driver addresses for
- * one major device: an open, close, and strategy routine.
- * Biosw is an an array of such vectors indexed by major
- * device numbers.
+ * A block io vector is a list of 3 driver addresses for one major device: an
+ * open, close, and strategy routine. Biosw is an an array of such vectors
+ * indexed by major device numbers.
  */
-struct biovec
-{
-    int (*open)();
-    int (*close)();
-    int (*strat)();
+struct biovec {
+    int (*open) ();
+    int (*close) ();
+    int (*strat) ();
 } biosw[];
 
 /*
@@ -27,21 +26,19 @@ char *devname[];
 /*
  * Character device switch
  */
-struct ciovec
-{
-    int (*open)();
-    int (*close)();
-    int (*read)();
-    int (*write)();
-    int (*mode)();
+struct ciovec {
+    int (*open) ();
+    int (*close) ();
+    int (*read) ();
+    int (*write) ();
+    int (*mode) ();
 } ciosw[];
 
 /*
- * Macros for accessing the major and minor
- * device numbers.
+ * Macros for accessing the major and minor device numbers.
  */
 #define minor(dev)	((dev) & 0377)
-#define major(dev)	((unsigned)(dev) >> 8)
+#define major(dev)	((UINT16)(dev) >> 8)
 
 /*
  * Globals initialized in con.c
@@ -54,7 +51,7 @@ UINT swapsize;                  /* number of swap blocks */
 UINT swapaddr;                  /* number of first swap block */
 
 /*
- * Note: if swapdev == rootdev, then swapaddr is set to rootdev's fsize 
+ * Note: if swapdev == rootdev, then swapaddr is set to rootdev's fsize
  */
 
 /*

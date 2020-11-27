@@ -1,6 +1,11 @@
+/*
+ * sys/dir.h
+ * 
+ * on disk directory format
+ */
 struct dir {
-	UCOUNT ino;
-	TEXT name[14];
+    UINT ino;
+    char name[14];
 };
 
 /*
@@ -10,3 +15,6 @@ struct dir {
 #define	d_name	name
 #define	direct	dir
 
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

@@ -1,14 +1,12 @@
 /*
- * reg.h 
+ * sys/reg.h
  */
 
 /*
- * The Decision trap firmware saves the trapped
- * process' registers in the following structure.
- * The address of this structure is given in uhdr.8.
+ * The Decision trap firmware saves the trapped process' registers in the
+ * following structure. The address of this structure is given in uhdr.8.
  */
-struct reg
-{
+struct reg {
     UCHAR task;
     UCHAR mask;
     UINT pc;

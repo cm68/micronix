@@ -1,18 +1,17 @@
 /*
- * file.h 
+ * sys/file.h
+ * 
+ * open file structure
  */
-/*
- * System file list structure
- */
-struct file
-{
-    UCHAR mode;                 /* IREAD, IWRITE, PIPE == IEXEC */
-    char count;
+struct file {
+    UINT8 mode;                 /* IREAD, IWRITE, PIPE == IEXEC */
+    UINT8 count;
     struct inode *inode;
-    ULONG rwptr;
+    UINT32 rwptr;
 } flist[];
 
 #define PIPE	IEXEC           /* must include inode.h before this */
+
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

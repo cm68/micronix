@@ -3,17 +3,13 @@
  * part of the opendir library
  */
 
-typedef short ino_t;
-
-struct dirent {
-	ino_t d_ino;
-	char d_name[14];
-};
-
+/*
+ * an open directory
+ */
 struct dirhandle {
-	short fd;
-	struct dirent d;
-	char pad;
+	int fd;
+	struct dir d;
+	char pad;			/* null termination for length 14 file name */
 };
 
 typedef struct dirhandle DIR;

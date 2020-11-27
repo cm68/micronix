@@ -2,11 +2,9 @@
  * Structure of utmp and wtmp files
  */
 
-struct utmp
-	{
-	TEXT	tty [8],
-		name [8];
-		
-	LONG	time;
-	};
+struct utmp {
+	char tty [8];
+	char name [8];
+	UINT32 time;
+};
 

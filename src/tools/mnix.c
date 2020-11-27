@@ -16,10 +16,10 @@
 #include <string.h>
 #include <strings.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include "../micronix/include/types.h"
-#include "../micronix/include/sys/sup.h"
-#include "../micronix/include/sys/inode.h"
+#include "../micronix/include/sys/fs.h"
 #include "../micronix/include/sys/dir.h"
 #include "../include/fslib.h"
 #include "../include/util.h"
@@ -71,7 +71,7 @@ usage()
     }
 }
 
-struct sup *fs;
+struct super *fs;
 
 int
 main(argc, argv)
@@ -168,7 +168,7 @@ list(char *name, int opts)
         return;
     }
 
-    if ((ip->mode & ITYPE) == IDIR) {
+    if ((ip->mode & D_IFMT) == D_IFDIR) {
         for (i = 0; i < ((ip->size0 << 16) + ip->size1) / 16; i++) {
             dp = getdirent(ip, i);
             f = iget(fs, dp->ino);
@@ -234,7 +234,7 @@ catfile(char *name, int opts)
         return;
     }
 
-    if ((ip->mode & ITYPE) == IDIR) {
+    if ((ip->mode & D_IFMT) == D_IFDIR) {
         printf("%s: is directory\n", name);
         return;
     }
@@ -280,7 +280,7 @@ dumpfile(char *name, int opts)
         return;
     }
 
-    if ((ip->mode & ITYPE) == IDIR) {
+    if ((ip->mode & D_IFMT) == D_IFDIR) {
         printf("%s: is directory\n", name);
         return;
     }
@@ -334,7 +334,7 @@ readcmd(int c, char **a)
         return 2;
     }
 
-    if ((ip->mode & ITYPE) != IORD) {
+    if ((ip->mode & D_IFMT) != D_IFREG) {
         printf("need regular file\n");
         return 2;
     }
@@ -385,7 +385,7 @@ writecmd(int c, char **a)
         }
     }
 
-    if ((ip->mode & ITYPE) != IORD) {
+    if ((ip->mode & D_IFMT) != D_IFREG) {
         printf("need regular file\n");
         return 2;
     }

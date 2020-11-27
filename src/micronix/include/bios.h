@@ -21,49 +21,38 @@
  * disk parameter block
  */
 
-struct dpb
-	{
-	UCOUNT	spt;	/* sectors per track */
+struct dpb {
+	UINT	spt;	/* sectors per track */
+	UINT8	bsh;	/* block shift factor */
+	UINT8 blm;
+	UINT8	exm;	/* extent mask */
 
-	UTINY	bsh,	/* block shift factor */
-		blm,
-		exm;	/* extent mask */
+	UINT	dsm;	/* disk storage capacity */
+	UINT		drm;	/* directory capacity */
 
-	UCOUNT	dsm,	/* disk storage capacity */
-		drm;	/* directory capacity */
+	UINT8	al0;
+	UINT8		al1;
 
-	UTINY	al0,
-		al1;
-
-	UCOUNT	cks,	/* size of the diectory check vector */
-		off;
-	};
-
-
-
-
-
-
-
+	UINT	cks;	/* size of the diectory check vector */
+	UINT	off;
+};
 
 /*
  * disk parameter header
  */
 
+struct dph {
+	UINT *xlt;		/* translation vector */
 
-struct dph
-	{
-	UCOUNT *xlt;		/* translation vector */
+	UINT	scratch [3];
 
-	UCOUNT	scratch [3];
-
-	TEXT *dirbuf;		/* 128 - byte scratchpad area */
+	char *dirbuf;		/* 128 - byte scratchpad area */
 
 	struct dpb *dpb;	/* disk parameter block */
 
-	TEXT	*csv,
-		*alv;		/* scratch pad */
-	};
+	UINT8	*csv;
+	UINT8  *alv;		/* scratch pad */
+};
 
 
 

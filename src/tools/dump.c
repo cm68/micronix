@@ -7,7 +7,6 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdio.h>
-#include <malloc.h>
 
 unsigned char inbuf[16]
 #ifdef DEBUG

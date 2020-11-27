@@ -7,7 +7,8 @@
 #include <sys/stat.h>
 #else
 #include <types.h>
-#include <stat.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #endif
 
 /*
@@ -422,7 +423,7 @@ readfile(fname, fromp, nochangename)
 #ifdef linux
     size = sbuf.st_size;
 #else
-    size = sbuf.size1;
+    size = sbuf.d.size1 + (sbuf.d.size0 << 16);
 #endif
     if (size + fromp > Filemax) {
         sprintf(msgbuf, "cannot insert file (limit is %d)!\n", FILELENG);

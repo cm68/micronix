@@ -1,12 +1,15 @@
-struct passwd
-	{
-	TEXT	*name,
-		*passwd;
+/*
+ * presumably, this is returned by some library function that reads
+ * the /etc/passwd file
+ */
+struct passwd {
+	char	*name;
+	char	*passwd;
 
-	UTINY	uid,
-		gid;
+	UINT8	uid;
+	UINT8	gid;
 
-	TEXT	*person,
-		*dir,
-		*shell;
-	};
+	char	*person;
+	char 	*dir;
+	char	*shell;
+};

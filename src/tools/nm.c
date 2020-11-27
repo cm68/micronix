@@ -8,7 +8,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <malloc.h>
 
 #include "../micronix/include/types.h"
 #include "../micronix/include/obj.h"
