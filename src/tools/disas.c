@@ -301,7 +301,8 @@ addhireloc(word addr, unsigned char type, char *name)
     hr->name = strdup(name);
     hr->next = hirelocs;
     hirelocs = hr;
-    printf("reloc at %x type %d name %s\n", hr->addr, hr->type, hr->name);
+    if (debug) 
+        printf("reloc at %x type %d name %s\n", hr->addr, hr->type, hr->name);
 }
 
 dohirelocs()
@@ -837,8 +838,9 @@ char **argv;
                 exit(1);
             }
             i = hipre.reclen;
-            printf("record type %d (%s) len %d\n", 
-                hipre.code, hirectype[hipre.code], hipre.reclen);
+            if (debug) 
+                printf("record type %d (%s) len %d\n", 
+                    hipre.code, hirectype[hipre.code], hipre.reclen);
             switch (hipre.code) {
             case HIREC_END:
                 break;
@@ -923,6 +925,8 @@ char **argv;
                             ncsv = j;
                         }
                         add_sym(symbuf, j++);
+                    } else if (hisymrec.flags == HTSYM_EQU) {
+                        add_sym(symbuf, hisymrec.addr);
                     } else {
                         fprintf(stderr, "unknown symbol %s %s type %x\n",
                             segbuf, symbuf, hisymrec.flags);
