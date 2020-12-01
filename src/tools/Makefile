@@ -12,6 +12,9 @@ include ../Makefile.inc
 
 $(SIMTARGETS): ../lib/libsim.a
 
+disas: disas.c ../lib/mnix_sys.c
+	cc -g -o disas disas.c ../lib/mnix_sys.c
+
 zmac: zmac.o mio.o doc.o zi80dis.o
 	$(CXX) -Wall $(CXXFLAGS) -o zmac zmac.o mio.o doc.o zi80dis.o
 
