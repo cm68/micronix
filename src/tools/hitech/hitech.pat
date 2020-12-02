@@ -41,15 +41,18 @@ block crt
 		CALL ANY ANY		; 0x137 _exit
 		JUMP 0000			; 0x13a warmboot
 	end
-	extract crt+0x5 _Lbss
+	extract crt+5 _Lbss
 	extract crt+0x9 _Hbss
 	extract crt+0x30 _argc
 	extract crt+0x2a startup
 	extract crt+0x34 _main
 	extract crt+0x38 _exit
+	replace crt+0
+		00 00 00 00
+	end
 	replace crt+0x17
 		c1 						; pop bc
-		69 62					; ld bc,hl
+		60 69					; ld hl,bc
 		22 _argc				; ld (argc), hl
 		eb						; ex de,hl
 		21 00 00				; ld hl,0
@@ -61,7 +64,7 @@ block crt
 		c1						; pop bc
 		e5						; push hl
 		JUMP _exit				; call exit
-		00 00 00 00 
+		2a _main+5
 		00 00 00 00 
 		00 00 00 00
 		00 00 00 00
@@ -80,6 +83,8 @@ block getuser
 		26 00
 		JUMP ANY ANY
 	end
+	extract getuser+0x1 csv
+	extract getuser+0x12 cret
 end
 
 block setuser
@@ -125,3 +130,32 @@ block bdoshl
 		JUMP ANY ANY
 	end
 end
+
+block close
+	match
+		CALL csv
+		e5
+		06 08
+		dd 7e 06
+		cd ANY ANY
+		38 06
+		21 ff ff
+		JUMP cret
+		11 2a 00
+		dd 6e 06
+		26 00
+		cd ANY ANY
+		11 ANY ANY
+		19
+		e5
+		fd e1
+		CALL getuser
+	end
+end
+
+block write
+	match
+	end
+end
+
+
