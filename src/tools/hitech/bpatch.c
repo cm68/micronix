@@ -50,6 +50,11 @@
  */
 #include <stdio.h>
 
+typedef unsigned char UINT8;
+typedef unsigned short UINT16;
+typedef unsigned short UINT;
+#include "../../micronix/include/obj.h"
+
 #define	MAX_PATTERN 256
 
 char *patchfile = "hitech.pat";
@@ -67,6 +72,7 @@ char *p;						/* pointer into patch text */
 
 int hit;						/* state of most recent match */
 word matchaddr;
+int dirty;
 
 usage(char c)
 {
@@ -91,16 +97,24 @@ word
 getvar(char *n)
 {
 	struct var *v;
+	word vv = 0xffff;
+
 	for (v = vars; v; v = v->next) {
-		if (strcmp(n, v->name) == 0) return v->value;
+		if (strcmp(n, v->name) == 0) {
+			vv = v->value;
+			break;
+		}
 	}
-	return 0;	
+//	if (verbose > 1) printf("getvar %s = %04x\n", n, vv); 
+	return vv;	
 }
 
 void
 putvar(char *n, word new)
 {
 	struct var *v;
+
+	if (verbose > 1) printf("putvar: %s %04x\n", n, new);
 
 	for (v = vars; v; v = v->next) {
 		if (strcmp(n, v->name) == 0) {
@@ -170,33 +184,12 @@ wordmatch(char *m)
 	return 0;
 }
 
-extract()
-{
-	if (verbose > 1) printf("extract\n");
-	skiptoeol();
-}
-
-replace()
-{
-	if (verbose > 1) printf("replace\n");
-	while (*p) {
-		skipwhite();
-		if (wordmatch("end")) {
-			skiptoeol();
-			break;
-		}
-		skiptoeol();
-	}
-	if (verbose > 1) printf("replace end\n");
-}
-
 word
 nibble(char c)
 {
 	if (c >= '0' && c <= '9') return c - '0';
 	c |= 0x20;
 	if (c >= 'a' && c <= 'f') return (c - 'a') + 0xa;
-	printf("malformed hex number %c\n", c);
 	return 0xffff;
 }
 
@@ -210,21 +203,77 @@ decin(char *s)
 	}
 }
 
+/*
+ * return a hex int
+ * the upper word is the number of hex digits
+ * terminate at a non-hex.
+ */
 unsigned int
 hexin(char *s)
 {
 	word r = 0;
 	word d;
+	int i = 0;
 	
-	while (*s) {
-		d = nibble(*s);
+	while (s[i]) {
+		d = nibble(s[i]);
 		if (d == 0xffff)
-			return 0xffffffff;
+			break;
 		r <<= 4;
 		r += d;
-		s++;
+		i++;
 	}
-	return r;
+
+	return r | (i << 16);
+}
+
+word
+numin(char *s)
+{
+	if (s[0] == '0' && s[1] == 'x')
+		return hexin(s+2) & 0xffff;
+	return decin(s);
+}
+
+/*
+ * given a string, return the address.
+ * grammar: 
+ * address :  <variable> , <variable> + <offset>, hexdigit...
+ * 
+ * LEXICAL NOTE: spaces are not tolerated anywhere in addresses.  there is no
+ * space allowed before or after the '+'.  this is NOT a generic expression parser.
+ */
+word
+getaddr(char *in)
+{
+	char *s;
+	unsigned int v;
+	word o = 0;
+
+	if (verbose > 1) printf("getaddr %s", in);
+
+	s = index(in, '+');
+	if (s) {
+		*s++ = '\0';
+	}
+
+	v = hexin(in);
+	if ((v >> 16) != 4) {
+
+		v = getvar(in);
+		if (v == 0xffff) {
+			printf("variable %s not set\n", in);
+		}
+		if (s) {
+			o = numin(s);
+			if (o == 0xffffffff) {
+				printf("malformed offset %s\n", s);
+				o = 0;
+			}
+		}
+	}
+	if (verbose > 1) printf(" = %04x\n", v + o);
+	return v + o;
 }
 
 /*
@@ -240,7 +289,7 @@ unsigned int
 patword()
 {
 	char *t = get();
-	word r;
+	unsigned int r;
 	int i;
 
 	if (strcmp(t, "ANY") == 0) return 0xffff;
@@ -248,13 +297,13 @@ patword()
 	if (strcmp(t, "JUMP") == 0) return 0xc3;
 
 	i = strlen(t);
+	r = hexin(t);
 
-	if (i == 2 && ((r = hexin(t)) != 0xffffffff)) {
-		r = hexin(t);
-		return r;
+	if ((r >> 16) == 2) {
+		return r & 0xff;
 	}
 
-	if (i == 4 && ((r = hexin(t)) != 0xffffffff)) {
+	if ((r >> 16) == 4) {
 		return r | 0xffff0000;
 	}
 
@@ -270,7 +319,7 @@ patword()
 		r &= 0xff;
 		return (r);
 	}
-	r = getvar(t);
+	r = getaddr(t);
 	if (r == 0xffff) {
 		printf("variable %s not set\n", t);
 	}
@@ -281,52 +330,82 @@ int
 patmatch(word *pat, int pl, word base)
 {
 	int i;
+
+	if (!pl) return 0;
+
 	for (i = 0; i < pl; i++) {
 		if (pat[i] == 0xffff) continue;
 		if (pat[i] == membuf[base + i]) continue;
+		if (verbose && i > 4) {
+			printf("miscompare at index %d: %04x wanted %04x got %02x\n", 
+				i, base + i, pat[i], membuf[base + i]);
+		}
 		return 0;
 	}
 	matchaddr = base;
 	return 1;
 }
 
-/*
- * given a string, return the address.
- * grammar: 
- * address :  <variable> , <variable> + <offset>, hexdigit...
- * 
- * LEXICAL NOTE: spaces are not tolerated anywhere in addresses.  there is no
- * space allowed before or after the '+'.  this is NOT a generic expression parser.
- */
-word
-getaddr(char *in)
+extract()
 {
-	char *s;
+	char *a;
+	word ad;
 	word v;
-	word o = 0;
 
-	v = hexin(in);
-	if (v != 0xffffffff) return v;
+	if (verbose > 1) printf("extract\n");
 
-	s = index(in, '+');
-	if (s) {
-		*s++ = '\0';
-	}
-	v = getvar(in);
-	if (v == 0xffff) {
-		printf("variable %s not set\n", in);
-	}
-	if (s) {
-		if (s[0] == '0' && s[1] == 'x') {
-			o = hexin(s+2);
-		} else {
-			o = decin(s);
+	a = get();
+	ad = getaddr(a);
+
+	v = wordat(ad);
+
+	a = get();
+	putvar(a, v);
+	printf("extract: %s(%04x) = %04x\n", a, ad, v);
+	skiptoeol();
+}
+
+replace()
+{
+	unsigned char *repl = malloc(MAX_PATTERN);
+	int rl = 0;
+	word ad;
+	char *a;
+	int i;
+
+	a = get();
+	ad = getaddr(strdup(a));
+
+	if (verbose > 1) printf("replace %s(%04x)\n", a, ad);
+
+	while (*p) {
+		skipwhite();
+		if (wordmatch("end")) {
+			skiptoeol();
+			break;
 		}
-		if (o == 0xffffffff) {
-			printf("malformed offset %s\n", s);
-			o = 0;
+		i = patword();
+		if ((i & 0xffff0000) == 0xffff0000) {
+			repl[rl++] = i & 0xff;
+			i = (i >> 8) & 0xff;
 		}
+		repl[rl++] = i;
 	}
+
+	if (verbose > 1) {
+		printf("replacement bytes %d\n", rl);
+	}
+	for (i = 0; i < rl; i++) {
+		if (verbose > 1) {
+			printf("%02x ", repl[i]);
+			if ((i % 8) == 7) printf("\n");
+		}
+		membuf[ad + i] = repl[i];
+		dirty = 1;
+	}
+	if (verbose > 1) printf("\n");
+	
+	if (verbose > 1) printf("replace end\n");
 }
 
 /*
@@ -381,7 +460,7 @@ match()
 			hit = 1;
 		}
 	} else {
-		for (base = 0; base < objsize; base++) {
+		for (base = 0x100; base < objsize + 0x100; base++) {
 			if (patmatch(pat, pl, base)) {
 				if (hit) {
 					printf("multiple hit\n");
@@ -406,7 +485,12 @@ block()
 	word addr;
 	blockname = get();
 
+	if (!blockname[0]) { 
+		fprintf(stderr, "block must have a name\n"); 
+		exit (6);
+	}
 	printf("block %s\n", blockname);
+	blockname = strdup(blockname);
 
 	skiptoeol();
 	while (*p) {
@@ -415,6 +499,7 @@ block()
 			match();
 			if (hit) {
 				printf("block hit at %x\n", matchaddr);
+				putvar(blockname, matchaddr);
 			}
 		}
 		if (wordmatch("extract")) {
@@ -434,7 +519,10 @@ block()
 process(char *fn)
 {
 	int fd;
+	struct obj hdr;
 	
+	dirty = 0;
+
 	if (verbose) 
 		printf("process %s\n", fn);
 	fd = open(fn, 2);
@@ -449,8 +537,6 @@ process(char *fn)
 	}
 	printf("read %d bytes\n", objsize);
 
-	objsize += 0x100;
-
 	for (p = patch; *p; p++) {
 		skipwhite();
 		if (wordmatch("block")) {
@@ -458,6 +544,36 @@ process(char *fn)
 		}
 	}
 	close(fd);
+
+	if (dirty) {
+		char *s;
+		fn = strdup(fn);
+		s = index(fn, '.');
+		if (!s) {
+			fprintf(stderr, "filename must have .COM extension\n");
+			exit(8);
+		}
+		*s = '\0';
+		fd = creat(fn, 0777);
+		if (fd < 0) {
+			perror(fn);
+			exit(9);
+		} 		
+
+		printf("file dirty: writing to %s\n", fn);
+		hdr.ident = OBJECT;
+		hdr.conf = NORELOC;
+		hdr.table = 0;
+		hdr.text = objsize;
+		hdr.data = 0;
+		hdr.bss = 0;
+		hdr.heap = 0;
+		hdr.textoff = 0x100;
+		hdr.dataoff = 0;		
+		write(fd, &hdr, sizeof(hdr));
+		write(fd, &membuf[0x100], objsize);
+		close(fd);
+	}
 }
 
 int
