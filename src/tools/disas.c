@@ -632,10 +632,11 @@ load_symfile()
 void
 usage(char *s)
 {
-	fprintf(stderr, "%sUsage:\n\t%s%s%s%s%s%s%s%s%s",
+	fprintf(stderr, "%sUsage:\n\t%s%s%s%s%s%s%s%s%s%s%s",
 		s, progname,
 		"[options] <filename>\n",
 		"options:\n",
+		"\t[-H\tset hitech\n",
 		"\t[-v\tincrease verbosity\n",
 		"\t[-a <startaddr>]\tassume start address\n",
 		"\t[-e <endaddr>]\tassume end address\n",
@@ -681,6 +682,10 @@ char **argv;
         argv++;
 
 		switch (o) {
+		case 'H':	/* debug */
+			hitech++;
+			break;
+
 		case 'v':	/* debug */
 			debug++;
 			break;
@@ -851,7 +856,7 @@ char **argv;
                 i -= sizeof(hiblkrec);
                 i -= higetstr(segbuf);
                 curseg = nametoseg(segbuf);
-                if (curseg != SEG_OTHER && curseg != SEG_TEXT) {
+                if (curseg != SEG_OTHER) {
                     if (!seg[curseg].base) {
                         seg[curseg].base = ROUNDUP(endaddr);
                     }

@@ -310,7 +310,7 @@ patword()
 	if (t[i-2] == "." && (t[i-1] == 'L' || t[i-1] == 'H')) {
 		t[i-2] = '\0';
 		r = getvar(t);
-		if (r == 0xffff) {
+		if (verbose && r == 0xffff) {
 			printf("variable %s not set\n", t);
 		}
 		if (t[i-1] == 'H') {
@@ -320,7 +320,7 @@ patword()
 		return (r);
 	}
 	r = getaddr(t);
-	if (r == 0xffff) {
+	if (verbose && r == 0xffff) {
 		printf("variable %s not set\n", t);
 	}
 	return 0xffff0000 | r;
@@ -374,7 +374,11 @@ replace()
 	int i;
 
 	a = get();
-	ad = getaddr(strdup(a));
+	if (hit) {
+		ad = getaddr(strdup(a));
+	} else {
+		ad = 0;
+	}
 
 	if (verbose > 1) printf("replace %s(%04x)\n", a, ad);
 
@@ -489,7 +493,7 @@ block()
 		fprintf(stderr, "block must have a name\n"); 
 		exit (6);
 	}
-	printf("block %s\n", blockname);
+	if (verbose > 1) printf("block %s\n", blockname);
 	blockname = strdup(blockname);
 
 	skiptoeol();
@@ -498,8 +502,10 @@ block()
 		if (wordmatch("match")) {
 			match();
 			if (hit) {
-				printf("block hit at %x\n", matchaddr);
+				printf("block %s hit at %x\n", blockname, matchaddr);
 				putvar(blockname, matchaddr);
+			} else {
+				printf("block %s miss\n", blockname);
 			}
 		}
 		if (wordmatch("extract")) {
