@@ -1,3 +1,4 @@
+asmtext.*
 bpatch
 *.o
 lib
@@ -5,3 +6,12 @@ lib
 UNUSED
 objdump
 bpatch
+*.sym
+*.dis
+CGEN
+CPP
+OBJTOHEX
+OPTIM
+P1
+ZAS
+

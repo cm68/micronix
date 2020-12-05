@@ -1,39 +1,37 @@
 ;
 ; grammar file for the hitech c library replacement
 ;
+; there are 2 distinct hitech libraries that we endeavor to patch:
+; the one you get from compiling with the supplied libraries, and
+; the one that was used to generate the compiler itself.
 ;
-; crt0
+; they differ in that the supplied library source has stdio built on top
+; of open/close/read/write, etc.
+;
+; the compiler has no such layer, with fread, fopen, fflush, fwrite,
+; built directly on top of bdos calls.
+;
+
+;
+; zcrtcpm.obj - this is org'ed at 0x100, and we can extract a lot of symbols
+; directly from it and cascade down from there
 ;
 block crt
 	match 0100
-		2a 06 00
-		f9
+		2a 06 00 f9
 		11 ANY ANY			; 0x104 bss start
 		b7
 		21 ANY ANY 			; 0x108 bss end
-		ed 52
-		4d 
-		44
-		0b
-		6b
-		62
-		13
-		36 00
-		ed b0
+		ed 52 4d 44
+		0b 6b 62 13
+		36 00 ed b0
 		21 ANY ANY 			; 0x117 nularg
-		e5
-		21 80 00
-		4e
-		23
-		06 00
-		09
-		36 00
-		21 81 00
-		e5
+		e5 21 80 00
+		4e 23 06 00
+		09 36 00
+		21 81 00 e5
 		CALL ANY ANY		; 0x129 startup
-		c1
-		c1
-		e5
+		c1 c1 e5
 		2a ANY ANY			; 0x12f argc
 		e5
 		CALL ANY ANY		; 0x133 _main
@@ -47,61 +45,112 @@ block crt
 	extract crt+0x2a startup
 	extract crt+0x34 _main
 	extract crt+0x38 _exit
+	;
+	; nop-out the setting of the stack pointer
+	;
 	replace crt+0
 		00 00 00 00
 	end
-	replace crt+0x17
-		c1 						; pop bc
-		60 69					; ld hl,bc
-		22 _argc				; ld (argc), hl
-		eb						; ex de,hl
-		21 00 00				; ld hl,0
-		39						; add hl,sp
-		e5						; push hl
-		d5						; push de
-		CALL _main				; call main	
-		c1						; pop bc
-		c1						; pop bc
-		e5						; push hl
-		JUMP _exit				; call exit
-		2a _main+5
-		00 00 00 00 
-		00 00 00 00
-		00 00 00 00
+	;
+	; micronix gives us argc, argv, right on the stack.
+	; we don't need to grunge it out of the unparsed command tail at 0x80
+	;
+	patch crt+0x17
+		pop		bc
+		ld		h,b
+		ld		l,c
+		ld		(_argc),hl
+		ex		de,hl
+		ld		hl,0
+		add		hl,sp
+		push	hl
+		push	de
+		call	_main
+		pop		bc
+		pop		bc
+		push	hl
+		call	_exit
 	end
 end
 
-block getuser
+;
+; function prolog that establishes a stack frame pointer in IX and saves IY
+;
+block csv
 	match
-		CALL ANY ANY
-		0e 20
-		1e ff
+		e1
+		fd e5
+		dd e5
+		dd 21 00 00
+		dd 39
+		e9
+	end
+end
+
+;
+; function prolog that saves IY, puts a frame pointer in IX, and bumps the
+; stack pointer to allocate automatic variable space with a negative offset
+; off of IX.
+;
+block ncsv
+	match
+		e1 
+		fd e5 
+		dd e5 
+		dd 21 00 00 
+		dd 39 
+		5e 
+		23 
+		56 
+		23 
+		eb 
+		39 
+		f9 
+		eb 
+		e9 
+	end
+end
+
+;
+; function epilog that pops everything off the stack, restores IY and returns
+; to the function's caller.
+;
+block cret
+	match
+		dd f9
+		dd e1
+		fd e1
+		c9
+	end
+end
+
+;
+; bdos call, returning 8 bit value, sign extended to HL
+;
+block bdosa1
+	match
+		CALL csv
+		dd 5e 08
+		dd 56 09
+		dd 4e 06
 		dd e5
 		CALL 0005
 		dd e1
 		6f
-		26 00
-		JUMP ANY ANY
-	end
-	extract getuser+0x1 csv
-	extract getuser+0x12 cret
-end
-
-block setuser
-	match
-		CALL ANY ANY
-		dd 5e 06
-		0e 20
-		dd e5
-		CALL 0005
-		dd e1
-		JUMP ANY ANY
+		17
+		9f
+		67
+		JUMP cret
 	end
 end
 
+;
+; variation of bdosa1, that saves and restores IY.  redundantly,
+; since this is done by csv already.
+;
 block bdosa
 	match
-		CALL ANY ANY
+		CALL csv
 		dd 5e 08
 		dd 56 09
 		dd 4e 06
@@ -114,52 +163,176 @@ block bdosa
 		17
 		9f
 		67
-		JUMP ANY ANY
+		JUMP cret
 	end
 end
 
+;
+; bdos call, returning 16 bits
+;
 block bdoshl
 	match
-		CALL ANY ANY
+		CALL csv
 		dd 5e 08
 		dd 56 09
 		dd 4e 06
 		dd e5
 		CALL 0005
 		dd e1
-		JUMP ANY ANY
+		JUMP cret
 	end
 end
 
+;
+; one variation of exit.  calls cpm_clean
+; and puts the return address into 0x80, presumably
+; where the shell (NOT CCP) can test the exit status
+;
 block __exit
 	match
 		CALL ANY ANY
 		e1
 		e1
-		22 80 00
+		22 0080
 		JUMP 0000
 	end
-	replace __exit
-		e1
-		e1
-		cf 01
+	;
+	; micronix exit simply uses the value in hl.
+	;
+	patch __exit
+		pop hl
+		pop hl
+		db 0xcf, 01
 	end
 end
 
+;
+; another variation on exit.  just calls __cpm_clean after
+; storing hl into 0x80.  nothing on the stack, apparently
+;
 block exit
+	match
+		22 0080
+		cd ANY ANY
+		c3 0000
+	end
+	patch exit
+		db 0xcf, 01
+	end
+end
+
+;
+; finally, the c version.  this calls _cleanup, which calls fclose on
+; all the stdio FILES.  we'll do this too.
+; this isn't the one found in the compiler binaries
+;
+block _exit
 	match
 		CALL csv
 		CALL ANY ANY
 		dd 6e 06
 		dd 66 07
 		e5
-		CALL ANY ANY
+		CALL __exit
 		JUMP cret			
 	end
-	replace exit
+end
+
+;
+; the stdio version found in the compiler
+;
+block _exit
+	match _exit
+		CALL csv
+		e5
+		dd 36 ff 05
+		fd 21 ANY ANY
+		fd e5
 		e1
+		01 0008
+		09
+		e5
+		fd e1
+		ed 42
+		e5
+		CALL ANY ANY
+		c1
+		dd 7e ff
+		c6 ff
+		dd 77 ff
+		b7
+		20 e4
+		dd 6e 06
+		dd 66 07
+		22 0080
+		CALL 0000
+		JUMP cret
+	end
+	extract _exit+0xa __iob
+	extract _exit+0x1a _fclose
+end
+
+;
+; stdio
+;
+block _fclose
+	match _fclose
+		CALL csv
+		e5
+		dd 6e 06
+		dd 66 07
+		e5
+		fd e1
+		11 __iob
+	end
+	extract _fclose+0x3d _fflush
+	patch _fclose+0x48
+		ld		l,(IY+7)
+		ld		h,0
+		db		0xcf, 06
+		ld		hl,0
+		jp		cret		
+		ds		48, 0
+	end
+end
+
+block _fflush
+	match _fflush
+		CALL csv
+		e5
+		dd 6e 06
+		dd 66 07
+		e5
+		fd e1
+		11 __iob
+		fd e5
 		e1
-		cf 01
+		b7
+		ed 52
+		11 0008
+		cd ANY ANY
+		11 0029
+		cd ANY ANY
+		11 ANY ANY
+		19
+		dd 75 fe
+		dd 74 ff
+		fd cb 06 4e
+		20 06
+		21 ff ff
+		JUMP cret
+	end
+	patch _fflush
+		call csv
+		ld l,(ix+6)	; get FILE ptr
+		ld h,(ix+7)
+		push hl
+		pop iy
+		bit 1,(iy+6) ; if IOWRT
+		jr z,retffl
+	retffl:
+		ld hl,0
+		jp cret	
 	end
 end
 
@@ -181,7 +354,6 @@ block close
 		19
 		e5
 		fd e1
-		CALL getuser
 	end
 end
 
@@ -206,22 +378,27 @@ block write
 	; returns carry clear on good, byte count in hl
 	; errno in hl.
 	;
-	replace write
-		21 07 00			; 00: ld hl, 7
-		39					; 03: add hl, sp
-		56 2b				; 04: ld d,(hl) ; dec hl
-		5e 2b				; 06: ld e,(hl) ; dec hl	
-		ed 53 write+0x1c	; 08: ld (write+0x1c),de
-		56 2b				; 0c: ld d,(hl) ; dec hl
-		5e 2b				; 0e: ld e,(hl) ; dec hl
-		ed 53 write+0x1a	; 10: ld (write+0x1a),de
-		56 2b				; 14: ld d,(hl) ; dec hl
-		5e					; 16: ld e,(hl)
-		eb					; 17: ex de,hl
-		cf 04 00 00 00 00	; 18: write buf, len
-		d0					; 1e: ret nc
-		21 ff ff 			; 1f: ld hl,-1
-		c9					; 22: ret
+	patch write
+		ld		hl,7
+		add 	hl,sp
+		ld		d,(hl)
+		dec		hl
+		ld		e,(hl)
+		dec		hl
+		ld		(sys_wr+4),de
+		ld		d,(hl)
+		dec		hl
+		ld		e,(hl)
+		dec		hl
+		ld		(sys_wr+2),de
+		ld		d,(hl)
+		dec		hl
+		ld		l,(hl)
+		ld		h,d
+sys_wr:	db		0xcf, 04, 0, 0, 0, 0
+		ret		nc
+		ld		hl,0xffff
+		ret
 	end
 end
 
@@ -246,22 +423,27 @@ block read
 		e5
 		fd e1
 	end
-	replace read
-		21 07 00			; 00: ld hl, 7
-		39					; 03: add hl, sp
-		56 2b				; 04: ld d,(hl) ; dec hl
-		5e 2b				; 06: ld e,(hl) ; dec hl	
-		ed 53 read+0x1c		; 08: ld (read+0x1c),de
-		56 2b				; 0c: ld d,(hl) ; dec hl
-		5e 2b				; 0e: ld e,(hl) ; dec hl
-		ed 53 read+0x1a		; 10: ld (read+0x1a),de
-		56 2b				; 14: ld d,(hl) ; dec hl
-		5e					; 16: ld e,(hl)
-		eb					; 17: ex de,hl
-		cf 03 00 00 00 00	; 18: write buf, len
-		d0					; 1e: ret nc
-		21 ff ff 			; 1f: ld hl,-1
-		c9					; 22: ret
+	patch read
+		ld		hl, 7
+		add		hl, sp
+		ld		d,(hl)
+		dec		hl
+		ld		e,(hl)
+		dec		hl	
+		ld		(sys_rd+4),de
+		ld		d,(hl)
+		dec		hl
+		ld		e,(hl)
+		dec		hl
+		ld		(sys_rd+2),de
+		ld		d,(hl)
+		dec		hl
+		ld		l,(hl)
+		ld		h,d
+sys_rd:	db		0xcf, 03, 00, 00, 00, 00
+		ret		nc
+		ld		hl,0xffff
+		ret
 	end
 end
 
@@ -299,10 +481,56 @@ block open
 	end
 end
 
+block unlink
+	match
+	CALL ncsv
+	d3 ff
+	dd 6e 06
+	dd 66 07
+	e5
+	dd e5
+	d1
+	21 d6 ff
+	19
+	e5
+	CALL ANY ANY
+	c1
+	c1
+	7d
+	b7
+	28 06
+	21 00 00
+	JUMP cret
+	end
+end
+
 block creat
 	match
 	end
-	replace creat
+	patch creat
+		ld hl, 5
+		add hl, sp
+		ld d,(hl)
+		dec hl
+		ld e,(hl)
+		dec hl
+		ld (crsys+4),de
+		ld d,(hl)
+		dec hl
+		ld e,(hl)
+		dec hl
+		ld (crsys+2),de
+	crsys: db cf 05 00 00 00 00
+		ret nc
+		ld hl, 0xffff
+		ret
+	end
+end
+
+block fwrite
+	match
+	end
+	function
 	end
 end
 
