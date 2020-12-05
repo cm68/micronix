@@ -28,8 +28,14 @@
  *   end
  *   extract <address> <variable name>
  *   ...
+ *   patch <address>
+ *     <assembly code>
+ *	 end
+ *   function <address>
+ *     <c code>
+ *   end
  *   replace <address>
- *     <pattern bytes>
+ *     <replacement bytes>
  *   end
  *   ... more replacements
  * end
@@ -38,8 +44,6 @@
  * pattern bytes :  hexdigit hexdigit , ANY, <variable>.L, <variable>.H
  *               CALL JUMP <variable> are specially handled. expanding into
  *				 0xcd, 0xc3, and variable.L, variable.H respectively
- *               this is not an assembler. yet.  making it into one is probably a
- *				 silly idea.
  *
  * address :  <variable> , <variable> + <offset>, hexdigit...
  * offset : 0xhexdigit..., integer
@@ -49,13 +53,18 @@
  * whth an explicit 0x.
  */
 #include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
 
 typedef unsigned char UINT8;
 typedef unsigned short UINT16;
 typedef unsigned short UINT;
 #include "../../micronix/include/obj.h"
 
-#define	MAX_PATTERN 256
+#define	MAX_PATTERN 4096
+#define	MAX_PATCH	4096
 
 char *patchfile = "hitech.pat";
 char *pname;
@@ -67,12 +76,13 @@ typedef unsigned short word;
 unsigned char membuf[65536];	/* binary image */
 int objsize;
 
-char patch[65536];				/* patch text */
+char patchtext[65536];			/* patch text */
 char *p;						/* pointer into patch text */
 
 int hit;						/* state of most recent match */
 word matchaddr;
 int dirty;
+char *blockname;
 
 usage(char c)
 {
@@ -118,9 +128,11 @@ putvar(char *n, word new)
 
 	for (v = vars; v; v = v->next) {
 		if (strcmp(n, v->name) == 0) {
-			printf("putvar: name %s already present value %x new %x\n",
-				n, v->value, new);
+			if (v->value != new) {
+				printf("putvar: name %s already present value %x new %x\n",
+					n, v->value, new);
 				v->value = new;
+			}
 			return;
 		}
 	}
@@ -158,6 +170,21 @@ skiptoeol()
 	while (*p && *p != '\n') {
 		p++;
 	}
+}
+
+symchar(char c)
+{
+	if (c == '_') return 1;
+	if (c >= '0' && c <= '9') return 1;
+	if (c >= 'A' && c <= 'Z') return 1;
+	if (c >= 'a' && c <= 'z') return 1;
+	return 0;
+}
+
+isymchar(char c)
+{
+	if (c >= '0' && c <= '9') return 0;
+	return symchar(c);
 }
 
 skipwhite()
@@ -201,6 +228,7 @@ decin(char *s)
 		r *= 10;
 		r += *s++ - '0';
 	}
+	return r;
 }
 
 /*
@@ -238,7 +266,7 @@ numin(char *s)
 /*
  * given a string, return the address.
  * grammar: 
- * address :  <variable> , <variable> + <offset>, hexdigit...
+ * address :  <variable> , <variable> +|- <offset>, hexdigit...
  * 
  * LEXICAL NOTE: spaces are not tolerated anywhere in addresses.  there is no
  * space allowed before or after the '+'.  this is NOT a generic expression parser.
@@ -249,28 +277,35 @@ getaddr(char *in)
 	char *s;
 	unsigned int v;
 	word o = 0;
+	char sign = 1;
 
 	if (verbose > 1) printf("getaddr %s", in);
 
-	s = index(in, '+');
-	if (s) {
+	if ((s = index(in, '+')) != 0) {
 		*s++ = '\0';
+		sign = 1;
+	} else if ((s = index(in, '-')) != 0) {
+		*s++ = '\0';
+		sign = -1;
 	}
 
 	v = hexin(in);
 	if ((v >> 16) != 4) {
-
 		v = getvar(in);
 		if (v == 0xffff) {
 			printf("variable %s not set\n", in);
 		}
-		if (s) {
-			o = numin(s);
-			if (o == 0xffffffff) {
-				printf("malformed offset %s\n", s);
-				o = 0;
-			}
+	} else {
+		v &= 0xffff;
+	}
+
+	if (s) {
+		o = numin(s);
+		if (o == 0xffffffff) {
+			printf("malformed offset %s\n", s);
+			o = 0;
 		}
+		o *= sign;
 	}
 	if (verbose > 1) printf(" = %04x\n", v + o);
 	return v + o;
@@ -307,7 +342,7 @@ patword()
 		return r | 0xffff0000;
 	}
 
-	if (t[i-2] == "." && (t[i-1] == 'L' || t[i-1] == 'H')) {
+	if (t[i-2] == '.' && (t[i-1] == 'L' || t[i-1] == 'H')) {
 		t[i-2] = '\0';
 		r = getvar(t);
 		if (verbose && r == 0xffff) {
@@ -346,22 +381,30 @@ patmatch(word *pat, int pl, word base)
 	return 1;
 }
 
+/*
+ * extract addr name
+ */
 extract()
 {
 	char *a;
 	word ad;
 	word v;
+	char *aa;
 
 	if (verbose > 1) printf("extract\n");
 
 	a = get();
+	aa = strdup(a);
+
 	ad = getaddr(a);
 
 	v = wordat(ad);
 
 	a = get();
-	putvar(a, v);
-	printf("extract: %s(%04x) = %04x\n", a, ad, v);
+	if (hit) {
+		putvar(a, v);
+		printf("extract: %s(%04x) %s = %04x\n", aa, ad, a, v);
+	}
 	skiptoeol();
 }
 
@@ -397,6 +440,127 @@ replace()
 	}
 
 	if (verbose > 1) {
+		printf("replacement bytes %d%s\n", rl, hit ? "" : " (ignored)");
+	}
+	for (i = 0; i < rl; i++) {
+		if (verbose > 1) {
+			printf("%02x ", repl[i]);
+			if ((i % 8) == 7) printf("\n");
+		}
+		if (hit) {
+			membuf[ad + i] = repl[i];
+			dirty = 1;
+		}
+	}
+	if (verbose > 1) printf("\n");
+	
+	if (verbose > 1) printf("replace end\n");
+}
+
+/*
+ * this is a bit bizarre, but we invoke a c compiler to generate the
+ * bytes to put into our binary
+ */
+function()
+{
+	unsigned char *repl = malloc(MAX_PATTERN);
+	int rl = 0;
+	word ad;
+	char *a;
+	int i;
+	char *c_text, *o;
+	struct var *v;
+
+	c_text = o = malloc(MAX_PATCH);
+
+	a = get();
+	if (hit) {
+		ad = getaddr(strdup(a));
+	} else {
+		ad = 0;
+	}
+
+	if (verbose > 1) printf("function %s(%04x)\n", a, ad);
+
+	/*
+	 * build the assembly prologue:
+	 * send all our defined variables to the assembly as equates
+	 */
+	if (hit) {
+		o += sprintf(o, "\n#asm\n");
+		for (v = vars; v; v = v->next) {
+			o += sprintf(o, "%s\tequ\t0x%04x\n", v->name, v->value);
+		}
+		o += sprintf(o, "\n#endasm\n");
+	}
+
+	/*
+	 * copy the entire text of the patch into the asm buffer
+	 * including the end line
+	 * all lines get indented, except label lines
+	 */
+	while (*p) {
+		char *s;
+		char c;
+
+		while (*p == '\n') p++;
+
+		/*
+		 * process a line
+		 * eat leading white space
+		 */
+		while (*p && (*p == ' ' || *p == '\t')) p++;
+
+		/* do we have a label? _foo0: */
+		s = p;
+		if (isymchar(*s)) {
+			while (*s && symchar(*s)) s++;
+		}
+		if (*s != ':') {
+			*o++ = '\t';
+		}
+
+		s = p;
+
+		/* copy the rest of the line, compressing out redundant space */
+		while (*p && *p != '\n') {
+			if (*p == ' ' || *p == '\t') *p = '\t';
+			*o++ = *p++;
+			if (o[-1] == '\t') {
+				while ((*p == '\t') || (*p == ' ')) p++;
+			}
+		}
+		*o++ = '\n';
+		*o = '\0';
+
+		if (strncmp(s, "end\n", 4) == 0)
+			break;
+	}
+
+	if (verbose > 1) printf("c text: %s\n", c_text);
+	if (hit) {
+		char linkcmd[80];
+
+		i = creat("c_text.c", 0777);
+		write(i, c_text, strlen(c_text));
+		close(i);
+		i = system("zxc -c c_text.c");
+		if (i != 0) {
+			fprintf(stderr, "compile for block %s failed\n", blockname);
+			exit(9);
+		}
+		sprintf(linkcmd, "zxcc LINK.COM --Z --C%04xH --Oc_bin.com c_text.obj", ad);
+		i = system(linkcmd);
+		if (i != 0) {
+			fprintf(stderr, "link for block %s failed\n", blockname);
+			exit(10);
+		}
+		i = open("c_bin.com", 0);
+		rl = read(i, repl, MAX_PATTERN);
+		close(i);
+	}
+
+	if (verbose > 1) {
 		printf("replacement bytes %d\n", rl);
 	}
 	for (i = 0; i < rl; i++) {
@@ -404,12 +568,126 @@ replace()
 			printf("%02x ", repl[i]);
 			if ((i % 8) == 7) printf("\n");
 		}
-		membuf[ad + i] = repl[i];
-		dirty = 1;
+		if (hit) {
+			membuf[ad + i] = repl[i];
+			dirty = 1;
+		}
 	}
 	if (verbose > 1) printf("\n");
 	
-	if (verbose > 1) printf("replace end\n");
+	if (verbose > 1) printf("patch end\n");
+}
+/*
+ * this is a bit bizarre, but we invoke an assembler to generate the
+ * bytes to put into our binary
+ */
+patch()
+{
+	unsigned char *repl = malloc(MAX_PATTERN);
+	int rl = 0;
+	word ad;
+	char *a;
+	int i;
+	char *asmtext;
+	char *o;
+	struct var *v;
+
+	asmtext = o = malloc(MAX_PATCH);
+
+	a = get();
+	if (hit) {
+		ad = getaddr(strdup(a));
+	} else {
+		ad = 0;
+	}
+
+	if (verbose > 1) printf("patch %s(%04x)\n", a, ad);
+
+	/*
+	 * build the assembly prologue:
+	 * send all our defined variables to the assembly as equates
+	 */
+	if (hit) {
+		o += sprintf(o, "\n\t.org\t0x%04x\n", ad);
+		for (v = vars; v; v = v->next) {
+			o += sprintf(o, "%s\tequ\t0x%04x\n", v->name, v->value);
+		}
+	}
+
+	/*
+	 * copy the entire text of the patch into the asm buffer
+	 * including the end line
+	 * all lines get indented, except label lines
+	 */
+	while (*p) {
+		char *s;
+		char c;
+
+		while (*p == '\n') p++;
+
+		/*
+		 * process a line
+		 * eat leading white space
+		 */
+		while (*p && (*p == ' ' || *p == '\t')) p++;
+
+		/* do we have a label? _foo0: */
+		s = p;
+		if (isymchar(*s)) {
+			while (*s && symchar(*s)) s++;
+		}
+		if (*s != ':') {
+			*o++ = '\t';
+		}
+
+		s = p;
+
+		/* copy the rest of the line, compressing out redundant space */
+		while (*p && *p != '\n') {
+			if (*p == ' ' || *p == '\t') *p = '\t';
+			*o++ = *p++;
+			if (o[-1] == '\t') {
+				while ((*p == '\t') || (*p == ' ')) p++;
+			}
+		}
+		*o++ = '\n';
+		*o = '\0';
+
+		if (strncmp(s, "end\n", 4) == 0)
+			break;
+	}
+
+	if (verbose > 1) printf("asm text: %s\n", asmtext);
+	if (hit) {
+		i = creat("asmtext.asm", 0777);
+		write(i, asmtext, strlen(asmtext));
+		close(i);
+		i = system("../zmac -o asmtext.cim asmtext.asm");
+		if (i != 0) {
+			fprintf(stderr, "patch assembly for block %s failed\n", blockname);
+			exit(9);
+		}
+		i = open("asmtext.cim", 0);
+		rl = read(i, repl, MAX_PATTERN);
+		close(i);
+	}
+
+	if (verbose > 1) {
+		printf("replacement bytes %d\n", rl);
+	}
+	for (i = 0; i < rl; i++) {
+		if (verbose > 1) {
+			printf("%02x ", repl[i]);
+			if ((i % 8) == 7) printf("\n");
+		}
+		if (hit) {
+			membuf[ad + i] = repl[i];
+			dirty = 1;
+		}
+	}
+	if (verbose > 1) printf("\n");
+	
+	if (verbose > 1) printf("patch end\n");
 }
 
 /*
@@ -477,7 +755,7 @@ match()
 		if (hit) {
 			printf("hit at %04x\n", base);
 		} else {
-			printf("miss\n", base);
+			printf("miss\n");
 		}
 		printf("match end\n");
 	}
@@ -485,7 +763,6 @@ match()
 
 block()
 {
-	char *blockname;
 	word addr;
 	blockname = get();
 
@@ -503,13 +780,24 @@ block()
 			match();
 			if (hit) {
 				printf("block %s hit at %x\n", blockname, matchaddr);
-				putvar(blockname, matchaddr);
+				addr = getvar(blockname);
+				if (getvar(blockname) == 0xffff) {
+					putvar(blockname, matchaddr);
+				} else if (addr != matchaddr) {
+					printf("block %d matchaddr %04x already %04x\n", blockname, matchaddr, addr);
+				}
 			} else {
 				printf("block %s miss\n", blockname);
 			}
 		}
 		if (wordmatch("extract")) {
 			extract();
+		}
+		if (wordmatch("patch")) {
+			patch();
+		}
+		if (wordmatch("function")) {
+			patch();
 		}
 		if (wordmatch("replace")) {
 			replace();
@@ -526,6 +814,9 @@ process(char *fn)
 {
 	int fd;
 	struct obj hdr;
+	struct var *v;
+	char *s;
+	char *nfn;
 	
 	dirty = 0;
 
@@ -543,7 +834,7 @@ process(char *fn)
 	}
 	printf("read %d bytes\n", objsize);
 
-	for (p = patch; *p; p++) {
+	for (p = patchtext; *p; p++) {
 		skipwhite();
 		if (wordmatch("block")) {
 			block();
@@ -552,17 +843,16 @@ process(char *fn)
 	close(fd);
 
 	if (dirty) {
-		char *s;
-		fn = strdup(fn);
-		s = index(fn, '.');
-		if (!s) {
+		nfn = strdup(fn);
+		s = index(nfn, '.');
+		if (!s || (strlen(s) != 4)) {
 			fprintf(stderr, "filename must have .COM extension\n");
 			exit(8);
 		}
 		*s = '\0';
-		fd = creat(fn, 0777);
+		fd = creat(nfn, 0777);
 		if (fd < 0) {
-			perror(fn);
+			perror(nfn);
 			exit(9);
 		} 		
 
@@ -580,6 +870,21 @@ process(char *fn)
 		write(fd, &membuf[0x100], objsize);
 		close(fd);
 	}
+	s = index(fn, '.');	
+	if (!s || (strlen(s) != 4)) {
+		fprintf(stderr, "filename must have .COM extension\n");
+		exit(8);
+	}
+	strcpy(s+1, "sym");
+	fd = creat(fn, 0777);
+	if (fd < 0) {
+		perror(fn);
+		exit(9);
+	}
+	for (v = vars; v; v = v->next) {
+		dprintf(fd, "%s\tcode\t0x%04x\n", v->name, v->value);
+	}
+	close(fd);
 }
 
 int
@@ -620,12 +925,12 @@ main(int argc, char **argv)
 		perror(patchfile);
 		exit (2);
 	}
-	i = read(pf, patch, sizeof(patch));
+	i = read(pf, patchtext, sizeof(patchtext));
 	if (i < 0) {
-		perror(pf);
+		perror(patchfile);
 		exit(5);
 	}
-	patch[i] = '\0';
+	patchtext[i] = '\0';
 
 	while (argc--) {
 		process(*argv++);

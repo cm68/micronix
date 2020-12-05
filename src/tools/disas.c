@@ -43,7 +43,6 @@ Configuration notes:
 	somewhat.
 
     23 oct 2020 - added whitesmith's object support
-    23 nov 2020 - added special detection of hitech's ncsv call
     24 nov 2020 - added support for hitech's object file format
         XXX - this is broken if there are any segments other than text, data, bss..
     the theory for relocatable objects is that we load segments
@@ -209,8 +208,7 @@ int micronix;
 
 short jraddr;
 
-word startup;
-word getarg;
+word mainfunc;
 word ncsv;
 
 char *progname;
@@ -531,7 +529,11 @@ load_symfile()
         return;
     }
     sf = fopen(symfile, "r");
-    if (!sf) return;
+    if (!sf) {
+        symfile = 0;
+        return;
+    }
+
     while (1) {
         n = 0;
         flags = 0;
@@ -736,10 +738,23 @@ char **argv;
         name = "/dev/stdin";
     }
 
-    if (!symfile && (strcasecmp(&name[strlen(name) - 4], ".com") == 0)) {
-        symfile = strdup(name);
-        strcpy(&symfile[strlen(symfile) - 4], (name[strlen(name)-1] == 'm') ? ".sym" : ".SYM");
-    }
+    if (!symfile) {
+        if (strcasecmp(&name[strlen(name) - 4], ".com") == 0) {
+            symfile = strdup(name);
+            i = strlen(symfile);
+            strcpy(symfile + i - 4, ".sym");
+            if (access(symfile, 4) != 0) {
+                strcpy(symfile + i - 4, ".SYM");
+            }
+        } else {
+            char sfname[100];
+            sprintf(sfname, "%s.sym", name);
+            if (access(sfname, 4) != 0) {
+                sprintf(sfname, "%s.SYM", name);
+            }
+            symfile = strdup(sfname);
+        }
+    } 
     load_symfile();
 
     if (strcasecmp(name + strlen(name) - 4, ".com") == 0) {
@@ -774,7 +789,7 @@ char **argv;
     if (obj.ident == OBJECT) {
         int j;
         rewind(file);
-        fseek(file, sizeof(obj), 0);
+        fseek(file, sizeof(obj), SEEK_SET);
 
          /* read in the whitesmith's object file */
         symlen = ((obj.conf & 7) << 1) + 1;
@@ -783,9 +798,15 @@ char **argv;
             fprintf(stderr, "code read failed\n");
             exit(1);
         }
-        if (fread(&codebuf[obj.dataoff], 1, obj.data, file) != obj.data) {
-            fprintf(stderr, "data read failed\n");
-            exit(1);
+        if (obj.dataoff == 0) {
+            obj.dataoff = obj.textoff + obj.text;
+        }
+
+        if (obj.data) {
+            if (fread(&codebuf[obj.dataoff], 1, obj.data, file) != obj.data) {
+                fprintf(stderr, "data read failed\n");
+                exit(1);
+            }
         }
         j = seg[SEG_UNDEF].base = ROUNDUP(obj.dataoff + obj.data + obj.bss);
 
@@ -810,7 +831,7 @@ char **argv;
                 break;
             }
         }
-        startaddr = 0;
+        startaddr = obj.textoff;
         codelen = endaddr = obj.dataoff + obj.data;
         reg_target(obj.textoff, CODE);
         micronix++;
@@ -970,13 +991,9 @@ char **argv;
     }
 	fclose(file);
 
-    if (patmatch(zcrtpat, 0x100, sizeof(zcrtpat) / 2)) {
-        hitech++;
-        startup = wordat(0x12a);
-        getarg = wordat(startup+1);
-        ncsv = wordat(getarg+1);
-        if (debug) printf("ncsv at %04x\n", ncsv);
-        add_sym("ncsv", ncsv);
+    if (find_symbol("ncsv") != -1) {
+        ncsv = find_symbol("ncsv");
+        hitech = 1;
     }
 
     for (tracing = 5; tracing; tracing--) {
@@ -1247,6 +1264,9 @@ void
 header(char *name)
 {
 	printf(";\n;\tdisas version %d\n;\t%s\n;\n", VERSION, name);
+    if (symfile) {
+	    printf(";\tsymbols loaded from %s\n;\n", symfile);
+    }
     if (obj.ident == OBJECT) {
 	    printf(";\twhitesmiths type %x symlen %d %s\n", 
             obj.conf, symlen, (obj.conf & 0200) ? "norelocs" : "");

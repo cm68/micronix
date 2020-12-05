@@ -1,13 +1,4 @@
-all: test.dis test
-
-test.dis: test.com
-	../disas test.com >test.dis
-
-test: bpatch test.com hitech.pat
-	./bpatch test.com
-
-test.com:
-	zxc test.c -lc
+all: bpatch
 
 bpatch: bpatch.c
 	cc -g -o bpatch bpatch.c
@@ -15,14 +6,16 @@ bpatch: bpatch.c
 objdump: objdump.c
 	cc -g -o objdump objdump.c
 
-hello.com: hello.c
-	zxc hello.c -lc
+%: %.COM hitech.pat bpatch
+	./bpatch $<
 
-hello.dis: hello.com hello.sym
-	../disas -f hello.sym hello.com >hello.dis
+%.COM: %.c
+	zxc $< -lc
+	mv $*.com $*.COM
 
-hello: bpatch hello.com hitech.pat
-	./bpatch hello.com
-	
+%.dis: %.COM hitech.pat bpatch
+	./bpatch $<
+	../disas $< >$@
+
 clean:
-	rm *.o hitpatch objdump hitech
+	rm -rf *.o bpatch objdump hitech *.dSYM *.dis *.sym

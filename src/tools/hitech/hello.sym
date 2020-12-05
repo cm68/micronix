@@ -1,3 +1,0 @@
-define bdoshl 0x7ec
-define bdosa 0x4ed
-define write 0x238
