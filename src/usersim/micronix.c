@@ -82,6 +82,8 @@ char *initfile[] = {
 #define	V_SYS0	(1 << 5)        /* dump raw syscall args */
 #define	V_ERROR	(1 << 6)        /* perror on system calls */
 
+char *progname;
+
 char *vopts[] = {
     "V_SYS", "V_DATA", "V_EXEC", "V_INST", "V_ASYS", "V_SYS0", "V_ERROR", 0
 };
@@ -99,6 +101,19 @@ struct MACHINE *cp;
 
 char namebuf[PATH_MAX];
 char workbuf[PATH_MAX];
+
+/*
+ * breakpoints and watchpoints are handled using the same data structure
+ */
+struct point
+{
+    unsigned short addr;
+    int value;
+    struct point *next;
+};
+
+struct point *breaks;
+struct point *watches;
 
 #define MAXFILE 63
 /*
@@ -271,17 +286,22 @@ pop()
 #define	TTY_FD	64
 
 void
-usage(char *complaint, char *p)
+usage(char *complaint, char *arg)
 {
     int i;
 
-    fprintf(stderr, "%s", complaint);
+    fprintf(stderr, "%s%s%s", 
+        complaint ? complaint : "", 
+        arg ? arg : "",
+        (arg || complaint) ? "\n" : "");
+
     fprintf(stderr, "usage: %s [<options>] [program [<program options>]]\n",
-        p);
+        progname);
     fprintf(stderr, "\t-r\trun as root\n");
     fprintf(stderr, "\t-T\topen a debug terminal window\n");
     fprintf(stderr, "\t-d <root dir>\n");
     fprintf(stderr, "\t-b\t\tstart with breakpoint\n");
+    fprintf(stderr, "\t-B\t\taddr[,addr]\n");
     fprintf(stderr, "\t-v <verbosity>\n");
     for (i = 0; vopts[i]; i++) {
         fprintf(stderr, "\t%2x %-8s", 1 << i, vopts[i]);
@@ -304,33 +324,47 @@ usage(char *complaint, char *p)
 char sys_stop[64];
 char sys_trace[64];
 
+/*
+ * get a system call id.  either by name or integer.
+ */
 int
 get_syscall(char **sp)
 {
     int i;
-    for (i = 0; i < strlen(*sp); i++)
-        (*sp)[i] = tolower((*sp)[i]);
+    char nbuf[20];
+    char *s = *sp;
+    char *d = nbuf;
 
-    if (**sp >= 'a' && **sp <= 'z') {
+    while (*s) {
+        if (isupper(*s)) *s = tolower(*s);
+        if (*s < 'a' || *s > 'z') break;
+        *d++ = *s++;
+    }
+    *d = '\0';
+
+    if (nbuf[0] >= 'a' && nbuf[0] <= 'z') {
         for (i = 0; syscalls[i].name; i++) {
-            if (strcmp(*sp, syscalls[i].name) == 0) {
-                *sp += strlen(*sp);
+            if (strcmp(nbuf, syscalls[i].name) == 0) {
+                *sp += strlen(nbuf);
                 return i;
             }
         }
         return -1;
     }
-    return strtol(*sp, &sp, 0);
+    return strtol(*sp, sp, 0);
 }
+
 int
 main(int argc, char **argv)
 {
-    char *progname = *argv++;
     char *s;
     char **argvec;
     int i;
+    int j;
     char *ttyname;
+    struct point *p;
 
+    progname = *argv++;
     argc--;
 
     while (argc) {
@@ -351,7 +385,7 @@ main(int argc, char **argv)
         while (*s) {
             switch (*s++) {
             case 'h':
-                usage("", progname);
+                usage(0, 0);
                 break;
             case 'T':
                 debug_terminal = 1;
@@ -361,47 +395,80 @@ main(int argc, char **argv)
                 break;
             case 'd':
                 if (!argc--) {
-                    usage("directory not specified\n", progname);
+                    usage("directory not specified\n", 0);
                 }
                 rootdir = *argv++;
                 break;
             case 'v':
                 if (!argc--) {
-                    usage("verbosity not specified\n", progname);
+                    usage("verbosity not specified\n", 0);
                 }
                 verbose = strtol(*argv++, 0, 0);
                 break;
             case 's':
                 if (!argc--) {
-                    usage("stop syscall not specified\n", progname);
+                    usage("stop syscall not specified\n", 0);
                     break;
                 }
                 s = *argv++;
-                i = get_syscall(&s);
-                if ((i > sizeof(sys_stop)) || (i < 0)) {
-                    usage("unrecognized system call\n", progname);
-                    break;
+                while (*s) {
+                    i = get_syscall(&s);
+                    if ((i > sizeof(sys_stop)) || (i < 0)) {
+                        usage("unrecognized system call\n", s);
+                        break;
+                    }
+                    j = 1;
+                    if (*s == '=') {
+                        s++;
+                        j = strtol(s, &s, 10);
+                    }
+                    sys_stop[i] = j;
+                    printf("stopping syscall %s", syscalls[i].name);
+                    if (j > 1) printf(" after %d", j);
+                    printf("\n");
+                    if (*s != ',') break;
+                    s++;
                 }
-                sys_stop[i] = 1;
                 break;
             case 't':
                 if (!argc--) {
-                    usage("trace syscall not specified\n", progname);
+                    usage("trace syscall not specified\n", 0);
                     break;
                 }
                 s = *argv++;
-                i = get_syscall(&s);
-                if ((i > sizeof(sys_stop)) || (i < 0)) {
-                    usage("unrecognized system call\n", progname);
-                    break;
+                while (*s) {
+                    i = get_syscall(&s);
+                    if ((i > sizeof(sys_stop)) || (i < 0)) {
+                        usage("unrecognized system call\n", s);
+                        break;
+                    }
+                    sys_trace[i] = 1;
+                    if (*s != ',') break;
+                    s++;
                 }
-                sys_trace[i] = 1;
                 break;
             case 'b':
                 breakpoint++;
                 break;
+            case 'B':
+                s = *argv++;
+                if (!argc--) {
+                    usage("need breakpoint list\n", 0);
+                    break;
+                }
+                while (*s) {
+                    i = strtol(s, &s, 16);
+                    p = malloc(sizeof(*p));
+                    p->addr = i;
+                    p->next = breaks;
+                    breaks = p;
+                    printf("added breakpoint at %04x\n", i);
+                    if (*s != ',') break;
+                    s++;
+                }
+                break;
             default:
-                usage("unrecognized option\n", progname);
+                usage("unrecognized option :", --s);
                 break;
             }
         }
@@ -794,19 +861,6 @@ dumpcpu()
         get_word(cp->state.registers.word[Z80_SP]) & 0xffff, brake);
 }
 
-/*
- * breakpoints and watchpoints are handled using the same data structure
- */
-struct point
-{
-    unsigned short addr;
-    int value;
-    struct point *next;
-};
-
-struct point *breaks;
-struct point *watches;
-
 int
 watchpoint_hit()
 {
@@ -1039,6 +1093,7 @@ emulate()
             if (point_at(&breaks, cp->state.pc, 0)) {
                 pid();
                 fprintf(mytty, "break at %04x\n", cp->state.pc);
+                dumpcpu();
             }
             breakpoint = 1;
         }
