@@ -230,9 +230,14 @@ int fd;
 
 	magic = getint16(0);
 
-	/* assume the object file is a library */
+	/*
+	 * hitech archives don't have a magic number.  the first word is
+	 * the size of the dictionary. 
+	 * so, assume the object file is a library
+	 */
 	if (magic != 0xa) {
-		files = getint16(1);
+		files = getint16(0);
+		reblock(magic);
 		filename = malloc(sizeof(char *) * files);
 		printf("archive of %d files\n", files);
 		for (i = 0; i < files; i++) {
