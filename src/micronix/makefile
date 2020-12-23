@@ -40,3 +40,5 @@ update:
         fi ; \
     done
 
+repeat:
+	while sleep 2 ; do make -s update ; done
