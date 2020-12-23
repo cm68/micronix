@@ -481,6 +481,12 @@ block open
 	end
 end
 
+block frm
+	CALL csv
+	e5 e5
+	dd
+end
+
 block unlink
 	match
 	CALL ncsv
@@ -527,10 +533,209 @@ block creat
 	end
 end
 
-block fwrite
+;
+; the compiler system interface uses 
+; fopen, fclose, fwrite, fread, fflush
+;
+; iob { char *ptr, int cnt, char *base, char flag, char fd }
+; flags (bits 0-7): rd wr nbuf mybuf eof err string binary
+;
+
+block filbuf
 	match
 	end
-	function
+	; f->cnt = 0
+	; if (f->flag & IORD) return EOF
+	; if (f->base == 0) {
+	;     f->ptr = &tmp
+	; count = 1;
+	; } else {
+	;     f->ptr = f->base
+	;	  count = BUFSIZE
+	; } 
+	; f->cnt = read(f->fd, f->ptr, count);
+	; if (f->cnt > 0) {
+	;   f->cnt--;
+	;   return(*f->fptr++);
+	; }
+    ; if (f->cnt == 0) f->flag |= EOF
+	; if (f->cnt < 0) f->flag |= ERR
+	; return eof
+	;
+	patch
+		pop hl				; get f into de
+		pop de
+		push de
+		push hl
+
+		ld hl,6				; if ! f->flag & IORD
+		add hl,de
+		bit 0,(hl)
+		jr z,feof
+	
+		dec hl				; get base
+		ld b,(hl)
+		dec hl
+		ld c,(hl)
+		ld a,b
+		or c
+		jr nz, fbuf			; if base, use it
+		ld bc,fend+1		; else use fend+1
+	fbuf:
+		ld (m_read+2),bc
+
+		ld bc,0x200			; count = BUFSIZE
+		jz nz,fcnt
+		ld bc,1				; if !base count = 1
+	fcnt:
+		ld (m_read+4),bc
+		dec hl
+		ld bc,-1		; assume eof 
+		ld (fend+1),bc
+		ld bc,0
+
+	m_read:			; read(fd, base, 0x200 - cnt)
+		defb 0xcf, 5, 0, 0, 0, 0
+
+		ld a,0x10	; ERR bit
+		jr c,ferr
+		ld a,h
+		or l
+
+	feof:
+		ld a,0x08	; EOF bit
+		jr z,fret
+
+		ld b,h		; save returned byte count for f->cnt
+		ld c,l
+
+	ferr:
+		ld (_errno), hl
+
+	fret:			; a = bits for flags, bc = count
+		ld hl,6
+		add hl,de
+		or (hl)	
+		ld (hl),a
+		or a
+		jr z,fr
+		ld bc,0		; if err ret, f->cnt = 0
+	fr:
+		dec hl		; f->cnt = bc
+		dec hl
+		dec hl
+		ld (hl),b
+		dec hl
+		ld (hl),c
+		ld a,c
+		or b
+		jr nz,fneof
+
+	fend:
+		ld hl,-1	; store into this instruction data field
+		ret		
 	end
 end
 
+block fflush
+	match
+	end
+	;
+	; if(!(f->_flag & _IOWRT) || 
+	;    f->_base == (char *)NULL || 
+	; (cnt = BUFSIZ - f->_cnt) == 0)
+	;		return 0;
+	; if (write(fileno(f), f->_base, cnt) != cnt)
+	;	f->_flag |= _IOERR;
+	;	f->_cnt = BUFSIZ;
+	;	f->_ptr = f->_base;
+	;	if(f->_flag & _IOERR)
+	;		return(EOF);
+	;	return 0;
+	;
+	patch fflush
+		pop hl			; de = file *
+		pop de
+		push de
+		push hl
+		ld hl,6			; get flags
+		add hl,de
+		bit 1,(hl)		; not write
+		jr z, ferr
+
+		ld hl,2
+		add hl,de
+		ld c,(hl)		; bc = cnt
+		inc hl
+		ld b,(hl)
+		ld hl,0x200		; BUFSIZE - cnt
+		or a
+		sbc hl,bc
+		ld a,h
+		or l
+		jr z,fend
+		ld b,h			; bc = to_write
+		ld c,l
+	
+		ld hl,4			; if base == 0, no buffer
+		add hl,de
+		ld a,(hl)
+		inc hl
+		or (hl)
+		jr z,fend
+
+		push de			; save our file *
+		push bc			; save our count
+
+		ld (m_write+4),bc
+		ld b,(hl)
+		dec hl
+		ld c,(hl)
+		ld (m_write+2),bc
+		inc hl
+		inc hl
+		inc hl
+		ld l,(hl)
+		ld h,0
+
+	m_write:			; write(fd, base, 0x200 - cnt)
+		defb 0xcf, 5, 0, 0, 0, 0
+
+		pop bc			; restore file *, cnt
+		pop de
+
+		ld a,h			; if ret != cnt
+		cp b
+		jr nz,fioer
+		ld a,l
+		cp c
+		jr z,fok
+	fioer:
+		ld hl,6
+		add hl,de
+		ld a,(hl)		; set error
+		or 0x20
+		ld (hl),a
+	fok:	
+		dec hl
+		ld b,(hl)
+		dec hl
+		ld c,(hl)
+		dec hl
+		ld (hl),2		; f->cnt = 0x200
+		dec hl
+		ld (hl),0
+		dec hl
+		ld (hl),b		; f->ptr = f->base
+		dec hl
+		ld (hl),c	
+		and 0x20
+		jr nz,ferr
+	fend:
+		ld hl, 0
+		ret	
+	ferr:
+		ld hl, 0xffff
+		ret
+	end	
+end

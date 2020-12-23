@@ -784,7 +784,8 @@ block()
 				if (getvar(blockname) == 0xffff) {
 					putvar(blockname, matchaddr);
 				} else if (addr != matchaddr) {
-					printf("block %d matchaddr %04x already %04x\n", blockname, matchaddr, addr);
+					printf("block %s matchaddr %04x already %04x\n", 
+						blockname, matchaddr, addr);
 				}
 			} else {
 				printf("block %s miss\n", blockname);
@@ -856,7 +857,7 @@ process(char *fn)
 			exit(9);
 		} 		
 
-		printf("file dirty: writing to %s\n", fn);
+		printf("file dirty: writing to %s\n", nfn);
 		hdr.ident = OBJECT;
 		hdr.conf = NORELOC;
 		hdr.table = 0;
