@@ -12,7 +12,7 @@
 
 struct hitechobj {
 	unsigned short magic;		/* 0x0a */
-	unsigned char len;			/* 7 */;
+	unsigned char len;			/* 7 */
 	unsigned int bytesex;		/* 0x03020100 */
 	unsigned short bsize;		/* 0x100 */
 	char arch[4];				/* Z80 */
