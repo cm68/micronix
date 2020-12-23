@@ -11,7 +11,8 @@
 #define	INIT	= 0
 
 #include	<types.h>
-#include	<stat.h>
+#include	<sys/fs.h>
+#include	<sys/stat.h>
 #include	<errno.h>
 #include <setjmp.h>
 
@@ -57,8 +58,6 @@
 #define DOLREPQ	2
 
 jmp_buf saved INIT;
-
-extern errno;
 
 /*
  * I am pretty sure this buffer stuff is way overdesigned.
@@ -1498,7 +1497,6 @@ fclean()
 texec(f, t)
     register *t;
 {
-    extern errno;
     register char *cp;
     char tline[48];
     char txe2big, txeacces;
@@ -2087,17 +2085,17 @@ e3()
     if (eq(a, "-f")) {
         if (stat(p1, &sb) == -1)
             return 0;
-        return ((sb.flags & S_TYPE) == S_PLAIN);
+        return ((sb.st_mode & S_IFMT) == S_IFREG);
     }
     if (eq(a, "-d")) {
         if (stat(p1, &sb) == -1)
             return 0;
-        return ((sb.flags & S_TYPE) == S_ISDIR);
+        return ((sb.st_mode & S_IFMT) == S_IFDIR);
     }
     if (eq(a, "-s")) {
         if (stat(p1, &sb) == -1)
             return 0;
-        return (sb.size0 || sb.size1);
+        return (sb.d.size0 || sb.d.size1);
     }
 
     /*
