@@ -12,158 +12,205 @@
 #define MAXLIB 100
 #define MAXOPT 100
 
-/*
- * temporary file names for compilation
- */
-char *tmp_cpp;			/* cpp output */
-char *tmp_p1;			/* parser output */
-char *tmp_cgen;			/* cgen output */
-char *tmp_opt;			/* optimizer output */
-char *tmp_as;			/* assembler output */
-
-char *outfile;
 int mypid;
 
-#define CHSPACE 1000
-char ts[CHSPACE + 50];
-char *tsa = ts;
-char *tsp = ts;
-char *av[50];
+char *av[50];			/* exec arg vector */
 
-/* source files */
-char *clist[MAXFIL];
+char *source[MAXFIL];	/* source files */
+char nsrc;
 
-char *llist[MAXLIB];
-int pflag;				/* preserve temporary files */
+char *object[MAXLIB];	/* link files */
+int nobj;
+
+char *cppflags[MAXOPT];	/* cpp options */
+int ncpp;
+
+char *outfile;
+
+char namebuf[100];
+
+int pflag;
 int sflag;
 int cflag;
 int eflag;
-int exflag;
 int oflag;
-int proflag;
-int noflflag;
-char *chpass;
-char *npassname;
+int vflag;
+int nflag;
 
-char *pass_cpp	= "/bin/CPP";
-char *pass_p1	= "/bin/P1";
-char *pass_cgen	= "/bin/CGEN";
-char *pass_opt	= "/bin/OPT";
+int err;
 
-char *pref = "/lib/HTCRT0.OBJ";
+char *crt0 = "/lib/HTCRT0.OBJ";
 
+int idexit();
 char *setsuf();
 char *strcat();
 char *strcpy();
 char *pname;
 
+#define	PASS_CPP	0
+#define	PASS_P1		1
+#define	PASS_CGEN	2
+#define	PASS_OPTIM	3
+#define	PASS_AS		4
+#define	PASS_LINK	5
+
+struct pass {
+	char *name;
+	char *path;
+} pass[] = {
+	{ "cpp", 0 },
+	{ "p1", 0 },
+	{ "cgen", 0 },
+	{ "optim", 0 },
+	{ "as", 0 },
+	{ "link", 0 }
+};
+
+char *execpath = "/usr/lib";
+
 char *
 mktmp(char *suffix)
 {
-	char namebuf[40];
-
 	sprintf(namebuf, "/tmp/ctm%05d-%s", mypid, suffix);
 	return strdup(namebuf);
 }
 
 usage()
 {
-	fprintf(stderr, "usage: %s [options] [sources] [objects]\n", pname);
+	fprintf(stderr, "usage: %s [options] [sources] [objects] [-l<lib> ...]\n", 
+		pname);
+	fprintf(stderr, "\t-o <output file>\n");
+	fprintf(stderr, "\t-P <executable path>]\n");
+	fprintf(stderr, "\t-D<macro>[=<definition>]\n");
+	fprintf(stderr, "\t-U<macro>[=<definition>]\n");
+	fprintf(stderr, "\t-I<include directory>\n");
+	fprintf(stderr, "\t-L<library directory>\n");
+	fprintf(stderr, "\t-l<library directory>\n");
+	fprintf(stderr, "\t-E\tstop after preprocessing (produce .i)\n");
+	fprintf(stderr, "\t-S\tstop before assembly (produce .s)\n");
+	fprintf(stderr, "\t-c\tstop before link\n");
+	fprintf(stderr, "\t-O\tinvoke optimizer\n");
+	fprintf(stderr, "\t-p\tpreserve temporary files\n");
+	fprintf(stderr, "\tsources:\tfiles with a .c or .s extension\n");
+	fprintf(stderr, "\tobjects:\tfiles with a .obj extension\n");
+	fprintf(stderr, "\t\talso may be library references with -l<libname>\n");
+
+	exit(9);
 }
 
 main(argc, argv)
     char *argv[];
 {
-    char *t;
-    char *savetsp;
-    char *assource;
-    char **pv, *ptemp[MAXOPT], **pvt;
-    int nc, nl, i, j, c, f20, nxo, na;
-    int idexit();
+	char *s;
+	int i;
+	int j;
+	char c;
+
+	i = 0;
 
 	pname = argv[0];
-
 	mypid = getpid();
 
-    i = nc = nl = f20 = nxo = 0;
-    pv = ptemp;
+	/*
+	 * predefined symbols
+ 	 */
+	cppflags[ncpp++] = "-Dmicronix";
+	cppflags[ncpp++] = "-Dz80";
 
     while (++i < argc) {
         if (*argv[i] == '-') {
             switch (argv[i][1]) {
 
-            case 'S':
-                sflag++;
-                cflag++;
-                break;
-
             case 'o':
+				if (outfile) {
+					fprintf(stderr, "only 1 -o allowed\n");
+					exit(3);
+				}
                 if (++i < argc) {
                     outfile = argv[i];
-                    if ((c = getsuf(outfile)) == 'c' || c == 'o') {
-                        error("Would overwrite %s", outfile);
+                    if ((c = getsuf(outfile)) == 'c' || c == 's') {
+                        fprintf(stderr, "Would overwrite %s\n", outfile);
                         exit(8);
                     }
                 }
                 break;
 
-            case 'O':
+			case 'P':			/* executable path */
+				if (++i >= argc) {
+                	fprintf(stderr, "exec path required\n");
+                    exit(3);
+				}
+				execpath = argv[i];
+				break;
+            case 'S':			/* don't assemble */
+                sflag++;
+                break;
+
+            case 'O':			/* optimize */
                 oflag++;
                 break;
 
-            case 'E':
-                exflag++;
+            case 'E':			/* only preprocess */
+                eflag++;
 
-            case 'c':
+            case 'c':			/* don't link */
                 cflag++;
                 break;
 
-            case 'p':
+            case 'p':			/* keep all generated files */
                 pflag++;
                 break;
+
+			case 'v':
+				vflag++;		/* list commands being run */
+				break;
+
+			case 'n':
+				nflag++;		/* just list commands being run */
+				vflag++;
+				break;
 
 			case 'h':
 				usage();
 				break;
 
-            case 'D':
+            case 'D':			/* cpp flags */
             case 'I':
             case 'U':
-            case 'C':
-                *pv++ = argv[i];
-                if (pv >= ptemp + MAXOPT) {
-                    error("Too many DIUC options", (char *)NULL);
-                    --pv;
+                cppflags[ncpp++] = argv[i];
+                if (ncpp >= MAXOPT) {
+                    fprintf(stderr, "Too many DIU options\n");
+					exit(10);
                 }
                 break;
 
             default:
-                error("unknown flag %c\n", argv[i][1]);
-				exit(9);
+                fprintf(stderr, "unknown flag %c\n", argv[i][1]);
+				usage();
             }
 			continue;
         }
-        t = argv[i];
+        s = argv[i];
 
-		/* if there is a .c or .s file, append it to clist */
-        if ((c = getsuf(t)) == 'c' || c == 's' || exflag) {
-        	clist[nc++] = t;
-            if (nc >= MAXFIL) {
-            	error("Too many source files", (char *)NULL);
+		/* 
+		 * if there is a .c or .s file, append it to sources and objects
+		 */
+        if ((c = getsuf(s)) == 'c' || c == 's') {
+        	source[nsrc++] = s;
+            if (nsrc >= MAXFIL) {
+            	fprintf(stderr, "Too many source files\n");
                 exit(1);
             }
-            t = setsuf(t, 'o');
+            s = setsuf(s, 'o');
         }
 
 		/* append unique object files to llist */
-        if (nodup(llist, t)) {
-        	llist[nl++] = t;
-            if (nl >= MAXLIB) {
-            	error("Too many object/library files", (char *)NULL);
+        if (nodup(object, s)) {
+        	object[nobj++] = s;
+            if (nobj >= MAXLIB) {
+            	fprintf(stderr, "Too many object/library files\n");
                 exit(1);
             }
-            if (getsuf(t) == 'o')
-				nxo++;
         }
     }
 
@@ -173,158 +220,120 @@ main(argc, argv)
         signal(SIGTERM, idexit);
 
 	/*
-	 * generate temp file names
-	 * if no optimizer to be run, put cgen into .s
+	 * resolve paths to executables
 	 */
-	tmp_cpp = mktmp(".e");
-	tmp_p1 = mktmp(".1");
-	tmp_cgen = mktmp(".2");
-	tmp_opt = mktmp(".s");
-	tmp_as = mktmp(".obj");
-	if (!oflag) {
-		tmp_cgen = tmp_opt;
+	for (i = 0; i <= PASS_LINK; i++) {
+		sprintf(namebuf, "%s/%s", execpath, pass[i].name);
+		pass[i].path = strdup(namebuf);
 	}
 
-    pvt = pv;
-#ifdef notdef
+	/*
+	 * process all the source files
+	 */
+    for (i = 0; i < nsrc; i++) {
 
-    for (i = 0; i < nc; i++) {
-        if (nc > 1)
-            printf("%s:\n", clist[i]);
-        if (getsuf(clist[i]) == 's') {
-            assource = clist[i];
-            goto assemble;
-        } else
-            assource = tmp3;
-        savetsp = tsp;
-        av[0] = "cpp";
-        av[1] = clist[i];
-        av[2] = exflag ? "-" : tmp4;
-        na = 3;
-        for (pv = ptemp; pv < pvt; pv++)
-            av[na++] = *pv;
-        av[na++] = 0;
-        if (callsys(passp, av)) {
-            cflag++;
-            eflag++;
+		char *ofn;
+
+		s = source[i];
+        if (getsuf(s) == 's') {
+			ofn = s;
+			goto assemble;
+		}
+
+        av[1] = s;
+		av[2] = ofn = setsuf(s, 'i');
+        for (j = 0; j < ncpp; j++) {
+            av[j + 3] = cppflags[j];
+		}
+        av[j + 3] = 0;
+        if (run(PASS_CPP, av)) {
+			free(ofn);
+			cflag++;
             continue;
         }
-        av[1] = tmp4;
-        tsp = savetsp;
-        av[0] = "c0";
-        av[2] = tmp1;
-        av[3] = tmp2;
-        if (proflag) {
-            av[4] = "-P";
-            av[5] = 0;
-        } else
-            av[4] = 0;
-        if (callsys(pass0, av)) {
-            cflag++;
-            eflag++;
+
+		if (eflag)
+			continue;
+
+        av[1] = ofn;
+        av[2] = ofn = setsuf(ofn, '1');
+		av[3] = 0;
+        if (run(PASS_P1, av)) {
+			cflag++;
+			free(av[1]);
+			free(ofn);
             continue;
         }
-        av[0] = "c1";
-        av[1] = tmp1;
-        av[2] = tmp2;
-        if (sflag)
-            assource = tmp3 = setsuf(clist[i], 's');
-        av[3] = tmp3;
-        if (oflag)
-            av[3] = tmp5;
-        av[4] = 0;
-        if (callsys(pass1, av)) {
+		free(av[1]);
+
+        av[1] = ofn;
+        av[2] = ofn = setsuf(ofn, 's');
+		av[3] = 0;
+        if (run(PASS_CGEN, av)) {
             cflag++;
-            eflag++;
+			free(av[1]);
+			free(ofn);
             continue;
         }
+		free(av[1]);
+
         if (oflag) {
-            av[0] = "c2";
-            av[1] = tmp5;
-            av[2] = tmp3;
+            av[1] = ofn;
+            av[2] = ofn = setsuf(ofn, 'S');
             av[3] = 0;
-            if (callsys(pass2, av)) {
-                unlink(tmp3);
-                tmp3 = assource = tmp5;
-            } else
-                unlink(tmp5);
-        }
-        if (sflag)
-            continue;
+            if (run(PASS_OPTIM, av)) {
+				cflag++;
+				free(av[1]);
+				free(ofn);
+				continue;
+			}
+		}
+		free(av[1]);
+
+		if (sflag) 
+			continue;
+
 assemble:
-        av[0] = "as";
-        av[1] = "-u";
-        av[2] = "-o";
-        av[3] = setsuf(clist[i], 'o');
-        av[4] = assource;
-        av[5] = 0;
-        cunlink(tmp1);
-        cunlink(tmp2);
-        cunlink(tmp4);
-        if (callsys("/bin/as", av) > 1) {
+        av[1] = "-o";
+        av[2] = setsuf(ofn, 'o');
+        av[3] = ofn;
+        av[4] = 0;
+        if (run(PASS_AS, av)) {
+			free(ofn);
+			free(av[2]);
             cflag++;
-            eflag++;
             continue;
         }
+		free(ofn);
     }
-nocom:
-    if (cflag == 0 && nl != 0) {
-        i = 0;
-        av[0] = "ld";
-        av[1] = "-X";
-        av[2] = pref;
-        j = 3;
-        if (noflflag) {
-            j = 4;
-            av[3] = "-lfpsim";
-        }
-        if (outfile) {
-            av[j++] = "-o";
-            av[j++] = outfile;
-        }
-        while (i < nl)
-            av[j++] = llist[i++];
-        if (f20)
-            av[j++] = "-l2";
-        else {
-            av[j++] = "-lc";
-        }
+
+	if (!outfile)
+		outfile = "a.out";
+
+    if (cflag == 0 && nobj != 0) {
+
+        av[1] = "-o";
+        av[2] = outfile;
+		av[3] = crt0;
+		j = 4;
+        for (i = 0; i < nobj; i++) {
+            av[j++] = object[i];
+		}
         av[j++] = 0;
-        eflag |= callsys("/bin/ld", av);
-        if (nc == 1 && nxo == 1 && eflag == 0)
-            cunlink(setsuf(clist[0], 'o'));
+        run(PASS_LINK, av);
     }
     dexit();
-#endif
 }
 
 idexit()
 {
-    eflag = 100;
+    err = 100;
     dexit();
 }
 
 dexit()
 {
-    if (!pflag) {
-        if (!eflag)
-			cunlink(tmp_cpp);
-        cunlink(tmp_p1);
-		if (!oflag)
-			cunlink(tmp_cgen);
-        if (!sflag)
-            cunlink(tmp_opt);
-    }
-    exit(eflag);
-}
-
-error(s, x)
-    char *s, *x;
-{
-    fprintf(exflag ? stderr : stdout, s, x ? x : "" );
-    putc('\n', exflag ? stderr : stdout);
-    cflag++;
-    eflag++;
+    exit(err);
 }
 
 /*
@@ -366,28 +375,43 @@ setsuf(s, ch)
     return (s);
 }
 
-callsys(f, v)
-    char f[], *v[];
+run(p, v)
+    int p;
+	char *v[];
 {
     int t, status;
+	int i;
+
+	v[0] = pass[p].name;
+
+	if (vflag) {
+		for (i = 0; v[i]; i++) {
+			fprintf(stderr, "%s ", v[i]);
+		}
+		fputs("\n", stderr);
+		if (nflag)
+			return 0;
+	}
 
     if ((t = fork()) == 0) {
-        execv(f, v);
-        printf("Can't find %s\n", f);
+        execv(pass[p].path, v);
+        fprintf(stderr, "Can't find %s\n", pass[p].path);
         exit(100);
     } else if (t == -1) {
-        printf("Try again\n");
+        fprintf(stderr, "fork failed\n");
         return (100);
     }
     while (t != wait(&status));
     if (t = status & 0377) {
         if (t != SIGINT) {
-            printf("Fatal error in %s\n", f);
-            eflag = 8;
+            fprintf(stderr, "Fatal error in %s\n", pass[p].path);
+            err = 8;
         }
         dexit();
     }
-    return ((status >> 8) & 0377);
+	status = (status >> 8) & 0x377;
+	if (status) err = 1;
+    return (status);
 }
 
 /*
