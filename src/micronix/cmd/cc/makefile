@@ -1,6 +1,6 @@
 #
 # micronix makefile for cc compiler driver.  
-# eventually will handle both whitesmith's and hitech c.
+# handles both hitech and whitesmith's c
 #
 all:	cc
 
