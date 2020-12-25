@@ -43,10 +43,9 @@ int eflag CINIT;
 int oflag CINIT;
 int vflag CINIT;
 int nflag CINIT;
+int wflag = 1;
 
 int err CINIT;
-
-char *crt0 = "/lib/HTCRT0.OBJ";
 
 int idexit();
 char *setsuf();
@@ -73,14 +72,15 @@ struct pass {
 	{ "link", 0 }
 };
 
-char *execpath = "/usr/lib";
+char *execpath CINIT;
 
 usage()
 {
 	fprintf(stderr, "usage: %s [options] [sources] [objects] [-l<lib> ...]\n", 
 		pname);
+	fprintf(stderr, "\t-W\tuse whitesmith compiler\n");
+	fprintf(stderr, "\t-H\tuse hitech compiler\n");
 	fprintf(stderr, "\t-o <output file>\n");
-	fprintf(stderr, "\t-P <executable path>]\n");
 	fprintf(stderr, "\t-D<macro>[=<definition>]\n");
 	fprintf(stderr, "\t-U<macro>[=<definition>]\n");
 	fprintf(stderr, "\t-I<include directory>\n");
@@ -113,9 +113,6 @@ main(argc, argv)
 	/*
 	 * predefined symbols
  	 */
-	cppflags[ncpp++] = "-Dmicronix";
-	cppflags[ncpp++] = "-Dz80";
-
     while (++i < argc) {
         if (*argv[i] == '-') {
             switch (argv[i][1]) {
@@ -134,13 +131,14 @@ main(argc, argv)
                 }
                 break;
 
-			case 'P':			/* executable path */
-				if (++i >= argc) {
-                	fprintf(stderr, "exec path required\n");
-                    exit(3);
-				}
-				execpath = argv[i];
+			case 'W':			/* whitesmith */
+				wflag++;
 				break;
+
+			case 'H':			/* hitech */
+				wflag=0;
+				break;
+
             case 'S':			/* don't assemble */
                 sflag++;
                 break;
@@ -230,6 +228,22 @@ main(argc, argv)
     if (signal(SIGTERM, SIG_IGN) != SIG_IGN)
         signal(SIGTERM, idexit);
 
+	if (wflag) {
+		cppflags[ncpp++] = "-d";
+		cppflags[ncpp++] = "unix";
+		cppflags[ncpp++] = "-i";
+		cppflags[ncpp++] = "/include/";
+		cppflags[ncpp++] = "-x";
+		execpath = "/bin";
+		pass[PASS_P1].name = "cp1";
+		pass[PASS_CGEN].name = "cp2";
+		oflag = 0;
+	} else {
+		cppflags[ncpp++] = "-Dmicronix";
+		cppflags[ncpp++] = "-Dz80";
+		execpath = "/hitech";
+	}
+
 	/*
 	 * resolve paths to executables
 	 */
@@ -244,19 +258,28 @@ main(argc, argv)
     for (i = 0; i < nsrc; i++) {
 
 		char *ofn;
+		char *ifn;
 
 		s = source[i];
         if (getsuf(s) == 's') {
-			ofn = s;
+			ifn = s;
 			goto assemble;
 		}
 
-        av[1] = s;
-		av[2] = ofn = setsuf(s, 'i');
+		/* preprocess */
         for (j = 0; j < ncpp; j++) {
-            av[j + 3] = cppflags[j];
+            av[j+1] = cppflags[j];
 		}
-        av[j + 3] = 0;
+		j++;
+		if (wflag) {
+			av[j++] = "-o";
+			av[j++] = ofn = setsuf(s, 'i');
+			av[j++] = s;
+		} else {
+			av[j++] = s;
+			av[j++] = ofn = setsuf(s, 'i');
+		}
+        av[j] = 0;
         if (run(PASS_CPP, av)) {
 			free(ofn);
 			cflag++;
@@ -266,77 +289,129 @@ main(argc, argv)
 		if (eflag)
 			continue;
 
-        av[1] = ofn;
-        av[2] = ofn = setsuf(ofn, '1');
-		av[3] = 0;
+		/* parse */
+		j = 1;
+		ifn = ofn;
+		ofn = setsuf(ifn, '1');
+
+		if (wflag) {
+			av[j++] = "-b0";
+			av[j++] = "-m";
+			av[j++] = "-u";
+			av[j++] = "-o";
+			av[j++] = ofn;
+			av[j++] = ifn;
+			ofn = av[j-2];
+		} else {
+			av[j++] = ifn;
+			av[j++] = ofn;
+		}
+		av[j] = 0;
         if (run(PASS_P1, av)) {
 			cflag++;
-			free(av[1]);
+			free(ifn);
 			free(ofn);
             continue;
         }
-		if (!pflag) cunlink(av[1]);
-		free(av[1]);
+		if (!pflag) cunlink(ifn);
+		free(ifn);
 
-        av[1] = ofn;
-        av[2] = ofn = setsuf(ofn, 's');
-		av[3] = 0;
+		/* generate code */
+		j = 1;
+		ifn = ofn;
+		ofn = setsuf(ifn, 's');
+
+		if (wflag) {
+			av[j++] = "-o";
+			av[j++] = ofn;
+			av[j++] = ifn;
+		} else {
+			av[j++] = ofn;
+			av[j++] = ifn;
+		}
+		av[j] = 0;
         if (run(PASS_CGEN, av)) {
             cflag++;
-			free(av[1]);
+			free(ifn);
 			free(ofn);
             continue;
         }
-		if (!pflag) cunlink(av[1]);
-		free(av[1]);
+		if (!pflag) cunlink(ifn);
+		free(ifn);
 
+		/* maybe optimize */
         if (oflag) {
-            av[1] = ofn;
-            av[2] = ofn = setsuf(ofn, 'S');
-            av[3] = 0;
+			j = 1;
+			ifn = ofn;
+            ofn = setsuf(ofn, 'S');
+
+            av[j++] = ifn;
+            av[j++] = ofn;
+            av[j] = 0;
             if (run(PASS_OPTIM, av)) {
 				cflag++;
-				free(av[1]);
+				free(ifn);
 				free(ofn);
 				continue;
 			}
-			if (!pflag) cunlink(av[1]);
-			free(av[1]);
+			if (!pflag) cunlink(ifn);
+			free(ifn);
 		}
 
 		if (sflag) 
 			continue;
 
 assemble:
-        av[1] = "-o";
-        av[2] = setsuf(ofn, 'o');
-        av[3] = ofn;
-        av[4] = 0;
+		j = 1;
+		ifn = ofn;
+		ofn = setsuf(ifn, 'o');
+
+        av[j++] = "-o";
+        av[j++] = ofn;
+        av[j++] = ifn;
+        av[j] = 0;
         if (run(PASS_AS, av)) {
+			free(ifn);
 			free(ofn);
-			free(av[2]);
             cflag++;
             continue;
         }
-		if (ofn != s) {
-			if (!pflag) cunlink(ofn);
-			free(ofn);
+		if (ifn != s) {
+			if (!pflag) cunlink(ifn);
+			free(ifn);
 		}
     }
 
-	/*
-	 * now maybe link
-	 */
+	/* link */
     if (cflag == 0 && nobj != 0) {
 
-        av[1] = "-o";
-        av[2] = outfile;
-		av[3] = crt0;
-		j = 4;
+		j = 1;
+        av[j++] = "-o";
+        av[j++] = outfile;
+		if (wflag) {
+			av[j++] = "-u_main";
+			av[j++] = "-eb__memory";
+			av[j++] = "-tb0x100";
+			av[j++] = "-tr";
+			av[j++] = "-dr12";
+			av[j++] = "/lib/uhdr.o";
+		} else {
+			av[j++] = "/lib/HTCRT0.OBJ";
+		}
         for (i = 0; i < nobj; i++) {
+			if (wflag && object[i][0] == '-' && object[i][1] == 'l') {
+				s = malloc(strlen(object[i]) + 2);
+				sprintf(s, "%s.a", object[i]);
+				object[i] = s;
+			}
             av[j++] = object[i];
 		}
-        av[j++] = 0;
+		if (wflag) {
+			av[j++] = "-lmd.a";
+			av[j++] = "-lu.a";
+			av[j++] = "-lm.a";
+		}
+        av[j] = 0;
         run(PASS_LINK, av);
 		for (i = 0; i < ngobj; i++) {
 			cunlink(gobj[i]);
@@ -394,9 +469,12 @@ run(p, v)
     int p;
 	char **v;
 {
-    int t, status;
+    int t;
+	int status;
 	int i;
 	char *path;
+
+	status = 0;
 
 	v[0] = pass[p].name;
 	path = pass[p].path;
@@ -414,21 +492,36 @@ run(p, v)
     if ((t = fork()) == 0) {
         execv(path, v);
         fprintf(stderr, "Can't find %s\n", path);
-        exit(100);
+		status = 100;
+		goto out;
     } else if (t == -1) {
         fprintf(stderr, "fork failed\n");
-        return (100);
+		status = 101;
+        goto out;
     }
-    while (t != wait(&status));
-    if (err = status & 0377) {
-        if (err != SIGINT) {
-            fprintf(stderr, "Fatal error in %s\n", pass[p].path);
-            err = 8;
-        }
-        exit(err);
-    }
-	status = (status >> 8) & 0x377;
-	if (status) err = 1;
+    while (t != wait(&status))
+		;
+
+    if (status & 0377) {	/* signalled ? */
+        fprintf(stderr, "child signalled error in %s\n", pass[p].path);
+        status = status & 0377;
+    } else {
+		status = (status >> 8) & 0x377;
+	}
+out:
+	if (status) err = status;
+	if (vflag) {
+		fprintf(stderr, "child exit status %d\n", status);
+	}
+	/*
+	 * whitesmith's is ass backwards: exit code 0 is failure
+	 */
+	if (wflag) {
+		if (status == 1) 
+			status = 0;
+		else 
+			status = 1;
+	}
     return (status);
 }
 
