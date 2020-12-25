@@ -12,32 +12,39 @@
 #define MAXLIB 100
 #define MAXOPT 100
 
-int mypid;
+#ifndef HITECH
+#define CINIT = 0
+#else
+#define	CINIT
+#endif
 
-char *av[50];			/* exec arg vector */
+char *av[50] CINIT;			/* exec arg vector */
 
-char *source[MAXFIL];	/* source files */
-char nsrc;
+char *source[MAXFIL] CINIT;	/* source files */
+char nsrc CINIT;
 
-char *object[MAXLIB];	/* link files */
-int nobj;
+char *object[MAXLIB] CINIT;	/* link files */
+int nobj CINIT;
 
-char *cppflags[MAXOPT];	/* cpp options */
-int ncpp;
+char *gobj[MAXFIL] CINIT;		/* temporary objects */
+char ngobj CINIT;
 
-char *outfile;
+char *cppflags[MAXOPT] CINIT;	/* cpp options */
+int ncpp CINIT;
 
-char namebuf[100];
+char *outfile CINIT;
 
-int pflag;
-int sflag;
-int cflag;
-int eflag;
-int oflag;
-int vflag;
-int nflag;
+char namebuf[100] CINIT;
 
-int err;
+int pflag CINIT;
+int sflag CINIT;
+int cflag CINIT;
+int eflag CINIT;
+int oflag CINIT;
+int vflag CINIT;
+int nflag CINIT;
+
+int err CINIT;
 
 char *crt0 = "/lib/HTCRT0.OBJ";
 
@@ -45,7 +52,7 @@ int idexit();
 char *setsuf();
 char *strcat();
 char *strcpy();
-char *pname;
+char *pname CINIT;
 
 #define	PASS_CPP	0
 #define	PASS_P1		1
@@ -67,13 +74,6 @@ struct pass {
 };
 
 char *execpath = "/usr/lib";
-
-char *
-mktmp(char *suffix)
-{
-	sprintf(namebuf, "/tmp/ctm%05d-%s", mypid, suffix);
-	return strdup(namebuf);
-}
 
 usage()
 {
@@ -109,7 +109,6 @@ main(argc, argv)
 	i = 0;
 
 	pname = argv[0];
-	mypid = getpid();
 
 	/*
 	 * predefined symbols
@@ -165,6 +164,14 @@ main(argc, argv)
 				vflag++;		/* list commands being run */
 				break;
 
+			case 'l':			/* add library */
+				object[nobj++] = strdup(argv[i]);
+				if (nobj >= MAXLIB) {
+					fprintf(stderr, "Too many object/library files\n");
+					exit(1);
+				}
+				break;
+
 			case 'n':
 				nflag++;		/* just list commands being run */
 				vflag++;
@@ -202,6 +209,7 @@ main(argc, argv)
                 exit(1);
             }
             s = setsuf(s, 'o');
+			gobj[ngobj++] = s;
         }
 
 		/* append unique object files to llist */
@@ -213,6 +221,9 @@ main(argc, argv)
             }
         }
     }
+
+	if (!outfile)
+		outfile = "a.out";
 
     if (signal(SIGINT, SIG_IGN) != SIG_IGN)
         signal(SIGINT, idexit);
@@ -264,6 +275,7 @@ main(argc, argv)
 			free(ofn);
             continue;
         }
+		if (!pflag) cunlink(av[1]);
 		free(av[1]);
 
         av[1] = ofn;
@@ -275,6 +287,7 @@ main(argc, argv)
 			free(ofn);
             continue;
         }
+		if (!pflag) cunlink(av[1]);
 		free(av[1]);
 
         if (oflag) {
@@ -287,8 +300,9 @@ main(argc, argv)
 				free(ofn);
 				continue;
 			}
+			if (!pflag) cunlink(av[1]);
+			free(av[1]);
 		}
-		free(av[1]);
 
 		if (sflag) 
 			continue;
@@ -304,12 +318,15 @@ assemble:
             cflag++;
             continue;
         }
-		free(ofn);
+		if (ofn != s) {
+			if (!pflag) cunlink(ofn);
+			free(ofn);
+		}
     }
 
-	if (!outfile)
-		outfile = "a.out";
-
+	/*
+	 * now maybe link
+	 */
     if (cflag == 0 && nobj != 0) {
 
         av[1] = "-o";
@@ -321,19 +338,17 @@ assemble:
 		}
         av[j++] = 0;
         run(PASS_LINK, av);
+		for (i = 0; i < ngobj; i++) {
+			cunlink(gobj[i]);
+		}
     }
-    dexit();
+    exit(err);
 }
 
 idexit()
 {
     err = 100;
-    dexit();
-}
-
-dexit()
-{
-    exit(err);
+	exit(err);
 }
 
 /*
@@ -377,14 +392,17 @@ setsuf(s, ch)
 
 run(p, v)
     int p;
-	char *v[];
+	char **v;
 {
     int t, status;
 	int i;
+	char *path;
 
 	v[0] = pass[p].name;
+	path = pass[p].path;
 
 	if (vflag) {
+		fprintf(stderr, "%s: ", path);
 		for (i = 0; v[i]; i++) {
 			fprintf(stderr, "%s ", v[i]);
 		}
@@ -394,20 +412,20 @@ run(p, v)
 	}
 
     if ((t = fork()) == 0) {
-        execv(pass[p].path, v);
-        fprintf(stderr, "Can't find %s\n", pass[p].path);
+        execv(path, v);
+        fprintf(stderr, "Can't find %s\n", path);
         exit(100);
     } else if (t == -1) {
         fprintf(stderr, "fork failed\n");
         return (100);
     }
     while (t != wait(&status));
-    if (t = status & 0377) {
-        if (t != SIGINT) {
+    if (err = status & 0377) {
+        if (err != SIGINT) {
             fprintf(stderr, "Fatal error in %s\n", pass[p].path);
             err = 8;
         }
-        dexit();
+        exit(err);
     }
 	status = (status >> 8) & 0x377;
 	if (status) err = 1;
@@ -436,5 +454,8 @@ cunlink(f)
 {
     if (f == NULL)
         return;
+	if (vflag) {
+		fprintf(stderr, "remove %s\n", f);
+	}
     unlink(f);
 }
