@@ -5,7 +5,7 @@
 all:	cc
 
 cc : cc.c
-	cc -o cc cc.c -lS
+	cc -o cc cc.c -lS -lS
 
 install: cc /old/cc
 	cp cc /bin/cc
