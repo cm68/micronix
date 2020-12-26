@@ -481,12 +481,6 @@ block open
 	end
 end
 
-block frm
-	CALL csv
-	e5 e5
-	dd
-end
-
 block unlink
 	match
 	CALL ncsv

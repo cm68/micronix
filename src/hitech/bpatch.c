@@ -1,6 +1,9 @@
 /*
  * patch a hitech-c compiled binary for CP/M to run on micronix
  *
+ * runs on linux, and snarfs the entire object file into memory
+ * porting this to micronix is not worth it.
+ *
  * it turns out that the hitech compiler suite uses a unix-like libc
  * for i/o.  so, we grunge through the binaries looking for bdos calls,
  * and then go up the call tree until we find the unix api functions.
@@ -11,12 +14,12 @@
  * this is driven from a pattern-matching file with conditional blocks and
  * replacements.
  *
- * a block is either true or false. it must contain a match block that has either
- * a fixed address, a relative address from a variable, or no anchor at all.  if
- * it has no anchor, the entire file is searched for the match.
+ * a block is either true or false. it must contain a match block that has 
+ * either a fixed address, a relative address from a variable, or no anchor 
+ * at all.  if it has no anchor, the entire file is searched for the match.
  *
- * if a match is found, the variable in the block name is assigned to the base address
- * of the match, and the extract and replace rules are applied.
+ * if a match is found, the variable in the block name is assigned to the 
+ * base address of the match, and the extract and replace rules are applied.
  *
  * if no match is found, the block is ignored and the next block is processed.
  *
@@ -31,9 +34,6 @@
  *   patch <address>
  *     <assembly code>
  *	 end
- *   function <address>
- *     <c code>
- *   end
  *   replace <address>
  *     <replacement bytes>
  *   end
@@ -61,13 +61,14 @@
 typedef unsigned char UINT8;
 typedef unsigned short UINT16;
 typedef unsigned short UINT;
-#include "../../micronix/include/obj.h"
+#include "../micronix/include/obj.h"
 
 #define	MAX_PATTERN 4096
 #define	MAX_PATCH	4096
 
 char *patchfile = "hitech.pat";
 char *pname;
+int sflag;
 int verbose;
 int pf;
 
@@ -88,6 +89,7 @@ usage(char c)
 {
 	fprintf(stderr, "usage:\n%s [<options>] objectfile ...\n", pname);
 	fprintf(stderr, "\t-v\t\tincrease verbosity\n");
+	fprintf(stderr, "\t-s\t\tproduce sym file\n");
 	fprintf(stderr, "\t-p <patchfile>\n");
 	if (c) {
 		fprintf(stderr, "\n\tinvalid flag %c\n", c);
@@ -268,8 +270,9 @@ numin(char *s)
  * grammar: 
  * address :  <variable> , <variable> +|- <offset>, hexdigit...
  * 
- * LEXICAL NOTE: spaces are not tolerated anywhere in addresses.  there is no
- * space allowed before or after the '+'.  this is NOT a generic expression parser.
+ * LEXICAL NOTE: 
+ *		spaces are not tolerated anywhere in addresses.  there is no space 
+ *		allowed before or after the '+'.  this is NOT an expression parser.
  */
 word
 getaddr(char *in)
@@ -292,7 +295,7 @@ getaddr(char *in)
 	v = hexin(in);
 	if ((v >> 16) != 4) {
 		v = getvar(in);
-		if (v == 0xffff) {
+		if (verbose && v == 0xffff) {
 			printf("variable %s not set\n", in);
 		}
 	} else {
@@ -317,8 +320,8 @@ getaddr(char *in)
  *
  * there's a little syntactic sugar here, doing a substitute for
  * the words CALL and JUMP, and even a little layer violation when
- * a variable name or 4 byte hex number is found.  in this case, we return 2 packed
- * match bytes which the caller needs to unpack.
+ * a variable name or 4 byte hex number is found.  in this case, we 
+ * return 2 packed match bytes which the caller needs to unpack.
  */
 unsigned int
 patword()
@@ -403,7 +406,8 @@ extract()
 	a = get();
 	if (hit) {
 		putvar(a, v);
-		printf("extract: %s(%04x) %s = %04x\n", aa, ad, a, v);
+		if (verbose) 
+			printf("extract: %s(%04x) %s = %04x\n", aa, ad, a, v);
 	}
 	skiptoeol();
 }
@@ -458,126 +462,6 @@ replace()
 }
 
 /*
- * this is a bit bizarre, but we invoke a c compiler to generate the
- * bytes to put into our binary
- */
-function()
-{
-	unsigned char *repl = malloc(MAX_PATTERN);
-	int rl = 0;
-	word ad;
-	char *a;
-	int i;
-	char *c_text, *o;
-	struct var *v;
-
-	c_text = o = malloc(MAX_PATCH);
-
-	a = get();
-	if (hit) {
-		ad = getaddr(strdup(a));
-	} else {
-		ad = 0;
-	}
-
-	if (verbose > 1) printf("function %s(%04x)\n", a, ad);
-
-	/*
-	 * build the assembly prologue:
-	 * send all our defined variables to the assembly as equates
-	 */
-	if (hit) {
-		o += sprintf(o, "\n#asm\n");
-		for (v = vars; v; v = v->next) {
-			o += sprintf(o, "%s\tequ\t0x%04x\n", v->name, v->value);
-		}
-		o += sprintf(o, "\n#endasm\n");
-	}
-
-	/*
-	 * copy the entire text of the patch into the asm buffer
-	 * including the end line
-	 * all lines get indented, except label lines
-	 */
-	while (*p) {
-		char *s;
-		char c;
-
-		while (*p == '\n') p++;
-
-		/*
-		 * process a line
-		 * eat leading white space
-		 */
-		while (*p && (*p == ' ' || *p == '\t')) p++;
-
-		/* do we have a label? _foo0: */
-		s = p;
-		if (isymchar(*s)) {
-			while (*s && symchar(*s)) s++;
-		}
-		if (*s != ':') {
-			*o++ = '\t';
-		}
-
-		s = p;
-
-		/* copy the rest of the line, compressing out redundant space */
-		while (*p && *p != '\n') {
-			if (*p == ' ' || *p == '\t') *p = '\t';
-			*o++ = *p++;
-			if (o[-1] == '\t') {
-				while ((*p == '\t') || (*p == ' ')) p++;
-			}
-		}
-		*o++ = '\n';
-		*o = '\0';
-
-		if (strncmp(s, "end\n", 4) == 0)
-			break;
-	}
-
-	if (verbose > 1) printf("c text: %s\n", c_text);
-	if (hit) {
-		char linkcmd[80];
-
-		i = creat("c_text.c", 0777);
-		write(i, c_text, strlen(c_text));
-		close(i);
-		i = system("zxc -c c_text.c");
-		if (i != 0) {
-			fprintf(stderr, "compile for block %s failed\n", blockname);
-			exit(9);
-		}
-		sprintf(linkcmd, "zxcc LINK.COM --Z --C%04xH --Oc_bin.com c_text.obj", ad);
-		i = system(linkcmd);
-		if (i != 0) {
-			fprintf(stderr, "link for block %s failed\n", blockname);
-			exit(10);
-		}
-		i = open("c_bin.com", 0);
-		rl = read(i, repl, MAX_PATTERN);
-		close(i);
-	}
-
-	if (verbose > 1) {
-		printf("replacement bytes %d\n", rl);
-	}
-	for (i = 0; i < rl; i++) {
-		if (verbose > 1) {
-			printf("%02x ", repl[i]);
-			if ((i % 8) == 7) printf("\n");
-		}
-		if (hit) {
-			membuf[ad + i] = repl[i];
-			dirty = 1;
-		}
-	}
-	if (verbose > 1) printf("\n");
-	
-	if (verbose > 1) printf("patch end\n");
-}
-/*
  * this is a bit bizarre, but we invoke an assembler to generate the
  * bytes to put into our binary
  */
@@ -600,8 +484,6 @@ patch()
 	} else {
 		ad = 0;
 	}
-
-	if (verbose > 1) printf("patch %s(%04x)\n", a, ad);
 
 	/*
 	 * build the assembly prologue:
@@ -662,7 +544,7 @@ patch()
 		i = creat("asmtext.asm", 0777);
 		write(i, asmtext, strlen(asmtext));
 		close(i);
-		i = system("../zmac -o asmtext.cim asmtext.asm");
+		i = system("../tools/zmac -o asmtext.cim asmtext.asm");
 		if (i != 0) {
 			fprintf(stderr, "patch assembly for block %s failed\n", blockname);
 			exit(9);
@@ -670,7 +552,12 @@ patch()
 		i = open("asmtext.cim", 0);
 		rl = read(i, repl, MAX_PATTERN);
 		close(i);
+		unlink("asmtext.cim");
+		unlink("asmtext.asm");
 	}
+
+	if (hit) 
+		printf("apply patch %s length %d at %04x\n", blockname, rl, ad);
 
 	if (verbose > 1) {
 		printf("replacement bytes %d\n", rl);
@@ -692,9 +579,9 @@ patch()
 
 /*
  * this function is really the engine of the patcher.
- * it does all the searching in the object file, and is where we spend the vast majority
- * of our time. first, we snarf the entire match text into a buffer, where we do value
- * substititions as needed.
+ * it does all the searching in the object file, and is where we spend the 
+ * vast majority of our time. first, we snarf the entire match text into a 
+ * buffer, where we do value substititions as needed.
  */
 match()
 {
@@ -714,6 +601,7 @@ match()
 
 	if (verbose > 1) printf("match %s\n", anchor ? anchor : "unanchored");
 
+	/* read in the match block */
 	while (*p) {
 		skipwhite();
 		if (wordmatch("end")) {
@@ -738,8 +626,10 @@ match()
 	}
 
 	if (anchor) {
-		if (patmatch(pat, pl, base)) {
-			hit = 1;
+		if (base != 0xffff) {
+			if (patmatch(pat, pl, base)) {
+				hit = 1;
+			}
 		}
 	} else {
 		for (base = 0x100; base < objsize + 0x100; base++) {
@@ -779,7 +669,8 @@ block()
 		if (wordmatch("match")) {
 			match();
 			if (hit) {
-				printf("block %s hit at %x\n", blockname, matchaddr);
+				if (verbose)
+					printf("block %s hit at %x\n", blockname, matchaddr);
 				addr = getvar(blockname);
 				if (getvar(blockname) == 0xffff) {
 					putvar(blockname, matchaddr);
@@ -788,16 +679,14 @@ block()
 						blockname, matchaddr, addr);
 				}
 			} else {
-				printf("block %s miss\n", blockname);
+				if (verbose) 
+					printf("block %s miss\n", blockname);
 			}
 		}
 		if (wordmatch("extract")) {
 			extract();
 		}
 		if (wordmatch("patch")) {
-			patch();
-		}
-		if (wordmatch("function")) {
 			patch();
 		}
 		if (wordmatch("replace")) {
@@ -833,7 +722,7 @@ process(char *fn)
 		perror(fn);
 		exit(4);
 	}
-	printf("read %d bytes\n", objsize);
+	if (verbose) printf("read %d bytes\n", objsize);
 
 	for (p = patchtext; *p; p++) {
 		skipwhite();
@@ -871,21 +760,24 @@ process(char *fn)
 		write(fd, &membuf[0x100], objsize);
 		close(fd);
 	}
-	s = index(fn, '.');	
-	if (!s || (strlen(s) != 4)) {
-		fprintf(stderr, "filename must have .COM extension\n");
-		exit(8);
+
+	if (sflag) {
+		s = index(fn, '.');	
+		if (!s || (strlen(s) != 4)) {
+			fprintf(stderr, "filename must have .COM extension\n");
+			exit(8);
+		}
+		strcpy(s+1, "sym");
+		fd = creat(fn, 0777);
+		if (fd < 0) {
+			perror(fn);
+			exit(9);
+		}
+		for (v = vars; v; v = v->next) {
+			dprintf(fd, "%s\tcode\t0x%04x\n", v->name, v->value);
+		}
+		close(fd);
 	}
-	strcpy(s+1, "sym");
-	fd = creat(fn, 0777);
-	if (fd < 0) {
-		perror(fn);
-		exit(9);
-	}
-	for (v = vars; v; v = v->next) {
-		dprintf(fd, "%s\tcode\t0x%04x\n", v->name, v->value);
-	}
-	close(fd);
 }
 
 int
@@ -902,6 +794,9 @@ main(int argc, char **argv)
 		for (s = ++*argv; *s; s++) switch(*s) {
 		case 'v':
 			verbose++;
+			break;
+		case 's':
+			sflag++;
 			break;
 		case 'p':
 			patchfile = *++argv;
