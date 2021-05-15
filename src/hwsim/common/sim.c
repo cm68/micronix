@@ -74,7 +74,6 @@ int traceflags;
 
 int trace_inst;
 int trace_bio;
-int trace_ior;
 int trace_io;
 int trace_symbols;
 int trace_timer;
@@ -85,7 +84,6 @@ struct {
 } def_traces[] = {
     {"inst", &trace_inst },
     {"bio", &trace_bio },
-    {"ior", &trace_ior },
     {"io", &trace_io },
     {"symbols", &trace_symbols },
     {"timer", &trace_timer },

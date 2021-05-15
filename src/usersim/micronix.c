@@ -61,7 +61,7 @@ int am_root = 1;
 int rootpid;
 int mypid;
 FILE *mytty;
-int logfd;
+extern int logfd;
 
 char curdir[100] = "";
 char *rootdir = 0;
@@ -861,6 +861,39 @@ dumpcpu()
         get_word(cp->state.registers.word[Z80_SP]) & 0xffff, brake);
 }
 
+void
+cpmsys()
+{
+    unsigned char c_reg;
+    unsigned short de_reg;
+    char vbuf[30];
+    unsigned short from;
+
+    from = get_word(cp->state.registers.word[Z80_SP]) - 3;
+    c_reg = cp->state.registers.byte[Z80_C];
+    de_reg = cp->state.registers.word[Z80_DE];
+
+
+    fprintf(mytty, "cp/m system call from %x - ", from);
+
+    vbuf[0] = '\0';
+
+    switch(c_reg) {
+    case 32:
+        if ((de_reg & 0xff) == 0xff) {
+            sprintf(vbuf, "%s", "get user num\n");
+        } else {
+            sprintf(vbuf, "%s", "set user num to %d\n", de_reg & 0x1f);
+        }
+        break;
+    default:
+        sprintf(vbuf, "call: %d arg: %x\n", c_reg, de_reg);
+        break;
+    }
+    fputs(vbuf, mytty);
+    dumpcpu();
+}
+
 int
 watchpoint_hit()
 {
@@ -958,7 +991,17 @@ monitor()
             while (*s && (*s == ' '))
                 s++;
             if (*s) {
-                i = strtol(s, &s, 16);
+                if (strcmp(s, "tos") == 0) {
+                    int tos;
+                    tos  = cp->state.registers.word[Z80_SP] & 0xffff;
+                    printf("stack %04x\n", tos);
+                    for (i = 0; i < 10; i++) {
+                        printf("\t%04x\n", get_word(tos + (i * 2)));
+                    } 
+                    break;
+                } else {
+                    i = strtol(s, &s, 16);
+                }
             } else {
                 if (lastaddr == -1) {
                     i = cp->state.registers.word[Z80_SP];
@@ -1095,6 +1138,12 @@ emulate()
                 fprintf(mytty, "break at %04x\n", cp->state.pc);
                 dumpcpu();
             }
+            breakpoint = 1;
+        }
+        /* cp/m system call */
+        if (cp->state.pc == 0x0005) {
+            pid();
+            cpmsys();
             breakpoint = 1;
         }
         if (breakpoint == 1) {

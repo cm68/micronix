@@ -8,6 +8,7 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #include "../micronix/include/types.h"
 #include "../micronix/include/sys/fs.h"
@@ -24,7 +25,7 @@
 
 int spt = 15;
 
-int traceflags;
+extern int traceflags;
 int trace_fs;
 
 /*
@@ -293,9 +294,11 @@ char *itype[] = {
     "BDEV"
 };
 
+#ifdef notdef
 struct super *fs;
 struct dsknod *ip;
 struct dir *dp;
+#endif
 char dbuf[512];
 
 #ifdef notdef
@@ -1000,9 +1003,8 @@ fileunlink(struct super *fs, char *name)
         }
         iput(dp);
         putdir(dp, dirp);
-        ifree(ip);
     }
-    free(dp);
+    ifree(dp);
     
     if (inum == 0) {
         return;
@@ -1011,18 +1013,18 @@ fileunlink(struct super *fs, char *name)
     /*
      * now maybe remove the file
      */
-    ip = iget(fs, inum);
-    ip->nlink--;
-    if (ip->nlink == 0) {
-        filefree(ip);
+    dp = iget(fs, inum);
+    dp->nlink--;
+    if (dp->nlink == 0) {
+        filefree(dp);
 
-        ip->mode = 0;
+        dp->mode = 0;
         if (fs->ninode != 100) {
             fs->inode[fs->ninode++] = inum;
         }
     }
-    iput(ip);
-    ifree(ip);
+    iput(dp);
+    ifree(dp);
     ((struct image *)fs)->superdirty = 1;
 }
 

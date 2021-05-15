@@ -1,3 +1,6 @@
+#
+# cross compile hitech c library
+#
 LIBRARY = libu.lib
 OBJECTS = read.obj write.obj open.obj close.obj fork.obj _exit.obj
 CRT = crt0.obj

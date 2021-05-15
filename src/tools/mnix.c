@@ -1,6 +1,7 @@
 /*
  * a command line micronix filesystem reader/writer/lister
- * the interface really needs to look like tar
+ *
+ * the interface really needs to look like tar: 
  *
  * mar -xf <image> micronix       - extract /micronix
  * mar -rf <image> micronix       - replace or add /micronix
@@ -23,6 +24,8 @@
 #include "../micronix/include/sys/dir.h"
 #include "../include/fslib.h"
 #include "../include/util.h"
+
+int traceflags;
 
 char *filesystem;
 int nerror;
@@ -113,13 +116,14 @@ main(argc, argv)
     if (traceflags) {
         printf("filesystem: %s\n", filesystem);
     }
-    i = openfs(filesystem, &fs);
+    i = openfsrw(filesystem, &fs, 1);
     if (i < 0) {
         printf("can't open %s\n", filesystem);
         exit(errno);
     }
 
     if (traceflags) {
+        printf("superblock\n");
         dumpsb(fs);
     }
 

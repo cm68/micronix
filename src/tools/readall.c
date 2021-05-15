@@ -14,6 +14,8 @@
 #include "../include/fslib.h"
 #include "../include/util.h"
 
+int traceflags;
+
 struct super *fs;
 int dryrun;
 int verbose;

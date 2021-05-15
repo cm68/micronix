@@ -1,0 +1,9 @@
+*.dis
+bpatch 
+cgen 
+cpp 
+libr 
+link 
+optim 
+p1 
+zas

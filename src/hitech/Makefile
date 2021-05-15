@@ -8,6 +8,7 @@ HITECH = cpp p1 cgen optim link libr zas
 CFLAGS = -Wno-implicit-int
 
 all: $(HITECH)
+	cp $(HITECH) bin
 
 bpatch: bpatch.c
 	cc -g $(CFLAGS) -o $@ $<
@@ -15,9 +16,9 @@ bpatch: bpatch.c
 %: %.com hitech.pat bpatch
 	./bpatch $<
 
-%.dis: %.COM hitech.pat bpatch
+%.dis: %.com hitech.pat bpatch
 	./bpatch $<
-	../disas $< >$@
+	../tools/disas $< >$@
 
 install: $(HITECH)
 	mkdir -p ../../filesystem/hitech

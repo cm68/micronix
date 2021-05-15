@@ -71,11 +71,11 @@ extern int nmi_pin;
 // called by driver to assert or clear vectored interrupt line
 void set_vi(int signal, int card, int value);
 
-void (*vi_change)(unsigned char new);
-unsigned char (*get_intack)();
+extern void (*vi_change)(unsigned char new);
+extern unsigned char (*get_intack)();
 
 /* the cpu registers a hook that gets called when the bus int line changed */
-void (*int_change)(int value);
+extern void (*int_change)(int value);
 
 // set if symbols are valid
 int super();

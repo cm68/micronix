@@ -1,3 +1,7 @@
+/*
+ * micronix hitech c
+ * libu/open.c
+ */
 #asm
 	psect text
 	global _errno

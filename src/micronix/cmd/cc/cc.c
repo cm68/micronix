@@ -44,6 +44,7 @@ int oflag CINIT;
 int vflag CINIT;
 int nflag CINIT;
 int wflag = 1;
+char *xopt = 0;
 
 int err CINIT;
 
@@ -84,6 +85,7 @@ usage()
 	fprintf(stderr, "\t-D<macro>[=<definition>]\n");
 	fprintf(stderr, "\t-U<macro>[=<definition>]\n");
 	fprintf(stderr, "\t-I<include directory>\n");
+	fprintf(stderr, "\t-i <include directory>\n");
 	fprintf(stderr, "\t-L<library directory>\n");
 	fprintf(stderr, "\t-l<library directory>\n");
 	fprintf(stderr, "\t-E\tstop after preprocessing (produce .i)\n");
@@ -91,6 +93,8 @@ usage()
 	fprintf(stderr, "\t-c\tstop before link\n");
 	fprintf(stderr, "\t-O\tinvoke optimizer\n");
 	fprintf(stderr, "\t-p\tpreserve temporary files\n");
+	fprintf(stderr, "\t-n\tonly show commands\n");
+	fprintf(stderr, "\t-x#\tpass option to cp2\n");
 	fprintf(stderr, "\tsources:\tfiles with a .c or .s extension\n");
 	fprintf(stderr, "\tobjects:\tfiles with a .obj extension\n");
 	fprintf(stderr, "\t\talso may be library references with -l<libname>\n");
@@ -177,6 +181,19 @@ main(argc, argv)
 
 			case 'h':
 				usage();
+				break;
+
+			case 'i':			/* compatibility with ws cc */
+                if (++i >= argc) {
+                    fprintf(stderr, "need include directory\n");
+					exit(3);
+				}
+				cppflags[ncpp++] = "-i";
+				cppflags[ncpp++] = argv[i];
+				break;
+
+			case 'x':			/* whitesmith's x option for cp2 */
+				xopt = argv[i];
 				break;
 
             case 'D':			/* cpp flags */
@@ -322,6 +339,7 @@ main(argc, argv)
 		ofn = setsuf(ifn, 's');
 
 		if (wflag) {
+			if (xopt) av[j++] = xopt;
 			av[j++] = "-o";
 			av[j++] = ofn;
 			av[j++] = ifn;

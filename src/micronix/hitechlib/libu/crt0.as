@@ -1,5 +1,6 @@
 ;
-; micronix hi-tech-c crt0.as
+; micronix hi-tech c
+; libu/crt0.as
 ;
 	psect	text,global,pure
 	psect	data,global
