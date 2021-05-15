@@ -1,0 +1,1808 @@
+#! /bin/sh
+# This is a shell archive, meaning:
+# 1. Remove everything above the #! /bin/sh line.
+# 2. Save the resulting text in a file.
+# 3. Execute the file with /bin/sh (not csh) to create:
+#	442.shar
+#	442.patch
+# This archive created: Wed Jan 30 20:38:00 2002
+export PATH; PATH=/bin:/usr/bin:$PATH
+if test -f '442.shar'
+then
+	echo shar: "will not over-write existing file '442.shar'"
+else
+sed 's/^X//' << \SHAR_EOF > '442.shar'
+X#! /bin/sh
+X# This is a shell archive, meaning:
+X# 1. Remove everything above the #! /bin/sh line.
+X# 2. Save the resulting text in a file.
+X# 3. Execute the file with /bin/sh (not csh) to create:
+X#	/usr/include/stdint.h
+X# This archive created: Wed Jan 30 20:22:37 2002
+Xexport PATH; PATH=/bin:/usr/bin:$PATH
+Xif test -f '/usr/include/stdint.h'
+Xthen
+X	echo shar: "will not over-write existing file '/usr/include/stdint.h'"
+Xelse
+Xsed 's/^Z//' << \SHAR_EOF > '/usr/include/stdint.h'
+XZ/*
+XZ * Public domain - 2002/1/30 - sms
+XZ *
+XZ *	@(#)stdint.h	1.0 (2.11BSD) 2002/1/30
+XZ*/
+XZ
+XZ#ifndef	_STDINT_H_
+XZ#define	_STDINT_H_
+XZ
+XZ/* Exact-size types  */
+XZtypedef char                  int8_t;
+XZtypedef unsigned char         uint8_t;
+XZtypedef int                   int16_t;
+XZtypedef unsigned int          uint16_t;
+XZtypedef long                  int32_t;
+XZtypedef unsigned long         uint32_t;
+XZ#ifdef notyet
+XZtypedef long long             int64_t;
+XZtypedef unsigned long long    uint64_t;
+XZ#endif
+XZ
+XZ/* BSD compat types */
+XZtypedef uint8_t                       u_int8_t;
+XZtypedef uint16_t                      u_int16_t;
+XZtypedef uint32_t                      u_int32_t;
+XZ#ifdef notyet
+XZtypedef uint64_t                      u_int64_t;
+XZ#endif
+XZ#endif /* _STDINT_H_ */
+XSHAR_EOF
+Xfi
+Xexit 0
+X#	End of shell archive
+SHAR_EOF
+fi
+if test -f '442.patch'
+then
+	echo shar: "will not over-write existing file '442.patch'"
+else
+sed 's/^X//' << \SHAR_EOF > '442.patch'
+X*** /usr/src/bin/od.c.old	Sun Feb  8 14:24:54 1987
+X--- /usr/src/bin/od.c	Mon Nov 19 20:07:49 2001
+X***************
+X*** 1,4 ****
+X! static char *sccsid = "@(#)od.c	5.12 (Berkeley) 5/14/84";
+X  /*
+X   * od -- octal, hex, decimal, character dump of data in a file.
+X   *
+X--- 1,4 ----
+X! static char *sccsid = "@(#)od.c	5.13 (2.11BSD) 2001/11/19";
+X  /*
+X   * od -- octal, hex, decimal, character dump of data in a file.
+X   *
+X***************
+X*** 697,706 ****
+X  static long	_mask = 0x7fffffff;
+X  
+X  char *
+X! icvt (value, radix, signed, ndigits)
+X  long	value;
+X  int	radix;
+X! int	signed;
+X  int	ndigits;
+X  {
+X  	register long	val = value;
+X--- 697,706 ----
+X  static long	_mask = 0x7fffffff;
+X  
+X  char *
+X! icvt (value, radix, xsigned, ndigits)
+X  long	value;
+X  int	radix;
+X! int	xsigned;
+X  int	ndigits;
+X  {
+X  	register long	val = value;
+X***************
+X*** 720,726 ****
+X  		goto done; /*return(b);*/
+X  	}
+X  
+X! 	if (signed && (sign = (val < 0)))	/* signed conversion */
+X  	{
+X  		/*
+X  		 * It is necessary to do the first divide
+X--- 720,726 ----
+X  		goto done; /*return(b);*/
+X  	}
+X  
+X! 	if (xsigned && (sign = (val < 0)))	/* signed conversion */
+X  	{
+X  		/*
+X  		 * It is necessary to do the first divide
+X***************
+X*** 776,782 ****
+X  		*--b = '-';
+X  
+X  	tmp1 = ndigits - (&_icv_buf[MAXINTLENGTH] - b);
+X! 	tmp2 = signed? ' ':'0';
+X  	while (tmp1 > 0)
+X  	{
+X  		*--b = tmp2;
+X--- 776,782 ----
+X  		*--b = '-';
+X  
+X  	tmp1 = ndigits - (&_icv_buf[MAXINTLENGTH] - b);
+X! 	tmp2 = xsigned? ' ':'0';
+X  	while (tmp1 > 0)
+X  	{
+X  		*--b = tmp2;
+X*** /usr/src/ucb/ex/ex_io.c.old	Sun Sep  8 11:59:44 1991
+X--- /usr/src/ucb/ex/ex_io.c	Mon Nov 19 20:08:08 2001
+X***************
+X*** 5,11 ****
+X   */
+X  
+X  #if	!defined(lint) && defined(DOSCCS)
+X! static char *sccsid = "@(#)ex_io.c	7.11.1.1 (Berkeley) 8/12/86";
+X  #endif
+X  
+X  #include "ex.h"
+X--- 5,11 ----
+X   */
+X  
+X  #if	!defined(lint) && defined(DOSCCS)
+X! static char *sccsid = "@(#)ex_io.c	7.11.1.2 (2.11BSD) 2001/11/19";
+X  #endif
+X  
+X  #include "ex.h"
+X***************
+X*** 856,872 ****
+X  # define rindex strrchr
+X  #endif
+X  
+X! checkmodeline(line)
+X! char *line;
+X  {
+X  	char *beg, *end;
+X  	char cmdbuf[1024];
+X  	char *index(), *rindex();
+X  
+X! 	beg = index(line, ':');
+X  	if (beg == NULL)
+X  		return;
+X! 	if (&beg[-3] < line)
+X  		return;
+X  	if (!(  ( (beg[-3] == ' ' || beg[-3] == '\t')
+X  	        && beg[-2] == 'e'
+X--- 856,872 ----
+X  # define rindex strrchr
+X  #endif
+X  
+X! checkmodeline(xline)
+X! char *xline;
+X  {
+X  	char *beg, *end;
+X  	char cmdbuf[1024];
+X  	char *index(), *rindex();
+X  
+X! 	beg = index(xline, ':');
+X  	if (beg == NULL)
+X  		return;
+X! 	if (&beg[-3] < xline)
+X  		return;
+X  	if (!(  ( (beg[-3] == ' ' || beg[-3] == '\t')
+X  	        && beg[-2] == 'e'
+X*** /usr/src/ucb/pascal/pi/pas.y.old	Thu Mar 17 14:17:22 1983
+X--- /usr/src/ucb/pascal/pi/pas.y	Mon Nov 19 20:06:16 2001
+X***************
+X*** 210,219 ****
+X  
+X  const_decl:
+X  	YCONST YID '=' const ';'
+X! 		= constbeg($1, line2of($2)), const(lineof($3), $2, $4);
+X  		|
+X  	const_decl YID '=' const ';'
+X! 		= const(lineof($3), $2, $4);
+X  		|
+X  	YCONST error
+X  		= {
+X--- 210,219 ----
+X  
+X  const_decl:
+X  	YCONST YID '=' const ';'
+X! 		= constbeg($1, line2of($2)), xconst(lineof($3), $2, $4);
+X  		|
+X  	const_decl YID '=' const ';'
+X! 		= xconst(lineof($3), $2, $4);
+X  		|
+X  	YCONST error
+X  		= {
+X*** /usr/src/ucb/pascal/pi/const.c.old	Fri Jul 10 13:58:28 1981
+X--- /usr/src/ucb/pascal/pi/const.c	Mon Nov 19 20:08:29 2001
+X***************
+X*** 1,4 ****
+X! /*	@(#)const.c	2.3	SCCS id keyword	*/
+X  /* Copyright (c) 1979 Regents of the University of California */
+X  #
+X  /*
+X--- 1,4 ----
+X! /*	@(#)const.c	2.3.1 2001/11/19 */
+X  /* Copyright (c) 1979 Regents of the University of California */
+X  #
+X  /*
+X***************
+X*** 29,35 ****
+X  }
+X  #endif
+X  
+X! const(cline, cid, cdecl)
+X  	int cline;
+X  	register char *cid;
+X  	register int *cdecl;
+X--- 29,35 ----
+X  }
+X  #endif
+X  
+X! xconst(cline, cid, cdecl)
+X  	int cline;
+X  	register char *cid;
+X  	register int *cdecl;
+X*** /usr/src/ucb/pascal/pxp/const.c.old	Sat May 31 03:50:44 1986
+X--- /usr/src/ucb/pascal/pxp/const.c	Mon Nov 19 20:06:17 2001
+X***************
+X*** 31,37 ****
+X  	setline(cline);
+X  }
+X  
+X! const(cline, cid, cdecl)
+X  	int cline;
+X  	char *cid;
+X  	int *cdecl;
+X--- 31,37 ----
+X  	setline(cline);
+X  }
+X  
+X! xconst(cline, cid, cdecl)
+X  	int cline;
+X  	char *cid;
+X  	int *cdecl;
+X*** /usr/src/ucb/pascal/pxp/pas.y.old	Fri Jul 10 13:59:37 1981
+X--- /usr/src/ucb/pascal/pxp/pas.y	Mon Nov 19 20:06:20 2001
+X***************
+X*** 203,212 ****
+X  
+X  const_decl:
+X  	YCONST YID '=' const ';'
+X! 		= constbeg($1, line2of($2)), const(lineof($3), $2, $4);
+X  		|
+X  	const_decl YID '=' const ';'
+X! 		= const(lineof($3), $2, $4);
+X  		|
+X  	YCONST error
+X  		= {
+X--- 203,212 ----
+X  
+X  const_decl:
+X  	YCONST YID '=' const ';'
+X! 		= constbeg($1, line2of($2)), xconst(lineof($3), $2, $4);
+X  		|
+X  	const_decl YID '=' const ';'
+X! 		= xconst(lineof($3), $2, $4);
+X  		|
+X  	YCONST error
+X  		= {
+X*** /usr/src/usr.bin/f77/data.c.old	Mon Feb 16 16:57:36 1987
+X--- /usr/src/usr.bin/f77/data.c	Mon Nov 19 20:06:22 2001
+X***************
+X*** 16,23 ****
+X  
+X  if(repp == NULL)
+X  	nrep = 1;
+X! else if (ISICON(repp) && repp->const.ci >= 0)
+X! 	nrep = repp->const.ci;
+X  else
+X  	{
+X  	error("invalid repetition count in DATA statement",0,0,ERR);
+X--- 16,23 ----
+X  
+X  if(repp == NULL)
+X  	nrep = 1;
+X! else if (ISICON(repp) && repp->xconst.ci >= 0)
+X! 	nrep = repp->xconst.ci;
+X  else
+X  	{
+X  	error("invalid repetition count in DATA statement",0,0,ERR);
+X***************
+X*** 74,80 ****
+X  		if(ip->implb==NULL || ip->impub==NULL || ip->varnp==NULL)
+X  			error("bad impldoblock 0%o", ip,0,FATAL1);
+X  		if(ip->isactive)
+X! 			ip->varvp->const.ci += ip->impdiff;
+X  		else
+X  			{
+X  			q = fixtype(cpexpr(ip->implb));
+X--- 74,80 ----
+X  		if(ip->implb==NULL || ip->impub==NULL || ip->varnp==NULL)
+X  			error("bad impldoblock 0%o", ip,0,FATAL1);
+X  		if(ip->isactive)
+X! 			ip->varvp->xconst.ci += ip->impdiff;
+X  		else
+X  			{
+X  			q = fixtype(cpexpr(ip->implb));
+X***************
+X*** 87,93 ****
+X  				q = fixtype(cpexpr(ip->impstep));
+X  				if( ! ISICON(q) )
+X  					goto doerr;
+X! 				ip->impdiff = q->const.ci;
+X  				frexpr(q);
+X  				}
+X  			else
+X--- 87,93 ----
+X  				q = fixtype(cpexpr(ip->impstep));
+X  				if( ! ISICON(q) )
+X  					goto doerr;
+X! 				ip->impdiff = q->xconst.ci;
+X  				frexpr(q);
+X  				}
+X  			else
+X***************
+X*** 96,102 ****
+X  			q = fixtype(cpexpr(ip->impub));
+X  			if(! ISICON(q))
+X  				goto doerr;
+X! 			ip->implim = q->const.ci;
+X  			frexpr(q);
+X  
+X  			ip->isactive = YES;
+X--- 96,102 ----
+X  			q = fixtype(cpexpr(ip->impub));
+X  			if(! ISICON(q))
+X  				goto doerr;
+X! 			ip->implim = q->xconst.ci;
+X  			frexpr(q);
+X  
+X  			ip->isactive = YES;
+X***************
+X*** 108,115 ****
+X  			rp->rpltag = TCONST;
+X  			}
+X  
+X! 		if( (ip->impdiff>0 && (ip->varvp->const.ci <= ip->implim))
+X! 		 || (ip->impdiff<0 && (ip->varvp->const.ci >= ip->implim)) )
+X  			{ /* start new loop */
+X  			curdtp = ip->datalist;
+X  			goto next;
+X--- 108,115 ----
+X  			rp->rpltag = TCONST;
+X  			}
+X  
+X! 		if( (ip->impdiff>0 && (ip->varvp->xconst.ci <= ip->implim))
+X! 		 || (ip->impdiff<0 && (ip->varvp->xconst.ci >= ip->implim)) )
+X  			{ /* start new loop */
+X  			curdtp = ip->datalist;
+X  			goto next;
+X***************
+X*** 134,144 ****
+X  		q = mkaddr(np);
+X  		off = typesize[np->vtype] * curdtelt;
+X  		if(np->vtype == TYCHAR)
+X! 			off *= np->vleng->const.ci;
+X  		q->memoffset = mkexpr(OPPLUS, q->memoffset, mkintcon(off) );
+X  		if( (neltp = np->vdim->nelt) && ISCONST(neltp))
+X  			{
+X! 			if(++curdtelt < neltp->const.ci)
+X  				skip = NO;
+X  			}
+X  		else
+X--- 134,144 ----
+X  		q = mkaddr(np);
+X  		off = typesize[np->vtype] * curdtelt;
+X  		if(np->vtype == TYCHAR)
+X! 			off *= np->vleng->xconst.ci;
+X  		q->memoffset = mkexpr(OPPLUS, q->memoffset, mkintcon(off) );
+X  		if( (neltp = np->vdim->nelt) && ISCONST(neltp))
+X  			{
+X! 			if(++curdtelt < neltp->xconst.ci)
+X  				skip = NO;
+X  			}
+X  		else
+X***************
+X*** 153,159 ****
+X  		}
+X  	if(q->vtype == TYCHAR)
+X  		if(ISICON(q->vleng))
+X! 			*elenp = q->vleng->const.ci;
+X  		else	{
+X  			error("initialization of string of nonconstant length",0,0,ERR);
+X  			continue;
+X--- 153,159 ----
+X  		}
+X  	if(q->vtype == TYCHAR)
+X  		if(ISICON(q->vleng))
+X! 			*elenp = q->vleng->xconst.ci;
+X  		else	{
+X  			error("initialization of string of nonconstant length",0,0,ERR);
+X  			continue;
+X***************
+X*** 166,174 ****
+X  		*vlenp = eqvclass[np->vardesc.varno].eqvleng;
+X  	else	{
+X  		*vlenp =  (np->vtype==TYCHAR ?
+X! 				np->vleng->const.ci : typesize[np->vtype]);
+X  		if(np->vdim)
+X! 			*vlenp *= np->vdim->nelt->const.ci;
+X  		}
+X  	return(q);
+X  
+X--- 166,174 ----
+X  		*vlenp = eqvclass[np->vardesc.varno].eqvleng;
+X  	else	{
+X  		*vlenp =  (np->vtype==TYCHAR ?
+X! 				np->vleng->xconst.ci : typesize[np->vtype]);
+X  		if(np->vdim)
+X! 			*vlenp *= np->vdim->nelt->xconst.ci;
+X  		}
+X  	return(q);
+X  
+X***************
+X*** 214,220 ****
+X  	*t++ = ' ';
+X  varname[XL+1] = '\0';
+X  
+X! offset = varp->memoffset->const.ci;
+X  type = varp->vtype;
+X  valtype = valp->vtype;
+X  if(type!=TYCHAR && valtype==TYCHAR)
+X--- 214,220 ----
+X  	*t++ = ' ';
+X  varname[XL+1] = '\0';
+X  
+X! offset = varp->memoffset->xconst.ci;
+X  type = varp->vtype;
+X  valtype = valp->vtype;
+X  if(type!=TYCHAR && valtype==TYCHAR)
+X***************
+X*** 232,239 ****
+X  	}
+X  if(type != TYCHAR)
+X  	if(valtype == TYUNKNOWN)
+X! 		con.ci = valp->const.ci;
+X! 	else	consconv(type, &con, valtype, &valp->const);
+X  
+X  k = 1;
+X  switch(type)
+X--- 232,239 ----
+X  	}
+X  if(type != TYCHAR)
+X  	if(valtype == TYUNKNOWN)
+X! 		con.ci = valp->xconst.ci;
+X! 	else	consconv(type, &con, valtype, &valp->xconst);
+X  
+X  k = 1;
+X  switch(type)
+X***************
+X*** 267,273 ****
+X  		break;
+X  
+X  	case TYCHAR:
+X! 		k = valp->vleng->const.ci;
+X  		if(elen < k)
+X  			k = elen;
+X  
+X--- 267,273 ----
+X  		break;
+X  
+X  	case TYCHAR:
+X! 		k = valp->vleng->xconst.ci;
+X  		if(elen < k)
+X  			k = elen;
+X  
+X***************
+X*** 274,282 ****
+X  		for(i = 0 ; i < k ; ++i)
+X  			{
+X  			fprintf(initfile, datafmt, varname, offset++, vlen, TYCHAR);
+X! 			fprintf(initfile, "\t%d\n", valp->const.ccp[i]);
+X  			}
+X! 		k = elen - valp->vleng->const.ci;
+X  		while( k-- > 0)
+X  			{
+X  			fprintf(initfile, datafmt, varname, offset++, vlen, TYCHAR);
+X--- 274,282 ----
+X  		for(i = 0 ; i < k ; ++i)
+X  			{
+X  			fprintf(initfile, datafmt, varname, offset++, vlen, TYCHAR);
+X! 			fprintf(initfile, "\t%d\n", valp->xconst.ccp[i]);
+X  			}
+X! 		k = elen - valp->vleng->xconst.ci;
+X  		while( k-- > 0)
+X  			{
+X  			fprintf(initfile, datafmt, varname, offset++, vlen, TYCHAR);
+X*** /usr/src/usr.bin/f77/defines.old	Mon Feb 16 16:57:36 1987
+X--- /usr/src/usr.bin/f77/defines	Mon Nov 19 20:06:23 2001
+X***************
+X*** 233,239 ****
+X  #define ISERROR(z) (z->tag==TERROR)
+X  #define ISPLUSOP(z) (z->tag==TEXPR && z->opcode==OPPLUS)
+X  #define ISSTAROP(z) (z->tag==TEXPR && z->opcode==OPSTAR)
+X! #define ISONE(z) (ISICON(z) && z->const.ci==1)
+X  #define INT(z) ONEOF(z, MSKINT|MSKCHAR)
+X  #define ICON(z) mkintcon( (ftnint)(z) )
+X  #define CHCON(z) mkstrcon(strlen(z), z)
+X--- 233,239 ----
+X  #define ISERROR(z) (z->tag==TERROR)
+X  #define ISPLUSOP(z) (z->tag==TEXPR && z->opcode==OPPLUS)
+X  #define ISSTAROP(z) (z->tag==TEXPR && z->opcode==OPSTAR)
+X! #define ISONE(z) (ISICON(z) && z->xconst.ci==1)
+X  #define INT(z) ONEOF(z, MSKINT|MSKCHAR)
+X  #define ICON(z) mkintcon( (ftnint)(z) )
+X  #define CHCON(z) mkstrcon(strlen(z), z)
+X*** /usr/src/usr.bin/f77/defs.old	Mon Feb 16 16:57:41 1987
+X--- /usr/src/usr.bin/f77/defs	Mon Nov 19 20:06:24 2001
+X***************
+X*** 268,274 ****
+X  	unsigned tag:4;
+X  	unsigned vtype:4;
+X  	expptr vleng;
+X! 	union constant const;
+X  	};
+X  
+X  
+X--- 268,274 ----
+X  	unsigned tag:4;
+X  	unsigned vtype:4;
+X  	expptr vleng;
+X! 	union constant xconst;
+X  	};
+X  
+X  
+X*** /usr/src/usr.bin/f77/equiv.c.old	Tue Jun 27 19:54:24 1989
+X--- /usr/src/usr.bin/f77/equiv.c	Mon Nov 19 20:06:25 2001
+X***************
+X*** 47,53 ****
+X  			}
+X  		else	offp = ICON(0);
+X  		if(ISICON(offp))
+X! 			offset = q->eqvoffset = offp->const.ci;
+X  		else	{
+X  			error("nonconstant subscript in equivalence ", np, 0, DCLERR);
+X  			np = NULL;
+X--- 47,53 ----
+X  			}
+X  		else	offp = ICON(0);
+X  		if(ISICON(offp))
+X! 			offset = q->eqvoffset = offp->xconst.ci;
+X  		else	{
+X  			error("nonconstant subscript in equivalence ", np, 0, DCLERR);
+X  			np = NULL;
+X*** /usr/src/usr.bin/f77/exec.c.old	Mon Feb 16 16:57:37 1987
+X--- /usr/src/usr.bin/f77/exec.c	Mon Nov 19 20:06:27 2001
+X***************
+X*** 227,237 ****
+X  		}
+X  	else if( ISINT(p->vtype) )
+X  		{
+X! 		q = convic(p->const.ci);
+X  		n = strlen(q);
+X  		if(n > 0)
+X  			{
+X! 			p->const.ccp = copyn(n, q);
+X  			p->vtype = TYCHAR;
+X  			p->vleng = ICON(n);
+X  			}
+X--- 227,237 ----
+X  		}
+X  	else if( ISINT(p->vtype) )
+X  		{
+X! 		q = convic(p->xconst.ci);
+X  		n = strlen(q);
+X  		if(n > 0)
+X  			{
+X! 			p->xconst.ccp = copyn(n, q);
+X  			p->vtype = TYCHAR;
+X  			p->vleng = ICON(n);
+X  			}
+X*** /usr/src/usr.bin/f77/expr.c.old	Mon Feb 16 16:57:37 1987
+X--- /usr/src/usr.bin/f77/expr.c	Mon Nov 19 20:06:43 2001
+X***************
+X*** 21,27 ****
+X  register struct constblock * p;
+X  
+X  p = mkconst(TYLOGICAL);
+X! p->const.ci = l;
+X  return(p);
+X  }
+X  
+X--- 21,27 ----
+X  register struct constblock * p;
+X  
+X  p = mkconst(TYLOGICAL);
+X! p->xconst.ci = l;
+X  return(p);
+X  }
+X  
+X***************
+X*** 33,39 ****
+X  register struct constblock *p;
+X  
+X  p = mkconst(TYLONG);
+X! p->const.ci = l;
+X  #ifdef MAXSHORT
+X  	if(l >= -MAXSHORT   &&   l <= MAXSHORT)
+X  		p->vtype = TYSHORT;
+X--- 33,39 ----
+X  register struct constblock *p;
+X  
+X  p = mkconst(TYLONG);
+X! p->xconst.ci = l;
+X  #ifdef MAXSHORT
+X  	if(l >= -MAXSHORT   &&   l <= MAXSHORT)
+X  		p->vtype = TYSHORT;
+X***************
+X*** 49,55 ****
+X  register struct constblock *p;
+X  
+X  p = mkconst(TYADDR);
+X! p->const.ci = l;
+X  return(p);
+X  }
+X  
+X--- 49,55 ----
+X  register struct constblock *p;
+X  
+X  p = mkconst(TYADDR);
+X! p->xconst.ci = l;
+X  return(p);
+X  }
+X  
+X***************
+X*** 62,68 ****
+X  register struct constblock *p;
+X  
+X  p = mkconst(t);
+X! p->const.cd[0] = d;
+X  return(p);
+X  }
+X  
+X--- 62,68 ----
+X  register struct constblock *p;
+X  
+X  p = mkconst(t);
+X! p->xconst.cd[0] = d;
+X  return(p);
+X  }
+X  
+X***************
+X*** 75,84 ****
+X  register struct constblock *p;
+X  
+X  p = mkconst(TYUNKNOWN);
+X! p->const.ci = 0;
+X  while(--leng >= 0)
+X  	if(*s != ' ')
+X! 		p->const.ci = (p->const.ci << shift) | hextoi(*s++);
+X  return(p);
+X  }
+X  
+X--- 75,84 ----
+X  register struct constblock *p;
+X  
+X  p = mkconst(TYUNKNOWN);
+X! p->xconst.ci = 0;
+X  while(--leng >= 0)
+X  	if(*s != ' ')
+X! 		p->xconst.ci = (p->xconst.ci << shift) | hextoi(*s++);
+X  return(p);
+X  }
+X  
+X***************
+X*** 95,101 ****
+X  
+X  p = mkconst(TYCHAR);
+X  p->vleng = ICON(l);
+X! p->const.ccp = s = (char *) ckalloc(l);
+X  while(--l >= 0)
+X  	*s++ = *v++;
+X  return(p);
+X--- 95,101 ----
+X  
+X  p = mkconst(TYCHAR);
+X  p->vleng = ICON(l);
+X! p->xconst.ccp = s = (char *) ckalloc(l);
+X  while(--l >= 0)
+X  	*s++ = *v++;
+X  return(p);
+X***************
+X*** 115,125 ****
+X  	{
+X  	p = mkconst( (rtype==TYDREAL||itype==TYDREAL) ? TYDCOMPLEX : TYCOMPLEX );
+X  	if( ISINT(rtype) )
+X! 		p->const.cd[0] = realp->const.ci;
+X! 	else	p->const.cd[0] = realp->const.cd[0];
+X  	if( ISINT(itype) )
+X! 		p->const.cd[1] = imagp->const.ci;
+X! 	else	p->const.cd[1] = imagp->const.cd[0];
+X  	}
+X  else
+X  	{
+X--- 115,125 ----
+X  	{
+X  	p = mkconst( (rtype==TYDREAL||itype==TYDREAL) ? TYDCOMPLEX : TYCOMPLEX );
+X  	if( ISINT(rtype) )
+X! 		p->xconst.cd[0] = realp->xconst.ci;
+X! 	else	p->xconst.cd[0] = realp->xconst.cd[0];
+X  	if( ISINT(itype) )
+X! 		p->xconst.cd[1] = imagp->xconst.ci;
+X! 	else	p->xconst.cd[1] = imagp->xconst.cd[0];
+X  	}
+X  else
+X  	{
+X***************
+X*** 163,169 ****
+X  else if( ISCONST(p) && pt!=TYADDR)
+X  	{
+X  	q = mkconst(t);
+X! 	consconv(t, &(q->const), p->vtype, &(p->const));
+X  	frexpr(p);
+X  	}
+X  #if TARGET == PDP11
+X--- 163,169 ----
+X  else if( ISCONST(p) && pt!=TYADDR)
+X  	{
+X  	q = mkconst(t);
+X! 	consconv(t, &(q->xconst), p->vtype, &(p->xconst));
+X  	frexpr(p);
+X  	}
+X  #if TARGET == PDP11
+X***************
+X*** 237,243 ****
+X  	case TCONST:
+X  		if(e->vtype == TYCHAR)
+X  			{
+X! 			e->const.ccp = copyn(1+strlen(e->const.ccp), e->const.ccp);
+X  			e->vleng = cpexpr(e->vleng);
+X  			}
+X  	case TERROR:
+X--- 237,243 ----
+X  	case TCONST:
+X  		if(e->vtype == TYCHAR)
+X  			{
+X! 			e->xconst.ccp = copyn(1+strlen(e->xconst.ccp), e->xconst.ccp);
+X  			e->vleng = cpexpr(e->vleng);
+X  			}
+X  	case TERROR:
+X***************
+X*** 289,295 ****
+X  	case TCONST:
+X  		if( ISCHAR(p) )
+X  			{
+X! 			free(p->const.ccp);
+X  			frexpr(p->vleng);
+X  			}
+X  		break;
+X--- 289,295 ----
+X  	case TCONST:
+X  		if( ISCHAR(p) )
+X  			{
+X! 			free(p->xconst.ccp);
+X  			frexpr(p->vleng);
+X  			}
+X  		break;
+X***************
+X*** 1075,1084 ****
+X  checkcond = NULL;
+X  if( ISICON(p) )
+X  	{
+X! 	if(p->const.ci < 0)
+X  		goto badsub;
+X  	if( ISICON(dimp->nelt) )
+X! 		if(p->const.ci < dimp->nelt->const.ci)
+X  			return(p);
+X  		else
+X  			goto badsub;
+X--- 1075,1084 ----
+X  checkcond = NULL;
+X  if( ISICON(p) )
+X  	{
+X! 	if(p->xconst.ci < 0)
+X  		goto badsub;
+X  	if( ISICON(dimp->nelt) )
+X! 		if(p->xconst.ci < dimp->nelt->xconst.ci)
+X  			return(p);
+X  		else
+X  			goto badsub;
+X***************
+X*** 1250,1260 ****
+X  		nelt = 1;
+X  		if(t = v->vdim)
+X  			if( (neltp = t->nelt) && ISCONST(neltp) )
+X! 				nelt = neltp->const.ci;
+X  			else
+X  				error("adjustable automatic array", v, 0, DCLERR);
+X  		p = autovar(nelt, v->vtype, v->vleng);
+X! 		v->voffset = p->memoffset->const.ci;
+X  		frexpr(p);
+X  		break;
+X  
+X--- 1250,1260 ----
+X  		nelt = 1;
+X  		if(t = v->vdim)
+X  			if( (neltp = t->nelt) && ISCONST(neltp) )
+X! 				nelt = neltp->xconst.ci;
+X  			else
+X  				error("adjustable automatic array", v, 0, DCLERR);
+X  		p = autovar(nelt, v->vtype, v->vleng);
+X! 		v->voffset = p->memoffset->xconst.ci;
+X  		frexpr(p);
+X  		break;
+X  
+X***************
+X*** 1303,1309 ****
+X  return(c - 'a');
+X  }
+X  
+X! #define ICONEQ(z, c)  (ISICON(z) && z->const.ci==c)
+X  #define COMMUTE	{ e = lp;  lp = rp;  rp = e; }
+X  
+X  
+X--- 1303,1309 ----
+X  return(c - 'a');
+X  }
+X  
+X! #define ICONEQ(z, c)  (ISICON(z) && z->xconst.ci==c)
+X  #define COMMUTE	{ e = lp;  lp = rp;  rp = e; }
+X  
+X  
+X***************
+X*** 1340,1346 ****
+X  
+X  		if( ISICON(rp) )
+X  			{
+X! 			if(rp->const.ci == 0)
+X  				goto retright;
+X  			goto mulop;
+X  			}
+X--- 1340,1346 ----
+X  
+X  		if( ISICON(rp) )
+X  			{
+X! 			if(rp->xconst.ci == 0)
+X  				goto retright;
+X  			goto mulop;
+X  			}
+X***************
+X*** 1361,1370 ****
+X  	mulop:
+X  		if( ISICON(rp) )
+X  			{
+X! 			if(rp->const.ci == 1)
+X  				goto retleft;
+X  
+X! 			if(rp->const.ci == -1)
+X  				{
+X  				frexpr(rp);
+X  				return( mkexpr(OPNEG, lp, 0) );
+X--- 1361,1370 ----
+X  	mulop:
+X  		if( ISICON(rp) )
+X  			{
+X! 			if(rp->xconst.ci == 1)
+X  				goto retleft;
+X  
+X! 			if(rp->xconst.ci == -1)
+X  				{
+X  				frexpr(rp);
+X  				return( mkexpr(OPNEG, lp, 0) );
+X***************
+X*** 1375,1381 ****
+X  			{
+X  			if(opcode == OPSTAR)
+X  				e = mkexpr(OPSTAR, lp->rightp, rp);
+X! 			else  if(ISICON(rp) && lp->rightp->const.ci % rp->const.ci == 0)
+X  				e = mkexpr(OPSLASH, lp->rightp, rp);
+X  			else	break;
+X  
+X--- 1375,1381 ----
+X  			{
+X  			if(opcode == OPSTAR)
+X  				e = mkexpr(OPSTAR, lp->rightp, rp);
+X! 			else  if(ISICON(rp) && lp->rightp->xconst.ci % rp->xconst.ci == 0)
+X  				e = mkexpr(OPSLASH, lp->rightp, rp);
+X  			else	break;
+X  
+X***************
+X*** 1407,1413 ****
+X  	addop:
+X  		if( ISICON(rp) )
+X  			{
+X! 			if(rp->const.ci == 0)
+X  				goto retleft;
+X  			if( ISPLUSOP(lp) && ISICON(lp->rightp) )
+X  				{
+X--- 1407,1413 ----
+X  	addop:
+X  		if( ISICON(rp) )
+X  			{
+X! 			if(rp->xconst.ci == 0)
+X  				goto retleft;
+X  			if( ISPLUSOP(lp) && ISICON(lp->rightp) )
+X  				{
+X***************
+X*** 1458,1464 ****
+X  
+X  		if( ISCONST(rp) )
+X  			{
+X! 			if(rp->const.ci == 0)
+X  				if(opcode == OPOR)
+X  					goto retleft;
+X  				else
+X--- 1458,1464 ----
+X  
+X  		if( ISCONST(rp) )
+X  			{
+X! 			if(rp->xconst.ci == 0)
+X  				if(opcode == OPOR)
+X  					goto retleft;
+X  				else
+X***************
+X*** 1675,1685 ****
+X  	switch(opcode)
+X  		{
+X  		case OPNOT:
+X! 			lp->const.ci = ! lp->const.ci;
+X  			return(lp);
+X  
+X  		case OPBITNOT:
+X! 			lp->const.ci = ~ lp->const.ci;
+X  			return(lp);
+X  
+X  		case OPNEG:
+X--- 1675,1685 ----
+X  	switch(opcode)
+X  		{
+X  		case OPNOT:
+X! 			lp->xconst.ci = ! lp->xconst.ci;
+X  			return(lp);
+X  
+X  		case OPBITNOT:
+X! 			lp->xconst.ci = ~ lp->xconst.ci;
+X  			return(lp);
+X  
+X  		case OPNEG:
+X***************
+X*** 1709,1758 ****
+X  		return(e);
+X  
+X  	case OPAND:
+X! 		p->const.ci = lp->const.ci && rp->const.ci;
+X  		break;
+X  
+X  	case OPOR:
+X! 		p->const.ci = lp->const.ci || rp->const.ci;
+X  		break;
+X  
+X  	case OPEQV:
+X! 		p->const.ci = lp->const.ci == rp->const.ci;
+X  		break;
+X  
+X  	case OPNEQV:
+X! 		p->const.ci = lp->const.ci != rp->const.ci;
+X  		break;
+X  
+X  	case OPBITAND:
+X! 		p->const.ci = lp->const.ci & rp->const.ci;
+X  		break;
+X  
+X  	case OPBITOR:
+X! 		p->const.ci = lp->const.ci | rp->const.ci;
+X  		break;
+X  
+X  	case OPBITXOR:
+X! 		p->const.ci = lp->const.ci ^ rp->const.ci;
+X  		break;
+X  
+X  	case OPLSHIFT:
+X! 		p->const.ci = lp->const.ci << rp->const.ci;
+X  		break;
+X  
+X  	case OPRSHIFT:
+X! 		p->const.ci = lp->const.ci >> rp->const.ci;
+X  		break;
+X  
+X  	case OPCONCAT:
+X! 		ll = lp->vleng->const.ci;
+X! 		lr = rp->vleng->const.ci;
+X! 		p->const.ccp = q = (char *) ckalloc(ll+lr);
+X  		p->vleng = ICON(ll+lr);
+X! 		s = lp->const.ccp;
+X  		for(i = 0 ; i < ll ; ++i)
+X  			*q++ = *s++;
+X! 		s = rp->const.ccp;
+X  		for(i = 0; i < lr; ++i)
+X  			*q++ = *s++;
+X  		break;
+X--- 1709,1758 ----
+X  		return(e);
+X  
+X  	case OPAND:
+X! 		p->xconst.ci = lp->xconst.ci && rp->xconst.ci;
+X  		break;
+X  
+X  	case OPOR:
+X! 		p->xconst.ci = lp->xconst.ci || rp->xconst.ci;
+X  		break;
+X  
+X  	case OPEQV:
+X! 		p->xconst.ci = lp->xconst.ci == rp->xconst.ci;
+X  		break;
+X  
+X  	case OPNEQV:
+X! 		p->xconst.ci = lp->xconst.ci != rp->xconst.ci;
+X  		break;
+X  
+X  	case OPBITAND:
+X! 		p->xconst.ci = lp->xconst.ci & rp->xconst.ci;
+X  		break;
+X  
+X  	case OPBITOR:
+X! 		p->xconst.ci = lp->xconst.ci | rp->xconst.ci;
+X  		break;
+X  
+X  	case OPBITXOR:
+X! 		p->xconst.ci = lp->xconst.ci ^ rp->xconst.ci;
+X  		break;
+X  
+X  	case OPLSHIFT:
+X! 		p->xconst.ci = lp->xconst.ci << rp->xconst.ci;
+X  		break;
+X  
+X  	case OPRSHIFT:
+X! 		p->xconst.ci = lp->xconst.ci >> rp->xconst.ci;
+X  		break;
+X  
+X  	case OPCONCAT:
+X! 		ll = lp->vleng->xconst.ci;
+X! 		lr = rp->vleng->xconst.ci;
+X! 		p->xconst.ccp = q = (char *) ckalloc(ll+lr);
+X  		p->vleng = ICON(ll+lr);
+X! 		s = lp->xconst.ccp;
+X  		for(i = 0 ; i < ll ; ++i)
+X  			*q++ = *s++;
+X! 		s = rp->xconst.ccp;
+X  		for(i = 0; i < lr; ++i)
+X  			*q++ = *s++;
+X  		break;
+X***************
+X*** 1761,1767 ****
+X  	case OPPOWER:
+X  		if( ! ISINT(rtype) )
+X  			return(e);
+X! 		conspower(&(p->const), lp, rp->const.ci);
+X  		break;
+X  
+X  
+X--- 1761,1767 ----
+X  	case OPPOWER:
+X  		if( ! ISINT(rtype) )
+X  			return(e);
+X! 		conspower(&(p->xconst), lp, rp->xconst.ci);
+X  		break;
+X  
+X  
+X***************
+X*** 1768,1784 ****
+X  	default:
+X  		if(ltype == TYCHAR)
+X  			{
+X! 			lcon.ci = cmpstr(lp->const.ccp, rp->const.ccp,
+X! 					lp->vleng->const.ci, rp->vleng->const.ci);
+X  			rcon.ci = 0;
+X  			mtype = tyint;
+X  			}
+X  		else	{
+X  			mtype = maxtype(ltype, rtype);
+X! 			consconv(mtype, &lcon, ltype, &(lp->const) );
+X! 			consconv(mtype, &rcon, rtype, &(rp->const) );
+X  			}
+X! 		consbinop(opcode, mtype, &(p->const), &lcon, &rcon);
+X  		break;
+X  	}
+X  
+X--- 1768,1784 ----
+X  	default:
+X  		if(ltype == TYCHAR)
+X  			{
+X! 			lcon.ci = cmpstr(lp->xconst.ccp, rp->xconst.ccp,
+X! 					lp->vleng->xconst.ci, rp->vleng->xconst.ci);
+X  			rcon.ci = 0;
+X  			mtype = tyint;
+X  			}
+X  		else	{
+X  			mtype = maxtype(ltype, rtype);
+X! 			consconv(mtype, &lcon, ltype, &(lp->xconst) );
+X! 			consconv(mtype, &rcon, rtype, &(rp->xconst) );
+X  			}
+X! 		consbinop(opcode, mtype, &(p->xconst), &lcon, &rcon);
+X  		break;
+X  	}
+X  
+X***************
+X*** 1848,1863 ****
+X  	{
+X  	case TYSHORT:
+X  	case TYLONG:
+X! 		p->const.ci = - p->const.ci;
+X  		break;
+X  
+X  	case TYCOMPLEX:
+X  	case TYDCOMPLEX:
+X! 		p->const.cd[1] = - p->const.cd[1];
+X  		/* fall through and do the real parts */
+X  	case TYREAL:
+X  	case TYDREAL:
+X! 		p->const.cd[0] = - p->const.cd[0];
+X  		break;
+X  	default:
+X  		error("consnegop: impossible type %d", p->vtype,0,FATAL1);
+X--- 1848,1863 ----
+X  	{
+X  	case TYSHORT:
+X  	case TYLONG:
+X! 		p->xconst.ci = - p->xconst.ci;
+X  		break;
+X  
+X  	case TYCOMPLEX:
+X  	case TYDCOMPLEX:
+X! 		p->xconst.cd[1] = - p->xconst.cd[1];
+X  		/* fall through and do the real parts */
+X  	case TYREAL:
+X  	case TYDREAL:
+X! 		p->xconst.cd[0] = - p->xconst.cd[0];
+X  		break;
+X  	default:
+X  		error("consnegop: impossible type %d", p->vtype,0,FATAL1);
+X***************
+X*** 1901,1910 ****
+X  		return;
+X  		}
+X  	n = - n;
+X! 	consbinop(OPSLASH, type, &x, powp, &(ap->const));
+X  	}
+X  else
+X! 	consbinop(OPSTAR, type, &x, powp, &(ap->const));
+X  
+X  for( ; ; )
+X  	{
+X--- 1901,1910 ----
+X  		return;
+X  		}
+X  	n = - n;
+X! 	consbinop(OPSLASH, type, &x, powp, &(ap->xconst));
+X  	}
+X  else
+X! 	consbinop(OPSTAR, type, &x, powp, &(ap->xconst));
+X  
+X  for( ; ; )
+X  	{
+X***************
+X*** 2079,2097 ****
+X  	{
+X  	case TYSHORT:
+X  	case TYLONG:
+X! 		if(p->const.ci > 0) return(1);
+X! 		if(p->const.ci < 0) return(-1);
+X  		return(0);
+X  
+X  	case TYREAL:
+X  	case TYDREAL:
+X! 		if(p->const.cd[0] > 0) return(1);
+X! 		if(p->const.cd[0] < 0) return(-1);
+X  		return(0);
+X  
+X  	case TYCOMPLEX:
+X  	case TYDCOMPLEX:
+X! 		return(p->const.cd[0]!=0 || p->const.cd[1]!=0);
+X  
+X  	default:
+X  		error("conssgn(type %d)", p->vtype,0,FATAL1);
+X--- 2079,2097 ----
+X  	{
+X  	case TYSHORT:
+X  	case TYLONG:
+X! 		if(p->xconst.ci > 0) return(1);
+X! 		if(p->xconst.ci < 0) return(-1);
+X  		return(0);
+X  
+X  	case TYREAL:
+X  	case TYDREAL:
+X! 		if(p->xconst.cd[0] > 0) return(1);
+X! 		if(p->xconst.cd[0] < 0) return(-1);
+X  		return(0);
+X  
+X  	case TYCOMPLEX:
+X  	case TYDCOMPLEX:
+X! 		return(p->xconst.cd[0]!=0 || p->xconst.cd[1]!=0);
+X  
+X  	default:
+X  		error("conssgn(type %d)", p->vtype,0,FATAL1);
+X***************
+X*** 2115,2121 ****
+X  
+X  if(ISICON(rp))
+X  	{
+X! 	if(rp->const.ci == 0)
+X  		{
+X  		frexpr(p);
+X  		if( ISINT(ltype) )
+X--- 2115,2121 ----
+X  
+X  if(ISICON(rp))
+X  	{
+X! 	if(rp->xconst.ci == 0)
+X  		{
+X  		frexpr(p);
+X  		if( ISINT(ltype) )
+X***************
+X*** 2123,2129 ****
+X  		else
+X  			return( putconst( mkconv(ltype, ICON(1))) );
+X  		}
+X! 	if(rp->const.ci < 0)
+X  		{
+X  		if( ISINT(ltype) )
+X  			{
+X--- 2123,2129 ----
+X  		else
+X  			return( putconst( mkconv(ltype, ICON(1))) );
+X  		}
+X! 	if(rp->xconst.ci < 0)
+X  		{
+X  		if( ISINT(ltype) )
+X  			{
+X***************
+X*** 2131,2140 ****
+X  			error("integer**negative",0,0,ERR);
+X  			return( errnode() );
+X  			}
+X! 		rp->const.ci = - rp->const.ci;
+X  		p->leftp = lp = fixexpr(mkexpr(OPSLASH, ICON(1), lp));
+X  		}
+X! 	if(rp->const.ci == 1)
+X  		{
+X  		frexpr(rp);
+X  		free(p);
+X--- 2131,2140 ----
+X  			error("integer**negative",0,0,ERR);
+X  			return( errnode() );
+X  			}
+X! 		rp->xconst.ci = - rp->xconst.ci;
+X  		p->leftp = lp = fixexpr(mkexpr(OPSLASH, ICON(1), lp));
+X  		}
+X! 	if(rp->xconst.ci == 1)
+X  		{
+X  		frexpr(rp);
+X  		free(p);
+X*** /usr/src/usr.bin/f77/gram.dcl.old	Mon Jan  3 22:23:18 1994
+X--- /usr/src/usr.bin/f77/gram.dcl	Mon Nov 19 20:06:45 2001
+X***************
+X*** 53,59 ****
+X  			$$ = 0;
+X  			error("length must be an integer constant", 0, 0, DCLERR);
+X  			}
+X! 		  else $$ = $3->const.ci;
+X  		}
+X  	| SSTAR intonlyon SLPAR SSTAR SRPAR intonlyoff
+X  		{ $$ = 0; }
+X--- 53,59 ----
+X  			$$ = 0;
+X  			error("length must be an integer constant", 0, 0, DCLERR);
+X  			}
+X! 		  else $$ = $3->xconst.ci;
+X  		}
+X  	| SSTAR intonlyon SLPAR SSTAR SRPAR intonlyoff
+X  		{ $$ = 0; }
+X*** /usr/src/usr.bin/f77/io.c.old	Mon Feb 16 16:57:39 1987
+X--- /usr/src/usr.bin/f77/io.c	Mon Nov 19 20:06:47 2001
+X***************
+X*** 252,264 ****
+X  
+X  if(p = V(IOSEND))
+X  	if(ISICON(p))
+X! 		ioendlab = mklabel(p->const.ci)->labelno;
+X  	else
+X  		error("bad end= clause",0,0,ERR);
+X  
+X  if(p = V(IOSERR))
+X  	if(ISICON(p))
+X! 		ioerrlab = mklabel(p->const.ci)->labelno;
+X  	else
+X  		error("bad err= clause",0,0,ERR);
+X  
+X--- 252,264 ----
+X  
+X  if(p = V(IOSEND))
+X  	if(ISICON(p))
+X! 		ioendlab = mklabel(p->xconst.ci)->labelno;
+X  	else
+X  		error("bad end= clause",0,0,ERR);
+X  
+X  if(p = V(IOSERR))
+X  	if(ISICON(p))
+X! 		ioerrlab = mklabel(p->xconst.ci)->labelno;
+X  	else
+X  		error("bad err= clause",0,0,ERR);
+X  
+X***************
+X*** 644,650 ****
+X  		ioset(TYADDR, fmtoff, addrof(cpexpr(p)) );
+X  	else if( ISICON(p) )
+X  		{
+X! 		if( (k = fmtstmt( mklabel(p->const.ci) )) > 0 )
+X  			ioset(TYADDR, fmtoff, mkaddcon(k) );
+X  		else
+X  			ioformatted = UNFORMATTED;
+X--- 644,650 ----
+X  		ioset(TYADDR, fmtoff, addrof(cpexpr(p)) );
+X  	else if( ISICON(p) )
+X  		{
+X! 		if( (k = fmtstmt( mklabel(p->xconst.ci) )) > 0 )
+X  			ioset(TYADDR, fmtoff, mkaddcon(k) );
+X  		else
+X  			ioformatted = UNFORMATTED;
+X*** /usr/src/usr.bin/f77/pdp11.c.old	Fri Jun  9 20:34:02 1995
+X--- /usr/src/usr.bin/f77/pdp11.c	Mon Nov 19 20:06:48 2001
+X***************
+X*** 349,355 ****
+X  	addreg(argloc = 4);
+X  else
+X  	{
+X! 	addreg( argloc = argvec->memoffset->const.ci );
+X  	if(proctype == TYCHAR)
+X  		{
+X  		mvarg(TYADDR, 0, chslot);
+X--- 349,355 ----
+X  	addreg(argloc = 4);
+X  else
+X  	{
+X! 	addreg( argloc = argvec->memoffset->xconst.ci );
+X  	if(proctype == TYCHAR)
+X  		{
+X  		mvarg(TYADDR, 0, chslot);
+X*** /usr/src/usr.bin/f77/proc.c.old	Mon Jan  3 22:18:51 1994
+X--- /usr/src/usr.bin/f77/proc.c	Mon Nov 19 20:06:51 2001
+X***************
+X*** 304,316 ****
+X  type = np->vtype;
+X  if(proctype == TYUNKNOWN)
+X  	if( (proctype = type) == TYCHAR)
+X! 		procleng = (np->vleng ? np->vleng->const.ci : (ftnint) 0);
+X  
+X  if(proctype == TYCHAR)
+X  	{
+X  	if(type != TYCHAR)
+X  		error("noncharacter entry of character function",0,0,ERR);
+X! 	else if( (np->vleng ? np->vleng->const.ci : (ftnint) 0) != procleng)
+X  		error("mismatched character entry lengths",0,0,ERR);
+X  	}
+X  else if(type == TYCHAR)
+X--- 304,316 ----
+X  type = np->vtype;
+X  if(proctype == TYUNKNOWN)
+X  	if( (proctype = type) == TYCHAR)
+X! 		procleng = (np->vleng ? np->vleng->xconst.ci : (ftnint) 0);
+X  
+X  if(proctype == TYCHAR)
+X  	{
+X  	if(type != TYCHAR)
+X  		error("noncharacter entry of character function",0,0,ERR);
+X! 	else if( (np->vleng ? np->vleng->xconst.ci : (ftnint) 0) != procleng)
+X  		error("mismatched character entry lengths",0,0,ERR);
+X  	}
+X  else if(type == TYCHAR)
+X***************
+X*** 345,351 ****
+X  	if(nentry == 1)
+X  		retslot = autovar(1, TYDREAL, NULL);
+X  	np->vstg = STGAUTO;
+X! 	np->voffset = retslot->memoffset->const.ci;
+X  	}
+X  
+X  for(p = ep->arglist ; p ; p = p->nextp)
+X--- 345,351 ----
+X  	if(nentry == 1)
+X  		retslot = autovar(1, TYDREAL, NULL);
+X  	np->vstg = STGAUTO;
+X! 	np->voffset = retslot->memoffset->xconst.ci;
+X  	}
+X  
+X  for(p = ep->arglist ; p ; p = p->nextp)
+X***************
+X*** 459,469 ****
+X  	return(-1);
+X  if(q->vdim)
+X  	if( ISICON(q->vdim->nelt) )
+X! 		leng *= q->vdim->nelt->const.ci;
+X  	else	return(-1);
+X  if(q->vleng)
+X  	if( ISICON(q->vleng) )
+X! 		leng *= q->vleng->const.ci;
+X  	else 	return(-1);
+X  return(leng);
+X  }
+X--- 459,469 ----
+X  	return(-1);
+X  if(q->vdim)
+X  	if( ISICON(q->vdim->nelt) )
+X! 		leng *= q->vdim->nelt->xconst.ci;
+X  	else	return(-1);
+X  if(q->vleng)
+X  	if( ISICON(q->vleng) )
+X! 		leng *= q->vleng->xconst.ci;
+X  	else 	return(-1);
+X  return(leng);
+X  }
+X***************
+X*** 495,505 ****
+X  			v->voffset = p->extleng;
+X  			v->vardesc.varno = p - extsymtab;
+X  			if(type == TYCHAR)
+X! 				size = v->vleng->const.ci;
+X  			else	size = typesize[type];
+X  			if(t = v->vdim)
+X  				if( (neltp = t->nelt) && ISCONST(neltp) )
+X! 					size *= neltp->const.ci;
+X  				else
+X  					error("adjustable array in common", v, 0, DCLERR);
+X  			p->extleng += size;
+X--- 495,505 ----
+X  			v->voffset = p->extleng;
+X  			v->vardesc.varno = p - extsymtab;
+X  			if(type == TYCHAR)
+X! 				size = v->vleng->xconst.ci;
+X  			else	size = typesize[type];
+X  			if(t = v->vdim)
+X  				if( (neltp = t->nelt) && ISCONST(neltp) )
+X! 					size *= neltp->xconst.ci;
+X  				else
+X  					error("adjustable array in common", v, 0, DCLERR);
+X  			p->extleng += size;
+X***************
+X*** 555,561 ****
+X  
+X  if(t == TYCHAR)
+X  	if( ISICON(lengp) )
+X! 		leng = lengp->const.ci;
+X  	else	{
+X  		error("automatic variable of nonconstant length",0,0,FATAL);
+X  		}
+X--- 555,561 ----
+X  
+X  if(t == TYCHAR)
+X  	if( ISICON(lengp) )
+X! 		leng = lengp->xconst.ci;
+X  	else	{
+X  		error("automatic variable of nonconstant length",0,0,FATAL);
+X  		}
+X***************
+X*** 597,603 ****
+X  
+X  if(type==TYCHAR)
+X  	if( ISICON(lengp) )
+X! 		leng = lengp->const.ci;
+X  	else	{
+X  		error("adjustable length",0,0,ERR);
+X  		return( errnode() );
+X--- 597,603 ----
+X  
+X  if(type==TYCHAR)
+X  	if( ISICON(lengp) )
+X! 		leng = lengp->xconst.ci;
+X  	else	{
+X  		error("adjustable length",0,0,ERR);
+X  		return( errnode() );
+X***************
+X*** 606,612 ****
+X  	{
+X  	q = p->datap;
+X  	if(q->vtype==type && q->ntempelt==nelt &&
+X! 	    (type!=TYCHAR || q->vleng->const.ci==leng) )
+X  		{
+X  		oldp->nextp = p->nextp;
+X  		free(p);
+X--- 606,612 ----
+X  	{
+X  	q = p->datap;
+X  	if(q->vtype==type && q->ntempelt==nelt &&
+X! 	    (type!=TYCHAR || q->vleng->xconst.ci==leng) )
+X  		{
+X  		oldp->nextp = p->nextp;
+X  		free(p);
+X***************
+X*** 695,701 ****
+X  	if( (v->vtype = lengtype(type, length))==TYCHAR && length!=0)
+X  		v->vleng = ICON(length);
+X  	}
+X! else if(v->vtype!=type || (type==TYCHAR && v->vleng->const.ci!=length) )
+X  	error("incompatible or duplicate type declaration", v, 0, DCLERR);
+X  /*! added "or duplicate" to error message PLWard 10/80 */
+X  }
+X--- 695,701 ----
+X  	if( (v->vtype = lengtype(type, length))==TYCHAR && length!=0)
+X  		v->vleng = ICON(length);
+X  	}
+X! else if(v->vtype!=type || (type==TYCHAR && v->vleng->xconst.ci!=length) )
+X  	error("incompatible or duplicate type declaration", v, 0, DCLERR);
+X  /*! added "or duplicate" to error message PLWard 10/80 */
+X  }
+X*** /usr/src/usr.bin/f77/put.c.old	Mon Feb 16 16:57:40 1987
+X--- /usr/src/usr.bin/f77/put.c	Mon Nov 19 20:06:53 2001
+X***************
+X*** 154,160 ****
+X  switch(type = p->vtype)
+X  	{
+X  	case TYCHAR:
+X! 		if(p->vleng->const.ci > XL)
+X  			break;	/* too long for literal table */
+X  		litflavor = 1;
+X  		goto loop;
+X--- 154,160 ----
+X  switch(type = p->vtype)
+X  	{
+X  	case TYCHAR:
+X! 		if(p->vleng->xconst.ci > XL)
+X  			break;	/* too long for literal table */
+X  		litflavor = 1;
+X  		goto loop;
+X***************
+X*** 176,184 ****
+X  			if(type == litp->littype) switch(litflavor)
+X  				{
+X  			case 1:
+X! 				if(p->vleng->const.ci != litp->litval.litcval.litclen)
+X  					break;
+X! 				if(! eqn( (int) p->vleng->const.ci, p->const.ccp,
+X  					litp->litval.litcval.litcstr) )
+X  						break;
+X  
+X--- 176,184 ----
+X  			if(type == litp->littype) switch(litflavor)
+X  				{
+X  			case 1:
+X! 				if(p->vleng->xconst.ci != litp->litval.litcval.litclen)
+X  					break;
+X! 				if(! eqn( (int) p->vleng->xconst.ci, p->xconst.ccp,
+X  					litp->litval.litcval.litcstr) )
+X  						break;
+X  
+X***************
+X*** 188,199 ****
+X  				return(q);
+X  
+X  			case 2:
+X! 				if(p->const.cd[0] == litp->litval.litdval)
+X  					goto ret;
+X  				break;
+X  
+X  			case 3:
+X! 				if(p->const.ci == litp->litval.litival)
+X  					goto ret;
+X  				break;
+X  				}
+X--- 188,199 ----
+X  				return(q);
+X  
+X  			case 2:
+X! 				if(p->xconst.cd[0] == litp->litval.litdval)
+X  					goto ret;
+X  				break;
+X  
+X  			case 3:
+X! 				if(p->xconst.ci == litp->litval.litival)
+X  					goto ret;
+X  				break;
+X  				}
+X***************
+X*** 205,222 ****
+X  			switch(litflavor)
+X  				{
+X  				case 1:
+X! 					litp->litval.litcval.litclen = p->vleng->const.ci;
+X  					cpn( (int) litp->litval.litcval.litclen,
+X! 						p->const.ccp,
+X  						litp->litval.litcval.litcstr);
+X  					break;
+X  
+X  				case 2:
+X! 					litp->litval.litdval = p->const.cd[0];
+X  					break;
+X  
+X  				case 3:
+X! 					litp->litval.litival = p->const.ci;
+X  					break;
+X  				}
+X  			}
+X--- 205,222 ----
+X  			switch(litflavor)
+X  				{
+X  				case 1:
+X! 					litp->litval.litcval.litclen = p->vleng->xconst.ci;
+X  					cpn( (int) litp->litval.litcval.litclen,
+X! 						p->xconst.ccp,
+X  						litp->litval.litcval.litcstr);
+X  					break;
+X  
+X  				case 2:
+X! 					litp->litval.litdval = p->xconst.cd[0];
+X  					break;
+X  
+X  				case 3:
+X! 					litp->litval.litival = p->xconst.ci;
+X  					break;
+X  				}
+X  			}
+X***************
+X*** 233,239 ****
+X  	case TYLOGICAL:
+X  	case TYSHORT:
+X  	case TYLONG:
+X! 		prconi(asmfile, type, p->const.ci);
+X  		break;
+X  
+X  	case TYCOMPLEX:
+X--- 233,239 ----
+X  	case TYLOGICAL:
+X  	case TYSHORT:
+X  	case TYLONG:
+X! 		prconi(asmfile, type, p->xconst.ci);
+X  		break;
+X  
+X  	case TYCOMPLEX:
+X***************
+X*** 249,263 ****
+X  
+X  	flpt:
+X  		for(i = 0 ; i < k ; ++i)
+X! 			prconr(asmfile, type, p->const.cd[i]);
+X  		break;
+X  
+X  	case TYCHAR:
+X! 		putstr(asmfile, p->const.ccp, p->vleng->const.ci);
+X  		break;
+X  
+X  	case TYADDR:
+X! 		prcona(asmfile, p->const.ci);
+X  		break;
+X  
+X  	default:
+X--- 249,263 ----
+X  
+X  	flpt:
+X  		for(i = 0 ; i < k ; ++i)
+X! 			prconr(asmfile, type, p->xconst.cd[i]);
+X  		break;
+X  
+X  	case TYCHAR:
+X! 		putstr(asmfile, p->xconst.ccp, p->vleng->xconst.ci);
+X  		break;
+X  
+X  	case TYADDR:
+X! 		prcona(asmfile, p->xconst.ci);
+X  		break;
+X  
+X  	default:
+X*** /usr/src/usr.bin/f77/putdmr.c.old	Thu Nov 12 21:57:38 1992
+X--- /usr/src/usr.bin/f77/putdmr.c	Mon Nov 19 20:06:56 2001
+X***************
+X*** 210,221 ****
+X  				if(type == TYSHORT)
+X  					{
+X  					p2op2(P2ICON, P2SHORT);
+X! 					p2i( (short)(p->const.ci) );
+X  					}
+X  				else
+X  					{
+X  					p2op2(P2LCON, P2LONG);
+X! 					p2li(p->const.ci);
+X  					}
+X  				free(p);
+X  				break;
+X--- 210,221 ----
+X  				if(type == TYSHORT)
+X  					{
+X  					p2op2(P2ICON, P2SHORT);
+X! 					p2i( (short)(p->xconst.ci) );
+X  					}
+X  				else
+X  					{
+X  					p2op2(P2LCON, P2LONG);
+X! 					p2li(p->xconst.ci);
+X  					}
+X  				free(p);
+X  				break;
+X***************
+X*** 224,230 ****
+X  				p2op(P2NAME);
+X  				p2i(P2STATIC);
+X  				p2i(P2INT);
+X! 				p2i( (int) p->const.ci);
+X  				p2op2(P2ADDR, P2PTR);
+X  				free(p);
+X  				break;
+X--- 224,230 ----
+X  				p2op(P2NAME);
+X  				p2i(P2STATIC);
+X  				p2i(P2INT);
+X! 				p2i( (int) p->xconst.ci);
+X  				p2op2(P2ADDR, P2PTR);
+X  				free(p);
+X  				break;
+X***************
+X*** 494,500 ****
+X  int type;
+X  int ncomma;
+X  
+X! if(!ISICON(p->rightp) || (k = p->rightp->const.ci)<2)
+X  	error("putpower: bad call",0,0,FATAL);
+X  base = p->leftp;
+X  type = base->vtype;
+X--- 494,500 ----
+X  int type;
+X  int ncomma;
+X  
+X! if(!ISICON(p->rightp) || (k = p->rightp->xconst.ci)<2)
+X  	error("putpower: bad call",0,0,FATAL);
+X  base = p->leftp;
+X  type = base->vtype;
+X***************
+X*** 798,804 ****
+X  				break;
+X  
+X  			case OPCONV:
+X! 				if(!ISICON(p->vleng) || p->vleng->const.ci!=1
+X  				   || ! INT(p->leftp->vtype) )
+X  					error("putch1: bad character conversion",0,0,FATAL);
+X  				t = mktemp(TYCHAR, ICON(1) );
+X--- 798,804 ----
+X  				break;
+X  
+X  			case OPCONV:
+X! 				if(!ISICON(p->vleng) || p->vleng->xconst.ci!=1
+X  				   || ! INT(p->leftp->vtype) )
+X  					error("putch1: bad character conversion",0,0,FATAL);
+X  				t = mktemp(TYCHAR, ICON(1) );
+X***************
+X*** 963,969 ****
+X  	}
+X  else
+X  	funct = 0;
+X! if(p->memoffset && (!ISICON(p->memoffset) || p->memoffset->const.ci!=0) )
+X  	offp = cpexpr(p->memoffset);
+X  else
+X  	offp = NULL;
+X--- 963,969 ----
+X  	}
+X  else
+X  	funct = 0;
+X! if(p->memoffset && (!ISICON(p->memoffset) || p->memoffset->xconst.ci!=0) )
+X  	offp = cpexpr(p->memoffset);
+X  else
+X  	offp = NULL;
+X*** /VERSION.old	Tue Dec  4 19:33:14 2001
+X--- /VERSION	Wed Jan 30 20:00:45 2002
+X***************
+X*** 1,5 ****
+X! Current Patch Level: 441
+X! Date: December 4, 2001
+X  
+X  2.11 BSD
+X  ============
+X--- 1,5 ----
+X! Current Patch Level: 442
+X! Date: January 30, 2002
+X  
+X  2.11 BSD
+X  ============
+SHAR_EOF
+fi
+exit 0
+#	End of shell archive

@@ -1,0 +1,76 @@
+#
+# Copyright (c) 1988 Regents of the University of California.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms are permitted
+# provided that this notice is preserved and that due credit is given
+# to the University of California at Berkeley. The name of the University
+# may not be used to endorse or promote products derived from this
+# software without specific prior written permission. This software
+# is provided ``as is'' without express or implied warranty.
+#
+#	2.2 (2.11BSD GTE) 1996/6/8
+#
+M=	../machine
+VPATH=	../machine
+
+CFILES=	${M}/enable34.c ${M}/in_cksum.c
+COBJS=	enable34.o in_cksum.o
+
+SFILES=	${M}/net_copy.s \
+	${M}/net_csv.s ${M}/net_mbuf.s ${M}/net_scb.s ${M}/net_SKcall.s \
+	${M}/net_trap.s ${M}/net_xxx.s
+SOBJS=	mch_KScall.o net_copy.o net_csv.o \
+	net_mbuf.o net_scb.o net_SKcall.o net_trap.o net_xxx.o
+
+.c.o:
+	${CC} ${CFLAGS} -S $*.c
+	${SED} -f NETSPLFIX $*.s | ${AS} -u -o $*.o
+	rm -f $*.s
+
+.s.o:
+	${CPP} $*.s | ${AS} -u -o $*.o
+
+all: ${COBJS} ${SOBJS}
+
+in_cksum.o:
+	${CC} ${CFLAGS} -S ${M}/in_cksum.c
+	${ED} - < ${M}/cksum-fix > /dev/null in_cksum.s
+	${SED} -f NETSPLFIX in_cksum.s | ${AS} -u -o $@
+	rm -f in_cksum.s
+
+depend: assym.h
+	mkdep -f Make.pdpnet ${CFLAGS} ${CFILES} ${SFILES}
+
+assym.h:
+	make -f Make.pdp CFLAGS="${CFLAGS}" assym.h
+# DO NOT DELETE THIS LINE -- mkdep uses it.
+# DO NOT PUT ANYTHING AFTER THIS LINE, IT WILL GO AWAY.
+
+enable34.o: ../machine/enable34.c ../h/param.h /usr/include/sys/localopts.h
+enable34.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+enable34.o: /usr/include/sys/types.h /usr/include/sys/select.h
+enable34.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+enable34.o: ../h/../machine/net_mac.h
+in_cksum.o: ../machine/in_cksum.c ../h/param.h /usr/include/sys/localopts.h
+in_cksum.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+in_cksum.o: /usr/include/sys/types.h /usr/include/sys/select.h
+in_cksum.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+in_cksum.o: ../h/../machine/net_mac.h ../machine/../machine/seg.h ../h/mbuf.h
+in_cksum.o: ../h/domain.h ../h/protosw.h /usr/include/netinet/in.h
+in_cksum.o: /usr/include/netinet/in_systm.h
+net_copy.o: ../machine/net_copy.s ../machine/DEFS.h localopts.h assym.h
+net_copy.o: ../machine/../machine/mch_iopage.h
+net_csv.o: ../machine/net_csv.s ../machine/DEFS.h localopts.h assym.h
+net_csv.o: ../machine/../machine/mch_iopage.h ../machine/../machine/koverlay.h
+net_mbuf.o: ../machine/net_mbuf.s ../machine/DEFS.h localopts.h assym.h
+net_mbuf.o: ../machine/../machine/mch_iopage.h
+net_scb.o: ../machine/net_scb.s acc.h css.h de.h ec.h il.h qe.h qt.h sri.h vv.h
+net_SKcall.o: ../machine/net_SKcall.s ../machine/DEFS.h localopts.h assym.h
+net_SKcall.o: ../machine/../machine/mch_iopage.h
+net_trap.o: ../machine/net_trap.s ../machine/DEFS.h localopts.h assym.h
+net_trap.o: ../machine/../machine/mch_iopage.h
+net_xxx.o: ../machine/net_xxx.s ../machine/DEFS.h localopts.h assym.h
+net_xxx.o: ../machine/../machine/mch_iopage.h
+
+# IF YOU PUT ANYTHING HERE IT WILL GO AWAY

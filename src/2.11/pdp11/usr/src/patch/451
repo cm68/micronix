@@ -1,0 +1,183 @@
+Subject: sysctl securelevel -1
+Index:	 src/sys/conf/param.c src/sys/sys/kern_sysctl.c src/sys/GENERIC/param.c
+
+Description:
+	By default the securelevel is set to 1 by init when going multiuser. 
+	However, both common behavior in other systems, as well as explicit 
+	comments in init mentions that if the operator have set securelevel 
+	to -1, init will not bump it to 1.
+
+	The problem is that it is not possible to set securelevel to -1, not 
+	even in single user mode. The only component allowed to lower the 
+	securelevel is init, and init only does it in two places and gives no 
+	further control.
+
+	The solution is to allow, only if securelevel is 0, root to both
+	raise *and* lower the securelevel via sysctl -w kern.securelevel 
+
+Repeat-By:
+	Observation.   Going init always raises the securelevel to 1.  This
+	patch implments a runtime (via sysctl) method of setting securelevel
+	to -1 rather than compiling (via param.c) -1 into the kernel.
+	
+Fix:
+
+	This patch (and description) are from Johnny Billquist (bqt@softjar.se).
+	Thanks!
+
+	The compile time setting of securelevel is removed in the template
+	param.c file and GENERIC build directories only.   It is only 
+	necessary to edit your local kernel param.c if you keep synchronized 
+	with the system config templates.
+
+	Cut where indicated and save to a file (/tmp/451 for example), change
+	into the root directory and apply the patch:
+
+	cd /
+	patch -p0 < /tmp/451
+
+	For the change to take effect a new kernel is built and installed:
+
+	cd /sys/YOUR_KERNEL
+	make
+	mv /unix /ounix
+	(and optionally for a networking kernel)
+	mv /netnix /onetnix
+	mv netnix /netnix
+	reboot
+
+	This and previous updates to 2.11BSD are available at the following
+	locations:
+	
+	ftp://ftp.update.uu.se/pub/pdp11/2.11BSD
+	http://www.tuhs.org/Archive/PDP-11/Distributions/ucb/2.11BSD/Patches
+	ftp://ftp.2bsd.com/2.11BSD
+
+---------------------------cut here--------------------
+*** ./usr/src/sys/conf/param.c.old	Fri Feb 14 23:22:50 1997
+--- ./usr/src/sys/conf/param.c	Wed Dec 19 23:28:13 2018
+***************
+*** 3,9 ****
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)param.c	2.2 (2.11BSD GTE) 1997/2/14
+   */
+  
+  #include "../h/param.h"
+--- 3,9 ----
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)param.c	2.3 (2.11BSD) 2018/12/19
+   */
+  
+  #include "../h/param.h"
+***************
+*** 71,86 ****
+  struct	mount mount[NMOUNT];
+  struct	buf buf[NBUF], bfreelist[BQUEUES];
+  struct	bufhd bufhash[BUFHSZ];
+- 
+- /*
+-  * Remove the ifdef/endif to run the kernel in unsecure mode even when in
+-  * a multiuser state.  Normally 'init' raises the security level to 1 
+-  * upon transitioning to multiuser.  Setting the securelevel to -1 prevents
+-  * the secure level from being raised by init.
+- */
+- #ifdef	PERMANENTLY_INSECURE
+- int	securelevel = -1;
+- #endif
+  
+  #ifdef UCB_CLIST
+  	u_int clstdesc = ((((btoc(NCLIST*sizeof(struct cblock)))-1) << 8) | RW);
+--- 71,76 ----
+*** ./usr/src/sys/sys/kern_sysctl.c.old	Fri Oct 13 23:54:52 2000
+--- ./usr/src/sys/sys/kern_sysctl.c	Thu Dec 20 20:44:23 2018
+***************
+*** 33,39 ****
+   * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+   * SUCH DAMAGE.
+   *
+!  *	@(#)kern_sysctl.c	8.4.12 (2.11BSD) 2000/5/17
+   */
+  
+  /*
+--- 33,39 ----
+   * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+   * SUCH DAMAGE.
+   *
+!  *	@(#)kern_sysctl.c	8.4.13 (2.11BSD) 2018/12/20
+   */
+  
+  /*
+***************
+*** 230,236 ****
+  		if ((error = sysctl_int(oldp, oldlenp, newp, newlen, &level)) ||
+  		    newp == NULL)
+  			return (error);
+! 		if (level < securelevel && u.u_procp->p_pid != 1)
+  			return (EPERM);
+  		securelevel = level;
+  		return (0);
+--- 230,236 ----
+  		if ((error = sysctl_int(oldp, oldlenp, newp, newlen, &level)) ||
+  		    newp == NULL)
+  			return (error);
+! 		if (level < securelevel && u.u_procp->p_pid != 1 && securelevel > 0)
+  			return (EPERM);
+  		securelevel = level;
+  		return (0);
+*** ./usr/src/sys/GENERIC/param.c.old	Fri Feb 14 23:35:37 1997
+--- ./usr/src/sys/GENERIC/param.c	Thu Dec 20 21:50:02 2018
+***************
+*** 3,9 ****
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)param.c	2.2 (2.11BSD GTE) 1997/2/14
+   */
+  
+  #include "../h/param.h"
+--- 3,9 ----
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)param.c	2.3 (2.11BSD) 2018/12/19
+   */
+  
+  #include "../h/param.h"
+***************
+*** 71,86 ****
+  struct	mount mount[NMOUNT];
+  struct	buf buf[NBUF], bfreelist[BQUEUES];
+  struct	bufhd bufhash[BUFHSZ];
+- 
+- /*
+-  * Remove the ifdef/endif to run the kernel in unsecure mode even when in
+-  * a multiuser state.  Normally 'init' raises the security level to 1 
+-  * upon transitioning to multiuser.  Setting the securelevel to -1 prevents
+-  * the secure level from being raised by init.
+- */
+- #ifdef	PERMANENTLY_INSECURE
+- int	securelevel = -1;
+- #endif
+  
+  #ifdef UCB_CLIST
+  	u_int clstdesc = ((((btoc(NCLIST*sizeof(struct cblock)))-1) << 8) | RW);
+--- 71,76 ----
+*** ./VERSION.old	Wed Mar 16 08:05:36 2016
+--- ./VERSION	Sat Dec 22 08:22:27 2018
+***************
+*** 1,5 ****
+! Current Patch Level: 450
+! Date: March 16, 2016
+  
+  2.11 BSD
+  ============
+--- 1,5 ----
+! Current Patch Level: 451
+! Date: December 22, 2018
+  
+  2.11 BSD
+  ============
