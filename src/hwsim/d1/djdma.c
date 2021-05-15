@@ -21,6 +21,8 @@
 #include <sys/ioctl.h>
 #include <stdio.h>
 
+#define DELAYED_DJINT 1
+
 int trace_djdma;
 extern int trace_bio;
 

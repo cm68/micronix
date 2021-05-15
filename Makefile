@@ -18,6 +18,7 @@ filesystem: src/tools/readall
 	for i in $(DISKS) ; do src/tools/readall -d filesystem $$i ; done
 	mkdir -p filesystem/usr/src/sys filesystem/usr/src/cmd
 	cp -r src/micronix/* filesystem/usr/src
+	cp src/hitech/bin/* filesystem/hitech
 	echo "path /bin /usr/bin" > filesystem/.sh
 
 clean:

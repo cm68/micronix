@@ -19,7 +19,8 @@
  * at all.  if it has no anchor, the entire file is searched for the match.
  *
  * if a match is found, the variable in the block name is assigned to the 
- * base address of the match, and the extract and replace rules are applied.
+ * base address of the match, and the extract, patch, and  replace rules are 
+ * applied. patch uses an assembler, but replace is just hex data
  *
  * if no match is found, the block is ignored and the next block is processed.
  *
@@ -27,17 +28,17 @@
  *
  * block <variable name>
  *   match [<address>]
- *     <pattern bytes>
+ *     <pattern bytes>	  [ ; comment ]
  *   end
  *   extract <address> <variable name>
  *   ...
  *   patch <address>
- *     <assembly code>
+ *     <assembly code>    [ ; comment ] 
  *	 end
  *   replace <address>
  *     <replacement bytes>
  *   end
- *   ... more replacements
+ *   ... more extracts, patches and replacements
  * end
  *
  * hexdigit : [0-9a-f]
@@ -49,8 +50,8 @@
  * offset : 0xhexdigit..., integer
  *
  * note that integer constants are heavily hexadecimal.  the only place
- * where decimal is assumed is in <address>+<offset>, and that is overridden
- * whth an explicit 0x.
+ * where decimal is assumed is in <address>+<offset>, and that can be 
+ * overridden with an explicit 0x.
  */
 #include <stdio.h>
 #include <unistd.h>
@@ -189,6 +190,9 @@ isymchar(char c)
 	return symchar(c);
 }
 
+/*
+ * skip white space (also newlines and comments)
+ */
 skipwhite()
 {
 	for (;*p ; p++) {
@@ -295,7 +299,7 @@ getaddr(char *in)
 	v = hexin(in);
 	if ((v >> 16) != 4) {
 		v = getvar(in);
-		if (verbose && v == 0xffff) {
+		if ((verbose > 1) && v == 0xffff) {
 			printf("variable %s not set\n", in);
 		}
 	} else {
@@ -323,45 +327,68 @@ getaddr(char *in)
  * a variable name or 4 byte hex number is found.  in this case, we 
  * return 2 packed match bytes which the caller needs to unpack.
  */
-unsigned int
-patword()
+#define	BYTE	0
+#define	WORD	1
+#define ANY		2
+#define	UNK		3
+unsigned int val;
+
+int
+getval()
 {
 	char *t = get();
 	unsigned int r;
 	int i;
 
-	if (strcmp(t, "ANY") == 0) return 0xffff;
-	if (strcmp(t, "CALL") == 0) return 0xcd;
-	if (strcmp(t, "JUMP") == 0) return 0xc3;
+	if (strcmp(t, "ANY") == 0) {
+		return ANY;
+	}
+	if (strcmp(t, "CALL") == 0) {
+		val = 0xcd;
+		return BYTE;
+	}
+
+	if (strcmp(t, "JUMP") == 0) {
+		val = 0xc3;
+		return BYTE;
+	}
 
 	i = strlen(t);
 	r = hexin(t);
 
 	if ((r >> 16) == 2) {
-		return r & 0xff;
+		val = r & 0xff;
+		return BYTE;
 	}
 
 	if ((r >> 16) == 4) {
-		return r | 0xffff0000;
+		val = r & 0xffff;
+		return WORD;
 	}
 
 	if (t[i-2] == '.' && (t[i-1] == 'L' || t[i-1] == 'H')) {
 		t[i-2] = '\0';
 		r = getvar(t);
-		if (verbose && r == 0xffff) {
-			printf("variable %s not set\n", t);
+		if (r == 0xffff) {
+			if (verbose) printf("variable %s not set\n", t);
+			return UNK;
 		}
 		if (t[i-1] == 'H') {
-			r >>= 8;
+			val = r >> 8;
+		} else {
+			val = r;
 		}
 		r &= 0xff;
-		return (r);
+		return BYTE;
 	}
+
 	r = getaddr(t);
-	if (verbose && r == 0xffff) {
-		printf("variable %s not set\n", t);
+	if (r == 0xffff) {
+		if (verbose) printf("variable %s not set\n", t);
+		return UNK;
 	}
-	return 0xffff0000 | r;
+	val = r;
+	return WORD;
 }
 
 int
@@ -374,7 +401,7 @@ patmatch(word *pat, int pl, word base)
 	for (i = 0; i < pl; i++) {
 		if (pat[i] == 0xffff) continue;
 		if (pat[i] == membuf[base + i]) continue;
-		if (verbose && i > 4) {
+		if ((verbose > 1) && (i > 4)) {
 			printf("miscompare at index %d: %04x wanted %04x got %02x\n", 
 				i, base + i, pat[i], membuf[base + i]);
 		}
@@ -387,6 +414,7 @@ patmatch(word *pat, int pl, word base)
 /*
  * extract addr name
  */
+void
 extract()
 {
 	char *a;
@@ -394,6 +422,10 @@ extract()
 	word v;
 	char *aa;
 
+	if (!hit) {
+		skiptoeol();
+		return;
+	}
 	if (verbose > 1) printf("extract\n");
 
 	a = get();
@@ -404,14 +436,12 @@ extract()
 	v = wordat(ad);
 
 	a = get();
-	if (hit) {
-		putvar(a, v);
-		if (verbose) 
-			printf("extract: %s(%04x) %s = %04x\n", aa, ad, a, v);
-	}
+	printf("\t%10s %04x (%s:%04x)\n", a, v, aa, ad);
+	putvar(a, v);
 	skiptoeol();
 }
 
+void
 replace()
 {
 	unsigned char *repl = malloc(MAX_PATTERN);
@@ -435,36 +465,51 @@ replace()
 			skiptoeol();
 			break;
 		}
-		i = patword();
-		if ((i & 0xffff0000) == 0xffff0000) {
-			repl[rl++] = i & 0xff;
-			i = (i >> 8) & 0xff;
+		switch (getval()) {
+		case WORD:
+			repl[rl++] = val & 0xff;
+			val >>= 8;
+		case BYTE:
+			repl[rl++] = val & 0xff;
+			break;
+		case ANY:
+			printf("ANY in replacement\n");
+			hit = 0;
+			break;
+		case UNK:
+			if (hit) {
+				printf("unknown value in replacement: hit cancelled");
+				hit = 0;
+			}
+			break;
 		}
-		repl[rl++] = i;
+	}
+
+	if (hit) {
+		printf("\t%10s %04x %d\n", "replace", ad, rl);
+	} else {
+		return;
 	}
 
 	if (verbose > 1) {
-		printf("replacement bytes %d%s\n", rl, hit ? "" : " (ignored)");
+		printf("replacement bytes %d\n", rl);
 	}
 	for (i = 0; i < rl; i++) {
 		if (verbose > 1) {
 			printf("%02x ", repl[i]);
 			if ((i % 8) == 7) printf("\n");
 		}
-		if (hit) {
-			membuf[ad + i] = repl[i];
-			dirty = 1;
-		}
+		membuf[ad + i] = repl[i];
+		dirty = 1;
 	}
 	if (verbose > 1) printf("\n");
-	
-	if (verbose > 1) printf("replace end\n");
 }
 
 /*
  * this is a bit bizarre, but we invoke an assembler to generate the
  * bytes to put into our binary
  */
+void
 patch()
 {
 	unsigned char *repl = malloc(MAX_PATTERN);
@@ -557,7 +602,7 @@ patch()
 	}
 
 	if (hit) 
-		printf("apply patch %s length %d at %04x\n", blockname, rl, ad);
+		printf("\t%10s %04x %d\n", "patch", ad, rl);
 
 	if (verbose > 1) {
 		printf("replacement bytes %d\n", rl);
@@ -583,6 +628,7 @@ patch()
  * vast majority of our time. first, we snarf the entire match text into a 
  * buffer, where we do value substititions as needed.
  */
+void
 match()
 {
 	char *anchor;
@@ -590,16 +636,21 @@ match()
 	int pl = 0;
 	int i;
 	word base;
+	char *msg = "unanchored";
 
 	anchor = get();
-	hit = 0;
+	hit = 1;
 	if (anchor[0]) {
 		base = getaddr(anchor);
+		msg = anchor;
+		if (base == 0xffff) {
+			msg = "invalid";	
+		}
 	} else {
 		anchor = 0;
 	}
 
-	if (verbose > 1) printf("match %s\n", anchor ? anchor : "unanchored");
+	if (verbose) printf("match %s\n", msg);
 
 	/* read in the match block */
 	while (*p) {
@@ -608,13 +659,27 @@ match()
 			skiptoeol();
 			break;
 		}
-		i = patword();
-		if ((i & 0xffff0000) == 0xffff0000) {
-			pat[pl++] = i & 0xff;
-			i = (i >> 8) & 0xff;
+		switch (getval()) {
+		case WORD:
+			pat[pl++] = val & 0xff;
+			val >>= 8;
+		case BYTE:
+			pat[pl++] = val & 0xff;
+			break;
+		case ANY:
+			pat[pl++] = 0xffff;
+			break;
+		case UNK:
+			hit = 0;
 		}
-		pat[pl++] = i;
 	}
+
+	if (hit == 0 || base == 0xffff) {
+		if (verbose) printf("miss forced due to unknown values\n");
+		return;
+	}
+
+	hit = 0;
 
 	if (verbose > 1) {
 		printf("checking match patlen %d\n", pl);
@@ -641,6 +706,8 @@ match()
 			}
 		}
 	}
+	if (hit)
+		printf("match\t%10s %04x\n", blockname, matchaddr);
 	if (verbose > 1) {
 		if (hit) {
 			printf("hit at %04x\n", base);
@@ -651,6 +718,7 @@ match()
 	}
 }
 
+void
 block()
 {
 	word addr;
@@ -660,7 +728,7 @@ block()
 		fprintf(stderr, "block must have a name\n"); 
 		exit (6);
 	}
-	if (verbose > 1) printf("block %s\n", blockname);
+	if (verbose) printf("\nblock %s\n", blockname);
 	blockname = strdup(blockname);
 
 	skiptoeol();
@@ -669,8 +737,6 @@ block()
 		if (wordmatch("match")) {
 			match();
 			if (hit) {
-				if (verbose)
-					printf("block %s hit at %x\n", blockname, matchaddr);
 				addr = getvar(blockname);
 				if (getvar(blockname) == 0xffff) {
 					putvar(blockname, matchaddr);
@@ -700,6 +766,7 @@ block()
 	if (verbose > 1) printf("block end\n");
 }
 
+void
 process(char *fn)
 {
 	int fd;

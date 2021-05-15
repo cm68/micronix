@@ -15,6 +15,8 @@
 
 #define	NB	10
 
+int traceflags;
+
 int sflg;
 
 int nfile;

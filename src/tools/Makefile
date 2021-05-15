@@ -31,3 +31,5 @@ test: nm disas
 		0xa48e 0xa4d3 0xa799 0xa79a 0xa4eb 0xa2de \
 		./m167 >m167.out
 
+install: disas
+	cp disas ~/bin

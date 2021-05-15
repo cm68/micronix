@@ -571,14 +571,14 @@ multio_uart_poll(struct ace *ap)
 {
     int bytes;
     int error;
-    long long now;
+    long long t;
 
-    now = now64();
+    t = now64();
 
     // if we are shifting a character out.
     if (ap->txpend) {
         // has it been shifted out yet?
-        if (now >= ap->txpend) {
+        if (t >= ap->txpend) {
             ap->lsr |= LSR_TXE;
             ap->txpend = 0;
             multio_set_inti(ap);
@@ -598,10 +598,10 @@ multio_uart_poll(struct ace *ap)
     }
 
     // let's not recieve characters any faster than the recieve baud rate
-    if (now < ap->rxwait) {
+    if (t < ap->rxwait) {
 #ifdef notdef
         trace(trace_uart, "early poll ret %lld %lld %lld\n", 
-            now, ap->rxwait, ap->rxwait - now);
+            t, ap->rxwait, ap->rxwait - t);
 #endif
         return 0;
     }
@@ -609,7 +609,7 @@ multio_uart_poll(struct ace *ap)
     // let's not do a reciever overrun
     if (ap->lsr & LSR_DR) {
 #ifdef notdef
-        trace(trace_uart, "rx overrun\n", now, ap->rxwait);
+        trace(trace_uart, "rx overrun\n", t, ap->rxwait);
 #endif
         return 0;
     }
@@ -911,7 +911,7 @@ clock_handler()
 byte rtc[5] = { 0x25, 0x34, 0x12, 0x25, 0x76 };
 int rtcptr;
 static byte last_wrclock;
-time_t now;
+time_t nowtime;
 char *clk_cmd[] = { "SHOLD", "ENSR", "SET", "GET", "64Hz", "256Hz", "2kHz", "32Hz" };
 
 /*
@@ -942,8 +942,8 @@ wr_clock(portaddr p, byte v)
         case CC_SET:        // set time - no, we not going to do that
             break; 
         case CC_GET:        // read the unix time and populate the array
-            now = time(&now);
-            tm = localtime(&now);
+            nowtime = time(0);
+            tm = localtime(&nowtime);
             rtc[0] = bcd(tm->tm_sec / 10, tm->tm_sec % 10);
             rtc[1] = bcd(tm->tm_min / 10, tm->tm_min % 10);
             rtc[2] = bcd(tm->tm_hour / 10, tm->tm_hour % 10);

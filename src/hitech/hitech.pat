@@ -75,15 +75,17 @@ end
 
 ;
 ; function prolog that establishes a stack frame pointer in IX and saves IY
+; not proposing to change this, but to use it as an anchor in subsequent
+; blocks
 ;
 block csv
 	match
-		e1
-		fd e5
-		dd e5
-		dd 21 00 00
-		dd 39
-		e9
+		e1				; pop hl    - return address
+		fd e5			; push iy   - save iy
+		dd e5			; push ix   - save old frame pointer
+		dd 21 00 00		; ld ix,0   - make new frame pointer
+		dd 39			; add ix,sp
+		e9				; jp (hl)   - return to caller
 	end
 end
 
@@ -91,6 +93,7 @@ end
 ; function prolog that saves IY, puts a frame pointer in IX, and bumps the
 ; stack pointer to allocate automatic variable space with a negative offset
 ; off of IX.
+; again, not proposing to change, but to use as a match anchor
 ;
 block ncsv
 	match
@@ -114,6 +117,7 @@ end
 ;
 ; function epilog that pops everything off the stack, restores IY and returns
 ; to the function's caller.
+; used to make matching more specific
 ;
 block cret
 	match
@@ -200,9 +204,9 @@ block __exit
 	; micronix exit simply uses the value in hl.
 	;
 	patch __exit
-		pop hl
-		pop hl
-		db 0xcf, 01
+		pop hl			; return address
+		pop hl			; exit code
+		db 0xcf, 01		; exit(hl)
 	end
 end
 
@@ -217,7 +221,7 @@ block exit
 		c3 0000
 	end
 	patch exit
-		db 0xcf, 01
+		db 0xcf, 01		; exit(hl)
 	end
 end
 
@@ -229,7 +233,7 @@ end
 block _exit
 	match
 		CALL csv
-		CALL ANY ANY
+		CALL ANY ANY		; call _cleanup
 		dd 6e 06
 		dd 66 07
 		e5
@@ -244,18 +248,18 @@ end
 block _exit
 	match _exit
 		CALL csv
-		e5
-		dd 36 ff 05
-		fd 21 ANY ANY
-		fd e5
-		e1
-		01 0008
-		09
-		e5
-		fd e1
-		ed 42
-		e5
-		CALL ANY ANY
+		e5					; push hl      - make space for counter
+		dd 36 ff 05			; ld (ix-1),5  - 5 files
+		fd 21 ANY ANY		; ld iy,_iob   - end of iob
+		fd e5				; push iy
+		e1					; pop hl
+		01 0008				; ld bc,8
+		09					; add hl,bc
+		e5					; push hl
+		fd e1				; pop iy
+		ed 42				; sbc hl,bc
+		e5					; push hl
+		CALL ANY ANY		; call fclose
 		c1
 		dd 7e ff
 		c6 ff

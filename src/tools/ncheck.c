@@ -8,6 +8,7 @@
 #include "../include/fslib.h"
 #include "../include/util.h"
 
+int traceflags;
 extern int trace_fs;
 int verbose;
 int extra;

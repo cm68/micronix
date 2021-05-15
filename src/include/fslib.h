@@ -20,6 +20,7 @@ struct statb {
 #define	INODE_OFF(i)	(i % I_PER_BLK)
 
 extern int openfs(char *name, struct super **f);
+extern int openfsrw(char *name, struct super **f, int writable);
 extern void closefs(struct super *f);
 
 extern char *mytime();

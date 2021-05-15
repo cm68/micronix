@@ -30,7 +30,7 @@ struct hitechobj {
 #define	HIREC_END	6
 
 /*
- * record prefix sharred by all types
+ * record prefix shared by all types
  */
 struct hipre {
 	unsigned short reclen;
