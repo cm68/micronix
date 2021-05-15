@@ -1,0 +1,1155 @@
+*** /etc/rc.local.old	Sat Nov 16 16:23:44 1996
+--- /etc/rc.local	Wed May 17 21:00:28 2000
+***************
+*** 1,10 ****
+  #! /bin/sh -
+  # site-specific startup actions, daemons
+  
+! strings /vmunix | grep UNIX >/tmp/t1
+  tail +2 /etc/motd >>/tmp/t1
+  mv /tmp/t1 /etc/motd
+! chmod 666 /etc/motd
+  
+  echo -n			starting local daemons:			>/dev/console 2>&1
+  #if [ $INET = YES -a -f /usr/sbin/timed ]; then
+--- 1,10 ----
+  #! /bin/sh -
+  # site-specific startup actions, daemons
+  
+! sysctl -n kern.version | head -1 > /tmp/t1
+  tail +2 /etc/motd >>/tmp/t1
+  mv /tmp/t1 /etc/motd
+! chmod 644 /etc/motd
+  
+  echo -n			starting local daemons:			>/dev/console 2>&1
+  #if [ $INET = YES -a -f /usr/sbin/timed ]; then
+*** /usr/src/sys/sys/kern_sysctl.c.old	Wed Aug 11 19:40:36 1999
+--- /usr/src/sys/sys/kern_sysctl.c	Wed May 17 20:01:48 2000
+***************
+*** 33,39 ****
+   * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+   * SUCH DAMAGE.
+   *
+!  *	@(#)kern_sysctl.c	8.4.11 (2.11BSD) 1999/8/11
+   */
+  
+  /*
+--- 33,39 ----
+   * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+   * SUCH DAMAGE.
+   *
+!  *	@(#)kern_sysctl.c	8.4.12 (2.11BSD) 2000/5/17
+   */
+  
+  /*
+***************
+*** 195,204 ****
+  
+  	switch (name[0]) {
+  	case KERN_OSTYPE:
+  	case KERN_OSRELEASE:
+! 		/* code is cheaper than D space */
+! 		bsd[0]='2';bsd[1]='.';bsd[2]='1';bsd[3]='1';bsd[4]='B';
+! 		bsd[5]='S';bsd[6]='D';bsd[7]='\0';
+  		return (sysctl_rdstring(oldp, oldlenp, newp, bsd));
+  	case KERN_ACCTTHRESH:
+  		level = Acctthresh;
+--- 195,204 ----
+  
+  	switch (name[0]) {
+  	case KERN_OSTYPE:
++ 		bsd[0]='B';bsd[1]='S';bsd[2]='D';bsd[3]='\0';
++ 		return (sysctl_rdstring(oldp, oldlenp, newp, bsd));
+  	case KERN_OSRELEASE:
+! 		bsd[0]='2';bsd[1]='.';bsd[2]='1';bsd[3]='1';bsd[4]='\0';
+  		return (sysctl_rdstring(oldp, oldlenp, newp, bsd));
+  	case KERN_ACCTTHRESH:
+  		level = Acctthresh;
+*** /usr/src/sys/sys/kern_prot2.c.old	Sun Feb 20 18:13:08 2000
+--- /usr/src/sys/sys/kern_prot2.c	Tue Aug  1 20:44:47 2000
+***************
+*** 35,41 ****
+   * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+   * SUCH DAMAGE.
+   *
+!  *	@(#)kern_prot2.c  8.9.2 (2.11BSD) 2000/2/20
+   */
+  
+  #include "param.h"
+--- 35,41 ----
+   * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+   * SUCH DAMAGE.
+   *
+!  *	@(#)kern_prot2.c  8.9.3 (2.11BSD) 2000/8/1
+   */
+  
+  #include "param.h"
+***************
+*** 49,72 ****
+  
+  int
+  setuid()
+! {
+  	struct a {
+  		uid_t uid;
+  		} *uap = (struct a *)u.u_ap;
+  
+- 	return(_setuid(uap->uid));
+- 	}
+- 
+- /*
+-  * This is a helper function used by setuid() above and the 4.3BSD 
+-  * compatibility code.  When the latter goes away this can be joined
+-  * back into the above code and save a function call.
+- */
+- int
+- _setuid(uid)
+- 	register uid_t uid;
+- 	{
+- 
+  	if (uid != u.u_ruid && !suser())
+  		return(u.u_error);
+  	/*
+--- 49,60 ----
+  
+  int
+  setuid()
+! 	{
+  	struct a {
+  		uid_t uid;
+  		} *uap = (struct a *)u.u_ap;
++ 	register uid_t uid = uap->uid;
+  
+  	if (uid != u.u_ruid && !suser())
+  		return(u.u_error);
+  	/*
+***************
+*** 78,84 ****
+          QUOTAMAP();
+  	if (u.u_quota->q_uid != uid) {
+  		qclean();
+! 		qstart(getquota((uid_t)uid, 0, 0));
+  	}
+  	QUOTAUNMAP();
+  #endif
+--- 66,72 ----
+          QUOTAMAP();
+  	if (u.u_quota->q_uid != uid) {
+  		qclean();
+! 		qstart(getquota(uid, 0, 0));
+  	}
+  	QUOTAUNMAP();
+  #endif
+***************
+*** 88,94 ****
+  	u.u_ruid = uid;
+  	u.u_svuid = uid;
+  	u.u_acflag |= ASUGID;
+! 	return (u.u_error = 0);
+  	}
+  
+  int
+--- 76,82 ----
+  	u.u_ruid = uid;
+  	u.u_svuid = uid;
+  	u.u_acflag |= ASUGID;
+! 	return(u.u_error = 0);
+  	}
+  
+  int
+***************
+*** 97,119 ****
+  	struct a {
+  		uid_t euid;
+  		} *uap = (struct a *)u.u_ap;
+  
+! 	return(_seteuid(uap->euid));
+! 	}
+! 
+! int
+! _seteuid(euid)
+! 	register uid_t euid;
+! 	{
+! 
+! 	if (euid != u.u_ruid && euid != u.u_svuid && !suser())
+! 		return (u.u_error);
+  	/*
+  	 * Everything's okay, do it.
+  	 */
+  	u.u_uid = euid;
+  	u.u_acflag |= ASUGID;
+! 	return (u.u_error = 0);
+  	}
+  
+  int
+--- 85,100 ----
+  	struct a {
+  		uid_t euid;
+  		} *uap = (struct a *)u.u_ap;
++ 	register uid_t euid = uap->euid;
+  
+! 	if	(euid != u.u_ruid && euid != u.u_svuid && !suser())
+! 		return(u.u_error);
+  	/*
+  	 * Everything's okay, do it.
+  	 */
+  	u.u_uid = euid;
+  	u.u_acflag |= ASUGID;
+! 	return(u.u_error = 0);
+  	}
+  
+  int
+***************
+*** 122,143 ****
+  	struct a {
+  		gid_t gid;
+  		} *uap = (struct a *)u.u_ap;
+! 	
+! 	return(_setgid(uap->gid));
+! 	}
+  
+- int 
+- _setgid(gid)
+- 	register gid_t gid;
+- 	{
+- 
+  	if (gid != u.u_rgid && !suser())
+! 		return (u.u_error);	/* XXX */
+  	u.u_groups[0] = gid;		/* effective gid is u_groups[0] */
+  	u.u_rgid = gid;
+  	u.u_svgid = gid;
+  	u.u_acflag |= ASUGID;
+! 	return (u.u_error = 0);
+  	}
+  
+  int
+--- 103,117 ----
+  	struct a {
+  		gid_t gid;
+  		} *uap = (struct a *)u.u_ap;
+! 	register gid_t	gid = uap->gid;
+  
+  	if (gid != u.u_rgid && !suser())
+! 		return(u.u_error);	/* XXX */
+  	u.u_groups[0] = gid;		/* effective gid is u_groups[0] */
+  	u.u_rgid = gid;
+  	u.u_svgid = gid;
+  	u.u_acflag |= ASUGID;
+! 	return(u.u_error = 0);
+  	}
+  
+  int
+***************
+*** 146,163 ****
+  	struct a {
+  		gid_t egid;
+  	} *uap = (struct a *)u.u_ap;
+  
+- 	return(_setegid(uap->egid));
+- 	}
+- 
+- int
+- _setegid(egid)
+- 	register gid_t egid;
+- 	{
+- 
+  	if (egid != u.u_rgid && egid != u.u_svgid && !suser())
+! 		return (u.u_error);
+  	u.u_groups[0] = egid;
+  	u.u_acflag |= ASUGID;
+! 	return (u.u_error = 0);
+  	}
+--- 120,130 ----
+  	struct a {
+  		gid_t egid;
+  	} *uap = (struct a *)u.u_ap;
++ 	register gid_t egid = uap->egid;
+  
+  	if (egid != u.u_rgid && egid != u.u_svgid && !suser())
+! 		return(u.u_error);
+  	u.u_groups[0] = egid;
+  	u.u_acflag |= ASUGID;
+! 	return(u.u_error = 0);
+  	}
+*** /usr/src/sys/sys/subr_prf.c.old	Sat Dec  5 17:34:36 1998
+--- /usr/src/sys/sys/subr_prf.c	Tue Aug  1 20:46:48 2000
+***************
+*** 3,9 ****
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)subr_prf.c	1.2 (2.11BSD) 1998/12/5
+   */
+  
+  #include "param.h"
+--- 3,9 ----
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)subr_prf.c	1.3 (2.11BSD) 2000/8/1
+   */
+  
+  #include "param.h"
+***************
+*** 300,306 ****
+   * about failing disk tranfers.
+   */
+  harderr(bp, cp)
+! 	struct buf *bp;
+  	char *cp;
+  {
+  	printf("%s%d%c: hard error sn%D ", cp,
+--- 300,306 ----
+   * about failing disk tranfers.
+   */
+  harderr(bp, cp)
+! 	register struct buf *bp;
+  	char *cp;
+  {
+  	printf("%s%d%c: hard error sn%D ", cp,
+*** /usr/src/sys/h/param.h.old	Wed Sep 15 19:38:45 1999
+--- /usr/src/sys/h/param.h	Wed May 17 20:10:44 2000
+***************
+*** 3,12 ****
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)param.h	1.6 (2.11BSD) 1999/9/5
+   */
+  
+! #define	BSD	211		/* 2.11 * 10, as cpp doesn't do floats */
+  
+  #include <sys/localopts.h>
+  #include <sys/stddef.h>		/* for 'offsetof' */
+--- 3,12 ----
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)param.h	1.7 (2.11BSD) 2000/5/17
+   */
+  
+! #define	BSD	200005		/* System version (year and month) */
+  
+  #include <sys/localopts.h>
+  #include <sys/stddef.h>		/* for 'offsetof' */
+*** /usr/src/sys/mdec/rauboot.s.old	Wed May 31 19:54:49 1995
+--- /usr/src/sys/mdec/rauboot.s	Wed May 17 19:54:13 2000
+***************
+*** 298,304 ****
+  	clr	(r0)			/ Tell controller we go it
+  	rts	pc
+  
+! icons:	RAERR
+  	ra+RARING
+  	0
+  	RAGO
+--- 298,309 ----
+  	clr	(r0)			/ Tell controller we go it
+  	rts	pc
+  
+! / Some adaptors (TD Systems Viking for example) require the vector field
+! /  to be initialized even though interrupts are not enabled.  Use the primary
+! /  vector of 0154.   The standalone MSCP driver does the same thing and later on
+! /  the  kernel programs the adaptor with an assigned vector
+! 
+! icons:	RAERR + 033			/ 033 = 0154 >> 2
+  	ra+RARING
+  	0
+  	RAGO
+*** /usr/src/sys/netinet/raw_ip.c.old	Fri Jul  7 13:30:17 1989
+--- /usr/src/sys/netinet/raw_ip.c	Wed May 17 20:15:14 2000
+***************
+*** 9,15 ****
+   * software without specific prior written permission. This software
+   * is provided ``as is'' without express or implied warranty.
+   *
+!  *	@(#)raw_ip.c	7.3 (Berkeley) 12/7/87
+   */
+  
+  #include "param.h"
+--- 9,15 ----
+   * software without specific prior written permission. This software
+   * is provided ``as is'' without express or implied warranty.
+   *
+!  *	@(#)raw_ip.c	7.3.1 (2.11BSD) 2000/5/17
+   */
+  
+  #include "param.h"
+***************
+*** 61,71 ****
+  	int error;
+  	struct rawcb *rp = sotorawcb(so);
+  	struct sockaddr_in *sin;
+- #if BSD>=43
+  	short proto = rp->rcb_proto.sp_protocol;
+! #else
+! 	short proto = so->so_proto->pr_protocol;
+! #endif
+  	/*
+  	 * if the protocol is IPPROTO_RAW, the user handed us a 
+  	 * complete IP packet.  Otherwise, allocate an mbuf for a
+--- 61,68 ----
+  	int error;
+  	struct rawcb *rp = sotorawcb(so);
+  	struct sockaddr_in *sin;
+  	short proto = rp->rcb_proto.sp_protocol;
+! 
+  	/*
+  	 * if the protocol is IPPROTO_RAW, the user handed us a 
+  	 * complete IP packet.  Otherwise, allocate an mbuf for a
+***************
+*** 113,125 ****
+  
+  	ip->ip_dst = ((struct sockaddr_in *)&rp->rcb_faddr)->sin_addr;
+  
+- #if BSD>=43
+  	return (ip_output(m, rp->rcb_options, &rp->rcb_route, 
+  	   (so->so_options & SO_DONTROUTE) | IP_ALLOWBROADCAST));
+- #else
+- 	return (ip_output(m, (struct mbuf *)0, &rp->rcb_route, 
+- 	   (so->so_options & SO_DONTROUTE) | IP_ALLOWBROADCAST));
+- #endif
+  bad:
+  	m_freem(m);
+  	return (error);
+--- 110,117 ----
+*** /usr/src/sys/netinet/tcp_input.c.old	Sat May  7 14:43:47 1988
+--- /usr/src/sys/netinet/tcp_input.c	Wed May 17 20:17:27 2000
+***************
+*** 9,15 ****
+   * software without specific prior written permission. This software
+   * is provided ``as is'' without express or implied warranty.
+   *
+!  *	@(#)tcp_input.c	7.15.1.2 (Berkeley) 3/16/88
+   */
+  
+  #include "param.h"
+--- 9,15 ----
+   * software without specific prior written permission. This software
+   * is provided ``as is'' without express or implied warranty.
+   *
+!  *	@(#)tcp_input.c	7.15.1.3 (2.11BSD) 2000/5/17
+   */
+  
+  #include "param.h"
+***************
+*** 321,329 ****
+  		inp = (struct inpcb *)so->so_pcb;
+  		inp->inp_laddr = ti->ti_dst;
+  		inp->inp_lport = ti->ti_dport;
+- #if BSD>=43
+  		inp->inp_options = ip_srcroute();
+- #endif
+  		tp = intotcpcb(inp);
+  		tp->t_state = TCPS_LISTEN;
+  	}
+--- 321,327 ----
+***************
+*** 491,507 ****
+  		ti->ti_seq++;
+  		if (ti->ti_len > tp->rcv_wnd) {
+  			todrop = ti->ti_len - tp->rcv_wnd;
+- #if BSD>=43
+  			m_adj(m, -todrop);
+- #else
+- 			/* XXX work around 4.2 m_adj bug */
+- 			if (m->m_len) {
+- 				m_adj(m, -todrop);
+- 			} else {
+- 				/* skip tcp/ip header in first mbuf */
+- 				m_adj(m->m_next, -todrop);
+- 			}
+- #endif
+  			ti->ti_len = tp->rcv_wnd;
+  			tiflags &= ~TH_FIN;
+  			tcpstat.tcps_rcvpackafterwin++;
+--- 489,495 ----
+***************
+*** 615,631 ****
+  				goto dropafterack;
+  		} else
+  			tcpstat.tcps_rcvbyteafterwin += todrop;
+- #if BSD>=43
+  		m_adj(m, -todrop);
+- #else
+- 		/* XXX work around m_adj bug */
+- 		if (m->m_len) {
+- 			m_adj(m, -todrop);
+- 		} else {
+- 			/* skip tcp/ip header in first mbuf */
+- 			m_adj(m->m_next, -todrop);
+- 		}
+- #endif
+  		ti->ti_len -= todrop;
+  		tiflags &= ~(TH_PUSH|TH_FIN);
+  	}
+--- 603,609 ----
+***************
+*** 1290,1323 ****
+  	tp->snd_cwnd = mss;
+  	return (mss);
+  }
+- 
+- #if BSD<43
+- /* XXX this belongs in netinet/in.c */
+- in_localaddr(in)
+- 	struct in_addr in;
+- {
+- 	register u_long i = ntohl(in.s_addr);
+- 	register struct ifnet *ifp;
+- 	register struct sockaddr_in *sin;
+- 	register u_long mask;
+- 
+- 	if (IN_CLASSA(i))
+- 		mask = IN_CLASSA_NET;
+- 	else if (IN_CLASSB(i))
+- 		mask = IN_CLASSB_NET;
+- 	else if (IN_CLASSC(i))
+- 		mask = IN_CLASSC_NET;
+- 	else
+- 		return (0);
+- 
+- 	i &= mask;
+- 	for (ifp = ifnet; ifp; ifp = ifp->if_next) {
+- 		if (ifp->if_addr.sa_family != AF_INET)
+- 			continue;
+- 		sin = (struct sockaddr_in *)&ifp->if_addr;
+- 		if ((sin->sin_addr.s_addr & mask) == i)
+- 			return (1);
+- 	}
+- 	return (0);
+- }
+- #endif
+--- 1268,1270 ----
+*** /usr/src/sys/netinet/tcp_output.c.old	Tue Oct 10 22:39:54 1995
+--- /usr/src/sys/netinet/tcp_output.c	Wed May 17 20:18:48 2000
+***************
+*** 9,15 ****
+   * software without specific prior written permission. This software
+   * is provided ``as is'' without express or implied warranty.
+   *
+!  *	@(#)tcp_output.c	7.13.1.4 (Berkeley) 1995/10/10
+   */
+  
+  #include "param.h"
+--- 9,15 ----
+   * software without specific prior written permission. This software
+   * is provided ``as is'' without express or implied warranty.
+   *
+!  *	@(#)tcp_output.c	7.13.1.5 (2.11BSD) 2000/5/17
+   */
+  
+  #include "param.h"
+***************
+*** 390,402 ****
+  	 */
+  	((struct ip *)ti)->ip_len = sizeof (struct tcpiphdr) + optlen + len;
+  	((struct ip *)ti)->ip_ttl = ip_defttl;	/* XXX */
+- #if BSD>=43
+  	error = ip_output(m, tp->t_inpcb->inp_options, &tp->t_inpcb->inp_route,
+  	    so->so_options & SO_DONTROUTE);
+- #else
+- 	error = ip_output(m, (struct mbuf *)0, &tp->t_inpcb->inp_route, 
+- 			  so->so_options & SO_DONTROUTE);
+- #endif
+  	if (error) {
+  		if (error == ENOBUFS) {
+  			tcp_quench(tp->t_inpcb);
+--- 390,397 ----
+*** /usr/src/sys/netinet/tcp_timer.c.old	Thu Apr 28 16:25:02 1988
+--- /usr/src/sys/netinet/tcp_timer.c	Wed May 17 20:19:44 2000
+***************
+*** 9,15 ****
+   * software without specific prior written permission. This software
+   * is provided ``as is'' without express or implied warranty.
+   *
+!  *	@(#)tcp_timer.c	7.11.1.2 (Berkeley) 3/16/88
+   */
+  
+  #include "param.h"
+--- 9,15 ----
+   * software without specific prior written permission. This software
+   * is provided ``as is'' without express or implied warranty.
+   *
+!  *	@(#)tcp_timer.c	7.11.1.3 (2.11BSD) 2000/5/17
+   */
+  
+  #include "param.h"
+***************
+*** 178,186 ****
+  		 * retransmit times until then.
+  		 */
+  		if (tp->t_rxtshift > TCP_MAXRXTSHIFT / 4) {
+- #if BSD>=43
+  			in_losing(tp->t_inpcb);
+- #endif
+  			tp->t_rttvar += (tp->t_srtt >> 2);
+  			tp->t_srtt = 0;
+  		}
+--- 178,184 ----
+*** /usr/src/sys/netinet/tcp_usrreq.c.old	Thu Apr 28 16:26:57 1988
+--- /usr/src/sys/netinet/tcp_usrreq.c	Wed May 17 20:20:49 2000
+***************
+*** 9,15 ****
+   * software without specific prior written permission. This software
+   * is provided ``as is'' without express or implied warranty.
+   *
+!  *	@(#)tcp_usrreq.c	7.7.1.2 (Berkeley) 3/16/88
+   */
+  
+  #include "param.h"
+--- 9,15 ----
+   * software without specific prior written permission. This software
+   * is provided ``as is'' without express or implied warranty.
+   *
+!  *	@(#)tcp_usrreq.c	7.7.1.3 (2.11BSD) 2000/5/17
+   */
+  
+  #include "param.h"
+***************
+*** 61,74 ****
+  	int error = 0;
+  	int ostate;
+  
+- #if BSD>=43
+  	if (req == PRU_CONTROL)
+  		return (in_control(so, (int)m, (caddr_t)nam,
+  			(struct ifnet *)rights));
+- #else
+- 	if (req == PRU_CONTROL)
+- 		return(EOPNOTSUPP);
+- #endif
+  	if (rights && rights->m_len)
+  		return (EINVAL);
+  
+--- 61,69 ----
+***************
+*** 317,323 ****
+  	return (error);
+  }
+  
+- #if BSD>=43
+  tcp_ctloutput(op, so, level, optname, mp)
+  	int op;
+  	struct socket *so;
+--- 312,317 ----
+***************
+*** 375,381 ****
+  	}
+  	return (error);
+  }
+- #endif
+  
+  int	tcp_sendspace = 1024*4;
+  int	tcp_recvspace = 1024*4;
+--- 369,374 ----
+*** /usr/src/etc/rc.local.old	Fri Jan 10 20:54:34 1997
+--- /usr/src/etc/rc.local	Wed May 17 21:01:41 2000
+***************
+*** 1,10 ****
+  #! /bin/sh -
+  # site-specific startup actions, daemons
+  
+! strings /vmunix | grep UNIX >/tmp/t1
+  tail +2 /etc/motd >>/tmp/t1
+  mv /tmp/t1 /etc/motd
+! chmod 666 /etc/motd
+  
+  echo -n			starting local daemons:			>/dev/console 2>&1
+  #if [ $INET = YES -a -f /usr/sbin/timed ]; then
+--- 1,10 ----
+  #! /bin/sh -
+  # site-specific startup actions, daemons
+  
+! sysctl -n kern.version | head -1 > /tmp/t1
+  tail +2 /etc/motd >>/tmp/t1
+  mv /tmp/t1 /etc/motd
+! chmod 644 /etc/motd
+  
+  echo -n			starting local daemons:			>/dev/console 2>&1
+  #if [ $INET = YES -a -f /usr/sbin/timed ]; then
+*** /usr/src/lib/libc/net/named/gethnamadr.c.old	Sun Jul 10 18:04:23 1994
+--- /usr/src/lib/libc/net/named/gethnamadr.c	Wed May 17 20:22:57 2000
+***************
+*** 11,18 ****
+   */
+  
+  #if defined(LIBC_SCCS) && !defined(lint)
+! static char sccsid[] = "@(#)gethostnamadr.c	6.31.2 (2.11BSD GTE) 6/27/94";
+! #endif /* LIBC_SCCS and not lint */
+  
+  #include <sys/param.h>
+  #include <sys/socket.h>
+--- 11,18 ----
+   */
+  
+  #if defined(LIBC_SCCS) && !defined(lint)
+! static char sccsid[] = "@(#)gethostnamadr.c	6.31.3 (2.11BSD) 2000/5/17";
+! #endif
+  
+  #include <sys/param.h>
+  #include <sys/socket.h>
+***************
+*** 112,120 ****
+  	ap = host_aliases;
+  	host.h_aliases = host_aliases;
+  	hap = h_addr_ptrs;
+- #if BSD >= 43 || defined(h_addr)	/* new-style hostent structure */
+  	host.h_addr_list = h_addr_ptrs;
+- #endif
+  	haveanswer = 0;
+  	while (--ancount >= 0 && cp < eom) {
+  		if ((n = dn_expand((char *)answer->buf, eom, cp, bp, buflen)) < 0)
+--- 112,118 ----
+***************
+*** 190,200 ****
+  	}
+  	if (haveanswer) {
+  		*ap = NULL;
+- #if BSD >= 43 || defined(h_addr)	/* new-style hostent structure */
+  		*hap = NULL;
+- #else
+- 		host.h_addr = h_addr_ptrs[0];
+- #endif
+  		return (&host);
+  	} else {
+  		h_errno = TRY_AGAIN;
+--- 188,194 ----
+***************
+*** 320,328 ****
+  		goto again;
+  	*cp++ = '\0';
+  	/* THIS STUFF IS INTERNET SPECIFIC */
+- #if BSD >= 43 || defined(h_addr)	/* new-style hostent structure */
+  	host.h_addr_list = host_addrs;
+- #endif
+  	host.h_addr = hostaddr;
+  	*((u_long *)host.h_addr) = inet_addr(p);
+  	host.h_length = sizeof (u_long);
+--- 314,320 ----
+*** /usr/src/lib/libc/net/res_send.c.old	Sun Jun 26 17:22:50 1994
+--- /usr/src/lib/libc/net/res_send.c	Wed May 17 20:27:18 2000
+***************
+*** 11,18 ****
+   */
+  
+  #if defined(LIBC_SCCS) && !defined(lint)
+! static char sccsid[] = "@(#)res_send.c	6.19.1 (Berkeley) 6/27/94";
+! #endif /* LIBC_SCCS and not lint */
+  
+  /*
+   * Send query to name server and wait for reply.
+--- 11,18 ----
+   */
+  
+  #if defined(LIBC_SCCS) && !defined(lint)
+! static char sccsid[] = "@(#)res_send.c	6.19.2 (2.11BSD) 2000/5/17";
+! #endif
+  
+  /*
+   * Send query to name server and wait for reply.
+***************
+*** 28,48 ****
+  #include <arpa/nameser.h>
+  #include <resolv.h>
+  
+- extern int errno;
+- 
+  static int s = -1;	/* socket used for communications */
+  static struct sockaddr no_addr;
+-   
+  
+- #ifndef FD_SET
+- #define	NFDBITS		32
+- #define	FD_SETSIZE	32
+- #define	FD_SET(n, p)	((p)->fds_bits[(n)/NFDBITS] |= (1 << ((n) % NFDBITS)))
+- #define	FD_CLR(n, p)	((p)->fds_bits[(n)/NFDBITS] &= ~(1 << ((n) % NFDBITS)))
+- #define	FD_ISSET(n, p)	((p)->fds_bits[(n)/NFDBITS] & (1 << ((n) % NFDBITS)))
+- #define FD_ZERO(p)	bzero((char *)(p), sizeof(*(p)))
+- #endif
+- 
+  #define KEEPOPEN (RES_USEVC|RES_STAYOPEN)
+  
+  res_send(buf, buflen, answer, anslen)
+--- 28,36 ----
+***************
+*** 199,205 ****
+  			 */
+  			if (s < 0)
+  				s = socket(AF_INET, SOCK_DGRAM, 0);
+- #if	BSD >= 43
+  			if (_res.nscount == 1 || retry == _res.retry) {
+  				/*
+  				 * Don't use connect if we might
+--- 187,192 ----
+***************
+*** 224,233 ****
+  #endif DEBUG
+  					continue;
+  				}
+! 			} else
+! #endif BSD
+! 			if (sendto(s, buf, buflen, 0, &_res.nsaddr_list[ns],
+! 			    sizeof(struct sockaddr)) != buflen) {
+  #ifdef DEBUG
+  				if (_res.options & RES_DEBUG)
+  					perror("sendto");
+--- 211,218 ----
+  #endif DEBUG
+  					continue;
+  				}
+! 			} else if (sendto(s,buf,buflen,0,&_res.nsaddr_list[ns],
+! 			    		sizeof(struct sockaddr)) != buflen) {
+  #ifdef DEBUG
+  				if (_res.options & RES_DEBUG)
+  					perror("sendto");
+*** /usr/src/ucb/netstat/inet.c.old	Sun Aug 28 10:53:19 1994
+--- /usr/src/ucb/netstat/inet.c	Wed May 17 20:29:47 2000
+***************
+*** 11,17 ****
+   */
+  
+  #if	defined(DOSCCS) && !defined(lint)
+! static char sccsid[] = "@(#)inet.c	5.9.3 (2.11BSD GTE) 8/28/94";
+  #endif
+  
+  #include <strings.h>
+--- 11,17 ----
+   */
+  
+  #if	defined(DOSCCS) && !defined(lint)
+! static char sccsid[] = "@(#)inet.c	5.9.4 (2.11BSD) 2000/5/17";
+  #endif
+  
+  #include <strings.h>
+***************
+*** 243,252 ****
+  		return;
+  	klseek(kmem, off, 0);
+  	read(kmem, (char *)&ipstat, sizeof (ipstat));
+- #if BSD>=43
+  	printf("%s:\n\t%lu total packets received\n", name,
+  		ipstat.ips_total);
+- #endif
+  	printf("\t%lu bad header checksum%s\n",
+  		ipstat.ips_badsum, plural(ipstat.ips_badsum));
+  	printf("\t%lu with size smaller than minimum\n", ipstat.ips_toosmall);
+--- 243,250 ----
+***************
+*** 253,259 ****
+  	printf("\t%lu with data size < data length\n", ipstat.ips_tooshort);
+  	printf("\t%lu with header length < data size\n", ipstat.ips_badhlen);
+  	printf("\t%lu with data length < header length\n", ipstat.ips_badlen);
+- #if BSD>=43
+  	printf("\t%lu fragment%s received\n",
+  		ipstat.ips_fragments, plural(ipstat.ips_fragments));
+  	printf("\t%lu fragment%s dropped (dup or out of space)\n",
+--- 251,256 ----
+***************
+*** 266,272 ****
+  		ipstat.ips_cantforward, plural(ipstat.ips_cantforward));
+  	printf("\t%lu redirect%s sent\n",
+  		ipstat.ips_redirectsent, plural(ipstat.ips_redirectsent));
+- #endif
+  }
+  
+  static	char *icmpnames[] = {
+--- 263,268 ----
+*** /usr/src/ucb/rlogin/rlogin.c.old	Wed May  7 19:45:04 1997
+--- /usr/src/ucb/rlogin/rlogin.c	Wed May 17 20:44:43 2000
+***************
+*** 9,15 ****
+  "@(#) Copyright (c) 1983 Regents of the University of California.\n\
+   All rights reserved.\n";
+  
+! static char sccsid[] = "@(#)rlogin.c	5.10.1 (2.11BSD) 1997/3/28";
+  #endif
+  
+  /*
+--- 9,15 ----
+  "@(#) Copyright (c) 1983 Regents of the University of California.\n\
+   All rights reserved.\n";
+  
+! static char sccsid[] = "@(#)rlogin.c	5.10.2 (2.11BSD) 2000/5/17";
+  #endif
+  
+  /*
+***************
+*** 28,33 ****
+--- 28,35 ----
+  #include <errno.h>
+  #include <pwd.h>
+  #include <signal.h>
++ #include <string.h>
++ #include <stdlib.h>
+  #include <setjmp.h>
+  #include <netdb.h>
+  
+***************
+*** 35,42 ****
+  # define TIOCPKT_WINDOW 0x80
+  # endif TIOCPKT_WINDOW
+  
+- char	*index(), *rindex(), *malloc(), *getenv();
+- struct	passwd *getpwuid();
+  char	*name;
+  int	rem;
+  char	cmdchar = '~';
+--- 37,42 ----
+***************
+*** 46,66 ****
+      { "0", "50", "75", "110", "134", "150", "200", "300",
+        "600", "1200", "1800", "2400", "4800", "9600", "19200", "38400" };
+  char	term[256] = "network";
+- extern	int errno;
+  int	lostpeer();
+  int	dosigwinch = 0;
+- #ifndef sigmask
+- #define sigmask(m)	(1L << ((m)-1))
+- #endif
+- #ifdef sun
+- struct	ttysize winsize;
+- struct winsize {
+- 	unsigned short ws_row, ws_col;
+- 	unsigned short ws_xpixel, ws_ypixel;
+- };
+- #else sun
+  struct	winsize winsize;
+- #endif sun
+  int	sigwinch(), oob();
+  
+  main(argc, argv)
+--- 46,54 ----
+***************
+*** 132,142 ****
+  		strcat(term, "/");
+  		strcat(term, speeds[ttyb.sg_ospeed]);
+  	}
+- #ifdef sun
+- 	(void) ioctl(0, TIOCGSIZE, &winsize);
+- #else sun
+  	(void) ioctl(0, TIOCGWINSZ, &winsize);
+- #endif sun
+  	signal(SIGPIPE, lostpeer);
+  	signal(SIGURG, oob);
+  	oldmask = sigblock(sigmask(SIGURG));
+--- 120,126 ----
+***************
+*** 177,183 ****
+  doit(oldmask)
+  	long oldmask;
+  {
+- 	int exit();
+  	struct sgttyb sb;
+  
+  	ioctl(0, TIOCGETP, (char *)&sb);
+--- 161,166 ----
+***************
+*** 349,369 ****
+  	sigwinch();			/* check for size changes */
+  }
+  
+- #ifdef sun
+  sigwinch()
+  {
+- 	struct ttysize ws;
+- 
+- 	if (dosigwinch && ioctl(0, TIOCGSIZE, &ws) == 0 &&
+- 	    bcmp(&ws, &winsize, sizeof (ws))) {
+- 		winsize = ws;
+- 		sendwindow();
+- 	}
+- }
+- 
+- #else sun
+- sigwinch()
+- {
+  	struct winsize ws;
+  
+  	if (dosigwinch && ioctl(0, TIOCGWINSZ, &ws) == 0 &&
+--- 332,339 ----
+***************
+*** 372,378 ****
+  		sendwindow();
+  	}
+  }
+- #endif
+  
+  /*
+   * Send the window size to the server via the magic escape
+--- 342,347 ----
+***************
+*** 386,402 ****
+  	obuf[1] = 0377;
+  	obuf[2] = 's';
+  	obuf[3] = 's';
+- #ifdef sun
+- 	wp->ws_row = htons(winsize.ts_lines);
+- 	wp->ws_col = htons(winsize.ts_cols);
+- 	wp->ws_xpixel = 0;
+- 	wp->ws_ypixel = 0;
+- #else sun
+  	wp->ws_row = htons(winsize.ws_row);
+  	wp->ws_col = htons(winsize.ws_col);
+  	wp->ws_xpixel = htons(winsize.ws_xpixel);
+  	wp->ws_ypixel = htons(winsize.ws_ypixel);
+- #endif sun
+  	(void) write(rem, obuf, sizeof(obuf));
+  }
+  
+--- 355,364 ----
+***************
+*** 506,516 ****
+   */
+  reader()
+  {
+- #if !defined(BSD) || BSD < 43
+- 	int pid = -getpid();
+- #else
+  	int pid = getpid();
+- #endif
+  	int n, remaining;
+  	char *bufp = rcvbuf;
+  
+--- 468,474 ----
+*** /usr/src/ucb/Makefile.old	Fri Jun 27 19:50:46 1997
+--- /usr/src/ucb/Makefile	Wed May 17 20:32:16 2000
+***************
+*** 3,9 ****
+  # All rights reserved.  The Berkeley software License Agreement
+  # specifies the terms and conditions for redistribution.
+  #
+! #	@(#)Makefile	5.17.4 (2.11BSD GTE) 1997/6/27
+  #
+  DESTDIR=
+  CFLAGS=	-O
+--- 3,9 ----
+  # All rights reserved.  The Berkeley software License Agreement
+  # specifies the terms and conditions for redistribution.
+  #
+! #	@(#)Makefile	5.17.5 (2.11BSD) 2000/5/17
+  #
+  DESTDIR=
+  CFLAGS=	-O
+***************
+*** 12,18 ****
+  # Programs that live in subdirectories, and have makefiles of their own.
+  #
+  SUBDIR=	Mail compress dbx error ex finger fp ftp indent lock man \
+! 	more msgs netstat pascal rdist sendbug talk tftp \
+  	tn3270 tset vgrind vlp window
+  
+  # Shell scripts that need only be installed and are never removed.
+--- 12,18 ----
+  # Programs that live in subdirectories, and have makefiles of their own.
+  #
+  SUBDIR=	Mail compress dbx error ex finger fp ftp indent lock man \
+! 	more msgs netstat pascal rdist rlogin sendbug talk tftp \
+  	tn3270 tset vgrind vlp window
+  
+  # Shell scripts that need only be installed and are never removed.
+***************
+*** 34,40 ****
+  
+  # Programs that must run setuid to root
+  #
+! SETUID=	quota rlogin rsh
+  
+  # Programs that must run set-group-id kmem.
+  #
+--- 34,40 ----
+  
+  # Programs that must run setuid to root
+  #
+! SETUID=	quota rsh
+  
+  # Programs that must run set-group-id kmem.
+  #
+*** /usr/src/share/me/tmac.e.old	Mon Oct 21 20:50:21 1996
+--- /usr/src/share/me/tmac.e	Fri Oct 13 19:56:55 2000
+***************
+*** 1045,1051 ****
+  .if \n(dw=5 .ds dw Thursday
+  .if \n(dw=6 .ds dw Friday
+  .if \n(dw=7 .ds dw Saturday
+! .ds td \*(mo \n(dy, 19\n(yr
+  .\"		*** PARAMETRIC INITIALIZATIONS ***
+  .if (1m<0.1i)&(\nx!=0) \
+  .	vs 9p			\" for 12-pitch DTC terminals
+--- 1045,1052 ----
+  .if \n(dw=5 .ds dw Thursday
+  .if \n(dw=6 .ds dw Friday
+  .if \n(dw=7 .ds dw Saturday
+! .nr *y \n(yr+1900
+! .ds td \*(mo \n(dy, \n(*y
+  .\"		*** PARAMETRIC INITIALIZATIONS ***
+  .if (1m<0.1i)&(\nx!=0) \
+  .	vs 9p			\" for 12-pitch DTC terminals
+*** /usr/src/share/tmac/tmac.s.old	Mon Oct 21 20:30:44 1996
+--- /usr/src/share/tmac/tmac.s	Mon Oct  9 20:37:30 2000
+***************
+*** 934,940 ****
+  .if \n(mo-9 .ds MO October
+  .if \n(mo-10 .ds MO November
+  .if \n(mo-11 .ds MO December
+! .ds DY \*(MO \n(dy, 19\n(yr
+  .nr * 0 1
+  .IZ
+  .em EM
+--- 934,942 ----
+  .if \n(mo-9 .ds MO October
+  .if \n(mo-10 .ds MO November
+  .if \n(mo-11 .ds MO December
+! .nr *y \n(yr+1900
+! .ds DY \*(MO \n(dy, \n(*y
+! .ie
+  .nr * 0 1
+  .IZ
+  .em EM
+*** /usr/src/share/tmac/tmac.an.new.old	Thu Oct 31 22:18:00 1996
+--- /usr/src/share/tmac/tmac.an.new	Wed Oct 11 23:17:45 2000
+***************
+*** 20,30 ****
+  .if "\nm"10" .ds ]m November
+  .if "\nm"11" .ds ]m December
+  '	# set the date
+  .if n \{.nr m \nm+1
+! .	 ie \nd .ds ]W Modified \nm/\nd/\ny
+! .	 el .ds ]W Printed \n(mo/\n(dy/\n(yr\}
+! .if t \{.ie \nd .ds ]W \*(]m \nd, 19\ny
+! .	 el .ds ]W \*(]m \n(dy, 19\n(yr\}
+  .if t .tr *\(**
+  .ie n \{\
+  .	ds lq \&"\"
+--- 20,35 ----
+  .if "\nm"10" .ds ]m November
+  .if "\nm"11" .ds ]m December
+  '	# set the date
++ .nr )y \n(yr-100
++ .ie \n(yr<100 .ds ]Y \n(yr
++ .el .ds ]Y 0\n()y
++ '
++ .nr )Y \n(yr+1900
+  .if n \{.nr m \nm+1
+! .	 ie \nd .ds ]W Modified \nm/\nd/\*(]Y
+! .	 el .ds ]W Printed \n(mo/\n(dy/\*(]Y\}
+! .if t \{.ie \nd .ds ]W \*(]m \nd, \n()Y
+! .	 el .ds ]W \*(]m \n(dy, \n()Y\}
+  .if t .tr *\(**
+  .ie n \{\
+  .	ds lq \&"\"
+*** /VERSION.old	Fri Apr 21 20:38:04 2000
+--- /VERSION	Wed May 17 21:02:26 2000
+***************
+*** 1,5 ****
+! Current Patch Level: 431
+! Date: April 21, 2000
+  
+  2.11 BSD
+  ============
+--- 1,5 ----
+! Current Patch Level: 432
+! Date: May 17, 2000
+  
+  2.11 BSD
+  ============

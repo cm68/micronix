@@ -1,0 +1,46 @@
+#! /bin/sh
+# This is a shell archive, meaning:
+# 1. Remove everything above the #! /bin/sh line.
+# 2. Save the resulting text in a file.
+# 3. Execute the file with /bin/sh (not csh) to create:
+#	/usr/include/stdint.h
+# This archive created: Wed Jan 30 20:22:37 2002
+export PATH; PATH=/bin:/usr/bin:$PATH
+if test -f '/usr/include/stdint.h'
+then
+	echo shar: "will not over-write existing file '/usr/include/stdint.h'"
+else
+sed 's/^Z//' << \SHAR_EOF > '/usr/include/stdint.h'
+Z/*
+Z * Public domain - 2002/1/30 - sms
+Z *
+Z *	@(#)stdint.h	1.0 (2.11BSD) 2002/1/30
+Z*/
+Z
+Z#ifndef	_STDINT_H_
+Z#define	_STDINT_H_
+Z
+Z/* Exact-size types  */
+Ztypedef char                  int8_t;
+Ztypedef unsigned char         uint8_t;
+Ztypedef int                   int16_t;
+Ztypedef unsigned int          uint16_t;
+Ztypedef long                  int32_t;
+Ztypedef unsigned long         uint32_t;
+Z#ifdef notyet
+Ztypedef long long             int64_t;
+Ztypedef unsigned long long    uint64_t;
+Z#endif
+Z
+Z/* BSD compat types */
+Ztypedef uint8_t                       u_int8_t;
+Ztypedef uint16_t                      u_int16_t;
+Ztypedef uint32_t                      u_int32_t;
+Z#ifdef notyet
+Ztypedef uint64_t                      u_int64_t;
+Z#endif
+Z#endif /* _STDINT_H_ */
+SHAR_EOF
+fi
+exit 0
+#	End of shell archive

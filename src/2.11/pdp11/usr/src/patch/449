@@ -1,0 +1,101 @@
+Subject: Revert /boot breakage, update VERSION
+Index:	 src/sys/pdpstand/boot.c  2.11BSD
+
+Description:
+	1. The changes made to boot.c in patch 448 broke the ability to enter
+	   single user mode when running under the Begemot (p11) simulator.
+	   
+Repeat-By:
+        1. Install the /boot program after applying patch 448.  Launch the
+	simulator ("p11 -b" in the directory with the p11conf files),
+	"telnet localhost 10000" (to get to the console).   Hit <return>
+	and notice that you do NOT get to a single user prompt.   Not only
+	do you not get to a single user prompt (ever) but a "fsck" is done
+	as if the system had crashed.
+
+	The printf and timed prompt never appear!  My guess is that there
+	is a conflict or race condition with the p11 simulator.  Either that
+	or the clock hasn't been started by the simulator at this point in
+	the system's life.
+
+	The change to the prf.c (printf) in the standalone area is being
+	retained since it's not hurting hurting anything.
+
+Fix:
+	IF you like the current /boot behaviour then do not apply this
+	entire patch - edit out the boot.c part and only update the 
+	/VERSION file.  /VERSION is being updated to  remove extremely 
+	outdated information.
+
+	Cut where indicated and save to a file (/tmp/449 for example):
+
+	    cd /
+	    patch -p0 < /tmp/449
+
+------------------------cut here------------------
+*** VERSION.old	Thu Mar  3 17:39:14 2016
+--- VERSION	Thu Mar  3 18:18:15 2016
+***************
+*** 1,5 ****
+! Current Patch Level: 448
+! Date: January 5, 2010
+  
+  2.11 BSD
+  ============
+--- 1,5 ----
+! Current Patch Level: 449
+! Date: March 3, 2016
+  
+  2.11 BSD
+  ============
+***************
+*** 58,67 ****
+  	made to both the kernel and the application programs.
+  
+  	Steven M. Schultz
+! 	GTE Government Systems
+! 	112 South Lakeview Canyon Road
+! 	Thousand Oaks CA 91359
+! 	sms@wlv.iipo.gtegsc.com
+  
+  	Below is the original VERSION file distributed with 2.10.1BSD
+  -----------------------------------------------------------------------
+--- 58,65 ----
+  	made to both the kernel and the application programs.
+  
+  	Steven M. Schultz
+! 	sms@2bsd.com
+!  
+  
+  	Below is the original VERSION file distributed with 2.10.1BSD
+  -----------------------------------------------------------------------
+*** /usr/src/sys/pdpstand/boot.c.old	Thu Mar  3 17:39:15 2016
+--- /usr/src/sys/pdpstand/boot.c	Thu Mar  3 18:14:09 2016
+***************
+*** 172,189 ****
+  	 * this is an automatic reboot, otherwise do it the hard way.
+  	 */
+  	if (checkword != ~bootopts)
+! 		bootopts = 0;
+! 
+! 	printf("Press <CR> to boot, or any other key to abort:  ");
+! 	for (i=5; i>=0; i--) {
+! 		printf("\b%d", i);
+! 		j = getchar2(50);
+! 		if (j != -1) {
+! 			if (j != '\n') bootopts = RB_ASKNAME;
+! 			break;
+! 		}
+! 	}
+! 	printf("\n");
+  	j = -1;
+  	do {
+  		if (bootopts & RB_ASKNAME) {
+--- 172,178 ----
+  	 * this is an automatic reboot, otherwise do it the hard way.
+  	 */
+  	if (checkword != ~bootopts)
+! 		bootopts = RB_SINGLE | RB_ASKNAME;
+  	j = -1;
+  	do {
+  		if (bootopts & RB_ASKNAME) {

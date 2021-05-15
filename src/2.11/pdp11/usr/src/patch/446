@@ -1,0 +1,655 @@
+Subject: fixes for libkern, autoconfig, umount, tar; add rkboot.s (#446)
+Index:	 ulrem.s,rk.c,conf.c,rkboot.s,rkauto.c,umount.c,tar.c 2.11BSD
+
+Description:
+	1. Standalone mkfs fails to handle a default (<cr>) answer to
+	   the 'file sys size' properly, and create a file system with
+           a small number of inodes. This is caused by a bug in the unsigned 
+	   long modulo (%) routine ulrem in the C runtime system when compiled 
+	   for libkern.
+
+        2. Booting a 211BSD system of a RK05 drive fails with 'panic: iinit'
+
+        3. No BOOTDEV option for 'rk' drives available
+           No BOOTDEV option for 'xp' drives documented
+
+        4. First access to a RK05 drive causes a hard error when no
+           drive 0 attached to the system.
+
+        5. the umount command returns inverted exit() codes in some
+           cases, thus 0 when a command failed and 1 when it succeeded.
+
+        6. tar core dumps when a large file system is written to a tarball.
+
+Repeat-By:
+	1. Create distribution tape with 'make tmscptape', boot with
+           'tm(0,2)' into standalone mkfs. Use defaults for 'file sys size'
+           and 'bytes per inode', the resulting isize is much smaller
+	   than expected.
+
+        2-3. Observation.
+
+        4. start 211BSD in simh, attach drive rk1 but not rk0 to a file,
+           mount the file system on /dev/rk1h. You'll get one hard error:
+             rk0b: hard error sn2 er=100000<DRE> ds=4707<SOK,DRY,RWSRDY>
+           after that access to rk1h works fine.
+
+        5. Observation, try 'umount' and check exit status
+
+        6. For a full 211BSD system a 'tar c -C / .' ends in a
+             Segmentation fault (core dumped)
+           a tar.core is written somewhere into the file system.
+
+Fix:	1. mkfs / ulrem:
+	   The ulrem routine in the C runtime system is, like several other 
+	   long int routines, available in two implementations, with and 
+	   without floating point instructions. The version with FPP 
+	   instructions is faster, used when libc is created, and thus by 
+	   all normal programs. The version without FPP instructions is used 
+	   when libkern is created, and intended for kernel and standalone 
+	   code usage.
+
+           ulrem as of patch level 445 miscalculates the remainder in some
+	   cases when the quotient is zero:
+               a=   1; b=    10; ==>  a%b=    0;   Should be 1 !
+               a=  99; b= 32766; ==>  a%b=   99;   a/b=0, but ok
+
+           The ltoa() function in /sys/pdpstand/sys.c uses u_long modulo and
+	   involved in the processing the default file system size in 
+	   standalone mkfs, the ulrem bug leads to a misdetermination of the 
+	   file system size when just <cr> is answered.
+
+           To fix this the non-FPP part of ulrem was rewritten. When both 
+	   operands are non-negative the new code simply jumps to the lrem 
+	   routine (signed long modulo). When one or both operands are 
+	   negative, the remainder is calculated quite simplistically by
+		rem = lhs-(lhs/rhs)*rhs
+           using ldiv and lmul. This is slow, but save. Since this case is in 
+	   practice rare, preformance isn't an issue here.
+
+           At this point one wonders how 211BSD worked at all with such 
+	   elementary arithmetic problems. The answer is:
+           - the FPP version of ulrem works correctly
+           - ulrem isn't used by the kernel (unix and netnix)
+           - up to patch 434 the standalone programs where mistakenly linked 
+	     against libc rather libkern, thus used the FPP version, which 
+	     works correctly.
+           - /boot does link against ulrem but apparently seems not to be 
+	     affected much....
+	
+	2. Booting 211BSD of a RK05 drive:
+	   During kernel startup the root file system and the swap space must
+	   be accessed, well before autoconfig is executed. The kernel calls 
+	   in /sys/sys/init_main.c
+             (void)(*bdevsw[major(bootdev)].d_root)(bootcsr);
+           which executes the 'root attach' function of the driver. The rk.c 
+	   driver doesn't provide this function, the boot device attach fails,
+	   and the kernel panics with 'iinit'.
+           
+           The fix is simple:
+
+           - rk.c now implements rkroot(), the root attach function
+           - the block device switch bdevsw[] entry for rk is updated.
+
+        3a. No BOOTDEV option for 'rk' drives available
+            During a 'reboot' the kernel finally calls doboot(). The directory
+	    /sys/conf/boot hold implementations for a variety of boot devices, 
+	    but not for the admittedly exotic case of rk05 boot device.
+
+            Fix: rkboot.s is added with this patch
+
+        3b. No BOOTDEV option for 'xp' drives documented
+            The 'BOOTDEV rm' option can be used in case of a xp boot device.
+	    RM and RP drives have different ..uboot.s implementations because
+	    in this case knowledge of the disk geometry is needed, but the
+	    primary boot block loader ..boot.s only loads lbn 0 and is thus
+	    common for RM and RP drives.
+
+            Updated the comment on the 'BOOTDEV rm' line and added
+            a 'BOOTDEV rk' line to the GENERIC and non-networking (NONET)
+	    configurations shipped with the distribution.
+
+	4. First access to RK drive:
+	   The rkauto() function used by autoconfig to probe for RK11
+	   controllers executes a 'drive reset' on drive 0:
+
+             stuff(RKCS_IDE | RKCS_DRESET | RKCS_GO, (&(addr->rkcs)));
+
+           If no drive 0 is attached, the RK11 controller will set the hard 
+	   error bit in RKER and refuse all further commands until a control
+	   reset is executed.
+
+           In a configuration with no drive 0 attached, the autoconfig will 
+	   thus detect and properly attach the RK11 controller, but leave it 
+	   in an error state. The next request, typically a read caused by a
+	   mount, will fail. The rk.c driver does a 'control reset' and retry
+	   in this case, so the mount will succeed, fortunately.
+
+           autoconfig should leave devices in operational state, so extra code
+	   was added to rkauto() to execute 'control reset' in the case 
+	   described above.
+
+	5. umount exit status:
+	   The main() of umount.c accumulates the return codes for calls of 
+	   umountfs(), intention is to return an exit status of 1 of any of
+	   the unmounts fails:
+
+               for (errs = 0; *argv != NULL; ++argv)
+	           if (umountfs(*argv) == 0)
+	               errs = 1;
+	  
+	   umountfs returns 0 in case of success, 1 in case of error, so the 
+	   if() should use != and not ==.	   
+
+	6. tar memory faults when large tarballs are created:
+	   In order to be able to reconstruct files with several hard links 
+	   from a tarball tar has to keep track of all ordinary files with a 
+	   link count > 1. A struct linkbuf is malloc'ed for each file with
+	   additional hard links. Eventually the data segment expands into the
+	   stack segment and tar will core dump. As such, this is a principal 
+	   limitation of tar  on a 16 bit system.
+
+           It's worth mentioning that the tar man pages state:
+
+             DIAGNOSTICS
+               Complaints if enough memory is not available to hold
+               the link tables.
+
+           The getmem() function indeed checks whether the malloc() succeeded. 
+	   However, the failure mechanism is more subtle. First the data area
+	   expands beyond 140000, than the stack area tries to grow below 
+	   160000, which is not possible.  In all tests done tar crashed
+	   due to a failure to expand the stack.
+
+	   Last but not least: because tar changes the current working 
+	   directory to the directory it's currently processing the tar.core 
+	   ends up in this directory, and not the cwd where tar was started in.
+
+           Now the good news: struct linkbuf a much larger than needed:
+	       struct linkbuf {
+	           ino_t  inum;
+	           dev_t  devnum;
+	           int    count;
+	           char	  pathname[NAMSIZ];
+	           struct linkbuf *nextp;
+                };
+           It allocates NAMSIZ bytes for the path name, NAMSIZ is
+	   #defined'ed to 100 in tar.c. This is way larger than the typical 
+	   file name size, thus wasting precious space.
+
+	   A simple modification is to change this to
+	           char	  *pathname;
+	   and allocate with a separate malloc a minimally sized buffer for
+	   the pathname.
+
+	   This reduces the memory consumption to a point where a tarball with
+	   a full 211BSD system disk can be created. The test system had 201 
+	   ordinary files with multiple links, the tar needs 11.2 kB for
+	   linkbuf's, the data area grows to about 120000. The original tar 
+	   needed more than twice as much space for linkbuf structures.
+
+	The patches above where submitted by
+	    Walter F.J. Mueller <w.f.j.mueller@gsi.de>
+
+	The following files are affected by this update:
+
+	modified:  /usr/src/lib/libc/pdp/crt/ulrem.s
+        modified:  /usr/src/sys/pdpuba/rk.c
+	modified:  /usr/src/sys/pdp/conf.c
+        added:     /usr/src/sys/conf/boot/rkboot.s
+	modified:  /usr/src/sys/conf/boot/rmboot.s
+	modified:  /usr/src/sys/conf/GENERIC
+	modified:  /usr/src/sys/conf/NONET
+	modified:  /usr/src/sys/autoconfig/rkauto.c
+	modified:  /usr/src/sbin/umount/umount.c
+	modified:  /usr/src/bin/tar.c
+
+	To apply this update save the patch (for example /tmp/446.patch):
+
+	   # The rkboot.s should not exist but rm -f to be certain it is absent
+	   rm -f /usr/src/sys/conf/boot/rkboot.s
+	   patch -p0 < /tmp/446.patch
+
+           cd /usr/src/lib/libkern
+           make clean
+           make
+           make install
+           make clean
+
+           cd /sys/pdpstand
+           make clean
+           make
+           cp boot disklabel toyset /
+	   
+           cd /usr/src/sys/autoconfig
+           make clean
+           make
+           make install
+           make clean
+
+           cd /usr/src/sbin/umount
+           make 
+           make install
+           make clean
+
+           cd /usr/src/bin
+           make tar
+           install -s -m 751 -g staff tar /bin
+
+       You may wish to recompile the kernel (both the current and the GENERIC)
+       but that can be deferred if desired.
+
+---------------------------446.patch cut here----------------------
+*** /usr/src/sys/pdpuba/rk.c.old	Sat Jan 18 16:44:45 1997
+--- /usr/src/sys/pdpuba/rk.c	Sat Dec 27 17:22:21 2008
+***************
+*** 43,48 ****
+--- 43,55 ----
+  					*/
+  #endif
+  
++ /* added rkroot() to support RK11 based systems (2008-12-14,wfjm) */
++ 
++ rkroot()
++ {
++ 	rkattach((struct rkdevice *)0177400, 0);
++ }
++ 
+  rkattach(addr, unit)
+  struct rkdevice *addr;
+  {
+*** /usr/src/sys/conf/boot/rmboot.s.old	Fri Apr 19 21:03:43 1991
+--- /usr/src/sys/conf/boot/rmboot.s	Sat Dec 27 17:27:04 2008
+***************
+*** 50,56 ****
+  /  Otherwise, use a BOOT opcode, if available;
+  /  if necessary, read in block 0 to location 0 "by hand".
+  
+! / rm02/3/5 bootstrap - salkind@nyu
+  
+  WC	= -256.
+  READ	= 70
+--- 50,56 ----
+  /  Otherwise, use a BOOT opcode, if available;
+  /  if necessary, read in block 0 to location 0 "by hand".
+  
+! / rm02/3/5 rp06 bootstrap - salkind@nyu
+  
+  WC	= -256.
+  READ	= 70
+*** /usr/src/sys/conf/boot/rkboot.s.old	Sat Dec 27 17:28:29 2008
+--- /usr/src/sys/conf/boot/rkboot.s	Fri Dec 26 12:51:47 2008
+***************
+*** 0 ****
+--- 1,77 ----
++ /*
++  *	SCCS id	@(#)rkboot.s	1.0 (2.11BSD)	12/26/2008
++  */
++ #include "localopts.h"
++ 
++ /  The boot options and device are placed in the last SZFLAGS bytes
++ /  at the end of core for the bootstrap.
++ ENDCORE=	160000		/ end of core, mem. management off
++ SZFLAGS=	6		/ size of boot flags
++ BOOTOPTS=	2		/ location of options, bytes below ENDCORE
++ BOOTDEV=	4		/ boot unit
++ CHECKWORD=	6
++ 
++ .globl	_doboot, hardboot, _bootcsr
++ .text
++ _doboot:
++ 	mov	4(sp),r4	/ boot options
++ 	mov	2(sp),r3	/ boot device
++ 
++ #ifndef	KERN_NONSEP
++ /  If running separate I/D, need to turn off memory management.
++ /  Call the routine unmap in low text, after setting up a jump
++ /  in low data where the PC will be pointing.
++ .globl	unmap
++ 	mov	$137,*$unmap+2		/ jmp *$hardboot
++ 	mov	$hardboot,*$unmap+4
++ 	jmp	unmap
++ 	/ "return" from unmap will be to hardboot in data
++ .data
++ #else
++ /  Reset to turn off memory management
++ 	reset
++ #endif
++ 
++ /  On power fail, hardboot is the entry point (map is already off)
++ /  and the args are in r4 (RB_POWRFAIL), r3 (rootdev)
++ 
++ hardboot:
++ 	mov	r4, ENDCORE-BOOTOPTS
++ 	ash	$-3,r3		/ shift out the partition number
++ 	bic	$!7,r3		/ save only the drive number
++ 	mov	r3, ENDCORE-BOOTDEV
++ 	com	r4		/ if CHECKWORD == ~bootopts, flags are believed
++ 	mov	r4, ENDCORE-CHECKWORD
++ 1:
++ 	reset
++ 
++ /  The remainder of the code is dependent on the boot device.
++ /  If you have a bootstrap ROM, just jump to the correct entry.
++ /  Otherwise, use a BOOT opcode, if available;
++ /  if necessary, read in block 0 to location 0 "by hand".
++ 
++ / Bootstrap for rk05 drive - wfjm
++ 
++ WC = -256.
++ 
++ rkcs =  4	/ offset from base csr: control & status
++ rkda = 12	/ desired disk address
++ 
++ / RK05 constants.
++ iocom = 005	/ read + go
++ 
++ / initialize rk
++ 
++ 	mov	_bootcsr,r1	/ bootcsr points to rkcs
++ 	add	$rkda-rkcs,r1	/ r1 -> rkda
++ 	mov	ENDCORE-BOOTDEV,r2	/ drive number
++ 	ash	$13,r2		/ drsel is in bits 15:13
++ 	mov	r2,(r1)		/ setup rkda (disk address)
++ 	clr	-(r1)		/ clear rkba (memory address)
++ 	mov	$WC,-(r1)	/ setup rkwc (transfer length)
++ 	mov	$iocom,-(r1)	/ issue read+go
++ 
++ 1:	tstb	(r1)
++ 	bge	1b		/ wait for iocom to complete
++ 	mov	ENDCORE-BOOTDEV,r0
++ 	clr	pc
+*** /usr/src/sys/conf/GENERIC.old	Sat Oct 13 18:20:02 2001
+--- /usr/src/sys/conf/GENERIC	Sat Dec 27 17:17:24 2008
+***************
+*** 52,59 ****
+  #BOOTDEV	hk6			# rk06 boot device
+  #BOOTDEV	hk7			# rk07 boot device
+  #BOOTDEV	ra			# MSCP boot device
+  #BOOTDEV	rl			# rl01/02 boot device
+! #BOOTDEV	rm			# rm02/03/05 boot device
+  #BOOTDEV	br			# Eaton BR1537/BR1711 boot device
+  #BOOTDEV	sc11			# Emulex SC11/B boot device
+  #BOOTDEV	sc21			# Emulex SC21 boot device
+--- 52,60 ----
+  #BOOTDEV	hk6			# rk06 boot device
+  #BOOTDEV	hk7			# rk07 boot device
+  #BOOTDEV	ra			# MSCP boot device
++ #BOOTDEV	rk			# rk05 boot device
+  #BOOTDEV	rl			# rl01/02 boot device
+! #BOOTDEV	rm			# rm02/03/05 rp06 boot device
+  #BOOTDEV	br			# Eaton BR1537/BR1711 boot device
+  #BOOTDEV	sc11			# Emulex SC11/B boot device
+  #BOOTDEV	sc21			# Emulex SC21 boot device
+*** /usr/src/sys/conf/NONET.old	Wed Nov 22 21:26:15 1995
+--- /usr/src/sys/conf/NONET	Sat Dec 27 17:19:22 2008
+***************
+*** 50,57 ****
+  #BOOTDEV	hk6			# rk06 boot device
+  #BOOTDEV	hk7			# rk07 boot device
+  BOOTDEV		ra			# MSCP boot device
+  #BOOTDEV	rl			# rl01/02 boot device
+! #BOOTDEV	rm			# rm02/03/05 boot device
+  #BOOTDEV	br			# Eaton BR1537/BR1711 boot device
+  #BOOTDEV	sc11			# Emulex SC11/B boot device
+  #BOOTDEV	sc21			# Emulex SC21 boot device
+--- 50,58 ----
+  #BOOTDEV	hk6			# rk06 boot device
+  #BOOTDEV	hk7			# rk07 boot device
+  BOOTDEV		ra			# MSCP boot device
++ #BOOTDEV	rk			# rk05 boot device
+  #BOOTDEV	rl			# rl01/02 boot device
+! #BOOTDEV	rm			# rm02/03/05 rp06 boot device
+  #BOOTDEV	br			# Eaton BR1537/BR1711 boot device
+  #BOOTDEV	sc11			# Emulex SC11/B boot device
+  #BOOTDEV	sc21			# Emulex SC21 boot device
+*** /usr/src/sys/autoconfig/rkauto.c.old	Wed Dec 30 17:56:32 1992
+--- /usr/src/sys/autoconfig/rkauto.c	Sat Dec 27 17:25:32 2008
+***************
+*** 16,23 ****
+--- 16,39 ----
+  	struct rkdevice *addr;
+  	int vector;
+  {
++ 	extern int errno;
++ 
+  	stuff(RKCS_IDE | RKCS_DRESET | RKCS_GO, (&(addr->rkcs)));
+  	DELAY(10L);
+  	stuff(0, (&(addr->rkcs)));
++ 
++ 	/* in case no drive 0 was attached, the DRESET above will leave
++ 	 * the controller in an error state. The grab below checks for this
++ 	 * and the stuff below executes a RESET (control reset) to clear
++ 	 * the error condition. Without this the first access to any drive
++ 	 * will fail when the system is up.
++ 	 * 2008-12-25 wfjm
++ 	*/
++ 	errno = 0;
++ 	if ((grab(&(addr->rker)) & RKER_DRE) && !errno) {
++ 		stuff(RKCS_RESET | RKCS_GO, (&(addr->rkcs)));
++ 		DELAY(10L);
++ 	}
++ 
+  	return(ACP_IFINTR);
+  }
+*** /usr/src/sys/pdp/conf.c.old	Sat Oct 13 18:20:03 2001
+--- /usr/src/sys/pdp/conf.c	Sat Dec 27 17:21:22 2008
+***************
+*** 23,34 ****
+  
+  #include "rk.h"
+  #if NRK > 0
+! int	rkopen(), rkstrategy();
+  daddr_t	rksize();
+  #define	rkclose		nulldev
+  #else
+  #define	rkopen		nodev
+  #define	rkclose		nodev
+  #define	rkstrategy	nodev
+  #define	rksize		NULL
+  #endif
+--- 23,35 ----
+  
+  #include "rk.h"
+  #if NRK > 0
+! int	rkopen(), rkroot(), rkstrategy();
+  daddr_t	rksize();
+  #define	rkclose		nulldev
+  #else
+  #define	rkopen		nodev
+  #define	rkclose		nodev
++ #define rkroot		nulldev
+  #define	rkstrategy	nodev
+  #define	rksize		NULL
+  #endif
+***************
+*** 192,198 ****
+  	raopen,		raclose,	rastrategy,	raroot,		rasize,
+  	0,
+  /* rk = 6 */
+! 	rkopen,		rkclose,	rkstrategy,	nulldev,	rksize,
+  	0,
+  /* rl = 7 */
+  	rlopen,		rlclose,	rlstrategy,	rlroot,		rlsize,
+--- 193,199 ----
+  	raopen,		raclose,	rastrategy,	raroot,		rasize,
+  	0,
+  /* rk = 6 */
+! 	rkopen,		rkclose,	rkstrategy,	rkroot,		rksize,
+  	0,
+  /* rl = 7 */
+  	rlopen,		rlclose,	rlstrategy,	rlroot,		rlsize,
+*** /usr/src/bin/tar.c.old	Tue Oct  3 12:40:03 1989
+--- /usr/src/bin/tar.c	Sat Dec 27 17:29:22 2008
+***************
+*** 55,61 ****
+  	ino_t	inum;
+  	dev_t	devnum;
+  	int	count;
+! 	char	pathname[NAMSIZ];
+  	struct	linkbuf *nextp;
+  };
+  
+--- 55,61 ----
+  	ino_t	inum;
+  	dev_t	devnum;
+  	int	count;
+! 	char	*pathname;
+  	struct	linkbuf *nextp;
+  };
+  
+***************
+*** 604,615 ****
+  			}
+  			lp = (struct linkbuf *) getmem(sizeof(*lp));
+  			if (lp != NULL) {
+! 				lp->nextp = ihead;
+! 				ihead = lp;
+! 				lp->inum = stbuf.st_ino;
+! 				lp->devnum = stbuf.st_dev;
+! 				lp->count = stbuf.st_nlink - 1;
+! 				strcpy(lp->pathname, longname);
+  			}
+  		}
+  		blocks = (stbuf.st_size + (TBLOCK-1)) / TBLOCK;
+--- 604,618 ----
+  			}
+  			lp = (struct linkbuf *) getmem(sizeof(*lp));
+  			if (lp != NULL) {
+! 				lp->pathname = getmem(strlen(longname)+1);
+! 				if (lp->pathname != NULL) {
+! 					lp->nextp = ihead;
+! 					ihead = lp;
+! 					lp->inum = stbuf.st_ino;
+! 					lp->devnum = stbuf.st_dev;
+! 					lp->count = stbuf.st_nlink - 1;
+! 					strcpy(lp->pathname, longname);
+! 				}
+  			}
+  		}
+  		blocks = (stbuf.st_size + (TBLOCK-1)) / TBLOCK;
+*** /usr/src/lib/libc/pdp/crt/ulrem.s.old	Sun Jun  6 20:47:00 1993
+--- /usr/src/lib/libc/pdp/crt/ulrem.s	Sat Dec 27 17:30:34 2008
+***************
+*** 6,11 ****
+--- 6,12 ----
+   *  Version	Date		Modification
+   *	0.0	02Feb91		1. Initial inspiration struck.
+   *	1.0	05Jun93		2. Released into the Public Domain.
++  *      1.1     23Dec08         Revised, corrected KERNEL (no-FPP) code wfjm
+  */
+  
+  #include "DEFS.h"
+***************
+*** 56,62 ****
+--- 57,105 ----
+  #else
+  /*
+   * ulrem for the kernel (uses only fixed point - no FP)
++  *
++  * uses lrem if lhs and rhs non-negative, otherwise reminder is calculated
++  * 'brute-force' via lhs-(lhs/rhs)*rhs using uldiv and lmul. (wfjm)
+  */
++ 
++ 	.globl	ulrem
++ 	.globl	lrem, uldiv, lmul
++ ulrem:
++ ENTRY(ulrem)
++ 	tst	2(sp)		/ hi(lhs)
++ 	bmi	1f		/ if negative, a-(a/b)*b handling
++ 	tst	6(sp)		/ hi(rhs)
++ 	bmi	1f		/ if negative, a-(a/b)*b handling
++ 	jmp	lrem		/ if lhs and rhs >=0, use lrem
++ 
++ 1:	mov	r5,-(sp)	/ need frame pointer
++ 	mov	sp,r5		/ setup frame pointer
++ 	mov	12(r5),-(sp)	/ lo(rhs) for *
++ 	mov	10(r5),-(sp)	/ hi(rhs)
++ 	mov	12(r5),-(sp)	/ lo(rhs) for /
++ 	mov	10(r5),-(sp)	/ hi(rhs)
++ 	mov	6(r5),-(sp)	/ lo(lhs) for /
++ 	mov	4(r5),-(sp)	/ hi(lhs)
++ 	jsr	pc,uldiv	/ do lhs/rhs
++ 	add	$10,sp		/ clean up stack
++ 	mov	r1,-(sp)	/ lo(lhs/rhs)
++ 	mov	r0,-(sp)	/ hi(lhs/rhs)
++ 	jsr	pc,lmul		/ do (lhs/rhs)*rhs
++ 	add	$10,sp		/ clean up stack
++ 	mov	r1,-(sp)	/ lo((lhs/rhs)*rhs))
++ 	mov	r0,-(sp)	/ hi((lhs/rhs)*rhs))
++ 	mov	6(r5),r1	/ lo(lhs)
++ 	mov	4(r5),r0	/ hi(lhs)
++ 	sub	(sp)+,r0	/ hi(lhs-((lhs/rhs)*rhs))
++ 	sub	(sp)+,r1	/ lo(lhs-((lhs/rhs)*rhs))
++ 	sbc	r0		/ handle carry from lo to hi part
++ 	mov	(sp)+,r5	/ restore r5
++ 	rts	pc
++ 
++ #ifdef NEVER
++ /* the old code here for reference and further debugging.
++  * a 1%10 produced a 0 instead of a 1.
++  */ 
+  	.globl ulrem
+  ulrem:
+  ENTRY(ulrem)
+***************
+*** 131,136 ****
+--- 174,180 ----
+  	mov	(sp)+,r3
+  	mov	(sp)+,r2
+  	rts	pc
++ #endif NEVER
+  #endif KERNEL
+  
+  /*
+*** /usr/src/sbin/umount/umount.c.old	Tue Jan 16 23:25:05 1996
+--- /usr/src/sbin/umount/umount.c	Sat Dec 27 17:29:58 2008
+***************
+*** 67,73 ****
+  	int argc;
+  	register char *argv[];
+  {
+! 	int all, ch, errs;
+  
+  	/* Start disks transferring immediately. */
+  	sync();
+--- 67,73 ----
+  	int argc;
+  	register char *argv[];
+  {
+! 	int all, ch, errs=0;
+  
+  	/* Start disks transferring immediately. */
+  	sync();
+***************
+*** 108,114 ****
+  		errs = umountall();
+  	} else
+  		for (errs = 0; *argv != NULL; ++argv)
+! 			if (umountfs(*argv) == 0)
+  				errs = 1;
+  	exit(errs);
+  }
+--- 108,114 ----
+  		errs = umountall();
+  	} else
+  		for (errs = 0; *argv != NULL; ++argv)
+! 			if (umountfs(*argv) != 0)
+  				errs = 1;
+  	exit(errs);
+  }
+*** /VERSION.old	Tue Dec 26 14:53:42 2006
+--- /VERSION	Sat Dec 27 17:32:05 2008
+***************
+*** 1,5 ****
+! Current Patch Level: 445
+! Date: December 26, 2006
+  
+  2.11 BSD
+  ============
+--- 1,5 ----
+! Current Patch Level: 446
+! Date: December 27, 2008
+  
+  2.11 BSD
+  ============

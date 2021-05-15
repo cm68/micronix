@@ -1,0 +1,56 @@
+*** /usr/src/libexec/ftpd/ftpcmd.y.old	Wed Feb 21 02:38:38 1990
+--- /usr/src/libexec/ftpd/ftpcmd.y	Wed Feb  7 20:35:41 2001
+***************
+*** 14,20 ****
+   * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+   * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+   *
+!  *	@(#)ftpcmd.y	5.20 (Berkeley) 2/28/89
+   */
+  
+  /*
+--- 14,20 ----
+   * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+   * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+   *
+!  *	@(#)ftpcmd.y	5.20.1 (2.11BSD) 2001/2/7
+   */
+  
+  /*
+***************
+*** 458,466 ****
+  					struct tm *gmtime();
+  					t = gmtime(&stbuf.st_mtime);
+  					reply(213,
+! 					    "19%02d%02d%02d%02d%02d%02d",
+! 					    t->tm_year, t->tm_mon+1, t->tm_mday,
+! 					    t->tm_hour, t->tm_min, t->tm_sec);
+  				}
+  			}
+  			if ($4 != NULL)
+--- 458,467 ----
+  					struct tm *gmtime();
+  					t = gmtime(&stbuf.st_mtime);
+  					reply(213,
+! 					    "%04d%02d%02d%02d%02d%02d",
+! 					    t->tm_year + 1900, t->tm_mon+1,
+! 					    t->tm_mday, t->tm_hour, t->tm_min,
+! 					    t->tm_sec);
+  				}
+  			}
+  			if ($4 != NULL)
+*** /VERSION.old	Fri Nov 24 09:42:22 2000
+--- /VERSION	Wed Feb  7 20:56:59 2001
+***************
+*** 1,5 ****
+! Current Patch Level: 434
+! Date: November 24, 2000
+  
+  2.11 BSD
+  ============
+--- 1,5 ----
+! Current Patch Level: 435
+! Date: February 7, 2001
+  
+  2.11 BSD
+  ============

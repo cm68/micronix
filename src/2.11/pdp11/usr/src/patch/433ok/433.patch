@@ -1,0 +1,510 @@
+*** /usr/src/sys/pdpstand/M.s.old	Mon Jun  5 20:26:53 1995
+--- /usr/src/sys/pdpstand/M.s	Tue Oct 17 20:10:05 2000
+***************
+*** 1,6 ****
+  /
+  /	SCCS id	@(#)M.s	1.7 (Berkeley)	7/11/83
+! /		@(#)M.s	3.1 (2.11BSD)	1995/06/01 (sms@wlv.iipo.gtegsc.com)
+  /
+  / Startup code for two-stage bootstrap with support for autoboot.
+  / Supports 11/45, 11/70, 11/53, 11/73, 11/83, 11/84, 11/93, 11/94
+--- 1,6 ----
+  /
+  /	SCCS id	@(#)M.s	1.7 (Berkeley)	7/11/83
+! /		@(#)M.s	3.2 (2.11BSD)	2000/10/17 (sms@moe.2bsd.com)
+  /
+  / Startup code for two-stage bootstrap with support for autoboot.
+  / Supports 11/45, 11/70, 11/53, 11/73, 11/83, 11/84, 11/93, 11/94
+***************
+*** 104,110 ****
+  /
+  /	If 11/40 class processor, only need set the I space registers
+  /
+! 	movb	_sep_id, _ksep
+  	jeq	1f
+  
+  /
+--- 104,110 ----
+  /
+  /	If 11/40 class processor, only need set the I space registers
+  /
+! 	movb	_sep_id,_ksep
+  	jeq	1f
+  
+  /
+***************
+*** 199,209 ****
+  1:
+  	mov	$nomfpt,nofault	/ catch possible fault from instruction
+  	mfpt			/ 23/24, 44, and KDJ-11 have this instruction
+  	cmp	r0,$1		/ 44?
+  	bne	1f		/ no - br
+  	mov	$1,*$MSCR	/ disable cache parity traps
+! 	mov	$44.,_cputype
+! 	rts	pc
+  1:
+  	cmp	r0,$5		/ KDJ-11?
+  	bne	2f		/ no - br
+--- 199,210 ----
+  1:
+  	mov	$nomfpt,nofault	/ catch possible fault from instruction
+  	mfpt			/ 23/24, 44, and KDJ-11 have this instruction
++ 	bic	$!377,r0	/ cpu module in low byte
+  	cmp	r0,$1		/ 44?
+  	bne	1f		/ no - br
+  	mov	$1,*$MSCR	/ disable cache parity traps
+! 	mov	$44.,r0
+! 	br	out
+  1:
+  	cmp	r0,$5		/ KDJ-11?
+  	bne	2f		/ no - br
+***************
+*** 210,222 ****
+  	mov	*$MAINT,r0	/ get system maint register
+  	ash	$-4,r0		/ move down and
+  	bic	$177760,r0	/  isolate the module id
+- 	mov	$1,*$MSCR	/ disable cache parity traps
+  	movb	j11typ(r0),r0	/ lookup cpu type
+  	movb	_ubmap,r1	/ unibus?
+- 	beq	1f		/ nope - br
+- 	bis	$2,*$MSCR	/ disable unibus traps
+- 1:
+  	add	r1,r0		/ bump the cpu type (93 -> 94, 83 ->84)
+  	br	out
+  2:
+  	cmp	r0,$3		/ 23 or 24?
+--- 211,224 ----
+  	mov	*$MAINT,r0	/ get system maint register
+  	ash	$-4,r0		/ move down and
+  	bic	$177760,r0	/  isolate the module id
+  	movb	j11typ(r0),r0	/ lookup cpu type
+  	movb	_ubmap,r1	/ unibus?
+  	add	r1,r0		/ bump the cpu type (93 -> 94, 83 ->84)
++ 	mov	$out,nofault	/ catch fault if no MSCR register (53)
++ 	mov	$1,*$MSCR	/ disable cache parity traps
++ 	tst	r1		/ unibus machine?
++ 	beq	out		/ nope - we're done
++ 	bis	$2,*$MSCR	/ disable unibus traps
+  	br	out
+  2:
+  	cmp	r0,$3		/ 23 or 24?
+***************
+*** 237,246 ****
+  2:
+  	mov	$40.,r0		/ assume 40
+  	mov	$out,nofault
+! 	tst	*$MSCR		/ 60 has MSCR, 40 doesn't
+  	mov	$60.,r0
+- 	mov	$1,*$MSCR
+  out:
+  	mov	r0,_cputype
+  	rts	pc
+  
+--- 239,248 ----
+  2:
+  	mov	$40.,r0		/ assume 40
+  	mov	$out,nofault
+! 	mov	$1,*$MSCR	/ 60 has MSCR, 40 doesn't - disable cache traps
+  	mov	$60.,r0
+  out:
++ 	clr	nofault
+  	mov	r0,_cputype
+  	rts	pc
+  
+*** /usr/src/sys/pdpstand/conf.c.old	Fri Nov  7 19:49:28 1997
+--- /usr/src/sys/pdpstand/conf.c	Fri Oct 20 20:06:03 2000
+***************
+*** 3,9 ****
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)conf.c	2.7 (2.11BSD) 1997/11/7
+   */
+  
+  #include "../h/param.h"
+--- 3,9 ----
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)conf.c	2.8 (2.11BSD) 2000/10/20
+   */
+  
+  #include "../h/param.h"
+***************
+*** 127,139 ****
+  	int	(*strat)() = devsw[io->i_ino.i_dev].dv_strategy;
+  	register struct disklabel *lp;
+  	register struct partition *pi;
+  	
+  	switch	(fnc)
+  		{
+  		case	WRITELABEL:
+! 			return(writelabel(io, strat));
+  		case	READLABEL:
+! 			return(readlabel(io, strat));
+  		case	DEFAULTLABEL:
+  /*
+   * Zero out the label buffer and then assign defaults common to all drivers.
+--- 127,144 ----
+  	int	(*strat)() = devsw[io->i_ino.i_dev].dv_strategy;
+  	register struct disklabel *lp;
+  	register struct partition *pi;
++ 	int	status;
+  	
++ 	io->i_flgs |= F_LABEL;		/* label operation now in progress */
++ 
+  	switch	(fnc)
+  		{
+  		case	WRITELABEL:
+! 			status = writelabel(io, strat);
+! 			break;
+  		case	READLABEL:
+! 			status = readlabel(io, strat);
+! 			break;
+  		case	DEFAULTLABEL:
+  /*
+   * Zero out the label buffer and then assign defaults common to all drivers.
+***************
+*** 165,175 ****
+  */
+  			lp->d_bbsize = 512;
+  			lp->d_sbsize = SBSIZE;
+! 			return((*dvlab)(io));
+  		default:
+  			printf("devlabel: bad fnc %d\n");
+! 			return(-1);
+  		}
+  	}
+  
+  /*
+--- 170,184 ----
+  */
+  			lp->d_bbsize = 512;
+  			lp->d_sbsize = SBSIZE;
+! 			status = (*dvlab)(io);
+! 			break;
+  		default:
+  			printf("devlabel: bad fnc %d\n");
+! 			status = -1;
+! 			break;
+  		}
++ 	io->i_flgs &= ~F_LABEL;
++ 	return(status);
+  	}
+  
+  /*
+***************
+*** 212,217 ****
+--- 221,231 ----
+   * Check for end of volume.  Actually this checks for end of partition.
+   * Since this is almost always called when reading unlabeled disks (treating
+   * a floppy as a short tape for example) it's effectively an EOV check.
++  *
++  * If a 'label' operation is in progress do not perform any checking because
++  * there is nothing to compare against.   The label hasn't been read yet!  The
++  * block number has been calculated/set to be the label sector so obviously 
++  * an end of volume condition can not exist.
+  */
+  
+  deveovchk(io)
+***************
+*** 220,225 ****
+--- 234,241 ----
+  	register struct partition *pi;
+  	daddr_t  sz, eov;
+  
++ 	if	(io->i_flgs & F_LABEL)
++ 		return(1);
+  	pi = &io->i_label.d_partitions[io->i_part];
+  	sz = io->i_cc / 512;
+  /*
+*** /usr/src/sys/pdpstand/saio.h.old	Fri Mar  8 15:27:52 1996
+--- /usr/src/sys/pdpstand/saio.h	Fri Oct 20 20:01:34 2000
+***************
+*** 3,9 ****
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)saio.h	2.2 (2.11BSD GTE) 1996/3/8
+   */
+  
+  /*
+--- 3,9 ----
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)saio.h	2.3 (2.11BSD) 2000/10/20
+   */
+  
+  /*
+***************
+*** 42,47 ****
+--- 42,48 ----
+  #define	F_ALLOC	04
+  #define	F_FILE	010
+  #define	F_TAPE	020
++ #define	F_LABEL	040
+  #define	READ	F_READ
+  #define	WRITE	F_WRITE
+  
+*** /usr/src/lib/libc/pdp/csu/Makefile.old	Sat Apr  9 01:15:24 1994
+--- /usr/src/lib/libc/pdp/csu/Makefile	Tue Oct 24 20:06:35 2000
+***************
+*** 3,17 ****
+  # All rights reserved.  The Berkeley software License Agreement
+  # specifies the terms and conditions for redistribution.
+  #
+! #	@(#)Makefile	5.6.1 (2.11BSD GTE) 4/9/94
+  #
+  #	crt0	Normal C run time startoff
+  #	mcrt0	C run time start off for profiling, ``prof'' conventions
+- #	gcrt0	C run time start off for profiling, ``gprof'' conventions
+  #
+  DESTDIR=
+! SRCS=	crt0.s mon.c mcount.s gmon.c
+! #OBJS=	crt0.o mcrt0.o gcrt0.o mon.o gmon.o
+  OBJS=	crt0.o mcrt0.o mon.o
+  CFLAGS=	-O ${DEFS}
+  TAGSFILE=tags
+--- 3,15 ----
+  # All rights reserved.  The Berkeley software License Agreement
+  # specifies the terms and conditions for redistribution.
+  #
+! #	@(#)Makefile	5.6.2 (2.11BSD) 2000/10/24
+  #
+  #	crt0	Normal C run time startoff
+  #	mcrt0	C run time start off for profiling, ``prof'' conventions
+  #
+  DESTDIR=
+! SRCS=	crt0.s mon.c mcount.s
+  OBJS=	crt0.o mcrt0.o mon.o
+  CFLAGS=	-O ${DEFS}
+  TAGSFILE=tags
+***************
+*** 21,27 ****
+  install: ${OBJS}
+  	install -c -m 0644 crt0.o ${DESTDIR}/lib/crt0.o
+  	install -c -m 0644 mcrt0.o ${DESTDIR}/lib/mcrt0.o
+- #	install -c -m 0644 gcrt0.o ${DESTDIR}/usr/lib/gcrt0.o
+  
+  crt0.o:	crt0.s
+  	/lib/cpp ${DEFS} ${DFLAGS} crt0.s | sed 's;^#;/;' | as -o x.o
+--- 19,24 ----
+***************
+*** 33,41 ****
+  	ld -x -r -o moncrt0.o x.o
+  	rm -f x.o
+  
+- gcrt0.o: moncrt0.o gmon.o
+- 	ld -x -r -o gcrt0.o moncrt0.o gmon.o
+- 
+  mcrt0.o: moncrt0.o mon.o
+  	ld -x -r -o mcrt0.o moncrt0.o mon.o
+  
+--- 30,35 ----
+***************
+*** 48,60 ****
+  	ld -x -r -o mon.o x.o
+  	rm -f x.o x.s xx.s mon.s
+  
+- gmon.o: gmon.c gmon.h gmon.ex
+- 	cc ${CFLAGS} -S ${DFLAGS} gmon.c
+- 	ex - gmon.s < gmon.ex
+- 	as -o x.o gmon.s
+- 	ld -x -r -o gmon.o x.o
+- 	rm -f x.o gmon.s
+- 
+  tags:	
+  	cwd=`pwd`; \
+  	for i in *.c; do \
+--- 42,47 ----
+***************
+*** 87,93 ****
+  
+  crt0.o: crt0.s
+  mon.o: mon.c
+! gmon.o: gmon.c ./gmon.h
+  # DEPENDENCIES MUST END AT END OF FILE
+  # IF YOU PUT STUFF HERE IT WILL GO AWAY
+  # see make depend above
+--- 74,80 ----
+  
+  crt0.o: crt0.s
+  mon.o: mon.c
+! mcount.o: mcount.s ./../sys/SYS.h /usr/include/syscall.h
+  # DEPENDENCIES MUST END AT END OF FILE
+  # IF YOU PUT STUFF HERE IT WILL GO AWAY
+  # see make depend above
+*** /usr/src/sys/sys/ufs_alloc.c.old	Thu Sep 19 21:49:24 1996
+--- /usr/src/sys/sys/ufs_alloc.c	Sat Oct 14 23:57:02 2000
+***************
+*** 3,14 ****
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)ufs_alloc.c	1.3 (2.11BSD GTE) 1996/9/19
+   */
+  
+  #include "param.h"
+  #include "../machine/seg.h"
+- 
+  #include "fs.h"
+  #include "dir.h"
+  #include "inode.h"
+--- 3,13 ----
+   * All rights reserved.  The Berkeley software License Agreement
+   * specifies the terms and conditions for redistribution.
+   *
+!  *	@(#)ufs_alloc.c	1.4 (2.11BSD) 2000/10/14
+   */
+  
+  #include "param.h"
+  #include "../machine/seg.h"
+  #include "fs.h"
+  #include "dir.h"
+  #include "inode.h"
+***************
+*** 37,44 ****
+  {
+  	register struct fs *fs;
+  	register struct buf *bp;
+! 	int	async;
+  	daddr_t bno;
+  
+  	fs = ip->i_fs;
+  	async = fs->fs_flags & MNT_ASYNC;
+--- 36,44 ----
+  {
+  	register struct fs *fs;
+  	register struct buf *bp;
+! 	int	async, i;
+  	daddr_t bno;
++ 	char *fullerr = "file system full";
+  
+  	fs = ip->i_fs;
+  	async = fs->fs_flags & MNT_ASYNC;
+***************
+*** 104,122 ****
+  nospace:
+  	fs->fs_nfree = 0;
+  	fs->fs_tfree = 0;
+! 	fserr(fs, "file system full");
+  	/*
+  	 * THIS IS A KLUDGE...
+  	 * SHOULD RATHER SEND A SIGNAL AND SUSPEND THE PROCESS IN A
+  	 * STATE FROM WHICH THE SYSTEM CALL WILL RESTART
+  	 */
+! 	uprintf("\n%s: write failed, file system full\n", fs->fs_fsmnt);
+! 	{
+! 		register int i;
+! 
+! 		for (i = 0; i < 5; i++)
+! 			sleep((caddr_t)&lbolt, PRIBIO);
+! 	}
+  	u.u_error = ENOSPC;
+  	return(NULL);
+  }
+--- 104,118 ----
+  nospace:
+  	fs->fs_nfree = 0;
+  	fs->fs_tfree = 0;
+! 	fserr(fs, fullerr);
+  	/*
+  	 * THIS IS A KLUDGE...
+  	 * SHOULD RATHER SEND A SIGNAL AND SUSPEND THE PROCESS IN A
+  	 * STATE FROM WHICH THE SYSTEM CALL WILL RESTART
+  	 */
+! 	uprintf("\n%s: %s\n", fs->fs_fsmnt, fullerr);
+! 	for (i = 0; i < 5; i++)
+! 		sleep((caddr_t)&lbolt, PRIBIO);
+  	u.u_error = ENOSPC;
+  	return(NULL);
+  }
+***************
+*** 181,190 ****
+  	if (fs->fs_nbehind < 4 * NICINOD) {
+  		first = 1;
+  		ino = fs->fs_lasti;
+- #ifdef DIAGNOSTIC
+- 		if (itoo(ino))
+- 			panic("ialloc");
+- #endif DIAGNOSTIC
+  		adr = itod(ino);
+  	} else {
+  fromtop:
+--- 177,182 ----
+***************
+*** 202,218 ****
+  			continue;
+  		}
+  		dp = (struct dinode *)mapin(bp);
+! 		for (i = 0;i < INOPB;i++) {
+  			if (dp->di_mode != 0)
+! 				goto cont;
+  			if (ifind(pip->i_dev, ino))
+! 				goto cont;
+  			fs->fs_inode[fs->fs_ninode++] = ino;
+  			if (fs->fs_ninode >= NICINOD)
+  				break;
+- 		cont:
+- 			ino++;
+- 			dp++;
+  		}
+  		mapout(bp);
+  		brelse(bp);
+--- 194,207 ----
+  			continue;
+  		}
+  		dp = (struct dinode *)mapin(bp);
+! 		for (i = 0; i < INOPB; i++, ino++, dp++) {
+  			if (dp->di_mode != 0)
+! 				continue;
+  			if (ifind(pip->i_dev, ino))
+! 				continue;
+  			fs->fs_inode[fs->fs_ninode++] = ino;
+  			if (fs->fs_ninode >= NICINOD)
+  				break;
+  		}
+  		mapout(bp);
+  		brelse(bp);
+***************
+*** 219,226 ****
+--- 208,230 ----
+  		if (fs->fs_ninode >= NICINOD)
+  			break;
+  	}
++ /*
++  * If some inodes have been found but not NICINOD of them the intent was to
++  * go back and scan the inode list from the beginning and add new inodes to
++  * fs_inode[].   On filesystems with few free inodes this had the unfortunate 
++  * side effect of finding the inodes we already knew about!   The resulting
++  * duplicates caused fs_ninode to be higher than it should have been.   Part
++  * of the allocation logic said there were inodes available (fs_ninode > 0)
++  * while 'fs_tinode = 0' meant there were none!
++  *
++  * Since we're going to scan from the beginning simply toss away any inodes
++  * already found.  Either NICINOD or all available inodes will be found.
++ */
+  	if (fs->fs_ninode < NICINOD && first)
++ 		{
++ 		fs->fs_ninode = 0;
+  		goto fromtop;
++ 		}
+  	fs->fs_lasti = inobas;
+  	fs->fs_ilock = 0;
+  	wakeup((caddr_t)&fs->fs_ilock);
+*** /VERSION.old	Wed May 17 21:02:26 2000
+--- /VERSION	Tue Oct 17 19:30:52 2000
+***************
+*** 1,5 ****
+! Current Patch Level: 432
+! Date: May 17, 2000
+  
+  2.11 BSD
+  ============
+--- 1,5 ----
+! Current Patch Level: 433
+! Date: October 17, 2000
+  
+  2.11 BSD
+  ============

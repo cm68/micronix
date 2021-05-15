@@ -1,0 +1,123 @@
+Subject: Y2K bug in FTPD (#435)
+Index:	libexec/ftpd/ftpdcmd.y 2.11BSD
+
+Description:
+	The MDTM command fails when trying to retrieve files which already
+	exist locally.
+
+Repeat-By:
+	Open an FTP session to a 2.11BSD system, send the command
+
+		quote mdtm foobar.c
+
+	where foobar.c is a file created after January 1 2000.  
+
+	Observe that the time string which comes back is of the form
+
+		191000115144152
+
+	instead of
+
+		20000115144152
+
+Fix:
+	Many thanks to Martijn van Buul (pino@dohd.org) for finding _and_
+	fixing the problem.   His bug report:
+
+"(part of a typescript, an FTP session to my PDP, running 2.11BSD)
+
+ncftp /usr/home/martijnb> ls -la foobar.c
+-rw-r--r--  1 martijnb users         106 Jan 15 15:25 foobar.c
+ncftp /usr/home/martijnb> quote mdtm foobar.c
+191010115144152
+
+(mdtm should return the datestamp, in the form yyyymmddhhmm. ftpd
+thinks that it is 19101, and chops off the last digit of the filedate..)
+
+Things go wrong when you try to get an allready existing file:
+
+ncftp /usr/home/martijnb > get foobar.c
+
+The local file "foobar.c" already exists.
+	Local:           133 bytes, dated Mon Feb  5 13:25:59 2001.
+	Remote:          133 bytes, dated Thu Oct 13 04:44:15 1910.
+
+	[O]verwrite?  [A]ppend to?  [S]kip?  [N]ew Name?  > "
+
+	The main reason this slipped thru the cracks is that the bug
+	was in a Yacc (.y) file.   In 1999 a scan was made of the '.c'
+	files on the system looking for references to 'tm_year' but the
+	ftpdcmd.y file was missed obviously.
+
+	To install this update cut where indicated and save to a file
+	(/tmp/435).   Then:
+
+		patch  -p0 < /tmp/435
+		cd /usr/src/libexec/ftpd
+		make 
+		make install
+		make clean
+
+	Enjoy!
+
+	As always this and previous updates to 2.11BSD are available via
+	anonymous FTP to either FTP.TO.GD-ES.COM or MOE.2BSD.COM in the
+	directory /pub/2.11BSD.
+
+------------------------cut here-----------------------
+*** /usr/src/libexec/ftpd/ftpcmd.y.old	Wed Feb 21 02:38:38 1990
+--- /usr/src/libexec/ftpd/ftpcmd.y	Wed Feb  7 20:35:41 2001
+***************
+*** 14,20 ****
+   * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+   * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+   *
+!  *	@(#)ftpcmd.y	5.20 (Berkeley) 2/28/89
+   */
+  
+  /*
+--- 14,20 ----
+   * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+   * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+   *
+!  *	@(#)ftpcmd.y	5.20.1 (2.11BSD) 2001/2/7
+   */
+  
+  /*
+***************
+*** 458,466 ****
+  					struct tm *gmtime();
+  					t = gmtime(&stbuf.st_mtime);
+  					reply(213,
+! 					    "19%02d%02d%02d%02d%02d%02d",
+! 					    t->tm_year, t->tm_mon+1, t->tm_mday,
+! 					    t->tm_hour, t->tm_min, t->tm_sec);
+  				}
+  			}
+  			if ($4 != NULL)
+--- 458,467 ----
+  					struct tm *gmtime();
+  					t = gmtime(&stbuf.st_mtime);
+  					reply(213,
+! 					    "%04d%02d%02d%02d%02d%02d",
+! 					    t->tm_year + 1900, t->tm_mon+1,
+! 					    t->tm_mday, t->tm_hour, t->tm_min,
+! 					    t->tm_sec);
+  				}
+  			}
+  			if ($4 != NULL)
+*** /VERSION.old	Fri Nov 24 09:42:22 2000
+--- /VERSION	Wed Feb  7 20:56:59 2001
+***************
+*** 1,5 ****
+! Current Patch Level: 434
+! Date: November 24, 2000
+  
+  2.11 BSD
+  ============
+--- 1,5 ----
+! Current Patch Level: 435
+! Date: February 7, 2001
+  
+  2.11 BSD
+  ============
