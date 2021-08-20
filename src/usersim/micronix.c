@@ -861,37 +861,105 @@ dumpcpu()
         get_word(cp->state.registers.word[Z80_SP]) & 0xffff, brake);
 }
 
+struct cpm_syscall {
+    int type; 
+    char *name;
+} cpmcalls[] = {
+    0, "RESET",    // 0
+    0, "CONIN",    // 1
+    0, "CONOUT",   // 2
+    0, "RDR",      // 3
+    0, "PUNCH",    // 4
+    0, "LIST",     // 5
+    0, "CONIO",    // 6
+    0, "GETIOBYTE",// 7
+    0, "SETIOBYTE",// 8
+    0, "OUTSTR",   // 9
+    0, "CONREAD",  // 10
+    0, "CONSTAT",  // 11
+    0, "BDOSVER",  // 12
+    0, "DSKRESET", // 13
+    0, "SELECT",   // 14
+    1, "OPENF",    // 15
+    0, "CLOSEF",   // 16
+    0, "SFIRST",   // 17
+    0, "SNEXT",    // 18
+    1, "DELETE",   // 19
+    1, "FREAD",    // 20
+    1, "FWRITE",   // 21
+    1, "FMAKE",    // 22
+    0, "RENAME",   // 23
+    0, "LOGVEC",   // 24
+    0, "GETDRV",   // 25
+    0, "SETDMA",   // 26
+    0, "ALLVEC",   // 27
+    0, "SETRO",    // 28
+    0, "GETRO",    // 29
+    0, "SETATTR",  // 30
+    0, "GETDPB",   // 31
+    0, "USER",     // 32
+    0, "RREAD",    // 33
+    1, "RWRITE",   // 34
+    0, "FSIZE",    // 35
+    1, "RSEEK",    // 36
+    0, "DRESET",   // 37
+    0, "DLOCK",    // 38
+    0, "DUNLOCK",  // 39
+    1, "RWRITEZ",  // 40
+    0
+};
+
 void
 cpmsys()
 {
     unsigned char c_reg;
     unsigned short de_reg;
-    char vbuf[30];
+    char vbuf[200];
     unsigned short from;
+    struct cpm_syscall *cs = 0;
+    int i;
+    char *s;
+    char c;
 
     from = get_word(cp->state.registers.word[Z80_SP]) - 3;
     c_reg = cp->state.registers.byte[Z80_C];
     de_reg = cp->state.registers.word[Z80_DE];
 
-
     fprintf(mytty, "cp/m system call from %x - ", from);
 
     vbuf[0] = '\0';
 
-    switch(c_reg) {
-    case 32:
-        if ((de_reg & 0xff) == 0xff) {
-            sprintf(vbuf, "%s", "get user num\n");
-        } else {
-            sprintf(vbuf, "%s", "set user num to %d\n", de_reg & 0x1f);
+    if (c_reg <= (sizeof(cpmcalls) / sizeof(cpmcalls[0]))) {
+        cs = &cpmcalls[c_reg];
+    }
+
+    s = vbuf;
+    if (cs) {
+        printf("vbuf: %x\n", vbuf);
+        s += sprintf(vbuf, "call: %s arg: %x ", cs->name, de_reg);
+        printf("s: %x\n", s);
+        if (cs->type == 1) {
+            s += sprintf(s, "fcb: %c:", get_byte(de_reg) + '@');
+        printf("s: %x\n", s);
+            for (i = 1; i < 9; i++) {
+                c = get_byte(de_reg + i);
+                if (c != ' ') *s++ = c;
+            }
+            *s++='.';
+            for (i = 9; i < 12; i++) {
+                c = get_byte(de_reg + i);
+                if (c != ' ') *s++ = c;
+            }
         }
-        break;
-    default:
+        strcpy(s, "\n");
+        hexdump(vbuf, 40);
+        printf("s: %x\n", s);
+    } else {
         sprintf(vbuf, "call: %d arg: %x\n", c_reg, de_reg);
-        break;
     }
     fputs(vbuf, mytty);
     dumpcpu();
+    cp->state.pc = pop();
 }
 
 int

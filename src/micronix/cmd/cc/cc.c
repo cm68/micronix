@@ -258,6 +258,7 @@ main(argc, argv)
 	} else {
 		cppflags[ncpp++] = "-Dmicronix";
 		cppflags[ncpp++] = "-Dz80";
+		cppflags[ncpp++] = "-I/include/";
 		execpath = "/hitech";
 	}
 

@@ -1,4 +1,5 @@
 *.dis
+objscan
 bpatch 
 cgen 
 cpp 
