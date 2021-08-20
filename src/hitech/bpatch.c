@@ -1,6 +1,10 @@
 /*
  * patch a hitech-c compiled binary for CP/M to run on micronix
  *
+ * please note that this parser is a hack - it is extremely
+ *		dependent on a well-formed patch file.  
+ *		forget an 'end', and you are screwed.
+ *
  * runs on linux, and snarfs the entire object file into memory
  * porting this to micronix is not worth it.
  *
@@ -25,7 +29,7 @@
  * if no match is found, the block is ignored and the next block is processed.
  *
  * grammar:
- *
+ * ; <comment>
  * block <variable name>
  *   match [<address>]
  *     <pattern bytes>	  [ ; comment ]
@@ -43,15 +47,13 @@
  * end
  *
  * hexdigit : [0-9a-f]
- * pattern bytes :  hexdigit hexdigit , ANY, <variable>.L, <variable>.H
- *               CALL JUMP <variable> are specially handled. expanding into
- *				 0xcd, 0xc3, and variable.L, variable.H respectively
- *
- * address :  <variable> , <variable> + <offset>, hexdigit...
- * offset : 0xhexdigit..., integer
- *
+ * pattern bytes :  hexdigits, ANY, <variable>[(+|-)offset]
+ *		CALL JUMP RET are syntax sugar for 0xcd, 0xc3, 0xc9 respectively
+ * 		CALL foo:
+ *			if foo is known, will try to match, and if unknown, create
+ *			bias is not allowed for unknown symbols
  * note that integer constants are heavily hexadecimal.  the only place
- * where decimal is assumed is in <address>+<offset>, and that can be 
+ * where decimal is assumed is in <variable>+<offset>, and that can be 
  * overridden with an explicit 0x.
  */
 #include <stdio.h>
@@ -69,6 +71,7 @@ typedef unsigned short UINT;
 #define MAX_PATCH 4096
 
 char *patchfile = "hitech.pat";
+char *patchdir;
 char *pname;
 int sflag;
 int verbose;
@@ -87,6 +90,21 @@ word matchaddr;
 int dirty;
 char *blockname;
 
+/*
+ * pattern array is parsed into this.
+ * a pattern entry can matches exactly 1 byte.
+ * if the 
+ */
+struct pat {
+	char *name;
+	unsigned char value;
+	unsigned char flags;
+#define	ANY		1
+#define	EXTRACT	2
+#define	BYTE	4
+#define	WORD	8
+};
+
 usage(char c)
 {
     fprintf(stderr, "usage:\n%s [<options>] objectfile ...\n", pname);
@@ -99,7 +117,7 @@ usage(char c)
     exit(1);
 }
 
-char getbuf[20];
+char getbuf[40];
 
 struct var {
     char *name;
@@ -107,20 +125,30 @@ struct var {
     struct var *next;
 } *vars;
 
-word
+char namebuf[20];
+
+/*
+ * given a variable name, return the var struct or null
+ */
+struct var *
 getvar(char *n)
 {
-    struct var *v;
+    struct var *v = 0;
     word vv = 0xffff;
+	int i;
+	
+	for (i = 0; i < sizeof(namebuf) - 1; i++) {
+		if (*n == '\0' || *n == '+' || *n == '-' || *n == '.')
+			break;	
+		namebuf[i] = *n++;
+	}
+	namebuf[i] = '\0';
 
     for (v = vars; v; v = v->next) {
-        if (strcmp(n, v->name) == 0) {
-            vv = v->value;
-            break;
+        if (strcmp(namebuf, v->name) == 0) {
+            return v;
         }
     }
-    //	if (verbose > 1) printf("getvar %s = %04x\n", n, vv); 
-    return vv;
 }
 
 void
@@ -160,9 +188,11 @@ get()
 
     while (*cursor && (*cursor == ' ' || *cursor == '\t'))
         cursor++;
+
     *s = '\0';
 
-    while (*cursor && *cursor != '\n' && *cursor != ';' && *cursor != ' ' && *cursor != '\t') {
+    while (*cursor && *cursor != '\n' && 
+		*cursor != ';' && *cursor != ' ' && *cursor != '\t') {
         *s++ = *cursor++;
         *s = '\0';
     }
@@ -219,15 +249,6 @@ wordmatch(char *m)
 }
 
 word
-nibble(char c)
-{
-    if (c >= '0' && c <= '9') return c - '0';
-    c |= 0x20;
-    if (c >= 'a' && c <= 'f') return (c - 'a') + 0xa;
-    return 0xffff;
-}
-
-word
 decin(char *s)
 {
     word r = 0;
@@ -240,9 +261,10 @@ decin(char *s)
 
 /*
  * return a hex int
- * the upper word is the number of hex digits
- * terminate at a non-hex.
+ * the upper word is the number of hex digits, which can be zero.
  */
+#define	HEXDIGITS(k)	((k) >> 16)
+
 unsigned int
 hexin(char *s)
 {
@@ -250,13 +272,25 @@ hexin(char *s)
     word d;
     int i = 0;
 
-    while (s[i]) {
-        d = nibble(s[i]);
-        if (d == 0xffff)
-            break;
+    while (*s) {
+		switch(*s) {
+		case '0': case '1': case '2': case '3': case '4': 
+		case '5': case '6': case '7': case '8': case '9':
+			d = *s - '0';
+			break;
+		case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
+			d = *s - 'a' + 0xa;
+			break;
+		case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
+			d = *s - 'A' + 0xa;
+			break;
+		default:
+			return 0;
+		}
         r <<= 4;
         r += d;
         i++;
+		s++;
     }
 
     return r | (i << 16);
@@ -286,6 +320,7 @@ getaddr(char *in)
     unsigned int v;
     word o = 0;
     char sign = 1;
+	struct var *varp;
 
     if (verbose > 1) printf("getaddr %s", in);
 
@@ -298,11 +333,15 @@ getaddr(char *in)
     }
 
     v = hexin(in);
-    if ((v >> 16) != 4) {
-        v = getvar(in);
-        if ((verbose > 1) && v == 0xffff) {
-            printf("variable %s not set\n", in);
-        }
+    if (HEXDIGITS(v) != 4) {
+        varp = getvar(in);
+		if (varp) {
+			v = varp->value;
+		} else {
+			if (verbose > 1) {
+				printf("variable %s not set\n", in);
+			}
+		}
     } else {
         v &= 0xffff;
     }
@@ -320,95 +359,49 @@ getaddr(char *in)
 }
 
 /*
- * this processes 00 - ff, ANY, and <variable>.L, variable.H
- * integer constants here are ALWAYS hex.
- *
- * there's a little syntactic sugar here, doing a substitute for
- * the words CALL and JUMP, and even a little layer violation when
- * a variable name or 4 byte hex number is found.  in this case, we 
- * return 2 packed match bytes which the caller needs to unpack.
+ * if a pattern exactly matches at base, then return a hit and extract
+ * variables
  */
-#define BYTE 0
-#define WORD 1
-#define ANY  2
-#define UNK  3
-unsigned int val;
-
 int
-getval()
-{
-    char *t = get();
-    unsigned int r;
-    int i;
-
-    if (strcmp(t, "ANY") == 0) {
-        return ANY;
-    }
-    if (strcmp(t, "CALL") == 0) {
-        val = 0xcd;
-        return BYTE;
-    }
-
-    if (strcmp(t, "JUMP") == 0) {
-        val = 0xc3;
-        return BYTE;
-    }
-
-    i = strlen(t);
-    r = hexin(t);
-
-    if ((r >> 16) == 2) {
-        val = r & 0xff;
-        return BYTE;
-    }
-
-    if ((r >> 16) == 4) {
-        val = r & 0xffff;
-        return WORD;
-    }
-
-    if (t[i - 2] == '.' && (t[i - 1] == 'L' || t[i - 1] == 'H')) {
-        t[i - 2] = '\0';
-        r = getvar(t);
-        if (r == 0xffff) {
-            if (verbose) printf("variable %s not set\n", t);
-            return UNK;
-        }
-        if (t[i - 1] == 'H') {
-            val = r >> 8;
-        } else {
-            val = r;
-        }
-        r &= 0xff;
-        return BYTE;
-    }
-
-    r = getaddr(t);
-    if (r == 0xffff) {
-        if (verbose) printf("variable %s not set\n", t);
-        return UNK;
-    }
-    val = r;
-    return WORD;
-}
-
-int
-patmatch(word *pat, int pl, word base)
+patmatch(struct pat *pat, int pl, word base)
 {
     int i;
 
     if (!pl) return 0;
 
     for (i = 0; i < pl; i++) {
-        if (pat[i] == 0xffff) continue;
-        if (pat[i] == membuf[base + i]) continue;
+        if (pat[i].flags & ANY) continue;
+        if (pat[i].value == membuf[base + i]) continue;
         if ((verbose > 1) && (i > 4)) {
-            printf("miscompare at index %d: %04x wanted %04x got %02x\n",
-                    i, base + i, pat[i], membuf[base + i]);
+            printf("miscompare at index %d: %04x wanted %02x got %02x\n",
+                    i, base + i, pat[i].value, membuf[base + i]);
         }
         return 0;
     }
     matchaddr = base;
+
+	if (verbose > 1) {
+		printf(">>>>>>> hit at %04x <<<<<<<\n", base);
+    }
+	if (!hit) {
+
+		/* let's extract variables only on the first hit */
+		for (i = 0; i < pl; i++) {
+			int ext;
+			if (pat[i].flags & EXTRACT) {
+				if (verbose > 4) {
+					printf("extract [%d]: %s %d %d\n", 
+						i, pat[i].name, pat[i].value, pat[i].flags);
+				}
+				if (pat[i].flags & BYTE) {
+					ext = membuf[base + i];
+				} else {
+					ext += membuf[base + i] << 8;
+					putvar(pat[i].name, ext);
+				}
+			}
+		}
+	}
     return 1;
 }
 
@@ -442,11 +435,95 @@ extract()
     skiptoeol();
 }
 
+/*
+ * parse a pattern, returning the number of entries
+ */
+int
+parsepat(struct pat *p)
+{
+	int pl;
+	char *t;
+	unsigned int i;
+	int val;
+	struct var *sym;
+	int f;
+	char *n;
+	
+	pl = 0;
+
+    while (*cursor) {
+        skipwhite();
+        if (wordmatch("end")) {
+            skiptoeol();
+            break;
+        }
+
+    	t = get();
+		val = hexin(t);
+		n = 0;
+		f = 0;
+		if (verbose > 4) {
+			printf("%s\n", t);
+		}
+
+		if (!strcmp(t, "ANY")) {
+			val = 0;
+			f = ANY;
+		} else if (!strcmp(t, "RET")) {
+			val = 0xc9;
+		} else if (!strcmp(t, "CALL")) {
+			val = 0xcd;
+		} else if (!strcmp(t, "JUMP")) {
+			val = 0xc3;
+		} else if (HEXDIGITS(val) > 2) {
+			f = WORD;
+			val = val & 0xffff;
+		} else if (HEXDIGITS(val) > 0) {
+			val = val & 0xff;
+		} else {
+			namebuf[0] = '\0';
+			sym = getvar(t);
+			i = strlen(namebuf);
+			if (sym) {
+				val = sym->value;
+				int sign = 0;
+				if (t[i] == '+') {
+					sign = 1;
+				} else if (t[i] == '-') {
+					sign = -1;
+				}
+				val = val + (sign * numin(&t[i+1]));
+				f = WORD;
+			} else if (i) {
+				if (t[i] != '\0') {
+					printf("no bias on unknown symbol");
+				}
+				n = strdup(namebuf);
+				f = ANY | WORD | EXTRACT;
+			} else {
+				printf("no name\n");
+			}
+		}
+		p[pl].value = val;
+		p[pl].name = n;
+		p[pl].flags = f | BYTE;
+		pl++;
+
+		if ((f & WORD) || (f & EXTRACT)) {
+			p[pl].value = (val >> 8) & 0xff;
+			p[pl].name = n;
+			p[pl].flags = f;
+			pl++;
+		}
+    }
+	return (pl);
+}
+
 void
 replace()
 {
-    unsigned char *repl = malloc(MAX_PATTERN);
-    int rl = 0;
+    struct pat *repl = malloc(sizeof (*repl) * MAX_PATTERN);
+    int rl;
     word ad;
     char *a;
     int i;
@@ -460,31 +537,7 @@ replace()
 
     if (verbose > 1) printf("replace %s(%04x)\n", a, ad);
 
-    while (*cursor) {
-        skipwhite();
-        if (wordmatch("end")) {
-            skiptoeol();
-            break;
-        }
-        switch (getval()) {
-        case WORD:
-            repl[rl++] = val & 0xff;
-            val >>= 8;
-        case BYTE:
-            repl[rl++] = val & 0xff;
-            break;
-        case ANY:
-            printf("ANY in replacement\n");
-            hit = 0;
-            break;
-        case UNK:
-            if (hit) {
-                printf("unknown value in replacement: hit cancelled");
-                hit = 0;
-            }
-            break;
-        }
-    }
+	rl = parsepat(repl);
 
     if (hit) {
         printf("\t%10s %04x %d\n", "replace", ad, rl);
@@ -497,10 +550,10 @@ replace()
     }
     for (i = 0; i < rl; i++) {
         if (verbose > 1) {
-            printf("%02x ", repl[i]);
+            printf("%02x ", repl[i].value);
             if ((i % 8) == 7) printf("\n");
         }
-        membuf[ad + i] = repl[i];
+        membuf[ad + i] = repl[i].value;
         dirty = 1;
     }
     if (verbose > 1) printf("\n");
@@ -559,11 +612,20 @@ patch()
          */
         while (*cursor && (*cursor == ' ' || *cursor == '\t')) cursor++;
 
+		if (wordmatch("missing")) {
+            fprintf(stderr, "patch for block %s missing\n", blockname);
+			exit(2);
+		}
+
         /* process included source: include[\t ]+ ["']filename["'] \n */
         if (wordmatch("include")) {
             char *incfile = malloc(100);
             char *ifn = incfile;
             int fd;
+
+			if (patchdir) {
+				ifn += sprintf(incfile, "%s/", patchdir);
+			}
 
             while (*cursor && (*cursor == ' ' || *cursor == '\t')) cursor++;
             i = *cursor;
@@ -619,7 +681,7 @@ patch()
 
         /* copy the rest of the line, compressing out redundant space */
         while (*cursor && *cursor != '\n') {
-            if (*cursor == ' ' || *cursor == '\t') *cursor = '\t';
+            if (*cursor == ' ' || *cursor == '\t') *cursor = ' ';
             *optr++ = *cursor++;
             if (optr[-1] == '\t') {
                 while ((*cursor == '\t') || (*cursor == ' ')) cursor++;
@@ -628,11 +690,11 @@ patch()
         *optr++ = '\n';
         *optr = '\0';
 
-        if (strncmp(s, "end\n", 4) == 0)
+        if (strncmp(s, "end", 3) == 0 && rindex(" \t\n\0", s[3]))
             break;
     }
 
-    if (verbose > 1) printf("asm text: %s\n", asmtext);
+    if (verbose > 1) printf("asm text:\n%s\n", asmtext);
     if (hit) {
         i = creat("asmtext.asm", 0777);
         write(i, asmtext, strlen(asmtext));
@@ -678,63 +740,39 @@ patch()
  * vast majority of our time. first, we snarf the entire match text into a 
  * buffer, where we do value substititions as needed.
  */
+
 void
 match()
 {
     char *anchor;
-    word *pat = malloc(MAX_PATTERN * 2);
-    int pl = 0;
+    struct pat *pat = malloc(sizeof (*pat) * MAX_PATTERN);
+    int pl;
     int i;
     word base;
     char *msg = "unanchored";
 
     anchor = get();
-    hit = 1;
     if (anchor[0]) {
         base = getaddr(anchor);
         msg = anchor;
-        if (base == 0xffff) {
-            msg = "invalid";
-        }
     } else {
         anchor = 0;
     }
 
     if (verbose) printf("match %s\n", msg);
 
-    /* read in the match block */
-    while (*cursor) {
-        skipwhite();
-        if (wordmatch("end")) {
-            skiptoeol();
-            break;
-        }
-        switch (getval()) {
-        case WORD:
-            pat[pl++] = val & 0xff;
-            val >>= 8;
-        case BYTE:
-            pat[pl++] = val & 0xff;
-            break;
-        case ANY:
-            pat[pl++] = 0xffff;
-            break;
-        case UNK:
-            hit = 0;
-        }
-    }
-
-    if (hit == 0 || base == 0xffff) {
-        if (verbose) printf("miss forced due to unknown values\n");
-        return;
-    }
+	pl = parsepat(pat);
 
     hit = 0;
 
     if (verbose > 1) {
         printf("checking match patlen %d\n", pl);
         for (i = 0; i < pl; i++) {
-            printf("%04x ", pat[i]);
+			if (pat[i].flags & ANY) {
+				printf("?? ");
+			} else {
+				printf("%02x ", pat[i].value);
+			}
             if ((i % 8) == 7) printf("\n");
         }
         printf("\n");
@@ -759,9 +797,7 @@ match()
     if (hit)
         printf("match\t%10s %04x\n", blockname, matchaddr);
     if (verbose > 1) {
-        if (hit) {
-            printf("hit at %04x\n", base);
-        } else {
+        if (!hit) {
             printf("miss\n");
         }
         printf("match end\n");
@@ -771,8 +807,8 @@ match()
 void
 block()
 {
-    word addr;
     blockname = get();
+	struct var *vp;
 
     if (!blockname[0]) {
         fprintf(stderr, "block must have a name\n");
@@ -787,12 +823,12 @@ block()
         if (wordmatch("match")) {
             match();
             if (hit) {
-                addr = getvar(blockname);
-                if (getvar(blockname) == 0xffff) {
+				vp = getvar(blockname);
+                if (!vp) {
                     putvar(blockname, matchaddr);
-                } else if (addr != matchaddr) {
+                } else if (vp->value != matchaddr) {
                     printf("block %s matchaddr %04x already %04x\n",
-                            blockname, matchaddr, addr);
+                            blockname, matchaddr, vp->value);
                 }
             } else {
                 if (verbose)
@@ -910,7 +946,12 @@ main(int argc, char **argv)
 
         for (s = ++*argv; *s; s++) switch (*s) {
             case 'v':
-                verbose++;
+				if (s[1]) {
+					verbose = atoi(&s[1]);
+					s = "v";
+				} else {
+					verbose++;
+				}
                 break;
             case 's':
                 sflag++;
@@ -945,6 +986,10 @@ main(int argc, char **argv)
     }
     patchbuf[i] = '\0';
 
+	if (rindex(patchfile, '/')) {
+		patchdir = strdup(patchfile);
+		*(char *)rindex(patchdir, '/') = '\0';
+	}
     while (argc--) {
         process(*argv++);
     }

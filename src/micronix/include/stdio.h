@@ -35,9 +35,6 @@ extern _exit (), exit ();
 #define	_TTY	0400	/* _fd corresponds to a tty */
 #define	_ALLOC  01000	/* buffer obtained through alloc */
 
-#define	NULL	0
-#define	EOF	(-1)
-
 #define	getc(p) (--(p)->_cnt >= 0 \
 			? *(p)->_ptr++ & 0377 : _fillbuf (p))
 
@@ -57,9 +54,6 @@ extern _exit (), exit ();
 
 #define	fflush(a)	(_flushbuf(EOF,(a)))
 
-#define YES 1
-#define NO  0
-
 #define isalpha(a) (isupper(a) || islower(a))
 #define isupper(a) ('A' <= (a) && (a) <= 'Z')
 #define islower(a) ('a' <= (a) && (a) <= 'z')
@@ -67,9 +61,6 @@ extern _exit (), exit ();
 #define isspace(a) ((a) == ' ' || (a) == '\t' || (a) == '\n')
 #define toupper(a) (islower(a) ? ((a) + 'A' - 'a') : (a))
 #define tolower(a) (isupper(a) ? ((a) + 'a' - 'A') : (a))
-
-#define min(a,b) ((a) < (b) ? (a) : (b))
-#define max(a,b) ((a) > (b) ? (a) : (b))
 
 /*
  * system parameters
