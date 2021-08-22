@@ -34,9 +34,9 @@
 block crt
 	match 0100
 		2a 06 00 f9
-		11 _Lbss			; 0x104 bss start
+		11 __Lbss			; 0x104 bss start
 		b7
-		21 _Hbss 			; 0x108 bss end
+		21 __Hbss 			; 0x108 bss end
 		ed 52 4d 44
 		0b 6b 62 13
 		36 00 ed b0
@@ -54,18 +54,23 @@ block crt
 		CALL _exit			; 0x137 _exit
 		JUMP 0000			; 0x13a warmboot
 	end
-	;
-	; nop-out the setting of the stack pointer, since this has been done
-	; by the exec() call
-	;
-	replace crt+0
-		00 00 00 00
-	end
+
 	;
 	; micronix gives us argc, argv, right on the stack.
 	; we don't need to grunge it out of the unparsed command tail at 0x80
 	;
-	patch crt+0x17
+	patch crt 61
+		ld		de,__Lbss
+		xor		a
+		ld		hl,__Hbss	
+		sbc		hl,de
+		ld		c,l
+		ld		b,h
+		dec		bc
+		ld		l,e
+		ld		h,d
+		inc		de
+		ld		(hl),a
 		pop		bc
 		ld		h,b
 		ld		l,c
@@ -80,7 +85,6 @@ block crt
 		pop		bc
 		push	hl
 		jp		_exit
-		ds		16,0		
 	end
 end
 
@@ -203,11 +207,10 @@ block __exit
 	;
 	; micronix exit simply uses the value in hl.
 	;
-	patch __exit
+	patch __exit 12
 		pop hl			; return address
 		pop hl			; exit code
 		db 0xcf, 01		; exit(hl)
-		ds	8,0
 	end
 end
 
@@ -464,29 +467,38 @@ end
 block _close
 	match
 		CALL csv 
-		e5 06 08 dd 7e 06 CALL brelop 
-		38 06 21 ff ff JUMP cret 
-		11 2a 00 dd 6e 06 26 00 CALL amul 
+		e5 06 08 dd 7e 06 
+		CALL brelop 
+		38 06 21 ff ff 
+		JUMP cret 
+		11 2a 00 dd 6e 06 26 00 
+		CALL amul 
 		11 __fcb 
-		19 e5 fd e1 CALL _getuid 
+		19 e5 fd e1 
+		CALL _getuid 
 		dd 75 ff fd 6e 29 26 00 e5 
 		CALL _setuid 
 		c1 fd 7e 28 fe 02 28 1d fe 
-		03 28 19 21 0c 00 e5 CALL _bdoshl 
+		03 28 19 21 0c 00 e5 
+		CALL _bdoshl 
 		c1 af 6f 7c e6 05 67 7d b4 
 		28 12 fd 7e 28 fe 01 20 0b 
-		fd e5 21 10 00 e5 CALL _bdos 
+		fd e5 21 10 00 e5 
+		CALL _bdos 
 		c1 c1 fd 36 28 00 dd 6e ff 
-		26 00 e5 CALL _setuid 
-		c1 21 00 00 JUMP cret 
+		26 00 e5 
+		CALL _setuid 
+		c1 21 00 00 
+		JUMP cret 
 	end
-	patch _close+20
+	; we simply call the micronix close with the fd in hl
+	patch _close 121
+		call	csv
 		ld		l,(IX+6)
 		ld		h,0
 		db		0xcf, 06
 		ld		hl,0
 		jp		cret
-		ds		88, 0
 	end
 end
 
@@ -517,51 +529,166 @@ block write
 	end
 end
 
-block read
+block _read
 	match
-		CALL ncsv
-		79 ff
-		dd 36 fb 00
-		dd 36 fc 00
-		06 08
-		dd 7e 06
-		CALL brelop
-		38 06
-		21 ff ff
-		JUMP cret
-		11 2a 00
-		dd 6e 06
-		26 00
-		CALL ANY ANY
-		11 fcb
-		19
-		e5
-		fd e1
+		CALL ncsv 
+		79 ff dd 36 fb 00 dd 36 fc 
+		00 06 08 dd 7e 06 
+		CALL brelop 
+		38 06 21 ff ff 
+		JUMP cret 
+		11 2a 00 dd 6e 06 26 00 
+		CALL amul 
+		11 __fcb 
+		19 e5 fd e1 fd 7e 28 
+		fe 01 ca ANY ANY 
+		fe 03 ca ANY ANY fe 
+		04 28 57 
+		fe 05 20 d3 
+		dd 6e 0a dd 66 0b 
+		dd 75 fb dd 74 fc 
+		dd 7e 0a dd b6 0b 
+		20 12 
+		dd 5e 0a dd 56 0b 
+		dd 6e fb dd 66 fc b7 ed 52 
+		JUMP cret 
+		dd 6e 0a dd 66 0b 2b 
+		dd 75 0a dd 74 0b 
+		21 03 00 e5 
+		CALL _bdos 
+		c1 7d e6 7f 
+		dd 6e 08 dd 66 09 23 
+		dd 75 08 dd 74 09 2b 
+		77 fe 0a 20 bb 18 c1 
+		dd 5e 0a dd 56 0b 21 80 00 
+		CALL wrelop 
+		30 08 dd 36 0a 80 dd 36 0b 
+		00 dd 7e 0a dd e5 d1 21 79 
+		ff 19 77 dd e5 d1 21 79 ff 
+		19 e5 21 0a 00 e5 
+		CALL _bdos 
+		c1 c1 dd e5 d1 21 7a ff 19 
+		6e 26 00 dd 75 fb dd 74 fc 
+		dd 5e 0a dd 56 0b dd 66 fc 
+		CALL wrelop 
+		30 2c 21 0a 00 e5 21 02 00 
+		e5 
+		CALL _bdos 
+		c1 c1 dd e5 d1 dd 6e fb dd 
+		66 fc 23 23 19 11 79 ff 19 
+		36 0a dd 6e fb dd 66 fc 23 
+		dd 75 fb dd 74 fc dd 6e fb 
+		dd 66 fc e5 dd 6e 08 dd 66 
+		09 e5 dd e5 d1 21 7b ff 19 
+		e5 
+		CALL _bmove 
+		c1 c1 c1 dd 6e fb dd 66 fc 
+		JUMP cret 
+		CALL _getuid 
+		5d dd 73 fd dd 6e 0a dd 66 
+		0b dd 75 fb dd 74 fc 
+		c3 ANY ANY 
+		CALL __sigchk 
+		fd 6e 29 26 00 e5 
+		CALL _setuid 
+		c1 fd 7e 24 e6 7f dd 77 fe 
+		5f 16 00 21 80 00 b7 ed 52 
+		dd 75 ff 5d dd 6e 0a dd 66 
+		0b 
+		CALL wrelop 
+		30 06 
+		dd 7e 0a dd 77 ff 
+		11 80 00 21 00 00 e5 d5 
+		fd 5e 24 fd 56 25 
+		fd 6e 26 fd 66 27 
+		CALL aldiv 
+		e5 d5 fd e5 d1 21 21 00 19 
+		e5 
+		CALL __putrno 
+		c1 c1 c1 dd 7e ff fe 80 20 
+		22 dd 6e 08 dd 66 09 e5 21 
+		1a 00 e5 
+		CALL _bdos 
+		c1 c1 fd e5 21 21 00 e5 
+		CALL _bdos 
+		c1 c1 7d b7 28 44 
+		c3 ANY ANY 
+		dd e5 d1 21 79 ff 19 e5 21 
+		1a 00 e5 
+		CALL _bdos 
+		c1 c1 fd e5 21 21 00 e5 
+		CALL _bdos 
+		c1 c1 7d b7 20 6a dd 6e ff 
+		26 00 e5 dd 6e 08 dd 66 09 
+		e5 dd e5 d1 dd 6e fe 26 00 
+		19 11 79 ff 19 e5 
+		CALL _bmove 
+		c1 c1 c1 dd 5e ff 16 00 dd 
+		6e 08 dd 66 09 19 dd 75 08 
+		dd 74 09 7b 21 00 00 55 e5 
+		d5 fd e5 d1 21 24 00 19 
+		CALL asaladd 
+		dd 5e ff 16 00 dd 6e 0a dd 
+		66 0b b7 ed 52 dd 75 0a dd 
+		74 0b dd 6e fd 62 e5 
+		CALL _setuid 
+		c1 dd 7e 0a dd b6 0b c2 ANY 
+		ANY dd 6e fd 26 00 e5 CALL _setuid 
+		c1 
+		c3 ANY ANY 
 	end
-	patch read
+	patch read 616
 		include read.asm
 	end
 end
 
-block open
+;
+; open the file, the cp/m version builds an fcb and so on
+; open.obj
+;
+block _open
 	match
-		CALL csv
-		e5
-		dd 5e 08
-		dd 56 09
-		13
-		dd 73 08
-		dd 72 09
-		21 03 00
-		CALL ANY ANY
-		f2 ANY ANY
-		dd 36 08 03
-		dd 36 09 00
-		CALL ANY ANY
-		e5
-		fd e1
+		CALL csv 
+		e5 dd 5e 08 dd 56 09 13 dd 
+		73 08 dd 72 09 
+		21 03 00 
+		CALL wrelop 
+		f2 ANY ANY dd 36 08 03 dd 36 
+		09 00 
+		CALL _getfcb 
+		e5 fd e1 7d b4 20 06 21 ff 
+		ff 
+		JUMP cret 
+		dd 6e 06 dd 66 07 e5 fd e5 
+		CALL _setfcb 
+		c1 c1 7d b7 20 68 11 01 00 
+		dd 6e 08 dd 66 09 b7 ed 52 
+		20 19 21 0c 00 e5 
+		CALL _bdos 
+		c1 7d 06 30 
+		CALL brelop 
+		fa ANY ANY fd 7e 06 f6 80 fd 
+		77 06 
+		CALL _getuid 
+		dd 75 ff fd 6e 29 26 00 e5 
+		CALL _setuid 
+		c1 fd e5 21 0f 00 e5 
+		CALL _bdos 
+		c1 c1 7d fe ff 20 11 fd e5 
+		CALL _putfcb 
+		dd 6e ff 26 00 e3 
+		CALL _setuid 
+		c1 18 90 dd 6e ff 26 00 e5 
+		CALL _setuid 
+		c1 dd 7e 08 fd 77 28 11 __fcb 
+		fd e5 e1 b7 ed 52 11 2a 00 
+		CALL adiv 
+		JUMP cret 
 	end
-	patch open
+	;
+	; the micronix version is truly simple.
+	;
+	patch _open 190
 		ld		hl, 5
 		add 	hl, sp
 		ld		d,(hl)
@@ -583,50 +710,66 @@ sys_open:
 	end
 end
 
-block unlink
+;
+; remove a file
+; unlink.obj
+;
+block _unlink
 	match
-	CALL ncsv
-	d3 ff
-	dd 6e 06
-	dd 66 07
-	e5
-	dd e5
-	d1
-	21 d6 ff
-	19
-	e5
-	CALL ANY ANY
-	c1
-	c1
-	7d
-	b7
-	28 06
-	21 00 00
-	JUMP cret
+		CALL ncsv 
+		d3 ff dd 6e 06 dd 66 07 e5 
+		dd e5 d1 21 d6 ff 19 e5 
+		CALL _setfcb 
+		c1 c1 7d b7 28 06 21 00 00 
+		JUMP cret 
+		CALL _getuid 
+		dd 75 d5 dd 6e ff 26 00 e5 
+		CALL _setuid 
+		dd e5 d1 21 d6 ff 19 e3 21 
+		13 00 e5 
+		CALL _bdos 
+		c1 7d 17 9f 67 dd 75 d3 dd 
+		74 d4 dd 6e d5 26 00 e3 
+		CALL _setuid 
+		c1 dd 6e d3 dd 66 d4 
+		JUMP cret 
 	end
 end
 
-block creat
+;
+; make a new file
+; creat.obj
+;
+block _creat
 	match
-		CALL csv
-		e5
-		CALL ANY ANY
-		e5
-		fd e1
-		7d
-		b4
-		20 06
-		21 ff ff
-		JUMP cret
-		CALL ANY ANY
-		dd 75 ff
-		dd 6e 06
-		dd 66 07
-		e5
-		fd e5
-		CALL ANY ANY
+		CALL csv 
+		e5 cd _getfcb 
+		e5 fd e1 7d b4 20 06 21 ff 
+		ff 
+		JUMP cret 
+		CALL _getuid 
+		dd 75 ff dd 6e 06 dd 66 07 
+		e5 fd e5
+		CALL _setfcb 
+		c1 c1 7d b7 20 3c dd 6e 06 
+		dd 66 07 e5 
+		CALL _unlink 
+		fd 6e 29 26 00 e3 
+		CALL _setuid 
+		c1 fd e5 21 16 00 e5 
+		CALL _bdos 
+		c1 c1 7d fe ff dd 6e ff 26 
+		00 e5 20 0a 
+		CALL _setuid 
+		c1 fd 36 28 00 18 ae 
+		CALL _setuid 
+		c1 fd 36 28 02 11 __fcb 
+		fd e5 e1 b7 ed 52 11 2a 00 
+		CALL adiv 
+		JUMP cret 
+
 	end
-	patch creat
+	patch _creat
 		ld hl,0x5
 		add hl,sp
 		ld d,(hl)
