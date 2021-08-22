@@ -55,7 +55,6 @@ static void emulate();
 #define	DEFROOT	"filesystem"
 
 int traceflags;
-int savemode;
 int debug_terminal;
 int am_root = 1;
 int rootpid;
@@ -353,6 +352,19 @@ get_syscall(char **sp)
     }
     return strtol(*sp, sp, 0);
 }
+void
+pverbose()
+{
+    int i;
+
+    fprintf(mytty, "verbose %x ", verbose);
+    for (i = 0; vopts[i]; i++) {
+        if (verbose & (1 << i)) {
+            fprintf(mytty, "%s ", vopts[i]);
+        }
+    }
+    fprintf(mytty, "\n");
+}
 
 int
 main(int argc, char **argv)
@@ -542,13 +554,7 @@ main(int argc, char **argv)
         rootinode = sbuf.st_ino;
     }
     if (verbose) {
-        fprintf(mytty, "verbose %x ", verbose);
-        for (i = 0; vopts[i]; i++) {
-            if (verbose & (1 << i)) {
-                fprintf(mytty, "%s ", vopts[i]);
-            }
-        }
-        fprintf(mytty, "\n");
+        pverbose();
         fprintf(mytty, "emulating %s with root %s\n", argv[0], rootdir);
     }
 
@@ -1026,6 +1032,15 @@ monitor()
             s++;
         head = &breaks;
         switch (c) {
+        case 'v':
+            while (*s && (*s == ' '))
+                s++;
+            if (*s) {
+                verbose = strtol(s, &s, 16);
+                pverbose();
+            }
+            break;
+ 
         case 'c':
             c = 1;
             while (*s && (*s == ' '))
@@ -1175,6 +1190,7 @@ monitor()
             fprintf(mytty, "b [-] <nnnn> ... :breakpoint\n");
             fprintf(mytty, "w [-] <nnnn> ... :watchpoint\n");
             fprintf(mytty, "c [-] <nn> :system call trace\n");
+            fprintf(mytty, "v <nn> :set verbose\n");
             break;
         default:
             fprintf(mytty, "unknown command %c\n", c);
@@ -1689,10 +1705,10 @@ SystemCall(MACHINE * cp)
     struct statb *ip;
     struct dirfd *df;
     char **argvec;
-    int stopnow;
+    int savemode;
     struct syscall *sp;
 
-    stopnow = verbose;
+    savemode = verbose;
 
     if (verbose & V_SYS0) {
         pid();
@@ -1747,13 +1763,17 @@ SystemCall(MACHINE * cp)
     /*
      * if this is a system call we are interested in, deal with it 
      */
-    if (sys_trace[code] || sys_stop[code]) {
+    if (sys_stop[code]) {
         pid();
         dumpcpu();
         verbose = -1;
-        if (sys_stop[code]) {
-            breakpoint = 1;
+        if (--sys_stop[code] == 0) {
+                breakpoint = 1;
         }
+    } else if (sys_trace[code]) {
+        pid();
+        dumpcpu();
+        verbose = -1;
     }
 
     sp = &syscalls[code];
@@ -2497,7 +2517,7 @@ SystemCall(MACHINE * cp)
     }
     cp->state.pc = pop();
     cp->state.status = 0;
-    verbose = stopnow;
+    verbose = savemode;
     if ((verbose & V_SYS) && (cp->state.registers.word[Z80_HL] == 0xffff)) {
         fprintf(mytty, "code = %d\n", code);
         dumpcpu();
