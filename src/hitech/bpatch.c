@@ -36,7 +36,7 @@
  *   end
  *   extract <address> <variable name>
  *   ...
- *   patch <address>
+ *   patch <address> [<fill length]
  *     include <filename>
  *     <assembly code>    [ ; comment ] 
  *	 end
@@ -181,6 +181,10 @@ wordat(word addr)
     return membuf[addr] + (membuf[addr + 1] << 8);
 }
 
+/*
+ * copy the next token to getbuf, returning the pointer.
+ * leave the cursor after the next hunk of horizontal white space
+ */
 char *
 get()
 {
@@ -196,6 +200,10 @@ get()
         *s++ = *cursor++;
         *s = '\0';
     }
+
+    while (*cursor && (*cursor == ' ' || *cursor == '\t'))
+        cursor++;
+
     return getbuf;
 }
 
@@ -574,6 +582,7 @@ patch()
     char *asmtext;
     char *optr;
     struct var *v;
+	int fill = 0;
 
     asmtext = optr = malloc(MAX_PATCH);
 
@@ -583,7 +592,10 @@ patch()
     } else {
         ad = 0;
     }
-
+	if (*cursor != '\n') {
+		fill = atoi(get());
+	}
+	
     /*
      * build the assembly prologue:
      * send all our defined variables to the assembly as equates
@@ -714,7 +726,7 @@ patch()
     }
 
     if (hit)
-        printf("\t%10s %04x %d\n", "patch", ad, rl);
+        printf("patch %04x %d fill %d\n", ad, rl, fill);
 
     if (verbose > 1) {
         printf("replacement bytes %d\n", rl);
@@ -729,6 +741,15 @@ patch()
             dirty = 1;
         }
     }
+	while (i < fill) {
+        if (verbose > 1) {
+            printf("%02x ", 0);
+            if ((i % 8) == 7) printf("\n");
+        }
+		membuf[ad + i] = 0;
+		i++;
+	}
+
     if (verbose > 1) printf("\n");
 
     if (verbose > 1) printf("patch end\n");
@@ -759,7 +780,7 @@ match()
         anchor = 0;
     }
 
-    if (verbose) printf("match %s\n", msg);
+    if (verbose > 1) printf("match %s\n", msg);
 
 	pl = parsepat(pat);
 
@@ -795,7 +816,8 @@ match()
         }
     }
     if (hit)
-        printf("match\t%10s %04x\n", blockname, matchaddr);
+        printf("hit %04x for %d\n", matchaddr, pl);
+
     if (verbose > 1) {
         if (!hit) {
             printf("miss\n");
@@ -831,7 +853,7 @@ block()
                             blockname, matchaddr, vp->value);
                 }
             } else {
-                if (verbose)
+                if (verbose > 1)
                     printf("block %s miss\n", blockname);
             }
         }
