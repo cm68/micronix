@@ -58,7 +58,7 @@ block crt
 	;
 	; micronix gives us argc, argv, right on the stack.
 	; we don't need to grunge it out of the unparsed command tail at 0x80
-	;
+
 	patch crt 61
 		ld		de,__Lbss
 		xor		a
@@ -275,6 +275,98 @@ block _exit
 		22 0080
 		CALL 0000
 		JUMP cret
+	end
+end
+
+;
+; open the file, the cp/m version builds an fcb and so on
+; open.obj
+;
+block _open
+	match
+		CALL csv 
+		e5 dd 5e 08 dd 56 09 13 dd 
+		73 08 dd 72 09 
+		21 03 00 
+		CALL wrelop 
+		f2 ANY ANY dd 36 08 03 dd 36 
+		09 00 
+		CALL _getfcb 
+		e5 fd e1 7d b4 20 06 21 ff 
+		ff 
+		JUMP cret 
+		dd 6e 06 dd 66 07 e5 fd e5 
+		CALL _setfcb 
+		c1 c1 7d b7 20 68 11 01 00 
+		dd 6e 08 dd 66 09 b7 ed 52 
+		20 19 21 0c 00 e5 
+		CALL _bdos 
+		c1 7d 06 30 
+		CALL brelop 
+		fa ANY ANY fd 7e 06 f6 80 fd 
+		77 06 
+		CALL _getuid 
+		dd 75 ff fd 6e 29 26 00 e5 
+		CALL _setuid 
+		c1 fd e5 21 0f 00 e5 
+		CALL _bdos 
+		c1 c1 7d fe ff 20 11 fd e5 
+		CALL _putfcb 
+		dd 6e ff 26 00 e3 
+		CALL _setuid 
+		c1 18 90 dd 6e ff 26 00 e5 
+		CALL _setuid 
+		c1 dd 7e 08 fd 77 28 11 __fcb 
+		fd e5 e1 b7 ed 52 11 2a 00 
+		CALL adiv 
+		JUMP cret 
+	end
+	;
+	; the micronix version is truly simple.
+	; this is a boon, since we use the space after the new open code
+	; to contain some worker subroutines.
+	;
+	patch _open 190
+		ld		hl, 5
+		add 	hl, sp
+		ld		d,(hl)
+		dec		hl
+		ld		e,(hl)
+		dec		hl
+		ld		(sys_open+4),de
+		ld		d,(hl)
+		dec		hl
+		ld		e,(hl)
+		dec		hl
+		ld		(sys_open+2),de
+sys_open:
+		db		0xcf, 05, 00, 00, 00, 00
+		ret		nc
+		ld		hl,0xffff
+		ret
+		ds		159,0	
+	end
+	define fcbcalc _open+32
+	;
+	; given the file number in a, return the fcb in hl
+	;
+	patch fcbcalc
+		ld		de,__fcb
+		ld		l,a
+		ld		h,0
+		add		hl,hl
+		ex		de,hl
+		add		hl,de
+		ex		de,hl
+		add		hl,hl
+		add		hl,hl
+		ex		de,hl
+		add		hl,de
+		ex		de,hl
+		add		hl,hl
+		add		hl,hl
+		add		hl,de
+		ret
 	end
 end
 
@@ -502,7 +594,7 @@ block _close
 	end
 end
 
-block write
+block _write
 	match
 		CALL ncsv
 		79 ff
@@ -524,7 +616,7 @@ block write
 	; returns carry clear on good, byte count in hl
 	; errno in hl.
 	;
-	patch write
+	patch _write
 		include	write.asm
 	end
 end
@@ -637,76 +729,8 @@ block _read
 		c1 
 		c3 ANY ANY 
 	end
-	patch read 616
+	patch _read 616
 		include read.asm
-	end
-end
-
-;
-; open the file, the cp/m version builds an fcb and so on
-; open.obj
-;
-block _open
-	match
-		CALL csv 
-		e5 dd 5e 08 dd 56 09 13 dd 
-		73 08 dd 72 09 
-		21 03 00 
-		CALL wrelop 
-		f2 ANY ANY dd 36 08 03 dd 36 
-		09 00 
-		CALL _getfcb 
-		e5 fd e1 7d b4 20 06 21 ff 
-		ff 
-		JUMP cret 
-		dd 6e 06 dd 66 07 e5 fd e5 
-		CALL _setfcb 
-		c1 c1 7d b7 20 68 11 01 00 
-		dd 6e 08 dd 66 09 b7 ed 52 
-		20 19 21 0c 00 e5 
-		CALL _bdos 
-		c1 7d 06 30 
-		CALL brelop 
-		fa ANY ANY fd 7e 06 f6 80 fd 
-		77 06 
-		CALL _getuid 
-		dd 75 ff fd 6e 29 26 00 e5 
-		CALL _setuid 
-		c1 fd e5 21 0f 00 e5 
-		CALL _bdos 
-		c1 c1 7d fe ff 20 11 fd e5 
-		CALL _putfcb 
-		dd 6e ff 26 00 e3 
-		CALL _setuid 
-		c1 18 90 dd 6e ff 26 00 e5 
-		CALL _setuid 
-		c1 dd 7e 08 fd 77 28 11 __fcb 
-		fd e5 e1 b7 ed 52 11 2a 00 
-		CALL adiv 
-		JUMP cret 
-	end
-	;
-	; the micronix version is truly simple.
-	;
-	patch _open 190
-		ld		hl, 5
-		add 	hl, sp
-		ld		d,(hl)
-		dec		hl
-		ld		e,(hl)
-		dec		hl
-		ld		(sys_open+4),de
-		ld		d,(hl)
-		dec		hl
-		ld		e,(hl)
-		dec		hl
-		ld		(sys_open+2),de
-sys_open:
-		db		0xcf, 05, 00, 00, 00, 00
-		ret		nc
-		ld		hl,0xffff
-		ret
-		ds		159,0	
 	end
 end
 
