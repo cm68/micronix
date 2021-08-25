@@ -3,7 +3,7 @@
 # compiler, assembler, linker and tools to micronix
 #
 
-VERBOSITY = -v
+VERBOSE = -v
 HITECH = cpp p1 cgen optim link libr zas
 
 CFLAGS = -Wno-implicit-int
@@ -15,7 +15,7 @@ bpatch: bpatch.c
 	cc -g $(CFLAGS) -o $@ $<
 
 %: %.com hitech.pat bpatch
-	./bpatch $(VERBOSITY) -p hitech.pat $<
+	./bpatch $(VERBOSE) -p hitech.pat $<
 
 %.dis: %.com hitech.pat bpatch
 	./bpatch -p hitech.pat $<

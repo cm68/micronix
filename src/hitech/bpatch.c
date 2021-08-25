@@ -34,6 +34,7 @@
  *   match [<address>]
  *     <pattern bytes>	  [ ; comment ]
  *   end
+ *   define  <variable name> <variable>[+|-]<offset>
  *   extract <address> <variable name>
  *   ...
  *   patch <address> [<fill length]
@@ -76,6 +77,12 @@ char *pname;
 int sflag;
 int verbose;
 int pf;
+#define	V_PARSE		1
+#define	V_VAR		2
+#define	V_DATA		4
+#define	V_MATCH		8
+#define	V_LOW		16
+#define	V_CHANGES	32
 
 typedef unsigned short word;
 
@@ -85,10 +92,18 @@ int objsize;
 char patchbuf[65536]; /* patch text */
 char *cursor; /* pointer into patch text */
 
-int hit; /* state of most recent match */
 word matchaddr;
 int dirty;
 char *blockname;
+
+/*
+ * a block can have several match blocks and several patch/replace blocks.
+ * a block hits only if ALL match blocks hit.
+ */
+int blockstart;
+int blockend;
+int blockhit;
+int blockdirty;
 
 /*
  * pattern array is parsed into this.
@@ -104,6 +119,8 @@ struct pat {
 #define	BYTE	4
 #define	WORD	8
 };
+
+#define	max(a,b) ((a) > (b) ? (a) : (b))
 
 usage(char c)
 {
@@ -123,7 +140,7 @@ struct var {
     char *name;
     word value;
     struct var *next;
-} *vars;
+} *vars, *varq;
 
 char namebuf[20];
 
@@ -156,7 +173,7 @@ putvar(char *n, word new)
 {
     struct var *v;
 
-    if (verbose > 1) printf("putvar: %s %04x\n", n, new);
+    if (verbose & V_VAR) printf("putvar: %s %04x\n", n, new);
 
     for (v = vars; v; v = v->next) {
         if (strcmp(n, v->name) == 0) {
@@ -174,6 +191,46 @@ putvar(char *n, word new)
     v->next = vars;
     vars = v;
 }
+
+void
+queuevar(char *n, word new)
+{
+    struct var *v;
+
+    if (verbose & V_VAR) printf("queuevar: %s %04x\n", n, new);
+
+    for (v = varq; v; v = v->next) {
+        if (strcmp(n, v->name) == 0) {
+            if (v->value != new) {
+                printf("queuevar: name %s already present value %x new %x\n",
+                        n, v->value, new);
+                v->value = new;
+            }
+            return;
+        }
+    }
+    v = malloc(sizeof (*v));
+    v->name = strdup(n);
+    v->value = new;
+    v->next = varq;
+    varq = v;
+}
+
+void
+do_queue(int hit)
+{
+	struct var *v;
+
+	while (v = varq) {
+		varq = v->next;
+		if (hit) {
+			putvar(v->name, v->value);
+		}
+		free(v->name);
+		free(v);
+	}
+}
+
 
 word
 wordat(word addr)
@@ -330,7 +387,7 @@ getaddr(char *in)
     char sign = 1;
 	struct var *varp;
 
-    if (verbose > 1) printf("getaddr %s", in);
+    if (verbose & V_VAR) printf("getaddr %s", in);
 
     if ((s = index(in, '+')) != 0) {
         *s++ = '\0';
@@ -346,7 +403,7 @@ getaddr(char *in)
 		if (varp) {
 			v = varp->value;
 		} else {
-			if (verbose > 1) {
+			if (verbose & V_VAR) {
 				printf("variable %s not set\n", in);
 			}
 		}
@@ -362,12 +419,12 @@ getaddr(char *in)
         }
         o *= sign;
     }
-    if (verbose > 1) printf(" = %04x\n", v + o);
+    if (verbose & V_VAR) printf(" = %04x\n", v + o);
     return v + o;
 }
 
 /*
- * if a pattern exactly matches at base, then return a hit and extract
+ * if a pattern exactly matches at base, then return a hit
  * variables
  */
 int
@@ -380,7 +437,7 @@ patmatch(struct pat *pat, int pl, word base)
     for (i = 0; i < pl; i++) {
         if (pat[i].flags & ANY) continue;
         if (pat[i].value == membuf[base + i]) continue;
-        if ((verbose > 1) && (i > 4)) {
+        if ((verbose & V_MATCH) && (i > 4)) {
             printf("miscompare at index %d: %04x wanted %02x got %02x\n",
                     i, base + i, pat[i].value, membuf[base + i]);
         }
@@ -388,28 +445,10 @@ patmatch(struct pat *pat, int pl, word base)
     }
     matchaddr = base;
 
-	if (verbose > 1) {
-		printf(">>>>>>> hit at %04x <<<<<<<\n", base);
+	if (verbose & V_MATCH) {
+		printf("hit at %04x", base);
     }
-	if (!hit) {
 
-		/* let's extract variables only on the first hit */
-		for (i = 0; i < pl; i++) {
-			int ext;
-			if (pat[i].flags & EXTRACT) {
-				if (verbose > 4) {
-					printf("extract [%d]: %s %d %d\n", 
-						i, pat[i].name, pat[i].value, pat[i].flags);
-				}
-				if (pat[i].flags & BYTE) {
-					ext = membuf[base + i];
-				} else {
-					ext += membuf[base + i] << 8;
-					putvar(pat[i].name, ext);
-				}
-			}
-		}
-	}
     return 1;
 }
 
@@ -424,11 +463,11 @@ extract()
     word v;
     char *aa;
 
-    if (!hit) {
+    if (!blockhit) {
         skiptoeol();
         return;
     }
-    if (verbose > 1) printf("extract\n");
+    if (verbose) printf("extract\n");
 
     a = get();
     aa = strdup(a);
@@ -440,6 +479,31 @@ extract()
     a = get();
     printf("\t%10s %04x (%s:%04x)\n", a, v, aa, ad);
     putvar(a, v);
+    skiptoeol();
+}
+
+/*
+ * define name expression
+ */
+void
+defvar()
+{
+    char *a;
+    word ad;
+    word v;
+    char *aa;
+	char *varname;
+
+    if (!blockhit) {
+        skiptoeol();
+        return;
+    }
+	varname = strdup(get());
+
+    ad = getaddr(get());
+
+    if (verbose) printf("define %10s %04x\n", varname, ad);
+    putvar(varname, ad);
     skiptoeol();
 }
 
@@ -470,7 +534,7 @@ parsepat(struct pat *p)
 		val = hexin(t);
 		n = 0;
 		f = 0;
-		if (verbose > 4) {
+		if (verbose & V_LOW) {
 			printf("%s\n", t);
 		}
 
@@ -537,34 +601,29 @@ replace()
     int i;
 
     a = get();
-    if (hit) {
+    if (blockhit) {
         ad = getaddr(strdup(a));
     } else {
         ad = 0;
     }
 
-    if (verbose > 1) printf("replace %s(%04x)\n", a, ad);
+    if (verbose) printf("replace %s(%04x)\n", a, ad);
 
 	rl = parsepat(repl);
 
-    if (hit) {
+    if (blockhit) {
         printf("\t%10s %04x %d\n", "replace", ad, rl);
     } else {
         return;
     }
+	if (blockend < ad + rl) {
+		blockend = ad + rl;
+	}
 
-    if (verbose > 1) {
-        printf("replacement bytes %d\n", rl);
-    }
     for (i = 0; i < rl; i++) {
-        if (verbose > 1) {
-            printf("%02x ", repl[i].value);
-            if ((i % 8) == 7) printf("\n");
-        }
         membuf[ad + i] = repl[i].value;
-        dirty = 1;
+		blockdirty = dirty = 1;
     }
-    if (verbose > 1) printf("\n");
 }
 
 /*
@@ -584,10 +643,12 @@ patch()
     struct var *v;
 	int fill = 0;
 
+    if (verbose) printf("patch\n");
+
     asmtext = optr = malloc(MAX_PATCH);
 
     a = get();
-    if (hit) {
+    if (blockhit) {
         ad = getaddr(strdup(a));
     } else {
         ad = 0;
@@ -600,7 +661,7 @@ patch()
      * build the assembly prologue:
      * send all our defined variables to the assembly as equates
      */
-    if (hit) {
+    if (blockhit) {
         for (v = vars; v; v = v->next) {
             optr += sprintf(optr, "%s\tequ\t0x%04x\n", v->name, v->value);
         }
@@ -706,8 +767,8 @@ patch()
             break;
     }
 
-    if (verbose > 1) printf("asm text:\n%s\n", asmtext);
-    if (hit) {
+    if (verbose & V_DATA) printf("asm text:\n%s\n", asmtext);
+    if (blockhit) {
         i = creat("asmtext.asm", 0777);
         write(i, asmtext, strlen(asmtext));
         close(i);
@@ -719,40 +780,27 @@ patch()
         i = open("asmtext.cim", 0);
         rl = read(i, repl, MAX_PATTERN);
         close(i);
-        if (verbose > 1) {
+        if (verbose) {
             unlink("asmtext.cim");
             unlink("asmtext.asm");
         }
     }
 
-    if (hit)
+    if (blockhit) {
+		if (blockend < ad + fill) {
+			blockend = ad + fill;
+		}
         printf("patch %04x %d fill %d\n", ad, rl, fill);
+        blockdirty = dirty = 1;
 
-    if (verbose > 1) {
-        printf("replacement bytes %d\n", rl);
-    }
-    for (i = 0; i < rl; i++) {
-        if (verbose > 1) {
-            printf("%02x ", repl[i]);
-            if ((i % 8) == 7) printf("\n");
-        }
-        if (hit) {
-            membuf[ad + i] = repl[i];
-            dirty = 1;
-        }
-    }
-	while (i < fill) {
-        if (verbose > 1) {
-            printf("%02x ", 0);
-            if ((i % 8) == 7) printf("\n");
-        }
-		membuf[ad + i] = 0;
-		i++;
+		for (i = 0 ; i < fill; i++) {
+			membuf[ad + i] = 0;
+		}
+		for (i = 0; i < rl; i++) {
+			membuf[ad + i] = repl[i];
+		}
 	}
-
-    if (verbose > 1) printf("\n");
-
-    if (verbose > 1) printf("patch end\n");
+    if (verbose) printf("patch end\n");
 }
 
 /*
@@ -762,7 +810,7 @@ patch()
  * buffer, where we do value substititions as needed.
  */
 
-void
+int
 match()
 {
     char *anchor;
@@ -771,6 +819,7 @@ match()
     int i;
     word base;
     char *msg = "unanchored";
+	int hit = 0;
 
     anchor = get();
     if (anchor[0]) {
@@ -780,13 +829,11 @@ match()
         anchor = 0;
     }
 
-    if (verbose > 1) printf("match %s\n", msg);
+    if (verbose) printf("match %s\n", msg);
 
 	pl = parsepat(pat);
 
-    hit = 0;
-
-    if (verbose > 1) {
+    if (verbose & V_DATA) {
         printf("checking match patlen %d\n", pl);
         for (i = 0; i < pl; i++) {
 			if (pat[i].flags & ANY) {
@@ -815,15 +862,30 @@ match()
             }
         }
     }
-    if (hit)
-        printf("hit %04x for %d\n", matchaddr, pl);
 
-    if (verbose > 1) {
-        if (!hit) {
-            printf("miss\n");
-        }
-        printf("match end\n");
-    }
+	if (hit) {
+		if (blockstart == 0) {
+			blockstart = matchaddr;
+		}
+		blockend = matchaddr + pl;
+
+		for (i = 0; i < pl; i++) {
+			int ext;
+			if (pat[i].flags & EXTRACT) {
+				if (verbose & V_VAR) {
+					printf("extract [%d]: %s %d %d\n", 
+						i, pat[i].name, pat[i].value, pat[i].flags);
+				}
+				if (pat[i].flags & BYTE) {
+					ext = membuf[base + i];
+				} else {
+					ext += membuf[base + i] << 8;
+					queuevar(pat[i].name, ext);
+				}
+			}
+		}
+	}
+	return hit;
 }
 
 void
@@ -831,6 +893,7 @@ block()
 {
     blockname = get();
 	struct var *vp;
+	int matchcount;
 
     if (!blockname[0]) {
         fprintf(stderr, "block must have a name\n");
@@ -839,24 +902,44 @@ block()
     if (verbose) printf("\nblock %s\n", blockname);
     blockname = strdup(blockname);
 
+	blockstart = 0;
+	blockend = 0;
+    blockhit = 0;
+	blockdirty = 0;
+
+	varq = 0;
+	matchcount = 0;
+
     skiptoeol();
     while (*cursor) {
         skipwhite();
         if (wordmatch("match")) {
-            match();
-            if (hit) {
-				vp = getvar(blockname);
-                if (!vp) {
-                    putvar(blockname, matchaddr);
-                } else if (vp->value != matchaddr) {
-                    printf("block %s matchaddr %04x already %04x\n",
-                            blockname, matchaddr, vp->value);
-                }
+			matchcount++;
+            if (match()) {
+				if (matchcount == 1) {
+					vp = getvar(blockname);
+					if (!vp) {
+						putvar(blockname, matchaddr);
+					} else if (vp->value != matchaddr) {
+						printf("block %s matchaddr %04x already %04x\n",
+								blockname, matchaddr, vp->value);
+					}
+				}
+				blockhit = 1;
             } else {
-                if (verbose > 1)
+                if (verbose & V_MATCH)
                     printf("block %s miss\n", blockname);
+				blockhit = 0;
             }
-        }
+        } else {
+			if (verbose && blockhit) {
+                    printf("block %s hit at 0x%04x\n", blockname, blockstart);
+			}
+			do_queue(blockhit);
+		}
+		if (wordmatch("define")) {
+			defvar();
+		}
         if (wordmatch("extract")) {
             extract();
         }
@@ -871,7 +954,19 @@ block()
             break;
         }
     }
-    if (verbose > 1) printf("block end\n");
+	if (blockhit && blockdirty && (verbose & V_CHANGES)) {
+		int i;
+
+		printf("block data from %x to %x (%d)\n", 
+			blockstart, blockend, blockend - blockstart);
+
+        for (i = 0; i < blockend - blockstart; i++) {
+			printf("%02x ", membuf[blockstart + i]);
+            if ((i % 8) == 7) printf("\n");
+        }
+        printf("\n");
+	}
+    if (verbose) printf("block end\n");
 }
 
 void
@@ -969,7 +1064,7 @@ main(int argc, char **argv)
         for (s = ++*argv; *s; s++) switch (*s) {
             case 'v':
 				if (s[1]) {
-					verbose = atoi(&s[1]);
+					verbose = strtol(&s[1], 0, 0);
 					s = "v";
 				} else {
 					verbose++;
@@ -993,8 +1088,8 @@ main(int argc, char **argv)
         argc--;
     }
 
-    if (verbose > 1)
-        printf("using patch: %s\n", patchfile);
+    if (verbose)
+        printf("using patch: %s verbose: %x\n", patchfile, verbose);
 
     pf = open(patchfile, 0);
     if (pf < 0) {
