@@ -86,6 +86,13 @@ block crt
 		push	hl
 		jp		_exit
 	end
+	;
+	; make a dummy function that is guaranteed to breakpoint
+	;
+	define lose crt+40
+	patch lose
+		call 0005
+	end
 end
 
 ;
@@ -394,6 +401,9 @@ block _fclose
 		fd cb 06 6e 20 b3 21 00 00 
 		JUMP cret 
 	end
+	patch
+		call lose
+	end
 end
 
 ;
@@ -559,25 +569,36 @@ end
 block _close
 	match
 		CALL csv 
-		e5 06 08 dd 7e 06 
+		e5 06 08 
+		dd 7e 06 
 		CALL brelop 
-		38 06 21 ff ff 
+		38 06 
+		21 ff ff 
 		JUMP cret 
-		11 2a 00 dd 6e 06 26 00 
+		11 2a 00 
+		dd 6e 06 26 00 
 		CALL amul 
 		11 __fcb 
 		19 e5 fd e1 
 		CALL _getuid 
-		dd 75 ff fd 6e 29 26 00 e5 
+		dd 75 ff 
+		fd 6e 29 26 00 e5 
 		CALL _setuid 
-		c1 fd 7e 28 fe 02 28 1d fe 
-		03 28 19 21 0c 00 e5 
+		c1 
+		fd 7e 28 fe 02 28 1d 
+		fe 03 28 19 
+		21 0c 00 e5 
 		CALL _bdoshl 
-		c1 af 6f 7c e6 05 67 7d b4 
-		28 12 fd 7e 28 fe 01 20 0b 
-		fd e5 21 10 00 e5 
+		c1 af 6f 7c e6 05 
+		67 7d b4 28 12 
+		fd 7e 28 
+		fe 01 20 0b 
+		fd e5 
+		21 10 00 e5 
 		CALL _bdos 
-		c1 c1 fd 36 28 00 dd 6e ff 
+		c1 c1 
+		fd 36 28 00 
+		dd 6e ff 
 		26 00 e5 
 		CALL _setuid 
 		c1 21 00 00 
@@ -594,30 +615,112 @@ block _close
 	end
 end
 
+;
+; the hitech write system call has to do a lot of work with
+; setting the dma buffer, getting the userid, sector copy,
+; knowing about character devices, etc.
+; write.obj
+;
 block _write
 	match
-		CALL ncsv
-		79 ff
-		06 08
-		dd 7e 06
-		CALL brelop
-		38 06
-		21 ff ff
-		JUMP cret
-		11 2a 00
-		dd 6e 06
-		26 00
-		CALL ANY ANY
-		11 fcb
+		CALL ncsv 
+		79 ff 06 08 dd 7e 06 CALL brelop 
+		38 06 21 ff ff JUMP cret 
+		11 2a 00 dd 6e 06 26 00 CALL amul 
+		11 __fcb 
+		19 e5 
+		fd e1 
+		dd 36 fe 02 dd 6e 0a dd 66 0b 
+		dd 75 f9 dd 74 fa fd 7e 28 
+		fe 02 ca ANY ANY 
+		fe 03 ca ANY ANY 
+		fe 04 28 71 
+		fe 06 28 25 
+		fe 07 28 3c 
+		18 bd 
+		CALL __sigchk 
+		dd 6e 08 dd 66 09 7e 23 
+		dd 75 08 dd 74 09 
+		6f 17 9f 67 
+		e5 21 04 00 e5 CALL _bdos 
+		c1 c1 
+		dd 6e 0a dd 66 0b 2b 
+		dd 75 0a dd 74 0b 23 7d b4 
+		20 cf 
+		dd 6e f9 dd 66 fa JUMP cret 
+		dd 36 fe 05 18 27 CALL __sigchk 
+		dd 6e 08 dd 66 09 7e 23 
+		dd 75 08 dd 74 09 6f 17 9f 67 
+		dd 75 fb dd 74 fc e5 
+		dd 6e fe 26 00 e5 CALL _bdos 
+		c1 c1 dd 6e 0a dd 66 0b 2b 
+		dd 75 0a dd 74 0b 23 7d b4 
+		20 c7 18 b6 CALL _getuid 
+		5d dd 73 fd c3 ANY ANY CALL __sigchk 
+		fd 6e 29 26 00 e5 CALL _setuid 
+		c1 fd 7e 24 e6 7f dd 77 fe 
+		5f 16 00 21 80 00 b7 ed 52 
+		dd 75 ff 5d dd 6e 0a dd 66 0b 
+		CALL wrelop 
+		30 06 
+		dd 7e 0a dd 77 ff 11 
+		80 00 21 00 00 e5 d5 fd 5e 24 
+		fd 56 25 fd 6e 26 fd 66 27 CALL aldiv 
+		e5 d5 fd e5 d1 21 21 00 19 e5 CALL __putrno 
+		c1 c1 c1 dd 7e ff fe 80 20 
+		12 dd 6e 08 dd 66 09 e5 21 
+		1a 00 e5 CALL _bdos 
+		c1 c1 18 5e dd e5 d1 21 79 
+		ff 19 e5 21 1a 00 e5 CALL _bdos 
+		c1 dd e5 d1 21 79 ff 19 36 
+		1a 21 7f 00 e3 dd e5 d1 21 
+		7a ff 19 e5 dd e5 d1 21 79 
+		ff 19 e5 CALL _bmove 
+		c1 c1 c1 fd e5 21 21 00 e5 
+		CALL _bdos 
+		c1 dd 6e ff 26 00 e3 dd e5 
+		d1 dd 6e fe 26 00 19 11 79 
+		ff 19 e5 dd 6e 08 dd 66 09 
+		e5 CALL _bmove 
+		c1 c1 c1 fd e5 21 22 00 e5 
+		CALL _bdos 
+		c1 c1 7d b7 20 49 dd 5e ff 
+		16 00 dd 6e 08 dd 66 09 19 
+		dd 75 08 dd 74 09 7b 21 00 
+		00 55 e5 d5 fd e5 d1 21 24 
+		00 19 CALL asaladd 
+		dd 5e ff 16 00 dd 6e 0a dd 
+		66 0b b7 ed 52 dd 75 0a dd 
+		74 0b dd 6e fd 62 e5 CALL _setuid 
+		c1 dd 7e 0a dd b6 0b c2 ANY 
+		ANY dd 6e fd 26 00 e5 CALL _setuid 
+		c1 dd 5e 0a dd 56 0b dd 6e 
+		f9 dd 66 fa b7 ed 52 c3 cret 
 	end
-	; write system call:  
-	; file descriptor in hl,
-	; RST8 04 buf.l buf.h bytes.l bytes.h
-	; returns carry clear on good, byte count in hl
-	; errno in hl.
+	;
+	; micronix is much simpler; we do have to maintain the file
+	; offset, which we keep in the fcb.
 	;
 	patch _write
-		include	write.asm
+		call	csv
+		ld		a,(ix+6)
+		call	fcbcalc
+		push	hl
+		pop		iy
+
+		ld		d,(ix+9)
+		ld		e,(ix+8)
+		ld		b,(ix+11)
+		ld		c,(ix+10)
+		ld		(m_write+2),de
+		ld		(m_write+4),bc
+		ld		l,(ix+6)
+		ld		h,0
+
+	m_write:			; write(fd, base, 0x200 - cnt)
+		defb 0xcf, 4, 0, 0, 0, 0
+
+		jmp		cret
 	end
 end
 
@@ -729,8 +832,26 @@ block _read
 		c1 
 		c3 ANY ANY 
 	end
-	patch _read 616
-		include read.asm
+	patch _read
+		call	csv
+		ld		a,(ix+6)
+		call	fcbcalc
+		push	hl
+		pop		iy
+
+		ld		d,(ix+9)
+		ld		e,(ix+8)
+		ld		b,(ix+11)
+		ld		c,(ix+10)
+		ld		(m_read+2),de
+		ld		(m_read+4),bc
+		ld		l,(ix+6)
+		ld		h,0
+
+	m_read:			; read(fd, base, cnt)
+		defb 0xcf, 3, 0, 0, 0, 0
+
+		jmp		cret
 	end
 end
 

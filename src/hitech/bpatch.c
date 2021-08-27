@@ -193,25 +193,25 @@ putvar(char *n, word new)
 }
 
 void
-queuevar(char *n, word new)
+queuevar(char *n, word value)
 {
     struct var *v;
 
-    if (verbose & V_VAR) printf("queuevar: %s %04x\n", n, new);
+    if (verbose & V_VAR) printf("queuevar: %s %04x\n", n, value);
 
     for (v = varq; v; v = v->next) {
         if (strcmp(n, v->name) == 0) {
-            if (v->value != new) {
-                printf("queuevar: name %s already present value %x new %x\n",
-                        n, v->value, new);
-                v->value = new;
+            if (v->value != value) {
+                printf("queuevar: name %s already present value %x value %x\n",
+                        n, v->value, value);
+                v->value = value;
             }
             return;
         }
     }
     v = malloc(sizeof (*v));
     v->name = strdup(n);
-    v->value = new;
+    v->value = value;
     v->next = varq;
     varq = v;
 }
@@ -444,11 +444,6 @@ patmatch(struct pat *pat, int pl, word base)
         return 0;
     }
     matchaddr = base;
-
-	if (verbose & V_MATCH) {
-		printf("hit at %04x", base);
-    }
-
     return 1;
 }
 
@@ -877,9 +872,9 @@ match()
 						i, pat[i].name, pat[i].value, pat[i].flags);
 				}
 				if (pat[i].flags & BYTE) {
-					ext = membuf[base + i];
+					ext = membuf[matchaddr + i];
 				} else {
-					ext += membuf[base + i] << 8;
+					ext += membuf[matchaddr + i] << 8;
 					queuevar(pat[i].name, ext);
 				}
 			}
@@ -932,8 +927,9 @@ block()
 				blockhit = 0;
             }
         } else {
-			if (verbose && blockhit) {
-                    printf("block %s hit at 0x%04x\n", blockname, blockstart);
+			if (verbose && blockhit && matchcount) {
+            	printf("block %s hit at 0x%04x\n", blockname, blockstart);
+				matchcount = 0;
 			}
 			do_queue(blockhit);
 		}
