@@ -43,7 +43,7 @@ void
 check(file)
     char *file;
 {
-    struct dsknod *ip;
+    struct dsknod *dp;
     int i, j, pno;
 
     i = openfs(file, &fs);
@@ -53,23 +53,23 @@ check(file)
     }
     printf("%s:\n", file);
 
-    nfiles = fs->isize * I_PER_BLK;
+    nfiles = fs->s_isize * I_PER_BLK;
     for (i = 0; i < NDIRS; i++)
         htab[i].hino = 0;
     for (pno = 0; pno < 3; pno++) {
         for (ino = 1; ino < nfiles; ino++) {
-            ip = iget(fs, ino);
-            (*pass[pno]) (ip);
-            ifree(ip);
+            dp = iget(fs, ino);
+            (*pass[pno]) (dp);
+            ifree(dp);
         }
     }
     closefs(fs);
 }
 
 void
-pass1(struct dsknod *ip)
+pass1(struct dsknod *dp)
 {
-    if ((ip->mode & D_ALLOC) == 0 || (ip->mode & D_IFMT) != D_IFDIR)
+    if ((dp->d_mode & IALLOC) == 0 || (dp->d_mode & IFMT) != IFDIR)
         return;
     hlookup(ino, 1);
 }
@@ -84,27 +84,27 @@ dotname(struct dir *dp)
 }
 
 void
-pass2(ip)
-    struct dsknod *ip;
+pass2(dp)
+    struct dsknod *dp;
 {
     int doff;
     struct htab *hp;
-    struct dir *dp;
+    struct dir *dirp;
     int i;
 
-    if ((ip->mode & D_ALLOC) == 0 || (ip->mode & D_IFMT) != D_IFDIR)
+    if ((dp->d_mode & IALLOC) == 0 || (dp->d_mode & IFMT) != IFDIR)
         return;
 
-    for (doff = 0; (dp = getdirent(ip, doff)) != 0; doff++) {
-        if (dp->ino == 0)
+    for (doff = 0; (dirp = getdirent(dp, doff)) != 0; doff++) {
+        if (dirp->ino == 0)
             continue;
-        if ((hp = hlookup(dp->ino, 0)) == 0)
+        if ((hp = hlookup(dirp->ino, 0)) == 0)
             continue;
-        if (dotname(dp))
+        if (dotname(dirp))
             continue;
         hp->hpino = ino;
         for (i = 0; i < 14; i++)
-            hp->hname[i] = dp->name[i];
+            hp->hname[i] = dirp->name[i];
     }
 }
 
@@ -128,29 +128,29 @@ pname(int i, int lev)
 }
 
 void
-pass3(ip)
-    struct dsknod *ip;
+pass3(dp)
+    struct dsknod *dp;
 {
     int doff;
-    struct dir *dp;
+    struct dir *dirp;
     int *ilp;
 
-    if ((ip->mode & D_ALLOC) == 0 || (ip->mode & D_IFMT) != D_IFDIR)
+    if ((dp->d_mode & IALLOC) == 0 || (dp->d_mode & IFMT) != IFDIR)
         return;
 
-    for (doff = 0; (dp = getdirent(ip, doff)) != 0; doff++) {
-        if (dp->ino == 0)
+    for (doff = 0; (dirp = getdirent(dp, doff)) != 0; doff++) {
+        if (dirp->ino == 0)
             continue;
-        if (aflg == 0 && dotname(dp))
+        if (aflg == 0 && dotname(dirp))
             continue;
         for (ilp = iilist; *ilp >= 0; ilp++)
-            if (*ilp == dp->ino)
+            if (*ilp == dirp->ino)
                 break;
-        if (ilp > iilist && *ilp != dp->ino)
+        if (ilp > iilist && *ilp != dirp->ino)
             continue;
-        printf("%d	", dp->ino);
+        printf("%d	", dirp->ino);
         pname(ino, 0);
-        printf("/%.14s\n", dp->name);
+        printf("/%.14s\n", dirp->name);
     }
 }
 

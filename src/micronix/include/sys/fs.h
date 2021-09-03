@@ -1,54 +1,61 @@
 /*
  * sys/fs.h
- * 
- * note:  this file was duplicated in the micronix 1.61 source as sup.h the v6
+ *
+ * this is modified from the stock fs.h to align it with v6
+ *      field names and defines now match
  * filesystem superblock - found on block 1 of every bdev
  */
 struct super {
-    UINT isize;                 /* number of inode blocks */
-    UINT fsize;                 /* largest file block + 1 */
-    UINT nfree;                 /* number of free blocks in free[] */
-    UINT free[100];             /* the free block list */
-    UINT ninode;                /* number of free inumbers in inode[] */
-    UINT inode[100];            /* the free inode list */
+    UINT s_isize;               /* number of inode blocks */
+    UINT s_fsize;               /* largest file block + 1 */
+    UINT s_nfree;               /* number of free blocks in free[] */
+    UINT s_free[100];           /* the free block list */
+    UINT s_ninode;              /* number of free inumbers in inode[] */
+    UINT s_inode[100];          /* the free inode list */
 
-    UINT8 flock;                /* mounted read only */
-    UINT8 ilock;
+    UINT8 s_flock;              /* mounted read only */
+    UINT8 s_ilock;
+    UINT8 s_fmod;               /* dirty */
 
-    UINT32 time;                /* last umount time */
+    UINT32 s_time;              /* last umount time */
 };
 
 /*
- * the on-disk inode
+ * the on-disk inode - these fields have the d_ prefix to
+ * allow the in-memory inode to have the i_ prefix reference
+ * the included structure.
  */
 struct dsknod {
-    UINT mode;                  /* what kind of inode */
-    UINT8 nlink;                /* link count */
-    UINT8 uid;                  /* user id of owner */
-    UINT8 gid;                  /* group id of owner */
-    UINT8 size0;                /* high byte of size */
-    UINT size1;                 /* low word */
-    UINT addr[8];               /* block list of file */
-    UINT32 actime;              /* time of last read */
-    UINT32 modtime;             /* time of last write */
+    UINT d_mode;                /* what kind of inode */
+    UINT8 d_nlink;              /* link count */
+    UINT8 d_uid;                /* user id of owner */
+    UINT8 d_gid;                /* group id of owner */
+    UINT8 d_size0;              /* high byte of size */
+    UINT d_size1;               /* low word */
+    UINT d_addr[8];             /* block list of file */
+    UINT32 d_atime;             /* time of last read */
+    UINT32 d_mtime;             /* time of last write */
 };
 
-#define D_ALLOC		0100000 /* inode is allocated */
+#define IALLOC		0100000     /* inode is allocated */
 
-#define D_IFMT		0060000 /* inode type */
-#define D_IFREG		0000000 /* a file */
-#define D_IIO		0020000 /* io nodes have this set */
-#define D_IFCHR		0020000 /* cdev */
-#define D_IFDIR		0040000 /* directory */
-#define D_IFBLK		0060000 /* bdev */
+#define ILARG		0010000     /* large file addressing */
 
-#define D_LARGE		0010000 /* large file addressing */
-#define D_ISUID		0004000 /* set uid */
-#define D_ISGID		0002000 /* set gid */
-#define D_1WRITE	0001000 /* exclusive write (!) */
+#define IFMT		0060000     /* inode type */
+#define     IFREG		0000000 /* a file */
+#define     IIO 		0020000 /* io nodes have this set */
+#define     IFCHR		0020000 /* cdev */
+#define     IFDIR		0040000 /* directory */
+#define     IFBLK		0060000 /* bdev */
 
-#define D_PERM		0000777 /* permissions masks */
+#define ISUID		0004000     /* set uid */
+#define ISGID		0002000     /* set gid */
+#define ISVTX       0001000     /* sticky */
 
+#define IPERM		0000777     /* permissions masks */
+#define     IREAD   0000004
+#define     IWRITE  0000002
+#define     IEXEC   0000001
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

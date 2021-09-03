@@ -65,9 +65,10 @@ struct cmdtab
 };
 
 void
-usage()
+usage(char *e)
 {
     int i;
+    printf("%s [-f <filesystem>] <command>\n", e);
     printf("commands:\n");
     for (i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++) {
         printf("\t%s\n", cmds[i].usage);
@@ -82,6 +83,7 @@ main(argc, argv)
     char **argv;
 {
     int i;
+    char *pname = argv[0];
 
     putenv("TZ=GMT");
     tzset();
@@ -107,7 +109,7 @@ main(argc, argv)
     }
 
     if (!argc) {
-        usage();
+        usage(pname);
         exit(0);
     }
     if (!filesystem) {
@@ -135,7 +137,7 @@ main(argc, argv)
         }
     }
     if (nerror == -1) {
-        usage();
+        usage(pname);
     }
     closefs(fs);
     return (nerror);
@@ -145,44 +147,44 @@ int
 iinfo(int c, char **a)
 {
     int inum;
-    struct dsknod *ip;
+    struct dsknod *dp;
     char na[20];
 
     if (!c) return 1;
     inum = atoi(*++a);
 
-    ip = iget(fs, inum);
-    if (!ip) return 2;
+    dp = iget(fs, inum);
+    if (!dp) return 2;
     sprintf(na, "inum %d\n", inum);
-    isummary(na, ip);
-    ifree(ip); 
+    isummary(na, dp);
+    ifree(dp); 
     return 0;
 }
 
 void
 list(char *name, int opts)
 {
-    struct dsknod *ip, *f;
-    struct dir *dp;
+    struct dsknod *dp, *f;
+    struct dir *dirp;
     int i;
 
-    ip = namei(fs, name);
-    if (!ip) {
+    dp = namei(fs, name);
+    if (!dp) {
         printf("%s: not found\n", name);
         return;
     }
 
-    if ((ip->mode & D_IFMT) == D_IFDIR) {
-        for (i = 0; i < ((ip->size0 << 16) + ip->size1) / 16; i++) {
-            dp = getdirent(ip, i);
-            f = iget(fs, dp->ino);
-            isummary(dp->name, f);
+    if ((dp->d_mode & IFMT) == IFDIR) {
+        for (i = 0; i < ((dp->d_size0 << 16) + dp->d_size1) / 16; i++) {
+            dirp = getdirent(dp, i);
+            f = iget(fs, dirp->ino);
+            isummary(dirp->name, f);
             ifree(f);
         }
     } else {
-        isummary(name, ip);
+        isummary(name, dp);
     }
-    ifree(ip);
+    ifree(dp);
 }
 
 int
@@ -225,30 +227,29 @@ ls(int c, char **a)
 void
 catfile(char *name, int opts)
 {
-    struct dsknod *ip;
-    struct dir *dp;
+    struct dsknod *dp;
     int i;
     int size;
     char buf[512];
     int valid;
 
-    ip = namei(fs, name);
-    if (!ip) {
+    dp = namei(fs, name);
+    if (!dp) {
         printf("%s: not found\n", name);
         return;
     }
 
-    if ((ip->mode & D_IFMT) == D_IFDIR) {
+    if ((dp->d_mode & IFMT) == IFDIR) {
         printf("%s: is directory\n", name);
         return;
     }
 
-    size = (ip->size0 << 16) + ip->size1;
+    size = (dp->d_size0 << 16) + dp->d_size1;
     for (i = 0; i < size; i += 512) {
-        valid = fileread(ip, i, buf);
+        valid = fileread(dp, i, buf);
         write(1, buf, valid);
     }
-    ifree(ip);
+    ifree(dp);
 }
 
 int
@@ -271,30 +272,29 @@ cat(int c, char **a)
 void
 dumpfile(char *name, int opts)
 {
-    struct dsknod *ip;
-    struct dir *dp;
+    struct dsknod *dp;
     int i;
     int size;
     char buf[512];
     int valid;
 
-    ip = namei(fs, name);
-    if (!ip) {
+    dp = namei(fs, name);
+    if (!dp) {
         printf("%s: not found\n", name);
         return;
     }
 
-    if ((ip->mode & D_IFMT) == D_IFDIR) {
+    if ((dp->d_mode & IFMT) == IFDIR) {
         printf("%s: is directory\n", name);
         return;
     }
 
-    size = (ip->size0 << 16) + ip->size1;
+    size = (dp->d_size0 << 16) + dp->d_size1;
     for (i = 0; i < size; i += 512) {
-        valid = fileread(ip, i, buf);
+        valid = fileread(dp, i, buf);
         hexdump(buf, valid);
     }
-    ifree(ip);
+    ifree(dp);
 }
 
 int
@@ -317,8 +317,7 @@ dumpcmd(int c, char **a)
 int
 readcmd(int c, char **a)
 {
-    struct dsknod *ip;
-    struct dir *dp;
+    struct dsknod *dp;
     int i;
     int size;
     char buf[512];
@@ -332,25 +331,25 @@ readcmd(int c, char **a)
         return -1;
     }
 
-    ip = namei(fs, *a++);
-    if (!ip) {
+    dp = namei(fs, *a++);
+    if (!dp) {
         printf("can't find file\n");
         return 2;
     }
 
-    if ((ip->mode & D_IFMT) != D_IFREG) {
+    if ((dp->d_mode & IFMT) != IFREG) {
         printf("need regular file\n");
         return 2;
     }
 
     outfd = open(*a, O_WRONLY | O_CREAT, 0777);
     printf("write to %s\n", *a);
-    size = (ip->size0 << 16) + ip->size1;
+    size = (dp->d_size0 << 16) + dp->d_size1;
     for (i = 0; i < size; i += 512) {
-        valid = fileread(ip, i, buf);
+        valid = fileread(dp, i, buf);
         write(outfd, buf, valid);
     }
-    ifree(ip);
+    ifree(dp);
     close(outfd);
     return 0;
 }
@@ -358,8 +357,7 @@ readcmd(int c, char **a)
 int
 writecmd(int c, char **a)
 {
-    struct dsknod *ip;
-    struct dir *dp;
+    struct dsknod *dp;
     int i;
     int size;
     char buf[512];
@@ -380,32 +378,33 @@ writecmd(int c, char **a)
     }
     
     destname = *++a;
-    ip = namei(fs, destname);
-    if (!ip) {
+    dp = namei(fs, destname);
+    if (!dp) {
         printf("can't find file %s\n", destname);
-        ip = filecreate(fs, destname);
-        if (!ip) {
+        dp = filecreate(fs, destname);
+        if (!dp) {
+            printf("can't create file %s\n", destname);
             return 2;
         }
     }
 
-    if ((ip->mode & D_IFMT) != D_IFREG) {
+    if ((dp->d_mode & IFMT) != IFREG) {
         printf("need regular file\n");
         return 2;
     }
 
-    filefree(ip);
+    filefree(dp);
     i = 0;
     do {
         valid = read(infd, buf, 512);
-        if (filewrite(ip, i, buf) != 512) {
+        if (filewrite(dp, i, buf) != 512) {
             printf("write failed\n");
         }
         i += valid;
     } while (valid == 512);
-    ip->size0 = i >> 16;
-    ip->size1 = i & 0xffff;
-    iput(ip);
+    dp->d_size0 = i >> 16;
+    dp->d_size1 = i & 0xffff;
+    iput(dp);
     close(infd);
     return 0;
 }
@@ -413,8 +412,7 @@ writecmd(int c, char **a)
 int 
 rmcmd(int c, char **a)
 {
-    struct dsknod *ip;
-    struct dir *dp;
+    struct dsknod *dp;
     int i;
     int size;
     char buf[512];
@@ -437,8 +435,7 @@ rmcmd(int c, char **a)
 int 
 infocmd(int c, char **a)
 {
-    struct dsknod *ip;
-    struct dir *dp;
+    struct dsknod *dp;
     int i;
     int size;
     char buf[512];
@@ -454,8 +451,8 @@ infocmd(int c, char **a)
         return -1;
     }
 
-    ip = namei(fs, *a);
-    idump(ip);
+    dp = namei(fs, *a);
+    idump(dp);
 
     return 0;
 }
@@ -463,8 +460,7 @@ infocmd(int c, char **a)
 int 
 emptycmd(int c, char **a)
 {
-    struct dsknod *ip;
-    struct dir *dp;
+    struct dsknod *dp;
     int i;
     int size;
     char buf[512];
@@ -480,8 +476,8 @@ emptycmd(int c, char **a)
         return -1;
     }
 
-    ip = namei(fs, *a);
-    filefree(ip);
+    dp = namei(fs, *a);
+    filefree(dp);
 
     return 0;
 }
@@ -510,8 +506,8 @@ fsinfo(int c, char **a)
     dumpsb(fs);
     printf("free list: \n");
 
-    bcopy(fs->free, fl, sizeof(fl));
-    fi = fs->nfree - 1;
+    bcopy(fs->s_free, fl, sizeof(fl));
+    fi = fs->s_nfree - 1;
 
     /* scan through whole freelist from end */
     k = 0;

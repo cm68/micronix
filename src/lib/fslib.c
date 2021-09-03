@@ -37,7 +37,6 @@ struct image {
         struct super fs;
         char superblock[512];
     } sb;
-    int superdirty;
     int driver;
     int fd;
     void *drive;
@@ -55,14 +54,14 @@ struct image {
 #define DRIVER_LIBDSK   3
 
 void
-closefs(struct super *arg)
+closefs(struct super *fs)
 {
-    struct image *i = (struct image *)arg;
+    struct image *i = (struct image *)fs;
 
-    if (i->superdirty) {
-        writeblk(arg, 1, i->sb.superblock);
+    if (fs->s_fmod) {
+        writeblk(fs, 1, i->sb.superblock);
     }
-    i->superdirty = 0;
+    fs->s_fmod = 0;
     switch (i->driver) {
     case DRIVER_LIBDSK:
 #ifdef USE_LIBDSK
@@ -338,7 +337,7 @@ dump(unsigned char *b, int size)
 int
 filesize(struct dsknod *ip)
 {
-    return (ip->size0 << 16) + ip->size1;
+    return (ip->d_size0 << 16) + ip->d_size1;
 }
 
 void
@@ -419,6 +418,13 @@ iput(struct dsknod *dp)
     writeblk(ip->fs, inblkno, (char *)inodeblk);
 }
 
+int 
+inumof(struct dsknod *dp)
+{
+    struct i_node *ip = (struct i_node *)dp;
+    return ip->inum;
+}
+
 void
 ifree(struct dsknod *dp)
 {
@@ -476,8 +482,8 @@ void
 dumpsb(struct super *fs)
 {
     printf("isize: %d fsize: %d nfree: %d ninode: %d time: %s\n",
-        fs->isize, fs->fsize, fs->nfree, fs->ninode,
-        mytime(timeswap(fs->time)));
+        fs->s_isize, fs->s_fsize, fs->s_nfree, fs->s_ninode,
+        mytime(timeswap(fs->s_time)));
 }
 
 void
@@ -515,14 +521,15 @@ isummary(char *name, struct dsknod *dp)
     int i;
 
     printf("%5d ", ((struct i_node *)dp)->inum);
-    printf("%c", "-cdb"[(dp->mode >> 13) & 3]);
-    printperm(dp->mode >> 6, dp->mode & D_ISUID);
-    printperm(dp->mode >> 3, dp->mode & D_ISGID);
-    printperm(dp->mode, 0);
-    printf("%3d ", dp->nlink);
-    printf("%3d %3d ", dp->uid, dp->gid);
-    if (dp->mode & D_IIO) {
-        printf("%3d,%3d ", (dp->addr[0] >> 8) & 0xff, dp->addr[0] & 0xff);
+    printf("%c", "-cdb"[(dp->d_mode >> 13) & 3]);
+    printperm(dp->d_mode >> 6, dp->d_mode & ISUID);
+    printperm(dp->d_mode >> 3, dp->d_mode & ISGID);
+    printperm(dp->d_mode, 0);
+    printf("%3d ", dp->d_nlink);
+    printf("%3d %3d ", dp->d_uid, dp->d_gid);
+    if (dp->d_mode & IIO) {
+        printf("%3d,%3d ", 
+            (dp->d_addr[0] >> 8) & 0xff, dp->d_addr[0] & 0xff);
     } else {
         printf("%7d ", filesize(dp));
     }
@@ -543,45 +550,45 @@ idump(struct dsknod *dp)
     UINT dindir[256];
     struct i_node *ip = (struct i_node *)dp;
 
-    if (!(dp->mode & D_ALLOC))
+    if (!(dp->d_mode & IALLOC))
         return;
 
     isummary("", dp);
 
-    ft = (dp->mode & D_IFMT) >> 13;
-    printf("inode %5d: %6o %d %s\n", ip->inum, dp->mode, ft, itype[ft & 3]);
+    ft = (dp->d_mode & IFMT) >> 13;
+    printf("inode %5d: %6o %d %s\n", ip->inum, dp->d_mode, ft, itype[ft & 3]);
 
     size = filesize(dp);
 
     printf("\tmode: %o links: %d uid: %d gid: %d size: %d %s\n",
-        dp->mode, dp->nlink, dp->uid, dp->gid,
-        size, dp->mode & D_LARGE ? "LARGE" : "");
+        dp->d_mode, dp->d_nlink, dp->d_uid, dp->d_gid,
+        size, dp->d_mode & ILARG ? "LARGE" : "");
 
-    printf("\trtime: %s ", mytime(dp->actime));
-    printf("wtime: %s\n", mytime(dp->modtime));
+    printf("\trtime: %s ", mytime(dp->d_atime));
+    printf("wtime: %s\n", mytime(dp->d_mtime));
 
-    if (dp->mode & D_IIO) {
-        int maj = (dp->addr[0] >> 8) & 0xff;
-        int min = dp->addr[0] & 0xff;
+    if (dp->d_mode & IIO) {
+        int maj = (dp->d_addr[0] >> 8) & 0xff;
+        int min = dp->d_addr[0] & 0xff;
 
         printf("\tmaj: %d min: %d\n", maj, min);
     } else {
         printf("\tblocklist:\n\t\t");
         for (i = 0; i < 8; i++) {
-            printf("%d ", dp->addr[i]);
+            printf("%d ", dp->d_addr[i]);
         }
         printf("\n");
-        if (dp->mode & D_LARGE) {
+        if (dp->d_mode & ILARG) {
             for (i = 0; i < 7; i++) {
-                if (dp->addr[i]) {
-                    printf("indirect %d\n", dp->addr[i]);
-                    readblk(ip->fs, dp->addr[i], (char *) indir);
+                if (dp->d_addr[i]) {
+                    printf("indirect %d\n", dp->d_addr[i]);
+                    readblk(ip->fs, dp->d_addr[i], (char *) indir);
                     blocklist(indir);
                 }
             }
-            if (dp->addr[7]) {
+            if (dp->d_addr[7]) {
                 printf("double indirect\n");
-                readblk(ip->fs, dp->addr[7], (char *) dindir);
+                readblk(ip->fs, dp->d_addr[7], (char *) dindir);
                 blocklist(dindir);
                 for (i = 0; i < 256; i++) {
                     printf("indirect %d\n", i);
@@ -593,11 +600,11 @@ idump(struct dsknod *dp)
             }
         }
     }
-    if ((dp->mode & D_IFMT) == D_IFDIR) {
+    if ((dp->d_mode & IFMT) == IFDIR) {
         for (i = 0; i < 8; i++) {
             if (i * 512 > size)
                 break;
-            readblk(ip->fs, dp->addr[i], dbuf);
+            readblk(ip->fs, dp->d_addr[i], dbuf);
             dirdump(dbuf, size - (i * 512));
         }
     }
@@ -675,7 +682,7 @@ lookup(struct dsknod *dp, char *name)
     int entries = filesize(dp) / 16;
     int i;
 
-    if ((dp->mode & D_IFMT) != D_IFDIR) {
+    if ((dp->d_mode & IFMT) != IFDIR) {
         return 0;
     }
 
@@ -736,13 +743,13 @@ balloc(struct super *fs)
     int b, i;
     UINT buf[256];
 
-    i = --fs->nfree;
+    i = --fs->s_nfree;
     /* nfree is the current head.  we manage it */
     if (i < 0 || i >= 100) {
         printf("bad freeblock\n");
         return (0);
     }
-    b = fs->free[i];
+    b = fs->s_free[i];
 
     if (b == 0) {
         printf("no space\n");
@@ -754,18 +761,18 @@ balloc(struct super *fs)
      * read our block, copy the free list
      * and zero the block
      */
-    if (fs->nfree <= 0) {
+    if (fs->s_nfree <= 0) {
         readblk(fs, b, (UINT8 *)buf);
-        fs->nfree = buf[0];
+        fs->s_nfree = buf[0];
         for (i = 0; i < 100; i++) {
-            fs->free[i] = buf[i + 1];
+            fs->s_free[i] = buf[i + 1];
         }
         for (i = 0; i < 256; i++) {
             buf[i] = 0;
         }
         writeblk(fs, b, (UINT8 *)buf);
     }
-    ((struct image *)fs)->superdirty = 1;
+    fs->s_fmod = 1;
     return (b);
 }
 
@@ -775,15 +782,15 @@ bfree(struct super *fs, int blkno)
     int i;
     UINT buf[256];
 
-    if (fs->nfree >= 100) {
-        buf[0] = fs->nfree;
+    if (fs->s_nfree >= 100) {
+        buf[0] = fs->s_nfree;
         for (i = 0; i < 100; i++)
-            buf[i + 1] = fs->free[i];
-        fs->nfree = 0; 
+            buf[i + 1] = fs->s_free[i];
+        fs->s_nfree = 0; 
         writeblk(fs, blkno, (UINT8 *)buf);
     }
-    fs->free[fs->nfree++] = blkno;
-    ((struct image *)fs)->superdirty = 1;
+    fs->s_free[fs->s_nfree++] = blkno;
+    fs->s_fmod = 1;
 }
 
 /*
@@ -799,7 +806,7 @@ int iiblkno = -1;
  * this code does all the heavy lifting of knowing about the
  * way that block numbers are handled in the v6 filesystem
  * two modes for the 8 addr's in th inode:
- *  D_LARGE, where the first 7 are indirect blocks,
+ *  ILARG, where the first 7 are indirect blocks,
  *      and the 8th is double indirect, 
  * and small, where all are block numbers for files <= 4096
  *
@@ -814,49 +821,49 @@ bmap(struct dsknod *dp, int offset, int alloc)
     int iindex;                 // indirect index
     int i;
 
-    if (!(dp->mode & D_LARGE)) {      // file is within 4k limit
+    if (!(dp->d_mode & ILARG)) {      // file is within 4k limit
         if (lblk <= 7) {
-            if ((dp->addr[lblk] == 0) && alloc) {
-                dp->addr[lblk] = balloc(ip->fs);
+            if ((dp->d_addr[lblk] == 0) && alloc) {
+                dp->d_addr[lblk] = balloc(ip->fs);
             }
-            return dp->addr[lblk];
+            return dp->d_addr[lblk];
         } else if (!alloc) {
             return 0;
         }
 
-        // convert to D_LARGE
+        // convert to ILARG
         iblkno = balloc(ip->fs);
         bzero((char *)iblk, 512);
         for (i = 0; i < 8; i++) {
-            iblk[i] = dp->addr[i];
-            dp->addr[i] = 0;
+            iblk[i] = dp->d_addr[i];
+            dp->d_addr[i] = 0;
         }
-        dp->addr[0] = iblkno;
-        dp->mode |= D_LARGE;
+        dp->d_addr[0] = iblkno;
+        dp->d_mode |= ILARG;
         writeblk(ip->fs, iblkno, (char *)iblk);
         iput(dp);     
-        // fall into D_LARGE case
+        // fall into ILARG case
     }
 
     iindex = lblk / 256;
     if (iindex == 7) {       // double indirect
-        if (dp->addr[7] == 0) {
+        if (dp->d_addr[7] == 0) {
             if (!alloc) {
                 return 0;
             }
-            iiblkno = dp->addr[7] = balloc(ip->fs);
+            iiblkno = dp->d_addr[7] = balloc(ip->fs);
             bzero((char *)iiblk, 512);
             writeblk(ip->fs, iiblkno, (char *)iiblk);
             iput(dp);
         }
-        if (iiblkno != dp->addr[7]) {
-            iiblkno = dp->addr[7];
+        if (iiblkno != dp->d_addr[7]) {
+            iiblkno = dp->d_addr[7];
             readblk(ip->fs, iiblkno, (char *)iiblk);
         }
         aa = iiblk;
         iindex -= 7 * 256;
     } else {
-        aa = dp->addr;
+        aa = dp->d_addr;
     }
 
     // an indirect hole
@@ -865,7 +872,7 @@ bmap(struct dsknod *dp, int offset, int alloc)
             return 0;
         }
         aa[iindex] = balloc(ip->fs);
-        if (aa == dp->addr) {
+        if (aa == dp->d_addr) {
             iput(dp);
         } else {
             writeblk(ip->fs, iiblkno, (char *)iiblk);
@@ -917,14 +924,14 @@ filefree(struct dsknod *dp)
     struct i_node *ip = (struct i_node *)dp;
     int i, j;
 
-    if (dp->mode & D_IIO) {
+    if (dp->d_mode & IIO) {
         return;
     }
-    if (!(dp->mode & D_LARGE)) {
+    if (!(dp->d_mode & ILARG)) {
         for (i = 0; i < 8; i++) {
-            if (dp->addr[i]) {
-                bfree(ip->fs, dp->addr[i]);
-                dp->addr[i] = 0;
+            if (dp->d_addr[i]) {
+                bfree(ip->fs, dp->d_addr[i]);
+                dp->d_addr[i] = 0;
             }
         }
         goto done;
@@ -933,19 +940,19 @@ filefree(struct dsknod *dp)
     iiblkno = -1;
 
     for (i = 0; i < 7; i++) {
-        iblkfree(ip->fs, &dp->addr[i]);
+        iblkfree(ip->fs, &dp->d_addr[i]);
     }
-    if (dp->addr[7]) {
-        readblk(ip->fs, dp->addr[7], (char *)iiblk);
+    if (dp->d_addr[7]) {
+        readblk(ip->fs, dp->d_addr[7], (char *)iiblk);
         for (i = 0; i < 256; i++) {
             iblkfree(ip->fs, &iiblk[i]);
         }
-        writeblk(ip->fs, dp->addr[7], (char *)iiblk);
+        writeblk(ip->fs, dp->d_addr[7], (char *)iiblk);
     }
 done:
-    dp->mode &= ~D_LARGE;
-    dp->size0 = 0;
-    dp->size1 = 0;
+    dp->d_mode &= ~ILARG;
+    dp->d_size0 = 0;
+    dp->d_size1 = 0;
     iput(dp);
 }
 
@@ -973,7 +980,7 @@ fileunlink(struct super *fs, char *name)
     }
     free(dirname);
 
-    if ((dp->mode & D_IFMT) != D_IFDIR) {
+    if ((dp->d_mode & IFMT) != IFDIR) {
         return;
     }
 
@@ -992,14 +999,14 @@ fileunlink(struct super *fs, char *name)
     if (inum != 0) {
         memmove(&dp[i], &dp[i+1], (entries - i) * sizeof(struct dir));
         memset(&dp[entries-1], 0, sizeof(struct dir));
-        dp->size1 -= 16;
+        dp->d_size1 -= 16;
         size = filesize(dp);
         if ((size % 512) == 0) {
-            if (dp->mode & D_LARGE) {
-                printf("can't handle D_LARGE directories\n");
+            if (dp->d_mode & ILARG) {
+                printf("can't handle ILARG directories\n");
             }
-            bfree(fs, dp->addr[size / 512]);
-            dp->addr[size/ 512] = 0;
+            bfree(fs, dp->d_addr[size / 512]);
+            dp->d_addr[size/ 512] = 0;
         }
         iput(dp);
         putdir(dp, dirp);
@@ -1014,18 +1021,116 @@ fileunlink(struct super *fs, char *name)
      * now maybe remove the file
      */
     dp = iget(fs, inum);
-    dp->nlink--;
-    if (dp->nlink == 0) {
+    dp->d_nlink--;
+    if (dp->d_nlink == 0) {
         filefree(dp);
 
-        dp->mode = 0;
-        if (fs->ninode != 100) {
-            fs->inode[fs->ninode++] = inum;
+        dp->d_mode = 0;
+        if (fs->s_ninode != 100) {
+            fs->s_inode[fs->s_ninode++] = inum;
         }
     }
     iput(dp);
     ifree(dp);
-    ((struct image *)fs)->superdirty = 1;
+    fs->s_fmod = 1;
+}
+
+/*
+ * link an inode to a name
+ */
+void
+filelink(struct super *fs, char *path, int inum)
+{
+    char *dirname = strdup(path);
+    char *name;
+    struct dsknod *dp;
+    struct dir *dirp;
+    int entries;
+    int size;
+    int i;
+ 
+    /*
+     * get the directory inode
+     */
+    name = rindex(dirname, '/');
+    if (!name) {
+        dp = iget(fs, 1);
+        name = dirname; 
+    } else {
+        *name++ = 0;
+        dp = namei(fs, dirname);
+    }
+
+    if ((dp->d_mode & IFMT) != IFDIR) {
+        goto lose;
+    }
+
+    /*
+     * scan the directory for unallocated entries
+     */
+    entries = filesize(dp) / 16;
+
+    dirp = getdir(dp);
+    for (i = 0 ; i < entries; i++) {
+        if (dirp[i].ino == 0) {
+            break;
+        }
+    }
+
+    /* fell off bottom */
+    if (i >= entries) {
+        dp->d_size1 += 16;
+        /* if we need a new block */
+        if ((dp->d_size1 & 511) == 0) {
+            dirp = realloc(dirp, dp->d_size1);
+        }
+    }
+    dirp[i].ino = inum;
+    strncpy(dirp[i].name, name, 14);
+    putdir(dp, dirp);
+    iput(dp);
+    fs->s_fmod = 1;
+
+lose:
+    if (dp) ifree(dp);
+    free(dirname);
+}
+
+/*
+ * get an inode from the freelist and allocate it.
+ * if the freelist is empty, fail - too lazy to code
+ */
+int
+ialloc(struct super *fs, UINT mode)
+{
+    int inum;
+    struct dsknod *dp;
+    int i;
+
+    mode &= ~ILARG;
+
+    if (fs->s_ninode <= 0) {
+        return 0;
+    }
+    inum = fs->s_inode[--fs->s_ninode];
+    dp = iget(fs, inum);
+    if (dp->d_mode & IALLOC) {
+        return 0;
+    }
+
+    dp->d_mode = IALLOC | mode;
+    dp->d_nlink = 0;
+    dp->d_uid = dp->d_gid = 0;
+    dp->d_size1 = dp->d_size0 = 0;
+    for (i = 0; i < 8; i++) {
+        dp->d_addr[i] = 0;
+    }
+    printf("allocated inum %d\n", inum);
+    iput(dp);
+    ifree(dp);
+
+    fs->s_fmod = 1;
+    return inum;
 }
 
 /*
@@ -1034,7 +1139,15 @@ fileunlink(struct super *fs, char *name)
 struct dsknod *
 filecreate(struct super *fs, char *name)
 {
-    return 0;
+    int inum;
+
+    inum = ialloc(fs, IFREG);
+    if (inum == 0) {
+        printf("ialloc failed\n");
+        return 0;
+    }
+    filelink(fs, name, inum);
+    return (namei(fs, name));
 }
 
 /*
