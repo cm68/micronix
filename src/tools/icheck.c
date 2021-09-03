@@ -38,7 +38,7 @@ unsigned short buf[256];
 
 int nerror;
 
-void pass(struct dsknod *ip);
+void pass(struct dsknod *dp);
 int blockcheck(int blkno, char *mesg);
 
 struct super *fs;
@@ -61,7 +61,7 @@ check(file)
 {
     int b;
     int i;
-    struct dsknod *ip;
+    struct dsknod *dp;
     unsigned short fl[100];
 
     i = openfs(file, &fs);
@@ -88,7 +88,7 @@ check(file)
     if (bitmap) {
         free(bitmap);
     }
-    bmapsize = (fs->fsize + 7) / 8;
+    bmapsize = (fs->s_fsize + 7) / 8;
     bitmap = malloc(bmapsize);
     bzero(bitmap, bmapsize);
 
@@ -96,13 +96,13 @@ check(file)
      * if we are rebuilding the freelist, no point in scanning it
      */
     if (sflg) {
-        fs->nfree = 0;
-        fs->free[0] = 0;
+        fs->s_nfree = 0;
+        fs->s_free[0] = 0;
     }
 
     /* copy the freelist from superblock to fl */
-    bcopy(fs->free, fl, sizeof(fl));
-    i = fs->nfree - 1;
+    bcopy(fs->s_free, fl, sizeof(fl));
+    i = fs->s_nfree - 1;
 
     /* scan through whole freelist from end */
     while ((b = fl[i]) != 0) {
@@ -125,16 +125,16 @@ check(file)
     /*
      * process all the inodes - now we know all the used blocks
      */
-    for (ino = 1; ino < fs->isize * I_PER_BLK; ino++) {
-        ip = iget(fs, ino);
-        pass(ip);
-        ifree(ip);
+    for (ino = 1; ino < fs->s_isize * I_PER_BLK; ino++) {
+        dp = iget(fs, ino);
+        pass(dp);
+        ifree(dp);
     }
 
     /*
      * count the allocated blocks in the bitmap 
      */
-    for (i = fs->isize + 2; i < fs->fsize; i++) {
+    for (i = fs->s_isize + 2; i < fs->s_fsize; i++) {
 #define BITINDEX(b)   ((b) >> 3)
 #define BITMASK(b)  (1 << ((b) & 7))
         if (bitmap[BITINDEX(i)] & BITMASK(i)) {
@@ -146,8 +146,8 @@ check(file)
         }
     }
 
-    if (used != (fs->fsize - (fs->isize + 2))) {
-        printf("missing %5d %5d\n", used, (fs->fsize - (fs->isize + 2)));
+    if (used != (fs->s_fsize - (fs->s_isize + 2))) {
+        printf("missing %5d %5d\n", used, (fs->s_fsize - (fs->s_isize + 2)));
     }
     printf("spcl  %6d\n", nspcl);
     printf("files %6d\n", nfile);
@@ -167,46 +167,46 @@ check(file)
  * process the blocks of an inode and account for it
  */
 void
-pass(struct dsknod *ip)
+pass(struct dsknod *dp)
 {
     int i;
     int size;
     int b;
 
-    if (!(ip->mode & D_ALLOC))
+    if (!(dp->d_mode & IALLOC))
         return;
 
-    if (ip->mode & D_IIO) {
+    if (dp->d_mode & IIO) {
         nspcl++;
         return;
     }
 
-    if ((ip->mode & D_IFMT) == D_IFDIR)
+    if ((dp->d_mode & IFMT) == IFDIR)
         ndir++;
     else
         nfile++;
 
-    size = (ip->size0 << 16) + ip->size1;
+    size = (dp->d_size0 << 16) + dp->d_size1;
     for (i = 0; i < size; i += 512) {
-        b = bmap(ip, i, 0);
+        b = bmap(dp, i, 0);
         if (b) {
             blockcheck(b, "data");
         }
     }
 
-    if (!(ip->mode & D_LARGE)) {
+    if (!(dp->d_mode & ILARG)) {
         return;
     }
 
     nlarg++;
     for (i = 0; i < 7; i++) {
-        b = ip->addr[i];
+        b = dp->d_addr[i];
         if (b) {
             blockcheck(b, "indirect");
             nindir++;
         }
     }
-    b = ip->addr[7];
+    b = dp->d_addr[7];
     if (!b) {
         return;
     }
@@ -240,7 +240,7 @@ blockcheck(blkno, mesg)
     if (ino)
         nused++;
 
-    if (blkno < fs->isize + 2 || blkno >= fs->fsize) {
+    if (blkno < fs->s_isize + 2 || blkno >= fs->s_fsize) {
         printf("%d bad; inode=%d, class=%s\n", blkno, ino,
             mesg);
         return (1);

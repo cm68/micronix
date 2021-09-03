@@ -32,17 +32,17 @@ void dospecial(char *name, struct dsknod *ip);
  * given the inumber of a directory, process all the files
  */
 void
-dive(struct dsknod *dip, char *name)
+dive(struct dsknod *container, char *name)
 {
     struct dsknod *ip;
-    struct dir *dp;
+    struct dir *dirp;
     int i;
     int entries;
     char *namebuf;
 
-    tracec(verbose, "directory %s (length %d)\n", name, filesize(dip));
+    tracec(verbose, "directory %s (length %d)\n", name, filesize(container));
 
-    if ((dip->mode & D_IFMT) != D_IFDIR) {
+    if ((container->d_mode & IFMT) != IFDIR) {
         lose("not directory");
     }
 
@@ -52,27 +52,27 @@ dive(struct dsknod *dip, char *name)
     if (!dryrun) {
         system(namebuf);
     }
-    dp = getdir(dip);
-    entries = filesize(dip) / sizeof(struct dir);
+    dirp = getdir(container);
+    entries = filesize(container) / sizeof(struct dir);
 
     for (i = 0; i < entries; i++) {
-        ip = iget(fs, dp[i].ino);
-        if (!(ip->mode & D_ALLOC))
+        ip = iget(fs, dirp[i].ino);
+        if (!(ip->d_mode & IALLOC))
             continue;
 
-        sprintf(namebuf, "%s/%s", name, dp[i].name);
+        sprintf(namebuf, "%s/%s", name, dirp[i].name);
 
-        switch (ip->mode & D_IFMT) {
-        case D_IFDIR:
-            if (strcmp(dp[i].name, ".") == 0) continue;
-            if (strcmp(dp[i].name, "..") == 0) continue;
+        switch (ip->d_mode & IFMT) {
+        case IFDIR:
+            if (strcmp(dirp[i].name, ".") == 0) continue;
+            if (strcmp(dirp[i].name, "..") == 0) continue;
             dive(ip, namebuf);
             continue;
-        case D_IFREG:
+        case IFREG:
             dofile(namebuf, ip);
             break;
-        case D_IFBLK:
-        case D_IFCHR:
+        case IFBLK:
+        case IFCHR:
             dospecial(namebuf, ip);
             break;
         }
@@ -80,11 +80,11 @@ dive(struct dsknod *dip, char *name)
 }
 
 void
-dofile(char *name, struct dsknod *ip)
+dofile(char *name, struct dsknod *dp)
 {
     int fd;
     int off;
-    int size = ip->size1 + (ip->size0 << 16);
+    int size = dp->d_size1 + (dp->d_size0 << 16);
     char buf[512];
 
     tracec(verbose, "regular file %s (length %d)\n", name, size);
@@ -99,14 +99,14 @@ dofile(char *name, struct dsknod *ip)
     }
 
     for (off = 0; off < size; off += 512) {
-        fileread(ip, off, buf);
+        fileread(dp, off, buf);
         if (traceflags & extra) {
             printf("\noffset %d logical block %d\n", off, off / 512);
         }
         write(fd, buf, (size - off > 512) ? 512 : size - off);
     }
     close(fd);
-    chmod(name, ip->mode & 0777);
+    chmod(name, dp->d_mode & 0777);
 }
 
 /*
@@ -116,14 +116,14 @@ dofile(char *name, struct dsknod *ip)
  * zero flexibility in format. major and minor are ascii decimal
  */
 void
-dospecial(char *name, struct dsknod *ip)
+dospecial(char *name, struct dsknod *dp)
 {
     char linkname[20];
 
     sprintf(linkname, "%cdev(%d,%d)", 
-        ((ip->mode & D_IFMT) == D_IFBLK) ? 'b' :'c',
-        (ip->addr[0] >> 8) & 0xff,
-        ip->addr[0] & 0xff);
+        ((dp->d_mode & IFMT) == IFBLK) ? 'b' :'c',
+        (dp->d_addr[0] >> 8) & 0xff,
+        dp->d_addr[0] & 0xff);
 
     tracec(verbose, "special file %s %s\n", name, linkname);
 
@@ -136,6 +136,7 @@ dospecial(char *name, struct dsknod *ip)
 
 char *pname;
 
+void
 usage()
 {
     fprintf(stderr, "usage:\n%s <options> image\n", pname);
@@ -150,7 +151,7 @@ main(int argc, char **argv)
     int i;
     int d;
     struct dsknod *ip;
-    struct dir *dp;
+    // struct dir *dirp;
     struct dfile *df;
     char *s;
     struct dfile *pd;
