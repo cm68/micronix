@@ -1023,7 +1023,6 @@ char **argv;
             }
             o = line[2];
             v = (line[0] + (line[1] << 8)) & 0xffff;
-            printf("sym: %s %d %04x\n", &line[3], o, v);
             switch (o) {
             case 0xd:
                 add_sym(&line[3], v + seg[SEG_TEXT].base);
@@ -1688,7 +1687,7 @@ int out;
                 if (s && (strcmp(s, "c.switch") == 0)) {
                     if (codebuf[(trace_addr) - 3] == 0x21) {
                         swaddr = wordat(trace_addr - 2);
-                        fprintf(stderr, "switch table at %x\n", swaddr);
+                        if (debug) fprintf(stderr, "switch table at %x\n", swaddr);
                         while (1) {
                             i = wordat(swaddr);
                             reg_target(swaddr, WORD|REF);
