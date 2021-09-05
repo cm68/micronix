@@ -139,7 +139,7 @@ FILE *file;
 char *name;
 char tracing;
 
-char line[80];
+unsigned char line[80];
 char *linep;
 char col;
 char in_code;
@@ -404,9 +404,95 @@ getword()
     return lastword;
 }
 
+unsigned char
+nextbyte()
+{
+    static char b;
+
+    if (fread(&b, sizeof(b), 1, file) != 1) {
+        printf("premature eof on object file\n");
+        return 0;
+    }
+    return b;
+}
+
+/*
+ * whitesmith's relocations are a little wierd.
+ */
+#define WS_END  0
+#define WS_BIAS 1
+#define WS_TEXT 2
+#define WS_DATA 3
+#define WS_BSS  4
+#define WS_SYM  5
+
+char *wsrname[] = {
+    "end", "bias", "text", "data", "bss", "sym"
+};
+
+/*
+ * the relocation cursor
+ */
+int wscursor;
+int wssym;
+int wswhere;
+
+int
+getwsreloc()
+{
+    unsigned char control;
+    int i;
+
+    while (1) {
+        control = nextbyte();
+
+        if (control == 0) {                                 // done
+            return WS_END;
+        } else if ((control >= 1) && (control <= 31)) {     // short skip
+            wscursor += control;
+            continue;
+        } else if (control >= 32 && control <= 63) {        // long skip
+            wscursor += 32 + ((control - 32) * 256) + nextbyte();
+            continue;
+        }
+
+        wswhere = wscursor;
+        wscursor += (control & 2) ? 4 : 2;
+        control -= 64;
+        control >>= 2;
+
+        wssym = -1;
+        switch (control) {
+        case 0:
+            return WS_BIAS;
+        case 1:
+            return WS_TEXT;
+        case 2:
+            return WS_DATA;
+        case 3:
+            return WS_BSS;
+        default:
+            break; 
+        }
+        control -= 4;
+        if (control == 47) {
+            control = nextbyte();
+            if (control < 128) {
+                wssym = control + 128;
+            } else {
+                wssym = 175 + ((control - 128) * 256) + nextbyte();
+            }
+        } else {
+            wssym = control;
+        }
+        return WS_SYM;
+    }
+}
+
 /*
  * process a control file
  */
+
 char *symfile;
 
 struct sym {
@@ -414,6 +500,16 @@ struct sym {
     int value;
     struct sym *next;
 } *syms;
+
+/*
+ * brute force symbol table, used by whitesmith's code since we need an
+ * index.  so, really, the symbols are ordered by address, and they are
+ * in an array indexed by an absolute symbol number
+ */
+#define MAX_SYMS    10000
+
+struct sym *symtab[MAX_SYMS];
+int nsyms;
 
 int
 find_symbol(char *ls)
@@ -432,16 +528,17 @@ find_symbol(char *ls)
 /*
  * add symbols, keeping the list in order
  */
-void
 add_sym(char *name, int v)
 {
     struct sym *s;
     struct sym *p;
  
+    /* gotta be unique */
     if (find_symbol(name) != -1) {
+        printf("symbol %s multi add\n", name);
         return;
     }
-    // printf("adding symbol %s : %x\n", name, v);
+    if (debug > 2) printf("adding symbol %s : %x\n", name, v);
 
     p = 0;
     // traverse the list, stopping when we find a bigger one
@@ -461,6 +558,7 @@ add_sym(char *name, int v)
         s->next = p->next;
         p->next = s;
     }
+    symtab[nsyms++] = s;
 }
 
 char *
@@ -512,6 +610,31 @@ dump_symbols()
             printf("%s\tequ\t%04xh\n", s->name, v);
         }
     }
+}
+
+dorelocs(int segnum)
+{
+    int type;
+
+    wscursor = seg[segnum].base;
+    if (debug) printf("ws_relocs %s\n", seg[segnum].name);
+    do {
+        type = getwsreloc();
+        if (debug) printf("%04x %s %d\n", wswhere, wsrname[type], wssym);
+        switch (type) {
+        case WS_TEXT:
+            setword(wswhere, wordat(wswhere) - obj.textoff + seg[SEG_TEXT].base);
+            break;
+        case WS_DATA:
+            setword(wswhere, wordat(wswhere) - obj.dataoff + seg[SEG_DATA].base);
+            break;
+        case WS_SYM:
+            setword(wswhere, symtab[wssym]->value);
+            break;
+        default:
+            break;
+        }
+    } while (type != WS_END);
 }
 
 /*
@@ -848,39 +971,51 @@ char **argv;
         rewind(file);
         fseek(file, sizeof(obj), SEEK_SET);
 
-         /* read in the whitesmith's object file */
         symlen = ((obj.conf & 7) << 1) + 1;
         
-        seg[SEG_TEXT].base = obj.textoff;
+        /*
+         * assign segment addresses - we do some magic here if it's
+         * got relocations, so text won't be at zero
+         */
+        if (obj.conf == RELOC) {
+            seg[SEG_ZERO].length = 0x100;
+            seg[SEG_ZERO].base = 0;
+        }
+        seg[SEG_TEXT].base = obj.textoff + seg[SEG_ZERO].length;
         seg[SEG_TEXT].length = obj.text;
 
-        if (fread(&codebuf[obj.textoff], 1, obj.text, file) != obj.text) {
+        seg[SEG_DATA].base = obj.dataoff + seg[SEG_ZERO].length;
+        seg[SEG_DATA].length = obj.data;
+
+        seg[SEG_BSS].base = ROUNDUP(seg[SEG_DATA].base + seg[SEG_DATA].length);
+        seg[SEG_BSS].length = obj.bss;
+        seg[SEG_UNDEF].base = ROUNDUP(seg[SEG_BSS].base + seg[SEG_BSS].length);
+
+        /*
+         * read in the whitesmith's text segment
+         */
+        if (fread(&codebuf[seg[SEG_TEXT].base], 1, obj.text, file) 
+                != obj.text) {
             fprintf(stderr, "code read failed\n");
             exit(1);
         }
-        /*
-         * odd case - not sure when this happens
-         */
-        if (obj.dataoff == 0) {
-            seg[SEG_DATA].base = obj.textoff + obj.text;
-        } else {
-            seg[SEG_DATA].base = obj.dataoff;
-        }
-        seg[SEG_DATA].length = obj.data;
 
+        /*
+         * read in the data segment if any
+         */
         if (obj.data) {
-            if (fread(&codebuf[obj.dataoff], 1, obj.data, file) != obj.data) {
+            if (fread(&codebuf[seg[SEG_DATA].base], 1, obj.data, file) 
+                    != obj.data) {
                 fprintf(stderr, "data read failed\n");
                 exit(1);
             }
         }
-        
-        seg[SEG_BSS].base = seg[SEG_DATA].base + seg[SEG_DATA].length;
-        seg[SEG_BSS].length = obj.bss;
-        seg[SEG_UNDEF].base = ROUNDUP(seg[SEG_BSS].base + seg[SEG_BSS].length);
 
         undefs = 0;
 
+        /*
+         * now, read in the symbol table if any
+         */
         for (i = 0; i < obj.table / (symlen + 3); i++) {
             if (fread(line, symlen + 3, 1, file) != 1) {
                 fprintf(stderr, "symbol %d read failed\n", i);
@@ -888,14 +1023,15 @@ char **argv;
             }
             o = line[2];
             v = (line[0] + (line[1] << 8)) & 0xffff;
+            printf("sym: %s %d %04x\n", &line[3], o, v);
             switch (o) {
             case 0xd:
-                add_sym(&line[3], v);
-                reg_target(v, CODE);
+                add_sym(&line[3], v + seg[SEG_TEXT].base);
+                reg_target(v + seg[SEG_TEXT].base, CODE);
                 break;
             case 0xe:
-                add_sym(&line[3], v);
-				reg_target(v, REF);
+                add_sym(&line[3], v + seg[SEG_DATA].base);
+				reg_target(v + seg[SEG_DATA].base, REF);
                 break;
             case 0x8:
                 add_sym(&line[3], seg[SEG_UNDEF].base + undefs++);
@@ -903,7 +1039,14 @@ char **argv;
             }
         }
         seg[SEG_UNDEF].length = undefs;
-
+        /*
+         * and finally, the relocations if any
+         */
+        if (obj.conf == RELOC) {
+            if (debug) printf("relocs present\n");
+            dorelocs(SEG_TEXT);
+            dorelocs(SEG_DATA);
+        }
         startaddr = obj.textoff;
         endaddr = obj.dataoff + obj.data;
         reg_target(obj.textoff, CODE);
