@@ -25,11 +25,16 @@ doc.inl: doc.c doc.txt
 zmac.c: zmac.y
 	bison --output=zmac.c zmac.y
 
-test: nm disas
-	./nm tests/mw.o
+test: disas
+	./disas tests/mw.o
+
+test1: disas
 	./disas -c 0xa72a 0xa72e 0xa732 0xa736 0xa73a 0xa73e 0xa742 0xa746 \
 		0xa48e 0xa4d3 0xa799 0xa79a 0xa4eb 0xa2de \
-		./m167 >m167.out
+		./tests/m167 >tests/m167.out
+
+test2: disas
+	./disas ../../lib/libm/idiv.o
 
 install: disas
 	cp disas ~/bin
