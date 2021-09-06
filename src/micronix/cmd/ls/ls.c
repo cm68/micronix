@@ -449,7 +449,7 @@ char *file;
 		if (stat(file, &statb) < 0) {
 			printf("%s not found\n", file);
 			statb.st_ino = -1;
-			statb.d.size0 = statb.d.size1 = 0;
+			statb.d.d_size0 = statb.d.d_size1 = 0;
 			statb.st_mode = 0;
 			errors++;
 			if (argfl) {
@@ -458,7 +458,7 @@ char *file;
 			}
 		}
 		rep->lnum = statb.st_ino;
-		rep->lsize = statb.d.size1 + (statb.d.size0 << 16);
+		rep->lsize = statb.d.d_size1 + (statb.d.d_size0 << 16);
 		switch(statb.st_mode & S_IFMT) {
 
 		case S_IFDIR:

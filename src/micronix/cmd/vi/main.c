@@ -423,7 +423,7 @@ readfile(fname, fromp, nochangename)
 #ifdef linux
     size = sbuf.st_size;
 #else
-    size = sbuf.d.size1 + (sbuf.d.size0 << 16);
+    size = sbuf.d.d_size1 + (sbuf.d.d_size0 << 16);
 #endif
     if (size + fromp > Filemax) {
         sprintf(msgbuf, "cannot insert file (limit is %d)!\n", FILELENG);
