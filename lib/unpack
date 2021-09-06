@@ -1,6 +1,0 @@
-#!/bin/bash
-for i in ../filesystem/lib/*.a ; do
-	d=$(basename $i .a)
-	mkdir $d
-	(cd $d ; ../../src/tools/ar -x ../$i )
-done

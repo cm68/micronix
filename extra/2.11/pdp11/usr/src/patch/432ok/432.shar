@@ -1,0 +1,54 @@
+#! /bin/sh
+# This is a shell archive, meaning:
+# 1. Remove everything above the #! /bin/sh line.
+# 2. Save the resulting text in a file.
+# 3. Execute the file with /bin/sh (not csh) to create:
+#	/usr/src/ucb/rlogin/Makefile
+# This archive created: Thu Oct 12 21:10:13 2000
+export PATH; PATH=/bin:/usr/bin:$PATH
+if test -f '/usr/src/ucb/rlogin/Makefile'
+then
+	echo shar: "will not over-write existing file '/usr/src/ucb/rlogin/Makefile'"
+else
+sed 's/^Z//' << \SHAR_EOF > '/usr/src/ucb/rlogin/Makefile'
+Z#
+Z# Public Domain.  1996/11/16 - Steven Schultz
+Z#
+Z#	@(#)Makefile	1.0 (2.11BSD) 2000/5/17
+Z#
+ZCFLAGS=	 -O
+ZSEPFLAG= -i
+ZSRCS=	rlogin.c
+ZOBJS=	rlogin.o
+ZMAN=	rlogin.0
+ZMANSRC=	rlogin.1
+Z
+Zall: rlogin rlogin.0
+Z
+Zrlogin: ${OBJS}
+Z	${CC} ${CFLAGS} ${SEPFLAG} -o $@ ${OBJS}
+Z
+Zrlogin.0: ${MANSRC}
+Z	/usr/man/manroff ${MANSRC} > ${MAN}
+Z
+Zclean:
+Z	rm -f ${OBJS} ${MAN} rlogin tags 
+Z
+Zdepend: ${SRCS}
+Z	mkdep ${CFLAGS} ${SRCS}
+Z
+Zinstall: rlogin
+Z	install -c -o bin -g bin -m 444 ${MAN} ${DESTDIR}/usr/man/cat1
+Z	install -s -o root -g bin -m 4755 rlogin ${DESTDIR}/usr/ucb/rlogin
+Z
+Zlint: ${SRCS}
+Z	lint -hax ${SRCS}
+Z
+Ztags: ${SRCS}
+Z	ctags ${SRCS}
+Z# DO NOT DELETE THIS LINE -- mkdep uses it.
+Z# DO NOT PUT ANYTHING AFTER THIS LINE, IT WILL GO AWAY.
+SHAR_EOF
+fi
+exit 0
+#	End of shell archive

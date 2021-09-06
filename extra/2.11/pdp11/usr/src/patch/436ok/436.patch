@@ -1,0 +1,149 @@
+*** /usr/src/libexec/ftpd/ftpd.c.old	Fri Mar 22 22:43:24 1996
+--- /usr/src/libexec/ftpd/ftpd.c	Thu Apr 26 19:36:30 2001
+***************
+*** 20,26 ****
+  "@(#) Copyright (c) 1985, 1988 Regents of the University of California.\n\
+   All rights reserved.\n";
+  
+! static char sccsid[] = "@(#)ftpd.c	5.28.2	(2.11BSD) 1996/3/22";
+  #endif
+  
+  /*
+--- 20,26 ----
+  "@(#) Copyright (c) 1985, 1988 Regents of the University of California.\n\
+   All rights reserved.\n";
+  
+! static char sccsid[] = "@(#)ftpd.c	5.28.3	(2.11BSD) 2001/4/26";
+  #endif
+  
+  /*
+***************
+*** 476,482 ****
+  		sprintf(proctitle, "%s: anonymous/%.*s", remotehost,
+  		    sizeof(proctitle) - sizeof(remotehost) -
+  		    sizeof(": anonymous/"), passwd);
+! 		setproctitle(proctitle);
+  #endif /* SETPROCTITLE */
+  		if (logging)
+  			syslog(LOG_INFO, "ANONYMOUS FTP LOGIN FROM %s, %s",
+--- 476,482 ----
+  		sprintf(proctitle, "%s: anonymous/%.*s", remotehost,
+  		    sizeof(proctitle) - sizeof(remotehost) -
+  		    sizeof(": anonymous/"), passwd);
+! 		setproctitle("%s", proctitle);
+  #endif /* SETPROCTITLE */
+  		if (logging)
+  			syslog(LOG_INFO, "ANONYMOUS FTP LOGIN FROM %s, %s",
+***************
+*** 485,491 ****
+  		reply(230, "User %s logged in.", pw->pw_name);
+  #ifdef SETPROCTITLE
+  		sprintf(proctitle, "%s: %s", remotehost, pw->pw_name);
+! 		setproctitle(proctitle);
+  #endif /* SETPROCTITLE */
+  		if (logging)
+  			syslog(LOG_INFO, "FTP LOGIN FROM %s, %s",
+--- 485,491 ----
+  		reply(230, "User %s logged in.", pw->pw_name);
+  #ifdef SETPROCTITLE
+  		sprintf(proctitle, "%s: %s", remotehost, pw->pw_name);
+! 		setproctitle("%s", proctitle);
+  #endif /* SETPROCTITLE */
+  		if (logging)
+  			syslog(LOG_INFO, "FTP LOGIN FROM %s, %s",
+***************
+*** 1133,1139 ****
+  		    sizeof (remotehost));
+  #ifdef SETPROCTITLE
+  	sprintf(proctitle, "%s: connected", remotehost);
+! 	setproctitle(proctitle);
+  #endif /* SETPROCTITLE */
+  
+  	if (logging) {
+--- 1133,1139 ----
+  		    sizeof (remotehost));
+  #ifdef SETPROCTITLE
+  	sprintf(proctitle, "%s: connected", remotehost);
+! 	setproctitle("%s", proctitle);
+  #endif /* SETPROCTITLE */
+  
+  	if (logging) {
+*** /usr/src/man/man3/getenv.3.old	Mon Mar 30 16:52:45 1987
+--- /usr/src/man/man3/getenv.3	Thu Feb 22 19:48:44 2001
+***************
+*** 1,6 ****
+! .\"	@(#)getenv.3	6.4 (Berkeley) 3/20/87
+  .\"
+! .TH GETENV 3 "March 20, 1987"
+  .AT 3
+  .SH NAME
+  getenv, setenv, unsetenv \- manipulate environmental variables
+--- 1,6 ----
+! .\"	@(#)getenv.3	6.4.1 (2.11BSD) 2001/2/22
+  .\"
+! .TH GETENV 3 "February 22, 2001"
+  .AT 3
+  .SH NAME
+  getenv, setenv, unsetenv \- manipulate environmental variables
+***************
+*** 10,16 ****
+  .B char *name;
+  .PP
+  .B setenv(name, value, overwrite)
+! .B char *name, value;
+  .B int overwrite;
+  .PP
+  .B void unsetenv(name)
+--- 10,16 ----
+  .B char *name;
+  .PP
+  .B setenv(name, value, overwrite)
+! .B char *name, *value;
+  .B int overwrite;
+  .PP
+  .B void unsetenv(name)
+*** /usr/share/lint/llib-lc.old	Mon Feb 28 20:49:45 2000
+--- /usr/share/lint/llib-lc	Thu Feb 22 19:52:02 2001
+***************
+*** 1,4 ****
+! /*	@(#)llib-lc	1.47 (2.11BSD) 1999/9/9 */
+  
+  /* LINTLIBRARY */
+  
+--- 1,4 ----
+! /*	@(#)llib-lc	1.48 (2.11BSD) 2001/2/22 */
+  
+  /* LINTLIBRARY */
+  
+***************
+*** 345,351 ****
+  		{ return 1; }
+  void	seekdir( p, l) DIR *p; long l; {}
+  int	setegid(egid) gid_t egid; { return 0; }
+! int	setenv(n, v, o) char *n, v; { return 0; }
+  int	seteuid(euid) uid_t euid; { return 0; }
+  
+  int	setfsent() { return 0; }
+--- 345,351 ----
+  		{ return 1; }
+  void	seekdir( p, l) DIR *p; long l; {}
+  int	setegid(egid) gid_t egid; { return 0; }
+! int	setenv(n, v, o) char *n, *v; { return 0; }
+  int	seteuid(euid) uid_t euid; { return 0; }
+  
+  int	setfsent() { return 0; }
+*** /VERSION.old	Wed Feb  7 20:56:59 2001
+--- /VERSION	Thu Apr 26 19:36:22 2001
+***************
+*** 1,5 ****
+! Current Patch Level: 435
+! Date: February 7, 2001
+  
+  2.11 BSD
+  ============
+--- 1,5 ----
+! Current Patch Level: 436
+! Date: April 26, 2001
+  
+  2.11 BSD
+  ============
