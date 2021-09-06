@@ -1,0 +1,187 @@
+#
+# Copyright (c) 1988 Regents of the University of California.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms are permitted
+# provided that this notice is preserved and that due credit is given
+# to the University of California at Berkeley. The name of the University
+# may not be used to endorse or promote products derived from this
+# software without specific prior written permission. This software
+# is provided ``as is'' without express or implied warranty.
+#
+#	2.2 (2.11BSD GTE) 1996/6/8
+#
+M=	../machine
+VPATH=	../machine
+
+CFILES=	${M}/clock.c ${M}/conf.c ${M}/cons.c ${M}/kern_pdp.c \
+	${M}/machdep.c ${M}/machdep2.c ${M}/mem.c ${M}/ram.c ${M}/trap.c
+COBJS=	clock.o conf.o cons.o kern_pdp.o machdep.o machdep2.o mem.o \
+	ram.o trap.o
+
+# We compile mch_KScall here rather than in Make.pdpnet so that it gets
+# compiled with the right flags.  This means that it gets compiled for all
+# kernel, but is only included in the networking kernel.  As it only takes
+# a few seconds to compile it, it isn't worth trashing up Make.pdpnet to
+# compile it there.
+
+SFILES=	${M}/mch_backup.s \
+	${M}/mch_click.s ${M}/mch_copy.s ${M}/mch_csv.s ${M}/mch_dump.s \
+	${M}/mch_dzpdma.s ${M}/mch_fpsim.s ${M}/mch_KScall.s \
+	${M}/mch_profile.s ${M}/mch_start.s ${M}/mch_trap.s \
+	${M}/mch_vars.s ${M}/mch_xxx.s ${M}/scb.s ${M}/toy.s
+SOBJS=	mch_backup.o mch_click.o mch_copy.o mch_csv.o \
+	mch_dump.o mch_dzpdma.o mch_fpsim.o mch_KScall.o mch_profile.o \
+	mch_start.o mch_trap.o mch_vars.o mch_xxx.o scb.o toy.o
+
+.c.o:
+	${CC} ${CFLAGS} -S $*.c
+	${SED} -f SPLFIX $*.s | ${AS} -u -o $*.o
+	rm -f $*.s
+
+.s.o:
+	${CPP} $*.s | ${AS} -u -o $*.o
+
+all: assym.h ${COBJS} ${SOBJS} ../pdp/symbols.sort
+
+assym.h: genassym
+	./genassym > $@
+
+genassym:
+	${CC} -O ${CFLAGS} ${M}/genassym.c -o $@
+
+# it's a tab character in the sed statement below not a space.
+
+../pdp/symbols.sort: ../pdp/symbols.raw
+	grep -v '^#' ../pdp/symbols.raw \
+	    | sed 's/^	//' | sort -u > ../pdp/symbols.sort
+
+depend:  assym.h
+	mkdep -f Make.pdp ${CFLAGS} ${CFILES} ${SFILES} ${M}/genassym.c
+
+# DO NOT DELETE THIS LINE -- mkdep uses it.
+# DO NOT PUT ANYTHING AFTER THIS LINE, IT WILL GO AWAY.
+
+clock.o: ../machine/clock.c ../h/param.h /usr/include/sys/localopts.h
+clock.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+clock.o: /usr/include/sys/types.h /usr/include/sys/select.h
+clock.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+clock.o: ../h/../machine/net_mac.h ../machine/clock.h
+conf.o: ../machine/conf.c ../h/param.h /usr/include/sys/localopts.h
+conf.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+conf.o: /usr/include/sys/types.h /usr/include/sys/select.h
+conf.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+conf.o: ../h/../machine/net_mac.h ../h/conf.h ../h/buf.h ../h/time.h
+conf.o: /usr/include/sys/types.h ../h/ioctl.h ../h/ttychars.h ../h/ttydev.h
+conf.o: ../h/resource.h ../h/inode.h ../h/proc.h ../h/clist.h ../h/tty.h
+conf.o: ../h/ttychars.h ../h/ttydev.h rk.h tm.h hk.h xp.h br.h ht.h rl.h ts.h
+conf.o: tms.h si.h ra.h rx.h ram.h lp.h dh.h dz.h pty.h dr.h dhu.h dhv.h dn.h
+conf.o: ingres.h
+cons.o: ../machine/cons.c ../h/param.h /usr/include/sys/localopts.h
+cons.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+cons.o: /usr/include/sys/types.h /usr/include/sys/select.h
+cons.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+cons.o: ../h/../machine/net_mac.h ../h/conf.h ../h/user.h
+cons.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+cons.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+cons.o: ../h/proc.h ../h/ioctl.h ../h/ttychars.h ../h/ttydev.h ../h/tty.h
+cons.o: ../h/ttychars.h ../h/ttydev.h ../h/systm.h ../machine/cons.h cn.h
+kern_pdp.o: ../machine/kern_pdp.c ../h/param.h /usr/include/sys/localopts.h
+kern_pdp.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_pdp.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_pdp.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_pdp.o: ../h/../machine/net_mac.h ../machine/../machine/autoconfig.h
+kern_pdp.o: ../machine/../machine/seg.h ../h/user.h ../h/../machine/fperr.h
+kern_pdp.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+kern_pdp.o: ../h/resource.h /usr/include/sys/errno.h ../h/ioctl.h
+kern_pdp.o: ../h/ttychars.h ../h/ttydev.h ../h/proc.h ../h/kernel.h
+kern_pdp.o: /usr/include/sys/time.h ../h/systm.h ../machine/cpu.h ../h/tty.h
+kern_pdp.o: ../h/ttychars.h ../h/ttydev.h tms.h ra.h
+machdep.o: ../machine/machdep.c ../h/param.h /usr/include/sys/localopts.h
+machdep.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+machdep.o: /usr/include/sys/types.h /usr/include/sys/select.h
+machdep.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+machdep.o: ../h/../machine/net_mac.h ../machine/../machine/psl.h
+machdep.o: ../machine/../machine/reg.h ../h/signalvar.h ../h/user.h
+machdep.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+machdep.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+machdep.o: ../h/proc.h ../h/buf.h ../h/map.h ../h/uba.h ../h/syslog.h
+machdep2.o: ../machine/machdep2.c ../h/param.h /usr/include/sys/localopts.h
+machdep2.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+machdep2.o: /usr/include/sys/types.h /usr/include/sys/select.h
+machdep2.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+machdep2.o: ../h/../machine/net_mac.h ../machine/../machine/seg.h
+machdep2.o: ../machine/../machine/iopage.h ../h/dir.h ../h/inode.h ../h/user.h
+machdep2.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+machdep2.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+machdep2.o: ../h/proc.h ../h/fs.h ../h/map.h ../h/buf.h ../h/text.h ../h/file.h
+machdep2.o: /usr/include/fcntl.h ../h/clist.h ../h/uba.h ../h/callout.h
+machdep2.o: ../h/reboot.h ../h/systm.h ram.h ../h/msgbuf.h ../h/namei.h
+machdep2.o: ../h/uio.h /usr/include/machine/seg.h ra.h tms.h ingres.h
+machdep2.o: ../h/disklabel.h ../h/mount.h /usr/include/sys/fs.h ec.h
+mem.o: ../machine/mem.c ../h/param.h /usr/include/sys/localopts.h
+mem.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+mem.o: /usr/include/sys/types.h /usr/include/sys/select.h
+mem.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+mem.o: ../h/../machine/net_mac.h ../machine/../machine/seg.h ../h/user.h
+mem.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+mem.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+mem.o: ../h/conf.h ../h/uio.h
+ram.o: ../machine/ram.c ram.h
+trap.o: ../machine/trap.c ../h/param.h /usr/include/sys/localopts.h
+trap.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+trap.o: /usr/include/sys/types.h /usr/include/sys/select.h
+trap.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+trap.o: ../h/../machine/net_mac.h ../machine/../machine/psl.h
+trap.o: ../machine/../machine/reg.h ../machine/../machine/seg.h
+trap.o: ../machine/../machine/trap.h ../machine/../machine/iopage.h
+trap.o: ../h/signalvar.h ../h/systm.h ../h/user.h ../h/../machine/fperr.h
+trap.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+trap.o: ../h/resource.h /usr/include/sys/errno.h ../h/proc.h ../h/vm.h
+trap.o: ../h/vmparam.h ../h/../machine/vmparam.h ../h/vmmac.h ../h/vmmeter.h
+trap.o: ../h/vmsystm.h
+mch_backup.o: ../machine/mch_backup.s ../machine/DEFS.h localopts.h assym.h
+mch_click.o: ../machine/mch_click.s ../machine/DEFS.h localopts.h assym.h
+mch_click.o: ../machine/../machine/mch_iopage.h
+mch_copy.o: ../machine/mch_copy.s ../machine/DEFS.h localopts.h assym.h
+mch_copy.o: ../machine/../machine/mch_iopage.h
+mch_csv.o: ../machine/mch_csv.s ../machine/DEFS.h localopts.h assym.h
+mch_csv.o: ../machine/../machine/mch_iopage.h ../machine/../machine/koverlay.h
+mch_dump.o: ../machine/mch_dump.s ../machine/DEFS.h localopts.h assym.h
+mch_dump.o: ../machine/../machine/mch_iopage.h ht.h tm.h ts.h
+mch_dzpdma.o: ../machine/mch_dzpdma.s ../machine/DEFS.h localopts.h assym.h
+mch_dzpdma.o: ../machine/../machine/mch_iopage.h
+mch_dzpdma.o: ../machine/../machine/koverlay.h dz.h
+mch_fpsim.o: ../machine/mch_fpsim.s ../machine/DEFS.h localopts.h assym.h
+mch_KScall.o: ../machine/mch_KScall.s ../machine/DEFS.h localopts.h assym.h
+mch_KScall.o: ../machine/../machine/mch_iopage.h
+mch_profile.o: ../machine/mch_profile.s
+mch_start.o: ../machine/mch_start.s ../machine/DEFS.h localopts.h assym.h
+mch_start.o: ../machine/../machine/mch_iopage.h ../machine/../machine/mch_cpu.h
+mch_start.o: ../machine/../machine/trap.h
+mch_trap.o: ../machine/mch_trap.s ../machine/DEFS.h localopts.h assym.h
+mch_trap.o: ../machine/../machine/mch_iopage.h ../machine/../machine/koverlay.h
+mch_trap.o: ../machine/../machine/trap.h
+mch_vars.o: ../machine/mch_vars.s ../machine/DEFS.h localopts.h assym.h
+mch_vars.o: ../machine/../machine/mch_iopage.h
+mch_xxx.o: ../machine/mch_xxx.s ../machine/DEFS.h localopts.h assym.h
+mch_xxx.o: ../machine/../machine/mch_iopage.h ../machine/../machine/koverlay.h
+scb.o: ../machine/scb.s ../machine/DEFS.h localopts.h assym.h
+scb.o: ../machine/../machine/trap.h ../machine/../machine/mch_iopage.h
+scb.o: ../machine/../machine/koverlay.h acc.h css.h de.h dh.h dhu.h dhv.h dn.h
+scb.o: dr.h dz.h ec.h hk.h ht.h il.h lp.h ra.h rk.h rl.h br.h rx.h si.h sri.h
+scb.o: tm.h ts.h tms.h xp.h vv.h
+toy.o: ../machine/toy.s
+genassym.o: ../machine/genassym.c ../h/param.h /usr/include/sys/localopts.h
+genassym.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+genassym.o: /usr/include/sys/types.h /usr/include/sys/select.h
+genassym.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+genassym.o: ../h/../machine/net_mac.h ../machine/../machine/seg.h ../h/user.h
+genassym.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+genassym.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+genassym.o: ../h/inode.h ../h/mbuf.h ../h/buf.h ../h/proc.h ../h/errno.h
+genassym.o: ../h/reboot.h /usr/include/syscall.h ../h/vm.h ../h/vmparam.h
+genassym.o: ../h/../machine/vmparam.h ../h/vmmac.h ../h/vmmeter.h
+genassym.o: ../h/vmsystm.h dz.h ../machine/../net/netisr.h /usr/include/stdio.h
+
+# IF YOU PUT ANYTHING HERE IT WILL GO AWAY

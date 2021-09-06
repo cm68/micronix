@@ -1,0 +1,635 @@
+#
+# Copyright (c) 1988 Regents of the University of California.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms are permitted
+# provided that this notice is preserved and that due credit is given
+# to the University of California at Berkeley. The name of the University
+# may not be used to endorse or promote products derived from this
+# software without specific prior written permission. This software
+# is provided ``as is'' without express or implied warranty.
+#
+#	2.6 (2.11BSD GTE) 1997/11/28
+#
+S=	../sys
+VPATH=	../sys
+
+CFILES=	${S}/init_main.c ${S}/init_sysent.c ${S}/kern_acct.c		\
+	${S}/kern_clock.c ${S}/kern_descrip.c ${S}/kern_exec.c		\
+	${S}/kern_exit.c ${S}/kern_fork.c ${S}/kern_mman.c		\
+	${S}/kern_proc.c ${S}/kern_prot.c ${S}/kern_resource.c		\
+	${S}/kern_prot2.c						\
+	${S}/kern_sig.c ${S}/kern_subr.c ${S}/kern_sysctl.c		\
+	${S}/kern_sig2.c						\
+	${S}/kern_synch.c ${S}/kern_time.c ${S}/kern_xxx.c		\
+	${S}/quota_sys.c ${S}/quota_kern.c ${S}/quota_ufs.c		\
+	${S}/quota_subr.c ${S}/subr_log.c ${S}/subr_prf.c ${S}/subr_rmap.c \
+	${S}/subr_xxx.c ${S}/sys_generic.c ${S}/sys_inode.c		\
+	${S}/sys_kern.c ${S}/sys_pipe.c					\
+	${S}/ingreslock.c						\
+	${S}/sys_process.c ${S}/syscalls.c ${S}/tty.c ${S}/tty_conf.c	\
+	${S}/tty_pty.c ${S}/tty_subr.c ${S}/tty_tb.c ${S}/tty_tty.c	\
+	${S}/ufs_alloc.c ${S}/ufs_bio.c ${S}/ufs_bmap.c			\
+	${S}/ufs_dsort.c ${S}/ufs_fio.c ${S}/ufs_inode.c		\
+	${S}/ufs_mount.c ${S}/ufs_namei.c ${S}/ufs_subr.c		\
+	${S}/ufs_disksubr.c ${S}/ufs_syscalls2.c			\
+	${S}/ufs_syscalls.c ${S}/uipc_syscalls.c ${S}/vm_proc.c		\
+	${S}/vfs_vnops.c \
+	${S}/vm_sched.c ${S}/vm_swap.c ${S}/vm_swp.c ${S}/vm_text.c
+OBJS=	init_main.o init_sysent.o kern_acct.o kern_clock.o		\
+	kern_descrip.o kern_exec.o kern_exit.o kern_fork.o kern_mman.o	\
+	kern_proc.o kern_prot.o kern_resource.o kern_sig.o kern_sysctl.o \
+	kern_prot2.o kern_sig2.o					\
+	kern_subr.o kern_synch.o kern_time.o kern_xxx.o quota_sys.o	\
+       quota_kern.o quota_ufs.o quota_subr.o subr_log.o subr_prf.o subr_rmap.o \
+	ingreslock.o							\
+	subr_xxx.o sys_generic.o sys_inode.o sys_kern.o			\
+	sys_pipe.o sys_process.o syscalls.o tty.o tty_conf.o tty_pty.o	\
+	tty_subr.o tty_tb.o tty_tty.o ufs_alloc.o ufs_bio.o ufs_bmap.o	\
+	ufs_dsort.o ufs_fio.o ufs_inode.o ufs_mount.o ufs_namei.o	\
+	ufs_subr.o ufs_syscalls.o uipc_syscalls.o vm_proc.o vm_sched.o	\
+	ufs_disksubr.o ufs_syscalls2.o					\
+	vfs_vnops.o \
+	vm_swap.o vm_swp.o vm_text.o
+
+.c.o:
+	${CC} ${CFLAGS} -S $*.c
+	${SED} -f SPLFIX $*.s | ${AS} -u -o $*.o
+	rm -f $*.s
+
+all: ${OBJS}
+
+depend: 
+	mkdep -f Make.sys ${CFLAGS} ${CFILES}
+
+# DO NOT DELETE THIS LINE -- mkdep uses it.
+# DO NOT PUT ANYTHING AFTER THIS LINE, IT WILL GO AWAY.
+
+init_main.o: ../sys/init_main.c ../h/param.h /usr/include/sys/localopts.h
+init_main.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+init_main.o: /usr/include/sys/types.h /usr/include/sys/select.h
+init_main.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+init_main.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/user.h
+init_main.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+init_main.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+init_main.o: ../h/fs.h ../h/mount.h /usr/include/sys/fs.h ../h/map.h
+init_main.o: ../h/proc.h ../h/ioctl.h ../h/ttychars.h ../h/ttydev.h
+init_main.o: ../h/inode.h ../h/conf.h ../h/buf.h /usr/include/fcntl.h ../h/vm.h
+init_main.o: ../h/vmparam.h ../h/../machine/vmparam.h ../h/vmmac.h
+init_main.o: ../h/vmmeter.h ../h/vmsystm.h ../h/clist.h ../h/uba.h
+init_main.o: ../h/reboot.h ../h/systm.h ../h/kernel.h /usr/include/sys/time.h
+init_main.o: ../h/namei.h ../h/uio.h /usr/include/machine/seg.h
+init_main.o: ../h/disklabel.h ../h/stat.h
+init_sysent.o: ../sys/init_sysent.c ../h/param.h /usr/include/sys/localopts.h
+init_sysent.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+init_sysent.o: /usr/include/sys/types.h /usr/include/sys/select.h
+init_sysent.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+init_sysent.o: ../h/../machine/net_mac.h ../h/systm.h
+kern_acct.o: ../sys/kern_acct.c ../h/param.h /usr/include/sys/localopts.h
+kern_acct.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_acct.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_acct.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_acct.o: ../h/../machine/net_mac.h ../h/systm.h ../h/user.h
+kern_acct.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+kern_acct.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+kern_acct.o: ../h/msgbuf.h ../h/kernel.h /usr/include/sys/time.h ../h/acct.h
+kern_clock.o: ../sys/kern_clock.c ../h/param.h /usr/include/sys/localopts.h
+kern_clock.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_clock.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_clock.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_clock.o: ../h/../machine/net_mac.h ../sys/../machine/psl.h
+kern_clock.o: ../sys/../machine/seg.h ../h/user.h ../h/../machine/fperr.h
+kern_clock.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+kern_clock.o: ../h/resource.h /usr/include/sys/errno.h ../h/proc.h
+kern_clock.o: ../h/callout.h ../h/dk.h ../h/kernel.h /usr/include/sys/time.h
+kern_clock.o: ../h/systm.h
+kern_descrip.o: ../sys/kern_descrip.c ../h/param.h /usr/include/sys/localopts.h
+kern_descrip.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_descrip.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_descrip.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_descrip.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+kern_descrip.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+kern_descrip.o: ../h/resource.h /usr/include/sys/errno.h ../h/proc.h
+kern_descrip.o: ../h/file.h /usr/include/fcntl.h ../h/systm.h ../h/inode.h
+kern_descrip.o: ../h/ioctl.h ../h/ttychars.h ../h/ttydev.h ../h/stat.h
+kern_descrip.o: ../h/conf.h ../h/socket.h ../h/socketvar.h ../h/syslog.h
+kern_exec.o: ../sys/kern_exec.c ../h/param.h /usr/include/sys/localopts.h
+kern_exec.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_exec.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_exec.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_exec.o: ../h/../machine/net_mac.h ../sys/../machine/reg.h
+kern_exec.o: ../sys/../machine/seg.h ../h/systm.h ../h/map.h ../h/user.h
+kern_exec.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+kern_exec.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+kern_exec.o: ../h/proc.h ../h/buf.h ../h/inode.h ../h/acct.h ../h/namei.h
+kern_exec.o: ../h/uio.h /usr/include/machine/seg.h ../h/fs.h ../h/mount.h
+kern_exec.o: /usr/include/sys/fs.h ../h/file.h /usr/include/fcntl.h ../h/text.h
+kern_exec.o: ../h/signalvar.h
+kern_exit.o: ../sys/kern_exit.c ../h/param.h /usr/include/sys/localopts.h
+kern_exit.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_exit.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_exit.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_exit.o: ../h/../machine/net_mac.h ../sys/../machine/psl.h
+kern_exit.o: ../sys/../machine/reg.h ../h/systm.h ../h/map.h ../h/user.h
+kern_exit.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+kern_exit.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+kern_exit.o: ../h/proc.h ../h/inode.h ../h/vm.h ../h/vmparam.h
+kern_exit.o: ../h/../machine/vmparam.h ../h/vmmac.h ../h/vmmeter.h
+kern_exit.o: ../h/vmsystm.h ../h/file.h /usr/include/fcntl.h ../h/wait.h
+kern_exit.o: ../h/kernel.h /usr/include/sys/time.h ingres.h
+kern_fork.o: ../sys/kern_fork.c ../h/param.h /usr/include/sys/localopts.h
+kern_fork.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_fork.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_fork.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_fork.o: ../h/../machine/net_mac.h ../sys/../machine/reg.h
+kern_fork.o: ../sys/../machine/seg.h ../h/systm.h ../h/map.h ../h/user.h
+kern_fork.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+kern_fork.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+kern_fork.o: ../h/proc.h ../h/inode.h ../h/acct.h ../h/file.h
+kern_fork.o: /usr/include/fcntl.h ../h/vm.h ../h/vmparam.h
+kern_fork.o: ../h/../machine/vmparam.h ../h/vmmac.h ../h/vmmeter.h
+kern_fork.o: ../h/vmsystm.h ../h/text.h ../h/kernel.h /usr/include/sys/time.h
+kern_mman.o: ../sys/kern_mman.c ../h/param.h /usr/include/sys/localopts.h
+kern_mman.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_mman.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_mman.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_mman.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/user.h
+kern_mman.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+kern_mman.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+kern_mman.o: ../h/proc.h ../h/vm.h ../h/vmparam.h ../h/../machine/vmparam.h
+kern_mman.o: ../h/vmmac.h ../h/vmmeter.h ../h/vmsystm.h ../h/text.h
+kern_mman.o: ../h/systm.h
+kern_proc.o: ../sys/kern_proc.c ../h/param.h /usr/include/sys/localopts.h
+kern_proc.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_proc.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_proc.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_proc.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+kern_proc.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+kern_proc.o: ../h/resource.h /usr/include/sys/errno.h ../h/proc.h ../h/systm.h
+kern_prot.o: ../sys/kern_prot.c ../h/param.h /usr/include/sys/localopts.h
+kern_prot.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_prot.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_prot.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_prot.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+kern_prot.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+kern_prot.o: ../h/resource.h /usr/include/sys/errno.h ../h/proc.h ../h/systm.h
+kern_resource.o: ../sys/kern_resource.c ../h/param.h
+kern_resource.o: /usr/include/sys/localopts.h /usr/include/sys/stddef.h
+kern_resource.o: /usr/include/machine/machparam.h /usr/include/sys/types.h
+kern_resource.o: /usr/include/sys/select.h /usr/include/sys/types.h
+kern_resource.o: ../h/signal.h /usr/include/sys/types.h
+kern_resource.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+kern_resource.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+kern_resource.o: ../h/resource.h /usr/include/sys/errno.h ../h/proc.h
+kern_resource.o: ../h/systm.h ../h/vm.h ../h/vmparam.h
+kern_resource.o: ../h/../machine/vmparam.h ../h/vmmac.h ../h/vmmeter.h
+kern_resource.o: ../h/vmsystm.h ../h/kernel.h /usr/include/sys/time.h
+kern_prot2.o: ../sys/kern_prot2.c ../h/param.h /usr/include/sys/localopts.h
+kern_prot2.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_prot2.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_prot2.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_prot2.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+kern_prot2.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+kern_prot2.o: ../h/resource.h /usr/include/sys/errno.h ../h/acct.h ../h/proc.h
+kern_prot2.o: ../h/systm.h
+kern_sig.o: ../sys/kern_sig.c ../h/param.h /usr/include/sys/localopts.h
+kern_sig.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_sig.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_sig.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_sig.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/systm.h
+kern_sig.o: ../h/user.h ../h/../machine/fperr.h ../h/dir.h ../h/exec.h
+kern_sig.o: ../h/time.h /usr/include/sys/types.h ../h/resource.h
+kern_sig.o: /usr/include/sys/errno.h ../h/inode.h ../h/proc.h ../h/text.h
+kern_sig.o: ../h/namei.h ../h/uio.h /usr/include/machine/seg.h ../h/acct.h
+kern_sig.o: ../h/signalvar.h
+kern_subr.o: ../sys/kern_subr.c ../h/param.h /usr/include/sys/localopts.h
+kern_subr.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_subr.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_subr.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_subr.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/systm.h
+kern_subr.o: ../h/user.h ../h/../machine/fperr.h ../h/dir.h ../h/exec.h
+kern_subr.o: ../h/time.h /usr/include/sys/types.h ../h/resource.h
+kern_subr.o: /usr/include/sys/errno.h ../h/buf.h ../h/uio.h
+kern_sysctl.o: ../sys/kern_sysctl.c /usr/include/sys/param.h
+kern_sysctl.o: /usr/include/sys/localopts.h /usr/include/sys/stddef.h
+kern_sysctl.o: /usr/include/machine/machparam.h /usr/include/sys/types.h
+kern_sysctl.o: /usr/include/sys/select.h /usr/include/sys/types.h ../h/signal.h
+kern_sysctl.o: /usr/include/sys/types.h /usr/include/sys/../machine/net_mac.h
+kern_sysctl.o: /usr/include/sys/user.h /usr/include/sys/../machine/fperr.h
+kern_sysctl.o: /usr/include/sys/dir.h /usr/include/sys/exec.h
+kern_sysctl.o: /usr/include/sys/time.h /usr/include/sys/types.h
+kern_sysctl.o: /usr/include/sys/resource.h /usr/include/sys/errno.h
+kern_sysctl.o: /usr/include/sys/systm.h /usr/include/sys/proc.h
+kern_sysctl.o: /usr/include/sys/buf.h /usr/include/sys/kernel.h
+kern_sysctl.o: /usr/include/sys/time.h /usr/include/sys/file.h
+kern_sysctl.o: /usr/include/fcntl.h /usr/include/sys/inode.h
+kern_sysctl.o: /usr/include/sys/ioctl.h /usr/include/sys/ttychars.h
+kern_sysctl.o: /usr/include/sys/ttydev.h /usr/include/sys/text.h
+kern_sysctl.o: /usr/include/sys/tty.h /usr/include/sys/ttychars.h
+kern_sysctl.o: /usr/include/sys/ttydev.h /usr/include/sys/vm.h
+kern_sysctl.o: /usr/include/sys/vmparam.h /usr/include/sys/../machine/vmparam.h
+kern_sysctl.o: /usr/include/sys/vmmac.h /usr/include/sys/vmmeter.h
+kern_sysctl.o: /usr/include/sys/vmsystm.h /usr/include/sys/map.h
+kern_sysctl.o: /usr/include/machine/seg.h /usr/include/sys/sysctl.h
+kern_sysctl.o: /usr/include/machine/cpu.h ../h/conf.h
+kern_sig2.o: ../sys/kern_sig2.c /usr/include/sys/param.h
+kern_sig2.o: /usr/include/sys/localopts.h /usr/include/sys/stddef.h
+kern_sig2.o: /usr/include/machine/machparam.h /usr/include/sys/types.h
+kern_sig2.o: /usr/include/sys/select.h /usr/include/sys/types.h ../h/signal.h
+kern_sig2.o: /usr/include/sys/types.h /usr/include/sys/../machine/net_mac.h
+kern_sig2.o: /usr/include/sys/signal.h /usr/include/sys/signalvar.h
+kern_sig2.o: /usr/include/sys/dir.h /usr/include/sys/namei.h
+kern_sig2.o: /usr/include/sys/uio.h /usr/include/machine/seg.h
+kern_sig2.o: /usr/include/sys/time.h /usr/include/sys/types.h
+kern_sig2.o: /usr/include/sys/resource.h /usr/include/sys/proc.h
+kern_sig2.o: /usr/include/sys/systm.h /usr/include/sys/kernel.h
+kern_sig2.o: /usr/include/sys/time.h /usr/include/sys/user.h
+kern_sig2.o: /usr/include/sys/../machine/fperr.h /usr/include/sys/dir.h
+kern_sig2.o: /usr/include/sys/exec.h /usr/include/sys/time.h
+kern_sig2.o: /usr/include/sys/resource.h /usr/include/sys/errno.h
+kern_synch.o: ../sys/kern_synch.c ../h/param.h /usr/include/sys/localopts.h
+kern_synch.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_synch.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_synch.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_synch.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/user.h
+kern_synch.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+kern_synch.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+kern_synch.o: ../h/proc.h ../h/buf.h ../h/signal.h ../h/signalvar.h ../h/vm.h
+kern_synch.o: ../h/vmparam.h ../h/../machine/vmparam.h ../h/vmmac.h
+kern_synch.o: ../h/vmmeter.h ../h/vmsystm.h ../h/kernel.h
+kern_synch.o: /usr/include/sys/time.h ../h/systm.h
+kern_time.o: ../sys/kern_time.c ../h/param.h /usr/include/sys/localopts.h
+kern_time.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_time.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_time.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_time.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+kern_time.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+kern_time.o: ../h/resource.h /usr/include/sys/errno.h ../h/proc.h ../h/kernel.h
+kern_time.o: /usr/include/sys/time.h ../h/systm.h
+kern_xxx.o: ../sys/kern_xxx.c ../h/param.h /usr/include/sys/localopts.h
+kern_xxx.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+kern_xxx.o: /usr/include/sys/types.h /usr/include/sys/select.h
+kern_xxx.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+kern_xxx.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+kern_xxx.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+kern_xxx.o: ../h/resource.h /usr/include/sys/errno.h ../h/signal.h
+kern_xxx.o: ../h/reboot.h ../h/kernel.h /usr/include/sys/time.h ../h/systm.h
+kern_xxx.o: ../h/fs.h
+quota_sys.o: ../sys/quota_sys.c ../h/param.h /usr/include/sys/localopts.h
+quota_sys.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+quota_sys.o: /usr/include/sys/types.h /usr/include/sys/select.h
+quota_sys.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+quota_sys.o: ../h/../machine/net_mac.h ../h/systm.h ../h/user.h
+quota_sys.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+quota_sys.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+quota_sys.o: ../h/proc.h ../h/inode.h ../h/quota.h ../h/fs.h ../h/mount.h
+quota_sys.o: /usr/include/sys/fs.h ../h/uio.h
+quota_kern.o: ../sys/quota_kern.c ../h/param.h /usr/include/sys/localopts.h
+quota_kern.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+quota_kern.o: /usr/include/sys/types.h /usr/include/sys/select.h
+quota_kern.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+quota_kern.o: ../h/../machine/net_mac.h
+quota_ufs.o: ../sys/quota_ufs.c ../h/param.h /usr/include/sys/localopts.h
+quota_ufs.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+quota_ufs.o: /usr/include/sys/types.h /usr/include/sys/select.h
+quota_ufs.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+quota_ufs.o: ../h/../machine/net_mac.h
+quota_subr.o: ../sys/quota_subr.c ../h/param.h /usr/include/sys/localopts.h
+quota_subr.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+quota_subr.o: /usr/include/sys/types.h /usr/include/sys/select.h
+quota_subr.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+quota_subr.o: ../h/../machine/net_mac.h
+subr_log.o: ../sys/subr_log.c ../h/param.h /usr/include/sys/localopts.h
+subr_log.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+subr_log.o: /usr/include/sys/types.h /usr/include/sys/select.h
+subr_log.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+subr_log.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+subr_log.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+subr_log.o: ../h/resource.h /usr/include/sys/errno.h ../h/proc.h ../h/ioctl.h
+subr_log.o: ../h/ttychars.h ../h/ttydev.h ../h/msgbuf.h ../h/file.h
+subr_log.o: /usr/include/fcntl.h ../h/inode.h ../h/errno.h ../h/uio.h
+subr_log.o: /usr/include/machine/seg.h ../h/map.h
+subr_prf.o: ../sys/subr_prf.c ../h/param.h /usr/include/sys/localopts.h
+subr_prf.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+subr_prf.o: /usr/include/sys/types.h /usr/include/sys/select.h
+subr_prf.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+subr_prf.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+subr_prf.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+subr_prf.o: ../h/resource.h /usr/include/sys/errno.h /usr/include/machine/seg.h
+subr_prf.o: ../h/buf.h ../h/msgbuf.h ../h/conf.h ../h/ioctl.h ../h/ttychars.h
+subr_prf.o: ../h/ttydev.h ../h/tty.h ../h/ttychars.h ../h/ttydev.h
+subr_prf.o: ../h/reboot.h ../h/systm.h ../h/syslog.h
+subr_rmap.o: ../sys/subr_rmap.c ../h/param.h /usr/include/sys/localopts.h
+subr_rmap.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+subr_rmap.o: /usr/include/sys/types.h /usr/include/sys/select.h
+subr_rmap.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+subr_rmap.o: ../h/../machine/net_mac.h ../h/systm.h ../h/map.h ../h/vm.h
+subr_rmap.o: ../h/vmparam.h ../h/../machine/vmparam.h ../h/vmmac.h
+subr_rmap.o: ../h/vmmeter.h ../h/vmsystm.h
+subr_xxx.o: ../sys/subr_xxx.c ../h/param.h /usr/include/sys/localopts.h
+subr_xxx.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+subr_xxx.o: /usr/include/sys/types.h /usr/include/sys/select.h
+subr_xxx.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+subr_xxx.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+subr_xxx.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+subr_xxx.o: ../h/resource.h /usr/include/sys/errno.h
+sys_generic.o: ../sys/sys_generic.c ../h/param.h /usr/include/sys/localopts.h
+sys_generic.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+sys_generic.o: /usr/include/sys/types.h /usr/include/sys/select.h
+sys_generic.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+sys_generic.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/user.h
+sys_generic.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+sys_generic.o: /usr/include/sys/types.h ../h/resource.h
+sys_generic.o: /usr/include/sys/errno.h ../h/proc.h ../h/signalvar.h
+sys_generic.o: ../h/inode.h ../h/file.h /usr/include/fcntl.h ../h/ioctl.h
+sys_generic.o: ../h/ttychars.h ../h/ttydev.h ../h/conf.h ../h/uio.h pty.h
+sys_generic.o: ../h/kernel.h /usr/include/sys/time.h ../h/systm.h
+sys_inode.o: ../sys/sys_inode.c ../h/param.h /usr/include/sys/localopts.h
+sys_inode.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+sys_inode.o: /usr/include/sys/types.h /usr/include/sys/select.h
+sys_inode.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+sys_inode.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/user.h
+sys_inode.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+sys_inode.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+sys_inode.o: ../h/proc.h ../h/signalvar.h ../h/inode.h ../h/buf.h ../h/fs.h
+sys_inode.o: ../h/file.h /usr/include/fcntl.h ../h/stat.h ../h/mount.h
+sys_inode.o: /usr/include/sys/fs.h ../h/conf.h ../h/uio.h ../h/ioctl.h
+sys_inode.o: ../h/ttychars.h ../h/ttydev.h ../h/tty.h ../h/ttychars.h
+sys_inode.o: ../h/ttydev.h ../h/kernel.h /usr/include/sys/time.h ../h/systm.h
+sys_inode.o: ../h/syslog.h
+sys_kern.o: ../sys/sys_kern.c ../h/param.h /usr/include/sys/localopts.h
+sys_kern.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+sys_kern.o: /usr/include/sys/types.h /usr/include/sys/select.h
+sys_kern.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+sys_kern.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/user.h
+sys_kern.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+sys_kern.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+sys_kern.o: ../h/file.h /usr/include/fcntl.h ../h/socketvar.h ../h/inode.h
+sys_kern.o: ../h/proc.h ../h/namei.h ../h/uio.h /usr/include/machine/seg.h
+sys_kern.o: ../h/mbuf.h ../h/map.h
+sys_pipe.o: ../sys/sys_pipe.c ../h/param.h /usr/include/sys/localopts.h
+sys_pipe.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+sys_pipe.o: /usr/include/sys/types.h /usr/include/sys/select.h
+sys_pipe.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+sys_pipe.o: ../h/../machine/net_mac.h ../h/systm.h ../h/user.h
+sys_pipe.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+sys_pipe.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+sys_pipe.o: ../h/proc.h ../h/inode.h ../h/file.h /usr/include/fcntl.h ../h/fs.h
+sys_pipe.o: ../h/mount.h /usr/include/sys/fs.h ../h/uio.h
+ingreslock.o: ../sys/ingreslock.c ingres.h
+sys_process.o: ../sys/sys_process.c ../h/param.h /usr/include/sys/localopts.h
+sys_process.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+sys_process.o: /usr/include/sys/types.h /usr/include/sys/select.h
+sys_process.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+sys_process.o: ../h/../machine/net_mac.h ../sys/../machine/psl.h
+sys_process.o: ../sys/../machine/reg.h ../sys/../machine/seg.h ../h/systm.h
+sys_process.o: ../h/user.h ../h/../machine/fperr.h ../h/dir.h ../h/exec.h
+sys_process.o: ../h/time.h /usr/include/sys/types.h ../h/resource.h
+sys_process.o: /usr/include/sys/errno.h ../h/proc.h ../h/inode.h ../h/text.h
+sys_process.o: ../h/vm.h ../h/vmparam.h ../h/../machine/vmparam.h ../h/vmmac.h
+sys_process.o: ../h/vmmeter.h ../h/vmsystm.h ../h/ptrace.h
+syscalls.o: ../sys/syscalls.c
+tty.o: ../sys/tty.c ../h/param.h /usr/include/sys/localopts.h
+tty.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+tty.o: /usr/include/sys/types.h /usr/include/sys/select.h
+tty.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+tty.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h ../h/dir.h
+tty.o: ../h/exec.h ../h/time.h /usr/include/sys/types.h ../h/resource.h
+tty.o: /usr/include/sys/errno.h ../h/ioctl.h ../h/ttychars.h ../h/ttydev.h
+tty.o: ../h/tty.h ../h/ttychars.h ../h/ttydev.h ../h/proc.h ../h/file.h
+tty.o: /usr/include/fcntl.h ../h/conf.h ../h/dk.h ../h/uio.h ../h/kernel.h
+tty.o: /usr/include/sys/time.h ../h/systm.h ../h/inode.h ../h/syslog.h
+tty_conf.o: ../sys/tty_conf.c ../h/param.h /usr/include/sys/localopts.h
+tty_conf.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+tty_conf.o: /usr/include/sys/types.h /usr/include/sys/select.h
+tty_conf.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+tty_conf.o: ../h/../machine/net_mac.h ../sys/../pdp/seg.h ../h/file.h
+tty_conf.o: /usr/include/fcntl.h ../h/ioctl.h ../h/ttychars.h ../h/ttydev.h
+tty_conf.o: ../h/tty.h ../h/ttychars.h ../h/ttydev.h ../h/errno.h ../h/conf.h
+tty_conf.o: sl.h
+tty_pty.o: ../sys/tty_pty.c pty.h ../h/param.h /usr/include/sys/localopts.h
+tty_pty.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+tty_pty.o: /usr/include/sys/types.h /usr/include/sys/select.h
+tty_pty.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+tty_pty.o: ../h/../machine/net_mac.h ../h/systm.h ../h/ioctl.h ../h/ttychars.h
+tty_pty.o: ../h/ttydev.h ../h/tty.h ../h/ttychars.h ../h/ttydev.h ../h/user.h
+tty_pty.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+tty_pty.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+tty_pty.o: ../h/conf.h ../h/file.h /usr/include/fcntl.h ../h/proc.h ../h/uio.h
+tty_pty.o: ../h/kernel.h /usr/include/sys/time.h ../h/inode.h
+tty_subr.o: ../sys/tty_subr.c ../h/param.h /usr/include/sys/localopts.h
+tty_subr.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+tty_subr.o: /usr/include/sys/types.h /usr/include/sys/select.h
+tty_subr.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+tty_subr.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/clist.h
+tty_subr.o: ../h/ioctl.h ../h/ttychars.h ../h/ttydev.h ../h/tty.h
+tty_subr.o: ../h/ttychars.h ../h/ttydev.h
+tty_tb.o: ../sys/tty_tb.c tb.h
+tty_tty.o: ../sys/tty_tty.c ../h/param.h /usr/include/sys/localopts.h
+tty_tty.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+tty_tty.o: /usr/include/sys/types.h /usr/include/sys/select.h
+tty_tty.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+tty_tty.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+tty_tty.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+tty_tty.o: ../h/resource.h /usr/include/sys/errno.h ../h/proc.h ../h/ioctl.h
+tty_tty.o: ../h/ttychars.h ../h/ttydev.h ../h/tty.h ../h/ttychars.h
+tty_tty.o: ../h/ttydev.h ../h/conf.h
+ufs_alloc.o: ../sys/ufs_alloc.c ../h/param.h /usr/include/sys/localopts.h
+ufs_alloc.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+ufs_alloc.o: /usr/include/sys/types.h /usr/include/sys/select.h
+ufs_alloc.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+ufs_alloc.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/fs.h
+ufs_alloc.o: ../h/dir.h ../h/inode.h ../h/buf.h ../h/user.h
+ufs_alloc.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+ufs_alloc.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+ufs_alloc.o: ../h/kernel.h /usr/include/sys/time.h ../h/mount.h
+ufs_alloc.o: /usr/include/sys/fs.h
+ufs_bio.o: ../sys/ufs_bio.c ../h/param.h /usr/include/sys/localopts.h
+ufs_bio.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+ufs_bio.o: /usr/include/sys/types.h /usr/include/sys/select.h
+ufs_bio.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+ufs_bio.o: ../h/../machine/net_mac.h ../h/buf.h ../h/user.h
+ufs_bio.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+ufs_bio.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+ufs_bio.o: ../h/conf.h ../h/fs.h ../h/dk.h ../h/systm.h ../h/map.h ../h/uba.h
+ufs_bio.o: ../h/trace.h ram.h
+ufs_bmap.o: ../sys/ufs_bmap.c ../h/param.h /usr/include/sys/localopts.h
+ufs_bmap.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+ufs_bmap.o: /usr/include/sys/types.h /usr/include/sys/select.h
+ufs_bmap.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+ufs_bmap.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/systm.h
+ufs_bmap.o: ../h/conf.h ../h/dir.h ../h/inode.h ../h/user.h
+ufs_bmap.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+ufs_bmap.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+ufs_bmap.o: ../h/buf.h ../h/fs.h ../h/mount.h /usr/include/sys/fs.h ../h/uio.h
+ufs_dsort.o: ../sys/ufs_dsort.c ../h/param.h /usr/include/sys/localopts.h
+ufs_dsort.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+ufs_dsort.o: /usr/include/sys/types.h /usr/include/sys/select.h
+ufs_dsort.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+ufs_dsort.o: ../h/../machine/net_mac.h ../h/systm.h ../h/buf.h ../h/dk.h
+ufs_fio.o: ../sys/ufs_fio.c ../h/param.h /usr/include/sys/localopts.h
+ufs_fio.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+ufs_fio.o: /usr/include/sys/types.h /usr/include/sys/select.h
+ufs_fio.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+ufs_fio.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+ufs_fio.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+ufs_fio.o: ../h/resource.h /usr/include/sys/errno.h ../h/fs.h ../h/inode.h
+ufs_fio.o: ../h/mount.h /usr/include/sys/fs.h ../h/namei.h ../h/uio.h
+ufs_fio.o: /usr/include/machine/seg.h ../h/systm.h ../h/acct.h ../h/stat.h
+ufs_inode.o: ../sys/ufs_inode.c ../h/param.h /usr/include/sys/localopts.h
+ufs_inode.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+ufs_inode.o: /usr/include/sys/types.h /usr/include/sys/select.h
+ufs_inode.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+ufs_inode.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/user.h
+ufs_inode.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+ufs_inode.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+ufs_inode.o: ../h/proc.h ../h/inode.h ../h/fs.h ../h/mount.h
+ufs_inode.o: /usr/include/sys/fs.h ../h/kernel.h /usr/include/sys/time.h
+ufs_inode.o: ../h/buf.h ../h/text.h ../h/systm.h ../h/syslog.h
+ufs_mount.o: ../sys/ufs_mount.c ../h/param.h /usr/include/sys/localopts.h
+ufs_mount.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+ufs_mount.o: /usr/include/sys/types.h /usr/include/sys/select.h
+ufs_mount.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+ufs_mount.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/systm.h
+ufs_mount.o: ../h/user.h ../h/../machine/fperr.h ../h/dir.h ../h/exec.h
+ufs_mount.o: ../h/time.h /usr/include/sys/types.h ../h/resource.h
+ufs_mount.o: /usr/include/sys/errno.h ../h/inode.h ../h/fs.h ../h/buf.h
+ufs_mount.o: ../h/mount.h /usr/include/sys/fs.h ../h/file.h
+ufs_mount.o: /usr/include/fcntl.h ../h/namei.h ../h/uio.h
+ufs_mount.o: /usr/include/machine/seg.h ../h/conf.h ../h/stat.h
+ufs_mount.o: ../h/disklabel.h ../h/ioctl.h ../h/ttychars.h ../h/ttydev.h
+ufs_namei.o: ../sys/ufs_namei.c ../h/param.h /usr/include/sys/localopts.h
+ufs_namei.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+ufs_namei.o: /usr/include/sys/types.h /usr/include/sys/select.h
+ufs_namei.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+ufs_namei.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/systm.h
+ufs_namei.o: ../h/dir.h ../h/inode.h ../h/fs.h ../h/mount.h
+ufs_namei.o: /usr/include/sys/fs.h ../h/user.h ../h/../machine/fperr.h
+ufs_namei.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+ufs_namei.o: ../h/resource.h /usr/include/sys/errno.h ../h/buf.h ../h/namei.h
+ufs_namei.o: ../h/uio.h /usr/include/machine/seg.h
+ufs_subr.o: ../sys/ufs_subr.c ../h/param.h /usr/include/sys/localopts.h
+ufs_subr.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+ufs_subr.o: /usr/include/sys/types.h /usr/include/sys/select.h
+ufs_subr.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+ufs_subr.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/user.h
+ufs_subr.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+ufs_subr.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+ufs_subr.o: ../h/proc.h ../h/fs.h ../h/inode.h ../h/buf.h ../h/mount.h
+ufs_subr.o: /usr/include/sys/fs.h ../h/kernel.h /usr/include/sys/time.h
+ufs_subr.o: ../h/systm.h
+ufs_disksubr.o: ../sys/ufs_disksubr.c ../h/errno.h ../h/syslog.h
+ufs_disksubr.o: /usr/include/sys/param.h /usr/include/sys/localopts.h
+ufs_disksubr.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+ufs_disksubr.o: /usr/include/sys/types.h /usr/include/sys/select.h
+ufs_disksubr.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+ufs_disksubr.o: /usr/include/sys/../machine/net_mac.h /usr/include/sys/user.h
+ufs_disksubr.o: /usr/include/sys/../machine/fperr.h /usr/include/sys/dir.h
+ufs_disksubr.o: /usr/include/sys/exec.h /usr/include/sys/time.h
+ufs_disksubr.o: /usr/include/sys/types.h /usr/include/sys/resource.h
+ufs_disksubr.o: /usr/include/sys/errno.h /usr/include/sys/systm.h
+ufs_disksubr.o: /usr/include/machine/seg.h /usr/include/sys/buf.h
+ufs_disksubr.o: /usr/include/sys/file.h /usr/include/fcntl.h
+ufs_disksubr.o: /usr/include/sys/ioctl.h /usr/include/sys/ttychars.h
+ufs_disksubr.o: /usr/include/sys/ttydev.h /usr/include/sys/disklabel.h
+ufs_disksubr.o: /usr/include/sys/disk.h /usr/include/sys/disklabel.h
+ufs_syscalls2.o: ../sys/ufs_syscalls2.c ../h/param.h
+ufs_syscalls2.o: /usr/include/sys/localopts.h /usr/include/sys/stddef.h
+ufs_syscalls2.o: /usr/include/machine/machparam.h /usr/include/sys/types.h
+ufs_syscalls2.o: /usr/include/sys/select.h /usr/include/sys/types.h
+ufs_syscalls2.o: ../h/signal.h /usr/include/sys/types.h
+ufs_syscalls2.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h
+ufs_syscalls2.o: /usr/include/sys/file.h /usr/include/fcntl.h ../h/user.h
+ufs_syscalls2.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+ufs_syscalls2.o: /usr/include/sys/types.h ../h/resource.h
+ufs_syscalls2.o: /usr/include/sys/errno.h ../h/inode.h ../h/buf.h ../h/fs.h
+ufs_syscalls2.o: ../h/namei.h ../h/uio.h /usr/include/machine/seg.h
+ufs_syscalls2.o: ../h/mount.h /usr/include/sys/fs.h ../h/kernel.h
+ufs_syscalls2.o: /usr/include/sys/time.h
+ufs_syscalls.o: ../sys/ufs_syscalls.c ../h/param.h /usr/include/sys/localopts.h
+ufs_syscalls.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+ufs_syscalls.o: /usr/include/sys/types.h /usr/include/sys/select.h
+ufs_syscalls.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+ufs_syscalls.o: ../h/../machine/net_mac.h ../h/systm.h ../h/user.h
+ufs_syscalls.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+ufs_syscalls.o: /usr/include/sys/types.h ../h/resource.h
+ufs_syscalls.o: /usr/include/sys/errno.h ../h/inode.h ../h/namei.h ../h/uio.h
+ufs_syscalls.o: /usr/include/machine/seg.h ../h/fs.h ../h/file.h
+ufs_syscalls.o: /usr/include/fcntl.h ../h/stat.h ../h/kernel.h
+ufs_syscalls.o: /usr/include/sys/time.h
+uipc_syscalls.o: ../sys/uipc_syscalls.c ../h/param.h
+uipc_syscalls.o: /usr/include/sys/localopts.h /usr/include/sys/stddef.h
+uipc_syscalls.o: /usr/include/machine/machparam.h /usr/include/sys/types.h
+uipc_syscalls.o: /usr/include/sys/select.h /usr/include/sys/types.h
+uipc_syscalls.o: ../h/signal.h /usr/include/sys/types.h
+uipc_syscalls.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h
+uipc_syscalls.o: ../sys/../machine/psl.h ../h/systm.h ../h/user.h
+uipc_syscalls.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+uipc_syscalls.o: /usr/include/sys/types.h ../h/resource.h
+uipc_syscalls.o: /usr/include/sys/errno.h ../h/proc.h ../h/file.h
+uipc_syscalls.o: /usr/include/fcntl.h ../h/inode.h ../h/buf.h ../h/mbuf.h
+uipc_syscalls.o: ../h/protosw.h ../h/socket.h ../h/socketvar.h ../h/uio.h
+uipc_syscalls.o: ../h/domain.h /usr/include/pdpif/if_uba.h
+uipc_syscalls.o: /usr/include/netinet/in.h /usr/include/netinet/in_systm.h
+vm_proc.o: ../sys/vm_proc.c ../h/param.h /usr/include/sys/localopts.h
+vm_proc.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+vm_proc.o: /usr/include/sys/types.h /usr/include/sys/select.h
+vm_proc.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+vm_proc.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+vm_proc.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+vm_proc.o: ../h/resource.h /usr/include/sys/errno.h ../h/proc.h ../h/text.h
+vm_proc.o: ../h/map.h ../h/kernel.h /usr/include/sys/time.h
+vfs_vnops.o: ../sys/vfs_vnops.c /usr/include/sys/param.h
+vfs_vnops.o: /usr/include/sys/localopts.h /usr/include/sys/stddef.h
+vfs_vnops.o: /usr/include/machine/machparam.h /usr/include/sys/types.h
+vfs_vnops.o: /usr/include/sys/select.h /usr/include/sys/types.h ../h/signal.h
+vfs_vnops.o: /usr/include/sys/types.h /usr/include/sys/../machine/net_mac.h
+vfs_vnops.o: /usr/include/sys/file.h /usr/include/fcntl.h
+vfs_vnops.o: /usr/include/sys/user.h /usr/include/sys/../machine/fperr.h
+vfs_vnops.o: /usr/include/sys/dir.h /usr/include/sys/exec.h
+vfs_vnops.o: /usr/include/sys/time.h /usr/include/sys/types.h
+vfs_vnops.o: /usr/include/sys/resource.h /usr/include/sys/errno.h
+vfs_vnops.o: /usr/include/sys/namei.h /usr/include/sys/uio.h
+vfs_vnops.o: /usr/include/machine/seg.h /usr/include/sys/inode.h
+vfs_vnops.o: /usr/include/sys/stat.h
+vm_sched.o: ../sys/vm_sched.c ../h/param.h /usr/include/sys/localopts.h
+vm_sched.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+vm_sched.o: /usr/include/sys/types.h /usr/include/sys/select.h
+vm_sched.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+vm_sched.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h
+vm_sched.o: ../h/dir.h ../h/exec.h ../h/time.h /usr/include/sys/types.h
+vm_sched.o: ../h/resource.h /usr/include/sys/errno.h ../h/proc.h ../h/text.h
+vm_sched.o: ../h/vm.h ../h/vmparam.h ../h/../machine/vmparam.h ../h/vmmac.h
+vm_sched.o: ../h/vmmeter.h ../h/vmsystm.h ../h/kernel.h /usr/include/sys/time.h
+vm_sched.o: ../h/systm.h
+vm_swap.o: ../sys/vm_swap.c ../h/param.h /usr/include/sys/localopts.h
+vm_swap.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+vm_swap.o: /usr/include/sys/types.h /usr/include/sys/select.h
+vm_swap.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+vm_swap.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/user.h
+vm_swap.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+vm_swap.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+vm_swap.o: ../h/proc.h ../h/text.h ../h/map.h ../h/buf.h ../h/systm.h ../h/vm.h
+vm_swap.o: ../h/vmparam.h ../h/../machine/vmparam.h ../h/vmmac.h ../h/vmmeter.h
+vm_swap.o: ../h/vmsystm.h
+vm_swp.o: ../sys/vm_swp.c ../h/param.h /usr/include/sys/localopts.h
+vm_swp.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+vm_swp.o: /usr/include/sys/types.h /usr/include/sys/select.h
+vm_swp.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+vm_swp.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/user.h
+vm_swp.o: ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+vm_swp.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+vm_swp.o: ../h/proc.h ../h/buf.h ../h/conf.h ../h/systm.h ../h/vm.h
+vm_swp.o: ../h/vmparam.h ../h/../machine/vmparam.h ../h/vmmac.h ../h/vmmeter.h
+vm_swp.o: ../h/vmsystm.h ../h/trace.h ../h/uio.h
+vm_text.o: ../sys/vm_text.c ../h/param.h /usr/include/sys/localopts.h
+vm_text.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+vm_text.o: /usr/include/sys/types.h /usr/include/sys/select.h
+vm_text.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+vm_text.o: ../h/../machine/net_mac.h ../sys/../machine/seg.h ../h/map.h
+vm_text.o: ../h/user.h ../h/../machine/fperr.h ../h/dir.h ../h/exec.h
+vm_text.o: ../h/time.h /usr/include/sys/types.h ../h/resource.h
+vm_text.o: /usr/include/sys/errno.h ../h/proc.h ../h/text.h ../h/inode.h
+vm_text.o: ../h/buf.h ../h/uio.h ../h/systm.h
+
+# IF YOU PUT ANYTHING HERE IT WILL GO AWAY

@@ -1,0 +1,108 @@
+#
+# Copyright (c) 1988 Regents of the University of California.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms are permitted
+# provided that this notice is preserved and that due credit is given
+# to the University of California at Berkeley. The name of the University
+# may not be used to endorse or promote products derived from this
+# software without specific prior written permission. This software
+# is provided ``as is'' without express or implied warranty.
+#
+#	2.1  (2.11BSD) 1996/6/8
+#
+U=	../pdpuba
+VPATH=	../pdpuba
+
+CFILES=	${U}/br.c ${U}/dh.c ${U}/dn.c ${U}/dhu.c ${U}/dhv.c ${U}/dkbad.c \
+	${U}/dr.c ${U}/dz.c ${U}/hk.c ${U}/ht.c ${U}/lp.c ${U}/ra.c ${U}/rk.c \
+	${U}/rl.c ${U}/rx.c ${U}/si.c ${U}/tm.c ${U}/tmscp.c ${U}/tmscpdump.c \
+	${U}/ts.c ${U}/xp.c
+OBJS=	br.o dh.o dhu.o dhv.o dkbad.o dn.o dr.o dz.o hk.o ht.o lp.o ra.o rk.o \
+	rl.o rx.o si.o tm.o tmscp.o tmscpdump.o ts.o xp.o dn.o
+
+.c.o:
+	${CC} ${CFLAGS} -S $*.c
+	${SED} -f SPLFIX $*.s | ${AS} -u -o $*.o
+	rm -f $*.s
+
+all: ${OBJS}
+
+depend: 
+	mkdep -f Make.pdpuba ${CFLAGS} ${CFILES}
+
+# DO NOT DELETE THIS LINE -- mkdep uses it.
+# DO NOT PUT ANYTHING AFTER THIS LINE, IT WILL GO AWAY.
+
+br.o: ../pdpuba/br.c br.h
+dh.o: ../pdpuba/dh.c dh.h
+dn.o: ../pdpuba/dn.c dn.h
+dhu.o: ../pdpuba/dhu.c dhu.h
+dhv.o: ../pdpuba/dhv.c dhv.h
+dkbad.o: ../pdpuba/dkbad.c ../h/param.h /usr/include/sys/localopts.h
+dkbad.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+dkbad.o: /usr/include/sys/types.h /usr/include/sys/select.h
+dkbad.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+dkbad.o: ../h/../machine/net_mac.h
+dr.o: ../pdpuba/dr.c dr.h
+dz.o: ../pdpuba/dz.c dz.h ../h/param.h /usr/include/sys/localopts.h
+dz.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+dz.o: /usr/include/sys/types.h /usr/include/sys/select.h
+dz.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+dz.o: ../h/../machine/net_mac.h ../h/user.h ../h/../machine/fperr.h ../h/dir.h
+dz.o: ../h/exec.h ../h/time.h /usr/include/sys/types.h ../h/resource.h
+dz.o: /usr/include/sys/errno.h ../h/file.h /usr/include/fcntl.h ../h/conf.h
+dz.o: ../h/ioctl.h ../h/ttychars.h ../h/ttydev.h ../h/tty.h ../h/ttychars.h
+dz.o: ../h/ttydev.h ../pdpuba/dzreg.h ../pdpuba/pdma.h ../h/proc.h
+dz.o: ../pdpuba/ubavar.h ../h/vm.h ../h/vmparam.h ../h/../machine/vmparam.h
+dz.o: ../h/vmmac.h ../h/vmmeter.h ../h/vmsystm.h ../h/kernel.h
+dz.o: /usr/include/sys/time.h ../h/syslog.h ../h/systm.h
+hk.o: ../pdpuba/hk.c hk.h
+ht.o: ../pdpuba/ht.c ht.h
+lp.o: ../pdpuba/lp.c lp.h
+ra.o: ../pdpuba/ra.c ra.h ../h/param.h /usr/include/sys/localopts.h
+ra.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+ra.o: /usr/include/sys/types.h /usr/include/sys/select.h
+ra.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+ra.o: ../h/../machine/net_mac.h ../pdpuba/../machine/seg.h
+ra.o: ../pdpuba/../machine/mscp.h /usr/include/pdp/mscp_common.h ../h/systm.h
+ra.o: ../h/buf.h ../h/conf.h ../h/map.h ../h/syslog.h ../h/ioctl.h
+ra.o: ../h/ttychars.h ../h/ttydev.h ../h/uba.h ../pdpuba/rareg.h ../h/dk.h
+ra.o: ../h/disklabel.h ../h/disk.h /usr/include/sys/disklabel.h ../h/errno.h
+ra.o: ../h/file.h /usr/include/fcntl.h ../h/stat.h /usr/include/sys/kernel.h
+ra.o: /usr/include/sys/time.h /usr/include/sys/types.h
+rk.o: ../pdpuba/rk.c rk.h
+rl.o: ../pdpuba/rl.c rl.h
+rx.o: ../pdpuba/rx.c rx.h ../h/param.h /usr/include/sys/localopts.h
+rx.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+rx.o: /usr/include/sys/types.h /usr/include/sys/select.h
+rx.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+rx.o: ../h/../machine/net_mac.h ../h/buf.h ../h/conf.h ../h/ioctl.h
+rx.o: ../h/ttychars.h ../h/ttydev.h ../h/tty.h ../h/ttychars.h ../h/ttydev.h
+rx.o: ../pdpuba/rxreg.h ../h/errno.h ../h/map.h ../h/uba.h
+si.o: ../pdpuba/si.c si.h
+tm.o: ../pdpuba/tm.c tm.h
+tmscp.o: ../pdpuba/tmscp.c tms.h ../h/param.h /usr/include/sys/localopts.h
+tmscp.o: /usr/include/sys/stddef.h /usr/include/machine/machparam.h
+tmscp.o: /usr/include/sys/types.h /usr/include/sys/select.h
+tmscp.o: /usr/include/sys/types.h ../h/signal.h /usr/include/sys/types.h
+tmscp.o: ../h/../machine/net_mac.h ../h/systm.h ../h/buf.h ../h/conf.h
+tmscp.o: ../h/user.h ../h/../machine/fperr.h ../h/dir.h ../h/exec.h ../h/time.h
+tmscp.o: /usr/include/sys/types.h ../h/resource.h /usr/include/sys/errno.h
+tmscp.o: ../h/file.h /usr/include/fcntl.h ../h/map.h ../h/ioctl.h
+tmscp.o: ../h/ttychars.h ../h/ttydev.h ../h/syslog.h ../h/mtio.h ../h/uio.h
+tmscp.o: ../h/tty.h ../h/ttychars.h ../h/ttydev.h ../h/uba.h ../h/kernel.h
+tmscp.o: /usr/include/sys/time.h ../pdpuba/tmscpreg.h ../pdpuba/../pdp/tmscp.h
+tmscp.o: /usr/include/machine/mscp_common.h ../pdpuba/../machine/seg.h
+tmscpdump.o: ../pdpuba/tmscpdump.c tms.h ../h/param.h
+tmscpdump.o: /usr/include/sys/localopts.h /usr/include/sys/stddef.h
+tmscpdump.o: /usr/include/machine/machparam.h /usr/include/sys/types.h
+tmscpdump.o: /usr/include/sys/select.h /usr/include/sys/types.h ../h/signal.h
+tmscpdump.o: /usr/include/sys/types.h ../h/../machine/net_mac.h ../h/buf.h
+tmscpdump.o: /usr/include/machine/seg.h ../pdpuba/tmscpreg.h
+tmscpdump.o: /usr/include/pdp/tmscp.h /usr/include/machine/mscp_common.h
+tmscpdump.o: ../h/errno.h ../h/map.h ../h/uba.h /usr/include/pdp/seg.h
+ts.o: ../pdpuba/ts.c ts.h
+xp.o: ../pdpuba/xp.c xp.h
+
+# IF YOU PUT ANYTHING HERE IT WILL GO AWAY
