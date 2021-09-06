@@ -16,4 +16,4 @@ wrelop:
 	sbc	hl,de		;set carry flag if appropriate
 	inc	a		;set sign flag as appropriate and reset Z flag
 	ret
-
+

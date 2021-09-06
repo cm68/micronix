@@ -18,4 +18,3 @@ register FILE *	stream;
 	*--stream->_ptr = c;
 	return(c);
 }
-

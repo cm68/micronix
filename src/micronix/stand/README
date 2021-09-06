@@ -1,2 +1,8 @@
+it's a good idea to keep these executables under 4k, because micronix
+loads at 0x1000.
+
+in a pinch, the boot code could put all buffers except the indirect
+block into a non-loaded BSS above 4k; that will gain 512 bytes.
+
 this directory contains the standalone and cp/m boot programs
 for the djdma and hddma controllers

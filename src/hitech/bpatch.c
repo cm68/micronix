@@ -125,7 +125,13 @@ struct pat {
 usage(char c)
 {
     fprintf(stderr, "usage:\n%s [<options>] objectfile ...\n", pname);
-    fprintf(stderr, "\t-v\t\tincrease verbosity\n");
+    fprintf(stderr, "\t-v<bits>\t\tincrease verbosity\n");
+	fprintf(stderr, "\t\t parse = 1\n");
+	fprintf(stderr, "\t\t var = 2\n");
+	fprintf(stderr, "\t\t data = 4\n");
+	fprintf(stderr, "\t\t match = 8\n");
+	fprintf(stderr, "\t\t low = 16\n");
+	fprintf(stderr, "\t\t changes = 32\n");
     fprintf(stderr, "\t-s\t\tproduce sym file\n");
     fprintf(stderr, "\t-p <patchfile>\n");
     if (c) {

@@ -21,4 +21,3 @@ unsigned	size, nitems;
 			--count;
 	return(nitems - (count+size-1)/size);
 }
-

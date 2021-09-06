@@ -19,4 +19,3 @@ unsigned char _ctype_[] = {
 	_L,	_L,	_L,	_L,	_L,	_L,	_L,	_L,
 	_L,	_L,	_L,	_P,	_P,	_P,	_P,	_C
 };
-

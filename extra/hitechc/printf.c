@@ -8,4 +8,3 @@ int	a;
 {
 	return(_doprnt(stdout, f, &a));
 }
-

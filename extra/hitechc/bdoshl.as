@@ -22,4 +22,3 @@ _bdoshl:
 	call	entry
 	pop	ix
 	jp	cret		;return value already in hl
-

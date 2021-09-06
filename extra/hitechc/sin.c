@@ -46,5 +46,3 @@ double	f;
 	return y * eval_poly(y_squared, coeff_a, 4) / eval_poly(y_squared, coeff_b, 4);
 }
 
-
-

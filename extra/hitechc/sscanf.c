@@ -19,4 +19,3 @@ int	args;
 	file._flag = _IOSTRG|_IOBINARY|_IOREAD;
 	return _doscan(&file, fmt, &args);
 }
-

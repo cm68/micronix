@@ -20,4 +20,3 @@ aslllsh:
 	pop	bc
 	call	allsh		;do the shift
 	jp	iregstore	;go store the value and return
-

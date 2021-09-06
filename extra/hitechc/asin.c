@@ -9,4 +9,3 @@ double	x;
 	y = sqrt(1 - x*x);
 	return atan(x/y);
 }
-

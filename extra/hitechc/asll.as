@@ -23,4 +23,3 @@ asal:
 	ld	(hl),e
 	ex	de,hl		;return value in hl
 	ret
-

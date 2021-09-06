@@ -15,4 +15,3 @@ char *	name;
 	setuid(luid);
 	return retval;
 }
-

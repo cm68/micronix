@@ -467,4 +467,3 @@ stack:
 
 	psect	bss		;for reloc info
 	end	start
-

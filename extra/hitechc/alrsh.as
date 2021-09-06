@@ -18,4 +18,3 @@ alrsh:
 	rr	e
 	djnz	1b
 	ret
-

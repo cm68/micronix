@@ -268,4 +268,3 @@ divide:
 	dec	a			;decrement loop count
 	jr	nz,3b
 	ret				;finished
-

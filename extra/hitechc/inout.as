@@ -23,4 +23,3 @@ _outp:
 	ld	l,c		;return value in hl also
 	ld	h,0
 	ret
-

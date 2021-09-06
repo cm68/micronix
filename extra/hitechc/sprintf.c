@@ -14,4 +14,3 @@ int	a;
 	*spf._ptr = 0;
 	return spf._ptr - wh;
 }
-

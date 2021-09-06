@@ -18,4 +18,3 @@ _islower:
 	ret
 nix:	ld	hl,0
 	ret
-
