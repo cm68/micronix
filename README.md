@@ -16,7 +16,7 @@ or, for a quite strange experience,
 
 ---------------------
 
-Morrow Designs Micronix and tools
+Morrow Designs Micronix and tools					updated 6 Sep 2021
 
 directories:
 
@@ -29,6 +29,9 @@ filesystem:
 disks:
 	floppy images recovered from the net, version 1.4 and 1.3
 
+wslib:
+	the whitesmith's libraries, burst apart and disassembled
+
 src/micronix:
 	the source tree for things that are to be built natively, including
     libraries, commands and the kernel.
@@ -37,9 +40,11 @@ src/micronix:
 	notable additions:  
 		a much better make, 
 		an in-memory, ansi-only, vi subset derived from stevie
-		2.11's ls
+		2.11's ls and cp
 		a working pwd, rm, mknod
-		
+		a cc that deals with whitesmith's and hitech when that compiler
+		is ready
+	
 src/micronix/lib:
 	additions and replacements for the whitesmith's library.
 		
@@ -49,9 +54,18 @@ src/micronix/sys:
 	so I re-indented it to a more K&R like style.
 	it is NOT ansi, and compiles on whitesmith's C.
 
+src/micronix/stand:
+	ghidra-driven rewrite of the cold boot loaders for the kernel
+
+src/micronix/include:
+	include files rejiggered to make porting from v6 and v7 easier
+
 src/tools:
 	file system checkers, dumper and extractor
-	object file tools, including an overachieving nm
+	object file tools, including an overachieving nm and 
+	a rootin' tootin' fire-breathing disassembler that knows about
+	hitech objects, whitesmith's objects, and com files, does
+	code tracing, and allows a symbol file to be fed in. 
 
 src/lib:
 	libraries for file system, disassembly, and random utility
@@ -98,10 +112,14 @@ src/hwsim:
 src/include:
 	library include files for the emulation
 
-extra/hitechc:
-	the hitech c compiler.  this is not capable of running yet, but if the
-	cp/m libc gets removed via binary jiggery-pokery, and replaced with
-	a z80, micronix one, then we are in business with the most modern native
+src/hitechc:
+	the hitech c compiler.  this is not capable of running yet, but a big
+	start has been made to replace the bottom level i/o with micronix versions.
+	this is facilitated by a binary patch tool that effectively pattern
+	matches library fragments and patches on top of them.   it's good
+	enough to work for cpp already, but the compiler passes use a different
+	library implementation.
+	when that's done, then we are in business with the most modern native
 	c compiler in existence.
 
 extra/qc:
@@ -109,7 +127,7 @@ extra/qc:
 	as it is small-c derived, so args get pushed wrong, no ansi, etc. 
 	but it is native, and it is source.
 
-extra/v6, extra/v7:
+extra/v6, extra/v7, extra/2.11
 	oh, yeah.  this is the real mc-coy.  this is useful for reference and
 	tool source grabbing.  the porting to micronix is simple, if tedious.
 	the include files are subtly different.
