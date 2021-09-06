@@ -9,11 +9,11 @@ extern char memwant, swapping;
 extern struct proc *swapproc;
 
 /*
- * Rescheduling flag. If YES, switch processes at next
+ * Rescheduling flag. If 1, switch processes at next
  * opportunity. Set by run (below), tested in trap (trap.c),
  * and reset in next (below).
  */
-char resched = NO;
+char resched = 0;
 
 /*
  * Hier to the run-time throne.
@@ -27,7 +27,7 @@ char resched = NO;
  */
 
 /*
- * char idle = NO; 
+ * char idle = 0; 
  */
 
 /*
@@ -54,7 +54,7 @@ run(p)
     p->mode |= AWAKE;
     p->event = 0;
     if (p->mode & LOADED)
-        resched = YES;
+        resched = 1;
     else if (!swapping)
         run(swapproc);
 }
@@ -80,13 +80,13 @@ sleep(event, pri)
  * process. This is presently called by sleep, exit, and trap.
  * The revived process will return from its call to next, or
  * from its call to procopy (a subroutine of fork), whichever
- * last called saveframe. In the procopy case, this return NO
+ * last called saveframe. In the procopy case, this return 0
  * enables fork to distinguish between parent and child.
  * Warning: this is intimately connected with C's stack framing.
  */
 next()
 {
-    fast struct proc *n;        /* force stacking of reg variables */
+    register struct proc *n;        /* force stacking of reg variables */
     static int temp[12];        /* for use while changing stacks */
 
     if ((n = sched()) != u.p) {
@@ -96,9 +96,9 @@ next()
         newmap(n);              /* re-write the segmentation registers */
         setframe(u.p->frmptr, u.p->stkptr);
     }
-    resched = NO;
+    resched = 0;
     enable();                   /* unconditionally enable interrupts */
-    return NO;
+    return 0;
 }
 
 /*
@@ -106,20 +106,20 @@ next()
  */
 sched()
 {
-    fast struct proc *next, *p;
+    register struct proc *next, *p;
     static struct proc *circle = plist;
-    static UCHAR i;
+    static UINT8 i;
 
     enable();                   /* allow wakeups while idling */
-    next = NULL;
-    while (next == NULL) {
+    next = 0;
+    while (next == 0) {
         for (p = circle, i = 0; i < NPROC; p++, i++) {
             if (p >= &plist[NPROC])
                 p = plist;
             if ((p->mode & (ALIVE | AWAKE | LOADED)) !=
                 (ALIVE | AWAKE | LOADED))
                 continue;
-            if (next == NULL || priority(p) > priority(next)) {
+            if (next == 0 || priority(p) > priority(next)) {
                 next = p;
             }
         }

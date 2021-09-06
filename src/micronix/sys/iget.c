@@ -3,10 +3,13 @@
  */
 #include <types.h>
 #include <sys/sys.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/mount.h>
 #include <sys/buf.h>
 #include <sys/proc.h>
+#include <errno.h>
 
 struct inode ilist[];
 
@@ -18,15 +21,15 @@ struct inode *
 iget(num, dev)
     int num, dev;
 {
-    fast struct inode *i, *f;
+    register struct inode *i, *f;
 
   loop:
-    f = NULL;
+    f = 0;
     for (i = ilist; i < ilist + NINODE; i++) {
-        if (i->inum == num && i->dev == dev) {
+        if (i->i_inum == num && i->i_dev == dev) {
             ilock(i);
-            if (i->mount) {
-                dev = i->mount->dev;
+            if (i->i_mount) {
+                dev = i->i_mount->dev;
                 num = 1;        /* root inumber */
                 irelse(i);
                 goto loop;
@@ -35,25 +38,25 @@ iget(num, dev)
         }
         if (i->count > 0 || i->flags & IBUSY)
             continue;
-        if (f == NULL || f->time > i->time)
+        if (f == 0 || f->time > i->time)
             f = i;
     }
-    if ((i = f) == NULL) {
+    if ((i = f) == 0) {
         u.error = ENFILE;
-        return NULL;
+        return 0;
     }
     ilock(i);
     if ((i->flags & IMOD) && !iio(IWRITE, i)) {
         irelse(i);
-        return NULL;
+        return 0;
     }
-    i->inum = num;              /* mark it for other searchers */
-    i->dev = dev;
-    i->count = i->mount = 0;
+    i->i_inum = num;              /* mark it for other searchers */
+    i->i_dev = dev;
+    i->i_count = i->i_mount = 0;
     if (!iio(IREAD, i)) {
         zero(i, sizeof(*i));    /* has wrong dev and inum */
         irelse(i);
-        return NULL;
+        return 0;
     }
     return (i);
 }
@@ -79,40 +82,40 @@ ilock(ip)
  */
 iio(flag, ip)
     int flag;
-    fast struct inode *ip;
+    register struct inode *ip;
 {
-    fast unsigned int inum, i;
+    register unsigned int inum, i;
     static struct mount *m;
     static struct buf *bp;
     static struct dsknod *dp;
 
-    inum = ip->inum;
+    inum = ip->i_inum;
     i = inum + 31;
-    if ((m = mlook(ip->dev)) == NULL)
+    if ((m = mlook(ip->i_dev)) == 0)
         panic("iio");           /* not mounted */
     if (inum == 0 || inum > m->isize << 4) {
         pr("Bad inumber");
-        u.error = ESYS;
-        return NO;
+        u.error = EIO;
+        return 0;
     }
     if (m->ronly)
         ip->flags |= IRONLY;
     else
         ip->flags &= ~IRONLY;
-    if ((bp = bread(i >> 4, ip->dev)) == NULL)
-        return NO;
+    if ((bp = bread(i >> 4, ip->i_dev)) == 0)
+        return 0;
     dp = bp->data + ((i & 15) << 5);
     if (flag == IREAD) {
-        copy(dp, &ip->mode, 32);
+        copy(dp, &ip->i_mode, 32);
         brelse(bp);
-        x3to4(&ip->size0, &ip->size);
+        x3to4(&ip->i_size0, &ip->i_size);
     } else {
-        x4to3(&ip->size, &ip->size0);
-        copy(&ip->mode, dp, 32);
+        x4to3(&ip->i_size, &ip->i_size0);
+        copy(&ip->i_mode, dp, 32);
         bdwrite(bp);
     }
     ip->flags &= ~IMOD;
-    return YES;
+    return 1;
 }
 
 /*
@@ -120,9 +123,9 @@ iio(flag, ip)
  * anyone waiting for it.
  */
 irelse(i)
-    fast struct inode *i;
+    register struct inode *i;
 {
-    if (i == NULL)
+    if (i == 0)
         return;
     if (i->flags & IWANT)
         wakeup(i);
@@ -153,10 +156,10 @@ itime()
 iflush(dev)
     int dev;
 {
-    fast struct inode *ip;
+    register struct inode *ip;
 
     for (ip = ilist; ip < ilist + NINODE; ip++)
-        if (dev == ip->dev) {
+        if (dev == ip->i_dev) {
             ilock(ip);
             if (ip->flags & IMOD)
                 iio(IWRITE, ip);
@@ -170,7 +173,7 @@ iflush(dev)
  */
 isync()
 {
-    fast struct inode *ip;
+    register struct inode *ip;
 
     for (ip = ilist; ip < ilist + NINODE; ip++)
         if ((ip->flags & (IMOD | IBUSY)) == IMOD) {

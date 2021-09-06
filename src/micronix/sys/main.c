@@ -2,13 +2,16 @@
  * main.c 
  */
 #include <types.h>
+#include <sys/fs.h>
 #include <sys/sys.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/mount.h>
 #include <sys/proc.h>
 #include <sys/file.h>
 #include <sys/buf.h>
 #include <sys/con.h>
+#include <sys/signal.h>
 
 #include "build.h"
 
@@ -26,12 +29,12 @@ struct mount mlist[NMOUNT] = 0;
 /*
  * Buffer stuff initialized in binit
  */
-UCHAR nbuf = 0;
+UINT8 nbuf = 0;
 struct buf *btop = 0;
 char (*buffer)[512] = 0;
 struct buf blist[4] = 0;        /* expanded by binit */
 
-extern UCHAR segmap[];          /* malloc.c */
+extern UINT8 segmap[];          /* malloc.c */
 extern UINT nsegs;
 extern int nodev();             /* con.c */
 
@@ -51,7 +54,7 @@ static char pad[5 * 512] = 0;
  */
 main()
 {
-    char ronly = NO;
+    char ronly = 0;
 
     cus();                      /* custom hardware */
     enable();                   /* enable interrupts */
@@ -67,11 +70,11 @@ main()
         bopen(rootdev, READ);
         if (u.error)
             panic("Can't read root device");
-        ronly = YES;
+        ronly = 1;
         pr("\nRoot device is read-only\n\n");
     }
-    tmount(rootdev, NULL, ronly);
-    if ((rootdir = iget(1, rootdev)) == NULL)
+    tmount(rootdev, 0, ronly);
+    if ((rootdir = iget(1, rootdev)) == 0)
         panic("Can't get root dir");
     u.cdir = rootdir;
     rootdir->count = 2;
@@ -92,7 +95,7 @@ main()
  */
 pinit()
 {
-    UCHAR i;
+    UINT8 i;
 
     u.p = swapproc;
     u.p->mode = ALLOC | ALIVE | AWAKE | LOADED | LOCKED | SYS;
@@ -156,7 +159,7 @@ pcon()
         panic("Not enough memory to run");
 }
 
-UCHAR map0[], image0[];
+UINT8 map0[], image0[];
 
 #define ADDR	(*(char*)0x1000)
 

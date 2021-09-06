@@ -3,10 +3,13 @@
  */
 #include <types.h>
 #include <sys/sys.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <sys/file.h>
 #include <sys/con.h>
+#include <errno.h>
 
 /*
  * Open system call.
@@ -15,10 +18,10 @@ open(name, mode)
     char *name;
     unsigned int mode;
 {
-    fast struct inode *ip;
-    fast int fd;
+    register struct inode *ip;
+    register int fd;
 
-    if ((ip = iname(name)) == NULL)
+    if ((ip = iname(name)) == 0)
         return;
     mode = imode(mode);         /* translate to inode mode */
     if (!access(ip, mode)) {
@@ -36,20 +39,20 @@ open(name, mode)
 pipe(vec)
     int *vec;
 {
-    fast struct inode *ip;
-    fast struct file *rf, *wf;
+    register struct inode *ip;
+    register struct file *rf, *wf;
     int rd, wd;
 
     vec[0] = vec[1] = -1;
-    if ((rf = falloc()) == NULL || (rd = oalloc()) == ERROR)
+    if ((rf = falloc()) == 0 || (rd = oalloc()) == ERROR)
         return;
     rf->count = 1;
     rf->mode = IREAD | PIPE;
     u.olist[rd] = rf;
-    if ((wf = falloc()) == NULL || (wd = oalloc()) == ERROR ||
-        (ip = ialloc(rootdev)) == NULL) {
+    if ((wf = falloc()) == 0 || (wd = oalloc()) == ERROR ||
+        (ip = ialloc(rootdev)) == 0) {
         rf->count = 0;
-        u.olist[rd] = NULL;
+        u.olist[rd] = 0;
         return;
     }
     wf->count = 1;
@@ -71,20 +74,20 @@ iopen(ip, mode)
     struct inode *ip;
     int mode;
 {
-    fast struct file *fp;
-    fast int dev, fd;
+    register struct file *fp;
+    register int dev, fd;
     static char writ;
 
     writ = mode & IWRITE;
-    if (writ && (ip->mode & I1WRITE))
+    if (writ && (ip->i_mode & ISVTX))
         ip->flags |= IWRLOCK;
-    dev = ip->addr[0];
-    switch (ip->mode & ITYPE) {
-    case IDIR:
+    dev = ip->i_addr[0];
+    switch (ip->i_mode & IFMT) {
+    case IFDIR:
         if (writ)
             u.error = EISDIR;
         break;
-    case ICIO:
+    case IFCHR:
         {
 
             /*
@@ -99,10 +102,10 @@ iopen(ip, mode)
             ip->count--;
             break;
         }
-    case IBIO:
+    case IFBLK:
         bopen(dev, writ);
     }
-    if (u.error || (fp = falloc()) == NULL || (fd = oalloc()) == ERROR) {
+    if (u.error || (fp = falloc()) == 0 || (fd = oalloc()) == ERROR) {
         ip->flags &= ~IWRLOCK;
         return ERROR;
     }
@@ -120,11 +123,11 @@ iopen(ip, mode)
 close(fd)
     int fd;
 {
-    fast struct file *fp;
+    register struct file *fp;
 
-    if ((fp = ofile(fd)) == NULL)
+    if ((fp = ofile(fd)) == 0)
         return;
-    u.olist[fd] = NULL;
+    u.olist[fd] = 0;
     fclose(fp);
 }
 
@@ -133,7 +136,7 @@ close(fd)
  * Clear all region locks on last close.
  */
 fclose(fp)
-    fast struct file *fp;
+    register struct file *fp;
 {
     static struct inode *ip;
     static UINT writ;
@@ -158,23 +161,23 @@ fclose(fp)
         * Close an inode, from fclose and umount.
         */
 iclose(ip, writ)
-    fast struct inode *ip;
+    register struct inode *ip;
     int writ;
 {
-    fast int dev;
+    register int dev;
 
     if (--ip->count <= 0) {
         ilock(ip);
-        dev = ip->addr[0];
-        switch (ip->mode & ITYPE) {
-        case ICIO:
+        dev = ip->i_addr[0];
+        switch (ip->i_mode & IFMT) {
+        case IFCHR:
             ip->count++;
             irelse(ip);
             cclose(dev, writ);
             ilock(ip);
             ip->count--;
             break;
-        case IBIO:
+        case IFBLK:
             bflush(dev);
             bclose(dev, writ);
         }
@@ -188,7 +191,7 @@ iclose(ip, writ)
 struct file *
 falloc()
 {
-    fast struct file *fp;
+    register struct file *fp;
 
     for (fp = flist; fp < flist + NFILE; fp++)
         if (fp->count <= 0) {
@@ -196,7 +199,7 @@ falloc()
             return (fp);
         }
     u.error = ENFILE;
-    return NULL;
+    return 0;
 }
 
 /*
@@ -204,10 +207,10 @@ falloc()
  */
 oalloc()
 {
-    fast struct file **op, **otop;
+    register struct file **op, **otop;
 
     for (op = u.olist, otop = op + NOPEN; op < otop; op++)
-        if (*op == NULL)
+        if (*op == 0)
             return (op - u.olist);
     u.error = EMFILE;
     return ERROR;
@@ -221,12 +224,12 @@ struct file *
 ofile(fd)
     unsigned int fd;
 {
-    fast struct file *fp;
+    register struct file *fp;
 
-    if (fd < NOPEN && (fp = u.olist[fd]) != NULL)
+    if (fd < NOPEN && (fp = u.olist[fd]) != 0)
         return (fp);
     u.error = EBADF;
-    return NULL;
+    return 0;
 }
 
 /*

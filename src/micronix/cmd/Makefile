@@ -8,9 +8,9 @@ install :
 	cd pwd ; make install
 	cd rm ; make install
 	cd vi ; make install
-	cd msh ; make install
 	cd mknod ; make install
 	cp/cp reset /bin/reset
+	# cd msh ; make install
 
 clean : 
 	cd Make ; make clean
@@ -20,6 +20,6 @@ clean :
 	cd pwd ; make clean
 	cd far ; make clean
 	cd rm ; make clean
-	cd msh ; make clean
 	cd mknod ; make clean
 	cd vi ; make clean
+	# cd msh ; make clean

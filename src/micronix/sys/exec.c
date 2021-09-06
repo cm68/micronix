@@ -3,10 +3,14 @@
  */
 #include <types.h>
 #include <sys/sys.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
+#include <sys/signal.h>
 #include <obj.h>
+#include <errno.h>
 
 #define NBLKS	4               /* max argument blocks */
 #define NODEV	-1              /* see con.c */
@@ -27,7 +31,7 @@ static struct inode *ip = 0;
 static struct buf *bp[NBLKS] = 0;
 static UINT nargs = 0;
 static UINT nbytes = 0;
-static UCHAR nblks = 0;
+static UINT8 nblks = 0;
 static struct obj hdr = 0;
 
 /*
@@ -36,11 +40,11 @@ static struct obj hdr = 0;
 exec(name, args)
     char *name, **args;
 {
-    static char execing = NO;
+    static char execing = 0;
 
     while (execing)
         sleep(&exec, PRIWAIT);
-    execing = YES;
+    execing = 1;
 
     if (xchk(name) && getargs(args) && rdhdr() && fit()) {
         mrelse();
@@ -52,7 +56,7 @@ exec(name, args)
     }
     irelse(ip);
     arelse();
-    execing = NO;
+    execing = 0;
     wakeup(&exec);
 }
 
@@ -62,15 +66,15 @@ exec(name, args)
 xchk(name)
     char *name;
 {
-    if ((ip = iname(name)) != NULL) {
-        if ((ip->mode & ITYPE) != IORD || ip->size == 0) {
+    if ((ip = iname(name)) != 0) {
+        if ((ip->i_mode & IFMT) != IFREG || ip->size == 0) {
             u.error = ENOEXEC;
-            return NO;
+            return 0;
         }
         if (access(ip, IEXEC))
-            return YES;
+            return 1;
     }
-    return NO;
+    return 0;
 }
 
 /*
@@ -81,14 +85,14 @@ rdhdr()
     u.offset = 0;
     u.segflg = KSEG;
     if (nread(ip, &hdr, sizeof(hdr)) < 0)
-        return NO;
+        return 0;
     if (hdr.ident != OBJECT) {  /* old cpm format */
         u.offset = 0;           /* rewind file */
         copy(&cpmhdr, &hdr, sizeof(hdr));
         hdr.text = ip->size;
         hdr.dataoff = hdr.text + hdr.textoff;
     }
-    return YES;
+    return 1;
 }
 
 /*
@@ -104,10 +108,10 @@ fit()
 
     if (brake + hdr.heap + 4 + nargs + nargs + nbytes > MAXMEM) {
         u.error = ENOMEM;
-        return NO;
+        return 0;
     }
     u.brake = brake;
-    return YES;
+    return 1;
 }
 
 /*
@@ -119,7 +123,7 @@ getargs(args)
     static char *s, *d;
 
     nargs = nbytes = nblks = 0;
-    while ((s = getword(args++)) != NULL) {
+    while ((s = getword(args++)) != 0) {
         nargs++;
         do {
             if ((nbytes & 511) == 0) {
@@ -129,14 +133,14 @@ getargs(args)
                     d = bp[nblks]->data;
                 } else {
                     u.error = E2BIG;
-                    return NO;
+                    return 0;
                 }
             }
             nbytes++;
         }
         while ((*d++ = getbyte(s++)) != '\0');
     }
-    return YES;
+    return 1;
 }
 
 /*
@@ -144,7 +148,7 @@ getargs(args)
  */
 putargs()
 {
-    static UCHAR n, c, *s, *a, *d, *t, **av;
+    static UINT8 n, c, *s, *a, *d, *t, **av;
     static UINT ac, count;
     extern char usrtop;
 
@@ -188,8 +192,8 @@ setusr()
     static int *sp, *st;
 
     u.pc = hdr.textoff;
-    u.euid = (ip->mode & ISETUID) ? (ip->uid) : (u.uid);
-    u.egid = (ip->mode & ISETGID) ? (ip->gid) : (u.gid);
+    u.u_euid = (ip->i_mode & ISUID) ? (ip->i_uid) : (u.u_uid);
+    u.u_egid = (ip->i_mode & ISGID) ? (ip->i_gid) : (u.u_gid);
     for (sp = u.p->slist, st = sp + NSIG; sp < st; sp++)
         if (*sp > 1)
             *sp = 0;

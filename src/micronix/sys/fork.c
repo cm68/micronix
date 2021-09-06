@@ -3,10 +3,13 @@
  */
 #include <types.h>
 #include <sys/sys.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <sys/file.h>
 #include <sys/con.h>
+#include <errno.h>
 
 extern struct proc *initproc, *swapproc;
 
@@ -15,8 +18,8 @@ extern struct proc *initproc, *swapproc;
  */
 fork()
 {
-    fast struct proc *child;
-    fast struct file **o;
+    register struct proc *child;
+    register struct file **o;
 
     /*
      * Allocate a process slot.
@@ -43,7 +46,7 @@ fork()
     u.cdir->count++;
 
     for (o = u.olist; o < u.olist + NOPEN; o++)
-        if (*o != NULL)
+        if (*o != 0)
             (*o)->count++;
 
     if (procopy(child))
@@ -56,15 +59,15 @@ fork()
  * Copy the current proc structure to child, update
  * the proc structures as necessary, and copy the
  * current core image to another bank or to disk.
- * Then return YES. Later, the copy will be activated
- * by next() and will return from this level with NO.
+ * Then return 1. Later, the copy will be activated
+ * by next() and will return from this level with 0.
  */
 procopy(child)
-    fast struct proc *child;    /* see comments to next (sleep.c) */
+    register struct proc *child;    /* see comments to next (sleep.c) */
 {
     static char bank;
-    fast int s;
-    fast char mode;
+    register int s;
+    register char mode;
 
     saveframe(&u.p->frmptr, &u.p->stkptr);
     copy(u.p, child, sizeof(struct proc));
@@ -90,7 +93,7 @@ procopy(child)
         u.p->mode = mode;
     }
 
-    return YES;
+    return 1;
 }
 
 /*
@@ -114,7 +117,7 @@ procptr(id)
         if ((p->pid == id) && (p->mode & ALLOC))
             return p;
 
-    return NULL;                /* No such process ID */
+    return 0;                /* No such process ID */
 }
 
 /*
@@ -153,8 +156,8 @@ newpid(a)
 exit(stat)
     int stat;
 {
-    fast int fd;
-    fast struct proc *p;
+    register int fd;
+    register struct proc *p;
 
     u.p->status |= (stat << 8);
 
@@ -190,7 +193,7 @@ wait(addr)
     struct proc *p;
 
     for (;;) {
-        child = NO;             /* no child found yet */
+        child = 0;             /* no child found yet */
 
         /*
          * Search for child.
@@ -198,7 +201,7 @@ wait(addr)
 
         for (p = plist; p < plist + NPROC; p++) {
             if (p->parent == u.p) {
-                child = YES;
+                child = 1;
 
                 /*
                  * If the child is a zombie,
@@ -214,7 +217,7 @@ wait(addr)
             }
         }
 
-        if (child == NO) {
+        if (child == 0) {
             u.error = ECHILD;   /* No kids. */
             return;
         }

@@ -3,9 +3,12 @@
  */
 #include <types.h>
 #include <sys/sys.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <sys/file.h>
+#include <errno.h>
 
 extern long seconds;
 
@@ -15,9 +18,9 @@ extern long seconds;
 stat(name, buf)
     char *name, *buf;
 {
-    fast struct inode *ip;
+    register struct inode *ip;
 
-    if ((ip = iname(name)) != NULL)
+    if ((ip = iname(name)) != 0)
         istat(ip, buf);
 }
 
@@ -28,9 +31,9 @@ fstat(fd, buf)
     int fd;
     char *buf;
 {
-    fast struct file *fp;
+    register struct file *fp;
 
-    if ((fp = ofile(fd)) == NULL)
+    if ((fp = ofile(fd)) == 0)
         return;
     ilock(fp->inode);
     istat(fp->inode, buf);
@@ -45,7 +48,7 @@ istat(ip, buf)
 {
     if (!valid(buf, 36))
         return;
-    x4to3(&ip->size, &ip->size0);       /* update 3-byte size */
+    x4to3(&ip->i_size, &ip->i_size0);       /* update 3-byte size */
     copyout(ip, buf, 36);
     irelse(ip);
 }
@@ -77,13 +80,13 @@ stime(high, low)
  */
 seek(fd, disp, from)
     int fd;
-    fast int disp;
-    fast unsigned from;
+    register int disp;
+    register unsigned from;
 {
     static struct file *fp;
     static long offset;
 
-    if ((fp = ofile(fd)) == NULL)
+    if ((fp = ofile(fd)) == 0)
         return;
     if (fp->mode & PIPE) {
         u.error = ESPIPE;
@@ -119,7 +122,7 @@ seek(fd, disp, from)
  * Sleep system call (not internal sleep)
  */
 snooze(secs)
-    fast unsigned int secs;
+    register unsigned int secs;
 {
     long waketime;
     extern int revel;

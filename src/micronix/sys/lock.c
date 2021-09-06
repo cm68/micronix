@@ -22,7 +22,7 @@ reclock(fd, size)
     static struct inode *ip;
     static struct lock *l, *new;
 
-    if ((fp = ofile(fd)) == NULL)
+    if ((fp = ofile(fd)) == 0)
         return;
 
     /*
@@ -34,7 +34,7 @@ reclock(fd, size)
 
     ip = fp->inode;
 
-    new = NULL;
+    new = 0;
 
     for (l = llist; l < llist + NLOCK; l++) {
         if (l->file) {
@@ -49,7 +49,7 @@ reclock(fd, size)
         }
     }
 
-    if (new == NULL) {
+    if (new == 0) {
         u.error = ENFILE;       /* Lock table full. */
         return;
     }
@@ -72,7 +72,7 @@ unlock(fd)
     static struct file *fp;
     static struct lock *l;
 
-    if ((fp = ofile(fd)) == NULL)
+    if ((fp = ofile(fd)) == 0)
         return;
 
     u.offset = fp->rwptr;
@@ -80,7 +80,7 @@ unlock(fd)
 
     for (l = llist; l < llist + NLOCK; l++)
         if (l->file == fp && lockhit(l))
-            l->file = NULL;
+            l->file = 0;
 }
 
 /*
@@ -105,7 +105,7 @@ lclose(fp)
 
     for (l = llist; l < llist + NLOCK; l++)
         if (l->file == fp)
-            l->file = NULL;
+            l->file = 0;
 }
 
 /*

@@ -13,6 +13,7 @@
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <sys/con.h>
+#include <errno.h>
 
 #define NDRIVES 4               /* Number of drives. See mws[] below. */
 #define SECSIZE 3               /* Sector size (512 bytes) */
@@ -27,9 +28,9 @@
 struct spec
 {
     UINT tracks;                /* number of tracks per surface */
-    UCHAR heads;                /* number of heads */
-    UCHAR sectors;              /* number of sectors per track */
-    UCHAR stpdel;               /* delay between step pulses, 100 us */
+    UINT8 heads;                /* number of heads */
+    UINT8 sectors;              /* number of sectors per track */
+    UINT8 stpdel;               /* delay between step pulses, 100 us */
     UINT precomp;               /* track where precomp begins */
     UINT lowcur;                /* track where low current begins */
 } specs[] = {
@@ -46,17 +47,17 @@ struct spec
 struct info
 {
     UINT tracks;                /* number of tracks per surface */
-    UCHAR heads;                /* number of heads */
-    UCHAR sectors;              /* number of sectors per track */
-    UCHAR stpdel;               /* delay between step pulses, 100 us */
+    UINT8 heads;                /* number of heads */
+    UINT8 sectors;              /* number of sectors per track */
+    UINT8 stpdel;               /* delay between step pulses, 100 us */
     UINT precomp;               /* track where precomp begins */
     UINT lowcur;                /* track where low current begins */
 
     UINT maxblk;                /* max legal block number */
     UINT spc;                   /* number of sectors per cylinder */
     UINT curtrk;                /* current track */
-    UCHAR flags;                /* see below */
-    UCHAR type;                 /* index into specs table above */
+    UINT8 flags;                /* see below */
+    UINT8 type;                 /* index into specs table above */
 } mws[NDRIVES] = 0;
 
 /*
@@ -73,30 +74,30 @@ struct info
  */
 struct
 {
-    UCHAR seksel;               /* out<<4 | drv */
+    UINT8 seksel;               /* out<<4 | drv */
     UINT steps;                 /* number of steps */
-    UCHAR hedsel;               /* pcmp<<7 | hicur<<6 | (~head&7)<<2 | drv */
+    UINT8 hedsel;               /* pcmp<<7 | hicur<<6 | (~head&7)<<2 | drv */
     UINT dma;                   /* dma address */
-    UCHAR xdma;                 /* high byte of 24-bit address */
+    UINT8 xdma;                 /* high byte of 24-bit address */
 
     union
     {
         UINT word;
         struct
         {
-            UCHAR low;
-            UCHAR high;
+            UINT8 low;
+            UINT8 high;
         }
         byte;
     }
     arg0;
-    UCHAR arg2;
-    UCHAR arg3;
+    UINT8 arg2;
+    UINT8 arg3;
 
-    UCHAR op;                   /* op code */
-    UCHAR stat;                 /* completion status */
+    UINT8 op;                   /* op code */
+    UINT8 stat;                 /* completion status */
     UINT link;                  /* address of next command */
-    UCHAR xlink;                /* high byte of address */
+    UINT8 xlink;                /* high byte of address */
 
     UINT count;                 /* number of bytes to transfer */
     UINT blk;                   /* block no. */
@@ -146,7 +147,7 @@ struct
  */
 static struct info *mwinfo = 0; /* current drive */
 static struct buf *mwbuf = 0;   /* current io request */
-static UCHAR retry = 0,         /* number of retries so far */
+static UINT8 retry = 0,         /* number of retries so far */
     curdrv = -1,                /* number of current drive */
     mwstate = 0;                /* see below */
 
@@ -167,7 +168,7 @@ mwopen(dev, mode)
     UINT dev, mode;
 {
     static struct info *info;
-    static UCHAR drive, type;
+    static UINT8 drive, type;
     static struct buf *b;
 
     drive = dev & 3;
@@ -187,7 +188,7 @@ mwopen(dev, mode)
     copy(&specs[type], info, sizeof(struct spec));
     info->maxblk = info->tracks * info->heads * info->sectors - 1;
     info->spc = info->heads * info->sectors;
-    if ((b = bread(1, dev)) != NULL) {
+    if ((b = bread(1, dev)) != 0) {
         info->flags |= OPEN;
         brelse(b);
     }
@@ -217,9 +218,9 @@ mwclose(dev)
  * Strategy
  */
 mwstrat(b)
-    fast struct buf *b;
+    register struct buf *b;
 {
-    fast struct info *info;
+    register struct info *info;
 
     info = &mws[b->dev & 3];
     if (b->blk > info->maxblk) {
@@ -230,7 +231,7 @@ mwstrat(b)
     }
     b->cyl = mwcyl(b->blk, info);
     di();
-    if (mwbuf == NULL)
+    if (mwbuf == 0)
         mwbuf = b;
     else
         bsort(mwbuf, b);
@@ -268,7 +269,7 @@ mwstop()
     cmd.hedsel |= LCONST | 3;   /* select drive 4 - turn off light */
     cmd.op = LOAD;
     mwwait();
-    busgive(NULL);
+    busgive(0);
 }
 
 /*
@@ -334,9 +335,9 @@ advque()
 
     iodone(mwbuf);
     f = mwbuf->forw;
-    mwbuf->forw = NULL;
+    mwbuf->forw = 0;
     mwbuf = f;
-    if (mwbuf == NULL)
+    if (mwbuf == 0)
         mwstop();
     else if (curdrv != (mwbuf->dev & 3))
         newdrv();
@@ -556,15 +557,15 @@ busget(func)
     int *(func) ();
 {
     di();
-    if (bus != NULL && bus != func) {   /* someone else has it */
-        if (next == NULL)       /* register the heir */
+    if (bus != 0 && bus != func) {   /* someone else has it */
+        if (next == 0)       /* register the heir */
             next = func;
         ei();
-        return NO;              /* didn't get it */
+        return 0;              /* didn't get it */
     } else {
         bus = func;             /* application accepted */
         ei();
-        return YES;             /* got it */
+        return 1;             /* got it */
     }
 }
 
@@ -577,11 +578,11 @@ busgive(func)
         next = func;            /* register next heir */
         ei();
         (*bus) ();              /* invoke new master */
-        return YES;             /* bus was given away */
+        return 1;             /* bus was given away */
     } else {
-        bus = NULL;             /* no bus master */
+        bus = 0;             /* no bus master */
         ei();
-        return NO;              /* no one took bus */
+        return 0;              /* no one took bus */
     }
 }
 

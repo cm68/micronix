@@ -10,7 +10,7 @@
 /*
  * queue protocol
  *
- *      If first or last is NULL, queue is empty.
+ *      If first or last is 0, queue is empty.
  *
  *      first, last % 16 is in the range 2 - 15 (inclusive). (or 0)
  *      all routines must preserve this status.
@@ -38,7 +38,7 @@
 
 char clist[CSIZE] = { 0 };
 
-struct cblock *cfree = NULL;    /* free list */
+struct cblock *cfree = 0;    /* free list */
 
 /*
  * Drain all queues and flush the output.
@@ -59,7 +59,7 @@ drainall(tty)
  * and output que empties.
  */
 drainques(tty)
-    fast struct tty *tty;
+    register struct tty *tty;
 {
     drain(&tty->rawque);
     drain(&tty->cokque);
@@ -75,7 +75,7 @@ drainques(tty)
  * Empty a queue, discarding its contents
  */
 drain(q)
-    fast struct que *q;
+    register struct que *q;
 {
     static struct cblock *x, *y;
 
@@ -158,7 +158,7 @@ fillque(q)
      */
 
     /*
-     * resched = YES; 
+     * resched = 1; 
      */
 
     ei();
@@ -234,7 +234,7 @@ putc(q, c)
 getc(q)
     register struct que *q;
 {
-    fast UINT c;
+    register UINT c;
 
     di();
 
@@ -262,12 +262,12 @@ qalloc(q)
     if (q->count == 0 && q->last) {
         new = q->last;
         new--;
-        q->last = NULL;
+        q->last = 0;
     }
 
     else {
         if (!cfree)
-            return NO;
+            return 0;
 
         new = cfree;            /* allocate */
         cfree = cfree->next;
@@ -282,13 +282,13 @@ qalloc(q)
     }
 
     q->last = new->block;
-    new->next = NULL;
-    return YES;
+    new->next = 0;
+    return 1;
 }
 
 static
 qrelse(q)
-    fast struct que *q;
+    register struct que *q;
 {
     static struct cblock *b;
 
@@ -312,7 +312,7 @@ qfree(q)
 
     if (!old) {
         qinit(q);
-        return NO;
+        return 0;
     }
 
     old--;
@@ -324,12 +324,12 @@ qfree(q)
 
     if (new) {
         q->first = new->block;
-        return YES;
+        return 1;
     }
 
     else {
         qinit(q);
-        return NO;
+        return 0;
     }
 }
 

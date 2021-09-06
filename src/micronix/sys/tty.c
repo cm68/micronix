@@ -5,6 +5,8 @@
 #include <sys/sys.h>
 #include <sys/tty.h>
 #include <sys/proc.h>
+#include <errno.h>
+#include <sys/signal.h>
 
 /*
  * Open a tty. Called by the device open routine.
@@ -14,7 +16,7 @@
 ttyopen(tty)
     struct tty *tty;
 {
-    if (u.p->tty == NULL)
+    if (u.p->tty == 0)
         u.p->tty = tty;
 
     tty->count++;
@@ -25,7 +27,7 @@ ttyopen(tty)
  * Close a tty. Called by device close routine.
  */
 ttyclose(tty)
-    fast struct tty *tty;
+    register struct tty *tty;
 {
     if (!--tty->count) {
         tty->state &= ~OPEN;
@@ -36,7 +38,7 @@ ttyclose(tty)
  * High level output. Write characters to the terminal.
  */
 ttywrite(tty)
-    fast struct tty *tty;
+    register struct tty *tty;
 {
     for (;;) {
         fillque(&tty->outque);
@@ -54,9 +56,9 @@ ttywrite(tty)
  * Read characters from the terminal
  */
 ttyread(tty)
-    fast struct tty *tty;
+    register struct tty *tty;
 {
-    fast struct que *cok;
+    register struct que *cok;
 
     if (tty->state & ERROR) {
         tty->state &= ~ERROR;   /* clear the error condition */
@@ -88,10 +90,10 @@ ttyread(tty)
  * We can't afford to sleep here while using the buffer
  */
 cookin(tty)
-    fast struct tty *tty;
+    register struct tty *tty;
 {
-    fast struct que *cook, *raw;
-    fast c;
+    register struct que *cook, *raw;
+    register c;
     static char buf[TTYHOG], *p, *q;
 
     cook = &tty->cokque;
@@ -207,7 +209,7 @@ cookin(tty)
 cwait(tty)
     struct tty *tty;
 {
-    fast struct que *raw;
+    register struct que *raw;
 
     raw = &tty->rawque;
 
@@ -224,7 +226,7 @@ cwait(tty)
  * Get/set tty status (for an sgtty routine)
  */
 ttymode(tty, flag)
-    fast struct tty *tty;
+    register struct tty *tty;
     int flag;
 {
 
@@ -241,13 +243,13 @@ ttymode(tty, flag)
  * ready-to-print interrupt.
  */
 ttyout(tty)
-    fast struct tty *tty;
+    register struct tty *tty;
 {
 
     /*
      * fast struct que *que; 
      */
-    fast char *state;
+    register char *state;
     char cold;
 
     state = &tty->state;
@@ -303,11 +305,11 @@ ttyout(tty)
  * Expand the output que if necessary.
  */
 cookout(tty)
-    fast struct tty *tty;
+    register struct tty *tty;
 {
     struct que *que;
-    fast int mode;
-    fast char c;
+    register int mode;
+    register char c;
     int inc;
     static char *more = "--more--\b\b\b\b\b\b\b\b        \b\b\b\b\b\b\b\b";
 
@@ -427,11 +429,11 @@ ttyhangup(t)
  * it if necessary.
  */
 ttyin(c, tty)
-    fast int c;
-    fast struct tty *tty;
+    register int c;
+    register struct tty *tty;
 {
     struct que *raw;
-    fast struct que *out;
+    register struct que *out;
     char state;
     int mode;
 
@@ -488,7 +490,7 @@ ttyin(c, tty)
              */
         case XOFF:
             tty->state |= LOSTOP;
-            (*tty->stop) (tty, NO);
+            (*tty->stop) (tty, 0);
             return;
 
         case XON:
@@ -558,7 +560,7 @@ ttyin(c, tty)
  * Conditionally start output
  */
 cstart(tty)
-    fast struct tty *tty;
+    register struct tty *tty;
 {
     if (!(tty->state & LOSTOP))
         (*tty->start) (tty);
@@ -568,7 +570,7 @@ cstart(tty)
  * Unconditionally start output
  */
 ustart(tty)
-    fast struct tty *tty;
+    register struct tty *tty;
 {
     tty->state &= ~LOSTOP;
     (*tty->start) (tty);
@@ -579,10 +581,10 @@ ustart(tty)
  * Called by ttyclose, ttymode, and ttywrite().
  */
 outwait(tty, count)
-    fast struct tty *tty;
-    fast int count;
+    register struct tty *tty;
+    register int count;
 {
-    fast struct que *out;
+    register struct que *out;
 
     out = &tty->outque;
 

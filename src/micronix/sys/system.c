@@ -4,6 +4,8 @@
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/proc.h>
+#include <sys/signal.h>
+#include <errno.h>
 
 extern char resched;
 
@@ -104,11 +106,11 @@ system()
     enable();
     u.segflg = USEG;
     u.error = 0;
-    docall(u.pc, YES);          /* note: fork may change u */
+    docall(u.pc, 1);          /* note: fork may change u */
     u.p->pri = PRIUSER;
 
     /*
-     * if (hier && priority(hier) > priority(u.p)) resched = YES; 
+     * if (hier && priority(hier) > priority(u.p)) resched = 1; 
      */
     u.p->mode &= ~SYS;
 }
@@ -125,10 +127,10 @@ int arg[4] = 0;
  * signal can abort from this level.
  */
 docall(addr, direct)
-    fast char *addr;
+    register char *addr;
     int direct;
 {
-    fast int call, nbytes;
+    register int call, nbytes;
     int dummy;
 
     if (direct)
@@ -156,7 +158,7 @@ docall(addr, direct)
 indir(addr)
     char *addr;
 {
-    docall(addr, NO);
+    docall(addr, 0);
 }
 
 /*
@@ -173,7 +175,7 @@ unimp()
 badcall()
 {
     u.error = EINVAL;
-    send(u.p, SIGBAD);
+    send(u.p, SIGSYS);
 }
 
 /*

@@ -3,9 +3,12 @@
  */
 #include <types.h>
 #include <sys/sys.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/file.h>
 #include <sys/proc.h>
+#include <errno.h>
 
 /*
  * Break system call
@@ -26,11 +29,11 @@ brake(addr)
 chdir(name)
     char *name;
 {
-    fast struct inode *i;
+    register struct inode *i;
 
-    if ((i = iname(name)) == NULL)
+    if ((i = iname(name)) == 0)
         return;
-    if ((i->mode & ITYPE) != IDIR) {
+    if ((i->i_mode & IFMT) != IFDIR) {
         u.error = ENOTDIR;
         goto out;
     }
@@ -51,16 +54,16 @@ chmod(name, mode)
     char *name;
     int mode;
 {
-    fast struct inode *i;
+    register struct inode *i;
 
 #define MBITS	07777           /* user changable mode bits */
 
-    if ((i = iname(name)) == NULL)
+    if ((i = iname(name)) == 0)
         return;
-    if (!ronly(i) && (u.euid == i->uid || super())) {
-        i->mode &= ~MBITS;
-        i->mode |= (mode & MBITS);
-        i->flags |= IMOD;
+    if (!ronly(i) && (u.u_euid == i->i_uid || super())) {
+        i->i_mode &= ~MBITS;
+        i->i_mode |= (mode & MBITS);
+        i->i_flags |= IMOD;
     }
     irelse(i);
 }
@@ -72,16 +75,16 @@ chown(name, owner)
     char *name;
     UINT owner;
 {
-    fast struct inode *ip;
+    register struct inode *ip;
 
     if (!super())
         return;
-    if ((ip = iname(name)) == NULL)
+    if ((ip = iname(name)) == 0)
         return;
     if (!ronly(ip)) {
-        ip->uid = owner;
-        ip->gid = owner >> 8;
-        ip->flags |= IMOD;
+        ip->i_uid = owner;
+        ip->i_gid = owner >> 8;
+        ip->i_flags |= IMOD;
     }
     irelse(ip);
 }
@@ -92,9 +95,9 @@ chown(name, owner)
 dup(fd)
     int fd;
 {
-    fast struct file *fp;
+    register struct file *fp;
 
-    if ((fp = ofile(fd)) == NULL)
+    if ((fp = ofile(fd)) == 0)
         return;
     if ((fd = oalloc()) == ERROR)
         return;
@@ -117,7 +120,7 @@ sync()
  */
 getuid()
 {
-    return ((u.gid << 8) | u.uid);
+    return ((u.u_gid << 8) | u.u_uid);
 }
 
 /*
@@ -126,16 +129,16 @@ getuid()
 setuid(id)
     unsigned int id;
 {
-    fast char uid, gid;
+    register char uid, gid;
 
     uid = (char) id;
     gid = id >> 8;
-    if ((uid == u.uid && gid == u.gid) || super()) {
+    if ((uid == u.u_uid && gid == u.u_gid) || super()) {
         u.p->uid = uid;
-        u.uid = uid;
-        u.gid = gid;
-        u.euid = uid;
-        u.egid = gid;
+        u.u_uid = uid;
+        u.u_gid = gid;
+        u.u_euid = uid;
+        u.u_egid = gid;
     }
 }
 
@@ -145,7 +148,7 @@ setuid(id)
 nice(n)
     int n;
 {
-    fast char nice;
+    register char nice;
 
     nice = n;
     if (nice < 0 && !super())

@@ -4,6 +4,7 @@
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/proc.h>
+#include <sys/signal.h>
 
 long seconds = 0;               /* system time */
 int revel = 0;                  /* seconds to revelie for sleep system call */
@@ -19,11 +20,11 @@ extern struct proc *swapproc;
  */
 clock()
 {
-    fast struct proc *p;
-    fast int *sec;
+    register struct proc *p;
+    register int *sec;
 
     timein();                   /* see below */
-    resched = YES;
+    resched = 1;
 
     /*
      * Once per second stuff.
@@ -85,19 +86,19 @@ struct tmout tlist[NTMOUTS] = 0;        /* timeout list */
  */
 timein()
 {
-    static char tmbusy = NO;
-    fast struct tmout *t;
+    static char tmbusy = 0;
+    register struct tmout *t;
 
     if (tmbusy)
         return;
 
-    tmbusy = YES;
+    tmbusy = 1;
     for (t = tlist; t < tlist + NTMOUTS; t++)
-        if (t->func != NULL && --t->ticks == 0) {
+        if (t->func != 0 && --t->ticks == 0) {
             (*(t->func)) (t->arg);
-            t->func = NULL;
+            t->func = 0;
         }
-    tmbusy = NO;
+    tmbusy = 0;
 }
 
 /*
@@ -107,11 +108,11 @@ timein()
 timeout(func, arg, ticks)
     int (*func)(), arg, ticks;
 {
-    fast struct tmout *t;
+    register struct tmout *t;
 
     di();
     for (t = tlist; t < tlist + NTMOUTS; t++)
-        if (t->func == NULL) {
+        if (t->func == 0) {
             t->func = func;
             t->arg = arg;
             t->ticks = ticks + 1;

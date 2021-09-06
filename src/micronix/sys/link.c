@@ -3,8 +3,11 @@
  */
 #include <types.h>
 #include <sys/sys.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/proc.h>
+#include <errno.h>
 
 /*
  * Link system call
@@ -12,38 +15,38 @@
 link(old, new)
     char *old, *new;
 {
-    fast struct inode *ip;
-    fast int inum, dev;
+    register struct inode *ip;
+    register int inum, dev;
 
-    if ((ip = iname(old)) == NULL)
+    if ((ip = iname(old)) == 0)
         return;
     irelse(ip);                 /* avoid deadlock */
-    if ((ip->mode & ITYPE) == IDIR && !super())
+    if ((ip->i_mode & IFMT) == IFDIR && !super())
         return;
-    if (ip->nlinks == 127) {
+    if (ip->i_nlink == 127) {
         u.error = EMLINK;
         return;
     }
-    inum = ip->inum;
-    dev = ip->dev;
-    if ((ip = iname(new)) != NULL) {
+    inum = ip->i_inum;
+    dev = ip->i_dev;
+    if ((ip = iname(new)) != 0) {
         irelse(ip);
         u.error = EEXIST;
         return;
     }
     if (u.error != ENOENT)
         return;
-    if (u.iparent->dev != dev) {
+    if (u.iparent->i_dev != dev) {
         u.error = EXDEV;
         return;
     }
     u.error = 0;
     if (!access(u.iparent, IWRITE))
         return;
-    if ((ip = iget(inum, dev)) == NULL)
+    if ((ip = iget(inum, dev)) == 0)
         return;
-    ip->nlinks++;
-    ip->flags |= IMOD;
+    ip->i_nlink++;
+    ip->i_flags |= IMOD;
     irelse(ip);
     ilink(inum);
 }
@@ -77,23 +80,23 @@ ilink(inum)
 unlink(name)
     char *name;
 {
-    fast struct inode *ip, *parent;
+    register struct inode *ip, *parent;
 
-    if ((ip = iname(name)) == NULL)
+    if ((ip = iname(name)) == 0)
         return;
     irelse(ip);                 /* no process switching until done */
     parent = u.iparent;
-    if (parent == NULL) {       /* root or current dir */
+    if (parent == 0) {       /* root or current dir */
         u.error = ENOENT;
         return;
     }
-    if ((ip->mode & ITYPE) == IDIR && !super())
+    if ((ip->i_mode & IFMT) == IFDIR && !super())
         return;
     if (!access(parent, IWRITE))
         return;
-    if (ip->nlinks > 0) {
-        ip->nlinks--;
-        ip->flags |= IMOD;
+    if (ip->i_nlink > 0) {
+        ip->i_nlink--;
+        ip->i_flags |= IMOD;
     }
     parent->count++;            /* protect parent inode across idec */
     idec(ip);

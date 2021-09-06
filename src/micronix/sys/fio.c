@@ -3,6 +3,8 @@
  */
 #include <types.h>
 #include <sys/sys.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/buf.h>
 #include <sys/con.h>
@@ -18,24 +20,24 @@ extern long seconds;
  * to read directories, and to load files for execution.
  */
 iread(ip)
-    fast struct inode *ip;
+    register struct inode *ip;
 {
     int request, dev, log, phys, rahead;
-    fast int into, nbytes;
+    register int into, nbytes;
     static int type;
     struct buf *bp;
     static long gap;
 
     if ((request = u.count) == 0)
         return (0);
-    type = ip->mode & ITYPE;
-    dev = (type & IIO) ? ip->addr[0] : ip->dev;
-    if (type == ICIO) {
+    type = ip->i_mode & IFMT;
+    dev = (type & IIO) ? ip->i_addr[0] : ip->i_dev;
+    if (type == IFCHR) {
         cread(dev);
         goto done;
     }
-    if (type != IBIO) {         /* don't read past eof */
-        if ((gap = ip->size - u.offset) <= 0)
+    if (type != IFBLK) {         /* don't read past eof */
+        if ((gap = ip->i_size - u.offset) <= 0)
             goto out;
         if (request > gap)
             request = u.count = gap;
@@ -49,7 +51,7 @@ iread(ip)
         nbytes = min(u.count, 512 - into);
         if (rahead != 0 && into + nbytes == 512)
             aread(rahead, dev);
-        if ((bp = bread(phys, dev)) == NULL)
+        if ((bp = bread(phys, dev)) == 0)
             break;
         iomove(READ, bp->data + into, nbytes);
         brelse(bp);
@@ -58,8 +60,8 @@ iread(ip)
     }
   done:
     if (!(ip->flags & IRONLY)) {
-        ip->rtime = seconds;
-        ip->flags |= IMOD;
+        ip->i_rtime = seconds;
+        ip->i_flags |= IMOD;
     }
   out:
     return (request - u.count);
@@ -70,19 +72,19 @@ iread(ip)
  * Used for system write calls, pipes, and directories.
  */
 iwrite(ip)
-    fast struct inode *ip;
+    register struct inode *ip;
 {
     int request, dev, log, phys, pipe;
-    fast int into, nbytes;
+    register int into, nbytes;
     static int type, dummy;
     struct buf *bp;
 
     if ((request = u.count) == 0)
         return (0);
-    type = ip->mode & ITYPE;
-    pipe = ip->flags & IPIPE;
-    dev = (type & IIO) ? ip->addr[0] : ip->dev;
-    if (type == ICIO) {
+    type = ip->i_mode & IFMT;
+    pipe = ip->i_flags & IPIPE;
+    dev = (type & IIO) ? ip->i_addr[0] : ip->i_dev;
+    if (type == IFCHR) {
         cwrite(dev);
         goto done;
     }
@@ -94,7 +96,7 @@ iwrite(ip)
             break;
         if ((nbytes = min(u.count, 512 - into)) == 512)
             bp = bget(phys, dev);
-        else if ((bp = bread(phys, dev)) == NULL)
+        else if ((bp = bread(phys, dev)) == 0)
             break;
         iomove(WRITE, bp->data + into, nbytes);
         if ((into + nbytes == 512) && !pipe)
@@ -108,7 +110,7 @@ iwrite(ip)
     if (ip->size < u.offset)
         ip->size = u.offset;
     if (!(ip->flags & IRONLY)) {        /* special files */
-        ip->wtime = seconds;
+        ip->i_mtime = seconds;
         ip->flags |= IMOD;
     }
   out:
@@ -126,8 +128,8 @@ iwrite(ip)
  */
 iomove(flag, buf, count)
     int flag;
-    fast char *buf;
-    fast int count;
+    register char *buf;
+    register int count;
 {
     u.count -= count;
     u.offset += count;

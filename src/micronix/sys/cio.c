@@ -5,8 +5,11 @@
 #include <sys/sys.h>
 #include <sys/con.h>
 #include <sys/file.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/proc.h>
+#include <errno.h>
 
 /*
  * Access ciosw to open a character device
@@ -55,10 +58,10 @@ cmode(fd, addr, flag)
     static struct inode *ip;
     static int dev;
 
-    if ((fp = ofile(fd)) == NULL)
+    if ((fp = ofile(fd)) == 0)
         return;
     ip = fp->inode;
-    if ((ip->mode & ITYPE) != ICIO) {
+    if ((ip->i_mode & IFMT) != IFCHR) {
         u.error = ENOTTY;
         return;
     }
@@ -66,7 +69,7 @@ cmode(fd, addr, flag)
         return;
     u.base = addr;
     u.segflg = USEG;
-    dev = ip->addr[0];
+    dev = ip->i_addr[0];
     (*ciosw[cmajor(dev)].mode) (dev, flag);
 }
 
