@@ -1077,9 +1077,9 @@ monitor()
                 if (strcmp(s, "tos") == 0) {
                     int tos;
                     tos  = cp->state.registers.word[Z80_SP] & 0xffff;
-                    printf("stack %04x\n", tos);
+                    fprintf(mytty, "stack %04x\n", tos);
                     for (i = 0; i < 10; i++) {
-                        printf("\t%04x\n", get_word(tos + (i * 2)));
+                        fprintf(mytty, "\t%04x\n", get_word(tos + (i * 2)));
                     } 
                     break;
                 } else {
