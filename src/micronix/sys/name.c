@@ -5,7 +5,10 @@
 #include <sys/sys.h>
 #include <sys/buf.h>
 #include <sys/proc.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
+#include <errno.h>
 
 extern struct inode *rootdir;
 
@@ -18,17 +21,17 @@ struct inode *
 iname(name)
     char *name;
 {
-    fast struct inode *ip, *parent;
-    fast int inum;
+    register struct inode *ip, *parent;
+    register int inum;
 
-    u.iparent = NULL;
+    u.iparent = 0;
     for (ip = u.cdir; getbyte(name) == '/'; name++)
         ip = rootdir;
     ilock(ip);
     for (;;) {
         if (getbyte(name) == 0)
             return (ip);
-        if ((ip->mode & ITYPE) != IDIR) {
+        if ((ip->i_mode & IFMT) != IFDIR) {
             u.error = ENOTDIR;
             break;
         }
@@ -39,14 +42,14 @@ iname(name)
             break;
         parent->count++;
         irelse(parent);
-        ip = iget(inum, parent->dev);
+        ip = iget(inum, parent->i_dev);
         parent->count--;
-        if (ip == NULL)
-            return NULL;
+        if (ip == 0)
+            return 0;
     }
 
     irelse(ip);                 /* no sleeps between now and create */
-    return NULL;
+    return 0;
 }
 
 /*
@@ -62,7 +65,7 @@ dlook(ip, np)
     struct inode *ip;
     char **np;
 {
-    fast UINT nblks, tail, log;
+    register UINT nblks, tail, log;
     static UINT phys, end, dummy;
     static char c, *p, *nambuf;
     static struct buf *b;
@@ -78,7 +81,7 @@ dlook(ip, np)
             break;
         }
     p = *np + (p - nambuf);
-    until((c = getbyte(p)) == 0 || c == '/')
+    while (!((c = getbyte(p)) == 0 || c == '/'))
         p++;
     while (getbyte(p) == '/')
         p++;
@@ -93,7 +96,7 @@ dlook(ip, np)
     for (log = 0; log < nblks; log++) {
         if ((phys = imap(ip, log, &dummy)) == 0)
             continue;
-        if ((b = bread(phys, ip->dev)) == 0)
+        if ((b = bread(phys, ip->i_dev)) == 0)
             continue;
         end = b->data + ((tail && log == nblks - 1) ? tail : 512);
         for (d = b->data; d < end; d++, place++) {
@@ -134,13 +137,13 @@ direqu(a, b)
     y = b;
     for (i = 0; i < 14; i++) {
         if (*x != *y)
-            return NO;
+            return 0;
         if (*x == 0)
-            return YES;
+            return 1;
         x++;
         y++;
     }
-    return YES;
+    return 1;
 }
 
 /*

@@ -4,8 +4,9 @@
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/buf.h>
-#include <sys/sup.h>
+#include <sys/fs.h>
 #include <sys/proc.h>
+#include <errno.h>
 
 /*
  * Allocate a disk block from the device freelist.
@@ -15,25 +16,25 @@
 balloc(dev)
     int dev;
 {
-    fast struct buf *sb;
+    register struct buf *sb;
     static struct buf *fb;
-    fast struct sup *sup;
-    fast int bn;
+    register struct super *sup;
+    register int bn;
 
     sb = getsb(dev);
     sup = sb->data;
-    if (sup->flock) {           /* mounted read-only */
+    if (sup->s_flock) {           /* mounted read-only */
         u.error = EROFS;
         return (0);
     }
-    if (sup->nfree <= 0
-        || (bn = sup->free[--sup->nfree]) == 0 || bcheck(bn, sup, dev) == NO)
+    if (sup->s_nfree <= 0
+        || (bn = sup->s_free[--sup->s_nfree]) == 0 || bcheck(bn, sup, dev) == 0)
         goto full;
 
-    if (sup->nfree == 0) {
-        if ((fb = bread(bn, dev)) == NULL)
+    if (sup->s_nfree == 0) {
+        if ((fb = bread(bn, dev)) == 0)
             goto bad;
-        copy(fb->data, &sup->nfree, 202);       /* PORT */
+        copy(fb->data, &sup->s_nfree, 202);       /* PORT */
     } else {
         fb = bget(bn, dev);
     }
@@ -45,7 +46,7 @@ balloc(dev)
   full:
     u.error = ENOSPC;
   bad:
-    sup->nfree = 0;
+    sup->s_nfree = 0;
     prdev("No more space", dev);
     bdwrite(sb);
     return (0);
@@ -58,25 +59,25 @@ bfree(bn, dev)
     int bn;
     int dev;
 {
-    fast struct buf *sb, *fb;
-    fast struct sup *sup;
+    register struct buf *sb, *fb;
+    register struct super *sup;
 
     if (bn == 0)
         return;
     sb = getsb(dev);
     sup = sb->data;
-    if (bcheck(bn, sup, dev) == NO)
+    if (bcheck(bn, sup, dev) == 0)
         goto done;
-    if (sup->nfree == 0) {
-        sup->free[0] = 0;
-        sup->nfree = 1;
-    } else if (sup->nfree >= 100) {
+    if (sup->s_nfree == 0) {
+        sup->s_free[0] = 0;
+        sup->s_nfree = 1;
+    } else if (sup->s_nfree >= 100) {
         fb = bget(bn, dev);
-        copy(&sup->nfree, fb->data, 202);       /* PORT */
+        copy(&sup->s_nfree, fb->data, 202);       /* PORT */
         bawrite(fb);
-        sup->nfree = 0;
+        sup->s_nfree = 0;
     }
-    sup->free[sup->nfree++] = bn;
+    sup->s_free[sup->s_nfree++] = bn;
   done:
     bdwrite(sb);
 }
@@ -86,12 +87,12 @@ bfree(bn, dev)
  */
 bcheck(bn, sup, dev)
     int bn, dev;
-    struct sup *sup;
+    struct super *sup;
 {
-    if (sup->isize + 1 < bn && bn < sup->fsize)
-        return YES;
+    if (sup->s_isize + 1 < bn && bn < sup->s_fsize)
+        return 1;
     prdev("Out of range block number", dev);
-    return NO;
+    return 0;
 }
 
 /*

@@ -4,14 +4,15 @@
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/proc.h>
+#include <sys/signal.h>
 
 /*
  * Firmware constants, defined in uhdr.s
  */
-UCHAR status, cmask, ctask, mask, oldstack, rst1[];
+UINT8 status, cmask, ctask, mask, oldstack, rst1[];
 UINT trapvec, trapstack;
 
-UCHAR resched;                  /* sleep.c */
+UINT8 resched;                  /* sleep.c */
 
 /*
  * Permission masks.

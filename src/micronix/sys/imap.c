@@ -3,9 +3,12 @@
  */
 #include <types.h>
 #include <sys/sys.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/buf.h>
 #include <sys/proc.h>
+#include <errno.h>
 
 /*
  * Return the physical block number for logical block log,
@@ -20,15 +23,15 @@
  * in case the disk goes bad.
  */
 imap(ip, log, rap)
-    fast struct inode *ip;
-    fast int log;
-    fast int *rap;
+    register struct inode *ip;
+    register int log;
+    register int *rap;
 {
     int bn, index, dev, ind;
     struct buf *bp;
 
     *rap = 0;
-    if (ip->mode & IIO) {       /* don't map io file */
+    if (ip->i_mode & IIO) {       /* don't map io file */
         *rap = log + 1;
         return (log);
     }
@@ -36,8 +39,8 @@ imap(ip, log, rap)
         u.error = EFBIG;
         return (0);
     }
-    dev = ip->dev;
-    if ((ip->mode & ILARGE) == 0) {     /* small addressing */
+    dev = ip->i_dev;
+    if ((ip->i_mode & ILARG) == 0) {     /* small addressing */
         if (log < 8)
             return (imapi(ip, log, rap));
         /*
@@ -47,12 +50,12 @@ imap(ip, log, rap)
             return (0);
         bp = bget(bn, dev);
         zero(bp->data, 512);
-        copy(ip->addr, bp->data, 16);
-        zero(ip->addr, 16);
-        ip->addr[0] = bn;
+        copy(ip->i_addr, bp->data, 16);
+        zero(ip->i_addr, 16);
+        ip->i_addr[0] = bn;
         bdwrite(bp);
-        ip->mode |= ILARGE;
-        ip->flags |= IMOD;
+        ip->i_mode |= ILARG;
+        ip->i_flags |= IMOD;
     }
     index = log >> 8;
     ind = imapi(ip, min(index, 7), rap);
@@ -66,16 +69,16 @@ imap(ip, log, rap)
  * allocate a new block and install its number.
  */
 imapi(ip, n, rap)
-    fast struct inode *ip;
+    register struct inode *ip;
     int n, *rap;
 {
-    fast int *p;
-    fast int bn;
+    register int *p;
+    register int bn;
 
     *rap = 0;
-    p = &ip->addr[n];
+    p = &ip->i_addr[n];
     if (*p == 0)
-        if (plug(p, ip->dev))
+        if (plug(p, ip->i_dev))
             ip->flags |= IMOD;
     if (n < 7)
         *rap = *(p + 1);
@@ -90,14 +93,14 @@ imapi(ip, n, rap)
 imapb(ind, n, dev, rap)
     int ind, n, dev, *rap;
 {
-    fast struct buf *bp;
-    fast int *p;
-    fast int bn;
+    register struct buf *bp;
+    register int *p;
+    register int bn;
 
     *rap = 0;
     if (ind == 0)
         return (0);
-    if ((bp = bread(ind, dev)) == NULL)
+    if ((bp = bread(ind, dev)) == 0)
         return (0);
     p = bp->data + n * sizeof(int);
     if (*p == 0 && plug(p, dev))
@@ -120,11 +123,11 @@ plug(p, dev)
     if ((bn = balloc(dev)) != 0) {
         if (*p == 0) {
             *p = bn;
-            return YES;
+            return 1;
         }
         bfree(bn);
     }
-    return NO;
+    return 0;
 }
 
 /*

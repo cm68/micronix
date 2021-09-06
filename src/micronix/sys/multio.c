@@ -5,6 +5,7 @@
 #include <sys/sys.h>
 #include <sys/tty.h>
 #include <sys/proc.h>
+#include <errno.h>
 
 #define NMIO    4               /* number of mult I/O ports */
 #define MBASE 0x48
@@ -80,7 +81,7 @@ extern char nmio;               /* The number of mult I/O boards present */
 
 static unsigned char base = MBASE, hiport = MBASE, loport = MBASE;
 
-static unsigned char mother = YES;
+static unsigned char mother = 1;
 
 /*
  * Hardware fiddlers in mio.s
@@ -232,7 +233,7 @@ mustty(dev, flag)
  */
 static
 ttinit(tty, dev)
-    fast struct tty *tty;
+    register struct tty *tty;
 {
     tty->ispeed = tty->ospeed = 13;     /* 9600 baud */
     tty->erase = '\b';

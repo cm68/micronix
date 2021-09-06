@@ -4,9 +4,12 @@
  */
 #include <types.h>
 #include <sys/sys.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/mount.h>
 #include <sys/proc.h>
+#include <errno.h>
 
 #define SUPERID 0               /* Id of superuser */
 
@@ -26,7 +29,7 @@ access(i, per)
 
     ip = i;
     perm = per;
-    mode = ip->mode;
+    mode = ip->i_mode;
     /*
      * Don't allow anyone to write
      * on devices mounted read-only
@@ -34,43 +37,43 @@ access(i, per)
      */
     if (perm & IWRITE) {
         if (!(mode & IIO) && ronly(ip))
-            return NO;
+            return 0;
         if (ip->flags & IWRLOCK) {
             u.error = EBUSY;
-            return NO;
+            return 0;
         }
     }
     /*
      * Allow a super user any access except EXEC, when at
      * least one of the exec bits must be on.
      */
-    if (u.euid == SUPERID) {
+    if (u.u_euid == SUPERID) {
         if (!(perm & IEXEC))
-            return YES;
+            return 1;
         if (mode & (IEXEC | IEXEC << 3 | IEXEC << 6))
-            return YES;
+            return 1;
         goto bad;
     }
     /*
      * Check the anyone permissions
      */
     if ((perm & mode) == perm)
-        return YES;
+        return 1;
     /*
      * Check the group permissions
      */
     perm <<= 3;
-    if (u.egid == ip->gid && (perm & mode) == perm)
-        return YES;
+    if (u.u_egid == ip->i_gid && (perm & mode) == perm)
+        return 1;
     /*
      * Check the owner permissions
      */
     perm <<= 3;
-    if (u.euid == ip->uid && (perm & mode) == perm)
-        return YES;
+    if (u.u_euid == ip->i_uid && (perm & mode) == perm)
+        return 1;
   bad:
     u.error = EACCES;
-    return NO;
+    return 0;
 }
 
 /*
@@ -80,10 +83,10 @@ access(i, per)
 int
 super()
 {
-    if (u.euid == SUPERID)
-        return YES;
+    if (u.u_euid == SUPERID)
+        return 1;
     u.error = EPERM;
-    return NO;
+    return 0;
 }
 
 /*
@@ -97,15 +100,15 @@ permission(name, mode)
     static struct inode *ip;
     static int euid, egid;
 
-    if ((ip = iname(name)) == NULL)
+    if ((ip = iname(name)) == 0)
         return;
-    euid = u.euid;
-    egid = u.egid;
-    u.euid = u.uid;
-    u.egid = u.gid;
+    euid = u.u_euid;
+    egid = u.u_egid;
+    u.u_euid = u.u_uid;
+    u.u_egid = u.u_gid;
     access(ip, mode);
-    u.euid = euid;
-    u.egid = egid;
+    u.u_euid = euid;
+    u.u_egid = egid;
     irelse(ip);
 }
 
@@ -120,9 +123,9 @@ ronly(ip)
 {
     if (ip->flags & IRONLY) {
         u.error = EROFS;
-        return YES;
+        return 1;
     }
-    return NO;
+    return 0;
 }
 
 /*

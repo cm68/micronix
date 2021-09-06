@@ -67,7 +67,7 @@ clean:
 # '
 
 access.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h
-balloc.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/sup.h $(SYS)/proc.h
+balloc.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h
 cio.o: $(SYS)/sys.h $(SYS)/con.h $(SYS)/file.h $(SYS)/inode.h $(SYS)/proc.h
 con.o: $(SYS)/sys.h $(SYS)/con.h
 create.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h
@@ -76,16 +76,16 @@ dj.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h
 exec.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/buf.h $(INC)/obj.h
 fio.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h
 fork.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/con.h
-ialloc.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/sup.h
+ialloc.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/buf.h
 iget.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/buf.h $(SYS)/proc.h
 imap.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/buf.h $(SYS)/proc.h
 link.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h
 lock.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/lock.h
 main.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/buf.h $(SYS)/con.h build.h
 makedate.o: $(INC)/std.h $(INC)/time.h
-malloc.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/sup.h $(SYS)/con.h
+malloc.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/con.h
 memdev.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/con.h
-mount.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/sup.h
+mount.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h $(SYS)/buf.h
 mset.o: $(SYS)/tty.h
 multio.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
 mw.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h
@@ -104,5 +104,5 @@ system.o: $(SYS)/sys.h $(SYS)/proc.h
 time.o: $(SYS)/sys.h $(SYS)/proc.h
 trap.o: $(SYS)/sys.h $(SYS)/proc.h
 tty.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
-uio.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/sup.h
+uio.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/con.h
 user.o: $(SYS)/sys.h $(SYS)/proc.h

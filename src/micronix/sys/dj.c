@@ -6,6 +6,7 @@
 #include <sys/buf.h>
 #include <sys/con.h>
 #include <sys/proc.h>
+#include <errno.h>
 
 /*
  * Micronix driver for Disk Jockey DMA
@@ -141,7 +142,6 @@
 #define	BUFSIZE		512
 #define 	K		1024
 #define	K4		4096
-#define	UCHAR		unsigned char
 
 #define	NDRIVES		8
 
@@ -220,11 +220,11 @@ struct specs
 struct dm
 {
     struct specs *specs;
-    UCHAR flags;                /* see below */
+    UINT8 flags;                /* see below */
 };
 
-static unsigned char kw = NO,   /* 1K write operation */
-*haltstat = 0, djtimer = 0, djtaken = NO, kbuf[K] = { 0 };
+static unsigned char kw = 0,   /* 1K write operation */
+*haltstat = 0, djtimer = 0, djtaken = 0, kbuf[K] = { 0 };
 
 unsigned char djcomm[26] = { 0 };
 
@@ -238,43 +238,43 @@ static struct buf *curbuf = 0,  /* buffer currently under scrutiny */
     *qtail = 0;                 /* Next request found here. */
 
 static struct specs specs[] = {
-    {0, NO, 26, 26, 4, 77, 2, 128, 1950},
-    {0, NO, 26, 26, 2, 77, 2, 256, 1950},
-    {0, NO, 15, 15, 1, 77, 2, 512, 1125},
-    {0, NO, 8, 8, 1, 77, 2, 1024, 600},
+    {0, 0, 26, 26, 4, 77, 2, 128, 1950},
+    {0, 0, 26, 26, 2, 77, 2, 256, 1950},
+    {0, 0, 15, 15, 1, 77, 2, 512, 1125},
+    {0, 0, 8, 8, 1, 77, 2, 1024, 600},
 
-    {0, YES, 26, 52, 4, 77, 2, 128, 3900},
-    {0, YES, 26, 52, 2, 77, 2, 256, 3900},
-    {0, YES, 15, 30, 1, 77, 2, 512, 2250},
-    {0, YES, 8, 16, 1, 77, 2, 1024, 1200},
+    {0, 1, 26, 52, 4, 77, 2, 128, 3900},
+    {0, 1, 26, 52, 2, 77, 2, 256, 3900},
+    {0, 1, 15, 30, 1, 77, 2, 512, 2250},
+    {0, 1, 8, 16, 1, 77, 2, 1024, 1200},
 
-    {0x90, NO, 10, 10, 1, 35, 2, 512, 330},     /* 5 1/4 default */
-    {0xF0, YES, 10, 20, 1, 35, 2, 512, 660},
-    {0xB0, NO, 10, 10, 1, 35, 2, 512, 330},
-    {0x10, NO, 10, 10, 2, 35, 3, 256, 320},
+    {0x90, 0, 10, 10, 1, 35, 2, 512, 330},     /* 5 1/4 default */
+    {0xF0, 1, 10, 20, 1, 35, 2, 512, 660},
+    {0xB0, 0, 10, 10, 1, 35, 2, 512, 330},
+    {0x10, 0, 10, 10, 2, 35, 3, 256, 320},
 
-    {0xA0, NO, 10, 10, 1, 40, 2, 512, 380},
-    {0xC0, NO, 10, 10, 1, 80, 2, 512, 780},
-    {0xD0, YES, 10, 20, 1, 40, 2, 512, 760},
-    {0xE0, YES, 10, 20, 1, 80, 2, 512, 1560},
+    {0xA0, 0, 10, 10, 1, 40, 2, 512, 380},
+    {0xC0, 0, 10, 10, 1, 80, 2, 512, 780},
+    {0xD0, 1, 10, 20, 1, 40, 2, 512, 760},
+    {0xE0, 1, 10, 20, 1, 80, 2, 512, 1560},
 
-    {0, NO, 18, 18, 4, 40, 0, 128, 720},        /* Xerox */
-    {0, NO, 10, 10, 2, 40, 0, 256, 400},        /* Osborne */
-    {0, NO, 8, 8, 1, 40, 0, 512, 320},  /* IBM dos 1 single */
-    {0, NO, 5, 5, 1, 40, 0, 1024, 200}, /* single sided Morrow */
-    {0, NO, 9, 9, 1, 40, 0, 512, 360},  /* IBM dos 2, single */
+    {0, 0, 18, 18, 4, 40, 0, 128, 720},        /* Xerox */
+    {0, 0, 10, 10, 2, 40, 0, 256, 400},        /* Osborne */
+    {0, 0, 8, 8, 1, 40, 0, 512, 320},  /* IBM dos 1 single */
+    {0, 0, 5, 5, 1, 40, 0, 1024, 200}, /* single sided Morrow */
+    {0, 0, 9, 9, 1, 40, 0, 512, 360},  /* IBM dos 2, single */
 
-    {0, YES, 18, 36, 4, 40, 0, 128, 1440},
-    {0, YES, 10, 20, 2, 40, 0, 256, 800},
-    {0, YES, 8, 16, 1, 40, 0, 512, 640},
-    {0, YES, 5, 10, 1, 40, 0, 1024, 400},       /* Dual Morrow */
-    {0, YES, 9, 18, 1, 40, 0, 512, 720},        /* IBM dos 2, double */
+    {0, 1, 18, 36, 4, 40, 0, 128, 1440},
+    {0, 1, 10, 20, 2, 40, 0, 256, 800},
+    {0, 1, 8, 16, 1, 40, 0, 512, 640},
+    {0, 1, 5, 10, 1, 40, 0, 1024, 400},       /* Dual Morrow */
+    {0, 1, 9, 18, 1, 40, 0, 512, 720},        /* IBM dos 2, double */
 
     /*
-     * {0, NO, 10, 10, 1, 40, 0, 512, 400}, /* radio shack * 
+     * {0, 0, 10, 10, 1, 40, 0, 512, 400}, /* radio shack * 
      */
 
-    {END, NO, 0, 0, 0, 0}
+    {END, 0, 0, 0, 0, 0}
 };
 
 struct delay delay[] = {
@@ -327,7 +327,7 @@ djopen(dev, mode)
 
     b = bread(0, dev | GETSTAT);
 
-    if (b == NULL) {
+    if (b == 0) {
       err:
         u.error = EIO;
         return;
@@ -433,7 +433,7 @@ djclose(dev)
 djstrat(b)
     register struct buf *b;
 {
-    b->forw = NULL;
+    b->forw = 0;
 
     di();
 
@@ -524,7 +524,7 @@ djwait(a)
     for (i = TIME; i && *a == NOSTAT; i--);
 }
 
-static unsigned char inservice = NO;
+static unsigned char inservice = 0;
 
 djint()
 {
@@ -552,14 +552,14 @@ djint()
     if (inservice               /* already working on it */
         || (curbuf && INTSTAT == NOSTAT)        /* not our int. */
         ||(!curbuf && !qtail)   /* not our int. */
-        ||(busget(&djint) == NO)        /* can't get bus yet. See mw.c */
+        ||(busget(&djint) == 0)        /* can't get bus yet. See mw.c */
         ) {
         ei();
         return;
     }
 
     else {
-        inservice = YES;
+        inservice = 1;
         ei();
     }
 
@@ -607,7 +607,7 @@ djint()
                 goto request;
 
             if (busgive(&djint) || !busget(&djint)) {
-                inservice = NO;
+                inservice = 0;
                 ei();
                 return;
             }
@@ -681,7 +681,7 @@ djint()
 
         sio(d, kbuf, KERNEL, SWRITE, ksec, dev);        /* setup new comm. */
 
-        kw = YES;               /* doing the write portion of a 1K req. */
+        kw = 1;               /* doing the write portion of a 1K req. */
 
         goto go;
 
@@ -696,9 +696,9 @@ djint()
     di();
 
     if (!qtail) {               /* all done , No more requests */
-        inservice = NO;
+        inservice = 0;
         ei();
-        busgive(NULL);
+        busgive(0);
         return;
     }
 
@@ -791,7 +791,7 @@ djint()
       go:
         di();
         djstart();
-        inservice = NO;
+        inservice = 0;
         ei();
         return;
     }
@@ -807,7 +807,7 @@ djint()
     if (ksec != sec || kdev != dev) {   /* not in cache */
         kdev = -1;              /* cache invalid */
         sio(d, kbuf, KERNEL, SREAD, sec, dev);
-        kw = NO;
+        kw = 0;
     }
 
     else if (op == SREAD)       /* partial cached read */
@@ -912,7 +912,7 @@ getstat(a)
     di();
 
     if (D[14] != OKSTAT)
-        return NO;
+        return 0;
 
     /*
      * read sector zero of 5 inch hard diskettes to find the config byte.
@@ -971,7 +971,7 @@ getstat(a)
         readone();
 
         if (D[4] != OKSTAT)
-            return NO;
+            return 0;
 
         S->config = kbuf[0x5C]; /* copy the configuration byte */
     }
@@ -1039,7 +1039,7 @@ getstat(a)
             if (!(*kbuf & 2))
                 S->spt = 9;
 
-            return YES;         /* short cut */
+            return 1;         /* short cut */
         }
 
         /*
@@ -1122,7 +1122,7 @@ getstat(a)
         }
     }
 
-    return YES;
+    return 1;
 }
 
 #undef S
@@ -1164,7 +1164,7 @@ djgoose()
 
 djmclose()
 {
-    djtaken = NO;
+    djtaken = 0;
 }
 
 djmopen()
@@ -1178,7 +1178,7 @@ djmopen()
         if (dm[i].flags & ISOPEN)
             return djbusy();
 
-    djtaken = YES;
+    djtaken = 1;
 }
 
 static
@@ -1357,7 +1357,7 @@ busplease()
 static
 busthanks()
 {
-    busgive(NULL);
+    busgive(0);
 }
 
 /*

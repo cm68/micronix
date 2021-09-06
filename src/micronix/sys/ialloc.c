@@ -3,10 +3,12 @@
  */
 #include <types.h>
 #include <sys/sys.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
-#include <sys/sup.h>
+#include <errno.h>
 
 extern long seconds;
 
@@ -31,28 +33,28 @@ struct inode *
 ialloc(dev)
     int dev;
 {
-    fast struct buf *sb;
-    fast struct sup *sup;
-    fast struct inode *ip;
+    register struct buf *sb;
+    register struct super *sup;
+    register struct inode *ip;
 
     sb = getsb(dev);
     sup = sb->data;
 
     for (;;) {
-        ip = NULL;              /* no I-node yet. */
+        ip = 0;              /* no I-node yet. */
 
-        if (sup->ninode <= 0 && ifill(sup, dev) == NO) {
+        if (sup->s_ninode <= 0 && ifill(sup, dev) == 0) {
             break;              /* no more free I-nodes */
         }
 
-        if ((ip = iget(sup->inode[--sup->ninode], dev)) == 0) {
+        if ((ip = iget(sup->s_inode[--sup->s_ninode], dev)) == 0) {
             /*
              * this particular I-node not obtainable 
              */
             continue;
         }
 
-        if ((ip->mode & IALLOC) == 0) {
+        if ((ip->i_mode & IALLOC) == 0) {
             break;              /* I-node is free */
         }
 
@@ -63,14 +65,14 @@ ialloc(dev)
     }
 
     if (ip) {
-        zero(&ip->mode, sizeof(struct dsknod));
-        ip->mode = IALLOC;
-        ip->rtime = seconds;
-        ip->wtime = seconds;
-        ip->flags |= IMOD;
-        ip->count = 0;
-        ip->mount = NULL;
-        ip->size = 0;
+        zero(&ip->i_mode, sizeof(struct dsknod));
+        ip->i_mode = IALLOC;
+        ip->i_rtime = seconds;
+        ip->i_mtime = seconds;
+        ip->i_flags |= IMOD;
+        ip->i_count = 0;
+        ip->i_mount = 0;
+        ip->i_size = 0;
     }
 
     bdwrite(sb);
@@ -81,11 +83,11 @@ ialloc(dev)
  * Put some inumbers in the superblock's inode freelist
  */
 ifill(sup, dev)
-    fast struct sup *sup;
+    register struct super *sup;
     int dev;
 {
-    fast int inum;
-    fast n, limit;
+    register int inum;
+    register n, limit;
     unsigned itop;
     register unsigned iblk;
     static struct buf *bp;
@@ -100,7 +102,7 @@ ifill(sup, dev)
     isync();
 
     iblk = lastiblock;          /* First Inode block to search */
-    limit = sup->isize;         /* Max no. of blocks to search */
+    limit = sup->s_isize;         /* Max no. of blocks to search */
     itop = limit + 1;           /* Top I-block number. */
 
     for (; limit; limit--, iblk++) {
@@ -111,7 +113,7 @@ ifill(sup, dev)
         /*
          * unreadable I-list block 
          */
-        if ((bp = bread(iblk, dev)) == NULL) {
+        if ((bp = bread(iblk, dev)) == 0) {
             continue;
         }
 
@@ -122,21 +124,21 @@ ifill(sup, dev)
          */
 
         for (n = 16, dp = bp->data; n; n--, dp++, inum++)
-            if ((dp->mode & IALLOC) == 0)
-                if (sup->ninode < 100)
-                    sup->inode[sup->ninode++] = inum;
+            if ((dp->d_mode & IALLOC) == 0)
+                if (sup->s_ninode < 100)
+                    sup->s_inode[sup->s_ninode++] = inum;
 
         brelse(bp);
 
-        if (sup->ninode >= 100) {
+        if (sup->s_ninode >= 100) {
             break;              /* I-cache full. */
         }
     }
 
     lastiblock = iblk;          /* advice */
 
-    if (sup->ninode) {
-        return YES;             /* We managed to find some I-nodes */
+    if (sup->s_ninode) {
+        return 1;             /* We managed to find some I-nodes */
     }
 
     u.error = ENOSPC;           /* Closest error I could find */
@@ -144,7 +146,7 @@ ifill(sup, dev)
     /*
      * pr("ifill: no inodes on dev %h\n", dev); 
      */
-    return NO;
+    return 0;
 }
 
 /*
@@ -152,9 +154,9 @@ ifill(sup, dev)
  * and release it.
  */
 idec(ip)
-    fast struct inode *ip;
+    register struct inode *ip;
 {
-    if (ip->count == 0 && ip->nlinks == 0) {
+    if (ip->i_count == 0 && ip->i_nlink == 0) {
         itrunc(ip);
         ifree(ip);
     }
@@ -169,30 +171,28 @@ ifree(ip)
     struct inode *ip;
 {
     static struct buf *sb;
-    static struct sup *sup;
+    static struct super *sup;
 
-    sb = getsb(ip->dev);
+    sb = getsb(ip->i_dev);
     sup = sb->data;
 
-    if (sup->ninode < 100) {    /* Fit in super block free list ? */
-        sup->inode[sup->ninode++] = ip->inum;
-    }
-
-    else {
+    if (sup->s_ninode < 100) {    /* Fit in super block free list ? */
+        sup->s_inode[sup->s_ninode++] = ip->i_inum;
+    } else {
         unsigned new;
 
         /*
          * record new low water mark for ifill ()
          */
 
-        new = (ip->inum + 31) / 16;
+        new = (ip->i_inum + 31) / 16;
 
         if (new < lastiblock)   /* new minimum ? */
             lastiblock = new;
     }
 
-    zero(&ip->mode, sizeof(struct dsknod));
-    ip->flags |= IMOD;
+    zero(&ip->i_mode, sizeof(struct dsknod));
+    ip->i_flags |= IMOD;
     bdwrite(sb);
 }
 
@@ -200,25 +200,25 @@ ifree(ip)
  * Free all blocks addressed by the inode
  */
 itrunc(ip)
-    fast struct inode *ip;
+    register struct inode *ip;
 {
-    fast int n, dev;
+    register int n, dev;
 
-    if (ip->mode & IIO)
+    if (ip->i_mode & IIO)
         return;
-    dev = ip->dev;
-    if (ip->mode & ILARGE) {
-        indfree(ip->addr[7], 2, dev);
+    dev = ip->i_dev;
+    if (ip->i_mode & ILARG) {
+        indfree(ip->i_addr[7], 2, dev);
         for (n = 6; n >= 0; n--)
-            indfree(ip->addr[n], 1, dev);
+            indfree(ip->i_addr[n], 1, dev);
     } else
         for (n = 7; n >= 0; n--)
-            bfree(ip->addr[n], dev);
-    zero(ip->addr, 16);
-    ip->size = 0;
-    ip->mode &= ~ILARGE;
-    ip->flags |= IMOD;
-    ip->wtime = seconds;
+            bfree(ip->i_addr[n], dev);
+    zero(ip->i_addr, 16);
+    ip->i_size = 0;
+    ip->i_mode &= ~ILARG;
+    ip->i_flags |= IMOD;
+    ip->i_mtime = seconds;
 }
 
 /*
@@ -228,10 +228,10 @@ itrunc(ip)
  */
 indfree(ind, level, dev)
     int ind, dev;
-    fast int level;
+    register int level;
 {
-    fast int *p;
-    fast struct buf *bp;
+    register int *p;
+    register struct buf *bp;
 
     if (ind == 0)
         return;
@@ -240,7 +240,7 @@ indfree(ind, level, dev)
         bfree(ind, dev);
         return;
     }
-    if ((bp = bread(ind, dev)) == NULL) {
+    if ((bp = bread(ind, dev)) == 0) {
 
         /*
          * pr("indfree: bad freelist dev %h\n", dev); 

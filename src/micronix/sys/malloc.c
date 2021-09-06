@@ -9,8 +9,10 @@
 #include <sys/sys.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
-#include <sys/sup.h>
+#include <sys/fs.h>
 #include <sys/con.h>
+#include <sys/signal.h>
+#include <errno.h>
 
 #define NONE    0               /* Decision cpu memory-access bits */
 #define FULL    3
@@ -101,7 +103,7 @@ mwake()
 {
     if (memwant)
         wakeup(&mfree);
-    memwant = NO;
+    memwant = 0;
 }
 
 /*
@@ -110,7 +112,7 @@ mwake()
  */
 mrelse()
 {
-    static UCHAR i, grow;
+    static UINT8 i, grow;
     static struct mem *m;
 
     m = u.p->mem;
@@ -135,11 +137,11 @@ mrelse()
 mget(p)
     struct proc *p;
 {
-    static UCHAR grow, i;
+    static UINT8 grow, i;
     static struct mem *m;
 
     if (p->nsegs > nsegs)
-        return NO;
+        return 0;
     grow = 0;
     for (i = 0; i < 17; i++) {
         m = &p->mem[i];
@@ -151,7 +153,7 @@ mget(p)
             m->seg = segalloc();
         }
     }
-    return YES;
+    return 1;
 }
 
 /*
@@ -172,13 +174,13 @@ grow(seg)
     m = &u.p->mem[seg];
 
     if (m->per == FULL) {
-        return YES;
+        return 1;
     }
 
     if (brakeseg < seg && seg < stackseg) {
         u.error = ENXIO;
-        send(u.p, SIGMEM);
-        return NO;
+        send(u.p, SIGSEGV);
+        return 0;
     }
 
     m->per = FULL;
@@ -192,7 +194,7 @@ grow(seg)
 
         newmap(u.p);
 
-        return YES;
+        return 1;
     }
 
     u.p->nsegs++;
@@ -200,12 +202,12 @@ grow(seg)
     u.p->swap = 0;
 
     while (nsegs == 0) {
-        memwant = YES;
+        memwant = 1;
         sleep(&mfree, PRIMEM);
     }
 
     if (u.p->swap)
-        return YES;
+        return 1;
 
     grow = segalloc();
     m = u.p->mem;
@@ -215,7 +217,7 @@ grow(seg)
             m[i].seg = grow;
 
     newmap(u.p);
-    return YES;
+    return 1;
 }
 
 /*
@@ -226,16 +228,16 @@ grow(seg)
 valid(addr, count)
     UINT count, addr;
 {
-    fast UCHAR first, last, i;
+    register UINT8 first, last, i;
 
     if (count != 0) {
         first = addr >> 12;
         last = (addr + count - 1) >> 12;
         for (i = first; i <= last; i++)
             if (u.p->mem[i].per == GROW && !grow(i))
-                return NO;
+                return 0;
     }
-    return YES;
+    return 1;
 }
 
 #define segtop(x)       ((((x) << 12) + 4095))
@@ -247,8 +249,8 @@ valid(addr, count)
  */
 fault()
 {
-    fast UCHAR tseg, pseg, temp;
-    extern UCHAR trapad;
+    register UINT8 tseg, pseg, temp;
+    extern UINT8 trapad;
 
     tseg = trapad >> 4;         /* high nibble of trap addr */
     pseg = trapad & 0x0F;       /* low nibble */
@@ -293,7 +295,7 @@ bankcopy(p)
 newmap(n)
     struct proc *n;
 {
-    extern UCHAR image0[], image1[], map0[], map1[];
+    extern UINT8 image0[], image1[], map0[], map1[];
 
     di();
     map0[2 * USERSEG] = image0[2 * USERSEG] = n->mem[16].seg;
@@ -322,13 +324,13 @@ swapmap[MAPSIZE] = 0;
  */
 swapinit()
 {
-    fast struct buf *b;
-    fast struct sup *s;
+    register struct buf *b;
+    register struct super *s;
 
     if (swapdev == rootdev) {
         b = getsb(rootdev);
         s = b->data;
-        swapaddr = s->fsize;
+        swapaddr = s->s_fsize;
         brelse(b);
     }
     swapmap[0].size = swapsize;
@@ -340,10 +342,10 @@ swapinit()
  * Allocate size (!= 0) blocks of swap space.
  */
 salloc(size)
-    fast int size;
+    register int size;
 {
-    fast struct map *mp;
-    fast int blk;
+    register struct map *mp;
+    register int blk;
 
     for (mp = swapmap; mp->size != 0; mp++) {
         blk = mp->addr;
@@ -358,7 +360,7 @@ salloc(size)
         }
     }
     pr("Out of swap space");
-    return NO;
+    return 0;
 }
 
 /*
@@ -367,7 +369,7 @@ salloc(size)
 sfree(size, blk)
     int size, blk;
 {
-    fast struct map *mp;
+    register struct map *mp;
 
     for (mp = swapmap; mp->addr < blk && mp->size != 0; mp++);
     rshift(mp);
@@ -385,7 +387,7 @@ sfree(size, blk)
  * Shift the map left, overwriting *mp
  */
 lshift(mp)
-    fast struct map *mp;
+    register struct map *mp;
 {
     for (; mp->size != 0; mp++) {
         mp->size = (mp + 1)->size;
@@ -399,7 +401,7 @@ lshift(mp)
 rshift(mp)
     struct map *mp;
 {
-    fast struct map *np;
+    register struct map *np;
 
     for (np = mp; np->size != 0; np++)  /* find the end */
         ;

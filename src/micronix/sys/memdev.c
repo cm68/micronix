@@ -78,7 +78,7 @@ iowrite(dev)
 iorw(dev, rw)
     int dev, rw;
 {
-    static UCHAR port;
+    static UINT8 port;
 
     port = minor(dev);
     if (port == 0)

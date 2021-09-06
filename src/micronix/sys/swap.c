@@ -6,10 +6,12 @@
 #include <sys/proc.h>
 #include <sys/buf.h>
 #include <sys/con.h>
+#include <sys/signal.h>
+#include <errno.h>
 
-char memwant = NO;              /* someone wants memory, so look for a
+char memwant = 0;              /* someone wants memory, so look for a
                                  * swapout */
-char swapping = NO;             /* run status of swap process */
+char swapping = 0;             /* run status of swap process */
 
 /*
  * Swap other processes between core and disk. After
@@ -19,7 +21,7 @@ char swapping = NO;             /* run status of swap process */
 int
 swap()
 {
-    fast struct proc *n;
+    register struct proc *n;
     extern int mfree();
 
     swapinit();                 /* Initialize the swap map */
@@ -37,14 +39,14 @@ swap()
             if (mget(n)) {
                 swapin(n);
             } else {
-                memwant = YES;
+                memwant = 1;
             }
         } else {
           sleep:
 
-            swapping = NO;
+            swapping = 0;
             sleep(&mfree, PRISWAP);
-            swapping = YES;
+            swapping = 1;
         }
     }
 }
@@ -58,10 +60,10 @@ findin()
     static struct proc *p, *n;
 
     di();
-    n = NULL;
+    n = 0;
     for (p = plist; p < plist + NPROC; p++)
         if ((p->mode & (AWAKE | SWAPPED)) == (AWAKE | SWAPPED)
-            && (n == NULL || n->time < p->time)
+            && (n == 0 || n->time < p->time)
             )
             n = p;
     ei();
@@ -78,13 +80,13 @@ findout()
     static struct proc *p, *n;
 
     di();
-    n = NULL;
+    n = 0;
     for (p = plist; p < plist + NPROC; p++)
         if ((p->mode & (ALIVE | LOADED | LOCKED)) == (ALIVE | LOADED)
             &&
             p->time >= MINRUN
             &&
-            (n == NULL
+            (n == 0
                 || (n->mode & AWAKE == p->mode & AWAKE && n->time < p->time)
                 || n->mode & AWAKE)
             )
@@ -99,18 +101,18 @@ findout()
  */
 
 swapout(p)
-    fast struct proc *p;
+    register struct proc *p;
 {
     p->mode &= ~LOADED;
 
     if ((p->swap = salloc(p->nsegs << 3)) != 0 && swapio(BWRITE, p)) {
         p->mode |= SWAPPED;
-        return YES;
+        return 1;
     } else {
         p->mode |= LOADED;
         send(p, SIGKILL);
         pr("swap error: process %i killed\n", procid(p));
-        return NO;
+        return 0;
     }
 }
 
@@ -119,18 +121,18 @@ swapout(p)
  */
 
 swapin(p)
-    fast struct proc *p;
+    register struct proc *p;
 {
     p->mode &= ~SWAPPED;
 
     if (swapio(BREAD, p)) {
         sfree(p->nsegs << 3, p->swap);
         p->mode |= LOADED;
-        return YES;
+        return 1;
     } else {
         mfree(p);
         pr("swap error: process %i hung\n", procid(p));
-        return NO;
+        return 0;
     }
 }
 
@@ -147,13 +149,14 @@ struct buf swab[17] = 0, lock = 0;
 
 swapio(flag, p)
     int flag;
-    fast struct proc *p;
+    register struct proc *p;
 {
-    static UCHAR i, seg, success;
+    static UINT8 i, seg, success;
     static UINT blk;
     static struct buf *b;
 
-    until(block(&lock));
+    while (!(block(&lock)))
+        ;
     blk = p->swap;
     for (i = 0; i < 17; i++) {
         if (p->mem[i].per != FULL)
@@ -172,7 +175,7 @@ swapio(flag, p)
         blk += 8;
     }
 
-    success = YES;
+    success = 1;
     for (i = 0; i < 17; i++)
         if (p->mem[i].per == FULL) {
             b = &swab[i];
@@ -180,7 +183,7 @@ swapio(flag, p)
             if (b->flags & BERROR) {
                 if (b->error == ENXIO)
                     pr("Swap space full\n");
-                success = NO;
+                success = 0;
             }
         }
     brelse(&lock);

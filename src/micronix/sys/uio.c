@@ -6,10 +6,11 @@
 #include <sys/proc.h>
 #include <sys/buf.h>
 #include <sys/con.h>
-#include <sys/sup.h>
+#include <sys/fs.h>
+#include <errno.h>
 
 extern long seconds;            /* see clock.c */
-UCHAR nbuf;                     /* initialized in binit(), main.c */
+UINT8 nbuf;                     /* initialized in binit(), main.c */
 char (*buffer)[512];            /* ditto */
 struct buf *btop;               /* ditto */
 
@@ -18,12 +19,12 @@ struct buf *btop;               /* ditto */
  */
 struct buf *
 bget(blk, dev)
-    UCHAR blk, dev;
+    UINT8 blk, dev;
 {
-    fast struct buf *b, *f;
+    register struct buf *b, *f;
 
   loop:
-    f = NULL;
+    f = 0;
     for (b = blist; b < btop; b++) {
         if (b->blk == blk && b->dev == dev) {
             if (block(b))
@@ -33,13 +34,13 @@ bget(blk, dev)
         }
         if (b->flags & (BBUSY | BLOCK))
             continue;
-        if (f == NULL || b->time < f->time)
+        if (f == 0 || b->time < f->time)
             f = b;
     }
     /*
      * block not found
      */
-    if ((b = f) == NULL)        /* no available buffers */
+    if ((b = f) == 0)        /* no available buffers */
         goto loop;
     block(b);
     if (b->flags & BDELWRI) {
@@ -66,11 +67,11 @@ block(b)
     if (b->flags & BBUSY) {
         b->flags |= BWANT;
         sleep(b, PRIBIO);
-        return NO;
+        return 0;
     }
     b->flags |= BBUSY;
     ei();
-    return YES;
+    return 1;
 }
 
 /*
@@ -80,7 +81,7 @@ struct buf *
 bread(blk, dev)
     UINT blk, dev;
 {
-    fast struct buf *b;
+    register struct buf *b;
 
     b = bget(blk, dev);
 
@@ -92,7 +93,7 @@ bread(blk, dev)
 
     if (geterror(b)) {
         brelse(b);
-        return NULL;
+        return 0;
     } else {
         return (b);
     }
@@ -104,7 +105,7 @@ bread(blk, dev)
 aread(blk, dev)
     UINT blk, dev;
 {
-    fast struct buf *b;
+    register struct buf *b;
 
     for (b = blist; b < btop; b++)
         if (b->blk == blk && b->dev == dev)
@@ -125,7 +126,7 @@ getsb(dev)
 {
     struct buf *b;
 
-    if ((b = bread(1, dev)) == NULL)
+    if ((b = bread(1, dev)) == 0)
         panic("cant get superblock");   /* should be locked in core */
     return (b);
 }
@@ -140,7 +141,7 @@ getsb(dev)
  * the kernel except across sleep.
  */
 bwrite(b)
-    fast struct buf *b;
+    register struct buf *b;
 {
     b->flags |= BSYNC;
     b->flags &= ~BREAD;
@@ -176,9 +177,9 @@ bdwrite(b)
  * Release the buffer
  */
 brelse(b)
-    fast struct buf *b;
+    register struct buf *b;
 {
-    if (b == NULL || (b->flags & BBUSY) == 0)
+    if (b == 0 || (b->flags & BBUSY) == 0)
         return;
     if (b->flags & BWANT)
         wakeup(b);
@@ -250,8 +251,8 @@ strat(bp)
     b->flags &= ~(BDONE | BERROR);
     b->error = 0;
     b->count = 512;
-    b->forw = NULL;
-    b->back = NULL;
+    b->forw = 0;
+    b->back = 0;
     (*biosw[bmajor(b->dev)].strat) (b);
 }
 
@@ -358,7 +359,7 @@ geterror(b)
 bflush(dev)
     UINT dev;
 {
-    fast struct buf *b;
+    register struct buf *b;
 
   loop:
     for (b = blist; b < btop; b++)
@@ -389,15 +390,15 @@ bzero(b)
  */
 bsync()
 {
-    fast struct buf *b;
-    fast struct sup *s;
+    register struct buf *b;
+    register struct super *s;
 
     b = getsb(rootdev);
     s = b->data;
 
-    if (!s->flock) {            /* not read-only */
+    if (!s->s_flock) {            /* not read-only */
         di();
-        s->time = seconds;
+        s->s_time = seconds;
         ei();
         bdwrite(b);
     } else

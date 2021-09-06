@@ -3,9 +3,13 @@
  */
 #include <types.h>
 #include <sys/sys.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/file.h>
 #include <sys/proc.h>
+#include <sys/signal.h>
+#include <errno.h>
 
 /*
  * The pipe size at which the writing process is suspended.
@@ -39,14 +43,14 @@ write(fd, buf, count)
 rdwri(rw, fd, buf, count)
     int rw, fd, buf, count;
 {
-    fast struct inode *ip;
-    fast struct file *fp;
+    register struct inode *ip;
+    register struct file *fp;
     static char mode;
     static int nbytes;
 
     if (!valid(buf, count))     /* is user memory allocated? */
         return;
-    if ((fp = ofile(fd)) == NULL)       /* bad descriptor */
+    if ((fp = ofile(fd)) == 0)       /* bad descriptor */
         return;
     mode = fp->mode;            /* IREAD | IWRITE | PIPE */
     if ((rw & mode) == 0) {
@@ -73,9 +77,9 @@ rdwri(rw, fd, buf, count)
  * If there is no reader, signal and return error.
  */
 pwrite(ip)
-    fast struct inode *ip;
+    register struct inode *ip;
 {
-    fast int request, nleft;
+    register int request, nleft;
 
     request = nleft = u.count;
   lock:
@@ -110,9 +114,9 @@ pwrite(ip)
  * waiting for more. This allows interactive pipes.
  */
 pread(ip)
-    fast struct inode *ip;
+    register struct inode *ip;
 {
-    fast int nbytes;
+    register int nbytes;
 
   lock:
     ilock(ip);

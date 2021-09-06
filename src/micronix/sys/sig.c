@@ -5,6 +5,8 @@
 #include <sys/sys.h>
 #include <sys/proc.h>
 #include <sys/tty.h>
+#include <sys/signal.h>
+#include <errno.h>
 
 #define TERMIN	0               /* code for terminate */
 #define IGNORE	1               /* code for ignore */
@@ -13,9 +15,9 @@
  * Signal system call
  */
 signal(sig, func)
-    fast unsigned int sig, (*func) ();
+    register unsigned int sig, (*func) ();
 {
-    fast int old;
+    register int old;
 
     if (sig >= NSIG || sig == SIGKILL || sig == 0) {
         u.error = EINVAL;
@@ -36,15 +38,15 @@ signal(sig, func)
 kill(pid, sig)
     int pid, sig;
 {
-    fast struct proc *p;
+    register struct proc *p;
 
     if (pid == 0) {
         killall(u.p->tty, sig);
         return;
     }
     p = procptr(pid);
-    if (p != NULL && p != u.p && (p->mode & ALIVE) &&
-        (p->uid == u.uid || super()))
+    if (p != 0 && p != u.p && (p->mode & ALIVE) &&
+        (p->uid == u.u_uid || super()))
         send(p, sig);
     else
         u.error = ESRCH;
@@ -57,7 +59,7 @@ killall(tty, sig)
     struct tty *tty;
     int sig;
 {
-    fast struct proc *p;
+    register struct proc *p;
 
     for (p = &plist[2]; p < plist + NPROC; p++)
         if (p->tty == tty)
@@ -68,8 +70,8 @@ killall(tty, sig)
  * Send a signal to a process.
  */
 send(p, sig)
-    fast struct proc *p;
-    fast int sig;
+    register struct proc *p;
+    register int sig;
 {
     if (!(p->mode & ALIVE))
         return;
@@ -95,9 +97,9 @@ send(p, sig)
  * a tty will return eof.
  */
 setback(p)
-    fast struct proc *p;
+    register struct proc *p;
 {
-    fast int i;
+    register int i;
 
     p->mode |= BACK;
     for (i = 0; i < NSIG; i++)
@@ -117,18 +119,18 @@ setback(p)
  */
 sig()
 {
-    fast char s;
-    fast int func;
+    register char s;
+    register int func;
 
     s = u.p->slist[0];
 
     if (!s)
-        return NO;              /* no signal to process */
+        return 0;              /* no signal to process */
 
     func = u.p->slist[s];
 
     if (func == IGNORE || u.p->pri >= SIGPRI)
-        return NO;
+        return 0;
 
     if (func == TERMIN) {
         u.p->status = s;
@@ -161,7 +163,7 @@ sig()
  */
 core()
 {
-    fast int fd;
+    register int fd;
 
 #define UADDR 9
 #define K32 0x8000
@@ -186,9 +188,9 @@ core()
  */
 abort()
 {
-    fast int s;
+    register int s;
 
-    if ((s = sig()) == NO || s == SIGTINT)
+    if ((s = sig()) == 0 || s == SIGTINT)
         return;
     u.error = EINTR;
     setframe(u.abort, u.abort);
