@@ -36,15 +36,15 @@ struct stat {
  */
 #define	st_dev		dev_u.dev_s
 #define	st_ino		ino
-#define	st_mode		d.mode
-#define	st_nlink	d.nlink
-#define	st_uid		d.uid
-#define	st_gid		d.gid
-#define	st_size0	d.size0
-#define	st_size1	d.size1
-#define	st_addr		d.addr
-#define	st_rtime	d.actime
-#define	st_mtime	d.modtime
+#define	st_mode		d.d_mode
+#define	st_nlink	d.d_nlink
+#define	st_uid		d.d_uid
+#define	st_gid		d.d_gid
+#define	st_size0	d.d_size0
+#define	st_size1	d.d_size1
+#define	st_addr		d.d_addr
+#define	st_rtime	d.d_atime
+#define	st_mtime	d.d_mtime
 
 /*
  * v7 names the fields differently, maybe they didn't trust their c compiler

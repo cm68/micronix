@@ -2107,14 +2107,14 @@ SystemCall(MACHINE * cp)
         break;
     case 14:                   /* mknod <name> mode dev (dev == 0) for dir */
         filename = fname(fn);
-        switch (arg2 & D_IFMT) {
-        case D_IFDIR:
+        switch (arg2 & IFMT) {
+        case IFDIR:
             ret = mkdir(filename, arg2 & 0777);
             break;
-        case D_IFBLK:
-        case D_IFCHR:
+        case IFBLK:
+        case IFCHR:
             sprintf(workbuf, "%cdev(%d,%d)", 
-                ((arg2 & D_IFMT) == D_IFBLK) ? 'b' : 'c',
+                ((arg2 & IFMT) == IFBLK) ? 'b' : 'c',
                 (arg3 >> 8) & 0xff, arg3 & 0xff);
             ret = symlink(workbuf, filename);
         printf("make dev %s %s %o %x = %d\n", filename, workbuf, arg2, arg3, ret); fflush(stdout);
@@ -2169,7 +2169,7 @@ SystemCall(MACHINE * cp)
                 sbuf.st_mode |=
                     (files[fd].dt == 'c') ? S_IFCHR : S_IFBLK;
                 ip = (struct statb *) &cp->memory[arg2];
-                ip->d.addr[0] = ((files[fd].major & 0xff) << 8) | 
+                ip->d.d_addr[0] = ((files[fd].major & 0xff) << 8) | 
                     (files[fd].minor & 0xff);
             }
         } else {
@@ -2203,18 +2203,18 @@ SystemCall(MACHINE * cp)
         }
         ip->dev = sbuf.st_dev;
         // ip->inum = sbuf.st_ino;
-        ip->d.nlink = sbuf.st_nlink;
-        ip->d.uid = sbuf.st_uid;
-        ip->d.gid = sbuf.st_gid;
-        ip->d.size0 = sbuf.st_size >> 16;
-        ip->d.size1 = sbuf.st_size & 0xffff;
-        ip->d.actime = swizzle(sbuf.st_atime);
-        ip->d.modtime = swizzle(sbuf.st_mtime);
-        ip->d.mode = (sbuf.st_mode & 07777) | /* IALLOC | */
-            ((sbuf.st_size > (8 * 512)) ? D_LARGE : 0);
+        ip->d.d_nlink = sbuf.st_nlink;
+        ip->d.d_uid = sbuf.st_uid;
+        ip->d.d_gid = sbuf.st_gid;
+        ip->d.d_size0 = sbuf.st_size >> 16;
+        ip->d.d_size1 = sbuf.st_size & 0xffff;
+        ip->d.d_atime = swizzle(sbuf.st_atime);
+        ip->d.d_mtime = swizzle(sbuf.st_mtime);
+        ip->d.d_mode = (sbuf.st_mode & 07777) | /* IALLOC | */
+            ((sbuf.st_size > (8 * 512)) ? ILARG : 0);
         switch (sbuf.st_mode & S_IFMT) {
         case S_IFDIR:
-            ip->d.mode |= D_IFDIR;
+            ip->d.d_mode |= IFDIR;
             break;
         case S_IFREG:
             break;
@@ -2225,15 +2225,15 @@ SystemCall(MACHINE * cp)
                 carry_set();
                 break;
             }
-            ip->d.addr[0] = ((Maj & 0xff) << 8) | (Min & 0xff);
-            ip->d.mode |= ((dt == 'c') ? D_IFCHR : D_IFBLK);
+            ip->d.d_addr[0] = ((Maj & 0xff) << 8) | (Min & 0xff);
+            ip->d.d_mode |= ((dt == 'c') ? IFCHR : IFBLK);
             }
             break;
         case S_IFCHR:
-            ip->d.mode |= D_IFCHR;
+            ip->d.d_mode |= IFCHR;
             break;
         case S_IFBLK:
-            ip->d.mode |= D_IFBLK;
+            ip->d.d_mode |= IFBLK;
             break;
         default:
             break;
