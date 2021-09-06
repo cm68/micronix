@@ -1,5 +1,0 @@
-
-#!/bin/sh
-
-rm -f /usr/src/man/man1/rlogin.1
-rm -f /usr/src/ucb/rlogin.c

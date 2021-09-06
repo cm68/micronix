@@ -464,4 +464,3 @@ fldiv:
 
 fperr:
 	defs	1		;floating over/underflow flag
-

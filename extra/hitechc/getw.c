@@ -13,4 +13,3 @@ register FILE *	stream;
 		return EOF;
 	return (hi << 8) + (lo & 0xFF);
 }
-

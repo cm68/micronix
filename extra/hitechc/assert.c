@@ -9,4 +9,3 @@ int	line;
 	fprintf(stderr, "Assertion failed: %s line %d: \"%s\"\n", file, line, exp);
 	abort();
 }
-

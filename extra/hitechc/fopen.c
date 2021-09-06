@@ -18,4 +18,3 @@ char *	name, * mode;
 		return((FILE *)NULL);
 	return freopen(name, mode, f);
 }
-

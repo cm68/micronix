@@ -45,4 +45,3 @@ kbhit()
 {
 	return (bdos(0x0B) & 0xFF) != 0;
 }
-

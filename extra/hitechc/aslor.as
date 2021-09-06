@@ -6,4 +6,3 @@ asllor:
 	call	iregset
 	call	alor
 	jp	iregstore
-

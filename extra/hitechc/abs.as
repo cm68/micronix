@@ -15,4 +15,3 @@ _abs:
 	or	a		;Clear carry
 	sbc	hl,de
 	ret
-

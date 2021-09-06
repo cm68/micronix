@@ -39,4 +39,3 @@ struct tod *	tod;
 	t += frmbcd(tod->sec);
 	return t;
 }
-

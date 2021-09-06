@@ -60,7 +60,8 @@ cp $disk ./boot.IMD
 rm ./boot.IMD-delta
 
 echo installing $root/kernels/$kernel
-$root/src/tools/mnix -f ./boot.IMD write $root/kernels/$kernel /micronix
+#$root/src/tools/mnix -f ./boot.IMD write $root/kernels/$kernel /micronix
+$root/src/tools/mnix -f ./boot.IMD write $root/kernels/$kernel $kernel
 
 export TERMINAL_FONTSIZE=14
 

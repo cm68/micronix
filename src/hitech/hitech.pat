@@ -228,8 +228,8 @@ end
 block exit
 	match
 		22 0080
-		cd __cpm_clean
-		c3 0000
+		CALL __cpm_clean
+		JUMP 0000
 	end
 	patch exit
 		db 0xcf, 01		; exit(hl)
@@ -333,6 +333,10 @@ block _open
 	; this is a boon, since we use the space after the new open code
 	; to contain some worker subroutines.
 	;
+	; while we are here, let's set the file position.  
+	; this is stored in the FCB.
+	;
+	define fcbcalc _open+51
 	patch _open 190
 		ld		hl, 5
 		add 	hl, sp
@@ -348,12 +352,30 @@ block _open
 		ld		(sys_open+2),de
 sys_open:
 		db		0xcf, 05, 00, 00, 00, 00
-		ret		nc
+		jr		c,openfail
+		push	hl
+		ld		a,l
+
+		call	fcbcalc
+		ld		de,36
+		add		hl,de
+		xor		a
+		ld		(hl),a
+		inc		hl
+		ld		(hl),a
+		inc		hl
+		ld		(hl),a
+		inc		hl
+		ld		(hl),a
+		pop		hl	
+		push	hl
+		call	0x4c20
+		jmp		lose
+		ret
+openfail:
 		ld		hl,0xffff
 		ret
-		ds		159,0	
 	end
-	define fcbcalc _open+32
 	;
 	; given the file number in a, return the fcb in hl
 	;
@@ -411,7 +433,9 @@ end
 ; found in fflush.obj
 ;
 block _fflush
+	; guaranteed to fail
 	match
+		de ad be ef 
 		CALL csv
 		e5 dd 6e 06
 		dd 66 07
@@ -537,9 +561,9 @@ block _fflush
 		b7
 		ed 52
 		11 0008
-		cd ANY ANY
+		CALL ANY ANY
 		11 0029
-		cd ANY ANY
+		CALL ANY ANY
 		11 ANY ANY
 		19
 		dd 75 fe
@@ -549,18 +573,18 @@ block _fflush
 		21 ff ff
 		JUMP cret
 	end
-	patch _fflush
-		call csv
-		ld l,(ix+6)	; get FILE ptr
-		ld h,(ix+7)
-		push hl
-		pop iy
-		bit 1,(iy+6) ; if IOWRT
-		jr z,retffl
-	retffl:
-		ld hl,0
-		jp cret	
-	end
+;	patch _fflush
+;		call csv
+;		ld l,(ix+6)	; get FILE ptr
+;		ld h,(ix+7)
+;		push hl
+;		pop iy
+;		bit 1,(iy+6) ; if IOWRT
+;		jr z,retffl
+;	retffl:
+;		ld hl,0
+;		jp cret	
+;	end
 end
 
 ;
@@ -888,7 +912,7 @@ end
 block _creat
 	match
 		CALL csv 
-		e5 cd _getfcb 
+		e5 CALL _getfcb 
 		e5 fd e1 7d b4 20 06 21 ff 
 		ff 
 		JUMP cret 
@@ -1040,23 +1064,216 @@ block filbuf
 	end
 end
 
-block fsize
+;
+; the ugly work in the lseek logic happens here,
+; where the cp/m implementation does a 'get file size'
+; seek.obj
+;
+block _fsize
 	match
-		CALL ncsv
-		fb ff
-		06 08
-		dd 7e 06
-		cd brelop
-		38 08
-		11 ff ff
-		6b 62
-		JUMP cret
-		11 2a 00
-		dd 6e 06
-		26 00
-		cd ANY ANY
-		dd 75 fb
-		fd 6e 29
+		CALL ncsv 
+		fb ff 06 08 dd 7e 06 CALL brelop 
+		38 08 11 ff ff 6b 62 JUMP cret 
+		11 2a 00 dd 6e 06 26 00 CALL amul 
+		11 __fcb 
+		19 e5 fd e1 CALL _getuid 
+		dd 75 fb fd 6e 29 26 00 e5 CALL _setuid 
+		c1 fd e5 21 23 00 e5 CALL _bdos 
+		c1 dd 6e fb 26 00 e3 CALL _setuid 
+		c1 06 10 fd 7e 23 21 00 00 55 5f CALL allsh 
+		e5 d5 06 08 fd 7e 22 21 00 00 55 5f CALL allsh 
+		e5 d5 fd 7e 21 21 00 00 55 5f CALL aladd 
+		CALL aladd 
+		dd 73 fc dd 72 fd dd 75 fe 
+		dd 74 ff 06 07 dd e5 e1 2b 
+		2b 2b 2b CALL asallsh 
+		dd 5e fc dd 56 fd dd 6e fe 
+		dd 66 ff e5 d5 fd 5e 24 fd 
+		56 25 fd 6e 26 fd 66 27 CALL arelop 
+		f2 ANY ANY dd 5e fc dd 56 fd 
+		dd 6e fe dd 66 ff JUMP cret 
+		fd 5e 24 fd 56 25 fd 6e 26 
+		fd 66 27 JUMP cret 
 	end	
+	;
+	; fstat the file the file and return the file size as a long
+	; in hlde
+	;
+	patch _fsize
+		pop		de
+		pop		hl
+		push	hl
+		push	de
+		ld		a,l
+		call	fcbcalc
+		push	hl
+		ld		(fs_call+2),hl
+		ld		h,0
+		ld		l,a
+	fs_call:
+		db		0xcf, 28, 0x00, 0x00
+		ld		de,9
+		pop		hl
+		add		hl,de				; stat size
+		ld		c,(hl)				; high byte
+		inc		hl
+		ld		e,(hl)				; low
+		inc		hl
+		ld		d,(hl)				; middle
+		ld		h,0
+		ld		l,c
+		ret
+	end
+end
+
+;
+; micronix has no lseek, being v6.  however, we do
+; have seek, which is a little more work
+; seek.obj
+;
+block _lseek
+	;
+	; lseek(fd, offset, whence)
+	;	    +2,     +4,     +8  on stack
+	; offset is a long, and whence = (0 = abs,1 = rel,2 = end)
+	;
+	match
+		CALL csv 
+		e5 e5 06 08 dd 7e 06 CALL brelop 
+		38 08 11 ff ff 6b 62 JUMP cret 
+		11 2a 00 dd 6e 06 26 00 CALL amul 
+		11 __fcb 
+		19 e5 fd e1 dd 7e 0c fe 01 
+		28 49 fe 02 
+		dd 5e 08 dd 56 09 
+		dd 6e 0a dd 66 0b 28 64 
+		dd 73 fc dd 72 fd 
+		dd 75 fe dd 74 ff 
+		dd cb ff 7e 20 bd 
+		dd 5e fc dd 56 fd 
+		dd 6e fe dd 66 ff 
+		fd 73 24 fd 72 25 
+		fd 75 26 fd 74 27 
+		fd 5e 24 fd 56 25 
+		fd 6e 26 fd 66 27 
+		JUMP cret 
+		dd 5e 08 dd 56 09 
+		dd 6e 0a dd 66 0b e5 d5 
+		fd 5e 24 fd 56 25 
+		fd 6e 26 fd 66 27 CALL aladd 
+		dd 73 fc dd 72 fd 
+		dd 75 fe dd 74 ff 18 a8 
+		e5 d5 dd 6e 06 26 00 e5 
+		CALL _fsize c1 
+		18 e1 
+	end
+	;
+	; we need to do 2 seek calls, with the high byte multiplied by 2.
+	; the gnarly part is that we then need to return the seek position
+	; which isn't returned.
+	patch _lseek 178
+		ld		hl,8
+		add		hl,sp
+		ld		a,(hl)
+		ld		(seek_lo+4),a
+		add		3
+		ld		(seek_hi+4),a
+		dec		hl
+		dec		hl
+		ld		a,(hl)
+		add		a
+		ld		(seek_hi+2),a
+		xor		a
+		ld		(seek_hi+3),a
+		dec		hl
+		ld		a,(hl)
+		ld		(seek_lo+3),a
+		dec		hl
+		ld		a,(hl)
+		ld		(seek_lo+2),a
+		dec		hl
+		ld		d,(hl)
+		dec		hl
+		ld		l,(hl)
+		ld		h,d
+		push	hl
+		push	hl
+	seek_lo:
+		db		0xcf, 19, 0x00, 0x00, 0x00
+		pop		hl
+	seek_hi:
+		db		0xcf, 19, 0x00, 0x00, 0x00
+		pop		hl
+
+		ld		a,l
+		call	fcbcalc				; file descriptor in a preserved
+		push	hl					; save fcb
+		ld		de,36				; rwp offset
+		add		hl,de
+		push	hl					; save fcb+rwp on stack
+		push	af
+
+		ld		a,(seek_lo+4)		; get 'whence'
+		ld		de,seek_zero		; assume absolute
+		dec		a
+		jr		c,addit				; if it was zero, go with absolute
+		ex		de,hl
+		jr		z,addit				; relative
+		pop		af
+			
+	seek_zero:
+		db		0, 0, 0, 0
+	; 
+	; add the long pointed at by de to the input offset and
+	; put the result in the rwp, which is pointed at by bc.
+	; this will either be zero, the fcb->rwp, or the file size
+	; this is a signed add, so eof-5 will do the right thing
+	;
+	addit:
+		pop		bc
+		ld		hl,4				; point at file offset long low
+		add		hl,sp
+
+		ld		a,(de)				; bits 0-7
+		add		(hl)
+		ld		(bc),a
+		inc		hl
+		inc		de
+		inc		bc
+
+		ld		a,(de)				; bits 8-15
+		add		(hl)
+		ld		(bc),a
+		inc		hl
+		inc		de
+		inc		bc
+			
+		ld		a,(de)				; bits 16 - 23
+		add		(hl)
+		ld		(bc),a
+		inc		hl
+		inc		de
+		inc		bc
+
+		ld		a,(de)				; bits 24 - 31
+		add		(hl)
+		ld		(bc),a
+
+	;
+	; we're done now, and need to get the result into hlde
+	; luckily, we're pointing at it with bc
+	;	
+		ld		h,b
+		ld		l,c
+		ld		b,(hl)
+		dec		hl
+		ld		c,(hl)
+		dec		hl
+		ld		d,(hl)
+		dec		hl
+		ld		e,(hl)
+		ld		h,b
+		ld		l,c
+	end
 end
 

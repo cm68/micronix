@@ -1141,7 +1141,7 @@ filecreate(struct super *fs, char *name)
 {
     int inum;
 
-    inum = ialloc(fs, IFREG);
+    inum = ialloc(fs, IFREG|0777);
     if (inum == 0) {
         printf("ialloc failed\n");
         return 0;

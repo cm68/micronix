@@ -10,4 +10,3 @@ char *	sys_err[] =
 	"Seek past end of disk???",
 };
 short	sys_ner = sizeof sys_err / sizeof sys_err[0];
-

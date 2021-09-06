@@ -49,9 +49,3 @@ jp	l2
 l2:
 jp	cret
 f8	equ	0
-
-;P:SCANF.C: 9: scanf(fmt, args)
-;P:SCANF.C: 10: char *	fmt;
-;P:SCANF.C: 11: int	args;
-;P:SCANF.C: 12: {
-psect	te

@@ -1,5 +1,5 @@
 ;	byte relational	operation - returns flags correctly for
-;	comparision of words in a and c
+;	comparision of bytes in a and b
 
 	psect	text
 	global	brelop
@@ -23,4 +23,3 @@ brelop:
 	inc	a		;set sign flag as appropriate and reset Z flag
 	pop	de
 	ret
-

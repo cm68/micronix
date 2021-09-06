@@ -113,4 +113,3 @@ time_t *	tp;
 {
 	return asctime(localtime(tp));
 }
-

@@ -18,4 +18,3 @@ asalrsh:
 	pop	bc
 	call	alrsh		;do the shift
 	jp	iregstore	;go store the value and return
-
