@@ -941,12 +941,9 @@ cpmsys()
 
     s = vbuf;
     if (cs) {
-        printf("vbuf: %x\n", vbuf);
         s += sprintf(vbuf, "call: %s arg: %x ", cs->name, de_reg);
-        printf("s: %x\n", s);
         if (cs->type == 1) {
             s += sprintf(s, "fcb: %c:", get_byte(de_reg) + '@');
-        printf("s: %x\n", s);
             for (i = 1; i < 9; i++) {
                 c = get_byte(de_reg + i);
                 if (c != ' ') *s++ = c;
@@ -958,8 +955,6 @@ cpmsys()
             }
         }
         strcpy(s, "\n");
-        hexdump(vbuf, 40);
-        printf("s: %x\n", s);
     } else {
         sprintf(vbuf, "call: %d arg: %x\n", c_reg, de_reg);
     }
@@ -1085,7 +1080,7 @@ monitor()
                     addr  = cp->state.registers.word[Z80_IX] & 0xffff;
                 } else if (!strcmp(s, "iy")) {
                     addr  = cp->state.registers.word[Z80_IY] & 0xffff;
-                } else if (!strcmp(s, "sp")) {
+                } else if (!strcmp(s, "sp") || !strcmp(s, "tos")) {
                     addr  = cp->state.registers.word[Z80_SP] & 0xffff;
                     fprintf(mytty, "stack %04x\n", addr);
                     for (i = 0; i < 10; i++) {
@@ -1123,7 +1118,7 @@ monitor()
                 }
                 fprintf(mytty, "%04x: %-20s\n", i, cmdline);
                 i += c;
-                lastaddr = i & 0xfff;
+                lastaddr = i & 0xffff;
             }
             break;
         case 'r':
