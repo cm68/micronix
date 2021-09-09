@@ -434,16 +434,19 @@ getaddr(char *in)
  * variables
  */
 int
-patmatch(struct pat *pat, int pl, word base)
+patmatch(struct pat *pat, int pl, word base, int anc)
 {
     int i;
 
     if (!pl) return 0;
 
+	if (anc) {
+		printf("checking block at %04x\n", base);
+	}
     for (i = 0; i < pl; i++) {
         if (pat[i].flags & ANY) continue;
         if (pat[i].value == membuf[base + i]) continue;
-        if ((verbose & V_MATCH) && (i > 4)) {
+        if ((verbose & V_MATCH) && ((i > 4) || anc)) {
             printf("miscompare at index %d: %04x wanted %02x got %02x\n",
                     i, base + i, pat[i].value, membuf[base + i]);
         }
@@ -787,6 +790,7 @@ patch()
         }
     }
 
+	/* XXX - make sure patch not too big ! */
     if (blockhit) {
 		if (blockend < ad + fill) {
 			blockend = ad + fill;
@@ -829,6 +833,7 @@ match()
     } else {
         anchor = 0;
     }
+	msg = strdup(msg);
 
     if (verbose) printf("match %s\n", msg);
 
@@ -848,14 +853,16 @@ match()
     }
 
     if (anchor) {
-        if (base != 0xffff) {
-            if (patmatch(pat, pl, base)) {
+		if (base == 0) {
+        	printf("anchor address %s unknown\n", msg);
+		} else {
+            if (patmatch(pat, pl, base, 1)) {
                 hit = 1;
             }
         }
     } else {
         for (base = 0x100; base < objsize + 0x100; base++) {
-            if (patmatch(pat, pl, base)) {
+            if (patmatch(pat, pl, base, 0)) {
                 if (hit) {
                     printf("multiple hit\n");
                 }
@@ -886,6 +893,7 @@ match()
 			}
 		}
 	}
+	free(msg);
 	return hit;
 }
 
