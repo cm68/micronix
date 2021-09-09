@@ -34,25 +34,23 @@
 block crt
 	match 0100
 		2a 06 00 f9
-		11 __Lbss			; 0x104 bss start
+		11 __Lbss
 		b7
-		21 __Hbss 			; 0x108 bss end
+		21 __Hbss
 		ed 52 4d 44
 		0b 6b 62 13
 		36 00 ed b0
-		21 ANY ANY 			; 0x117 nularg
+		21 ANY ANY
 		e5 21 80 00
 		4e 23 06 00
 		09 36 00
 		21 81 00 e5
-		CALL startup 		; 0x129 startup
-		c1 c1 e5
-		2a _argc			; 0x12f argc
+		CALL startup c1 c1 e5
+		2a _argc
 		e5
-		CALL _main			; 0x133 _main
-		e5
-		CALL _exit			; 0x137 _exit
-		JUMP 0000			; 0x13a warmboot
+		CALL _main e5
+		CALL _exit
+		JUMP 0000
 	end
 
 	;
@@ -155,16 +153,10 @@ end
 block _bdosa1
 	match
 		CALL csv
-		dd 5e 08
-		dd 56 09
-		dd 4e 06
-		dd e5
-		CALL 0005
-		dd e1
-		6f
-		17
-		9f
-		67
+		dd 5e 08 dd 56 09
+		dd 4e 06 
+		dd e5 CALL 0005 dd e1
+		6f 17 9f 67
 		JUMP cret
 	end
 end
@@ -178,9 +170,8 @@ block _bdosa
 	match
 		CALL csv
 		dd 5e 08 dd 56 09 dd 4e 06
-		dd e5 fd e5
-		CALL 0005
-		fd e1 dd e1 6f 17 9f 67
+		dd e5 fd e5 CALL 0005 fd e1 dd e1 
+		6f 17 9f 67
 		JUMP cret
 	end
 end
@@ -191,10 +182,9 @@ end
 ;
 block _bdoshl
 	match
-		CALL csv
-		dd 5e 08 dd 56 09 dd 4e 06 dd e5
-		CALL 0005
-		dd e1
+		CALL csv 
+		dd 5e 08 dd 56 09 dd 4e 06 
+		dd e5 CALL 0005 dd e1
 		JUMP cret
 	end
 end
@@ -207,8 +197,8 @@ end
 ;
 block __exit
 	match
-		CALL cpm_clean
-		e1 e1 22 0080
+		CALL cpm_clean e1 e1 
+		22 0080
 		JUMP 0000
 	end
 	;
@@ -246,8 +236,8 @@ block _exit
 	match
 		CALL csv
 		CALL __cleanup
-		dd 6e 06 dd 66 07 e5
-		CALL __exit
+		dd 6e 06 dd 66 07 
+		e5 CALL __exit
 		JUMP cret			
 	end
 end
@@ -259,26 +249,15 @@ end
 block _exit
 	match
 		CALL csv
-		e5					; push hl      - make space for counter
-		dd 36 ff 05			; ld (ix-1),5  - 5 files
-		fd 21 __iob			; ld iy,_iob   - end of iob
-		fd e5				; push iy
-		e1					; pop hl
-		01 0008				; ld bc,8
-		09					; add hl,bc
-		e5					; push hl
-		fd e1				; pop iy
-		ed 42				; sbc hl,bc
-		e5					; push hl
-		CALL _fclose		; call fclose
-		c1
-		dd 7e ff
-		c6 ff
-		dd 77 ff
-		b7
-		20 e4
-		dd 6e 06
-		dd 66 07
+		e5				
+		dd 36 ff 05	
+		fd 21 __iob
+		fd e5 e1
+		01 0008 09 e5 fd e1 ed 42
+		e5 CALL _fclose c1
+		dd 7e ff c6 ff
+		dd 77 ff b7 20 e4
+		dd 6e 06 dd 66 07
 		22 0080
 		CALL 0000
 		JUMP cret
@@ -292,40 +271,33 @@ end
 block _open
 	match
 		CALL csv 
-		e5 dd 5e 08 dd 56 09 13 dd 
-		73 08 dd 72 09 
-		21 03 00 
-		CALL wrelop 
-		f2 ANY ANY dd 36 08 03 dd 36 
-		09 00 
-		CALL _getfcb 
-		e5 fd e1 7d b4 20 06 21 ff 
-		ff 
+		e5 
+		dd 5e 08 dd 56 09 13 dd 73 08 dd 72 09
+		21 03 00 CALL wrelop
+		f2 ANY ANY 
+		dd 36 08 03 dd 36 09 00
+		CALL _getfcb e5 
+		fd e1 7d b4 20 06 21 ff ff
 		JUMP cret 
-		dd 6e 06 dd 66 07 e5 fd e5 
-		CALL _setfcb 
-		c1 c1 7d b7 20 68 11 01 00 
-		dd 6e 08 dd 66 09 b7 ed 52 
-		20 19 21 0c 00 e5 
-		CALL _bdos 
-		c1 7d 06 30 
-		CALL brelop 
-		fa ANY ANY fd 7e 06 f6 80 fd 
-		77 06 
+		dd 6e 06 dd 66 07 
+		e5 fd e5 CALL _setfcb c1 c1 
+		7d b7 20 68 
+		11 01 00
+		dd 6e 08 dd 66 09 b7 ed 52 20 19 
+		21 0c 00 e5 CALL _bdos c1 
+		7d 06 30 CALL brelop fa ANY ANY
+		fd 7e 06 f6 80 fd 77 06
 		CALL _getuid 
-		dd 75 ff fd 6e 29 26 00 e5 
-		CALL _setuid 
-		c1 fd e5 21 0f 00 e5 
-		CALL _bdos 
-		c1 c1 7d fe ff 20 11 fd e5 
-		CALL _putfcb 
-		dd 6e ff 26 00 e3 
-		CALL _setuid 
-		c1 18 90 dd 6e ff 26 00 e5 
-		CALL _setuid 
-		c1 dd 7e 08 fd 77 28 11 __fcb 
-		fd e5 e1 b7 ed 52 11 2a 00 
-		CALL adiv 
+		dd 75 ff fd 6e 29 26 00 
+		e5 CALL _setuid c1 
+		fd e5 21 0f 00 e5 CALL _bdos c1 c1 
+		7d fe ff 20 11 
+		fd e5 CALL _putfcb dd 6e ff 26 00 e3
+		CALL _setuid c1 18 90 
+		dd 6e ff 26 00 
+		e5 CALL _setuid c1 
+		dd 7e 08 fd 77 28 11 __fcb
+		fd e5 e1 b7 ed 52 11 2a 00 CALL adiv
 		JUMP cret 
 	end
 	;
@@ -368,9 +340,6 @@ sys_open:
 		inc		hl
 		ld		(hl),a
 		pop		hl	
-		push	hl
-		call	0x4c20
-		jmp		lose
 		ret
 openfail:
 		ld		hl,0xffff
@@ -400,7 +369,61 @@ openfail:
 end
 
 ;
-; fclose.obj
+; this is the fclose found in the compiler passes
+;
+block _fclose
+	match _fclose
+		CALL csv
+		e5 
+		dd 6e 06 dd 66 07 e5 fd e1 
+		11 __iob fd e5 e1 b7 ed 52
+		11 08 00 CALL adiv
+		11 29 00 CALL lmul
+		11 __fcb 19
+		dd 75 fe dd 74 ff
+		fd 7e 06 e6 03 b7 20 06
+		21 ff ff JUMP cret
+		fd e5 CALL _fflush c1 
+		fd 7e 06 e6 f8
+		fd 77 06 
+		dd 5e fe dd 56 ff
+		21 24 00 19 7e fe 02 28 0c
+		21 0c 00 e5 CALL _bdoshl c1 
+		cb 44 28 10
+		dd 6e fe dd 66 ff 
+		e5 21 10 00 e5 CALL _bdosa c1 c1
+		dd 5e fe dd 56 ff
+		21 24 00 19 36 00
+		21 00 00 JUMP cret
+	end
+	patch _fclose 133
+		call	csv
+		ld		l,(ix+6)
+		ld		h,(ix+7)
+		push	hl
+		pop		iy
+		ld		a,(iy+6)
+		and		0x3
+		jr		nz,noflush
+		push	iy
+		call	_fflush
+		pop		bc
+		ld		a,(iy+6)
+		and		0xf8
+		ld		(iy+6),a
+	noflush:
+		ld		l,(iy+7)
+		ld		h,0
+		db		0xcf, 06
+		ld		hl,0
+		jp		cret
+		ret
+	end
+end
+
+;
+; this is the version of fclose that is in cpp, etc
+; fclose.o bj
 ;
 block _fclose
 	match
@@ -409,17 +432,14 @@ block _fclose
 		fd 7e 06 e6 03 b7 20 06
 		21 ff ff
 		JUMP cret
-		fd e5
-		CALL _fflush	
-		c1 fd 7e 06 e6 f8 fd 77 06 
-		fd 7e 04 fd b6 05 28 19 fd 
-		cb 06 5e 20 13 fd 6e 04 fd 
-		66 05 e5
-		CALL __buffree 
-		c1 fd 36 04 00 fd 36 05 00 
-		fd 6e 07 26 00 e5 
-		CALL _close 
-		c1 11 ff ff b7 ed 52 28 b9 
+		fd e5 CALL _fflush c1 
+		fd 7e 06 e6 f8 fd 77 06
+		fd 7e 04 fd b6 05 28 19 
+		fd cb 06 5e 20 13 
+		fd 6e 04 fd 66 05 e5 CALL __buffree c1 
+		fd 36 04 00 fd 36 05 00
+		fd 6e 07 26 00 e5 CALL _close c1 
+		11 ff ff b7 ed 52 28 b9
 		fd cb 06 6e 20 b3 21 00 00 
 		JUMP cret 
 	end
@@ -434,15 +454,25 @@ end
 ;
 block _fflush
 	; guaranteed to fail
-	match
-		de ad be ef 
-		CALL csv
-		e5 dd 6e 06
-		dd 66 07
-		e5
-		fd e1
-		fd cb 06 4e
+	match _fflush
+		 CALL csv 
+		 e5 dd 6e 06 dd 66 07 e5 
+		 fd e1 fd cb 06 4e 28 1e 
+		 fd 7e 04 fd b6 05 28 16 
+		 fd 5e 02 fd 56 03 21 00 02 b7 ed 52 
+		 dd 75 fe dd 74 ff 7d b4 20 06 
+		 21 00 00 JUMP cret
+		 dd 6e fe dd 66 ff e5 
+		 fd 6e 04 fd 66 05 e5 
+		 fd 6e 07 26 00 e5 CALL write c1 c1 c1
+		 dd 5e fe dd 56 ff b7 ed 52 28 04 
+		 fd cb 06 ee 
+		 fd 36 02 00 fd 36 03 02 
+		 fd 6e 04 fd 66 05 
+		 fd 75 00 fd 74 01 
+		 fd cb 06 6e 28 b7 21 ff ff JUMP cret
 	end
+	
 	;
 	; if(!(f->_flag & _IOWRT) || 
 	;    f->_base == (char *)NULL || 
@@ -502,7 +532,7 @@ block _fflush
 		ld h,0
 
 	m_write:			; write(fd, base, 0x200 - cnt)
-		defb 0xcf, 5, 0, 0, 0, 0
+		defb 0xcf, 4, 0, 0, 0, 0
 
 		pop bc			; restore file *, cnt
 		pop de
@@ -550,28 +580,57 @@ end
 block _fflush
 	match _fflush
 		CALL csv
-		e5
-		dd 6e 06
-		dd 66 07
-		e5
-		fd e1
-		11 __iob
-		fd e5
-		e1
-		b7
-		ed 52
-		11 0008
-		CALL ANY ANY
-		11 0029
-		CALL ANY ANY
-		11 ANY ANY
-		19
-		dd 75 fe
-		dd 74 ff
-		fd cb 06 4e
-		20 06
+		e5 dd 6e 06 dd 66 07 
+		e5 fd e1 11 __iob
+		fd e5 e1 b7 ed 52
+		11 0008 CALL adiv
+		11 0029 CALL lmul
+		11 __fcb 19
+		dd 75 fe dd 74 ff
+		fd cb 06 4e 20 06
 		21 ff ff
 		JUMP cret
+		fd 7e 02 e6 7f
+		6f af 67 7d b4 28 27
+		06 04 
+		dd 5e fe dd 56 ff
+		21 24 00
+		19 7e CALL brelop 30 15
+		fd 6e 00 fd 66 01
+		36 1a fd 6e 02 fd 66 03
+		2b fd 75 02 fd 74 03
+		fd 6e 04 fd 66 05 
+		fd 75 00 fd 74 01
+		7d b4 20 06
+		21 00 00 JUMP cret
+		fd 5e 02 fd 56 03
+		21 00 02 b7 ed 52
+		fd 75 02 fd 74 03
+		dd 5e fe dd 56 ff
+		21 24 00 19 7e fe 02 28 52
+		fe 04 28 3a
+		fd 36 02 00 fd 36 03 00
+		fd 6e 04 fd 66 05
+		fd 75 00 fd 74 01
+		fd 36 02 00 fd 36 03 02 18 b7
+		fd 6e 00 fd 66 01 
+		7e 23 fd 75 00 fd 74 01 
+		6f 17 9f 67 
+		e5 21 02 00 e5 CALL bdosa c1 c1 
+		fd 6e 02 fd 66 03 2b
+		fd 75 02 fd 74 03 23 7d b4 20 d2 18 b2
+		fd 5e 02 fd 56 03 
+		21 7f 00 19 11 80 00 cd adiv 
+		fd 75 02 fd 74 03 18 34 
+		fd 6e 00 fd 66 01 
+		e5 21 1a 00 e5 CALL bdosa c1
+		dd 6e fe dd 66 ff e3 
+		21 15 00 e5 CALL bdosa c1 c1 
+		7d b7 c2 ANY ANY
+		11 80 00 fd 6e 00 fd 66 01 19 
+		fd 75 00 fd 74 01 fd 6e 02 fd 66 03 2b
+		fd 75 02 fd 74 03 23 7d b4 20 ba 
+		c3 ANY ANY
 	end
 ;	patch _fflush
 ;		call csv
@@ -593,39 +652,28 @@ end
 block _close
 	match
 		CALL csv 
-		e5 06 08 
-		dd 7e 06 
-		CALL brelop 
-		38 06 
-		21 ff ff 
-		JUMP cret 
-		11 2a 00 
-		dd 6e 06 26 00 
+		e5 06 08 dd 7e 06
+		CALL brelop 38 06
+		21 ff ff JUMP cret
+		11 2a 00 dd 6e 06 26 00
 		CALL amul 
-		11 __fcb 
-		19 e5 fd e1 
+		11 __fcb 19 e5 fd e1
 		CALL _getuid 
 		dd 75 ff 
-		fd 6e 29 26 00 e5 
-		CALL _setuid 
-		c1 
+		fd 6e 29 26 00 
+		e5 CALL _setuid c1
 		fd 7e 28 fe 02 28 1d 
 		fe 03 28 19 
-		21 0c 00 e5 
-		CALL _bdoshl 
-		c1 af 6f 7c e6 05 
+		21 0c 00 e5 CALL _bdoshl c1 
+		af 6f 7c e6 05
 		67 7d b4 28 12 
 		fd 7e 28 
 		fe 01 20 0b 
-		fd e5 
-		21 10 00 e5 
-		CALL _bdos 
-		c1 c1 
+		fd e5 21 10 00 e5 CALL _bdos c1 c1
 		fd 36 28 00 
 		dd 6e ff 
-		26 00 e5 
-		CALL _setuid 
-		c1 21 00 00 
+		26 00 e5 CALL _setuid c1 
+		21 00 00
 		JUMP cret 
 	end
 	; we simply call the micronix close with the fd in hl
@@ -647,16 +695,14 @@ end
 ;
 block _write
 	match
-		CALL ncsv 
-		79 ff 06 08 dd 7e 06 CALL brelop 
-		38 06 21 ff ff JUMP cret 
+		CALL ncsv 79 ff 
+		06 08 dd 7e 06 CALL brelop 38 06 
+		21 ff ff JUMP cret
 		11 2a 00 dd 6e 06 26 00 CALL amul 
-		11 __fcb 
-		19 e5 
-		fd e1 
-		dd 36 fe 02 dd 6e 0a dd 66 0b 
-		dd 75 f9 dd 74 fa fd 7e 28 
-		fe 02 ca ANY ANY 
+		11 __fcb 19 e5 fd e1
+		dd 36 fe 02 
+		dd 6e 0a dd 66 0b dd 75 f9 dd 74 fa fd 
+		7e 28 fe 02 ca ANY ANY
 		fe 03 ca ANY ANY 
 		fe 04 28 71 
 		fe 06 28 25 
@@ -666,60 +712,56 @@ block _write
 		dd 6e 08 dd 66 09 7e 23 
 		dd 75 08 dd 74 09 
 		6f 17 9f 67 
-		e5 21 04 00 e5 CALL _bdos 
-		c1 c1 
+		e5 21 04 00 e5 CALL _bdos c1 c1
 		dd 6e 0a dd 66 0b 2b 
-		dd 75 0a dd 74 0b 23 7d b4 
-		20 cf 
+		dd 75 0a dd 74 0b 23 7d b4 20 cf
 		dd 6e f9 dd 66 fa JUMP cret 
 		dd 36 fe 05 18 27 CALL __sigchk 
 		dd 6e 08 dd 66 09 7e 23 
 		dd 75 08 dd 74 09 6f 17 9f 67 
 		dd 75 fb dd 74 fc e5 
-		dd 6e fe 26 00 e5 CALL _bdos 
-		c1 c1 dd 6e 0a dd 66 0b 2b 
+		dd 6e fe 26 00 e5 CALL _bdos c1 c1 
+		dd 6e 0a dd 66 0b 2b
 		dd 75 0a dd 74 0b 23 7d b4 
 		20 c7 18 b6 CALL _getuid 
 		5d dd 73 fd c3 ANY ANY CALL __sigchk 
-		fd 6e 29 26 00 e5 CALL _setuid 
-		c1 fd 7e 24 e6 7f dd 77 fe 
+		fd 6e 29 26 00 e5 CALL _setuid c1 
+		fd 7e 24 e6 7f dd 77 fe
 		5f 16 00 21 80 00 b7 ed 52 
 		dd 75 ff 5d dd 6e 0a dd 66 0b 
-		CALL wrelop 
-		30 06 
-		dd 7e 0a dd 77 ff 11 
-		80 00 21 00 00 e5 d5 fd 5e 24 
-		fd 56 25 fd 6e 26 fd 66 27 CALL aldiv 
-		e5 d5 fd e5 d1 21 21 00 19 e5 CALL __putrno 
-		c1 c1 c1 dd 7e ff fe 80 20 
-		12 dd 6e 08 dd 66 09 e5 21 
-		1a 00 e5 CALL _bdos 
-		c1 c1 18 5e dd e5 d1 21 79 
-		ff 19 e5 21 1a 00 e5 CALL _bdos 
-		c1 dd e5 d1 21 79 ff 19 36 
-		1a 21 7f 00 e3 dd e5 d1 21 
-		7a ff 19 e5 dd e5 d1 21 79 
-		ff 19 e5 CALL _bmove 
-		c1 c1 c1 fd e5 21 21 00 e5 
-		CALL _bdos 
-		c1 dd 6e ff 26 00 e3 dd e5 
+		CALL wrelop 30 06
+		dd 7e 0a dd 77 ff 
+		11 80 00 21 00 00 e5 d5 
+		fd 5e 24 fd 56 25 fd 6e 26 fd 66 27 
+		CALL aldiv
+		e5 d5 fd e5 d1 21 21 00 19 e5 CALL __putrno c1 c1 c1 
+		dd 7e ff fe 80 20 12 
+		dd 6e 08 dd 66 09 e5 
+		21 1a 00 e5 CALL _bdos c1 c1 18 5e 
+		dd e5 d1 21 79 ff 19 e5 21 1a 00 e5 CALL _bdos c1
+		dd e5 d1 21 79 ff 19 36
+		1a 21 7f 00 e3 dd e5 d1 
+		21 7a ff 19 e5 dd e5 d1 
+		21 79 ff 19 e5 CALL _bmove c1 c1 c1 
+		fd e5 21 21 00 e5 CALL _bdos c1 
+		dd 6e ff 26 00 e3 dd e5
 		d1 dd 6e fe 26 00 19 11 79 
 		ff 19 e5 dd 6e 08 dd 66 09 
-		e5 CALL _bmove 
-		c1 c1 c1 fd e5 21 22 00 e5 
-		CALL _bdos 
-		c1 c1 7d b7 20 49 dd 5e ff 
-		16 00 dd 6e 08 dd 66 09 19 
-		dd 75 08 dd 74 09 7b 21 00 
-		00 55 e5 d5 fd e5 d1 21 24 
-		00 19 CALL asaladd 
+		e5 CALL _bmove c1 c1 c1 
+		fd e5 21 22 00 e5 CALL _bdos c1 c1 
+		7d b7 20 49 
+		dd 5e ff 16 00 
+		dd 6e 08 dd 66 09 19
+		dd 75 08 dd 74 09 7b 21 00 00 
+		55 e5 d5 fd e5 d1 21 24 00 
+		19 CALL asaladd
 		dd 5e ff 16 00 dd 6e 0a dd 
 		66 0b b7 ed 52 dd 75 0a dd 
-		74 0b dd 6e fd 62 e5 CALL _setuid 
-		c1 dd 7e 0a dd b6 0b c2 ANY 
-		ANY dd 6e fd 26 00 e5 CALL _setuid 
-		c1 dd 5e 0a dd 56 0b dd 6e 
-		f9 dd 66 fa b7 ed 52 c3 cret 
+		74 0b dd 6e fd 62 e5 CALL _setuid c1 
+		dd 7e 0a dd b6 0b c2 ANY ANY 
+		dd 6e fd 26 00 e5 CALL _setuid c1 
+		dd 5e 0a dd 56 0b dd 6e f9 
+		dd 66 fa b7 ed 52 JUMP cret
 	end
 	;
 	; micronix is much simpler; we do have to maintain the file
@@ -750,12 +792,10 @@ end
 
 block _read
 	match
-		CALL ncsv 
-		79 ff dd 36 fb 00 dd 36 fc 
-		00 06 08 dd 7e 06 
-		CALL brelop 
-		38 06 21 ff ff 
-		JUMP cret 
+		CALL ncsv 79 ff 
+		dd 36 fb 00 dd 36 fc 00 
+		06 08 dd 7e 06 CALL brelop 38 06
+		21 ff ff JUMP cret
 		11 2a 00 dd 6e 06 26 00 
 		CALL amul 
 		11 __fcb 
@@ -773,76 +813,62 @@ block _read
 		JUMP cret 
 		dd 6e 0a dd 66 0b 2b 
 		dd 75 0a dd 74 0b 
-		21 03 00 e5 
-		CALL _bdos 
-		c1 7d e6 7f 
+		21 03 00 e5 CALL _bdos c1 
+		7d e6 7f
 		dd 6e 08 dd 66 09 23 
 		dd 75 08 dd 74 09 2b 
 		77 fe 0a 20 bb 18 c1 
 		dd 5e 0a dd 56 0b 21 80 00 
-		CALL wrelop 
-		30 08 dd 36 0a 80 dd 36 0b 
-		00 dd 7e 0a dd e5 d1 21 79 
-		ff 19 77 dd e5 d1 21 79 ff 
-		19 e5 21 0a 00 e5 
-		CALL _bdos 
-		c1 c1 dd e5 d1 21 7a ff 19 
+		CALL wrelop 30 08 
+		dd 36 0a 80 dd 36 0b 00 
+		dd 7e 0a dd e5 d1 21 79 ff 
+		19 77 dd e5 d1 21 79 ff
+		19 e5 21 0a 00 e5 CALL _bdos c1 c1 
+		dd e5 d1 21 7a ff 19
 		6e 26 00 dd 75 fb dd 74 fc 
 		dd 5e 0a dd 56 0b dd 66 fc 
-		CALL wrelop 
-		30 2c 21 0a 00 e5 21 02 00 
-		e5 
-		CALL _bdos 
-		c1 c1 dd e5 d1 dd 6e fb dd 
+		CALL wrelop 30 2c 
+		21 0a 00 e5 
+		21 02 00 e5 CALL _bdos c1 c1
+		dd e5 d1 dd 6e fb dd
 		66 fc 23 23 19 11 79 ff 19 
 		36 0a dd 6e fb dd 66 fc 23 
 		dd 75 fb dd 74 fc dd 6e fb 
 		dd 66 fc e5 dd 6e 08 dd 66 
 		09 e5 dd e5 d1 21 7b ff 19 
-		e5 
-		CALL _bmove 
-		c1 c1 c1 dd 6e fb dd 66 fc 
-		JUMP cret 
+		e5 CALL _bmove c1 c1 c1 
+		dd 6e fb dd 66 fc JUMP cret
 		CALL _getuid 
 		5d dd 73 fd dd 6e 0a dd 66 
 		0b dd 75 fb dd 74 fc 
 		c3 ANY ANY 
 		CALL __sigchk 
-		fd 6e 29 26 00 e5 
-		CALL _setuid 
-		c1 fd 7e 24 e6 7f dd 77 fe 
+		fd 6e 29 26 00 e5 CALL _setuid c1 
+		fd 7e 24 e6 7f dd 77 fe
 		5f 16 00 21 80 00 b7 ed 52 
-		dd 75 ff 5d dd 6e 0a dd 66 
-		0b 
-		CALL wrelop 
-		30 06 
+		dd 75 ff 5d dd 6e 0a dd 66 0b
+		CALL wrelop 30 06
 		dd 7e 0a dd 77 ff 
 		11 80 00 21 00 00 e5 d5 
 		fd 5e 24 fd 56 25 
 		fd 6e 26 fd 66 27 
 		CALL aldiv 
 		e5 d5 fd e5 d1 21 21 00 19 
-		e5 
-		CALL __putrno 
-		c1 c1 c1 dd 7e ff fe 80 20 
-		22 dd 6e 08 dd 66 09 e5 21 
-		1a 00 e5 
-		CALL _bdos 
-		c1 c1 fd e5 21 21 00 e5 
-		CALL _bdos 
-		c1 c1 7d b7 28 44 
+		e5 CALL __putrno c1 c1 c1 
+		dd 7e ff fe 80 20
+		22 dd 6e 08 dd 66 09 e5 
+		21 1a 00 e5 CALL _bdos c1 c1
+		fd e5 21 21 00 e5 CALL _bdos c1 c1 
+		7d b7 28 44
 		c3 ANY ANY 
 		dd e5 d1 21 79 ff 19 e5 21 
-		1a 00 e5 
-		CALL _bdos 
-		c1 c1 fd e5 21 21 00 e5 
-		CALL _bdos 
-		c1 c1 7d b7 20 6a dd 6e ff 
+		1a 00 e5 CALL _bdos c1 c1 
+		fd e5 21 21 00 e5 CALL _bdos c1 c1 
+		7d b7 20 6a dd 6e ff
 		26 00 e5 dd 6e 08 dd 66 09 
 		e5 dd e5 d1 dd 6e fe 26 00 
-		19 11 79 ff 19 e5 
-		CALL _bmove 
-		c1 c1 c1 dd 5e ff 16 00 dd 
+		19 11 79 ff 19 e5 CALL _bmove c1 c1 c1 
+		dd 5e ff 16 00 dd
 		6e 08 dd 66 09 19 dd 75 08 
 		dd 74 09 7b 21 00 00 55 e5 
 		d5 fd e5 d1 21 24 00 19 
@@ -852,10 +878,10 @@ block _read
 		74 0b dd 6e fd 62 e5 
 		CALL _setuid 
 		c1 dd 7e 0a dd b6 0b c2 ANY 
-		ANY dd 6e fd 26 00 e5 CALL _setuid 
-		c1 
+		ANY dd 6e fd 26 00 e5 CALL _setuid c1
 		c3 ANY ANY 
 	end
+
 	patch _read
 		call	csv
 		ld		a,(ix+6)
@@ -885,22 +911,18 @@ end
 ;
 block _unlink
 	match
-		CALL ncsv 
-		d3 ff dd 6e 06 dd 66 07 e5 
-		dd e5 d1 21 d6 ff 19 e5 
-		CALL _setfcb 
-		c1 c1 7d b7 28 06 21 00 00 
-		JUMP cret 
+		CALL ncsv d3 ff 
+		dd 6e 06 dd 66 07 e5
+		dd e5 d1 21 d6 ff 19 e5 CALL _setfcb c1 c1 
+		7d b7 28 06 21 00 00 JUMP cret
 		CALL _getuid 
-		dd 75 d5 dd 6e ff 26 00 e5 
-		CALL _setuid 
-		dd e5 d1 21 d6 ff 19 e3 21 
-		13 00 e5 
-		CALL _bdos 
-		c1 7d 17 9f 67 dd 75 d3 dd 
-		74 d4 dd 6e d5 26 00 e3 
-		CALL _setuid 
-		c1 dd 6e d3 dd 66 d4 
+		dd 75 d5 dd 6e ff 26 00 
+		e5 CALL _setuid dd e5 d1 21 d6 ff 19 e3 
+		21 13 00 e5 CALL _bdos c1 
+		7d 17 9f 67 
+		dd 75 d3 dd 74 d4 dd 6e d5 26 00 
+		e3 CALL _setuid c1 
+		dd 6e d3 dd 66 d4
 		JUMP cret 
 	end
 end
@@ -913,33 +935,28 @@ block _creat
 	match
 		CALL csv 
 		e5 CALL _getfcb 
-		e5 fd e1 7d b4 20 06 21 ff 
-		ff 
-		JUMP cret 
+		e5 fd e1 7d b4 20 06 
+		21 ff ff JUMP cret
 		CALL _getuid 
 		dd 75 ff dd 6e 06 dd 66 07 
-		e5 fd e5
-		CALL _setfcb 
-		c1 c1 7d b7 20 3c dd 6e 06 
-		dd 66 07 e5 
-		CALL _unlink 
+		e5 fd e5 CALL _setfcb c1 c1 
+		7d b7 20 3c dd 6e 06
+		dd 66 07 e5 CALL _unlink
 		fd 6e 29 26 00 e3 
-		CALL _setuid 
-		c1 fd e5 21 16 00 e5 
-		CALL _bdos 
-		c1 c1 7d fe ff dd 6e ff 26 
-		00 e5 20 0a 
-		CALL _setuid 
-		c1 fd 36 28 00 18 ae 
-		CALL _setuid 
-		c1 fd 36 28 02 11 __fcb 
+		CALL _setuid c1 
+		fd e5 21 16 00 e5 CALL _bdos c1 c1 
+		7d fe ff dd 6e ff 26
+		00 e5 20 0a CALL _setuid c1 
+		fd 36 28 00 18 ae
+		CALL _setuid c1 
+		fd 36 28 02 11 __fcb
 		fd e5 e1 b7 ed 52 11 2a 00 
 		CALL adiv 
 		JUMP cret 
 
 	end
 	patch _creat
-		ld hl,0x5
+		ld hl,0x5		; point at mode
 		add hl,sp
 		ld d,(hl)
 		dec hl
@@ -956,6 +973,52 @@ block _creat
 		ld hl, 0xffff
 		ret
 		ds 91,0
+	end
+end
+
+;
+; used by the compiler passes, it does all the work for fopen
+; the fopen itself does not need any patching
+; FILE *reopen(char *name, char *mode, FILE *
+block _freopen
+	match
+	CALL csv 
+	e5 e5 dd 6e 0a dd 66 0b e5 
+	fd e1 e5 CALL _fclose c1 
+	11 __iob fd e5 e1 b7 ed 52
+	11 08 00 CALL adiv 
+	7d fd 77 07 6f 17 9f 67 
+	11 29 00 CALL lmul
+	11 __fcb 19 
+	dd 75 fc dd 74 fd 
+	dd 36 ff 00 dd 36 fe 0f 
+	fd 7e 06 e6 4f fd 77 06 
+	dd 6e 08 dd 66 09 7e fe 72 28 0b 
+	fe 77 20 17 
+	dd 34 ff dd 36 fe 16 dd 6e 08 dd 66 09 
+	23 7e fe 62 20 04 
+	fd 36 06 80 
+	dd 6e 06 dd 66 07 e5 
+	dd 6e fc dd 66 fd e5 CALL _setfcb c1 c1
+	dd 7e fe fe 16 dd 6e fc dd 66 fd e5 20 0f 
+	21 13 00 e5 CALL bdosa c1 
+	dd 6e fc dd 66 fd e3 dd 6e fe 26 00 
+	e5 CALL bdosa c1 c1 
+	7d fe ff 20 06 
+	21 00 00 JUMP cret 
+	dd 7e ff b7 20 05 
+	21 01 00 18 03 
+	21 02 00 7d dd 5e fc dd 56 fd 
+	21 24 00 19 77 
+	dd 7e ff 3c 5f fd 7e 06 b3 fd 77 06 e6 0c b7 20 16 
+	fd 7e 04 fd b6 05 20 0e 
+	21 00 02 e5 CALL _sbrk c1 
+	fd 75 04 fd 74 05 
+	fd 6e 04 fd 66 05 fd 75 00 fd 74 01 
+	7d fd b6 05 28 10 
+	dd 7e ff b7 fd 36 02 00 28 0a 
+	fd 36 03 02 18 08 
+	fd 36 02 00 fd 36 03 00 fd e5 e1 JUMP cret
 	end
 end
 
@@ -1071,16 +1134,16 @@ end
 ;
 block _fsize
 	match
-		CALL ncsv 
-		fb ff 06 08 dd 7e 06 CALL brelop 
-		38 08 11 ff ff 6b 62 JUMP cret 
+		CALL ncsv fb ff 
+		06 08 dd 7e 06 CALL brelop 38 08
+		11 ff ff 6b 62 JUMP cret
 		11 2a 00 dd 6e 06 26 00 CALL amul 
 		11 __fcb 
 		19 e5 fd e1 CALL _getuid 
-		dd 75 fb fd 6e 29 26 00 e5 CALL _setuid 
-		c1 fd e5 21 23 00 e5 CALL _bdos 
-		c1 dd 6e fb 26 00 e3 CALL _setuid 
-		c1 06 10 fd 7e 23 21 00 00 55 5f CALL allsh 
+		dd 75 fb fd 6e 29 26 00 e5 CALL _setuid c1 
+		fd e5 21 23 00 e5 CALL _bdos c1
+		dd 6e fb 26 00 e3 CALL _setuid c1 
+		06 10 fd 7e 23 21 00 00 55 5f CALL allsh
 		e5 d5 06 08 fd 7e 22 21 00 00 55 5f CALL allsh 
 		e5 d5 fd 7e 21 21 00 00 55 5f CALL aladd 
 		CALL aladd 
@@ -1089,11 +1152,11 @@ block _fsize
 		2b 2b 2b CALL asallsh 
 		dd 5e fc dd 56 fd dd 6e fe 
 		dd 66 ff e5 d5 fd 5e 24 fd 
-		56 25 fd 6e 26 fd 66 27 CALL arelop 
-		f2 ANY ANY dd 5e fc dd 56 fd 
-		dd 6e fe dd 66 ff JUMP cret 
-		fd 5e 24 fd 56 25 fd 6e 26 
-		fd 66 27 JUMP cret 
+		56 25 fd 6e 26 fd 66 27 CALL arelop f2 ANY ANY 
+		dd 5e fc dd 56 fd dd 6e fe dd 66 ff 
+		JUMP cret
+		fd 5e 24 fd 56 25 fd 6e 26 fd 66 27 
+		JUMP cret
 	end	
 	;
 	; fstat the file the file and return the file size as a long
@@ -1139,8 +1202,8 @@ block _lseek
 	;
 	match
 		CALL csv 
-		e5 e5 06 08 dd 7e 06 CALL brelop 
-		38 08 11 ff ff 6b 62 JUMP cret 
+		e5 e5 06 08 dd 7e 06 CALL brelop 38 08 
+		11 ff ff 6b 62 JUMP cret
 		11 2a 00 dd 6e 06 26 00 CALL amul 
 		11 __fcb 
 		19 e5 fd e1 dd 7e 0c fe 01 
