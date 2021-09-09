@@ -1019,6 +1019,7 @@ monitor()
     int i;
     int delete;
     char *s;
+    int addr;
 
     while (1) {
       more:
@@ -1074,26 +1075,32 @@ monitor()
             while (*s && (*s == ' '))
                 s++;
             if (*s) {
-                if (strcmp(s, "tos") == 0) {
-                    int tos;
-                    tos  = cp->state.registers.word[Z80_SP] & 0xffff;
-                    fprintf(mytty, "stack %04x\n", tos);
+                if (!strcmp(s, "bc")) {
+                    addr  = cp->state.registers.word[Z80_BC] & 0xffff;
+                } else if (!strcmp(s, "de")) {
+                    addr  = cp->state.registers.word[Z80_DE] & 0xffff;
+                } else if (!strcmp(s, "hl")) {
+                    addr  = cp->state.registers.word[Z80_HL] & 0xffff;
+                } else if (!strcmp(s, "ix")) {
+                    addr  = cp->state.registers.word[Z80_IX] & 0xffff;
+                } else if (!strcmp(s, "iy")) {
+                    addr  = cp->state.registers.word[Z80_IY] & 0xffff;
+                } else if (!strcmp(s, "sp")) {
+                    addr  = cp->state.registers.word[Z80_SP] & 0xffff;
+                    fprintf(mytty, "stack %04x\n", addr);
                     for (i = 0; i < 10; i++) {
-                        fprintf(mytty, "\t%04x\n", get_word(tos + (i * 2)));
+                        fprintf(mytty, "\t%04x\n", get_word(addr + (i * 2)));
                     } 
                     break;
                 } else {
-                    i = strtol(s, &s, 16);
+                    addr = strtol(s, &s, 16);
                 }
             } else {
-                if (lastaddr == -1) {
-                    i = cp->state.registers.word[Z80_SP];
-                } else {
-                    i = lastaddr;
-                }
+                addr = lastaddr;
             }
-            dumpmem(&get_byte, i, 256);
-            lastaddr = (i + 256) & 0xfff;
+            addr &= 0xffff;
+            dumpmem(&get_byte, addr, 256);
+            lastaddr = (addr + 256) & 0xffff;
             break;
         case 'l':
             while (*s && (*s == ' '))
