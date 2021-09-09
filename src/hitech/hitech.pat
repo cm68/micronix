@@ -1020,6 +1020,69 @@ block _freopen
 	fd 36 03 02 18 08 
 	fd 36 02 00 fd 36 03 00 fd e5 e1 JUMP cret
 	end
+
+	;
+	; we're not going to try for full library compatibility
+	; just enough to make the compiler work. 
+	; the specific hair that we are not going to split is a
+	; stream open for both read and write.  what's the file
+	; pointer? how does this interact with flushing?
+	; screw that.
+	;
+	patch _freopen 295
+		call	csv
+
+		ld		h,(ix+11)	; close the file
+		ld		l,(ix+10)
+		call	_fclose
+
+		ld		h,(ix+9)	; parse mode: rwa = 012
+		ld		l,(ix+8)
+		ld		b,0
+		ld		a,(hl)
+		cp		'r'
+		jr		z,modeset
+		inc		b
+		cp		'w'
+		jr		z,modeset
+		set		1,b
+	modeset:
+		ld		a,5			; do an open
+		ld		(sys+1),a
+		ld		a,b			; mode r,w = 0,1
+		and		1
+		ld		(sys+4),a
+		push	hl
+		ld		h,(ix+7)	; get the name
+		ld		l,(ix+6)
+		ld		(sys+2),hl
+
+	sys:
+		db		0xcf, 0x5, 0x0, 0x0, 0x0, 0x0
+		jr		nc, opened
+
+		dec		b			; mode 0 must succeed
+		jr		c, openfail
+		ld		a,8			; change it to a creat	
+		ld		(sys+1),a
+		ld		hl,666O		; permissive mode
+		ld		(sys+4),hl
+		db		0xcf, 0x0, sys
+		jr		c,openfail
+
+	opened:
+		bit		1,b
+		jr		z,noseek
+		push	hl
+		db		0xcf, 19, 0, 0, 2, 0
+		pop		hl
+	noseek:
+
+	openfail:
+		ld		hl,0
+		jp		cret
+	end
+
 end
 
 ;

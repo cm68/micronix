@@ -3,7 +3,7 @@
 # compiler, assembler, linker and tools to micronix
 #
 
-DEBUG = -v 0x31
+DEBUG = -v 0x71
 VERBOSE = -v
 HITECH = cpp p1 cgen optim link libr zas
 
@@ -34,7 +34,7 @@ clean:
 	rm -rf *.o bpatch objdump *.dSYM *.dis *.sym asmtext.*
 
 test: install
-	../../sim $(DEBUG) /hitech/cpp -Dmicronix -Dz80 -I/include/ /usr/src/cmd/cc/cc.c cc.i
+	../../sim $(DEBUG) /hitech/cpp -Dmicronix -Dz80 -I/include/ /usr/src/cmd/cc/cc.c /usr/src/cmd/cc/cc.i
 	../../sim $(DEBUG) /hitech/p1 /usr/src/cmd/cc/cc.i /usr/src/cmd/cc/cc.1
 	
 objscan: objscan.c
