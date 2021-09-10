@@ -189,6 +189,16 @@ block _bdoshl
 	end
 end
 
+block _bufallo
+	match
+		CALL csv 
+		fd 2a freep fd e5 e1 7d b4 28 0b 
+		fd 6e 00 fd 66 01 22 freep 18 0b 
+		21 00 02 e5 CALL _sbrk c1 e5 fd e1 fd e5 e1 
+		JUMP cret
+	end
+end
+
 ;
 ; one variation of exit.  calls cpm_clean
 ; and puts the return address into 0x80, presumably
@@ -1028,32 +1038,39 @@ block _freopen
 	; stream open for both read and write.  what's the file
 	; pointer? how does this interact with flushing?
 	; screw that.
+	; file * freopen(char *name, char *mode, file *fp)
 	;
 	patch _freopen 295
 		call	csv
 
 		ld		h,(ix+11)	; close the file
 		ld		l,(ix+10)
+		push	hl
+		push	hl
+		pop		iy
 		call	_fclose
 
 		ld		h,(ix+9)	; parse mode: rwa = 012
 		ld		l,(ix+8)
 		ld		b,0
+		set		0,(iy+6)	; set read bit
 		ld		a,(hl)
 		cp		'r'
 		jr		z,modeset
+		res		0,(iy+6)	; reset read bit
+		set		1,(iy+6)	; set write bit
 		inc		b
 		cp		'w'
 		jr		z,modeset
-		set		1,b
+		set		1,b			; set append bit
 	modeset:
-		ld		a,5			; do an open
+		ld		a,5			; open syscall number
 		ld		(sys+1),a
 		ld		a,b			; mode r,w = 0,1
 		and		1
 		ld		(sys+4),a
 		push	hl
-		ld		h,(ix+7)	; get the name
+		ld		h,(ix+7)	; copy name pointer to syscall
 		ld		l,(ix+6)
 		ld		(sys+2),hl
 
@@ -1062,27 +1079,46 @@ block _freopen
 		jr		nc, opened
 
 		dec		b			; mode 0 must succeed
-		jr		c, openfail
+		jp		m, openfail
 		ld		a,8			; change it to a creat	
 		ld		(sys+1),a
 		ld		hl,666O		; permissive mode
 		ld		(sys+4),hl
-		db		0xcf, 0x0, sys
+		db		0xcf, 0x0	; indirect
+		dw		sys
 		jr		c,openfail
 
 	opened:
-		bit		1,b
+		ld		(iy+7),l	; iob->file = file descriptor
+		bit		1,b			; is append set
 		jr		z,noseek
-		push	hl
 		db		0xcf, 19, 0, 0, 2, 0
-		pop		hl
-	noseek:
 
+	noseek:
+		ld		hl,0		; iob->count = 0
+		ld		(iy+2),l
+		ld		(iy+3),h
+		ld		a,(iy+6)
+		and		0xc
+		jr		nz,noalloc
+		call	_bufallo
+		ld		(iy+4),l	; iob->base = bufalloc()
+		ld		(iy+5),h
+		bit		0,(iy+6)
+		jr		nz, noalloc	; if read, iob->count=0
+		ld		(iy+3),2	; iob->count = 512
+	noalloc:
+		ld		l,(iy+4)	; iob->ptr = iob->base
+		ld		h,(iy+5)
+		ld		(iy+0),l
+		ld		(iy+1),h
+		push	iy
+		pop		hl
+		jp		cret
 	openfail:
 		ld		hl,0
 		jp		cret
 	end
-
 end
 
 ;

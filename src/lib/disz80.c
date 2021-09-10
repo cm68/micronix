@@ -40,7 +40,7 @@ struct optab base_optab[256] = {
 
 	{"JR NC,%s", OP_PC8}, {"LD SP,%s", OP_DATA}, {"LD (%s),A", OP_DATA|OP_IND}, {"INC SP", 0},
 	{"INC (HL)", 0}, {"DEC (HL)", 0}, {"LD (HL),%s", OP_IMM8}, {"SCF", 0},
-	{"JR C,%s", 0}, {"ADD HL,SP", 0}, {"LD A,(%s)", OP_DATA|OP_IND}, {"DEC SP", 0},
+	{"JR C,%s", OP_PC8}, {"ADD HL,SP", 0}, {"LD A,(%s)", OP_DATA|OP_IND}, {"DEC SP", 0},
 	{"INC A", 0}, {"DEC A", 0}, {"LD A,%s", OP_IMM8}, {"CCF", 0},
 
 	{"LD B,B", 0}, {"LD B,C", 0}, {"LD B,D", 0}, {"LD B,E", 0},
