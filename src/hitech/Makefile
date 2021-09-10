@@ -6,6 +6,7 @@
 DEBUG = -v 0x71
 VERBOSE = -v
 HITECH = cpp p1 cgen optim link libr zas
+HITECH = cpp p1
 
 CFLAGS = -Wno-implicit-int
 
@@ -17,6 +18,7 @@ bpatch: bpatch.c
 
 %: %.com hitech.pat bpatch
 	./bpatch $(VERBOSE) -p hitech.pat $<
+	cp $* ../../filesystem/hitech
 
 %.dis: %.com hitech.pat bpatch
 	./bpatch -p hitech.pat $<
