@@ -1127,21 +1127,46 @@ end
 ;
 ; iob { char *ptr, int cnt, char *base, char flag, char fd }
 ; flags (bits 0-7): rd wr nbuf mybuf eof err string binary
-;
 
-block filbuf
+; this is called from fgetc, and the compiler version knows all about setdma, sectors, and all that.
+; filbuf(file *fp)
+;
+block _filbuf
 	match
-		01 02 03 04 05 06 07 99 99 99
+		CALL csv 
+		e5 dd 6e 06 dd 66 07 e5 fd e1 
+		11 __iob fd e5 e1 b7 ed 52 
+		11 08 00 CALL adiv 
+		11 29 00 CALL lmul 
+		11 __fcb 19 
+		dd 75 fe dd 74 ff 
+		fd 36 02 00 fd 36 03 00 
+		CALL _concheck 
+		dd 5e fe dd 56 ff 
+		21 24 00 19 7e 
+		fe 01 c2 ANY ANY 
+		fd 6e 04 fd 66 05 
+		fd 75 00 fd 74 01 18 33 
+		fd 6e 00 fd 66 01 
+		e5 21 1a 00 e5 CALL bdosa c1 
+		dd 6e fe dd 66 ff e3 
+		21 14 00 e5 CALL bdosa c1 c1 
+		7d b7 20 26 
+		11 80 00 
+		fd 6e 00 fd 66 01 19 
+		fd 75 00 fd 74 01 
+		fd 5e 04 fd 56 05 
+		21 00 02 19 eb 
+		fd 6e 00 fd 66 01 CALL wrelop 38 b7 
+		fd 5e 04 fd 56 05 fd 6e 00 fd 66 01 
+		b7 ed 52 
+		fd 75 02 fd 74 03 6b 62 
+		fd 75 00 fd 74 01 fd 7e 02 fd b6 03 20 06 
+		21 ff ff JUMP cret 
+		fd 6e 02 fd 66 03 2b 
+		fd 75 02 fd 74 03 fd 6e 00 fd 66 01 23 
+		fd 75 00 fd 74 01 2b 6e 26 00 JUMP cret
 	end
-	; f->cnt = 0
-	; if (f->flag & IORD) return EOF
-	; if (f->base == 0) {
-	;     f->ptr = &tmp
-	; count = 1;
-	; } else {
-	;     f->ptr = f->base
-	;	  count = BUFSIZE
-	; } 
 	; f->cnt = read(f->fd, f->ptr, count);
 	; if (f->cnt > 0) {
 	;   f->cnt--;
@@ -1157,11 +1182,17 @@ block filbuf
 		push de
 		push hl
 
-		ld hl,6				; if ! f->flag & IORD
+		; if (f->flag & IORD) return EOF
+		ld hl,6
 		add hl,de
 		bit 0,(hl)
 		jr z,feof
 	
+		; if (f->base) {
+		;     bc = f->base ; count = 512 ;
+		; } else {
+		;	  bc = fend + 1 ; count = 1;
+		; }
 		dec hl				; get base
 		ld b,(hl)
 		dec hl
@@ -1172,9 +1203,8 @@ block filbuf
 		ld bc,fend+1		; else use fend+1
 	fbuf:
 		ld (m_read+2),bc
-
 		ld bc,0x200			; count = BUFSIZE
-		jz nz,fcnt
+		jr nz,fcnt
 		ld bc,1				; if !base count = 1
 	fcnt:
 		ld (m_read+4),bc
@@ -1186,20 +1216,17 @@ block filbuf
 	m_read:			; read(fd, base, 0x200 - cnt)
 		defb 0xcf, 5, 0, 0, 0, 0
 
-		ld a,0x10	; ERR bit
-		jr c,ferr
-		ld a,h
+		ld a,0x20	; ERR bit
+		jr c,fret
+		ld a,h		; is byte count 0?
 		or l
 
 	feof:
-		ld a,0x08	; EOF bit
+		ld a,0x10	; EOF bit
 		jr z,fret
 
 		ld b,h		; save returned byte count for f->cnt
 		ld c,l
-
-	ferr:
-		ld (_errno), hl
 
 	fret:			; a = bits for flags, bc = count
 		ld hl,6
@@ -1216,13 +1243,10 @@ block filbuf
 		ld (hl),b
 		dec hl
 		ld (hl),c
-		ld a,c
-		or b
-		jr nz,fneof
 
 	fend:
 		ld hl,-1	; store into this instruction data field
-		ret		
+		ret	
 	end
 end
 
