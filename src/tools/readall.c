@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "../micronix/include/types.h"
 #include "../micronix/include/sys/fs.h"

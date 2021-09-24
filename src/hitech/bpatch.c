@@ -172,6 +172,7 @@ getvar(char *n)
             return v;
         }
     }
+	return v;
 }
 
 void
@@ -227,7 +228,7 @@ do_queue(int hit)
 {
 	struct var *v;
 
-	while (v = varq) {
+	while ((v = varq) != 0) {
 		varq = v->next;
 		if (hit) {
 			putvar(v->name, v->value);
@@ -270,6 +271,7 @@ get()
     return getbuf;
 }
 
+void
 skiptoeol()
 {
     while (*cursor && *cursor != '\n') {
@@ -295,6 +297,7 @@ isymchar(char c)
 /*
  * skip white space (also newlines and comments)
  */
+void
 skipwhite()
 {
     for (; *cursor; cursor++) {
@@ -418,12 +421,7 @@ getaddr(char *in)
     }
 
     if (s) {
-        o = numin(s);
-        if (o == 0xffffffff) {
-            printf("malformed offset %s\n", s);
-            o = 0;
-        }
-        o *= sign;
+        o = numin(s) * sign;
     }
     if (verbose & V_VAR) printf(" = %04x\n", v + o);
     return v + o;

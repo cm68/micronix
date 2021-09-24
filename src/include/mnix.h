@@ -24,5 +24,7 @@ struct syscall {
 #define	SF_BUF		128
 #define	SF_SMALL	256
 
+int mnix_scpr(unsigned short addr, unsigned char (*gb)(unsigned short a), char *dest);
+
 extern struct syscall syscalls[];
 extern char *signame[];

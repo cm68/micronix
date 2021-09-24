@@ -51,4 +51,4 @@ extern void fileunlink(struct super *f, char *name);
 extern struct dsknod *filecreate(struct super *f, char *name);
 extern int dircreate(struct super *f, char *name);
 extern int dirrm(struct super *f, char *name);
-
+extern int filesize(struct dsknod *ip);

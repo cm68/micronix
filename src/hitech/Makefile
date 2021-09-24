@@ -10,8 +10,11 @@ HITECH = cpp p1
 
 CFLAGS = -Wno-implicit-int
 
-all: $(HITECH)
+all: $(HITECH) bin
 	cp $(HITECH) bin
+
+bin:
+	mkdir bin
 
 bpatch: bpatch.c
 	cc -g $(CFLAGS) -o $@ $<
@@ -36,8 +39,8 @@ clean:
 	rm -rf *.o bpatch objdump *.dSYM *.dis *.sym asmtext.*
 
 test: install
-	../../sim $(DEBUG) /hitech/cpp -Dmicronix -Dz80 -I/include/ /usr/src/cmd/cc/cc.c /usr/src/cmd/cc/cc.i
-	../../sim $(DEBUG) /hitech/p1 /usr/src/cmd/cc/cc.i /usr/src/cmd/cc/cc.1
+	../../sim -d ../../filesystem $(DEBUG) /hitech/cpp -Dmicronix -Dz80 -I/include/ /usr/src/cmd/cc/cc.c /usr/src/cmd/cc/cc.i
+	../../sim -d ../../filesystem $(DEBUG) /hitech/p1 /usr/src/cmd/cc/cc.i /usr/src/cmd/cc/cc.1
 	
 objscan: objscan.c
 	cc -g -o objscan objscan.c
