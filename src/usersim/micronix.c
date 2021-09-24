@@ -21,6 +21,8 @@
 #include <unistd.h>
 #include <limits.h>
 #include <string.h>
+#include <fcntl.h>
+#include <ctype.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <signal.h>

@@ -18,6 +18,7 @@
 #include <strings.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include "../micronix/include/types.h"
 #include "../micronix/include/sys/fs.h"

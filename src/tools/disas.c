@@ -52,12 +52,14 @@ Configuration notes:
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 
 #include "../micronix/include/types.h"
 #include "../micronix/include/obj.h"
 #include "../include/ws.h"
 #include "../include/hitech.h"
+#include "../include/mnix.h"
 
 /*
  * word should be at least 16 bits unsigned,
@@ -115,6 +117,7 @@ typedef unsigned char byte;
 #define	HEX	50
 #define	LIMIT	60
 
+void dump_symbols();
 void trace();
 void header();
 int dis();
@@ -130,6 +133,7 @@ int tcmp();
 int instr(word addr, int size);
 int code_addr(int v);
 char *addr_name(word a);
+int find_symbol(char *ls);
 
 /*
  * variables
@@ -528,6 +532,7 @@ find_symbol(char *ls)
 /*
  * add symbols, keeping the list in order
  */
+void
 add_sym(char *name, int v)
 {
     struct sym *s;

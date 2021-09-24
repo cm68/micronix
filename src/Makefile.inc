@@ -3,7 +3,8 @@
 #MACHINE = -m32
 
 CC = gcc 
-WARNS = -Wno-builtin-declaration-mismatch -Wformat-overflow=0
+WARNS = -Wno-builtin-declaration-mismatch -Wformat-overflow=0 -Wno-pointer-sign
+
 GCCFLAGS = $(MACHINE) -fdiagnostics-color=always
 DEBUG = -g
 CFLAGS = $(DEBUG) $(INCLUDE) $(WARNS) $(GCCFLAGS) $(DEFINES)
