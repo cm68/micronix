@@ -21,8 +21,6 @@
 #include <unistd.h>
 #include <limits.h>
 #include <string.h>
-#include <fcntl.h>
-#include <ctype.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <signal.h>
@@ -82,11 +80,13 @@ char *initfile[] = {
 #define	V_ASYS	(1 << 4)        /* even small syscalls */
 #define	V_SYS0	(1 << 5)        /* dump raw syscall args */
 #define	V_ERROR	(1 << 6)        /* perror on system calls */
+#define V_SFAIL (1 << 7)        /* breakpoint on syscall fail */
 
 char *progname;
 
 char *vopts[] = {
-    "V_SYS", "V_DATA", "V_EXEC", "V_INST", "V_ASYS", "V_SYS0", "V_ERROR", 0
+    "V_SYS", "V_DATA", "V_EXEC", "V_INST", 
+    "V_ASYS", "V_SYS0", "V_ERROR", "V_SFAIL", 0
 };
 
 char *seekoff[] = { "SET", "CUR", "END" };
@@ -809,12 +809,18 @@ void
 carry_set()
 {
     cp->state.registers.byte[Z80_F] |= Z80_C_FLAG;
+    if (verbose & V_SFAIL) {
+        breakpoint = 1;
+    }
 }
 
 void
 carry_clear()
 {
     cp->state.registers.byte[Z80_F] &= ~Z80_C_FLAG;
+    if (verbose & V_SFAIL) {
+        breakpoint = 0;
+    }
 }
 
 void
@@ -1947,9 +1953,13 @@ SystemCall(MACHINE * cp)
         } else {
             close(fd);
         }
-        files[fd].special = 0;
-        files[fd].offset = 0;
-        carry_clear();
+        if (fd <= MAXFILE) {
+            files[fd].special = 0;
+            files[fd].offset = 0;
+            carry_clear();
+        } else {
+            carry_set();
+        }
         break;
 
     case 7:                    /* wait */

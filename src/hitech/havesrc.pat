@@ -1,18 +1,9 @@
 ;
-; grammar file for the hitech c library replacement
+; grammar file for the hitech stdio library replacement for which we have
+; source code.  this is built on top of open/close/read/write, etc.
 ;
 ; blocks with no patch are used as pattern verifiers for called
 ; functions and to extract labels
-;
-; there are 2 distinct hitech libraries that we endeavor to patch:
-; the one you get from compiling with the supplied libraries, and
-; the one that was used to generate the compiler itself.
-;
-; they differ in that the supplied library source has stdio built on top
-; of open/close/read/write, etc.
-;
-; the compiler has no such layer, with fread, fopen, fflush, fwrite,
-; built directly on top of bdos calls.
 ;
 ; the intention is to have the patch completely fill the space occupied
 ; by the replaced function, padding it out with NOPs
@@ -157,22 +148,7 @@ block brelop
 end
 
 ;
-; bdos call, returning 8 bit value, sign extended to HL
-;
-block _bdosa1
-	match
-		CALL csv
-		dd 5e 08 dd 56 09
-		dd 4e 06 
-		dd e5 CALL 0005 dd e1
-		6f 17 9f 67
-		JUMP cret
-	end
-end
-
-;
-; variation of bdosa1, that saves and restores IY.  redundantly,
-; since this is done by csv already.
+; bdosa, that saves and restores IY.  redundantly, ; since this is done by csv already.
 ; bdos.obj
 ;
 block _bdosa
@@ -230,22 +206,6 @@ block __exit
 	end
 end
 
-;
-; another variation on exit.  just calls __cpm_clean after
-; storing hl into 0x80.  nothing on the stack, apparently
-;
-block exit
-	match
-		22 0080
-		CALL __cpm_clean
-		JUMP 0000
-	end
-	patch exit
-		db 0xcf, 01		; exit(hl)
-	end
-end
-
-;
 ; finally, the c version.  this calls _cleanup, which calls fclose on
 ; all the stdio FILES.  we'll do this too.
 ; this isn't the one found in the compiler binaries
@@ -258,31 +218,6 @@ block _exit
 		dd 6e 06 dd 66 07 
 		e5 CALL __exit
 		JUMP cret			
-	end
-end
-
-;
-; the stdio version found in the compiler
-; - note: no source code available.
-;
-block _exit
-	match
-		CALL csv
-		e5
-		dd 36 ff 05	
-		fd 21 __iob
-		fd e5 e1
-		01 0008 09 e5 fd e1 ed 42
-		e5 CALL _fclose c1
-		dd 7e ff c6 ff
-		dd 77 ff b7 20 e4
-		dd 6e 06 dd 66 07
-		22 0080
-		CALL 0000
-		JUMP cret
-	end
-	patch _exit+49
-		db 0xcf, 01
 	end
 end
 
@@ -391,61 +326,8 @@ openfail:
 end
 
 ;
-; this is the fclose found in the compiler passes
-;
-block _fclose
-	match
-		CALL csv
-		e5 
-		dd 6e 06 dd 66 07 e5 fd e1 
-		11 __iob fd e5 e1 b7 ed 52
-		11 08 00 CALL adiv
-		11 29 00 CALL lmul
-		11 __fcb 19
-		dd 75 fe dd 74 ff
-		fd 7e 06 e6 03 b7 20 06
-		21 ff ff JUMP cret
-		fd e5 CALL _fflush c1 
-		fd 7e 06 e6 f8
-		fd 77 06 
-		dd 5e fe dd 56 ff
-		21 24 00 19 7e fe 02 28 0c
-		21 0c 00 e5 CALL _bdoshl c1 
-		cb 44 28 10
-		dd 6e fe dd 66 ff 
-		e5 21 10 00 e5 CALL _bdosa c1 c1
-		dd 5e fe dd 56 ff
-		21 24 00 19 36 00
-		21 00 00 JUMP cret
-	end
-	patch _fclose 133
-		call	csv
-		ld		l,(ix+6)		; get the iob ptr
-		ld		h,(ix+7)
-		push	hl
-		pop		iy				; put it into struct ptr
-		ld		a,(iy+6)		; get flag byte
-		and		0x3				; if not open, skip
-		jr		z,noflush
-		push	iy
-		call	_fflush			; fflush(file)
-		pop		bc
-		ld		a,(iy+6)		; iob->flag &= ~7
-		and		0xfc
-		ld		(iy+6),a
-	noflush:
-		ld		l,(iy+7)		; get file descriptor
-		ld		h,0
-		db		0xcf, 06
-		ld		hl,0
-		jp		cret
-		ret
-	end
-end
-
-;
-; this is the version of fclose that is in cpp, etc
-; fclose.o bj
+; fclose actually does not require any changes
+; fclose.obj
 ;
 block _fclose
 	match
@@ -465,19 +347,14 @@ block _fclose
 		fd cb 06 6e 20 b3 21 00 00 
 		JUMP cret 
 	end
-	code
-		fclose(){
-			lose();
-		}
-	end
 end
 
 ;
-; we find 2 versions of fflush.  this one, which is a simple C implementation
-; found in fflush.obj
+; this simple C implementation does need any change, since the hard
+; work is in write()
+; fflush.obj
 ;
 block _fflush
-	; guaranteed to fail
 	match _fflush
 		 CALL csv 
 		 e5 dd 6e 06 dd 66 07 e5 
@@ -496,191 +373,12 @@ block _fflush
 		 fd 75 00 fd 74 01 
 		 fd cb 06 6e 28 b7 21 ff ff JUMP cret
 	end
-	
-	;
-	; if(!(f->_flag & _IOWRT) || 
-	;    f->_base == (char *)NULL || 
-	; (cnt = BUFSIZ - f->_cnt) == 0)
-	;		return 0;
-	; if (write(fileno(f), f->_base, cnt) != cnt)
-	;	f->_flag |= _IOERR;
-	;	f->_cnt = BUFSIZ;
-	;	f->_ptr = f->_base;
-	;	if(f->_flag & _IOERR)
-	;		return(EOF);
-	;	return 0;
-	;
-	patch _fflush
-		pop hl			; de = file *
-		pop de
-		push de
-		push hl
-		ld hl,6			; get flags
-		add hl,de
-		bit 1,(hl)		; not write
-		jr z, ferr
-
-		ld hl,2
-		add hl,de
-		ld c,(hl)		; bc = cnt
-		inc hl
-		ld b,(hl)
-		ld hl,0x200		; BUFSIZE - cnt
-		or a
-		sbc hl,bc
-		ld a,h
-		or l
-		jr z,fend
-		ld b,h			; bc = to_write
-		ld c,l
-	
-		ld hl,4			; if base == 0, no buffer
-		add hl,de
-		ld a,(hl)
-		inc hl
-		or (hl)
-		jr z,fend
-
-		push de			; save our file *
-		push bc			; save our count
-
-		ld (m_write+4),bc
-		ld b,(hl)
-		dec hl
-		ld c,(hl)
-		ld (m_write+2),bc
-		inc hl
-		inc hl
-		inc hl
-		ld l,(hl)
-		ld h,0
-
-	m_write:			; write(fd, base, 0x200 - cnt)
-		defb 0xcf, 4, 0, 0, 0, 0
-
-		pop bc			; restore file *, cnt
-		pop de
-
-		ld a,h			; if ret != cnt
-		cp b
-		jr nz,fioer
-		ld a,l
-		cp c
-		jr z,fok
-	fioer:
-		ld hl,6
-		add hl,de
-		ld a,(hl)		; set error
-		or 0x20
-		ld (hl),a
-	fok:	
-		dec hl
-		ld b,(hl)
-		dec hl
-		ld c,(hl)
-		dec hl
-		ld (hl),2		; f->cnt = 0x200
-		dec hl
-		ld (hl),0
-		dec hl
-		ld (hl),b		; f->ptr = f->base
-		dec hl
-		ld (hl),c	
-		and 0x20
-		jr nz,ferr
-	fend:
-		ld hl, 0
-		ret	
-	ferr:
-		ld hl, 0xffff
-		ret
-	end 
-end
-
-;
-; and this one, which knows about fcb's, etc.
-; no source code
-;
-block _fflush
-	match _fflush
-		CALL csv
-		e5 dd 6e 06 dd 66 07 
-		e5 fd e1 11 __iob
-		fd e5 e1 b7 ed 52
-		11 0008 CALL adiv
-		11 0029 CALL lmul
-		11 __fcb 19
-		dd 75 fe dd 74 ff
-		fd cb 06 4e 20 06
-		21 ff ff
-		JUMP cret
-		fd 7e 02 e6 7f
-		6f af 67 7d b4 28 27
-		06 04 
-		dd 5e fe dd 56 ff
-		21 24 00
-		19 7e CALL brelop 30 15
-		fd 6e 00 fd 66 01
-		36 1a fd 6e 02 fd 66 03
-		2b fd 75 02 fd 74 03
-		fd 6e 04 fd 66 05 
-		fd 75 00 fd 74 01
-		7d b4 20 06
-		21 00 00 JUMP cret
-		fd 5e 02 fd 56 03
-		21 00 02 b7 ed 52
-		fd 75 02 fd 74 03
-		dd 5e fe dd 56 ff
-		21 24 00 19 7e fe 02 28 52
-		fe 04 28 3a
-		fd 36 02 00 fd 36 03 00
-		fd 6e 04 fd 66 05
-		fd 75 00 fd 74 01
-		fd 36 02 00 fd 36 03 02 18 b7
-		fd 6e 00 fd 66 01 
-		7e 23 fd 75 00 fd 74 01 
-		6f 17 9f 67 
-		e5 21 02 00 e5 CALL bdosa c1 c1 
-		fd 6e 02 fd 66 03 2b
-		fd 75 02 fd 74 03 23 7d b4 20 d2 18 b2
-		fd 5e 02 fd 56 03 
-		21 7f 00 19 11 80 00 cd adiv 
-		fd 75 02 fd 74 03 18 34 
-		fd 6e 00 fd 66 01 
-		e5 21 1a 00 e5 CALL bdosa c1
-		dd 6e fe dd 66 ff e3 
-		21 15 00 e5 CALL bdosa c1 c1 
-		7d b7 c2 ANY ANY
-		11 80 00 fd 6e 00 fd 66 01 19 
-		fd 75 00 fd 74 01 fd 6e 02 fd 66 03 2b
-		fd 75 02 fd 74 03 23 7d b4 20 ba 
-		c3 ANY ANY
-	end
-	code _fflush
-		struct iob { char *ptr; int cnt; char *base ; unsigned char flag ; unsigned char fd };
-		int
-		_fflush(struct iob *fp) {
-			if ((iob->flag & 2)) return -1;
-			if ((f->base == 0) || (f->cnt == 0x200)) return 0;
-		}
-	end
-;	patch _fflush
-;		call csv
-;		ld l,(ix+6)	; get FILE ptr
-;		ld h,(ix+7)
-;		push hl
-;		pop iy
-;		bit 1,(iy+6) ; if IOWRT
-;		jr z,retffl
-;	retffl:
-;		ld hl,0
-;		jp cret	
-;	end
 end
 
 ;
 ; close finds the fcb and calls cp/m close on it.
 ; close.obj
+;
 block _close
 	match
 		CALL csv 
@@ -1005,270 +703,6 @@ block _creat
 		ld hl, 0xffff
 		ret
 		ds 91,0
-	end
-end
-
-;
-; used by the compiler passes, it does all the work for fopen
-; the fopen itself does not need any patching
-; FILE *reopen(char *name, char *mode, FILE *
-block _freopen
-	match
-	CALL csv 
-	e5 e5 dd 6e 0a dd 66 0b e5 
-	fd e1 e5 CALL _fclose c1 
-	11 __iob fd e5 e1 b7 ed 52
-	11 08 00 CALL adiv 
-	7d fd 77 07 6f 17 9f 67 
-	11 29 00 CALL lmul
-	11 __fcb 19 
-	dd 75 fc dd 74 fd 
-	dd 36 ff 00 dd 36 fe 0f 
-	fd 7e 06 e6 4f fd 77 06 
-	dd 6e 08 dd 66 09 7e fe 72 28 0b 
-	fe 77 20 17 
-	dd 34 ff dd 36 fe 16 dd 6e 08 dd 66 09 
-	23 7e fe 62 20 04 
-	fd 36 06 80 
-	dd 6e 06 dd 66 07 e5 
-	dd 6e fc dd 66 fd e5 CALL _setfcb c1 c1
-	dd 7e fe fe 16 dd 6e fc dd 66 fd e5 20 0f 
-	21 13 00 e5 CALL bdosa c1 
-	dd 6e fc dd 66 fd e3 dd 6e fe 26 00 
-	e5 CALL bdosa c1 c1 
-	7d fe ff 20 06 
-	21 00 00 JUMP cret 
-	dd 7e ff b7 20 05 
-	21 01 00 18 03 
-	21 02 00 7d dd 5e fc dd 56 fd 
-	21 24 00 19 77 
-	dd 7e ff 3c 5f fd 7e 06 b3 fd 77 06 e6 0c b7 20 16 
-	fd 7e 04 fd b6 05 20 0e 
-	21 00 02 e5 CALL _sbrk c1 
-	fd 75 04 fd 74 05 
-	fd 6e 04 fd 66 05 fd 75 00 fd 74 01 
-	7d fd b6 05 28 10 
-	dd 7e ff b7 fd 36 02 00 28 0a 
-	fd 36 03 02 18 08 
-	fd 36 02 00 fd 36 03 00 fd e5 e1 JUMP cret
-	end
-
-	;
-	; we're not going to try for full library compatibility
-	; just enough to make the compiler work. 
-	; the specific hair that we are not going to split is a
-	; stream open for both read and write.  what's the file
-	; pointer? how does this interact with flushing?
-	; screw that.
-	; file * freopen(char *name, char *mode, file *fp)
-	;
-	patch _freopen 295
-		call	csv
-
-		ld		h,(ix+11)	; close the file
-		ld		l,(ix+10)
-		push	hl
-		push	hl
-		pop		iy
-		call	_fclose
-
-		ld		h,(ix+9)	; parse mode: rwa = 012
-		ld		l,(ix+8)
-		ld		b,0
-		set		0,(iy+6)	; set read bit
-		ld		a,(hl)
-		cp		'r'
-		jr		z,modeset
-		res		0,(iy+6)	; reset read bit
-		set		1,(iy+6)	; set write bit
-		inc		b
-		cp		'w'
-		jr		z,modeset
-		set		1,b			; set append bit
-	modeset:
-		ld		a,5			; open syscall number
-		ld		(sys+1),a
-		ld		a,b			; mode r,w = 0,1
-		and		1
-		ld		(sys+4),a
-		push	hl
-		ld		h,(ix+7)	; copy name pointer to syscall
-		ld		l,(ix+6)
-		ld		(sys+2),hl
-
-	sys:
-		db		0xcf, 0x5, 0x0, 0x0, 0x0, 0x0
-		jr		nc, opened
-
-		dec		b			; mode 0 must succeed
-		jp		m, openfail
-		ld		a,8			; change it to a creat	
-		ld		(sys+1),a
-		ld		hl,666O		; permissive mode
-		ld		(sys+4),hl
-		db		0xcf, 0x0	; indirect
-		dw		sys
-		jr		c,openfail
-
-	opened:
-		ld		(iy+7),l	; iob->file = file descriptor
-		bit		1,b			; is append set
-		jr		z,noseek
-		db		0xcf, 19, 0, 0, 2, 0
-
-	noseek:
-		ld		hl,0		; iob->count = 0
-		ld		(iy+2),l
-		ld		(iy+3),h
-		ld		a,(iy+6)
-		and		0xc
-		jr		nz,noalloc
-		call	_bufallo
-		ld		(iy+4),l	; iob->base = bufalloc()
-		ld		(iy+5),h
-		bit		0,(iy+6)
-		jr		nz, noalloc	; if read, iob->count=0
-		ld		(iy+3),2	; iob->count = 512
-	noalloc:
-		ld		l,(iy+4)	; iob->ptr = iob->base
-		ld		h,(iy+5)
-		ld		(iy+0),l
-		ld		(iy+1),h
-		push	iy
-		pop		hl
-		jp		cret
-	openfail:
-		ld		hl,0
-		jp		cret
-	end
-end
-
-;
-; the compiler system interface uses 
-; fopen, fclose, fwrite, fread, fflush
-;
-; iob { char *ptr, int cnt, char *base, char flag, char fd }
-; flags (bits 0-7): rd wr nbuf mybuf eof err string binary
-
-; this is called from fgetc, and the compiler version knows all about setdma, sectors, and all that.
-; filbuf(file *fp)
-;
-block _filbuf
-	match
-		CALL csv 
-		e5 dd 6e 06 dd 66 07 e5 fd e1 
-		11 __iob fd e5 e1 b7 ed 52 
-		11 08 00 CALL adiv 
-		11 29 00 CALL lmul 
-		11 __fcb 19 
-		dd 75 fe dd 74 ff 
-		fd 36 02 00 fd 36 03 00 
-		CALL _concheck 
-		dd 5e fe dd 56 ff 
-		21 24 00 19 7e 
-		fe 01 c2 ANY ANY 
-		fd 6e 04 fd 66 05 
-		fd 75 00 fd 74 01 18 33 
-		fd 6e 00 fd 66 01 
-		e5 21 1a 00 e5 CALL bdosa c1 
-		dd 6e fe dd 66 ff e3 
-		21 14 00 e5 CALL bdosa c1 c1 
-		7d b7 20 26 
-		11 80 00 
-		fd 6e 00 fd 66 01 19 
-		fd 75 00 fd 74 01 
-		fd 5e 04 fd 56 05 
-		21 00 02 19 eb 
-		fd 6e 00 fd 66 01 CALL wrelop 38 b7 
-		fd 5e 04 fd 56 05 fd 6e 00 fd 66 01 
-		b7 ed 52 
-		fd 75 02 fd 74 03 6b 62 
-		fd 75 00 fd 74 01 fd 7e 02 fd b6 03 20 06 
-		21 ff ff JUMP cret 
-		fd 6e 02 fd 66 03 2b 
-		fd 75 02 fd 74 03 fd 6e 00 fd 66 01 23 
-		fd 75 00 fd 74 01 2b 6e 26 00 JUMP cret
-	end
-	; f->cnt = read(f->fd, f->ptr, count);
-	; if (f->cnt > 0) {
-	;   f->cnt--;
-	;   return(*f->fptr++);
-	; }
-    ; if (f->cnt == 0) f->flag |= EOF
-	; if (f->cnt < 0) f->flag |= ERR
-	; return eof
-	;
-	patch
-		pop hl				; get f into de
-		pop de
-		push de
-		push hl
-
-		; if (f->flag & IORD) return EOF
-		ld hl,6
-		add hl,de
-		bit 0,(hl)
-		jr z,feof
-	
-		; if (f->base) {
-		;     bc = f->base ; count = 512 ;
-		; } else {
-		;	  bc = fend + 1 ; count = 1;
-		; }
-		dec hl				; get base
-		ld b,(hl)
-		dec hl
-		ld c,(hl)
-		ld a,b
-		or c
-		jr nz, fbuf			; if base, use it
-		ld bc,fend+1		; else use fend+1
-	fbuf:
-		ld (m_read+2),bc
-		ld bc,0x200			; count = BUFSIZE
-		jr nz,fcnt
-		ld bc,1				; if !base count = 1
-	fcnt:
-		ld (m_read+4),bc
-		dec hl
-		ld bc,-1		; assume eof 
-		ld (fend+1),bc
-		ld bc,0
-
-	m_read:			; read(fd, base, 0x200 - cnt)
-		defb 0xcf, 5, 0, 0, 0, 0
-
-		ld a,0x20	; ERR bit
-		jr c,fret
-		ld a,h		; is byte count 0?
-		or l
-
-	feof:
-		ld a,0x10	; EOF bit
-		jr z,fret
-
-		ld b,h		; save returned byte count for f->cnt
-		ld c,l
-
-	fret:			; a = bits for flags, bc = count
-		ld hl,6
-		add hl,de
-		or (hl)	
-		ld (hl),a
-		or a
-		jr z,fr
-		ld bc,0		; if err ret, f->cnt = 0
-	fr:
-		dec hl		; f->cnt = bc
-		dec hl
-		dec hl
-		ld (hl),b
-		dec hl
-		ld (hl),c
-
-	fend:
-		ld hl,-1	; store into this instruction data field
-		ret	
 	end
 end
 
