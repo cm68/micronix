@@ -44,6 +44,9 @@
  *   replace <address>
  *     <replacement bytes>
  *   end
+ *   code <address>
+ *   	<c code>
+ *   end
  *   ... more extracts, patches and replacements
  * end
  *
@@ -172,7 +175,6 @@ getvar(char *n)
             return v;
         }
     }
-	return v;
 }
 
 void
@@ -228,7 +230,7 @@ do_queue(int hit)
 {
 	struct var *v;
 
-	while ((v = varq) != 0) {
+	while (v = varq) {
 		varq = v->next;
 		if (hit) {
 			putvar(v->name, v->value);
@@ -271,7 +273,6 @@ get()
     return getbuf;
 }
 
-void
 skiptoeol()
 {
     while (*cursor && *cursor != '\n') {
@@ -297,7 +298,6 @@ isymchar(char c)
 /*
  * skip white space (also newlines and comments)
  */
-void
 skipwhite()
 {
     for (; *cursor; cursor++) {
@@ -421,7 +421,12 @@ getaddr(char *in)
     }
 
     if (s) {
-        o = numin(s) * sign;
+        o = numin(s);
+        if (o == 0xffffffff) {
+            printf("malformed offset %s\n", s);
+            o = 0;
+        }
+        o *= sign;
     }
     if (verbose & V_VAR) printf(" = %04x\n", v + o);
     return v + o;
@@ -782,7 +787,7 @@ patch()
         i = open("asmtext.cim", 0);
         rl = read(i, repl, MAX_PATTERN);
         close(i);
-        if (verbose) {
+        if (!verbose) {
             unlink("asmtext.cim");
             unlink("asmtext.asm");
         }
@@ -806,6 +811,131 @@ patch()
     if (verbose) printf("patch end\n");
 }
 
+/*
+ * even more bizarre, but we invoke the 
+ * hitech c compiler, assembler and linker
+ * to generate bytes to put into our binary
+ */
+void
+code()
+{
+    unsigned char *repl = malloc(MAX_PATTERN);
+    int rl = 0;
+    word ad;
+    char *a;
+    int i;
+    char *ctext;
+    char *optr;
+    struct var *v;
+	int fill = 0;
+
+    if (verbose) printf("code\n");
+
+    ctext = optr = malloc(MAX_PATCH);
+
+    a = get();
+    if (blockhit) {
+        ad = getaddr(strdup(a));
+    } else {
+        ad = 0;
+    }
+	if (*cursor != '\n') {
+		fill = atoi(get());
+	}
+	
+    /*
+     * build the assembly prologue:
+     * send all our defined variables to the assembly as equates
+     */
+    if (blockhit) {
+        optr += sprintf(optr, "#asm\n");
+
+        for (v = vars; v; v = v->next) {
+			if (strcmp(v->name, blockname) == 0) continue;
+            optr += sprintf(optr, "%s\tequ\t0%04xH\n", v->name, v->value);
+        }
+        optr += sprintf(optr, "#endasm\n");
+    }
+
+    /*
+     * copy the entire text of the patch into the c buffer
+     * not including the end line
+     * all lines get indented, except label lines
+     */
+    while (*cursor) {
+        char *s;
+        char c;
+
+        while (*cursor == '\n') cursor++;
+
+        /*
+         * process a line
+         * eat leading white space
+         */
+        while (*cursor && (*cursor == ' ' || *cursor == '\t')) cursor++;
+
+        if (strncmp(cursor, "end", 3) == 0 && rindex(" \t\n\0", cursor[3]))
+            break;
+
+        /* copy the rest of the line, compressing out redundant space */
+        while (*cursor && *cursor != '\n') {
+            if (*cursor == ' ' || *cursor == '\t') *cursor = ' ';
+            *optr++ = *cursor++;
+            if (optr[-1] == '\t') {
+                while ((*cursor == '\t') || (*cursor == ' ')) cursor++;
+            }
+        }
+        *optr++ = '\n';
+        *optr = '\0';
+    }
+
+    if (verbose & V_DATA) printf("c text:\n%s\n", ctext);
+
+    if (blockhit) {
+		char linkcmd[100];
+
+        i = creat("ctext.c", 0777);
+        write(i, ctext, strlen(ctext));
+        close(i);
+        i = system("zxc -C ctext.c");
+        if (i != 0) {
+            fprintf(stderr, "code compile for block %s failed\n", blockname);
+            exit(9);
+        }
+		sprintf(linkcmd, 
+			"zxcc LINK --C0 --Ptext=%xH/0 --Octext.bin ctext.obj", ad);
+		i = system(linkcmd);
+        if (i != 0) {
+            fprintf(stderr, "link for block %s failed\n", blockname);
+            exit(9);
+        }
+        i = open("ctext.bin", 0);
+        rl = read(i, repl, MAX_PATTERN);
+        close(i);
+        if (!verbose) {
+            unlink("ctext.bin");
+            unlink("ctext.obj");
+            unlink("ctext.c");
+        }
+    }
+
+	/* XXX - make sure patch not too big ! */
+    if (blockhit) {
+		if (blockend < ad + fill) {
+			blockend = ad + fill;
+		}
+        printf("code %04x %d fill %d\n", ad, rl, fill);
+        blockdirty = dirty = 1;
+
+		for (i = 0 ; i < fill; i++) {
+			membuf[ad + i] = 0;
+		}
+		for (i = 0; i < rl; i++) {
+			membuf[ad + i] = repl[i];
+		}
+	}
+    if (verbose) printf("code end\n");
+}
 /*
  * this function is really the engine of the patcher.
  * it does all the searching in the object file, and is where we spend the 
@@ -950,6 +1080,9 @@ block()
 		}
         if (wordmatch("extract")) {
             extract();
+        }
+        if (wordmatch("code")) {
+            code();
         }
         if (wordmatch("patch")) {
             patch();

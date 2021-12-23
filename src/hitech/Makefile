@@ -7,20 +7,23 @@ DEBUG = -v 0x71
 VERBOSE = -v
 HITECH = cpp p1 cgen optim link libr zas
 HITECH = cpp p1
+SIM = ../../src/usersim/sim -d ../../filesystem
+PATCHFILE = havesrc.pat
 
 CFLAGS = -Wno-implicit-int
+
 
 all: $(HITECH) bin
 	cp $(HITECH) bin
 
 bin:
-	mkdir bin
+	mkdir -p bin
 
 bpatch: bpatch.c
 	cc -g $(CFLAGS) -o $@ $<
 
-%: %.com hitech.pat bpatch
-	./bpatch $(VERBOSE) -p hitech.pat $<
+%: %.com bpatch $(PATCHFILE)
+	./bpatch $(VERBOSE) -p $(PATCHFILE) $<
 	cp $* ../../filesystem/hitech
 
 %.dis: %.com hitech.pat bpatch
@@ -36,11 +39,13 @@ clobber: clean
 	rm -f $(HITECH)
 
 clean:
-	rm -rf *.o bpatch objdump *.dSYM *.dis *.sym asmtext.*
+	rm -rf *.o bpatch objdump *.dSYM *.dis *.sym asmtext.* ctext.*
 
 test: install
-	../../sim -d ../../filesystem $(DEBUG) /hitech/cpp -Dmicronix -Dz80 -I/include/ /usr/src/cmd/cc/cc.c /usr/src/cmd/cc/cc.i
-	../../sim -d ../../filesystem $(DEBUG) /hitech/p1 /usr/src/cmd/cc/cc.i /usr/src/cmd/cc/cc.1
+	$(SIM) $(DEBUG) /hitech/cpp -Dmicronix -Dz80 -I/include/ /usr/src/cmd/cc/cc.c /usr/src/cmd/cc/cc.i
+	$(SIM) $(DEBUG) /hitech/p1 /usr/src/cmd/cc/cc.i /usr/src/cmd/cc/cc.1
 	
 objscan: objscan.c
 	cc -g -o objscan objscan.c
+
+p1: PATCHFILE = nosrc.pat
