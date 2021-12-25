@@ -1,5 +1,8 @@
 /*
  * process an ar file
+ *
+ * tools/ar.c
+ * Changed: <2021-12-23 15:53:30 curt>
  */
 
 #include <unistd.h>
@@ -93,3 +96,7 @@ char **argv;
 		}
 	}
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

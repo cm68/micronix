@@ -1,4 +1,10 @@
-// Output documentation in HTML format.
+/*
+ * Output documentation in HTML format.
+ * part of zmac
+ *
+ * tools/doc.c
+ * Changed: <2021-12-23 15:59:35 curt>
+ */
 
 #include <stdio.h>
 #include <string.h>
@@ -314,3 +320,7 @@ static void print(char *str)
 		str++;
 	}
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

@@ -1,3 +1,9 @@
+/*
+ * child terminal window for the simulator
+ *
+ * lib/openx.c
+ * Changed: <2021-12-23 15:44:00 curt>
+ */
 #define	_GNU_SOURCE
 
 #include <stdio.h>

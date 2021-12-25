@@ -1,5 +1,8 @@
 /*	HEADER FILE FOR PASCAL FILE I/O
  *	copyright (c) 1980 by Whitesmiths, Ltd.
+ *
+ * include/pascal.h
+ * Changed: <2021-12-23 15:12:11 curt>
  */
 
 typedef struct {
@@ -21,3 +24,7 @@ typedef struct {
 
 #define NFILES	16
 #define P_TFD	0200
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

@@ -1,3 +1,9 @@
+/*
+ * another hitech c test file
+ *
+ * tools/hitech/test.c 
+ * Changed: <2021-12-23 16:24:32 curt>
+ */
 char buffer[4096];
 
 main(argc, argv)
@@ -25,3 +31,6 @@ char **argv;
 	exit (0);
 }
 
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

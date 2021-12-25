@@ -1,6 +1,8 @@
-/* instructions.h
+/*
  * Declaration of the "generic" instructions emulated.
  *
+ * usersim/instructions.h
+ * Changed: <2021-12-23 18:05:26 curt>
  * Copyright (c) 2012 Lin Ke-Fong
  *
  * This code is free, do whatever you want with it. 
@@ -235,3 +237,7 @@ enum {
                                  */
 
 };
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

@@ -1,3 +1,8 @@
+# Makefile for user mode simulator
+#
+# usersim/Makefile
+# Changed: <2021-12-23 18:04:24 curt>
+#
 
 OBJECTS = z80emu.o micronix.o
 TARGETS = sim

@@ -1,8 +1,10 @@
 /*
- * sys/inode.h
+ * the in-core inode
  * 
- * this include file is strictly for the use of the kernel. it defines the
- * in-core inode
+ * this include file is strictly for the use of the kernel. 
+ *
+ * include/sys/inode.h
+ * Changed: <2021-12-23 14:26:57 curt>
  */
 
 struct inode {

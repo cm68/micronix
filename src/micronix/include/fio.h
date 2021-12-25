@@ -1,6 +1,7 @@
 /*
- * fio.h - header file for subroutines responsible for 
- *		setting up and tearing down FIO buffers
+ * header file for subroutines responsible for 
+ *     setting up and tearing down FIO buffers
+ * XXX - used by what, exactly?
  *
  *	Len Edmondson
  *	Morrow Designs
@@ -8,7 +9,8 @@
  *
  *	C library
  *
- * XXX - and where is this used
+ * include/fio.h
+ * Changed: <2021-12-23 15:08:16 curt>
  */
 
 # define NFIOS 16
@@ -18,3 +20,7 @@ FIO	stdout;
 FIO	stderr;
 
 FIO *_fios [NFIOS];	/* table of inited FIO's */
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

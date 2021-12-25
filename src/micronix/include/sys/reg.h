@@ -1,5 +1,8 @@
 /*
- * sys/reg.h
+ * micronix rom register save area structure after trap
+ *
+ * include/sys/reg.h
+ * Changed: <2021-12-23 14:32:12 curt>
  */
 
 /*

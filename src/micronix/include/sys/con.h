@@ -1,5 +1,8 @@
 /*
- * sys/con.h - the device driver switch tables
+ * the device driver switch tables
+ *
+ * include/sys/con.h
+ * Changed: <2021-12-23 14:18:35 curt>
  */
 
 /*

@@ -1,5 +1,8 @@
 /*
- * dj.c 
+ * Disk Jockey DMA driver
+ *
+ * sys/dj.c 
+ * Changed: <2021-12-23 15:21:37 curt>
  */
 #include <types.h>
 #include <sys/sys.h>
@@ -7,6 +10,7 @@
 #include <sys/con.h>
 #include <sys/proc.h>
 #include <errno.h>
+#include <sys/dj.h>
 
 /*
  * Micronix driver for Disk Jockey DMA
@@ -217,8 +221,7 @@ struct specs
  * about configuration and current activity.
  */
 
-struct dm
-{
+struct dm {
     struct specs *specs;
     UINT8 flags;                /* see below */
 };

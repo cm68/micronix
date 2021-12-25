@@ -1,4 +1,9 @@
-
+/*
+ * hitech C object dumper
+ *
+ * tools/hitech/objdump.c
+ * Changed: <2021-12-23 16:23:47 curt>
+ */
 int fd;
 
 typedef unsigned char int8;
@@ -295,3 +300,6 @@ char **argv;
 	}
 }
 
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

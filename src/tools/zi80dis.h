@@ -1,3 +1,10 @@
+/*
+ *
+ *
+ * tools/zi80dis.h
+ * Changed: <2021-12-23 16:12:12 curt>
+ */
+
 //
 // zi80dis.h - extract disassembly and timing information for Z-80 and 8080 instructions.
 //
@@ -92,3 +99,7 @@ int zi_tstates(const unsigned char *inst, int *low, int *high, int *ocf,
 	int *low8080, int *high8080);
 
 #endif /* defined(__cplusplus) */
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

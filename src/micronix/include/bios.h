@@ -1,3 +1,9 @@
+/*
+ * cp/m bios interface
+ *
+ * include/bios.h
+ * Changed: <2021-12-23 14:42:09 curt>
+ */
 # define 	B_BOOT 		0x00
 # define	B_WBOOT		0x03
 # define	B_CONST		0x06
@@ -56,4 +62,6 @@ struct dph {
 
 
 
-
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

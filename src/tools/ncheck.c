@@ -1,3 +1,9 @@
+/*
+ * check file and directory connectivity
+ *
+ * tools/ncheck.c
+ * Changed: <2021-12-23 16:04:22 curt>
+ */
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,6 +1,9 @@
-/* z80user.h
+/* 
  * Add your code here to interface the emulated system with z80emu. See towards
  * the end of the file for an example for running zextest.
+ *
+ * z80user.h
+ * Changed: <2021-12-23 18:09:53 curt>
  *
  * Copyright (c) 2016, 2017 Lin Ke-Fong
  *
@@ -150,3 +153,7 @@ extern "C" {
 #endif
 
 #endif
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

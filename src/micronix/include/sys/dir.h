@@ -1,7 +1,8 @@
 /*
- * sys/dir.h
- * 
  * on disk directory format
+ *
+ * include/sys/dir.h
+ * Changed: <2021-12-23 14:20:40 curt>
  */
 struct dir {
     UINT ino;

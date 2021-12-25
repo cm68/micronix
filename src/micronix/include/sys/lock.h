@@ -1,5 +1,8 @@
 /*
- * sys/lock.h
+ * file region locking
+ *
+ * include/sys/lock.h
+ * Changed: <2021-12-23 14:27:03 curt>
  */
 
 #define NLOCK 10

@@ -1,3 +1,10 @@
+/*
+ * this is a simple text of the openx function
+ *
+ * test/termtest.c
+ * Changed: <2021-12-23 15:48:18 curt>
+ */
+
 #define	_GNU_SOURCE
 
 #include <stdio.h>

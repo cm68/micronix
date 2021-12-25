@@ -1,4 +1,11 @@
 /*
+ * decode the micronix system calls in the disassembler
+ * and interactive simulator
+ *
+ * lib/mnix_sys.c
+ * Changed: <2021-12-23 15:42:53 curt>
+ */
+/*
  * the number of bytes to adjust the return address on the stack by.
  * since the rst1 already advanced to point at the function code, 1 has
  * already been advanced over. we minimally need to bump again by 1, for
@@ -150,3 +157,6 @@ char *signame[] = {
 	"term"
 };
 
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

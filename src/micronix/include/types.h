@@ -12,6 +12,9 @@
  * and as for floating point, that's a can of worms that luckily
  * is not going to come up, since there are no shared data structures
  * that use those.
+ *
+ * include/types.h
+ * Changed: <2021-12-23 15:16:27 curt>
  */
 typedef char INT8;
 typedef unsigned char UINT8;
@@ -47,3 +50,7 @@ union bytepair {
 
 #define	min(a,b) (((a) < (b)) ? (a) : (b))
 #define	max(a,b) (((a) > (b)) ? (a) : (b))
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

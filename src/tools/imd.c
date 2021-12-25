@@ -1,7 +1,8 @@
 /*
- * imd.c
- *
  * use the imd library to do command-ish things with IMD files
+ *
+ * tools/imd.c
+ * Changed: <2021-12-23 16:01:35 curt>
  */
 
 #include <unistd.h>

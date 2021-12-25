@@ -1,5 +1,8 @@
 /*
- * sys/tty.h
+ * kernel tty handler data structures
+ *
+ * include/sys/tty.h
+ * Changed: <2021-12-23 14:36:14 curt>
  */
 
 /*

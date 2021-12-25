@@ -1,7 +1,8 @@
 /*
- * disz80.c
- *
  * a z80 disassembler - brute force with symbols
+ *
+ * lib/disz80.c
+ * Changed: <2021-12-23 15:39:44 curt>
  */
 
 #include <stdio.h>
@@ -618,3 +619,7 @@ format_instr(
 	// printf("format_instr: %x -> %d\n", addr, bcount);
 	return bcount;
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

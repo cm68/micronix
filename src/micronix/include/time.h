@@ -1,5 +1,8 @@
 /*
  * broken down time structure used by localtime and gmtime
+ *
+ * include/time.h
+ * Changed: <2021-12-23 15:15:41 curt>
  */
 
 struct time {
@@ -15,3 +18,7 @@ struct time {
 };
 
 UINT timezone;
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

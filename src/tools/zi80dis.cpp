@@ -1,3 +1,4 @@
+/*
 //
 // zi80dis.cpp - extract disassembly and timing information for Z-80 and 8080 instructions
 //
@@ -11,6 +12,12 @@
 //		in (c)			ed70
 //		out (c),0		ed71
 //		srop (ix+d),r	undocumented IX/IY shift/rotate instructions
+ *
+ * part of zmac
+ *
+ * tools/zi80dis.cpp
+ * Changed: <2021-12-23 16:12:45 curt>
+ */
 
 #include <stdio.h>
 #include <string.h>

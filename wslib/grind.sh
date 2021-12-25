@@ -2,6 +2,9 @@
 #
 # disassemble the whitesmith's library
 #
+# wslib/grind.sh 
+# Changed: <2021-12-23 15:25:40 curt>
+#
 for i in ../filesystem/lib/*.a ; do
 	d=$(basename $i .a)
 	mkdir $d

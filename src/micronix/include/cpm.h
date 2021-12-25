@@ -1,30 +1,35 @@
-
+/*
+ * cp/m bdos interface
+ *
+ * include/cpm.h
+ * Changed: <2021-12-23 14:44:50 curt>
+ */
 # define equal(a,b) cmpstr(a,b)
 # define scopy(a,b) cpystr(b,a)
 
 # define NEWLINE '\n'
 # define RETURN  '\r'
 
-# define C_OPEN		15
-# define C_CLOSE	16
-# define C_DELETE	19
-# define C_READ		33
-# define C_WRITE	34
-# define C_SELECT	14
-# define C_ERROR	-1
-# define C_MAKE		22
 # define C_CONIN	1
-# define C_CONREAD	10
 # define C_CONWRITE	2
-# define C_PRINT	9
-# define C_DMA		26
 # define C_RDR		3
 # define C_PUNCH	4
 # define C_LIST		5
-# define C_STAT		11
-# define C_SEARCH	17
-# define C_SIZE		35
 # define C_IO		6
+# define C_PRINT	9
+# define C_CONREAD	10
+# define C_STAT		11
+# define C_SELECT	14
+# define C_OPEN		15
+# define C_CLOSE	16
+# define C_SEARCH	17
+# define C_DELETE	19
+# define C_MAKE		22
+# define C_DMA		26
+# define C_READ		33
+# define C_WRITE	34
+# define C_SIZE		35
+# define C_ERROR	-1
 # define C_IOIN		-1
 
 # define E_NODATA	1
@@ -87,3 +92,7 @@ struct file {
 };
 
 struct file _files [NFILES];
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

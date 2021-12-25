@@ -1,5 +1,8 @@
 /*
- * disas - simple Z80/Z280 disassembler
+ * disas - Z80/Z280 disassembler
+ *
+ * tools/disas.c
+ * Changed: <2021-12-23 15:55:26 curt>
  * 
  * Copyright 1989 by Luc Rooijakkers <lwj@cs.kun.nl> Permission is hereby
  * granted to use and modify this code for non-commercial use, provided this

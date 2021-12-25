@@ -1,8 +1,9 @@
 /*
- * util.c
- *
  * generally useful utility functions
  * pluggable tracing facility, hexdump, white space, bitdef formatter
+ *
+ * lib/util.c
+ * Changed: <2021-12-23 15:44:39 curt>
  */
 
 #define	_GNU_SOURCE

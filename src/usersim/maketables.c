@@ -1,5 +1,8 @@
-/* maketables.c
+/*
  * Instructions and flags tables generator.
+ *
+ * instructions/maketables.c
+ * Changed: <2021-12-23 18:06:39 curt>
  *
  * Copyright (c) 2012, 2016 Lin Ke-Fong
  * 
@@ -733,3 +736,7 @@ static void make_szyxp_flags_table (void)
         }
         printf("\n\n};\n");
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

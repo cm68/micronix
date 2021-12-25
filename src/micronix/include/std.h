@@ -1,5 +1,8 @@
 /*
  * pseudo storage classes
+ *
+ * include/std.h
+ * Changed: <2021-12-23 15:14:17 curt>
  */
 
 /* awful brain damage */
@@ -77,3 +80,7 @@ typedef struct fio {
 	char *_buf;
 	UINT _size;	/* buffer size */
 } FIO;
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

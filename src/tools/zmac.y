@@ -1,3 +1,10 @@
+/*
+ * zmac assembler
+ *
+ * tools/zmac.y
+ * Changed: <>
+ */
+
 %{
 // GWP - keep track of version via hand-maintained date stamp.
 #define VERSION "12mar2018"

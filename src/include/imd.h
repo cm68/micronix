@@ -1,5 +1,8 @@
 /*
+ * interface to the imd library
+ *
  * imd.h
+ * Changed: <2021-12-23 15:32:43 curt>
  *
  * an imd file is just a header followed by a bunch of tracks.
  *

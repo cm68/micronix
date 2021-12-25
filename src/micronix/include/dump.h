@@ -1,5 +1,9 @@
 /*
- * XXX - what is this used for
+ * no idea where this is used
+ * XXX
+ *
+ * include/dump.h
+ * Changed: <2021-12-23 14:48:38 curt>
  */
 struct dump {
 	UINT isize;
@@ -10,3 +14,7 @@ struct dump {
 
 	UINT	tsize;
 };
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

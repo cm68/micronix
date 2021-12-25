@@ -1,6 +1,10 @@
 /*
- * common code for micronix filesystem maintenance utilities
+ * micronix filesystem access library for host tools
+ *
  * brute force for everything
+ *
+ * lib/fslib.c
+ * Changed: <2021-12-23 15:50:00 curt>
  */
 #include <unistd.h>
 #include <stdio.h>

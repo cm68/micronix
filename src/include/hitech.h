@@ -1,6 +1,9 @@
 /*
  * the hitech object file
  *
+ * hitech.h
+ * Changed: <2021-12-23 15:32:04 curt>
+ *
  * this file is derived purely from inspection of a number of object
  * files, and there are large gaps in understanding the format.  doubtless
  * the format has support for different word lengths, byte orders, relocation
@@ -85,3 +88,6 @@ struct hiunkrec5 {
 	unsigned short i1;
 };
 
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

@@ -1,5 +1,8 @@
-/* z80config.h 
+/* 
  * Define or comment out macros in this file to configure the emulator. 
+ *
+ * usersim/z80config.h
+ * Changed: <2021-12-23 18:08:20 curt>
  *
  * Copyright (c) 2016, 2017 Lin Ke-Fong
  *
@@ -80,3 +83,7 @@
 /* #define Z80_MASK_IM2_VECTOR_ADDRESS */
 
 #endif
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

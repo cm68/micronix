@@ -1,8 +1,12 @@
-
 /*
+ * dump out object file contents
+ *
  * dump out the symbol table and optionally the relocation entries
  * of an object file, or if an archive, of each file in the archive
  * just for grins, it can disassemble too.
+ *
+ * tools/nm.c
+ * Changed: <2021-12-23 16:05:07 curt>
  */
 
 #include <fcntl.h>
