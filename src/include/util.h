@@ -1,5 +1,8 @@
 /*
  * generally useful utility functions
+ *
+ * util.h
+ * Changed: <2021-12-23 15:35:39 curt>
  */
 
 typedef unsigned long long u64;

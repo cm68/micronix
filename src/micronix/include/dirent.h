@@ -1,6 +1,9 @@
 /*
  * data structure returned by readdir
  * part of the opendir library
+ *
+ * include/dirent.h
+ * Changed: <2021-12-23 14:48:12 curt>
  */
 
 /*
@@ -13,3 +16,7 @@ struct dirhandle {
 };
 
 typedef struct dirhandle DIR;
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

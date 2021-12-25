@@ -1,11 +1,10 @@
 /*
- * mw.c 
- */
-
-/*
- * Micronix drivers for HD-DMA
+ * Micronix driver for HD-DMA
  * Gary Fitts, Morrow Designs
  * See the HD-DMA manual for more information.
+ *
+ * sys/mw.c 
+ * Changed: <2021-12-23 15:22:37 curt>
  */
 
 #include <types.h>

@@ -1,7 +1,9 @@
 /*
- * sys/signal.h
+ * signal definitions
  *
- * all the signal names
+ * include/sys/signal.h
+ *
+ * Changed: <2021-12-23 14:32:52 curt>
  */
 #define	SIG_DFL		0
 #define	SIG_IGN	 	1

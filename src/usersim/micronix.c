@@ -1,5 +1,9 @@
 /*
  * micronix. this emulates the micronix user mode 
+ *
+ * usersim/micronix.c
+ * Changed: <2021-12-25 09:21:44 curt>
+ *
  * Copyright (c) 2018, Curt Mayer 
  * do whatever you want, just don't claim you wrote it. 
  * warrantee: madness! nope. 
@@ -322,8 +326,8 @@ usage(char *complaint, char *arg)
 /*
  * system calls to stop on 
  */
-char sys_stop[64];
-char sys_trace[64];
+char sys_stop[NSYS];
+char sys_trace[NSYS];
 
 /*
  * get a system call id.  either by name or integer.
@@ -352,7 +356,12 @@ get_syscall(char **sp)
         }
         return -1;
     }
-    return strtol(*sp, sp, 0);
+    i = strtol(*sp, sp, 0);
+    if (i >= NSYS) {
+        fprintf(stderr, "bad system call number %d\n", i);
+        i = -1;
+    }
+    return i;
 }
 void
 pverbose()
@@ -366,6 +375,16 @@ pverbose()
         }
     }
     fprintf(mytty, "\n");
+}
+
+dump_stops()
+{
+    int i;
+
+    for (i = 0 ; i < NSYS; i++) {
+        if (!sys_stop[i]) continue;
+        fprintf(mytty, "stopping syscall %s after %d\n", syscalls[i].name, sys_stop[i]);
+    }
 }
 
 int
@@ -437,9 +456,6 @@ main(int argc, char **argv)
                         j = strtol(s, &s, 10);
                     }
                     sys_stop[i] = j;
-                    printf("stopping syscall %s", syscalls[i].name);
-                    if (j > 1) printf(" after %d", j);
-                    printf("\n");
                     if (*s != ',') break;
                     s++;
                 }
@@ -559,6 +575,7 @@ main(int argc, char **argv)
         pverbose();
         fprintf(mytty, "emulating %s with root %s\n", argv[0], rootdir);
     }
+    dump_stops();
 
     cp = &context;
     Z80Reset(&cp->state);
@@ -818,9 +835,6 @@ void
 carry_clear()
 {
     cp->state.registers.byte[Z80_F] &= ~Z80_C_FLAG;
-    if (verbose & V_SFAIL) {
-        breakpoint = 0;
-    }
 }
 
 void
@@ -1050,12 +1064,7 @@ monitor()
             while (*s && (*s == ' '))
                 s++;
             if (!*s) {
-                for (i = 0; i < sizeof(sys_stop); i++) {
-                    if ((i % 16) == 0)
-                        fprintf(mytty, "\n%02d: ", i);
-                    fprintf(mytty, "%03d ", sys_stop[i]);
-                }
-                fprintf(mytty, "\n");
+                dump_stops();
             }
             if (*s == '-') {
                 s++;
@@ -1677,6 +1686,30 @@ swizzle(long in)
     return ((in >> 16) & 0xffff) | ((in & 0xffff) << 16);
 }
 
+char hexdig[] = "01234567890ABCDEF";
+
+char *
+degrime(char *s)
+{
+    static char dbuf[100];
+    char *d = dbuf;
+    char c;
+
+    while (*s) {
+        c = *s++;
+        if ((c > ' ') && (c <= 0x7e)) {
+            *d++ = c;
+            continue;
+        }
+        *d++ = '\\';
+        *d++ = 'x';
+        *d++ = hexdig[(c >> 4) & 0xf];
+        *d++ = hexdig[c & 0xf];
+    }
+    *d++ = '\0';
+    return dbuf;
+}
+
 /*
  * micronix system calls are done using the RST8 instruction, which
  * is a one-byte call instruction to location 8, which has a halt instruction
@@ -1769,6 +1802,10 @@ SystemCall(MACHINE * cp)
         code = get_byte(sc + 1);
     }
 
+    if (code >= NSYS) {
+        fprintf(stderr, "bad system call number %d\n", code);
+    }
+
     savemode = verbose;
     /*
      * if this is a system call we are interested in, deal with it 
@@ -1776,8 +1813,8 @@ SystemCall(MACHINE * cp)
     if (sys_stop[code]) {
         pid();
         dumpcpu();
-        verbose = -1;
         if (--sys_stop[code] == 0) {
+                verbose = -1;
                 breakpoint = 1;
         }
     } else if (sys_trace[code]) {
@@ -1827,7 +1864,7 @@ SystemCall(MACHINE * cp)
 	if (i & (b)) { i ^= (b) ; fprintf(mytty,f,a,i?",":""); }
         F(SF_FD, "%d%s", fd);
         F(SF_ARG1, "%04x%s", arg1);
-        F(SF_NAME, "\"%s\"%s", fn);
+        F(SF_NAME, "\"%s\"%s", degrime(fn));
         F(SF_ARG2, "%04x%s", arg2);
         F(SF_NAME2, "\"%s\"%s", fn2);
         F(SF_ARG3, "%04x%s", arg3);
@@ -2513,6 +2550,7 @@ SystemCall(MACHINE * cp)
     }
 
     cp->state.registers.word[Z80_HL] = ret;
+    /* write for 0 bytes */
     if ((code == 4) && (arg2 == 0)) {
         goto nolog2;
     }

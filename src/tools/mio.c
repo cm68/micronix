@@ -1,7 +1,10 @@
 /*
  * mio.c - Colin Kelley  1-18-87
  *   routines to emulate temporary file handling with memory instead
+ * part of zmac
  *
+ * tools/mio.c
+ * Changed: <2021-12-23 16:02:36 curt>
  */
 
 #include <memory.h>
@@ -134,3 +137,7 @@ register unsigned char *p;
 	}
 	return (i);
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

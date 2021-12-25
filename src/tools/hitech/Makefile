@@ -1,3 +1,8 @@
+# build hitech c object file tools
+#
+# tools/hitech/Makefile
+# Changed: <2021-12-23 16:22:24 curt>
+
 CFLAGS = -Wno-implicit-int
 
 %: %.c

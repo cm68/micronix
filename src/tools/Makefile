@@ -1,3 +1,8 @@
+# build host tools
+#
+# tools/Makefile
+# Changed: <2021-12-23 15:53:01 curt>
+
 SIMTARGETS = \
 	ar nm size imd disas dump \
 	mnix dcheck icheck ncheck readall

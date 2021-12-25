@@ -1,6 +1,9 @@
 /*
  * a command line micronix filesystem reader/writer/lister
  *
+ * tools/mnix.c
+ * Changed: <2021-12-23 16:03:47 curt>
+ *
  * the interface really needs to look like tar: 
  *
  * mar -xf <image> micronix       - extract /micronix

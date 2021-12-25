@@ -1,5 +1,8 @@
 /*
  * data structures known used by the disassembler hook
+ *
+ * mnix.h
+ * Changed: <2021-12-23 15:33:11 curt>
  */
 
 /*
@@ -28,3 +31,7 @@ int mnix_scpr(unsigned short addr, unsigned char (*gb)(unsigned short a), char *
 
 extern struct syscall syscalls[];
 extern char *signame[];
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

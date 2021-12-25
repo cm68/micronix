@@ -1,6 +1,9 @@
 /*
  * the v6 error numbers.  these may very well conflict with host numbers,
  * so files including these need to be careful.
+ *
+ * include/errno.h
+ * Changed: <2021-12-23 15:06:21 curt>
  */
 #define	EPERM	 1
 #define	ENOENT	 2
@@ -33,3 +36,7 @@
 #define	EROFS	30
 #define	EMLINK	31
 #define	EPIPE	32
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

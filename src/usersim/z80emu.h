@@ -1,6 +1,9 @@
-/* z80emu.h
+/* 
  * Main header of z80emu. Don't modify this file directly. Use z80config.h and
  * z80user.h to customize the emulator to your need. 
+ *
+ * usersim/z80emu.h
+ * Changed: <2021-12-23 18:09:27 curt>
  *
  * Copyright (c) 2012, 2016 Lin Ke-Fong
  *
@@ -180,3 +183,7 @@ extern int      Z80Emulate (Z80_STATE *state,
 #endif
 
 #endif
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

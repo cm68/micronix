@@ -1,9 +1,16 @@
 /*
- * sys/fs.h
+ * filesystem on disk data structures
+ *
+ * include/sys/fs.h
+ * Changed: <2021-12-23 14:25:52 curt>
+ */
+
+/*
+ *
+ * filesystem superblock - found on block 1 of every bdev
  *
  * this is modified from the stock fs.h to align it with v6
  *      field names and defines now match
- * filesystem superblock - found on block 1 of every bdev
  */
 struct super {
     UINT s_isize;               /* number of inode blocks */
@@ -56,6 +63,7 @@ struct dsknod {
 #define     IREAD   0000004
 #define     IWRITE  0000002
 #define     IEXEC   0000001
+
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

@@ -1,7 +1,8 @@
 /*
- * sys/buf.h
- * 
  * Block io buffer header
+ *
+ * include/sys/buf.h
+ * Changed: <2021-12-23 14:18:06 curt>
  */
 struct buf {
     UINT8 flags;                /* see below */

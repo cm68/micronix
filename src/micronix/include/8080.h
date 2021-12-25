@@ -1,3 +1,10 @@
+/*
+ * 8080 instructions
+ * not sure why this file exists or who uses it
+ *
+ * include/8080.h
+ * Changed: <2021-12-23 14:47:48 curt>
+ */
 # define	ACI	1
 # define	ADC	2
 # define	ADD	3
@@ -153,3 +160,7 @@
 	SUB,	"SUB",
 	SUI,	"SUI",
 	XRA,	"XRA",
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

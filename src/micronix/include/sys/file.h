@@ -1,7 +1,8 @@
 /*
- * sys/file.h
- * 
  * open file structure
+ *
+ * include/sys/file.h
+ * Changed: <2021-12-23 14:20:51 curt>
  */
 struct file {
     UINT8 mode;                 /* IREAD, IWRITE, PIPE == IEXEC */

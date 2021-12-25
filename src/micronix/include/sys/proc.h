@@ -1,10 +1,12 @@
 /*
- * sys/proc.h
+ * process table
+ *
+ * include/sys/proc.h
+ * Changed: <2021-12-23 14:29:50 curt>
  */
 
 /*
- * Process structure. A table of 1 proc structure per process is maintained
- * in the kernel.
+ * A table of 1 proc structure per process is maintained in the kernel.
  */
 struct proc {
     char args[8];               /* for ps */

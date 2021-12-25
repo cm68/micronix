@@ -1,5 +1,10 @@
 /*
+ * process a filessytem image
+ *
  * readall starts from the root and spews all the files into the destdir
+ *
+ * tools/readall.c
+ * Changed: <2021-12-23 16:05:55 curt>
  */
 
 #include <unistd.h>

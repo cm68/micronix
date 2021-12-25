@@ -1,9 +1,13 @@
 #
-# include directory in the source tree
+# include file installation to filesystem root
+# after this file is done, the include tree is rationalized
 #
+# include/Makefile
+# Changed: <2021-12-23 14:40:40 curt>
 
 #
 # include files that have been revised or moved
+# we save these to /old
 #
 REPLACE = dir.h fs.h sgtty.h stat.h access.h signal.h
 

@@ -1,5 +1,8 @@
 /*
  * produce intel hex files
+ *
+ * tools/dump.c
+ * Changed: <2021-12-23 16:00:13 curt>
  */
 #undef	DEBUG
 
@@ -107,4 +110,6 @@ main(int argc, char **argv)
 	}
 #endif
 }
-
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

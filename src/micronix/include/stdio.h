@@ -1,3 +1,9 @@
+/*
+ * the whitesmith's stdio implementation
+ *
+ * include/stdio.h
+ * Modified: <stdio.h 2021-12-23 15:15:10 curt>
+ */
 #ifdef linux
  error error error error
  this file should never, ever be included by linux code
@@ -93,3 +99,7 @@ extern _exit (), exit ();
 #define ferror(a) ((a)->_flag & _ERR)
 #define fileno(a) ((a)->_fd)
 #define clearerr(a) ((a)->_flag &= ~ERR)
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

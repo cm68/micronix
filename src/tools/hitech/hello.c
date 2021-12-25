@@ -1,3 +1,9 @@
+/*
+ * hitech c test file
+ *
+ * tools/hitech/hello.c
+ * Changed: <2021-12-23 16:23:09 curt>
+ */
 main(argc, argv)
 int argc;
 char **argv;
@@ -10,3 +16,6 @@ char **argv;
 	write(1, "\n", 1);
 }
 
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

@@ -1,6 +1,11 @@
 /*
+ * account for used blocks
+ *
  * icheck goes through every inode and accounts for allocated blocks
  * we flag duplicates
+ *
+ * tools/icheck.c
+ * Changed: <2021-12-23 16:00:58 curt>
  */
 #include <stdio.h>
 #include <stdlib.h>

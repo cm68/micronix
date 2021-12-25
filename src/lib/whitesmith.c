@@ -1,5 +1,8 @@
 /*
  * library for dealing with whitesmith's object file
+ *
+ * lib/whitesmith.c
+ * Changed: <2021-12-23 15:45:52 curt>
  */
 #include <stdio.h>
 #include "../micronix/include/types.h"
@@ -121,3 +124,7 @@ getreloc(unsigned char **rp)
 		return (&reloc);
 	}
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

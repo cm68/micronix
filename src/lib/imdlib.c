@@ -1,7 +1,10 @@
 /*
- * imdlib.c
+ * access an imd file with delta support
  *
  * an imd file is just a header followed by a bunch of tracks.
+ *
+ * lib/imdlib.c
+ * Changed: <2021-12-23 15:41:31 curt>
  */
 
 #include <unistd.h>

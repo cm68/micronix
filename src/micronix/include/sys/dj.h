@@ -1,3 +1,9 @@
+/*
+ * DJ/DMA disk controller
+ *
+ * include/sys/dj.h
+ * Changed: <2021-12-23 15:20:02 curt>
+ */
 
 # define	DJINTERVAL	(10 * HERTZ)
 # define	DJTHRESHHOLD	2
@@ -130,36 +136,34 @@
  * delays
  */
 
-struct delay
-	{
+struct delay {
 	int step, settle;
-	};
+};
 
 /*
  * the structure of the internal tables of
  * the DJDMA
  */
 
-struct djtable
-	{
-	char	tracks,		/* no. of tracks on the drive */
+struct djtable {
+	char
+    	tracks,		/* no. of tracks on the drive */
 		curtrack,	/* current track */
 		pattern,
 		number;
 
-	int	steprate,	/* stepping rate */
+	int	
+        steprate,	/* stepping rate */
 		rampup,
 		rampdown,
 		settle,		/* head settle delay 34.1 to the mS */
 		image;
 
-	char	config,
-		code;
-	};
+	char	config, code;
+};
 
  
-struct status
-	{
+struct status {
 	unsigned char	
 		other[8],
 		spt,
@@ -169,10 +173,9 @@ struct status
 		slength,	/* sector length */
 		dstat,		/* drive status */
 		retstat;	/* command return status */
-	};
+};
 
-struct specs
-	{
+struct specs {
 	unsigned char
 		config,		/* configuration byte */
 		ds,		/* double sided (boolean) */
@@ -185,7 +188,7 @@ struct specs
 	unsigned
 		bps,		/* bytes per sector */
 		volume;		/* secs per disk */
-	};
+};
 		
 /*
  * Each drive has one of the following structures
@@ -193,9 +196,11 @@ struct specs
  * about configuration and current activity.
  */
 
-struct dm
-        {
+struct dm {
 	struct specs	*specs;
 	UCHAR		flags;		/* see below */
-        };			
+};			
 
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

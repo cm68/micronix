@@ -1,3 +1,10 @@
+/*
+ * interface to the fs library
+ *
+ * fslib.h
+ * Changed: <2021-12-23 15:31:25 curt>
+ */
+
 #define	INODES_START	2
 #define	I_PER_BLK	16
 #ifdef notdef
@@ -52,3 +59,7 @@ extern struct dsknod *filecreate(struct super *f, char *name);
 extern int dircreate(struct super *f, char *name);
 extern int dirrm(struct super *f, char *name);
 extern int filesize(struct dsknod *ip);
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

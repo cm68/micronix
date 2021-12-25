@@ -1,10 +1,16 @@
 /*
- * obj.h
+ * Whitesmith's object file format 
+ *
+ * each object file has 5 sections: 
+ * 16-byte header, text,  data, symbol table, relocation bytes 
  * 
- * Whitesmith's object file format The file has 5 sections: 16-byte header text
- * data symbol table relocation bytes The header structure is:
+ * include/obj.h
+ * Changed: <2021-12-23 15:11:39 curt>
  */
 
+/*
+ * The object file header
+ */
 struct obj {
     UINT8 ident;                /* see below */
     UINT8 conf;                 /* see below */

@@ -1,7 +1,9 @@
 /*
- * sgtty.h
- * 
  * communicate with the terminal driver
+ * the v6 version of ioctl
+ *
+ * include/sys/sgtty.h
+ * Changed: <2021-12-23 14:31:49 curt>
  */
 struct sgtty {
     UINT8 ispeed;

@@ -1,5 +1,8 @@
-/* macros.h
+/* 
  * Helper macros definitions.
+ *
+ * usersim/macros.h
+ * Changed: <2021-12-24 06:15:02 curt>
  *
  * Copyright (c) 2012-2017 Lin Ke-Fong
  *
@@ -376,3 +379,7 @@
         (x) >>= 1;                                                      \
         F = SZYXP_FLAGS_TABLE[(x) & 0xff] | c;                          \
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

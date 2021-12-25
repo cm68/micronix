@@ -1,7 +1,8 @@
 /*
- * dump out the symbol table and optionally the relocation entries
- * of an object file, or if an archive, of each file in the archive
- * just for grins, it can disassemble too.
+ * dump out object file header information
+ *
+ * tools/size.c
+ * Changed: <2021-12-23 16:08:16 curt>
  */
 
 #include <fcntl.h>
@@ -13,8 +14,6 @@
 #include "../include/ws.h"
 
 int verbose;
-int rflag;
-int dflag;
 struct ws_symbol *syms;
 int nsyms;
 
@@ -113,12 +112,6 @@ char **argv;
 		case 'v':
 			verbose++;
 			continue;
-		case 'd':
-			dflag++;
-			continue;
-		case 'r':
-			rflag++;
-			continue;
 		default:
 			continue;
 		}
@@ -132,3 +125,7 @@ char **argv;
 		}
 	}
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

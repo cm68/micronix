@@ -1,6 +1,8 @@
 /*
- * Controller command structure
- * See HD-DMA manual
+ * HD-DMA Controller command structure
+ *
+ * include/sys/mw.h
+ * Changed: <2021-12-23 14:28:50 curt>
  */
 struct hddma_cmd
 {
@@ -69,3 +71,7 @@ struct hddma_cmd
 #define INTOFF		0       /* turn off completion interrupts */
 
 /* status bits */
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

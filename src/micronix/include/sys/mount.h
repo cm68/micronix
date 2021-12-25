@@ -1,9 +1,12 @@
 /*
- * sys/mount.h
+ * in-core structure describing mounted filesystems
+ *
+ * include/sys/mount.h
+ * Changed: <2021-12-23 14:27:56 curt>
  */
 
 /*
- * Mount structure. The fsize and isize are copied here from the superblock
+ * The fsize and isize are copied here from the superblock
  * to make them more accessible.
  */
 struct mount {

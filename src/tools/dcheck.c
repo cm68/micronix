@@ -1,3 +1,9 @@
+/*
+ * check the link count
+ *
+ * tools/dcheck.c
+ * Changed: <2021-12-23 15:54:15 curt>
+ */
 
 /*
  * this is the V6 dcheck - validate the link count

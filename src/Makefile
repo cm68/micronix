@@ -1,3 +1,9 @@
+#
+# build the simulators
+#
+# src/Makefile
+# Changed: <2021-12-23 15:26:57 curt>
+#
 DIRS = lib tools usersim hwsim
 
 all:

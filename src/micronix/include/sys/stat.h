@@ -1,5 +1,8 @@
 /*
- * sys/stat.h
+ * in-core data structure for stat and fstat calls
+ *
+ * include/sys/stat.h
+ * Changed: <2021-12-23 14:36:34 curt>
  * 
  * v6 did not have a well-defined system interface contract, where utilities
  * like ls.c had their own copy of the stat structure in their code. needless
@@ -15,8 +18,8 @@
  */
 
 /*
- * this structure is passed to the kernel when asking about a file micronix
- * has the dev_t unpacked, v7+ wants it packed
+ * this structure is passed to the kernel when asking about a file 
+ * micronix has the dev_t unpacked, v7+ wants it packed
  */
 struct stat {
     union {

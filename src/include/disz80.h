@@ -1,7 +1,8 @@
 /*
- * disz80.h
- *
  * a z80 disassembler interface
+ *
+ * disz80.h
+ * Changed: <2021-12-23 15:30:08 curt>
  */
 
 /*
@@ -28,3 +29,7 @@ int format_instr(
 	int (*syscall)(unsigned short addr, unsigned char (*gb)(unsigned short a), char *d));
 
 extern int mnix_sc(unsigned short addr, unsigned char (*gb)(unsigned short a), char *d);
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

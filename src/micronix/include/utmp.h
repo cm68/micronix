@@ -1,5 +1,8 @@
 /*
  * Structure of utmp and wtmp files
+ *
+ * include/utmp.h
+ * Changed: <2021-12-23 15:16:58 curt>
  */
 
 struct utmp {
@@ -8,3 +11,6 @@ struct utmp {
 	UINT32 time;
 };
 
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */
