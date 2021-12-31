@@ -2,7 +2,7 @@
  * Disk Jockey DMA driver
  *
  * sys/dj.c 
- * Changed: <2021-12-24 05:55:50 curt>
+ * Changed: <2021-12-30 19:10:31 curt>
  */
 #include <types.h>
 #include <sys/sys.h>
@@ -43,6 +43,7 @@
  *                      3 - SA800 (reserved)
  *
  */
+#ifdef notdef
 #define	DJINTERVAL	(10 * HERTZ)
 #define	DJTHRESHHOLD	2
 
@@ -169,8 +170,7 @@
  * delays
  */
 
-struct delay
-{
+struct delay {
     int step, settle;
 };
 
@@ -179,8 +179,7 @@ struct delay
  * the DJDMA
  */
 
-struct djtable
-{
+struct djtable {
     char tracks,                /* no. of tracks on the drive */
          curtrack,              /* current track */
          pattern, number;
@@ -192,8 +191,7 @@ struct djtable
     char config, code;
 };
 
-struct status
-{
+struct status {
     unsigned char other[8], spt, config, dev,   /* device number */
          dchar,                 /* drive characteristics */
          slength,               /* sector length */
@@ -201,8 +199,7 @@ struct status
          retstat;               /* command return status */
 };
 
-struct specs
-{
+struct specs {
     unsigned char config,       /* configuration byte */
          ds,                    /* double sided (boolean) */
          spt,                   /* sectors per track */
@@ -225,6 +222,7 @@ struct dm {
     struct specs *specs;
     UINT8 flags;                /* see below */
 };
+#endif
 
 static unsigned char kw = 0,   /* 1K write operation */
 *haltstat = 0, djtimer = 0, djtaken = 0, kbuf[K] = { 0 };
