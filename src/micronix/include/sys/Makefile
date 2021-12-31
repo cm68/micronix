@@ -2,12 +2,12 @@
 # Makefile to install the include/sys header files
 #
 # include/sys/Makefile 
-# Changed: <2021-12-30 18:43:25 curt>
+# Changed: <2021-12-30 19:08:05 curt>
 #
 
 INCLUDES = \
 	access.h buf.h con.h dir.h file.h fs.h inode.h lock.h mount.h \
-	proc.h reg.h sgtty.h signal.h stat.h sys.h tty.h dj.c mw.c
+	proc.h reg.h sgtty.h signal.h stat.h sys.h tty.h dj.h mw.h
 
 all:
 
