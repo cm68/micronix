@@ -1,5 +1,8 @@
 /*
- * imap.c 
+ * translate logical block of inode to disk block
+ *
+ * sys/imap.c 
+ * Changed: <2021-12-24 06:00:58 curt>
  */
 #include <types.h>
 #include <sys/sys.h>

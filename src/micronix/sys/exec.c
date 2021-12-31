@@ -1,5 +1,8 @@
 /*
- * exec.c 
+ * execute a binary
+ *
+ * sys/exec.c 
+ * Changed: <2021-12-24 05:56:43 curt>
  */
 #include <types.h>
 #include <sys/sys.h>

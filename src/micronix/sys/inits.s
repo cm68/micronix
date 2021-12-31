@@ -1,15 +1,23 @@
-/ Initialize the Wunderbuss/Multio
-/ Load this module in the data area above _main
-/ so that this code sits in buffer space
+/*
+ * Initialize the Wunderbuss/Multio
+ *
+ * sys/inits.s
+ * Changed: <2021-12-24 06:04:50 curt>
+ */
+
+/*
+ * Load this module in the data area above _main
+ * so that this code sits in buffer space
+ */
 
 . := .data
 
 public	_minit
 public	_coninit
 
-/* absolute I/O addresses on the Master Mult I/O */
-
-
+/*
+ * absolute I/O addresses on the Master Mult I/O
+ */
 MBASE	:= 0x48		/base io address for master multiboard
 SLBASE	:= 0x58
 MUDATA	:= MBASE	 /port for uart data
@@ -29,10 +37,9 @@ MUSTATUS := MBASE[5]	 /* Master Uart(ace) status */
 MMSTATUS := MBASE[6]	/* Master Modem status */
 MSELECT := MBASE[7]	/offset to select uart or _int controller
 
-
-
-/* offsets into mio I/O space */
-
+/*
+ * offsets into mio I/O space
+ */
 BASE	:= 0	     /base io address for master multiboard
 UDATA	:= 0
 LOBAUD	:= 0

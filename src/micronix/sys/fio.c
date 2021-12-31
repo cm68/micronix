@@ -1,5 +1,8 @@
 /*
- * fio.c 
+ * file i/o
+ *
+ * sys/fio.c 
+ * Changed: <2021-12-24 05:57:11 curt>
  */
 #include <types.h>
 #include <sys/sys.h>

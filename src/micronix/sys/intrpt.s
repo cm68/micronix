@@ -1,7 +1,12 @@
-/Interrupt dispatch table
-/Extra space allows us to move the vectors to a 32-byte
-/boundry, as required by the interrupt controller.
-/Most of the interrupt catchers are in mio.s.
+/*
+ * Interrupt dispatch table
+ * Extra space allows us to move the vectors to a 32-byte
+ * boundry, as required by the interrupt controller.
+ * Most of the interrupt catchers are in mio.s.
+ *
+ * sys/intrpt.s
+ * Changed: <2021-12-24 06:08:17 curt>
+ */
 
 public	vectors
 

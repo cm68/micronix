@@ -1,5 +1,8 @@
 /*
- * create.c 
+ * make a file
+ *
+ * sys/create.c 
+ * Changed: <2021-12-24 05:54:15 curt>
  */
 #include <types.h>
 #include <sys/sys.h>
