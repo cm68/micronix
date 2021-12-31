@@ -2,7 +2,7 @@
  * micronix. this emulates the micronix user mode 
  *
  * usersim/micronix.c
- * Changed: <2021-12-25 09:21:44 curt>
+ * Changed: <2021-12-30 18:18:10 curt>
  *
  * Copyright (c) 2018, Curt Mayer 
  * do whatever you want, just don't claim you wrote it. 
@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <sys/fcntl.h>
 #include <dirent.h>
 #include <time.h>
 #include <errno.h>
@@ -27,6 +28,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <sys/wait.h>
+#include <ctype.h>
 #include <signal.h>
 
 #include "z80emu.h"
@@ -68,7 +70,7 @@ extern int logfd;
 
 char curdir[100] = "";
 char *rootdir = 0;
-int rootinode;
+ino_t rootinode;
 
 struct stat sbuf;
 
@@ -377,6 +379,7 @@ pverbose()
     fprintf(mytty, "\n");
 }
 
+void
 dump_stops()
 {
     int i;
@@ -714,8 +717,7 @@ do_exec(char *name, char **argv)
     int ai;
     unsigned short *ao;
     int argc;
-    struct fsym
-    {
+    struct fsym {
         unsigned short v;
         unsigned char t;
         char name[9];
@@ -773,7 +775,7 @@ do_exec(char *name, char **argv)
     fread(cp->memory + header.dataoff, 1, header.data, file);
     if (header.table) {
         if (verbose & V_EXEC) {
-            printf("got %d symbols\n", header.table / sizeof(fsym));
+            printf("got %d symbols\n", (int)(header.table / sizeof(fsym)));
         }
         for (i = 0; i < header.table / sizeof(fsym); i++) {
             fread(&fsym, 1, sizeof(fsym), file);
@@ -826,9 +828,6 @@ void
 carry_set()
 {
     cp->state.registers.byte[Z80_F] |= Z80_C_FLAG;
-    if (verbose & V_SFAIL) {
-        breakpoint = 1;
-    }
 }
 
 void
@@ -2257,15 +2256,27 @@ SystemCall(MACHINE * cp)
         ip->d.d_nlink = sbuf.st_nlink;
         ip->d.d_uid = sbuf.st_uid;
         ip->d.d_gid = sbuf.st_gid;
-        ip->d.d_size0 = sbuf.st_size >> 16;
-        ip->d.d_size1 = sbuf.st_size & 0xffff;
         ip->d.d_atime = swizzle(sbuf.st_atime);
         ip->d.d_mtime = swizzle(sbuf.st_mtime);
         ip->d.d_mode = (sbuf.st_mode & 07777) | /* IALLOC | */
             ((sbuf.st_size > (8 * 512)) ? ILARG : 0);
         switch (sbuf.st_mode & S_IFMT) {
         case S_IFDIR:
+            /*
+             * windows subsystem for linux returns a busted directory size
+             * we need to actually count the freaking directory entries and
+             * multiply by 16.  what a lose
+             */
             ip->d.d_mode |= IFDIR;
+            if (code != 28) {
+                DIR *dp;
+                sbuf.st_size = 0;
+                dp = opendir(filename);
+                while (readdir(dp)) {
+                    sbuf.st_size += 16;
+                }
+                closedir(dp);
+            }
             break;
         case S_IFREG:
             break;
@@ -2289,9 +2300,12 @@ SystemCall(MACHINE * cp)
         default:
             break;
         }
+        ip->d.d_size0 = sbuf.st_size >> 16;
+        ip->d.d_size1 = sbuf.st_size & 0xffff;
         // ip->mode = sbuf.st_mode;
-        if (verbose & V_DATA)
+        if (verbose & V_DATA) {
             dumpmem(&get_byte, arg2, 36);
+        }
         carry_clear();
         break;
 
@@ -2547,6 +2561,11 @@ SystemCall(MACHINE * cp)
         fprintf(mytty, "unrecognized syscall %d %x\n", code, code);
         carry_set();
         break;
+    }
+
+    /* if the system call failed, and we want a breakpoint */
+    if ((cp->state.registers.byte[Z80_F] & Z80_C_FLAG) && (verbose & V_SFAIL)) {
+        breakpoint = 1;
     }
 
     cp->state.registers.word[Z80_HL] = ret;
