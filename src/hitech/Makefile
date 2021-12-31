@@ -1,6 +1,7 @@
 #
 # makefile to generate the binary patcher and to patch the hitech c
 # compiler, assembler, linker and tools to micronix
+# Changed: <2021-12-30 18:27:49 curt>
 #
 
 DEBUG = -v 0x71
@@ -13,7 +14,7 @@ PATCHFILE = havesrc.pat
 CFLAGS = -Wno-implicit-int
 
 
-all: $(HITECH) bin
+all: bin $(HITECH)
 	cp $(HITECH) bin
 
 bin:
