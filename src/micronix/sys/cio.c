@@ -1,5 +1,8 @@
 /*
- * cio.c 
+ * character i/o top levels
+ *
+ * sys/cio.c 
+ * Changed: <2021-12-24 05:52:38 curt>
  */
 #include <types.h>
 #include <sys/sys.h>

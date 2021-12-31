@@ -1,6 +1,10 @@
 /*
- * link.c 
+ * manage directory entries
+ *
+ * sys/link.c 
+ * Changed: <2021-12-24 06:08:49 curt>
  */
+ 
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/fs.h>

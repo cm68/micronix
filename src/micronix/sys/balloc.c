@@ -1,5 +1,8 @@
 /*
- * balloc.c 
+ * allocate/free a block from the freelist
+ *
+ * sys/balloc.c 
+ * Changed: <2021-12-23 18:14:37 curt>
  */
 #include <types.h>
 #include <sys/sys.h>

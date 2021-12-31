@@ -1,6 +1,8 @@
-
 /*
- * access.c
+ * check for permissions on file operation
+ *
+ * sys/access.c
+ * Changed: <2021-12-23 18:13:41 curt>
  */
 #include <types.h>
 #include <sys/sys.h>

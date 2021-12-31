@@ -2,7 +2,11 @@
  * disas - Z80/Z280 disassembler
  *
  * tools/disas.c
- * Changed: <2021-12-23 15:55:26 curt>
+ * Changed: <2021-12-25 12:47:38 curt>
+ *
+ * todo: XXX
+ *  detect switch statements
+ *  decode indirect system calls
  * 
  * Copyright 1989 by Luc Rooijakkers <lwj@cs.kun.nl> Permission is hereby
  * granted to use and modify this code for non-commercial use, provided this

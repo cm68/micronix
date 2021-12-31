@@ -1,5 +1,8 @@
 /*
- * con.c 
+ * kernel constant tables initialized
+ *
+ * sys/con.c 
+ * Changed: <2021-12-24 05:53:41 curt>
  */
 #include <types.h>
 #include <sys/sys.h>

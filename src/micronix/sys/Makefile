@@ -1,3 +1,8 @@
+#
+# micronix makefile for compiling kernel inside simulator
+#
+# sys/Makefile
+# Changed: <2021-12-23 18:12:31 curt>
 
 INC = ../include
 SYS = ../include/sys

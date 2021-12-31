@@ -1,5 +1,9 @@
 /*
- * main.c 
+ * the kernel startup
+ * this should be loaded high, so it can be overlaid by kernel data
+ *
+ * sys/main.c
+ * Changed: <2021-12-24 06:10:54 curt>
  */
 #include <types.h>
 #include <sys/fs.h>

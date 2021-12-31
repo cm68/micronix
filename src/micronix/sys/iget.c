@@ -1,5 +1,8 @@
 /*
- * iget.c 
+ * manage in-core inode
+ *
+ * sys/iget.c 
+ * Changed: <2021-12-24 05:59:47 curt>
  */
 #include <types.h>
 #include <sys/sys.h>
