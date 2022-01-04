@@ -46,14 +46,15 @@ struct termios oldt;
 #ifdef CONIO
 #include <conio.h>
 #else
-#include <sgtty.h>
+#include <sys/sgtty.h>
 struct sgttyb oldt;
 #endif
 #endif
 #endif
 
 #include <stdio.h>
-#include <sgtty.h>
+#include <types.h>
+#include </sys/sgtty.h>
 struct sgtty oldt = 0;
 #endif
 

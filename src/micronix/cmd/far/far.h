@@ -6,9 +6,11 @@
  */
 
 #include <stdio.h>
-#include <access.h>
-/* #include <types.h> */
-#include <stat.h>
+#include <types.h>
+#include <std.h>
+#include <sys/access.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include <errno.h>
 #include <mtab.h>
 
