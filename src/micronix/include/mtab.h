@@ -5,7 +5,7 @@
  * Changed: <2021-12-23 15:09:10 curt>
  */
 struct mtab {
-	char directory[32],
+	char directory[32];
 	char special[32];
 };
 
