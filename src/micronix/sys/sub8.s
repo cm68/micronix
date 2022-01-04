@@ -1,4 +1,9 @@
-/Miscellaneous subroutines needed by kernel
+/*
+ * Miscellaneous subroutines needed by kernel
+ *
+ * sys/sub8.s
+ * Changed: <>
+ */
 
 public	_saveframe
 public	_setframe

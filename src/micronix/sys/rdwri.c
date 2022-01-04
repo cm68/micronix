@@ -1,5 +1,8 @@
 /*
- * rdwri.c 
+ * read and write system call worker
+ *
+ * sys/rdwri.c 
+ * Changed: <>
  */
 #include <types.h>
 #include <sys/sys.h>

@@ -1,6 +1,10 @@
 /*
- * mset.c 
+ * do the work for the mio serial ports
+ *
+ * sys/mset.c 
+ * Changed: <2022-01-04 10:38:52 curt>
  */
+ 
 #include <types.h>
 #include <sys/tty.h>
 

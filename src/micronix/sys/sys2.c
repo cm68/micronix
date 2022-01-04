@@ -1,5 +1,8 @@
 /*
- * sys2.c 
+ * more random system calls
+ *
+ * sys/sys2.c 
+ * Changed: <2022-01-04 10:53:07 curt>
  */
 #include <types.h>
 #include <sys/sys.h>

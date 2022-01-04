@@ -1,5 +1,8 @@
 /*
- * name.c 
+ * directory name to inode translation
+ * 
+ * sys/name.c 
+ * Changed: <>
  */
 #include <types.h>
 #include <sys/sys.h>

@@ -1,5 +1,8 @@
 /*
- * queue.c 
+ * tty queues
+ * 
+ * sys/queue.c 
+ * Changed: <>
  */
 
 #include <types.h>

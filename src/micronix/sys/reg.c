@@ -1,5 +1,8 @@
 /*
- * reg.c 
+ * system call wrappers, sort of.
+ *
+ * sys/reg.c 
+ * Changed: <2022-01-04 10:43:12 curt>
  */
 #include <types.h>
 #include <sys/sys.h>

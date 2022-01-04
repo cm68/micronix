@@ -1,5 +1,8 @@
 /*
- * open.c 
+ * manage open file table
+ *
+ * sys/open.c 
+ * Changed: <>
  */
 #include <types.h>
 #include <sys/sys.h>

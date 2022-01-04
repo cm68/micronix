@@ -1,5 +1,7 @@
 /*
- * mount.c 
+ * manage the mount table
+ * sys/mount.c 
+ * Changed: <>
  */
 #include <types.h>
 #include <sys/sys.h>

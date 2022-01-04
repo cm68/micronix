@@ -1,4 +1,9 @@
-/Decision firmware references
+/*
+ * Decision firmware references
+ *
+ * sys/uhdr.s
+ * Changed: <2022-01-04 11:29:52 curt>
+ */
 
 _trapstack := &8
 _cmask	:= &7

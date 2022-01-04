@@ -1,5 +1,8 @@
 /*
- * sleep.c 
+ * process sleep and wakeup
+ *
+ * sys/sleep.c 
+ * Changed: <2022-01-04 10:45:08 curt>
  */
 #include <types.h>
 #include <sys/sys.h>
