@@ -1,0 +1,2 @@
+update:
+	(cd .. ; make update)
