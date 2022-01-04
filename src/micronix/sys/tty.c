@@ -1,5 +1,8 @@
 /*
- * otty.c 
+ * tty driver
+ *
+ * sys/tty.c 
+ * Changed: <>
  */
 #include <types.h>
 #include <sys/sys.h>

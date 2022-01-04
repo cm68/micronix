@@ -1,8 +1,8 @@
 /*
- * malloc.c 
- */
-/*
  * Allocate and free primary and secondary memory
+ *
+ * sys/malloc.c 
+ * Changed: <>
  */
 
 #include <types.h>

@@ -1,5 +1,8 @@
 /*
- * trap.c 
+ * trap handling, interfacing with monitor lowlevel
+ * 
+ * sys/trap.c 
+ * Changed: <2022-01-04 11:31:53 curt>
  */
 #include <types.h>
 #include <sys/sys.h>

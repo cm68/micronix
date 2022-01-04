@@ -1,5 +1,8 @@
 /*
- * uio.c 
+ * block i/o 
+ *
+ * sys/uio.c 
+ * Changed: <>
  */
 #include <types.h>
 #include <sys/sys.h>

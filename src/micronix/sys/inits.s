@@ -110,7 +110,7 @@ INTSOFF := 0377		/mask off all interrupts
 
 
 ARMMASTER  := 0103	/allow interrupts 2 - 7 (ttys, clock, slaves)
-ARMSLAVE:= 0307		/allow 3-5	(ACE's only)
+ARMSLAVE:= 0307		/allow 3-5	(ACEs only)
 GETIRR	:= 10
 
 CONNECT := 3		/data terminal ready, request to send

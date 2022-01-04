@@ -1,5 +1,8 @@
 /*
- * system.c 
+ * System call table
+ *
+ * sys/system.c 
+ * Changed: <2022-01-04 10:53:40 curt>
  */
 #include <types.h>
 #include <sys/sys.h>

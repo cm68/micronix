@@ -1,5 +1,8 @@
 /*
- * sig.c 
+ * send and deliver signals
+ * 
+ * sys/sig.c 
+ * Changed: <>
  */
 #include <types.h>
 #include <sys/sys.h>

@@ -1,6 +1,11 @@
-/* Morrow Designs multiple Mult I/O driver */
-/* Len Edmondson */
-/* February, 1982 */
+/*
+ * Morrow Designs multiple Mult I/O driver
+ * Len Edmondson
+ * February, 1982
+ *
+ * sys/mio.s
+ * Changed: <2022-01-04 11:03:49 curt>
+ */
 
 /* THESE CONSTANTS DEPEND ON # include "tty.h" */
 
@@ -134,7 +139,7 @@ INTSOFF := 0377		/mask off all interrupts
 
 
 ARMMASTER  := 0103	/allow interrupts 2 - 7 (ttys, clock, slaves)
-ARMSLAVE:= 0307		/allow 3-5	(ACE's only)
+ARMSLAVE:= 0307		/allow 3-5	(ACEs only)
 GETIRR	:= 10
 
 CONNECT := 3		/data terminal ready, request to send
@@ -496,18 +501,13 @@ ace3:
 
 
 /*		ace7 = (a = miobase + MSTATUS);
-/*		in; ace7: MSTATUS; a & CLR2SND; rz;
-/*			/
-/*			hl = tty => sp; call _cstart; sp => af;
-/*			/
-/*		return;
-/*		/
-
-
-
-
-
-
+ *		in; ace7: MSTATUS; a & CLR2SND; rz;
+ *			/
+ *			hl = tty => sp; call _cstart; sp => af;
+ *			/
+ *		return;
+ *		/
+ */
 
 
 	ace6:
@@ -553,7 +553,7 @@ _mstart:      /* called when a char is put into output que */
 	dstart:
 		/
 
-		/* we want to clear the bit in the PIC's IMR */
+		/* we want to clear the bit in the PICs IMR */
 		/* that corresponds to line 6 */
 
 		/* out (OCW1, in (OCW1) & 0277); */
@@ -608,7 +608,7 @@ _mstop:			/called when a que emptys or esc is hit
 	dstop:
 		/
 
-		/* we want to set the bit in the PIC's IMR */
+		/* we want to set the bit in the PICs IMR */
 		/* that corresponds to line 6 */
 		/* to disable further _ints */
 		/* out (OCW1, in (OCW1) | 0100); */
@@ -767,8 +767,8 @@ conout:
 	a = miobase -> c3 + USTATUS -> c2;
 
 /*
-/* wait til ready
-/*
+ * wait til ready
+ */
 
 	c1: in; c2: USTATUS; a & EMPTY;
 		/

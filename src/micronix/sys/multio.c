@@ -1,5 +1,8 @@
 /*
- * omultio.c 
+ * one version of the multio driver
+ *
+ * sys/multio.c 
+ * Changed: <>
  */
 #include <types.h>
 #include <sys/sys.h>

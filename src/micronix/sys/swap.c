@@ -1,5 +1,8 @@
 /*
- * swap.c 
+ * swapping and scheduling
+ *
+ * sys/swap.c 
+ * Changed: <2022-01-04 10:47:08 curt>
  */
 #include <types.h>
 #include <sys/sys.h>

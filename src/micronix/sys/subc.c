@@ -1,5 +1,8 @@
 /*
- * subc.c 
+ * kernel print
+ * 
+ * sys/subc.c 
+ * Changed: <>
  */
 #include <types.h>
 #include <sys/sys.h>

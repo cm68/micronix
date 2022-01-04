@@ -1,3 +1,10 @@
+/*
+ * low level memory access
+ *
+ * sys/mem.s
+ * Changed: <2022-01-04 10:36:15 curt>
+ */
+
 public	_getbyte
 public	_getword
 public	_putbyte
@@ -11,8 +18,8 @@ public	_meminit
 MAP0	:= &0x0600		/task zero window registers
 IMAGE0	:= &0x0200		/readable version of MAP0
 
-MAP1	:= &0x0620		/task one's map registers
-IMAGE1	:= &0x0220		/task one's readable map registers
+MAP1	:= &0x0620		/task ones map registers
+IMAGE1	:= &0x0220		/task ones readable map registers
 
 LDIR	:= &0xB0ED		/z80 do *de++ = *hl++ while --bc != 0
 
@@ -47,7 +54,7 @@ getw:
 	a <*> -1
 	a <*> -1		/now a = 2 * high nibble of addr
 
-	bc = IMAGE1		/task one's map
+	bc = IMAGE1		/task ones map
 	a + c -> c		/bc points to map reg for desired word
 
 	a = h & 0x0F		/remove high nibble from addr
@@ -59,7 +66,7 @@ getw:
 	a = *bc -> *MAP0[4]	/crosses a segment boundary
 
 	bc =^ hl		/get word
-	a = *IMAGE0[2]		/restore task 0's windows
+	a = *IMAGE0[2]		/restore task 0s windows
 	a -> *MAP0[2]
 	a = *IMAGE0[4]
 	a -> *MAP0[4]
@@ -88,7 +95,7 @@ putb:
 	a <*> -1
 	a <*> -1		/now a = 2 * high nibble of addr
 
-	de = IMAGE1		/task one's map
+	de = IMAGE1		/task ones map
 	a + e -> e		/de points to map reg for desired byte
 
 	a = h & 0x0F		/remove high nibble from addr
@@ -97,7 +104,7 @@ putb:
 	call _di
 	a = *de -> *MAP0[2]	/now task zero can see desired address
 	c -> *hl		/put data
-	a = *IMAGE0[2] -> *MAP0[2]	/restore task zero's window
+	a = *IMAGE0[2] -> *MAP0[2]	/restore task zeros window
 
 	sp => de
 	jmp _ei
@@ -144,7 +151,7 @@ _copyin:
 
 	bc => sp		/save count
 
-	bc = IMAGE1		/task one's map
+	bc = IMAGE1		/task ones map
 	a + c -> c		/bc points to map reg for source
 
 	call _di
@@ -197,7 +204,7 @@ _copyout:
 
 	bc => sp		/save count
 
-	bc = IMAGE1		/task one's map
+	bc = IMAGE1		/task ones map
 	a + c -> c		/bc points to map reg for source
 
 	call _di
@@ -260,7 +267,7 @@ _memrw:
 	a <*> -1
 	a <*> -1
 	a <*> -1		/now a = high 8 bits of 20-bit space addr
-	a -> *IMAGE0[4] -> *MAP0[4]	/task0's window to space
+	a -> *IMAGE0[4] -> *MAP0[4]	/task0s window to space
 	a = d & 0x0F		/remove high nibble from space addr
 	a | 0x20 -> d		/replace it with window nibble
 
@@ -269,10 +276,10 @@ _memrw:
 	a <*> -1		/rotate a right 3 times w/o carry
 	a <*> -1
 	a <*> -1		/now a = 2 * high nibble of user addr
-	bc = IMAGE1		/task one's map
+	bc = IMAGE1		/task ones map
 	a + c -> c		/bc points to map reg for user addr
 	a = *bc
-	a -> *IMAGE0[2] -> *MAP0[2]	/task0's window to user
+	a -> *IMAGE0[2] -> *MAP0[2]	/task0s window to user
 	a = h & 0x0F		/remove high nibble from user addr
 	a | 0x10 -> h		/replace it with window nibble
 
@@ -329,7 +336,7 @@ _segcopy:
 	LDIR			/z80 do *de++ = *hl++ while --bc != 0
 
 	call _di
-	sp => af		/restore task 0's map
+	sp => af		/restore task 0s map
 	a -> *MAP0[4]
 	a -> *IMAGE0[4]
 	sp => af

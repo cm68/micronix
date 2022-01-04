@@ -1,5 +1,8 @@
 /*
- * sys1.c 
+ * random system calls
+ *
+ * sys/sys1.c 
+ * Changed: <>
  */
 #include <types.h>
 #include <sys/sys.h>
