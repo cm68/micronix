@@ -28,7 +28,9 @@ unix : low.o io.o high.o
 	link -tb0x1000 -r -o unix low.o io.o -lm.a high.o
 
 $(AS_OBJS) : $*.s
-	as $*.s
+	cpp -o $*.i $*.s
+	as -o $*.o $*.i
+	rm $*.i
 
 $(HIGH_C) : $*.c
 	cc $(CFLAGS) -c -x0 $*.c
