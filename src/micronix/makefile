@@ -13,7 +13,16 @@ all:
 	cd include ; make install
 	cd lib ; make install
 	cd cmd ; make install
-	cd sys ; make install
+	# cd sys ; make install
+
+#
+# this command populates /old with the stock micronix binaries
+# and installs the new programs in their place
+#
+upgrade:
+	cd include ; make upgrade
+	cd lib ; make upgrade
+	cd cmd ; make upgrade
 
 #
 # the update rule is used when inside the source tree in the simulator

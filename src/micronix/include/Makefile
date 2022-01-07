@@ -3,7 +3,7 @@
 # after this file is done, the include tree is rationalized
 #
 # include/Makefile
-# Changed: <2021-12-23 14:40:40 curt>
+# Changed: <2022-01-06 15:52:30 curt>
 
 #
 # include files that have been revised or moved
@@ -18,8 +18,12 @@ INCLUDES = \
 
 all:
 
-install:
+upgrade:
 	mkdir /old/include
 	cd /include ; mv $(REPLACE) /old/include
+	cp $(INCLUDES) /include
+	cd sys ; make install
+
+install:
 	cp $(INCLUDES) /include
 	cd sys ; make install

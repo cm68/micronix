@@ -1,6 +1,15 @@
 
+upgrade : 
+	cd Make ; make upgrade
+	cd cc ; make upgrade
+	cd cp ; make upgrade
+	cd ls ; make upgrade
+	cd pwd ; make upgrade
+	cd rm ; make upgrade
+	cd mknod ; make upgrade
+	cd mkdir ; make upgrade
+
 install : 
-	mkdir /old
 	cd Make ; make install
 	cd cc ; make install
 	cd cp ; make install
@@ -9,7 +18,10 @@ install :
 	cd rm ; make install
 	cd vi ; make install
 	cd mknod ; make install
+	cd mkdir ; make install
 	cp/cp reset /bin/reset
+	# cd ar ; make install
+	# cd far ; make install
 	# cd msh ; make install
 
 clean : 
@@ -18,8 +30,9 @@ clean :
 	cd cp ; make clean
 	cd ls ; make clean
 	cd pwd ; make clean
-	cd far ; make clean
 	cd rm ; make clean
 	cd mknod ; make clean
+	cd mkdir ; make clean
 	cd vi ; make clean
+	# cd far ; make clean
 	# cd msh ; make clean

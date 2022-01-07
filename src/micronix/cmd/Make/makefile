@@ -11,8 +11,11 @@ $(OBJECTS) : $*.c
 
 make.o: make.c
 
+upgrade: Make
+	cp /bin/make /old/make
+	cp Make /bin/make
+	
 install: Make
-	mv /bin/make /bin/mk
 	cp Make /bin/make
 
 clean : ; rm $(OBJECTS)

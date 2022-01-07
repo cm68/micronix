@@ -3,10 +3,11 @@ all:	mknod
 mknod : mknod.c
 	cc -o mknod mknod.c -lS
 
-install: mknod /old/mknod
+upgrade: mknod
+	cp /bin/mknod /old/mknod
 	cp mknod /bin/mknod
 
-/old/mknod:
-	cp /bin/mknod /old/mknod
+install: mknod
+	cp mknod /bin/mknod
 
 clean: ; rm mknod *.o

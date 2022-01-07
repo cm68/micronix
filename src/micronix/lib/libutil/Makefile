@@ -3,6 +3,8 @@ DESTLIB = /lib/libutil.a
 
 all: $(OBJECTS)
 
+upgrade:
+
 install: $(DESTLIB) $(OBJECTS)
 	lib $(DESTLIB) -rv $(OBJECTS)
 

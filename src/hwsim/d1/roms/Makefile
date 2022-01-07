@@ -24,3 +24,5 @@ install: $(OBJ) $(SYM)
 
 clean:
 	rm -f *.cim *.lst *.bin *.sym
+
+clobber: clean
