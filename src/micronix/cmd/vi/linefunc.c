@@ -1,5 +1,8 @@
 /*
  * STevie - ST editor for VI enthusiasts.    ...Tim Thompson...twitch!tjt...
+ *
+ * cmd/vi/linefunc.c
+ * Changed: <2022-01-06 16:39:43 curt>
  */
 
 #include "stevie.h"

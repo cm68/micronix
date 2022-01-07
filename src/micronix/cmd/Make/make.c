@@ -9,7 +9,8 @@
  *                      unix portability and speed
  * 30 Oct 20    CMM     runs on micronix, upward compatible
  *                      with stock make
- * make.c
+ * cmd/Make/make.c
+ * Changed: <2022-01-06 16:33:43 curt>
  */
 #include	"make.h"
 

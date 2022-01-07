@@ -1,8 +1,10 @@
 /*
  * Copyright (c) 1985 by Morris Code Works
  *
- * makeread.c
+ * cmd/Make/makeread.c
+ * Changed: <2022-01-06 16:34:29 curt>
  */
+ 
 #include	<stdio.h>
 #ifdef nodef
 #include	<ctype.h>

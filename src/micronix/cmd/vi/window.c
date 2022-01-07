@@ -1,6 +1,9 @@
 /*
  * this file contains all the terminal specific things needed to render
  * and manage the screen
+ *
+ * cmd/vi/window.c
+ * Changed: <2022-01-06 16:41:10 curt>
  */
 
 #include "stevie.h"

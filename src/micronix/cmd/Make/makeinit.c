@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 1985 by Morris Code Works
  *
- * makeinit.c
+ * cmd/Make/makeinit.c
+ * Changed: <>
  */
 #include	<stdio.h>
 #include	"make.h"

@@ -1,4 +1,3 @@
-
 /*
  * Format program for Morrow Designs HDC DMA hard disc controller 
  *                      Version 1.7 released 
@@ -26,6 +25,9 @@
  * 3 15 82 Marc         Added MiniScribe 1006 and 1012 3
  * 15 82 Marc           Fixed 'usage' to display version #
  * 12 22 81 Les Kent    Initial coding 
+ *
+ * cpmtools/formatmw.c 
+ * Changed: <2022-01-06 16:32:33 curt>
  */
 
 #include <std.h>

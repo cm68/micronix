@@ -2,6 +2,9 @@
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
+ *
+ * cmd/cp/cp.c
+ * Changed: <2022-01-06 16:31:58 curt>
  */
 
 /*
@@ -220,3 +223,8 @@ Perror(s)
     fprintf(stderr, "cp: ");
     perror(s);
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */
+

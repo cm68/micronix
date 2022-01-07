@@ -1,5 +1,8 @@
 /*
  * edit commands
+ *
+ * cmd/vi/edit.c
+ * Changed: <2022-01-06 16:39:23 curt>
  */
 
 #include "stevie.h"
