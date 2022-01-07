@@ -11,8 +11,9 @@ far5.o : far5.c ; cc -cz far5.c
 
 clean: ; rm *.o far
 
-install: far /old/far
+upgrade: far
+	cp /bin/bar /old/far
 	cp far /bin/far
 
-/old/far:
-	cp /bin/far /old/far
+install: far
+	cp far /bin/far

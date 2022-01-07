@@ -2,7 +2,7 @@
  * micronix. this emulates the micronix user mode 
  *
  * usersim/micronix.c
- * Changed: <2021-12-30 18:18:10 curt>
+ * Changed: <2022-01-04 20:24:21 curt>
  *
  * Copyright (c) 2018, Curt Mayer 
  * do whatever you want, just don't claim you wrote it. 
@@ -31,8 +31,7 @@
 #include <ctype.h>
 #include <signal.h>
 
-#include "z80emu.h"
-#include "z80user.h"
+#include "../hwsim/common/sim.h"
 
 #include "../micronix/include/types.h"
 #include "../micronix/include/sys/fs.h"
@@ -57,6 +56,7 @@
 
 static int do_exec(char *name, char **argv);
 static void emulate();
+void SystemCall();
 
 #define	DEFROOT	"filesystem"
 
@@ -71,6 +71,9 @@ extern int logfd;
 char curdir[100] = "";
 char *rootdir = 0;
 ino_t rootinode;
+
+/* i/o buffer used for real system calls */
+char iobuf[65536];
 
 struct stat sbuf;
 
@@ -88,6 +91,49 @@ char *initfile[] = {
 #define	V_ERROR	(1 << 6)        /* perror on system calls */
 #define V_SFAIL (1 << 7)        /* breakpoint on syscall fail */
 
+void
+copyout(byte *buf, paddr pa, int len)
+{
+    while (len--) {
+        put_byte(pa++, *buf++);
+    }
+}
+
+void
+copyin(byte *buf, paddr pa, int len)
+{
+    while (len--) {
+        *buf++ = get_byte(pa++);
+    }
+}
+
+static void
+push(unsigned short s)
+{
+    unsigned short sp;
+
+    sp = z80_get_reg16(sp_reg);
+    sp -= 2;
+    z80_set_reg16(sp_reg, sp);
+
+    put_word(sp, s);
+}
+
+static unsigned short
+pop()
+{
+    unsigned short i;
+    unsigned short sp;
+
+    sp = z80_get_reg16(sp_reg);
+    i = get_word(sp);
+    sp += 2;
+    z80_set_reg16(sp_reg, sp);
+
+    return (i);
+}
+
+
 char *progname;
 
 char *vopts[] = {
@@ -99,12 +145,8 @@ char *seekoff[] = { "SET", "CUR", "END" };
 
 int verbose;
 
-MACHINE context;
-
 unsigned short brake;
 volatile int breakpoint;
-
-struct MACHINE *cp;
 
 char namebuf[PATH_MAX];
 char workbuf[PATH_MAX];
@@ -242,52 +284,6 @@ unsigned int
 reloc(symaddr_t addr)
 {
     return 0;
-}
-
-void
-put_word(int addr, int value)
-{
-    addr &= 0xffff;
-    cp->memory[addr] = value & 0xff;
-    cp->memory[addr + 1] = (value >> 8) & 0xff;
-}
-
-void
-put_byte(int addr, unsigned char value)
-{
-    addr &= 0xffff;
-    cp->memory[addr] = value;
-}
-
-unsigned short
-get_word(int addr)
-{
-    addr &= 0xffff;
-    return cp->memory[addr] + (cp->memory[addr + 1] << 8);
-}
-
-unsigned char
-get_byte(unsigned short addr)
-{
-    addr &= 0xffff;
-    return cp->memory[addr];
-}
-
-static void
-push(unsigned short s)
-{
-    cp->state.registers.word[Z80_SP] -= 2;
-    put_word(cp->state.registers.word[Z80_SP], s);
-}
-
-static unsigned short
-pop()
-{
-    unsigned short i;
-
-    i = get_word(cp->state.registers.word[Z80_SP]);
-    cp->state.registers.word[Z80_SP] += 2;
-    return (i);
 }
 
 #define	TTY_FD	64
@@ -580,8 +576,7 @@ main(int argc, char **argv)
     }
     dump_stops();
 
-    cp = &context;
-    Z80Reset(&cp->state);
+	z80_init();
 
     /*
      * build argvec 
@@ -597,7 +592,7 @@ main(int argc, char **argv)
     }
     free(argvec);
 
-    cp->state.pc = pop();
+    z80_set_reg16(pc_reg, pop());
     emulate();
     return EXIT_SUCCESS;
 }
@@ -770,9 +765,15 @@ do_exec(char *name, char **argv)
         signal(i, SIG_DFL);
     }
 
-    bzero(cp->memory, 64*1024);
-    fread(cp->memory + header.textoff, 1, header.text, file);
-    fread(cp->memory + header.dataoff, 1, header.data, file);
+    for (i = 0; i < 65536; i++) {
+        put_byte(i, 0);
+    }
+
+    fread(iobuf, 1, header.text, file);
+    copyout(iobuf, header.textoff, header.text);
+    fread(iobuf, 1, header.data, file);
+    copyout(iobuf, header.dataoff, header.data);
+
     if (header.table) {
         if (verbose & V_EXEC) {
             printf("got %d symbols\n", (int)(header.table / sizeof(fsym)));
@@ -784,11 +785,11 @@ do_exec(char *name, char **argv)
     }
     fclose(file);
 
-    cp->state.registers.word[Z80_SP] = STACKTOP;
+    z80_set_reg16(sp_reg, STACKTOP);
     put_byte(8, 0x76);
 
-    cp->state.pc = header.textoff;
-    cp->is_done = 0;
+    z80_set_reg16(pc_reg, header.textoff);
+
     brake = header.dataoff + header.data + header.bss + header.heap;
 
     ao = malloc(argc * sizeof(*ao));
@@ -797,12 +798,21 @@ do_exec(char *name, char **argv)
      * now, copy the args to argv and the stack 
      */
     for (i = 0; i < argc; i++) {
+        int j; 
+        char *s;
+
         ai = argc - (i + 1);
-        ao[ai] = cp->state.registers.word[Z80_SP]
-            - (strlen(argv[ai]) + 1);
-        cp->state.registers.word[Z80_SP] = ao[ai];
+        ao[ai] = z80_get_reg16(sp_reg) - (strlen(argv[ai]) + 1);
+        z80_set_reg16(sp_reg, ao[ai]);
         // printf("copyout %s to %04x\n", argv[ai], ao[ai]);
-        strcpy(&cp->memory[ao[ai]], argv[ai]);
+        s = argv[ai];
+        j = ao[ai]; 
+        while (1) {
+            put_byte(j, *s);
+            if (!*s) break;
+            s++;
+            j++;
+        }
     }
     push(0xffff);
     for (i = 0; i < argc; i++) {
@@ -827,13 +837,21 @@ getsim(long addr)
 void
 carry_set()
 {
-    cp->state.registers.byte[Z80_F] |= Z80_C_FLAG;
+    unsigned char f;
+
+    f = z80_get_reg8(f_reg);
+    f |= 1;
+    z80_set_reg8(f_reg, f);
 }
 
 void
 carry_clear()
 {
-    cp->state.registers.byte[Z80_F] &= ~Z80_C_FLAG;
+    unsigned char f;
+
+    f = z80_get_reg8(f_reg);
+    f &= 0xfe;
+    z80_set_reg8(f_reg, f);
 }
 
 void
@@ -844,48 +862,51 @@ dumpcpu()
     char fbuf[9];
     char *s;
     int i;
+    unsigned short pc;
 
     // 01234567
     strcpy(fbuf, "        ");
 
-    format_instr(cp->state.pc, outbuf,
+    pc = z80_get_reg16(pc_reg);
+
+    format_instr(pc, outbuf,
         &get_byte, &lookup_sym, &reloc, &mnix_sc);
-    s = lookup_sym(cp->state.pc);
+    s = lookup_sym(pc);
     if (s) {
         fprintf(mytty, "%s\n", s);
     }
-    fprintf(mytty, "%04x: %-20s ", cp->state.pc, outbuf);
+    fprintf(mytty, "%04x: %-20s ", pc, outbuf);
 
-    f = cp->state.registers.byte[Z80_F];
+    f = z80_get_reg8(f_reg);
 
-    if (f & Z80_C_FLAG)
+    if (f & 1)
         fbuf[0] = 'C';
-    if (f & Z80_N_FLAG)
+    if (f & 2)
         fbuf[1] = 'N';
-    if (f & Z80_PV_FLAG)
+    if (f & 4)
         fbuf[2] = 'V';
-    if (f & Z80_X_FLAG)
+    if (f & 8)
         fbuf[3] = 'X';
-    if (f & Z80_H_FLAG)
+    if (f & 16)
         fbuf[4] = 'H';
-    if (f & Z80_Y_FLAG)
+    if (f & 32)
         fbuf[5] = 'Y';
-    if (f & Z80_Z_FLAG)
+    if (f & 64)
         fbuf[6] = 'Z';
-    if (f & Z80_S_FLAG)
+    if (f & 128)
         fbuf[7] = 'S';
 
     fprintf(mytty,
         " %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x brk:%04x\n",
         fbuf,
-        cp->state.registers.byte[Z80_A],
-        cp->state.registers.word[Z80_BC],
-        cp->state.registers.word[Z80_DE],
-        cp->state.registers.word[Z80_HL],
-        cp->state.registers.word[Z80_IX],
-        cp->state.registers.word[Z80_IY],
-        cp->state.registers.word[Z80_SP],
-        get_word(cp->state.registers.word[Z80_SP]) & 0xffff, brake);
+        z80_get_reg8(a_reg),
+        z80_get_reg16(bc_reg),
+        z80_get_reg16(de_reg),
+        z80_get_reg16(hl_reg),
+        z80_get_reg16(ix_reg),
+        z80_get_reg16(iy_reg),
+        z80_get_reg16(sp_reg),
+        get_word(z80_get_reg16(sp_reg)), brake);
 }
 
 struct cpm_syscall {
@@ -939,8 +960,8 @@ struct cpm_syscall {
 void
 cpmsys()
 {
-    unsigned char c_reg;
-    unsigned short de_reg;
+    unsigned char C_reg;
+    unsigned short DE_reg;
     char vbuf[200];
     unsigned short from;
     struct cpm_syscall *cs = 0;
@@ -948,40 +969,40 @@ cpmsys()
     char *s;
     char c;
 
-    from = get_word(cp->state.registers.word[Z80_SP]) - 3;
-    c_reg = cp->state.registers.byte[Z80_C];
-    de_reg = cp->state.registers.word[Z80_DE];
+    from = get_word(z80_get_reg16(sp_reg)) - 3;
+    C_reg = z80_get_reg8(c_reg);
+    DE_reg = z80_get_reg16(de_reg);
 
     fprintf(mytty, "cp/m system call from %x - ", from);
 
     vbuf[0] = '\0';
 
-    if (c_reg <= (sizeof(cpmcalls) / sizeof(cpmcalls[0]))) {
-        cs = &cpmcalls[c_reg];
+    if (C_reg <= (sizeof(cpmcalls) / sizeof(cpmcalls[0]))) {
+        cs = &cpmcalls[C_reg];
     }
 
     s = vbuf;
     if (cs) {
-        s += sprintf(vbuf, "call: %s arg: %x ", cs->name, de_reg);
+        s += sprintf(vbuf, "call: %s arg: %x ", cs->name, DE_reg);
         if (cs->type == 1) {
-            s += sprintf(s, "fcb: %c:", get_byte(de_reg) + '@');
+            s += sprintf(s, "fcb: %c:", get_byte(DE_reg) + '@');
             for (i = 1; i < 9; i++) {
-                c = get_byte(de_reg + i);
+                c = get_byte(DE_reg + i);
                 if (c != ' ') *s++ = c;
             }
             *s++='.';
             for (i = 9; i < 12; i++) {
-                c = get_byte(de_reg + i);
+                c = get_byte(DE_reg + i);
                 if (c != ' ') *s++ = c;
             }
         }
         strcpy(s, "\n");
     } else {
-        sprintf(vbuf, "call: %d arg: %x\n", c_reg, de_reg);
+        sprintf(vbuf, "call: %d arg: %x\n", C_reg, DE_reg);
     }
     fputs(vbuf, mytty);
     dumpcpu();
-    cp->state.pc = pop();
+    z80_set_reg16(pc_reg, pop());
 }
 
 int
@@ -1087,17 +1108,17 @@ monitor()
                 s++;
             if (*s) {
                 if (!strcmp(s, "bc")) {
-                    addr  = cp->state.registers.word[Z80_BC] & 0xffff;
+                    addr  = z80_get_reg16(bc_reg);
                 } else if (!strcmp(s, "de")) {
-                    addr  = cp->state.registers.word[Z80_DE] & 0xffff;
+                    addr  = z80_get_reg16(de_reg);
                 } else if (!strcmp(s, "hl")) {
-                    addr  = cp->state.registers.word[Z80_HL] & 0xffff;
+                    addr  = z80_get_reg16(hl_reg);
                 } else if (!strcmp(s, "ix")) {
-                    addr  = cp->state.registers.word[Z80_IX] & 0xffff;
+                    addr  = z80_get_reg16(ix_reg);
                 } else if (!strcmp(s, "iy")) {
-                    addr  = cp->state.registers.word[Z80_IY] & 0xffff;
+                    addr  = z80_get_reg16(iy_reg);
                 } else if (!strcmp(s, "sp") || !strcmp(s, "tos")) {
-                    addr  = cp->state.registers.word[Z80_SP] & 0xffff;
+                    addr  = z80_get_reg16(sp_reg);
                     fprintf(mytty, "stack %04x\n", addr);
                     for (i = 0; i < 10; i++) {
                         fprintf(mytty, "\t%04x\n", get_word(addr + (i * 2)));
@@ -1120,7 +1141,7 @@ monitor()
                 i = strtol(s, &s, 16);
             } else {
                 if (lastaddr == -1) {
-                    i = cp->state.pc;
+                    i = z80_get_reg16(pc_reg);
                 } else {
                     i = lastaddr;
                 }
@@ -1234,16 +1255,14 @@ emulate()
         if (watchpoint_hit()) {
             breakpoint = 1;
         }
-        if (point_at(&breaks, cp->state.pc, 0)) {
-            if (point_at(&breaks, cp->state.pc, 0)) {
-                pid();
-                fprintf(mytty, "break at %04x\n", cp->state.pc);
-                dumpcpu();
-            }
+        if (point_at(&breaks, z80_get_reg16(pc_reg), 0)) {
+            pid();
+            fprintf(mytty, "break at %04x\n", z80_get_reg16(pc_reg));
+            dumpcpu();
             breakpoint = 1;
         }
         /* cp/m system call */
-        if (cp->state.pc == 0x0005) {
+        if (z80_get_reg16(pc_reg) == 0x0005) {
             pid();
             cpmsys();
             breakpoint = 1;
@@ -1260,7 +1279,7 @@ emulate()
          * the second arg is the number of cycles we are allowing 
          * the emulator to run
          */
-        Z80Emulate(&cp->state, 1, &context);
+        z80_run();
         /*
          * if we have a signal to deliver, do it now
          */
@@ -1274,8 +1293,8 @@ emulate()
                 if (verbose & V_SYS) {
                     fprintf(mytty, "invoking signal %d %x\n", i, signal_handler[i]);
                 }
-                push(cp->state.pc);
-                cp->state.pc = signal_handler[i];
+                push(z80_get_reg16(pc_reg));
+                z80_set_reg16(pc_reg, signal_handler[i]);
             } else {
                 if (verbose & V_SYS) {
                     fprintf(mytty, "ignoring signal %d\n", i);
@@ -1283,10 +1302,10 @@ emulate()
             }
             signalled &= ~(1 << i);
         }
-        if (cp->state.status == Z80_STATUS_HALT) {
-            SystemCall(&context);
+        if (z80_get_reg8(status_reg) & S_HLTA) {
+            SystemCall();
         }
-    } while (!cp->is_done);
+    } while (1);
 }
 
 /*
@@ -1724,7 +1743,7 @@ degrime(char *s)
  * to skip over the system call args. and return to after the syscall.
  */
 void
-SystemCall(MACHINE * cp)
+SystemCall()
 {
     unsigned char code;
     unsigned short sc;
@@ -1749,6 +1768,8 @@ SystemCall(MACHINE * cp)
     char **argvec;
     int savemode;
     struct syscall *sp;
+    char name1[256];
+    char name2[256];
 
     savemode = verbose;
 
@@ -1825,8 +1846,7 @@ SystemCall(MACHINE * cp)
     sp = &syscalls[code];
 
     if (verbose & V_SYS0) {
-        fprintf(mytty, "%10s %3d ",
-            sp->name, cp->state.registers.word[Z80_HL]);
+        fprintf(mytty, "%10s %3d ", sp->name, z80_get_reg16(hl_reg));
         dumpmem(&get_byte, sc, sp->argbytes + 1);
     }
 
@@ -1839,11 +1859,15 @@ SystemCall(MACHINE * cp)
     if (sp->flag & SF_ARG4)
         arg3 = get_word(sc + 8);
     if (sp->flag & SF_FD)
-        fd = cp->state.registers.word[Z80_HL];
-    if (sp->flag & SF_NAME)
-        fn = &cp->memory[arg1];
-    if (sp->flag & SF_NAME2)
-        fn2 = &cp->memory[arg2];
+        fd = z80_get_reg16(hl_reg);
+    if (sp->flag & SF_NAME) {
+        copyin(name1, arg1, sizeof(name1));
+        fn = name1;
+    }
+    if (sp->flag & SF_NAME2) {
+        copyin(name2, arg2, sizeof(name2));
+        fn2 = name2;
+    }
 
     /*
      * what's with these zero length writes? 
@@ -1912,11 +1936,12 @@ SystemCall(MACHINE * cp)
             if (arg2 < ret) {
                 ret = arg2;
             }
-            memcpy(&cp->memory[arg1], &df->buffer[df->offset], ret);
+            copyout(&df->buffer[df->offset], arg1, ret);
             df->offset += ret;
         } else {
             if ((ret = seekfile(fd)) == 0) {
-                ret = read(fd, &cp->memory[arg1], arg2);
+                ret = read(fd, iobuf, arg2);
+                copyout(iobuf, arg1, ret);
             }
         }
         if (ret == 0xffff) {
@@ -1930,7 +1955,8 @@ SystemCall(MACHINE * cp)
 
     case 4:                    /* write (hl), buffer, len */
         if ((ret = seekfile(fd)) == 0) {
-            ret = write(fd, &cp->memory[arg1], arg2);
+            copyin(iobuf, arg1, arg2);
+            ret = write(fd, iobuf, arg2);
         }
         if (ret == 0xffff) {
             ret = errno;
@@ -2017,11 +2043,11 @@ SystemCall(MACHINE * cp)
             fprintf(mytty, "wait ret %x %x\n", ret, i);
         }
         if (WIFEXITED(i)) {
-            cp->state.registers.byte[Z80_D] = WEXITSTATUS(i);
-            cp->state.registers.byte[Z80_E] = 0;
+            z80_set_reg8(d_reg, WEXITSTATUS(i));
+            z80_set_reg8(e_reg, 0);
         } else if (WIFSIGNALED(i)) {
-            cp->state.registers.byte[Z80_D] = 1;
-            cp->state.registers.byte[Z80_E] = WTERMSIG(i);
+            z80_set_reg8(d_reg, 1);
+            z80_set_reg8(e_reg, WTERMSIG(i));
         } else {
             fprintf(mytty, "waitfuck %x\n", i);
         }
@@ -2105,7 +2131,8 @@ SystemCall(MACHINE * cp)
         argvec = malloc((i + 1) * sizeof(char *));
         i = 0;
         for (i = 0; (arg1 = get_word(arg2 + (i * 2))); i++) {
-            argvec[i] = strdup(&cp->memory[arg1]);
+            copyin(name2, arg1, sizeof(name2));
+            argvec[i] = strdup(name2);
         }
         argvec[i] = 0;
         ret = do_exec(fname(fn), argvec);
@@ -2151,7 +2178,7 @@ SystemCall(MACHINE * cp)
         break;
     case 13:                   /* time */
         i = time(0);
-        cp->state.registers.word[Z80_DE] = i & 0xffff;
+        z80_set_reg16(de_reg, i);
         ret = (i >> 16) & 0xffff;
         carry_clear();
         break;
@@ -2207,6 +2234,8 @@ SystemCall(MACHINE * cp)
 
     case 18:                   /* stat fn buf */
     case 28:                   /* fstat fd buf */
+        ip = (struct statb *) iobuf;
+
         if (code == 28) {
             ret = fstat(fd, &sbuf);
             if ((df = dirget(fd))) {
@@ -2218,7 +2247,6 @@ SystemCall(MACHINE * cp)
                 sbuf.st_mode &= ~S_IFMT;
                 sbuf.st_mode |=
                     (files[fd].dt == 'c') ? S_IFCHR : S_IFBLK;
-                ip = (struct statb *) &cp->memory[arg2];
                 ip->d.d_addr[0] = ((files[fd].major & 0xff) << 8) | 
                     (files[fd].minor & 0xff);
             }
@@ -2242,8 +2270,6 @@ SystemCall(MACHINE * cp)
             carry_set();
             break;
         }
-
-        ip = (struct statb *) &cp->memory[arg2];
 
         if (sbuf.st_ino == rootinode) {
             ip->inum = 2;
@@ -2303,6 +2329,7 @@ SystemCall(MACHINE * cp)
         ip->d.d_size0 = sbuf.st_size >> 16;
         ip->d.d_size1 = sbuf.st_size & 0xffff;
         // ip->mode = sbuf.st_mode;
+        copyout(iobuf, arg2, 36);
         if (verbose & V_DATA) {
             dumpmem(&get_byte, arg2, 36);
         }
@@ -2482,7 +2509,7 @@ SystemCall(MACHINE * cp)
             carry_set();
         } else {
             ret = p[0];
-            cp->state.registers.word[Z80_DE] = p[1];
+            z80_set_reg16(de_reg, p[1]);
             carry_clear();
         }
         break;
@@ -2564,11 +2591,12 @@ SystemCall(MACHINE * cp)
     }
 
     /* if the system call failed, and we want a breakpoint */
-    if ((cp->state.registers.byte[Z80_F] & Z80_C_FLAG) && (verbose & V_SFAIL)) {
+    if ((z80_get_reg8(f_reg) & 1) && (verbose & V_SFAIL)) {
         breakpoint = 1;
     }
 
-    cp->state.registers.word[Z80_HL] = ret;
+    z80_set_reg16(hl_reg, ret);
+
     /* write for 0 bytes */
     if ((code == 4) && (arg2 == 0)) {
         goto nolog2;
@@ -2579,17 +2607,17 @@ SystemCall(MACHINE * cp)
         }
         fprintf(mytty, " = %04x%s\n",
             ret,
-            (cp->state.registers.byte[Z80_F] & Z80_C_FLAG) ? " FAILED" : "");
+            (z80_get_reg8(f_reg) & 1) ? " FAILED" : "");
     }
   nolog2:
     if ((verbose & V_DATA) && (sp->flag & SF_BUF)) {
         dumpmem(&get_byte, arg1, ret);
         fflush(stdout);
     }
-    cp->state.pc = pop();
-    cp->state.status = 0;
+    z80_set_reg16(pc_reg, pop());
+    z80_set_reg8(status_reg, 0);
     verbose = savemode;
-    if ((verbose & V_SYS) && (cp->state.registers.word[Z80_HL] == 0xffff)) {
+    if ((verbose & V_SYS) && (z80_get_reg16(hl_reg) == 0xffff)) {
         fprintf(mytty, "code = %d\n", code);
         dumpcpu();
     }

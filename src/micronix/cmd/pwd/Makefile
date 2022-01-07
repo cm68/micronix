@@ -3,10 +3,11 @@ all:	pwd
 pwd : pwd.c
 	cc -o pwd pwd.c
 
-install: pwd /old/pwd
+install: pwd
 	cp pwd /bin/pwd
 
-/old/pwd:
+upgrade: pwd
 	cp /bin/pwd /old/pwd
+	cp pwd /bin/pwd
 
 clean: ; rm pwd *.o

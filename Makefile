@@ -2,7 +2,7 @@
 # this is just a top-level makefile to build the simulator
 #
 # Makefile
-# Changed: <2022-01-04 11:24:07 curt>
+# Changed: <2022-01-06 15:10:27 curt>
 #
 
 all: src/usersim/sim sim filesystem

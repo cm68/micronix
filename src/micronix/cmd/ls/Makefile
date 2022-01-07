@@ -3,10 +3,11 @@ all:	ls
 ls : ls.c
 	cc -o ls ls.c -lS
 
-install: ls /old/ls
+install:
 	cp ls /bin/ls
 
-/old/ls:
+upgrade: ls
 	cp /bin/ls /old/ls
+	cp ls /bin/ls
 
 clean: ; rm ls *.o

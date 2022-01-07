@@ -7,10 +7,11 @@ all:	cc
 cc : cc.c
 	cc -o cc cc.c -lS -lS
 
-install: cc /old/cc
+upgrade: cc
+	cp /bin/cc /old/cc
 	cp cc /bin/cc
 
-/old/cc:
-	cp /bin/cc /old/cc
+install: cc
+	cp cc /bin/cc
 
 clean: ; rm cc *.o

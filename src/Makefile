@@ -4,7 +4,7 @@
 # src/Makefile
 # Changed: <2021-12-23 15:26:57 curt>
 #
-DIRS = lib tools usersim hwsim
+DIRS = lib tools hwsim usersim
 
 all:
 	for i in $(DIRS) ; do \

@@ -9,7 +9,11 @@ all: $(OBJECTS)
 
 install: all
 	lib /lib/libS.a -rv $(OBJECTS)
-	
+
+upgrade: all
+	cp /lib/libS.a /old
+	lib /lib/libS.a -rv $(OBJECTS)
+
 $(COBJS): $*.c
 	cc -c $*.c
 

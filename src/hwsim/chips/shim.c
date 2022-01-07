@@ -6,6 +6,7 @@
 
 byte control;
 byte status;
+byte unhalt;
 
 int int_pin;
 int nmi_pin;
@@ -24,6 +25,15 @@ z80_tick(int num_ticks, uint64_t pins, void* user_data) {
     }
     if (nmi_pin) {
         pins |= Z80_NMI;
+    }
+    if (unhalt) {
+        status &= ~S_HLTA;
+        pins &= ~Z80_HALT;
+        z80_set_pc(&z80, z80_pc(&z80)+1);
+        unhalt = 0;
+    }
+    if (pins & Z80_HALT) {
+        status |= S_HLTA;
     }
     if (pins & Z80_MREQ) {
         if (pins & Z80_RD) {
@@ -73,11 +83,63 @@ z80_get_reg8(enum reg8 r8)
         return z80_a(&z80);
     case f_reg:
         return z80_f(&z80);
+    case b_reg:
+        return z80_b(&z80);
+    case c_reg:
+        return z80_c(&z80);
+    case d_reg:
+        return z80_d(&z80);
+    case e_reg:
+        return z80_e(&z80);
+    case h_reg:
+        return z80_h(&z80);
+    case l_reg:
+        return z80_l(&z80);
     case status_reg:
         return status;
     default:
         printf("get unknown 8 bit register %d\n", r8);
         return 0;
+    }
+}
+
+void
+z80_set_reg8(enum reg8 r8, byte v)
+{
+    switch (r8) {
+    case a_reg:
+        z80_set_a(&z80, v);
+        break;
+    case f_reg:
+        z80_set_f(&z80, v);
+        break;
+    case b_reg:
+        z80_set_b(&z80, v);
+        break;
+    case c_reg:
+        z80_set_c(&z80, v);
+        break;
+    case d_reg:
+        z80_set_d(&z80, v);
+        break;
+    case e_reg:
+        z80_set_e(&z80, v);
+        break;
+    case h_reg:
+        z80_set_h(&z80, v);
+        break;
+    case l_reg:
+        z80_set_l(&z80, v);
+        break;
+    case status_reg:
+        if (v == 0) {
+            if (status & S_HLTA) {
+                unhalt = 1;
+            }
+        }
+        break;
+    default:
+        printf("set unknown 8 bit register %d\n", r8);
     }
 }
 
@@ -106,18 +168,27 @@ z80_get_reg16(enum reg16 r16)
 }
 
 void
-z80_set_reg8(enum reg8 r8, byte v)
-{
-    switch (r8) {
-    default:
-        printf("set unknown 8 bit register %d\n", r8);
-    }
-}
-
-void
 z80_set_reg16(enum reg16 r16, word v)
 {
     switch (r16) {
+    case bc_reg:
+        z80_set_bc(&z80, v);
+        break;
+    case de_reg:
+        z80_set_de(&z80, v);
+        break;
+    case hl_reg:
+        z80_set_hl(&z80, v);
+        break;
+    case ix_reg:
+        z80_set_ix(&z80, v);
+        break;
+    case iy_reg:
+        z80_set_iy(&z80, v);
+        break;
+    case sp_reg:
+        z80_set_sp(&z80, v);
+        break;
     case pc_reg:
         z80_set_pc(&z80, v);
         break;

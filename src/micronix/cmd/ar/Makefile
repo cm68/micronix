@@ -3,10 +3,10 @@ all:	ar
 ar : ar.c
 	cc -o ar ar.c -lS
 
-install: ar /oar/ar
+upgrade: ar
 	cp ar /bin/ar
 
-/oar/ar:
-	cp /bin/ar /oar/ar
+install: ar
+	cp ar /bin/ar
 
 clean: ; rm ar *.o
