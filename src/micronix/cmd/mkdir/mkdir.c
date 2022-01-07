@@ -2,6 +2,9 @@
  * mkdir command - micronix does not have a mkdir system call,
  * but we do have a mkdir library implementation, so the v7 code
  * is pretty much cloned
+ *
+ * cmd/mkdir/mkdir.c
+ * Changed: <2022-01-06 16:34:50 curt>
  */
 #include <types.h>
 #include <stdio.h>

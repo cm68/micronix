@@ -1,3 +1,9 @@
+/*
+ * ported the V7 rm
+ *
+ * cmd/rm/rm.c
+ * Changed: <2022-01-06 16:38:16 curt>
+ */
 int errcode = 0;
 
 #include <stdio.h>
@@ -160,3 +166,8 @@ yes()
         b = getchar();
     return (i == 'y');
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */
+

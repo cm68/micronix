@@ -1,6 +1,9 @@
 /*
- *  link editor - v7 ported to micronix to consume
- *  hitech c object files
+ * link editor - v7 ported to micronix to consume
+ * hitech c object files
+ *
+ * cmd/ld/ld.c
+ * Changed: <2022-01-06 16:30:01 curt>
  */
 
 #include <signal.h>
@@ -1297,3 +1300,7 @@ register struct buf *b;
 	b->xnext = b->iobuf;
 	b->nleft = sizeof(b->iobuf)/sizeof(int);
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */

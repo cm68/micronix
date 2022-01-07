@@ -1,3 +1,10 @@
+/*
+ * the stock micronix mknod is broken, so this is pretty brutal rewrite
+ *
+ * cmd/mknod/mknod.c
+ * Changed: <2022-01-06 16:36:04 curt>
+ */
+
 main(argc, argv)
 int argc;
 char **argv;
@@ -40,3 +47,8 @@ char *s;
 	}
 	return(n);
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */
+

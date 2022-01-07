@@ -1,5 +1,8 @@
 /*
  * list file or directory - v7 version, patched for micronix
+ *
+ * cmd/ls/ls.c
+ * Changed: <2022-01-06 16:33:19 curt>
  */
 
 /*
@@ -516,3 +519,8 @@ struct lbuf **pp1, **pp2;
 	return(rflg * strcmp(p1->lflags&ISARG? p1->ln.namep: p1->ln.lname,
 				p2->lflags&ISARG? p2->ln.namep: p2->ln.lname));
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */
+

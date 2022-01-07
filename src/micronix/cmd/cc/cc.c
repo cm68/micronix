@@ -1,5 +1,8 @@
 /*
  * v7 cc command swizzled to work with hitech c ported to micronix
+ *
+ * cmd/cc/cc.c
+ * Changed: <2022-01-06 16:31:24 curt>
  */
 #include <stdio.h>
 /* #include <ctype.h> */
@@ -571,3 +574,8 @@ cunlink(f)
 	}
     unlink(f);
 }
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */
+

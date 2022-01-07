@@ -1,5 +1,8 @@
 /*
  * STevie - ST editor for VI enthusiasts.    ...Tim Thompson...twitch!tjt...
+ *
+ * cmd/vi/normal.c
+ * Changed: <2022-01-06 16:40:45 curt>
  */
 
 #include "stevie.h"

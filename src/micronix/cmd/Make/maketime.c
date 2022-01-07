@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 1985 by Morris Code Works
  *
- * maketime.c
+ * cmd/Make/maketime.c
+ * Changed: <2022-01-06 16:34:44 curt>
  */
 #include	"make.h"
 

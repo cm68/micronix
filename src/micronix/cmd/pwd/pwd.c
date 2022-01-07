@@ -1,3 +1,10 @@
+/*
+ * the stock micronix pwd is busted, so this is a rewrite
+ *
+ * cmd/pwd/pwd.c
+ * Changed: <2022-01-06 16:37:35 curt>
+ */
+
 #include <types.h>
 #include <std.h>
 #include <sys/fs.h>
@@ -132,3 +139,8 @@ ckroot()
     prname();
 }
 #endif
+
+/*
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */
+
