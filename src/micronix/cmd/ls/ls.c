@@ -2,7 +2,7 @@
  * list file or directory - v7 version, patched for micronix
  *
  * cmd/ls/ls.c
- * Changed: <2022-01-06 16:33:19 curt>
+ * Changed: <2022-08-20 12:56:22 curt>
  */
 
 /*
@@ -43,6 +43,7 @@ struct lbuf {
 	long	lmtime;
 };
 
+lwide = 0;
 int errors = 0;
 int fc = 0;
 int maxn = 0;
@@ -76,6 +77,18 @@ long	nblock();
 
 #define	ISARG	0100000
 
+/* return the number of digits an integer needs to print */
+wide(i)
+int i;
+{
+    int r = 1;
+    while (i /= 10) {
+        r++;
+    }
+    return r;
+}
+
+int
 main(argc, argv)
 char *argv[];
 {
@@ -162,7 +175,7 @@ char *argv[];
 			t = "/etc/group";
 		pwdf = fopen(t, "r");
 	}
-	if (argc==0) {
+	if (argc == 0) {
 		argc++;
 		argv = &dotp - 1;
 	}
@@ -173,6 +186,12 @@ char *argv[];
 		ep->lflags |= ISARG;
 	}
 	qsort(firstp, lastp - firstp, sizeof *lastp, compar);
+    lwide = 0;
+    for (epp = firstp; epp < slastp; epp++) {
+		ep = *epp;
+        i = wide(ep->lnl);
+        if (i > lwide) lwide = i;
+    }
 	slastp = lastp;
 	for (epp=firstp; epp<slastp; epp++) {
 		ep = *epp;
@@ -189,6 +208,12 @@ char *argv[];
 			if (lflg || sflg)
 				printf("total %D\n", tblocks);
 			if (!xflg) {
+                lwide = 0;
+				for (ep1=slastp; ep1 < lastp; ep1++) {
+                    ep = *ep1;
+                    i = wide(ep->lnl);
+                    if (i > lwide) lwide = i;
+				}
 				for (ep1=slastp; ep1 < lastp; ep1++) {
 					pentry(*ep1);
 				}
@@ -229,6 +254,7 @@ struct lbuf *ap;
 	register t;
 	register struct lbuf *p;
 	register char *cp;
+    char lprec[10];
 
 	if (xflg) {
 		t = WIDTH / (maxn + 1);
@@ -246,9 +272,10 @@ struct lbuf *ap;
 	if (sflg)
 	printf("%4D ", nblock(p->lsize));
 	if (lflg) {
+        sprintf(lprec, "%%%dd ", lwide+1);
 		putchar(p->ltype);
 		pmode(p->lflags);
-		printf("%2d ", p->lnl);
+		printf(lprec, p->lnl);
 		t = p->luid;
 		if(gflg)
 			t = p->lgid;
