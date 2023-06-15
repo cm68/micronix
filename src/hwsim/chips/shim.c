@@ -95,6 +95,28 @@ z80_get_reg8(enum reg8 r8)
         return z80_h(&z80);
     case l_reg:
         return z80_l(&z80);
+    case a1_reg:
+        return (z80_af_(&z80) >> 8) & 0xff;
+    case f1_reg:
+        return z80_af_(&z80) & 0xff;
+    case b1_reg:
+        return (z80_bc_(&z80) >> 8) & 0xff;
+    case c1_reg:
+        return z80_bc_(&z80) & 0xff;
+    case d1_reg:
+        return (z80_de_(&z80) >> 8) & 0xff;
+    case e1_reg:
+        return z80_de_(&z80) & 0xff;
+    case h1_reg:
+        return (z80_hl_(&z80) >> 8) & 0xff;
+    case l1_reg:
+        return z80_hl_(&z80) & 0xff;
+    case i_reg:
+        return z80_i(&z80);
+    case r_reg:
+        return z80_r(&z80);
+    case im_reg:
+        return z80_im(&z80);
     case status_reg:
         return status;
     default:
@@ -131,6 +153,36 @@ z80_set_reg8(enum reg8 r8, byte v)
     case l_reg:
         z80_set_l(&z80, v);
         break;
+    case a1_reg:
+        z80_set_af_(&z80, (z80_af_(&z80) & 0xff) | (v << 8));
+        break;
+    case f1_reg:
+        z80_set_af_(&z80, (z80_af_(&z80) & 0xff00) | v);
+        break;
+    case b1_reg:
+        z80_set_bc_(&z80, (z80_bc_(&z80) & 0xff) | (v << 8));
+        break;
+    case c1_reg:
+        z80_set_bc_(&z80, (z80_bc_(&z80) & 0xff00) | v);
+        break;
+    case d1_reg:
+        z80_set_de_(&z80, (z80_de_(&z80) & 0xff) | (v << 8));
+        break;
+    case e1_reg:
+        z80_set_de_(&z80, (z80_de_(&z80) & 0xff00) | v);
+        break;
+    case h1_reg:
+        z80_set_hl_(&z80, (z80_hl_(&z80) & 0xff) | (v << 8));
+        break;
+    case l1_reg:
+        z80_set_hl_(&z80, (z80_hl_(&z80) & 0xff00) | v);
+        break;
+    case i_reg:
+        z80_set_i(&z80, v);
+        break;
+    case r_reg:
+        z80_set_r(&z80, v);
+        break;
     case status_reg:
         if (v == 0) {
             if (status & S_HLTA) {
@@ -153,6 +205,12 @@ z80_get_reg16(enum reg16 r16)
         return z80_de(&z80);
     case hl_reg:
         return z80_hl(&z80);
+    case bc1_reg:
+        return z80_bc_(&z80);
+    case de1_reg:
+        return z80_de_(&z80);
+    case hl1_reg:
+        return z80_hl_(&z80);
     case ix_reg:
         return z80_ix(&z80);
     case iy_reg:
@@ -179,6 +237,15 @@ z80_set_reg16(enum reg16 r16, word v)
         break;
     case hl_reg:
         z80_set_hl(&z80, v);
+        break;
+    case bc1_reg:
+        z80_set_bc_(&z80, v);
+        break;
+    case de1_reg:
+        z80_set_de_(&z80, v);
+        break;
+    case hl1_reg:
+        z80_set_hl_(&z80, v);
         break;
     case ix_reg:
         z80_set_ix(&z80, v);
