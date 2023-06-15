@@ -2,7 +2,7 @@
  * micronix. this emulates the micronix user mode 
  *
  * usersim/micronix.c
- * Changed: <2022-01-04 20:24:21 curt>
+ * Changed: <2023-06-15 11:36:43 curt>
  *
  * Copyright (c) 2018, Curt Mayer 
  * do whatever you want, just don't claim you wrote it. 
@@ -30,6 +30,7 @@
 #include <sys/wait.h>
 #include <ctype.h>
 #include <signal.h>
+#include <curses.h>
 
 #include "../hwsim/common/sim.h"
 
@@ -60,12 +61,40 @@ void SystemCall();
 
 #define	DEFROOT	"filesystem"
 
+/*
+ * we use curses for the GUI, and we have certain regions where
+ * we plant content.
+ */
+#define W_BC    0
+#define W_DE    1
+#define W_HL    2
+#define W_SP    3
+#define W_BC1   4
+#define W_DE1   5
+#define W_HL1   6
+#define W_PC    7
+#define W_IX    8
+#define W_IY    9
+#define W_AF    10
+#define W_AF1   11
+#define W_F     12
+#define W_F1    13
+#define W_IR    14
+#define W_IFF   15
+#define W_IRQ   16
+#define W_DIS   17
+
+WINDOW *win[18];
+
+WINDOW *textwin;
+SCREEN *screen;
+
 int traceflags;
 int debug_terminal;
 int am_root = 1;
 int rootpid;
 int mypid;
-FILE *mytty;
+FILE *tty;
 extern int logfd;
 
 char curdir[100] = "";
@@ -218,7 +247,7 @@ seekfile(int fd)
 
     new = (((trk * SPT) + sec) * 512) + blkoff;
 #ifdef notdef
-    fprintf(mytty, "special: %d (%d) = %d:(%d, %d) -> %d:(%d, %d)\n", 
+    wprintw(textwin, "special: %d (%d) = %d:(%d, %d) -> %d:(%d, %d)\n", 
         files[fd].offset, blkoff, 
         blkno, blkno / SPT, blkno % SPT,
         new, trk, sec);
@@ -264,14 +293,14 @@ fname(char *orig)
 void
 stop_handler()
 {
-    fprintf(mytty, "breakpoint signal\n");
+    wprintw(textwin, "breakpoint signal\n");
     breakpoint = 1;
 }
 
 void
 pid()
 {
-    fprintf(mytty, "%x: ", mypid);
+    wprintw(textwin, "%x: ", mypid);
 }
 
 char *
@@ -366,13 +395,13 @@ pverbose()
 {
     int i;
 
-    fprintf(mytty, "verbose %x ", verbose);
+    wprintw(textwin, "verbose %x ", verbose);
     for (i = 0; vopts[i]; i++) {
         if (verbose & (1 << i)) {
-            fprintf(mytty, "%s ", vopts[i]);
+            wprintw(textwin, "%s ", vopts[i]);
         }
     }
-    fprintf(mytty, "\n");
+    wprintw(textwin, "\n");
 }
 
 void
@@ -382,8 +411,84 @@ dump_stops()
 
     for (i = 0 ; i < NSYS; i++) {
         if (!sys_stop[i]) continue;
-        fprintf(mytty, "stopping syscall %s after %d\n", syscalls[i].name, sys_stop[i]);
+        wprintw(textwin, "stopping syscall %s after %d\n", syscalls[i].name, sys_stop[i]);
     }
+}
+
+WINDOW *
+boxwin(int high, int wide, int posy, int posx)
+{
+    WINDOW *frame;
+    WINDOW *content;
+
+    frame = newwin(high, wide, posy, posx);
+    content = derwin(frame, high - 2, wide - 2, 1, 1);
+    wborder(frame, 0, 0, 0, 0, 0, 0, 0, 0);
+    wrefresh(frame); 
+    return content;
+}
+
+WINDOW *
+labelwin(char *label, int high, int wide, int posy, int posx)
+{
+    WINDOW *frame;
+    WINDOW *content;
+
+    frame = newwin(high, wide, posy, posx);
+    content = derwin(frame, high - 2, wide - 2, 1, 1);
+    wborder(frame, 0, 0, 0, 0, 0, 0, 0, 0);
+    mvwaddstr(frame, 0, 1, label);
+    wrefresh(frame); 
+    return content;
+}
+
+struct {
+    int index;
+    char *label;
+    int x;
+    int y;
+    int w;
+} reglayout[] = {
+    { W_BC,     "BC", 1, 1, 6 },
+    { W_DE,     "DE", 7, 1, 6},
+    { W_HL,     "HL", 14, 1, 6 },
+    { W_SP,     "SP", 28, 1, 6 },
+    { W_BC1,    "BC\'", 1, 4, 6 },
+    { W_DE1,    "DE\'", 7, 4, 6 },
+    { W_HL1,    "HL\'", 14, 4, 6 },
+    { W_PC,     "PC", 28, 4, 6 },
+    { W_IX,     "IX", 21, 1, 6 },
+    { W_IY,     "IY", 21, 4, 6 },
+    { W_AF,     "AF", 35, 1, 6 },
+    { W_AF1,    "AF\'", 35, 4, 6 }
+};
+
+void
+makewins()
+{
+    int i;
+
+    if (!(screen = newterm("xterm", tty, tty))) {
+        perror("newterm fail");
+        exit(1);
+    }
+
+    cbreak();
+
+    // nodelay(textwin, TRUE);
+
+    for (i = 0; i < sizeof (reglayout)/sizeof(reglayout[0]); i++) {
+        win[reglayout[i].index] = labelwin(reglayout[i].label, 3, 
+            reglayout[i].w, reglayout[i].y, reglayout[i].x);
+    }
+    win[W_DIS] = labelwin("disassembly", 6, 30, 1, 42);
+    scrollok(win[W_DIS], TRUE);
+
+    textwin = labelwin("command", 12, 62, 8, 1);
+    scrollok(textwin, TRUE);
+    wnoutrefresh(textwin);
+
+    doupdate();
 }
 
 int
@@ -395,6 +500,7 @@ main(int argc, char **argv)
     int j;
     char *ttyname;
     struct point *p;
+    WINDOW tempwin;
 
     progname = *argv++;
     argc--;
@@ -547,16 +653,18 @@ main(int argc, char **argv)
     } else {
         ttyname = "/dev/tty";
     }
-    mytty = fopen(ttyname, "r+");
-    if (!mytty) {
+    tty = fopen(ttyname, "r+");
+    if (!tty) {
         perror(ttyname);
         exit(errno);
     }
-    dup2(fileno(mytty), TTY_FD);
-    mytty = fdopen(TTY_FD, "r+");
-    logfd = fileno(mytty);
-    setvbuf(mytty, 0, _IOLBF, 0);
+    dup2(fileno(tty), TTY_FD);
+    tty = fdopen(TTY_FD, "r+");
+    logfd = fileno(tty);
+    setvbuf(tty, 0, _IOLBF, 0);
     signal(SIGUSR1, stop_handler);
+
+    makewins();
 
     /*
      * if our rootdir is relative, we need to make it absolute 
@@ -572,7 +680,7 @@ main(int argc, char **argv)
     }
     if (verbose) {
         pverbose();
-        fprintf(mytty, "emulating %s with root %s\n", argv[0], rootdir);
+        wprintw(textwin, "emulating %s with root %s\n", argv[0], rootdir);
     }
     dump_stops();
 
@@ -618,7 +726,7 @@ alarm_handler(int i)
     fd_set rfd;
     struct timeval tv;
 
-    // fprintf(mytty, "sigalarm!\n");
+    // wprintw(textwin, "sigalarm!\n");
 
     tv.tv_usec = 0;
     tv.tv_sec = 0;
@@ -720,19 +828,19 @@ do_exec(char *name, char **argv)
 
     if (verbose & V_EXEC) {
         pid();
-        fprintf(mytty, "exec %s\n", name);
+        wprintw(textwin, "exec %s\n", name);
     }
     /*
      * count our args from the null-terminated list 
      */
     for (argc = 0; argv[argc]; argc++) {
         if (verbose & V_EXEC) {
-            fprintf(mytty, "arg %d = %s\n", argc, argv[argc]);
+            wprintw(textwin, "arg %d = %s\n", argc, argv[argc]);
         }
     }
 
     if ((file = fopen(name, "rb")) == NULL) {
-        fprintf(mytty, "Can't open file %s!\n", name);
+        wprintw(textwin, "Can't open file %s!\n", name);
         return (errno);
     }
     fseek(file, 0, SEEK_SET);
@@ -750,7 +858,7 @@ do_exec(char *name, char **argv)
     }
 
     if (verbose & V_EXEC) {
-        fprintf(mytty,
+        wprintw(textwin,
             "exec header: magic: %x conf: %x symsize: %d text: %d data: %d bss: %d heap: %d textoff: %x dataoff: %x\n",
             header.ident, header.conf, header.table, header.text, header.data,
             header.bss, header.heap, header.textoff, header.dataoff);
@@ -855,6 +963,17 @@ carry_clear()
 }
 
 void
+regout(int regnum, unsigned short val)
+{
+    WINDOW *w = win[regnum];
+    char buf[6];
+    sprintf(buf, "%04x", val);
+    mvwaddstr(w, 0, 0, buf);
+    wrefresh(w);
+    wrefresh(w->_parent);
+}
+
+void
 dumpcpu()
 {
     unsigned char f;
@@ -873,9 +992,10 @@ dumpcpu()
         &get_byte, &lookup_sym, &reloc, &mnix_sc);
     s = lookup_sym(pc);
     if (s) {
-        fprintf(mytty, "%s\n", s);
+        waddstr(win[W_DIS], s);
     }
-    fprintf(mytty, "%04x: %-20s ", pc, outbuf);
+    wprintw(win[W_DIS], "\n%s", outbuf);
+    wrefresh(win[W_DIS]); wrefresh(win[W_DIS]->_parent);
 
     f = z80_get_reg8(f_reg);
 
@@ -896,7 +1016,8 @@ dumpcpu()
     if (f & 128)
         fbuf[7] = 'S';
 
-    fprintf(mytty,
+#ifdef notdef
+    wprintw(textwin,
         " %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x brk:%04x\n",
         fbuf,
         z80_get_reg8(a_reg),
@@ -907,6 +1028,8 @@ dumpcpu()
         z80_get_reg16(iy_reg),
         z80_get_reg16(sp_reg),
         get_word(z80_get_reg16(sp_reg)), brake);
+#endif
+    regout(W_PC, pc);
 }
 
 struct cpm_syscall {
@@ -973,7 +1096,7 @@ cpmsys()
     C_reg = z80_get_reg8(c_reg);
     DE_reg = z80_get_reg16(de_reg);
 
-    fprintf(mytty, "cp/m system call from %x - ", from);
+    wprintw(textwin, "cp/m system call from %x - ", from);
 
     vbuf[0] = '\0';
 
@@ -1000,7 +1123,7 @@ cpmsys()
     } else {
         sprintf(vbuf, "call: %d arg: %x\n", C_reg, DE_reg);
     }
-    fputs(vbuf, mytty);
+    waddstr(textwin, vbuf);
     dumpcpu();
     z80_set_reg16(pc_reg, pop());
 }
@@ -1017,7 +1140,7 @@ watchpoint_hit()
         }
         n = get_byte(p->addr);
         if (n != p->value) {
-            fprintf(mytty, "value %02x at %04x changed to %02x\n",
+            wprintw(textwin, "value %02x at %04x changed to %02x\n",
                 p->value, p->addr, n);
             p->value = n;
             return (1);
@@ -1060,11 +1183,9 @@ monitor()
 
     while (1) {
       more:
-        fprintf(mytty, "%d >>> ", mypid);
-        s = fgets(cmdline, sizeof(cmdline), mytty);
-        if (*s) {
-            s[strlen(s) - 1] = 0;
-        }
+        wprintw(textwin, "%d >>> ", mypid);
+        i = wgetnstr(textwin, cmdline, sizeof(cmdline));
+        s = cmdline;
         c = *s++;
         while (*s && (*s == ' '))
             s++;
@@ -1119,9 +1240,9 @@ monitor()
                     addr  = z80_get_reg16(iy_reg);
                 } else if (!strcmp(s, "sp") || !strcmp(s, "tos")) {
                     addr  = z80_get_reg16(sp_reg);
-                    fprintf(mytty, "stack %04x\n", addr);
+                    wprintw(textwin, "stack %04x\n", addr);
                     for (i = 0; i < 10; i++) {
-                        fprintf(mytty, "\t%04x\n", get_word(addr + (i * 2)));
+                        wprintw(textwin, "\t%04x\n", get_word(addr + (i * 2)));
                     } 
                     break;
                 } else {
@@ -1151,9 +1272,9 @@ monitor()
                     &get_byte, &lookup_sym, &reloc, &mnix_sc);
                 s = lookup_sym(i);
                 if (s) {
-                    fprintf(mytty, "%s\n", s);
+                    wprintw(textwin, "%s\n", s);
                 }
-                fprintf(mytty, "%04x: %-20s\n", i, cmdline);
+                wprintw(textwin, "%04x: %-20s\n", i, cmdline);
                 i += c;
                 lastaddr = i & 0xffff;
             }
@@ -1212,27 +1333,27 @@ monitor()
                     }
                 } else {
                     for (p = *head; p; p = p->next) {
-                        fprintf(mytty, "%04x\n", p->addr);
+                        wprintw(textwin, "%04x\n", p->addr);
                     }
                 }
             }
             break;
         case '?':
         case 'h':
-            fprintf(mytty, "commands:\n");
-            fprintf(mytty, "l <addr> :list\n");
-            fprintf(mytty, "d <addr> :dump memory\n");
-            fprintf(mytty, "r dump cpu state\n");
-            fprintf(mytty, "g: continue\n");
-            fprintf(mytty, "s: single step\n");
-            fprintf(mytty, "q: exit\n");
-            fprintf(mytty, "b [-] <nnnn> ... :breakpoint\n");
-            fprintf(mytty, "w [-] <nnnn> ... :watchpoint\n");
-            fprintf(mytty, "c [-] <nn> :system call trace\n");
-            fprintf(mytty, "v <nn> :set verbose\n");
+            wprintw(textwin, "commands:\n");
+            wprintw(textwin, "l <addr> :list\n");
+            wprintw(textwin, "d <addr> :dump memory\n");
+            wprintw(textwin, "r dump cpu state\n");
+            wprintw(textwin, "g: continue\n");
+            wprintw(textwin, "s: single step\n");
+            wprintw(textwin, "q: exit\n");
+            wprintw(textwin, "b [-] <nnnn> ... :breakpoint\n");
+            wprintw(textwin, "w [-] <nnnn> ... :watchpoint\n");
+            wprintw(textwin, "c [-] <nn> :system call trace\n");
+            wprintw(textwin, "v <nn> :set verbose\n");
             break;
         default:
-            fprintf(mytty, "unknown command %c\n", c);
+            wprintw(textwin, "unknown command %c\n", c);
             break;
         case 0:
             break;
@@ -1257,7 +1378,7 @@ emulate()
         }
         if (point_at(&breaks, z80_get_reg16(pc_reg), 0)) {
             pid();
-            fprintf(mytty, "break at %04x\n", z80_get_reg16(pc_reg));
+            wprintw(textwin, "break at %04x\n", z80_get_reg16(pc_reg));
             dumpcpu();
             breakpoint = 1;
         }
@@ -1291,13 +1412,13 @@ emulate()
             }
             if (signal_handler[i]) {
                 if (verbose & V_SYS) {
-                    fprintf(mytty, "invoking signal %d %x\n", i, signal_handler[i]);
+                    wprintw(textwin, "invoking signal %d %x\n", i, signal_handler[i]);
                 }
                 push(z80_get_reg16(pc_reg));
                 z80_set_reg16(pc_reg, signal_handler[i]);
             } else {
                 if (verbose & V_SYS) {
-                    fprintf(mytty, "ignoring signal %d\n", i);
+                    wprintw(textwin, "ignoring signal %d\n", i);
                 }
             }
             signalled &= ~(1 << i);
@@ -1530,7 +1651,7 @@ bitdump(unsigned short v)
 
     for (tb = ttybits; tb->name; tb++) {
         if (tb->bitmask & v) {
-            fprintf(mytty, "%s ", tb->name);
+            wprintw(textwin, "%s ", tb->name);
         }
     }
 }
@@ -1546,11 +1667,11 @@ void
 cchar(char *s, char c)
 {
     if (c == 0x7f) {
-        fprintf(mytty, "%s: DEL ", s);
+        wprintw(textwin, "%s: DEL ", s);
     } else if (c < ' ') {
-        fprintf(mytty, "%s: ^%c ", s, c + '@');
+        wprintw(textwin, "%s: ^%c ", s, c + '@');
     } else {
-        fprintf(mytty, "%s: %c ", s, c);
+        wprintw(textwin, "%s: %c ", s, c);
     }
 }
 
@@ -1562,12 +1683,12 @@ tty_dump(char *s, unsigned short a)
 {
     char c;
 
-    fprintf(mytty, "%s in: %s out: %s ",
+    wprintw(textwin, "%s in: %s out: %s ",
         s, baud[get_byte(a)], baud[get_byte(a + 1)]);
     cchar("erase", get_byte(a + 2));
     cchar("kill", get_byte(a + 3));
     bitdump(get_word(a + 4));
-    fprintf(mytty, "\n");
+    wprintw(textwin, "\n");
 }
 
 /*
@@ -1637,14 +1758,14 @@ struct tidbits lflags[] = {
 void
 tbdump(char *s, struct tidbits *tb, tcflag_t v)
 {
-    fprintf(mytty, "%s: 0%06o ", s, v);
+    wprintw(textwin, "%s: 0%06o ", s, v);
     while (tb->name) {
         if (tb->bit & v) {
-            fprintf(mytty, "%s ", tb->name);
+            wprintw(textwin, "%s ", tb->name);
         }
         tb++;
     }
-    fprintf(mytty, "\n");
+    wprintw(textwin, "\n");
 }
 
 /*
@@ -1667,7 +1788,7 @@ settimode(unsigned short mode)
 
 #ifdef notdef
     ti_dump();
-    fprintf(mytty, "settimode: %06o\n", mode);
+    wprintw(textwin, "settimode: %06o\n", mode);
 #endif
 
     for (tb = ttybits; tb->name; tb++) {
@@ -1801,7 +1922,7 @@ SystemCall()
         && ((get_byte(sc - 2) & 0xff) != 0xcd)) {
         pid();
         dumpcpu();
-        fprintf(mytty, "halt no syscall %x!\n", sc);
+        wprintw(textwin, "halt no syscall %x!\n", sc);
         exit(1);
     }
 
@@ -1817,7 +1938,7 @@ SystemCall()
         indirect++;
         sc = get_word(sc + 2);
         if ((code = get_byte(sc)) != 0xcf) {
-            fprintf(mytty, "indir no syscall %d %x!\n", code, sc);
+            wprintw(textwin, "indir no syscall %d %x!\n", code, sc);
         }
         code = get_byte(sc + 1);
     }
@@ -1846,7 +1967,7 @@ SystemCall()
     sp = &syscalls[code];
 
     if (verbose & V_SYS0) {
-        fprintf(mytty, "%10s %3d ", sp->name, z80_get_reg16(hl_reg));
+        wprintw(textwin, "%10s %3d ", sp->name, z80_get_reg16(hl_reg));
         dumpmem(&get_byte, sc, sp->argbytes + 1);
     }
 
@@ -1880,11 +2001,11 @@ SystemCall()
 
     if ((verbose & V_SYS) && (!(sp->flag & SF_SMALL) || (verbose & V_ASYS))) {
         pid();
-        fprintf(mytty, "%s(", sp->name);
+        wprintw(textwin, "%s(", sp->name);
         i = sp->flag & (SF_FD | SF_ARG1 | SF_NAME | SF_ARG2 | SF_NAME2 |
             SF_ARG2 | SF_ARG3 | SF_ARG4);
 #define F(b, f, a) \
-	if (i & (b)) { i ^= (b) ; fprintf(mytty,f,a,i?",":""); }
+	if (i & (b)) { i ^= (b) ; wprintw(textwin,f,a,i?",":""); }
         F(SF_FD, "%d%s", fd);
         F(SF_ARG1, "%04x%s", arg1);
         F(SF_NAME, "\"%s\"%s", degrime(fn));
@@ -1892,7 +2013,7 @@ SystemCall()
         F(SF_NAME2, "\"%s\"%s", fn2);
         F(SF_ARG3, "%04x%s", arg3);
         F(SF_ARG4, "%04x%s", arg4);
-        fprintf(mytty, ") ");
+        wprintw(textwin, ") ");
     }
   nolog:
 
@@ -1911,7 +2032,7 @@ SystemCall()
     switch (code) {
     case 0:                    /* double indirect is a no-op */
         pid();
-        fprintf(mytty, "double indirect syscall!\n");
+        wprintw(textwin, "double indirect syscall!\n");
         break;
 
     case 1:                    /* exit (hl) */
@@ -1981,7 +2102,7 @@ SystemCall()
                 ret = dirsnarf(filename);
                 if (ret == 0xffff) {
                     ret = errno;
-                    fprintf(mytty, "dirsnarf lose\n");
+                    wprintw(textwin, "dirsnarf lose\n");
                     goto lose;
                 }
             } else {
@@ -2027,12 +2148,12 @@ SystemCall()
     case 7:                    /* wait */
         if (verbose & V_SYS) {
             pid();
-            fprintf(mytty, "wait\n");
+            wprintw(textwin, "wait\n");
         }
         if ((ret = wait(&i)) == 0xffff) {
             if (verbose & V_SYS) {
                 pid();
-                fprintf(mytty, "no children\n");
+                wprintw(textwin, "no children\n");
             }
             ret = ECHILD;
             carry_set();
@@ -2040,7 +2161,7 @@ SystemCall()
         }
         if (verbose & V_SYS) {
             pid();
-            fprintf(mytty, "wait ret %x %x\n", ret, i);
+            wprintw(textwin, "wait ret %x %x\n", ret, i);
         }
         if (WIFEXITED(i)) {
             z80_set_reg8(d_reg, WEXITSTATUS(i));
@@ -2049,7 +2170,7 @@ SystemCall()
             z80_set_reg8(d_reg, 1);
             z80_set_reg8(e_reg, WTERMSIG(i));
         } else {
-            fprintf(mytty, "waitfuck %x\n", i);
+            wprintw(textwin, "waitfuck %x\n", i);
         }
         ret = (ret - rootpid) & 0x3fff;
         carry_clear();
@@ -2516,7 +2637,7 @@ SystemCall()
 
     case 48:                   /* set signal handler */
         if (arg1 > 15) {
-            fprintf(mytty, "signal %d out of range\n", arg1);
+            wprintw(textwin, "signal %d out of range\n", arg1);
             carry_set();
             ret = -1;
             arg1 = 0;
@@ -2556,7 +2677,7 @@ SystemCall()
 
 #ifdef notdef
             if ((arg2 != 0) && (arg2 != 1)) {
-                fprintf(mytty, "unimplemented signal %s %x\n",
+                wprintw(textwin, "unimplemented signal %s %x\n",
                     signame[arg1], arg2);
             }
 #endif
@@ -2569,12 +2690,12 @@ SystemCall()
 #ifdef notdef
             if (verbose & V_SYS) {
                 pid();
-                fprintf(mytty, "signal %s %s\n", signame[arg1],
+                wprintw(textwin, "signal %s %s\n", signame[arg1],
                     arg2 ? "ignore" : "default");
             }
         } else if (verbose & V_SYS) {
             pid();
-            fprintf(mytty, "signal %s %x\n",
+            wprintw(textwin, "signal %s %x\n",
                 signame[arg1], signal_handler[arg1]);
 #endif
         }
@@ -2585,7 +2706,7 @@ SystemCall()
         break;
     default:
         pid();
-        fprintf(mytty, "unrecognized syscall %d %x\n", code, code);
+        wprintw(textwin, "unrecognized syscall %d %x\n", code, code);
         carry_set();
         break;
     }
@@ -2603,9 +2724,9 @@ SystemCall()
     }
     if ((verbose & V_SYS) && (!(sp->flag & SF_SMALL) || (verbose & V_ASYS))) {
         if ((code == 2) && (ret == 0)) {
-            fprintf(mytty, "\n%d: fork() ", mypid);
+            wprintw(textwin, "\n%d: fork() ", mypid);
         }
-        fprintf(mytty, " = %04x%s\n",
+        wprintw(textwin, " = %04x%s\n",
             ret,
             (z80_get_reg8(f_reg) & 1) ? " FAILED" : "");
     }
@@ -2618,7 +2739,7 @@ SystemCall()
     z80_set_reg8(status_reg, 0);
     verbose = savemode;
     if ((verbose & V_SYS) && (z80_get_reg16(hl_reg) == 0xffff)) {
-        fprintf(mytty, "code = %d\n", code);
+        wprintw(textwin, "code = %d\n", code);
         dumpcpu();
     }
 }

@@ -87,9 +87,9 @@ unsigned char int_ack();
 extern void open_terminal(char *name, int signum, int *infdp, int *outfdp, int cooked, char *logfile);
 
 // generally useful timed callout facility
-void timeout(char *name, int usec, void (*function)(int a), int arg);
-void recurring_timeout(char *name, int hertz, void (*function)(int a), int arg);
-void cancel_timeout(void (*function)(), int arg);
+void time_out(char *name, int usec, void (*func)(int a), int arg);
+void recurring_time_out(char *name, int hertz, void (*func)(int a), int arg);
+void cancel_time_out(void (*func)(), int arg);
 
 // linux freaking signal madness
 typedef void (*sighandler_t)(int);

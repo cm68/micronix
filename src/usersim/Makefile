@@ -11,8 +11,8 @@ EMU=../hwsim/chips/shim.o mem.o
 else
 EMU = z80emu.o z80shim.o
 endif
-LDFLAGS = -L../lib -lsim
-LDFLAGS = -L../lib -lsim
+LDFLAGS = -L../lib -lsim -lcurses
+
 OBJECTS = micronix.o $(EMU)
 TARGETS = sim
 
