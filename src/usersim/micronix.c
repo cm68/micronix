@@ -2,7 +2,7 @@
  * micronix. this emulates the micronix user mode 
  *
  * usersim/micronix.c
- * Changed: <2023-06-15 11:36:43 curt>
+ * Changed: <2023-06-15 14:15:20 curt>
  *
  * Copyright (c) 2018, Curt Mayer 
  * do whatever you want, just don't claim you wrote it. 
@@ -83,8 +83,10 @@ void SystemCall();
 #define W_IFF   15
 #define W_IRQ   16
 #define W_DIS   17
+#define W_DUMP  18
+#define W_STACK 19
 
-WINDOW *win[18];
+WINDOW *win[20];
 
 WINDOW *textwin;
 SCREEN *screen;
@@ -415,6 +417,50 @@ dump_stops()
     }
 }
 
+int pline;
+
+/* dump line format */
+#define DUMP_ADDR   0
+#define DUMP_DATA   6
+#define DUMP_CHAR   57
+
+char
+sanitize(char c)
+{
+    if ((c <= 0x20) || (c >= 0x7f))
+        return '.';
+    return c;
+}
+
+memdump(WINDOW *w, unsigned short addr, int len)
+{
+    int i;
+    char c;
+    int pcol;
+
+    wclear(w);
+
+    pcol = 0;
+    pline = 0;
+
+    while (len) {
+        if (pcol == 0)
+            mvwprintw(w, pline, DUMP_ADDR, "%04x:", addr);
+        c = get_byte(addr++);
+        mvwprintw(w, pline, DUMP_DATA + (pcol * 3) + (pcol / 4), 
+            "%02x", c & 0xff);
+        mvwprintw(w, pline, DUMP_CHAR + (pcol) + (pcol / 4), 
+            "%c", sanitize(c));
+        if (pcol++ == 15) {
+            pcol = 0;
+            pline++;
+        }
+        len--;
+    }
+    wrefresh(w); 
+    wrefresh(w->_parent);
+}
+
 WINDOW *
 boxwin(int high, int wide, int posy, int posx)
 {
@@ -436,8 +482,10 @@ labelwin(char *label, int high, int wide, int posy, int posx)
 
     frame = newwin(high, wide, posy, posx);
     content = derwin(frame, high - 2, wide - 2, 1, 1);
-    wborder(frame, 0, 0, 0, 0, 0, 0, 0, 0);
-    mvwaddstr(frame, 0, 1, label);
+    if (label) {
+        wborder(frame, 0, 0, 0, 0, 0, 0, 0, 0);
+        mvwaddstr(frame, 0, 1, label);
+    }
     wrefresh(frame); 
     return content;
 }
@@ -449,18 +497,23 @@ struct {
     int y;
     int w;
 } reglayout[] = {
-    { W_BC,     "BC", 1, 1, 6 },
-    { W_DE,     "DE", 7, 1, 6},
-    { W_HL,     "HL", 14, 1, 6 },
-    { W_SP,     "SP", 28, 1, 6 },
-    { W_BC1,    "BC\'", 1, 4, 6 },
-    { W_DE1,    "DE\'", 7, 4, 6 },
-    { W_HL1,    "HL\'", 14, 4, 6 },
-    { W_PC,     "PC", 28, 4, 6 },
-    { W_IX,     "IX", 21, 1, 6 },
-    { W_IY,     "IY", 21, 4, 6 },
-    { W_AF,     "AF", 35, 1, 6 },
-    { W_AF1,    "AF\'", 35, 4, 6 }
+    { W_BC,     "BC", 0, 0, 6 },
+    { W_DE,     "DE", 6, 0, 6},
+    { W_HL,     "HL", 13, 0, 6 },
+    { W_SP,     "SP", 27, 0, 6 },
+    { W_BC1,    "BC\'", 0, 3, 6 },
+    { W_DE1,    "DE\'", 6, 3, 6 },
+    { W_HL1,    "HL\'", 13, 3, 6 },
+    { W_PC,     "PC", 27, 3, 6 },
+    { W_IX,     "IX", 20, 0, 6 },
+    { W_IY,     "IY", 20, 3, 6 },
+    { W_AF,     "AF", 34, 0, 6 },
+    { W_AF1,    "AF\'", 34, 3, 6 },
+    { W_F,       0, 40, 0, 10 },
+    { W_F1,      0, 40, 3, 10 },
+    { W_IR,     "IR", 50, 0, 6 },
+    { W_IFF,    "IFF", 50, 3, 4 },
+    { W_IRQ,    "IRQ", 58, 3, 4 }
 };
 
 void
@@ -472,7 +525,6 @@ makewins()
         perror("newterm fail");
         exit(1);
     }
-
     cbreak();
 
     // nodelay(textwin, TRUE);
@@ -481,10 +533,14 @@ makewins()
         win[reglayout[i].index] = labelwin(reglayout[i].label, 3, 
             reglayout[i].w, reglayout[i].y, reglayout[i].x);
     }
-    win[W_DIS] = labelwin("disassembly", 6, 30, 1, 42);
+    win[W_DIS] = labelwin("disassembly", 10, COLS - 2, 6, 0);
     scrollok(win[W_DIS], TRUE);
 
-    textwin = labelwin("command", 12, 62, 8, 1);
+    win[W_DUMP] = labelwin("dump", 18, COLS - 2, 17, 0);
+
+    win[W_STACK] = labelwin("stack", 18, COLS - 2, 35, 0);
+
+    textwin = labelwin("command", 12, COLS - 2, LINES - 13, 0);
     scrollok(textwin, TRUE);
     wnoutrefresh(textwin);
 
@@ -701,6 +757,7 @@ main(int argc, char **argv)
     free(argvec);
 
     z80_set_reg16(pc_reg, pop());
+    dumpcpu();
     emulate();
     return EXIT_SUCCESS;
 }
@@ -973,31 +1030,14 @@ regout(int regnum, unsigned short val)
     wrefresh(w->_parent);
 }
 
+char fbuf[9];
+
 void
-dumpcpu()
+fflags(unsigned char f)
 {
-    unsigned char f;
-    char outbuf[40];
-    char fbuf[9];
-    char *s;
     int i;
-    unsigned short pc;
-
-    // 01234567
-    strcpy(fbuf, "        ");
-
-    pc = z80_get_reg16(pc_reg);
-
-    format_instr(pc, outbuf,
-        &get_byte, &lookup_sym, &reloc, &mnix_sc);
-    s = lookup_sym(pc);
-    if (s) {
-        waddstr(win[W_DIS], s);
-    }
-    wprintw(win[W_DIS], "\n%s", outbuf);
-    wrefresh(win[W_DIS]); wrefresh(win[W_DIS]->_parent);
-
-    f = z80_get_reg8(f_reg);
+    for (i = 0; i < sizeof(fbuf); i++) fbuf[i] = ' ';
+    fbuf[8] = '\0';
 
     if (f & 1)
         fbuf[0] = 'C';
@@ -1015,6 +1055,28 @@ dumpcpu()
         fbuf[6] = 'Z';
     if (f & 128)
         fbuf[7] = 'S';
+}
+
+void
+dumpcpu()
+{
+    unsigned short af;
+    unsigned char f;
+    char outbuf[40];
+    char *s;
+    int i;
+    unsigned short pc;
+
+    pc = z80_get_reg16(pc_reg);
+
+    format_instr(pc, outbuf,
+        &get_byte, &lookup_sym, &reloc, &mnix_sc);
+    s = lookup_sym(pc);
+    if (s) {
+        waddstr(win[W_DIS], s);
+    }
+    wprintw(win[W_DIS], "\n%04x %s", pc, outbuf);
+    wrefresh(win[W_DIS]); wrefresh(win[W_DIS]->_parent);
 
 #ifdef notdef
     wprintw(textwin,
@@ -1029,7 +1091,29 @@ dumpcpu()
         z80_get_reg16(sp_reg),
         get_word(z80_get_reg16(sp_reg)), brake);
 #endif
+
+    f = z80_get_reg8(f_reg);
+    fflags(f);
+    mvwaddstr(win[W_F], 0, 0, fbuf);
+    wrefresh(win[W_F]);
+    f = z80_get_reg8(f1_reg);
+    fflags(f);
+    mvwaddstr(win[W_F1], 0, 0, fbuf);
+    wrefresh(win[W_F1]);
+    regout(W_IR, (z80_get_reg8(i_reg) << 8) | z80_get_reg8(r_reg));
+    regout(W_AF, z80_get_reg8(a_reg) << 8 | z80_get_reg8(f_reg));
+    regout(W_AF1, z80_get_reg8(a1_reg) << 8 | z80_get_reg8(f1_reg));
+    regout(W_BC, z80_get_reg16(bc_reg));
+    regout(W_DE, z80_get_reg16(de_reg));
+    regout(W_HL, z80_get_reg16(hl_reg));
+    regout(W_BC1, z80_get_reg16(bc1_reg));
+    regout(W_DE1, z80_get_reg16(de1_reg));
+    regout(W_HL1, z80_get_reg16(hl1_reg));
+    regout(W_IX, z80_get_reg16(ix_reg));
+    regout(W_IY, z80_get_reg16(iy_reg));
+    regout(W_SP, z80_get_reg16(sp_reg));
     regout(W_PC, pc);
+    memdump(win[W_STACK], z80_get_reg16(sp_reg) - 128, 256);
 }
 
 struct cpm_syscall {
@@ -1252,7 +1336,7 @@ monitor()
                 addr = lastaddr;
             }
             addr &= 0xffff;
-            dumpmem(&get_byte, addr, 256);
+            memdump(win[W_DUMP], addr, 256);
             lastaddr = (addr + 256) & 0xffff;
             break;
         case 'l':
