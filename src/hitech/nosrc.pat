@@ -318,26 +318,110 @@ block _fflush
 		fd 75 02 fd 74 03 23 7d b4 20 ba 
 		c3 ANY ANY
 	end
-	code _fflush
-		struct iob { char *ptr; int cnt; char *base ; unsigned char flag ; unsigned char fd; };
-		int
-		_fflush(struct iob *f) {
-			if ((f->flag & 2)) return -1;
-			if ((f->base == 0) || (f->cnt == 0x200)) return 0;
-		}
+	patch _fflush
+                pop hl                  ; de = file *
+                pop de
+                push de
+                push hl
+                ld hl,6                 ; get flags
+                add hl,de
+                bit 1,(hl)              ; not write
+                jr z, ferr
+
+                ld hl,2
+                add hl,de
+                ld c,(hl)               ; bc = cnt
+                inc hl
+                ld b,(hl)
+                ld hl,0x200             ; BUFSIZE - cnt
+                or a
+                sbc hl,bc
+                ld a,h
+                or l
+                jr z,fend
+                ld b,h                  ; bc = to_write
+                ld c,l
+
+                ld hl,4                 ; if base == 0, no buffer
+                add hl,de
+                ld a,(hl)
+                inc hl
+                or (hl)
+                jr z,fend
+
+                push de                 ; save our file *
+                push bc                 ; save our count
+
+                ld (m_write+4),bc
+                ld b,(hl)
+                dec hl
+                ld c,(hl)
+                ld (m_write+2),bc
+                inc hl
+                inc hl
+                inc hl
+                ld l,(hl)
+                ld h,0
+
+        m_write:                        ; write(fd, base, 0x200 - cnt)
+                defb 0xcf, 4, 0, 0, 0, 0
+
+                pop bc                  ; restore file *, cnt
+                pop de
+
+                ld a,h                  ; if ret != cnt
+                cp b
+                jr nz,fioer
+                ld a,l
+                cp c
+                jr z,fok
+        fioer:
+                ld hl,6
+                add hl,de
+                ld a,(hl)               ; set error
+                or 0x20
+                ld (hl),a
+        fok:
+                dec hl
+                ld b,(hl)
+                dec hl
+                ld c,(hl)
+                dec hl
+                ld (hl),2               ; f->cnt = 0x200
+                dec hl
+                ld (hl),0
+                dec hl
+                ld (hl),b               ; f->ptr = f->base
+                dec hl
+                ld (hl),c
+                and 0x20
+                jr nz,ferr
+        fend:
+                ld hl, 0
+                ret
+        ferr:
+                ld hl, 0xffff
+                ret
 	end
-;	patch _fflush
-;		call csv
-;		ld l,(ix+6)	; get FILE ptr
-;		ld h,(ix+7)
-;		push hl
-;		pop iy
-;		bit 1,(iy+6) ; if IOWRT
-;		jr z,retffl
-;	retffl:
-;		ld hl,0
-;		jp cret	
-;	end
+end
+
+block _con_check
+	match
+		CALL csv
+		e5 21 0b 00 e5
+		CALL bdosa
+		c1 7d b7 ca cret
+		21 01 00 e5
+		CALL bdosa
+		c1 5d dd 73 ff
+		7b fe 03
+		c2 cret
+		CALL exit
+		JUMP cret
+	end
+	patch _con_check
+		ret
+	end
 end
 
 ;
@@ -359,6 +443,16 @@ block _unlink
 		e3 CALL _setuid c1 
 		dd 6e d3 dd 66 d4
 		JUMP cret 
+	end
+	patch _unlink
+		pop de
+		pop hl
+		ld (m_unlink+2),de
+		push hl
+		push de
+		ret
+	m_unlink:		; unlink(fname)
+		defb 0xcf, 10, 0, 0
 	end
 end
 

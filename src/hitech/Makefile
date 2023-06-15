@@ -1,7 +1,7 @@
 #
 # makefile to generate the binary patcher and to patch the hitech c
 # compiler, assembler, linker and tools to micronix
-# Changed: <2021-12-30 18:27:49 curt>
+# Changed: <2022-09-13 17:07:40 curt>
 #
 
 DEBUG = -v 0x71
@@ -13,6 +13,8 @@ PATCHFILE = havesrc.pat
 
 CFLAGS = -Wno-implicit-int
 
+DEST = ../../filesystem/hitech
+INSTALL= $(DEST)/cpp $(DEST)/p1
 
 all: bin $(HITECH)
 	cp $(HITECH) bin
@@ -32,9 +34,18 @@ bpatch: bpatch.c
 	../tools/disas $< >$<.dis
 	../tools/disas $* >$*.dis 
 
+$(DEST)/p1: p1
+	cp $< $@
+
+$(DEST)/cpp: cpp
+	cp $< $@
+
+$(DEST)/cgen: cgen
+	cp $< $@
+
 install: $(HITECH)
-	mkdir -p ../../filesystem/hitech
-	cp $(HITECH) ../../filesystem/hitech
+	mkdir -p $(DEST)
+	cp $(HITECH) $(DEST)
 	
 clobber: clean
 	rm -f $(HITECH)
@@ -42,9 +53,16 @@ clobber: clean
 clean:
 	rm -rf *.o bpatch objdump *.dSYM *.dis *.sym asmtext.* ctext.*
 
-test: install
+testcpp: $(DEST)/cpp
 	$(SIM) $(DEBUG) /hitech/cpp -Dmicronix -Dz80 -I/include/ /usr/src/cmd/cc/cc.c /usr/src/cmd/cc/cc.i
+
+testp1: $(DEST)/p1
 	$(SIM) $(DEBUG) /hitech/p1 /usr/src/cmd/cc/cc.i /usr/src/cmd/cc/cc.1
+
+testcgen: $(DEST)/cgen
+	$(SIM) $(DEBUG) /hitech/cgen /usr/src/cmd/cc/cc.1 /usr/src/cmd/cc/cc.2
+
+test: testcpp testp1 testcgen
 	
 objscan: objscan.c
 	cc -g -o objscan objscan.c

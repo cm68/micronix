@@ -70,6 +70,7 @@ rm -f core
 echo "running with $trarg"
 
 echo "file ./d1" >.gdbargs
+echo "core-file core" >> .gdbargs
 echo "set args -l $x -S $symfile $confarg $trarg ./boot.IMD" >> .gdbargs
 ./d1 -l $x -S $symfile $confarg $trarg ./boot.IMD
 stty cooked echo echoe
