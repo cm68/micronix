@@ -2,7 +2,7 @@
  * v7 cc command swizzled to work with hitech c ported to micronix
  *
  * cmd/cc/cc.c
- * Changed: <2022-01-06 16:31:24 curt>
+ * Changed: <2023-06-16 01:27:24 curt>
  */
 #include <stdio.h>
 /* #include <ctype.h> */
@@ -39,6 +39,7 @@ char *outfile CINIT;
 
 char namebuf[100] CINIT;
 
+int Sflag CINIT;
 int pflag CINIT;
 int sflag CINIT;
 int cflag CINIT;
@@ -145,6 +146,10 @@ main(argc, argv)
 			case 'H':			/* hitech */
 				wflag=0;
 				break;
+
+            case 's':			/* strip binary */
+                Sflag++;
+                break;
 
             case 'S':			/* don't assemble */
                 sflag++;
@@ -414,7 +419,11 @@ assemble:
 			av[j++] = "-u_main";
 			av[j++] = "-eb__memory";
 			av[j++] = "-tb0x100";
-			av[j++] = "-tr";
+            if (Sflag) {
+                av[j++] = "-tr";
+            } else {
+                av[j++] = "-r";
+            }
 			av[j++] = "-dr12";
 			av[j++] = "/lib/uhdr.o";
 		} else {
