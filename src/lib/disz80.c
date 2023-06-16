@@ -3,7 +3,7 @@
  *
  * lib/disz80.c
  *
- * Changed: <2023-06-15 22:11:37 curt>
+ * Changed: <2023-06-16 00:35:57 curt>
  */
 
 #include <stdio.h>
@@ -565,20 +565,18 @@ format_instr(unsigned short addr, char *outbuf)
 	}
 
 	if (oflags & (OP_TEXT | OP_DATA)) {
-		if (get_reloc) {
-			reloc = (*get_reloc)(addr + bcount);
-			switch (RELTYPE(reloc)) {
-			case RL_SYMBOL:
-				symname = get_symname(reloc);
-				break;
-			case RL_TEXT:
-				break;
-			case RL_DATA:
-				break;
-			default:
-				symname = 0;
-				break;
-			}
+		reloc = get_reloc(addr + bcount);
+		switch (RELTYPE(reloc)) {
+		case RL_SYMBOL:
+			symname = get_symname(RELNUM(reloc));
+			break;
+		case RL_TEXT:
+			break;
+		case RL_DATA:
+			break;
+		default:
+			symname = 0;
+			break;
 		}
 		value = (unsigned char)get_byte(addr + bcount++);
 		value += get_byte(addr + bcount++) << 8;

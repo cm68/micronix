@@ -3,7 +3,7 @@
  *
  * tools/disas.c
  *
- * Changed: <2023-06-16 00:16:46 curt>
+ * Changed: <2023-06-16 01:00:09 curt>
  *
  * todo: XXX
  *  detect switch statements
@@ -146,6 +146,7 @@ int find_symbol(char *ls);
 /*
  * variables
  */
+int fmt_indir_sc = 0;
 
 FILE *file;
 char *name;
@@ -301,7 +302,7 @@ getbyte()
 }
 
 byte
-byteat(word addr)
+get_byte(word addr)
 {
     return codebuf[addr];
 }
@@ -328,7 +329,7 @@ patmatch(short *p, word b, int len)
         if (*p == -1) {
             p++; b++; continue;
         }
-        if (*p++ != byteat(b++)) return 0;
+        if (*p++ != get_byte(b++)) return 0;
     }
     return 1;
 }
