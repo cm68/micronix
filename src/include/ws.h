@@ -2,10 +2,10 @@
  * whitesmith's object access library
  *
  * ws.h
- * Changed: <2021-12-23 15:34:55 curt>
+ * Changed: <2023-06-16 00:42:02 curt>
  */
 
-extern struct ws_reloc *getreloc(unsigned char **pp);
+extern struct ws_reloc *readreloc(unsigned char **pp);
 extern unsigned short location;
 
 /*

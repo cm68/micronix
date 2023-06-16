@@ -1,14 +1,14 @@
 # build host tools
 #
 # tools/Makefile
-# Changed: <2021-12-23 15:53:01 curt>
+# Changed: <2023-06-16 01:03:21 curt>
 
 SIMTARGETS = \
 	ar nm size imd disas dump \
 	mnix dcheck icheck ncheck readall
 	#mar  hitech
 
-LDFLAGS = -L../lib -lsim
+LDFLAGS = 
 GENERATED = doc.inl zmac.c doc
 TARGETS = $(SIMTARGETS) zmac
 CXXFLAGS= $(MACHINE)
@@ -16,6 +16,30 @@ CXXFLAGS= $(MACHINE)
 include ../Makefile.inc
 
 $(SIMTARGETS): ../lib/libsim.a
+
+nm:	nm.o
+	$(CC) -o nm nm.o ../lib/disz80.o ../lib/util.o ../lib/whitesmith.o ../lib/mnix_sys.c
+
+imd:	imd.o
+	$(CC) -o imd imd.o ../lib/imdlib.o ../lib/util.o
+
+disas:	disas.o
+	$(CC) -o disas disas.o ../lib/mnix_sys.o
+
+mnix:	mnix.o
+	$(CC) -o mnix mnix.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o
+
+dcheck:	dcheck.o
+	$(CC) -o dcheck dcheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o
+
+icheck:	icheck.o
+	$(CC) -o icheck icheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o
+
+ncheck:	ncheck.o
+	$(CC) -o ncheck ncheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o
+
+readall:	readall.o
+	$(CC) -o readall readall.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o
 
 zmac: zmac.o mio.o doc.o zi80dis.o
 	$(CXX) -Wall $(CXXFLAGS) -o zmac zmac.o mio.o doc.o zi80dis.o

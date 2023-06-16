@@ -6,7 +6,8 @@
  * just for grins, it can disassemble too.
  *
  * tools/nm.c
- * Changed: <2021-12-23 16:05:07 curt>
+ *
+ * Changed: <2023-06-16 00:50:15 curt>
  */
 
 #include <fcntl.h>
@@ -20,6 +21,7 @@
 #include "../include/util.h"
 #include "../include/disz80.h"
 
+int fmt_indir_sc = 0;
 int traceflags;
 int verbose;
 int sflag = 1;
@@ -62,7 +64,7 @@ int endoff;
 int fd;
 
 unsigned char
-readbyte(unsigned short addr)
+get_byte(unsigned short addr)
 {
     unsigned char c;
 
@@ -95,7 +97,7 @@ lookup(int i)
  * in which case the low 16 bits are a symbol number
  */
 char *
-sym(symaddr_t addr)
+get_symname(unsigned short addr)
 {
     int i;
 
@@ -124,7 +126,7 @@ int labels;
 char label[65536];
 
 unsigned int
-reloc(symaddr_t addr)
+get_reloc(unsigned short addr)
 {
     struct reloc *r;
     int ret = 0;
@@ -162,12 +164,12 @@ disassem()
     lseek(fd, textoff, SEEK_SET);
     location = head.textoff;
     while (location < head.textoff + head.text) {
-        bc = format_instr(location, outbuf, &readbyte, &sym, &reloc, &mnix_sc);
-        if ((tag = sym(location))) {
+        bc = format_instr(location, outbuf);
+        if ((tag = get_symname(location))) {
             printf("%s:\n", tag);
         }
         for (i = 0; i < bc; i++) {
-            barray[i] = readbyte(location + i);
+            barray[i] = get_byte(location + i);
         }
         printf("%04x: %-30s", location, outbuf);
         printf(" ; ");
@@ -196,16 +198,16 @@ disassem()
         printf("data:\n");
         location = head.dataoff;
         while (location < head.dataoff + head.data) {
-            if ((tag = sym(location))) {
+            if ((tag = get_symname(location))) {
                 printf("%s:\n", tag);
             }
             for (i = location + 1; i < head.dataoff + head.data; i++) {
-                if (sym(i)) {
+                if (get_symname(i)) {
                     break;
                 }
             }
             fflush(stdout);
-            dumpmem(&readbyte, location, i - location);
+            dumpmem(&get_byte, location, i - location);
             location = i;
         }
     }
@@ -223,7 +225,7 @@ outimage()
  
     fd = creat("imagefile", 0777);
     for (i = 0; i < 65536; i++) {
-        c = readbyte(i);            
+        c = get_byte(i);            
         write(fd, &c, 1);
     }
     close(fd);
@@ -237,7 +239,7 @@ makerelocs(unsigned char seg)
 
     location = 0;
 
-    while ((rp = getreloc(&relocp)) != 0) {
+    while ((rp = readreloc(&relocp)) != 0) {
         r = malloc(sizeof(struct reloc));
         r->seg = seg;
         r->rl.offset = rp->offset;
