@@ -1,7 +1,7 @@
 #define CHIPS_IMPL
 
 #include <stdio.h>
-#include "../common/sim.h"
+#include "../../include/sim.h"
 #include "z80.h"
 
 byte control;
