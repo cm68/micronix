@@ -1,8 +1,9 @@
 /*
  * data structures known used by the disassembler hook
  *
- * mnix.h
- * Changed: <2021-12-24 15:33:58 curt>
+ * include/mnix.h
+ *
+ * Changed: <2023-06-16 00:15:04 curt>
  */
 
 /*
@@ -27,7 +28,8 @@ struct syscall {
 #define	SF_BUF		128
 #define	SF_SMALL	256
 
-int mnix_scpr(unsigned short addr, unsigned char (*gb)(unsigned short a), char *dest);
+int fmt_syscall(unsigned short addr, char *dest);
+extern int fmt_indir_sc;
 
 extern struct syscall syscalls[];
 extern char *signame[];

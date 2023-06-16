@@ -3,7 +3,8 @@
  * and interactive simulator
  *
  * lib/mnix_sys.c
- * Changed: <2021-12-23 15:42:53 curt>
+ *
+ * Changed: <2023-06-15 22:08:38 curt>
  */
 /*
  * the number of bytes to adjust the return address on the stack by.
@@ -75,16 +76,16 @@ struct syscall syscalls[] = {
  * format a system call with args
  */
 int
-mnix_sc(unsigned short addr, unsigned char (*gb)(unsigned short a), char *dest)
+fmt_syscall(unsigned short addr, char *dest)
 {
-	char sc;
+	unsigned char sc;
 	int i;
 	char nbuf[6];
-	int iaddr;
+	unsigned short iaddr;
 	int ret;
 
 	addr &= 0xffff;
-	sc = (*gb)(addr + 1);
+	sc = get_byte(addr + 1);
 	if ((sc < 0) || (sc >= sizeof(syscalls) / sizeof(syscalls[0]))) {
 		sprintf(dest, "unknown %x\n", sc);
 		return 0;
@@ -92,19 +93,19 @@ mnix_sc(unsigned short addr, unsigned char (*gb)(unsigned short a), char *dest)
 	ret = syscalls[sc].argbytes;
 
 	sprintf(dest, "%s ", syscalls[sc].name);
-	if (sc == 0) {
-		iaddr = ((*gb)(addr + 3) << 8) + ((*gb)(addr + 2) & 0xff);
+	if (sc == 0 && fmt_indir_sc) {
+		iaddr = (get_byte(addr + 3) << 8) + (get_byte(addr + 2) & 0xff);
 		iaddr &= 0xffff;
-		if (((*gb)(iaddr) & 0xff) != 0xcf) {
+		if ((get_byte(iaddr) & 0xff) != 0xcf) {
 			sprintf(dest, "(0x%x)\n", iaddr);
 			return ret;
 		}
 		addr = iaddr;
-		sc = (*gb)(addr + 1);
+		sc = get_byte(addr + 1);
 		sprintf(dest, "(0x%x) %s ", iaddr, syscalls[sc].name);
 	}
 	for (i = 1; i < syscalls[sc].argbytes; i++) {
-		sprintf(nbuf, "%02x ", (*gb)(addr + i + 1) & 0xff);
+		sprintf(nbuf, "%02x ", get_byte(addr + i + 1) & 0xff);
 		strcat(dest, nbuf);
 	}
 	return ret;
@@ -114,16 +115,16 @@ mnix_sc(unsigned short addr, unsigned char (*gb)(unsigned short a), char *dest)
  * format a system call - don't follow indirection
  */
 int
-mnix_scpr(unsigned short addr, unsigned char (*gb)(unsigned short a), char *dest)
+mnix_scpr(unsigned short addr, char *dest)
 {
-	char sc;
+	unsigned char sc;
 	int i;
 	char nbuf[6];
-	int iaddr;
+	unsigned short iaddr;
 	int ret;
 
 	addr &= 0xffff;
-	sc = (*gb)(addr + 1);
+	sc = get_byte(addr + 1);
 	if ((sc < 0) || (sc >= sizeof(syscalls) / sizeof(syscalls[0]))) {
 		sprintf(dest, "unknown %x\n", sc);
 		return 0;
@@ -132,7 +133,7 @@ mnix_scpr(unsigned short addr, unsigned char (*gb)(unsigned short a), char *dest
 
 	sprintf(dest, "%s ", syscalls[sc].name);
 	for (i = 1; i < syscalls[sc].argbytes; i++) {
-		sprintf(nbuf, "%02x ", (*gb)(addr + i + 1) & 0xff);
+		sprintf(nbuf, "%02x ", get_byte(addr + i + 1) & 0xff);
 		strcat(dest, nbuf);
 	}
 	return ret;

@@ -2,11 +2,13 @@
  * micronix. this emulates the micronix user mode 
  *
  * usersim/micronix.c
- * Changed: <2023-06-15 14:15:20 curt>
+ *
+ * Changed: <2023-06-16 00:17:59 curt>
  *
  * Copyright (c) 2018, Curt Mayer 
  * do whatever you want, just don't claim you wrote it. 
  * warrantee: madness! nope. 
+ *
  * plugs into the z80emu code from: 
  *  Copyright (c) 2012, 2016 * Lin Ke-Fong 
  *  Copyright (c) 2012 Chris Pressey This code is free, do
@@ -32,15 +34,15 @@
 #include <signal.h>
 #include <curses.h>
 
-#include "../hwsim/common/sim.h"
-
 #include "../micronix/include/types.h"
 #include "../micronix/include/sys/fs.h"
 
+#include "../include/sim.h"
 #include "../include/disz80.h"
 #include "../include/util.h"
 #include "../include/mnix.h"
 #include "../include/fslib.h"
+#include "../include/gui.h"
 
 #ifdef __APPLE__
     typedef void (*sighandler_t)(int);
@@ -61,35 +63,7 @@ void SystemCall();
 
 #define	DEFROOT	"filesystem"
 
-/*
- * we use curses for the GUI, and we have certain regions where
- * we plant content.
- */
-#define W_BC    0
-#define W_DE    1
-#define W_HL    2
-#define W_SP    3
-#define W_BC1   4
-#define W_DE1   5
-#define W_HL1   6
-#define W_PC    7
-#define W_IX    8
-#define W_IY    9
-#define W_AF    10
-#define W_AF1   11
-#define W_F     12
-#define W_F1    13
-#define W_IR    14
-#define W_IFF   15
-#define W_IRQ   16
-#define W_DIS   17
-#define W_DUMP  18
-#define W_STACK 19
-
-WINDOW *win[20];
-
-WINDOW *textwin;
-SCREEN *screen;
+extern WINDOW **win;
 
 int traceflags;
 int debug_terminal;
@@ -164,7 +138,6 @@ pop()
     return (i);
 }
 
-
 char *progname;
 
 char *vopts[] = {
@@ -192,8 +165,8 @@ struct point
     struct point *next;
 };
 
-struct point *breaks;
-struct point *watches;
+extern struct point *breaks;
+extern struct point *watches;
 
 #define MAXFILE 63
 /*
@@ -248,12 +221,6 @@ seekfile(int fd)
     sec %= SPT;
 
     new = (((trk * SPT) + sec) * 512) + blkoff;
-#ifdef notdef
-    wprintw(textwin, "special: %d (%d) = %d:(%d, %d) -> %d:(%d, %d)\n", 
-        files[fd].offset, blkoff, 
-        blkno, blkno / SPT, blkno % SPT,
-        new, trk, sec);
-#endif
     lseek(fd, new, SEEK_SET);
     return 0;
 }
@@ -295,24 +262,18 @@ fname(char *orig)
 void
 stop_handler()
 {
-    wprintw(textwin, "breakpoint signal\n");
+    message("breakpoint signal\n");
     breakpoint = 1;
 }
 
 void
 pid()
 {
-    wprintw(textwin, "%x: ", mypid);
-}
-
-char *
-get_symname(int addr)
-{
-    return 0;
+    message("%x: ", mypid);
 }
 
 unsigned int
-reloc(symaddr_t addr)
+get_reloc(unsigned short addr)
 {
     return 0;
 }
@@ -355,8 +316,8 @@ usage(char *complaint, char *arg)
 /*
  * system calls to stop on 
  */
-char sys_stop[NSYS];
-char sys_trace[NSYS];
+extern char sys_stop[];
+extern char sys_trace[];
 
 /*
  * get a system call id.  either by name or integer.
@@ -387,164 +348,24 @@ get_syscall(char **sp)
     }
     i = strtol(*sp, sp, 0);
     if (i >= NSYS) {
-        fprintf(stderr, "bad system call number %d\n", i);
+        message("bad system call number %d\n", i);
         i = -1;
     }
     return i;
 }
+
 void
 pverbose()
 {
     int i;
 
-    wprintw(textwin, "verbose %x ", verbose);
+    message("verbose %x ", verbose);
     for (i = 0; vopts[i]; i++) {
         if (verbose & (1 << i)) {
-            wprintw(textwin, "%s ", vopts[i]);
+            message("%s ", vopts[i]);
         }
     }
-    wprintw(textwin, "\n");
-}
-
-void
-dump_stops()
-{
-    int i;
-
-    for (i = 0 ; i < NSYS; i++) {
-        if (!sys_stop[i]) continue;
-        wprintw(textwin, "stopping syscall %s after %d\n", syscalls[i].name, sys_stop[i]);
-    }
-}
-
-int pline;
-
-/* dump line format */
-#define DUMP_ADDR   0
-#define DUMP_DATA   6
-#define DUMP_CHAR   57
-
-char
-sanitize(char c)
-{
-    if ((c <= 0x20) || (c >= 0x7f))
-        return '.';
-    return c;
-}
-
-memdump(WINDOW *w, unsigned short addr, int len)
-{
-    int i;
-    char c;
-    int pcol;
-
-    wclear(w);
-
-    pcol = 0;
-    pline = 0;
-
-    while (len) {
-        if (pcol == 0)
-            mvwprintw(w, pline, DUMP_ADDR, "%04x:", addr);
-        c = get_byte(addr++);
-        mvwprintw(w, pline, DUMP_DATA + (pcol * 3) + (pcol / 4), 
-            "%02x", c & 0xff);
-        mvwprintw(w, pline, DUMP_CHAR + (pcol) + (pcol / 4), 
-            "%c", sanitize(c));
-        if (pcol++ == 15) {
-            pcol = 0;
-            pline++;
-        }
-        len--;
-    }
-    wrefresh(w); 
-    wrefresh(w->_parent);
-}
-
-WINDOW *
-boxwin(int high, int wide, int posy, int posx)
-{
-    WINDOW *frame;
-    WINDOW *content;
-
-    frame = newwin(high, wide, posy, posx);
-    content = derwin(frame, high - 2, wide - 2, 1, 1);
-    wborder(frame, 0, 0, 0, 0, 0, 0, 0, 0);
-    wrefresh(frame); 
-    return content;
-}
-
-WINDOW *
-labelwin(char *label, int high, int wide, int posy, int posx)
-{
-    WINDOW *frame;
-    WINDOW *content;
-
-    frame = newwin(high, wide, posy, posx);
-    content = derwin(frame, high - 2, wide - 2, 1, 1);
-    if (label) {
-        wborder(frame, 0, 0, 0, 0, 0, 0, 0, 0);
-        mvwaddstr(frame, 0, 1, label);
-    }
-    wrefresh(frame); 
-    return content;
-}
-
-struct {
-    int index;
-    char *label;
-    int x;
-    int y;
-    int w;
-} reglayout[] = {
-    { W_BC,     "BC", 0, 0, 6 },
-    { W_DE,     "DE", 6, 0, 6},
-    { W_HL,     "HL", 13, 0, 6 },
-    { W_SP,     "SP", 27, 0, 6 },
-    { W_BC1,    "BC\'", 0, 3, 6 },
-    { W_DE1,    "DE\'", 6, 3, 6 },
-    { W_HL1,    "HL\'", 13, 3, 6 },
-    { W_PC,     "PC", 27, 3, 6 },
-    { W_IX,     "IX", 20, 0, 6 },
-    { W_IY,     "IY", 20, 3, 6 },
-    { W_AF,     "AF", 34, 0, 6 },
-    { W_AF1,    "AF\'", 34, 3, 6 },
-    { W_F,       0, 40, 0, 10 },
-    { W_F1,      0, 40, 3, 10 },
-    { W_IR,     "IR", 50, 0, 6 },
-    { W_IFF,    "IFF", 50, 3, 4 },
-    { W_IRQ,    "IRQ", 58, 3, 4 }
-};
-
-void
-makewins()
-{
-    int i;
-
-    if (!(screen = newterm("xterm", tty, tty))) {
-        perror("newterm fail");
-        exit(1);
-    }
-    cbreak();
-
-    // nodelay(textwin, TRUE);
-
-    for (i = 0; i < sizeof (reglayout)/sizeof(reglayout[0]); i++) {
-        win[reglayout[i].index] = labelwin(reglayout[i].label, 3, 
-            reglayout[i].w, reglayout[i].y, reglayout[i].x);
-    }
-    win[W_DIS] = labelwin("disassembly", 10, COLS - 2, 6, 0);
-    scrollok(win[W_DIS], TRUE);
-
-    win[W_DUMP] = labelwin("dump", 18, COLS - 2, 17, 0);
-
-    win[W_STACK] = labelwin("stack", 18, COLS - 2, 35, 0);
-
-    textwin = labelwin("command", 12, COLS - 2, LINES - 13, 0);
-    scrollok(textwin, TRUE);
-    wnoutrefresh(textwin);
-
-    doupdate();
+    message("\n");
 }
 
 int
@@ -556,7 +377,6 @@ main(int argc, char **argv)
     int j;
     char *ttyname;
     struct point *p;
-    WINDOW tempwin;
 
     progname = *argv++;
     argc--;
@@ -607,7 +427,7 @@ main(int argc, char **argv)
                 s = *argv++;
                 while (*s) {
                     i = get_syscall(&s);
-                    if ((i > sizeof(sys_stop)) || (i < 0)) {
+                    if ((i > NSYS) || (i < 0)) {
                         usage("unrecognized system call\n", s);
                         break;
                     }
@@ -629,7 +449,7 @@ main(int argc, char **argv)
                 s = *argv++;
                 while (*s) {
                     i = get_syscall(&s);
-                    if ((i > sizeof(sys_stop)) || (i < 0)) {
+                    if ((i > NSYS) || (i < 0)) {
                         usage("unrecognized system call\n", s);
                         break;
                     }
@@ -649,11 +469,7 @@ main(int argc, char **argv)
                 }
                 while (*s) {
                     i = strtol(s, &s, 16);
-                    p = malloc(sizeof(*p));
-                    p->addr = i;
-                    p->next = breaks;
-                    breaks = p;
-                    printf("added breakpoint at %04x\n", i);
+                    add_breakpoint((unsigned short)i);
                     if (*s != ',') break;
                     s++;
                 }
@@ -720,7 +536,9 @@ main(int argc, char **argv)
     setvbuf(tty, 0, _IOLBF, 0);
     signal(SIGUSR1, stop_handler);
 
-    makewins();
+    if (debug_terminal) {
+        makewins(tty);
+    }
 
     /*
      * if our rootdir is relative, we need to make it absolute 
@@ -736,7 +554,7 @@ main(int argc, char **argv)
     }
     if (verbose) {
         pverbose();
-        wprintw(textwin, "emulating %s with root %s\n", argv[0], rootdir);
+        message("emulating %s with root %s\n", argv[0], rootdir);
     }
     dump_stops();
 
@@ -783,7 +601,7 @@ alarm_handler(int i)
     fd_set rfd;
     struct timeval tv;
 
-    // wprintw(textwin, "sigalarm!\n");
+    // message("sigalarm!\n");
 
     tv.tv_usec = 0;
     tv.tv_sec = 0;
@@ -833,14 +651,14 @@ set_alarm()
 struct symbol
 {
     char *name;
-    symaddr_t value;
+    unsigned short value;
     char type;
     struct symbol *next;
 };
 struct symbol *syms;
 
 char *
-lookup_sym(symaddr_t value)
+get_symname(unsigned short value)
 {
     struct symbol *s;
 
@@ -852,7 +670,7 @@ lookup_sym(symaddr_t value)
 }
 
 void
-add_sym(char *name, int type, int value)
+add_sym(char *name, int type, unsigned short value)
 {
     struct symbol *s;
 
@@ -885,19 +703,19 @@ do_exec(char *name, char **argv)
 
     if (verbose & V_EXEC) {
         pid();
-        wprintw(textwin, "exec %s\n", name);
+        message("exec %s\n", name);
     }
     /*
      * count our args from the null-terminated list 
      */
     for (argc = 0; argv[argc]; argc++) {
         if (verbose & V_EXEC) {
-            wprintw(textwin, "arg %d = %s\n", argc, argv[argc]);
+            message("arg %d = %s\n", argc, argv[argc]);
         }
     }
 
     if ((file = fopen(name, "rb")) == NULL) {
-        wprintw(textwin, "Can't open file %s!\n", name);
+        message("Can't open file %s!\n", name);
         return (errno);
     }
     fseek(file, 0, SEEK_SET);
@@ -915,7 +733,7 @@ do_exec(char *name, char **argv)
     }
 
     if (verbose & V_EXEC) {
-        wprintw(textwin,
+        message(
             "exec header: magic: %x conf: %x symsize: %d text: %d data: %d bss: %d heap: %d textoff: %x dataoff: %x\n",
             header.ident, header.conf, header.table, header.text, header.data,
             header.bss, header.heap, header.textoff, header.dataoff);
@@ -1019,103 +837,6 @@ carry_clear()
     z80_set_reg8(f_reg, f);
 }
 
-void
-regout(int regnum, unsigned short val)
-{
-    WINDOW *w = win[regnum];
-    char buf[6];
-    sprintf(buf, "%04x", val);
-    mvwaddstr(w, 0, 0, buf);
-    wrefresh(w);
-    wrefresh(w->_parent);
-}
-
-char fbuf[9];
-
-void
-fflags(unsigned char f)
-{
-    int i;
-    for (i = 0; i < sizeof(fbuf); i++) fbuf[i] = ' ';
-    fbuf[8] = '\0';
-
-    if (f & 1)
-        fbuf[0] = 'C';
-    if (f & 2)
-        fbuf[1] = 'N';
-    if (f & 4)
-        fbuf[2] = 'V';
-    if (f & 8)
-        fbuf[3] = 'X';
-    if (f & 16)
-        fbuf[4] = 'H';
-    if (f & 32)
-        fbuf[5] = 'Y';
-    if (f & 64)
-        fbuf[6] = 'Z';
-    if (f & 128)
-        fbuf[7] = 'S';
-}
-
-void
-dumpcpu()
-{
-    unsigned short af;
-    unsigned char f;
-    char outbuf[40];
-    char *s;
-    int i;
-    unsigned short pc;
-
-    pc = z80_get_reg16(pc_reg);
-
-    format_instr(pc, outbuf,
-        &get_byte, &lookup_sym, &reloc, &mnix_sc);
-    s = lookup_sym(pc);
-    if (s) {
-        waddstr(win[W_DIS], s);
-    }
-    wprintw(win[W_DIS], "\n%04x %s", pc, outbuf);
-    wrefresh(win[W_DIS]); wrefresh(win[W_DIS]->_parent);
-
-#ifdef notdef
-    wprintw(textwin,
-        " %s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x tos:%04x brk:%04x\n",
-        fbuf,
-        z80_get_reg8(a_reg),
-        z80_get_reg16(bc_reg),
-        z80_get_reg16(de_reg),
-        z80_get_reg16(hl_reg),
-        z80_get_reg16(ix_reg),
-        z80_get_reg16(iy_reg),
-        z80_get_reg16(sp_reg),
-        get_word(z80_get_reg16(sp_reg)), brake);
-#endif
-
-    f = z80_get_reg8(f_reg);
-    fflags(f);
-    mvwaddstr(win[W_F], 0, 0, fbuf);
-    wrefresh(win[W_F]);
-    f = z80_get_reg8(f1_reg);
-    fflags(f);
-    mvwaddstr(win[W_F1], 0, 0, fbuf);
-    wrefresh(win[W_F1]);
-    regout(W_IR, (z80_get_reg8(i_reg) << 8) | z80_get_reg8(r_reg));
-    regout(W_AF, z80_get_reg8(a_reg) << 8 | z80_get_reg8(f_reg));
-    regout(W_AF1, z80_get_reg8(a1_reg) << 8 | z80_get_reg8(f1_reg));
-    regout(W_BC, z80_get_reg16(bc_reg));
-    regout(W_DE, z80_get_reg16(de_reg));
-    regout(W_HL, z80_get_reg16(hl_reg));
-    regout(W_BC1, z80_get_reg16(bc1_reg));
-    regout(W_DE1, z80_get_reg16(de1_reg));
-    regout(W_HL1, z80_get_reg16(hl1_reg));
-    regout(W_IX, z80_get_reg16(ix_reg));
-    regout(W_IY, z80_get_reg16(iy_reg));
-    regout(W_SP, z80_get_reg16(sp_reg));
-    regout(W_PC, pc);
-    memdump(win[W_STACK], z80_get_reg16(sp_reg) - 128, 256);
-}
-
 struct cpm_syscall {
     int type; 
     char *name;
@@ -1180,7 +901,7 @@ cpmsys()
     C_reg = z80_get_reg8(c_reg);
     DE_reg = z80_get_reg16(de_reg);
 
-    wprintw(textwin, "cp/m system call from %x - ", from);
+    message("cp/m system call from %x - ", from);
 
     vbuf[0] = '\0';
 
@@ -1207,242 +928,9 @@ cpmsys()
     } else {
         sprintf(vbuf, "call: %d arg: %x\n", C_reg, DE_reg);
     }
-    waddstr(textwin, vbuf);
+    message(vbuf);
     dumpcpu();
     z80_set_reg16(pc_reg, pop());
-}
-
-int
-watchpoint_hit()
-{
-    struct point *p;
-    int n;
-
-    for (p = watches; p; p = p->next) {
-        if (p->value == -1) {
-            p->value = get_byte(p->addr);
-        }
-        n = get_byte(p->addr);
-        if (n != p->value) {
-            wprintw(textwin, "value %02x at %04x changed to %02x\n",
-                p->value, p->addr, n);
-            p->value = n;
-            return (1);
-        }
-    }
-    return (0);
-}
-
-struct point *
-point_at(struct point **head, unsigned short addr, struct point **pp)
-{
-    struct point *p;
-
-    if (pp)
-        *pp = 0;
-    for (p = *head; p; p = p->next) {
-        if (p->addr == addr) {
-            break;
-        }
-        if (pp) {
-            *pp = p;
-        }
-    }
-    return p;
-}
-
-int lastaddr = -1;
-
-int
-monitor()
-{
-    struct point *p, *prev, **head;
-    char cmdline[100];
-    char l;
-    char c;
-    int i;
-    int delete;
-    char *s;
-    int addr;
-
-    while (1) {
-      more:
-        wprintw(textwin, "%d >>> ", mypid);
-        i = wgetnstr(textwin, cmdline, sizeof(cmdline));
-        s = cmdline;
-        c = *s++;
-        while (*s && (*s == ' '))
-            s++;
-        head = &breaks;
-        switch (c) {
-        case 'v':
-            while (*s && (*s == ' '))
-                s++;
-            if (*s) {
-                verbose = strtol(s, &s, 16);
-                pverbose();
-            }
-            break;
- 
-        case 'c':
-            c = 1;
-            while (*s && (*s == ' '))
-                s++;
-            if (!*s) {
-                dump_stops();
-            }
-            if (*s == '-') {
-                s++;
-                c = 0;
-            }
-            if (*s) {
-                i = strtol(s, &s, 16);
-            }
-            if (i) {
-                if (i < 0) {
-                    i = -i;
-                    c = 0;
-                }
-                if (i < sizeof(sys_stop)) {
-                    sys_stop[i] = c;
-                }
-            }
-            break;
-        case 'd':
-            while (*s && (*s == ' '))
-                s++;
-            if (*s) {
-                if (!strcmp(s, "bc")) {
-                    addr  = z80_get_reg16(bc_reg);
-                } else if (!strcmp(s, "de")) {
-                    addr  = z80_get_reg16(de_reg);
-                } else if (!strcmp(s, "hl")) {
-                    addr  = z80_get_reg16(hl_reg);
-                } else if (!strcmp(s, "ix")) {
-                    addr  = z80_get_reg16(ix_reg);
-                } else if (!strcmp(s, "iy")) {
-                    addr  = z80_get_reg16(iy_reg);
-                } else if (!strcmp(s, "sp") || !strcmp(s, "tos")) {
-                    addr  = z80_get_reg16(sp_reg);
-                    wprintw(textwin, "stack %04x\n", addr);
-                    for (i = 0; i < 10; i++) {
-                        wprintw(textwin, "\t%04x\n", get_word(addr + (i * 2)));
-                    } 
-                    break;
-                } else {
-                    addr = strtol(s, &s, 16);
-                }
-            } else {
-                addr = lastaddr;
-            }
-            addr &= 0xffff;
-            memdump(win[W_DUMP], addr, 256);
-            lastaddr = (addr + 256) & 0xffff;
-            break;
-        case 'l':
-            while (*s && (*s == ' '))
-                s++;
-            if (*s) {
-                i = strtol(s, &s, 16);
-            } else {
-                if (lastaddr == -1) {
-                    i = z80_get_reg16(pc_reg);
-                } else {
-                    i = lastaddr;
-                }
-            }
-            for (l = 0; l < LISTLINES; l++) {
-                c = format_instr(i, cmdline,
-                    &get_byte, &lookup_sym, &reloc, &mnix_sc);
-                s = lookup_sym(i);
-                if (s) {
-                    wprintw(textwin, "%s\n", s);
-                }
-                wprintw(textwin, "%04x: %-20s\n", i, cmdline);
-                i += c;
-                lastaddr = i & 0xffff;
-            }
-            break;
-        case 'r':
-            dumpcpu();
-            break;
-        case 's':
-            while (*s && (*s == ' '))
-                s++;
-            if (*s) {
-                i = strtol(s, &s, 16);
-            } else {
-                i = 1;
-            }
-            dumpcpu();
-            return (i);
-        case 'g':
-            return (0);
-        case 'q':
-            exit(1);
-            return (0);
-        case 'w':              /* w [-] <addr> <addr> ... */
-            head = &watches;
-        case 'b':              /* b [-] <addr> <addr> ... */
-            delete = 0;
-            i = -1;
-            if (*s == '-') {
-                s++;
-                delete = 1;
-            }
-            while (*s) {
-                i = strtol(s, &s, 16);
-                p = point_at(head, i, &prev);
-                if (p && delete) {
-                    if (prev) {
-                        prev->next = p->next;
-                    } else {
-                        *head = p->next;
-                    }
-                    free(p);
-                } else if ((!p) && (!delete)) {
-                    p = malloc(sizeof(*p));
-                    p->addr = i;
-                    p->next = *head;
-                    *head = p;
-                }
-                while (*s && (*s == ' '))
-                    s++;
-            }
-            if (i == -1) {
-                if (delete) {
-                    while ((p = *head)) {
-                        *head = p->next;
-                        free(p);
-                    }
-                } else {
-                    for (p = *head; p; p = p->next) {
-                        wprintw(textwin, "%04x\n", p->addr);
-                    }
-                }
-            }
-            break;
-        case '?':
-        case 'h':
-            wprintw(textwin, "commands:\n");
-            wprintw(textwin, "l <addr> :list\n");
-            wprintw(textwin, "d <addr> :dump memory\n");
-            wprintw(textwin, "r dump cpu state\n");
-            wprintw(textwin, "g: continue\n");
-            wprintw(textwin, "s: single step\n");
-            wprintw(textwin, "q: exit\n");
-            wprintw(textwin, "b [-] <nnnn> ... :breakpoint\n");
-            wprintw(textwin, "w [-] <nnnn> ... :watchpoint\n");
-            wprintw(textwin, "c [-] <nn> :system call trace\n");
-            wprintw(textwin, "v <nn> :set verbose\n");
-            break;
-        default:
-            wprintw(textwin, "unknown command %c\n", c);
-            break;
-        case 0:
-            break;
-        }
-    }
 }
 
 /*
@@ -1460,9 +948,9 @@ emulate()
         if (watchpoint_hit()) {
             breakpoint = 1;
         }
-        if (point_at(&breaks, z80_get_reg16(pc_reg), 0)) {
+        if (breakpoint_at(z80_get_reg16(pc_reg))) {
             pid();
-            wprintw(textwin, "break at %04x\n", z80_get_reg16(pc_reg));
+            message("break at %04x\n", z80_get_reg16(pc_reg));
             dumpcpu();
             breakpoint = 1;
         }
@@ -1496,13 +984,13 @@ emulate()
             }
             if (signal_handler[i]) {
                 if (verbose & V_SYS) {
-                    wprintw(textwin, "invoking signal %d %x\n", i, signal_handler[i]);
+                    message("invoking signal %d %x\n", i, signal_handler[i]);
                 }
                 push(z80_get_reg16(pc_reg));
                 z80_set_reg16(pc_reg, signal_handler[i]);
             } else {
                 if (verbose & V_SYS) {
-                    wprintw(textwin, "ignoring signal %d\n", i);
+                    message("ignoring signal %d\n", i);
                 }
             }
             signalled &= ~(1 << i);
@@ -1735,7 +1223,7 @@ bitdump(unsigned short v)
 
     for (tb = ttybits; tb->name; tb++) {
         if (tb->bitmask & v) {
-            wprintw(textwin, "%s ", tb->name);
+            message("%s ", tb->name);
         }
     }
 }
@@ -1751,11 +1239,11 @@ void
 cchar(char *s, char c)
 {
     if (c == 0x7f) {
-        wprintw(textwin, "%s: DEL ", s);
+        message("%s: DEL ", s);
     } else if (c < ' ') {
-        wprintw(textwin, "%s: ^%c ", s, c + '@');
+        message("%s: ^%c ", s, c + '@');
     } else {
-        wprintw(textwin, "%s: %c ", s, c);
+        message("%s: %c ", s, c);
     }
 }
 
@@ -1767,12 +1255,12 @@ tty_dump(char *s, unsigned short a)
 {
     char c;
 
-    wprintw(textwin, "%s in: %s out: %s ",
+    message("%s in: %s out: %s ",
         s, baud[get_byte(a)], baud[get_byte(a + 1)]);
     cchar("erase", get_byte(a + 2));
     cchar("kill", get_byte(a + 3));
     bitdump(get_word(a + 4));
-    wprintw(textwin, "\n");
+    message("\n");
 }
 
 /*
@@ -1842,14 +1330,14 @@ struct tidbits lflags[] = {
 void
 tbdump(char *s, struct tidbits *tb, tcflag_t v)
 {
-    wprintw(textwin, "%s: 0%06o ", s, v);
+    message("%s: 0%06o ", s, v);
     while (tb->name) {
         if (tb->bit & v) {
-            wprintw(textwin, "%s ", tb->name);
+            message("%s ", tb->name);
         }
         tb++;
     }
-    wprintw(textwin, "\n");
+    message("\n");
 }
 
 /*
@@ -1872,7 +1360,7 @@ settimode(unsigned short mode)
 
 #ifdef notdef
     ti_dump();
-    wprintw(textwin, "settimode: %06o\n", mode);
+    message("settimode: %06o\n", mode);
 #endif
 
     for (tb = ttybits; tb->name; tb++) {
@@ -2006,7 +1494,7 @@ SystemCall()
         && ((get_byte(sc - 2) & 0xff) != 0xcd)) {
         pid();
         dumpcpu();
-        wprintw(textwin, "halt no syscall %x!\n", sc);
+        message("halt no syscall %x!\n", sc);
         exit(1);
     }
 
@@ -2022,7 +1510,7 @@ SystemCall()
         indirect++;
         sc = get_word(sc + 2);
         if ((code = get_byte(sc)) != 0xcf) {
-            wprintw(textwin, "indir no syscall %d %x!\n", code, sc);
+            message("indir no syscall %d %x!\n", code, sc);
         }
         code = get_byte(sc + 1);
     }
@@ -2051,7 +1539,7 @@ SystemCall()
     sp = &syscalls[code];
 
     if (verbose & V_SYS0) {
-        wprintw(textwin, "%10s %3d ", sp->name, z80_get_reg16(hl_reg));
+        message("%10s %3d ", sp->name, z80_get_reg16(hl_reg));
         dumpmem(&get_byte, sc, sp->argbytes + 1);
     }
 
@@ -2085,11 +1573,11 @@ SystemCall()
 
     if ((verbose & V_SYS) && (!(sp->flag & SF_SMALL) || (verbose & V_ASYS))) {
         pid();
-        wprintw(textwin, "%s(", sp->name);
+        message("%s(", sp->name);
         i = sp->flag & (SF_FD | SF_ARG1 | SF_NAME | SF_ARG2 | SF_NAME2 |
             SF_ARG2 | SF_ARG3 | SF_ARG4);
 #define F(b, f, a) \
-	if (i & (b)) { i ^= (b) ; wprintw(textwin,f,a,i?",":""); }
+	if (i & (b)) { i ^= (b) ; message(f,a,i?",":""); }
         F(SF_FD, "%d%s", fd);
         F(SF_ARG1, "%04x%s", arg1);
         F(SF_NAME, "\"%s\"%s", degrime(fn));
@@ -2097,7 +1585,7 @@ SystemCall()
         F(SF_NAME2, "\"%s\"%s", fn2);
         F(SF_ARG3, "%04x%s", arg3);
         F(SF_ARG4, "%04x%s", arg4);
-        wprintw(textwin, ") ");
+        message(") ");
     }
   nolog:
 
@@ -2116,7 +1604,7 @@ SystemCall()
     switch (code) {
     case 0:                    /* double indirect is a no-op */
         pid();
-        wprintw(textwin, "double indirect syscall!\n");
+        message("double indirect syscall!\n");
         break;
 
     case 1:                    /* exit (hl) */
@@ -2186,7 +1674,7 @@ SystemCall()
                 ret = dirsnarf(filename);
                 if (ret == 0xffff) {
                     ret = errno;
-                    wprintw(textwin, "dirsnarf lose\n");
+                    message("dirsnarf lose\n");
                     goto lose;
                 }
             } else {
@@ -2232,12 +1720,12 @@ SystemCall()
     case 7:                    /* wait */
         if (verbose & V_SYS) {
             pid();
-            wprintw(textwin, "wait\n");
+            message("wait\n");
         }
         if ((ret = wait(&i)) == 0xffff) {
             if (verbose & V_SYS) {
                 pid();
-                wprintw(textwin, "no children\n");
+                message("no children\n");
             }
             ret = ECHILD;
             carry_set();
@@ -2245,7 +1733,7 @@ SystemCall()
         }
         if (verbose & V_SYS) {
             pid();
-            wprintw(textwin, "wait ret %x %x\n", ret, i);
+            message("wait ret %x %x\n", ret, i);
         }
         if (WIFEXITED(i)) {
             z80_set_reg8(d_reg, WEXITSTATUS(i));
@@ -2254,7 +1742,7 @@ SystemCall()
             z80_set_reg8(d_reg, 1);
             z80_set_reg8(e_reg, WTERMSIG(i));
         } else {
-            wprintw(textwin, "waitfuck %x\n", i);
+            message("waitfuck %x\n", i);
         }
         ret = (ret - rootpid) & 0x3fff;
         carry_clear();
@@ -2721,7 +2209,7 @@ SystemCall()
 
     case 48:                   /* set signal handler */
         if (arg1 > 15) {
-            wprintw(textwin, "signal %d out of range\n", arg1);
+            message("signal %d out of range\n", arg1);
             carry_set();
             ret = -1;
             arg1 = 0;
@@ -2761,7 +2249,7 @@ SystemCall()
 
 #ifdef notdef
             if ((arg2 != 0) && (arg2 != 1)) {
-                wprintw(textwin, "unimplemented signal %s %x\n",
+                message("unimplemented signal %s %x\n",
                     signame[arg1], arg2);
             }
 #endif
@@ -2774,12 +2262,12 @@ SystemCall()
 #ifdef notdef
             if (verbose & V_SYS) {
                 pid();
-                wprintw(textwin, "signal %s %s\n", signame[arg1],
+                message("signal %s %s\n", signame[arg1],
                     arg2 ? "ignore" : "default");
             }
         } else if (verbose & V_SYS) {
             pid();
-            wprintw(textwin, "signal %s %x\n",
+            message("signal %s %x\n",
                 signame[arg1], signal_handler[arg1]);
 #endif
         }
@@ -2790,7 +2278,7 @@ SystemCall()
         break;
     default:
         pid();
-        wprintw(textwin, "unrecognized syscall %d %x\n", code, code);
+        message("unrecognized syscall %d %x\n", code, code);
         carry_set();
         break;
     }
@@ -2808,9 +2296,9 @@ SystemCall()
     }
     if ((verbose & V_SYS) && (!(sp->flag & SF_SMALL) || (verbose & V_ASYS))) {
         if ((code == 2) && (ret == 0)) {
-            wprintw(textwin, "\n%d: fork() ", mypid);
+            message("\n%d: fork() ", mypid);
         }
-        wprintw(textwin, " = %04x%s\n",
+        message(" = %04x%s\n",
             ret,
             (z80_get_reg8(f_reg) & 1) ? " FAILED" : "");
     }
@@ -2823,7 +2311,7 @@ SystemCall()
     z80_set_reg8(status_reg, 0);
     verbose = savemode;
     if ((verbose & V_SYS) && (z80_get_reg16(hl_reg) == 0xffff)) {
-        wprintw(textwin, "code = %d\n", code);
+        message("code = %d\n", code);
         dumpcpu();
     }
 }

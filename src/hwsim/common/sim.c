@@ -1,5 +1,7 @@
 /* 
- * sim.c
+ * hwsim/sim.c
+ *
+ * Changed: <2023-06-16 00:12:50 curt>
  *
  * this is the general emulator framework
  *
@@ -556,55 +558,52 @@ cancel_timeout(void (*handler)(), int arg)
     timeout_sched();
 }
 
+char fbuf[0];
+
+void
+fflags(unsigned char f)
+{
+    int i;
+    for (i = 0; i < sizeof(fbuf); i++) fbuf[i] = ' ';
+    fbuf[8] = '\0';
+
+    if (f & 1)
+        fbuf[0] = 'C';
+    if (f & 2)
+        fbuf[1] = 'N';
+    if (f & 4)
+        fbuf[2] = 'V';
+    if (f & 8)
+        fbuf[3] = 'X';
+    if (f & 16)
+        fbuf[4] = 'H';
+    if (f & 32)
+        fbuf[5] = 'Y';
+    if (f & 64)
+        fbuf[6] = 'Z';
+    if (f & 128)
+        fbuf[7] = 'S';
+}
+
 void
 dumpcpu()
 {
     byte f;
-    char outbuf[40];
-    char fbuf[10];
     char *s;
     int i;
     word pc, sp;
-
-    memset(fbuf, ' ', sizeof(fbuf));
-    fbuf[sizeof(fbuf) - 1] = 0;
+    char fbuf[9];
 
     pc = z80_get_reg16(pc_reg);
     sp = z80_get_reg16(sp_reg);
 
-    listing = 1;
-    format_instr(pc, outbuf, &get_byte, &lookup_sym, &reloc, &mnix_sc);
-    listing = 0;
+    format_instr(pc, outbuf, &lookup_sym, &reloc, &mnix_sc);
 
     s = lookup_sym(pc);
-    if (s) printf("%-10s\n", s);
+    if (s) waddstr(win[W_DIS], s);
 
     f = z80_get_reg8(f_reg);
-    if (f & C_FLAG)
-        fbuf[0] = 'C';
-    if (f & N_FLAG)
-        fbuf[1] = 'N';
-    if (f & PV_FLAG)
-        fbuf[2] = 'V';
-    if (f & X_FLAG)
-        fbuf[2] = 'X';
-    if (f & H_FLAG)
-        fbuf[3] = 'H';
-    if (f & Y_FLAG)
-        fbuf[4] = 'Y';
-    if (f & Z_FLAG)
-        fbuf[5] = 'Z';
-    if (f & S_FLAG)
-        fbuf[6] = 'S';
-    if (z80_get_reg8(irr_reg) & IFF1)
-        fbuf[8] = 'I';
-
-    printf(
-        "%s a:%02x bc:%04x de:%04x hl:%04x ix:%04x iy:%04x sp:%04x",
-        fbuf, z80_get_reg8(a_reg),
-        z80_get_reg16(bc_reg), z80_get_reg16(de_reg), z80_get_reg16(hl_reg), 
-        z80_get_reg16(ix_reg), z80_get_reg16(iy_reg), sp);
-    printf(" pc:%04x %-20s\n", pc, outbuf);
+    fflags(f, win[W_F]);
 }
 
 /*

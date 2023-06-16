@@ -1,8 +1,9 @@
 /*
  * a z80 disassembler interface
  *
- * disz80.h
- * Changed: <2021-12-23 15:30:08 curt>
+ * include/disz80.h
+ *
+ * Changed: <2023-06-16 00:06:59 curt>
  */
 
 /*
@@ -15,20 +16,18 @@
 #define	RL_DATA		3
 #define	RELNUM(i)	((i) & 0xffff)
 
-typedef unsigned int symaddr_t;
+/*
+ * callers to the dissassembler need to define these
+ */
+extern unsigned int get_reloc(unsigned short addr);
+extern unsigned char get_byte(unsigned short addr);
+extern char *get_symname(unsigned short addr);
+extern int fmt_syscall(unsigned short addr, char *dest);
 
 /*
  * format an instruction and return the bytes consumed
  */
-int format_instr(
-	unsigned short addr, 
-	char *outbuf,
-	unsigned char (*get_byte)(unsigned short addr),		
-	char *(*get_sym)(symaddr_t symaddr),
-	unsigned int (*get_reloc)(symaddr_t offset),
-	int (*syscall)(unsigned short addr, unsigned char (*gb)(unsigned short a), char *d));
-
-extern int mnix_sc(unsigned short addr, unsigned char (*gb)(unsigned short a), char *d);
+int format_instr(unsigned short addr, char *outbuf);
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

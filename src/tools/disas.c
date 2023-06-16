@@ -2,7 +2,8 @@
  * disas - Z80/Z280 disassembler
  *
  * tools/disas.c
- * Changed: <2021-12-25 12:47:38 curt>
+ *
+ * Changed: <2023-06-16 00:16:46 curt>
  *
  * todo: XXX
  *  detect switch statements
@@ -2410,7 +2411,7 @@ dis_op:
                 char sbuf[100];
                 if (op == 0xcf && micronix) {
                     outop("SYS");
-                    instaddr += mnix_scpr(inst_start, byteat, sbuf);
+                    instaddr += fmt_syscall(inst_start, sbuf);
                     outs(sbuf);
                 } else {
                     outop("RST");
