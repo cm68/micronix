@@ -277,6 +277,9 @@ dumpcpu()
     int i;
     unsigned short pc;
 
+    if (!win)
+        return;
+
     pc = z80_get_reg16(pc_reg);
 
     format_instr(pc, outbuf);
