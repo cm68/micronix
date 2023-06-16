@@ -1,5 +1,12 @@
+#
+# Makefile for all hardware simulators and tools
+#
+# hwsim/common/Makefile
+#
+# Changed: <2023-06-16 00:11:53 curt>
+#
 EXTRAS = sample_shim.o sample_cpu.o
-OBJECTS = sim.o s100.o harddisk.o
+OBJECTS = sim.o s100.o
 
 TARGETS = $(EXTRAS) libhwsim.a
 

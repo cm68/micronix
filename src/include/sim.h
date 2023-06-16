@@ -1,7 +1,9 @@
 /*
- * sim.h
- *
  * global definitions for simulator
+ *
+ * include/sim.h
+ *
+ * Changed: <2023-06-16 00:07:53 curt>
  */
 
 // anything in the simulator has one of these types

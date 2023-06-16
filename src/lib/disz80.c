@@ -2,11 +2,14 @@
  * a z80 disassembler - brute force with symbols
  *
  * lib/disz80.c
- * Changed: <2021-12-23 15:39:44 curt>
+ *
+ * Changed: <2023-06-15 22:11:37 curt>
  */
 
 #include <stdio.h>
 #include <string.h>
+
+extern unsigned char get_byte(unsigned short addr);
 
 #include "../include/disz80.h"
 
@@ -457,13 +460,7 @@ struct optab ed_optab[256] = {
  * format an instruction
  */
 int					/* how many bytes we consumed */
-format_instr(
-	unsigned short addr,
-	char *outbuf, 			/* where to put the output */
-	unsigned char (*get_byte)(unsigned short addr),	/* how to read bytes */
-	char * (*get_sym)(symaddr_t offset),
-	unsigned int (*get_reloc)(symaddr_t offset),
-	int (*sc)(unsigned short addr, unsigned char (*gb)(unsigned short a), char *out))
+format_instr(unsigned short addr, char *outbuf)
 {
 	char bcount = 0;
 	unsigned char opcode;
@@ -483,25 +480,25 @@ format_instr(
 	o1 = o2 = o3 = o4 = 0xff;
 
 	o1 = 
-	opcode = (*get_byte)(addr + bcount++);
+	opcode = get_byte(addr + bcount++);
 
 	switch (opcode) {
 	case 0xcb:
 		o2 = 
-		opcode = (*get_byte)(addr + bcount++);
+		opcode = get_byte(addr + bcount++);
 		o = &cb_optab[opcode];
 		break;
 	case 0xed:
 		o2 = 
-		opcode = (*get_byte)(addr + bcount++);
+		opcode = get_byte(addr + bcount++);
 		o = &ed_optab[opcode];
 		break;
 	case 0xdd:
 		o2 = 
-		opcode = (*get_byte)(addr + bcount++);
+		opcode = get_byte(addr + bcount++);
 		if (opcode == 0xcb) {
-			signed_byte = (char)(*get_byte)(addr + bcount++);
-			opcode = (*get_byte)(addr + bcount++);
+			signed_byte = (char)get_byte(addr + bcount++);
+			opcode = get_byte(addr + bcount++);
 			o = &ddcb_optab[opcode];
 		} else {
 			o = &dd_optab[opcode];
@@ -509,10 +506,10 @@ format_instr(
 		break;
 	case 0xfd:
 		o2 = 
-		opcode = (*get_byte)(addr + bcount++);
+		opcode = get_byte(addr + bcount++);
 		if (opcode == 0xcb) {
-			signed_byte = (char)(*get_byte)(addr + bcount++);
-			opcode = (*get_byte)(addr + bcount++);
+			signed_byte = (char)get_byte(addr + bcount++);
+			opcode = get_byte(addr + bcount++);
 			o = &fdcb_optab[opcode];
 		} else {
 			o = &fd_optab[opcode];
@@ -530,15 +527,16 @@ format_instr(
 
 	/* micronix system call RST8 - variable length */
 	if (oflags & OP_SYS) {
-		if (sc) {
-			bcount += (*sc)(addr, get_byte, valbuf);
-		} else {
-			oflags = 0;
-		}
+        i = fmt_syscall(addr, valbuf);
+		if (i) {
+            bcount += i; 
+        } else {
+            oflags = 0;
+        }
 	}
 
 	if (oflags & OP_IDX) {
-		signed_byte = (char)(*get_byte)(addr + bcount++);
+		signed_byte = (char)get_byte(addr + bcount++);
 	}
 
 	if (oflags & (OP_IDX | OP_IDX1)) {
@@ -552,13 +550,13 @@ format_instr(
 
 	if (oflags & OP_IMM8) {
 		o4 =
-		opcode = (*get_byte)(addr + bcount++);
+		opcode = get_byte(addr + bcount++);
 		value = opcode;
 		sprintf(valbuf, "0x%x", value);
 	}
 
 	if (oflags & OP_PC8) {
-		signed_byte = (char)(*get_byte)(addr + bcount++);
+		signed_byte = (char)get_byte(addr + bcount++);
 		if (signed_byte < 0) {
 			sprintf(valbuf, ".-%d", -signed_byte);
 		} else {
@@ -571,7 +569,7 @@ format_instr(
 			reloc = (*get_reloc)(addr + bcount);
 			switch (RELTYPE(reloc)) {
 			case RL_SYMBOL:
-				symname = (*get_sym)(reloc);
+				symname = get_symname(reloc);
 				break;
 			case RL_TEXT:
 				break;
@@ -582,10 +580,10 @@ format_instr(
 				break;
 			}
 		}
-		value = (unsigned char)(*get_byte)(addr + bcount++);
-		value += (*get_byte)(addr + bcount++) << 8;
+		value = (unsigned char)get_byte(addr + bcount++);
+		value += get_byte(addr + bcount++) << 8;
 		if (!symname) {
-			symname = (*get_sym)(value);
+			symname = get_symname(value);
 			if (symname) {
 				value = 0;
 			}
