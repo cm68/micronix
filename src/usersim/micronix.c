@@ -3,7 +3,7 @@
  *
  * usersim/micronix.c
  *
- * Changed: <2023-06-16 00:17:59 curt>
+ * Changed: <2023-06-16 02:06:05 curt>
  *
  * Copyright (c) 2018, Curt Mayer 
  * do whatever you want, just don't claim you wrote it. 
@@ -681,6 +681,19 @@ add_sym(char *name, int type, unsigned short value)
     s->type = type;
     s->next = syms;
     syms = s;
+}
+
+unsigned short
+lookup_sym(char *name)
+{
+    struct symbol *s;
+
+    for (s = syms; s; s = s->next) {
+        if (strcmp(s->name, name) == 0) {
+            return s->value;
+        }
+    }
+    return 0;
 }
 
 /*

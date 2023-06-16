@@ -3,7 +3,7 @@
  *
  * lib/gui.c
  *
- * Changed: <2023-06-16 00:15:53 curt>
+ * Changed: <2023-06-16 02:05:15 curt>
  *
  */
 #include <curses.h>
@@ -285,7 +285,7 @@ dumpcpu()
     format_instr(pc, outbuf);
     s = get_symname(pc);
     if (s) {
-        waddstr(win[W_DIS], s);
+        wprintw(win[W_DIS], "\n%s:", s);
     }
     wprintw(win[W_DIS], "\n%04x %s", pc, outbuf);
     wrefresh(win[W_DIS]); wrefresh(win[W_DIS]->_parent);
@@ -387,7 +387,9 @@ monitor()
             while (*s && (*s == ' '))
                 s++;
             if (*s) {
-                if (!strcmp(s, "bc")) {
+                if ((i = lookup_sym(s)) != 0) {
+                    addr = i;
+                } else if (!strcmp(s, "bc")) {
                     addr  = z80_get_reg16(bc_reg);
                 } else if (!strcmp(s, "de")) {
                     addr  = z80_get_reg16(de_reg);
