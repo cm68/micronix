@@ -41,7 +41,7 @@ extern int readblk(struct super *f, int blkno, char *buf);
 extern int writeblk(struct super *f, int blkno, char *buf);
 extern int fileread(struct dsknod *ip, int offset, char *buf);
 extern int filewrite(struct dsknod *ip, int offset, char *buf);
-extern void idump(struct dsknod *ip);
+extern void idump(char *name, struct dsknod *ip, int always);
 extern void isummary(char *name, struct dsknod *ip);
 extern void dump(unsigned char *buf, int size);
 extern void dumpsb(struct super *sb);
