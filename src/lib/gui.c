@@ -16,6 +16,7 @@
 #include "disz80.h"
 #include "mnix.h"
 
+extern unsigned short lookup_sym(char *);
 extern unsigned char get_byte(unsigned short addr);
 extern int mypid;
 extern int verbose;
