@@ -15,6 +15,7 @@ void skipwhite(char **s);
 
 void dumpmem(unsigned char (*readbyte)(u16 addr), u16 addr, int len);
 void hexdump(void *addr, int len);
+void blockedit(char *buf, int len);
 
 int register_trace(char *name);
 extern char *tracenames[];
