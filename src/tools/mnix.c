@@ -2,7 +2,7 @@
  * a command line micronix filesystem reader/writer/lister
  *
  * tools/mnix.c
- * Changed: <2021-12-23 16:03:47 curt>
+ * Changed: <2023-06-19 14:22:14 curt>
  *
  * the interface really needs to look like tar: 
  *
@@ -47,6 +47,7 @@ int mkdircmd();
 int rmdircmd();
 int fsinfo();
 int iinfo();
+int blkcmd();
 
 struct cmdtab
 {
@@ -54,7 +55,7 @@ struct cmdtab
     int (*handler)(int n, char **a);
     char *usage;
 } cmds[] = {
-    {"inode", iinfo, "inode <inum>" },
+    {"inode", iinfo, "inode [-v] <inum>" },
     {"fsinfo", fsinfo, "fsinfo" },
     {"empty", emptycmd, "empty <file>" },
     {"info", infocmd, "info <file>" },
@@ -65,7 +66,8 @@ struct cmdtab
     {"write", writecmd, "write <src> <dest>" },
     {"rm", rmcmd, "rm <file>" },
     {"mkdir", mkdircmd, "mkdir <directory>" },
-    {"rmdir", rmdircmd, "rmdir <directory>" }
+    {"rmdir", rmdircmd, "rmdir <directory>" },
+    {"block", blkcmd, "block [-e] <blkno>" }
 };
 
 void
@@ -77,6 +79,35 @@ usage(char *e)
     for (i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++) {
         printf("\t%s\n", cmds[i].usage);
     }
+}
+
+/*
+ * a seperate command arg processor
+ */
+char opt[26];       // indexed by 'a' to 'z'
+
+void
+readopt(int *argc, char ***argv, char *allowed)
+{
+    char c;
+    char *s;
+
+    (*argv)++;
+    s = **argv;
+    (*argc)--;
+    if (*s == '-') {
+        while (c = *++s) {
+            if ((c >= 'a') && (c <= 'z') && index(allowed, c)) {
+                opt[c-'a']++;
+            } else {
+                printf("bogus option: %c\n", c);
+                break;
+            }
+        }
+        (*argc)--;
+        (*argv)++;
+    }
+    return;
 }
 
 struct super *fs;
@@ -154,13 +185,15 @@ iinfo(int c, char **a)
     struct dsknod *dp;
     char na[20];
 
+    readopt(&c, &a, "v");
+
     if (!c) return 1;
-    inum = atoi(*++a);
+    inum = atoi(*a);
 
     dp = iget(fs, inum);
     if (!dp) return 2;
     sprintf(na, "inum %d\n", inum);
-    isummary(na, dp);
+    idump(na, dp, opt['v'-'a']);
     ifree(dp); 
     return 0;
 }
@@ -456,7 +489,7 @@ infocmd(int c, char **a)
     }
 
     dp = namei(fs, *a);
-    idump(dp);
+    idump(*a, dp, 0);
 
     return 0;
 }
@@ -496,6 +529,32 @@ int
 mkdircmd(int c, char **a)
 {
     return 1;
+}
+
+int
+blkcmd(int c, char **a)
+{
+    unsigned char buf[512];
+    unsigned char newbuf[512];
+    int blkno;
+
+    readopt(&c, &a, "e");
+
+    if (!c) return 1;
+    blkno = atoi(*a);
+
+    readblk(fs, blkno, buf);
+    if (opt['e'-'a']) {
+        bcopy(buf, newbuf, 512);
+        blockedit(newbuf);
+        if (bcmp(buf, newbuf, 512) != 0) {
+            printf("dirty\n");
+            // writeblk(fs, blkno, newbuf);
+        }
+    } else {
+        hexdump(buf, 512);
+    } 
+    return 0;
 }
 
 int
