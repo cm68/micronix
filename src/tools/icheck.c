@@ -5,7 +5,7 @@
  * we flag duplicates
  *
  * tools/icheck.c
- * Changed: <2021-12-23 16:00:58 curt>
+ * Changed: <2023-06-19 05:51:26 curt>
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -272,6 +272,17 @@ blockcheck(blkno, mesg)
     return (0);
 }
 
+void
+usage(char *pname)
+{
+    fprintf(stderr, "usage:\n%s -[vsh] [-b <blocknum> ...] <filesystem>\n",
+        pname);
+    fprintf(stderr, "\t-s\trebuild freelist\n");
+    fprintf(stderr, "\t-v\tbe verbose\n");
+    fprintf(stderr, "\t-b\tlist of blocks to find in inodes\n");
+    exit(1);
+}
+
 int
 main(argc, argv)
     int argc;
@@ -279,6 +290,7 @@ main(argc, argv)
 {
     char **p;
     int n, *lp;
+    char *pname = argv[0];
 
     while (--argc) {
         argv++;
@@ -299,7 +311,9 @@ main(argc, argv)
                 }
                 *lp++ = -1;
                 continue;
-
+            case 'h':
+                usage(pname);
+                break;
             default:
                 printf("Bad flag\n");
             }
