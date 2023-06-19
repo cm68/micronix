@@ -3,7 +3,7 @@
  *
  * tools/disas.c
  *
- * Changed: <2023-06-16 01:00:09 curt>
+ * Changed: <2023-06-19 05:27:02 curt>
  *
  * todo: XXX
  *  detect switch statements
@@ -313,6 +313,7 @@ wordat(word addr)
     return (codebuf[addr + 1] << 8) + codebuf[addr];
 }
 
+void
 setword(word addr, word new)
 {
     codebuf[addr] = new & 0xff;
@@ -338,7 +339,7 @@ struct hireloc {
     word addr;
     unsigned char type;
     char *name;
-    char *next;
+    struct hireloc *next;
 };
 
 struct hireloc *hirelocs;
@@ -362,6 +363,7 @@ addhireloc(word addr, unsigned char type, char *name)
         printf("reloc at %x type %d name %s\n", hr->addr, hr->type, hr->name);
 }
 
+void
 dohirelocs()
 {
     struct hireloc *hr, *hn;
@@ -626,6 +628,7 @@ dump_symbols()
     }
 }
 
+void
 dorelocs(int segnum)
 {
     int type;
@@ -837,7 +840,7 @@ usage(char *s)
 		"\t[-c <code addr> ... ]\tplaces that are code\n",
 		"\t[-d <data addr> ... ]\tplaces that are data\n",
 		"\t[-f <controlfile>\tcan contain:\n");
-    fprintf(stderr, "%s%s%s%s%s%s%s%s",
+    fprintf(stderr, "%s%s%s%s%s%s%s%s%s",
         "\t\tdefine <name> <addr>\n",
         "\t\t<name> equ <addr>\n",
         "\t\twords <addr> <length>\n",
