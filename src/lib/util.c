@@ -1,9 +1,10 @@
 /*
  * generally useful utility functions
  * pluggable tracing facility, hexdump, white space, bitdef formatter
+ * also, a block editor
  *
  * lib/util.c
- * Changed: <2021-12-23 15:44:39 curt>
+ * Changed: <2023-06-19 14:56:36 curt>
  */
 
 #define	_GNU_SOURCE
@@ -17,6 +18,8 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/errno.h>
+#include <curses.h>
+#include <term.h>
 
 #include "../include/util.h"
 
@@ -263,6 +266,29 @@ devnum(char *name, char *dtp, int *majorp, int *minorp)
         return ENOENT;
     }
     return 0;
+}
+
+/*
+ * a block editor
+ */
+void
+blockedit(char *buf, int len)
+{
+    char inbuf[200];
+    int numlines = (len + 15) / 16;
+    int i;
+    int j;
+
+    initscr(); 
+    cbreak();
+    noecho();
+
+    for (i = 0; i < numlines; i++) {
+        mvprintw(i, 0, "%03x: ", i * 16);    
+    }
+    getch();
+    doupdate();
+    endwin();
 }
 
 /*
