@@ -1,11 +1,11 @@
 # build host tools
 #
 # tools/Makefile
-# Changed: <2023-06-16 01:03:21 curt>
+# Changed: <2023-06-19 06:09:52 curt>
 
 SIMTARGETS = \
 	ar nm size imd disas dump \
-	mnix dcheck icheck ncheck readall
+	mnix dcheck icheck ncheck readal imdd
 	#mar  hitech
 
 LDFLAGS = 
@@ -54,6 +54,9 @@ doc.inl: doc.c doc.txt
 zmac.c: zmac.y
 	bison --output=zmac.c zmac.y
 
+imdd: imdd.c
+	cc -o imdd imdd.c
+
 test: disas
 	./disas tests/mw.o
 
@@ -64,6 +67,24 @@ test1: disas
 
 test2: disas
 	./disas ../../lib/libm/idiv.o
+
+testd:	dcheck
+	for i in ../../disks/dist/*.IMD ; do \
+		echo $$i ; \
+		./dcheck $$i ; \
+	done;
+
+testi:	icheck
+	for i in ../../disks/dist/*.IMD ; do \
+		echo $$i ; \
+		./icheck $$i ; \
+	done;
+
+testn:	ncheck
+	for i in ../../disks/dist/*.IMD ; do \
+		echo $$i ; \
+		./ncheck $$i ; \
+	done;
 
 install: disas
 	cp disas ~/bin
