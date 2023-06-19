@@ -4,7 +4,7 @@
  * brute force for everything
  *
  * lib/fslib.c
- * Changed: <2021-12-23 15:50:00 curt>
+ * Changed: <2023-06-19 07:13:45 curt>
  */
 #include <unistd.h>
 #include <stdio.h>
@@ -287,7 +287,7 @@ writeblk(struct super *fs, int blkno, char *buf)
 void
 lose(char *s)
 {
-    fprintf(stderr, "%s", s);
+    fprintf(stderr, "%s\n", s);
     exit(1);
 }
 
@@ -545,7 +545,7 @@ isummary(char *name, struct dsknod *dp)
  * print out an inode, raw
  */
 void
-idump(struct dsknod *dp)
+idump(char *name, struct dsknod *dp, int always)
 {
     int i;
     int j;
@@ -555,10 +555,12 @@ idump(struct dsknod *dp)
     UINT dindir[256];
     struct i_node *ip = (struct i_node *)dp;
 
-    if (!(dp->d_mode & IALLOC))
-        return;
+    if (!always) {
+        if (!(dp->d_mode & IALLOC))
+            return;
+    }
 
-    isummary("", dp);
+    isummary(name, dp);
 
     ft = (dp->d_mode & IFMT) >> 13;
     printf("inode %5d: %6o %d %s\n", ip->inum, dp->d_mode, ft, itype[ft & 3]);
