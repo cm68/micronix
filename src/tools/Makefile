@@ -8,7 +8,7 @@ SIMTARGETS = \
 	mnix dcheck icheck ncheck readal imdd
 	#mar  hitech
 
-LDFLAGS = 
+LDFLAGS = -lcurses
 GENERATED = doc.inl zmac.c doc
 TARGETS = $(SIMTARGETS) zmac
 CXXFLAGS= $(MACHINE)
@@ -18,28 +18,28 @@ include ../Makefile.inc
 $(SIMTARGETS): ../lib/libsim.a
 
 nm:	nm.o
-	$(CC) -o nm nm.o ../lib/disz80.o ../lib/util.o ../lib/whitesmith.o ../lib/mnix_sys.c
+	$(CC) -o nm nm.o ../lib/disz80.o ../lib/util.o ../lib/whitesmith.o ../lib/mnix_sys.c $(LDFLAGS)
 
 imd:	imd.o
-	$(CC) -o imd imd.o ../lib/imdlib.o ../lib/util.o
+	$(CC) -o imd imd.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
 
 disas:	disas.o
-	$(CC) -o disas disas.o ../lib/mnix_sys.o
+	$(CC) -o disas disas.o ../lib/mnix_sys.o $(LDFLAGS)
 
 mnix:	mnix.o
-	$(CC) -o mnix mnix.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o
+	$(CC) -o mnix mnix.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
 
 dcheck:	dcheck.o
-	$(CC) -o dcheck dcheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o
+	$(CC) -o dcheck dcheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
 
 icheck:	icheck.o
-	$(CC) -o icheck icheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o
+	$(CC) -o icheck icheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
 
 ncheck:	ncheck.o
-	$(CC) -o ncheck ncheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o
+	$(CC) -o ncheck ncheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
 
 readall:	readall.o
-	$(CC) -o readall readall.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o
+	$(CC) -o readall readall.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
 
 zmac: zmac.o mio.o doc.o zi80dis.o
 	$(CXX) -Wall $(CXXFLAGS) -o zmac zmac.o mio.o doc.o zi80dis.o
