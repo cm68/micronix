@@ -124,7 +124,7 @@ void z80_run();
 enum reg8 { 
     a_reg, f_reg, b_reg, c_reg, d_reg, e_reg, h_reg, l_reg, 
     a1_reg, f1_reg, b1_reg, c1_reg, d1_reg, e1_reg, h1_reg, l1_reg, 
-    i_reg, r_reg, irr_reg, im_reg, control_reg, status_reg 
+    i_reg, r_reg, iff_reg, im_reg, control_reg, status_reg 
 };
 enum reg16 { 
     pc_reg, sp_reg, 

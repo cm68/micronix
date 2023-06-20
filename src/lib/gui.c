@@ -3,7 +3,7 @@
  *
  * lib/gui.c
  *
- * Changed: <2023-06-16 02:05:15 curt>
+ * Changed: <2023-06-20 10:50:13 curt>
  *
  */
 #include <curses.h>
@@ -31,6 +31,12 @@ extern void pverbose();
 
 WINDOW **win;
 SCREEN *screen;
+
+int disas_lines;
+int disas_line;
+int disas_pc[100];
+
+void clear_dis();
 
 char sys_stop[NSYS];
 char sys_trace[NSYS];
@@ -143,8 +149,9 @@ struct {
     { W_F,       0, 40, 0, 10 },
     { W_F1,      0, 40, 3, 10 },
     { W_IR,     "IR", 50, 0, 6 },
-    { W_IFF,    "IFF", 50, 3, 4 },
-    { W_IRQ,    "IRQ", 58, 3, 4 }
+    { W_IM,     "IM", 57, 0, 3 },
+    { W_IFF,    "IFF", 61, 0, 4 },
+    { W_IRQ,    "IRQ", 66, 0, 4 }
 };
 
 void
@@ -208,25 +215,27 @@ makewins(FILE *tty)
         perror("newterm fail");
         exit(1);
     }
-    cbreak();
+    if (COLS < 80) {
+        perror("not enough columns");
+        exit(1);
+    }
 
-    // nodelay(textwin, TRUE);
+    cbreak();
 
     for (i = 0; i < sizeof (reglayout)/sizeof(reglayout[0]); i++) {
         win[reglayout[i].index] = labelwin(reglayout[i].label, 3,
             reglayout[i].w, reglayout[i].y, reglayout[i].x);
     }
-    win[W_DIS] = labelwin("disassembly", 10, COLS - 2, 6, 0);
+    win[W_STACK] = labelwin("stack", 18, 78, 6, 0);
+    win[W_DUMP] = labelwin("dump", 18, 78, 24, 0);
+    disas_lines = LINES - 57;
+    // disas_lines = 6;
+    win[W_DIS] = labelwin("disassembly", disas_lines + 2, 78, 42, 0);
     scrollok(win[W_DIS], TRUE);
-
-    win[W_DUMP] = labelwin("dump", 18, COLS - 2, 17, 0);
-
-    win[W_STACK] = labelwin("stack", 18, COLS - 2, 35, 0);
-
-    win[W_CMD] = labelwin("command", 12, COLS - 2, LINES - 13, 0);
+    clear_dis();
+    win[W_CMD] = labelwin("command", 12, 78, LINES - 13, 0);
     scrollok(win[W_CMD], TRUE);
     wnoutrefresh(win[W_CMD]);
-
     doupdate();
 }
 
@@ -269,13 +278,68 @@ fflags(unsigned char f)
 }
 
 void
+clear_dis()
+{
+    int i;
+    for (i = 0; i < disas_lines; i++) {
+        disas_pc[i] = -1;
+    }
+}
+
+/*
+ * be smarter about disassembly window
+ * keep track of where we are and update a cursor if we loop back
+ */
+void
+update_dis(unsigned short pc)
+{
+    char outbuf[40];
+    int i;
+    char *s;
+
+    /* message("pc: %x disas_lines: %d disas_line: %d:", 
+        pc, disas_lines, disas_line);
+    for (i = 0; i < 7; i++) { message(disas_pc[i] == -1 ? "%d " : "%04x ", disas_pc[i]); } ; message("\n");
+    */
+
+    mvwaddstr(win[W_DIS], disas_line, 0, "  ");
+    for (i = 0; i < disas_lines; i++) {
+        if (disas_pc[i] == pc) {
+            // message("hit at %d\n", i);
+            mvwaddstr(win[W_DIS], i, 0, "->");
+            disas_line = i;
+            return;
+        }
+    }
+
+    if (disas_pc[disas_line] != -1) {
+        disas_line++;
+    }
+    if (disas_line == disas_lines) {
+        // message("disas scroll\n");
+        for (i = 1 ; i < disas_lines; i++) {
+            disas_pc[i-1] = disas_pc[i];
+        }
+        scroll(win[W_DIS]);
+        disas_line--;
+    }
+    mvwaddstr(win[W_DIS], disas_line, 0, "->");
+    disas_pc[disas_line] = pc;
+
+    format_instr(pc, outbuf);
+    s = get_symname(pc);
+    if (s) {
+        mvwprintw(win[W_DIS], disas_line, 2, "%s:", s);
+    }
+    mvwprintw(win[W_DIS], disas_line, 12, "%04x %s", pc, outbuf);
+    wrefresh(win[W_DIS]); wrefresh(win[W_DIS]->_parent);
+}
+
+void
 dumpcpu()
 {
     unsigned short af;
     unsigned char f;
-    char outbuf[40];
-    char *s;
-    int i;
     unsigned short pc;
 
     if (!win)
@@ -283,22 +347,29 @@ dumpcpu()
 
     pc = z80_get_reg16(pc_reg);
 
-    format_instr(pc, outbuf);
-    s = get_symname(pc);
-    if (s) {
-        wprintw(win[W_DIS], "\n%s:", s);
-    }
-    wprintw(win[W_DIS], "\n%04x %s", pc, outbuf);
-    wrefresh(win[W_DIS]); wrefresh(win[W_DIS]->_parent);
+    update_dis(pc);
 
     f = z80_get_reg8(f_reg);
     fflags(f);
     mvwaddstr(win[W_F], 0, 0, fbuf);
     wrefresh(win[W_F]);
+
     f = z80_get_reg8(f1_reg);
     fflags(f);
     mvwaddstr(win[W_F1], 0, 0, fbuf);
     wrefresh(win[W_F1]);
+
+    mvwaddch(win[W_IM], 0, 0, '0' + z80_get_reg8(im_reg));
+    wrefresh(win[W_IM]);
+
+    f = z80_get_reg8(iff_reg);
+    mvwaddch(win[W_IFF], 0, 0, (f & IFF1) ? '1' : ' ');
+    mvwaddch(win[W_IFF], 0, 0, (f & IFF2) ? '2' : ' ');
+    wrefresh(win[W_IFF]);
+
+    mvwaddch(win[W_IRQ], 0, 0, int_pin ? '1' : ' ');
+    wrefresh(win[W_IRQ]);
+
     regout(W_IR, (z80_get_reg8(i_reg) << 8) | z80_get_reg8(r_reg));
     regout(W_AF, z80_get_reg8(a_reg) << 8 | z80_get_reg8(f_reg));
     regout(W_AF1, z80_get_reg8(a1_reg) << 8 | z80_get_reg8(f1_reg));

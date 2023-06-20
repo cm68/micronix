@@ -3,7 +3,7 @@
  *
  * include/gui.h
  *
- * Changed: <2023-06-16 00:10:47 curt>
+ * Changed: <2023-06-20 09:45:48 curt>
  */
 
 /* window ID's */
