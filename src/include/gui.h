@@ -29,6 +29,7 @@
 #define W_IR    18
 #define W_IFF   19
 #define W_IRQ   20
+#define W_IM    21
 
 extern void message(char *fmt, ...);
 extern void makewins(FILE *tty);
