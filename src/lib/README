@@ -1,0 +1,5 @@
+this directory contains somewhat generic simulator related library functions
+that are usable by both hardware and software simulator on different platforms.
+
+also, z80 chip emulator sources are here, to build into lib<emulator name>.a
+all using the same interface.

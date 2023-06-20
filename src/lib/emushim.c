@@ -3,11 +3,14 @@
  * for Lin Ke-Fong's emulation
  * it is intended to be an interface equivalent to the shim.c in
  * the chips emulation
+ *
+ * lib/emushim.c
+ * Changed: <2023-06-20 11:53:21 curt>
  */
 #include <stdio.h>
 #include "z80emu.h"
 #include "z80user.h"
-#include "../hwsim/common/sim.h"
+#include "sim.h"
 
 MACHINE context;
 int running;
@@ -129,7 +132,7 @@ z80_get_reg8(enum reg8 r8)
         return context.state.i;
     case r_reg:
         return context.state.r;
-    case irr_reg:
+    case iff_reg:
         return context.state.iff1 | (context.state.iff2 << 1);
     case control_reg:
         return 0;
@@ -177,7 +180,7 @@ z80_set_reg8(enum reg8 r8, unsigned char v)
     case r_reg:
         context.state.r = v;
         break;
-    case irr_reg:
+    case iff_reg:
         break;
     case control_reg:
         break;
