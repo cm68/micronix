@@ -4,7 +4,7 @@
  * also, a block editor
  *
  * lib/util.c
- * Changed: <2023-06-19 14:56:36 curt>
+ * Changed: <2023-06-19 19:12:10 curt>
  */
 
 #define	_GNU_SOURCE
@@ -268,25 +268,121 @@ devnum(char *name, char *dtp, int *majorp, int *minorp)
     return 0;
 }
 
+int
+chextoi(char c)
+{
+    if (c < 'a') return c - '0';
+    return (c - 'a') + 0xa;
+}
+
 /*
  * a block editor
  */
 void
 blockedit(char *buf, int len)
 {
-    char inbuf[200];
+    unsigned char *editbuf;
     int numlines = (len + 15) / 16;
+    int c;
+    unsigned int b;
+    int y;
+    int x;
+    int col;
     int i;
-    int j;
+    
+    editbuf = malloc(len);
+    bcopy(buf, editbuf, len);
 
     initscr(); 
     cbreak();
     noecho();
 
-    for (i = 0; i < numlines; i++) {
-        mvprintw(i, 0, "%03x: ", i * 16);    
+    for (y = 0; y < numlines; y++) {
+        mvprintw(y, 0, "%03x: ", y * 16);    
+        for (x = 0; x < 16; x++) {
+            if ((y * 16) + x >= len) break;
+            b = editbuf[(y*16)+x] & 0xff;
+            mvprintw(y, 5 + (x * 3) + (x / 4), "%02x", b);
+            if ((b <= 0x20) || (b >= 0x7f))
+                b = '.';
+            mvaddch(y, 57 + (x) + (x / 4), b);
+        }
     }
-    getch();
+
+    y = 0;
+    x = 0;
+    col = 0;
+
+    while (1) {
+        i = (y * 16) + x;
+        c = mvgetch(y, 5 + (x * 3) + (x / 4) + col);
+        switch (c) {
+        case '0': case '1': case '2': case '3': case '4': 
+        case '5': case '6': case '7': case '8': case '9': 
+        case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
+            b = editbuf[i] & 0xff;
+            if (col) {
+                b = (b & 0xf0) | chextoi(c);
+            } else {
+                b = (b & 0xf) | (chextoi(c) << 4);
+            }
+            editbuf[i] = b;
+            mvprintw(y, 5 + (x * 3) + (x / 4), "%02x", b);
+            if ((b <= 0x20) || (b >= 0x7f))
+                b = '.';
+            mvaddch(y, 57 + (x) + (x / 4), b);
+
+            col++; 
+            if (col == 2) {
+                col = 0;
+                x++; 
+                if (x > 15) {
+                    x = 0; 
+                    y++;
+                    if (y >= numlines) {
+                        y = 0;
+                    }
+                }
+                if (((y * 16) + x) >= len) {
+                    x = 0;
+                    y = 0;
+                }
+            }
+            break;
+        case 'h':   // left
+            if (col) {
+                col--;
+            } else {
+                x--; if (x < 0) x = 0;
+                col = 1;
+            }
+            break;
+        case 'j':   // down
+            y++; if (y >= numlines) y = numlines - 1;
+            break;
+        case 'k':   // up   
+            y--; if (y < 0) y = 0;
+            break;
+        case 'l':   // right
+            if (col) {
+                x++; if (x > 15) x = 15;
+                if (((y * 16) + x) >= len) x = (len % 16) - 1;
+                col = 0;
+            } else {
+                col++;
+            }
+            break;
+        case 'w':   // write 
+        case 'x':   // exit 
+            goto done;
+            break;
+        case 'q':   // abort 
+            goto abort;
+        }
+    }
+done:
+    bcopy(editbuf, buf, len);
+abort:
     doupdate();
     endwin();
 }
