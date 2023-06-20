@@ -2,7 +2,7 @@
  * a command line micronix filesystem reader/writer/lister
  *
  * tools/mnix.c
- * Changed: <2023-06-19 14:22:14 curt>
+ * Changed: <2023-06-19 19:16:00 curt>
  *
  * the interface really needs to look like tar: 
  *
@@ -55,7 +55,7 @@ struct cmdtab
     int (*handler)(int n, char **a);
     char *usage;
 } cmds[] = {
-    {"inode", iinfo, "inode [-v] <inum>" },
+    {"inode", iinfo, "inode [-f] <inum>" },
     {"fsinfo", fsinfo, "fsinfo" },
     {"empty", emptycmd, "empty <file>" },
     {"info", infocmd, "info <file>" },
@@ -185,7 +185,7 @@ iinfo(int c, char **a)
     struct dsknod *dp;
     char na[20];
 
-    readopt(&c, &a, "v");
+    readopt(&c, &a, "f");
 
     if (!c) return 1;
     inum = atoi(*a);
@@ -193,7 +193,7 @@ iinfo(int c, char **a)
     dp = iget(fs, inum);
     if (!dp) return 2;
     sprintf(na, "inum %d\n", inum);
-    idump(na, dp, opt['v'-'a']);
+    idump(na, dp, opt['f'-'a']);
     ifree(dp); 
     return 0;
 }
@@ -546,10 +546,10 @@ blkcmd(int c, char **a)
     readblk(fs, blkno, buf);
     if (opt['e'-'a']) {
         bcopy(buf, newbuf, 512);
-        blockedit(newbuf);
+        blockedit(newbuf, 512);
         if (bcmp(buf, newbuf, 512) != 0) {
             printf("dirty\n");
-            // writeblk(fs, blkno, newbuf);
+            writeblk(fs, blkno, newbuf);
         }
     } else {
         hexdump(buf, 512);
