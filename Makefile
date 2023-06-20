@@ -5,7 +5,8 @@
 # Changed: <2023-06-19 19:39:40 curt>
 #
 
-all: src/usersim/sim sim filesystem
+all: sim filesystem
+	cd src ; make
 
 sim:
 	ln -s src/usersim/sim sim
