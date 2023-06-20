@@ -2,7 +2,7 @@
 # this is just a top-level makefile to build the simulator
 #
 # Makefile
-# Changed: <2022-01-06 15:10:27 curt>
+# Changed: <2023-06-19 19:39:40 curt>
 #
 
 all: src/usersim/sim sim filesystem
@@ -16,9 +16,16 @@ src/usersim/sim src/tools/readall:
 test: filesystem  src/usersim/sim
 	src/usersim/sim
 
-DISKS = disks/dist/101*.IMD disks/dist/1070*
+DISKS = $(shell cat disks/dist/MICRONIX | grep -v ^# | cut -f 1)
+DISKS1 = $(shell cat disks/dist/NEWER | grep -v ^# | cut -f 1)
 filesystem: src/tools/readall
-	for i in $(DISKS) ; do src/tools/readall -d filesystem $$i ; done
+	for i in $(DISKS) ; do \
+		src/tools/readall -d filesystem disks/dist/$$i ; \
+	done
+	mkdir -p filesystem/newer
+	for i in $(DISKS1) ; do \
+		src/tools/readall -d filesystem/newer disks/dist/$$i ; \
+	done
 	mkdir -p filesystem/usr/src/sys filesystem/usr/src/cmd filesystem/hitech
 	cp -r src/micronix/* filesystem/usr/src
 	for i in $$(find src/hitech/bin -type f -print); do cp $$i filesystem/hitech ; done
