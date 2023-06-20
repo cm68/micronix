@@ -1,0 +1,13 @@
+#
+# list of files to unpack into filesystem
+#
+1010-8_stand-alone.IMD		micronix 1.3 #1010-8 stand alone
+1011-8_dist_1.IMD		micronix 1.3 #1011-8 distribution vol 1
+1012-8_dist_2.IMD		micronix 1.3 #1011-8 distribution vol 2
+1013-8_dist_3.IMD		micronix 1.3 #1011-8 distribution vol 3
+1014-8_c_1.IMD			micronix 1.4 #1014-8 c volume 1
+1016-8_c_2.IMD			micronix 1.4 #1016-8 c volume 2
+1070-8_pascal.IMD		micronix 1.3 #1070-8 pascal
+#UX141_SA.IMD			micronix 1.41 stand alone
+#UX14_D1.IMD			micronix 1.4 dist vol 1
+#UX14_D2.IMD			micronix 1.4 dist vol 2

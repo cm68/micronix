@@ -1,0 +1,6 @@
+#
+# list of files to unpack into filesystem
+#
+UX141_SA.IMD			micronix 1.41 stand alone
+UX14_D1.IMD			micronix 1.4 dist vol 1
+UX14_D2.IMD			micronix 1.4 dist vol 2
