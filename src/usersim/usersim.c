@@ -1,9 +1,9 @@
 /*
  * micronix. this emulates the micronix user mode 
  *
- * usersim/micronix.c
+ * usersim/usersim.c
  *
- * Changed: <2023-06-16 02:06:05 curt>
+ * Changed: <2023-06-22 22:49:53 curt>
  *
  * Copyright (c) 2018, Curt Mayer 
  * do whatever you want, just don't claim you wrote it. 
@@ -74,7 +74,7 @@ FILE *tty;
 extern int logfd;
 
 char curdir[100] = "";
-char *rootdir = 0;
+char *rootdir;
 ino_t rootinode;
 
 /* i/o buffer used for real system calls */
@@ -377,6 +377,7 @@ main(int argc, char **argv)
     int j;
     char *ttyname;
     struct point *p;
+    char rpath[100];
 
     progname = *argv++;
     argc--;
@@ -492,21 +493,79 @@ main(int argc, char **argv)
     if (!rootdir) {
         rootdir = DEFROOT;
     }
+
+    /*
+     * something of a hack: let's look for our rootdir if there isnt one
+     * right here
+     */
+    for (i = 0; i < 4; i++) {
+        rpath[0] = '\0';
+        for (j = 0; j < i; j++) {
+            strcat(rpath, "../");
+        }
+        strcat(rpath, rootdir);
+        if ((stat(rpath, &sbuf) == 0) && 
+            ((sbuf.st_mode & S_IFMT) == S_IFDIR)) {
+            rootdir = strdup(rpath);
+            break;
+        }
+    }
+
+    /*
+     * if our rootdir is relative, we need to make it absolute 
+     */
+    if (*rootdir != '/') {
+        getcwd(workbuf, sizeof(workbuf));
+        strcat(workbuf, "/");
+        strcat(workbuf, rootdir);
+        realpath(workbuf, namebuf);
+        rootdir = strdup(namebuf);
+        lstat(rootdir, &sbuf);
+        rootinode = sbuf.st_ino;
+    }
+    if (verbose) {
+        pverbose();
+        message("emulating %s with root %s\n", argv[0], rootdir);
+    }
+
     rootpid = mypid = getpid();
 
     /*
-     * we might be piping the simulator.  let's get an open file for our debug output
-     * and monitor functions.  finally, let's make sure the file descriptor is out of
-     * range of the file descriptors our emulation uses.
-     * this is so that we can debug interactive stuff that might be writing/reading from
-     * stdin, and we want all our debug output to go to a different terminal, one that
-     * isn't running a shell.  
-     * also, if we specified to open a debug window, let's connect the emulator's file
-     * descriptors to an xterm or something.
+     * we might be piping the simulator.  let's get an open file for our 
+     * debug output and monitor functions.  finally, let's make sure the 
+     * file descriptor is out of range of the file descriptors our emulation
+     * uses.
+     * this is so that we can debug interactive stuff that might be 
+     * writing/reading from stdin, and we want all our debug output to go to 
+     * a different terminal, one that isn't running a shell.  
+     * also, if we specified to open a debug window, let's connect the 
+     * emulator's file descriptors to an xterm or something.
      */
     if (debug_terminal) {
-        char *cmd = malloc(100);
         int pipefd[2];
+        char *cmd = malloc(100);
+        char *args[30];
+        char *s;
+
+        char **argp = args;
+        *argp++ = "xterm";
+        *argp++ = "-T";
+        *argp++ = "debug";
+        s = getenv("DEBUG_GEOMETRY");
+        if (!s) s = "80x80";
+        *argp++ = "-geometry";
+        *argp++ = strdup(s);
+        *argp++ = "-fa";
+        *argp++ = "Monospace";
+        *argp++ = "-fs";
+        s = getenv("DEBUG_FONTSIZE");
+        if (!s) s = "12";
+        *argp++ = strdup(s);
+        *argp++ = "-e";
+        *argp++ = "bash";
+        *argp++ = "-c";
+        *argp++ = cmd;
+        *argp++ = (char *) 0;
 
         pipe(pipefd);
         sprintf(cmd,
@@ -520,7 +579,7 @@ main(int argc, char **argv)
             }
             ttyname[strlen(ttyname) - 1] = 0;
         } else {
-            execlp("xterm", "xterm", "-e", "bash", "-c", cmd, (char *) 0);
+            execvp("xterm", args);
         }
     } else {
         ttyname = "/dev/tty";
@@ -540,22 +599,7 @@ main(int argc, char **argv)
         makewins(tty);
     }
 
-    /*
-     * if our rootdir is relative, we need to make it absolute 
-     */
-    if (*rootdir != '/') {
-        getcwd(workbuf, sizeof(workbuf));
-        strcat(workbuf, "/");
-        strcat(workbuf, rootdir);
-        realpath(workbuf, namebuf);
-        rootdir = strdup(namebuf);
-        lstat(rootdir, &sbuf);
-        rootinode = sbuf.st_ino;
-    }
-    if (verbose) {
-        pverbose();
-        message("emulating %s with root %s\n", argv[0], rootdir);
-    }
+    mon_init();
     dump_stops();
 
 	z80_init();
