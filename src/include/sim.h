@@ -19,6 +19,9 @@ typedef void (*outhandler)(portaddr port, byte val);
 extern inhandler input_handler[256];
 extern outhandler output_handler[256];
 
+extern int monitor();
+extern void mon_init();
+
 // memory and port access functions - all memory access by instruction set is here
 extern void copyin(byte *buf, paddr pa, int len);	// copy from simulation
 extern void copyout(byte *buf, paddr pa, int len);	// copy to simulation

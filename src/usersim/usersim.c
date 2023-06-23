@@ -3,7 +3,7 @@
  *
  * usersim/usersim.c
  *
- * Changed: <2023-06-22 22:49:53 curt>
+ * Changed: <2023-06-23 14:00:37 curt>
  *
  * Copyright (c) 2018, Curt Mayer 
  * do whatever you want, just don't claim you wrote it. 
@@ -155,6 +155,7 @@ volatile int breakpoint;
 char namebuf[PATH_MAX];
 char workbuf[PATH_MAX];
 
+#ifdef notdef
 /*
  * breakpoints and watchpoints are handled using the same data structure
  */
@@ -167,6 +168,7 @@ struct point
 
 extern struct point *breaks;
 extern struct point *watches;
+#endif
 
 #define MAXFILE 63
 /*
@@ -314,45 +316,11 @@ usage(char *complaint, char *arg)
 }
 
 /*
- * system calls to stop on 
+ * trace and stops are similar: when a system call happens that we registered for,
+ * we dump and possibly stop.  we stop if the counter goes to zero
  */
-extern char sys_stop[];
-extern char sys_trace[];
-
-/*
- * get a system call id.  either by name or integer.
- */
-int
-get_syscall(char **sp)
-{
-    int i;
-    char nbuf[20];
-    char *s = *sp;
-    char *d = nbuf;
-
-    while (*s) {
-        if (isupper(*s)) *s = tolower(*s);
-        if (*s < 'a' || *s > 'z') break;
-        *d++ = *s++;
-    }
-    *d = '\0';
-
-    if (nbuf[0] >= 'a' && nbuf[0] <= 'z') {
-        for (i = 0; syscalls[i].name; i++) {
-            if (strcmp(nbuf, syscalls[i].name) == 0) {
-                *sp += strlen(nbuf);
-                return i;
-            }
-        }
-        return -1;
-    }
-    i = strtol(*sp, sp, 0);
-    if (i >= NSYS) {
-        message("bad system call number %d\n", i);
-        i = -1;
-    }
-    return i;
-}
+extern char sys_stop[NSYS];
+extern char sys_trace[NSYS];
 
 void
 pverbose()
@@ -428,7 +396,7 @@ main(int argc, char **argv)
                 s = *argv++;
                 while (*s) {
                     i = get_syscall(&s);
-                    if ((i > NSYS) || (i < 0)) {
+                    if (i == -1) {
                         usage("unrecognized system call\n", s);
                         break;
                     }
@@ -450,7 +418,7 @@ main(int argc, char **argv)
                 s = *argv++;
                 while (*s) {
                     i = get_syscall(&s);
-                    if ((i > NSYS) || (i < 0)) {
+                    if (i == -1) {
                         usage("unrecognized system call\n", s);
                         break;
                     }
@@ -600,7 +568,6 @@ main(int argc, char **argv)
     }
 
     mon_init();
-    dump_stops();
 
 	z80_init();
 
@@ -1580,24 +1547,18 @@ SystemCall()
     /*
      * if this is a system call we are interested in, deal with it 
      */
-    if (sys_stop[code]) {
-        pid();
-        dumpcpu();
-        if (--sys_stop[code] == 0) {
-                verbose = -1;
-                breakpoint = 1;
-        }
-    } else if (sys_trace[code]) {
-        pid();
-        dumpcpu();
-        verbose = -1;
+    if (sys_stop[code] || sys_trace[code]) {
+        verbose |= V_SYS;
+    }
+    if (sys_stop[code] && !(--sys_stop[code])) {
+        breakpoint = 1;
     }
 
     sp = &syscalls[code];
 
     if (verbose & V_SYS0) {
         message("%10s %3d ", sp->name, z80_get_reg16(hl_reg));
-        dumpmem(&get_byte, sc, sp->argbytes + 1);
+        // dumpmem(&get_byte, sc, sp->argbytes + 1);
     }
 
     if (sp->flag & (SF_ARG1 | SF_NAME))
@@ -1738,7 +1699,7 @@ SystemCall()
                 ret = open(filename, arg2);
                 if (ret == 0xffff) {
                     if (verbose & V_ERROR)
-                        perror(filename);
+                        message("%s: %s\n", strerror(errno), filename);
                     goto lose;
                 }
                 files[ret].offset = 0;
@@ -1752,7 +1713,7 @@ SystemCall()
             carry_clear();
         } else {
             if (verbose & V_ERROR)
-                perror(filename);
+                message("%s: %s\n", strerror(errno), filename);
           lose:
             ret = errno;
             carry_set();
@@ -1809,7 +1770,7 @@ SystemCall()
         ret = creat(filename = fname(fn), arg2);
         if (ret == -1) {
             if (verbose & V_ERROR)
-                perror(filename);
+                message("%s: %s\n", strerror(errno), filename);
             ret = errno;
             carry_set();
         } else {
@@ -1834,7 +1795,7 @@ SystemCall()
         ret = link(filename, fname(fn2));
         if (ret != 0) {
             if (verbose & V_ERROR)
-                perror(filename);
+                message("%s: %s\n", strerror(errno), filename);
             ret = -1;
         } else {
             carry_clear();
@@ -1863,7 +1824,7 @@ SystemCall()
                 }
             }
             if (verbose & V_ERROR)
-                perror(filename);
+                message("%s: %s\n", strerror(errno), filename);
             ret = errno;
             carry_set();
         } else {
@@ -1944,7 +1905,7 @@ SystemCall()
                 ((arg2 & IFMT) == IFBLK) ? 'b' : 'c',
                 (arg3 >> 8) & 0xff, arg3 & 0xff);
             ret = symlink(workbuf, filename);
-        printf("make dev %s %s %o %x = %d\n", filename, workbuf, arg2, arg3, ret); fflush(stdout);
+            message("make dev %s %s %o %x = %d\n", filename, workbuf, arg2, arg3, ret);
             break;
         default:
             ret = -1;
@@ -1952,7 +1913,7 @@ SystemCall()
         }
         if (ret == -1) {
             if (verbose & V_ERROR)
-                perror(filename);
+                message("%s: %s\n", strerror(errno), filename);
             ret = errno;
             carry_set();
         } else {
@@ -2012,7 +1973,7 @@ SystemCall()
             ret = lstat(filename, &sbuf);
             if (ret) {
                 if (verbose & V_ERROR)
-                    perror(filename);
+                    message("%s: %s\n", strerror(errno), filename);
             }
         }
         if (ret) {

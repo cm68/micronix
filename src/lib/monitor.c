@@ -3,7 +3,7 @@
  *
  * lib/monitor.c
  *
- * Changed: <2023-06-23 00:18:13 curt>
+ * Changed: <2023-06-23 13:43:54 curt>
  *
  */
 #include <curses.h>
@@ -43,8 +43,8 @@ struct moncmd {
 struct moncmd *moncmds;
 int nmoncmds;
 
-char sys_stop[NSYS];
-char sys_trace[NSYS];
+char sys_stop[NSYS];    // number of syscalls to skip before stopping
+char sys_trace[NSYS];   // trace out
 
 unsigned short lastaddr;
 int fmt_indir_sc = 1;
@@ -62,13 +62,13 @@ struct point *breaks;
 struct point *watches;
 
 struct point *
-point_at(struct point **head, unsigned short addr, struct point **pp)
+point_at(struct point *head, unsigned short addr, struct point **pp)
 {
     struct point *p;
 
     if (pp)
         *pp = 0;
-    for (p = *head; p; p = p->next) {
+    for (p = head; p; p = p->next) {
         if (p->addr == addr) {
             break;
         }
@@ -82,7 +82,7 @@ point_at(struct point **head, unsigned short addr, struct point **pp)
 int
 breakpoint_at(unsigned short addr)
 {
-    if (point_at(&breaks, addr, 0))
+    if (point_at(breaks, addr, 0))
         return 1;
     return 0;
 }
@@ -117,19 +117,6 @@ add_breakpoint(unsigned short addr)
     p->addr = addr;
     p->next = breaks;
     breaks = p;
-    message("added breakpoint at %04x\n", addr);
-}
-
-void
-dump_stops()
-{
-    int i;
-
-    for (i = 0 ; i < NSYS; i++) {
-        if (!sys_stop[i]) continue;
-        message("stopping syscall %s after %d\n", 
-            syscalls[i].name, sys_stop[i]);
-    }
 }
 
 /*
@@ -183,16 +170,15 @@ getaddress(char **s)
 }
 
 /*
+ * the return value is encoded as follows:
+ * 0 - 
  * return 1 if stopped, else 0
  */
 int
 monitor()
 {
-    struct point *p, *prev, **head;
-    char l;
     char c;
     int i;
-    int delete;
     char *s;
     int addr;
 
@@ -203,9 +189,7 @@ monitor()
         s = cmdline;
 
         skipwhite(&s);
-
         c = *s++;
-
         skipwhite(&s);
 
         for (i = 0; i < nmoncmds; i++) {
@@ -221,36 +205,178 @@ monitor()
     }
 }
 
+/*
+ * all the command processors take a pointer to the pointer to the input string
+ * and we have skipped any white space.  if we're at the end of the command,
+ * we're pointing at a null.
+ *
+ * commands return 0 if we want to stay interactive
+ * return <n> if thats how many instructions we want to step
+ * return -1 if we want to run 
+ */
+
+void
+register_mon_cmd(char c, char *help, int (*handler)(char **p))
+{
+    moncmds = realloc(moncmds, sizeof(moncmds[0]) * (nmoncmds + 1));
+    moncmds[nmoncmds].cmd = c;
+    moncmds[nmoncmds].help = help;
+    moncmds[nmoncmds].handler = handler;
+    nmoncmds++;
+}
+
+int
+next_cmd(char **sp)
+{
+    message("unimplemented\n");
+    return 0;
+}
+
+int
+step_cmd(char **sp)
+{
+    int i;
+
+    if (**sp) {
+        i = strtol(*sp, sp, 16);
+    } else {
+        i = 1;
+    }
+    return (i);
+}
+
+int
+go_cmd(char **sp)
+{
+    return (-1);
+}
+
+/*
+ * list, add or delete syscall trace
+ * [-]<syscall> ...
+ */
+int
+trace_cmd(char **sp)
+{
+    int i;
+    int delete = 0;
+    int k = 0;
+
+    if (!**sp) {
+        message("tracing:\n");
+        for (i = 0 ; i < NSYS; i++) {
+            if (!sys_trace[i]) continue;
+            k++;
+            message("%s\t", syscalls[i].name);
+            if ((k % 9) == 0) message("\n");
+        }
+        if ((k % 9) != 0) message("\n");
+    }
+
+    if (**sp == '-') {
+        (*sp)++;
+        delete = 1;
+    }
+
+    while (**sp) {
+        skipwhite(sp);
+        i = get_syscall(sp);
+        if (i == -1) {
+            message("unrecognized syscall\n");
+            return 0;
+        } 
+        sys_trace[i] = delete ? 0 : 1;
+    }
+    return 0;
+}
+
+/*
+ * list, add or delete syscall stops
+ * <syscall>[=<skip count>] ...
+ */
+int
+stop_cmd(char **sp)
+{
+    int i;
+    int k = 0;
+
+    if (!**sp) {
+        message("syscall stops:\n");
+        for (i = 0 ; i < NSYS; i++) {
+            if (!sys_stop[i]) continue;
+            k++;
+            message("%s=%d\t", syscalls[i].name, sys_stop[i]);
+            if ((k % 7) == 0) message("\n");
+        }
+        if ((k % 7) != 0) message("\n");
+    }
+
+    while (**sp) {
+        skipwhite(sp);
+        i = get_syscall(sp);
+        if (i == -1) {
+            message("unrecognized syscall\n");
+            return 0;
+        } 
+        skipwhite(sp);
+        if (**sp == '=') {
+            (*sp)++;
+            k = strtol(*sp, sp, 10);
+        } else {
+            k = 1;
+        }
+        sys_stop[i] = k;
+    }
+    return 0;
+}
+
+int
+verbose_cmd(char **sp)
+{
+    if (**sp) {
+        verbose = strtol(*sp, sp, 16);
+    }
+    pverbose();
+    return 0;
+}
+
+/*
+ * list code
+ * l [addr]
+ */
 int
 list_cmd(char **sp)
 {
-    int i;
+    unsigned short addr;
     int l;
     int c;
     char *s;
 
     if (**sp) {
-        i = getaddress(sp);
+        addr = getaddress(sp);
     } else {
         if (lastaddr == -1) {
-            i = z80_get_reg16(pc_reg);
+            addr = z80_get_reg16(pc_reg);
         } else {
-            i = lastaddr;
+            addr = lastaddr;
         }
     }
     for (l = 0; l < LISTLINES; l++) {
-        c = format_instr(i, cmdline);
-        s = get_symname(i);
-        if (s) {
-            message("%s\n", s);
+        c = format_instr(addr, cmdline);
+        if ((s = get_symname(addr))) {
+            message("%s:\n", s);
         }
-        message("%04x: %-20s\n", i, cmdline);
-        i += c;
-        lastaddr = i & 0xffff;
+        message("%04x: %-20s\n", addr, cmdline);
+        addr += c;
+        lastaddr = addr & 0xffff;
     }
     return 0;
 }
 
+/*
+ * hexdump at address
+ * d [addr]
+ */
 int
 dump_cmd(char **sp)
 {
@@ -271,199 +397,71 @@ dump_cmd(char **sp)
     return 0;
 }
 
-break_cmd(char **sp)
+void
+point_cmd(char **sp, struct point **head)
 {
-}
+    unsigned short addr = 0;
+    int delete = 0;
+    struct point *p, *prev;
 
-next_cmd(char **sp)
-{
-}
-
-int
-step_cmd(char **sp)
-{
-    int i;
-
-    if (**sp) {
-        i = strtol(*sp, sp, 16);
-    } else {
-        i = 1;
+    if (**sp == '-') {
+        (*sp)++;
+        delete = 1;
     }
-    return (i);
-}
 
-go_cmd(char **sp)
-{
-    return (-1);
-}
-
-trace_cmd(char **sp)
-{
-}
-
-verbose_cmd(char **sp)
-{
-}
-
-#ifdef notdef
-
-        head = &breaks;
-        switch (c) {
-        case 'v':
-            while (*s && (*s == ' '))
-                s++;
-            if (*s) {
-                verbose = strtol(s, &s, 16);
-                pverbose();
-            }
-            break;
- 
-        case 'c':
-            c = 1;
-            while (*s && (*s == ' '))
-                s++;
-            if (!*s) {
-                dump_stops();
-            }
-            if (*s == '-') {
-                s++;
-                c = 0;
-            }
-            if (*s) {
-                i = strtol(s, &s, 16);
-            }
-            if (i) {
-                if (i < 0) {
-                    i = -i;
-                    c = 0;
-                }
-                if (i < sizeof(sys_stop)) {
-                    sys_stop[i] = c;
-                }
-            }
-            break;
-
-        case 'l':
-            while (*s && (*s == ' '))
-                s++;
-            if (*s) {
-                i = strtol(s, &s, 16);
+    while (**sp) {
+        skipwhite(sp);
+        addr = strtol(*sp, sp, 16);
+        p = point_at(*head, addr, &prev);
+        if (p && delete) {
+            if (prev) {
+                prev->next = p->next;
             } else {
-                if (lastaddr == -1) {
-                    i = z80_get_reg16(pc_reg);
-                } else {
-                    i = lastaddr;
-                }
+                *head = p->next;
             }
-            for (l = 0; l < LISTLINES; l++) {
-                c = format_instr(i, cmdline);
-                s = get_symname(i);
-                if (s) {
-                    message("%s\n", s);
-                }
-                message("%04x: %-20s\n", i, cmdline);
-                i += c;
-                lastaddr = i & 0xffff;
+            free(p);
+        } else if ((!p) && (!delete)) {
+            p = malloc(sizeof(*p));
+            p->addr = addr;
+            p->next = *head;
+            *head = p;
+        }
+    }
+
+    if (addr == 0) {
+        if (delete) {
+            while ((p = *head)) {
+                *head = p->next;
+                free(p);
             }
-            break;
-        case 's':
-            while (*s && (*s == ' '))
-                s++;
-            if (*s) {
-                i = strtol(s, &s, 16);
-            } else {
-                i = 1;
+        } else {
+            for (p = *head; p; p = p->next) {
+                message("%04x\n", p->addr);
             }
-            dumpcpu();
-            return (i);
-        case 'g':
-            return (0);
-        case 'q':
-            exit(1);
-            return (0);
-        case 'w':              /* w [-] <addr> <addr> ... */
-            head = &watches;
-        case 'b':              /* b [-] <addr> <addr> ... */
-            delete = 0;
-            i = -1;
-            if (*s == '-') {
-                s++;
-                delete = 1;
-            }
-            while (*s) {
-                i = strtol(s, &s, 16);
-                p = point_at(head, i, &prev);
-                if (p && delete) {
-                    if (prev) {
-                        prev->next = p->next;
-                    } else {
-                        *head = p->next;
-                    }
-                    free(p);
-                } else if ((!p) && (!delete)) {
-                    p = malloc(sizeof(*p));
-                    p->addr = i;
-                    p->next = *head;
-                    *head = p;
-                }
-                while (*s && (*s == ' '))
-                    s++;
-            }
-            if (i == -1) {
-                if (delete) {
-                    while ((p = *head)) {
-                        *head = p->next;
-                        free(p);
-                    }
-                } else {
-                    for (p = *head; p; p = p->next) {
-                        message("%04x\n", p->addr);
-                    }
-                }
-            }
-            break;
-        case '?':
-        case 'h':
-            message("commands:\n");
-            message("l <addr> :list\n");
-            message("d <addr> :dump memory\n");
-            message("g: continue\n");
-            message("s: single step\n");
-            message("q: exit\n");
-            message("b [-] <nnnn> ... :breakpoint\n");
-            message("w [-] <nnnn> ... :watchpoint\n");
-            message("c [-] <nn> :system call trace\n");
-            message("v <nn> :set verbose\n");
-            break;
-        default:
-            message("unknown command %c\n", c);
-            break;
-        case 0:
-            break;
         }
     }
 }
-#endif
 
 /*
- * all the command processors take a pointer to the pointer to the input string
- * and we have skipped any white space.  if we're at the end of the command,
- * we're pointing at a null.
- *
- * all command processors assume that we are going to do another command.  if
- * we want to return to the simulation, we need to return from monitor.
- * that's the convention we use.  so, if our command returns 1, then we are
- * going to simulate some more.
+ * add or delete breakpoint
+ * [-][<addr>] [...]
  */
-
-void
-register_mon_cmd(char c, char *help, int (*handler)(char **p))
+int
+break_cmd(char **sp)
 {
-    moncmds = realloc(moncmds, sizeof(moncmds[0]) * (nmoncmds + 1));
-    moncmds[nmoncmds].cmd = c;
-    moncmds[nmoncmds].help = help;
-    moncmds[nmoncmds].handler = handler;
-    nmoncmds++;
+    point_cmd(sp, &breaks);
+    return 0;
+}
+
+/*
+ * add or delete watchpoint
+ * w [-][addr] [...]
+ */
+int
+watch_cmd(char **sp)
+{
+    point_cmd(sp, &watches);
+    return 0;
 }
 
 int
@@ -473,20 +471,13 @@ exit_cmd(char **sp)
 }
 
 int
-regs_cmd(char **sp)
-{
-    dumpcpu();
-    return 0;
-}
-
-int
 help_cmd(char **sp)
 {
     int i;
 
-    message("commands:\n");
     for (i = 0; i < nmoncmds; i++) {
-        message("%c %s\n", moncmds[i].cmd, moncmds[i].help);
+        if (moncmds[i].help)
+            message("%c %s\n", moncmds[i].cmd, moncmds[i].help);
     }
     return 0;
 }
@@ -497,19 +488,18 @@ help_cmd(char **sp)
 void
 mon_init()
 {
-    register_mon_cmd('l', "[addr]\tlist instructions", list_cmd);
-    register_mon_cmd('b', "[-][<addr>] [...]\tadd or delete breakpoint", break_cmd);
-    register_mon_cmd('d', "[addr]\tdump memory", dump_cmd);
-    register_mon_cmd('s', "[inst count]\tstep", step_cmd);
-    register_mon_cmd('n', "\tstep over", next_cmd);
-    register_mon_cmd('g', "[address]\tgo", go_cmd);
-    register_mon_cmd('r', "\tdump registers", regs_cmd);
-    register_mon_cmd('t', "trace\tset trace", trace_cmd);
-    register_mon_cmd('q', "\tquit", exit_cmd);
-    register_mon_cmd('x', "\texit", exit_cmd);
-    register_mon_cmd('v', "<verbosity>\tset verbosity", verbose_cmd);
-    register_mon_cmd('h', "\thelp", help_cmd);
-    register_mon_cmd('?', "\thelp", help_cmd);
+    register_mon_cmd('b', "[-][<addr>] ...\tadd or delete breakpoint", break_cmd);
+    register_mon_cmd('c', "<syscall>[=<skip count>] ...\tadd or delete syscall stop", 
+        stop_cmd);
+    register_mon_cmd('d', "[addr]\t\tdump memory", dump_cmd);
+    register_mon_cmd('g', "[address]\t\tgo", go_cmd);
+    register_mon_cmd('l', "[addr]\t\tlist instructions", list_cmd);
+    register_mon_cmd('n', "\t\t\tstep over", next_cmd);
+    register_mon_cmd('q', "\t\t\tquit", exit_cmd);
+    register_mon_cmd('s', "[inst count]\t\tstep", step_cmd);
+    register_mon_cmd('t', "[-]<syscall> ...\tadd or delete syscall trace", trace_cmd);
+    register_mon_cmd('v', "<verbosity>\t\tset verbosity", verbose_cmd);
+    register_mon_cmd('h', "\t\t\thelp", help_cmd);
 }
 
 /*

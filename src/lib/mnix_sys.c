@@ -4,7 +4,7 @@
  *
  * lib/mnix_sys.c
  *
- * Changed: <2023-06-15 22:08:38 curt>
+ * Changed: <2023-06-23 12:44:24 curt>
  */
 /*
  * the number of bytes to adjust the return address on the stack by.
@@ -15,7 +15,9 @@
 #include "../include/disz80.h"
 #include "../include/mnix.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 struct syscall syscalls[] = {
 /* 0  */	{3, "indir", SF_ARG1 },
@@ -157,6 +159,40 @@ char *signame[] = {
 	"alarm",
 	"term"
 };
+
+/*
+ * get a system call id.  either by name or integer.
+ */
+int
+get_syscall(char **sp)
+{
+    int i;
+    char nbuf[20];
+    char *s = *sp;
+    char *d = nbuf;
+
+    while (*s) {
+        if (isupper(*s)) *s = tolower(*s);
+        if (*s < 'a' || *s > 'z') break;
+        *d++ = *s++;
+    }
+    *d = '\0';
+
+    if (nbuf[0] >= 'a' && nbuf[0] <= 'z') {
+        for (i = 0; syscalls[i].name; i++) {
+            if (strcmp(nbuf, syscalls[i].name) == 0) {
+                *sp += strlen(nbuf);
+                return i;
+            }
+        }
+        return -1;
+    }
+    i = strtol(*sp, sp, 0);
+    if (i >= NSYS) {
+        i = -1;
+    }
+    return i;
+}
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

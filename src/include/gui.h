@@ -40,6 +40,7 @@ extern void add_breakpoint(unsigned short addr);
 extern void dump_stops();
 extern int watchpoint_hit();
 extern int breakpoint_at(unsigned short addr);
+extern void memdump(WINDOW *w, unsigned short addr, int len);
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
