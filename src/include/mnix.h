@@ -34,6 +34,8 @@ extern int fmt_indir_sc;
 extern struct syscall syscalls[];
 extern char *signame[];
 
+extern int get_syscall(char **sp);
+
 #define NSYS    64
 
 /*
