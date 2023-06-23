@@ -3,13 +3,14 @@
  *
  * lib/gui.c
  *
- * Changed: <2023-06-20 10:50:13 curt>
+ * Changed: <2023-06-23 00:08:03 curt>
  *
  */
 #include <curses.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 
 #include "gui.h"
 #include "sim.h"
@@ -21,6 +22,7 @@ extern unsigned char get_byte(unsigned short addr);
 extern int mypid;
 extern int verbose;
 extern void pverbose();
+extern unsigned short lastaddr;
 
 /* dump line format */
 #define DUMP_ADDR   0
@@ -38,10 +40,10 @@ int disas_pc[100];
 
 void clear_dis();
 
+#ifdef notdef
 char sys_stop[NSYS];
 char sys_trace[NSYS];
 
-unsigned short lastaddr;
 int fmt_indir_sc = 1;
 
 /*
@@ -126,6 +128,7 @@ dump_stops()
             syscalls[i].name, sys_stop[i]);
     }
 }
+#endif
 
 struct {
     int index;
@@ -201,39 +204,71 @@ labelwin(char *label, int high, int wide, int posy, int posx)
     return content;
 }
 
+#define REG_ROWS    6
+#define STACK_ROWS  16
+#define DUMP_ROWS   16
+#define DIS_ROWS    4
+#define CMD_ROWS    4
+
+#define MIN_FOR_STACK   (REG_ROWS+STACK_ROWS+DUMP_ROWS+DIS_ROWS+CMD_ROWS)
+#define MIN_LINES   (REG_ROWS + DUMP_ROWS + DIS_ROWS + CMD_ROWS)
+
 void
 makewins(FILE *tty)
 {
     int i;
+    int row;
+    int lines;
+    int cols;
+    struct winsize w;
+
+    if (ioctl(fileno(tty), TIOCGWINSZ, &w) != 0) {
+        perror("can't get window size");
+        exit(1);
+    }
+    lines = w.ws_row;
+    cols = w.ws_col;
+    if (lines < MIN_LINES) {
+        fprintf(stderr, "need minimum of %d lines: got %d\n", MIN_LINES, lines);
+        exit(1);
+    }
+
 
     if (!win) {
-        win = malloc(sizeof(WINDOW *) * 
-            ((sizeof(reglayout)/sizeof(reglayout[0])) + 4));
+        win = malloc(sizeof(WINDOW *) * W_COUNT);
     }
 
     if (!(screen = newterm("xterm", tty, tty))) {
         perror("newterm fail");
         exit(1);
     }
-    if (COLS < 80) {
-        perror("not enough columns");
-        exit(1);
-    }
-
+    set_term(screen);
     cbreak();
 
+    /* make register windows */
     for (i = 0; i < sizeof (reglayout)/sizeof(reglayout[0]); i++) {
         win[reglayout[i].index] = labelwin(reglayout[i].label, 3,
             reglayout[i].w, reglayout[i].y, reglayout[i].x);
     }
-    win[W_STACK] = labelwin("stack", 18, 78, 6, 0);
-    win[W_DUMP] = labelwin("dump", 18, 78, 24, 0);
-    disas_lines = LINES - 57;
-    // disas_lines = 6;
-    win[W_DIS] = labelwin("disassembly", disas_lines + 2, 78, 42, 0);
+    row = REG_ROWS;
+
+    /* if there's room, make window for stack dump */
+    if (lines > MIN_FOR_STACK) {
+        win[W_STACK] = labelwin("stack", STACK_ROWS, 78, row, 0);
+        row += STACK_ROWS;
+    }
+
+    win[W_DUMP] = labelwin("dump", DUMP_ROWS, 78, row, 0);
+    row += DUMP_ROWS;
+
+    disas_lines = (lines - (row + 4)) / 2;
+
+    win[W_DIS] = labelwin("disassembly", disas_lines + 2, 78, row, 0);
     scrollok(win[W_DIS], TRUE);
     clear_dis();
-    win[W_CMD] = labelwin("command", 12, 78, LINES - 13, 0);
+
+    row += disas_lines + 2;
+    win[W_CMD] = labelwin("command", lines - row, 78, row, 0);
     scrollok(win[W_CMD], TRUE);
     wnoutrefresh(win[W_CMD]);
     doupdate();
@@ -250,31 +285,19 @@ regout(int regnum, unsigned short val)
     wrefresh(w->_parent);
 }
 
-char fbuf[9];
-
+/*
+ * format flags into fbuf
+ */
 void
-fflags(unsigned char f)
+fflags(unsigned char f, char *fbuf)
 {
     int i;
-    for (i = 0; i < sizeof(fbuf); i++) fbuf[i] = ' ';
-    fbuf[8] = '\0';
+    char fname[] = "CNVXHYZS";
 
-    if (f & 1)
-        fbuf[0] = 'C';
-    if (f & 2)
-        fbuf[1] = 'N';
-    if (f & 4)
-        fbuf[2] = 'V';
-    if (f & 8)
-        fbuf[3] = 'X';
-    if (f & 16)
-        fbuf[4] = 'H';
-    if (f & 32)
-        fbuf[5] = 'Y';
-    if (f & 64)
-        fbuf[6] = 'Z';
-    if (f & 128)
-        fbuf[7] = 'S';
+    for (i = 0; i < sizeof(fbuf); i++) {
+        fbuf[i] = ((1 << i) & f) ? fname[i] : ' ';
+    }
+    fbuf[8] = '\0';
 }
 
 void
@@ -341,6 +364,7 @@ dumpcpu()
     unsigned short af;
     unsigned char f;
     unsigned short pc;
+    char fbuf[9];
 
     if (!win)
         return;
@@ -350,12 +374,12 @@ dumpcpu()
     update_dis(pc);
 
     f = z80_get_reg8(f_reg);
-    fflags(f);
+    fflags(f, fbuf);
     mvwaddstr(win[W_F], 0, 0, fbuf);
     wrefresh(win[W_F]);
 
     f = z80_get_reg8(f1_reg);
-    fflags(f);
+    fflags(f, fbuf);
     mvwaddstr(win[W_F1], 0, 0, fbuf);
     wrefresh(win[W_F1]);
 
@@ -383,7 +407,8 @@ dumpcpu()
     regout(W_IY, z80_get_reg16(iy_reg));
     regout(W_SP, z80_get_reg16(sp_reg));
     regout(W_PC, pc);
-    memdump(win[W_STACK], z80_get_reg16(sp_reg) - 128, 256);
+    if (win[W_STACK]) 
+        memdump(win[W_STACK], z80_get_reg16(sp_reg) - 128, 256);
 }
 
 void
@@ -396,10 +421,12 @@ message(char *fmt, ...)
         vfprintf(stderr, fmt, args);
     } else {
         vw_printw(win[W_CMD], fmt, args);
+        wrefresh(win[W_CMD]);
     }
     va_end(args);
 }
 
+#ifdef notdef
 int
 monitor()
 {
@@ -583,6 +610,7 @@ monitor()
         }
     }
 }
+#endif
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

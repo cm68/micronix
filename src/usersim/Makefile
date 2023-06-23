@@ -6,7 +6,7 @@
 
 LDFLAGS = -L../lib -lsim -lcurses -lchips -lmem
 
-OBJECTS = micronix.o
+OBJECTS = usersim.o
 TARGETS = sim
 
 include ../Makefile.inc
@@ -14,7 +14,7 @@ include ../Makefile.inc
 sim: $(OBJECTS) ../lib/libsim.a
 	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $(LDFLAGS)
 
-micronix.o: micronix.c
+usersim.o: usersim.c
 
 test: sim
 	./sim -d ../../filesystem ../../filesystem/bin/ls

@@ -2,7 +2,7 @@
 #
 # lib/Makefile
 #
-# Changed: <2023-06-20 12:10:31 curt>
+# Changed: <2023-06-20 18:04:52 curt>
 
 CHIPS = libchips.a
 CHIPSOBJS = z80_shim.o
@@ -13,30 +13,39 @@ MEMOBJS = mem.o
 EMU = libemu.a
 EMUOBJS = emushim.o z80emu.o
 
+S100 = libs100.a
+S100OBJS = s100.o
+
 OBJECTS = util.o imdlib.o openx.o disz80.o \
-	mnix_sys.o whitesmith.o fslib.o gui.o
+	mnix_sys.o whitesmith.o fslib.o gui.o monitor.o
 
 LIBRARY = libsim.a
 
 GENERATED = tables.h
 
-TARGETS = $(LIBRARY) $(CHIPS) $(EMU) $(MEM) maketables
+TARGETS = $(LIBRARY) $(CHIPS) $(EMU) $(MEM) $(S100) maketables
 
 INCLUDE = -I../include
 
 include ../Makefile.inc
 
 $(LIBRARY): $(OBJECTS)
-	ar rv $(LIBRARY) $(OBJECTS)
+	$(AR) rv $(LIBRARY) $(OBJECTS)
 
 $(CHIPS): $(CHIPSOBJS)
-	ar rv $(CHIPS) $(CHIPSOBJS)
+	$(AR) rv $(CHIPS) $(CHIPSOBJS)
 
 $(EMU): $(EMUOBJS)
-	ar rv $(EMU) $(EMUOBJS)
+	$(AR) rv $(EMU) $(EMUOBJS)
 
 $(MEM): $(MEMOBJS)
-	ar rv $(MEM) $(MEMOBJS)
+	$(AR) rv $(MEM) $(MEMOBJS)
+
+$(S100): $(S100OBJS)
+	$(AR) rv $(S100) $(S100OBJS)
+
+$(HWSIM): $(HWSIMOBJS)
+	$(AR) rv $(HWSIM) $(HWSIMOBJS)
 
 maketables: maketables.c
 	$(CC) -Wall $< -o maketables
