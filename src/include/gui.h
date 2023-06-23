@@ -31,10 +31,11 @@
 #define W_IRQ   20
 #define W_IM    21
 
+#define W_COUNT 22
+
 extern void message(char *fmt, ...);
 extern void makewins(FILE *tty);
 extern void dumpcpu();
-extern int monitor();
 extern void add_breakpoint(unsigned short addr);
 extern void dump_stops();
 extern int watchpoint_hit();

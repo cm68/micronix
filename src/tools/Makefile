@@ -1,6 +1,11 @@
+#
 # build host tools
 #
+# these are things like native assemblers, disassemblers, file system checkers,
+# extractors, inspectors, etc
+#
 # tools/Makefile
+#
 # Changed: <2023-06-19 06:09:52 curt>
 
 SIMTARGETS = \
@@ -88,3 +93,6 @@ testn:	ncheck
 
 install: disas
 	cp disas ~/bin
+
+# vim: tabstop=4 shiftwidth=4 expandtab:
+

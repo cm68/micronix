@@ -1,8 +1,9 @@
 #
 # micronix makefile for compiling kernel inside simulator
 #
-# sys/Makefile
-# Changed: <2021-12-23 18:12:31 curt>
+# micronix/sys/Makefile
+#
+# Changed: <2023-06-23 01:04:56 curt>
 
 INC = ../include
 SYS = ../include/sys
@@ -113,3 +114,6 @@ trap.o: $(SYS)/sys.h $(SYS)/proc.h
 tty.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
 uio.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/con.h
 user.o: $(SYS)/sys.h $(SYS)/proc.h
+
+# vim: tabstop=4 shiftwidth=4 expandtab:
+

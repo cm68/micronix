@@ -968,7 +968,7 @@ wr_clock(portaddr p, byte v)
         }
         if (rate != 0) {
             if (!(traceflags & trace_noclock)) {
-                recurring_timeout("multio_clock", rate, clock_handler, 0);
+                recurring_time_out("multio_clock", rate, clock_handler, 0);
             }
         }
     }

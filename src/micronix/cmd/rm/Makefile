@@ -1,3 +1,10 @@
+#
+# makefile for rm
+#
+# micronix/cmd/rm/Makefile
+#
+# Changed: <2023-06-23 01:07:31 curt>
+
 all:	rm
 
 rm : rm.c
@@ -11,3 +18,5 @@ upgrade: rm
 	cp rm /bin/rm
 
 clean: ; /bin/rm rm *.o
+
+# vim: tabstop=4 shiftwidth=4 expandtab:

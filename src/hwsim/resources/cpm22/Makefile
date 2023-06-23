@@ -8,3 +8,6 @@ ccp.lst: ccp.asm
 
 cbios-e3.lst: cbios-e3.asm
 	asl -L cbios-e3.asm
+
+# vim: tabstop=4 shiftwidth=4 expandtab:
+

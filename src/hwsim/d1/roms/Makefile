@@ -1,3 +1,10 @@
+#
+# assemble the monitor roms and generate list and symbols for simulator
+#
+# hwsim/d1/roms/Makefile
+#
+# Changed: <2023-06-20 18:04:52 curt>
+
 OBJ = mon375.bin mon447.bin
 SYM = mon375.sym mon447.sym
 SRC = mon375.s mon447.s
@@ -26,3 +33,6 @@ clean:
 	rm -f *.cim *.lst *.bin *.sym
 
 clobber: clean
+
+# vim: tabstop=4 shiftwidth=4 expandtab:
+

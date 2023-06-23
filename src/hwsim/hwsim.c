@@ -1,7 +1,7 @@
 /* 
  * hwsim/sim.c
  *
- * Changed: <2023-06-16 00:12:50 curt>
+ * Changed: <2023-06-20 17:43:07 curt>
  *
  * this is the general emulator framework
  *
@@ -232,7 +232,7 @@ dump_port_handler(portaddr p, byte v)
     dumpreg8(f_reg);
     dumpreg8(i_reg);
     dumpreg8(r_reg);
-    dumpreg8(irr_reg);
+    dumpreg8(iff_reg);
     dumpreg8(control_reg);
     dumpreg8(status_reg);
     close(fd);
@@ -559,52 +559,6 @@ cancel_timeout(void (*handler)(), int arg)
 }
 
 char fbuf[0];
-
-void
-fflags(unsigned char f)
-{
-    int i;
-    for (i = 0; i < sizeof(fbuf); i++) fbuf[i] = ' ';
-    fbuf[8] = '\0';
-
-    if (f & 1)
-        fbuf[0] = 'C';
-    if (f & 2)
-        fbuf[1] = 'N';
-    if (f & 4)
-        fbuf[2] = 'V';
-    if (f & 8)
-        fbuf[3] = 'X';
-    if (f & 16)
-        fbuf[4] = 'H';
-    if (f & 32)
-        fbuf[5] = 'Y';
-    if (f & 64)
-        fbuf[6] = 'Z';
-    if (f & 128)
-        fbuf[7] = 'S';
-}
-
-void
-dumpcpu()
-{
-    byte f;
-    char *s;
-    int i;
-    word pc, sp;
-    char fbuf[9];
-
-    pc = z80_get_reg16(pc_reg);
-    sp = z80_get_reg16(sp_reg);
-
-    format_instr(pc, outbuf, &lookup_sym, &reloc, &mnix_sc);
-
-    s = lookup_sym(pc);
-    if (s) waddstr(win[W_DIS], s);
-
-    f = z80_get_reg8(f_reg);
-    fflags(f, win[W_F]);
-}
 
 /*
  * read a complete command from the terminal

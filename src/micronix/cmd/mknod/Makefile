@@ -1,3 +1,11 @@
+#
+# makefile for mknod
+#
+# micronix/cmd/mknod/Makefile
+#
+# Changed: <2023-06-23 01:12:17 curt>
+
+
 all:	mknod
 
 mknod : mknod.c
@@ -11,3 +19,5 @@ install: mknod
 	cp mknod /bin/mknod
 
 clean: ; rm mknod *.o
+
+# vim: tabstop=4 shiftwidth=4 expandtab:

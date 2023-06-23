@@ -1,4 +1,9 @@
+#
 # Makefile for sh
+#
+# micronix/cmd/ash/Makefile
+#
+# Changed: <2023-06-23 01:07:31 curt>
 
 OBJ	= \
 	sh1.o \
@@ -17,3 +22,5 @@ $(OBJ):	sh.h $*.c
 
 clean:
 	rm -f sh *.o *.bak core
+
+# vim: tabstop=4 shiftwidth=4 expandtab:

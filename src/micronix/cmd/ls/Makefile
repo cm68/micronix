@@ -1,3 +1,10 @@
+#
+# makefile for ls
+#
+# micronix/cmd/ls/Makefile
+#
+# Changed: <2023-06-23 01:07:31 curt>
+
 all:	ls
 
 ls : ls.c
@@ -11,3 +18,5 @@ upgrade: ls
 	cp ls /bin/ls
 
 clean: ; rm ls *.o
+
+# vim: tabstop=4 shiftwidth=4 expandtab:

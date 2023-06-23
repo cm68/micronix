@@ -1,9 +1,9 @@
 #
 # Makefile to install the include/sys header files
 #
-# include/sys/Makefile 
-# Changed: <2021-12-30 19:08:05 curt>
+# micronix/include/sys/Makefile 
 #
+# Changed: <2023-06-23 01:01:56 curt>
 
 INCLUDES = \
 	access.h buf.h con.h dir.h file.h fs.h inode.h lock.h mount.h \

@@ -1,8 +1,9 @@
+#
 # simulator library makefile
 #
 # lib/Makefile
 #
-# Changed: <2023-06-20 18:04:52 curt>
+# Changed: <2023-06-23 01:23:47 curt>
 
 CHIPS = libchips.a
 CHIPSOBJS = z80_shim.o
@@ -60,4 +61,6 @@ z80emu.o: z80emu.c z80emu.h z80config.h z80user.h \
 	instructions.h macros.h tables.h
 
 mem.o: mem.c
+
+# vim: tabstop=4 shiftwidth=4 expandtab:
 

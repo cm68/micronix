@@ -1,3 +1,10 @@
+#
+# makefile for ar
+#
+# micronix/cmd/ar/Makefile
+#
+# Changed: <2023-06-23 01:07:31 curt>
+
 all:	ar
 
 ar : ar.c
@@ -10,3 +17,5 @@ install: ar
 	cp ar /bin/ar
 
 clean: ; rm ar *.o
+
+# vim: tabstop=4 shiftwidth=4 expandtab:

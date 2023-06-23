@@ -1,8 +1,10 @@
 #
 # makefile to generate the binary patcher and to patch the hitech c
 # compiler, assembler, linker and tools to micronix
-# Changed: <2022-09-13 17:07:40 curt>
 #
+# hitech/Makefile
+#
+# Changed: <2022-09-13 17:07:40 curt>
 
 DEBUG = -v 0x71
 VERBOSE = -v

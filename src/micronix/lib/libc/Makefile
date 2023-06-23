@@ -1,3 +1,10 @@
+#
+# rebuild the micronix libc
+#
+# micronix/lib/libc/Makefile
+#
+# Changed: <2023-06-23 01:00:03 curt>
+
 ASOBJS = setjmp.o
 COBJS = qsort.o malloc.o atoi.o \
 	strdup.o index.o strncmp.o rindex.o \
@@ -22,3 +29,6 @@ $(ASOBJS): $*.s
 
 clean:
 	rm $(OBJECTS)
+
+# vim: tabstop=4 shiftwidth=4 expandtab:
+
