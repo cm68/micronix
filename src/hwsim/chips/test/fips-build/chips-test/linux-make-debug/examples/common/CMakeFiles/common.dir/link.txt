@@ -1,2 +1,0 @@
-/usr/bin/ar qc libcommon.a  CMakeFiles/common.dir/common.c.o CMakeFiles/common.dir/sokol.c.o
-/usr/bin/ranlib libcommon.a

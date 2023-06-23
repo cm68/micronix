@@ -1,5 +1,0 @@
-this directory contains the general framework of the simulator
-tools used to manipulate disk images, and other objects of generic
-utility
-
-it's also the location of the include files that define the interfaces`
