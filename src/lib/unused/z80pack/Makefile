@@ -5,3 +5,6 @@ TARGETS=$(LIB)
 $(LIB):	$(OBJECTS)
 
 include ../Makefile.inc
+
+# vim: tabstop=4 shiftwidth=4 expandtab:
+

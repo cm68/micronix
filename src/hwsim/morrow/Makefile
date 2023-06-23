@@ -1,3 +1,8 @@
+#
+# Makefile for morrow
+#
+#
+#
 CC = gcc
 DEBUG = -g
 CFLAGS = $(DEBUG) -I../common -fdiagnostics-color=always
@@ -25,3 +30,6 @@ clean:
 
 clobber:	clean
 	rm -f $(TARGETS)
+
+# vim: tabstop=4 shiftwidth=4 expandtab:
+

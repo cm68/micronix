@@ -3,15 +3,18 @@
 # as much host information as possible in one place
 #
 # src/Makefile.inc
-# Changed: <2021-12-23 15:27:20 curt>
 #
+# Changed: <2021-12-23 15:27:20 curt>
+
 # set this for a 32 bit build.  if you don't specify, it will use the native one
 #MACHINE = -m32
 
+AR = ar
 CC = gcc 
-WARNS = -Wno-builtin-declaration-mismatch -Wformat-overflow=0 -Wno-pointer-sign
+WARNS = -Wno-builtin-declaration-mismatch -Wformat-overflow=0 -Wno-pointer-sign \
+	-fdiagnostics-color=always
 
-GCCFLAGS = $(MACHINE) -fdiagnostics-color=always
+GCCFLAGS = $(MACHINE)
 DEBUG = -g
 CFLAGS = $(DEBUG) $(INCLUDE) $(WARNS) $(GCCFLAGS) $(DEFINES)
 

@@ -1,7 +1,11 @@
+#
 # build hitech c object file tools
 #
+# this is is the home of the hitech object transmogrifier
+#
 # tools/hitech/Makefile
-# Changed: <2021-12-23 16:22:24 curt>
+#
+# Changed: <2023-06-23 01:03:40 curt>
 
 CFLAGS = -Wno-implicit-int
 
@@ -38,3 +42,6 @@ objdump: objdump.c
 
 clean:
 	rm -rf *.o bpatch objdump hitech *.dSYM *.dis *.sym
+
+# vim: tabstop=4 shiftwidth=4 expandtab:
+

@@ -2,8 +2,9 @@
 # include file installation to filesystem root
 # after this file is done, the include tree is rationalized
 #
-# include/Makefile
-# Changed: <2022-01-06 15:52:30 curt>
+# micronix/include/Makefile
+#
+# Changed: <2023-06-23 01:01:20 curt>
 
 #
 # include files that have been revised or moved
@@ -27,3 +28,6 @@ upgrade:
 install:
 	cp $(INCLUDES) /include
 	cd sys ; make install
+
+# vim: tabstop=4 shiftwidth=4 expandtab:
+

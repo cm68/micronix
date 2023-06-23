@@ -1,3 +1,10 @@
+#
+# makefile for msh
+#
+# micronix/cmd/msh/Makefile
+#
+# Changed: <2023-06-23 01:15:46 curt>
+
 all:	msh
 
 msh: msh.c
@@ -16,3 +23,4 @@ install: msh
 
 clean: ; /bin/rm msh *.o
 
+# vim: tabstop=4 shiftwidth=4 expandtab:

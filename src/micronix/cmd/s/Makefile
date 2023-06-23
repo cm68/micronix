@@ -1,7 +1,14 @@
 #
+# makefile for s
+#
+# micronix/cmd/s/Makefile
+#
+# Changed: <2023-06-23 01:07:31 curt>
+#
 # S is too big to build with whitesmith's c, because the code quality
 # is just not good enough.
 #
+
 OBJEXT = o
 #OBJEXT = obj
 
@@ -28,3 +35,5 @@ install: s
 clean : ; rm *.$(OBJEXT)
 
 update :  ; cd ../.. ; make update
+
+# vim: tabstop=4 shiftwidth=4 expandtab:

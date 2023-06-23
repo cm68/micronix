@@ -88,3 +88,6 @@ allclean:
 
 install: z80sim
 	cp z80sim ${HOME}/bin
+
+# vim: tabstop=4 shiftwidth=4 expandtab:
+

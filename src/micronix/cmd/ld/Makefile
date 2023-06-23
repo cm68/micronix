@@ -1,3 +1,11 @@
+#
+# makefile for ld
+#
+# micronix/cmd/ld/Makefile
+#
+# Changed: <2023-06-23 01:11:42 curt>
+
+
 all:	ld
 
 ld : ld.c
@@ -10,3 +18,5 @@ install: ld
 	cp ld /bin/ld
 
 clean: ; rm ld *.o
+
+# vim: tabstop=4 shiftwidth=4 expandtab:

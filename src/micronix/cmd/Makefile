@@ -1,3 +1,9 @@
+#
+# makefile for cmd
+#
+# micronix/cmd/Makefile
+#
+# Changed: <2023-06-23 01:07:31 curt>
 
 upgrade : 
 	cd Make ; make upgrade
@@ -36,3 +42,5 @@ clean :
 	cd vi ; make clean
 	# cd far ; make clean
 	# cd msh ; make clean
+
+# vim: tabstop=4 shiftwidth=4 expandtab:

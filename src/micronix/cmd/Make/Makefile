@@ -1,4 +1,9 @@
 #
+# micronix/cmd/Make/Makefile
+#
+# Changed: <2023-06-23 01:18:03 curt>
+
+#
 # makefile for building make on linux
 
 CFLAGS = -fdiagnostics-color=always -g
@@ -22,3 +27,5 @@ clobber : Makefile
 
 hexdump.o: ../../lib/libutil/hexdump.c
 	cc -c ../../lib/libutil/hexdump.c
+
+# vim: tabstop=4 shiftwidth=4 expandtab:

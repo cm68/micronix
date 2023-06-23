@@ -1,3 +1,10 @@
+#
+# micronix native additional utility library
+#
+# micronix/lib/Makefile
+#
+# Changed: <2021-12-23 15:51:54 curt>
+
 OBJECTS = hexdump.o logmsg.o
 DESTLIB = /lib/libutil.a
 
@@ -16,3 +23,6 @@ $(DESTLIB):
 
 clean: 
 	rm $(OBJECTS)
+
+# vim: tabstop=4 shiftwidth=4 expandtab:
+

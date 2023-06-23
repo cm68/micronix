@@ -339,7 +339,7 @@ setintr()
     need_intack = 1;
     djdma_running = 0;
 #ifdef DELAYED_DJINT
-    timeout("djdma_setintr", DJDMA_INT_DELAY, post_djdma_int, 0);
+    time_out("djdma_setintr", DJDMA_INT_DELAY, post_djdma_int, 0);
 #else
     set_vi(DJDMA_INTERRUPT, 0, 1);
 #endif

@@ -1,3 +1,10 @@
+#
+# makefile for cp
+#
+# micronix/cmd/cp/Makefile
+#
+# Changed: <2023-06-23 01:07:31 curt>
+
 all:	cp
 
 cp : cp.c
@@ -11,3 +18,5 @@ install: cp
 	./cp cp /bin/cp
 
 clean: ; /bin/rm cp *.o
+
+# vim: tabstop=4 shiftwidth=4 expandtab:
