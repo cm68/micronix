@@ -3,7 +3,7 @@
  *
  * usersim/usersim.c
  *
- * Changed: <2023-06-23 14:00:37 curt>
+ * Changed: <2023-07-03 20:50:53 curt>
  *
  * Copyright (c) 2018, Curt Mayer 
  * do whatever you want, just don't claim you wrote it. 
@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/fcntl.h>
+#include <sys/mman.h>
 #include <dirent.h>
 #include <time.h>
 #include <errno.h>
@@ -33,6 +34,7 @@
 #include <ctype.h>
 #include <signal.h>
 #include <curses.h>
+#include <pthread.h>
 
 #include "../micronix/include/types.h"
 #include "../micronix/include/sys/fs.h"
@@ -68,12 +70,11 @@ extern WINDOW **win;
 int traceflags;
 int debug_terminal;
 int am_root = 1;
-int rootpid;
 int mypid;
 FILE *tty;
 extern int logfd;
 
-char curdir[100] = "";
+char curdir[1000] = "";
 char *rootdir;
 ino_t rootinode;
 
@@ -95,6 +96,59 @@ char *initfile[] = {
 #define	V_SYS0	(1 << 5)        /* dump raw syscall args */
 #define	V_ERROR	(1 << 6)        /* perror on system calls */
 #define V_SFAIL (1 << 7)        /* breakpoint on syscall fail */
+
+/*
+ * memory driver for trivial 64k used in usersim
+ */
+unsigned char memory[65536];
+
+void
+put_byte(unsigned short addr, unsigned char value)
+{
+    if (watchpoint_at(addr)) {
+        message("watchpoint %04x\n", addr);
+        watchpoint_touched = 1;
+    }
+    memory[addr] = value;
+}
+
+void
+put_word(unsigned short addr, unsigned short value)
+{
+
+    put_byte(addr, value & 0xff);
+    put_byte(addr+1, (value >> 8) & 0xff);
+}
+
+unsigned short
+get_word(unsigned short addr)
+{
+    return memory[addr] + (memory[addr + 1] << 8);
+}
+
+unsigned char
+get_byte(unsigned short addr)
+{
+    addr &= 0xffff;
+    return memory[addr];
+}
+
+unsigned char
+input(unsigned short p)
+{
+    return 0;
+}
+
+void
+output(unsigned short p, unsigned char v)
+{
+}
+
+unsigned char
+int_ack()
+{
+    return 0;
+}
 
 void
 copyout(byte *buf, paddr pa, int len)
@@ -154,21 +208,6 @@ volatile int breakpoint;
 
 char namebuf[PATH_MAX];
 char workbuf[PATH_MAX];
-
-#ifdef notdef
-/*
- * breakpoints and watchpoints are handled using the same data structure
- */
-struct point
-{
-    unsigned short addr;
-    int value;
-    struct point *next;
-};
-
-extern struct point *breaks;
-extern struct point *watches;
-#endif
 
 #define MAXFILE 63
 /*
@@ -298,7 +337,6 @@ usage(char *complaint, char *arg)
     fprintf(stderr, "\t-T\topen a debug terminal window\n");
     fprintf(stderr, "\t-d <root dir>\n");
     fprintf(stderr, "\t-b\t\tstart with breakpoint\n");
-    fprintf(stderr, "\t-B\t\taddr[,addr]\n");
     fprintf(stderr, "\t-v <verbosity>\n");
     for (i = 0; vopts[i]; i++) {
         fprintf(stderr, "\t%2x %-8s", 1 << i, vopts[i]);
@@ -430,19 +468,6 @@ main(int argc, char **argv)
             case 'b':
                 breakpoint++;
                 break;
-            case 'B':
-                s = *argv++;
-                if (!argc--) {
-                    usage("need breakpoint list\n", 0);
-                    break;
-                }
-                while (*s) {
-                    i = strtol(s, &s, 16);
-                    add_breakpoint((unsigned short)i);
-                    if (*s != ',') break;
-                    s++;
-                }
-                break;
             default:
                 usage("unrecognized option :", --s);
                 break;
@@ -480,23 +505,28 @@ main(int argc, char **argv)
     }
 
     /*
-     * if our rootdir is relative, we need to make it absolute 
+     * make our shared memory segments
      */
-    if (*rootdir != '/') {
-        getcwd(workbuf, sizeof(workbuf));
-        strcat(workbuf, "/");
-        strcat(workbuf, rootdir);
-        realpath(workbuf, namebuf);
-        rootdir = strdup(namebuf);
-        lstat(rootdir, &sbuf);
-        rootinode = sbuf.st_ino;
-    }
+    initpids();
+    initinums();
+
+    /*
+     * make our rootdir absolute
+     */
+    chdir(rootdir);
+    getcwd(workbuf, sizeof(workbuf));
+    realpath(workbuf, namebuf);
+    rootdir = strdup(namebuf);
+    lstat(rootdir, &sbuf);
+    rootinode = sbuf.st_ino;
+    allocinum(rootinode);
+
     if (verbose) {
         pverbose();
         message("emulating %s with root %s\n", argv[0], rootdir);
     }
 
-    rootpid = mypid = getpid();
+    mypid = getpid();
 
     /*
      * we might be piping the simulator.  let's get an open file for our 
@@ -550,7 +580,8 @@ main(int argc, char **argv)
             execvp("xterm", args);
         }
     } else {
-        ttyname = "/dev/tty";
+        ttyname = "/dev/stdin";
+        win = 0;
     }
     tty = fopen(ttyname, "r+");
     if (!tty) {
@@ -1043,6 +1074,91 @@ struct dirfd
 } *opendirs;
 
 /*
+ * pids are longer in linux, so we need to manage them too in shared memory.
+ */
+struct pids {
+    pthread_mutex_t mutex;
+    int linuxpid[65536];
+    int hiwat;
+} *pids;
+
+void
+initpids()
+{
+    pids = (struct pids *)mmap((void *)NULL, sizeof(struct pids), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0);
+    if (pids == (struct pids *)-1) {
+        perror("initpids");
+        exit(2);
+    }
+    pthread_mutex_init(&pids->mutex, NULL);
+    pids->hiwat = 2;
+}
+
+/*
+ * allocate a pid and register it.
+ * that means we need to make sure there are no duplicates.
+ */
+allocpid(int lpid)
+{
+    int p;
+
+    pthread_mutex_lock(&pids->mutex);
+    for (p = 1; p < pids->hiwat; p++) {
+        if (pids->linuxpid[p] == lpid) {
+            pthread_mutex_unlock(&pids->mutex);
+            return p;
+        }
+    }
+    p = pids->hiwat++;
+    pids->linuxpid[p] = lpid;
+    pthread_mutex_unlock(&pids->mutex);
+    return p;
+}
+ 
+/*
+ * inumbers are different size, and we need to map between them
+ */
+struct inums {
+    pthread_mutex_t mutex;
+    int inumber[65536];
+    int hiwat;
+} *inums;
+
+void
+initinums()
+{
+    inums = (struct inums *)mmap((void *)NULL, sizeof(struct inums), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0);
+    if (inums == (struct inum *)-1) {
+        perror("initinums");
+        exit(2);
+    }
+    pthread_mutex_init(&inums->mutex, NULL);
+    inums->hiwat = 2;
+}
+
+/*
+ * allocate an inumber and register it.
+ * that means we need to make sure there are no duplicates.
+ */
+allocinum(int ui)
+{
+    int i;
+
+    pthread_mutex_lock(&inums->mutex);
+    for (i = 0; i < inums->hiwat; i++) {
+        if (inums->inumber[i] == ui) {
+            pthread_mutex_unlock(&inums->mutex);
+            return i;
+        }
+    }
+    i = inums->hiwat++;
+    inums->inumber[i] = ui;
+    pthread_mutex_unlock(&inums->mutex);
+//    printf("allocinum %d -> %d\n", ui, i);
+    return i;
+}
+
+/*
  * a version 6 directory entry 
  */
 struct v6dir
@@ -1099,7 +1215,7 @@ dirsnarf(char *name)
             bzero(&df->buffer[df->end], DIRINC);
         }
         v = (struct v6dir *) &df->buffer[df->end];
-        v->inum = (UINT) de->d_ino & 0xffff;
+        v->inum = allocinum(de->d_ino);
         if (v->inum == 2) v->inum = 1;
         if ((de->d_ino == rootinode) || 
             (is_root_dir && (strcmp(de->d_name, "..") == 0))) {
@@ -1632,7 +1748,7 @@ SystemCall()
     case 2:                    /* fork */
         ret = fork();
         if (ret) {
-            ret = (ret - rootpid) & 0x3fff;
+            ret = allocpid(ret);
             push(pop() + 3);
         } else {
             mypid = getpid();
@@ -1762,7 +1878,7 @@ SystemCall()
         } else {
             message("waitfuck %x\n", i);
         }
-        ret = (ret - rootpid) & 0x3fff;
+        ret = allocpid(ret);
         carry_clear();
         break;
 
@@ -1864,14 +1980,14 @@ SystemCall()
          * again, because of chroot being privileged, we need to do some
          * pretty sleazy stuff 
          */
-        if (*fn == '/') {
+        if (*fn == '/') {           /* if absolute path */
             strcpy(namebuf, fn);
-        } else {
+        } else {                    /* if relative path */
             sprintf(namebuf, "%s/%s", curdir, fn);
         }
         sprintf(workbuf, "%s/%s", rootdir, namebuf);
         realpath(workbuf, namebuf);
-        ret = stat(filename = workbuf, &sbuf);
+        ret = stat(filename = namebuf, &sbuf);
         if (ret || !(S_ISDIR(sbuf.st_mode))) {
             ret = 20;
             carry_set();
@@ -1985,11 +2101,10 @@ SystemCall()
         if (sbuf.st_ino == rootinode) {
             ip->inum = 2;
         } else {
-            ip->inum = sbuf.st_ino & 0xffff;
+            ip->inum = allocinum(sbuf.st_ino);
             if (ip->inum == 2) ip->inum = 1;
         }
         ip->dev = sbuf.st_dev;
-        // ip->inum = sbuf.st_ino;
         ip->d.d_nlink = sbuf.st_nlink;
         ip->d.d_uid = sbuf.st_uid;
         ip->d.d_gid = sbuf.st_gid;
@@ -2094,7 +2209,7 @@ SystemCall()
         break;
 
     case 20:                   /* getpid */
-        ret = (getpid() - rootpid) & 0x3fff;
+        ret = allocpid(getpid());
         carry_clear();
         break;
 
