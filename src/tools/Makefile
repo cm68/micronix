@@ -10,7 +10,7 @@
 
 SIMTARGETS = \
 	ar nm size imd disas dump \
-	mnix dcheck icheck ncheck readal imdd
+	mnix dcheck icheck ncheck readall imdd
 	#mar  hitech
 
 LDFLAGS = -lcurses

@@ -2,7 +2,7 @@
  * v7 cc command swizzled to work with hitech c ported to micronix
  *
  * cmd/cc/cc.c
- * Changed: <2023-06-16 01:27:24 curt>
+ * Changed: <2023-07-01 21:58:59 curt>
  */
 #include <stdio.h>
 /* #include <ctype.h> */
@@ -90,8 +90,8 @@ usage()
 	fprintf(stderr, "\t-U<macro>[=<definition>]\n");
 	fprintf(stderr, "\t-I<include directory>\n");
 	fprintf(stderr, "\t-i <include directory>\n");
-	fprintf(stderr, "\t-L<library directory>\n");
-	fprintf(stderr, "\t-l<library directory>\n");
+	/* fprintf(stderr, "\t-L<library directory>\n"); */
+	fprintf(stderr, "\t-l<library>\n");
 	fprintf(stderr, "\t-E\tstop after preprocessing (produce .i)\n");
 	fprintf(stderr, "\t-S\tstop before assembly (produce .s)\n");
 	fprintf(stderr, "\t-c\tstop before link\n");

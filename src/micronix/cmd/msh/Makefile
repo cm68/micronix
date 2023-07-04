@@ -23,4 +23,4 @@ install: msh
 
 clean: ; /bin/rm msh *.o
 
-# vim: tabstop=4 shiftwidth=4 expandtab:
+# vim: tabstop=4 shiftwidth=4 noexpandtab:

@@ -23,4 +23,4 @@ $(OBJ):	sh.h $*.c
 clean:
 	rm -f sh *.o *.bak core
 
-# vim: tabstop=4 shiftwidth=4 expandtab:
+# vim: tabstop=4 shiftwidth=4 noexpandtab:

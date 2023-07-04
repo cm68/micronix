@@ -25,9 +25,12 @@ CFLAGS = $(DEBUG) $(INCLUDE) $(WARNS) $(GCCFLAGS) $(DEFINES)
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 all: $(TARGETS)
+	for i in $(DIRS) ; do (cd $$i ; make -k) ; done
 
 clean:
 	rm -f *.o dumpfile logfile file.inp file.out make.out
+	for i in $(DIRS) ; do (cd $$i ; make clean) ; done
 
 clobber:	clean
 	rm -f $(TARGETS) $(GENERATED)
+	for i in $(DIRS) ; do (cd $$i ; make clobber) ; done

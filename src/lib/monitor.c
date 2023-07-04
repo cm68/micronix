@@ -3,7 +3,7 @@
  *
  * lib/monitor.c
  *
- * Changed: <2023-06-23 13:43:54 curt>
+ * Changed: <2023-06-23 15:11:11 curt>
  *
  */
 #include <curses.h>
@@ -50,39 +50,38 @@ unsigned short lastaddr;
 int fmt_indir_sc = 1;
 
 /*
- * breakpoints and watchpoints are handled using the same data structure
+ * breakpoints and watchpoints are handled using an 8k bitmap
  */
-struct point {
-    unsigned short addr;
-    int value;
-    struct point *next;
-};
+int watchpoint_touched;
 
-struct point *breaks;
-struct point *watches;
+unsigned short next_was;
+unsigned short next_break;
 
-struct point *
-point_at(struct point *head, unsigned short addr, struct point **pp)
-{
-    struct point *p;
-
-    if (pp)
-        *pp = 0;
-    for (p = head; p; p = p->next) {
-        if (p->addr == addr) {
-            break;
-        }
-        if (pp) {
-            *pp = p;
-        }
-    }
-    return p;
-}
+char breaks[8192];
+char watches[8192];
+int nwatches;
+int nbreaks;
 
 int
 breakpoint_at(unsigned short addr)
 {
-    if (point_at(breaks, addr, 0))
+    if (!nbreaks) return 0;
+    if (breaks[addr / 8] & (1 << (addr % 8))) {
+        if (addr == next_break) {
+            if (!next_was) {
+                breaks[addr / 8] &= ~(1 << (addr % 8));
+            }
+        }
+        return 1;
+    }
+    return 0;
+}
+
+int
+watchpoint_at(unsigned short addr)
+{
+    if (!nwatches) return 0;
+    if (watches[addr / 8] & (1 << (addr % 8)))
         return 1;
     return 0;
 }
@@ -90,33 +89,30 @@ breakpoint_at(unsigned short addr)
 int
 watchpoint_hit()
 {
-    struct point *p;
-    int n;
-
-    for (p = watches; p; p = p->next) {
-        if (p->value == -1) {
-            p->value = get_byte(p->addr);
-        }
-        n = get_byte(p->addr);
-        if (n != p->value) {
-            message("value %02x at %04x changed to %02x\n",
-                p->value, p->addr, n);
-            p->value = n;
-            return (1);
-        }
+    if (watchpoint_touched) {
+        watchpoint_touched = 0;
+        return 1;
     }
-    return (0);
+    return 0;
 }
 
 void
 add_breakpoint(unsigned short addr)
 {
-    struct point *p;
+    if (breakpoint_at(addr))
+        return;
+    breaks[addr / 8] |= (1 << (addr % 8));
+    nbreaks++;
+    printf("added breakpoint at %04x\n", addr);
+}
 
-    p = malloc(sizeof(*p));
-    p->addr = addr;
-    p->next = breaks;
-    breaks = p;
+void
+add_watchpoint(unsigned short addr)
+{
+    if (watchpoint_at(addr))
+        return;
+    watches[addr / 8] |= (1 << (addr % 8));
+    nwatches++;
 }
 
 /*
@@ -185,7 +181,7 @@ monitor()
     while (1) {
         dumpcpu();
         message("%d >>> ", mypid);
-        i = wgetnstr(win[W_CMD], cmdline, sizeof(cmdline));
+        i = read_line(cmdline, sizeof(cmdline));
         s = cmdline;
 
         skipwhite(&s);
@@ -225,10 +221,24 @@ register_mon_cmd(char c, char *help, int (*handler)(char **p))
     nmoncmds++;
 }
 
+/*
+ * we do something gnarly here:  
+ * we'll call the instruction formatter to find out how many bytes are used
+ * by this instruction, and put a temporary breakpoint just after it.
+ */
+
 int
 next_cmd(char **sp)
 {
-    message("unimplemented\n");
+    char outbuf[60];
+    unsigned short pc;
+    int i;
+
+    pc = z80_get_reg16(pc_reg);
+    i = format_instr(pc, outbuf);    
+    next_was = breakpoint_at(pc + i);
+    next_break = pc + i;
+    add_breakpoint(pc + i);
     return 0;
 }
 
@@ -398,11 +408,12 @@ dump_cmd(char **sp)
 }
 
 void
-point_cmd(char **sp, struct point **head)
+point_cmd(char **sp, char *map, int *mapcount)
 {
     unsigned short addr = 0;
     int delete = 0;
-    struct point *p, *prev;
+    int index;
+    int bit;
 
     if (**sp == '-') {
         (*sp)++;
@@ -411,33 +422,41 @@ point_cmd(char **sp, struct point **head)
 
     while (**sp) {
         skipwhite(sp);
-        addr = strtol(*sp, sp, 16);
-        p = point_at(*head, addr, &prev);
-        if (p && delete) {
-            if (prev) {
-                prev->next = p->next;
-            } else {
-                *head = p->next;
+        addr = getaddress(sp);
+        if (addr == 0) break;
+
+        index = addr / 8;
+        bit = (1 << (addr % 8));
+
+        if (map[index] & bit) {
+            if (delete) {
+                (*mapcount)--;
+                map[index] &= ~bit;
             }
-            free(p);
-        } else if ((!p) && (!delete)) {
-            p = malloc(sizeof(*p));
-            p->addr = addr;
-            p->next = *head;
-            *head = p;
+        } else if (!delete) {
+            (*mapcount)++;
+            map[index] |= bit;
         }
     }
 
     if (addr == 0) {
         if (delete) {
-            while ((p = *head)) {
-                *head = p->next;
-                free(p);
+            *mapcount = 0;
+            for (index = 0; index < 8192; index++) {
+                map[index] = 0;
             }
         } else {
-            for (p = *head; p; p = p->next) {
-                message("%04x\n", p->addr);
+            int k = 0;
+            for (index = 0; index < 8192; index++) {
+                for (bit = 0; bit < 8; bit++) {
+                    if (map[index] & (1 << bit)) {
+                        message("%04x\t", (index * 8) + bit);
+                        k++;
+                        if ((k % 9) == 0) message("\n");
+                    }
+                }
             }
+            if ((k % 9) != 0) message("\n");
         }
     }
 }
@@ -449,7 +468,7 @@ point_cmd(char **sp, struct point **head)
 int
 break_cmd(char **sp)
 {
-    point_cmd(sp, &breaks);
+    point_cmd(sp, breaks, &nbreaks);
     return 0;
 }
 
@@ -460,7 +479,7 @@ break_cmd(char **sp)
 int
 watch_cmd(char **sp)
 {
-    point_cmd(sp, &watches);
+    point_cmd(sp, watches, &nwatches);
     return 0;
 }
 
@@ -499,6 +518,7 @@ mon_init()
     register_mon_cmd('s', "[inst count]\t\tstep", step_cmd);
     register_mon_cmd('t', "[-]<syscall> ...\tadd or delete syscall trace", trace_cmd);
     register_mon_cmd('v', "<verbosity>\t\tset verbosity", verbose_cmd);
+    register_mon_cmd('w', "[-][<addr>] ...\tadd or delete watchpoint", watch_cmd);
     register_mon_cmd('h', "\t\t\thelp", help_cmd);
 }
 

@@ -3,7 +3,7 @@
 #
 # micronix/cmd/pwd/Makefile
 #
-# Changed: <2023-06-23 01:07:31 curt>
+# Changed: <2023-07-01 07:04:54 curt>
 
 all:	pwd
 
@@ -19,4 +19,4 @@ upgrade: pwd
 
 clean: ; rm pwd *.o
 
-# vim: tabstop=4 shiftwidth=4 expandtab:
+# vim: tabstop=4 shiftwidth=4 noexpandtab:

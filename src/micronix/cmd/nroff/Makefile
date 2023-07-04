@@ -17,4 +17,4 @@ nroff: $(OBJS)
 $(OBJS): $*.c
 	cc -c $*.c
 
-# vim: tabstop=4 shiftwidth=4 expandtab:
+# vim: tabstop=4 shiftwidth=4 noexpandtab:

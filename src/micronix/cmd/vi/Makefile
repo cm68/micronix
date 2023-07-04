@@ -20,4 +20,4 @@ $(OBJECTS) : $*.c stevie.h
 clean:
 	rm $(OBJECTS) vi
 
-# vim: tabstop=4 shiftwidth=4 expandtab:
+# vim: tabstop=4 shiftwidth=4 noexpandtab:

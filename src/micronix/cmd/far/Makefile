@@ -26,4 +26,4 @@ upgrade: far
 install: far
 	cp far /bin/far
 
-# vim: tabstop=4 shiftwidth=4 expandtab:
+# vim: tabstop=4 shiftwidth=4 noexpandtab:

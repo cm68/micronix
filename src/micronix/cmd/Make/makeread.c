@@ -2,7 +2,7 @@
  * Copyright (c) 1985 by Morris Code Works
  *
  * cmd/Make/makeread.c
- * Changed: <2022-01-06 16:34:29 curt>
+ * Changed: <2023-07-02 23:45:34 curt>
  */
  
 #include	<stdio.h>
@@ -587,7 +587,7 @@ linetype()
      * decode buffer type... simple rules 
      */
     /* empty line and comments */
-    if (*cp == '\0' || *cp == '#')
+    if (*cp == '\0' || *cp == '#' || (*cp == ' ' && cp[1] == '\0'))
         return (COMMENT);
 
     /* starting tab is a recipe line */
