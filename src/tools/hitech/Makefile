@@ -5,21 +5,21 @@
 #
 # tools/hitech/Makefile
 #
-# Changed: <2023-06-23 01:03:40 curt>
+# Changed: <2023-06-25 00:54:38 curt>
 
-CFLAGS = -Wno-implicit-int
+CFLAGS = -Wno-implicit-int -fdiagnostics-color=always
 
 %: %.c
 	cc -g $(CFLAGS) -o $@ $<
 
-all: bpatch
+all: objdump
 
 bpatch: bpatch.c
 
 #	cc -g -o bpatch bpatch.c
 
 objdump: objdump.c
-	cc -g -o objdump objdump.c
+	cc $(CFLAGS) -g -o objdump objdump.c
 
 %: %.COM hitech.pat bpatch
 	./bpatch $<

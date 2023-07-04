@@ -66,7 +66,7 @@ Configuration notes:
 #include "../micronix/include/types.h"
 #include "../micronix/include/obj.h"
 #include "../include/ws.h"
-#include "../include/hitech.h"
+#include "../micronix/include/hitech.h"
 #include "../include/mnix.h"
 
 /*

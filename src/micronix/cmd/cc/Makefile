@@ -12,4 +12,4 @@ cc : cc.c
 
 clean: ; rm cc *.o
 
-# vim: tabstop=4 shiftwidth=4 expandtab:
+# vim: tabstop=4 shiftwidth=4 noexpandtab:

@@ -36,4 +36,4 @@ clean : ; rm *.$(OBJEXT)
 
 update :  ; cd ../.. ; make update
 
-# vim: tabstop=4 shiftwidth=4 expandtab:
+# vim: tabstop=4 shiftwidth=4 noexpandtab:

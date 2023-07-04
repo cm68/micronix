@@ -3,7 +3,7 @@
  *
  * lib/gui.c
  *
- * Changed: <2023-06-23 12:43:39 curt>
+ * Changed: <2023-06-27 15:17:44 curt>
  *
  */
 #include <curses.h>
@@ -319,6 +319,25 @@ dumpcpu()
     regout(W_PC, pc);
     if (win[W_STACK]) 
         memdump(win[W_STACK], z80_get_reg16(sp_reg) - 128, 256);
+}
+
+int
+read_line(char *buf, int buflen)
+{
+    int i;
+    if (win) {
+        i = wgetnstr(win[W_CMD], buf, buflen);
+    } else {
+        if (fgets(buf, buflen, stdin) == NULL) {
+            i = ERR;
+        } else {
+            i = strlen(buf);
+            if (buf[i-1] == '\n')
+                buf[i-1] = '\0';
+            i = OK;
+        }
+    }
+    return i;
 }
 
 void

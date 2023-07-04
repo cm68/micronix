@@ -3,21 +3,15 @@
  *
  * include/sim.h
  *
- * Changed: <2023-06-16 00:07:53 curt>
+ * Changed: <2023-06-23 16:55:25 curt>
  */
 
 // anything in the simulator has one of these types
 typedef unsigned char byte;
 typedef unsigned short word;
-typedef unsigned int paddr;	// 24 bit physical address
+typedef unsigned int paddr;     // 24 bit physical address
 typedef unsigned short vaddr;	// 16 bit virtual address
 typedef word portaddr;
-
-typedef byte (*inhandler)(portaddr port);
-typedef void (*outhandler)(portaddr port, byte val);
-
-extern inhandler input_handler[256];
-extern outhandler output_handler[256];
 
 extern int monitor();
 extern void mon_init();
@@ -34,6 +28,21 @@ extern byte get_byte(word addr);
 extern void output(portaddr p, byte v);
 extern byte input(portaddr p);
 
+extern int watchpoint_at(vaddr addr);
+extern int watchpoint_touched;
+
+extern int int_pin;
+extern byte int_ack();
+
+extern void register_mon_cmd(char c, char *help, int (*handler)(char **p));
+
+#ifdef notdef
+typedef byte (*inhandler)(portaddr port);
+typedef void (*outhandler)(portaddr port, byte val);
+
+extern inhandler input_handler[256];
+extern outhandler output_handler[256];
+
 // raw memory and i/o access - defined by bus
 extern byte physread(paddr addr);
 extern void physwrite(paddr addr, byte value);
@@ -41,7 +50,6 @@ extern void s100_output(portaddr p, byte v);
 extern byte s100_input(portaddr p);
 
 // register callbacks for plugging drivers - these can be in constructors
-extern void register_mon_cmd(char c, char *help, int (*handler)(char **p));
 extern int register_trace(char *tracename);
 
 /* a driver registers one of these */
@@ -70,7 +78,6 @@ extern int nmi_line;
  * control line at the cpu pin - the cpu card could have a mask
  * this is used by the chip sim
  */
-extern int int_pin;
 extern int nmi_pin;
 
 // called by driver to assert or clear vectored interrupt line
@@ -119,6 +126,8 @@ extern int running;
 
 #define	CONF_SET	0x80000000	// config specified
 extern int config_sw;
+
+#endif
 
 // the instruction set simulator interface
 void z80_init();

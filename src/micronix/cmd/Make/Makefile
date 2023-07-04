@@ -28,4 +28,4 @@ clobber : Makefile
 hexdump.o: ../../lib/libutil/hexdump.c
 	cc -c ../../lib/libutil/hexdump.c
 
-# vim: tabstop=4 shiftwidth=4 expandtab:
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
