@@ -3,17 +3,17 @@
  *
  * /usr/src/cmd/asz/asm.c 
  *
- * Changed: <2023-07-05 21:46:30 curt>
+ * Changed: <2023-07-05 23:42:10 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
-#include "asm.h"
-#include "sio.h"
-
-#include "isr.h"
-
 #include <stdio.h>
+#ifdef linux
 #include <stdlib.h>
+#endif
+
+#include "asm.h"
+#include "isr.h"
 
 /*
  * there are a number of global variables to reduce the amount of data being passed
@@ -126,8 +126,7 @@ void
 asm_error(msg)
 char *msg;
 {
-	printf("%s:%d %s\n", infile, sio_line, msg);
-	sio_close();
+	printf("%s:%d %s\n", infile, line_num, msg);
 	exit(1);
 }
 
@@ -137,11 +136,13 @@ char *msg;
  *
  * size = number of bytes to allocate
  */
+#ifdef linux
 void *
+#endif
 asm_alloc(size)
 int size;
 {
-	return (void *) malloc(size);
+	return malloc(size);
 }
 
 /*
@@ -150,7 +151,7 @@ int size;
  * returns new object
  */
 struct reloc *
-asm_alloc_reloc()
+alloc_reloc()
 {
 	struct reloc *new;
 	int i;
@@ -187,9 +188,9 @@ asm_wskip()
 	char comment;
 
 	comment = 0;
-	while ((sio_peek() <= ' ' || sio_peek() == ';' || comment)
-		   && sio_peek() != '\n' && sio_peek() != -1)
-		if (sio_next() == ';')
+	while ((peek() <= ' ' || peek() == ';' || comment)
+		   && peek() != '\n' && peek() != -1)
+		if (get_next() == ';')
 			comment = 1;
 }
 
@@ -225,7 +226,7 @@ char in;
  * white space will by cycled past, both in front and behind the token
  */
 char
-asm_token_read()
+token_read()
 {
 	char c, out;
 	int i;
@@ -234,7 +235,7 @@ asm_token_read()
 	asm_wskip();
 
 	/* peek and check type */
-	out = c = sio_peek();
+	out = c = peek();
 	if (asm_alpha(c))
 		out = 'a';
 	else if (asm_num(c))
@@ -247,12 +248,12 @@ asm_token_read()
 			if (i < TOKEN_BUF_SIZE - 1)
 				token_buf[i++] = c;
 
-			sio_next();
-			c = sio_peek();
+			get_next();
+			c = peek();
 		}
 		token_buf[i] = 0;
 	} else {
-		sio_next();
+		get_next();
 	}
 
 	/* correct for new lines */
@@ -278,19 +279,19 @@ char c;
 	char tok;
 
 	if (c == '}') {
-		while (sio_peek() == '\n')
-			asm_token_read();
+		while (peek() == '\n')
+			token_read();
 	}
 
-	tok = asm_token_read();
+	tok = token_read();
 
 	if (tok != c) {
 		asm_error("unexpected character");
 	}
 
 	if (c == '{' || c == ',') {
-		while (sio_peek() == '\n')
-			asm_token_read();
+		while (peek() == '\n')
+			token_read();
 	}
 }
 
@@ -302,7 +303,7 @@ asm_eol()
 {
 	char tok;
 
-	tok = asm_token_read();
+	tok = token_read();
 	if (tok != 'n' && tok != -1)
 		asm_error("expected end of line");
 }
@@ -316,7 +317,7 @@ asm_skip()
 	char tok;
 
 	do {
-		tok = asm_token_read();
+		tok = token_read();
 	} while (tok != 'n' && tok != -1);
 }
 
@@ -366,7 +367,7 @@ char in;
  * 0 = ?, 2 = binary, 8 = octal, 10 = decimal, 16 = hex
  */
 unsigned short
-asm_num_parse(in)
+num_parse(in)
 char *in;
 {
 	int num_start, num_end, i;
@@ -419,7 +420,7 @@ char *in;
  * returns pointer to found symbol, or null
  */
 struct symbol *
-asm_sym_fetch(table, sym)
+sym_fetch(table, sym)
 struct symbol *table;
 char *sym;
 {
@@ -461,7 +462,7 @@ char *sym;
  * returns parent symbol chain
  */
 struct symbol *
-asm_type_size(type, result)
+type_size(type, result)
 char *type;
 unsigned short * result;
 {
@@ -477,7 +478,7 @@ unsigned short * result;
 		return NULL;
 	}
 	/* else, look in the symbol table */
-	sym = asm_sym_fetch(sym_table, type);
+	sym = sym_fetch(sym_table, type);
 
 	if (sym) {
 		*result = sym->size;
@@ -498,7 +499,7 @@ unsigned short * result;
  * value = value of symbol
  */
 struct symbol *
-asm_sym_update(table, sym, type, parent, value)
+sym_update(table, sym, type, parent, value)
 struct symbol *table;
 char *sym;
 char type;
@@ -508,7 +509,7 @@ unsigned short value;
 	struct symbol *entry;
 	int i;
 
-	entry = asm_sym_fetch(table, sym);
+	entry = sym_fetch(table, sym);
 
 	if (!entry) {
 		if (table->parent) {
@@ -561,16 +562,16 @@ asm_reset()
 	sym_table = (struct symbol *) asm_alloc(sizeof(struct symbol));
 	sym_table->parent = NULL;
 
-	asm_sym_update(sym_table, "sys", 1, NULL, 0x0005);
-	asm_sym_update(sym_table, "header", 1, NULL, 0x0000);
+	sym_update(sym_table, "sys", 1, NULL, 0x0005);
+	sym_update(sym_table, "header", 1, NULL, 0x0000);
 
 	textr.last = 0;
 	textr.index = 0;
-	textr.head = asm_alloc_reloc();
+	textr.head = alloc_reloc();
 	textr.tail = textr.head;
 	datar.last = 0;
 	datar.index = 0;
-	datar.head = asm_alloc_reloc();
+	datar.head = alloc_reloc();
 	datar.tail = datar.head;
 
 	/* count memory consumption */
@@ -591,7 +592,7 @@ asm_reset()
  * value = value of symbol
  */
 void
-asm_local_add(label, type, value)
+local_add(label, type, value)
 unsigned char label;
 unsigned char type;
 unsigned short value;
@@ -738,7 +739,7 @@ unsigned char type;
 		/* see if another table is needed */
 		if (i == RELOC_SIZE) {
 			i = 0;
-			tab->tail->next = asm_alloc_reloc();
+			tab->tail->next = alloc_reloc();
 			tab->tail = tab->tail->next;
 		}
 	} while (next == 254);
@@ -755,7 +756,7 @@ unsigned char type;
  * tab = relocation table
  */
 void
-asm_reloc_out(tab, base)
+reloc_out(tab, base)
 struct reloc *tab;
 unsigned short base;
 {
@@ -787,28 +788,28 @@ unsigned short base;
                 printf("bump: %d\n", bump);
             }
             while (bump >= 8223) {
-                sio_out(0x3f);
-                sio_out(0xff);
+                outbyte(0x3f);
+                outbyte(0xff);
                 bump -= 8223;
             }
             if (bump >= 32) {
                 bump -= 32;
-                sio_out((bump >> 8) + 32);
-                sio_out(bump & 0xff);
+                outbyte((bump >> 8) + 32);
+                outbyte(bump & 0xff);
             } else if (bump) {
-                sio_out(bump);
+                outbyte(bump);
             }
             control = 64;
             switch (tab->toff[i].type) {
             case 1:
-                sio_out(0x44);
+                outbyte(0x44);
                 break;
             case 2:
-                sio_out(0x48);
+                outbyte(0x48);
                 break; 
             default:
                 control = (tab->toff[i].type - 5) << 2;
-                sio_out(80+control);
+                outbyte(80+control);
                 break;
             }
             last = base + 2;
@@ -820,7 +821,7 @@ unsigned short base;
 	}
 
     /* end of relocs */
-    sio_out(0);
+    outbyte(0);
 }
 
 /*
@@ -882,7 +883,7 @@ char c;
  * vindex = pointer to value index
  */
 void
-exp_estack_pop(eindex, vindex)
+est_pop(eindex, vindex)
 int *eindex;
 int *vindex;
 {
@@ -1005,7 +1006,7 @@ int *vindex;
  * op = expression to push
  */
 void
-exp_estack_push(eindex, op)
+est_push(eindex, op)
 int *eindex;
 char op;
 {
@@ -1021,7 +1022,7 @@ char op;
  * val = value to push
  */
 void
-exp_vstack_push(vindex, type, value)
+vsta_push(vindex, type, value)
 int *vindex;
 unsigned char type;
 unsigned short value;
@@ -1083,7 +1084,7 @@ char tok;
  * returns 1 if true, otherwise 0
  */
 char
-exp_estack_has_lpar(size)
+est_lpar(size)
 int size;
 {
 	int i;
@@ -1120,7 +1121,7 @@ char itok;
 			tok = itok;
 			itok = 0;
 		} else
-			tok = asm_token_read();
+			tok = token_read();
 
 		/* default is absolute */
 		type = 4;
@@ -1132,13 +1133,13 @@ char itok;
 			dosz = 0;
 			if (tok == '$') {
 				dosz = 1;
-				tok = asm_token_read();
+				tok = token_read();
 				if (tok != 'a')
 					asm_error("unexpected token");
 			}
 
 			op = 0;
-			sym = asm_sym_fetch(sym_table, token_buf);
+			sym = sym_fetch(sym_table, token_buf);
 			if (sym) {
 
 				if (dosz) {
@@ -1157,17 +1158,17 @@ char itok;
 			}
 
 			/* parse subtypes for symbols */
-			while (sio_peek() == '.') {
+			while (peek() == '.') {
 
-				asm_token_read();
-				tok = asm_token_read();
+				token_read();
+				tok = token_read();
 
 				if (tok != 'a')
 					asm_error("unexpected token");
 
 				/* don't both doing another lookup if sym is null */
 				if (sym)
-					sym = asm_sym_fetch(sym, token_buf);
+					sym = sym_fetch(sym, token_buf);
 
 				if (sym) {
 					if (dosz) {
@@ -1194,24 +1195,24 @@ char itok;
 									token_buf[1] == 'f');
 			} else {
 				/* its a numeric (for realz) */
-				num = asm_num_parse(token_buf);
+				num = num_parse(token_buf);
 			}
 		} else if (tok == '\'') {
 			/* it is a char */
 			op = 0;
 
 			/* escape character */
-			if (sio_peek() == '\\') {
-				sio_next();
-				num = asm_escape_char(sio_next());
+			if (peek() == '\\') {
+				get_next();
+				num = asm_escape_char(get_next());
 
 				if (!num)
 					asm_error("unknown escape");
 			} else {
-				num = sio_next();
+				num = get_next();
 			}
 
-			if (asm_token_read() != '\'')
+			if (token_read() != '\'')
 				asm_error("expected \'");
 		} else {
 			/* it is a token (hopefully mathematic) */
@@ -1223,12 +1224,12 @@ char itok;
 				op = tok;
 
 			if (tok == '>' || tok == '<') {
-				if (tok != sio_peek())
+				if (tok != peek())
 					op = -1;
 				else
 					op = tok;
 
-				asm_token_read();
+				token_read();
 			}
 
 			if (op == -1)
@@ -1243,38 +1244,38 @@ char itok;
 			while (eindex
 				   && asm_precedence(op) <=
 				   asm_precedence(exp_estack[eindex - 1]))
-				exp_estack_pop(&eindex, &vindex);
+				est_pop(&eindex, &vindex);
 
-			exp_estack_push(&eindex, op);
+			est_push(&eindex, op);
 		} else if (op == '(') {
 			/* handle left parenthesis  */
-			exp_estack_push(&eindex, '(');
+			est_push(&eindex, '(');
 		} else if (op == ')') {
-			if (!exp_estack_has_lpar(eindex))
+			if (!est_lpar(eindex))
 				asm_error("unexpected ')'");
 
 			while (exp_estack[eindex - 1] != '(')
-				exp_estack_pop(&eindex, &vindex);
+				est_pop(&eindex, &vindex);
 
 			/* pop the '(' too */
 			eindex--;
 		} else {
 			/* handle numbers */
-			exp_vstack_push(&vindex, type, num);
+			vsta_push(&vindex, type, num);
 		}
 
 		/* check for ending conditions */
-		tok = sio_peek();
+		tok = peek();
 		if (tok == ',' || tok == '\n' || tok == ']' || tok == '}'
 			|| tok == -1)
 			break;
-		if (tok == ')' && !exp_estack_has_lpar(eindex))
+		if (tok == ')' && !est_lpar(eindex))
 			break;
 
 	}
 
 	while (eindex)
-		exp_estack_pop(&eindex, &vindex);
+		est_pop(&eindex, &vindex);
 
 	if (vindex != 1)
 		asm_error("value stack overpopulation");
@@ -1300,10 +1301,10 @@ char nofail;
 	char res;
 
 	/* if there is no bracket, just return 0 */
-	if (sio_peek() != '[')
+	if (peek() != '[')
 		return 0;
 
-	asm_token_read();
+	token_read();
 
 	res = asm_evaluate(&result, 0);
 
@@ -1335,11 +1336,11 @@ unsigned char b;
 	if (asm_pass == 2) {
 		switch (asm_seg) {
 		case 1:
-			sio_out((char) b);
+			outbyte((char) b);
 			break;
 
 		case 2:
-			sio_tmp((char) b);
+			outtmp((char) b);
 			break;
 
 		case 3:
@@ -1361,7 +1362,7 @@ unsigned char b;
  * w = word to emit
  */
 void
-asm_emit_word(w)
+emitword(w)
 unsigned short w;
 {
 	asm_emit(w & 0xFF);
@@ -1369,11 +1370,11 @@ unsigned short w;
 }
 
 void
-sio_out_word(word)
+outword(word)
 unsigned short word;
 {
-	sio_out(word & 0xFF);
-	sio_out(word >> 8);
+	outbyte(word & 0xFF);
+	outbyte(word >> 8);
 }
 
 void
@@ -1382,22 +1383,22 @@ asm_header()
     if (verbose > 2) {
         printf("glob_count = %d\n", glob_count);
     }
-    sio_out(0x99);
-    sio_out(0x14);
-    sio_out_word(glob_count * 12);      /* symbol table size */
-    sio_out_word(data_top);            /* text */
-    sio_out_word(bss_top - data_top);  /* data */
-    sio_out_word(mem_size - bss_top);  /* bss */
-    sio_out_word(0);                   /* stack+heap */
-    sio_out_word(text_top);            /* textoff */
-    sio_out_word(data_top);            /* dataoff */
+    outbyte(0x99);
+    outbyte(0x14);
+    outword(glob_count * 12);      /* symbol table size */
+    outword(data_top);            /* text */
+    outword(bss_top - data_top);  /* data */
+    outword(mem_size - bss_top);  /* bss */
+    outword(0);                   /* stack+heap */
+    outword(text_top);            /* textoff */
+    outword(data_top);            /* dataoff */
 }
 
 /*
  * emits a string found in the char stream
  */
 void
-asm_emit_string()
+emit_str()
 {
 	char c, state;
 	int radix, length;
@@ -1406,9 +1407,9 @@ asm_emit_string()
 	/* zero state, just accept raw characters */
 	state = 0;
 
-	sio_next();
+	get_next();
 	while (1) {
-		c = sio_next();
+		c = get_next();
 
 		/* we are done (maybe) */
 		if (c == -1)
@@ -1462,7 +1463,7 @@ asm_emit_string()
 
 			decode = (decode * radix) + num;
 
-			num = asm_classify_radix(sio_peek());
+			num = asm_classify_radix(peek());
 			length--;
 
 			/* end the parsing */
@@ -1501,7 +1502,7 @@ unsigned short size;
  * type = segment to emit into
  */
 void
-asm_emit_addr(size, value, type)
+emit_addr(size, value, type)
 unsigned short size;
 unsigned short value;
 unsigned char type;
@@ -1553,7 +1554,7 @@ unsigned char type;
 				asm_error("invalid segment");
 			}
 		}
-		asm_emit_word(value);
+		emitword(value);
 	}
 }
 
@@ -1562,7 +1563,7 @@ unsigned char type;
  * only absolute resolutions will be allowed
  */
 void
-asm_emit_imm(value, type)
+emit_imm(value, type)
 unsigned short value;
 unsigned char type;
 {
@@ -1579,7 +1580,7 @@ unsigned char type;
  * size = maximum size of space
  */
 void
-asm_emit_expression(size, tok)
+emit_exp(size, tok)
 unsigned short size;
 char tok;
 {
@@ -1588,14 +1589,14 @@ char tok;
 
 	type = asm_evaluate(&value, tok);
 
-	asm_emit_addr(size, value, type);
+	emit_addr(size, value, type);
 }
 
 /*
  * recursive function to do type-based definitions
  */
 void
-asm_define_type(type)
+def_type(type)
 struct symbol *type;
 {
 	struct symbol *sym;
@@ -1618,16 +1619,16 @@ struct symbol *type;
 			asm_error("field domain overrun");
 		asm_fill((base + sym->value) - asm_address);
 
-		tok = sio_peek();
+		tok = peek();
 		if (tok == '"') {
-			asm_emit_string();
+			emit_str();
 
 		} else if (tok == '{') {
 			/* emit the type (recursive) */
-			asm_define_type(sym->parent);
+			def_type(sym->parent);
 
 		} else {
-			asm_emit_expression(sym->size, 0);
+			emit_exp(sym->size, 0);
 		}
 
 		if (sym->next) {
@@ -1652,7 +1653,7 @@ struct symbol *type;
  * count = number of data structures created
  */
 void
-asm_define(type, count)
+define(type, count)
 char *type;
 unsigned short count;
 {
@@ -1662,7 +1663,7 @@ unsigned short count;
 	unsigned short size, addr;
 
 	/* get the symbol type */
-	parent = asm_type_size(type, &size);
+	parent = type_size(type, &size);
 
 	if (!size)
 		asm_error("not a type");
@@ -1671,16 +1672,16 @@ unsigned short count;
 	addr = asm_address;
 
 	i = 0;
-	while (sio_peek() != '\n' && sio_peek() != -1) {
-		tok = sio_peek();
+	while (peek() != '\n' && peek() != -1) {
+		tok = peek();
 		if (tok == '"') {
-			asm_emit_string();
+			emit_str();
 
 		} else if (tok == '{') {
-			asm_define_type(parent);
+			def_type(parent);
 
 		} else {
-			asm_emit_expression(size, 0);
+			emit_exp(size, 0);
 		}
 
 		/* see how many elements we emitted, and align to size */
@@ -1690,7 +1691,7 @@ unsigned short count;
 		}
 		asm_fill(addr - asm_address);
 
-		if (sio_peek() != '\n' && sio_peek() != -1)
+		if (peek() != '\n' && peek() != -1)
 			asm_expect(',');
 	}
 
@@ -1718,26 +1719,26 @@ char *name;
 	asm_expect('{');
 
 	if (asm_pass == 1) {
-		while (sio_peek() != '}' && sio_peek() != -1)
-			asm_token_read();
+		while (peek() != '}' && peek() != -1)
+			token_read();
 
 		asm_expect('}');
 		return;
 	}
-	if (asm_sym_fetch(sym_table, name))
+	if (sym_fetch(sym_table, name))
 		asm_error("type already defined");
 
-	type = asm_sym_update(sym_table, name, 4, NULL, 0);
+	type = sym_update(sym_table, name, 4, NULL, 0);
 
 	base = 0;
 	while (1) {
 		/* read type */
-		tok = asm_token_read();
+		tok = token_read();
 
 		if (tok != 'a')
 			asm_error("expected symbol");
 
-		sym = asm_type_size(token_buf, &size);
+		sym = type_size(token_buf, &size);
 
 		if (!size)
 			asm_error("not a type");
@@ -1748,17 +1749,17 @@ char *name;
 			count = 1;
 
 		/* read name */
-		tok = asm_token_read();
+		tok = token_read();
 
 		if (tok != 'a')
 			asm_error("expected symbol");
 
-		sym = asm_sym_update(type, token_buf, 4, sym, base);
+		sym = sym_update(type, token_buf, 4, sym, base);
 		sym->size = size;
 
 		base += size * count;
 
-		if (sio_peek() == ',')
+		if (peek() == ',')
 			asm_expect(',');
 		else
 			break;
@@ -1787,14 +1788,14 @@ unsigned char eval;
 	unsigned char ret, type;
 
 	/* check if there is anything next */
-	if (sio_peek() == '\n' || sio_peek() == -1)
+	if (peek() == '\n' || peek() == -1)
 		return 255;
 
 	/* assume at plain expression at first */
 	ret = 31;
 
 	/* read the token */
-	tok = asm_token_read();
+	tok = token_read();
 
 	/* maybe a register symbol? */
 	if (tok == 'a') {
@@ -1810,7 +1811,7 @@ unsigned char eval;
 	}
 	/* maybe in parenthesis? */
 	if (tok == '(') {
-		tok = asm_token_read();
+		tok = token_read();
 
 		if (asm_sequ(token_buf, "hl")) {
 			asm_expect(')');
@@ -1834,9 +1835,9 @@ unsigned char eval;
 		}
 
 		else if (asm_sequ(token_buf, "ix")) {
-			if (sio_peek() == '+') {
+			if (peek() == '+') {
 				/* its got a constant */
-				asm_token_read();
+				token_read();
 				tok = 0;
 				ret = 25;
 			} else {
@@ -1844,9 +1845,9 @@ unsigned char eval;
 				return 29;
 			}
 		} else if (asm_sequ(token_buf, "iy")) {
-			if (sio_peek() == '+') {
+			if (peek() == '+') {
 				/* its got a constant */
-				asm_token_read();
+				token_read();
 				tok = 0;
 				ret = 28;
 			} else {
@@ -1879,6 +1880,7 @@ unsigned char eval;
 	return ret;
 }
 
+#ifdef TOOBIG
 /*
  * assembles an instructions
  * if/elses that would make yandev blush
@@ -2069,7 +2071,7 @@ struct instruct *isr;
 
 			arg = 6;
 			/* its an undefined operation */
-			if (sio_peek() == ',') {
+			if (peek() == ',') {
 				asm_expect(',');
 				arg = asm_arg(&con, 1);
 
@@ -2127,10 +2129,10 @@ struct instruct *isr;
 		if (arg >= 13 && arg <= 20) {
 			asm_emit(isr->opcode + ((arg - 13) << 3));
 			asm_expect(',');
-			asm_emit_expression(2, 0);
+			emit_exp(2, 0);
 		} else if (arg == 31) {
 			asm_emit(isr->opcode + 1);
-			asm_emit_expression(2, con);
+			emit_exp(2, con);
 		} else if (arg == 6) {
 			asm_emit(isr->arg);
 		} else if (arg == 29) {
@@ -2162,7 +2164,7 @@ struct instruct *isr;
 			return 1;
 
 		asm_emit(isr->opcode + reg);
-		asm_emit_expression(1, con);
+		emit_exp(1, con);
 	}
 
 	else if (isr->type == CALFLO) {
@@ -2172,10 +2174,10 @@ struct instruct *isr;
 		if (arg >= 13 && arg <= 20) {
 			asm_emit(isr->opcode + ((arg - 13) << 3));
 			asm_expect(',');
-			asm_emit_expression(2, 0);
+			emit_exp(2, 0);
 		} else if (arg == 31) {
 			asm_emit(isr->arg);
-			asm_emit_expression(2, con);
+			emit_exp(2, con);
 		} else
 			return 1;
 	}
@@ -2366,7 +2368,7 @@ struct instruct *isr;
 				return 1;
 			}
 
-			asm_emit_addr(2, value, type);
+			emit_addr(2, value, type);
 		}
 		/* standard a-(hl) and ixh-(iy+*) */
 		else if (arg < 8 || (arg >= 23 && arg <= 28)) {
@@ -2466,14 +2468,14 @@ struct instruct *isr;
 				/* reg8->reg8 */
 				asm_emit(0x40 + (arg << 3) + reg);
 				if (prim)
-					asm_emit_imm(value, type);
+					emit_imm(value, type);
 			} else if (arg < 8 && reg == 31) {
 				/* *->reg8 */
 				asm_emit(0x06 + (arg << 3));
 				if (prim)
-					asm_emit_imm(value, type);
+					emit_imm(value, type);
 				type = asm_evaluate(&value, con);
-				asm_emit_imm(value, type);
+				emit_imm(value, type);
 			} else if (arg == 7) {
 				/* special a loads */
 				switch (reg) {
@@ -2487,7 +2489,7 @@ struct instruct *isr;
 
 				case 32:
 					asm_emit(0x3A);
-					asm_emit_expression(2, con);
+					emit_exp(2, con);
 					asm_expect(')');
 					break;
 
@@ -2526,7 +2528,7 @@ struct instruct *isr;
 			if (reg == 31) {
 				/* direct */
 				asm_emit(0x01 + ((arg - 8) << 4));
-				asm_emit_expression(2, con);
+				emit_exp(2, con);
 			} else if (reg == 32) {
 				/* deferred */
 				if (arg == 10) {
@@ -2537,7 +2539,7 @@ struct instruct *isr;
 					asm_emit(0xED);
 					asm_emit(0x4B + ((arg - 8) << 4));
 				}
-				asm_emit_expression(2, con);
+				emit_exp(2, con);
 				asm_expect(')');
 			} else if (arg == 11) {
 				/* sp specials */
@@ -2593,6 +2595,773 @@ struct instruct *isr;
 
 	return 0;
 }
+#else
+
+/*
+ * load indirect
+ */
+int
+do_stax()
+{
+	unsigned char prim, arg, reg, type;
+	unsigned short con, value;
+
+    type = asm_evaluate(&value, con);
+    asm_expect(')');
+    asm_expect(',');
+    arg = asm_arg(&con, 1);
+
+    switch (arg) {
+    case 10:    /* ld (nn), hl */
+        asm_emit(0x22);
+        break;
+
+    case 7:     /* ld (nn), a */
+        asm_emit(0x32);
+        break;
+
+    case 21:    /* ld (nn), ix */
+        asm_emit(0xDD);
+        asm_emit(0x22);
+        break;
+
+    case 22:    /* ld (nn), iy */
+        asm_emit(0xFD);
+        asm_emit(0x22);
+        break;
+
+    case 8:     /* ld (nn), bc */
+    case 9:     /* ld (nn), de */
+    case 11:    /* ld (nn), sp */
+        asm_emit(0xED);
+        asm_emit(0x43 + ((arg - 8) << 4));
+        break;
+
+    default:
+        return 1;
+    }
+    emit_addr(2, value, type);
+    return 0;
+}
+
+/*
+ * 16 bit load
+ */
+int
+do_16i(arg)
+char arg;
+{
+	unsigned char reg;
+	unsigned short con;
+
+    /* correct for ix,iy into hl */
+    if (arg == 21) {
+        asm_emit(0xDD);
+        arg = 10;
+    } else if (arg == 22) {
+        asm_emit(0xFD);
+        arg = 10;
+    }
+    /* grab a direct or deferred word */
+    asm_expect(',');
+    reg = asm_arg(&con, 0);
+
+    if (reg == 31) {
+        /* ld bc|de|hl|sp, nn */
+        asm_emit(0x01 + ((arg - 8) << 4));
+        emit_exp(2, con);
+    } else if (reg == 32) {
+        if (arg == 10) {
+            /* ld hl, (nn) */
+            asm_emit(0x2A);
+        } else {
+            /* ld bc|de|sp, (nn) */
+            asm_emit(0xED);
+            asm_emit(0x4B + ((arg - 8) << 4));
+        }
+        emit_exp(2, con);
+        asm_expect(')');
+    } else if (arg == 11) {
+        /* ld sp,hl|ix|iy specials */
+        switch (reg) {
+        case 10:
+            break;
+        case 21:
+            asm_emit(0xDD);
+            break;
+        case 22:
+            asm_emit(0xFD);
+            break;
+        default:
+            return 1;
+        }
+        asm_emit(0xF9);
+    } else
+        return 1;
+    return 0;
+}
+
+int
+do_ldr8(arg)
+char arg;
+{
+	unsigned char prim, reg, type;
+	unsigned short con, value;
+
+	prim = 0;
+
+    /* grab any constants if they exist */
+    if (arg == 25 || arg == 28) {
+        type = asm_evaluate(&value, con);
+        asm_expect(')');
+        prim++;
+    }
+    asm_expect(',');
+
+    /* correct for carry flag */
+    reg = asm_arg(&con, 0);
+    if (reg == 16)
+        reg = 1;
+
+    /* i* class dest? */
+    if (arg >= 23 && arg <= 28) {
+        /* check for ix or iy, correct iy */
+        if (arg <= 25) {
+            /* ix */
+            asm_emit(0xDD);
+        } else {
+            /* iy */
+            asm_emit(0xFD);
+
+            /* iy should now act like ix */
+            if (reg >= 23 && reg <= 28) {
+                if (reg < 26)
+                    return 1;
+                reg = reg - 3;
+            }
+            arg = arg - 3;
+        }
+
+        /* check if arg is (ix+*) or not */
+        if (arg == 25) {
+            /* no (hl) */
+            if (reg == 6)
+                return 1;
+        } else {
+            /* no h-(hl) */
+            if (reg >= 4 && reg <= 6)
+                return 1;
+
+            /* downconvert ix* */
+            if (reg >= 23 && reg <= 25) {
+                if (reg == 25)
+                    return 1;
+                reg = reg - 19;
+            }
+        }
+
+        arg = arg - 19;
+
+    }
+    /* i* class src? */
+    else if (reg >= 23 && reg <= 28) {
+        /* no (hl) */
+        if (arg == 6)
+            return 1;
+
+        /* check for ix or iy, correct iy */
+        if (reg <= 25) {
+            /* ix */
+            asm_emit(0xDD);
+        } else {
+            /* iy */
+            asm_emit(0xFD);
+
+            /* iy should now act like ix */
+            if (reg >= 23 && reg <= 28) {
+                if (reg < 26)
+                    return 1;
+                reg = reg - 3;
+            }
+        }
+
+        /*
+         * grab ix/iy offset
+         * h/l only allowed for ix+*
+         */
+        if (reg == 25) {
+            type = asm_evaluate(&value, con);
+            asm_expect(')');
+            prim++;
+        } else if (arg == 4 || arg == 5)
+            return 1;
+
+        reg = reg - 19;
+    }
+
+    /* no (hl),(hl) */
+    if (arg == 6 && reg == 6)
+        return 1;
+
+    if (arg < 8 && reg < 8) {
+        /* reg8->reg8 */
+        asm_emit(0x40 + (arg << 3) + reg);
+        if (prim)
+            emit_imm(value, type);
+    } else if (arg < 8 && reg == 31) {
+        /* *->reg8 */
+        asm_emit(0x06 + (arg << 3));
+        if (prim)
+            emit_imm(value, type);
+        type = asm_evaluate(&value, con);
+        emit_imm(value, type);
+    } else if (arg == 7) {
+        /* special a loads */
+        switch (reg) {
+        case 35:
+            asm_emit(0x0A);
+            break;
+
+        case 36:
+            asm_emit(0x1A);
+            break;
+
+        case 32:
+            asm_emit(0x3A);
+            emit_exp(2, con);
+            asm_expect(')');
+            break;
+
+        case 37:
+            asm_emit(0xED);
+            asm_emit(0x57);
+            break;
+
+        case 38:
+            asm_emit(0xED);
+            asm_emit(0x5F);
+            break;
+
+        default:
+            return 1;
+        }
+    } else
+        return 1;
+    return 0;
+}
+
+/*
+ * assembles an instructions
+ * if/elses that would make yandev blush
+ *
+ * isr = pointer to instruct
+ * returns 0 if successful
+ */
+char
+asm_doisr(isr)
+struct instruct *isr;
+{
+	unsigned char prim, arg, reg, type;
+	unsigned short con, value;
+
+	/* primary select to 0 */
+	prim = 0;
+	if (isr->type == BASIC) {
+		/* basic ops */
+		asm_emit(isr->opcode);
+        return 0;
+	}
+
+	if (isr->type == BASIC_EXT) {
+		/* basic extended ops */
+		asm_emit(isr->arg);
+		asm_emit(isr->opcode);
+        return 0;
+	}
+
+	if (isr->type == ARITH) {
+		/* arithmetic operations */
+		arg = asm_arg(&con, 1);
+
+		/* detect type of operation */
+		if (isr->arg == CARRY) {
+			if (arg == 10) {
+				/* hl adc/sbc */
+				prim = 1;
+			} else if (arg != 7)
+				return 1;
+
+			/* grab next arg */
+			asm_expect(',');
+			arg = asm_arg(&con, 1);
+		} else if (isr->arg == ADD) {
+			if (arg == 10) {
+				/* hl add */
+				prim = 2;
+
+			} else if (arg == 21 || arg == 22) {
+				/* ix/iy add */
+				prim = 3;
+				reg = arg;
+			} else if (arg != 7)
+				return 1;
+
+			/* grab next arg */
+			asm_expect(',');
+			arg = asm_arg(&con, 1);
+
+			/* no add i*,hl */
+			if (prim == 3 && arg == 10)
+				return 1;
+
+			/* add i*,i* */
+			if (prim == 3 && arg == reg)
+				arg = 10;
+		}
+
+		if (prim == 0) {
+			if (arg < 8) {
+				/* basic from a-(hl) */
+				asm_emit(isr->opcode + arg);
+			} else if (arg >= 23 && arg <= 25) {
+				/* ix class */
+				asm_emit(0xDD);
+				asm_emit(isr->opcode + (arg - 23) + 4);
+				if (arg == 25)
+					asm_emit(con & 0xFF);
+			} else if (arg >= 26 && arg <= 28) {
+				/* iy class */
+				asm_emit(0xFD);
+				asm_emit(isr->opcode + (arg - 26) + 4);
+				if (arg == 28)
+					asm_emit(con & 0xFF);
+			} else if (arg == 31) {
+				/* constant */
+				asm_emit(isr->opcode + 0x46);
+				asm_emit(con);
+			} else
+				return 1;
+		} else if (prim == 1) {
+			/* 16 bit carry ops bc-sp */
+			if (arg >= 8 && arg <= 11) {
+				asm_emit(0xED);
+				asm_emit((0x42 + (isr->opcode == 0x88 ? 8 : 0)) +
+						 ((arg - 8) << 4));
+			} else
+				return 1;
+		} else if (prim == 2) {
+			/* 16 bit add ops bc-sp */
+			if (arg >= 8 && arg <= 11) {
+				asm_emit(0x09 + ((arg - 8) << 4));
+			} else
+				return 1;
+		} else if (prim == 3) {
+			/* correct for hl -> ix,iy */
+			if (arg == 10)
+				arg = reg;
+			if (arg == reg)
+				arg = 10;
+
+			/* pick ext block */
+			if (reg == 21)
+				asm_emit(0xDD);
+			else
+				asm_emit(0xFD);
+
+			/* 16 bit add ops bc-sp */
+			if (arg >= 8 && arg <= 11) {
+				asm_emit(0x09 + ((arg - 8) << 4));
+			} else
+				return 1;
+		}
+        return 0;
+	}
+
+	if (isr->type == INCR) {
+		arg = asm_arg(&con, 1);
+
+		if (arg < 8) {
+			/* basic from a-(hl) */
+			asm_emit(isr->opcode + ((arg) << 3));
+		} else if (arg < 12) {
+			/* words bc-sp */
+			asm_emit(isr->arg + ((arg - 8) << 4));
+		} else if (arg == 21) {
+			/* ix */
+			asm_emit(0xDD);
+			asm_emit(isr->arg + 0x20);
+		} else if (arg == 22) {
+			/* iy */
+			asm_emit(0xFD);
+			asm_emit(isr->arg + 0x20);
+		} else if (arg >= 23 && arg <= 25) {
+			/* ixh-(ix+*) */
+			asm_emit(0xDD);
+			asm_emit(isr->opcode + ((arg - 19) << 3));
+			if (arg == 25)
+				asm_emit(con);
+		} else if (arg >= 26 && arg <= 28) {
+			/* iyh-(iy+*) */
+			asm_emit(0xFD);
+			asm_emit(isr->opcode + ((arg - 22) << 3));
+			if (arg == 28)
+				asm_emit(con);
+		} else
+			return 1;
+        return 0;
+	}
+
+	if (isr->type == BITSH) {
+		arg = asm_arg(&con, 1);
+
+		/* bit instructions have a bit indicator that must be parsed */
+		reg = 0;
+		if (isr->arg) {
+			if (arg != 31)
+				return 1;
+
+			if (con > 7)
+				return 1;
+
+			reg = con;
+
+			/* grab next */
+			asm_expect(',');
+			arg = asm_arg(&con, 1);
+		}
+		/* check for (ix+*) / (iy+*) */
+		if (arg == 25 || arg == 28) {
+
+			if (arg == 25)
+				asm_emit(0xDD);
+			else
+				asm_emit(0xFD);
+
+			asm_emit(0xCB);
+
+			/* write offset */
+			asm_emit(con);
+
+			arg = 6;
+			/* its an undefined operation */
+			if (peek() == ',') {
+				asm_expect(',');
+				arg = asm_arg(&con, 1);
+
+				/* short out for (hl) */
+				if (arg == 6)
+					arg = 8;
+			}
+		} else
+			asm_emit(0xCB);
+
+		if (arg > 7)
+			return 1;
+
+		asm_emit(isr->opcode + arg + (reg << 3));
+        return 0;
+	}
+
+	if (isr->type == STACK) {
+		arg = asm_arg(&con, 1);
+
+		/* swap af for sp */
+		if (arg == 11)
+			arg = 12;
+		else if (arg == 12)
+			arg = 11;
+
+		if (arg >= 8 && arg <= 11) {
+			/* bc-af */
+			asm_emit(isr->opcode + ((arg - 8) << 4));
+		} else if (arg == 21) {
+			asm_emit(0xDD);
+			asm_emit(isr->opcode + 0x20);
+		} else if (arg == 22) {
+			asm_emit(0xFD);
+			asm_emit(isr->opcode + 0x20);
+		} else
+			return 1;
+        return 0;
+	}
+
+	if (isr->type == RETFLO) {
+		/* return */
+		arg = asm_arg(&con, 0);
+
+		if (arg >= 13 && arg <= 20) {
+			asm_emit(isr->opcode + ((arg - 13) << 3));
+		} else if (arg == 255) {
+			asm_emit(isr->arg);
+		} else
+			return 1;
+        return 0;
+	}
+
+	if (isr->type == JMPFLO) {
+		/* jump (absolute) */
+		arg = asm_arg(&con, 0);
+
+		if (arg >= 13 && arg <= 20) {
+			asm_emit(isr->opcode + ((arg - 13) << 3));
+			asm_expect(',');
+			emit_exp(2, 0);
+		} else if (arg == 31) {
+			asm_emit(isr->opcode + 1);
+			emit_exp(2, con);
+		} else if (arg == 6) {
+			asm_emit(isr->arg);
+		} else if (arg == 29) {
+			asm_emit(0xDD);
+			asm_emit(isr->arg);
+		} else if (arg == 30) {
+			asm_emit(0xFD);
+			asm_emit(isr->arg);
+		} else
+			return 1;
+        return 0;
+	}
+
+	if (isr->type == JRLFLO) {
+		/* jump (relative) */
+		arg = asm_arg(&con, 0);
+
+		/* jr allows for 4 conditional modes */
+		reg = 0;
+		if (isr->arg) {
+			if (arg >= 13 && arg <= 16) {
+				reg = (arg - 12) << 3;
+				asm_expect(',');
+				arg = asm_arg(&con, 0);
+			} else if (arg != 31)
+				return 1;
+		}
+
+		if (arg != 31)
+			return 1;
+
+		asm_emit(isr->opcode + reg);
+		emit_exp(1, con);
+        return 0;
+	}
+
+	if (isr->type == CALFLO) {
+		/* call */
+		arg = asm_arg(&con, 0);
+
+		if (arg >= 13 && arg <= 20) {
+			asm_emit(isr->opcode + ((arg - 13) << 3));
+			asm_expect(',');
+			emit_exp(2, 0);
+		} else if (arg == 31) {
+			asm_emit(isr->arg);
+			emit_exp(2, con);
+		} else
+			return 1;
+        return 0;
+	}
+
+	if (isr->type == RSTFLO) {
+		/* rst */
+		arg = asm_arg(&con, 1);
+
+		if (arg != 31 || con & 0x7 || con > 0x38)
+			return 1;
+
+		asm_emit(isr->opcode + con);
+        return 0;
+	}
+
+	if (isr->type == IOIN) {
+		/* in */
+		arg = asm_arg(&con, 1);
+
+		/* special case for (c) only */
+		if (arg == 33) {
+			asm_emit(0xED);
+			asm_emit(isr->arg + 0x30);
+			return 0;
+		}
+		/* throw out (hl) */
+		if (arg == 6 || arg > 7)
+			return 1;
+
+		/* grab next argument */
+		reg = arg;
+		asm_expect(',');
+		arg = asm_arg(&con, 1);
+
+		/* decode */
+		if (reg == 7 && arg == 32) {
+			asm_emit(isr->opcode);
+			asm_emit(con);
+		} else if (arg == 33) {
+			asm_emit(0xED);
+			asm_emit(isr->arg + (reg << 3));
+		} else
+			return 1;
+        return 0;
+	}
+
+	if (isr->type == IOOUT) {
+		/* out */
+		arg = asm_arg(&con, 1);
+
+		if (arg == 32) {
+			/* immediate */
+			reg = con;
+			asm_expect(',');
+			arg = asm_arg(&con, 1);
+
+			/* only 'a' is supported */
+			if (arg != 7)
+				return 1;
+
+			asm_emit(isr->opcode);
+			asm_emit(reg);
+		} else if (arg == 33) {
+			/* (c) */
+			asm_expect(',');
+			arg = asm_arg(&con, 1);
+
+			/* no (hl), but we can do '0' instead */
+			if (arg == 6)
+				return 1;
+			if (arg == 31 && !con)
+				arg = 6;
+
+			if (arg > 7)
+				return 1;
+
+			asm_emit(0xED);
+			asm_emit(isr->arg + (arg << 3));
+		} else
+			return 1;
+        return 0;
+	}
+
+	if (isr->type == EXCH) {
+		reg = asm_arg(&con, 1);
+		asm_expect(',');
+		arg = asm_arg(&con, 1);
+
+		/* af */
+		if (reg == 12) {
+			if (arg == 12) {
+				asm_expect('\'');
+				asm_emit(isr->arg);
+			} else
+				return 1;
+		}
+		/* de */
+		else if (reg == 9) {
+			if (arg == 10) {
+				asm_emit(isr->opcode + 0x08);
+			} else
+				return 1;
+		}
+		/* (sp) */
+		else if (reg == 34) {
+			switch (arg) {
+			case 10:
+				break;
+
+			case 21:
+				asm_emit(0xDD);
+				break;
+
+			case 22:
+				asm_emit(0xFD);
+				break;
+
+			default:
+				return 1;
+			}
+
+			asm_emit(isr->opcode);
+		}
+        return 0;
+	}
+
+	if (isr->type == INTMODE) {
+		arg = asm_arg(&con, 1);
+
+		/* only 0-2 */
+		if (arg != 31)
+			return 1;
+
+		asm_emit(0xED);
+		switch (con) {
+		case 0:
+		case 1:
+			asm_emit(isr->opcode + (con << 4));
+			break;
+
+		case 2:
+			asm_emit(isr->arg);
+			break;
+
+		default:
+			return 1;
+		}
+        return 0;
+	}
+
+	if (isr->type == LOAD) {
+        /* i will never forgive you zilog */
+
+		/* correct for carry flag */
+		arg = asm_arg(&con, 0);
+		if (arg == 16)
+			arg = 1;
+
+		/* special case for deferred constant */
+		if (arg == 32) {
+            return do_stax();
+		}
+
+		/* standard a-(hl) and ixh-(iy+*) */
+		if (arg < 8 || (arg >= 23 && arg <= 28)) {
+            return do_ldr8(arg);
+        }
+
+		/* bc-sp, and ix/iy */
+		if ((arg >= 8 && arg <= 11) || (arg == 21 || arg == 22)) {
+            return do_16i(arg);
+		}
+
+		/* ld (bc)|(de)|i|r, a */
+		if (arg >= 35 && arg <= 38) {
+			asm_expect(',');
+			reg = asm_arg(&con, 1);
+			if (reg != 7)
+				return 1;
+
+			switch (arg) {
+			case 35:    /* ld (bc),a */
+				asm_emit(0x02);
+				break;
+
+			case 36:    /* ld (de),a */
+				asm_emit(0x12);
+				break;
+
+			case 37:    /* ld i,a */
+				asm_emit(0xED);
+				asm_emit(0x47);
+				break;
+
+			case 38:    /* ld r,a */
+				asm_emit(0xED);
+				asm_emit(0x4F);
+				break;
+			}
+		} else
+			return 1;
+	}
+	return 1;
+}
+#endif
 
 /*
  * attempts to assemble an instruction assuming a symbol has just been tokenized
@@ -2627,7 +3396,7 @@ char *in;
  * next = next segment
  */
 void
-asm_change_seg(next)
+change_seg(next)
 char next;
 {
 	switch (asm_seg) {
@@ -2669,7 +3438,7 @@ char next;
  * iterates through and fixes all segments for the second pass
  */
 void
-asm_fix_seg()
+fix_seg()
 {
 	struct symbol *sym;
 	struct local *loc;
@@ -2718,12 +3487,13 @@ asm_fix_seg()
 	}
 }
 
+char translate[6] = { 0x00, 0x05, 0x06, 0x07, 0x0c, 0x08 };
+
 void
 output_symbol(s)
 struct symbol *s;
 {
     int i;
-    int translate[6] = { 0x00, 0x05, 0x06, 0x07, 0x0c, 0x08 };
     int t;
  
     if (verbose > 2) {
@@ -2731,10 +3501,10 @@ struct symbol *s;
     }
     t = s->type;
     if (t > 5) t = 5;
-    sio_out_word(s->value);
-    sio_out(translate[t]);
+    outword(s->value);
+    outbyte(translate[t]);
     for (i = 0; i < 9; i++) {
-        sio_out(s->name[i]);
+        outbyte(s->name[i]);
     }
 }
 
@@ -2772,15 +3542,15 @@ asm_meta()
         output_symbol(sort[i]);
     }
 
-	asm_reloc_out(textr.head, 0);
-	asm_reloc_out(datar.head, text_top);
+	reloc_out(textr.head, 0);
+	reloc_out(datar.head, text_top);
 }
 
 /*
  * perform assembly functions
  */
 void
-asm_assemble()
+assemble()
 {
 	char tok, type, next;
 	int ifdepth, trdepth;
@@ -2804,7 +3574,7 @@ asm_assemble()
 
 	while (1) {
 		
-		tok = asm_token_read();
+		tok = token_read();
         /* 
 		 * if (tok != 'a') printf("reading: %c\n", tok);
 		 * else printf("reading: %s\n", token_buf);
@@ -2833,8 +3603,8 @@ asm_assemble()
 				loc_cnt = 0;
 
 				/* fix segment symbols */
-				asm_change_seg(1);
-				asm_fix_seg();
+				change_seg(1);
+				fix_seg();
 
 				/* store bss_top for header emission */
 				mem_size = text_top + data_top + bss_top;
@@ -2845,7 +3615,7 @@ asm_assemble()
 				asm_address = text_top = 0;
 				asm_seg = 1;
 
-				sio_rewind();
+				rewind(input_file);
 
 				continue;
 			} else if (asm_pass == 1) {
@@ -2855,8 +3625,8 @@ asm_assemble()
 
 #ifdef notdef
 				// fix segment symbols
-				asm_change_seg(1);
-				asm_fix_seg();
+				change_seg(1);
+				fix_seg();
 
 				// store bss_top for header emission
 				mem_size = text_top + data_top + bss_top;
@@ -2870,7 +3640,7 @@ asm_assemble()
 
                 asm_header();
 
-				sio_rewind();
+				rewind(input_file);
                 continue;
 
 			} else if (asm_pass == 2) {
@@ -2883,7 +3653,7 @@ asm_assemble()
 						 ((2 + RELOC_SIZE * 2) * reloc_count), sym_count,
 						 loc_count, glob_count, reloc_count);
                 }
-				sio_append();
+				appendtmp();
 
 				asm_meta();
 
@@ -2893,7 +3663,7 @@ asm_assemble()
 
 		/* command read */
 		if (tok == '.') {
-			tok = asm_token_read();
+			tok = token_read();
 
 			if (tok != 'a')
 				asm_error("expected directive");
@@ -2943,7 +3713,7 @@ asm_assemble()
 
 			/* change segment */
 			if (next != 0) {
-				asm_change_seg(next);
+				change_seg(next);
 				asm_seg = next;
 				asm_eol();
 				continue;
@@ -2952,11 +3722,11 @@ asm_assemble()
 			else if (asm_sequ(token_buf, "globl")) {
 				/* these can be chained with commas */
 				while (1) {
-					tok = asm_token_read();
+					tok = token_read();
 					if (tok != 'a')
 						asm_error("expected symbol");
 					if (asm_pass == 1) {
-						sym = asm_sym_fetch(sym_table, token_buf);
+						sym = sym_fetch(sym_table, token_buf);
 						if (!sym)
 							asm_error("undefined symbol");
 						if (sym->type > 4)
@@ -2964,7 +3734,7 @@ asm_assemble()
 						asm_glob(sym);
 					}
 					/* see if there is another */
-					if (sio_peek() == ',')
+					if (peek() == ',')
 						asm_expect(',');
 					else
 						break;
@@ -2975,7 +3745,7 @@ asm_assemble()
 			else if (asm_sequ(token_buf, "extern")) {
 				/* these can be chained with commas */
 				while (1) {
-					tok = asm_token_read();
+					tok = token_read();
 					if (tok != 'a')
 						asm_error("expected symbol");
 					if (asm_pass == 0) {
@@ -2985,7 +3755,7 @@ asm_assemble()
 
 						/* create external symbol, and increment extern counter */
 						sym =
-							asm_sym_update(sym_table, token_buf, extn++,
+							sym_update(sym_table, token_buf, extn++,
 										   NULL, 0);
 
 						/*
@@ -2997,7 +3767,7 @@ asm_assemble()
 
 					}
 					/* see if there is another */
-					if (sio_peek() == ',')
+					if (peek() == ',')
 						asm_expect(',');
 					else
 						break;
@@ -3006,41 +3776,41 @@ asm_assemble()
 			}
 
 			else if (asm_sequ(token_buf, "def")) {
-				tok = asm_token_read();
+				tok = token_read();
 				if (tok != 'a')
 					asm_error("expected symbol");
 				asm_token_cache(sym_name);
 				result = asm_bracket(1);
-				asm_define(sym_name, result);
+				define(sym_name, result);
 				asm_eol();
 
 			}
 			
 			else if (asm_sequ(token_buf, "defl")) {
-				tok = asm_token_read();
+				tok = token_read();
 				if (tok != 'a')
 					asm_error("expected symbol");
 
 				asm_token_cache(sym_name);
 				result = asm_bracket(1);
-				tok = asm_token_read();
+				tok = token_read();
 				if (tok != 'a')
 					asm_error("expected symbol");
 
-				sym = asm_type_size(sym_name, &mem_size);
+				sym = type_size(sym_name, &mem_size);
 				if (!mem_size)
 					asm_error("not a type");
 
 				sym =
-					asm_sym_update(sym_table, token_buf, asm_seg, sym,
+					sym_update(sym_table, token_buf, asm_seg, sym,
 								   asm_address);
 				sym->size = mem_size;
-				asm_define(sym_name, result);
+				define(sym_name, result);
 				asm_eol();
 			}
 
 			else if (asm_sequ(token_buf, "type")) {
-				tok = asm_token_read();
+				tok = token_read();
 				if (tok == 'a') {
 					asm_token_cache(sym_name);
 					asm_type(sym_name);
@@ -3065,33 +3835,33 @@ asm_assemble()
 			if (asm_instr(token_buf)) {
 				/* it's an instruction */
 				asm_eol();
-			} else if (sio_peek() == '=') {
+			} else if (peek() == '=') {
 				/* it's a symbol definition */
 				asm_token_cache(sym_name);
-				asm_token_read();
+				token_read();
 
 				/* evaluate the expression */
 				type = asm_evaluate(&result, 0);
 
 				/* set the new symbol */
-				asm_sym_update(sym_table, sym_name, type, NULL, result);
+				sym_update(sym_table, sym_name, type, NULL, result);
 				asm_eol();
-			} else if (sio_peek() == ':') {
+			} else if (peek() == ':') {
 				/* it's a label */
 
 				/* set the new symbol (if it is the first pass) */
 				if (asm_pass == 0) {
-					asm_sym_update(sym_table, token_buf, asm_seg, NULL,
+					sym_update(sym_table, token_buf, asm_seg, NULL,
 								   asm_address);
 
 					/* auto globals? */
 					if (g_flag) {
-						sym = asm_sym_fetch(sym_table, token_buf);
+						sym = sym_fetch(sym_table, token_buf);
 						asm_glob(sym);
 					}
 				}
 
-				asm_token_read();
+				token_read();
 			} else {
 				asm_error("unexpected symbol");
 			}
@@ -3099,7 +3869,7 @@ asm_assemble()
 
 		else if (tok == '0') {
 			/* numeric read */
-			result = asm_num_parse(token_buf);
+			result = num_parse(token_buf);
 
 			if (result > 9)
 				asm_error("local too large");
@@ -3108,7 +3878,7 @@ asm_assemble()
 
 			loc_cnt++;
 			if (asm_pass == 0)
-				asm_local_add(result, asm_seg, asm_address);
+				local_add(result, asm_seg, asm_address);
 
 		} else if (tok != 'n') {
 			asm_error("unexpected token");

@@ -1,27 +1,21 @@
+#
+# cross Makefile for asz assemble
+#
+# usr/src/cmd/asz/GNUmakefile
+#
+# Changed: <2023-07-04 19:55:33 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
+
+CLASS = cmd
+DIR = asz
+CFILES = main.c asm.c
+HFILES = isr.h asm.h
+SRCS = $(CFILES) $(HFILES)
+
+include ../GNUmakefile.inc
+
 TARGET = asz
-LIBS = 
-CC = gcc
-CFLAGS = -g -Wall
 
-all: $(TARGET)
-
-OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
-HEADERS = $(wildcard *.h)
-
-%.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(TARGET): $(OBJECTS)
-	$(CC) $(OBJECTS) -Wall $(LIBS) -o $@
-
-clean:
-	rm -f *.o
-
-clobber: clean
-	rm -f $(TARGET)
-
-test:	asz
-	./asz uhdr.s
-	~/src/micronix/src/tools/nm -vrd uhdr.o
-	./asz test1.s
-	~/src/micronix/src/tools/nm -vrd test1.o
+cross: $(CFILES) $(HFILES)
+	cc -o asz $(CFILES)
