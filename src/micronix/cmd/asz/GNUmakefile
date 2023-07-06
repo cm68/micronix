@@ -12,10 +12,13 @@ DIR = asz
 CFILES = main.c asm.c
 HFILES = isr.h asm.h
 SRCS = $(CFILES) $(HFILES)
+TARGET = asz
+GENERATED = 
 
 include ../GNUmakefile.inc
 
-TARGET = asz
-
 cross: $(CFILES) $(HFILES)
 	cc -g -o asz $(CFILES)
+
+test: cross
+	cd tests ; make test

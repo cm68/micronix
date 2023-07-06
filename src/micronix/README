@@ -1,0 +1,12 @@
+this directory and subdirectories contain native sources for
+micronix as modernized and modified. many of the sources are
+recovered from disassembly and grunging through a variety of
+old floppies. yet others are ported from Bell Labs v6 and V7.
+
+there are 3 makefiles:
+
+Makefile:  used by the old make to bootstrap the new tools
+
+makefile:  used to build the new tools
+
+GNUmakefile: used when outside the simulator

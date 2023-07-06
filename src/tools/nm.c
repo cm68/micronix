@@ -7,7 +7,7 @@
  *
  * tools/nm.c
  *
- * Changed: <2023-06-16 00:50:15 curt>
+ * Changed: <2023-07-06 10:21:03 curt>
  */
 
 #include <fcntl.h>
@@ -269,6 +269,9 @@ dumprelocs()
         case REL_DATAOFF:
             printf("data relative\n");
             break;
+        case REL_BSSOFF:
+            printf("bss relative\n");
+            break;
         case REL_SYMBOL:
             if (r->rl.value > nsyms) {
                 printf("out of bounds symbol reference %d\n", r->rl.value);
@@ -349,10 +352,13 @@ do_object(int fd, int limit)
                 case SF_DATA:
                     printf("data ");
                     break;
+                case SF_BSS:
+                    printf("bss ");
+                    break;
                 case 0:
                     break;
                 default:
-                    printf("unknown segment");
+                    printf("unknown segment %d", flag & SF_SEG);
                     break;
                 }
                 printf("\n");
@@ -375,6 +381,9 @@ do_object(int fd, int limit)
         printf("error reading relocs");
         goto out;
     }
+
+    if (verbose > 1) hexdump(relocbuf, i);
+
     if (head.conf == RELOC) {
         relocp = relocbuf;
         makerelocs(SEG_TEXT);

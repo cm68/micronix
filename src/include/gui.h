@@ -33,6 +33,7 @@
 
 #define W_COUNT 22
 
+extern int read_line(char *buf, int buflen);
 extern void message(char *fmt, ...);
 extern void makewins(FILE *tty);
 extern void dumpcpu();

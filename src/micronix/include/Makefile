@@ -2,9 +2,9 @@
 # include file installation to filesystem root
 # after this file is done, the include tree is rationalized
 #
-# micronix/include/Makefile
+# /include/Makefile
 #
-# Changed: <2023-06-23 01:01:20 curt>
+# Changed: <2023-07-04 11:03:50 curt>
 
 #
 # include files that have been revised or moved

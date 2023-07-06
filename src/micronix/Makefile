@@ -1,11 +1,15 @@
 #
 # this makefile is used to bootstrap the new make
+# since the old make prefers the 'Makefile' to 'makefile'
+# this one gets read.
 #
-# Changed: <2021-12-23 15:51:54 curt>
+# /Makefile
+#
+# Changed: <2023-07-04 10:24:40 curt>
 
-all : /usr/src/cmd/Make/bootstrap 
+all: /usr/src/cmd/Make/bootstrap 
 	sh -v /usr/src/cmd/Make/bootstrap
 	/bin/make upgrade
 
-# vim: tabstop=4 shiftwidth=4 expandtab:
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 

@@ -7,6 +7,9 @@
 #
 # for size reasons, I may delete the .type operator and all it's related functionality.
 # this is a kinda cool feature, but on a Z80, memory is tight.
+#
+# on another note, the declaration syntax for data is utterly brain dead.
+# 
 
 # Assembler
 Assembler for the TRASM toolchain. Takes in a source file and assembles it into an object file, including relocations and symbol table. If multiple source files are provided, they will be concatenate together in the order they were passed in.
