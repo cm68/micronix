@@ -3,12 +3,16 @@
  *
  * /usr/src/cmd/asz/asm.h
  *
- * Changed: <2023-07-05 20:41:57 curt>
+ * Changed: <2023-07-05 23:02:56 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
 #ifndef ASM_H
 #define ASM_H
+
+#ifndef linux
+#define void
+#endif
 
 #define EXP_STACK_DEPTH 16
 #define TOKEN_BUF_SIZE 19
@@ -60,12 +64,20 @@ struct header {
 	struct reloc *tail;
 };
 
+extern FILE *input_file;
+extern int line_num;
+extern char *infile;
 extern char verbose;
 extern char g_flag;
 
 /* interface functions */
 
+void appendtmp();
 void asm_reset();
-void asm_assemble();
+void assemble();
+char peek();
+char get_next();
+void outbyte();
+void outtmp();
 
 #endif

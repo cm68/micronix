@@ -1,31 +1,182 @@
 /*
- * trasm main file - mostly arg processing
+ * trasm main file - arg processing and file handling
  *
  * /usr/src/cmd/asz/main.c
  *
- * Changed: <2023-07-05 20:36:59 curt>
+ * this file has interpolated the original sio.c
+ * because it became almost trivial after the buffer stuff was
+ * stripped out
+ *
+ * this file mostly rewritten because it had truly lame file name
+ * handling:  output only went to a.out, and all specified files
+ * were assembled into it.
+ *
+ * now, instead, for a file foo.s, we write foo.o as the gods intended
+ *
+ * Changed: <2023-07-06 01:29:04 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
 
 #include <stdio.h>
-#include <stdlib.h>
 
-#include "sio.h"
+#ifdef linux
+#include <stdlib.h>
+#include <unistd.h>
+#endif
+
 #include "asm.h"
 
 #define VERSION "1.0"
 
-/*
- * flags 
- */
 char verbose = 0;
 char g_flag = 0;
 
-/*
- * arg zero 
- */
 char *progname;
+
+int line_num;
+
+FILE *input_file;
+FILE *output_file;
+FILE *temp_file;
+
+char *infile;
+char outfile[32];
+char tname[32];
+
+/*
+ * given a source file, open it, the output file, and the temp file
+ */
+void
+sio_open(filename)
+char *filename;
+{
+    char *d = outfile;
+
+    infile = filename;
+
+    while (*filename) {
+        if ((*d++ = *filename++) == '.') break;
+    }
+    if (!*filename) {
+        *d++ = '.';
+    }
+    *d++ = 'o';
+    *d++ = '\0';
+
+	if (!(input_file = fopen(infile, "r"))) {
+		printf("cannot open source file %s\n", filename);
+		exit(1);
+	}
+    
+	sprintf(tname, "/tmp/atm%d", getpid());
+	if (!(temp_file = fopen(tname, "wb"))) {
+		printf("cannot open tmp file %s\n", tname);
+		exit(1);
+	}
+
+	if (!(output_file = fopen(outfile, "wb"))) {
+		printf("cannot open output %s\n", outfile);
+		exit(1);
+	}
+
+	rewind(input_file);
+}
+
+/*
+ * closes source files when done
+ */
+void
+sio_close()
+{
+	if (input_file)
+		fclose(input_file);
+	fclose(output_file);
+	fclose(temp_file);
+	input_file = NULL;
+	output_file = NULL;
+	temp_file = NULL;
+
+	remove(tname);
+}
+
+/*
+ * returns what sio_next() would but does not move forward
+ */
+char
+peek()
+{
+    char c;
+    c = fgetc(input_file);
+    ungetc(c, input_file);
+
+    return c;
+}
+
+/*
+ * returns the next character in the source, or -1 if complete
+ */
+char
+get_next()
+{
+    char c;
+
+    c = fgetc(input_file);
+
+	if (c == '\n')
+		line_num++;
+
+	return c;
+}
+
+/*
+ * outputs a byte onto output file
+ *
+ * out = byte to output
+ */
+void
+outbyte(out)
+char out;
+{
+	fwrite(&out, 1, 1, output_file);
+}
+
+/*
+ * writes a byte to the temp file
+ *
+ * tmp = byte to write to tmp
+ */
+void
+outtmp(tmp)
+char tmp;
+{
+	fwrite(&tmp, 1, 1, temp_file);
+}
+
+/*
+ * appends contents of tmp file to output file
+ */
+void
+appendtmp()
+{
+	char c;
+
+	fclose(temp_file);
+
+	if (!(temp_file = fopen(tname, "rb"))) {
+		printf("cannot open tmp file\n");
+		exit(1);
+	}
+
+	while (0 < fread(&c, 1, 1, temp_file))
+		fwrite(&c, 1, 1, output_file);
+
+	fclose(temp_file);
+	if (!(temp_file = fopen(tname, "wb"))) {
+		printf("cannot open tmp file\n");
+		exit(1);
+	}
+}
 
 /*
  * print usage message
@@ -78,11 +229,11 @@ char **argv;
     }
 
 	if (verbose)
-		printf("TRASM cross assembler v%s\n", VERSION);
+		printf("TRASM assembler v%s\n", VERSION);
 
     while (argc--) {
         sio_open(*argv++);
-        asm_assemble();
+        assemble();
         sio_close();
     }
 }
