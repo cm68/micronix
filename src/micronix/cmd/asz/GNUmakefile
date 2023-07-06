@@ -18,4 +18,4 @@ include ../GNUmakefile.inc
 TARGET = asz
 
 cross: $(CFILES) $(HFILES)
-	cc -o asz $(CFILES)
+	cc -g -o asz $(CFILES)
