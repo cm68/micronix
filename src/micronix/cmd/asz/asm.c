@@ -3,13 +3,16 @@
  *
  * /usr/src/cmd/asz/asm.c 
  *
- * Changed: <2023-07-05 23:42:10 curt>
+ * Changed: <2023-07-06 01:56:20 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
 #include <stdio.h>
 #ifdef linux
 #include <stdlib.h>
+#define INIT
+#else
+#define INIT    = 0
 #endif
 
 #include "asm.h"
@@ -22,71 +25,71 @@
 /*
  * token buffer 
  */
-char token_buf[TOKEN_BUF_SIZE];
-char sym_name[TOKEN_BUF_SIZE];
+char token_buf[TOKEN_BUF_SIZE] INIT;
+char sym_name[TOKEN_BUF_SIZE] INIT;
 
 /*
  * current assembly address 
  */
-unsigned short asm_address;
+unsigned short asm_address INIT;
 
 /*
  * segment tops 
  */
-unsigned short text_top;
-unsigned short data_top;
-unsigned short bss_top;
+unsigned short text_top INIT;
+unsigned short data_top = 0;
+unsigned short bss_top = 0;
 
-unsigned short text_size;
-unsigned short mem_size;
+unsigned short text_size = 0;
+unsigned short mem_size = 0;
 
 /*
  * current pass 
  */
-char asm_pass;
+char asm_pass = 0;
 
 /*
  * current segment 
  */
-char asm_seg;
+char asm_seg = 0;
 
 /*
  * the expression evaluator requires some larger data structures, lets
  * define them 
  */
 
-struct tval exp_vstack[EXP_STACK_DEPTH];
+struct tval exp_vstack[EXP_STACK_DEPTH] INIT;
 
-char exp_estack[EXP_STACK_DEPTH];
+char exp_estack[EXP_STACK_DEPTH] INIT;
 
-struct symbol *sym_table;
+struct symbol *sym_table INIT;
 
-struct local *loc_table;
+struct local *loc_table INIT;
 
-int loc_cnt;
+int loc_cnt INIT;
 
-struct global *glob_table;
+struct global *glob_table INIT;
 
 /*
  * head of relocation tables 
  */
-struct header textr;
-struct header datar;
+struct header textr INIT;
+struct header datar INIT;
 
-unsigned short reloc_rec;
-unsigned short glob_rec;
+unsigned short reloc_rec INIT;
+unsigned short glob_rec INIT;
 
-int sym_count;
-int loc_count;
-int glob_count;
-int reloc_count;
+int sym_count INIT;
+int loc_count INIT;
+int glob_count INIT;
+int reloc_count INIT;
 
 /*
  * extern number 
  */
-unsigned char extn;
+unsigned char extn INIT;
 
-struct symbol **sort;
+struct symbol **sort INIT;
 
 /*
  * checks if a string is equal
@@ -3490,7 +3493,7 @@ fix_seg()
 char translate[6] = { 0x00, 0x05, 0x06, 0x07, 0x0c, 0x08 };
 
 void
-output_symbol(s)
+out_symbol(s)
 struct symbol *s;
 {
     int i;
@@ -3539,7 +3542,7 @@ asm_meta()
     /* qsort(sort, i, sizeof(struct symbol *), gcomp); */
 
     for (i = 0; i < glob_count; i++) {
-        output_symbol(sort[i]);
+        out_symbol(sort[i]);
     }
 
 	reloc_out(textr.head, 0);
