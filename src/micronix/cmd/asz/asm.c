@@ -3,7 +3,7 @@
  *
  * /usr/src/cmd/asz/asm.c 
  *
- * Changed: <2023-07-06 01:56:20 curt>
+ * Changed: <2023-07-06 10:41:42 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
@@ -31,27 +31,21 @@ char sym_name[TOKEN_BUF_SIZE] INIT;
 /*
  * current assembly address 
  */
-unsigned short asm_address INIT;
+unsigned short cur_address INIT;
 
 /*
  * segment tops 
  */
 unsigned short text_top INIT;
-unsigned short data_top = 0;
-unsigned short bss_top = 0;
+unsigned short data_top INIT;
+unsigned short bss_top INIT;
 
-unsigned short text_size = 0;
-unsigned short mem_size = 0;
+unsigned short text_size INIT;
+unsigned short mem_size INIT;
 
-/*
- * current pass 
- */
-char asm_pass = 0;
+char asm_pass INIT;
 
-/*
- * current segment 
- */
-char asm_seg = 0;
+char asm_seg INIT;
 
 /*
  * the expression evaluator requires some larger data structures, lets
@@ -90,6 +84,15 @@ int reloc_count INIT;
 unsigned char extn INIT;
 
 struct symbol **sort INIT;
+
+void
+print_mem()
+{
+    if (verbose > 2) {
+        printf("text_top: %d data_top: %d bss_top: %d mem_size: %d syms: %d\n",
+            text_top, data_top, bss_top, mem_size, glob_count);
+    }
+}
 
 /*
  * checks if a string is equal
@@ -186,7 +189,7 @@ char *token_cache;
  * skips past all of the white space to a token
  */
 void
-asm_wskip()
+skipwhite()
 {
 	char comment;
 
@@ -235,7 +238,7 @@ token_read()
 	int i;
 
 	/* skip all leading white space */
-	asm_wskip();
+	skipwhite();
 
 	/* peek and check type */
 	out = c = peek();
@@ -264,7 +267,7 @@ token_read()
 		out = 'n';
 
 	/* skip more whitespace */
-	asm_wskip();
+	skipwhite();
 
 	return out;
 }
@@ -754,7 +757,7 @@ unsigned char type;
 }
 
 /*
- * outputs a relocation table to a.out
+ * outputs a relocation table to whitesmith's object
  *
  * tab = relocation table
  */
@@ -802,17 +805,29 @@ unsigned short base;
             } else if (bump) {
                 outbyte(bump);
             }
-            control = 64;
             switch (tab->toff[i].type) {
             case 1:
                 outbyte(0x44);
                 break;
-            case 2:
+            case 2:     /* data */
                 outbyte(0x48);
                 break; 
+            case 3:     /* bss */
+                outbyte(0x4c);
+                break; 
             default:
-                control = (tab->toff[i].type - 5) << 2;
-                outbyte(80+control);
+                control = (tab->toff[i].type - 5) + 4;
+                if (control < 47) {
+                    outbyte((control + 16) << 2);
+                } else if (control < 175) {
+                    outbyte(0xfc);
+                    outbyte(control - 47);
+                } else {
+                    control -= 175;
+                    outbyte(0xfc);
+                    outbyte((control >> 8) + 0x80);
+                    outbyte(control);
+                }
                 break;
             }
             last = base + 2;
@@ -1356,7 +1371,7 @@ unsigned char b;
 		}
 	}
 
-	asm_address++;
+	cur_address++;
 }
 
 /*
@@ -1383,18 +1398,16 @@ unsigned short word;
 void
 asm_header()
 {
-    if (verbose > 2) {
-        printf("glob_count = %d\n", glob_count);
-    }
+    print_mem();
     outbyte(0x99);
     outbyte(0x14);
-    outword(glob_count * 12);      /* symbol table size */
-    outword(data_top);            /* text */
-    outword(bss_top - data_top);  /* data */
-    outword(mem_size - bss_top);  /* bss */
-    outword(0);                   /* stack+heap */
-    outword(text_top);            /* textoff */
-    outword(data_top);            /* dataoff */
+    outword(glob_count * 12);       /* symbol table size */
+    outword(data_top);              /* text */
+    outword(bss_top - data_top);    /* data */
+    outword(mem_size - bss_top);    /* bss */
+    outword(0);                     /* stack+heap */
+    outword(text_top);              /* textoff */
+    outword(data_top);              /* dataoff */
 }
 
 /*
@@ -1481,7 +1494,7 @@ emit_str()
 	}
 
 	/* make sure we don't land in whitespace */
-	asm_wskip();
+	skipwhite();
 }
 
 /*
@@ -1490,7 +1503,7 @@ emit_str()
  * size = number of bytes to fill
  */
 void
-asm_fill(size)
+fill(size)
 unsigned short size;
 {
 	while (size--)
@@ -1530,7 +1543,7 @@ unsigned char type;
 
 		if (type > 0 && type < 4) {
 			/* emit a relative address */
-			rel = (value - asm_address) - 1;
+			rel = (value - cur_address) - 1;
 			if (rel < 0x80 || rel > 0xFF7F)
 				asm_emit(rel);
 			else
@@ -1546,11 +1559,11 @@ unsigned char type;
 			/* relocate! */
 			switch (asm_seg) {
 			case 1:
-				asm_reloc(&textr, asm_address, type);
+				asm_reloc(&textr, cur_address, type);
 				break;
 
 			case 2:
-				asm_reloc(&datar, asm_address - text_top, type);
+				asm_reloc(&datar, cur_address - text_top, type);
 				break;
 
 			default:
@@ -1610,7 +1623,7 @@ struct symbol *type;
 		asm_error("not a type");
 
 	size = type->size;
-	base = asm_address;
+	base = cur_address;
 
 	/* get the first field */
 	asm_expect('{');
@@ -1618,9 +1631,9 @@ struct symbol *type;
 	sym = type->parent;
 	while (sym) {
 		/* correct to required location */
-		if (asm_address > base + sym->value)
+		if (cur_address > base + sym->value)
 			asm_error("field domain overrun");
-		asm_fill((base + sym->value) - asm_address);
+		fill((base + sym->value) - cur_address);
 
 		tok = peek();
 		if (tok == '"') {
@@ -1642,9 +1655,9 @@ struct symbol *type;
 	}
 
 	/* finish corrections */
-	if (asm_address > base + size)
+	if (cur_address > base + size)
 		asm_error("field domain overrun");
-	asm_fill((base + size) - asm_address);
+	fill((base + size) - cur_address);
 
 	asm_expect('}');
 }
@@ -1672,7 +1685,7 @@ unsigned short count;
 		asm_error("not a type");
 
 	/* record current address */
-	addr = asm_address;
+	addr = cur_address;
 
 	i = 0;
 	while (peek() != '\n' && peek() != -1) {
@@ -1688,11 +1701,11 @@ unsigned short count;
 		}
 
 		/* see how many elements we emitted, and align to size */
-		while (asm_address > addr) {
+		while (cur_address > addr) {
 			addr += size;
 			i++;
 		}
-		asm_fill(addr - asm_address);
+		fill(addr - cur_address);
 
 		if (peek() != '\n' && peek() != -1)
 			asm_expect(',');
@@ -1705,7 +1718,7 @@ unsigned short count;
 	if (i > count)
 		asm_error("define domain overrun");
 
-	asm_fill(size * (count - i));
+	fill(size * (count - i));
 }
 
 /*
@@ -3395,7 +3408,7 @@ char *in;
 
 /*
  * changes segments for first pass segment top tracking
- *
+ * save our place
  * next = next segment
  */
 void
@@ -3404,34 +3417,28 @@ char next;
 {
 	switch (asm_seg) {
 	case 1:
-		text_top = asm_address;
+		text_top = cur_address;
 		break;
-
 	case 2:
-		data_top = asm_address;
+		data_top = cur_address;
 		break;
-
 	case 3:
-		bss_top = asm_address;
+		bss_top = cur_address;
 		break;
-
 	default:
 		break;
 	}
 
 	switch (next) {
 	case 1:
-		asm_address = text_top;
+		cur_address = text_top;
 		break;
-
 	case 2:
-		asm_address = data_top;
+		cur_address = data_top;
 		break;
-
 	case 3:
-		asm_address = bss_top;
+		cur_address = bss_top;
 		break;
-
 	default:
 		break;
 	}
@@ -3490,7 +3497,14 @@ fix_seg()
 	}
 }
 
-char translate[6] = { 0x00, 0x05, 0x06, 0x07, 0x0c, 0x08 };
+char translate[6] = { 
+    0x00,           /* undefined */
+    0x05 | 0x08,    /* text */
+    0x06 | 0x08,    /* data */
+    0x07 | 0x08,    /* bss */
+    0x04 | 0x08,    /* absolute */
+    0x00            /* external */
+};
 
 void
 out_symbol(s)
@@ -3564,7 +3578,7 @@ assemble()
 
 	asm_pass = 0;
 
-	asm_address = 0;
+	cur_address = 0;
 
 	asm_seg = 1;
 	text_top = data_top = bss_top = 0;
@@ -3591,7 +3605,9 @@ assemble()
 
             if (verbose > 2) {
                 printf("end of pass %d\n", asm_pass);
+                print_mem();
             }
+
 			if (asm_pass == 0) {
 				if (verbose) {
 					printf
@@ -3615,7 +3631,7 @@ assemble()
 				/* reset segment addresses */
 				bss_top = text_top + data_top;
 				data_top = text_size = text_top;
-				asm_address = text_top = 0;
+				cur_address = text_top = 0;
 				asm_seg = 1;
 
 				rewind(input_file);
@@ -3638,7 +3654,7 @@ assemble()
 				bss_top = text_top + data_top;
 				data_top = text_size = text_top;
 #endif
-				asm_address = text_top = 0;
+				cur_address = text_top = 0;
 				asm_seg = 1;
 
                 asm_header();
@@ -3722,7 +3738,7 @@ assemble()
 				continue;
 			}
 
-			else if (asm_sequ(token_buf, "globl")) {
+			if (asm_sequ(token_buf, "globl")) {
 				/* these can be chained with commas */
 				while (1) {
 					tok = token_read();
@@ -3743,9 +3759,10 @@ assemble()
 						break;
 				}
 				asm_eol();
+                continue;
 			}
 			
-			else if (asm_sequ(token_buf, "extern")) {
+			if (asm_sequ(token_buf, "extern")) {
 				/* these can be chained with commas */
 				while (1) {
 					tok = token_read();
@@ -3776,9 +3793,24 @@ assemble()
 						break;
 				}
 				asm_eol();
+                continue;
 			}
 
-			else if (asm_sequ(token_buf, "def")) {
+			if (asm_sequ(token_buf, "defb")) {
+				result = asm_bracket(1);
+				define("byte", result);
+				asm_eol();
+                continue;
+			}
+
+			if (asm_sequ(token_buf, "defw")) {
+				result = asm_bracket(1);
+				define("word", result);
+				asm_eol();
+                continue;
+			}
+
+			if (asm_sequ(token_buf, "def")) {
 				tok = token_read();
 				if (tok != 'a')
 					asm_error("expected symbol");
@@ -3786,10 +3818,10 @@ assemble()
 				result = asm_bracket(1);
 				define(sym_name, result);
 				asm_eol();
-
+                continue;
 			}
-			
-			else if (asm_sequ(token_buf, "defl")) {
+
+			if (asm_sequ(token_buf, "defl")) {
 				tok = token_read();
 				if (tok != 'a')
 					asm_error("expected symbol");
@@ -3806,13 +3838,14 @@ assemble()
 
 				sym =
 					sym_update(sym_table, token_buf, asm_seg, sym,
-								   asm_address);
+								   cur_address);
 				sym->size = mem_size;
 				define(sym_name, result);
 				asm_eol();
+                continue;
 			}
 
-			else if (asm_sequ(token_buf, "type")) {
+			if (asm_sequ(token_buf, "type")) {
 				tok = token_read();
 				if (tok == 'a') {
 					asm_token_cache(sym_name);
@@ -3855,7 +3888,7 @@ assemble()
 				/* set the new symbol (if it is the first pass) */
 				if (asm_pass == 0) {
 					sym_update(sym_table, token_buf, asm_seg, NULL,
-								   asm_address);
+								   cur_address);
 
 					/* auto globals? */
 					if (g_flag) {
@@ -3881,7 +3914,7 @@ assemble()
 
 			loc_cnt++;
 			if (asm_pass == 0)
-				local_add(result, asm_seg, asm_address);
+				local_add(result, asm_seg, cur_address);
 
 		} else if (tok != 'n') {
 			asm_error("unexpected token");

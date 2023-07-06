@@ -1,30 +1,31 @@
 /*
  * the whitesmith's stdio implementation
  *
- * include/stdio.h
- * Modified: <stdio.h 2021-12-23 15:15:10 curt>
- */
-#ifdef linux
- error error error error
- this file should never, ever be included by linux code
-#endif
+ * /include/stdio.h
 
-# define	_BUFSIZE	512
-# define	 BUFSIZ		512
-# define	_NFILE		16
+ * Modified: <2023-07-05 23:06:12 curt>
+
+ * vim: tabstop=4 shiftwidth=4 expandtab:
+ */
+
+#define	_BUFSIZE	512
+#define	 BUFSIZ		512
+#define	_NFILE		16
 
 typedef struct _iobuf {
-	char	*_ptr;
-	int	_cnt;
-	char	*_base;
-	int	_flag;
-	int	_fd;
-	long	_offset;
-	int	_pid;
+	char *_ptr;
+	int _cnt;
+	char *_base;
+	int _flag;
+	int _fd;
+	long _offset;
+	int _pid;
 } FILE;
 
-extern FILE _iob [_NFILE];
-extern _exit (), exit ();
+extern FILE _iob[_NFILE];
+
+extern _exit();
+extern exit();
 
 #define	stdin	(&_iob[0])
 #define	stdout	(&_iob[1])
@@ -36,13 +37,12 @@ extern _exit (), exit ();
 #define	_BIGBUF	010
 #define	_EOF	020
 #define	_ERR	040
-#define	_UNSEEK 0100	/* the _fd is not seekable */
+#define	_UNSEEK 0100			/* the _fd is not seekable */
 #define	_PIPE	0200
-#define	_TTY	0400	/* _fd corresponds to a tty */
-#define	_ALLOC  01000	/* buffer obtained through alloc */
+#define	_TTY	0400			/* _fd corresponds to a tty */
+#define	_ALLOC  01000			/* buffer obtained through alloc */
 
-#define	getc(p) (--(p)->_cnt >= 0 \
-			? *(p)->_ptr++ & 0377 : _fillbuf (p))
+#define	getc(p) (((--(p)->_cnt) >= 0) ? (*(p)->_ptr++ & 0377) : (_fillbuf (p)))
 
 #define	getchar() getc(stdin)
 
@@ -86,11 +86,11 @@ extern _exit (), exit ();
 #define BYTMASK	0377
 
 /*
- *	macros
+ *  macros
  */
 
 #define abs(x)		((x) < 0 ? (-(x)) : (x))
-#define iswhite(c)	((c) <= ' ' || 0177 <= (c)) /* ASCII ONLY */
+#define iswhite(c)	((c) <= ' ' || 0177 <= (c))	/* ASCII ONLY */
 #define isblack(a)	(!iswhite(a))
 #define max(x, y)	(((x) < (y)) ? (y) : (x))
 #define min(x, y)	(((x) < (y)) ? (x) : (y))
@@ -99,7 +99,3 @@ extern _exit (), exit ();
 #define ferror(a) ((a)->_flag & _ERR)
 #define fileno(a) ((a)->_fd)
 #define clearerr(a) ((a)->_flag &= ~ERR)
-
-/*
- * vim: tabstop=4 shiftwidth=4 expandtab:
- */

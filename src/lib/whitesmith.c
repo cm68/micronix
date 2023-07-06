@@ -2,7 +2,7 @@
  * library for dealing with whitesmith's object file
  *
  * lib/whitesmith.c
- * Changed: <2021-12-23 15:45:52 curt>
+ * Changed: <2023-07-06 10:24:36 curt>
  */
 #include <stdio.h>
 #include "../micronix/include/types.h"
@@ -50,7 +50,7 @@ binout(unsigned char b)
  * 64 :		unused
  * 68 : 	text offset
  * 72 :		data offset
- * 76 :		unused
+ * 76 :		bss offset
  * 80 - 248 :	symbol table entry 0 - 42
  * 252 :	symbol table 43 and beyond read next byte
  *     0 - 127   symbol table entries 43 - 170
@@ -93,7 +93,7 @@ readreloc(unsigned char **rp)
 		control >>= 2;
 
 		/* these are just words that add in the segment base */
-		if (control == REL_TEXTOFF || control == REL_DATAOFF) {
+		if ((control >= REL_TEXTOFF) && (control <= REL_BSSOFF)) {
 			reloc.offset = location;
 			reloc.type = control;
 			location += 2;
