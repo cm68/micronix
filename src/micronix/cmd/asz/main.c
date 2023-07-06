@@ -13,7 +13,7 @@
  *
  * now, instead, for a file foo.s, we write foo.o as the gods intended
  *
- * Changed: <2023-07-06 01:29:04 curt>
+ * Changed: <2023-07-06 01:41:35 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
@@ -23,26 +23,29 @@
 #ifdef linux
 #include <stdlib.h>
 #include <unistd.h>
+#define INIT
+#else
+#define INIT = 0
 #endif
 
 #include "asm.h"
 
 #define VERSION "1.0"
 
-char verbose = 0;
-char g_flag = 0;
+char verbose INIT;
+char g_flag INIT;
 
-char *progname;
+char *progname INIT;
 
-int line_num;
+int line_num INIT;
 
-FILE *input_file;
-FILE *output_file;
-FILE *temp_file;
+FILE *input_file INIT;
+FILE *output_file INIT;
+FILE *temp_file INIT;
 
-char *infile;
-char outfile[32];
-char tname[32];
+char *infile INIT;
+char outfile[32] INIT;
+char tname[32] INIT;
 
 /*
  * given a source file, open it, the output file, and the temp file

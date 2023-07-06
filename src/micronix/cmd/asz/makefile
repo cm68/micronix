@@ -10,7 +10,7 @@
 all: asz
 
 asz: main.o asm.o
-	cc -v -o asz main.o asm.o
+	cc -v -o asz main.o asm.o -lS
 
 main.o:	main.c
 	cc -v -c main.c
