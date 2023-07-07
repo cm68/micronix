@@ -1,18 +1,19 @@
 ;
-; assembly source for access system call
+; assembly source for _exit system call
 ;
-; /usr/src/lib/libu/access.s
+; /usr/src/lib/libu/_exit.s
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Changed: <2023-07-07 01:13:08 curt>
 ;
-; vim: tabstop=4 shiftwidth=4 noexpandtab:
+; vim: tabstop=8 shiftwidth=8 noexpandtab:
 ;
 
 _exit.o:
-    0    _errno: 0000 08 global 
-    1    __exit: 0000 0d global defined code 
-0000: pop bc                         ; c1             .    
-0001: pop hl                         ; e1             .    
-0002: push hl                        ; e5             .    
-0003: push bc                        ; c5             .    
-0004: sys exit                       ; cf 01          ..   
+	.globl	__exit
+
+	.text
+__exit:	pop	bc
+	pop	hl
+	push	hl
+	push	bc
+	.db	0xcf, 0x01

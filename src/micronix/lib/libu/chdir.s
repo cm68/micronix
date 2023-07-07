@@ -7,10 +7,8 @@
 ;
 ; vim: tabstop=8 shiftwidth=8 noexpandtab:
 ;
-
-chdir.o:
-    	.extern	_errno
 	.globl	_chdir
+    	.extern	_errno
 
 	.text
 _chdir: ld	hl, 0x2

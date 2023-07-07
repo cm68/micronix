@@ -1,14 +1,13 @@
 ;
-; assembly source for access system call
+; assembly source for errno data space
 ;
-; /usr/src/lib/libu/access.s
+; /usr/src/lib/libu/errno.s
 ;
 ; Changed: <2023-07-07 00:36:28 curt>
 ;
-; vim: tabstop=4 shiftwidth=4 noexpandtab:
+; vim: tabstop=8 shiftwidth=8 noexpandtab:
 ;
+	.globl	_errno
 
-errno.o:
-    0    _errno: 0000 0e global defined data 
-data:
-0000: 00 00                                           ..
+	.data
+	.dw	0

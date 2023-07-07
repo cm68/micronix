@@ -7,9 +7,8 @@
 ;
 ; vim: tabstop=8 shiftwidth=8 noexpandtab:
 ;
-
-	.extern	_errno
 	.globl	__break
+	.extern	_errno
 
 	.text
 __break:

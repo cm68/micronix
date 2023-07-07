@@ -7,9 +7,8 @@
 ;
 ; vim: tabstop=8 shiftwidth=8 noexpandtab:
 ;
-
-	.extern	_errno
 	.globl	_chmod
+	.extern	_errno
 
 	.text
 _chmod:	ld	hl, 0x2
