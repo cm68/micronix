@@ -15,6 +15,21 @@ or, for a quite strange experience,
 	(run the simulated z80 micronix man program on sh, and pipe it to linux less)
 
 ---------------------
+updated 7 July 2023
+
+the whitesmith's c compiler for cp/m has been released in source form by PJ Plauger,
+and although it is quite a long way from usable in the released form on micronix,
+I have started porting it to micronix
+
+also, the bizarre anat assembler that is a baneful attempt to make a high level
+language out of 8080 is also in the source that is released.  As I have no real
+desire to learn to read that horrible stuff, I have snagged a relocating assembler
+that consumes standard z80 mnemonics call TRASM, and hacked it to bits.
+the author, Gavin Tersteeg, gctersteeg@gmail.com, built an impressive tool kit.
+in this source tree, it's call asz, and it will be the backend to the improved
+whitesmith compiler.
+
+---------------------
 
 Morrow Designs Micronix and tools					updated 6 Sep 2021
 
