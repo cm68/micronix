@@ -1,11 +1,11 @@
 ;
-; assembly source for access system call
+; assembly source for umount system call
 ;
-; /usr/src/lib/libu/access.s
+; /usr/src/lib/libu/umount.s
 ;
 ; Changed: <2023-07-07 00:36:28 curt>
 ;
-; vim: tabstop=4 shiftwidth=4 noexpandtab:
+; vim: tabstop=8 shiftwidth=8 noexpandtab:
 ;
 
 umount.o:

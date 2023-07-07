@@ -1,11 +1,12 @@
 ;
-; assembly source for access system call
+; assembly source for pause system call
+; not found in unix v6
+; 
+; /usr/src/lib/libu/pause.s
 ;
-; /usr/src/lib/libu/access.s
+; Changed: <2023-07-07 01:33:25 curt>
 ;
-; Changed: <2023-07-07 00:36:28 curt>
-;
-; vim: tabstop=4 shiftwidth=4 noexpandtab:
+; vim: tabstop=8 shiftwidth=8 noexpandtab:
 ;
 
 pause.o:
