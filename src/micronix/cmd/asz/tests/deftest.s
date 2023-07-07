@@ -12,4 +12,4 @@ data_seg:
 	.defb 1,3,5
 
 .bss
-bss_seg: .defb [20]
+bss_seg: .ds 20
