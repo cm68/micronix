@@ -480,9 +480,10 @@ main(argc, argv)
                 case 'n':
                     sflag= 0;
                     continue;
+                default:
                 case 'h':
                     usage(pname);
-                    continue;
+                    return 1;
                 case 'v':
                     verbose++;
                     continue;
@@ -494,8 +495,6 @@ main(argc, argv)
                     continue;
                 case 'r':
                     rflag++;
-                    continue;
-                default:
                     continue;
                 }
         } else {

@@ -8,8 +8,8 @@
 
 .data
 data_seg:
-	.defw 2
-	.defb 1,3,5
-
+	.db "foobie", 45h
+	.dw	4
+	.ds 30
 .bss
 bss_seg: .ds 20

@@ -1612,7 +1612,7 @@ ds()
 	char type;
 
 	type = asm_evaluate(&value, 0);
-	cur_address += value;
+    fill(value);
 }
 
 /*
