@@ -18,7 +18,7 @@ GENERATED =
 include ../GNUmakefile.inc
 
 cross: $(CFILES) $(HFILES)
-	cc -g -o asz $(CFILES)
+	cc -fdiagnostics-color=always -g -o asz $(CFILES) 2>&1
 
 test: cross
 	cd tests ; make test
