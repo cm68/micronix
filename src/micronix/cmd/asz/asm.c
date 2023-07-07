@@ -5,9 +5,11 @@
  * or an assembler that is used in conjunction with a preprocessor
  * things removed:  the type machinery, and the odd defl, def syntax
  *
+ * another messy feature removed is the local label stuff.
+ *
  * /usr/src/cmd/asz/asm.c 
  *
- * Changed: <2023-07-06 17:56:36 curt>
+ * Changed: <2023-07-07 00:18:54 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
@@ -16,6 +18,7 @@
 #include <stdlib.h>
 #define INIT
 #else
+#define void int
 #define INIT    = 0
 #endif
 
@@ -43,24 +46,53 @@ struct tval {
 	unsigned short type;
 };
 
+/*
+ * symbols come in a couple of flavors that are driven by
+ * the assembler semantics:
+ *
+ * global symbols are exported to the object file, but can
+ * have relocations referring to them.
+ *
+ * extern symbols are also found in the object file, and
+ * are very likely to have relocations referring to them
+ *
+ * static symbols are not exported to the object file, but
+ * are also likely to have relocations applied to them. these
+ * relocations in the object file are implemented at segment
+ * offsets.  they also are likely to start out unresolved
+ * until they find definitions
+ *
+ * symbols are created when encountered, and usually it's a
+ * forward reference without any information other than the
+ * name.
+ *
+ * symbols that are intended to be in the object file get 
+ * assigned an index in pass 1 of 0, otherwise 0xffff.
+ */
 struct symbol {
-	unsigned short type;
-	char name[SYMBOL_NAME_SIZE];
-	unsigned short size;
-	unsigned short value;
-	struct symbol *next;
+    unsigned char seg;              /* SEG_* */
+    unsigned short index;           /* object file ordinal */
+    unsigned short value;           /* segment relative */
+    char name[SYMBOL_NAME_SIZE];    /* zero padded */
+    struct symbol *next;
 };
 
-struct local {
-	unsigned short type;
-	unsigned char label;
-	unsigned short value;
-	struct local *next;
+/*
+ * relocs are chained off of headers and need to stay
+ * ordered.
+ */
+struct reloc {
+    unsigned short off;
+    unsigned short type;
+    struct symbol *ref;
+    struct reloc *next;
 };
 
-struct global {
-	struct symbol *symbol;
-	struct global *next;
+struct rhead {
+    char *segment;
+    unsigned short last;
+    struct reloc *head;
+    struct reloc *tail;
 };
 
 /*
@@ -107,47 +139,13 @@ char segment INIT;
  * the expression evaluator requires some larger data structures, lets
  * define them 
  */
-
 struct tval exp_vstack[EXP_STACK_DEPTH] INIT;
-
 char exp_estack[EXP_STACK_DEPTH] INIT;
 
-struct symbol *sym_table INIT;
+struct rhead textr = { "text" };
+struct rhead datar = { "data" };
 
-struct local *loc_table INIT;
-
-int loc_cnt INIT;
-
-struct global *glob_table INIT;
-
-/*
- * relocs are chained off of headers and need to stay
- * ordered.
- */
-struct reloc {
-	unsigned short off;
-	unsigned short type;
-	struct reloc *next;
-};
-
-struct header {
-	unsigned short last;
-	unsigned char index;
-	struct reloc *head;
-	struct reloc *tail;
-};
-
-struct header textr INIT;
-struct header datar INIT;
-
-int glob_count INIT;
-
-/*
- * extern number 
- */
-unsigned short extn INIT;
-
-struct symbol **sort INIT;
+struct symbol *symbols INIT;
 
 /*
  * checks if a string is equal
@@ -184,10 +182,10 @@ char *b;
  * msg = error message
  */
 void
-asm_error(msg)
+gripe(msg)
 char *msg;
 {
-	printf("%s:%d %s\n", infile, line_num, msg);
+	printf("%s:%d %s at %c\n", infile, line_num, msg, peek());
 	exit(1);
 }
 
@@ -321,7 +319,7 @@ char c;
 	tok = token_read();
 
 	if (tok != c) {
-		asm_error("unexpected character");
+		gripe("unexpected character");
 	}
 
 	if (c == '{' || c == ',') {
@@ -340,7 +338,7 @@ asm_eol()
 
 	tok = token_read();
 	if (tok != T_NL && tok != T_EOF)
-		asm_error("expected end of line");
+		gripe("expected end of line");
 }
 
 /*
@@ -449,9 +447,9 @@ char *in;
 		 * error checking 
 		 */
 		if (i == -1)
-			asm_error("unexpected character in numeric");
+			gripe("unexpected character in numeric");
 		if (i >= radix)
-			asm_error("radix mismatch in numeric");
+			gripe("radix mismatch in numeric");
 
 		out = (out * radix) + i;
 	}
@@ -461,24 +459,21 @@ char *in;
 
 /*
  * fetches the symbol
- *
- * parent = parent structure to search
- * sym = pointer to symbol name
  * returns pointer to found symbol, or null
  */
 struct symbol *
-sym_fetch(sym)
-char *sym;
+sym_fetch(name)
+char *name;
 {
 	struct symbol *entry;
 	int i;
 	char equal;
 
-	for (entry = sym_table; entry; entry = entry->next) {
+	for (entry = symbols; entry; entry = entry->next) {
 
 		equal = 1;
 		for (i = 0; i < SYMBOL_NAME_SIZE; i++) {
-			if (entry->name[i] != sym[i])
+			if (entry->name[i] != name[i])
 				equal = 0;
 			if (!entry->name[i])
 				break;
@@ -491,16 +486,13 @@ char *sym;
 
 /*
  * defines or redefines a symbol
- *
- * sym = symbol name
- * type = symbol type (0 = undefined, 1 = text, 2 = data, 3 = bss, 4 = absolute, 5+ = external)
- * value = value of symbol
  */
 struct symbol *
-sym_update(sym, type, value)
+sym_update(sym, seg, value, visible)
 char *sym;
-short type;
+short seg;
 unsigned short value;
+int visible;
 {
 	struct symbol *entry;
 	int i;
@@ -509,9 +501,10 @@ unsigned short value;
 
 	if (!entry) {
 		entry = (struct symbol *) malloc(sizeof(struct symbol));
-		entry->next = sym_table;
-		entry->size = 0;
-		sym_table = entry;
+		entry->next = symbols;
+		symbols = entry;
+        entry->seg = SEG_UNDEF;
+        entry->index = 0xffff;
 		for (i = 0; i < SYMBOL_NAME_SIZE - 1 && sym[i] != 0; i++)
 			entry->name[i] = sym[i];
 		entry->name[i] = 0;
@@ -520,191 +513,80 @@ unsigned short value;
 	/*
 	 * update the symbol 
 	 */
-	entry->type = type;
+    if ((entry->seg != SEG_UNDEF) && 
+        (entry->seg != seg)) {
+        gripe("segment for symbol changed");            
+    }
+	entry->seg = seg;
 	entry->value = value;
-
+    if (visible) entry->index = 0;
 	return entry;
+}
+
+void
+freerelocs(rh)
+struct rhead *rh;
+{
+    struct reloc *r, *n;
+
+    for (r = rh->head; r;) {
+        n = r->next;
+        free(r);
+        r = n;
+    }
+
+    rh->last = 0;
+    rh->tail = 0;
+    rh->head = 0;
 }
 
 /*
  * resets all allocation stuff
+ * this is what we run between assemblies.
+ * it should clean out everything.
  */
 void
 asm_reset()
 {
-	sym_table = NULL;
-	loc_table = NULL;
-	glob_table = NULL;
+    struct symbol *s, *n;
+    struct reloc *r;
 
-	/*
-	 * sym_update(sym_table, "sys", 1, NULL, 0x0005);
-	 * sym_update(sym_table, "header", 1, NULL, 0x0000); 
-	 */
-	textr.last = 0;
-	textr.index = 0;
-	textr.head = 0;
-	textr.tail = 0;
-
-	datar.last = 0;
-	datar.index = 0;
-	datar.head = 0;
-	datar.tail = 0;
-
-	glob_count = 0;
-
-	/*
-	 * externs start at 5 
-	 */
-	extn = 5;
+    for (s = symbols; s;) {
+        n = s->next;
+        free(s);
+        s = n;
+    }
+    freerelocs(&textr);
+    freerelocs(&datar);
 }
 
 /*
- * appends a local symbol to the local table
- *
- * label = label # (0-9)
- * type = symbol segment (text, data, or bss)
- * value = value of symbol
+ * adds an reference into a relocation table
+ * we only do this in the second pass, since that's when
+ * all symbols and segment addresses are resolved
  */
 void
-local_add(label, type, value)
-unsigned char label;
-unsigned char type;
-unsigned short value;
-{
-	struct local *new, *curr;
-
-	/*
-	 * alloc the new local symbol 
-	 */
-	new = (struct local *) malloc(sizeof(struct local));
-	new->label = label;
-	new->type = type;
-	new->value = value;
-
-	/*
-	 * append to local table 
-	 */
-	if (loc_table) {
-		curr = loc_table;
-		while (curr->next)
-			curr = curr->next;
-
-		curr->next = new;
-	} else
-		loc_table = new;
-}
-
-/*
- * fetches a local symbol
- *
- * index = how many local indicies have been counted during pass
- * label = label # (0-9)
- * dir = direction (0 = backwards, 1 = forwards)
- */
-char
-local_fetch(result, index, label, dir)
-unsigned short *result;
-int index;
-unsigned char label;
-char dir;
-{
-	struct local *curr, *last;
-
-	curr = loc_table;
-
-	/*
-	 * iterate through list 
-	 */
-	last = NULL;
-	while (curr) {
-
-		if (curr->label == label) {
-			if (index) {
-				last = curr;
-			} else
-				break;
-		}
-
-		if (index)
-			index--;
-		curr = curr->next;
-	}
-
-	if (dir)
-		last = curr;
-
-	*result = 0;
-	if (last) {
-		*result = last->value;
-		return last->type;
-	}
-	return 0;
-}
-
-/*
- * adds a symbol to the global table
- *
- * sym = symbol to add
- */
-void
-add_glob(sym)
-struct symbol *sym;
-{
-	struct global *curr, *new;
-
-	glob_count++;
-
-	new = (struct global *) malloc(sizeof(struct global));
-	new->symbol = sym;
-	new->next = NULL;
-
-	if (verbose > 3)
-		printf("add_glob: %s\n", sym->name);
-
-	curr = NULL;
-	if (glob_table) {
-		curr = glob_table;
-
-		while (1) {
-			/*
-			 * if the symbol already is glob, just ignore it 
-			 */
-			if (curr->symbol == sym)
-				return;
-
-			if (curr->next) {
-				curr = curr->next;
-			} else {
-				curr->next = new;
-				return;
-			}
-		}
-	} else {
-		glob_table = new;
-	}
-}
-
-/*
- * adds an address into a relocation table, extending it if needed
- *
- * tab = reloc table
- * target = address to add
- */
-void
-add_reloc(tab, addr, type)
-struct header *tab;
+add_reloc(tab, addr, type, sym)
+struct rhead *tab;
 unsigned short addr;
-unsigned char type;
+unsigned short type;
+struct symbol *sym;
 {
 	unsigned short diff;
 	unsigned char i, next;
 	struct reloc *r;
 
-	if (pass)
+	if (!pass)
 		return;
 
+    if (verbose > 2)
+        printf("add_reloc: %s %x %d %s\n", tab->segment, addr, type, sym ? sym->name : "nosym");
+
+    if (type == SEG_ABS)
+        return;
+    
 	if (addr < tab->last)
-		asm_error("backwards reloc");
+		gripe("backwards reloc");
 
 	r = (struct reloc *) malloc(sizeof(struct reloc *));
 
@@ -740,8 +622,8 @@ unsigned short base;
 		s = r->type;
 		if (verbose > 3) {
 			printf("reloc: base: %x off: %x(%x) type: %x %s\n",
-				   base, r->off, base + r->off,
-				   s, s < 5 ? "" : sort[s - 5]->name);
+				   base, r->off, base + r->off, 
+				   s, r->ref ? r->ref->name : "nosym");
 		}
 
 		base += r->off;
@@ -867,7 +749,7 @@ int *vindex;
 	char op;
 
 	if (!(*eindex))
-		asm_error("expression stack depletion");
+		gripe("expression stack depletion");
 
 	/*
 	 * pop off estack 
@@ -878,7 +760,7 @@ int *vindex;
 	 * attempt to pop out two values from the value stack 
 	 */
 	if (*vindex < 2)
-		asm_error("value stack depletion");
+		gripe("value stack depletion");
 
 	/*
 	 * grab values off the stack 
@@ -910,7 +792,7 @@ int *vindex;
 			if (pass == 0)
 				res = 0;
 			else
-				asm_error("zero divide");
+				gripe("zero divide");
 		} else
 			res = a / b;
 		break;
@@ -940,7 +822,7 @@ int *vindex;
 		break;
 
 	case '(':
-		asm_error("unexpected '('");
+		gripe("unexpected '('");
 
 	default:
 		res = 0;
@@ -959,14 +841,14 @@ int *vindex;
 		/*
 		 * operations between two non-absolute types are forbidden 
 		 */
-		asm_error("incompatable types");
+		gripe("incompatable types");
 	} else if (at == 4 && bt != 4) {
 		/*
 		 * a is absolute, b is not
 		 * only addition is allowed here, ot becomes bt
 		 */
 		if (op != '+')
-			asm_error("invalid type operation");
+			gripe("invalid type operation");
 		ot = bt;
 	} else if (at != 4 && bt == 4) {
 		/*
@@ -974,7 +856,7 @@ int *vindex;
 		 * either addition or subtraction is allowed here, ot becomes at
 		 */
 		if (op != '+' && op != '-')
-			asm_error("invalid type operation");
+			gripe("invalid type operation");
 		ot = at;
 	} else {
 		/*
@@ -1002,7 +884,7 @@ int *eindex;
 char op;
 {
 	if (*eindex >= EXP_STACK_DEPTH)
-		asm_error("expression stack overflow");
+		gripe("expression stack overflow");
 	exp_estack[(*eindex)++] = op;
 }
 
@@ -1019,7 +901,7 @@ unsigned char type;
 unsigned short value;
 {
 	if (*vindex >= EXP_STACK_DEPTH)
-		asm_error("value stack overflow");
+		gripe("value stack overflow");
 	exp_vstack[*vindex].type = type;
 	exp_vstack[(*vindex)++].value = value;
 }
@@ -1091,119 +973,69 @@ int size;
  * evaluates an expression that is next in the token queue
  *
  * result = pointer where result will be placed in
+ * sym is where we put a symbol pointer if that is what the expression contains
  * tok = initial token, 0 if none
  * returns status 0 = unresolved, 1 = text, 2 = data, 3 = bss, 4 = absolute, 5+ = external types
  */
 unsigned char
-asm_evaluate(result, itok)
+asm_evaluate(result, symp, itok)
 unsigned short *result;
+struct symbol **symp;
 char itok;
 {
-	char tok, op, type, dosz;
+	char tok, op, type;
 	unsigned short num;
 	struct symbol *sym;
 	int vindex, eindex;
 
 	vindex = eindex = 0;
+    sym = 0;
 
 	while (1) {
-		/*
-		 * read token, or use inital token 
-		 */
+		/* read token, or use inital token */
 		if (itok) {
 			tok = itok;
 			itok = 0;
 		} else
 			tok = token_read();
 
-		/*
-		 * default is absolute 
-		 */
-		type = 4;
+		type = SEG_ABS;
 
-		/*
-		 * it is a symbol 
-		 */
-		if (tok == T_NAME || tok == '$') {
-
-			/*
-			 * see if we are doing a size or value operation 
-			 */
-			dosz = 0;
-			if (tok == '$') {
-				dosz = 1;
-				tok = token_read();
-				if (tok != T_NAME)
-					asm_error("unexpected token");
-			}
-
-			op = 0;
+		/* it is a symbol */
+		if (tok == T_NAME) {
+            op = 0;
 			sym = sym_fetch(token_buf);
 			if (sym) {
-
-				if (dosz) {
-					/*
-					 * all sizes are absolute 
-					 */
-					num = sym->size;
-				} else {
-					/*
-					 * get type 
-					 */
-					type = sym->type;
-
-					/*
-					 * get value 
-					 */
-					num = sym->value;
-				}
+			    type = sym->seg;
+				num = sym->value;
 			} else {
-				type = 0;
+				type = SEG_ABS;
 				num = 0;
 			}
 		} else if (tok == '0') {
-			/*
-			 * it is a numeric (maybe) 
-			 */
-			op = 0;
 
-			if (asm_num(token_buf[0])
-				&& (token_buf[1] == 'f' || token_buf[1] == 'b')
-				&& token_buf[2] == 0) {
-				/*
-				 * nope, actually a local label 
-				 */
-				type =
-					local_fetch(&num, loc_cnt,
-								hexparse(token_buf[0]),
-								token_buf[1] == 'f');
-			} else {
-				/*
-				 * its a numeric (for realz) 
-				 */
-				num = num_parse(token_buf);
-			}
+			/* it is a numeric */
+			op = 0;
+			num = num_parse(token_buf);
+
 		} else if (tok == '\'') {
-			/*
-			 * it is a char 
-			 */
+
+			/* * it is a char */
 			op = 0;
 
-			/*
-			 * escape character 
-			 */
+			/* escape character */
 			if (peek() == '\\') {
 				get_next();
 				num = asm_escape_char(get_next());
 
 				if (!num)
-					asm_error("unknown escape");
+					gripe("unknown escape");
 			} else {
 				num = get_next();
 			}
 
 			if (token_read() != '\'')
-				asm_error("expected \'");
+				gripe("expected \'");
 		} else {
 			/*
 			 * it is a token (hopefully mathematic) 
@@ -1225,7 +1057,7 @@ char itok;
 			}
 
 			if (op == -1)
-				asm_error("unknown token in expression");
+				gripe("unknown token in expression");
 		}
 
 		/*
@@ -1234,9 +1066,6 @@ char itok;
 		if (op != ')' && op != '(' && op) {
 			/*
 			 * handle operators 
-			 */
-
-			/*
 			 * pop off anything in the stack of higher precedence 
 			 */
 			while (eindex
@@ -1252,7 +1081,7 @@ char itok;
 			est_push(&eindex, '(');
 		} else if (op == ')') {
 			if (!est_lpar(eindex))
-				asm_error("unexpected ')'");
+				gripe("unexpected ')'");
 
 			while (exp_estack[eindex - 1] != '(')
 				est_pop(&eindex, &vindex);
@@ -1284,7 +1113,7 @@ char itok;
 		est_pop(&eindex, &vindex);
 
 	if (vindex != 1)
-		asm_error("value stack overpopulation");
+		gripe("value stack overpopulation");
 
 	*result = exp_vstack[0].value;
 
@@ -1314,7 +1143,7 @@ unsigned char b;
 			break;
 		case SEG_BSS:
 			if (b)
-				asm_error("data in bss");
+				gripe("data in bss");
 			break;
 		default:
 			break;
@@ -1411,7 +1240,7 @@ emit_str()
 				radix = 16;
 				length = 2;
 			} else {
-				asm_error("unknown escape");
+				gripe("unknown escape");
 			}
 		}
 
@@ -1422,9 +1251,9 @@ emit_str()
 			num = hexparse(c);
 
 			if (num == -1)
-				asm_error("unexpected character in numeric");
+				gripe("unexpected character in numeric");
 			if (num >= radix)
-				asm_error("radix mismatch in numeric");
+				gripe("radix mismatch in numeric");
 
 			decode = (decode * radix) + num;
 
@@ -1468,16 +1297,17 @@ unsigned short size;
 }
 
 /*
- * emits up to two bytes, and handels relocation tracking
+ * emits up to two bytes, and handles relocation tracking
  *
  * size = number of bytes to emit
  * value = value to emit
  * type = segment to emit into
  */
 void
-emit_addr(size, value, type)
+emit_addr(size, value, sym, type)
 unsigned short size;
 unsigned short value;
+struct symbol *sym;
 unsigned char type;
 {
 	unsigned short rel;
@@ -1487,20 +1317,20 @@ unsigned char type;
 		 * if we are on the second pass, error out 
 		 */
 		if (pass == 1)
-			asm_error("undefined symbol");
+			gripe("undefined symbol");
 
 		value = 0;
 	}
 
 	if (!size)
-		asm_error("not a type");
+		gripe("not a type");
 
 	if (size == 1) {
 		/*
 		 * here we output only a byte 
 		 */
 		if ((type >= SEG_EXT) && (pass == 1))
-			asm_error("cannot extern byte");
+			gripe("cannot extern byte");
 
 		if ((type >= SEG_TEXT) && (type <= SEG_BSS)) {
 			/*
@@ -1510,27 +1340,25 @@ unsigned char type;
 			if ((rel < 0x80) || (rel > 0xFF7F))
 				asm_emit(rel);
 			else
-				asm_error("relative out of bounds");
+				gripe("relative out of bounds");
 		} else {
 			asm_emit(value);
 		}
 
 	} else {
 
-		if (((type >= SEG_TEXT) && (type <= SEG_BSS)) ||
-			((type > 4) && (pass == 1))) {
-
+		if (pass) {
 			switch (segment) {
 			case SEG_TEXT:
-				add_reloc(&textr, cur_address, type);
+				add_reloc(&textr, cur_address, type, sym);
 				break;
 
 			case SEG_DATA:
-				add_reloc(&datar, cur_address - text_top, type);
+				add_reloc(&datar, cur_address, type, sym);
 				break;
 
 			default:
-				asm_error("invalid segment");
+				gripe("invalid segment");
 			}
 		}
 		emitword(value);
@@ -1547,7 +1375,7 @@ unsigned short value;
 unsigned char type;
 {
 	if (type != SEG_ABS && (pass == 1))
-		asm_error("must be absolute");
+		gripe("must be absolute");
 
 	asm_emit(value);
 }
@@ -1565,10 +1393,11 @@ char tok;
 {
 	unsigned short value;
 	unsigned char type;
+    struct symbol *sym;
 
-	type = asm_evaluate(&value, tok);
+	type = asm_evaluate(&value, &sym, tok);
 
-	emit_addr(size, value, type);
+	emit_addr(size, value, sym, type);
 }
 
 void
@@ -1610,8 +1439,9 @@ ds()
 {
 	short value;
 	char type;
+    struct symbol *sym;
 
-	type = asm_evaluate(&value, 0);
+	type = asm_evaluate(&value, &sym, 0);
     fill(value);
 }
 
@@ -1631,6 +1461,7 @@ unsigned char eval;
 	int i;
 	char tok;
 	unsigned char ret, type;
+    struct symbol *sym;
 
 	/*
 	 * check if there is anything next 
@@ -1717,17 +1548,18 @@ unsigned char eval;
 			ret = 32;
 		}
 	}
+
 	/*
 	 * ok, its an expression 
 	 */
 	if (eval) {
-		type = asm_evaluate(con, tok);
+		type = asm_evaluate(con, &sym, tok);
 		if (type == 0) {
 			*con = 0;
 			if (pass == 1)
-				asm_error("undefined symbol");
+				gripe("undefined symbol");
 		} else if (type != 4)
-			asm_error("must be absolute");
+			gripe("must be absolute");
 
 		/*
 		 * if not 29, needs a trailing ')' 
@@ -1747,12 +1579,14 @@ unsigned char eval;
  * load indirect
  */
 int
-do_stax()
+do_stax(con)
+unsigned short con;
 {
 	unsigned char prim, arg, reg, type;
-	unsigned short con, value;
+	unsigned short value;
+    struct symbol *sym;
 
-	type = asm_evaluate(&value, con);
+	type = asm_evaluate(&value, &sym, con);
 	asm_expect(')');
 	asm_expect(',');
 	arg = asm_arg(&con, 1);
@@ -1786,7 +1620,7 @@ do_stax()
 	default:
 		return 1;
 	}
-	emit_addr(2, value, type);
+	emit_addr(2, value, sym, type);
 	return 0;
 }
 
@@ -1865,6 +1699,7 @@ char arg;
 {
 	unsigned char prim, reg, type;
 	unsigned short con, value;
+    struct symbol *sym;
 
 	prim = 0;
 
@@ -1872,7 +1707,7 @@ char arg;
 	 * grab any constants if they exist 
 	 */
 	if (arg == 25 || arg == 28) {
-		type = asm_evaluate(&value, con);
+		type = asm_evaluate(&value, &sym, con);
 		asm_expect(')');
 		prim++;
 	}
@@ -1982,7 +1817,7 @@ char arg;
 		 * h/l only allowed for ix+*
 		 */
 		if (reg == 25) {
-			type = asm_evaluate(&value, con);
+			type = asm_evaluate(&value, &sym, con);
 			asm_expect(')');
 			prim++;
 		} else if (arg == 4 || arg == 5)
@@ -1998,19 +1833,16 @@ char arg;
 		return 1;
 
 	if (arg < 8 && reg < 8) {
-		/*
-		 * reg8->reg8 
-		 */
+		/* reg8->reg8 */
 		asm_emit(0x40 + (arg << 3) + reg);
 		if (prim)
 			emit_imm(value, type);
 	} else if (arg < 8 && reg == 31) {
-		/*
-		 *->reg8 */
+		/* ->reg8 */
 		asm_emit(0x06 + (arg << 3));
 		if (prim)
 			emit_imm(value, type);
-		type = asm_evaluate(&value, con);
+		type = asm_evaluate(&value, &sym, con);
 		emit_imm(value, type);
 	} else if (arg == 7) {
 		/*
@@ -2618,10 +2450,6 @@ struct instruct *isr;
 
 	if (isr->type == LOAD) {
 		/*
-		 * i will never forgive you zilog 
-		 */
-
-		/*
 		 * correct for carry flag 
 		 */
 		arg = asm_arg(&con, 0);
@@ -2632,7 +2460,7 @@ struct instruct *isr;
 		 * special case for deferred constant 
 		 */
 		if (arg == 32) {
-			return do_stax();
+			return do_stax(con);
 		}
 
 		/*
@@ -2704,7 +2532,7 @@ char *in;
 			if (verbose > 2)
 				printf("instruction: %s\n", in);
 			if (asm_doisr(&isr_table[i]))
-				asm_error("invalid operand");;
+				gripe("invalid operand");;
 			return 1;
 		}
 		i++;
@@ -2753,116 +2581,6 @@ char next;
 }
 
 /*
- * iterates through and fixes all segments for the second pass
- */
-void
-fix_seg()
-{
-	struct symbol *sym;
-	struct local *loc;
-
-	for (sym = sym_table; sym; sym = sym->next) {
-
-		/*
-		 * data starts at text end - XXX 
-		 */
-		if (sym->type == SEG_DATA) {
-			sym->value += text_size;
-		}
-
-		/*
-		 * bss -> text 
-		 */
-		if (sym->type == SEG_BSS) {
-			sym->value += text_top + data_top;
-		}
-	}
-
-	for (loc = loc_table; loc; loc = loc->next) {
-
-		/*
-		 * data -> text 
-		 */
-		if (loc->type == SEG_DATA) {
-			loc->value += text_top;
-		}
-		/*
-		 * bss -> text 
-		 */
-		if (loc->type == SEG_BSS) {
-			loc->value += text_top + data_top;
-		}
-	}
-}
-
-char translate[6] = {
-	0x00,						/* undefined */
-	0x05 | 0x08,				/* text */
-	0x06 | 0x08,				/* data */
-	0x07 | 0x08,				/* bss */
-	0x04 | 0x08,				/* absolute */
-	0x00						/* external */
-};
-
-void
-out_symbol(s)
-struct symbol *s;
-{
-	int i;
-	int t;
-
-	if (verbose > 3) {
-		printf("symbol: %s\t type %d value %x\n", s->name, s->type,
-			   s->value);
-	}
-	t = s->type;
-	if (t > 5)
-		t = 5;
-	outword(s->value);
-	outbyte(translate[t]);
-	for (i = 0; i < 9; i++) {
-		outbyte(s->name[i]);
-	}
-}
-
-#ifdef notdef
-int
-gcomp(a, b)
-struct symbol **a;
-struct symbol **b;
-{
-	return (strcmp((*a)->name, (*b)->name));
-}
-#endif
-
-/*
- * outputs the metadata blocks after assembly is done
- */
-void
-asm_meta()
-{
-	int i;
-	unsigned char lextn;
-	struct global *glob;
-
-	sort = (struct symbol **) malloc(sizeof(struct symbol *) * glob_count);
-	i = 0;
-	for (glob = glob_table; glob; glob = glob->next) {
-		sort[i++] = glob->symbol;
-	}
-	/*
-	 * qsort(sort, i, sizeof(struct symbol *), gcomp); 
-	 */
-
-	for (i = 0; i < glob_count; i++) {
-		out_symbol(sort[i]);
-	}
-
-	reloc_out(textr.head, 0);
-	reloc_out(datar.head, text_top);
-}
-
-/*
  * perform assembly functions
  * we do some passes over the source code, 
  * pass 1: locate symbols and relocs in relative segments
@@ -2887,8 +2605,6 @@ assemble()
 	text_top = data_top = bss_top = 0;
 	cur_address = 0;
 
-	loc_cnt = 0;
-
 	ifdepth = trdepth = 0;
 
 	/*
@@ -2903,8 +2619,8 @@ assemble()
 		if (verbose) {
 			printf("start of pass %d\n", pass);
 			printf
-				("text_top: %d data_top: %d bss_top: %d mem_size: %d syms: %d\n",
-				 text_top, data_top, bss_top, mem_size, glob_count);
+				("text_top: %d data_top: %d bss_top: %d mem_size: %d\n",
+				 text_top, data_top, bss_top, mem_size);
 		}
 
 		while ((tok = token_read()) != -1) {
@@ -2918,7 +2634,7 @@ assemble()
 				tok = token_read();
 
 				if (tok != T_NAME)
-					asm_error("expected directive");
+					gripe("expected directive");
 
 				if (verbose > 2)
 					printf("directive: %s\n", token_buf);
@@ -2929,10 +2645,10 @@ assemble()
 					/*
 					 * evaluate the expression 
 					 */
-					type = asm_evaluate(&result, 0);
+					type = asm_evaluate(&result, &sym, 0);
 
 					if (type != 4)
-						asm_error("must be absolute");
+						gripe("must be absolute");
 
 					if (result)
 						trdepth++;
@@ -2943,7 +2659,7 @@ assemble()
 
 				else if (asm_sequ(token_buf, "endif")) {
 					if (!ifdepth)
-						asm_error("unpaired .endif");
+						gripe("unpaired .endif");
 
 					if (ifdepth == trdepth)
 						trdepth--;
@@ -2983,18 +2699,11 @@ assemble()
 					while (1) {
 						tok = token_read();
 						if (tok != T_NAME)
-							asm_error("expected symbol");
+							gripe("expected symbol");
 						if (pass == 0) {
-							sym = sym_update(token_buf, SEG_UNDEF, 0);
-							if (!sym)
-								asm_error("undefined symbol");
-							if (sym->type >= SEG_EXT)
-								asm_error("symbol is external");
-							add_glob(sym);
+							sym = sym_update(token_buf, SEG_UNDEF, 0, 1);
 						}
-						/*
-						 * see if there is another 
-						 */
+						/* see if there is another */
 						if (peek() == ',')
 							asm_expect(',');
 						else
@@ -3008,23 +2717,11 @@ assemble()
 					while (1) {
 						tok = token_read();
 						if (tok != T_NAME)
-							asm_error("expected symbol");
+							gripe("expected symbol");
 						if (pass == 0) {
-							/*
-							 * create external symbol 
-							 */
-							sym = sym_update(token_buf, extn++, 0);
-
-							/*
-							 * output extern to the global table
-							 * this will ensure that it is outputted so the
-							 * linker can see it
-							 */
-							add_glob(sym);
+							sym = sym_update(token_buf, SEG_EXT, 0, 1);
 						}
-						/*
-						 * see if there is another 
-						 */
+						/* see if there is another */
 						if (peek() == ',')
 							asm_expect(',');
 						else
@@ -3064,7 +2761,7 @@ assemble()
 				}
 
 				printf("%s\n", token_buf);
-				asm_error("unkown directive");
+				gripe("unkown directive");
 				continue;
 			}
 			/*
@@ -3078,7 +2775,6 @@ assemble()
 			 * symbol read 
 			 */
 			else if (tok == 'a') {
-
 				/*
 				 * try to get the type of the symbol 
 				 */
@@ -3094,72 +2790,37 @@ assemble()
 					asm_token_cache(sym_name);
 					token_read();
 
-					/*
-					 * evaluate the expression 
-					 */
-					type = asm_evaluate(&result, 0);
+					type = asm_evaluate(&result, &sym, 0);
 
-					/*
-					 * set the new symbol 
-					 */
-					sym_update(sym_name, type, result);
+					sym_update(sym_name, type, result, 0);
 					asm_eol();
 				} else if (peek() == ':') {
-					/*
-					 * it's a label 
-					 */
-
 					/*
 					 * set the new symbol (if it is the first pass) 
 					 */
 					if (pass == 0) {
-						sym_update(token_buf, segment, cur_address);
-
-						/*
-						 * auto globals? 
-						 */
-						if (g_flag) {
-							sym = sym_fetch(token_buf);
-							add_glob(sym);
-						}
+						sym_update(token_buf, segment, cur_address, 0);
 					}
 
 					token_read();
 				} else {
-					asm_error("unexpected symbol");
+					gripe("unexpected symbol");
 				}
-			}
-
-			else if (tok == '0') {
-				/*
-				 * numeric read 
-				 */
-				result = num_parse(token_buf);
-
-				if (result > 9)
-					asm_error("local too large");
-
-				asm_expect(':');
-
-				loc_cnt++;
-				if (pass == 0)
-					local_add(result, segment, cur_address);
-
 			} else if (tok != 'n') {
-				asm_error("unexpected token");
+				gripe("unexpected token");
 			}
 		}
 
 		if (ifdepth)
-			asm_error("unpaired .if");
+			gripe("unpaired .if");
 
 		change_seg(SEG_TEXT);
         
 		if (verbose) {
 			printf("end of pass %d\n", pass);
 			printf
-				("text_top: %d data_top: %d bss_top: %d mem_size: %d syms: %d\n\n",
-				 text_top, data_top, bss_top, mem_size, glob_count);
+				("text_top: %d data_top: %d bss_top: %d mem_size: %d\n\n",
+				 text_top, data_top, bss_top, mem_size);
 		}
 
 		pass++;
@@ -3169,14 +2830,31 @@ assemble()
 		 */
 		if (pass == 1) {
 
+			change_seg(SEG_TEXT);
+
 			mem_size = text_top + data_top + bss_top;
 			text_size = text_top;
 			data_size = data_top;
 			bss_size = bss_top;
 
+            next = 0;
+
+	        for (sym = symbols; sym; sym = sym->next) {
+
+                if (sym->index == 0) {
+                    sym->index = next++;
+                }
+		        if (sym->seg == SEG_DATA) {
+                    sym->value += text_size;
+                }
+                if (sym->seg == SEG_BSS) {
+                    sym->value += text_size + data_size;
+                }
+            }
+
 			outbyte(0x99);
 			outbyte(0x14);
-			outword(glob_count * 12); /* symbol table size */
+			outword(next * 12); /* symbol table size */
 			outword(text_size);	/* text */
 			outword(data_size);	/* data */
 			outword(bss_size);	/* bss */
@@ -3184,18 +2862,10 @@ assemble()
 			outword(0);			/* textoff */
 			outword(text_size);	/* dataoff */
 
-			printf
-				("magic %x text:%d data:%d bss:%d heap:%d symbols:%d textoff:%x dataoff:%x\n",
-				 0x9914, text_size, data_size, bss_size, 0,
-				 glob_count * 12, 0, text_size);
-
-			loc_cnt = 0;
-
-			/*
-			 * fix segment symbols 
-			 */
-			change_seg(SEG_TEXT);
-			fix_seg();
+            if (verbose)
+                printf("magic %x text:%d data:%d bss:%d heap:%d symbols:%d textoff:%x dataoff:%x\n",
+                     0x9914, text_size, data_size, bss_size, 0,
+                     next * 12, 0, text_size);
 
 			/*
 			 * reset segment addresses to their final addresses
@@ -3211,12 +2881,46 @@ assemble()
 		}
 
 		/*
-		 * pass 2 is to output the code, tmp, and metadata
-		 * and then we're done.
+		 * pass 2 is to output the code, data, symbols and reloc
 		 */
 		if (pass == 2) {
 			appendtmp();
-			asm_meta();
+
+            for (sym = symbols; sym; sym = sym->next) {
+                if (sym->index == 0xffff)
+                    continue;
+	            outword(sym->value);
+                switch (sym->seg) {
+                case SEG_UNDEF:
+                    type = 0x08;
+                    break;
+                case SEG_TEXT:
+                    type = 0x05 | 0x08;
+                    break;
+                case SEG_DATA:
+                    type = 0x06 | 0x08;
+                    break;
+                case SEG_BSS:
+                    type = 0x07 | 0x08;
+                    break;
+                case SEG_ABS:
+                    type = 0x04 | 0x08;
+                    break;
+                case SEG_EXT:
+                    type = 0x08;
+                    break;
+                default:
+                    break;
+                }
+                outbyte(type);
+                for (next = 0; next < 9; next++) {
+                    outbyte(sym->name[next]);
+                }
+            }
+
+            reloc_out(textr.head, 0);
+            reloc_out(datar.head, text_top);
+
 			return;
 		}
 	}
