@@ -13,7 +13,7 @@
  *
  * now, instead, for a file foo.s, we write foo.o as the gods intended
  *
- * Changed: <2023-07-06 01:41:35 curt>
+ * Changed: <2023-07-06 14:48:10 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
@@ -29,8 +29,6 @@
 #endif
 
 #include "asm.h"
-
-#define VERSION "1.0"
 
 char verbose INIT;
 char g_flag INIT;
@@ -71,6 +69,7 @@ char *filename;
 		printf("cannot open source file %s\n", filename);
 		exit(1);
 	}
+    if (verbose) printf("source %s\n", infile);
     
 	sprintf(tname, "/tmp/atm%d", getpid());
 	if (!(temp_file = fopen(tname, "wb"))) {
@@ -231,8 +230,9 @@ char **argv;
         usage();
     }
 
-	if (verbose)
-		printf("TRASM assembler v%s\n", VERSION);
+    if (verbose) {
+        printf("verbose: %d\n", verbose);
+    }
 
     while (argc--) {
         sio_open(*argv++);
