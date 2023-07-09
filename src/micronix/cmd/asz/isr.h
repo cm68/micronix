@@ -3,7 +3,7 @@
  *
  * /usr/src/cmd/asz/isr.h
  *
- * Changed: <2023-07-04 23:48:49 curt>
+ * Changed: <2023-07-08 22:34:14 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
@@ -18,13 +18,13 @@
 #define INCR 4      /* increment / decrement group */
 #define BITSH 5     /* bit / shift instruction */
 #define STACK 6     /* stack pop / push */
-#define RETFLO 7    /* return program flow */
-#define JMPFLO 8    /* jump program flow */
-#define JRLFLO 9    /* jump relative program flow */
-#define CALFLO 10   /* call program flow */
-#define RSTFLO 11   /* rst program flow */
-#define IOIN 12     /* i/o in instruction */
-#define IOOUT 13    /* i/o out instruction */
+#define RET 7    /* return program flow */
+#define JMP 8    /* jump program flow */
+#define JRL 9    /* jump relative program flow */
+#define CALL 10   /* call program flow */
+#define RST 11   /* rst program flow */
+#define IN 12     /* i/o in instruction */
+#define OUT 13    /* i/o out instruction */
 #define EXCH 14     /* exchange instruction */
 #define INTMODE 15  /* interrupt mode instruction */
 #define LOAD 16     /* load instruction */
@@ -42,7 +42,7 @@ struct instruct {
 };
 
 struct oprnd {
-	unsigned char type;
+	unsigned char token;
 	char *mnem;
 };
 
@@ -54,28 +54,28 @@ struct oprnd op_table[] = {
 	{ 3, "e" },
 	{ 4, "h" },
 	{ 5, "l" },
-	{ 7, "a" },
-	{ 8, "bc" },
-	{ 9, "de" },
-	{ 10, "hl" },
-	{ 11, "sp" },
-	{ 12, "af" },
-	{ 13, "nz" },
-	{ 14, "z" },
-	{ 15, "nc" },
-	{ 16, "cr" },
-	{ 17, "po" },
-	{ 18, "pe" },
-	{ 19, "p" },
-	{ 20, "m" },
-	{ 21, "ix" },
-	{ 22, "iy" },
+	{ T_A, "a" },
+	{ T_BC, "bc" },
+	{ T_DE, "de" },
+	{ T_HL, "hl" },
+	{ T_SP, "sp" },
+	{ T_AF, "af" },
+	{ T_NZ, "nz" },
+	{ T_Z, "z" },
+	{ T_NC, "nc" },
+	{ T_CR, "cr" },
+	{ T_PO, "po" },
+	{ T_PE, "pe" },
+	{ T_P, "p" },
+	{ T_M, "m" },
+	{ T_IX, "ix" },
+	{ T_IY, "iy" },
 	{ 23, "ixh" },
 	{ 24, "ixl" },
 	{ 26, "iyh" },
 	{ 27, "iyl" },
-	{ 37, "i" },
-	{ 38, "r" },
+	{ T_I, "i" },
+	{ T_R, "r" },
 	{ 255, "" }
 };
 
@@ -194,26 +194,26 @@ struct instruct isr_table[] = {
 	{ STACK, "push", 0xC5, 0 },
 	
 	/* return */
-	{ RETFLO, "ret", 0xC0, 0xC9 },
+	{ RET, "ret", 0xC0, 0xC9 },
 	
 	/* jump */
-	{ JMPFLO, "jp", 0xC2, 0xE9 },
+	{ JMP, "jp", 0xC2, 0xE9 },
 	
 	/* jump relative */
-	{ JRLFLO, "jr", 0x18, 1 },
-	{ JRLFLO, "djnz", 0x10, 0},
+	{ JRL, "jr", 0x18, 1 },
+	{ JRL, "djnz", 0x10, 0},
 	
 	/* call */
-	{ CALFLO, "call", 0xC4, 0xCD },
+	{ CALL, "call", 0xC4, 0xCD },
 	
 	/* rst */
-	{ RSTFLO, "rst", 0xC7, 0 },
+	{ RST, "rst", 0xC7, 0 },
 	
 	/* in */
-	{ IOIN, "in", 0xDB, 0x40 },
+	{ IN, "in", 0xDB, 0x40 },
 	
 	/* out */
-	{ IOOUT, "out", 0xD3, 0x41 },
+	{ OUT, "out", 0xD3, 0x41 },
 	
 	/* exchange */
 	{ EXCH, "ex", 0xE3, 0x08 },

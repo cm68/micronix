@@ -9,7 +9,7 @@
  *
  * /usr/src/cmd/asz/asm.c 
  *
- * Changed: <2023-07-07 00:18:54 curt>
+ * Changed: <2023-07-09 11:49:11 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
@@ -34,16 +34,25 @@
 #include "asm.h"
 #include "isr.h"
 
-#define EXP_STACK_DEPTH 16
 #define TOKEN_BUF_SIZE 19
 #define SYMBOL_NAME_SIZE 9
 
 /*
- * special types 
+ * symbols have a segment, emitted code does too.
  */
-struct tval {
-	unsigned short value;
-	unsigned short type;
+#define SEG_UNDEF   0       /* if index == 0xffff, not .globl */
+#define SEG_TEXT    1
+#define SEG_DATA    2
+#define SEG_BSS     3
+#define SEG_ABS     4
+#define SEG_EXT     5
+
+/*
+ * expressions can be these
+ */
+struct expval {
+	unsigned short num;
+    struct symbol *sym;
 };
 
 /*
@@ -68,6 +77,7 @@ struct tval {
  *
  * symbols that are intended to be in the object file get 
  * assigned an index in pass 1 of 0, otherwise 0xffff.
+ *
  */
 struct symbol {
     unsigned char seg;              /* SEG_* */
@@ -82,28 +92,18 @@ struct symbol {
  * ordered.
  */
 struct reloc {
-    unsigned short off;
-    unsigned short type;
-    struct symbol *ref;
+    unsigned short addr;    /* where the fixup goes */
+    struct symbol *sym;     /* what it contains */
     struct reloc *next;
 };
 
 struct rhead {
     char *segment;
-    unsigned short last;
     struct reloc *head;
     struct reloc *tail;
 };
 
-/*
- * symbols have a segment, emitted code does too.
- */
-#define SEG_UNDEF   0
-#define SEG_TEXT    1
-#define SEG_DATA    2
-#define SEG_BSS     3
-#define SEG_ABS     4
-#define SEG_EXT     5
+extern char *input_line;
 
 /*
  * token buffer 
@@ -134,13 +134,6 @@ unsigned short bss_size INIT;
 char pass INIT;
 
 char segment INIT;
-
-/*
- * the expression evaluator requires some larger data structures, lets
- * define them 
- */
-struct tval exp_vstack[EXP_STACK_DEPTH] INIT;
-char exp_estack[EXP_STACK_DEPTH] INIT;
 
 struct rhead textr = { "text" };
 struct rhead datar = { "data" };
@@ -185,21 +178,28 @@ void
 gripe(msg)
 char *msg;
 {
-	printf("%s:%d %s at %c\n", infile, line_num, msg, peek());
+	printf("%s:%d %s%s at %c\n", 
+        infile, line_num, msg, peek());
 	exit(1);
 }
 
-/*
- * moves the contents of token_buf into token_cache
- */
 void
-asm_token_cache(token_cache)
-char *token_cache;
+gripe2(msg, arg)
+char *msg;
+char *arg;
+{
+	printf("%s:%d %s%s at %c\n", 
+        infile, line_num, msg, arg, peek());
+	exit(1);
+}
+
+void
+save_symname()
 {
 	int i;
 
 	for (i = 0; i < TOKEN_BUF_SIZE; i++)
-		token_cache[i] = token_buf[i];
+		sym_name[i] = token_buf[i];
 }
 
 /*
@@ -465,21 +465,21 @@ struct symbol *
 sym_fetch(name)
 char *name;
 {
-	struct symbol *entry;
+	struct symbol *sym;
 	int i;
 	char equal;
 
-	for (entry = symbols; entry; entry = entry->next) {
+	for (sym = symbols; sym; sym = sym->next) {
 
 		equal = 1;
 		for (i = 0; i < SYMBOL_NAME_SIZE; i++) {
-			if (entry->name[i] != name[i])
+			if (sym->name[i] != name[i])
 				equal = 0;
-			if (!entry->name[i])
+			if (!sym->name[i])
 				break;
 		}
 		if (equal)
-			return entry;
+			return sym;
 	}
 	return NULL;
 }
@@ -488,39 +488,39 @@ char *name;
  * defines or redefines a symbol
  */
 struct symbol *
-sym_update(sym, seg, value, visible)
-char *sym;
+sym_update(name, seg, value, visible)
+char *name;
 short seg;
 unsigned short value;
 int visible;
 {
-	struct symbol *entry;
+	struct symbol *sym;
 	int i;
 
-	entry = sym_fetch(sym);
+	sym = sym_fetch(name);
 
-	if (!entry) {
-		entry = (struct symbol *) malloc(sizeof(struct symbol));
-		entry->next = symbols;
-		symbols = entry;
-        entry->seg = SEG_UNDEF;
-        entry->index = 0xffff;
-		for (i = 0; i < SYMBOL_NAME_SIZE - 1 && sym[i] != 0; i++)
-			entry->name[i] = sym[i];
-		entry->name[i] = 0;
+	if (!sym) {
+		sym = (struct symbol *) malloc(sizeof(struct symbol));
+		sym->next = symbols;
+		symbols = sym;
+        sym->seg = SEG_UNDEF;
+        sym->index = 0xffff;
+		for (i = 0; i < SYMBOL_NAME_SIZE - 1 && name[i] != 0; i++)
+			sym->name[i] = name[i];
+		sym->name[i] = 0;
 	}
 
 	/*
 	 * update the symbol 
 	 */
-    if ((entry->seg != SEG_UNDEF) && 
-        (entry->seg != seg)) {
-        gripe("segment for symbol changed");            
+    if ((sym->seg != SEG_UNDEF) && 
+        (sym->seg != seg)) {
+        gripe2("segment for symbol changed", name);            
     }
-	entry->seg = seg;
-	entry->value = value;
-    if (visible) entry->index = 0;
-	return entry;
+	sym->seg = seg;
+	sym->value = value;
+    if (visible) sym->index = 0;
+	return sym;
 }
 
 void
@@ -535,7 +535,6 @@ struct rhead *rh;
         r = n;
     }
 
-    rh->last = 0;
     rh->tail = 0;
     rh->head = 0;
 }
@@ -566,10 +565,9 @@ asm_reset()
  * all symbols and segment addresses are resolved
  */
 void
-add_reloc(tab, addr, type, sym)
+add_reloc(tab, addr, sym)
 struct rhead *tab;
 unsigned short addr;
-unsigned short type;
 struct symbol *sym;
 {
 	unsigned short diff;
@@ -580,19 +578,20 @@ struct symbol *sym;
 		return;
 
     if (verbose > 2)
-        printf("add_reloc: %s %x %d %s\n", tab->segment, addr, type, sym ? sym->name : "nosym");
+        printf("add_reloc: %s %x %s\n", 
+            tab->segment, addr, sym ? sym->name : "nosym");
 
-    if (type == SEG_ABS)
+    if (sym->seg == SEG_ABS)
         return;
-    
-	if (addr < tab->last)
-		gripe("backwards reloc");
+
+    if (sym->seg == SEG_UNDEF)
+        return;
 
 	r = (struct reloc *) malloc(sizeof(struct reloc *));
 
-	r->off = addr - tab->last;
+	r->addr = addr;
+    r->sym = sym;
 	r->next = 0;
-	r->type = type;
 
 	if (!tab->head) {
 		tab->tail = tab->head = r;
@@ -600,7 +599,6 @@ struct symbol *sym;
 		tab->tail->next = r;
 	}
 	tab->tail = r;
-	tab->last = addr;
 }
 
 /*
@@ -616,19 +614,16 @@ unsigned short base;
 	int last = base;
 	int bump;
 	int control;
-	int s;
+    int seg;
 
 	while (r) {
-		s = r->type;
+		seg = r->sym->seg;
 		if (verbose > 3) {
-			printf("reloc: base: %x off: %x(%x) type: %x %s\n",
-				   base, r->off, base + r->off, 
-				   s, r->ref ? r->ref->name : "nosym");
+			printf("reloc: base: %x addr: %x seg: %d %s\n",
+				   base, r->addr, seg, r->sym->name);
 		}
 
-		base += r->off;
-
-		bump = base - last;
+		bump = r->addr - last;
 		if (verbose > 4) {
 			printf("bump: %d\n", bump);
 		}
@@ -644,7 +639,7 @@ unsigned short base;
 		} else if (bump) {
 			outbyte(bump);
 		}
-		switch (r->type) {
+		switch (seg) {
 		case SEG_UNDEF:
 			printf("reloc for undef\n");
 			break;
@@ -661,7 +656,7 @@ unsigned short base;
 			outbyte(0x4c);
 			break;
 		default:
-			control = (r->type - 5) + 4;
+			control = r->sym->index;
 			if (control < 47) {
 				outbyte((control + 16) << 2);
 			} else if (control < 175) {
@@ -684,443 +679,125 @@ unsigned short base;
 /*
  * converts an escaped char into its value
  *
- * c = char to escape
- * returns escaped value
+ * \[bernetv] = c escape for control chars
+ * \000 (octal) = 
+ * \<anything else> = same
  */
 char
-asm_escape_char(c)
-char c;
+c_escape()
 {
+    char c;
+    int i = 0;
+
+    c = get_next();
 	switch (c) {
-	case 'a':
-		return 0x07;
 
 	case 'b':
-		return 0x08;
+		return '\b';
 
 	case 'e':
 		return 0x1B;
 
 	case 'r':
-		return 0x0D;
-
-	case 'f':
-		return 0x0C;
+		return '\r';
 
 	case 'n':
-		return 0x0A;
+		return '\n';
 
 	case 't':
-		return 0x09;
+		return '\t';
 
 	case 'v':
 		return 0x0B;
 
-	case '\\':
-		return 0x5C;
-
-	case '\'':
-		return 0x27;
-
-	case '\"':
-		return 0x22;
-
-	case '\?':
-		return 0x3F;
-
-	default:
-		return 0;
-	}
-}
-
-/*
- * pops a value off the estack and evaluates it in the vstack
- *
- * eindex = pointer to expression index
- * vindex = pointer to value index
- */
-void
-est_pop(eindex, vindex)
-int *eindex;
-int *vindex;
-{
-	unsigned short a, b, res;
-	unsigned char at, bt, ot;
-	char op;
-
-	if (!(*eindex))
-		gripe("expression stack depletion");
-
-	/*
-	 * pop off estack 
-	 */
-	op = exp_estack[--*eindex];
-
-	/*
-	 * attempt to pop out two values from the value stack 
-	 */
-	if (*vindex < 2)
-		gripe("value stack depletion");
-
-	/*
-	 * grab values off the stack 
-	 */
-	b = exp_vstack[--*vindex].value;
-	bt = exp_vstack[*vindex].type;
-	a = exp_vstack[--*vindex].value;
-	at = exp_vstack[*vindex].type;
-
-	switch (op) {
-	case '!':
-		res = a | ~b;
-		break;
-
-	case '+':
-		res = a + b;
-		break;
-
-	case '-':
-		res = a - b;
-		break;
-
-	case '*':
-		res = a * b;
-		break;
-
-	case '/':
-		if (b == 0) {
-			if (pass == 0)
-				res = 0;
-			else
-				gripe("zero divide");
-		} else
-			res = a / b;
-		break;
-
-	case '%':
-		res = a % b;
-		break;
-
-	case '>':
-		res = a >> b;
-		break;
-
-	case '<':
-		res = a << b;
-		break;
-
-	case '&':
-		res = a & b;
-		break;
-
-	case '^':
-		res = a ^ b;
-		break;
-
-	case '|':
-		res = a | b;
-		break;
-
-	case '(':
-		gripe("unexpected '('");
+    case '0': case '1': case '2': case '3':
+    case '4': case '5': case '6': case '7':
+        i = c - '0';
+        while (1) {
+            c = peek();
+            if (c > '7' || c < '0') break;
+            c = get_next();
+            i = (i << 3) + c - '0';
+        }
+        return i;    
 
 	default:
-		res = 0;
-		break;
+		return c;
 	}
-
-	/*
-	 * calculate types 
-	 */
-	if (!at || !bt) {
-		/*
-		 * any operation with an undefined type will also be undefined 
-		 */
-		ot = 0;
-	} else if (at != 4 && bt != 4) {
-		/*
-		 * operations between two non-absolute types are forbidden 
-		 */
-		gripe("incompatable types");
-	} else if (at == 4 && bt != 4) {
-		/*
-		 * a is absolute, b is not
-		 * only addition is allowed here, ot becomes bt
-		 */
-		if (op != '+')
-			gripe("invalid type operation");
-		ot = bt;
-	} else if (at != 4 && bt == 4) {
-		/*
-		 * b is absolute, a is not
-		 * either addition or subtraction is allowed here, ot becomes at
-		 */
-		if (op != '+' && op != '-')
-			gripe("invalid type operation");
-		ot = at;
-	} else {
-		/*
-		 * both are absolute 
-		 */
-		ot = 4;
-	}
-
-	/*
-	 * push into stack 
-	 */
-	exp_vstack[*vindex].value = res;
-	exp_vstack[(*vindex)++].type = ot;
-}
-
-/*
- * pushes a expression onto the estack
- *
- * eindex = pointer to expression idnex
- * op = expression to push
- */
-void
-est_push(eindex, op)
-int *eindex;
-char op;
-{
-	if (*eindex >= EXP_STACK_DEPTH)
-		gripe("expression stack overflow");
-	exp_estack[(*eindex)++] = op;
-}
-
-/*
- * pushes a value onto the vstack
- *
- * vindex = pointer to value index
- * val = value to push
- */
-void
-vsta_push(vindex, type, value)
-int *vindex;
-unsigned char type;
-unsigned short value;
-{
-	if (*vindex >= EXP_STACK_DEPTH)
-		gripe("value stack overflow");
-	exp_vstack[*vindex].type = type;
-	exp_vstack[(*vindex)++].value = value;
-}
-
-/*
- * returns the precedence of a specific token
- *
- * tok = token
- * returns precedence of token
- */
-int
-asm_precedence(tok)
-char tok;
-{
-	switch (tok) {
-	case '!':
-		return 1;
-
-	case '+':
-	case '-':
-		return 2;
-
-	case '*':
-	case '/':
-	case '%':
-		return 3;
-
-	case '>':
-	case '<':
-		return 4;
-
-	case '&':
-		return 5;
-
-	case '^':
-		return 6;
-
-	case '|':
-		return 7;
-
-	case '(':
-		return 0;
-
-	default:
-		return 99;
-	}
-}
-
-/*
- * checks to see if there is a left parenthesis in the expression stack
- *
- * size = size of stack
- * returns 1 if true, otherwise 0
- */
-char
-est_lpar(size)
-int size;
-{
-	int i;
-
-	for (i = 0; i < size; i++)
-		if (exp_estack[i] == '(')
-			return 1;
-
-	return 0;
 }
 
 /*
  * evaluates an expression that is next in the token queue
  *
  * result = pointer where result will be placed in
- * sym is where we put a symbol pointer if that is what the expression contains
- * tok = initial token, 0 if none
- * returns status 0 = unresolved, 1 = text, 2 = data, 3 = bss, 4 = absolute, 5+ = external types
+ * returns segment of expression
+ *
+ * in pass 1, we really only need to parse the expression
+ * and create symbol references.
+ *
+ * in pass 2, we actually need to do the expression eval
+ * with all the interesting segment and arithmetic rules:
+ * ABS = RELOC - RELOC if same segment
+ * RELOC = RELOC +- ABS
+ * ABS = ABS op ABS
+ * and the usual precedence rules
+ *
+ * nb: the original author seems like he never heard of
+ * recursion, so he built a stack structure to deal with
+ * expressions.  C has a perfectly good stack.
  */
 unsigned char
-asm_evaluate(result, symp, itok)
-unsigned short *result;
-struct symbol **symp;
-char itok;
+evaluate(result)
+struct expval *result;
 {
-	char tok, op, type;
-	unsigned short num;
-	struct symbol *sym;
-	int vindex, eindex;
+    char ret = SEG_ABS;
+    char tok;
+    struct symbol *sym;
 
-	vindex = eindex = 0;
-    sym = 0;
+    result->sym = 0;
+    result->num = 0;
 
 	while (1) {
-		/* read token, or use inital token */
-		if (itok) {
-			tok = itok;
-			itok = 0;
-		} else
-			tok = token_read();
-
-		type = SEG_ABS;
+		tok = token_read();
 
 		/* it is a symbol */
 		if (tok == T_NAME) {
-            op = 0;
 			sym = sym_fetch(token_buf);
 			if (sym) {
-			    type = sym->seg;
-				num = sym->value;
+			    result->sym = sym;
+				result->num = sym->value;
 			} else {
-				type = SEG_ABS;
-				num = 0;
+                result->sym = sym_update(token_buf, SEG_UNDEF, 0, 0);
+                result->num = 0;
 			}
-		} else if (tok == '0') {
-
-			/* it is a numeric */
-			op = 0;
-			num = num_parse(token_buf);
-
+            ret = result->sym->seg;
+		} else if (tok == T_NUM) {
+			result->num = num_parse(token_buf);
 		} else if (tok == '\'') {
-
-			/* * it is a char */
-			op = 0;
-
 			/* escape character */
 			if (peek() == '\\') {
 				get_next();
-				num = asm_escape_char(get_next());
-
-				if (!num)
-					gripe("unknown escape");
+				result->num = c_escape();
 			} else {
-				num = get_next();
+				result->num = get_next();
 			}
-
 			if (token_read() != '\'')
 				gripe("expected \'");
-		} else {
-			/*
-			 * it is a token (hopefully mathematic) 
-			 */
-			op = -1;
-
-			if (tok == '+' || tok == '-' || tok == '*' || tok == '/' ||
-				tok == '&' || tok == '|' || tok == '%' || tok == '!' ||
-				tok == '^' || tok == '(' || tok == ')')
-				op = tok;
-
-			if (tok == '>' || tok == '<') {
-				if (tok != peek())
-					op = -1;
-				else
-					op = tok;
-
-				token_read();
-			}
-
-			if (op == -1)
-				gripe("unknown token in expression");
 		}
 
-		/*
-		 * now lets handle the token 
-		 */
-		if (op != ')' && op != '(' && op) {
-			/*
-			 * handle operators 
-			 * pop off anything in the stack of higher precedence 
-			 */
-			while (eindex
-				   && asm_precedence(op) <=
-				   asm_precedence(exp_estack[eindex - 1]))
-				est_pop(&eindex, &vindex);
-
-			est_push(&eindex, op);
-		} else if (op == '(') {
-			/*
-			 * handle left parenthesis 
-			 */
-			est_push(&eindex, '(');
-		} else if (op == ')') {
-			if (!est_lpar(eindex))
-				gripe("unexpected ')'");
-
-			while (exp_estack[eindex - 1] != '(')
-				est_pop(&eindex, &vindex);
-
-			/*
-			 * pop the '(' too 
-			 */
-			eindex--;
-		} else {
-			/*
-			 * handle numbers 
-			 */
-			vsta_push(&vindex, type, num);
-		}
+        /*
+         * here is where we look ahead and handle parenthesis and
+         * operator precedence
+         */
 
 		/*
 		 * check for ending conditions 
 		 */
 		tok = peek();
-		if (tok == ',' || tok == '\n' || tok == ']' || tok == '}'
-			|| tok == -1)
+		if (tok == ',' || tok == '\n' || tok == -1)
 			break;
-		if (tok == ')' && !est_lpar(eindex))
-			break;
-
 	}
-
-	while (eindex)
-		est_pop(&eindex, &vindex);
-
-	if (vindex != 1)
-		gripe("value stack overpopulation");
-
-	*result = exp_vstack[0].value;
-
-	/*
-	 * return type 
-	 */
-	return exp_vstack[0].type;
+    return ret;
 }
 
 /*
@@ -1130,7 +807,7 @@ char itok;
  * b = byte to emit
  */
 void
-asm_emit(b)
+emitbyte(b)
 unsigned char b;
 {
 	if (pass == 1) {
@@ -1162,8 +839,8 @@ void
 emitword(w)
 unsigned short w;
 {
-	asm_emit(w & 0xFF);
-	asm_emit(w >> 8);
+	emitbyte(w & 0xFF);
+	emitbyte(w >> 8);
 }
 
 void
@@ -1201,7 +878,7 @@ emit_str()
 		if (c == '"') {
 			if (state != 1) {
 				if (state == 3) {
-					asm_emit(decode);
+					emitbyte(decode);
 				}
 
 				break;
@@ -1217,19 +894,19 @@ emit_str()
 			if (c == '\\')
 				state = 1;
 			else
-				asm_emit(c);
+				emitbyte(c);
 
 		} else if (state == 1) {
 			/*
 			 * escape character 
 			 */
-			decode = asm_escape_char(c);
+			decode = c_escape(c);
 
 			/*
 			 * simple escape 
 			 */
 			if (decode) {
-				asm_emit(decode);
+				emitbyte(decode);
 				state = 0;
 			} else if (asm_num(c)) {
 				state = 3;
@@ -1265,7 +942,7 @@ emit_str()
 			 */
 			if (length < 1 || num == -1 || num >= radix) {
 				state = 0;
-				asm_emit(decode);
+				emitbyte(decode);
 			}
 		}
 		/*
@@ -1293,75 +970,68 @@ unsigned short size;
 	if (verbose > 3)
 		printf("fill segment: %d for %d\n", segment, size);
 	while (size--)
-		asm_emit(0);
+		emitbyte(0);
 }
 
 /*
  * emits up to two bytes, and handles relocation tracking
  *
  * size = number of bytes to emit
- * value = value to emit
- * type = segment to emit into
+ * vp = value to push out
  */
 void
-emit_addr(size, value, sym, type)
+emit_addr(size, vp)
 unsigned short size;
-unsigned short value;
-struct symbol *sym;
-unsigned char type;
+struct expval *vp;
 {
 	unsigned short rel;
+    unsigned char seg;
+    unsigned short num;
 
-	if (type == SEG_UNDEF) {
-		/*
-		 * if we are on the second pass, error out 
-		 */
+    if (vp->sym) {
+        seg = vp->sym->seg;
+    } else {
+        seg = SEG_ABS;
+    }
+	if (seg == SEG_UNDEF) {
+		/* if we are on the second pass, error out */
 		if (pass == 1)
-			gripe("undefined symbol");
-
-		value = 0;
+			gripe2("undefined symbol", vp->sym->name);
+		num = 0;
 	}
-
-	if (!size)
-		gripe("not a type");
 
 	if (size == 1) {
 		/*
 		 * here we output only a byte 
 		 */
-		if ((type >= SEG_EXT) && (pass == 1))
+		if ((seg >= SEG_EXT) && (pass == 1))
 			gripe("cannot extern byte");
 
-		if ((type >= SEG_TEXT) && (type <= SEG_BSS)) {
-			/*
-			 * emit a relative address 
-			 */
-			rel = (value - cur_address) - 1;
+		if (seg == SEG_TEXT) {
+			rel = (vp->sym->value - cur_address) - 1;
 			if ((rel < 0x80) || (rel > 0xFF7F))
-				asm_emit(rel);
+				emitbyte(rel);
 			else
 				gripe("relative out of bounds");
 		} else {
-			asm_emit(value);
+			emitbyte(vp->num);
 		}
 
 	} else {
 
-		if (pass) {
+		if (vp->sym && pass) {
 			switch (segment) {
 			case SEG_TEXT:
-				add_reloc(&textr, cur_address, type, sym);
+				add_reloc(&textr, cur_address, vp->sym);
 				break;
-
 			case SEG_DATA:
-				add_reloc(&datar, cur_address, type, sym);
+				add_reloc(&datar, cur_address, vp->sym);
 				break;
-
 			default:
 				gripe("invalid segment");
 			}
 		}
-		emitword(value);
+		emitword(num);
 	}
 }
 
@@ -1370,14 +1040,13 @@ unsigned char type;
  * only absolute resolutions will be allowed
  */
 void
-emit_imm(value, type)
-unsigned short value;
-unsigned char type;
+emit_imm(vp)
+struct expval *vp;
 {
-	if (type != SEG_ABS && (pass == 1))
+	if (vp->sym && vp->sym->seg != SEG_ABS && (pass == 1))
 		gripe("must be absolute");
 
-	asm_emit(value);
+	emitbyte(vp->num);
 }
 
 /*
@@ -1387,17 +1056,14 @@ unsigned char type;
  * size = maximum size of space
  */
 void
-emit_exp(size, tok)
+emit_exp(size)
 unsigned short size;
-char tok;
 {
-	unsigned short value;
-	unsigned char type;
-    struct symbol *sym;
+    struct expval value;
 
-	type = asm_evaluate(&value, &sym, tok);
+	evaluate(&value);
 
-	emit_addr(size, value, sym, type);
+	emit_addr(size, &value);
 }
 
 void
@@ -1410,7 +1076,7 @@ db()
 		if (tok == '"') {
 			emit_str();
 		} else {
-			emit_exp(1, 0);
+			emit_exp(1);
 		}
 		if (peek() != ',')
 			break;
@@ -1426,7 +1092,7 @@ dw()
 
 	while (peek() != '\n' && peek() != -1) {
 		tok = peek();
-		emit_exp(2, 0);
+		emit_exp(2);
 		if (peek() != ',')
 			break;
 		else
@@ -1437,30 +1103,28 @@ dw()
 void
 ds()
 {
-	short value;
-	char type;
-    struct symbol *sym;
+    unsigned char seg;
+    struct expval value;
 
-	type = asm_evaluate(&value, &sym, 0);
-    fill(value);
+	seg = evaluate(&value);
+    if (seg != SEG_ABS) {
+        gripe("ds requires absolute argument");
+    }
+    fill(value.num);
 }
 
 /*
- * parses an operand, extracting the type of operation and/or constant
- *
- * con = pointer to constant return
- * eval = automatically evaluate expressions into con
- *        it also converts 'c' from a register to a flag is eval is not on
- * returns type of operand
+ * parses an operand, 
+ * returns token describing the argument,
+ * populate vp if it's passed in.
  */
 unsigned char
-asm_arg(con, eval)
-unsigned short *con;
-unsigned char eval;
+operand(vp)
+struct expval *vp;
 {
 	int i;
 	char tok;
-	unsigned char ret, type;
+	unsigned char ret, seg;
     struct symbol *sym;
 
 	/*
@@ -1472,7 +1136,7 @@ unsigned char eval;
 	/*
 	 * assume at plain expression at first 
 	 */
-	ret = 31;
+	ret = T_PLAIN;
 
 	/*
 	 * read the token 
@@ -1480,19 +1144,16 @@ unsigned char eval;
 	tok = token_read();
 
 	/*
-	 * maybe a register symbol? 
+	 * maybe a register symbol? sometimes 'c' means carry
 	 */
-	if (tok == 'a') {
-		i = 0;
-		while (op_table[i].type != 255) {
+	if (tok == T_NAME) {
+		for (i = 0; op_table[i].token != 255; i++) {
 			if (asm_sequ(token_buf, op_table[i].mnem)) {
-				if (!eval && op_table[i].type == 1)
-					return 16;
-				return op_table[i].type;
+				return op_table[i].token;
 			}
-			i++;
 		}
 	}
+
 	/*
 	 * maybe in parenthesis? 
 	 */
@@ -1501,76 +1162,56 @@ unsigned char eval;
 
 		if (asm_sequ(token_buf, "hl")) {
 			asm_expect(')');
-			return 6;
+			return T_HL_I;
 		} else if (asm_sequ(token_buf, "c")) {
 			asm_expect(')');
-			return 33;
+			return T_C_I;
 		} else if (asm_sequ(token_buf, "sp")) {
 			asm_expect(')');
-			return 34;
+			return T_SP_I;
 		} else if (asm_sequ(token_buf, "bc")) {
 			asm_expect(')');
-			return 35;
+			return T_BC_I;
 		} else if (asm_sequ(token_buf, "de")) {
 			asm_expect(')');
-			return 36;
+			return T_DE_I;
 		}
 
 		else if (asm_sequ(token_buf, "ix")) {
 			if (peek() == '+') {
-				/*
-				 * its got a constant 
-				 */
 				token_read();
 				tok = 0;
-				ret = 25;
+				ret = T_IX_DISP;
 			} else {
 				asm_expect(')');
-				return 29;
+				return T_IX_I;
 			}
 		} else if (asm_sequ(token_buf, "iy")) {
 			if (peek() == '+') {
-				/*
-				 * its got a constant 
-				 */
 				token_read();
 				tok = 0;
-				ret = 28;
+				ret = T_IY_DISP;
 			} else {
 				asm_expect(')');
-				return 30;
+				return T_IY_I;
 			}
-		}
-		/*
-		 * evaluate as deferred expression 
-		 */
-		else {
-			ret = 32;
+		} else {
+			ret = T_INDIR;
 		}
 	}
 
 	/*
 	 * ok, its an expression 
 	 */
-	if (eval) {
-		type = asm_evaluate(con, &sym, tok);
-		if (type == 0) {
-			*con = 0;
-			if (pass == 1)
-				gripe("undefined symbol");
-		} else if (type != 4)
-			gripe("must be absolute");
+	seg = evaluate(vp);
+	if (seg == SEG_UNDEF) {
+		if (pass == 1)
+			gripe2("undefined symbol", vp->sym->name);
+	}
 
-		/*
-		 * if not 29, needs a trailing ')' 
-		 */
-		if (ret != 31)
-			asm_expect(')');
-	} else {
-		/*
-		 * hack to return tok so the caller can run asm_emit_exp 
-		 */
-		*con = tok;
+    /* all others have already returned */
+    if (ret != T_PLAIN) {
+	    asm_expect(')');
 	}
 	return ret;
 }
@@ -1579,48 +1220,45 @@ unsigned char eval;
  * load indirect
  */
 int
-do_stax(con)
-unsigned short con;
+do_stax(vp)
+struct expval *vp;
 {
 	unsigned char prim, arg, reg, type;
 	unsigned short value;
-    struct symbol *sym;
-
-	type = asm_evaluate(&value, &sym, con);
-	asm_expect(')');
+    
 	asm_expect(',');
-	arg = asm_arg(&con, 1);
+	arg = operand(value);
 
 	switch (arg) {
-	case 10:					/* ld (nn), hl */
-		asm_emit(0x22);
+	case T_HL:					/* ld (nn), hl */
+		emitbyte(0x22);
 		break;
 
-	case 7:					/* ld (nn), a */
-		asm_emit(0x32);
+	case T_A:					/* ld (nn), a */
+		emitbyte(0x32);
 		break;
 
-	case 21:					/* ld (nn), ix */
-		asm_emit(0xDD);
-		asm_emit(0x22);
+	case T_IX:					/* ld (nn), ix */
+		emitbyte(0xDD);
+		emitbyte(0x22);
 		break;
 
-	case 22:					/* ld (nn), iy */
-		asm_emit(0xFD);
-		asm_emit(0x22);
+	case T_IY:					/* ld (nn), iy */
+		emitbyte(0xFD);
+		emitbyte(0x22);
 		break;
 
-	case 8:					/* ld (nn), bc */
-	case 9:					/* ld (nn), de */
-	case 11:					/* ld (nn), sp */
-		asm_emit(0xED);
-		asm_emit(0x43 + ((arg - 8) << 4));
+	case T_BC:					/* ld (nn), bc */
+	case T_DE:					/* ld (nn), de */
+	case T_SP:					/* ld (nn), sp */
+		emitbyte(0xED);
+		emitbyte(0x43 + ((arg - T_BC) << 4));
 		break;
 
 	default:
 		return 1;
 	}
-	emit_addr(2, value, sym, type);
+	emit_addr(2, vp);
 	return 0;
 }
 
@@ -1628,66 +1266,64 @@ unsigned short con;
  * 16 bit load
  */
 int
-do_16i(arg)
-char arg;
+do_16i(reg)
+char reg;
 {
-	unsigned char reg;
-	unsigned short con;
+	unsigned char arg;
+	struct expval value;
 
 	/*
 	 * correct for ix,iy into hl 
 	 */
-	if (arg == 21) {
-		asm_emit(0xDD);
-		arg = 10;
-	} else if (arg == 22) {
-		asm_emit(0xFD);
-		arg = 10;
+	if (reg == T_IX) {
+		emitbyte(0xDD);
+		reg = T_HL;
+	} else if (reg == T_IY) {
+		emitbyte(0xFD);
+		reg = T_HL;
 	}
+
 	/*
 	 * grab a direct or deferred word 
 	 */
 	asm_expect(',');
-	reg = asm_arg(&con, 0);
+	arg = operand(&value);
 
-	if (reg == 31) {
+	if (arg == T_PLAIN) {
 		/*
 		 * ld bc|de|hl|sp, nn 
 		 */
-		asm_emit(0x01 + ((arg - 8) << 4));
-		emit_exp(2, con);
-	} else if (reg == 32) {
-		if (arg == 10) {
-			/*
-			 * ld hl, (nn) 
-			 */
-			asm_emit(0x2A);
+		emitbyte(0x01 + ((reg - T_BC) << 4));
+		emit_exp(2);
+	} else if (arg == T_INDIR) {
+		if (reg == T_HL) {
+			emitbyte(0x2A);
 		} else {
 			/*
 			 * ld bc|de|sp, (nn) 
 			 */
-			asm_emit(0xED);
-			asm_emit(0x4B + ((arg - 8) << 4));
+			emitbyte(0xED);
+			emitbyte(0x4B + ((reg - T_BC) << 4));
 		}
-		emit_exp(2, con);
+		emit_exp(2);
 		asm_expect(')');
-	} else if (arg == 11) {
+	} else if (reg == T_SP) {
 		/*
 		 * ld sp,hl|ix|iy specials 
 		 */
-		switch (reg) {
-		case 10:
+		switch (arg) {
+		case T_HL:
 			break;
-		case 21:
-			asm_emit(0xDD);
+		case T_IX:
+			emitbyte(0xDD);
 			break;
-		case 22:
-			asm_emit(0xFD);
+		case T_IY:
+			emitbyte(0xFD);
 			break;
 		default:
 			return 1;
 		}
-		asm_emit(0xF9);
+		emitbyte(0xF9);
 	} else
 		return 1;
 	return 0;
@@ -1698,179 +1334,114 @@ do_ldr8(arg)
 char arg;
 {
 	unsigned char prim, reg, type;
-	unsigned short con, value;
     struct symbol *sym;
+    struct expval value, disp;
+    value.sym = 0;
+    disp.sym = 0;
 
 	prim = 0;
 
 	/*
 	 * grab any constants if they exist 
 	 */
-	if (arg == 25 || arg == 28) {
-		type = asm_evaluate(&value, &sym, con);
+	if (arg == T_IX_DISP || arg == T_IY_DISP) {
+		if (evaluate(&disp) != SEG_ABS) {
+            gripe("nonconstant displacement");
+        }
+        prim++;
 		asm_expect(')');
-		prim++;
 	}
 	asm_expect(',');
 
-	/*
-	 * correct for carry flag 
-	 */
-	reg = asm_arg(&con, 0);
-	if (reg == 16)
-		reg = 1;
+	reg = operand(&value);
 
-	/*
-	 * i* class dest? 
-	 */
-	if (arg >= 23 && arg <= 28) {
-		/*
-		 * check for ix or iy, correct iy 
-		 */
-		if (arg <= 25) {
-			/*
-			 * ix 
-			 */
-			asm_emit(0xDD);
+	if (arg >= T_IXH && arg <= T_IY_DISP) {
+		if (arg <= T_IX_DISP) {
+			emitbyte(0xDD);
+            /* lose on ld ix*, iy* or ld ix[hl], (ix+d) */
+            if (reg >= T_IYH)
+                return 1;
+            if (arg != T_IX_DISP && reg == T_IX_DISP)
+                return 1;
 		} else {
-			/*
-			 * iy 
-			 */
-			asm_emit(0xFD);
-
-			/*
-			 * iy should now act like ix 
-			 */
-			if (reg >= 23 && reg <= 28) {
-				if (reg < 26)
-					return 1;
-				reg = reg - 3;
-			}
-			arg = arg - 3;
+			emitbyte(0xFD);
+            /* lose on ld iy*, ix* or ld iy[hl], (iy+d) */
+            if (reg >= T_IXH && reg <= T_IX_DISP)
+                return 1;
+            if (arg != T_IY_DISP && reg == T_IY_DISP)
+                return 1;
+            arg -= 3;
 		}
-
-		/*
-		 * check if arg is (ix+*) or not 
-		 */
-		if (arg == 25) {
-			/*
-			 * no (hl) 
-			 */
-			if (reg == 6)
-				return 1;
-		} else {
-			/*
-			 * no h-(hl) 
-			 */
-			if (reg >= 4 && reg <= 6)
-				return 1;
-
-			/*
-			 * downconvert ix* 
-			 */
-			if (reg >= 23 && reg <= 25) {
-				if (reg == 25)
-					return 1;
-				reg = reg - 19;
-			}
-		}
-
-		arg = arg - 19;
-
-	}
-	/*
-	 * i* class src? 
-	 */
-	else if (reg >= 23 && reg <= 28) {
-		/*
-		 * no (hl) 
-		 */
-		if (arg == 6)
+        arg = arg - (T_IXH + T_H);
+	} else if (reg >= T_IXH && reg <= T_IY_DISP) {
+		if (arg == T_HL_I)
 			return 1;
 
-		/*
-		 * check for ix or iy, correct iy 
-		 */
-		if (reg <= 25) {
-			/*
-			 * ix 
-			 */
-			asm_emit(0xDD);
+		if (reg <= T_IX_DISP) {
+			emitbyte(0xDD);
 		} else {
-			/*
-			 * iy 
-			 */
-			asm_emit(0xFD);
-
-			/*
-			 * iy should now act like ix 
-			 */
-			if (reg >= 23 && reg <= 28) {
-				if (reg < 26)
-					return 1;
-				reg = reg - 3;
-			}
+			emitbyte(0xFD);
+            reg -= 3;
 		}
-
-		/*
-		 * grab ix/iy offset
-		 * h/l only allowed for ix+*
-		 */
-		if (reg == 25) {
-			type = asm_evaluate(&value, &sym, con);
+		if (reg == T_IX_DISP) {
+            if (evaluate(&disp) != SEG_ABS) {
+                gripe("nonconstant displacement");
+            }
+            prim++;
 			asm_expect(')');
-			prim++;
 		} else if (arg == 4 || arg == 5)
+            /* lose on ld [hl], ix[hl] */
 			return 1;
-
-		reg = reg - 19;
+        reg = reg - (T_IXH + T_H);
 	}
 
 	/*
 	 * no (hl),(hl) 
 	 */
-	if (arg == 6 && reg == 6)
+	if (arg == T_HL_I && reg == T_HL_I)
 		return 1;
 
-	if (arg < 8 && reg < 8) {
+	if (arg <= T_A && reg <= T_A) {
 		/* reg8->reg8 */
-		asm_emit(0x40 + (arg << 3) + reg);
+		emitbyte(0x40 + (arg << 3) + reg);
 		if (prim)
-			emit_imm(value, type);
-	} else if (arg < 8 && reg == 31) {
-		/* ->reg8 */
-		asm_emit(0x06 + (arg << 3));
+			emit_imm(&disp);
+	} else if (arg <= T_A && reg == T_PLAIN) {
+		/* ld reg8, n */
+		emitbyte(0x06 + (arg << 3));
 		if (prim)
-			emit_imm(value, type);
-		type = asm_evaluate(&value, &sym, con);
-		emit_imm(value, type);
-	} else if (arg == 7) {
+			emit_imm(&disp);
+		if (evaluate(&value) != SEG_ABS) {
+            gripe("non constant immediate");
+        }
+		emit_imm(&value);
+	} else if (arg == T_A) {
 		/*
 		 * special a loads 
 		 */
 		switch (reg) {
-		case 35:
-			asm_emit(0x0A);
+		case T_BC_I:
+			emitbyte(0x0A);
 			break;
 
-		case 36:
-			asm_emit(0x1A);
+		case T_DE_I:
+			emitbyte(0x1A);
 			break;
 
-		case 32:
-			asm_emit(0x3A);
-			emit_exp(2, con);
+		case T_INDIR:
+			emitbyte(0x3A);
+			emit_exp(2);
 			asm_expect(')');
 			break;
 
-		case 37:
-			asm_emit(0xED);
-			asm_emit(0x57);
+		case T_I:
+			emitbyte(0xED);
+			emitbyte(0x57);
 			break;
 
-		case 38:
-			asm_emit(0xED);
-			asm_emit(0x5F);
+		case T_R:
+			emitbyte(0xED);
+			emitbyte(0x5F);
 			break;
 
 		default:
@@ -1893,7 +1464,7 @@ asm_doisr(isr)
 struct instruct *isr;
 {
 	unsigned char prim, arg, reg, type;
-	unsigned short con, value;
+    struct expval value;
 
 	/*
 	 * primary select to 0 
@@ -1903,7 +1474,7 @@ struct instruct *isr;
 		/*
 		 * basic ops 
 		 */
-		asm_emit(isr->opcode);
+		emitbyte(isr->opcode);
 		return 0;
 	}
 
@@ -1911,8 +1482,8 @@ struct instruct *isr;
 		/*
 		 * basic extended ops 
 		 */
-		asm_emit(isr->arg);
-		asm_emit(isr->opcode);
+		emitbyte(isr->arg);
+		emitbyte(isr->opcode);
 		return 0;
 	}
 
@@ -1920,33 +1491,33 @@ struct instruct *isr;
 		/*
 		 * arithmetic operations 
 		 */
-		arg = asm_arg(&con, 1);
+		arg = operand(&value);
 
 		/*
 		 * detect type of operation 
 		 */
 		if (isr->arg == CARRY) {
-			if (arg == 10) {
+			if (arg == T_HL) {
 				/*
 				 * hl adc/sbc 
 				 */
 				prim = 1;
-			} else if (arg != 7)
+			} else if (arg != T_A)
 				return 1;
 
 			/*
 			 * grab next arg 
 			 */
 			asm_expect(',');
-			arg = asm_arg(&con, 1);
+			arg = operand(&value);
 		} else if (isr->arg == ADD) {
-			if (arg == 10) {
+			if (arg == T_HL) {
 				/*
 				 * hl add 
 				 */
 				prim = 2;
 
-			} else if (arg == 21 || arg == 22) {
+			} else if (arg == T_IX || arg == T_IY) {
 				/*
 				 * ix/iy add 
 				 */
@@ -1959,58 +1530,49 @@ struct instruct *isr;
 			 * grab next arg 
 			 */
 			asm_expect(',');
-			arg = asm_arg(&con, 1);
+			arg = operand(&value);
 
 			/*
 			 * no add i*,hl 
 			 */
-			if (prim == 3 && arg == 10)
+			if (prim == 3 && arg == T_HL)
 				return 1;
 
 			/*
 			 * add i*,i* 
 			 */
 			if (prim == 3 && arg == reg)
-				arg = 10;
+				arg = T_HL;
 		}
 
 		if (prim == 0) {
-			if (arg < 8) {
+			if (arg <= T_A) {
 				/*
 				 * basic from a-(hl) 
 				 */
-				asm_emit(isr->opcode + arg);
-			} else if (arg >= 23 && arg <= 25) {
-				/*
-				 * ix class 
-				 */
-				asm_emit(0xDD);
-				asm_emit(isr->opcode + (arg - 23) + 4);
-				if (arg == 25)
-					asm_emit(con & 0xFF);
-			} else if (arg >= 26 && arg <= 28) {
-				/*
-				 * iy class 
-				 */
-				asm_emit(0xFD);
-				asm_emit(isr->opcode + (arg - 26) + 4);
-				if (arg == 28)
-					asm_emit(con & 0xFF);
-			} else if (arg == 31) {
-				/*
-				 * constant 
-				 */
-				asm_emit(isr->opcode + 0x46);
-				asm_emit(con);
+				emitbyte(isr->opcode + arg);
+			} else if (arg >= T_IXH && arg <= T_IX_DISP) {
+				emitbyte(0xDD);
+				emitbyte(isr->opcode + (arg - T_IXH) + 4);
+				if (arg == T_IX_DISP)
+					emitbyte(value.num & 0xFF);
+			} else if (arg >= T_IYH && arg <= T_IY_DISP) {
+				emitbyte(0xFD);
+				emitbyte(isr->opcode + (arg - T_IYH) + 4);
+				if (arg == T_IY_DISP)
+					emitbyte(value.num & 0xFF);
+			} else if (arg == T_PLAIN) {
+				emitbyte(isr->opcode + 0x46);
+				emitbyte(value.num);
 			} else
 				return 1;
 		} else if (prim == 1) {
 			/*
 			 * 16 bit carry ops bc-sp 
 			 */
-			if (arg >= 8 && arg <= 11) {
-				asm_emit(0xED);
-				asm_emit((0x42 + (isr->opcode == 0x88 ? 8 : 0)) +
+			if (arg >= T_BC && arg <= T_SP) {
+				emitbyte(0xED);
+				emitbyte((0x42 + (isr->opcode == 0x88 ? 8 : 0)) +
 						 ((arg - 8) << 4));
 			} else
 				return 1;
@@ -2018,32 +1580,32 @@ struct instruct *isr;
 			/*
 			 * 16 bit add ops bc-sp 
 			 */
-			if (arg >= 8 && arg <= 11) {
-				asm_emit(0x09 + ((arg - 8) << 4));
+			if (arg >= T_BC && arg <= T_SP) {
+				emitbyte(0x09 + ((arg - 8) << 4));
 			} else
 				return 1;
 		} else if (prim == 3) {
 			/*
 			 * correct for hl -> ix,iy 
 			 */
-			if (arg == 10)
+			if (arg == T_HL)
 				arg = reg;
 			if (arg == reg)
-				arg = 10;
+				arg = T_HL;
 
 			/*
 			 * pick ext block 
 			 */
-			if (reg == 21)
-				asm_emit(0xDD);
+			if (reg == T_IX)
+				emitbyte(0xDD);
 			else
-				asm_emit(0xFD);
+				emitbyte(0xFD);
 
 			/*
 			 * 16 bit add ops bc-sp 
 			 */
-			if (arg >= 8 && arg <= 11) {
-				asm_emit(0x09 + ((arg - 8) << 4));
+			if (arg >= T_BC && arg <= T_SP) {
+				emitbyte(0x09 + ((arg - 8) << 4));
 			} else
 				return 1;
 		}
@@ -2051,97 +1613,84 @@ struct instruct *isr;
 	}
 
 	if (isr->type == INCR) {
-		arg = asm_arg(&con, 1);
+		arg = operand(&value);
 
-		if (arg < 8) {
-			/*
-			 * basic from a-(hl) 
-			 */
-			asm_emit(isr->opcode + ((arg) << 3));
-		} else if (arg < 12) {
-			/*
-			 * words bc-sp 
-			 */
-			asm_emit(isr->arg + ((arg - 8) << 4));
-		} else if (arg == 21) {
-			/*
-			 * ix 
-			 */
-			asm_emit(0xDD);
-			asm_emit(isr->arg + 0x20);
-		} else if (arg == 22) {
-			/*
-			 * iy 
-			 */
-			asm_emit(0xFD);
-			asm_emit(isr->arg + 0x20);
-		} else if (arg >= 23 && arg <= 25) {
+		if (arg <= T_A) {
+			/* b,c,d,e,h,l,a */
+			emitbyte(isr->opcode + ((arg) << 3));
+		} else if (arg <= T_SP) {
+			/* words bc,de,hl,sp */
+			emitbyte(isr->arg + ((arg - T_BC) << 4));
+		} else if (arg == T_IX) {
+			emitbyte(0xDD);
+			emitbyte(isr->arg + 0x20);
+		} else if (arg == T_IY) {
+			emitbyte(0xFD);
+			emitbyte(isr->arg + 0x20);
+		} else if (arg >= T_IXH && arg <= T_IX_DISP) {
 			/*
 			 * ixh-(ix+*) 
 			 */
-			asm_emit(0xDD);
-			asm_emit(isr->opcode + ((arg - 19) << 3));
-			if (arg == 25)
-				asm_emit(con);
-		} else if (arg >= 26 && arg <= 28) {
+			emitbyte(0xDD);
+			emitbyte(isr->opcode + ((arg - 19) << 3));
+			if (arg == T_IX_DISP)
+				emitbyte(&value);
+		} else if (arg >= T_IYH && arg <= T_IY_DISP) {
 			/*
 			 * iyh-(iy+*) 
 			 */
-			asm_emit(0xFD);
-			asm_emit(isr->opcode + ((arg - 22) << 3));
-			if (arg == 28)
-				asm_emit(con);
+			emitbyte(0xFD);
+			emitbyte(isr->opcode + ((arg - T_IY) << 3));
+			if (arg == T_IY_DISP)
+				emitbyte(&value);
 		} else
 			return 1;
 		return 0;
 	}
 
 	if (isr->type == BITSH) {
-		arg = asm_arg(&con, 1);
+		arg = operand(&value);
 
 		/*
 		 * bit instructions have a bit indicator that must be parsed 
 		 */
 		reg = 0;
 		if (isr->arg) {
-			if (arg != 31)
+			if (arg != T_PLAIN)
 				return 1;
 
-			if (con > 7)
+			if (value.num > 7)
 				return 1;
 
-			reg = con;
+			reg = value.num;
 
-			/*
-			 * grab next 
-			 */
 			asm_expect(',');
-			arg = asm_arg(&con, 1);
+			arg = operand(&value);
 		}
 		/*
 		 * check for (ix+*) / (iy+*) 
 		 */
-		if (arg == 25 || arg == 28) {
+		if (arg == T_IX_DISP || arg == T_IY_DISP) {
 
-			if (arg == 25)
-				asm_emit(0xDD);
+			if (arg == T_IX_DISP)
+				emitbyte(0xDD);
 			else
-				asm_emit(0xFD);
+				emitbyte(0xFD);
 
-			asm_emit(0xCB);
+			emitbyte(0xCB);
 
 			/*
 			 * write offset 
 			 */
-			asm_emit(con);
+			emitbyte(&value);
 
-			arg = 6;
+			arg = T_HL_I;
 			/*
 			 * its an undefined operation 
 			 */
 			if (peek() == ',') {
 				asm_expect(',');
-				arg = asm_arg(&con, 1);
+				arg = operand(&value);
 
 				/*
 				 * short out for (hl) 
@@ -2150,296 +1699,235 @@ struct instruct *isr;
 					arg = 8;
 			}
 		} else
-			asm_emit(0xCB);
+			emitbyte(0xCB);
 
 		if (arg > 7)
 			return 1;
 
-		asm_emit(isr->opcode + arg + (reg << 3));
+		emitbyte(isr->opcode + arg + (reg << 3));
 		return 0;
 	}
 
 	if (isr->type == STACK) {
-		arg = asm_arg(&con, 1);
-
-		/*
-		 * swap af for sp 
-		 */
-		if (arg == 11)
+		arg = operand(&value);
+		/* hack - swap af for sp */
+		if (arg == T_SP)
 			arg = 12;
 		else if (arg == 12)
-			arg = 11;
+			arg = T_SP;
 
-		if (arg >= 8 && arg <= 11) {
-			/*
-			 * bc-af 
-			 */
-			asm_emit(isr->opcode + ((arg - 8) << 4));
-		} else if (arg == 21) {
-			asm_emit(0xDD);
-			asm_emit(isr->opcode + 0x20);
-		} else if (arg == 22) {
-			asm_emit(0xFD);
-			asm_emit(isr->opcode + 0x20);
+		if (arg >= T_BC && arg <= T_SP) {
+			emitbyte(isr->opcode + ((arg - T_BC) << 4));
+		} else if (arg == T_IX) {
+			emitbyte(0xDD);
+			emitbyte(isr->opcode + 0x20);
+		} else if (arg == T_IY) {
+			emitbyte(0xFD);
+			emitbyte(isr->opcode + 0x20);
 		} else
 			return 1;
 		return 0;
 	}
 
-	if (isr->type == RETFLO) {
-		/*
-		 * return 
-		 */
-		arg = asm_arg(&con, 0);
+	if (isr->type == RET) {
+		arg = operand(&value);
 
-		if (arg >= 13 && arg <= 20) {
-			asm_emit(isr->opcode + ((arg - 13) << 3));
+		if (arg >= T_NZ && arg <= T_M) {
+			emitbyte(isr->opcode + ((arg - T_NZ) << 3));
 		} else if (arg == 255) {
-			asm_emit(isr->arg);
+			emitbyte(isr->arg);
 		} else
 			return 1;
 		return 0;
 	}
 
-	if (isr->type == JMPFLO) {
-		/*
-		 * jump (absolute) 
-		 */
-		arg = asm_arg(&con, 0);
+	if (isr->type == JMP) {
+		arg = operand(&value);
 
-		if (arg >= 13 && arg <= 20) {
-			asm_emit(isr->opcode + ((arg - 13) << 3));
+        if (arg == 1) arg = T_CR;
+		if (arg >= T_NZ && arg <= T_M) {
+			emitbyte(isr->opcode + ((arg - T_NZ) << 3));
 			asm_expect(',');
-			emit_exp(2, 0);
-		} else if (arg == 31) {
-			asm_emit(isr->opcode + 1);
-			emit_exp(2, con);
-		} else if (arg == 6) {
-			asm_emit(isr->arg);
-		} else if (arg == 29) {
-			asm_emit(0xDD);
-			asm_emit(isr->arg);
-		} else if (arg == 30) {
-			asm_emit(0xFD);
-			asm_emit(isr->arg);
+			emit_exp(2);
+		} else if (arg == T_PLAIN) {
+			emitbyte(isr->opcode + 1);
+			emit_exp(2);
+		} else if (arg == T_HL_I) {
+			emitbyte(isr->arg);
+		} else if (arg == T_IX_I) {
+			emitbyte(0xDD);
+			emitbyte(isr->arg);
+		} else if (arg == T_IY_I) {
+			emitbyte(0xFD);
+			emitbyte(isr->arg);
 		} else
 			return 1;
 		return 0;
 	}
 
-	if (isr->type == JRLFLO) {
-		/*
-		 * jump (relative) 
-		 */
-		arg = asm_arg(&con, 0);
+	if (isr->type == JRL) {
+		arg = operand(&value);
 
-		/*
-		 * jr allows for 4 conditional modes 
-		 */
 		reg = 0;
-		if (isr->arg) {
-			if (arg >= 13 && arg <= 16) {
-				reg = (arg - 12) << 3;
+		if (isr->arg) { /* not djnz */
+            if (arg == 1) arg = T_CR;
+			if (arg >= T_NZ && arg <= T_CR) {
+				reg = (arg - T_NZ) << 3;
 				asm_expect(',');
-				arg = asm_arg(&con, 0);
-			} else if (arg != 31)
+				arg = operand(&value);
+			} else if (arg != T_PLAIN)
 				return 1;
 		}
 
-		if (arg != 31)
+		if (arg != T_PLAIN)
 			return 1;
 
-		asm_emit(isr->opcode + reg);
-		emit_exp(1, con);
+		emitbyte(isr->opcode + reg);
+		emit_exp(1);
 		return 0;
 	}
 
-	if (isr->type == CALFLO) {
-		/*
-		 * call 
-		 */
-		arg = asm_arg(&con, 0);
+	if (isr->type == CALL) {
+		arg = operand(&value);
 
-		if (arg >= 13 && arg <= 20) {
-			asm_emit(isr->opcode + ((arg - 13) << 3));
+        if (arg == 1) arg = T_CR;
+		if (arg >= T_NZ && arg <= T_M) {
+			emitbyte(isr->opcode + ((arg - T_NZ) << 3));
 			asm_expect(',');
-			emit_exp(2, 0);
-		} else if (arg == 31) {
-			asm_emit(isr->arg);
-			emit_exp(2, con);
+			emit_exp(2);
+		} else if (arg == T_PLAIN) {
+			emitbyte(isr->arg);
+			emit_exp(2);
 		} else
 			return 1;
 		return 0;
 	}
 
-	if (isr->type == RSTFLO) {
-		/*
-		 * rst 
-		 */
-		arg = asm_arg(&con, 1);
+	if (isr->type == RST) {
+		arg = operand(&value);
 
-		if (arg != 31 || con & 0x7 || con > 0x38)
+		if (arg != T_PLAIN || value.num & 0x7 || value.num > 0x38)
 			return 1;
 
-		asm_emit(isr->opcode + con);
+		emitbyte(isr->opcode + value.num);
 		return 0;
 	}
 
-	if (isr->type == IOIN) {
-		/*
-		 * in 
-		 */
-		arg = asm_arg(&con, 1);
+	if (isr->type == IN) {
+		arg = operand(&value);
 
-		/*
-		 * special case for (c) only 
-		 */
-		if (arg == 33) {
-			asm_emit(0xED);
-			asm_emit(isr->arg + 0x30);
+		/* in (c) */
+		if (arg == T_C_I) {
+			emitbyte(0xED);
+			emitbyte(0x70);
 			return 0;
 		}
-		/*
-		 * throw out (hl) 
-		 */
-		if (arg == 6 || arg > 7)
+
+		if (arg == T_HL_I || arg > T_A)
 			return 1;
 
-		/*
-		 * grab next argument 
-		 */
 		reg = arg;
 		asm_expect(',');
-		arg = asm_arg(&con, 1);
+		arg = operand(&value);
 
-		/*
-		 * decode 
-		 */
-		if (reg == 7 && arg == 32) {
-			asm_emit(isr->opcode);
-			asm_emit(con);
-		} else if (arg == 33) {
-			asm_emit(0xED);
-			asm_emit(isr->arg + (reg << 3));
+		if (reg == T_A && arg == T_INDIR) {
+			emitbyte(isr->opcode);
+			emitbyte(&value);
+		} else if (arg == T_C_I) {
+			emitbyte(0xED);
+			emitbyte(0x40 + (reg << 3));
 		} else
 			return 1;
 		return 0;
 	}
 
-	if (isr->type == IOOUT) {
-		/*
-		 * out 
-		 */
-		arg = asm_arg(&con, 1);
+	if (isr->type == OUT) {
+		arg = operand(&value);
 
-		if (arg == 32) {
-			/*
-			 * immediate 
-			 */
-			reg = con;
+		if (arg == T_INDIR) {
+			reg = value.num;
 			asm_expect(',');
-			arg = asm_arg(&con, 1);
+			arg = operand(&value);
 
-			/*
-			 * only 'a' is supported 
-			 */
-			if (arg != 7)
+			if (arg != T_A)
 				return 1;
 
-			asm_emit(isr->opcode);
-			asm_emit(reg);
-		} else if (arg == 33) {
-			/*
-			 * (c) 
-			 */
+			emitbyte(isr->opcode);
+			emitbyte(reg);
+		} else if (arg == T_C_I) {
 			asm_expect(',');
-			arg = asm_arg(&con, 1);
+			arg = operand(&value);
 
-			/*
-			 * no (hl), but we can do '0' instead 
-			 */
-			if (arg == 6)
+			/* special dispensation for out (c),0 */
+			if (arg == T_HL_I)
 				return 1;
-			if (arg == 31 && !con)
-				arg = 6;
+			if (arg == T_PLAIN && !value.num)
+				arg = T_HL_I;
 
-			if (arg > 7)
+			if (arg > T_A)
 				return 1;
 
-			asm_emit(0xED);
-			asm_emit(isr->arg + (arg << 3));
+			emitbyte(0xED);
+			emitbyte(0x41 + (arg << 3));
 		} else
 			return 1;
 		return 0;
 	}
 
 	if (isr->type == EXCH) {
-		reg = asm_arg(&con, 1);
+		reg = operand(&value);
 		asm_expect(',');
-		arg = asm_arg(&con, 1);
+		arg = operand(&value);
 
-		/*
-		 * af 
-		 */
-		if (reg == 12) {
-			if (arg == 12) {
+		if (reg == T_AF) {
+			if (arg == T_AF) {
 				asm_expect('\'');
-				asm_emit(isr->arg);
+				emitbyte(isr->arg);
 			} else
 				return 1;
 		}
-		/*
-		 * de 
-		 */
-		else if (reg == 9) {
-			if (arg == 10) {
-				asm_emit(isr->opcode + 0x08);
+		else if (reg == T_DE) {
+			if (arg == T_HL) {
+				emitbyte(isr->opcode + 0x08);
 			} else
 				return 1;
 		}
-		/*
-		 * (sp) 
-		 */
-		else if (reg == 34) {
+		else if (reg == T_SP_I) {
 			switch (arg) {
-			case 10:
+			case T_HL:
 				break;
-
-			case 21:
-				asm_emit(0xDD);
+			case T_IX:
+				emitbyte(0xDD);
 				break;
-
-			case 22:
-				asm_emit(0xFD);
+			case T_IY:
+				emitbyte(0xFD);
 				break;
-
 			default:
 				return 1;
 			}
-
-			asm_emit(isr->opcode);
+			emitbyte(isr->opcode);
 		}
 		return 0;
 	}
 
 	if (isr->type == INTMODE) {
-		arg = asm_arg(&con, 1);
+		arg = operand(&value);
 
 		/*
 		 * only 0-2 
 		 */
-		if (arg != 31)
+		if (arg != T_PLAIN)
 			return 1;
 
-		asm_emit(0xED);
-		switch (con) {
+		emitbyte(0xED);
+		switch (value.num) {
 		case 0:
 		case 1:
-			asm_emit(isr->opcode + (con << 4));
+			emitbyte(isr->opcode + (value.num << 4));
 			break;
 
 		case 2:
-			asm_emit(isr->arg);
+			emitbyte(isr->arg);
 			break;
 
 		default:
@@ -2449,31 +1937,26 @@ struct instruct *isr;
 	}
 
 	if (isr->type == LOAD) {
-		/*
-		 * correct for carry flag 
-		 */
-		arg = asm_arg(&con, 0);
-		if (arg == 16)
-			arg = 1;
+		arg = operand(&value);
 
 		/*
 		 * special case for deferred constant 
 		 */
-		if (arg == 32) {
-			return do_stax(con);
+		if (arg == T_INDIR) {
+			return do_stax(&value);
 		}
 
 		/*
 		 * standard a-(hl) and ixh-(iy+*) 
 		 */
-		if (arg < 8 || (arg >= 23 && arg <= 28)) {
+		if (arg <= T_A || (arg >= T_IXH && arg <= T_IY_DISP)) {
 			return do_ldr8(arg);
 		}
 
 		/*
 		 * bc-sp, and ix/iy 
 		 */
-		if ((arg >= 8 && arg <= 11) || (arg == 21 || arg == 22)) {
+		if ((arg >= T_BC && arg <= T_SP) || (arg == T_IX || arg == T_IY)) {
 			return do_16i(arg);
 		}
 
@@ -2482,27 +1965,27 @@ struct instruct *isr;
 		 */
 		if (arg >= 35 && arg <= 38) {
 			asm_expect(',');
-			reg = asm_arg(&con, 1);
+			reg = operand(&value);
 			if (reg != 7)
 				return 1;
 
 			switch (arg) {
 			case 35:			/* ld (bc),a */
-				asm_emit(0x02);
+				emitbyte(0x02);
 				break;
 
 			case 36:			/* ld (de),a */
-				asm_emit(0x12);
+				emitbyte(0x12);
 				break;
 
 			case 37:			/* ld i,a */
-				asm_emit(0xED);
-				asm_emit(0x47);
+				emitbyte(0xED);
+				emitbyte(0x47);
 				break;
 
 			case 38:			/* ld r,a */
-				asm_emit(0xED);
-				asm_emit(0x4F);
+				emitbyte(0xED);
+				emitbyte(0x4F);
 				break;
 			}
 		} else
@@ -2592,10 +2075,11 @@ char next;
 void
 assemble()
 {
-	char tok, type, next;
-	int ifdepth, trdepth;
+	char tok;
+    unsigned short type;
 	unsigned short result;
 	struct symbol *sym;
+    unsigned short next;
 
 	asm_reset();
 
@@ -2604,8 +2088,6 @@ assemble()
 	segment = SEG_TEXT;
 	text_top = data_top = bss_top = 0;
 	cur_address = 0;
-
-	ifdepth = trdepth = 0;
 
 	/*
 	 * run passes 
@@ -2634,48 +2116,11 @@ assemble()
 				tok = token_read();
 
 				if (tok != T_NAME)
-					gripe("expected directive");
+					gripe2("expected directive", token_buf);
 
 				if (verbose > 2)
 					printf("directive: %s\n", token_buf);
 
-				if (asm_sequ(token_buf, "if")) {
-					ifdepth++;
-
-					/*
-					 * evaluate the expression 
-					 */
-					type = asm_evaluate(&result, &sym, 0);
-
-					if (type != 4)
-						gripe("must be absolute");
-
-					if (result)
-						trdepth++;
-
-					asm_eol();
-					continue;
-				}
-
-				else if (asm_sequ(token_buf, "endif")) {
-					if (!ifdepth)
-						gripe("unpaired .endif");
-
-					if (ifdepth == trdepth)
-						trdepth--;
-					ifdepth--;
-
-					asm_eol();
-					continue;
-				}
-
-				/*
-				 * skip if in an untrue if segment 
-				 */
-				if (ifdepth > trdepth) {
-					asm_skip();
-					continue;
-				}
 
 				next = 0;
 				if (asm_sequ(token_buf, "text")) {
@@ -2764,17 +2209,11 @@ assemble()
 				gripe("unkown directive");
 				continue;
 			}
-			/*
-			 * skip if in an untrue if segment 
-			 */
-			if (ifdepth > trdepth && tok != 'n') {
-				asm_skip();
-			}
 
 			/*
 			 * symbol read 
 			 */
-			else if (tok == 'a') {
+			else if (tok == T_NAME) {
 				/*
 				 * try to get the type of the symbol 
 				 */
@@ -2787,10 +2226,10 @@ assemble()
 					/*
 					 * it's a symbol definition 
 					 */
-					asm_token_cache(sym_name);
+					save_symname();
 					token_read();
 
-					type = asm_evaluate(&result, &sym, 0);
+					type = evaluate(&result, &sym, 0);
 
 					sym_update(sym_name, type, result, 0);
 					asm_eol();
@@ -2810,9 +2249,6 @@ assemble()
 				gripe("unexpected token");
 			}
 		}
-
-		if (ifdepth)
-			gripe("unpaired .if");
 
 		change_seg(SEG_TEXT);
         
@@ -2839,8 +2275,13 @@ assemble()
 
             next = 0;
 
+            /* we've seen everything, so we can assign indexes */
 	        for (sym = symbols; sym; sym = sym->next) {
 
+                if (sym->seg == SEG_UNDEF) {
+                    gripe2("undefined symbol", sym->name);
+                    continue;
+                }
                 if (sym->index == 0) {
                     sym->index = next++;
                 }
@@ -2887,9 +2328,6 @@ assemble()
 			appendtmp();
 
             for (sym = symbols; sym; sym = sym->next) {
-                if (sym->index == 0xffff)
-                    continue;
-	            outword(sym->value);
                 switch (sym->seg) {
                 case SEG_UNDEF:
                     type = 0x08;
@@ -2912,6 +2350,13 @@ assemble()
                 default:
                     break;
                 }
+                if (verbose > 3) {
+                    printf("sym: %9s index: %5d seg: %d type: %x\n",
+                        sym->name, sym->index, sym->seg, type);
+                }
+                if (sym->index == 0xffff)
+                    continue;
+	            outword(sym->value);
                 outbyte(type);
                 for (next = 0; next < 9; next++) {
                     outbyte(sym->name[next]);
