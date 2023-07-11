@@ -1,7 +1,7 @@
 ; Get char routine
 
-.text
-.globl getc
+	.globl getc
+	.text
 getc:
 	ld	b,2
 	call	sys

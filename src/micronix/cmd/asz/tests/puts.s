@@ -1,8 +1,8 @@
 ; Put string routine
 
-.text
-.globl puts
-.extern putc
+	.text
+	.globl puts
+	.extern putc
 puts:
 	ld	a,(hl)
 	or	a
@@ -11,6 +11,6 @@ puts:
 	inc	hl
 	jp	puts
 
-.bss
-.globl buffer
-	.defl byte[32] buffer
+	.bss
+	.globl buffer
+buffer:	.ds	32

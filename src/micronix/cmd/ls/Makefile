@@ -3,12 +3,12 @@
 #
 # micronix/cmd/ls/Makefile
 #
-# Changed: <2023-06-23 01:07:31 curt>
+# Changed: <2023-07-10 15:33:57 curt>
 
 all:	ls
 
 ls : ls.c
-	cc -o ls ls.c -lS
+	cc -I/usr/include -o ls ls.c -lS
 
 install:
 	cp ls /bin/ls

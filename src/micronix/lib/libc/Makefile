@@ -4,6 +4,8 @@
 # micronix/lib/libc/Makefile
 #
 # Changed: <2023-06-23 01:00:03 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 ASOBJS = setjmp.o
 COBJS = qsort.o malloc.o atoi.o \
@@ -22,13 +24,10 @@ upgrade: all
 	lib /lib/libS.a -rv $(OBJECTS)
 
 $(COBJS): $*.c
-	cc -c $*.c
+	cc -i /usr/include/ -c $*.c
 
 $(ASOBJS): $*.s
 	as -o $*.o $*.s
 
 clean:
 	rm $(OBJECTS)
-
-# vim: tabstop=4 shiftwidth=4 expandtab:
-

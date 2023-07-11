@@ -276,7 +276,8 @@ dumprelocs()
             if (r->rl.value > nsyms) {
                 printf("out of bounds symbol reference %d\n", r->rl.value);
             } else {
-                printf("symbol reference %s\n", syms[r->rl.value].name);
+                printf("symbol reference %d %s\n", 
+                    r->rl.value, syms[r->rl.value].name);
             }
             break;
         default:

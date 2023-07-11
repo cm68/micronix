@@ -10,13 +10,13 @@
 all: asz
 
 asz: main.o asm.o
-	cc -v -o asz main.o asm.o -lS
+	cc -I/usr/include -v -o asz main.o asm.o -lS
 
 main.o:	main.c
-	cc -v -c main.c
+	cc -I/usr/include -v -c main.c
 
 asm.o:	asm.c
-	cc -v -c asm.c
+	cc -I/usr/include -v -c asm.c
 
 clean:
 	rm *.o

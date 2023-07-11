@@ -3,12 +3,12 @@
 #
 # micronix/cmd/pwd/Makefile
 #
-# Changed: <2023-07-01 07:04:54 curt>
+# Changed: <2023-07-10 14:55:22 curt>
 
 all:	pwd
 
 pwd : pwd.c
-	cc -o pwd pwd.c
+	cc -I/usr/include -o pwd pwd.c
 
 install: pwd
 	cp pwd /bin/pwd

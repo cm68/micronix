@@ -1,8 +1,10 @@
 /*
- * v7 cc command swizzled to work with hitech c ported to micronix
+ * v7 cc command 
+ * swizzled to work with hitech c and whitesmith's
  *
  * cmd/cc/cc.c
- * Changed: <2023-07-01 21:58:59 curt>
+ *
+ * Changed: <2023-07-10 15:29:17 curt>
  */
 #include <stdio.h>
 /* #include <ctype.h> */
@@ -21,12 +23,12 @@
 #define	CINIT
 #endif
 
-char *av[50] CINIT;			/* exec arg vector */
+char *av[50] CINIT;             /* exec arg vector */
 
-char *source[MAXFIL] CINIT;	/* source files */
+char *source[MAXFIL] CINIT;     /* source files */
 char nsrc CINIT;
 
-char *object[MAXLIB] CINIT;	/* link files */
+char *object[MAXLIB] CINIT;     /* link files */
 int nobj CINIT;
 
 char *gobj[MAXFIL] CINIT;		/* temporary objects */
@@ -47,7 +49,8 @@ int eflag CINIT;
 int oflag CINIT;
 int vflag CINIT;
 int nflag CINIT;
-int wflag = 1;
+int hflag = 0;
+int iflag = 0;
 char *xopt = 0;
 
 int err CINIT;
@@ -69,25 +72,24 @@ struct pass {
 	char *name;
 	char *path;
 } pass[] = {
-	{ "cpp", 0 },
-	{ "p1", 0 },
-	{ "cgen", 0 },
-	{ "optim", 0 },
-	{ "as", 0 },
-	{ "link", 0 }
+	{ "cpp", 0 },       /* PASS_CPP */
+	{ "cp1", 0 },       /* PASS_P1 */
+	{ "cp2", 0 },       /* PASS_CGEN */
+	{ "optim", 0 },     /* PASS_OPTIM */
+	{ "as", 0 },        /* PASS_AS */
+	{ "link", 0 }       /* PASS_LINK */
 };
 
-char *execpath CINIT;
+char *execpath = "/bin/";
 
 usage()
 {
 	fprintf(stderr, "usage: %s [options] [sources] [objects] [-l<lib> ...]\n", 
 		pname);
-	fprintf(stderr, "\t-W\tuse whitesmith compiler\n");
+    fprintf(stderr, "\t-P<prefix>\tprefix tools with string\n");
 	fprintf(stderr, "\t-H\tuse hitech compiler\n");
 	fprintf(stderr, "\t-o <output file>\n");
 	fprintf(stderr, "\t-D<macro>[=<definition>]\n");
-	fprintf(stderr, "\t-U<macro>[=<definition>]\n");
 	fprintf(stderr, "\t-I<include directory>\n");
 	fprintf(stderr, "\t-i <include directory>\n");
 	/* fprintf(stderr, "\t-L<library directory>\n"); */
@@ -123,7 +125,7 @@ main(argc, argv)
  	 */
     while (++i < argc) {
         if (*argv[i] == '-') {
-            switch (argv[i][1]) {
+            switch (c = argv[i][1]) {
 
             case 'o':
 				if (outfile) {
@@ -139,12 +141,14 @@ main(argc, argv)
                 }
                 break;
 
-			case 'W':			/* whitesmith */
-				wflag++;
-				break;
-
 			case 'H':			/* hitech */
-				wflag=0;
+                cppflags[ncpp++] = "-Dmicronix";
+                cppflags[ncpp++] = "-Dz80";
+                cppflags[ncpp++] = "-I/include/";
+                pass[PASS_P1].name = "p1";
+                pass[PASS_CGEN].name = "cgen";
+                execpath = "/hitech/";
+				hflag++;
 				break;
 
             case 's':			/* strip binary */
@@ -187,11 +191,16 @@ main(argc, argv)
 				vflag++;
 				break;
 
+            case 'P':           /* prepend fragment to tool executable */
+                execpath = argv[i];
+                break;
+
 			case 'h':
 				usage();
 				break;
 
 			case 'i':			/* compatibility with ws cc */
+                iflag++;
                 if (++i >= argc) {
                     fprintf(stderr, "need include directory\n");
 					exit(3);
@@ -204,10 +213,29 @@ main(argc, argv)
 				xopt = argv[i];
 				break;
 
-            case 'D':			/* cpp flags */
             case 'I':
-            case 'U':
-                cppflags[ncpp++] = argv[i];
+                iflag++;
+                if (!hflag) {
+                    cppflags[ncpp++] = "-i";
+                    j = strlen(argv[i]);
+                    if (argv[i][j-1] != '/') {
+                        j = strlen(argv[i]);
+                        s = malloc(j);
+                        strcpy(s, argv[i]+2);
+                        strcat(s, "/");
+                        cppflags[ncpp++] = s;
+                    } else {
+                        cppflags[ncpp++] = argv[i];
+                    }
+                } else {
+                    cppflags[ncpp++] = argv[i];
+                }
+                break;
+            case 'D':
+                if (!hflag) {
+                } else {
+                    cppflags[ncpp++] = argv[i];
+                }
                 if (ncpp >= MAXOPT) {
                     fprintf(stderr, "Too many DIU options\n");
 					exit(10);
@@ -253,28 +281,22 @@ main(argc, argv)
     if (signal(SIGTERM, SIG_IGN) != SIG_IGN)
         signal(SIGTERM, idexit);
 
-	if (wflag) {
+	if (!hflag) {
 		cppflags[ncpp++] = "-d";
 		cppflags[ncpp++] = "unix";
-		cppflags[ncpp++] = "-i";
-		cppflags[ncpp++] = "/include/";
+        if (!iflag) {
+            cppflags[ncpp++] = "-i";
+            cppflags[ncpp++] = "/include/";
+        }
 		cppflags[ncpp++] = "-x";
-		execpath = "/bin";
-		pass[PASS_P1].name = "cp1";
-		pass[PASS_CGEN].name = "cp2";
 		oflag = 0;
-	} else {
-		cppflags[ncpp++] = "-Dmicronix";
-		cppflags[ncpp++] = "-Dz80";
-		cppflags[ncpp++] = "-I/include/";
-		execpath = "/hitech";
 	}
 
 	/*
 	 * resolve paths to executables
 	 */
 	for (i = 0; i <= PASS_LINK; i++) {
-		sprintf(namebuf, "%s/%s", execpath, pass[i].name);
+		sprintf(namebuf, "%s%s", execpath, pass[i].name);
 		pass[i].path = strdup(namebuf);
 	}
 
@@ -297,13 +319,13 @@ main(argc, argv)
             av[j+1] = cppflags[j];
 		}
 		j++;
-		if (wflag) {
+		if (hflag) {
+			av[j++] = s;
+			av[j++] = ofn = setsuf(s, 'i');
+		} else {
 			av[j++] = "-o";
 			av[j++] = ofn = setsuf(s, 'i');
 			av[j++] = s;
-		} else {
-			av[j++] = s;
-			av[j++] = ofn = setsuf(s, 'i');
 		}
         av[j] = 0;
         if (run(PASS_CPP, av)) {
@@ -320,7 +342,10 @@ main(argc, argv)
 		ifn = ofn;
 		ofn = setsuf(ifn, '1');
 
-		if (wflag) {
+		if (hflag) {
+			av[j++] = ifn;
+			av[j++] = ofn;
+		} else {
 			av[j++] = "-b0";
 			av[j++] = "-m";
 			av[j++] = "-u";
@@ -328,9 +353,6 @@ main(argc, argv)
 			av[j++] = ofn;
 			av[j++] = ifn;
 			ofn = av[j-2];
-		} else {
-			av[j++] = ifn;
-			av[j++] = ofn;
 		}
 		av[j] = 0;
         if (run(PASS_P1, av)) {
@@ -347,12 +369,12 @@ main(argc, argv)
 		ifn = ofn;
 		ofn = setsuf(ifn, 's');
 
-		if (wflag) {
-			if (xopt) av[j++] = xopt;
-			av[j++] = "-o";
+		if (hflag) {
 			av[j++] = ofn;
 			av[j++] = ifn;
 		} else {
+			if (xopt) av[j++] = xopt;
+			av[j++] = "-o";
 			av[j++] = ofn;
 			av[j++] = ifn;
 		}
@@ -415,7 +437,9 @@ assemble:
 		j = 1;
         av[j++] = "-o";
         av[j++] = outfile;
-		if (wflag) {
+		if (hflag) {
+			av[j++] = "/lib/HTCRT0.OBJ";
+		} else {
 			av[j++] = "-u_main";
 			av[j++] = "-eb__memory";
 			av[j++] = "-tb0x100";
@@ -426,18 +450,16 @@ assemble:
             }
 			av[j++] = "-dr12";
 			av[j++] = "/lib/uhdr.o";
-		} else {
-			av[j++] = "/lib/HTCRT0.OBJ";
 		}
         for (i = 0; i < nobj; i++) {
-			if (wflag && object[i][0] == '-' && object[i][1] == 'l') {
+			if ((!hflag) && object[i][0] == '-' && object[i][1] == 'l') {
 				s = malloc(strlen(object[i]) + 2);
 				sprintf(s, "%s.a", object[i]);
 				object[i] = s;
 			}
             av[j++] = object[i];
 		}
-		if (wflag) {
+		if (!hflag) {
 			av[j++] = "-lmd.a";
 			av[j++] = "-lu.a";
 			av[j++] = "-lm.a";
@@ -547,7 +569,7 @@ out:
 	/*
 	 * whitesmith's is ass backwards: exit code 0 is failure
 	 */
-	if (wflag) {
+	if (!hflag) {
 		if (status == 1) 
 			status = 0;
 		else 

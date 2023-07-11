@@ -3,7 +3,7 @@
  *
  * /usr/src/cmd/asz/asm.h
  *
- * Changed: <2023-07-09 02:15:28 curt>
+ * Changed: <2023-07-09 17:24:09 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
@@ -30,6 +30,7 @@ void outtmp();
 #define T_NAME  'a'
 #define T_NUM   '0'
 #define T_NL    'n'
+#define T_STR   '\"'
 
 #define T_B     0
 #define T_C     1

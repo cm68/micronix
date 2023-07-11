@@ -33,7 +33,6 @@ filesystem: src/tools/readall
 		cp -r src/micronix/$$i filesystem/usr/src ; \
 	done
 	mkdir -p filesystem/old
-	cp -r filesystem/include filesystem/old/include
 	echo "path /bin /usr/bin" > filesystem/.sh
 
 clean:

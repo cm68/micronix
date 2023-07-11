@@ -1,13 +1,15 @@
 ; Part 1 of hello world test
 
-.extern puts
+	.extern puts
 
 .text
-	ld	hl, hello_s
+	ld	hl, hello_p
 	call	puts
 	ret
 	
-.data
-.globl hello_s
-	.def word hello_s
-	.defl byte hello_s "Hello, world\n\0"
+	.data
+	.globl hello_s
+hello_p:	
+	.dw	hello
+hello:
+	.db	"Hello, world\n\0"

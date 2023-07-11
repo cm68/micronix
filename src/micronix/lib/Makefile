@@ -3,7 +3,9 @@
 #
 # micronix/lib/Makefile
 #
-# Changed: <2023-06-23 00:58:10 curt>
+# Changed: <2023-07-10 14:32:51 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 all:
 	cd libc ; make
@@ -16,6 +18,3 @@ install:
 upgrade:
 	cd libc ; make upgrade
 	cd libutil ; make upgrade
-
-# vim: tabstop=4 shiftwidth=4 expandtab:
-

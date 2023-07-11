@@ -13,7 +13,7 @@
  *
  * now, instead, for a file foo.s, we write foo.o as the gods intended
  *
- * Changed: <2023-07-09 12:01:41 curt>
+ * Changed: <2023-07-09 14:20:00 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
@@ -101,35 +101,6 @@ sio_close()
 	temp_file = NULL;
 
 	remove(tname);
-}
-
-char *input_char = "";
-
-char input_buffer[100];
-
-/*
- * returns what sio_next() would but does not move forward
- */
-char
-peek()
-{
-    return input_char[1];
-}
-
-/*
- * returns the next character in the source, or -1 if complete
- */
-char
-get_next()
-{
-    char c;
-
-    if (!*input_char) {
-        input_char = fgets(input_buffer, sizeof(input_buffer), input_file);
-        if (!input_char) return -1;
-        line_num++;
-    }
-    return (*input_char++);
 }
 
 /*

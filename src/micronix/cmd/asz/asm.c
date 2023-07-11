@@ -9,13 +9,14 @@
  *
  * /usr/src/cmd/asz/asm.c 
  *
- * Changed: <2023-07-09 11:49:11 curt>
+ * Changed: <2023-07-09 17:36:53 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
 #include <stdio.h>
 #ifdef linux
 #include <stdlib.h>
+#include <string.h>
 #define INIT
 #else
 #define void int
@@ -103,13 +104,16 @@ struct rhead {
     struct reloc *tail;
 };
 
-extern char *input_line;
+char *input_char = "";
+
+char input_buffer[100];
 
 /*
  * token buffer 
  */
 char token_buf[TOKEN_BUF_SIZE] INIT;
 char sym_name[TOKEN_BUF_SIZE] INIT;
+unsigned short token_val;
 
 /*
  * current assembly address 
@@ -139,6 +143,54 @@ struct rhead textr = { "text" };
 struct rhead datar = { "data" };
 
 struct symbol *symbols INIT;
+
+void
+fill_buf()
+{
+    if (!*input_char) {
+        input_char = input_buffer;
+        if (!fgets(input_buffer, sizeof(input_buffer), input_file)) {
+            input_char[0] = -1;
+            input_char[1] = 0;
+        }
+        line_num++;
+    }
+}
+
+/*
+ * returns what sio_next() would but does not move forward
+ */
+char
+peek()
+{
+    if (!*input_char) 
+        fill_buf();
+    return (*input_char);
+}
+
+/*
+ * returns the next character in the source, or -1 if complete
+ */
+char
+get_next()
+{
+    char c;
+
+    if (!*input_char)
+        fill_buf();
+    
+    return (*input_char == -1 ? -1 : *input_char++);
+}
+
+/*
+ * consumes to end of line
+ */
+void
+consume()
+{
+    *input_char = '\0';
+    fill_buf();
+}
 
 /*
  * checks if a string is equal
@@ -178,8 +230,8 @@ void
 gripe(msg)
 char *msg;
 {
-	printf("%s:%d %s%s at %c\n", 
-        infile, line_num, msg, peek());
+	printf("%s:%d %s\n%s", 
+        infile, line_num, msg, input_buffer);
 	exit(1);
 }
 
@@ -188,8 +240,8 @@ gripe2(msg, arg)
 char *msg;
 char *arg;
 {
-	printf("%s:%d %s%s at %c\n", 
-        infile, line_num, msg, arg, peek());
+	printf("%s:%d %s%s\n%s", 
+        infile, line_num, msg, arg, input_buffer);
 	exit(1);
 }
 
@@ -203,28 +255,10 @@ save_symname()
 }
 
 /*
- * skips past all of the white space to a token
- */
-void
-skipwhite()
-{
-	char comment;
-
-	comment = 0;
-	while ((peek() <= ' ' || peek() == ';' || comment)
-		   && peek() != '\n' && peek() != -1)
-		if (get_next() == ';')
-			comment = 1;
-}
-
-/*
- * tests if a character is a alpha (aA - zZ or underscore)
- *
- * in = character to test
- * returns true (1) or false (0)
+ * is this an alphabetic or underscore
  */
 char
-asm_alpha(in)
+alpha(in)
 char in;
 {
 	return (in >= 'A' && in <= 'Z') || (in >= 'a' && in <= 'z')
@@ -232,91 +266,213 @@ char in;
 }
 
 /*
- * tests if a character is a alpha
+ * converts an escaped char into its value
  *
- * in = character to test
- * returns true (1) or false (0)
+ * \[bernetv] = c escape for control chars
+ * \000 (octal) = 
+ * \<anything else> = same
  */
 char
-asm_num(in)
-char in;
+escape()
 {
-	return (in >= '0' && in <= '9');
-}
+    char c;
+    int i = 0;
 
-/*
- * reads the next token in from the source, buffers if needed, and returns type
- * white space will by cycled past, both in front and behind the token
- */
-char
-token_read()
-{
-	char c, out;
-	int i;
-
-	/*
-	 * skip all leading white space 
-	 */
-	skipwhite();
-
-	/*
-	 * peek and check type 
-	 */
-	out = c = peek();
-	if (asm_alpha(c))
-		out = T_NAME;
-	else if (asm_num(c))
-		out = T_NUM;
-
-	if (out == T_NAME || out == T_NUM) {
-		/*
-		 * scan in the buffer if needed 
-		 */
-		i = 0;
-		while (asm_num(c) || asm_alpha(c)) {
-			if (i < TOKEN_BUF_SIZE - 1)
-				token_buf[i++] = c;
-
-			get_next();
-			c = peek();
-		}
-		token_buf[i] = 0;
-	} else {
-		get_next();
+    c = get_next();
+	switch (c) {
+	case 'b':
+		return '\b';
+	case 'e':
+		return 0x1B;
+	case 'r':
+		return '\r';
+	case 'n':
+		return '\n';
+	case 't':
+		return '\t';
+	case 'v':
+		return 0x0B;
+    case '0': case '1': case '2': case '3':
+    case '4': case '5': case '6': case '7':
+        i = c - '0';
+        while (1) {
+            c = peek();
+            if (c > '7' || c < '0') break;
+            c = get_next();
+            i = (i << 3) + c - '0';
+        }
+        return i;    
+	default:
+		return c;
 	}
-
-	/*
-	 * correct for new lines 
-	 */
-	if (out == '\n')
-		out = T_NL;
-
-	/*
-	 * skip more whitespace 
-	 */
-	skipwhite();
-
-	return out;
 }
 
 /*
- * expects a specific symbol
- * some symbols have special cases for ignoring trailing or leading line breaks
- *
+ * parse number - handles quite a few formats:
+ * decimal: 20, 78
+ * hex:  0x0, 0X00, 000H, 00h
+ * octal: 06, 003, 05o, 06O
+ * binary: 0b0001010 000100B 01010b
+ */
+unsigned short
+parsenum(s, i)
+char *s;
+int i;
+{
+    unsigned short val = 0;
+    int base;
+    char c = s[i-1] | 0x20;
+
+    /* detect and consume our radix markers */
+    if (c == 'h') {
+        base = 16;
+        s[i-1] = '\0';
+    } else if (c == 'o') {
+        base = 8;
+        s[i-1] = '\0';
+    } else if (c == 'b') {
+        base = 2;
+        s[i-1] = '\0';
+    } else if (*s == 0) {
+        c = *s++ | 0x20;
+        if (c == 'h') {
+            base = 16;
+            s++;
+        } else if (c == 'b') {
+            base = 2;
+            s++;
+        } else {
+            base = 8;
+        }
+    }
+
+    while (*s) {
+        val *= base;
+        c = *s | 0x20; 
+        c -= '0';
+        if ((base == 16) && (c > 9)) 
+            c -= ('a' - '9') + 1;
+        if ((c > base) || (c < 0)) {
+            gripe("numeric digit out of range");
+        }
+        val += c;
+        s++;
+    }
+    return val;
+}
+
+char
+delimiter(c)
+char c;
+{
+    switch (c) {
+    case ',': case ')': case '+': case '-':
+    case '|': case '&': case ' ': case '\t':
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+/*
+ * the lexer.
+ * reads the next token in from the source, 
+ * white space and comments are ignored
+ * special tokens are advanced over
+ * [a-zA-Z_]+ -> T_NAME, token_buf filled
+ * '\escape' 'c' -> T_NUM, token_val filled
+ * "string" -> T_STRING, token_buf filled
+ * anything else passes as the character
+
+ * NB: ambiguity: how is ABBAH parsed?  we call it a NAME.
+ * to make it a number, prefix it with 0. 0ABBAH.
+ */
+char
+get_token()
+{
+    int i = 0;
+    unsigned short val = 0;
+    char *s;
+    char c;
+
+    c = get_next();
+
+    if (alpha(c)) {
+        token_buf[i++] = c;
+        while (alpha(c = peek())) {
+            token_buf[i++] = c;
+            get_next();
+        }
+        token_buf[i++] = '\0';
+        return T_NAME;
+    }
+
+    /*
+     * a little tricky.  we need to scan to the next delimiter
+     * into the token_buf, because we might have a postfix base
+     */
+    if (c >= '0' & c <= '9') {
+        s = token_buf;
+        token_buf[i++];
+        while (1) {
+            c = peek();
+            if (delimiter(c))
+                break;
+            token_buf[i++] = c;
+            get_next();
+        }
+        token_buf[i++] = '\0';
+        token_val = parsenum(token_buf);
+        return T_NUM;
+    }
+
+    if (c == '\'') {
+        token_val = get_next();
+        if (token_val == '\\') {
+            token_val = escape();
+        }
+        if (get_next() != '\'') {
+            gripe("unterminated char literal");
+        }
+        return T_NUM;
+    }
+
+    if (c == '\"') {
+        while (1) {
+            c = get_next();
+            if (c == '\n') {
+                gripe("unterminated string");
+            }
+            if (c == '\"') {
+                break;
+            }
+            if (c == '\\') {
+                c = escape();
+            }
+            token_buf[i++] = c;
+        }
+        token_buf[i++] = '\0';
+        return T_STR;
+    }
+	return c;
+}
+
+/*
+ * require a specific symbol
  * c = symbol to expect
  */
 void
-asm_expect(c)
+need(c)
 char c;
 {
 	char tok;
 
 	if (c == '}') {
 		while (peek() == '\n')
-			token_read();
+			get_token();
 	}
 
-	tok = token_read();
+	tok = get_token();
 
 	if (tok != c) {
 		gripe("unexpected character");
@@ -324,34 +480,8 @@ char c;
 
 	if (c == '{' || c == ',') {
 		while (peek() == '\n')
-			token_read();
+			get_token();
 	}
-}
-
-/*
- * consumes an end of line
- */
-void
-asm_eol()
-{
-	char tok;
-
-	tok = token_read();
-	if (tok != T_NL && tok != T_EOF)
-		gripe("expected end of line");
-}
-
-/*
- * skips to and consumes an end of line
- */
-void
-asm_skip()
-{
-	char tok;
-
-	do {
-		tok = token_read();
-	} while (tok != T_NL && tok != T_EOF);
 }
 
 /*
@@ -677,56 +807,6 @@ unsigned short base;
 }
 
 /*
- * converts an escaped char into its value
- *
- * \[bernetv] = c escape for control chars
- * \000 (octal) = 
- * \<anything else> = same
- */
-char
-c_escape()
-{
-    char c;
-    int i = 0;
-
-    c = get_next();
-	switch (c) {
-
-	case 'b':
-		return '\b';
-
-	case 'e':
-		return 0x1B;
-
-	case 'r':
-		return '\r';
-
-	case 'n':
-		return '\n';
-
-	case 't':
-		return '\t';
-
-	case 'v':
-		return 0x0B;
-
-    case '0': case '1': case '2': case '3':
-    case '4': case '5': case '6': case '7':
-        i = c - '0';
-        while (1) {
-            c = peek();
-            if (c > '7' || c < '0') break;
-            c = get_next();
-            i = (i << 3) + c - '0';
-        }
-        return i;    
-
-	default:
-		return c;
-	}
-}
-
-/*
  * evaluates an expression that is next in the token queue
  *
  * result = pointer where result will be placed in
@@ -758,7 +838,7 @@ struct expval *result;
     result->num = 0;
 
 	while (1) {
-		tok = token_read();
+		tok = get_token();
 
 		/* it is a symbol */
 		if (tok == T_NAME) {
@@ -773,17 +853,9 @@ struct expval *result;
             ret = result->sym->seg;
 		} else if (tok == T_NUM) {
 			result->num = num_parse(token_buf);
-		} else if (tok == '\'') {
-			/* escape character */
-			if (peek() == '\\') {
-				get_next();
-				result->num = c_escape();
-			} else {
-				result->num = get_next();
-			}
-			if (token_read() != '\'')
-				gripe("expected \'");
-		}
+		} else {
+            gripe("neither fish nor fowl");
+        }
 
         /*
          * here is where we look ahead and handle parenthesis and
@@ -1081,7 +1153,7 @@ db()
 		if (peek() != ',')
 			break;
 		else
-			asm_expect(',');
+			need(',');
 	}
 }
 
@@ -1096,7 +1168,7 @@ dw()
 		if (peek() != ',')
 			break;
 		else
-			asm_expect(',');
+			need(',');
 	}
 }
 
@@ -1130,7 +1202,8 @@ struct expval *vp;
 	/*
 	 * check if there is anything next 
 	 */
-	if (peek() == '\n' || peek() == -1)
+    tok = peek();
+	if (tok == '\n' || tok == -1)
 		return 255;
 
 	/*
@@ -1141,7 +1214,7 @@ struct expval *vp;
 	/*
 	 * read the token 
 	 */
-	tok = token_read();
+	tok = get_token();
 
 	/*
 	 * maybe a register symbol? sometimes 'c' means carry
@@ -1158,41 +1231,41 @@ struct expval *vp;
 	 * maybe in parenthesis? 
 	 */
 	if (tok == '(') {
-		tok = token_read();
+		tok = get_token();
 
 		if (asm_sequ(token_buf, "hl")) {
-			asm_expect(')');
+			need(')');
 			return T_HL_I;
 		} else if (asm_sequ(token_buf, "c")) {
-			asm_expect(')');
+			need(')');
 			return T_C_I;
 		} else if (asm_sequ(token_buf, "sp")) {
-			asm_expect(')');
+			need(')');
 			return T_SP_I;
 		} else if (asm_sequ(token_buf, "bc")) {
-			asm_expect(')');
+			need(')');
 			return T_BC_I;
 		} else if (asm_sequ(token_buf, "de")) {
-			asm_expect(')');
+			need(')');
 			return T_DE_I;
 		}
 
 		else if (asm_sequ(token_buf, "ix")) {
 			if (peek() == '+') {
-				token_read();
+				get_token();
 				tok = 0;
 				ret = T_IX_DISP;
 			} else {
-				asm_expect(')');
+				need(')');
 				return T_IX_I;
 			}
 		} else if (asm_sequ(token_buf, "iy")) {
 			if (peek() == '+') {
-				token_read();
+				get_token();
 				tok = 0;
 				ret = T_IY_DISP;
 			} else {
-				asm_expect(')');
+				need(')');
 				return T_IY_I;
 			}
 		} else {
@@ -1211,7 +1284,7 @@ struct expval *vp;
 
     /* all others have already returned */
     if (ret != T_PLAIN) {
-	    asm_expect(')');
+	    need(')');
 	}
 	return ret;
 }
@@ -1226,7 +1299,7 @@ struct expval *vp;
 	unsigned char prim, arg, reg, type;
 	unsigned short value;
     
-	asm_expect(',');
+	need(',');
 	arg = operand(value);
 
 	switch (arg) {
@@ -1286,7 +1359,7 @@ char reg;
 	/*
 	 * grab a direct or deferred word 
 	 */
-	asm_expect(',');
+	need(',');
 	arg = operand(&value);
 
 	if (arg == T_PLAIN) {
@@ -1306,7 +1379,7 @@ char reg;
 			emitbyte(0x4B + ((reg - T_BC) << 4));
 		}
 		emit_exp(2);
-		asm_expect(')');
+		need(')');
 	} else if (reg == T_SP) {
 		/*
 		 * ld sp,hl|ix|iy specials 
@@ -1349,9 +1422,9 @@ char arg;
             gripe("nonconstant displacement");
         }
         prim++;
-		asm_expect(')');
+		need(')');
 	}
-	asm_expect(',');
+	need(',');
 
 	reg = operand(&value);
 
@@ -1388,7 +1461,7 @@ char arg;
                 gripe("nonconstant displacement");
             }
             prim++;
-			asm_expect(')');
+			need(')');
 		} else if (arg == 4 || arg == 5)
             /* lose on ld [hl], ix[hl] */
 			return 1;
@@ -1431,7 +1504,7 @@ char arg;
 		case T_INDIR:
 			emitbyte(0x3A);
 			emit_exp(2);
-			asm_expect(')');
+			need(')');
 			break;
 
 		case T_I:
@@ -1508,7 +1581,7 @@ struct instruct *isr;
 			/*
 			 * grab next arg 
 			 */
-			asm_expect(',');
+			need(',');
 			arg = operand(&value);
 		} else if (isr->arg == ADD) {
 			if (arg == T_HL) {
@@ -1529,7 +1602,7 @@ struct instruct *isr;
 			/*
 			 * grab next arg 
 			 */
-			asm_expect(',');
+			need(',');
 			arg = operand(&value);
 
 			/*
@@ -1664,7 +1737,7 @@ struct instruct *isr;
 
 			reg = value.num;
 
-			asm_expect(',');
+			need(',');
 			arg = operand(&value);
 		}
 		/*
@@ -1689,7 +1762,7 @@ struct instruct *isr;
 			 * its an undefined operation 
 			 */
 			if (peek() == ',') {
-				asm_expect(',');
+				need(',');
 				arg = operand(&value);
 
 				/*
@@ -1747,7 +1820,7 @@ struct instruct *isr;
         if (arg == 1) arg = T_CR;
 		if (arg >= T_NZ && arg <= T_M) {
 			emitbyte(isr->opcode + ((arg - T_NZ) << 3));
-			asm_expect(',');
+			need(',');
 			emit_exp(2);
 		} else if (arg == T_PLAIN) {
 			emitbyte(isr->opcode + 1);
@@ -1773,7 +1846,7 @@ struct instruct *isr;
             if (arg == 1) arg = T_CR;
 			if (arg >= T_NZ && arg <= T_CR) {
 				reg = (arg - T_NZ) << 3;
-				asm_expect(',');
+				need(',');
 				arg = operand(&value);
 			} else if (arg != T_PLAIN)
 				return 1;
@@ -1793,7 +1866,7 @@ struct instruct *isr;
         if (arg == 1) arg = T_CR;
 		if (arg >= T_NZ && arg <= T_M) {
 			emitbyte(isr->opcode + ((arg - T_NZ) << 3));
-			asm_expect(',');
+			need(',');
 			emit_exp(2);
 		} else if (arg == T_PLAIN) {
 			emitbyte(isr->arg);
@@ -1827,7 +1900,7 @@ struct instruct *isr;
 			return 1;
 
 		reg = arg;
-		asm_expect(',');
+		need(',');
 		arg = operand(&value);
 
 		if (reg == T_A && arg == T_INDIR) {
@@ -1846,7 +1919,7 @@ struct instruct *isr;
 
 		if (arg == T_INDIR) {
 			reg = value.num;
-			asm_expect(',');
+			need(',');
 			arg = operand(&value);
 
 			if (arg != T_A)
@@ -1855,7 +1928,7 @@ struct instruct *isr;
 			emitbyte(isr->opcode);
 			emitbyte(reg);
 		} else if (arg == T_C_I) {
-			asm_expect(',');
+			need(',');
 			arg = operand(&value);
 
 			/* special dispensation for out (c),0 */
@@ -1876,12 +1949,12 @@ struct instruct *isr;
 
 	if (isr->type == EXCH) {
 		reg = operand(&value);
-		asm_expect(',');
+		need(',');
 		arg = operand(&value);
 
 		if (reg == T_AF) {
 			if (arg == T_AF) {
-				asm_expect('\'');
+				need('\'');
 				emitbyte(isr->arg);
 			} else
 				return 1;
@@ -1964,7 +2037,7 @@ struct instruct *isr;
 		 * ld (bc)|(de)|i|r, a 
 		 */
 		if (arg >= 35 && arg <= 38) {
-			asm_expect(',');
+			need(',');
 			reg = operand(&value);
 			if (reg != 7)
 				return 1;
@@ -2012,8 +2085,6 @@ char *in;
 	i = 0;
 	while (isr_table[i].type) {
 		if (asm_sequ(in, isr_table[i].mnem)) {
-			if (verbose > 2)
-				printf("instruction: %s\n", in);
 			if (asm_doisr(&isr_table[i]))
 				gripe("invalid operand");;
 			return 1;
@@ -2105,22 +2176,18 @@ assemble()
 				 text_top, data_top, bss_top, mem_size);
 		}
 
-		while ((tok = token_read()) != -1) {
+		while ((tok = get_token()) != -1) {
 			if (verbose > 4)
-				printf("token %d %c\n", tok, tok);
+				printf("line %d: %s", line_num, input_buffer);
 
 			/*
 			 * command read 
 			 */
 			if (tok == '.') {
-				tok = token_read();
+				tok = get_token();
 
 				if (tok != T_NAME)
 					gripe2("expected directive", token_buf);
-
-				if (verbose > 2)
-					printf("directive: %s\n", token_buf);
-
 
 				next = 0;
 				if (asm_sequ(token_buf, "text")) {
@@ -2136,13 +2203,13 @@ assemble()
 				 */
 				if (next != 0) {
 					change_seg(next);
-					asm_eol();
+					consume();
 					continue;
 				}
 
 				if (asm_sequ(token_buf, "globl")) {
 					while (1) {
-						tok = token_read();
+						tok = get_token();
 						if (tok != T_NAME)
 							gripe("expected symbol");
 						if (pass == 0) {
@@ -2150,17 +2217,17 @@ assemble()
 						}
 						/* see if there is another */
 						if (peek() == ',')
-							asm_expect(',');
+							need(',');
 						else
 							break;
 					}
-					asm_eol();
+					consume();
 					continue;
 				}
 
 				if (asm_sequ(token_buf, "extern")) {
 					while (1) {
-						tok = token_read();
+						tok = get_token();
 						if (tok != T_NAME)
 							gripe("expected symbol");
 						if (pass == 0) {
@@ -2168,11 +2235,11 @@ assemble()
 						}
 						/* see if there is another */
 						if (peek() == ',')
-							asm_expect(',');
+							need(',');
 						else
 							break;
 					}
-					asm_eol();
+					consume();
 					continue;
 				}
 
@@ -2181,7 +2248,7 @@ assemble()
 				 */
 				if (asm_sequ(token_buf, "ds")) {
 					ds();
-					asm_eol();
+					consume();
 					continue;
 				}
 
@@ -2191,7 +2258,7 @@ assemble()
 				if (asm_sequ(token_buf, "defb") ||
 					asm_sequ(token_buf, "db")) {
 					db();
-					asm_eol();
+					consume();
 					continue;
 				}
 
@@ -2201,7 +2268,7 @@ assemble()
 				if (asm_sequ(token_buf, "defw") ||
 					asm_sequ(token_buf, "dw")) {
 					dw();
-					asm_eol();
+					consume();
 					continue;
 				}
 
@@ -2221,18 +2288,18 @@ assemble()
 					/*
 					 * it's an instruction 
 					 */
-					asm_eol();
+					consume();
 				} else if (peek() == '=') {
 					/*
 					 * it's a symbol definition 
 					 */
 					save_symname();
-					token_read();
+					get_token();
 
 					type = evaluate(&result, &sym, 0);
 
 					sym_update(sym_name, type, result, 0);
-					asm_eol();
+					consume();
 				} else if (peek() == ':') {
 					/*
 					 * set the new symbol (if it is the first pass) 
@@ -2241,7 +2308,7 @@ assemble()
 						sym_update(token_buf, segment, cur_address, 0);
 					}
 
-					token_read();
+					get_token();
 				} else {
 					gripe("unexpected symbol");
 				}
@@ -2316,6 +2383,7 @@ assemble()
 			bss_top = data_top + data_size;
 			cur_address = 0;
 
+            line_num = 0;
 			rewind(input_file);
 
 			continue;

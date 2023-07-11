@@ -6,12 +6,14 @@
 #
 # if both Makefile and makefile are present, the new make uses this
 # file, while the old make uses Makefile.
-@
+#
 # so, if you have both Makefile and makefile, it depends on which
 # make you are running.
 #
 # this mechanism will be used to bootstrap the new make on a system where
 # the new make does not exist yet.
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 all:
 	cd include ; make install
@@ -40,4 +42,3 @@ upgrade:
 	cd lib ; make upgrade
 	cd cmd ; make upgrade
 
-# vim: tabstop=4 shiftwidth=4 noexpandtab:

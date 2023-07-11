@@ -1,0 +1,78 @@
+.\" macros for whitesmith's compiler documentation
+.de NM		\" name
+\fBNAME\fP
+.in 0.5i
+.br
+\fB\\$1\fP - \\$2 \\$3 \\$4 \\$5 \\$6
+.sp 1
+..
+.de FU		\" function
+.in 0
+.sp 
+\fBFUNCTION\fP
+.in 0.5i
+..
+.de SY		\" synopsis
+.in 0
+\fBSYNOPSIS\fP
+.in 0.5i
+..
+.de SA		\" see also
+.sp 1
+.in 0
+\fBSEE ALSO\fP
+.in 0.5i
+..
+.de BU		\" bugs
+.sp
+.in 0
+\fBBUGS\fP
+.in 0.5i
+..
+.de NO		\" bugs
+.sp
+.in 0
+\fBNOTE\fP
+.in 0.5i
+..
+.de RT		\" returns
+.sp
+.in 0
+\fBRETURNS\fP
+.in 0.5i
+..
+.de LP		\" blank line
+.sp 1
+.in 0.5i
+..
+.de HC		\" who knows
+.br
+..
+.de IP		\" indent tag and block
+.in 0.5i
+.sp 1
+\fB\\$1 \\$2 \\$3 \\$4 \\$5 \\$6 \fP
+.in 1.0i
+..
+.de DS		\" preformatted text
+.nr Li \\n(.i
+.in -0.5i
+.sp 1
+.nf
+..
+.de DE		\" end preformatted
+.fi
+.in \\n(Liu
+..
+.de EG		\" example
+.in 0
+\fBEXAMPLE\fP
+.nr Li \\n(.i
+.in 0.5i
+.sp 1
+.nf
+..
+.de FI		\" end example
+.fi
+.in \\n(Liu
+..

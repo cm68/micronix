@@ -3,7 +3,9 @@
 #
 # micronix/cmd/Makefile
 #
-# Changed: <2023-06-23 01:07:31 curt>
+# Changed: <2023-07-10 14:36:31 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 upgrade : 
 	cd Make ; make upgrade
@@ -42,5 +44,3 @@ clean :
 	cd vi ; make clean
 	# cd far ; make clean
 	# cd msh ; make clean
-
-# vim: tabstop=4 shiftwidth=4 expandtab:
