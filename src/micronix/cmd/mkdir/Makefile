@@ -8,7 +8,7 @@
 all: mkdir
 
 mkdir: mkdir.c
-	cc -o mkdir mkdir.c -lS
+	cc -I/usr/include -o mkdir mkdir.c -lS
 
 install: mkdir
 	cp mkdir /bin/mkdir

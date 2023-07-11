@@ -7,6 +7,8 @@
 # tools/Makefile
 #
 # Changed: <2023-06-19 06:09:52 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 SIMTARGETS = \
 	ar nm size imd disas dump \
@@ -94,5 +96,4 @@ testn:	ncheck
 install: disas
 	cp disas ~/bin
 
-# vim: tabstop=4 shiftwidth=4 expandtab:
 

@@ -1,7 +1,7 @@
 ; Put char routine
 
-.text
-.globl putc
+	.text
+	.globl putc
 putc:
 	ld	b,1
 	call	sys

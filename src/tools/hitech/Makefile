@@ -6,6 +6,8 @@
 # tools/hitech/Makefile
 #
 # Changed: <2023-06-25 00:54:38 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 CFLAGS = -Wno-implicit-int -fdiagnostics-color=always
 
@@ -43,5 +45,4 @@ objdump: objdump.c
 clean:
 	rm -rf *.o bpatch objdump hitech *.dSYM *.dis *.sym
 
-# vim: tabstop=4 shiftwidth=4 expandtab:
 

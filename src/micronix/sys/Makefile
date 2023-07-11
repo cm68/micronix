@@ -3,7 +3,9 @@
 #
 # micronix/sys/Makefile
 #
-# Changed: <2023-06-23 01:04:56 curt>
+# Changed: <2023-07-10 14:40:04 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 INC = ../include
 SYS = ../include/sys
@@ -114,6 +116,3 @@ trap.o: $(SYS)/sys.h $(SYS)/proc.h
 tty.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
 uio.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/con.h
 user.o: $(SYS)/sys.h $(SYS)/proc.h
-
-# vim: tabstop=4 shiftwidth=4 expandtab:
-

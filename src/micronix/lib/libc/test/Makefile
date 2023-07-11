@@ -4,6 +4,8 @@
 # micronix/lib/libc/test/Makefile
 #
 # Changed: <2023-06-23 00:59:13 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 all: jmptest
 
@@ -16,6 +18,3 @@ jmptest: jmptest.c
 
 clean:
 	rm -f *.i *.cp1 *.o jmptest
-
-# vim: tabstop=4 shiftwidth=4 expandtab:
-

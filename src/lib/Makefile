@@ -4,7 +4,9 @@
 #
 # lib/Makefile
 #
-# Changed: <2023-06-23 17:15:11 curt>
+# Changed: <2023-07-10 14:45:25 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 CHIPS = libchips.a
 CHIPSOBJS = z80_shim.o
@@ -45,6 +47,3 @@ emushim.o: emushim.c z80emu.h z80config.h z80user.h \
 
 z80emu.o: z80emu.c z80emu.h z80config.h z80user.h \
 	instructions.h macros.h tables.h
-
-# vim: tabstop=4 shiftwidth=4 expandtab:
-

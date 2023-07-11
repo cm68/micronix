@@ -9,6 +9,7 @@
 # the update rule is used when inside the source tree in the simulator
 # to sync from the source tree above. currently does nothing.
 #
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
+
 update:
 
-# vim: tabstop=4 shiftwidth=4 noexpandtab:
