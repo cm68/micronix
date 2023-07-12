@@ -60,7 +60,6 @@ TEXT *getflags(pac, pav, fmt, args)
 	TEXT *fmt;
 	TEXT **args;
 	{
-	IMPORT TEXT _data[];
 	FAST TEXT *f, *q, *r;
 	BOOL done, islong, suc;
 	COUNT v;
@@ -83,7 +82,7 @@ TEXT *getflags(pac, pav, fmt, args)
 		if (cmpbuf("help", q, 4)) { /* PMO bug fix */
             TEXT *msg;
             if (q[4] == ':')
-                msg = _data + 1;
+                msg = "plugh";
             else if (*(msg = fmt + scnstr(fmt, ':')))
                 msg++;
             else

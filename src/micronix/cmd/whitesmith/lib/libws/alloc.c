@@ -6,8 +6,8 @@
 #define BLKSIZE	512
 #define HEAP	struct heap
 #define MAXCORE 512
-#define SIZHDR	((BYTES)&(0->x))
-#define SIZPTR	(sizeof (TEXT *))
+#define SIZHDR	(sizeof(BYTES))
+#define SIZPTR	(sizeof(TEXT *))
 
 struct heap
 	{

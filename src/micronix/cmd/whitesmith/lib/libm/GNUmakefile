@@ -1,20 +1,20 @@
 #
 # Makefile for updating the source tree
 #
-# cmd/whitesmith/wslib/GNUmakefile
+# cmd/whitesmith/lib/libm/GNUmakefile
 #
 # Changed: <2023-07-04 19:55:33 curt>
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIR = wslib
-CLASS = cmd/whitesmith
+DIR = libm
+CLASS = cmd/whitesmith/lib
 ROOT = ~/src/micronix/filesystem
 SRCDIR = /usr/src/$(CLASS)/$(DIR)
 DEST = $(ROOT)/$(SRCDIR)
 NOWARN = --warning=no-ignore-newer
 
-SRCS = *.c
+SRCS = $(wildcard *.s *.c)
 
 update: 
 	mkdir -p $(DEST)
