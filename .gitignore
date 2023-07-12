@@ -2,3 +2,4 @@ sim
 core
 filesystem
 extra
+*.tar
