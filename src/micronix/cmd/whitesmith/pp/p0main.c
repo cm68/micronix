@@ -2,7 +2,7 @@
  *	copyright (c) 1978 by Whitesmiths, Ltd.
  */
 #include <std.h>
-#include "int0.h"
+#include "../include/c/int0.h"
 
 /*	DATA FLOW:
 	getl(line)->
