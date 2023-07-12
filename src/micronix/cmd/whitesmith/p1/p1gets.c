@@ -2,8 +2,8 @@
  *	copyright (c) 1978 by Whitesmiths, Ltd.
  */
 #include <std.h>
-#include "int1.h"
-#include "int01.h"
+#include "../include/c/int1.h"
+#include "../include/c/int01.h"
 
 /*	the null name
  */

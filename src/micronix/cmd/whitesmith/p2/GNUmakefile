@@ -14,14 +14,14 @@ SRCDIR = /usr/src/$(CLASS)/$(DIR)
 DEST = $(ROOT)/$(SRCDIR)
 NOWARN = --warning=no-ignore-newer
 
-SRCS = *.c *.h
+SRCS = $(wildcard *.c *.h)
 
 update: 
 	mkdir -p $(DEST)
 	tar -f $(DIR).tar --ignore-failed-read -c Makefile $(SRCS)
 	tar -f $(DIR).tar -C $(DEST) --keep-newer-files -x $(NOWARN)
 
-doc: p2.0 p2.3 int012.3 int12.3 int2.3 p2expr.3 p2fmov.3 p2gen.3 \
+doc: p2.0 p2.3 p2expr.3 p2fmov.3 p2gen.3 \
 	p2jump.3 p2main.3 p2subs.3 p2tab.3
 
 %.0 : %.mp

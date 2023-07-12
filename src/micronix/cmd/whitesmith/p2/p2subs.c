@@ -2,9 +2,9 @@
  *	copyright (c) 1979 by Whitesmiths, Ltd.
  */
 #include <std.h>
-#include "int2.h"
-#include "int12.h"
-#include "int012.h"
+#include "../include/c/int2.h"
+#include "../include/c/int12.h"
+#include "../include/c/int012.h"
 
 /*	type tables
  */

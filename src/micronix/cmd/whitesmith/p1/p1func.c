@@ -2,10 +2,10 @@
  *	copyright (c) 1978 by Whitesmiths, Ltd.
  */
 #include <std.h>
-#include "int1.h"
-#include "int01.h"
-#include "int12.h"
-#include "int012.h"
+#include "../include/c/int1.h"
+#include "../include/c/int01.h"
+#include "../include/c/int12.h"
+#include "../include/c/int012.h"
 
 /*	allocation resources
  */

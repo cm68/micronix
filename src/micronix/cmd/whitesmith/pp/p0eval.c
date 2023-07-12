@@ -2,9 +2,9 @@
  *	copyright (c) 1978 by Whitesmiths, Ltd.
  */
 #include <std.h>
-#include "int0.h"
-#include "int01.h"
-#include "int012.h"
+#include "../include/c/int0.h"
+#include "../include/c/int01.h"
+#include "../include/c/int012.h"
 
 /*	escape sequences for c
  */
