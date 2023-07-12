@@ -14,7 +14,7 @@ SRCDIR = /usr/src/$(CLASS)/$(DIR)
 DEST = $(ROOT)/$(SRCDIR)
 NOWARN = --warning=no-ignore-newer
 
-SRCS = *.c *.h
+SRCS = $(wildcard *.c *.h)
 
 update: 
 	mkdir -p $(DEST)

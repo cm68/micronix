@@ -13,14 +13,10 @@ SRCDIR = /usr/src/$(CLASS)/$(DIR)
 DEST = $(ROOT)/$(SRCDIR)
 NOWARN = --warning=no-ignore-newer
 
-DIRS = asm p1 p2 pp util link
-
-all:
-	for i in $(DIRS); do \
-		(cd $$i ; make all) ; \
-	done
+DIRS = asm p1 p2 pp util link lib include
 
 update:
+	mkdir -p $(DEST)
 	tar -f $(DIR).tar --ignore-failed-read -c Makefile
 	tar -f $(DIR).tar -C $(DEST) --keep-newer-files -x $(NOWARN)
 	for i in $(DIRS); do \
