@@ -1,31 +1,34 @@
 #
-# micronix/cmd/Make/Makefile
+# Makefile for better make on micronix
+# this make, because it is named with upper case 'Makefile',
+# is preferred by the old micronix make
 #
-# Changed: <2023-06-23 01:18:03 curt>
-
+# cmd/Make/Makefile
 #
-# makefile for building make on linux
-
-CFLAGS = -fdiagnostics-color=always -g
-
-# first define some macros we will be using
-
-MFILES	 = make.c makeinit.c makeread.c maketime.c ../../lib/libutil/hexdump.c
-OBJECTS = make.o makeinit.o makeread.o maketime.o hexdump.o
-
-TFILES	 = touch.c
-TOBJECTS = touch.o
-
-Make : $(OBJECTS)
-	cc $(CFLAGS) -o Make $(OBJECTS)
-
-clean :
-	rm -f $(OBJECTS)
-
-clobber : Makefile
-	rm -f $(OBJECTS) Make
-
-hexdump.o: ../../lib/libutil/hexdump.c
-	cc -c ../../lib/libutil/hexdump.c
-
+# Changed: <2023-07-12 13:02:27 curt>
+#
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
+
+install: Make
+	cp Make /bin/make
+
+Make: make.o makeread.o makeinit.o maketime.o
+	cc -o Make *.o -lS
+
+make.o: make.c
+	cc -c make.c
+
+makeread.o: makeread.c
+	cc -c makeread.c
+
+makeinit.o: makeinit.c
+	cc -c makeinit.c
+
+maketime.o: maketime.c
+	cc -c maketime.c
+
+clean:
+	rm *.o
+
+clobber: clean
+	rm Make
