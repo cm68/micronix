@@ -1,13 +1,13 @@
 #
 # Makefile for updating the source tree
 #
-# cmd/cc/GNUmakefile
+# cmd/echo/GNUmakefile
 #
 # Changed: <2023-07-04 19:55:33 curt>
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIR = cc
+DIR = echo
 CLASS = cmd
 ROOT = ~/src/micronix/filesystem
 SRCDIR = /usr/src/$(CLASS)/$(DIR)
@@ -21,15 +21,7 @@ update:
 	tar -f $(DIR).tar --ignore-failed-read -c Makefile $(SRCS)
 	tar -f $(DIR).tar -C $(DEST) --keep-newer-files -x $(NOWARN)
 
-doc:
-
-%.0 : %.mp
-	nroff -M.. $< -mws > $@
-
-%.3 : %.ic
-	nroff -M.. $< -mws > $@
-
 clean:
 
 clobber: clean
-	rm -f *.3 *.0 $(DIR).tar
+	rm -f *.0 $(DIR).tar
