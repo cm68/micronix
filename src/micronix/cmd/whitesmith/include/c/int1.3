@@ -1,0 +1,132 @@
+[1mNAME[0m
+     [1mint1.h [22m‐ header file for p1
+
+
+[1mFUNCTION[0m
+     int1.h contains structure definitions and constants used on‐
+     ly by p1.
+
+     [1mTYPES ‐[0m
+          The C data types are encoded as a group  of  constants.
+          The   basic  types  (TCHAR,  TUCHAR,  TSHORT,  TSFIELD,
+          TUSHORT,  TLONG,  TLFIELD,  TULONG,  TFLOAT,   TDOUBLE,
+          TSTRUCT,  TUNION)  have  codes such that (type & 03) is
+          zero, while the type modifiers (TFNRET, TARRAY, TPTRTO)
+          have  codes  with  (type & 03) nonzero.  The types int,
+          field, and unsigned are mapped  either  into  short  or
+          long  versions,  depending  on  the  target  machine (l
+          flag).
+
+     [1mVAL ‐[0m
+          is a union of all the different values that may  belong
+          to a symbol, term, literal, or token:
+
+             dn ‐ the value of a double token or term
+             an ‐ identifier name
+             ln ‐ the value of an integer token
+             x ‐ a literal string descriptor struct containing:
+                     sptr ‐ start of string
+                     slen ‐ length in bytes
+
+     [1mATTR ‐[0m
+          is  the  structure  of an attribute element; attributes
+          modify the basic symbol table entries.  next points  to
+          the  next  ATTR used by the same symbol table entry.  a
+          is a union of:
+
+             m ‐ the constant size of a single array dimension
+             stab ‐ a pointer to the symbol table describing
+                     function arguments or member of struct/union
+             b ‐ a bit field discriptor struct containing:
+                     boff ‐ field offset within current word
+                     bsize ‐ bit size of the field
+
+     [1mCASE ‐[0m
+          is the structure filled by each occurrence  of  a  case
+          statement.   A  linked  list  of CASEs is kept for each
+          switch and these lists are stacked by switch  code  for
+          switches within switches.  next points to the next CASE
+          allocated for this context.  clabel is the label  asso‐
+          ciated  with  the  code within the case.  cvalue is the
+          constant value of the case.
+
+     [1mSYMBOL ‐[0m
+          is the symbol  table  structure.   All  symbols  reside
+          within the symbol table at one time or another; however
+          local symbols are purged on block exit.  next points to
+          the  next  SYMBOL in the linked list.  at points to the
+          linked list of attributes, for array, function, struct,
+          or  union.   n is the VAL, always holding an identifier
+          an.  ty is the packed data  type  where  each  modifier
+          (TFNRET,  TARRAY,  TPTRTO)  gets two bits read right to
+          left.  The basic type gets six bits,  to  the  left  of
+          modifiers.  e.g. array of pointers to integers:
+
+                     ty is (TARRAY|(TPTRTO << 2)|(TINT << 4))
+
+     sn contains the name of the symbol.  sc contains the storage
+     class of the symbol.  s is a union of:
+
+        tagtab points to the member tab, for tag entries
+        reg is the register allocated for REGISTER
+        label is the assigned label for STATIC
+        offset is the byte offset for AUTO and ARG
+
+     Note that for an EXTRN this field is ignored, since its name
+     suffices to identify its address.
+
+     [1mLITERAL ‐[0m
+          is  an  alias  for TERM.  A table of string literals is
+          built during each external initialization and dumped at
+          the end of that initialization.
+
+     [1mTERM ‐[0m
+          is  the  structure  of  a single term of an expression.
+          GLOBAL TERM *exlist points to the  start  of  a  linked
+          list  which  contains the pieces of the current expres‐
+          sion; exlist is freed at the start of each new  expres‐
+          sion.  next is a pointer to the next TERM in the exlist
+          list.  at is the pointer to the attribute list.   n  is
+          the  identifier portion of most symbols, the value of a
+          double constant, or the string description for a liter‐
+          al.   ty  is the type of the term.  op is the operator,
+          or zero for a variable.  e is a union of:
+
+             structure o (for operator):
+                     left is a pointer to left subtree
+                     right is a pointer to right subtree
+                     mid is a pointer to middle subtree (?: only)
+             structure v (for variable):
+                     bias is the byte offset
+                     idx is the register
+                     refs is the ref count
+
+     The v structure provides for addresses  of  the  form:  name
+     plus  long  bias  indexed  by register idx, with (refs == 0)
+     meaning the address itself, (refs == 1) meaning the content,
+     and  (refs  ==  n)  meaning  (n  ‐ 1) levels of indirection.
+     Note, however, that no name, no bias, no refs, with  an  idx
+     specifies  the contents of the register idx; and no refs, no
+     idx, type TDOUBLE is a double constant.
+
+     [1mTOKEN ‐[0m
+          is a structure into which a token from the preprocessor
+          is  read.  type is the type of the token (see int01.h).
+          t is the token value.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
