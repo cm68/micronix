@@ -1,0 +1,66 @@
+[1mNAME[0m
+     [1mint0.h [22m‐ header file for C preprocessor
+
+
+[1mFUNCTION[0m
+     int0.h contains structure definitions and constants used on‐
+     ly by the C preprocessor.
+
+     [1mLEX ‐[0m
+          is an int used to hold token codes, e.g. PCHCON,  which
+          are never zero.
+
+     [1mINCL ‐[0m
+          is  a  structure  used  to  control an open file.  next
+          points to any pending files,  if  this  is  an  include
+          file.   fname  is either NULL or points to an allocated
+          filename, for diagnostics.  nline is the  current  line
+          number  in  the file, for diagnostics.  pfio is the FIO
+          control buffer for the file.
+
+     [1mPRETAB ‐[0m
+          is the structure used for  predefined  tables  of  key‐
+          words,  operators,  etc.   prename  points  to the name
+          string, which begins with a byte containing  length  of
+          the string, to save scanning the name for its terminat‐
+          ing null.  pretype is the encoded  token  type,  always
+          non‐zero.   PRETAB arrays must be sorted on the prename
+          strings.
+
+     [1mTLIST ‐[0m
+          is the structure of an entry in the token list used  to
+          describe  input lines and definitions.  Each entry rep‐
+          resents zero or more characters of leading  whitespace,
+          followed  by  zero or more characters of the actual to‐
+          ken; PEOL is the only token  with  a  length  of  zero.
+          next  points to the next item in the list.  type is the
+          token type, always non‐zero; token lists invariably end
+          in an EOL token.  type is one of: PCHCON for ’...’, PE‐
+          OL for end of line, PIDENT  for  identifier,  PNUM  for
+          number,  PPUNCT  for  punctuation,  PSTRING  for "...".
+          white points at the whitespace string preceding the to‐
+          ken.   nwhite  is  the  number of whitespace characters
+          starting at white.  text points to  the  start  of  the
+          defining  text  for  the token.  ntext is the number of
+          characters in the text string.
+
+     [1mALIST ‐[0m
+          is the structure of an argument list  element  for  the
+          expansion  of  a  macro with arguments.  next points to
+          the next argument.  astart points at the first token in
+          the  argument token list.  aend points at the first to‐
+          ken beyond the argument token list.
+
+     [1mDEF ‐[0m
+          is the  symbol  table  structure  for  #defines.   next
+          points to the next older entry in this definition list.
+          dnlen is the  length  of  the  definition  name.   defn
+          points to the first token in the definition token list;
+          it is always non‐NULL.  dname is the definition name.
+
+     [1mARGS ‐[0m
+          is the structure filled in by getflags for the ‐d argu‐
+          ments  from the command line.  ntop is the index of the
+          highest  free  entry  in  anames;  zero  implies  full.
+          anames  is  the  array of text pointers for each of the
+          arguments, filled in from the top down.

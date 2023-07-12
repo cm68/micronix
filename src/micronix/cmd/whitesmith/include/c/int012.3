@@ -1,0 +1,66 @@
+[1mNAME[0m
+     [1mint012.h [22m‐ constants used by all compiler
+
+
+[1mFUNCTION[0m
+     int012.h  contains  those C operators which are encoded from
+     the input to pp and which are used throughout all passes.
+
+     [1mBINOP ‐[0m
+          binary operators are encoded such that ((BINOP & op) ==
+          BINOP).
+
+     [1mUNOP ‐[0m
+          unary  operators  are encoded such that ((UNOP & op) ==
+          UNOP).
+
+     Operators may be both unary and binary (e.g.  LTIMES).   The
+     input tokens associated with operator defines are:
+
+                LAND    &               LGXOR   =^
+                LANDAND &&              LINCR   ++
+                LCOMP   ~               LISEQ   ==
+                LDECR   ‐‐              LLESS   <
+                LDIVIDE /               LLEQ    <=
+                LGAND   =&              LLSHIFT <<
+                LGDIV   =/              LMINUS  ‐
+                LGETS   =               LMODULO %
+                LGLSH   =<<             LNOT    !
+                LGRSH   =>>             LNOTEQ  !=
+                LGMIN   =‐              LOR             |
+                LGMOD   =%              LOROR   ||
+                LGOR    =|              LPLUS   +
+                LGPLU   =+              LQUERY  ?
+                LGREAT  >               LRSHIFT >>
+                LGEQ    >=              LTIMES  *
+                LGTIM   =*              LXOR    ^
+
+     [1mNAMING ‐[0m
+          Throughout the compiler, manifest constants whose names
+          begin with ’L’ are  lexemes  that  originate  in  input
+          text,  while  ’D’  names indicate entities that are de‐
+          fined along the way.  Thus, DEXTERN  is  introduced  to
+          describe the storage class of a symbol that has the ex‐
+          tern storage class, but is now further known from  con‐
+          text to be defined, i.e. initialized.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
