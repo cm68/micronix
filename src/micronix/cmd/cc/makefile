@@ -2,9 +2,11 @@
 # micronix makefile for cc compiler driver.  
 # handles both hitech and whitesmith's c
 #
+# this lower case file is preferred by the newer make
+#
 # micronix/cmd/cc/makefile
 #
-# Changed: <2023-07-10 15:11:18 curt>
+# Changed: <2023-07-12 13:11:06 curt>
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 

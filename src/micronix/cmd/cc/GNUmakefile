@@ -15,6 +15,7 @@ DEST = $(ROOT)/$(SRCDIR)
 NOWARN = --warning=no-ignore-newer
 
 SRCS = $(wildcard *.c *.h)
+CFILES = cc.c
 
 update: 
 	mkdir -p $(DEST)
@@ -30,6 +31,10 @@ doc:
 	nroff -M.. $< -mws > $@
 
 clean:
+	rm -f *.o
 
 clobber: clean
-	rm -f *.3 *.0 $(DIR).tar
+	rm -f *.3 *.0 $(DIR).tar cc
+
+cross:
+	cc -fdiagnostics-color=always -g -o cc $(CFILES) 2>&1

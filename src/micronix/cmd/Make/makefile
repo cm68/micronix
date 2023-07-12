@@ -1,23 +1,27 @@
 #
-# a makefile to make the make that replaces the micronix make
+# Makefile for replacement make
+# this file is preferred by this make, because it is named as lower case
+# 'makefile'
 #
+# cmd/Make/makefile
+#
+# Changed: <2023-07-12 13:06:11 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
+
 OBJECTS = make.o makeinit.o makeread.o maketime.o
 
 Make: $(OBJECTS)
-	cc -o Make make.o makeinit.o makeread.o maketime.o -lutil -lS
+	cc -o Make make.o makeinit.o makeread.o maketime.o -lS
 
 $(OBJECTS) : $*.c
 	cc -c $*.c
 
-make.o: make.c
-
-upgrade: Make
-	cp /bin/make /old/make
-	cp Make /bin/make
-	
 install: Make
 	cp Make /bin/make
 
-clean : ; rm $(OBJECTS)
+clean:
+	rm $(OBJECTS)
 
-update :  ; cd ../.. ; make update
+clobber: clean
+	rm -f Make
