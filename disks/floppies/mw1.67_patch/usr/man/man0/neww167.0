@@ -1,0 +1,26 @@
+.he "                   Whats New in Micronix 1.67"
+.in 12
+.ti -8
+The kernal has been modified slightly to permit dev/kmem to 
+work properly.
+
+.ti -8
+Fixed utilities ...
+
+.ti -8
+cu	: corrects ~%get and ~%put command execution.
+
+.ti -8
+uuencode/uudecode     : correct version substituted for 1.66 version
+
+.ti -8
+dar	: new version permits reading additional IBM formats
+
+ 
+.ti -8
+/usr/man/man0/new.0
+.br
+This file contains the on-line documentation of new features.
+It has been split into several files, new16.0, new161.0, new162.0, etc.
+These are viewed by typing "help new16" , "help new161", etc.
+

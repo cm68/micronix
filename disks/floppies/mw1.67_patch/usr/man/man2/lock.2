@@ -1,0 +1,197 @@
+.he "lock (2)                     2/22/84                     lock (2)"
+.fo "				   -#-"
+.in 10
+.rm 65
+.bd
+.ti -5
+NAME
+.br
+.bd
+lock
+- record lock
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+lock(descriptor, size) 
+
+.br
+.bd
+unlock(descriptor)
+
+.ti -5
+.bd
+FUNCTION       
+.br
+The lock() and unlock() system calls allow cooperating
+processes to share files under conditions of
+simultaneous access.
+The term "record lock" seems to imply fixed size records.
+You may define your "records" to be any length you like
+from 1 byte 
+up to the maximum of 65535 bytes.
+The operating system maintains a table of locked areas of files.
+A call to lock() attempts to add a new locked area of a file.
+A call to unlock() attempts to release an area.
+Here are the rules regarding locks.
+Only an open file may be locked.
+Any locks on a file are released upon close() of the file
+or upon exit().
+Locks are preserved accross fork() calls.
+Both parent and child retain locked areas
+of their open files.
+The file locks are not completely released
+until both parent and child release their respective locks.
+The maximum size of an area which may be locked with a single
+call to lock() is 65535 bytes.
+The file area to be locked begins
+at the current file offset and has size specified by the user.
+The lock() call returns 0 indicating success or
+-1 indicating failure.
+The unlock() call always succeeds.
+Locking will fail when the systems lock table overflows
+or when attempting to lock an already locked region.
+Locking will fail if any part of the proposed new region
+overlaps any part of any existing lock.
+Currently, the maximum permissible number of simultaneously
+locked regions system-wide is 10.
+The system provides only lock against lock.
+That is, processes may still freely read and write
+locked regions.
+Processes must be self-disciplined for the
+scheme to work.
+A call to unlock() releases any lock on the region
+in which the byte addressed by the current file offset
+falls.
+If the addressed byte is not within a locked region
+nothing happens, and the system doesn't complain.
+(Use seek() to adjust the file offset.)
+
+.ti -5
+.bd
+RETURNS
+.br
+A -1 indicates failure. 0 indicates success.
+
+.ti -5
+.bd
+ASSEMBLER
+.br
+.bd
+(lock = 49)
+.br
+.bd
+(file descriptor in hl)
+.br
+.bd
+sys; lock; nbytes
+.br
+
+.br
+.bd
+(unlock = 50)
+.br
+.bd
+(file descriptor in hl)
+.br
+.bd
+sys; unlock;
+.br
+
+.ti -5
+.bd
+RETURNS
+.br
+The carry flag is cleared on success, or set on failure.
+
+
+
+.ti -5
+.bd
+EXAMPLE
+
+
+Let's assume we have several identical processes
+all referencing the same data file.
+Here is how lock() and unlock() might be used to advantage
+(and to prevent disaster).
+
+To incrementally update a record:
+.nf
+
+update (a, b, c)
+	struct data *a;
+	int b;			/* record number */
+	int c;			/* file descriptor */
+	{
+	long address;
+
+/*
+ * compute the byte number of the beginning 
+ * of the data record in question
+ */
+
+
+	address = b;
+	address *= sizeof (*a);
+
+/*
+ * seek to the beginning of the record
+ * in the file in preparation
+ * for setting the lock
+ *
+ */
+
+	lseek (f, address, 0);
+
+	for (;;)
+		{
+		if (lock (f, sizeof (*a) >= 0)
+			{
+			break;
+			}
+
+		write (1, "record temporarily busy.\n", 25);
+
+		sleep (1);		/* wait one second, then try again */
+		}
+
+/*
+ * We have clearance now, so read the record.
+ */
+
+
+	read (f, a, sizeof (*a));
+
+/*
+ * We are free to play with the data as we like in this
+ * protected region confident that we have exclusive access.
+ */
+
+	a->amount++;			/* increment something */
+
+	a->balance += outlay;		/* an accounting example */
+
+/*
+ * Replace the record, that is, write it back to the file.
+ */
+
+	write (f, a, sizeof (*a));
+
+/* 
+ * release the lock
+ */
+
+	lseek (f, address, 0);
+	unlock (f);
+	}
+
+
+
+
+
+

@@ -1,0 +1,1709 @@
+.in 15
+.rm 79
+.ta 5
+.he "upm (1)                           10/17/83                           upm (1)"
+.fo "					       -#-"
+.ti -5
+NAME
+.br
+.bd
+upm -
+CP/M 2.2 for Micronix
+
+
+.ti -5
+SYNTAX
+.br
+upm [upm arguments] [cpm program] [program arguments]
+
+
+.ti -5
+DESCRIPTION
+.br
+.bd
+Upm
+duplicates as closely as possible
+Digital Research's CP/M 2.2 operatÿng system.
+It is essentially a rewrite of CP/M using
+Micronix system calls.
+It allows CP/M tools (such as "WordStar")
+and Micronix tools (such as "edit")
+to be used interchangably on the same files.
+Moreover, since Micronix runs on a Z-80,
+.bd
+upm
+need not emulate an 8080. All CPM programs run at full speed.
+(The name "upm" was coined from the words UNIX and CP/M.)
+
+This is a long document (about 20 pages).
+Its sections, in order of appearance, are:
+.nf
+
+Overview                                   Select Errors
+Getting Started                            File Names
+Running Modes                              Bios Jump Table
+Drive-Directory Correspondence             Built-In Commands
+Entering Upm                               Control Characters
+Customizing the Environment                Submit Files
+Auto Entry                                 Test Files
+Terminal Emulation                         Upm and the Background
+Printers                                   Trace Mode 
+Printer Handshaking                        Exiting Upm
+Policing the Printer                       Bugs
+System-Wide LST Device                     
+.fi
+
+.bd
+.ti -5
+Overview
+
+.bd
+Upm
+provides a close functional replica of the environment which
+applications programs written to run under CP/M expect.
+Most CP/M programs
+(such as Micropro's WordStar word processing program)
+will run unchanged under upm.
+
+The intended purpose of
+.bd
+upm
+is to bridge the gap between multi-user UNIX and the
+large amount of special-purpose software available
+for the CP/M operating system -- giving
+true multi-user function for CPM software,
+and making up for the lack of some of these applications
+running directly under UNIX.
+
+There is no significant difference between the way application programs
+are run under
+.bd
+upm 
+and the way they are run under CP/M.
+All documentation for these programs is valid.
+(However, some CPM documentation is oriented toward floppy disks.
+It may contain such phrases as "insert the working diskette into
+drive A". With Micronix, just as with a hard-disk CPM system,
+the user must realize that no insertion is needed.)
+
+.bd
+Upm
+is intended to be a means whereby applications
+software written for CP/M may be run unchanged directly under Micronix.
+Under Micronix there are no records, no extents, no
+disk drives
+in the CP/M sense, no file control blocks (FCBs), disk parameter
+blocks (DPBs), allocation vectors, etc., but
+.bd
+upm
+does a good job of pulling the wool over the eyes of
+most CP/M programs.
+
+Some CP/M programs do not work under
+.bd
+upm,
+however, because of system dependence.
+For example, programs containing the
+8080 instructions
+"in", "out", or "hlt"
+will not work.
+The instant one of these instructions is encountered,
+the operating system will be notified
+and the offending program will be terminated.
+In a multi-user system such as Micronix,
+all access to the hardware must be very tightly
+controlled and coordinated.
+If the above instructions were allowed,
+user programs could usurp the operating system's
+control over its resources.
+If a CP/M program goes awry it will
+have only a local effect - the rest of the operating system will
+continue running.  Corrective action, if required,
+can be taken from another terminal on the system.
+(See the section on "exiting upm" below.)
+
+
+.ti -5
+.bd
+Getting Started
+
+.bd
+Upm
+runs on the Micronix operating system, whose file structure
+is quite different from that of CP/M.
+The first thing you'll need to do to run your CP/M
+package is to copy it over to Micronix using the
+.bd
+far
+(Floppy ARchiver)
+command.
+(See
+.bd
+far
+in Section 1 of the Micronix Reference Manual.)
+Be sure you are in the directory that you want the programs to reside in.
+Insert your CP/M floppy diskette into floppy drive A and
+type:
+
+	% far fla -xv
+
+for 8" diskettes, or
+
+	% far mfa -xv
+
+for 5 1/4" diskettes.  (mfa2 for double-sided soft-sectored diskettes)
+
+The
+.bd
+far
+command copiÿs all of the files on the CP/M
+diskette over to the Micronix file system
+and places them in your current directory.
+
+Now, type
+
+	% upm
+
+and you're off and running!
+There's still a lot more to learn, however, so as soon
+as the novelty wears off, read on.
+
+
+.bd
+.ti -5
+Running Modes
+
+.bd
+Upm
+has two modes: DIRECT and INTERACTIVE.
+If you intend to run only one CP/M application program, use the
+DIRECT mode.
+
+If you intend to run a series of CP/M programs, use the
+INTERACTIVE mode.
+
+To enter INTERACTIVE mode, type
+
+	% upm
+
+(You can also log in directly to upm.
+When used this way, upm is called the "cpm shell",
+since it looks as though you have simply logged onto
+a hard-disk CP/M system. See
+.bd
+account
+in Section 1 of the Micronix Reference Manual.)
+
+To enter DIRECT mode, simply type the program name after
+the shell prompt,
+just as though it were a Micronix program.
+For example, you can enter Wordstar directly from the Micronix
+shell by typing
+
+	% ws
+
+The shell will set up the emulator
+for you. (Just how it is set up is detailed below
+in the section on "auto entry").
+
+You can also get into the direct mode by typing
+
+	% upm program_name
+
+By itself, this has no advantage over the more direct approach.
+But it allows you to include other arguments to
+.bd
+upm
+on the command line. This is discussed in more detail below.
+
+
+.bd
+.ti -5
+Drive-Directory Correspondences
+
+CP/M uses a "flat" directory structure,
+where all the files on a disk are globbed together
+in a single huge directory.
+You can do the same thing under Micronix if you want,
+but sooner or later you will want to take
+advantage of the Micronix hierarchical directory structure to
+better organize your work.
+So to use
+.bd
+upm
+most effectively,
+you should understand the relationship
+between CP/M drive letters and Micronix directories.
+
+CP/M organizes its information by drive letter (A: - P:).
+Since the corresponding structure in Micronix is the directory,
+.bd
+upm
+maintains a table of CP/M drive letters and the names
+of the Micronix directories to which they correspond.
+
+The special command "="
+displays the drive-directory relationships currently in effect.
+
+For example,
+
+.nf
+.bd 4
+	A> =
+
+	A: -> /cpm
+	B: -> ./
+.fi
+
+tells you that the A drive corresponds to the directory /cpm,
+and the B drive corresponds to the directory "./" (the current
+directory).  (If these directory names seem mysterious, type
+the command "help pathnames".)
+
+You may change the drive designation pointers with a command of the form:
+
+.bd
+	B:dirname
+
+wherein B may be replaced by any of the letters A througÿ P,
+and dirname (directory name) must contain at least one slant
+character ("/").
+.bd
+Upm
+recognizes a directory name
+by the presence of at least one "/".
+If the directory name doesn't already contain a slant,
+you can always add one by putting a ./ at the beginning.
+As an example:
+
+If you want to set drive B to the subdirectory called "letters", type
+
+	A> B:./letters
+
+Remember that "./letters" means "start in the current directory (.)
+and look in the subdirectory (/) called letters."
+(If you had typed B:letters, it would have looked like a request
+to execute a program called letters from drive B.)
+
+
+.bd
+.ti -5
+Entering upm
+
+Perhaps it would help to understand this idea of drive-directory
+designations if we walk through some typical examples of entering
+.bd
+upm.
+
+
+Typing
+
+	% upm
+
+.nf
+returns
+
+.bd 50
+    Morrow Designs upm
+    N Bytes free
+
+    A: -> ./
+
+    A>
+.bd 0
+
+.fi
+Now drive A corresponds
+to the current directory (./).	You may now re-designate this "drive"
+and/or designate others.
+
+One common setup is to address the directory /cpm
+(where many of the CP/M application programs live)
+as drive A, and the user's current directory as
+drive B.
+
+.nf
+.bd 2
+    A> a:/cpm
+    A> b:./
+
+returns
+
+.bd 2
+    A: -> /cpm
+    B: -> ./
+.fi
+
+The above display is automatic.	 It is also possible to request a
+display of the Micronix-upm relationship by entering an equal (=)
+sign after
+the A> prompt.
+
+
+.ti -5
+.bd
+Customizing the environment
+
+Drive designation modifiers may be used as commands to
+.bd
+upm
+(in INTERACTIVE mode),
+on the command line,
+or in a
+.bd
+upm
+"startup" file called ".upm".
+
+.bd
+Upm
+can be customized to come up in any configuration you choose.
+There are three places
+.bd
+upm
+takes its configuration information from
+(in order of appearance):
+
+.ta 5
+.in +5
+.ti -5
+1)	In the .upm file in the current directory or the
+user's home directory.
+
+.ti -5
+2)	The command line (entered to the right of the word "upm").
+
+.ti -5
+3)	Interactive commands (only in INTERACTIVE mode, of course).
+
+.in -5
+An example  of drive-directory designators on the command line follows:
+
+	% upm  a:/cpm  b:./  b:	 a:ws
+
+This means: run
+.bd
+upm,
+set drive A to the Micronix directory "/cpm",
+set drive B to the directory "./" (your current directory),
+select drive B as the "current drive",
+then run ws from the A drive.
+
+The order of events from the time
+.bd
+upm
+is called is as follows:
+.sp
+.in +5
+.ta 5
+.ti -5
+1)	An attempt is made to read the .upm startup file in the
+current directory.
+If this fails,
+an attempt is made to read this file
+in the user's home directory.
+The .upm startup file may contain drive designators,
+drive select commands,
+a LST: redirection command,
+a CP/M program name and arguments.
+The CP/M program may be given as a Micronix file name
+OR a CP/M program name.
+The commands found in the .upm file are executed in the order they appear.
+
+.ti -5
+2)	The command line is scanned for drive designators,
+drive select commands,
+a LST: redirection command and a
+CP/M program name and its arguments (if any).
+The commands found on the command line are executed in the order
+they appear.
+(Drive selection occurs first; program execution second).
+.bd 4
+If both a startup file (i.e., .upm) and command line arguments are present,
+the arguments take precedence.  If two .upm files have been set up,
+the one in the current directory takes precedence over
+the one in the home directory.
+
+So, for example, if a .upm file sets drive B: to one directory
+and a command line argument sets it to another, the command line will win.
+This lets you selectively override your standard settings.
+
+.ti -5
+3)	A choice is made.
+If no CP/M program name was specified on the command line
+or in the startup file,
+.bd
+upm
+goes into INTERACTIVE mode
+and gives a CP/M prompt (e.g. "A>").
+If a program was specified, that program is immediately run.
+.in -5
+
+The features described above may be used to customize
+.bd
+upm,
+and can be used to advantage in conjunction with shell
+startup files.
+Some examples follow.
+
+A possible .upm file might contain:
+.sp
+.in +5
+.bd 7
+A:/cpm
+.br
+B:./
+.br
+.bd
+LST:/dev/ttyC,1200
+.br
+B:
+.in -5
+
+Which means:
+
+.in +5
+Make CP/M drive A refer to Micronix directory "/cpm".
+
+Make CP/M drive B refer to Micronix directory "./" (your current
+directory).
+
+Arrange to have printed output sent to ttyC at
+1200 baud.
+
+Select drive B.
+.in -5
+
+With the preceeding .upm file in existence,
+you need only type "upm", and	the .upm file
+will be scanned
+and
+everything will be set up as described.
+
+This spares you the hassle of repeatedly typing in drive designation
+commands each time you enter
+.bd
+upm.
+
+It's also possible to specify more information on the command line.
+Consider:
+
+.ti +5
+.bd
+	% upm  a:/cpm  b:./  lst:output	 b:  a:ws document
+
+This command tells the system to:
+
+.in +5
+1) Start
+.bd
+upm.
+.br
+2) Set drive A to /cpm
+.br
+3) Set drive B to ./
+.br
+4) Arrange to have printed output written onto the file "output" on
+the currently logged drive.
+.br
+5) Select drive B
+.br
+6) Run WordStar
+.br
+7) Pass the argument "document" to WordStar
+.in -5
+
+
+Admittedly, it would be a bit cumbersome to type
+this entire command every time. Instead,
+you could use the
+.bd
+alias
+command to make a "shorthand" command line.
+
+Simply create a shell startup file named ".sh" in your
+home directory containing (amoung other things):
+
+.bd
+alias ws "upm a:/cpm b:./ lst:output b: a:ws"
+
+The shell (command interpreter)
+will read this file each time you log in.
+
+When you want to run WordStar, type:
+
+	% ws document
+
+and the above command is run for you.
+
+
+.ti -5
+Auto Entry
+
+As mentioned above, it is often enough to
+type the name of a CPM program after the shell prompt.
+Here is what happens when you type
+
+	% prog
+
+.in +5
+.ti -5
+1.	The shell looks through each directory in its "search path"
+(see below) for a command called "prog".  If found, it is run.
+
+.ti -5
+2.	If not found, the shell appends ".com" to the name,
+getting "prog.com", and looks for that file.
+
+.ti -5
+3.	If prog.com is found, the shell sets up
+upm as follows: drive A is set to the directory in which the
+file was found. Drive B is set to the user's current directory.
+Drive B is selected as the current drive. Finally, the command
+is executed from the A drive.
+.in -5
+
+So for example,
+suppose that "ws.com" is in the directory /cpm.
+If you type
+
+	% ws document
+
+then the shell silently expands this into
+
+	% upm  a:/cpm  b:./  b:	 a:ws  document
+
+and runs it.
+
+If you get the response "command not found", then the file
+ws.com was not in the shell's search path,
+that is, ws.com was not in your current directory or in any
+of the directories where the shell ordinarily looks for commands.
+To remedy this, you could give the command
+
+	% path .  /bin	/usr/bin  /cpm
+
+This tells the shell to look first in "." (your current directory),
+then in "/bin", then in "/usr/bin", and finally in "/cpm".
+Better still, put this command in your .sh file, so that you
+don't have tp retype it each time you log in.
+
+The default path, ie, the path you get if you don't say otherwise,
+is  ".	/bin  /usr/bin".   You can change this to anything you
+want with the path command.
+
+Note: The shell's automatic upm set-up does not work for all CP/M
+programs. For instance, the Logicalc program lc.com insists that it
+be on the "currently logged drive", (whereas WordStar can be on either
+the currently logged drive or the A drive).
+So the best way to run logicalc is to put the following alias in
+your .sh file:
+
+	alias lc "upm  a:/cpm  b:./  lc"
+
+Then logicalc will run happily as long as you remember that your
+spreadsheet files are on your B drive.
+
+
+.ti -5
+.bd
+Terminal Emulation
+
+.bd
+upm  
+has the capability of emulating  different 
+terminals.   A terminal emulator converts the control  characters 
+that  your  terminal and a terminal-configured piece of  software 
+use to communicate "special effects".   These special effects are 
+things  like  moving the cursor around,  clearing the  screen  or 
+highlighting  parts  of  the  screen.    By  converting   control 
+characters  you can make several terminals all look the same  for 
+software.   This may allow you to use the same configured version 
+of software for all your terminals.
+
+Terminal  emulation may also be of use to you if you have an 
+unusual  terminal  that is not listed  in  software  installation 
+programs.   You  would simply add your terminal specifications to 
+the Micronix file /etc/terminals, and upm will emulate one of the 
+more  common  types of terminals  for  you.   Then,  you  install 
+software for the terminal that 
+.bd
+upm 
+is emulating.
+
+There are three different terminals that upm can emulate: an 
+ADM-3A,  a  Soroc IQ-120,  and an ADM-31.   These three terminals 
+represent   increasingly   sophisticated   levels   of   terminal 
+"intelligence".  The ADM-3A, the least intelligent, can clear the 
+screen,  and  move the cursor.   The Soroc IQ-120 represents  the 
+next level.   The Soroc can do everything the ADM-3A can do, plus 
+it can display characters in high or low intensity and has  erase 
+to end of screen and end of line functions.
+
+The  most  intelligent terminals have all  the  capabilities 
+previously mentioned,  plus delete and insert line and  character 
+functions.    The  ADM-31  has  all  of  these  capabilities  and 
+represents the "highest" level of terminal intelligence.
+
+The  use  of  levels categorizes similar 
+terminals in a small number of groups.   This allows the terminal 
+emulator  to  translate many different terminals'  control  codes 
+into  three  subsets,  requiring only (at most)  three  different 
+configured  versions  of software.   Your terminal may have  many 
+bells  and  whistles  that aren't included in the  highest  level  
+definition,  but  software  writers rarely make  use  of  unusual 
+features  when  creating  software for use with  general  purpose 
+terminals.
+
+The  recon  program  will display the  terminals  listed  in  the 
+/etc/terminals file, and tell you which terminal 
+.bd
+upm 
+will emulate 
+for  your  terminal  selection.   Install your software  for  the 
+terminal emulated.   If your terminal name is not listed by 
+.bd
+recon, 
+you can 
+add  it  by following the directions given in the  entry  in  the 
+Reference Manual for Files,  /etc/terminals,  in the back part of 
+this binder.
+
+Terminal  emulation is activated by adding the terminal type 
+to a line in the /etc/ttys file.   
+.bd
+upm 
+notices that the ttys file 
+has been changed,  and searches for the line corresponding to the 
+port that the terminal running 
+.bd
+upm 
+is attached to.   If this line 
+has   a  terminal  name  on  it,   .bd
+upm  
+then  searches  the  file 
+/etc/terminals  for  the  matching  terminal.   If  there  is  no 
+terminal  name  on  the line in the  ttys  file,  or  a  matching 
+terminal in the terminals file, 
+.bd
+upm 
+turns off terminal emulation.
+
+Terminal  names  are  added to the /etc/ttys file  by the 
+.bd
+recon
+program.   The 
+.bd
+recon 
+program  displays  the names of terminals in  the  /etc/terminals 
+file, asks for the name of  terminal 
+connected  to each login port,  and adds the name to the line for 
+that port.   If you examine the ttys file after using recon,  you 
+would  see  that terminal names have been added  after  the  word 
+"term=", as in
+
+     ttyA      9600      login     term=mor20
+
+In this case,  the terminal name is mor20.   If you prefer not to 
+use  the  recon program to add terminal names,  you can  add  the 
+names  yourself with an editor.   Be careful not to leave a space 
+between "term=" and the terminal name.  The terminal name must be 
+one of the abbreviated mnemonic names listed in the /etc/terminals file.
+
+Initially,  the /etc/terminals file has only about  twenty  different 
+terminal  names in it,  so you may not find your terminal in  the 
+file.   The  terminals  file is purposely short in an attempt  to 
+reduce  the  time  spent scanning through the  file  looking  for 
+terminal  names and capabilities.   
+
+The  process  of checking the /etc/terminals  and  /etc/ttys 
+files  to  see if changes have been made takes 
+.bd
+upm  
+a  noticeable 
+amount of time.   In fact, the longer the /etc/terminals file is, 
+the longer it will take 
+.bd
+upm 
+to search through it.   To reduce the 
+time  added  to  include terminal emulation,  a special  file  is 
+created for each login port when upm is executed.   If upm  finds 
+this  file  and  neither  /etc/ttys or  /etc/terminals  has  been 
+modified  more  recently  than  this  file,  then  upm  uses  the 
+information in this cache file for terminal emulation.  This file is in 
+the /usr/upm directory, and is named upmttyX, where X is a letter 
+representing the port, for example, A for the console (upmttyA).
+
+If  you do not have a /usr/upm directory,  upm will never be 
+able to create the special file upmttyX, and will take 10 seconds 
+or so to start working every time.   Once a upmttyX file has been 
+created,  upm  will  start working much quicker.   If  your  file 
+system lacks this directory, you can make one by typing
+
+     # mkdir /usr/upm
+     # []
+
+.bd
+upm 
+will change the upmttyX file if it discovers that either 
+of the files /etc/ttys or /etc/terminals has been changed since the 
+upmttyX  file  was created.   This means that you don't  need  to 
+signal  a change in terminal type to upm because upm will  always 
+check for it.
+
+.ti -5
+.bd
+Printers
+
+Or how to select the best way to talk to your printer.
+
+There have to be half a dozen ways one could set up
+a printer with
+.bd
+upm.
+
+First, consider your environment:
+Are you going to be running single user all the time?
+Are many users going to be using one printer?
+Will you be printing software listings or text?
+
+Next consider your requirements:
+Are you going to use special forms that will be changing?
+Will you run many small files or a few large ones?
+Do you want to allow simultaneous printer access or lock out
+later users, returning the message "Busy"?
+Are you going to print many copies of a single large file?
+
+Let's try to sort all of this out.
+
+Most all CP/M applications programs send their printer
+output to the LST: device.
+
+.bd
+Upm
+can be taught to take those characters sent to
+the LST: device and do any of a number of things
+with them.
+If you don't tell it otherwise (the default condition),
+characters go into the LST: device and appear
+on the controlling terminal (on your screen).
+This is normally not very useful or beautiful.
+
+The easiest way to send these characters to a printer is to:
+.in +5
+1. Attach the printer to one of the I/O ports on the
+back of the Decision, say to ttyC, and then,
+.br
+2. Put the word "lst" on the ttyC line of the Micronix configuration
+file /etc/ttys. (Also, put the baud rate on this line.)
+.in -5
+All this is explained in detail in the documents called
+"printers" and "ttys" (type the commands "help printers"
+and "help ttys").
+
+Once you have done this, anyone who uses upm on your system
+will automatically use the same printer. BUT,
+this doesn't police simultaneous access to the printer. If users
+are located within shouting distance, or if it is very unlikely
+that two people will ever be printing simultaneously, then this
+is enough. Otherwise, read on.
+
+You can arrange to have characters from the LST: device
+sent to a file and saved up for later access.
+This can be useful if you want to print something
+again and again, or if you want to print
+later or on another machine.  Entering
+
+	A>LST:file
+
+is the command to accomplish this.
+Characters sent to the LST: device are written to the
+file named after LST:.
+"File" may be any arbitrary Micronix file name.
+It need not contain a slant.
+(Be careful though, as any previous contents
+of this file will be lost.)
+If the file did not previously exist,
+it will be created.
+
+Once you have saved your output in a file, you can send it to the printer
+with the "lpr" program by typing the command
+
+	A>!lpr file
+
+The exclaimation point is the way to run a Micronix
+command from the CP/M environment.
+This will send files to the printer in first-come-first-served
+order, making sure that different users do not interfere with
+each other. There is more information on this below.
+
+You can send characters direct to a
+"character special file" (or in other words to some other port).
+
+	A>LST:/dev/ttyC
+
+channels characters coming from the
+LST: device to "ttyC" into which might be plugged a printer.
+If you get the message "File or device busy",
+that's the case.
+You'll be able to access the tty as soon as
+whoever has it right now releases it.
+If you get the message "Permission denied",
+you should get your local super-user (possibly yourself)
+to execute the commmand:
+
+	# chmod a+w /dev/ttyC
+
+to enable writing to the device.
+Ttys
+used like this should
+.ul
+not
+be listed in the /etc/ttys file as
+"login" ports.
+You need to choose which ports you will use to log in on
+and which ports you will use as printers.
+In addition, you can specifiy the baud rate of your printer.
+(Default is whatever the device was set to before.)
+It is always a good idea to specify your baud rate.
+Also be sure your hardware and software baud rates agree:
+
+	A>LST:/dev/ttyD,1200
+
+would send characters to ttyD at a rate of 1200 baud.
+
+
+.bd
+.ti -5
+Printer Handshaking
+
+Micronix supports Clear-to-Send (CTS) and X-on, X-off handshaking.
+If it asks (as WordStar does), you should tell your CP/M program to do
+.ul
+no
+handshaking,
+as Micronix will be handling that end of things.
+X-on, X-off handshaking is always there and
+you don't have to specify it.
+If you don't use it, it doesn't get in the way.
+
+CTS handshaking, however, needs to be carefully set up.
+Note that the Morrow Designs Wunderbuss I/O
+(found in Decision I table top models)
+has CTS coming out on
+.ul
+pin-8
+of the 25-pin connectors.
+This is not standard.
+The CTS pin is normally ignored.
+If you specify the CTS type of handshaking described
+below, no data will be transmitted until the
+signal on pin-8 on the Wunderbuss IO (pin-5 on the Mult/IO) is TRUE.
+(See the help files on "printers", "setup", and "cables" for details.)
+
+The following command line
+
+	A>LST:/dev/ttyB,9600,cts
+
+would send characters through the CP/M LST device
+to
+ttyB at 9600 baud with CTS handshaking.
+
+
+.bd
+.ti -5
+Policing the Printer
+
+If you want only one person to be able to access your
+printer at a time, type:
+
+	# chmod u+l /dev/ttyC
+
+(The # is a super-user shell prompt. You should log in as "root"
+(the super-user) to execute this command.)
+This will set the single write lock bit,
+after which only one user will be able to access the printer (ttyC)
+at a time.
+Other users will get the message "File or device busy."
+With the lock bit set,
+once a user gains access to the printer, he will hog it
+until he either A) exits from upm, or B) types the command
+
+	A> LST:
+
+to release the printer (by re-assigning it to "nothing").
+
+If you want many users to be able to use the printer
+at once (and do your own policing), type:
+
+	# chmod u-l /dev/ttyC
+
+to clear the lock bit.
+In this state, the users will have to decide amongst
+themselves when to print.
+You'll also probably have to move the paper to "Top of form"
+manually after printing.
+If two users try to print at once, the characters will be intermingled
+(very ugly).
+
+If you prefer to have software make the use decisions
+for you (set up a spooling printer), use the
+.bd
+lpr
+program.
+It is recommended that you prepare your printed
+copy by formatting it, sending it to an output file (as described
+above), then type the command
+
+	A> !lpr file
+
+.bd
+Lpr
+is good at handling large
+printing jobs done on the same type
+of paper
+with printers which never fail, etc.
+.bd
+Lpr
+works in a deferred bulk fashion.
+If you want immediacy, use the direct tty method
+outlined above.
+See lpr in section 1 for more details.)
+
+.ti -5
+.bd
+The system-wide LST device.
+
+It is possible to designate a particular
+device on the system to be the recipient
+of all output from all instances of upm
+which are sending characters to their respective LST devices.
+(Note that if a user has specified a LST device in his own .upm file,
+it will override the system-wide LST device.)
+
+This is accomplished by making an entry in the /etc/ttys file.
+The /etc/ttys file is scanned by upm for a line containg the
+word "lst".
+If such a line is found, then upm arranges
+that LST characters will be sent to the device
+named by the first word on that line.
+
+We desperately need an example of this simple concept.
+Suppose your "/etc/ttys" file contains:
+
+	ttyA login 9600
+	ttyB login 9600
+	ttyC lst   1200
+
+Any upm program run on the system will send its LST output
+to ttyC as specified.
+
+The Micronix /etc/ttys file as shipped has such an entry.
+
+
+.bd
+.ti -5
+Select Errors
+
+It is not possible to get a CP/M
+SELECT ERROR underÿ.bd
+upm.
+
+If you select a drive which has as yet no corresponding
+directory,
+.bd
+upm
+inquires with the line
+
+	Select a directory for drive D:
+
+for instance.
+
+You should respond by typing the name of a
+Micronix directory (/a/tom/letters, for example).
+.bd
+Upm
+will continue
+badgering you until you do.
+
+This feature can be used to change directories right
+in the middle of a program (WordStar as a good example):
+
+.in +5
+Change the logged drive to drive E: (previously
+undefined).
+.bd
+Upm
+will ask you for a directory name.
+Respond with the name of the directory you want to reference.
+Drive E: will now correspond to that new directory
+(and you didn't have to get out of WordStar do to it).
+.in -5
+
+
+.ti -5
+.bd
+File Names
+
+.bd
+Upm
+intervenes in all file transactions originated
+by the CP/M program.
+When the CP/M program thinks it is opening a CP/M file,
+it is really opening a Micronix file.
+.bd
+Upm
+handles conversion back and forth between CP/M FCB's and Micronix
+file path names.
+It maintains a table of correspondences between CP/M drives and
+Micronix directories.
+For example, a CP/M program might read from a file named
+
+	B:TEST.DOC
+
+Here "B" indicates CP/M drive B and "TEST.DOC" is the
+CP/M file name.
+Suppose for a moment that
+.bd
+upm
+is currently remembering
+the correspondence
+
+	B: -> /a/hubert
+
+then the above CP/M file name would be translated to:
+
+	/a/hubert/test.doc
+
+We see here that "B:" got translated to "/a/hubert/"
+and TEST.DOC got translated to "test.doc".
+
+
+.bd
+.ti -5
+File Names
+
+CP/M file names are all upper case.
+.bd
+Upm
+converts these to all lower case
+Micronix file names as seen in the above example.
+
+(If a "/" appears in a CP/M file name,
+it will be converted to a "|" because
+"/" has special meaning in Micronix file names.)
+
+It should be noted that some files
+may be inaccessible from
+.bd
+upm
+because they have "CP/M impossible names".
+This is no great stumbling block, however,
+as one can simply rename the Micronix file(s).
+(See
+.bd
+mv
+in Section 1 of the Micronix Reference Manual.)
+
+For file names to be accessible from
+.bd
+upm
+the rules are:
+
+.in +5
+All lower case letters.
+
+Maximum eight character filename.
+
+Maximum three character extension (optional).
+
+Names without an extension may be at most eight characters long.
+and should
+have
+.ul
+no
+final
+".".
+
+No question marks (?) or asterisks (*) may be used as a character
+in the name.
+.in -5
+
+.ti -5
+Examples of valid upm accessible file names:
+
+.nf
+	a.doc	example.txt	ppp
+
+	z.f	prog.c		peter
+.fi
+
+
+.ti -5
+.bd
+BIOS Jump Table
+
+.bd
+Upm
+also contains a "BIOS jump table"
+bearing a striking resemblance to the original,
+and corresponding in function.
+The two BIOS calls,
+"read sector" and "write sector,"
+are considered illegal as they have no corresponding function
+in the Micronix environment.
+All the other BIOS calls are allowed, however,
+some are silently ignored. (See the
+.ul
+CP/M 2.2 Operating System Manual
+for more information on the CP/M BIOS.)
+The BIOS calls having to do with character I/O
+are fully implemented.
+If you've never heard of a BIOS jump table, ignore this section.
+
+
+.ti -5
+.bd
+Built-In Commands
+
+Here is a summary of the available built-in commands under
+.bd
+upm.
+Some of these are also discussed at length elsewhere
+in this document.
+
+Note that character case is insignificant under CP/M
+but matters to Micronix.
+In the following table, CP/M-ish things
+are given
+in upper case; Micronix-ish things in lower case.
+
+
+.in +6
+.ti -8
+=	Displays drive-directory correspondences.
+
+.ti -8
+!command
+Run a Micronix command.
+Any valid shell command may appear after the exclamation point.
+
+.ti -8
+ERA	Erases specified files.
+
+.ti -8
+DIR	Displays file names in the directory.
+
+.ti -8
+exit	Leave upm.
+This is the only way to get out of upm INTERACTIVE mode
+(short of killing the process from another terminal).
+
+.ti -8
+REN	Renames a specified file.
+Exactly as in standard CP/M.
+REN new = old.
+
+.ti -8
+SAVE	Save memory contents in a file.
+.br
+UNIMPLEMENTED.
+.br
+If you want to patch files, see the Micronix utility
+.bd
+ddt
+(in Section 1 of the Micronix Reference Manual).
+
+.ti -8
+TYPE	Types the contents of a file.
+
+.ti -8
+USER	Move to another area within the same directory.
+UNIMPLEMENTED.
+.br
+All files are considered to be "USER 0"
+for the purposes of CP/M programs.
+The far (1) utility can be used to access files with any user number
+on a CP/M floppy.
+
+.ti -8
+A:	Select a drive.
+
+.ti -8
+A:/directory
+.br
+Set a new drive-directory correspondence.
+
+.ti -8
+LST:file
+.br
+Send LST: output to a file
+Creat the file if it didn't exist.
+
+.ti -8
+LST:tty
+.br
+Send LST: directly to another tty.
+(X-on X-off handshaking will be used by default.)
+
+.ti -8
+LST:tty,speed
+.br
+Send LST: directly to a tty
+.ul
+and
+set the speed.
+(Again X-on, X-off handshaking used by default.)
+
+.ti -8
+LST:file,speed,cts
+.br
+Send LST: output to a file and set the speed and CTS handshaking.
+Output is inhibited until the CTS line (pin-8 on the Wunderbuss or pin-5
+on the Mult/IO)
+is driven
+.bd
+TRUE.
+
+.ti -8
+LST:|program
+.br
+Send (pipe) the LST: output to another program.
+Note that if this command is
+entered from the shell,
+the command line must be in quotation marks or else
+the shell will interpret the pipe incorrectly; i.e:
+entering
+
+.bd
+upm lst:|lpr
+
+will be parsed into two commands by the shell.
+You can convey the intended meaning
+by enclosing the upm LST redirection argument in quotes, thusly:
+
+.bd
+upm "lst:|lpr"
+
+.ti -8
+LST:	Disconnect LST:.
+LST: reverts to the default (characters appear on your screen).
+.in -6
+
+.ti -5
+.bd
+Control characters
+
+The control characters discussed below are
+effective only when the "standard" CP/M
+console I/O calls are used.
+They will not be understood if the CP/M BIOS jumps
+or CP/M direct I/O calls are used to generate the output
+or request input.
+
+^P - printer toggle.
+
+Normally console output is sent only to the console.
+If you type ^P, console output will be sent to both
+the LST device and the console.
+If you type ^P again, console output is once again
+sent only to the console.
+
+^S - suspend console output.
+
+If, while console output is occurring, a ^S is received,
+it is interpreted as an instruction to temporarily
+suspend further output.
+When in suspended mode, any character will restart the output,
+except ^C which will cause upm to exit immediately.
+
+^C - abort.
+
+A ^C as the first character of an input line will cause
+an exit from upm.
+
+^R - retype current input line.
+
+.ti -5
+.bd
+Submit files.
+
+Standard CP/M submit file format is implemented.
+IMPORTANT:
+Submit file operation works only in upm's INTERACTIVE mode.
+From the user's point of view, operation under upm is identical to
+operation under CPM.
+
+Here is the way submit files work internally, under both CPM and upm.
+Please note that that this is
+OPTIONAL TECHNICAL material, needed only by programers with special
+requirements.
+We repeat it here only because it is very hard to find this in the
+CPM documentation.
+
+.in +5
+The submit file is named "A:$$$.SUB"
+
+Upm checks for the presence of a submit file
+just before issuing its prompt ( "X>" ).
+A submit file consists of a series of records.
+Each record represents one CP/M command.
+Each record is 128 bytes in length.
+The records are in reverse order within the submit file.
+Last record first, first record last, etc.
+
+The first byte of each record gives the length of the
+command line found in the following 127 bytes.
+
+The following 127 bytes contain the CP/M command
+exactly as one would enter it from the console.
+
+Standard CP/M reduces the length of its submit file
+by one record upon executing each command.
+
+Upm doesn't actually change the size of the file,
+but keeps track of where it is.
+.in -5
+
+
+.bd
+.ti -5
+Text Files
+
+Herein are some practical suggestions on the handling of text files
+and the successful transportation thereof between CP/M and Micronix.
+Also included is a description of the differences in their formats.
+
+CP/M text files and Micronix text files are identical,
+.ul
+except
+for the following:
+
+.in +5
+.ti -5
+.ta 5
+1.	At the end of each line of a Micronix text file there is a single
+NEWLINE character; at the end of each line of a CP/M text file
+there is a RETURN character followed by a NEWLINE character.
+
+.ti -5
+2.	A CP/M file's length must be an even multiple of 128 bytes.
+A Micronix file's length may be any number of bytes
+(both are constrained to maximum file sizes).
+CP/M text files are padded with ^Z characters at the end
+to round them out to an even multiple of 128.
+Micronix text files are not.
+
+.in -5
+There is a convenient utility for converting a text file back and forth
+between the two formats.
+(See
+.bd
+clean
+in Section 1 of the Micronix Reference Manual.)
+To make a text file suitable for Micronix, enter:
+
+.bd
+	% clean filename
+
+To make a text file suitable for CP/M or
+.bd
+upm,
+enter:
+
+.bd
+	% clean -u filename
+
+The name
+.bd
+clean
+comes from the idea of cleaning out the excess RETURN characters
+and ^Z characters at the end; "-u" stands for "unclean".
+
+
+.ti -5
+.bd
+Upm and the Background
+
+Non-interactive CP/M programs may be run in the background.
+The asm assembler is an example of a non-interactive program.
+Running something in the background means you don't have
+to wait for it to finish, but are able to do something
+else on the system while waiting.
+See also the section on background processes
+in "sh" in section 1 of the Micronix reference manual.
+It is also possible to run a non-interactive CP/M
+program in the background at reduced priority
+so that the subjective response time is not as
+adversely affected.
+
+	% asm program &
+
+Would cause the named program's assembly proccess
+to be initiated, but you
+would immediately regain control of the console.
+Note that this command must be issued from the shell.
+
+	% nice 5 asm program &
+
+Would cause the same action as above but at a reduced priority level.
+(The default "nice" is 0.)
+
+
+.ti -5
+.bd
+Trace Mode
+
+.bd
+Upm
+incorporates a trace mode for use in tracking down trouble,
+or to analyze CP/M system call usage (or for any other
+reason which comes up).
+
+To run
+.bd
+upm
+in "trace mode", type:
+
+	% upm -v
+
+(The -v stands for verbose.)
+Each CP/M call made by the CP/M program
+running under emulation will be displayed
+on your screen as a single character.
+
+Below is a table of the CP/M calls and the associated characters.
+
+
+.nf
+.ta 8
+CPM call    CPM call  Upm trace
+ name	     number    letter	  Description
+--------    --------  ---------   -----------
+RESET           0       A         system reset
+CONIN           1       B         console input
+CONOUT          3       D         console output
+READER          3       D         reader input
+PUNCH           4       E         punch output
+LIST            5       F         list output
+DIRECTIO        6       G         direct I/O
+GETIO           7       H         get I/O byte
+SETIO           8       I         set I/O byte
+PRINTSTRING     9       J         print string
+READBUF        10       K         read console buffer
+CONSTAT        11       L         get console status
+VERSION        12       M         return version number
+DISKRESET      13       N         reset disk system
+SELECTDISK     14       O         select disk
+OPEN           15       P         open file
+CLOSE          16       Q         close file
+FIRST          17       R         search for first
+NEXT           18       S         search for next
+DELETE         19       T         delete file
+READSEQ        20       U         read sequentially
+WRITESEQ       21       V         write sequentially
+MAKE           22       W         make file
+RENAME         23       X         rename file
+LOGIN          24       Y         return login vector
+CURDISK        25       Z         return current disk
+DMA            26       [         setD MA address
+GETADDR        27       \         get addr (alloc)
+PROTECT        28       ]         write protect disk
+GETRO          29       ^         get read/only vector
+SETFILE        30       _         set file attributes
+PARMS          31       `         get addr (disk parms)
+USERCODE       32       a         set / get user code
+READRANDOM     33       b         read randomly
+WRITERANDOM    34       c         write randomly
+SIZE           35       d         compute file size
+SETRANDOM      36       e         set random record
+.fi
+.ta 5
+
+
+.ti -5
+.bd
+Other flags
+.br
+
+.in +5
+.ti -5
+-p
+.br
+Suppress polling behavour.
+Bios console status call always returns true.
+Bdos direct I/O call always returns a character, delaying if it has to.
+Example:
+
+	upm -p
+
+
+.ti -5
+-t
+.br
+Suppress terminal emulation.
+Characters are sent through upm unchanged.
+Upm comes up a little faster too.
+Example:
+	
+	upm -t
+
+
+.ti -5
+-mOCTAL
+.br
+Set the file creation mode.
+The default mode is 0666, which corresponds to readable and writable
+by everyone.
+
+	upm -m0600
+
+would cause all newly created files to be readable and writeable
+only by their owner.
+
+	upm -m01666
+
+would cause all newly created files to be write-locked.
+Only one user could have the file open for writing at a time.
+
+
+	upm -m0644
+
+would make the file readable only by other than the file's owner.
+
+
+.in -5
+
+.ti -5
+.bd
+Exiting upm
+
+You may leave INTERACTIVE mode by typing "exit" as a
+command.
+
+Exit from
+.bd
+upm's
+DIRECT mode occurs immediately upon completion of the
+called application program.
+
+The appearance is that the CP/M program was run
+directly under Micronix and then returned directly to Micronix.
+
+If a program "bombs, freezes up, locks up, crashes," etc., what can you do?
+(Sometimes you can restore control by hitting DELETE or RUBOUT, but
+if you are running under upm, that will not work.)
+One feature of Micronix is that a single crashed program cannot bring
+the whole system down.
+The system manager can "kill" the abberant program
+from another terminal. Here is what the system manager should do:
+
+Remember that each terminal is called tty-something, such as ttyA, ttyB, etc.
+Let's say that the crashed program is running on ttyB.
+Log in as "root" on another terminal, and type the command "ps a".
+This will give the Process Status of tasks running on the system.
+The "a" means "tell me about All the tasks, not just the ones
+belonging by this terminal". A list of tasks will appear, including
+those belonging to ttyB. Note the numbers of all the tasks associated
+with ttyB. You want to kill all of them (not just the ones called "upm").
+Say that tasks number 4, 6, and 7 are listed as belonging to ttyB.
+You should type
+
+	# kill 4 6 7
+
+The # is the super-user shell prompt, not something you type.
+Unless you have logged in as the super-user (who is usually called
+"root") you won't be able to kill someone else's programs.
+This will terminate the offending program, and will also log the
+user out. The user can then log back in and proceed.
+
+
+.ti -5
+.bd
+BUGS
+
+Here is a collation of all the sort of things which
+are
+.ul
+not
+likely to work under
+.bd
+upm:
+
+8080 Instructions:
+
+	hlt, in, out
+
+
+Hardware specific programs:
+
+	Hard disk formatters.
+	Floppy disk formatters.
+	Modem programs.
+
+
+CP/M specific programs:
+
+	MOVCPM, SYSGEN
+
+
+CP/M specific calls (the CP/M call 27 returns nonsense,
+because there is no allocation bit map,
+but this is often harmless.)
+
+
+.ti -5
+.bd
+SEE ALSO
+.br
+.bd
+Upm
+tutorial in User Reference Manual
+
+.ul
+CP/M 2.2 Operating System Manual
+.br
+   by Digital Research, (C) 1976, 1977, 1978
+
+clean (1), far (1), ls (1), chmod (1), ps (1), mv (1)
+
+.bd
+.ti -5
+FILES
+.br
+/usr/upm - directory for cached terminal information.
+Upm does not create this directory, but requiees that it be there.
+
+~/.upm  .upm  
+.br
+Upm start up files.  (~ means your home directory)
+
+/etc/passwd - To find home directory.
+
+/etc/terminals - Terminal definition information.
+
+.bd
+.ti -5
+CREDITS
+.br
+CP/M is a trademark of Digital Research.
+
+.br
+WordStar
+is a trademark of  MicroPro International Corporation.
+
+UNIX is a trademark of Bell Laboratories.
+
+.bd
+upm
+is a product of the Morrow Designs software group.
+
+
+
+
+
+
+
+
+
+
+

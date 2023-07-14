@@ -1,1 +1,6 @@
 this directory contains micronix binary floppy images
+the floppies directory contains the micronix 1.6 series of
+binaries from https://github.com/MicronixUser/MorrowDecisionI
+
+reading them requires the use of the 1k sector skew code, because
+they were imaged from 1k sector 5.25 disks.
