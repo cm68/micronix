@@ -1,0 +1,9 @@
+
+This is the /etc/motd (message-of-the-day) file.
+It is printed each time a user logs in.
+It is usually changed daily.
+
+To see what's new in Micronix 1.67, type
+help new167
+
+

@@ -1,0 +1,72 @@
+.in 10
+.rm +10
+.he "uuencode (1)                       3/1/84                        uudecode (1)
+.fo "                                    -#-"
+.bd
+.ti -5
+NAME
+.br
+uuencode, uudecode - convert to ascii file
+
+.bd
+.ti -5
+SYNTAX
+
+uuencode source destination
+
+uudecode [filename]
+
+.ti -5
+.bd
+DESCRIPTION
+.br
+Uuencode and uudecode provide the means to 
+convert any arbitrary file into a text file
+and back again.
+Our version is compatible with standard unix
+uuencode and uudecode.
+These programs are intended for use
+with cu(1).
+An algorithm is used which results in an approximate
+35% expansion in the file.
+Each triple of bytes in the file has its
+3 sets of 8 bits converted to 4 sets of 6 bits,
+thus expanding 3 bytes to 4.
+
+.ti -5
+EXAMPLE
+.br
+Suppose you wish to transfer a the file "data"
+accross the wire and it contains non-ascii
+(non-printing) characters.
+
+.nf
+
+Step 1: Convert your file to a text file using uuencode
+
+	uuencode data data > x
+
+
+Step 2: Transfer your file.
+
+	cu /dev/ttyC
+	~%put x
+
+
+Step 3: Reconstitute your file on the other end (still under cu).
+
+	uudecode x
+
+
+Step 4: Clean up. (here and there)
+
+	rm x
+	~
+	rm x
+
+
+.bd
+.ti -5
+SEE ALSO
+.br
+cu(1)

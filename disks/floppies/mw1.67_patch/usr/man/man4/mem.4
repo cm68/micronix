@@ -1,0 +1,94 @@
+.in 5
+.rm 65
+.he "mem (4)                    2/15/84                        mem (4)"
+.fo "                              -#-"
+.bd
+DEVICE
+.in +5
+.br
+.bd
+mem, kmem
+- memory device
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+The memory device provides access to the machine's primary memory
+(RAM).
+Access to the memory device
+is through the system calls open(), seek(), read(), write(), close().
+Memory is viewed as a file,
+you seek() to the address you would like to read or write.
+
+Currently, two flavors of memory access are available.
+Flavor selection is accomplished through the minor device number.
+
+For a minor device number of 0 (device name /dev/mem)
+you have access to 1 meg of memory.
+(addresses 0 - FFFFF)
+
+For minor device number 1 (device name /dev/kmem)
+you have access only to kernel memory and perhaps
+more importantly to the MPZ80's page zero in the first
+4 K of address space (0 - FFF).
+Caution is advised as its possible to crash the system
+by even reading some locations in page zero.
+Reading beyond address FFFF results in wrap around to address 0.
+
+The recommended modes for the files /dev/mem and /dev/kmem are 0.
+
+	chmod 0 /dev/mem /dev/kmem
+
+Allowing the general public read access to system memory
+constitutes a security breach.
+
+Example:
+
+How to read byte 200 hex in page zero with C.
+
+main ()
+	{
+	char c;
+	int f;
+
+	f = open ("/dev/kmem", 0);
+
+	seek (f, 0x200, 0);
+
+	read (f, &c, 1);
+	}
+
+
+Example:
+
+How to examine memory manually with ddt.
+This example would display memory locations
+beginning with C0FA hex.
+
+ddt /dev/mem
+-dC0FA
+
+
+
+Notes on Micronix memory use.
+
+0 - FFF is unused.
+
+1000 - FFFF is used by the kernel (kernel space).
+
+10000 - ??? is used for user processes (user space).
+
+User space is allocated in 4096 byte address space segments.
+The actual memory image of a user's program
+is likely to be scattered throughout memory.
+
+.ti -5
+FILES
+
+/dev/mem - User memory
+
+/dev/kmem - Kernel memory
+
+

@@ -1,0 +1,16 @@
+.he "                   Whats New in Micronix 1.63"
+.in 12
+.ti -8
+The kernal has been changed to enable /dev/mem.  Use "help mem" 
+for details.
+
+.ti -8
+
+.ti -8
+/usr/man/man0/new.0
+.br
+This file contains the on-line documentation of new features.
+It has been split into five files, new16.0, new161.0, new162.0, new163.0 and
+new164.0 for versions 1.6, 1.61, 1.62, 1.63 and 1.64 respectively.
+These are viewed by typing "help new16" , "help new161", etc.
+

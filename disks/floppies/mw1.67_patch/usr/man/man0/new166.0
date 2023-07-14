@@ -1,0 +1,41 @@
+.he "                   Whats New in Micronix 1.66"
+.in 12
+.ti -8
+The kernal has been modified to enable record locking.  Use "help lock"
+for details.
+
+.ti -8
+Fixed utilities ...
+
+.br
+cu	: corrects ~%get and ~%put command execution.
+
+.br
+upm	: now can execute DATASTAR from MICROPRO.
+
+.br
+/libmd	: corrects 'atoi' in /lib/libmd.a (requires C option).
+
+.br
+/libS	: corrects 'scanf' in /lib/libS.a (requires C option).
+
+.ti -8
+New utilities ...
+
+.br
+uudecode: utility to decode a 'cu' transmitted file back into binary format.
+
+.br
+uuencode: utility to encode a binary formatted file into 6 bit (bits 7,6 = 0)
+file for subsequent transmission using 'cu'. See 'man uuencode' for
+details.
+ 
+.ti -8
+/usr/man/man0/new.0
+.br
+This file contains the on-line documentation of new features.
+It has been split into five files, new16.0, new161.0, new162.0, new163.0 and
+new166.0 for versions 1.6, 1.61, 1.62, 1.63 and 1.66 respectively.
+Versions 1.64 and 1.65 were not released.
+These are viewed by typing "help new16" , "help new161", etc.
+

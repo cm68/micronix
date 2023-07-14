@@ -1,0 +1,29 @@
+.he "                   Whats New in Micronix 1.62"
+.in 12
+.ti -8
+The following files have been changed:
+
+.ti -8
+/micronix.mw
+.br
+The scheduling algorithm for keyboard respone has been modified to
+improve response time in both single and multi-user modes.
+
+.ti -8
+/upm4.2
+.br
+This new version of upm is experimental.  It provides the option of
+a -p flag to suppress polling.  Some applications software will
+not run with this flag.  When the use of this flag does not block
+the application software, its use should enhance response time
+for other users on the system.  Other flags are also provided.  See
+the flags section of the upm documentation.
+
+.ti -8
+/usr/man/man0/new.0
+.br
+This file contains the on-line documentation of new features.
+It has been split into two files, new16.0 and new161.0
+for versions 1.6 and 1.61.
+These are viewed by typing "help new16" and "help new161".
+
