@@ -4,7 +4,7 @@
  * brute force for everything
  *
  * lib/fslib.c
- * Changed: <2023-06-19 07:13:45 curt>
+ * Changed: <2023-07-13 13:27:06 curt>
  */
 #include <unistd.h>
 #include <stdio.h>
@@ -27,8 +27,7 @@
 #include <libdsk.h>
 #endif
 
-
-int spt = 15;
+/* int spt = 15; */
 
 extern int traceflags;
 int trace_fs;
@@ -49,6 +48,8 @@ struct image {
     int major;
     int minor;
     int altsec;
+    int spt;    /* sectors per track */
+    int bps;    /* bytes per sector */
 #ifdef USE_LIBDSK
     DSK_PDRIVER *drive;
 #endif
@@ -138,16 +139,42 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
     } 
  
     if (ret >= 0) {
+        i->spt = 15;
         i->dt = ' ';
         i->altsec = 0;
         devnum(filesystem, &i->dt, &i->major, &i->minor);
-        if ((i->driver == DRIVER_IMD) || 
-            ((i->dt == 'b') && (i->major == 2) && (i->minor & 0x8))) {
+        if (i->driver == DRIVER_IMD) {
             i->altsec = 1;
         }
         if (i->dt == ' ') {
             if (is_sticky(filesystem)) {
                 i->altsec = 1;
+            }
+        }
+        if (i->minor & 0x10) {
+            i->bps = 1024;
+        } else {
+            i->bps = 512;
+        }
+        if (i->minor & 0x08) {              /* do skew */
+printf("skew\n");
+            i->altsec = 1;
+        }
+        if (i->major == 2) {
+            if (i->minor & 0x04) {          /* 5.25 */
+printf("5.25 inch\n");
+                if (i->bps == 1024) {
+                    i->spt = 10;
+                } else {
+                    i->spt = 9;
+                }
+            } else {
+                if (i->bps == 1024) {
+                    i->spt = 16;
+                } else {
+                    i->spt = 15;
+                }
+printf("8 inch\n");
             }
         }
         *fsp = (struct super *)i;
@@ -170,18 +197,18 @@ openfs(char *filesystem, struct super **fsp)
 UINT
 secmap(struct super *fs, UINT blkno)
 {
-    int trk = blkno / spt;
-    int sec = blkno % spt;
     struct image *i = (struct image *)fs;
+    int trk = blkno / i->spt;
+    int sec = blkno % i->spt;
 
     if (i->altsec) {
         sec <<= 1;
-        if (!(spt & 1) && sec >= spt) {
+        if (!(i->spt & 1) && sec >= i->spt) {
             sec++;
         }
-        sec %= spt;
+        sec %= i->spt;
     }
-    return (trk * spt + sec);
+    return (trk * i->spt + sec);
 }
 
 int secsize;
