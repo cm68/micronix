@@ -532,7 +532,7 @@ find_symbol(char *ls)
     struct sym *s = syms;
 
     while (s) {
-        if (strcasecmp(s->name, ls) == 0) {
+        if (strcmp(s->name, ls) == 0) {
             return (s->value);
         }
         s = s->next;
@@ -548,10 +548,11 @@ add_sym(char *name, int v)
 {
     struct sym *s;
     struct sym *p;
+    int i;
  
     /* gotta be unique */
-    if (find_symbol(name) != -1) {
-        printf("symbol %s multi add\n", name);
+    if ((i = find_symbol(name)) != -1) {
+        printf("symbol %s multi add %x %x\n", name, v, i);
         return;
     }
     if (debug > 2) printf("adding symbol %s : %x\n", name, v);
@@ -1042,11 +1043,13 @@ char **argv;
             v = (line[0] + (line[1] << 8)) & 0xffff;
             switch (o) {
             case 0xd:
-                add_sym(&line[3], v + seg[SEG_TEXT].base);
+                add_sym(&line[3], v);
+                // add_sym(&line[3], v + seg[SEG_TEXT].base);
                 reg_target(v + seg[SEG_TEXT].base, CODE);
                 break;
             case 0xe:
-                add_sym(&line[3], v + seg[SEG_DATA].base);
+                add_sym(&line[3], v);
+                // add_sym(&line[3], v + seg[SEG_DATA].base);
 				reg_target(v + seg[SEG_DATA].base, REF);
                 break;
             case 0x8:

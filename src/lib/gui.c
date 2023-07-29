@@ -3,7 +3,7 @@
  *
  * lib/gui.c
  *
- * Changed: <2023-06-27 15:17:44 curt>
+ * Changed: <2023-07-27 16:33:02 curt>
  *
  */
 #include <curses.h>
@@ -232,7 +232,10 @@ update_dis(unsigned short pc)
 
     /* message("pc: %x disas_lines: %d disas_line: %d:", 
         pc, disas_lines, disas_line);
-    for (i = 0; i < 7; i++) { message(disas_pc[i] == -1 ? "%d " : "%04x ", disas_pc[i]); } ; message("\n");
+    for (i = 0; i < 7; i++) { 
+        message(disas_pc[i] == -1 ? "%d " : "%04x ", disas_pc[i]); 
+    }
+    message("\n");
     */
 
     mvwaddstr(win[W_DIS], disas_line, 0, "  ");
@@ -276,10 +279,24 @@ dumpcpu()
     unsigned short pc;
     char fbuf[9];
 
-    if (!win)
-        return;
-
     pc = z80_get_reg16(pc_reg);
+
+    if (!win) {
+        char outbuf[40];
+        char *s;
+        format_instr(pc, outbuf);
+        s = get_symname(pc);
+        if (s) {
+            message("%s:\n", s);
+        }
+        f = z80_get_reg8(f_reg);
+        fflags(f, fbuf);
+        message("bc: %04x de: %04x hl: %04x sp: %04x: af: %04x %s %04x %s\n",
+            z80_get_reg16(bc_reg), z80_get_reg16(de_reg), z80_get_reg16(hl_reg), 
+            z80_get_reg16(sp_reg), z80_get_reg8(a_reg) << 8 | z80_get_reg8(f_reg), fbuf, 
+            pc, outbuf);
+        return;
+    }
 
     update_dis(pc);
 

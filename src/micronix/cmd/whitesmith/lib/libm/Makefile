@@ -3,13 +3,16 @@
 #
 # src/cmd/whitesmith/lib/libm/Makefile
 #
-# Changed: <2023-07-12 12:04:05 curt>
+# Changed: <2023-07-28 19:08:17 curt>
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 LIB = libm.a
 
 all: $(LIB)
+
+install: $(LIB)
+	cp $(LIB) /lib
 
 SOBJS1 = \
 	btou.o cffun.o count.o dadd.o dcmp.o ddiv.o dmul.o \
@@ -39,7 +42,7 @@ $(LIB): $(LIBOBJS) Makefile
 	rm -f objs editscript makelib.sh objlist
 
 
-$(SOBJS) : $*.s
+$(SOBJS1) $(SOBJS2) : $*.s
 	as -o $*.o $*.s
 
 $(COBJS) : $*.c

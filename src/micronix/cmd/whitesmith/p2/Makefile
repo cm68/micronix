@@ -3,9 +3,11 @@
 #
 # src/cmd/whitesmith/p2
 #
-# Changed: <2023-07-10 18:06:37 curt>
+# Changed: <2023-07-28 20:15:54 curt>
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
+
+INCLUDE = -I/usr/src/cmd/whitesmith/include
 
 all: p2
 
@@ -15,7 +17,7 @@ p2: $(P2OBJS)
 	cc -o p2 $(P2OBJS) -lws
 
 $(P2OBJS) : $*.c
-	cc -c $*.c
+	cc $(INCLUDE) -c $*.c
 
 clean:
 	rm -f *.o

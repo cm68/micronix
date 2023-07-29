@@ -1,11 +1,15 @@
 /*
  * v7 cc command 
  * swizzled to work with hitech c and whitesmith's
+ * -I, -D are normalized
  *
  * cmd/cc/cc.c
  *
- * Changed: <2023-07-10 15:29:17 curt>
+ * Changed: <2023-07-27 10:17:22 curt>
+ *
+ * vim: tabstop=4 shiftwidth=4 expandtab:
  */
+
 #include <stdio.h>
 /* #include <ctype.h> */
 #include <sys/signal.h>
@@ -225,7 +229,7 @@ main(argc, argv)
                         strcat(s, "/");
                         cppflags[ncpp++] = s;
                     } else {
-                        cppflags[ncpp++] = argv[i];
+                        cppflags[ncpp++] = argv[i]+2;
                     }
                 } else {
                     cppflags[ncpp++] = argv[i];
@@ -605,8 +609,4 @@ cunlink(f)
 	}
     unlink(f);
 }
-
-/*
- * vim: tabstop=4 shiftwidth=4 expandtab:
- */
 

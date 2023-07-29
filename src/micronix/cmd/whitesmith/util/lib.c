@@ -3,8 +3,6 @@
  */
 #include <std.h>
 
-typedef TEXT TBOOL;
-
 #define MAGICW	0177565
 #define MAGIC6	0177555
 #define MAGIC7	0177545

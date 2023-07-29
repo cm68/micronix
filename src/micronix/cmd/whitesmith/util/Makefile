@@ -8,23 +8,25 @@
 # lord
 # rel
 #
-# Changed: <2023-07-10 19:24:41 curt>
+# Changed: <2023-07-28 19:51:33 curt>
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
+
+INCLUDE = -I/usr/src/cmd/whitesmith/include
 
 all: hex lib lord rel
 
 hex: hex.c
-	cc -o hex hex.c -lws -lws
+	cc $(INCLUDE) -o hex hex.c -lWS
 
 lib: lib.c
-	cc -o lib lib.c -lws -lws
+	cc $(INCLUDE) -o lib lib.c -lWS -lWS ../lib/libws/itob.o
 
 lord: lord.c
-	cc -o lord lord.c -lws -lws
+	cc $(INCLUDE) -o lord lord.c -lWS
 
 rel: rel.c
-	cc -o rel rel.c -lws -lws
+	cc $(INCLUDE) -o rel rel.c -lWS
 
 clean:
 	rm -f *.o

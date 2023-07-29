@@ -7,21 +7,10 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
+DEPTH = ../..
 DIR = echo
 CLASS = cmd
-ROOT = ~/src/micronix/filesystem
-SRCDIR = /usr/src/$(CLASS)/$(DIR)
-DEST = $(ROOT)/$(SRCDIR)
-NOWARN = --warning=no-ignore-newer
 
 SRCS = $(wildcard *.c *.h)
 
-update: 
-	mkdir -p $(DEST)
-	tar -f $(DIR).tar --ignore-failed-read -c Makefile $(SRCS)
-	tar -f $(DIR).tar -C $(DEST) --keep-newer-files -x $(NOWARN)
-
-clean:
-
-clobber: clean
-	rm -f *.0 $(DIR).tar
+include $(DEPTH)/GNUmakefile.inc

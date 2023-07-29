@@ -7,7 +7,12 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
+INCLUDE = -I/usr/src/cm/whitesmith/include
+
 all: p1
+
+install: p1
+	cp p1 /bin/cp1
 
 P1OBJS = p1data.o p1expr.o p1func.o p1gets.o p1main.o\
 	p1puts.o p1red.o p1subs.o p1type.o
@@ -16,7 +21,7 @@ p1: $(P1OBJS)
 	cc -o p1 $(P1OBJS) -lws
 
 $(P1OBJS) : $*.c
-	cc -c $*.c
+	cc $(INCLUDE) -c $*.c
 
 clean:
 	rm -f *.o
