@@ -1,15 +1,25 @@
 #
 # native Makefile for whitesmiths offbeat library
 #
+# note that due to version madness, this generated library
+# is named libWS.a, distinct from libws.a, which is the micronix
+# distributed version that has a slightly but importantly different
+# std.h FIO structure
+#
 # src/cmd/whitesmith/lib/libws/Makefile
 #
-# Changed: <2023-07-12 12:03:15 curt>
+# Changed: <2023-07-28 19:18:52 curt>
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-LIB = libws.a
+INCLUDE=-I/usr/src/cmd/whitesmith/include
+
+LIB = libWS.a
 
 all: $(LIB)
+
+install: $(LIB)
+	cp $(LIB) /lib
 
 BROKEN = alloc.o getc.o getl.o match.o mkord.o pat.o
 #
@@ -48,7 +58,7 @@ LIBOBJS = $(LIBOBJS1) $(LIBOBJS2) $(LIBOBJS3) $(LIBOBJS4)
 # broken out because of command line limitations
 #
 $(LIB): $(LIBOBJS) Makefile
-	rm -v $(LIB)
+	rm -f $(LIB)
 	obj $(LIBOBJS1) > objs
 	obj $(LIBOBJS2) >> objs
 	obj $(LIBOBJS3) >> objs
@@ -63,7 +73,7 @@ $(LIB): $(LIBOBJS) Makefile
 	rm -f objs editscript makelib.sh objlist
 
 $(LIBOBJS) : $*.c
-	cc -c $*.c
+	cc $(INCLUDE) -c $*.c
 
 clean:
 	rm -f *.o objs editscript makelib.sh objlist

@@ -7,23 +7,10 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
+DEPTH = ../../../..
 DIR = libm
 CLASS = cmd/whitesmith/lib
-ROOT = ~/src/micronix/filesystem
-SRCDIR = /usr/src/$(CLASS)/$(DIR)
-DEST = $(ROOT)/$(SRCDIR)
-NOWARN = --warning=no-ignore-newer
 
 SRCS = $(wildcard *.s *.c)
 
-update: 
-	mkdir -p $(DEST)
-	tar -f $(DIR).tar --ignore-failed-read -c Makefile $(SRCS)
-	tar -f $(DIR).tar -C $(DEST) --keep-newer-files -x $(NOWARN)
-
-doc: 
-
-clean:
-
-clobber: clean
-	rm -f $(DIR).tar
+include $(DEPTH)/GNUmakefile.inc

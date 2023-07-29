@@ -1,5 +1,5 @@
 #
-# Makefile for updating the source tree
+# Makefile for pass 1 of the whitesmith c compiler
 #
 # cmd/whitesmith/p1/GNUmakefile
 #
@@ -7,30 +7,13 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
+DEPTH = ../../..
 DIR = p1
 CLASS = cmd/whitesmith
-ROOT = ~/src/micronix/filesystem
-SRCDIR = /usr/src/$(CLASS)/$(DIR)
-DEST = $(ROOT)/$(SRCDIR)
-NOWARN = --warning=no-ignore-newer
 
 SRCS = $(wildcard *.c *.h)
 
-update: 
-	mkdir -p $(DEST)
-	tar -f $(DIR).tar --ignore-failed-read -c Makefile $(SRCS)
-	tar -f $(DIR).tar -C $(DEST) --keep-newer-files -x $(NOWARN)
+DOCSRCS = p1.mp p1data.ic p1expr.ic p1func.ic p1gets.ic p1.ic p1main.ic \
+	p1puts.ic p1red.ic p1subs.ic p1type.ic
 
-doc: p1.0 p1data.3 p1expr.3 p1func.3 p1gets.3 p1.3 p1main.3 \
-	p1puts.3 p1red.3 p1subs.3 p1type.3
-
-%.0 : %.mp
-	nroff -M.. $< -mws > $@
-
-%.3 : %.ic
-	nroff -M.. $< -mws > $@
-
-clean:
-
-clobber: clean
-	rm -f *.0 *.3 $(DIR).tar
+include $(DEPTH)/GNUmakefile.inc

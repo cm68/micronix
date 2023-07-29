@@ -22,4 +22,8 @@ upgrade: cc
 install: cc
 	cp cc /bin/cc
 
-clean: ; rm cc *.o
+clean:
+	rm -f *.o
+
+clobber: clean
+	rm -f cc

@@ -7,15 +7,20 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
+INCLUDE = -I/usr/src/cmd/whitesmith/include
+
 all: pp
+
+install: pp
+	cp pp /bin/cpp
 
 PPOBJS = p0eval.o p0lex.o p0main.o p0subs.o
 
 pp: $(PPOBJS)
-	cc -o pp $(PPOBJS) -lws
+	cc -o pp $(PPOBJS) -lWS
 
 $(PPOBJS) : $*.c
-	cc -c $*.c
+	cc $(INCLUDE) -c $*.c
 
 clean:
 	rm -f *.o
