@@ -4,7 +4,7 @@
  * also, a block editor
  *
  * lib/util.c
- * Changed: <2023-06-19 19:12:10 curt>
+ * Changed: <2023-07-13 13:55:15 curt>
  */
 
 #define	_GNU_SOURCE
@@ -254,15 +254,21 @@ int
 devnum(char *name, char *dtp, int *majorp, int *minorp)
 {
     char linkbuf[80];
-
+    char *s;
     int i;
-    i = readlink(name, linkbuf, sizeof(linkbuf));
+
+    s = linkbuf;
+
+    i = readlink(name, s, sizeof(linkbuf));
     if (i == -1) {
         return ENOENT;
     } else {
-        linkbuf[i] = '\0';
+        s[i] = '\0';
     }
-    if ((i = sscanf(linkbuf, "%cdev(%d,%d)", dtp, majorp, minorp)) != 3) {
+
+// printf("devnum: %s\n", s);
+    if ((i = sscanf(s, "%cdev(%d,%d)", dtp, majorp, minorp)) != 3) {
+// printf("major %x minor: %x dtp: %s\n", *majorp, *minorp, dtp);
         return ENOENT;
     }
     return 0;

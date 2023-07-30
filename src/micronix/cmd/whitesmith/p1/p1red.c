@@ -43,8 +43,8 @@ BOOL canadd(l, r)
 		{
 		if (!l->n.an[0])
 			cpynm(l->n.an, r->n.an);
-		l->e.v.bias =+ r->e.v.bias;
-		l->e.v.idx =+ r->e.v.idx;
+		l->e.v.bias += r->e.v.bias;
+		l->e.v.idx += r->e.v.idx;
 		if (type(l->ty) == TPTRTO)
 			;
 		else if (type(r->ty) == TPTRTO)
@@ -88,7 +88,7 @@ BOOL cansub(l, r)
 			cpynm(l->n.an, noname);
 		if (r->e.v.idx)
 			l->e.v.idx = 0;
-		l->e.v.bias =- r->e.v.bias;
+		l->e.v.bias -= r->e.v.bias;
 		return (YES);
 		}
 	return (NO);

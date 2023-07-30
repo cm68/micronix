@@ -57,7 +57,7 @@ COUNT filbuf(fio, buf, tot, sk, amt)
 	FAST COUNT i, j, stat;
 	UTINY trash;
 
-	for (i = j = 0; *amt && j < tot; *amt =- 1)
+	for (i = j = 0; *amt && j < tot; *amt -= 1)
 		{
 		if (i % skew == 0)
 			{
@@ -72,7 +72,7 @@ COUNT filbuf(fio, buf, tot, sk, amt)
 		{
 		trash = gtc(fio);
 		++i;
-		*amt =- 1;
+		*amt -= 1;
 		}
 	return (j);
 	}
@@ -171,7 +171,7 @@ BOOL main(ac, av)
 		while (0 < tsize)
 			{
 			putrec(loc, buf, i = filbuf(&ifio, buf, 32, skew, &tsize), YES);
-			loc =+ i;
+			loc += i;
 			}
 		for (i = 0; dsize && i < soff; ++i, --dsize)
 			buf[0] = gtc(&ifio);
@@ -182,7 +182,7 @@ BOOL main(ac, av)
 		while (0 < dsize)
 			{
 			putrec(loc, buf, i = filbuf(&ifio, buf, 32, skew, &dsize), NO);
-			loc =+ i;
+			loc += i;
 			}
 		}
 	else
@@ -192,7 +192,7 @@ BOOL main(ac, av)
 		while (n = fread(ifd, buf, 32))
 			{
 			putrec(loc, buf, n, YES);
-			loc =+ n;
+			loc += n;
 			}
 		}
 	putend();
@@ -220,8 +220,8 @@ BYTES putrec(off, s, n, iscode)
 		i = 4;
 		if (islong)
 			{
-			sum =+ putx(buf + i, (UCOUNT)(off >> 16));
-			i =+ 2;
+			sum += putx(buf + i, (UCOUNT)(off >> 16));
+			i += 2;
 			}
 		}
 	else
@@ -230,17 +230,17 @@ BYTES putrec(off, s, n, iscode)
 		sum = putx(&buf[1], n);
 		i = 3;
 		}
-	sum =+ putx(buf + i, (UCOUNT)(off >> 8));
-	i =+ 2;
-	sum =+ putx(buf + i, (UCOUNT)off);
-	i =+ 2;
+	sum += putx(buf + i, (UCOUNT)(off >> 8));
+	i += 2;
+	sum += putx(buf + i, (UCOUNT)off);
+	i += 2;
 	if (!sfl)
 		{
-		sum =+ putx(buf + i, !drfl ? 0 : iscode ? 0x81 : 0x82);
-		i =+ 2;
+		sum += putx(buf + i, !drfl ? 0 : iscode ? 0x81 : 0x82);
+		i += 2;
 		}
-	for (; 0 < n; --n, ++s, i =+ 2)
-		sum =+ putx(buf + i, *s);
+	for (; 0 < n; --n, ++s, i += 2)
+
 	putx(buf + i, (sfl) ? ~sum : -sum);
 	buf[i + 2] = '\n';
 	if (putlin(buf, i + 3) != i + 3)
@@ -271,11 +271,11 @@ VOID putstart()
 		{
 		cpystr(buf, "S0", "XX0000", NULL);
 		sum = putx(&buf[2], lenstr(iname) + 3);
-		for (i = 8, s = iname; *s; i =+ 2, ++s)
-			sum =+ putx(buf + i, *s);
+		for (i = 8, s = iname; *s; i += 2, ++s)
+			sum += putx(buf + i, *s);
 		putx(buf + i, ~sum);
 		buf[i + 2] = '\n';
-		i =+ 3;
+		i += 3;
 		}
 	if (putlin(buf, i) != i)
 		error("can't write start record", NULL);
@@ -295,8 +295,8 @@ VOID putend()
 		{
 		cpystr(buf, ":00XXXX01XX", NULL);
 		sum = 1;
-		sum =+ putx(&buf[3], (COUNT)(tbias >> 8));
-		sum =+ putx(&buf[5], (COUNT)tbias);
+		sum += putx(&buf[3], (COUNT)(tbias >> 8));
+		sum += putx(&buf[5], (COUNT)tbias);
 		putx(&buf[9], -sum);
 		buf[11] = '\n';
 		i = 12;
@@ -309,15 +309,15 @@ VOID putend()
 		i = 4;
 		if (islong)
 			{
-			sum =+ putx(&buf[i], (UCOUNT)(tbias >> 16));
-			i =+ 2;
+			sum += putx(&buf[i], (UCOUNT)(tbias >> 16));
+			i += 2;
 			}
-		sum =+ putx(&buf[i], (COUNT)(tbias >> 8));
-		i =+ 2;
-		sum =+ putx(&buf[i], (COUNT)tbias);
-		i =+ 2;
+		sum += putx(&buf[i], (COUNT)(tbias >> 8));
+		i += 2;
+		sum += putx(&buf[i], (COUNT)tbias);
+		i += 2;
 		putx(&buf[i], ~sum);
-		i =+ 2;
+		i += 2;
 		buf[i] = '\n';
 		++i;
 		}

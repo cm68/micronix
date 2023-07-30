@@ -23,9 +23,9 @@ BYTES ltob(is, ln, base)
 		base = -base;
 	lb = base;
 	if (ln < 0 || lb <= ln)
-		s =+ ltob(s, (ULONG)ln / lb, base);
+		s += ltob(s, (ULONG)ln / lb, base);
 	*s = (ULONG)ln % lb + '0';
 	if ('9' < *s)
-		*s =+ ('a' - ('9' + 1));
+		*s += ('a' - ('9' + 1));
 	return (s - is + 1);
 	}

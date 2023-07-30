@@ -123,14 +123,14 @@ TLIST *lexfloat(p)
 
 	s = p->text;
 	dnum = _dzero;
-	s =+ flaccum(s, &dnum, p->ntext);
+	s += flaccum(s, &dnum, p->ntext);
 	s = lexfnxt(&p, s);
 	if (*s == '.')
 		{
 		p = p->next, s = p->text;
 		n = flaccum(s, &dnum, p->ntext);
 		exp = -n;
-		s =+ n;
+		s += n;
 		}
 	else
 		exp = 0;
@@ -148,11 +148,11 @@ TLIST *lexfloat(p)
 			minus = YES;
 			}
 		s = lexfnxt(&p, s);
-		s =+ btos(s, p->ntext - (s - p->text), &x, 10);
+		s += btos(s, p->ntext - (s - p->text), &x, 10);
 		if (minus)
-			exp =- x;
+			exp -= x;
 		else
-			exp =+ x;
+			exp += x;
 		}
 	dnum = dtento(dnum, exp);
 	putcode("c8", LDNUM, &dnum);

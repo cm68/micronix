@@ -85,7 +85,7 @@ LONG copy(ffd, tfd, size)
 	TEXT buf[BUFSIZE];
 
 	i = BUFSIZE;
-	for (n = 0; !size || n < size; n =+ j)
+	for (n = 0; !size || n < size; n += j)
 		{
 		if (size)
 			i = min(size - n, BUFSIZE);
@@ -199,7 +199,7 @@ VOID found(i)
 	{
 	IMPORT TBOOL *pfound;
 
-	pfound[i] =| FOUND;
+	pfound[i] |= FOUND;
 	}
 
 /*	get entry header
@@ -404,10 +404,10 @@ VOID markpth(ac, av)
 	for (i = 0; i < ac; ++i)
 		if (*(s = av[i]))
 			{
-			for (pn = s; pn[x = instr(pn, ":]/")]; pn =+ x + 1)
+			for (pn = s; pn[x = instr(pn, ":]/")]; pn += x + 1)
 				;
 			if (pn != s)
-				pfound[i] =| STRPNM;
+				pfound[i] |= STRPNM;
 			}
 	}
 
@@ -470,7 +470,7 @@ VOID pthdr(fd, phdr)
 		for (lo = msize, i = 0; i < 4; ++i)
 			{
 			phdr->v7.v7size[i] = lo;
-			lo =>> 8;
+			lo >>= 8;
 			}
 		break;
 	case 6:
@@ -639,7 +639,7 @@ TEXT *strpath(buf, name)
 
 	pn = pathnm(buf, name, ":");
 #ifdef IDRIS
-	pn =+ 2;
+	pn += 2;
 #else
 	++pn;
 #endif

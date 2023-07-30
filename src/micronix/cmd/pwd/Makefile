@@ -3,12 +3,16 @@
 #
 # micronix/cmd/pwd/Makefile
 #
-# Changed: <2023-07-10 14:55:22 curt>
+# Changed: <2023-07-29 11:22:47 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
+
+INCLUDE = -I/usr/include
 
 all:	pwd
 
 pwd : pwd.c
-	cc -I/usr/include -o pwd pwd.c
+	cc $(INCLUDE) -o pwd pwd.c
 
 install: pwd
 	cp pwd /bin/pwd
@@ -18,5 +22,3 @@ upgrade: pwd
 	cp pwd /bin/pwd
 
 clean: ; rm pwd *.o
-
-# vim: tabstop=4 shiftwidth=4 noexpandtab:

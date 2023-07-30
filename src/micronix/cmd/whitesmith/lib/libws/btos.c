@@ -38,8 +38,8 @@ BYTES btos(s, n, i, base)
 		else if (1 < n && tolower(s[1]) == 'x')
 			{
 			base = 16;
-			s =+ 2;
-			n =- 2;
+			s += 2;
+			n -= 2;
 			}
 		else
 			base = 8;
@@ -47,8 +47,8 @@ BYTES btos(s, n, i, base)
 	else if (base == 16 && 2 <= n)
 		if (*s == '0' && tolower(s[1]) == 'x')
 			{
-			s =+ 2;
-			n =- 2;
+			s += 2;
+			n -= 2;
 			}
 	for (; 0 < n; --n, ++s)
 		{

@@ -234,7 +234,7 @@ TEXT *getfname(p)
 			;
 		n = s - p->next->text;
 		q = wsalloc(lenstr(iprefix) + n + 1, 0);
-		for (s = iprefix; *s; s =+ (s[i]) ? i + 1 : i) 
+		for (s = iprefix; *s; s += (s[i]) ? i + 1 : i) 
 			{
 			cpybuf(q, s, i = scnstr(s, '|'));
 			cpybuf(q + i, p->next->text, n);
@@ -261,7 +261,7 @@ DEF **hash(s, n)
 	FAST COUNT sum;
 
 	for (sum = 0; 0 < n; --n)
-		sum =+ *s++;
+		sum += *s++;
 	return (&htable[sum % NHASH]);
 	}
 
@@ -388,7 +388,7 @@ VOID predef(p)
 			pargs("1", 1);
 		else
 			{
-			s =+ n + 1;
+			s += n + 1;
 			pargs(s, lenstr(s));
 			}
 		pargs("\n", 1);

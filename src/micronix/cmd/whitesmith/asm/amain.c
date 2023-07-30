@@ -4,15 +4,21 @@
 #include <std.h>
 #include "a.h"
 
+#ifdef linux
+#define	create creat
+#endif
+
+TEXT *tmpname();
+
 /*	FLAGS:
 	-o name	send output to file name
 	-x		put global symbols only (dummy)
  */
-TEXT *_pname {"as.80"};
+TEXT *_pname = {"as.80"};
 
 /*	the table of keywords
  */
-LOCAL PRETAB keytab[] {
+LOCAL PRETAB keytab[] = {
 	"\1a", A,
 	"\1b", B,
 	"\1c", C,
@@ -49,7 +55,7 @@ LOCAL PRETAB keytab[] {
 
 /*	the table of operators
  */
-LOCAL PRETAB optab[] {
+LOCAL PRETAB optab[] = {
 	"\1!", OR,
 	"\1&", AND,
 	"\1*", INDIR,
@@ -81,7 +87,7 @@ LOCAL PRETAB optab[] {
 
 /*	the table of predefined values
  */
-LOCAL PRETAB valtab[] {
+LOCAL PRETAB valtab[] = {
 	"\2di", 0363,
 	"\2ei", 0373,
 	"\2in", 0333,
@@ -113,25 +119,25 @@ LOCAL PRETAB valtab[] {
 
 /*	file control variables:
  */
-GLOBAL BOOL xflag {NO};
-GLOBAL COUNT lno {1};
-GLOBAL COUNT nerrors {0};
-GLOBAL FILE ofd {-1};
-GLOBAL FILE tfd[2] {-1, -1};
-GLOBAL FIO *infio {NULL};
-GLOBAL FIO *outfio[2] {NULL};
-LOCAL TEXT *oname {NULL};
-LOCAL VOID *onext {NULL};
+GLOBAL BOOL xflag = {NO};
+GLOBAL COUNT lno = {1};
+GLOBAL COUNT nerrors = {0};
+GLOBAL FILE ofd = {-1};
+GLOBAL FILE tfd[2] = {-1, -1};
+GLOBAL FIO *infio = {NULL};
+GLOBAL FIO *outfio[2] = {NULL};
+LOCAL TEXT *oname = {NULL};
+LOCAL VOID *onext = {NULL};
 
 /*	symbol control
  */
-GLOBAL COUNT tval {0};
-GLOBAL TERM *cobase {NULL};
-GLOBAL TERM *dabase {NULL};
-GLOBAL TERM *elc {NULL};
-GLOBAL TERM *psym[NSYM] {NULL};
-GLOBAL TERM *tptr {NULL};
-GLOBAL TEXT string[MAXSTR+1] {0};
+GLOBAL COUNT tval = {0};
+GLOBAL TERM *cobase = {NULL};
+GLOBAL TERM *dabase = {NULL};
+GLOBAL TERM *elc = {NULL};
+GLOBAL TERM *psym[NSYM] = {NULL};
+GLOBAL TERM *tptr = {NULL};
+GLOBAL TEXT string[MAXSTR+1] = {0};
 
 /*	get identifier
  */
@@ -155,7 +161,7 @@ LEX getal(c)
 		return (t);
 	else if (tval = scntab(valtab, NVALS, tname, i))
 		{
-		tval =& BYTMASK;
+		tval &= BYTMASK;
 		return (N);
 		}
 	else
@@ -212,7 +218,7 @@ LEX gexpr(p, mand)
 	t = gterm(p, mand ? "expression" : NULL);
 	if (p->ty)
 		for (; (t & (ISTERM|BINOP)) == BINOP; t = u)
-			if (t == COMMA)
+ 			if (t == COMMA)
 				{
 				gstring(p, "x, string");
 				u = gterm(&term, "string");
@@ -278,7 +284,7 @@ LEX gterm(p, mesg)
 			{
 			t = gexpr(p, YES);
 			define(q, p);
-			p->ty =| PUBF;
+			p->ty |= PUBF;
 			}
 		else if (t == N)
 			{
@@ -289,7 +295,7 @@ LEX gterm(p, mesg)
 			}
 		else
 			{
-			q->ty =| TDEF;
+			q->ty |= TDEF;
 			p->ty = q->ty & TMASK;
 			p->val = q->val;
 			p->base = q->base;
@@ -348,7 +354,7 @@ TERM **hash(s)
 	FAST COUNT i, n;
 
 	for (n = 0, i = LENNAME; 0 <= --i && *s; )
-		n =+ *s++;
+		n += *s++;
 	return (&psym[n & NSYM-1]);
 	}
 
@@ -372,14 +378,14 @@ BOOL main(ac, av)
 	TEXT nbuf[MAXNAME];
 
 	getflags(&ac, &av, "x,o*:F <files>", &xflag, &oname);
-	infio = alloc(sizeof (*infio), NULL);
-	outfio[0] = alloc(sizeof (*outfio[0]), NULL);
-	outfio[1] = alloc(sizeof (*outfio[1]), NULL);
+	infio = wsalloc(sizeof (*infio), NULL);
+	outfio[0] = wsalloc(sizeof (*outfio[0]), NULL);
+	outfio[1] = wsalloc(sizeof (*outfio[1]), NULL);
 	if (!oname && 0 < ac && av[0][i = lenstr(av[0]) - 1] == 's'
 		&& i < MAXNAME-1)
 		{
 		oname = nbuf;
-		cpystr(nbuf, av[0], NULL);
+ 		cpystr(nbuf, av[0], NULL);
 		nbuf[i] = 'o';
 		}
 	else if (!oname)
@@ -390,15 +396,19 @@ BOOL main(ac, av)
 		exit(NO);
 		}
 	for (i = 2; 0 <= --i; )
-		if ((tfd[i] = create(tname(i), UPDATE, 1)) < 0)
+		if ((tfd[i] = create(tmpname(i), UPDATE, 1)) < 0)
 			{
 			err("can't create temp file");
 			exit(NO);
 			}
 		else
 			finit(outfio[i], tfd[i], BWRITE);
+#ifdef linux
+	onext = on_exit(&tclose);
+#else
 	onext = onexit(&tclose);
 	onintr(&exit);
+#endif
 	cobase = addsym(".text");
 	dabase = addsym(".data");
 	elc = addsym(".");
@@ -461,14 +471,14 @@ VOID *tclose()
 	for (i = 2; 0 <= --i; )
 		{
 		close(tfd[i]);
-		remove(tname(i));
+		remove(tmpname(i));
 		}
 	return (onext);
 	}
 
 /*	create a temp file name
  */
-TEXT *tname(n)
+TEXT *tmpname(n)
 	COUNT n;
 	{
 	INTERN TEXT buf[MAXNAME];

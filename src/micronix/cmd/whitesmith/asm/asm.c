@@ -4,7 +4,9 @@
 #include <std.h>
 #include "a.h"
 
-LOCAL CODETAB gettab[] {
+COUNT putval();
+
+LOCAL CODETAB gettab[] = {
 	Ir, Nn, "1L4,WR",
 	IBC, A, "2",
 	A, IBC, "a",
@@ -25,7 +27,7 @@ LOCAL CODETAB gettab[] {
 	HL, DE, "6b,62",
 	0};
 
-LOCAL CODETAB poptab[] {
+LOCAL CODETAB poptab[] = {
 	BC, SP, "c1",
 	DE, SP, "d1",
 	HL, SP, "e1",
@@ -36,14 +38,14 @@ LOCAL CODETAB poptab[] {
 	SP, AF, "f5",
 	0};
 
-LOCAL CODETAB swaptab[] {
+LOCAL CODETAB swaptab[] = {
 	HL, ISP, "e3",
 	ISP, HL, "e3",
 	HL, DE, "eb",
 	DE, HL, "eb",
 	0};
 
-LOCAL CODETAB plutab[] {
+LOCAL CODETAB plutab[] = {
 	HL, Ir, "9R4",
 	Ir, 1, "3L4",
 	Cr, 1, "4L3",
@@ -51,98 +53,98 @@ LOCAL CODETAB plutab[] {
 	A, N, "c6,R",
 	0};
 
-LOCAL CODETAB mintab[] {
+LOCAL CODETAB mintab[] = {
 	Ir, 1, "bL4",
 	Cr, 1, "5L3",
 	A, Cr, "90R",
 	A, N, "d6,R",
 	0};
 
-LOCAL CODETAB pluctab[] {
+LOCAL CODETAB pluctab[] = {
 	A, Cr, "88R",
 	A, N, "ce,R",
 	0};
 
-LOCAL CODETAB minctab[] {
+LOCAL CODETAB minctab[] = {
 	A, Cr, "98R",
 	A, N, "de,R",
 	0};
 
-LOCAL CODETAB andtab[] {
+LOCAL CODETAB andtab[] = {
 	A, Cr, "a0R",
 	A, N, "e6,R",
 	0};
 
-LOCAL CODETAB xortab[] {
+LOCAL CODETAB xortab[] = {
 	A, Cr, "a8R",
 	A, N, "ee,R",
 	0};
 
-LOCAL CODETAB ortab[] {
+LOCAL CODETAB ortab[] = {
 	A, Cr, "b0R",
 	A, N, "f6,R",
 	0};
 
-LOCAL CODETAB cmptab[] {
+LOCAL CODETAB cmptab[] = {
 	A, Cr, "b8R",
 	A, N, "fe,R",
 	0};
 
-LOCAL CODETAB rottab[] {
+LOCAL CODETAB rottab[] = {
 	A, 1, "7",
 	A, -1, "f",
 	0};
 
-LOCAL CODETAB rotctab[] {
+LOCAL CODETAB rotctab[] = {
 	A, 1, "17",
 	A, -1, "1f",
 	0};
 
-LOCAL CODETAB rototab[] {
+LOCAL CODETAB rototab[] = {
 	A, 1, "37,17",
 	A, -1, "37,1f",
 	0};
 
-LOCAL CODETAB rotztab[] {
+LOCAL CODETAB rotztab[] = {
 	A, 1, "b7,17",
 	A, -1, "b7,1f",
 	0};
 
-LOCAL CODETAB jmptab[] {
+LOCAL CODETAB jmptab[] = {
 	Jc, INN, "c3,WR",
 	Jc, IHL, "e9",
 	0};
 
-LOCAL CODETAB jctab[] {
+LOCAL CODETAB jctab[] = {
 	Jc, INN, "c2L0,WR",
 	0};
 
-LOCAL CODETAB goesup[] {
+LOCAL CODETAB goesup[] = {
 	BC, HL, "71,23,70",
 	DE, HL, "73,23,72",
 	0};
 
-LOCAL CODETAB getsup[] {
+LOCAL CODETAB getsup[] = {
 	BC, HL, "4e,23,46",
 	DE, HL, "5e,23,56",
 	0};
 
-LOCAL CODETAB getsbya[] {
+LOCAL CODETAB getsbya[] = {
 	HL, HL, "7e,23,66,6f",
 	0};
 
-LOCAL CODETAB getsnot[] {
+LOCAL CODETAB getsnot[] = {
 	A, A, "2f",
 	0};
 
 /*	indexed by bincodes
  */
-GLOBAL CODETAB *tabtab[] {
+GLOBAL CODETAB *tabtab[] = {
 	gettab, poptab, swaptab, plutab, mintab, pluctab, minctab,
 	andtab, xortab, ortab, cmptab, rottab, rotctab, rototab, rotztab,
 	jmptab, jctab, getsup, goesup, getsbya, getsnot, 0};
 
-LOCAL TINY jcvals[] {002, 012, 022, 032, 042, 052, 062, 072,
+LOCAL TINY jcvals[] = {002, 012, 022, 032, 042, 052, 062, 072,
 		000, 010, 020, 030, 040, 050, 060, 070, 013};
 
 /*	define q as p
@@ -217,7 +219,7 @@ COUNT temp;
 			t = JCOND;
 		l = &term;
 		}
-	l->ty =| PUBF;
+	l->ty |= PUBF;
 	if (t == GOESTO || t == PUSH)
 		{
 		x = l, l = r, r = x;
@@ -265,15 +267,15 @@ COUNT temp;
 			break;
 		case 'L':
 			n = *++s - '0';
-			i =+ putval(tab->cl, l) << n;
+			i += putval(tab->cl, l) << n;
 			break;
 		case 'R':
 /*			TO WORK AROUND BUG IN C68k
-			i =+ putval(tab->cr, r) << (s[1] ? *++s - '0' : 0);
+			i += putval(tab->cr, r) << (s[1] ? *++s - '0' : 0);
 */
 			temp = putval(tab->cr, r);
-			temp =<< (s[1] ? *++s - '0' : 0);
-			i =+ temp;
+			temp <<= (s[1] ? *++s - '0' : 0);
+			i += temp;
 			break;
 		case ',':
 			putbyte(i);
@@ -305,7 +307,7 @@ VOID dolit(p)
 			break;
 	if (!q)
 		{
-		q = alloc(sizeof (*q), littab), littab = q;
+		q = wsalloc(sizeof (*q), littab), littab = q;
 		q->t.ty = p->ty;
 		q->t.val = (p->ty != STRING) ? p->val : buybuf(string, string[0] + 1);
 		q->t.base = pseg;

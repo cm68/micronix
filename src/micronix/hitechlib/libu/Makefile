@@ -3,7 +3,9 @@
 #
 # micronix/hitechlib/libu/Makefile
 #
-# Changed: <2023-06-23 01:06:16 curt>
+# Changed: <2023-07-10 14:50:47 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 LIBRARY = libu.lib
 OBJECTS = read.obj write.obj open.obj close.obj fork.obj _exit.obj
@@ -26,6 +28,3 @@ clean: clobber
 
 clobber:
 	rm -f $(OBJECTS) $(LIBRARY) $(CRT)
-
-# vim: tabstop=4 shiftwidth=4 expandtab:
-

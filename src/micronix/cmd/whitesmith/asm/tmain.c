@@ -4,17 +4,21 @@
 #include <std.h>
 #include "t.h"
 
+#ifdef linux
+#define create creat
+#endif
+
 /*	FLAGS:
 	-i name: output for ISIS, not Microsoft
 	-o name: send output to file name
 	-s name: start address is name
  */
 
-TEXT *_pname {"anat"};
+TEXT *_pname = {"anat"};
 
 /*	the table of keywords
  */
-LOCAL PRETAB keytab[] {
+LOCAL PRETAB keytab[] = {
 	"\1a", A,
 	"\1b", B,
 	"\1c", C,
@@ -51,7 +55,7 @@ LOCAL PRETAB keytab[] {
 
 /*	the table of operators
  */
-LOCAL PRETAB optab[] {
+LOCAL PRETAB optab[] = {
 	"\1!", OR,
 	"\1&", AND,
 	"\1*", INDIR,
@@ -83,7 +87,7 @@ LOCAL PRETAB optab[] {
 
 /*	the table of predefined values
  */
-LOCAL PRETAB valtab[] {
+LOCAL PRETAB valtab[] = {
 	"\2di", 0363,
 	"\2ei", 0373,
 	"\2in", 0333,
@@ -115,22 +119,22 @@ LOCAL PRETAB valtab[] {
 
 /*	file control variables:
  */
-GLOBAL BOOL iflag {NO};
-GLOBAL COUNT lno {1};
-GLOBAL COUNT nerrors {0};
-GLOBAL FIO stderr {STDERR, 0, WRITE, 0};
-LOCAL TEXT *oname {NULL};
-GLOBAL TEXT *sname {NULL};
+GLOBAL BOOL iflag = {NO};
+GLOBAL COUNT lno = {1};
+GLOBAL COUNT nerrors = {0};
+GLOBAL FIO stderr = {STDERR, 0, WRITE, 0};
+LOCAL TEXT *oname = {NULL};
+GLOBAL TEXT *sname = {NULL};
 
 /*	symbol control
  */
-GLOBAL COUNT tval {0};
-GLOBAL TERM *cobase {NULL};
-GLOBAL TERM *dabase {NULL};
-GLOBAL TERM *elc {NULL};
-GLOBAL TERM *symtab {NULL};
-GLOBAL TERM *tptr {NULL};
-GLOBAL TEXT string[MAXSTR+1] {0};
+GLOBAL COUNT tval = {0};
+GLOBAL TERM *cobase = {NULL};
+GLOBAL TERM *dabase = {NULL};
+GLOBAL TERM *elc = {NULL};
+GLOBAL TERM *symtab = {NULL};
+GLOBAL TERM *tptr = {NULL};
+GLOBAL TEXT string[MAXSTR+1] = {0};
 
 /*	get identifier
  */
@@ -157,7 +161,7 @@ err("/getal %ac", c);
 		return (t);
 	else if (tval = scntab(valtab, NVALS, tname, i))
 		{
-		tval =& BYTMASK;
+		tval &= BYTMASK;
 		return (N);
 		}
 	else
@@ -217,7 +221,7 @@ LEX gexpr(p, mand)
 	t = gterm(p, mand ? "expression" : NULL);
 	if (p->ty)
 		for (; (t & (ISTERM|BINOP)) == BINOP; t = u)
-			if (t == COMMA)
+ 			if (t == COMMA)
 				{
 				gstring(p, "x, string");
 				u = gterm(&term, "string");
@@ -286,7 +290,7 @@ err("/gterm %o", t);
 			{
 			t = gexpr(p, YES);
 			define(q, p);
-			p->ty =| PUBF;
+			p->ty |= PUBF;
 			}
 		else if (t == N)
 			{
@@ -297,7 +301,7 @@ err("/gterm %o", t);
 			}
 		else
 			{
-			q->ty =| TDEF;
+			q->ty |= TDEF;
 			p->ty = q->ty & TMASK;
 			p->val = q->val;
 			p->base = q->base;
@@ -368,7 +372,7 @@ BOOL main(ac, av)
 	if (!oname && 0 <ac && av[0][i = lenstr(av[0]) - 1] == '8' && i < 15)
 		{
 		oname = nbuf;
-		cpystr(nbuf, av[0], NULL);
+ 		cpystr(nbuf, av[0], NULL);
 		nbuf[i] = outmode ? 'r' : 'm';
 		}
 	if (!oname)

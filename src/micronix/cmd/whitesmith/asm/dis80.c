@@ -53,36 +53,36 @@ typedef struct {
 	-c		produce CP/M assembler - default
 	-i		produce ISIS-II assembler
  */
-BOOL cfl {NO};
-BOOL ifl {NO};
-BOOL manyfls {NO};
-BOOL success {YES};
+BOOL cfl = {NO};
+BOOL ifl = {NO};
+BOOL manyfls = {NO};
+BOOL success = {YES};
 
 /*	decoded header values
  */
-UCOUNT bsize {0};
-UCOUNT dbias {0};
-UCOUNT dsize {0};
-UCOUNT sbytes {0};
-UCOUNT ssize {0};
-UCOUNT tbias {0};
-UCOUNT tsize {0};
+UCOUNT bsize = {0};
+UCOUNT dbias = {0};
+UCOUNT dsize = {0};
+UCOUNT sbytes = {0};
+UCOUNT ssize = {0};
+UCOUNT tbias = {0};
+UCOUNT tsize = {0};
 
 /*	symbol table definitions
  */
-SYMBOL *symtab {NULL};	/* pointer to sorted entries */
-COUNT numsym {0};
+SYMBOL *symtab = {NULL};	/* pointer to sorted entries */
+COUNT numsym = {0};
 
 /*	input buffer
  */
-IOBUF ibuf[2] {0};
+IOBUF ibuf[2] = {0};
 
 /*	output definitions
  */
-TEXT cseg[4] {"_c_"};
-TEXT dseg[4] {"_d_"};
+TEXT cseg[4] = {"_c_"};
+TEXT dseg[4] = {"_d_"};
 
-TEXT *_pname {"dis80"};
+TEXT *_pname = {"dis80"};
 
 /*	find actual length of a name
  */
@@ -135,7 +135,7 @@ BOOL disasm(fd, fn)
 		(!putsect(fd, dsize, dbias, "d", DATREL)))
 		return (NO);
 	putfmt("\tend\n");
-	free(symtab, NULL);
+	wsfree(symtab, NULL);
 	return (YES);
 	}
 
@@ -154,7 +154,7 @@ UTINY getby(fd, idx)
 		p->n = fread(fd, p->buf, IBSIZE);
 		if (!p->n)
 			error("unexpected EOF", NULL);
-		p->off =+ p->n;
+		p->off += p->n;
 		p->chr = p->buf;
 		}
 	--p->n;
@@ -194,7 +194,7 @@ VOID getsym(fd)
 
 	numsym = sbytes / entsize;
 	lseek(fd, (LONG)(tsize + dsize), 1);
-	symtab = alloc(sizeof (SYMBOL) * numsym, NULL);
+	symtab = wsalloc(sizeof (SYMBOL) * numsym, NULL);
 	for (i = 0, ps = symtab; i < numsym; ++i, ++ps)
 		{
 		fread(fd, ps, entsize);
@@ -248,7 +248,7 @@ BOOL main(ac, av)
 				putstr(STDOUT, av[-1], NULL);
 				putstr(STDOUT, ":\n", NULL);
 				}
-			success =& disasm(fd, av[-1]);
+			success &= disasm(fd, av[-1]);
 			close(fd);
 			}
 	return (success);
@@ -285,7 +285,7 @@ VOID mapsyms(s, bias)
 			else if (*q == '.')
 				*q = s[1];
 		if ((ps->fl & XDEF) == DATREL)
-			ps->val =- bias;
+			ps->val -= bias;
 		}
 	cseg[0] = s[0];
 	cseg[2] = s[0];
@@ -298,7 +298,7 @@ VOID mapsyms(s, bias)
 VOID putby(c)
 	COUNT c;
 	{
-	INTERN COUNT nb {0};
+	INTERN COUNT nb = {0};
 
 	if (0 <= c)
 		{
@@ -332,17 +332,17 @@ BOOL putsect(fd, nin, bias, hdr, flags)
 
 	putfmt("\t%pseg\n%p:\n", hdr, *hdr == 'c' ? cseg : dseg);
 	putsyms("%.7b\tequ\t$+0%hsH\n", XDEF, flags);
-	for (nabs = 0; co = getby(fd, RELBUF); nin =- n)
+	for (nabs = 0; co = getby(fd, RELBUF); nin -= n)
 		{
 		if (co < 32)
 			{
 			n = co;
-			nabs =+ n;
+			nabs += n;
 			}
 		else if (co < 64)
 			{
 			n = ((co - 32) << 8) + getby(fd, RELBUF) + 32;
-			nabs =+ n;
+			nabs += n;
 			}
 		else
 			{
@@ -351,7 +351,7 @@ BOOL putsect(fd, nin, bias, hdr, flags)
 			b = (co >> 2) - 16;
 			if (b == 47)
 				{
-				b =+ getby(fd, RELBUF);
+				b += getby(fd, RELBUF);
 				if (175 <= b)
 					b = ((b - 175) << 8) + getby(fd, RELBUF) + 175;
 				}
@@ -373,7 +373,7 @@ BOOL putsect(fd, nin, bias, hdr, flags)
 				return (remark("can't handle .bss"));
 				break;
 			default:
-				if (numsym <= (b =- 4) || !(p = symtab + b))
+				if (numsym <= (b -= 4) || !(p = symtab + b))
 					return (remark("bad symbol number"));
 				if (p->fl & DEFD)
 					val = p->val;
@@ -383,10 +383,10 @@ BOOL putsect(fd, nin, bias, hdr, flags)
 				break;
 				}
 			if (co & 01)
-				val =- bias;
+				val -= bias;
 			i = getby(fd, CODBUF);
-			i =| getby(fd, CODBUF) << 8;
-			val =+ i;
+			i |= getby(fd, CODBUF) << 8;
+			val += i;
 			n = 2;
 			putby(-1);
 			putfmt("\tdw\t%.7p", s);
@@ -395,7 +395,7 @@ BOOL putsect(fd, nin, bias, hdr, flags)
 			putfmt("\n");
 			}
 		}
-	nabs =+ nin;
+	nabs += nin;
 	for ( ; nabs; --nabs)
 		putby(getby(fd, CODBUF));
 	putby(-1);
