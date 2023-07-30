@@ -6,21 +6,21 @@
 
 /*	index lists
  */
-GLOBAL LEX bincodes[] {
+GLOBAL LEX bincodes[] = {
 	GETS, POP, SWAP, PLUS, MINUS, PLUSC, MINUSC,
 	AND, XOR, OR, CMP, ROT, ROTC, ROTO, ROTZ,
 	JMP, JCOND, GETSUP, GOESUP, GETSBYA, GETSNOT, 0};
-GLOBAL TINY crlist[] {B, C, D, E, H, L, IHL, A, 0};
-GLOBAL TINY irlist[] {BC, DE, HL, SP, 0};
+GLOBAL TINY crlist[] = {B, C, D, E, H, L, IHL, A, 0};
+GLOBAL TINY irlist[] = {BC, DE, HL, SP, 0};
 
 /*	the literal table
  */
-GLOBAL LIT *littab {NULL};
+GLOBAL LIT *littab = {NULL};
 
 /*	token control
  */
-LOCAL COUNT nback {0};
-LOCAL META chstk[3] {0};
+LOCAL COUNT nback = {0};
+LOCAL META chstk[3] = {0};
 
 /*	add a symbol to table
  */
@@ -31,7 +31,7 @@ TERM *addsym(s)
 	FAST COUNT i;
 	FAST TERM *q;
 
-	q = alloc(sizeof (*q), symtab);
+	q = wsalloc(sizeof (*q), symtab);
 	symtab = q;
 	q->ty = INN;
 	q->val = 0;
@@ -90,8 +90,8 @@ VOID dosub(q, p)
 	FAST TERM *q, *p;
 	{
 	FAST LEX pty;
-	INTERN TINY is[] {IIX, IIY, N, NN, INN, 0};
-	INTERN TINY was[] {IX, IY, N, NN, INN, 0};
+	INTERN TINY is[] = {IIX, IIY, N, NN, INN, 0};
+	INTERN TINY was[] = {IX, IY, N, NN, INN, 0};
 
 	pty = p->ty & TMASK;
 	if (p->base || !nn(pty))
@@ -101,7 +101,7 @@ VOID dosub(q, p)
 	else
 		{
 		q->ty = q->ty & ~TMASK | pty;
-		q->val =+ p->val;
+		q->val += p->val;
 		}
 	}
 
@@ -115,7 +115,7 @@ VOID dounop(p, t)
 	FAST LEX pseg, pty;
 	FAST TERM *q;
 
-	p->ty =& ~PUBF;
+	p->ty &= ~PUBF;
 	pseg = (LEX)p->base;
 	pty = p->ty & TMASK;
 	switch (t)
@@ -132,7 +132,7 @@ VOID dounop(p, t)
 		else if (pty < NN || IY < pty)
 			err("illegal *");
 		else
-			p->ty =| INDF;
+			p->ty |= INDF;
 		break;
 	case PLUS:
 		break;
@@ -161,12 +161,12 @@ VOID dounop(p, t)
 		if (!q)
 			err("illegal public");
 		else
-			q->ty =| PUBF;
-		p->ty =| PUBF;
+			q->ty |= PUBF;
+		p->ty |= PUBF;
 		break;
 	default:
 		dobin(p, p, t);
-		p->ty =| PUBF;
+		p->ty |= PUBF;
 		}
 	}
 

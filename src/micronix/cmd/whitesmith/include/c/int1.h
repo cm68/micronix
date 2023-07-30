@@ -119,3 +119,7 @@ struct token {
 	LEX type;
 	VAL t;
 	};
+
+#ifdef linux
+BOOL gscty(SYMBOL *prototype, ...);
+#endif

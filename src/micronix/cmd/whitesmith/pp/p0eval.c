@@ -113,7 +113,7 @@ BYTES doesc(buf, s, n)
 			for (sum = 0, j = 0; j < 3 && isdigit(*s) ; ++j, ++s)
 				sum = (sum << 3) + (*s - '0');
 			*q++ = 0xff & sum;
-			i =+ j;
+			i += j;
 			}
 		else if (*s == 'x' || *s == 'X')
 			{
@@ -352,8 +352,8 @@ TLIST *exterm(p, plv)
 		else if (1 < n && tolower(s[1]) == 'x')
 			{
 			base = 16;
-			s =+ 2;
-			n =- 2;
+			s += 2;
+			n -= 2;
 			}
 		else
 			base = 8;

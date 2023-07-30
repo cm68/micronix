@@ -4,18 +4,22 @@
 #include <std.h>
 #include "t.h"
 
-GLOBAL BOOL outmode {0};
+TERM *litlbl();
+
+IMPORT TERM *cobase, *dabase, *elc;
+
+GLOBAL BOOL outmode = {0};
 
 /*	segment selectors
  */
-LOCAL TEXT *cseg {"\tcseg\n"};
-LOCAL TEXT *dseg {"\tdseg\n"};
+LOCAL TEXT *cseg = {"\tcseg\n"};
+LOCAL TEXT *dseg = {"\tdseg\n"};
 
 /*	register names for output
  */
-LOCAL TEXT *crname[] {"b", "c", "d", "e", "h", "l", "m", "a", "?"};
-LOCAL TEXT *irname[] {"b", "d", "h", "sp", "??"};
-LOCAL TEXT *jcname[] {
+LOCAL TEXT *crname[] = {"b", "c", "d", "e", "h", "l", "m", "a", "?"};
+LOCAL TEXT *irname[] = {"b", "d", "h", "sp", "??"};
+LOCAL TEXT *jcname[] = {
 	"cnz", "cz", "cnc", "cc", "cpo", "cpe", "cp", "cm",
 	"jnz", "jz", "jnc", "jc", "jpo", "jpe", "jp", "jm",
 	"call", "jmp", "j??"};
@@ -87,7 +91,7 @@ VOID dobin(l, r, ot)
 			t = JCOND;
 		l = &term;
 		}
-	l->ty =| PUBF;
+	l->ty |= PUBF;
 	if (t == GOESTO || t == PUSH)
 		{
 		x = l, l = r, r = x;
@@ -152,7 +156,7 @@ VOID dolit(p)
 			break;
 	if (!q)
 		{
-		q = alloc(sizeof (*q), littab), littab = q;
+		q = wsalloc(sizeof (*q), littab), littab = q;
 		q->t.ty = p->ty;
 		q->t.val = (p->ty != STRING) ? p->val : buybuf(string, string[0] + 1);
 		q->t.base = pseg;
@@ -180,7 +184,7 @@ TERM *litlbl(p, lbl)
 	for (i = 2; i <= 4; ++i)
 		{
 		p->nm[i] = (lbl & 017) + 'a';
-		lbl =>> 4;
+		lbl >>= 4;
 		}
 	return (p);
 	}
@@ -230,7 +234,7 @@ VOID putftr(p)
 		if (p->base && p->base != cobase && p->base != dabase)
 			{
 			putfmt("\textrn\t");
-			p->ty =| PUBF;
+			p->ty |= PUBF;
 			}
 		else if (p->ty & PUBF)
 			putfmt("\tpublic\t");
@@ -262,7 +266,7 @@ VOID puthdr(s)
 	if (s)
 		{
 		while(s[i = instr(s, "/:]")])
-			s =+ i + 1;
+			s += i + 1;
 		putfmt(iflag ? "\tname\t%b@\n" : "\ttitle\t%b\n", s, instr(s, "."));
 		}
 	putfmt(cseg);
@@ -277,7 +281,7 @@ VOID putsp(val)
 
 	if (val & 1)
 		putfmt("\tdb\t0\n");
-	for (i = val >> 1; 0 < i; i =- 8)
+	for (i = val >> 1; 0 < i; i -= 8)
 		{
 		putfmt("\tdw\t0");
 		for (j = min(i, 8) - 1; 0 < j; --j)

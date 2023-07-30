@@ -8,6 +8,7 @@
 #include "../include/c/int012.h"
 
 #ifdef linux
+#include <stdarg.h>
 #define	create	creat
 #endif
 
@@ -345,14 +346,25 @@ SYMBOL *gdecl(pro, abstract)
 
 /*	get sc/ty into proto symbol
  */
+#ifdef linux
+BOOL gscty(SYMBOL *pro, ...)
+#else
 BOOL gscty(pro, defsc)
 	FAST SYMBOL *pro;
 	LEX defsc;
+#endif
 	{
+#ifdef linux
+	va_list ap;
+	LEX defsc[10];
+	int nsc = 0;
+	LEX *r;
+#else
+	ARGINT *r;
+#endif
 	IMPORT BITS tint, tunsign;
 	IMPORT SYMBOL *symtab;
 	FAST LEX sc, ty;
-	ARGINT *r;
 	LEX mod, uns;
 	SYMBOL *p;
 	TOKEN tok;
@@ -366,7 +378,13 @@ BOOL gscty(pro, defsc)
 	INTERN TINY modalt[] = {LCHAR, LSHORT, LLONG, 0};
 	INTERN TINY scalt[] = {LEXTERN, LSTATIC, LAUTO, LREG, LTYPDEF, 0};
 	INTERN TINY sualt[] = {LSTRUCT, LUNION, 0};
-
+#ifdef linux
+	/* snarf in the variable acceptable storage classes */
+	va_start(ap, pro);
+	while ((defsc[nsc++] = va_arg(ap, int)))
+		;
+	va_end(ap);
+#endif
 	clrsym(pro);
 	sc = alt(scalt);
 	uns = eat(LUNSIGN);
@@ -383,11 +401,23 @@ BOOL gscty(pro, defsc)
 		}
 	else if (tok.type)
 		baktok(&tok);
+	/* 
+	 * search the acceptable storage classes passed and break on hit
+	 */
+#ifdef linux
+	for (r = defsc; *r && *r != sc; ++r)
+		;
+#else
 	for (r = &defsc; *r && *r != sc; ++r)
 		;
+#endif
 	if (*r != sc)
 		perror("illegal storage class");
+#ifdef linux
+	pro->sc = (sc) ? sc : defsc[0];
+#else
 	pro->sc = (sc) ? sc : defsc;
+#endif
 	if (pro->ty && !mod && !uns)
 		return (YES);
 	else if (!ty || ty == LINT)
@@ -428,7 +458,7 @@ BOOL main(ac, av)
 		{0, 004, 014, 034, 04034, 014034, 034034, 034234};
 	INTERN BYTES nregs = {3};
 
-	infile = buybuf("", 1);
+	infile = buybuf("", 4);
 	getflags(&ac, &av, "a,c,d,e,l,m,n#,o*,b#,r#,u:F <file>",
 		&aflag, &cflag, &dflag, &eflag, &intsize, &mflag,
 		&nlen, &ofile, &bndef, &nregs, &uflag);

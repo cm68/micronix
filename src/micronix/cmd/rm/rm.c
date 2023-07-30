@@ -3,6 +3,8 @@
  *
  * cmd/rm/rm.c
  * Changed: <2022-01-06 16:38:16 curt>
+ *
+ * vim: tabstop=4 shiftwidth=4 expandtab:
  */
 int errcode = 0;
 
@@ -41,6 +43,7 @@ main(argc, argv)
                 break;
             default:
                 printf("rm: unknown option %s\n", *argv);
+                printf("rm [-fir] <name>..\n");
                 exit(1);
             }
     }
@@ -166,8 +169,4 @@ yes()
         b = getchar();
     return (i == 'y');
 }
-
-/*
- * vim: tabstop=4 shiftwidth=4 expandtab:
- */
 

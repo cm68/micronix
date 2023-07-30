@@ -16,8 +16,8 @@ typedef struct {
 	TEXT cbuf[128];
 	} CBUF;
 
-LOCAL BOOL dseg {NO};
-LOCAL CBUF cb[2] {NULL, CCODE};
+LOCAL BOOL dseg = {NO};
+LOCAL CBUF cb[2] = {NULL, CCODE};
 
 /*	output file stuff
  */
@@ -29,7 +29,7 @@ typedef struct {
 	TEXT *buf;
 	} OBUF;
 
-LOCAL OBUF obuf[2] {0};
+LOCAL OBUF obuf[2] = {0};
 
 /*	drain a temp file buffer
  */
@@ -108,7 +108,7 @@ VOID relby(oseg, b)
 		}
 	else
 		{
-		p->off =+ n;
+		p->off += n;
 		p->start = 0;
 		p->n = 0;
 		off = p->off;
@@ -141,12 +141,12 @@ VOID relout(csize, dsize)
 				p->base = 1;
 			else if (p->base == dabase)
 				{
-				p->val =+ csize;
+				p->val += csize;
 				p->base = 2;
 				}
 			else
 				{
-				p->ty =| PUBF;
+				p->ty |= PUBF;
 				p->base = ++u;
 				}
 			if (p->ty & PUBF)
@@ -209,7 +209,7 @@ VOID relseg(fd)
 		tread(&cb[0].cbuf, n);
 		if (!cb[0].cbase)
 			{
-			nabs =+ n;
+			nabs += n;
 			for (i = 0; i < n; ++i)
 				relby(LOBUF, cb[0].cbuf[i]);
 			}
@@ -223,17 +223,17 @@ VOID relseg(fd)
 			for (i = 0; i < n; ++i)
 				relby(LOBUF, cb[0].cbuf[i]);
 			if (!b)
-				nabs =+ n;
+				nabs += n;
 			else
 				{
-				for (; 8223 <= nabs; nabs =- 8223)
+				for (; 8223 <= nabs; nabs -= 8223)
 					{
 					relby(HIBUF, 0x3f);
 					relby(HIBUF, 0xff);
 					}
 				if (32 <= nabs)
 					{
-					nabs =- 32;
+					nabs -= 32;
 					relby(HIBUF, nabs >> 8 | 32);
 					relby(HIBUF, nabs);
 					}
@@ -249,7 +249,7 @@ VOID relseg(fd)
 					}
 				else
 					{
-					b =- 175;
+					b -= 175;
 					relby(HIBUF, 0xfc);
 					relby(HIBUF, 0x80 | b >> 8);
 					relby(HIBUF, b);
@@ -270,7 +270,7 @@ VOID relsym(p)
 	relwd(HIBUF, p->val);
 	m = ((COUNT)p->base < 4) ? (COUNT)p->base | 004 : 0;
 	if (p->ty & PUBF)
-		m =| 010;
+		m |= 010;
 	relby(HIBUF, m);
 	for (m = 0; m < LENNAME; ++m)
 		relby(HIBUF, p->nm[m]);

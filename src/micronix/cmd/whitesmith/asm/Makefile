@@ -15,6 +15,11 @@ INCLUDE = -I/usr/src/cmd/whitesmith/include
 
 all: anat as80 dis80
 
+install: all
+	cp as80 /bin/as
+	cp anat /bin/anat
+	cp dis80 /bin/dis80
+
 ASOBJS = amain.o amake.o asm.o auxx.o
 
 as80: $(ASOBJS)

@@ -11,6 +11,7 @@ void *
 wsalloc(BYTES need, BYTES *link)
 {
 	void *p;
+	if (need < sizeof(*link)) need = sizeof(*link);
 	p = malloc(need);
 	*(BYTES **)p = link;
 	return p;

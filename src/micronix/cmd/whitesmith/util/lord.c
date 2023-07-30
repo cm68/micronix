@@ -215,7 +215,7 @@ BOOL tsort(qb)
 
 	for (q = *qb; q; q = q->next)
 		for (r = *qb; r; r = r->next)
-			q->nrefs =+ lmatch(q->defs, r->refs);
+			q->nrefs += lmatch(q->defs, r->refs);
 	for (nb = &new, better = YES; *qb && better; )
 		{
 		better = NO;
@@ -229,7 +229,7 @@ BOOL tsort(qb)
 				*rb = r->next;
 				better = YES;
 				for (q = *qb; q; q = q->next)
-					q->nrefs =- lmatch(q->defs, r->refs);
+					q->nrefs -= lmatch(q->defs, r->refs);
 				}
 		}
 	if (*qb)
