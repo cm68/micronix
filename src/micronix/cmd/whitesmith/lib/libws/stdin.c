@@ -3,4 +3,4 @@
  */
 #include <std.h>
 
-GLOBAL FIO stdin {STDIN, 0, READ, 0};
+GLOBAL FIO stdin  = {STDIN, 0, READ, 0};

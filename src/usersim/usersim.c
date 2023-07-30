@@ -3,7 +3,7 @@
  *
  * usersim/usersim.c
  *
- * Changed: <2023-07-03 20:50:53 curt>
+ * Changed: <2023-07-29 09:57:12 curt>
  *
  * Copyright (c) 2018, Curt Mayer 
  * do whatever you want, just don't claim you wrote it. 
@@ -13,6 +13,8 @@
  *  Copyright (c) 2012, 2016 * Lin Ke-Fong 
  *  Copyright (c) 2012 Chris Pressey This code is free, do
  * whatever you want with it. 
+ *
+ * vim: tabstop=4 shiftwidth=4 expandtab:
  */
 
 #define	_GNU_SOURCE
@@ -76,6 +78,7 @@ extern int logfd;
 
 char curdir[1000] = "";
 char *rootdir;
+char *execprog;
 ino_t rootinode;
 
 /* i/o buffer used for real system calls */
@@ -96,6 +99,8 @@ char *initfile[] = {
 #define	V_SYS0	(1 << 5)        /* dump raw syscall args */
 #define	V_ERROR	(1 << 6)        /* perror on system calls */
 #define V_SFAIL (1 << 7)        /* breakpoint on syscall fail */
+#define V_FUNC  (1 << 8)        /* trace functions */
+#define V_FUNC0 (1 << 9)        /* skip tracing c helpers */
 
 /*
  * memory driver for trivial 64k used in usersim
@@ -196,7 +201,8 @@ char *progname;
 
 char *vopts[] = {
     "V_SYS", "V_DATA", "V_EXEC", "V_INST", 
-    "V_ASYS", "V_SYS0", "V_ERROR", "V_SFAIL", 0
+    "V_ASYS", "V_SYS0", "V_ERROR", "V_SFAIL", 
+    "V_FUNC", "V_FUNC0", 0
 };
 
 char *seekoff[] = { "SET", "CUR", "END" };
@@ -244,6 +250,7 @@ seekfile(int fd)
         return -1;
     }
 
+//message("seekfile fd: %d %d\n", fd, files[fd].offset);
     if ((files[fd].dt != 'b') || 
         (files[fd].major != 2) || 
         ((files[fd].minor & 0x8) == 0)) {
@@ -310,7 +317,9 @@ stop_handler()
 void
 pid()
 {
+#ifdef notdef
     message("%x: ", mypid);
+#endif
 }
 
 unsigned int
@@ -468,6 +477,10 @@ main(int argc, char **argv)
             case 'b':
                 breakpoint++;
                 break;
+	    case 'p':
+		argc--;
+		execprog = *argv++;
+		break;
             default:
                 usage("unrecognized option :", --s);
                 break;
@@ -617,7 +630,7 @@ main(int argc, char **argv)
     free(argvec);
 
     z80_set_reg16(pc_reg, pop());
-    dumpcpu();
+    // dumpcpu();
     emulate();
     return EXIT_SUCCESS;
 }
@@ -759,6 +772,9 @@ do_exec(char *name, char **argv)
     if (verbose & V_EXEC) {
         pid();
         message("exec %s\n", name);
+    }
+    if (execprog && (strcmp(execprog,argv[0]) == 0)) {
+	breakpoint = 1;
     }
     /*
      * count our args from the null-terminated list 
@@ -988,6 +1004,52 @@ cpmsys()
     z80_set_reg16(pc_reg, pop());
 }
 
+strdump(int p)
+{
+#define XBUF 10
+    char xbuf[XBUF];
+    unsigned char c;
+    int i;
+
+    for (i = 0; i < XBUF - 1; i++) {
+        xbuf[i + 1] = '\0';
+        c = get_byte(p + i);
+        xbuf[i] = c;
+        if ((c < ' ') || (c > 0x7e)) xbuf[i] = '.';
+        if (!c) break;
+    }
+    message("%s ", xbuf);
+}
+
+static void
+funcdump(char *s)
+{
+#define ADUMP   4
+
+    unsigned short a[ADUMP];
+    unsigned short sp;
+    int i;
+
+    if ((verbose & V_FUNC0) && (s[0] == 'c' && s[1] == '.')) 
+        return;
+
+    sp = z80_get_reg16(sp_reg);
+    for (i = 0; i < ADUMP; i++) {
+        a[i] = get_word(sp + (i * 2));
+    }
+    message("%s(", s);
+    for (i = 1; i < ADUMP; i++) {
+        message("%04x", a[i]);
+        if (i < (ADUMP - 1)) message(",");
+    }
+    message(") ");
+    for (i = 1; i < ADUMP; i++) {
+        strdump(a[i]);
+        if (i < (ADUMP - 1)) message(" ");
+    }
+    message("\n");
+}
+
 /*
  * this is the actual micronix emulator that emulates all the system calls
  * of micronix. initially, it starts with exec of the named file, and then 
@@ -996,21 +1058,24 @@ cpmsys()
 static void
 emulate()
 {
-    unsigned char *ip;
     int i;
+    unsigned short pc;
+    char *s;
 
     do {
+        pc = z80_get_reg16(pc_reg);
+
         if (watchpoint_hit()) {
             breakpoint = 1;
         }
-        if (breakpoint_at(z80_get_reg16(pc_reg))) {
+        if (breakpoint_at(pc)) {
             pid();
-            message("break at %04x\n", z80_get_reg16(pc_reg));
+            message("break at %04x\n", pc);
             dumpcpu();
             breakpoint = 1;
         }
         /* cp/m system call */
-        if (z80_get_reg16(pc_reg) == 0x0005) {
+        if (pc == 0x0005) {
             pid();
             cpmsys();
             breakpoint = 1;
@@ -1023,10 +1088,14 @@ emulate()
             pid();
             dumpcpu();
         }
-        /*
-         * the second arg is the number of cycles we are allowing 
-         * the emulator to run
-         */
+
+        if (verbose & V_FUNC) {
+            s = get_symname(pc);
+            if (s) {
+                funcdump(s);
+            }
+        }
+
         z80_run();
         /*
          * if we have a signal to deliver, do it now
@@ -1041,7 +1110,7 @@ emulate()
                 if (verbose & V_SYS) {
                     message("invoking signal %d %x\n", i, signal_handler[i]);
                 }
-                push(z80_get_reg16(pc_reg));
+                push(pc);
                 z80_set_reg16(pc_reg, signal_handler[i]);
             } else {
                 if (verbose & V_SYS) {
@@ -1651,12 +1720,14 @@ SystemCall()
         sc = get_word(sc + 2);
         if ((code = get_byte(sc)) != 0xcf) {
             message("indir no syscall %d %x!\n", code, sc);
+            exit(4);
         }
         code = get_byte(sc + 1);
     }
 
     if (code >= NSYS) {
         fprintf(stderr, "bad system call number %d\n", code);
+        exit(4);
     }
 
     savemode = verbose;
@@ -2203,6 +2274,7 @@ SystemCall()
             }
             files[fd].offset = i;
         }
+//message("seek fd %d to %d\n", fd, i);
         ret = (i >> 16) & 0xffff;
         ret = 0;
         carry_clear();
@@ -2254,9 +2326,7 @@ SystemCall()
 
     case 32:                   /* gtty */
         if (tcgetattr(fd, &ti)) {
-            /*
-             * perror("gtty"); 
-             */
+            // perror("gtty"); 
             ret = ENOTTY;
             carry_set();
             break;
@@ -2325,6 +2395,7 @@ SystemCall()
             ret = 0;
             carry_set();
         } else {
+            files[ret] = files[fd];
             carry_clear();
         }
         break;
@@ -2431,9 +2502,11 @@ SystemCall()
         if ((code == 2) && (ret == 0)) {
             message("\n%d: fork() ", mypid);
         }
-        message(" = %04x%s\n",
-            ret,
-            (z80_get_reg8(f_reg) & 1) ? " FAILED" : "");
+        if (z80_get_reg8(f_reg) & 1) {
+            message(" = %04x %d %s\n", ret, errno, strerror(errno));
+        } else {
+            message(" = %04x\n", ret);
+        }
     }
   nolog2:
     if ((verbose & V_DATA) && (sp->flag & SF_BUF)) {
@@ -2448,7 +2521,3 @@ SystemCall()
         dumpcpu();
     }
 }
-
-/*
- * vim: tabstop=4 shiftwidth=4 expandtab:
- */

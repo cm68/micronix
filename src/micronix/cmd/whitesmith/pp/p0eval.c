@@ -6,25 +6,29 @@
 #include "../include/c/int01.h"
 #include "../include/c/int012.h"
 
+TLIST *expr();
+TLIST *extail();
+TLIST *exterm();
+
 /*	escape sequences for c
  */
-LOCAL TEXT eschars[] {"btnvfrBTNVFR(!)^"};	/* ASCII */
-LOCAL TEXT escodes[] {010, 011, 012, 013, 014, 015, 010, 011, 012,
+LOCAL TEXT eschars[] = {"btnvfrBTNVFR(!)^"};	/* ASCII */
+LOCAL TEXT escodes[] = {010, 011, 012, 013, 014, 015, 010, 011, 012,
 	013, 114, 015, 0173, 0174, 0175, 0176};
 
 /*	the priority tables
  */
-LOCAL TEXT ipri[] {LTIMES, LDIVIDE, LMODULO, LPLUS, LMINUS, LLSHIFT, LRSHIFT,
+LOCAL TEXT ipri[] = {LTIMES, LDIVIDE, LMODULO, LPLUS, LMINUS, LLSHIFT, LRSHIFT,
 	LLESS, LLEQ, LGREAT, LGEQ, LISEQ, LNOTEQ,
 	LAND, LXOR, LOR, LANDAND, LOROR, LQUERY, 0};
-LOCAL TEXT opri[] {14, 14, 14, 13, 13, 12, 12,
+LOCAL TEXT opri[] = {14, 14, 14, 13, 13, 12, 12,
 	11, 11, 11, 11, 10, 10,
 	9, 8, 7, 6, 5, 4};
 
 /*	the operator table
  */
 #define NOPS	54
-LOCAL PRETAB optab[] {
+LOCAL PRETAB optab[] = {
 	"\1!", LNOT,
 	"\1%", LMODULO,
 	"\1&", LAND,
@@ -254,34 +258,34 @@ TLIST *extail(lpr, plv, pop, p)
 		switch (op)
 			{
 		case LPLUS:
-			lv =+ rv;
+			lv += rv;
 			break;
 		case LMINUS:
 			lv = mv;
 			break;
 		case LTIMES:
-			lv =* rv;
+			lv *= rv;
 			break;
 		case LDIVIDE:
-			lv =/ rv;
+			lv /= rv;
 			break;
 		case LMODULO:
-			lv =% rv;
+			lv %= rv;
 			break;
 		case LAND:
-			lv =& rv;
+			lv &= rv;
 			break;
 		case LOR:
-			lv =| rv;
+			lv |= rv;
 			break;
 		case LXOR:
-			lv =^ rv;
+			lv ^= rv;
 			break;
 		case LLSHIFT:
-			lv =<< rv;
+			lv <<= rv;
 			break;
 		case LRSHIFT:
-			lv =>> rv;
+			lv >>= rv;
 			break;
 		case LLESS:
 			lv = (mv < 0);

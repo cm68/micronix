@@ -17,22 +17,27 @@
 #define YPOPHL	0400
 #define YPOPBC	01000
 
+GLOBAL TEXT *utobits();
+GLOBAL TEXT *bitstou();
+GLOBAL BITS genfl();
+GLOBAL BITS genput();
+
 /*	register masks to index numbers
  */
-GLOBAL TINY ctab[] {030, 030, 030, 030, 030, 020, 040, 010, 000, 000, 000, 030};
-GLOBAL BITS rtab[] {R0, R1, R2, R3, R4, BC, AUTIDX, HL, TS, R0, R1, 0};
-GLOBAL TINY xtab[] {X0, X1, X2, X3, X4, XBC, XDE, XHL, XSP, XP0, XP1, 0};
-LOCAL TEXT *xname[] {"\20", "\21", "\22", "\23", "\24",
+GLOBAL TINY ctab[] = {030, 030, 030, 030, 030, 020, 040, 010, 000, 000, 000, 030};
+GLOBAL BITS rtab[] = {R0, R1, R2, R3, R4, BC, AUTIDX, HL, TS, R0, R1, 0};
+GLOBAL TINY xtab[] = {X0, X1, X2, X3, X4, XBC, XDE, XHL, XSP, XP0, XP1, 0};
+LOCAL TEXT *xname[] = {"\20", "\21", "\22", "\23", "\24",
 		"bc", "de", "hl", "SP"};
-LOCAL TEXT *uptab[]  {
+LOCAL TEXT *uptab[]  = {
 		"-1-1-1", "-1-1", "-1", "", "+1", "+1+1", "+1+1+1"};
-LOCAL TINY cxtab[] {XBC, XDE, XHL, 0};
-LOCAL TEXT *dnname[] {"c", "e", "l", "DN?"};
-LOCAL TEXT *upname[] {"b", "d", "h", "UP?"};
+LOCAL TINY cxtab[] = {XBC, XDE, XHL, 0};
+LOCAL TEXT *dnname[] = {"c", "e", "l", "DN?"};
+LOCAL TEXT *upname[] = {"b", "d", "h", "UP?"};
 
 /*	break functions
  */
-GLOBAL TEXT *(*gfun[])() {NULL, utobits, bitstou};
+GLOBAL TEXT *(*gfun[])() = {NULL, utobits, bitstou};
 
 /*	move bit field to uppable location
  */
@@ -43,12 +48,24 @@ TEXT *bitstou(p)
 	switch (gotten(p->e.o.left))
 		{
 	case WBC:
+#ifdef linux
+		return ("\0\0\0Kbtou; bc<=sp");
+#else
 		return ("\x\x\xKbtou; bc<=sp");
+#endif
 	case WMEM:
 	case WVMEM:
+#ifdef linux
+		return ("\0\0\0Kbtou; hl<=sp->WX");
+#else
 		return ("\x\x\xKbtou; hl<=sp->WX");
+#endif
 	default:
+#ifdef linux
+		return ("\0\0\0Kbtou; hl<=sp; a=l->X=h->UX");
+#else
 		return ("\x\x\xKbtou; hl<=sp; a=l->X=h->UX");
+#endif
 		}
 	}
 
@@ -75,7 +92,7 @@ putterm(r, 1);
 	if (!(flags = genfl(p, l, r, tab, set)))
 		return (0);
 	if (idx != l->f.idx)
-		set =& ~xtor(l->f.idx);
+		set &= ~xtor(l->f.idx);
 	if ((code & 0200) && !(tab = (*gfun[tab[3]])(p, set)))
 		return (0);
 	if (code & 0100)
@@ -89,9 +106,9 @@ putterm(r, 1);
 		p->got = l->got & GVOL;
 		}
 	if ((l->got & (GJUNK|GVOL)) == (GJUNK|GVOL))
-		set =| xtor(l->f.idx);
+		set |= xtor(l->f.idx);
 	if ((r->got & (GJUNK|GVOL)) == (GJUNK|GVOL))
-		set =| xtor(r->f.idx);
+		set |= xtor(r->f.idx);
 	if (p->op == LGETS && adequ(&l->f, &r->f) &&
 		r->f.idx != XP0 && r->f.idx != XP1)
 		return (set);
@@ -103,11 +120,11 @@ putterm(r, 1);
 			if (r->f.nm[0])
 				cpybuf(p->f.nm, r->f.nm, LENNAME);
 			p->f.bias = p->f.bias + r->f.bias;
-			p->f.idx =+ r->f.idx;
+			p->f.idx += r->f.idx;
 			if (r->got & GVOL)
 				{
-				p->got =| GVOL;
-				set =& ~xtor(p->f.idx);
+				p->got |= GVOL;
+				set &= ~xtor(p->f.idx);
 				}
 			if (!p->f.nm[0] && -4 <= (ARGINT)p->f.bias &&
 				(ARGINT)p->f.bias <= 4 && (p->f.idx == XHL ||
@@ -117,9 +134,9 @@ putterm(r, 1);
 				return (set);
 			}
 	if (code & 040)
-		p->got =| GZSET;
+		p->got |= GZSET;
 	if (code & 004)
-		p->got =| GNSET;
+		p->got |= GNSET;
 #ifdef DEBUG
 putfmt("/gen = %p\n", &tab[3]);
 #endif
@@ -152,13 +169,13 @@ VOID genad(p, up, byte)
 		{
 		if (!refs)
 			{
-			off =>> up << 3;
-			if (byte && ((off =& BYTMASK) == 1))
+			off >>= up << 3;
+			if (byte && ((off &= BYTMASK) == 1))
 				off = 0401;
 			}
 		else
 			{
-			off =+ up;
+			off += up;
 			chput("*", NULL);
 			}
 		putnb(p->f.nm, off);
@@ -229,7 +246,7 @@ BITS genfl(p, l, r, tab, set)
 			{
 			chput("hl<>*sp\n", NULL);
 			l->f.idx = XHL;
-			flags =| SWPHL;
+			flags |= SWPHL;
 			}
 		else if (set & BC && twant(tab[1]) & (r->f.refs ? WPBC : WBC))
 			{
@@ -244,31 +261,31 @@ BITS genfl(p, l, r, tab, set)
 		!(code & 030) || !(xtor(l->f.idx) & (BC|HL)))
 		;
 	else if (code & 010)
-		flags =| (l->f.idx == XHL) ? DECHL : DECBC;
+		flags |= (l->f.idx == XHL) ? DECHL : DECBC;
 	else if (l->f.idx == XHL)
 		{
 		chput("hl=>sp\n", NULL);
-		flags =| XPOPHL;
+		flags |= XPOPHL;
 		}
 	else
 		{
 		chput("bc=>sp\n", NULL);
-		flags =| XPOPBC;
+		flags |= XPOPBC;
 		}
 	if ((r->got & (GJUNK|GVOL)) == (GJUNK|GVOL) || !r->f.refs ||
 		!(code & 003) || !(xtor(r->f.idx) & (BC|HL)))
 		;
 	else if (code & 001)
-		flags =| (r->f.idx == XHL) ? DECHL : DECBC;
+		flags |= (r->f.idx == XHL) ? DECHL : DECBC;
 	else if (r->f.idx == XHL)
 		{
 		chput("hl=>sp\n", NULL);
-		flags =| YPOPHL;
+		flags |= YPOPHL;
 		}
 	else
 		{
 		chput("bc=>sp\n", NULL);
-		flags =| YPOPBC;
+		flags |= YPOPBC;
 		}
 	return (flags);
 	}
@@ -302,11 +319,11 @@ BITS genput(p, tab, set, flags)
 				++i;
 			for (; *q == 'D'; ++q)
 				--i;
-			flags =| (*q == 'X') ? XBYTE : YBYTE;
+			flags |= (*q == 'X') ? XBYTE : YBYTE;
 			genad((*q == 'X') ? p->e.o.left : p->e.o.right, i, YES);
 			break;
 		case 'W':
-			flags =& (q[1] == 'X') ? ~XBYTE : ~YBYTE;
+			flags &= (q[1] == 'X') ? ~XBYTE : ~YBYTE;
 			break;
 		case 'T':
 			crlab = crs();
@@ -402,7 +419,11 @@ TEXT *utobits(p)
 	{
 	
 	putos(p->e.o.left->e.o.ty, "hl=0", "=>sp\n");
+#ifdef linux
+	return ("\0\0\0Kutob");
+#else
 	return ("\x\x\xKutob");
+#endif
 	}
 
 /*	get the index name

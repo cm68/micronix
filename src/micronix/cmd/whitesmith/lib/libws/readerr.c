@@ -3,4 +3,4 @@
  */
 #include <std.h>
 
-TEXT *readerr {"read error"};
+TEXT *readerr = {"read error"};

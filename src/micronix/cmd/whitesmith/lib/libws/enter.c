@@ -3,8 +3,8 @@
  */
 #include <std.h>
 
-LOCAL TEXT *entcond {"bad leave call"};
-LOCAL BYTES entval {0};
+LOCAL TEXT *entcond = {"bad leave call"};
+LOCAL BYTES entval = {0};
 
 /*	enter a control region
  */

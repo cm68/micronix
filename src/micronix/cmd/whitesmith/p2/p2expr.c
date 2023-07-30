@@ -6,29 +6,37 @@
 #include "../include/c/int12.h"
 #include "../include/c/int012.h"
 
+GLOBAL BITS fix();
+GLOBAL BITS vfix();
+GLOBAL BITS force();
+GLOBAL BITS ftyp();
+GLOBAL BITS getsop();
+GLOBAL BITS move();
+GLOBAL BITS postop();
+
 /*	strategies
  */
 #define LR		0
 #define RL		1
 #define LTR		2
 
-#define FAIL	1
+#define FAIL		1
 #define SUC		2
 
 /*	automatic offsets and register stuff
  */
-GLOBAL BYTES autmin {0};
-GLOBAL BYTES autoff {0};
-GLOBAL BITS regset {0};
-GLOBAL BITS regmin {0};
+GLOBAL BYTES autmin = {0};
+GLOBAL BYTES autoff = {0};
+GLOBAL BITS regset = {0};
+GLOBAL BITS regmin = {0};
 
 /*	the character pool offset
  */
-GLOBAL BYTES choff {0};
+GLOBAL BYTES choff = {0};
 
 /*	constant zero
  */
-GLOBAL EXPR exzero {0};
+GLOBAL EXPR exzero = {0};
 
 /*	are the addresses exactly the same
  */
@@ -82,17 +90,17 @@ putterm(p, 1);
 			}
 		lwant = pref(want, lwant);
 		if (p->op == LGETS)
-			lwant =| GNOCODE;
+			lwant |= GNOCODE;
 		}
 	else
 		lwant = pref(want, twant(tab[0]));
 	if (want & WNULL)
-		lwant =| GJUNK;
+		lwant |= GJUNK;
 	if (lwant & PTRSET)
-		lwant =| WPSTK;
+		lwant |= WPSTK;
 	rwant = twant(tab[1]) | GJUNK;
 	if (want & GRVOL)
-		r->got =| GVOL;
+		r->got |= GVOL;
 	lty = tab[0] & 017;
 	rty = (0374 <= tab[1] || tab[1] <= 017) ? r->e.o.ty : tab[1] & 017;
 	lvol = l->got & GVOL;
@@ -166,7 +174,7 @@ putterm(p, 1);
 		if (!(xtor(p->e.v.idx) & regset) && (xtor(p->e.v.idx) & REGSET))
 			p->got = 0;
 		else
-			p->got =& GVOL;
+			p->got &= GVOL;
 		cpyad(&p->f, &p->e.v);
 		break;
 	case DINDIR:
@@ -176,7 +184,7 @@ putterm(p, 1);
 			p->got = l->got & (GVOL|GJUNK);
 			l->f.ty = p->e.o.ty;
 			cpyad(&p->f, &l->f);
-			p->f.refs =+ (p->op == DINDIR) ? 1 : -1;
+			p->f.refs += (p->op == DINDIR) ? 1 : -1;
 			}
 		break;
 	case LNOT:
@@ -197,7 +205,7 @@ putterm(p, 1);
 	case DFNONLY:
 		set = fncall(p, want, set);
 		if (!(want & WNULL))
-			set =& ~xtor(p->f.idx);
+			set &= ~xtor(p->f.idx);
 		break;
 	case DELIST:
 		if (fix(l, WNULL, set, l->e.o.ty)
@@ -269,7 +277,7 @@ BITS force(p, want, set, ty)
 putfmt("/force %o %o %o %o %o\n", p->op, want, set, ty, p->got);
 putterm(p, 1);
 #endif
-	ty =& 017;
+	ty &= 017;
 	if (!ty)
 		{
 		if (p->f.idx == XP0 || p->f.idx == XP1)
@@ -278,7 +286,7 @@ putterm(p, 1);
 			p->got = 0;
 		return (set);
 		}
-	p->got =| want & GJUNK;
+	p->got |= want & GJUNK;
 	if (want & WTERM)
 		return (set);
 	else if (want & WNULL)
@@ -286,7 +294,7 @@ putterm(p, 1);
 		if (p->f.idx == XSP || p->f.idx == XP0 || p->f.idx == XP1)
 			chput(msp(p->f.refs ? 2 : bytype[ty]), "\n", NULL);
 		if (p->got & GVOL)
-			set =| xtor(p->f.idx);
+			set |= xtor(p->f.idx);
 		setad(p, ty, 0, 0);
 		return (set);
 		}
@@ -314,7 +322,7 @@ putterm(p, 1);
 		return (set);
 	ty = regtype[ty];
 	if (p->got & GVOL)
-		set =| xtor(p->f.idx);
+		set |= xtor(p->f.idx);
 	q = ftab;
 	for (; q->fwant; ++q)
 		if (q->fwant & want && q->fset & set && ty <= q->fty
@@ -326,7 +334,7 @@ putterm(p, 1);
 	if (!q->fwant)
 		return (0);
 	p->f.refs = (q->fwant & PTRSET) ? 1 : 0;
-	p->got =| GVOL;
+	p->got |= GVOL;
 	return (set);
 	}
 
@@ -338,6 +346,7 @@ BITS ftyp(p, want, set, ty)
 	FAST LEX ty;
 	{
 	IMPORT TINY equtype[], regtype[];
+	IMPORT TEXT *reref[], *intreg[];
 	FAST BITS reg;
 	BITS junk;
 	EXPR ex;
@@ -351,7 +360,7 @@ BITS ftyp(p, want, set, ty)
 		junk = p->got & GJUNK;
 		ty = regtype[ty];
 		if (p->got & GVOL)
-			set =| xtor(p->f.idx);
+			set |= xtor(p->f.idx);
 		if (ty <= XUSHORT)
 			reg = set & BC;
 		else
@@ -364,15 +373,15 @@ BITS ftyp(p, want, set, ty)
 			}
 		if (!reg)
 			return (0);
-		reg =& (reg - 1) ^ reg;
+		reg &= (reg - 1) ^ reg;
 		setad(&ex, ty, rtox(reg), 0);
 		ex.got = GVOL;
 		if (want & GNOCODE)
 			cpyad(&p->f, &ex.f);
 		else
 			set = move(&ex, p, set);
-		set =& ~reg;
-		p->got =| GVOL | junk;
+		set &= ~reg;
+		p->got |= GVOL | junk;
 		}
 	return (set);
 	}
@@ -403,7 +412,7 @@ putterm(p, 1);
 		lgot = gotten(l);
 		if (p->op != LGETS || !(want & WNULL)
 			|| !(lgot & WVMEM) || l->f.idx != X0)
-			pwant =| lgot & VOLSET;
+			pwant |= lgot & VOLSET;
 		else
 			{
 			if (!(set = fix(r, WVMEM, set, l->f.ty)))
@@ -451,7 +460,7 @@ putterm(p, 1);
 		set = move(l, p, set);
 		}
 	else
-		p->got =| l->got & (GVOL|GJUNK);
+		p->got |= l->got & (GVOL|GJUNK);
 	return (set);
 	}
 
@@ -483,7 +492,7 @@ putterm(r, 1);
 	cpyad(&right.e.v, &r->f);
 	want = gotten(l);
 	if (r->got & GVOL)
-		want =| GRVOL;
+		want |= GRVOL;
 	set = getsop(&ex, want, set, want);
 	cpyad(&r->f, &ex.f);
 	r->got = ex.got | l->got & (GVOL|GJUNK);
@@ -515,7 +524,7 @@ BITS postop(p, want, set)
 	if (!(set = force(p, (p->f.ty & 017) <= XUSHORT ? WSTACK : WVMEM,
 		set, ty)))
 		return (0);
-	p->got =& ~(GZSET|GNSET);
+	p->got &= ~(GZSET|GNSET);
 	ex.op = (p->op == DGPLU) ? LGPLU : LGMIN;
 	ex.e.o.ty = p->e.o.ty;
 	ex.e.o.left = l;
@@ -543,7 +552,7 @@ BITS vfix(p, want, set, ty, wvol)
 	case WBC:
 		if (!iscons(p))
 			return (set);
-		vwant =& ~WBC;
+		vwant &= ~WBC;
 		break;
 	case WHL:
 	case WVMEM:
@@ -559,7 +568,7 @@ BITS vfix(p, want, set, ty, wvol)
 
 /*	void an expression
  */
-CODE **void(qb, r)
+CODE **voidfn(qb, r)
 	FAST CODE **qb;
 	FAST EXPR *r;
 	{
@@ -569,7 +578,7 @@ CODE **void(qb, r)
 	FAST BYTES chsave;
 
 #ifdef DEBUG
-putfmt("/void %o\n", r->op);
+putfmt("/voidfn %o\n", r->op);
 putterm(r, 1);
 putexpr(r, 0);
 #endif

@@ -4,6 +4,16 @@
 #include <std.h>
 #include "../include/c/int0.h"
 
+#ifdef linux
+#define	create	creat
+#endif
+
+INCL *nxtfile();
+TLIST *getin();
+TLIST *putgr();
+TEXT *getln();
+GLOBAL TEXT *buybuf();
+
 /*	DATA FLOW:
 	getl(line)->
 	getln(logical line)-> getin(includes)->
@@ -20,15 +30,15 @@
 	-x => put lexemes, not lines.
 	-6 => put SOH, extra newlines for v6 compiler
  */
-LOCAL BOOL cflag {NO};
-LOCAL ARGS pdefs {NDARGS};
-LOCAL TEXT *ofile {NULL};
-GLOBAL BOOL xflag {NO};
-GLOBAL BOOL v6flag {NO};
-GLOBAL BYTES pchar {'#'};
-GLOBAL BYTES schar {'@'};
-GLOBAL TEXT *iprefix {"|"};
-GLOBAL TEXT *_pname {"pp"};
+LOCAL BOOL cflag = {NO};
+LOCAL ARGS pdefs = {NDARGS};
+LOCAL TEXT *ofile = {NULL};
+GLOBAL BOOL xflag = {NO};
+GLOBAL BOOL v6flag = {NO};
+GLOBAL BYTES pchar = {'#'};
+GLOBAL BYTES schar = {'@'};
+GLOBAL TEXT *iprefix = {"|"};
+GLOBAL TEXT *_pname = {"pp"};
 
 /*	FILE CONTROL:
 	argc = no of file args left
@@ -38,17 +48,17 @@ GLOBAL TEXT *_pname {"pp"};
 	nerrors = no of errors seen
 	pflag => name has changed
 */
-GLOBAL TEXT **argv {NULL};
-GLOBAL BYTES argc {0};
-GLOBAL FILE errfd {STDERR};
-GLOBAL INCL *pincl {NULL};
-GLOBAL COUNT nerrors {0};
-GLOBAL BOOL pflag {NO};
+GLOBAL TEXT **argv = {NULL};
+GLOBAL BYTES argc = {0};
+GLOBAL FILE errfd = {STDERR};
+GLOBAL INCL *pincl = {NULL};
+GLOBAL COUNT nerrors = {0};
+GLOBAL BOOL pflag = {NO};
 
 /*	the table of predefined #keywords
  */
 #define NPPS	18
-LOCAL PRETAB pptab[] {
+LOCAL PRETAB pptab[] = {
 	"\2IF", PIF,
 	"\2if", PIF,
 	"\4ELSE", PELSE,
@@ -84,7 +94,7 @@ TLIST *getex()
 			{
 			if (tok = scntab(pptab, NPPS, p->next->text, p->next->ntext))
 				{
-				p = free(p, p->next);
+				p = wsfree(p, p->next);
 				p->type = tok;
 				}
 			else
@@ -130,8 +140,8 @@ TLIST *getin()
 		else
 			{
 			fclose(&pincl->pfio);
-			free(pincl->fname, NULL);
-			pincl = free(pincl, pincl->next);
+			wsfree(pincl->fname, NULL);
+			pincl = wsfree(pincl, pincl->next);
 			pflag = YES;
 			}
 		}
@@ -169,8 +179,8 @@ TEXT *getln(pi)
 			}
 		else if (!cflag && *s == '\\')
 			{
-			s =+ 2;
-			i =- 2;
+			s += 2;
+			i -= 2;
 			}
 		else if (!cflag && !strchar && *s == '/' && 1 < i && s[1] == '*')
 			{
@@ -180,7 +190,7 @@ TEXT *getln(pi)
 			if (j < i - 1)
 				{
 				*s++ = ' ';
-				i =- j + 2;
+				i -= j + 2;
 				for (k = 0; k < i; ++k)
 					s[k] = s[k + j + 1];
 				}
@@ -192,7 +202,7 @@ TEXT *getln(pi)
 			else
 				{
 				++pi->nline;
-				i =+ 2;
+				i += 2;
 				}
 			}
 		else if (*s == '\n')
@@ -344,11 +354,11 @@ VOID putns(p)
 		else if ((fd = open(fname, READ, 0)) < 0)
 			{
 			perror("can't #include %p", fname);
-			free(fname, NULL);
+			wsfree(fname, NULL);
 			}
 		else
 			{
-			pincl = alloc(sizeof (*pincl), pincl);
+			pincl = wsalloc(sizeof (*pincl), pincl);
 			pincl->fname = fname;
 			pincl->nline = 0;
 			finit(&pincl->pfio, fd, READ);
@@ -366,7 +376,7 @@ VOID putns(p)
 				{
 				pflag = YES;
 				if (pincl->fname)
-					free(pincl->fname, NULL);
+					wsfree(pincl->fname, NULL);
 				pincl->fname = fname;
 				}
 			}

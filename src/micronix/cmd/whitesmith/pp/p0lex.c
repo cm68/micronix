@@ -5,9 +5,11 @@
 #include "../include/c/int0.h"
 #include "../include/c/int01.h"
 
+TEXT *lexfnxt();
+
 /*	the keyword table
  */
-LOCAL PRETAB keytab[] {
+LOCAL PRETAB keytab[] = {
 	"\2do", LDO,
 	"\2if", LIF,
 	"\3for", LFOR,
@@ -209,13 +211,13 @@ TLIST *lexint(p, base, nskip)
 	COUNT base;
 	BYTES nskip;
 	{
-	FAST BOOL signed;
+	FAST BOOL is_signed;
 	FAST BYTES n;
 	COUNT snum, unum;
 	LONG lnum;
 	TINY cnum, ty;
 
-	signed = (base == 10);
+	is_signed = (base == 10);
 	n = p->ntext - nskip;
 	if (btol(p->text + nskip, n, &lnum, base) < n)
 		perror("illegal constant %b", p->text, p->ntext);
@@ -223,12 +225,12 @@ TLIST *lexint(p, base, nskip)
 	snum = lnum;
 	cnum = snum;
 	if (tolower(p->text[p->ntext - 1]) == 'l' ||
-		signed && snum != lnum || !signed && unum)
-		ty = (signed || 0 <= lnum) ? LLNUM : LULNUM;
-	else if (signed && cnum != snum || !signed && (snum & ~BYTMASK))
-		ty = (signed || 0 <= snum) ? LSNUM : LUSNUM;
+		is_signed && snum != lnum || !is_signed && unum)
+		ty = (is_signed || 0 <= lnum) ? LLNUM : LULNUM;
+	else if (is_signed && cnum != snum || !is_signed && (snum & ~BYTMASK))
+		ty = (is_signed || 0 <= snum) ? LSNUM : LUSNUM;
 	else
-		ty = (signed || 0 <= cnum) ? LCNUM : LSNUM;
+		ty = (is_signed || 0 <= cnum) ? LCNUM : LSNUM;
 	putcode("c4", ty, &lnum);
 	return (p->next);
 	}

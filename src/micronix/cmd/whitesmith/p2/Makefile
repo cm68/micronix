@@ -11,10 +11,13 @@ INCLUDE = -I/usr/src/cmd/whitesmith/include
 
 all: p2
 
+install: p2
+	cp p2 /bin/cp2
+
 P2OBJS = p2expr.o p2fmov.o p2gen.o p2jump.o p2main.o p2subs.o p2tab.o q2dbug.o
 
 p2: $(P2OBJS)
-	cc -o p2 $(P2OBJS) -lws
+	cc -o p2 $(P2OBJS) -lWS ../lib/libws/error.o
 
 $(P2OBJS) : $*.c
 	cc $(INCLUDE) -c $*.c

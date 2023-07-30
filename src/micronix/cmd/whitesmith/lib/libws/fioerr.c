@@ -3,4 +3,4 @@
  */
 #include <std.h>
 
-TEXT *fioerr {"NULL FIO pointer"};
+TEXT *fioerr = {"NULL FIO pointer"};

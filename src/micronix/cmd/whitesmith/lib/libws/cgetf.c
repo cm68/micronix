@@ -106,8 +106,8 @@ COUNT _getf(pfn, arg, f, pp)
 				n = min(width, size);
 				if (0 < n && r[n - 1] == '\n')
 					--n;
-				r =+ n;
-				size =- n;
+				r += n;
+				size -= n;
 				}
 			else
 				{
@@ -141,7 +141,7 @@ COUNT _getf(pfn, arg, f, pp)
 					{
 					++pp;
 					*(BYTES *)*pp++ = n;
-					nargs =+ 2;
+					nargs += 2;
 					}
 				}
 			else if (*q == 'l' || *q == 'i' && sizeof (int) == sizeof (LONG))

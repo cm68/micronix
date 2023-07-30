@@ -3,4 +3,4 @@
  */
 #include <std.h>
 
-TEXT *_pname {"error"};
+TEXT *_pname = {"error"};

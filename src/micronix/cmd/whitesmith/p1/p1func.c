@@ -9,20 +9,22 @@
 
 /*	allocation resources
  */
-GLOBAL BITS regset {REGSET};
-GLOBAL LONG autoff {0};
+GLOBAL BITS regset = {REGSET};
+GLOBAL LONG autoff = {0};
 
 /*	case tables
  */
-GLOBAL LABEL deflbl {0};
+GLOBAL LABEL deflbl = {0};
 
 /*	the return term
  */
-GLOBAL TERM rterm {NULL};
-LOCAL TINY rettab[] {INTRET, INTRET, INTRET, INTRET, INTRET, LONGRET,
+GLOBAL TERM rterm = {NULL};
+LOCAL TINY rettab[] = {INTRET, INTRET, INTRET, INTRET, INTRET, LONGRET,
 			LONGRET, LONGRET, FLTRET, FLTRET, INTRET};
 
 extern struct token *gettok();
+extern struct symbol *setty();
+SYMBOL *lookex();
 
 /*	initialize an auto
  */
@@ -87,7 +89,7 @@ VOID doblock(brk, cont)
 			else if (!cmptype(p, q))
 				nmerr("redeclared", p->n.an);
 			if (q)
-				p = free(p, q);
+				p = wsfree(p, q);
 			if (p->sc == LTYPDEF || isfn)
 				;
 			else if (p->sc == LSTATIC)
@@ -106,8 +108,8 @@ VOID doblock(brk, cont)
 				else
 					{
 					p->sc = LAUTO;
-					autoff =- bytes(p->ty, p->at);
-					autoff =& ~((1 << bound(p->ty, p->at)) - 1L);
+					autoff -= bytes(p->ty, p->at);
+					autoff &= ~((1 << bound(p->ty, p->at)) - 1L);
 					p->s.offset = autoff;
 					}
 				autinit(p);
@@ -150,7 +152,7 @@ VOID dostat(brk, cont)
 	IMPORT BITS tint;
 	IMPORT CASE *casetab;
 	IMPORT LABEL deflbl;
-	IMPORT LONG const();
+	IMPORT LONG constfn();
 	IMPORT SYMBOL *lbltab;
 	IMPORT TERM rterm;
 	FAST CASE *r;
@@ -166,8 +168,8 @@ VOID dostat(brk, cont)
 		switch (gettok(&tok)->type)
 			{
 		case LCASE:
-			casetab = alloc(sizeof (*casetab), casetab);
-			casetab->cvalue = const(YES);
+			casetab = wsalloc(sizeof (*casetab), casetab);
+			casetab->cvalue = constfn(YES);
 			need(LCOLON);
 			for (r = casetab->next; r && r != &casetab; r = r->next)
 				if (r->cvalue == casetab->cvalue)
@@ -324,7 +326,6 @@ BOOL fninit(pd)
 	SYMBOL *lcltab, proto, **qb, *symsave;
 	TERM *pfn, to;
 	TINY reg;
-	extern struct symbol *setty();
 
 	defined = NO;
 	lcltab = pd->at->a.stab;
@@ -332,7 +333,7 @@ BOOL fninit(pd)
 	while (gscty(&proto, DARG, LREG, 0))
 		{
 		defined = YES;
-		for (; (p = gdecl(&proto, NO)); free(p, NULL))
+		for (; (p = gdecl(&proto, NO)); wsfree(p, NULL))
 			{
 			if (!(q = lookup(p->n.an, lcltab, NULL)))
 				nmerr("not an argument", p->n.an);
@@ -398,7 +399,7 @@ BOOL fninit(pd)
 		lbltab = NULL;
 		doblock(0, 0);
 		pret();
-		for (q = lbltab; q; q = free(q, q->next))
+		for (q = lbltab; q; q = wsfree(q, q->next))
 			if (!q->sc)
 				nmerr("missing label", q->n.an);
 		perc(symsave);
@@ -435,5 +436,5 @@ VOID perc(symsave)
 			symtab = q, q = p;
 			}
 		else
-			q = free(q, q->next);
+			q = wsfree(q, q->next);
 	}

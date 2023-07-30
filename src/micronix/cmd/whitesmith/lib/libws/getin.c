@@ -4,6 +4,7 @@
 #include <std.h>
 
 #define	NAMSIZE	64
+GLOBAL TEXT *wsalloc();
 
 /*	linked list structure
  */
@@ -48,7 +49,7 @@ BOOL getin(pac, pav)
 			}
 		else
 			{
-			p = alloc(sizeof(LNKLST), NULL);
+			p = wsalloc(sizeof(LNKLST), NULL);
 			*qb = p;
 			qb = &p->next;
 			buf[i] = '\0';
@@ -56,9 +57,9 @@ BOOL getin(pac, pav)
 			++*pac;
 			}
 		}
-	s = alloc(sizeof(**pav) * (*pac + 1), NULL);
+	s = wsalloc(sizeof(**pav) * (*pac + 1), NULL);
 	*pav = s;
-	for (p = head; p; p = free(p, p->next))
+	for (p = head; p; p = wsfree(p, p->next))
 		*s++ = p->buf;
 	*s = NULL;
 	return (success);

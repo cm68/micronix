@@ -5,16 +5,20 @@
 #include "../include/c/int1.h"
 #include "../include/c/int01.h"
 
+extern struct token *gettok();
+TOKEN *gtok();
+COUNT needc();
+
 /*	the null name
  */
-GLOBAL TEXT noname[LENNAME] {""};
+GLOBAL TEXT noname[LENNAME] = {""};
 
 /*	token stacking mechanism
  */
 #define NTOKQ	3
 
-LOCAL COUNT ntoks {0};
-LOCAL TOKEN tokstk[NTOKQ] {0};
+LOCAL COUNT ntoks = {0};
+LOCAL TOKEN tokstk[NTOKQ] = {0};
 
 /*	is the next token any of a set?
  */
@@ -52,7 +56,6 @@ VOID baktok(t)
 LEX eat(lex)
 	FAST LEX lex;
 	{
-	extern struct token *gettok();
 	TOKEN tok;
 
 	if (gettok(&tok)->type != lex)
@@ -68,7 +71,7 @@ LEX eat(lex)
  */
 COUNT getch()
 	{
-	INTERN COUNT nin {0};
+	INTERN COUNT nin = {0};
 	INTERN TEXT buf[128], *bnext;
 
 	if (!nin)
@@ -119,10 +122,10 @@ TOKEN *gtok(t)
 		else
 			{
 			n = needc();
-			f = alloc(n + 1, NULL);
+			f = wsalloc(n + 1, NULL);
 			getstr(f, n);
 			f[n] = '\0';
-			infile = free(infile, f);
+			infile = wsfree(infile, f);
 			}
 	if (t->type == EOF || !t->type)
 		t->type = EOF;
@@ -150,7 +153,7 @@ TOKEN *gtok(t)
 		break;
 	case LSTRING:
 		getstr(&t->t.x.slen, 2);
-		t->t.x.sptr = alloc(t->t.x.slen, NULL);
+		t->t.x.sptr = wsalloc(t->t.x.slen, NULL);
 		getstr(t->t.x.sptr, t->t.x.slen);
 		break;
 	default:
@@ -180,9 +183,9 @@ TOKEN *ident(t)
 LEX need(lex)
 	FAST LEX lex;
 	{
-	INTERN TINY neelex[] {LLPAREN, LRPAREN, LSCOLON, LCOLON, LLCURLY, LRCURLY,
+	INTERN TINY neelex[] = {LLPAREN, LRPAREN, LSCOLON, LCOLON, LLCURLY, LRCURLY,
 		LWHILE, LRBRACK, 0};
-	INTERN TEXT *neestr[] {"(", ")", ";", ":", "{", "}", "while", "]", "???"};
+	INTERN TEXT *neestr[] = {"(", ")", ";", ":", "{", "}", "while", "]", "???"};
 
 	if (!eat(lex))
 		{
@@ -257,7 +260,7 @@ VOID putch(c)
 	COUNT c;
 	{
 	IMPORT FILE outfd;
-	INTERN COUNT nout {0};
+	INTERN COUNT nout = {0};
 	INTERN TEXT buf[128];
 
 	if (nout == 128 || c < 0 && nout)

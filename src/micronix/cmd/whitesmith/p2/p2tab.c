@@ -62,7 +62,7 @@
 	T	put created symbol
  */
 
-LOCAL TEXT *andtab[] {
+LOCAL TEXT *andtab[] = {
 	"\302\202\144a=X&Y",
 	"\302\202\044a=X&Y->X",
 	"\302\205\044a=X&Y->X",
@@ -76,7 +76,7 @@ LOCAL TEXT *andtab[] {
 	"\050\050\000Kland",
 	0};
 
-LOCAL TEXT *cltab[] {
+LOCAL TEXT *cltab[] = {
 	"\302\000\104a=X|a",
 	"\000\202\104a-a::Y",
 	"\302\202\104a=X::Y",
@@ -90,7 +90,7 @@ LOCAL TEXT *cltab[] {
 	"\052\052\104Kdcmp",
 	0};
 
-LOCAL TEXT *cmptab[] {
+LOCAL TEXT *cmptab[] = {
 	"\302\000\140a=X|a",
 	"\302\202\140a=X::Y",
 	"\205\000\140a=X|UX",
@@ -102,12 +102,12 @@ LOCAL TEXT *cmptab[] {
 	"\052\052\140Kdcmp",
 	0};
 
-LOCAL TEXT *comtab[] {
+LOCAL TEXT *comtab[] = {
 	"\305\000\010a=X=!a->X=UX=!a->X",
 	"\050\000\000Klcom",
 	0};
 
-LOCAL TEXT *divtab[] {
+LOCAL TEXT *divtab[] = {
 	"\023\023\000Kidiv",
 	"\025\025\000Kudiv",
 	"\046\046\000Kldiv",
@@ -115,7 +115,7 @@ LOCAL TEXT *divtab[] {
 	"\052\052\044Kddiv",
 	0};
 
-LOCAL TEXT *gettab[] {
+LOCAL TEXT *gettab[] = {
 	"\062\017\000X=Y",
 	"\302\302\000a=Y->X",
 	"\302\305\000a=Y->X",
@@ -160,7 +160,7 @@ LOCAL TEXT *gettab[] {
 	"\052\052\000Kdtd",
 	0};
 
-LOCAL TEXT *lshtab[] {
+LOCAL TEXT *lshtab[] = {
 	"\302\001\044a=X+a->X",
 	"\302\002\044a=X+a+a->X",
 	"\302\003\044a=X+a+a+a->X",
@@ -181,7 +181,7 @@ LOCAL TEXT *lshtab[] {
 	"\050\030\000sp=>af;Kllsh",
 	0};
 
-LOCAL TEXT *mintab[] {
+LOCAL TEXT *mintab[] = {
 	"\062\001\040X-1",
 	"\302\202\044a=X-Y->X",
 	"\302\205\044a=X-Y->X",
@@ -195,7 +195,7 @@ LOCAL TEXT *mintab[] {
 	"\052\052\044Kdsub",
 	0};
 
-LOCAL TEXT *modtab[] {
+LOCAL TEXT *modtab[] = {
 	"\023\023\000Kimod",
 	"\025\025\000Kumod",
 	"\046\046\000Klmod",
@@ -203,13 +203,13 @@ LOCAL TEXT *modtab[] {
 	"\052\052\004Kdmod",
 	0};
 
-LOCAL TEXT *negtab[] {
+LOCAL TEXT *negtab[] = {
 	"\305\000\014a=0-X->X=0-^UX->X",
 	"\050\000\000Klneg",
 	"\052\000\000Kdneg",
 	0};
 
-LOCAL TEXT *iortab[] {
+LOCAL TEXT *iortab[] = {
 	"\302\202\044a=X|Y->X",
 	"\302\205\044a=X|Y->X",
 	"\302\210\046a=X|UUY->X",
@@ -220,7 +220,7 @@ LOCAL TEXT *iortab[] {
 	"\050\050\000Klor",
 	0};
 
-LOCAL TEXT *plutab[] {
+LOCAL TEXT *plutab[] = {
 	"\062\377\040X-1",
 	"\062\001\040X+1",
 	"\302\202\044a=X+Y->X",
@@ -243,7 +243,7 @@ LOCAL TEXT *plutab[] {
 	"\052\052\044Kdadd",
 	0};
 
-LOCAL TEXT *rshtab[] {
+LOCAL TEXT *rshtab[] = {
 	"\301\001\000a=X+a=X<^>-1->X",
 	"\302\001\000a=X<->-1->X",
 	"\303\001\000a=UX+a=X<^>-1->X=DX<^>-1->X",
@@ -256,7 +256,7 @@ LOCAL TEXT *rshtab[] {
 	"\050\030\000sp=>af;Kulrsh",
 	0};
 
-LOCAL TEXT *timtab[] {
+LOCAL TEXT *timtab[] = {
 	"\302\002\044a=X+a->X",
 	"\302\003\044a=X+a+X->X",
 	"\302\004\044a=X+a+a->X",
@@ -286,7 +286,7 @@ LOCAL TEXT *timtab[] {
 	"\052\052\044Kdmul",
 	0};
 
-LOCAL TEXT *xortab[] {
+LOCAL TEXT *xortab[] = {
 	"\302\202\044a=X^Y->X",
 	"\302\205\044a=X^Y->X",
 	"\302\210\046a=X^UUY->X",
@@ -299,7 +299,7 @@ LOCAL TEXT *xortab[] {
 
 /*	table selectors
  */
-GLOBAL TEXT *(*bintab[])[] {timtab, divtab, modtab, plutab, mintab,
+GLOBAL TEXT *(*bintab[])[] = {timtab, divtab, modtab, plutab, mintab,
 	lshtab, rshtab, andtab, xortab, iortab, comtab, negtab, cmptab, cltab,
 	gettab, timtab, divtab, modtab, plutab, mintab,
 	lshtab, rshtab, andtab, xortab, iortab, plutab, mintab};
@@ -310,7 +310,7 @@ VOID csect(nsect)
 	COUNT nsect;
 	{
 	IMPORT BYTES xmask;
-	INTERN COUNT osect {1};
+	INTERN COUNT osect = {1};
 
 	nsect = (nsect & xmask) ? 1 : 0;
 	if (nsect ^ osect)
@@ -401,7 +401,7 @@ BOOL putasm(fmt, args)
  */
 COUNT getch()
 	{
-	INTERN COUNT nin {0};
+	INTERN COUNT nin = {0};
 	INTERN TEXT buf[128], *bnext;
 
 	if (!nin)
@@ -418,7 +418,7 @@ VOID putch(c)
 	COUNT c;
 	{
 	IMPORT FILE outfd;
-	INTERN COUNT nout {0};
+	INTERN COUNT nout = {0};
 	INTERN TEXT buf[128];
 
 	if (nout == 128 || c < 0 && nout)

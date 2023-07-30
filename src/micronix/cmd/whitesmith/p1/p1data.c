@@ -6,7 +6,10 @@
 #include "../include/c/int01.h"
 #include "../include/c/int012.h"
 
-GLOBAL BOOL decflag {NO};
+IMPORT TERM *gexpr();
+IMPORT LONG dinit();
+
+GLOBAL BOOL decflag = {NO};
 
 /*	initialize an array
  */
@@ -17,7 +20,6 @@ LONG arinit(ty, at, q, list)
 	BOOL list;
 	{
 	IMPORT LITERAL *littab;
-	IMPORT LONG dinit();
 	FAST COUNT i;
 	FAST LITERAL *l;
 	LONG size;
@@ -40,7 +42,7 @@ LONG arinit(ty, at, q, list)
 			(q || eat(LLCURLY) || (q = gexpr(NO)));
 			++i, q = NULL)
 			{
-			size =+ dinit(ty, at->next, q, list);
+			size += dinit(ty, at->next, q, list);
 			if (!q)
 				need(LRCURLY);
 			if (list)
@@ -58,7 +60,6 @@ VOID datinit(p)
 	FAST SYMBOL *p;
 	{
 	IMPORT BOOL decflag;
-	IMPORT TERM *gexpr();
 	FAST LEX ate, lgets;
 	FAST TERM *q;
 	BOOL ndata;
@@ -197,7 +198,7 @@ LONG stinit(p, q, list)
 					if (!iscons(r))
 						perror("illegal field initializer");
 					else
-						n =| (r->e.v.bias & ((1L << p->at->a.b.bsize) - 1))
+						n |= (r->e.v.bias & ((1L << p->at->a.b.bsize) - 1))
 							<< (LONG) p->at->a.b.boff;
 					if (list)
 						eat(LCOMMA);

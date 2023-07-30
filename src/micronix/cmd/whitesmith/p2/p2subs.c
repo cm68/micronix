@@ -6,23 +6,29 @@
 #include "../include/c/int12.h"
 #include "../include/c/int012.h"
 
+GLOBAL TEXT *gname();
+GLOBAL TEXT *ln();
+GLOBAL LEX needch();
+GLOBAL BITS treg();
+GLOBAL TINY xtor();
+
 /*	type tables
  */
-GLOBAL TINY bytype[] {0, 2, 2, 2, 2, 2, 4, 4, 4, 4, 8};
-GLOBAL TINY equtype[] {0, XUCHAR, XUCHAR, XUSHORT, XSFIELD, XUSHORT,
+GLOBAL TINY bytype[] = {0, 2, 2, 2, 2, 2, 4, 4, 4, 4, 8};
+GLOBAL TINY equtype[] = {0, XUCHAR, XUCHAR, XUSHORT, XSFIELD, XUSHORT,
 		XULONG, XLFIELD, XULONG, XFLOAT, XDOUBLE};
-GLOBAL TINY regtype[] {0, XSHORT, XSHORT, XSHORT, XUSHORT, XUSHORT,
+GLOBAL TINY regtype[] = {0, XSHORT, XSHORT, XSHORT, XUSHORT, XUSHORT,
 		XLONG, XULONG, XULONG, XDOUBLE, XDOUBLE};
 
 /*	the nameless name
  */
-GLOBAL TEXT noname[] {0, 0, 0, 0, 0, 0, 0, 0};
+GLOBAL TEXT noname[] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 /*	relational operator mapping tables
  */
-GLOBAL TINY cmpops[] {GLESS, GLEQ, GGREAT, GGEQ, GISEQ, GNOTEQ, 0};
-GLOBAL TINY flpops[] {GGEQ, GGREAT, GLEQ, GLESS, GNOTEQ, GISEQ};
-GLOBAL TINY lexops[] {LLESS, LLEQ, LGREAT, LGEQ, LISEQ, LNOTEQ, 0};
+GLOBAL TINY cmpops[] = {GLESS, GLEQ, GGREAT, GGEQ, GISEQ, GNOTEQ, 0};
+GLOBAL TINY flpops[] = {GGEQ, GGREAT, GLEQ, GLESS, GNOTEQ, GISEQ};
+GLOBAL TINY lexops[] = {LLESS, LLEQ, LGREAT, LGEQ, LISEQ, LNOTEQ, 0};
 
 /*	the character pool stuff
  */
@@ -31,7 +37,7 @@ GLOBAL TINY lexops[] {LLESS, LLEQ, LGREAT, LGEQ, LISEQ, LNOTEQ, 0};
 struct chbuf {
 	TEXT *next;
 	TEXT cbuf[01000];
-	} *chbase {NULL};
+	} *chbase = {NULL};
 
 /*	put strings to character pool
  */
@@ -55,13 +61,13 @@ VOID chwrite(s, n)
 	FAST COUNT i;
 	FAST CHBUF **qb, *q;
 
-	for (; 0 < n; n =- i)
+	for (; 0 < n; n -= i)
 		{
 		for (i = choff >> 9, qb = &chbase; 0 <= i; --i)
 			{
 			if (!*qb)
 				{
-				*qb = alloc(sizeof (**qb), NULL);
+				*qb = wsalloc(sizeof (**qb), NULL);
 				(*qb)->cbuf[0777] = '\0';
 				}
 			q = *qb;
@@ -72,10 +78,10 @@ VOID chwrite(s, n)
 #ifdef DEBUG
 putfmt("<<%i|%b>>", choff, s, i);
 #endif
-		choff =+ i;
+		choff += i;
 		if ((choff & 0777) == 0777)
 			++choff;
-		s =+ i;
+		s += i;
 		}
 	}
 
@@ -128,9 +134,9 @@ BOOL decflt(d, dble)
 	if (!dble)
 		for (i = 4; i < 8; ++i)
 			d[i] = 0;
-	d[0] =| exp >> 1 & 0177;
+	d[0] |= exp >> 1 & 0177;
 	d[1] = exp << 7 | d[1] & 0177;
-	for (i = 0; i < 8; i =+ 2)
+	for (i = 0; i < 8; i += 2)
 		t = d[i], d[i] = d[i + 1], d[i + 1] = t;
 	return (d[4] || d[5] || d[6] || d[7]);
 	}
@@ -232,16 +238,16 @@ EXPR *gexpr()
 	FAST EXPR *q;
 	FAST TEXT *s;
 	LONG bias;
-	INTERN TINY gidx[] {XBC, X2, X3, X4, XDE, XDE, X0, X0, 0};
-	INTERN TINY grx[] {INTRET, R2, R3, R4, ARGIDX, AUTIDX, FLTRET, LONGRET, 0};
+	INTERN TINY gidx[] = {XBC, X2, X3, X4, XDE, XDE, X0, X0, 0};
+	INTERN TINY grx[] = {INTRET, R2, R3, R4, ARGIDX, AUTIDX, FLTRET, LONGRET, 0};
 
-	q = alloc(sizeof (*q), exlist), exlist = q;
+	q = wsalloc(sizeof (*q), exlist), exlist = q;
 	q->got = 0;
 	q->op = needch();
 	if ((q->e.v.ty = needch()) == XSFIELD || q->e.v.ty == XLFIELD)
 		{
-		q->e.v.ty =| needch() << 4;
-		q->e.v.ty =| needch() << 10;
+		q->e.v.ty |= needch() << 4;
+		q->e.v.ty |= needch() << 10;
 		}
 	else if ((q->e.v.ty & 017) == XPTRTO)
 		q->e.v.ty = XUSHORT;
@@ -261,9 +267,9 @@ EXPR *gexpr()
 		gint(&bias);
 		q->e.v.bias = bias;
 		if ((n = needch()) == ARGIDX)
-			q->e.v.bias =+ 4;
+			q->e.v.bias += 4;
 		else if (n == AUTIDX)
-			q->e.v.bias =- AUTOFF;
+			q->e.v.bias -= AUTOFF;
 		q->e.v.idx = gidx[scnstr(grx, n)];
 		q->e.v.refs = needch();
 		s = q->e.v.nm;
@@ -400,7 +406,7 @@ TEXT *ln(label)
 	for (s = name + 1; label; ++s)
 		{
 		*s = (label & 07) + '0';
-		label =>> 3;
+		label >>= 3;
 		}
 	*s = '\0';
 	return (name);
@@ -450,7 +456,7 @@ VOID panic(s)
 BITS pref(want, need)
 	BITS want, need;
 	{
-	return (((want =& need) ? want : need) & ~GJUNK);
+	return (((want &= need) ? want : need) & ~GJUNK);
 	}
 
 /*	convert register mask to index number
@@ -527,8 +533,8 @@ BITS treg(p, want, set)
 
 	if ((set & (HL|BC)) != (HL|BC))
 		return (0);
-	set =| xtor(p->f.idx);
-	autoff =- 8;
+	set |= xtor(p->f.idx);
+	autoff -= 8;
 	if (autoff < autmin)
 		autmin = autoff;
 	chput("hl=", NULL);

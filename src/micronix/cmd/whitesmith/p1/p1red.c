@@ -17,7 +17,7 @@
 	0002	if (R not const) exit
 	0001	if (L not const) exit
  */
-LOCAL TINY recodes[] {0, 0100, 0100, 0, 0101, 0100, 0101,
+LOCAL TINY recodes[] = {0, 0100, 0100, 0, 0101, 0100, 0101,
 	0101, 0100, 0100, 0300, 0300, 0100,
 	0300, 0300, 0300, 0300, 0300, 0300, 0300, 0300,
 	0300, 0300, 0300, 0300, 0300, 0360, 0320,
@@ -66,7 +66,7 @@ BOOL canmul(l, r)
 	{
 	if (iscons(l) && iscons(r))
 		{
-		l->e.v.bias =* r->e.v.bias;
+		l->e.v.bias *= r->e.v.bias;
 		l->ty = maxty(l->ty, r->ty, TULONG);
 		return (YES);
 		}
@@ -250,28 +250,28 @@ TERM *reduce(q)
 		if (!r->e.v.bias)
 			perror("illegal /");
 		else
-			l->e.v.bias =/ r->e.v.bias;
+			l->e.v.bias /= r->e.v.bias;
 		break;
 	case LMODULO:
 		if (!r->e.v.bias)
 			perror("illegal %");
 		else
-			l->e.v.bias =% r->e.v.bias;
+			l->e.v.bias %= r->e.v.bias;
 		break;
 	case LAND:
-		l->e.v.bias =& r->e.v.bias;
+		l->e.v.bias &= r->e.v.bias;
 		break;
 	case LOR:
-		l->e.v.bias =| r->e.v.bias;
+		l->e.v.bias |= r->e.v.bias;
 		break;
 	case LXOR:
-		l->e.v.bias =^ r->e.v.bias;
+		l->e.v.bias ^= r->e.v.bias;
 		break;
 	case LLSHIFT:
-		l->e.v.bias =<< r->e.v.bias;
+		l->e.v.bias <<= r->e.v.bias;
 		break;
 	case LRSHIFT:
-		l->e.v.bias =>> r->e.v.bias;
+		l->e.v.bias >>= r->e.v.bias;
 		break;
 	case LLESS:
 		l->e.v.bias = (l->e.v.bias < r->e.v.bias);
