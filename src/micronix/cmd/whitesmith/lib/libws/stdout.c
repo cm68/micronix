@@ -3,4 +3,4 @@
  */
 #include <std.h>
 
-GLOBAL FIO stdout {STDOUT, 0, WRITE, 0};
+GLOBAL FIO stdout  = {STDOUT, 0, WRITE, 0};

@@ -11,7 +11,6 @@ DEPTH = ../../../..
 DIR = libws
 CLASS = cmd/whitesmith/lib
 ROOT = ~/src/micronix/filesystem
-
-SRCS = $(wildcard *.c)
+TARGET = libWS.a
 
 include $(DEPTH)/GNUmakefile.inc

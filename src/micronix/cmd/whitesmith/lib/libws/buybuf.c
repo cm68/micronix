@@ -3,13 +3,15 @@
  */
 #include <std.h>
 
+GLOBAL TEXT *wsalloc();
+
 TEXT *buybuf(s, n)
 	FAST TEXT *s;
 	FAST BYTES n;
 	{
 	FAST TEXT *q, *start;
 
-	start = alloc(n, NULL);
+	start = wsalloc(n, NULL);
 	for (q = start; 0 < n; --n)
 		*q++ = *s++;
 	return (start);

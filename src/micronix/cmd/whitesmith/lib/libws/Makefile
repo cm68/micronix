@@ -8,7 +8,7 @@
 #
 # src/cmd/whitesmith/lib/libws/Makefile
 #
-# Changed: <2023-07-28 19:18:52 curt>
+# Changed: <2023-07-29 13:25:54 curt>
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
@@ -37,13 +37,13 @@ LIBOBJS2 = \
 
 LIBOBJS3 = \
 	lenstr.o lower.o lstoi.o lstol.o lstou.o ltob.o ltols.o \
-	mapchr.o notbuf.o notstr.o ordbuf.o \
+	mapchr.o notbuf.o notstr.o ordbuf.o cnorm.o dtof.o \
 	pathnm.o pname.o prefix.o putc.o putch.o putf.o putfmt.o
 
 LIBOBJS4 = \
 	putl.o putlin.o putstr.o readerr.o remark.o scnbuf.o scnstr.o \
 	sort.o sqze.o stdin.o stdout.o stob.o subbuf.o substr.o \
-	usage.o writerr.o
+	usage.o writerr.o cfcan.o raise.o dtoe.o cfcon.o
 
 LIBOBJS = $(LIBOBJS1) $(LIBOBJS2) $(LIBOBJS3) $(LIBOBJS4)
 

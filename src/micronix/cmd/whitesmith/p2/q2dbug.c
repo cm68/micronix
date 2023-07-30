@@ -6,9 +6,9 @@
 #include "../include/c/int12.h"
 #include "../include/c/int012.h"
 
-LOCAL TEXT *tyname[] {"char", "uchar", "short", "sfield", "unsign",
+LOCAL TEXT *tyname[] = {"char", "uchar", "short", "sfield", "unsign",
 	"long", "lfield", "ulong", "float", "double", "?!"};
-LOCAL TINY tytab[] {XCHAR, XUCHAR, XSHORT, XSFIELD, XUSHORT,
+LOCAL TINY tytab[] = {XCHAR, XUCHAR, XSHORT, XSFIELD, XUSHORT,
 	XLONG, XLFIELD, XULONG, XFLOAT, XDOUBLE, 0};
 
 /*	put indented (sub)expression

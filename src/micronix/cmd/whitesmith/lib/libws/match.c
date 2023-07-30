@@ -4,6 +4,8 @@
 #include <std.h>
 #include <pat.h>
 
+LOCAL BOOL omatch();
+
 /*	look for match anchored at index
  */
 BYTES amatch(buf, n, indx, pat, pmsub)
@@ -118,12 +120,12 @@ LOCAL BOOL omatch(buf, n, pindx, pat, pmsub)
 	case CCL:
 		if (*pindx < n && mtchccl(*pp, ++ppat, &offset))
 			bump = 1;
-		ppat =+ offset;
+		ppat += offset;
 		break;
 	case NCCL:
 		if (*pindx < n && *pp != '\n' && !mtchccl(*pp, ++ppat, &offset))
 			bump = 1;
-		ppat =+ offset;
+		ppat += offset;
 		break;
 	case LPAR:
 		if (pmsub)
@@ -131,17 +133,17 @@ LOCAL BOOL omatch(buf, n, pindx, pat, pmsub)
 			pmsub[ppat[1]].mtext = pp;
 			pmsub[ppat[1]].mlen = 0;
 			}
-		ppat =+ 2;
+		ppat += 2;
 		bump = 0;
 		break;
 	case RPAR:
 		if (pmsub)
 			pmsub[ppat[1]].mlen = pp - pmsub[ppat[1]].mtext;
-		ppat =+ 2;
+		ppat += 2;
 		bump = 0;
 		break;
 	case CCHAR:
-		*pat =+ 2;
+		*pat += 2;
 		if (*pindx < n && *pp == ppat[1])
 			{
 			++*pindx;
@@ -152,7 +154,7 @@ LOCAL BOOL omatch(buf, n, pindx, pat, pmsub)
 	*pat = ppat;
 	if (0 <= bump)
 		{
-		*pindx =+ bump;
+		*pindx += bump;
 		return (YES);
 		}
 	else

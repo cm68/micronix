@@ -6,12 +6,17 @@
 #include "../include/c/int01.h"
 #include "../include/c/int12.h"
 
+BYTES bound();
+BITS dety();
+SYMBOL *setty();
+BITS type();
+
 /*	index for boundaries and bytesizes
  */
 #define ITIDX	7
-BYTES bndtab[] {0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 1, -1};
-BYTES bytab[] {1, 1, 2, 2, 2, 4, 4, 4, 4, 8, 2, 0};
-GLOBAL TINY typtab[] {TCHAR, TUCHAR, TSHORT, TSFIELD, TUSHORT, TLONG,
+BYTES bndtab[] = {0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 1, -1};
+BYTES bytab[] = {1, 1, 2, 2, 2, 4, 4, 4, 4, 8, 2, 0};
+GLOBAL TINY typtab[] = {TCHAR, TUCHAR, TSHORT, TSFIELD, TUSHORT, TLONG,
 		TLFIELD, TULONG, TFLOAT, TDOUBLE, TPTRTO, 0};
 
 /*	enforce bound based on type, attributes and offset
@@ -62,7 +67,7 @@ ATTR *buymat(m, link)
 	{
 	FAST ATTR *pa;
 
-	pa = alloc(sizeof (*pa), link);
+	pa = wsalloc(sizeof (*pa), link);
 	pa->a.m = m;
 	return (pa);
 	}
@@ -76,7 +81,7 @@ TERM *buyop(op, left, right)
 	IMPORT TERM *exlist;
 	FAST TERM *q;
 
-	exlist = q = alloc(sizeof (*q), exlist);
+	exlist = q = wsalloc(sizeof (*q), exlist);
 	q->ty = 0;
 	q->at = NULL;
 	q->op = op;
@@ -94,7 +99,7 @@ ATTR *buysat(stab, link)
 	{
 	FAST ATTR *pa;
 
-	pa = alloc(sizeof (*pa), link);
+	pa = wsalloc(sizeof (*pa), link);
 	pa->a.stab = stab;
 	return (pa);
 	}
@@ -110,7 +115,7 @@ SYMBOL *buysym(ty, at, name, sc)
 	IMPORT TEXT noname[];
 	FAST SYMBOL *q;
 
-	q = alloc(sizeof (*q), NULL);
+	q = wsalloc(sizeof (*q), NULL);
 	setty(q, ty, at);
 	cpynm(q->n.an, name ? name : noname);
 	q->sc = sc;
@@ -131,7 +136,7 @@ TERM *buyterm(ty, at, an, bias, idx, refs)
 	IMPORT TEXT noname[];
 	FAST TERM *q;
 
-	exlist = q = alloc(sizeof (*q), exlist);
+	exlist = q = wsalloc(sizeof (*q), exlist);
 	q->ty = ty;
 	q->at = at;
 	q->op = 0;

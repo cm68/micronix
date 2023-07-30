@@ -3,4 +3,4 @@
  */
 #include <std.h>
 
-TEXT *writerr {"write error"};
+TEXT *writerr = {"write error"};

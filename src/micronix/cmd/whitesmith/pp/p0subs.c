@@ -4,9 +4,15 @@
 #include <std.h>
 #include "../include/c/int0.h"
 
+GLOBAL TEXT *wsalloc();
+GLOBAL TEXT *buybuf();
+TLIST *getargs();
+TLIST *lookup();
+TLIST *stotl();
+
 /*	the hash table definitions
  */
-LOCAL DEF *htable[NHASH] {0};
+LOCAL DEF *htable[NHASH] = {0};
 
 /*	allocate a new token for the tlist and copy a previous into it
  */
@@ -15,7 +21,7 @@ TLIST *buytl(p, link)
 	{
 	FAST TLIST *q;
 
-	q = alloc(sizeof (*q), link);
+	q = wsalloc(sizeof (*q), link);
 	q->type = p->type;
 	q->white = p->white;
 	q->nwhite = p->nwhite;
@@ -87,7 +93,7 @@ TLIST *dodef(pd, qn, args)
 						}
 					qb = &(*qb)->next;
 					}
-			r = free(r, r->next);
+			r = wsfree(r, r->next);
 			}
 		else
 			{
@@ -97,7 +103,7 @@ TLIST *dodef(pd, qn, args)
 			}
 		}
 	while (pd != pe)
-		pd = free(pd, pd->next);
+		pd = wsfree(pd, pd->next);
 	*qb = qn;
 	return (qs);
 	}
@@ -176,7 +182,7 @@ TLIST *getargs(ip, ap)
 	p = ip;
 	for (qb = ap, p = p->next; p && !punct(p, ')'); qb = &q->next)
 		{
-		*qb = q = alloc(sizeof (**ap), NULL);
+		*qb = q = wsalloc(sizeof (**ap), NULL);
 		q->astart = p;
 		for (npar = 0; p && (0 < npar || !punct(p, ',')
 			&& !punct(p, ')')); p = p->next)
@@ -227,7 +233,7 @@ TEXT *getfname(p)
 		for (s = p->next->text; *s != '>' && !iswhite(*s); ++s)
 			;
 		n = s - p->next->text;
-		q = alloc(lenstr(iprefix) + n + 1, 0);
+		q = wsalloc(lenstr(iprefix) + n + 1, 0);
 		for (s = iprefix; *s; s =+ (s[i]) ? i + 1 : i) 
 			{
 			cpybuf(q, s, i = scnstr(s, '|'));
@@ -270,7 +276,7 @@ VOID install(s, n, pd)
 
 	n = min(n, LENNAME);
 	qb = hash(s, n);
-	*qb = q = alloc(sizeof (*q), *qb);
+	*qb = q = wsalloc(sizeof (*q), *qb);
 	cpybuf(q->dname, s, n);
 	q->dnlen = n;
 	q->defn = pd;
@@ -307,7 +313,7 @@ INCL *nxtfile()
 		return (NULL);
 	else
 		{
-		pi = alloc(sizeof(*pi), NULL);
+		pi = wsalloc(sizeof(*pi), NULL);
 		if (fd == STDIN)
 			pi->fname = NULL;
 		else
@@ -440,7 +446,7 @@ TLIST *stotl(s)
 	qb = &qs;
 	FOREVER
 		{
-		q = alloc(sizeof (*q), NULL);
+		q = wsalloc(sizeof (*q), NULL);
 		q->white = s;
 		while (iswhite(*s) && *s != '\n')
 			++s;
@@ -509,7 +515,7 @@ VOID undef(s, n)
 			break;
 	if (q)
 		{
-		free(q->defn, NULL);
-		*qb = free(q, q->next);
+		wsfree(q->defn, NULL);
+		*qb = wsfree(q, q->next);
 		}
 	}

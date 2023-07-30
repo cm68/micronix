@@ -7,7 +7,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-INCLUDE = -I/usr/src/cm/whitesmith/include
+INCLUDE = -I/usr/src/cmd/whitesmith/include
 
 all: p1
 

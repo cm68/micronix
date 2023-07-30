@@ -9,6 +9,6 @@ struct list *frelst(p, plast)
 		} *p, *plast;
 	{
 	while (p && p != plast)
-		p = free(p, p->next);
+		p = wsfree(p, p->next);
 	return (p);
 	}

@@ -6,13 +6,16 @@
 #include "../include/c/int12.h"
 #include "../include/c/int012.h"
 
+GLOBAL LABEL jf();
+GLOBAL LABEL jt();
+
 /*	the branch and jump ops
  */
-GLOBAL TINY brops[] {GJUMP, GLESS, GLEQ, GGREAT, GGEQ, GISEQ, GNOTEQ, 
+GLOBAL TINY brops[] = {GJUMP, GLESS, GLEQ, GGREAT, GGEQ, GISEQ, GNOTEQ, 
 	GLOW, GHIS, 0};
-GLOBAL TEXT *jtext[] {"jmp", "jm", "JLEQ", "JGT", "jp", "jz", "jnz", "jc", "jnc",
+GLOBAL TEXT *jtext[] = {"jmp", "jm", "JLEQ", "JGT", "jp", "jz", "jnz", "jc", "jnc",
 	"BAD JMP"};
-GLOBAL TINY jncops[] {0, GGEQ, GGREAT, GLEQ, GLESS, GNOTEQ, GISEQ,
+GLOBAL TINY jncops[] = {0, GGEQ, GGREAT, GLEQ, GLESS, GNOTEQ, GISEQ,
 	GHIS, GLOW};
 
 /*	compute a boolean value
@@ -154,7 +157,7 @@ BYTES fnargs(p, set)
 		size = 0;
 	if (!fix(p, WSTACK, set, regtype[p->e.o.ty & 017]))
 		panic("ARG");
-	size =+ bytype[p->f.ty & 017];
+	size += bytype[p->f.ty & 017];
 	return (size);
 	}
 

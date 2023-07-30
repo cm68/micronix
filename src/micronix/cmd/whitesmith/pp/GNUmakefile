@@ -1,5 +1,5 @@
 #
-# Makefile for updating the source tree
+# Makefile for the whitesmith c preprocessor
 #
 # cmd/whitesmith/pp/GNUmakefile
 #
@@ -12,7 +12,7 @@ DIR = pp
 CLASS = cmd/whitesmith
 TARGET = pp
 
-DOCSRCS = pp.mp p0lex.ic p0main.ic p0subs.ic
-SRCS = $(wildcard *.c *.h) $(DOCSRCS)
-
 include $(DEPTH)/GNUmakefile.inc
+
+test: pp
+	./pp -i ../include/ -d unix -o p0main.i p0main.c

@@ -6,6 +6,8 @@
 #include "../include/c/int12.h"
 #include "../include/c/int012.h"
 
+GLOBAL BITS twant();
+
 /*	codes for force tables:
 
 	0--	dest is stack
@@ -29,7 +31,7 @@
 
 /*	double to mem
  */
-LOCAL TEXT *dbmem[] {
+LOCAL TEXT *dbmem[] = {
 	"\373bc->hl=&X;\4",
 	"\363bc=&X;\4",
 /* 	"\353hl<=sp;bc=&X;\4", */
@@ -38,7 +40,7 @@ LOCAL TEXT *dbmem[] {
 
 /*	double to stack
  */
-LOCAL TEXT *dbstk[] {
+LOCAL TEXT *dbstk[] = {
 	"\073hl=8+bc;\5",
 	"\063hl+(bc=8);\5",
 /* 	"\053hl<=sp+(bc=8);\5", */
@@ -47,7 +49,7 @@ LOCAL TEXT *dbstk[] {
 
 /*	force table deref
  */
-GLOBAL TEXT *deref[] {
+GLOBAL TEXT *deref[] = {
 	"\241bc=^(hl=de)",
 	"\231bc=(hl=Y)",
 	"\221bc->hl=^hl",
@@ -64,7 +66,7 @@ GLOBAL TEXT *deref[] {
 
 /*	force table for int to register
  */
-GLOBAL TEXT *intreg[] {
+GLOBAL TEXT *intreg[] = {
 	"\271bc->hl=^hl",
 	"\261bc=^hl",
 /* 	"\251bc=^(hl<=sp)", */
@@ -83,7 +85,7 @@ GLOBAL TEXT *intreg[] {
 
 /*	force int to memory
  */
-LOCAL TEXT *intmem[] {
+LOCAL TEXT *intmem[] = {
 	"\371hl=bc=a^->Y",
 	"\361hl=a^->Y",
 /* 	"\351hl<=sp=a^->Y", */
@@ -96,7 +98,7 @@ LOCAL TEXT *intmem[] {
 
 /*	force table for int to stack
  */
-LOCAL TEXT *intstk[] {
+LOCAL TEXT *intstk[] = {
 	"\073bc->hl=^hl=>sp",
 	"\063bc=^hl=>sp",
 /* 	"\053bc=^(hl<=sp)=>sp", */
@@ -108,7 +110,7 @@ LOCAL TEXT *intstk[] {
 
 /*	long to mem
  */
-LOCAL TEXT *lomem[] {
+LOCAL TEXT *lomem[] = {
 	"\373bc->hl=&X;\2",
 	"\363bc=&X;\2",
 /* 	"\353hl<=sp;bc=&X;\2", */
@@ -117,7 +119,7 @@ LOCAL TEXT *lomem[] {
 
 /*	long to stack
  */
-LOCAL TEXT *lostk[] {
+LOCAL TEXT *lostk[] = {
 	"\073hl=bc;\3",
 	"\063\3",
 /* 	"\053hl<=sp;\3", */
@@ -126,7 +128,7 @@ LOCAL TEXT *lostk[] {
 
 /*	pointer moves for force
  */
-GLOBAL TEXT *ptmov[] {
+GLOBAL TEXT *ptmov[] = {
 	"\240bc=de",
 	"\230bc=&Y",
 	"\210bc=hl",
@@ -143,7 +145,7 @@ GLOBAL TEXT *ptmov[] {
 
 /*	reref moves for force
  */
-GLOBAL TEXT *reref[] {
+GLOBAL TEXT *reref[] = {
 	"\241hl=&Z+de->bc",
 	"\231hl=W+(bc=&Z)->bc",
 	"\221hl=&Z+bc->bc",
@@ -158,7 +160,7 @@ GLOBAL TEXT *reref[] {
 
 /*	force strategies
  */
-GLOBAL FTAB ftab[] {
+GLOBAL FTAB ftab[] = {
 	WPHL, HL, XDOUBLE, ptmov,
 	WPBC, BC, XDOUBLE, ptmov,
 	WHL, HL, XUSHORT, intreg,
@@ -172,18 +174,18 @@ GLOBAL FTAB ftab[] {
 	WSTACK, TS, XDOUBLE, dbstk,
 	0};
 
-LOCAL TINY binops[] {LTIMES, LDIVIDE, LMODULO, LPLUS, LMINUS,
+LOCAL TINY binops[] = {LTIMES, LDIVIDE, LMODULO, LPLUS, LMINUS,
 	LLSHIFT, LRSHIFT, LAND, LXOR, LOR, LCOMP, DMINUS, DCMP, DLESS,
 	LGETS, LGTIM, LGDIV, LGMOD, LGPLU, LGMIN,
 	LGLSH, LGRSH, LGAND, LGXOR, LGOR, DGPLU, DGMIN, 0};
-LOCAL TINY optytab[] {3, 0, 0, 3, 3,
+LOCAL TINY optytab[] = {3, 0, 0, 3, 3,
 	3, 0, 3, 3, 3, 3, 3, 3, 3,
 	2, 3, 0, 0, 3, 3,
 	3, 0, 3, 3, 3, 3, 3};
 
 /*	the want expansions
  */
-GLOBAL BITS wantab[] {WBC, WSTACK, WPSTK, WPHL,
+GLOBAL BITS wantab[] = {WBC, WSTACK, WPSTK, WPHL,
 	WBC|WHL, 0, 0, WHL,
 	WBC|WHL|WPHL, 0, 0, WPBC|WPHL,
 	WBC|WHL|WVMEM|WPBC|WPHL|WMEM, 0, 0, WVMEM|WMEM};
@@ -260,15 +262,15 @@ putterm(p, 1);
 		return (set);
 		}
 	if ((p->got & GVOL) && !(xreg & REGSET))
-		set =| xreg;
+		set |= xreg;
 	if (reg & RPS && xreg & (R0|R1))
 		{
 		reg = (p->got & GVOL) ? xreg : 0;
 		idx = xreg & R0 ? XP0 : XP1;
 		}
-	else if (reg =& set)
+	else if (reg &= set)
 		{
-		reg =& (reg - 1) ^ reg;
+		reg &= (reg - 1) ^ reg;
 		idx = rtox(reg);
 		}
 	else
@@ -276,7 +278,7 @@ putterm(p, 1);
 	lcode = ctab[scnstr(xtab, idx)] << 3;
 	rcode = ctab[scnstr(xtab, p->f.idx)];
 	if (rmatch && p->f.refs && rcode <= 020)
-		rcode =+ 050;
+		rcode += 050;
 	if (p->got & GVOL || rcode)
 		;
 	else if (!(set & HL))
@@ -335,7 +337,7 @@ putfmt("/fgen %p\n", q + 1);
 			cpybuf(p->f.nm, noname, LENNAME);
 			p->f.bias = 0;
 			p->f.idx = idx;
-			p->got =| GVOL;
+			p->got |= GVOL;
 			return (set);
 			}
 	panic("FGEN");
@@ -350,7 +352,7 @@ BOOL opick(p, code, match, ty)
 	{
 	TINY by;
 
-	code =& BYTMASK;
+	code &= BYTMASK;
 	if (code <= 014 || 0374 <= code)
 		return (iscons(p) && (by = code) == p->e.v.bias);
 	else if (code == 015)
@@ -411,7 +413,7 @@ BITS twant(code)
 	{
 	IMPORT BITS wantab[];
 
-	if (0374 <= (code =& BYTMASK))
+	if (0374 <= (code &= BYTMASK))
 		return (wantab[0]);
 	else
 		return (wantab[code >> 4]);

@@ -3,6 +3,30 @@
  */
 #include <std.h>
 
+#ifdef linux
+extern void *malloc();
+extern void free();
+
+void *
+wsalloc(BYTES need, BYTES *link)
+{
+	void *p;
+	p = malloc(need);
+	*(BYTES **)p = link;
+	return p;
+}
+
+void *
+wsfree(void *p, BYTES *link)
+{
+	free(p);
+	return link;
+}
+
+#else
+GLOBAL BYTES *nalloc();
+GLOBAL TEXT *wsfree();
+
 #define BLKSIZE	512
 #define HEAP	struct heap
 #define MAXCORE 512
@@ -19,10 +43,10 @@ struct heap
 /*	TEXT junk[hsize];	*/
 	};
 
-LOCAL BYTES _hunk {0};
-LOCAL HEAP *_heap {NULL};
-LOCAL TEXT *_hbot {NULL};
-LOCAL TEXT *_htop {NULL};
+LOCAL BYTES _hunk = {0};
+LOCAL HEAP *_heap = {NULL};
+LOCAL TEXT *_hbot = {NULL};
+LOCAL TEXT *_htop = {NULL};
 
 /*	break off a cell
  */
@@ -47,14 +71,14 @@ LOCAL VOID *_hmerge(p)
 
 	if (((TEXT *)p + p->hsize + (SIZHDR+SIZPTR)) == q)
 		{
-		p->hsize =+ q->hsize + (SIZHDR+SIZPTR);
+		p->hsize += q->hsize + (SIZHDR+SIZPTR);
 		p->x.next = q->x.next;
 		}
 	}
 
 /*	allocate, failing hard
  */
-BYTES *alloc(need, link)
+BYTES *wsalloc(need, link)
 	BYTES need, *link;
 	{
 	IMPORT TEXT *_memerr;
@@ -93,9 +117,9 @@ BYTES *nalloc(need, link)
 		if (!_hunk)
 			_hunk = MAXCORE;
 		else if (_hunk != MAXCORE)
-			_hunk =>> 1;
+			_hunk >>= 1;
 		for (s = NULL; need <= _hunk && !(s = sbreak(n = _hunk)); )
-			_hunk =>> 1;
+			_hunk >>= 1;
 		if (!s)
 			s = sbreak(n = need);
 		if (!s)
@@ -107,14 +131,14 @@ BYTES *nalloc(need, link)
 				_hbot = s;
 			if (_htop < (TEXT *)s + n)
 				_htop = (TEXT *)s + n;
-			free(&s->x.next, NULL);
+			wsfree(&s->x.next, NULL);
 			}
 		}
 	}
 
 /*	add this buffer to the free list
  */
-TEXT *free(addr, link)
+TEXT *wsfree(addr, link)
 	TEXT *addr, *link;
 	{
 	IMPORT HEAP *_heap;
@@ -160,3 +184,4 @@ TEXT *free(addr, link)
 		}
 	return (link);
 	}
+#endif

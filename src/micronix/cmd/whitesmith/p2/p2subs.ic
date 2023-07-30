@@ -19,7 +19,7 @@ Whenever the current chbuf is full a new one is allocated.
 chread reads one character from the current character buffer;
 it is called by emit in p2tab.c.
 This mechanism is mildly fragile, requiring extensive cooperation between
-void, putasm, emit, chread, and chwrite.
+voidfn, putasm, emit, chread, and chwrite.
 .LP
 decflt converts a double number from p1 to DEC format.
 It is kept machine independent by calling upon the machine library

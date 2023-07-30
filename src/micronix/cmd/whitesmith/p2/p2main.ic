@@ -21,7 +21,7 @@ data declarations and literals inside functions get percolated out.
 This permits all code to be steered to a single section, if necessary,
 with no need to jump over data.
 .LP
-void and jcond are called to generate code sequences for expressions.
+voidfn and jcond are called to generate code sequences for expressions.
 Other input codes call for various jumps or switches to be emitted,
 or keep p2 advised of the current register usage and auto offset water mark.
 .LP

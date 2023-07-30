@@ -7,6 +7,10 @@
 #include "../include/c/int12.h"
 #include "../include/c/int012.h"
 
+#ifdef linux
+#define	create	creat
+#endif
+
 /*	FLAGS:
 	-a	addresses and data are in different registers [yuk]
 	-b#	highest enforced bound
@@ -20,23 +24,23 @@
 	-r#	no of regs [0,7]
 	-u	char strings are unsigned chars
  */
-BITS iregs {REGSET};
-BITS tchar {TCHAR};
-BITS tfield {TSFIELD};
-BITS tint {TSHORT};
-BITS tunsign {TUSHORT};
-BOOL aflag {NO};
-BOOL cflag {NO};
-BOOL dflag {NO};
-BOOL eflag {NO};
-BOOL mflag {NO};
-BOOL uflag {NO};
-BYTES bitswd {16};
-BYTES bndef {1};
-BYTES intsize {2};
-BYTES nlen {7};
+BITS iregs = {REGSET};
+BITS tchar = {TCHAR};
+BITS tfield = {TSFIELD};
+BITS tint = {TSHORT};
+BITS tunsign = {TUSHORT};
+BOOL aflag = {NO};
+BOOL cflag = {NO};
+BOOL dflag = {NO};
+BOOL eflag = {NO};
+BOOL mflag = {NO};
+BOOL uflag = {NO};
+BYTES bitswd = {16};
+BYTES bndef = {1};
+BYTES intsize = {2};
+BYTES nlen = {7};
 
-TEXT *_pname {"p1"};
+TEXT *_pname = {"p1"};
 
 /*	FILE CONTROL:
 	errfd = error file
@@ -45,12 +49,12 @@ TEXT *_pname {"p1"};
 	infile = the current file name.
 	lineno = the current line number.
  */
-GLOBAL FILE errfd {STDERR};
-GLOBAL TEXT *ofile {NULL};
-GLOBAL COUNT nerrors {0};
-GLOBAL TEXT *infile {NULL};
-GLOBAL COUNT lineno {0};
-GLOBAL FILE outfd {STDOUT};
+GLOBAL FILE errfd = {STDERR};
+GLOBAL TEXT *ofile = {NULL};
+GLOBAL COUNT nerrors = {0};
+GLOBAL TEXT *infile = {NULL};
+GLOBAL COUNT lineno = {0};
+GLOBAL FILE outfd = {STDOUT};
 
 /*	SYMBOL TABLES:
 	casetab = the case table
@@ -63,15 +67,17 @@ GLOBAL FILE outfd {STDOUT};
 	symtab = current symbol table start
 	untab = the union tag table
  */
-GLOBAL CASE *casetab {NULL};
-GLOBAL TERM *exlist {NULL};
-GLOBAL SYMBOL *lbltab {NULL};
-GLOBAL LITERAL *littab {NULL};
-GLOBAL SYMBOL *mostab {NULL};
-GLOBAL SYMBOL *strtab {NULL};
-GLOBAL SYMBOL *symend {NULL};
-GLOBAL SYMBOL *symtab {NULL};
-GLOBAL SYMBOL *untab {NULL};
+GLOBAL CASE *casetab = {NULL};
+GLOBAL TERM *exlist = {NULL};
+GLOBAL SYMBOL *lbltab = {NULL};
+GLOBAL LITERAL *littab = {NULL};
+GLOBAL SYMBOL *mostab = {NULL};
+GLOBAL SYMBOL *strtab = {NULL};
+GLOBAL SYMBOL *symend = {NULL};
+GLOBAL SYMBOL *symtab = {NULL};
+GLOBAL SYMBOL *untab = {NULL};
+
+SYMBOL *gdecl();
 
 /*	compare the types of two symtab entries
  */
@@ -110,7 +116,7 @@ ATTR *decsu(lty)
 	IMPORT BITS tfield, tint, tunsign;
 	IMPORT BOOL mflag;
 	IMPORT BYTES bitswd;
-	IMPORT LONG bndify(), bytes(), const();
+	IMPORT LONG bndify(), bytes(), constfn();
 	IMPORT SYMBOL *mostab, *strtab, *untab;
 	FAST COUNT boff, bsize;
 	FAST SYMBOL *p;
@@ -144,7 +150,7 @@ ATTR *decsu(lty)
 				else
 					{
 					nmerr("member redefined", p->n.an);
-					p = free(p, q);
+					p = wsfree(p, q);
 					}
 				if (!eat(LCOLON))
 					{
@@ -155,7 +161,7 @@ ATTR *decsu(lty)
 					{
 					if (lty != LSTRUCT)
 						perror("illegal field");
-					bsize = const(YES);
+					bsize = constfn(YES);
 					if (p->ty != tint && p->ty != tunsign)
 						perror("illegal bitfield");
 					p->ty = tfield;
@@ -180,7 +186,7 @@ ATTR *decsu(lty)
 					else
 						{
 						p->at->a.b.boff = boff;
-						boff =+ bsize;
+						boff += bsize;
 						ffld = NO;
 						}
 					}
@@ -243,13 +249,13 @@ SYMBOL *dterm(pro, abstract)
 	FAST SYMBOL *pro;
 	BOOL abstract;
 	{
-	IMPORT LONG const();
+	IMPORT LONG constfn();
 	FAST ATTR **qb;
 	FAST SYMBOL *p, *r;
 	LEX lex;
 	SYMBOL *table;
 	TOKEN tok;
-	INTERN TINY endalt[] {LLPAREN, LLBRACK, 0};
+	INTERN TINY endalt[] = {LLPAREN, LLBRACK, 0};
 
 	if (eat(LTIMES))
 		return (retype(dterm(pro, abstract), TPTRTO));
@@ -302,7 +308,7 @@ SYMBOL *dterm(pro, abstract)
 			}
 		else
 			{
-			*qb = buymat(const(NO), NULL);
+			*qb = buymat(constfn(NO), NULL);
 			need(LRBRACK);
 			retype(p, TARRAY);
 			}
@@ -329,9 +335,9 @@ SYMBOL *gdecl(pro, abstract)
 	for (qb = &p->at; *qb; qb = &(*qb)->next)
 		;
 	*qb = at;
-	for (i = 0, nty = p->ty; nty != pro->ty; ++i, nty =>> 2)
+	for (i = 0, nty = p->ty; nty != pro->ty; ++i, nty >>= 2)
 		;
-	for (; 0 < i; --i, p->ty =>> 2)
+	for (; 0 < i; --i, p->ty >>= 2)
 		nty = nty << 2 | p->ty & 3;
 	p->ty = nty;
 	return (p);
@@ -350,16 +356,16 @@ BOOL gscty(pro, defsc)
 	LEX mod, uns;
 	SYMBOL *p;
 	TOKEN tok;
-	INTERN BITS tutok[] {TUCHAR, TUSHORT, TULONG, 0, 0,
+	INTERN BITS tutok[] = {TUCHAR, TUSHORT, TULONG, 0, 0,
 			0, 0, 0};
-	INTERN BITS tytok[] {TCHAR, TSHORT, TLONG, TFLOAT, TDOUBLE,
+	INTERN BITS tytok[] = {TCHAR, TSHORT, TLONG, TFLOAT, TDOUBLE,
 			TSTRUCT, TUNION, 0};
-	INTERN TINY tylex[] {LCHAR, LSHORT, LLONG, LFLOAT, LDOUBLE,
+	INTERN TINY tylex[] = {LCHAR, LSHORT, LLONG, LFLOAT, LDOUBLE,
 			LSTRUCT, LUNION, 0};
-	INTERN TINY basalt[] {LINT, LFLOAT, LDOUBLE, 0};
-	INTERN TINY modalt[] {LCHAR, LSHORT, LLONG, 0};
-	INTERN TINY scalt[] {LEXTERN, LSTATIC, LAUTO, LREG, LTYPDEF, 0};
-	INTERN TINY sualt[] {LSTRUCT, LUNION, 0};
+	INTERN TINY basalt[] = {LINT, LFLOAT, LDOUBLE, 0};
+	INTERN TINY modalt[] = {LCHAR, LSHORT, LLONG, 0};
+	INTERN TINY scalt[] = {LEXTERN, LSTATIC, LAUTO, LREG, LTYPDEF, 0};
+	INTERN TINY sualt[] = {LSTRUCT, LUNION, 0};
 
 	clrsym(pro);
 	sc = alt(scalt);
@@ -417,10 +423,10 @@ BOOL main(ac, av)
 	FAST SYMBOL *p, *q;
 	BOOL prog;
 	SYMBOL proto;
-	INTERN BITS ir[8]
+	INTERN BITS ir[8] =
 	/*   0  r1   r2   r3   r4/a1  r5/a2   r6/a3   r7		f(REGSET) */
 		{0, 004, 014, 034, 04034, 014034, 034034, 034234};
-	INTERN BYTES nregs {3};
+	INTERN BYTES nregs = {3};
 
 	infile = buybuf("", 1);
 	getflags(&ac, &av, "a,c,d,e,l,m,n#,o*,b#,r#,u:F <file>",
@@ -428,11 +434,11 @@ BOOL main(ac, av)
 		&nlen, &ofile, &bndef, &nregs, &uflag);
 	if (intsize != 2)
 		fixlint();
-	bndef =& 03;
+	bndef &= 03;
 	if (uflag)
 		tchar = TUCHAR;
 	if (aflag)
-		nregs =+ 3;
+		nregs += 3;
 	iregs = ir[nregs & 7];
 	if (ofile)
 		if ((outfd = create(ofile, WRITE, 1)) < 0)
@@ -484,7 +490,7 @@ BOOL main(ac, av)
 					}
 				else if (type(q->ty) == TFNRET)
 					q->at->a.stab = p->at->a.stab;
-				p = free(p, q);
+				p = wsfree(p, q);
 				}
 			if (p->sc == LTYPDEF)
 				;

@@ -10,10 +10,6 @@
 DEPTH = ../../..
 DIR = p1
 CLASS = cmd/whitesmith
-
-SRCS = $(wildcard *.c *.h)
-
-DOCSRCS = p1.mp p1data.ic p1expr.ic p1func.ic p1gets.ic p1.ic p1main.ic \
-	p1puts.ic p1red.ic p1subs.ic p1type.ic
+TARGET = p1
 
 include $(DEPTH)/GNUmakefile.inc

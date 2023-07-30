@@ -8,25 +8,32 @@
 #include "../include/c/int012.h"
 
 extern struct token *gettok();
+TERM *gexpr();
+TERM *melist();
+TERM *mtail();
+TERM *mterm();
+TERM *mexpr();
+TERM *mtrail();
+TERM *buyop();
 
 /*	the binary operator tables
  */
-LOCAL TINY binops[] {LTIMES, LDIVIDE, LMODULO, LPLUS, LMINUS, LLSHIFT, LRSHIFT,
+LOCAL TINY binops[] = {LTIMES, LDIVIDE, LMODULO, LPLUS, LMINUS, LLSHIFT, LRSHIFT,
 	LLESS, LLEQ, LGREAT, LGEQ, LISEQ, LNOTEQ,
 	LAND, LXOR, LOR, LANDAND, LOROR, LQUERY,
 	LGETS, LGTIM, LGDIV, LGMOD, LGPLU, LGMIN, LGLSH, LGRSH,
 	LGAND, LGXOR, LGOR, 0};
-LOCAL TINY getsops[] {LGTIM, LGDIV, LGMOD, LGPLU, LGMIN, LGLSH, LGRSH,
+LOCAL TINY getsops[] = {LGTIM, LGDIV, LGMOD, LGPLU, LGMIN, LGLSH, LGRSH,
 	0, 0, 0, 0, 0, 0,
 	LGAND, LGXOR, LGOR, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0};
-LOCAL TINY lpri[] {14, 14, 14, 13, 13, 12, 12,
+LOCAL TINY lpri[] = {14, 14, 14, 13, 13, 12, 12,
 	11, 11, 11, 11, 10, 10,
 	9, 8, 7, 6, 5, 3,
 	1, 1, 1, 1, 1, 1, 1, 1,
 	1, 1, 1};
-LOCAL TINY rpri[] {14, 14, 14, 13, 13, 12, 12,
+LOCAL TINY rpri[] = {14, 14, 14, 13, 13, 12, 12,
 	11, 11, 11, 11, 10, 10,
 	9, 8, 7, 6, 5, 4,
 	2, 2, 2, 2, 2, 2, 2, 2,
@@ -34,12 +41,12 @@ LOCAL TINY rpri[] {14, 14, 14, 13, 13, 12, 12,
 
 /*	the unary operator tables
  */
-LOCAL TINY untoks[] {LTIMES, LAND, LPLUS, LMINUS, LNOT, LCOMP, 0};
-LOCAL TINY unops[] {DINDIR, DADDR, DPLUS, DMINUS, LNOT, LCOMP};
+LOCAL TINY untoks[] = {LTIMES, LAND, LPLUS, LMINUS, LNOT, LCOMP, 0};
+LOCAL TINY unops[] = {DINDIR, DADDR, DPLUS, DMINUS, LNOT, LCOMP};
 
 /*	build a constant and compile time evaluate
  */
-LONG const(mand)
+LONG constfn(mand)
 	BOOL mand;
 	{
 	FAST TERM *q;
@@ -130,7 +137,7 @@ TERM *mcast()
 		{
 		p = gdecl(&proto, YES);
 		need(LRPAREN);
-		return (free(p, setty(buyop(DCAST, NULL, NULL), p->ty, p->at)));
+		return (wsfree(p, setty(buyop(DCAST, NULL, NULL), p->ty, p->at)));
 		}
 	}
 
@@ -250,8 +257,8 @@ TERM *mterm(mand)
 	FAST TERM *q;
 	FAST LITERAL *l;
 	TOKEN tok;
-	INTERN TINY lty[] {LCNUM, LUCNUM, LSNUM, LUSNUM, LLNUM, LULNUM};
-	INTERN TINY tty[] {TCHAR, TUCHAR, TSHORT, TUSHORT, TLONG, TULONG};
+	INTERN TINY lty[] = {LCNUM, LUCNUM, LSNUM, LUSNUM, LLNUM, LULNUM};
+	INTERN TINY tty[] = {TCHAR, TUCHAR, TSHORT, TUSHORT, TLONG, TULONG};
 
 	switch (gettok(&tok)->type)
 		{
@@ -269,7 +276,7 @@ TERM *mterm(mand)
 		q = buyterm(tty[scnstr(lty, tok.type)], NULL, NULL, tok.t.ln, 0, 0);
 		break;
 	case LSTRING:
-		l = alloc(sizeof (*l), littab), littab = l;
+		l = wsalloc(sizeof (*l), littab), littab = l;
 		l->e.l.next = tok.t.x.sptr;
 		l->e.l.a.m = tok.t.x.slen + 1;
 		setty(l, TARRAY | (tchar << 2), &l->e.l);

@@ -5,7 +5,11 @@
 /* the pseudo storage classes
  */
 #define FAST	register
+#ifdef linux
+#define	GLOBAL
+#else
 #define GLOBAL	extern
+#endif
 #define IMPORT	extern
 #define INTERN	static
 #define LOCAL	static

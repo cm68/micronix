@@ -24,9 +24,9 @@ BYTES itob(is, n, base)
 	else if (base < 0)
 		base = -base;
 	if (base <= u)
-		s =+ itob(s, u / base, base);
+		s += itob(s, u / base, base);
 	*s = (u % base) + '0';
 	if ('9' < *s)
-		*s =+ ('a' - ('9' + 1));
+		*s += ('a' - ('9' + 1));
 	return (s - is + 1);
 	}

@@ -6,6 +6,10 @@
 #include "../include/c/int12.h"
 #include "../include/c/int012.h"
 
+#ifdef linux
+#define	create	creat
+#endif
+
 /*	FLAGS:
 	-ck	check stack growth
 	-f	enable far function calls
@@ -13,30 +17,33 @@
 	-p	emit profiler calls on function entries; also enable debug output
 	-x#	4 => code to .cseg, 2=> to .lits, 1=> to .data
  */
-GLOBAL BOOL ckflag {NO};
-GLOBAL BOOL farflag {NO};
-GLOBAL BOOL pflag {NO};
-GLOBAL BYTES xmask {6};
-GLOBAL TEXT *ofile {NULL};
+GLOBAL BOOL ckflag = {NO};
+GLOBAL BOOL farflag = {NO};
+GLOBAL BOOL pflag = {NO};
+GLOBAL BYTES xmask = {6};
+GLOBAL TEXT *ofile = {NULL};
 
-BYTES lineno {0};
-BYTES yellow {0100};	/* stack "used" per func in addition to autos */
-TEXT funname[LENNAME+2] {""};
+GLOBAL TEXT *msp();
+GLOBAL HEADER *lookup();
 
-TEXT *_pname {"p2.80"};
+BYTES lineno = {0};
+BYTES yellow = {0100};	/* stack "used" per func in addition to autos */
+TEXT funname[LENNAME+2] = {""};
+
+TEXT *_pname = {"p2.80"};
 
 /*	FILE CONTROL:
 	errfd = error output file descriptor
 	outfd = assembly language output file descriptor (ofile)
  */
-GLOBAL FILE errfd {STDERR};
-GLOBAL FILE outfd {STDOUT};
+GLOBAL FILE errfd = {STDERR};
+GLOBAL FILE outfd = {STDOUT};
 
 /*	tables
  */
-GLOBAL EXPR *exlist {NULL};
-LOCAL HEADER *labtab {NULL};
-LOCAL COUNT nlabels {0};
+GLOBAL EXPR *exlist = {NULL};
+LOCAL HEADER *labtab = {NULL};
+LOCAL COUNT nlabels = {0};
 
 /*	buy a code element
  */
@@ -47,7 +54,7 @@ CODE *buycode(inst, hdr, size)
 	{
 	FAST CODE *q;
 
-	q = alloc(sizeof (*q), NULL);
+	q = wsalloc(sizeof (*q), NULL);
 	q->inst = inst;
 	q->c.hdr = hdr;
 	q->size = size;
@@ -60,7 +67,7 @@ LABEL crs()
 	{
 	INTERN LABEL orgcrs;
 
-	orgcrs =+ 2;
+	orgcrs += 2;
 	return (orgcrs);
 	}
 
@@ -93,7 +100,7 @@ LEX gtbody(qb)
 			break;
 		case GREGS:
 			regset = needch();
-			regmin =& regset;
+			regmin &= regset;
 			break;
 		case GJUMP:
 			l = glabel();
@@ -131,7 +138,7 @@ LEX gtbody(qb)
 				qb = &p->first;
 			else
 				{
-				p->flags =| ISCASE;
+				p->flags |= ISCASE;
 				++p->nrefs;
 				qb = (0 < swskips) ? NULL : &p->first;
 				}
@@ -144,7 +151,7 @@ LEX gtbody(qb)
 		case GVOID:
 			r = gexpr();
 			if (qb)
-				qb = void(qb, r);
+				qb = voidfn(qb, r);
 			break;
 		case GLESS:
 		case GLEQ:
@@ -175,7 +182,7 @@ HEADER *lookup(label)
 	for (qb = &labtab; p = *qb; qb = &p->next)
 		if (p->label == label)
 			return (p);
-	p = alloc(sizeof (*p), NULL), *qb = p;
+	p = wsalloc(sizeof (*p), NULL), *qb = p;
 	p->first = NULL;
 	p->label = label;
 	p->offset = 0;
@@ -228,17 +235,17 @@ BOOL main(ac, av)
 		regmin = REGSET|TS;
 		autmin = -AUTOFF;
 		autoff = -AUTOFF;
-		for (p = labtab; p; p = free(p, p->next))
+		for (p = labtab; p; p = wsfree(p, p->next))
 			frelst(p->first, NULL);
 		labtab = NULL;
 		lookup(0);
-		labtab->flags =| ISCASE;
+		labtab->flags |= ISCASE;
 		choff = 1;
 		tok = gtbody(&labtab->first);
 		for (p = labtab; p; p = p->next)
 			if ((p->flags & (ISCASE|VISITED)) == ISCASE)
 				{
-				p->flags =| VISITED|TOEMIT;
+				p->flags |= VISITED|TOEMIT;
 				visit(p->first, nlabels);
 				}
 		shorten(labtab);
@@ -250,7 +257,7 @@ BOOL main(ac, av)
 			}
 		csect(ISTEXT);
 		putasm("%p:\n", funname);
-		autmin =& ~1;
+		autmin &= ~1;
 		if (ckflag)
 			{
 			putasm("hl = &%o\ncall c.entx\n", autmin - yellow);
@@ -258,7 +265,7 @@ BOOL main(ac, av)
 			}
 		else if ((regmin & REGSET) != REGSET)
 			{
-			autmin =+ AUTOFF;
+			autmin += AUTOFF;
 			if (farflag)
 				{
 				putasm("hl = &%o\ncall c.fents\n", autmin);
@@ -336,7 +343,7 @@ TEXT *msp(off)
 		break;
 	default:
 		s = cpystr(buf, "hl=0", NULL);
-		s =+ stob(s, off, 8);
+		s += stob(s, off, 8);
 		cpystr(s, "+sp->sp", NULL);
 		s = buf;
 		}
@@ -380,13 +387,13 @@ VOID shorten(tab)
 					{
 					if ((q->inst == GRET || q->inst == GHDR) && q->c.hdr)
 						q->c.hdr->offset = pc;
-					pc =+ q->size;
+					pc += q->size;
 					}
 				}
 			}
 		for (p = tab; p; p = p->next)
 			if (p->flags & TOEMIT)
-				for (pc = p->offset, q = p->first; q; pc =+ osize, q = q->next)
+				for (pc = p->offset, q = p->first; q; pc += osize, q = q->next)
 					{
 					osize = q->size;
 					switch (q->inst)
@@ -472,11 +479,11 @@ VOID visit(qs, nlbl)
 					q->next = p->first, p->first = NULL;
 					if (p->flags & VISITED)
 						return;
-					p->flags =| VISITED;
+					p->flags |= VISITED;
 					}
 			else if (!(p->flags & VISITED))
 					{
-					p->flags =| VISITED|TOEMIT|NAILED;
+					p->flags |= VISITED|TOEMIT|NAILED;
 					visit(p->first, nlbl);
 					}
 			}

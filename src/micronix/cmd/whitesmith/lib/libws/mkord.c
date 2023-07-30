@@ -4,6 +4,9 @@
 #include <std.h>
 #include <sort.h>
 
+LOCAL BOOL setkey();
+LOCAL COUNT ordkey();
+
 typedef struct
 	{
 	BOOL rev;
@@ -16,8 +19,8 @@ typedef struct
 	COUNT endaddch;
 	} KEY;
 
-LOCAL COUNT firstkey {KEYLIM};
-LOCAL KEY key[KEYLIM + 1] {0};
+LOCAL COUNT firstkey = {KEYLIM};
+LOCAL KEY key[KEYLIM + 1] = {0};
 
 /*	finds terminus of a key
  */
@@ -56,7 +59,7 @@ LOCAL COUNT dictcmp(p, q, lp, lq)
 	FAST TEXT *p, *q;
 	TEXT *lp, *lq;
 	{
-	INTERN TEXT ndict[128]
+	INTERN TEXT ndict[128] =
 		{
 		1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,
 		1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,

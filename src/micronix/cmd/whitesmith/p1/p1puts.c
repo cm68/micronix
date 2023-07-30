@@ -7,26 +7,31 @@
 #include "../include/c/int12.h"
 #include "../include/c/int012.h"
 
+BYTES pint();
+LABEL pjt();
+LABEL pjump();
+LABEL plabel();
+
 /*	zero term
  */
-LOCAL TERM zeterm {NULL, NULL, 0, TCHAR};
+LOCAL TERM zeterm = {NULL, NULL, 0, TCHAR};
 
 /*	table of type for pass2
  */
 
 /*	table of relational ops and flipped relops
  */
-LOCAL TINY relops[] {LISEQ, LNOTEQ, LLESS, LLEQ, LGREAT, LGEQ, 0};
-LOCAL TINY reflip[] {LNOTEQ, LISEQ, LGEQ, LGREAT, LLEQ, LLESS, 0};
-LOCAL TINY jctab[] {GISEQ, GNOTEQ, GLESS, GLEQ, GGREAT, GGEQ, 0};
+LOCAL TINY relops[] = {LISEQ, LNOTEQ, LLESS, LLEQ, LGREAT, LGEQ, 0};
+LOCAL TINY reflip[] = {LNOTEQ, LISEQ, LGEQ, LGREAT, LLEQ, LLESS, 0};
+LOCAL TINY jctab[] = {GISEQ, GNOTEQ, GLESS, GLEQ, GGREAT, GGEQ, 0};
 
 /*	create a label and return it
  */
 LABEL crs()
 	{
-	INTERN LABEL nextsym {-1};
+	INTERN LABEL nextsym = {-1};
 
-	return (nextsym =+ 2);
+	return (nextsym += 2);
 	}
 
 /*	make a label number printable
@@ -134,7 +139,7 @@ VOID pend()
 	FAST COUNT i;
 	FAST LITERAL *p;
 
-	for (p = littab; p; p = free(p, p->next))
+	for (p = littab; p; p = wsfree(p, p->next))
 		{
 		if (p->op)
 			{
@@ -144,7 +149,7 @@ VOID pend()
 			i = p->e.l.a.m;
 			pstr(p->e.l.next, i - 1);
 			}
-		free(p->e.l.next, NULL);
+		wsfree(p->e.l.next, NULL);
 		}
 	littab = NULL;
 	}
@@ -383,7 +388,7 @@ VOID pswtab(ptab, def, tab)
 	pcode(GSWTAB);
 	pcode(bound(tunsign, 0));
 	ptname(lblname(tab));
-	for (p = *ptab; p != ptab; p = free(p, p->next))
+	for (p = *ptab; p != ptab; p = wsfree(p, p->next))
 		{
 		paddr(lblname(p->clabel), 0L, 4);
 		pint(p->cvalue, intsize);
@@ -402,7 +407,7 @@ VOID ptexpr(p)
 	IMPORT TINY typtab[];
 	FAST COUNT i;
 	FAST TEXT *s;
-	INTERN TINY xtab[] {XCHAR, XUCHAR, XSHORT, XSFIELD, XUSHORT, XLONG,
+	INTERN TINY xtab[] = {XCHAR, XUCHAR, XSHORT, XSFIELD, XUSHORT, XLONG,
 		XLFIELD, XULONG, XFLOAT, XDOUBLE, XPTRTO, XUSHORT};
 
 	pcode(p->op);
@@ -519,7 +524,7 @@ TINY rbuy(ty, pset)
 		}
 	mask = (aflag && (*pset & 034000) && type(ty) == TPTRTO) ? 034000 : -1;
 	set = *pset & mask;
-	set =^ set & set - 1;
-	*pset =& ~set;
+	set ^= set & set - 1;
+	*pset &= ~set;
 	return (set & 034 ? set : set >> 9 | 0200);
 	}

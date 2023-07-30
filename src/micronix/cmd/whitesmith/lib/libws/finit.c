@@ -3,8 +3,8 @@
  */
 #include <std.h>
 
-GLOBAL FIO *_pfio {NULL};
-LOCAL VOID *(*_fnext)() {NULL};
+GLOBAL FIO *_pfio = {NULL};
+LOCAL VOID *(*_fnext)() = {NULL};
 
 /*	flush all pending writes
  */
@@ -42,7 +42,11 @@ FIO *finit(pf, fd, mode)
 		pf->_pnext = _pfio;
 		_pfio = pf;
 		if (!_fnext)
+#ifdef linux
+			_fnext = on_exit(&_flush);
+#else
 			_fnext = onexit(&_flush);
+#endif
 		}
 	return (pf);
 	}
