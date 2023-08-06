@@ -1,0 +1,198 @@
+[1mNAME[0m
+     [1mhex [22m‐ translate object file to ASCII
+
+[1mSYNOPSIS[0m
+     hex ‐[flags] <ifile>
+
+[1mFUNCTION[0m
+     Hex  translates  executable images produced by link to Intel
+     standard hex format or to Motorola S‐record object file for‐
+     mat.   The  executable image is read from <ifile>, if speci‐
+     fied, otherwise from the file xeq.
+
+     The flags are:
+
+     [1m‐h [22mDo not start record for Intel hex files.
+
+     [1m‐m* [22mInsert the string *, instead of <ifile>,  into  the  Mo‐
+          torola SO record generated when ‐s is given.
+
+
+     [1m‐r##     [22mInterpret the input file as "raw" binary and not as
+          object file.  Output is produced as described below, in
+          either  format, except that the starting address of the
+          module is specified by the long integer ##.
+
+
+     [1m‐s       [22mProduce S‐record rather than the default  hex  for‐
+          mat.
+
+
+     [1m+#        [22mStart  output  with the #th byte.  # should be be‐
+          tween 0 and one less than the value  specified  by  the
+          ‐#flag.  ‐4 +3 produces bytes 3, 7, 11, 1 5, ...; ‐2 +0
+          produces all even bytes; ‐1 +1 outputs all odd bytes; 0
+          is the default which outputs all bytes.
+
+
+     [1m‐#       [22mOutput every #th byte. ‐2 outputs every other byte,
+          ‐4 every fourth; 1 is the  default  which  outputs  all
+          bytes.
+
+          Output is written to STDOUT.
+
+          [4mHex[24m [4mFiles[0m
+
+          A  file  in  Intel hex format consists of the following
+          records, in the order listed:
+
+          1)      A "$" alone on a line to indicate  the  end  of
+          the  (non‐existent)  symbol  table. If ‐h is specified,
+          this line is omitted.
+
+          2)      Data records for  the  text  segment,  if  any.
+          These  represent 32 image bytes per line, possibly ter‐
+          minated by a shorter line.
+
+          3)      Data records for the data segment, if  any,  in
+          the same format as the text segment records.
+
+          4)      An end record specifying the start address.
+
+          Data records each begin with a ":" and consist of pairs
+          of hexadecimal digits, each pair representing  the  nu‐
+          merical  value  of a byte.  The last pair is a checksum
+          such that the numerical sum of all the bytes represent‐
+          ed  on  the  line, modulo 256, is zero.  the bytes on a
+          data record line are:
+
+          a)      The number of image bytes on the line.
+
+          b)      Two bytes for the load offset of the first  im‐
+          age  byte.  The offset is written more significant byte
+          first so that it reads correctly as a four‐digit  hexa‐
+          decimal number.
+
+          c)      A zero byte "00".
+
+          d)      The image bytes in increasing order of address.
+
+          e)      The checksum byte.
+
+          An  end record also begins with a ":" and is written as
+          digit pairs with a trailing checksum.  Its format is:
+
+          a)      A zero byte "00".
+
+          b)      Two bytes for the start address,  in  the  same
+          format as the load offset in a data record.
+
+          c)      A one byte "01".
+
+          d)      The checksum byte.
+
+          [4mS‐Record[24m [4mFiles[0m
+
+          A  file  in  Motorola  S‐record  format  is a series of
+          records each containing the following fields:
+
+                  <S field><count><addr><data bytes><checksum>
+
+          All information is represented as pairs of  hexadecimal
+          digits, each pair representing the numerical value of a
+          byte.
+
+          <S filed> determines the interpretation of the  remain‐
+          der  of  the  line; valid S fields are "SO", "S1", S2",
+          "S8", "S9". <count> indicates the number of bytes  rep‐
+          resented  in  the rest of the line, so the total number
+          of characters in the line is <count> * 2 + 4.
+
+          <addr> indicates the byte address  of  the  first  data
+          byte  in the data field. SO records have two zero bytes
+          as their address field; S1 and S2 records  have  <addr>
+          fields  of two and three bytes in length, respectively;
+          S9 and S8 records have <addr> fields of two  and  three
+          bytes  in  length,  respectively,  and  contain no data
+          bytes. <addr>  is  represented  most  significant  byte
+          first.
+
+          The SO record contains the name of the input file, for‐
+          matted as data bytes.  If input was from  xeq,  XEQ  is
+          used  as the name.  S1 and S2 records represent text or
+          data segment bytes to be loaded.  They normally contain
+          32  image bytes, output in increasing order of address;
+          the last record of each segment may  be  shorter.   The
+          text segment is output first, followed by the data seg‐
+          ment.  S9 records contain only a two‐byte start address
+          in  their <addr> field; S8 records contain a three‐byte
+          address.  The start address of an object  file  is  the
+          start of the text section.
+
+          <checksum> is a single byte value such that the numeri‐
+          cal sum of all the bytes represented on the  line  (ex‐
+          cept the S field), taken modulo 256, is 255 (0xFF).
+
+[1mRETURNS[0m
+     Hex  returns  success if no error messages are printed, that
+     is, if all records make sense and all reads and writes  suc‐
+     ceed; otherwise it reports failure.
+[1mEXAMPLE[0m
+
+     The file hello.c, consisting of :
+             char *p {"hello world"};
+
+     when compiled produces the following Intel hex file:
+     % hex hello.o
+
+     $
+     :0E000002006856C6C6F20776F726C640094
+     :000000010
+
+[1mSEE ALSO[0m
+     link (1), obj (1), cc (1), as (1), cp1 (1), cp2 (1), cpp (1)
+
+[1mNOTE[0m
+     This program and documentation are products of Whitesmiths, Ltd.,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

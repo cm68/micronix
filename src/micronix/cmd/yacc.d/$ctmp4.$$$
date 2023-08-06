@@ -1,0 +1,2 @@
+-Z -Ptext=0,data,bss -C100H -OP:YACC.COM CRTCPM.OBJ P:YACC P:L.OBJ P:Y0.OBJ P:Y1.OBJ P:Y2.OBJ P:Y3.OBJ P:Y4.OBJ P:Y5.OBJ LIBC.LIB 
+

@@ -1,0 +1,2 @@
+compiler wsc
+syntax on

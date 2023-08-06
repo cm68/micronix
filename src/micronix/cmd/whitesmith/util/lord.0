@@ -1,0 +1,132 @@
+[1mNAME[0m
+      ‐
+
+     lord ‐ order libraries
+[1mSYNOPSIS[0m
+     lord ‐[c* d* i r* s]
+
+[1mFUNCTION[0m
+     Lord reads in a list of module names, with associated inter‐
+     depencies, from STDIN, and outputs to STDOUT a topologically
+     sorted  list  of module names such that, if at all possible,
+     no module depends on an earlier module in  the  list.   Each
+     module  is introduced by a line containing its name followed
+     by a colon.  Subsequent lines are interpreted as either:
+
+
+     [1mdefs [22mthings defined by the module,
+
+
+     [1mrefs [22mthings referred to by the module, or other stuff.
+
+     Refs and defs have the syntax given by one or  more  formats
+     entered as flags on the command line.  Each character of the
+     format must match the corresponding character at the  begin‐
+     ning  of an input line; a ?  will match any character except
+     newline.  If all characters of the format match, the rest of
+     the  input  line  is  taken as a ref or def name.  Thus, the
+     format flag "‐d0x????D" would identify as valid def any line
+     beginning with "0x", four arbitrary characters and a "D", so
+     that the input line "0x3ff0D_inbuf" would be taken as a  def
+     named "_inbuf".
+
+     The flags are:
+
+     [1m‐c*  [22mprepend the string * to the output stream.  Implies ‐s.
+          Each module name is output preceded  by  a  space;  the
+          output  stream  is  terminated  with a newline.  Hence,
+          lord can be used to build a command line.
+
+     [1m‐d* [22muse the string * as a fromat for defs.
+
+     [1m‐i [22mignore other stuff.  Default is  to  complain  about  any
+          line not recognizable as a def or ref.
+
+     [1m‐r* [22muse the string * as a format for refs.
+
+     [1m‐s  [22msuppress  output  of  defs  and refs; output only module
+          names in order.
+
+     Up to ten formats may be input for defs, and up to  ten  for
+     refs.
+
+     If no ‐d flags are given, lord uses the default def formats:
+     "0x????????B",   "0x????????D",   "0x????????T",   0x????B",
+     "0x????D",  "0x????????U" and "0x????U".  These are compati‐
+     ble with the default output of rel (obj).
+
+     If there  are any circular dependencies among  the  modules,
+     lord  writes "not completely sorted" to STDERR and outputs a
+     partially‐ordered list.  In general, rearrangements are made
+     only  when  necessary,  so  an ordered set of modules should
+     pass through lord unchanged.
+
+[1mRETURNS[0m
+     Lord returns success if no error messages are printed,  oth‐
+     erwise failure.
+[1mEXAMPLE[0m
+
+     To create a library of ordered object modules under Idris:
+             % rel *.0 | lord ‐c"lib libx.a ‐c" | sh
+
+     To order a set of objects using Micronix nm:
+
+             % nm *.o > nmlist
+             % lord < nmlist ‐c"ar r libx.a" | \
+                     ‐d"??????T" ‐d"??????D" \
+                     ‐d"??????B" ‐r"??????U" | sh
+
+[1mSEE ALSO[0m
+     lib (1), obj (1)
+
+[1mNOTE[0m
+     This program and documentation are products of Whitesmiths, Ltd.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,1611 @@
+	.data
+dbuf0:	.db	0
+
+	.text
+_start:	ld de,dbuf0
+	ld bc,_start
+
+	.extern	_ext000
+	.extern	_ext001
+	.extern	_ext002
+	.extern	_ext003
+	.extern	_ext004
+	.extern	_ext005
+	.extern	_ext006
+	.extern	_ext007
+	.extern	_ext008
+	.extern	_ext009
+	.extern	_ext010
+	.extern	_ext011
+	.extern	_ext012
+	.extern	_ext013
+	.extern	_ext014
+	.extern	_ext015
+	.extern	_ext016
+	.extern	_ext017
+	.extern	_ext018
+	.extern	_ext019
+	.extern	_ext020
+	.extern	_ext021
+	.extern	_ext022
+	.extern	_ext023
+	.extern	_ext024
+	.extern	_ext025
+	.extern	_ext026
+	.extern	_ext027
+	.extern	_ext028
+	.extern	_ext029
+	.extern	_ext030
+	.extern	_ext031
+	.extern	_ext032
+	.extern	_ext033
+	.extern	_ext034
+	.extern	_ext035
+	.extern	_ext036
+	.extern	_ext037
+	.extern	_ext038
+	.extern	_ext039
+	.extern	_ext040
+	.extern	_ext041
+	.extern	_ext042
+	.extern	_ext043
+	.extern	_ext044
+	.extern	_ext045
+	.extern	_ext046
+	.extern	_ext047
+	.extern	_ext048
+	.extern	_ext049
+	.extern	_ext050
+	.extern	_ext051
+	.extern	_ext052
+	.extern	_ext053
+	.extern	_ext054
+	.extern	_ext055
+	.extern	_ext056
+	.extern	_ext057
+	.extern	_ext058
+	.extern	_ext059
+	.extern	_ext060
+	.extern	_ext061
+	.extern	_ext062
+	.extern	_ext063
+	.extern	_ext064
+	.extern	_ext065
+	.extern	_ext066
+	.extern	_ext067
+	.extern	_ext068
+	.extern	_ext069
+	.extern	_ext070
+	.extern	_ext071
+	.extern	_ext072
+	.extern	_ext073
+	.extern	_ext074
+	.extern	_ext075
+	.extern	_ext076
+	.extern	_ext077
+	.extern	_ext078
+	.extern	_ext079
+	.extern	_ext080
+	.extern	_ext081
+	.extern	_ext082
+	.extern	_ext083
+	.extern	_ext084
+	.extern	_ext085
+	.extern	_ext086
+	.extern	_ext087
+	.extern	_ext088
+	.extern	_ext089
+	.extern	_ext090
+	.extern	_ext091
+	.extern	_ext092
+	.extern	_ext093
+	.extern	_ext094
+	.extern	_ext095
+	.extern	_ext096
+	.extern	_ext097
+	.extern	_ext098
+	.extern	_ext099
+	.extern	_ext100
+	.extern	_ext101
+	.extern	_ext102
+	.extern	_ext103
+	.extern	_ext104
+	.extern	_ext105
+	.extern	_ext106
+	.extern	_ext107
+	.extern	_ext108
+	.extern	_ext109
+	.extern	_ext110
+	.extern	_ext111
+	.extern	_ext112
+	.extern	_ext113
+	.extern	_ext114
+	.extern	_ext115
+	.extern	_ext116
+	.extern	_ext117
+	.extern	_ext118
+	.extern	_ext119
+	.extern	_ext120
+	.extern	_ext121
+	.extern	_ext122
+	.extern	_ext123
+	.extern	_ext124
+	.extern	_ext125
+	.extern	_ext126
+	.extern	_ext127
+	.extern	_ext128
+	.extern	_ext129
+	.extern	_ext130
+	.extern	_ext131
+	.extern	_ext132
+	.extern	_ext133
+	.extern	_ext134
+	.extern	_ext135
+	.extern	_ext136
+	.extern	_ext137
+	.extern	_ext138
+	.extern	_ext139
+	.extern	_ext140
+	.extern	_ext141
+	.extern	_ext142
+	.extern	_ext143
+	.extern	_ext144
+	.extern	_ext145
+	.extern	_ext146
+	.extern	_ext147
+	.extern	_ext148
+	.extern	_ext149
+	.extern	_ext150
+	.extern	_ext151
+	.extern	_ext152
+	.extern	_ext153
+	.extern	_ext154
+	.extern	_ext155
+	.extern	_ext156
+	.extern	_ext157
+	.extern	_ext158
+	.extern	_ext159
+	.extern	_ext160
+	.extern	_ext161
+	.extern	_ext162
+	.extern	_ext163
+	.extern	_ext164
+	.extern	_ext165
+	.extern	_ext166
+	.extern	_ext167
+	.extern	_ext168
+	.extern	_ext169
+	.extern	_ext170
+	.extern	_ext171
+	.extern	_ext172
+	.extern	_ext173
+	.extern	_ext174
+	.extern	_ext175
+	.extern	_ext176
+	.extern	_ext177
+	.extern	_ext178
+	.extern	_ext179
+	.extern	_ext180
+	.extern	_ext181
+	.extern	_ext182
+	.extern	_ext183
+	.extern	_ext184
+	.extern	_ext185
+	.extern	_ext186
+	.extern	_ext187
+	.extern	_ext188
+	.extern	_ext189
+	.extern	_ext190
+	.extern	_ext191
+	.extern	_ext192
+	.extern	_ext193
+	.extern	_ext194
+	.extern	_ext195
+	.extern	_ext196
+	.extern	_ext197
+	.extern	_ext198
+	.extern	_ext199
+	.extern	_ext200
+	.extern	_ext201
+	.extern	_ext202
+	.extern	_ext203
+	.extern	_ext204
+	.extern	_ext205
+	.extern	_ext206
+	.extern	_ext207
+	.extern	_ext208
+	.extern	_ext209
+	.extern	_ext210
+	.extern	_ext211
+	.extern	_ext212
+	.extern	_ext213
+	.extern	_ext214
+	.extern	_ext215
+	.extern	_ext216
+	.extern	_ext217
+	.extern	_ext218
+	.extern	_ext219
+	.extern	_ext220
+	.extern	_ext221
+	.extern	_ext222
+	.extern	_ext223
+	.extern	_ext224
+	.extern	_ext225
+	.extern	_ext226
+	.extern	_ext227
+	.extern	_ext228
+	.extern	_ext229
+	.extern	_ext230
+	.extern	_ext231
+	.extern	_ext232
+	.extern	_ext233
+	.extern	_ext234
+	.extern	_ext235
+	.extern	_ext236
+	.extern	_ext237
+	.extern	_ext238
+	.extern	_ext239
+	.extern	_ext240
+	.extern	_ext241
+	.extern	_ext242
+	.extern	_ext243
+	.extern	_ext244
+	.extern	_ext245
+	.extern	_ext246
+	.extern	_ext247
+	.extern	_ext248
+	.extern	_ext249
+	.extern	_ext250
+	.extern	_ext251
+	.extern	_ext252
+	.extern	_ext253
+	.extern	_ext254
+	.extern	_ext255
+	.extern	_ext256
+	.extern	_ext257
+	.extern	_ext258
+	.extern	_ext259
+	.extern	_ext260
+	.extern	_ext261
+	.extern	_ext262
+	.extern	_ext263
+	.extern	_ext264
+	.extern	_ext265
+	.extern	_ext266
+	.extern	_ext267
+	.extern	_ext268
+	.extern	_ext269
+	.extern	_ext270
+	.extern	_ext271
+	.extern	_ext272
+	.extern	_ext273
+	.extern	_ext274
+	.extern	_ext275
+	.extern	_ext276
+	.extern	_ext277
+	.extern	_ext278
+	.extern	_ext279
+	.extern	_ext280
+	.extern	_ext281
+	.extern	_ext282
+	.extern	_ext283
+	.extern	_ext284
+	.extern	_ext285
+	.extern	_ext286
+	.extern	_ext287
+	.extern	_ext288
+	.extern	_ext289
+	.extern	_ext290
+	.extern	_ext291
+	.extern	_ext292
+	.extern	_ext293
+	.extern	_ext294
+	.extern	_ext295
+	.extern	_ext296
+	.extern	_ext297
+	.extern	_ext298
+	.extern	_ext299
+	.extern	_ext300
+	.extern	_ext301
+	.extern	_ext302
+	.extern	_ext303
+	.extern	_ext304
+	.extern	_ext305
+	.extern	_ext306
+	.extern	_ext307
+	.extern	_ext308
+	.extern	_ext309
+	.extern	_ext310
+	.extern	_ext311
+	.extern	_ext312
+	.extern	_ext313
+	.extern	_ext314
+	.extern	_ext315
+	.extern	_ext316
+	.extern	_ext317
+	.extern	_ext318
+	.extern	_ext319
+	.extern	_ext320
+	.extern	_ext321
+	.extern	_ext322
+	.extern	_ext323
+	.extern	_ext324
+	.extern	_ext325
+	.extern	_ext326
+	.extern	_ext327
+	.extern	_ext328
+	.extern	_ext329
+	.extern	_ext330
+	.extern	_ext331
+	.extern	_ext332
+	.extern	_ext333
+	.extern	_ext334
+	.extern	_ext335
+	.extern	_ext336
+	.extern	_ext337
+	.extern	_ext338
+	.extern	_ext339
+	.extern	_ext340
+	.extern	_ext341
+	.extern	_ext342
+	.extern	_ext343
+	.extern	_ext344
+	.extern	_ext345
+	.extern	_ext346
+	.extern	_ext347
+	.extern	_ext348
+	.extern	_ext349
+	.extern	_ext350
+	.extern	_ext351
+	.extern	_ext352
+	.extern	_ext353
+	.extern	_ext354
+	.extern	_ext355
+	.extern	_ext356
+	.extern	_ext357
+	.extern	_ext358
+	.extern	_ext359
+	.extern	_ext360
+	.extern	_ext361
+	.extern	_ext362
+	.extern	_ext363
+	.extern	_ext364
+	.extern	_ext365
+	.extern	_ext366
+	.extern	_ext367
+	.extern	_ext368
+	.extern	_ext369
+	.extern	_ext370
+	.extern	_ext371
+	.extern	_ext372
+	.extern	_ext373
+	.extern	_ext374
+	.extern	_ext375
+	.extern	_ext376
+	.extern	_ext377
+	.extern	_ext378
+	.extern	_ext379
+	.extern	_ext380
+	.extern	_ext381
+	.extern	_ext382
+	.extern	_ext383
+	.extern	_ext384
+	.extern	_ext385
+	.extern	_ext386
+	.extern	_ext387
+	.extern	_ext388
+	.extern	_ext389
+	.extern	_ext390
+	.extern	_ext391
+	.extern	_ext392
+	.extern	_ext393
+	.extern	_ext394
+	.extern	_ext395
+	.extern	_ext396
+	.extern	_ext397
+	.extern	_ext398
+	.extern	_ext399
+	.extern	_ext400
+	ld	hl,_ext000
+	ld	hl,_ext001
+	ld	hl,_ext002
+	ld	hl,_ext003
+	ld	hl,_ext004
+	ld	hl,_ext005
+	ld	hl,_ext006
+	ld	hl,_ext007
+	ld	hl,_ext008
+	ld	hl,_ext009
+	ld	hl,_ext010
+	ld	hl,_ext011
+	ld	hl,_ext012
+	ld	hl,_ext013
+	ld	hl,_ext014
+	ld	hl,_ext015
+	ld	hl,_ext016
+	ld	hl,_ext017
+	ld	hl,_ext018
+	ld	hl,_ext019
+	ld	hl,_ext020
+	ld	hl,_ext021
+	ld	hl,_ext022
+	ld	hl,_ext023
+	ld	hl,_ext024
+	ld	hl,_ext025
+	ld	hl,_ext026
+	ld	hl,_ext027
+	ld	hl,_ext028
+	ld	hl,_ext029
+	ld	hl,_ext030
+	ld	hl,_ext031
+	ld	hl,_ext032
+	ld	hl,_ext033
+	ld	hl,_ext034
+	ld	hl,_ext035
+	ld	hl,_ext036
+	ld	hl,_ext037
+	ld	hl,_ext038
+	ld	hl,_ext039
+	ld	hl,_ext040
+	ld	hl,_ext041
+	ld	hl,_ext042
+	ld	hl,_ext043
+	ld	hl,_ext044
+	ld	hl,_ext045
+	ld	hl,_ext046
+	ld	hl,_ext047
+	ld	hl,_ext048
+	ld	hl,_ext049
+	ld	hl,_ext050
+	ld	hl,_ext051
+	ld	hl,_ext052
+	ld	hl,_ext053
+	ld	hl,_ext054
+	ld	hl,_ext055
+	ld	hl,_ext056
+	ld	hl,_ext057
+	ld	hl,_ext058
+	ld	hl,_ext059
+	ld	hl,_ext060
+	ld	hl,_ext061
+	ld	hl,_ext062
+	ld	hl,_ext063
+	ld	hl,_ext064
+	ld	hl,_ext065
+	ld	hl,_ext066
+	ld	hl,_ext067
+	ld	hl,_ext068
+	ld	hl,_ext069
+	ld	hl,_ext070
+	ld	hl,_ext071
+	ld	hl,_ext072
+	ld	hl,_ext073
+	ld	hl,_ext074
+	ld	hl,_ext075
+	ld	hl,_ext076
+	ld	hl,_ext077
+	ld	hl,_ext078
+	ld	hl,_ext079
+	ld	hl,_ext080
+	ld	hl,_ext081
+	ld	hl,_ext082
+	ld	hl,_ext083
+	ld	hl,_ext084
+	ld	hl,_ext085
+	ld	hl,_ext086
+	ld	hl,_ext087
+	ld	hl,_ext088
+	ld	hl,_ext089
+	ld	hl,_ext090
+	ld	hl,_ext091
+	ld	hl,_ext092
+	ld	hl,_ext093
+	ld	hl,_ext094
+	ld	hl,_ext095
+	ld	hl,_ext096
+	ld	hl,_ext097
+	ld	hl,_ext098
+	ld	hl,_ext099
+	ld	hl,_ext100
+	ld	hl,_ext101
+	ld	hl,_ext102
+	ld	hl,_ext103
+	ld	hl,_ext104
+	ld	hl,_ext105
+	ld	hl,_ext106
+	ld	hl,_ext107
+	ld	hl,_ext108
+	ld	hl,_ext109
+	ld	hl,_ext110
+	ld	hl,_ext111
+	ld	hl,_ext112
+	ld	hl,_ext113
+	ld	hl,_ext114
+	ld	hl,_ext115
+	ld	hl,_ext116
+	ld	hl,_ext117
+	ld	hl,_ext118
+	ld	hl,_ext119
+	ld	hl,_ext120
+	ld	hl,_ext121
+	ld	hl,_ext122
+	ld	hl,_ext123
+	ld	hl,_ext124
+	ld	hl,_ext125
+	ld	hl,_ext126
+	ld	hl,_ext127
+	ld	hl,_ext128
+	ld	hl,_ext129
+	ld	hl,_ext130
+	ld	hl,_ext131
+	ld	hl,_ext132
+	ld	hl,_ext133
+	ld	hl,_ext134
+	ld	hl,_ext135
+	ld	hl,_ext136
+	ld	hl,_ext137
+	ld	hl,_ext138
+	ld	hl,_ext139
+	ld	hl,_ext140
+	ld	hl,_ext141
+	ld	hl,_ext142
+	ld	hl,_ext143
+	ld	hl,_ext144
+	ld	hl,_ext145
+	ld	hl,_ext146
+	ld	hl,_ext147
+	ld	hl,_ext148
+	ld	hl,_ext149
+	ld	hl,_ext150
+	ld	hl,_ext151
+	ld	hl,_ext152
+	ld	hl,_ext153
+	ld	hl,_ext154
+	ld	hl,_ext155
+	ld	hl,_ext156
+	ld	hl,_ext157
+	ld	hl,_ext158
+	ld	hl,_ext159
+	ld	hl,_ext160
+	ld	hl,_ext161
+	ld	hl,_ext162
+	ld	hl,_ext163
+	ld	hl,_ext164
+	ld	hl,_ext165
+	ld	hl,_ext166
+	ld	hl,_ext167
+	ld	hl,_ext168
+	ld	hl,_ext169
+	ld	hl,_ext170
+	ld	hl,_ext171
+	ld	hl,_ext172
+	ld	hl,_ext173
+	ld	hl,_ext174
+	ld	hl,_ext175
+	ld	hl,_ext176
+	ld	hl,_ext177
+	ld	hl,_ext178
+	ld	hl,_ext179
+	ld	hl,_ext180
+	ld	hl,_ext181
+	ld	hl,_ext182
+	ld	hl,_ext183
+	ld	hl,_ext184
+	ld	hl,_ext185
+	ld	hl,_ext186
+	ld	hl,_ext187
+	ld	hl,_ext188
+	ld	hl,_ext189
+	ld	hl,_ext190
+	ld	hl,_ext191
+	ld	hl,_ext192
+	ld	hl,_ext193
+	ld	hl,_ext194
+	ld	hl,_ext195
+	ld	hl,_ext196
+	ld	hl,_ext197
+	ld	hl,_ext198
+	ld	hl,_ext199
+	ld	hl,_ext200
+	ld	hl,_ext201
+	ld	hl,_ext202
+	ld	hl,_ext203
+	ld	hl,_ext204
+	ld	hl,_ext205
+	ld	hl,_ext206
+	ld	hl,_ext207
+	ld	hl,_ext208
+	ld	hl,_ext209
+	ld	hl,_ext210
+	ld	hl,_ext211
+	ld	hl,_ext212
+	ld	hl,_ext213
+	ld	hl,_ext214
+	ld	hl,_ext215
+	ld	hl,_ext216
+	ld	hl,_ext217
+	ld	hl,_ext218
+	ld	hl,_ext219
+	ld	hl,_ext220
+	ld	hl,_ext221
+	ld	hl,_ext222
+	ld	hl,_ext223
+	ld	hl,_ext224
+	ld	hl,_ext225
+	ld	hl,_ext226
+	ld	hl,_ext227
+	ld	hl,_ext228
+	ld	hl,_ext229
+	ld	hl,_ext230
+	ld	hl,_ext231
+	ld	hl,_ext232
+	ld	hl,_ext233
+	ld	hl,_ext234
+	ld	hl,_ext235
+	ld	hl,_ext236
+	ld	hl,_ext237
+	ld	hl,_ext238
+	ld	hl,_ext239
+	ld	hl,_ext240
+	ld	hl,_ext241
+	ld	hl,_ext242
+	ld	hl,_ext243
+	ld	hl,_ext244
+	ld	hl,_ext245
+	ld	hl,_ext246
+	ld	hl,_ext247
+	ld	hl,_ext248
+	ld	hl,_ext249
+	ld	hl,_ext250
+	ld	hl,_ext251
+	ld	hl,_ext252
+	ld	hl,_ext253
+	ld	hl,_ext254
+	ld	hl,_ext255
+	ld	hl,_ext256
+	ld	hl,_ext257
+	ld	hl,_ext258
+	ld	hl,_ext259
+	ld	hl,_ext260
+	ld	hl,_ext261
+	ld	hl,_ext262
+	ld	hl,_ext263
+	ld	hl,_ext264
+	ld	hl,_ext265
+	ld	hl,_ext266
+	ld	hl,_ext267
+	ld	hl,_ext268
+	ld	hl,_ext269
+	ld	hl,_ext270
+	ld	hl,_ext271
+	ld	hl,_ext272
+	ld	hl,_ext273
+	ld	hl,_ext274
+	ld	hl,_ext275
+	ld	hl,_ext276
+	ld	hl,_ext277
+	ld	hl,_ext278
+	ld	hl,_ext279
+	ld	hl,_ext280
+	ld	hl,_ext281
+	ld	hl,_ext282
+	ld	hl,_ext283
+	ld	hl,_ext284
+	ld	hl,_ext285
+	ld	hl,_ext286
+	ld	hl,_ext287
+	ld	hl,_ext288
+	ld	hl,_ext289
+	ld	hl,_ext290
+	ld	hl,_ext291
+	ld	hl,_ext292
+	ld	hl,_ext293
+	ld	hl,_ext294
+	ld	hl,_ext295
+	ld	hl,_ext296
+	ld	hl,_ext297
+	ld	hl,_ext298
+	ld	hl,_ext299
+	ld	hl,_ext300
+	ld	hl,_ext301
+	ld	hl,_ext302
+	ld	hl,_ext303
+	ld	hl,_ext304
+	ld	hl,_ext305
+	ld	hl,_ext306
+	ld	hl,_ext307
+	ld	hl,_ext308
+	ld	hl,_ext309
+	ld	hl,_ext310
+	ld	hl,_ext311
+	ld	hl,_ext312
+	ld	hl,_ext313
+	ld	hl,_ext314
+	ld	hl,_ext315
+	ld	hl,_ext316
+	ld	hl,_ext317
+	ld	hl,_ext318
+	ld	hl,_ext319
+	ld	hl,_ext320
+	ld	hl,_ext321
+	ld	hl,_ext322
+	ld	hl,_ext323
+	ld	hl,_ext324
+	ld	hl,_ext325
+	ld	hl,_ext326
+	ld	hl,_ext327
+	ld	hl,_ext328
+	ld	hl,_ext329
+	ld	hl,_ext330
+	ld	hl,_ext331
+	ld	hl,_ext332
+	ld	hl,_ext333
+	ld	hl,_ext334
+	ld	hl,_ext335
+	ld	hl,_ext336
+	ld	hl,_ext337
+	ld	hl,_ext338
+	ld	hl,_ext339
+	ld	hl,_ext340
+	ld	hl,_ext341
+	ld	hl,_ext342
+	ld	hl,_ext343
+	ld	hl,_ext344
+	ld	hl,_ext345
+	ld	hl,_ext346
+	ld	hl,_ext347
+	ld	hl,_ext348
+	ld	hl,_ext349
+	ld	hl,_ext350
+	ld	hl,_ext351
+	ld	hl,_ext352
+	ld	hl,_ext353
+	ld	hl,_ext354
+	ld	hl,_ext355
+	ld	hl,_ext356
+	ld	hl,_ext357
+	ld	hl,_ext358
+	ld	hl,_ext359
+	ld	hl,_ext360
+	ld	hl,_ext361
+	ld	hl,_ext362
+	ld	hl,_ext363
+	ld	hl,_ext364
+	ld	hl,_ext365
+	ld	hl,_ext366
+	ld	hl,_ext367
+	ld	hl,_ext368
+	ld	hl,_ext369
+	ld	hl,_ext370
+	ld	hl,_ext371
+	ld	hl,_ext372
+	ld	hl,_ext373
+	ld	hl,_ext374
+	ld	hl,_ext375
+	ld	hl,_ext376
+	ld	hl,_ext377
+	ld	hl,_ext378
+	ld	hl,_ext379
+	ld	hl,_ext380
+	ld	hl,_ext381
+	ld	hl,_ext382
+	ld	hl,_ext383
+	ld	hl,_ext384
+	ld	hl,_ext385
+	ld	hl,_ext386
+	ld	hl,_ext387
+	ld	hl,_ext388
+	ld	hl,_ext389
+	ld	hl,_ext390
+	ld	hl,_ext391
+	ld	hl,_ext392
+	ld	hl,_ext393
+	ld	hl,_ext394
+	ld	hl,_ext395
+	ld	hl,_ext396
+	ld	hl,_ext397
+	ld	hl,_ext398
+	ld	hl,_ext399
+	ld	hl,_ext400
+	.globl	_lab000
+	.globl	_lab001
+	.globl	_lab002
+	.globl	_lab003
+	.globl	_lab004
+	.globl	_lab005
+	.globl	_lab006
+	.globl	_lab007
+	.globl	_lab008
+	.globl	_lab009
+	.globl	_lab010
+	.globl	_lab011
+	.globl	_lab012
+	.globl	_lab013
+	.globl	_lab014
+	.globl	_lab015
+	.globl	_lab016
+	.globl	_lab017
+	.globl	_lab018
+	.globl	_lab019
+	.globl	_lab020
+	.globl	_lab021
+	.globl	_lab022
+	.globl	_lab023
+	.globl	_lab024
+	.globl	_lab025
+	.globl	_lab026
+	.globl	_lab027
+	.globl	_lab028
+	.globl	_lab029
+	.globl	_lab030
+	.globl	_lab031
+	.globl	_lab032
+	.globl	_lab033
+	.globl	_lab034
+	.globl	_lab035
+	.globl	_lab036
+	.globl	_lab037
+	.globl	_lab038
+	.globl	_lab039
+	.globl	_lab040
+	.globl	_lab041
+	.globl	_lab042
+	.globl	_lab043
+	.globl	_lab044
+	.globl	_lab045
+	.globl	_lab046
+	.globl	_lab047
+	.globl	_lab048
+	.globl	_lab049
+	.globl	_lab050
+	.globl	_lab051
+	.globl	_lab052
+	.globl	_lab053
+	.globl	_lab054
+	.globl	_lab055
+	.globl	_lab056
+	.globl	_lab057
+	.globl	_lab058
+	.globl	_lab059
+	.globl	_lab060
+	.globl	_lab061
+	.globl	_lab062
+	.globl	_lab063
+	.globl	_lab064
+	.globl	_lab065
+	.globl	_lab066
+	.globl	_lab067
+	.globl	_lab068
+	.globl	_lab069
+	.globl	_lab070
+	.globl	_lab071
+	.globl	_lab072
+	.globl	_lab073
+	.globl	_lab074
+	.globl	_lab075
+	.globl	_lab076
+	.globl	_lab077
+	.globl	_lab078
+	.globl	_lab079
+	.globl	_lab080
+	.globl	_lab081
+	.globl	_lab082
+	.globl	_lab083
+	.globl	_lab084
+	.globl	_lab085
+	.globl	_lab086
+	.globl	_lab087
+	.globl	_lab088
+	.globl	_lab089
+	.globl	_lab090
+	.globl	_lab091
+	.globl	_lab092
+	.globl	_lab093
+	.globl	_lab094
+	.globl	_lab095
+	.globl	_lab096
+	.globl	_lab097
+	.globl	_lab098
+	.globl	_lab099
+	.globl	_lab100
+	.globl	_lab101
+	.globl	_lab102
+	.globl	_lab103
+	.globl	_lab104
+	.globl	_lab105
+	.globl	_lab106
+	.globl	_lab107
+	.globl	_lab108
+	.globl	_lab109
+	.globl	_lab110
+	.globl	_lab111
+	.globl	_lab112
+	.globl	_lab113
+	.globl	_lab114
+	.globl	_lab115
+	.globl	_lab116
+	.globl	_lab117
+	.globl	_lab118
+	.globl	_lab119
+	.globl	_lab120
+	.globl	_lab121
+	.globl	_lab122
+	.globl	_lab123
+	.globl	_lab124
+	.globl	_lab125
+	.globl	_lab126
+	.globl	_lab127
+	.globl	_lab128
+	.globl	_lab129
+	.globl	_lab130
+	.globl	_lab131
+	.globl	_lab132
+	.globl	_lab133
+	.globl	_lab134
+	.globl	_lab135
+	.globl	_lab136
+	.globl	_lab137
+	.globl	_lab138
+	.globl	_lab139
+	.globl	_lab140
+	.globl	_lab141
+	.globl	_lab142
+	.globl	_lab143
+	.globl	_lab144
+	.globl	_lab145
+	.globl	_lab146
+	.globl	_lab147
+	.globl	_lab148
+	.globl	_lab149
+	.globl	_lab150
+	.globl	_lab151
+	.globl	_lab152
+	.globl	_lab153
+	.globl	_lab154
+	.globl	_lab155
+	.globl	_lab156
+	.globl	_lab157
+	.globl	_lab158
+	.globl	_lab159
+	.globl	_lab160
+	.globl	_lab161
+	.globl	_lab162
+	.globl	_lab163
+	.globl	_lab164
+	.globl	_lab165
+	.globl	_lab166
+	.globl	_lab167
+	.globl	_lab168
+	.globl	_lab169
+	.globl	_lab170
+	.globl	_lab171
+	.globl	_lab172
+	.globl	_lab173
+	.globl	_lab174
+	.globl	_lab175
+	.globl	_lab176
+	.globl	_lab177
+	.globl	_lab178
+	.globl	_lab179
+	.globl	_lab180
+	.globl	_lab181
+	.globl	_lab182
+	.globl	_lab183
+	.globl	_lab184
+	.globl	_lab185
+	.globl	_lab186
+	.globl	_lab187
+	.globl	_lab188
+	.globl	_lab189
+	.globl	_lab190
+	.globl	_lab191
+	.globl	_lab192
+	.globl	_lab193
+	.globl	_lab194
+	.globl	_lab195
+	.globl	_lab196
+	.globl	_lab197
+	.globl	_lab198
+	.globl	_lab199
+	.globl	_lab200
+	.globl	_lab201
+	.globl	_lab202
+	.globl	_lab203
+	.globl	_lab204
+	.globl	_lab205
+	.globl	_lab206
+	.globl	_lab207
+	.globl	_lab208
+	.globl	_lab209
+	.globl	_lab210
+	.globl	_lab211
+	.globl	_lab212
+	.globl	_lab213
+	.globl	_lab214
+	.globl	_lab215
+	.globl	_lab216
+	.globl	_lab217
+	.globl	_lab218
+	.globl	_lab219
+	.globl	_lab220
+	.globl	_lab221
+	.globl	_lab222
+	.globl	_lab223
+	.globl	_lab224
+	.globl	_lab225
+	.globl	_lab226
+	.globl	_lab227
+	.globl	_lab228
+	.globl	_lab229
+	.globl	_lab230
+	.globl	_lab231
+	.globl	_lab232
+	.globl	_lab233
+	.globl	_lab234
+	.globl	_lab235
+	.globl	_lab236
+	.globl	_lab237
+	.globl	_lab238
+	.globl	_lab239
+	.globl	_lab240
+	.globl	_lab241
+	.globl	_lab242
+	.globl	_lab243
+	.globl	_lab244
+	.globl	_lab245
+	.globl	_lab246
+	.globl	_lab247
+	.globl	_lab248
+	.globl	_lab249
+	.globl	_lab250
+	.globl	_lab251
+	.globl	_lab252
+	.globl	_lab253
+	.globl	_lab254
+	.globl	_lab255
+	.globl	_lab256
+	.globl	_lab257
+	.globl	_lab258
+	.globl	_lab259
+	.globl	_lab260
+	.globl	_lab261
+	.globl	_lab262
+	.globl	_lab263
+	.globl	_lab264
+	.globl	_lab265
+	.globl	_lab266
+	.globl	_lab267
+	.globl	_lab268
+	.globl	_lab269
+	.globl	_lab270
+	.globl	_lab271
+	.globl	_lab272
+	.globl	_lab273
+	.globl	_lab274
+	.globl	_lab275
+	.globl	_lab276
+	.globl	_lab277
+	.globl	_lab278
+	.globl	_lab279
+	.globl	_lab280
+	.globl	_lab281
+	.globl	_lab282
+	.globl	_lab283
+	.globl	_lab284
+	.globl	_lab285
+	.globl	_lab286
+	.globl	_lab287
+	.globl	_lab288
+	.globl	_lab289
+	.globl	_lab290
+	.globl	_lab291
+	.globl	_lab292
+	.globl	_lab293
+	.globl	_lab294
+	.globl	_lab295
+	.globl	_lab296
+	.globl	_lab297
+	.globl	_lab298
+	.globl	_lab299
+	.globl	_lab300
+	.globl	_lab301
+	.globl	_lab302
+	.globl	_lab303
+	.globl	_lab304
+	.globl	_lab305
+	.globl	_lab306
+	.globl	_lab307
+	.globl	_lab308
+	.globl	_lab309
+	.globl	_lab310
+	.globl	_lab311
+	.globl	_lab312
+	.globl	_lab313
+	.globl	_lab314
+	.globl	_lab315
+	.globl	_lab316
+	.globl	_lab317
+	.globl	_lab318
+	.globl	_lab319
+	.globl	_lab320
+	.globl	_lab321
+	.globl	_lab322
+	.globl	_lab323
+	.globl	_lab324
+	.globl	_lab325
+	.globl	_lab326
+	.globl	_lab327
+	.globl	_lab328
+	.globl	_lab329
+	.globl	_lab330
+	.globl	_lab331
+	.globl	_lab332
+	.globl	_lab333
+	.globl	_lab334
+	.globl	_lab335
+	.globl	_lab336
+	.globl	_lab337
+	.globl	_lab338
+	.globl	_lab339
+	.globl	_lab340
+	.globl	_lab341
+	.globl	_lab342
+	.globl	_lab343
+	.globl	_lab344
+	.globl	_lab345
+	.globl	_lab346
+	.globl	_lab347
+	.globl	_lab348
+	.globl	_lab349
+	.globl	_lab350
+	.globl	_lab351
+	.globl	_lab352
+	.globl	_lab353
+	.globl	_lab354
+	.globl	_lab355
+	.globl	_lab356
+	.globl	_lab357
+	.globl	_lab358
+	.globl	_lab359
+	.globl	_lab360
+	.globl	_lab361
+	.globl	_lab362
+	.globl	_lab363
+	.globl	_lab364
+	.globl	_lab365
+	.globl	_lab366
+	.globl	_lab367
+	.globl	_lab368
+	.globl	_lab369
+	.globl	_lab370
+	.globl	_lab371
+	.globl	_lab372
+	.globl	_lab373
+	.globl	_lab374
+	.globl	_lab375
+	.globl	_lab376
+	.globl	_lab377
+	.globl	_lab378
+	.globl	_lab379
+	.globl	_lab380
+	.globl	_lab381
+	.globl	_lab382
+	.globl	_lab383
+	.globl	_lab384
+	.globl	_lab385
+	.globl	_lab386
+	.globl	_lab387
+	.globl	_lab388
+	.globl	_lab389
+	.globl	_lab390
+	.globl	_lab391
+	.globl	_lab392
+	.globl	_lab393
+	.globl	_lab394
+	.globl	_lab395
+	.globl	_lab396
+	.globl	_lab397
+	.globl	_lab398
+	.globl	_lab399
+	.globl	_lab400
+_lab000:	nop
+_lab001:	nop
+_lab002:	nop
+_lab003:	nop
+_lab004:	nop
+_lab005:	nop
+_lab006:	nop
+_lab007:	nop
+_lab008:	nop
+_lab009:	nop
+_lab010:	nop
+_lab011:	nop
+_lab012:	nop
+_lab013:	nop
+_lab014:	nop
+_lab015:	nop
+_lab016:	nop
+_lab017:	nop
+_lab018:	nop
+_lab019:	nop
+_lab020:	nop
+_lab021:	nop
+_lab022:	nop
+_lab023:	nop
+_lab024:	nop
+_lab025:	nop
+_lab026:	nop
+_lab027:	nop
+_lab028:	nop
+_lab029:	nop
+_lab030:	nop
+_lab031:	nop
+_lab032:	nop
+_lab033:	nop
+_lab034:	nop
+_lab035:	nop
+_lab036:	nop
+_lab037:	nop
+_lab038:	nop
+_lab039:	nop
+_lab040:	nop
+_lab041:	nop
+_lab042:	nop
+_lab043:	nop
+_lab044:	nop
+_lab045:	nop
+_lab046:	nop
+_lab047:	nop
+_lab048:	nop
+_lab049:	nop
+_lab050:	nop
+_lab051:	nop
+_lab052:	nop
+_lab053:	nop
+_lab054:	nop
+_lab055:	nop
+_lab056:	nop
+_lab057:	nop
+_lab058:	nop
+_lab059:	nop
+_lab060:	nop
+_lab061:	nop
+_lab062:	nop
+_lab063:	nop
+_lab064:	nop
+_lab065:	nop
+_lab066:	nop
+_lab067:	nop
+_lab068:	nop
+_lab069:	nop
+_lab070:	nop
+_lab071:	nop
+_lab072:	nop
+_lab073:	nop
+_lab074:	nop
+_lab075:	nop
+_lab076:	nop
+_lab077:	nop
+_lab078:	nop
+_lab079:	nop
+_lab080:	nop
+_lab081:	nop
+_lab082:	nop
+_lab083:	nop
+_lab084:	nop
+_lab085:	nop
+_lab086:	nop
+_lab087:	nop
+_lab088:	nop
+_lab089:	nop
+_lab090:	nop
+_lab091:	nop
+_lab092:	nop
+_lab093:	nop
+_lab094:	nop
+_lab095:	nop
+_lab096:	nop
+_lab097:	nop
+_lab098:	nop
+_lab099:	nop
+_lab100:	nop
+_lab101:	nop
+_lab102:	nop
+_lab103:	nop
+_lab104:	nop
+_lab105:	nop
+_lab106:	nop
+_lab107:	nop
+_lab108:	nop
+_lab109:	nop
+_lab110:	nop
+_lab111:	nop
+_lab112:	nop
+_lab113:	nop
+_lab114:	nop
+_lab115:	nop
+_lab116:	nop
+_lab117:	nop
+_lab118:	nop
+_lab119:	nop
+_lab120:	nop
+_lab121:	nop
+_lab122:	nop
+_lab123:	nop
+_lab124:	nop
+_lab125:	nop
+_lab126:	nop
+_lab127:	nop
+_lab128:	nop
+_lab129:	nop
+_lab130:	nop
+_lab131:	nop
+_lab132:	nop
+_lab133:	nop
+_lab134:	nop
+_lab135:	nop
+_lab136:	nop
+_lab137:	nop
+_lab138:	nop
+_lab139:	nop
+_lab140:	nop
+_lab141:	nop
+_lab142:	nop
+_lab143:	nop
+_lab144:	nop
+_lab145:	nop
+_lab146:	nop
+_lab147:	nop
+_lab148:	nop
+_lab149:	nop
+_lab150:	nop
+_lab151:	nop
+_lab152:	nop
+_lab153:	nop
+_lab154:	nop
+_lab155:	nop
+_lab156:	nop
+_lab157:	nop
+_lab158:	nop
+_lab159:	nop
+_lab160:	nop
+_lab161:	nop
+_lab162:	nop
+_lab163:	nop
+_lab164:	nop
+_lab165:	nop
+_lab166:	nop
+_lab167:	nop
+_lab168:	nop
+_lab169:	nop
+_lab170:	nop
+_lab171:	nop
+_lab172:	nop
+_lab173:	nop
+_lab174:	nop
+_lab175:	nop
+_lab176:	nop
+_lab177:	nop
+_lab178:	nop
+_lab179:	nop
+_lab180:	nop
+_lab181:	nop
+_lab182:	nop
+_lab183:	nop
+_lab184:	nop
+_lab185:	nop
+_lab186:	nop
+_lab187:	nop
+_lab188:	nop
+_lab189:	nop
+_lab190:	nop
+_lab191:	nop
+_lab192:	nop
+_lab193:	nop
+_lab194:	nop
+_lab195:	nop
+_lab196:	nop
+_lab197:	nop
+_lab198:	nop
+_lab199:	nop
+_lab200:	nop
+_lab201:	nop
+_lab202:	nop
+_lab203:	nop
+_lab204:	nop
+_lab205:	nop
+_lab206:	nop
+_lab207:	nop
+_lab208:	nop
+_lab209:	nop
+_lab210:	nop
+_lab211:	nop
+_lab212:	nop
+_lab213:	nop
+_lab214:	nop
+_lab215:	nop
+_lab216:	nop
+_lab217:	nop
+_lab218:	nop
+_lab219:	nop
+_lab220:	nop
+_lab221:	nop
+_lab222:	nop
+_lab223:	nop
+_lab224:	nop
+_lab225:	nop
+_lab226:	nop
+_lab227:	nop
+_lab228:	nop
+_lab229:	nop
+_lab230:	nop
+_lab231:	nop
+_lab232:	nop
+_lab233:	nop
+_lab234:	nop
+_lab235:	nop
+_lab236:	nop
+_lab237:	nop
+_lab238:	nop
+_lab239:	nop
+_lab240:	nop
+_lab241:	nop
+_lab242:	nop
+_lab243:	nop
+_lab244:	nop
+_lab245:	nop
+_lab246:	nop
+_lab247:	nop
+_lab248:	nop
+_lab249:	nop
+_lab250:	nop
+_lab251:	nop
+_lab252:	nop
+_lab253:	nop
+_lab254:	nop
+_lab255:	nop
+_lab256:	nop
+_lab257:	nop
+_lab258:	nop
+_lab259:	nop
+_lab260:	nop
+_lab261:	nop
+_lab262:	nop
+_lab263:	nop
+_lab264:	nop
+_lab265:	nop
+_lab266:	nop
+_lab267:	nop
+_lab268:	nop
+_lab269:	nop
+_lab270:	nop
+_lab271:	nop
+_lab272:	nop
+_lab273:	nop
+_lab274:	nop
+_lab275:	nop
+_lab276:	nop
+_lab277:	nop
+_lab278:	nop
+_lab279:	nop
+_lab280:	nop
+_lab281:	nop
+_lab282:	nop
+_lab283:	nop
+_lab284:	nop
+_lab285:	nop
+_lab286:	nop
+_lab287:	nop
+_lab288:	nop
+_lab289:	nop
+_lab290:	nop
+_lab291:	nop
+_lab292:	nop
+_lab293:	nop
+_lab294:	nop
+_lab295:	nop
+_lab296:	nop
+_lab297:	nop
+_lab298:	nop
+_lab299:	nop
+_lab300:	nop
+_lab301:	nop
+_lab302:	nop
+_lab303:	nop
+_lab304:	nop
+_lab305:	nop
+_lab306:	nop
+_lab307:	nop
+_lab308:	nop
+_lab309:	nop
+_lab310:	nop
+_lab311:	nop
+_lab312:	nop
+_lab313:	nop
+_lab314:	nop
+_lab315:	nop
+_lab316:	nop
+_lab317:	nop
+_lab318:	nop
+_lab319:	nop
+_lab320:	nop
+_lab321:	nop
+_lab322:	nop
+_lab323:	nop
+_lab324:	nop
+_lab325:	nop
+_lab326:	nop
+_lab327:	nop
+_lab328:	nop
+_lab329:	nop
+_lab330:	nop
+_lab331:	nop
+_lab332:	nop
+_lab333:	nop
+_lab334:	nop
+_lab335:	nop
+_lab336:	nop
+_lab337:	nop
+_lab338:	nop
+_lab339:	nop
+_lab340:	nop
+_lab341:	nop
+_lab342:	nop
+_lab343:	nop
+_lab344:	nop
+_lab345:	nop
+_lab346:	nop
+_lab347:	nop
+_lab348:	nop
+_lab349:	nop
+_lab350:	nop
+_lab351:	nop
+_lab352:	nop
+_lab353:	nop
+_lab354:	nop
+_lab355:	nop
+_lab356:	nop
+_lab357:	nop
+_lab358:	nop
+_lab359:	nop
+_lab360:	nop
+_lab361:	nop
+_lab362:	nop
+_lab363:	nop
+_lab364:	nop
+_lab365:	nop
+_lab366:	nop
+_lab367:	nop
+_lab368:	nop
+_lab369:	nop
+_lab370:	nop
+_lab371:	nop
+_lab372:	nop
+_lab373:	nop
+_lab374:	nop
+_lab375:	nop
+_lab376:	nop
+_lab377:	nop
+_lab378:	nop
+_lab379:	nop
+_lab380:	nop
+_lab381:	nop
+_lab382:	nop
+_lab383:	nop
+_lab384:	nop
+_lab385:	nop
+_lab386:	nop
+_lab387:	nop
+_lab388:	nop
+_lab389:	nop
+_lab390:	nop
+_lab391:	nop
+_lab392:	nop
+_lab393:	nop
+_lab394:	nop
+_lab395:	nop
+_lab396:	nop
+_lab397:	nop
+_lab398:	nop
+_lab399:	nop
+_lab400:	nop

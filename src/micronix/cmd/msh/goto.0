@@ -1,27 +1,66 @@
-GOTO(I)                                                                GOTO(I)
+     PROGRAM
+          goto ‐  command transfer
+
+     USAGE
+          goto label
+
+     FUNCTION
+          Goto  is allowed only when the Shell is taking commands
+          from a file.
+
+          The file is searched from the beginning for a line  be‐
+          ginning  with  ‘:’  followed by one or more spaces fol‐
+          lowed by the label.
+
+          If such a line is found, the goto command returns.
+
+          Since the read pointer in the command  file  points  to
+          the  line  after  the label, the effect is to cause the
+          Shell to transfer to the labelled line.
+
+          ‘:’ is a do‐nothing command  that  is  ignored  by  the
+          Shell and only serves to place a label.
+
+     SEE ALSO
+          sh(1)
 
 
 
-NNAAMMEE
-       goto    command transfer
-
-SSYYNNOOPPSSIISS
-       ggoottoo label
-
-DDEESSCCRRIIPPTTIIOONN
-       _G_o_t_o  is  allowed  only  when the Shell is taking commands from a file.
-       The file is searched from the beginning for a line beginning  with  `:'
-       followed  by  one or more spaces followed by the _l_a_b_e_l_.  If such a line
-       is found, the _g_o_t_o command returns.  Since the read pointer in the com‐
-       mand  file  points  to the line after the label, the effect is to cause
-       the Shell to transfer to the labelled line.
-
-       `:' is a do-nothing command that is  ignored  by  the  Shell  and  only
-       serves to place a label.
-
-SSEEEE AALLSSOO
-       sh(I)
 
 
 
-                                    5/31/77                            GOTO(I)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

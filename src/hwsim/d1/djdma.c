@@ -15,6 +15,7 @@
  */
 
 #include "sim.h"
+#include "hwsim.h"
 #include "imd.h"
 #include "util.h"
 #include <unistd.h>

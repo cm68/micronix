@@ -1,0 +1,4 @@
+cc -c tab$1.c
+strip tab$1.o
+chmod 755 tab$1.o
+mv tab$1.o /usr/lib/term/$1

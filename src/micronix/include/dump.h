@@ -1,18 +1,18 @@
 /*
- * no idea where this is used
- * XXX
+ * no idea where this is used - XXX
  *
- * include/dump.h
- * Changed: <2021-12-23 14:48:38 curt>
+ * /include/dump.h
+ *
+ * Changed: <2023-07-04 11:24:05 curt>
  */
 struct dump {
-	UINT isize;
-	UINT fsize;
+	unsigned short isize;
+	unsigned short fsize;
 
-	UINT32 date;
-	UINT32 ddate;
+	unsigned long date;
+	unsigned long ddate;
 
-	UINT	tsize;
+	unsigned short tsize;
 };
 
 /*

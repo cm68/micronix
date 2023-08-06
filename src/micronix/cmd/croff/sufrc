@@ -1,0 +1,3 @@
+as suftab.s
+strip a.out
+mv a.out /usr/lib/suftab

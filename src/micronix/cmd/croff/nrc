@@ -1,0 +1,3 @@
+cc -DNROFF -n -O n[123456789].c n10.c ni.c nii.c ntab.c hytab.o t.o
+strip a.out
+mv a.out nroff

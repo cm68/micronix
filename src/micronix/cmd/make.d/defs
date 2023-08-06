@@ -1,0 +1,117 @@
+#include <stdio.h>
+
+#define pwb
+
+#define SHELLCOM "/bin/sh"
+#define TIMETYPE long int
+
+#ifdef gcos
+#define TIMETYPE int
+#endif
+
+#ifdef unix
+/*  to install metering, add a statement like */
+#define METERFILE "/usr/sif/make/Meter"
+/* to turn metering on, set external variable meteron to 1 */
+#endif
+
+/* define FSTATIC to be static on systems with C compilers
+   supporting file-static; otherwise define it to be null
+*/
+#define FSTATIC static
+
+#define STRUCTP int *
+
+#define HASHSIZE 255
+#define NLEFTS 40
+#define NCHARS 500
+#define NINTS  250
+#define YYLMAX 400
+
+#define SIGINT 2
+#define SIGQUIT 3
+#define ALLDEPS  1
+#define SOMEDEPS 2
+
+
+extern int sigivalue;
+extern int sigqvalue;
+extern int dbgflag;
+extern int prtrflag;
+extern int silflag;
+extern int noexflag;
+extern int noruleflag;
+extern int touchflag;
+extern int questflag;
+extern int ndocoms;
+extern int ignerr;
+extern int okdel;
+extern int inarglist;
+extern char *prompt;
+
+
+
+struct nameblock
+	{
+	STRUCTP nextp;
+	char *namep;
+	struct lineblock *linep;
+	int done;
+	int septype;
+	TIMETYPE modtime;
+	};
+
+extern struct nameblock *mainname ;
+extern struct nameblock *firstname;
+
+struct lineblock
+	{
+	STRUCTP nextp;
+	struct depblock *depp;
+	struct shblock *shp;
+	};
+extern struct lineblock *sufflist;
+
+struct depblock
+	{
+	STRUCTP nextp;
+	struct nameblock *depname;
+	};
+
+struct shblock
+	{
+	STRUCTP nextp;
+	char *shbp;
+	};
+
+struct varblock
+	{
+	STRUCTP nextp;
+	char *varname;
+	char *varval;
+	int noreset:1;
+	int used:1;
+	};
+extern struct varblock *firstvar;
+
+struct pattern
+	{
+	STRUCTP nextp;
+	char *patval;
+	};
+extern struct pattern *firstpat;
+
+struct	opendir
+	{
+	STRUCTP nextp;
+	FILE * dirfc;
+	char *dirn;
+	};
+extern struct opendir *firstod;
+
+
+struct chain
+	{
+	STRUCTP nextp;
+	STRUCTP datap;
+	};

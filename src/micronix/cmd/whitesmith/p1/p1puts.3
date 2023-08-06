@@ -1,0 +1,132 @@
+p1puts.ic [1mNAME[0m
+     [1mp1puts.c [22m‐ put commands and expression trees
+
+
+[1mFUNCTION[0m
+     p1puts.c  puts  commands and expression trees from p1 to p2.
+     The commands and tree formats are described in int12.h.
+
+     THe zero term, zeterm, is a handy term to  have  around  for
+     moving zero into an expression.
+
+     xtab is a table which maps the types used in p1, typtab, in‐
+     to types used by p2.  Used by ptexpr.
+
+     relops, reflip, and jctab are tables whcih map the relation‐
+     al operators (relops, reflip) into operators (jctab) for p2.
+     pjc, pjf, pjt use the tables.
+
+     nextsym, the created label number, starts at ‐1, and is  in‐
+     cremented by two in crs() before return.  Thus, created sym‐
+     bols from p1 begin at 1 and are odd.
+
+     lblname makes a label number (short), into a printable char‐
+     acter string.  The character string begins with a ’>’ and is
+     mapped backwards from the integer, such  that  0123  becomes
+     ">321".   This  must  match a similar algorithm in p2, since
+     sometimes labels are passed both by name and  by  value  for
+     later matchup.
+
+     pend  walks  the littab (LITERAL) table, and for each double
+     or string constant which is defined and used (p‐>sc not  ze‐
+     ro) puts it to p2.
+
+     pjc puts conditional jumps to p2.  It maps relational opera‐
+     tions into p2 operator commands, puts the label to jump  and
+     puts  the  left  and right expressions which are compared by
+     the operator.
+
+     pjf and pjt are responsible for putting jump  on  false  and
+     jump  on  true  expressions, including &&, || and NOT opera‐
+     tors.  To outline pjf:
+
+        if no expression to test
+                return false branch
+        else if (&&)
+                false branch = recurse (pjf) or left side
+                return label created by recursing on right side
+        else if (||)
+                true branch = recurse (pft) on left side
+                return label created by recursing on right side
+        else if (NOT)
+                return recurse on pjt
+        else if a relational
+                put a jump conditional flipping operator
+        else
+                put a jump conditioanl of operator EQUAL vs. the zeterm
+
+     pmove builds a gets operator into a term, given the left and
+     right  side,  and must typify the term before putting it to
+     p2.
+
+     pswtab puts the branch table used by  switch  code.   First,
+     the  label  of the switch table is put, followed by pairs of
+     label addresses and case values.  Finally the default label,
+     value are put.
+
+     pvoid,  which  is  the  conduit for expressions to p2, first
+     calls docheck, to check whether the expression  is  meaning‐
+     ful.
+
+     rbuy buys a register of the allocatable set for use within a
+     function.  The expressions:
+
+        *pset = set & (set ‐ 1);
+                return (get ^ *pset);
+
+     returns the rightmost element of a set and removes  it  from
+     the set.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

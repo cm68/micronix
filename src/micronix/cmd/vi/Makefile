@@ -12,14 +12,14 @@ TARGET = vi
 OBJECTS = window.o normal.o misccmds.o linefunc.o cmdline.o \
 	edit.o main.o
 
-vi: $(OBJECTS)
+$(TARGET): $(OBJECTS)
 	cc -o vi $(OBJECTS) -lS -lutil
 
 install: vi
 	cp vi /bin/vi
 
 $(OBJECTS) : $*.c stevie.h
-	cc -c $*.c
+	cc -I/usr/include -c $*.c
 
 clean:
 	rm $(OBJECTS) $(TARGET)

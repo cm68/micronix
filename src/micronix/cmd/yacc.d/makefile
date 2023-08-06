@@ -1,0 +1,27 @@
+YNAME=/bin/yacc
+YLIB=/lib/liby.a
+AUXDIR=/usr/lib
+
+CFLAGS=-O
+LDFLAGS = -s
+
+head: yacc liby.a
+	;
+
+yacc: y0.o y1.o y2.o y3.o y4.o y5.o
+	$(CC) $(LDFLAGS) y0.o y1.o y2.o y3.o y4.o y5.o -lS -o yacc
+
+y0.o y1.o y2.o y3.o y4.o y5.o: dextern files
+
+liby.a: libmai.o libpar.o libzac.o libzer.o libzin.o
+	-rm liby.a
+	-ar r liby.a libmai.o libpar.o libzac.o libzer.o libzin.o
+
+install: head
+	cp yacc $(YNAME)
+	cp liby.a $(YLIB)
+	cp yaccopar $(AUXDIR)/yaccopar
+
+clobber:
+	-rm yacc liby.a
+	-rm *.o

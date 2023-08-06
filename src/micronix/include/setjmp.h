@@ -2,9 +2,10 @@
  * non-local goto state
  * 
  * include/setjmp.h
- * Changed: <2021-12-23 15:13:30 curt>
+ *
+ * Changed: <2023-07-04 11:27:59 curt>
  */
-typedef UINT jmp_buf[3];
+typedef unsigned short jmp_buf[3];
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

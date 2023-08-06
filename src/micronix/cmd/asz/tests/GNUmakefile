@@ -7,13 +7,13 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-TFILES = bsst.s getc.s hello.s putc.s puts.s symtest.s deftest.s
-TFILES = symtest.s
+TFILES = bsst.s getc.s hello.s putc.s puts.s symtest.s deftest.s \
+	symtest.s
 
 test: $(TFILES)
 	for i in $(TFILES) ; do \
 		echo ============== $$i ============== ; \
-		../asz -vvvv $$i ; \
+		../asz -vvvvv $$i ; \
 		bname=$$(basename $$i .s) ; \
 		nm80 -drv $$bname.o > $$bname.dis ; \
 	done

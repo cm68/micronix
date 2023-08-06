@@ -1,0 +1,177 @@
+Machine type is Z80
+
+b:crtcpm.obj    text            0      1D9	data         91B6       5C
+y0.obj          data         9212      495	bss          ABD0     1D4E
+y1.obj          text          1D9      AE2	data         96A7      232
+		bss          C91E      190
+y2.obj          text          CBB     2056	data         98D9      5D7
+		bss          CAAE        2
+y3.obj          text         2D11     1264	data         9EB0       84
+y4.obj          text         3F75     1432	data         9F34      1A2
+y5.obj          text         53A7     12CA	data         A0D6      658
+		bss          CAB0        A
+
+b:libc.lib
+start1.obj      text         6671        3	bss          CABA        2
+getargs.obj     text         6674      76F	data         A72E       93
+		bss          CABC        A
+fprintf.obj     text         6DE3       22
+sprintf.obj     text         6E05       42	bss          CAC6        9
+doprnt.obj      text         6E47      328	data         A7C1        7
+		bss          CACF        5
+gets.obj        text         716F       BD
+fputc.obj       text         722C       74
+flsbuf.obj      text         72A0       A7
+fopen.obj       text         7347       4F
+freopen.obj     text         7396      1CC
+fseek.obj       text         7562      2E9
+fread.obj       text         784B       93
+ungetc.obj      text         78DE       87
+fgetc.obj       text         7965       9B
+filbuf.obj      text         7A00       BB
+stdclean.obj    text         7ABB       25	data         A7C8       48
+		bss          CAD4      200
+fclose.obj      text         7AE0       70
+fflush.obj      text         7B50       94
+buf.obj         text         7BE4       46	bss          CCD4        2
+exit.obj        text         7C2A       13
+open.obj        text         7C3D      1DB
+read.obj        text         7E18      346	data         A810        2
+write.obj       text         815E      2C0	data         A812       10
+seek.obj        text         841E       E0
+creat.obj       text         84FE       A4
+isatty.obj      text         85A2       37
+cleanup.obj     text         85D9       73	data         A822      170
+close.obj       text         864C       C4
+unlink.obj      text         8710       77
+getfcb.obj      text         8787      3BD	data         A992       18
+signal.obj      text         8B44       7D	bss          CCD6        2
+getuid.obj      text         8BC1       19
+bdos.obj        text         8BDA       5E	data         A9AA       14
+_exit.obj       text         8C38       23
+sys_err.obj     data         A9BE      180	bss          CCD8        2
+asladd.obj      text         8C5B        9
+aslsub.obj      text         8C64        9
+atoi.obj        text         8C6D       40
+ctype_.obj      data         AB3E       81
+strchr.obj      text         8CAD       13
+idiv.obj        text         8CC0       6B
+pnum.obj        text         8D2B      15A	data         ABBF       11
+ldiv.obj        text         8E85      120
+bmove.obj       text         8FA5       10
+imul.obj        text         8FB5       1F
+alrsh.obj       text         8FD4       14
+sbrk.obj        text         8FE8       43	bss          CCDA        2
+shll.obj        text         902B        D
+strcmp.obj      text         9038       1A
+strcpy.obj      text         9052       12
+strlen.obj      text         9064        E
+iregset.obj     text         9072       26
+isdigit.obj     text         9098       19
+islower.obj     text         90B1       19
+isupper.obj     text         90CA       19
+ladd.obj        text         90E3        E
+land.obj        text         90F1       15
+brelop.obj      text         9106       14
+wrelop.obj      text         911A        F
+lrelop.obj      text         9129       25
+lsub.obj        text         914E       10
+csv.obj         text         915E       28
+rcsv.obj        text         9186       1E
+toupper.obj     text         91A4       12
+
+TOTAL		Name         Link     Load   Length
+		(abs)           0        0        0
+		text            0        0     91B6
+		data         91B6     91B6     1A1A
+		bss          ABD0     ABD0     210C
+
+                                  Symbol Table
+
+__Hbss      bss   CCDC  __Hdata     data  ABD0  __Htext     text  91B6
+__Lbss      bss   ABD0  __Ldata     data  91B6  __Ltext     text  0000
+__argc_     bss   CABA  __bufallo   text  7BE4  __buffree   text  7C0E
+__cleanup   text  7ABB  __cpm_clean text  85D9  __ctype_    data  AB3E
+__doprnt    text  6E88  __exact     data  9204  __exit      text  8C38
+__fcb       data  A822  __filbuf    text  7A00  __flsbuf    text  72A0
+__fsize     text  7C3D  __getargs   text  6674  __initrsx   text  863C
+__iob       data  A7C8  __piped     data  9202  __pnum      text  8D2B
+__putrno    text  85FB  __sibuf     bss   CAD4  __sigchk    text  8B77
+__z3env     data  9200  _acte       data  9471  _acts       data  946B
+_actsiz     data  9218  _adb        bss   CAB2  _amem       bss   AD28
+_apack      text  4352  _arout      text  60A2  _aryfil     text  0AB4
+_atoi       text  8C74  _bdos       text  8BDA  _bmove      text  8FA5
+_brk        text  8FE8  _callopt    text  53A7  _carray     text  50F5
+_cempty     text  361A  _chcopy     text  05CD  _checksp    text  901C
+_chfind     text  25F6  _close      text  864C  _closure    text  3A14
+_clset      bss   ABD2  _cnames     bss   AC60  _cnamp      bss   C1CC
+_cnamsz     data  9416  _concat     text  0C64  _coutput    text  601F
+_cpfir      text  2E4B  _cpres      text  2D11  _cpyact     text  281C
+_cpycode    text  26F5  _creat      text  84FE  _cstash     text  1DBC
+_cwp        bss   C65E  _defact     bss   C660  _defin      text  19B1
+_defout     text  1C51  _dollar     data  9465  _earout     text  6590
+_earray     text  5213  _eoutput    text  63FF  _errno      bss   CCD8
+_error      text  09F9  _excfb      data  9435  _excfc      data  9441
+_excfe      data  944D  _excfsb     data  943B  _excfse     data  9447
+_exit       text  7C2A  _extval     bss   ABDE  _faction    bss   ABE0
+_farout     text  639C  _fatfl      data  9427  _fclose     text  7AE0
+_fdefine    bss   AC5E  _fflush     text  7B50  _fgetc      text  7965
+_fgets      text  716F  _finact     text  1791  _finput     bss   C394
+_flset      text  3E58  _fopen      text  7347  _foutput    bss   C52A
+_fprintf    text  6DE3  _fputc      text  722C  _fread      text  784B
+_freopen    text  7396  _fseek      text  7658  _ftable     bss   C1C8
+_ftell      text  77CA  _ftemp      bss   C360  _getfcb     text  87AC
+_gets       text  71E6  _gettok     text  1E15  _getuid     text  8BC1
+_ggreed     data  A0D6  _gin        text  593F  _go2gen     text  473C
+_go2out     text  4531  _gtnm       text  615D  _hideprod   text  52CE
+_indgo      bss   C036  _isatty     text  85A2  _isdig      text  9098
+_isdigit    text  9098  _islower    text  90B1  _isupper    text  90CA
+_lastred    bss   B34E  _levprd     data  9220  _lflag      data  9424
+_lineno     data  941E  _lkst       bss   B050  _lseek      text  841E
+_lsetsz     data  9420  _main       text  01D9  _maxa       bss   CAB8
+_maxoff     bss   CAB0  _maxspr     bss   CAB6  _mem        data  9216
+_mem0       bss   B144  _memp       data  921A  _memsiz     data  9214
+_movmem     text  8FA5  _mstates    bss   C1D0  _ndefout    data  9425
+_ndefs      data  945F  _nerrors    bss   C91C  _nlset      bss   C396
+_nnonter    data  941A  _nolook     bss   C658  _nontrst    bss   C52C
+_nprod      data  921C  _nstate     bss   C1CA  _nterms     bss   B04C
+_ntlim      data  9418  _ntstates   bss   C7F0  _numbval    bss   C65A
+_nxdb       bss   CAB4  _nxti       text  5E3E  _ofiles     data  9429
+_oflags     data  942F  _open       text  7D1C  _osummary   text  5F5C
+_others     text  0264  _output     text  3F75  _parser     data  9453
+_pcom       text  664B  _pempty     bss   B04E  _pfirst     bss   AC1E
+_pgo        data  A0D8  _pmem       data  A0DC  _prdlim     data  921E
+_prdptr     bss   BE42  _precftn    text  4919  _pres       bss   C1C6
+_prlook     text  0B8F  _pstate     bss   AEB8  _putfcb     text  87EB
+_putitem    text  355C  _rarray     text  51B0  _read       text  7E18
+_routput    text  622B  _sbrk       text  8FF0  _setfcb     text  87FD
+_setuid     text  8BC8  _setunion   text  0AFD  _setup      text  0CBB
+_signal     text  8B44  _sprintf    text  6E05  _stagen     text  3790
+_state      text  30FE  _stin       text  5B36  _strchr     text  8CAD
+_strcmp     text  9038  _strcpy     text  9052  _strlen     text  9064
+_stsize     data  9212  _summary    text  0807  _symnam     text  079F
+_sys_err    data  A9CC  _sys_ner    data  AA04  _tbitset    bss   B350
+_temp1      bss   BCB2  _tlim       data  9414  _tokname    bss   C362
+_toupper    text  91A4  _trmlev     bss   ABE2  _trmset     bss   B2D4
+_tstates    bss   AC22  _tystate    bss   C398  _ungetc     text  78DE
+_unlink     text  8710  _warray     data  9459  _wdef       text  50C3
+_wract      text  4AC0  _write      text  815E  _writem     text  0607
+_wrstate    text  4DF3  _wsets      bss   B352  _wssize     data  9422
+_yalloc     text  0A65  _yypgo      data  A0DA  _zzacent    bss   C65C
+_zzclose    bss   B140  _zzcwp      data  941C  _zzexcp     bss   ABD0
+_zzgobest   bss   AC20  _zzgoent    bss   C528  _zzmemsz    bss   B34C
+_zzrrconf   bss   B142  _zzsrconf   bss   C1CE  adiv        text  8CCF
+aladd       text  90E3  aland       text  90F1  aldiv       text  8ED1
+almod       text  8EF8  alrsh       text  8FD4  alsub       text  914E
+amod        text  8CC0  amul        text  8FB5  arelop      text  9129
+asaladd     text  8C5B  asaldiv     text  8EBC  asalmod     text  8F0A
+asalsub     text  8C64  aslladd     text  8C5B  aslldiv     text  8EF0
+asllmod     text  8F1D  asllsub     text  8C64  brelop      text  9106
+cret        text  916A  csv         text  915E  indir       text  9171
+iregset     text  9072  iregstore   text  908C  ldiv        text  8CCA
+lladd       text  90E3  lland       text  90F1  lldiv       text  8EE4
+llmod       text  8F12  llsub       text  914E  lmod        text  8CC5
+lmul        text  8FB5  lrelop      text  9129  ncsv        text  9172
+rcsv        text  9186  shal        text  902B  shll        text  902B
+start       text  0100  startup     text  6671  wrelop      text  911A
+

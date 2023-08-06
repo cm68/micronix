@@ -2,19 +2,20 @@
  * presumably, this is returned by some library function that reads
  * the /etc/passwd file
  *
- * include/pwd.h
+ * /include/pwd.h
+ *
  * Changed: <2021-12-23 15:12:53 curt>
  */
 struct passwd {
-	char	*name;
-	char	*passwd;
+	char *name;
+	char *passwd;
 
-	UINT8	uid;
-	UINT8	gid;
+	unsigned char uid;
+	unsigned char gid;
 
-	char	*person;
-	char 	*dir;
-	char	*shell;
+	char *person;
+	char *dir;
+	char *shell;
 };
 
 /*

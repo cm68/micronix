@@ -1,0 +1,66 @@
+[1mNAME[0m
+     [1mp0lex.c [22m‐ produce lexemes for p1
+
+
+[1mFUNCTION[0m
+     p0lex.c  converts  token  lists  used throughout pp into the
+     lexemes sent to p1, assuming ‐x has been  set.   putls  fans
+     out to one of lexident, lexstring, lexchars, lexnum, or lex‐
+     punct; and lexnum calls lexint or lexfloat.
+
+     firnon, which finds the first non base digit, will be called
+     with a base of 10 or 16.
+
+     flaccum,  which  builds a floating number, is one of the few
+     places in the compiler  to  use  floating  point.   It  uses
+     _dtens[], which is a library array representing the floating
+     powers of ten.
+
+     lexchars builds an unsigned character, short, or  long  con‐
+     stant  into sbuf.  sbuf[0] and sbuf[n+1] are quotes; sbuf[1]
+     through sbuf[n‐3] contain the character constant.
+
+     lexfloat has been a source of problems, since  TLIST  syntax
+     bear  little  resemblance  to C language floating constants.
+     lexfnxt is one such patch.
+
+     lexident tries to match the identifier with a C  keyword  by
+     scanning keytab (NKEYS has the number of keywords); if it is
+     a keyword, the associated keyword token is passed on, other‐
+     wise  it  is  an  arbitary identifier, and the identifier is
+     passed on.
+
+     lexint puts out a long, short or  character  number.   Among
+     other  tests,  to determine whether long or short or charac‐
+     ter, lexint assigns the number to a long,  a  short,  and  a
+     character.   If it assigns to a character unchanged, it is a
+     character constant; to a short unchanged, it is short;  oth‐
+     erwise long.  A trailing ’L’ or ’l’ forces long.
+
+     putcode  is  a  simple formatted output routine that accepts
+     only the codes
+
+     [1mc ‐ [22mput next arg as a character.
+
+     [1mp ‐ [22mput next arg as null terminated string.
+
+     [1mb ‐ [22mput next arg as buffer, length is argument following.
+
+     [1m1, 2, 4, 8 ‐ [22mput next arg as buffer of specified length.
+
+     putls not only controls flow thoroughout p0lex, but it  also
+     puts unadorned text if the ‐x flag is not used.  To allow pp
+     to also act as the first pass of the UNIX V6 compliler,  the
+     ‐6 flag instructs putls to put out one SOH for each #includ‐
+     ed newline when writing unadorned text to a file.
+
+
+
+
+
+
+
+
+
+
+

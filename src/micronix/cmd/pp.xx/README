@@ -1,0 +1,23 @@
+this is the whitesmith's c preprocessor ported to stdio
+for the whitesmith compiler, and eventually to a completely
+portable, albiet pre-ansi form.
+
+the preprocessor used a rather idiosyncratic C library that
+only remotely resembled what has come to be the standard C
+library, which appeared with v7.
+
+worse yet, some of the names are the same, but functionality
+is different.  
+
+one of the more interesting interfaces is alloc/free with 2 arguments.  
+free returns the second argument.
+it facilitates a clean linked list reclaim.
+	chain = free(chain, chain->next)
+
+similarly, to allocate memory and placing a pointer in the first word,
+as one might want to do when building a linked list,
+	head = alloc(bytes, head)
+
+wierdly, something like generic linked list machinery is assumed
+by functions like frelst(head, tail), which frees a linked list
+from head to tail, returning tail.

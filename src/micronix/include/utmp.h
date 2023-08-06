@@ -6,8 +6,8 @@
  */
 
 struct utmp {
-	char tty [8];
-	char name [8];
+	char tty[8];
+	char name[8];
 	UINT32 time;
 };
 

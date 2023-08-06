@@ -3,7 +3,9 @@
 #
 # micronix/cmd/ls/Makefile
 #
-# Changed: <2023-07-10 15:33:57 curt>
+# Changed: <2023-07-27 10:20:23 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 all:	ls
 
@@ -19,4 +21,3 @@ upgrade: ls
 
 clean: ; rm ls *.o
 
-# vim: tabstop=4 shiftwidth=4 noexpandtab:

@@ -1,0 +1,5 @@
+verbose 9 V_SYS V_INST 
+emulating /usr/src/cmd/whitesmith/pp/pp with root /big/src/micronix/filesystem
+bc: ffff de: ffff hl: ffff sp: ff68: af: ffff CNVXHYZS 0100 POP BC
+bc: ffff de: ffff hl: ffff sp: ff68: af: ffff CNVXHYZS 0100 POP BC
+518776 >>> 

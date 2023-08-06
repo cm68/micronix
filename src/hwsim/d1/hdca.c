@@ -5,6 +5,7 @@
  */
 
 #include "sim.h"
+#include "hwsim.h"
 #include "util.h"
 #include <unistd.h>
 #include <strings.h>

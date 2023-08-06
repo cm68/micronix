@@ -4,23 +4,24 @@
  * substantially rewritten to remove stuff not needed for a compiler backend
  * or an assembler that is used in conjunction with a preprocessor
  * things removed:  the type machinery, and the odd defl, def syntax
+ * the most significant thing removed is any notion of arithmetic expressions
  *
  * another messy feature removed is the local label stuff.
- *
+ * 
  * /usr/src/cmd/asz/asm.c 
  *
- * Changed: <2023-07-09 17:36:53 curt>
+ * Changed: <2023-08-02 16:05:15 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
-#include <stdio.h>
 #ifdef linux
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #define INIT
 #else
 #define void int
-#define INIT    = 0
+#define INIT = 0
 #endif
 
 /*
@@ -32,11 +33,268 @@
  * 5 - tokens
  */
 
-#include "asm.h"
-#include "isr.h"
+extern FILE *input_file;
+extern int line_num;
+extern char *infile;
+extern char verbose;
+extern char g_flag;
 
-#define TOKEN_BUF_SIZE 19
-#define SYMBOL_NAME_SIZE 9
+void appendtmp();
+void asm_reset();
+void assemble();
+unsigned char peek();
+unsigned char get_next();
+void outbyte();
+void outtmp();
+unsigned char operand();
+
+/*
+ * all token numbers are biased by 0x80, and are unsigned
+ * this means that 7 bit ascii characters are literally
+ * matched
+ */
+#define T_BIAS  0x80
+
+#define T_B     T_BIAS + 0
+#define T_C     T_BIAS + 1
+#define T_D     T_BIAS + 2
+#define T_E     T_BIAS + 3
+#define T_H     T_BIAS + 4
+#define T_L     T_BIAS + 5
+#define T_HL_I  T_BIAS + 6
+#define T_A     T_BIAS + 7
+
+#define T_BC    T_BIAS + 8
+#define T_DE    T_BIAS + 9
+#define T_HL    T_BIAS + 10
+#define T_SP    T_BIAS + 11
+#define T_AF    T_BIAS + 12
+#define T_IX    T_BIAS + 13
+#define T_IY    T_BIAS + 14
+
+#define T_NZ    T_BIAS + 15
+#define T_Z     T_BIAS + 16
+#define T_NC    T_BIAS + 17
+#define T_CR    T_BIAS + 18
+#define T_PO    T_BIAS + 19
+#define T_PE    T_BIAS + 20
+#define T_P     T_BIAS + 21
+#define T_M     T_BIAS + 22
+
+#define T_IXH   T_BIAS + 23
+#define T_IXL   T_BIAS + 24
+#define T_IX_D  T_BIAS + 25
+#define T_IYH   T_BIAS + 26
+#define T_IYL   T_BIAS + 27
+#define T_IY_D  T_BIAS + 28
+
+#define T_PLAIN T_BIAS + 29
+#define T_INDIR T_BIAS + 30
+
+#define T_SP_I  T_BIAS + 31
+#define T_BC_I  T_BIAS + 32
+#define T_DE_I  T_BIAS + 33
+#define T_IX_I  T_BIAS + 34
+#define T_IY_I  T_BIAS + 35
+
+#define T_C_I   T_BIAS + 36
+#define T_I     T_BIAS + 37
+#define T_R     T_BIAS + 38
+
+#define T_NAME  T_BIAS + 39
+#define T_NUM   T_BIAS + 40
+#define T_STR   T_BIAS + 41
+#define T_EOF   T_BIAS + 42
+
+char *tokname[] = {
+    /*  0 */ "B", "C", "D", "E", "H", "L", "(HL)", "A",
+    /*  8 */ "BC", "DE", "HL", "SP", "AF", "IX", "IY",
+    /* 15 */ "NZ", "Z", "NC", "CR", "PO", "PE", "P", "M",
+    /* 23 */ "IXH", "IXL", "(IX+d)", "IYH", "IYL", "(IY+d)",
+    /* 29 */ "SYMREF", "INDIR", 
+    /* 31 */ "(SP)", "(BC)", "(DE)", "(IX)", "(IY)", "(C)", "I", "R"
+    /* 39 */ "NAME", "NUM", "STR", "EOF"
+};
+
+#define END         0
+#define BASIC       1   /* 1 byte instruction, no args */
+#define BASIC_EXT   2   /* 2 byte instruction, no arg */
+#define ARITH       3   /* arithmetic operation group */
+#define INCR        4   /* increment / decrement group */
+#define BITSH       5   /* bit / shift instruction */
+#define STACK       6   /* stack pop / push */
+#define RET         7   /* return program flow */
+#define JMP         8   /* jump program flow */
+#define JRL         9   /* jump relative program flow */
+#define CALL        10  /* call program flow */
+#define RST         11  /* rst program flow */
+#define IN          12  /* i/o in instruction */
+#define OUT         13  /* i/o out instruction */
+#define EXCH        14  /* exchange instruction */
+#define INTMODE     15  /* interrupt mode instruction */
+#define LOAD        16  /* load instruction */
+
+#define UNARY 0
+#define CARRY 1
+#define ADD 2
+
+/*
+ * operand table
+ */
+struct oprnd {
+	unsigned char token;
+	char *mnem;
+};
+
+struct oprnd op_table[] = {
+	{ T_B, "b" },
+	{ T_C, "c" },
+	{ T_D, "d" },
+	{ T_E, "e" },
+	{ T_H, "h" },
+	{ T_L, "l" },
+	{ T_A, "a" },
+	{ T_BC, "bc" },
+	{ T_DE, "de" },
+	{ T_HL, "hl" },
+	{ T_SP, "sp" },
+	{ T_AF, "af" },
+	{ T_NZ, "nz" },
+	{ T_Z, "z" },
+	{ T_NC, "nc" },
+	{ T_CR, "cr" },
+	{ T_PO, "po" },
+	{ T_PE, "pe" },
+	{ T_P, "p" },
+	{ T_M, "m" },
+	{ T_IX, "ix" },
+	{ T_IY, "iy" },
+	{ T_IXH, "ixh" },
+	{ T_IXL, "ixl" },
+	{ T_IYH, "iyh" },
+	{ T_IYL, "iyl" },
+	{ T_I, "i" },
+	{ T_R, "r" },
+	{ 255, "" }
+};
+
+
+/*
+ * instruction table
+ */
+struct instruct {
+	unsigned char type;
+	char *mnem;
+	unsigned char opcode;
+	unsigned char arg;
+};
+
+struct instruct isr_table[] = {
+	/* basic instructions */
+	{ BASIC, "nop", 0x00, 0 },
+	{ BASIC, "rlca", 0x07, 0 },
+	{ BASIC, "rrca", 0x0F, 0 },
+	{ BASIC, "rla", 0x17, 0 },
+	{ BASIC, "rra", 0x1F, 0 },
+	{ BASIC, "daa", 0x27, 0 },
+	{ BASIC, "cpl", 0x2F, 0 },
+	{ BASIC, "scf", 0x37, 0 },
+	{ BASIC, "ccf", 0x3F, 0 },
+	{ BASIC, "halt", 0x76, 0 },
+	{ BASIC, "exx", 0xD9, 0 },
+	{ BASIC, "di", 0xF3, 0 },
+	{ BASIC, "ei", 0xFB, 0 },
+	
+	/* extended basic instructions */
+	{ BASIC_EXT, "neg", 0x44, 0xED },
+	{ BASIC_EXT, "retn", 0x44, 0xED },
+	{ BASIC_EXT, "reti", 0x4D, 0xED },
+	{ BASIC_EXT, "rrd", 0x67, 0xED },
+	{ BASIC_EXT, "rld", 0x6F, 0xED },
+	{ BASIC_EXT, "ldi", 0xA0, 0xED },
+	{ BASIC_EXT, "cpi", 0xA1, 0xED },
+	{ BASIC_EXT, "ini", 0xA2, 0xED },
+	{ BASIC_EXT, "outi", 0xA3, 0xED },
+	{ BASIC_EXT, "ldd", 0xA8, 0xED },
+	{ BASIC_EXT, "cpd", 0xA9, 0xED },
+	{ BASIC_EXT, "ind", 0xAA, 0xED },
+	{ BASIC_EXT, "outd", 0xAB, 0xED },
+	{ BASIC_EXT, "ldir", 0xB0, 0xED },
+	{ BASIC_EXT, "cpir", 0xB1, 0xED },
+	{ BASIC_EXT, "inir", 0xB2, 0xED },
+	{ BASIC_EXT, "otir", 0xB3, 0xED },
+	{ BASIC_EXT, "lddr", 0xB8, 0xED },
+	{ BASIC_EXT, "cpdr", 0xB9, 0xED },
+	{ BASIC_EXT, "indr", 0xBA, 0xED },
+	{ BASIC_EXT, "otdr", 0xBB, 0xED },
+	
+	/* arithmetic */
+	{ ARITH, "add", 0x80, ADD },
+	{ ARITH, "adc", 0x88, CARRY },
+	{ ARITH, "sub", 0x90, UNARY },
+	{ ARITH, "sbc", 0x98, CARRY },
+	{ ARITH, "and", 0xA0, UNARY },
+	{ ARITH, "xor", 0xA8, UNARY },
+	{ ARITH, "or", 0xB0, UNARY },
+	{ ARITH, "cp", 0xB8, UNARY },
+	
+	/* inc / dec */
+	{ INCR, "inc", 0x04, 0x03 },
+	{ INCR, "dec", 0x05, 0x0B },
+	
+	/* bit / shift */
+	{ BITSH, "rlc", 0x00, 0 },
+	{ BITSH, "rrc", 0x08, 0 },
+	{ BITSH, "rl", 0x10, 0 },
+	{ BITSH, "rr", 0x18, 0 },
+	{ BITSH, "sla", 0x20, 0 },
+	{ BITSH, "sra", 0x28, 0 },
+	{ BITSH, "sll", 0x30, 0 },
+	{ BITSH, "srl", 0x38, 0 },
+	{ BITSH, "bit", 0x40, 1 },
+	{ BITSH, "res", 0x80, 1 },
+	{ BITSH, "set", 0xC0, 1 },
+	
+	/* stack ops */
+	{ STACK, "pop", 0xC1, 0 },
+	{ STACK, "push", 0xC5, 0 },
+	
+	/* return */
+	{ RET, "ret", 0xC0, 0xC9 },
+	
+	/* jump */
+	{ JMP, "jp", 0xC2, 0xE9 },
+	
+	/* jump relative */
+	{ JRL, "jr", 0x18, 1 },
+	{ JRL, "djnz", 0x10, 0},
+	
+	/* call */
+	{ CALL, "call", 0xC4, 0xCD },
+	
+	/* rst */
+	{ RST, "rst", 0xC7, 0 },
+	
+	/* in */
+	{ IN, "in", 0xDB, 0x40 },
+	
+	/* out */
+	{ OUT, "out", 0xD3, 0x41 },
+	
+	/* exchange */
+	{ EXCH, "ex", 0xE3, 0x08 },
+	
+	/* interrupt mode */
+	{ INTMODE, "im", 0x46, 0x5E },
+	
+	/* load instructions */
+	{ LOAD, "ld", 0x00, 0x00 },
+	
+	{ END, "", 0x00, 0x00}
+};
+
+#define TOKLEN 19
+#define SYMLEN 9
 
 /*
  * symbols have a segment, emitted code does too.
@@ -47,14 +305,6 @@
 #define SEG_BSS     3
 #define SEG_ABS     4
 #define SEG_EXT     5
-
-/*
- * expressions can be these
- */
-struct expval {
-	unsigned short num;
-    struct symbol *sym;
-};
 
 /*
  * symbols come in a couple of flavors that are driven by
@@ -84,7 +334,7 @@ struct symbol {
     unsigned char seg;              /* SEG_* */
     unsigned short index;           /* object file ordinal */
     unsigned short value;           /* segment relative */
-    char name[SYMBOL_NAME_SIZE];    /* zero padded */
+    char name[SYMLEN];              /* zero padded */
     struct symbol *next;
 };
 
@@ -104,16 +354,26 @@ struct rhead {
     struct reloc *tail;
 };
 
-char *input_char = "";
+/*
+ * expressions can take values of this:
+ * if both sym and num are present, this is a biased symbol
+ * something like .dw  foo+34
+ */
+struct expval {
+    struct symbol *sym;
+    unsigned short num;
+};
 
-char input_buffer[100];
+unsigned char *inptr = "";
+unsigned char inbuf[100];
 
 /*
  * token buffer 
  */
-char token_buf[TOKEN_BUF_SIZE] INIT;
-char sym_name[TOKEN_BUF_SIZE] INIT;
+char token_buf[TOKLEN] INIT;
+char sym_name[TOKLEN] INIT;
 unsigned short token_val;
+unsigned char cur_token;
 
 /*
  * current assembly address 
@@ -144,54 +404,6 @@ struct rhead datar = { "data" };
 
 struct symbol *symbols INIT;
 
-void
-fill_buf()
-{
-    if (!*input_char) {
-        input_char = input_buffer;
-        if (!fgets(input_buffer, sizeof(input_buffer), input_file)) {
-            input_char[0] = -1;
-            input_char[1] = 0;
-        }
-        line_num++;
-    }
-}
-
-/*
- * returns what sio_next() would but does not move forward
- */
-char
-peek()
-{
-    if (!*input_char) 
-        fill_buf();
-    return (*input_char);
-}
-
-/*
- * returns the next character in the source, or -1 if complete
- */
-char
-get_next()
-{
-    char c;
-
-    if (!*input_char)
-        fill_buf();
-    
-    return (*input_char == -1 ? -1 : *input_char++);
-}
-
-/*
- * consumes to end of line
- */
-void
-consume()
-{
-    *input_char = '\0';
-    fill_buf();
-}
-
 /*
  * checks if a string is equal
  * string a is read as lower case
@@ -200,7 +412,7 @@ consume()
  * b = pointer to string b
  */
 char
-asm_sequ(a, b)
+match(a, b)
 char *a;
 char *b;
 {
@@ -231,7 +443,7 @@ gripe(msg)
 char *msg;
 {
 	printf("%s:%d %s\n%s", 
-        infile, line_num, msg, input_buffer);
+        infile, line_num, msg, inbuf);
 	exit(1);
 }
 
@@ -241,7 +453,7 @@ char *msg;
 char *arg;
 {
 	printf("%s:%d %s%s\n%s", 
-        infile, line_num, msg, arg, input_buffer);
+        infile, line_num, msg, arg, inbuf);
 	exit(1);
 }
 
@@ -249,9 +461,14 @@ void
 save_symname()
 {
 	int i;
+    char c;
 
-	for (i = 0; i < TOKEN_BUF_SIZE; i++)
-		sym_name[i] = token_buf[i];
+	for (i = 0; i < SYMLEN; i++) {
+        c = token_buf[i];
+		sym_name[i] = c;
+        if (!c) break;
+    }
+    sym_name[i] = '\0';
 }
 
 /*
@@ -363,11 +580,12 @@ int i;
 
 char
 delimiter(c)
-char c;
+unsigned char c;
 {
     switch (c) {
     case ',': case ')': case '+': case '-':
     case '|': case '&': case ' ': case '\t':
+    case '\n': case T_EOF:
         return 1;
     default:
         return 0;
@@ -375,57 +593,133 @@ char c;
 }
 
 /*
- * the lexer.
- * reads the next token in from the source, 
- * white space and comments are ignored
- * special tokens are advanced over
- * [a-zA-Z_]+ -> T_NAME, token_buf filled
- * '\escape' 'c' -> T_NUM, token_val filled
- * "string" -> T_STRING, token_buf filled
- * anything else passes as the character
+ * read an entire line into a null-terminated C string
+ */
+void
+get_line()
+{
+    unsigned char *s;
 
+    inptr = inbuf;
+    if (!fgets(inbuf, sizeof(inbuf), input_file)) {
+        inbuf[0] = T_EOF;
+        inbuf[1] = 0;
+    }
+    line_num++;
+}
+
+/*
+ * get the next character that we would read, but don't advance
+ */
+unsigned char
+peek()
+{
+    unsigned char c;
+
+    c = *inptr;
+    if (verbose > 5)
+        printf("peek: %d \'%c\'\n", c, (c > ' ') ? c : ' ');
+    return (c);
+}
+
+/*
+ * returns the next character in the source, or -1 if complete
+ */
+unsigned char
+get_next()
+{
+    unsigned char c;
+
+    if (!*inptr)
+        get_line();
+    
+    c = *inptr;
+    if (c != T_EOF) {
+        inptr++;
+    }
+    if (verbose > 5)
+        printf("get_next: %d \'%c\'\n", c, (c > ' ') ? c : ' ');
+    return c;
+}
+
+/*
+ * consumes to end of line
+ */
+void
+consume()
+{
+    *inptr = '\0';
+}
+
+/*
+ * the lexer. 
+ *
+ * really quite sloppy.  the notion of what a token is
+ * is quite imprecise.  really, what this is a input
+ * scanner that returns special character codes for
+ * recognized strings of related characters.
+ *
+ * [a-zA-Z_]+ -> T_NAME, token_buf filled
+ * [digits]+ '\escape' 'c' -> T_NUM, token_val filled
+ * "string" -> T_STR, token_buf filled
+ *
+ * anything else passes as the character
+ * finally, return 0 if end of line
+ * and -1 for end of file
  * NB: ambiguity: how is ABBAH parsed?  we call it a NAME.
  * to make it a number, prefix it with 0. 0ABBAH.
  */
-char
+void
 get_token()
 {
     int i = 0;
     unsigned short val = 0;
-    char *s;
-    char c;
+    unsigned char *s;
+    unsigned char c;
 
-    c = get_next();
+    /* skip over whitespace and comments */
+    while (1) {
+        c = get_next();
+        if (c == T_EOF) {
+            cur_token = T_EOF;
+            return;
+        }
+        if ((c == ' ') || (c == '\t')) continue;
+        if (c == ';') {
+            consume();
+            continue;
+        }
+        break;
+    }
 
+    /* if it looks like a symbol, fill it */
     if (alpha(c)) {
         token_buf[i++] = c;
-        while (alpha(c = peek())) {
-            token_buf[i++] = c;
-            get_next();
+        while (alpha(peek())) {
+            token_buf[i++] = get_next();
         }
         token_buf[i++] = '\0';
-        return T_NAME;
+        cur_token = T_NAME;
+        return;
     }
 
     /*
-     * a little tricky.  we need to scan to the next delimiter
-     * into the token_buf, because we might have a postfix base
+     * if it starts like a number, scan until the next "delimiter"
      */
     if (c >= '0' & c <= '9') {
-        s = token_buf;
-        token_buf[i++];
-        while (1) {
-            c = peek();
-            if (delimiter(c))
-                break;
-            token_buf[i++] = c;
-            get_next();
+        token_buf[i++] = c;
+        while (!delimiter(peek)) {
+            token_buf[i++] = get_next();
         }
         token_buf[i++] = '\0';
         token_val = parsenum(token_buf);
-        return T_NUM;
+        cur_token = T_NUM;
+        return;
     }
 
+    /*
+     * literal character is a number
+     */
     if (c == '\'') {
         token_val = get_next();
         if (token_val == '\\') {
@@ -434,9 +728,15 @@ get_token()
         if (get_next() != '\'') {
             gripe("unterminated char literal");
         }
-        return T_NUM;
+        cur_token = T_NUM;
+        return;
     }
 
+    /*
+     * literal string detected - just parse
+     * no need to save it, since we will emit this
+     * in .db
+     */
     if (c == '\"') {
         while (1) {
             c = get_next();
@@ -452,139 +752,25 @@ get_token()
             token_buf[i++] = c;
         }
         token_buf[i++] = '\0';
-        return T_STR;
+        cur_token = T_STR;
+        return;
     }
-	return c;
+    cur_token = c;
+	return;
 }
 
 /*
- * require a specific symbol
- * c = symbol to expect
+ * require a specific character
  */
 void
 need(c)
-char c;
+unsigned char c;
 {
-	char tok;
+	get_token();
 
-	if (c == '}') {
-		while (peek() == '\n')
-			get_token();
-	}
-
-	tok = get_token();
-
-	if (tok != c) {
+	if (cur_token != c) {
 		gripe("unexpected character");
 	}
-
-	if (c == '{' || c == ',') {
-		while (peek() == '\n')
-			get_token();
-	}
-}
-
-/*
- * helper function for number parsing, returns radix type from character
- *
- * r = radix identifier
- * returns radix type, or 0 if not a radix
- */
-char
-asm_classify_radix(r)
-char r;
-{
-	if (r == 'b' || r == 'B')
-		return 2;
-	if (r == 'o' || r == 'O')
-		return 8;
-	if (r == 'x' || r == 'X' || r == 'h' || r == 'H')
-		return 16;
-	return 0;
-}
-
-/*
- * another helper function, this time to take a decimal / hex char and convert it
- *
- * in = char to convert to number
- * returns number, of -1 if failed
- */
-int
-hexparse(in)
-char in;
-{
-	if (in >= '0' && in <= '9')
-		return in - '0';
-	else if (in >= 'A' && in <= 'F')
-		return (in - 'A') + 10;
-	else if (in >= 'a' && in <= 'f')
-		return (in - 'a') + 10;
-	return -1;
-}
-
-/*
- * attempts to parse a number into an unsigned 16 bit integer
- *
- * in = pointer to string
- * returns actual value of number
- * 0 = ?, 2 = binary, 8 = octal, 10 = decimal, 16 = hex
- */
-unsigned short
-num_parse(in)
-char *in;
-{
-	int num_start, num_end, i;
-	unsigned short out;
-	char radix;
-
-	radix = 10;
-
-	/*
-	 * first skip through any leading zeros, and set octal maybe 
-	 */
-	for (num_start = 0; in[num_start] == '0'; num_start++)
-		radix = 8;
-
-	/*
-	 * lets also find the end while we are at it 
-	 */
-	for (num_end = 0; in[num_end] != 0; num_end++);
-
-	/*
-	 * check and see if there is a radix identifier here 
-	 */
-	if ((i = asm_classify_radix(in[num_start]))) {
-		radix = i;
-		num_start++;
-	} else {
-		/*
-		 * lets check at the end too 
-		 */
-		if ((i = asm_classify_radix(in[num_end - 1]))) {
-			radix = i;
-			num_end--;
-		}
-	}
-
-	/*
-	 * now to parse 
-	 */
-	out = 0;
-	for (; num_start < num_end; num_start++) {
-		i = hexparse(in[num_start]);
-
-		/*
-		 * error checking 
-		 */
-		if (i == -1)
-			gripe("unexpected character in numeric");
-		if (i >= radix)
-			gripe("radix mismatch in numeric");
-
-		out = (out * radix) + i;
-	}
-
-	return out;
 }
 
 /*
@@ -602,7 +788,7 @@ char *name;
 	for (sym = symbols; sym; sym = sym->next) {
 
 		equal = 1;
-		for (i = 0; i < SYMBOL_NAME_SIZE; i++) {
+		for (i = 0; i < SYMLEN; i++) {
 			if (sym->name[i] != name[i])
 				equal = 0;
 			if (!sym->name[i])
@@ -635,7 +821,7 @@ int visible;
 		symbols = sym;
         sym->seg = SEG_UNDEF;
         sym->index = 0xffff;
-		for (i = 0; i < SYMBOL_NAME_SIZE - 1 && name[i] != 0; i++)
+		for (i = 0; i < SYMLEN - 1 && name[i] != 0; i++)
 			sym->name[i] = name[i];
 		sym->name[i] = 0;
 	}
@@ -807,72 +993,6 @@ unsigned short base;
 }
 
 /*
- * evaluates an expression that is next in the token queue
- *
- * result = pointer where result will be placed in
- * returns segment of expression
- *
- * in pass 1, we really only need to parse the expression
- * and create symbol references.
- *
- * in pass 2, we actually need to do the expression eval
- * with all the interesting segment and arithmetic rules:
- * ABS = RELOC - RELOC if same segment
- * RELOC = RELOC +- ABS
- * ABS = ABS op ABS
- * and the usual precedence rules
- *
- * nb: the original author seems like he never heard of
- * recursion, so he built a stack structure to deal with
- * expressions.  C has a perfectly good stack.
- */
-unsigned char
-evaluate(result)
-struct expval *result;
-{
-    char ret = SEG_ABS;
-    char tok;
-    struct symbol *sym;
-
-    result->sym = 0;
-    result->num = 0;
-
-	while (1) {
-		tok = get_token();
-
-		/* it is a symbol */
-		if (tok == T_NAME) {
-			sym = sym_fetch(token_buf);
-			if (sym) {
-			    result->sym = sym;
-				result->num = sym->value;
-			} else {
-                result->sym = sym_update(token_buf, SEG_UNDEF, 0, 0);
-                result->num = 0;
-			}
-            ret = result->sym->seg;
-		} else if (tok == T_NUM) {
-			result->num = num_parse(token_buf);
-		} else {
-            gripe("neither fish nor fowl");
-        }
-
-        /*
-         * here is where we look ahead and handle parenthesis and
-         * operator precedence
-         */
-
-		/*
-		 * check for ending conditions 
-		 */
-		tok = peek();
-		if (tok == ',' || tok == '\n' || tok == -1)
-			break;
-	}
-    return ret;
-}
-
-/*
  * emits a byte into assembly output
  * no bytes emitted on first pass, only update addresses
  *
@@ -921,113 +1041,6 @@ unsigned short word;
 {
 	outbyte(word & 0xFF);
 	outbyte(word >> 8);
-}
-
-/*
- * emits a string found in the char stream
- */
-void
-emit_str()
-{
-	char c, state;
-	int radix, length;
-	unsigned char decode, num;
-
-	/*
-	 * zero state, just accept raw characters 
-	 */
-	state = 0;
-
-	get_next();
-	while (1) {
-		c = get_next();
-
-		/*
-		 * we are done (maybe) 
-		 */
-		if (c == -1)
-			break;
-		if (c == '"') {
-			if (state != 1) {
-				if (state == 3) {
-					emitbyte(decode);
-				}
-
-				break;
-			}
-		}
-		/*
-		 * just emit the char outright 
-		 */
-		if (!state) {
-			/*
-			 * sets the state to 1 
-			 */
-			if (c == '\\')
-				state = 1;
-			else
-				emitbyte(c);
-
-		} else if (state == 1) {
-			/*
-			 * escape character 
-			 */
-			decode = c_escape(c);
-
-			/*
-			 * simple escape 
-			 */
-			if (decode) {
-				emitbyte(decode);
-				state = 0;
-			} else if (asm_num(c)) {
-				state = 3;
-				radix = 8;
-				length = 3;
-			} else if (c == 'x') {
-				state = 2;
-				radix = 16;
-				length = 2;
-			} else {
-				gripe("unknown escape");
-			}
-		}
-
-		if (state == 3) {
-			/*
-			 * numeric parsing 
-			 */
-			num = hexparse(c);
-
-			if (num == -1)
-				gripe("unexpected character in numeric");
-			if (num >= radix)
-				gripe("radix mismatch in numeric");
-
-			decode = (decode * radix) + num;
-
-			num = asm_classify_radix(peek());
-			length--;
-
-			/*
-			 * end the parsing 
-			 */
-			if (length < 1 || num == -1 || num >= radix) {
-				state = 0;
-				emitbyte(decode);
-			}
-		}
-		/*
-		 * this is to consume the 'x' identifier 
-		 */
-		if (state == 2)
-			state = 3;
-	}
-
-	/*
-	 * make sure we don't land in whitespace 
-	 */
-	skipwhite();
 }
 
 /*
@@ -1128,27 +1141,49 @@ struct expval *vp;
  * size = maximum size of space
  */
 void
-emit_exp(size)
+emit_exp(size, value)
 unsigned short size;
+struct expval *value;
 {
-    struct expval value;
-
-	evaluate(&value);
-
-	emit_addr(size, &value);
+	emit_addr(size, value);
 }
 
+/*
+ */
 void
 db()
 {
-	char tok;
+    char c;
+    struct expval value;
 
-	while (peek() != '\n' && peek() != -1) {
-		tok = peek();
-		if (tok == '"') {
-			emit_str();
+	while (peek() != '\n' && peek() != T_EOF) {
+		c = peek();
+		if (c == '"') {
+            /* eat the double quote */
+            get_next();
+
+            while (1) {
+                c = get_next();
+
+                if (c == '\n') {
+                    gripe("unterminated string constant");
+                    break;
+                }
+
+                if (c == '\"') {
+                    break;
+                }
+
+                if (c == '\\') {
+                    c = escape();
+                }
+                emitbyte(c);
+            }
 		} else {
-			emit_exp(1);
+            if (operand(&value) != T_NUM) {
+                gripe("unexpected non-number");
+            }
+			emit_exp(1, &value);
 		}
 		if (peek() != ',')
 			break;
@@ -1160,11 +1195,13 @@ db()
 void
 dw()
 {
-	char tok;
+    struct expval value;
 
 	while (peek() != '\n' && peek() != -1) {
-		tok = peek();
-		emit_exp(2);
+        if (operand(&value) != T_NUM) {
+            gripe("unexpected non-number");
+        }
+		emit_exp(2, &value);
 		if (peek() != ',')
 			break;
 		else
@@ -1175,11 +1212,10 @@ dw()
 void
 ds()
 {
-    unsigned char seg;
+    unsigned char c;
     struct expval value;
 
-	seg = evaluate(&value);
-    if (seg != SEG_ABS) {
+    if (operand(&value) != T_NUM) {
         gripe("ds requires absolute argument");
     }
     fill(value.num);
@@ -1189,21 +1225,22 @@ ds()
  * parses an operand, 
  * returns token describing the argument,
  * populate vp if it's passed in.
+ * if the operand is an (ix+d), then the expval is the displacement
  */
 unsigned char
 operand(vp)
 struct expval *vp;
 {
 	int i;
-	char tok;
+	char c;
 	unsigned char ret, seg;
     struct symbol *sym;
 
 	/*
 	 * check if there is anything next 
 	 */
-    tok = peek();
-	if (tok == '\n' || tok == -1)
+    c = peek();
+	if (c == '\n' || c == -1)
 		return 255;
 
 	/*
@@ -1214,14 +1251,14 @@ struct expval *vp;
 	/*
 	 * read the token 
 	 */
-	tok = get_token();
+	get_token();
 
 	/*
 	 * maybe a register symbol? sometimes 'c' means carry
 	 */
-	if (tok == T_NAME) {
+	if (cur_token == T_NAME) {
 		for (i = 0; op_table[i].token != 255; i++) {
-			if (asm_sequ(token_buf, op_table[i].mnem)) {
+			if (match(token_buf, op_table[i].mnem)) {
 				return op_table[i].token;
 			}
 		}
@@ -1230,57 +1267,69 @@ struct expval *vp;
 	/*
 	 * maybe in parenthesis? 
 	 */
-	if (tok == '(') {
-		tok = get_token();
-
-		if (asm_sequ(token_buf, "hl")) {
+	if (cur_token == '(') {
+		get_token();
+        if (cur_token == T_NAME)
+		if (match(token_buf, "hl")) {
 			need(')');
 			return T_HL_I;
-		} else if (asm_sequ(token_buf, "c")) {
+		} else if (match(token_buf, "c")) {
 			need(')');
 			return T_C_I;
-		} else if (asm_sequ(token_buf, "sp")) {
+		} else if (match(token_buf, "sp")) {
 			need(')');
 			return T_SP_I;
-		} else if (asm_sequ(token_buf, "bc")) {
+		} else if (match(token_buf, "bc")) {
 			need(')');
 			return T_BC_I;
-		} else if (asm_sequ(token_buf, "de")) {
+		} else if (match(token_buf, "de")) {
 			need(')');
 			return T_DE_I;
 		}
 
-		else if (asm_sequ(token_buf, "ix")) {
-			if (peek() == '+') {
+        /* (ix+d) (ix-d) (iy+d) (iy-d) - populate displacement and eat ')' */
+		else if (match(token_buf, "ix") || match(token_buf, "iy")) {
+            ret = token_buf[1] == 'x' ? T_IX_D : T_IY_D;
+            c = peek();
+			if ((c == '+') || (c == '-')) {
 				get_token();
-				tok = 0;
-				ret = T_IX_DISP;
+                c = cur_token;
+                get_token();
+                if (cur_token != T_NUM) {
+                    gripe("index displacement missing");
+                }
+                if (c == '-') {
+                    vp->num = -token_val;
+                } else {
+                    vp->num = token_val;
+                }
 			} else {
-				need(')');
-				return T_IX_I;
+				ret = (ret - T_IX_D) + T_IX_I;
 			}
-		} else if (asm_sequ(token_buf, "iy")) {
-			if (peek() == '+') {
-				get_token();
-				tok = 0;
-				ret = T_IY_DISP;
-			} else {
-				need(')');
-				return T_IY_I;
-			}
+			need(')');
 		} else {
 			ret = T_INDIR;
+            get_token();
 		}
 	}
 
-	/*
-	 * ok, its an expression 
-	 */
-	seg = evaluate(vp);
-	if (seg == SEG_UNDEF) {
-		if (pass == 1)
-			gripe2("undefined symbol", vp->sym->name);
-	}
+    vp->sym = 0;
+
+    /* XXX expression stuff would be here */
+    if (cur_token == T_NAME) {
+        vp->sym = sym_fetch(token_buf);
+        if (!vp->sym) {
+            if (pass == 1) {
+                gripe2("undefined symbol", vp->sym->name);
+            } else {
+                vp->sym = sym_update(token_buf, SEG_UNDEF, 0, 0);
+                vp->num = 0;
+            }
+	    }
+    } else if (cur_token == T_NUM) {
+        vp->sym = 0;
+		vp->num = token_val;
+    }
 
     /* all others have already returned */
     if (ret != T_PLAIN) {
@@ -1367,7 +1416,7 @@ char reg;
 		 * ld bc|de|hl|sp, nn 
 		 */
 		emitbyte(0x01 + ((reg - T_BC) << 4));
-		emit_exp(2);
+		emit_exp(2, &value);
 	} else if (arg == T_INDIR) {
 		if (reg == T_HL) {
 			emitbyte(0x2A);
@@ -1402,64 +1451,59 @@ char reg;
 	return 0;
 }
 
+/*
+ * if there is a passed in expval, it's a displacement for the first arg
+ */
 int
-do_ldr8(arg)
+do_ldr8(arg, disp)
 char arg;
+struct expval *disp;
 {
-	unsigned char prim, reg, type;
+    unsigned char has_disp;
+	unsigned char reg, type;
     struct symbol *sym;
-    struct expval value, disp;
+    struct expval value;
     value.sym = 0;
-    disp.sym = 0;
+    disp->sym = 0;
 
-	prim = 0;
+	has_disp = 0;
 
-	/*
-	 * grab any constants if they exist 
-	 */
-	if (arg == T_IX_DISP || arg == T_IY_DISP) {
-		if (evaluate(&disp) != SEG_ABS) {
-            gripe("nonconstant displacement");
-        }
-        prim++;
-		need(')');
+	if (arg == T_IX_D || arg == T_IY_D) {
+        has_disp++;
 	}
 	need(',');
 
 	reg = operand(&value);
 
-	if (arg >= T_IXH && arg <= T_IY_DISP) {
-		if (arg <= T_IX_DISP) {
+	if (arg >= T_IXH && arg <= T_IY_D) {
+		if (arg <= T_IX_D) {
 			emitbyte(0xDD);
             /* lose on ld ix*, iy* or ld ix[hl], (ix+d) */
             if (reg >= T_IYH)
                 return 1;
-            if (arg != T_IX_DISP && reg == T_IX_DISP)
+            if (arg != T_IX_D && reg == T_IX_D)
                 return 1;
 		} else {
 			emitbyte(0xFD);
             /* lose on ld iy*, ix* or ld iy[hl], (iy+d) */
-            if (reg >= T_IXH && reg <= T_IX_DISP)
+            if (reg >= T_IXH && reg <= T_IX_D)
                 return 1;
-            if (arg != T_IY_DISP && reg == T_IY_DISP)
+            if (arg != T_IY_D && reg == T_IY_D)
                 return 1;
             arg -= 3;
 		}
         arg = arg - (T_IXH + T_H);
-	} else if (reg >= T_IXH && reg <= T_IY_DISP) {
+	} else if (reg >= T_IXH && reg <= T_IY_D) {
 		if (arg == T_HL_I)
 			return 1;
 
-		if (reg <= T_IX_DISP) {
+		if (reg <= T_IX_D) {
 			emitbyte(0xDD);
 		} else {
 			emitbyte(0xFD);
             reg -= 3;
 		}
-		if (reg == T_IX_DISP) {
-            if (evaluate(&disp) != SEG_ABS) {
-                gripe("nonconstant displacement");
-            }
+		if (reg == T_IX_D) {
             prim++;
 			need(')');
 		} else if (arg == 4 || arg == 5)
@@ -1484,7 +1528,7 @@ char arg;
 		emitbyte(0x06 + (arg << 3));
 		if (prim)
 			emit_imm(&disp);
-		if (evaluate(&value) != SEG_ABS) {
+		if (evaluate(0, &value) != SEG_ABS) {
             gripe("non constant immediate");
         }
 		emit_imm(&value);
@@ -1527,7 +1571,6 @@ char arg;
 
 /*
  * assembles an instructions
- * if/elses that would make yandev blush
  *
  * isr = pointer to instruct
  * returns 0 if successful
@@ -1624,15 +1667,15 @@ struct instruct *isr;
 				 * basic from a-(hl) 
 				 */
 				emitbyte(isr->opcode + arg);
-			} else if (arg >= T_IXH && arg <= T_IX_DISP) {
+			} else if (arg >= T_IXH && arg <= T_IX_D) {
 				emitbyte(0xDD);
 				emitbyte(isr->opcode + (arg - T_IXH) + 4);
-				if (arg == T_IX_DISP)
+				if (arg == T_IX_D)
 					emitbyte(value.num & 0xFF);
-			} else if (arg >= T_IYH && arg <= T_IY_DISP) {
+			} else if (arg >= T_IYH && arg <= T_IY_D) {
 				emitbyte(0xFD);
 				emitbyte(isr->opcode + (arg - T_IYH) + 4);
-				if (arg == T_IY_DISP)
+				if (arg == T_IY_D)
 					emitbyte(value.num & 0xFF);
 			} else if (arg == T_PLAIN) {
 				emitbyte(isr->opcode + 0x46);
@@ -1700,21 +1743,21 @@ struct instruct *isr;
 		} else if (arg == T_IY) {
 			emitbyte(0xFD);
 			emitbyte(isr->arg + 0x20);
-		} else if (arg >= T_IXH && arg <= T_IX_DISP) {
+		} else if (arg >= T_IXH && arg <= T_IX_D) {
 			/*
 			 * ixh-(ix+*) 
 			 */
 			emitbyte(0xDD);
 			emitbyte(isr->opcode + ((arg - 19) << 3));
-			if (arg == T_IX_DISP)
+			if (arg == T_IX_D)
 				emitbyte(&value);
-		} else if (arg >= T_IYH && arg <= T_IY_DISP) {
+		} else if (arg >= T_IYH && arg <= T_IY_D) {
 			/*
 			 * iyh-(iy+*) 
 			 */
 			emitbyte(0xFD);
 			emitbyte(isr->opcode + ((arg - T_IY) << 3));
-			if (arg == T_IY_DISP)
+			if (arg == T_IY_D)
 				emitbyte(&value);
 		} else
 			return 1;
@@ -1740,12 +1783,13 @@ struct instruct *isr;
 			need(',');
 			arg = operand(&value);
 		}
+
 		/*
 		 * check for (ix+*) / (iy+*) 
 		 */
-		if (arg == T_IX_DISP || arg == T_IY_DISP) {
+		if (arg == T_IX_D || arg == T_IY_D) {
 
-			if (arg == T_IX_DISP)
+			if (arg == T_IX_D)
 				emitbyte(0xDD);
 			else
 				emitbyte(0xFD);
@@ -2022,8 +2066,8 @@ struct instruct *isr;
 		/*
 		 * standard a-(hl) and ixh-(iy+*) 
 		 */
-		if (arg <= T_A || (arg >= T_IXH && arg <= T_IY_DISP)) {
-			return do_ldr8(arg);
+		if (arg <= T_A || (arg >= T_IXH && arg <= T_IY_D)) {
+			return do_ldr8(arg, &value);
 		}
 
 		/*
@@ -2084,7 +2128,7 @@ char *in;
 	 */
 	i = 0;
 	while (isr_table[i].type) {
-		if (asm_sequ(in, isr_table[i].mnem)) {
+		if (match(in, isr_table[i].mnem)) {
 			if (asm_doisr(&isr_table[i]))
 				gripe("invalid operand");;
 			return 1;
@@ -2178,7 +2222,7 @@ assemble()
 
 		while ((tok = get_token()) != -1) {
 			if (verbose > 4)
-				printf("line %d: %s", line_num, input_buffer);
+				printf("line %d: %s", line_num, inbuf);
 
 			/*
 			 * command read 
@@ -2190,11 +2234,11 @@ assemble()
 					gripe2("expected directive", token_buf);
 
 				next = 0;
-				if (asm_sequ(token_buf, "text")) {
+				if (match(token_buf, "text")) {
 					next = 1;
-				} else if (asm_sequ(token_buf, "data")) {
+				} else if (match(token_buf, "data")) {
 					next = 2;
-				} else if (asm_sequ(token_buf, "bss")) {
+				} else if (match(token_buf, "bss")) {
 					next = 3;
 				}
 
@@ -2207,7 +2251,7 @@ assemble()
 					continue;
 				}
 
-				if (asm_sequ(token_buf, "globl")) {
+				if (match(token_buf, "globl")) {
 					while (1) {
 						tok = get_token();
 						if (tok != T_NAME)
@@ -2225,7 +2269,7 @@ assemble()
 					continue;
 				}
 
-				if (asm_sequ(token_buf, "extern")) {
+				if (match(token_buf, "extern")) {
 					while (1) {
 						tok = get_token();
 						if (tok != T_NAME)
@@ -2246,7 +2290,7 @@ assemble()
 				/*
 				 * .ds <byte count> 
 				 */
-				if (asm_sequ(token_buf, "ds")) {
+				if (match(token_buf, "ds")) {
 					ds();
 					consume();
 					continue;
@@ -2255,8 +2299,8 @@ assemble()
 				/*
 				 * .defb <byte>|<string>[,...] 
 				 */
-				if (asm_sequ(token_buf, "defb") ||
-					asm_sequ(token_buf, "db")) {
+				if (match(token_buf, "defb") ||
+					match(token_buf, "db")) {
 					db();
 					consume();
 					continue;
@@ -2265,8 +2309,8 @@ assemble()
 				/*
 				 * .defw <word>[,...]
 				 */
-				if (asm_sequ(token_buf, "defw") ||
-					asm_sequ(token_buf, "dw")) {
+				if (match(token_buf, "defw") ||
+					match(token_buf, "dw")) {
 					dw();
 					consume();
 					continue;
@@ -2296,7 +2340,7 @@ assemble()
 					save_symname();
 					get_token();
 
-					type = evaluate(&result, &sym, 0);
+					type = evaluate(0, &result);
 
 					sym_update(sym_name, type, result, 0);
 					consume();
@@ -2312,7 +2356,7 @@ assemble()
 				} else {
 					gripe("unexpected symbol");
 				}
-			} else if (tok != 'n') {
+			} else if (tok != '\n') {
 				gripe("unexpected token");
 			}
 		}
@@ -2384,6 +2428,8 @@ assemble()
 			cur_address = 0;
 
             line_num = 0;
+
+            *input_char = '\0';
 			rewind(input_file);
 
 			continue;

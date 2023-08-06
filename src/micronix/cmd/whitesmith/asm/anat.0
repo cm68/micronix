@@ -1,0 +1,66 @@
+[1mNAME[0m
+     [1manat [22m‐ A‐Natural translator
+
+[1mSYNOPSIS[0m
+     anat ‐[i o* s*] <files>
+
+[1mFUNCTION[0m
+     anat  translates  A‐Natural  narrative assembly language for
+     the Intel 8080 to standard assembly language as accepted  by
+     either  the  ISIS‐II  asm80 or the Microsoft Macro‐80 assem‐
+     bler.  Since the output of the 8080 code generator p2.80  is
+     A‐Natural,  anat  is required to interface the C compiler to
+     existing 8080 software development facilities.
+
+     The flags are:
+
+     [1m‐i [22memit code in ISIS‐II format, in  which  identifiers  have
+          each  ’.’  changed  to ’@’ and each ’_’ changed to ’?’.
+          Default is Microsoft  format,  in  which  each  ’.’  is
+          changed to ’$’ and each ’_’ is changed to ’.’.
+
+     [1m‐o*  [22mwrite the output to the file * and write error messages
+          to STDOUT.  Default is STDOUT for output and STDERR for
+          error messages.
+
+     [1m‐s*  [22memit  an end statement with the operand *, to specify a
+          starting address.  Default is to emit an end  statement
+          with no start address.
+
+     If  <files>  are present, they are concatenated in order and
+     used as the input file instead of the default STDIN.
+
+     If ‐o is absent, and one or more files are present, and  the
+     first filename ends with ’8’, then anat behaves as if ‐o was
+     specified using the first filename, only with  the  trailing
+     ’8’ changed to ’m’.  Thus,
+
+        anat file.8
+
+     is the same as
+
+        anat ‐o file.m file.8
+
+     If  ‐o is present, a name directive (title for Microsoft) is
+     emitted using the output file name as  the  module  name;  a
+     .suffix in the name is stripped off.  If there is no ‐o, but
+     <files> are present, then the first input file name is  used
+     in  the  name directive.  If neither is present, no name di‐
+     rective is emitted.
+
+     Code generation begins in cseg, and reverts to cseg  at  the
+     end  before  any  literals are emitted.  Any symbols not de‐
+     fined by the end of the input file are published  via  extrn
+     statements at the end.
+
+[1mBUGS[0m
+     The  start  string  used  with  ‐s does not have ’.’ and ’_’
+     mapped as for identifiers.
+
+
+
+
+
+
+
+

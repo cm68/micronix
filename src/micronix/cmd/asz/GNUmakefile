@@ -7,18 +7,14 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
+DEPTH = ../..
 CLASS = cmd
 DIR = asz
-CFILES = main.c asm.c
-HFILES = isr.h asm.h
-SRCS = $(CFILES) $(HFILES)
 TARGET = asz
-GENERATED = 
+INCFLAG =
+LIBS =
 
-include ../GNUmakefile.inc
+include $(DEPTH)/GNUmakefile.inc
 
-cross: $(CFILES) $(HFILES)
-	cc -fdiagnostics-color=always -g -o asz $(CFILES) 2>&1
-
-test: cross
+test:
 	cd tests ; make test

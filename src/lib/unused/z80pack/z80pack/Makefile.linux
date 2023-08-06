@@ -1,4 +1,18 @@
+#
+# Makefile for 
+#
+# <path>
+#
+# Changed: <2023-07-04 19:55:33 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
+
 CC = gcc
+all:
+
+clean:
+
+clobber: clean
 
 # Development
 #CFLAGS = -O3 -c -Wall -Wextra -fstack-protector-all -D_FORTIFY_SOURCE=2
@@ -88,6 +102,3 @@ allclean:
 
 install: z80sim
 	cp z80sim ${HOME}/bin
-
-# vim: tabstop=4 shiftwidth=4 expandtab:
-

@@ -1553,16 +1553,21 @@ catchpipe()
 }
 
 /*
- * dopump: pump command: pump [+] [-[subchar]] [eofstr] default is to
- * substitute using $ - suppresses substitution -subchar uses subchar instead 
- * of $ for substitution + causes leading tabs in input to be thrown away
- * eofstr defaults to ! eofstr may not begin with `+', which is reserved for
- * future flags.  acts like filter, although actually copy of sh in input,
- * \subchar = subchar, no other escaping performed if interactive, ignores
- * interrupts & quits, but dies if other end of pipe dies; if
- * non-interactive, reads to eofstr or real eof even if other end does die.
- * NOTE: line is used as workarea, both for eofstr and input line eofstr is
- * safe because initial arg can't be at beginning 
+ * dopump: pump command: 
+ * pump [+] [-[subchar]] [eofstr] 
+ * default is to substitute using $
+ * -        suppresses substitution 
+ * -subchar uses subchar instead of $ for substitution
+ * +        causes leading tabs in input to be thrown away
+ * eofstr defaults to ! 
+ * eofstr may not begin with `+', which is reserved for future flags.
+ * acts like filter, although actually copy of sh 
+ * in input, \subchar = subchar, no other escaping performed
+ * if interactive, ignores interrupts & quits, but dies if other end 
+ * of pipe dies; if non-interactive, reads to eofstr or real eof
+ * even if other end does die.
+ * NOTE: line is used as workarea, both for eofstr and input line 
+ * eofstr is safe because initial arg can't be at beginning 
  */
 
 dopump(t)

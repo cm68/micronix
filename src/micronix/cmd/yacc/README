@@ -1,0 +1,3 @@
+this is a seriously slimmed down 2.11BSD yacc.  the fixed tables have been
+defined as 'TINY', which appears to be small enough to generate the parser
+for 2.11BSD make.
