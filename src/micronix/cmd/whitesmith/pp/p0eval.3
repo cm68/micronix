@@ -1,0 +1,66 @@
+[1mNAME[0m
+     [1mp0eval.c [22m‐ evaluate #if expressions
+
+
+[1mFUNCTION[0m
+     p0eval.c  contains  functions for parsing and evaluating #if
+     expressions.  escape character and  operator  parsing  func‐
+     tions are also packaged in p0eval.c.
+
+     The  eschars/escodes  tables map escape sequences into ASCII
+     codes.  For example, ’\b’ maps to ASCII 010.
+
+     The ipri/opri tables map operators valid in #if  expressions
+     into  priorities.   The  higher  the  mapped  priority,  the
+     stronger the operator binds in extail.
+
+     Remember that the prename fields of PRETAB must be in sorted
+     order.
+
+     doesc,  escape  character processing, is passed the complete
+     lexeme, including quotes (e.g. ’\b’).  It  must  process  at
+     least  two  characters,  and callers of doesc will receive a
+     buffer containing  the  quotes  as  well  as  the  character
+     string, as well as a matching count.
+
+     dopunct  tries  to  match  the  longest  defined punctuation
+     string.
+
+     eval calls expr, which returns the first TLIST which  cannot
+     be  parsed.   If  that TLIST is not end of line (PEOL) some‐
+     thing is wrong with the #if expression.
+
+     Parsing goes something like this:
+
+     [1mexpr ‐ [22mgets a term (exterm) followed by an  optional  opera‐
+          tor/tail pair (exop/extail).
+
+     [1mextail  ‐  [22mputs  term/binop pairs on the current expression,
+          either recursing on itself or evaluating  the  previous
+          expr‐binop‐term, this depending on operator precedence.
+          extail returns the next TLIST when no  more  terms  are
+          available.   The  expression evaluation is done in long
+          throughout.
+
+     [1mexterm ‐ [22maccepts PNUM’s, PCHCON’s, parenthesized  exprs,  or
+          the unops, LMINUS, LNOT, LCOMP, LPLUS.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

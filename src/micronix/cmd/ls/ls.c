@@ -2,7 +2,9 @@
  * list file or directory - v7 version, patched for micronix
  *
  * cmd/ls/ls.c
- * Changed: <2022-08-20 12:56:22 curt>
+ * Changed: <2023-07-27 10:19:53 curt>
+ *
+ * vim: tabstop=4 shiftwidth=4 expandtab:
  */
 
 /*
@@ -546,8 +548,4 @@ struct lbuf **pp1, **pp2;
 	return(rflg * strcmp(p1->lflags&ISARG? p1->ln.namep: p1->ln.lname,
 				p2->lflags&ISARG? p2->ln.namep: p2->ln.lname));
 }
-
-/*
- * vim: tabstop=4 shiftwidth=4 expandtab:
- */
 

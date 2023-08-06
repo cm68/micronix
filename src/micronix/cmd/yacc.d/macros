@@ -1,0 +1,3 @@
+# define isdigit(x) ((x)>='0' && (x)<='9')
+# define isupper(x) ((x)>='A' && (x)<='Z')
+# define islower(x) ((x)>='a' && (x)<='z')

@@ -1,0 +1,9 @@
+target are named in the following way
+
+for example, the zas assembler exists in 3 forms:
+	zas.com:  a cp/m executable
+	x.zas:	  linux executable
+	zas:	  micronix executable
+
+there is a compiler driver in each of these forms,
+that calls the appropriate tools using the naming scheme

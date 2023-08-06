@@ -1,0 +1,7 @@
+yacc gram.y
+mv y.tab.c gram.c
+cc -O -Dpwb version.c main.c doname.c misc.c files.c dosys.c gram.c -lPW -lS -o make
+rm gram.c
+rm *.o
+strip make
+echo 'To re-archive, use: "make arch"'

@@ -1,0 +1,136 @@
+
+yydebu = yyargu;
+yystat = 0;
+yychar = -1;
+yynerr = 0;
+yyerrf = 0;
+yypv = 0;
+
+999 if( yydebu != 0 ) {
+	write( 6, 911 ) yystat, yyval, yychar, yypv
+911	format("state ", i5, "  value ", i6, "  char ", i6, "  level ", i3 )
+	}
+
+yypv = yypv + 1
+yys( yypv ) = yystat
+yyvalv( yypv ) = yyval
+
+920
+
+yyn = yypact( yystat+1 )
+
+if( yyn <= (-1000) ) goto 950
+
+if( yychar<0 ) yychar = yylex(yylval);
+
+if( yydebu > 1 ){
+	write( 6, 921 ) yyn, yychar
+921	format( "n = ", i6, "  char = ", i5 )
+	}
+yyn = yyn + yychar;
+if( yyn < 0 || yyn >= YYLAST ) goto 950
+yyn = yyact( yyn+1 )
+if( yychk( yyn+1 ) == yychar ){
+	yychar = -1
+	yyval = yylval
+	yystat = yyn
+	if( yyerrf > 0 ) yyerrf = yyerrf - 1
+	goto 999
+	}
+
+950
+
+	if( yydebu > 1 ){
+		write( 6, 951 ) yyn
+951		format( "default is ", i5 )
+		}
+
+	yyn = yydef( yystat+1 )
+
+	if( yyn == (-2) ) {
+		if( yychar < 0 ) yychar = yylex(yylval);
+		yyn = yyexcp( yystat, yychar );
+		}
+
+	if( yyn == (-1 ) ) {
+		yypars = 0;
+		return;
+		}
+
+	if( yyn == 0 ){
+
+		if( yyerrf == 3 ){
+
+			if( yydebu != 0 ){
+				write( 6, 961 ) yychar
+				961 format( "error recovery discards char ", i5 )
+				}
+
+			if( yychar == (-1) ){
+				yypars = 1
+				return
+				}
+
+			yychar = -1
+			goto 920
+			}
+
+		if( yyerrf == 0 ){#  new error
+			write( 6, 971 ) 
+			971 format( "syntax error" )
+			975 continue   # for simulated arror activity
+			yynerr = yynerr + 1;
+			}
+
+		yyerrf = 3
+
+		# find a state where error is a legal shift
+
+		while( yypv >= 1 ){
+			yyn = yys( yypv )
+			yyn = yypact(  yyn+1 ) + YYERRCODE
+			if( yyn >= 0 && yyn < YYLAST ){
+				yyn = yyact( yyn+1 )
+				if( yychk( yyn+1 ) == YYERRCODE ){
+					yystat = yyn
+					goto 999
+					}
+				}
+
+			if( yydebu != 0 ){
+				write ( 6, 972 ) yys(yypv ), yys( yypv-1 )
+				972 format( "error recovery pops ", i4, " uncovers ", i4 )
+				}
+
+			yypv = yypv - 1
+			}
+
+		yypars = 1
+		return
+
+		}
+
+	if( yydebu != 0 ){
+		write ( 6, 981 ) yyn
+981		format( "reduce ", i5 )
+		}
+
+	yypvt = yypv
+	yym = yyn
+	yypv = yypv - yyr2( yyn+1 )
+	yyval = yyvalv( yypv+1 )
+	if( yydebu > 2 ){
+		write( 6, 982 ) yys(yypv), yypv, yyval
+982		format( "reduce uncovers ", i4, " level ", i3, " val ", i6 )
+		}
+	yyn = yyr1( yyn+1 )
+	yyj = yypgo( yyn+1 ) + yys( yypv ) +2
+	if( yyj > YYLAST ) goto 990
+	yystat = yyact( yyj )
+	if( yychk( yystat+1 ) != ( -yyn ) ){
+		990 yyn = yypgo( yyn+1 )
+		yystat = yyact( yyn+1 )
+		}
+	goto 1000
+	$A
+	end

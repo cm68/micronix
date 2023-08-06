@@ -28,6 +28,7 @@
 #include <setjmp.h>
 
 #include "sim.h"
+#include "hwsim.h"
 #include "util.h"
 
 extern int listing;

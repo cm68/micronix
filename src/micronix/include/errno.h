@@ -2,8 +2,9 @@
  * the v6 error numbers.  these may very well conflict with host numbers,
  * so files including these need to be careful.
  *
- * include/errno.h
- * Changed: <2021-12-23 15:06:21 curt>
+ * /include/errno.h
+ *
+ * Changed: <2023-07-04 10:39:01 curt>
  */
 #define	EPERM	 1
 #define	ENOENT	 2

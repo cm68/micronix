@@ -1,0 +1,139 @@
+
+define YYWRITE	= 6
+	
+	yydebu = yyargu
+	yystat = 0
+	yychar = -1
+	yynerr = 0
+	yyerrf = 0
+	yypv   = 0
+
+# Put a state and value onto the stack.
+
+yystack:
+	debug if( yydebu ~= 0 )
+		write( YYWRITE, "  state ", yystat:i(6),
+			  "  value ", yyval: i(6),
+			  "  char  ", yychar:i(6),
+			  "  level ", yypv:  i(3) )
+
+	yypv += 1
+	yys(yypv)   = yystat
+	yyvalv(yypv) = yyval
+
+# Enter a new state without stacking.
+
+yynewstate:
+
+	yyn = yypact(yystat+1)
+
+	if( yyn <= -1000 ) goto yydefault	
+	
+	if( yychar < 0 ) yychar = yylex(yylval)
+	
+	debug if( yydebu > 1 )
+		write( YYWRITE, "  n     ", yyn:   i(6),
+			  "  char  ", yychar:i(6) )
+
+	if( (yyn += yychar) < 0 || yyn >= YYLAST ) goto yydefault
+
+	if( yychk( (yyn = yyact(yyn+1)) + 1 ) == yychar ) {
+		yychar = -1
+		yyval  = yylval
+		yystat = yyn
+		if( yyerrf > 0 ) yyerrf -= 1
+		goto yystack
+		}
+	
+# Default action for a state.
+
+yydefault:
+	
+	debug if( yydebu > 1 )
+		write( YYWRITE, "  default", yyn:i(5) )
+
+	yyn = yydef(yystat+1)
+
+	if( yyn == -2 ) {
+		if( yychar < 0 ) yychar = yylex(yylval)
+		yyn = yyexcp( yystat, yychar )
+		}
+
+	if( yyn == -1 ) return( 0 )
+
+	if( yyn ==  0 ) {
+
+		switch( yyerrf ) {
+
+		case 0:	# Brand new error.
+
+			write( YYWRITE, "  syntax error" )
+		yyerrlab:
+			yynerr += 1
+
+		case 1:	# Incompletely recovered error,
+		case 2:	# try again.
+
+			yyerrf = 3
+	
+			# find a state where error is a legal shift
+	
+			while( yypv >= 1 ) {
+				yyn = yypact(yys(yypv)+1) + YYERRCODE
+				if( yyn >= 0 & yyn < YYLAST ) {
+					yyn = yyact(yyn+1)
+					if( yychk(yyn+1) == YYERRCODE ) {
+						yystat = yyn
+						goto yystack
+						}
+					}
+	
+				debug if( yydebu ~= 0 & yypv >= 2 )
+					write( YYWRITE, "  error recovery pops ",
+						  yys(yypv):i(4),
+						  "  uncovers ", yys(yypv-1) )
+	
+				yypv -= 1
+				}
+	
+			return( 1 )
+
+		case 3:	# No shift yet, discard input.
+
+			debug if( yydebu ~= 0 )
+				write( YYWRITE, "  error recovery discards char ",
+					  yychar:i(5) )
+		
+			if( yychar == -1 ) return( 1 )
+		
+			yychar = -1
+			goto yynewstate
+
+			}
+
+		}
+
+	debug if( yydebu ~= 0 )
+		write( YYWRITE, "  reduce ", yyn:i(5) )
+
+	yypvt = yypv
+	yym = yyn
+	yypv = yypv - yyr2(yyn+1)
+	yyval = yyvalv(yypv+1)
+
+	debug if( yydebu > 2 )
+		write( YYWRITE, "  reduce uncovers ", yys(yypv):i(4),
+			  "  level ", yypv :i(3),
+			  "  val   ", yyval:i(6) )
+	yyn = yyr1(yyn+1)
+	yyj = yypgo(yyn+1) + yys(yypv) + 2
+	if( yyj > YYLAST || yychk( (yystat = yyact(yyj)) + 1 ) ~= -yyn )
+		yystat = yyact( (yypgo(yyn+1) + 1) )
+
+	switch(yym){
+	$A
+	}
+	goto yystack
+
+	
+	end

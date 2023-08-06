@@ -1,0 +1,66 @@
+[1mNAME[0m
+     [1mdis80 [22m‐ translate A‐Natural relocatable files
+
+[1mSYNOPSIS[0m
+     dis80 ‐[c i] <files>
+
+[1mFUNCTION[0m
+     dis80  permits  translation to symbolic form of the relocat‐
+     able binary files produced by the A‐Natural assembler as.80.
+     This  form  is compatible with existing assembler code on an
+     8080.
+
+     The flags are:
+
+     [1m‐c [22mTranslate each file to an assembler program suitable  for
+          input  to the Microsoft assembler under CP/M.  Each un‐
+          derscore ’_’ in an identifier is changed  to  ’.’,  and
+          each ’.’ is changed to ’$’.
+
+     [1m‐i  [22mTranslate each file to an assembler program suitable for
+          input to the asm80 assembler under ISIS‐II.   Each  un‐
+          derscore  ’_’  in  an identifier is changed to ’?’, and
+          each ’.’ is changed to ’@’.
+
+     If no flags are given, the default is ‐c.
+
+     <files> specifies one or more files, which must be in A‐Nat‐
+     ural  relocatable  format.   If more than one file is speci‐
+     fied, then the output for each is preceded by a line of  the
+     form
+
+        file:
+
+     Assembler  output  is  headed by a title directive (name for
+     ISIS‐II), where the name is derived  from  the  filename  by
+     stripping  off  any characters to the right of and including
+     the leftmost ’.’, then appending a ’@’ in the case of  ISIS‐
+     II, and a ’$’ in the case of Microsoft.
+
+[1mRETURNS[0m
+     dis80  returns  success if no diagnostics are produced, i.e.
+     if all reads are successful and all file formats are  valid.
+     Otherwise it returns failure.
+[1mEXAMPLE[0m
+
+     To convert chdr.o for use with Microsoft assembler code:
+
+        % dis80 chdr.o >chdr.mac
+
+[1mSEE ALSO[0m
+     as.80, link
+
+[1mBUGS[0m
+     The  symbols  "_c_"  and "_d_" must not be used in A‐Natural
+     programs to be translated with dis80.
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,132 @@
+[1mNAME[0m
+     [1mpifunc.c [22m‐ function initialize
+
+
+[1mFUNCTION[0m
+     p1func.c does the job of initializing function bodies.
+
+     The  resources  used  at  allocation time consist of regset,
+     autoff, argstart, and autstart.  Regset  is  initialized  to
+     those  registers  which  may be allocated by the programmer;
+     usually called r2, r3, r4.  p1 passes the current regset in‐
+     formation  to p2 at judicious intervals.  autoff is the cur‐
+     rent auto offset, also passed to p2.
+
+     The return, rterm, is used to build an operand of  the  cor‐
+     rect  return type for the current procedure.  rterm is built
+     in fninit and used in dostat.  rettab is a table which  maps
+     basic types into allocatable C return types.
+
+     Autos  are initialized in autinit.  First, the current state
+     of register allocation and auto offset are sent to p2.  Then
+     a move instruction is generated, since initialization of au‐
+     tos or registers require an inline move.
+
+     fninit parses a function  initializer,  in  particular  that
+     part of the function not including the block body.  The flag
+     defined, which indicates whether the  function  is  initial‐
+     ized,  (i.e.  has a statement body), is set to NO; the table
+     of argument declarations is assigned to lcltab; and the sym‐
+     bol  table  is  saved in symsave.  Then, argument redeclara‐
+     tions are parsed by first calling gscty and then gdecl.   If
+     there are any redeclarations, the function is considered de‐
+     fined.  If either the argument is nonexistent or the  redec‐
+     laration  has  occurred twice, it is in error.  If the func‐
+     tion has defined set, it must have a body, or if it  is  de‐
+     fined  it  must  have  a body.  Defined functions which have
+     been previously defined are flagged as errors.  As  in  data
+     initializers,  LEXTERN  and  LSTATIC  are set to DEXTERN and
+     DSTATIC respectively, to indicate that the function  is  de‐
+     fined.
+
+     Next, the return term for the function is built.  This terms
+     type must be scalar and the correct register is picked  from
+     rettab.   Each  of the arguments, in lcltab, is given proper
+     argument types, and offsets and register arguments  are  set
+     up by passing a move command to p2, moving from the stack to
+     the register.  The lcltab is put into the symbol  table  and
+     doblock then processes function bodies.
+
+     Any  GOTO for which no label exists after the block has been
+     processed is flagged as an error; the sc field is filled  in
+     by  doblock  when labels are known, so that the lack thereof
+     is considered an error.  Finally, in perc, symbols which are
+     extern  inside of function bodies are percolated to the gen‐
+     eral symbol table, and the symbol table is restored.
+
+     doblock parses curly bracketed blocks  by  parsing  internal
+     data declarations and their initializers, and by calling do‐
+     stat repeatedly to parse statement bodies.  The current  al‐
+     locatable  register  set,  auto offset, and symbol table top
+     are saved.  Then auto, register, extern, static, or  typedef
+     declarations  are parsed by calling gscty and gdecl until no
+     further declarations are encountered.  If either the  regis‐
+     ter set or the auto offset has changed, p2 is informed.  For
+     each declaration, autinit is called  to  parse  and  process
+     initializations.   And finally, dostat is called until right
+     curly bracket or end‐of‐file is encountered.
+
+     dostat parses C statements and passes commands to p2.  Since
+     dostat  will recurse on itself a great deal, every effort is
+     made to reduce auto usage to prevent  stack  overflow  on  a
+     small  machine.  The first job dostat has is to parse cases,
+     case defaults, or labels, until either multiple cases or la‐
+     bels are exhausted (default breaks).  Cases are added to the
+     casetab; defaults are communicated to  p2;  and  labels  are
+     added to lbltab, a storage class is assigned, and the creat‐
+     ed label is sent to p2.  Then for each statement, parsing is
+     done, using:
+
+        1. gelist, gtest, and gexpr to get expressions.
+        2. need or gtok to get tokens.
+        3. dostat to parse sub‐statements.
+        4. pjump, pjf, and pjt to process jumps.
+        5. pvoid, pmove, and pswitch to pass expresions
+                or commands to p2.
+
+     The  current break and continue statement labels are kept in
+     brk and cont; the current statement top, middle, and  bottem
+     labels  are  kept  in top, mid, bot.  GOTO statements may be
+     called upon to go to an as yet unseen label; if so, a  label
+     is bought and put into the label table, and the jump is gen‐
+     erated.  If said label is never seen, fninit  will  flag  an
+     error;  since no sc field will have been set.  switch state‐
+     ments first put switch header code; then parse the  enclosed
+     block;  and  then put the table of labels and cases built by
+     case processing.  The parsing of a statements can be  illus‐
+     trated using the WHILE as example:
+
+        case LWHILE:
+                top = plabel(crs());
+                bot = pjf(gtest(NO), crs(), 0);
+                dostat(bot, top);
+                pjump(top, bot);
+
+        this generates:
+                top:
+                        compute the (expression)
+                        jump false to bot
+                        do the statement body, bot is the break label
+                                        and top is the continue label
+                        jump to top
+                bot:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

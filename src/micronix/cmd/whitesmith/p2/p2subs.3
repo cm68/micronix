@@ -1,0 +1,132 @@
+[1mNAME[0m
+     [1mp2subs.c [22m‐ utility functions
+
+
+[1mFUNCTION[0m
+     p2subs.c is a collection of input, output, and utility func‐
+     tions, plus several useful tables.
+
+     The type tables are indexed by the ty  codes  (XCHAR,  etc.)
+     to map types into: sizes in bytes, with bytype; types equiv‐
+     alent for addition or assigning, with equtype; and types ac‐
+     tually used when coerced to a register, with regtype.
+
+     Relational  operators map the comparing operators in cmpops:
+     by flipping (0 < X) to !(0 >= X), with flpops; and  from  p1
+     lexemes, with lexops.
+
+     gen  calls  chput and chwrite to build buffer loads of 01000
+     characters, as linked lists.  Whenever the current chbuf  is
+     full  a  new  one  is allocated.  chread reads one character
+     from the current character buffer; it is called by  emit  in
+     p2tab.c.  This mechanism is mildly fragile, requiring exten‐
+     sive cooperation between voidfn, putasm, emit,  chread,  and
+     chwrite.
+
+     decflt  converts  a double number from p1 to DEC format.  It
+     is kept machine independent by calling upon the machine  li‐
+     brary  function  _fcan  to first put the number in canonical
+     form, regardless of the host machine.  This  form  puts  the
+     number  as a signed eight‐byte fraction in place of the dou‐
+     ble number d, and returns the power of two exponent as func‐
+     tion value.  decflt returns true if the number can be repre‐
+     sented as a float.
+
+     gcode eats tokens from p1 until it encounters  one  not  di‐
+     gestible as a data generator code, thus emitting data relat‐
+     ed stuff while main builds function  bodies.   gexpr,  gint,
+     glabel,  gname  and needch get input from pass one; the code
+     contains few subtleties.
+
+     gexpr obtains expression trees as necessary, converting them
+     to the internal form demanded by p2.  This consists primari‐
+     ly of mapping LONGRET and FLTRET to  the  proper  registers,
+     correcting  argument and auto offsets to skip over the saved
+     registers, and generally mapping registers to internal  form
+     (grx).   Double constants are converted to DEC form and made
+     into literals, as are long integers.
+
+     gotten is central to the force and pick logic.   It  catego‐
+     rizes  terms  by address class: in bc (or de), in hl, on the
+     stack, in memory, in a quasi‐register (volatile  memory),  a
+     pointer  in  bc, a pointer in hl, a pointer on the stack, or
+     simply a (nonadressable) term.  This information drives  the
+     code  table  select  logic  as well as the coercions used in
+     force to setup for code  generation.   Note  that  constants
+     look  just like references to bc, which is true from a hard‐
+     ware capability standpoint, but hardly true strategically.
+
+     pref is a simple function that is wonderfully useful in sev‐
+     eral  contexts.   It basically returns what you want reduced
+     by what you need, if there is any of that  stuff;  otherwise
+     it  punts  and  gives you what you need.  This is the secret
+     behind generating code in the right place whenever possible,
+     but  always in an acceptable place even if forcing is called
+     for afterward.
+
+     tempify is used to try to liberate a volatile  register,  by
+     pushing  either  the  term or a pointer to the term onto the
+     stack.  treg does much the same thing for longs and doubles;
+     rather  than perform an elaborate stacking, however, it sim‐
+     ply buys auto space and copies the term there.  Such  tempo‐
+     rary autos can be simply abandoned when no longer needed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

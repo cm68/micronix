@@ -1,7 +1,7 @@
 /* 
  * hwsim/sim.c
  *
- * Changed: <2023-06-20 17:43:07 curt>
+ * Changed: <2023-06-23 14:23:42 curt>
  *
  * this is the general emulator framework
  *
@@ -581,6 +581,7 @@ read_commandline(char *s)
     }
 }
 
+#ifdef notdef
 /*
  * utility functions for the command processors
  */
@@ -737,6 +738,8 @@ list_cmd(char **sp)
     return 0;
 }
 
+#endif
+
 /*
  * breakpoints and are done with an 8k bitmap
  */
@@ -811,6 +814,7 @@ break_cmd(char **sp)
     return 0;
 }
 
+#ifdef notdef
 int
 dump_cmd(char **p)
 {
@@ -936,6 +940,7 @@ struct moncmd moncmds[MONCMDS] = {
     { '?', "\thelp", help_cmd },
     { 0, 0, 0 }
 };
+#endif
 
 int
 main(int argc, char **argv)

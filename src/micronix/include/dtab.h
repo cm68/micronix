@@ -1,12 +1,12 @@
 /*
- * not the foggiest idea what this is used for
- * XXX
+ * not the foggiest idea what this is used for - XXX
  *
- * include/dtab.h
- * Changed: <2021-12-23 14:48:22 curt>
+ * /include/dtab.h
+ *
+ * Changed: <2023-07-04 10:36:56 curt>
  */
 struct dtab {
-	UINT32 date;
+	unsigned long date;
 	char directory[64];
 };
 

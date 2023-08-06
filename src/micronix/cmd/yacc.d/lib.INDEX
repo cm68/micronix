@@ -1,0 +1,14 @@
+This archive file has the source for the yacc library.
+It is expected that the yacc library will fall into
+disuse as version 2 is better known, since the new
+documentation will invite users to write their own
+main and yyerror routines, and not search the library
+at all.  In particular, the routine libpar.c is provied
+only for compatibility with older versions of yacc.
+
+To make a library, liby.a, say
+	ar x ylib.a
+	cc -c lib???.c
+	ar r liby.a lib???.o
+This library can be copied onto /usr/lib/liby.a when
+local tests are completed.

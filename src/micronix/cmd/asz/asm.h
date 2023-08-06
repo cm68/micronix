@@ -3,7 +3,7 @@
  *
  * /usr/src/cmd/asz/asm.h
  *
- * Changed: <2023-07-09 17:24:09 curt>
+ * Changed: <2023-08-02 08:56:38 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
@@ -25,12 +25,6 @@ char peek();
 char get_next();
 void outbyte();
 void outtmp();
-
-#define T_EOF   -1
-#define T_NAME  'a'
-#define T_NUM   '0'
-#define T_NL    'n'
-#define T_STR   '\"'
 
 #define T_B     0
 #define T_C     1
@@ -77,4 +71,11 @@ void outtmp();
 #define T_C_I   33
 #define T_I     37
 #define T_R     38
+
+#define T_NAME  39
+#define T_NUM   40
+#define T_STR   41
+#define T_EOL   42
+#define T_EOF   43
+
 #endif

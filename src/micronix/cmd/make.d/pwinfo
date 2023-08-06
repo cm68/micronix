@@ -1,0 +1,13 @@
+Differences between PW make & original make:
+-  If exit status is ignored for an executed command,
+   a warning is not printed if the command returns a non-zero status.
+   The original prints such a warning.
+-  When the command is printed prior to execution,
+   the command name is prefixed with ">";  this makes the commands stand out.
+-  Has builtin suffix rules for LEAP script .t-.o files, and .z-.h files.
+-  After reading internal "makerules" file,
+   but before reading the local "makefile" file,
+   PW version reads "makecomm"/"Makecomm"in login directory,
+   and then in local directory.
+   "makecomm" is useful for defining "common" macro names.
+-  PW version exec's commands by using pexec(), which uses the .path file.

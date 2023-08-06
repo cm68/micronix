@@ -365,6 +365,7 @@ char *	file;
 	if(verbose) {
 		strcat(strcpy(buf, "ERA "), file);
 		print(buf);
+		return;
 	}
 	setfcb(DFCB, file);
 	putc(type, cmdfile);

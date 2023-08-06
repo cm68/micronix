@@ -1,0 +1,66 @@
+[1mNAME[0m
+     [1mp1expr.c [22m‐ expression parser for p1
+
+
+[1mFUNCTION[0m
+     p1expr.c parses a single complete expression and returns the
+     parsed, typified, and reduced expression tree.   Expressions
+     are  found  in the context of data initializers and within C
+     statements; and constant expressions are called for in a va‐
+     riety of contexts.
+
+     The  binary operator table, binops, is used to map operators
+     into their respective priorities.  The getsops table is used
+     to  map  the gets operators into the binop table.  The table
+     of priorities, lpri and rpri, contain the priority for  spe‐
+     cific  operators.  For example, LTIMES has a priority of 14,
+     which is stronger than LPLUS with a  priority  of  13;  thus
+     times  binds  stronger than plus, as it should.  Two tables,
+     lpri and rpri, are needed for the query and the gets  opera‐
+     tors.   For  example,  if  LGETS  appears on both sides of a
+     term, as in A = B = C, we would  ordinarily  parse  left  to
+     right,  first  A = B, and then B = C; however, since we want
+     to parse right to left, rpri for query and the  gets  opera‐
+     tors  is higher than lpri, so we evaluate B = C and then A =
+     B.
+
+     The unary operator tables map unary operator lexemes to  the
+     matching  unary  operator.   For  example,  LTIMES  maps  to
+     DINDIR.
+
+     The functions const, gelist, gexpr, gtest are the portals to
+     the outside world.  They guarantee to return a parsed, typi‐
+     fied, and reduced expression tree.  The one  trick  is  that
+     they free all storage from the previous expression tree pri‐
+     or to building  the  current  expression,  so  that  storage
+     doesn’t silt up.
+
+        exlist = frelst(exlist, NULL);
+
+
+     To properly parse a cast, mcast must call gscty and gdecl to
+     build a prototype symbol table entry.  Note the second argu‐
+     ment  to gdecl, which indicates this is a cast, and no vari‐
+     able name will be tolerated.  mcast builds a new unary oper‐
+     ator DCAST, setting the ty and at fields from the prototype.
+
+     Making  expressions involves the usual term/op/tail parsing,
+     where mtail either  builds  a  subtree  (first  op  priority
+     high/equal)  or recurses on itself (second operator priority
+     high).
+
+     Making of terms, mterm,  is  straightforward,  however  some
+     points  are  worth  noting.   mterm ensures that no constant
+     smaller than int is ever unsigned,  thus  avoiding  numerous
+     subtle  bugs.  LSTRING is converted here to a LITERAL struc‐
+     ture, to be later put out at function conclusion.  LDNUM  is
+     made into a literal double term.
+
+     mtrail  has  a  declaration  of TERM *buyop().  Without this
+     declaration, the statement:
+
+        q = buyop(LPOINTS,(tok.type == LPOINTS) ? q:
+                buyop(DADDR, q, NULL), NULL);
+
+     would produce incorrect code,  as  the  then‐else  balancing
+     would try to balance pointer q with int buyop.

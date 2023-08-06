@@ -1,0 +1,47 @@
+This archive file contains:
+
+Source files:			y?.c, and dextern
+Parsers:			yacc[eor]par
+Test Version files:		tfiles
+Installation Dependent file:	instfiles
+Macro file:			macros
+shell file, make test version:	tmake
+shell file, install in system:	install
+documentation:			yaccdiffs
+
+The archive file contains information for testing and installing
+Version 2 of Yacc.  The programs require the -lS library.
+
+Cat yaccdiffs for a brief description of the differences
+between version 2 of yacc and earlier versions.
+
+To install a command called yacc in the same directory
+as the yacc.a file, do
+	ar x yacc.a
+This yacc command must be run with the current directory 
+equal to the directory containing the yacc.a files.
+	sh -v <tmake
+
+To install a version of yacc as a system command,
+it is necessary to provide an installation dependent
+version of the file "files", called myfiles.
+This should contain macro definitions for
+absolute file names for the three parser files.
+If the filenames /usr/lib/yacc[eor]par are acceptable,
+the file instfiles can be copied to myfiles;
+otherwise, the file instfiles should be read and
+changed.  The parsers should be copied to the indicated
+locations.
+
+The command
+	sh -v <install
+then compiles a program called yacc which can be
+run in any directory and refers to the absolute
+path names for the parsers given in myfiles.
+This can be copied to /usr/bin/yacc after running
+any local tests you wish.
+
+If this process does not compile due to the lack of macros
+"isdigit", "isupper", and "islower" on the standard library
+<stdio.h>, append the file "macros" to the tfile and
+myfile files.

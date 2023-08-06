@@ -1,0 +1,155 @@
+
+state 0
+	$accept : _file $end 
+	file : _    (1)
+
+	.  reduce 1
+
+	file  goto 1
+
+state 1
+	$accept :  file_$end 
+	file :  file_comline 
+
+	$end  accept
+	error  shift 5
+	START  shift 3
+	MACRODEF  shift 4
+	.  error
+
+	comline  goto 2
+
+state 2
+	file :  file comline_    (2)
+
+	.  reduce 2
+
+
+state 3
+	comline :  START_    (3)
+	comline :  START_namelist deplist shellist 
+
+	NAME  shift 7
+	.  reduce 3
+
+	namelist  goto 6
+
+state 4
+	comline :  MACRODEF_    (4)
+
+	.  reduce 4
+
+
+state 5
+	comline :  error_    (6)
+
+	.  reduce 6
+
+
+state 6
+	comline :  START namelist_deplist shellist 
+	namelist :  namelist_NAME 
+	deplist : _    (9)
+
+	NAME  shift 9
+	COLON  shift 12
+	DOUBLECOLON  shift 13
+	.  reduce 9
+
+	deplist  goto 8
+	dlist  goto 10
+	sepchar  goto 11
+
+state 7
+	namelist :  NAME_    (7)
+
+	.  reduce 7
+
+
+state 8
+	comline :  START namelist deplist_shellist 
+	shellist : _    (15)
+
+	SHELLINE  shift 16
+	.  reduce 15
+
+	shlist  goto 15
+	shellist  goto 14
+
+state 9
+	namelist :  namelist NAME_    (8)
+
+	.  reduce 8
+
+
+state 10
+	deplist :  dlist_    (10)
+	dlist :  dlist_NAME 
+
+	NAME  shift 17
+	.  reduce 10
+
+
+state 11
+	dlist :  sepchar_    (11)
+
+	.  reduce 11
+
+
+state 12
+	sepchar :  COLON_    (13)
+
+	.  reduce 13
+
+
+state 13
+	sepchar :  DOUBLECOLON_    (14)
+
+	.  reduce 14
+
+
+state 14
+	comline :  START namelist deplist shellist_    (5)
+
+	.  reduce 5
+
+
+state 15
+	shellist :  shlist_    (16)
+	shlist :  shlist_SHELLINE 
+
+	SHELLINE  shift 18
+	.  reduce 16
+
+
+state 16
+	shlist :  SHELLINE_    (17)
+
+	.  reduce 17
+
+
+state 17
+	dlist :  dlist NAME_    (12)
+
+	.  reduce 12
+
+
+state 18
+	shlist :  shlist SHELLINE_    (18)
+
+	.  reduce 18
+
+
+9/127 terminals, 8/200 nonterminals
+19/400 grammar rules, 19/600 states
+0 shift/reduce, 0 reduce/reduce conflicts reported
+8/250 working sets used
+memory: states,etc. 114/5200, parser 7/4000
+9/450 distinct lookahead sets
+0 extra closures
+10 shift entries, 1 exceptions
+8 goto entries
+0 entries saved by goto default
+Optimizer space used: input 30/5200, output 18/4000
+18 table entries, 0 zero
+maximum spread: 262, maximum offset: 258

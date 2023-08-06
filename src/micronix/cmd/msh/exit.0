@@ -1,24 +1,66 @@
-EXIT(I)                                                                EXIT(I)
+     PROGRAM
+          exit ‐ terminate command file
+
+     USAGE
+          exit [ integer ]
+
+     FUNCTION
+          Exit  performs  a seek to the end of its standard input
+          file.  Thus, if it is invoked inside  a  file  of  com‐
+          mands, upon return from the shell will discover an end‐
+          of‐file and terminate.
+
+          The optional argument will be returned to the shell  as
+          the exit status code.
+
+     SEE ALSO
+          if(1), goto(1), sh(1)
 
 
 
-NNAAMMEE
-       exit    terminate command file
-
-SSYYNNOOPPSSIISS
-       eexxiitt [ integer ]
-
-DDEESSCCRRIIPPTTIIOONN
-       _E_x_i_t  performs  a sseeeekk to the end of its standard input file.  Thus, if
-       it is invoked inside a file of commands,  upon  return  from  _e_x_i_t  the
-       shell will discover an end-of-file and terminate.
-
-       The  optional argument will be returned to the shell as the exit status
-       code.
-
-SSEEEE AALLSSOO
-       if(I), goto(I), sh(I)
 
 
 
-                                    5/31/77                            EXIT(I)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

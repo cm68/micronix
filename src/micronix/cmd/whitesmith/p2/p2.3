@@ -1,0 +1,132 @@
+[1mNAME[0m
+     [1mp2 [22m‐ 8080 pass 2 of C
+
+
+[1mFUNCTION[0m
+     p2  generates  code for the 8080.  It reads encoded commands
+     and expression trees from p1 and produces  A‐Natural  assem‐
+     bler  code.   No error diagnostics are produced; if anything
+     is seriously amiss, p2 will  produce  a  PANIC  message  and
+     quit.
+
+     Its principal data transform is:
+
+     [1mgexpr  ‐  [22mreads  in  expression trees for gcode and modifies
+          them for 8080.
+
+     [1mgcode ‐ [22mgets encoded data commands and puts them in the  ap‐
+          propriate assembler directive form.  It passes commands
+          dealing with  function  bodies,  e.g.  expressions  and
+          jumps, on to main.
+
+     [1mmain ‐ [22mgets a sequence of function bodies and generates code
+          for each into an in‐core buffer which will be shortened
+          and emitted.  Flow of control is represented by a label
+          table and a code graph, with  the  assembler  code  for
+          each  expression  stored  in a character pool.  All ex‐
+          pressions originate either  as  comparisons  associated
+          with  conditional jumps or as computations to be "void‐
+          ed", i.e. to be computed and forgotten.
+
+     [1mjcond ‐ [22mgenerates code for conditional jumps.
+
+     [1mvoid ‐ [22mgenerates code for expression trees.
+
+     [1mshorten ‐ [22mis the branch shortener, much of which applies  to
+          any machine, but some of which is peculiar to 8080.  It
+          visits sequences of code, trying whenever  possible  to
+          eliminate  redundant  branches.  It also eliminates un‐
+          reachable code.
+
+     Code generation is performed by an intricate algorithm  that
+     looks  through  tables to find the best, i.e. shortest, code
+     sequence for a given subexpression;  it  can  backtrack  and
+     discard  code if a given strategy proves hopeless.  In prin‐
+     ciple, the generator must always succeed, but  this  depends
+     upon  a fragile and not fully understood series of relation‐
+     ships between the code tables and the driver routines,  thus
+     the panic messages when the impossible occurs.
+
+     Each  item in an expression tree has room for "fixing", i.e.
+     a scratch area in which is evolved the  location  where  the
+     result of each subcomputation ends up.  The p‐>f fixing area
+     is considered to be garbage as the generator descends a tree
+     and is developed on the way back up; the code generator also
+     cheerfully trashes the  fixing  areas  of  subtrees  in  the
+     process of emitting code.
+
+     Retry strategy centers around the binary operators.  The ba‐
+     sic idea is to reduce the left and right subtrees each to  a
+     term,  by calling fix recursively, then to do the operation.
+     Subtrees are tried left first, then right first,  then  left
+     with  stacking.  All may fail if there are insufficient reg‐
+     ister resources, but at the highest level (with r0, r1,  bc,
+     and hl) this should never happen.
+
+     The main flow through code generation of expressions is:
+
+     [1mvoid or jcond ‐ [22mstarts it all; fixes an expression.
+
+     [1mfix  ‐ [22mdecides on an address descriptor for a term, or calls
+          an operator specific function (e.g.  binop)  to  reduce
+          that  subtree to an address descriptor.  It then forces
+          the term to the right address category based  on  wants
+          and gots.
+
+     [1mforce  ‐  [22mcoerces  the operand to the right type and storage
+          class.  It allocates machine resources,  registers  and
+          stack, in doing so.
+
+     [1mbinop  ‐  [22mfixes  and forces both sides of a binary operator,
+          usually after picking an appropriate table entry  (pick
+          in p2tab.c), and then it applies the table entry to the
+          forced operands, generating code in the process.
+
+     [1mgen ‐ [22mgenerates code into the character pool.  It  typically
+          uses  table entries, but also can use specialized func‐
+          tions to produce certain code  sequences.   Gives  back
+          registers.
+
+     The code is organized into several files:
+
+     [1mint12.h ‐ [22mdefinitions common to p1 and p2.
+
+     [1mint012.h  ‐ [22mdefinitions common to all parts of the C compil‐
+          er.
+
+     [1mint2.h ‐ [22mdata structures and type  definitions  peculiar  to
+          p2.
+
+     [1mp2expr.c  ‐  [22mcontains those modules which work on expression
+          trees, choosing the strategies for generating code, in‐
+          cluding  largely  machine  independent  functions (fix,
+          binop, void) and machine dependent resource  allocation
+          and coercion (force).
+
+     [1mp2fmov.c  ‐  [22mcontains  encodings  of  the strategies to move
+          scalar items from place to place among  8080  registers
+          and  memory.   All this code is equivalent to that per‐
+          formed by a move instruction  on  more  reasonable  ma‐
+          chines.
+
+     [1mp2gen.c  ‐  [22mdoes actual code generation, usually from tables
+          residing in p2tab.c.
+
+     [1mp2jump.c ‐ [22mcontains those modules for  generating  code  for
+          jumps, boolean expressions, and function calls.
+
+     [1mp2main.c ‐ [22mbuilds code graphs for functions, reduces branch‐
+          ing, and emits code.
+
+     [1mp2subs.c ‐ [22mare the functions used by all parts of p2 and the
+          input of commands and expression trees from p1.
+
+     [1mp2tab.c  ‐ [22mcontains the machine specific tables used to gen‐
+          erate code along with the functions which  perform  low
+          level input and output.
+
+
+
+
+
+

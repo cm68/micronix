@@ -9,6 +9,5 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-all: /usr/src/cmd/Make/bootstrap 
-	sh -v /usr/src/cmd/Make/bootstrap
-	/bin/make upgrade
+all:
+	(cd /usr/src/cmd/Make ; make install)

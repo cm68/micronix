@@ -1,0 +1,132 @@
+[1mNAME[0m
+     [1mrel [22m‐ examine relocatable files
+
+[1mSYNOPSIS[0m
+     rel <flags> <files>
+
+[1mFUNCTION[0m
+     rel  permits inspection of the relocatable binary files pro‐
+     duced by the assembler as or by the loader ld11.  It can  be
+     used simply to check for defined or undefined symbols, or to
+     check module sizes.
+
+     The flags are:
+     [1m‐d                         [22mList all defined symbols in  each
+          file, along with the value of the symbol, in octal, and
+          the code ’T’ for text relative, ’D’ for data  relative,
+          ’B’  for  bss relative, ’A’ for absolute, ’F’ for file‐
+          names, or ’?’  for anything else it doesn’t  recognize.
+          Lower  case  letters  are used for local symbols, upper
+          case for globals.
+     [1m‐i                         [22mPrint global entries with  inter‐
+          vals  shown  in the value field.  ‐i implies sorting by
+          value plus the ‐d and ‐u flags.
+     [1m‐s                         [22mDisplay the sizes, in decimal, of
+          the  text  segment,  the data segment, the bss segment,
+          and the sum of both segments.
+     [1m‐u                         [22mList  all  undefined  symbols  in
+          each  file.   If  ‐d  is  also specified, the symbol is
+          listed with the code ’U’; its value is  the  space  re‐
+          quired.
+     [1m‐v                          [22mSort  by  value,  implies the ‐d
+          flag above.  If the values match  then  the  names  are
+          used.
+
+     If  no  flags  are given, the default is ‐du, i.e. a list of
+     all symbols with their values is given, in alphabetical  or‐
+     der  by symbol name.  If multiple options are given, the or‐
+     der of output is 1) the segment sizes called for by  ‐s,  2)
+     the symbol list called for by ‐d and/or ‐u.
+
+     <files> specifies zero or more files, which must be in relo‐
+     catable format.  If more than one file  is  specified,  then
+     the output for each is preceded by a line of the form
+
+        file:
+
+     and  if  ‐s  is present a total line is also printed.  If no
+     files are specified, or if ’‐’ is encountered on the command
+     line, "a.out" is used.
+
+[1mRETURNS[0m
+     rel  returns success if no diagnostics are produced, i.e. if
+     all reads are successful and all file formats are valid.
+[1mEXAMPLE[0m
+
+     To obtain a list of undefined symbols:
+
+     % rel ‐u mesg.o
+
+     which might look like:
+
+     _chmod
+     _cpybuf
+     _devname
+     _fstat
+     c~ret
+     c~sav
+
+[1mSEE ALSO[0m
+     as, ld
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

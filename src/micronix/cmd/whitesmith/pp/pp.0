@@ -1,0 +1,132 @@
+[1mNAME[0m
+     [1mpp [22m‐ preprocess defines and includes
+
+[1mSYNOPSIS[0m
+     pp ‐[c d*^ i* o* p? s? x 6] <files>
+
+[1mFUNCTION[0m
+     pp  is  the  preprocessor used by the C compiler, to perform
+     #define, #include, and other functions signalled by a #, be‐
+     fore  actual  compilation  begins.  It can be used to advan‐
+     tage, however, with most language processors.  The flag  op‐
+     tions are:
+
+     [1m‐c  [22mdon’t  strip  out /* comments */ nor continue lines that
+          end with .
+
+     [1m‐d* [22mwhere * has the form name=def, define name with the def‐
+          inition string def before reading the input; if =def is
+          omitted, the definition is taken as "1".  The name  and
+          def  must  be in the same argument, i.e., no blanks are
+          permitted unless the argument is  quoted.   Up  to  ten
+          definitions may be entered in this fashion.
+
+     [1m‐i* [22mchange the prefix used with #include <filename> from the
+          default "" to the string *.  Multiple  prefixes  to  be
+          tried in order may be specified, separated by the char‐
+          acter ’|’.
+
+     [1m‐o* [22mwrite the output to the file * and write error  messages
+          to STDOUT.  Default is STDOUT for output and STDERR for
+          error  messages.    On   many   systems   (other   than
+          Idris/UNIX), the ‐o option is mandatory with ‐x because
+          STDOUT is interpreted as a text file, and hence becomes
+          corrupted.
+
+     [1m‐p?   [22mchange  the preprocessor control character from ’#’ to
+          the character ?.
+
+     [1m‐s?  [22mchange the  secondary  preprocessor  control  character
+          from ’@’ to the character ?.
+
+     [1m‐x [22mput out lexemes for input to the C compiler p1, not lines
+          of text.
+
+     [1m‐6 [22mput out extra newlines and/or SOH  (’1’)  codes  to  keep
+          source  line  numbers  correct  for UNIX/V6 compiler or
+          ptc.
+
+     pp processes the named files, or STDIN if none are given, in
+     the  order  specified, writing the resultant text to STDOUT.
+     Preprocessor actions are described in detail in Section I of
+     the C Programmers’ Manual.
+
+     The  presence  of a secondary preprocessor control character
+     permits two levels of parameterization.  For  instance,  the
+     invocation
+
+        pp ‐c ‐p@
+
+     will  expand  define  and  ifdef conditionals, leaving all #
+     commands and comments intact; invoking pp with no  arguments
+     would  expand both @ and # commands.  The flag ‐s# would ef‐
+     fectively disable the secondary control character.
+[1mEXAMPLE[0m
+
+     The standard style for writing C programs is:
+
+             /* name of program
+              */
+             #include <std.h>
+
+             #define MAXN    100
+
+             COUNT things[MAXN];
+             etc.
+
+The use of uppercase only identifiers is not required by pp,  but
+is  strongly  recommended  to  distinguish parameters from normal
+program identifiers and keywords.
+
+[1mSEE ALSO[0m
+     p1, ptc
+
+[1mBUGS[0m
+     Unbalanced quotes ’ or " may not occur in a  line,  even  in
+     the  absence of the ‐x flag.  Floating constants longer than
+     38 digits may compile incorrectly, on some host machines.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

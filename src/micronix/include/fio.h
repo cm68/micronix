@@ -1,25 +1,27 @@
 /*
  * header file for subroutines responsible for 
  *     setting up and tearing down FIO buffers
- * XXX - used by what, exactly?
  *
- *	Len Edmondson
- *	Morrow Designs
- * 	  1981
+ * FIO are the predecessor of FILE
  *
- *	C library
+ *  Len Edmondson
+ *  Morrow Designs
+ *    1981
+ *
+ *  C library
  *
  * include/fio.h
- * Changed: <2021-12-23 15:08:16 curt>
+ *
+ * Changed: <2023-07-04 10:41:57 curt>
  */
 
-# define NFIOS 16
+#define NFIOS 16
 
-FIO	stdin;
-FIO	stdout;
-FIO	stderr;
+FIO stdin;
+FIO stdout;
+FIO stderr;
 
-FIO *_fios [NFIOS];	/* table of inited FIO's */
+FIO *_fios[NFIOS];				/* table of inited FIO's */
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

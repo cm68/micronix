@@ -1,8 +1,12 @@
 #
-# Makefile for morrow
+# Makefile for 
 #
+# <path>
 #
+# Changed: <2023-07-10 14:47:12 curt>
 #
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
+
 CC = gcc
 DEBUG = -g
 CFLAGS = $(DEBUG) -I../common -fdiagnostics-color=always
@@ -30,6 +34,3 @@ clean:
 
 clobber:	clean
 	rm -f $(TARGETS)
-
-# vim: tabstop=4 shiftwidth=4 expandtab:
-

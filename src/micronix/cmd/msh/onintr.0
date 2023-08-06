@@ -1,0 +1,66 @@
+     PROGRAM
+          onintr ‐ handle interrupts in shell files
+
+     USAGE
+          onintr [ label ]
+
+     FUNCTION
+          The  onintr  command  catches interrupts received while
+          the Shell is reading from a file.
+
+          After the interrupt, and after any active  process  has
+          completed,  the  Shell  procedure is transferred to the
+          label specified.  Unless another onintr command is pro‐
+          cessed, the next interrupt will kill the Shell.
+
+          The command without a label turns interrupts back on.
+
+          The  special  case ‘‘onintr ‐’’ causes interrupts to be
+          totally ignored, both by the Shell itself and by subse‐
+          quent commands invoked by the Shell.
+
+          Onintr is executed within the Shell.
+
+     SEE ALSO
+          sh(1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

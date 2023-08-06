@@ -1,0 +1,3 @@
+hello.o:
+magic 9914 text:0 data:0 bss:0 heap:0 symbols:0 textoff:0 dataoff:0
+relocs:

@@ -1,0 +1,132 @@
+[1mNAME[0m
+     [1mp1 [22m‐ pass one of C compiler
+
+
+[1mFUNCTION[0m
+     p1 performs machine independent syntax analysis and pre‐code
+     generation typing and expression reduction.  It reads encod‐
+     ed tokens from pp and writes encoded commands and expression
+     trees to p2.  The current file  name  and  line  number  are
+     passed  from pp so that errors may be properly labelled.  If
+     any errors occur in p1, p2 is superfluous and should not  be
+     run.
+
+     Its basic data transform is to recognize sequences of exter‐
+     nal declarations:
+
+     [1mgscty ‐ [22mbuilds storage class and type of the declaration in‐
+          to  a prototype SYMBOL.  gscty is at the top of a group
+          of modules which recognize and build the complex  types
+          struct  and  union.  gscty is used from all declaration
+          contexts.
+
+     [1mgdecl ‐ [22madds the declaration name and  other  attributes  to
+          the prototype SYMBOL.  gdecl is also used in other dec‐
+          laration contexts.
+
+     [1mmain ‐ [22mbuilds the symbol  table  of  external  declarations.
+          main  calls  either  fninit, to deal with functions, or
+          datinit to deal with  data  declarations  and  possible
+          initializers.
+
+     [1mfninit  ‐  [22mparses a complete function initializer.  Included
+          in function initializers are local declarations and ex‐
+          ecutable statements.  fninit breaks a function body in‐
+          to a series of expression  evaluations  embedded  in  a
+          network  of  if’s and goto’s, sending commands to p2 to
+          generate the appropriate machine code.
+
+     [1mdatinit ‐ [22mparses a data initializer and passes  commands  on
+          to  p2,  which outputs the appropriate assembler direc‐
+          tives.
+
+     Expressions are built for use by fninit or datinit using the
+     following transforms:
+
+     [1mmexpr  ‐  [22mmakes  a complete expression tree.  It gets tokens
+          from the input stream and parses them top down.
+
+     [1mtypify ‐ [22mwalks the expression, typing each operand and oper‐
+          ation and checking for adherence to the rules of C.
+
+     [1mreduce  ‐  [22mperforms compile time expression reduction on the
+          typified tree.
+
+     The code is organized into several files:
+
+     [1mint01.h ‐ [22mdefinitions common to pp and p1
+
+     [1mint012.h ‐ [22mdefinitions common to all parts of the C  compil‐
+          er.
+
+     [1mint1.h ‐ [22mdata structures and type definitions peculiar to p1
+          but commom to all parts thereof.
+
+     [1mint12.h ‐ [22mdefinitions common to p1 and p2.
+
+     [1mp1conf.c ‐ [22mthe configuration file, containing p1 machine de‐
+          pendencies.
+
+     [1mp1expr.c  ‐ [22mthe expression parser for p1.  The parser builds
+          and returns a single complete expression tree.
+
+     [1mp1func.c ‐ [22mparses a single function body, including argument
+          declarations,  auto and register declarations, and exe‐
+          cutable statements.
+
+     [1mp1gets.c ‐ [22mdoes all input for p1.  In particular  gtok  gets
+          an encoded lexeme from pp and builds a TOKEN.
+
+     [1mp1main.c  ‐  [22mis the parser of external declarations, and, as
+          such, the driver of p1.
+
+     [1mp1puts.c ‐ [22mdoes all output for p1.  It puts command language
+          and expression trees to p2.
+
+     [1mp1red.c ‐ [22mdoes all compile time expression reduction includ‐
+          ing  constant  evaluation,  term  commutation,  subtree
+          elimination and subtree movement.
+
+     [1mp1subs.c ‐ [22mthe subroutines used by various parts of p1.
+
+     [1mp1type.c  ‐ [22mforces all operands and operators to the correct
+          type.  Alters arrays and functions to scalars.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,66 @@
+[1mNAME[0m
+     [1mp0main.c [22m‐ preprocessor driver
+
+
+[1mFUNCTION[0m
+     p0main.c  contains the main data flow through the preproces‐
+     sor as outlined in the pp internals document.
+
+     pflag is a secret flag set by nxtfile and the #include logic
+     of  putns  to inform putls that the filename has changed and
+     should be reported to p1.  If lexemes are not being put  out
+     by putls, pflag is never cleared.
+
+     A  static text buffer is used by getln to assemble a logical
+     line.  Everyone is careful to make full use of a line before
+     calling getln for the next line.
+
+     The  code  in getln whichs builds the line without continua‐
+     tions and comments is somewhat twisty; in pseudo‐code:
+
+        get a buffer full
+        while (still characters in the buffer)
+                if (last char is ’´)
+                        up line count
+                        get as much as will fit in the buffer
+                else if (’´ anywhere)
+                        walk past ’´ plus next
+                else if (’/*’)
+                        if (’*/’ in same line)
+                                get rid of comment
+                        else if (getting a new buffer fails)
+                                error ("incomplete comment")
+                        else
+                                place ’/*’ before new bufferful
+                else if (newline)
+                        up line count
+                        return
+                else
+                        walk past one char
+
+     free  and  frelst  calls  are  freely  sprinkled  throughout
+     p0main.c and to some extent throughout p0subs.c.  Failure to
+     free a generic structure will cause free storage to  quickly
+     evaporate.
+
+     [1mgetex ‐ [22mfrees #IFDEF, #IFNDEF TLIST’s
+
+     [1mgetin ‐ [22mfrees file name space; frees INCL’s
+
+     [1mputgr ‐ [22mfrelst TLIST for an if group
+
+     [1mputns ‐ [22mfrelst TLIST for define, include, undef, line state‐
+          ments Several error conditions require freeing  of  one
+          sort or another.
+
+
+
+
+
+
+
+
+
+
+
+

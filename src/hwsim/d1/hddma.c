@@ -26,6 +26,7 @@
  */
 
 #include "sim.h"
+#include "hwsim.h"
 #include "util.h"
 #include <sys/types.h>
 #include <unistd.h>

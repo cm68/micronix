@@ -1,0 +1,132 @@
+[1mNAME[0m
+     [1mp1 [22m‐ parse C programs
+
+[1mSYNOPSIS[0m
+     p1 ‐[a b# c e l m n# o* r# u] <file>
+
+[1mFUNCTION[0m
+     p1  is the parsing pass of the C compiler.  It accepts a se‐
+     quential file of lexemes from the preprocessor pp and writes
+     a  sequential  file of flow graphs and parse trees, suitable
+     for input to a machine‐dependent code generator p2.  The op‐
+     eration  of p1 is largely independent of any target machine.
+     The flag options are:
+
+     [1m‐a [22mcompile code for machines with separate address and  data
+          registers.   This  flag  implies ‐r6 (because currently
+          used only in conjunction with the MC68000 code  genera‐
+          tor).
+
+     [1m‐b#  [22menforce storage boundaries according to #, which is re‐
+          duced modulo 4.  A bound of 0 leaves no holes in struc‐
+          tures  or  auto allocations; a bound of 1 (default) re‐
+          quires short, int and longer data to begin on  an  even
+          bound;  a  bound of 2 is the same as 1, except that 4‐8
+          byte data are forced to a multiple of four byte  bound‐
+          ary;  a bound of 3 is the same as 2, except that 8 byte
+          data (doubles) are forced to a multiple of  eight  byte
+          boundary.
+
+     [1m‐c  [22mignore case distinctions in testing external identifiers
+          for equality, and map all names to lowercase on output.
+          By default, case distinctions matter.
+
+     [1m‐e  [22mdon’t  force  loading  of extern references that are de‐
+          clared but never defined or used in an expression.  De‐
+          fault is to load all externs declared.
+
+     [1m‐l  [22mtake  integers and pointers to be 4 bytes long.  Default
+          is 2 bytes.
+
+     [1m‐m [22mtreat each struct/union as a separate name space, and re‐
+          quire  x.m to have x a structure with m one of its mem‐
+          bers.
+
+     [1m‐n# [22mignore characters after the first # in testing  external
+          identifiers  for equality.  Default is 7; maximum is 8,
+          except that values up  to  32  are  permitted  for  the
+          VAX‐11 code generator only.
+
+     [1m‐o*  [22mwrite the output to the file * and write error messages
+          to STDOUT.  Default is STDOUT for output and STDERR for
+          error messages.
+
+     [1m‐r#  [22massign no more than # variables to registers at any one
+          time, where # is reduced modulo 7.  Default is 3 regis‐
+          ter  variables; values above 3 are currently acceptable
+          only for the MC68000 code generator (3 data registers +
+          3  address registers maximum), and the VAX‐11 code gen‐
+          erator (6 registers maximum).
+
+     [1m‐u [22mtake "string" as array of unsigned  char,  not  array  of
+          char.
+
+     If  <file>  is present, it is used as the input file instead
+     of  the  default  STDIN.   On  many  systems   (other   than
+     Idris/UNIX),  the ‐o option and <file> are mandatory because
+     STDIN and STDOUT are interpreted as text  files,  and  hence
+     become corrupted.
+[1mEXAMPLE[0m
+
+     p1 is usually sandwiched between pp and some version of p2, as in:
+
+             pp ‐x ‐o temp1 file.c
+             p1 ‐o temp2 temp1
+             p2.11 ‐o file.s temp2
+
+[1mSEE ALSO[0m
+     pp
+
+[1mBUGS[0m
+     p1 can be rather cavalier about semicolons.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

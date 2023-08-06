@@ -1,7 +1,8 @@
 /*
  * format of the mount file managed by mount(1) and umount(1).
  * 
- * include/mtab.h
+ * /include/mtab.h
+ *
  * Changed: <2021-12-23 15:09:10 curt>
  */
 struct mtab {

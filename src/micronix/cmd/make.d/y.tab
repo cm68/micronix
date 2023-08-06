@@ -1,0 +1,309 @@
+
+# line 1 "p:gram.y"
+#include "defs"
+# define NAME 257
+# define SHELLINE 258
+# define START 259
+# define MACRODEF 260
+# define COLON 261
+# define DOUBLECOLON 262
+# define GREATER 263
+#define yyclearin yychar = -1
+#define yyerrok yyerrflag = 0
+extern int yychar;
+extern short yyerrflag;
+#ifndef YYMAXDEPTH
+#define YYMAXDEPTH 150
+#endif
+#ifndef YYSTYPE
+#define YYSTYPE int
+#endif
+YYSTYPE yylval, yyval;
+
+# line 9 "p:gram.y"
+struct depblock *pp;
+FSTATIC struct shblock *prevshp;
+
+FSTATIC struct nameblock *lefts[NLEFTS];
+struct nameblock *leftp;
+FSTATIC int nlefts;
+
+struct lineblock *lp, *lpp;
+FSTATIC struct depblock *prevdep;
+FSTATIC int sepc;
+# define YYERRCODE 256
+
+# line 101 "p:gram.y"
+
+
+
+
+# include "lex.c"
+short yyexca[] ={
+-1, 1,
+	0, -1,
+	-2, 0,
+	};
+# define YYNPROD 19
+# define YYLAST 18
+short yyact[]={
+
+   9,  15,  18,   5,  12,  13,   3,   4,  16,  17,
+   7,  11,  10,  14,   8,   6,   2,   1 };
+short yypact[]={
+
+-1000,-253,-1000,-247,-1000,-1000,-257,-1000,-250,-1000,
+-248,-1000,-1000,-1000,-1000,-256,-1000,-1000,-1000 };
+short yypgo[]={
+
+   0,  17,  16,  15,  14,  13,  12,  11,   1 };
+short yyr1[]={
+
+   0,   1,   1,   2,   2,   2,   2,   3,   3,   4,
+   4,   6,   6,   7,   7,   5,   5,   8,   8 };
+short yyr2[]={
+
+   0,   0,   2,   1,   1,   4,   1,   1,   2,   0,
+   1,   1,   2,   1,   1,   0,   1,   1,   2 };
+short yychk[]={
+
+-1000,  -1,  -2, 259, 260, 256,  -3, 257,  -4, 257,
+  -6,  -7, 261, 262,  -5,  -8, 258, 257, 258 };
+short yydef[]={
+
+   1,  -2,   2,   3,   4,   6,   9,   7,  15,   8,
+  10,  11,  13,  14,   5,  16,  17,  12,  18 };
+#if	!defined(lint) && defined(DOSCCS)
+static char yaccpar_sccsid[] = "@(#)yaccpar	4.1	(Berkeley)	2/11/83";
+#endif
+
+#
+# define YYFLAG -1000
+# define YYERROR goto yyerrlab
+# define YYACCEPT return(0)
+# define YYABORT return(1)
+
+/*	parser for yacc output	*/
+
+#ifdef YYDEBUG
+int yydebug = 0; /* 1 for debugging */
+#endif
+YYSTYPE yyv[YYMAXDEPTH]; /* where the values are stored */
+int yychar = -1; /* current input token number */
+int yynerrs = 0;  /* number of errors */
+short yyerrflag = 0;  /* error recovery flag */
+
+yyparse() {
+
+	short yys[YYMAXDEPTH];
+	short yyj, yym;
+	register YYSTYPE *yypvt;
+	register short yystate, *yyps, yyn;
+	register YYSTYPE *yypv;
+	register short *yyxi;
+
+	yystate = 0;
+	yychar = -1;
+	yynerrs = 0;
+	yyerrflag = 0;
+	yyps= &yys[-1];
+	yypv= &yyv[-1];
+
+ yystack:    /* put a state and value onto the stack */
+
+#ifdef YYDEBUG
+	if( yydebug  ) printf( "state %d, char 0%o\n", yystate, yychar );
+#endif
+		if( ++yyps> &yys[YYMAXDEPTH] ) { yyerror( "yacc stack overflow" ); return(1); }
+		*yyps = yystate;
+		++yypv;
+		*yypv = yyval;
+
+ yynewstate:
+
+	yyn = yypact[yystate];
+
+	if( yyn<= YYFLAG ) goto yydefault; /* simple state */
+
+	if( yychar<0 ) if( (yychar=yylex())<0 ) yychar=0;
+	if( (yyn += yychar)<0 || yyn >= YYLAST ) goto yydefault;
+
+	if( yychk[ yyn=yyact[ yyn ] ] == yychar ){ /* valid shift */
+		yychar = -1;
+		yyval = yylval;
+		yystate = yyn;
+		if( yyerrflag > 0 ) --yyerrflag;
+		goto yystack;
+		}
+
+ yydefault:
+	/* default state action */
+
+	if( (yyn=yydef[yystate]) == -2 ) {
+		if( yychar<0 ) if( (yychar=yylex())<0 ) yychar = 0;
+		/* look through exception table */
+
+		for( yyxi=yyexca; (*yyxi!= (-1)) || (yyxi[1]!=yystate) ; yyxi += 2 ) ; /* VOID */
+
+		while( *(yyxi+=2) >= 0 ){
+			if( *yyxi == yychar ) break;
+			}
+		if( (yyn = yyxi[1]) < 0 ) return(0);   /* accept */
+		}
+
+	if( yyn == 0 ){ /* error */
+		/* error ... attempt to resume parsing */
+
+		switch( yyerrflag ){
+
+		case 0:   /* brand new error */
+
+			yyerror( "syntax error" );
+		yyerrlab:
+			++yynerrs;
+
+		case 1:
+		case 2: /* incompletely recovered error ... try again */
+
+			yyerrflag = 3;
+
+			/* find a state where "error" is a legal shift action */
+
+			while ( yyps >= yys ) {
+			   yyn = yypact[*yyps] + YYERRCODE;
+			   if( yyn>= 0 && yyn < YYLAST && yychk[yyact[yyn]] == YYERRCODE ){
+			      yystate = yyact[yyn];  /* simulate a shift of "error" */
+			      goto yystack;
+			      }
+			   yyn = yypact[*yyps];
+
+			   /* the current yyps has no shift onn "error", pop stack */
+
+#ifdef YYDEBUG
+			   if( yydebug ) printf( "error recovery pops state %d, uncovers %d\n", *yyps, yyps[-1] );
+#endif
+			   --yyps;
+			   --yypv;
+			   }
+
+			/* there is no state on the stack with an error shift ... abort */
+
+	yyabort:
+			return(1);
+
+
+		case 3:  /* no shift yet; clobber input char */
+
+#ifdef YYDEBUG
+			if( yydebug ) printf( "error recovery discards char %d\n", yychar );
+#endif
+
+			if( yychar == 0 ) goto yyabort; /* don't discard EOF, quit */
+			yychar = -1;
+			goto yynewstate;   /* try again in the same state */
+
+			}
+
+		}
+
+	/* reduction by production yyn */
+
+#ifdef YYDEBUG
+		if( yydebug ) printf("reduce %d\n",yyn);
+#endif
+		yyps -= yyr2[yyn];
+		yypvt = yypv;
+		yypv -= yyr2[yyn];
+		yyval = yypv[1];
+		yym=yyn;
+			/* consult goto table to find next state */
+		yyn = yyr1[yyn];
+		yyj = yypgo[yyn] + *yyps + 1;
+		if( yyj>=YYLAST || yychk[ yystate = yyact[yyj] ] != -yyn ) yystate = yyact[yypgo[yyn]];
+		switch(yym){
+			
+case 5:
+# line 28 "p:gram.y"
+ {
+	    while( --nlefts >= 0)
+		{
+		leftp = lefts[nlefts];
+		if(leftp->septype == 0)
+			leftp->septype = sepc;
+		else if(leftp->septype != sepc)
+			fprintf(stderr, "Inconsistent rules lines for `%s'\n",
+				leftp->namep);
+		else if(sepc==ALLDEPS && *(leftp->namep)!='.' && yypvt[-0]!=0)
+			{
+			for(lp=leftp->linep; lp->nextp!=0; lp=lp->nextp)
+			    if(lp->shp)
+				fprintf(stderr, "Multiple rules lines for `%s'\n",
+				    leftp->namep);
+			}
+
+		lp = intalloc(sizeof(*lp));
+		lp->nextp = 0;
+		lp->depp = yypvt[-1];
+		lp->shp = yypvt[-0];
+
+		if(equals(leftp->namep, ".SUFFIXES") && yypvt[-1]==0)
+			leftp->linep = 0;
+		else if(leftp->linep == 0)
+			leftp->linep = lp;
+		else	{
+			for(lpp = leftp->linep; lpp->nextp!=0;
+				lpp = lpp->nextp) ;
+				if(sepc == ALLDEPS)
+					lpp->shp = 0;
+			lpp->nextp = lp;
+			}
+		}
+	} break;
+case 7:
+# line 66 "p:gram.y"
+ { lefts[0] = yypvt[-0]; nlefts = 1; } break;
+case 8:
+# line 67 "p:gram.y"
+ { lefts[nlefts++] = yypvt[-0];
+	    	if(nlefts>NLEFTS) fatal("Too many lefts"); } break;
+case 9:
+# line 71 "p:gram.y"
+ { fatal("Must be a separator on rules line"); } break;
+case 11:
+# line 75 "p:gram.y"
+ { prevdep = 0;  yyval = 0; } break;
+case 12:
+# line 76 "p:gram.y"
+ {
+			  pp = intalloc(sizeof(*pp));
+			  pp->nextp = 0;
+			  pp->depname = yypvt[-0];
+			  if(prevdep == 0) yyval = pp;
+			  else  prevdep->nextp = pp;
+			  prevdep = pp;
+			  } break;
+case 13:
+# line 86 "p:gram.y"
+ { sepc = ALLDEPS; } break;
+case 14:
+# line 87 "p:gram.y"
+ { sepc = SOMEDEPS; } break;
+case 15:
+# line 90 "p:gram.y"
+ {yyval = 0; } break;
+case 16:
+# line 91 "p:gram.y"
+ { yyval = yypvt[-0]; } break;
+case 17:
+# line 94 "p:gram.y"
+ { yyval = yypvt[-0];  prevshp = yypvt[-0]; } break;
+case 18:
+# line 95 "p:gram.y"
+ { yyval = yypvt[-1];
+			prevshp->nextp = yypvt[-0];
+			prevshp = yypvt[-0];
+			} break;
+		}
+		goto yystack;  /* stack new state and value */
+
+	}

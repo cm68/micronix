@@ -4,7 +4,8 @@
 # micronix/cmd/mknod/Makefile
 #
 # Changed: <2023-06-23 01:12:17 curt>
-
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 all:	mknod
 
@@ -20,4 +21,3 @@ install: mknod
 
 clean: ; rm mknod *.o
 
-# vim: tabstop=4 shiftwidth=4 noexpandtab:

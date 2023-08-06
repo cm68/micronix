@@ -1,0 +1,7 @@
+this code is shitty c.
+
+1) it makes calls with variable number of arguments
+   assuming that the arguments are on the stack.
+   varargs was invented to make this kind of thing portable,
+   but modern C compilers really shit the bed when you take the address
+   of an argument and increment it.

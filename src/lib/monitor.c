@@ -3,7 +3,7 @@
  *
  * lib/monitor.c
  *
- * Changed: <2023-06-23 15:11:11 curt>
+ * Changed: <2023-07-29 09:12:49 curt>
  *
  */
 #include <curses.h>
@@ -184,6 +184,10 @@ monitor()
         i = read_line(cmdline, sizeof(cmdline));
         s = cmdline;
 
+        if (i < 1) {
+            printf("read_line returned %d\n", i);
+            exit(4);
+        }
         skipwhite(&s);
         c = *s++;
         skipwhite(&s);

@@ -1,0 +1,49 @@
+/* here are the definitions of the files, etc. which differ from
+	installation to installation */
+
+/*	tempfile names */
+# define TEMPNAME "yacc.tmp"
+# define ACTNAME "yacc.acts"
+
+/*	output names for C, ratfor, efl */
+# define FILEC "y.tab.c"
+# define FILER "y.tab.r"
+# define FILEE "y.tab.e"
+
+/*	user output file */
+# define FILEU "y.output"
+
+	/* file for # defines */
+# define FILED "y.tab.h"
+
+	/* if two pass operation is desired, insert here defines for
+	   a macro TWOPASS (no contents), and define a macro
+		define OPTFILE "filename"
+	with the location of the optimizer program */
+	/* the installation then proceeds by
+	cc -O y[0-4].c -lS
+	mv a.out yacc
+	cc -O y5.c -lS
+	mv a.out optimizer_file
+	*/
+
+/* location of the parsers */
+# define CPARSER "/usr/lib/yaccopar"
+# define RPARSER "/usr/lib/yaccrpar"
+# define EPARSER "/usr/lib/yaccepar"
+
+/*	command to clobber tempfiles after use */
+# define ZAPFILE(x)  unlink(x)
+
+	/* bit packing macros (may be machine dependent) */
+# define BIT(a,i) ((a)[(i)>>4] & (1<<((i)&017)))
+# define SETBIT(a,i) ((a)[(i)>>4] |= (1<<((i)&017)))
+
+	/* number of words needed to hold n+1 bits */
+# define NWORDS(n) (((n)+16)/16)
+
+#ifdef notdef
+# define isdigit(x) ((x)>='0' && (x)<='9')
+# define isupper(x) ((x)>='A' && (x)<='Z')
+# define islower(x) ((x)>='a' && (x)<='z')
+#endif

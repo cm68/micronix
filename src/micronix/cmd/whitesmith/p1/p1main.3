@@ -1,0 +1,66 @@
+[1mNAME[0m
+     [1mp1main.c [22m‐ declaration parsing
+
+
+[1mFUNCTION[0m
+     p1main.c  controls  declaration parsing and symbol table ma‐
+     nipulation for p1.
+
+     The files, flags, and symbol table definitions are well doc‐
+     umented in the code.  The m flag to p1 indicates each struc‐
+     ture and union will have its own private member of structure
+     table.
+
+     Comma separated lists are parsed in several contexts:
+
+        while not list end
+                get sc and ty
+                if either
+                        progress = YES
+                while decl
+                        progress = YES
+                        build symbol table
+                        if cant eat comma break
+                if next not ; and no progress
+                        error
+
+     Cmptype  compares  the complete type of two symbol table en‐
+     tries.
+
+     Decsu parses  structure‐union  declarations.   It  uses  the
+     mechanism  sketched above, although it must also deal within
+     with bit fields.  At a.b.boff the offset of the bit field is
+     built.   At  a.b.bsize  the  size of the bit field is built.
+     Also members of stuctures are  placed  into  the  member  of
+     structure table, and members and tags are associated.
+
+     dterm  parses  the  declaration part of a term, on a left to
+     right basis.  dterm must recognize:
+
+        *, (dterm), ident, (), []
+
+     gdecl parses a full declaration.  It gets a prototype symbol
+     table,  and  calls dterm to complete the job.  It then flips
+     the ty and at fields, so that it matches the way a C  decla‐
+     ration should look.
+
+     Going  up  a  level,  gscty  gets a storage class, modifier,
+     type, and builds the prototype symbol table entry.  And  go‐
+     ing  up  one  more  level,  to the very top, main parses se‐
+     quences of external, static, ot typedef statements,  accord‐
+     ing to the structure for list walking previously given.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

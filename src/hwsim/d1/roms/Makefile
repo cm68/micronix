@@ -3,7 +3,9 @@
 #
 # hwsim/d1/roms/Makefile
 #
-# Changed: <2023-06-20 18:04:52 curt>
+# Changed: <2023-07-10 14:47:33 curt>
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 OBJ = mon375.bin mon447.bin
 SYM = mon375.sym mon447.sym
@@ -33,6 +35,3 @@ clean:
 	rm -f *.cim *.lst *.bin *.sym
 
 clobber: clean
-
-# vim: tabstop=4 shiftwidth=4 expandtab:
-

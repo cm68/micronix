@@ -1,0 +1,66 @@
+     PROGRAM
+          shift ‐ adjust Shell arguments
+
+     USAGE shift [ digit ]
+
+     FUNCTION
+          Shift is used in Shell command files to shift the argu‐
+          ment list left by 1, so that old $2 can now be referred
+          to by $1 and so forth.  Shift is useful to iterate over
+          several arguments to a command file.
+
+          For example, the command file
+
+          while "$1"
+                  pr ‐3 $1
+                  shift
+          end
+
+          prints each of its arguments in 3‐column format.
+
+          Shift is executed within the Shell.
+
+          The optional argument causes shift to leave shell argu‐
+          ments numbered lower than $digit alone on shifts; shift
+          alone and "shift 1" are identical in effect.
+
+    SEE ALSO
+          sh(1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

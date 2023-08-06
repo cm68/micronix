@@ -1,0 +1,476 @@
+148982 execve("/usr/bin/man", ["man", "ls"], 0x7ffdd3bfb340 /* 49 vars */) = 0
+148982 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/lib/man-db/tls/x86_64/x86_64/libmandb-2.9.4.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/lib/man-db/tls/x86_64/x86_64", 0x7ffc9c138550) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/lib/man-db/tls/x86_64/libmandb-2.9.4.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/lib/man-db/tls/x86_64", 0x7ffc9c138550) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/lib/man-db/tls/x86_64/libmandb-2.9.4.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/lib/man-db/tls/x86_64", 0x7ffc9c138550) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/lib/man-db/tls/libmandb-2.9.4.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/lib/man-db/tls", 0x7ffc9c138550) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/lib/man-db/x86_64/x86_64/libmandb-2.9.4.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/lib/man-db/x86_64/x86_64", 0x7ffc9c138550) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/lib/man-db/x86_64/libmandb-2.9.4.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/lib/man-db/x86_64", 0x7ffc9c138550) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/lib/man-db/x86_64/libmandb-2.9.4.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/lib/man-db/x86_64", 0x7ffc9c138550) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/lib/man-db/libmandb-2.9.4.so", O_RDONLY|O_CLOEXEC) = 3
+148982 openat(AT_FDCWD, "/usr/lib/man-db/libman-2.9.4.so", O_RDONLY|O_CLOEXEC) = 3
+148982 openat(AT_FDCWD, "/usr/lib/man-db/libz.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+148982 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libz.so.1", O_RDONLY|O_CLOEXEC) = 3
+148982 openat(AT_FDCWD, "/usr/lib/man-db/libpipeline.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libpipeline.so.1", O_RDONLY|O_CLOEXEC) = 3
+148982 openat(AT_FDCWD, "/usr/lib/man-db/libc.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+148982 openat(AT_FDCWD, "/usr/lib/man-db/libgdbm.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libgdbm.so.6", O_RDONLY|O_CLOEXEC) = 3
+148982 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libseccomp.so.2", O_RDONLY|O_CLOEXEC) = 3
+148982 openat(AT_FDCWD, "/etc/ld.so.preload", O_RDONLY) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/lib/locale/locale-archive", O_RDONLY|O_CLOEXEC) = 3
+148982 openat(AT_FDCWD, "/home/curt/.manpath", O_RDONLY) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/etc/manpath.config", O_RDONLY) = 3
+148982 stat("/home/curt/kde/src/kdesrc-build/pager", 0x7ffc9c139230) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/.local/bin/pager", 0x7ffc9c139230) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/bin/pager", 0x7ffc9c139230) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/local/bin/pager", 0x7ffc9c139230) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/bin/pager", {st_mode=S_IFREG|0755, st_size=175816, ...}) = 0
+148982 openat(AT_FDCWD, "/usr/share/locale/locale.alias", O_RDONLY|O_CLOEXEC) = 3
+148982 openat(AT_FDCWD, "/usr/share/locale/en_US.UTF-8/LC_MESSAGES/man-db.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/share/locale/en_US.utf8/LC_MESSAGES/man-db.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/share/locale/en_US/LC_MESSAGES/man-db.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/share/locale/en.UTF-8/LC_MESSAGES/man-db.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/share/locale/en.utf8/LC_MESSAGES/man-db.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/share/locale/en/LC_MESSAGES/man-db.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/kde/src/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/kde/src/kdesrc-build/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/kde/src/share/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/kde/src/kdesrc-build/share/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/.local/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/.local/bin/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/.local/share/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/.local/bin/share/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/bin/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/share/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/bin/share/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/local/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/local/share/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/local/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/local/games/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/local/share/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/local/games/share/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/src/esp/xtensa-lx106-elf/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/src/esp/xtensa-lx106-elf/bin/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/src/esp/xtensa-lx106-elf/share/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/src/esp/xtensa-lx106-elf/bin/share/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/.local/share/JetBrains/Toolbox/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/.local/share/JetBrains/Toolbox/scripts/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/.local/share/JetBrains/Toolbox/share/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/.local/share/JetBrains/Toolbox/scripts/share/man", 0x7ffc9c139170) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/man", 0x7ffc9c1390e0) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/share/man", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 stat("/usr/share/man/ro", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/da", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/zh_CN", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/ko", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/gl", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/id", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/fi", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/nb", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/el", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/es", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/tr", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/pt_BR", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/fr", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/ca", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/de", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/pt", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/nl", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/it", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/fr.UTF-8", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/ru", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/cs", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/hu", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/lt", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/pl", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/fr.ISO8859-1", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/sr", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/sv", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/uk", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/ja", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/sl", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/et", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man/zh_TW", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/local/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/local", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/local/man", {st_mode=S_IFLNK|0777, st_size=9, ...}) = 0
+148982 readlink("/usr/local/man", "share/man", 4095) = 9
+148982 lstat("/usr/local/share", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/local/share/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/local/share/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/local", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/local/share", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/local/share/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/share", {st_mode=S_IFDIR|0755, st_size=12288, ...}) = 0
+148982 lstat("/usr/share/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/local/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/local", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/local/man", {st_mode=S_IFLNK|0777, st_size=9, ...}) = 0
+148982 readlink("/usr/local/man", "share/man", 4095) = 9
+148982 lstat("/usr/local/share", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/local/share/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/local/share/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/local", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/local/share", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/local/share/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 stat("/usr/share/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 lstat("/usr/share", {st_mode=S_IFDIR|0755, st_size=12288, ...}) = 0
+148982 lstat("/usr/share/man", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/var/cache/man/oldlocal/index.db", O_RDONLY) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/gconv/gconv-modules.cache", O_RDONLY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man/man1", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(3, "/usr/share/man/man1/ls.1.gz", O_RDONLY) = 4
+148982 lstat("/usr/share/man/man1/ls.1.gz", {st_mode=S_IFREG|0644, st_size=3249, ...}) = 0
+148982 stat("/usr/share/man/man1/ls.1.gz", {st_mode=S_IFREG|0644, st_size=3249, ...}) = 0
+148982 stat("/usr/share/man/man1/ls.1.gz", {st_mode=S_IFREG|0644, st_size=3249, ...}) = 0
+148982 openat(AT_FDCWD, "/usr/share/man/man1/ls.1.gz", O_RDONLY) = 3
+148983 +++ exited with 0 +++
+148982 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148983, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/var/cache/man/index.db", O_RDONLY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man/man8", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man/man3", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man/man2", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man/man5", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man/man4", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man/man9", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man/man6", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/local/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man/man7", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+148982 openat(AT_FDCWD, "/usr/share/man", O_RDONLY|O_PATH|O_DIRECTORY) = 3
+148982 access("/usr/share/man/man1/ls.1.gz", R_OK) = 0
+148982 lstat("/usr/share/man/man1/ls.1.gz", {st_mode=S_IFREG|0644, st_size=3249, ...}) = 0
+148982 stat("/usr/share/man/man1/ls.1.gz", {st_mode=S_IFREG|0644, st_size=3249, ...}) = 0
+148982 stat("/usr/share/man/man1/ls.1.gz", {st_mode=S_IFREG|0644, st_size=3249, ...}) = 0
+148982 openat(AT_FDCWD, "/usr/share/man/man1/ls.1.gz", O_RDONLY) = 3
+148984 +++ exited with 0 +++
+148982 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148984, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148982 stat("/usr/share/man/man1/ls.1.gz", {st_mode=S_IFREG|0644, st_size=3249, ...}) = 0
+148982 stat("/usr/share/man/cat1/ls.1.gz", 0x7ffc9c139160) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/share/man/man1/ls.1.gz", {st_mode=S_IFREG|0644, st_size=3249, ...}) = 0
+148982 stat("/home/curt/kde/src/kdesrc-build/gpreconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/.local/bin/gpreconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/bin/gpreconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/local/bin/gpreconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/bin/gpreconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/bin/gpreconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/local/games/gpreconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/games/gpreconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/src/esp/xtensa-lx106-elf/bin/gpreconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/.local/share/JetBrains/Toolbox/scripts/gpreconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/kde/src/kdesrc-build/preconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/.local/bin/preconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/home/curt/bin/preconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/local/bin/preconv", 0x7ffc9c138fe0) = -1 ENOENT (No such file or directory)
+148982 stat("/usr/bin/preconv", {st_mode=S_IFREG|0755, st_size=63848, ...}) = 0
+148982 openat(AT_FDCWD, "/usr/share/man/man1/ls.1.gz", O_RDONLY) = 3
+148982 access("/usr/share/man/mandb_nfmt", X_OK) = -1 ENOENT (No such file or directory)
+148982 openat(AT_FDCWD, "/dev/tty", O_RDONLY) = 3
+148982 stat("/usr/share/man/man1/ls.1.gz", {st_mode=S_IFREG|0644, st_size=3249, ...}) = 0
+148982 stat("/usr/share/man/man1/ls.1.gz", {st_mode=S_IFREG|0644, st_size=3249, ...}) = 0
+148985 +++ exited with 0 +++
+148982 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148985, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148982 stat("/var/cache/man/cat1/ls.1.gz", 0x7ffc9c139020) = -1 ENOENT (No such file or directory)
+148982 stat("/var/cache/man/cat1", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148982 access("/usr/share/man/man1/ls.1.gz", R_OK) = 0
+148982 openat(AT_FDCWD, "/var/cache/man/cat1/catY0qLqv", O_RDWR|O_CREAT|O_EXCL, 0600) = -1 EACCES (Permission denied)
+148986 openat(AT_FDCWD, "/dev/null", O_WRONLY) = 3
+148986 chdir("/usr/share/man")          = 0
+148987 openat(AT_FDCWD, "/dev/null", O_WRONLY) = 3
+148987 chdir("/usr/share/man")          = 0
+148988 openat(AT_FDCWD, "/dev/null", O_WRONLY) = 3
+148988 chdir("/usr/share/man")          = 0
+148989 openat(AT_FDCWD, "/dev/null", O_WRONLY) = 3
+148989 chdir("/usr/share/man")          = 0
+148990 openat(AT_FDCWD, "/dev/null", O_WRONLY) = 3
+148990 chdir("/usr/share/man")          = 0
+148992 execve("/home/curt/kde/src/kdesrc-build/pager", ["pager"], 0x5623f5347140 /* 53 vars */) = -1 ENOENT (No such file or directory)
+148992 execve("/home/curt/.local/bin/pager", ["pager"], 0x5623f5347140 /* 53 vars */) = -1 ENOENT (No such file or directory)
+148992 execve("/home/curt/bin/pager", ["pager"], 0x5623f5347140 /* 53 vars */) = -1 ENOENT (No such file or directory)
+148992 execve("/usr/local/bin/pager", ["pager"], 0x5623f5347140 /* 53 vars */) = -1 ENOENT (No such file or directory)
+148992 execve("/usr/bin/pager", ["pager"], 0x5623f5347140 /* 53 vars */) = 0
+148992 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+148992 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+148992 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libtinfo.so.6", O_RDONLY|O_CLOEXEC) = 3
+148988 execve("/home/curt/kde/src/kdesrc-build/preconv", ["preconv", "-e", "UTF-8"], 0x5623f52e5b90 /* 52 vars */) = -1 ENOENT (No such file or directory)
+148988 execve("/home/curt/.local/bin/preconv", ["preconv", "-e", "UTF-8"], 0x5623f52e5b90 /* 52 vars */) = -1 ENOENT (No such file or directory)
+148988 execve("/home/curt/bin/preconv", ["preconv", "-e", "UTF-8"], 0x5623f52e5b90 /* 52 vars */ <unfinished ...>
+148992 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+148988 <... execve resumed>)            = -1 ENOENT (No such file or directory)
+148988 execve("/usr/local/bin/preconv", ["preconv", "-e", "UTF-8"], 0x5623f52e5b90 /* 52 vars */) = -1 ENOENT (No such file or directory)
+148988 execve("/usr/bin/preconv", ["preconv", "-e", "UTF-8"], 0x5623f52e5b90 /* 52 vars */) = 0
+148988 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+148988 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+148988 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libuchardet.so.0", O_RDONLY|O_CLOEXEC) = 3
+148988 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libstdc++.so.6", O_RDONLY|O_CLOEXEC) = 3
+148992 openat(AT_FDCWD, "/usr/bin/.sysless", O_RDONLY) = -1 ENOENT (No such file or directory)
+148992 openat(AT_FDCWD, "/etc/sysless", O_RDONLY) = -1 ENOENT (No such file or directory)
+148992 openat(AT_FDCWD, "/home/curt/.less", O_RDONLY) = -1 ENOENT (No such file or directory)
+148992 stat("/home/curt/.terminfo", 0x559e6457d510) = -1 ENOENT (No such file or directory)
+148992 stat("/etc/terminfo", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148992 stat("/lib/terminfo", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148992 stat("/usr/share/terminfo", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148988 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libgcc_s.so.1", O_RDONLY|O_CLOEXEC <unfinished ...>
+148992 access("/etc/terminfo/x/xterm", R_OK <unfinished ...>
+148988 <... openat resumed>)            = 3
+148992 <... access resumed>)            = -1 ENOENT (No such file or directory)
+148992 access("/lib/terminfo/x/xterm", R_OK) = 0
+148992 openat(AT_FDCWD, "/lib/terminfo/x/xterm", O_RDONLY) = 3
+148989 execve("/home/curt/kde/src/kdesrc-build/tbl", ["tbl"], 0x5623f52e5b90 /* 52 vars */ <unfinished ...>
+148993 +++ exited with 0 +++
+148989 <... execve resumed>)            = -1 ENOENT (No such file or directory)
+148988 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC <unfinished ...>
+148989 execve("/home/curt/.local/bin/tbl", ["tbl"], 0x5623f52e5b90 /* 52 vars */ <unfinished ...>
+148988 <... openat resumed>)            = 3
+148989 <... execve resumed>)            = -1 ENOENT (No such file or directory)
+148989 execve("/home/curt/bin/tbl", ["tbl"], 0x5623f52e5b90 /* 52 vars */) = -1 ENOENT (No such file or directory)
+148989 execve("/usr/local/bin/tbl", ["tbl"], 0x5623f52e5b90 /* 52 vars */ <unfinished ...>
+148992 openat(AT_FDCWD, "/usr/lib/locale/locale-archive", O_RDONLY|O_CLOEXEC <unfinished ...>
+148989 <... execve resumed>)            = -1 ENOENT (No such file or directory)
+148992 <... openat resumed>)            = 3
+148989 execve("/usr/bin/tbl", ["tbl"], 0x5623f52e5b90 /* 52 vars */ <unfinished ...>
+148992 openat(AT_FDCWD, "/home/curt/.lesshst", O_RDONLY <unfinished ...>
+148988 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libm.so.6", O_RDONLY|O_CLOEXEC) = 3
+148989 <... execve resumed>)            = 0
+148992 <... openat resumed>)            = 3
+148989 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+148989 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC <unfinished ...>
+148990 execve("/home/curt/kde/src/kdesrc-build/nroff", ["nroff", "-mandoc", "-Tutf8"], 0x5623f52e5b90 /* 52 vars */ <unfinished ...>
+148989 <... openat resumed>)            = 3
+148992 openat(AT_FDCWD, "/dev/tty", O_RDONLY) = 3
+148990 <... execve resumed>)            = -1 ENOENT (No such file or directory)
+148986 +++ exited with 0 +++
+148990 execve("/home/curt/.local/bin/nroff", ["nroff", "-mandoc", "-Tutf8"], 0x5623f52e5b90 /* 52 vars */ <unfinished ...>
+148982 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148986, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148990 <... execve resumed>)            = -1 ENOENT (No such file or directory)
+148990 execve("/home/curt/bin/nroff", ["nroff", "-mandoc", "-Tutf8"], 0x5623f52e5b90 /* 52 vars */ <unfinished ...>
+148989 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libstdc++.so.6", O_RDONLY|O_CLOEXEC) = 3
+148990 <... execve resumed>)            = -1 ENOENT (No such file or directory)
+148990 execve("/usr/local/bin/nroff", ["nroff", "-mandoc", "-Tutf8"], 0x5623f52e5b90 /* 52 vars */) = -1 ENOENT (No such file or directory)
+148990 execve("/usr/bin/nroff", ["nroff", "-mandoc", "-Tutf8"], 0x5623f52e5b90 /* 52 vars */ <unfinished ...>
+148992 getcwd( <unfinished ...>
+148990 <... execve resumed>)            = 0
+148992 <... getcwd resumed>"/big/src/micronix/src/micronix/cmd/whitesmith/util", 4096) = 51
+148992 lstat("/big/src/micronix/src/micronix/cmd/whitesmith/util/-",  <unfinished ...>
+148990 access("/etc/ld.so.preload", R_OK <unfinished ...>
+148989 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libgcc_s.so.1", O_RDONLY|O_CLOEXEC <unfinished ...>
+148990 <... access resumed>)            = -1 ENOENT (No such file or directory)
+148989 <... openat resumed>)            = 3
+148990 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+148990 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+148994 +++ exited with 0 +++
+148989 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+148989 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libm.so.6", O_RDONLY|O_CLOEXEC) = 3
+148988 openat(AT_FDCWD, "/usr/lib/locale/locale-archive", O_RDONLY|O_CLOEXEC) = 3
+148988 access("preconv", F_OK)          = -1 ENOENT (No such file or directory)
+148990 stat("/big/src/micronix/src/micronix/cmd/whitesmith/util",  <unfinished ...>
+148988 access("/home/curt/kde/src/kdesrc-build/preconv", F_OK) = -1 ENOENT (No such file or directory)
+148988 access("/home/curt/.local/bin/preconv", F_OK <unfinished ...>
+148987 +++ exited with 0 +++
+148988 <... access resumed>)            = -1 ENOENT (No such file or directory)
+148982 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148987, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148988 access("/home/curt/bin/preconv", F_OK) = -1 ENOENT (No such file or directory)
+148988 access("/usr/local/bin/preconv", F_OK) = -1 ENOENT (No such file or directory)
+148988 access("/usr/bin/preconv", F_OK) = 0
+148988 openat(AT_FDCWD, "/usr/lib/charset.alias", O_RDONLY|O_NOFOLLOW) = -1 ENOENT (No such file or directory)
+148988 +++ exited with 0 +++
+148982 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148988, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148989 +++ exited with 0 +++
+148982 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148989, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148992 <... lstat resumed>0x7ffc8324db40) = -1 ENOENT (No such file or directory)
+148992 getcwd("/big/src/micronix/src/micronix/cmd/whitesmith/util", 4096) = 51
+148992 lstat("/big/src/micronix/src/micronix/cmd/whitesmith/util/-", 0x7ffc8324db10) = -1 ENOENT (No such file or directory)
+148990 <... stat resumed>{st_mode=S_IFDIR|0777, st_size=18, ...}) = 0
+148990 stat(".", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+148990 getcwd("/usr/share/man", 4096)   = 15
+148990 openat(AT_FDCWD, "/usr/bin/nroff", O_RDONLY) = 3
+148995 openat(AT_FDCWD, "/dev/null", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 3
+148995 stat("/home/curt/kde/src/kdesrc-build/locale", 0x7ffeae67cdc0) = -1 ENOENT (No such file or directory)
+148995 stat("/home/curt/.local/bin/locale", 0x7ffeae67cdc0) = -1 ENOENT (No such file or directory)
+148995 stat("/home/curt/bin/locale", 0x7ffeae67cdc0) = -1 ENOENT (No such file or directory)
+148995 stat("/usr/local/bin/locale", 0x7ffeae67cdc0) = -1 ENOENT (No such file or directory)
+148995 stat("/usr/bin/locale", {st_mode=S_IFREG|0755, st_size=55336, ...}) = 0
+148995 execve("/usr/bin/locale", ["locale", "charmap"], 0x558677be89e8 /* 52 vars */) = 0
+148995 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+148995 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+148995 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+148995 openat(AT_FDCWD, "/usr/lib/locale/locale-archive", O_RDONLY|O_CLOEXEC) = 3
+148995 +++ exited with 0 +++
+148990 stat("/usr/bin/groff", {st_mode=S_IFREG|0755, st_size=124288, ...}) = 0
+148996 execve("/usr/bin/groff", ["groff", "-mtty-char", "-Tutf8", "-mandoc"], 0x558677be8038 /* 53 vars */ <unfinished ...>
+148990 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148995, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148996 <... execve resumed>)            = 0
+148996 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+148996 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+148996 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libstdc++.so.6", O_RDONLY|O_CLOEXEC) = 3
+148996 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libm.so.6", O_RDONLY|O_CLOEXEC) = 3
+148996 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = 3
+148996 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+148996 openat(AT_FDCWD, "/usr/share/groff/site-font/devutf8/DESC", O_RDONLY) = -1 ENOENT (No such file or directory)
+148996 openat(AT_FDCWD, "/usr/share/groff/1.22.4/font/devutf8/DESC", O_RDONLY) = 3
+148997 execve("/usr/bin/troff", ["troff", "-mtty-char", "-mandoc", "-Tutf8"], 0x55d3774a09f0 /* 54 vars */ <unfinished ...>
+148998 execve("/usr/bin/grotty", ["grotty"], 0x55d3774a09f0 /* 54 vars */ <unfinished ...>
+148997 <... execve resumed>)            = 0
+148997 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC <unfinished ...>
+148998 <... execve resumed>)            = 0
+148997 <... openat resumed>)            = 3
+148998 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+148998 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC <unfinished ...>
+148997 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libstdc++.so.6", O_RDONLY|O_CLOEXEC <unfinished ...>
+148998 <... openat resumed>)            = 3
+148997 <... openat resumed>)            = 3
+148998 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libstdc++.so.6", O_RDONLY|O_CLOEXEC) = 3
+148997 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libm.so.6", O_RDONLY|O_CLOEXEC) = 3
+148998 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libm.so.6", O_RDONLY|O_CLOEXEC) = 3
+148997 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = 3
+148998 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = 3
+148997 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+148998 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+148998 openat(AT_FDCWD, "/usr/lib/locale/locale-archive", O_RDONLY|O_CLOEXEC) = 3
+148997 openat(AT_FDCWD, "/usr/lib/locale/locale-archive", O_RDONLY|O_CLOEXEC) = 3
+148997 openat(AT_FDCWD, "/usr/share/groff/site-font/devutf8/DESC", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/font/devutf8/DESC", O_RDONLY) = 3
+148997 openat(AT_FDCWD, "/usr/share/groff/site-font/devutf8/R", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/font/devutf8/R", O_RDONLY) = 3
+148997 openat(AT_FDCWD, "/usr/share/groff/site-font/devutf8/I", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/font/devutf8/I", O_RDONLY) = 3
+148997 openat(AT_FDCWD, "/usr/share/groff/site-font/devutf8/B", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/font/devutf8/B", O_RDONLY) = 3
+148997 openat(AT_FDCWD, "/usr/share/groff/site-font/devutf8/BI", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/font/devutf8/BI", O_RDONLY) = 3
+148997 openat(AT_FDCWD, "/etc/localtime", O_RDONLY|O_CLOEXEC) = 3
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/troffrc", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/troffrc", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/troffrc", O_RDONLY) = 3
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/composite.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/composite.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/composite.tmac", O_RDONLY) = 4
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/fallbacks.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/fallbacks.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/fallbacks.tmac", O_RDONLY) = 4
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/tty.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/tty.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/tty.tmac", O_RDONLY) = 4
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/unicode.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/unicode.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/unicode.tmac", O_RDONLY) = 5
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/latin1.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/latin1.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/latin1.tmac", O_RDONLY) = 5
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/hyphen.us", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/hyphen.us", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/hyphen.us", O_RDONLY) = 4
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/hyphenex.us", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/hyphenex.us", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/hyphenex.us", O_RDONLY) = 4
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/papersize.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/papersize.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/papersize.tmac", O_RDONLY) = 4
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/pspic.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/pspic.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/pspic.tmac", O_RDONLY) = 4
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/pdfpic.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/pdfpic.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/pdfpic.tmac", O_RDONLY) = 4
+148997 openat(AT_FDCWD, "/home/curt/tty-char.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/tty-char.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/tty-char.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/tty-char.tmac", O_RDONLY) = 3
+148997 openat(AT_FDCWD, "/home/curt/latin1.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/latin1.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/latin1.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/latin1.tmac", O_RDONLY) = 4
+148997 openat(AT_FDCWD, "/home/curt/andoc.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/andoc.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/andoc.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/andoc.tmac", O_RDONLY) = 3
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/troffrc-end", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/troffrc-end", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/troffrc-end", O_RDONLY) = 3
+148997 openat(AT_FDCWD, "/home/curt/an-old.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/an-old.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/an-old.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/an-old.tmac", O_RDONLY) = 3
+148997 openat(AT_FDCWD, "/home/curt/devtag.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/devtag.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/devtag.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/devtag.tmac", O_RDONLY) = 4
+148997 openat(AT_FDCWD, "/home/curt/an-ext.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/an-ext.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/an-ext.tmac", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/1.22.4/tmac/an-ext.tmac", O_RDONLY) = 4
+148997 openat(AT_FDCWD, "/home/curt/man.local", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/lib/groff/site-tmac/man.local", O_RDONLY) = -1 ENOENT (No such file or directory)
+148997 openat(AT_FDCWD, "/usr/share/groff/site-tmac/man.local", O_RDONLY) = 4
+148998 openat(AT_FDCWD, "/usr/share/groff/site-font/devutf8/DESC", O_RDONLY) = -1 ENOENT (No such file or directory)
+148998 openat(AT_FDCWD, "/usr/share/groff/1.22.4/font/devutf8/DESC", O_RDONLY) = 3
+148998 openat(AT_FDCWD, "/usr/share/groff/site-font/devutf8/R", O_RDONLY) = -1 ENOENT (No such file or directory)
+148998 openat(AT_FDCWD, "/usr/share/groff/1.22.4/font/devutf8/R", O_RDONLY) = 3
+148998 openat(AT_FDCWD, "/usr/share/groff/site-font/devutf8/B", O_RDONLY) = -1 ENOENT (No such file or directory)
+148998 openat(AT_FDCWD, "/usr/share/groff/1.22.4/font/devutf8/B", O_RDONLY) = 3
+148998 openat(AT_FDCWD, "/usr/share/groff/site-font/devutf8/I", O_RDONLY) = -1 ENOENT (No such file or directory)
+148998 openat(AT_FDCWD, "/usr/share/groff/1.22.4/font/devutf8/I", O_RDONLY) = 3
+148997 +++ exited with 0 +++
+148996 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148997, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148998 +++ exited with 0 +++
+148996 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148998, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148996 +++ exited with 0 +++
+148990 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148996, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148990 +++ exited with 0 +++
+148982 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148990, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148991 +++ exited with 0 +++
+148982 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148991, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148992 +++ exited with 0 +++
+148982 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=148992, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+148982 +++ exited with 0 +++

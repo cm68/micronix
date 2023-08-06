@@ -1,109 +1,132 @@
-IF(I)                                                                    IF(I)
+     PROGRAM
+          if ‐  conditional command
+
+     USAGE
+          if expr command [ arg ... ]
+
+          if expr then
+                  command(s)
+                  ...
+          [ else [ command ]
+                  ... ]
+          endif
+
+          test expr
+
+     FUNCTION
+          If  evaluates  the  expression expr.  In the first form
+          above, if expr is true, the given command  is  executed
+          with  the  given arguments.  The command may be another
+          if.
+
+          In the second form, if expr is true, the  commands  be‐
+          tween the then and the next unmatched else or endif are
+          executed.  If expr is false, the  commands  after  then
+          are  skipped,  and the commands after the optional else
+          are executed.  Zero or one commands may be  written  on
+          the  same  line  as the else.  In particular, if may be
+          used this way.  The  pseudo  commands  else  and  endif
+          (whichever  occurs  first)  must  not  be hidden behind
+          semicolons or other commands.  This form may be nested:
+          every then needs a matching endif.
+
+          Test  is  an  entry to if that evaluates the expression
+          and returns exit code 0 if it is true, and code 1 if it
+          is false or in error.
+
+          The following primitives are used to construct the
+           expr:
+
+          ‐r file true if the file exists and is readable.
+
+          ‐w file true if the file exists and is writable.
+
+          ‐s  file true if the file exists and has a size greater
+          than zero.
+
+          ‐f file true if the file  exists  and  is  an  ordinary
+          file.
+
+          ‐d file true if the file exists and is a directory.
+
+          ‐z s1   true if the length of string s1 is zero.
+
+          ‐n s1   true if the length of string s1 is nonzero.
+
+          s1 = s2 true if the strings s1 and s2 are equal.
+
+          s1  !=  s2        true if the strings s1 and s2 are not
+          equal.
+
+          n1 ‐eq n2
+          n1 ‐ne n2
+          n1 ‐gt n2
+          n1 ‐ge n2
+          n1 ‐lt n2
+          n1 ‐le n2       true if the stated algebraic  relation‐
+          ship exists.  The arguments n1 and n2 must be integers.
+
+          {  command  }     The  bracketed command is executed to
+          obtain the exit  status.   Status  zero  is  considered
+          true.  The command must not be another if.
+
+          These  primaries may be combined with the following op‐
+          erators:
+
+          !       unary negation operator
+
+          ‐a      binary and operator
+
+          ‐o      binary or operator
+
+          ( expr )        parentheses for grouping.
+
+          ‐a has higher precedence than ‐o.
+
+          Notice that all the operators and  flags  are  separate
+          arguments to if and hence must be surrounded by spaces.
+          Notice also that  parentheses  are  meaningful  to  the
+          Shell and must be escaped.
+
+     EXIT CODES
+          0 ‐ true expression, no error.
+          1 ‐ false condition or error.
+
+     SEE ALSO
+          exit(1), goto(1), sh(1), switch(1), while(1), exit(2)
+
+     DIAGNOSTICS
+          if:missing endif
+          if:syntax error: value
+          if:non‐numeric arg: value
+          if:no command: name
+          else:missing endif
+
+          Test may issue any of the if messages above, except the
+          first.
+
+     BUGS
+          In general, if, else, endif, and test must not be  hid‐
+          den behind semicolons on a command line.
+
+          Many of the effects are obtained by searching the input
+          file and  adjusting  the  read  pointer  appropriately.
+          Thus,  including any of these commands in a part of the
+          file intended to be read by a command  other  than  the
+          shell may cause strange results if they are encountered
+          while searching.
+
+          These commands ignore redirection or  piping  of  their
+          standard input or output.
+
+          Commands  executed  by  if  or  test may be affected by
+          redirections, but  this  practice  is  undesirable  and
+          should be avoided.
 
 
 
-NNAAMMEE
-       if   conditional command
-
-SSYYNNOOPPSSIISS
-       iiff expr command [ arg ... ]
-
-       iiff expr tthheenn
-            command(s)
-            ...
-       [ eellssee [ command ]
-            ... ]
-       eennddiiff
-
-       tteesstt expr
-
-DDEESSCCRRIIPPTTIIOONN
-       _I_f  evaluates the expression _e_x_p_r_.  In the first form above, if _e_x_p_r is
-       true, the given _c_o_m_m_a_n_d is executed with the given arguments.  The com‐
-       mand may be another _i_f_.
-
-       In  the second form, if _e_x_p_r is true, the commands between the _t_h_e_n and
-       the next unmatched _e_l_s_e or _e_n_d_i_f are  executed.  If _e_x_p_r is false,  the
-       commands  after  _t_h_e_n  are skipped, and the commands after the optional
-       _e_l_s_e are executed.  Zero or one commands may be  written  on  the  same
-       line  as the _e_l_s_e_.  In particular, _i_f may be used this way.  The pseudo
-       commands _e_l_s_e and _e_n_d_i_f (whichever occurs first) must not be hidden be‐
-       hind semicolons or other commands.  This form may be nested: every _t_h_e_n
-       needs a matching _e_n_d_i_f_.
-
-       _T_e_s_t is an entry to _i_f that evaluates the expression and  returns  exit
-       code 0 if it is true, and code 1 if it is false or in error.
-
-       The following primitives are used to construct the _e_x_p_r_:
-
-       rr file    true if the file exists and is readable.
-
-       ww file    true if the file exists and is writable.
-
-       ss file    true if the file exists and has a size greater than zero.
-
-       ff file    true if the file exists and is an ordinary file.
-
-       dd file    true if the file exists and is a directory.
-
-       zz s1 true if the length of string _s_1 is zero.
-
-       nn s1 true if the length of string _s_1 is nonzero.
-
-       s1 == s2   true if the strings _s_1 and _s_2 are equal.
-
-       s1 !!== s2  true if the strings _s_1 and _s_2 are not equal.
-
-       n1  eeqq  n2  n1  nnee  n2 n1 ggtt n2 n1 ggee n2 n1 lltt n2 n1 llee n2  true if the
-       stated algebraic relationship exists.  The arguments _n_1 and _n_2 must  be
-       integers.
-
-       {{  command  }}    The  bracketed  command is executed to obtain the exit
-       status.  Status zero is considered _t_r_u_e_.  The command must nnoott  be  an‐
-       other _i_f_.
-
-       These primaries may be combined with the following operators:
-
-       !!    unary negation operator
-
-       aa    binary _a_n_d operator
-
-       oo    binary _o_r operator
-
-       (( expr ))  parentheses for grouping.
-
-       aa  has  higher  precedence  than  oo..  Notice that all the operators and
-       flags are separate arguments to _i_f and hence must be surrounded by spa‐
-       ces.  Notice also that parentheses are meaningful to the Shell and must
-       be escaped.
-
-EEXXIITT CCOODDEESS
-       0  true expression, no error.
-       1  false condition or error.
-
-SSEEEE AALLSSOO
-       exit(I), goto(I), sh(I), switch(I), while(I), exit(II)
-
-DDIIAAGGNNOOSSTTIICCSS
-       if:missing endif
-       if:syntax error: value
-       if:non-numeric arg: value
-       if:no command: name
-       else:missing endif
-
-       _T_e_s_t may issue any of the _i_f messages above, except the first.
-
-BBUUGGSS
-       In general, _i_f_, _e_l_s_e_, _e_n_d_i_f_, and _t_e_s_t must not be hidden  behind  semi‐
-       colons  on a command line.  Many of the effects are obtained by search‐
-       ing the input file and adjusting the read pointer appropriately.  Thus,
-       including  any  of  these commands in a part of the file intended to be
-       read by a command other than the shell may  cause  strange  results  if
-       they are encountered while searching.
-       These  commands ignore redirection or piping of their standard input or
-       output.  Commands executed by _i_f or _t_e_s_t may be  affected  by  redirec‐
-       tions, but this practice is undesirable and should be avoided.
 
 
 
-                                    5/31/77                              IF(I)
+
+

@@ -19,7 +19,7 @@
 typedef char INT8;
 typedef unsigned char UINT8;
 
-typedef	short INT16;
+typedef short INT16;
 typedef unsigned short UINT16;
 
 typedef unsigned short UINT;
@@ -36,7 +36,7 @@ typedef unsigned short UINT;
 typedef int INT32;
 typedef unsigned int UINT32;
 #else
-typedef	long INT32;
+typedef long INT32;
 typedef unsigned long UINT32;
 #endif
 
