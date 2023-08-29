@@ -7,7 +7,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-LDFLAGS = -L../lib -lsim -lcurses -lchips -lmem
+LDFLAGS = -L../lib -lsim -lcurses -lchips # -lmem
 
 OBJECTS = usersim.o
 TARGETS = sim
