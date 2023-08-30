@@ -35,7 +35,9 @@
 #include <sys/wait.h>
 #include <ctype.h>
 #include <signal.h>
+#define trace xxtrace
 #include <curses.h>
+#undef trace
 #include <pthread.h>
 
 #include "../micronix/include/types.h"
