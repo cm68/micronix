@@ -18,7 +18,9 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/errno.h>
+#define trace xxtrace
 #include <curses.h>
+#undef trace
 #include <term.h>
 
 #include "../include/util.h"

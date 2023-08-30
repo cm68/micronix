@@ -4,6 +4,8 @@
 # Makefile
 # Changed: <2023-07-05 23:17:23 curt>
 #
+# to build this, we have some prerequsites:
+# bison, lib32ncurses-dev
 
 all: sim filesystem
 	cd src ; make

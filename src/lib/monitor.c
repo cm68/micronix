@@ -6,7 +6,10 @@
  * Changed: <2023-07-29 09:12:49 curt>
  *
  */
+#define trace xxtrace
 #include <curses.h>
+#undef trace
+
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
