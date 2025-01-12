@@ -42,14 +42,21 @@ MKFILE = $(wildcard ?akefile)
 DOCFILES = $(DOCSRCS:.mp=.0) $(DOCSRCS:.ic=.3)
 OBJECTS = $(patsubst %.c,%.o,$(CSRCS))
 
-MAKESH = $(DEST)/make.sh
-
+#
+# cross build
+#
 ifdef CROSS
+
+%: $^
+	$(CC) $(CCOPTS) -o $@ $^ -L../lib/libws -lWS
+
+%.o : %.c
+	$(CC) $(CCOPTS) $(WARNS) $(INCFLAG) -c $<
 
 INCFLAG ?= -I$(DEPTH)/cmd/whitesmith/include
 LIBS ?= -L../lib/libws -lWS
 
-CCOPTS = -gdwarf -g3 -Og -m32 \
+CCOPTS = -gdwarf -g3 -O0 -m32 \
 	-fno-eliminate-unused-debug-symbols -fno-eliminate-unused-debug-types
 CC = gcc
 
@@ -64,57 +71,65 @@ $(TARGET): $(OBJECTS)
 endif
 endif
 
-%: $^
-	$(CC) $(CCOPTS) -o $@ $^ -L../lib/libws -lWS
-
-%.o : %.c
-	$(CC) $(CCOPTS) $(WARNS) $(INCFLAG) -c $<
-
-else
-
-%.o : %.c $(MAKESH)
-	-$(SIM) -d $(ROOT) /bin/sh /$(SRCDIR)/make.sh $@
-
-%: $^ $(MAKESH)
-	-$(SIM) -d $(ROOT) /bin/sh /$(SRCDIR)/make.sh $@
-
-endif
-
-all: $(MAKESH) $(TARGET) $(TARGETS) doc
+all: $(TARGET) $(TARGETS) doc
 	for dir in $(DIRS) ; do (cd $$dir ; make all) ; done
-ifndef CROSS
-	-$(SIM) -d $(ROOT) /bin/sh /$(SRCDIR)/make.sh
-endif
 
 clean: $(MAKESH)
 	for dir in $(DIRS) ; do (cd $$dir ; make clean) ; done
-ifndef CROSS
-	-$(SIM) -d $(ROOT) /bin/sh /$(SRCDIR)/make.sh clean
-endif
 	rm -f *.o
 
 clobber: $(MAKESH) clean
 	for dir in $(DIRS) ; do (cd $$dir ; make clobber) ; done
-ifndef CROSS
-	-$(SIM) -d $(ROOT) /bin/sh /$(SRCDIR)/make.sh clobber
-endif
 	rm -f $(TARGET) make.sh $(DIR).tar $(GENERATED)
 
 install: $(MAKESH)
 	for dir in $(DIRS) ; do (cd $$dir ; make install) ; done
-ifndef CROSS
-	-$(SIM) -d $(ROOT) /bin/sh /$(SRCDIR)/make.sh install
-endif
 
-ifndef CROSS
-$(DEST)/make.sh: GNUmakefile $(DEPTH)/GNUmakefile.inc $(SRCS) $(MKFILE)
+else 
+#
+# native build inside filesystem
+#
+
+%.o : %.c
+	-$(SIM) -d $(ROOT) /bin/sh $(SRCDIR)/make.sh $@
+
+%: $^
+	-$(SIM) -d $(ROOT) /bin/sh $(SRCDIR)/make.sh $@
+
+all: update $(SRCDIR)/$(TARGET) $(TARGETS) doc
+	for dir in $(DIRS) ; do (cd $$dir ; make all) ; done
+	-$(SIM) -d $(ROOT) /bin/sh $(SRCDIR)/make.sh
+
+clean: update
+	for dir in $(DIRS) ; do (cd $$dir ; make clean) ; done
+	-$(SIM) -d $(ROOT) /bin/sh $(SRCDIR)/make.sh clean
+	rm -f *.o
+
+clobber: update clean
+	for dir in $(DIRS) ; do (cd $$dir ; make clobber) ; done
+	-$(SIM) -d $(ROOT) /bin/sh $(SRCDIR)/make.sh clobber
+	rm -f $(TARGET) make.sh $(DIR).tar $(GENERATED)
+
+install: update
+	for dir in $(DIRS) ; do (cd $$dir ; make install) ; done
+	-$(SIM) -d $(ROOT) /bin/sh $(SRCDIR)/make.sh install
+
+make.sh: GNUmakefile $(DEPTH)/GNUmakefile.inc $(SRCS) $(MKFILE)
 	echo "echo" > make.sh
 	echo "cd $(SRCDIR)" > make.sh
 	echo "make \$$1" >> make.sh
-	mkdir -p $(DEST)
+
+$(DIR).tar: $(SRCS) make.sh $(MKFILE)
 	tar -f $(DIR).tar --ignore-failed-read -c $(MKFILE) $(SRCS) make.sh
-	tar -f $(DIR).tar -C $(DEST) --keep-newer-files -x $(NOWARN)
+
 endif
+
+#
+# populate the filesystem source tree
+#
+update: $(DIR).tar
+	mkdir -p $(DEST)
+	tar -f $(DIR).tar -C $(DEST) --keep-newer-files -x $(NOWARN)
 
 doc: $(DOCFILES)
 	for dir in $(DIRS) ; do (cd $$dir ; make doc) ; done

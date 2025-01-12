@@ -10,7 +10,7 @@
  * 
  * /usr/src/cmd/asz/asm.c 
  *
- * Changed: <2023-08-02 16:05:15 curt>
+ * Changed: <2023-09-21 12:52:17 curt>
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
@@ -20,6 +20,7 @@
 #include <string.h>
 #define INIT
 #else
+#include <stdio.h>
 #define void int
 #define INIT = 0
 #endif
@@ -42,8 +43,8 @@ extern char g_flag;
 void appendtmp();
 void asm_reset();
 void assemble();
-unsigned char peek();
-unsigned char get_next();
+unsigned char peekchar();
+unsigned char nextchar();
 void outbyte();
 void outtmp();
 unsigned char operand();
@@ -88,8 +89,8 @@ unsigned char operand();
 #define T_IYL   T_BIAS + 27
 #define T_IY_D  T_BIAS + 28
 
-#define T_PLAIN T_BIAS + 29
-#define T_INDIR T_BIAS + 30
+#define T_PLAIN T_BIAS + 29     /* an immediate value */
+#define T_INDIR T_BIAS + 30     /* in indirect immediate */
 
 #define T_SP_I  T_BIAS + 31
 #define T_BC_I  T_BIAS + 32
@@ -112,7 +113,7 @@ char *tokname[] = {
     /* 15 */ "NZ", "Z", "NC", "CR", "PO", "PE", "P", "M",
     /* 23 */ "IXH", "IXL", "(IX+d)", "IYH", "IYL", "(IY+d)",
     /* 29 */ "SYMREF", "INDIR", 
-    /* 31 */ "(SP)", "(BC)", "(DE)", "(IX)", "(IY)", "(C)", "I", "R"
+    /* 31 */ "(SP)", "(BC)", "(DE)", "(IX)", "(IY)", "(C)", "I", "R",
     /* 39 */ "NAME", "NUM", "STR", "EOF"
 };
 
@@ -407,9 +408,6 @@ struct symbol *symbols INIT;
 /*
  * checks if a string is equal
  * string a is read as lower case
- *
- * a = pointer to string a
- * b = pointer to string b
  */
 char
 match(a, b)
@@ -495,7 +493,7 @@ escape()
     char c;
     int i = 0;
 
-    c = get_next();
+    c = nextchar();
 	switch (c) {
 	case 'b':
 		return '\b';
@@ -513,9 +511,9 @@ escape()
     case '4': case '5': case '6': case '7':
         i = c - '0';
         while (1) {
-            c = peek();
+            c = peekchar();
             if (c > '7' || c < '0') break;
-            c = get_next();
+            c = nextchar();
             i = (i << 3) + c - '0';
         }
         return i;    
@@ -532,12 +530,12 @@ escape()
  * binary: 0b0001010 000100B 01010b
  */
 unsigned short
-parsenum(s, i)
+parsenum(s)
 char *s;
-int i;
 {
+    int i = strlen(s);
     unsigned short val = 0;
-    int base;
+    int base = 10;
     char c = s[i-1] | 0x20;
 
     /* detect and consume our radix markers */
@@ -578,27 +576,15 @@ int i;
     return val;
 }
 
-char
-delimiter(c)
-unsigned char c;
-{
-    switch (c) {
-    case ',': case ')': case '+': case '-':
-    case '|': case '&': case ' ': case '\t':
-    case '\n': case T_EOF:
-        return 1;
-    default:
-        return 0;
-    }
-}
-
 /*
  * read an entire line into a null-terminated C string
+ * the line will end with a newline.
  */
 void
 get_line()
 {
     unsigned char *s;
+    int i;
 
     inptr = inbuf;
     if (!fgets(inbuf, sizeof(inbuf), input_file)) {
@@ -606,27 +592,60 @@ get_line()
         inbuf[1] = 0;
     }
     line_num++;
+    i = strlen(inbuf);
+    /* 
+     * we normalize the line to not do the cr-lf thing.
+     * if we see a cr, we change it to and lf and null out.
+     */
+    if (inbuf[i - 2] == '\r') {
+        inbuf[i - 2] = '\n';
+        inbuf[i - 1] = 0;
+    }
 }
 
 /*
  * get the next character that we would read, but don't advance
  */
 unsigned char
-peek()
+peekchar()
 {
     unsigned char c;
 
     c = *inptr;
     if (verbose > 5)
-        printf("peek: %d \'%c\'\n", c, (c > ' ') ? c : ' ');
+        printf("peekchar: %d \'%c\'\n", c, (c > ' ') ? c : ' ');
     return (c);
+}
+
+char *tokenname(t)
+unsigned char t;
+{
+    static char tbuf[30];
+    if (t < ' ') {
+        switch (t) {
+        case '\t':
+            sprintf(tbuf, "\\t");
+            break;
+        case '\n':
+            sprintf(tbuf, "\\n");
+            break;
+        default:
+            sprintf(tbuf, "\\%o", t); 
+            break;
+        }
+    } else if (t < T_BIAS) {
+        sprintf(tbuf, "%c", t);
+    } else {
+        return tokname[t - T_BIAS];
+    }
+    return tbuf;
 }
 
 /*
  * returns the next character in the source, or -1 if complete
  */
 unsigned char
-get_next()
+nextchar()
 {
     unsigned char c;
 
@@ -637,8 +656,7 @@ get_next()
     if (c != T_EOF) {
         inptr++;
     }
-    if (verbose > 5)
-        printf("get_next: %d \'%c\'\n", c, (c > ' ') ? c : ' ');
+
     return c;
 }
 
@@ -659,7 +677,7 @@ consume()
  * scanner that returns special character codes for
  * recognized strings of related characters.
  *
- * [a-zA-Z_]+ -> T_NAME, token_buf filled
+ * [a-zA-Z_0-9]+ -> T_NAME, token_buf filled
  * [digits]+ '\escape' 'c' -> T_NUM, token_val filled
  * "string" -> T_STR, token_buf filled
  *
@@ -679,12 +697,16 @@ get_token()
 
     /* skip over whitespace and comments */
     while (1) {
-        c = get_next();
+        c = nextchar();
+
         if (c == T_EOF) {
             cur_token = T_EOF;
             return;
         }
+
         if ((c == ' ') || (c == '\t')) continue;
+
+        /* a comment */
         if (c == ';') {
             consume();
             continue;
@@ -695,51 +717,54 @@ get_token()
     /* if it looks like a symbol, fill it */
     if (alpha(c)) {
         token_buf[i++] = c;
-        while (alpha(peek())) {
-            token_buf[i++] = get_next();
+        while (1) {
+            c = peekchar();
+            if (alpha(c) || (c >= '0' && c <= '9')) {
+                token_buf[i++] = nextchar();
+            } else {
+                break;
+            }
         }
         token_buf[i++] = '\0';
-        cur_token = T_NAME;
-        return;
+        c = T_NAME;
     }
 
-    /*
-     * if it starts like a number, scan until the next "delimiter"
-     */
-    if (c >= '0' & c <= '9') {
+    /* numbers can have radix info, so look for a delimiter */
+    else if (c >= '0' & c <= '9') {
         token_buf[i++] = c;
-        while (!delimiter(peek)) {
-            token_buf[i++] = get_next();
+        while (1) {
+            c = peekchar();
+            if ((c == ',') || (c == ' ') || 
+                (c == '\t') || (c == '\n') || (c == T_EOF)) {
+                break;
+            }
+            token_buf[i++] = nextchar();
         }
         token_buf[i++] = '\0';
         token_val = parsenum(token_buf);
-        cur_token = T_NUM;
-        return;
+        c = T_NUM;
     }
 
     /*
-     * literal character is a number
+     * literal character in quotes is a number
      */
-    if (c == '\'') {
-        token_val = get_next();
+    else if (c == '\'') {
+        token_val = nextchar();
         if (token_val == '\\') {
             token_val = escape();
         }
-        if (get_next() != '\'') {
+        if (nextchar() != '\'') {
             gripe("unterminated char literal");
         }
-        cur_token = T_NUM;
-        return;
+        c = T_NUM;
     }
 
     /*
-     * literal string detected - just parse
-     * no need to save it, since we will emit this
-     * in .db
+     * literal string detected - just parse into token_buf
      */
-    if (c == '\"') {
+    else if (c == '\"') {
         while (1) {
-            c = get_next();
+            c = nextchar();
             if (c == '\n') {
                 gripe("unterminated string");
             }
@@ -752,15 +777,24 @@ get_token()
             token_buf[i++] = c;
         }
         token_buf[i++] = '\0';
-        cur_token = T_STR;
-        return;
+        c = T_STR;
     }
     cur_token = c;
+
+    if (verbose > 5) {
+        printf("get_token: %d %s", c, tokenname(c));
+        if (c == T_NAME) {
+            printf(":%s", token_buf);
+        } else if (c == T_NUM) {
+            printf(":0x%x", token_val);
+        }
+        printf("\n");
+    }
 	return;
 }
 
 /*
- * require a specific character
+ * require a specific token
  */
 void
 need(c)
@@ -769,7 +803,9 @@ unsigned char c;
 	get_token();
 
 	if (cur_token != c) {
-		gripe("unexpected character");
+        char s[20];
+        sprintf(s, " %d", c);
+		gripe2("expected character", s);
 	}
 }
 
@@ -1065,7 +1101,7 @@ unsigned short size;
  * vp = value to push out
  */
 void
-emit_addr(size, vp)
+emit_exp(size, vp)
 unsigned short size;
 struct expval *vp;
 {
@@ -1081,7 +1117,7 @@ struct expval *vp;
 	if (seg == SEG_UNDEF) {
 		/* if we are on the second pass, error out */
 		if (pass == 1)
-			gripe2("undefined symbol", vp->sym->name);
+			gripe2("undefined symbol ", vp->sym->name);
 		num = 0;
 	}
 
@@ -1116,7 +1152,7 @@ struct expval *vp;
 				gripe("invalid segment");
 			}
 		}
-		emitword(num);
+		emitword(vp->num);
 	}
 }
 
@@ -1135,35 +1171,30 @@ struct expval *vp;
 }
 
 /*
- * helper function to evaluate an expression and emit the results
- * will handle relocation tracking and pass related stuff
- *
- * size = maximum size of space
- */
-void
-emit_exp(size, value)
-unsigned short size;
-struct expval *value;
-{
-	emit_addr(size, value);
-}
-
-/*
  */
 void
 db()
 {
-    char c;
+    unsigned char c;
     struct expval value;
 
-	while (peek() != '\n' && peek() != T_EOF) {
-		c = peek();
+	while (1) {
+		c = peekchar();
+        if (c == '\n')
+            break;
+        if (c == T_EOF)
+            break;
+        /* ignore whitespace */
+        if (c == '\t' || c == ' ') {
+            nextchar();
+            continue;
+        }
 		if (c == '"') {
             /* eat the double quote */
-            get_next();
+            nextchar();
 
             while (1) {
-                c = get_next();
+                c = nextchar();
 
                 if (c == '\n') {
                     gripe("unterminated string constant");
@@ -1180,12 +1211,13 @@ db()
                 emitbyte(c);
             }
 		} else {
-            if (operand(&value) != T_NUM) {
-                gripe("unexpected non-number");
+            c = operand(&value);
+            if (c != T_PLAIN) {
+                gripe("unexpected value");
             }
 			emit_exp(1, &value);
 		}
-		if (peek() != ',')
+		if (peekchar() != ',')
 			break;
 		else
 			need(',');
@@ -1197,12 +1229,12 @@ dw()
 {
     struct expval value;
 
-	while (peek() != '\n' && peek() != -1) {
-        if (operand(&value) != T_NUM) {
-            gripe("unexpected non-number");
+	while (peekchar() != '\n' && peekchar() != -1) {
+        if (operand(&value) != T_PLAIN) {
+            gripe("unexpected value");
         }
 		emit_exp(2, &value);
-		if (peek() != ',')
+		if (peekchar() != ',')
 			break;
 		else
 			need(',');
@@ -1215,7 +1247,8 @@ ds()
     unsigned char c;
     struct expval value;
 
-    if (operand(&value) != T_NUM) {
+    c = operand(&value);
+    if (c != T_PLAIN && (value.sym != 0)) {
         gripe("ds requires absolute argument");
     }
     fill(value.num);
@@ -1235,18 +1268,17 @@ struct expval *vp;
 	char c;
 	unsigned char ret, seg;
     struct symbol *sym;
+    int indir = 0;
+
+    vp->num = 0;
+    vp->sym = 0;
 
 	/*
 	 * check if there is anything next 
 	 */
-    c = peek();
+    c = peekchar();
 	if (c == '\n' || c == -1)
 		return 255;
-
-	/*
-	 * assume at plain expression at first 
-	 */
-	ret = T_PLAIN;
 
 	/*
 	 * read the token 
@@ -1269,28 +1301,29 @@ struct expval *vp;
 	 */
 	if (cur_token == '(') {
 		get_token();
-        if (cur_token == T_NAME)
-		if (match(token_buf, "hl")) {
-			need(')');
-			return T_HL_I;
-		} else if (match(token_buf, "c")) {
-			need(')');
-			return T_C_I;
-		} else if (match(token_buf, "sp")) {
-			need(')');
-			return T_SP_I;
-		} else if (match(token_buf, "bc")) {
-			need(')');
-			return T_BC_I;
-		} else if (match(token_buf, "de")) {
-			need(')');
-			return T_DE_I;
-		}
+        if (cur_token == T_NAME) {
+            if (match(token_buf, "hl")) {
+                need(')');
+                return T_HL_I;
+            } else if (match(token_buf, "c")) {
+                need(')');
+                return T_C_I;
+            } else if (match(token_buf, "sp")) {
+                need(')');
+                return T_SP_I;
+            } else if (match(token_buf, "bc")) {
+                need(')');
+                return T_BC_I;
+            } else if (match(token_buf, "de")) {
+                need(')');
+                return T_DE_I;
+            }
+        }
 
         /* (ix+d) (ix-d) (iy+d) (iy-d) - populate displacement and eat ')' */
 		else if (match(token_buf, "ix") || match(token_buf, "iy")) {
             ret = token_buf[1] == 'x' ? T_IX_D : T_IY_D;
-            c = peek();
+            c = peekchar();
 			if ((c == '+') || (c == '-')) {
 				get_token();
                 c = cur_token;
@@ -1307,35 +1340,33 @@ struct expval *vp;
 				ret = (ret - T_IX_D) + T_IX_I;
 			}
 			need(')');
+            return ret;
 		} else {
-			ret = T_INDIR;
+			indir++;
             get_token();
 		}
 	}
 
-    vp->sym = 0;
-
-    /* XXX expression stuff would be here */
     if (cur_token == T_NAME) {
         vp->sym = sym_fetch(token_buf);
         if (!vp->sym) {
             if (pass == 1) {
-                gripe2("undefined symbol", vp->sym->name);
+                gripe2("undefined symbol ", vp->sym->name);
             } else {
                 vp->sym = sym_update(token_buf, SEG_UNDEF, 0, 0);
-                vp->num = 0;
             }
 	    }
     } else if (cur_token == T_NUM) {
-        vp->sym = 0;
 		vp->num = token_val;
+    } else {
+        gripe("need an operand");
     }
 
-    /* all others have already returned */
-    if (ret != T_PLAIN) {
+    if (indir) {
 	    need(')');
+        return T_INDIR;
 	}
-	return ret;
+	return T_PLAIN;
 }
 
 /*
@@ -1380,7 +1411,7 @@ struct expval *vp;
 	default:
 		return 1;
 	}
-	emit_addr(2, vp);
+	emit_exp(2, vp);
 	return 0;
 }
 
@@ -1427,7 +1458,7 @@ char reg;
 			emitbyte(0xED);
 			emitbyte(0x4B + ((reg - T_BC) << 4));
 		}
-		emit_exp(2);
+		emit_exp(2, &value);
 		need(')');
 	} else if (reg == T_SP) {
 		/*
@@ -1453,10 +1484,13 @@ char reg;
 
 /*
  * if there is a passed in expval, it's a displacement for the first arg
+ * cases:
+ * ld a|b|c|d|e|h|l|(hl)|(ix+d)|(iy+d), a|b|c|d|e|h|l|(hl)|(ix+d)|(iy+d)
+ * ld a,(bc)|(de)|(nnnn)|i|r
  */
 int
 do_ldr8(arg, disp)
-char arg;
+unsigned char arg;
 struct expval *disp;
 {
     unsigned char has_disp;
@@ -1504,7 +1538,7 @@ struct expval *disp;
             reg -= 3;
 		}
 		if (reg == T_IX_D) {
-            prim++;
+            has_disp++;
 			need(')');
 		} else if (arg == 4 || arg == 5)
             /* lose on ld [hl], ix[hl] */
@@ -1521,16 +1555,13 @@ struct expval *disp;
 	if (arg <= T_A && reg <= T_A) {
 		/* reg8->reg8 */
 		emitbyte(0x40 + (arg << 3) + reg);
-		if (prim)
+		if (has_disp)
 			emit_imm(&disp);
-	} else if (arg <= T_A && reg == T_PLAIN) {
+	} else if (arg <= T_A && (reg == T_PLAIN)) {
 		/* ld reg8, n */
 		emitbyte(0x06 + (arg << 3));
-		if (prim)
+		if (has_disp)
 			emit_imm(&disp);
-		if (evaluate(0, &value) != SEG_ABS) {
-            gripe("non constant immediate");
-        }
 		emit_imm(&value);
 	} else if (arg == T_A) {
 		/*
@@ -1547,7 +1578,7 @@ struct expval *disp;
 
 		case T_INDIR:
 			emitbyte(0x3A);
-			emit_exp(2);
+			emit_exp(2, &value);
 			need(')');
 			break;
 
@@ -1772,7 +1803,7 @@ struct instruct *isr;
 		 */
 		reg = 0;
 		if (isr->arg) {
-			if (arg != T_PLAIN)
+			if (arg != T_PLAIN || value.sym)
 				return 1;
 
 			if (value.num > 7)
@@ -1805,7 +1836,7 @@ struct instruct *isr;
 			/*
 			 * its an undefined operation 
 			 */
-			if (peek() == ',') {
+			if (peekchar() == ',') {
 				need(',');
 				arg = operand(&value);
 
@@ -1861,14 +1892,15 @@ struct instruct *isr;
 	if (isr->type == JMP) {
 		arg = operand(&value);
 
+        /* optional condition code */
         if (arg == 1) arg = T_CR;
 		if (arg >= T_NZ && arg <= T_M) {
 			emitbyte(isr->opcode + ((arg - T_NZ) << 3));
 			need(',');
-			emit_exp(2);
-		} else if (arg == T_PLAIN) {
+			emit_exp(2, &value);
+		} else if (arg == T_NUM) {
 			emitbyte(isr->opcode + 1);
-			emit_exp(2);
+			emit_exp(2, &value);
 		} else if (arg == T_HL_I) {
 			emitbyte(isr->arg);
 		} else if (arg == T_IX_I) {
@@ -1892,7 +1924,7 @@ struct instruct *isr;
 				reg = (arg - T_NZ) << 3;
 				need(',');
 				arg = operand(&value);
-			} else if (arg != T_PLAIN)
+			} else if (arg != T_NUM)
 				return 1;
 		}
 
@@ -1900,7 +1932,7 @@ struct instruct *isr;
 			return 1;
 
 		emitbyte(isr->opcode + reg);
-		emit_exp(1);
+		emit_exp(1, &value);
 		return 0;
 	}
 
@@ -1911,10 +1943,10 @@ struct instruct *isr;
 		if (arg >= T_NZ && arg <= T_M) {
 			emitbyte(isr->opcode + ((arg - T_NZ) << 3));
 			need(',');
-			emit_exp(2);
+			emit_exp(2, &value);
 		} else if (arg == T_PLAIN) {
 			emitbyte(isr->arg);
-			emit_exp(2);
+			emit_exp(2, &value);
 		} else
 			return 1;
 		return 0;
@@ -2190,7 +2222,6 @@ char next;
 void
 assemble()
 {
-	char tok;
     unsigned short type;
 	unsigned short result;
 	struct symbol *sym;
@@ -2220,17 +2251,23 @@ assemble()
 				 text_top, data_top, bss_top, mem_size);
 		}
 
-		while ((tok = get_token()) != -1) {
+		while (1) {
+            get_token();
+
+            if (cur_token == T_EOF) {
+                break;
+            }            
+
 			if (verbose > 4)
 				printf("line %d: %s", line_num, inbuf);
 
 			/*
 			 * command read 
 			 */
-			if (tok == '.') {
-				tok = get_token();
+			if (cur_token == '.') {
+				get_token();
 
-				if (tok != T_NAME)
+				if (cur_token != T_NAME)
 					gripe2("expected directive", token_buf);
 
 				next = 0;
@@ -2253,14 +2290,14 @@ assemble()
 
 				if (match(token_buf, "globl")) {
 					while (1) {
-						tok = get_token();
-						if (tok != T_NAME)
+						get_token();
+						if (cur_token != T_NAME)
 							gripe("expected symbol");
 						if (pass == 0) {
 							sym = sym_update(token_buf, SEG_UNDEF, 0, 1);
 						}
 						/* see if there is another */
-						if (peek() == ',')
+						if (peekchar() == ',')
 							need(',');
 						else
 							break;
@@ -2271,14 +2308,14 @@ assemble()
 
 				if (match(token_buf, "extern")) {
 					while (1) {
-						tok = get_token();
-						if (tok != T_NAME)
+						get_token();
+						if (cur_token != T_NAME)
 							gripe("expected symbol");
 						if (pass == 0) {
 							sym = sym_update(token_buf, SEG_EXT, 0, 1);
 						}
 						/* see if there is another */
-						if (peek() == ',')
+						if (peekchar() == ',')
 							need(',');
 						else
 							break;
@@ -2324,7 +2361,7 @@ assemble()
 			/*
 			 * symbol read 
 			 */
-			else if (tok == T_NAME) {
+			else if (cur_token == T_NAME) {
 				/*
 				 * try to get the type of the symbol 
 				 */
@@ -2333,18 +2370,18 @@ assemble()
 					 * it's an instruction 
 					 */
 					consume();
-				} else if (peek() == '=') {
+				} else if (peekchar() == '=') {
 					/*
 					 * it's a symbol definition 
 					 */
 					save_symname();
 					get_token();
 
-					type = evaluate(0, &result);
+					type = operand(&result);
 
 					sym_update(sym_name, type, result, 0);
 					consume();
-				} else if (peek() == ':') {
+				} else if (peekchar() == ':') {
 					/*
 					 * set the new symbol (if it is the first pass) 
 					 */
@@ -2356,7 +2393,7 @@ assemble()
 				} else {
 					gripe("unexpected symbol");
 				}
-			} else if (tok != '\n') {
+			} else if (cur_token != '\n') {
 				gripe("unexpected token");
 			}
 		}
@@ -2390,7 +2427,7 @@ assemble()
 	        for (sym = symbols; sym; sym = sym->next) {
 
                 if (sym->seg == SEG_UNDEF) {
-                    gripe2("undefined symbol", sym->name);
+                    gripe2("undefined symbol ", sym->name);
                     continue;
                 }
                 if (sym->index == 0) {
@@ -2429,7 +2466,7 @@ assemble()
 
             line_num = 0;
 
-            *input_char = '\0';
+            *inptr = '\0';
 			rewind(input_file);
 
 			continue;

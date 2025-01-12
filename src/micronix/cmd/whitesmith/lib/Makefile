@@ -13,6 +13,9 @@ all:
 	cd libu ; make
 	
 install: 
+	cd libws ; make install
+	cd libm ; make install
+	# cd libu ; make install
 
 clean: 
 	cd libws ; make clean
