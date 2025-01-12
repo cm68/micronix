@@ -28,6 +28,7 @@ install :
 	cd mknod ; make install
 	cd mkdir ; make install
 	cp/cp reset /bin/reset
+	cd echo ; make echo
 	# cd ar ; make install
 	# cd far ; make install
 	# cd msh ; make install
@@ -41,6 +42,7 @@ clean :
 	cd rm ; make clean
 	cd mknod ; make clean
 	cd mkdir ; make clean
+	cd echo ; make clean
 	cd vi ; make clean
 	# cd far ; make clean
 	# cd msh ; make clean

@@ -20,8 +20,5 @@ install: $(DESTLIB) $(OBJECTS)
 $(OBJECTS): $*.c
 	cc -i /usr/include/ -c $*.c
 
-$(DESTLIB):
-	cp libempty.a $(DESTLIB)
-
 clean: 
 	rm $(OBJECTS)

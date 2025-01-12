@@ -8,8 +8,8 @@
 	ret
 	
 	.data
-	.globl hello_s
+	.globl hello_p, hello_s
 hello_p:	
-	.dw	hello
-hello:
+	.dw	hello_s
+hello_s:
 	.db	"Hello, world\n\0"

@@ -269,7 +269,9 @@ _putf(outfn, stream, fmt, pp)
 				(*outfn)(stream, &cfill, 1);
         }
 	}
+#ifdef linux
     va_end(ap);
+#endif
 }
 
 #ifdef TEST

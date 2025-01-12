@@ -23,7 +23,7 @@ SOBJS2 = \
 	repk.o switch.o unpk.o utob.o zret.o
 
 COBJS = \
-	cfcan.o cfcon.o memerr.o stop.o
+	cfcon.o memerr.o stop.o
 
 LIBOBJS = $(SOBJS1) $(SOBJS2) $(COBJS)
 

@@ -1,7 +1,9 @@
-.globl	bss_seg, data_seg
+.globl	bss_seg, data_seg, text_seg
 
 	.text
+	ld	hl,text_seg
 	ld	hl,data_seg
+text_seg:
 	ld	hl,bss_seg
 	ret
 	nop

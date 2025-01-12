@@ -3,11 +3,16 @@
 #
 # src/cmd/whitesmith/lib/libu/Makefile
 #
-# Changed: <2023-07-11 06:01:43 curt>
+# Changed: <2023-09-04 08:27:00 curt>
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
+LIB = libu.a
+
 all: libu.a
+
+install: $(LIB)
+	cp $(LIB) /lib
 
 SOBJS =
 
