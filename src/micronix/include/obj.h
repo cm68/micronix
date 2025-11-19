@@ -6,7 +6,7 @@
  * 
  * /include/obj.h
  *
- * Changed: <2023-07-04 11:25:30 curt>
+ * Changed: <2025-11-19 15:32:15 curt>
  */
 
 /*
@@ -25,16 +25,25 @@ struct obj {
 };
 
 #define OBJECT	0x99			/* Whitesmith's standard */
-#define RELOC	0x14			/* relocation bytes present */
-#define NORELOC 0x94			/* no reloc bytes */
+
+#define CONF_SYMLEN     0x07
+#define CONF_INT32      0x08
+#define CONF_LITTLE     0x10
+#define CONF_ALIGN      0x60
+#define CONF_NORELO     0x80
+
+#define CONF_9  (CONF_LITTLE | (4 & CONF_SYMLEN))       /* 9 char syms */
+#define CONF_15 (CONF_LITTLE | (7 & CONF_SYMLEN))       /* 15 char syms */
 
 /*
  * symbol table
  * the name field is actually dependent on the conf byte
- * but in micronix, we only ever see the 8 byte symbols.
- * in addition, the conf byte could set the size of the value
- * to 4 bytes, and this does not come up in micronix for obvious
- * reasons
+ *
+ * but in micronix, the default is 9 characters, but we can have
+ * up to 15, if the conf byte is 7. handle the worst case, and
+ * swizzle the read count accordingly.
+ * when we read in the symbol table, we'll need to swizzle the amount
+ * we read.
  */
 struct ws_symbol {
 	unsigned short value;
@@ -46,7 +55,7 @@ struct ws_symbol {
 #define         SF_BSS          0x03
 #define SF_DEF          0x04
 #define SF_GLOBAL       0x08
-	char name[9];
+	char name[15];
 };
 
 /*

@@ -7,7 +7,7 @@
  *
  * tools/nm.c
  *
- * Changed: <2023-07-06 10:21:03 curt>
+ * Changed: <2025-11-19 15:35:38 curt>
  */
 
 #include <fcntl.h>
@@ -30,6 +30,7 @@ int dflag;
 int xflag;
 struct ws_symbol *syms;
 int nsyms;
+unsigned char symlen;
 
 unsigned char relocbuf[16384];
 unsigned char *relocp;
@@ -112,13 +113,6 @@ get_symname(unsigned short addr)
     default:
         break;
     }
-#ifdef notdef
-    for (i = 0; i < nsyms; i++) {
-        if ((syms[i].flag & SF_DEF) && (syms[i].value == addr)) {
-            return syms[i].name;
-        }
-    }
-#endif
     return 0;
 }
 
@@ -239,7 +233,13 @@ makerelocs(unsigned char seg)
 
     location = 0;
 
-    while ((rp = readreloc(&relocp)) != 0) {
+    while (1) {
+        if (verbose > 3) 
+            printf("reloc: %x\n", *relocp);
+
+        rp = readreloc(&relocp);
+        if (!rp)
+            break;
         r = malloc(sizeof(struct reloc));
         r->seg = seg;
         r->rl.offset = rp->offset;
@@ -306,6 +306,7 @@ do_object(int fd, int limit)
     int i;
     unsigned short value;
     unsigned char flag;
+    unsigned char l;
 
     read(fd, &head, sizeof(head));
     if (verbose) {
@@ -325,19 +326,24 @@ do_object(int fd, int limit)
     textoff = lseek(fd, 0, SEEK_CUR);
     dataoff = lseek(fd, head.text, SEEK_CUR);
     lseek(fd, head.data, SEEK_CUR);
+    symlen = (head.conf & 0x7) * 2 + 1;
 
     /*
      * read symbol table 
      */
     nsyms = head.table / 12;
     if (nsyms) {
-        syms = malloc(nsyms * sizeof(*syms));
-        read(fd, syms, nsyms * sizeof(*syms));
+        i = nsyms * (sizeof(struct ws_symbol) + symlen - 1);
+
+        syms = malloc(i);
 
         sym = syms;
-        if (sflag) {
-            for (i = 0; i < nsyms; i++) {
-                printf("%5d %9s: ", i, sym->name);
+        l = sizeof(*sym) - (15 - symlen);
+        printf("reading %d length symbol\n", l);
+        for (i = 0; i < nsyms; i++) {
+            read(fd, sym, l);
+            if (sflag) {
+                printf("%5d %15s: ", i, sym->name);
                 value = sym->value;
                 flag = sym->flag;
 
@@ -363,8 +369,8 @@ do_object(int fd, int limit)
                     break;
                 }
                 printf("\n");
-                sym++;
             }
+            sym++;
         }
     }
 
@@ -385,7 +391,7 @@ do_object(int fd, int limit)
 
     if (verbose > 1) hexdump(relocbuf, i);
 
-    if (head.conf == RELOC) {
+    if (!(head.conf & CONF_NORELO)) {
         relocp = relocbuf;
         makerelocs(SEG_TEXT);
         makerelocs(SEG_DATA);
