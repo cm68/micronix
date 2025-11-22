@@ -339,7 +339,6 @@ do_object(int fd, int limit)
 
         sym = syms;
         l = sizeof(*sym) - (15 - symlen);
-        printf("reading %d length symbol\n", l);
         for (i = 0; i < nsyms; i++) {
             read(fd, sym, l);
             if (sflag) {
