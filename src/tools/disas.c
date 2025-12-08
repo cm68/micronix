@@ -3,7 +3,7 @@
  *
  * tools/disas.c
  *
- * Changed: <2023-06-19 05:27:02 curt>
+ * Changed: <2025-12-08 15:37:11 curt>
  *
  * todo: XXX
  *  detect switch statements
@@ -995,7 +995,7 @@ char **argv;
          * assign segment addresses - we do some magic here if it's
          * got relocations, so text won't be at zero
          */
-        if (obj.conf == RELOC) {
+        if (!(obj.conf & CONF_NORELO)) {
             seg[SEG_ZERO].length = 0x100;
             seg[SEG_ZERO].base = 0;
         }
@@ -1061,7 +1061,7 @@ char **argv;
         /*
          * and finally, the relocations if any
          */
-        if (obj.conf == RELOC) {
+        if (!(obj.conf & CONF_NORELO)) {
             if (debug) printf("relocs present\n");
             dorelocs(SEG_TEXT);
             dorelocs(SEG_DATA);

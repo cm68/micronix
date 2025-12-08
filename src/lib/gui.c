@@ -3,7 +3,7 @@
  *
  * lib/gui.c
  *
- * Changed: <2023-07-27 16:33:02 curt>
+ * Changed: <2025-12-08 15:48:04 curt>
  *
  */
 #include <curses.h>
@@ -201,10 +201,10 @@ regout(int regnum, unsigned short val)
 void
 fflags(unsigned char f, char *fbuf)
 {
-    int i;
+    unsigned i;
     char fname[] = "CNVXHYZS";
 
-    for (i = 0; i < sizeof(fbuf); i++) {
+    for (i = 0; i < 8; i++) {
         fbuf[i] = ((1 << i) & f) ? fname[i] : ' ';
     }
     fbuf[8] = '\0';
@@ -293,8 +293,8 @@ dumpcpu()
         fflags(f, fbuf);
         message("bc: %04x de: %04x hl: %04x sp: %04x: af: %04x %s %04x %s\n",
             z80_get_reg16(bc_reg), z80_get_reg16(de_reg), z80_get_reg16(hl_reg), 
-            z80_get_reg16(sp_reg), z80_get_reg8(a_reg) << 8 | z80_get_reg8(f_reg), fbuf, 
-            pc, outbuf);
+            z80_get_reg16(sp_reg), z80_get_reg8(a_reg) << 8 | z80_get_reg8(f_reg), 
+            fbuf, pc, outbuf);
         return;
     }
 

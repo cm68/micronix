@@ -68,24 +68,24 @@ struct optab base_optab[256] = {
 	{"LD A,H", 0}, {"LD A,L", 0}, {"LD A,(HL)", 0}, {"LD A,A", 0},
 	
 	{"ADD A,B", 0}, {"ADD A,C", 0}, {"ADD A,D", 0}, {"ADD A,E", 0},
-	{"ADD A,H", 0}, {"ADD A,H", 0}, {"ADD A,(HL)", 0}, {"ADD A,A", 0},
+	{"ADD A,H", 0}, {"ADD A,L", 0}, {"ADD A,(HL)", 0}, {"ADD A,A", 0},
 	{"ADC A,B", 0}, {"ADC A,C", 0}, {"ADC A,D", 0}, {"ADC A,E", 0},
-	{"ADC A,H", 0}, {"ADC A,H", 0}, {"ADC A,(HL)", 0}, {"ADC A,A", 0},
+	{"ADC A,H", 0}, {"ADC A,L", 0}, {"ADC A,(HL)", 0}, {"ADC A,A", 0},
 
 	{"SUB A,B", 0}, {"SUB A,C", 0}, {"SUB A,D", 0}, {"SUB A,E", 0},
-	{"SUB A,H", 0}, {"SUB A,H", 0}, {"SUB A,(HL)", 0}, {"SUB A,A", 0},
+	{"SUB A,H", 0}, {"SUB A,L", 0}, {"SUB A,(HL)", 0}, {"SUB A,A", 0},
 	{"SBC A,B", 0}, {"SBC A,C", 0}, {"SBC A,D", 0}, {"SBC A,E", 0},
-	{"SBC A,H", 0}, {"SBC A,H", 0}, {"SBC A,(HL)", 0}, {"SBC A,A", 0},
+	{"SBC A,H", 0}, {"SBC A,L", 0}, {"SBC A,(HL)", 0}, {"SBC A,A", 0},
 
 	{"AND A,B", 0}, {"AND A,C", 0}, {"AND A,D", 0}, {"AND A,E", 0},
-	{"AND A,H", 0}, {"AND A,H", 0}, {"AND A,(HL)", 0}, {"AND A,A", 0},
+	{"AND A,H", 0}, {"AND A,L", 0}, {"AND A,(HL)", 0}, {"AND A,A", 0},
 	{"XOR A,B", 0}, {"XOR A,C", 0}, {"XOR A,D", 0}, {"XOR A,E", 0},
-	{"XOR A,H", 0}, {"XOR A,H", 0}, {"XOR A,(HL)", 0}, {"XOR A,A", 0},
+	{"XOR A,H", 0}, {"XOR A,L", 0}, {"XOR A,(HL)", 0}, {"XOR A,A", 0},
 
 	{"OR A,B", 0}, {"OR A,C", 0}, {"OR A,D", 0}, {"OR A,E", 0},
-	{"OR A,H", 0}, {"OR A,H", 0}, {"OR A,(HL)", 0}, {"OR A,A", 0},
+	{"OR A,H", 0}, {"OR A,L", 0}, {"OR A,(HL)", 0}, {"OR A,A", 0},
 	{"CP A,B", 0}, {"CP A,C", 0}, {"CP A,D", 0}, {"CP A,E", 0},
-	{"CP A,H", 0}, {"CP A,H", 0}, {"CP A,(HL)", 0}, {"CP A,A", 0},
+	{"CP A,H", 0}, {"CP A,L", 0}, {"CP A,(HL)", 0}, {"CP A,A", 0},
 	
 	{"RET NZ", 0}, {"POP BC", 0}, {"JP NZ,%s", OP_TEXT}, {"JP %s", OP_TEXT},
 	{"CALL NZ,%s", OP_TEXT}, {"PUSH BC", 0}, {"ADD A,%s", OP_IMM8}, {"RST 0", 0},
