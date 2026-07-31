@@ -29,6 +29,7 @@ extern void output(portaddr p, byte v);
 extern byte input(portaddr p);
 
 extern int watchpoint_at(vaddr addr);
+extern int rwatchpoint_at(vaddr addr);
 extern int watchpoint_touched;
 
 extern int int_pin;

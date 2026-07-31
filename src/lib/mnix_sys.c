@@ -47,7 +47,7 @@ struct syscall syscalls[] = {
 /* 24  */	{1, "getuid", 0 },
 /* 25  */	{1, "stime", 0 },
 /* 26  */	{7, "ptrace", SF_ARG1|SF_ARG2|SF_ARG3 },/* pid addr req */
-/* 27  */	{1, "alarm", 0 },
+/* 27  */	{1, "alarm", SF_FD },
 /* 28  */	{3, "fstat", SF_FD|SF_ARG1 },
 /* 29  */	{1, "pause", 0 },
 /* 30  */	{1, "bad", 0 },

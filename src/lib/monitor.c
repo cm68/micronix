@@ -65,6 +65,15 @@ char watches[8192];
 int nwatches;
 int nbreaks;
 
+/*
+ * Read watchpoints, kept apart from the write ones because they are
+ * wanted for different questions and arming both at once on a hot
+ * location buries the one you meant.  "who reads this as zero" is a
+ * question the write map cannot answer at all.
+ */
+char rwatches[8192];
+int nrwatches;
+
 int
 breakpoint_at(unsigned short addr)
 {
@@ -85,6 +94,15 @@ watchpoint_at(unsigned short addr)
 {
     if (!nwatches) return 0;
     if (watches[addr / 8] & (1 << (addr % 8)))
+        return 1;
+    return 0;
+}
+
+int
+rwatchpoint_at(unsigned short addr)
+{
+    if (!nrwatches) return 0;
+    if (rwatches[addr / 8] & (1 << (addr % 8)))
         return 1;
     return 0;
 }
@@ -187,7 +205,7 @@ monitor()
         i = read_line(cmdline, sizeof(cmdline));
         s = cmdline;
 
-        if (i < 1) {
+        if (i < 0) {
             printf("read_line returned %d\n", i);
             exit(4);
         }
@@ -490,6 +508,17 @@ watch_cmd(char **sp)
     return 0;
 }
 
+/*
+ * add or delete read watchpoint
+ * r [-][addr] [...]
+ */
+int
+rwatch_cmd(char **sp)
+{
+    point_cmd(sp, rwatches, &nrwatches);
+    return 0;
+}
+
 int
 exit_cmd(char **sp)
 {
@@ -526,6 +555,8 @@ mon_init()
     register_mon_cmd('t', "[-]<syscall> ...\tadd or delete syscall trace", trace_cmd);
     register_mon_cmd('v', "<verbosity>\t\tset verbosity", verbose_cmd);
     register_mon_cmd('w', "[-][<addr>] ...\tadd or delete watchpoint", watch_cmd);
+    register_mon_cmd('r', "[-][<addr>] ...\tadd or delete read watchpoint",
+        rwatch_cmd);
     register_mon_cmd('h', "\t\t\thelp", help_cmd);
 }
 
