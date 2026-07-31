@@ -427,7 +427,12 @@ dump_cmd(char **sp)
         }
     }
     addr &= 0xffff;
-    memdump(win[W_DUMP], addr, 256);
+    /*
+     * win is only allocated when the gui comes up, so indexing it
+     * headless dereferences null before memdump can decide anything.
+     * memdump prints when it is handed no window.
+     */
+    memdump(win ? win[W_DUMP] : (WINDOW *)0, addr, 256);
     lastaddr = (addr + 256) & 0xffff;
     return 0;
 }

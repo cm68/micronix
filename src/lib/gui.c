@@ -6,6 +6,12 @@
  * Changed: <2025-12-08 15:48:04 curt>
  *
  */
+/*
+ * WINDOW is opaque in current ncurses, and this file reaches for
+ * w->_parent.  Asking for the internals keeps that working rather
+ * than rewriting the refresh logic.
+ */
+#define NCURSES_INTERNALS 1
 #include <curses.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -74,6 +80,39 @@ memdump(WINDOW *w, unsigned short addr, int len)
     char c;
     int pcol;
 	int pline;
+
+    /*
+     * No GUI: the dump has nowhere to draw, so print it.  message()
+     * already makes exactly this choice for text - stderr when there
+     * is no window - and "d" was the one command that drew instead of
+     * printing, which made it silently do nothing under a pipe or a
+     * script.  Same hex-and-ascii layout, sixteen to a line.
+     */
+    if (!win || !w) {
+        char txt[17];
+        int n = 0;
+
+        while (len) {
+            if (n == 0)
+                message("%04x:", addr);
+            c = get_byte(addr++);
+            message(" %02x", c & 0xff);
+            txt[n] = ((c < ' ') || (c > 0x7e)) ? '.' : c;
+            if (++n == 16) {
+                txt[16] = '\0';
+                message("  %s\n", txt);
+                n = 0;
+            }
+            len--;
+        }
+        if (n) {
+            txt[n] = '\0';
+            for (i = n; i < 16; i++)
+                message("   ");
+            message("  %s\n", txt);
+        }
+        return;
+    }
 
     wclear(w);
 
