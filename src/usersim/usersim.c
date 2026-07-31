@@ -3,7 +3,7 @@
  *
  * usersim/usersim.c
  *
- * Changed: <2023-07-29 09:57:12 curt>
+ * Changed: <2025-12-10 16:51:57 curt>
  *
  * Copyright (c) 2018, Curt Mayer 
  * do whatever you want, just don't claim you wrote it. 
@@ -72,6 +72,23 @@ void SystemCall();
 extern WINDOW **win;
 
 int traceflags;
+int sp_report;                  /* -S: report stack low-water at exit */
+unsigned short sp_lowater = 0xffff;
+unsigned short sp_initial;
+
+/*
+ * text segment write protection: armed by the loader once the image
+ * is in place.  any store into [tprot_lo, tprot_hi) - a runaway
+ * stack pushing into code, or a stray pointer - is a bug in the
+ * emulated program.  first hit is reported with pc/sp; the count is
+ * reported again at exit.
+ */
+unsigned short tprot_lo;
+unsigned short tprot_hi;
+int tprot_hits;
+unsigned short tprot_addr, tprot_pc;
+FILE *repfp;                    /* report stream: dup of stderr, immune
+                                   to the guest closing fd 2 */
 int debug_terminal;
 int am_root = 1;
 int mypid;
@@ -113,8 +130,25 @@ void
 put_byte(unsigned short addr, unsigned char value)
 {
     if (watchpoint_at(addr)) {
-        message("watchpoint %04x\n", addr);
+        /*
+         * The pc has to be reported here rather than left to the
+         * monitor: the stop is deferred to the top of the next
+         * instruction, so by the time the monitor runs the pc is no
+         * longer the one that did the write.  Old and new value
+         * because "who wrote this" and "what did they write" are
+         * usually the same question.
+         */
+        message("watchpoint: write %04x %02x -> %02x at pc %04x\n",
+            addr, memory[addr], value, z80_get_reg16(pc_reg));
         watchpoint_touched = 1;
+    }
+    if (tprot_hi && addr >= tprot_lo && addr < tprot_hi) {
+        if (tprot_hits++ == 0) {
+            tprot_addr = addr;
+            tprot_pc = z80_get_reg16(pc_reg);
+            message("stack overflow: write %04x at pc %04x sp %04x\n",
+                addr, tprot_pc, z80_get_reg16(sp_reg));
+        }
     }
     memory[addr] = value;
 }
@@ -127,16 +161,41 @@ put_word(unsigned short addr, unsigned short value)
     put_byte(addr+1, (value >> 8) & 0xff);
 }
 
+/*
+ * Read watchpoints.  get_word does not go through get_byte, so the
+ * check has to be in both or half the reads are invisible - and a
+ * word read of a pointer is exactly the case these are wanted for.
+ */
+static void
+rwatch(unsigned short addr, unsigned short value, int width)
+{
+    if (!rwatchpoint_at(addr))
+        return;
+    if (width == 2)
+        message("watchpoint: read %04x -> %04x at pc %04x\n",
+            addr, value, z80_get_reg16(pc_reg));
+    else
+        message("watchpoint: read %04x -> %02x at pc %04x\n",
+            addr, value, z80_get_reg16(pc_reg));
+    watchpoint_touched = 1;
+}
+
 unsigned short
 get_word(unsigned short addr)
 {
-    return memory[addr] + (memory[addr + 1] << 8);
+    unsigned short v = memory[addr] + (memory[addr + 1] << 8);
+
+    rwatch(addr, v, 2);
+    if (rwatchpoint_at(addr + 1))
+        rwatch(addr + 1, v >> 8, 1);
+    return v;
 }
 
 unsigned char
 get_byte(unsigned short addr)
 {
     addr &= 0xffff;
+    rwatch(addr, memory[addr], 1);
     return memory[addr];
 }
 
@@ -345,6 +404,7 @@ usage(char *complaint, char *arg)
     fprintf(stderr, "usage: %s [<options>] [program [<program options>]]\n",
         progname);
     fprintf(stderr, "\t-r\trun as root\n");
+    fprintf(stderr, "\t-S\treport stack low-water and final break at exit\n");
     fprintf(stderr, "\t-T\topen a debug terminal window\n");
     fprintf(stderr, "\t-d <root dir>\n");
     fprintf(stderr, "\t-b\t\tstart with breakpoint\n");
@@ -424,6 +484,9 @@ main(int argc, char **argv)
                 break;
             case 'r':
                 am_root = 1;
+                break;
+            case 'S':
+                sp_report = 1;
                 break;
             case 'd':
                 if (!argc--) {
@@ -633,6 +696,10 @@ main(int argc, char **argv)
 
     z80_set_reg16(pc_reg, pop());
     // dumpcpu();
+    repfp = fdopen(dup(2), "w");
+    if (!repfp)
+        repfp = stderr;
+
     emulate();
     return EXIT_SUCCESS;
 }
@@ -768,8 +835,9 @@ do_exec(char *name, char **argv)
     struct fsym {
         unsigned short v;
         unsigned char t;
-        char name[9];
+        char name[15];
     } fsym;
+    int symsize;
 
     if (verbose & V_EXEC) {
         pid();
@@ -821,6 +889,8 @@ do_exec(char *name, char **argv)
         signal(i, SIG_DFL);
     }
 
+    tprot_hi = 0;               /* disarm text protection during load */
+
     for (i = 0; i < 65536; i++) {
         put_byte(i, 0);
     }
@@ -831,11 +901,16 @@ do_exec(char *name, char **argv)
     copyout(iobuf, header.dataoff, header.data);
 
     if (header.table) {
-        if (verbose & V_EXEC) {
-            printf("got %d symbols\n", (int)(header.table / sizeof(fsym)));
+        if (header.conf == CONF_9) {
+            symsize = 12;
+        } else {
+            symsize = 18;
         }
-        for (i = 0; i < header.table / sizeof(fsym); i++) {
-            fread(&fsym, 1, sizeof(fsym), file);
+        if (verbose & V_EXEC) {
+            printf("got %d symbols\n", (int)(header.table / symsize));
+        }
+        for (i = 0; i < header.table / symsize; i++) {
+            fread(&fsym, 1, symsize, file);
             add_sym(fsym.name, fsym.t, fsym.v);
         }
     }
@@ -847,6 +922,10 @@ do_exec(char *name, char **argv)
     z80_set_reg16(pc_reg, header.textoff);
 
     brake = header.dataoff + header.data + header.bss + header.heap;
+
+    /* image is in place: arm text write protection */
+    tprot_lo = header.textoff;
+    tprot_hi = header.textoff + header.text;
 
     ao = malloc(argc * sizeof(*ao));
 
@@ -1099,6 +1178,14 @@ emulate()
         }
 
         z80_run();
+
+        {
+            unsigned short xsp = z80_get_reg16(sp_reg);
+            if (!sp_initial)
+                sp_initial = xsp;
+            if (xsp && xsp < sp_lowater)
+                sp_lowater = xsp;
+        }
         /*
          * if we have a signal to deliver, do it now
          */
@@ -1815,6 +1902,19 @@ SystemCall()
         break;
 
     case 1:                    /* exit (hl) */
+        if (sp_report) {
+            fprintf(repfp,
+                "stack: initial %04x low %04x used %d brk %04x gap %d\n",
+                sp_initial, sp_lowater, sp_initial - sp_lowater,
+                brake, sp_lowater - brake);
+            fflush(repfp);
+        }
+        if (tprot_hits) {
+            fprintf(repfp,
+                "stack overflow: %d writes (first: addr %04x pc %04x)\n",
+                tprot_hits, tprot_addr, tprot_pc);
+            fflush(repfp);
+        }
         exit(fd);
         break;
 
@@ -2308,6 +2408,11 @@ SystemCall()
 
     case 25:                   /* stime */
         carry_set();
+        break;
+
+    case 27:                    /* alarm */
+        ret = alarm(fd);
+        carry_clear();
         break;
 
     case 31:                   /* stty */
