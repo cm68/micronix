@@ -14,6 +14,11 @@ TARGETS = sim
 
 include ../Makefile.inc
 
+# these sources are K&R-era C.  A gcc new enough to make an implicit
+# declaration an error rather than a warning will not build them at
+# all, which is why the binary here had outlived its source.
+CFLAGS += -std=gnu89
+
 sim: $(OBJECTS) ../lib/libsim.a
 	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $(LDFLAGS)
 

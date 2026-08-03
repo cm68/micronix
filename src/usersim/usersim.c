@@ -288,7 +288,55 @@ struct openfile {
     int special;        // is a special file needing sector hackery
     long offset;         // notional file offset
     int filesize;
+    int noseek;         // pipe, tty or socket: the host holds the position
 } files[MAXFILE + 1];
+
+/*
+ * Learn where a descriptor already is, rather than assuming.
+ *
+ * seekfile() below pushes the notional offset at the host before every
+ * read and write, which is only meaningful for a descriptor that has a
+ * position and whose position we set.  A pipe has neither: the lseek
+ * fails with ESPIPE and is thrown away, once per I/O, forever.
+ */
+void
+adoptfd(int fd)
+{
+    off_t o;
+
+    if ((fd < 0) || (fd > MAXFILE))
+        return;
+    if ((o = lseek(fd, 0, SEEK_CUR)) == (off_t) -1) {
+        files[fd].noseek = 1;
+        files[fd].offset = 0;
+    } else {
+        files[fd].noseek = 0;
+        files[fd].offset = o;
+    }
+}
+
+/*
+ * The descriptors we were handed rather than opened.
+ *
+ * Their notional offset was the static zero, so the first read the
+ * emulated program did on stdin seeked the CALLER's own file position
+ * back to the start - and a "while read x ; do sim ... done < file"
+ * loop restarted from line one forever.  We share the open file
+ * description with whoever launched us, so the honest thing is to take
+ * the position we find and leave it where the guest leaves it: a child
+ * that consumes its stdin is supposed to advance it.
+ */
+void
+adoptfds(void)
+{
+    int fd;
+
+    for (fd = 0; fd <= MAXFILE; fd++) {
+        if (fcntl(fd, F_GETFD) == -1)
+            continue;                   /* not open */
+        adoptfd(fd);
+    }
+}
 
 #define SPT 15
 
@@ -305,6 +353,9 @@ seekfile(int fd)
         errno = EBADF;
         return -1;
     }
+
+    if (files[fd].noseek)
+        return 0;
 
     if ((files[fd].dt == 'b') && (files[fd].offset > files[fd].filesize)) {
         errno = ENXIO;
@@ -605,6 +656,9 @@ main(int argc, char **argv)
     }
 
     mypid = getpid();
+
+    /* before the tty below, so this only sees what we were handed */
+    adoptfds();
 
     /*
      * we might be piping the simulator.  let's get an open file for our 
@@ -1991,7 +2045,8 @@ SystemCall()
                         message("%s: %s\n", strerror(errno), filename);
                     goto lose;
                 }
-                files[ret].offset = 0;
+                /* a fifo or a tty has no position to track either */
+                adoptfd(ret);
                 files[ret].dt = 'r';
                 devnum(filename, &files[ret].dt,
                     &files[ret].major, &files[ret].minor);
@@ -2018,6 +2073,7 @@ SystemCall()
         if (fd <= MAXFILE) {
             files[fd].special = 0;
             files[fd].offset = 0;
+            files[fd].noseek = 0;
             carry_clear();
         } else {
             carry_set();
