@@ -130,8 +130,9 @@ Both CP/M system disks map the hard disk to drives E and F.
 which controller, and which install script
 ------------------------------------------
 
-The kernel decides this, and it disagrees with the CP/M disk's README.
-con.c:
+Which controllers a kernel supports depends on the kernel, and it
+changed.  con.c in this tree - which is 1.61, main.c prints the version -
+has HDCA gone:
 
     struct biovec biosw[] = {
         &nodev, &nulldev, &nulldev,         /* 0 = no device */
@@ -140,16 +141,43 @@ con.c:
         &mwopen, &mwclose, &mwstrat,        /* 3 = HD-DMA */
     };
 
-Major 3 is HD-DMA, driven by mw.c, and that is where m5a, m10a and m16a
-live.  Major 1 is HDCA and is nodev - this kernel does not support it.
-So the standalone signon is right and DRIVE_A's README is wrong:
+but 1.4 still had it, and 1.6 is where it was retired.  Do not read the
+table above as describing every kernel in kernels/.
 
-    m5init, m10init, m16init    HDDMA      (signon, and the kernel)
-    hdinit                      HDCA       - obsolete, will not work
+The boot banner tells you which one you are running, because main.c
+prints only the devices that have a strategy routine:
 
-Micronix therefore only reaches a hard disk through HDDMA, which is the
-programmable controller, which is why the 512 requirement is a size
-argument to FORMATMW rather than a property of the hardware.
+    pr("disks: ");
+    for (i = 1; i < nbdev; i++)
+        if (biosw[i].strat != &nodev)
+            pr("%s ", devname[i]);
+
+so a 1.4 kernel says
+
+    disks: hdca(rev4)  djdma  hddma
+
+and a 1.61 kernel, with HDCA nodev, says only djdma and hddma.  If
+hdca(rev4) is in the list the kernel can use it.
+
+So on 1.4 all four install scripts are live, and the standalone signon
+is the guide - it is also the one that gets the controllers the right
+way round, where DRIVE_A's README has them swapped:
+
+    m5init, m10init, m16init    HDDMA
+    hdinit                      HDCA   (1.4 only; gone by 1.6)
+
+
+and why the mismatch is an HDDMA problem only
+---------------------------------------------
+
+HDCA cannot get this wrong.  It has one sector size, it is 512, and 512
+is what Micronix wants - so a drive FORMATHD prepared is already the
+size the kernel expects, and there is no argument to get wrong.
+
+The hazard belongs entirely to HDDMA, and it is the price of that
+controller being the programmable one.  FORMATMW will happily give you
+any of five sector sizes, only one of which Micronix can read, and the
+default is not it.
 
 
 where the drive files live
