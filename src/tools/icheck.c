@@ -69,7 +69,14 @@ check(file)
     struct dsknod *dp;
     unsigned short fl[100];
 
-    i = openfs(file, &fs);
+    /*
+     * Read only unless we mean to rebuild.  -s is documented to rebuild
+     * the free list, which is a write, and opening read only made that
+     * fail every time at the last step with "write ret -1" after doing
+     * all the work.  A check that is only checking should still not be
+     * able to write.
+     */
+    i = openfsrw(file, &fs, sflg);
     if (i < 0) {
         printf("cannot open %s\n", file);
         nerror |= 04;

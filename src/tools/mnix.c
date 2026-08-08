@@ -48,6 +48,7 @@ int rmdircmd();
 int fsinfo();
 int iinfo();
 int blkcmd();
+int setblkcmd();
 
 struct cmdtab
 {
@@ -67,7 +68,8 @@ struct cmdtab
     {"rm", rmcmd, "rm <file>" },
     {"mkdir", mkdircmd, "mkdir <directory>" },
     {"rmdir", rmdircmd, "rmdir <directory>" },
-    {"block", blkcmd, "block [-e] <blkno>" }
+    {"block", blkcmd, "block [-e] <blkno>" },
+    {"setblk", setblkcmd, "setblk <path> <blkno> ..." }
 };
 
 void
@@ -529,6 +531,105 @@ int
 mkdircmd(int c, char **a)
 {
     return 1;
+}
+
+
+/*
+ * Give a file a block list of our choosing.
+ *
+ * This exists for one job: a boot area has to be at a fixed place on the
+ * platter, and the only thing in a v6 filesystem that keeps a block from
+ * being handed out is an inode claiming it.  So the file is made to own
+ * the blocks the hardware will read, and then writing the file writes
+ * the boot area, through the same mapping the kernel and the rom both
+ * use rather than a second opinion about where the sector is.
+ *
+ * Two things this does not do, deliberately.  It does not take the
+ * blocks off the free list - run icheck -s afterwards, which rebuilds
+ * the list from what the inodes claim, and until you do the blocks are
+ * both owned and queued to be handed out.  And it does not write any
+ * contents; set the blocks first, then write the file, and the write
+ * lands on them.
+ */
+int
+setblkcmd(int c, char **a)
+{
+    struct dsknod *dp;
+    UINT blocks[256];
+    UINT iblk[256];
+    int nblk = 0;
+    int iblkno;
+    char *path;
+    int i;
+
+    a++;
+    c--;
+    if (c < 2) {
+        return -1;
+    }
+    path = *a++;
+    c--;
+
+    while (c-- && nblk < 256) {
+        blocks[nblk++] = atoi(*a++);
+    }
+
+    dp = namei(fs, path);
+    if (!dp) {
+        printf("can't find %s\n", path);
+        return 2;
+    }
+    if ((dp->d_mode & IFMT) != IFREG) {
+        printf("%s is not a regular file\n", path);
+        return 2;
+    }
+
+    /*
+     * Eight addresses in an inode.  Up to eight blocks they are the
+     * blocks; past that they are indirect blocks holding 256 apiece, and
+     * the file has to say so with ILARG.  A cylinder is more than eight
+     * blocks on every drive we care about, so the second case is the
+     * usual one here, not the exception.
+     */
+    if (nblk <= 8) {
+        dp->d_mode &= ~ILARG;
+        for (i = 0; i < 8; i++) {
+            dp->d_addr[i] = (i < nblk) ? blocks[i] : 0;
+        }
+    } else {
+        iblkno = balloc(fs);
+        if (!iblkno) {
+            printf("no block for the indirect\n");
+            return 2;
+        }
+        bzero((char *)iblk, 512);
+        for (i = 0; i < nblk; i++) {
+            iblk[i] = blocks[i];
+        }
+        writeblk(fs, iblkno, (char *)iblk);
+        for (i = 0; i < 8; i++) {
+            dp->d_addr[i] = 0;
+        }
+        dp->d_addr[0] = iblkno;
+        dp->d_mode |= ILARG;
+    }
+
+    /*
+     * And the size, or it is an empty file with a block list: reads
+     * return nothing and a write goes to the allocator instead of to the
+     * blocks sitting right there in the inode.
+     */
+    dp->d_size0 = 0;
+    dp->d_size1 = nblk * 512;
+    iput(dp);
+
+    printf("%s: %d blocks, %d bytes%s", path, nblk, nblk * 512,
+        (nblk > 8) ? ", ILARG" : "");
+    if (nblk > 8) {
+        printf(", indirect in %d", iblkno);
+    }
+    printf("\nnow run icheck -s to rebuild the free list\n");
+    return 0;
 }
 
 int

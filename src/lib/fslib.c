@@ -179,6 +179,21 @@ printf("8 inch\n");
         }
         *fsp = (struct super *)i;
         readblk(*fsp, 1, i->sb.superblock);
+
+        /*
+         * s_fmod means "this superblock has changed since we read it",
+         * which is a statement about now and not about the disk.  Take
+         * whatever is on the platter and it is never true when you read
+         * it and never false afterwards: the Micronix kernel does not use
+         * the field at all - balloc and bfree bdwrite the superblock
+         * buffer instead - so every Micronix filesystem carries it set,
+         * and closefs then writes the superblock back on every close
+         * whether anything changed or not.  Read only opens fail that
+         * write, which is where "write ret -1" came from at the end of an
+         * ordinary icheck, and read write opens modify a filesystem the
+         * caller only asked to look at.
+         */
+        (*fsp)->s_fmod = 0;
     } else {
         free((struct super *)i);
     }
