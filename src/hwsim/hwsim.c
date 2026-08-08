@@ -1093,7 +1093,13 @@ main(int argc, char **argv)
         drivenames[i+1] = 0;
     }
 
-    if (!drivenames) {
+    /*
+     * With nothing said at all, put the usual disk in the usual drive.
+     * But not when a 5 1/4 inch floppy was named: that asks for a machine
+     * booting off the other port, and quietly occupying the 8 inch one
+     * would take that boot away - the controller tries 8 inch first.
+     */
+    if (!drivenames && !fivenames) {
         drivenames = malloc(sizeof(char *) * 2);
         drivenames[0] = "DRIVE_A.IMD";
         drivenames[1] = 0;

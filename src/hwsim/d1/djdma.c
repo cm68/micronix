@@ -462,6 +462,18 @@ sense()
 
     drive = physdrive(physread(channel + 1));
 
+    /*
+     * An empty drive is not an error to ask about - software senses all
+     * of them to find out what is there, and the answer for a drive with
+     * no disk in it is that it is not ready.  This used to walk into
+     * imd_trkinfo with a null and die, which no one noticed while every
+     * drive slot was always filled.
+     */
+    if (!imdp[drive]) {
+        trace(trace_djdma, "drive %d: empty", drive);
+        return S_UNREADY;
+    }
+
     // look at track 1 to determine density and sidedness - a hack
     imd_trkinfo(imdp[drive], 1, 0, &nsecs, &secsize);
 
@@ -577,6 +589,9 @@ readtrk()
         physread(channel + 4) + 
         (physread(channel + 5) << 8) +
         (physread(channel + 6) << 16);
+    if (!imdp[drive]) {
+        return S_UNREADY;
+    }
     imd_trkinfo(imdp[drive], cyl, head, &secs, &secsize);
 
     dparams[drive].current = cyl;
@@ -620,6 +635,9 @@ writetrk()
         physread(channel + 4) + 
         (physread(channel + 5) << 8) +
         (physread(channel + 6) << 16);
+    if (!imdp[drive]) {
+        return S_UNREADY;
+    }
     imd_trkinfo(imdp[drive], cyl, head, &secs, &secsize);
 
     dparams[drive].current = cyl;
@@ -838,8 +856,19 @@ djdma_init()
     for (i = 0; i < sizeof(bootstrap); i++) {
         physwrite(i + 0x38, bootstrap[i]);
     }
-    imd_read(imdp[0], 0, 0, 1, secbuf);
-    copyout(secbuf, 0x80, 0x80);
+    /*
+     * The bootstrap loads the first sector of the boot drive, and the
+     * boot drive is logical 0 - which after the renumbering above may be
+     * on either port.  Manual section 7: 80 hex bytes are loaded from
+     * the first sector on track 0 of the disk, and the cpu is sent to
+     * 000080.
+     */
+    if (imdp[physdrive(0)]) {
+        imd_read(imdp[physdrive(0)], 0, 0, 1, secbuf);
+        copyout(secbuf, 0x80, 0x80);
+    } else {
+        printf("djdma: no disk to boot from\n");
+    }
     physwrite(0x4a, 0x40);
     return 0;
 }
