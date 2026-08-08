@@ -390,6 +390,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-b\t<boot rom file>\n");
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
     fprintf(stderr, "\t-S\t<symbol file file>\n");
+    fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
     fprintf(stderr, "\t-x\topen a debug terminal window\n");
     fprintf(stderr, "\t-t\t<tracebits>\n");
     fprintf(stderr, "\t-l\tproduce logfile\n");
@@ -991,6 +992,12 @@ main(int argc, char **argv)
                     usage("symfile name missing\n", progname);
                 }
                 sym_filename = strdup(*argv++);
+                break;
+            case 'd':
+                if (!argc--) {
+                    usage("drive directory missing\n", progname);
+                }
+                drive_setdir(*argv++);
                 break;
             case 't':
                 if (!argc--) {

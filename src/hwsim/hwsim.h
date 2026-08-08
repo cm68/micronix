@@ -76,6 +76,7 @@ typedef void (*sighandler_t)(int);
 sighandler_t mysignal(int signum, sighandler_t handler);
 
 // hard disk abstraction
+void drive_setdir(char *dir);   // where drive_open looks for unit files
 void *drive_open(char *name);
 int drive_sectorsize(void *dhandle, int secsize);
 int drive_write(void *dhandle, int cyl, int head, int sec, char *buf);

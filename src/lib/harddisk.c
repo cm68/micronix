@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <limits.h>
 
 #define	DEF_SECSIZE	2048			// largest possible
 #define MAGIC		0xD15CC0DE		// whoo-hoo, aren't we clever
@@ -37,21 +38,53 @@ struct drive {
 } drive[NDRIVES];
 
 /*
+ * Controllers name their drives by unit - hddma-0, hdca-2 - which are
+ * looked up in the current directory unless a search directory is set.
+ * The blank drives that ship with the tree are in hwsim/resources, and
+ * without this the only way to use them was to run the simulator from
+ * the directory they live in.  Nothing warns you when you get that
+ * wrong, either: drive_open creates what it cannot find, so a run from
+ * the wrong place quietly gets a new empty disk instead of an error.
+ *
+ * A name that already has a / in it is used as given, so a controller
+ * or a future per-unit option can still name an exact file.
+ */
+static char *drive_dir;
+
+void
+drive_setdir(char *dir)
+{
+    drive_dir = strdup(dir);
+}
+
+/*
  * when we format the drive, we write the label if it is not present, and whenever we
  * increase they cylinder or head count, we update the label.
  * note that this only will work if we format all the heads on a cylinder, before we
  * step to the next one.   that's the most reasonable method
  */
 struct drive *
-drive_open(char *name) 
+drive_open(char *name)
 {
     int i;
     struct drive *dp;
+    char path[PATH_MAX];
 
+    if (drive_dir && !strchr(name, '/')) {
+        snprintf(path, sizeof(path), "%s/%s", drive_dir, name);
+    } else {
+        snprintf(path, sizeof(path), "%s", name);
+    }
+
+    /*
+     * match on the resolved path, not the unit name: two controllers
+     * that both call their first unit 0 are different drives, but the
+     * same file reached by two names is one drive
+     */
     for (i = 0; i < NDRIVES; i++) {
         dp = &drive[i];
         if (!dp->name) break;
-        if (strcmp(name, drive[i].name) == 0) {
+        if (strcmp(path, drive[i].name) == 0) {
             return (&drive[i]);
         }
     }
@@ -59,10 +92,10 @@ drive_open(char *name)
         printf("too many drives\n");
         return 0;
     }
-    dp->name = strdup(name);
-    dp->fd = open(name, O_RDWR|O_CREAT, 0777);
+    dp->name = strdup(path);
+    dp->fd = open(path, O_RDWR|O_CREAT, 0777);
     if (dp->fd < 0) {
-        printf("open of %s failed %d\n", name, errno);
+        printf("open of %s failed %d\n", path, errno);
         return 0;
     }
     // get the label or make a new one
