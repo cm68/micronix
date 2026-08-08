@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# boot the 1.67 standalone with its console in an xterm
+#
+# -c 0x114 is three things at once: 0x100 puts uart 0 - the console - in
+# an xterm instead of borrowing the terminal this was started from, 0x10
+# selects the djdma floppy as the boot device, and 0x04 says do not stop
+# in the monitor first.  0x14 is what the switches default to; the 0x100
+# is the part worth remembering.
+#
+here=`dirname $0`
+here=`cd $here && pwd`
+cd `dirname $0`/../../src/hwsim/d1 || exit 1
+
+rm -f $here/*-delta          # writes persist between runs otherwise
+
+exec ./d1 -b roms/mon447.bin -c 0x114 -d $here -5 $here/sa67.5.skew.1k

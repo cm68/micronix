@@ -1,0 +1,65 @@
+installing Micronix 1.67 on a simulated hard disk
+=================================================
+
+	./run
+
+which opens an xterm for the console and boots the 1.67 standalone
+floppy off the simulated DJ/DMA.  The window this is started from stays
+the simulator's own monitor.
+
+Wait for the welcome.  It takes a few minutes of simulated time to get
+from the loader to a shell - the banner appears early and then nothing
+happens for a while, which is normal - and the shell gives no prompt, so
+the last line you see is
+
+	Then boot Micronix from the hard disk. If you have any
+	questions, please read the Installation section of the
+	Micronix User's Manual.
+
+Anything typed before that point is thrown away when the shell sets up
+the terminal, which is worth knowing because it looks like the machine
+ignoring you.  When it has settled, type
+
+	source m5init
+
+and it will mkfs /dev/m5a, fsck it, mount it on /b, copy the running
+system across with cptree, relink /b/dev/root and /b/dev/swap, patch the
+kernel's root and swap devices with ddt, tidy up and unmount.  It prints
+"Disk initialization complete." when it is done.  cptree is copying a
+whole filesystem through a simulated Z80, so give it time.
+
+what is here
+------------
+
+    standalone167.bin	the 1.67 standalone, with one byte changed
+    sa67.5.skew.1k	the name that gives it its geometry, via bdev(2,93)
+    hddma-0		the drive to install on, blank, 5 meg
+    hddma-1		a second drive, blank, for swap
+
+The one changed byte is the swap device.  Micronix ships with
+
+	root dev: djdma/76
+	swap dev: nodev/0
+
+and with no swap device it prints "No more space on disk nodev/0" and
+gets no further than the banner - balloc failing on device zero.  The
+swap word is the second of the two device words in the kernel image, the
+pair that m5init itself patches with "ddt /b/micronix sB6CB 0 3 0 3", and
+here it points at hddma/1 so the install has drive 0 to itself.
+
+Why it needs to swap at all is not understood - the disk shipped without
+a swap device, so the real machine did not need one - so treat that byte
+as a workaround rather than a fix.  See hwsim/DISKS.
+
+afterwards
+----------
+
+m5init does not write a boot block, and nothing else does either: the rom
+reads cylinder 0 head 0 sector 0 of the hard disk and there is nothing
+there.  See hwsim/DISKS for what that takes - micronix/stand builds the
+two levels and cmd/installboot puts them in a file that owns cylinder 0,
+which is what keeps the filesystem from allocating over them.
+
+Use 1.67 and not 1.6.  1.6's kernel has its root device as djdma/12,
+which is the single sided minor for a disk that is double sided, and it
+stops in the rom monitor before reaching a shell.  1.67 has 76.
