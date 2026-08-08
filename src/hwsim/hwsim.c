@@ -432,6 +432,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-S\t<symbol file file>\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
     fprintf(stderr, "\t-T\t<space:addr>[,count] trace from here, for count instructions\n");
+    fprintf(stderr, "\t-W\t<addr> report every write to this address and keep going\n");
     fprintf(stderr, "\t-5\t<file> a floppy on the 5 1/4 inch port\n");
     fprintf(stderr, "\t-x\topen a debug terminal window\n");
     fprintf(stderr, "\t-t\t<tracebits>\n");
@@ -1055,6 +1056,12 @@ main(int argc, char **argv)
                     fivenames[n] = strdup(*argv++);
                     fivenames[n + 1] = 0;
                 }
+                break;
+            case 'W':
+                if (!argc--) {
+                    usage("watch address not specified\n", progname);
+                }
+                add_write_watch(strtol(*argv++, 0, 0));
                 break;
             case 'T':
                 {

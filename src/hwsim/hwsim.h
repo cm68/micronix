@@ -99,3 +99,4 @@ extern int config_sw;
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
+extern void add_write_watch(unsigned short addr);

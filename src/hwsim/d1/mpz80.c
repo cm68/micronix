@@ -234,6 +234,31 @@ int trapcount;
 int trace_trap;
 
 /*
+ * Addresses to report writes to, from -W.  A watchpoint in the monitor
+ * stops the machine, which is the right thing when you are driving it by
+ * hand and the wrong thing when the question is who writes to a byte
+ * during a boot - the answer to that is a list, and stopping at the
+ * first entry hides the rest.
+ *
+ * The virtual address is what you give it and the physical is what gets
+ * printed beside it, because the same virtual address is a different
+ * byte in every task, and knowing which physical byte was hit is how you
+ * tell a process writing its own memory from something writing through
+ * it.
+ */
+#define NWATCH 8
+static vaddr watchlist[NWATCH];
+static int nwatch;
+
+void
+add_write_watch(vaddr addr)
+{
+    if (nwatch < NWATCH) {
+        watchlist[nwatch++] = addr;
+    }
+}
+
+/*
  * the program counter when the trap hit
  */
 int trapaddr;
@@ -680,6 +705,29 @@ put_byte(vaddr addr, unsigned char value)
     char *cmd;
  
     local = super() && (addr < 0x1000);
+
+    if (nwatch) {
+        int w;
+
+        for (w = 0; w < nwatch; w++) {
+            if (watchlist[w] != addr)
+                continue;
+            {
+                char sbuf[16];
+                paddr wpa;
+                byte wattr;
+
+                if (super() && (addr < 0x1000)) {
+                    wpa = addr;
+                } else {
+                    getpte(addr, &wpa, &wattr);
+                }
+                printf("watch: %04x <- %02x (physical %06x) from %s\n",
+                    addr, value, wpa,
+                    dis_space(z80_get_reg16(pc_reg), sbuf, sizeof(sbuf)));
+            }
+        }
+    }
 
     if (!local) {                           // mapped ram
         seg = "mapped:";
