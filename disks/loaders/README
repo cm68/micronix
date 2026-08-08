@@ -1,0 +1,79 @@
+Micronix boot loaders, extracted for disassembly
+================================================
+
+Two stages boot a Micronix floppy.  The DJ/DMA rom reads 0x80 bytes from
+the first sector of track 0 into 0x0080 and jumps there; that first level
+boot builds a channel program, reads the second level in, and jumps to
+it.  The second level is the one that knows the v6 filesystem: it lists
+the root directory, finds a kernel, and loads it.  There is no source for
+it, which is why these are here.
+
+micronix16-boot1.bin    128 bytes   org 0x0080  first level
+micronix16-loader.bin   9728 bytes  org 0x0100  second level
+micronix14-boot1.bin    128 bytes   org 0x0080  first level
+micronix14-trk0.bin     3328 bytes              track 0, 26 x 128
+micronix14-trk1.bin     7680 bytes              track 1, 15 x 512
+
+1.6, from disks/floppies/Micronix1.6/standalone.bin
+---------------------------------------------------
+
+Both addresses come from the first level boot itself, and the loader runs
+in the simulator at them, so they are not guesses.
+
+    0080  ld a,26 / ld (0050),a / ld hl,00be / ld (0051),hl
+    008f  out (ef),a                      run the channel at 00be
+    0091  wait for completion at 00d7
+    0098  ld hl,00dd / ld bc,40ff / ld de,0014
+    00a1  walk twenty sector statuses, counting bad ones in d
+    00b2  ld a,d / or a / jp z,0100       all good: enter the loader
+    00bb  jp 00bb                         otherwise hang
+
+The channel reads track 0 to dma ffff00.  With 512 byte sectors that puts
+sector 0 off the top of memory and sector 1 at ffff00+200 = 1000100,
+which wraps in twenty four bits to 000100 - so the sectors numbered 1
+through 9 land at 0100 through 12ff, and the second track read follows at
+1300.  Nineteen sectors, contiguous, which is what the file holds.
+
+It disassembles as Whitesmith's C: "ld sp,0100 / call 0a67 / jp 0000" is
+crt0 calling main and exiting, and the strings are in there - "Micronix
+DJDMA loader", "Drive not ready", "Format?", "Loading", "Entering".
+
+1.41, from disks/dist/UX141_SA.IMD
+-----------------------------------
+
+Eight inch, and track 0 is the usual single density boot track: 26
+sectors of 128 bytes, with the rest of the disk 15 sectors of 512.  So
+the first level boot is exactly one sector.  It is byte for byte the same
+block as the 1.3 standalone (disks/boot.IMD), which is worth knowing
+before reading too much into either.
+
+Its channel program, at 00dd, decodes as
+
+    23 80 30 00        set dma address 003080
+    20 01 01 00 00     read sector cyl 1 sec 1 drive 0
+    22 00 00 00 00 00  sense drive status
+    25 00              controller halt
+
+    ee: 20 00 03 00 00 read sector cyl 0 sec 3 drive 0
+        25 00          controller halt
+
+and the block ends "c3 80 30", jp 3080.  Between the two programs it
+reads a sense byte back out of the channel at 00e9, uses it to index a
+table of pairs at 00f5 (0134 0134 0229 0222), and pokes what it finds
+into the loaded image at 3090 - drive parameters chosen from what the
+sense reported.
+
+That accounts for 640 bytes at 3080, and the bytes at 3080 do not look
+like an entry point, so either the load is larger than those two commands
+suggest or the entry is not at the start.  Both whole tracks are here
+rather than a guessed span; disassembling them is how to settle it.
+
+How these were extracted
+------------------------
+
+Sectors in sector number order, by imd_read through imdlib - the same
+path the simulator's DJDMA uses, so a sector here is the sector the
+controller would fetch.  Note this is not what src/tools/mnix's block
+command gives you: readblk maps a filesystem block through the driver's
+interleave, block 0 always reads as zeros, and a 512 byte block reader
+cannot address a 128 byte boot track at all.
