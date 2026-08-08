@@ -1,30 +1,35 @@
 #!/bin/sh
 #
-# boot the 1.67 standalone with its console in an xterm
+# Boot the Micronix 1.67 standalone with its console in an xterm, ready
+# to install onto the simulated hard disk.  Type the command yourself
+# when it is time - see below for when that is.
 #
-# The deltas go first, before anything else happens.  Writes to a floppy
-# image do not go to the image, they go to a -delta file beside it, and
-# that file is still there next time - so a second run does not start
-# from the distributed disk, it starts from wherever the last run left
-# off.  Run out of space once and every run afterwards is out of space
-# before it begins, which reads as the same failure repeating rather than
-# as one failure being inherited.
+#	./run			system calls in this window
+#	./run -t 0x120000	system calls and every trap as well
+#	./run -t 0x800		just the clock, if that is the question
 #
-# -t 0x80000 is the system call trace.  It goes to stdout, which is the
-# window this was started from, so the calls scroll past there while the
-# console has the xterm to itself.  Each line says which task made the
-# call and from what address, so anything interesting can be handed
-# straight back to -T as a trace trigger.
+# Anything given on the command line is passed through, so -T and the
+# rest are available without editing this.
 #
-# -c 0x114 is three things at once: 0x100 puts uart 0 - the console - in
-# an xterm instead of borrowing the terminal this was started from, 0x10
-# selects the djdma floppy as the boot device, and 0x04 says do not stop
-# in the monitor first.  0x14 is what the switches default to; the 0x100
-# is the part worth remembering.
+# The trace bits worth knowing, from ./d1 -h in src/hwsim/d1:
+#
+#	    800  clock	every tick
+#	  20000  trap	every entry to the kernel - interrupts as well as
+#			system calls, which is most of them: a quiet boot
+#			is nearly four thousand interrupts to fifty calls
+#	 100000  syscall
+#
+# -c 0x114 is three things: 0x100 puts uart 0 - the console - in an xterm
+# of its own instead of borrowing this window, 0x10 boots the djdma
+# floppy, and 0x04 says do not stop in the monitor first.  Add 0x1000 for
+# a machine with no clock, which is a thing you can want and not a thing
+# you want by accident.
 #
 here=`dirname "$0"`
 here=`cd "$here" && pwd` || exit 1
 
+# Writes to a floppy image go to a -delta beside it and stay there, so
+# without this every run starts from wherever the last one left off.
 for d in "$here"/*-delta; do
 	if [ -f "$d" ]; then
 		echo "run: discarding $d"
@@ -32,6 +37,27 @@ for d in "$here"/*-delta; do
 	fi
 done
 
+cat <<'NOTE'
+run: the console is the xterm; system calls appear here.
+
+     Wait for the welcome to finish printing in the xterm - it ends
+     "...Micronix User's Manual." - and then wait a little longer.  The
+     shell prints no prompt, so that last line is the prompt.  Anything
+     typed before it arrives is discarded when the shell sets up the
+     terminal, which looks exactly like the machine ignoring you.
+
+     Then, in the xterm:
+
+         source m5init
+
+     mkfs, fsck, mount, cptree the system across, relink root and swap,
+     patch the kernel, unmount.  It ends "Disk initialization complete."
+     cptree is copying a filesystem through a simulated Z80, so it takes
+     a while and the system call trace here is how you watch it work.
+
+NOTE
+
 cd "$here/../../src/hwsim/d1" || exit 1
 
-exec ./d1 -b roms/mon447.bin -c 0x114 -t 0x80000 -d "$here" -5 "$here/sa67.5.skew.1k"
+exec ./d1 -b roms/mon447.bin -c 0x114 -t 0x100000 \
+	-d "$here" -5 "$here/sa67.5.skew.1k" "$@"
