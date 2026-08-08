@@ -36,6 +36,28 @@ kernel's root and swap devices with ddt, tidy up and unmount.  It prints
 "Disk initialization complete." when it is done.  cptree is copying a
 whole filesystem through a simulated Z80, so give it time.
 
+"no more space"
+---------------
+
+Two different failures say this, and they want opposite things.
+
+"No more space on disk nodev/0" is swap - device zero is nodev - and
+means the kernel wanted to swap before it had anywhere to.  That should
+not happen here because the swap word in standalone167.bin points at
+hddma/1, so if it does, the image has been replaced with an unpatched
+one.
+
+"No more space on disk djdma/76" is the floppy filling up, and the usual
+reason is that the mount failed: m5init runs "mount /dev/m5a /b" and then
+"cptree / /b", and if the mount did not take then cptree copies the whole
+system into the directory /b on the floppy instead of onto the hard disk,
+which fills 760 blocks quickly.  The system call trace in the runner
+window shows whether the mount worked, and mkfs before it.
+
+Either way, start again from a clean disk - run discards the deltas, so
+just run it again rather than trying to tidy up inside a filesystem that
+has already been half filled.
+
 what is here
 ------------
 
