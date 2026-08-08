@@ -106,6 +106,7 @@ byte keybreg;
 static char *keyb_bits[] = { 0, "diag", 0, 0, 0, 0, 0, 0 };
 
 extern void syscall_at(word pc);
+char *dis_space(word addr, char *buf, int len);
 
 // this register is negated:  if the switch is on, the value reads low
 byte switchreg;
@@ -229,6 +230,7 @@ super()
  * and implement the trap function
  */
 int trapcount;
+int trace_trap;
 
 /*
  * the program counter when the trap hit
@@ -249,6 +251,31 @@ static byte local;
 void
 trap(byte trapbits)
 {
+    /*
+     * Everything that enters the kernel comes through here, and the same
+     * mechanism carries all of it: a halt out of user mode is a system
+     * call, an interrupt is the same trap with a different bit cleared.
+     * The cause is which bit is missing, not which is set, so say it in
+     * words - and say where it came from before taskreg is zeroed and
+     * there is no longer any way to know.
+     *
+     * The place it prints is the place -T takes, so a trap worth looking
+     * at can be handed straight back as a trace trigger.
+     */
+    if (traceflags & trace_trap) {
+        char sbuf[16];
+        char *why;
+
+        if (!(trapbits & ST_INT)) {
+            why = "interrupt";
+        } else if (!(trapbits & ST_HALT)) {
+            why = "halt";
+        } else {
+            why = "reset";
+        }
+        trace(trace_trap, "trap: %-9s from %s\n", why,
+            dis_space(z80_get_reg16(pc_reg), sbuf, sizeof(sbuf)));
+    }
     trace(trace_mpz80, "trap 0x%x %s\n", trapbits, bitdef(trapbits, stat_bits));
     taskreg = 0;
     trapcount = 15;
@@ -768,6 +795,7 @@ mpz80_setup()
     taskreg = 0;
 
     trace_mpz80 = register_trace("mpz80");
+    trace_trap = register_trace("trap");
     trace_map = register_trace("map");
     trace_mem = register_trace("mem");
     trace_syscall = register_trace("syscall");
