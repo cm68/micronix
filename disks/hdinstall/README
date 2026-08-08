@@ -15,18 +15,33 @@ can be handed straight back to the simulator as -T tsk1:43f3 to start an
 instruction trace there.  If the calls are more than you want, take
 -t 0x80000 out of run.
 
-Wait for the welcome.  It takes a few minutes of simulated time to get
-from the loader to a shell - the banner appears early and then nothing
-happens for a while, which is normal - and the shell gives no prompt, so
-the last line you see is
+Wait for the welcome, and then for the shell's prompt, which is
+
+	#
+
+If the welcome appears and no prompt follows, the machine is wedged - it
+is not a shell waiting quietly.  That distinction cost most of a day
+here, because a wedged machine and a shell with nothing to say look
+identical if you believe there is no prompt.  What the wedge looks like
+from outside: system calls stop - the last one is init's
+stat("/dev/ttyA") - while clock interrupts keep arriving, tens of
+thousands of them, every one of them landing at tsk1:003d.  The processor
+is halted there waiting for something to run and the scheduler never
+finds it.
+
+	tail -f ../../src/hwsim/d1/logfile
+
+and watch whether the syscall count moves.  If it is frozen and the
+interrupt count is climbing, that is this.
+
+The last line of the welcome is
 
 	Then boot Micronix from the hard disk. If you have any
 	questions, please read the Installation section of the
 	Micronix User's Manual.
 
-Anything typed before that point is thrown away when the shell sets up
-the terminal, which is worth knowing because it looks like the machine
-ignoring you.  When it has settled, type
+Anything typed before the prompt is thrown away when the shell sets up
+the terminal.  When the # appears, type
 
 	source m5init
 

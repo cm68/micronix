@@ -50,11 +50,11 @@ cat <<'NOTE'
 run: the console is the xterm.  The trace is in
      src/hwsim/d1/logfile - tail -f it from another window.
 
-     Wait for the welcome to finish printing in the xterm - it ends
-     "...Micronix User's Manual." - and then wait a little longer.  The
-     shell prints no prompt, so that last line is the prompt.  Anything
-     typed before it arrives is discarded when the shell sets up the
-     terminal, which looks exactly like the machine ignoring you.
+     Wait for the welcome, and then for the shell's prompt, which is #.
+     Anything typed before it is discarded when the shell sets up the
+     terminal.  If the welcome prints and no # follows, the machine is
+     wedged rather than waiting - watch the logfile and see whether the
+     system call count is moving.
 
      Then, in the xterm:
 
