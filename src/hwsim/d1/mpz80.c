@@ -106,6 +106,7 @@ byte keybreg;
 static char *keyb_bits[] = { 0, "diag", 0, 0, 0, 0, 0, 0 };
 
 extern void syscall_at(word pc);
+extern void syscall_return(word pc);
 char *dis_space(word addr, char *buf, int len);
 
 // this register is negated:  if the switch is on, the value reads low
@@ -616,6 +617,16 @@ get_byte(vaddr addr)
      * the first byte fetched in the trap sequence.  making that code path flow clean is not
      * that easy, so the brute force here will have to do. - XXX
      */
+    /*
+     * A call that was traced going in gets its answer reported coming
+     * out, which is the first thing fetched back in user mode at the
+     * address the caller resumes from.
+     */
+    if ((!super()) && (z80_get_reg8(status_reg) & S_M1) &&
+        (traceflags & trace_syscall)) {
+        syscall_return(addr);
+    }
+
     if ((!super()) && 
         (z80_get_reg8(status_reg) & S_M1) && 
         (retval == 0x76) && 

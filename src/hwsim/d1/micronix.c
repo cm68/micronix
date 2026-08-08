@@ -48,6 +48,67 @@ getname(word addr)
 }
 
 /*
+ * Watching only the calls is half an observation, and it is the half
+ * that cannot tell a request from an answer: a trace ending at
+ * sbrk(4723) does not say whether the break moved, and a stat that is
+ * the last line in the log might have failed, returned, or never come
+ * back at all.
+ *
+ * So the call arms the address the caller resumes at, and the next M1
+ * fetch there reports what came back.
+ *
+ * What to look at there is the carry flag and HL, not BC.  The kernel
+ * answers with carry clear and its result in HL, or carry set and an
+ * error number in HL; BC belongs to the library wrapper, which sets it
+ * afterwards - "ld bc,0 / ret nc" leaving a call that worked, "dec bc"
+ * with the errno stored leaving one that did not.  Reading BC at the
+ * resume point gives you whatever the caller happened to be holding,
+ * which reads convincingly as a result and is not one.
+ *
+ * usersim prints the call and its result on one line because it is the
+ * kernel and knows both at once.  Here a real kernel runs in between, so
+ * the two are separate lines with whatever the kernel did between them -
+ * which is usually the interesting part anyway.
+ */
+/*
+ * One slot, which is not enough: fork leaves two processes making calls
+ * and whichever calls next takes the slot, so a return can go unreported
+ * - stat("/dev/ttyB") loses its answer to a wait() from the child.  A
+ * slot per task would fix it and has not been needed yet.
+ */
+static word retpc;
+static char *retname;
+static int armed;
+
+static void
+syscall_arm(word addr, char *name)
+{
+    retpc = addr;
+    retname = name;
+    armed = 1;
+}
+
+void
+syscall_return(word addr)
+{
+    word hl;
+    byte f;
+
+    if (!armed || addr != retpc) {
+        return;
+    }
+    armed = 0;
+    hl = z80_get_reg16(hl_reg);
+    f = z80_get_reg8(f_reg);
+    if (f & 1) {
+        printf("micronix %s = ERROR %d\n", retname ? retname : "?", hl);
+    } else {
+        printf("micronix %s = %d (0x%04x)\n", retname ? retname : "?",
+            (short) hl, hl);
+    }
+}
+
+/*
  * micronix system calls are done using the RST8 instruction, which
  * is a one-byte call instruction to location 8, which has a halt instruction
  * placed there by the exec call.
@@ -72,6 +133,7 @@ syscall_at(word sc)
 	word arg2;	/* second arg */
 	word arg3;	/* third arg */
 	word arg4;	/* fourth arg */
+	word retaddr;	/* where the caller comes back to */
 
 	char *fn;
 	char *fn2;
@@ -86,6 +148,7 @@ syscall_at(word sc)
 	 * the hack is that in the second case, sc[0] is part of
 	 * the high part of the address of the halt.
 	 */
+	retaddr = sc;           /* rst pushed the byte after itself */
 	sc -= 1; 
 
 	/* make sure that we came here from a rst1 */
@@ -100,6 +163,11 @@ syscall_at(word sc)
 	/* this is an indirect call - the argument points at a syscall */
 	if (code == 0) {
 		indirect++;
+		/*
+		 * The descriptor is elsewhere, but the caller still resumes
+		 * after its own four bytes - rst, zero, and the address.
+		 */
+		retaddr = sc + 4;
 		sc = fuword(sc + 2);
 		if ((code = fubyte(sc)) != 0xcf) {
 			printf("indir no syscall %d %x!\n", code, sc);
@@ -262,4 +330,22 @@ syscall_at(word sc)
 		break;
 	}
 	dumpmem(&fubyte, sc, sp->argbytes + 1);
+
+	/*
+	 * Arm the return.  Watching only the calls is half an observation,
+	 * and it is the half that cannot tell a request from an answer: a
+	 * trace that ends at sbrk(4723) does not say whether the break
+	 * moved, and a stat that is the last thing in the log might have
+	 * failed, or returned, or never come back at all.
+	 *
+	 * For a direct call the caller resumes past the code byte and the
+	 * inline arguments, which is argbytes + 1 from the rst; an indirect
+	 * one resumes after its own four bytes and that was worked out
+	 * above.
+	 */
+	if (!indirect) {
+		retaddr = sc + sp->argbytes + 1;
+	}
+	syscall_arm(retaddr, sp->name);
 }
+
