@@ -200,6 +200,16 @@ get_byte(unsigned short addr)
 }
 
 /*
+ * usersim has one address space, so there is nothing to qualify
+ */
+char *
+dis_space(unsigned short addr, char *buf, int len)
+{
+    snprintf(buf, len, "%04x", addr);
+    return buf;
+}
+
+/*
  * the disassembler's fetch: like get_byte but without tripping a read
  * watchpoint, because listing an instruction is not the program
  * reading that byte

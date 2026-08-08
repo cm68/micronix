@@ -38,6 +38,21 @@ extern int fmt_syscall(unsigned short addr, char *dest);
 extern unsigned char dis_byte(unsigned short addr);
 
 /*
+ * An address by itself does not say where it is.  0x100b is one thing in
+ * task 1 and another in the supervisor's on board memory, and while a
+ * trap sequence runs the cpu is not fetching from the pc at all - it is
+ * reading a sixteen byte window of rom while the pc counts past whatever
+ * happens to be underneath.  Printing the bare number invites the reader
+ * to look up the wrong bytes, which is exactly what happened here.
+ *
+ * dis_space writes the space and the address within it into buf and
+ * returns buf.  In the trap window the address is the offset into the
+ * window, 0 through 15, because that is the only number that means
+ * anything there.
+ */
+extern char *dis_space(unsigned short addr, char *buf, int len);
+
+/*
  * format an instruction and return the bytes consumed
  */
 int format_instr(unsigned short addr, char *outbuf);

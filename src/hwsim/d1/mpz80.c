@@ -312,6 +312,27 @@ fubyte(word addr)
 }
 
 /*
+ * Which space an address is in, for display.  Three answers here: the
+ * trap window while a trap sequence is running, the supervisor's on
+ * board memory and map, or a numbered task.  The trap window reports the
+ * offset into itself, since the pc it is running under means nothing.
+ */
+char *
+dis_space(word addr, char *buf, int len)
+{
+    byte tr = (delay == 1) ? next_taskreg : taskreg;
+
+    if (trapcount && (addr >= trapaddr) && (addr <= (trapaddr + 15))) {
+        snprintf(buf, len, "trap:%02d", addr - trapaddr);
+    } else if ((tr & 0xf) == 0) {
+        snprintf(buf, len, "sys:%04x", addr);
+    } else {
+        snprintf(buf, len, "tsk%d:%04x", tr & 0xf, addr);
+    }
+    return buf;
+}
+
+/*
  * The disassembler's fetch.  It has to decode an address exactly the way
  * get_byte does - supervisor sees the on board ram, registers, eprom and
  * fpu below 0x1000, everyone else goes through the map - because showing

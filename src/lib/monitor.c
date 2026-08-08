@@ -397,11 +397,13 @@ list_cmd(char **sp)
         }
     }
     for (l = 0; l < LISTLINES; l++) {
+        char abuf[16];
+
         c = format_instr(addr, cmdline);
         if ((s = get_symname(addr))) {
             message("%s:\n", s);
         }
-        message("%04x: %-20s\n", addr, cmdline);
+        message("%-9s %-20s\n", dis_space(addr, abuf, sizeof(abuf)), cmdline);
         addr += c;
         lastaddr = addr & 0xffff;
     }
