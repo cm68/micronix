@@ -1,0 +1,276 @@
+block mapping and numbering
+===========================
+
+A block number means four different things in this system depending on
+who is holding it, and every layer between them applies a transformation
+of its own.  Nearly everything that went wrong while getting Micronix to
+boot was two layers disagreeing about which number they had, and none of
+those failures looked like what it was: they looked like corrupt disks,
+missing files, or permission errors.
+
+The four numbers are:
+
+    filesystem block   what an inode holds and the superblock counts.
+                       Block 0 is the boot block, block 1 the superblock.
+
+    driver block       the same number, on its way to becoming a place -
+                       skewed, offset by the reserved tracks, and split
+                       into a cylinder, a head and a sector.
+
+    physical sector    cylinder, head and sector, as the controller and
+                       the platter understand it.
+
+    file offset        where an image file keeps it, which is a fifth
+                       thing again and depends on who wrote the file.
+
+Getting from any one of these to any other is easy.  Knowing which one
+you are holding is the whole problem.
+
+
+the floppy: what the driver does
+--------------------------------
+
+sys/dj.c, sio(), is the entire mapping and is worth reading in full:
+
+	D[5] = (sec / sp->cylinder) + sp->toff;	/* cylinder */
+	D[6] = sec % spt;			/* sector */
+
+	if (dev & ALT) {			/* skew */
+		D[6] <<= 1;
+		if (!(spt & 1) && D[6] >= spt)
+			D[6]++;
+		D[6] %= spt;
+	}
+
+	if (d->flags & ORG1)
+		D[6]++;				/* soft sectors count from 1 */
+
+	if (sp->ds && (sec % sp->cylinder) >= spt)
+		D[6] |= VERSO;			/* the other side */
+
+Four separate adjustments, each of which can be got wrong on its own:
+
+toff, the track offset.  Reserved tracks are expressed here as an offset
+added to every cylinder, not as blocks subtracted from every block
+number.  Every Morrow format in the table has toff 2; the IBM, Xerox and
+Osborne formats have 0.  Two cylinders is 40 blocks on a double sided
+five inch disk, which is exactly the reserved area, and it is also
+exactly what the .trim20k images have had removed from the front.  Same
+quantity, three different ways of saying it.
+
+The skew.  This one belongs to the driver and not to the medium, which
+matters because it is easy to bake it into both.  A raw image holds its
+sectors in sector number order; the driver maps a block to a sector and
+then asks for that sector.  Doing it in both places maps every block
+twice and lands somewhere unrelated.  The proof is the second level boot:
+at its own place in the file it begins "ld sp,0100 / call 0a67 / jp 0000",
+a program's entry point, and one skew further along the same bytes start
+in the middle of an instruction.
+
+ORG1.  Soft sectored formats number their sectors from 1 and hard
+sectored ones from 0.  This is not an independent fact - see below - but
+it is applied here as a separate +1 and can be lost on its own.
+
+The side.  A double sided disk puts the second head's sectors at the top
+of the cylinder, so a cylinder is two tracks.  Which brings us to the
+mistake that cost the most time.
+
+	A cylinder is not a track.  A forty cylinder double sided disk
+	and an eighty cylinder single sided disk both have eighty
+	tracks, both hold 800 sectors, and both report "tracks: 80" to
+	the controller.  Nothing in the track count tells them apart.
+	What tells them apart is where cylinder boundaries fall: with
+	two heads cylinder 2 is block 40, with one head it is block 20.
+
+The 1.6 standalone is forty cylinders, double sided.  Three independent
+things say so: the second level boot asks for cylinder 2 and the
+filesystem starts at block 40, the superblock's fsize is 760, and the
+format table entry with 760 blocks is the double sided one.
+
+
+the floppy: how the driver decides which format
+-----------------------------------------------
+
+djopen() picks an entry out of specs[], and there are two quite different
+routes into that table.
+
+Hard sectored disks are looked up.  The driver reads sector 0 and takes
+byte 5c as a configuration byte, then searches specs[] for a matching
+config:
+
+	if (s->dchar & HARD) {
+		sp = &specs[DEFSPECS];
+		if (s->config)
+			for (S = specs; S->config != END; S++)
+				if (S->config == s->config)
+					sp = S;
+	}
+
+Soft sectored disks are computed, from the sector length and a few
+adjustments:
+
+	sp = &specs[s->slength & 3];
+	if (dev & FIVE) {
+		sp += FIVEBASE;
+		if ((dev & DOUBSIDE) || s->config == DOUBSIDE)
+			sp += 5;
+	}
+	if (s->spt == 9 && s->slength == S512)
+		sp += 2;
+
+FIVEBASE is 16, and index 16 onward is the Xerox, Osborne and IBM block -
+every one of which has toff 0.  So the eight Morrow five inch formats,
+which are indices 8 through 15 and all have toff 2, are reachable only
+through the hard sectored lookup.  A Morrow disk that is reported as soft
+sectored cannot be identified correctly, no matter what else is right.
+
+That is worth stating plainly because it inverts the intuition: hard or
+soft sectored is not a small detail about how the disk was formatted, it
+is the switch that decides whether the driver asks the disk what it is or
+guesses from a sector size.
+
+And the disk does know.  Byte 5c of sector 0 of the 1.6 standalone is d0,
+which selects
+
+	{0xD0, 1, 10, 20, 1, 40, 2, 512, 760}
+	 config ds spt cyl spb ncyl toff bps size
+
+forty cylinders, double sided, ten 512 byte sectors, track offset two,
+760 blocks - agreeing exactly with everything measured the hard way.
+
+
+what this cost, and what it looked like
+---------------------------------------
+
+The simulator's sense reported drive characteristics without the hard
+sectored bit.  One bit.  The chain from there:
+
+	soft sectored			(what we said)
+	-> no configuration lookup	(so the disk is never asked)
+	-> index 18, an IBM format	(what the arithmetic lands on)
+	-> toff 0 instead of 2		(the only field that then matters)
+	-> every read two cylinders low
+
+The superblock is at cylinder 2 sector 2 and it read cylinder 0 sector 2.
+The root inode block is at cylinder 2 sector 4 and it read cylinder 0
+sector 4.  Right sector, right head, wrong cylinder, every time, by a
+constant.
+
+What that looked like from the outside was none of the above.  The kernel
+booted, printed its banner, and then failed to exec /etc/init three times
+and stopped.  /etc/init was present and intact.  Tracing into the exec
+showed access() being handed a mode of 0141000 - allocated, directory,
+sticky, no permissions - where the real inode 65 is 0110100, and
+correctly refusing it with EACCES.  The kernel was right about everything
+it was given; it was reading file data and being told it was an inode.
+
+	When a filesystem looks corrupt, suspect the mapping before the
+	data.  An inode that reads as a sticky directory with no
+	permission bits is not a damaged inode, it is not an inode.
+
+
+the hard disk: a different trick entirely
+-----------------------------------------
+
+sys/mw.c does not skew and has no track offset.  It rotates:
+
+	cyl  = (blk / spc + tracks / 2) mod tracks
+	head = (blk mod spc) / spt
+	sec  = (blk mod spc) mod spt
+
+Block 0 is the middle cylinder.  Read that backwards and physical
+cylinder 0 - the only place the rom's boot looks - is at the halfway mark
+of the filesystem's blocks: 5236 of 10404 on the five meg drive, 10405 of
+20808 on the ten, 15606 of 31212 on the sixteen.
+
+The likely reason is seek distance: the superblock and the inodes live at
+low block numbers, so putting block 0 in the middle of the platter halves
+the average seek to them.  The side effect is that the boot area is in
+the middle of the block space rather than at either end, where no
+reserved-area mechanism can protect it - mkfs only knows how to exclude
+blocks at the end of a device, for swap.  Hence installboot, and the file
+that owns cylinder 0 so the free list never offers it.
+
+
+image files: a fifth number
+---------------------------
+
+Three kinds of file in this tree, and they are not interchangeable.
+
+Micronix floppy raw images are the whole disk, sectors in sector number
+order, reserved area included.  The .trim20k variants beside them have
+had the first 40 blocks removed, which is exactly the reserved area, so
+the filesystem starts at block 0 and the host tools can read it - and a
+loader is precisely what is not in them.
+
+IMD floppy images carry their own geometry per track, including the
+sector map and the sector size, which is why an eight inch disk can have
+26 sectors of 128 on track 0 and 15 of 512 everywhere else.
+
+Simulator hard disk files have a 2048 byte label - magic d15cc0de, sector
+size, cylinders, heads, sectors per track - and the data after it in
+physical order, cylinder then head then sector.  So a Micronix filesystem
+is not a drive file: filesystem block B lives at
+
+	label + ((cyl * heads + head) * spt + sec) * 512
+
+with the rotation above applied to get cyl, head and sec.  Writing a
+filesystem straight into a drive file is not off by an offset, it is
+shuffled, and nothing will read it.
+
+This is also why installboot seeking to 512 * blkno is right on Micronix
+and would be wrong on the host: there it is talking to /dev/m5a and the
+kernel does the rotation on the way past.
+
+
+rules that would have saved the time
+------------------------------------
+
+Ask the medium what it is.  The disk carries a configuration byte at
+sector 0 byte 5c and the controller will tell you the sector size, the
+sidedness and the sectoring.  Every hour lost here was spent deducing
+something the disk was willing to say.
+
+One fact, several hats.  Hard versus soft sectoring is the same fact as
+the sector base is the same fact as whether ORG1 applies.  If you learn
+one, set all of them from it, and they cannot drift apart.
+
+Count the words carefully.  Track, cylinder and side are three words and
+two of them are sometimes the same number.  Sector, block and record are
+three more.
+
+Skew belongs to exactly one layer.  Decide which, write it down, and
+never apply it twice.
+
+A reserved area has three spellings: blocks removed from the front of an
+image, a track offset added to every cylinder, and nothing at all with a
+file owning the blocks instead.  All three are in use here.
+
+Read the byte, not the comment.  The monitor's read table says "sector 1,
+head 0, cyl 0" and the byte is db 0.  The firmware's tables say which
+sector a format starts at and the comment above them is the only place it
+is written down.
+
+
+the numbers, for reference
+--------------------------
+
+five inch, Micronix, from the format table
+
+    config  cyl  hd  spt  bps  toff  blocks
+    90       35   1   10  512    2     330
+    F0       35   2   10  512    2     660
+    B0       35   1   10  512    2     330
+    A0       40   1   10  512    2     380
+    C0       80   1   10  512    2     780
+    D0       40   2   10  512    2     760	<- the 1.6 standalone
+    E0       80   2   10  512    2    1560
+
+hard disks, from sys/mw.c
+
+	   tracks  hd  spt  blocks  cyl 0 is block
+    m5     153    4   17   10404   5236
+    m10    306    4   17   20808  10404
+    m16    306    6   17   31212  15606
+
+vim: tabstop=8 shiftwidth=8 noexpandtab:
