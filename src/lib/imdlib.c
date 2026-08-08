@@ -236,16 +236,17 @@ static struct rawfmt {
     int spt;
     int secsize;
     int skew;
+    int firstsec;               // lowest numbered sector on a track
     char *what;
 } rawfmts[] = {
-    { 40*2*10*512, 40, 2, 10, 512, 0, "5 1/4 inch, 40 track, double sided, 512 byte sectors" },
-    { 40*1*10*512, 40, 1, 10, 512, 0, "5 1/4 inch, 40 track, single sided, 512 byte sectors" },
-    { 35*2*10*512, 35, 2, 10, 512, 0, "5 1/4 inch, 35 track, double sided, 512 byte sectors" },
-    { 35*1*10*512, 35, 1, 10, 512, 0, "5 1/4 inch, 35 track, single sided, 512 byte sectors" },
-    { 80*2*10*512, 80, 2, 10, 512, 0, "5 1/4 inch, 80 track, double sided, 512 byte sectors" },
-    { 77*2*8*512,  77, 2,  8, 512, 0, "8 inch, double sided, 512 byte sectors" },
-    { 77*1*26*128, 77, 1, 26, 128, 0, "8 inch, single sided, 128 byte sectors" },
-    { 0, 0, 0, 0, 0, 0, 0 }
+    { 40*2*10*512, 40, 2, 10, 512, 0, 1, "5 1/4 inch, 40 track, double sided, 512 byte sectors" },
+    { 40*1*10*512, 40, 1, 10, 512, 0, 1, "5 1/4 inch, 40 track, single sided, 512 byte sectors" },
+    { 35*2*10*512, 35, 2, 10, 512, 0, 1, "5 1/4 inch, 35 track, double sided, 512 byte sectors" },
+    { 35*1*10*512, 35, 1, 10, 512, 0, 1, "5 1/4 inch, 35 track, single sided, 512 byte sectors" },
+    { 80*2*10*512, 80, 2, 10, 512, 0, 1, "5 1/4 inch, 80 track, double sided, 512 byte sectors" },
+    { 77*2*8*512,  77, 2,  8, 512, 0, 1, "8 inch, double sided, 512 byte sectors" },
+    { 77*1*26*128, 77, 1, 26, 128, 0, 1, "8 inch, single sided, 128 byte sectors" },
+    { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
 /*
@@ -273,14 +274,37 @@ raw_geometry(char *fname, struct rawfmt *fp, long size)
         return 0;
     }
 
-    fp->secsize = (minor & 0x10) ? 1024 : 512;
+    /*
+     * The 1024 byte bit picks how many sectors are on a track, but it does
+     * not change the unit these images are addressed in.  fslib reads them
+     * with readblk, which seeks to 512 * block and skews block numbers with
+     * this same spt - so a track here is ten 512 byte blocks, whatever the
+     * drive's own sectors were.  Describing it any other way puts every
+     * block after the first in the wrong place, and it has to agree with
+     * fslib or the simulator and mnix will read the same disk differently.
+     */
     if (minor & 0x04) {
-        fp->spt = (fp->secsize == 1024) ? 10 : 9;
+        fp->spt = (minor & 0x10) ? 10 : 9;
         fp->what = "5 1/4 inch";
     } else {
-        fp->spt = (fp->secsize == 1024) ? 16 : 15;
+        fp->spt = (minor & 0x10) ? 16 : 15;
         fp->what = "8 inch";
     }
+    fp->secsize = 512;
+
+    /*
+     * Where sector numbering starts, from the DJDMA firmware's own
+     * tables (DJ49.MAC, "to determine the lowest numbered sector"):
+     *
+     *      8" soft sectored    26, 26, 15, 8 sectors   all from 1
+     *      5" soft sectored     5 sectors               from 1
+     *      5" hard sectored    10 sectors               from 0
+     *
+     * Ten sectors on a five inch disk is the hard sectored North Star
+     * format, and it counts from zero.  Numbering it from one puts every
+     * sector one place out and invents a sector ten that is not there.
+     */
+    fp->firstsec = ((minor & 0x04) && fp->spt == 10) ? 0 : 1;
     fp->skew = (minor & 0x08) ? 1 : 0;
 
     /*
@@ -314,7 +338,7 @@ raw_geometry(char *fname, struct rawfmt *fp, long size)
  * inverts that mapping.  Sector numbers start at 1.
  */
 static void
-raw_secmap(char *secmap, int spt, int skew)
+raw_secmap(char *secmap, int spt, int skew, int firstsec)
 {
     int n, pos;
 
@@ -328,7 +352,7 @@ raw_secmap(char *secmap, int spt, int skew)
         } else {
             pos = n;
         }
-        secmap[pos] = n + 1;
+        secmap[pos] = n + firstsec;
     }
 }
 
@@ -367,6 +391,7 @@ raw_load(char *fname, int drive, int create_delta)
     printf("%s: raw image, %s, %d cyl, %d head, %d x %d byte sectors%s\n",
         fname, fp->what, fp->cyls, fp->heads, fp->spt, fp->secsize,
         fp->skew ? ", skewed" : "");
+    printf("%s: sectors numbered from %d\n", fname, fp->firstsec);
 
     ip = malloc(sizeof(*ip));
     memset(ip, 0, sizeof(*ip));
@@ -385,7 +410,7 @@ raw_load(char *fname, int drive, int create_delta)
             tp->head = head;
             tp->secsize = fp->secsize;
             tp->secmap = malloc(fp->spt);
-            raw_secmap(tp->secmap, fp->spt, fp->skew);
+            raw_secmap(tp->secmap, fp->spt, fp->skew, fp->firstsec);
             tp->data = malloc(fp->spt * sizeof(char *));
             for (sec = 0; sec < fp->spt; sec++) {
                 /*
@@ -481,6 +506,30 @@ imd_load(char *fname, int drive, int create_delta)
 
     attach_delta(ip, fname, create_delta);
     return ip;
+}
+
+/*
+ * The lowest numbered sector on a track.  Sector numbering does not
+ * always start at one - see the firmware tables quoted in raw_load - and
+ * a caller walking a whole track has to start where the track starts.
+ */
+int
+imd_firstsec(void *vp, int cyl, int head)
+{
+    struct imd *ip = (struct imd *)vp;
+    struct imd_trk *tp = ip->tracks[trknum(cyl, head)];
+    int i, low;
+
+    if (!tp || !tp->secmap || !tp->fixed.nsec) {
+        return 1;
+    }
+    low = tp->secmap[0];
+    for (i = 1; i < tp->fixed.nsec; i++) {
+        if (tp->secmap[i] < low) {
+            low = tp->secmap[i];
+        }
+    }
+    return low;
 }
 
 void

@@ -579,6 +579,7 @@ readtrk()
     paddr sectab;
     int secs;
     int secsize;
+    int firstsec;
     int i;
     int bytes;
 
@@ -598,11 +599,18 @@ readtrk()
 
     tracec(trace_djdma, "drive:%d cyl:%d head:%x sectab:%x secs:%d", 
         drive, cyl, head, sectab, secs);
+    firstsec = imd_firstsec(imdp[drive], cyl, head);
     for (i = 0; i < secs; i++) {
         if (physread(sectab + i) == 0xff) {
             continue;
         }
-        bytes = imd_read(imdp[drive], cyl, head, i + 1, secbuf);
+        /*
+         * Sector numbering does not always start at one - the firmware
+         * keeps the lowest sector number beside the sectors per track for
+         * exactly this reason, and a hard sectored five inch disk counts
+         * from zero.  Walk the track from wherever it actually starts.
+         */
+        bytes = imd_read(imdp[drive], cyl, head, firstsec + i, secbuf);
         if (bytes > 0) {
 
             copyout(secbuf, dmaaddr + secsize * i, bytes);
@@ -864,7 +872,8 @@ djdma_init()
      * 000080.
      */
     if (imdp[physdrive(0)]) {
-        imd_read(imdp[physdrive(0)], 0, 0, 1, secbuf);
+        imd_read(imdp[physdrive(0)], 0, 0,
+            imd_firstsec(imdp[physdrive(0)], 0, 0), secbuf);
         copyout(secbuf, 0x80, 0x80);
     } else {
         printf("djdma: no disk to boot from\n");

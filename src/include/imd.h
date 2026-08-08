@@ -107,6 +107,7 @@ struct imd_trk {
 
 extern void imd_close(void *vp);
 extern void *imd_load(char *fname, int drive, int create_delta);
+extern int imd_firstsec(void *vp, int cyl, int head);
 extern void imd_trkinfo(void *vp, int cyl, int head, int *secs, int *secsize);
 extern int imd_write(void *vp, int cyl, int head, int osec, char *buf);
 extern int imd_read(void *vp, int cyl, int head, int osec, char *buf);
