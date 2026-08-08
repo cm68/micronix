@@ -284,6 +284,13 @@ read, 1 write, 2 readhead, 3 format, 4 specify, 5 sense, 6 nop, which is
 also what BOOTMW's equates and the kernel's mw.c use.  So the ROM path
 works.  What is missing is anything to find at the other end.
 
+It is a Micronix path, not a CP/M one, and the ROM says so itself: the
+sector size it loads into the controller is "secsiz equ 3 ;512 byte
+sectors for Micronix", which is the same 3 the kernel's mw.c sends.
+BOOTMW's Cbios uses 7, a thousand and twenty four, so a CP/M hard disk
+cannot be read by this boot at all.  Whoever wrote nuboot meant it to
+start Micronix off a hard disk.
+
 Nothing writes that sector.  m5init and hdinit make a filesystem, copy
 the running system across, relink /dev/root and /dev/swap and patch the
 kernel; there is no step that writes a boot block, and mkfs's only
@@ -320,10 +327,36 @@ low end upward, so the halfway mark is not reached until the filesystem
 is about half full, and then some ordinary file lands on the boot sector
 and the disk stops booting with nothing to say why.
 
-Making a hard disk self-booting therefore means changing something real:
-the rotation in mw.c so that block 0 is physical cylinder 0, or a way to
-keep a block out of the free list that mkfs cannot currently express.
-Either is a modification to the system, not a restoration of it.
+There is a way to reserve it that needs nothing new, and it is the old
+unix answer: a block is in use if an inode says so.  Give a file the
+blocks of cylinder 0 and the free list will never offer them again,
+fsck will agree, and writing the file writes the boot area.
+
+The block to own is not what the ROM's comment says.  rdtbl reads "sector
+1, head 0, cyl 0" but the byte is db 0, and mw.c computes sector as
+csec % nsecs from csec = blk % spc, counting from zero.  So the ROM's
+sector 1 is the driver's sector 0, and the block is c * spc exactly with
+c = tracks - tracks/2 - no plus one:
+
+	5 meg	block  5236	cylinder 0 is 68 blocks
+	10 meg	block 10404	cylinder 0 is 68 blocks
+	16 meg	block 15606	cylinder 0 is 102 blocks
+
+Taking the whole cylinder rather than one block costs 34K or 51K, keeps
+the second level next to the first where it can be read without seeking,
+and stops the filesystem putting anything else in cylinder 0.
+
+The tools for it are here.  Make the file, edit its inode so its block
+list is c*spc upward - mnix block -e - then icheck -s to rebuild the
+free list from what the inodes claim, which both marks these blocks used
+and returns the ones the file was originally given.  icheck -b <block>
+says which inode holds a block, which is how to check it afterwards and
+how to notice if it ever stops being true.
+
+What this does not survive: deleting the file, or reinstalling with
+cptree, which copies contents and not block numbers.  And the numbers are
+per drive type, so a file built for the five meg drive is wrong on the
+other two.
 
 
 where the drive files live
