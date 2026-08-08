@@ -4,9 +4,18 @@
 # to install onto the simulated hard disk.  Type the command yourself
 # when it is time - see below for when that is.
 #
-#	./run			system calls in this window
+#	./run			system calls, traced to the logfile
 #	./run -t 0x120000	system calls and every trap as well
 #	./run -t 0x800		just the clock, if that is the question
+#
+# The trace goes to src/hwsim/d1/logfile and not to this window - trace()
+# writes to a file descriptor, and -l is what points that descriptor at
+# the logfile.  Watch it from another window with
+#
+#	tail -f ~/src/micronix/src/hwsim/d1/logfile
+#
+# The instruction trace is the exception: -t 1 goes to stderr, so it does
+# land in this window.
 #
 # Anything given on the command line is passed through, so -T and the
 # rest are available without editing this.
@@ -38,7 +47,8 @@ for d in "$here"/*-delta; do
 done
 
 cat <<'NOTE'
-run: the console is the xterm; system calls appear here.
+run: the console is the xterm.  The trace is in
+     src/hwsim/d1/logfile - tail -f it from another window.
 
      Wait for the welcome to finish printing in the xterm - it ends
      "...Micronix User's Manual." - and then wait a little longer.  The
@@ -53,11 +63,11 @@ run: the console is the xterm; system calls appear here.
      mkfs, fsck, mount, cptree the system across, relink root and swap,
      patch the kernel, unmount.  It ends "Disk initialization complete."
      cptree is copying a filesystem through a simulated Z80, so it takes
-     a while and the system call trace here is how you watch it work.
+     a while, and the trace in logfile is how you watch it work.
 
 NOTE
 
 cd "$here/../../src/hwsim/d1" || exit 1
 
-exec ./d1 -b roms/mon447.bin -c 0x114 -t 0x100000 \
+exec ./d1 -b roms/mon447.bin -c 0x114 -t 0x100000 -l \
 	-d "$here" -5 "$here/sa67.5.skew.1k" "$@"
