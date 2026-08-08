@@ -6,3 +6,21 @@ block into a non-loaded BSS above 4k; that will gain 512 bytes.
 
 this directory contains the standalone and cp/m boot programs
 for the djdma and hddma controllers
+
+mwboot.com is the second level, and it is linked at 0100 - which is both
+where cp/m loads a .com and where the monitor's hard disk boot enters, so
+the one binary serves either way in.
+
+mwboot1.s is the first level for the monitor's way in, and only for that.
+The rom reads one sector, 512 bytes, to 0100 and jumps to it; mwboot.com
+is several sectors, so something has to fetch the rest, and that sector
+is this.  It moves itself to c000 first, because what it is loading is
+linked at 0100 and would otherwise land on the loop doing the loading.
+
+It sets up almost nothing.  The rom used the channel at 0080 to read the
+first level in, so the constants are loaded, the drive is selected and
+the heads are at cylinder 0 - only the sector, the dma address and the
+opcode change.  65 bytes of the 512.
+
+installboot puts the two of them in a file that owns cylinder 0, block 0
+being the first level and block 1 onward the second.
