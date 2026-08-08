@@ -2,6 +2,13 @@
 #
 # boot the 1.67 standalone with its console in an xterm
 #
+# -t 0x80000 is the system call trace.  It goes to stdout, which is the
+# window this was started from, so the calls scroll past in the monitor
+# window while the console has the xterm to itself - which is the whole
+# reason for putting the console in a window.  Each line says which task
+# made the call and from what address, so anything interesting can be
+# handed straight back to -T as a trace trigger.
+#
 # -c 0x114 is three things at once: 0x100 puts uart 0 - the console - in
 # an xterm instead of borrowing the terminal this was started from, 0x10
 # selects the djdma floppy as the boot device, and 0x04 says do not stop
@@ -14,4 +21,4 @@ cd `dirname $0`/../../src/hwsim/d1 || exit 1
 
 rm -f $here/*-delta          # writes persist between runs otherwise
 
-exec ./d1 -b roms/mon447.bin -c 0x114 -d $here -5 $here/sa67.5.skew.1k
+exec ./d1 -b roms/mon447.bin -c 0x114 -t 0x80000 -d $here -5 $here/sa67.5.skew.1k

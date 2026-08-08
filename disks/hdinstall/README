@@ -5,7 +5,15 @@ installing Micronix 1.67 on a simulated hard disk
 
 which opens an xterm for the console and boots the 1.67 standalone
 floppy off the simulated DJ/DMA.  The window this is started from stays
-the simulator's own monitor.
+the simulator's own monitor, and system calls scroll past in it as they
+happen - which is the reason for putting the console in a window of its
+own.  Each line names the task and the address the call came from, so
+
+	tsk1:43f3 micronix stat("/dev/ttyA", f7db
+
+can be handed straight back to the simulator as -T tsk1:43f3 to start an
+instruction trace there.  If the calls are more than you want, take
+-t 0x80000 out of run.
 
 Wait for the welcome.  It takes a few minutes of simulated time to get
 from the loader to a shell - the banner appears early and then nothing
