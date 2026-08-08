@@ -353,10 +353,26 @@ and returns the ones the file was originally given.  icheck -b <block>
 says which inode holds a block, which is how to check it afterwards and
 how to notice if it ever stops being true.
 
+Give it mode 0.  Nothing is meant to read or write it through the
+filesystem - the ROM reads the sector off the platter without knowing
+there is a filesystem there at all - so every open is a mistake, and mode
+0 turns the mistakes into errors instead of into a disk that stops
+booting three months later.  It also keeps the file out of anything that
+copies what it can read.
+
+Two things mode 0 does not do, and it is worth being clear about both.
+Unlink is permission on the directory, not on the file, so mode 0 does
+not stop rm; keeping the boot file in / where only root can write is what
+stops that.  And root ignores modes entirely, which matters because that
+is who installs run as.
+
 What this does not survive: deleting the file, or reinstalling with
-cptree, which copies contents and not block numbers.  And the numbers are
-per drive type, so a file built for the five meg drive is wrong on the
-other two.
+cptree.  cptree copies contents, not block numbers, and running as root
+it will copy this file happily - leaving a new disk with a boot file that
+has the right bytes in the wrong blocks and does not boot.  That failure
+looks like a successful install, so it is the one to write down.  The
+numbers are also per drive type, so a file built for the five meg drive
+is wrong on the other two.
 
 
 where the drive files live
