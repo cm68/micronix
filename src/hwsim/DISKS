@@ -384,6 +384,63 @@ each of those is a separate deliberate act rather than a slip.  ncheck
 will still report the path, so it stays findable by the tools that check
 filesystems even though nothing can walk to it.
 
+installing it
+-------------
+
+    mkdir /boot
+    touch /boot/bootmw
+    sync
+    umount the filesystem
+    patch the inode on the raw device: block list c*spc upward, size spc*512
+    icheck -s to rebuild the free list
+    mount the filesystem
+    open /boot/bootmw and write the boot area through it
+    sync, umount, chmod 0 the file and the directory
+
+Three things about that order are load bearing.
+
+The inode has to be patched while the filesystem is unmounted.  A mounted
+kernel holds that inode in core, and writing the raw device underneath it
+achieves nothing - the cached copy is written back over the patch at
+umount, and the failure is silent.  That is also why the mount has to
+come after: the newly mounted filesystem reads the inode off the disk
+rather than believing what it remembers.
+
+The free list has to be rebuilt.  touch makes a file with no blocks, so
+filling in a block list claims blocks that are still on the free list -
+they belong to the file and are also queued to be handed out, and the
+next thing that allocates gets one.  icheck -s rebuilds the list from
+what the inodes say, which claims cylinder 0 and costs nothing else.
+fsck alone will also do it; it knows both halves of this by name,
+"allocated blocks in the free list" and "blocks missing from the free
+list".
+
+The size has to be set, to spc * 512.  An inode with a block list and a
+zero size is an empty file: reads return nothing, and a write goes
+through the allocator rather than to the blocks that are sitting there.
+
+Then writing the file writes the boot area, because the kernel maps
+block c*spc through the same mw.c arithmetic the ROM's read uses and
+lands on cylinder 0 head 0 sector 0.  That is the whole point of doing it
+this way rather than writing the platter directly: one path, one mapping,
+and no second opinion about where the sector is.
+
+what goes in the first 512 bytes
+--------------------------------
+
+The ROM reads one sector to physical 0100 and enters task 1 at 0100, so
+the first block of the file is a first level boot and has to be built for
+0100 - not 0080, where the floppy's runs, because that address belongs to
+the DJ/DMA ROM's convention and not to this one.  M5LOAD's first level
+cannot be dropped in unchanged for that reason.
+
+It has 512 bytes to work in rather than the floppy's 128, and it has less
+to do than the floppy's does: nuboot has already sent the controller its
+load constants command by the time this code runs, so the drive is
+configured and only read commands are needed.  It has to pull the rest of
+cylinder 0 in and enter the second level, which is M5LOAD's, at 0100 -
+so it has to load it somewhere else and jump, or move itself first.
+
 What this does not survive: deleting the file, or reinstalling with
 cptree.  cptree copies contents, not block numbers, and running as root
 it will copy this file happily - leaving a new disk with a boot file that
