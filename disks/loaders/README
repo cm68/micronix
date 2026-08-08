@@ -38,6 +38,39 @@ It disassembles as Whitesmith's C: "ld sp,0100 / call 0a67 / jp 0000" is
 crt0 calling main and exiting, and the strings are in there - "Micronix
 DJDMA loader", "Drive not ready", "Format?", "Loading", "Entering".
 
+What the 1.6 second level does
+------------------------------
+
+micronix16-loader.dis is it disassembled, from micronix16-loader.ctl,
+which carries the names:
+
+    disas -f micronix16-loader.ctl -a 0x100 micronix16-loader.bin
+
+It is Whitesmith's C, and reading it is much easier once you know that DE
+is never a value - it is the frame pointer.  Every function opens "call
+cent", which makes DE the frame and stacks the old one, and leaves by "jp
+cret", which puts SP back from DE.  Arguments are at DE+4 upward and the
+return value comes back in BC, which is why so many functions end "ld a,c
+/ or b" in their caller.
+
+main is five calls and says the whole program:
+
+    djinit      the banner, then check the drive answers
+    fs0a7c      readblk(1) - the superblock - then a channel command,
+                and exit if it fails
+    lsfiles     print "Files:" and walk the directory
+    pickfile    "File to boot: ", or "No bootable files"
+    bootkern    "Loading", then "Entering", then into the kernel
+
+The two routines worth looking at for their own sake are inp and outp at
+088b and 08a1.  A C program has no way to name an I/O port, so these
+assemble three bytes onto the stack - nop / in a,(port) / ret, and nop /
+out (port),a / ret - and call them there.  Everything this loader does to
+the DJDMA goes through them; djpulse is just outp(0ef, 0).
+
+The block buffer is 0494 to 0693, exactly 512 bytes, and lsfiles walks it
+between those two addresses.
+
 1.41, from disks/dist/UX141_SA.IMD
 -----------------------------------
 

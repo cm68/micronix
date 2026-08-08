@@ -1,0 +1,1897 @@
+;
+;	disas version 3
+;	micronix16-loader.bin
+;
+;	symbols loaded from micronix16-loader.ctl
+;
+;
+;	text	0100	2600
+;
+;
+
+	org	0100H
+crt0: 	LD	SP,crt0		; 0100 1..	  31 00 01 
+	CALL	main		; 0103 .g.	  cd 67 0a 
+exit: 	JP	boot		; 0106 ...	  c3 00 00 
+
+djpulse: CALL	cent		; 0109 .5.	  cd 35 0a 
+	LD	HL,boot		; 010c !..	  21 00 00 
+	PUSH	HL		; 010f .	  e5 
+	LD	HL,00EFH	; 0110 !..	  21 ef 00 
+	PUSH	HL		; 0113 .	  e5 
+	CALL	outp		; 0114 ...	  cd a1 08 
+	POP	AF		; 0117 .	  f1 
+	POP	AF		; 0118 .	  f1 
+	JP	cret		; 0119 .<.	  c3 3c 0a 
+
+djcmd: 	CALL	cent		; 011c .5.	  cd 35 0a 
+	LD	A,23H		; 011f >#	  3e 23 
+	LD	(djmbox),A	; 0121 2P.	  32 50 00 
+	LD	HL,0006H	; 0124 !..	  21 06 00 
+	ADD	HL,DE		; 0127 .	  19 
+	LD	A,(HL)		; 0128 ~	  7e 
+	LD	(djchan),A	; 0129 2Q.	  32 51 00 
+	LD	HL,0006H	; 012c !..	  21 06 00 
+	ADD	HL,DE		; 012f .	  19 
+	LD	C,(HL)		; 0130 N	  4e 
+	INC	HL		; 0131 #	  23 
+	LD	B,(HL)		; 0132 F	  46 
+	PUSH	BC		; 0133 .	  c5 
+	LD	HL,0008H	; 0134 !..	  21 08 00 
+	PUSH	HL		; 0137 .	  e5 
+	CALL	arith0a02	; 0138 ...	  cd 02 0a 
+	POP	HL		; 013b .	  e1 
+	LD	A,L		; 013c }	  7d 
+	LD	(0052H),A	; 013d 2R.	  32 52 00 
+	LD	A,00H		; 0140 >.	  3e 00 
+	LD	(djstat),A	; 0142 2S.	  32 53 00 
+	LD	A,20H		; 0145 >.	  3e 20 
+	LD	(0054H),A	; 0147 2T.	  32 54 00 
+	LD	HL,0004H	; 014a !..	  21 04 00 
+	ADD	HL,DE		; 014d .	  19 
+	LD	C,(HL)		; 014e N	  4e 
+	INC	HL		; 014f #	  23 
+	LD	B,(HL)		; 0150 F	  46 
+	PUSH	BC		; 0151 .	  c5 
+	LD	HL,(H0d9a)	; 0152 *..	  2a 9a 0d 
+	PUSH	HL		; 0155 .	  e5 
+	CALL	H097d		; 0156 .}.	  cd 7d 09 
+	POP	HL		; 0159 .	  e1 
+	INC	HL		; 015a #	  23 
+	INC	HL		; 015b #	  23 
+	LD	A,L		; 015c }	  7d 
+	LD	(0055H),A	; 015d 2U.	  32 55 00 
+	LD	HL,0004H	; 0160 !..	  21 04 00 
+	ADD	HL,DE		; 0163 .	  19 
+	LD	C,(HL)		; 0164 N	  4e 
+	INC	HL		; 0165 #	  23 
+	LD	B,(HL)		; 0166 F	  46 
+	PUSH	BC		; 0167 .	  c5 
+	LD	HL,(H0d9c)	; 0168 *..	  2a 9c 0d 
+	PUSH	HL		; 016b .	  e5 
+	CALL	H0998		; 016c ...	  cd 98 09 
+	POP	HL		; 016f .	  e1 
+	LD	A,L		; 0170 }	  7d 
+	LD	(0056H),A	; 0171 2V.	  32 56 00 
+	LD	A,(0056H)	; 0174 :V.	  3a 56 00 
+	ADD	A,A		; 0177 .	  87 
+	LD	(0056H),A	; 0178 2V.	  32 56 00 
+	LD	HL,(H0d9c)	; 017b *..	  2a 9c 0d 
+	LD	A,L		; 017e }	  7d 
+	AND	01H		; 017f ..	  e6 01 
+	JP	NZ,H019e	; 0181 ...	  c2 9e 01 
+	LD	A,(0056H)	; 0184 :V.	  3a 56 00 
+	LD	C,A		; 0187 O	  4f 
+	ADD	A,A		; 0188 .	  87 
+	SBC	A,A		; 0189 .	  9f 
+	LD	B,A		; 018a G	  47 
+	LD	HL,H0d9c	; 018b !..	  21 9c 0d 
+	LD	A,C		; 018e y	  79 
+	SUB	(HL)		; 018f .	  96 
+	LD	A,B		; 0190 x	  78 
+	INC	HL		; 0191 #	  23 
+	SBC	A,(HL)		; 0192 .	  9e 
+	JP	C,H019e		; 0193 ...	  da 9e 01 
+	LD	A,(0056H)	; 0196 :V.	  3a 56 00 
+	ADD	A,01H		; 0199 ..	  c6 01 
+	LD	(0056H),A	; 019b 2V.	  32 56 00 
+H019e: 	LD	A,(0056H)	; 019e :V.	  3a 56 00 
+	LD	C,A		; 01a1 O	  4f 
+	ADD	A,A		; 01a2 .	  87 
+	SBC	A,A		; 01a3 .	  9f 
+	LD	B,A		; 01a4 G	  47 
+	PUSH	BC		; 01a5 .	  c5 
+	LD	HL,(H0d9c)	; 01a6 *..	  2a 9c 0d 
+	PUSH	HL		; 01a9 .	  e5 
+	CALL	H0998		; 01aa ...	  cd 98 09 
+	POP	BC		; 01ad .	  c1 
+	LD	A,C		; 01ae y	  79 
+	LD	(0056H),A	; 01af 2V.	  32 56 00 
+	LD	A,(H0d98)	; 01b2 :..	  3a 98 0d 
+	OR	A		; 01b5 .	  b7 
+	JP	NZ,H01c1	; 01b6 ...	  c2 c1 01 
+	LD	A,(0056H)	; 01b9 :V.	  3a 56 00 
+	ADD	A,01H		; 01bc ..	  c6 01 
+	LD	(0056H),A	; 01be 2V.	  32 56 00 
+H01c1: 	LD	HL,0004H	; 01c1 !..	  21 04 00 
+	ADD	HL,DE		; 01c4 .	  19 
+	LD	C,(HL)		; 01c5 N	  4e 
+	INC	HL		; 01c6 #	  23 
+	LD	B,(HL)		; 01c7 F	  46 
+	PUSH	BC		; 01c8 .	  c5 
+	LD	HL,(H0d9a)	; 01c9 *..	  2a 9a 0d 
+	PUSH	HL		; 01cc .	  e5 
+	CALL	H0998		; 01cd ...	  cd 98 09 
+	POP	HL		; 01d0 .	  e1 
+	PUSH	HL		; 01d1 .	  e5 
+	LD	HL,H0d9c	; 01d2 !..	  21 9c 0d 
+	POP	BC		; 01d5 .	  c1 
+	LD	A,C		; 01d6 y	  79 
+	SUB	(HL)		; 01d7 .	  96 
+	LD	A,B		; 01d8 x	  78 
+	INC	HL		; 01d9 #	  23 
+	SBC	A,(HL)		; 01da .	  9e 
+	JP	C,H01e6		; 01db ...	  da e6 01 
+	LD	A,(0056H)	; 01de :V.	  3a 56 00 
+	OR	80H		; 01e1 ..	  f6 80 
+	LD	(0056H),A	; 01e3 2V.	  32 56 00 
+H01e6: 	LD	A,(H0d98)	; 01e6 :..	  3a 98 0d 
+	OR	A		; 01e9 .	  b7 
+	JP	Z,H01f3		; 01ea ...	  ca f3 01 
+	LD	BC,0004H	; 01ed ...	  01 04 00 
+	JP	H01f6		; 01f0 ...	  c3 f6 01 
+
+H01f3: 	LD	BC,boot		; 01f3 ...	  01 00 00 
+H01f6: 	LD	A,C		; 01f6 y	  79 
+	LD	(0057H),A	; 01f7 2W.	  32 57 00 
+	LD	A,00H		; 01fa >.	  3e 00 
+	LD	(0058H),A	; 01fc 2X.	  32 58 00 
+	LD	A,25H		; 01ff >%	  3e 25 
+	LD	(0059H),A	; 0201 2Y.	  32 59 00 
+	LD	A,00H		; 0204 >.	  3e 00 
+	LD	(005AH),A	; 0206 2Z.	  32 5a 00 
+	CALL	djpulse		; 0209 ...	  cd 09 01 
+	LD	HL,005AH	; 020c !Z.	  21 5a 00 
+	PUSH	HL		; 020f .	  e5 
+	CALL	djwait		; 0210 .(.	  cd 28 02 
+	POP	AF		; 0213 .	  f1 
+	LD	A,(0058H)	; 0214 :X.	  3a 58 00 
+	CP	40H		; 0217 .@	  fe 40 
+	JP	NZ,H0222	; 0219 .".	  c2 22 02 
+	LD	BC,0001H	; 021c ...	  01 01 00 
+	JP	H0225		; 021f .%.	  c3 25 02 
+
+H0222: 	LD	BC,boot		; 0222 ...	  01 00 00 
+H0225: 	JP	cret		; 0225 .<.	  c3 3c 0a 
+
+djwait: CALL	cent		; 0228 .5.	  cd 35 0a 
+	LD	HL,FFFFH	; 022b !..	  21 ff ff 
+	LD	(timeout),HL	; 022e "..	  22 9e 0d 
+H0231: 	LD	HL,timeout	; 0231 !..	  21 9e 0d 
+	LD	A,(HL)		; 0234 ~	  7e 
+	INC	HL		; 0235 #	  23 
+	OR	(HL)		; 0236 .	  b6 
+	JP	Z,H025a		; 0237 .Z.	  ca 5a 02 
+	LD	HL,0004H	; 023a !..	  21 04 00 
+	ADD	HL,DE		; 023d .	  19 
+	LD	A,(HL)		; 023e ~	  7e 
+	INC	HL		; 023f #	  23 
+	LD	H,(HL)		; 0240 f	  66 
+	LD	L,A		; 0241 o	  6f 
+	LD	A,(HL)		; 0242 ~	  7e 
+	OR	A		; 0243 .	  b7 
+	JP	NZ,H025a	; 0244 .Z.	  c2 5a 02 
+	LD	A,(timeout)	; 0247 :..	  3a 9e 0d 
+	SUB	01H		; 024a ..	  d6 01 
+	LD	(timeout),A	; 024c 2..	  32 9e 0d 
+	LD	A,(H0d9f)	; 024f :..	  3a 9f 0d 
+	SBC	A,00H		; 0252 ..	  de 00 
+	LD	(H0d9f),A	; 0254 2..	  32 9f 0d 
+	JP	H0231		; 0257 .1.	  c3 31 02 
+
+H025a: 	JP	cret		; 025a .<.	  c3 3c 0a 
+
+H025d: 	DB	"Drive not ready",0AH,00H
+H026e: 	DB	"Micronix DJDMA loader",0AH,00H
+djinit: CALL	cent		; 0285 .5.	  cd 35 0a 
+	LD	HL,H026e	; 0288 !n.	  21 6e 02 
+	PUSH	HL		; 028b .	  e5 
+	CALL	printf		; 028c ...	  cd fd 07 
+	POP	AF		; 028f .	  f1 
+	CALL	djsense		; 0290 .?.	  cd 3f 04 
+	LD	A,C		; 0293 y	  79 
+	OR	B		; 0294 .	  b0 
+	JP	Z,H02b2		; 0295 ...	  ca b2 02 
+	LD	HL,boot		; 0298 !..	  21 00 00 
+	PUSH	HL		; 029b .	  e5 
+	CALL	dj02f2		; 029c ...	  cd f2 02 
+	POP	AF		; 029f .	  f1 
+	LD	A,C		; 02a0 y	  79 
+	OR	B		; 02a1 .	  b0 
+	JP	NZ,H02bd	; 02a2 ...	  c2 bd 02 
+	LD	HL,0004H	; 02a5 !..	  21 04 00 
+	PUSH	HL		; 02a8 .	  e5 
+	CALL	dj02f2		; 02a9 ...	  cd f2 02 
+	POP	AF		; 02ac .	  f1 
+	LD	A,C		; 02ad y	  79 
+	OR	B		; 02ae .	  b0 
+	JP	NZ,H02bd	; 02af ...	  c2 bd 02 
+H02b2: 	LD	HL,H025d	; 02b2 !].	  21 5d 02 
+	PUSH	HL		; 02b5 .	  e5 
+	CALL	printf		; 02b6 ...	  cd fd 07 
+	POP	AF		; 02b9 .	  f1 
+	CALL	exit		; 02ba ...	  cd 06 01 
+H02bd: 	LD	A,(H0d98)	; 02bd :..	  3a 98 0d 
+	OR	A		; 02c0 .	  b7 
+	JP	Z,H02d1		; 02c1 ...	  ca d1 02 
+	LD	A,0AH		; 02c4 >.	  3e 0a 
+	LD	(H0d9c),A	; 02c6 2..	  32 9c 0d 
+	ADD	A,A		; 02c9 .	  87 
+	SBC	A,A		; 02ca .	  9f 
+	LD	(H0d9d),A	; 02cb 2..	  32 9d 0d 
+	JP	H02db		; 02ce ...	  c3 db 02 
+
+H02d1: 	LD	A,0FH		; 02d1 >.	  3e 0f 
+	LD	(H0d9c),A	; 02d3 2..	  32 9c 0d 
+	ADD	A,A		; 02d6 .	  87 
+	SBC	A,A		; 02d7 .	  9f 
+	LD	(H0d9d),A	; 02d8 2..	  32 9d 0d 
+H02db: 	LD	HL,(H0d9c)	; 02db *..	  2a 9c 0d 
+	LD	(H0d9a),HL	; 02de "..	  22 9a 0d 
+	LD	A,(H0d99)	; 02e1 :..	  3a 99 0d 
+	OR	A		; 02e4 .	  b7 
+	JP	Z,H02ef		; 02e5 ...	  ca ef 02 
+	LD	HL,(H0d9a)	; 02e8 *..	  2a 9a 0d 
+	ADD	HL,HL		; 02eb )	  29 
+	LD	(H0d9a),HL	; 02ec "..	  22 9a 0d 
+H02ef: 	JP	cret		; 02ef .<.	  c3 3c 0a 
+
+dj02f2: CALL	cent		; 02f2 .5.	  cd 35 0a 
+	LD	A,23H		; 02f5 >#	  3e 23 
+	LD	(djmbox),A	; 02f7 2P.	  32 50 00 
+	LD	A,00H		; 02fa >.	  3e 00 
+	LD	(djchan),A	; 02fc 2Q.	  32 51 00 
+	LD	A,20H		; 02ff >.	  3e 20 
+	LD	(0052H),A	; 0301 2R.	  32 52 00 
+	LD	A,00H		; 0304 >.	  3e 00 
+	LD	(djstat),A	; 0306 2S.	  32 53 00 
+	LD	A,25H		; 0309 >%	  3e 25 
+	LD	(0054H),A	; 030b 2T.	  32 54 00 
+	LD	A,00H		; 030e >.	  3e 00 
+	LD	(0055H),A	; 0310 2U.	  32 55 00 
+	CALL	djpulse		; 0313 ...	  cd 09 01 
+	LD	HL,0055H	; 0316 !U.	  21 55 00 
+	PUSH	HL		; 0319 .	  e5 
+	CALL	djwait		; 031a .(.	  cd 28 02 
+	POP	AF		; 031d .	  f1 
+	LD	A,00H		; 031e >.	  3e 00 
+	LD	(H0d98),A	; 0320 2..	  32 98 0d 
+	LD	HL,0004H	; 0323 !..	  21 04 00 
+	ADD	HL,DE		; 0326 .	  19 
+	LD	A,(HL)		; 0327 ~	  7e 
+	INC	HL		; 0328 #	  23 
+	LD	H,(HL)		; 0329 f	  66 
+	LD	L,A		; 032a o	  6f 
+	LD	A,L		; 032b }	  7d 
+	AND	04H		; 032c ..	  e6 04 
+	JP	Z,H0370		; 032e .p.	  ca 70 03 
+	LD	A,20H		; 0331 >.	  3e 20 
+	LD	(djmbox),A	; 0333 2P.	  32 50 00 
+	LD	A,00H		; 0336 >.	  3e 00 
+	LD	(djchan),A	; 0338 2Q.	  32 51 00 
+	LD	A,00H		; 033b >.	  3e 00 
+	LD	(0052H),A	; 033d 2R.	  32 52 00 
+	LD	HL,0004H	; 0340 !..	  21 04 00 
+	ADD	HL,DE		; 0343 .	  19 
+	LD	A,(HL)		; 0344 ~	  7e 
+	LD	(djstat),A	; 0345 2S.	  32 53 00 
+	LD	A,00H		; 0348 >.	  3e 00 
+	LD	(0054H),A	; 034a 2T.	  32 54 00 
+	LD	A,25H		; 034d >%	  3e 25 
+	LD	(0055H),A	; 034f 2U.	  32 55 00 
+	LD	A,00H		; 0352 >.	  3e 00 
+	LD	(0056H),A	; 0354 2V.	  32 56 00 
+	CALL	djpulse		; 0357 ...	  cd 09 01 
+	LD	HL,0056H	; 035a !V.	  21 56 00 
+	PUSH	HL		; 035d .	  e5 
+	CALL	djwait		; 035e .(.	  cd 28 02 
+	POP	AF		; 0361 .	  f1 
+	LD	A,(0054H)	; 0362 :T.	  3a 54 00 
+	CP	40H		; 0365 .@	  fe 40 
+	JP	Z,H03c7		; 0367 ...	  ca c7 03 
+	LD	BC,boot		; 036a ...	  01 00 00 
+	JP	cret		; 036d .<.	  c3 3c 0a 
+
+H0370: 	LD	HL,0004H	; 0370 !..	  21 04 00 
+	ADD	HL,DE		; 0373 .	  19 
+	LD	A,(HL)		; 0374 ~	  7e 
+	AND	07H		; 0375 ..	  e6 07 
+	LD	(HL),A		; 0377 w	  77 
+	SUB	A		; 0378 .	  97 
+	INC	HL		; 0379 #	  23 
+	LD	(HL),A		; 037a w	  77 
+	LD	A,20H		; 037b >.	  3e 20 
+	LD	(djmbox),A	; 037d 2P.	  32 50 00 
+	LD	A,02H		; 0380 >.	  3e 02 
+	LD	(djchan),A	; 0382 2Q.	  32 51 00 
+	LD	A,01H		; 0385 >.	  3e 01 
+	LD	(0052H),A	; 0387 2R.	  32 52 00 
+	LD	HL,0004H	; 038a !..	  21 04 00 
+	ADD	HL,DE		; 038d .	  19 
+	LD	A,(HL)		; 038e ~	  7e 
+	LD	(djstat),A	; 038f 2S.	  32 53 00 
+	LD	A,22H		; 0392 >"	  3e 22 
+	LD	(0055H),A	; 0394 2U.	  32 55 00 
+	LD	HL,0004H	; 0397 !..	  21 04 00 
+	ADD	HL,DE		; 039a .	  19 
+	LD	A,(HL)		; 039b ~	  7e 
+	LD	(0056H),A	; 039c 2V.	  32 56 00 
+	LD	A,00H		; 039f >.	  3e 00 
+	LD	(005AH),A	; 03a1 2Z.	  32 5a 00 
+	LD	A,25H		; 03a4 >%	  3e 25 
+	LD	(dfcb),A	; 03a6 2[.	  32 5b 00 
+	LD	A,00H		; 03a9 >.	  3e 00 
+	LD	(005CH),A	; 03ab 2\.	  32 5c 00 
+	CALL	djpulse		; 03ae ...	  cd 09 01 
+	LD	HL,005CH	; 03b1 !\.	  21 5c 00 
+	PUSH	HL		; 03b4 .	  e5 
+	CALL	djwait		; 03b5 .(.	  cd 28 02 
+	POP	AF		; 03b8 .	  f1 
+	LD	A,(005AH)	; 03b9 :Z.	  3a 5a 00 
+	CP	40H		; 03bc .@	  fe 40 
+	JP	Z,H040e		; 03be ...	  ca 0e 04 
+	LD	BC,boot		; 03c1 ...	  01 00 00 
+	JP	cret		; 03c4 .<.	  c3 3c 0a 
+
+H03c7: 	LD	A,(H205c)	; 03c7 :\.	  3a 5c 20 
+	LD	(H0da0),A	; 03ca 2..	  32 a0 0d 
+	LD	A,(H0da0)	; 03cd :..	  3a a0 0d 
+	LD	C,A		; 03d0 O	  4f 
+	SUB	A		; 03d1 .	  97 
+	LD	B,A		; 03d2 G	  47 
+	LD	A,C		; 03d3 y	  79 
+	CP	D0H		; 03d4 ..	  fe d0 
+	JP	NZ,H03dc	; 03d6 ...	  c2 dc 03 
+	LD	A,B		; 03d9 x	  78 
+	CP	00H		; 03da ..	  fe 00 
+H03dc: 	JP	Z,H0406		; 03dc ...	  ca 06 04 
+	LD	A,(H0da0)	; 03df :..	  3a a0 0d 
+	LD	C,A		; 03e2 O	  4f 
+	SUB	A		; 03e3 .	  97 
+	LD	B,A		; 03e4 G	  47 
+	LD	A,C		; 03e5 y	  79 
+	CP	E0H		; 03e6 ..	  fe e0 
+	JP	NZ,H03ee	; 03e8 ...	  c2 ee 03 
+	LD	A,B		; 03eb x	  78 
+	CP	00H		; 03ec ..	  fe 00 
+H03ee: 	JP	Z,H0406		; 03ee ...	  ca 06 04 
+	LD	A,(H0da0)	; 03f1 :..	  3a a0 0d 
+	LD	C,A		; 03f4 O	  4f 
+	SUB	A		; 03f5 .	  97 
+	LD	B,A		; 03f6 G	  47 
+	LD	A,C		; 03f7 y	  79 
+	CP	F0H		; 03f8 ..	  fe f0 
+	JP	NZ,H0400	; 03fa ...	  c2 00 04 
+	LD	A,B		; 03fd x	  78 
+	CP	00H		; 03fe ..	  fe 00 
+H0400: 	JP	Z,H0406		; 0400 ...	  ca 06 04 
+	CALL	fmterror	; 0403 ...	  cd 83 04 
+H0406: 	LD	A,01H		; 0406 >.	  3e 01 
+	LD	(H0d98),A	; 0408 2..	  32 98 0d 
+	JP	H0370		; 040b .p.	  c3 70 03 
+
+H040e: 	LD	A,(H0d98)	; 040e :..	  3a 98 0d 
+	OR	A		; 0411 .	  b7 
+	JP	Z,H041d		; 0412 ...	  ca 1d 04 
+	LD	A,01H		; 0415 >.	  3e 01 
+	LD	(H0d99),A	; 0417 2..	  32 99 0d 
+	JP	H0439		; 041a .9.	  c3 39 04 
+
+H041d: 	LD	A,(0059H)	; 041d :Y.	  3a 59 00 
+	LD	C,A		; 0420 O	  4f 
+	ADD	A,A		; 0421 .	  87 
+	SBC	A,A		; 0422 .	  9f 
+	LD	B,A		; 0423 G	  47 
+	LD	A,C		; 0424 y	  79 
+	AND	04H		; 0425 ..	  e6 04 
+	LD	C,A		; 0427 O	  4f 
+	SUB	A		; 0428 .	  97 
+	LD	B,A		; 0429 G	  47 
+	LD	A,C		; 042a y	  79 
+	LD	(H0d99),A	; 042b 2..	  32 99 0d 
+	LD	A,(0058H)	; 042e :X.	  3a 58 00 
+	CP	02H		; 0431 ..	  fe 02 
+	JP	Z,H0439		; 0433 .9.	  ca 39 04 
+	CALL	fmterror	; 0436 ...	  cd 83 04 
+H0439: 	LD	BC,0001H	; 0439 ...	  01 01 00 
+	JP	cret		; 043c .<.	  c3 3c 0a 
+
+djsense: CALL	cent		; 043f .5.	  cd 35 0a 
+	LD	A,2EH		; 0442 >.	  3e 2e 
+	LD	(djmbox),A	; 0444 2P.	  32 50 00 
+	LD	A,00H		; 0447 >.	  3e 00 
+	LD	(djchan),A	; 0449 2Q.	  32 51 00 
+	LD	A,00H		; 044c >.	  3e 00 
+	LD	(0052H),A	; 044e 2R.	  32 52 00 
+	LD	A,25H		; 0451 >%	  3e 25 
+	LD	(djstat),A	; 0453 2S.	  32 53 00 
+	LD	A,00H		; 0456 >.	  3e 00 
+	LD	(0054H),A	; 0458 2T.	  32 54 00 
+	CALL	djpulse		; 045b ...	  cd 09 01 
+	LD	HL,0054H	; 045e !T.	  21 54 00 
+	PUSH	HL		; 0461 .	  e5 
+	CALL	djwait		; 0462 .(.	  cd 28 02 
+	POP	AF		; 0465 .	  f1 
+	LD	A,(0054H)	; 0466 :T.	  3a 54 00 
+	CP	40H		; 0469 .@	  fe 40 
+	JP	NZ,H0474	; 046b .t.	  c2 74 04 
+	LD	BC,0001H	; 046e ...	  01 01 00 
+	JP	H0477		; 0471 .w.	  c3 77 04 
+
+H0474: 	LD	BC,boot		; 0474 ...	  01 00 00 
+H0477: 	JP	cret		; 0477 .<.	  c3 3c 0a 
+
+H047a: 	DB	"Format?",0AH,00H
+fmterror: CALL	cent		; 0483 .5.	  cd 35 0a 
+	LD	HL,H047a	; 0486 !z.	  21 7a 04 
+	PUSH	HL		; 0489 .	  e5 
+	CALL	printf		; 048a ...	  cd fd 07 
+	POP	AF		; 048d .	  f1 
+	CALL	exit		; 048e ...	  cd 06 01 
+	JP	cret		; 0491 .<.	  c3 3c 0a 
+
+dirbuf: DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H
+dirend: DW	boot
+H0696: 	DW	boot
+H0698: 	DW	boot
+H069a: 	DW	boot
+H069c: 	DW	boot
+ptr069e: DW	boot
+dirptr: DW	boot
+H06a2: 	DB	"Entering",0AH,00H
+H06ac: 	DB	"Loading",0AH,00H
+bootkern: CALL	cent		; 06b5 .5.	  cd 35 0a 
+	LD	HL,dirbuf	; 06b8 !..	  21 94 04 
+	PUSH	HL		; 06bb .	  e5 
+	LD	HL,(ptr069e)	; 06bc *..	  2a 9e 06 
+	LD	BC,0008H	; 06bf ...	  01 08 00 
+	ADD	HL,BC		; 06c2 .	  09 
+	LD	C,(HL)		; 06c3 N	  4e 
+	INC	HL		; 06c4 #	  23 
+	LD	B,(HL)		; 06c5 F	  46 
+	PUSH	BC		; 06c6 .	  c5 
+	CALL	djcmd		; 06c7 ...	  cd 1c 01 
+	POP	AF		; 06ca .	  f1 
+	POP	AF		; 06cb .	  f1 
+	LD	A,C		; 06cc y	  79 
+	OR	B		; 06cd .	  b0 
+	JP	NZ,H06d4	; 06ce ...	  c2 d4 06 
+	CALL	exit		; 06d1 ...	  cd 06 01 
+H06d4: 	LD	HL,dirbuf	; 06d4 !..	  21 94 04 
+	LD	(dirend),HL	; 06d7 "..	  22 94 06 
+	LD	HL,H0fb6	; 06da !..	  21 b6 0f 
+	PUSH	HL		; 06dd .	  e5 
+	LD	HL,(dirend)	; 06de *..	  2a 94 06 
+	LD	C,(HL)		; 06e1 N	  4e 
+	INC	HL		; 06e2 #	  23 
+	LD	B,(HL)		; 06e3 F	  46 
+	PUSH	BC		; 06e4 .	  c5 
+	CALL	djcmd		; 06e5 ...	  cd 1c 01 
+	POP	AF		; 06e8 .	  f1 
+	POP	AF		; 06e9 .	  f1 
+	LD	A,C		; 06ea y	  79 
+	OR	B		; 06eb .	  b0 
+	JP	NZ,H06f2	; 06ec ...	  c2 f2 06 
+	CALL	exit		; 06ef ...	  cd 06 01 
+H06f2: 	LD	A,(H0fb6)	; 06f2 :..	  3a b6 0f 
+	LD	C,A		; 06f5 O	  4f 
+	SUB	A		; 06f6 .	  97 
+	LD	B,A		; 06f7 G	  47 
+	LD	A,C		; 06f8 y	  79 
+	CP	99H		; 06f9 ..	  fe 99 
+	JP	NZ,H0701	; 06fb ...	  c2 01 07 
+	LD	A,B		; 06fe x	  78 
+	CP	00H		; 06ff ..	  fe 00 
+H0701: 	JP	NZ,H0724	; 0701 .$.	  c2 24 07 
+	LD	HL,(H0fc2)	; 0704 *..	  2a c2 0f 
+	LD	(H069c),HL	; 0707 "..	  22 9c 06 
+	LD	HL,(H0fc2)	; 070a *..	  2a c2 0f 
+	LD	BC,FFF0H	; 070d ...	  01 f0 ff 
+	ADD	HL,BC		; 0710 .	  09 
+	LD	(H0696),HL	; 0711 "..	  22 96 06 
+	LD	HL,(H0fba)	; 0714 *..	  2a ba 0f 
+	PUSH	HL		; 0717 .	  e5 
+	LD	HL,(H0fbc)	; 0718 *..	  2a bc 0f 
+	EX	(SP),HL		; 071b .	  e3 
+	POP	BC		; 071c .	  c1 
+	ADD	HL,BC		; 071d .	  09 
+	LD	(H069a),HL	; 071e "..	  22 9a 06 
+	JP	H0744		; 0721 .D.	  c3 44 07 
+
+H0724: 	SUB	A		; 0724 .	  97 
+	LD	(H069c),A	; 0725 2..	  32 9c 06 
+	LD	A,10H		; 0728 >.	  3e 10 
+	LD	(H069d),A	; 072a 2..	  32 9d 06 
+	SUB	A		; 072d .	  97 
+	LD	(H0696),A	; 072e 2..	  32 96 06 
+	LD	A,10H		; 0731 >.	  3e 10 
+	LD	(H0697),A	; 0733 2..	  32 97 06 
+	LD	HL,(ptr069e)	; 0736 *..	  2a 9e 06 
+	LD	BC,0006H	; 0739 ...	  01 06 00 
+	ADD	HL,BC		; 073c .	  09 
+	LD	A,(HL)		; 073d ~	  7e 
+	INC	HL		; 073e #	  23 
+	LD	H,(HL)		; 073f f	  66 
+	LD	L,A		; 0740 o	  6f 
+	LD	(H069a),HL	; 0741 "..	  22 9a 06 
+H0744: 	LD	HL,(H069a)	; 0744 *..	  2a 9a 06 
+	LD	BC,FFFFH	; 0747 ...	  01 ff ff 
+	ADD	HL,BC		; 074a .	  09 
+	PUSH	HL		; 074b .	  e5 
+	LD	HL,0009H	; 074c !..	  21 09 00 
+	PUSH	HL		; 074f .	  e5 
+	CALL	arith0a02	; 0750 ...	  cd 02 0a 
+	POP	HL		; 0753 .	  e1 
+	INC	HL		; 0754 #	  23 
+	LD	(H0698),HL	; 0755 "..	  22 98 06 
+	LD	HL,H06ac	; 0758 !..	  21 ac 06 
+	PUSH	HL		; 075b .	  e5 
+	CALL	printf		; 075c ...	  cd fd 07 
+	POP	AF		; 075f .	  f1 
+	LD	HL,dirbuf	; 0760 !..	  21 94 04 
+	LD	(dirend),HL	; 0763 "..	  22 94 06 
+H0766: 	LD	HL,H0698	; 0766 !..	  21 98 06 
+	LD	A,(HL)		; 0769 ~	  7e 
+	INC	HL		; 076a #	  23 
+	OR	(HL)		; 076b .	  b6 
+	JP	Z,H078a		; 076c ...	  ca 8a 07 
+	LD	HL,(H0696)	; 076f *..	  2a 96 06 
+	PUSH	HL		; 0772 .	  e5 
+	LD	HL,(dirend)	; 0773 *..	  2a 94 06 
+	LD	C,(HL)		; 0776 N	  4e 
+	INC	HL		; 0777 #	  23 
+	LD	B,(HL)		; 0778 F	  46 
+	PUSH	BC		; 0779 .	  c5 
+	CALL	djcmd		; 077a ...	  cd 1c 01 
+	POP	AF		; 077d .	  f1 
+	POP	AF		; 077e .	  f1 
+	LD	A,C		; 077f y	  79 
+	OR	B		; 0780 .	  b0 
+	JP	NZ,H07a8	; 0781 ...	  c2 a8 07 
+	CALL	exit		; 0784 ...	  cd 06 01 
+	JP	H07a8		; 0787 ...	  c3 a8 07 
+
+H078a: 	LD	HL,boot		; 078a !..	  21 00 00 
+	PUSH	HL		; 078d .	  e5 
+	LD	HL,0041H	; 078e !A.	  21 41 00 
+	PUSH	HL		; 0791 .	  e5 
+	CALL	outp		; 0792 ...	  cd a1 08 
+	POP	AF		; 0795 .	  f1 
+	POP	AF		; 0796 .	  f1 
+	LD	HL,H06a2	; 0797 !..	  21 a2 06 
+	PUSH	HL		; 079a .	  e5 
+	CALL	printf		; 079b ...	  cd fd 07 
+	POP	AF		; 079e .	  f1 
+	LD	HL,(H069c)	; 079f *..	  2a 9c 06 
+	CALL	jphl		; 07a2 .;.	  cd 3b 0a 
+	JP	cret		; 07a5 .<.	  c3 3c 0a 
+
+H07a8: 	LD	A,(H0698)	; 07a8 :..	  3a 98 06 
+	SUB	01H		; 07ab ..	  d6 01 
+	LD	(H0698),A	; 07ad 2..	  32 98 06 
+	LD	A,(H0699)	; 07b0 :..	  3a 99 06 
+	SBC	A,00H		; 07b3 ..	  de 00 
+	LD	(H0699),A	; 07b5 2..	  32 99 06 
+	LD	HL,(dirend)	; 07b8 *..	  2a 94 06 
+	INC	HL		; 07bb #	  23 
+	INC	HL		; 07bc #	  23 
+	LD	(dirend),HL	; 07bd "..	  22 94 06 
+	LD	A,(H0697)	; 07c0 :..	  3a 97 06 
+	ADD	A,02H		; 07c3 ..	  c6 02 
+	LD	(H0697),A	; 07c5 2..	  32 97 06 
+	JP	H0766		; 07c8 .f.	  c3 66 07 
+
+putchar: CALL	cent		; 07cb .5.	  cd 35 0a 
+	LD	HL,0001H	; 07ce !..	  21 01 00 
+	PUSH	HL		; 07d1 .	  e5 
+	LD	HL,004FH	; 07d2 !O.	  21 4f 00 
+	PUSH	HL		; 07d5 .	  e5 
+	CALL	outp		; 07d6 ...	  cd a1 08 
+	POP	AF		; 07d9 .	  f1 
+	POP	AF		; 07da .	  f1 
+H07db: 	LD	HL,004DH	; 07db !M.	  21 4d 00 
+	PUSH	HL		; 07de .	  e5 
+	CALL	inp		; 07df ...	  cd 8b 08 
+	POP	AF		; 07e2 .	  f1 
+	LD	A,C		; 07e3 y	  79 
+	AND	20H		; 07e4 ..	  e6 20 
+	JP	Z,H07db		; 07e6 ...	  ca db 07 
+	LD	HL,0004H	; 07e9 !..	  21 04 00 
+	ADD	HL,DE		; 07ec .	  19 
+	LD	C,(HL)		; 07ed N	  4e 
+	INC	HL		; 07ee #	  23 
+	LD	B,(HL)		; 07ef F	  46 
+	PUSH	BC		; 07f0 .	  c5 
+	LD	HL,0048H	; 07f1 !H.	  21 48 00 
+	PUSH	HL		; 07f4 .	  e5 
+	CALL	outp		; 07f5 ...	  cd a1 08 
+	POP	AF		; 07f8 .	  f1 
+	POP	AF		; 07f9 .	  f1 
+	JP	cret		; 07fa .<.	  c3 3c 0a 
+
+printf: CALL	cent		; 07fd .5.	  cd 35 0a 
+H0800: 	LD	HL,0004H	; 0800 !..	  21 04 00 
+	ADD	HL,DE		; 0803 .	  19 
+	LD	A,(HL)		; 0804 ~	  7e 
+	INC	HL		; 0805 #	  23 
+	LD	H,(HL)		; 0806 f	  66 
+	LD	L,A		; 0807 o	  6f 
+	LD	A,(HL)		; 0808 ~	  7e 
+	OR	A		; 0809 .	  b7 
+	JP	Z,H0826		; 080a .&.	  ca 26 08 
+	LD	HL,0004H	; 080d !..	  21 04 00 
+	ADD	HL,DE		; 0810 .	  19 
+	LD	A,(HL)		; 0811 ~	  7e 
+	INC	HL		; 0812 #	  23 
+	LD	H,(HL)		; 0813 f	  66 
+	LD	L,A		; 0814 o	  6f 
+	LD	A,(HL)		; 0815 ~	  7e 
+	CP	0AH		; 0816 ..	  fe 0a 
+	JP	NZ,H0829	; 0818 .).	  c2 29 08 
+	LD	HL,000DH	; 081b !..	  21 0d 00 
+	PUSH	HL		; 081e .	  e5 
+	CALL	putchar		; 081f ...	  cd cb 07 
+	POP	AF		; 0822 .	  f1 
+	JP	H0829		; 0823 .).	  c3 29 08 
+
+H0826: 	JP	cret		; 0826 .<.	  c3 3c 0a 
+
+H0829: 	LD	HL,0004H	; 0829 !..	  21 04 00 
+	ADD	HL,DE		; 082c .	  19 
+	LD	A,(HL)		; 082d ~	  7e 
+	INC	HL		; 082e #	  23 
+	LD	H,(HL)		; 082f f	  66 
+	LD	L,A		; 0830 o	  6f 
+	LD	A,(HL)		; 0831 ~	  7e 
+	LD	C,A		; 0832 O	  4f 
+	ADD	A,A		; 0833 .	  87 
+	SBC	A,A		; 0834 .	  9f 
+	LD	B,A		; 0835 G	  47 
+	PUSH	BC		; 0836 .	  c5 
+	CALL	putchar		; 0837 ...	  cd cb 07 
+	POP	AF		; 083a .	  f1 
+	LD	HL,0004H	; 083b !..	  21 04 00 
+	ADD	HL,DE		; 083e .	  19 
+	LD	A,(HL)		; 083f ~	  7e 
+	ADD	A,01H		; 0840 ..	  c6 01 
+	LD	(HL),A		; 0842 w	  77 
+	INC	HL		; 0843 #	  23 
+	LD	A,(HL)		; 0844 ~	  7e 
+	ADC	A,00H		; 0845 ..	  ce 00 
+	LD	(HL),A		; 0847 w	  77 
+	JP	H0800		; 0848 ...	  c3 00 08 
+
+	DB	CDH,"5",0AH,"!",04H,00H,19H,"~",D6H,0AH,"#~",DEH
+	DB	00H,DAH,"o",08H,"!",04H,00H,19H,"N#F",C5H,"!",0AH
+	DB	00H,E5H,CDH,"}",09H,CDH,"K",08H,F1H,"!",04H,00H
+	DB	19H,"N#F",C5H,"!",0AH,00H,E5H,CDH,98H,09H,E1H
+	DB	01H,"0",00H,09H,E5H,CDH,CBH,07H,F1H,C3H,"<",0AH
+inp: 	POP	BC		; 088b .	  c1 
+	POP	HL		; 088c .	  e1 
+	LD	H,C9H		; 088d &.	  26 c9 
+	PUSH	HL		; 088f .	  e5 
+	LD	HL,DB00H	; 0890 !..	  21 00 db 
+	PUSH	HL		; 0893 .	  e5 
+	LD	HL,boot		; 0894 !..	  21 00 00 
+	ADD	HL,SP		; 0897 9	  39 
+	CALL	jphl		; 0898 .;.	  cd 3b 0a 
+	POP	HL		; 089b .	  e1 
+	PUSH	BC		; 089c .	  c5 
+	LD	C,A		; 089d O	  4f 
+	SUB	A		; 089e .	  97 
+	LD	B,A		; 089f G	  47 
+	RET			; 08a0 .	  c9 
+
+outp: 	POP	BC		; 08a1 .	  c1 
+	POP	HL		; 08a2 .	  e1 
+	LD	H,C9H		; 08a3 &.	  26 c9 
+	EX	(SP),HL		; 08a5 .	  e3 
+	LD	A,L		; 08a6 }	  7d 
+	LD	HL,D300H	; 08a7 !..	  21 00 d3 
+	PUSH	HL		; 08aa .	  e5 
+	LD	HL,boot		; 08ab !..	  21 00 00 
+	ADD	HL,SP		; 08ae 9	  39 
+	CALL	jphl		; 08af .;.	  cd 3b 0a 
+	PUSH	BC		; 08b2 .	  c5 
+	RET			; 08b3 .	  c9 
+
+shift08b4: POP	HL		; 08b4 .	  e1 
+	PUSH	DE		; 08b5 .	  d5 
+	LD	DE,boot		; 08b6 ...	  11 00 00 
+	PUSH	DE		; 08b9 .	  d5 
+	PUSH	BC		; 08ba .	  c5 
+	PUSH	HL		; 08bb .	  e5 
+	LD	D,10H		; 08bc ..	  16 10 
+H08be: 	DEC	D		; 08be .	  15 
+	RET	M		; 08bf .	  f8 
+	LD	HL,0002H	; 08c0 !..	  21 02 00 
+	ADD	HL,SP		; 08c3 9	  39 
+	LD	A,(HL)		; 08c4 ~	  7e 
+	ADD	A,A		; 08c5 .	  87 
+	LD	(HL),A		; 08c6 w	  77 
+	INC	HL		; 08c7 #	  23 
+	LD	A,(HL)		; 08c8 ~	  7e 
+	ADC	A,A		; 08c9 .	  8f 
+	LD	(HL),A		; 08ca w	  77 
+	INC	HL		; 08cb #	  23 
+	LD	A,(HL)		; 08cc ~	  7e 
+	ADC	A,A		; 08cd .	  8f 
+	LD	(HL),A		; 08ce w	  77 
+	INC	HL		; 08cf #	  23 
+	LD	A,(HL)		; 08d0 ~	  7e 
+	ADC	A,A		; 08d1 .	  8f 
+	LD	(HL),A		; 08d2 w	  77 
+	DEC	HL		; 08d3 +	  2b 
+	LD	C,L		; 08d4 M	  4d 
+	LD	B,H		; 08d5 D	  44 
+	LD	HL,0010H	; 08d6 !..	  21 10 00 
+	ADD	HL,SP		; 08d9 9	  39 
+	LD	A,(BC)		; 08da .	  0a 
+	SUB	(HL)		; 08db .	  96 
+	LD	E,A		; 08dc _	  5f 
+	INC	BC		; 08dd .	  03 
+	LD	A,(BC)		; 08de .	  0a 
+	INC	HL		; 08df #	  23 
+	SBC	A,(HL)		; 08e0 .	  9e 
+	JP	C,H08be		; 08e1 ...	  da be 08 
+	LD	(BC),A		; 08e4 .	  02 
+	LD	A,E		; 08e5 {	  7b 
+	DEC	BC		; 08e6 .	  0b 
+	LD	(BC),A		; 08e7 .	  02 
+	LD	HL,0002H	; 08e8 !..	  21 02 00 
+	ADD	HL,SP		; 08eb 9	  39 
+	INC	(HL)		; 08ec 4	  34 
+	JP	H08be		; 08ed ...	  c3 be 08 
+
+	DB	E5H,C5H,D5H,1EH,00H,"!",09H,00H,"9~",B7H,F2H,08H
+	DB	09H,97H,"+",96H,"w>",00H,"#",9EH,"w",1CH,"!",0AH
+	DB	00H,"9N#Fx",B7H,F2H,1CH,09H,97H,91H,"O>",00H,98H
+	DB	"G",1CH,CDH,B4H,08H,C1H,F1H,F1H,D2H,",",09H,97H
+	DB	91H,"O>",00H,98H,"G!",0AH,00H,"9q#p",D1H,C3H,"X"
+	DB	0AH,E5H,C5H,D5H,1EH,00H,"!",09H,00H,"9~",B7H,F2H
+	DB	"N",09H,97H,"+",96H,"w>",00H,"#",9EH,"w!",0AH
+	DB	00H,"9N#Fx",B7H,F2H,"b",09H,97H,91H,"O>",00H,98H
+	DB	"G",1CH,CDH,B4H,08H,F1H,C1H,F1H,D2H,"r",09H,97H
+	DB	91H,"O>",00H,98H,"G!",0AH,00H,"9q#p",D1H,C3H,"X"
+	DB	0AH
+H097d: 	PUSH	HL		; 097d .	  e5 
+	PUSH	BC		; 097e .	  c5 
+	PUSH	DE		; 097f .	  d5 
+	LD	HL,000AH	; 0980 !..	  21 0a 00 
+	ADD	HL,SP		; 0983 9	  39 
+	LD	C,(HL)		; 0984 N	  4e 
+	INC	HL		; 0985 #	  23 
+	LD	B,(HL)		; 0986 F	  46 
+	CALL	shift08b4	; 0987 ...	  cd b4 08 
+	POP	BC		; 098a .	  c1 
+	POP	AF		; 098b .	  f1 
+	POP	AF		; 098c .	  f1 
+	LD	HL,000AH	; 098d !..	  21 0a 00 
+	ADD	HL,SP		; 0990 9	  39 
+	LD	(HL),C		; 0991 q	  71 
+	INC	HL		; 0992 #	  23 
+	LD	(HL),B		; 0993 p	  70 
+	POP	DE		; 0994 .	  d1 
+	JP	H0a58		; 0995 .X.	  c3 58 0a 
+
+H0998: 	PUSH	HL		; 0998 .	  e5 
+	PUSH	BC		; 0999 .	  c5 
+	PUSH	DE		; 099a .	  d5 
+	LD	HL,000AH	; 099b !..	  21 0a 00 
+	ADD	HL,SP		; 099e 9	  39 
+	LD	C,(HL)		; 099f N	  4e 
+	INC	HL		; 09a0 #	  23 
+	LD	B,(HL)		; 09a1 F	  46 
+	CALL	shift08b4	; 09a2 ...	  cd b4 08 
+	POP	AF		; 09a5 .	  f1 
+	POP	BC		; 09a6 .	  c1 
+	POP	AF		; 09a7 .	  f1 
+	LD	HL,000AH	; 09a8 !..	  21 0a 00 
+	ADD	HL,SP		; 09ab 9	  39 
+	LD	(HL),C		; 09ac q	  71 
+	INC	HL		; 09ad #	  23 
+	LD	(HL),B		; 09ae p	  70 
+	POP	DE		; 09af .	  d1 
+	JP	H0a58		; 09b0 .X.	  c3 58 0a 
+
+	DB	E5H,C5H,"!",06H,00H,"9~",B7H,F2H,C3H,09H,"/<",C3H
+	DB	E7H,09H
+H09c3: 	JP	Z,H0a58		; 09c3 .X.	  ca 58 0a 
+	LD	C,A		; 09c6 O	  4f 
+	LD	HL,0008H	; 09c7 !..	  21 08 00 
+	ADD	HL,SP		; 09ca 9	  39 
+	LD	A,(HL)		; 09cb ~	  7e 
+	INC	HL		; 09cc #	  23 
+	LD	H,(HL)		; 09cd f	  66 
+	LD	L,A		; 09ce o	  6f 
+H09cf: 	ADD	HL,HL		; 09cf )	  29 
+	DEC	C		; 09d0 .	  0d 
+	JP	NZ,H09cf	; 09d1 ...	  c2 cf 09 
+	JP	H0a29		; 09d4 .).	  c3 29 0a 
+
+	DB	E5H,C5H,"!",06H,00H,"9~",B7H,F2H,E7H,09H,"/<",C3H
+	DB	C3H,09H,CAH,"X",0AH,"O!",08H,00H,"9~#fo|",87H
+	DB	"|",1FH,"g}",1FH,"o",0DH,C2H,F3H,09H,C3H,")",0AH
+arith0a02: PUSH	HL		; 0a02 .	  e5 
+	PUSH	BC		; 0a03 .	  c5 
+	LD	HL,0006H	; 0a04 !..	  21 06 00 
+	ADD	HL,SP		; 0a07 9	  39 
+	LD	A,(HL)		; 0a08 ~	  7e 
+	OR	A		; 0a09 .	  b7 
+	JP	P,H0a12		; 0a0a ...	  f2 12 0a 
+	CPL			; 0a0d /	  2f 
+	INC	A		; 0a0e <	  3c 
+	JP	H09c3		; 0a0f ...	  c3 c3 09 
+
+H0a12: 	JP	Z,H0a58		; 0a12 .X.	  ca 58 0a 
+	LD	C,A		; 0a15 O	  4f 
+	LD	HL,0008H	; 0a16 !..	  21 08 00 
+	ADD	HL,SP		; 0a19 9	  39 
+	LD	A,(HL)		; 0a1a ~	  7e 
+	INC	HL		; 0a1b #	  23 
+	LD	H,(HL)		; 0a1c f	  66 
+	LD	L,A		; 0a1d o	  6f 
+H0a1e: 	LD	A,H		; 0a1e |	  7c 
+	OR	A		; 0a1f .	  b7 
+	RRA			; 0a20 .	  1f 
+	LD	H,A		; 0a21 g	  67 
+	LD	A,L		; 0a22 }	  7d 
+	RRA			; 0a23 .	  1f 
+	LD	L,A		; 0a24 o	  6f 
+	DEC	C		; 0a25 .	  0d 
+	JP	NZ,H0a1e	; 0a26 ...	  c2 1e 0a 
+H0a29: 	LD	C,L		; 0a29 M	  4d 
+	LD	B,H		; 0a2a D	  44 
+	LD	HL,0008H	; 0a2b !..	  21 08 00 
+	ADD	HL,SP		; 0a2e 9	  39 
+	LD	(HL),C		; 0a2f q	  71 
+	INC	HL		; 0a30 #	  23 
+	LD	(HL),B		; 0a31 p	  70 
+	JP	H0a58		; 0a32 .X.	  c3 58 0a 
+
+cent: 	LD	HL,boot		; 0a35 !..	  21 00 00 
+	ADD	HL,SP		; 0a38 9	  39 
+	EX	DE,HL		; 0a39 .	  eb 
+	EX	(SP),HL		; 0a3a .	  e3 
+jphl: 	JP	(HL)		; 0a3b .	  e9 
+
+cret: 	EX	DE,HL		; 0a3c .	  eb 
+	LD	SP,HL		; 0a3d .	  f9 
+	POP	DE		; 0a3e .	  d1 
+	RET			; 0a3f .	  c9 
+
+	DB	F5H,"!",06H,00H,"9N#F###q#p",C1H,"+++q",C1H,E1H
+	DB	F1H,F1H,C9H
+H0a58: 	LD	HL,0004H	; 0a58 !..	  21 04 00 
+	ADD	HL,SP		; 0a5b 9	  39 
+	LD	C,(HL)		; 0a5c N	  4e 
+	INC	HL		; 0a5d #	  23 
+	LD	B,(HL)		; 0a5e F	  46 
+	INC	HL		; 0a5f #	  23 
+	LD	(HL),C		; 0a60 q	  71 
+	INC	HL		; 0a61 #	  23 
+	LD	(HL),B		; 0a62 p	  70 
+	POP	BC		; 0a63 .	  c1 
+	POP	HL		; 0a64 .	  e1 
+	POP	AF		; 0a65 .	  f1 
+	RET			; 0a66 .	  c9 
+
+main: 	CALL	cent		; 0a67 .5.	  cd 35 0a 
+	CALL	djinit		; 0a6a ...	  cd 85 02 
+	CALL	fs0a7c		; 0a6d .|.	  cd 7c 0a 
+	CALL	lsfiles		; 0a70 ...	  cd b0 0a 
+	CALL	pickfile	; 0a73 .Z.	  cd 5a 0b 
+	CALL	bootkern	; 0a76 ...	  cd b5 06 
+	JP	cret		; 0a79 .<.	  c3 3c 0a 
+
+fs0a7c: CALL	cent		; 0a7c .5.	  cd 35 0a 
+	LD	HL,0001H	; 0a7f !..	  21 01 00 
+	PUSH	HL		; 0a82 .	  e5 
+	CALL	readblk		; 0a83 ...	  cd e4 0b 
+	POP	AF		; 0a86 .	  f1 
+	LD	HL,dirbuf	; 0a87 !..	  21 94 04 
+	PUSH	HL		; 0a8a .	  e5 
+	LD	HL,(ptr069e)	; 0a8b *..	  2a 9e 06 
+	LD	BC,0008H	; 0a8e ...	  01 08 00 
+	ADD	HL,BC		; 0a91 .	  09 
+	LD	C,(HL)		; 0a92 N	  4e 
+	INC	HL		; 0a93 #	  23 
+	LD	B,(HL)		; 0a94 F	  46 
+	PUSH	BC		; 0a95 .	  c5 
+	CALL	djcmd		; 0a96 ...	  cd 1c 01 
+	POP	AF		; 0a99 .	  f1 
+	POP	AF		; 0a9a .	  f1 
+	LD	A,C		; 0a9b y	  79 
+	OR	B		; 0a9c .	  b0 
+	JP	NZ,H0aa3	; 0a9d ...	  c2 a3 0a 
+	CALL	exit		; 0aa0 ...	  cd 06 01 
+H0aa3: 	JP	cret		; 0aa3 .<.	  c3 3c 0a 
+
+H0aa6: 	DB	0AH,00H
+H0aa8: 	DB	"Files:",0AH,00H
+lsfiles: CALL	cent		; 0ab0 .5.	  cd 35 0a 
+	LD	HL,H0aa8	; 0ab3 !..	  21 a8 0a 
+	PUSH	HL		; 0ab6 .	  e5 
+	CALL	printf		; 0ab7 ...	  cd fd 07 
+	POP	AF		; 0aba .	  f1 
+	LD	HL,dirbuf	; 0abb !..	  21 94 04 
+	LD	(dirptr),HL	; 0abe "..	  22 a0 06 
+H0ac1: 	LD	HL,dirend	; 0ac1 !..	  21 94 06 
+	LD	A,(dirptr)	; 0ac4 :..	  3a a0 06 
+	SUB	L		; 0ac7 .	  95 
+	LD	A,(H06a1)	; 0ac8 :..	  3a a1 06 
+	SBC	A,H		; 0acb .	  9c 
+	JP	NC,H0aed	; 0acc ...	  d2 ed 0a 
+	LD	HL,(dirptr)	; 0acf *..	  2a a0 06 
+	LD	C,(HL)		; 0ad2 N	  4e 
+	INC	HL		; 0ad3 #	  23 
+	LD	B,(HL)		; 0ad4 F	  46 
+	PUSH	BC		; 0ad5 .	  c5 
+	CALL	readblk		; 0ad6 ...	  cd e4 0b 
+	POP	AF		; 0ad9 .	  f1 
+	LD	A,C		; 0ada y	  79 
+	OR	B		; 0adb .	  b0 
+	JP	Z,H0af0		; 0adc ...	  ca f0 0a 
+	LD	HL,(dirptr)	; 0adf *..	  2a a0 06 
+	INC	HL		; 0ae2 #	  23 
+	INC	HL		; 0ae3 #	  23 
+	LD	A,(HL)		; 0ae4 ~	  7e 
+	CP	2EH		; 0ae5 ..	  fe 2e 
+	JP	NZ,H0b01	; 0ae7 ...	  c2 01 0b 
+	JP	H0af0		; 0aea ...	  c3 f0 0a 
+
+H0aed: 	JP	cret		; 0aed .<.	  c3 3c 0a 
+
+H0af0: 	LD	HL,(dirptr)	; 0af0 *..	  2a a0 06 
+	LD	A,L		; 0af3 }	  7d 
+	ADD	A,10H		; 0af4 ..	  c6 10 
+	LD	L,A		; 0af6 o	  6f 
+	LD	A,H		; 0af7 |	  7c 
+	ADC	A,00H		; 0af8 ..	  ce 00 
+	LD	H,A		; 0afa g	  67 
+	LD	(dirptr),HL	; 0afb "..	  22 a0 06 
+	JP	H0ac1		; 0afe ...	  c3 c1 0a 
+
+H0b01: 	LD	A,(H0da1)	; 0b01 :..	  3a a1 0d 
+	ADD	A,01H		; 0b04 ..	  c6 01 
+	LD	(H0da1),A	; 0b06 2..	  32 a1 0d 
+	LD	HL,(dirptr)	; 0b09 *..	  2a a0 06 
+	LD	A,(HL)		; 0b0c ~	  7e 
+	INC	HL		; 0b0d #	  23 
+	LD	H,(HL)		; 0b0e f	  66 
+	LD	L,A		; 0b0f o	  6f 
+	LD	(H0fb1),HL	; 0b10 "..	  22 b1 0f 
+	LD	HL,(dirptr)	; 0b13 *..	  2a a0 06 
+	INC	HL		; 0b16 #	  23 
+	INC	HL		; 0b17 #	  23 
+	PUSH	HL		; 0b18 .	  e5 
+	CALL	printf		; 0b19 ...	  cd fd 07 
+	POP	AF		; 0b1c .	  f1 
+	LD	HL,H0aa6	; 0b1d !..	  21 a6 0a 
+	PUSH	HL		; 0b20 .	  e5 
+	CALL	printf		; 0b21 ...	  cd fd 07 
+	POP	AF		; 0b24 .	  f1 
+	JP	H0af0		; 0b25 ...	  c3 f0 0a 
+
+H0b28: 	DB	"File not found",0AH,00H
+H0b38: 	DB	"File to boot: ",00H
+H0b47: 	DB	"No bootable files",0AH,00H
+pickfile: CALL	cent		; 0b5a .5.	  cd 35 0a 
+	LD	A,(H0da1)	; 0b5d :..	  3a a1 0d 
+	OR	A		; 0b60 .	  b7 
+	JP	NZ,H0b6f	; 0b61 .o.	  c2 6f 0b 
+	LD	HL,H0b47	; 0b64 !G.	  21 47 0b 
+	PUSH	HL		; 0b67 .	  e5 
+	CALL	printf		; 0b68 ...	  cd fd 07 
+	POP	AF		; 0b6b .	  f1 
+	CALL	exit		; 0b6c ...	  cd 06 01 
+H0b6f: 	LD	A,(H0da1)	; 0b6f :..	  3a a1 0d 
+	CP	01H		; 0b72 ..	  fe 01 
+	JP	NZ,H0b82	; 0b74 ...	  c2 82 0b 
+	LD	HL,(H0fb1)	; 0b77 *..	  2a b1 0f 
+	PUSH	HL		; 0b7a .	  e5 
+	CALL	readblk		; 0b7b ...	  cd e4 0b 
+	POP	AF		; 0b7e .	  f1 
+	JP	cret		; 0b7f .<.	  c3 3c 0a 
+
+H0b82: 	LD	HL,H0b38	; 0b82 !8.	  21 38 0b 
+	PUSH	HL		; 0b85 .	  e5 
+	CALL	printf		; 0b86 ...	  cd fd 07 
+	POP	AF		; 0b89 .	  f1 
+	CALL	gets		; 0b8a ...	  cd d7 0c 
+	LD	HL,dirbuf	; 0b8d !..	  21 94 04 
+	LD	(dirptr),HL	; 0b90 "..	  22 a0 06 
+H0b93: 	LD	HL,dirend	; 0b93 !..	  21 94 06 
+	LD	A,(dirptr)	; 0b96 :..	  3a a0 06 
+	SUB	L		; 0b99 .	  95 
+	LD	A,(H06a1)	; 0b9a :..	  3a a1 06 
+	SBC	A,H		; 0b9d .	  9c 
+	JP	NC,H0bc8	; 0b9e ...	  d2 c8 0b 
+	LD	HL,H0da2	; 0ba1 !..	  21 a2 0d 
+	PUSH	HL		; 0ba4 .	  e5 
+	LD	HL,(dirptr)	; 0ba5 *..	  2a a0 06 
+	INC	HL		; 0ba8 #	  23 
+	INC	HL		; 0ba9 #	  23 
+	PUSH	HL		; 0baa .	  e5 
+	CALL	cmp0c5a		; 0bab .Z.	  cd 5a 0c 
+	POP	AF		; 0bae .	  f1 
+	POP	AF		; 0baf .	  f1 
+	LD	A,C		; 0bb0 y	  79 
+	OR	B		; 0bb1 .	  b0 
+	JP	Z,H0bd3		; 0bb2 ...	  ca d3 0b 
+	LD	HL,(dirptr)	; 0bb5 *..	  2a a0 06 
+	LD	C,(HL)		; 0bb8 N	  4e 
+	INC	HL		; 0bb9 #	  23 
+	LD	B,(HL)		; 0bba F	  46 
+	PUSH	BC		; 0bbb .	  c5 
+	CALL	readblk		; 0bbc ...	  cd e4 0b 
+	POP	AF		; 0bbf .	  f1 
+	LD	A,C		; 0bc0 y	  79 
+	OR	B		; 0bc1 .	  b0 
+	JP	Z,H0bd3		; 0bc2 ...	  ca d3 0b 
+	JP	cret		; 0bc5 .<.	  c3 3c 0a 
+
+H0bc8: 	LD	HL,H0b28	; 0bc8 !(.	  21 28 0b 
+	PUSH	HL		; 0bcb .	  e5 
+	CALL	printf		; 0bcc ...	  cd fd 07 
+	POP	AF		; 0bcf .	  f1 
+	JP	H0b82		; 0bd0 ...	  c3 82 0b 
+
+H0bd3: 	LD	HL,(dirptr)	; 0bd3 *..	  2a a0 06 
+	LD	A,L		; 0bd6 }	  7d 
+	ADD	A,10H		; 0bd7 ..	  c6 10 
+	LD	L,A		; 0bd9 o	  6f 
+	LD	A,H		; 0bda |	  7c 
+	ADC	A,00H		; 0bdb ..	  ce 00 
+	LD	H,A		; 0bdd g	  67 
+	LD	(dirptr),HL	; 0bde "..	  22 a0 06 
+	JP	H0b93		; 0be1 ...	  c3 93 0b 
+
+readblk: CALL	cent		; 0be4 .5.	  cd 35 0a 
+	LD	HL,0004H	; 0be7 !..	  21 04 00 
+	ADD	HL,DE		; 0bea .	  19 
+	LD	A,(HL)		; 0beb ~	  7e 
+	INC	HL		; 0bec #	  23 
+	OR	(HL)		; 0bed .	  b6 
+	JP	Z,H0c54		; 0bee .T.	  ca 54 0c 
+	LD	HL,dj0db1	; 0bf1 !..	  21 b1 0d 
+	PUSH	HL		; 0bf4 .	  e5 
+	LD	HL,0004H	; 0bf5 !..	  21 04 00 
+	ADD	HL,DE		; 0bf8 .	  19 
+	LD	A,(HL)		; 0bf9 ~	  7e 
+	INC	HL		; 0bfa #	  23 
+	LD	H,(HL)		; 0bfb f	  66 
+	LD	L,A		; 0bfc o	  6f 
+	LD	BC,FFFFH	; 0bfd ...	  01 ff ff 
+	ADD	HL,BC		; 0c00 .	  09 
+	PUSH	HL		; 0c01 .	  e5 
+	LD	HL,0004H	; 0c02 !..	  21 04 00 
+	PUSH	HL		; 0c05 .	  e5 
+	CALL	arith0a02	; 0c06 ...	  cd 02 0a 
+	POP	HL		; 0c09 .	  e1 
+	INC	HL		; 0c0a #	  23 
+	INC	HL		; 0c0b #	  23 
+	PUSH	HL		; 0c0c .	  e5 
+	CALL	djcmd		; 0c0d ...	  cd 1c 01 
+	POP	AF		; 0c10 .	  f1 
+	POP	AF		; 0c11 .	  f1 
+	LD	A,C		; 0c12 y	  79 
+	OR	B		; 0c13 .	  b0 
+	JP	Z,H0c54		; 0c14 .T.	  ca 54 0c 
+	LD	HL,0004H	; 0c17 !..	  21 04 00 
+	ADD	HL,DE		; 0c1a .	  19 
+	LD	A,(HL)		; 0c1b ~	  7e 
+	INC	HL		; 0c1c #	  23 
+	LD	H,(HL)		; 0c1d f	  66 
+	LD	L,A		; 0c1e o	  6f 
+	LD	BC,FFFFH	; 0c1f ...	  01 ff ff 
+	ADD	HL,BC		; 0c22 .	  09 
+	LD	A,L		; 0c23 }	  7d 
+	AND	0FH		; 0c24 ..	  e6 0f 
+	LD	L,A		; 0c26 o	  6f 
+	SUB	A		; 0c27 .	  97 
+	LD	H,A		; 0c28 g	  67 
+	ADD	HL,HL		; 0c29 )	  29 
+	ADD	HL,HL		; 0c2a )	  29 
+	ADD	HL,HL		; 0c2b )	  29 
+	ADD	HL,HL		; 0c2c )	  29 
+	ADD	HL,HL		; 0c2d )	  29 
+	LD	BC,dj0db1	; 0c2e ...	  01 b1 0d 
+	ADD	HL,BC		; 0c31 .	  09 
+	LD	(ptr069e),HL	; 0c32 "..	  22 9e 06 
+	LD	HL,(ptr069e)	; 0c35 *..	  2a 9e 06 
+	LD	A,(HL)		; 0c38 ~	  7e 
+	INC	HL		; 0c39 #	  23 
+	LD	H,(HL)		; 0c3a f	  66 
+	LD	L,A		; 0c3b o	  6f 
+	SUB	A		; 0c3c .	  97 
+	LD	L,A		; 0c3d o	  6f 
+	LD	A,H		; 0c3e |	  7c 
+	AND	70H		; 0c3f .p	  e6 70 
+	LD	H,A		; 0c41 g	  67 
+	LD	A,L		; 0c42 }	  7d 
+	CP	00H		; 0c43 ..	  fe 00 
+	JP	NZ,H0c4b	; 0c45 .K.	  c2 4b 0c 
+	LD	A,H		; 0c48 |	  7c 
+	CP	10H		; 0c49 ..	  fe 10 
+H0c4b: 	JP	NZ,H0c54	; 0c4b .T.	  c2 54 0c 
+	LD	BC,0001H	; 0c4e ...	  01 01 00 
+	JP	cret		; 0c51 .<.	  c3 3c 0a 
+
+H0c54: 	LD	BC,boot		; 0c54 ...	  01 00 00 
+	JP	cret		; 0c57 .<.	  c3 3c 0a 
+
+cmp0c5a: CALL	cent		; 0c5a .5.	  cd 35 0a 
+H0c5d: 	LD	HL,0004H	; 0c5d !..	  21 04 00 
+	ADD	HL,DE		; 0c60 .	  19 
+	LD	A,(HL)		; 0c61 ~	  7e 
+	INC	HL		; 0c62 #	  23 
+	LD	H,(HL)		; 0c63 f	  66 
+	LD	L,A		; 0c64 o	  6f 
+	PUSH	HL		; 0c65 .	  e5 
+	LD	HL,0006H	; 0c66 !..	  21 06 00 
+	ADD	HL,DE		; 0c69 .	  19 
+	LD	A,(HL)		; 0c6a ~	  7e 
+	INC	HL		; 0c6b #	  23 
+	LD	H,(HL)		; 0c6c f	  66 
+	LD	L,A		; 0c6d o	  6f 
+	POP	BC		; 0c6e .	  c1 
+	LD	A,(BC)		; 0c6f .	  0a 
+	CP	(HL)		; 0c70 .	  be 
+	JP	Z,H0c97		; 0c71 ...	  ca 97 0c 
+	LD	BC,boot		; 0c74 ...	  01 00 00 
+	JP	cret		; 0c77 .<.	  c3 3c 0a 
+
+H0c7a: 	LD	HL,0004H	; 0c7a !..	  21 04 00 
+	ADD	HL,DE		; 0c7d .	  19 
+	LD	A,(HL)		; 0c7e ~	  7e 
+	ADD	A,01H		; 0c7f ..	  c6 01 
+	LD	(HL),A		; 0c81 w	  77 
+	INC	HL		; 0c82 #	  23 
+	LD	A,(HL)		; 0c83 ~	  7e 
+	ADC	A,00H		; 0c84 ..	  ce 00 
+	LD	(HL),A		; 0c86 w	  77 
+	LD	HL,0006H	; 0c87 !..	  21 06 00 
+	ADD	HL,DE		; 0c8a .	  19 
+	LD	A,(HL)		; 0c8b ~	  7e 
+	ADD	A,01H		; 0c8c ..	  c6 01 
+	LD	(HL),A		; 0c8e w	  77 
+	INC	HL		; 0c8f #	  23 
+	LD	A,(HL)		; 0c90 ~	  7e 
+	ADC	A,00H		; 0c91 ..	  ce 00 
+	LD	(HL),A		; 0c93 w	  77 
+	JP	H0c5d		; 0c94 .].	  c3 5d 0c 
+
+H0c97: 	LD	HL,0004H	; 0c97 !..	  21 04 00 
+	ADD	HL,DE		; 0c9a .	  19 
+	LD	A,(HL)		; 0c9b ~	  7e 
+	INC	HL		; 0c9c #	  23 
+	LD	H,(HL)		; 0c9d f	  66 
+	LD	L,A		; 0c9e o	  6f 
+	LD	A,(HL)		; 0c9f ~	  7e 
+	OR	A		; 0ca0 .	  b7 
+	JP	NZ,H0c7a	; 0ca1 .z.	  c2 7a 0c 
+	LD	BC,0001H	; 0ca4 ...	  01 01 00 
+	JP	cret		; 0ca7 .<.	  c3 3c 0a 
+
+getchar: CALL	cent		; 0caa .5.	  cd 35 0a 
+H0cad: 	LD	HL,004DH	; 0cad !M.	  21 4d 00 
+	PUSH	HL		; 0cb0 .	  e5 
+	CALL	inp		; 0cb1 ...	  cd 8b 08 
+	POP	AF		; 0cb4 .	  f1 
+	LD	A,C		; 0cb5 y	  79 
+	AND	01H		; 0cb6 ..	  e6 01 
+	JP	Z,H0cad		; 0cb8 ...	  ca ad 0c 
+	LD	HL,0048H	; 0cbb !H.	  21 48 00 
+	PUSH	HL		; 0cbe .	  e5 
+	CALL	inp		; 0cbf ...	  cd 8b 08 
+	POP	AF		; 0cc2 .	  f1 
+	LD	A,C		; 0cc3 y	  79 
+	AND	7FH		; 0cc4 ..	  e6 7f 
+	LD	C,A		; 0cc6 O	  4f 
+	SUB	A		; 0cc7 .	  97 
+	LD	B,A		; 0cc8 G	  47 
+	JP	cret		; 0cc9 .<.	  c3 3c 0a 
+
+H0ccc: 	DB	0AH,00H
+H0cce: 	DB	"XXX",0AH,00H
+H0cd3: 	DB	08H," ",08H,00H
+gets: 	CALL	cent		; 0cd7 .5.	  cd 35 0a 
+H0cda: 	LD	HL,H0da2	; 0cda !..	  21 a2 0d 
+	LD	(H0fb4),HL	; 0cdd "..	  22 b4 0f 
+H0ce0: 	CALL	getchar		; 0ce0 ...	  cd aa 0c 
+	LD	A,C		; 0ce3 y	  79 
+	LD	(H0fb3),A	; 0ce4 2..	  32 b3 0f 
+	LD	HL,(H0fb4)	; 0ce7 *..	  2a b4 0f 
+	LD	BC,H0da2	; 0cea ...	  01 a2 0d 
+	LD	A,L		; 0ced }	  7d 
+	SUB	C		; 0cee .	  91 
+	LD	L,A		; 0cef o	  6f 
+	LD	A,H		; 0cf0 |	  7c 
+	SBC	A,B		; 0cf1 .	  98 
+	LD	H,A		; 0cf2 g	  67 
+	LD	A,0EH		; 0cf3 >.	  3e 0e 
+	SUB	L		; 0cf5 .	  95 
+	LD	A,00H		; 0cf6 >.	  3e 00 
+	SBC	A,H		; 0cf8 .	  9c 
+	JP	C,H0d0c		; 0cf9 ...	  da 0c 0d 
+	LD	A,(H0fb3)	; 0cfc :..	  3a b3 0f 
+	CP	0DH		; 0cff ..	  fe 0d 
+	JP	Z,H0d0c		; 0d01 ...	  ca 0c 0d 
+	LD	A,(H0fb3)	; 0d04 :..	  3a b3 0f 
+	CP	0AH		; 0d07 ..	  fe 0a 
+	JP	NZ,H0d1c	; 0d09 ...	  c2 1c 0d 
+H0d0c: 	LD	HL,H0ccc	; 0d0c !..	  21 cc 0c 
+	PUSH	HL		; 0d0f .	  e5 
+	CALL	printf		; 0d10 ...	  cd fd 07 
+	POP	AF		; 0d13 .	  f1 
+	LD	HL,(H0fb4)	; 0d14 *..	  2a b4 0f 
+	LD	(HL),00H	; 0d17 6.	  36 00 
+	JP	cret		; 0d19 .<.	  c3 3c 0a 
+
+H0d1c: 	LD	A,(H0fb3)	; 0d1c :..	  3a b3 0f 
+	CP	08H		; 0d1f ..	  fe 08 
+	JP	NZ,H0d38	; 0d21 .8.	  c2 38 0d 
+	LD	HL,H0da2	; 0d24 !..	  21 a2 0d 
+	LD	A,(H0fb4)	; 0d27 :..	  3a b4 0f 
+	CP	L		; 0d2a .	  bd 
+	JP	NZ,H0d32	; 0d2b .2.	  c2 32 0d 
+	LD	A,(H0fb5)	; 0d2e :..	  3a b5 0f 
+	CP	H		; 0d31 .	  bc 
+H0d32: 	JP	NZ,H0d4b	; 0d32 .K.	  c2 4b 0d 
+	JP	H0ce0		; 0d35 ...	  c3 e0 0c 
+
+H0d38: 	LD	A,(H0fb3)	; 0d38 :..	  3a b3 0f 
+	CP	18H		; 0d3b ..	  fe 18 
+	JP	NZ,H0d66	; 0d3d .f.	  c2 66 0d 
+	LD	HL,H0cce	; 0d40 !..	  21 ce 0c 
+	PUSH	HL		; 0d43 .	  e5 
+	CALL	printf		; 0d44 ...	  cd fd 07 
+	POP	AF		; 0d47 .	  f1 
+	JP	H0cda		; 0d48 ...	  c3 da 0c 
+
+H0d4b: 	LD	HL,H0cd3	; 0d4b !..	  21 d3 0c 
+	PUSH	HL		; 0d4e .	  e5 
+	CALL	printf		; 0d4f ...	  cd fd 07 
+	POP	AF		; 0d52 .	  f1 
+	LD	A,(H0fb4)	; 0d53 :..	  3a b4 0f 
+	SUB	01H		; 0d56 ..	  d6 01 
+	LD	(H0fb4),A	; 0d58 2..	  32 b4 0f 
+	LD	A,(H0fb5)	; 0d5b :..	  3a b5 0f 
+	SBC	A,00H		; 0d5e ..	  de 00 
+	LD	(H0fb5),A	; 0d60 2..	  32 b5 0f 
+	JP	H0ce0		; 0d63 ...	  c3 e0 0c 
+
+H0d66: 	LD	A,(H0fb3)	; 0d66 :..	  3a b3 0f 
+	CP	03H		; 0d69 ..	  fe 03 
+	JP	Z,H0d76		; 0d6b .v.	  ca 76 0d 
+	LD	A,(H0fb3)	; 0d6e :..	  3a b3 0f 
+	CP	7FH		; 0d71 ..	  fe 7f 
+	JP	NZ,H0d79	; 0d73 .y.	  c2 79 0d 
+H0d76: 	CALL	exit		; 0d76 ...	  cd 06 01 
+H0d79: 	LD	A,(H0fb3)	; 0d79 :..	  3a b3 0f 
+	LD	C,A		; 0d7c O	  4f 
+	ADD	A,A		; 0d7d .	  87 
+	SBC	A,A		; 0d7e .	  9f 
+	LD	B,A		; 0d7f G	  47 
+	PUSH	BC		; 0d80 .	  c5 
+	CALL	putchar		; 0d81 ...	  cd cb 07 
+	POP	AF		; 0d84 .	  f1 
+	LD	HL,(H0fb4)	; 0d85 *..	  2a b4 0f 
+	PUSH	HL		; 0d88 .	  e5 
+	LD	HL,(H0fb4)	; 0d89 *..	  2a b4 0f 
+	INC	HL		; 0d8c #	  23 
+	LD	(H0fb4),HL	; 0d8d "..	  22 b4 0f 
+	POP	HL		; 0d90 .	  e1 
+	LD	A,(H0fb3)	; 0d91 :..	  3a b3 0f 
+	LD	(HL),A		; 0d94 w	  77 
+	JP	H0ce0		; 0d95 ...	  c3 e0 0c 
+
+H0d98: 	DB	00H
+H0d99: 	DB	00H
+H0d9a: 	DW	boot
+H0d9c: 	DW	boot
+timeout: DW	boot
+H0da0: 	DB	00H
+H0da1: 	DB	00H
+H0da2: 	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H
+dj0db1: DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H
+H0fb1: 	DW	boot
+H0fb3: 	DB	00H
+H0fb4: 	DW	boot
+H0fb6: 	DB	1AH,1AH,1AH,1AH
+H0fba: 	DW	1A1AH
+H0fbc: 	DW	1A1AH
+	DB	1AH,1AH,1AH,1AH
+H0fc2: 	DW	1A1AH
+	DB	1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH
+	DB	1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH
+	DB	1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH
+	DB	1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH
+	DB	1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH,1AH
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+H205c: 	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
+	DB	E5H,E5H,E5H,E5H,E5H,E5H,E5H,E5H
