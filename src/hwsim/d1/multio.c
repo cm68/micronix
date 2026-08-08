@@ -28,11 +28,12 @@
 
 int trace_multio;
 int trace_uart;
-int trace_noclock;
+int trace_clock;
 int trace_intr;
 int trace_intack;
 
 #define HZ_1    0x800
+#define NOCLOCK 0x1000
 
 #define BAUDCLOCK   1843200L
 
@@ -990,8 +991,18 @@ wr_clock(portaddr p, byte v)
         if ((config_sw & CONF_SET) && (config_sw & HZ_1)) {
             rate = 1;
         }
+        /*
+         * Whether there is a clock is a property of the machine, not of
+         * what you are watching, so it hangs off the configuration
+         * switches and not off the trace flags.  It used to be trace bit
+         * 800, "noclock", which meant that asking for every trace with
+         * -t 0xfffff turned the clock off - and a Micronix with no clock
+         * does not fail, it spins in the scheduler looking for something
+         * to run, forever and silently.  The most detailed trace
+         * available was the one that broke the machine.
+         */
         if (rate != 0) {
-            if (!(traceflags & trace_noclock)) {
+            if (!((config_sw & CONF_SET) && (config_sw & NOCLOCK))) {
                 recurring_time_out("multio_clock", rate, clock_handler, 0);
             }
         }
@@ -1166,7 +1177,15 @@ multio_poll()
 
     if (clock_happened) {
         clock_happened = 0;
-        l(" ---- clock --- \n\n");
+        /*
+         * This used to print unconditionally, which put a line between
+         * every pair of lines in every trace at whatever rate the clock
+         * was running.  It is worth seeing when the question is the
+         * clock and worth nothing otherwise, so it costs a bit now - the
+         * one that used to turn the clock off, which now lives with the
+         * configuration switches where behaviour belongs.
+         */
+        trace(trace_clock, " ---- clock --- \n");
         set_vi(7, 0, 1);
     }
     return 0;
@@ -1298,7 +1317,7 @@ multio_setup()
     myttyname = tty ? strdup(tty) : 0;
     trace_multio = register_trace("multio");
     trace_uart = register_trace("uart");
-    trace_noclock = register_trace("noclock");
+    trace_clock = register_trace("clock");
     trace_intr = register_trace("intr");
     trace_intack = register_trace("intack");
     return 0;
@@ -1309,6 +1328,7 @@ multio_usage()
 {
     printf("config switch values:\n");
     printf("\t0x0700 - xterm tty enable mask\n");
+    printf("\t0x1000 - no clock\n");
     printf("\t0x0800 - 1 hz clock\n");
 }
 
