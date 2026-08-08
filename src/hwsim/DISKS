@@ -187,11 +187,77 @@ from the outside.  _hdstrat is the routine main.c tests against &nodev
 before printing a device, so that symbol existing at 0xb189 is the same
 fact as hdca(rev4) appearing in the 1.4 boot banner.
 
-A disassembly with those labels is therefore the way back to how HDCA
-was actually driven; kernels/micronix.167.dis shows the technique has
-been used on this tree before.  Until then hwsim/d1/hdca.c is the only
-description of the controller's behaviour that anyone can read, which is
-worth remembering before changing it to make a program happy.
+A disassembly with those labels is therefore a way back to how HDCA was
+actually driven; kernels/micronix.167.dis shows the technique has been
+used on this tree before.  The board itself is documented independently
+of the software - see below - so a lost driver is not a lost controller.
+
+
+read the manuals first
+----------------------
+
+Both controllers have their technical references in extra/docs, and
+every device has a man page in filesystem/usr/man/man4.  They answer
+most of what this file was written to work out, and they outrank
+hwsim/d1/*.c, which are behavioural models of the hardware and no better
+than the reading behind them.
+
+    extra/docs/HDCA_Controller_Technical_Reference_Rev2_Feb83.pdf
+    extra/docs/HDC_DMA_Technical_Manual_1983.pdf
+    extra/docs/HDCDMA_Disk_Controller_Rev1_Apr82.pdf
+    extra/docs/HD-DMA_Preliminary_Technical_Manual_Jan82.pdf
+    extra/docs/MPZ80_CPU_Technical_Manual_Rev_1_Apr82.pdf
+    extra/docs/DJ_DMA_Technical_Manual_Revision_1_Apr82.pdf
+    extra/docs/Micronix_Operating_System_1.61_Jun83.pdf
+    extra/hardware/djdma/Morrow/decision/pcb_pics/HDCA-4A_*.jpg
+
+    filesystem/usr/man/man4/{hdca,hddma,djdma,multio,io,mem,null}.4
+
+What the man pages settle:
+
+  Formatting is a CP/M job by design, not by accident.  Both hdca.4 and
+  hddma.4 say "Micronix does not support a disk formatting program, so
+  each drive must be formatted under CP/M."  That is why every route to
+  a Micronix hard disk goes through a CP/M boot disk first.
+
+  Skew does not matter.  "A sector skew of 6 is recommended, but is not
+  critical.  Since these drives are soft-sectored, there is no
+  compatibility problem with different skews."  So FORMATMW's default of
+  3 is fine and skew is never the explanation for a disk that will not
+  read - look at the sector size instead.
+
+  The two controllers take different drives.  HDCA is up to four 8 inch
+  Winchesters, m10, m20 or m26, named hda through hdd at major 1, minor
+  0-3, and Micronix detects their size by itself.  HDDMA is up to four
+  5 1/4 inch drives, m5, m10 or m16, named m5a through m16d at major 3,
+  with the size encoded in the minor: m5 is 0-3, m10 is 4-7, m16 is 8-11.
+  HDDMA has no autodetect, which is why the size is in the device name.
+
+  Micronix rolls the tracks.  From hddma.4: "Micronix logically 'rolls'
+  the tracks by (number of tracks) / 2.  Thus on an m5, which has 153
+  tracks, logical track 0 is physical track 76."
+
+  The reason is worth having, because it says which way to unroll.  One
+  hard disk usually serves as both root and swap, and when rootdev ==
+  swapdev Micronix puts swap in the space above the file system.  So the
+  logical disk is
+
+       ilist           file space             swap space
+      |-------|-----------------------------|------------|
+
+  and rolling by half makes the physical disk
+
+       file space   swap space   ilist     file space
+      ------------|------------|-------|-----------------
+
+  which brings the ilist and the swap space next to each other in the
+  middle of the platter.  The heads spend most of a busy system's time
+  over exactly those two, so the seek between them becomes short.
+
+  Anything reading a drive image directly is looking at physical tracks
+  and has to undo this - including the python that went looking for
+  STAT.COM while this file was being written, which only got away with
+  it because that disk was CP/M's and CP/M does not roll anything.
 
 
 and why the mismatch is an HDDMA problem only
