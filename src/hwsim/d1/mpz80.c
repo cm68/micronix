@@ -342,6 +342,18 @@ dis_byte(word addr)
      */
     tr = (delay == 1) ? next_taskreg : taskreg;
 
+    /*
+     * A trap in progress is fetching from the rom window rather than
+     * from wherever the pc points, so a listing has to follow it there
+     * or it shows the memory the sequence is stepping over instead of
+     * the sequence itself.  This is the remapping get_byte does - just
+     * not the counting down of it, which is the cpu's business and not
+     * ours.
+     */
+    if (trapcount && (addr >= trapaddr) && (addr <= (trapaddr + 15))) {
+        addr = 0xbf0 + (addr - trapaddr);
+    }
+
     if (!(((tr & 0xf) == 0) && (addr < LOCAL))) {
         byte save = taskreg;
         byte v;

@@ -16,9 +16,15 @@ GENERATED = roms/mon447.bin roms/mon447.sym roms/mon375.bin roms/mon375.sym
 DIRS = roms
 SIM = ../hwsim.o ../s100.o
 
+# The libraries are prerequisites, not just link arguments.  Without
+# them here a change to libsim.a - the disassembler, the monitor, the
+# syscall formatter - relinks nothing, and the simulator keeps running
+# the code you just replaced while you wonder why the fix did nothing.
+LIBS = ../../lib/libsim.a ../../lib/libchips.a
+
 include ../../Makefile.inc
 
-d1: $(DRIVERS) $(GENERATED)
+d1: $(DRIVERS) $(GENERATED) $(SIM) $(LIBS)
 	$(CC) $(DEBUG) $(GCCFLAGS) -o d1 $(DRIVERS) $(SIM) $(LDFLAGS)
 	-pkill d1
 
