@@ -1,0 +1,341 @@
+;
+;	disas version 3
+;	bootmw930.bin
+;
+;	symbols loaded from bootmw930.ctl
+;
+;
+;	text	0100	0600
+;
+;
+
+	org	0100H
+buffer: JP	start		; 0100 ...	  c3 00 05 
+
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H
+start: 	LD	C,0AH		; 0500 ..	  0e 0a 
+again: 	PUSH	BC		; 0502 .	  c5 
+	XOR	A		; 0503 .	  af 
+	CALL	mwldrv		; 0504 ...	  cd 86 05 
+	POP	BC		; 0507 .	  c1 
+	OR	A		; 0508 .	  b7 
+	JP	NZ,ready	; 0509 ...	  c2 16 05 
+	DEC	C		; 050c .	  0d 
+	JP	NZ,again	; 050d ...	  c2 02 05 
+	LD	DE,bfail	; 0510 .=.	  11 3d 05 
+	JP	errpr		; 0513 .5.	  c3 35 05 
+
+ready: 	CALL	mwhome		; 0516 ...	  cd b3 05 
+	LD	C,01H		; 0519 ..	  0e 01 
+	CALL	mwsec		; 051b ...	  cd 20 06 
+	LD	BC,buffer	; 051e ...	  01 00 01 
+	CALL	mwdma		; 0521 ...	  cd 1a 06 
+	LD	C,0AH		; 0524 ..	  0e 0a 
+retry: 	PUSH	BC		; 0526 .	  c5 
+	CALL	mwread		; 0527 .^.	  cd 5e 06 
+	POP	BC		; 052a .	  c1 
+	JP	NC,buffer	; 052b ...	  d2 00 01 
+	DEC	C		; 052e .	  0d 
+	JP	NZ,retry	; 052f .&.	  c2 26 05 
+	LD	DE,nosec	; 0532 .d.	  11 64 05 
+errpr: 	LD	C,09H		; 0535 ..	  0e 09 
+	CALL	bdos		; 0537 ...	  cd 05 00 
+	JP	boot		; 053a ...	  c3 00 00 
+
+bfail: 	DB	0DH,0AH,"HDDMA controller or drive failure.",0DH
+	DB	0AH,"$"
+nosec: 	DB	0DH,0AH,"Read error, track 0 sector 0.",0DH,0AH
+	DB	"$"
+mwldrv: LD	(mwcurl),A	; 0586 2..	  32 dc 06 
+	CALL	mwreset		; 0589 .8.	  cd 38 06 
+	JP	C,zret		; 058c ...	  da a4 05 
+	LD	A,(mwcurl)	; 058f :..	  3a dc 06 
+	CALL	mwdrv		; 0592 ...	  cd a6 05 
+	JP	C,zret		; 0595 ...	  da a4 05 
+	CALL	mwstat		; 0598 ...	  cd ae 05 
+	AND	04H		; 059b ..	  e6 04 
+	JP	NZ,zret		; 059d ...	  c2 a4 05 
+	CALL	mwhome		; 05a0 ...	  cd b3 05 
+	RET			; 05a3 .	  c9 
+
+zret: 	XOR	A		; 05a4 .	  af 
+	RET			; 05a5 .	  c9 
+
+mwdrv: 	LD	(mwdrive),A	; 05a6 2..	  32 dd 06 
+mwsel: 	LD	A,06H		; 05a9 >.	  3e 06 
+	JP	mwprep		; 05ab .`.	  c3 60 06 
+
+mwstat: LD	A,05H		; 05ae >.	  3e 05 
+	JP	mwprep		; 05b0 .`.	  c3 60 06 
+
+mwhome: CALL	mwreset		; 05b3 .8.	  cd 38 06 
+	LD	HL,dmarg1	; 05b6 !..	  21 e8 06 
+	LD	(HL),1EH	; 05b9 6.	  36 1e 
+	INC	HL		; 05bb #	  23 
+	LD	(HL),00H	; 05bc 6.	  36 00 
+	CALL	mwissue		; 05be ...	  cd 98 06 
+	CALL	mwptr		; 05c1 ...	  cd b3 06 
+	LD	(HL),FFH	; 05c4 6.	  36 ff 
+	INC	HL		; 05c6 #	  23 
+	LD	(HL),FFH	; 05c7 6.	  36 ff 
+	LD	BC,boot		; 05c9 ...	  01 00 00 
+	CALL	mwseek		; 05cc ...	  cd d3 05 
+	CALL	mwreset		; 05cf .8.	  cd 38 06 
+	RET			; 05d2 .	  c9 
+
+mwseek: CALL	mwptr		; 05d3 ...	  cd b3 06 
+	LD	E,(HL)		; 05d6 ^	  5e 
+	INC	HL		; 05d7 #	  23 
+	LD	D,(HL)		; 05d8 V	  56 
+	DEC	HL		; 05d9 +	  2b 
+	LD	(HL),C		; 05da q	  71 
+	INC	HL		; 05db #	  23 
+	LD	(HL),B		; 05dc p	  70 
+	LD	L,C		; 05dd i	  69 
+	LD	H,B		; 05de `	  60 
+	LD	(dmarg0),HL	; 05df "..	  22 e7 06 
+	LD	A,D		; 05e2 z	  7a 
+	INC	A		; 05e3 <	  3c 
+	LD	HL,FFFFH	; 05e4 !..	  21 ff ff 
+	JP	NZ,mwskip0	; 05e7 ...	  c2 ef 05 
+	LD	C,10H		; 05ea ..	  0e 10 
+	JP	mwskip		; 05ec ...	  c3 04 06 
+
+mwskip0: LD	H,B		; 05ef `	  60 
+	LD	L,C		; 05f0 i	  69 
+	CALL	mwhlmde		; 05f1 ...	  cd c7 06 
+	LD	C,10H		; 05f4 ..	  0e 10 
+	LD	A,H		; 05f6 |	  7c 
+	AND	80H		; 05f7 ..	  e6 80 
+	JP	NZ,mwsout	; 05f9 ...	  c2 01 06 
+	LD	C,00H		; 05fc ..	  0e 00 
+	JP	mwskip		; 05fe ...	  c3 04 06 
+
+mwsout: CALL	mwneghl		; 0601 ...	  cd bf 06 
+mwskip: LD	(dmastep),HL	; 0604 "..	  22 e1 06 
+	LD	A,(mwdrive)	; 0607 :..	  3a dd 06 
+	OR	C		; 060a .	  b1 
+	LD	(dmasel0),A	; 060b 2..	  32 e0 06 
+	LD	A,06H		; 060e >.	  3e 06 
+	CALL	mwprep		; 0610 .`.	  cd 60 06 
+	LD	HL,boot		; 0613 !..	  21 00 00 
+	LD	(dmastep),HL	; 0616 "..	  22 e1 06 
+	RET			; 0619 .	  c9 
+
+mwdma: 	LD	H,B		; 061a `	  60 
+	LD	L,C		; 061b i	  69 
+	LD	(dmadma),HL	; 061c "..	  22 e4 06 
+	RET			; 061f .	  c9 
+
+mwsec: 	LD	A,C		; 0620 y	  79 
+	DEC	A		; 0621 =	  3d 
+	CALL	mwdspt		; 0622 ./.	  cd 2f 06 
+	ADD	A,09H		; 0625 ..	  c6 09 
+	LD	(mwsectr),A	; 0627 2..	  32 df 06 
+	LD	A,C		; 062a y	  79 
+	LD	(mwhead),A	; 062b 2..	  32 de 06 
+	RET			; 062e .	  c9 
+
+mwdspt: LD	C,00H		; 062f ..	  0e 00 
+mwdsptx: SUB	09H		; 0631 ..	  d6 09 
+	RET	C		; 0633 .	  d8 
+	INC	C		; 0634 .	  0c 
+	JP	mwdsptx		; 0635 .1.	  c3 31 06 
+
+mwreset: OUT	(54H),A		; 0638 .T	  d3 54 
+	LD	HL,dmasel0	; 063a !..	  21 e0 06 
+	LD	(0050H),HL	; 063d "P.	  22 50 00 
+	XOR	A		; 0640 .	  af 
+	LD	(0052H),A	; 0641 2R.	  32 52 00 
+	LD	HL,(dmarg0)	; 0644 *..	  2a e7 06 
+	PUSH	HL		; 0647 .	  e5 
+	LD	HL,dmarg1	; 0648 !..	  21 e8 06 
+	LD	(HL),1EH	; 064b 6.	  36 1e 
+	INC	HL		; 064d #	  23 
+	LD	(HL),00H	; 064e 6.	  36 00 
+	INC	HL		; 0650 #	  23 
+	LD	(HL),07H	; 0651 6.	  36 07 
+	INC	HL		; 0653 #	  23 
+	LD	(HL),04H	; 0654 6.	  36 04 
+	CALL	mwissue		; 0656 ...	  cd 98 06 
+	POP	HL		; 0659 .	  e1 
+	LD	(dmarg0),HL	; 065a "..	  22 e7 06 
+	RET			; 065d .	  c9 
+
+mwread: LD	A,00H		; 065e >.	  3e 00 
+mwprep: LD	(dmaop),A	; 0660 2..	  32 eb 06 
+	LD	C,40H		; 0663 .@	  0e 40 
+	LD	HL,(dmarg0)	; 0665 *..	  2a e7 06 
+	LD	DE,0001H	; 0668 ...	  11 01 00 
+	CALL	mwhlcde		; 066b ...	  cd ce 06 
+	JP	C,mwpreps	; 066e .~.	  da 7e 06 
+	LD	C,C0H		; 0671 ..	  0e c0 
+	LD	DE,0001H	; 0673 ...	  11 01 00 
+	CALL	mwhlcde		; 0676 ...	  cd ce 06 
+	JP	C,mwpreps	; 0679 .~.	  da 7e 06 
+	LD	C,80H		; 067c ..	  0e 80 
+mwpreps: LD	A,(mwhead)	; 067e :..	  3a de 06 
+	LD	(dmarg2),A	; 0681 2..	  32 e9 06 
+	CPL			; 0684 /	  2f 
+	AND	07H		; 0685 ..	  e6 07 
+	RLCA			; 0687 .	  07 
+	RLCA			; 0688 .	  07 
+	OR	C		; 0689 .	  b1 
+	LD	C,A		; 068a O	  4f 
+	LD	A,(mwdrive)	; 068b :..	  3a dd 06 
+	OR	C		; 068e .	  b1 
+	LD	(dmasel1),A	; 068f 2..	  32 e3 06 
+	LD	A,(mwsectr)	; 0692 :..	  3a df 06 
+	LD	(dmarg3),A	; 0695 2..	  32 ea 06 
+mwissue: LD	HL,dmastat	; 0698 !..	  21 ec 06 
+	LD	(HL),00H	; 069b 6.	  36 00 
+	OUT	(55H),A		; 069d .U	  d3 55 
+	LD	DE,boot		; 069f ...	  11 00 00 
+mwiloop: LD	A,(HL)		; 06a2 ~	  7e 
+	OR	A		; 06a3 .	  b7 
+	RET	M		; 06a4 .	  f8 
+	SCF			; 06a5 7	  37 
+	RET	NZ		; 06a6 .	  c0 
+	EX	(SP),HL		; 06a7 .	  e3 
+	EX	(SP),HL		; 06a8 .	  e3 
+	EX	(SP),HL		; 06a9 .	  e3 
+	EX	(SP),HL		; 06aa .	  e3 
+	DEC	DE		; 06ab .	  1b 
+	LD	A,D		; 06ac z	  7a 
+	OR	E		; 06ad .	  b3 
+	JP	NZ,mwiloop	; 06ae ...	  c2 a2 06 
+	SCF			; 06b1 7	  37 
+	RET			; 06b2 .	  c9 
+
+mwptr: 	LD	A,(mwdrive)	; 06b3 :..	  3a dd 06 
+	RLCA			; 06b6 .	  07 
+	LD	E,A		; 06b7 _	  5f 
+	LD	D,00H		; 06b8 ..	  16 00 
+	LD	HL,mwtab	; 06ba !..	  21 d4 06 
+	ADD	HL,DE		; 06bd .	  19 
+	RET			; 06be .	  c9 
+
+mwneghl: LD	A,H		; 06bf |	  7c 
+	CPL			; 06c0 /	  2f 
+	LD	H,A		; 06c1 g	  67 
+	LD	A,L		; 06c2 }	  7d 
+	CPL			; 06c3 /	  2f 
+	LD	L,A		; 06c4 o	  6f 
+	INC	HL		; 06c5 #	  23 
+	RET			; 06c6 .	  c9 
+
+mwhlmde: EX	DE,HL		; 06c7 .	  eb 
+	CALL	mwneghl		; 06c8 ...	  cd bf 06 
+	EX	DE,HL		; 06cb .	  eb 
+	ADD	HL,DE		; 06cc .	  19 
+	RET			; 06cd .	  c9 
+
+mwhlcde: LD	A,H		; 06ce |	  7c 
+	CP	D		; 06cf .	  ba 
+	RET	NZ		; 06d0 .	  c0 
+	LD	A,L		; 06d1 }	  7d 
+	CP	E		; 06d2 .	  bb 
+	RET			; 06d3 .	  c9 
+
+mwtab: 	DB	FFH,FFH,FFH,FFH,FFH,FFH,FFH,FFH
+mwcurl: DB	00H
+mwdrive: DB	FFH
+mwhead: DB	00H
+mwsectr: DB	00H
+dmasel0: DB	00H
+dmastep: DW	boot
+dmasel1: DB	00H
+dmadma: DW	boot
+	DB	00H
+dmarg0: DW	boot
+dmarg2: DB	00H
+dmarg3: DB	00H
+dmaop: 	DB	00H
+dmastat: DB	00H
+dmalnk: DB	E0H,06H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H

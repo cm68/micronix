@@ -123,3 +123,49 @@ because that is where its geometry comes from; an IMD file carries its
 own.  Be careful which file such a name points at - the .trim20k images
 beside the .bin ones have had the first forty blocks removed, which is
 the whole reserved area, so a loader is precisely what is not in them.
+
+BOOTMW - booting Micronix from the HD/DMA controller
+-----------------------------------------------------
+
+bootmw930.bin is BOOTMW.COM from
+extra/hardware/djdma/Morrow/decision/floppy/930, disassembled into
+bootmw930.dis with the names in bootmw930.ctl.
+
+Those names are not guesses.  BOOTMW.ASM sits beside the binary, and it
+assembles to it byte for byte - 1520 bytes, the shipped .COM being the
+same followed by sixteen zeros of CP/M record padding - so every name is
+the author's own, out of the assembler's symbol table.  Read the source
+first; the listing is only here for reading against what runs in the
+simulator.  (zmac assembles it after two edits: the header comments start
+with * rather than ;, and it writes 8080's rlc where zmac wants rlca.)
+
+The program is short and says what booting the hard disk takes:
+
+    start   login drive 0, ten tries, or say "HDDMA controller or
+            drive failure." and go back to CP/M
+    ready   home to track 0, sector 1, dma to buffer, read it, ten tries
+            jnc buffer          - jump into what was just read
+            or say "Read error, track 0 sector 0."
+
+So BOOTMW itself knows nothing about Micronix or about a filesystem.  It
+reads track 0 sector 1 into 0100 and jumps there, and everything after
+that is the boot block on the disk - the same two stage arrangement the
+floppies use, with BOOTMW standing in for the DJ/DMA rom.
+
+The equates are the useful part, because they are the controller's
+programming interface written down by someone who had the board:
+
+    commands    0 read sector       1 write sector      2 find a sector
+                3 write headers (format a track)
+                4 load disk parameters
+                5 sense drive status                    6 no-op
+    ports       54 reset    55 attention    50 default channel address
+    status      1 track zero    2 write fault   4 drive ready
+                8 seek complete
+
+    sectsiz     7, and the comment says it must be 7 for this Cbios -
+                which is 1024 byte sectors
+
+That last line matters.  The HDCA can only do 512 byte sectors, so it and
+the HD/DMA are not interchangeable at the media level, whatever else is
+true of them.  See src/hwsim/DISKS.
