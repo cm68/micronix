@@ -82,6 +82,14 @@ int trace_io;
 int trace_symbols;
 int trace_timer;
 
+/*
+ * A trace trigger, like the one on a logic analyzer: run quietly until
+ * the machine reaches a place, then start recording.  Held as the string
+ * dis_space prints for that place, so arming it needs no knowledge of
+ * how a space is spelled and testing it is a compare.
+ */
+char tracetrig[16];
+
 struct {
     char *name;
     int *valuep;
@@ -391,6 +399,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
     fprintf(stderr, "\t-S\t<symbol file file>\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
+    fprintf(stderr, "\t-T\t<space:addr> start tracing when the pc gets here\n");
     fprintf(stderr, "\t-x\topen a debug terminal window\n");
     fprintf(stderr, "\t-t\t<tracebits>\n");
     fprintf(stderr, "\t-l\tproduce logfile\n");
@@ -999,6 +1008,16 @@ main(int argc, char **argv)
                 }
                 drive_setdir(*argv++);
                 break;
+            case 'T':
+                if (!argc--) {
+                    usage("trace trigger address missing\n", progname);
+                }
+                if (!dis_parse(*argv, tracetrig, sizeof(tracetrig))) {
+                    usage("trigger wants a space: sys:0100, tsk1:100b "
+                        "or trap:05\n", progname);
+                }
+                argv++;
+                break;
             case 't':
                 if (!argc--) {
                     usage("trace not specified \n", progname);
@@ -1170,6 +1189,20 @@ main(int argc, char **argv)
          * free with the shared monitor and are checked the way usersim
          * checks them.
          */
+        /*
+         * the trigger.  once it fires it stays fired - this arms the
+         * trace, it does not gate it
+         */
+        if (tracetrig[0]) {
+            char abuf[16];
+
+            if (strcmp(dis_space(program_counter, abuf, sizeof(abuf)),
+                tracetrig) == 0) {
+                printf("trace trigger: %s\n", abuf);
+                traceflags |= trace_inst;
+                tracetrig[0] = 0;
+            }
+        }
         if (watchpoint_hit()) {
             printf("watchpoint\n");
             inst_countdown = 0;

@@ -53,6 +53,15 @@ extern unsigned char dis_byte(unsigned short addr);
 extern char *dis_space(unsigned short addr, char *buf, int len);
 
 /*
+ * The other direction: turn something a person typed - sys:0100,
+ * tsk1:100b, trap:05 - into exactly the string dis_space would print for
+ * that place, so the two can simply be compared.  Returns 0 if the spec
+ * makes no sense for this machine.  It lives beside dis_space so that
+ * only one file has to know how a space is spelled.
+ */
+extern int dis_parse(char *spec, char *buf, int len);
+
+/*
  * format an instruction and return the bytes consumed
  */
 int format_instr(unsigned short addr, char *outbuf);

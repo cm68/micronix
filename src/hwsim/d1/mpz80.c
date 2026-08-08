@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <string.h>
+#include <ctype.h>
 #include <sys/time.h>
 #include <signal.h>
 #include <unistd.h>
@@ -330,6 +331,40 @@ dis_space(word addr, char *buf, int len)
         snprintf(buf, len, "tsk%d:%04x", tr & 0xf, addr);
     }
     return buf;
+}
+
+/*
+ * The inverse of dis_space: normalise what someone typed into the string
+ * dis_space would print, so a caller can watch for a place by comparing
+ * the two.  The address is hex, except in the trap window where it is
+ * the decimal offset dis_space reports.
+ */
+int
+dis_parse(char *spec, char *buf, int len)
+{
+    char *colon = strchr(spec, ':');
+
+    if (!colon || !colon[1])
+        return 0;
+
+    if (strncmp(spec, "trap:", 5) == 0) {
+        int off = strtol(colon + 1, 0, 10);
+
+        if (off < 0 || off > 15)
+            return 0;
+        snprintf(buf, len, "trap:%02d", off);
+        return 1;
+    }
+    if (strncmp(spec, "sys:", 4) == 0) {
+        snprintf(buf, len, "sys:%04x", (unsigned)strtol(colon + 1, 0, 16));
+        return 1;
+    }
+    if (strncmp(spec, "tsk", 3) == 0 && isdigit((unsigned char)spec[3])) {
+        snprintf(buf, len, "tsk%d:%04x", atoi(spec + 3),
+            (unsigned)strtol(colon + 1, 0, 16));
+        return 1;
+    }
+    return 0;
 }
 
 /*

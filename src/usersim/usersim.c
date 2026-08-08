@@ -200,6 +200,18 @@ get_byte(unsigned short addr)
 }
 
 /*
+ * one address space here, so a spec is just an address
+ */
+int
+dis_parse(char *spec, char *buf, int len)
+{
+    char *p = strchr(spec, ':');
+
+    snprintf(buf, len, "%04x", (unsigned)strtol(p ? p + 1 : spec, 0, 16));
+    return 1;
+}
+
+/*
  * usersim has one address space, so there is nothing to qualify
  */
 char *
