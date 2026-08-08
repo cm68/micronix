@@ -511,6 +511,24 @@ sense()
     if (drive >= FIVE) {
         dcb |= SB1_FIVE;
     }
+
+    /*
+     * Hard or soft sectored, which is not a detail - it decides how the
+     * driver finds out what the disk is.  Micronix reads byte 5c of
+     * sector 0 for a configuration byte and looks it up, but only on a
+     * hard sectored disk; told the disk is soft sectored it never looks,
+     * falls through to the IBM formats, and gets a track offset of zero
+     * where every Morrow format has two.  Everything it reads after that
+     * is two cylinders low, which looks like a corrupt filesystem rather
+     * than like this.
+     *
+     * We know the answer already: sector numbering is what distinguishes
+     * them, hard sectored from 0 and soft sectored from 1, and the track
+     * says which it is.
+     */
+    if (imd_firstsec(imdp[drive], 1, 0) == 0) {
+        dcb |= SB1_HARD;
+    }
     if (secsize2 > 0) {
         dsb |= SB3_DSDD8;
     }
