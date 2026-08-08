@@ -167,6 +167,33 @@ way round, where DRIVE_A's README has them swapped:
     hdinit                      HDCA   (1.4 only; gone by 1.6)
 
 
+the 1.4 source is gone
+----------------------
+
+There is no source for 1.4 anywhere and there will not be.  src/micronix
+is 1.61, and the HDCA driver is not in it - so kernels/micronix.14 is the
+only surviving copy of that driver, as a binary.
+
+It is not a total loss, because the symbol table survived beside it.
+kernels/micronix.14.sym names the whole driver:
+
+    0xaf88 _hdopen     0xb189 _hdstrat    0xb107 _hdclose
+    0xaeb3 _hdint      0xb570 _hdsint     0xade8 __hdproc
+    0xae2c __hdrhdr    0xaee6 __hdrdat    0xaf39 __hdwdat
+    0xae3f __hdup
+
+and micronix.161.sym has none of them, which is the retirement visible
+from the outside.  _hdstrat is the routine main.c tests against &nodev
+before printing a device, so that symbol existing at 0xb189 is the same
+fact as hdca(rev4) appearing in the 1.4 boot banner.
+
+A disassembly with those labels is therefore the way back to how HDCA
+was actually driven; kernels/micronix.167.dis shows the technique has
+been used on this tree before.  Until then hwsim/d1/hdca.c is the only
+description of the controller's behaviour that anyone can read, which is
+worth remembering before changing it to make a program happy.
+
+
 and why the mismatch is an HDDMA problem only
 ---------------------------------------------
 
