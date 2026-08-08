@@ -434,6 +434,21 @@ the first block of the file is a first level boot and has to be built for
 the DJ/DMA ROM's convention and not to this one.  M5LOAD's first level
 cannot be dropped in unchanged for that reason.
 
+M5LOAD is 12K, which is 24 blocks - three times the eight addresses an
+inode holds, so the boot file is an ILARG file with an indirect block
+whatever else is decided.  It is a third of cylinder 0 on the five and
+ten meg drives and a quarter of it on the sixteen, so the cylinder holds
+it with room to spare.
+
+Not all of that is program.  M5LOAD is a floppy's system tracks, so it is
+zero to 0800, the first level at 0800, the second level from 0a00 to
+6272, and padding after - about nine blocks of content in a 24 block
+file.  Which means it cannot be written into the boot file as it stands:
+block 0 of the file is what the ROM reads, and block 0 of M5LOAD is zero.
+The two pieces have to be laid down deliberately, first level in block 0
+and second level from block 1, and the first level is being rewritten for
+0100 anyway.
+
 It has 512 bytes to work in rather than the floppy's 128, and it has less
 to do than the floppy's does: nuboot has already sent the controller its
 load constants command by the time this code runs, so the drive is
