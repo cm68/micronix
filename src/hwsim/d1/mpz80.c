@@ -311,6 +311,67 @@ fubyte(word addr)
     return physread(pa);
 }
 
+/*
+ * The disassembler's fetch.  It has to decode an address exactly the way
+ * get_byte does - supervisor sees the on board ram, registers, eprom and
+ * fpu below 0x1000, everyone else goes through the map - because showing
+ * mapped ram where the monitor's eprom actually is turns the whole
+ * listing into nonsense.
+ *
+ * What it must not do is any of get_byte's other work: no trap sequence
+ * redirection, no counting that sequence down, no task switch countdown,
+ * no substituting a nop for a halt, no tracing.  Listing an instruction
+ * is not the cpu asking for it, and must not move the machine along.
+ */
+byte
+dis_byte(word addr)
+{
+    paddr pa;
+    byte attr;
+    byte tr;
+
+    /*
+     * Which task register applies is not simply the current one.  A write
+     * to it starts a countdown of M1 fetches, and get_byte applies the
+     * switch BEFORE it decodes the address - so when the countdown is
+     * down to its last fetch, the opcode about to be read already belongs
+     * to the new task.  dumpcpu asks us a moment before that fetch
+     * happens, so we have to look ahead the same way, or every listing of
+     * the instruction a task switch lands on shows the old space's bytes.
+     * That is what made the rst 8 at 0x0009 read as ld (bc),a.
+     */
+    tr = (delay == 1) ? next_taskreg : taskreg;
+
+    if (!(((tr & 0xf) == 0) && (addr < LOCAL))) {
+        byte save = taskreg;
+        byte v;
+
+        /*
+         * getpte reads taskreg itself to pick the map, so the look ahead
+         * has to be in force while it runs.  Put it back straight away:
+         * nothing else may observe this, least of all the cpu.
+         */
+        taskreg = tr;
+        getpte(addr, &pa, &attr);
+        v = physread(pa);
+        taskreg = save;
+        return v;
+    }
+    switch (addr & 0xe00) {
+    case RAM: case RAM + 0x200:
+        return local_ram[addr];
+    case REGS:
+        return *rregp[addr & 3];
+    case EPROM: case EPROM + 0x200:
+        return eprom[addr - EPROM];
+    case FPU:
+        return ((addr >> 3) & 1) ? fpu_status : fpu_data;
+    case MAP:                   // write only, and reading it is not our business
+    default:
+        return 0;
+    }
+}
+
 word
 fuword(word addr)
 {

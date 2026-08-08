@@ -199,6 +199,17 @@ get_byte(unsigned short addr)
     return memory[addr];
 }
 
+/*
+ * the disassembler's fetch: like get_byte but without tripping a read
+ * watchpoint, because listing an instruction is not the program
+ * reading that byte
+ */
+unsigned char
+dis_byte(unsigned short addr)
+{
+    return memory[addr & 0xffff];
+}
+
 unsigned char
 input(unsigned short p)
 {

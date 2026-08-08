@@ -87,7 +87,7 @@ fmt_syscall(unsigned short addr, char *dest)
 	int ret;
 
 	addr &= 0xffff;
-	sc = get_byte(addr + 1);
+	sc = dis_byte(addr + 1);
 	if ((sc < 0) || (sc >= sizeof(syscalls) / sizeof(syscalls[0]))) {
 		sprintf(dest, "unknown %x\n", sc);
 		return 0;
@@ -96,18 +96,18 @@ fmt_syscall(unsigned short addr, char *dest)
 
 	sprintf(dest, "%s ", syscalls[sc].name);
 	if (sc == 0 && fmt_indir_sc) {
-		iaddr = (get_byte(addr + 3) << 8) + (get_byte(addr + 2) & 0xff);
+		iaddr = (dis_byte(addr + 3) << 8) + (dis_byte(addr + 2) & 0xff);
 		iaddr &= 0xffff;
-		if ((get_byte(iaddr) & 0xff) != 0xcf) {
+		if ((dis_byte(iaddr) & 0xff) != 0xcf) {
 			sprintf(dest, "(0x%x)\n", iaddr);
 			return ret;
 		}
 		addr = iaddr;
-		sc = get_byte(addr + 1);
+		sc = dis_byte(addr + 1);
 		sprintf(dest, "(0x%x) %s ", iaddr, syscalls[sc].name);
 	}
 	for (i = 1; i < syscalls[sc].argbytes; i++) {
-		sprintf(nbuf, "%02x ", get_byte(addr + i + 1) & 0xff);
+		sprintf(nbuf, "%02x ", dis_byte(addr + i + 1) & 0xff);
 		strcat(dest, nbuf);
 	}
 	return ret;
@@ -126,7 +126,7 @@ mnix_scpr(unsigned short addr, char *dest)
 	int ret;
 
 	addr &= 0xffff;
-	sc = get_byte(addr + 1);
+	sc = dis_byte(addr + 1);
 	if ((sc < 0) || (sc >= sizeof(syscalls) / sizeof(syscalls[0]))) {
 		sprintf(dest, "unknown %x\n", sc);
 		return 0;
@@ -135,7 +135,7 @@ mnix_scpr(unsigned short addr, char *dest)
 
 	sprintf(dest, "%s ", syscalls[sc].name);
 	for (i = 1; i < syscalls[sc].argbytes; i++) {
-		sprintf(nbuf, "%02x ", get_byte(addr + i + 1) & 0xff);
+		sprintf(nbuf, "%02x ", dis_byte(addr + i + 1) & 0xff);
 		strcat(dest, nbuf);
 	}
 	return ret;

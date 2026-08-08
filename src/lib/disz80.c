@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
-extern unsigned char get_byte(unsigned short addr);
+extern unsigned char dis_byte(unsigned short addr);
 
 #include "../include/disz80.h"
 
@@ -480,25 +480,25 @@ format_instr(unsigned short addr, char *outbuf)
 	o1 = o2 = o3 = o4 = 0xff;
 
 	o1 = 
-	opcode = get_byte(addr + bcount++);
+	opcode = dis_byte(addr + bcount++);
 
 	switch (opcode) {
 	case 0xcb:
 		o2 = 
-		opcode = get_byte(addr + bcount++);
+		opcode = dis_byte(addr + bcount++);
 		o = &cb_optab[opcode];
 		break;
 	case 0xed:
 		o2 = 
-		opcode = get_byte(addr + bcount++);
+		opcode = dis_byte(addr + bcount++);
 		o = &ed_optab[opcode];
 		break;
 	case 0xdd:
 		o2 = 
-		opcode = get_byte(addr + bcount++);
+		opcode = dis_byte(addr + bcount++);
 		if (opcode == 0xcb) {
-			signed_byte = (char)get_byte(addr + bcount++);
-			opcode = get_byte(addr + bcount++);
+			signed_byte = (char)dis_byte(addr + bcount++);
+			opcode = dis_byte(addr + bcount++);
 			o = &ddcb_optab[opcode];
 		} else {
 			o = &dd_optab[opcode];
@@ -506,10 +506,10 @@ format_instr(unsigned short addr, char *outbuf)
 		break;
 	case 0xfd:
 		o2 = 
-		opcode = get_byte(addr + bcount++);
+		opcode = dis_byte(addr + bcount++);
 		if (opcode == 0xcb) {
-			signed_byte = (char)get_byte(addr + bcount++);
-			opcode = get_byte(addr + bcount++);
+			signed_byte = (char)dis_byte(addr + bcount++);
+			opcode = dis_byte(addr + bcount++);
 			o = &fdcb_optab[opcode];
 		} else {
 			o = &fd_optab[opcode];
@@ -536,7 +536,7 @@ format_instr(unsigned short addr, char *outbuf)
 	}
 
 	if (oflags & OP_IDX) {
-		signed_byte = (char)get_byte(addr + bcount++);
+		signed_byte = (char)dis_byte(addr + bcount++);
 	}
 
 	if (oflags & (OP_IDX | OP_IDX1)) {
@@ -550,13 +550,13 @@ format_instr(unsigned short addr, char *outbuf)
 
 	if (oflags & OP_IMM8) {
 		o4 =
-		opcode = get_byte(addr + bcount++);
+		opcode = dis_byte(addr + bcount++);
 		value = opcode;
 		sprintf(valbuf, "0x%x", value);
 	}
 
 	if (oflags & OP_PC8) {
-		signed_byte = (char)get_byte(addr + bcount++);
+		signed_byte = (char)dis_byte(addr + bcount++);
 		if (signed_byte < 0) {
 			sprintf(valbuf, ".-%d", -signed_byte);
 		} else {
@@ -578,8 +578,8 @@ format_instr(unsigned short addr, char *outbuf)
 			symname = 0;
 			break;
 		}
-		value = (unsigned char)get_byte(addr + bcount++);
-		value += get_byte(addr + bcount++) << 8;
+		value = (unsigned char)dis_byte(addr + bcount++);
+		value += dis_byte(addr + bcount++) << 8;
 		if (!symname) {
 			symname = get_symname(value);
 			if (symname) {
