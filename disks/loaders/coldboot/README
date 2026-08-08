@@ -1,0 +1,34 @@
+The Micronix cold boot set, off disks/floppies/Micronix1.6/cold_boot_loader.bin
+
+    cpmls -f morrow5 cold_boot_loader.bin
+    cpmcp -f morrow5 cold_boot_loader.bin 0:M5LOAD ./M5LOAD
+
+with the diskdefs here in the current directory - cpmtools reads
+./diskdefs before /etc/cpmtools/diskdefs, so nothing needs installing.
+The definition is the geometry we arrived at for these images: 80 tracks
+of ten 512 byte sectors, 2048 byte blocks, four reserved tracks, which
+puts the CP/M directory at 20480 - the same forty blocks the Micronix
+floppies reserve.
+
+There is a matched pair per controller, and it is the same two stage
+arrangement as everywhere else in this system - a small loader that knows
+the hardware, and a bigger one that knows the v6 filesystem:
+
+    DJBOOT.COM   DJLOAD     floppy, DJ/DMA
+    HDBOOT.COM   HDLOAD     HDCA
+    M5BOOT.COM   M5LOAD     HD/DMA, 5 meg
+    M10BOOT.COM  M10LOAD    HD/DMA, 10 meg
+    M16BOOT.COM  M16LOAD    HD/DMA, 16 meg
+
+M5LOAD says what it is in plain text - "Micronix loader for the HD-DMA" -
+along with "Drive not ready", "Read error", "Block out of range",
+"Loading" and "Entering", which are the same messages the floppy's second
+level prints.  The three sizes match the three install scripts in
+filesystem: m5init, m10init, m16init, and hdinit for the HDCA.
+
+These are damaged in the archive.  The real content of M5LOAD is bytes
+2048 through 7167 and the rest is E5 filler, and DJLOAD only has content
+from 8192 to 9215.  E5 is what an unwritten CP/M block reads as, so these
+sectors did not come off the original diskette.  The floppy's own
+reserved tracks are intact, which is where micronix16-loader.bin came
+from - use that one to read the second level, not DJLOAD.

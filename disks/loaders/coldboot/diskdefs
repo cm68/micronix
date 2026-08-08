@@ -1,0 +1,10 @@
+diskdef morrow5
+  seclen 512
+  tracks 80
+  sectrk 10
+  blocksize 2048
+  maxdir 64
+  skew 1
+  boottrk 4
+  os 2.2
+end
