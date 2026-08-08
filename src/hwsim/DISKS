@@ -362,9 +362,27 @@ copies what it can read.
 
 Two things mode 0 does not do, and it is worth being clear about both.
 Unlink is permission on the directory, not on the file, so mode 0 does
-not stop rm; keeping the boot file in / where only root can write is what
-stops that.  And root ignores modes entirely, which matters because that
+not stop rm.  And root ignores modes entirely, which matters because that
 is who installs run as.
+
+The first of those is worth answering properly rather than by putting the
+file in / and hoping.  Give it a directory of its own, in /, and give the
+directory mode 0 too.  That costs two inodes and one block, and the block
+comes off the ordinary free list rather than out of cylinder 0.
+
+What it buys is a barrier against a different verb.  Mode 0 on the file
+answers open.  Mode 0 on the directory answers unlink, and also creat,
+which is the one that is easy to forget: without it, nothing stops a
+file of the same name being made over the top of this one, which loses
+the blocks just as thoroughly as rm would and looks less like a mistake
+while it is happening.  Removing the directory itself needs write on /,
+so that is root only as well.
+
+The layers, then, are: to lose the boot area you have to get past mode 0
+on the file, mode 0 on the directory, and write permission on / - and
+each of those is a separate deliberate act rather than a slip.  ncheck
+will still report the path, so it stays findable by the tools that check
+filesystems even though nothing can walk to it.
 
 What this does not survive: deleting the file, or reinstalling with
 cptree.  cptree copies contents, not block numbers, and running as root
