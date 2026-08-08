@@ -538,3 +538,54 @@ the raw device, and the same path should find a kernel to load.
 
 
 vim: tabstop=8 shiftwidth=8 noexpandtab:
+
+
+booting the 1.6 standalone, and what stops it
+---------------------------------------------
+
+Two things had to be true before the standalone floppy would run its
+init, and one of them is still open.
+
+The first was the hard sectored bit - see MAPPING, which is the whole
+story.  Without it every filesystem read landed two cylinders low and
+/etc/init read as a sticky directory.  With it the kernel mounts root,
+init runs, and the standalone prints its welcome telling you to source
+m5init.
+
+The second is swap, and this one is worth knowing before it wastes an
+afternoon.  The standalone ships with
+
+	root dev: djdma/12
+	swap dev: nodev/0
+
+and the console then says "No more space on disk nodev/0" and nothing
+more happens.  That is balloc failing on device zero: the kernel wanted
+to swap and there is no swap device.  Patching the swap word in the
+kernel image - it is the second of the two device words, immediately
+after the root device, and they are the words m5init patches with
+"ddt /b/micronix sB6CB 0 3 0 3" - to a spare hard drive gets past it:
+
+	swap dev: hddma/1
+
+after which the welcome appears every time and init gets as far as
+reading /etc/ttys and stat'ing the terminals in it.
+
+Why it needs to swap at all is the open question, and the reason to be
+careful about calling that patch a fix.  The disk shipped with no swap
+device, so on real hardware it evidently did not need one; a machine with
+1024K and 64K tasks has room for sixteen processes and this is running
+two.  Something about how core is being sized or handed out here differs
+from the real machine, and the patch papers over it.
+
+Where it stops now: init reads /etc/ttys, stats /dev/ttyA through ttyI
+growing its break as it builds the table, and then traps to the rom
+monitor - the ":" prompt with "?" for every character you type is
+mon447's, at line 1326 and 1494 of its source, not a shell.  Only ttyA
+has a login entry in /etc/ttys, so init has not yet reached the point of
+spawning one.
+
+Note also that writes go to a -delta file beside the image and persist
+between runs, so a run that gets further than the last one may only be
+inheriting its mess.  Clear the deltas before drawing conclusions.
+
+vim: tabstop=8 shiftwidth=8 noexpandtab:
