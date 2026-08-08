@@ -1,0 +1,21 @@
+Files on this disk include:
+
+fdj.com         Format a 5 or 8 inch floppy disk.
+formatmw.com    Format a hard disk with the HDDMA controller.
+formatmw.doc    Documentation for the HDCA formatting program.
+check.com       Checks the integrity of an HDDMA drive.
+ramchk1.com	Check the integrity of main memory.
+down.com	M10/M16 winchester head park program.  Run this
+		program before you power down or move the system.
+
+djboot.com      Boot Micronix from a 5 or 8 inch floppy.
+m5boot.com      Boot Micronix from an M5  drive with the HDDMA controller.
+m10boot.com     Boot Micronix from an M10 drive with the HDDMA controller.
+m16boot.com     Boot Micronix from an M16 drive with the HDDMA controller.
+
+djload          These are versions of the above bootstrap programs
+m5load		 suitable for loading onto the system tracks of a 5 inch
+m10load          floppy disk. For example, if you do a "sysgen m10load" to
+m16load          a 5 inch floppy, then as long as you have that floppy in
+                 drive A, pressing RESET will boot Micronix from the M10.
+

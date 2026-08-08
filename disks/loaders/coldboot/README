@@ -1,34 +1,58 @@
-The Micronix cold boot set, off disks/floppies/Micronix1.6/cold_boot_loader.bin
+The Micronix cold boot set
+
+These are the intact copies, from
+
+    ~/src-orig/src-local/cpnet/server/rlee/M/MORROW/MICRONIX/COLDBOOT
+
+which is one of five identical copies on this machine - the others are
+under archives/amaus, and rlee's BACKUPS/8INCH/D8, DEVELOP/BOX-10 and
+LOOSE DISKS/022.  README.orig here is that disk's own README, and it is
+the authority for what follows.  Bitsavers has a second, older version
+under Morrow/micronix/1.3/1008-8; it differs from these only in the 165
+bytes at 0x800 to 0x94c, and not at all in the second stage.
+
+They were also on disks/floppies/Micronix1.6/cold_boot_loader.bin, and
+can be pulled off it with the diskdefs here:
 
     cpmls -f morrow5 cold_boot_loader.bin
     cpmcp -f morrow5 cold_boot_loader.bin 0:M5LOAD ./M5LOAD
 
-with the diskdefs here in the current directory - cpmtools reads
-./diskdefs before /etc/cpmtools/diskdefs, so nothing needs installing.
-The definition is the geometry we arrived at for these images: 80 tracks
-of ten 512 byte sectors, 2048 byte blocks, four reserved tracks, which
-puts the CP/M directory at 20480 - the same forty blocks the Micronix
-floppies reserve.
+but do not - that image is damaged.  M5LOAD off it has content only in
+bytes 2048 to 7167 and DJLOAD only 8192 to 9215, the rest being E5, which
+is what an unwritten CP/M block reads as.  The copies here have 74 and 69
+stray E5 bytes respectively, which is just data.
 
-There is a matched pair per controller, and it is the same two stage
-arrangement as everywhere else in this system - a small loader that knows
-the hardware, and a bigger one that knows the v6 filesystem:
+What they are, in the disk's own words:
 
-    DJBOOT.COM   DJLOAD     floppy, DJ/DMA
-    HDBOOT.COM   HDLOAD     HDCA
-    M5BOOT.COM   M5LOAD     HD/DMA, 5 meg
-    M10BOOT.COM  M10LOAD    HD/DMA, 10 meg
-    M16BOOT.COM  M16LOAD    HD/DMA, 16 meg
+    djboot.com   Boot Micronix from a 5 or 8 inch floppy.
+    m5boot.com   Boot Micronix from an M5  drive with the HDDMA controller.
+    m10boot.com  Boot Micronix from an M10 drive with the HDDMA controller.
+    m16boot.com  Boot Micronix from an M16 drive with the HDDMA controller.
 
-M5LOAD says what it is in plain text - "Micronix loader for the HD-DMA" -
-along with "Drive not ready", "Read error", "Block out of range",
-"Loading" and "Entering", which are the same messages the floppy's second
-level prints.  The three sizes match the three install scripts in
-filesystem: m5init, m10init, m16init, and hdinit for the HDCA.
+    djload, m5load, m10load, m16load - "versions of the above bootstrap
+    programs suitable for loading onto the system tracks of a 5 inch
+    floppy disk.  For example, if you do a sysgen m10load to a 5 inch
+    floppy, then as long as you have that floppy in drive A, pressing
+    RESET will boot Micronix from the M10."
 
-These are damaged in the archive.  The real content of M5LOAD is bytes
-2048 through 7167 and the rest is E5 filler, and DJLOAD only has content
-from 8192 to 9215.  E5 is what an unwritten CP/M block reads as, so these
-sectors did not come off the original diskette.  The floppy's own
-reserved tracks are intact, which is where micronix16-loader.bin came
-from - use that one to read the second level, not DJLOAD.
+So there are two ways in, and neither of them puts anything on the hard
+disk.  Either you are in CP/M and run m5boot.com, or you sysgen m5load
+onto a floppy's system tracks and RESET boots that floppy, which then
+boots Micronix off the hard disk.  This is why m5init and hdinit never
+write a boot block - there is nothing to write.  The hard disk holds a
+filesystem and nothing else.
+
+The xxLOAD layout is the same in all of them, and is a floppy's system
+tracks rather than anything to do with a hard disk:
+
+    0000-07ff   zero
+    0800        first level boot, 128 bytes, runs at 0080
+    0a00        second level, the crt0 "ld sp,0100 / call ... / jp 0"
+                and then "Drive not ready", "Micronix loader for ..."
+
+DJLOAD's second level is the loader in micronix16-loader.bin, found at
+0a00, which is what says these files are images of the tracks that loader
+was read off.  The first level code is common to all of them - M5LOAD's
+first 92 bytes at 0800 are the floppy's exactly, and 92 is 5c, which is
+where the channel program starts.  Same code, different channel program,
+which is the only part that has to know what it is talking to.
