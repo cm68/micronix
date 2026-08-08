@@ -273,6 +273,59 @@ any of five sector sizes, only one of which Micronix can read, and the
 default is not it.
 
 
+booting a hard disk, and why nothing does
+-----------------------------------------
+
+mon447 can boot either hard disk controller.  nuboot resets the HDDMA on
+port 54, homes with ffff step pulses, reads cylinder 0 head 0 sector 1
+to physical 0100 and enters task 1 there; boothd does the same for the
+HDCA.  hddma.c answers all of it - the ports, and the command set 0
+read, 1 write, 2 readhead, 3 format, 4 specify, 5 sense, 6 nop, which is
+also what BOOTMW's equates and the kernel's mw.c use.  So the ROM path
+works.  What is missing is anything to find at the other end.
+
+Nothing writes that sector.  m5init and hdinit make a filesystem, copy
+the running system across, relink /dev/root and /dev/swap and patch the
+kernel; there is no step that writes a boot block, and mkfs's only
+exclusion is at the end of the device, for swap, as its man page says.
+The two supported ways in are on the cold boot diskette: run m5boot.com
+from CP/M, or sysgen m5load onto a floppy's system tracks so RESET boots
+that floppy, which then boots Micronix off the hard disk.
+
+The reason it is done that way is arithmetic.  mw.c maps a block to a
+cylinder as blk/spc plus half the cylinder count, wrapping, so block 0
+is the middle cylinder.  Turn that around and physical cylinder 0 - the
+one place the ROM looks - is at exactly the halfway mark of the
+filesystem's block space:
+
+	5 meg	153x4x17	block  5237 of 10404
+	10 meg	306x4x17	block 10405 of 20808
+	16 meg	306x6x17	block 15607 of 31212
+
+That is ordinary data space.  Nothing reserves it and nothing can: mkfs
+only knows how to exclude blocks at the end of the device.
+
+The filesystem does have a reserved boot block, and it is no use here.
+Block 0 is never allocated and reads as zero - fslib's readblk and
+writeblk both special-case it, and the loader's own readblk bails on it
+- and v6's mkfs will even install a boot program there.  But block 0 is
+physical cylinder tracks/2, cylinder 76 on the five meg drive, and no
+ROM will ever look there.  The one block that is reserved is somewhere
+the hardware cannot boot from, and the one place the hardware boots from
+is not reserved.
+
+If you write a boot block to cylinder 0 anyway it will work for a while,
+which is the worst way for this to fail.  Blocks are handed out from the
+low end upward, so the halfway mark is not reached until the filesystem
+is about half full, and then some ordinary file lands on the boot sector
+and the disk stops booting with nothing to say why.
+
+Making a hard disk self-booting therefore means changing something real:
+the rotation in mw.c so that block 0 is physical cylinder 0, or a way to
+keep a block out of the free list that mkfs cannot currently express.
+Either is a modification to the system, not a restoration of it.
+
+
 where the drive files live
 --------------------------
 
