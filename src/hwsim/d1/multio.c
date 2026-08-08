@@ -1179,6 +1179,12 @@ multio_init()
         int pipe_up[2];
         int mypid = getpid();
 
+        if (!myttyname) {
+            fprintf(stderr, "uart 0 wants the controlling terminal, but "
+                "stdin is not one.\nstart from a terminal, or put uart 0 "
+                "in an xterm with -c 0x100\n");
+            exit(1);
+        }
         termfd = open(myttyname, O_RDWR);
         if (termfd == -1) {
             perror("terminal");
@@ -1256,7 +1262,17 @@ multio_init()
 static int
 multio_setup()
 {
-    myttyname = strdup(ttyname(0));
+    /*
+     * Only needed when uart 0 is going to borrow the terminal we were
+     * started from, which is the case when bit 0 of the xterm mask is
+     * clear.  ttyname answers NULL when stdin is not a terminal at all -
+     * started from a script, or with stdin redirected - and strdup of
+     * that is a crash before any of the machine exists.  Leave it null
+     * and let the code that wants a terminal complain about it.
+     */
+    char *tty = ttyname(0);
+
+    myttyname = tty ? strdup(tty) : 0;
     trace_multio = register_trace("multio");
     trace_uart = register_trace("uart");
     trace_noclock = register_trace("noclock");
