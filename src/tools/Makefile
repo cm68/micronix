@@ -12,7 +12,7 @@
 
 SIMTARGETS = \
 	ar nm size imd disas dump \
-	mnix dcheck icheck ncheck readall imdd
+	mnix dcheck icheck ncheck readall imdd dumpsec
 	#mar  hitech
 
 LDFLAGS = -lcurses
@@ -28,6 +28,9 @@ nm:	nm.o
 
 imd:	imd.o
 	$(CC) $(CFLAGS) -o imd imd.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
+
+dumpsec: dumpsec.o
+	$(CC) $(CFLAGS) -o dumpsec dumpsec.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
 
 disas:	disas.o
 	$(CC) $(CFLAGS) -o disas disas.o ../lib/mnix_sys.o $(LDFLAGS)

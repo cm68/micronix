@@ -71,9 +71,22 @@ rather than a guessed span; disassembling them is how to settle it.
 How these were extracted
 ------------------------
 
-Sectors in sector number order, by imd_read through imdlib - the same
-path the simulator's DJDMA uses, so a sector here is the sector the
-controller would fetch.  Note this is not what src/tools/mnix's block
-command gives you: readblk maps a filesystem block through the driver's
-interleave, block 0 always reads as zeros, and a 512 byte block reader
-cannot address a 128 byte boot track at all.
+    dumpsec -c 0 -n 1 ../dist/UX141_SA.IMD          >micronix14-trk0.bin
+    dumpsec -c 1 -n 1 ../dist/UX141_SA.IMD          >micronix14-trk1.bin
+    dumpsec -c 0 -n 1 <a bdev(2,93) name for the 1.6 standalone>
+
+the last being both sides of cylinder 0, whose first sector is the first
+level boot and whose remaining nineteen are the second level.
+
+src/tools/dumpsec writes sectors in sector number order through imd_read,
+the same path the simulator's DJDMA takes, so a sector in these files is
+the sector the controller would fetch.  Note this is not what mnix's
+block command gives you: readblk maps a filesystem block through the
+driver's interleave, block 0 always reads as zeros, and a 512 byte block
+reader cannot address a 128 byte boot track at all.
+
+A raw image needs a bdev(2,minor) name, or a symlink chain ending in one,
+because that is where its geometry comes from; an IMD file carries its
+own.  Be careful which file such a name points at - the .trim20k images
+beside the .bin ones have had the first forty blocks removed, which is
+the whole reserved area, so a loader is precisely what is not in them.

@@ -406,10 +406,19 @@ raw_load(char *fname, int drive, int create_delta)
     if ((fd = open(fname, O_RDONLY)) < 0)
         return 0;
 
-    printf("%s: raw image, %s, %d cyl, %d head, %d x %d byte sectors%s\n",
+    /*
+     * How a raw image got interpreted is worth saying, since the name is
+     * the only thing that says it - but on stderr, not stdout.  A caller
+     * writing sectors to a pipe gets this in the middle of the data
+     * otherwise, which is a hard thing to notice and a confusing thing to
+     * debug.  The simulator sends its stdout to the logfile and leaves
+     * stderr on the monitor, so it still sees this either way.
+     */
+    fprintf(stderr,
+        "%s: raw image, %s, %d cyl, %d head, %d x %d byte sectors%s, "
+        "sectors numbered from %d\n",
         fname, fp->what, fp->cyls, fp->heads, fp->spt, fp->secsize,
-        fp->skew ? ", skewed" : "");
-    printf("%s: sectors numbered from %d\n", fname, fp->firstsec);
+        fp->skew ? ", skewed" : "", fp->firstsec);
 
     ip = malloc(sizeof(*ip));
     memset(ip, 0, sizeof(*ip));
