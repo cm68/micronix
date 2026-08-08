@@ -1,0 +1,164 @@
+hard disk sector sizes, and why a disk that works under one system
+is unreadable under the other
+
+src/hwsim/DISKS
+
+
+the two controllers are not equally flexible
+-------------------------------------------
+
+HDCA has one sector size and no way to ask for another.  hdca.c says
+
+    #define SECLEN  512     // fixed sector size
+
+and uses it unconditionally - select_drive calls drive_sectorsize with
+it, and both the read and the write path check the transfer against it.
+512 is baked deeper in than the one constant, too: the read case shuffles
+the sector through the controller's buffer as
+
+    bcopy(&iobuf[0], &buffer[2], 510);
+    bcopy(&iobuf[510], &buffer[0], 2);
+
+because the last two bytes of a sector land at the start of the window.
+Those 510s and 2s are the sector size written out longhand, so making
+HDCA take another size is more than changing SECLEN.
+
+FORMATHD offers no sector size choice either; its menu is only format a
+logical drive, format a physical drive, continue, and diagnose.
+
+HDDMA is programmable.  The size comes from the format or specify
+channel command (the FSECSIZE and SSECSIZE macros in hddma.c decode it),
+lib/harddisk.c records it in the drive label, and every later transfer
+uses the recorded value.  FORMATMW takes "size <n>" with 128, 256, 512,
+1024 or 2048 allowed, and defaults to 1024.
+
+
+the sensitivity
+---------------
+
+Nothing in the simulator ties the sector size a disk was formatted with
+to the sector size the operating system expects, because nothing in the
+hardware did either.  A drive holds whatever the format program wrote,
+and a BIOS asks for whatever it was built for.  When they disagree the
+result is not an error - it is silent corruption, because every transfer
+is the wrong length and lands at the wrong offset.
+
+The two systems disagree by default:
+
+    CP/M      wants the drive type's native size.  For an st506 that is
+              1024 - the size FORMATMW uses when not told otherwise.
+
+    Micronix  requires 512.  FORMATMW.DOC is explicit: "Users of the
+              Morrow Designs multi-user operating system, Micronix, are
+              required to format their disks with 512 byte sectors."
+
+So a drive prepared for Micronix cannot be read by CP/M and a drive
+prepared for CP/M cannot be read by Micronix, on the same controller,
+with the same format program.  Only the "size" argument differs.
+
+
+what it looks like when it is wrong
+-----------------------------------
+
+Formatting an st506 with size 512 and then using it from CP/M:
+
+    A>PIP E:=A:*.COM[V]
+    COPYING -
+    ASM.COM
+    VERIFY ERROR: =A:*.COM[V]
+
+and a file copied without [V] is written but comes back wrong - the
+copy of STAT.COM ran and printed nothing.  On the drive image only the
+first 4K block of a two block file had been written at all.
+
+Two ways to see it without guessing:
+
+  - Arithmetic.  STAT reported 5408k free.  153 cylinders * 4 heads *
+    17 sectors * 512 is 5202K, less than CP/M believed it had; at 1024
+    the geometry is 9 sectors per track and 153 * 4 * 9 * 1024 is 5508K,
+    which is the "5,508 1K sectors" FORMATMW.DOC lists for the st506.
+
+  - The access trace.  lib/harddisk.c prints every cylinder/head/sector
+    it touches, and the BIOS was walking sectors 0 through 8 - nine to a
+    track, which is the 1024 byte geometry, not the seventeen the drive
+    had been formatted with.
+
+Reformatting with plain "FORMATMW st506" produced secsize 1024,
+153 cylinders, 4 heads, 9 sectors, 5642240 bytes, and the same PIP with
+verify copied 21 files with no errors.
+
+Note that hddma.c does NOT adapt.  The line in the specify case that
+would have adopted the requested size is commented out
+
+    // secsz[drv] = secsize;
+
+so a specify that disagrees with the label only prints
+
+    drive 0 sectorsize mismatch on specify 512 expected 2048
+
+and the transfer goes ahead at the label's size.  That is arguably the
+honest behaviour - a real controller cannot reformat a platter because
+the host asked it to - but it means the warning in the log is the only
+notice you get before the corruption starts.
+
+
+boot disks
+----------
+
+    922.IMD                    CP/M for HDDMA.  Banner reads
+                               "AB: DJDMA 8", CD: DJDMA 5 1/4", EF: HDDMA".
+                               Carries BOOTMW, FORMATMW, CBIOS.ASM and
+                               MOVCPM5/MOVCPM10/MOVCPM16.
+
+    910.IMD                    CP/M for HDCA.  Banner reads
+                               "... EF: HDCA Fujitsu M10".  Carries
+                               BOOTHD, FORMATHD, HDLOCK, CBIOS.ASM,
+                               DEBLOCK.ASM, DISKDEF.LIB and NOTESHD.DOC.
+
+    DRIVE_A.IMD                the Micronix installation disk, also
+    1009-8_cold-boot.IMD       shipped as 1009.  Format programs and
+                               boot loaders only - no CP/M drive letter
+                               for the hard disk at all, so files cannot
+                               be PIPed onto one from here.
+
+    1010-8_stand-alone.IMD     Micronix standalone.  /etc/signon tells
+    UX141_SA.IMD               you which install script to source.
+
+Both CP/M system disks map the hard disk to drives E and F.
+
+
+which controller, and which install script
+------------------------------------------
+
+The kernel decides this, and it disagrees with the CP/M disk's README.
+con.c:
+
+    struct biovec biosw[] = {
+        &nodev, &nulldev, &nulldev,         /* 0 = no device */
+        &nodev, &nodev, &nodev,             /* 1 = HDCA - removed, obsolete */
+        &djopen, &djclose, &djstrat,        /* 2 = DJ-DMA */
+        &mwopen, &mwclose, &mwstrat,        /* 3 = HD-DMA */
+    };
+
+Major 3 is HD-DMA, driven by mw.c, and that is where m5a, m10a and m16a
+live.  Major 1 is HDCA and is nodev - this kernel does not support it.
+So the standalone signon is right and DRIVE_A's README is wrong:
+
+    m5init, m10init, m16init    HDDMA      (signon, and the kernel)
+    hdinit                      HDCA       - obsolete, will not work
+
+Micronix therefore only reaches a hard disk through HDDMA, which is the
+programmable controller, which is why the 512 requirement is a size
+argument to FORMATMW rather than a property of the hardware.
+
+
+where the drive files live
+--------------------------
+
+Controllers name units hddma-0..3 and hdca-0..3.  drive_open resolves
+those in the directory given by -d, or the current one if there is no
+-d.  It opens O_CREAT, so a name it cannot find is created blank rather
+than refused: if a run seems to have lost its disk, check -d before
+looking anywhere else.
+
+vim: tabstop=8 shiftwidth=8 noexpandtab:

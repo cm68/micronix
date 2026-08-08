@@ -19,3 +19,13 @@ pip can be patched to use inp: and out: to send and receive a file. this patch i
 documented in hsim.c
 
 the clock now works, at least the 1990 is simulated for reading.  setting, forget it.
+
+see DISKS for hard disk sector sizes.  it is the one thing that will silently
+destroy your data rather than fail: CP/M and Micronix want a drive formatted
+differently, and neither notices when it gets the other one.
+
+the first two paragraphs above are out of date.  the instruction simulator was
+replaced - d1 commit 66d1a33a, "use chips emulator, cleaner build" - and the
+chips core in include/z80.h now does interrupt acknowledge and has an im 0 path
+added to it.  z80pack was never plugged in; lib/unused/z80pack is that road not
+taken.
