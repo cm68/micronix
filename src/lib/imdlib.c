@@ -235,22 +235,108 @@ static struct rawfmt {
     int heads;
     int spt;
     int secsize;
+    int skew;
     char *what;
 } rawfmts[] = {
-    { 40*2*10*512, 40, 2, 10, 512, "5 1/4 inch, 40 track, double sided, 512 byte sectors" },
-    { 40*1*10*512, 40, 1, 10, 512, "5 1/4 inch, 40 track, single sided, 512 byte sectors" },
-    { 35*2*10*512, 35, 2, 10, 512, "5 1/4 inch, 35 track, double sided, 512 byte sectors" },
-    { 35*1*10*512, 35, 1, 10, 512, "5 1/4 inch, 35 track, single sided, 512 byte sectors" },
-    { 80*2*10*512, 80, 2, 10, 512, "5 1/4 inch, 80 track, double sided, 512 byte sectors" },
-    { 77*2*8*512,  77, 2,  8, 512, "8 inch, double sided, 512 byte sectors" },
-    { 77*1*26*128, 77, 1, 26, 128, "8 inch, single sided, 128 byte sectors" },
-    { 0, 0, 0, 0, 0, 0 }
+    { 40*2*10*512, 40, 2, 10, 512, 0, "5 1/4 inch, 40 track, double sided, 512 byte sectors" },
+    { 40*1*10*512, 40, 1, 10, 512, 0, "5 1/4 inch, 40 track, single sided, 512 byte sectors" },
+    { 35*2*10*512, 35, 2, 10, 512, 0, "5 1/4 inch, 35 track, double sided, 512 byte sectors" },
+    { 35*1*10*512, 35, 1, 10, 512, 0, "5 1/4 inch, 35 track, single sided, 512 byte sectors" },
+    { 80*2*10*512, 80, 2, 10, 512, 0, "5 1/4 inch, 80 track, double sided, 512 byte sectors" },
+    { 77*2*8*512,  77, 2,  8, 512, 0, "8 inch, double sided, 512 byte sectors" },
+    { 77*1*26*128, 77, 1, 26, 128, 0, "8 inch, single sided, 128 byte sectors" },
+    { 0, 0, 0, 0, 0, 0, 0 }
 };
+
+/*
+ * Where a raw image's geometry comes from.
+ *
+ * A flat file carries none, but the archived Micronix floppies say it in
+ * their name: they are symlinks to bdev(2,N), and N is the Micronix minor
+ * device number for the drive they came off.  devnum reads that, and
+ * fslib.c has long decoded the same bits to read these images from the
+ * host side - djdma.4's encoding with one addition:
+ *
+ *      bit 2   5 1/4 inch rather than 8 inch
+ *      bit 3   alternate sectoring, ie the sectors are skewed
+ *      bit 4   1024 byte sectors rather than 512
+ *
+ * A plain file with no such link falls back to recognising the size.
+ */
+static int
+raw_geometry(char *fname, struct rawfmt *fp, long size)
+{
+    char dt;
+    int major, minor;
+
+    if (devnum(fname, &dt, &major, &minor) != 0 || major != 2) {
+        return 0;
+    }
+
+    fp->secsize = (minor & 0x10) ? 1024 : 512;
+    if (minor & 0x04) {
+        fp->spt = (fp->secsize == 1024) ? 10 : 9;
+        fp->what = "5 1/4 inch";
+    } else {
+        fp->spt = (fp->secsize == 1024) ? 16 : 15;
+        fp->what = "8 inch";
+    }
+    fp->skew = (minor & 0x08) ? 1 : 0;
+
+    /*
+     * fslib treats these as a linear run of tracks and never uses a
+     * second head - blkno/spt is the track number - so a cylinder here
+     * is one track and there is one head.
+     */
+    fp->heads = 1;
+    fp->cyls = size / (fp->spt * fp->secsize);
+    if (fp->cyls == 0 || (long)fp->cyls * fp->spt * fp->secsize != size) {
+        printf("%s: bdev(2,%d) says %d byte sectors, %d per track, "
+            "which does not divide %ld bytes\n",
+            fname, minor, fp->secsize, fp->spt, size);
+        return 0;
+    }
+    fp->size = size;
+    return 1;
+}
+
+/*
+ * Lay out the sector identifiers for one track.
+ *
+ * With no skew the sectors sit in the order they are numbered.  With it,
+ * the disk was written two apart, and fslib's secmap() gives the rule:
+ * logical sector n was recorded at position 2n mod spt, with an extra
+ * step once past the end of an even numbered track so the second pass
+ * falls between the first rather than back on top of it.
+ *
+ * secmap here runs the other way round - it says which sector is at each
+ * position, because that is what translate_sector looks up - so this
+ * inverts that mapping.  Sector numbers start at 1.
+ */
+static void
+raw_secmap(char *secmap, int spt, int skew)
+{
+    int n, pos;
+
+    for (n = 0; n < spt; n++) {
+        if (skew) {
+            pos = n << 1;
+            if (!(spt & 1) && pos >= spt) {
+                pos++;
+            }
+            pos %= spt;
+        } else {
+            pos = n;
+        }
+        secmap[pos] = n + 1;
+    }
+}
 
 static void *
 raw_load(char *fname, int drive, int create_delta)
 {
     struct rawfmt *fp;
+    struct rawfmt named;
     struct imd *ip;
     struct imd_trk *tp;
     struct stat sb;
@@ -259,9 +345,16 @@ raw_load(char *fname, int drive, int create_delta)
     if (stat(fname, &sb) < 0)
         return 0;
 
-    for (fp = rawfmts; fp->size; fp++) {
-        if (fp->size == sb.st_size)
-            break;
+    /*
+     * the name knows best; the size table is the fallback
+     */
+    if (raw_geometry(fname, &named, sb.st_size)) {
+        fp = &named;
+    } else {
+        for (fp = rawfmts; fp->size; fp++) {
+            if (fp->size == sb.st_size)
+                break;
+        }
     }
     if (!fp->size) {
         printf("%s: %ld bytes is not a raw disk image size I know\n",
@@ -271,7 +364,9 @@ raw_load(char *fname, int drive, int create_delta)
     if ((fd = open(fname, O_RDONLY)) < 0)
         return 0;
 
-    printf("%s: raw image, %s\n", fname, fp->what);
+    printf("%s: raw image, %s, %d cyl, %d head, %d x %d byte sectors%s\n",
+        fname, fp->what, fp->cyls, fp->heads, fp->spt, fp->secsize,
+        fp->skew ? ", skewed" : "");
 
     ip = malloc(sizeof(*ip));
     memset(ip, 0, sizeof(*ip));
@@ -290,6 +385,7 @@ raw_load(char *fname, int drive, int create_delta)
             tp->head = head;
             tp->secsize = fp->secsize;
             tp->secmap = malloc(fp->spt);
+            raw_secmap(tp->secmap, fp->spt, fp->skew);
             tp->data = malloc(fp->spt * sizeof(char *));
             for (sec = 0; sec < fp->spt; sec++) {
                 /*
@@ -298,7 +394,6 @@ raw_load(char *fname, int drive, int create_delta)
                  * driver's business, which djdma.4 calls alternate
                  * sectoring and gives its own minor device numbers.
                  */
-                tp->secmap[sec] = sec + 1;
                 tp->data[sec] = malloc(fp->secsize);
                 if (read(fd, tp->data[sec], fp->secsize) != fp->secsize) {
                     printf("%s: short read at cyl %d head %d sector %d\n",
