@@ -25,6 +25,7 @@
 #include "hwsim.h"
 #include "mnix.h"
 #include "util.h"
+#include "disz80.h"
 
 extern byte fubyte(word addr);
 extern word fuword(word addr);
@@ -108,6 +109,10 @@ syscall_at(word sc)
 	}
 
 	sp = &syscalls[code];
+	{
+		char sbuf[16];
+		printf("%s ", dis_space(sc, sbuf, sizeof(sbuf)));
+	}
 	printf("micronix ");
 
 	if (sp->flag & (SF_ARG1|SF_NAME)) arg1 = fuword(sc+2);
