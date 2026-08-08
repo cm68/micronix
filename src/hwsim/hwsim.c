@@ -277,8 +277,23 @@ load_symfile(char *s)
 void
 exit_port_handler(portaddr p, byte v)
 {
-    printf("exit port tickled %x\n", v);
-    exit(0);
+    /*
+     * Port 0 is ours, not Morrow's - a way for a test program to stop
+     * the simulator.  Nothing in a real machine answers there, so a
+     * guest that reaches it has usually gone somewhere it did not mean
+     * to, and quietly exiting 0 makes a crash look like a clean finish.
+     * That is exactly what it did once: a runaway init executed OUT (0)
+     * out of whatever it had wandered into, the simulator stopped, and
+     * the trace ended with no indication that anything was wrong.
+     *
+     * So say where it came from, say it on stderr where the rest of the
+     * bad news goes, and exit non zero.
+     */
+    fprintf(stderr, "exit port tickled with %02x from pc %04x\n",
+        v, z80_get_reg16(pc_reg));
+    printf("exit port tickled %02x from pc %04x\n",
+        v, z80_get_reg16(pc_reg));
+    exit(1);
 }
 
 #define dumpreg8(rn) r = z80_get_reg8(rn) ; write(fd, &r, 1)
