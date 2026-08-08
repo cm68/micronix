@@ -11,7 +11,7 @@ INCLUDE = -I../../include -I..
 LDFLAGS = -L../../lib -lsim -lchips -lcurses
 
 TARGETS=d1
-DRIVERS=djdma.o multio.o hddma.o hdca.o mpz80.o # micronix.o
+DRIVERS=djdma.o multio.o hddma.o hdca.o mpz80.o micronix.o
 GENERATED = roms/mon447.bin roms/mon447.sym roms/mon375.bin roms/mon375.sym
 DIRS = roms
 SIM = ../hwsim.o ../s100.o

@@ -104,9 +104,7 @@ byte keybreg;
 #define     KB_DIAG     0x02        // P1 - 13 if high, run diagnostics
 static char *keyb_bits[] = { 0, "diag", 0, 0, 0, 0, 0, 0 };
 
-#ifdef notdef
 extern void syscall_at(word pc);
-#endif
 
 // this register is negated:  if the switch is on, the value reads low
 byte switchreg;
@@ -446,12 +444,22 @@ get_byte(vaddr addr)
         (z80_get_reg8(status_reg) & S_M1) && 
         (retval == 0x76) && 
         (!prefix) && (maskreg & MASK_HALT)) {
-#ifdef notdef
-        // system calls are a rst8
-        if ((z80_get_reg16(pc_reg) == 8) && (traceflags & trace_syscall)) {
+        /*
+         * Every system call arrives as a halt trapping out of user mode,
+         * but not always with the pc at 8.  A program is free to put its
+         * own halt anywhere and reach it from location 8 - init has one
+         * at 0x100b with a ret behind it - and upm calls a halt outright
+         * because cp/m owns the rst vectors.  Testing for pc == 8 threw
+         * away every call that did not take the plainest route, which
+         * was all of init's.
+         *
+         * syscall_at already knows the difference: it looks behind the
+         * return address for the rst (0xcf) or the call (0xcd) that got
+         * there, and says so if it finds neither.  Let it decide.
+         */
+        if (traceflags & trace_syscall) {
             syscall_at(fuword(z80_get_reg16(sp_reg)));
         }
-#endif
         trap(ST_RESET & ~ST_HALT);
         seg = "nop:";
         retval = 0;

@@ -22,6 +22,8 @@
 #include <sys/time.h>
 #include <signal.h>
 #include "sim.h"
+#include "hwsim.h"
+#include "mnix.h"
 #include "util.h"
 
 extern byte fubyte(word addr);
@@ -151,8 +153,29 @@ syscall_at(word sc)
 	case 10:	/* unlink <file> */
 		printf("unlink(\"%s\")\n", fn);
 		break;
-	case 11: /* exec */
-		printf("exec(\"%s\")\n", fn);
+	case 11: /* exec <name> <argv> */
+		/*
+		 * arg2 is argv: a null terminated vector of pointers to
+		 * strings, all in the caller's address space.  Printing them
+		 * is the only way to see what init is trying to run and with
+		 * what, which is the question when a system boots to a banner
+		 * and then goes quiet.
+		 */
+		printf("exec(\"%s\"", fn);
+		if (arg2) {
+			word p;
+			int i;
+
+			for (i = 0; i < 16; i++) {
+				p = fuword(arg2 + i * 2);
+				if (!p)
+					break;
+				printf(", \"%s\"", getname(p));
+			}
+			if (i == 16)
+				printf(", ...");
+		}
+		printf(")\n");
 		break;
 	case 12: /* chdir <ptr to name> */
 		printf("chdir(\"%s\")\n", fn);
