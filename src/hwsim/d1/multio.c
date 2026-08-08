@@ -65,6 +65,7 @@ struct ace {
     // do not deliver characters any faster than the baud rate
     u64 rxwait;         // rx only when
     u64 txpend;         // tx done when
+    byte txe_ack;       // THRE interrupt was reset by an IIR read
 
     int line;
     u64 chartime;       // shift time through the uart
@@ -549,7 +550,7 @@ multio_set_inti(struct ace *ap)
 
     if ((ap->inte & INTE_RDAV) && (ap->lsr & LSR_DR)) {
         ap->inti = INTI_RDAV;
-    } else if ((ap->inte & INTE_TXE) && (ap->lsr & LSR_TXE)) {
+    } else if ((ap->inte & INTE_TXE) && (ap->lsr & LSR_TXE) && !ap->txe_ack) {
         ap->inti = INTI_TXE;
     } else {
         ap->inti = INTI_NOINT;
@@ -711,6 +712,7 @@ wr_txb(portaddr p, byte v)
     ap->txpend = now64() + ap->chartime;
     ap->txb = v;
     ap->lsr &= ~LSR_TXE;
+    ap->txe_ack = 0;        // this character will empty the register again
 
     if (((ap->mcr & MCR_LOOP) == 0) && (ap->outfd != -1)) {
         write(ap->outfd, &v, 1);
@@ -847,15 +849,36 @@ rd_inti(portaddr p)
 {
     struct ace *ap = select_ace();
 
-    trace(trace_uart, "%s: read inti %02x %s\n", 
-        ap->name, ap->inti, bitdef(ap->inti, inti_bits));
+    byte retval = ap->inti;
 
-    /* XXX - this is probably busted */
+    trace(trace_uart, "%s: read inti %02x %s\n", 
+        ap->name, retval, bitdef(retval, inti_bits));
+
+    /*
+     * Table IV of the 8250A data sheet: the transmitter holding register
+     * empty interrupt is reset by "Reading the IIR Register (if source of
+     * interrupt) or Writing into the Transmitter Holding Register".
+     *
+     * That reset has to stick.  THRE is not a level that can be sampled
+     * again the moment anyone asks - the condition is still true, the
+     * register is still empty - it stays reset until the holding register
+     * empties once more, which only a write can bring about.  Re-deriving
+     * it from the condition made the driver spin: it read the IIR, got
+     * THRE, re-enabled the interrupt, and wr_inte handed it THRE straight
+     * back, seven thousand times, without ever sending a character.
+     */
     if (ap->inti == INTI_TXE) {
         ap->inti = INTI_NOINT;
+        ap->txe_ack = 1;
         set_vi(ap->vi_line, 0, 0);
     }
-    return ap->inti;
+    /*
+     * The read reports the interrupt that WAS pending and resets it as a
+     * side effect; it does not report the state after its own reset.
+     * Returning ap->inti here handed the driver "no interrupt pending"
+     * every time, so it could never work out what to service.
+     */
+    return retval;
 }
 
 static byte 
