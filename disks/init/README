@@ -1,0 +1,23 @@
+/etc/init from the Micronix 1.6 standalone
+
+There is no source for init, so this is the disassembly, and the names in
+init.ctl are not guesses: they come from watching it run.  The simulator
+prints the address of every system call a program makes, so one boot of
+the standalone names every library stub in the program by what it did -
+_stat is at 43f3 because that is where the stat calls came from.
+
+    disas -f init.ctl init
+
+It is Whitesmith's C: c.ent at 3f87 and c.ret at 3f8e, arguments pushed
+right to left, results in BC.  The syscall stubs are in the data segment,
+which starts at 3fe2, not in the text - which is why the addresses in a
+trace of it are above the text size.
+
+What it does, in the order the trace shows: closes every inherited
+descriptor, sets all fifteen signals, opens /dev/root and /dev/swap,
+creates /etc/utmp and /etc/mtab, appends to /usr/adm/wtmp, forks, and
+then opens /etc/ttys with fopen and reads it a line at a time with fgets,
+stat'ing each terminal named in it.  Only ttyA has a login entry.
+
+On 1.6 in the simulator it does not get past that enumeration - see
+hwsim/DISKS.  1.67 does, and reaches a shell.
