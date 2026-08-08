@@ -91,6 +91,14 @@ int trace_timer;
 char tracetrig[16];
 
 /*
+ * Floppies on the 5 1/4 inch port.  The positional arguments fill the
+ * 8 inch port, because that is what every disk in this tree is; -5 puts
+ * one on the other port.  djdma.4 numbers them the same way: minor 0-3
+ * are the 8 inch drives and 4-7 the 5 1/4 inch ones.
+ */
+char **fivenames;
+
+/*
  * How many instructions to record once it fires.  Zero means until the
  * machine stops, which is what you want when you do not yet know how far
  * the interesting part runs.  Capturing BEFORE the trigger would answer
@@ -409,6 +417,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-S\t<symbol file file>\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
     fprintf(stderr, "\t-T\t<space:addr>[,count] trace from here, for count instructions\n");
+    fprintf(stderr, "\t-5\t<file> a floppy on the 5 1/4 inch port\n");
     fprintf(stderr, "\t-x\topen a debug terminal window\n");
     fprintf(stderr, "\t-t\t<tracebits>\n");
     fprintf(stderr, "\t-l\tproduce logfile\n");
@@ -1016,6 +1025,21 @@ main(int argc, char **argv)
                     usage("drive directory missing\n", progname);
                 }
                 drive_setdir(*argv++);
+                break;
+            case '5':
+                if (!argc--) {
+                    usage("5 1/4 inch drive file missing\n", progname);
+                }
+                {
+                    int n = 0;
+
+                    if (fivenames) {
+                        while (fivenames[n]) n++;
+                    }
+                    fivenames = realloc(fivenames, sizeof(char *) * (n + 2));
+                    fivenames[n] = strdup(*argv++);
+                    fivenames[n + 1] = 0;
+                }
                 break;
             case 'T':
                 {

@@ -177,7 +177,28 @@ static paddr dmaaddr;                   // the 24 bit dma address
 static int retrylimit = 10;
 static int djdma_running = 0;
 static char secbuf[2048];
+/*
+ * Physical drives: 0-3 are the 8 inch port, 4-7 the 5 1/4 inch port.
+ * That split is the controller's, and Micronix inherits it - djdma.4
+ * gives minor 0-3 as 8 inch, 4-7 as 5 1/4 inch, and 8-15 the same again
+ * with alternate sectoring, which is the driver's skew and not ours.
+ */
 static void *imdp[8];
+#define FIVE    4               // first physical 5 1/4 inch drive
+
+/*
+ * Which bank answers to logical 0-3.  DJ/DMA manual 2.6.7: the 8 inch
+ * drives are logically 0-3 and the 5 1/4 inch 4-7 by default, and SET
+ * LOGICAL DRIVE with bit 2 set swaps the two.  Since the banks are four
+ * apart and four wide, the whole mapping is one bit.
+ */
+static int five_first;
+
+static int
+physdrive(int logical)
+{
+    return five_first ? (logical ^ FIVE) : logical;
+}
 static int need_intack;
 static int int_posted;      // the interrupt line is actually asserted
 int trace_djint;            // command/interrupt handshake
@@ -328,7 +349,7 @@ readsec()
     sec = physread(channel + 2);
     head = sec & 0x80 ? 1 : 0;
     sec &= 0x7f;
-    drive = physread(channel + 3);
+    drive = physdrive(physread(channel + 3));
 
     tracec(trace_bio|trace_djdma, "drive:%d cylinder:%d sec:%d head:%d",
             drive, cyl, sec, head);
@@ -404,7 +425,7 @@ writesec()
     sec = physread(channel + 2);
     head = sec & 0x80 ? 1 : 0;
     sec &= 0x7f;
-    drive = physread(channel + 3);
+    drive = physdrive(physread(channel + 3));
 
     tracec(trace_bio|trace_djdma, "drive:%d cyl:%d sec:%d head:%d",
         drive, cyl, sec, head);
@@ -439,7 +460,7 @@ sense()
     byte slc;       // sector length code
     byte dsb;       // drive status byte
 
-    drive = physread(channel + 1);
+    drive = physdrive(physread(channel + 1));
 
     // look at track 1 to determine density and sidedness - a hack
     imd_trkinfo(imdp[drive], 1, 0, &nsecs, &secsize);
@@ -468,6 +489,15 @@ sense()
         break;
     default:
         printf("fung wha secsize %d nsecs %d\n", secsize, nsecs);
+    }
+
+    /*
+     * Which port a drive hangs off is a property of the drive, not of
+     * whatever is in it, so it comes from the drive number and not from
+     * the media.  Physical 4-7 are the 5 1/4 inch port.
+     */
+    if (drive >= FIVE) {
+        dcb |= SB1_FIVE;
     }
     if (secsize2 > 0) {
         dsb |= SB3_DSDD8;
@@ -503,11 +533,26 @@ setretry()
 static unsigned char
 setdrive()
 {
-    unsigned char drive;
+    unsigned char param;
+    unsigned char was;
 
-    drive = physread(channel + 1);
-    tracec(trace_djdma, "%d", drive);
-    return S_NORMAL;
+    param = physread(channel + 1);
+
+    /*
+     * "bit-2 in the parameter field is the only part of the byte
+     * examined by the command" - 4 puts the 5 1/4 inch drives at 0-3,
+     * 0 puts them back at 4-7.
+     *
+     * The status is the logical value the first physical 8 inch drive
+     * had BEFORE this command: 40 if it was 0, 44 if it was 4.
+     */
+    was = five_first ? FIVE : 0;
+    five_first = (param & FIVE) ? 1 : 0;
+
+    tracec(trace_djdma, "%02x %s inch drives are now 0-3",
+        param, five_first ? "5 1/4" : "8");
+
+    return S_NORMAL | was;
 }
 
 /*
@@ -527,7 +572,7 @@ readtrk()
 
     cyl = physread(channel + 1);
     head = physread(channel + 2);
-    drive = physread(channel + 3);
+    drive = physdrive(physread(channel + 3));
     sectab = 
         physread(channel + 4) + 
         (physread(channel + 5) << 8) +
@@ -570,7 +615,7 @@ writetrk()
 
     cyl = physread(channel + 1);
     head = physread(channel + 2);
-    drive = physread(channel + 3);
+    drive = physdrive(physread(channel + 3));
     sectab = 
         physread(channel + 4) + 
         (physread(channel + 5) << 8) +
@@ -593,7 +638,7 @@ settrk()
     byte drive;
     byte tracks;
 
-    drive = physread(channel + 1);
+    drive = physdrive(physread(channel + 1));
     tracks = physread(channel + 2);
 
     tracec(trace_djdma, "drive:%d tracks:%d", drive, tracks);
@@ -740,6 +785,7 @@ byte bootstrap[] = {
 };
 
 extern char **drivenames;
+extern char **fivenames;
 /*
  * hook up the registers and do reset processing
  * this runs the load sector 0 to physical memory 0
@@ -753,7 +799,7 @@ djdma_init()
 	register_output(DJDMA_PORT, &pulse_djdma);
 
     if (drivenames) {
-        for (i = 0; drivenames[i]; i++) {
+        for (i = 0; drivenames[i] && i < FIVE; i++) {
             imdp[i] = imd_load(drivenames[i], i, 1);
             if (!imdp[i]) {
                 printf("djdma_init: could not open %s\n",
@@ -761,6 +807,28 @@ djdma_init()
                 return 1;
             }
         }
+    }
+    if (fivenames) {
+        for (i = 0; fivenames[i] && i < FIVE; i++) {
+            imdp[FIVE + i] = imd_load(fivenames[i], FIVE + i, 1);
+            if (!imdp[FIVE + i]) {
+                printf("djdma_init: could not open %s\n",
+                    fivenames[i]);
+                return 1;
+            }
+        }
+    }
+
+    /*
+     * DJ/DMA manual 7: the controller boots from the first ready drive on
+     * either port, testing the 8 inch port first, and 2.6.7 notes that
+     * the bootstrap changes the logical numbering.  So a machine with
+     * nothing on the 8 inch port boots off the 5 1/4 inch one, and that
+     * drive has to answer to 0 afterwards.
+     */
+    if (!imdp[0] && imdp[FIVE]) {
+        printf("djdma: booting the 5 1/4 inch port, its drives are now 0-3\n");
+        five_first = 1;
     }
 
     for (i = 0; i < 38; i++) {
