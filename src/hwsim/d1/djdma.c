@@ -22,7 +22,6 @@
 #include <sys/ioctl.h>
 #include <stdio.h>
 
-#define DELAYED_DJINT 1
 
 int trace_djdma;
 extern int trace_bio;
@@ -31,7 +30,6 @@ extern int terminal_fd_in;
 extern int terminal_fd_out;
 
 #define DJDMA_INTERRUPT 1
-#define DJDMA_INT_DELAY (30 * 1000)
 
 #define	DJDMA_PORT	0xef	// djdma command start port
 #define	DEF_CCA		0x50	// djdma default channel command address
@@ -201,11 +199,8 @@ physdrive(int logical)
 }
 static int need_intack;
 static int int_posted;      // the interrupt line is actually asserted
+static int int_pending;     // asked for, not raised yet - see setintr
 int trace_djint;            // command/interrupt handshake
-
-#ifdef DELAYED_DJINT
-static void post_djdma_int(int a);
-#endif
 
 static unsigned char
 djunknown()
@@ -230,26 +225,11 @@ pulse_djdma(portaddr p, byte v)
          * until we get this pulse.  just advance the channel, since we already posted the status.
          */
         trace(trace_djint, "djdma INTACK: pulse acknowledges the interrupt%s\n",
-            int_posted ? "" : " - arrived before it was raised, cancelling");
-#ifdef DELAYED_DJINT
-        /*
-         * The host got here before the delay expired.  On real hardware
-         * that cannot happen - the controller has its own z80 and is
-         * still busy - but here the whole channel program ran inside the
-         * guest's OUT instruction, so the kernel had control back long
-         * before the 30ms was up and pulsed the port again.
-         *
-         * Drop the pending interrupt rather than letting it arrive after
-         * the acknowledgement that was meant to clear it.  Without this
-         * the line is raised with need_intack already spent, no second
-         * pulse is coming to take it down, and the 8259 re-delivers a
-         * level that never goes away.
-         */
-        cancel_time_out(post_djdma_int, 0);
-#endif
+            int_posted ? "" : " - WHICH WAS NEVER RAISED");
         channel += 2;
         need_intack = 0;
         int_posted = 0;
+        int_pending = 0;
         set_vi(DJDMA_INTERRUPT, 0, 0);
     } else {
         trace(trace_djint, "djdma START: channel pulse%s\n",
@@ -370,41 +350,37 @@ readsec()
     return status;
 }
 
-#ifdef DELAYED_DJINT
-static void
-post_djdma_int(int a)
-{
-    /*
-     * The delay this arrives after is the race.  If the host pulsed the
-     * channel port while it was pending, need_intack has already been
-     * spent acknowledging an interrupt that had not happened, and there
-     * is no second pulse coming to take this one down again.
-     */
-    trace(trace_djint, "djdma RAISE: delayed interrupt fires%s\n",
-        need_intack ? "" : " - NOBODY IS WAITING FOR IT, IT WILL STICK");
-    int_posted = 1;
-    set_vi(DJDMA_INTERRUPT, 0, 1);
-}
-#endif
-
 /*
- * generate an interrupt.  the next output pulse is an intack, and does
- * not start the channel.  the doc is definitely ambiguous, but we generate the status immediately.
+ * Ask for an interrupt.
+ *
+ * This only sets a flag.  The line is raised later, by the poll hook,
+ * and that is the whole point: a channel program runs to completion
+ * inside the guest's OUT instruction, so anything done here happens
+ * before the OUT has returned.  Raise the line here and the interrupt is
+ * delivered to a machine that has not finished the instruction that
+ * caused it; the kernel then pulses the port to acknowledge an interrupt
+ * it has not been given yet, and the two get one out of step - which is
+ * how a completion goes missing and a process sleeps on a buffer for
+ * ever.
+ *
+ * A timer was tried first and made it worse.  It moved the raise far
+ * enough away that the acknowledgement reliably arrived first, so the
+ * pending interrupt had to be cancelled to stop the line sticking, and
+ * cancelling it lost every completion instead of some.
+ *
+ * Setting a bit and letting the next poll assert it costs nothing, has
+ * no constant to tune, and puts the interrupt strictly after the
+ * instruction - which is where real hardware puts it, because a real
+ * controller has its own processor and is still busy.  The clock does
+ * the same thing with clock_happened, and so does the hdca.
  */
 static unsigned char
 setintr()
 {
     need_intack = 1;
     djdma_running = 0;
-#ifdef DELAYED_DJINT
-    trace(trace_djint, "djdma REQ:   interrupt requested, firing in %d us\n",
-        DJDMA_INT_DELAY);
-    time_out("djdma_setintr", DJDMA_INT_DELAY, post_djdma_int, 0);
-#else
-    trace(trace_djint, "djdma REQ:   interrupt requested, raised now\n");
-    int_posted = 1;
-    set_vi(DJDMA_INTERRUPT, 0, 1);
-#endif
+    int_pending = 1;
+    trace(trace_djint, "djdma REQ:   interrupt requested, raised at the next poll\n");
     return S_NORMAL;
 }
 
@@ -710,6 +686,18 @@ djdma_poll_func()
 {
     int bytes;
     char conschar;
+
+    /*
+     * The interrupt setintr asked for.  Raising it here rather than
+     * there is what keeps it after the instruction that caused it.
+     */
+    if (int_pending) {
+        int_pending = 0;
+        int_posted = 1;
+        trace(trace_djint, "djdma RAISE: interrupt asserted%s\n",
+            need_intack ? "" : " - NOBODY IS WAITING FOR IT");
+        set_vi(DJDMA_INTERRUPT, 0, 1);
+    }
 
     // if serial polling and there is space
     if (serial_poll && (physread(SERFLAG) != S_NORMAL)) {
