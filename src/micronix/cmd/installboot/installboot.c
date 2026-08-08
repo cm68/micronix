@@ -65,8 +65,10 @@ struct super *sb;
 
 usage()
 {
-    fprintf(stderr, "usage: %s [-v] -%s <device> <bootfile> [<name>]\n",
-        pname, "m5|-m10|-m16");
+    fprintf(stderr, "usage: %s [-v] [-m5|-m10|-m16] <device> <bootfile>\n",
+        pname);
+    fprintf(stderr, "\tthe drive is worked out from the superblock;\n");
+    fprintf(stderr, "\tthe flags are only for saying otherwise\n");
     fprintf(stderr, "\trun on an unmounted device, after mkfs\n");
     fprintf(stderr, "\tfollow with icheck -s to rebuild the free list\n");
     exit(1);
@@ -125,6 +127,41 @@ getblk()
     if (sb->s_nfree <= 1)
         die("free list nearly empty - is this freshly mkfs'd?");
     return sb->s_free[--sb->s_nfree];
+}
+
+/*
+ * Which drive this is, from the size mkfs wrote in the superblock.
+ *
+ * Nothing has to be told: the three drives are 10404, 20808 and 31212
+ * blocks, and mkfs only ever makes the filesystem smaller than the drive
+ * - it is given a count of blocks to leave at the end for swap.  So the
+ * drive is the smallest one the filesystem fits on, and the sizes are far
+ * enough apart that no plausible swap area could reach the one below.
+ *
+ * Being told would be worse than working it out.  A wrong flag here
+ * writes a boot into the middle of a filesystem and reports success.
+ */
+int
+whichdrive(fsize)
+    int fsize;
+{
+    int i;
+    int total;
+
+    for (i = 0; dnames[i]; i++) {
+        total = dtracks[i] * dheads[i] * dsecs[i];
+        if (fsize <= total) {
+            /*
+             * It has to be most of the drive.  A filesystem far smaller
+             * than the drive it fits on is not one of ours, and guessing
+             * at that point would be picking a number out of the air.
+             */
+            if (fsize < total - (total >> 2))
+                return -1;
+            return i;
+        }
+    }
+    return -1;
 }
 
 /*
@@ -237,7 +274,7 @@ main(argc, argv)
         if (type < 0)
             usage();
     }
-    if (argc < 2 || type < 0)
+    if (argc < 2)
         usage();
 
     device = *argv++;
@@ -245,6 +282,19 @@ main(argc, argv)
     argc -= 2;
     if (argc > 0)
         name = *argv;
+
+    if ((dev = open(device, 2)) < 0)
+        die("cannot open the device for writing");
+    rdblk(SUPERBLK, sbbuf);
+    sb = (struct super *) sbbuf;
+
+    if (type < 0) {
+        type = whichdrive(sb->s_fsize);
+        if (type < 0)
+            die("cannot tell which drive this is from the superblock");
+        printf("%s: %d blocks, so this is an %s\n",
+            device, sb->s_fsize, dnames[type]);
+    }
 
     /*
      * Where cylinder 0 is, in blocks.  mw.c adds half the cylinder count
@@ -255,11 +305,6 @@ main(argc, argv)
     spc = dheads[type] * dsecs[type];
     first = (dtracks[type] - (dtracks[type] >> 1)) * spc;
     nblk = spc;
-
-    if ((dev = open(device, 2)) < 0)
-        die("cannot open the device for writing");
-    rdblk(SUPERBLK, sbbuf);
-    sb = (struct super *) sbbuf;
 
     if (first + nblk > sb->s_fsize)
         die("cylinder 0 is past the end of this filesystem - wrong drive?");
