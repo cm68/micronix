@@ -308,13 +308,23 @@ raw_geometry(char *fname, struct rawfmt *fp, long size)
     fp->skew = (minor & 0x08) ? 1 : 0;
 
     /*
-     * fslib treats these as a linear run of tracks and never uses a
-     * second head - blkno/spt is the track number - so a cylinder here
-     * is one track and there is one head.
+     * fslib treats these as a linear run of tracks - blkno/spt is the
+     * track number - and never has to say which side that track is on.
+     * A controller does: it is told a cylinder and a head, and both are
+     * on the wire.  Calling every track its own cylinder makes the two
+     * agree about the first track and about nothing after it.
+     *
+     * The loader settles it.  This disk's filesystem starts at block 40
+     * (its superblock says 760 blocks of the 800 that are here, so forty
+     * are reserved), and the loader looks for it at cylinder 2 - which is
+     * block 40 only if a cylinder is two tracks.  Five inch drives are
+     * double sided, so a five inch image is heads-per-cylinder 2 and half
+     * as many cylinders.
      */
-    fp->heads = 1;
-    fp->cyls = size / (fp->spt * fp->secsize);
-    if (fp->cyls == 0 || (long)fp->cyls * fp->spt * fp->secsize != size) {
+    fp->heads = (minor & 0x04) ? 2 : 1;
+    fp->cyls = size / (fp->spt * fp->secsize * fp->heads);
+    if (fp->cyls == 0 ||
+        (long)fp->cyls * fp->heads * fp->spt * fp->secsize != size) {
         printf("%s: bdev(2,%d) says %d byte sectors, %d per track, "
             "which does not divide %ld bytes\n",
             fname, minor, fp->secsize, fp->spt, size);
@@ -340,19 +350,27 @@ raw_geometry(char *fname, struct rawfmt *fp, long size)
 static void
 raw_secmap(char *secmap, int spt, int skew, int firstsec)
 {
-    int n, pos;
+    int i;
 
-    for (n = 0; n < spt; n++) {
-        if (skew) {
-            pos = n << 1;
-            if (!(spt & 1) && pos >= spt) {
-                pos++;
-            }
-            pos %= spt;
-        } else {
-            pos = n;
-        }
-        secmap[pos] = n + firstsec;
+    /*
+     * A raw image holds its sectors in sector number order: the nth
+     * sector of a track is the nth 512 bytes of that track in the file.
+     *
+     * It is tempting to bake fslib's interleave into this map, since that
+     * is the only skew anywhere in sight, but that skew belongs to the
+     * filesystem and not to the medium.  The driver maps a filesystem
+     * block to a sector number and then asks for that sector; the medium
+     * only has to find it.  Applying the skew here as well maps every
+     * block twice and lands somewhere unrelated.
+     *
+     * The second level boot is the proof.  It is loaded from the sector
+     * numbered one, and at that sector's own place in the file it begins
+     * "ld sp,0100 / call 0a67 / jp 0000" - a program's entry point.  One
+     * skew further along the same bytes start in the middle of an
+     * instruction.
+     */
+    for (i = 0; i < spt; i++) {
+        secmap[i] = i + firstsec;
     }
 }
 
