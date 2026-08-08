@@ -36,16 +36,28 @@ kernel's root and swap devices with ddt, tidy up and unmount.  It prints
 "Disk initialization complete." when it is done.  cptree is copying a
 whole filesystem through a simulated Z80, so give it time.
 
+about swap, and a wrong turn worth not repeating
+------------------------------------------------
+
+The disk ships with
+
+	root dev: djdma/76
+	swap dev: nodev/0
+
+and that is correct - it is not a missing setting.  fork only swaps a
+child out if there is a swap device:
+
+	bankcopy(child);
+	if (swapdev && swapout(child)) run(swapproc);
+
+so with nodev the standalone runs entirely in core, which is what a
+floppy-only system wants.  Pointing swap at a drive turns a system that
+does not swap into one that does, and then it spends its time in the
+scheduler walking twenty process slots looking for something to bring
+back.  Do not "fix" it.
+
 "no more space"
 ---------------
-
-Two different failures say this, and they want opposite things.
-
-"No more space on disk nodev/0" is swap - device zero is nodev - and
-means the kernel wanted to swap before it had anywhere to.  That should
-not happen here because the swap word in standalone167.bin points at
-hddma/1, so if it does, the image has been replaced with an unpatched
-one.
 
 "No more space on disk djdma/76" is the floppy filling up, and the usual
 reason is that the mount failed: m5init runs "mount /dev/m5a /b" and then
@@ -61,25 +73,13 @@ has already been half filled.
 what is here
 ------------
 
-    standalone167.bin	the 1.67 standalone, with one byte changed
+    standalone167.bin	the 1.67 standalone, exactly as distributed
     sa67.5.skew.1k	the name that gives it its geometry, via bdev(2,93)
     hddma-0		the drive to install on, blank, 5 meg
-    hddma-1		a second drive, blank, for swap
+    hddma-1		a spare, blank
 
-The one changed byte is the swap device.  Micronix ships with
-
-	root dev: djdma/76
-	swap dev: nodev/0
-
-and with no swap device it prints "No more space on disk nodev/0" and
-gets no further than the banner - balloc failing on device zero.  The
-swap word is the second of the two device words in the kernel image, the
-pair that m5init itself patches with "ddt /b/micronix sB6CB 0 3 0 3", and
-here it points at hddma/1 so the install has drive 0 to itself.
-
-Why it needs to swap at all is not understood - the disk shipped without
-a swap device, so the real machine did not need one - so treat that byte
-as a workaround rather than a fix.  See hwsim/DISKS.
+Nothing is patched.  An earlier version of this directory had the swap
+device changed and that was a mistake - see above.
 
 afterwards
 ----------
