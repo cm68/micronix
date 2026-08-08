@@ -19,7 +19,7 @@ SIM = ../hwsim.o ../s100.o
 include ../../Makefile.inc
 
 d1: $(DRIVERS) $(GENERATED)
-	$(CC) $(DEBUG) -o d1 $(DRIVERS) $(SIM) $(LDFLAGS)
+	$(CC) $(DEBUG) $(GCCFLAGS) -o d1 $(DRIVERS) $(SIM) $(LDFLAGS)
 	-pkill d1
 
 $(GENERATED):   

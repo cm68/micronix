@@ -41,7 +41,18 @@ extern void add_breakpoint(unsigned short addr);
 extern void dump_stops();
 extern int watchpoint_hit();
 extern int breakpoint_at(unsigned short addr);
+
+/*
+ * memdump is the one thing here that paints into a curses window, so its
+ * prototype is only declared to callers that have already included curses.
+ * Everything above is curses-free, which is what lets hwsim.c include this
+ * header for dumpcpu() without dragging curses in: curses defines timeout()
+ * as a macro and declares its own trace(), and both collide with names this
+ * tree already uses - hwsim.c's timeout() and util.h's trace().
+ */
+#ifdef NCURSES_VERSION
 extern void memdump(WINDOW *w, unsigned short addr, int len);
+#endif
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

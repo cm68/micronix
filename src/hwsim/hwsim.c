@@ -39,6 +39,8 @@
 #include <setjmp.h>
 
 #include "sim.h"
+#include "hwsim.h"
+#include "gui.h"
 #include "util.h"
 #include "imd.h"
 #include "disz80.h"
@@ -93,7 +95,6 @@ struct {
 } ;
 
 volatile int inst_countdown = -1;
-int next_break = -1;
 
 int stops[10];
 
@@ -110,10 +111,40 @@ stop_handler()
     stop();
 }
 
+/*
+ * The disassembler used to be handed its callbacks - format_instr took
+ * &get_byte, &lookup_sym, &reloc and &mnix_sc - and now calls these two
+ * by name instead (disz80.h).  Nothing here relocates, so this is the
+ * identity answer rather than a stub with a different meaning.
+ */
 unsigned int
-reloc(unsigned int addr)
+get_reloc(unsigned short addr)
 {
     return 0;
+}
+
+/*
+ * The monitor's v command drives this, and pverbose reports it.  hwsim
+ * came with the same idea under another name: -t sets traceflags at
+ * startup out of the same tracenames table.  They are kept as one value
+ * so that setting either one is visible to the other, rather than the
+ * command line and the monitor disagreeing about what is being traced.
+ */
+int verbose;
+
+void
+pverbose()
+{
+    int i;
+
+    traceflags = verbose;
+    message("verbose %x ", verbose);
+    for (i = 0; tracenames[i]; i++) {
+        if (verbose & (1 << i)) {
+            message("%s ", tracenames[i]);
+        }
+    }
+    message("\n");
 }
 
 struct sym {
@@ -162,6 +193,29 @@ lookup_sym(unsigned int symaddr)
         s = s->next;
     }
     return 0;
+}
+
+/*
+ * The shared monitor and gui ask for a symbol by address through this
+ * name; usersim answers it out of the symbol table of the process it is
+ * running.  Here there is no one process to ask about - the MPZ80 task
+ * register selects an address space, and every task has its own idea of
+ * what lives at 0x1000.
+ *
+ * So for now this answers only for supervisor space, which is what
+ * lookup_sym already does: super() is (taskreg & 0xf) == 0, so a symbol
+ * comes back only while the machine is in task 0.  Symbols in user space
+ * read as unknown rather than as the kernel's symbol of the same address,
+ * which is the answer that would actively mislead.
+ *
+ * The real fix is to key symbol tables by task register and load one per
+ * address space - kernel plus whatever user program is being debugged -
+ * at which point this becomes a lookup in the table taskreg selects.
+ */
+char *
+get_symname(unsigned short addr)
+{
+    return lookup_sym(addr);
 }
 
 void
@@ -491,7 +545,7 @@ timeout_handler()
 }
 
 void
-recurring_timeout(char *name, int hertz, void (*function)(int a), int a)
+recurring_time_out(char *name, int hertz, void (*function)(int a), int a)
 {
     int i;
     struct timeout *tp;
@@ -518,7 +572,7 @@ recurring_timeout(char *name, int hertz, void (*function)(int a), int a)
  * call function in usec_from_now
  */
 void
-timeout(char *name, int usec_from_now, void (*function)(int a), int arg)
+time_out(char *name, int usec_from_now, void (*function)(int a), int arg)
 {
     int i;
     struct timeout *tp;
@@ -543,7 +597,7 @@ timeout(char *name, int usec_from_now, void (*function)(int a), int arg)
 }
 
 void
-cancel_timeout(void (*handler)(), int arg)
+cancel_time_out(void (*handler)(), int arg)
 {
     int i;
     struct timeout *tp;
@@ -740,79 +794,6 @@ list_cmd(char **sp)
 
 #endif
 
-/*
- * breakpoints and are done with an 8k bitmap
- */
-char breaks[8192];          // if set, stop
-int nbreaks = 0;            // number of breakpoints
-
-int
-breakpoint_at(vaddr a)
-{
-    if (nbreaks && (breaks[a / 8] & (1 << (a % 8)))) {
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
-int
-break_cmd(char **sp)
-{
-    int i;
-    int b;
-    vaddr addr;
-    int delete = 0;
- 
-    if (!**sp) {
-        printf("%d breakpoints\n", nbreaks);
-        if (!nbreaks) {
-            return 0;
-        }
-        for (i = 0; i < 8192; i++) {
-            if (breaks[i]) {
-                for (b = 0; b < 8; b++) {
-                    if (breaks[i] & (1 << b)) {
-                        char *s;
-                        addr = i * 8 + b;
-                        s = lookup_sym(addr);
-                        if (s) {
-                            printf("%04x %s\n", addr, s);
-                        } else {
-                            printf("%04x\n", addr);
-                        }
-                    } 
-                }
-            }
-        }
-        return 0;
-    }
-    if (**sp == '-') {
-        (*sp)++;
-        delete = 1;
-    }
-
-    i = 0;
-    while (**sp) {
-        skipwhite(sp);
-        addr = getaddress(sp);
-        if (delete) {
-            if (breakpoint_at(addr)) nbreaks--;
-            breaks[addr/8] &= ~(1 << (addr % 8));
-        } else {
-            if (!breakpoint_at(addr)) nbreaks++;
-            breaks[addr/8] |= (1 << (addr % 8));
-        }
-        i++;
-    }
-    if (delete && !i) {
-        for (i = 0; i < 8192; i++) {
-            breaks[i] = 0;
-            nbreaks = 0;
-        }
-    }
-    return 0;
-}
 
 #ifdef notdef
 int
@@ -1109,7 +1090,13 @@ main(int argc, char **argv)
     if (rom_size) {
         rom_image = malloc(rom_size);
         fd = open(rom_filename, O_RDONLY);
-        if (!fd) {
+        if (fd < 0) {
+            /*
+             * open answers -1, not 0.  Testing !fd let a missing rom
+             * through to the read below, which then failed with EBADF -
+             * so a rom that was not there reported itself as a bad file
+             * descriptor, which is a long way from the truth.
+             */
             perror(rom_filename);
             exit(errno);
         }
@@ -1132,6 +1119,13 @@ main(int argc, char **argv)
     }
 
     mysignal(SIGUSR1, stop_handler);
+
+    /*
+     * the monitor's command table is built at runtime by mon_init, so
+     * without this call the debugger comes up with no commands at all
+     */
+    verbose = traceflags;
+    mon_init();
 
     setup_sim_ports();
     z80_init();
@@ -1161,9 +1155,17 @@ main(int argc, char **argv)
                 (*drivers[i]->poll_hook)();
             }
         }
-        if (next_break == program_counter) {
+        /*
+         * The monitor owns breakpoints now, so there is no separate
+         * check for the temporary one that "step over" plants: it goes
+         * into the same bitmap as any other, and breakpoint_at() takes
+         * it back out again once it fires.  Watchpoints come along for
+         * free with the shared monitor and are checked the way usersim
+         * checks them.
+         */
+        if (watchpoint_hit()) {
+            printf("watchpoint\n");
             inst_countdown = 0;
-            next_break = -1;
         }
         if (breakpoint_at(program_counter)) {
             printf("breakpoint\n");

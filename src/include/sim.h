@@ -15,6 +15,7 @@ typedef word portaddr;
 
 extern int monitor();
 extern void mon_init();
+extern int getaddress(char **s);		// parse an address from a command line
 
 // memory and port access functions - all memory access by instruction set is here
 extern void copyin(byte *buf, paddr pa, int len);	// copy from simulation

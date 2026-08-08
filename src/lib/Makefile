@@ -15,7 +15,7 @@ EMU = libemu.a
 EMUOBJS = emushim.o z80emu.o
 
 OBJECTS = util.o imdlib.o openx.o disz80.o \
-	mnix_sys.o whitesmith.o fslib.o gui.o monitor.o
+	mnix_sys.o whitesmith.o fslib.o gui.o monitor.o harddisk.o
 
 LIBRARY = libsim.a
 
