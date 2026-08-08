@@ -179,6 +179,12 @@ static int djdma_running = 0;
 static char secbuf[2048];
 static void *imdp[8];
 static int need_intack;
+static int int_posted;      // the interrupt line is actually asserted
+int trace_djint;            // command/interrupt handshake
+
+#ifdef DELAYED_DJINT
+static void post_djdma_int(int a);
+#endif
 
 static unsigned char
 djunknown()
@@ -202,10 +208,31 @@ pulse_djdma(portaddr p, byte v)
          * if the last command was setintr, we are still "running" that command
          * until we get this pulse.  just advance the channel, since we already posted the status.
          */
+        trace(trace_djint, "djdma INTACK: pulse acknowledges the interrupt%s\n",
+            int_posted ? "" : " - arrived before it was raised, cancelling");
+#ifdef DELAYED_DJINT
+        /*
+         * The host got here before the delay expired.  On real hardware
+         * that cannot happen - the controller has its own z80 and is
+         * still busy - but here the whole channel program ran inside the
+         * guest's OUT instruction, so the kernel had control back long
+         * before the 30ms was up and pulsed the port again.
+         *
+         * Drop the pending interrupt rather than letting it arrive after
+         * the acknowledgement that was meant to clear it.  Without this
+         * the line is raised with need_intack already spent, no second
+         * pulse is coming to take it down, and the 8259 re-delivers a
+         * level that never goes away.
+         */
+        cancel_time_out(post_djdma_int, 0);
+#endif
         channel += 2;
         need_intack = 0;
+        int_posted = 0;
         set_vi(DJDMA_INTERRUPT, 0, 0);
     } else {
+        trace(trace_djint, "djdma START: channel pulse%s\n",
+            int_posted ? " - WITH AN INTERRUPT STILL ASSERTED" : "");
         /*
          * fetch from the reset channel address
          */
@@ -326,6 +353,15 @@ readsec()
 static void
 post_djdma_int(int a)
 {
+    /*
+     * The delay this arrives after is the race.  If the host pulsed the
+     * channel port while it was pending, need_intack has already been
+     * spent acknowledging an interrupt that had not happened, and there
+     * is no second pulse coming to take this one down again.
+     */
+    trace(trace_djint, "djdma RAISE: delayed interrupt fires%s\n",
+        need_intack ? "" : " - NOBODY IS WAITING FOR IT, IT WILL STICK");
+    int_posted = 1;
     set_vi(DJDMA_INTERRUPT, 0, 1);
 }
 #endif
@@ -340,8 +376,12 @@ setintr()
     need_intack = 1;
     djdma_running = 0;
 #ifdef DELAYED_DJINT
+    trace(trace_djint, "djdma REQ:   interrupt requested, firing in %d us\n",
+        DJDMA_INT_DELAY);
     time_out("djdma_setintr", DJDMA_INT_DELAY, post_djdma_int, 0);
 #else
+    trace(trace_djint, "djdma REQ:   interrupt requested, raised now\n");
+    int_posted = 1;
     set_vi(DJDMA_INTERRUPT, 0, 1);
 #endif
     return S_NORMAL;
@@ -740,6 +780,7 @@ int
 djdma_setup()
 {
     trace_djdma = register_trace("djdma");
+    trace_djint = register_trace("djint");
     return 0;
 }
 
