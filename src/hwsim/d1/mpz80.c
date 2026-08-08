@@ -252,7 +252,27 @@ trap(byte trapbits)
     trace(trace_mpz80, "trap 0x%x %s\n", trapbits, bitdef(trapbits, stat_bits));
     taskreg = 0;
     trapcount = 15;
-    trapaddr = z80_get_reg16(pc_reg);
+    /*
+     * The window starts at the instruction AFTER the trapping one, not at
+     * it.  The halt's own M1 does not read the window at all - the board
+     * turns the data driver off and forces a nop in, which is why the
+     * manual says 0bf0 has to contain one.  The fifteen byte sequence is
+     * fetched from the M1 cycles that follow, so the call at the end of
+     * it pushes trapaddr+16 counting from the halt, and trappd's
+     *
+     *     ld de,-15 / pop hl / add hl,de / ld (u.pc),hl
+     *
+     * recovers the instruction after the halt.  That is what the manual
+     * means by "the program counter ... contains the location of the
+     * next instruction which would have been executed had the trap not
+     * occurred", and what the kernel relies on: task0() never touches
+     * u.pc, it just returns through the firmware, and start() expects to
+     * come back to the ret behind its hlt().
+     *
+     * Starting the window one too low gave the kernel back the address
+     * of the halt itself, so resuming re-executed it forever.
+     */
+    trapaddr = z80_get_reg16(pc_reg) + 1;
     trapstat = trapbits;
 }
 
