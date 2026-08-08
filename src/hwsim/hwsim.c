@@ -90,6 +90,15 @@ int trace_timer;
  */
 char tracetrig[16];
 
+/*
+ * How many instructions to record once it fires.  Zero means until the
+ * machine stops, which is what you want when you do not yet know how far
+ * the interesting part runs.  Capturing BEFORE the trigger would answer
+ * "how did I get here" and costs a ring buffer to do; this only answers
+ * "what happens next", which is a countdown.
+ */
+long tracelen;
+
 struct {
     char *name;
     int *valuep;
@@ -399,7 +408,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
     fprintf(stderr, "\t-S\t<symbol file file>\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
-    fprintf(stderr, "\t-T\t<space:addr> start tracing when the pc gets here\n");
+    fprintf(stderr, "\t-T\t<space:addr>[,count] trace from here, for count instructions\n");
     fprintf(stderr, "\t-x\topen a debug terminal window\n");
     fprintf(stderr, "\t-t\t<tracebits>\n");
     fprintf(stderr, "\t-l\tproduce logfile\n");
@@ -1009,14 +1018,23 @@ main(int argc, char **argv)
                 drive_setdir(*argv++);
                 break;
             case 'T':
-                if (!argc--) {
-                    usage("trace trigger address missing\n", progname);
+                {
+                    char spec[64];
+                    char *comma;
+
+                    if (!argc--) {
+                        usage("trace trigger address missing\n", progname);
+                    }
+                    snprintf(spec, sizeof(spec), "%s", *argv++);
+                    if ((comma = strchr(spec, ','))) {
+                        *comma++ = 0;
+                        tracelen = strtol(comma, 0, 0);
+                    }
+                    if (!dis_parse(spec, tracetrig, sizeof(tracetrig))) {
+                        usage("trigger wants a space: sys:0100, tsk1:100b "
+                            "or trap:05\n", progname);
+                    }
                 }
-                if (!dis_parse(*argv, tracetrig, sizeof(tracetrig))) {
-                    usage("trigger wants a space: sys:0100, tsk1:100b "
-                        "or trap:05\n", progname);
-                }
-                argv++;
                 break;
             case 't':
                 if (!argc--) {
@@ -1213,6 +1231,16 @@ main(int argc, char **argv)
         }
         if ((traceflags & trace_inst) || (inst_countdown == 0) || ((traceflags & trace_symbols) && lookup_sym(program_counter))) {
             dumpcpu();
+        }
+        /*
+         * capture length.  only counts while the trace is actually on, so
+         * a count given with a trigger measures from the trigger
+         */
+        if (tracelen && (traceflags & trace_inst)) {
+            if (--tracelen == 0) {
+                traceflags &= ~trace_inst;
+                printf("trace: capture complete\n");
+            }
         }
         if (inst_countdown == 0) {
             monitor();
