@@ -771,8 +771,31 @@ wr_inte(portaddr p, byte v)
         ap->dlm = v;
         return;
     }
+    /*
+     * Enabling the transmit interrupt while the holding register is
+     * already empty raises it.  The 8250 resets THRE on an iir read, but
+     * that reset lasts only until the condition is asserted again - and
+     * writing the enable bit with the register empty asserts it.
+     *
+     * Without this the only way to ever see another transmit interrupt
+     * is to write a character, and the kernel's way of starting output
+     * on an idle line is the other way round: queue the character, arm
+     * the interrupt, wait.  So output flows for as long as it is
+     * continuous, because each completion pulls the next character out,
+     * and stops dead at the first character written after the queue has
+     * once run empty.  That is the shell's prompt: the whole of the
+     * welcome text arrives and the "# " after it never does.
+     *
+     * Same shape as the djdma completion that went missing - a level
+     * that is not re-examined when the thing that would raise it
+     * changes.
+     */
+    if ((v & INTE_TXE) && (ap->lsr & LSR_TXE)) {
+        ap->txe_ack = 0;
+    }
+
     ap->inte = v;
-    trace(trace_uart, "%s: write inte %02x %s\n", 
+    trace(trace_uart, "%s: write inte %02x %s\n",
         ap->name, ap->inte, bitdef(ap->inte, inte_bits));
     multio_set_inti(ap);
 }
