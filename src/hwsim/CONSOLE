@@ -159,16 +159,65 @@ the console in the right place, and so does the reverse.  Nothing in the
 tree exercises that yet.
 
 
-what is and is not tested
--------------------------
+the port has a speed, and it matters
+------------------------------------
 
-The arbitration is verified in the direction that matters here: the
-hdinstall boot claims nothing, stays on the multio, and is byte for byte
-what it was before the change.
+The first thing a contyp 4 disk did once it had a console was lose a
+character: "abc" arrived as "bc", "dir" as "ir", one character at the
+front of every burst and never anywhere else.
 
-The controller-console direction is verified against the bios source
-above and not yet by running one, because no CONTYP 4 disk is in the
-tree.  Booting one is the test, and what it should print is the one
-console: line, before its first character of output.
+Read conin again, in the order it does things:
+
+    ci2:	cmp	m	; wait for 40 at 3f
+		jz	ci2
+		mov	m,a	; clear the flag FIRST
+		dcx	h
+		ana	m	; and only then fetch 3e
+
+The flag is cleared before the byte is fetched.  Anything that can
+deposit a second character inside those three instructions overwrites the
+first one, and the bios never knows.  Nobody noticed in 1982 because the
+thing depositing is a separate Z80 shifting bits down a wire at 9600
+baud: the next character is a millisecond away and those instructions are
+microseconds.  The window is real on the hardware too, and it is never
+hit.
+
+Our poll had no rate limit at all, so it drained the entire input pipe in
+one go, deposited every character on top of the last, and the bios
+collected whichever one was there when it looked - losing exactly the
+first per burst, which is the signature.
+
+So the port now delivers a character no faster than DJSER_BAUD shifts
+one, timed off simnow64 like everything else here.  That is not a
+workaround for the race, it is the reason the race does not exist: give
+the port its speed and the hardware's own margin comes back with it.
+
+    A timing detail that looks like decoration is sometimes the only
+    thing making a piece of software correct.  Software written against
+    real hardware is full of races that the hardware's speed closes, and
+    a simulator that does everything instantly opens every one of them.
+
+
+what is tested
+--------------
+
+Both directions, by running them.
+
+Micronix, disks/hdinstall/run: claims nothing, stays on the multio, and
+the boot is byte for byte what it was before any of this.
+
+CP/M, disk 925 from the bitsavers Morrow archive - its imd header says
+"djdma as console, blank list" and its cbios is a contyp 4 - boots to
+
+    console: input follows the djdma bit banged serial
+
+    Morrow Designs 48K CP/M 2.2 E3
+    ABCD: DJDMA 8", EFGH: DJDMA 5 1/4"
+
+    A>
+
+with the one console: line arriving before its first character of
+output, and takes a typed command and runs it.  926 is the same disk
+built for a multio console and is the control.
 
 vim: tabstop=8 shiftwidth=8 noexpandtab:

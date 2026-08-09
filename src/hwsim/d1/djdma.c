@@ -759,6 +759,29 @@ int serial_poll = 0;
 int djserial_out;               // bytes the controller has sent
 int djserial_in;                // and taken
 
+/*
+ * The port is bit banged, so a character takes a character time to
+ * arrive and the next one cannot be there before that.  The delay is not
+ * decoration.  A contyp 4 cbios reads it like this:
+ *
+ *	ci2:	cmp	m	; wait for 40 at 3f
+ *		jz	ci2
+ *		mov	m,a	; clear the flag FIRST
+ *		dcx	h
+ *		ana	m	; and only then fetch 3e
+ *
+ * - the flag is cleared before the byte is fetched, so anything able to
+ * deposit a second character inside those three instructions destroys
+ * the first one.  A separate Z80 shifting bits at 9600 baud cannot get
+ * near it.  A poll with no rate limit drains the whole input pipe in one
+ * go and loses exactly one character per burst, which is what this did:
+ * "abc" arrived as "bc".
+ */
+#define DJSER_BAUD  9600
+#define DJSER_CHAR  ((10 * 1000000) / DJSER_BAUD)   // microseconds per character
+
+static unsigned long long serial_next;  // no character before this
+
 static int
 djdma_poll_func()
 {
@@ -776,6 +799,11 @@ djdma_poll_func()
         return 0;
     }
 
+    // and no faster than the port can shift one in
+    if (simnow64() < serial_next) {
+        return 0;
+    }
+
     // if serial polling and there is space
     if (serial_poll && (physread(SERFLAG) != S_NORMAL)) {
         ioctl(terminal_fd_in, FIONREAD, &bytes);
@@ -785,6 +813,7 @@ djdma_poll_func()
                 return 1;
             }
             djserial_in++;
+            serial_next = simnow64() + DJSER_CHAR;
             tracec(trace_djdma, "serial in %02x %s ", conschar & 0xff,
                 printable(conschar));
             physwrite(SERDATA, conschar);
