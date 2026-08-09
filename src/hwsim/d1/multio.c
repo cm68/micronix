@@ -600,6 +600,16 @@ multio_uart_poll(struct ace *ap)
         return 0;
     }
 
+    /*
+     * Uart 0 shares its descriptor with the djdma's serial port, and a
+     * character can only be delivered once.  If the controller has the
+     * console, leave the input alone - it is not ours.  The other two
+     * uarts have descriptors of their own and are never in question.
+     */
+    if (ap == &ace[0] && console_owner != CONS_MULTIO) {
+        return 0;
+    }
+
     // let's not recieve characters any faster than the recieve baud rate
     if (t < ap->rxwait) {
 #ifdef notdef
@@ -701,6 +711,15 @@ wr_txb(portaddr p, byte v)
 
     trace(trace_uart, "multio: txb %02x %s reaches the uart, group %d\n",
         v, printable(v), group);
+
+    /*
+     * Sending on uart 0 claims the console back from the floppy
+     * controller, if it ever had it.  Normally this changes nothing -
+     * the multio holds the console from reset - and it costs a compare.
+     */
+    if (ap == &ace[0]) {
+        console_claim(CONS_MULTIO);
+    }
 
     if (ap->lcr & LCR_DLAB) {
         trace(trace_uart, "%s: write dll %02x\n", ap->name, v);

@@ -759,25 +759,22 @@ int serial_poll = 0;
 int djserial_out;               // bytes the controller has sent
 int djserial_in;                // and taken
 
-static void
-djserial_used(char *dir)
-{
-    static int said;
-
-    if (said) {
-        return;
-    }
-    said = 1;
-    fprintf(stderr, "djdma: bit banged serial (%s) in use - "
-        "the controller's console, not the machine's\n", dir);
-}
-
 static int
 djdma_poll_func()
 {
     int bytes;
     char conschar;
 
+
+    /*
+     * Only the device that owns the console may take a character out of
+     * it: the multio reads the same descriptor, and whichever of us got
+     * there first would leave the other waiting forever for a keystroke
+     * that had already been delivered somewhere else.
+     */
+    if (console_owner != CONS_DJDMA) {
+        return 0;
+    }
 
     // if serial polling and there is space
     if (serial_poll && (physread(SERFLAG) != S_NORMAL)) {
@@ -787,7 +784,6 @@ djdma_poll_func()
                 printf("djdma_poll_func: read problem\n");
                 return 1;
             }
-            djserial_used("in");
             djserial_in++;
             tracec(trace_djdma, "serial in %02x %s ", conschar & 0xff,
                 printable(conschar));
@@ -811,12 +807,12 @@ serin()
         break;
     case 1:
         /*
-         * Arming this points the controller at the same file descriptor
-         * the MULTIO reads, so from here on a keystroke goes to whichever
-         * of the two asks for it first and the other never sees it.  Say
-         * so when it is armed, not when a character goes missing.
+         * Arming a receive is a claim on the console: a bios that did
+         * not have this port for a console would have no reason to ask
+         * it for a character.  Claim here as well as on output, because
+         * a bios may well read before it writes.
          */
-        djserial_used("in armed");
+        console_claim(CONS_DJDMA);
         serial_poll = 1;
         break;
     }
@@ -832,7 +828,7 @@ serout()
     byte outch;
 
     outch = physread(channel + 1);
-    djserial_used("out");
+    console_claim(CONS_DJDMA);
     djserial_out++;
     tracec(trace_djdma, "%02x %s ", outch & 0xff, printable(outch));
     write(terminal_fd_out, &outch, 1);

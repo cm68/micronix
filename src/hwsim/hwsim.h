@@ -97,6 +97,21 @@ extern int running;
 extern int config_sw;
 
 /*
+ * Console arbitration.  Two devices can be the console - the serial
+ * board and the floppy controller's own bit banged port - and they read
+ * the same file descriptor, so exactly one of them may consume a
+ * keystroke.  Which one is not configured anywhere and cannot be seen by
+ * looking at a disk: it is however the bios on it was assembled.  So it
+ * is discovered instead.  A device claims the console by using it, and
+ * input follows the most recent claim.  See CONSOLE.
+ */
+#define	CONS_MULTIO	0		// the serial board, and the default
+#define	CONS_DJDMA	1		// the floppy controller's serial port
+
+extern int console_owner;
+void console_claim(int who);
+
+/*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
 extern void add_write_watch(unsigned short lo, unsigned short hi);

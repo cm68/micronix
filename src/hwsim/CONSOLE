@@ -27,7 +27,55 @@ somewhere to talk - the floppy controller is the only intelligent thing
 in the box that has a UART.  A machine with a MULTIO has no reason to use
 it, and a configuration that does is one built for a machine that did not
 have one.  It is not a recommended configuration and nothing in this tree
-is set up that way.
+is set up that way - but disks that are exist, and the archive's disk list
+names a run of them ("DJDMA as console", "DJDMA serial console", around
+disk 900).
+
+
+which console a disk wants, and why it cannot be detected
+---------------------------------------------------------
+
+It is assembled in.  extra/hardware/.../floppy/930/CBIOS&.ASM selects a
+console driver at assembly time with CONTYP, and CONTYP 4 is the DJ/DMA
+one.  There is no byte on the disk that says so, no signature, and no
+sane place to look for one: the same CP/M, the same everything else, and
+a different console driver linked into the bios.
+
+So there is nothing to detect up front.  What there is instead is the
+moment of use, and it is unambiguous.  CONTYP 4 is short enough to quote:
+
+    conout: lxi  h,dmchan
+            mvi  m,serout       ; 2b
+            inx  h
+            mov  m,c
+            jmp  docmd
+
+    conin:  lxi  h,serin+1      ; poll 3f until the controller
+            xra  a              ; deposits 40 there
+    ci2:    cmp  m
+            jz   ci2
+            ...
+
+    ttyset: ...
+    dmaci:  db  writem          ; zot the monitor disable flag
+            ...
+            db  senabl          ; 2c - enable serial input
+            db  1
+
+Output is a channel command every time.  Input is not - conin and conist
+only poll memory at 3e and 3f - but the poll has to be armed, and ttyset
+arms it with senabl once at initialization.  Both ends therefore announce
+themselves with a channel command, which is exactly what the controller's
+own driver already decodes.  Hence the hook: no configuration switch, no
+image sniffing, no guessing.  The bios says what it wants by doing it.
+
+One aside for anyone booting such a disk here: ttyset also writes a byte
+to 13f5 in controller memory - the comment calls it the "magical place in
+monitor", zeroing a flag that would otherwise let the DJ/DMA's own
+monitor have the serial port.  Our write_djmem only models the drive
+parameter block at 1340, so it says "write_djmem 0x13f5 outside of
+DPARAM" and ignores it.  That is correct behaviour and not a fault: we do
+not simulate the controller's monitor, so there is nothing to disable.
 
 
 why it was ambiguous
@@ -76,23 +124,51 @@ If something appears in the window that no txb trace accounts for, it did
 not come from the machine.
 
 
-how it says so now
-------------------
+the hook
+--------
 
-The DJ/DMA serial still works - it is what the hardware does, and a
-configuration may yet turn up that needs it - but it can no longer be
-used silently.  The first use in each direction reports on stderr,
-unconditionally and without a trace flag:
+Ownership is a single variable, console_owner, and it starts at
+CONS_MULTIO because that is the machine this tree simulates.  A device
+claims it by using it:
 
-    djdma: bit banged serial (out) in use - the controller's console,
-    not the machine's
+    djdma serout (2b)       claims - conout does this per character
+    djdma senabl (2c) with 1 claims - ttyset does this once
+    multio uart 0 transmit  claims back
 
-and arming the input poll reports as "(in armed)", at the moment it is
-armed rather than at the moment a keystroke goes missing.  Per character
-detail is on the djdma trace bit alongside everything else the controller
-does.
+and ownership decides one thing only: who may take a character out of
+the shared descriptor.  When the controller owns it, multio_uart_poll
+leaves uart 0's input alone; when the multio owns it, djdma_poll_func
+does.  Uarts 1 and 2 have descriptors of their own and are never in
+question.
 
-Counters djserial_out and djserial_in hold the totals if you want them
-from the debugger.
+Output is deliberately not arbitrated.  Both devices keep writing to the
+same window, because that is what somebody watching the machine sees, and
+the traces now say which device each character came from.
+
+A change of owner reports on stderr without a trace flag:
+
+    console: input follows the djdma bit banged serial
+
+Claiming what is already owned is silent, so the ordinary boot says
+nothing.  Counters djserial_out and djserial_in hold the controller's
+totals.
+
+Last claim wins rather than first, so a machine whose monitor talks to
+the multio and whose bios then switches to the controller ends up with
+the console in the right place, and so does the reverse.  Nothing in the
+tree exercises that yet.
+
+
+what is and is not tested
+-------------------------
+
+The arbitration is verified in the direction that matters here: the
+hdinstall boot claims nothing, stays on the multio, and is byte for byte
+what it was before the change.
+
+The controller-console direction is verified against the bios source
+above and not yet by running one, because no CONTYP 4 disk is in the
+tree.  Booting one is the test, and what it should print is the one
+console: line, before its first character of output.
 
 vim: tabstop=8 shiftwidth=8 noexpandtab:

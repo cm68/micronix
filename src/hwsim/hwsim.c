@@ -1336,6 +1336,40 @@ main(int argc, char **argv)
     exit(0);
 }
 
+/*
+ * Console arbitration, discovered rather than configured.
+ *
+ * A boot floppy carries its answer in its bios and says nothing about it
+ * anywhere a simulator could read, so there is nothing to detect up
+ * front.  What there is instead is the moment of use: a bios that talks
+ * to the floppy controller's serial port issues a channel command to do
+ * it, and that command is unambiguous.  Ownership therefore follows the
+ * most recent claim, and a claim is made by transmitting a character or
+ * by arming a receive.  The serial board owns the console until told
+ * otherwise, which is the normal case and stays silent.
+ *
+ * Ownership decides who may consume input, and only that.  Output from
+ * both still reaches the same window, deliberately - that is what a
+ * person watching the machine sees - and the traces say which device
+ * each character came from.
+ */
+int console_owner = CONS_MULTIO;
+
+static char *console_names[] = {
+    "the multio uart 0",
+    "the djdma bit banged serial"
+};
+
+void
+console_claim(int who)
+{
+    if (console_owner == who) {
+        return;
+    }
+    console_owner = who;
+    fprintf(stderr, "console: input follows %s\n", console_names[who]);
+}
+
 __attribute__((constructor))
 void
 init_trace()
