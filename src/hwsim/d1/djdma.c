@@ -203,6 +203,21 @@ static int int_posted;      // the interrupt line is actually asserted
 static int int_pending;     // asked for, not raised yet - see setintr
 int trace_djint;            // command/interrupt handshake
 
+/*
+ * The controller has finished; put the line up.  This runs from a
+ * timeout, which is counted in cycles, so it lands the same number of
+ * instructions after the command every run.
+ */
+static void
+post_djdma_int(int a)
+{
+    trace(trace_djint, "djdma RAISE: interrupt asserted%s\n",
+        need_intack ? "" : " - NOBODY IS WAITING FOR IT");
+    int_posted = 1;
+    set_vi(DJDMA_INTERRUPT, 0, 1);
+}
+
+
 static unsigned char
 djunknown()
 {
@@ -368,12 +383,27 @@ readsec()
 }
 
 /*
+ * How long the controller takes to do what it was asked, in simulated
+ * microseconds.  A five inch disk turns at 300 rpm, so a revolution is
+ * 200ms and an average sector read is a good part of a rotation once
+ * latency is counted.  The number does not have to be right; it has to
+ * be long enough that the host cannot get back to the controller before
+ * the controller has finished, which is the property the driver is
+ * written against.
+ */
+#define DJDMA_INT_DELAY (30 * 1000)
+
+static void post_djdma_int(int a);
+
+/*
  * Ask for an interrupt.
  *
- * This only sets a flag.  The line is raised later, by the poll hook,
- * and that is the whole point: a channel program runs to completion
- * inside the guest's OUT instruction, so anything done here happens
- * before the OUT has returned.  Raise the line here and the interrupt is
+ * The line goes up when the controller finishes, and the controller has
+ * its own z80 - the firmware is in resources/DJDMA25 - so finishing
+ * takes milliseconds while the host gets on with something else.  Here
+ * the whole channel program runs inside the guest's OUT instruction, so
+ * without a delay the interrupt is delivered before the instruction that
+ * caused it has finished.  Raise the line here and the interrupt is
  * delivered to a machine that has not finished the instruction that
  * caused it; the kernel then pulses the port to acknowledge an interrupt
  * it has not been given yet, and the two get one out of step - which is
@@ -396,8 +426,18 @@ setintr()
 {
     need_intack = 1;
     djdma_running = 0;
-    int_pending = 1;
-    trace(trace_djint, "djdma REQ:   interrupt requested, raised at the next poll\n");
+    /*
+     * One controller, one completion outstanding.  Asking again before
+     * the last one landed replaces it rather than queueing behind it -
+     * there is only one interrupt line and only one z80 on the board.
+     * Without this the timeout table fills during the loader, which
+     * polls rather than waiting for interrupts, and the simulator exits
+     * with "timeout overflow".
+     */
+    cancel_time_out(post_djdma_int, 0);
+    trace(trace_djint, "djdma REQ:   interrupt requested, firing in %d us\n",
+        DJDMA_INT_DELAY);
+    time_out("djdma_setintr", DJDMA_INT_DELAY, post_djdma_int, 0);
     return S_NORMAL;
 }
 
@@ -704,17 +744,6 @@ djdma_poll_func()
     int bytes;
     char conschar;
 
-    /*
-     * The interrupt setintr asked for.  Raising it here rather than
-     * there is what keeps it after the instruction that caused it.
-     */
-    if (int_pending) {
-        int_pending = 0;
-        int_posted = 1;
-        trace(trace_djint, "djdma RAISE: interrupt asserted%s\n",
-            need_intack ? "" : " - NOBODY IS WAITING FOR IT");
-        set_vi(DJDMA_INTERRUPT, 0, 1);
-    }
 
     // if serial polling and there is space
     if (serial_poll && (physread(SERFLAG) != S_NORMAL)) {
