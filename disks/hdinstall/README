@@ -3,17 +3,25 @@ installing Micronix 1.67 on a simulated hard disk
 
 	./run
 
-which opens an xterm for the console and boots the 1.67 standalone
-floppy off the simulated DJ/DMA.  The window this is started from stays
-the simulator's own monitor, and system calls scroll past in it as they
-happen - which is the reason for putting the console in a window of its
-own.  Each line names the task and the address the call came from, so
+which boots the 1.67 standalone off the simulated DJ/DMA with the
+console in this window and nothing else going on.  Nothing is traced
+unless you ask for it:
+
+	./run -t 0x100000	system calls and what they returned
+	./run -t 0x120000	and every entry to the kernel as well
+	./run -c 0x114		console in an xterm of its own instead
+
+Tracing goes to src/hwsim/d1/logfile - run adds -l when it sees -t,
+because trace output goes to a file descriptor and -l is what points that
+descriptor at the log, and because otherwise it would land on top of the
+console.  Watch it from another window with tail -f.
+
+Each line names the task and the address, so
 
 	tsk1:43f3 micronix stat("/dev/ttyA", f7db
 
-can be handed straight back to the simulator as -T tsk1:43f3 to start an
-instruction trace there.  If the calls are more than you want, take
--t 0x80000 out of run.
+can be handed straight back as -T tsk1:43f3 to start an instruction trace
+there, or -W <addr> to watch writes to a byte.
 
 Wait for the welcome, and then for the shell's prompt, which is
 

@@ -1,38 +1,31 @@
 #!/bin/sh
 #
-# Boot the Micronix 1.67 standalone with its console in an xterm, ready
-# to install onto the simulated hard disk.  Type the command yourself
-# when it is time - see below for when that is.
+# Boot the Micronix 1.67 standalone with the hard disk attached.
 #
-#	./run			system calls, traced to the logfile
-#	./run -t 0x120000	system calls and every trap as well
-#	./run -t 0x800		just the clock, if that is the question
+#	./run			the console is this window, nothing else
+#	./run -t 0x100000	and trace system calls into the logfile
+#	./run -t 0x120000	system calls and every trap
+#	./run -c 0x114		put the console in an xterm of its own
 #
-# The trace goes to src/hwsim/d1/logfile and not to this window - trace()
-# writes to a file descriptor, and -l is what points that descriptor at
-# the logfile.  Watch it from another window with
+# Nothing is traced unless you ask.  Anything on the command line is
+# passed through, so -t, -T, -W and -c are all available without editing
+# this.
 #
-#	tail -f ~/src/micronix/src/hwsim/d1/logfile
+# If -t is given, -l goes with it: trace output is written to a file
+# descriptor and -l is what points that descriptor at
+# src/hwsim/d1/logfile.  Without it the trace is not produced at all, and
+# with it going anywhere else it would land on top of the console.  Watch
+# it from another window:
 #
-# The instruction trace is the exception: -t 1 goes to stderr, so it does
-# land in this window.
+#	tail -f ../../src/hwsim/d1/logfile
 #
-# Anything given on the command line is passed through, so -T and the
-# rest are available without editing this.
+# The bits, from ./d1 -h:
 #
-# The trace bits worth knowing, from ./d1 -h in src/hwsim/d1:
-#
-#	    800  clock	every tick
-#	  20000  trap	every entry to the kernel - interrupts as well as
-#			system calls, which is most of them: a quiet boot
-#			is nearly four thousand interrupts to fifty calls
-#	 100000  syscall
-#
-# -c 0x114 is three things: 0x100 puts uart 0 - the console - in an xterm
-# of its own instead of borrowing this window, 0x10 boots the djdma
-# floppy, and 0x04 says do not stop in the monitor first.  Add 0x1000 for
-# a machine with no clock, which is a thing you can want and not a thing
-# you want by accident.
+#	     1  inst	every instruction - large, and to stderr, not the log
+#	    80  djdma	    100  djint
+#	   800  clock
+#	 20000  trap	every entry to the kernel, interrupts included
+#	100000  syscall	calls and what they returned
 #
 here=`dirname "$0"`
 here=`cd "$here" && pwd` || exit 1
@@ -46,28 +39,15 @@ for d in "$here"/*-delta; do
 	fi
 done
 
-cat <<'NOTE'
-run: the console is the xterm.  The trace is in
-     src/hwsim/d1/logfile - tail -f it from another window.
-
-     Wait for the welcome, and then for the shell's prompt, which is #.
-     Anything typed before it is discarded when the shell sets up the
-     terminal.  If the welcome prints and no # follows, the machine is
-     wedged rather than waiting - watch the logfile and see whether the
-     system call count is moving.
-
-     Then, in the xterm:
-
-         source m5init
-
-     mkfs, fsck, mount, cptree the system across, relink root and swap,
-     patch the kernel, unmount.  It ends "Disk initialization complete."
-     cptree is copying a filesystem through a simulated Z80, so it takes
-     a while, and the trace in logfile is how you watch it work.
-
-NOTE
+# -l only when there is something to log
+log=
+for a in "$@"; do
+	case "$a" in
+	-t) log=-l ;;
+	esac
+done
 
 cd "$here/../../src/hwsim/d1" || exit 1
 
-exec ./d1 -b roms/mon447.bin -c 0x114 -t 0x100000 -l \
+exec ./d1 -b roms/mon447.bin $log \
 	-d "$here" -5 "$here/sa67.5.skew.1k" "$@"
