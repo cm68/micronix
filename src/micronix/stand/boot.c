@@ -49,7 +49,7 @@ int loadsize = 0;
 char filecount = 0;
 int found = 0;
 
-exit()
+bail()
 {
 	int (*loadbase)();
 	loadbase = 0;
@@ -63,19 +63,19 @@ exit()
  */
 load()
 {
-	register int *bnum;
+	register UINT16 *bnum;
 
 	iget();
 
 	if (!readblock(inode->d_addr[0], indirbuf)) {
 		outstr("read indir failed");
-		exit();
+		bail();
 	}
 	bnum = indirbuf;
 
 	if (!readblock(*bnum, &objbuf)) {
 		outstr("read header failed");
-		exit();
+		bail();
 	}
 	if (objbuf.ident == OBJECT) {
 		loadbase = objbuf.textoff;
@@ -88,7 +88,7 @@ load()
 	while (loadsize > 0) {
 		if (!readblock(*bnum, loadptr)) {
 			outstr("read object failed");
-			exit();
+			bail();
 		}
 		bnum++;
 		loadptr += 512;
@@ -130,7 +130,7 @@ select()
 
     if (!readblock(inode->d_addr[0], dirbuf)) {
 		outstr("read directory failed\n");
-		exit();
+		bail();
     }
 
     outstr("Files:\n");
@@ -150,7 +150,7 @@ select()
 
     if (filecount == 0) {
         outstr("No bootable files\n");
-        exit();
+        bail();
     }
 
     if (filecount != 1) {
@@ -209,13 +209,13 @@ readline()
 	char c;
 
 top:
-    s = &inputbuf;
+    s = inputbuf;
 
 	while (s < (&inputbuf[sizeof(inputbuf)] - 1)) {
 		*s = '\0';
 		c = conin();
 		if (c == '\b') {
-			if (s != &inputbuf) {
+			if (s != inputbuf) {
 				s--;
 				outstr("\b \b");
 			}
@@ -229,7 +229,7 @@ top:
 			goto top;
 		}
         if ((c == 0x3) || (c == 0x7f)) {
-        	exit();
+        	bail();
         }
         conout(c);
         *s++ = c;
