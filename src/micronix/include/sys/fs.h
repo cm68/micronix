@@ -12,15 +12,6 @@
  * this is modified from the stock fs.h to align it with v6
  *      field names and defines now match
  */
-/*
- * ccc cannot yet parse a struct this big - member offsets are held in a
- * byte, and this is 415 - so a program that only needs the layout can
- * define SMALL_STRUCTS and reach the fields by offset instead.  Remove
- * the guard, and the offsets that go with it, once the compiler takes
- * big structs.  See cmd/mkfs/mkfs.c.
- */
-#ifndef SMALL_STRUCTS
-
 struct super {
     UINT s_isize;               /* number of inode blocks */
     UINT s_fsize;               /* largest file block + 1 */
@@ -35,8 +26,6 @@ struct super {
 
     UINT32 s_time;              /* last umount time */
 };
-
-#endif /* SMALL_STRUCTS */
 
 /*
  * the on-disk inode - these fields have the d_ prefix to

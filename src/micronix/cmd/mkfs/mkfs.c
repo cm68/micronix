@@ -47,28 +47,6 @@
  * writes a boot into the middle of a filesystem and says it worked.
  */
 
-/*
- * the superblock, by hand
- * -----------------------
- *
- * struct super is 415 bytes, mostly s_free[100] and s_inode[100], and
- * ccc holds member offsets in a byte - so it cannot parse the type at
- * all.  With SMALL_STRUCTS defined, sys/fs.h leaves the struct out and
- * the fields are reached by offset into the block buffer instead.
- *
- * The offsets below are the on-disk layout, which is the thing that
- * actually matters: a Z80 packs this struct with no padding, and a host
- * compiler would align s_time and produce a different one.  So this is
- * not merely a workaround for a compiler limit - it is the more correct
- * of the two ways to write it, and the reason the accessors take the
- * buffer rather than a struct pointer.
- *
- * Undefine SMALL_STRUCTS and the struct comes back and the same code
- * compiles against it, so this can be backfilled with a one line change
- * once big structs work.
- */
-#define SMALL_STRUCTS   1
-
 #include <types.h>
 #include <stdio.h>
 #include <sys/fs.h>
@@ -118,41 +96,15 @@ char *bootfile;                 /* -i, or zero */
 UINT bootfirst;                 /* first block of the boot area */
 UINT bootnblk;                  /* how many of them */
 
-#ifdef SMALL_STRUCTS
-
 /*
- * Where the superblock's fields are, counted in bytes from the front of
- * the block.  Two byte fields throughout, so the arrays are 200 bytes
- * each and nothing needs alignment.
+ * The superblock, laid over the block buffer.  This was reached by hand
+ * computed offsets for a while, because struct super is 415 bytes and
+ * the compiler held member offsets in a byte, so it could not parse the
+ * type at all.  It can now, and the offsets are gone.
  *
- *	0	s_isize		206	s_ninode
- *	2	s_fsize		208	s_inode[100]
- *	4	s_nfree		408	s_flock, s_ilock, s_fmod
- *	6	s_free[100]	411	s_time		415 total
+ * The names stay behind the macros: the body reads the same either way,
+ * and it is the body that says what mkfs does.
  */
-#define SB_ISIZE    0
-#define SB_FSIZE    2
-#define SB_NFREE    4
-#define SB_FREE     6
-#define SB_NINODE   206
-#define SB_INODE    208
-
-UINT *
-sbword(off)
-    int off;
-{
-    return (UINT *) &sbbuf[off];
-}
-
-#define S_ISIZE     (*sbword(SB_ISIZE))
-#define S_FSIZE     (*sbword(SB_FSIZE))
-#define S_NFREE     (*sbword(SB_NFREE))
-#define S_NINODE    (*sbword(SB_NINODE))
-#define S_FREE(i)   (sbword(SB_FREE)[i])
-#define S_INODE(i)  (sbword(SB_INODE)[i])
-
-#else
-
 struct super *sb;
 
 #define S_ISIZE     (sb->s_isize)
@@ -161,8 +113,6 @@ struct super *sb;
 #define S_NINODE    (sb->s_ninode)
 #define S_FREE(i)   (sb->s_free[i])
 #define S_INODE(i)  (sb->s_inode[i])
-
-#endif
 
 usage()
 {
@@ -418,9 +368,7 @@ main(argc, argv)
     for (n = 0; n < isize; n++)
         wrblk(INOSTART + n, blkbuf);
 
-#ifndef SMALL_STRUCTS
     sb = (struct super *) sbbuf;
-#endif
     for (i = 0; i < BSIZE; i++)
         sbbuf[i] = 0;
     S_ISIZE = isize;
