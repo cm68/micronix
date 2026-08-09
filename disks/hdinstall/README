@@ -110,8 +110,8 @@ afterwards
 m5init does not write a boot block, and nothing else does either: the rom
 reads cylinder 0 head 0 sector 0 of the hard disk and there is nothing
 there.  See hwsim/DISKS for what that takes - micronix/stand builds the
-two levels and cmd/installboot puts them in a file that owns cylinder 0,
-which is what keeps the filesystem from allocating over them.
+two levels and mkfs -i puts them in a file that owns cylinder 0, which is
+what keeps the filesystem from allocating over them.
 
 Use 1.67 and not 1.6.  1.6's kernel has its root device as djdma/12,
 which is the single sided minor for a disk that is double sided, and it

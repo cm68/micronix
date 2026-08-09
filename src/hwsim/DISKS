@@ -501,10 +501,10 @@ block 0 at physical sector 5168.  A filesystem written straight into a
 drive file is not wrong by an offset, it is shuffled, and the only thing
 that will read it is nothing.
 
-This is also why installboot seeking to 512 * blkno is right on Micronix
-and would be wrong here.  There it is talking to /dev/m5a and the kernel
-does the rotation on the way past; a host tool writing the drive file has
-to do it itself.
+This is also why mkfs seeking to 512 * blkno is right on Micronix and
+would be wrong here.  There it is talking to /dev/m5a and the kernel does
+the rotation on the way past; a host tool writing the drive file has to
+do it itself.
 
 booting one, which works
 ------------------------
@@ -513,8 +513,8 @@ Done end to end in the simulator, off a hand built filesystem:
 
     make bootimg in micronix/stand	first level padded to a block,
 					second level after it
-    installboot <fs> bootimg		deduces the drive, claims cylinder 0
-    icheck -s <fs>			rebuild the free list
+    mkfs -i bootimg <fs>		claims cylinder 0 as it builds the
+					free list, so nothing else is needed
     permute the filesystem into physical order, prepend a label
     d1 -b roms/mon447.bin -c 0x0c -d <dir>
 
@@ -533,8 +533,12 @@ root directory.  Nothing bootable in it because that filesystem is empty
 apart from /boot, which is mode 0.
 
 What is left is the part that needs the simulator rather than the host:
-mkfs and m5init on a real drive from a booted 1.6, then installboot on
-the raw device, and the same path should find a kernel to load.
+m5init on a real drive from a booted 1.67, with its mkfs given -i, and
+the same path should find a kernel to load.
+
+To replace a boot after the fact, dd over the blocks the file already
+owns.  Nothing about the filesystem changes - the inode is what protects
+them, and it goes on claiming them whatever they contain.
 
 
 vim: tabstop=8 shiftwidth=8 noexpandtab:

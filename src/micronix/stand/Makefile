@@ -26,8 +26,8 @@ mwboot1.cim: mwboot1.s
 	cp zout/mwboot1.cim .
 
 #
-# what installboot writes: the first level in block 0, the second level
-# from block 1, which is where the first level looks for it.
+# what mkfs -i writes: the first level in block 0, the second level from
+# block 1, which is where the first level looks for it.
 #
 bootimg: mwboot1.cim mwboot.com
 	dd if=mwboot1.cim of=bootimg bs=512 conv=sync

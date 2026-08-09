@@ -22,5 +22,5 @@ first level in, so the constants are loaded, the drive is selected and
 the heads are at cylinder 0 - only the sector, the dma address and the
 opcode change.  65 bytes of the 512.
 
-installboot puts the two of them in a file that owns cylinder 0, block 0
+mkfs -i puts the two of them in a file that owns cylinder 0, block 0
 being the first level and block 1 onward the second.

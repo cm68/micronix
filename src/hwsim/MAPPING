@@ -187,9 +187,10 @@ The likely reason is seek distance: the superblock and the inodes live at
 low block numbers, so putting block 0 in the middle of the platter halves
 the average seek to them.  The side effect is that the boot area is in
 the middle of the block space rather than at either end, where no
-reserved-area mechanism can protect it - mkfs only knows how to exclude
-blocks at the end of a device, for swap.  Hence installboot, and the file
-that owns cylinder 0 so the free list never offers it.
+reserved-area mechanism can protect it - the only exclusion mkfs is told
+about is a count of blocks at the end of a device, for swap.  So mkfs -i
+gives cylinder 0 to a file instead, and simply never puts those blocks on
+the free list it is building.
 
 
 image files: a fifth number
@@ -218,8 +219,8 @@ with the rotation above applied to get cyl, head and sec.  Writing a
 filesystem straight into a drive file is not off by an offset, it is
 shuffled, and nothing will read it.
 
-This is also why installboot seeking to 512 * blkno is right on Micronix
-and would be wrong on the host: there it is talking to /dev/m5a and the
+This is also why mkfs seeking to 512 * blkno is right on Micronix and
+would be wrong on the host: there it is talking to /dev/m5a and the
 kernel does the rotation on the way past.
 
 

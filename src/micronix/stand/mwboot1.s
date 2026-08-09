@@ -8,7 +8,7 @@
 ; job is to bring in the sector after it: mwboot.com, which is linked at
 ; 0100 and knows the v6 filesystem.
 ;
-; installboot puts both of us in a file that owns cylinder 0, so this is
+; mkfs -i puts both of us in a file that owns cylinder 0, so this is
 ; block 0 of that file and mwboot.com is block 1 onward.  Nothing else on
 ; the disk is involved and no filesystem is read here - that is mwboot's
 ; job, and this exists only because the rom will read one sector and no
