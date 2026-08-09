@@ -699,6 +699,9 @@ wr_txb(portaddr p, byte v)
 {
     struct ace *ap = select_ace();
 
+    trace(trace_uart, "multio: txb %02x %s reaches the uart, group %d\n",
+        v, printable(v), group);
+
     if (ap->lcr & LCR_DLAB) {
         trace(trace_uart, "%s: write dll %02x\n", ap->name, v);
         ap->dll = v;
@@ -1081,6 +1084,15 @@ void
 multio_select(portaddr p, byte v)
 {
     static int lastgroup = -1;
+
+    /*
+     * Which group is selected decides what the eight ports at 0048 mean,
+     * so a wrong decode here does not fail, it silently sends characters
+     * to the parallel port instead of the uart.  Say what was written
+     * and what it was taken to mean.
+     */
+    trace(trace_multio, "multio: select %02x -> group %d\n",
+        v, v & GROUP_MASK);
 
     group = v & GROUP_MASK;
 
