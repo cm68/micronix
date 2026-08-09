@@ -50,6 +50,7 @@ struct image {
     int altsec;
     int spt;    /* sectors per track */
     int bps;    /* bytes per sector */
+    int offset; /* blocks before the filesystem - the reserved area */
 #ifdef USE_LIBDSK
     DSK_PDRIVER *drive;
 #endif
@@ -98,9 +99,34 @@ is_sticky(char *fn)
 }
 
 /*
+ * Does this look like a superblock?
+ *
+ * Used to find where the filesystem starts, so it has to be able to say
+ * no about a block of anything else - a boot sector, a directory, the
+ * middle of a binary.  The fields check each other: the ilist has to fit
+ * inside the filesystem, the filesystem inside the image, and the two
+ * free lists cannot be longer than the arrays holding them.
+ */
+static int
+sbvalid(char *buf, int imgblks, int offset)
+{
+    struct super *s = (struct super *)buf;
+
+    if (s->s_isize == 0 || s->s_isize > 1000)
+        return 0;
+    if (s->s_fsize <= s->s_isize + 2)
+        return 0;
+    if (s->s_nfree > 100 || s->s_ninode > 100)
+        return 0;
+    if (imgblks && s->s_fsize > imgblks - offset)
+        return 0;
+    return 1;
+}
+
+/*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
-int 
+int
 openfsrw(char *filesystem, struct super **fsp, int writable)
 {
     int ret;
@@ -157,12 +183,12 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
             i->bps = 512;
         }
         if (i->minor & 0x08) {              /* do skew */
-printf("skew\n");
+            trace(trace_fs, "openfs: skewed\n");
             i->altsec = 1;
         }
         if (i->major == 2) {
             if (i->minor & 0x04) {          /* 5.25 */
-printf("5.25 inch\n");
+                trace(trace_fs, "openfs: 5 1/4 inch\n");
                 if (i->bps == 1024) {
                     i->spt = 10;
                 } else {
@@ -174,10 +200,55 @@ printf("5.25 inch\n");
                 } else {
                     i->spt = 15;
                 }
-printf("8 inch\n");
+                trace(trace_fs, "openfs: 8 inch\n");
             }
         }
         *fsp = (struct super *)i;
+
+        /*
+         * Where the filesystem starts.
+         *
+         * A floppy keeps its boot loader in reserved tracks at the front
+         * and the filesystem begins after them - toff in the driver's
+         * format table, two cylinders on every Morrow format.  The
+         * .trim20k images in this tree have exactly that cut off the
+         * front, which is why they read with no offset at all and why a
+         * loader is precisely what is not in them.
+         *
+         * Trimming is no good for an image we mean to boot afterwards,
+         * so rather than require it, find the start: try no offset, then
+         * two cylinders' worth for a single sided disk and for a double
+         * sided one, and take the first that has a superblock at block 1.
+         * The check is strong enough to say no - the ilist has to fit in
+         * the filesystem and the filesystem in the image - so this
+         * cannot quietly settle on the wrong one.
+         */
+        i->offset = 0;
+        if (i->driver == DRIVER_IMAGE) {
+            char probe[512];
+            int imgblks;
+            int cand[3];
+            int k;
+
+            imgblks = lseek(i->fd, 0L, 2) / 512;
+            cand[0] = 0;
+            cand[1] = 2 * i->spt;           /* two cylinders, one head */
+            cand[2] = 4 * i->spt;           /* two cylinders, two heads */
+
+            for (k = 0; k < 3; k++) {
+                i->offset = cand[k];
+                readblk(*fsp, 1, probe);
+                if (sbvalid(probe, imgblks, i->offset))
+                    break;
+            }
+            if (k == 3) {
+                i->offset = 0;              /* say nothing new; it will fail */
+            } else if (i->offset) {
+                trace(trace_fs, "openfs: filesystem starts at block %d\n",
+                    i->offset);
+            }
+        }
+
         readblk(*fsp, 1, i->sb.superblock);
 
         /*
@@ -271,7 +342,7 @@ readblk(struct super *fs, int blkno, char *buf)
     trace(trace_fs, "readblk: %d -> %d\n", blkno, realblk);
 
     if (i->driver == DRIVER_IMAGE) {
-        if (lseek(i->fd, 512 * realblk, SEEK_SET) < 0)
+        if (lseek(i->fd, 512L * (realblk + i->offset), SEEK_SET) < 0)
             lose("readblk seek");
         if (read(i->fd, buf, 512) != 512)
             lose("readblk");
@@ -309,7 +380,7 @@ writeblk(struct super *fs, int blkno, char *buf)
     trace(trace_fs, "writeblk: %d -> %d\n", blkno, realblk);
 
     if (i->driver == DRIVER_IMAGE) {
-        if (lseek(i->fd, 512 * realblk, SEEK_SET) < 0)
+        if (lseek(i->fd, 512L * (realblk + i->offset), SEEK_SET) < 0)
             lose("writeblk seek");
         if ((ret = write(i->fd, buf, 512)) != 512) {
             printf("write ret %d\n", ret);
@@ -1017,9 +1088,10 @@ fileunlink(struct super *fs, char *name)
     int inum = 0;
     int entries;
     int size;
+    char *base;
     char *s;
     int i;
- 
+
     s = rindex(dirname, '/');
     if (!s) {
         dp = iget(fs, 1);
@@ -1027,6 +1099,19 @@ fileunlink(struct super *fs, char *name)
         *s = 0;
         dp = namei(fs, dirname);
     }
+
+    /*
+     * The entry to look for is the last component, not the path.  This
+     * compared whole paths against directory entries, so "/bin/fp" never
+     * matched the entry "fp", nothing was found, and rm returned success
+     * having done nothing at all.  filelink, right below, gets this
+     * right - it advances past the slash.
+     *
+     * Taken from the caller's string rather than from the copy, because
+     * the copy is freed on the next line and the pointer would dangle.
+     */
+    s = rindex(name, '/');
+    base = s ? s + 1 : name;
     free(dirname);
 
     if ((dp->d_mode & IFMT) != IFDIR) {
@@ -1040,14 +1125,22 @@ fileunlink(struct super *fs, char *name)
 
     dirp = getdir(dp);
     for (i = 0 ; i < entries; i++) {
-        if (strncmp(dirp[i].name, name, 14) == 0) {
+        if (strncmp(dirp[i].name, base, 14) == 0) {
             inum = dirp[i].ino;
             break;
         }
     }
     if (inum != 0) {
-        memmove(&dp[i], &dp[i+1], (entries - i) * sizeof(struct dir));
-        memset(&dp[entries-1], 0, sizeof(struct dir));
+        /*
+         * Close the gap in the directory.  These indexed dp, the inode,
+         * rather than dirp, the directory data - so the moment a name
+         * did match, this wrote over the inode table instead of over the
+         * entry.  The count was one too many as well: removing entry i
+         * of n leaves n - i - 1 above it to move down.
+         */
+        memmove(&dirp[i], &dirp[i+1],
+            (entries - i - 1) * sizeof(struct dir));
+        memset(&dirp[entries-1], 0, sizeof(struct dir));
         dp->d_size1 -= 16;
         size = filesize(dp);
         if ((size % 512) == 0) {
@@ -1074,7 +1167,18 @@ fileunlink(struct super *fs, char *name)
     if (dp->d_nlink == 0) {
         filefree(dp);
 
-        dp->d_mode = 0;
+        /*
+         * Clear the whole inode, not just the mode.  What was left
+         * behind was a free inode still carrying its old size, times
+         * and block list - which reads as garbage to anything that
+         * walks the ilist rather than the directories, and hands the
+         * next file to use this inumber a set of addresses belonging
+         * to blocks that are now on the free list.
+         *
+         * Only the on-disk part: struct i_node keeps fs and inum after
+         * it, and iput needs both.
+         */
+        memset(dp, 0, sizeof(struct dsknod));
         if (fs->s_ninode != 100) {
             fs->s_inode[fs->s_ninode++] = inum;
         }
@@ -1138,6 +1242,23 @@ filelink(struct super *fs, char *path, int inum)
     strncpy(dirp[i].name, name, 14);
     putdir(dp, dirp);
     iput(dp);
+
+    /*
+     * A name is a link, so count it.  ialloc leaves the count at zero
+     * and nothing else touched it, so every file mnix created came out
+     * with no links at all - which is what a free inode looks like.  It
+     * reads back fine, because reading follows the directory entry, and
+     * then fsck reclaims the file as unreferenced.
+     */
+    {
+        struct dsknod *tp = iget(fs, inum);
+
+        if (tp) {
+            tp->d_nlink++;
+            iput(tp);
+            ifree(tp);
+        }
+    }
     fs->s_fmod = 1;
 
 lose:
@@ -1174,7 +1295,7 @@ ialloc(struct super *fs, UINT mode)
     for (i = 0; i < 8; i++) {
         dp->d_addr[i] = 0;
     }
-    printf("allocated inum %d\n", inum);
+    trace(trace_fs, "allocated inum %d\n", inum);
     iput(dp);
     ifree(dp);
 
