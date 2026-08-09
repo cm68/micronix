@@ -1,0 +1,98 @@
+which console, and how to tell
+==============================
+
+There is more than one way for a character to leave a Decision, and
+until now they all arrived in the same window looking identical.  This
+is what each of them is, which one is in use, and how that was measured
+rather than assumed.
+
+
+the two transmitters
+--------------------
+
+The MULTIO is the machine's console.  Three 8250s, and uart 0 is the one
+Micronix opens: the kernel's tty driver for it is _mstty, and a boot that
+reaches multi-user has used it for every character.
+
+The DJ/DMA has a console of its own.  The controller is a Z80 with its
+own firmware and its own bit banged serial port, reached by two channel
+commands rather than by any port the CPU can address:
+
+    2b  serial output       send the byte at channel+1
+    2c  serial input enable  arm a poll that drops a received byte at
+                             physical 3e and sets a flag at 3f
+
+That port exists so a Decision with no serial board at all still has
+somewhere to talk - the floppy controller is the only intelligent thing
+in the box that has a UART.  A machine with a MULTIO has no reason to use
+it, and a configuration that does is one built for a machine that did not
+have one.  It is not a recommended configuration and nothing in this tree
+is set up that way.
+
+
+why it was ambiguous
+--------------------
+
+terminal_fd_in and terminal_fd_out are defined by the serial board and
+set to uart 0's descriptors (multio.c, at the end of multio_init).  The
+DJ/DMA's serout wrote to terminal_fd_out and its input poll read from
+terminal_fd_in, so:
+
+    a character sent by the controller and a character sent by the
+    MULTIO arrived in the same window, in the same order, with nothing
+    to tell them apart
+
+and, worse in the other direction:
+
+    once the input poll is armed, a keystroke goes to whichever of the
+    two asks for it first, and the other never sees it
+
+Neither of those announced itself.  The output case is a reporting
+problem - you cannot attribute what you are looking at - and the input
+case is a real hazard, because a character eaten by the controller is
+simply gone and the tty waits forever for it.
+
+
+what is actually in use
+-----------------------
+
+Measured, booting the 1.67 standalone off the 5 1/4 floppy with the hard
+disk attached - disks/hdinstall/run - through the loader's banner and
+directory listing, the kernel's banner, and the whole of the welcome
+text:
+
+    DJ/DMA serial out      0 characters
+    DJ/DMA serial in       0 characters, never armed
+    MULTIO uart 0        773 characters, every one of them traced
+
+So the second level loader does not use the controller's serial port
+either, which is worth saying because it is the natural guess: it is a
+standalone program talking to a machine it has just been read into by the
+DJ/DMA, and it prints "Micronix DJDMA loader" as its first line.  It
+still talks to the MULTIO.
+
+The rule that follows: on this machine, console output is MULTIO output.
+If something appears in the window that no txb trace accounts for, it did
+not come from the machine.
+
+
+how it says so now
+------------------
+
+The DJ/DMA serial still works - it is what the hardware does, and a
+configuration may yet turn up that needs it - but it can no longer be
+used silently.  The first use in each direction reports on stderr,
+unconditionally and without a trace flag:
+
+    djdma: bit banged serial (out) in use - the controller's console,
+    not the machine's
+
+and arming the input poll reports as "(in armed)", at the moment it is
+armed rather than at the moment a keystroke goes missing.  Per character
+detail is on the djdma trace bit alongside everything else the controller
+does.
+
+Counters djserial_out and djserial_in hold the totals if you want them
+from the debugger.
+
+vim: tabstop=8 shiftwidth=8 noexpandtab:

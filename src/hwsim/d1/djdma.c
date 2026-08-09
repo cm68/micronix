@@ -27,6 +27,8 @@
 int trace_djdma;
 extern int trace_bio;
 
+extern char *printable(char);       // multio.c
+
 extern int terminal_fd_in;
 extern int terminal_fd_out;
 
@@ -736,7 +738,39 @@ settiming()
     return S_NORMAL;
 }
 
+/*
+ * The bit banged serial port on the DJ/DMA.
+ *
+ * The controller has a console of its own, and it is not the machine's
+ * console: it is two channel commands, 2b to send a byte and 2c to arm
+ * a poll that drops a received byte at 3e with a flag at 3f.  A Decision
+ * with a MULTIO has no business using it - the MULTIO is the console -
+ * and a configuration that does is one somebody built for a machine that
+ * had no serial board at all.
+ *
+ * It is here because the standalone loaders use it, and it stays.  What
+ * does not stay is it being invisible: both directions used to share
+ * terminal_fd_in and terminal_fd_out with uart 0, so a character out of
+ * the controller and a character out of the MULTIO arrived in the same
+ * window looking identical, and a keystroke could be swallowed by
+ * whichever of the two asked first.  Every use now says so.
+ */
 int serial_poll = 0;
+int djserial_out;               // bytes the controller has sent
+int djserial_in;                // and taken
+
+static void
+djserial_used(char *dir)
+{
+    static int said;
+
+    if (said) {
+        return;
+    }
+    said = 1;
+    fprintf(stderr, "djdma: bit banged serial (%s) in use - "
+        "the controller's console, not the machine's\n", dir);
+}
 
 static int
 djdma_poll_func()
@@ -753,6 +787,10 @@ djdma_poll_func()
                 printf("djdma_poll_func: read problem\n");
                 return 1;
             }
+            djserial_used("in");
+            djserial_in++;
+            tracec(trace_djdma, "serial in %02x %s ", conschar & 0xff,
+                printable(conschar));
             physwrite(SERDATA, conschar);
             physwrite(SERFLAG, S_NORMAL);
         }
@@ -772,6 +810,13 @@ serin()
         serial_poll = 0;
         break;
     case 1:
+        /*
+         * Arming this points the controller at the same file descriptor
+         * the MULTIO reads, so from here on a keystroke goes to whichever
+         * of the two asks for it first and the other never sees it.  Say
+         * so when it is armed, not when a character goes missing.
+         */
+        djserial_used("in armed");
         serial_poll = 1;
         break;
     }
@@ -787,6 +832,9 @@ serout()
     byte outch;
 
     outch = physread(channel + 1);
+    djserial_used("out");
+    djserial_out++;
+    tracec(trace_djdma, "%02x %s ", outch & 0xff, printable(outch));
     write(terminal_fd_out, &outch, 1);
     return S_NORMAL;
 }
