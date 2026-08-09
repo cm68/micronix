@@ -264,31 +264,42 @@ main(argc, argv)
     given = 0;
 
     /*
-     * Options come before the device.  A leading minus is not enough to
-     * make an argument an option here - "-1024" is a block count - so
-     * stop at the first one that is followed by a digit.
+     * The manual says "mkfs device [size]" and m5init says
+     * "mkfs -f -1024 /dev/m5a", so the shipped one takes them in either
+     * order and so does this.  Every argument is one of four things and
+     * each says which it is: -i takes the boot file, a minus and digits
+     * is an exclusion, digits alone are a size, and what is left is the
+     * device.  -f is what the script passes to say do not ask; we never
+     * ask, so it is accepted and ignored rather than being a usage error
+     * on an invocation that has always worked.
      */
-    while (--argc > 0 && **++argv == '-' &&
-        !(argv[0][1] >= '0' && argv[0][1] <= '9')) {
-        if (argv[0][1] != 'i' || argc < 2)
-            usage();
-        argc--;
-        bootfile = *++argv;
-    }
-    if (argc < 1)
-        usage();
-
-    device = *argv++;
-    argc--;
-
-    if (argc > 0) {
-        arg = *argv;
-        if (*arg == '-') {
+    device = 0;
+    argc--;                     /* step over our own name */
+    argv++;
+    while (argc-- > 0) {
+        arg = *argv++;
+        if (arg[0] == '-' && arg[1] >= '0' && arg[1] <= '9') {
             exclude = atoi(arg + 1);
-        } else {
+        } else if (arg[0] == '-') {
+            if (arg[1] == 'f' && arg[2] == 0) {
+                continue;
+            }
+            if (arg[1] != 'i' || arg[2] != 0 || argc < 1)
+                usage();
+            argc--;
+            bootfile = *argv++;
+        } else if (arg[0] >= '0' && arg[0] <= '9') {
             given = atoi(arg);
+        } else {
+            if (device)
+                usage();
+            device = arg;
         }
     }
+    if (!device)
+        usage();
+    if (given && exclude)
+        die("give a size or an exclusion, not both");
 
     type = drivetype(device);
     dsize = dtracks[type] * (UINT) dheads[type] * dsecs[type];
