@@ -534,6 +534,22 @@ struct timeout {
 struct timeout timeouts[MAXTIMEOUTS];
 
 /*
+ * Simulated microseconds, from the cycle counter.
+ *
+ * Anything modelling how long the machine's own hardware takes - a
+ * character at a baud rate, a controller's turnaround - measures it with
+ * this and not with now64(), or the answer depends on what the host was
+ * doing.  It lives here rather than in util.c because the host tools
+ * link that library without a processor, and a cycle count means nothing
+ * to fsck.
+ */
+unsigned long long
+simnow64()
+{
+    return sim_cycles / (CPU_HZ / 1000000);
+}
+
+/*
  * Called once per instruction from the main loop.  Everything happens
  * here, between instructions, which is what makes it repeatable.
  */

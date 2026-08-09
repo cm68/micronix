@@ -576,7 +576,7 @@ multio_uart_poll(struct ace *ap)
     int error;
     long long t;
 
-    t = now64();
+    t = simnow64();
 
     // if we are shifting a character out.
     if (ap->txpend) {
@@ -654,7 +654,7 @@ ace_init(int i, char *name, int vi_line)
     ap->lsr = LSR_TXE;
     ap->name = name;
     ap->vi_line = vi_line;
-    ap->rxwait = now64();
+    ap->rxwait = simnow64();
     reg_intbit(vi_line, ap->name);
     ap->infd = -1;
     ap->outfd = -1;
@@ -680,7 +680,7 @@ rd_rxb(portaddr p)
         retval = ap->rxb;
 
         ap->lsr &= ~LSR_DR;
-        ap->rxwait = now64() + ap->chartime;
+        ap->rxwait = simnow64() + ap->chartime;
         multio_set_inti(ap);
     } else {
         retval = 0;
@@ -710,7 +710,7 @@ wr_txb(portaddr p, byte v)
         l("multio: send overrun on line %d\n", ap->line);
     }
 
-    ap->txpend = now64() + ap->chartime;
+    ap->txpend = simnow64() + ap->chartime;
     ap->txb = v;
     ap->lsr &= ~LSR_TXE;
     ap->txe_ack = 0;        // this character will empty the register again
