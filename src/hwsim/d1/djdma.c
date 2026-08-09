@@ -18,6 +18,7 @@
 #include "hwsim.h"
 #include "imd.h"
 #include "util.h"
+#include "disz80.h"
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <stdio.h>
@@ -224,16 +225,32 @@ pulse_djdma(portaddr p, byte v)
          * if the last command was setintr, we are still "running" that command
          * until we get this pulse.  just advance the channel, since we already posted the status.
          */
-        trace(trace_djint, "djdma INTACK: pulse acknowledges the interrupt%s\n",
-            int_posted ? "" : " - WHICH WAS NEVER RAISED");
+        {
+            char sbuf[16];
+
+            trace(trace_djint, "djdma INTACK: from %s%s\n",
+                dis_space(z80_get_reg16(pc_reg), sbuf, sizeof(sbuf)),
+                int_posted ? "" : " - WHICH WAS NEVER RAISED");
+        }
         channel += 2;
         need_intack = 0;
         int_posted = 0;
         int_pending = 0;
         set_vi(DJDMA_INTERRUPT, 0, 0);
     } else {
-        trace(trace_djint, "djdma START: channel pulse%s\n",
-            int_posted ? " - WITH AN INTERRUPT STILL ASSERTED" : "");
+        {
+            char sbuf[16];
+
+            /*
+             * Who started this.  The kernel reaches the controller from
+             * one place - djstart, at the bottom of the strategy path -
+             * so naming the caller says which request this is and lets a
+             * repeated command be told from a repeated retry.
+             */
+            trace(trace_djint, "djdma START: channel pulse from %s%s\n",
+                dis_space(z80_get_reg16(pc_reg), sbuf, sizeof(sbuf)),
+                int_posted ? " - WITH AN INTERRUPT STILL ASSERTED" : "");
+        }
         /*
          * fetch from the reset channel address
          */
