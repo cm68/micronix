@@ -217,7 +217,18 @@ CP/M, disk 925 from the bitsavers Morrow archive - its imd header says
     A>
 
 with the one console: line arriving before its first character of
-output, and takes a typed command and runs it.  926 is the same disk
-built for a multio console and is the control.
+output, and takes a typed command and runs it.
+
+Disk 926 is the control and is the better half of the test: the same
+cp/m, the same cbios revision, the same two controllers, the same banner,
+built for a multio console.  It boots with stderr empty - no claim, the
+multio holds the console from reset and is never asked for it back - and
+takes a typed command just the same.  Two disks that differ in which
+console driver was assembled into them, and nothing to set for either.
+
+Their directories agree with their headers, which is worth a look before
+trusting any archived disk's description of itself: 926 carries BAUD.COM
+and the HYTYPE driver, which set and use multio serial ports, and 925
+carries neither.
 
 vim: tabstop=8 shiftwidth=8 noexpandtab:
