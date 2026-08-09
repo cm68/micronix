@@ -47,6 +47,28 @@
  * writes a boot into the middle of a filesystem and says it worked.
  */
 
+/*
+ * the superblock, by hand
+ * -----------------------
+ *
+ * struct super is 415 bytes, mostly s_free[100] and s_inode[100], and
+ * ccc holds member offsets in a byte - so it cannot parse the type at
+ * all.  With SMALL_STRUCTS defined, sys/fs.h leaves the struct out and
+ * the fields are reached by offset into the block buffer instead.
+ *
+ * The offsets below are the on-disk layout, which is the thing that
+ * actually matters: a Z80 packs this struct with no padding, and a host
+ * compiler would align s_time and produce a different one.  So this is
+ * not merely a workaround for a compiler limit - it is the more correct
+ * of the two ways to write it, and the reason the accessors take the
+ * buffer rather than a struct pointer.
+ *
+ * Undefine SMALL_STRUCTS and the struct comes back and the same code
+ * compiles against it, so this can be backfilled with a one line change
+ * once big structs work.
+ */
+#define SMALL_STRUCTS   1
+
 #include <types.h>
 #include <stdio.h>
 #include <sys/fs.h>
@@ -67,28 +89,22 @@
  * mw.c does "type = minor(dev) >> 2", the low two bits being the
  * partition, so m5a is minor 0, m10a is 4 and m16a is 8.
  *
- * Filled in by drives() rather than written as initialisers, because
- * this compiler has none - not for autos and not for statics either.
+ *	tracks	heads	sectors		blocks
+ *	153	4	17		10404	5 meg
+ *	306	4	17		20808	10 meg
+ *	306	6	17		31212	16 meg
+ *	640	6	17		65280	32 meg
+ *	733	5	17		62305	40 meg
  */
 #define NDRIVE      5
-UINT dtracks[NDRIVE];
-UINT dheads[NDRIVE];
-UINT dsecs[NDRIVE];
-
-drives()
-{
-    dtracks[0] = 153; dheads[0] = 4; dsecs[0] = 17;     /* 5 meg */
-    dtracks[1] = 306; dheads[1] = 4; dsecs[1] = 17;     /* 10 meg */
-    dtracks[2] = 306; dheads[2] = 6; dsecs[2] = 17;     /* 16 meg */
-    dtracks[3] = 640; dheads[3] = 6; dsecs[3] = 17;     /* 32 meg */
-    dtracks[4] = 733; dheads[4] = 5; dsecs[4] = 17;     /* 40 meg */
-}
+UINT dtracks[NDRIVE] = { 153, 306, 306, 640, 733 };
+UINT dheads[NDRIVE] = { 4, 4, 6, 6, 5 };
+UINT dsecs[NDRIVE] = { 17, 17, 17, 17, 17 };
 
 char *pname;
 int dev = -1;
 
 char sbbuf[BSIZE];
-struct super *sb;
 char blkbuf[BSIZE];
 char dirbuf[BSIZE];
 char indbuf[BSIZE];
@@ -101,6 +117,52 @@ UINT nextino;                   /* next inumber to hand out */
 char *bootfile;                 /* -i, or zero */
 UINT bootfirst;                 /* first block of the boot area */
 UINT bootnblk;                  /* how many of them */
+
+#ifdef SMALL_STRUCTS
+
+/*
+ * Where the superblock's fields are, counted in bytes from the front of
+ * the block.  Two byte fields throughout, so the arrays are 200 bytes
+ * each and nothing needs alignment.
+ *
+ *	0	s_isize		206	s_ninode
+ *	2	s_fsize		208	s_inode[100]
+ *	4	s_nfree		408	s_flock, s_ilock, s_fmod
+ *	6	s_free[100]	411	s_time		415 total
+ */
+#define SB_ISIZE    0
+#define SB_FSIZE    2
+#define SB_NFREE    4
+#define SB_FREE     6
+#define SB_NINODE   206
+#define SB_INODE    208
+
+UINT *
+sbword(off)
+    int off;
+{
+    return (UINT *) &sbbuf[off];
+}
+
+#define S_ISIZE     (*sbword(SB_ISIZE))
+#define S_FSIZE     (*sbword(SB_FSIZE))
+#define S_NFREE     (*sbword(SB_NFREE))
+#define S_NINODE    (*sbword(SB_NINODE))
+#define S_FREE(i)   (sbword(SB_FREE)[i])
+#define S_INODE(i)  (sbword(SB_INODE)[i])
+
+#else
+
+struct super *sb;
+
+#define S_ISIZE     (sb->s_isize)
+#define S_FSIZE     (sb->s_fsize)
+#define S_NFREE     (sb->s_nfree)
+#define S_NINODE    (sb->s_ninode)
+#define S_FREE(i)   (sb->s_free[i])
+#define S_INODE(i)  (sb->s_inode[i])
+
+#endif
 
 usage()
 {
@@ -171,15 +233,15 @@ bfree(bn)
 {
     int i;
 
-    if (sb->s_nfree >= NICFREE) {
-        ((UINT *) blkbuf)[0] = sb->s_nfree;
+    if (S_NFREE >= NICFREE) {
+        ((UINT *) blkbuf)[0] = S_NFREE;
         for (i = 0; i < NICFREE; i++)
-            ((UINT *) blkbuf)[i + 1] = sb->s_free[i];
+            ((UINT *) blkbuf)[i + 1] = S_FREE(i);
         wrblk(bn, blkbuf);
-        sb->s_nfree = 0;
+        S_NFREE = 0;
     }
-    sb->s_free[sb->s_nfree] = bn;
-    sb->s_nfree++;
+    S_FREE(S_NFREE) = bn;
+    S_NFREE++;
 }
 
 /*
@@ -270,7 +332,6 @@ main(argc, argv)
     int i;
 
     pname = argv[0];
-    drives();
     bootfile = 0;
     exclude = 0;
     given = 0;
@@ -357,11 +418,13 @@ main(argc, argv)
     for (n = 0; n < isize; n++)
         wrblk(INOSTART + n, blkbuf);
 
+#ifndef SMALL_STRUCTS
     sb = (struct super *) sbbuf;
+#endif
     for (i = 0; i < BSIZE; i++)
         sbbuf[i] = 0;
-    sb->s_isize = isize;
-    sb->s_fsize = fsize;
+    S_ISIZE = isize;
+    S_FSIZE = fsize;
 
     nextblk = INOSTART + isize;
     nextino = ROOTINO;
@@ -482,8 +545,8 @@ main(argc, argv)
      * Seeded with a single zero entry, which is what the end of the
      * chain looks like to alloc.
      */
-    sb->s_nfree = 1;
-    sb->s_free[0] = 0;
+    S_NFREE = 1;
+    S_FREE(0) = 0;
     for (n = fsize - 1; n >= nextblk; n--) {
         if (!inboot(n))
             bfree(n);
@@ -492,9 +555,9 @@ main(argc, argv)
     }
 
     /* and the free inodes */
-    sb->s_ninode = 0;
-    for (n = nextino; n <= isize * IPERBLK && sb->s_ninode < NICINOD; n++)
-        sb->s_inode[sb->s_ninode++] = n;
+    S_NINODE = 0;
+    for (n = nextino; n <= isize * IPERBLK && S_NINODE < NICINOD; n++)
+        S_INODE(S_NINODE++) = n;
 
     /*
      * The boot itself, into the blocks the file now owns.  The first of
