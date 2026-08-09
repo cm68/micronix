@@ -1307,6 +1307,7 @@ main(int argc, char **argv)
         mysigunblock();
         running = 0;
         check_time_outs();
+        take_pending_trap();
         if (inst_countdown != -1) {
             inst_countdown--;
         }

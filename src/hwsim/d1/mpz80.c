@@ -343,6 +343,50 @@ trap(byte trapbits)
  * check if we can assert the int pin - the s100 interrupt line is controlled by
  * the pic, and the z80 interrupt line is controlled by us.
  */
+/*
+ * An interrupt is recognised between instructions, never inside one.
+ *
+ * This is called from the middle of bus cycles - a register write, the
+ * countdown of the trap window - and it used to trap from there.  The
+ * program counter at that moment is not an instruction address: the
+ * emulator is part way through fetching or executing, and what comes out
+ * of pc_reg is whatever it happens to be holding.  trap() takes that as
+ * the address to resume from, the rom window's call pushes trapaddr+16,
+ * and trappd subtracts fifteen and stores the result in u.pc.
+ *
+ * So a stale pc becomes the address the kernel will resume the process
+ * at, and it does not look wrong - it looks like an address.  Once it
+ * came out as 0092, which is inside the first level boot sector that has
+ * been dead since the machine started, and the byte there is d7, rst 10.
+ * Init was blamed for jumping into nothing for most of a day.
+ *
+ * So set a flag and let the main loop take it, which is the same
+ * correction the djdma interrupt needed: deliver the event after the
+ * instruction that caused it, not inside it.
+ *
+ * This is right for interrupts and would be wrong for faults, and the
+ * difference matters as soon as anything models memory management.  An
+ * interrupt is asked for and answered when the processor is between
+ * instructions, so deferring it loses nothing.  A page fault is not: the
+ * instruction cannot finish, the trap has to happen where it happened,
+ * and what the kernel needs is the address of the faulting instruction
+ * rather than of the next one - possibly part way through a parcel, with
+ * the instruction to be restarted afterwards.  A fault must therefore
+ * trap from inside the cycle and carry its own address, and cannot use
+ * this path or trapaddr's "pc plus one" without being wrong in the same
+ * way this was.
+ */
+static int int_pending_trap;
+
+void
+take_pending_trap()
+{
+    if (int_pending_trap) {
+        int_pending_trap = 0;
+        trap(ST_RESET & ~ST_INT);
+    }
+}
+
 void
 interrupt_check()
 {
@@ -354,7 +398,7 @@ interrupt_check()
     if (!super()) {
         if (maskreg & MASK_TINT) {      // no user interrupts, trap!
             // this goes to supervisor, which will assert int_pin later
-            trap(ST_RESET & ~ST_INT);
+            int_pending_trap = 1;
             return;
         }
     } else {

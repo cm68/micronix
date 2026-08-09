@@ -101,3 +101,4 @@ extern int config_sw;
  */
 extern void add_write_watch(unsigned short lo, unsigned short hi);
 extern unsigned long long simnow64();
+extern void take_pending_trap();
