@@ -1303,7 +1303,28 @@ main(int argc, char **argv)
 #endif
         running = 1;
         mysigblock();
-        z80_run();
+        {
+            unsigned long long before = sim_cycles;
+
+            z80_run();
+
+            /*
+             * A halted processor still consumes time.  It sits there
+             * taking bus cycles until something interrupts it, and if
+             * simulated time is the cycle count then a halt that
+             * advances nothing stops the clock - so the interrupt that
+             * would end the halt is never delivered, and the machine
+             * waits for ever on a timer that cannot fire.
+             *
+             * That deadlock looked like the console stopping in the
+             * middle of a word, with three clock interrupts in a four
+             * minute run.  Charge a nop's worth of cycles for standing
+             * still.
+             */
+            if (sim_cycles == before) {
+                sim_cycles += 4;
+            }
+        }
         mysigunblock();
         running = 0;
         check_time_outs();
