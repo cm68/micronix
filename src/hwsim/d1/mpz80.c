@@ -333,8 +333,26 @@ trap(byte trapbits)
      *
      * Starting the window one too low gave the kernel back the address
      * of the halt itself, so resuming re-executed it forever.
+     *
+     * That plus one belongs to the halt and to nothing else.  An
+     * interrupt is taken between instructions, where the pc is already
+     * the next instruction to execute - the window starts there, and
+     * adding one puts it a byte into the middle of it.
+     *
+     * The damage is not the resume address, which is what you would
+     * expect.  It is that trapaddr is also where the window is: get_byte
+     * only substitutes the rom for addresses from trapaddr up, so a
+     * trapaddr one too high leaves the first fetch after the trap
+     * reading ordinary memory at the pc instead of the first byte of the
+     * sequence.  The trap does not run at all.  The machine had taskreg
+     * zeroed and a trap pending, and executed whatever the supervisor
+     * happened to have at the user's pc - here d2, a jp into unmapped
+     * space, and from there a nop slide, a wrecked stack and a reboot.
      */
-    trapaddr = z80_get_reg16(pc_reg) + 1;
+    trapaddr = z80_get_reg16(pc_reg);
+    if (trapbits & ST_INT) {            // a halt or a reset, not an interrupt
+        trapaddr++;
+    }
     trapstat = trapbits;
 }
 
@@ -830,6 +848,23 @@ put_byte(vaddr addr, unsigned char value)
         *wregp[pa] = value;
         if ((addr & (REGS | 0x3)) == TASK) {
             setrom(1);
+            /*
+             * The manual says seven, twice: "a hardware delay of seven
+             * instruction fetches (M1 cycles) before execution begins in
+             * the desired task's memory space.  The 7th instruction fetch
+             * after writing into the task register should therefore be a
+             * user routine."
+             *
+             * Eight is right anyway, because those are not the same
+             * count.  An ED or CB prefixed instruction is one instruction
+             * fetch and two M1 cycles, and micronix's return to user runs
+             * ld sp,(0ah) - ED 7B - between the write and the jump.  Seven
+             * instructions, eight M1 cycles, and this counts cycles.
+             *
+             * Setting it to seven does not boot at all, which is the
+             * check worth remembering: the count is only meaningful
+             * against the instruction sequence that uses it.
+             */
             delay = 8;
         }
         interrupt_check();
