@@ -168,3 +168,4 @@ void z80_set_reg16(enum reg16, word v);
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
+extern unsigned long long sim_cycles;

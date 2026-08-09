@@ -432,7 +432,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-S\t<symbol file file>\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
     fprintf(stderr, "\t-T\t<space:addr>[,count] trace from here, for count instructions\n");
-    fprintf(stderr, "\t-W\t<addr> report every write to this address and keep going\n");
+    fprintf(stderr, "\t-W\t<addr>[-<addr>] report writes to this range and keep going\n");
     fprintf(stderr, "\t-5\t<file> a floppy on the 5 1/4 inch port\n");
     fprintf(stderr, "\t-x\topen a debug terminal window\n");
     fprintf(stderr, "\t-t\t<tracebits>\n");
@@ -495,97 +495,74 @@ mysignal(int signum, sighandler_t handler)
  * the recurring timeouts are handled in exactly the same way. when
  * the old one pops, we schedule the next.
  */
+/*
+ * Timeouts run on simulated time - z80 cycles - and not on the host's
+ * clock.
+ *
+ * They used to be setitimer and SIGALRM, which meant a disk completion
+ * or a clock tick landed wherever the host happened to be when the
+ * signal arrived.  Two runs of the same disk then did different things:
+ * one wedged after stat("/dev/ttyA"), one corrupted a name it was
+ * building, one got as far as /etc/passwd and dropped into the monitor.
+ * All three are the same race, and none of them could be reproduced on
+ * purpose, which makes them unfindable - you cannot bisect a fault that
+ * moves when you look at it.
+ *
+ * Counting cycles gives the same machine every time.  It is also closer
+ * to the hardware: a controller that says it will interrupt in thirty
+ * milliseconds means thirty milliseconds of processor time, not thirty
+ * milliseconds of whatever else the host was doing.
+ */
 struct timeout {
     char *name;
-    struct timeval when;    
-    struct timeval interval;    // if recurring
+    unsigned long long when;        // in cycles
+    unsigned long long interval;    // if recurring, else 0
     void (*handler)(int a);
-    int arg;                    // argument to pass handler
+    int arg;                        // argument to pass handler
 };
 
-static void timeout_handler();
-
-struct itimerval timer;
-struct timeval tv;
-struct timeval now;
 
 #define MILLION 1000000
 #define MAXTIMEOUTS 10
 
+/*
+ * What the simulated processor runs at.  The Decision 1 is a 4MHz Z80,
+ * and this is the number that turns a driver's microseconds into cycles.
+ */
+#define CPU_HZ  4000000
+
 struct timeout timeouts[MAXTIMEOUTS];
 
 /*
- * go through the timeout list and start the timer if there is a need
- * this can be called inside the signal handler, so we need protection
+ * Called once per instruction from the main loop.  Everything happens
+ * here, between instructions, which is what makes it repeatable.
  */
-static void
-timeout_sched()
+void
+check_time_outs()
 {
     int i;
     struct timeout *tp;
 
-    // put the elephant in cairo
-    tv.tv_sec = tv.tv_usec = 0;
-
-    // now find the how long to wait for the next pop
-    for (i = 0; i < MAXTIMEOUTS; i++) {
-        tp = &timeouts[i];
-        if (!tp->handler) continue;
-        if ((tv.tv_sec == 0) || timercmp(&tp->when, &tv, <=)) {
-            tv = tp->when;
-        }
-    }
-    timer.it_interval.tv_sec = timer.it_interval.tv_usec = 0;
-    if (tv.tv_sec != 0) {
-        gettimeofday(&now, 0);
-        timersub(&tv, &now, &timer.it_value);
-        setitimer(ITIMER_REAL, &timer, 0);
-        if (traceflags & trace_timer) printf("arming itimer\n");
-        mysignal(SIGALRM, timeout_handler);
-    } else {
-        timer.it_value.tv_sec = timer.it_value.tv_usec = 0;
-        setitimer(ITIMER_REAL, &timer, 0);
-        if (traceflags & trace_timer) printf("disarming itimer\n");
-    }
-}
-
-/*
- * this signal handler gets called every time our timer pops.
- * it is responsible for calling any expired timers
- * and arming any new timer.
- */
-static void
-timeout_handler()
-{
-    int i;
-    struct timeout *tp;
-
-    // if (trace & trace_timer) write(1, "timeout_handler called\n", 24);
-    // loop through all the timers, delivering callouts as needed
     for (i = 0; i < MAXTIMEOUTS; i++) {
         tp = &timeouts[i];
 
-    again:
-        if (!tp->handler) continue;
+        while (tp->handler && sim_cycles >= tp->when) {
+            void (*handler)(int a) = tp->handler;
+            int arg = tp->arg;
 
-        gettimeofday(&tv, 0);
-
-        // deliver any expired callouts.
-        if (timercmp(&tp->when, &tv, <=)) {
-            // if (trace & trace_timer) printf("timer callout %s\n", tp->name);
-            (*tp->handler)(tp->arg);
-
-            // increment any recurring timers and maybe deliver again
-            if (timerisset(&tp->interval)) {
-                timeradd(&tp->when, &tp->interval, &tp->when);
-                goto again;
+            if (tp->interval) {
+                tp->when += tp->interval;
+            } else {
+                tp->handler = 0;
+                tp->arg = 0;
             }
-
-            tp->handler = 0;
-            tp->arg = 0;
+            if (traceflags & trace_timer) {
+                printf("timeout %s at %llu\n",
+                    tp->name ? tp->name : "?", sim_cycles);
+            }
+            (*handler)(arg);
         }
     }
-    timeout_sched();
 }
 
 void
@@ -598,14 +575,11 @@ recurring_time_out(char *name, int hertz, void (*function)(int a), int a)
         tp = &timeouts[i];
         if (tp->handler)
             continue;
-        tp->interval.tv_usec = MILLION/hertz;
-        tp->interval.tv_sec = 0;
+        tp->interval = (unsigned long long) CPU_HZ / hertz;
         tp->handler = function;
         tp->name = name;
         tp->arg = a;
-        gettimeofday(&tp->when, 0);
-        timeradd(&tp->when, &tp->interval, &tp->when);
-        timeout_sched();
+        tp->when = sim_cycles + tp->interval;
         return;
     }
     printf("timeout overflow");
@@ -625,15 +599,12 @@ time_out(char *name, int usec_from_now, void (*function)(int a), int arg)
         tp = &timeouts[i];
         if (tp->handler)
             continue;
-        tv.tv_usec = usec_from_now;
-        tv.tv_sec = 0;
-        tp->interval.tv_usec = tp->interval.tv_sec = 0;
+        tp->interval = 0;
         tp->handler = function;
         tp->name = name;
         tp->arg = arg;
-        gettimeofday(&tp->when, 0);
-        timeradd(&tp->when, &tv, &tp->when);
-        timeout_sched();
+        tp->when = sim_cycles +
+            ((unsigned long long) usec_from_now * CPU_HZ) / MILLION;
         return;
     }
     printf("timeout overflow");
@@ -653,7 +624,6 @@ cancel_time_out(void (*handler)(), int arg)
             tp->arg = 0;
         }
 	}
-    timeout_sched();
 }
 
 char fbuf[0];
@@ -1061,7 +1031,13 @@ main(int argc, char **argv)
                 if (!argc--) {
                     usage("watch address not specified\n", progname);
                 }
-                add_write_watch(strtol(*argv++, 0, 0));
+                {
+                    char *w = *argv++;
+                    char *dash = strchr(w, '-');
+                    unsigned lo = strtol(w, 0, 0);
+
+                    add_write_watch(lo, dash ? strtol(dash + 1, 0, 0) : lo);
+                }
                 break;
             case 'T':
                 {
@@ -1314,6 +1290,7 @@ main(int argc, char **argv)
         z80_run();
         mysigunblock();
         running = 0;
+        check_time_outs();
         if (inst_countdown != -1) {
             inst_countdown--;
         }

@@ -15,6 +15,13 @@
 MACHINE context;
 int running;
 
+/*
+ * Simulated time, in z80 cycles.  Everything that used to be timed by
+ * the host's clock is timed by this instead - see the comment on the
+ * timeouts in hwsim.c.
+ */
+unsigned long long sim_cycles;
+
 void
 z80_init()
 {
@@ -24,7 +31,7 @@ z80_init()
 void
 z80_run()
 {
-    Z80Emulate(&context.state, 1, &context);
+    sim_cycles += Z80Emulate(&context.state, 1, &context);
 }
 
 void

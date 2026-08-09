@@ -2,6 +2,12 @@
 
 #include <stdio.h>
 #include "sim.h"
+
+/*
+ * Simulated time, in z80 cycles - the clock everything is timed by.
+ * See the timeout comment in hwsim/hwsim.c.
+ */
+unsigned long long sim_cycles;
 #include "z80.h"
 
 byte control;
@@ -70,6 +76,7 @@ z80_run()
 {
 	do {
 		z80_exec(&z80, 1);
+		sim_cycles++;
 	} while (!z80_opdone(&z80));
 }
 
