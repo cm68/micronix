@@ -66,12 +66,23 @@
  * The drives, from specs[] in sys/mw.c.  The minor number picks one:
  * mw.c does "type = minor(dev) >> 2", the low two bits being the
  * partition, so m5a is minor 0, m10a is 4 and m16a is 8.
+ *
+ * Filled in by drives() rather than written as initialisers, because
+ * this compiler has none - not for autos and not for statics either.
  */
 #define NDRIVE      5
-UINT dtracks[] = { 153, 306, 306, 640, 733 };
-UINT dheads[] = { 4, 4, 6, 6, 5 };
-UINT dsecs[] = { 17, 17, 17, 17, 17 };
-char *dnames[] = { "5 meg", "10 meg", "16 meg", "32 meg", "40 meg" };
+UINT dtracks[NDRIVE];
+UINT dheads[NDRIVE];
+UINT dsecs[NDRIVE];
+
+drives()
+{
+    dtracks[0] = 153; dheads[0] = 4; dsecs[0] = 17;     /* 5 meg */
+    dtracks[1] = 306; dheads[1] = 4; dsecs[1] = 17;     /* 10 meg */
+    dtracks[2] = 306; dheads[2] = 6; dsecs[2] = 17;     /* 16 meg */
+    dtracks[3] = 640; dheads[3] = 6; dsecs[3] = 17;     /* 32 meg */
+    dtracks[4] = 733; dheads[4] = 5; dsecs[4] = 17;     /* 40 meg */
+}
 
 char *pname;
 int dev = -1;
@@ -259,6 +270,7 @@ main(argc, argv)
     int i;
 
     pname = argv[0];
+    drives();
     bootfile = 0;
     exclude = 0;
     given = 0;
