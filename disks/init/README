@@ -21,3 +21,31 @@ stat'ing each terminal named in it.  Only ttyA has a login entry.
 
 On 1.6 in the simulator it does not get past that enumeration - see
 hwsim/DISKS.  1.67 does, and reaches a shell.
+
+where it dies, as of the deterministic simulator
+------------------------------------------------
+
+With the simulator timing everything by cycles, the 1.67 standalone does
+the same thing every run: 244 system calls and then a fall into unwritten
+memory.  The last four lines of the trace are
+
+	access("/bin/sh", 1)     = 1
+	access("/bin/login", 1)  = 1
+	access("/etc/passwd", 4) = 4
+	bootstrap stub entered at 0038
+
+which is console() working down the chain in the source here - sh, then
+login, then passwd, all present - and then calling rootpasswd().  It
+never arrives: there is no open, and no sbrk, between the access and the
+fall, so it dies in the first instructions of the function rather than in
+its fopen.
+
+What is distinctive about rootpasswd is its frame.  char line[512] is the
+largest local anywhere in init, and Whitesmith's allocates it by moving
+the stack pointer down 512 bytes in the prologue.  That is the thing to
+look at first.
+
+0038 is rst 38 and ff is its opcode, so "fell into unwritten memory" and
+"executed a wild jump" are the same event seen from the simulator's side.
+The simulator's boot stub lives at 0038 and used to swallow this
+silently - see hwsim/DISKS.
