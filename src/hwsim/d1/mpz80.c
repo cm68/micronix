@@ -246,15 +246,24 @@ int trace_trap;
  * tell a process writing its own memory from something writing through
  * it.
  */
+int stub_reported;
+
 #define NWATCH 8
-static vaddr watchlist[NWATCH];
+static vaddr watchlo[NWATCH];
+static vaddr watchhi[NWATCH];
 static int nwatch;
 
+/*
+ * A range rather than an address, because the thing worth watching is
+ * usually a buffer and the byte that matters moves about inside it.
+ */
 void
-add_write_watch(vaddr addr)
+add_write_watch(vaddr lo, vaddr hi)
 {
     if (nwatch < NWATCH) {
-        watchlist[nwatch++] = addr;
+        watchlo[nwatch] = lo;
+        watchhi[nwatch] = hi;
+        nwatch++;
     }
 }
 
@@ -643,6 +652,33 @@ get_byte(vaddr addr)
      * that easy, so the brute force here will have to do. - XXX
      */
     /*
+     * The djdma bootstrap lives at 0038, which is rst 38 - and ff, the
+     * byte unwritten memory reads as, is the opcode for rst 38.  So a
+     * program that runs off into nothing lands in the simulator's boot
+     * stub, which clears its own flag and waits for a value that is only
+     * written once, at startup.  A crash becomes a silent spin at 003d
+     * and nothing says what happened.
+     *
+     * The first entry is the boot and is expected.  Any entry after that
+     * is a program that has just executed something that was not code,
+     * and rst pushed the address after it, so the stack says where.
+     */
+    if (z80_get_reg8(status_reg) & S_M1) {
+        if ((addr >= 0x38) && (addr <= 0x4c)) {
+            if (!stub_reported) {
+                char sbuf[16];
+
+                stub_reported = 1;
+                printf("bootstrap stub entered at %04x (%s), stack top %04x\n",
+                    addr, dis_space(addr, sbuf, sizeof(sbuf)),
+                    fuword(z80_get_reg16(sp_reg)));
+            }
+        } else {
+            stub_reported = 0;
+        }
+    }
+
+    /*
      * A call that was traced going in gets its answer reported coming
      * out, which is the first thing fetched back in user mode at the
      * address the caller resumes from.
@@ -710,7 +746,7 @@ put_byte(vaddr addr, unsigned char value)
         int w;
 
         for (w = 0; w < nwatch; w++) {
-            if (watchlist[w] != addr)
+            if (addr < watchlo[w] || addr > watchhi[w])
                 continue;
             {
                 char sbuf[16];
@@ -722,8 +758,10 @@ put_byte(vaddr addr, unsigned char value)
                 } else {
                     getpte(addr, &wpa, &wattr);
                 }
-                printf("watch: %04x <- %02x (physical %06x) from %s\n",
-                    addr, value, wpa,
+                printf("watch: %04x <- %02x %s (physical %06x) from %s\n",
+                    addr, value,
+                    (value >= 0x20 && value < 0x7f) ? (char[]){'\'', value, '\'', 0} : "   ",
+                    wpa,
                     dis_space(z80_get_reg16(pc_reg), sbuf, sizeof(sbuf)));
             }
         }
