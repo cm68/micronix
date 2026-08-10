@@ -31,7 +31,7 @@
 ; data to its own address, bss cleared, entry where the header puts it.
 ; Replacing the second level is
 ;
-;	cat mwboot1.cim mwboot.com >bootimg
+;	cat mwboot1.bin mwboot.com >bootimg
 ;
 ; with a pad, and nothing else has to agree about anything.
 ;
@@ -56,6 +56,23 @@
 ; top of the loader.  After the move it uses jr for every branch of its
 ; own, so the copy runs correctly wherever it lands.
 ;
+;
+; assembled by asz, linked at BASE, and unwrapped
+; ----------------------------------------------
+;
+; asz has no org: it writes a relocatable object and the linker decides
+; where the text goes, so BASE below is the one place that says 0100 and
+; the Makefile passes the same number to wsld.  The 16 byte header the
+; linker writes is then cut off, because the rom reads a sector and
+; jumps to the first byte of it - there is nothing there to read a
+; header, which is the whole reason the second level needs this one.
+;
+; Two addresses of ours therefore appear in two forms.  A label is where
+; the linker put it, which is where it lies in the sector we were read
+; into; adding RBIAS gives the same byte in the copy at RELOC.  Every
+; reference the moved code makes to itself is written that way, and the
+; branches it takes are jr, which need no adjustment at all.
+;
 
 CHAN	equ	0080h		; the channel the rom left set up
 DMA	equ	CHAN+4		; 24 bit address, low two bytes here
@@ -69,7 +86,26 @@ STAGE	equ	08000h		; where the sectors land before relocation
 NSEC	equ	8		; 4k of it, which stand/README asks it to fit
 TRIES	equ	10		; per sector, as mwio.c retries
 
+BASE	equ	0100h		; where the rom reads us, and where we link
 RELOC	equ	0c000h		; out of the way of what we are loading
+RBIAS	equ	RELOC-BASE	; add to one of our addresses for its copy
+
+;
+; The MULTIO's first uart, for complaining with.  Output only, and no
+; setup: the monitor has been talking to this port since reset - it
+; printed before it read us in - so the baud rate and the line are
+; already right and all that is left is to wait for the holding register
+; and write a byte.  A few dozen bytes, which we have.
+;
+; Which group is selected decides what the eight ports at 0048 mean, so
+; the group is set before use.  Only the failure paths do this, so the
+; ordinary boot touches nothing on the way past.
+;
+GSEL	equ	04fh		; group select
+GRP1	equ	1		; the serial ports
+TXB	equ	048h		; transmit holding register
+LSR	equ	04dh		; line status
+LSRTXE	equ	020h		; holding register empty
 
 ;
 ; Whitesmith's object header, from include/obj.h.  Sixteen bytes, and
@@ -85,14 +121,14 @@ O_BSS	equ	8		; bss length, which is not in the file
 O_TOFF	equ	12		; where the text wants to be
 O_DOFF	equ	14		; and the data
 
-	org	0100h
+	.text
 
 start:
-	ld	hl,start
+	ld	hl,BASE
 	ld	de,RELOC
-	ld	bc,finish-start
+	ld	bc,finish-BASE
 	ldir
-	jp	RELOC+(run-start)
+	jp	run+RBIAS
 
 ;
 ; Read sectors 1 through NSEC of this track into STAGE upward.  Sector 0
@@ -101,6 +137,20 @@ start:
 ; one track and the head never moves.
 ;
 run:
+;
+; A stack of our own before anything calls anything.  The rom left one
+; somewhere and the second level's startup will pop from it regardless,
+; but the first level had no stack dependency at all until the signon
+; introduced one, and it costs three bytes not to inherit a guess.
+; Below RELOC is empty: we load to 0100 and stage at 8000.
+;
+	ld	sp,RELOC
+
+	ld	a,GRP1		; the eight ports at 0048 are the uart now
+	out	(GSEL),a
+	ld	hl,msign+RBIAS
+	call	puts+RBIAS
+
 	ld	hl,STAGE	; where the next sector goes
 	ld	b,NSEC		; how many are left
 	ld	c,1		; and which one this is
@@ -128,15 +178,11 @@ poll:
 	jr	nz,try
 
 ;
-; Out of retries.  There is nowhere to go and nothing to say it with -
-; the console belongs to whatever we failed to load - so stop where
-; somebody watching the front panel or the simulator can see it.  The
-; two stops below are deliberately different addresses: which one the pc
-; is sitting in says whether the disk would not read or what it read was
-; not a program.
+; Out of retries.  Say so and stop.
 ;
 stuck:
-	jr	stuck
+	ld	hl,mread+RBIAS
+	jr	moan
 
 good:
 	inc	h		; on by 512, and l stays 0
@@ -187,12 +233,42 @@ enter:
 	jp	(hl)
 
 ;
-; What we read is not a program.  Same silence as above, a different
-; address.
+; What we read is not a program.
 ;
 badmag:
-	jr	badmag
+	ld	hl,mmagic+RBIAS
+
+;
+; Complain and stop.  There is nowhere to go from here: the console
+; belongs to whatever we failed to load, and the only thing left is to
+; say which of the two things went wrong and wait for somebody.
+;
+moan:
+	call	puts+RBIAS
+hang:
+	jr	hang
+
+;
+; Output only, and no setup: the monitor has had this port since reset,
+; so the line is already right.  Wait for the holding register, write a
+; byte, repeat until the nul.
+;
+puts:
+	ld	a,(hl)
+	or	a
+	ret	z
+	ld	c,a
+	inc	hl
+pwait:
+	in	a,(LSR)
+	and	LSRTXE
+	jr	z,pwait
+	ld	a,c
+	out	(TXB),a
+	jr	puts
+
+msign:	.db	"mwboot:",13,10,0
+mread:	.db	"read",13,10,0
+mmagic:	.db	"magic",13,10,0
 
 finish:
-
-	end
