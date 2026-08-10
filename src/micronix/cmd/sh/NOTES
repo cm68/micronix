@@ -224,6 +224,68 @@ inference, not yet traced; everything above it is read off the code.
     0x9646  input-source stack pointer, base 0x9648
 
 
+The parser
+----------
+
+CORRECTION: an earlier note here called H2c12 "read and parse a line".
+It only reads.  It is 137 bytes and its only real call is H6448, the
+fgets of this libc.  The parsing is in the routines the loop calls
+after it.
+
+H015d calls fifteen routines.  By size, which is the quickest way to
+see which ones matter:
+
+    H2257  1465   the biggest thing in the shell
+    H03f5   727
+    H1339   687
+    H5292   515
+    H2057   461
+    H02d6   278
+    H56ab   196
+    H5f06   156   resumes a popped input source
+    H2c12   137   reads one line
+    H4f0c   126
+    H29ad    83
+    H424e    54
+    H2cfc    27   called from everywhere - a small common helper
+    H42b4    16
+
+and separately, not called from the loop directly:
+
+    H17d7  1040   THE TOKENISER.  It owns the metacharacters.
+
+The two copies of "<>&|" at 0x17cd and 0x17d2 are both inside H17d7,
+used at two different points, and both times like this:
+
+    H783d(*scan, "<>&|")
+
+so H783d is the "is this character in this set" test, and 0x9bec is
+the pointer being scanned along the line.  The shape at 0x1ab9 and
+0x1ad0 is a word scanner: stop at a metacharacter, stop at the end of
+the line, otherwise take the character and go on.
+
+H2257 does NOT reference the metacharacters, so it is not the
+tokeniser; it is the layer above.  It IS the parser proper, because
+"Missing name for redirect." at 0x2227 is referenced from 0x27c8,
+which is inside it.  So H2257 is where a command is built and where
+its redirections are attached.
+
+    H2257   parser: builds commands, attaches redirections
+    H17d7   tokeniser: splits on "<>&|" and whitespace
+    H783d   is-this-char-in-this-set, the test both use
+    H16f2   19 bytes: print via H7cab, then exit.  A fatal error.
+            H2257 calls it three times, so there are three ways for
+            the parse to give up.
+    H772d   72 bytes, a leaf, called eight times from H2257 - the
+            most used thing in the parser and still unidentified.
+
+"Syntax error." at 0x0111 is referenced from NOWHERE that disas can
+see.  Either it is reached by an address the tracer does not resolve,
+or it is dead.  Worth settling before writing the error paths, since
+a message with no reference may mean a whole branch is missing from
+the trace.
+
+
 Next
 ----
 
