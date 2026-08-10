@@ -1,0 +1,133 @@
+Reading /bin/form back into C
+=============================
+
+form.c was reconstructed from the binary, which we have no source for.
+This records how, because the same is to be done to every Micronix
+binary in that position, and most of what follows is about Whitesmiths
+C rather than about form.
+
+
+What the image looks like
+-------------------------
+
+    disas filesystem/bin/form
+
+    whitesmiths type 94 symlen 9 norelocs
+    symbols: 0 text: 100(341b) data: 4000(c6d) bss: 0
+
+16 byte header, then text at 0x100, then data at 0x4000.  To get at the
+data segment in the file, seek to 16 + textlen.
+
+STRIPPED.  "symbols: 0" is what makes this work harder than it needs to
+be, and it defeated one of disas's own features - see below.
+
+
+Whitesmiths calling conventions, learned here
+---------------------------------------------
+
+Every function opens by CALLing a fixed helper rather than opening code
+for its own frame:
+
+    H34c0:  ld hl,0 / add hl,sp / ex de,hl / ex (sp),hl / jp (hl)
+
+which leaves the frame pointer in DE, and closes with JP to
+
+    H34c7:  ex de,hl / ld sp,hl / pop de / ...
+
+So a function body reads as "CALL <framehelper>, LD HL,-N, ADD HL,SP,
+LD SP,HL" - and N is the frame size.  Locals are addressed off DE as
+"LD HL,FFF9H / ADD HL,DE".  Arguments are at positive offsets from DE:
+"LD HL,0004H / ADD HL,DE" is the first one.
+
+A switch is a third helper of the same family:
+
+    H349b:  ld a,(hl) / inc hl / or (hl) / jp nz,cmp
+            inc hl / ld a,(hl) / inc hl / ld h,(hl) / ld l,a / jp (hl)
+            ld a,c / inc hl / cp (hl) ...
+
+reached as "LD BC,<value> / LD HL,<table> / JP <helper>".  The table is
+4-byte entries of [address, value], ending at an entry whose address is
+zero - and THAT entry's second word is the default target.
+
+disas already knew how to walk this, but only when a symbol named
+"c.switch" pointed at the helper.  form has no symbols, so all sixteen
+of its request handlers disassembled as instructions.  disas now finds
+the helper by its byte signature (see src/tools/disas.c); do that first
+on any stripped image or the jump tables will read as nonsense that
+happens to decode.
+
+
+How form itself is put together
+-------------------------------
+
+Main loop, at H0327: read a line into the buffer at 0x4404, and
+
+    if (buf[0] == '.')  docommand(buf);     /* H03f9 */
+    else                dotext(buf);        /* H0edd */
+
+which is the whole of "if the first character of a line is a period,
+form attempts to interpret the line as a command".
+
+docommand looks the name up in a table of {name, code} pairs at 0x4a38,
+walked with strcmp (H2fce), and switches on the code.  The names live
+in the text segment at 0x03c9 as sixteen 3-byte entries.  Do not assume
+the switch values are indices into the name storage - they are not; read
+the pointer table.  The mapping is:
+
+    bp  1  H0506      ls  8  H047c
+    br  2  H0476      nf  9  H0469
+    ce  3  H067c      pl 10  H054e
+    fi  4  H0459      rm 11  H061e
+    fo  5  H04bd      sp 12  H04d1
+    he  6  H04a9      ti 13  H064c
+    in  7  H05b3      ul 14  H06ac
+    ta 16  H05ed      bd 15  H06d9
+
+    default   H0466   (which is just the function epilogue)
+
+That mapping is what makes the small handlers make sense, and it is how
+the variables below were identified:
+
+    H117d       break - flush the line being filled.  .br is nothing
+                but a call to it, and every request that changes the
+                shape of the page calls it first.
+    0x4000      fill, a 16 bit flag.  .fi is "call break, fill = 1"
+                and .nf is "call break, fill = 0".  Nothing else.
+    0x4404      the input line buffer.
+    0x4a1a      read by .ti.
+
+form has no messages of its own.  The only strings in the image are
+libc's errno table at 0x2cdc, so a large part of that 13K is library,
+not program.  Its only flags are -t and -o (at 0x0113 and 0x0116), and
+the fopen modes r/a/w are at 0x1976.
+
+
+What is traced and what is not
+------------------------------
+
+Traced out of the binary: the main loop and its dot test, the request
+set and their dispatch codes, which handlers are trivial, the fill flag,
+that .br is the break routine, the two command line flags.
+
+Taken from man1/form.1 rather than the binary: the defaults (fill on,
+indent 0, right margin 60, page length 66, .bd/.ce/.ul default 1), and
+the meaning of each request.
+
+NOT yet verified against the binary: pagination arithmetic - where the
+header sits, how many blank lines top and bottom, exactly when a page
+breaks.  form.c currently puts three blank lines, the header, and a
+blank at the top, and the footer three from the bottom, which produces
+a 67 line page where it should produce 66.  The handlers at H0506 (.bp)
+and H04a9/H04bd (.he/.fo) are where the real answer is.
+
+THE TEST THAT SETTLES IT is to run the original under the simulator and
+diff its output against ours over the whole man tree:
+
+    for f in filesystem/usr/man/man*/*; do
+        <run /bin/form under the simulator on $f>  > a
+        ./form.host $f                             > b
+        cmp a b
+    done
+
+183 pages is a large and free corpus of real input.  Do that before
+trusting any of this.
