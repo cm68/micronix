@@ -1,0 +1,94 @@
+Reading /bin/sh back into C - reconnaissance
+============================================
+
+Not yet written.  This is what has been established so far, so the next
+pass starts from here rather than from the beginning.  Read
+cmd/form/NOTES first - the Whitesmiths conventions described there
+(frame helper, switch helper, how disas has to be told about them) all
+apply, and form is the worked example.
+
+
+Shape
+-----
+
+    disas filesystem/bin/sh
+
+    whitesmiths type 94 symlen 9 norelocs
+    symbols: 0 text: 100(883d) data: 9000(bee) bss: 0
+
+34877 bytes of text against form's 13339, and stripped like everything
+else.
+
+
+What it is
+----------
+
+Not a Bourne shell.  The builtins include alias, unalias, source, dir,
+era and prompt, the startup files are ~/.login and ~/.sh, and the
+prompt is "# " - this is csh-flavoured.  man1/sh.1 is 443 lines and is
+the specification; read it before writing any code.
+
+Strings worth knowing:
+
+    0111  "Syntax error."
+    2227  "Missing name for redirect."
+    17cd  "<>&|"              the metacharacters
+    1bea  "/.login"           startup, relative to home
+    1bf2  "/.sh"
+    1c6a  "# "                the prompt
+    1c70  "read" "-v" "-c"    flags
+    1efa  "/usr/bin" "/bin"   the default path
+    09fd  "/dev/null"
+    490e  Terminated, Alarmed, Broken pipe, ... signal descriptions
+    4b70  JTERM, ALRM, PIPE, SYS, ...        signal names
+
+There is no message catalogue beyond that; as with form, a large part
+of the image is library.
+
+
+The builtin table
+-----------------
+
+The names are a packed list at 0x2c9e:
+
+    unalias\0alias\0kill\0home\0path\0type\0source\0nice\0era\0dir\0
+    sync\0echo\0pid\0prompt\0exit\0wait\0chdir\0cd\0
+
+and the dispatch table is {char *name; int code;} records at 0x9755 in
+DATA, eighteen of them:
+
+    cd       1     echo     6     path    13
+    chdir    1     sync     8     home    15
+    dir      2     prompt   9     kill    16
+    era      3     pid     10     alias   17
+    wait     4     type    11     unalias 18
+    exit     5     source  12     nice    19
+
+cd and chdir share code 1 - they are synonyms.  Codes 7 and 14 are
+absent from the table, so either the switch has cases reached some
+other way or the numbering has gaps; that is worth resolving early,
+since it may point at builtins that are recognised but not listed.
+
+TWO TRAPS, both of which cost time here:
+
+  1. The table is at ODD alignment (0x9755, and the records straddle
+     odd addresses).  A scan for pointers that steps two bytes at a
+     time walks straight past it.  Step one byte.
+
+  2. The table is in DATA and the names are in TEXT.  Searching the
+     text segment for a "LD HL,2c9e" that loads the list finds
+     nothing, because nothing does - the pointer is an initialised
+     variable, not an immediate.  Search both segments for the raw
+     bytes before concluding anything.
+
+
+Next
+----
+
+  - find the switch helper by signature (disas does this now) and pull
+    the jump table, as was done for form, to get the eighteen handler
+    addresses
+  - find the main loop: read a line, parse, fork/exec
+  - the parser is the bulk of it - "<>&|" at 0x17cd is where
+    redirection and pipes are recognised
+  - sh.1 gives the whole language; the binary settles the details
