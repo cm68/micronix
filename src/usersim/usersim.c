@@ -224,12 +224,29 @@ dis_space(unsigned short addr, char *buf, int len)
 /*
  * the disassembler's fetch: like get_byte but without tripping a read
  * watchpoint, because listing an instruction is not the program
- * reading that byte
+ * reading that byte.
+ *
+ * everything the simulator reads in order to *describe* the machine -
+ * the monitor's dump, the syscall and function traces, a string being
+ * shown beside an argument - goes through here rather than through
+ * get_byte.  the alternative is a debugger whose own output is what
+ * fires the watchpoint it was asked to set, and a trace that reports
+ * reads the program never made.
  */
 unsigned char
 dis_byte(unsigned short addr)
 {
     return memory[addr & 0xffff];
+}
+
+/*
+ * the word form of the same thing.  get_word is not two get_bytes here
+ * either, so this cannot be left to the caller.
+ */
+unsigned short
+dis_word(unsigned short addr)
+{
+    return memory[addr & 0xffff] | (memory[(addr + 1) & 0xffff] << 8);
 }
 
 unsigned char
@@ -1136,7 +1153,7 @@ cpmsys()
     char *s;
     char c;
 
-    from = get_word(z80_get_reg16(sp_reg)) - 3;
+    from = dis_word(z80_get_reg16(sp_reg)) - 3;
     C_reg = z80_get_reg8(c_reg);
     DE_reg = z80_get_reg16(de_reg);
 
@@ -1152,14 +1169,14 @@ cpmsys()
     if (cs) {
         s += sprintf(vbuf, "call: %s arg: %x ", cs->name, DE_reg);
         if (cs->type == 1) {
-            s += sprintf(s, "fcb: %c:", get_byte(DE_reg) + '@');
+            s += sprintf(s, "fcb: %c:", dis_byte(DE_reg) + '@');
             for (i = 1; i < 9; i++) {
-                c = get_byte(DE_reg + i);
+                c = dis_byte(DE_reg + i);
                 if (c != ' ') *s++ = c;
             }
             *s++='.';
             for (i = 9; i < 12; i++) {
-                c = get_byte(DE_reg + i);
+                c = dis_byte(DE_reg + i);
                 if (c != ' ') *s++ = c;
             }
         }
@@ -1181,7 +1198,7 @@ strdump(int p)
 
     for (i = 0; i < XBUF - 1; i++) {
         xbuf[i + 1] = '\0';
-        c = get_byte(p + i);
+        c = dis_byte(p + i);
         xbuf[i] = c;
         if ((c < ' ') || (c > 0x7e)) xbuf[i] = '.';
         if (!c) break;
@@ -1203,7 +1220,7 @@ funcdump(char *s)
 
     sp = z80_get_reg16(sp_reg);
     for (i = 0; i < ADUMP; i++) {
-        a[i] = get_word(sp + (i * 2));
+        a[i] = dis_word(sp + (i * 2));
     }
     message("%s(", s);
     for (i = 1; i < ADUMP; i++) {
@@ -1641,10 +1658,10 @@ tty_dump(char *s, unsigned short a)
     char c;
 
     message("%s in: %s out: %s ",
-        s, baud[get_byte(a)], baud[get_byte(a + 1)]);
-    cchar("erase", get_byte(a + 2));
-    cchar("kill", get_byte(a + 3));
-    bitdump(get_word(a + 4));
+        s, baud[dis_byte(a)], baud[dis_byte(a + 1)]);
+    cchar("erase", dis_byte(a + 2));
+    cchar("kill", dis_byte(a + 3));
+    bitdump(dis_word(a + 4));
     message("\n");
 }
 
@@ -2419,7 +2436,7 @@ SystemCall()
         // ip->mode = sbuf.st_mode;
         copyout(iobuf, arg2, 36);
         if (verbose & V_DATA) {
-            dumpmem(&get_byte, arg2, 36);
+            dumpmem(&dis_byte, arg2, 36);
         }
         carry_clear();
         break;
@@ -2706,7 +2723,7 @@ SystemCall()
     }
   nolog2:
     if ((verbose & V_DATA) && (sp->flag & SF_BUF)) {
-        dumpmem(&get_byte, arg1, ret);
+        dumpmem(&dis_byte, arg1, ret);
         fflush(stdout);
     }
     z80_set_reg16(pc_reg, pop());

@@ -38,6 +38,14 @@ extern int fmt_syscall(unsigned short addr, char *dest);
 extern unsigned char dis_byte(unsigned short addr);
 
 /*
+ * The word form, for the same reason and for the same callers: a trace
+ * that prints a stacked argument or a pointer is describing memory, not
+ * reading it, and get_word is not two get_bytes in every simulator.
+ * Only the simulators that trace through words need define it.
+ */
+extern unsigned short dis_word(unsigned short addr);
+
+/*
  * An address by itself does not say where it is.  0x100b is one thing in
  * task 1 and another in the supervisor's on board memory, and while a
  * trap sequence runs the cpu is not fetching from the pc at all - it is

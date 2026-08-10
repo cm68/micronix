@@ -80,6 +80,17 @@ get_byte(unsigned short addr)
     return c;
 }
 
+/*
+ * nm reads a file, not a running machine, so there is nothing for the
+ * disassembler's fetch to avoid disturbing - it is the same read.  the
+ * hook still has to exist, because disz80 fetches through it.
+ */
+unsigned char
+dis_byte(unsigned short addr)
+{
+    return get_byte(addr);
+}
+
 struct reloc *
 lookup(int i)
 {

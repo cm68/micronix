@@ -24,7 +24,6 @@
 #include "mnix.h"
 
 extern unsigned short lookup_sym(char *);
-extern unsigned char get_byte(unsigned short addr);
 extern int mypid;
 extern int verbose;
 extern void pverbose();
@@ -73,6 +72,12 @@ struct {
     { W_IRQ,    "IRQ", 66, 0, 4 }
 };
 
+/*
+ * A dump shows memory, it does not read it on the program's behalf, so
+ * it fetches with dis_byte - see disz80.h.  Drawing a dump used to trip
+ * the very read watchpoint the user had just set, and in hwsim would
+ * have stepped a trap sequence along under the reader.
+ */
 void
 memdump(WINDOW *w, unsigned short addr, int len)
 {
@@ -95,7 +100,7 @@ memdump(WINDOW *w, unsigned short addr, int len)
         while (len) {
             if (n == 0)
                 message("%04x:", addr);
-            c = get_byte(addr++);
+            c = dis_byte(addr++);
             message(" %02x", c & 0xff);
             txt[n] = ((c < ' ') || (c > 0x7e)) ? '.' : c;
             if (++n == 16) {
@@ -122,7 +127,7 @@ memdump(WINDOW *w, unsigned short addr, int len)
     while (len) {
         if (pcol == 0)
             mvwprintw(w, pline, DUMP_ADDR, "%04x:", addr);
-        c = get_byte(addr++);
+        c = dis_byte(addr++);
         mvwprintw(w, pline, DUMP_DATA + (pcol * 3) + (pcol / 4),
             "%02x", c & 0xff);
 	if ((c < ' ') || (c > 0x7e)) c = '.';
