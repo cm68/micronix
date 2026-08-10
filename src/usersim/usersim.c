@@ -75,14 +75,18 @@ int traceflags;
 int sp_report;                  /* -S: report stack low-water at exit */
 unsigned short sp_lowater = 0xffff;
 unsigned short sp_initial;
+int sp_overflow;                /* the stack has been below the break */
 
 /*
- * text segment write protection: armed by the loader once the image
- * is in place.  any store into [tprot_lo, tprot_hi) - a runaway
- * stack pushing into code, or a stray pointer - is a bug in the
- * emulated program.  first hit is reported with pc/sp; the count is
- * reported again at exit.
+ * text segment writes: [tprot_lo, tprot_hi) is the text of the image
+ * the loader put in place, for images that have a text segment to
+ * speak of.  a store into it is *not* an error - micronix does not
+ * write protect text, and whitesmith's puts string literals in among
+ * the code, so a program that walks a literal ("0" bumped to "9" to
+ * find a man section) writes its own text on purpose.  the count is
+ * therefore only a curiosity, reported under -W.
  */
+int tprot_report;               /* -W: report writes into text */
 unsigned short tprot_lo;
 unsigned short tprot_hi;
 int tprot_hits;
@@ -146,8 +150,10 @@ put_byte(unsigned short addr, unsigned char value)
         if (tprot_hits++ == 0) {
             tprot_addr = addr;
             tprot_pc = z80_get_reg16(pc_reg);
-            message("stack overflow: write %04x at pc %04x sp %04x\n",
-                addr, tprot_pc, z80_get_reg16(sp_reg));
+            if (tprot_report) {
+                message("text write: %04x at pc %04x sp %04x\n",
+                    addr, tprot_pc, z80_get_reg16(sp_reg));
+            }
         }
     }
     memory[addr] = value;
@@ -506,6 +512,7 @@ usage(char *complaint, char *arg)
         progname);
     fprintf(stderr, "\t-r\trun as root\n");
     fprintf(stderr, "\t-S\treport stack low-water and final break at exit\n");
+    fprintf(stderr, "\t-W\treport writes into the text segment\n");
     fprintf(stderr, "\t-T\topen a debug terminal window\n");
     fprintf(stderr, "\t-d <root dir>\n");
     fprintf(stderr, "\t-b\t\tstart with breakpoint\n");
@@ -588,6 +595,9 @@ main(int argc, char **argv)
                 break;
             case 'S':
                 sp_report = 1;
+                break;
+            case 'W':
+                tprot_report = 1;
                 break;
             case 'd':
                 if (!argc--) {
@@ -933,6 +943,7 @@ do_exec(char *name, char **argv)
     FILE *file;
     struct obj header;
     int i;
+    int isobj;
     int ai;
     unsigned short *ao;
     int argc;
@@ -965,7 +976,8 @@ do_exec(char *name, char **argv)
     }
     fseek(file, 0, SEEK_SET);
     fread(&header, 1, sizeof(header), file);
-    if (header.ident != OBJECT) {
+    isobj = header.ident == OBJECT;
+    if (!isobj) {
         fseek(file, 0, SEEK_END);
         header.text = ftell(file);
         header.textoff = 0x100;
@@ -993,7 +1005,17 @@ do_exec(char *name, char **argv)
         signal(i, SIG_DFL);
     }
 
-    tprot_hi = 0;               /* disarm text protection during load */
+    /*
+     * the new image gets its own accounting: the counters below belong
+     * to the program that is being replaced, and leaving them alone
+     * blames the next program for the last one's writes.
+     */
+    tprot_hi = 0;               /* disarmed while the image is loaded */
+    tprot_hits = 0;
+    tprot_addr = tprot_pc = 0;
+    sp_lowater = 0xffff;
+    sp_initial = 0;
+    sp_overflow = 0;
 
     for (i = 0; i < 65536; i++) {
         put_byte(i, 0);
@@ -1027,9 +1049,17 @@ do_exec(char *name, char **argv)
 
     brake = header.dataoff + header.data + header.bss + header.heap;
 
-    /* image is in place: arm text write protection */
-    tprot_lo = header.textoff;
-    tprot_hi = header.textoff + header.text;
+    /*
+     * image is in place: note where its text is.  a raw image has no
+     * header to say where text stops and data starts, so the whole
+     * file arrives as "text" and there is nothing to watch.
+     */
+    if (isobj) {
+        tprot_lo = header.textoff;
+        tprot_hi = header.textoff + header.text;
+    } else {
+        tprot_lo = tprot_hi = 0;
+    }
 
     ao = malloc(argc * sizeof(*ao));
 
@@ -1289,6 +1319,16 @@ emulate()
                 sp_initial = xsp;
             if (xsp && xsp < sp_lowater)
                 sp_lowater = xsp;
+            /*
+             * this is what a stack overflow actually looks like: the
+             * stack has come down past the break and is standing on
+             * the heap.  the text is a long way further down still.
+             */
+            if (xsp && brake && xsp < brake && !sp_overflow) {
+                sp_overflow = 1;
+                message("stack overflow: sp %04x below break %04x at pc %04x\n",
+                    xsp, brake, z80_get_reg16(pc_reg));
+            }
         }
         /*
          * if we have a signal to deliver, do it now
@@ -2013,9 +2053,9 @@ SystemCall()
                 brake, sp_lowater - brake);
             fflush(repfp);
         }
-        if (tprot_hits) {
+        if (tprot_report && tprot_hits) {
             fprintf(repfp,
-                "stack overflow: %d writes (first: addr %04x pc %04x)\n",
+                "text writes: %d (first: addr %04x pc %04x)\n",
                 tprot_hits, tprot_addr, tprot_pc);
             fflush(repfp);
         }
