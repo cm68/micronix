@@ -184,12 +184,53 @@ the next concrete piece of work, and it maps the whole of how the
 shell talks to the system.
 
 
+The shell body
+--------------
+
+main does three things:
+
+    H1c7b(argv, argc)       set up from the command line
+    H015d()                 the read-eval loop
+    H7117(*0x9008)          exit with the status kept in 0x9008
+
+H015d allocates 0x40a bytes of locals - a line buffer among them, at
+DE-0x208 - and loops:
+
+    H0165   clear bit 5 of the flag word at 0x99c6
+            if the word at 0x9002 is zero, skip the interactive
+            checks and go straight to H01a0
+            (0x9002 and 0x9008 are both initialised to 1)
+
+    H01a0   H42b4()             per-iteration reset
+            H424e()             the other half of it
+            H2c12(buf)          read and parse one line
+            if buf[0] is not zero, go to H01e6 and execute it
+
+            otherwise nothing was read.  If the stack at 0x9646 is
+            empty, leave the loop at H01fb - that is end of input.
+            Otherwise pop a word off it, hand it to H5f06(), and go
+            back to the top.
+
+0x9646 is a stack pointer and 0x9648 its base; it pops by subtracting
+two, and "empty" is tested as base minus pointer without borrow.  A
+stack that is unwound when input runs out, in a shell whose builtins
+include source, is the stack of input sources - so H5f06 is very
+likely the routine that resumes the previous one.  That last step is
+inference, not yet traced; everything above it is read off the code.
+
+    0x9002  tested at the top of every iteration, initialised 1
+    0x9008  the exit status main passes to exit
+    0x99c6  flag word, bit 5 cleared each time round
+    0x9646  input-source stack pointer, base 0x9648
+
+
 Next
 ----
 
-  - finish main: after the signal loop at H71ea comes argument
-    handling (-v, -c and "read" are at 0x1c70) and then the read
-    loop
-  - the parser is the bulk of it - "<>&|" at 0x17cd is where
-    redirection and pipes are recognised
+  - H1c7b is where -v, -c and "read" (0x1c70) are handled, and where
+    ~/.login and ~/.sh (0x1bea, 0x1bf2) must be read from
+  - H2c12 reads and parses a line and is the bulk of the program;
+    "<>&|" at 0x17cd is where redirection and pipes are recognised
+  - H01e6 is execution: fork, the exec at block 0x9b70, pipe and dup
+  - confirm H5f06 really is "resume the popped input source"
   - sh.1 gives the whole language; the binary settles the details
