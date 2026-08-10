@@ -303,6 +303,37 @@ a message with no reference may mean a whole branch is missing from
 the trace.
 
 
+The execution subsystem
+-----------------------
+
+H0a14 is the top of it, 2043 bytes, and these are what it is built
+from.  Confirmed by reading them, not by their size:
+
+    H0a14  2043  the engine.  close x15, dup x8, dobuiltin x4,
+                 ignoresigs x2, exit x3, runcmd x3
+    H07a8   594  runs one command.  Twenty-four distinct calls, the
+                 widest fan-out in the shell - this is where the
+                 special cases live
+    H5897   286  a SUBSHELL: it calls H015d, the read-eval loop,
+                 and then exit.  So this is the child that runs a
+                 script or a parenthesised list
+    H57c4   208  redirection: two closes, an open through indir, and
+                 H8228
+    H1285   158  two string equalities and two messages
+    H1228    77  builtin dispatch - holds the switch at 0x075e
+    H48dc    47  builtin lookup: takes a word, searches with a
+                 24 byte local
+    H4287    42  IGNORE SIGNALS.  signal(2,1) and signal(3,1) -
+                 SIGINT and SIGQUIT to SIG_IGN - through H827f,
+                 which is therefore signal()
+    H7e5f    24  execv(path, argv).  Its whole body is pushing two
+                 arguments and calling the exec stub H8100
+
+So the shape to match is: the engine forks, the child ignores
+signals, sets up redirection, and either execs or becomes a
+subshell; the parent waits.
+
+
 THE GOAL: MATCH THE CALL GRAPH
 ------------------------------
 

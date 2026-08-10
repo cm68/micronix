@@ -18,6 +18,7 @@
                             /*   0x9648 holds one FILE * per level */
 #define MAXALIAS    32
 #define MAXPATH     128
+#define MAXPATHV    8       /* the image has three: . /bin /usr/bin */
 
 /*
  * One command: its words, and where its three streams go.  A
@@ -82,9 +83,9 @@ extern int  verbose;        /* -v */
 extern int  status;         /* what exit is given      (0x9008) */
 extern char *prompt;
 extern char *homedir;
-extern char pathlist[MAXPATH];
+extern char *pathv[MAXPATHV];
 
-int  lookup();
+int  isbuiltin();
 int  dobuiltin();
 int  execute();
 int  runpipeline();

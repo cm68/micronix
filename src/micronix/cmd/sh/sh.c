@@ -14,6 +14,7 @@
  */
 
 #include <stdio.h>
+#include <signal.h>
 #include "sh.h"
 
 int  login;                 /* argv[0] began with '-'   (0x9004) */
@@ -23,7 +24,15 @@ int  interactive = 1;       /* the flag tested at the top of the loop */
 
 char *prompt = "# ";        /* 0x1c6a */
 char *homedir = "/";
-char pathlist[MAXPATH] = "/bin:/usr/bin";   /* 0x1efa, 0x1f03 */
+/*
+ * The search path.  The image keeps three char * in an array at
+ * 0x9741, laid out backwards the way its builtin table is, pointing
+ * at "." (0x1f08), "/bin" (0x1f03) and "/usr/bin" (0x1efa).  Three
+ * entries, and one of them is the current directory - an earlier
+ * version of this file had a colon separated string with only two,
+ * which was wrong twice over.
+ */
+char *pathv[MAXPATHV] = { ".", "/bin", "/usr/bin", 0 };
 
 char *progname = "sh";
 
@@ -94,10 +103,10 @@ char *a;
 }
 
 /*
- * Is this word a builtin?  Returns its number, or 0.
+ * H48dc.  Is this word a builtin?  Returns its number, or 0.
  */
 int
-lookup(w)
+isbuiltin(w)
 char *w;
 {
     struct builtin *b;
@@ -167,25 +176,41 @@ findcmd(name)
 char *name;
 {
     static char buf[MAXPATH];
-    char *p, *q;
+    int i;
 
     if (strchr(name, '/'))
         return access(name, 1) == 0 ? name : (char *)0;
 
-    p = pathlist;
-    while (*p) {
-        q = buf;
-        while (*p && *p != ':')
-            *q++ = *p++;
-        if (q != buf && q[-1] != '/')
-            *q++ = '/';
-        strcpy(q, name);
+    for (i = 0; i < MAXPATHV && pathv[i]; i++) {
+        strcpy(buf, pathv[i]);
+        if (buf[0] && buf[strlen(buf) - 1] != '/')
+            strcat(buf, "/");
+        strcat(buf, name);
         if (access(buf, 1) == 0)
             return buf;
-        if (*p == ':')
-            p++;
     }
     return (char *)0;
+}
+
+/*
+ * H4287.  Two calls to signal() with 1, for SIGINT and SIGQUIT - the
+ * shell stops listening to them around a child.
+ */
+ignoresigs()
+{
+    signal(2, SIG_IGN);
+    signal(3, SIG_IGN);
+}
+
+/*
+ * H7e5f.  Its whole body is pushing two arguments and calling the
+ * exec stub, so that is all this is.
+ */
+doexec(path, argv)
+char *path;
+char **argv;
+{
+    execv(path, argv);
 }
 
 /*
@@ -277,13 +302,14 @@ int pout;
         return -1;
     }
     if (pid == 0) {
+        ignoresigs();
         redirect(c, pin, pout);
         path = findcmd(c->argv[0]);
         if (!path) {
             warn("%s not found", c->argv[0]);
             exit(1);
         }
-        execv(path, c->argv);
+        doexec(path, c->argv);
         warn("cannot execute %s", path);
         exit(1);
     }
@@ -406,7 +432,7 @@ struct cmd *c;
 
     case B_TYPE:                        /* where would this be run from */
         for (i = 1; i < c->argc; i++) {
-            if (lookup(c->argv[i]))
+            if (isbuiltin(c->argv[i]))
                 printf("%s is a builtin\n", c->argv[i]);
             else if ((p = findcmd(c->argv[i])))
                 printf("%s is %s\n", c->argv[i], p);
@@ -433,10 +459,13 @@ struct cmd *c;
 
     case B_PATH:
         if (c->argc > 1) {
-            strncpy(pathlist, c->argv[1], MAXPATH - 1);
-            pathlist[MAXPATH - 1] = '\0';
+            for (i = 1; i < c->argc && i <= MAXPATHV; i++)
+                pathv[i - 1] = strsave(c->argv[i]);
+            pathv[i - 1] = (char *)0;
         } else {
-            printf("%s\n", pathlist);
+            for (i = 0; i < MAXPATHV && pathv[i]; i++)
+                printf("%s%s", i ? " " : "", pathv[i]);
+            printf("\n");
         }
         return 0;
 
@@ -517,7 +546,7 @@ struct pipeline *p;
     if (p->ncmd == 0)
         return 0;
     if (p->ncmd == 1 && p->cmd[0].argc > 0) {
-        code = lookup(p->cmd[0].argv[0]);
+        code = isbuiltin(p->cmd[0].argv[0]);
         if (code)
             return dobuiltin(code, &p->cmd[0]);
     }

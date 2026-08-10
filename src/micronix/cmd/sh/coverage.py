@@ -44,6 +44,13 @@ KNOWN = {
     0x4287: "pre-fork setup",
     0x2aa2: "backquote substitution - NOT implemented",
     0x16f2: "fatal error: print and exit",
+    0x0a14: "execution engine",
+    0x07a8: "run one command",
+    0x5897: "subshell - re-enters the read-eval loop",
+    0x57c4: "redirection",
+    0x1285: "two string tests and two messages",
+    0x7e5f: "execv wrapper",
+    0x4287: "ignore SIGINT and SIGQUIT",
 }
 # The libc floor: everything at or above the first syscall stub is
 # library, not shell.  The stubs start at H8094 (the first indir).
