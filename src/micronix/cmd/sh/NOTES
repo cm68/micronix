@@ -303,6 +303,41 @@ a message with no reference may mean a whole branch is missing from
 the trace.
 
 
+Inside the execution engine
+---------------------------
+
+H0a14 takes ONE argument, a pointer, and keeps it in 0x9bec.  It
+takes sixteen bytes of locals, zeroes two of them, and then loops.
+Each time round it tests
+
+    the word at +0 of the node        zero ends the loop
+    the field at +0x17                zero ends the loop
+    the field at +0x17 against 0x13
+
+0x13 is 19, which is B_NICE in the builtin numbering.  So the node
+carries a BUILTIN CODE at +0x17 and nice is special cased in the
+engine - which fits, since nice is the one builtin that then has to
+run something else.
+
+So the parser does not hand execution a flat array.  It builds nodes
+with a code in them, and the engine walks a chain.  The C's
+struct pipeline with its array of struct cmd is a flattening of that,
+and under the call-graph goal it is the wrong shape.
+
+These are the constant offsets added to pointers anywhere inside
+H0a14.  Only +0 and +0x17 are CONFIRMED to be fields of the command
+node; the rest are seen in the same routine and some certainly belong
+to other structures, so this is a list to work from, not a layout:
+
+    +0x00 +0x01 +0x02   +0x0a +0x0b +0x0c   +0x11 +0x13 +0x15
+    +0x17 +0x19         +0x1f +0x21 +0x23
+
+The pairs two apart - 0x17/0x19, 0x1f/0x21/0x23 - look like adjacent
+words, which would make the node at least 0x25 bytes.  Worth settling
+by finding where the parser ALLOCATES one: the size it asks for
+answers this outright.
+
+
 The execution subsystem
 -----------------------
 
