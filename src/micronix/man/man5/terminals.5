@@ -1,0 +1,266 @@
+.he "terminals (5)                4/6/83                 terminals (5)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+FILE
+.in +5
+.br
+.bd
+terminals
+- the terminal capabilities file
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+The terminals file, always located in the /etc directory,
+contains the list of terminals and their capabilities.  The
+information in this file is used by upm for terminal
+emulation.  The information here is also available to other
+programs that make use of the features of intelligent
+terminals, such as, cursor addressing, clear screen, erase
+to end of screen, etc.
+
+The terminals file is broken into descriptions of terminals
+by the terminal name lines, which always begin at the
+leftmost margin (column 1).  The first word on the line is
+the "terminal abbreviation", which should be short and
+mnemonic.  This should be followed by the full name of the
+terminal, which is free-form.  This full name will appear
+automatically in the terminal menus presented by the
+reconfiguration program.  See recon (1).
+
+The lines that follow each terminal name line define the
+characters that the terminal uses for control of special
+effects (cursor movement, clearscreen, highlighting, etc.).
+
+Terminals can be divided into three categories according to
+their capabilities.  Grouping terminals into these three
+"levels" allows the use of only, at most, three different
+versions of terminal-configured software.  The first level of
+terminals, the simplest level, is defined by terminals
+having the following capabilities:
+
+.bd
+LEVEL 1
+
+.nf
+.in +5
+Keyword        Description
+
+cursor         string of characters to move cursor
+home           home the cursor *
+up             character(s) to move the cursor up *
+down           character(s) to move the cursor down *
+right          character(s) to move the cursor right *
+left           character(s) to move the cursor left *
+clear          clear the screen and home cursor
+
+* (Optional, since most programs actually do not use.)
+.in -5
+.fi
+
+The keywords are used one per line, preceded by white-space
+(tabs or spaces) that distinguish the keywords from terminal
+names.  The characters that complete the keyword definition
+follow, separated by more whitespace.  A newline terminates
+each definition.  The keywords that define the next two
+levels are:
+
+.bd
+LEVEL 2
+
+.nf
+.in +5
+Keyword        Description
+
+ceos           clear to end of screen
+high           begin highlighting *
+low            return to normal intensity *
+
+* (Optional, since most programs actually do not use.)
+.in -5
+.fi
+
+.bd
+LEVEL 3
+
+.nf
+.in +5
+insline        insert a line
+inschar        insert a character in a line *
+delline        delete a line
+delchar        delete a character *
+
+* (Optional, since most programs actually do not use.)
+.in -5
+.fi
+
+The keywords must be spelled exactly as shown here, and must
+always be in lower case.  When adding a terminal to the
+terminals file, try to define as many capabilities as
+possible.  If you are deciding what level your terminal fits,
+your terminal must fulfill ALL of the categories in the
+lower levels before you can consider it as fitting in a
+higher level.  Three other keywords may optionally be used:
+like, init and exit.  The characters following init may be
+sent by a program to initialize a terminal; those following
+exit may be sent just before a program terminates.
+
+The like keyword is used to include a previously defined
+terminal's keywords and their definitions for the terminal
+currently being defined.  Differences between a terminal and
+one that it is "like" are adjusted by redefining keywords.
+You can only use three levels of like-ness, that is, the
+terminal you are describing can be "like" a previously
+defined terminal that is "like" another terminal, that is
+"like" some fully described terminal.  The like keyword
+should be the first keyword used in a description; if you
+use it last, the keywords you were trying to redefined will
+be overwritten by the definition of the "like" terminal.
+
+The keywords are followed by the characters that define
+them, separated by spaces.  There are a number of
+abbreviations and operators that are used with the keyword
+definitions.  The abbreviations that are recognized are:
+
+.bd
+ABBREVIATIONS RECOGNIZED
+
+.nf
+.in +5
+bs         backspace
+cr         carriage return
+esc        escape
+ff         formfeed
+nl         newline
+null       0-byte
+sp         space
+tb         tab
+vt         vertical tab
+
+other      all other single characters are
+           sent literally
+.in -5
+.fi
+
+These abbreviations provide a way of including human
+readable characters, as opposed to using their octal
+equivalents in keyword definitions.
+
+Several operators are also provided for keyword definitions.
+These operators modify the characters that follow them, or
+are used to include the row and column in cursor
+definitions.
+
+.bd
+OPERATORS
+
+.nf
+.in +5
+row + n      Send the line number plus an offset n
+             as a single byte.  The first row on the
+             screen is row 0.  Most terminals use
+             row + 32.
+
+col + n      Send the column number plus an offset n
+             as a single byte.  The first column on the
+             screen is column 0.  Most terminals use
+             column + 32.
+
+row ascii    Send the row number as a series of ascii
+             digits (with leading zeros supressed).
+             Used by ANSI-standard terminals.
+
+col ascii    Send the column number as a series of ascii
+             digits (with leading zeros supressed).
+             Used by ANSI-standard terminals.
+
+'            Send the following characters literally with
+             no conversion.  Eg, '0 is the same as 48 or
+             x30 (see x below).
+
+^            Convert the character that follows to the
+             corresponding control code
+
+xnn          Interpret the number nn that follows
+             as hexadecimal.  (Any number of digits.
+             Converts to one byte.)
+
+Onnn         Interpret the number nnn that follows
+             as octal.  (Any number of digits.
+             Converts to one byte.)
+.in -5
+.fi
+
+The row and col operators must always be followed by a plus
+sign and an offset (which may be zero), or by the word
+ascii.  (Each of these must be separated by a space.) into
+their ascii values (between 48 and 57).  The caret (^)
+indicates control keys, for example, ^H represents a
+backspace.  If you prefer to use hexadecimal or octal
+notation, use x or O to indicate the type of conversion
+desired.  Numbers are converted to a single byte (value 0 to
+255).  Strings or characters preceeded by a single quote (')
+are sent literally.  For example, O123 sends the byte
+with the octal value 123 (this is the letter S), while '0 '1
+'2 '3 sends the four ascii bytes 0, 1, 2, and 3.
+.sp 2
+.in -5
+.bd
+EXAMPLE
+.in +5
+.br
+.nf
+.in +5
+mor20     Morrow 20
+          like    proto3
+          cursor  esc = col + 32 row + 32
+          clear   ^Z
+.in -5
+.fi
+
+This example defines a terminal, abbreviated as mor20, as
+being "like" the proto3 definition, then goes on to redefine
+the cursor and clear keywords.  The sequence of characters
+used to move the cursor is:  an escape, an "=", the column
+number added to 32, and the row number added to 32.  The
+character that clears the screen is a Control-Z.
+
+If you need to create an entry for a terminal not in the
+terminals file, use the list of keywords for the three
+levels and find the character(s) used by your terminal for
+as many keywords as possible.  These characters are usually
+buried in a table in your terminal's manual describing
+control-sequences or special characters.  You should always
+be able to find all the control sequences necessary for a
+level 1 terminal at a minimum.  The names of the various
+functions, for example, home or highlight, will vary
+unpredictably from manual to manual.
+.sp 2
+.in -5
+.bd
+NOTE
+.in +5
+.br
+The shorter the terminals files is, the quicker it may be
+searched for matching terminal types.  You may wish to rename
+(mv) the terminals file, and keep an edited version with
+just the terminals you normally use in the file
+/etc/terminals.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/terminals
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+upm (1)

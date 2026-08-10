@@ -1,0 +1,199 @@
+Reversing scanned Micronix man pages back into source
+=====================================================
+
+These pages were recovered from the hardcopy in
+
+    extra/docs/Micronix_Operating_System_1.61_Jun83.pdf
+
+by reading the Acrobat text layer and re-marking it up by hand.  This
+file records the format, the house conventions, and where the process
+goes wrong, so the same thing can be done again when the library
+documentation is scanned.
+
+The tools live in tools/ and are described at the end.
+
+
+1.  The format is form(1), not troff
+------------------------------------
+
+/bin/man is a Whitesmiths binary.  Its strings give the whole story:
+it looks under /usr/man/man<section>, falls back to /usr/help/, and
+formats by exec'ing form.  There are no macros - a page calls the
+formatter's primitive requests directly - so nothing from the nroff
+-man world applies here.
+
+form(1) is documented in man1/form.1 and implements sixteen requests:
+
+    .bd n   bold the next n lines      .nf     no fill
+    .bp n   begin page n               .pl n   page length (66)
+    .br     break                      .rm n   right margin (60)
+    .ce n   centre the next n lines    .sp n   space n lines
+    .fi     fill (the default)         .ta n   tab
+    .fo T   footer                     .ti n   temporary indent
+    .he T   header                     .ul n   underline next n lines
+    .in n   indent                     .ls n   line spacing
+
+All are used across the 183 original pages except .pl and .ls, which
+are documented and never invoked.
+
+A line whose first character is a period is a command.  Five of the
+original pages have prose that begins with one and loses a line as a
+result - see link.1 line 111 (".data sections."), sh.1, edit.1,
+update.1 (".BD", which form does not match because it is upper case)
+and Intro.2.  Watch for this when reversing.
+
+
+2.  The page skeleton
+---------------------
+
+Four lines of furniture, then alternating section headings and bodies:
+
+    .he "name (n)                     4/6/83                    name (n)"
+    .fo "                               -#-"
+    .in 5
+    .rm 65
+
+The .he text is 65 columns wide with the page name at both ends.  The
+date is NOT exactly centred - null.4 splits 20/22 around it - and 19
+of the 183 originals pad with tabs rather than spaces.  Every page
+carries -#- in the footer; # is the page number.
+
+Order varies: 165 pages write .he .fo .in .rm, 12 write .in .rm .he
+.fo, and a handful do something else.  The first is the majority.
+
+A section heading is five lines:
+
+    .in -5
+    .bd
+    FUNCTION
+    .in +5
+    .br
+
+.bd bolds exactly the one line after it, which is why a bolded word
+in running prose sits on a line of its own.  The final section is
+never closed - 134 of the originals end at indent 10.
+
+A minority idiom (13 pages, e.g. cal.1) uses base .in 10 with .ti -5
+to outdent headings instead of the .in -5 / .in +5 pair.  Prefer the
+majority form.
+
+
+3.  The heading vocabulary is per section
+-----------------------------------------
+
+    man1    PROGRAM (89) or NAME (13), USAGE or SYNTAX, FUNCTION or
+            DESCRIPTION, EXAMPLE(S), SEE ALSO, NOTES, FILES, BUGS
+    man2    NAME, C, FUNCTION, RETURNS, ASSEMBLER, RETURNS
+    man3    SUBROUTINE(S), C, FUNCTION(S), RETURNS, ERRORS, NOTES,
+            ALSO READ
+    man4    DEVICE, FUNCTION or DESCRIPTION
+    man5    FILE, FUNCTION, FILES, SEE ALSO
+
+man2 documents every call twice, C then ASSEMBLER, each with its own
+RETURNS - the assembler half carries the syscall number and register
+contract:
+
+    (read = 3)
+    (file descriptor in hl)
+    sys; read; buffer; nbytes
+    (number of bytes read in hl)
+
+IMPORTANT: the PRINTED manual says NAME everywhere.  The sources do
+not.  null.4 carries the same date as the printed page and still says
+DEVICE; rc.5 says FILE.  So "NAME" in a scan of section 3, 4 or 5 is
+a typesetting normalisation - use the source spelling above.
+
+
+4.  What a hand reversal gets wrong
+-----------------------------------
+
+Measured by reversing null.4, rc.5, chdir.2 and alloc.3 blind - all
+four have header dates matching the source on disk, so every
+difference is reconstruction error rather than a revision change.
+
+  a. .bd TAKES A COUNT and the originals lean on it.  41 of 183 pages
+     use it; .bd 2 appears 45 times, .bd 3 sixteen.  A declaration
+     block is written
+
+         .bd 2
+         char *alloc(size)
+         unsigned size;
+
+     not as alternating .bd and .br.  This is the biggest single
+     structural tell.
+
+  b. EVERY IDENTIFIER IS BOLDED IN PROSE, not just command names -
+     parameters too.  alloc.3 bolds size, ptr, nelem and elsize
+     wherever they are mentioned.  The originals run 14.2 .bd per 100
+     lines; a first pass that bolds only command names runs about 7.5.
+
+  c. A PARAGRAPH BREAK IS A BLANK LINE, not .sp.  The tree uses blank
+     lines over .sp about two to one.  But .sp IS used between
+     declaration groups inside a C section, and .sp 2 before a
+     section heading.  Do not convert blindly.
+
+  d. LINES ARE FILLED LONGER than they look - the originals wrap
+     around 70 columns, not 55.  form re-fills anyway, so this is
+     cosmetic, but it is what makes a page look hand-typed.
+
+  e. ONE INDENTED LINE IS .ti +5, not an .in +5 / .in -5 pair.  This
+     is how null.4 sets its example:
+
+         .in +5
+         .ti +5
+         .br
+         cat file > /dev/null
+
+     Bracketing every short example the other way doubles the .in
+     count - 17.9 per page against the originals' 8.9 - while .ti
+     stays flat at about 2.3 either way.  Reserve the pair for a
+     block of several lines.
+
+  f. Trailing whitespace is everywhere in the originals (a bolded
+     word is often "Alloc " with a trailing space, headings are
+     padded).  Harmless, and not worth reproducing deliberately.
+
+
+5.  OCR damage to expect
+------------------------
+
+The 2011 Acrobat text layer is poor in predictable ways.  Seen
+repeatedly in this batch:
+
+    l <-> 1     cpl for cp1, mu1tio, 1pr, de1char, initfa1ize
+    I <-> |     "man edit I split" for a pipe
+    I <-> l     Is for ls, In for ln, hI for hl
+    O <-> 0     pprO, diabO, "numbered O", "returns O"
+    e <-> c     alloe, ealloe, ehar
+    ~           substituted for almost anything: al~rm, ea~h, thir~
+    •••         for ...
+    .           inserted mid-word: "structur.e", "set .. could"
+
+Section headers scan badly too: "l~b (1) OPTION" and
+"printers (41" both defeated the page-boundary detector and let one
+page absorb the next.  Check the tail of every extracted page.
+
+Some pages have NO text layer at all (page 505, for instance).  Use
+Read on the PDF with a page range to look at those directly.
+
+
+6.  Tools
+---------
+
+    tools/index.py      list every man page in a scan's text layer,
+                        allowing lettered subsections (3s, 3m, 3c),
+                        and diff that against what is already on disk
+    tools/extract.py    cut one page out of the text layer, dropping
+                        running headers and footers
+    tools/check.py      validate reversed pages: only real form(1)
+                        requests, .he exactly 65 columns
+    tools/compare.py    request mix per page, reversed vs original,
+                        to see how far off the house style you are
+
+Run index.py first to find what is missing, extract.py per page, mark
+up by hand, then check.py and compare.py.
+
+The fidelity test is worth repeating on any new batch: pick a page
+that exists BOTH in the scan and on disk AND whose header dates
+agree, reverse it without looking at the source, and diff.  That is
+how everything in section 4 was found.

@@ -1,0 +1,246 @@
+.he "network (4)                  4/6/83                   network (4)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+DEVICE
+.in +5
+.br
+.bd
+network
+- the Micronix network
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Micronix allows any number of Decisions to be interconnected in any
+pattern with simple, low cost hardware.  Files can be copied from any
+source to any destination on the network (see cp in section 1), and
+any user may send mail to any other user (see mail in section 1).
+This is all done with ordinary serial I/O ports and 3-conductor
+unshielded cables.  Error checking is extensive, so that cables may be
+cut and patched, and machines may be crashed and restarted, all with
+good assurance that all files will arrive intact.  There is a penalty
+for this generality and low cost, however.  The transfer rate is slow
+(about 40-50 bytes per second).  But since all network activity is in
+the background, users need not wait idly for file transfers to
+finish.
+.sp 2
+.in -5
+.bd
+Two-machine network
+.in +5
+.br
+Let's begin by describing the simplest network:  two machines with one
+cable between them.  First, you must choose names for the two
+machines.  These names are arbitrary; the only requirement is that
+each machine on the network must have a unique name.  The names should
+also be short and easy to type.  In this case, let's call them "sales"
+and "doc".
+
+Next, you must buy or build a cable long enough to connect them.  (See
+cables in section 4.)  Then you must choose a free serial port on each
+machine (see ports in section 4).  Let's say that you have chosen
+ttyD on doc, and ttyF on sales.  The cable can be plugged in at this
+point -- either end to either machine.
+
+Now you must edit three files on each machine.  These files are:
+
+.nf
+.in +5
+/etc/ttys
+/etc/netmap
+/etc/rc
+.in -5
+.fi
+
+The /etc/ttys file tells which IO ports on the local machine are
+connected to the network.  The /etc/netmap file gives the layout of
+the network.  The /etc/rc file contains commands that are run every
+time the system goes multi-user.  In this case, we will insert a
+command to start the "network daemon" (the background process that
+runs the network).
+
+Micronix comes with WordStar (a screen editor) and edit (a line
+editor).  You may use either to edit these files.  Instructions for
+using edit on the ttys file are contained in the ttys document in
+section 5.
+
+Here is what you must do to each file on each machine:
+
+.nf
+.in 0
+machine   file          action
+
+doc       /etc/ttys     Find the line that begins with ttyD.
+                        Change it to read as follows:
+                        ttyD 1200 net-sales
+
+doc       /etc/netmap   Change (or create) this file to read:
+                        doc
+                        sales
+
+doc       /etc/rc       Add the following lines:
+                        echo Starting network
+                        netdaemon
+
+sales     /etc/ttys     Find the line that begins with ttyF.
+                        Change it to read as follows:
+                        ttyF 1200 net-doc
+
+sales     /etc/netmap   Change (or create) this file to read:
+                        sales
+                        doc
+
+sales     /etc/rc       Add the following lines:
+                        echo Starting network
+                        netdaemon
+.in 5
+.fi
+
+You will have to bring the system down (with the down command) and
+then start it up again before these changes take effect.  You can test
+the network by typing the following command from the doc machine:
+
+.in +5
+.bd
+% cp /etc/ttys sales%/tmp
+.in -5
+
+The /etc/ttys file should appear on the sales machine in the /tmp
+directory.  See cp and mail in section 1 for more information on using
+the network.
+.sp 2
+.in -5
+.bd
+Three-machine network
+.in +5
+.br
+Now suppose we want to connect a third machine named "admin" to the
+network.
+
+The new machine can be connected to any of the existing machines.  It
+is only necessary to connect it to one of them, but connecting to
+more than one might speed up the network by providing a more direct
+path between machines.  For example, you could connect the new machine
+as follows:
+
+.nf
+.in +10
+sales -------- doc
+     \        /
+      \      /
+       admin
+.in -10
+.fi
+
+This requires a total of 6 IO ports, 2 on each machine.  But messages
+will be sent directly between any pair of machines.  Or you could
+connect this way:
+
+.nf
+.in +5
+sales -------- doc -------- admin
+.in -5
+.fi
+
+This network uses only 4 ports:  1 on sales, 2 on doc, and 1 on admin.
+The disadvantage is that messages between sales and admin have to go
+through doc.  This will be done automatically, but it takes longer.
+Since the emphasis in the design of this network is low cost, the 4
+port alternative is recommended.  (But if you have no other use for
+the ports, go ahead and use all 6.)
+
+Let's assume that you are going to use the straight-line connection
+(the 4 port alternative).  First, you must choose a free serial port
+on doc, say ttyE, and one on admin, say ttyC.  Connect these ports
+with a network cable, and change the configuration files as follows:
+
+.nf
+.in 0
+         /etc/netmap     /etc/rc      /etc/ttys
+         -----------     -------      ---------
+sales    sales           no change    no change
+         doc admin
+
+doc      doc             no change    ttyE 1200 net-admin
+         admin sales
+
+admin    admin           netdaemon    ttyC 1200 net-doc
+         doc sales
+.in 5
+.fi
+.sp 2
+.in -5
+.bd
+General networks
+.in +5
+.br
+The only restriction on the shape of the network is a physical one:  a
+seperate serial port is required at each end of each cable.
+Otherwise, the network can be a straight line, a star, a ring, or any
+pattern.  The rules to follow in setting up the 3 configuration files
+are as follows:
+
+/etc/ttys -- Find the lines corresponding to each network port on the
+local machine.  Put the word 1200 on each line, and in addition, put
+the word net-name, where "name" is the name of the machine to which
+that port is connected.
+
+/etc/rc -- Put the command netdaemon in the file.  It should be alone
+on a line.  It should appear only once, no matter how many network
+ports there are on the machine.  Optionally, it can be preceeded by an
+anouncement to remind the operator the network is being started.
+
+/etc/netmap -- The name of the local machine should appear alone on
+the first line.  Each succeeding line should begin with the name of a
+machine that is directly connected to the local machine.  If there are
+additional machines on the network, their names should appear (in any
+order) following the name of the direct connection through which they
+can be reached.  If there are several ways to reach an "indirect"
+machine, only one connection should be given:  the one that leads to
+the machine via the shortest route.
+
+For example, let's look at several different networks, and a possible
+netmap file for the "doc" machine in each network.
+
+.nf
+.in 0
+Line    sales -- doc -- admin -- support    doc
+                                            sales
+                                            admin support
+
+
+Ring         doc ------ sales               doc
+              |           |                 sales
+              |           |                 admin support
+            admin ---- support
+
+
+Star    sales ---- doc ---- admin           doc
+                    |                       sales
+                    |                       admin
+                 support                    support
+
+
+Star     doc ---- sales --- admin           doc
+                    |                       sales admin support
+                    |
+                 support
+
+
+Dipper   doc      admin --- support         doc
+           \      /                         sales
+            \    /                          admin support
+            sales
+.in 5
+.fi
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+cp (1), mail (1), cables (4), ports (4)

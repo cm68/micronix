@@ -1,0 +1,161 @@
+.he "msgs (1)                     4/6/83                      msgs (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+msgs
+- bulletin board and junk mail service
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+msgs -fhq [ [-]- number]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+The msgs program provides a system wide bulletin board.  Any user
+may post messages on the board and all users may view the
+messages on the board.  Using the msgs program is much like
+reading the classified section of a newspaper.
+
+The last message read by each user is automatically remembered.
+That is to say each user sees each message once and the system
+holds your place.
+
+When the command "msgs" is given an interactive mode is entered.
+
+You are shown the heading of the first message you haven't read
+yet.
+
+You are advised of the number of lines remaining in the file.
+
+You are asked if you'd like to see more.
+
+This looks like:
+
+.nf
+.in +5
+Message 23:
+   From harold Mon 23 Aug 11:30:22
+   New database program installed!!
+   (11 more lines) More? (Y/N/Q)
+.in -5
+.fi
+
+Possible responses:
+
+.in +5
+.ti -5
+y	Yes, I'd like to see the rest of this message.
+
+.ti -5
+n	No, I'm not interested in this message, skip me to the
+next message.
+
+.ti -5
+q	Quit.  Get out of the program right now.
+
+.ti -5
+(number)
+Jump to the message whose number is given, or the next
+highest numbered message.
+
+.ti -5
+-	Back up one message for a replay.
+
+.ti -5
+s filename
+Append this message to the end of the named file.  Create
+the file if it doesn't already exist.  If a minus (-)
+follows the 's', the previous message will be saved.
+.in -5
+
+If you press the <RUB-OUT> or <DELETE> key in the middle of the
+printing of a long message, the remaining portion of the message
+will be skipped.
+
+Command line flags:
+
+.in +5
+.ti -5
+-f	Causes msgs not to say "No new messages".
+
+.ti -5
+-h	Headings only.  The heading of a message is arbitrarily
+the first two non blank lines.
+
+.ti -5
+-q	Queries whether there are messages.  Prints "There are
+new messages" if there are.  This option is useful in
+startup files.
+.in -5
+
+To post a message, just mail it to "msgs".  Messages are
+automatically removed after 2 weeks, unless they are set to file
+mode 444, in which case they will be permanent.  See chmod (1).
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+To catch up on local events:
+
+.in +5
+.bd
+msgs
+.in -5
+
+To post a message:
+
+.nf
+.in +5
+.bd
+mail msgs
+
+There will be a company party at 4 p.m. on April 6th.
+All are invited to attend.
+Guest speakers will include Horton Hornblower.
+.in -5
+.fi
+
+To post a message from a file:
+
+.in +5
+.bd
+mail msgs < file &
+.in -5
+
+To view the complete list of message headings:
+
+.in +5
+.bd
+msgs -h 1
+.in -5
+
+To notify you if there are new messages, add this line to your
+".login" file in your home directory:
+
+.in +5
+.bd
+msgs -fq
+.in -5
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/usr/spool/msgs
+.br
+~/.msgs

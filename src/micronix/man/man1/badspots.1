@@ -1,0 +1,111 @@
+.he "badspots (1)                 4/6/83                  badspots (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+badspots
+- bad sector report
+.sp 2
+.in -5
+.bd
+SYNOPSIS
+.in +5
+.br
+.bd
+badspots [-p] filesystem ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Badspots
+is a Micronix utility program which produces a display
+of bad blocks on a hard disk whose name is given.  The program
+knows how to read the bad map formats of the two Morrow disk
+testing and formatting programs:
+
+.nf
+.in +5
+.bd
+FORMATMW
+and
+.bd
+FORMATHD
+.in -5
+.fi
+
+.bd
+Badspots
+knows about exactly 6 kinds of disks.
+
+.nf
+.in +5
+5 inch:
+	M5
+	M10
+	M16
+8 inch:
+	M10
+	M20
+	M26
+.in -5
+.fi
+
+The program only works properly on a freshly formatted or tested
+disk; that is to say, the Micronix file system is written over
+the disk's bad sector map.  Invalid bad sector maps are
+flagged in error and no list of block numbers is produced.  In
+particular, either a valid block list or nothing is sent to the
+standard output, so it is always meaningful to use the block
+list badspots produces.
+
+If there are no bad sectors in the disk's bad sector map,
+badspots produces no output.
+
+The Default Display Mode:  By default each bad sector is displayed
+as a Micronix block number.
+
+The -p option causes the cylinder, head, and sector numbers to
+be printed for each bad sector.
+.sp 2
+.in -5
+.bd
+EXAMPLE
+.in +5
+.br
+.bd
+fsck -b 'badspots /dev/m16a' /dev/m16a
+
+This is the way badspots is used in production at Morrow
+Designs.  The results of badspots are conveyed to fsck in this
+example.
+
+To simply view a list of badspots:
+
+.in +5
+.bd
+badspots hdb
+.in -5
+
+The badspots program is clever enough to try adding "/dev/" to
+the filename used if it is unable to open the file named on the
+command line.  To see that same badspots list expressed as
+cylinder, head, sector triplets:
+
+.in +5
+.bd
+badspots -p hdb
+.in -5
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+fsck (1), hdca (4), hddma (4)

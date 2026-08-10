@@ -1,0 +1,106 @@
+.he "field (1)                    4/6/83                     field (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+field
+- pick selected fields from each line of the input
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+field [-t separator] field-numbers <input >output
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Field
+reads its input line by line.  It breaks each line up into
+"fields".  Then the fields requested by the "field-number"
+arguments are printed out in the requested order.  By default,
+input fields are separated by whitespace (spaces and tabs),
+while output fields are separated by tabs.  The field separators
+can be changed (both at once) with the -t option.  The first
+field is numbered 0.  If a line begins with a separator, then
+field 0 is taken to be empty.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+.bd
+field 3 0 2 2 <x
+
+reads whitespace separated fields from each line of the file x
+and writes out the 3rd, 0th, 2nd, and 2nd fields, in that order.
+For instance, if x contained
+
+.nf
+.in +5
+Greg Smith	$2.50	4/9/83
+     Jones	$3.00	7/4/83
+.in -5
+.fi
+
+then the above example would print out
+
+.nf
+.in +5
+4/9/83	Greg	$2.50	$2.50
+7/4/83		$3.00	$3.00
+.in -5
+.fi
+
+.bd
+field -t: 5 4 </etc/passwd >temp
+
+reads the password file and writes a list of home directories
+and user names to temp.  For instance, if /etc/passwd contained
+
+.nf
+.in +5
+root:xxxxxxxx:0:0:Super:/:sh
+sally::10:1:Sally Jones:/a/sally:upm
+.in -5
+.fi
+
+then the resulting temp file would contain
+
+.nf
+.in +5
+/:Super
+/a/sally:Sally Jones
+.in -5
+.fi
+
+.bd
+ls -l | field 8 1
+
+will print a directory listing giving only file names and
+permissions.
+.sp 2
+.in -5
+.bd
+BUGS AND CAVEATS
+.in +5
+.br
+Input line length is limited to 512 bytes.  If an input line
+begins with a field separator, then the 0th field is empty.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+paste (1)

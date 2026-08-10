@@ -1,0 +1,288 @@
+.he "fp (1)                       4/6/83                        fp (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+fp
+- floppy backup service
+.sp 2
+.in -5
+.bd
+SYNOPSIS
+.in +5
+.br
+.bd
+fp [rxt][vfiqs] [device] [filenames ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+fp
+allows you to backup files on floppies under the Micronix
+system.
+
+In this document the word "volume" will be used to refer to a
+single instance of storage medium, for example, diskette, tape
+reel, tape cassette, or removable hard disk.
+
+The word "device" will refer to the disk or tape drive which
+manipulates the volume.  For example floppy drive, tape drive,
+hard disk drive.
+
+The word "set" will mean a series of volumes produced by a
+single fp run that you get when you make a copy of a large file
+structure.  Theoretically, a set could run to 30 volumes or so in
+an imaginable case with the current Micronix system.
+.sp 2
+.in -5
+.bd
+FEATURES
+.in +5
+.br
+* ability to split files across volumes for backup of large
+files.
+
+* minimal seeking on the device to reduce running time.
+
+* incremental dumps possible using the central "dtab" dump
+table.
+.sp 2
+.in -5
+.bd
+FLAGS (choose exactly one)
+.in +5
+.br
+.in +10
+.ti -10
+r	write files to the device.
+
+.ti -10
+x	read files from the device.
+
+.ti -10
+t	display files on the device.
+.in -10
+.sp 2
+.in -5
+.bd
+More flags (optional)
+.in +5
+.br
+.in +10
+.ti -10
+v	verbose - The v flag causes a note to be printed as
+each file is processed.  The v flag is always on (unless
+the s flag is used to suppress it).  With the t flag, v
+causes extra detail about the files on the fp volumes
+to be given.  The v flag is mainly here for backward
+compatability.
+
+.ti -10
+i	incremental - Normally, fp processes all the files it
+encounters.  With the i and r flags in effect, only
+files which have been changed since the dumpdate are
+acted upon.  The i flag forces fp to make an entry with
+the current date in the file /etc/dtab.  (Dtab stands
+for dump table.)  If this file is lost, so is the memory
+of previous dump dates.  One entry in the dtab file is
+produced for each file named on the command line.  If no
+files are named on the command line, the entry in
+"dtab" will be for the current directory.  If no dtab
+file exists, fp will attempt to create one.  This will
+work subject to the permissions of the /etc directory.
+See the examples for an actual use of the i flag.
+
+.ti -10
+c	create - This flag only works with the r flag.  Create
+means to erase any files that may already be on the
+volume.  Obviously, you only want to use this with new
+volumes, or volumes you are recycling.
+
+.ti -10
+l	label set - This flag causes fp to ask for a name to
+label this set of volumes with.  The label may be up to
+250 characters long.
+
+.ti -10
+e	formatting program - If fp encounters an unformatted
+disk during a backup operation, it will automatically
+invoke the fdj program, which will query the operator
+for information and format the currently inserted
+diskette.  This may save you during a long backup.  If
+you want to change the name of the formatting program
+invoked, use the e option, followed by the name of the
+program to be used.
+
+.ti -10
+f	device file name - Specifying f allows the choice of a
+different device name.  The default device name is
+/dev/fp.  /dev/fp is normally linked to /dev/mfa which
+is the first 5 1/4 inch floppy drive connected to a
+Morrow DJDMA running under Micronix.  If your system
+uses 8 inch drives, you should relink /dev/fp.  HINT -
+use the following commands for an 8" drive system:
+
+.nf
+.in +5
+.bd
+cd /dev; era fp
+.bd
+ln fla fp
+.in -5
+.fi
+
+.ti -10
+p	print - Operates similarly to extract, but the files
+are sent to the standard output instead of a file.  This
+is theoretically useful to manually peruse copied
+images of text files.
+
+.ti -10
+q	quick copy - Normally all files are checked for
+readability immediately after being copied to a volume.
+Specifying the q flag bypasses this safty feature.
+
+.ti -10
+s	silent operation - Normally, in the spirit of micros,
+fp announces each file transaction.  Specifying the s
+flag suppresses much of this printing.  You are still
+notified of error conditions.
+.in -10
+.sp 2
+.in -5
+.bd
+GENERAL RULES
+.in +5
+.br
+If the name of a directory is given to fp, it takes it to mean
+that dirctory and all its descendants.
+
+If no file names are given, the implication is to do all files.
+For the t flag, this means all the files stored on the current
+volume.  For r, this means the current directory and all its
+descendents.  For the x flag, all files in the set of volumes are
+extracted.
+
+If you name your files with absolute path names, that is,
+starting with the / of root, any file that you extract will be
+restored to its former position in the file system.  If you
+backup files starting in the current directory, or use filenames
+that don't begin with a /, you can restore files to any
+directory in the file system.
+
+It's possible for a volume to be full yet contain few or no
+files.  If a read-back error occurs, the remaining space on the
+volume, after the block with the error, will be effectively
+marked out.
+
+Links are preserved across fp operations.  If you copy a file to
+which there are several links, only one copy of the file's data
+will be made.
+
+For each file on the volume the t flag, for table, prints the
+length in bytes, the modification time of the file at the time
+it was copied, the file's name the way it was when backed up,
+and possibly a notation concering which part of the file
+represented.
+
+.nf
+.in +5
+4872 Nov 14 7:30 myfile [part 2]
+.in -5
+.fi
+
+In the above example, this part of the file is 4872 bytes long,
+the file had been last changed on Nov. 14th at 7:30 in the
+morning.  The file is named myfile, a relative filename and only
+part 2 of the file is represented here.  Part one of the file is
+found on the previous volume of the set.
+
+The most you can get on a current technology floppy is 800
+blocks.  2400 blocks will fit on an 8 inch floppy.  fp
+automatically sets its directory size to one eightieth the size
+of the volume, with a minimum of 20 blocks.  In the case of soft
+sectored 1K 5 inch floppies, the volume size is 800 blocks, the
+directory size is 20 blocks.  A maximum of 160 entries can be put
+on the volume.  There are 8 directory entries per directory
+block.  Sometimes this is wasteful (for instance when the average
+file size is small).
+
+When splitting files, fp does not waste space.  It writes right
+up to the end of the volume.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+To produce the first full dump of your file system, have many
+volumes formatted and:
+
+.in +5
+.bd
+cd / ; fp cril
+.in -5
+
+This creates a new volume (or set of volumes), backs up
+everything starting with the root directory (/), makes an entry
+in /etc/dtab, and requests a label for the volumes.
+
+To produce an incremental (the next day for instance):
+
+.in +5
+.bd
+cd / ; fp cril
+.in -5
+
+Using another formatted diskette, this backs up only the files
+that have been modified since the last dump of the root.
+
+To print a label for a volume:
+
+.in +5
+.bd
+fp t | lpr
+.in -5
+
+To produce a backup of your directory alone:
+
+.in +5
+.bd
+cd ; fp cril
+.in -5
+
+To completely restore your home directory from a dump, install
+volume 1 of the set in the device and:
+
+.in +5
+.bd
+cd ; fp x
+.in -5
+
+To copy to an 8 inch floppy under Micronix:
+
+.in +5
+.bd
+fp crf /dev/fla
+.in -5
+
+To copy a single (possibly large) file:
+
+.in +5
+.bd
+fp r filename
+.in -5
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+fdj (1), for details on the formatting program, and dtab (5).

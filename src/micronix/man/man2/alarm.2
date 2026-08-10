@@ -1,0 +1,64 @@
+.he "alarm (2)                    4/6/83                     alarm (2)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+alarm
+- set the alarm clock
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+alarm(seconds)
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+This call sets the "alarm clock", which will send an
+alarm signal to the calling process after the given
+number of seconds (see signal (2)).  Meanwhile, the
+process continues to run.
+
+An argument of 0 turns the alarm clock off.
+
+See also pause (2) and sleep (2).
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+If an alarm was previously set but not yet triggered,
+alarm returns the number of seconds remaining until the
+old alarm.  Otherwise it returns 0.
+.sp 2
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(alarm = 27)
+.br
+.bd
+(seconds in hl)
+.br
+.bd
+sys; alarm
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The time remaining on any old alarm is returned in hl.
+There is no error return.

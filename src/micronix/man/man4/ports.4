@@ -1,0 +1,142 @@
+.he "ports (4)                    4/6/83                     ports (4)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+DEVICE
+.in +5
+.br
+.bd
+ports
+- how to identify the 10 ports on the Decision
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+The back of the Decision I has at least three "serial"
+ports and at least one "parallel" port.  The serial
+ports look like thin sideways D's.  They are called 25
+pin female D connectors.  (There is a smaller 15 pin
+female D connector that is not used.)
+
+The parallel ports are 50 pin "flat cable" male
+connectors.  The same kind of connector may also be used
+for disk drives, so you must look inside the computer
+to tell which is which.  The connector is a parallel
+port if its cable goes to the "bus board" (on the
+tabletop model) or to a MULTIO board.  It is a
+disk-drive port if its cable goes to a disk controller.
+(If you're not sure how to recognize a bus board,
+MULTIO board, or disk controller, you should ask your
+dealer for assistance.)
+
+Once you have identified the serial ports and parallel
+ports, you should make sure that they are labeled.  Here
+is a stylized picture of the back of a basic tabletop
+Decision I with the ports labeled:
+
+.nf
+.in +5
+| ************************* |
+| ************************* |
+             ppr0
+
+
+\ ************* /   \ ************* /   \ ************* /
+ \ *********** /     \ *********** /     \ *********** /
+      ttyC                 ttyB                ttyA
+.in -5
+.fi
+
+The back of a rack-mount Decision looks slightly
+different, but the important thing is that on both
+models, the first serial port, called ttyA, is the
+right-most one (when looking at the computer from the
+back).
+
+If you add a MULTIO board, its serial ports should be
+labeled as follows.  Make sure that the board is plugged
+into the bus (with the component side of the board
+facing the front of the computer), and that three
+flat cables are connecting the board to three D
+connectors at the back of the computer.  (If you don't
+know how to do this, or if you aren't sure which MULTIO
+is the second one, you should ask your dealer for
+help.)  Stand in back of the computer and look at the
+MULTIO.  The three small connectors along the top of the
+MULTIO are the serial "jacks"; the large one is the
+parallel jack.  The D connector attached to the
+right-most (as seen from the back) serial jack should
+be labeled ttyD.  The one attached to the middle serial
+jack should be labeled ttyE, and the D connector
+attached to the left-most (as seen from the back)
+serial jack should be labeled ttyF.
+
+If you have a third or fourth MULTIO, then its serial
+ports should be labeled correspondingly as ttyG, ttyH,
+ttyI, and ttyJ, ttyK, ttyL.
+
+The parallel ports attached to the second, third, and
+fourth MULTIOs should be labeled ppr1, ppr2, and ppr3.
+(Remember that the first one was called ppr0.)
+.sp 2
+.in -5
+.bd
+NAMES
+.in +5
+.br
+Under Micronix, the twelve possible serial ports are
+consistently refered to as ttyA through ttyL.  (Some of
+the documentation that comes with the Decision I
+hardware refers to ttyA as the "console" or as "serial
+port 1", ttyB as "serial port 2", etc.)  Names for the
+parallel ports are a little more involved.  If ppr0 is
+connected to a parallel daisy-wheel printer, it is
+called "diab0".  If it is connected via a special cable
+(available from Morrow) to a Centronics type printer,
+it is called "cent0".
+
+.nf
+.in +5
+                references to       references to
+IO board        serial ports        parallel port
+--------        ------------        -------------
+first           ttyA ttyB ttyC      diab0 or cent0
+second          ttyD ttyE ttyF      diab1 or cent1
+third           ttyG ttyH ttyI      diab2 or cent2
+fourth          ttyJ ttyK ttyL      diab3 or cent3
+.in -5
+.fi
+
+These names are arbitrary, by the way:  they are not
+built into any program.  But they are built into three
+other places:
+
+.in +5
+.ti -3
+1.  They appear in the /dev directory as names for
+device files;
+
+.ti -3
+2.  They appear in the /etc/ttys file in reference
+to these devices;
+
+.ti -3
+3.  Finally, the curious program /bin/diablo (q.v.)
+may be linked to a name that matches a device name
+in /dev.  If so, it will write to a parallel diablo
+printer attached to that device.
+.in -5
+
+If you want to change any of these names, make sure to
+change all three occurrances.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+lpr (1), diablo (1), multio (4), cables (4), printers
+(4), terminals (4), ttys (5)

@@ -1,0 +1,282 @@
+.he "cables (4)                   4/6/83                    cables (4)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+DEVICE
+.in +5
+.br
+.bd
+cables
+- cables for modems, terminals, printers, and the network
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+This document tells you how to build cables to connect the
+Decision to various devices.  The presentation is rather
+technical.  If you don't want to build one of these cables
+yourself, you may purchase it from your dealer or from
+Morrow, or your dealer may be able to build it for you from
+these specifications.
+
+The first three serial ports on the Decision use the
+Wunderbus I/O motherboard, which (unlike the MULTIO
+expansion board) has no provisions for configuring the
+RS-232 connections via jumpers.  Thus the cables must do this
+configuration internally.  Also, the Wunderbus has an artwork
+error which assigns pin 5 as Carrier-Detect (RLSD) and pin 8
+as Clear-to-Send (CTS).  The cables detailed below take this
+into account.
+
+Four serial cables and two parallel cables are discussed:
+
+.in +5
+.ti -3
+1.  Decision to serial printer or terminal
+.br
+.ti -3
+2.  Decision to Decision (network)
+.br
+.ti -3
+3.  Decision to modem
+.br
+.ti -3
+4.  MULTIO to modem
+.br
+.ti -3
+5.  Decision to Centronics-compatible parallel printer
+.br
+.ti -3
+6.  Decision to Diablo-compatible parallel printer
+.in -5
+
+In general, the serial cables require two DB-25P male
+connectors (ITT Cannon or AMP) with shielded shells on both
+ends, and should be made with 22 guage shielded wire.  The
+RS-232 standard specifies a maximum length of 25 feet
+(although much longer cables have been known to work).  The
+parallel cables can be made with 50 conductor flat cable.
+They both have a 50 pin female flat cable connector (Ansley
+609-5000M) on the computer end.  Cable 6 has the same
+connector on the printer end, while cable 5 uses a 36
+pin female ribbon connector (Amphenol 57-40360).
+.sp 2
+.in -5
+.bd
+DECISION TO SERIAL PRINTER OR TERMINAL
+.in +5
+.br
+The cable required to communicate with a terminal or printer
+can be constructed so that it will work with both the
+Decision and the MULTIO board.  This assumes that the
+hardware handshaking on the printer is via pin 20.  (Most
+printers support this.  One exception is the NEC Spinwriter,
+which uses pin 19 instead.)
+
+The Decision's serial ports cannot be jumpered.  On the
+MULTIO, the appropriate serial port should be jumpered as
+follows:
+
+.nf
+.in +5
+|
+|  A  B  C  D  E  G
+|  |  |  |  |  |  |
+|  H  I  J  K  L  N
+|
+.in -5
+.fi
+
+The cable requires 22 guage shielded 8 conductor wire.  The
+pinout for both the MULTIO and the Decision is the same:
+
+.nf
+.in 0
+      ---------------------------
+                DECISION
+            DB-25P connector
+
+        1    2   3   7   5 6 8      20
+        |    |   |   |     \|/       |
+        |    |   |   |      |       /|\
+        1    2   3   7     20      5 6 8
+
+            DB-25P connector
+          PRINTER or TERMINAL
+      ---------------------------
+.in 5
+.fi
+
+Note:  For most terminals, only pins 2, 3, and 7 need be
+connected.  The cable described here has the advantages of
+working interchangably with printers and terminals, and of
+higher reliability at high baud rates.
+.sp 2
+.in -5
+.bd
+NETWORK
+.in +5
+.br
+The Micronix network uses the serial ports on the Decision
+or the MULTIO.  Since the first priority in designing this
+network was low cost, a simple unshielded 3 conductor cable
+is specified.  (The network does extensive error checking, so
+noise on the cable will only slow it down.)  The MULTIO
+should be jumpered as for #1 above.  The cable should be
+constructed as follows:
+
+.nf
+.in 0
+          Decision or MULTIO
+
+            DB-25P connector
+              2    3    7
+              |    |    |
+              3    2    7
+
+            DB-25P connector
+
+          Decision or MULTIO
+.in 5
+.fi
+.sp 2
+.in -5
+.bd
+DECISION TO MODEM
+.in +5
+.br
+This requires 22 guage shielded 8 conductor wire:
+
+.nf
+.in 0
+               DECISION
+           DB-25P connector
+
+    1    2  3  5  6  7    8   20
+    |    |  |  |  |  |    |    |
+    1    3  2  8  6  7    5   20
+
+           DB-25P connector
+                MODEM
+.in 5
+.fi
+.sp 2
+.in -5
+.bd
+MULTIO TO MODEM
+.in +5
+.br
+(Note:  this discussion assumes that the serial ports on the
+MULTIO have been brought out to female D connectors on the
+back of the computer with special cables installed at the
+factory.  If this has not been done, you can order these
+"MULTIO serial cables" from Morrow.)
+
+Jumper the appropriate MULTIO serial port for modem
+communications as follows:
+
+.nf
+.in +5
+   A  C  D  E  F  G  H
+   |  |  |  |  |  |  |
+   B  J  K  L  M  N  I
+.in -5
+.fi
+
+The cable from the computer to the modem requires 22 guage
+shielded 8 conductor wire:
+
+.nf
+.in 0
+      ---------------------------
+                to MULTIO
+             DB-25P connector
+
+       1   2   3   5   6   7   8   20
+       |   |   |   |   |   |   |    |
+       1   2   3   5   6   7   8   20
+
+             DB-25P connector
+                  MODEM
+      ---------------------------
+.in 5
+.fi
+.sp 2
+.in -5
+.bd
+DECISION TO PARALLEL CENTRONICS
+.in +5
+.br
+This cable also works with the MULTIO expansion board, since
+its parallel port is identical with the Decision's.  This is
+the most complex cable.  It is available by special order
+from Morrow.  Its pinout is:
+
+.nf
+.in 0
+------------------------------------------------------
+                     DECISION
+             50 pin flat cable connector
+
+ 2  3 12 13 21 24 26 27 28 33 36 37 39 40 42 43 45
+ |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+16 12 32 31  1 36 10 11 13  5  3  2  4  6  7  8  9
+
+          36 pin female ribbon connector
+          CENTRONICS-COMPATIBLE PRINTER
+------------------------------------------------------
+.in 5
+.fi
+
+or, sorted the other way:
+
+.nf
+.in 0
+                     DECISION
+             50 pin flat cable connector
+
+21 37 36 39 33 40 42 43 45 26 27  3 28  2 13 12 24
+ |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+ 1  2  3  4  5  6  7  8  9 10 11 12 13 16 31 32 36
+
+          36 pin female ribbon connector
+          CENTRONICS-COMPATIBLE PRINTER
+.in 5
+.fi
+.sp 2
+.in -5
+.bd
+DECISION TO PARALLEL DIABLO
+.in +5
+.br
+This cable also works with the MULTIO expansion board, since
+its parallel port is identical with the Decision's.  All you
+need is a simple straight-through 50 conductor cable with
+50-pin flat cable female connectors on both ends.  It is the
+same cable that Morrow uses for its disk drives.  If you need
+to build the cable, only 17 conductors are actually needed:
+
+.nf
+.in 0
+                     DECISION
+             50 pin flat cable connector
+
+ 2  3 12 13 21 24 26 27 28 33 36 37 39 40 42 43 45
+ |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+ 2  3 12 13 21 24 26 27 28 33 36 37 39 40 42 43 45
+
+             50 pin flat cable connector
+              DIABLO-COMPATIBLE PRINTER
+------------------------------------------------------
+.in 5
+.fi
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ports (4), printers (4), network (4), multio (4)

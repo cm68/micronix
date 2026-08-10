@@ -1,0 +1,258 @@
+.he "printers (4)                 4/6/83                  printers (4)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+DEVICE
+.in +5
+.br
+.bd
+printers
+- interfacing printers to Micronix
+.sp 2
+.in -5
+.bd
+INTRODUCTION
+.in +5
+.br
+This document explains what kinds of printers are
+supported by Micronix, how to plug them in, and how to
+test them.  This is not a stand-alone document, however.
+You will have to refer to several others as you read.
+This will be easiest to do with the printed version of
+the Micronix Reference Manual.  If you are reading this
+at your terminal, you can switch to another document by
+hitting DELETE or RUBOUT to get out of this one, and
+then typing the command "help" followed by the new
+document name.  The related documents are:
+
+.in -5
+.bd
+ttys (5)
+.in +5
+.br
+The document "configuration" in Section 5 (type the
+command "help configuration") explains how to configure
+Micronix for additional printers, automatic access from
+upm (the Micronix CP/M emulator), different baud rates,
+and hardware handshaking.
+
+.in -5
+.bd
+lpr (1)
+.in +5
+.br
+The document "lpr" in Section 1 (type the command "help
+lpr") explains how to use the Micronix spooling program
+called lpr.  This allows several users to print files
+without conflict.
+
+.in -5
+.bd
+upm (1)
+.in +5
+.br
+The document "upm" in Section 1 (type the command "help
+upm") explains (among many other things) how to use
+printers from the Micronix CP/M emulator.
+
+.in -5
+.bd
+cables (4)
+.in +5
+.br
+The document "cables" in Section 4 (type the command
+"help cables") explains how to build cables for various
+devices, including printers.
+
+.in -5
+.bd
+ports (4)
+.in +5
+.br
+The document "ports" in Section 4 (type the command
+"help ports") explains how to identify the various I/O
+connectors on the Decision.
+.sp 2
+.in -5
+.bd
+PRINTER INTERFACES
+.in +5
+.br
+Micronix and the Decision come equipped to handle four
+types of printer interfaces.  The interface refers to
+the physical connection, the cable, between the printer
+and the Decision.  The interface also refers to the type
+of "handshaking" used by your printer.  This is the
+method it uses to stop the flow of characters from the
+computer when it gets behind.  The four types of
+interfaces are:
+
+.in +5
+.ti -3
+1.  Serial (or "RS-232") printers with hardware
+handshaking,
+
+.ti -3
+2.  Serial printers with software ("XON XOFF")
+handshaking,
+
+.ti -3
+3.  Parallel printers with Centronics-standard
+interfaces, and
+
+.ti -3
+4.  Parallel printers with Diablo-standard
+interfaces.
+.in -5
+
+If you have either the first or second type of printer,
+you're in luck.  You can skip the rest of this section
+and start reading PLUGGING IN THE PRINTER.  If you don't
+have one of these two types, or are unsure of which
+type you are using, read on.
+
+Serial printers use either software handshaking or
+hardware handshaking.  Software handshaking means that
+when the printer's buffer is full it sends a "byte" to
+the computer to temporarily stop the flow of
+characters.  The printer sends a different byte when it
+is ready to receive again.  The byte that Micronix
+recognizes for stopping transmission is X-OFF.  Other
+aliases for X-OFF are control-S, DC3 and 13 hex.  The
+byte that restarts output is X-ON, also known as
+control-Q, DC1 and 11 hex.  If your printer uses X-ON
+and X-OFF, then you can skip ahead to the section
+PLUGGING IN YOUR PRINTER.  If you have a serial printer
+that doesn't use X-ON and X-OFF (for example, it uses
+ETX and ACK instead), you'll have to try hardware
+handshaking.
+
+Hardware handshaking makes use of one of the wires in
+the printer cable to start and stop output from the
+computer.  When the printer wants to stop transmission,
+it lowers the voltage on this wire.  To continue
+transmission, the voltage is raised again.
+Unfortunately, there is no real standard for which wire
+the printer should use.  Hardware handshaking between a
+printer and the Decision will probably require a
+special cable.
+
+If your printer requires hardware handshaking, you will
+have to do two things:  (1) read the document "cables"
+in Section 4, and then make or purchase a suitable
+cable, and (2) read the document "configuration" in
+Section 4, and then tell Micronix that your printer
+needs hardware handshaking.
+
+Parallel printers also require special cables (which
+you can either make or purchase from Morrow).  Please
+read the "cables" document, then return to the next
+section and follow instructions for parallel printers.
+.sp 2
+.in -5
+.bd
+PLUGGING IN YOUR PRINTER
+.in +5
+.br
+In the discussion that follows, we will assume that you
+are going to plug a serial printer into the port called
+"ttyC", and/or a parallel printer into the port called
+"ppr0".  If you don't know how to find these ports,
+please read the document called "ports".  If you want to
+use other ports, you will have to tell Micronix which
+ports you are using.  The document "configuration" tells
+how to do this.
+
+The serial printer can only be plugged in one way, so
+you don't have to worry about which way to orient the
+connector.  However, the 50 pin parallel connector is
+not "keyed":  that is, it is quite possible to plug it
+in upside down.  Read on for some guidance.  On many
+cables, pin 1 is labeled by having a red stripe on that
+edge.  Or, if you constructed your own cable, you should
+know where pin 1 is.  The 50 pin connector on the back
+of your Decision has pin 1 on the left hand side when
+looking at the back of the printer.  Plug the parallel
+cable into the Decision with the red stripe, and pin 1,
+toward the left.
+.sp 2
+.in -5
+.bd
+TESTING YOUR PRINTER
+.in +5
+.br
+Plug in your printer, turn it ON, and make sure that it
+is ON-LINE and set to "1200 baud".  (These settings are
+usually governed by switches on the printer.  Sometimes
+the switches are on the inside, especially the baud
+rate switches.)  If you can't set your printer to 1200
+baud, you will have to change Micronix to transmit at
+whatever rate is acceptable.  The document called
+"configuration" explains how to do this.
+
+For serial printers plugged into ttyC, type the command
+
+.in +5
+.bd
+echo A > /dev/ttyC
+.in -5
+
+There are two different test commands for parallel
+printers.  The difference between them is the way the
+device is named.  For parallel daisy-wheel printers
+plugged into ppr0, type
+
+.in +5
+.bd
+echo A > /dev/diab0
+.in -5
+
+and for Centronic style parallel printers plugged into
+ppr0, use
+
+.in +5
+.bd
+echo A > /dev/cent0
+.in -5
+
+Did you get an "A" on your printer?  If not, remember
+that interfacing printers IS non-trivial.  First, rule
+out the trivial problems by checking to see if:
+
+.in +5
+.ti -3
+1.  the printer is turned on (and plugged in),
+
+.ti -3
+2.  the printer is set to ON-LINE,
+
+.ti -3
+3.  there is paper in it (many printers won't print
+unless they can sense a piece of paper in them), and
+
+.ti -3
+4.  the cable is plugged in at both ends at the
+correct connector.
+.in -5
+
+If you have a parallel cable, you can also try plugging
+it in upside down.  After trying all of the suggestions,
+try the suggested command again, please.  If you get a
+different letter than an "A", there may be some wires
+scrambled in your cable, or your serial printer may be
+set to the wrong baud rate.
+
+If none of these suggestions helps, your cable is
+suspect.  Home built cables should be rechecked and
+store bought cables checked for flaws.  RS-232 cables,
+whether home-made or purchased, can be checked by using
+them to replace the cable connecting your terminal.
+Parallel cables can be checked for continuity.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+lpr (1), upm (1), cables (4), ports (4), ttys (5)

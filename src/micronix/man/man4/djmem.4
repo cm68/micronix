@@ -1,0 +1,131 @@
+.he "djmem (4)                    4/6/83                     djmem (4)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+DEVICE
+.in +5
+.br
+.bd
+djmem
+- Morrow Designs DJDMA floppy controller memory device
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+The djmem device provides access to the memory internal
+to the DJDMA floppy controller and to the functions
+"sense status" and "execute controller routine".  The
+djdma memory device was originally implemented to allow
+floppy diskette formatting under Micronix.  It is
+conceivable that it may be put to other uses.
+
+The djdma memory device driver ignores the minor device
+number.  That is to say you may access only one djdma
+controller and there is only one way to access it.
+
+The djdma and djmem drivers are mutually exclusive.  If
+you attempt to use one while the other is in use you
+will get the error return "File or Device Busy".
+
+A read on the djmem device transfers data from the
+djdma controller's memory into the user's memory.
+
+A write transfers from user memory to controller memory.
+
+Seek may be used to position the pointer into
+controller memory.
+
+The only safe locations to write are 0x1030 to 0x127f
+inclusive according to the djdma tech. reference
+manual.
+
+Note that the "0x" preceding the preceding numbers
+indicates base 16.
+
+At most 1024 bytes may be transferred in a single
+read/write call.  Larger byte counts cause an "invalid
+argument" error.
+
+So far the implementation has been very
+straightforward.
+
+In order to pull off formatting a couple extra extended
+features are needed.  These are implemented via the
+system calls stty() and gtty().
+
+Gtty on the device caused a "sense status" command to
+be performed and the results returned.
+
+Stty causes an "execute controller memory" command to
+be performed.
+
+Gtty returns 4 bytes of meaningful status.  Stty returns
+one byte of status.
+
+Gtty and Stty are called by passing a pointer to a
+6-byte structure in user memory.  The user process fills
+out the first 2 bytes of memory, Gtty or Stty fill out
+the remaining 4 bytes.
+
+For gtty the first 2 byte word represents the device
+number on which to perform the status operation.
+
+For stty the first 2 byte quantity is the address in
+controller memory to execute.
+
+The user familiar with C will find the following
+structure declarations illuminating.  Note that these
+declarations are available in /include/dj.h.
+
+.nf
+.in +5
+struct djstat
+	{
+	int drive;
+	char status[4];
+	};
+
+struct djexec
+	{
+	char *address;
+	char status[4];
+	};
+.in -5
+.fi
+
+For gtty the drives are numbered as follows:
+
+There are 8 possible drives.  Four 5 inch and four 8
+inch.
+
+The 8 inch drives are numbered 0-3.  The 5 inch drives
+are numbered 4-7.
+
+The meanings of the 4 status bytes returned are
+described in the djdma technical reference manual.
+
+The single status byte returned by the stty call has
+whatever meaning the controller routine called ascribes
+to it.
+
+Note that the stty call is potentially dangerous.  It is
+easily capable of dropping the whole system because
+through it you can do anything the controller can do,
+which includes reading or writing any portion of
+memory.
+
+This is also a security breach.
+
+It is recommended then that the file /dev/djmem be
+highly restricted and write locked.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+djdma (4), formatdj (1), intro (2), chmod (1), ls (1),
+DJDMA Technical Reference Manual.

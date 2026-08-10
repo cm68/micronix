@@ -1,0 +1,72 @@
+.he "tree (1)                     4/6/83                      tree (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+tree
+- draw a picture of the file system
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+tree [starting_directory] [-a]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Tree
+draws a picture of the file system tree structure starting
+from the root directory.  Optionally, a different starting
+directory can be specified.  Only directory names are listed,
+unless the -a option is given, in which case all files are
+listed.
+
+Directories on which the user does not have search permission
+are shown as empty.
+
+The picture is drawn on the standard output, so it normally
+appears on your screen, but it can also be sent to a printer
+(see below).
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+To see the entire accessible file system:
+
+.in +5
+.bd
+tree
+.in -5
+
+To see Mary's directory hierarchy:
+
+.in +5
+.bd
+tree /a/mary
+.in -5
+
+To see all files in Mary's hierarchy and print the result:
+
+.in +5
+.bd
+tree /a/mary -a | lpr
+.in -5
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+du (1), find (1)

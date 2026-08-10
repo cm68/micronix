@@ -1,0 +1,99 @@
+.he "paste (1)                    4/6/83                     paste (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+paste
+- print files side by side
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+paste [-t separator] file1 file2 ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Paste
+reads a line from each file in the order given and pastes
+the lines together into a single line, which is written to the
+standard output.  A tab separator is used unless another
+character is specified.  A file name of - refers to the standard
+input.  No attempt is made to line up the columns vertically.
+
+There is no limit on the input line length.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+Suppose that file1 contains
+
+.nf
+.in +5
+Sally
+Samantha
+Holly
+Agatha
+.in -5
+.fi
+
+and file2 contains
+
+.nf
+.in +5
+Mike
+Mordred
+Garth
+.in -5
+.fi
+
+.in +5
+.bd
+paste -t+ file1 file2
+.in -5
+
+would result in the following output
+
+.nf
+.in +5
+Sally+Mike
+Samantha+Mordred
+Holly+Garth
+Agatha
+.in -5
+.fi
+
+.in +5
+.bd
+ls | paste -
+.in -5
+
+would give a two-column listing of the current directory
+(alphabetized from left to right, not top to bottom).
+.sp 2
+.in -5
+.bd
+BUGS AND CAVEATS
+.in +5
+.br
+No attempt is made to align the columns vertically, except to
+put tabs between the columns.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+field (1)

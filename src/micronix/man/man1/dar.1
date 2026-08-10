@@ -1,0 +1,195 @@
+.he "dar (1)                      4/6/83                       dar (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+dar
+- access MSDOS format floppy diskettes
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+dar device [flags] [files]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Dar
+provides a simple interface to MSDOS floppy diskettes.
+It may be used for backing up files on diskettes, and
+recovering them as necessary.  "Device" is assumed to be the
+name of a Micronix special file (such as mfa) corresponding
+to a floppy drive that contains a MSDOS diskette.  Note that
+mfa stands for mini floppy A.  Dar can copy files in either
+direction, and can also be used to read the directory of a
+MSDOS floppy.  When the -v flag is used, it reports the
+amount of space still available on the diskette.
+
+Names such as /dev/mfa may be abbreviated as mfa.  You can
+check the names of the storage devices by entering
+
+.in +5
+.bd
+dir /dev (return)
+.in -5
+
+Currently only single sided 5.25" IBM PC format diskettes
+are recognized.
+
+The flags are:
+
+.in +10
+.ti -10
+-c	Create.  Start a new dos diskette from scratch.
+Remove all files, clean out the file allocation
+table.  This option must be used to copy files to a
+freshly formatted diskette.  It may be used in
+conjunction with any of the other arguments, and
+if so, it is performed first.
+
+.ti -10
+-d	Delete.  Delete the named files from the floppy
+diskette.  If no file names are given, no action
+is taken.
+
+.ti -10
+-p	Print.  Each named file is sent to the standard
+output (most likely your terminal).
+
+.ti -10
+-r	Replace.  Each named file is copied to the floppy.
+If no file names are given, all the files in the
+current directory are copied.  If a file of the
+same name already exists on the floppy, it is
+silently overwritten.
+
+.ti -10
+-t	Table.  Print a table of contents of the floppy
+diskette.  If any files are named, only those
+named and present are listed.
+
+.ti -10
+-x	Extract.  Each named file is copied from the
+diskette to the current Micronix directory.  If no
+file names are given, the entire contents of the
+diskette is extracted.
+
+.ti -10
+-v	Verbose.  Be verbose about it.  Each operation is
+printed along with the affected file name.  Files
+deleted are preceded by a "d", those replaced are
+preceded by an "r", those extracted are preceded
+by "x".  The percentage of the diskette that is
+occupied, along with the number of bytes still
+available, is reported when dar is finished.
+.in -10
+
+At most, one of the flags - d, t, r, x - may be present.  If
+none are present, -t is assumed.  -v may be used in
+combination with any of these as in "-xv".
+
+The file list may contain wild card matching patterns to be
+applied to the set of file names in the MSDOS diskette's
+directory.  Refer to the section "Argument Expansion" in the
+sh program writeup in this manual.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+You receive a MSDOS diskette and want to copy the files
+off.  To copy its entire contents to Micronix, insert the
+diskette into floppy drive A and type:
+
+.in +5
+.bd
+dar mfa -xv
+.in -5
+
+To copy a file from a diskette, changing its name in the
+process:
+
+.in +5
+.bd
+dar mfa -p filename > newname
+.in -5
+
+To copy only the ".doc" files over from a MSDOS
+mini-floppy:
+
+.in +5
+.bd
+dar mfa -xv "*.doc"
+.in -5
+
+To copy a file from diskette into a file that is elsewhere
+than your current directory:
+
+.in +5
+.bd
+dar mfb -p "name" > /dir/ ...
+.in -5
+
+(path from root to desired location; you could also specify
+a new name)
+
+The following discussion is intended primarily for users that
+are having trouble getting dar to do what they want it to.
+
+One aspect of dar command syntax somewhat complicates the issue of
+using it, namely, the use of quotation marks.  An example should help
+clear this up.  Let's say your current Micronix directory contains two
+files, a.com and a.bak.  Your MSDOS floppy contains a file a.pil that
+you wish to copy into your current directory.  Since this is the only
+file on the floppy that begins with "a", you lazily enter dar mfa -xv
+a*.  Next you are wondering what's wrong when you are faced with the
+message "a.com not found on diskette / a.bak not found on diskette".
+Of course they weren't found.  You didn't even want Micronix to be
+looking for them.
+
+What has happened is this:  Your command interpreter (shell) thought
+you meant to search the current directory for a match to the wildcard
+argument before going out to the floppy for the copy.  It indeed found
+two matches (a.com & a.bak), so Micronix went gleefully out to the
+floppy to copy them.  In vain, unfortunately.
+
+The solution here is to use quotation marks around your filename(s).
+Had you entered dar mfa -xv "a*", the shell would have left the
+command alone, and dar would have gone directly out to the floppy to
+find anything that began with an "a".  Success.
+
+Now, just to set the record straight, there is a further complication
+that may help you to understand how the shell operates.  Suppose the
+file on your floppy is called b.pil instead of a.pil.  If you enter
+dar mfa -xv b.* (no quotes), the file will in fact be copied,
+contrary to the previous discussion.  Furthermore, everything on the
+floppy diskette will be copied, much to your chagrin.  This is because
+your shell took b.* to your current Micronix directory, looked to see
+if a file of that name was really there, and finding no such file, it
+passed the command to Micronix as "dar mfa -xv".  As noted above in
+the description of the x flag, if there is no file specified, the
+whole diskette gets copied.
+
+In summary, you should enclose the argument in quotes whenever you
+want to copy specific files from the floppy to Micronix.  The only
+exception to this is a situation where you have certain files already
+established on Micronix and you want to extract only those floppy
+files that match the existing Micronix filenames.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+far (1) - to access CP/M diskettes.
