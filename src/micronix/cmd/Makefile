@@ -30,6 +30,7 @@ install :
 	cp/cp reset /bin/reset
 	cd echo ; make echo
 	cd form ; make install
+	cd sh ; make install
 	# cd ar ; make install
 	# cd far ; make install
 	# cd msh ; make install
@@ -45,6 +46,7 @@ clean :
 	cd mkdir ; make clean
 	cd echo ; make clean
 	cd form ; make clean
+	cd sh ; make clean
 	cd vi ; make clean
 	# cd far ; make clean
 	# cd msh ; make clean

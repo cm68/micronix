@@ -7,7 +7,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = ar cc cp echo form ld ls Make mkdir mknod pp pwd rm s vi
+DIRS = ar cc cp echo form ld ls Make mkdir mknod pp pwd rm s sh vi
 
 all:
 	for i in $(DIRS) ; do (cd $$i ; make all) ; done
