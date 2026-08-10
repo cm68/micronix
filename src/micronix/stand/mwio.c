@@ -18,6 +18,24 @@ struct drivespec {
 #define	SETTLE		100
 
 /*
+ * Fixed addresses, reached through pointers rather than as
+ *
+ *	*(int *)HDC_CCA = &cmd;
+ *
+ * because the compiler drops a store through a cast constant and says
+ * nothing - no error, no exit status, just an object file with the
+ * statement missing.  That is what left the controller pointing at the
+ * first level's command block, re-executing it and never writing a
+ * status byte, while the loader spun on it.  See ccc/CASTBUG.
+ *
+ * Put back when the compiler takes the shape; the initialisers below
+ * are the same constants and nothing else has to change.
+ */
+UINT *ccaptr = (UINT *)HDC_CCA;         /* channel command address */
+UINT8 *ccahigh = (UINT8 *)(HDC_CCA + 2);
+UINT8 *hdrbuf = (UINT8 *)0x84;          /* where read header lands a head */
+
+/*
  * whitesmith's stupidity means that BSS symbols don't link unless they
  * have an explicit initializer.
  */
@@ -43,8 +61,17 @@ reset()
 
     outstr("Micronix loader for the HD-DMA\n");
 
-	*(int *)0x5d = &cmd;
-	*(char *)0x5f = 0;
+	/*
+	 * Tell the controller where its command block is.  This wrote the
+	 * pointer to 5d, and the controller reads it from 50 - it is the
+	 * default channel command address, the same one BOOTMW's equates
+	 * name and the same one the rom's boot uses.  So the controller
+	 * went on executing whatever the rom had left at 50, never wrote a
+	 * status byte, and hdc_command spun on it forever.  The banner
+	 * printed and nothing else did.
+	 */
+	*ccaptr = (UINT)&cmd;
+	*ccahigh = 0;
 
     out(HDC_RESET, 0);
 
@@ -79,19 +106,35 @@ reset()
 		cmd.xdma = 0;
 		tries = 0;
 		while (1) {
-			*(char *)0x84 = 0xff;
-			if (!hdc_command(OP_HEADER)) {
-				if (tries++ > 10) goto probedone;
-			}
-			if (*(char *)0x84 == i) {
+			/*
+			 * Count every attempt, not only the failures.  This
+			 * counted failures alone, so a controller that
+			 * answers the command without returning a header -
+			 * which is every one that does not implement read
+			 * header - succeeded forever and never matched, and
+			 * the probe spun here with nothing to say.
+			 */
+			if (tries++ > 10)
+				goto probedone;
+			*hdrbuf = 0xff;
+			hdc_command(OP_HEADER);
+			if (*hdrbuf == i) {
 				break;
 			}
 		}
-		outstr("head\n");
 	}
 probedone:
-	spec.heads = i;
-	spec.spc = i * spec.spt;
+	/*
+	 * What the probe found, unless it found nothing.  A drive that
+	 * reports no heads at all is a probe that did not work rather
+	 * than a drive with no heads, and taking it at its word gives
+	 * spc = 0 and a division by zero at the first block read.  Keep
+	 * the table's geometry in that case; it is what we booted from.
+	 */
+	if (i > 0) {
+		spec.heads = i;
+		spec.spc = i * spec.spt;
+	}
 }
 
 /*
@@ -117,10 +160,28 @@ readblock(int blocknum, char *buffer)
 		return 0;
     }
 
+	/*
+	 * Where a block lives, the way sys/mw.c puts it there.
+	 *
+	 * spc is sectors per cylinder - 68 on an st506 - whatever the
+	 * comment on it says, so blocknum / spc is already the cylinder
+	 * and dividing that by heads again was wrong, as was taking the
+	 * head from it.  The sector came out right by accident, because
+	 * secnum % spt is the same either way.
+	 *
+	 * And the rotation, which was missing altogether.  mw.c adds half
+	 * the cylinder count and wraps, so that the superblock and the
+	 * inodes sit in the middle of the platter and the average seek to
+	 * them halves.  Without it this looked for the superblock at
+	 * cylinder 0 when it lives at cylinder 76, and read whatever was
+	 * there - which is the boot area, and so never got a filesystem
+	 * at all.
+	 */
 	secnum = blocknum % spec.spc;
-	trknum = blocknum / spec.spc;
-	cyl = trknum / spec.heads;
-	head = trknum % spec.heads;
+	cyl = blocknum / spec.spc + (spec.cylinders >> 1);
+	if (cyl >= spec.cylinders)
+		cyl -= spec.cylinders;
+	head = secnum / spec.spt;
 
 	if (curcyl < cyl) {
 		cmd.steps = cyl - curcyl;

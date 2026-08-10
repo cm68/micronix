@@ -52,6 +52,7 @@
 #include <sys/fs.h>
 #include <sys/dir.h>
 #include <sys/stat.h>
+#include <sys/dlabel.h>
 
 #define BSIZE       512
 #define SUPERBLK    1           /* the superblock */
@@ -63,9 +64,20 @@
 #define APERBLK     256         /* block numbers in an indirect block */
 
 /*
+ * The boot that goes in unless -i names another.  Cylinder 0 is reserved
+ * whatever happens - it is where the label lives, and a disk that cannot
+ * say what it is has the same problem whether or not it is bootable - so
+ * the only question -i answers is what to put in it.
+ */
+#define DEFBOOT     "/bootmw.bin"
+
+/*
  * The drives, from specs[] in sys/mw.c.  The minor number picks one:
- * mw.c does "type = minor(dev) >> 2", the low two bits being the
- * partition, so m5a is minor 0, m10a is 4 and m16a is 8.
+ * mw.c does "type = minor(dev) >> 2" for the kind of drive and
+ * "drive = dev & 3" for which one - so the low bits select one of four
+ * physical drives on the controller, not a partition, and m5a is minor
+ * 0, m10a is 4 and m16a is 8.  Each of those drives has its own
+ * cylinder 0 and so its own label.
  *
  *	tracks	heads	sectors		blocks
  *	153	4	17		10404	5 meg
@@ -92,7 +104,11 @@ UINT isize;                     /* blocks of inodes */
 UINT nextblk;                   /* next block to hand out while building */
 UINT nextino;                   /* next inumber to hand out */
 
-char *bootfile;                 /* -i, or zero */
+char *bootfile;                 /* -i, or DEFBOOT */
+int force;                      /* -f: destroy what is already there */
+
+/* said twice, so it is a string and not two */
+char *inuse = "there is a filesystem here - use -f";
 UINT bootfirst;                 /* first block of the boot area */
 UINT bootnblk;                  /* how many of them */
 
@@ -202,8 +218,6 @@ int
 inboot(bn)
     UINT bn;
 {
-    if (!bootfile)
-        return 0;
     return bn >= bootfirst && bn < bootfirst + bootnblk;
 }
 
@@ -234,6 +248,47 @@ clrdsk(ip)
 
     for (i = 0; i < sizeof(struct dsknod); i++)
         ((char *) ip)[i] = 0;
+}
+
+/*
+ * Write the label into the second half of the boot sector.
+ *
+ * This is the only place on the device that can be found without already
+ * knowing what the device is, so it is the only place a description of
+ * it is worth anything.  See sys/dlabel.h.
+ *
+ * The boot code has the first half.  If it has grown into the second we
+ * stop rather than write over it: a boot with its tail replaced by a
+ * label loads and runs and does something else.
+ */
+putlabel(buf, type)
+    char *buf;
+    int type;
+{
+    struct dlabel *lp;
+    int i;
+
+    for (i = DL_OFFSET; i < BSIZE; i++) {
+        if (buf[i])
+            die("the boot code runs into the label - it is too big");
+    }
+
+    lp = (struct dlabel *) &buf[DL_OFFSET];
+    for (i = 0; i < 4; i++)
+        lp->d_magic[i] = DL_MAGIC[i];
+    lp->d_version = DL_VERSION;
+
+    lp->d_tracks = dtracks[type];
+    lp->d_heads = dheads[type];
+    lp->d_spt = dsecs[type];
+
+    lp->d_cyl0 = bootfirst;
+    lp->d_bootblks = bootnblk;
+    lp->d_roll = dtracks[type] >> 1;    /* what mw.c adds to blk / spc */
+
+    lp->d_fsize = fsize;
+    lp->d_isize = isize;
+    lp->d_swap = dtracks[type] * dheads[type] * dsecs[type] - fsize;
 }
 
 /*
@@ -282,9 +337,10 @@ main(argc, argv)
     int i;
 
     pname = argv[0];
-    bootfile = 0;
+    bootfile = DEFBOOT;
     exclude = 0;
     given = 0;
+    force = 0;
 
     /*
      * The manual says "mkfs device [size]" and m5init says
@@ -292,9 +348,11 @@ main(argc, argv)
      * order and so does this.  Every argument is one of four things and
      * each says which it is: -i takes the boot file, a minus and digits
      * is an exclusion, digits alone are a size, and what is left is the
-     * device.  -f is what the script passes to say do not ask; we never
-     * ask, so it is accepted and ignored rather than being a usage error
-     * on an invocation that has always worked.
+     * device.
+     *
+     * -f is what m5init has always passed, and it now means what it
+     * looks like: go ahead and destroy what is there.  Without it, a
+     * disk that already holds a filesystem is left alone.
      */
     device = 0;
     argc--;                     /* step over our own name */
@@ -305,6 +363,7 @@ main(argc, argv)
             exclude = atoi(arg + 1);
         } else if (arg[0] == '-') {
             if (arg[1] == 'f' && arg[2] == 0) {
+                force = 1;
                 continue;
             }
             if (arg[1] != 'i' || arg[2] != 0 || argc < 1)
@@ -352,8 +411,51 @@ main(argc, argv)
     if (isize < 1)
         isize = 1;
 
+    /*
+     * Worth saying out loud: the ilist is the one thing here that cannot
+     * be changed afterwards, and running out of inodes on a disk with
+     * blocks to spare is a bad afternoon.  fsck reports the block count
+     * back - "227 I-list" - so print both and the two can be compared.
+     */
+    printf("I-list: %d blocks, %d inodes\n", isize, isize * IPERBLK);
+
     if ((dev = open(device, 2)) < 0)
         die("cannot open the device for writing");
+
+    /*
+     * Is there already something here?
+     *
+     * The manual is blunt about this - "it obliterates any former file
+     * system on the device... aim carefully!" - and aiming is not a
+     * mechanism.  Two ways to tell, and either is enough to stop:
+     *
+     * The label at cylinder 0 is the good one, being a magic number at a
+     * known place.  A v6 superblock has no magic at all, which is the
+     * weakness the label exists to cover, so for a disk made before
+     * there were labels we fall back on asking whether block 1 reads
+     * like a superblock - the ilist fitting inside the filesystem and
+     * the filesystem inside the device.
+     */
+    if (!force) {
+        struct dlabel *lp;
+
+        rdblk(bootfirst, blkbuf);
+        lp = (struct dlabel *) &blkbuf[DL_OFFSET];
+        if (lp->d_magic[0] == DL_MAGIC[0] && lp->d_magic[1] == DL_MAGIC[1] &&
+            lp->d_magic[2] == DL_MAGIC[2] && lp->d_magic[3] == DL_MAGIC[3]) {
+            printf("Label: %d/%d/%d, %d blocks\n", lp->d_tracks,
+                lp->d_heads, lp->d_spt, lp->d_fsize);
+            die(inuse);
+        }
+
+        rdblk(SUPERBLK, blkbuf);
+        sb = (struct super *) blkbuf;
+        if (sb->s_isize && sb->s_isize < 1000 &&
+            sb->s_fsize > sb->s_isize + 2 && sb->s_fsize <= dsize) {
+            printf("Unlabelled: %d blocks\n", sb->s_fsize);
+            die(inuse);
+        }
+    }
 
     /*
      * The last block first.  If the device is not as big as we were
@@ -381,17 +483,15 @@ main(argc, argv)
      * Where the boot area is, before anything is allocated, because the
      * free list has to be built around it.
      */
-    if (bootfile) {
-        spc = dheads[type] * (UINT) dsecs[type];
-        bootfirst = (dtracks[type] - (dtracks[type] >> 1)) * spc;
-        bootnblk = spc;
-        if (bootfirst + bootnblk > fsize)
-            die("cylinder 0 falls outside the filesystem");
-        if (bootfirst < nextblk)
-            die("cylinder 0 lands in the ilist - filesystem too small");
-        printf("Boot area: blocks %d through %d, cylinder 0\n",
-            bootfirst, bootfirst + bootnblk - 1);
-    }
+    spc = dheads[type] * (UINT) dsecs[type];
+    bootfirst = (dtracks[type] - (dtracks[type] >> 1)) * spc;
+    bootnblk = spc;
+    if (bootfirst + bootnblk > fsize)
+        die("cylinder 0 falls outside the filesystem");
+    if (bootfirst < nextblk)
+        die("cylinder 0 lands in the ilist - filesystem too small");
+    printf("Boot area: blocks %d through %d, cylinder 0\n",
+        bootfirst, bootfirst + bootnblk - 1);
 
     /*
      * The root directory, and the boot directory and file if we are
@@ -402,12 +502,10 @@ main(argc, argv)
     rootblk = allocblk();
     nextino++;                          /* inode 1 is the root */
 
-    if (bootfile) {
-        dirino = nextino++;
-        filino = nextino++;
-        dirblk = allocblk();
-        indblk = allocblk();
-    }
+    dirino = nextino++;
+    filino = nextino++;
+    dirblk = allocblk();
+    indblk = allocblk();
 
     /* the root directory: . and .. and, if there is one, boot */
     zero(dirbuf);
@@ -416,26 +514,23 @@ main(argc, argv)
     ((struct dir *) dirbuf)[1].ino = ROOTINO;
     ((struct dir *) dirbuf)[1].name[0] = '.';
     ((struct dir *) dirbuf)[1].name[1] = '.';
-    n = 2 * sizeof(struct dir);
-    if (bootfile) {
-        ((struct dir *) dirbuf)[2].ino = dirino;
-        ((struct dir *) dirbuf)[2].name[0] = 'b';
-        ((struct dir *) dirbuf)[2].name[1] = 'o';
-        ((struct dir *) dirbuf)[2].name[2] = 'o';
-        ((struct dir *) dirbuf)[2].name[3] = 't';
-        n = 3 * sizeof(struct dir);
-    }
+    ((struct dir *) dirbuf)[2].ino = dirino;
+    ((struct dir *) dirbuf)[2].name[0] = 'b';
+    ((struct dir *) dirbuf)[2].name[1] = 'o';
+    ((struct dir *) dirbuf)[2].name[2] = 'o';
+    ((struct dir *) dirbuf)[2].name[3] = 't';
+    n = 3 * sizeof(struct dir);
     wrblk(rootblk, dirbuf);
 
     ip = getdsk(ROOTINO, blkbuf);
     clrdsk(ip);
     ip->d_mode = IALLOC | IFDIR | 0777;
-    ip->d_nlink = bootfile ? 3 : 2;
+    ip->d_nlink = 3;
     ip->d_size1 = n;
     ip->d_addr[0] = rootblk;
     putdsk(ROOTINO, blkbuf);
 
-    if (bootfile) {
+    {
         /*
          * A directory nothing can walk into, holding a file nothing can
          * open.  Two inodes to make the boot that much harder to lose to
@@ -513,19 +608,39 @@ main(argc, argv)
      * file has to be a first level boot built to run where the rom puts
      * it.
      */
-    if (bootfile) {
-        if ((bfd = open(bootfile, 0)) < 0)
-            die("cannot open the boot file");
-        for (n = 0; n < bootnblk; n++) {
-            zero(blkbuf);
+    bfd = open(bootfile, 0);
+    if (bfd < 0)
+        printf("No boot: cannot open %s\n", bootfile);
+
+    for (n = 0; n < bootnblk; n++) {
+        zero(blkbuf);
+        if (bfd >= 0) {
             got = read(bfd, blkbuf, BSIZE);
-            if (got <= 0)
-                break;
-            wrblk(bootfirst + n, blkbuf);
+            if (got <= 0) {
+                close(bfd);
+                bfd = -1;
+                got = 0;
+            }
         }
-        close(bfd);
-        printf("Boot: %d blocks written from %s\n", n, bootfile);
+        /*
+         * The label goes in whether or not there was a boot to put
+         * around it: an unbootable disk still has to be able to say what
+         * it is.  The first block is written even when the file was
+         * empty, because that block is the label.
+         */
+        if (n == 0) {
+            putlabel(blkbuf, type);
+        } else if (bfd < 0) {
+            break;
+        }
+        wrblk(bootfirst + n, blkbuf);
     }
+    if (bfd >= 0)
+        close(bfd);
+    if (n > 1)
+        printf("Boot: %d blocks written from %s\n", n, bootfile);
+    printf("Label: %s at cylinder 0, %d/%d/%d roll %d\n", DL_MAGIC,
+        dtracks[type], dheads[type], dsecs[type], dtracks[type] >> 1);
 
     /*
      * The superblock last.  It is the thing that says which blocks and

@@ -174,10 +174,23 @@ select()
  */
 iget()
 {
-	if (!readblock(2 + (inumber / 32), inodebuf)) {
+	/*
+	 * Sixteen inodes to a block, not thirty two: struct dsknod is 32
+	 * bytes and a block is 512, which is why the buffer above is
+	 * declared ibuf[16].  With 32 this read the wrong block for any
+	 * inode past the fifteenth and then indexed off the end of the
+	 * buffer.
+	 *
+	 * And inodes are numbered from one, so the root is the first
+	 * entry of block 2 and inode n is n-1 into the ilist.  Without
+	 * the -1 every inode read the one after it: asking for the root
+	 * returned /boot, whose block list then led somewhere that is not
+	 * a directory.  mkfs computes it the same way, in getdsk.
+	 */
+	if (!readblock(2 + ((inumber - 1) / 16), inodebuf)) {
 		outstr("inode read failed\n");
 	}
-	inode = &inodebuf[inumber % 32];
+	inode = &inodebuf[(inumber - 1) % 16];
 }
 
 #ifdef __STDC__

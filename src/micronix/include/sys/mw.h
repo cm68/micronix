@@ -62,6 +62,7 @@ struct hddma_cmd
 /*
  * port addresses 
  */
+#define HDC_CCA     0x50        /* default channel command address */
 #define HDC_RESET   0x54        /* Reset to controller */
 #define HDC_ATTN    0x55        /* Attention to controller */
 
