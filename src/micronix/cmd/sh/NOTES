@@ -125,15 +125,42 @@ never comes back, so the string is never reached as code.  Do not
 read the first few instructions after a call as if they were code
 without checking whether they spell something.
 
-main opens by walking a sixteen entry table of sixteen byte records
-at 0x99b0, reading fields at +0 and +4 of each.  Sixteen is the
-signal count, and the signal names (0x4b70: JTERM, ALRM, PIPE, SYS,
-...) and descriptions (0x490e: Terminated, Alarmed, Broken pipe, ...)
-are both in text, so this is the signal disposition setup.
+main is a loop of sixteen iterations over sixteen byte records at
+0x99b0, and then exit.  Per record it reads fields at +0 and +4,
+subtracts one from the other, skips the record if the difference is
+zero, then tests bit 1 of the field at +6 and skips unless it is set.
 
-    0x9ab0  the loop counter main uses, and a general scratch byte
+WHAT THAT TABLE IS, I DO NOT KNOW.  I first wrote here that it was
+the signal dispositions, on the grounds that sixteen is the signal
+count and the signal names (0x4b70: JTERM, ALRM, PIPE, SYS ...) and
+descriptions (0x490e: Terminated, Alarmed, Broken pipe ...) are both
+in text.  That is thin evidence and the body does not read like
+signal setup - comparing two fields and testing a flag bit is a
+search, not an installation.  Treat it as unidentified.
+
+    0x9ab0  the loop counter, and a general scratch byte
+    0x9ab1  scratch word, holds the +0 minus +4 difference
     0x9bec  set from main's first argument
-    0x99b0  the sixteen signal records, sixteen bytes apart
+    0x99b0  sixteen records, sixteen bytes apart, purpose unknown
+
+The syscall stubs are worth knowing, since they anchor everything:
+
+    H8121  exit        H815a  getpid
+    H8127  fork        H815f  getuid
+    H813a  indir
+
+Micronix syscalls are the CF trap ("SYS exit"), and disas decodes
+them, so grepping the disassembly for SYS is the fastest way to find
+where a routine actually touches the system.  Everything sh calls:
+
+    16  indir           fork, wait, pipe, dup, close, nice, sync,
+     1  each of         getpid, getuid, exit
+
+The sixteen indir sites are the ones that matter - indir is how
+Micronix passes a call whose arguments live in memory, so open, exec,
+read and write are all in there.  Finding what each one dispatches is
+the next concrete piece of work, and it maps the whole of how the
+shell talks to the system.
 
 
 Next
