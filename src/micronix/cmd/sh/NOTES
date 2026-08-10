@@ -303,6 +303,67 @@ a message with no reference may mean a whole branch is missing from
 the trace.
 
 
+THE GOAL: MATCH THE CALL GRAPH
+------------------------------
+
+The C does not have to be the same code, but it should have the same
+FUNCTIONS in the same relationships.  One C function per function in
+the binary, calling what that one calls.  Anything in the C with no
+counterpart in the image is an invention and should go; any function
+in the image with nothing in the C is a hole.
+
+Where that stands, measured with tools/coverage.py:
+
+    172 functions in the image, 169 below the first syscall stub
+    33120 bytes of them
+    13 functions identified, 4625 bytes - fourteen per cent
+
+so the reconstruction currently matches about a seventh of it, and
+the shape of the rest is unknown.  The libc floor used for that split
+is crude - several of the larger unnamed routines at high addresses
+are certainly library rather than shell - so fourteen per cent is a
+floor, not a measurement.
+
+The biggest holes, all shell rather than libc:
+
+    H0a14  2043   THE EXECUTION ENGINE.  Bigger than the parser.
+                  Calls close fifteen times and dup eight, the
+                  builtin dispatch four, pre-fork setup twice.  The C
+                  does this job in about a hundred lines across
+                  redirect/spawn/runpipeline, so it is a heavy
+                  simplification of something with far more
+                  redirection machinery in it.
+    H2dc8   844
+    H03f5   732   called from the read-eval loop
+    H1339   690   called from the read-eval loop
+    H3d25   677
+    H07a8   615   called three times from the execution engine
+    H725f   527
+    H5292   518   called from the read-eval loop
+    H2a0e   516
+    H2057   510   called from the read-eval loop
+
+and 136 smaller ones, 15287 bytes in all.
+
+Going the other way, what the C has that the image does not:
+
+  - findcmd() searching a colon separated pathlist.  WRONG TWICE.
+    The image keeps an array of three char * at 0x9741, laid out
+    backwards like the builtin table, pointing at
+
+        0x1f08 "."   0x1f03 "/bin"   0x1efa "/usr/bin"
+
+    so the path is three entries and one of them is the current
+    directory, which the C leaves out altogether.  Which end it
+    searches from is not yet read.
+  - startup() joining the home directory to "/.login" - the strings
+    are real, the mechanism is a guess.
+  - nextline() prompting only at the outermost input level.
+  - the wait loop in runpipeline, and (status >> 8) & 0xff.
+  - the close(2)/dup(1) for the & forms; the operators are real, this
+    implementation of them is not traced.
+
+
 Next
 ----
 
