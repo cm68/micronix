@@ -82,13 +82,66 @@ TWO TRAPS, both of which cost time here:
      bytes before concluding anything.
 
 
+The builtin handlers
+--------------------
+
+The switch table is at 0x075e, seventeen cases and a default, found
+now that disas recognises the helper by signature:
+
+    cd/chdir  1  H0817      pid      10  H09e7
+    dir       2  H085c      type     11  H0990
+    era       3  H08a1      source   12  H09f2
+    wait      4  H09bb      path     13  H0979
+    exit      5  H08b2      home     15  H08cb
+    echo      6  H086d      kill     16  H08ba
+    sync      8  H098a      alias    17  H07d9
+    prompt    9  H09c6      unalias  18  H09a1
+                            nice     19  H0908
+
+    default      H0811
+
+CODES 7 AND 14 ARE SIMPLY NOT USED.  They are absent from the name
+table AND from the switch, so they are gaps in the numbering rather
+than builtins recognised but unlisted.  That was the open question
+in the first pass and it is now closed.
+
+Seventeen distinct codes over eighteen names, because cd and chdir
+are the same case.
+
+
+Entry and main
+--------------
+
+    H0100   the usual startup: set up argc/argv, CALL the C runtime
+            entry at H011f, then CALL main.
+    H7117   main.
+    H88ed   the frame helper - sh's equivalent of form's H34c0, and
+            the thing to look for at the head of every function.
+    H85a3   a multiply, called to index arrays by a variable.
+
+"Syntax error." sits at 0x0111, immediately after the call to main,
+and disassembles as instructions - the tracer follows the call and
+never comes back, so the string is never reached as code.  Do not
+read the first few instructions after a call as if they were code
+without checking whether they spell something.
+
+main opens by walking a sixteen entry table of sixteen byte records
+at 0x99b0, reading fields at +0 and +4 of each.  Sixteen is the
+signal count, and the signal names (0x4b70: JTERM, ALRM, PIPE, SYS,
+...) and descriptions (0x490e: Terminated, Alarmed, Broken pipe, ...)
+are both in text, so this is the signal disposition setup.
+
+    0x9ab0  the loop counter main uses, and a general scratch byte
+    0x9bec  set from main's first argument
+    0x99b0  the sixteen signal records, sixteen bytes apart
+
+
 Next
 ----
 
-  - find the switch helper by signature (disas does this now) and pull
-    the jump table, as was done for form, to get the eighteen handler
-    addresses
-  - find the main loop: read a line, parse, fork/exec
+  - finish main: after the signal loop at H71ea comes argument
+    handling (-v, -c and "read" are at 0x1c70) and then the read
+    loop
   - the parser is the bulk of it - "<>&|" at 0x17cd is where
     redirection and pipes are recognised
   - sh.1 gives the whole language; the binary settles the details
