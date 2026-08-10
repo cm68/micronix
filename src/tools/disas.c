@@ -272,6 +272,57 @@ char *progname;
 word instaddr;
 word inst_start;
 
+/*
+ * Whitesmiths' switch helper, recognised by what it IS rather than by
+ * what it is called.  The walk below has always been here, but it only
+ * fired when the symbol table named "c.switch" - so on a stripped image
+ * every switch table was disassembled as instructions.  /bin/form has no
+ * symbols at all and its sixteen request handlers came out as garbage.
+ *
+ * The routine reads a 4-byte entry, tests the first word for zero, and
+ * either takes the second word as the default target or compares it
+ * against BC:
+ *
+ *	ld a,(hl) / inc hl / or (hl) / jp nz,cmp
+ *	inc hl / ld a,(hl) / inc hl / ld h,(hl) / ld l,a / jp (hl)
+ *	ld a,c / inc hl / cp (hl)
+ *
+ * The two bytes of the jp are wild, since it is position dependent.
+ */
+short wsswpat[] = {
+    0x7e, 0x23, 0xb6, 0xc2, -1, -1,
+    0x23, 0x7e, 0x23, 0x66, 0x6f, 0xe9,
+    0x79, 0x23, 0xbe
+};
+
+word wsswitch;          /* address of that helper, 0 if not found */
+
+int patmatch(short *p, word b, int len);
+
+/*
+ * This is one of a family of fixed helpers the compiler calls rather
+ * than opening code for - the frame setup at the head of every function
+ * is another, and could be found the same way to recover frame sizes.
+ */
+void
+find_wsswitch()
+{
+    word a, end;
+
+    if (seg[SEG_TEXT].length < sizeof(wsswpat) / sizeof(short))
+        return;
+    end = seg[SEG_TEXT].base + seg[SEG_TEXT].length
+        - sizeof(wsswpat) / sizeof(short);
+    for (a = seg[SEG_TEXT].base; a < end; a++) {
+        if (patmatch(wsswpat, a, sizeof(wsswpat) / sizeof(short))) {
+            wsswitch = a;
+            if (debug)
+                fprintf(stderr, "whitesmith's switch helper at %04x\n", a);
+            return;
+        }
+    }
+}
+
 short zcrtpat[]= {
     0x2a, 0x06, 0x00, 0xf9, 0x11, -1, -1, 0xb7,
     0x21, -1, -1, 0xed, 0x52, 0x4d, 0x44, 0x0b,
@@ -303,6 +354,19 @@ getbyte()
 
 byte
 get_byte(word addr)
+{
+    return codebuf[addr];
+}
+
+/*
+ * The shared syscall decoder in lib/mnix_sys.c reads the address space
+ * through this, and expects whatever is hosting it to say how.  The
+ * simulators answer out of their memory; here it is just the image we
+ * have already read.  Without it disas has not linked since mnix_sys.c
+ * moved into lib - the binary in the tree predates the move.
+ */
+unsigned char
+dis_byte(unsigned short addr)
 {
     return codebuf[addr];
 }
@@ -1287,6 +1351,8 @@ char **argv;
         hitech = 1;
     }
 
+    find_wsswitch();
+
     for (tracing = 5; tracing; tracing--) {
         if (debug) {
             fprintf(stderr, "tracing %d code %d\n", tracing, ntarg);
@@ -1703,8 +1769,11 @@ int out;
             if (out == OUT_NNW) {
                 reg_target(value, WORD|REF);
             } else {
-                /* do whitesmith's switch statement */
-                if (s && (strcmp(s, "c.switch") == 0)) {
+                /* do whitesmith's switch statement.  Named when the
+                 * image carries symbols, found by signature when it
+                 * does not - /bin/form has none. */
+                if ((s && (strcmp(s, "c.switch") == 0)) ||
+                    (wsswitch && value == wsswitch)) {
                     if (codebuf[(trace_addr) - 3] == 0x21) {
                         swaddr = wordat(trace_addr - 2);
                         if (debug) fprintf(stderr, "switch table at %x\n", swaddr);
