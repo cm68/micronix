@@ -112,12 +112,23 @@ are the same case.
 Entry and main
 --------------
 
-    H0100   the usual startup: set up argc/argv, CALL the C runtime
-            entry at H011f, then CALL main.
-    H7117   main.
-    H88ed   the frame helper - sh's equivalent of form's H34c0, and
-            the thing to look for at the head of every function.
+    H0100   startup.  It calls TWO things:
+
+                CALL H011f      main(argc, argv)
+                ...
+                CALL H7117      exit(status)
+
+    H011f   MAIN.  Two arguments, argc at +4 and argv at +6; it keeps
+            argc in 0x963e and argv in 0x961c.
+    H7117   exit.
+    H88e2   frame helper, and H88ed a second one - sh's equivalents of
+            form's H34c0, at the head of every function.
     H85a3   a multiply, called to index arrays by a variable.
+
+I first recorded H7117 as main because it is the second thing the
+startup calls and it opens with a loop.  It is exit: the loop is the
+stdio flush described below.  When two calls come out of the startup,
+the first is main and the second is what is done with its result.
 
 "Syntax error." sits at 0x0111, immediately after the call to main,
 and disassembles as instructions - the tracer follows the call and
@@ -125,23 +136,33 @@ never comes back, so the string is never reached as code.  Do not
 read the first few instructions after a call as if they were code
 without checking whether they spell something.
 
-main is a loop of sixteen iterations over sixteen byte records at
-0x99b0, and then exit.  Per record it reads fields at +0 and +4,
-subtracts one from the other, skips the record if the difference is
-zero, then tests bit 1 of the field at +6 and skips unless it is set.
+The table at 0x99b0 is the STDIO STREAM TABLE - sixteen FILEs of
+sixteen bytes.  Only three are initialised, and they say what the
+layout is:
 
-WHAT THAT TABLE IS, I DO NOT KNOW.  I first wrote here that it was
-the signal dispositions, on the grounds that sixteen is the signal
-count and the signal names (0x4b70: JTERM, ALRM, PIPE, SYS ...) and
-descriptions (0x490e: Terminated, Alarmed, Broken pipe ...) are both
-in text.  That is thin evidence and the body does not read like
-signal setup - comparing two fields and testing a flag bit is a
-search, not an installation.  Treat it as unidentified.
+    [0]  +6=0001  +8=0000
+    [1]  +6=0002  +8=0001
+    [2]  +6=0006  +8=0002
+
++8 is 0, 1, 2 - the file descriptors, so these three are stdin,
+stdout and stderr.  +6 is flags; bit 0 is set on the reading stream
+and bit 1 on the two writing ones, so bit 1 is "writable" (the 6 on
+stderr is bit 1 plus something else, probably unbuffered).  +0 and +4
+are the buffer pointers: exit skips a stream when they are equal,
+which is to say when there is nothing held.
+
+    0x99b0  the stream table, sixteen bytes per FILE
+      +0/+4 buffer pointers, equal when empty
+      +6    flags, bit 1 = writable
+      +8    file descriptor
+
+exit's loop is therefore the flush: for each stream, skip it if the
+buffer is empty, skip it unless it is writable, otherwise write it
+out.  That is what fooled me into calling H7117 main.
 
     0x9ab0  the loop counter, and a general scratch byte
-    0x9ab1  scratch word, holds the +0 minus +4 difference
-    0x9bec  set from main's first argument
-    0x99b0  sixteen records, sixteen bytes apart, purpose unknown
+    0x9ab1  scratch word, the +0 minus +4 difference
+    0x963e  argc          0x961c  argv
 
 The syscall stubs are worth knowing, since they anchor everything:
 
