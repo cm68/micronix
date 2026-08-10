@@ -274,6 +274,29 @@ attention(portaddr p, byte v)
         command.status = GOOD;
         break;
     case OP_RHEAD:
+        /*
+         * Hand back the id of the sector we were pointed at.  This used
+         * to report success and transfer nothing, so a driver probing
+         * for heads saw its own sentinel come back unchanged, matched
+         * nothing, and went round forever.  The volume knows what its
+         * headers say because the format command told it - see
+         * drive_format - and a head that is not there says so by
+         * failing, which is the answer a probe is actually asking for.
+         */
+        i = drive_header(handle[drv], curcyl[drv], command.hd, command.sec,
+            (char *)secbuf);
+        if (i == 0) {
+            tracec(trace_hddma, "\tno header at c %d h %d s %d\n",
+                curcyl[drv], command.hd, command.sec);
+            command.status = 0xfe;              /* anything but GOOD */
+            break;
+        }
+        copyout(secbuf, dmaaddr, i);
+        if (traceflags & trace_hddma) {
+            lc("\theader c %d h %d s %d = %02x %02x %02x %02x %02x\n",
+                curcyl[drv], command.hd, command.sec,
+                secbuf[0], secbuf[1], secbuf[2], secbuf[3], secbuf[4]);
+        }
         command.status = GOOD;
         break;
     case OP_FMT:                                // format a whole track
@@ -284,6 +307,36 @@ attention(portaddr p, byte v)
         for (i = 0; i < secsize[drv]; i++) {
             secbuf[i] = command.fill;
         }
+        /*
+         * Tell the volume what this format laid down, before writing the
+         * data, so that a read header afterwards has something to say.
+         * The format command carries all of it and the sectors do not -
+         * they hold data, not their own ids - so this is the only place
+         * it can be kept.
+         */
+        /*
+         * And show what was handed to us.  A format command points at a
+         * table of the sector ids to lay down, which is the whole of
+         * what a read header has to give back later.  We have no
+         * formatter to read it from yet, so dump it: running mwformat
+         * under the simulator and looking at this is how the layout gets
+         * settled, rather than by guessing from the one driver that
+         * consumes it.
+         */
+        if (traceflags & trace_hddma) {
+            int n = (command.sptneg ^ 0xff) * 8;
+
+            if (n > sizeof(secbuf))
+                n = sizeof(secbuf);
+            lc("\tformat id table at %06x, %d sectors:\n",
+                dmaaddr, command.sptneg ^ 0xff);
+            copyin(secbuf, dmaaddr, n);
+            hexdump((char *)secbuf, n);
+        }
+
+        drive_format(handle[drv], 1, command.fseccode,
+            command.sptneg ^ 0xff, command.gap3, command.fill);
+
         for (i = 0; i < (command.sptneg ^ 0xff); i++) {
         	if (drive_write(handle[drv], curcyl[drv], head, i, (char *)secbuf) != secsize[drv]) {
         		lc("\tformat data fill write error\n");

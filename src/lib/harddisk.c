@@ -26,9 +26,38 @@ struct disklabel {
 	int cylinders;		    // number of cylinders
 	int heads;			    // number of heads
 	int spt;			    // sectors per track
+
+	/*
+	 * What a sector header says, recorded when the volume is
+	 * formatted.  A format command carries this - the sector count,
+	 * the size code, the gap and the fill - and the controller lays
+	 * it down on the track; read header hands it back.  Keeping it
+	 * only in the sectors themselves loses it, because the sectors
+	 * hold data and not their own ids.
+	 *
+	 * One copy for the volume rather than one per track: a format
+	 * here is homogeneous, and the headers of one track differ from
+	 * another's only in which track they name, which is the one part
+	 * that does not have to be stored.
+	 *
+	 * Appended to the label, so a drive file written before these
+	 * existed reads back zero and is treated as unformatted.
+	 */
+	int firstsec;           // number of the first sector on a track
+	int seccode;            // the size code the format command used
+	int gap3;               // inter sector gap
+	int fill;               // what the data was filled with
+	int formatted;          // nonzero once a format has been seen
 };
 
 #define DATAOFF 2048         // first 2k is label
+
+/*
+ * This is in lib, which does not have the simulator's trace flags, and
+ * the seek used to printf on every access - a line per sector, through
+ * every boot and every install.  Off unless somebody turns it on here.
+ */
+static int hd_debug = 0;
 #define NDRIVES 8
 
 struct drive {
@@ -153,17 +182,37 @@ diskoff(struct drive *dp, int cylinder, int head, int sector)
         return DATAOFF;
     }
 
-    if ((sector + 1) > dp->label.spt) {
-        dp->label.spt = sector + 1;
-        dirty++;
-    }
-    if ((head + 1) > dp->label.heads) {
-        dp->label.heads = head + 1;
-        dirty++;
-    }
-    if ((cylinder + 1) > dp->label.cylinders) {
-        dp->label.cylinders = cylinder + 1;
-        dirty++;
+    /*
+     * A blank drive learns its shape from what is written to it.  A
+     * formatted one does not: its geometry is the multipliers in the
+     * arithmetic below, so growing spt or heads after the fact moves
+     * every sector already written and quietly reinterprets the whole
+     * volume.  Out of range on a formatted drive is an error, which is
+     * also what makes a head probe mean anything - head 5 of a four head
+     * drive has to fail rather than make it a five head drive.
+     */
+    if (dp->label.formatted) {
+        if (sector >= dp->label.spt || head >= dp->label.heads ||
+            cylinder >= dp->label.cylinders) {
+            if (hd_debug)
+                printf("drive %s: c %d h %d s %d outside %d/%d/%d\n",
+                    dp->name, cylinder, head, sector,
+                    dp->label.cylinders, dp->label.heads, dp->label.spt);
+            return -1;
+        }
+    } else {
+        if ((sector + 1) > dp->label.spt) {
+            dp->label.spt = sector + 1;
+            dirty++;
+        }
+        if ((head + 1) > dp->label.heads) {
+            dp->label.heads = head + 1;
+            dirty++;
+        }
+        if ((cylinder + 1) > dp->label.cylinders) {
+            dp->label.cylinders = cylinder + 1;
+            dirty++;
+        }
     }
     if (dirty) {
         lseek(dp->fd, 0, SEEK_SET);
@@ -180,9 +229,65 @@ diskoff(struct drive *dp, int cylinder, int head, int sector)
         (head * dp->label.secsize * dp->label.spt) +
         (cylinder * dp->label.secsize * dp->label.spt * dp->label.heads);
 
-    printf("c: %d h: %d s: %d = %d\n", cylinder, head, sector, offset);
+    if (hd_debug)
+        printf("c: %d h: %d s: %d = %d\n", cylinder, head, sector, offset);
 
     return offset;
+}
+
+/*
+ * Record what a format command said about the sectors it laid down, and
+ * hand it back for a read header.  The volume owns this, not the
+ * controller: it outlives the run, and a drive file carried to another
+ * machine still knows what shape its tracks are.
+ */
+void
+drive_format(struct drive *dp, int firstsec, int seccode, int spt,
+    int gap3, int fill)
+{
+    dp->label.firstsec = firstsec;
+    dp->label.seccode = seccode;
+    dp->label.gap3 = gap3;
+    dp->label.fill = fill;
+    if (spt)
+        dp->label.spt = spt;
+    dp->label.formatted = 1;
+
+    lseek(dp->fd, 0, SEEK_SET);
+    if (write(dp->fd, &dp->label, sizeof(dp->label)) != sizeof(dp->label))
+        printf("could not update label\n");
+}
+
+/*
+ * The header of one sector, as read header returns it.  Everything but
+ * the track comes out of the label; the track is where we were asked to
+ * look.  Returns 0 if the drive has no such place, which is what a probe
+ * for a head that is not there has to see.
+ */
+int
+drive_header(struct drive *dp, int cylinder, int head, int sector, char *buf)
+{
+    if (!dp->label.formatted)
+        return 0;
+    if (cylinder >= dp->label.cylinders || head >= dp->label.heads ||
+        sector >= dp->label.spt)
+        return 0;
+
+    buf[0] = cylinder & 0xff;
+    buf[1] = (cylinder >> 8) & 0xff;
+    buf[2] = sector + dp->label.firstsec;
+    buf[3] = dp->label.seccode;
+    buf[4] = head;
+    return 5;
+}
+
+int
+drive_geometry(struct drive *dp, int *cyls, int *heads, int *spt)
+{
+    if (cyls) *cyls = dp->label.cylinders;
+    if (heads) *heads = dp->label.heads;
+    if (spt) *spt = dp->label.spt;
+    return dp->label.formatted;
 }
 
 int

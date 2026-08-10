@@ -18,6 +18,7 @@
 #include "../micronix/include/types.h"
 #include "../micronix/include/sys/fs.h"
 #include "../micronix/include/sys/dir.h"
+#include "../micronix/include/sys/dlabel.h"
 
 #include "../include/fslib.h"
 #include "../include/util.h"
@@ -51,6 +52,11 @@ struct image {
     int spt;    /* sectors per track */
     int bps;    /* bytes per sector */
     int offset; /* blocks before the filesystem - the reserved area */
+
+    /* a hard disk, from the two labels */
+    int cyls;
+    int heads;
+    int roll;   /* what mw.c adds to blk / spc before wrapping */
 #ifdef USE_LIBDSK
     DSK_PDRIVER *drive;
 #endif
@@ -59,6 +65,23 @@ struct image {
 #define DRIVER_IMAGE    1
 #define DRIVER_IMD      2
 #define DRIVER_LIBDSK   3
+#define DRIVER_HD       4       /* a simulator hard disk file */
+
+/*
+ * A simulator hard disk file: a 2048 byte label and then the sectors in
+ * physical order, cylinder then head then sector.  lib/harddisk.c writes
+ * it; this only reads the label.
+ */
+#define HD_MAGIC    0xd15cc0de
+#define HD_DATAOFF  2048
+
+struct simlabel {
+    int magic;
+    int secsize;
+    int cylinders;
+    int heads;
+    int spt;
+};
 
 void
 closefs(struct super *fs)
@@ -96,6 +119,93 @@ is_sticky(char *fn)
         }    
     }
     return 0;
+}
+
+/*
+ * Where a filesystem block lives in a hard disk file.
+ *
+ * sys/mw.c does not put block 0 at cylinder 0 - it rotates by d_roll,
+ * which is half the cylinder count, so that the superblock and the
+ * inodes sit in the middle of the platter and the average seek to them
+ * halves.  The cost is that nothing can find anything on one of these
+ * without knowing the geometry, which is why the disk carries a label.
+ *
+ *	cyl  = blk / spc + roll, wrapped at cyls
+ *	head = (blk mod spc) / spt
+ *	sec  = (blk mod spc) mod spt
+ */
+static long
+hdpos(struct image *i, int blkno)
+{
+    int spc = i->heads * i->spt;
+    int cyl, head, sec;
+
+    cyl = blkno / spc + i->roll;
+    if (cyl >= i->cyls)
+        cyl -= i->cyls;
+    head = (blkno % spc) / i->spt;
+    sec = (blkno % spc) % i->spt;
+
+    return (long) HD_DATAOFF +
+        (((long) cyl * i->heads + head) * i->spt + sec) * 512;
+}
+
+/*
+ * Read the two labels off a hard disk file: the simulator's, which says
+ * how the file is laid out, and Micronix's at physical cylinder 0 head 0
+ * sector 0, which says how the filesystem is laid out on it.  The second
+ * is the only block on the device that can be found without already
+ * knowing the answer, which is why it is the one that carries it.
+ */
+static int
+hdlabels(struct image *i)
+{
+    struct simlabel sl;
+    struct dlabel *dl;
+    char buf[512];
+
+    if (lseek(i->fd, 0L, 0) < 0 || read(i->fd, &sl, sizeof(sl)) != sizeof(sl))
+        return 0;
+    if (sl.magic != HD_MAGIC)
+        return 0;
+
+    i->cyls = sl.cylinders;
+    i->heads = sl.heads;
+    i->spt = sl.spt;
+    i->altsec = 0;              /* mw.c does not skew */
+    i->offset = 0;
+
+    /* physical 0/0/0 - no geometry needed to find it */
+    if (lseek(i->fd, (long) HD_DATAOFF, 0) < 0 ||
+        read(i->fd, buf, 512) != 512)
+        return 0;
+
+    dl = (struct dlabel *) &buf[DL_OFFSET];
+    if (strncmp(dl->d_magic, DL_MAGIC, 4) != 0) {
+        /*
+         * An unlabelled disk - made before mkfs wrote one, or by the
+         * 1983 mkfs.  Fall back on what mw.c would have assumed, and say
+         * so, because it is a guess and the next thing that goes wrong
+         * will want to know a guess was made.
+         */
+        i->roll = i->cyls >> 1;
+        trace(trace_fs, "openfs: no %s label, assuming roll %d\n",
+            DL_MAGIC, i->roll);
+        return 1;
+    }
+
+    i->roll = dl->d_roll;
+    if (dl->d_tracks != i->cyls || dl->d_heads != i->heads ||
+        dl->d_spt != i->spt) {
+        fprintf(stderr,
+            "warning: label says %d/%d/%d, the file says %d/%d/%d\n",
+            dl->d_tracks, dl->d_heads, dl->d_spt,
+            i->cyls, i->heads, i->spt);
+    }
+    trace(trace_fs, "openfs: %s label, %d/%d/%d roll %d, fs %d blocks\n",
+        DL_MAGIC, dl->d_tracks, dl->d_heads, dl->d_spt,
+        dl->d_roll, dl->d_fsize);
+    return 1;
 }
 
 /*
@@ -168,6 +278,21 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
         i->spt = 15;
         i->dt = ' ';
         i->altsec = 0;
+
+        /*
+         * A hard disk file says what it is in its first four bytes, so
+         * ask before doing anything that depends on a name or a minor
+         * number.  Its geometry comes off the disk rather than out of a
+         * table, which is the whole point of the label.
+         */
+        if (i->driver == DRIVER_IMAGE && hdlabels(i)) {
+            i->driver = DRIVER_HD;
+            *fsp = (struct super *)i;
+            readblk(*fsp, 1, i->sb.superblock);
+            (*fsp)->s_fmod = 0;
+            return ret;
+        }
+
         devnum(filesystem, &i->dt, &i->major, &i->minor);
         if (i->driver == DRIVER_IMD) {
             i->altsec = 1;
@@ -341,8 +466,11 @@ readblk(struct super *fs, int blkno, char *buf)
     realblk = secmap(fs, blkno);
     trace(trace_fs, "readblk: %d -> %d\n", blkno, realblk);
 
-    if (i->driver == DRIVER_IMAGE) {
-        if (lseek(i->fd, 512L * (realblk + i->offset), SEEK_SET) < 0)
+    if (i->driver == DRIVER_HD || i->driver == DRIVER_IMAGE) {
+        long off = (i->driver == DRIVER_HD) ? hdpos(i, blkno)
+            : 512L * (realblk + i->offset);
+
+        if (lseek(i->fd, off, SEEK_SET) < 0)
             lose("readblk seek");
         if (read(i->fd, buf, 512) != 512)
             lose("readblk");
@@ -379,8 +507,11 @@ writeblk(struct super *fs, int blkno, char *buf)
     realblk = secmap(fs, blkno);
     trace(trace_fs, "writeblk: %d -> %d\n", blkno, realblk);
 
-    if (i->driver == DRIVER_IMAGE) {
-        if (lseek(i->fd, 512L * (realblk + i->offset), SEEK_SET) < 0)
+    if (i->driver == DRIVER_HD || i->driver == DRIVER_IMAGE) {
+        long off = (i->driver == DRIVER_HD) ? hdpos(i, blkno)
+            : 512L * (realblk + i->offset);
+
+        if (lseek(i->fd, off, SEEK_SET) < 0)
             lose("writeblk seek");
         if ((ret = write(i->fd, buf, 512)) != 512) {
             printf("write ret %d\n", ret);

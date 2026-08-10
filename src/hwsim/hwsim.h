@@ -81,6 +81,10 @@ void *drive_open(char *name);
 int drive_sectorsize(void *dhandle, int secsize);
 int drive_write(void *dhandle, int cyl, int head, int sec, char *buf);
 int drive_read(void *dhandle, int cyl, int head, int sec, char *buf);
+void drive_format(void *dhandle, int firstsec, int seccode, int spt,
+    int gap3, int fill);            // record what a format laid down
+int drive_header(void *dhandle, int cyl, int head, int sec, char *buf);
+int drive_geometry(void *dhandle, int *cyls, int *heads, int *spt);
 
 /*
  * global simulator variables
