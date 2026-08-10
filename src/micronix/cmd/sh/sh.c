@@ -39,6 +39,15 @@ char *progname = "sh";
 char *strsave();
 
 /*
+ * The line and the pipeline built from it live out here rather than
+ * in main's frame.  Between them they are more than two kilobytes,
+ * and a Z80 frame will not carry that - ccc says "locals too large"
+ * and it is right to.
+ */
+char line[MAXLINE];
+struct pipeline pipe1;
+
+/*
  * The stack of input sources.  The binary keeps it at 0x9648 with the
  * pointer in 0x9646, pushes stdin onto it at startup, and pops one
  * level every time a source runs dry - which is what makes the source
@@ -195,11 +204,29 @@ char *name;
 /*
  * H4287.  Two calls to signal() with 1, for SIGINT and SIGQUIT - the
  * shell stops listening to them around a child.
+ *
+ * NOT DONE, because libu.a cannot link it: signal.o defines _signal
+ * but refers to __signal and _jtab, and _signal.o - the member that
+ * should carry them - is empty.  The syscall itself is there (the
+ * original reaches it through indir block 0x9b9e), so this wants
+ * fixing in the library rather than worked around here.
  */
 ignoresigs()
 {
-    signal(2, SIG_IGN);
-    signal(3, SIG_IGN);
+}
+
+/*
+ * isatty is not in libu.a either, but gtty is, and asking a
+ * descriptor for its terminal modes is how this was always done: if
+ * it answers, it is a terminal.
+ */
+int
+isatty(fd)
+int fd;
+{
+    char buf[6];
+
+    return gtty(fd, buf) == 0;
 }
 
 /*
@@ -515,8 +542,12 @@ struct cmd *c;
                 if (strcmp(aliases[j].name, c->argv[i]) == 0) {
                     free(aliases[j].name);
                     free(aliases[j].value);
-                    for (k = j; k + 1 < naliases; k++)
-                        aliases[k] = aliases[k + 1];
+                    /* field by field: this compiler has no
+                     * structure assignment */
+                    for (k = j; k + 1 < naliases; k++) {
+                        aliases[k].name = aliases[k + 1].name;
+                        aliases[k].value = aliases[k + 1].value;
+                    }
                     naliases--;
                     break;
                 }
@@ -601,8 +632,6 @@ main(argc, argv)
 int argc;
 char **argv;
 {
-    char line[MAXLINE];
-    struct pipeline pipe1;
     int i;
     char *cmdstring = 0;
 
