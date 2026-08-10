@@ -1,29 +1,22 @@
 /*
- * parse.c - NOT THE PARSER
+ * parse.c - turn one input line into a pipeline
  *
  * micronix/cmd/sh/parse.c
  *
- * The real parser has not been written.  This is a placeholder that
- * splits a line on whitespace and REFUSES anything else, so that the
- * rest of the shell can be built and exercised without this quietly
- * getting a redirection or a pipeline wrong.  Anything it cannot
- * honestly handle is an error, not a guess.
+ * The grammar is the binary's.  Its operator table sits at 0x2242,
+ * immediately before the parser that uses it at H2257, and holds
+ * eight operators in the order they have to be matched - longest
+ * first, or ">>" would never be seen because ">" matches it:
  *
- * What the real one has to do, from man1/sh.1 and from the binary:
+ *	|&  |  &  >>&  >>  >&  >  <
  *
- *	< > >> |	redirection and pipes.  The binary keeps the
- *			metacharacters as a string "<>&|" at 0x17cd.
- *	&		run in the background.
- *	'  "  \		quoting.
- *	`cmd`		substitution.  The routine at 0x2aa2 is the
- *			one that does it: it pipes, forks, closes the
- *			write end in the parent, fdopens the read end
- *			and reads the child's output back a line at a
- *			time through a 512 byte buffer.
- *	aliases		expanded before anything else.
+ * The forms ending in & send the standard error the same way as the
+ * standard output, which is what makes this a csh and not a Bourne
+ * shell.  There is no here-document and no "2>".
  *
- * H2c12 in the binary is the entry point to all of it, and it is the
- * bulk of the program.
+ * H17d7 in the binary is the tokeniser and holds the metacharacter
+ * set "<>&|"; H772d is the string equality it tests each operator
+ * with, called once per operator - eight times.
  *
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
@@ -31,7 +24,168 @@
 #include <stdio.h>
 #include "sh.h"
 
-char *metachars = "<>&|";       /* 0x17cd */
+char *metachars = "<>&|";       /* 0x17cd and 0x17d2 */
+
+/*
+ * The operators, longest first.  The order is the binary's own and
+ * it matters.
+ */
+struct op {
+    char *text;
+    int  code;
+};
+
+#define O_PIPEBOTH  1           /* |&  */
+#define O_PIPE      2           /* |   */
+#define O_BG        3           /* &   */
+#define O_APPBOTH   4           /* >>& */
+#define O_APPEND    5           /* >>  */
+#define O_OUTBOTH   6           /* >&  */
+#define O_OUT       7           /* >   */
+#define O_IN        8           /* <   */
+
+static struct op ops[] = {
+    "|&",   O_PIPEBOTH,
+    "|",    O_PIPE,
+    "&",    O_BG,
+    ">>&",  O_APPBOTH,
+    ">>",   O_APPEND,
+    ">&",   O_OUTBOTH,
+    ">",    O_OUT,
+    "<",    O_IN,
+    0,      0
+};
+
+/*
+ * Somewhere to put the words we pull out of the line.  The line
+ * itself is chopped up in place where quoting allows it, and copied
+ * here where it does not.
+ */
+static char wordbuf[MAXLINE * 2];
+static int  wordused;
+
+static char *
+saveword(s, n)
+char *s;
+int n;
+{
+    char *p;
+
+    if (wordused + n + 1 > sizeof(wordbuf))
+        return (char *)0;
+    p = &wordbuf[wordused];
+    while (n--)
+        *p++ = *s++;
+    *p = '\0';
+    p = &wordbuf[wordused];
+    wordused += strlen(p) + 1;
+    return p;
+}
+
+/*
+ * Which operator, if any, starts here?  Returns its code and sets
+ * *len to how long it was.  The table is in longest-first order so
+ * the first hit is the right one.
+ */
+static int
+isop(s, len)
+char *s;
+int *len;
+{
+    struct op *o;
+    int n;
+
+    for (o = ops; o->text; o++) {
+        n = strlen(o->text);
+        if (strncmp(s, o->text, n) == 0) {
+            *len = n;
+            return o->code;
+        }
+    }
+    return 0;
+}
+
+/*
+ * Copy one word, dealing with quotes.  Returns a pointer to the saved
+ * word and leaves *pp past it, or null at the end of the line.  A
+ * quote does not survive into the word; a backslash protects exactly
+ * the character after it.
+ */
+static char *
+getword(pp)
+char **pp;
+{
+    char buf[MAXLINE];
+    char *s = *pp;
+    char *q = buf;
+    int quote;
+
+    while (*s == ' ' || *s == '\t')
+        s++;
+    if (*s == '\0') {
+        *pp = s;
+        return (char *)0;
+    }
+
+    while (*s && *s != ' ' && *s != '\t') {
+        if (strchr(metachars, *s))
+            break;
+        if (*s == '\\' && s[1]) {
+            s++;
+            if (q < buf + sizeof(buf) - 1)
+                *q++ = *s++;
+            continue;
+        }
+        if (*s == '\'' || *s == '"') {
+            quote = *s++;
+            while (*s && *s != quote) {
+                if (q < buf + sizeof(buf) - 1)
+                    *q++ = *s++;
+                else
+                    s++;
+            }
+            if (*s == quote)
+                s++;
+            continue;
+        }
+        if (q < buf + sizeof(buf) - 1)
+            *q++ = *s++;
+        else
+            s++;
+    }
+    *pp = s;
+    if (q == buf)
+        return (char *)0;
+    return saveword(buf, q - buf);
+}
+
+static void
+clearcmd(c)
+struct cmd *c;
+{
+    c->argc = 0;
+    c->argv[0] = (char *)0;
+    c->in = c->out = (char *)0;
+    c->append = 0;
+    c->bg = 0;
+    c->both = 0;
+}
+
+/*
+ * The name a redirection is given.  Errors here are the binary's
+ * "Missing name for redirect.", raised from inside its parser.
+ */
+static char *
+redirname(pp)
+char **pp;
+{
+    char *w;
+
+    w = getword(pp);
+    if (!w)
+        warn("Missing name for redirect.", 0);
+    return w;
+}
 
 int
 parse(line, p)
@@ -40,13 +194,13 @@ struct pipeline *p;
 {
     struct cmd *c;
     char *s;
+    char *w;
+    int code, len;
 
+    wordused = 0;
     p->ncmd = 0;
     c = &p->cmd[0];
-    c->argc = 0;
-    c->in = c->out = (char *)0;
-    c->append = 0;
-    c->bg = 0;
+    clearcmd(c);
 
     for (s = line; *s; s++) {
         if (*s == '\n') {
@@ -55,33 +209,102 @@ struct pipeline *p;
         }
     }
 
-    for (s = line; *s; s++) {
-        if (strchr(metachars, *s) || *s == '\'' || *s == '"' || *s == '`') {
-            warn("parser not written: cannot handle %c yet", (char *)(int)*s);
-            return -1;
-        }
-    }
-
     s = line;
-    while (*s) {
+    for (;;) {
         while (*s == ' ' || *s == '\t')
             s++;
-        if (!*s)
+        if (*s == '\0')
             break;
+
+        if (*s == '#')                  /* a comment runs to the end */
+            break;
+
+        code = isop(s, &len);
+        if (code) {
+            s += len;
+            switch (code) {
+
+            case O_PIPEBOTH:
+            case O_PIPE:
+                if (c->argc == 0) {
+                    warn("Syntax error.", 0);
+                    return -1;
+                }
+                c->both = (code == O_PIPEBOTH);
+                if (p->ncmd + 1 >= MAXCMD) {
+                    warn("too many commands in a pipeline", 0);
+                    return -1;
+                }
+                p->ncmd++;
+                c = &p->cmd[p->ncmd];
+                clearcmd(c);
+                continue;
+
+            case O_BG:
+                c->bg = 1;
+                continue;
+
+            case O_APPBOTH:
+            case O_APPEND:
+                if (!(w = redirname(&s)))
+                    return -1;
+                c->out = w;
+                c->append = 1;
+                c->both = (code == O_APPBOTH);
+                continue;
+
+            case O_OUTBOTH:
+            case O_OUT:
+                if (!(w = redirname(&s)))
+                    return -1;
+                c->out = w;
+                c->append = 0;
+                c->both = (code == O_OUTBOTH);
+                continue;
+
+            case O_IN:
+                if (!(w = redirname(&s)))
+                    return -1;
+                c->in = w;
+                continue;
+            }
+        }
+
+        w = getword(&s);
+        if (!w)
+            continue;
         if (c->argc >= MAXARG - 1) {
             warn("too many arguments", 0);
             return -1;
         }
-        c->argv[c->argc++] = s;
-        while (*s && *s != ' ' && *s != '\t')
-            s++;
-        if (*s)
-            *s++ = '\0';
+        c->argv[c->argc++] = w;
+        c->argv[c->argc] = (char *)0;
     }
-    c->argv[c->argc] = (char *)0;
 
-    if (c->argc == 0)
+    /*
+     * A pipeline whose last stage has no words is "cmd |" with
+     * nothing after it.  An empty line is not an error.
+     */
+    if (p->ncmd == 0 && p->cmd[0].argc == 0)
         return 0;
-    p->ncmd = 1;
-    return 1;
+    if (p->cmd[p->ncmd].argc == 0) {
+        warn("Syntax error.", 0);
+        return -1;
+    }
+    p->ncmd++;
+
+    /*
+     * & anywhere in the pipeline backgrounds the whole of it, which
+     * is how it reads when it is written at the end.
+     */
+    {
+        int i, bg = 0;
+        for (i = 0; i < p->ncmd; i++)
+            if (p->cmd[i].bg)
+                bg = 1;
+        if (bg)
+            for (i = 0; i < p->ncmd; i++)
+                p->cmd[i].bg = 1;
+    }
+    return p->ncmd;
 }

@@ -276,8 +276,25 @@ its redirections are attached.
     H16f2   19 bytes: print via H7cab, then exit.  A fatal error.
             H2257 calls it three times, so there are three ways for
             the parse to give up.
-    H772d   72 bytes, a leaf, called eight times from H2257 - the
-            most used thing in the parser and still unidentified.
+    H772d   string EQUALITY.  Compare two strings a character at a
+            time, return 0 at the first difference, return 1 only
+            when both reach the terminator together.  Not strcmp -
+            there is no ordering in it.
+
+H772d is called eight times from H2257 because there are eight
+operators, and the parser tests the input against each in turn.  They
+are stored packed at 0x2242, immediately BEFORE the parser that uses
+them, in the order they must be matched - longest first, or ">" would
+swallow ">>":
+
+    |&   pipe, stderr as well        >>   append
+    |    pipe                        >&   stdout and stderr to a file
+    &    background                  >    stdout to a file
+    >>&  append, stderr as well      <    stdin from a file
+
+The forms ending in & are what make this a csh: they send the
+standard error wherever the standard output is going.  There is no
+here-document and no "2>".  That is the whole grammar.
 
 "Syntax error." at 0x0111 is referenced from NOWHERE that disas can
 see.  Either it is reached by an address the tracer does not resolve,

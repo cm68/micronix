@@ -30,6 +30,8 @@ struct cmd {
     char    *in;            /* < name    */
     char    *out;           /* > name    */
     int     append;         /* >> rather than > */
+    int     both;           /* the & forms: stderr goes where
+                             * stdout goes.  |& >& >>& */
     int     bg;             /* & on the end of the pipeline */
 };
 

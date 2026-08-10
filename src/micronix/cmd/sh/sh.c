@@ -237,6 +237,15 @@ int pout;
         dup(fd);
         close(fd);
     }
+    /*
+     * The & forms send the standard error wherever the standard
+     * output now goes.  Done last, so it picks up a redirection or a
+     * pipe indifferently.
+     */
+    if (c->both) {
+        close(2);
+        dup(1);
+    }
 }
 
 /*
@@ -251,6 +260,16 @@ int pout;
 {
     int pid;
     char *path;
+
+    /*
+     * Flush before forking.  The builtins write through stdio and the
+     * children write straight to the descriptor, so without this the
+     * two come out in the wrong order - and worse, a child inherits a
+     * copy of whatever is still sitting in the buffer and writes it
+     * out again itself.
+     */
+    fflush(stdout);
+    fflush(stderr);
 
     pid = fork();
     if (pid < 0) {
