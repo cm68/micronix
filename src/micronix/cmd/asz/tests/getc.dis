@@ -1,3 +1,9 @@
 getc.o:
-magic 9914 text:0 data:0 bss:0 heap:0 symbols:0 textoff:0 dataoff:0
+magic 9914 text:6 data:0 bss:0 heap:0 symbols:24 textoff:0 dataoff:6
+    0       sys: 0000 08 global 
+    1      getc: 0000 0d global defined code 
 relocs:
+TEXT:0003 out of bounds symbol reference 252
+0000: LD B,0x2                       ; 06 02          ..   
+0002: CALL 0x0                       ; cd 00 00       ...  
+0005: RET                            ; c9             .    

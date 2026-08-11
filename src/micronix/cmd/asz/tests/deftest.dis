@@ -1,3 +1,15 @@
 deftest.o:
-magic 9914 text:0 data:0 bss:0 heap:0 symbols:0 textoff:0 dataoff:0
+magic 9914 text:8 data:39 bss:20 heap:0 symbols:24 textoff:0 dataoff:8
+    0  data_seg: 0008 0e global defined data 
+    1   bss_seg: 002f 0f global defined bss 
 relocs:
+TEXT:0001 data relative
+TEXT:0005 bss relative
+0000: LD HL,0x0                      ; 21 00 00       !..  
+0003: LD HL,0x0                      ; 21 00 00       !..  
+0006: RET                            ; c9             .    
+0007: NOP                            ; 00             .    
+data:
+0008: 66 6f 6f 62  69 65 45 04  00 00 00 00  00 00 00 00  foob ieE. .... .... 
+0018: 00 00 00 00  00 00 00 00  00 00 00 00  00 00 00 00  .... .... .... .... 
+0028: 00 00 00 00  00 00 00                            .... ...
