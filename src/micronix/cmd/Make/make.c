@@ -145,32 +145,6 @@ char *paths[] = {
     0
 };
 
-/*
- * system() is not in the Micronix libc, and Make wants it for the
- * commands a bare exec cannot run - anything with * ; > or < in it.
- * Hand those to the shell, which is what system does anywhere else.
- */
-#ifndef linux
-int
-system(s)
-char *s;
-{
-    int child, w, st;
-
-    st = 0;
-    child = fork();
-    if (child == 0) {
-        execl("/bin/sh", "sh", "-c", s, 0);
-        _exit(127);
-    }
-    if (child < 0)
-        return -1;
-    while ((w = wait(&st)) != -1 && w != child)
-        ;
-    return st;
-}
-#endif
-
 int
 docmd(s)
     char *s;
