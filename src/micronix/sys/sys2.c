@@ -119,6 +119,7 @@ seek(fd, disp, from)
         u.error = EINVAL;
     else
         fp->rwptr = offset;
+    /* XXX - we should return offset in hl, de */
 }
 
 /*
