@@ -46,7 +46,7 @@ UINT8 *hdrbuf = (UINT8 *)0x84;          /* where read header lands a head */
 char tries INIT;
 int curcyl INIT;
 
-struct hddma_cmd cmd INIT;
+struct hddma_cmd cmd = { 0 };   /* braces: a struct is sized from its type */
 
 /*
  * reset the drive.
@@ -91,7 +91,7 @@ reset()
 
     if (cmd.status & SENSE_READY) {
 		outstr("Drive not ready\n");
-		exit();
+		bail();		/* not exit(): stdio comes in behind it */
 	}
 
 	/* recalibrate */

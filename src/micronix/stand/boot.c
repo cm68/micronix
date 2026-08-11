@@ -1,9 +1,45 @@
 /*
- * it's a good idea to keep this below 4k, to prevent
- * any and all kinds of overlapping load insanity
+ * The second level of the hard disk boot.
  *
- * the global variables and register variables are to
- * get the footprint below 4k.
+ *
+ * 4k is a hard limit, not a preference
+ * ------------------------------------
+ *
+ * Everything this file has - text, data and bss together - must end
+ * below 0ff0, and there is nowhere else for it to go.
+ *
+ * The kernel loads at 1000 and needs the whole of memory from there up.
+ * It cannot start any lower: the supervisor's first physical 4k page is
+ * the rom and the I/O space, so 0000 through 0fff is not memory the
+ * kernel can have.  That leaves the loader the same 4k the rom occupies
+ * once the map is switched, and nothing above it, because everything
+ * above it is about to be kernel.
+ *
+ * There is no way around this and no bigger number to move to.  The
+ * limit is not the loader's size, it is where memory begins for the
+ * supervisor and where the kernel has to start - neither of which this
+ * code gets a say in.  Anything that will not fit in the 4k has to be
+ * taken out of the loader, not moved somewhere else.
+ *
+ * So the loader is not merely tidier when it is small.  Anything of it
+ * that reaches 0ff0 is written over by the first block of the load, and
+ * whatever it was doing with that memory stops working part way through
+ * - which is how it presents: not a failure to load, but a load that
+ * seems to go fine and then enters nothing.  Both of the faults that
+ * this file has had were that, wearing different clothes:
+ *
+ *	the block list left in indirbuf, which straddles 0ff0, so the
+ *	load overwrote the list of blocks it was reading
+ *
+ *	the buffers declared "= 0", which reserved two bytes each and so
+ *	hid the problem by not being big enough to reach
+ *
+ * The current build ends at 0fba, with 54 bytes to spare.  If that runs
+ * out, the things worth taking are in this order: the library, which is
+ * why sexit.s exists at all; then readline and the file chooser, which
+ * only earn their keep when a disk has more than one bootable file.
+ *
+ * The global and register variables are here for the same reason.
  */
 #include <types.h>
 #include <sys/fs.h>
@@ -30,8 +66,48 @@ union diskbuf {
 	char bytes[512];
 };
 
-union diskbuf disk0 INIT;
-union diskbuf disk1 INIT;
+/*
+ * Real storage for the two buffers.
+ *
+ * These were "union diskbuf disk0 INIT", and INIT is "= 0", which
+ * reserved two bytes rather than 512: a union initialised with a scalar
+ * is sized from the initialiser and not from its type.  Braces do not
+ * help - "= { 0 }" reserves two as well - while arrays and structs are
+ * both sized properly, so the bytes are declared as an array and the
+ * union taken as a view of them.
+ *
+ * Uninitialised, so they land in bss and cost nothing in the file - the
+ * boot has to stay small - and crt0 clears bss before main runs.
+ *
+ * What the old declaration looked like from outside: every readblock
+ * wrote its 512 bytes over disk1, inputbuf, spec and cmd, which all sat
+ * within a few bytes of disk0.  Reading the root inode set spec.limit
+ * to zero, and the next readblock answered "Block out of range" for a
+ * block that was perfectly good.
+ */
+/*
+ * The block list, copied out of the indirect block before the load
+ * begins.
+ *
+ * It cannot be left in indirbuf and walked from there.  The kernel lands
+ * at its textoff - 0x10, which is 0ff0, and indirbuf straddles that: the
+ * load was overwriting the very list it was reading, so after a few
+ * blocks the next "block number" was kernel image and the jump went
+ * somewhere that was not the kernel.
+ *
+ * Declared first so it and disk0buf sit below the load address.  An
+ * indirect block holds 256 numbers, but a file that has to fit in a 64k
+ * address space cannot be more than 128 blocks, so that is the ceiling -
+ * and one too big is refused rather than quietly truncated.
+ */
+#define NBLIST	128
+UINT16 blist[NBLIST];
+
+char disk0buf[512];
+char disk1buf[512];
+
+#define disk0	(*(union diskbuf *) disk0buf)
+#define disk1	(*(union diskbuf *) disk1buf)
 
 #define	bytebuf		disk0.bytes
 #define	objbuf		disk0.obj
@@ -40,11 +116,18 @@ union diskbuf disk1 INIT;
 #define	inodebuf	disk0.ibuf
 #define	dirbuf		disk1.dir
 
-char inputbuf[15] INIT;
+char inputbuf[15];              /* bss: INIT would size it from the scalar */
 
 int (*loadbase)() = 0x1000;
-int loadptr = 0x1000;
-int loadsize = 0;
+
+/*
+ * Unsigned, both of them.  A kernel of 45013 text and 14604 data comes
+ * to 59633, which does not fit in a signed 16 bit int - it reads as
+ * -5903, "while (loadsize > 0)" is false at once, and the loader
+ * announced "Loading" and then "Entering" having loaded nothing.
+ */
+char *loadptr = (char *) 0x1000;
+UINT16 loadsize = 0;
 
 char filecount = 0;
 int found = 0;
@@ -63,7 +146,8 @@ bail()
  */
 load()
 {
-	register UINT16 *bnum;
+	register int i;
+	int nblk;
 
 	iget();
 
@@ -71,28 +155,39 @@ load()
 		outstr("read indir failed");
 		bail();
 	}
-	bnum = indirbuf;
 
-	if (!readblock(*bnum, &objbuf)) {
+	if (!readblock(indirbuf[0], &objbuf)) {
 		outstr("read header failed");
 		bail();
 	}
 	if (objbuf.ident == OBJECT) {
 		loadbase = objbuf.textoff;
-		loadptr = objbuf.textoff - 0x10;
+		loadptr = (char *) (objbuf.textoff - 0x10);
 		loadsize = objbuf.text + objbuf.data + 0x10;
 	} else {
 		loadsize = inode->d_size1;
 	}
+
+	/*
+	 * Take the block list somewhere the load will not reach, and count
+	 * the blocks up front - counting down through loadsize would have
+	 * to go negative to stop, which is what it cannot do.
+	 */
+	nblk = (loadsize + 511) / 512;
+	if (nblk > NBLIST) {
+		outstr("boot file is too big\n");
+		bail();
+	}
+	for (i = 0; i < nblk; i++)
+		blist[i] = indirbuf[i];
+
 	outstr("Loading\n");
-	while (loadsize > 0) {
-		if (!readblock(*bnum, loadptr)) {
+	for (i = 0; i < nblk; i++) {
+		if (!readblock(blist[i], loadptr)) {
 			outstr("read object failed");
 			bail();
 		}
-		bnum++;
 		loadptr += 512;
-		loadsize -= 512;
 	}
 	outstr("Entering\n");
 	out(0x41, 0);

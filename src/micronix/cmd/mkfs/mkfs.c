@@ -436,6 +436,16 @@ main(argc, argv)
      * like a superblock - the ilist fitting inside the filesystem and
      * the filesystem inside the device.
      */
+    /*
+     * Where the boot area is.  It has to be known here and not further
+     * down, because the check below reads the label out of it, and this
+     * was computed after that first use - so the read went wherever
+     * bootfirst happened to point.
+     */
+    spc = dheads[type] * (UINT) dsecs[type];
+    bootfirst = (dtracks[type] - (dtracks[type] >> 1)) * spc;
+    bootnblk = spc;
+
     if (!force) {
         struct dlabel *lp;
 
@@ -480,12 +490,11 @@ main(argc, argv)
     nextino = ROOTINO;
 
     /*
-     * Where the boot area is, before anything is allocated, because the
-     * free list has to be built around it.
+     * The boot area was worked out above, before the in-use check that
+     * reads it.  What is left is the part that needs the filesystem
+     * size and the ilist, which are only known now, and the free list
+     * below has to be built around the answer.
      */
-    spc = dheads[type] * (UINT) dsecs[type];
-    bootfirst = (dtracks[type] - (dtracks[type] >> 1)) * spc;
-    bootnblk = spc;
     if (bootfirst + bootnblk > fsize)
         die("cylinder 0 falls outside the filesystem");
     if (bootfirst < nextblk)

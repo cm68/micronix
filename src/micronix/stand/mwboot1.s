@@ -142,9 +142,22 @@ run:
 ; somewhere and the second level's startup will pop from it regardless,
 ; but the first level had no stack dependency at all until the signon
 ; introduced one, and it costs three bytes not to inherit a guess.
-; Below RELOC is empty: we load to 0100 and stage at 8000.
 ;
-	ld	sp,RELOC
+; At the top of memory, and it has to be up there.  The second level
+; inherits this stack and keeps using it while it loads the kernel, and
+; the kernel is 117 blocks starting at 0ff0 - it ends around 0f9f0.  A
+; stack at RELOC, which is where this was, is in the middle of that: the
+; load ran over it about seven eighths of the way through and the loader
+; died holding a return address that was now kernel image.  It got as far
+; as reading every block it meant to and then never reached its own
+; "Entering".
+;
+; Below is no good either.  0000 to 0fff is the rom and I/O page for the
+; supervisor, and the loader already fills 0100 to 0fba, so there is no
+; room down there for a stack and nowhere else for the loader to be.
+; Above the kernel is what is left.
+;
+	ld	sp,0		; ie 10000h - first push lands at fffe
 
 	ld	a,GRP1		; the eight ports at 0048 are the uart now
 	out	(GSEL),a

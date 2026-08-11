@@ -1,7 +1,13 @@
 /*
- * this is the hard disk abstraction for a volume
+ * a volume as the HDCDMA controller sees one
  *
- * lib/harddisk.c
+ * lib/hdcdmadisk.c
+ *
+ * The geometry and the transfers here would suit any hard disk, but what
+ * a sector header holds and what read header hands back are this
+ * controller's, out of its technical manual - so the file is named for
+ * it rather than claiming to be general.  Another controller gets its
+ * own beside this one.
  *
  * Changed: <2023-06-16 00:10:23 curt>
  */
@@ -64,7 +70,17 @@ struct drive {
     struct disklabel label;
     int fd;
     char *name;
+    int nexthdr;            /* rotational position, for read header */
 } drive[NDRIVES];
+
+/*
+ * What the two fixed bytes of a sector header are.  The second one is
+ * the one that carries meaning: the manual has it FE for an id field
+ * and F8 for a data field, which is how a driver tells the two apart
+ * when read header lands on the wrong thing.
+ */
+#define HDR_MARK    0xa1        /* the address mark */
+#define HDR_ID      0xfe        /* ... and this says id field, not data */
 
 /*
  * Controllers name their drives by unit - hddma-0, hdca-2 - which are
@@ -259,26 +275,69 @@ drive_format(struct drive *dp, int firstsec, int seccode, int spt,
 }
 
 /*
- * The header of one sector, as read header returns it.  Everything but
- * the track comes out of the label; the track is where we were asked to
- * look.  Returns 0 if the drive has no such place, which is what a probe
- * for a head that is not there has to see.
+ * CRC-16-CCITT, the polynomial the id field is written with.  The
+ * controller computes this over the mark and the header bytes.  Nothing
+ * here checks it, but a header carrying a plausible one costs little and
+ * a header carrying zeros invites the question.
+ */
+static unsigned short
+hdrcrc(unsigned char *p, int n)
+{
+    unsigned short crc = 0xffff;
+    int i, b;
+
+    for (i = 0; i < n; i++) {
+        crc ^= p[i] << 8;
+        for (b = 0; b < 8; b++)
+            crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
+    }
+    return crc;
+}
+
+/*
+ * Read Headers hands back the eight bytes that follow the preamble: the
+ * mark, an FE saying this is an id field and not data, the four bytes
+ * the format laid down - cylinder low, cylinder high, head, sector - and
+ * two CRC bytes.  HDCDMA technical manual 2.2.3, with the four from
+ * table 2-9, which is also what formatmw puts in the id table.
+ *
+ * There is no sector argument, and the manual is explicit that the
+ * argument field is unused: the command returns whichever header comes
+ * under the head next.  That is the whole reason a driver can probe for
+ * heads with it - it does not have to know what is there to ask - and it
+ * is why retrying "will usually find the next sector header".  The
+ * rotational position lives here and advances every call.
+ *
+ * Returns 0 if the drive has no such place, which is the answer a probe
+ * for a head that is not there needs.
  */
 int
-drive_header(struct drive *dp, int cylinder, int head, int sector, char *buf)
+drive_header(struct drive *dp, int cylinder, int head, char *buf)
 {
+    unsigned char *p = (unsigned char *) buf;
+    unsigned short crc;
+    int sector;
+
     if (!dp->label.formatted)
         return 0;
-    if (cylinder >= dp->label.cylinders || head >= dp->label.heads ||
-        sector >= dp->label.spt)
+    if (cylinder >= dp->label.cylinders || head >= dp->label.heads)
+        return 0;
+    if (dp->label.spt <= 0)
         return 0;
 
-    buf[0] = cylinder & 0xff;
-    buf[1] = (cylinder >> 8) & 0xff;
-    buf[2] = sector + dp->label.firstsec;
-    buf[3] = dp->label.seccode;
-    buf[4] = head;
-    return 5;
+    sector = dp->nexthdr % dp->label.spt;
+    dp->nexthdr = sector + 1;
+
+    p[0] = HDR_MARK;
+    p[1] = HDR_ID;
+    p[2] = cylinder & 0xff;
+    p[3] = (cylinder >> 8) & 0xff;
+    p[4] = head;
+    p[5] = sector + dp->label.firstsec;
+    crc = hdrcrc(p, 6);
+    p[6] = (crc >> 8) & 0xff;
+    p[7] = crc & 0xff;
+    return 8;
 }
 
 int

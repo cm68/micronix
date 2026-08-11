@@ -1,0 +1,234 @@
+hard disk boot on the simulated Decision 1 - where this stands
+=============================================================
+
+HWSIM.STATUS
+
+The goal was to stop hand-stamping the simulator's drive images and do it
+the way the hardware did: boot CP/M, format an m5 with Morrow's own
+FORMATMW, install Micronix onto what that produced, and boot it from the
+hard disk.  All of that has been made to work once, end to end.  It does
+not work at the time of writing, and the last section says what is
+broken.
+
+
+what works, and how to do it
+----------------------------
+
+Format.  CP/M boots from disks/dist/1009-8_cold-boot.IMD:
+
+	d1 -b roms/mon447.bin -d <drivedir> \
+	   1009-8_cold-boot.IMD 947-1.IMD
+
+That disk's FORMATMW is version 1.6, which predates the part number
+names - "m5" is rejected there, "seagate" and "st506" are the same drive
+and do work.  947-1.IMD carries 1.7 with the full option set, so it goes
+in as B: and the format is
+
+	B:FORMATMW M5 SIZE 512
+
+512 because Micronix requires it; see src/hwsim/DISKS.  The whole drive
+formats and verifies in about six seconds.
+
+Install.  From disks/hdinstall, with the 1.67 standalone on the 5 1/4
+port, switches 0x14 (0x10 djdma floppy boot, 0x04 skip the monitor):
+
+	d1 -b roms/mon447.bin -c 0x14 -d <drivedir> -5 sa67.5.skew.1k
+
+and at the shell prompt, a script like m5init but using the new mkfs:
+
+	mkfs -i /bootmw.bin /dev/m5a -1024
+	fsck /dev/m5a
+	mount /dev/m5a /b
+	cptree / /b -v
+	...
+	setdev /b/micronix 3/0 0/0
+
+Boot.  Switches 0x0c - 0x08 selects nuboot, which is the HDC-DMA path,
+plus 0x04 to skip the monitor.  The rom's decode is in mon447.s at tstsw:
+0x00 is boothd and that is the HDCA, not this controller.
+
+	d1 -b roms/mon447.bin -c 0x0c -d <drivedir>
+
+What that produced, once:
+
+	mwboot:
+	Micronix loader for the HD-DMA
+	Files:
+	micronix
+	Loading
+	Entering
+
+	Micronix 1.67
+	...
+	disks: djdma hddma
+	root dev: hddma/0
+	swap dev: nodev/0
+	#
+
+
+reference values worth not rediscovering
+----------------------------------------
+
+An m5 (= seagate, st506) at 512 bytes, from FORMATMW's own table and
+arithmetic: 153 cylinders, 4 heads, 17 sectors, 10404 blocks, 5326848
+bytes.  The drive label after a real format reads
+
+	secsize 512  cyl 153  heads 4  spt 17
+	firstsec 0  seccode 3  gap3 43  fill 0xe5  formatted 1
+
+The format command carries gap3 and the sector count complemented -
+0xd5 is 43, 0xee is 17 - and its size code is the complement of the
+specify command's, so 512 is 0xfc to format and 3 to specify.  The
+sector id table it points at is FOUR bytes an entry: cylinder low,
+cylinder high, head, sector, with sectors numbered from zero and
+interleaved by the skew.  Confirmed on the wire.
+
+Read Headers returns EIGHT bytes - mark, 0xfe, cylinder low, cylinder
+high, head, sector, two CRC - per the HDCDMA technical manual 2.2.3.
+Byte 4 is the head, which is what stand/mwio.c's probe tests.  The
+command takes no sector argument; it answers with whatever comes round
+next.
+
+sys/mw.c does not map block 0 to cylinder 0.  It rotates:
+
+	cyl = blk / spc;  cyl += tracks >> 1;  if (cyl >= tracks) cyl -= tracks;
+
+so cylinder 0 is block 5236 on the 5 meg, which is where mkfs -i puts
+the boot area.  Getting this wrong writes a boot into the middle of a
+filesystem and says it worked.
+
+The loader has 4k and there is no way around it.  The kernel loads at
+1000 and takes everything above; 0000-0fff is the supervisor's rom and
+I/O page.  Everything in stand/boot.c - text, data and bss - must end
+below 0ff0.  See the header comment there.
+
+
+what was wrong, and is now fixed
+--------------------------------
+
+In the simulator:
+
+  hddma.c recorded the format wrongly.  firstsec was hardcoded 1 when
+  sectors are numbered from 0, the size code was stored in the format
+  command's complement rather than the specify form, and gap3 was stored
+  complemented - so a header read back one sector high with a nonsense
+  gap.  The id table dump read 8 bytes an entry instead of 4.  The
+  "command.sseccode = 3" line, which forced every specify to 512, is
+  gone: CP/M formats at 1024 and both have to work.
+
+  drive_header returned five bytes of its own invention.  It now returns
+  the manual's eight, with a rotating sector so successive reads walk the
+  track, and refuses a head or cylinder the drive does not have - which
+  is what makes a probe mean anything.
+
+  lib/harddisk.c is lib/hdcdmadisk.c.  The geometry would suit any drive
+  but the header format is this controller's.  Watch for a stale
+  harddisk.o left inside libsim.a; it can win at link time.
+
+In micronix:
+
+  cmd/mkfs used bootfirst at line 442 and computed it at line 487, so
+  the in-use check read whatever that held - 58626 on a 10404 block
+  drive - and died.
+
+  stand/boot.c loaded nothing: loadsize is text + data + 0x10, which for
+  this kernel is 59633 and reads as -5903 in a signed 16 bit int, so the
+  load loop never ran and it entered an unloaded kernel.
+
+  stand/boot.c walked the block list in indirbuf, which straddles the
+  load address, so the load overwrote the list it was reading.  The list
+  is copied to blist first.
+
+  stand/sexit.s answers crt0's "jp sexit" so the library's exit - and the
+  stdio it flushes - stays out.  Worth 618 bytes of text and 578 of bss,
+  which is the difference between fitting under 0ff0 and not.
+
+  stand/mwboot1.s set the stack to RELOC, 0c000, which is in the middle
+  of where a 117 block kernel lands.  It is at the top of memory now.
+
+  cmd/ddt patching of the kernel's root device is replaced by
+  tools/setdev, which reads _rootdev and _swapdev out of the kernel's own
+  symbol table.  The old recipe searched for the bytes of djdma/12, which
+  is 1.6's root device; 1.67 has djdma/76, so it silently did nothing and
+  every disk built that way booted a kernel looking for the floppy.
+
+In ccc, which is a separate tree:
+
+  K&R array parameters and union initializers were both fixed there.
+  Byte-wide switch case labels are a documented restriction now - see
+  ccc/src/RESTRICTIONS.md - which is why formatmw switches on size/128.
+
+
+what is broken now
+------------------
+
+Booting from the hard disk fails at the loader with
+
+	Files:
+	No bootable files
+
+The head probe is sending the same command eleven times.  Every read
+header in the trace is byte for byte identical:
+
+	readhead ... step: 65535 down head: 0 args 1e 0 64 3 dmaaddr: 0x80
+
+cmd.headsel is not changing across the loop, so the controller rightly
+answers head 0 every time, the probe matches only i = 0, gives up at
+i = 1, and sets spec.heads and spec.spc to something wrong.  Every block
+number after that lands on the wrong cylinder and head, and the block it
+read as the root directory was not the root directory.
+
+Three things ruled out:
+
+  Not the 32 entry directory limit.  The root directory is 352 bytes,
+  22 entries, one block.  (Reading more of it would not cost buffer
+  space either - it reuses dirbuf - only the code to walk d_addr.)
+
+  Not the source cleanup that removed the __STDC__ and INIT conditionals.
+  The pre-cleanup loader fails the same way on the same disk.
+
+  Not the disk.  The image that booted and the image that does not have
+  byte identical root inodes, and identical inodes for /micronix -
+  IALLOC|ILARG, addr[0] 812.
+
+So something differs between the run that booted and the runs since, and
+it has not been found.  One unexplained detail that may be the thread to
+pull: in the trace of the run that booted, arg1 of the read header
+command is 9, and in the failing runs it is 0.
+
+
+the trees
+---------
+
+This work is spread across two working copies and none of it is
+committed.  The loader and simulator changes - boot.c, mwio.c,
+mwboot1.s, sexit.s, hddma.c, hdcdmadisk.c, mkfs.c, setdev.c, formatmw.c -
+exist BOTH as uncommitted changes in the main checkout and as copies in
+the worktree, which was branched from origin/master and then reset onto
+hwsim-drives.  Reconcile these before doing more, or one set will be lost.
+
+src/hwsim/d1/FORMATMW.C is the clean 1.7 source recovered from
+SOURCES/202/FORMATMW.BAK, with the 1.8 proto drive table merged in.  The
+copies that were being used had one line of NewWord damage - high bit set
+on the last letter of each word - and the missing semicolon after gap3[]
+is original to the source, not damage.
+
+stand/formatmw.c is that source ported off the Whitesmiths library.  It
+builds with ccc -m cpm.  It has not been run.
+
+
+driving the simulator without a person
+--------------------------------------
+
+The simulator wants a controlling terminal, so a script that drives it
+has to give it a pty - python's os.forkpty and an expect loop is enough.
+Two things to know if you write one:
+
+  Match on something that can only appear in the command's OUTPUT.  The
+  shell echoes what was typed, and the prompt is already on the screen,
+  so patterns like "# " or the command's own words match before the
+  command has run.  Ignore everything up to the point of the send.
+
+  A run takes as long as it takes.  cptree is five minutes and fsck's
+  bad block hunt is longer; a per-expect timeout of five minutes reads
+  as the simulator exiting on its own part way through the install.

@@ -196,6 +196,7 @@ attention(portaddr p, byte v)
     int steps;
     int i;
     int head;
+    int nsect, gaplen;              // decoded from the format command
 
     set_vi(HDDMA_INTERRUPT, 1, 0);
 
@@ -246,11 +247,12 @@ attention(portaddr p, byte v)
     switch (command.opcode) {
     case OP_READ:
         if (curcyl[drv] != (command.cyl_low + (command.cyl_high << 8))) {
-            lc("\ttrack lossage %d != %d\n", curcyl[drv], i);
+            lc("\ttrack lossage %d != %d\n", curcyl[drv],
+                command.cyl_low + (command.cyl_high << 8));
         }
         i = drive_read(handle[drv], curcyl[drv], command.hd, command.sec, (char *)&secbuf);
         if (i != secsize[drv]) {
-        	lc("\tread sector size mismatch %d expected %d\n", i, secsize[i]);
+        	lc("\tread sector size mismatch %d expected %d\n", i, secsize[drv]);
         }
         copyout(secbuf, dmaaddr, i);
 #ifdef notdef
@@ -263,12 +265,13 @@ attention(portaddr p, byte v)
         break;
     case OP_WRITE:
         if (curcyl[drv] != (command.cyl_low + (command.cyl_high << 8))) {
-            lc("\ttrack lossage %d != %d\n", curcyl[drv], i);
+            lc("\ttrack lossage %d != %d\n", curcyl[drv],
+                command.cyl_low + (command.cyl_high << 8));
         }
         copyin(secbuf, dmaaddr, secsize[drv]);
         i = drive_write(handle[drv], curcyl[drv], command.hd, command.sec, (char *)&secbuf);
         if (i != secsize[drv]) {
-        	lc("\twrite sector size mismatch %d expected %d\n", i, secsize[i]);
+        	lc("\twrite sector size mismatch %d expected %d\n", i, secsize[drv]);
         }
         if (traceflags & trace_bio) hexdump(secbuf, i);
         command.status = GOOD;
@@ -283,27 +286,44 @@ attention(portaddr p, byte v)
          * drive_format - and a head that is not there says so by
          * failing, which is the answer a probe is actually asking for.
          */
-        i = drive_header(handle[drv], curcyl[drv], command.hd, command.sec,
-            (char *)secbuf);
+        /*
+         * The argument field is unused here - the manual says so - and
+         * the head comes from the select head byte, not from arg2.  The
+         * command hands back whichever header comes under the head next,
+         * which is what lets a driver probe for heads without knowing
+         * what is there to ask for.
+         */
+        i = drive_header(handle[drv], curcyl[drv], head, (char *)secbuf);
         if (i == 0) {
-            tracec(trace_hddma, "\tno header at c %d h %d s %d\n",
-                curcyl[drv], command.hd, command.sec);
-            command.status = 0xfe;              /* anything but GOOD */
+            tracec(trace_hddma, "\tno header at c %d h %d\n",
+                curcyl[drv], head);
+            command.status = NOHDR;
             break;
         }
         copyout(secbuf, dmaaddr, i);
         if (traceflags & trace_hddma) {
-            lc("\theader c %d h %d s %d = %02x %02x %02x %02x %02x\n",
-                curcyl[drv], command.hd, command.sec,
-                secbuf[0], secbuf[1], secbuf[2], secbuf[3], secbuf[4]);
+            lc("\theader c %d h %d = %02x %02x %02x %02x %02x %02x %02x %02x"
+               " (cyl %d head %d sector %d)\n",
+                curcyl[drv], head,
+                secbuf[0], secbuf[1], secbuf[2], secbuf[3],
+                secbuf[4], secbuf[5], secbuf[6], secbuf[7],
+                secbuf[2] + (secbuf[3] << 8), secbuf[4], secbuf[5]);
         }
         command.status = GOOD;
         break;
     case OP_FMT:                                // format a whole track
     	i = FSECSIZE(command.fseccode);
         secsize[drv] = drive_sectorsize(handle[drv], i);
+        /*
+         * Both of these arrive complemented, and printing them raw said
+         * "gap3: 213" for a gap of 43.  gap3 is ~(gap3 - 1) and the
+         * sector count is ~spt - formatmw builds them that way because
+         * the 8x300 counts up to overflow rather than down to zero.
+         */
+        nsect = command.sptneg ^ 0xff;
+        gaplen = (command.gap3 ^ 0xff) + 1;
         tracec(trace_hddma, "\tgap3: %d scnt: %d secsize: %d fill: %x\n",
-                command.gap3, command.sptneg ^ 0xff, i, command.fill);
+                gaplen, nsect, i, command.fill);
         for (i = 0; i < secsize[drv]; i++) {
             secbuf[i] = command.fill;
         }
@@ -317,27 +337,45 @@ attention(portaddr p, byte v)
         /*
          * And show what was handed to us.  A format command points at a
          * table of the sector ids to lay down, which is the whole of
-         * what a read header has to give back later.  We have no
-         * formatter to read it from yet, so dump it: running mwformat
-         * under the simulator and looking at this is how the layout gets
-         * settled, rather than by guessing from the one driver that
-         * consumes it.
+         * what a read header has to give back later.
+         *
+         * Four bytes an entry - cylinder low, cylinder high, head,
+         * sector - which formatmw 1.7 confirms on the wire: seventeen
+         * sectors came to 68 bytes, and the sector numbers ran 0 6 12 1
+         * 7 13 ... , its skew of 3 over a track numbered from zero.
+         * This read 8 and dumped twice the table, the back half being
+         * whatever followed it in memory.
          */
         if (traceflags & trace_hddma) {
-            int n = (command.sptneg ^ 0xff) * 8;
+            int n = nsect * 4;
 
             if (n > sizeof(secbuf))
                 n = sizeof(secbuf);
-            lc("\tformat id table at %06x, %d sectors:\n",
-                dmaaddr, command.sptneg ^ 0xff);
+            lc("\tformat id table at %06x, %d sectors:\n", dmaaddr, nsect);
             copyin(secbuf, dmaaddr, n);
             hexdump((char *)secbuf, n);
+            for (i = 0; i < secsize[drv]; i++)  // hexdump reused secbuf
+                secbuf[i] = command.fill;
         }
 
-        drive_format(handle[drv], 1, command.fseccode,
-            command.sptneg ^ 0xff, command.gap3, command.fill);
+        /*
+         * Sectors are numbered from zero.  This passed 1, so every
+         * header read back one higher than the one the format laid
+         * down, and a driver matching on the sector it asked for never
+         * matched.
+         *
+         * The size code is stored in the form the specify command uses -
+         * 3 for 512 - and not the format command's complement of it.
+         * They are two encodings of one number: specify says
+         * size/128 - 1 and format says ~(size/128 - 1), so 512 is 3 to
+         * one and 0xfc to the other.  A header wants the size, and the
+         * specify form is the one the rom's equates and the kernel both
+         * name.
+         */
+        drive_format(handle[drv], 0, (secsize[drv] / 128) - 1,
+            nsect, gaplen, command.fill);
 
-        for (i = 0; i < (command.sptneg ^ 0xff); i++) {
+        for (i = 0; i < nsect; i++) {
         	if (drive_write(handle[drv], curcyl[drv], head, i, (char *)secbuf) != secsize[drv]) {
         		lc("\tformat data fill write error\n");
         	}
@@ -354,7 +392,12 @@ attention(portaddr p, byte v)
                 command.sseccode);
             break;
         }
-        command.sseccode = 3;
+        /*
+         * This used to overwrite the code with 3 before reading it, so
+         * every specify said 512 whatever the caller asked for and the
+         * mismatch below could never fire.  CP/M formats at 1024 and
+         * micronix at 512, and both have to work, so take what is sent.
+         */
         i = SSECSIZE(command.sseccode);
         if (traceflags & trace_hddma) {
             lc("\tsteprate: %d ms ", command.steprate & 0x7f);

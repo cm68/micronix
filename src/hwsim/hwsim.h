@@ -83,7 +83,8 @@ int drive_write(void *dhandle, int cyl, int head, int sec, char *buf);
 int drive_read(void *dhandle, int cyl, int head, int sec, char *buf);
 void drive_format(void *dhandle, int firstsec, int seccode, int spt,
     int gap3, int fill);            // record what a format laid down
-int drive_header(void *dhandle, int cyl, int head, int sec, char *buf);
+// no sector: read header returns whichever one comes round next
+int drive_header(void *dhandle, int cyl, int head, char *buf);
 int drive_geometry(void *dhandle, int *cyls, int *heads, int *spt);
 
 /*
