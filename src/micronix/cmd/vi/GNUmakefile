@@ -1,32 +1,17 @@
 #
-# Makefile for updating the source tree
+# cross build for vi
 #
-# cmd/ls/GNUmakefile
+# cmd/vi/GNUmakefile
 #
-# Changed: <2023-07-04 19:55:33 curt>
+# The only command here that needs a library beyond the ones ccc links
+# by itself: hexdump and logmsg come out of lib/libutil.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIR = vi
-CLASS = cmd
-ROOT = ~/src/micronix/filesystem
-SRCDIR = /usr/src/$(CLASS)/$(DIR)
-DEST = $(ROOT)/$(SRCDIR)
-NOWARN = --warning=no-ignore-newer
+DEPTH	= ../..
+DIR	= vi
+CLASS	= cmd
 
-SRCS = $(wildcard *.c *.h)
+LIBS	= $(DEPTH)/lib/libutil/libutil.a
 
-update: 
-	mkdir -p $(DEST)
-	tar -f $(DIR).tar --ignore-failed-read -c Makefile $(SRCS)
-	tar -f $(DIR).tar -C $(DEST) --keep-newer-files -x $(NOWARN)
-
-doc:
-
-clean:
-	rm -f *.o
-
-clobber: clean
-	rm -f *.3 *.0 $(DIR).tar
-
-cross:
+include $(DEPTH)/GNUmakefile.inc

@@ -1,19 +1,15 @@
 #
-# Makefile for updating the source tree
+# cross build for rm
 #
 # cmd/rm/GNUmakefile
 #
-# Changed: <2023-07-27 12:11:51 curt>
+# Everything is in GNUmakefile.inc: ccc from /usr/local, every .c in
+# this directory, linked into rm.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIR = rm
-CLASS = cmd
-ROOT = ~/src/micronix/filesystem
-SRCDIR = /usr/src/$(CLASS)/$(DIR)
-DEST = $(ROOT)/$(SRCDIR)
-NOWARN = --warning=no-ignore-newer
+DEPTH	= ../..
+DIR	= rm
+CLASS	= cmd
 
-SRCS = $(wildcard *.c *.h)
-
-include ../GNUmakefile.inc
+include $(DEPTH)/GNUmakefile.inc

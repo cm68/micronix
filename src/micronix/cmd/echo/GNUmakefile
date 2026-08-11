@@ -1,16 +1,15 @@
 #
-# Makefile for updating the source tree
+# cross build for echo
 #
 # cmd/echo/GNUmakefile
 #
-# Changed: <2023-07-04 19:55:33 curt>
+# Everything is in GNUmakefile.inc: ccc from /usr/local, every .c in
+# this directory, linked into echo.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DEPTH = ../..
-DIR = echo
-CLASS = cmd
-
-SRCS = $(wildcard *.c *.h)
+DEPTH	= ../..
+DIR	= echo
+CLASS	= cmd
 
 include $(DEPTH)/GNUmakefile.inc

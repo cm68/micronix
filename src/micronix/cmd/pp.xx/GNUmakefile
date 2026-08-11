@@ -1,21 +1,25 @@
 #
-# cross Makefile for pp preprocessor
+# cross build for pp, the whitesmith c preprocessor
 #
-# usr/src/cmd/asz/GNUmakefile
+# cmd/pp.xx/GNUmakefile
 #
-# Changed: <2023-07-04 19:55:33 curt>
+# The directory is pp.xx and the program is pp, so TARGET has to be
+# said out loud.  cmd/GNUmakefile used to name this directory "pp" in
+# DIRS, which is what sent the whole cmd build into a recursion.
+#
+# The sources are listed rather than globbed: dumplex.c is a debugging
+# lexer dump that has never been linked into pp.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-CLASS = cmd
-DIR = pp
-CFILES = p0eval.c p0lex.c p0main.c p0subs.c
-HFILES = int012.h int01.h int0.h
-SRCS = $(CFILES) $(HFILES)
+DEPTH	= ../..
+DIR	= pp.xx
+CLASS	= cmd
+TARGET	= pp
 
-include ../GNUmakefile.inc
+CSRCS	= p0main.c p0eval.c p0lex.c p0subs.c
 
-TARGET = pp
+# not linked: a standalone dump of the lexer's token stream
+NOTBUILT_C = dumplex.c
 
-cross: $(CFILES) $(HFILES)
-	cc -o pp $(CFILES)
+include $(DEPTH)/GNUmakefile.inc

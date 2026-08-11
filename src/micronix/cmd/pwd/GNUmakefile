@@ -1,17 +1,15 @@
 #
-# Makefile for updating the source tree
+# cross build for pwd
 #
-# cmd/whitesmith/pwd/GNUmakefile
+# cmd/pwd/GNUmakefile
 #
-# Changed: <2023-07-29 11:22:12 curt>
+# Everything is in GNUmakefile.inc: ccc from /usr/local, every .c in
+# this directory, linked into pwd.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DEPTH = ../..
-DIR = pwd
-CLASS = cmd
-ROOT = ~/src/micronix/filesystem
-SRCDIR = /usr/src/$(CLASS)/$(DIR)
+DEPTH	= ../..
+DIR	= pwd
+CLASS	= cmd
 
 include $(DEPTH)/GNUmakefile.inc
-
