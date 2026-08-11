@@ -1,28 +1,47 @@
 ;
-; assembly source for unlink system call
+; unlink system call
 ;
-; /usr/src/lib/libu/unlink.s
+; unlink(name)
+; char *name;
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Removes the indicated entry from its directory. If this
+; was the last link to the file, the file is removed and
+; its space is freed. If the file was open in any process,
+; this removal is delayed until the file is closed, even
+; though its last directory entry has disappeared.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; In order to unlink a file, a user must have write
+; permission on its directory. Write permission is not
+; required on the file itself. Only the super-user can
+; unlink a directory.
 ;
+; returns 0 on success, -1 on failure
+;
+	.extern _errno
+	.global _unlink
 
-unlink.o:
-    0    _errno: 0000 08 global 
-    1   _unlink: 0000 0d global defined code 
-0000: ld hl,0x2                      ; 21 02 00       !..  
-0003: add hl,sp                      ; 39             9    
-0004: ld a,(hl)                      ; 7e             ~    
-0005: inc hl                         ; 23             #    
-0006: ld h,(hl)                      ; 66             f    
-0007: ld l,a                         ; 6f             o    
-0008: ld (0x1a),hl                   ; 22 1a 00       "..  
-000b: sys indir 18 00                ; cf 00 18 00    .... 
-000f: ld bc,0x0                      ; 01 00 00       ...  
-0012: ret nc                         ; d0             .    
-0013: dec bc                         ; 0b             .    
-0014: ld (0x0),hl                    ; 22 00 00       "..  
-0017: ret                            ; c9             .    
-data:
-0018: cf 0a 00 00                                      .... 
+	.text
+_unlink:
+	pop 	de		; ret addr
+	pop 	hl		; name
+	ld 	(name),hl
+	push 	hl
+	push 	de
+
+	rst 	08h
+	.db 	000h
+	.dw 	scall
+	ex 	de,hl
+	ld 	hl,0
+	ret 	nc
+	ld 	(_errno),de
+	dec 	hl
+	ret
+
+	.data
+scall:	.db 	0cfh
+	.db 	00ah
+name:	.dw 	0
+
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

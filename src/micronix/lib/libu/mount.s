@@ -1,42 +1,54 @@
 ;
-; assembly source for mount system call
+; mount system call
 ;
-; /usr/src/lib/libu/mount.s
+; mount(device, on, ronly)
+; char *device, *on;
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Informs the system that the given block device contains a
+; file system. Subsequent references to the file "on" will
+; refer to the root directory of the new file system. The
+; old contents of "on" are inaccessible until the device is
+; unmounted.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; If ronly is non-zero, the system will not allow writing on
+; the device.
 ;
+; This call is restricted to the super-user.
+;
+; returns 0 on success, -1 on failure
+;
+	.extern _errno
+	.global _mount
 
-mount.o:
-    0    _errno: 0000 08 global 
-    1    _mount: 0000 0d global defined code 
-0000: ld hl,0x2                      ; 21 02 00       !..  
-0003: add hl,sp                      ; 39             9    
-0004: ld a,(hl)                      ; 7e             ~    
-0005: inc hl                         ; 23             #    
-0006: ld h,(hl)                      ; 66             f    
-0007: ld l,a                         ; 6f             o    
-0008: ld (0x30),hl                   ; 22 30 00       "0.  
-000b: ld hl,0x4                      ; 21 04 00       !..  
-000e: add hl,sp                      ; 39             9    
-000f: ld a,(hl)                      ; 7e             ~    
-0010: inc hl                         ; 23             #    
-0011: ld h,(hl)                      ; 66             f    
-0012: ld l,a                         ; 6f             o    
-0013: ld (0x32),hl                   ; 22 32 00       "2.  
-0016: ld hl,0x6                      ; 21 06 00       !..  
-0019: add hl,sp                      ; 39             9    
-001a: ld a,(hl)                      ; 7e             ~    
-001b: inc hl                         ; 23             #    
-001c: ld h,(hl)                      ; 66             f    
-001d: ld l,a                         ; 6f             o    
-001e: ld (0x34),hl                   ; 22 34 00       "4.  
-0021: sys indir 2e 00                ; cf 00 2e 00    .... 
-0025: ld bc,0x0                      ; 01 00 00       ...  
-0028: ret nc                         ; d0             .    
-0029: dec bc                         ; 0b             .    
-002a: ld (0x0),hl                    ; 22 00 00       "..  
-002d: ret                            ; c9             .    
-data:
-002e: cf 15 00 00  00 00 00 00                          .... .... 
+	.text
+_mount:
+	pop 	hl		; discard ret addr
+	pop 	hl		; device
+	ld 	(dev),hl
+	pop 	hl		; on
+	ld 	(dir),hl
+	pop 	hl		; ronly
+	ld 	(ronly),hl
+
+	ld 	hl,-8		; restore stack
+	add 	hl,sp
+	ld 	sp,hl
+
+	rst 	08h
+	.db 	000h
+	.dw 	scall
+	ex 	de,hl
+	ld 	hl,0
+	ret 	nc
+	ld 	(_errno),de
+	dec 	hl
+	ret
+
+	.data
+scall:	.db 	0cfh
+	.db 	015h
+dev:	.dw 	0
+dir:	.dw 	0
+ronly:	.dw 	0
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

@@ -1,38 +1,55 @@
 ;
-; assembly source for gtty system call
+; gtty system call
 ;
-; /usr/src/lib/libu/gtty.s
+; gtty(fd, buf)
+; struct sgtty *buf;
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Gets the status of the terminal associated with the file
+; descriptor, and writes the status into the 6-byte structure
+; pointed at by buf.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; struct sgtty {
+;   char ispeed;   /* input speed */
+;   char ospeed;   /* output speed */
+;   char erase;    /* erase character */
+;   char kill;     /* kill character */
+;   int  mode;     /* terminal mode */
+; };
 ;
-
-	.globl	_gtty
-	.extern	_errno
+; passes fd in hl
+;
+; returns 0 on success, -1 on failure
+;
+	.extern _errno
+	.global _gtty
 
 	.text
-_gtty:	ld	hl, 0x4
-	add	hl, sp
-	ld	a, (hl)
-	inc	hl
-	ld	h, (hl)
-	ld	l, a
-	ld	(vec), hl
-	ld	hl, 0x2
-	add	hl, sp
-	ld	a, (hl)
-	inc	hl
-	ld	h, (hl)
-	ld	l, a
-	.db	0xcf, 0x00
-	.dw	sys
-	ld	bc, 0x0
-	ret	nc
-	dec	bc
-	ld	(_errno), hl
+_gtty:
+	pop 	hl		; ret addr
+	pop 	hl		; fd in l (byte arg: high byte is junk)
+	ld 	a,l
+	pop 	hl		; buf
+	ld 	(buf),hl
+
+	ld	hl,-6
+	add	hl,sp
+	ld	sp,hl
+
+	ld 	l,a		; fd in hl
+	ld 	h,0
+	rst 	08h
+	.db 	000h
+	.dw 	scall
+	ex 	de,hl
+	ld 	hl,0
+	ret 	nc
+	ld 	(_errno),de
+	dec 	hl
 	ret
 
 	.data
-sys:	.db	0xcf, 0x20
-vec:	.dw	0
+scall:	.db 	0cfh
+	.db 	020h
+buf:	.dw 	0
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

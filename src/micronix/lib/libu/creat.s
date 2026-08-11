@@ -1,36 +1,51 @@
 ;
-; assembly source for creat system call
+; creat system call
 ;
-; /usr/src/lib/libu/creat.s
+; creat(name, mode)
+; char *name;
 ;
-; Changed: <2023-07-07 01:06:03 curt>
+; If the file does not exist, and if the parent directory
+; is writable, it is created with the given mode. If the
+; file does exist and is writable, it is truncated to 0
+; length, and its mode and owner remain unchanged. In
+; either case, the file is opened for writing only.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; See chmod(2) for the construction of modes. Note that the
+; file is opened for writing, even if the given mode does
+; not allow writing.
 ;
+; returns -1 on error, else file descriptor
+;
+	.extern _errno
+	.extern fdclr
+	.global _creat
 
-creat.o:
-    0    _errno: 0000 08 global 
-    1    _creat: 0000 0d global defined code 
-0000: ld hl,0x2                      ; 21 02 00       !..  
-0003: add hl,sp                      ; 39             9    
-0004: ld a,(hl)                      ; 7e             ~    
-0005: inc hl                         ; 23             #    
-0006: ld h,(hl)                      ; 66             f    
-0007: ld l,a                         ; 6f             o    
-0008: ld (0x26),hl                   ; 22 26 00       "&.  
-000b: ld hl,0x4                      ; 21 04 00       !..  
-000e: add hl,sp                      ; 39             9    
-000f: ld a,(hl)                      ; 7e             ~    
-0010: inc hl                         ; 23             #    
-0011: ld h,(hl)                      ; 66             f    
-0012: ld l,a                         ; 6f             o    
-0013: ld (0x28),hl                   ; 22 28 00       "(.  
-0016: sys indir 24 00                ; cf 00 24 00    ..$. 
-001a: ld c,l                         ; 4d             m    
-001b: ld b,h                         ; 44             d    
-001c: ret nc                         ; d0             .    
-001d: ld bc,0xffff                   ; 01 ff ff       ...  
-0020: ld (0x0),hl                    ; 22 00 00       "..  
-0023: ret                            ; c9             .    
-data:
-0024: cf 08 00 00  00 00                               .... ..
+	.text
+_creat:
+	pop 	hl		; discard ret addr
+	pop 	hl		; name
+	ld 	(name),hl
+	pop 	hl		; mode
+	ld 	(mode),hl
+
+	ld 	hl,-6		; restore stack
+	add 	hl,sp
+	ld 	sp,hl
+
+	rst 	08h
+	.db 	000h
+	.dw 	scall
+	jr 	c,err		; fd in hl
+	ld 	a,l
+	jp 	fdclr		; zero _fdpos[fd], fd in hl
+err:	ld 	(_errno),hl
+	ld 	hl,-1
+	ret
+
+	.data
+scall:	.db 	0cfh
+	.db 	008h
+name:	.dw 	0
+mode:	.dw 	0
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

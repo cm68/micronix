@@ -1,19 +1,24 @@
 ;
-; assembly source for pause system call
-; not found in unix v6
-; 
-; /usr/src/lib/libu/pause.s
+; pause system call
 ;
-; Changed: <2023-07-07 01:33:25 curt>
+; pause()
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; Suspends the calling process until a signal is received.
 ;
+; returns when signal received
+;
+	.global _pause
 
-pause.o:
-    0    _errno: 0000 08 global 
-    1    _pause: 0000 0d global defined code 
-0000: sys indir 08 00                ; cf 00 08 00    .... 
-0004: ld bc,0x0                      ; 01 00 00       ...  
-0007: ret                            ; c9             .    
-data:
-0008: cf 1d                                           ..
+	.text
+_pause:
+	rst 	08h
+	.db 	000h
+	.dw 	scall
+	ld 	hl,0
+	ret
+
+	.data
+scall:	.db 	0cfh
+	.db 	01dh
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

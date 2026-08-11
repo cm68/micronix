@@ -1,37 +1,61 @@
 ;
-; assembly source for pipe system call
+; pipe system call
 ;
-; /usr/src/lib/libu/pipe.s
+; pipe(fds)
+; int fds[2];
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Returns two file descriptors that can be used to
+; communicate between processes created by subsequent fork
+; calls. When the pipe is written using fds[1], up to 4096
+; bytes of data will be buffered before the writing process
+; is suspended. A read using fds[0] will pick up the data.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; Read calls on an empty pipe with no writers will return
+; an end-of-file (0 bytes read). Write calls under similar
+; conditions will generate a signal.
 ;
+; returns 0 on success, -1 on failure
+;
+	.extern _errno
+	.global _pipe
 
-pipe.o:
-    0    _errno: 0000 08 global 
-    1     _pipe: 0000 0d global defined code 
-0000: push de                        ; d5             .    
-0001: sys pipe                       ; cf 2a          .*   
-0003: ex de,hl                       ; eb             .    
-0004: push hl                        ; e5             .    
-0005: ld hl,0x6                      ; 21 06 00       !..  
-0008: add hl,sp                      ; 39             9    
-0009: ld a,(hl)                      ; 7e             ~    
-000a: inc hl                         ; 23             #    
-000b: ld h,(hl)                      ; 66             f    
-000c: ld l,a                         ; 6f             o    
-000d: ld (hl),e                      ; 73             s    
-000e: inc hl                         ; 23             #    
-000f: ld (hl),d                      ; 72             r    
-0010: inc hl                         ; 23             #    
-0011: pop de                         ; d1             .    
-0012: ld (hl),e                      ; 73             s    
-0013: inc hl                         ; 23             #    
-0014: ld (hl),d                      ; 72             r    
-0015: pop de                         ; d1             .    
-0016: ld bc,0x0                      ; 01 00 00       ...  
-0019: ret nc                         ; d0             .    
-001a: dec bc                         ; 0b             .    
-001b: ld (0x0),hl                    ; 22 00 00       "..  
-001e: ret                            ; c9             .    
+	.text
+_pipe:
+	pop 	hl		; discard ret addr
+	pop 	de		; fds pointer
+
+	ld 	hl,-4		; restore stack
+	add 	hl,sp
+	ld 	sp,hl
+
+	push 	de		; save fds pointer
+	rst 	08h
+	.db 	02ah
+
+	jr 	c,error
+
+	; returns: hl = read fd, de = write fd
+	ex	de,hl		; read fd in de
+	ex	(sp),hl		; pointer in hl, write fd to stack
+
+	ld 	(hl),e
+	inc 	hl
+	ld 	(hl),d
+	inc 	hl
+
+	ex	(sp),hl		; pointer to stack, write fd to hl
+	ex	de,hl		; write fd to de
+	pop	hl		; get pointer
+
+	ld 	(hl),e
+	inc 	hl
+	ld 	(hl),d
+
+	ld 	hl,0
+	ret
+error:
+	ld 	(_errno),hl
+	ld 	hl,-1
+	ret
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

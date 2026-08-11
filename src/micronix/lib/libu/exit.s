@@ -1,25 +1,22 @@
 ;
-; assembly source for exit system call
+; exit system call
 ;
-; /usr/src/lib/libu/exit.s
+; exit(status)
 ;
-; Changed: <2023-07-07 01:18:37 curt>
+; Closes all open files, terminates the calling process,
+; and notifies the parent process (if it is executing a
+; wait). The low byte of status is available to the parent
+; via wait.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; This call never returns.
 ;
-	.globl	_exit
-	.extern	c.ret
-	.extern	c.ent
-	.extern	__exit
-	
+	.global __exit
+
 	.text
-_exit:	call	c.ent
-	ld	hl,0x4
-	add	hl,de
-	ld	c,(hl)
-	inc	hl
-	ld	b,(hl)
-	push	bc
-	call	__exit
-	pop	af
-	jp	c.ret
+__exit:
+	pop 	hl		; discard ret addr
+	pop 	hl		; status
+	rst 	08h
+	.db 	001h
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

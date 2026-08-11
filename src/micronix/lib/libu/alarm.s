@@ -1,27 +1,29 @@
 ;
-; assembly source for alarm system call
+; alarm system call
 ;
-; /usr/src/lib/libu/alarm.s
+; alarm(seconds)
 ;
-; Changed: <2023-07-07 00:50:13 curt>
+; Causes a SIGALRM (14) signal to occur after the specified
+; number of seconds.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; returns the previous alarm value
 ;
-	.globl	_alarm
-	.extern _errno
+	.global _alarm
 
 	.text
 _alarm:
-	ld	hl, 0x2
-	add	hl, sp
-	ld	a, (hl)
-	inc	hl
-	ld	h, (hl)
-	ld	l, a
-	.db	0xcf, 0x00
-	.dw	sys
-	ld	bc, 0x0
+	pop 	de		; ret addr
+	pop 	hl		; seconds
+	push 	hl
+	push 	de
+
+	rst 	08h
+	.db 	000h
+	.dw 	scall
 	ret
 
 	.data
-sys:	.db	0xcf, 0x1b
+scall:	.db 	0cfh
+	.db 	01bh
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

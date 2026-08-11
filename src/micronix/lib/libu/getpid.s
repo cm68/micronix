@@ -1,17 +1,13 @@
 ;
-; assembly source for getpid system call
+; getpid system call
+; getpid()
 ;
-; /usr/src/lib/libu/getpid.s
-;
-; Changed: <2023-07-07 00:36:28 curt>
-;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
-;
+	.global _getpid
 
-getpid.o:
-    0    _errno: 0000 08 global 
-    1   _getpid: 0000 0d global defined code 
-0000: sys getpid                     ; cf 14          ..   
-0002: ld c,l                         ; 4d             m    
-0003: ld b,h                         ; 44             d    
-0004: ret                            ; c9             .    
+	.text
+_getpid:
+	rst 08h
+	.db 014h
+	ret
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

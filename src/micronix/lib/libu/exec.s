@@ -1,33 +1,47 @@
 ;
-; assembly source for exec system call
+; exec system call
 ;
-; /usr/src/lib/libu/exec.s
+; exec(name, argv)
+; char *name;
+; char *argv[];
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Overlays the calling core image with the named file, then
+; transfers to the beginning of the new core image. There
+; can be no return from a successful exec: the calling core
+; image is lost.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; Previously opened files remain open (so stdin and stdout
+; are preserved), and ignored signals remain ignored.
+; Caught signals are reset to their default behavior.
 ;
+; returns only on error, with -1
+;
+	.extern _errno
+	.global _exec
 
-exec.o:
-    0    _errno: 0000 08 global 
-    1     _exec: 0000 0d global defined code 
-0000: ld hl,0x2                      ; 21 02 00       !..  
-0003: add hl,sp                      ; 39             9    
-0004: ld a,(hl)                      ; 7e             ~    
-0005: inc hl                         ; 23             #    
-0006: ld h,(hl)                      ; 66             f    
-0007: ld l,a                         ; 6f             o    
-0008: ld (0x23),hl                   ; 22 23 00       "#.  
-000b: ld hl,0x4                      ; 21 04 00       !..  
-000e: add hl,sp                      ; 39             9    
-000f: ld a,(hl)                      ; 7e             ~    
-0010: inc hl                         ; 23             #    
-0011: ld h,(hl)                      ; 66             f    
-0012: ld l,a                         ; 6f             o    
-0013: ld (0x25),hl                   ; 22 25 00       "%.  
-0016: sys indir 21 00                ; cf 00 21 00    ..!. 
-001a: ld bc,0xffff                   ; 01 ff ff       ...  
-001d: ld (0x0),hl                    ; 22 00 00       "..  
-0020: ret                            ; c9             .    
-data:
-0021: cf 0b 00 00  00 00                               .... ..
+	.text
+_exec:
+	pop 	hl		; discard ret addr
+	pop 	hl		; name
+	ld 	(name),hl
+	pop 	hl		; argv
+	ld 	(argv),hl
+
+	ld 	hl,-6		; restore stack
+	add 	hl,sp
+	ld 	sp,hl
+
+	rst 	08h
+	.db 	000h
+	.dw 	scall
+	ld 	(_errno),hl	; exec only returns on error
+	ld 	hl,-1
+	ret
+
+	.data
+scall:	.db 	0cfh
+	.db 	00bh
+name:	.dw 	0
+argv:	.dw 	0
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

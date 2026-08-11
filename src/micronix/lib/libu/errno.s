@@ -1,13 +1,11 @@
 ;
-; assembly source for errno data space
+; data location to store _errno
 ;
-; /usr/src/lib/libu/errno.s
-;
-; Changed: <2023-07-07 00:36:28 curt>
-;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
-;
-	.globl	_errno
+	.global _errno
 
 	.data
-	.dw	0
+_errno:
+	.dw 000h
+
+; vim: tabstop=4 shiftwidth=4 noexpandtab:
+

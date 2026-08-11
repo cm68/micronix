@@ -1,34 +1,46 @@
 ;
-; assembly source for stty system call
+; stty system call
 ;
-; /usr/src/lib/libu/stty.s
+; stty(fd, vec)
+; struct sgtty *vec;
 ;
-; Changed: <2023-07-07 01:44:02 curt>
+; Sets the status of the terminal associated with the file
+; descriptor from the 6-byte structure pointed at by vec.
+; See gtty for the structure format.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; passes fd in hl
 ;
+; returns 0 on success, -1 on failure
+;
+	.extern _errno
+	.global _stty
 
-stty.o:
-    0    _errno: 0000 08 global 
-    1     _stty: 0000 0d global defined code 
-0000: ld hl,0x4                      ; 21 04 00       !..  
-0003: add hl,sp                      ; 39             9    
-0004: ld a,(hl)                      ; 7e             ~    
-0005: inc hl                         ; 23             #    
-0006: ld h,(hl)                      ; 66             f    
-0007: ld l,a                         ; 6f             o    
-0008: ld (0x22),hl                   ; 22 22 00       "".  
-000b: ld hl,0x2                      ; 21 02 00       !..  
-000e: add hl,sp                      ; 39             9    
-000f: ld a,(hl)                      ; 7e             ~    
-0010: inc hl                         ; 23             #    
-0011: ld h,(hl)                      ; 66             f    
-0012: ld l,a                         ; 6f             o    
-0013: sys indir 20 00                ; cf 00 20 00    .... 
-0017: ld bc,0x0                      ; 01 00 00       ...  
-001a: ret nc                         ; d0             .    
-001b: dec bc                         ; 0b             .    
-001c: ld (0x0),hl                    ; 22 00 00       "..  
-001f: ret                            ; c9             .    
-data:
-0020: cf 1f 00 00                                      .... 
+	.text
+_stty:
+	pop 	de		; ret addr
+	pop 	hl		; fd in l (byte arg: high byte is junk)
+	ld 	a,l
+	pop 	hl		; vec
+	ld 	(buf),hl
+	push 	hl
+	push 	af		; slot filler (caller cleans; contents unused)
+	push 	de
+
+	ld 	h,0
+	ld 	l,a
+	rst 	08h
+	.db 	000h
+	.dw 	scall
+	ex 	de,hl
+	ld 	hl,0
+	ret 	nc
+	ld 	(_errno),de
+	dec 	hl
+	ret
+
+	.data
+scall:	.db 	0cfh
+	.db 	01fh
+buf:	.dw 	0
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

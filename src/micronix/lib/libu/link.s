@@ -1,35 +1,47 @@
 ;
-; assembly source for link system call
+; link system call
 ;
-; /usr/src/lib/libu/link.s
+; link(old, new)
+; char *old, *new;
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; A link to "old" is created, with the name "new".
+; Either name may be an arbitrary pathname. "New" must
+; not already exist, its directory must be writable,
+; and it must be on the same device as "old". "Old"
+; must not be a directory (unless the user is the
+; super-user), and must not have more than 254 links.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; returns 0 on success, -1 on failure
 ;
+	.extern _errno
+	.global _link
 
-link.o:
-    0    _errno: 0000 08 global 
-    1     _link: 0000 0d global defined code 
-0000: ld hl,0x2                      ; 21 02 00       !..  
-0003: add hl,sp                      ; 39             9    
-0004: ld a,(hl)                      ; 7e             ~    
-0005: inc hl                         ; 23             #    
-0006: ld h,(hl)                      ; 66             f    
-0007: ld l,a                         ; 6f             o    
-0008: ld (0x25),hl                   ; 22 25 00       "%.  
-000b: ld hl,0x4                      ; 21 04 00       !..  
-000e: add hl,sp                      ; 39             9    
-000f: ld a,(hl)                      ; 7e             ~    
-0010: inc hl                         ; 23             #    
-0011: ld h,(hl)                      ; 66             f    
-0012: ld l,a                         ; 6f             o    
-0013: ld (0x27),hl                   ; 22 27 00       "'.  
-0016: sys indir 23 00                ; cf 00 23 00    ..#. 
-001a: ld bc,0x0                      ; 01 00 00       ...  
-001d: ret nc                         ; d0             .    
-001e: dec bc                         ; 0b             .    
-001f: ld (0x0),hl                    ; 22 00 00       "..  
-0022: ret                            ; c9             .    
-data:
-0023: cf 09 00 00  00 00                               .... ..
+	.text
+_link:
+	pop 	de		; ret addr
+	pop 	hl		; old
+	ld 	(old),hl
+	pop 	hl		; new
+	ld 	(new),hl
+
+	ld	hl,-4
+	add	hl,sp
+	ld	sp,hl
+
+	rst 	08h
+	.db 	000h
+	.dw 	scall
+	ex 	de,hl
+	ld 	hl,0
+	ret 	nc
+	ld 	(_errno),de
+	dec 	hl
+	ret
+
+	.data
+scall:	.db 	0cfh
+	.db 	009h
+old:	.dw 	0
+new:	.dw 	0
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

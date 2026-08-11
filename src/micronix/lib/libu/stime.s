@@ -1,36 +1,44 @@
 ;
-; assembly source for stime system call
+; stime system call
 ;
-; /usr/src/lib/libu/stime.s
+; stime(tp)
+; long *tp;
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Sets the system's idea of the date and time. The argument
+; is a pointer to a long containing the number of seconds
+; since 0:00 GMT, January 1, 1970.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; Only the super-user may make this call.
 ;
+; returns 0 on success, -1 on failure
+;
+	.extern _errno
+	.global _stime
 
-stime.o:
-    0    _errno: 0000 08 global 
-    1    _stime: 0000 0d global defined code 
-0000: push de                        ; d5             .    
-0001: ld hl,0x4                      ; 21 04 00       !..  
-0004: add hl,sp                      ; 39             9    
-0005: ld a,(hl)                      ; 7e             ~    
-0006: inc hl                         ; 23             #    
-0007: ld h,(hl)                      ; 66             f    
-0008: ld l,a                         ; 6f             o    
-0009: ld e,(hl)                      ; 5e             ^    
-000a: inc hl                         ; 23             #    
-000b: ld d,(hl)                      ; 56             v    
-000c: inc hl                         ; 23             #    
-000d: ld a,(hl)                      ; 7e             ~    
-000e: inc hl                         ; 23             #    
-000f: ld h,(hl)                      ; 66             f    
-0010: ld l,a                         ; 6f             o    
-0011: ex de,hl                       ; eb             .    
-0012: sys stime                      ; cf 19          ..   
-0014: pop de                         ; d1             .    
-0015: ld bc,0x0                      ; 01 00 00       ...  
-0018: ret nc                         ; d0             .    
-0019: dec bc                         ; 0b             .    
-001a: ld (0x0),hl                    ; 22 00 00       "..  
-001d: ret                            ; c9             .    
+	.text
+_stime:
+	pop 	de		; ret addr
+	pop 	hl		; tp pointer
+	push 	hl
+	push 	de
+
+	; load 32-bit time from *tp (little-endian)
+	ld 	e,(hl)
+	inc 	hl
+	ld 	d,(hl)
+	inc 	hl
+	ld 	a,(hl)
+	inc 	hl
+	ld 	h,(hl)
+	ld 	l,a
+	ex 	de,hl		; de:hl = time (de=high, hl=low)
+	rst 	08h
+	.db 	019h
+	ex 	de,hl
+	ld 	hl,0
+	ret 	nc
+	ld 	(_errno),de
+	dec 	hl
+	ret
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

@@ -1,47 +1,66 @@
 ;
-; assembly source for execv system call
+; execv and execl - wrappers for exec
 ;
-; /usr/src/lib/libu/execv.s
+; execv(name, argv)
+; char *name;
+; char *argv[];
 ;
-; Changed: <2023-07-07 01:10:10 curt>
+; execl(name, arg0, arg1, ..., argn, 0)
+; char *name, *arg0, *arg1, ..., *argn;
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; Execv is useful when the number of arguments is not known
+; in advance. Pointers to the argument strings are collected
+; into a list, a null pointer is appended to mark the end,
+; and execv is called with the address of the list.
 ;
+; Execl is useful when a known file is being executed with
+; known arguments. Any number of arguments may be given,
+; but the last must be a 0.
+;
+	.extern _exec
+	.global _execv
+	.global _execl
 
-execv.o:
-    0     c.ret: 0000 08 global 
-    1     c.ent: 0000 08 global 
-    2     _exec: 0000 08 global 
-    3    _execv: 0000 0d global defined code 
-    4    _execl: 001b 0d global defined code 
-0000: call 0x0                       ; cd 00 00       ...  
-0003: ld hl,0x6                      ; 21 06 00       !..  
-0006: add hl,de                      ; 19             .    
-0007: ld c,(hl)                      ; 4e             n    
-0008: inc hl                         ; 23             #    
-0009: ld b,(hl)                      ; 46             f    
-000a: push bc                        ; c5             .    
-000b: ld hl,0x4                      ; 21 04 00       !..  
-000e: add hl,de                      ; 19             .    
-000f: ld c,(hl)                      ; 4e             n    
-0010: inc hl                         ; 23             #    
-0011: ld b,(hl)                      ; 46             f    
-0012: push bc                        ; c5             .    
-0013: call 0x0                       ; cd 00 00       ...  
-0016: pop af                         ; f1             .    
-0017: pop af                         ; f1             .    
-0018: jp 0x0                         ; c3 00 00       ...  
-001b: call 0x0                       ; cd 00 00       ...  
-001e: ld hl,0x6                      ; 21 06 00       !..  
-0021: add hl,de                      ; 19             .    
-0022: push hl                        ; e5             .    
-0023: ld hl,0x4                      ; 21 04 00       !..  
-0026: add hl,de                      ; 19             .    
-0027: ld c,(hl)                      ; 4e             n    
-0028: inc hl                         ; 23             #    
-0029: ld b,(hl)                      ; 46             f    
-002a: push bc                        ; c5             .    
-002b: call 0x0                       ; cd 00 00       ...  
-002e: pop af                         ; f1             .    
-002f: pop af                         ; f1             .    
-0030: jp 0x0                         ; c3 00 00       ...  
+	.text
+; bc is a register-variable home and the shuffle below pops an
+; argument into it, so the caller's copy is saved before anything
+; touches it and the arguments are read where they lie.
+
+_execv:
+	push	bc		; the caller's register variable
+	ld 	hl,4
+	add 	hl,sp		; past the save and the return address
+	ld 	e,(hl)
+	inc 	hl
+	ld 	d,(hl)		; de = name
+	inc 	hl
+	ld 	c,(hl)
+	inc 	hl
+	ld 	b,(hl)		; bc = argv
+
+	push 	bc		; push argv
+	push 	de		; push name
+	call 	_exec
+	pop 	af
+	pop 	af
+	pop	bc
+	ret
+
+_execl:
+	push	bc		; the caller's register variable
+	ld 	hl,4
+	add 	hl,sp		; past the save and the return address
+	ld 	e,(hl)
+	inc 	hl
+	ld 	d,(hl)		; de = name
+	inc 	hl		; hl = &arg0, the rest of the list
+
+	push 	hl		; push &arg0 as argv
+	push 	de		; push name
+	call 	_exec
+	pop 	af
+	pop 	af
+	pop	bc
+	ret
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

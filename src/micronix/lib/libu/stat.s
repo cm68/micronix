@@ -1,35 +1,48 @@
 ;
-; assembly source for stat system call
+; stat system call
 ;
-; /usr/src/lib/libu/stat.s
+; stat(name, buf)
+; char *name;
+; struct stat *buf;
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Gets the status of a named file. Buf is the address of a
+; 36 byte buffer into which the status is placed. See fstat
+; for the structure format.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; It is not necessary to have read permission on the file,
+; but all directories leading to the file must be searchable.
 ;
+; returns 0 on success, -1 on failure
+;
+	.extern _errno
+	.global _stat
 
-stat.o:
-    0    _errno: 0000 08 global 
-    1     _stat: 0000 0d global defined code 
-0000: ld hl,0x2                      ; 21 02 00       !..  
-0003: add hl,sp                      ; 39             9    
-0004: ld a,(hl)                      ; 7e             ~    
-0005: inc hl                         ; 23             #    
-0006: ld h,(hl)                      ; 66             f    
-0007: ld l,a                         ; 6f             o    
-0008: ld (0x25),hl                   ; 22 25 00       "%.  
-000b: ld hl,0x4                      ; 21 04 00       !..  
-000e: add hl,sp                      ; 39             9    
-000f: ld a,(hl)                      ; 7e             ~    
-0010: inc hl                         ; 23             #    
-0011: ld h,(hl)                      ; 66             f    
-0012: ld l,a                         ; 6f             o    
-0013: ld (0x27),hl                   ; 22 27 00       "'.  
-0016: sys indir 23 00                ; cf 00 23 00    ..#. 
-001a: ld bc,0x0                      ; 01 00 00       ...  
-001d: ret nc                         ; d0             .    
-001e: dec bc                         ; 0b             .    
-001f: ld (0x0),hl                    ; 22 00 00       "..  
-0022: ret                            ; c9             .    
-data:
-0023: cf 12 00 00  00 00                               .... ..
+	.text
+_stat:
+	pop 	hl		; discard ret addr
+	pop 	hl		; name
+	ld 	(name),hl
+	pop 	hl		; buf
+	ld 	(buf),hl
+
+	ld 	hl,-6		; restore stack
+	add 	hl,sp
+	ld 	sp,hl
+
+	rst 	08h
+	.db 	000h
+	.dw 	scall
+	ex 	de,hl
+	ld 	hl,0
+	ret 	nc
+	ld 	(_errno),de
+	dec 	hl
+	ret
+
+	.data
+scall:	.db 	0cfh
+	.db 	012h
+name:	.dw 	0
+buf:	.dw 	0
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

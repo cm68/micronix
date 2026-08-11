@@ -1,37 +1,46 @@
 ;
-; assembly source for time system call
+; time system call
 ;
-; /usr/src/lib/libu/time.s
+; time(tp)
+; long *tp;
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Fills the long value pointed to by the argument with the
+; number of seconds since 0:00 GMT January 1 1970.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; returns time, also stores to *tp if not NULL
 ;
+	.global _time
 
-time.o:
-    0    _errno: 0000 08 global 
-    1     _time: 0000 0d global defined code 
-0000: push de                        ; d5             .    
-0001: sys time                       ; cf 0d          ..   
-0003: ex de,hl                       ; eb             .    
-0004: push hl                        ; e5             .    
-0005: ld hl,0x6                      ; 21 06 00       !..  
-0008: add hl,sp                      ; 39             9    
-0009: ld a,(hl)                      ; 7e             ~    
-000a: inc hl                         ; 23             #    
-000b: ld h,(hl)                      ; 66             f    
-000c: ld l,a                         ; 6f             o    
-000d: ld (hl),e                      ; 73             s    
-000e: inc hl                         ; 23             #    
-000f: ld (hl),d                      ; 72             r    
-0010: inc hl                         ; 23             #    
-0011: pop de                         ; d1             .    
-0012: ld (hl),e                      ; 73             s    
-0013: inc hl                         ; 23             #    
-0014: ld (hl),d                      ; 72             r    
-0015: pop de                         ; d1             .    
-0016: ld bc,0x0                      ; 01 00 00       ...  
-0019: ret nc                         ; d0             .    
-001a: dec bc                         ; 0b             .    
-001b: ld (0x0),hl                    ; 22 00 00       "..  
-001e: ret                            ; c9             .    
+	.text
+_time:
+	pop 	de		; ret addr
+	pop 	hl		; tp
+	push 	hl
+	push 	de
+
+	push	bc		; the caller's register variable: tp
+				; lands in bc below and bc is a home
+	push 	hl		; save tp
+	rst 	08h
+	.db 	00dh
+	; returns: de:hl = time (de=high, hl=low)
+	pop 	bc		; bc = tp
+	ld 	a,b
+	or 	c
+	jr 	z,9f		; tp is NULL
+	; store 32-bit time to *tp (little-endian)
+	ld 	a,l
+	ld 	(bc),a
+	inc 	bc
+	ld 	a,h
+	ld 	(bc),a
+	inc 	bc
+	ld 	a,e
+	ld 	(bc),a
+	inc 	bc
+	ld 	a,d
+	ld 	(bc),a
+9:	pop	bc
+	ret
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

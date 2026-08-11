@@ -1,16 +1,21 @@
 ;
-; assembly source for sync system call
+; sync system call
 ;
-; /usr/src/lib/libu/sync.s
+; sync()
 ;
-; Changed: <2023-07-07 01:44:23 curt>
+; Causes all information in core memory that should be on
+; disk to be written out. This includes modified super-blocks,
+; modified inodes, and delayed block I/O.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; always succeeds
 ;
+	.global _sync
 
-sync.o:
-    0    _errno: 0000 08 global 
-    1     _sync: 0000 0d global defined code 
-0000: sys sync                       ; cf 24          .$   
-0002: ld bc,0x0                      ; 01 00 00       ...  
-0005: ret                            ; c9             .    
+	.text
+_sync:
+	rst 	08h
+	.db 	024h
+	ld 	hl,0
+	ret
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

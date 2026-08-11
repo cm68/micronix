@@ -1,23 +1,37 @@
 ;
-; assembly source for close system call
+; close system call
 ;
-; /usr/src/lib/libu/close.s
+; close(fd)
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Given a file descriptor previously returned by open,
+; creat, or pipe, close closes the associated file.
+; A close of all files is automatic on exit, but since
+; processes are limited to 16 simultaneously open files,
+; close may be necessary for programs that deal with
+; many files.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; passes fd in hl
 ;
+; returns 0 on success, -1 on failure
+;
+	.extern _errno
+	.global _close
 
-close.o:
-    0    _errno: 0000 08 global 
-    1    _close: 0000 0d global defined code 
-0000: pop bc                         ; c1             .    
-0001: pop hl                         ; e1             .    
-0002: push hl                        ; e5             .    
-0003: push bc                        ; c5             .    
-0004: sys close                      ; cf 06          ..   
-0006: ld bc,0x0                      ; 01 00 00       ...  
-0009: ret nc                         ; d0             .    
-000a: dec bc                         ; 0b             .    
-000b: ld (0x0),hl                    ; 22 00 00       "..  
-000e: ret                            ; c9             .    
+	.text
+_close:
+	pop 	de		; ret addr
+	pop 	hl		; fd in l (byte arg: high byte is junk)
+	push 	hl
+	push 	de
+
+	ld 	h,0		; fd in hl
+	rst 	08h
+	.db 	006h
+	ex 	de,hl
+	ld 	hl,0
+	ret 	nc
+	ld 	(_errno),de
+	dec 	hl
+	ret
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

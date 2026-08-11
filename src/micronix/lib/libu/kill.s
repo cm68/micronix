@@ -1,34 +1,53 @@
 ;
-; assembly source for kill system call
+; kill system call
 ;
-; /usr/src/lib/libu/kill.s
+; kill(pid, sig)
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Sends the signal sig to the process with the given ID.
+; The usual effect is to kill the process - see signal(2)
+; for a discussion and a list of signals.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; The sending and receiving processes must have the same
+; effective user IDs, or the sender must be the super-user.
+; If the given process ID is 0, then the signal is sent to
+; all other processes with the same controlling tty.
 ;
+; A process can never kill itself.
+;
+; passes pid in hl
+;
+; returns 0 on success, -1 on failure
+;
+	.extern _errno
+	.global _kill
 
-kill.o:
-    0    _errno: 0000 08 global 
-    1     _kill: 0000 0d global defined code 
-0000: ld hl,0x4                      ; 21 04 00       !..  
-0003: add hl,sp                      ; 39             9    
-0004: ld a,(hl)                      ; 7e             ~    
-0005: inc hl                         ; 23             #    
-0006: ld h,(hl)                      ; 66             f    
-0007: ld l,a                         ; 6f             o    
-0008: ld (0x22),hl                   ; 22 22 00       "".  
-000b: ld hl,0x2                      ; 21 02 00       !..  
-000e: add hl,sp                      ; 39             9    
-000f: ld a,(hl)                      ; 7e             ~    
-0010: inc hl                         ; 23             #    
-0011: ld h,(hl)                      ; 66             f    
-0012: ld l,a                         ; 6f             o    
-0013: sys indir 20 00                ; cf 00 20 00    .... 
-0017: ld bc,0x0                      ; 01 00 00       ...  
-001a: ret nc                         ; d0             .    
-001b: dec bc                         ; 0b             .    
-001c: ld (0x0),hl                    ; 22 00 00       "..  
-001f: ret                            ; c9             .    
-data:
-0020: cf 25 00 00                                      .%.. 
+	.text
+_kill:
+	pop 	hl		; ret addr
+	pop 	de		; pid
+	pop 	hl		; sig
+	ld 	(sig),hl
+
+	ld	hl,-4		; restore stack
+	add	hl,sp
+	ld	sp,hl
+	
+	ex	de,hl		; get pid into hl
+
+	rst 	08h
+	.db 	000h
+	.dw 	scall
+
+	ex 	de,hl		; save errno
+	ld 	hl,0
+	ret 	nc
+	ld 	(_errno),de
+	dec 	hl
+	ret
+
+	.data
+scall:	.db 	0cfh
+	.db 	025h
+sig:	.dw 	0
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

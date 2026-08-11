@@ -1,23 +1,29 @@
 ;
-; assembly source for fork system call
+; fork system call
 ;
-; /usr/src/lib/libu/fork.s
+; fork()
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Fork is the only way to create a new process. The calling
+; process splits into a "parent" and a "child". The child's
+; core image is a copy of the parent's, open files are
+; shared, and signals remain unchanged.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; returns 0 to child, child pid to parent, -1 on error
 ;
-	.globl	_fork
-	.extern	_errno
+	.extern _errno
+	.global _fork
 
 	.text
-_fork:	.db	0xcf, 0x02
-	jp	child
-	ld	c, l
-	ld	b, h
-	ret	nc
-	ld	bc, 0xffff
-	ld	(_errno), hl
+_fork:
+	rst 	08h
+	.db 	002h
+	jp 	child
+	ret 	nc		; parent: pid in hl
+	ld 	(_errno),hl
+	ld 	hl,-1
 	ret
-child:	ld	bc, 0x0
+child:
+	ld 	hl,0
 	ret
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

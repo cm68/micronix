@@ -1,40 +1,50 @@
 ;
-; assembly source for access system call
+; access system call
 ;
-; /usr/src/lib/libu/access.s
+; access(name, mode)
+; char *name;
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Permission to access the named file, in the specified
+; mode, is tested. The test is based on the real user and
+; group IDs, rather than the effective IDs, so that a
+; set-user-id program may test the permissions of its
+; invoker. Mode is the sum of any of the following:
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; 4  read
+; 2  write
+; 1  execute
 ;
-	.globl	_access
+; returns 0 if permitted, -1 if not
+;
 	.extern _errno
+	.global _access
 
 	.text
-_access:	
-	ld	hl, 0x2
-	add	hl, sp
-	ld	a, (hl)
-	inc	hl
-	ld	h,(hl)
-	ld	l, a
-	ld	(name), hl
-	ld	hl, 0x4
-	add	hl, sp
-	ld	a, (hl)
-	inc	hl
-	ld	h, (hl)
-	ld	l,a
-	ld	(mode), hl
-	.db	0xcf, 0
-	.dw	sys
-	ld	bc, 0x0
-	ret	nc
-	dec	bc
-	ld	(_errno), hl
+_access:
+	pop 	hl		; discard ret addr
+	pop 	hl		; name
+	ld 	(name),hl
+	pop 	hl		; mode
+	ld 	(mode),hl
+
+	ld 	hl,-6		; restore stack
+	add 	hl,sp
+	ld 	sp,hl
+
+	rst 	08h
+	.db 	000h
+	.dw 	scall
+	ex 	de,hl
+	ld 	hl,0
+	ret 	nc
+	ld 	(_errno),de
+	dec 	hl
 	ret
 
 	.data
-sys:	.db	0xcf, 0x21
-name:	.dw	0
-mode:	.dw	0
+scall:	.db 	0cfh
+	.db 	021h
+name:	.dw 	0
+mode:	.dw 	0
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

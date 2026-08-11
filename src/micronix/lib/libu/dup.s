@@ -1,26 +1,45 @@
 ;
-; assembly source for dup system call
+; dup system call
 ;
-; /usr/src/lib/libu/dup.s
+; dup(fd)
 ;
-; Changed: <2023-07-07 00:36:28 curt>
+; Takes a file descriptor previously returned by open,
+; creat, or pipe and allocates a new descriptor synonymous
+; with the original. Subsequent reads or writes with the
+; new descriptor will have exactly the same effect as the
+; same call with the old descriptor.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; Since the algorithm returns the lowest available value,
+; combinations of dup and close can be used to move file
+; descriptors. This is used mostly for manipulating stdin
+; (fd 0) and stdout (fd 1).
 ;
+; returns -1 on error, else new file descriptor
+;
+	.extern _errno
+	.extern fdcpy
+	.global _dup
 
-dup.o:
-    0    _errno: 0000 08 global 
-    1      _dup: 0000 0d global defined code 
-0000: ld hl,0x2                      ; 21 02 00       !..  
-0003: add hl,sp                      ; 39             9    
-0004: ld a,(hl)                      ; 7e             ~    
-0005: inc hl                         ; 23             #    
-0006: ld h,(hl)                      ; 66             f    
-0007: ld l,a                         ; 6f             o    
-0008: sys dup                        ; cf 29          .)   
-000a: ld c,l                         ; 4d             m    
-000b: ld b,h                         ; 44             d    
-000c: ret nc                         ; d0             .    
-000d: ld bc,0xffff                   ; 01 ff ff       ...  
-0010: ld (0x0),hl                    ; 22 00 00       "..  
-0013: ret                            ; c9             .    
+	.text
+_dup:
+	pop 	de		; ret addr
+	pop 	hl		; fd in l (byte arg: high byte is junk)
+	push 	hl
+	push 	de
+	ld 	a,l
+	ld 	(fd),a		; save old fd for fdcpy
+
+	ld 	h,0		; fd in hl
+	rst 	08h
+	.db 	029h
+	jr 	c,err		; new fd in hl
+	ld 	a,(fd)
+	jp 	fdcpy		; _fdpos[new] = _fdpos[old], new fd in hl
+err:	ld 	(_errno),hl
+	ld 	hl,-1
+	ret
+
+	.data
+fd:	.db 	0
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:

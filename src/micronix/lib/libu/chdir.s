@@ -1,31 +1,39 @@
 ;
-; assembly source for chdir system call
+; chdir system call
 ;
-; /usr/src/lib/libu/chdir.s
+; chdir(dirname)
+; char *dirname;
 ;
-; Changed: <2023-07-07 00:51:11 curt>
+; The working directory of the current process is changed
+; to the given directory. The user must have search
+; (execute) permission on the directory.
 ;
-; vim: tabstop=8 shiftwidth=8 noexpandtab:
+; returns 0 on success, -1 on failure
 ;
-	.globl	_chdir
-    	.extern	_errno
+	.extern _errno
+	.global _chdir
 
 	.text
-_chdir: ld	hl, 0x2
-	add	hl, sp
-	ld	a, (hl)
-	inc	hl
-	ld	h, (hl)
-	ld	l, a
-	ld	(name), hl
-	.db	0xcf, 0x00
-	.dw	sys
-	ld	bc, 0x0
-	ret	nc
-	dec	bc
-	ld	(_errno), hl
+_chdir:
+	pop 	de		; ret addr
+	pop 	hl		; dirname
+	ld 	(path),hl
+	push 	hl
+	push 	de
+
+	rst 	08h
+	.db 	000h
+	.dw 	scall
+	ex 	de,hl
+	ld 	hl,0
+	ret 	nc
+	ld 	(_errno),de
+	dec 	hl
 	ret
 
 	.data
-sys:	.db	0xcf, 0x00
-name:	.dw	0
+scall:	.db 	0cfh
+	.db 	00ch
+path:	.dw 	0
+
+; vim: tabstop=8 shiftwidth=8 noexpandtab:
