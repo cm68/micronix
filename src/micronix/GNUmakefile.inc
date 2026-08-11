@@ -41,11 +41,43 @@ LIB	?= /usr/local/bin/wslib
 NM	?= /usr/local/bin/wsnm
 CCFLAGS	?= -m micronix
 
-# ccc's headers come first, so that the handful which exist in both
-# trees - cpm.h hitech.h setjmp.h stdio.h time.h - come from the
-# compiler that has to agree with them.  The micronix tree supplies
-# the system headers ccc has no equivalent for: types.h, dirent.h,
-# sys/dir.h and the rest.
+# -i and -I are not the same list, and the difference is the whole
+# reason the commands would not compile.  ccc resolves <sys/...> out
+# of its system include directory, which defaults to a place beside
+# the compiler holding a CP/M stat.h and nothing else, and that lookup
+# happens BEFORE -I - so no amount of reordering -I could reach the
+# tree's sys/stat.h.  Every command that stats a file got the CP/M
+# struct, which has st_mode and st_size and no st_uid, st_gid, st_ino
+# or st_mtime, and c0 reported them one at a time as missing members
+# of a structure that was never the right one.
+#
+# -i points the system include search at this tree, which is what the
+# native micronix build has always done - sys/Makefile says
+# "CFLAGS = -i $(INC)/" and has since it was written.
+#
+# -I still puts ccc's headers ahead of the tree's, so the five that
+# exist in both - cpm.h hitech.h setjmp.h stdio.h time.h - come from
+# the compiler that has to agree with them.  The tree's stdio.h is the
+# old Whitesmith one and shares almost nothing with ccc's; a command
+# linked against the libc built here has to use ccc's.
+#
+# NOT -i$(DEPTH)/include, tempting as it is.  -i is searched before -I
+# and falls through to it, so that one flag would fix sys/stat.h - but
+# it also puts the tree's stdio.h, time.h and setjmp.h ahead of ccc's,
+# and the tree's stdio.h is the old Whitesmith one with a different
+# FILE.  A command compiled against that and linked against the libc
+# built here would not fail to build, it would corrupt its own buffers
+# at run time.  The five colliding headers are shipped into the
+# simulated filesystem's /include for the native compiler, so they
+# cannot simply be retired either.
+#
+# What that leaves shadowed is sys/stat.h: ccc's system directory has
+# a CP/M one, with st_mode and st_size and no st_uid, st_gid, st_ino or
+# st_mtime, and no S_IFDIR or S_IFMT.  Every command that stats a file
+# gets it, and c0 reports the fields one at a time as missing members
+# of a structure that was never the right one.  That is ar, cp, ls,
+# mkdir, pwd, rm and vi - seven of the eight commands still failing.
+#
 INC	?= -I/usr/local/lib/include -I$(DEPTH)/include
 
 #

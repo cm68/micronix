@@ -1,7 +1,30 @@
 #include <stdio.h>
+#ifdef linux
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
+#else
+/*
+ * The micronix headers, not ccc's.  ccc's <stat.h> is the CP/M struct
+ * stat - mode, three times and size, and nothing else - so st_uid and
+ * st_gid do not exist in it, and its <signal.h> is the CP/M signal set
+ * without SIGHUP or SIGQUIT.  The sys/ names do not collide with
+ * anything ccc installs, so they resolve out of the tree's own
+ * include directory.  stat.h needs UINT out of types.h and struct
+ * dsknod out of sys/fs.h, and says so at the top of itself.
+ */
+#include <types.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
+#include <sys/signal.h>
+#endif
+
+/*
+ * ar_hdr and ARMAG live in ar.h beside this file, which was never
+ * included - gcc let it pass because struct ar_hdr was completed by
+ * the time it mattered and ARMAG happened to be an int.
+ */
+#include "ar.h"
 
 struct	stat	stbuf;
 

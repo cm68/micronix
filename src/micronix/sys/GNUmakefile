@@ -35,8 +35,9 @@ SRCDIR	= /usr/src/sys
 # no ccc driver can link this yet - see above
 TARGET	=
 
-# the kernel includes its own headers, not the C library's
-INC	= -I$(DEPTH)/include
+# the kernel includes its own headers, not the C library's.  -i, as
+# the native Makefile beside this has always done.
+INC	= -i$(DEPTH)/include
 
 include $(DEPTH)/GNUmakefile.inc
 
