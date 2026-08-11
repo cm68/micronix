@@ -3,7 +3,7 @@
  *
  * usersim/usersim.c
  *
- * Changed: <2025-12-10 16:51:57 curt>
+ * Changed: <2026-08-11 01:50:49 curt>
  *
  * Copyright (c) 2018, Curt Mayer 
  * do whatever you want, just don't claim you wrote it. 
@@ -1376,12 +1376,30 @@ struct dirfd
 } *opendirs;
 
 /*
+ * A micronix pid is a signed sixteen bit quantity, so the only values
+ * we are allowed to hand the guest are 2 through 32767.  0 and 1 are
+ * not ours to give out, and anything with the top bit set comes back
+ * to the guest as a negative number - which every caller of fork
+ * reads as a failure.
+ */
+#define MINPID  2
+#define MAXPID  32767
+#define NPIDS   (MAXPID + 1)    /* linuxpid[] is indexed BY micronix pid */
+
+/*
  * pids are longer in linux, so we need to manage them too in shared memory.
+ *
+ * This is a registry, not a counter: linuxpid[] is indexed by the pid
+ * we gave the guest and holds the linux pid it stands for, 0 meaning
+ * the slot is free.  next is only a hint of where to start looking,
+ * so pids get reused lazily rather than immediately - a guest that
+ * holds a stale pid is much likelier to get ESRCH than somebody
+ * else's process.
  */
 struct pids {
     pthread_mutex_t mutex;
-    int linuxpid[65536];
-    int hiwat;
+    int linuxpid[NPIDS];
+    unsigned short next;
 } *pids;
 
 void
@@ -1393,7 +1411,7 @@ initpids()
         exit(2);
     }
     pthread_mutex_init(&pids->mutex, NULL);
-    pids->hiwat = 2;
+    pids->next = MINPID;
 }
 
 /*
@@ -1403,18 +1421,71 @@ initpids()
 allocpid(int lpid)
 {
     int p;
+    int i;
+
+    /*
+     * A failed fork or wait arrives here as -1.  Registering it would
+     * put a sentinel in the table that a later -1 would then "find",
+     * so it never gets in.
+     */
+    if (lpid <= 0)
+        return -1;
 
     pthread_mutex_lock(&pids->mutex);
-    for (p = 1; p < pids->hiwat; p++) {
+
+    /* the same linux process always keeps the same micronix pid */
+    for (p = MINPID; p <= MAXPID; p++) {
         if (pids->linuxpid[p] == lpid) {
             pthread_mutex_unlock(&pids->mutex);
             return p;
         }
     }
-    p = pids->hiwat++;
-    pids->linuxpid[p] = lpid;
+
+    /*
+     * Take the next free slot, starting from the hint and wrapping.
+     * The old code just incremented a counter, which ran off the end
+     * of the table after enough forks - and long before that it
+     * started handing out values above 32767, which the guest read as
+     * a failed fork.
+     */
+    p = pids->next;
+    for (i = 0; i < NPIDS - MINPID; i++) {
+        if (p > MAXPID)
+            p = MINPID;
+        if (pids->linuxpid[p] == 0) {
+            pids->linuxpid[p] = lpid;
+            pids->next = (p == MAXPID) ? MINPID : p + 1;
+            pthread_mutex_unlock(&pids->mutex);
+            return p;
+        }
+        p++;
+    }
+
+    /* every pid is in use - the guest gets a failure, not a bad pid */
     pthread_mutex_unlock(&pids->mutex);
-    return p;
+    return -1;
+}
+
+/*
+ * Give a pid back.  A reaped child no longer exists, so its slot is
+ * free; without this the registry fills up and never drains.
+ */
+void
+freepid(int lpid)
+{
+    int p;
+
+    if (lpid <= 0)
+        return;
+
+    pthread_mutex_lock(&pids->mutex);
+    for (p = MINPID; p <= MAXPID; p++) {
+        if (pids->linuxpid[p] == lpid) {
+            pids->linuxpid[p] = 0;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&pids->mutex);
 }
  
 /*
@@ -2197,7 +2268,14 @@ SystemCall()
         } else {
             message("waitfuck %x\n", i);
         }
-        ret = allocpid(ret);
+        /*
+         * Map it before releasing it: the guest still has to be told
+         * which pid died, but the child is reaped, so the slot is
+         * free the moment we have read it.
+         */
+        i = ret;
+        ret = allocpid(i);
+        freepid(i);
         carry_clear();
         break;
 
