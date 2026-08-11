@@ -23,20 +23,18 @@ sysi = re.compile(r'SYS indir ([0-9a-f]{2}) ([0-9a-f]{2})')
 def load(path):
     L = open(path, errors='replace').read().split('\n')
 
-    starts = []
-    for i, l in enumerate(L):
-        m = lab.match(l)
-        if m:
-            blob = l + (L[i + 1] if i + 1 < len(L) else '')
-            if any(f in blob for f in FRAME):
-                starts.append(int(m.group(1), 16))
-    # A leaf - a syscall stub, say - does not open with a frame
-    # helper, so it never shows up above and the function before it
-    # swallows it whole.  Every CALL target is a function start too.
+    # A function is a thing that gets CALLed - leaves invariably
+    # are, so that set alone is the answer, and the entry point is
+    # the one addition because nothing calls it.  Detecting starts by
+    # "opens with a frame helper" instead was wrong BOTH ways on
+    # /bin/sh: it invented 38 functions that were really string
+    # labels and missed 42 real leaves.
+    starts = set()
     for l in L:
         for mc in cal.finditer(l):
-            starts.append(int(mc.group(1), 16))
-    starts = sorted(set(starts))
+            starts.add(int(mc.group(1), 16))
+    starts.add(0x0100)
+    starts = sorted(starts)
 
     # walk the listing once, attributing every line to the function it
     # is inside

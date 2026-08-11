@@ -10,17 +10,18 @@ import re, collections
 L = open('sh.dis', errors='replace').read().split('\n')
 lab = re.compile(r'^H([0-9a-f]{4}):')
 adr = re.compile(r';\s*([0-9a-f]{4}) ')
-FRAME = ('H88e2', 'H88ed')
-
-starts = []
-for i, l in enumerate(L):
-    m = lab.match(l)
-    if not m:
-        continue
-    blob = l + (L[i + 1] if i + 1 < len(L) else '')
-    if any(f in blob for f in FRAME):
-        starts.append(int(m.group(1), 16))
-starts = sorted(set(starts))
+# A function is a thing that gets CALLed.  Leaves invariably are, so
+# that set alone is the answer, plus the entry point because nothing
+# calls it.  Detecting starts by "opens with a frame helper" instead
+# was wrong BOTH ways on /bin/sh - it invented 38 functions that were
+# really string labels and missed 42 real leaves.
+cal2 = re.compile(r'CALL\s+H([0-9a-f]{4})')
+starts = set()
+for l in L:
+    for mc in cal2.finditer(l):
+        starts.add(int(mc.group(1), 16))
+starts.add(0x0100)
+starts = sorted(starts)
 
 TEXT_END = 0x0100 + 0x883d
 sizes = {}
@@ -52,19 +53,60 @@ KNOWN = {
     0x7e5f: "execv wrapper",
     0x4287: "ignore SIGINT and SIGQUIT",
 }
-# The libc floor: everything at or above the first syscall stub is
-# library, not shell.  The stubs start at H8094 (the first indir).
-LIBC_FROM = 0x8094
+# Many CALL targets are not program functions at all - they are the
+# compiler's own helpers (the frame setup, the switch dispatcher, the
+# arithmetic it cannot open code) and the library.  Counting those as
+# shell code inflates the denominator.
+#
+# The helpers have a signature: called from everywhere and calling
+# nothing.  That is mechanical, so use it rather than an address.
+callers = collections.defaultdict(set)
+outdeg = collections.defaultdict(set)
+cur = None
+for l in L:
+    m = adr.search(l)
+    if not m:
+        continue
+    a = int(m.group(1), 16)
+    if a in starts:
+        cur = a
+    if cur is None:
+        continue
+    for mc in cal2.finditer(l):
+        t = int(mc.group(1), 16)
+        callers[t].add(cur)
+        outdeg[cur].add(t)
 
-shell = [a for a in starts if a < LIBC_FROM]
-libc = [a for a in starts if a >= LIBC_FROM]
+HELPER_CALLERS = 6      # called from at least this many places
+helpers = set(a for a in starts
+              if len(callers[a]) >= HELPER_CALLERS and not outdeg[a])
+
+# The library is linked ABOVE all the program's own code - so every
+# library function sits at a higher address than every program one.
+# That is true, and it bounds the answer, but it does NOT give a
+# mechanical test on its own: I tried "the library never calls
+# downwards across the boundary" and it fails, because library
+# functions call each other downwards constantly.  H876f calls H8634.
+# Both attempts at deriving it that way gave nonsense - one program
+# function, then a hundred and seventy-one.
+#
+# So the line is set from the lowest routine actually IDENTIFIED as
+# library: H7117 is exit.  Everything above it is library or helper.
+# That is an anchor rather than a derivation, and it is a bound: the
+# real boundary is at or below this, so the shell figure below is an
+# over-estimate, not an under-estimate.
+LIBC_FROM = 0x7117
+
+shell = [a for a in starts if a < LIBC_FROM and a not in helpers]
+libc = [a for a in starts if a >= LIBC_FROM or a in helpers]
 
 sb = sum(sizes[a] for a in shell)
 lb = sum(sizes[a] for a in libc)
 kb = sum(sizes[a] for a in shell if a in KNOWN)
 
-print("functions: %d total, %d below the libc floor, %d at or above" %
-      (len(starts), len(shell), len(libc)))
+print("functions: %d total, %d shell, %d library or helper "
+      "(%d compiler helpers; library starts at H%04x)" %
+      (len(starts), len(shell), len(libc), len(helpers), LIBC_FROM))
 print("bytes:     %d shell, %d libc, %d text total" % (sb, lb, sb + lb))
 print()
 print("accounted for: %d of %d shell functions, %d of %d bytes (%.0f%%)" %
