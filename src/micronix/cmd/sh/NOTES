@@ -346,16 +346,30 @@ from.  Confirmed by reading them, not by their size:
 
     H0a14  2043  the engine.  close x15, dup x8, dobuiltin x4,
                  ignoresigs x2, exit x3, runcmd x3
-    H07a8   594  runs one command.  Twenty-four distinct calls, the
-                 widest fan-out in the shell - this is where the
-                 special cases live
+    H07a8   594  dobuiltin().  NOT "runs one command", which is what
+                 this said before reading it.  Every builtin body is
+                 inside it and its switch table sits at 0x075e,
+                 immediately before it - the same layout as the
+                 operator table before the parser.
+
+                 Three anchors, each independent:
+                     0x098a calls sync   and H098a is sync
+                     0x09e7 calls getpid and H09e7 is pid
+                     0x08b6 calls exit   and H08b2 is exit
+
+                 So its twenty-four calls are not one command's
+                 special cases; they are seventeen builtins' worth of
+                 bodies, and each handler address from the switch
+                 table is now a readable piece of code rather than
+                 just an address.
     H5897   286  a SUBSHELL: it calls H015d, the read-eval loop,
                  and then exit.  So this is the child that runs a
                  script or a parenthesised list
     H57c4   208  redirection: two closes, an open through indir, and
                  H8228
     H1285   158  two string equalities and two messages
-    H1228    77  builtin dispatch - holds the switch at 0x075e
+    H1228    77  called from the engine four times.  NOT the
+                 builtin dispatch - that is H07a8.  Unidentified.
     H48dc    47  builtin lookup: takes a word, searches with a
                  24 byte local
     H4287    42  IGNORE SIGNALS.  signal(2,1) and signal(3,1) -
