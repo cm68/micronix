@@ -8,6 +8,43 @@ cmd/form/NOTES first - the Whitesmiths conventions described there
 apply, and form is the worked example.
 
 
+WHICH libu, AND WHICH CALLING CONVENTION
+----------------------------------------
+
+/bin/sh was built by the Whitesmiths compiler against the Whitesmiths
+libu, and that is NOT the library we build against now.  They differ
+in the calling convention:
+
+    Whitesmiths                     ours (ccc/src/libu)
+      returns in BC                   returns in HL
+      keeps the return address in BC  keeps it in DE
+      "sys close"                     "rst 08h / .db 006h"
+
+So when reading this binary, a function's result is in BC.  That is
+why the idioms below mean what they do, and reading them as HL would
+be wrong:
+
+    LD BC,0000H / JP <epilogue>     return 0
+    LD BC,0001H / JP <epilogue>     return 1
+    LD C,L / LD B,H                 move a syscall's result to BC
+
+The .s files under ~/src/micronix/src/micronix/lib/libu are dumps of
+the WHITESMITHS library, so they are a historical reference for
+reading this binary and nothing else.  They are listings, not
+assembler input - asz stops on their symbol table - and their ABI is
+the wrong one.  They must not become the source of libu.
+
+The real source is /vault/src/ccc/src/libu: 44 files in asz syntax
+with a Makefile that archives them.  Two notes on it:
+
+  - _signal.s has no .global declarations, unlike every other file
+    there, so it assembles to an object that defines nothing.  That
+    is why __signal and _jtab come out undefined and why signal()
+    cannot be linked - and why ignoresigs() in sh.c is a no-op.
+  - there is no isatty.s, which is why isatty() here goes through
+    gtty.
+
+
 Shape
 -----
 
