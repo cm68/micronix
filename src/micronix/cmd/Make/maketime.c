@@ -39,7 +39,9 @@ char *fname;
 #ifdef linux
     rv = statb.st_mtim.tv_sec;
 #else
-    rv = statb.modtime;
+    /* Micronix calls it st_mtime; "modtime" was the Whitesmiths
+     * spelling and the ccc headers do not have it. */
+    rv = statb.st_mtime;
 #endif
     if (verbose > 2) 
         printf("stat of file %s returns %s\n", fname, PTime(rv));
@@ -59,9 +61,9 @@ CurrTime()
     return tt;
 }
 
-#ifdef linux
+/* cpybuf was defined only for linux, so on Micronix it became an
+ * undefined external and the link failed.  memcpy is in libc on both. */
 #define cpybuf(d,s,l)  memcpy(d,s,l)
-#endif
 
 /*
  * convert time to printable.
