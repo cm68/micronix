@@ -10,6 +10,21 @@ extra
 core.*
 
 #
+# Transient.  A -delta is where the simulator puts writes to a disk
+# image, so it is whatever the last run happened to leave; disks/hdinstall
+# and disks/init both delete them before starting for that reason.  .mx
+# is a make intermediate.
+#
+*-delta
+*.mx
+
+#
+# Claude Code's own directory - local settings, and the worktrees it
+# makes inside the repo.  There is one in there.
+#
+.claude/
+
+#
 # Build output.
 #
 # Scoped to the directories that build rather than written as *.o and
