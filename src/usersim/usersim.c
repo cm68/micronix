@@ -814,6 +814,22 @@ main(int argc, char **argv)
     if (!repfp)
         repfp = stderr;
 
+    /*
+     * The trace goes out through stdio, and stdio is fully buffered
+     * when stderr is a file rather than a terminal.  fork() then
+     * duplicates whatever is sitting in that buffer, so the child
+     * reprints the parent's last lines and an exec or _exit throws
+     * the rest away - which is why a redirected trace of anything
+     * that forks came out interleaved, short, and with syscall names
+     * spliced into each other.  Line buffering is not enough - one
+     * traced syscall is several fprintf calls, so a half-built line
+     * is still sitting in the buffer when fork copies it.  Unbuffered
+     * means nothing is ever held to be duplicated, at the cost of a
+     * write per call, which a debugging aid can afford.
+     */
+    setvbuf(repfp, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
+
     emulate();
     return EXIT_SUCCESS;
 }
