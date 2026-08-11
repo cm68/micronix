@@ -6,7 +6,7 @@ prints the address of every system call a program makes, so one boot of
 the standalone names every library stub in the program by what it did -
 _stat is at 43f3 because that is where the stat calls came from.
 
-    disas -f init.ctl init
+    disas -f init.ctl init.dist
 
 It is Whitesmith's C: c.ent at 3f87 and c.ret at 3f8e, arguments pushed
 right to left, results in BC.  The syscall stubs are in the data segment,

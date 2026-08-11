@@ -5,7 +5,8 @@
  *
  * THIS IS A RECONSTRUCTION.  There is no surviving source for /etc/init;
  * this file was written from the disassembly of the /etc/init binary on the
- * Micronix 1.6 standalone - see disks/init/{init,init.dis,init.ctl,README}.
+ * Micronix 1.6 standalone - see init.dist, init.dis, init.ctl and README
+ * beside this file.
  * Every function below corresponds to one function in that binary, in the
  * same order, and the odd bits are reproduced rather than tidied away,
  * because the odd bits are the ones that say what the system expected.
