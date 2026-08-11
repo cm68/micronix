@@ -3,3 +3,51 @@ core
 filesystem
 extra
 *.tar
+
+#
+# Core dumps under any name.  "core" above only catches the bare one.
+#
+core.*
+
+#
+# Build output.
+#
+# Scoped to the directories that build rather than written as *.o and
+# *.a, because the tree tracks 264 .o, 51 .a and 535 .com files that are
+# recovered artifacts and not output - src/micronix/lib/objects and
+# everything under extra/ are full of them, and a blanket pattern would
+# hide the next one somebody adds.
+#
+src/lib/*.o
+src/lib/*.a
+
+src/hwsim/*.o
+src/hwsim/d1/*.o
+src/hwsim/d1/d1
+src/hwsim/d1/logfile
+
+src/micronix/lib/libc/*.o
+src/micronix/lib/libc/*.a
+
+src/tools/dumpsec
+src/tools/setdev
+
+src/micronix/cmd/mkfs/mkfs
+
+#
+# stand/ builds a .com and several intermediates, but mwboot1.s and
+# sexit.s beside them are sources, so the assembly cannot be ignored by
+# extension - boot.s and mwio.s are named because they are what ccc
+# leaves behind for boot.c and mwio.c.
+#
+src/micronix/stand/*.o
+src/micronix/stand/boot.s
+src/micronix/stand/mwio.s
+src/micronix/stand/mwboot.com
+src/micronix/stand/mwboot.hex
+src/micronix/stand/mwboot1.abs
+src/micronix/stand/mwboot1.bin
+src/micronix/stand/mwboot1.cim
+src/micronix/stand/bootimg
+src/micronix/stand/formatmw.com
+src/micronix/stand/zout/
