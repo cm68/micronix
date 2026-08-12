@@ -36,14 +36,24 @@ update:
 # drives.  makedate.c is not either - it is a host program that writes
 # build.h, not part of the kernel.
 #
-# It reports and exits 0.  Twenty-two of the forty do not compile
-# today, so making it a gate would only mean it always fails; drop the
+# It reports and exits 0.  Twelve of the forty do not compile today,
+# so making it a gate would only mean it always fails; drop the
 # "; true" at the end when that stops being true.
 #
 CCCTREE  ?= $(HOME)/src/ccc
 CCC      ?= $(CCCTREE)/desthost/bin/ccc
 
+#
+# The linker and the object tools are not on the path and are not in
+# desthost/bin either - bin holds the driver and the things a user
+# runs, and the driver reaches into lib for the passes and for wsld.
+#
+WSLD     ?= $(CCCTREE)/desthost/lib/wsld
+WSSIZE   ?= $(CCCTREE)/desthost/bin/wssize
+WSNM     ?= $(CCCTREE)/desthost/bin/wsnm
+
 CCCDIR    = cccobj
+CCCOUT    = kernel.o
 CCCFLAGS  = -O -c -i../include -I.
 
 CCCSRCS   = $(filter-out makedate.c,$(wildcard *.c))
@@ -78,4 +88,54 @@ ccc-try: build.h
 	echo "(the ones that failed left $(CCCDIR)/<name>.log)"; \
 	true
 
-.PHONY: all clean clobber update ccc-try
+#
+# ---- linking what compiled -----------------------------------------
+#
+# A partial link - "-r", relocatable out - because the survey does not
+# compile the whole kernel yet, and a final link would fail on the
+# symbols the missing files define, which says nothing about whether
+# the objects agree with each other.  What is left undefined is those
+# files' routines and the compiler's own frame helpers, which live in
+# libccc.a and are not offered here.
+#
+# The bss numbers are the interesting part.  A header of this vintage
+# writes "struct user u;" and every file including it gets its own u,
+# and wsld folds those together and takes the duplicated bytes back.
+# But where one file also initializes the object, its copy is in data
+# and the rest are in bss, and those are NOT one object to be merged -
+# the initialized one is the definition and the others are a mistake
+# the header should have written extern.  wsld refuses that pair, and
+# refusing it is what found the eight in this kernel.
+#
+# With those declared extern the duplicates never reach the linker at
+# all: the compiler stops emitting them.  So "reclaimed 0" is the
+# right answer here and not a sign the merge is broken - there is
+# nothing left for it to merge but the .ebss sentinel.
+#
+# wssize prints text, data, bss, total, total-in-hex, name; bss is the
+# third, on the second line under the header.
+#
+ccc-link:
+	@test -d $(CCCDIR) || { echo "no $(CCCDIR) - run 'make ccc-try' first"; exit 1; }
+	@rm -f $(CCCDIR)/$(CCCOUT)
+	@objs=`ls $(CCCDIR)/*.o 2>/dev/null | grep -v '$(CCCOUT)$$'`; \
+	test -n "$$objs" || { echo "no objects in $(CCCDIR)"; exit 1; }; \
+	n=`echo $$objs | wc -w`; \
+	in=0; \
+	for o in $$objs; do \
+		b=`$(WSSIZE) $$o | awk 'NR==2{print $$3}'`; \
+		in=`expr $$in + $$b`; \
+	done; \
+	echo "linking $$n objects, $$in bytes of bss between them"; \
+	echo "-------------------------------------------------------"; \
+	if $(WSLD) -r -o $(CCCDIR)/$(CCCOUT) $$objs; then \
+		out=`$(WSSIZE) $(CCCDIR)/$(CCCOUT) | awk 'NR==2{print $$3}'`; \
+		echo "-------------------------------------------------------"; \
+		echo "linked bss $$out, was $$in, reclaimed `expr $$in - $$out`"; \
+		echo "u is at `$(WSNM) $(CCCDIR)/$(CCCOUT) | awk '$$5==\"_u\"{print $$1, $$2}'`"; \
+	else \
+		echo "-------------------------------------------------------"; \
+		echo "wsld failed"; exit 1; \
+	fi
+
+.PHONY: all clean clobber update ccc-try ccc-link
