@@ -27,6 +27,19 @@
 # make is the make micronix uses - it was cmd/Make until the v7 one
 # gave up the name, and that one is cmd/v7make now.  make.d is a third
 # make and is also not built.
+#
+# The compiler is moving into this tree, one directory per pass and
+# per tool:
+#
+#	cpp c0 c1 peep		the passes
+#	asz wsld wslib wsnm wssize ccc astpp	the tools
+#
+# Those are prototypes.  Their sources are symlinks into ~/src/ccc,
+# which is still where they are edited, and they are not in DIRS: they
+# are host programs today, and building them here means building the
+# compiler for the Z80, which is where this is going but is not there
+# yet.  asz among them replaces the TRASM-derived assembler, which is
+# cmd/asz.old.
 # That was true before this file was rewritten and is left alone; add
 # them when they have been made to compile with ccc.
 #

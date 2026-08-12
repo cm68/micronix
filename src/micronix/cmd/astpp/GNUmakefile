@@ -1,7 +1,7 @@
 #
-# cross build for asz - the assembler.  Replaces the TRASM-derived one, now cmd/asz.old.
+# cross build for astpp - prints an AST file in readable form.  A debugging aid.
 #
-# cmd/asz/GNUmakefile
+# cmd/astpp/GNUmakefile
 #
 # PROTOTYPE.  The compiler is moving into this tree, and this is the
 # shape it will have when it arrives: one directory per pass and per
@@ -17,7 +17,7 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 DEPTH	= ../..
-DIR	= asz
+DIR	= astpp
 CLASS	= cmd
 
 include $(DEPTH)/GNUmakefile.inc

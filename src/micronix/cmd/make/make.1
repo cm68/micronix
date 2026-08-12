@@ -1,0 +1,160 @@
+.he "make (1)                     8/12/26                     make (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+make
+- maintain program groups
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+make [ -f makefile ] [ -n ] [ -v ] [ target ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Make executes commands to bring a target up to date with the files it
+depends on.  A target is remade if any file it depends on has been
+modified more recently than the target, or if the target does not
+exist at all.
+.sp
+With no target named on the command line, make brings the first target
+in the makefile up to date.
+.sp
+A makefile is a sequence of entries.  The first line of an entry names
+one or more targets, a colon, and the files those targets depend on.
+The lines after it that begin with a tab are the commands that bring
+the target up to date.  A name may appear to the left of a colon on
+more than one line, and its dependencies accumulate, but only one set
+of commands may be given for it.
+.sp
+A line whose first character is a sharp is a comment.  A line ending
+in a backslash is continued on the next.  A command whose first
+character is an at sign is executed without being echoed.
+.sp 2
+.in -5
+.bd
+MACROS
+.in +5
+.br
+A line of the form
+.sp
+.nf
+     name = text
+.fi
+.sp
+defines a macro.  Afterwards $(name) is replaced by text.  A macro
+whose name is one character may be written $x without the parentheses.
+Macros may be defined in terms of other macros; expansion repeats
+until nothing is left to expand.
+.sp
+Four macros are set by make itself as each command is prepared:
+.sp
+.nf
+     $@   the full name of the target being made
+     $*   the target name up to its first period
+     $?   the dependencies newer than the target
+     $$   a dollar sign - but see BUGS
+.fi
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.nf
+     -f   read the named file instead of the default
+     -n   print the commands but do not execute them
+     -v   report what was read and what was decided
+.fi
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+A program built from two objects, each compiled from a source file and
+a common header:
+.sp
+.nf
+     pgm : a.o b.o
+          ccc a.o b.o -o pgm
+     a.o : incl a.c
+          ccc -c a.c
+     b.o : incl b.c
+          ccc -c b.c
+.fi
+.sp
+The same thing written with a macro, and with the two objects sharing
+one entry.  $* is the target name without its suffix, so the one
+command line serves both:
+.sp
+.nf
+     OBJECTS = a.o b.o
+     pgm : $(OBJECTS)
+          ccc $(OBJECTS) -o pgm
+     $(OBJECTS) : incl
+          ccc -c $*.c
+.fi
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+.nf
+     makefile     read first
+     Makefile     read if there is no makefile
+.fi
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ccc (1), sh (1)
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This make descends from the CP/M make written by Morris Code Works
+around 1985, and replaces the make micronix shipped with, which was
+more limited still.  The order in which the two default makefiles are
+tried is the reverse of the old one: makefile is read first here.
+.sp
+There are no built-in rules and no suffix rules.  Every target that is
+to be made must be named, and the command that makes it must be given.
+.sp
+There is no filename expansion anywhere.  A star or a question mark in
+a dependency list is an ordinary character, and a list of source files
+has to be written out in full - which is what the OBJECTS macro in the
+example above is for.
+.sp 2
+.in -5
+.bd
+BUGS
+.in +5
+.br
+$$ expands to two dollar signs rather than one.  Nothing later in the
+pipeline reduces it, so a command needing a literal dollar - a shell
+variable, say - cannot get one through a makefile.
+.sp
+A target named on the command line is folded to lower case before it
+is looked up, so "make Foo" makes foo.  Targets inside the makefile
+are not folded, and a mixed-case target can therefore be made by
+default but not by name.
+.sp
+The -v option is spelled -d in make.txt beside the source.  The
+program implements -v; the document is wrong.

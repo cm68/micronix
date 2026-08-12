@@ -1,7 +1,7 @@
 #
-# cross build for asz - the assembler.  Replaces the TRASM-derived one, now cmd/asz.old.
+# cross build for wslib - the archiver.  Not installed by ccc's install rule yet.
 #
-# cmd/asz/GNUmakefile
+# cmd/wslib/GNUmakefile
 #
 # PROTOTYPE.  The compiler is moving into this tree, and this is the
 # shape it will have when it arrives: one directory per pass and per
@@ -17,7 +17,7 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 DEPTH	= ../..
-DIR	= asz
+DIR	= wslib
 CLASS	= cmd
 
 include $(DEPTH)/GNUmakefile.inc

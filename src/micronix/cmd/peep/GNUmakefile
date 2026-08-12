@@ -1,11 +1,11 @@
 #
-# cross build for asz - the assembler.  Replaces the TRASM-derived one, now cmd/asz.old.
+# cross build for peep - the peephole optimiser, run over c1's output for -O.
 #
-# cmd/asz/GNUmakefile
+# cmd/peep/GNUmakefile
 #
 # PROTOTYPE.  The compiler is moving into this tree, and this is the
 # shape it will have when it arrives: one directory per pass and per
-# tool.  The sources here are symlinks into ~/src/ccc/src/tools, which is
+# tool.  The sources here are symlinks into ~/src/ccc/src/peep, which is
 # still where they are edited, so nothing is duplicated while both
 # trees exist.
 #
@@ -17,7 +17,7 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 DEPTH	= ../..
-DIR	= asz
+DIR	= peep
 CLASS	= cmd
 
 include $(DEPTH)/GNUmakefile.inc

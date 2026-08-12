@@ -1,11 +1,11 @@
 #
-# cross build for asz - the assembler.  Replaces the TRASM-derived one, now cmd/asz.old.
+# cross build for c0 - the parser: C in, an AST and a data file out.
 #
-# cmd/asz/GNUmakefile
+# cmd/c0/GNUmakefile
 #
 # PROTOTYPE.  The compiler is moving into this tree, and this is the
 # shape it will have when it arrives: one directory per pass and per
-# tool.  The sources here are symlinks into ~/src/ccc/src/tools, which is
+# tool.  The sources here are symlinks into ~/src/ccc/src/pass1, which is
 # still where they are edited, so nothing is duplicated while both
 # trees exist.
 #
@@ -17,7 +17,7 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 DEPTH	= ../..
-DIR	= asz
+DIR	= c0
 CLASS	= cmd
 
 include $(DEPTH)/GNUmakefile.inc
