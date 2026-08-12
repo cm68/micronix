@@ -159,29 +159,25 @@ add_to(s)
 {
     struct work *w;             /* ptr to this 'do' record */
     extern struct work *dolist; /* list of names to 'make' */
-    char *lc();                 /* convert to lowercase */
 
     /*
-     * get a pointer to newly allocated structure 
+     * get a pointer to newly allocated structure
      */
     if (!(w = (struct work *) calloc(1, sizeof(struct work))))
         OutOfMem();
 
-    w->name = lc(s);
+    /*
+     * The name is taken as it was typed.  This used to be folded to
+     * lower case on the way in, which meant a target could be made by
+     * default but not by name: nothing folds the targets read out of
+     * the makefile, so "make Foo" went looking for foo and did not
+     * find it.  The fold was in place, on argv, so the name the user
+     * typed was destroyed as well.
+     */
+    w->name = s;
 
     w->next = dolist;
-    dolist = w; 
-}
-
-char *
-lc(s)                           /* convert string to lower case */
-    char *s;
-{
-    char *str;
-
-    for (str = s; *str = tolower(*str); ++str);
-
-    return (s);
+    dolist = w;
 }
 
 /*
