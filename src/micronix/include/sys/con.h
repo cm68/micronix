@@ -46,12 +46,12 @@ struct ciovec {
 /*
  * Globals initialized in con.c
  */
-UINT nbdev;                     /* number of block devices */
-UINT ncdev;                     /* number of character devices */
-UINT rootdev;                   /* device number of root device */
-UINT swapdev;                   /* device number of swap device */
-UINT swapsize;                  /* number of swap blocks */
-UINT swapaddr;                  /* number of first swap block */
+extern UINT nbdev;              /* number of block devices */
+extern UINT ncdev;              /* number of character devices */
+extern UINT rootdev;            /* device number of root device */
+extern UINT swapdev;            /* device number of swap device */
+extern UINT swapsize;           /* number of swap blocks */
+extern UINT swapaddr;           /* number of first swap block */
 
 /*
  * Note: if swapdev == rootdev, then swapaddr is set to rootdev's fsize

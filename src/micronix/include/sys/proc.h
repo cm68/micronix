@@ -109,7 +109,16 @@ struct user {
     UINT stime;                 /* process system time */
     UINT32 cutime;              /* child user times */
     UINT32 cstime;              /* child system times */
-} u;
+};
+
+/*
+ * user.c initializes it, so this is a declaration and not another
+ * definition: a header that says "} u;" gives every file that
+ * includes it its own u in bss, and the one file with the
+ * initializer puts its copy in data.  Those do not merge and must
+ * not - the initialized one is the object.
+ */
+extern struct user u;
 
 #define u_uid   real.bytes.low
 #define u_gid   real.bytes.low

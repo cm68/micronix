@@ -12,10 +12,10 @@
 /*
  * Firmware constants, defined in uhdr.s
  */
-UINT8 status, cmask, ctask, mask, oldstack, rst1[];
-UINT trapvec, trapstack;
+extern UINT8 status, cmask, ctask, mask, oldstack, rst1[];
+extern UINT trapvec, trapstack;
 
-UINT8 resched;                  /* sleep.c */
+extern char resched;            /* sleep.c defines and initializes it */
 
 /*
  * Permission masks.
