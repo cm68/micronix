@@ -9,6 +9,29 @@
 #include <sys/con.h>
 
 /*
+ * The driver entry points the switches below are built out of.
+ *
+ * Nothing declared them.  They are defined in the driver that owns
+ * them, all with the implicit int of the day, and taking the address
+ * of a name this file has never heard of was something the compiler
+ * of the day let pass.  It is not C: &name needs a name, and the
+ * error a stricter compiler gives for it - "bad op", "need lvalue",
+ * pointing at the table rather than at the missing declaration - says
+ * nothing about what is actually wrong.
+ *
+ * Written the way they are defined, which is to say returning int.
+ * The switch fields are int (*)() to match.
+ */
+extern int nodev(), nulldev(), nullwrite();     /* cio.c */
+extern int djopen(), djclose(), djstrat();      /* dj.c */
+extern int djmopen(), djmclose(), djmread();
+extern int djmwrite(), djstty();
+extern int mwopen(), mwclose(), mwstrat();      /* mw.c */
+extern int muopen(), muclose(), muread();       /* multio.c */
+extern int muwrite(), mustty();
+extern int kread(), kwrite(), ioread(), iowrite();  /* memdev.c */
+
+/*
  * The block io switch is an array of
  * block io vectors. See con.h.
  * Device 0 must be nodev.
