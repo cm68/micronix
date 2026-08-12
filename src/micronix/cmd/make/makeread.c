@@ -522,6 +522,31 @@ expand(str, name, mod)
             }
         }
     } while (expanded);
+
+    /*
+     * Now reduce $$ to $.
+     *
+     * The loop above copies $$ through as $$ on purpose.  It runs
+     * again whenever a pass expanded something, and a single $ left in
+     * the buffer would be read as the start of a macro reference by
+     * that next pass - $$(CC) would come out as whatever CC is, and
+     * $$x as the one-character macro x.  The doubling is what carries
+     * a literal dollar past the re-scan intact.
+     *
+     * There are no more passes after this, so this is where it comes
+     * back down to one.  Documented as $$ giving a single $ since 1985
+     * and it never did: nothing reduced it, and a recipe could not get
+     * a dollar through to the shell.
+     */
+    for (src = dest = exbuf; *src; ) {
+        if (src[0] == '$' && src[1] == '$') {
+            *dest++ = '$';
+            src += 2;
+        } else {
+            *dest++ = *src++;
+        }
+    }
+    *dest = '\0';
 }
 
 /*

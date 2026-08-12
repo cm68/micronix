@@ -64,7 +64,7 @@ Four macros are set by make itself as each command is prepared:
      $@   the full name of the target being made
      $*   the target name up to its first period
      $?   the dependencies newer than the target
-     $$   a dollar sign - but see BUGS
+     $$   a dollar sign
 .fi
 .sp 2
 .in -5
@@ -147,10 +147,6 @@ example above is for.
 BUGS
 .in +5
 .br
-$$ expands to two dollar signs rather than one.  Nothing later in the
-pipeline reduces it, so a command needing a literal dollar - a shell
-variable, say - cannot get one through a makefile.
-.sp
 A target named on the command line is folded to lower case before it
 is looked up, so "make Foo" makes foo.  Targets inside the makefile
 are not folded, and a mixed-case target can therefore be made by
