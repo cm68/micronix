@@ -12,6 +12,8 @@
 CC	= ccc
 CFLAGS	=
 BIN	= /bin
+MAN	= vi.1
+MANDIR	= /usr/man/man1
 PROG	= vi
 HDRS	= stevie.h
 LIBS	= -lutil
@@ -32,6 +34,7 @@ $(OBJS): $*.c $(HDRS)
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/vi
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS)

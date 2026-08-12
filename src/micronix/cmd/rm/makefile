@@ -12,6 +12,8 @@
 CC	= ccc
 CFLAGS	=
 BIN	= /bin
+MAN	= rm.1
+MANDIR	= /usr/man/man1
 PROG	= rm
 OBJS	= rm.o
 
@@ -29,6 +31,7 @@ $(OBJS): $*.c
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/rm
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS)

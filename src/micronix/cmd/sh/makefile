@@ -12,6 +12,8 @@
 CC	= ccc
 CFLAGS	=
 BIN	= /bin
+MAN	= sh.1
+MANDIR	= /usr/man/man1
 PROG	= sh
 HDRS	= sh.h
 OBJS	= sh.o parse.o
@@ -30,6 +32,7 @@ $(OBJS): $*.c $(HDRS)
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/nsh
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS)

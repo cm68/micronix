@@ -12,6 +12,8 @@
 CC	= ccc
 CFLAGS	=
 BIN	= /bin
+MAN	= form.1
+MANDIR	= /usr/man/man1
 PROG	= form
 OBJS	= form.o
 
@@ -29,6 +31,7 @@ $(OBJS): $*.c
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/form
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS)

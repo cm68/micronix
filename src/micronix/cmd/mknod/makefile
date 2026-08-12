@@ -12,6 +12,8 @@
 CC	= ccc
 CFLAGS	=
 BIN	= /bin
+MAN	= mknod.1
+MANDIR	= /usr/man/man1
 PROG	= mknod
 OBJS	= mknod.o
 
@@ -29,6 +31,7 @@ $(OBJS): $*.c
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/mknod
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS)

@@ -12,6 +12,8 @@
 CC	= ccc
 CFLAGS	=
 BIN	= /bin
+MAN	= make.1
+MANDIR	= /usr/man/man1
 PROG	= make
 HDRS	= make.h
 OBJS	= make.o makeinit.o makeread.o maketime.o
@@ -30,6 +32,7 @@ $(OBJS): $*.c $(HDRS)
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/make
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS)

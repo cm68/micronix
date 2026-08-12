@@ -120,7 +120,12 @@ CSRCS	?= $(wildcard *.c)
 HSRCS	?= $(wildcard *.h)
 ASSRCS	?= $(wildcard *.s)
 DOCSRCS	?= $(wildcard *.mp *.ic)
-SRCS	?= $(CSRCS) $(HSRCS) $(ASSRCS)
+#
+# A man page ships with the source it documents, so that the makefile
+# beside it has something to install when the native build runs.
+#
+MANSRCS	?= $(wildcard *.1)
+SRCS	?= $(CSRCS) $(HSRCS) $(ASSRCS) $(MANSRCS)
 
 MKFILE	 = $(wildcard ?akefile)
 DOCFILES = $(DOCSRCS:.mp=.0) $(DOCSRCS:.ic=.3)
