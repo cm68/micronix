@@ -14,10 +14,10 @@
 
 extern int errno;
 
-int pflag = 0;
-int nflag = 0;
-int vflag = 0;
-char *pname = 0;
+int pflag;
+int nflag;
+int vflag;
+char *pname;
 
 usage()
 {

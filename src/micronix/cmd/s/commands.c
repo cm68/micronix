@@ -45,7 +45,7 @@
 
 #include <stdio.h>
 
-char cur_file[MAXTEXT] = 0;     /* remembers name of the current file */
+char cur_file[MAXTEXT];     /* remembers name of the current file */
 
 int
 simp_cmd(n, c)

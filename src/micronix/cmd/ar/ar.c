@@ -524,7 +524,15 @@ movefil(f)
 	for(i=0; i<14; i++)
 		if(arbuf.ar_name[i] = *cp)
 			cp++;
-	arbuf.ar_size = stbuf.st_size;
+	/*
+	 * micronix keeps a file size in three bytes, not four: a high
+	 * byte and a low word, and there is no st_size to read.  The
+	 * cast is load bearing - int is sixteen bits here, so shifting
+	 * the high byte up without widening it first would shift it
+	 * away entirely and every archive member would be recorded at
+	 * its size modulo 64K.
+	 */
+	arbuf.ar_size = ((long)stbuf.st_size0 << 16) + stbuf.st_size1;
 	arbuf.ar_date = stbuf.st_mtime;
 	arbuf.ar_uid = stbuf.st_uid;
 	arbuf.ar_gid = stbuf.st_gid;

@@ -197,7 +197,7 @@ struct pattern *patp;
 int *intp1, *intp2;
 
 if(gtcalled == 0)  getcat();
-thisdbl=0;
+thisdbl;
 
 if(mkchain == 0)
 	for(patp=firstpat ; patp!=0 ; patp = patp->nxtpattern)
@@ -208,7 +208,7 @@ patp->nxtpattern = firstpat;
 firstpat = patp;
 patp->patval = copys(pat);
 
-endir = 0;
+endir;
 
 for(p=pat; *p!='\0'; ++p)
 	if(*p=='/') endir = p;

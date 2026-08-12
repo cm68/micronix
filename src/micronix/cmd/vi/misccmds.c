@@ -103,7 +103,7 @@ gotoline(n)
 }
 
 char *Savedline = NULL;
-int Savednum = 0;
+int Savednum;
 
 /*
  * yankline

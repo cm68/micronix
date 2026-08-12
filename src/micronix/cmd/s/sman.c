@@ -70,13 +70,13 @@ extern scr_dlr();
 #define USEFUL		8       /* repaint screen if fewer rows can be reused 
                                  */
 
-int first_line = 0;             /* line number of first screen row */
-int keyboard = 0;               /* is command coming from keyboard? */
-int last_row = 0;               /* last row displaying buffer contents */
+int first_line;             /* line number of first screen row */
+int keyboard;               /* is command coming from keyboard? */
+int last_row;               /* last row displaying buffer contents */
 
-int *id = 0;
-char *msg_save = 0;
-char **text = 0;                /* text of line at row i (subscript 0 unused) 
+int *id;
+char *msg_save;
+char **text;                /* text of line at row i (subscript 0 unused) 
                                  */
 
 /*

@@ -206,7 +206,7 @@ char *path, pth[MAXPATHLEN], *strcpy();
 struct direct *dptr;
 
 
-thisdbl = 0;
+thisdbl;
 
 if(mkchain == NO)
 	for(patp=firstpat ; patp ; patp = patp->nxtpattern)
@@ -217,7 +217,7 @@ patp->nxtpattern = firstpat;
 firstpat = patp;
 patp->patval = copys(pat);
 
-endir = 0;
+endir;
 
 for(p=pat; *p!='\0'; ++p)
 	if(*p=='/') endir = p;
@@ -378,7 +378,7 @@ char *s, *p;
 
 #ifdef METERFILE
 #include <pwd.h>
-int meteron	= 0;	/* default: metering off */
+int meteron;	/* default: metering off */
 
 meter(file)
 char *file;

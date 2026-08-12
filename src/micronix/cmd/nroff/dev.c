@@ -59,8 +59,8 @@ struct escseq
 };
 
 
-static struct escseq	altmap[256] = 0;		/* for altset */
-static struct escseq	normmap[256] = 0;		/* for normal set */
+static struct escseq	altmap[256];		/* for altset */
+static struct escseq	normmap[256];		/* for normal set */
 
 char		       *kwdlist[] =
 {

@@ -448,8 +448,8 @@ int			ignoring;		/* .ig vs .de */
 int			hold_screen;
 int			debugging;
 int			stepping;		/* paging */
-int			ansi_escapes = 0;	/* for ANSI-style font esc */
-int			mc_ing = 0;		/* turned off */
+int			ansi_escapes;	/* for ANSI-style font esc */
+int			mc_ing;		/* turned off */
 int			mc_space = 2;
 char			mc_char = '|';
 char			tmpdir[256];

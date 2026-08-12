@@ -2,7 +2,7 @@
 #include "defs"
 
 FSTATIC struct nameblock *hashtab[HASHSIZE];
-FSTATIC int nhashed	= 0;
+FSTATIC int nhashed;
 
 
 /* simple linear hash.  hash function is sum of
@@ -15,7 +15,7 @@ register int i;
 register int hashval;
 register char *t;
 
-hashval = 0;
+hashval;
 
 for(t=s; *t!='\0' ; ++t)
 	hashval += *t;
@@ -52,10 +52,10 @@ if(nhashed++ > HASHSIZE-3)
 p = ALLOC(nameblock);
 p->nxtnameblock = firstname;
 p->namep = copys(s);
-p->linep = 0;
-p->done = 0;
-p->septype = 0;
-p->modtime = 0;
+p->linep;
+p->done;
+p->septype;
+p->modtime;
 
 firstname = p;
 if(mainname == NULL)
@@ -151,7 +151,7 @@ fatal("out of memory");
 char *subst(a,b)
 register char *a,*b;
 {
-static depth	= 0;
+static depth;
 register char *s;
 char vname[BUFSIZ];
 struct varblock *varptr(), *vbp;
@@ -245,7 +245,7 @@ vp = ALLOC(varblock);
 vp->nxtvarblock = firstvar;
 firstvar = vp;
 vp->varname = copys(v);
-vp->varval = 0;
+vp->varval;
 return(vp);
 }
 

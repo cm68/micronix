@@ -156,7 +156,7 @@ struct cmd
     UCOUNT link;                /* Link address */
     UTINY xlink;                /* Extended link address */
 };
-struct cmd cmd = 0, tcmd = 0;
+struct cmd cmd, tcmd;
 int curtrk = -1;
 
 int pattern[] = {
@@ -187,11 +187,11 @@ char gap3[] = {
 
 struct bad {
     unsigned int track, head, sector, type;
-} bad[128] = 0;
+} bad[128];
 
 #define	SOFT	1
 #define	HARD	2
-int curbad = 0;
+int curbad;
 
 #define	BADTRK	0               /* Track, head and sector of bad sector */
 #define	BADHED	2               /* map.  */
@@ -202,8 +202,8 @@ int curbad = 0;
 #define	ALTSEC	1               /* Starting sector of alternate sectors */
 
 #define	IMSIZE	512             /* Image map size */
-char image[IMSIZE] = 0;         /* Image for sector headers */
-char buffer[2048] = 0;          /* Sector buffer */
+char image[IMSIZE];         /* Image for sector headers */
+char buffer[2048];          /* Sector buffer */
 struct drives *info = &dtab[0];
 int drive = DDRIVE,             /* Drive number */
     size = DSIZE,               /* Sector size */

@@ -7,7 +7,7 @@
 
 #define MAX_NAME 50             /* maximum length of program or file name */
 
-char prog_name[MAX_NAME + 1] = 0;       /* used in error messages */
+char prog_name[MAX_NAME + 1];       /* used in error messages */
 
 /*
  * savename - record a program name for error messages 

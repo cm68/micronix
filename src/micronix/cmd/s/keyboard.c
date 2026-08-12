@@ -55,16 +55,16 @@ struct sgttyb oldt;
 #include <stdio.h>
 #include <types.h>
 #include </sys/sgtty.h>
-struct sgtty oldt = 0;
+struct sgtty oldt;
 #endif
 
 #define CMD_MAX 500             /* longest command that can be redone */
 
-char change[CMD_MAX + 2] = 0;   /* most recent buffer-change command */
-char cmd_last = 0;              /* first letter in the last command */
-char command[CMD_MAX + 2] = 0;  /* accumulates the current command */
+char change[CMD_MAX + 2];   /* most recent buffer-change command */
+char cmd_last;              /* first letter in the last command */
+char command[CMD_MAX + 2];  /* accumulates the current command */
 char *cmd_ptr = command;        /* next location in command */
-char pushed[CMD_MAX] = 0;       /* pushed-back command */
+char pushed[CMD_MAX];       /* pushed-back command */
 char *push_ptr = pushed;        /* next location in pushed */
 
 /*
@@ -179,7 +179,7 @@ k_redo()
 /*
  * keyboard input mode 
  */
-static int k_raw = 0;
+static int k_raw;
 
 /*
  * k_keyin - get a character from the keyboard

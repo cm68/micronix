@@ -34,10 +34,10 @@ struct work *dolist = NULL;
 extern char exbuf[];
 
 char execute = 1;               /* actually build stuff */
-char silent = 0;                /* show commands */
+char silent;                /* show commands */
 
-char knowhow = 0;               /* know how to make file */
-char madesomething = 0;         /* actually made a file */
+char knowhow;               /* know how to make file */
+char madesomething;         /* actually made a file */
 
 #ifndef linux
 char *

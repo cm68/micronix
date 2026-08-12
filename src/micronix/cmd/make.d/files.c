@@ -131,7 +131,7 @@ struct	{
 	}  entry[32];
 
 
-thisdbl=0;
+thisdbl;
 
 if(mkchain == 0)
 	for(patp=firstpat ; patp!=0 ; patp = patp->nextp)
@@ -142,7 +142,7 @@ patp->nextp = firstpat;
 firstpat = patp;
 patp->patval = copys(pat);
 
-endir = 0;
+endir;
 
 for(p=pat; *p!='\0'; ++p)
 	if(*p=='/') endir = p;

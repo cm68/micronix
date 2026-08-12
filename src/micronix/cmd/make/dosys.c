@@ -68,7 +68,7 @@ enbint(SIG_IGN);
 while( (pid = wait(&status)) != waitpid)
 	if(pid == -1)
 		fatal("bad wait code");
-waitpid = 0;
+waitpid;
 enbint(intrupt);
 return(status);
 }

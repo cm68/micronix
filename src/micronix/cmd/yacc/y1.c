@@ -10,8 +10,8 @@ static char sccsid[] = "@(#)y1.c	4.1.1	(2.11BSD)	1995/05/11";
 
 int tbitset;  /* size of lookahead sets */
 struct looksets lkst [ LSETSIZE ];
-int nlset = 0; /* next lookahead set index */
-int nolook = 0; /* flag to suppress lookahead computations */
+int nlset; /* next lookahead set index */
+int nolook; /* flag to suppress lookahead computations */
 struct looksets clset;  /* temporary storage for lookahead computations */
 
 	/* working set computations */
@@ -21,7 +21,7 @@ struct wset *cwp;
 
 	/* state information */
 
-int nstate = 0;		/* number of states */
+int nstate;		/* number of states */
 struct item *pstate[NSTATES+2];	/* pointers to the descriptions of the states */
 int tystate[NSTATES];	/* contains type information about the states */
 int indgo[NSTATES];		/* index to the stored goto table */
@@ -39,7 +39,7 @@ int *memp = amem;	/* next free action table position */
 int temp1[TEMPSIZE]; /* temporary storage, indexed by terms + ntokens or states */
 int lineno= 1; /* current input line number */
 int fatfl = 1;  	/* if on, error is fatal */
-int nerrors = 0;	/* number of errors */
+int nerrors;	/* number of errors */
 
 	/* storage for information about the nonterminals */
 
@@ -153,14 +153,14 @@ char *symnam(i){ /* return a pointer to the name of symbol i */
 	}
 
 struct wset *zzcwp = wsets;
-int zzgoent = 0;
-int zzgobest = 0;
-int zzacent = 0;
-int zzexcp = 0;
-int zzclose = 0;
-int zzsrconf = 0;
+int zzgoent;
+int zzgobest;
+int zzacent;
+int zzexcp;
+int zzclose;
+int zzsrconf;
 int * zzmemsz = mem0;
-int zzrrconf = 0;
+int zzrrconf;
 
 summary(){ /* output the summary on the tty */
 
@@ -263,7 +263,7 @@ cpres(){ /* compute an array with the beginnings of  productions yielding given 
 	if( pmem != &pyield[nprod] ) error( "internal Yacc error: pyield %d", pmem-&pyield[nprod] );
 	}
 
-int indebug = 0;
+int indebug;
 cpfir() {
 	/* compute an array with the first of nonterminals */
 	register *p, **s, i, **t, ch, changes;
@@ -375,7 +375,7 @@ state(c){ /* sorts last state,and sees if it equals earlier ones. returns state 
 	return(nstate++);
 	}
 
-int pidebug = 0; /* debugging flag for putitem */
+int pidebug; /* debugging flag for putitem */
 putitem( ptr, lptr )  int *ptr;  struct looksets *lptr; {
 	register struct item *j;
 
@@ -456,7 +456,7 @@ again:
 
 	}
 
-int gsdebug = 0;
+int gsdebug;
 stagen(){ /* generate the states */
 
 	int i, j;
@@ -526,7 +526,7 @@ stagen(){ /* generate the states */
 	/* no more to do... stop */
 	}
 
-int cldebug = 0; /* debugging flag for closure */
+int cldebug; /* debugging flag for closure */
 closure(i){ /* generate the closure of state i */
 
 	int c, ch, work, k;

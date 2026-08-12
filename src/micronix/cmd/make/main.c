@@ -26,9 +26,9 @@ struct pattern *firstpat	= NULL;
 struct dirhdr *firstod		= NULL;
 
 #include <signal.h>
-int sigivalue	= 0;
-int sigqvalue	= 0;
-int waitpid	= 0;
+int sigivalue;
+int sigqvalue;
+int waitpid;
 
 int dbgflag	= NO;
 int prtrflag	= NO;
@@ -48,7 +48,7 @@ char *prompt	= ">";	/* other systems -- pick what you want */
 #else
 char *prompt	= "";	/* other systems -- pick what you want */
 #endif
-int nopdir	= 0;
+int nopdir;
 char junkname[20];
 char funny[128];
 char	options[26 + 1] = { '-' };
@@ -73,7 +73,7 @@ char *op = options + 1;
 meter(METERFILE);
 #endif
 
-descset = 0;
+descset;
 
 funny['\0'] = (META | TERMINAL);
 for(s = "=|^();&<>*?[]:$`'\"\\\n" ; *s ; ++s)
@@ -88,7 +88,7 @@ for(i=1; i<argc; ++i)
 		argv[i] = 0;
 
 setvar("$","$");
-inarglist = 0;
+inarglist;
 
 for (i=1; i<argc; ++i)
 	if (argv[i]!=0 && argv[i][0]=='-') {
@@ -189,7 +189,7 @@ sigqvalue = (int) signal(SIGQUIT, SIG_IGN) & 01;
 enbint(intrupt);
 #endif
 
-nfargs = 0;
+nfargs;
 
 for(i=1; i<argc; ++i)
 	if((s=argv[i]) != 0)
@@ -280,7 +280,7 @@ extern char *builtin[];
 char **linesptr	= builtin;
 
 FILE * fin;
-int firstrd	= 0;
+int firstrd;
 
 
 rddescf(descfile)
@@ -334,8 +334,8 @@ extern int yylineno;
 extern char *zznextc;
 
 fin = k;
-yylineno = 0;
-zznextc = 0;
+yylineno;
+zznextc;
 
 if( yyparse() )
 	fatal("Description file error");

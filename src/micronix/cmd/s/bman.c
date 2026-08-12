@@ -128,18 +128,18 @@
 #define INSERT		2
 #define REPLACE		3
 
-int b_count = 0,                /* number of lines in the buffer */
-int changed = 0;                /* did last command change the buffer? */
-int cur_line = 0;
-int cur_pos = 0;                /* cursor location */
-int line_prev = 0;
-int pos_prev = 0;               /* origin of previous user change */
-int line_start = 0;
-int pos_start = 0;              /* origin of this user command */
-int mark_id = 0;
-int mark_pos = 0;               /* ID of marked line; position of mark in
+int b_count;                /* number of lines in the buffer */
+int changed;                /* did last command change the buffer? */
+int cur_line;
+int cur_pos;                /* cursor location */
+int line_prev;
+int pos_prev;               /* origin of previous user change */
+int line_start;
+int pos_start;              /* origin of this user command */
+int mark_id;
+int mark_pos;               /* ID of marked line; position of mark in
                                  * line */
-int modified = 0;               /* does buffer differ from external file? */
+int modified;               /* does buffer differ from external file? */
 
 /*
  * definition of a modification record 
@@ -152,8 +152,8 @@ struct mod_rec
     struct mod_rec *next;       /* link to next modification record */
 };
 
-struct mod_rec *curr_recs = 0;  /* mod recs for current user command */
-struct mod_rec *prev_recs = 0;  /* mod recs for previous user change */
+struct mod_rec *curr_recs;  /* mod recs for current user command */
+struct mod_rec *prev_recs;  /* mod recs for previous user change */
 
 /*
  * b_changed - tell if last command changed the buffer

@@ -81,12 +81,12 @@ if(p->done > 0)
 	return(p->done == 3);
 	}
 
-errstat = 0;
-tdep = 0;
-implcom = 0;
-explcom = 0;
+errstat;
+tdep;
+implcom;
+explcom;
 ptime = exists(p); 
-ptime1 = 0;
+ptime1;
 didwork = NO;
 p->done = 1;	/* avoid infinite loops */
 

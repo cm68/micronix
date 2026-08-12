@@ -53,9 +53,9 @@ int eflag CINIT;
 int oflag CINIT;
 int vflag CINIT;
 int nflag CINIT;
-int hflag = 0;
-int iflag = 0;
-char *xopt = 0;
+int hflag;
+int iflag;
+char *xopt;
 
 int err CINIT;
 

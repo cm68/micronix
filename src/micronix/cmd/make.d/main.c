@@ -55,7 +55,7 @@ meter(METERFILE);
 #endif
 
 pexinit();
-descset = 0;
+descset;
 
 inarglist = 1;
 for(i=1; i<argc; ++i)
@@ -63,7 +63,7 @@ for(i=1; i<argc; ++i)
 		argv[i] = 0;
 
 setvar("$","$");
-inarglist = 0;
+inarglist;
 
 for(i=1; i<argc; ++i)
     if(argv[i]!=0 && argv[i][0]=='-')
@@ -143,7 +143,7 @@ sigqvalue = signal(SIGQUIT,1) & 01;
 enbint(intrupt);
 #endif
 
-nfargs = 0;
+nfargs;
 
 for(i=1; i<argc; ++i)
 	if((s=argv[i]) != 0)
@@ -270,8 +270,8 @@ rdd1(k)
 FILE * k;
 {
 fin = k;
-yylineno = 0;
-zznextc = 0;
+yylineno;
+zznextc;
 
 if( yyparse() )
 	fatal("Description file error");

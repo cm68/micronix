@@ -19,7 +19,7 @@
 
 int  login;                 /* argv[0] began with '-'   (0x9004) */
 int  verbose;               /* -v: echo lines as they are run */
-int  status = 0;            /* what exit is given       (0x9008) */
+int  status;            /* what exit is given       (0x9008) */
 int  interactive = 1;       /* the flag tested at the top of the loop */
 
 char *prompt = "# ";        /* 0x1c6a */

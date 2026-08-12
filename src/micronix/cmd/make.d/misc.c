@@ -21,7 +21,7 @@ register int i;
 register int hashval;
 register char *t;
 
-hashval = 0;
+hashval;
 
 for(t=s; *t!='\0' ; ++t)
 	hashval =+ *t;
@@ -58,10 +58,10 @@ if(nhashed++ > HASHSIZE-3)
 p = intalloc(sizeof(*p));
 p->nextp = firstname;
 p->namep = copys(s);
-p->linep = 0;
-p->done = 0;
-p->septype = 0;
-p->modtime = 0;
+p->linep;
+p->done;
+p->septype;
+p->modtime;
 
 firstname = p;
 if(mainname==0 && s[0]!='.') mainname = p;
@@ -256,7 +256,7 @@ vp = intalloc(sizeof(*vp));
 vp->nextp = firstvar;
 firstvar = vp;
 vp->varname = copys(v);
-vp->varval = 0;
+vp->varval;
 return(vp);
 }
 
