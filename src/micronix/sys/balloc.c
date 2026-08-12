@@ -25,7 +25,7 @@ balloc(dev)
     register int bn;
 
     sb = getsb(dev);
-    sup = sb->data;
+    sup = (struct super *)sb->data;
     if (sup->s_flock) {           /* mounted read-only */
         u.error = EROFS;
         return (0);
@@ -68,7 +68,7 @@ bfree(bn, dev)
     if (bn == 0)
         return;
     sb = getsb(dev);
-    sup = sb->data;
+    sup = (struct super *)sb->data;
     if (bcheck(bn, sup, dev) == 0)
         goto done;
     if (sup->s_nfree == 0) {

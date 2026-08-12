@@ -105,7 +105,7 @@ imapb(ind, n, dev, rap)
         return (0);
     if ((bp = bread(ind, dev)) == 0)
         return (0);
-    p = bp->data + n * sizeof(int);
+    p = (int *)(bp->data + n * sizeof(int));
     if (*p == 0 && plug(p, dev))
         bdwrite(bp);
     else

@@ -335,7 +335,7 @@ djopen(dev, mode)
     }
 
     b->dev |= DISCARD;
-    s = b->data;
+    s = (struct status *)b->data;
 
     /*
      * deal with the Write Protect bit

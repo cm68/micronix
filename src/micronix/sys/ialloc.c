@@ -41,7 +41,7 @@ ialloc(dev)
     register struct inode *ip;
 
     sb = getsb(dev);
-    sup = sb->data;
+    sup = (struct super *)sb->data;
 
     for (;;) {
         ip = 0;              /* no I-node yet. */
@@ -126,7 +126,7 @@ ifill(sup, dev)
          * Scan block
          */
 
-        for (n = 16, dp = bp->data; n; n--, dp++, inum++)
+        for (n = 16, dp = (struct dsknod *)bp->data; n; n--, dp++, inum++)
             if ((dp->d_mode & IALLOC) == 0)
                 if (sup->s_ninode < 100)
                     sup->s_inode[sup->s_ninode++] = inum;
@@ -177,7 +177,7 @@ ifree(ip)
     static struct super *sup;
 
     sb = getsb(ip->i_dev);
-    sup = sb->data;
+    sup = (struct super *)sb->data;
 
     if (sup->s_ninode < 100) {    /* Fit in super block free list ? */
         sup->s_inode[sup->s_ninode++] = ip->i_inum;
@@ -250,7 +250,7 @@ indfree(ind, level, dev)
          */
         return;
     }
-    for (p = &bp->data[510]; p >= bp->data; p--)
+    for (p = (int *)&bp->data[510]; p >= (int *)bp->data; p--)
         indfree(*p, level - 1, dev);
     brelse(bp);
     bfree(ind, dev);

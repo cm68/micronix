@@ -397,7 +397,7 @@ bsync()
     register struct super *s;
 
     b = getsb(rootdev);
-    s = b->data;
+    s = (struct super *)b->data;
 
     if (!s->s_flock) {            /* not read-only */
         di();

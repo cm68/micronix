@@ -107,7 +107,7 @@ iio(flag, ip)
         ip->flags &= ~IRONLY;
     if ((bp = bread(i >> 4, ip->i_dev)) == 0)
         return 0;
-    dp = bp->data + ((i & 15) << 5);
+    dp = (struct dsknod *)(bp->data + ((i & 15) << 5));
     if (flag == IREAD) {
         copy(dp, &ip->i_mode, 32);
         brelse(bp);

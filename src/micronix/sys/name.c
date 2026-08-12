@@ -101,8 +101,8 @@ dlook(ip, np)
             continue;
         if ((b = bread(phys, ip->i_dev)) == 0)
             continue;
-        end = b->data + ((tail && log == nblks - 1) ? tail : 512);
-        for (d = b->data; d < end; d++, place++) {
+        end = (struct dir *)(b->data + ((tail && log == nblks - 1) ? tail : 512);
+        for (d = (struct dir *)b->data; d < end; d++, place++) {
             if (d->inum == 0) {
                 if (slot == 0)
                     slot = place;

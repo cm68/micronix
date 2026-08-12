@@ -329,7 +329,7 @@ swapinit()
 
     if (swapdev == rootdev) {
         b = getsb(rootdev);
-        s = b->data;
+        s = (struct super *)b->data;
         swapaddr = s->s_fsize;
         brelse(b);
     }
