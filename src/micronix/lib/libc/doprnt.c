@@ -172,7 +172,15 @@ dostring:
 				width = _fnum((char *)a, prec, width, sign, pputc);
 				a += FLTSIZE/sizeof(*a);
 			} else {
-				width = _pnum((len == sizeof(int)/sizeof *a ? (sign ? (long)*a : (unsigned long)*a) : *(long *)a), prec, width, sign, base, pputc);
+				/*
+				 * (unsigned)*a first: a is int *, so going
+				 * straight to unsigned long sign-extends,
+				 * and every unsigned conversion of a value
+				 * with the top bit set printed eight digits
+				 * with ffff in front.  The linker's load map
+				 * called sexit "FFFF9A41".
+				 */
+				width = _pnum((len == sizeof(int)/sizeof *a ? (sign ? (long)*a : (unsigned long)(unsigned int)*a) : *(long *)a), prec, width, sign, base, pputc);
 				a += len;
 			}
 			while(left-- > width)

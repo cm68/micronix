@@ -44,9 +44,6 @@ IOWRT_BIT       equ     1       ; _IOWRT is 02 - bit 1, not bit 2 (that is _IONB
 IOBINARY_BIT    equ     7
 IOSTRG_BIT      equ     6
 
-NEWLINE equ     0x0a
-RETURN  equ     0x0d
-CPMEOF  equ     0x1a
 
 
 	global	_fputc, __flsbuf
@@ -69,18 +66,16 @@ _fputc:
 
 	bit	IOWRT_BIT,(iy+flag)	;open for write?
 	jr	z,reteof
-	bit	IOBINARY_BIT,(iy+flag)	;binary mode writes it as it is
-	jr	nz,put
-	ld	a,c			;text mode: a \r goes out ahead
-	cp	NEWLINE			;of every \n
-	jr	nz,put
-	push	iy			;the file argument
-	ld	hl,RETURN
-	push	hl			;the character argument
-	call	_fputc			;preserves BC, so c survives this
-	pop	hl			;the arguments off again
-	pop	hl
-
+;
+; This is a Unix stdio, so \n is a byte and goes out on its own.  The
+; \r that used to be written ahead of it - and the ctrl-Z that fclose
+; put on the end - are CP/M's, and a file written here is read back
+; here: putting them in meant every byte count was wrong by the
+; number of lines, and reading such a file needed "b" to get the \r
+; back out again.
+;
+; _IOBINARY is still recorded by fopen; nothing here asks about it.
+;
 put:
 	ld	l,(iy+cnt)
 	ld	h,(iy+cnt+1)

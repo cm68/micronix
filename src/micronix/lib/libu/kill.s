@@ -28,7 +28,13 @@ _kill:
 	pop 	hl		; sig
 	ld 	(sig),hl
 
-	ld	hl,-4		; restore stack
+;
+; Six, not four: three pops moved sp up by that much.  The same
+; off-by-one-word link.s had, found with it - nothing in the tree
+; calls kill yet, so it had never had the chance to return to a
+; process id the way link returned to a filename.
+;
+	ld	hl,-6		; restore stack
 	add	hl,sp
 	ld	sp,hl
 	

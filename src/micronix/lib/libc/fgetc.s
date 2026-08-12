@@ -58,12 +58,11 @@ flag	equ	6
 file	equ	7
 
 IOREAD_BIT	equ	0	; _IOREAD is 01 - bit 0, not bit 1 (that is _IOWRT)
+IOWRT_BIT	equ	1	; _IOWRT is 02
 IOEOF_BIT	equ	4
 IOBINARY_BIT	equ	7
 IOSTRG_BIT	equ	6
 
-RETURN	equ	0x0d
-CPMEOF	equ	0x1a
 
 	global	_fgetc, __filbuf
 	psect	text
@@ -80,8 +79,25 @@ _fgetc:
 	pop	iy			;iy = f
 
 	ld	a,(iy+flag)		;get flag bits
+;
+; A read-write stream comes back from fseek with neither direction
+; bit set, because the seek is what makes the next operation free to
+; be either one.  Refusing that here was wrong twice: it returned EOF
+; without reading, and it set _IOEOF on the way out, so the stream
+; stayed dead for every call after.
+;
+; v7 leaves the decision to _filbuf, and so do we now: only a stream
+; that is positively write-only has nothing to read.  Neither bit set
+; falls through, _filbuf takes _IOREAD for it, and the read happens.
+;
+; asz is what found it - it seeks back over the temp file it just
+; assembled into and copies it into the object, and copied nothing.
+;
 	bit	IOREAD_BIT,a
-	jr	z,reteof		;return EOF if not open for read
+	jr	nz,isread		;open for reading, carry on
+	bit	IOWRT_BIT,a		;write-only has nothing to read
+	jr	nz,reteof
+isread:
 	bit	IOEOF_BIT,a		;already seen EOF?
 	jr	nz,reteof		;yes, repeat ourselves
 
@@ -101,32 +117,24 @@ loop:
 	ld	(iy+ptr),l		;update pointer
 	ld	(iy+ptr+1),h
 
+;
+; This is a Unix stdio.  A byte is a byte: there is no text mode, \r
+; is data, and ctrl-Z is the character 0x1a and not the end of
+; anything.  All of that came in from CP/M, where the directory only
+; records a file's length in 128 byte records and the last one has to
+; be terminated in its content - and it meant a read of any file
+; holding a 0x1a stopped early unless the caller remembered "b".
+;
+; _IOBINARY is left alone: fopen still records it, and nothing here
+; needs to ask.
+;
 got:
-	bit	IOBINARY_BIT,(iy+flag)	;binary mode returns everything
-	jr	nz,retch
-	cp	RETURN			;text mode: \r vanishes
-	jr	z,loop			;get another instead
-	cp	CPMEOF			;and ctrl-Z is the end
-	jr	nz,retch		;anything else goes back as is
-
-	ld	a,(iy+base)		;buffered?
-	or	(iy+base+1)
-	jr	z,reteof		;no: nothing to put the ctrl-Z into
-	ld	l,(iy+cnt)
-	ld	h,(iy+cnt+1)
-	inc	hl			;reset count
-	ld	(iy+cnt),l
-	ld	(iy+cnt+1),h
-	ld	l,(iy+ptr)
-	ld	h,(iy+ptr+1)
-	dec	hl			;reset pointer
-	ld	(iy+ptr),l
-	ld	(iy+ptr+1),h
+	jr	retch			;the byte, whatever it is
 
 reteof:
 	set	IOEOF_BIT,(iy+flag)	;note EOF
-	ld	hl,-1			;EOF, which is -1 - not the ctrl-Z
-	jr	done			;that marks it in a CP/M text file
+	ld	hl,-1			;EOF is -1, and it is the only EOF
+	jr	done
 
 retch:
 	ld	l,a			;the character, high byte clear

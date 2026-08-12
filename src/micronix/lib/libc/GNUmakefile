@@ -39,7 +39,7 @@ ASSRCS = \
 	qcmp.s qshl.s qsar.s qshr.s qinc.s qldst.s \
 	qmul.s qdiv.s op16.s tramp.s rcsv.s rindex.s \
 	sbrk.s shar.s shl16.s shll.s shlr.s strcat.s \
-	strchr.s strcmp.s strcpy.s swdisp.s oarg.s strlen.s \
+	strchr.s strcmp.s strcpy.s swdisp.s swdispw.s oarg.s strlen.s \
 	strncat.s strncmp.s strncpy.s strrchr.s tolower.s toupper.s \
 	xtoi.s fputc.s fgetc.s
 

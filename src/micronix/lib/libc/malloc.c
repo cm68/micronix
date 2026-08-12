@@ -48,8 +48,14 @@ static struct store *	alloct;		/*arena top*/
 static struct store	allocx;		/* for realloc */
 char *			sbrk();
 
+/*
+ * __malloc is the allocator: it returns 0 when it cannot find the
+ * space.  Almost nothing wants that - see malloc below - but the
+ * entry point is here for anything that genuinely can carry on
+ * without the memory it asked for.
+ */
 char *
-malloc(nw)
+__malloc(nw)
 unsigned nw;
 {
 	register struct store *p, *q;
@@ -117,6 +123,46 @@ found:
 	p->ptr = allocp;
 	sbusy(*p);
 	return((char *)(p+1));
+}
+
+#include <errno.h>
+
+extern int	write(int, void *, int);
+extern void	exit(int);
+
+/*
+ * malloc does not come back empty.
+ *
+ * Nothing on a machine this size can do anything useful with a failed
+ * allocation, and the evidence is that nobody even tried: cpp had
+ * thirteen call sites and checked none of them, wsld had thirteen and
+ * checked none of them.  What that costs is not a null pointer
+ * dereference and a core file - there is no core file here.  The first
+ * write through the null lands in page zero, on top of the rst 08
+ * syscall trap.  The next write() then does not trap; execution runs
+ * forward through the zeroed page to 0x0100, which is the entry point,
+ * and the program starts again.  It runs out of memory again, each
+ * pass eating another frame, until the stack has walked down through
+ * the heap.  The symptom is a program that has consumed the machine at
+ * a call depth of four, with no diagnostic anywhere near the cause.
+ *
+ * So the check belongs here, once, rather than in every program that
+ * remembers.  permalloc has always done this; now malloc agrees with
+ * it.  Anything that really can recover calls __malloc and looks at
+ * what it gets.
+ */
+char *
+malloc(nw)
+unsigned nw;
+{
+	char *p;
+
+	p = __malloc(nw);
+	if (p == NULL) {
+		write(2, "out of memory\n", 14);
+		exit(ENOMEM);
+	}
+	return p;
 }
 
 /*	freeing strategy tuned for LIFO allocation
