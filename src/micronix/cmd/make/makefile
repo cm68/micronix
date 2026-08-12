@@ -1,27 +1,38 @@
 #
-# Makefile for replacement make
-# this file is preferred by this make, because it is named as lower case
-# 'makefile'
+# makefile for make
 #
-# cmd/Make/makefile
+# micronix/cmd/make/makefile
 #
-# Changed: <2023-07-12 13:06:11 curt>
+# The native build: this runs inside micronix, under the make in
+# cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
+# it cross builds the same program on the host.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-OBJECTS = make.o makeinit.o makeread.o maketime.o
+CC	= ccc
+CFLAGS	=
+BIN	= /bin
+PROG	= make
+HDRS	= make.h
+OBJS	= make.o makeinit.o makeread.o maketime.o
 
-Make: $(OBJECTS)
-	cc -o Make make.o makeinit.o makeread.o maketime.o -lS
+all: $(PROG)
 
-$(OBJECTS) : $*.c
-	cc -c $*.c
+$(PROG): $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-install: Make
-	cp Make /bin/make
+#
+# One entry for every object: $* is the target without its suffix, so
+# this reads as "each of these comes from the .c of the same name".
+#
+$(OBJS): $*.c $(HDRS)
+	$(CC) $(CFLAGS) -c $*.c
+
+install: $(PROG)
+	cp $(PROG) $(BIN)/make
 
 clean:
-	rm $(OBJECTS)
+	rm -f $(OBJS)
 
 clobber: clean
-	rm -f Make
+	rm -f $(PROG)

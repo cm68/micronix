@@ -1,7 +1,7 @@
 #
-# makefile for rm
+# makefile for mkdir
 #
-# micronix/cmd/rm/makefile
+# micronix/cmd/mkdir/makefile
 #
 # The native build: this runs inside micronix, under the make in
 # cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
@@ -12,8 +12,8 @@
 CC	= ccc
 CFLAGS	=
 BIN	= /bin
-PROG	= rm
-OBJS	= rm.o
+PROG	= mkdir
+OBJS	= mkdir.o
 
 all: $(PROG)
 
@@ -28,7 +28,7 @@ $(OBJS): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
 install: $(PROG)
-	cp $(PROG) $(BIN)/rm
+	cp $(PROG) $(BIN)/mkdir
 
 clean:
 	rm -f $(OBJS)

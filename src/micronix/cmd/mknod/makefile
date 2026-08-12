@@ -1,7 +1,7 @@
 #
-# makefile for rm
+# makefile for mknod
 #
-# micronix/cmd/rm/makefile
+# micronix/cmd/mknod/makefile
 #
 # The native build: this runs inside micronix, under the make in
 # cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
@@ -12,8 +12,8 @@
 CC	= ccc
 CFLAGS	=
 BIN	= /bin
-PROG	= rm
-OBJS	= rm.o
+PROG	= mknod
+OBJS	= mknod.o
 
 all: $(PROG)
 
@@ -28,7 +28,7 @@ $(OBJS): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
 install: $(PROG)
-	cp $(PROG) $(BIN)/rm
+	cp $(PROG) $(BIN)/mknod
 
 clean:
 	rm -f $(OBJS)

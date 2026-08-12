@@ -1,7 +1,7 @@
 #
-# makefile for rm
+# makefile for sh
 #
-# micronix/cmd/rm/makefile
+# micronix/cmd/sh/makefile
 #
 # The native build: this runs inside micronix, under the make in
 # cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
@@ -12,8 +12,9 @@
 CC	= ccc
 CFLAGS	=
 BIN	= /bin
-PROG	= rm
-OBJS	= rm.o
+PROG	= sh
+HDRS	= sh.h
+OBJS	= sh.o parse.o
 
 all: $(PROG)
 
@@ -24,11 +25,11 @@ $(PROG): $(OBJS)
 # One entry for every object: $* is the target without its suffix, so
 # this reads as "each of these comes from the .c of the same name".
 #
-$(OBJS): $*.c
+$(OBJS): $*.c $(HDRS)
 	$(CC) $(CFLAGS) -c $*.c
 
 install: $(PROG)
-	cp $(PROG) $(BIN)/rm
+	cp $(PROG) $(BIN)/nsh
 
 clean:
 	rm -f $(OBJS)
