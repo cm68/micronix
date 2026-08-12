@@ -25,7 +25,15 @@ int lineno = 1;
  * input and macro expansions in the parse path are in fixed length
  * static arrays; dependency trees and macro definitions are malloc'd.
  */
-#define MAXLINE 1024
+/*
+ * A line, and the same line with its macros expanded.  The expansion
+ * is what needs the room: lib/libc names a hundred and forty seven
+ * objects, so "$(AR) -cr $(TARGET) $(OBJS)" comes to twelve hundred
+ * characters from twenty seven, and at 1024 that ran off the end of
+ * exbuf and took the program with it.  Two buffers, so raising this
+ * costs twice what it says.
+ */
+#define MAXLINE 2048
 char inbuf[MAXLINE] INIT;       /* input buffer */
 char exbuf[MAXLINE] INIT;       /* macro expanded */
 
@@ -39,7 +47,19 @@ char namebuf[NLEN] INIT;
 char workbuf[NLEN] INIT;
 
 /*
- * all whitespace inside a line is identical. 
+ * A line grew past the expansion buffer.  This used to be no message
+ * and no exit: expand() wrote on past the end of exbuf and make died
+ * on whatever it landed in, with nothing said about which line did it.
+ * Say so and stop instead.
+ */
+TooLong()
+{
+    fprintf(stderr, "line %d: too long after macro expansion\n", lineno);
+    exit(1);
+}
+
+/*
+ * all whitespace inside a line is identical.
  * a tab at the start of a line is significant
  */
 whitespace(c)
@@ -403,6 +423,7 @@ expand(str, name, mod)
     char *dest;
     char *src;
     char c;
+    char *elimit;               /* the last byte exbuf can take */
 
     if (verbose > 2) {
         printf("\nexpand \"%s\" name: \"%s\" mod: \"%s\"\n", 
@@ -431,6 +452,7 @@ expand(str, name, mod)
          */
         dest = exbuf;
         src = inbuf;
+        elimit = exbuf + MAXLINE - 1;
 
         /*
          * while there is any data left... 
@@ -438,6 +460,8 @@ expand(str, name, mod)
         while (*src) {
 
             if (*src != '$') {
+                if (dest >= elimit)
+                    TooLong();
                 *dest++ = *src++;
                 *dest = '\0';
                 continue;
@@ -516,6 +540,8 @@ expand(str, name, mod)
              */
             if (mtext) {
                 while (*mtext) {
+                    if (dest >= elimit)
+                        TooLong();
                     *dest++ = *mtext++;
                 }
                 *dest = '\0';
