@@ -56,7 +56,10 @@ SUDO	?= sudo
 CCCOWNED = cpm.h errno.h hitech.h setjmp.h stdio.h time.h
 SYSHDRS  = $(filter-out $(CCCOWNED),$(notdir $(wildcard include/*.h)))
 
-.PHONY: all update clean clobber doc sysinstall
+.PHONY: all update install clean clobber doc sysinstall
+
+install:
+	$(RECURSE)
 
 sysinstall:
 	$(SUDO) mkdir -p $(SYSINC)/sys

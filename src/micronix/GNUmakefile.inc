@@ -106,6 +106,16 @@ endif
 DEST	= $(ROOT)$(SRCDIR)
 NOWARN	= --warning=no-ignore-newer
 
+#
+# Where the binary goes in the filesystem.  Everything this tree
+# builds lives in /bin on the running system - that is where cp, ls,
+# make, mkdir, mknod, pwd, rm, sh, vi and form are on the 1.6
+# standalone - so /bin is the default and a directory that belongs
+# elsewhere says so.  init is the one that does: /etc/init.
+#
+BINDIR	?= /bin
+INSTDIR	 = $(ROOT)$(BINDIR)
+
 CSRCS	?= $(wildcard *.c)
 HSRCS	?= $(wildcard *.h)
 ASSRCS	?= $(wildcard *.s)
@@ -130,7 +140,7 @@ RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \
 	done
 
-.PHONY: all update clean clobber doc disas
+.PHONY: all update install clean clobber doc disas
 
 #
 # cross build
@@ -157,6 +167,27 @@ endif
 
 all: $(TARGET) $(TARGETS)
 	$(RECURSE)
+
+#
+# Put the built binary into the filesystem the simulator boots.  A
+# directory that only recurses, or one whose target is a library, has
+# nothing to install: libc.a is linked into the commands here and does
+# not exist on the running system.
+#
+ifeq ($(strip $(TARGET)),)
+install:
+	$(RECURSE)
+else
+ifeq ($(suffix $(TARGET)),.a)
+install:
+	$(RECURSE)
+else
+install: $(TARGET)
+	$(RECURSE)
+	mkdir -p $(INSTDIR)
+	cp $(TARGET) $(INSTDIR)/$(TARGET)
+endif
+endif
 
 clean:
 	$(RECURSE)

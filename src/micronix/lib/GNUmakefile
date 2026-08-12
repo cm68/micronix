@@ -16,12 +16,20 @@ RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \
 	done
 
-.PHONY: all update clean clobber doc
+.PHONY: all update install clean clobber doc
 
 all:
 	$(RECURSE)
 
 update:
+	$(RECURSE)
+
+#
+# Nothing to install: these libraries are linked into the commands and
+# do not exist on the running system.  The rule is here so that a
+# tree-wide "make install" walks without stopping.
+#
+install:
 	$(RECURSE)
 
 clean:

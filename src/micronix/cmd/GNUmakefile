@@ -22,13 +22,28 @@
 # now.  Kept, not built.
 #
 # These have a GNUmakefile but are not in DIRS, and so are not built:
-#	ash asz cpmtools far init msh nroff yacc yacc.d
+#	ash asz cpmtools far msh nroff yacc yacc.d
+#
+# make is the make micronix uses - it was cmd/Make until the v7 one
+# gave up the name, and that one is cmd/v7make now.  make.d is a third
+# make and is also not built.
 # That was true before this file was rewritten and is left alone; add
 # them when they have been made to compile with ccc.
 #
+# init compiles but does not link.  It is a reconstruction from the
+# disassembly of the 1.6 binary, and five of the helpers that binary
+# carries have not been written into it yet:
+#
+#	any	 0x3090	   concat  0x302b    equal    0x30dc
+#	setmem	 0x2ea0	   movblock 0x2fcb
+#
+# They are all in init.dis and can be read straight off it - any and
+# concat already have been, see the notes in init.c - so this is
+# transcription rather than guesswork.  Out of DIRS until they are in.
+#
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = ar cp echo form ls Make mkdir mknod pwd rm s sh vi
+DIRS = ar cp echo form ls make mkdir mknod pwd rm s sh vi
 
 #
 # "cd $$d &&", not "cd $$d ;".  With the semicolon, a directory named
@@ -40,12 +55,15 @@ RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \
 	done
 
-.PHONY: all update clean clobber doc
+.PHONY: all update install clean clobber doc
 
 all:
 	$(RECURSE)
 
 update:
+	$(RECURSE)
+
+install:
 	$(RECURSE)
 
 clean:
