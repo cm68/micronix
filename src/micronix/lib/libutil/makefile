@@ -1,7 +1,7 @@
 #
-# makefile for libu
+# makefile for libutil
 #
-# micronix/lib/libu/makefile
+# micronix/lib/libutil/makefile
 #
 # The native build: this runs inside micronix, under the make in
 # cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
@@ -21,20 +21,11 @@ CC	= ccc
 CFLAGS	=
 AR	= wslib
 LIBDIR	= /lib
-TARGET	= libu.a
+TARGET	= libutil.a
 
-AOBJS	= access.o alarm.o _break.o chdir.o chmod.o chown.o \
-	close.o creat.o dup.o errno.o exec.o execv.o \
-	exit.o fdpos.o fork.o fstat.o getpid.o getuid.o \
-	gtty.o kill.o link.o mknod.o mount.o nice.o \
-	open.o pause.o perror.o pipe.o read.o seekraw.o \
-	setuid.o _signal.o sleep.o stat.o stime.o sbrk.o \
-	stty.o sync.o time.o umount.o unlink.o wait.o \
-	write.o
+COBJS	= hexdump.o logmsg.o
 
-COBJS	= signal.o lseek.o seek.o
-
-OBJS	= $(AOBJS) $(COBJS)
+OBJS	= $(COBJS)
 
 all: $(TARGET)
 
@@ -47,9 +38,6 @@ $(TARGET): $(OBJS)
 # so this reads as "each of these comes from the file of the same
 # name".
 #
-$(AOBJS): $*.s
-	$(CC) $(CFLAGS) -c $*.s
-
 $(COBJS): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
