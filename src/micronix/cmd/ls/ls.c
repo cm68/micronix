@@ -450,14 +450,15 @@ struct lbuf *
 gstat(file, argfl)
 char *file;
 {
-	extern char *alloc();
+	/* alloc() is what v7 called it; the library here has malloc */
+	extern char *malloc();
 	struct stat statb;
 	register struct lbuf *rep;
 	static int nomocore;
 
 	if (nomocore)
 		return(NULL);
-	rep = (struct lbuf *)alloc(sizeof(struct lbuf));
+	rep = (struct lbuf *)malloc(sizeof(struct lbuf));
 	if (rep==NULL) {
 		fprintf(stderr, "ls: out of memory\n");
 		nomocore = 1;

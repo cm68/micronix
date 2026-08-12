@@ -44,7 +44,7 @@ ASSRCS = \
 	xtoi.s fputc.s fgetc.s
 
 CSRCS = \
-	rand.c srand1.c mkstemp.c permaloc.c timezone.c ctime.c \
+	rand.c srand1.c mkstemp.c mktemp.c isatty.c permaloc.c timezone.c ctime.c \
 	assert.c calloc.c malloc.c memcmp.c memcpy.c memset.c \
 	blkcpy.c ctype_.c cleanup.c fclose.c fflush.c filbuf.c \
 	flsbuf.c puts.c fopen.c fread.c freopen.c fwrite.c \
