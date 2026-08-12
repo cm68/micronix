@@ -1,0 +1,67 @@
+.he "rm (1)                       8/12/26                       rm (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+rm
+- remove files
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+rm [ -fir ] file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Rm removes the named files.  A file with more than one link to it
+survives the removal of any one of them; the directory entry goes and
+the file itself goes when the last entry does.
+.sp
+Removing a file needs write permission on the directory it is in, not
+on the file.  Rm asks before removing a file the user cannot write,
+unless -f is given.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-f	Remove without asking, whatever the permissions.
+
+.ti -10
+-i	Ask before every file.
+
+.ti -10
+-r	Descend into directories and remove their contents.
+
+.in -10
+.sp
+-r is the one to be careful with: it removes the directory and
+everything beneath it.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+Rm refuses to remove "..", which stops the commonest way of destroying
+a tree from inside it by mistake.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ls (1), mkdir (1)

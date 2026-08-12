@@ -1,0 +1,53 @@
+.he "cp (1)                       8/12/26                       cp (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+cp
+- copy files
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd 2
+cp [ -i ] f1 f2
+cp [ -ir ] f1 ... fn directory
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+In the first form cp copies f1 onto f2.  In the second it copies each
+file into the named directory, keeping its name.
+.sp
+Cp refuses to copy a file onto itself.  It compares the device and the
+i-number to decide, so it catches the case reached by two different
+paths as well as the obvious one.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-i	Ask before overwriting a file that exists.
+
+.ti -10
+-r	Copy a directory, and everything under it, recursively.
+
+.in -10
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ls (1), rm (1), mkdir (1)

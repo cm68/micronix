@@ -1,0 +1,48 @@
+.he "pwd (1)                      8/12/26                      pwd (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+pwd
+- print the working directory
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+pwd
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Pwd writes the full path name of the current directory.
+.sp
+There is no system call that answers the question, so pwd walks
+upward: it reads the current directory, finds the entry for "..",
+stats it to learn which inode the parent is, then reads the parent to
+find the name the child is filed under, and repeats until it reaches
+the root.  The names it collects on the way up are printed in reverse.
+.sp
+Pwd takes no arguments.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The one that came with micronix did not work.  This is a rewrite.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ls (1), cd in sh (1)
