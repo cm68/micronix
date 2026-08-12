@@ -68,13 +68,31 @@ RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \
 	done
 
+#
+# This directory has a native makefile of its own - the one that runs
+# "make install" in each command in turn - and the recursion alone
+# would leave /usr/src/cmd holding the subdirectories and nothing to
+# drive them.  So update ships it, the same way a command's own
+# GNUmakefile ships that command's, and --keep-newer-files for the
+# same reason: a makefile edited inside micronix is not to be
+# overwritten by one older than it.
+#
+ROOT	?= ~/src/micronix/filesystem
+DEST	 = $(ROOT)/usr/src/cmd
+NOWARN	 = --warning=no-ignore-newer
+
 .PHONY: all update install clean clobber doc
 
 all:
 	$(RECURSE)
 
-update:
+cmd.tar: makefile
+	tar -f cmd.tar -c makefile
+
+update: cmd.tar
 	$(RECURSE)
+	mkdir -p $(DEST)
+	tar -f cmd.tar -C $(DEST) --keep-newer-files -x $(NOWARN)
 
 install:
 	$(RECURSE)
@@ -84,6 +102,7 @@ clean:
 
 clobber:
 	$(RECURSE)
+	rm -f cmd.tar
 
 doc:
 	$(RECURSE)
