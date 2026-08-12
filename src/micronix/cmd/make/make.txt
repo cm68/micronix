@@ -96,11 +96,16 @@
 
         Other options:
 
-             -d   Display a detailed description of what was
-                  processed in the 'makefile'.
+             -v   Display a detailed description of what was
+                  processed in the 'makefile'.  Repeating it asks
+                  for more: -v -v -v also traces each macro
+                  expansion as it is made.
 
              -n   Trace and print, but do not execute the commands
                   needed to update the targets.
+
+             -f   Read the named file instead of looking for
+                  'makefile' and then 'Makefile'.
 
    FILES
         makefile     - the default input file
