@@ -10,6 +10,16 @@
 #include <sys/con.h>
 
 /*
+ * The static routines below, declared before anything calls them.
+ *
+ * A call the compiler has not seen declared is extern int by default,
+ * and the definition further down says static: two linkages for one
+ * name.  The complaint lands on the definition rather than on the
+ * call that caused it.
+ */
+static int krw();
+
+/*
  * kread() and kwrite() comprise the memory device.
  * minor device numbers 0 and 1 are defined.
  * minor 0 is for i/o to outer space

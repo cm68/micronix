@@ -13,6 +13,17 @@
  * Compile with -x0 and load after main, so that
  * this code sits in the buffer space.
  */
+
+/*
+ * The initialisers below, declared before cus() calls them.
+ *
+ * Without this the call is the first the compiler hears of the name,
+ * which makes it extern int by default, and the definition further
+ * down says static - two different linkages for one name.  The error
+ * lands on the definition, a page away from the call that caused it.
+ */
+static int cinit(), djinit(), hdinit();
+
 cus()
 {
 

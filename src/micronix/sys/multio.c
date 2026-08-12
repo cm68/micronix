@@ -10,6 +10,16 @@
 #include <sys/proc.h>
 #include <errno.h>
 
+/*
+ * The static routines below, declared before anything calls them.
+ *
+ * A call the compiler has not seen declared is extern int by default,
+ * and the definition further down says static: two linkages for one
+ * name.  The complaint lands on the definition rather than on the
+ * call that caused it.
+ */
+static int ttinit();
+
 #define NMIO    4               /* number of mult I/O ports */
 #define MBASE 0x48
 #define VREADY (1 << 3)

@@ -14,6 +14,12 @@
 #include <sys/con.h>
 #include <errno.h>
 
+/*
+ * Declared before anything calls it: an undeclared call is extern int
+ * by default and the definition says static.
+ */
+static int error();
+
 #define NDRIVES 4               /* Number of drives. See mws[] below. */
 #define SECSIZE 3               /* Sector size (512 bytes) */
 #define CHKTIME	(1 * HERTZ)     /* timeout ticks between controller status
@@ -33,11 +39,11 @@ struct spec
     UINT precomp;               /* track where precomp begins */
     UINT lowcur;                /* track where low current begins */
 } specs[] = {
-    {153, 4, 17, 30, 128, 128}  /* Seagate 5 meg */
-    {306, 4, 17, 2, 128, 128}   /* generic 10 meg */
-    {306, 6, 17, 2, 128, 128}   /* CMI 16 meg */
-    {640, 6, 17, 0, 256, 256}   /* CMI 32 meg */
-    {733, 5, 17, 30, 300, 733}  /* Seagate 40 meg */
+    {153, 4, 17, 30, 128, 128}, /* Seagate 5 meg */
+    {306, 4, 17, 2, 128, 128},  /* generic 10 meg */
+    {306, 6, 17, 2, 128, 128},  /* CMI 16 meg */
+    {640, 6, 17, 0, 256, 256},  /* CMI 32 meg */
+    {733, 5, 17, 30, 300, 733}, /* Seagate 40 meg */
 };
 
 /*
