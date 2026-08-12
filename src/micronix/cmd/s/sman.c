@@ -49,7 +49,21 @@
 #include "s.h"
 
 extern scr_puts();
-extern scr_inst();
+extern scr_instr();		/* was scr_inst, which is nothing */
+
+/*
+ * These three are static and defined at the bottom of this file, but
+ * called from above it.  Without a declaration those calls are
+ * implicitly extern - K&R's rule for an undeclared function - and
+ * compile to "call _expand" while the calls below the definition
+ * compile to the local label.  One function, two call targets, and a
+ * link that fails on a symbol defined in the same file.  The compiler
+ * accepts the contradiction without a word; see STATICLATEDEF in the
+ * ccc tree.
+ */
+static int expand();
+static int good_first();
+static int row_of_id();
 extern scr_dlc();
 extern scr_dlr();
 

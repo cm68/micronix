@@ -35,6 +35,13 @@
 #include "s.h"
 #include <stdio.h>
 
+/*
+ * static, and defined below the function that calls it.  Without this
+ * the call is implicitly extern and compiles to "call _get_count",
+ * which nothing defines; see STATICLATEDEF in the ccc tree.
+ */
+static int get_count();
+
 int
 main(argc, argv)
     int argc;

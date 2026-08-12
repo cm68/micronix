@@ -269,9 +269,12 @@ statinit()
     statline.end = '\0';
 }
 
-#ifdef linux
+/*
+ * This was inside "#ifdef linux", so on micronix cpybuf was left
+ * undefined and the four calls below compiled to an external _cpybuf
+ * that nothing defines.  libc has memcpy on either system.
+ */
 #define cpybuf memcpy
-#endif
 
 ifmt(s, scale, val)
 char *s;

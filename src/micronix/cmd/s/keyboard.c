@@ -32,8 +32,19 @@
 
 #include "s.h"
 
-#ifdef unix
-
+/*
+ * Shaped like the one in k_flip below: linux, or else micronix.  It
+ * used to be wrapped in "#ifdef unix", which nothing defines here -
+ * ccc predefines neither unix nor micronix - so the whole block went
+ * away and took <stdio.h> with it, leaving stdin undeclared.
+ *
+ * The micronix half was also outside the "#ifdef linux" rather than in
+ * its #else, so a linux build took both arms and declared oldt twice,
+ * once as termios and once as sgtty.
+ *
+ * <sys/sgtty.h> had a leading slash - </sys/sgtty.h> - which no
+ * include path can satisfy.
+ */
 #ifdef linux
 
 #ifdef TERMIOS
@@ -50,12 +61,14 @@ struct termios oldt;
 struct sgttyb oldt;
 #endif
 #endif
-#endif
+
+#else
 
 #include <stdio.h>
 #include <types.h>
-#include </sys/sgtty.h>
+#include <sys/sgtty.h>
 struct sgtty oldt;
+
 #endif
 
 #define CMD_MAX 500             /* longest command that can be redone */
