@@ -3,9 +3,8 @@
  *
  * micronix/cmd/sh/sh.h
  *
- * The parser is not written yet.  This defines the shape it has to
- * produce, so that everything downstream of it can be written and
- * read now.  See NOTES for where each of these came from in the
+ * This is the shape the parser produces and everything downstream of
+ * it consumes.  See NOTES for where each of these came from in the
  * binary.
  *
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
@@ -37,8 +36,9 @@ struct cmd {
 };
 
 /*
- * A pipeline is what one input line turns into.  "a | b | c" is three
- * commands; the plain case is one.
+ * A pipeline is what one statement turns into.  "a | b | c" is three
+ * commands; the plain case is one.  A line can hold several
+ * statements, separated by ";" - see runline().
  */
 struct pipeline {
     struct cmd  cmd[MAXCMD];
@@ -115,6 +115,7 @@ void aliasexpand();
 int  pushredir();
 void popredir();
 int  runpipeline();
+void runline();
 int  nextline();
 char *strsave();
 void fatal();
@@ -122,16 +123,17 @@ void warn();
 
 /* parse.c
  *
- * parse() takes one input line and fills in a pipeline.  It returns
- * the number of commands, 0 for a blank line, or -1 on a syntax
- * error, having already complained.
+ * parse() takes ONE STATEMENT off the front of a line and fills in a
+ * pipeline, leaving *pp where the next one starts.  It returns the
+ * number of commands, 0 when there is no statement left, or -1 on a
+ * syntax error, having already complained.  runline() is the loop
+ * around it.
  *
- * It knows "<>&|" and double quotes and nothing else, which is less
- * than the image knows.  The set the tokeniser really scans against
- * is at 0x17c0 and has a backtick, a paren and a semicolon in it as
- * well; 0x17cd, the four operators, is a pointer into the tail of
- * that same string.  So ";" and backticks and "( )" are all missing
- * here, and single quoting is here without being in the image at
- * all.  NOTES has the behaviour of each, read by running the binary.
+ * It knows "<>&|", ";" and double quotes.  The set the tokeniser
+ * really scans against is at 0x17c0 and has a backtick and an open
+ * paren in it as well; 0x17cd, the four operators, is a pointer into
+ * the tail of that same string.  So backticks and "( )" are still
+ * missing here, and single quoting is here without being in the image
+ * at all.  NOTES has the behaviour of each, read by running it.
  */
-int  parse(/* char *line, struct pipeline *p */);
+int  parse(/* char **pp, struct pipeline *p */);

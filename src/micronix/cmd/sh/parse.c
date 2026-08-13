@@ -40,6 +40,19 @@
 char *metachars = "<>&|";
 
 /*
+ * Where a word ends: the operators, and the semicolon that separates
+ * one statement from the next.
+ *
+ * The image's own set at 0x17c0 has the backtick and the open paren
+ * in it as well, and they are not here yet.  They go in when the code
+ * that acts on them does, and not before: a character that ends a
+ * word and that nothing then consumes leaves the parse loop turning
+ * on the spot, because getword returns nothing and never advances
+ * past it.
+ */
+static char *wordstop = "<>&|;";
+
+/*
  * The operators, longest first.  The order is the binary's own and
  * it matters.
  */
@@ -141,7 +154,7 @@ char **pp;
     }
 
     while (*s && *s != ' ' && *s != '\t') {
-        if (strchr(metachars, *s))
+        if (strchr(wordstop, *s))
             break;
         if (*s == '\\' && s[1]) {
             s++;
@@ -208,9 +221,23 @@ char **pp;
     return w;
 }
 
+/*
+ * One statement, not one line.
+ *
+ * ";" separates statements - "echo a ; echo b" runs two, with or
+ * without spaces around it - so a line is as many pipelines as it has
+ * semicolons, and the caller asks for them one at a time.  *pp is
+ * left where the next one starts, so this can be called again until
+ * it says there is nothing more.
+ *
+ * Returns the number of commands, 0 when the rest of the line holds
+ * no statement, or -1 on a syntax error, having already complained.
+ * It always either returns 0 or leaves *pp further along, so a caller
+ * that loops on the return value terminates.
+ */
 int
-parse(line, p)
-char *line;
+parse(pp, p)
+char **pp;
 struct pipeline *p;
 {
     struct cmd *c;
@@ -223,14 +250,23 @@ struct pipeline *p;
     c = &p->cmd[0];
     clearcmd(c);
 
-    for (s = line; *s; s++) {
+    for (s = *pp; *s; s++) {
         if (*s == '\n') {
             *s = '\0';
             break;
         }
     }
 
-    s = line;
+    /*
+     * Empty statements are not errors and not worth reporting: a
+     * leading or a doubled ";" is skipped here rather than parsed
+     * into a pipeline with nothing in it.
+     */
+    s = *pp;
+    while (*s == ' ' || *s == '\t' || *s == ';')
+        s++;
+    *pp = s;
+
     for (;;) {
         while (*s == ' ' || *s == '\t')
             s++;
@@ -239,6 +275,15 @@ struct pipeline *p;
 
         if (*s == '#')                  /* a comment runs to the end */
             break;
+
+        /*
+         * The end of this statement.  Step over it so the next call
+         * starts on what follows.
+         */
+        if (*s == ';') {
+            s++;
+            break;
+        }
 
         code = isop(s, &len);
         if (code) {
@@ -301,6 +346,8 @@ struct pipeline *p;
         c->argv[c->argc++] = w;
         c->argv[c->argc] = (char *)0;
     }
+
+    *pp = s;
 
     /*
      * A pipeline whose last stage has no words is "cmd |" with

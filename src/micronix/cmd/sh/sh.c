@@ -748,6 +748,37 @@ struct pipeline *p;
 }
 
 /*
+ * Run one input line, which is as many statements as it has
+ * semicolons in it.
+ *
+ * parse() hands them back one at a time and leaves the pointer where
+ * the next one starts, so this asks until there is nothing left.  A
+ * syntax error abandons the rest of the line - it has already said
+ * what was wrong, and carrying on into the remains of a line nobody
+ * managed to read would only say it again.
+ *
+ * pipe1 is reused for each statement, and can be, because execute()
+ * has finished with one before the next is parsed.  It is a global
+ * rather than a local here for the reason it always was: a struct
+ * pipeline is the better part of two kilobytes, which is not
+ * something to put on this machine's stack.
+ */
+void
+runline(line)
+char *line;
+{
+    char *s;
+    int n;
+
+    s = line;
+    while ((n = parse(&s, &pipe1)) != 0) {
+        if (n < 0)
+            break;
+        execute(&pipe1);
+    }
+}
+
+/*
  * Read one line from the innermost input source, popping back out of
  * each as it runs dry.  Returns 0 at the end of everything.
  */
@@ -870,8 +901,7 @@ char **argv;
      */
     if (cmdstring) {
         interactive = 0;
-        if (parse(cmdstring, &pipe1) > 0)
-            execute(&pipe1);
+        runline(cmdstring);
         exit(status);
     }
 
@@ -904,8 +934,7 @@ char **argv;
     while (nextline(line, sizeof(line))) {
         if (verbose)
             fputs(line, stderr);
-        if (parse(line, &pipe1) > 0)
-            execute(&pipe1);
+        runline(line);
     }
 
     exit(status);
