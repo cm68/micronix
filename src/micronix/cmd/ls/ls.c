@@ -188,13 +188,21 @@ char *argv[];
 		ep->lflags |= ISARG;
 	}
 	qsort(firstp, lastp - firstp, sizeof *lastp, compar);
+	/*
+	 * The arguments end where the list has got to so far, and the
+	 * loop below reads up to there.  This assignment used to sit
+	 * after it, so the bound was whatever the register happened to
+	 * hold and the walk dereferenced its way out of the process -
+	 * which a kernel that maps only what a process owns answers with
+	 * a segmentation violation.
+	 */
+	slastp = lastp;
     lwide = 0;
     for (epp = firstp; epp < slastp; epp++) {
 		ep = *epp;
         i = wide(ep->lnl);
         if (i > lwide) lwide = i;
     }
-	slastp = lastp;
 	for (epp=firstp; epp<slastp; epp++) {
 		ep = *epp;
 		if (ep->ltype=='d' && dflg==0 || fflg) {
