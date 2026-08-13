@@ -531,7 +531,16 @@ char *file;
 			rep->lsize = statb.st_addr[0];
 			break;
 		}
-		rep->lflags = statb.st_mode & ~S_IFMT;
+		/*
+		 * ISARG is 0100000, and so is S_ALLOC - the bit the inode
+		 * carries to say it is allocated, which is to say every
+		 * inode stat ever returns.  Keeping it made each entry
+		 * look like a name from the command line, and those are
+		 * held as a pointer where the others hold the name
+		 * itself, so -l printed whatever the pointer pointed at.
+		 * lflags wants the permission bits and nothing else.
+		 */
+		rep->lflags = statb.st_mode & ~(S_IFMT|S_ALLOC);
 		rep->luid = statb.st_uid;
 		rep->lgid = statb.st_gid;
 		rep->lnl = statb.st_nlink;
