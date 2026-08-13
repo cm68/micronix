@@ -287,6 +287,36 @@ check the dates on the build products against the sources before
 looking anywhere else.
 
 
+the blessed drive, and working on a copy
+---------------------------------------
+
+hddma-0.blessed is a drive that boots.  Original userland exactly as
+distributed - the 1.6 init, not the reconstruction - with the two
+things that make it come up off the hard disk: a loader carrying its
+own geometry, and a kernel whose root device is hddma/0.
+
+It is the thing to copy, not the thing to work on.  Nothing writes to
+it, so it stays a fixed point that two people can start from at the
+same time:
+
+	cp hddma-0.blessed mine
+	mnix -f mine write ../../src/micronix/cmd/init/init /etc/init
+	cd ../../src/hwsim/d1
+	./d1 -b roms/mon447.bin -B hdcdma hdcdma0:<somewhere>/mine
+
+The last line is why the drive can be anywhere: a unit named on the
+command line is an exact file, so a copy under your own name is as good
+as the one in this directory and two simulators can run at once without
+meeting.  See hwsim -h.
+
+When a filesystem gets trashed - and it will, this is what the tool
+that writes into it is for - copy the blessed one again rather than
+repairing it.
+
+What is in it is deliberately the original.  A reference that already
+has our binaries in it is not a reference: the point is to put them in
+and see what changes.
+
 the root device, without redoing the install
 --------------------------------------------
 
