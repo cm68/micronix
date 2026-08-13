@@ -911,16 +911,24 @@ struct symbol
 };
 struct symbol *syms;
 
+/*
+ * the function tracer asks for a name once per instruction, and the
+ * disassembler asks again for every operand it formats.  the usual
+ * answer is "nothing lives here", which walking the list can only give
+ * after visiting all of it, so the miss - the common case - cost the
+ * whole table.  the guest address space is 16 bits, so index it.
+ *
+ * the list stays authoritative: lookup_sym searches it by name, and two
+ * symbols may share an address, which this index cannot represent.
+ * add_sym prepends and get_symname returned the first match, so the
+ * newest symbol at an address won; overwriting here keeps that.
+ */
+char *symindex[65536];
+
 char *
 get_symname(unsigned short value)
 {
-    struct symbol *s;
-
-    for (s = syms; s; s = s->next) {
-        if (s->value == value)
-            return s->name;
-    }
-    return 0;
+    return symindex[value];
 }
 
 void
@@ -935,6 +943,28 @@ add_sym(char *name, int type, unsigned short value)
     s->type = type;
     s->next = syms;
     syms = s;
+    symindex[value] = s->name;
+}
+
+/*
+ * an exec replaces the image, and the symbols describe the image.  they
+ * used to just accumulate: every program run left its table behind, so
+ * a shell got slower the longer it ran, and a trace could still print a
+ * name belonging to a program that had already exited.
+ */
+static void
+free_syms()
+{
+    struct symbol *s;
+    struct symbol *next;
+
+    for (s = syms; s; s = next) {
+        next = s->next;
+        free(s->name);
+        free(s);
+    }
+    syms = 0;
+    memset(symindex, 0, sizeof(symindex));
 }
 
 unsigned short
@@ -1032,6 +1062,7 @@ do_exec(char *name, char **argv)
     sp_lowater = 0xffff;
     sp_initial = 0;
     sp_overflow = 0;
+    free_syms();
 
     for (i = 0; i < 65536; i++) {
         put_byte(i, 0);
