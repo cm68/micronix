@@ -58,6 +58,17 @@ SYSHDRS  = $(filter-out $(CCCOWNED),$(notdir $(wildcard include/*.h)))
 
 .PHONY: all update install clean clobber doc sysinstall
 
+#
+# First, because make takes the first target in the file as the
+# default goal and .PHONY is not one.  Typing "make" here compiles the
+# tree with the cross compiler and stops; it does not copy anything
+# into the filesystem the simulator boots.  That is install, and it is
+# a separate thing to ask for - GNUmakefile.inc orders these the same
+# way for the same reason.
+#
+all:
+	$(RECURSE)
+
 install:
 	$(RECURSE)
 
@@ -67,9 +78,6 @@ sysinstall:
 	(cd include && $(SUDO) cp $(SYSHDRS) $(SYSINC))
 	@echo "installed: $(SYSINC)/sys, and $(words $(SYSHDRS)) headers beside it"
 	@echo "not installed, ccc owns them: $(CCCOWNED)"
-
-all:
-	$(RECURSE)
 
 update:
 	$(RECURSE)
