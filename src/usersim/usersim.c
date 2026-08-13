@@ -513,6 +513,7 @@ usage(char *complaint, char *arg)
     fprintf(stderr, "\t-r\trun as root\n");
     fprintf(stderr, "\t-S\treport stack low-water and final break at exit\n");
     fprintf(stderr, "\t-W\treport writes into the text segment\n");
+    fprintf(stderr, "\t-w <addr>[,<addr>]  write watchpoints\n");
     fprintf(stderr, "\t-T\topen a debug terminal window\n");
     fprintf(stderr, "\t-d <root dir>\n");
     fprintf(stderr, "\t-b\t\tstart with breakpoint\n");
@@ -598,6 +599,28 @@ main(int argc, char **argv)
                 break;
             case 'W':
                 tprot_report = 1;
+                break;
+            /*
+             * -w <addr>[,<addr>...]: arm a write watchpoint without
+             * having to be sitting in the monitor.  The monitor's 'w'
+             * command has always been able to do this, but a fault
+             * that only shows up in a long batch run - the linker
+             * scribbling on malloc's arena, say - is not something you
+             * can catch by hand.
+             */
+            case 'w':
+                if (!argc--) {
+                    usage("watch address not specified\n", 0);
+                    break;
+                }
+                s = *argv++;
+                while (*s) {
+                    add_watchpoint((unsigned short)strtol(s, &s, 0));
+                    if (*s == ',')
+                        s++;
+                    else
+                        break;
+                }
                 break;
             case 'd':
                 if (!argc--) {
