@@ -80,8 +80,6 @@ BUILTINS
 .nf
      cd, chdir  change directory
      home       what cd with no argument means
-     dir        list a directory
-     era        remove files
      echo       write the arguments
      type       where a command would be run from
      path       set or show the search path
@@ -93,9 +91,26 @@ BUILTINS
      kill       signal a process
      wait       wait for the background ones
      pid        the process id
-     sync       flush the buffer cache
      exit       exit, with a status if given
 .fi
+.sp
+What is here needs the shell itself: cd moves it, exit ends it, source
+changes where it reads from, alias and path and prompt and home are
+its own tables, wait and pid are about its children and itself, and
+nice sets what its children inherit.  Anything that does not is a
+command.
+.sp
+dir and era were builtins and are now aliases, seeded before ~/.login
+and ~/.sh are read:
+.sp
+.nf
+     dir        ls
+     era        rm
+.fi
+.sp
+They are cp/m spellings rather than shell work, and as aliases they
+can be seen with alias and changed with it.  sync was a builtin and is
+now sync (1).
 .sp 2
 .in -5
 .bd
@@ -117,12 +132,19 @@ was read back out of that binary: the operator table, the builtin
 numbering, the search path and the prompt are all its own.  Where the
 two can be told apart, cmd/sh/NOTES says so.
 .sp
-It installs as /bin/nsh rather than over /bin/sh, so a system that
-will not come up under it still comes up.
+It installs as /bin/sh.  It did not for a while - the reconstruction
+was too unfinished to be the shell a system comes up under, and it
+went in as nsh so that a machine that would not start under it still
+started.  The operators, the search path and the builtins all work
+now, so it is the shell.
+.sp
+The one it replaces is a Whitesmiths binary with no source.  Keep a
+copy of it: this is read back out of that binary and is not finished,
+and the parts of it that are guesses are named in cmd/sh/NOTES.
 .sp 2
 .in -5
 .bd
 SEE ALSO
 .in +5
 .br
-msh (1)
+sync (1), msh (1)

@@ -47,18 +47,27 @@ struct pipeline {
 
 /*
  * The builtins, numbered as the binary numbers them - the table at
- * 0x9755 pairs each name with one of these.  7 and 14 are not used;
- * they are gaps rather than anything missing.  cd and chdir are the
- * same builtin, which is why there are eighteen names and seventeen
- * numbers.
+ * 0x9755 pairs each name with one of these.  cd and chdir are the
+ * same builtin, which is why the binary has eighteen names and
+ * seventeen numbers.
+ *
+ * The numbers are kept where the binary put them, so 2, 3, 7, 8 and
+ * 14 are gaps.  7 and 14 were already: the binary numbers around them
+ * and nothing is missing.  2, 3 and 8 are ours - dir, era and sync
+ * have left.
+ *
+ * What earns a place here is needing the shell's own state.  cd moves
+ * the shell, exit ends it, source redirects where it reads from, and
+ * alias, path, prompt and home are its tables; wait and pid are about
+ * its children and itself; nice sets what its children inherit.  dir
+ * and era needed none of it - they are cp/m spellings, seeded into
+ * the alias table in main() where a user can redefine them - and sync
+ * is a system call with a program of its own in cmd/sync.
  */
 #define B_CD        1
-#define B_DIR       2
-#define B_ERA       3
 #define B_WAIT      4
 #define B_EXIT      5
 #define B_ECHO      6
-#define B_SYNC      8
 #define B_PROMPT    9
 #define B_PID       10
 #define B_TYPE      11
@@ -69,6 +78,19 @@ struct pipeline {
 #define B_ALIAS     17
 #define B_UNALIAS   18
 #define B_NICE      19
+
+/*
+ * What dobuiltin says when the word names a builtin but the work is
+ * an ordinary command after all: dir is ls, and nice sets the
+ * priority and then wants the rest of the line run.  Both rewrite the
+ * command and leave the running to execute().
+ *
+ * Not 1, which is what it returned for an unknown code as well.
+ * execute() handed that straight back to its caller, so dir - whose
+ * whole body was "return 1" with a comment saying the external ls
+ * would pick it up - did nothing at all.
+ */
+#define B_ASCOMMAND (-2)
 
 struct builtin {
     char    *name;
@@ -88,6 +110,10 @@ extern char *pathv[MAXPATHV];
 int  isbuiltin();
 int  dobuiltin();
 int  execute();
+int  sourcefile();
+void aliasexpand();
+int  pushredir();
+void popredir();
 int  runpipeline();
 int  nextline();
 char *strsave();

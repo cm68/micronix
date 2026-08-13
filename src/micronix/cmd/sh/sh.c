@@ -73,12 +73,9 @@ int naliases;
 struct builtin builtins[] = {
     "cd",       B_CD,
     "chdir",    B_CD,
-    "dir",      B_DIR,
-    "era",      B_ERA,
     "wait",     B_WAIT,
     "exit",     B_EXIT,
     "echo",     B_ECHO,
-    "sync",     B_SYNC,
     "prompt",   B_PROMPT,
     "pid",      B_PID,
     "type",     B_TYPE,
@@ -202,17 +199,24 @@ char *name;
 }
 
 /*
- * H4287.  Two calls to signal() with 1, for SIGINT and SIGQUIT - the
- * shell stops listening to them around a child.
+ * H4287.  Two calls to signal() with 1, for SIGINT and SIGQUIT.
  *
- * NOT DONE, because libu.a cannot link it: signal.o defines _signal
- * but refers to __signal and _jtab, and _signal.o - the member that
- * should carry them - is empty.  The syscall itself is there (the
- * original reaches it through indir block 0x9b9e), so this wants
- * fixing in the library rather than worked around here.
+ * 1 is SIG_IGN.  signal() hands the kernel the address of a
+ * trampoline out of _jtab rather than of the handler, and _stab holds
+ * the handler the trampoline reaches - but 0 and 1 are the two values
+ * that mean themselves, default and ignore, and go to the kernel as
+ * they are.
+ *
+ * This was empty, and said so: libu could not link signal() because
+ * _signal.s declared none of its symbols, so __signal and _jtab
+ * resolved to nobody.  That is fixed, and so is the argument order in
+ * the stub - it handed the kernel the handler where the signal number
+ * belonged, and every call came back "out of range".
  */
 ignoresigs()
 {
+    signal(2, 1);                       /* interrupt */
+    signal(3, 1);                       /* quit */
 }
 
 /*
@@ -329,7 +333,22 @@ int pout;
         return -1;
     }
     if (pid == 0) {
-        ignoresigs();
+        /*
+         * A background child stops listening to the keyboard's
+         * interrupt and quit, so that a ^C meant for whatever is in
+         * front does not take it with it.  A foreground child keeps
+         * them, because a ^C is how you stop it.
+         *
+         * The call was here unconditionally while ignoresigs() was
+         * empty, where it cost nothing.  Now that it does something,
+         * doing it for every child would mean nothing could be
+         * interrupted.  Which of the two the original does is not
+         * read - NOTES has the two signal() calls at H4287 and not
+         * what guards them - so this is the v6 arrangement rather
+         * than the binary's, and is worth confirming against it.
+         */
+        if (c->bg)
+            ignoresigs();
         redirect(c, pin, pout);
         path = findcmd(c->argv[0]);
         if (!path) {
@@ -403,7 +422,7 @@ dobuiltin(code, c)
 int code;
 struct cmd *c;
 {
-    int i;
+    int i, j;
     char *p;
     FILE *f;
 
@@ -413,16 +432,6 @@ struct cmd *c;
         p = c->argc > 1 ? c->argv[1] : homedir;
         if (chdir(p) < 0)
             warn("cannot change to %s", p);
-        return 0;
-
-    case B_DIR:                         /* dir - list a directory */
-        return 1;                       /* handed to the external ls */
-
-    case B_ERA:                         /* era - remove files */
-        for (i = 1; i < c->argc; i++) {
-            if (unlink(c->argv[i]) < 0)
-                warn("cannot remove %s", c->argv[i]);
-        }
         return 0;
 
     case B_WAIT:
@@ -442,10 +451,6 @@ struct cmd *c;
         putchar('\n');
         return 0;
 
-    case B_SYNC:
-        sync();
-        return 0;
-
     case B_PROMPT:
         if (c->argc > 1)
             prompt = strsave(c->argv[1]);
@@ -459,7 +464,16 @@ struct cmd *c;
 
     case B_TYPE:                        /* where would this be run from */
         for (i = 1; i < c->argc; i++) {
-            if (isbuiltin(c->argv[i]))
+            /*
+             * The alias first, because that is what the word turns
+             * into before anything else looks at it.  Without this
+             * "type dir" answered "not found" the moment dir stopped
+             * being a builtin, which is true of the name and no use
+             * to the person asking.
+             */
+            if ((p = getalias(c->argv[i])))
+                printf("%s is aliased to %s\n", c->argv[i], p);
+            else if (isbuiltin(c->argv[i]))
                 printf("%s is a builtin\n", c->argv[i]);
             else if ((p = findcmd(c->argv[i])))
                 printf("%s is %s\n", c->argv[i], p);
@@ -473,16 +487,7 @@ struct cmd *c;
             warn("source needs a file", 0);
             return 1;
         }
-        if (nsrc >= MAXSRC) {
-            warn("source nested too deep", 0);
-            return 1;
-        }
-        if ((f = fopen(c->argv[1], "r")) == NULL) {
-            warn("cannot open %s", c->argv[1]);
-            return 1;
-        }
-        srcstack[nsrc++] = f;
-        return 0;
+        return sourcefile(c->argv[1], 0) < 0 ? 1 : 0;
 
     case B_PATH:
         if (c->argc > 1) {
@@ -556,10 +561,153 @@ struct cmd *c;
         return 0;
 
     case B_NICE:                        /* run the rest more politely */
-        nice(c->argc > 1 ? atoi(c->argv[1]) : 10);
-        return 0;
+        /*
+         * "the rest" is the point of it, and the rest was thrown
+         * away: the priority was set and nothing ran.  A number first
+         * is how much, otherwise it is the default and everything
+         * after the word is the command.
+         */
+        i = 1;
+        if (c->argc > 1 && c->argv[1][0] >= '0' && c->argv[1][0] <= '9') {
+            nice(atoi(c->argv[1]));
+            i = 2;
+        } else {
+            nice(10);
+        }
+        if (i >= c->argc)
+            return 0;                   /* nothing named: just the ask */
+        for (j = 0; i + j < c->argc; j++)
+            c->argv[j] = c->argv[i + j];
+        c->argc -= i;
+        c->argv[c->argc] = (char *)0;
+        return B_ASCOMMAND;
     }
     return 1;
+}
+
+/*
+ * A word that stands for something else.  The value is a line, so it
+ * can be several words - "alias ll ls -l" - and they go in front of
+ * whatever arguments were given.
+ *
+ * The table was set and shown and never read: "alias e echo" and then
+ * "e hello" answered "e not found".
+ *
+ * Expansion happens once, here, and what comes out is not looked at
+ * again, so "alias ls ls -F" ends rather than going round.  The value
+ * is copied because the words point into it after the split.
+ */
+void
+aliasexpand(c)
+struct cmd *c;
+{
+    char *v, *w;
+    char *nv[MAXARG];
+    int n, i;
+
+    if (c->argc == 0)
+        return;
+    if ((v = getalias(c->argv[0])) == (char *)0)
+        return;
+    v = strsave(v);
+    n = 0;
+    w = v;
+    while (*w && n < MAXARG - 1) {
+        while (*w == ' ' || *w == '\t')
+            w++;
+        if (!*w)
+            break;
+        nv[n++] = w;
+        while (*w && *w != ' ' && *w != '\t')
+            w++;
+        if (*w)
+            *w++ = '\0';
+    }
+    if (n == 0)
+        return;
+    for (i = 1; i < c->argc && n < MAXARG - 1; i++)
+        nv[n++] = c->argv[i];
+    for (i = 0; i < n; i++)
+        c->argv[i] = nv[i];
+    c->argc = n;
+    c->argv[n] = (char *)0;
+}
+
+/*
+ * Put a builtin's redirection in place, and take it away again.
+ *
+ * redirect() cannot serve here.  It exits when it cannot open the
+ * file, which is right in the child it was written for and is the
+ * shell going away when the builtin runs in the shell itself.  The
+ * descriptors it replaces are duped out of the way and duped back.
+ */
+int
+pushredir(c, sv)
+struct cmd *c;
+int *sv;
+{
+    int fd;
+
+    sv[0] = sv[1] = sv[2] = -1;
+    if (c->in) {
+        if ((fd = open(c->in, 0)) < 0) {
+            warn("cannot open %s", c->in);
+            return -1;
+        }
+        sv[0] = dup(0);
+        close(0);
+        dup(fd);
+        close(fd);
+    }
+    if (c->out) {
+        if (c->append) {
+            if ((fd = open(c->out, 1)) < 0)
+                fd = creat(c->out, 0666);
+            else
+                lseek(fd, 0L, 2);
+        } else {
+            fd = creat(c->out, 0666);
+        }
+        if (fd < 0) {
+            warn("cannot create %s", c->out);
+            popredir(sv);
+            return -1;
+        }
+        fflush(stdout);
+        sv[1] = dup(1);
+        close(1);
+        dup(fd);
+        close(fd);
+        if (c->both) {
+            sv[2] = dup(2);
+            close(2);
+            dup(1);
+        }
+    }
+    return 0;
+}
+
+void
+popredir(sv)
+int *sv;
+{
+    fflush(stdout);
+    fflush(stderr);
+    if (sv[2] >= 0) {
+        close(2);
+        dup(sv[2]);
+        close(sv[2]);
+    }
+    if (sv[1] >= 0) {
+        close(1);
+        dup(sv[1]);
+        close(sv[1]);
+    }
+    if (sv[0] >= 0) {
+        close(0);
+        dup(sv[0]);
+        close(sv[0]);
+    }
 }
 
 /*
@@ -572,14 +720,29 @@ int
 execute(p)
 struct pipeline *p;
 {
-    int code;
+    int code, r, i;
+    int sv[3];
 
     if (p->ncmd == 0)
         return 0;
+    for (i = 0; i < p->ncmd; i++)
+        aliasexpand(&p->cmd[i]);
     if (p->ncmd == 1 && p->cmd[0].argc > 0) {
         code = isbuiltin(p->cmd[0].argv[0]);
-        if (code)
-            return dobuiltin(code, &p->cmd[0]);
+        if (code) {
+            /*
+             * A builtin runs in the shell, so its redirection has to
+             * be put in place and taken away again around it - the
+             * child that redirect() serves never happens.  Without
+             * this "echo x > f" wrote x to the terminal and left no f.
+             */
+            if (pushredir(&p->cmd[0], sv) < 0)
+                return 1;
+            r = dobuiltin(code, &p->cmd[0]);
+            popredir(sv);
+            if (r != B_ASCOMMAND)
+                return r;
+        }
     }
     return runpipeline(p);
 }
@@ -616,16 +779,50 @@ startup(name)
 char *name;
 {
     char path[MAXPATH];
+
+    /*
+     * The names carry their own leading slash, so a home directory
+     * that is already the root would spell it twice - "//.sh".  It
+     * opens either way; it reads badly in a trace.
+     */
+    strcpy(path, homedir);
+    if (path[0] && path[strlen(path) - 1] == '/')
+        path[strlen(path) - 1] = '\0';
+    strcat(path, name);
+    sourcefile(path, 1);
+}
+
+/*
+ * Push a file as the input source.  nextline() reads from the
+ * innermost one and pops back out of it when it runs dry, so this is
+ * the whole of what source does and the whole of what a startup file
+ * is: the shell reads ~/.sh, then ~/.login if it is a login shell,
+ * then whatever it was reading before.
+ *
+ * The two were the same lines written twice.  What differs is the
+ * file not being there: no ~/.sh is the ordinary case and says
+ * nothing, and a source naming a file that is not there is a mistake
+ * worth hearing about.
+ */
+int
+sourcefile(path, quiet)
+char *path;
+int quiet;
+{
     FILE *f;
 
-    strcpy(path, homedir);
-    strcat(path, name);
-    if ((f = fopen(path, "r")) == NULL)
-        return;
-    if (nsrc < MAXSRC)
-        srcstack[nsrc++] = f;
-    else
-        fclose(f);
+    if (nsrc >= MAXSRC) {
+        if (!quiet)
+            warn("source nested too deep", 0);
+        return -1;
+    }
+    if ((f = fopen(path, "r")) == NULL) {
+        if (!quiet)
+            warn("cannot open %s", path);
+        return -1;
+    }
+    srcstack[nsrc++] = f;
+    return 0;
 }
 
 main(argc, argv)
@@ -642,6 +839,17 @@ char **argv;
      */
     if (argv[0] && argv[0][0] == '-')
         login = 1;
+
+    /*
+     * dir and era are cp/m spellings, kept so that fingers trained on
+     * that system reach something.  They are not shell work, so they
+     * are seeded here rather than built in: "alias dir" says what dir
+     * is, and "alias dir ls -l" changes it, neither of which a builtin
+     * could offer.  Seeded before ~/.login and ~/.sh are read, so a
+     * user who wants them to mean something else says so there.
+     */
+    setalias("dir", "ls");
+    setalias("era", "rm");
 
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-v") == 0) {
@@ -678,10 +886,20 @@ char **argv;
         interactive = isatty(0);
     }
 
-    if (login) {
+    /*
+     * ~/.sh is every shell and ~/.login is only the one you log in
+     * to, which is the csh arrangement these names come from.  Both
+     * were inside the login test, so ~/.sh - the one that sets the
+     * aliases and the path, and the whole reason to have a file at
+     * all - never ran for any shell started from another.
+     *
+     * Pushed in this order because nextline() reads the innermost
+     * source first: ~/.login goes on before ~/.sh so that ~/.sh is
+     * read before it, and the terminal after both.
+     */
+    if (login)
         startup("/.login");
-        startup("/.sh");
-    }
+    startup("/.sh");
 
     while (nextline(line, sizeof(line))) {
         if (verbose)
