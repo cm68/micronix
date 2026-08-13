@@ -51,6 +51,76 @@
 extern int errno;
 
 /*
+ * INITDBG - the variant of init that can talk.
+ *
+ * init proper is mute, and not by oversight.  closeall() shuts every
+ * descriptor it was started with, and the two opens that follow take 0 and
+ * 1 for /dev/root and /dev/swap - so descriptor 2, which is where perror()
+ * writes and it writes there unconditionally and without stdio, is closed
+ * for the whole of init's life.
+ *
+ * That is why the perror() calls further down are not the contradiction
+ * they look like: every one of them is in a child that has been through
+ * opentty(), and opentty() puts a terminal on 0, 1 and 2.  The parent has
+ * no perror() at all, and reports nothing.  A fork that fails, an
+ * /etc/ttys that will not open, a root device that is not there - all of
+ * them return quietly and the machine carries on in whatever state that
+ * left it.  The inode table filling up is what this was wanted for.
+ *
+ * Compiling with -DINITDBG puts the console on descriptor 2 in the parent
+ * and adds the reports.  Everything it adds is a diagnostic: no path
+ * changes, nothing new is retried, and without the flag the binary is the
+ * one that ships.  See "make init.dbg" in the GNUmakefile beside this.
+ */
+#ifdef INITDBG
+dbgerr(s)
+char *s;
+{
+	perror(s);
+}
+
+/*
+ * Put a terminal on descriptor 2 and keep it there.
+ *
+ * As early as possible means before closeall(), which is the call that
+ * takes the inherited descriptors away - so this runs first and closeall()
+ * is taught to leave 2 alone.
+ *
+ * open() takes the lowest free descriptor, so closing 0, 1 and 2 and then
+ * opening puts the terminal on 0 and the two dups on 1 and 2.  Closing 0
+ * and 1 again leaves it on 2 by itself, and the /dev/root and /dev/swap
+ * opens in main() take 0 and 1 exactly as they did before.  This is
+ * opentty()'s dup(dup(open())) idiom, and it works here for the same
+ * reason.
+ *
+ * /dev/console is the device to open, and it is the only one: there is no
+ * /dev/tty on this system - console, ttyA, ttyB and ttyC are all of them -
+ * and no kernel behind that name either, character major 0 being nulldev.
+ * /dev/console is cdev(1,1), which is the device /dev/ttyA also names.
+ */
+dbgopen()
+{
+	int fd;
+
+	close(0);
+	close(1);
+	close(2);
+
+	fd = open("/dev/console", 1);
+	if (fd < 0)
+		return;
+
+	dup(fd);
+	dup(fd);
+	close(0);
+	close(1);
+}
+#else
+#define dbgerr(s)
+#define dbgopen()
+#endif
+
+/*
  * Argument vectors for the execs below.  exec(name, argv) takes the
  * vector by reference, so each of these has to be an array that
  * outlives the call rather than a list of arguments written at it.
@@ -131,10 +201,24 @@ struct ttyent ttys[NTTYS];
  */
 main()
 {
+	dbgopen();          /* nothing without INITDBG; must precede closeall */
 	closeall();
 
 	rootfd = open("/dev/root", 0);
 	swapfd = open("/dev/swap", 0);
+	/*
+	 * The test goes inside the #ifdef, not just the call.  An empty
+	 * dbgerr() leaves "if (rootfd < 0);" behind, which is dead but is
+	 * still two compares and two branches - fourteen bytes that the
+	 * shipping init did not have.  Everywhere else the test was already
+	 * there and only the report is new.
+	 */
+#ifdef INITDBG
+	if (rootfd < 0)
+		dbgerr("/dev/root");
+	if (swapfd < 0)
+		dbgerr("/dev/swap");
+#endif
 
 	mkempty("/etc/utmp");
 	mkempty("/etc/mtab");
@@ -179,8 +263,10 @@ struct ttyent *t;
 		return;
 
 	pid = fork();
-	if (pid == -1)
+	if (pid == -1) {
+		dbgerr("spawn: fork");
 		return;
+	}
 	if (pid == 0)
 		startlogin(t);      /* does not return */
 	else
@@ -256,6 +342,7 @@ console()
 		pid = fork();
 		if (pid != -1)
 			break;
+		dbgerr("console: fork");
 		sleep(1);
 	}
 
@@ -349,8 +436,10 @@ readttys()
 		p->t_login = 0;
 
 	fp = fopen("/etc/ttys", "read");
-	if (fp == 0)
+	if (fp == 0) {
+		dbgerr("/etc/ttys");
 		return;
+	}
 
 	for (;;) {
 		fgets(line, 512, fp);
@@ -562,8 +651,10 @@ runrc()
 		return;
 
 	pid = fork();
-	if (pid == -1)
+	if (pid == -1) {
+		dbgerr("runrc: fork");
 		return;
+	}
 
 	if (pid != 0) {
 		while (wait(&status) != pid)
@@ -628,6 +719,15 @@ closeall()
 
 	for (i = 0; i < NSIG; i++) {
 		signal(i, SIG_IGN);
+#ifdef INITDBG
+		/*
+		 * dbgopen() put the console here a moment ago and it is to
+		 * stay.  The signal above still happens: it is the
+		 * descriptor that is spared, not the disposition.
+		 */
+		if (i == 2)
+			continue;
+#endif
 		close(i);
 	}
 }
@@ -1486,8 +1586,10 @@ resetttys()
 	static struct sgtty sg;
 
 	pid = fork();
-	if (pid == -1)
+	if (pid == -1) {
+		dbgerr("resetttys: fork");
 		return;
+	}
 
 	if (pid != 0) {
 		do {

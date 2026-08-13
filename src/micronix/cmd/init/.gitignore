@@ -1,2 +1,3 @@
 *.o
 init
+init.dbg
