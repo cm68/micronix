@@ -199,37 +199,41 @@ DATAOFF.  hddma-0 is 5328896 bytes, which is that 2k and then 10404
 blocks.  Nothing in the block space describes the drive.
 
 The second half of the boot block is used for something else, and it is
-an addition rather than anything Micronix shipped: mkfs's installboot
-scribbles format information there, a struct dlabel at DL_OFFSET, 256
-bytes into the block the first level occupies.  It holds what the drive
-is and where the boot area is:
+an addition of ours rather than anything Micronix shipped: a struct
+dlabel at DL_OFFSET, 256 bytes into the block the first level occupies,
+holding what the drive is and where the boot area is.
 
 	d_tracks d_heads d_spt		the geometry
-	d_cyl0				bootfirst, where this area starts
+	d_cyl0				where this area starts
 	d_bootblks			how many blocks it is
 	d_roll				what mw.c adds to blk / spc
 	d_fsize d_isize d_swap		the filesystem laid on top
 
-So an image handed to write -k has two things to get right:
+which is why a boot image is per drive.  stand builds one for each
+entry in the table in its Makefile - bootimg-m5, -m10, -m16, -m32,
+-m40 - with the geometry already in it, so installing one is writing
+the whole file and nothing has to be preserved from what was there:
 
-  - keep bytes 256-511.  bootimg pads the first level to 512 with
-    zeroes and would scribble over the format information.  Splice
-    instead: first level, then the existing 256-511, then the second
-    level at 512.  The first level is 181 bytes, so it does not reach
-    them.
+	make -C src/micronix/stand INC=/usr/local/usr/include bootimgs
+	mnix -f hddma-0 write -k bootimg-m5 /boot/bootmw
 
-  - pad to the file's full size, 34816, so the size stays what it was
-    and all 68 blocks stay claimed.  write -k refuses to grow a file,
-    which is the point - a block it had to allocate would not be in the
-    area the rom reads.
+The image has to be padded to the file's full size, 34816, so the size
+stays what it was and all 68 blocks stay claimed.  write -k refuses to
+grow a file, which is the point - a block it had to allocate would not
+be in the area the rom reads.
+
+mkfs writes the same structure when it installs a boot into a
+filesystem it is making, and overwrites what the build put there,
+adding the three filesystem fields the build cannot know.  A boot put
+on a disk any other way keeps the built-in geometry, which is the case
+this arrangement exists for.
 
 Worth knowing while stage 3 is broken: the second level does not read
 any of that.  stand/*.c mentions neither dlabel nor DL_OFFSET - mwio.c
 carries the geometry as a compiled-in default and probes the drive for
 the head count - and the probe is what fails.  The answer it is failing
-to work out is sitting in the same block it was loaded from, put there
-by mkfs for the purpose.  On the image here those bytes are zero,
-because mkfs -i has never been run on it.
+to work out is now in the block it was loaded from, put there by the
+build.
 
 setblk names the blocks a file owns, for building the arrangement in
 the first place.  It does not take them off the free list - run
