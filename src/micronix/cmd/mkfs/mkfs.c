@@ -268,12 +268,23 @@ putlabel(buf, type)
     struct dlabel *lp;
     int i;
 
-    for (i = DL_OFFSET; i < BSIZE; i++) {
-        if (buf[i])
-            die("the boot code runs into the label - it is too big");
-    }
-
+    /*
+     * The second half is either empty or already a label.  stand builds
+     * one boot image per drive with the geometry in it - see
+     * stand/mkbootimg.c - so a boot file arriving here with our own
+     * magic at DL_OFFSET is that, and it is written over: this knows
+     * the filesystem as well as the geometry and the built-in one does
+     * not.  Anything else in there is the boot code having grown into
+     * the label, which is a boot that would be quietly truncated.
+     */
     lp = (struct dlabel *) &buf[DL_OFFSET];
+    if (lp->d_magic[0] != DL_MAGIC[0] || lp->d_magic[1] != DL_MAGIC[1] ||
+        lp->d_magic[2] != DL_MAGIC[2] || lp->d_magic[3] != DL_MAGIC[3]) {
+        for (i = DL_OFFSET; i < BSIZE; i++) {
+            if (buf[i])
+                die("the boot code runs into the label - it is too big");
+        }
+    }
     for (i = 0; i < 4; i++)
         lp->d_magic[i] = DL_MAGIC[i];
     lp->d_version = DL_VERSION;

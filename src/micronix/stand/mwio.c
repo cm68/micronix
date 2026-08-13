@@ -3,6 +3,7 @@
  */
 #include <types.h>
 #include <sys/mw.h>
+#include <sys/dlabel.h>
 
 struct drivespec {
 	UINT cylinders;
@@ -10,8 +11,9 @@ struct drivespec {
 	UINT8 spt;			/* sectors per track */
 	UINT limit;			/* max block number */
 	UINT8 spc;			/* sectors per track */
+	UINT roll;			/* what mw.c adds to blk / spc */
 } spec = {
-	153, 4, 17, (153 * 4 * 17) -1, 4 * 17		/* st506 */
+	153, 4, 17, (153 * 4 * 17) -1, 4 * 17, 153 / 2	/* st506 */
 };
 
 #define	STEPDELAY	30
@@ -43,6 +45,8 @@ UINT8 *hdrbuf = (UINT8 *)0x84;          /* where read header lands a head */
 #define	INIT	= 0
 #endif
 
+extern char disk0buf[];		/* boot.c's, and not yet in use */
+
 char tries INIT;
 int curcyl INIT;
 
@@ -57,7 +61,7 @@ struct hddma_cmd cmd = { 0 };   /* braces: a struct is sized from its type */
  */
 reset()
 {
-	register int i;
+	register struct dlabel *lp;
 
     outstr("Micronix loader for the HD-DMA\n");
 
@@ -99,42 +103,62 @@ reset()
     cmd.drvsel |= STEPOUT;
     hdc_command(OP_NOP);
 
-	/* let's see if we can find out how many heads we have */
-	for (i = 0; i < 8; i++) {
-		cmd.headsel = (~i & 7) << 2;
-		cmd.dma = (UINT)0x80;
-		cmd.xdma = 0;
-		tries = 0;
-		while (1) {
-			/*
-			 * Count every attempt, not only the failures.  This
-			 * counted failures alone, so a controller that
-			 * answers the command without returning a header -
-			 * which is every one that does not implement read
-			 * header - succeeded forever and never matched, and
-			 * the probe spun here with nothing to say.
-			 */
-			if (tries++ > 10)
-				goto probedone;
-			*hdrbuf = 0xff;
-			hdc_command(OP_HEADER);
-			if (*hdrbuf == i) {
-				break;
-			}
-		}
-	}
-probedone:
 	/*
-	 * What the probe found, unless it found nothing.  A drive that
-	 * reports no heads at all is a probe that did not work rather
-	 * than a drive with no heads, and taking it at its word gives
-	 * spc = 0 and a division by zero at the first block read.  Keep
-	 * the table's geometry in that case; it is what we booted from.
+	 * The geometry, out of the label in the block we were loaded
+	 * from.  mkfs writes it there when it installs a boot, and
+	 * stand/mkbootimg builds one image per drive with it already in -
+	 * so the answer is on the disk and does not have to be guessed.
+	 *
+	 * This used to probe: read header on each of the eight possible
+	 * heads and see which answered.  The command takes no head
+	 * argument and answers with whatever comes round next, so what
+	 * came back was byte 0 of a header the drive chose, the probe
+	 * matched only head 0 and gave up at 1, and every block number
+	 * after that landed on the wrong cylinder.
+	 *
+	 * Physical cylinder 0, head 0, sector 0 needs no geometry to
+	 * reach, which is what makes this possible before the geometry is
+	 * known.  disk0buf is boot.c's and nothing has been read into it
+	 * yet.
 	 */
-	if (i > 0) {
-		spec.heads = i;
-		spec.spc = i * spec.spt;
+	cmd.steps = curcyl;
+	cmd.drvsel = STEPOUT;
+	curcyl = 0;
+	cmd.word0 = 0;			/* cylinder */
+	cmd.byte2 = 0;			/* head */
+	cmd.byte3 = 0;			/* sector */
+	cmd.headsel = (~0 & 7) << 2;
+	cmd.dma = (UINT)disk0buf;
+	cmd.xdma = 0;
+
+	tries = 0;
+	while (tries++ < 10) {
+		if (hdc_command(OP_READ))
+			break;
 	}
+	if (tries > 10)
+		outstr("label read failed\n");
+
+	lp = (struct dlabel *)&disk0buf[DL_OFFSET];
+	if (lp->d_magic[0] == DL_MAGIC[0] && lp->d_magic[1] == DL_MAGIC[1] &&
+	    lp->d_magic[2] == DL_MAGIC[2] && lp->d_magic[3] == DL_MAGIC[3] &&
+	    lp->d_tracks && lp->d_heads && lp->d_spt) {
+		spec.cylinders = lp->d_tracks;
+		spec.heads = lp->d_heads;
+		spec.spt = lp->d_spt;
+		spec.spc = lp->d_heads * lp->d_spt;
+		spec.roll = lp->d_roll;
+		spec.limit = lp->d_tracks * spec.spc - 1;
+	} else {
+		/*
+		 * No label, so the table's geometry stands - it is what we
+		 * booted from.  Say so: a disk that reads but cannot
+		 * describe itself is worth knowing about before the block
+		 * numbers start.
+		 */
+		outstr("No disk label, assuming st506\n");
+	}
+
 }
 
 /*
@@ -178,7 +202,7 @@ readblock(int blocknum, char *buffer)
 	 * at all.
 	 */
 	secnum = blocknum % spec.spc;
-	cyl = blocknum / spec.spc + (spec.cylinders >> 1);
+	cyl = blocknum / spec.spc + spec.roll;
 	if (cyl >= spec.cylinders)
 		cyl -= spec.cylinders;
 	head = secnum / spec.spt;
