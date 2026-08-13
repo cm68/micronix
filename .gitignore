@@ -70,8 +70,11 @@ src/micronix/stand/formatmw/formatmw.com
 src/micronix/stand/zout/
 
 #
-# The working hard disk image.  hddma-0.blessed is the one that is kept
-# - a drive that boots, to be copied and written into - and this is
-# whatever the last thing to run left behind.  See disks/hdinstall/REGEN.
+# The working hard disk images.  hddma-0.blessed is the one that is
+# kept - a drive that boots, to be copied and written into - and these
+# are whatever the last thing to run left behind.  hddma-1 is a blank,
+# which is a thing mkfs makes rather than a thing history carries.
+# See disks/hdinstall/REGEN.
 #
 disks/hdinstall/hddma-0
+disks/hdinstall/hddma-1
