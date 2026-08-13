@@ -55,14 +55,16 @@ src/micronix/cmd/mkfs/mkfs
 # extension - boot.s and mwio.s are named because they are what ccc
 # leaves behind for boot.c and mwio.c.
 #
-src/micronix/stand/*.o
-src/micronix/stand/boot.s
-src/micronix/stand/mwio.s
-src/micronix/stand/mwboot.com
-src/micronix/stand/mwboot.hex
-src/micronix/stand/mwboot1.abs
-src/micronix/stand/mwboot1.bin
-src/micronix/stand/mwboot1.cim
-src/micronix/stand/bootimg
-src/micronix/stand/formatmw.com
+src/micronix/stand/boot/*.o
+src/micronix/stand/boot/boot.s
+src/micronix/stand/boot/mwio.s
+src/micronix/stand/boot/mwboot.com
+src/micronix/stand/boot/mwboot.hex
+src/micronix/stand/boot/mwboot1.abs
+src/micronix/stand/boot/mwboot1.bin
+src/micronix/stand/boot/mwboot1.cim
+src/micronix/stand/boot/bootimg
+src/micronix/stand/boot/bootimg-*
+src/micronix/stand/boot/mkbootimg
+src/micronix/stand/formatmw/formatmw.com
 src/micronix/stand/zout/

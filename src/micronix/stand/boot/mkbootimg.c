@@ -1,7 +1,7 @@
 /*
  * mkbootimg - the boot image for one kind of drive
  *
- * micronix/stand/mkbootimg.c
+ * micronix/stand/boot/mkbootimg.c
  *
  * A boot image is the first level, which the rom reads to 0100 and
  * jumps to, and the second level behind it, which the first level
@@ -39,7 +39,7 @@
  * of a 16 bit unsigned, which is all dlabel.h needs of types.h.
  */
 typedef unsigned short UINT;
-#include "../include/sys/dlabel.h"
+#include "../../include/sys/dlabel.h"
 
 #define BSIZE   512
 

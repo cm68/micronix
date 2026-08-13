@@ -13,7 +13,15 @@ struct drivespec {
 	UINT8 spc;			/* sectors per track */
 	UINT roll;			/* what mw.c adds to blk / spc */
 } spec = {
-	153, 4, 17, (153 * 4 * 17) -1, 4 * 17, 153 / 2	/* st506 */
+	/*
+	 * Nothing.  The geometry comes off the disk and there is no
+	 * other source for it - a compiled-in table is a second opinion
+	 * about a drive this program has in front of it, and the whole
+	 * point of the label is not to need one.  An initialiser of
+	 * zeroes because Whitesmith's will not link a bss symbol
+	 * without one, the same reason as INIT below.
+	 */
+	0, 0, 0, 0, 0, 0
 };
 
 #define	STEPDELAY	30
@@ -41,9 +49,7 @@ UINT8 *hdrbuf = (UINT8 *)0x84;          /* where read header lands a head */
  * whitesmith's stupidity means that BSS symbols don't link unless they
  * have an explicit initializer.
  */
-#ifndef __STDC__
 #define	INIT	= 0
-#endif
 
 extern char disk0buf[];		/* boot.c's, and not yet in use */
 
@@ -151,12 +157,16 @@ reset()
 		spec.limit = lp->d_tracks * spec.spc - 1;
 	} else {
 		/*
-		 * No label, so the table's geometry stands - it is what we
-		 * booted from.  Say so: a disk that reads but cannot
-		 * describe itself is worth knowing about before the block
-		 * numbers start.
+		 * There is nothing to fall back on, and that is deliberate.
+		 * A disk that cannot say what it is cannot be read: every
+		 * block number goes through the geometry, so guessing it
+		 * means reading the wrong cylinder and calling whatever is
+		 * there a filesystem.
 		 */
-		outstr("No disk label, assuming st506\n");
+		outstr("No disk label at cylinder 0.\n");
+		outstr("The geometry is read from there and guessed nowhere.\n");
+		outstr("mkfs -i writes a label; stand/mkbootimg builds one in.\n");
+		bail();
 	}
 
 }
@@ -166,13 +176,9 @@ reset()
  * return 1 for success
  */
 int
-#ifndef __STDC__
 readblock(blocknum, buffer)
 int blocknum;
 char *buffer;
-#else
-readblock(int blocknum, char *buffer)
-#endif
 {
 	register int cyl;
 	int secnum;
@@ -237,12 +243,8 @@ readblock(int blocknum, char *buffer)
  * run a hdc command and wait for a response
  */
 int 
-#ifdef __STDC__
-hdc_command(UINT8 opcode)
-#else
 hdc_command(opcode)
 UINT8 opcode;
-#endif
 {
     cmd.opcode = opcode;
     cmd.status = 0;

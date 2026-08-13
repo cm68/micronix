@@ -46,11 +46,12 @@
 #include <sys/dir.h>
 #include <obj.h>
 
-#ifdef __STDC__
-#define	INIT
-#else
+/*
+ * Whitesmith's will not link a bss symbol without an explicit
+ * initialiser, and ccc is happy either way, so everything here says
+ * what it starts as.
+ */
 #define	INIT = 0
-#endif
 int inumber = 1;
 struct dsknod *inode INIT;
 
@@ -194,12 +195,8 @@ load()
 	(*loadbase)();
 }
 
-#ifdef __STDC__
-outstr(char *s)
-#else
 outstr(s)
 register char *s;
-#endif
 {
 	while (*s) {
 		if (*s == '\n') {
@@ -288,12 +285,8 @@ iget()
 	inode = &inodebuf[(inumber - 1) % 16];
 }
 
-#ifdef __STDC__
-conout(UINT8 a)
-#else
 conout(a)
 UINT8 a;
-#endif
 {
     out(0x4f, 1);
 	/* wait for txempty */
