@@ -90,7 +90,9 @@ goes in as B: and the command is
 controllers disagree about sector sizes and what that costs.  The whole
 drive formats and verifies in about six seconds.
 
-What a real format leaves in the drive label, worth checking against:
+What a real format leaves in the drive label - the simulator's own,
+out of band at the front of the drive file, not anything in the blocks -
+worth checking against:
 
 	secsize 512  cyl 153  heads 4  spt 17
 	firstsec 0  seccode 3  gap3 43  fill 0xe5  formatted 1
@@ -190,20 +192,44 @@ the blocks go back on the free list and come off it again in reverse -
 same blocks, same size, boot area written backwards, and nothing in ls
 or info shows it.  -k keeps the block list and writes through it.
 
-Two things the image handed to it has to get right, which bootimg on
-its own does not:
+There is no in-band disk label.  The drive's geometry - what the
+machine runs on - is out of band, in a fixed 2k header at the front of
+the simulator's drive file: struct disklabel in lib/hdcdmadisk.c,
+DATAOFF.  hddma-0 is 5328896 bytes, which is that 2k and then 10404
+blocks.  Nothing in the block space describes the drive.
 
-  - the drive label lives at offset 256 of the boot sector, the second
-    half of the same block as the first level.  bootimg pads the first
-    level to 512 with zeroes and would erase it.  Splice instead: first
-    level, then the existing bytes 256-511, then the second level at
-    512.  mkfs refuses to write a label if the boot code has grown into
-    it, and the first level is 181 bytes, so there is room.
+The second half of the boot block is used for something else, and it is
+an addition rather than anything Micronix shipped: mkfs's installboot
+scribbles format information there, a struct dlabel at DL_OFFSET, 256
+bytes into the block the first level occupies.  It holds what the drive
+is and where the boot area is:
 
-  - pad the result to the file's full size, 34816, so the size stays
-    what it was and all 68 blocks stay claimed.  write -k refuses to
-    grow a file, which is the point: a block it had to allocate would
-    not be in the area the rom reads.
+	d_tracks d_heads d_spt		the geometry
+	d_cyl0				bootfirst, where this area starts
+	d_bootblks			how many blocks it is
+	d_roll				what mw.c adds to blk / spc
+	d_fsize d_isize d_swap		the filesystem laid on top
+
+So an image handed to write -k has two things to get right:
+
+  - keep bytes 256-511.  bootimg pads the first level to 512 with
+    zeroes and would scribble over the format information.  Splice
+    instead: first level, then the existing 256-511, then the second
+    level at 512.  The first level is 181 bytes, so it does not reach
+    them.
+
+  - pad to the file's full size, 34816, so the size stays what it was
+    and all 68 blocks stay claimed.  write -k refuses to grow a file,
+    which is the point - a block it had to allocate would not be in the
+    area the rom reads.
+
+Worth knowing while stage 3 is broken: the second level does not read
+any of that.  stand/*.c mentions neither dlabel nor DL_OFFSET - mwio.c
+carries the geometry as a compiled-in default and probes the drive for
+the head count - and the probe is what fails.  The answer it is failing
+to work out is sitting in the same block it was loaded from, put there
+by mkfs for the purpose.  On the image here those bytes are zero,
+because mkfs -i has never been run on it.
 
 setblk names the blocks a file owns, for building the arrangement in
 the first place.  It does not take them off the free list - run
