@@ -1,33 +1,21 @@
 #
-# Makefile for updating the source tree
+# cross build for init
 #
 # cmd/init/GNUmakefile
 #
-# Changed: <2023-07-04 19:55:33 curt>
+# Everything is in GNUmakefile.inc: ccc from /usr/local, every .c in
+# this directory, linked into init.
+#
+# init.ctl and init.dist are data, not sources, and are not shipped by
+# the update rule - which is what was true before this was converted.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIR = init
-CLASS = cmd
-ROOT = ~/src/micronix/filesystem
-SRCDIR = /usr/src/$(CLASS)/$(DIR)
-DEST = $(ROOT)/$(SRCDIR)
-NOWARN = --warning=no-ignore-newer
+DEPTH	= ../..
+DIR	= init
+CLASS	= cmd
 
-SRCS = $(wildcard *.c *.h)
+# process 1 lives in /etc, not /bin
+BINDIR	= /etc
 
-update:
-	mkdir -p $(DEST)
-	tar -f $(DIR).tar --ignore-failed-read -c Makefile $(SRCS)
-	tar -f $(DIR).tar -C $(DEST) --keep-newer-files -x $(NOWARN)
-
-doc:
-
-clean:
-	rm -f *.o
-
-clobber: clean
-	rm -f *.3 *.0 $(DIR).tar
-
-cross:
-	(cd ../.. ; make update)
+include $(DEPTH)/GNUmakefile.inc

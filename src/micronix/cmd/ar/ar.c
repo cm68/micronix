@@ -1,7 +1,30 @@
 #include <stdio.h>
+#ifdef linux
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
+#else
+/*
+ * The micronix headers, not ccc's.  ccc's <stat.h> is the CP/M struct
+ * stat - mode, three times and size, and nothing else - so st_uid and
+ * st_gid do not exist in it, and its <signal.h> is the CP/M signal set
+ * without SIGHUP or SIGQUIT.  The sys/ names do not collide with
+ * anything ccc installs, so they resolve out of the tree's own
+ * include directory.  stat.h needs UINT out of types.h and struct
+ * dsknod out of sys/fs.h, and says so at the top of itself.
+ */
+#include <types.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
+#include <sys/signal.h>
+#endif
+
+/*
+ * ar_hdr and ARMAG live in ar.h beside this file, which was never
+ * included - gcc let it pass because struct ar_hdr was completed by
+ * the time it mattered and ARMAG happened to be an int.
+ */
+#include "ar.h"
 
 struct	stat	stbuf;
 
@@ -501,7 +524,15 @@ movefil(f)
 	for(i=0; i<14; i++)
 		if(arbuf.ar_name[i] = *cp)
 			cp++;
-	arbuf.ar_size = stbuf.st_size;
+	/*
+	 * micronix keeps a file size in three bytes, not four: a high
+	 * byte and a low word, and there is no st_size to read.  The
+	 * cast is load bearing - int is sixteen bits here, so shifting
+	 * the high byte up without widening it first would shift it
+	 * away entirely and every archive member would be recorded at
+	 * its size modulo 64K.
+	 */
+	arbuf.ar_size = ((long)stbuf.st_size0 << 16) + stbuf.st_size1;
 	arbuf.ar_date = stbuf.st_mtime;
 	arbuf.ar_uid = stbuf.st_uid;
 	arbuf.ar_gid = stbuf.st_gid;

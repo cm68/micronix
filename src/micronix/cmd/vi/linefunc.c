@@ -116,7 +116,7 @@ coladvance(p, col)
 }
 
 static char *laststr = NULL;
-static int lastdir = 0;
+static int lastdir;
 
 char *
 ssearch(dir, str)

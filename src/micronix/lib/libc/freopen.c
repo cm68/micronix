@@ -13,9 +13,12 @@ char *	name, * mode;
 register FILE *	iob;
 {
 	uchar		c;
+	char *		p;
+	int		plus;
 
 	fclose(iob);
 	c = 0;
+	plus = 0;
 	iob->_flag &= _IONBF;
 	switch (*mode) {
 
@@ -24,25 +27,53 @@ register FILE *	iob;
 	case 'a':
 		c++;
 	case 'r':
-		if(mode[1] == 'b')
-			iob->_flag = _IOBINARY;
 		break;
 
 	}
 
-	/* access mode */
+	/*
+	 * The modifiers come in either order - "w+b" and "wb+" mean the
+	 * same thing - so read all of them.  Looking only at mode[1]
+	 * meant "w+b" never got _IOBINARY, and the assignment that did
+	 * it threw away the _IONBF just preserved above.
+	 */
+	for (p = mode + 1; *p; p++) {
+		if (*p == '+')
+			plus++;
+		else if (*p == 'b')
+			iob->_flag |= _IOBINARY;
+	}
+
+	/*
+	 * access mode.  0 is read, 1 is write, 2 is read-write; a "+"
+	 * mode is the last of those whichever letter it followed.
+	 */
 	switch(c) {
 
 	case 0:
-		iob->_file = open(name, 0);
+		iob->_file = open(name, plus ? 2 : 0);
 		break;
 
 	case 1:
-		if ((iob->_file = open(name, 1)) >= 0)
+		if ((iob->_file = open(name, plus ? 2 : 1)) >= 0)
 			break;
-		/* else fall through */
+		/* else fall through: it does not exist yet */
 	case 2:
 		iob->_file = creat(name, 0666);
+		/*
+		 * creat hands back a descriptor open for writing only,
+		 * so a "w+" stream could be written and never read -
+		 * which is not what it promises.  The file exists and
+		 * is empty now, so open it again for both.
+		 *
+		 * asz is what wanted this: it assembles into a "w+b"
+		 * temp file and then seeks back over it to copy it into
+		 * the object.
+		 */
+		if (iob->_file >= 0 && plus) {
+			close(iob->_file);
+			iob->_file = open(name, 2);
+		}
 		break;
 	}
 	if (iob->_file < 0)
@@ -61,6 +92,12 @@ register FILE *	iob;
 		iob->_flag |= _IOWRT;
 	else
 		iob->_flag |= _IOREAD;
+	/*
+	 * A "+" stream is both, which is what lets fseek put it back to
+	 * undecided and let the next operation pick a direction.
+	 */
+	if (plus)
+		iob->_flag |= _IORW;
 	if (iob->_base && c)
 		iob->_cnt = BUFSIZ;
 	if (c == 1)

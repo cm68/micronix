@@ -1,18 +1,15 @@
 #
-# cross Makefile for cc
+# cross build for cc
 #
 # cmd/cc/GNUmakefile
 #
-# Changed: <2023-07-27 12:56:25 curt>
+# Everything is in GNUmakefile.inc: ccc from /usr/local, every .c in
+# this directory, linked into cc.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DEPTH = ../..
-DIR = cc
-CLASS = cmd
-
-SRCS = $(wildcard *.c *.h)
-TARGET = cc
+DEPTH	= ../..
+DIR	= cc
+CLASS	= cmd
 
 include $(DEPTH)/GNUmakefile.inc
-

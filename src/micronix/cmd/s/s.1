@@ -1,0 +1,127 @@
+.he "s (1)                        8/12/26                        s (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+s
+- a screen editor
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+s file
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+S is a small screen editor in the manner of vi.  It takes exactly one
+file, which it reads into a buffer; the file on disk is not touched
+until a write is asked for.
+.sp
+A command is a letter, most of which may be given a repeat count typed
+in front of it.  The three operators c, d and y - change, delete and
+yank - are followed by an address, and act on everything between the
+cursor and where that address lands.  An address given on its own just
+moves the cursor there, and an operator typed twice over takes the
+whole line.
+.sp
+The editor is in command mode until a command that takes text puts it
+into insert mode, which lasts until escape.
+.sp 2
+.in -5
+.bd
+ADDRESSES
+.in +5
+.br
+.nf
+     h l       one character left, right
+     backspace one character left
+     j k       one line down, up
+     space     one character right
+     w b       forward, back one word
+     0 $       the first, last character of a line
+     f F       forward, back to a character
+     ; \       repeat, reverse that search
+     / n       search for a pattern, and repeat it
+     G         a line by number, the last by default
+     H M L     the top, middle, bottom line shown
+     -         a line by number, relative
+     ' `       the marked line, the marked character
+     cc dd yy  the whole line
+.fi
+.sp 2
+.in -5
+.bd
+COMMANDS
+.in +5
+.br
+.nf
+     a A i     append after, at end of line, insert
+     o O       open a line below, above
+     C D       change, delete to end of line
+     x         delete characters
+     r s       replace, substitute one character
+     J         join this line and the next
+     p P       put the yank buffer after, before
+     u         undo
+     m         mark the cursor, for ' ` and *
+     .         do the last change again
+     *         make one change everywhere, to the mark
+     #         fill the lines from here to the mark
+     ?         the file name, and where you are
+     q         quit, asking first if modified
+     ZZ        write if modified, and quit
+     :         an input or output command
+.fi
+.sp 2
+.in -5
+.bd
+COLON COMMANDS
+.in +5
+.br
+.nf
+     :w        write, with an address and a name
+     :e        edit another file
+     :r        read a file in after this line
+     :R        read a file in at this line
+.fi
+.sp
+A colon command with no file name uses the file being edited.  One
+that would lose a modified buffer asks first.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The join command puts one space between the two lines and throws away
+the leading blanks of the second.
+.sp
+The star command works from the cursor to the mark, alternating a
+repeat of the last search with a repeat of the last change, which is
+how one change is made everywhere it applies.  It stops after fifty
+changes and says so; typing it again carries on from there.
+.sp
+The fill command reflows the lines from the cursor to the mark, to
+seventy-eight columns unless a count says otherwise.
+.sp
+S is Webb Miller's editor from A Software Tools Sampler, Prentice-Hall
+1987, by way of the HI-TECH C port.  The buffer and the screen are
+each behind a manager, so the part that knows about the terminal is
+small.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+vi (1)

@@ -1,30 +1,15 @@
 #
-# Makefile for updating the source tree
+# cross build for ar
 #
 # cmd/ar/GNUmakefile
 #
-# Changed: <2023-07-04 19:55:33 curt>
+# Everything is in GNUmakefile.inc: ccc from /usr/local, every .c in
+# this directory, linked into ar.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIR = ar
-CLASS = cmd
-ROOT = ~/src/micronix/filesystem
-SRCDIR = /usr/src/$(CLASS)/$(DIR)
-DEST = $(ROOT)/$(SRCDIR)
-NOWARN = --warning=no-ignore-newer
+DEPTH	= ../..
+DIR	= ar
+CLASS	= cmd
 
-SRCS = $(wildcard *.c *.h)
-
-update: 
-	mkdir -p $(DEST)
-	tar -f $(DIR).tar --ignore-failed-read -c Makefile $(SRCS)
-	tar -f $(DIR).tar -C $(DEST) --keep-newer-files -x $(NOWARN)
-
-clean:
-	rm -f *.o
-
-clobber: clean
-	rm -f *.3 *.0 $(DIR).tar
-
-cross:
+include $(DEPTH)/GNUmakefile.inc

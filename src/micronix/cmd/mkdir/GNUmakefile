@@ -1,33 +1,15 @@
 #
-# Makefile for updating the source tree
+# cross build for mkdir
 #
-# cmd/ls/GNUmakefile
+# cmd/mkdir/GNUmakefile
 #
-# Changed: <2023-07-04 19:55:33 curt>
+# Everything is in GNUmakefile.inc: ccc from /usr/local, every .c in
+# this directory, linked into mkdir.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIR = mkdir
-CLASS = cmd
-ROOT = ~/src/micronix/filesystem
-SRCDIR = /usr/src/$(CLASS)/$(DIR)
-DEST = $(ROOT)/$(SRCDIR)
-NOWARN = --warning=no-ignore-newer
+DEPTH	= ../..
+DIR	= mkdir
+CLASS	= cmd
 
-SRCS = $(wildcard *.c *.h)
-
-update: 
-	mkdir -p $(DEST)
-	tar -f $(DIR).tar --ignore-failed-read -c Makefile $(SRCS)
-	tar -f $(DIR).tar -C $(DEST) --keep-newer-files -x $(NOWARN)
-
-doc:
-
-clean:
-	rm -f *.o
-
-clobber: clean
-	rm -f *.3 *.0 $(DIR).tar
-
-cross:
-	(cd ../.. ; make update)
+include $(DEPTH)/GNUmakefile.inc

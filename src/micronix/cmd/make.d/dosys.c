@@ -93,7 +93,7 @@ int status;
 int argc;
 
 
-argc = 0;
+argc;
 s = pool;
 
 for(t=str ; *t!='\0' ; )
@@ -108,7 +108,7 @@ for(t=str ; *t!='\0' ; )
 
 if(argc == 0)   /* no command */
 	return(-1);
-argv[argc] = 0;
+argv[argc];
 
 if(fork() == 0)
 	{

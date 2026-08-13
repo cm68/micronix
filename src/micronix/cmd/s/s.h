@@ -22,7 +22,13 @@
  */
 #define	UNKNOWN		bell()
 
-#define	malloc(x) alloc(x)
+/*
+ * malloc was defined to alloc here, which is what v7 called it.  This
+ * library has malloc and no alloc, so every malloc() in s compiled to
+ * a call to a function that does not exist.
+ *
+ * #define	malloc(x) alloc(x)
+ */
 #define	getchar() getc(stdin)
 
 #define	FIXEDSCREEN

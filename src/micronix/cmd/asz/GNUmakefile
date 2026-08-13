@@ -1,20 +1,23 @@
 #
-# cross Makefile for asz assemble
+# cross build for asz - the assembler.  Replaces the TRASM-derived one, now cmd/asz.old.
 #
-# usr/src/cmd/asz/GNUmakefile
+# cmd/asz/GNUmakefile
 #
-# Changed: <2023-07-04 19:55:33 curt>
+# PROTOTYPE.  The compiler is moving into this tree, and this is the
+# shape it will have when it arrives: one directory per pass and per
+# tool.  The sources here are symlinks into ~/src/ccc/src/tools, which is
+# still where they are edited, so nothing is duplicated while both
+# trees exist.
+#
+# Not in cmd/GNUmakefile's DIRS.  These are host programs today, built
+# by gcc -m32 in the ccc tree; building them here with ccc means
+# building the compiler for the Z80, which is the point of moving them
+# but is not something that works yet.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DEPTH = ../..
-CLASS = cmd
-DIR = asz
-TARGET = asz
-INCFLAG =
-LIBS =
+DEPTH	= ../..
+DIR	= asz
+CLASS	= cmd
 
 include $(DEPTH)/GNUmakefile.inc
-
-test:
-	cd tests ; make test

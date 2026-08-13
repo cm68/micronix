@@ -327,7 +327,10 @@ readttys()
 
 	for (;;) {
 		fgets(line, 512, fp);
-		if (fp->_flag & (_EOF | _ERR)) {
+		/* was fp->_flag & (_EOF | _ERR), the old whitesmith flag
+		   names; feof and ferror ask the same thing and exist in
+		   both stdio.h's */
+		if (feof(fp) || ferror(fp)) {
 			fclose(fp);
 			return;
 		}
@@ -1399,7 +1402,7 @@ rootpasswd()
 
 	for (;;) {
 		fgets(line, 512, fp);
-		if (fp->_flag & (_EOF | _ERR))
+		if (feof(fp) || ferror(fp))	/* was fp->_flag & (_EOF|_ERR) */
 			break;
 
 		p = line;

@@ -1,0 +1,61 @@
+.he "mkdir (1)                    8/12/26                    mkdir (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+mkdir
+- make directories
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+mkdir [ -pvn ] dirname ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Mkdir makes each named directory.
+.sp
+Micronix has no mkdir system call.  The directory is made the way v7
+made it: the entry is created, and the two entries every directory
+must have - "." pointing at itself and ".." at its parent - are linked
+in afterwards.  A directory that exists but has no "." in it was
+interrupted between those steps.
+.sp
+The parent directory must be writable.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-p	Make any missing parent directories too, and do not complain if the directory already exists.
+
+.ti -10
+-v	Name each directory as it is made.
+
+.ti -10
+-n	Go through the motions without making anything.
+
+.ti -10
+-h	Print the usage line.
+
+.in -10
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+rm (1), ls (1)

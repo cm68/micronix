@@ -1,0 +1,92 @@
+.he "ls (1)                       8/12/26                       ls (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+ls
+- list the contents of a directory
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+ls [ -acdfgilrstu ] [ name ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+For each directory named, ls lists what is in it; for each file, ls
+lists the file.  With no name at all it lists the current directory.
+The listing is sorted by name unless an option says otherwise.
+.sp
+By default the names are printed several to a line, as many as fit in
+eighty columns.  Any option that has something to say about each file
+- -l, -s or -i - turns that off and prints one name to a line.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-l	Long: mode, links, owner, size and time as well as the name.
+
+.ti -10
+-s	Give the size of each file in blocks.
+
+.ti -10
+-i	Give the i-number of each file.
+
+.ti -10
+-a	List entries beginning with a period, which are otherwise left out.
+
+.ti -10
+-d	List a directory itself rather than its contents.
+
+.ti -10
+-t	Sort by time rather than by name, most recent first.
+
+.ti -10
+-u	Use the time of last use rather than last change.
+
+.ti -10
+-c	Use the time the inode was last changed.
+
+.ti -10
+-r	Reverse whichever order is in force.
+
+.ti -10
+-g	In a long listing, give the group rather than the owner.
+
+.ti -10
+-f	Take each argument to be a directory and read it without sorting or stat'ing, which is quick and shows the order the entries are really in.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The mode column writes an l rather than a w for the write bit when the
+file is marked for exclusive write, which is a micronix bit that v7
+does not have.
+.sp
+A file's size is kept in three bytes here, a high byte and a low word,
+so a long listing can report a size up to sixteen megabytes.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+pwd (1), rm (1)

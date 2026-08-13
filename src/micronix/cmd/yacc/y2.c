@@ -38,7 +38,7 @@ char * typeset[NTYPES];	/* pointers to type tags */
 
 	/* symbol tables for tokens and nonterminals */
 
-int ntokens = 0;
+int ntokens;
 struct toksymb tokset[NTERMS];
 int toklev[NTERMS];
 int nnonter = -1;
@@ -46,7 +46,7 @@ struct ntsymb nontrst[NNONTERM];
 int start;	/* start symbol */
 
 	/* assigned token type values */
-int extval = 0;
+int extval;
 
 	/* input and output file descriptors */
 

@@ -86,14 +86,14 @@
 #define SHORT_COUNT	4
 
 #ifndef FIXEDSCREEN
-int nrows = 0;
-int ncols = 0;
+int nrows;
+int ncols;
 #endif
 
-int scroll_size = 0;
+int scroll_size;
 
-int cur_row = 0;
-int cur_col = 0;                /* cursor location */
+int cur_row;
+int cur_col;                /* cursor location */
 char save = '\0';               /* character in location (nrows, ncols-1) */
 
 /*

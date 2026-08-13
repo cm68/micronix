@@ -350,7 +350,7 @@ char *fmt, *a0, *a1;
 	++nerrors;
 }
 
-static FILE *infile = 0;
+static FILE *infile;
 
 bufaddc(c)
 char c;

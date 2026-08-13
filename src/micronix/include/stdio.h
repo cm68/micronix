@@ -1,101 +1,99 @@
+#define	BUFSIZ		512
 /*
- * the whitesmith's stdio implementation
+ * Six left three for the program, because stdin, stdout and stderr
+ * hold the first three for the whole life of it.  wsld wants more
+ * than that on its own: it keeps every input open at once - crt0.o,
+ * the objects, libc.a, libu.a - and the output as well, and it fell
+ * over on libu.a with "cannot open" for a file that was there and
+ * readable.  fopen has no descriptor left to fail on at that point;
+ * it never gets as far as open.
  *
- * /include/stdio.h
-
- * Modified: <2023-07-05 23:06:12 curt>
-
- * vim: tabstop=4 shiftwidth=4 expandtab:
+ * A FILE is eight bytes, so this costs 48 bytes of bss in every
+ * program.  The 512 byte buffer behind one is only allocated when a
+ * file is actually opened, so nothing pays for slots it does not use.
  */
+#define	_NFILE		12
+# ifndef FILE
+#define	uchar	unsigned char
 
-#define	_BUFSIZE	512
-#define	 BUFSIZ		512
-#define	_NFILE		16
+extern	struct	_iobuf {
+	char *		_ptr;
+	int		_cnt;
+	char *		_base;
+	uchar		_flag;
+	char		_file;
+} _iob[_NFILE];
 
-typedef struct _iobuf {
-	char *_ptr;
-	int _cnt;
-	char *_base;
-	int _flag;
-	int _fd;
-	long _offset;
-	int _pid;
-} FILE;
+extern uchar _setup;
 
-extern FILE _iob[_NFILE];
+# endif
 
-extern _exit();
-extern exit();
+#define	_IOREAD		01	/* 0x01 */
+#define	_IOWRT		02	/* 0x02 */
+#define	_IORW		03	/* 0x03 */
+#define	_IONBF		04	/* 0x04 */
+#define	_IOMYBUF	010	/* 0x08 */
+#define	_IOEOF		020	/* 0x10 */
+#define	_IOERR		040	/* 0x20 */
+#define	_IOSTRG		0100	/* 0x40 */
+#define	_IOBINARY	0200	/* 0x80 */
 
-#define	stdin	(&_iob[0])
-#define	stdout	(&_iob[1])
-#define	stderr	(&_iob[2])
+#ifndef NULL
+#define	NULL		(void *)0
+#endif
 
-#define	_READ	01
-#define	_WRITE	02
-#define	_UNBUF	04
-#define	_BIGBUF	010
-#define	_EOF	020
-#define	_ERR	040
-#define	_UNSEEK 0100			/* the _fd is not seekable */
-#define	_PIPE	0200
-#define	_TTY	0400			/* _fd corresponds to a tty */
-#define	_ALLOC  01000			/* buffer obtained through alloc */
+#define	FILE		struct _iobuf
+#define	EOF		(-1)
 
-#define	getc(p) (((--(p)->_cnt) >= 0) ? (*(p)->_ptr++ & 0377) : (_fillbuf (p)))
+/* whence values for fseek.  unistd.h has them too, for lseek */
+#ifndef SEEK_SET
+#define	SEEK_SET	0
+#define	SEEK_CUR	1
+#define	SEEK_END	2
+#endif
 
-#define	getchar() getc(stdin)
-
-#define	putc(x,p) \
-	{\
-	if (--(p)->_cnt >= 0)\
-		*(p)->_ptr++ = (x);\
-	else\
-		_flushbuf ((x & 0377), (p));\
-	if ((x) == '\n' && (p)->_flag & (_TTY | _UNSEEK))\
-		fflush (p);\
-	}
-
+#define	getc(p)		fgetc(p)
+#define	getchar()	getc(stdin)
+#define	putc(x,p)	fputc(x,p)
 #define	putchar(x)	putc(x,stdout)
+#define	feof(p)		(((p)->_flag&_IOEOF)!=0)
+#define	ferror(p)	(((p)->_flag&_IOERR)!=0)
+#define	fileno(p)	((uchar)p->_file)
 
-#define	fflush(a)	(_flushbuf(EOF,(a)))
+extern FILE *stdin;
+extern FILE *stdout;
+extern FILE *stderr;
 
-#define isalpha(a) (isupper(a) || islower(a))
-#define isupper(a) ('A' <= (a) && (a) <= 'Z')
-#define islower(a) ('a' <= (a) && (a) <= 'z')
-#define isdigit(a) ('0' <= (a) && (a) <= '9')
-#define isspace(a) ((a) == ' ' || (a) == '\t' || (a) == '\n')
-#define toupper(a) (islower(a) ? ((a) + 'A' - 'a') : (a))
-#define tolower(a) (isupper(a) ? ((a) + 'a' - 'A') : (a))
-
+FILE *		fopen();
+FILE *		freopen();
+FILE *		fdopen();
+long		ftell();
 /*
- * system parameters
+ * A prototype, and it has to be one: fseek takes a long, and almost
+ * every caller in the tree writes fseek(fp, 0, SEEK_SET) with a plain
+ * int.  Undeclared, that pushed two bytes where the body reads four,
+ * so the offset was built from the offset and the whence, and whence
+ * itself came off the stack from beyond the arguments.  lseek saw a
+ * whence it did not recognise, returned EINVAL without ever issuing
+ * the seek, and fseek reported failure - silently, since hardly
+ * anyone checks it.  asz assembled into a temp file, seeked back to
+ * copy it into the object, and copied nothing.
  */
-
-#define STDIN	0
-#define STDOUT	1
-#define STDERR	2
-#define YES		1
-#define NO		0
-#define NULL	0
-#define BUFSIZE	512
-#define READ	0
-#define WRITE	1
-#define UPDATE	2
-#define EOF		-1
-#define BYTMASK	0377
-
+int		fseek(FILE *, long, int);
+char *		fgets();
+char *		_bufallo();
+int _flsbuf();
 /*
- *  macros
+ * int, not char: both return the character read or written, or EOF,
+ * which is -1 - a value a char cannot hold apart from a data byte of
+ * 0xff.  The bodies have always returned the full word in HL; the
+ * char spelling made every "!= EOF" test depend on the sign-extension
+ * of a truncated return.
  */
+int fgetc();
+int fputc();
+int printf(char *, ...);
+int fprintf(FILE *, char *, ...);
+int sprintf(char *, char *, ...);
 
-#define abs(x)		((x) < 0 ? (-(x)) : (x))
-#define iswhite(c)	((c) <= ' ' || 0177 <= (c))	/* ASCII ONLY */
-#define isblack(a)	(!iswhite(a))
-#define max(x, y)	(((x) < (y)) ? (y) : (x))
-#define min(x, y)	(((x) < (y)) ? (x) : (y))
-
-#define feof(a) ((a)->_flag & (_EOF | _ERR))
-#define ferror(a) ((a)->_flag & _ERR)
-#define fileno(a) ((a)->_fd)
-#define clearerr(a) ((a)->_flag &= ~ERR)
+/* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

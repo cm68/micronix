@@ -1,0 +1,61 @@
+.he "mknod (1)                    8/12/26                    mknod (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+mknod
+- make a device node
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+mknod name b/c major minor
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Mknod makes a special file called name, which is how a device is
+reached through the filesystem.
+.sp
+The second argument is the kind of device: b for a block device, one
+the system talks to a buffer at a time and can hold a filesystem, or c
+for a character device, one it talks to a byte at a time.
+.sp
+Major is which driver, and minor is which unit that driver is to use -
+which drive, which port.  Both are numbers, and their meanings belong
+to the driver rather than to mknod.
+.sp
+Only the super-user may make a device node.
+.sp 2
+.in -5
+.bd
+EXAMPLE
+.in +5
+.br
+.nf
+     mknod /dev/tty1 c 0 1
+     mknod /dev/hd0 b 2 0
+.fi
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The one that came with micronix was broken.  This is a rewrite.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ls (1)

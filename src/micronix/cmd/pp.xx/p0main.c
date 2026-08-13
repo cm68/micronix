@@ -252,7 +252,7 @@ char *path;
     }
 }
 
-char *progname = 0;
+char *progname;
 
 usage(c)
 char c;
@@ -273,12 +273,12 @@ char c;
     exit(1);
 }
 
-char **sources = 0;
-int srcfiles = 0;
+char **sources;
+int srcfiles;
 
 #define MAXDEFS 10
-char *defines[MAXDEFS] = 0;
-int ndefs = 0;
+char *defines[MAXDEFS];
+int ndefs;
 
 /*
  * expand define/include/if, perform lexical analysis

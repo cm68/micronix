@@ -29,7 +29,7 @@
 #include "nroff.h"
 #include <time.h>
 
-char *myname = 0;
+char *myname;
 
 main (argc, argv)
 int     argc;

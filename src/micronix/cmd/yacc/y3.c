@@ -71,7 +71,7 @@ output(){ /* print the output for the states */
 
 	}
 
-int pkdebug = 0;
+int pkdebug;
 apack(p, n ) int *p;{ /* pack state i from temp1 into amem */
 	int off;
 	register *pp, *qq, *rr;
@@ -175,7 +175,7 @@ go2out(){ /* output the gotos for the nontermninals */
 
 	}
 
-int g2debug = 0;
+int g2debug;
 go2gen(c){ /* output the gotos for nonterminal c */
 
 	register int i, cc;

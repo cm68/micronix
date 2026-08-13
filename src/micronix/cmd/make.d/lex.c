@@ -78,10 +78,10 @@ char *copys();
 for(p=q+1 ; *p==' '||*p=='\t' ; ++p)  ;
 
 sp = intalloc(sizeof(*sp));
-sp->nextp = 0;
+sp->nextp;
 sp->shbp = (fin == NULL ? p : copys(p) );
 yylval = sp;
-zznextc = 0;
+zznextc;
 return(SHELLINE);
 }
 
@@ -96,8 +96,8 @@ char lastch, *lastchp;
 extern char **linesptr;
 int incom;
 
-incom = 0;
-zznextc = 0;
+incom;
+zznextc;
 
 if(fin == NULL)
 	{

@@ -17,7 +17,8 @@
 #include <sys/dir.h>
 #include <dirent.h>
 
-#define	MAXPATHL	512
+/* the two buffers below are declared MAXPATHLEN + 1; this was MAXPATHL */
+#define	MAXPATHLEN	512
 #define	MAXBSIZE	512
 
 #ifdef linux

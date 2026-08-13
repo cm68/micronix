@@ -23,33 +23,33 @@
  * .fi/.nf are the whole of its handling.
  */
 int fill = 1;               /* .fi / .nf */
-int indent = 0;             /* .in */
-int tmpindent = 0;          /* .ti, one line only */
-int tmpset = 0;
+int indent;             /* .in */
+int tmpindent;          /* .ti, one line only */
+int tmpset;
 int rmargin = 60;           /* .rm */
 int pagelen = 66;           /* .pl */
 int spacing = 1;            /* .ls */
 int tabstop = 8;            /* .ta */
 
-int boldcnt = 0;            /* .bd n */
-int ulcnt = 0;              /* .ul n */
-int cecnt = 0;              /* .ce n */
+int boldcnt;            /* .bd n */
+int ulcnt;              /* .ul n */
+int cecnt;              /* .ce n */
 
 char header[MAXTEXT];       /* .he */
 char footer[MAXTEXT];       /* .fo */
 
 int pageno = 1;
-int line = 0;               /* lines already put on this page */
-int onpage = 0;             /* have we written the header yet */
+int line;               /* lines already put on this page */
+int onpage;             /* have we written the header yet */
 
-int ttyout = 0;             /* -t: no long runs of blank lines */
-int pending = 0;            /* blank lines held back under -t */
+int ttyout;             /* -t: no long runs of blank lines */
+int pending;            /* blank lines held back under -t */
 
 FILE *out;
 
 char obuf[MAXOUT];          /* the line being filled */
-int ocol = 0;               /* text columns used in obuf */
-int owords = 0;
+int ocol;               /* text columns used in obuf */
+int owords;
 
 char *progname = "form";
 
@@ -247,8 +247,13 @@ startcol()
 /*
  * Push out whatever has been filled so far.  This is .br, and every
  * request that changes the shape of the page calls it first.
+ *
+ * Named dobreak rather than brk because libc has a brk of its own -
+ * the memory one, in sbrk.o - and the linker takes the two for the
+ * same symbol: "wsld: duplicate symbol: _brk".  Nothing outside this
+ * file calls this, so the name is ours to change.
  */
-brk()
+dobreak()
 {
     char buf[MAXOUT * 2];
     char *q;
@@ -314,7 +319,7 @@ char *w;
     if (len == 0)
         return;
     if (ocol && startcol() + ocol + 1 + len > rmargin)
-        brk();
+        dobreak();
     if (ocol) {
         obuf[ocol++] = ' ';
         /* two spaces after a sentence, as the sources are typed */
@@ -348,7 +353,7 @@ char *s;
     for (p = s; *p == ' ' || *p == '\t'; p++)
         ;
     if (*p == '\0') {
-        brk();
+        dobreak();
         putblank();
         return;
     }
@@ -463,21 +468,21 @@ char *s;
     switch (r->code) {
 
     case R_BR:
-        brk();
+        dobreak();
         break;
 
     case R_FI:
-        brk();
+        dobreak();
         fill = 1;
         break;
 
     case R_NF:
-        brk();
+        dobreak();
         fill = 0;
         break;
 
     case R_IN:
-        brk();
+        dobreak();
         n = getarg(a, 0);
         if (!hasarg)
             indent = 0;
@@ -496,7 +501,7 @@ char *s;
         break;
 
     case R_RM:
-        brk();
+        dobreak();
         rmargin = getarg(a, 60);
         break;
 
@@ -518,14 +523,14 @@ char *s;
         break;
 
     case R_SP:
-        brk();
+        dobreak();
         n = getarg(a, 1);
         while (n-- > 0)
             putblank();
         break;
 
     case R_BP:
-        brk();
+        dobreak();
         n = getarg(a, 0);
         endpage();
         if (hasarg)
@@ -533,7 +538,7 @@ char *s;
         break;
 
     case R_CE:
-        brk();
+        dobreak();
         cecnt = getarg(a, 1);
         break;
 
@@ -632,7 +637,7 @@ char **argv;
             fclose(f);
         }
     }
-    brk();
+    dobreak();
     endpage();
     fflush(out);
     exit(0);

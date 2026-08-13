@@ -49,11 +49,11 @@ struct b_line
     struct b_line *prev;        /* pointer to previous line */
 };
 
-struct b_line line0 = 0;        /* points to first and last buffer lines */
-struct b_line *ref_line = 0;    /* recently referenced line */
+struct b_line line0;        /* points to first and last buffer lines */
+struct b_line *ref_line;    /* recently referenced line */
 
-int last_id = 0;                /* last ID assigned to a buffer line */
-int ref_nbr = 0;                /* number of recently referenced line */
+int last_id;                /* last ID assigned to a buffer line */
+int ref_nbr;                /* number of recently referenced line */
 
 /*
  * buf_delete - delete buffer lines 

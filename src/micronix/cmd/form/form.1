@@ -1,0 +1,114 @@
+.he "form (1)                     8/12/26                     form (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+form
+- format text
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+form [ -t ] [ -o file ] [ file ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Form reads text, fills and formats it, and writes it out paginated.
+With no file it reads the standard input.
+.sp
+A line whose first character is a period is a request.  Everything
+else is text.  In fill mode, which is the default, words are gathered
+onto a line until the next one would pass the right margin.  A break
+ends the line being filled and starts a new one; most requests that
+change the shape of the page take one first.  In no-fill mode a line
+of input is a line of output.
+.sp
+The page is sixty-six lines long with a header three lines down and a
+footer three lines from the bottom, both set by request.  A page fills
+to within six lines of the bottom and then breaks.
+.sp
+Form is the formatter the manual is written in.  There are no macros:
+a page calls these requests directly.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-t	For a terminal: do not write the long runs of blank lines that separate one page from the next, so that the text does not scroll away.
+
+.ti -10
+-o	Write to the named file rather than to the standard output.
+
+.in -10
+.sp 2
+.in -5
+.bd
+REQUESTS
+.in +5
+.br
+An argument is a number, which may be signed.  Where a request takes
+one and none is given, the default below is used.
+.sp
+.nf
+     .bd n   embolden the next n lines   (1)
+     .bp n   begin a page, numbered n    (the next)
+     .br     break                       
+     .ce n   centre the next n lines     (1)
+     .fi     fill                        (the default)
+     .fo T   footer text, in quotes      
+     .he T   header text, in quotes      
+     .in n   indent n columns            (0)
+     .ls n   line spacing                (1)
+     .nf     no fill                     
+     .pl n   page length                 (66)
+     .rm n   right margin                (60)
+     .sp n   space n lines               (1)
+     .ta n   tab stop                    (8)
+     .ti n   indent the next line only   (0)
+     .ul n   underline the next n lines  (1)
+.fi
+.sp
+An indent written +n or -n is relative to the one in force; written
+plain it is absolute, and with no argument at all it returns to the
+left margin.  An indent never goes negative.
+.sp
+A count applies to lines of output rather than of input, so a request
+to embolden filled text emboldens the line the words land on and not
+the line they were typed on.  This is why a word emboldened in running
+prose sits on a line of its own.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+A request form does not know makes its line vanish rather than
+producing a diagnostic, so prose that begins with a period is lost.
+Several pages of the original manual are short a line for this reason.
+.sp
+The text of the header and the footer is taken in quotes and used
+literally, except that a number sign in it is replaced by the page
+number.  Every page in this manual carries its page number that way.
+.sp
+The tests of the page length and the line spacing are thin: the
+original manual documents both requests and uses neither.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+man (1)

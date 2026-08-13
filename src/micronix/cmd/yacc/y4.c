@@ -14,14 +14,14 @@ int * ggreed = lkst[0].lset;
 int * pgo = wsets[0].ws.lset;
 int *yypgo = &nontrst[0].tvalue;
 
-int maxspr = 0;  /* maximum spread of any entry */
-int maxoff = 0;  /* maximum offset into a array */
+int maxspr;  /* maximum spread of any entry */
+int maxoff;  /* maximum offset into a array */
 int *pmem = mem;
 int *maxa;
 # define NOMORE -1000
 
-int nxdb = 0;
-int adb = 0;
+int nxdb;
+int adb;
 
 callopt(){
 

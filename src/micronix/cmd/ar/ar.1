@@ -1,0 +1,122 @@
+.he "ar (1)                       8/12/26                       ar (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+ar
+- archive and library maintainer
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+ar key [ posname ] archive file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Ar keeps a collection of files in one archive, which is what a library
+of object modules is.
+.sp
+The key is a string.  Exactly one letter of it says what to do, and
+any others modify it.
+.sp 2
+.in -5
+.bd
+KEYS
+.in +5
+.br
+.in +10
+.ti -10
+r	Replace the named files, adding any that are not there.
+
+.ti -10
+d	Delete the named files.
+
+.ti -10
+x	Extract the named files, or all of them if none is named.
+
+.ti -10
+t	List a table of contents.
+
+.ti -10
+p	Print the named files on the standard output.
+
+.ti -10
+m	Move the named files to the end, or to where a positioning letter says.
+
+.ti -10
+q	Append without reading the whole archive first.
+
+.in -10
+.sp 2
+.in -5
+.bd
+MODIFIERS
+.in +5
+.br
+.in +10
+.ti -10
+v	Verbose: say what is being done to each file.
+
+.ti -10
+u	With r, replace only files newer than the copy in the archive.
+
+.ti -10
+a	Place after the file named by posname.
+
+.ti -10
+b	Place before it.
+
+.ti -10
+i	The same as b.
+
+.ti -10
+c	Create the archive without the usual remark that it is being created.
+
+.ti -10
+l	Put temporary files in the current directory rather than in /tmp.
+
+.ti -10
+n	Do not follow the archive's own symbol conventions.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+Ar reads more than one archive format.  It looks at the magic number
+in the first word and recognises the v7, v6, Whitesmith and Hitech
+layouts, so an archive made by any of the compilers this machine has
+carried can be listed and extracted.  It writes the v7 format.
+.sp
+The archive this tree builds its libraries with is not ar - the
+compiler's own archiver, wslib, writes the format its linker reads.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+.in +10
+.ti -10
+/tmp/v*	Temporaries, unless -l is given.
+
+.in -10
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ld (1), cc (1)

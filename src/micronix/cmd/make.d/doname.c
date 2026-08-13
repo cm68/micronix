@@ -33,15 +33,15 @@ if(dbgflag)
 
 if(p->done > 0)  return(p->modtime);
 
-tdep = 0;
-implcom = 0;
-explcom = 0;
+tdep;
+implcom;
+explcom;
 ptime = exists(p->namep);
-ptime1 = 0;
-didwork = 0;
+ptime1;
+didwork;
 p->done = 1;	/* avoid infinite loops */
 
-qchain = 0;
+qchain;
 
 /* Expand any names that have embedded metacharaters */
 

@@ -32,8 +32,19 @@
 
 #include "s.h"
 
-#ifdef unix
-
+/*
+ * Shaped like the one in k_flip below: linux, or else micronix.  It
+ * used to be wrapped in "#ifdef unix", which nothing defines here -
+ * ccc predefines neither unix nor micronix - so the whole block went
+ * away and took <stdio.h> with it, leaving stdin undeclared.
+ *
+ * The micronix half was also outside the "#ifdef linux" rather than in
+ * its #else, so a linux build took both arms and declared oldt twice,
+ * once as termios and once as sgtty.
+ *
+ * <sys/sgtty.h> had a leading slash - </sys/sgtty.h> - which no
+ * include path can satisfy.
+ */
 #ifdef linux
 
 #ifdef TERMIOS
@@ -50,21 +61,23 @@ struct termios oldt;
 struct sgttyb oldt;
 #endif
 #endif
-#endif
+
+#else
 
 #include <stdio.h>
 #include <types.h>
-#include </sys/sgtty.h>
-struct sgtty oldt = 0;
+#include <sys/sgtty.h>
+struct sgtty oldt;
+
 #endif
 
 #define CMD_MAX 500             /* longest command that can be redone */
 
-char change[CMD_MAX + 2] = 0;   /* most recent buffer-change command */
-char cmd_last = 0;              /* first letter in the last command */
-char command[CMD_MAX + 2] = 0;  /* accumulates the current command */
+char change[CMD_MAX + 2];   /* most recent buffer-change command */
+char cmd_last;              /* first letter in the last command */
+char command[CMD_MAX + 2];  /* accumulates the current command */
 char *cmd_ptr = command;        /* next location in command */
-char pushed[CMD_MAX] = 0;       /* pushed-back command */
+char pushed[CMD_MAX];       /* pushed-back command */
 char *push_ptr = pushed;        /* next location in pushed */
 
 /*
@@ -179,7 +192,7 @@ k_redo()
 /*
  * keyboard input mode 
  */
-static int k_raw = 0;
+static int k_raw;
 
 /*
  * k_keyin - get a character from the keyboard

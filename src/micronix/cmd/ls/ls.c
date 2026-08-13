@@ -27,7 +27,7 @@
 #define WIDTH 80
 
 #define	NFILES	1024
-FILE	*pwdf = 0, *dirf = 0;
+FILE	*pwdf, *dirf;
 /* char	stdbuf[BUFSIZ]; */
 
 struct lbuf {
@@ -45,29 +45,29 @@ struct lbuf {
 	long	lmtime;
 };
 
-lwide = 0;
-int errors = 0;
-int fc = 0;
-int maxn = 0;
+int lwide;
+int errors;
+int fc;
+int maxn;
 int xflg = 1;
-int	aflg = 0;
-int dflg = 0;
-int lflg = 0;
-int sflg = 0;
-int tflg = 0;
-int uflg = 0;
-int iflg = 0;
-int fflg = 0;
-int gflg = 0;
-int cflg = 0;
+int	aflg;
+int dflg;
+int lflg;
+int sflg;
+int tflg;
+int uflg;
+int iflg;
+int fflg;
+int gflg;
+int cflg;
 int	rflg = 1;
-long	year = 0;
-int	flags = 0;
+long	year;
+int	flags;
 int	lastuid	= -1;
-char	tbuf[16] = 0;
-long	tblocks = 0;
-int	statreq = 0;
-struct	lbuf	*flist[NFILES] = 0;
+char	tbuf[16];
+long	tblocks;
+int	statreq;
+struct	lbuf	*flist[NFILES];
 struct	lbuf	**lastp = flist;
 struct	lbuf	**firstp = flist;
 char	*dotp	= ".";
@@ -450,14 +450,15 @@ struct lbuf *
 gstat(file, argfl)
 char *file;
 {
-	extern char *alloc();
+	/* alloc() is what v7 called it; the library here has malloc */
+	extern char *malloc();
 	struct stat statb;
 	register struct lbuf *rep;
 	static int nomocore;
 
 	if (nomocore)
 		return(NULL);
-	rep = (struct lbuf *)alloc(sizeof(struct lbuf));
+	rep = (struct lbuf *)malloc(sizeof(struct lbuf));
 	if (rep==NULL) {
 		fprintf(stderr, "ls: out of memory\n");
 		nomocore = 1;
@@ -490,7 +491,10 @@ char *file;
 			}
 		}
 		rep->lnum = statb.st_ino;
-		rep->lsize = statb.d.d_size1 + (statb.d.d_size0 << 16);
+		/* (long) before the shift: int is sixteen bits, so shifting
+		   the high byte up sixteen without widening it discards it,
+		   and every file of 64K or more listed short by that much */
+		rep->lsize = statb.d.d_size1 + ((long)statb.d.d_size0 << 16);
 		switch(statb.st_mode & S_IFMT) {
 
 		case S_IFDIR:

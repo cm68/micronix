@@ -17,13 +17,13 @@
 char dot[] = ".";
 char dotdot[] = "..";
 char root[] = "/";
-char path[512] = 0;
-int file = 0;
+char path[512];
+int file;
 int off = -1;
 
-struct stat rootstat = 0;
-struct stat statbuf = 0;
-struct dir dirent = 0;
+struct stat rootstat;
+struct stat statbuf;
+struct dir dirent;
 
 /*
  * print out the accumulated name

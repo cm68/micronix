@@ -1,0 +1,128 @@
+.he "sh (1)                       8/12/26                       sh (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+sh
+- the micronix shell
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+sh [ -v ] [ -c string ] [ file ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Sh reads lines and runs them.  With a file it reads that; with -c it
+runs the one string it is given and stops; with neither it reads the
+standard input, and prompts if that is a terminal.
+.sp
+A line is a pipeline: commands separated by a pipe, with redirections
+and perhaps an ampersand on the end.  Each command is looked up as a
+builtin first and then along the path, which is the current directory,
+/bin and /usr/bin.
+.sp
+This is a csh rather than a Bourne shell.  The operators ending in an
+ampersand send the standard error wherever the standard output is
+going, and there is no here document and no way to redirect a numbered
+descriptor.
+.sp
+A shell whose name begins with a minus is a login shell.  It reads
+/.login and then /.sh before it reads anything else.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-v	Write each line to the standard error as it is run.
+
+.ti -10
+-c	Run the string that follows, and exit.
+
+.in -10
+.sp 2
+.in -5
+.bd
+OPERATORS
+.in +5
+.br
+Longest first, which is the order they are matched in:
+.sp
+.nf
+     |&    pipe the standard output and the error
+     |     pipe the standard output
+     &     run the pipeline in the background
+     >>&   append both to a file
+     >>    append the standard output to a file
+     >&    both to a file
+     >     the standard output to a file
+     <     the standard input from a file
+.fi
+.sp 2
+.in -5
+.bd
+BUILTINS
+.in +5
+.br
+.nf
+     cd, chdir  change directory
+     home       what cd with no argument means
+     dir        list a directory
+     era        remove files
+     echo       write the arguments
+     type       where a command would be run from
+     path       set or show the search path
+     prompt     set the prompt
+     alias      make or show an abbreviation
+     unalias    take one away
+     source     read a file as input
+     nice       run the rest more politely
+     kill       signal a process
+     wait       wait for the background ones
+     pid        the process id
+     sync       flush the buffer cache
+     exit       exit, with a status if given
+.fi
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+.nf
+     /.login    read by a login shell, first
+     /.sh       read after /.login
+.fi
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+There is no source for the shell this tree ships in /bin, so this one
+was read back out of that binary: the operator table, the builtin
+numbering, the search path and the prompt are all its own.  Where the
+two can be told apart, cmd/sh/NOTES says so.
+.sp
+It installs as /bin/nsh rather than over /bin/sh, so a system that
+will not come up under it still comes up.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+msh (1)

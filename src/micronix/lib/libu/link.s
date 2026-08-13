@@ -24,7 +24,20 @@ _link:
 	pop 	hl		; new
 	ld 	(new),hl
 
-	ld	hl,-4
+;
+; Three pops moved sp up by six, so six is what comes back off it and
+; the return address is on top again for the ret at the end.
+;
+; This said -4.  sp came back two bytes high, so the ret took the
+; saved "old" pointer for a return address and jumped into it: link
+; returned to a filename.  Nothing said link - what it looked like was
+; the compiler driver, which uses link and unlink for the rename v6
+; does not have, restarting itself in the middle of a -O compile and
+; announcing "no input files specified" with the assembler temporary
+; as its program name.  The peephole had run and its output was
+; already linked into place; only the unlink after it was missing.
+;
+	ld	hl,-6
 	add	hl,sp
 	ld	sp,hl
 

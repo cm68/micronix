@@ -1,0 +1,84 @@
+.he "vi (1)                       8/12/26                       vi (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+vi
+- a screen editor
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+vi [ -d ] file
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Vi is STevie, Tim Thompson's editor for vi enthusiasts, ported here.
+It takes one file, which it reads into memory; a file that does not
+exist yet is not an error and is announced as a new one.
+.sp
+The commands are vi's, in the subset STevie implements: the addresses
+and the operators, the insert commands, the yank buffer, marks and
+searches.  Colon takes a command line.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-d	Set the debugging flag.
+
+.in -10
+.sp 2
+.in -5
+.bd
+COLON COMMANDS
+.in +5
+.br
+.nf
+     :w       write
+     :q :q!   quit, and quit without writing
+     :wq      write and quit
+     :e :e!   edit another file
+     :r       read a file in after this line
+     :.r      read a file in at this line
+     :f       the file name and where you are
+     :.=      the current line number
+     :$=      the number of lines
+     :set     set an option; tabstop is the one
+.fi
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The sizes are tuned to fill a sixty-four kilobyte machine: a file of
+up to sixteen thousand characters, a screen of up to sixty lines of
+eighty columns.  A terminal of fewer than three lines or sixteen
+columns is refused.
+.sp
+The debugging flag sets a variable that nothing reads, so it does
+nothing at present.
+.sp
+The usage message calls the program stevie, which is the name it was
+ported under.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+s (1)

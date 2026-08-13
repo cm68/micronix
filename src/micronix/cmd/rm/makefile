@@ -1,28 +1,40 @@
 #
-# micronix makefile for rm
-#
-# this lower case file is preferred by the newer make
+# makefile for rm
 #
 # micronix/cmd/rm/makefile
 #
-# Changed: <2023-07-27 12:13:40 curt>
+# The native build: this runs inside micronix, under the make in
+# cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
+# it cross builds the same program on the host.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-all:	rm
+CC	= ccc
+CFLAGS	=
+BIN	= /bin
+MAN	= rm.1
+MANDIR	= /usr/man/man1
+PROG	= rm
+OBJS	= rm.o
 
-rm : rm.c
-	cc -i /usr/include/ -o rm rm.c -lS -lS
+all: $(PROG)
 
-upgrade: rm
-	cp /bin/rm /old/rm
-	cp rm /bin/rm
+$(PROG): $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-install: rm
-	cp rm /bin/rm
+#
+# One entry for every object: $* is the target without its suffix, so
+# this reads as "each of these comes from the .c of the same name".
+#
+$(OBJS): $*.c
+	$(CC) $(CFLAGS) -c $*.c
+
+install: $(PROG)
+	cp $(PROG) $(BIN)/rm
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
-	rm -f *.o
+	rm -f $(OBJS)
 
 clobber: clean
-	rm -f rm
+	rm -f $(PROG)

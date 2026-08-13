@@ -25,7 +25,7 @@ TINY fd = -1;
 
 COUNT errno;                    /* external UNIX error number */
 
-UCOUNT nfiles = 0, userno = 0;
+UCOUNT nfiles, userno;
 
 struct fcb thedir[MAXGDIR * GENT] = { 0 };
 

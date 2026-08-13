@@ -1,0 +1,41 @@
+.he "echo (1)                     8/12/26                     echo (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+echo
+- echo arguments
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+echo [ -n ] [ arg ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Echo writes its arguments to the standard output, separated by single
+spaces and followed by a newline.
+.sp
+-n suppresses the newline.  It is recognised only as the first
+argument, and only written exactly so; "echo -n -n" writes the second
+one out.
+.sp
+Echo is used by shell scripts that need to produce diagnostics or
+prompt without a trailing newline.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+sh (1)
