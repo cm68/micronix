@@ -2104,6 +2104,17 @@ SystemCall()
 
     char *fn;
     char *fn2;
+    /*
+     * The guest's word, so a failed host call is 0xffff in it and
+     * never -1: the comparison promotes this to 65535 and asks
+     * whether that is -1, which it is not.  creat, mknod, access and
+     * dup each tested it that way, so each of them set no carry when
+     * the call had failed and the program was told it had worked.
+     *
+     * access is how it showed.  The shell asks it whether a name is
+     * there before running it, and getting yes for everything, it ran
+     * the first candidate in its path - "./ls" - for every command.
+     */
     unsigned short ret;
 
     int i;
@@ -2467,7 +2478,7 @@ SystemCall()
 
     case 8:                    /* creat <name> <mode> */
         ret = creat(filename = fname(fn), arg2);
-        if (ret == -1) {
+        if (ret == 0xffff) {
             if (verbose & V_ERROR)
                 message("%s: %s\n", strerror(errno), filename);
             ret = errno;
@@ -2618,7 +2629,7 @@ SystemCall()
             ret = -1;
             errno = EIO;
         }
-        if (ret == -1) {
+        if (ret == 0xffff) {
             if (verbose & V_ERROR)
                 message("%s: %s\n", strerror(errno), filename);
             ret = errno;
@@ -2890,7 +2901,7 @@ SystemCall()
         if (arg2 & 1)
             i |= X_OK;
         ret = access(fname(fn), i);
-        if (ret == -1) {
+        if (ret == 0xffff) {
             carry_set();
         } else {
             carry_clear();
@@ -2916,7 +2927,7 @@ SystemCall()
 
     case 41:
         ret = dup(fd);
-        if (ret == -1) {
+        if (ret == 0xffff) {
             ret = 0;
             carry_set();
         } else {
