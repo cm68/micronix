@@ -68,3 +68,10 @@ src/micronix/stand/boot/bootimg-*
 src/micronix/stand/boot/mkbootimg
 src/micronix/stand/formatmw/formatmw.com
 src/micronix/stand/zout/
+
+#
+# The working hard disk image.  hddma-0.blessed is the one that is kept
+# - a drive that boots, to be copied and written into - and this is
+# whatever the last thing to run left behind.  See disks/hdinstall/REGEN.
+#
+disks/hdinstall/hddma-0
