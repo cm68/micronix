@@ -348,6 +348,70 @@ struct openfile {
 } files[MAXFILE + 1];
 
 /*
+ * A guest descriptor is not a host descriptor.
+ *
+ * Micronix gives a process NOPEN of them - see olist[] in sys/proc.h -
+ * numbered from zero, and open hands back the lowest that is free.  We
+ * were returning the host's number instead, and the host's free list is
+ * not the guest's: the simulator has its own files open, so a program's
+ * first open came back 5 where the machine gives 3, and nothing stopped
+ * it opening forty when the kernel stops at sixteen.  A program that
+ * hoards descriptors, or one that believes what the number will be, ran
+ * here and did something else on the metal.
+ *
+ * The map is what the process owns.  It survives exec, because the
+ * descriptors do.
+ */
+#define NOPEN   16              /* sys/proc.h: struct file *olist[NOPEN] */
+
+int fdmap[NOPEN];
+
+void
+fdmap_init()
+{
+    int i;
+
+    for (i = 0; i < NOPEN; i++)
+        fdmap[i] = (i < 3) ? i : -1;
+}
+
+/*
+ * the host descriptor a guest one stands for, or -1 if it has none
+ */
+int
+hostfd(int gfd)
+{
+    if ((gfd < 0) || (gfd >= NOPEN))
+        return -1;
+    return fdmap[gfd];
+}
+
+/*
+ * give a host descriptor the lowest free guest number, the way the
+ * kernel would.  -1 when the process is full, which is EMFILE.
+ */
+int
+mapfd(int hfd)
+{
+    int i;
+
+    for (i = 0; i < NOPEN; i++) {
+        if (fdmap[i] == -1) {
+            fdmap[i] = hfd;
+            return i;
+        }
+    }
+    return -1;
+}
+
+void
+unmapfd(int gfd)
+{
+    if ((gfd >= 0) && (gfd < NOPEN))
+        fdmap[gfd] = -1;
+}
+
+/*
  * Learn where a descriptor already is, rather than assuming.
  *
  * seekfile() below pushes the notional offset at the host before every
@@ -742,6 +806,12 @@ main(int argc, char **argv)
 
     /* before the tty below, so this only sees what we were handed */
     adoptfds();
+
+    /*
+     * The guest starts with the three it is given and nothing else,
+     * whatever the simulator has open behind them.
+     */
+    fdmap_init();
 
     /*
      * we might be piping the simulator.  let's get an open file for our 
@@ -2025,7 +2095,8 @@ SystemCall()
     unsigned short sc;
     char indirect = 0;
 
-    unsigned short fd;          /* from hl */
+    unsigned short fd;          /* from hl - the host's, once mapped */
+    int gfd;                    /* what the guest called it */
     unsigned short arg1;        /* first arg */
     unsigned short arg2;        /* second arg */
     unsigned short arg3;        /* third arg */
@@ -2132,6 +2203,34 @@ SystemCall()
         arg3 = get_word(sc + 8);
     if (sp->flag & SF_FD)
         fd = z80_get_reg16(hl_reg);
+
+    /*
+     * SF_FD only says HL carried the first argument, and for exit,
+     * alarm, sleep and kill that is not a descriptor.  These are the
+     * calls where it is one, so these are the ones translated; the
+     * cases below go on working in host descriptors as they always
+     * have, and only the number the guest sees is its own.
+     */
+    gfd = -1;
+    switch (code) {
+    case 3:                     /* read */
+    case 4:                     /* write */
+    case 6:                     /* close */
+    case 19:                    /* seek */
+    case 28:                    /* fstat */
+    case 31:                    /* stty */
+    case 32:                    /* gtty */
+    case 41:                    /* dup */
+    case 49:                    /* lock */
+    case 50:                    /* unlock */
+        gfd = fd;
+        if ((fd = hostfd(gfd)) < 0) {
+            ret = EBADF;
+            carry_set();
+            goto sysdone;
+        }
+        break;
+    }
     if (sp->flag & SF_NAME) {
         copyin(name1, arg1, sizeof(name1));
         fn = name1;
@@ -2285,6 +2384,22 @@ SystemCall()
                     files[ret].filesize = sbuf.st_size;
                 }
             }
+            /*
+             * Both arms opened something of the host's; the guest is
+             * told the number the kernel would have given it.  A
+             * directory came from dirsnarf, which hands back the DIR's
+             * own descriptor, so it is named the same way as the rest.
+             */
+            if ((i = mapfd(ret)) < 0) {
+                if (dirget(ret))
+                    dirclose(ret);
+                else
+                    close(ret);
+                ret = EMFILE;
+                carry_set();
+                break;
+            }
+            ret = i;
             carry_clear();
         } else {
             if (verbose & V_ERROR)
@@ -2305,6 +2420,7 @@ SystemCall()
             files[fd].special = 0;
             files[fd].offset = 0;
             files[fd].noseek = 0;
+            unmapfd(gfd);
             carry_clear();
         } else {
             carry_set();
@@ -2357,6 +2473,14 @@ SystemCall()
             ret = errno;
             carry_set();
         } else {
+            adoptfd(ret);
+            if ((i = mapfd(ret)) < 0) {
+                close(ret);
+                ret = EMFILE;
+                carry_set();
+                break;
+            }
+            ret = i;
             carry_clear();
         }
         break;
@@ -2797,6 +2921,13 @@ SystemCall()
             carry_set();
         } else {
             files[ret] = files[fd];
+            if ((i = mapfd(ret)) < 0) {
+                close(ret);
+                ret = EMFILE;
+                carry_set();
+                break;
+            }
+            ret = i;
             carry_clear();
         }
         break;
@@ -2806,8 +2937,28 @@ SystemCall()
             ret = errno;
             carry_set();
         } else {
-            ret = p[0];
-            z80_set_reg16(de_reg, p[1]);
+            /*
+             * Two descriptors or neither: a guest with one slot left
+             * cannot have half a pipe.
+             */
+            adoptfd(p[0]);
+            adoptfd(p[1]);
+            if ((ret = mapfd(p[0])) < 0) {
+                close(p[0]);
+                close(p[1]);
+                ret = EMFILE;
+                carry_set();
+                break;
+            }
+            if ((i = mapfd(p[1])) < 0) {
+                unmapfd(ret);
+                close(p[0]);
+                close(p[1]);
+                ret = EMFILE;
+                carry_set();
+                break;
+            }
+            z80_set_reg16(de_reg, i);
             carry_clear();
         }
         break;
@@ -2888,6 +3039,7 @@ SystemCall()
         break;
     }
 
+  sysdone:
     /* if the system call failed, and we want a breakpoint */
     if ((z80_get_reg8(f_reg) & 1) && (verbose & V_SFAIL)) {
         breakpoint = 1;
