@@ -1,0 +1,271 @@
+rebuilding the hard disk image from source
+==========================================
+
+disks/hdinstall/REGEN
+
+README beside this says how to run the install that is here.  This says
+how to make the whole thing again from source: a set of floppy images
+carrying binaries this tree built - the reconstructed init among them -
+from which a hard disk can be formatted, installed and booted the way
+the hardware did it.
+
+The four stages are format, install, boot, and the build that feeds
+them.  They are independent: a loader can be replaced without redoing
+the install, and the install can be redone without reformatting.
+
+None of this is a script yet, deliberately: a script written over the
+top of the parts that do not work would hide which those are.
+
+What has been run, as this was written.  The build, all of it.  The
+stage 1 command as far as CP/M's A> prompt, with the two floppies and
+the drive named the new way - not the format itself.  Stage 3, which
+gets as far as the loader and stops where the last section says.  And
+the loader replacement below, which is how the rebuilt second level got
+onto the disk.  Stage 2 is out of HWSIM.STATUS and the scripts on the
+distribution floppy, not from a run here.
+
+
+what has to be built first
+--------------------------
+
+In ~/src/ccc, the compiler and its runtime:
+
+	make all && make install
+	sudo make sysinstall
+
+which puts ccc in /usr/local and its headers in both /usr/local/lib/include
+and /usr/local/usr/include.
+
+In src/micronix, the system's own headers, which go beside ccc's:
+
+	make sysinstall
+
+That installs into /usr/local/usr/include and leaves ccc's six alone -
+cpm.h errno.h hitech.h setjmp.h stdio.h time.h.  The result is one
+directory holding both sets, and that is the directory anything built
+for the target has to be told about.  It matters here because the
+loader's Makefile defaults INC to /usr/local/lib/include, which has
+ccc's headers but not types.h or sys/mw.h, so the loader will not
+compile without being told:
+
+	make -C src/micronix/stand INC=/usr/local/usr/include bootimg
+
+Then the libraries and the commands:
+
+	make -C src/micronix/lib
+	make -C src/micronix/cmd
+
+A trap that has cost time here: make decides what to rebuild from the
+dates on the sources, and a new compiler does not touch them.  After a
+codegen or ABI change in ccc, every object in the tree is stale while
+looking current - and neither lib/libc nor lib/libu has a clean target.
+Remove the objects and the archives by hand:
+
+	rm -f src/micronix/lib/libc/*.o src/micronix/lib/libc/libc.a
+	rm -f src/micronix/lib/libu/*.o src/micronix/lib/libu/libu.a
+
+cmd does have one: make -C src/micronix/cmd clean.
+
+
+stage 1: format, under CP/M
+---------------------------
+
+The drive is formatted by Morrow's own formatter running under CP/M,
+which is booted off the DJ-DMA floppy port:
+
+	cd src/hwsim/d1
+	./d1 -b roms/mon447.bin -B djdma \
+	    djdma0:../../../disks/dist/1009-8_cold-boot.IMD \
+	    djdma1:../../../disks/dist/947-1.IMD \
+	    hdcdma0:../../../disks/hdinstall/hddma-0
+
+The cold boot disk carries FORMATMW 1.6, which predates the part number
+names: "m5" is rejected there, "seagate" and "st506" are the same drive
+and both work.  947-1.IMD carries 1.7 with the full option set, so it
+goes in as B: and the command is
+
+	B:FORMATMW M5 SIZE 512
+
+512 because Micronix requires it - see src/hwsim/DISKS for why the two
+controllers disagree about sector sizes and what that costs.  The whole
+drive formats and verifies in about six seconds.
+
+What a real format leaves in the drive label, worth checking against:
+
+	secsize 512  cyl 153  heads 4  spt 17
+	firstsec 0  seccode 3  gap3 43  fill 0xe5  formatted 1
+
+
+stage 2: install, from the standalone floppy
+--------------------------------------------
+
+Boot the 1.67 standalone on the 5 1/4 port, with the formatted drive
+attached:
+
+	./d1 -b roms/mon447.bin -B djdma -5 ../../../disks/hdinstall/sa67.5.skew.1k \
+	    hdcdma0:../../../disks/hdinstall/hddma-0
+
+Use 1.67 and not 1.6: 1.6's kernel has its root device as djdma/12, the
+single sided minor for a disk that is double sided, and it stops in the
+rom monitor before reaching a shell.  1.67 has 76.
+
+Wait for the welcome and then for the shell's "#".  Anything typed
+before the prompt is thrown away when the shell sets up the terminal,
+and a machine that welcomes you and then says nothing may be wedged
+rather than waiting - README says how to tell the difference.
+
+The floppy carries the install scripts.  m5init is the one that ships,
+and what it does not do is write a boot block; the newer sequence adds
+that with mkfs -i, which gives cylinder 0 to a file so the filesystem
+cannot allocate over it:
+
+	mkfs -i /bootmw.bin /dev/m5a -1024
+	fsck /dev/m5a
+	mount /dev/m5a /b
+	cptree / /b -v
+	setdev /b/micronix 3/0 0/0
+
+cptree is copying a whole filesystem through a simulated Z80, so give
+it time.  If it reports "No more space on disk djdma/76" the mount did
+not take and cptree is filling the floppy's own /b - start again from a
+clean disk rather than tidying up.
+
+setdev replaces the old ddt recipe for pointing the kernel at its root
+device.  It reads _rootdev and _swapdev out of the kernel's symbol table
+instead of searching for the bytes of djdma/12, which is 1.6's root
+device - on a 1.67 kernel that search silently did nothing and every
+disk built that way booted a kernel still looking for the floppy.
+
+Leave swap as nodev.  A standalone with no swap device runs entirely in
+core, which is what a floppy system wants; pointing swap at the drive
+turns a system that does not swap into one that does.  README has the
+detail.
+
+
+stage 3: boot from the hard disk
+--------------------------------
+
+	./d1 -b roms/mon447.bin -B hdcdma \
+	    hdcdma0:../../../disks/hdinstall/hddma-0
+
+-B hdcdma is the HDC-DMA path with the monitor skipped, which is the
+configuration switch 0x0c that everything used to be written down as.
+The rom decodes the top five bits at mon447.s:tstsw - 0x00 is the HDCA,
+a different controller.
+
+What it produced, the once it worked end to end:
+
+	mwboot:
+	Micronix loader for the HD-DMA
+	Files:
+	micronix
+	Loading
+	Entering
+
+	Micronix 1.67
+	...
+	disks: djdma hddma
+	root dev: hddma/0
+	swap dev: nodev/0
+	#
+
+
+replacing the loader without redoing the install
+------------------------------------------------
+
+The loader is two levels: a sector the rom reads to 0100 and jumps to,
+and a second level that reads the filesystem to find the kernel.  Both
+live in the boot area, which is cylinder 0 - block 5236 on the 5 meg,
+because sys/mw.c rotates the mapping and does not put block 0 there -
+and the area is owned by /boot/bootmw so nothing allocates over it.
+
+That file can be rewritten from the host, which is much quicker than
+reinstalling:
+
+	make -C src/micronix/stand INC=/usr/local/usr/include bootimg
+	mnix -f hddma-0 write -k <image> /boot/bootmw
+
+write -k is the important half.  Plain write frees the file first, so
+the blocks go back on the free list and come off it again in reverse -
+same blocks, same size, boot area written backwards, and nothing in ls
+or info shows it.  -k keeps the block list and writes through it.
+
+Two things the image handed to it has to get right, which bootimg on
+its own does not:
+
+  - the drive label lives at offset 256 of the boot sector, the second
+    half of the same block as the first level.  bootimg pads the first
+    level to 512 with zeroes and would erase it.  Splice instead: first
+    level, then the existing bytes 256-511, then the second level at
+    512.  mkfs refuses to write a label if the boot code has grown into
+    it, and the first level is 181 bytes, so there is room.
+
+  - pad the result to the file's full size, 34816, so the size stays
+    what it was and all 68 blocks stay claimed.  write -k refuses to
+    grow a file, which is the point: a block it had to allocate would
+    not be in the area the rom reads.
+
+setblk names the blocks a file owns, for building the arrangement in
+the first place.  It does not take them off the free list - run
+icheck -s afterwards.
+
+
+where this stops today
+----------------------
+
+Stage 3 does not complete.  The loader runs and reads the disk, and
+then:
+
+	mwboot:
+	Micronix loader for the HD-DMA
+	Files:
+	No bootable files
+
+HWSIM.STATUS has the diagnosis: the head probe in stand/mwio.c sends
+the same command eleven times - cmd.headsel does not change across the
+loop - so the controller answers head 0 every time, the probe matches
+only i = 0 and gives up at i = 1, and spec.heads and spec.spc come out
+wrong.  Every block number after that lands on the wrong cylinder and
+head, so the block read as the root directory is not the root
+directory, and nothing in it looks bootable.
+
+An earlier failure, "Block out of range" before the directory read at
+all, was a stale loader: the sources had been fixed and the built
+objects had not, so the disk carried a loader older than its own fixes.
+Rebuilding and reinstalling as above got past it.  If it comes back,
+check the dates on stand/*.s and stand/mwboot.com against the sources
+before looking anywhere else.
+
+Separately, the image in this directory has no kernel: root holds
+micronix.mw with inode 0 - a name with nothing behind it - and no
+micronix.  patchm5 on the distribution floppy ends with "ln micronix.mw
+micronix; era micronix.mw", so a half-run patch leaves exactly that.
+Even with the probe fixed there would be nothing to boot until stage 2
+is run again.
+
+
+what is still missing for the stated goal
+-----------------------------------------
+
+The goal is a set of floppy images carrying binaries built here.  The
+build produces them and the install consumes them, and the join between
+is not made: standalone167.bin is the distributed 1.67 image, and it is
+skewed - its geometry comes from the minor number in the name it is
+reached by, bdev(2,93), and bit 3 of that minor selects the skew.  mnix
+reads and writes an unskewed filesystem, so it cannot put anything into
+that floppy: pointed at it, fsize reads 52481 on a 400k image and the
+root inode looks like a character device.
+
+So there are two ways forward and neither has been taken:
+
+  - teach mnix the skew, so the distributed floppy can be written the
+    same way the hard disk image is, or
+
+  - build a floppy image here rather than patching one: mkfs a blank,
+    populate it with mnix, and give it a minor whose geometry matches.
+
+Until then the binaries this tree builds can be put onto the hard disk
+image directly - that is how the rebuilt init got there - but not onto
+the floppy that installs it.
+
+vim: tabstop=4 shiftwidth=4 noexpandtab:
