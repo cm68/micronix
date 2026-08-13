@@ -21,6 +21,7 @@
 #include <strings.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <time.h>
 
 #include "../micronix/include/types.h"
@@ -64,7 +65,7 @@ struct cmdtab
     {"ls", ls, "ls [-a] <path>" },
     {"cat", cat, "cat <file>" },
     {"read", readcmd, "read <src> <dest>" },
-    {"write", writecmd, "write <src> <dest>" },
+    {"write", writecmd, "write [-k] <src> <dest>" },
     {"rm", rmcmd, "rm <file>" },
     {"mkdir", mkdircmd, "mkdir <directory>" },
     {"rmdir", rmdircmd, "rmdir <directory>" },
@@ -394,6 +395,21 @@ readcmd(int c, char **a)
 }
 
 int
+/*
+ * write <src> <dest>, and write -k <src> <dest>.
+ *
+ * Without -k the destination is emptied first and the contents land on
+ * whatever the free list hands out.  That is what you want for an
+ * ordinary file and is exactly wrong for a boot area, which has to stay
+ * on the blocks the rom will read: freeing it puts those blocks back on
+ * the free list and the write then lands somewhere else entirely.
+ *
+ * -k keeps the block list and writes through it, so the bytes go where
+ * the file already is.  It is the other half of setblk - set the blocks,
+ * then write -k onto them - and it refuses to grow the file, because a
+ * block that had to be allocated would not be part of the area and the
+ * boot would be half in it.
+ */
 writecmd(int c, char **a)
 {
     struct dsknod *dp;
@@ -403,9 +419,18 @@ writecmd(int c, char **a)
     int valid;
     int infd;
     char *destname;
+    int keep = 0;
+    int have;
+    struct stat sb;
 
     a++;
     c--;
+
+    if (c && strcmp(*a, "-k") == 0) {
+        keep = 1;
+        a++;
+        c--;
+    }
 
     if (c != 2) {
         return -1;
@@ -432,7 +457,25 @@ writecmd(int c, char **a)
         return 2;
     }
 
-    filefree(dp);
+    if (keep) {
+        /*
+         * How much room the file already has.  bmap with alloc 0
+         * answers 0 for a block that is not there, so this stops at
+         * the first hole and counts what is behind it.
+         */
+        have = 0;
+        while (bmap(dp, have * 512, 0)) {
+            have++;
+        }
+        if (fstat(infd, &sb) == 0 && sb.st_size > have * 512) {
+            printf("%s holds %d blocks, %s needs %d - refusing to grow it\n",
+                destname, have, *(a - 1), (int)((sb.st_size + 511) / 512));
+            close(infd);
+            return 2;
+        }
+    } else {
+        filefree(dp);
+    }
     i = 0;
     do {
         valid = read(infd, buf, 512);
