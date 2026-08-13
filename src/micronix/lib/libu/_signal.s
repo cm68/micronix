@@ -19,12 +19,20 @@
 	.extern _stab
 
 .text:
+;
+; signal(sig, func).  The arguments come off in the order they are
+; written - the first one is on top, the way access.s and write.s and
+; every other stub here reads them - and these two were stored the
+; other way round.  The kernel was handed the handler's address where
+; it wanted the signal number, so it answered "signal 3368 out of
+; range" and signal() failed for every call.
+;
 __signal:
 		pop		de
 		pop		hl
-		ld		(func),hl
-		pop		hl
 		ld		(sig),hl
+		pop		hl
+		ld		(func),hl
 		push	hl
 		push	hl
 		push	de
