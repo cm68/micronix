@@ -176,6 +176,21 @@ syscall_at(word sc)
 		code = fubyte(sc + 1);
 	}
 
+	/*
+	 * A code the table does not describe is not a reason to read
+	 * past the end of it.  The entry decides how many inline argument
+	 * bytes follow the rst, and the dump below and the return address
+	 * are both worked out from that, so a garbage argbytes dumps a
+	 * garbage-sized region and resumes in the wrong place - which is
+	 * a wedged machine, from tracing alone.  The standalone 1.67
+	 * system makes such a call at boot, so this is on the path to
+	 * every traced run, not a corner.  mnix_sys.c bounds its own
+	 * lookup the same way.
+	 */
+	if (code < 0 || code >= nsyscalls) {
+		printf("unrecognized syscall %d %x, not traced\n", code, code);
+		return;
+	}
 	sp = &syscalls[code];
 	{
 		char sbuf[16];

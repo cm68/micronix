@@ -75,6 +75,14 @@ struct syscall syscalls[] = {
 };
 
 /*
+ * How far the table goes.  Callers see it through an extern declaration
+ * of an unsized array, where sizeof does not work, so anyone bounding a
+ * lookup either counts by hand or does not bound it - and hwsim's
+ * tracer did not.
+ */
+int nsyscalls = sizeof(syscalls) / sizeof(syscalls[0]);
+
+/*
  * format a system call with args
  */
 int

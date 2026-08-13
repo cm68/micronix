@@ -32,6 +32,7 @@ int fmt_syscall(unsigned short addr, char *dest);
 extern int fmt_indir_sc;
 
 extern struct syscall syscalls[];
+extern int nsyscalls;           /* how many entries syscalls[] has */
 extern char *signame[];
 
 extern int get_syscall(char **sp);
