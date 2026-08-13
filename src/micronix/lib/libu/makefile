@@ -32,7 +32,7 @@ AOBJS	= access.o alarm.o _break.o chdir.o chmod.o chown.o \
 	stty.o sync.o time.o umount.o unlink.o wait.o \
 	write.o
 
-COBJS	= signal.o lseek.o seek.o
+COBJS	= signal.o lseek.o seek.o rename.o
 
 OBJS	= $(AOBJS) $(COBJS)
 

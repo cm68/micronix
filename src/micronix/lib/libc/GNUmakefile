@@ -52,7 +52,7 @@ CSRCS = \
 	qsort.c remove.c rewind.c fseek.c ftell.c fprintf.c \
 	sprintf.c printf.c doprnt.c putchar.c atol.c fscanf.c \
 	scanf.c sscanf.c doscan.c fnum.c atof.c mkdir.c \
-	opendir.c rename.c system.c
+	opendir.c system.c
 
 # superseded by the .s beside them: kept, not built
 NOTBUILT_C = \

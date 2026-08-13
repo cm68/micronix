@@ -25,7 +25,16 @@ ASSRCS = access.s alarm.s _break.s chdir.s chmod.s chown.s close.s \
 	stat.s stime.s sbrk.s stty.s sync.s time.s umount.s unlink.s wait.s \
 	write.s
 
-CSRCS = signal.c lseek.c seek.c
+#
+# rename.c is here rather than in libc because the API is what is
+# being held still, not what is under it.  Micronix is a v6 and has
+# no rename call - it arrived in 4.2BSD - so today this is a link and
+# an unlink written in C.  The day the kernel grows the call, this
+# becomes an .s stub shaped like link.s and nothing above it changes.
+# It is a system call as far as anything calling it is concerned, so
+# it lives with the system calls.
+#
+CSRCS = signal.c lseek.c seek.c rename.c
 
 include $(DEPTH)/GNUmakefile.inc
 

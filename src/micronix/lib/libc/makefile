@@ -48,7 +48,7 @@ COBJS	= rand.o srand1.o mkstemp.o mktemp.o isatty.o permaloc.o \
 	getenv.o pnum.o qsort.o remove.o rewind.o fseek.o \
 	ftell.o fprintf.o sprintf.o printf.o doprnt.o putchar.o \
 	atol.o fscanf.o scanf.o sscanf.o doscan.o fnum.o \
-	atof.o mkdir.o opendir.o rename.o system.o
+	atof.o mkdir.o opendir.o system.o
 
 OBJS	= $(AOBJS) $(COBJS)
 
