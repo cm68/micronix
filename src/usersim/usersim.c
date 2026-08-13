@@ -1607,6 +1607,154 @@ allocpid(int lpid)
 }
 
 /*
+ * The other direction: what linux process is the guest talking about?
+ *
+ * allocpid goes from a linux pid to the number we told the guest;
+ * kill arrives holding that number and needs the linux one back.  The
+ * table is indexed by it, so this is a lookup rather than a search.
+ * 0 in the slot means nobody, which is ESRCH.
+ */
+int
+hostpid(int gpid)
+{
+    int lpid;
+
+    if ((gpid < MINPID) || (gpid > MAXPID))
+        return -1;
+    pthread_mutex_lock(&pids->mutex);
+    lpid = pids->linuxpid[gpid];
+    pthread_mutex_unlock(&pids->mutex);
+    return lpid ? lpid : -1;
+}
+
+/*
+ * The guest's signal numbers are its own - see signame[] in
+ * mnix_sys.c - and mean nothing to the host until they are mapped.
+ * The four the simulator already knew about are mapped the way
+ * case 48 maps them, so that a handler installed for one is raised by
+ * the same one.
+ */
+int
+hostsig(int gsig)
+{
+    switch (gsig) {
+    case 0:  return 0;          /* the existence probe */
+    case 1:  return SIGHUP;
+    case 2:  return SIGINT;
+    case 3:  return SIGQUIT;
+    case 4:  return SIGILL;
+    case 5:  return SIGTRAP;
+    case 6:  return SIGTSTP;    /* "bg" */
+    case 7:  return SIGALRM;    /* "termio", as case 48 has it */
+    case 8:  return SIGFPE;
+    case 9:  return SIGKILL;
+    case 10: return SIGBUS;
+    case 11: return SIGSEGV;
+    case 12: return SIGSYS;     /* "sysarg" */
+    case 13: return SIGPIPE;
+    case 14: return SIGALRM;
+    case 15: return SIGTERM;
+    }
+    return -1;
+}
+
+/*
+ * Decode a signal trampoline.
+ *
+ * signal() in libu never hands the kernel a handler.  It hands over
+ * the address of a six-byte trampoline in _jtab, one per signal, and
+ * keeps the real handler in _stab - so the address in the trace is at
+ * a fixed offset in every program and says nothing whatever about
+ * what was installed.  Each trampoline is
+ *
+ *      push hl                 e5
+ *      ld   hl,(_stab+2n)      2a nn nn
+ *      jr   sigcall            18 dd
+ *
+ * so the operand of that load is the _stab slot, and the word in the
+ * slot is the handler.  Reading it out of the guest rather than
+ * working it out from symbols means this still reports on a stripped
+ * image, and means it reports what is actually there - which is the
+ * whole point of looking.
+ *
+ * Returns the slot address and the handler, or 0 if the bytes are not
+ * a trampoline.
+ */
+static int
+sigtramp(unsigned short addr, unsigned short *slotp, unsigned short *funcp)
+{
+    if (get_byte(addr) != 0xe5)         /* push hl */
+        return 0;
+    if (get_byte(addr + 1) != 0x2a)     /* ld hl,(nn) */
+        return 0;
+    if (get_byte(addr + 4) != 0x18)     /* jr sigcall */
+        return 0;
+    *slotp = get_word(addr + 2);
+    *funcp = get_word(*slotp);
+    return 1;
+}
+
+/*
+ * Say what a signal() argument means, on the end of the traced call.
+ *
+ * 0 and 1 are themselves - the kernel reads them as terminate and
+ * ignore and no trampoline is involved.  Anything else should be a
+ * trampoline, and the slot it loads from tells us which signal it
+ * belongs to.
+ *
+ * Both tables are indexed by sig-1, not by sig: there is no signal 0
+ * - sys/sig.c rejects it - so fifteen signals get fifteen
+ * trampolines, and signal.c stores at stab[sig-1] and hands over
+ * &jtab[sig-1].  The whitesmiths original computes the same thing
+ * the same way.  If the index does not match the signal being
+ * registered the program has handed over the wrong trampoline, and
+ * the trace says so rather than printing a number that looks fine.
+ */
+static void
+sigannotate(unsigned short sig, unsigned short func)
+{
+    unsigned short slot;
+    unsigned short handler;
+    unsigned short stab;
+    unsigned short jtab;
+    char *name;
+    int n = -1;
+
+    if (func == 0) {
+        message("[terminate] ");
+        return;
+    }
+    if (func == 1) {
+        message("[ignore] ");
+        return;
+    }
+    if (!sigtramp(func, &slot, &handler)) {
+        message("[not a trampoline] ");
+        return;
+    }
+
+    /*
+     * Either symbol gives the index; _stab is the direct one, and
+     * _jtab covers the case where only the text symbol survived.
+     */
+    if ((stab = lookup_sym("_stab")) != 0) {
+        n = (slot - stab) / 2;
+    } else if ((jtab = lookup_sym("_jtab")) != 0) {
+        n = (func - jtab) / 6;
+    }
+
+    message("[");
+    if (n >= 0) {
+        message("jtab[%d]%s ", n, (n == sig - 1) ? "" : " MISMATCH");
+    }
+    message("stab@%04x = %04x", slot, handler);
+    if ((name = get_symname(handler))) {
+        message(" %s", name);
+    }
+    message("] ");
+}
+
+/*
  * Give a pid back.  A reaped child no longer exists, so its slot is
  * free; without this the registry fills up and never drains.
  */
@@ -2118,6 +2266,7 @@ SystemCall()
     unsigned short ret;
 
     int i;
+    int lpid;                   /* the linux process a guest pid means */
     sighandler_t handler;
     int p[2];
 
@@ -2275,6 +2424,13 @@ SystemCall()
         F(SF_ARG3, "%04x%s", arg3);
         F(SF_ARG4, "%04x%s", arg4);
         message(") ");
+        /*
+         * The handler address alone is the same in every program and
+         * tells you nothing, so decode what it points at.
+         */
+        if (code == 48) {
+            sigannotate(arg1, arg2);
+        }
     }
   nolog:
 
@@ -2922,7 +3078,55 @@ SystemCall()
         break;
 
     case 37:                   /* kill <pid in hl> signal */
-        carry_set();
+        /*
+         * This was a stub that did nothing but set carry, so nothing
+         * in the guest could ever signal anything - which is why the
+         * trampolines in libu/_signal.s had never once run.
+         *
+         * Both numbers are the guest's: the signal is its own, and
+         * the pid is the one we handed out rather than any linux
+         * process.  sys/sig.c is the authority for what happens to
+         * them, and it is not simply the host's kill.
+         */
+        i = hostsig(arg1);
+        if (i < 0) {
+            errno = ret = EINVAL;
+            carry_set();
+            break;
+        }
+        if (fd == 0) {
+            /*
+             * The kernel sends this one to killall(u.p->tty), every
+             * process sharing the controlling tty - the caller
+             * included, which is the only way a process here can
+             * signal itself.  The host's process group is the
+             * closest thing we have to that tty, and it means the
+             * caller too, so 0 goes through as 0.
+             */
+            lpid = 0;
+        } else if ((lpid = hostpid(fd)) < 0) {
+            errno = ret = ESRCH;
+            carry_set();
+            break;
+        } else if (lpid == getpid()) {
+            /*
+             * "p != u.p" in kill(): a process named by its own pid
+             * is refused, and told the process does not exist.  The
+             * man page says a process can never kill itself and the
+             * kernel means it, so we have to answer the same way
+             * rather than let the host deliver it.
+             */
+            errno = ret = ESRCH;
+            carry_set();
+            break;
+        }
+        if (kill(lpid, i) < 0) {
+            ret = errno;
+            carry_set();
+            break;
+        }
+        ret = 0;
+        carry_clear();
         break;
 
     case 41:
