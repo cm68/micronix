@@ -37,6 +37,7 @@
  */
 #include <types.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <sys/sgtty.h>
@@ -1485,6 +1486,137 @@ resetttys()
 		close(fd);
 	}
 	exit(1);
+}
+
+/*
+ * ---------------------------------------------------------------------
+ * The Whitesmith's library routines init calls that this tree's libc
+ * does not carry.
+ *
+ * These are not init's own functions.  In the binary they sit in the
+ * library region, among malloc, free, atoi, perror and strlen:
+ *
+ *	setmem	 0x2ea0	   movblock 0x2fcb    concat   0x302b
+ *	any	 0x3090	   equal    0x30dc    putstr   0x3422
+ *
+ * so they are transcribed here rather than guessed, and the odd
+ * corners are kept for the same reason the rest of the file keeps
+ * them: they are what the callers were written against.  When libc
+ * grows them these go, and the addresses above say what to check
+ * against.
+ * ---------------------------------------------------------------------
+ */
+
+/*
+ * Fill n bytes at p with c, and return n.
+ *
+ * The loop compares the walking pointer against p+n as a signed
+ * quantity - sbc hl,de and a jump on carry - so a count that puts the
+ * end below the start writes nothing.  Returning the count is what the
+ * object does; nothing in init looks at it.
+ */
+setmem(p, n, c)
+char *p;
+int n;
+{
+	char *q;
+
+	q = p + n;
+	while (p < q)
+		*p++ = c;
+	return n;
+}
+
+/*
+ * Copy n bytes from src to dst.
+ *
+ * The count is post-decremented and the value BEFORE the decrement is
+ * the one tested, so a count of zero copies nothing rather than
+ * wrapping round.  The object leaves nothing meaningful in BC on the
+ * way out and neither does this.
+ */
+movblock(dst, src, n)
+char *dst;
+char *src;
+int n;
+{
+	while (n-- > 0)
+		*dst++ = *src++;
+}
+
+/*
+ * Concatenate the strings after dst onto dst, stopping at a null
+ * pointer, and return a pointer to the terminating NUL rather than to
+ * the start.  savestr() throws that away; nothing here uses it.
+ */
+concat(dst, va_alist)
+char *dst;
+{
+	va_list ap;
+	char *s;
+	char *d;
+
+	d = dst;
+	va_start(ap, dst);
+	while ((s = va_arg(ap, char *)) != 0) {
+		while (*s)
+			*d++ = *s++;
+	}
+	va_end(ap);
+	*d = 0;
+	return d;
+}
+
+/*
+ * Does c occur anywhere in s?
+ *
+ * The comparison is sixteen bits wide against the character zero
+ * extended, so a c above 255 can never match.  Both callers pass '/'
+ * and walk the string a character at a time, which is how "the last
+ * component of a path" is spelled here.
+ */
+any(c, s)
+char *s;
+{
+	while (*s) {
+		if (c == (*s & 0xff))
+			return 1;
+		s++;
+	}
+	return 0;
+}
+
+/*
+ * String equality, 1 or 0.  Compares before testing for the end, so
+ * two empty strings are equal and a prefix is not.
+ */
+equal(a, b)
+char *a;
+char *b;
+{
+	while (*a == *b) {
+		if (*a == 0)
+			return 1;
+		a++;
+		b++;
+	}
+	return 0;
+}
+
+/*
+ * Write each string to fd, stopping at a null pointer.  One write per
+ * string, its length measured first - the object calls strlen and then
+ * write, and does not buffer.
+ */
+putstr(fd, va_alist)
+{
+	va_list ap;
+	char *s;
+
+	va_start(ap, fd);
+	while ((s = va_arg(ap, char *)) != 0)
+		write(fd, s, strlen(s));
+	va_end(ap);
 }
 
 /*

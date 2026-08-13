@@ -43,20 +43,20 @@
 # That was true before this file was rewritten and is left alone; add
 # them when they have been made to compile with ccc.
 #
-# init compiles but does not link.  It is a reconstruction from the
-# disassembly of the 1.6 binary, and five of the helpers that binary
-# carries have not been written into it yet:
+# init builds.  It is a reconstruction from the disassembly of the 1.6
+# binary, and the helpers that binary carries are now written into it -
+# six of them, not the five listed here before: putstr was undefined
+# too and is at 0x3422.  They are library routines rather than init's
+# own, sitting among malloc, atoi and strlen in the binary, so they are
+# at the end of init.c under a heading that says so and gives their
+# addresses.  When libc grows them they come out again.
 #
-#	any	 0x3090	   concat  0x302b    equal    0x30dc
-#	setmem	 0x2ea0	   movblock 0x2fcb
-#
-# They are all in init.dis and can be read straight off it - any and
-# concat already have been, see the notes in init.c - so this is
-# transcription rather than guesswork.  Out of DIRS until they are in.
+# It has never been run.  Linking is not the same as working, and this
+# is process 1: the thing to try it on is a boot, not a shell.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = ar cp echo form ls make mkdir mknod pwd rm s sh vi
+DIRS = ar cp echo form init ls make mkdir mknod pwd rm s sh vi
 
 #
 # "cd $$d &&", not "cd $$d ;".  With the semicolon, a directory named
