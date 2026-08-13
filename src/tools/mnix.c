@@ -383,6 +383,11 @@ readcmd(int c, char **a)
     }
 
     outfd = open(*a, O_WRONLY | O_CREAT, 0777);
+    if (outfd < 0) {
+        printf("can't open %s for writing: %d\n", *a, errno);
+        ifree(dp);
+        return 2;
+    }
     printf("write to %s\n", *a);
     size = (dp->d_size0 << 16) + dp->d_size1;
     for (i = 0; i < size; i += 512) {
@@ -438,7 +443,15 @@ writecmd(int c, char **a)
 
     infd = open(*a, O_RDONLY);
     if (infd < 0) {
-        printf("can't open %s for reading %d\n", *a, errno);
+        /*
+         * And stop.  This used to say so and carry on, which meant
+         * every read below returned -1, nothing was written, and the
+         * size was set from a byte count that had gone negative - so
+         * a mistyped source name replaced the destination with a file
+         * of 16777215 bytes.  /etc/init went that way once.
+         */
+        printf("can't open %s for reading: %d\n", *a, errno);
+        return 2;
     }
     
     destname = *++a;
@@ -479,6 +492,14 @@ writecmd(int c, char **a)
     i = 0;
     do {
         valid = read(infd, buf, 512);
+        if (valid < 0) {
+            /*
+             * Whatever has been written stays; the size is what was
+             * actually read, not what the count reached after a -1.
+             */
+            printf("read error on the source: %d\n", errno);
+            break;
+        }
         if (filewrite(dp, i, buf) != 512) {
             printf("write failed\n");
         }
