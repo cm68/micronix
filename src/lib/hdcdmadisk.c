@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
@@ -103,6 +104,57 @@ drive_setdir(char *dir)
 }
 
 /*
+ * Per-unit overrides, which is the "future per-unit option" the comment
+ * above anticipated.  A unit named on the command line - hdcdma0:disk,
+ * hdca1:other - is recorded here under the name its controller will ask
+ * for, and drive_open answers with the file instead of looking in the
+ * drive directory.  An override wins over the directory: naming a unit
+ * is more specific than saying where units live.
+ */
+#define NOVERRIDE   16
+
+static struct {
+    char *unit;
+    char *path;
+} override[NOVERRIDE];
+
+static int noverride;
+
+int
+drive_setunit(char *unit, char *path)
+{
+    int i;
+
+    for (i = 0; i < noverride; i++) {
+        if (strcmp(override[i].unit, unit) == 0) {
+            free(override[i].path);
+            override[i].path = strdup(path);
+            return 0;
+        }
+    }
+    if (noverride == NOVERRIDE) {
+        return -1;
+    }
+    override[noverride].unit = strdup(unit);
+    override[noverride].path = strdup(path);
+    noverride++;
+    return 0;
+}
+
+static char *
+drive_override(char *name)
+{
+    int i;
+
+    for (i = 0; i < noverride; i++) {
+        if (strcmp(override[i].unit, name) == 0) {
+            return override[i].path;
+        }
+    }
+    return 0;
+}
+
+/*
  * when we format the drive, we write the label if it is not present, and whenever we
  * increase they cylinder or head count, we update the label.
  * note that this only will work if we format all the heads on a cylinder, before we
@@ -115,10 +167,16 @@ drive_open(char *name)
     struct drive *dp;
     char path[PATH_MAX];
 
-    if (drive_dir && !strchr(name, '/')) {
-        snprintf(path, sizeof(path), "%s/%s", drive_dir, name);
-    } else {
-        snprintf(path, sizeof(path), "%s", name);
+    {
+        char *over = drive_override(name);
+
+        if (over) {
+            snprintf(path, sizeof(path), "%s", over);
+        } else if (drive_dir && !strchr(name, '/')) {
+            snprintf(path, sizeof(path), "%s/%s", drive_dir, name);
+        } else {
+            snprintf(path, sizeof(path), "%s", name);
+        }
     }
 
     /*

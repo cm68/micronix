@@ -425,9 +425,13 @@ usage(char *complaint, char *p)
     int i;
 
     fprintf(stderr, "%s", complaint);
-    fprintf(stderr, "usage: %s [<options>] <drive file> ...\n", p);
+    fprintf(stderr, "usage: %s [<options>] [<drive> ...]\n", p);
+    fprintf(stderr, "  a drive is <controller><unit>:<file> - djdma0:boot.IMD,\n");
+    fprintf(stderr, "  hdcdma0:hddma-0, hdca1:/tmp/scratch - or a bare file,\n");
+    fprintf(stderr, "  which is the next floppy.  controllers are the -B names.\n");
     fprintf(stderr, "\t-h\thelp\n");
     fprintf(stderr, "\t-b\t<boot rom file>\n");
+    fprintf(stderr, "\t-B\t<djdma|hdcdma|hdca> boot from this, and skip the monitor\n");
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
     fprintf(stderr, "\t-S\t<symbol file file>\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
@@ -435,7 +439,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-W\t<addr>[-<addr>] report writes to this range and keep going\n");
     fprintf(stderr, "\t-5\t<file> a floppy on the 5 1/4 inch port\n");
     fprintf(stderr, "\t-x\topen a debug terminal window\n");
-    fprintf(stderr, "\t-t\t<tracebits>\n");
+    fprintf(stderr, "\t-t\t<tracebits>, or names: -t syscall,trap\n");
     fprintf(stderr, "\t-l\tproduce logfile\n");
     for (i = 0; tracenames[i]; i++) {
         fprintf(stderr, "\t%x %s\n", 1 << i, tracenames[i]);
@@ -953,6 +957,160 @@ struct moncmd moncmds[MONCMDS] = {
 };
 #endif
 
+
+/*
+ * The boot device, by name.
+ *
+ * The rom decides what to boot from the top five bits of the
+ * configuration switch - mon447.s at tstsw - and the numbers are not
+ * memorable:
+ *
+ *	0x00	boothd, which is the HDCA
+ *	0x08	nuboot, which is the HDC-DMA
+ *	0x10	the DJ-DMA floppy
+ *
+ * with 0x04 on top of any of them to skip the monitor and go straight
+ * to the boot.  Everything written down about running this machine says
+ * "switches 0x0c" and then explains what 0x0c is; this says hdcdma and
+ * does not need explaining.  -c still takes the number for anything
+ * these three do not cover, and a -c after -B wins.
+ */
+static struct {
+    char *name;
+    int sw;
+} bootdevs[] = {
+    { "hdca",   0x00 },
+    { "hdcdma", 0x08 },
+    { "djdma",  0x10 },
+    { 0, 0 }
+};
+
+static int
+bootdev(char *name)
+{
+    int i;
+
+    for (i = 0; bootdevs[i].name; i++) {
+        if (strcmp(bootdevs[i].name, name) == 0) {
+            return bootdevs[i].sw | 0x04;
+        }
+    }
+    return -1;
+}
+
+/*
+ * A drive named on the command line: <controller><unit>:<file>, as in
+ *
+ *	djdma0:boot.IMD  hdcdma0:hddma-0  hdca1:/tmp/scratch
+ *
+ * The controller names are the ones -B takes, so the same word means
+ * the same thing in both places.  A floppy goes on the list the DJ-DMA
+ * reads in order; a hard unit is recorded against the file name its
+ * controller will ask drive_open for, which is hddma-<n> or hdca-<n>.
+ *
+ * Returns 0 if the argument was not of this shape, so that a bare file
+ * name still means what it always did.
+ */
+static int
+drivearg(char *arg)
+{
+    char *colon = strchr(arg, ':');
+    char unit[32];
+    char ctl[32];
+    int n;
+    int i;
+    size_t len;
+
+    if (!colon || colon == arg) {
+        return 0;
+    }
+    len = colon - arg;
+    if (len >= sizeof(ctl)) {
+        return 0;
+    }
+    memcpy(ctl, arg, len);
+    ctl[len] = 0;
+
+    /* the trailing digits are the unit */
+    i = len;
+    while (i > 0 && ctl[i - 1] >= '0' && ctl[i - 1] <= '9') {
+        i--;
+    }
+    if (i == (int)len) {            /* no unit given: djdma:file is unit 0 */
+        n = 0;
+    } else {
+        n = atoi(&ctl[i]);
+    }
+    ctl[i] = 0;
+
+    if (strcmp(ctl, "djdma") == 0) {
+        int have = 0;
+
+        if (drivenames) {
+            while (drivenames[have]) have++;
+        }
+        if (n < have) {
+            drivenames[n] = strdup(colon + 1);
+            return 1;
+        }
+        drivenames = realloc(drivenames, sizeof(char *) * (n + 2));
+        while (have < n) {
+            drivenames[have++] = 0;
+        }
+        drivenames[n] = strdup(colon + 1);
+        drivenames[n + 1] = 0;
+        return 1;
+    }
+    if (strcmp(ctl, "hdcdma") == 0) {
+        snprintf(unit, sizeof(unit), "hddma-%d", n);
+        return drive_setunit(unit, colon + 1) == 0 ? 1 : -1;
+    }
+    if (strcmp(ctl, "hdca") == 0) {
+        snprintf(unit, sizeof(unit), "hdca-%d", n);
+        return drive_setunit(unit, colon + 1) == 0 ? 1 : -1;
+    }
+    return 0;
+}
+
+/*
+ * Trace bits, by number or by name: -t 0x100000 and -t syscall are the
+ * same thing, and -t syscall,trap is the pair.  The names are the ones
+ * the drivers registered, which is what usage() has always printed
+ * beside the numbers.
+ */
+static int
+traceparse(char *s, char *progname)
+{
+    char buf[256];
+    char *p;
+    char *comma;
+    int bits = 0;
+    int i;
+
+    if (*s >= '0' && *s <= '9') {
+        return strtol(s, 0, 0);
+    }
+    snprintf(buf, sizeof(buf), "%s", s);
+    p = buf;
+    while (p) {
+        if ((comma = strchr(p, ','))) {
+            *comma++ = 0;
+        }
+        for (i = 0; tracenames[i]; i++) {
+            if (strcmp(tracenames[i], p) == 0) {
+                bits |= 1 << i;
+                break;
+            }
+        }
+        if (!tracenames[i]) {
+            fprintf(stderr, "no trace called %s\n", p);
+            usage("", progname);
+        }
+        p = comma;
+    }
+    return bits;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1016,6 +1174,21 @@ main(int argc, char **argv)
                 }
                 rom_filename = strdup(*argv++);
                 break;
+            case 'B':
+                {
+                    int sw;
+
+                    if (!argc--) {
+                        usage("boot device missing: djdma, hdcdma or hdca\n",
+                            progname);
+                    }
+                    if ((sw = bootdev(*argv++)) < 0) {
+                        usage("boot device is djdma, hdcdma or hdca\n",
+                            progname);
+                    }
+                    config_sw = sw | CONF_SET;
+                }
+                break;
             case 'S':
                 if (!argc--) {
                     usage("symfile name missing\n", progname);
@@ -1078,7 +1251,7 @@ main(int argc, char **argv)
                 if (!argc--) {
                     usage("trace not specified \n", progname);
                 }
-                traceflags = strtol(*argv++, 0, 0);
+                traceflags = traceparse(*argv++, progname);
                 break;
             case 's':
                 inst_countdown = 0;
@@ -1093,8 +1266,21 @@ main(int argc, char **argv)
         }
     }
 
-    // the rest of the arguments are drive names
+    /*
+     * The rest of the arguments are drives.  <controller><unit>:<file>
+     * says which drive it is; a bare name is a floppy, appended in
+     * order, which is what it has always meant.
+     */
     while (*argv) {
+        int r = drivearg(*argv);
+
+        if (r < 0) {
+            usage("too many named units\n", progname);
+        }
+        if (r) {
+            argv++;
+            continue;
+        }
         if (!drivenames) {
             drivenames = malloc(sizeof(char *) * 2);
             i = 0;
