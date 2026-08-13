@@ -69,7 +69,13 @@ Strings worth knowing:
 
     0111  "Syntax error."
     2227  "Missing name for redirect."
-    17cd  "<>&|"              the metacharacters
+    1790  "Missing `."        four unterminated-construct errors,
+    179c  "Missing (."          sitting in the tokeniser's literal
+    17a8  "Missing )."         pool immediately before it
+    17b4  "Missing \"."
+    17c0  "(` \t"<>&|;\n\r"   THE delimiter set - see below
+    17cd  "<>&|"              a pointer into the TAIL of 17c0
+    17d2  "<>&|"              and another
     1bea  "/.login"           startup, relative to home
     1bf2  "/.sh"
     1c6a  "# "                the prompt
@@ -301,6 +307,73 @@ the pointer being scanned along the line.  The shape at 0x1ab9 and
 0x1ad0 is a word scanner: stop at a metacharacter, stop at the end of
 the line, otherwise take the character and go on.
 
+But "<>&|" is NOT the whole set, and reading it as such is what kept
+three quarters of the language out of the reconstruction.  0x17cd is
+a pointer into the TAIL of a longer string that starts at 0x17c0:
+
+    17c0    (  `     \t  "  <  >  &  |  ;  \n  \r  \0
+            ^                 ^
+            17c0              17cd
+
+One string, two pointers into it, used at different points - so a
+scan against 0x17c0 stops on a paren, a backtick, whitespace, a
+double quote, any of "<>&|", a semicolon or the end of the line,
+while a scan against 0x17cd stops only on the four operators.  The
+four "Missing X." messages at 0x1790 sit in the same literal pool
+immediately before H17d7, and the bytes at 0x17d7 itself are
+
+    call 0x88ed / ld hl,4 / add hl,de / ld a,(hl) / inc hl /
+    ld h,(hl) / ld l,a / ld (0x9bec),hl
+
+which loads an argument and stores it into the line-scan pointer, so
+the pool and the messages belong to the tokeniser and to nothing
+else.
+
+
+What the language actually is
+-----------------------------
+
+Read out of the binary by running it, which is the only way to settle
+this: usersim -d <fs> /newer/bin/sh with the lines fed to it.  Left
+is what the image does, right is what the C did at the time of
+writing.
+
+    echo a ; echo b         a / b           a ; echo b
+    echo `echo one two`     one two         `echo one two`
+    echo A`echo hi`B        A hi B          A`echo hi`B
+    echo "double ok"        double ok       double ok
+    echo 'single ok'        'single ok'     single ok
+    (echo in-paren)         in-paren        sh: (echo not found
+    (cd /etc) ; pwd         /               sh: (cd not found
+    echo `echo hi           Missing `.      `echo hi
+    echo "unterminated      Missing ".      -
+    (echo a                 Missing ).      -
+    echo a)                 a)              -
+
+So, in order of how much they change:
+
+  - ";" separates statements, with or without spaces around it.
+
+  - Backticks run the command and substitute its output, and the
+    backtick is a DELIMITER rather than a splice.  A`echo hi`B is
+    three words, not the one word AhiB a Bourne shell would make of
+    it - which follows directly from the backtick being in the set at
+    0x17c0, since being in that set is what ends a word.  The output
+    substituted is itself split into words.
+
+  - "( )" is a real subshell, not just grouping: the cd in
+    "(cd /etc) ; pwd" does not move the parent.
+
+  - Single quotes are NOT special.  The image prints 'single ok' with
+    the quotes still on it.  There is no "'" in the set at 0x17c0 and
+    no "Missing '." to go with the other four, and now there is
+    behaviour to say so as well.  The C's handling of them is
+    something we invented and did not read.
+
+Not yet accounted for: what raises "Missing (." at 0x179c.  An
+unterminated "(" gives "Missing )." and a bare ")" is taken as an
+ordinary character, so neither of the obvious ways reaches it.
+
 H2257 does NOT reference the metacharacters, so it is not the
 tokeniser; it is the layer above.  It IS the parser proper, because
 "Missing name for redirect." at 0x2227 is referenced from 0x27c8,
@@ -464,17 +537,25 @@ and 136 smaller ones, 15287 bytes in all.
 
 Going the other way, what the C has that the image does not:
 
-  - findcmd() searching a colon separated pathlist.  WRONG TWICE.
-    The image keeps an array of three char * at 0x9741, laid out
-    backwards like the builtin table, pointing at
+  - findcmd() searching a colon separated pathlist.  WAS WRONG TWICE,
+    and is now fixed.  The image keeps an array of three char * at
+    0x9741, laid out backwards like the builtin table, pointing at
 
         0x1f08 "."   0x1f03 "/bin"   0x1efa "/usr/bin"
 
     so the path is three entries and one of them is the current
-    directory, which the C leaves out altogether.  Which end it
-    searches from is not yet read.
+    directory, which the C left out altogether.  The C now has
+    { ".", "/bin", "/usr/bin" }.  Which end it searches from is still
+    not read.
+
+    Note for whoever reads a findcmd bug next: it was blamed twice
+    for something that was not its fault.  usersim's access() tested
+    an unsigned short against -1, so it answered yes for every name,
+    and the shell dutifully ran "./ls" for every command.  The shell
+    was right and the simulator was lying.
   - startup() joining the home directory to "/.login" - the strings
-    are real, the mechanism is a guess.
+    are real and the mechanism is still a guess, but the effect is
+    confirmed: the image prints what /.sh echoes, so it does read it.
   - nextline() prompting only at the outermost input level.
   - the wait loop in runpipeline, and (status >> 8) & 0xff.
   - the close(2)/dup(1) for the & forms; the operators are real, this
@@ -484,10 +565,32 @@ Going the other way, what the C has that the image does not:
 Next
 ----
 
+The three gaps, in the order they want doing - each needs the one
+before it to sit under:
+
+  - ";" as a statement separator.  A line becomes several pipelines
+    rather than one, which is a change to the read-eval loop and not
+    to the parser.
+  - backticks.  Fork, read the child's output through a pipe, split
+    what comes back into words and put them in the argument list
+    where the backtick was - a delimiter, not a splice.  An
+    unterminated one is "Missing `." and gives up the line.
+  - "( )".  A recursive parse and a forked subshell, and the largest
+    of the three.  "Missing )." for an unterminated one.
+
+and alongside the backtick work, take single quoting back out: the
+image does not have it.
+
+Still open:
+
   - H1c7b is where -v, -c and "read" (0x1c70) are handled, and where
     ~/.login and ~/.sh (0x1bea, 0x1bf2) must be read from
   - H2c12 reads and parses a line and is the bulk of the program;
-    "<>&|" at 0x17cd is where redirection and pipes are recognised
+    the set at 0x17c0 is where the language is recognised
   - H01e6 is execution: fork, the exec at block 0x9b70, pipe and dup
   - confirm H5f06 really is "resume the popped input source"
+  - what reaches "Missing (." at 0x179c
+  - which end of the path findcmd searches from
+  - whether ignoresigs() is on the background children only, which is
+    where the C puts it on a v6 reading, and not read from the image
   - sh.1 gives the whole language; the binary settles the details

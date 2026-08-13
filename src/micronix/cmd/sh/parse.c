@@ -14,17 +14,30 @@
  * standard output, which is what makes this a csh and not a Bourne
  * shell.  There is no here-document and no "2>".
  *
- * H17d7 in the binary is the tokeniser and holds the metacharacter
- * set "<>&|"; H772d is the string equality it tests each operator
- * with, called once per operator - eight times.
+ * H17d7 in the binary is the tokeniser; H772d is the string equality
+ * it tests each operator with, called once per operator - eight
+ * times.
  *
+ * "<>&|" is only part of what it splits on.  The tokeniser scans
+ * against a longer string at 0x17c0 -
+ *
+ *      (  `     \t  "  <  >  &  |  ;  \n  \r
+ *
+ * - and 0x17cd, the four operators, is a second pointer into the
+ * tail of it.  Reading the tail as the whole is what left ";",
+ * backticks and "( )" out of this file.  See NOTES for what each of
+ * them does, read by running the image.
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
 
 #include <stdio.h>
 #include "sh.h"
 
-char *metachars = "<>&|";       /* 0x17cd and 0x17d2 */
+/*
+ * The operator characters only - the tail of the set at 0x17c0, which
+ * is what 0x17cd and 0x17d2 point at.  Not the whole delimiter set.
+ */
+char *metachars = "<>&|";
 
 /*
  * The operators, longest first.  The order is the binary's own and
@@ -136,6 +149,14 @@ char **pp;
                 *q++ = *s++;
             continue;
         }
+        /*
+         * The single quote is OURS and the image does not have it.
+         * Its delimiter set at 0x17c0 has a double quote and no
+         * single one, there is no "Missing '." beside the other four
+         * messages, and running the image settles it: "echo 'x'"
+         * prints 'x' with the quotes still on.  Taking it out is
+         * part of the backtick work, since both are that same set.
+         */
         if (*s == '\'' || *s == '"') {
             quote = *s++;
             while (*s && *s != quote) {

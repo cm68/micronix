@@ -120,12 +120,18 @@ char *strsave();
 void fatal();
 void warn();
 
-/* parse.c - NOT WRITTEN.  See NOTES.
+/* parse.c
  *
  * parse() takes one input line and fills in a pipeline.  It returns
  * the number of commands, 0 for a blank line, or -1 on a syntax
- * error, having already complained.  The metacharacters it has to
- * know are "<>&|" - the binary keeps them as a string at 0x17cd -
- * plus quoting and backquote substitution.
+ * error, having already complained.
+ *
+ * It knows "<>&|" and double quotes and nothing else, which is less
+ * than the image knows.  The set the tokeniser really scans against
+ * is at 0x17c0 and has a backtick, a paren and a semicolon in it as
+ * well; 0x17cd, the four operators, is a pointer into the tail of
+ * that same string.  So ";" and backticks and "( )" are all missing
+ * here, and single quoting is here without being in the image at
+ * all.  NOTES has the behaviour of each, read by running the binary.
  */
 int  parse(/* char *line, struct pipeline *p */);
