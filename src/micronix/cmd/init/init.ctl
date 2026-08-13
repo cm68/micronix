@@ -163,39 +163,14 @@ define ttys 0x3fe8
 define builtins 0x4198
 
 ; the two dead functions and the SIGTERM handler are only ever reached
-; through a signal or not at all, and the switch arms only through
-; c.switch's tables, so disas cannot find any of them by tracing
-; branches.  Force them.
+; through a signal or not at all, so nothing branches to them and disas
+; cannot find them by tracing.  Force them.
+;
+; The switch arms used to be here too - thirty more addresses, in
+; docmd, mknodf and speedcode - because they are reached only through
+; c.switch's tables.  disas recognises that helper by what it is now
+; rather than by finding "c.switch" in a symbol table, so it walks the
+; tables itself and the arms come out without being named.
 code 0x0313
 code 0x0ca2
 code 0x1102
-code 0x1618
-code 0x1641
-code 0x1644
-code 0x164a
-code 0x167a
-code 0x1680
-code 0x1695
-code 0x16a4
-code 0x16dc
-code 0x1711
-code 0x1726
-code 0x175b
-code 0x1a4e
-code 0x1adc
-code 0x1aea
-code 0x1dd1
-code 0x1dd7
-code 0x1ddd
-code 0x1de3
-code 0x1de9
-code 0x1def
-code 0x1df5
-code 0x1dfb
-code 0x1e01
-code 0x1e07
-code 0x1e0d
-code 0x1e13
-code 0x1e19
-code 0x1e1f
-code 0x1e25
