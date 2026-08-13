@@ -228,12 +228,16 @@ adding the three filesystem fields the build cannot know.  A boot put
 on a disk any other way keeps the built-in geometry, which is the case
 this arrangement exists for.
 
-Worth knowing while stage 3 is broken: the second level does not read
-any of that.  stand/*.c mentions neither dlabel nor DL_OFFSET - mwio.c
-carries the geometry as a compiled-in default and probes the drive for
-the head count - and the probe is what fails.  The answer it is failing
-to work out is now in the block it was loaded from, put there by the
-build.
+The second level reads it.  mwio.c takes the geometry from the label
+in the block it was loaded from - physical cylinder 0, head 0, sector
+0, which needs no geometry to reach, which is what makes it possible
+before the geometry is known.  It keeps a compiled-in st506 table for a
+disk that has no label, and says so when it uses it.
+
+That is the point of the label rather than a convenience for the
+loader: a kernel that reads its geometry from the disk does not need
+specs[] in sys/mw.c compiled into it, and the loader is the first
+reader proving the mechanism.
 
 setblk names the blocks a file owns, for building the arrangement in
 the first place.  It does not take them off the free list - run
@@ -243,21 +247,31 @@ icheck -s afterwards.
 where this stops today
 ----------------------
 
-Stage 3 does not complete.  The loader runs and reads the disk, and
-then:
+Stage 3 boots.  The loader finds the kernel, loads it and enters it,
+and 1.67 comes up:
 
 	mwboot:
 	Micronix loader for the HD-DMA
 	Files:
-	No bootable files
+	micronix
+	Loading
+	Entering
 
-HWSIM.STATUS has the diagnosis: the head probe in stand/mwio.c sends
-the same command eleven times - cmd.headsel does not change across the
-loop - so the controller answers head 0 every time, the probe matches
-only i = 0 and gives up at i = 1, and spec.heads and spec.spc come out
-wrong.  Every block number after that lands on the wrong cylinder and
-head, so the block read as the root directory is not the root
-directory, and nothing in it looks bootable.
+	Micronix 1.67
+	...
+	disks: djdma hddma
+	root dev: djdma/76
+
+and then loops on "Read error block 1 on disk djdma/76".  The kernel on
+this image still has its root device pointing at the floppy, which is
+what setdev in stage 2 sets and what this image never had done to it.
+That is an install left half finished, not a loader fault.
+
+What used to fail here was "No bootable files", and it was the head
+probe: read header takes no head argument and answers with whatever
+comes round next, so the probe matched only head 0, gave up at one, and
+wrote 1 into spec.heads.  Every block number after that landed on the
+wrong cylinder.  The probe is gone.
 
 An earlier failure, "Block out of range" before the directory read at
 all, was a stale loader: the sources had been fixed and the built
