@@ -244,11 +244,10 @@ the first place.  It does not take them off the free list - run
 icheck -s afterwards.
 
 
-where this stops today
-----------------------
+where this gets to today
+------------------------
 
-Stage 3 boots.  The loader finds the kernel, loads it and enters it,
-and 1.67 comes up:
+All the way to a shell, on the drive in this directory:
 
 	mwboot:
 	Micronix loader for the HD-DMA
@@ -259,33 +258,66 @@ and 1.67 comes up:
 
 	Micronix 1.67
 	...
-	disks: djdma hddma
+	root dev: hddma/0
+	swap dev: nodev/0
+
+	# /bin/ls
+	a          bootmw.bin  f      micronix  patchm5
+	bin        dev         etc    tmp       ...
+	#
+
+with the reconstructed init as process 1, not the 1.6 binary.  On ^D
+that shell exits and init starts login on /dev/ttyA, which is the
+handover single user is supposed to make.
+
+Two failures on the way here are worth keeping, because both looked
+like something else:
+
+"No bootable files" was the head probe.  Read header takes no head
+argument and answers with whatever comes round next, so the probe
+matched only head 0, gave up at one, and wrote 1 into spec.heads.
+Every block number after that landed on the wrong cylinder, and the
+block read as the root directory was not the root directory.  The probe
+is gone; the geometry comes off the label.
+
+"Block out of range", before the directory read at all, was a stale
+loader: the sources had been fixed and the built objects had not, so
+the disk carried a loader older than its own fixes.  If it comes back,
+check the dates on the build products against the sources before
+looking anywhere else.
+
+
+the root device, without redoing the install
+--------------------------------------------
+
+stage 2 ends with setdev, and a disk that was installed without it
+boots a kernel still looking for the floppy:
+
 	root dev: djdma/76
+	Read error block 1 on disk djdma/76      (for ever)
 
-and then loops on "Read error block 1 on disk djdma/76".  The kernel on
-this image still has its root device pointing at the floppy, which is
-what setdev in stage 2 sets and what this image never had done to it.
-That is an install left half finished, not a loader fault.
+That can be put right from the host rather than by installing again.
+setdev is a host program - it reads _rootdev and _swapdev out of the
+kernel's own symbol table rather than searching for the bytes of a
+device number, which is why it works on 1.67 where the old ddt recipe
+silently did nothing:
 
-What used to fail here was "No bootable files", and it was the head
-probe: read header takes no head argument and answers with whatever
-comes round next, so the probe matched only head 0, gave up at one, and
-wrote 1 into spec.heads.  Every block number after that landed on the
-wrong cylinder.  The probe is gone.
+	mnix -f hddma-0 read /micronix micronix.k
+	setdev micronix.k 3/0 0/0
+	mnix -f hddma-0 write -k micronix.k /micronix
 
-An earlier failure, "Block out of range" before the directory read at
-all, was a stale loader: the sources had been fixed and the built
-objects had not, so the disk carried a loader older than its own fixes.
-Rebuilding and reinstalling as above got past it.  If it comes back,
-check the dates on stand/*.s and stand/mwboot.com against the sources
-before looking anywhere else.
+3/0 is hddma drive 0; swap stays nodev.  write -k because the kernel is
+found through the filesystem and its size does not change, so there is
+no reason to let it move.
 
-Separately, the image in this directory has no kernel: root holds
-micronix.mw with inode 0 - a name with nothing behind it - and no
-micronix.  patchm5 on the distribution floppy ends with "ln micronix.mw
-micronix; era micronix.mw", so a half-run patch leaves exactly that.
-Even with the probe fixed there would be nothing to boot until stage 2
-is run again.
+An init can be replaced the same way, and that is how the reconstructed
+one got onto this disk:
+
+	mnix -f hddma-0 write cmd/init/init /etc/init
+
+plain write there, not -k: it is bigger than the 1.6 binary it replaces
+and -k refuses to grow a file.  Nothing depends on where /etc/init
+sits, so moving it is free.
 
 
 what is still missing for the stated goal
