@@ -27,6 +27,21 @@
 ; fdadd: a = fd, hl = byte count
 ; adds count to _fdpos[fd]; returns count in hl
 ;
+; A long is stored HIGH word first - see QLONG.md - so the half this
+; addition starts from is two bytes in, and the carry out of it goes
+; DOWN into the bytes before it rather than up into the ones after.
+;
+; Added the other way round, the position reached lseek with its
+; halves swapped: a file read to its end at 31 bytes was 0x001f0000,
+; and ftell, which is that value less what is still in the buffer,
+; answered 0x001effe5 where it meant 4.  Everything that seeks back
+; over what it has written is on this - asz assembles into a temp
+; file and copies it back out - and nothing fails loudly: the seek
+; simply lands somewhere else.
+;
+; INC and DEC on a register pair leave the flags alone, and so do
+; LD A,(HL) and LD (HL),A, so the carry survives the walk back down.
+;
 fdadd:
 	push	hl
 	add 	a,a
@@ -36,6 +51,8 @@ fdadd:
 	ld 	hl,__fdpos
 	add 	hl,de
 	pop 	de		; count
+	inc 	hl
+	inc 	hl		; the low word, two bytes in
 	ld 	a,(hl)
 	add 	a,e
 	ld 	(hl),a
@@ -43,7 +60,9 @@ fdadd:
 	ld 	a,(hl)
 	adc 	a,d
 	ld 	(hl),a
-	inc 	hl
+	dec 	hl
+	dec 	hl
+	dec 	hl		; and the high word, back at the front
 	ld 	a,(hl)
 	adc 	a,0
 	ld 	(hl),a
