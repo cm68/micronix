@@ -232,6 +232,8 @@ char *argv[];
 				char cols = WIDTH / (maxn + 1);
 				char lines = ((lastp - slastp) + (cols - 1)) / cols;
 				char j;
+				int nent = lastp - slastp;
+				int n;
 #ifdef notdef
 				char total = lastp - slastp;
 				for (i = 0; i < total; i++) {
@@ -243,7 +245,17 @@ char *argv[];
 				sprintf(fbuf, "%%-%ds ", maxn);
 				for (i = 0; i < lines; i++) {
 					for (j = 0; j < cols; j++) {
-						ep1 = &slastp[i + (j * lines)];
+						/*
+						 * cols*lines is a rectangle and the
+						 * entries rarely fill one.  Across
+						 * a row the index only grows, so
+						 * the first cell past the last
+						 * entry ends the row.
+						 */
+						n = i + (j * lines);
+						if (n >= nent)
+							break;
+						ep1 = &slastp[n];
 						printf(fbuf, (*ep1)->ln.lname);
 					}
 					printf("\n");
