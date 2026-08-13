@@ -367,6 +367,20 @@ int pout;
         if (c->bg)
             ignoresigs();
         redirect(c, pin, pout);
+
+        /*
+         * A group runs here rather than being exec'd, and running
+         * here in a child of the shell is exactly what makes it a
+         * subshell: a cd or an exit inside it goes when the child
+         * does.  Its redirection is already in place, so it applies
+         * to everything in the group at once - "(echo a ; echo b) >f"
+         * puts both lines in f.
+         */
+        if (c->sub) {
+            runline(c->sub);
+            exit(status);
+        }
+
         path = findcmd(c->argv[0]);
         if (!path) {
             /* 0x1212 in the image, printed after the name */

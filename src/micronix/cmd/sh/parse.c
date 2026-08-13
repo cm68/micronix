@@ -49,13 +49,13 @@ char *metachars = "<>&|";
  * AhiB that a Bourne shell would make of it.  The image agrees
  * because the image is where that was read.
  *
- * The open paren is the one piece of the set at 0x17c0 still missing,
- * and it stays out until the code that acts on it arrives: a
- * character that ends a word and that nothing then consumes leaves
- * the parse loop turning on the spot, because getword returns nothing
- * and never advances past it.
+ * The open paren is here and the close paren is NOT, which looks
+ * lopsided and is what the image does: 0x17c0 has "(" in it and no
+ * ")", and "echo a)" prints a) with the paren still on.  A close
+ * paren only means anything to the scan that is already looking for
+ * one.
  */
-static char *wordstop = "<>&|;`";
+static char *wordstop = "<>&|;`(";
 
 /*
  * The operators, longest first.  The order is the binary's own and
@@ -220,6 +220,7 @@ struct cmd *c;
 {
     c->argc = 0;
     c->argv[0] = (char *)0;
+    c->sub = (char *)0;
     c->in = c->out = (char *)0;
     c->append = 0;
     c->bg = 0;
@@ -316,6 +317,97 @@ struct cmd *c;
 }
 
 /*
+ * A group: "( ... )", run in a child of its own.
+ *
+ * *pp is on the open paren.  Everything up to the matching close
+ * paren is kept as text and handed to runline() in that child, which
+ * is why a group holds anything a line holds - several statements,
+ * pipes, redirections, and other groups.  Nesting costs nothing for
+ * the same reason: "((echo nested))" is a group whose text is a
+ * group, and the inner one is parsed by the child.
+ *
+ * The child is the whole point.  "(cd /etc ; pwd) ; pwd" prints /etc
+ * and then /, and "(exit)" does not take the shell with it.
+ *
+ * A group and words are exclusive: the image answers "Syntax error."
+ * to both "echo (echo a)" and "(echo a) b".  What may follow is
+ * redirection, a pipe, or "&", and those attach to this command the
+ * way they would to any other.
+ */
+static int
+group(pp, c)
+char **pp;
+struct cmd *c;
+{
+    char buf[MAXLINE];
+    char *s;
+    char *q;
+    int depth;
+    int quote;
+
+    s = *pp + 1;                        /* past the open paren */
+    q = buf;
+    depth = 1;
+    while (*s) {
+        /*
+         * A paren inside a quoted run or a pair of backticks is not
+         * ours to count.  Copy the run out whole and leave what is in
+         * it to whoever parses this text later.
+         */
+        if (*s == '"' || *s == '`') {
+            quote = *s;
+            if (q < buf + sizeof(buf) - 1)
+                *q++ = *s;
+            s++;
+            while (*s && *s != quote) {
+                if (q < buf + sizeof(buf) - 1)
+                    *q++ = *s;
+                s++;
+            }
+            if (!*s)
+                break;                  /* the inner parse will say so */
+            if (q < buf + sizeof(buf) - 1)
+                *q++ = *s;
+            s++;
+            continue;
+        }
+        if (*s == '(')
+            depth++;
+        if (*s == ')' && --depth == 0)
+            break;
+        if (q < buf + sizeof(buf) - 1)
+            *q++ = *s;
+        s++;
+    }
+    if (*s != ')') {
+        perr("Missing ).");
+        return -1;
+    }
+    *q = '\0';
+    *pp = s + 1;                        /* past the close paren */
+
+    /*
+     * The unmatched paren is looked for BEFORE this, because that is
+     * the order the image answers in: "echo (" is "Missing )." and
+     * "echo (echo a)" is "Syntax error.".  It finds the end of the
+     * group first and complains about where the group is second.
+     */
+    if (c->argc > 0 || c->sub) {
+        perr("Syntax error.");
+        return -1;
+    }
+
+    /*
+     * Not saveword().  The child parses this text, and parse() begins
+     * by emptying the word buffer - so text held there would be
+     * overwritten by the very words being read out of it.  It lives
+     * on the heap instead, where nothing else is going to reach.
+     */
+    c->sub = strsave(buf);
+    return 0;
+}
+
+/*
  * One statement, not one line.
  *
  * ";" separates statements - "echo a ; echo b" runs two, with or
@@ -386,6 +478,12 @@ struct pipeline *p;
             continue;
         }
 
+        if (*s == '(') {
+            if (group(&s, c) < 0)
+                return -1;
+            continue;
+        }
+
         code = isop(s, &len);
         if (code) {
             s += len;
@@ -393,7 +491,7 @@ struct pipeline *p;
 
             case O_PIPEBOTH:
             case O_PIPE:
-                if (c->argc == 0) {
+                if (c->argc == 0 && !c->sub) {
                     perr("Syntax error.");
                     return -1;
                 }
@@ -442,6 +540,10 @@ struct pipeline *p;
             return -1;
         if (!w)
             continue;
+        if (c->sub) {                   /* "(echo a) b" */
+            perr("Syntax error.");
+            return -1;
+        }
         if (c->argc >= MAXARG - 1) {
             warn("too many arguments", 0);
             return -1;
@@ -456,9 +558,9 @@ struct pipeline *p;
      * A pipeline whose last stage has no words is "cmd |" with
      * nothing after it.  An empty line is not an error.
      */
-    if (p->ncmd == 0 && p->cmd[0].argc == 0)
+    if (p->ncmd == 0 && p->cmd[0].argc == 0 && !p->cmd[0].sub)
         return 0;
-    if (p->cmd[p->ncmd].argc == 0) {
+    if (p->cmd[p->ncmd].argc == 0 && !p->cmd[p->ncmd].sub) {
         perr("Syntax error.");
         return -1;
     }

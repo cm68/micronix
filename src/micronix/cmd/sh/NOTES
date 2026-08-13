@@ -1,8 +1,10 @@
 Reading /bin/sh back into C - reconnaissance
 ============================================
 
-Not yet written.  This is what has been established so far, so the next
-pass starts from here rather than from the beginning.  Read
+The C is written and installed as /bin/sh.  This is what has been
+established about the image it was read out of, and what is still
+unaccounted for, so the next pass starts from here rather than from
+the beginning.  Read
 cmd/form/NOTES first - the Whitesmiths conventions described there
 (frame helper, switch helper, how disas has to be told about them) all
 apply, and form is the worked example.
@@ -37,10 +39,14 @@ the wrong one.  They must not become the source of libu.
 The real source is /vault/src/ccc/src/libu: 44 files in asz syntax
 with a Makefile that archives them.  Two notes on it:
 
-  - _signal.s has no .global declarations, unlike every other file
-    there, so it assembles to an object that defines nothing.  That
-    is why __signal and _jtab come out undefined and why signal()
-    cannot be linked - and why ignoresigs() in sh.c is a no-op.
+  - _signal.s had no .global declarations, unlike every other file
+    there, so it assembled to an object that defined nothing:
+    __signal and _jtab came out undefined and signal() could not be
+    linked at all.  Fixed, along with a second bug behind it - the
+    stub stored signal(sig, func)'s two arguments the wrong way
+    round, so the kernel was handed the handler where it wanted the
+    number and answered "signal 3368 out of range".  ignoresigs() in
+    sh.c does something now.
   - there is no isatty.s, which is why isatty() here goes through
     gtty.
 
@@ -335,20 +341,39 @@ What the language actually is
 
 Read out of the binary by running it, which is the only way to settle
 this: usersim -d <fs> /newer/bin/sh with the lines fed to it.  Left
-is what the image does, right is what the C did at the time of
-writing.
+is what the image does, right is what the C did before any of this
+was written.  The C matches the image on every line below now, and
+these are the regression cases - run them against both.
 
     echo a ; echo b         a / b           a ; echo b
+    echo one;echo two       one / two       one;echo two
+    echo a ;; echo b        a / b           -
+    ; echo lead             lead            -
     echo `echo one two`     one two         `echo one two`
     echo A`echo hi`B        A hi B          A`echo hi`B
+    echo pre`echo mid`post  pre mid post    -
+    echo "a `echo b` c"     a `echo b` c    a b c
     echo "double ok"        double ok       double ok
     echo 'single ok'        'single ok'     single ok
-    (echo in-paren)         in-paren        sh: (echo not found
-    (cd /etc) ; pwd         /               sh: (cd not found
+    (echo a ; echo b)       a / b           sh: (echo not found
+    (echo a) | grep a       a               -
+    (cd /etc ; pwd) ; pwd   /etc / /        sh: (cd not found
+    ((echo nested))         nested          -
+    (exit) ; echo alive     alive           -
+    echo (echo a)           Syntax error.   -
+    (echo a) b              Syntax error.   -
     echo `echo hi           Missing `.      `echo hi
-    echo "unterminated      Missing ".      -
+    echo "unterminated      Missing ".      unterminated
+    echo (                  Missing ).      -
     (echo a                 Missing ).      -
-    echo a)                 a)              -
+    echo a)                 a)              a)
+    echo x >                Missing name for redirect.
+    nosuchcmd               nosuchcmd: Command not found.
+
+The last two are message-format differences that ran through everything:
+the image writes its parse errors bare where warn() put "sh: " on the
+front, and a command that is not there is "%s: Command not found."
+from 0x1212, not "sh: %s not found".
 
 So, in order of how much they change:
 
@@ -565,21 +590,20 @@ Going the other way, what the C has that the image does not:
 Next
 ----
 
-The three gaps, in the order they want doing - each needs the one
-before it to sit under:
+The three the delimiter set turned up are done: ";" separates
+statements, backticks substitute, "( )" is a subshell, and single
+quoting has gone back out.  What that leaves:
 
-  - ";" as a statement separator.  A line becomes several pipelines
-    rather than one, which is a change to the read-eval loop and not
-    to the parser.
-  - backticks.  Fork, read the child's output through a pipe, split
-    what comes back into words and put them in the argument list
-    where the backtick was - a delimiter, not a splice.  An
-    unterminated one is "Missing `." and gives up the line.
-  - "( )".  A recursive parse and a forked subshell, and the largest
-    of the three.  "Missing )." for an unterminated one.
+  - FILENAME GLOBBING.  The image expands "*" - "echo /etc/pass*"
+    answers /etc/passwd - and says "No match." at 0x02cb when nothing
+    matches.  The C does neither; it prints the pattern.  This is the
+    largest thing still missing and it is used everywhere.
+  - HISTORY.  "Event not found." at 0x4f9d says the image has "!"
+    event designators, csh's.  Nothing else about it is read yet.
 
-and alongside the backtick work, take single quoting back out: the
-image does not have it.
+Both were found while reading the tokeniser and neither has been
+looked into.  Note that "No match." is also what "echo `echo`" gives,
+so an empty substitution ends up in the globber somehow.
 
 Still open:
 
@@ -589,7 +613,9 @@ Still open:
     the set at 0x17c0 is where the language is recognised
   - H01e6 is execution: fork, the exec at block 0x9b70, pipe and dup
   - confirm H5f06 really is "resume the popped input source"
-  - what reaches "Missing (." at 0x179c
+  - what reaches "Missing (." at 0x179c.  Not an unterminated "(",
+    which gives "Missing ).", and not a bare ")", which is an
+    ordinary character - so neither of the obvious ways.
   - which end of the path findcmd searches from
   - whether ignoresigs() is on the background children only, which is
     where the C puts it on a v6 reading, and not read from the image

@@ -27,6 +27,13 @@
 struct cmd {
     char    *argv[MAXARG];  /* null terminated */
     int     argc;
+    char    *sub;           /* "( ... )": the text of a group, run in
+                             * a child of its own.  A command is words
+                             * or a group and never both - the image
+                             * calls "echo (echo a)" and "(echo a) b"
+                             * a syntax error - so this is set only
+                             * when argc is 0 and the other way
+                             * about. */
     char    *in;            /* < name    */
     char    *out;           /* > name    */
     int     append;         /* >> rather than > */
