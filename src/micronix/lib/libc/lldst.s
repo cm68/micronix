@@ -15,14 +15,15 @@
 ; Entry: HL = pointer to long
 ; Exit: HLDE = 32-bit value, HL = high word, DE = low word
 lld:
-	ld	e,(hl)		; low word from the lower address
+	ld	e,(hl)		; high word from the lower address
 	inc	hl
 	ld	d,(hl)
 	inc	hl
-	ld	a,(hl)		; high word from the higher one
+	ld	a,(hl)		; low word from the higher one
 	inc	hl
 	ld	h,(hl)
-	ld	l,a
+	ld	l,a		; hl = low word, de = high word
+	ex	de,hl		; and HLDE wants them the other way round
 	ret
 
 ; Load 32-bit from (DE) into HLDE
@@ -50,14 +51,17 @@ lstde:
 	ld	(lsret),hl
 	pop	hl		; high word back
 	ex	(sp),hl		; hl = dest ptr, TOS = high word
+	ex	de,hl		; de = dest ptr, hl = low word
+	ex	(sp),hl		; hl = high word, TOS = low word
+	ex	de,hl		; de = high word, hl = dest ptr
 	ld	(hl),e
 	inc	hl
-	ld	(hl),d
+	ld	(hl),d		; high word down, at the lower address
 	inc	hl
-	pop	de		; high word
+	pop	de		; low word
 	ld	(hl),e
 	inc	hl
-	ld	(hl),d
+	ld	(hl),d		; low word above it
 	ld	hl,(lsret)
 	jp	(hl)
 

@@ -23,13 +23,13 @@
 
 qinc:
 	push	bc		;the caller's register variable
-	ld	c,(hl)
-	inc	hl
-	ld	b,(hl)		;bc = low word
-	inc	hl
 	ld	e,(hl)
 	inc	hl
-	ld	d,(hl)		;de = high word; hl -> address+3
+	ld	d,(hl)		;de = high word, from the lower address
+	inc	hl
+	ld	c,(hl)
+	inc	hl
+	ld	b,(hl)		;bc = low word; hl -> address+3
 	push	de
 	exx
 	pop	hl		;hl' = the original high word
@@ -45,13 +45,13 @@ qinc:
 
 qdec:
 	push	bc
-	ld	c,(hl)
-	inc	hl
-	ld	b,(hl)
-	inc	hl
 	ld	e,(hl)
 	inc	hl
 	ld	d,(hl)
+	inc	hl
+	ld	c,(hl)
+	inc	hl
+	ld	b,(hl)
 	push	de
 	exx
 	pop	hl		;hl' = the original high word
@@ -64,15 +64,15 @@ qdec:
 	dec	de		;borrow out of the high word
 
 ;	Write the stepped value back.  HL is at the top of it, so this
-;	walks down: high word first, low word last.
+;	walks down: low word first, high word last.
 qstep:
-	ld	(hl),d
-	dec	hl
-	ld	(hl),e
-	dec	hl
 	ld	(hl),b
 	dec	hl
 	ld	(hl),c
+	dec	hl
+	ld	(hl),d
+	dec	hl
+	ld	(hl),e
 	pop	hl		;the original low word
 	pop	bc		;and the caller's bc
 	ret

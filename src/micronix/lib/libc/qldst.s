@@ -88,19 +88,18 @@ qstix:
 ; value is assembled in HL and DE first and the high half handed over
 ; to HL' through the stack.
 qld:
-	ld	e,(hl)		;low word, from the lower address
+	ld	e,(hl)		;high word, from the lower address
 	inc	hl
 	ld	d,(hl)
 	inc	hl
-	ld	a,(hl)		;high word, from the higher one
+	ld	a,(hl)		;low word, from the higher one
 	inc	hl
 	ld	h,(hl)
-	ld	l,a		;hl = high word, de = low word
-	push	hl
+	ld	l,a		;hl = low word, de = high word
+	push	de
 	exx
 	pop	hl		;hl' = high word
 	exx
-	ex	de,hl		;hl = low word
 	ret
 
 ; Load 32-bit from (DE) into HL':HL
@@ -140,14 +139,17 @@ qst:
 	pop	de		;de' = low word.    stack: ret, ptr
 	pop	bc		;bc' = return addr. stack: ptr
 	ex	(sp),hl		;hl = dest pointer; the high word is on the stack
-	ld	(hl),e
 	inc	hl
-	ld	(hl),d		;low word down, at the lower address
 	inc	hl
+	inc	hl		;hl -> the last byte of the low word
+	ld	(hl),d
+	dec	hl
+	ld	(hl),e		;low word up, at the higher address
+	dec	hl
 	pop	de		;de' = high word.   stack: as the caller left it
-	ld	(hl),e
-	inc	hl
-	ld	(hl),d		;high word above it
+	ld	(hl),d
+	dec	hl
+	ld	(hl),e		;high word down, at the lower address
 	ex	de,hl		;hl = high word again
 	push	bc		;the return address, for the ret below
 	exx			;hl = low word, hl' = high word, bc the caller's
