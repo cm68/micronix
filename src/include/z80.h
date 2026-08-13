@@ -583,8 +583,24 @@ bool z80_ei_pending(z80_t* cpu);
 #define _BUMPR() d8=_G8(r2,_R);d8=(d8&0x80)|((d8+1)&0x7F);_S8(r2,_R,d8)
 /* a normal opcode fetch, bump R */
 #define _FETCH(op) {_SA(pc++);_TWM(4,Z80_M1|Z80_MREQ|Z80_RD);op=_GD();_BUMPR();}
-/* special opcode fetch for CB prefix, only bump R if not a DD/FD+CB 'double prefix' op */
-#define _FETCH_CB(op) {_SA(pc++);_TWM(4,Z80_M1|Z80_MREQ|Z80_RD);op=_GD();if(!_IDX()){_BUMPR();}}
+/*
+ * special opcode fetch for CB prefix, only bump R if not a DD/FD+CB
+ * 'double prefix' op.
+ *
+ * The double-prefix form is DD/FD CB <displacement> <opcode>, and its
+ * opcode is the fourth byte, read after the displacement.  Hardware
+ * reads it with an ordinary memory cycle, not an M1: there is no
+ * refresh for it, which is the same reason R is not bumped here.
+ *
+ * Asserting M1 on it told anything watching the bus that a new
+ * instruction was starting, and the byte it saw was that opcode.
+ * BIT 6,(IX+d) and BIT 6,(IY+d) end in 0x76, which is HALT, and on the
+ * MPZ80 a halt fetched in user mode is how a system call leaves the
+ * program - so every one of those instructions trapped into the kernel
+ * as a syscall.  fgetc tests bit 6 of the FILE flags, so it took down
+ * anything that read through stdio.
+ */
+#define _FETCH_CB(op) {_SA(pc++);_TWM(4,(_IDX()?0:Z80_M1)|Z80_MREQ|Z80_RD);op=_GD();if(!_IDX()){_BUMPR();}}
 /* evaluate S+Z flags */
 #define _SZ(val) ((val&0xFF)?(val&Z80_SF):Z80_ZF)
 /* evaluate SZYXCH flags */
