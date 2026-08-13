@@ -35,7 +35,7 @@ AOBJS	= abs.o allsh.o alrsh.o asallsh.o asalrsh.o asar.o \
 	qadd.o qsub.o qand.o qor.o qxor.o qcom.o \
 	qcmp.o qshl.o qsar.o qshr.o qinc.o qldst.o \
 	qmul.o qdiv.o op16.o tramp.o rcsv.o rindex.o \
-	sbrk.o shar.o shl16.o shll.o shlr.o strcat.o \
+	shar.o shl16.o shll.o shlr.o strcat.o \
 	strchr.o strcmp.o strcpy.o swdisp.o swdispw.o oarg.o \
 	strlen.o strncat.o strncmp.o strncpy.o strrchr.o tolower.o \
 	toupper.o xtoi.o fputc.o fgetc.o
