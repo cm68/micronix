@@ -51,6 +51,15 @@
 extern int errno;
 
 /*
+ * Argument vectors for the execs below.  exec(name, argv) takes the
+ * vector by reference, so each of these has to be an array that
+ * outlives the call rather than a list of arguments written at it.
+ */
+static char *shargv[2];			/* the single user shell */
+static char *lgargv[4];			/* login on a terminal */
+static char *rcargv[3];			/* sh /etc/rc */
+
+/*
  * the two signal handlers, named before they are defined
  */
 extern reload();
@@ -197,7 +206,11 @@ struct ttyent *t;
 	sg.mode = t->t_mode;
 	stty(0, &sg);
 
-	exec("/bin/login", "login", "-t", t->t_name, 0);
+	lgargv[0] = "login";
+	lgargv[1] = "-t";
+	lgargv[2] = t->t_name;
+	lgargv[3] = 0;
+	exec("/bin/login", lgargv);
 
 	perror("/bin/login");
 	exit(0);
@@ -274,14 +287,27 @@ console()
 	 */
 	if (access("/bin/sh", A_EXEC) < 0)
 		perror("/bin/sh");
-	else if (access("/bin/login", A_EXEC) < 0)
+	if (access("/bin/login", A_EXEC) < 0)
 		perror("/bin/login");
-	else if (access("/etc/passwd", A_READ) < 0)
+	if (access("/etc/passwd", A_READ) < 0)
 		perror("/etc/passwd");
-	else if (rootpasswd())
-		exec("/bin/login", "login", "-t", "/dev/console", 0);
 
-	exec("/bin/sh", "-sh", 0);
+	/*
+	 * Single user is a root shell and it is not conditional.  The
+	 * machine comes up with one whatever else is or is not on the
+	 * disk - this is the mode you repair the disk from, so a missing
+	 * login or an unreadable passwd file must not be able to take it
+	 * away.  Login comes afterwards: when this shell exits, console()
+	 * returns and the multi-user path starts one per terminal.
+	 *
+	 * argv[0] is "-sh", with the leading dash that says login shell.
+	 * That is what the original passed and it is not decoration - it
+	 * is how the shell knows to read the profile and to be the one
+	 * you cannot exit out of into nothing.
+	 */
+	shargv[0] = "-sh";
+	shargv[1] = 0;
+	exec("/bin/sh", shargv);
 
 	/* no shell on the disk at all: fall back on the one built in here */
 	minishell();
@@ -548,7 +574,10 @@ runrc()
 	closefds();
 	defaultsigs();
 	opentty("/dev/console");
-	exec("/bin/sh", "sh", "/etc/rc", 0);
+	rcargv[0] = "sh";
+	rcargv[1] = "/etc/rc";
+	rcargv[2] = 0;
+	exec("/bin/sh", rcargv);
 	exit(0);
 }
 
@@ -943,12 +972,10 @@ minishell()
 			signal(i, SIG_DFL);
 
 		/*
-		 * This does not do what it looks like it does.  exec() takes
-		 * its argument vector from the address of its second
-		 * argument on the stack, execl-fashion, so handing it av
-		 * builds an argv of { av, ... } rather than av itself.  The
-		 * exec fails or the child gets nonsense for argv[0]; either
-		 * way the perror below is what actually runs.
+		 * exec(name, argv) - the vector by reference, not a list of
+		 * arguments after the name.  This is the only call in the
+		 * file that was written that way and the only one that
+		 * worked; see console(), where the others were.
 		 */
 		exec(av[0], av);
 		perror(av[0]);
