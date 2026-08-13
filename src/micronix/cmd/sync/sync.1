@@ -1,0 +1,48 @@
+.he "sync (1)                     8/13/26                     sync (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+sync
+- flush the buffer cache
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+sync
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Sync writes out every block the kernel is holding that differs from
+what is on the disk, and returns as soon as the writes are queued
+rather than when they finish.  A moment should pass before the power
+goes off.
+.sp
+Sync takes no arguments.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This was a builtin of sh (1) and is now a command.  A builtin earns
+its place by needing the shell's own state - cd moves the shell, exit
+ends it, alias and path are its tables - and sync needs none of it, so
+it had no reason to be one.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+sh (1)
