@@ -342,10 +342,188 @@ struct openfile {
     int minor;
     char dt;
     int special;        // is a special file needing sector hackery
-    long offset;         // notional file offset
+    int ofile;          // the open file it names, -1 for none
     int filesize;
     int noseek;         // pipe, tty or socket: the host holds the position
 } files[MAXFILE + 1];
+
+/*
+ * The open file table.
+ *
+ * A descriptor is not the file.  sys/file.h is two fields -
+ *
+ *      struct file {
+ *          UINT8 mode;
+ *          UINT8 count;
+ *          struct inode *inode;
+ *          UINT32 rwptr;
+ *      } flist[];
+ *
+ * - a count and a seek pointer, and olist[] in each process points at
+ * one of these rather than holding a position of its own.  That is
+ * what lets several descriptors name one open file: dup makes a
+ * second name for one, and fork gives the child the same ones its
+ * parent had.  In both cases the position is shared, and advancing it
+ * through one descriptor advances it through all of them.
+ *
+ * We had it the other way round - a position per descriptor, in
+ * memory fork copies - and both halves of that were wrong.  A forked
+ * child seeked back to wherever its parent had been at the fork and
+ * wrote on top of it, so a background command with its output
+ * redirected overwrote whatever the shell wrote next; and dup handed
+ * back a private copy of the position, which is the one thing a dup
+ * must never do - 2>&1 and >& weld two descriptors together and then
+ * expect them to stay welded.
+ *
+ * So it lives out here, shared the way the pid registry is and
+ * counted the way the kernel's is: every descriptor pointing at a
+ * slot is one count, and the slot is free when the last one goes.
+ */
+#define NFILE   60              /* sys/sys.h: the kernel's file table */
+
+struct ofile {
+    int count;                  /* descriptors pointing here; 0 is free */
+    long rwptr;                 /* the seek pointer - the shared thing */
+};
+
+struct ftab {
+    pthread_mutex_t mutex;
+    struct ofile file[NFILE];
+} *ftab;
+
+void
+initfiles()
+{
+    pthread_mutexattr_t attr;
+    int i;
+
+    ftab = (struct ftab *)mmap((void *)NULL, sizeof(struct ftab),
+        PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0);
+    if (ftab == (struct ftab *)-1) {
+        perror("initfiles");
+        exit(2);
+    }
+    /*
+     * The lock is in memory that other processes hold too, so it has
+     * to be a lock they can use.
+     */
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+    pthread_mutex_init(&ftab->mutex, &attr);
+
+    for (i = 0; i < NFILE; i++) {
+        ftab->file[i].count = 0;
+        ftab->file[i].rwptr = 0;
+    }
+    for (i = 0; i <= MAXFILE; i++)
+        files[i].ofile = -1;
+}
+
+/*
+ * A fresh open file, with one descriptor naming it.  -1 when the
+ * table is full, which is ENFILE - the whole machine is out, not just
+ * this process.
+ */
+int
+falloc()
+{
+    int i;
+
+    pthread_mutex_lock(&ftab->mutex);
+    for (i = 0; i < NFILE; i++) {
+        if (ftab->file[i].count == 0) {
+            ftab->file[i].count = 1;
+            ftab->file[i].rwptr = 0;
+            pthread_mutex_unlock(&ftab->mutex);
+            return i;
+        }
+    }
+    pthread_mutex_unlock(&ftab->mutex);
+    return -1;
+}
+
+/*
+ * another descriptor names this open file - a dup, or a fork
+ */
+void
+fhold(int slot)
+{
+    if ((slot < 0) || (slot >= NFILE))
+        return;
+    pthread_mutex_lock(&ftab->mutex);
+    ftab->file[slot].count++;
+    pthread_mutex_unlock(&ftab->mutex);
+}
+
+/*
+ * one fewer.  the last one out frees the slot.
+ */
+void
+frele(int slot)
+{
+    if ((slot < 0) || (slot >= NFILE))
+        return;
+    pthread_mutex_lock(&ftab->mutex);
+    if (ftab->file[slot].count > 0)
+        ftab->file[slot].count--;
+    pthread_mutex_unlock(&ftab->mutex);
+}
+
+/*
+ * the seek pointer of the file a descriptor names
+ */
+long
+getoff(int fd)
+{
+    long o;
+
+    if ((fd < 0) || (fd > MAXFILE) || (files[fd].ofile < 0))
+        return 0;
+    pthread_mutex_lock(&ftab->mutex);
+    o = ftab->file[files[fd].ofile].rwptr;
+    pthread_mutex_unlock(&ftab->mutex);
+    return o;
+}
+
+void
+setoff(int fd, long o)
+{
+    if ((fd < 0) || (fd > MAXFILE) || (files[fd].ofile < 0))
+        return;
+    pthread_mutex_lock(&ftab->mutex);
+    ftab->file[files[fd].ofile].rwptr = o;
+    pthread_mutex_unlock(&ftab->mutex);
+}
+
+/*
+ * A read or a write moves the pointer by what it transferred, and the
+ * whole point is that it moves for everyone naming the file, so this
+ * adds to the shared copy rather than reading it and putting it back.
+ */
+void
+addoff(int fd, long delta)
+{
+    if ((fd < 0) || (fd > MAXFILE) || (files[fd].ofile < 0))
+        return;
+    pthread_mutex_lock(&ftab->mutex);
+    ftab->file[files[fd].ofile].rwptr += delta;
+    pthread_mutex_unlock(&ftab->mutex);
+}
+
+/*
+ * Let go of the open file a descriptor named.  Called where a
+ * descriptor stops existing: a close, a process exiting, and the
+ * paths that opened something of the host's and then found the guest
+ * had no room for it.
+ */
+void
+dropfd(int fd)
+{
+    if ((fd < 0) || (fd > MAXFILE))
+        return;
+    frele(files[fd].ofile);
+    files[fd].ofile = -1;
+}
 
 /*
  * A guest descriptor is not a host descriptor.
@@ -412,6 +590,32 @@ unmapfd(int gfd)
 }
 
 /*
+ * A fork gives the child the descriptors its parent had, and an exit
+ * takes a process's away.  olist is what a process owns, so that is
+ * what gets counted: a descriptor duplicated onto another is two
+ * entries and two counts, the way the kernel would have it.
+ */
+void
+holdfds()
+{
+    int i;
+
+    for (i = 0; i < NOPEN; i++)
+        if (fdmap[i] >= 0)
+            fhold(files[fdmap[i]].ofile);
+}
+
+void
+relefds()
+{
+    int i;
+
+    for (i = 0; i < NOPEN; i++)
+        if (fdmap[i] >= 0)
+            frele(files[fdmap[i]].ofile);
+}
+
+/*
  * Learn where a descriptor already is, rather than assuming.
  *
  * seekfile() below pushes the notional offset at the host before every
@@ -419,20 +623,30 @@ unmapfd(int gfd)
  * position and whose position we set.  A pipe has neither: the lseek
  * fails with ESPIPE and is thrown away, once per I/O, forever.
  */
-void
+int
 adoptfd(int fd)
 {
     off_t o;
 
     if ((fd < 0) || (fd > MAXFILE))
-        return;
+        return -1;
+    /*
+     * This descriptor is a new open, so whatever it named before has
+     * one fewer name.  The paths that close a host descriptor without
+     * coming through here would otherwise strand a slot.
+     */
+    dropfd(fd);
+    if ((files[fd].ofile = falloc()) < 0)
+        return -1;              /* the machine is out of files: ENFILE */
+
     if ((o = lseek(fd, 0, SEEK_CUR)) == (off_t) -1) {
         files[fd].noseek = 1;
-        files[fd].offset = 0;
+        setoff(fd, 0);
     } else {
         files[fd].noseek = 0;
-        files[fd].offset = o;
+        setoff(fd, o);
     }
+    return 0;
 }
 
 /*
@@ -467,6 +681,7 @@ seekfile(int fd)
     int sec;
     int blkno;
     int blkoff;
+    long pos;
     long new;
 
     if ((fd < 0) || (fd > MAXFILE)) {
@@ -477,21 +692,27 @@ seekfile(int fd)
     if (files[fd].noseek)
         return 0;
 
-    if ((files[fd].dt == 'b') && (files[fd].offset > files[fd].filesize)) {
+    /*
+     * The position belongs to the open file rather than to us, so ask
+     * for it rather than remembering it.
+     */
+    pos = getoff(fd);
+
+    if ((files[fd].dt == 'b') && (pos > files[fd].filesize)) {
         errno = ENXIO;
         return -1;
     }
 
-//message("seekfile fd: %d %d\n", fd, files[fd].offset);
+//message("seekfile fd: %d %d\n", fd, pos);
     if ((files[fd].dt != 'b') || 
         (files[fd].major != 2) || 
         ((files[fd].minor & 0x8) == 0)) {
-        lseek(fd, files[fd].offset, SEEK_SET);
+        lseek(fd, pos, SEEK_SET);
         return 0;
     }
     
-    blkno = files[fd].offset / 512;
-    blkoff = files[fd].offset % 512;
+    blkno = pos / 512;
+    blkoff = pos % 512;
 
     trk = blkno / SPT;
     sec = blkno % SPT;
@@ -784,6 +1005,7 @@ main(int argc, char **argv)
      * make our shared memory segments
      */
     initpids();
+    initfiles();
     initinums();
 
     /*
@@ -2466,11 +2688,34 @@ SystemCall()
                 tprot_hits, tprot_addr, tprot_pc);
             fflush(repfp);
         }
+        /* the descriptors go with the process */
+        relefds();
         exit(fd);
         break;
 
     case 2:                    /* fork */
+        /*
+         * The child inherits the parent's descriptors, so it gets its
+         * own count on each of the open files they name - and it gets
+         * them before it exists.  Taken after the fork instead, the
+         * parent could close the last descriptor and free the slot
+         * out from under a child that had not run yet.
+         */
+        holdfds();
         ret = fork();
+        if (ret == 0xffff) {
+            /*
+             * No child took them after all.  This used to fall into
+             * the parent's arm, where allocpid(-1) made it 0xffff
+             * again and the carry was cleared regardless - so a fork
+             * that failed was reported as one that had worked and
+             * handed back process 65535.
+             */
+            relefds();
+            ret = errno;
+            carry_set();
+            break;
+        }
         if (ret) {
             ret = allocpid(ret);
             push(pop() + 3);
@@ -2499,7 +2744,7 @@ SystemCall()
             ret = errno;
             carry_set();
         } else {
-            files[fd].offset += ret;
+            addoff(fd, ret);
             carry_clear();
         }
         break;
@@ -2513,7 +2758,7 @@ SystemCall()
             ret = errno;
             carry_set();
         } else {
-            files[fd].offset += ret;
+            addoff(fd, ret);
             carry_clear();
         }
         break;
@@ -2543,7 +2788,12 @@ SystemCall()
                     goto lose;
                 }
                 /* a fifo or a tty has no position to track either */
-                adoptfd(ret);
+                if (adoptfd(ret) < 0) {
+                    close(ret);
+                    ret = ENFILE;
+                    carry_set();
+                    break;
+                }
                 files[ret].dt = 'r';
                 devnum(filename, &files[ret].dt,
                     &files[ret].major, &files[ret].minor);
@@ -2558,6 +2808,7 @@ SystemCall()
              * own descriptor, so it is named the same way as the rest.
              */
             if ((i = mapfd(ret)) < 0) {
+                dropfd(ret);
                 if (dirget(ret))
                     dirclose(ret);
                 else
@@ -2585,8 +2836,8 @@ SystemCall()
         }
         if (fd <= MAXFILE) {
             files[fd].special = 0;
-            files[fd].offset = 0;
             files[fd].noseek = 0;
+            dropfd(fd);
             unmapfd(gfd);
             carry_clear();
         } else {
@@ -2640,9 +2891,14 @@ SystemCall()
             ret = errno;
             carry_set();
         } else {
-            adoptfd(ret);
-            if ((i = mapfd(ret)) < 0) {
+            if (adoptfd(ret) < 0) {
                 close(ret);
+                ret = ENFILE;
+                carry_set();
+                break;
+            }
+            if ((i = mapfd(ret)) < 0) {
+                dropfd(ret);
                 ret = EMFILE;
                 carry_set();
                 break;
@@ -2926,6 +3182,27 @@ SystemCall()
             carry_set();
             break;
         }
+        /*
+         * A pipe has no position, and the kernel refuses it before it
+         * looks at the arguments at all:
+         *
+         *      if (fp->mode & PIPE) {
+         *          u.error = ESPIPE;
+         *          return;
+         *      }
+         *
+         * Only a pipe.  A tty is not refused - the kernel sets rwptr
+         * on it and lets it mean nothing - so this asks the host what
+         * the descriptor actually is rather than going by noseek,
+         * which covers ttys too.  It catches an inherited pipe as
+         * well as one of our own making, which is right: a guest
+         * whose stdin is the far end of a pipe has a pipe.
+         */
+        if (!fstat(fd, &sbuf) && S_ISFIFO(sbuf.st_mode)) {
+            ret = ESPIPE;
+            carry_set();
+            break;
+        }
         if (arg2 % 3) {
             i = (short) arg1;
         } else {
@@ -2946,23 +3223,56 @@ SystemCall()
                 i += df->end;
                 break;
             }
+            /*
+             * Before the start of the file is an error, not a
+             * position: the kernel leaves rwptr alone and returns
+             * EINVAL, so the seek has to fail without moving
+             * anything.  We used to store the negative and carry on.
+             */
+            if (i < 0) {
+                ret = EINVAL;
+                carry_set();
+                break;
+            }
             df->offset = i;
         } else {
             switch (arg2) {
             case 0:
                 break;
             case 1:
-                i += files[fd].offset;
+                i += getoff(fd);
                 break;
             case 2:
                 fstat(fd, &sbuf);
                 i += sbuf.st_size;
                 break;
             }
-            files[fd].offset = i;
+            if (i < 0) {
+                ret = EINVAL;
+                carry_set();
+                break;
+            }
+            setoff(fd, i);
         }
 //message("seek fd %d to %d\n", fd, i);
-        ret = (i >> 16) & 0xffff;
+        /*
+         * Nothing comes back but the carry.  sys/sys2.c sets rwptr
+         * and returns, and says so itself:
+         *
+         *      / * XXX - we should return offset in hl, de * /
+         *
+         * so there is no way for a program to ask where it is.  That
+         * is why lseek in libu keeps _fdpos[] and answers out of it,
+         * and why that answer goes stale the moment a fork or a dup
+         * gives the open file a second owner - the position moved and
+         * there is no call that would say so.  Real machine, same
+         * hole; we inherit it rather than invent a way out of it.
+         *
+         * Which is exactly why SEEK_CUR above has to add to the
+         * shared pointer and not to a copy of our own: the kernel
+         * adds to fp->rwptr, the one thing every owner shares, and it
+         * is the only place the true position exists.
+         */
         ret = 0;
         carry_clear();
         break;
@@ -3135,8 +3445,16 @@ SystemCall()
             ret = 0;
             carry_set();
         } else {
+            /*
+             * The whole of what dup means: another descriptor naming
+             * the same open file, and so the same position.  Copying
+             * the record copies which slot it names; the count says
+             * two descriptors now name it.
+             */
             files[ret] = files[fd];
+            fhold(files[ret].ofile);
             if ((i = mapfd(ret)) < 0) {
+                dropfd(ret);
                 close(ret);
                 ret = EMFILE;
                 carry_set();
@@ -3156,9 +3474,18 @@ SystemCall()
              * Two descriptors or neither: a guest with one slot left
              * cannot have half a pipe.
              */
-            adoptfd(p[0]);
-            adoptfd(p[1]);
+            if ((adoptfd(p[0]) < 0) || (adoptfd(p[1]) < 0)) {
+                dropfd(p[0]);
+                dropfd(p[1]);
+                close(p[0]);
+                close(p[1]);
+                ret = ENFILE;
+                carry_set();
+                break;
+            }
             if ((ret = mapfd(p[0])) < 0) {
+                dropfd(p[0]);
+                dropfd(p[1]);
                 close(p[0]);
                 close(p[1]);
                 ret = EMFILE;
@@ -3167,6 +3494,8 @@ SystemCall()
             }
             if ((i = mapfd(p[1])) < 0) {
                 unmapfd(ret);
+                dropfd(p[0]);
+                dropfd(p[1]);
                 close(p[0]);
                 close(p[1]);
                 ret = EMFILE;
