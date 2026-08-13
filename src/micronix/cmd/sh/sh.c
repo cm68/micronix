@@ -99,6 +99,23 @@ char *a;
     fprintf(stderr, "\n");
 }
 
+/*
+ * A message the image prints with nothing in front of it.
+ *
+ * Its parse errors are its own strings - "Syntax error." at 0x0111,
+ * "Missing name for redirect." at 0x2227, and the four "Missing X."
+ * at 0x1790 - and it writes them bare, where warn() would put "sh: "
+ * on the front.  Our own complaints, the ones with no string in the
+ * image behind them, keep the name: they are the shell talking about
+ * itself, not the language failing to parse.
+ */
+void
+perr(s)
+char *s;
+{
+    fprintf(stderr, "%s\n", s);
+}
+
 void
 fatal(s, a)
 char *s;
@@ -352,7 +369,8 @@ int pout;
         redirect(c, pin, pout);
         path = findcmd(c->argv[0]);
         if (!path) {
-            warn("%s not found", c->argv[0]);
+            /* 0x1212 in the image, printed after the name */
+            fprintf(stderr, "%s: Command not found.\n", c->argv[0]);
             exit(1);
         }
         doexec(path, c->argv);
@@ -776,6 +794,73 @@ char *line;
             break;
         execute(&pipe1);
     }
+}
+
+/*
+ * Run a command and hand back what it wrote.
+ *
+ * This is the inside of a pair of backticks.  The child runs it
+ * through runline(), so everything the shell can do the substitution
+ * can do too - aliases, builtins, redirection and pipes; the image
+ * takes "`ls -l /etc | grep passwd`" and so do we.  It is its own
+ * process, so scribbling on pipe1 in there costs us nothing.
+ *
+ * Fills buf with up to n-1 bytes and terminates it.  Returns how much
+ * it got, or -1 if the command could not be run at all.
+ */
+int
+backtick(cmd, buf, n)
+char *cmd;
+char *buf;
+int n;
+{
+    int fds[2];
+    int pid;
+    int used;
+    int r;
+    int st;
+
+    if (pipe(fds) < 0) {
+        warn("cannot pipe", 0);
+        return -1;
+    }
+    if ((pid = fork()) == 0) {
+        close(fds[0]);
+        close(1);
+        dup(fds[1]);
+        close(fds[1]);
+        runline(cmd);
+        exit(status);
+    }
+    if (pid < 0) {
+        close(fds[0]);
+        close(fds[1]);
+        warn("cannot fork", 0);
+        return -1;
+    }
+
+    /*
+     * The write end has to go before the read, or the read never sees
+     * the end of the file: we would be holding one ourselves.
+     */
+    close(fds[1]);
+    used = 0;
+    while (used < n - 1) {
+        if ((r = read(fds[0], &buf[used], n - 1 - used)) <= 0)
+            break;
+        used += r;
+    }
+    buf[used] = '\0';
+    close(fds[0]);
+
+    /*
+     * Reap ours and nobody else's.  A background job of the user's
+     * may finish while we are waiting here, and its status is not
+     * this one's to swallow.
+     */
+    while ((r = wait(&st)) >= 0 && r != pid)
+        ;
+    return used;
 }
 
 /*

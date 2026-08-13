@@ -116,9 +116,11 @@ int  pushredir();
 void popredir();
 int  runpipeline();
 void runline();
+int  backtick();
 int  nextline();
 char *strsave();
 void fatal();
+void perr();
 void warn();
 
 /* parse.c

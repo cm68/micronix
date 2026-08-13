@@ -40,17 +40,22 @@
 char *metachars = "<>&|";
 
 /*
- * Where a word ends: the operators, and the semicolon that separates
- * one statement from the next.
+ * Where a word ends: the operators, the semicolon that separates one
+ * statement from the next, and the backtick.
  *
- * The image's own set at 0x17c0 has the backtick and the open paren
- * in it as well, and they are not here yet.  They go in when the code
- * that acts on them does, and not before: a character that ends a
- * word and that nothing then consumes leaves the parse loop turning
- * on the spot, because getword returns nothing and never advances
- * past it.
+ * The backtick is a DELIMITER and not a splice, which is the whole
+ * reason it is in this string: being in it is what ends a word, so
+ * "A`echo hi`B" is the three words A, hi, B and not the one word
+ * AhiB that a Bourne shell would make of it.  The image agrees
+ * because the image is where that was read.
+ *
+ * The open paren is the one piece of the set at 0x17c0 still missing,
+ * and it stays out until the code that acts on it arrives: a
+ * character that ends a word and that nothing then consumes leaves
+ * the parse loop turning on the spot, because getword returns nothing
+ * and never advances past it.
  */
-static char *wordstop = "<>&|;";
+static char *wordstop = "<>&|;`";
 
 /*
  * The operators, longest first.  The order is the binary's own and
@@ -89,6 +94,12 @@ static struct op ops[] = {
  */
 static char wordbuf[MAXLINE * 2];
 static int  wordused;
+
+/*
+ * getword() has nowhere to return an error - a word and no word look
+ * the same from outside - so it says so here and parse() looks.
+ */
+static int wordbad;
 
 static char *
 saveword(s, n)
@@ -163,14 +174,19 @@ char **pp;
             continue;
         }
         /*
-         * The single quote is OURS and the image does not have it.
-         * Its delimiter set at 0x17c0 has a double quote and no
-         * single one, there is no "Missing '." beside the other four
-         * messages, and running the image settles it: "echo 'x'"
-         * prints 'x' with the quotes still on.  Taking it out is
-         * part of the backtick work, since both are that same set.
+         * The double quote, and only the double quote.  The single
+         * one used to be here and was ours: the image's set at 0x17c0
+         * has no "'" in it, there is no "Missing '." beside the other
+         * four messages, and running the image settles it - "echo
+         * 'x'" prints 'x' with the quotes still on.
+         *
+         * A quoted run is copied out whole, which is also why a
+         * backtick inside one is never substituted: it never reaches
+         * the parse loop that would act on it.  The image agrees -
+         * "a `echo b` c" quoted comes back with the backticks still
+         * in it.
          */
-        if (*s == '\'' || *s == '"') {
+        if (*s == '"') {
             quote = *s++;
             while (*s && *s != quote) {
                 if (q < buf + sizeof(buf) - 1)
@@ -178,8 +194,13 @@ char **pp;
                 else
                     s++;
             }
-            if (*s == quote)
-                s++;
+            if (*s != quote) {
+                perr("Missing \".");
+                wordbad = 1;
+                *pp = s;
+                return (char *)0;
+            }
+            s++;
             continue;
         }
         if (q < buf + sizeof(buf) - 1)
@@ -216,9 +237,82 @@ char **pp;
     char *w;
 
     w = getword(pp);
-    if (!w)
-        warn("Missing name for redirect.", 0);
+    if (!w && !wordbad)                 /* wordbad has said its piece */
+        perr("Missing name for redirect.");
     return w;
+}
+
+/*
+ * Command substitution.
+ *
+ * *pp is on the opening backtick.  Everything up to the closing one
+ * is a command; it is run, and what it wrote comes back as words,
+ * which are appended to this command as if they had been typed.  The
+ * words are split on whitespace, so a command whose output has
+ * several lines or several columns contributes several arguments -
+ * "`ls -l /etc | grep passwd`" arrives as eight of them.
+ *
+ * An unterminated one is the image's "Missing `." and gives up the
+ * line.  A backtick inside double quotes never reaches here: getword
+ * copies a quoted run out whole, which is why the image prints
+ * "a `echo b` c" for the quoted form and substitutes for the bare
+ * one.
+ */
+static int
+subst(pp, c)
+char **pp;
+struct cmd *c;
+{
+    char cmd[MAXLINE];
+    char out[MAXLINE];
+    char *s;
+    char *q;
+    char *w;
+    int n;
+
+    s = *pp + 1;                        /* past the opening backtick */
+    q = cmd;
+    while (*s && *s != '`') {
+        if (q < cmd + sizeof(cmd) - 1)
+            *q++ = *s;
+        s++;
+    }
+    if (*s != '`') {
+        perr("Missing `.");
+        return -1;
+    }
+    *q = '\0';
+    *pp = s + 1;                        /* past the closing one */
+
+    if (backtick(cmd, out, sizeof(out)) < 0)
+        return -1;
+
+    /*
+     * Split what came back.  An empty result contributes nothing at
+     * all, which is what the image does with `echo` - the word simply
+     * is not there afterwards.
+     */
+    s = out;
+    for (;;) {
+        while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r')
+            s++;
+        if (*s == '\0')
+            break;
+        q = s;
+        while (*s && *s != ' ' && *s != '\t' && *s != '\n' && *s != '\r')
+            s++;
+        if (c->argc >= MAXARG - 1) {
+            warn("too many arguments", 0);
+            return -1;
+        }
+        if (!(w = saveword(q, s - q))) {
+            warn("out of room for words", 0);
+            return -1;
+        }
+        c->argv[c->argc++] = w;
+        c->argv[c->argc] = (char *)0;
+    }
+    return 0;
 }
 
 /*
@@ -246,6 +340,7 @@ struct pipeline *p;
     int code, len;
 
     wordused = 0;
+    wordbad = 0;
     p->ncmd = 0;
     c = &p->cmd[0];
     clearcmd(c);
@@ -285,6 +380,12 @@ struct pipeline *p;
             break;
         }
 
+        if (*s == '`') {
+            if (subst(&s, c) < 0)
+                return -1;
+            continue;
+        }
+
         code = isop(s, &len);
         if (code) {
             s += len;
@@ -293,7 +394,7 @@ struct pipeline *p;
             case O_PIPEBOTH:
             case O_PIPE:
                 if (c->argc == 0) {
-                    warn("Syntax error.", 0);
+                    perr("Syntax error.");
                     return -1;
                 }
                 c->both = (code == O_PIPEBOTH);
@@ -337,6 +438,8 @@ struct pipeline *p;
         }
 
         w = getword(&s);
+        if (wordbad)
+            return -1;
         if (!w)
             continue;
         if (c->argc >= MAXARG - 1) {
@@ -356,7 +459,7 @@ struct pipeline *p;
     if (p->ncmd == 0 && p->cmd[0].argc == 0)
         return 0;
     if (p->cmd[p->ncmd].argc == 0) {
-        warn("Syntax error.", 0);
+        perr("Syntax error.");
         return -1;
     }
     p->ncmd++;
