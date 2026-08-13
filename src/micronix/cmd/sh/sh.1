@@ -1,4 +1,4 @@
-.he "sh (1)                       8/12/26                       sh (1)"
+.he "sh (1)                       8/13/26                       sh (1)"
 .fo "                               -#-"
 .in 5
 .rm 65
@@ -27,10 +27,11 @@ Sh reads lines and runs them.  With a file it reads that; with -c it
 runs the one string it is given and stops; with neither it reads the
 standard input, and prompts if that is a terminal.
 .sp
-A line is a pipeline: commands separated by a pipe, with redirections
-and perhaps an ampersand on the end.  Each command is looked up as a
-builtin first and then along the path, which is the current directory,
-/bin and /usr/bin.
+A line is one or more statements separated by semicolons.  A statement
+is a pipeline: commands separated by a pipe, with redirections and
+perhaps an ampersand on the end.  Each command is looked up as an
+alias first, then as a builtin, then along the path, which is the
+current directory, /bin and /usr/bin.
 .sp
 This is a csh rather than a Bourne shell.  The operators ending in an
 ampersand send the standard error wherever the standard output is
@@ -71,6 +72,41 @@ Longest first, which is the order they are matched in:
      >     the standard output to a file
      <     the standard input from a file
 .fi
+.sp 2
+.in -5
+.bd
+QUOTING AND SUBSTITUTION
+.in +5
+.br
+A double quote takes what is inside it as one word.  There is no
+single quote: 'x' is the three characters that were typed.  A
+backslash protects the character after it.
+.sp
+A command between backquotes is run and what it writes takes its
+place, split into words.  The backquote ends a word rather than
+joining one, so
+.sp
+.nf
+     echo A`echo hi`B
+.fi
+.sp
+is the three words A, hi and B.  Backquotes inside double quotes are
+not run.
+.sp
+Commands inside parentheses run in a shell of their own, so what they
+change they change only for themselves:
+.sp
+.nf
+     (cd /etc ; pwd) ; pwd
+.fi
+.sp
+writes /etc and then the directory you were in.  A group may be
+redirected, piped or backgrounded like any other command, and may
+hold anything a line may hold, groups included.  A group and ordinary
+words cannot be mixed in one command.
+.sp
+An unterminated quote, backquote or parenthesis is an error and the
+line is abandoned.
 .sp 2
 .in -5
 .bd
@@ -129,7 +165,9 @@ NOTES
 .br
 There is no source for the shell this tree ships in /bin, so this one
 was read back out of that binary: the operator table, the builtin
-numbering, the search path and the prompt are all its own.  Where the
+numbering, the search path, the prompt and the whole of the quoting
+and substitution above are all its own, most of it settled by running
+the image beside this one.  Where the
 two can be told apart, cmd/sh/NOTES says so.
 .sp
 It installs as /bin/sh.  It did not for a while - the reconstruction
@@ -141,6 +179,10 @@ now, so it is the shell.
 The one it replaces is a Whitesmiths binary with no source.  Keep a
 copy of it: this is read back out of that binary and is not finished,
 and the parts of it that are guesses are named in cmd/sh/NOTES.
+.sp
+Two things the original does and this does not: it expands filename
+patterns, answering "No match." when none fit, and it has csh's !
+history.  Neither is written here.
 .sp 2
 .in -5
 .bd
