@@ -16,7 +16,11 @@ WARNS = -Wno-builtin-declaration-mismatch -Wformat-overflow=0 -Wno-pointer-sign 
 
 GCCFLAGS = $(MACHINE)
 DEBUG = -g
-CFLAGS = $(DEBUG) $(INCLUDE) $(WARNS) $(GCCFLAGS) $(DEFINES)
+# the simulator spends all its time in one interpreter loop, and built
+# without this it runs at about half speed.  -g stays: we still want the
+# symbols for the monitor and for profiling.
+OPTIMIZE = -O2
+CFLAGS = $(DEBUG) $(OPTIMIZE) $(INCLUDE) $(WARNS) $(GCCFLAGS) $(DEFINES)
 CXXFLAGS = $(CFLAGS)
 
 %.o: %.c
