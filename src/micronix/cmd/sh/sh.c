@@ -665,7 +665,19 @@ struct cmd *c;
                 j = atoi(p);
             else
                 j = jobpid(p);
-            if (j <= 0 || kill(j, 9) < 0) {
+            /*
+             * Not "j <= 0 || kill(...)": the guard and the call are
+             * kept apart so that a pid we do not have cannot reach
+             * kill() at all.  Nothing else here matters as much -
+             * kill(0) is every process in the group, this shell
+             * included, so a lookup that comes back empty and is not
+             * stopped takes the whole session with it.
+             */
+            if (j <= 0) {
+                fprintf(stderr, "%s: No such process\n", p);
+                continue;
+            }
+            if (kill(j, 9) < 0) {
                 fprintf(stderr, "%s: No such process\n", p);
                 continue;
             }

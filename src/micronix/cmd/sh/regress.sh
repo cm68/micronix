@@ -261,6 +261,9 @@ check 'type nosuchfile'
 check 'type dir'
 check 'type /etc/motd /etc/motd'
 check 'type'
+check 'kill nosuchname'
+check 'kill 9999'
+check 'kill'
 
 #
 # History, which happens only at a terminal.  Fed a file the shell

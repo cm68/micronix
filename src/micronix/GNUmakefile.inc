@@ -174,6 +174,7 @@ INSTALLMAN = @if [ -n "$(strip $(MANSRCS))" ] ; then \
 %.o : %.c
 	$(CCC) $(CCFLAGS) $(INC) -c $<
 
+
 %.o : %.s
 	$(CCC) $(CCFLAGS) -c $<
 
@@ -193,6 +194,26 @@ endif
 
 all: $(TARGET) $(TARGETS)
 	$(RECURSE)
+
+#
+# EVERY object depends on EVERY header here.
+#
+# Without this, editing a header rebuilds nothing, and what you run is
+# objects compiled against one version of a declaration linked against
+# another.  It cost an afternoon: adding a function to sh.h left sh.o
+# as it was, and the shell that came out signalled its own process
+# group - which looked for a while like a code generator bug, and was
+# not.  The native makefiles beside these have always had
+# "$(OBJS): $*.c $(HDRS)".
+#
+# It goes HERE, below "all", and not up with the pattern rules: the
+# first explicit target in a makefile is the default goal, and put
+# above, this one made "make" mean "make glob.o".
+#
+# Per-object dependencies would be better and want a compiler that
+# will emit them; this is coarse and correct.
+#
+$(OBJS): $(HSRCS)
 
 #
 # Put the built binary into the filesystem the simulator boots.  A
