@@ -17,6 +17,13 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 CC	= ccc
+#
+# The compiler's own runtime, fmtlong and fmtstr.  ccc adds crt0.o,
+# libc.a and libu.a out of /lib by itself and knows nothing about this
+# one, so it has to be named - the GNUmakefile beside this does the
+# same.  Without it the link ends at _fmtlong and _fmtstr.
+#
+LIBS	= /lib/libccc.a
 CFLAGS	=
 LIBEXEC	= /libexec
 PROG	= c1
@@ -25,7 +32,7 @@ OBJS	= astio.o expr.o lower.o parseast.o pass2.o rewrite.o rules.o
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LIBS)
 
 #
 # One entry for every object: $* is the target without its suffix, so

@@ -189,6 +189,20 @@ INSTALLMAN = @if [ -n "$(strip $(MANSRCS))" ] ; then \
 		cp $(MANSRCS) $(MANINSTDIR) ; \
 	fi
 
+#
+# DELETE A TARGET WHOSE RECIPE FAILED.  Without this, make leaves what
+# the failed command had already written, and a zero-length file is
+# still newer than its source - so the next make says nothing needs
+# doing and the build carries on around the hole.
+#
+# lib/libu/sbrk.o is how this was found.  The assembler died partway
+# through it, leaving an empty sbrk.o that make then considered up to
+# date; ar archived the empty member, and every native link after that
+# failed with "undefined symbol: _sbrk" while sbrk.s sat there looking
+# perfectly correct, because it was.
+#
+.DELETE_ON_ERROR:
+
 .PHONY: all update install install-man clean clobber doc disas
 
 #
