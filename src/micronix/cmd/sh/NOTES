@@ -778,13 +778,29 @@ What is still missing, each checked against the image:
   - "prompt" WITH NO ARGUMENT says nothing in the image; ours prints
     the current prompt.  The page documents only "prompt word".
 
-  - DIRECTORY HASHING.  "The shell internalizes the contents of the
-    directories in the search path, so that in order to locate a
-    command, it does not need to refer to the file system."  We stat
-    every candidate every time.  The page notes the visible
-    consequence: a program added to the path mid-session may need its
-    name typed twice.  Worth having - findcmd is on the hot path of
-    every command - and nothing else depends on it.
+  - DIRECTORY HASHING is now done - see hash.c.  Traced side by side,
+    "ls" costs the image exactly one syscall, exec("/bin/ls"), where
+    an unhashed search costs three: access("./ls") failing,
+    access("/bin/ls") succeeding, and the exec.  The image never
+    looks at "./ls", so "." is in its tables like everything else,
+    and a hit is not confirmed - the path is built and exec'd.
+
+    What is kept is a 16-bit hash per name and not the name.  Not to
+    save room: a process has the 64k to itself and the machine has a
+    megabyte, so the 2k of names would be affordable.  It is that a
+    hit must be confirmed by exec anyway, since what findcmd wants to
+    know is whether the file will RUN, and no table of names says
+    that.
+
+    Where this differs from the image on purpose: the image trusts
+    its tables and loses when they are wrong, which is what its page
+    is describing when it says "it may be necessary to enter the
+    command's name twice".  Here a name no directory claims is
+    searched for anyway, and a path that will not exec sends spawn()
+    back to rebuild and search before it gives up.  Both directions
+    of staleness were tested - a command added after the tables were
+    built is found the first time, and one removed since is reported
+    missing rather than answered wrongly.
 
   - The page's list of special characters is "< > & | ` " ( )".  It
     omits ";" which the binary has, and includes ")" which the

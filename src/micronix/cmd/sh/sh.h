@@ -151,6 +151,10 @@ void warn();
  */
 int  parse(/* char **pp, struct pipeline *p */);
 
+/* hash.c - the search path, remembered */
+void hashpath();
+int  inhash(/* int i, char *name */);
+
 /* hist.c */
 void histadd();
 int  histexpand(/* char *line, int size */);

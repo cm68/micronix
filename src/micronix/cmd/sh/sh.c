@@ -207,10 +207,63 @@ char *s;
     return p;
 }
 
+static void
+joinpath(buf, dir, name)
+char *buf;
+char *dir;
+char *name;
+{
+    strcpy(buf, dir);
+    if (buf[0] && buf[strlen(buf) - 1] != '/')
+        strcat(buf, "/");
+    strcat(buf, name);
+}
+
 /*
- * Find a command on the path.  A name with a slash in it is used as
- * given; anything else is looked for in each path element.  The
- * binary's default is /bin then /usr/bin.
+ * The honest search: ask the file system about every directory in
+ * turn.  What findcmd did before there were any tables, and what it
+ * falls back to when they turn out not to be worth believing.
+ */
+static char *
+searchpath(buf, name)
+char *buf;
+char *name;
+{
+    int i;
+
+    for (i = 0; i < MAXPATHV && pathv[i]; i++) {
+        joinpath(buf, pathv[i], name);
+        if (access(buf, 1) == 0)
+            return buf;
+    }
+    return (char *)0;
+}
+
+/*
+ * Where would this command be run from?
+ *
+ * The path is remembered - see hash.c and "Directory Hashing" in
+ * man1/sh.1 - so a directory which certainly does not hold the name
+ * is skipped without asking the file system, and one which claims it
+ * is BELIEVED WITHOUT ASKING.  That is what the win is made of:
+ * traced against the image, running "ls" is one syscall,
+ *
+ *	exec("/bin/ls")
+ *
+ * where searching costs three - access("./ls") failing,
+ * access("/bin/ls") succeeding, and then the exec.
+ *
+ * Which means this can be WRONG, and the caller has to be ready for
+ * that.  A file removed since the tables were built is still claimed,
+ * and the path handed back will not exec.  spawn() answers that by
+ * rebuilding and searching properly before it gives up, so a stale
+ * table costs one failed exec and never a command.  The original had
+ * no such thing - its page says "it may be necessary to enter the
+ * command's name twice", which is exactly the cache being believed
+ * when it is wrong, with the user left to work it out.
+ *
+ * A name no directory claims is searched for here and now, since
+ * being absent from the tables is the other way they go stale.
  */
 char *
 findcmd(name)
@@ -223,14 +276,18 @@ char *name;
         return access(name, 1) == 0 ? name : (char *)0;
 
     for (i = 0; i < MAXPATHV && pathv[i]; i++) {
-        strcpy(buf, pathv[i]);
-        if (buf[0] && buf[strlen(buf) - 1] != '/')
-            strcat(buf, "/");
-        strcat(buf, name);
+        switch (inhash(i, name)) {
+        case 0:
+            continue;                   /* certainly not here */
+        case 1:
+            joinpath(buf, pathv[i], name);
+            return buf;                 /* believed */
+        }
+        joinpath(buf, pathv[i], name);  /* no tables for this one */
         if (access(buf, 1) == 0)
             return buf;
     }
-    return (char *)0;
+    return searchpath(buf, name);
 }
 
 /*
@@ -351,6 +408,7 @@ int pout;
 {
     int pid;
     char *path;
+    char pathbuf[MAXPATH];
 
     /*
      * Flush before forking.  The builtins write through stdio and the
@@ -399,14 +457,21 @@ int pout;
             exit(status);
         }
 
-        path = findcmd(c->argv[0]);
-        if (!path) {
-            /* 0x1212 in the image, printed after the name */
-            fprintf(stderr, "%s: Command not found.\n", c->argv[0]);
-            exit(1);
-        }
-        doexec(path, c->argv);
-        warn("cannot execute %s", path);
+        /*
+         * The tables can claim a name that is no longer there, so a
+         * path that will not exec is not the end of it: rebuild them,
+         * search properly, and try what that finds.  A stale table
+         * costs one failed exec here and never a command.
+         */
+        if ((path = findcmd(c->argv[0])))
+            doexec(path, c->argv);
+
+        hashpath();
+        if ((path = searchpath(pathbuf, c->argv[0])))
+            doexec(path, c->argv);
+
+        /* 0x1212 in the image, printed after the name */
+        fprintf(stderr, "%s: Command not found.\n", c->argv[0]);
         exit(1);
     }
     return pid;
@@ -482,6 +547,8 @@ struct cmd *c;
         p = c->argc > 1 ? c->argv[1] : homedir;
         if (chdir(p) < 0)
             warn("cannot change to %s", p);
+        else
+            hashpath();                 /* "." is a different place now */
         return 0;
 
     case B_WAIT:
@@ -547,6 +614,11 @@ struct cmd *c;
             for (i = 1; i < c->argc && i <= MAXPATHV; i++)
                 pathv[i - 1] = strsave(c->argv[i]);
             pathv[i - 1] = (char *)0;
+            /*
+             * The old tables describe directories we no longer look
+             * in, so they go now rather than being found wrong later.
+             */
+            hashpath();
         } else {
             for (i = 0; i < MAXPATHV && pathv[i]; i++)
                 printf("%s%s", i ? " " : "", pathv[i]);
