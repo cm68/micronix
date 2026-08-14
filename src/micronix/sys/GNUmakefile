@@ -95,8 +95,20 @@ objects: $(OBJS)
 #         declarator as an array, so "buffer = 0" is "need lvalue" and
 #         "buffer[1][2]" is "bad index".  Three lines reproduce it.
 #
+#
+# SURVEYCC and not CCC.  GNUmakefile.inc is included above and sets
+# CCC ?= /usr/local/bin/ccc, so a "CCC ?=" here is a no-op and the
+# survey quietly measured whatever was last INSTALLED rather than what
+# is in the tree.  That is the wrong compiler to be asking about: the
+# point of this target is to find out what the one being worked on
+# cannot do, and an install can be days behind.
+#
+# It cost real confusion once - three files reported as failing here
+# that compiled by hand with the tree's compiler, because the two were
+# not the same program.
+#
 CCCTREE  ?= $(HOME)/src/ccc
-CCC      ?= $(CCCTREE)/desthost/bin/ccc
+SURVEYCC ?= $(CCCTREE)/desthost/bin/ccc
 
 #
 # The linker and the object tools are not on the path and are not in
@@ -130,7 +142,7 @@ ccc-try: build.h
 	for f in $(CCCSRCS); do \
 		b=`basename $$f .c`; \
 		printf "%-12s" "$$b: "; \
-		if $(CCC) $(CCCFLAGS) -o $(CCCDIR)/$$b.o $$f \
+		if $(SURVEYCC) $(CCCFLAGS) -o $(CCCDIR)/$$b.o $$f \
 				> $(CCCDIR)/$$b.log 2>&1; then \
 			echo "ok"; ok=`expr $$ok + 1`; \
 			rm -f $(CCCDIR)/$$b.log; \

@@ -201,7 +201,15 @@ binit()
 
     space = (UINT) (&usrtop) - (UINT) (blist);
     nbuf = space / (512 + sizeof(struct buf));
-    buffer = &blist[nbuf];
+    /*
+     * The buffer pool starts where the headers stop.  blist is an
+     * array of struct buf and buffer is a pointer to a 512 byte
+     * block, so this is a deliberate change of mind about what the
+     * memory above the headers is, and the cast says so - the two
+     * types have nothing to do with each other and ccc is right to
+     * ask.
+     */
+    buffer = (char (*)[512]) &blist[nbuf];
     btop = blist + nbuf;
     for (b = blist; b < btop; b++) {
         zero(b, sizeof(*b));
