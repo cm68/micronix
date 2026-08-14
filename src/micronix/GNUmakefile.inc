@@ -123,6 +123,14 @@ BINDIR	?= /bin
 INSTDIR	 = $(ROOT)$(BINDIR)
 
 #
+# Where a library goes.  Not BINDIR with a different name on it: ccc
+# looks for libc.a in libdir and libdir is worked out as bin/../lib,
+# so this is /lib and a directory does not get to move it.
+#
+LIBDIR	 = /lib
+LIBINSTDIR = $(ROOT)$(LIBDIR)
+
+#
 # Where man(1) looks: /usr/man/man<section>, then /usr/help - see
 # man/README, which read that out of the /bin/man binary.  A
 # directory whose page is not in section 1 sets MANSEC itself.
@@ -147,6 +155,15 @@ DOCFILES = $(DOCSRCS:.mp=.0) $(DOCSRCS:.ic=.3)
 OBJS	?= $(CSRCS:.c=.o) $(ASSRCS:.s=.o)
 
 TARGET	?= $(DIR)
+
+#
+# What it is called once installed, which is nearly always what it is
+# called here.  cpp is the exception: the driver runs it as pass0, so
+# that is the name it goes into /libexec under - which is what ccc's
+# own build has always done, "$(INSTALL) cpp $(HOSTLIBEXEC)/pass0".
+# The directory, the source and the program stay cpp.
+#
+INSTNAME ?= $(TARGET)
 
 #
 # Recursion, as a canned recipe so that every rule descends the same
@@ -222,10 +239,17 @@ all: $(TARGET) $(TARGETS)
 $(OBJS): $(HSRCS)
 
 #
-# Put the built binary into the filesystem the simulator boots.  A
-# directory that only recurses, or one whose target is a library, has
-# nothing to install: libc.a is linked into the commands here and does
-# not exist on the running system.
+# Put what was built into the filesystem the simulator boots.  A
+# directory that only recurses has nothing to install.
+#
+# A LIBRARY INSTALLS TOO, and used to not.  The reasoning here was
+# that "libc.a is linked into the commands and does not exist on the
+# running system", which is true of the cross build and false of the
+# machine: a native makefile in cmd says "ccc -o sh sh.o" and names no
+# library at all, because the driver adds crt0.o, libc.a and libu.a
+# from libdir - bin/../lib, so /lib - all by itself.  Nothing there
+# meant nothing on that machine could link.  /lib is where a person
+# looks for things to link against and this is what puts them there.
 #
 ifeq ($(strip $(TARGET)),)
 install:
@@ -233,14 +257,33 @@ install:
 	$(INSTALLMAN)
 else
 ifeq ($(suffix $(TARGET)),.a)
-install:
+install: $(TARGET)
 	$(RECURSE)
+	mkdir -p $(LIBINSTDIR)
+	rm -f $(LIBINSTDIR)/$(TARGET)
+	cp $(TARGET) $(LIBINSTDIR)/$(TARGET)
 	$(INSTALLMAN)
 else
+#
+# rm BEFORE cp, and chmod AFTER it.  cp opens the destination for
+# writing and the destination is a program: /etc/init came off the 1.6
+# disk as mode ---x------, execute and nothing else, so the copy
+# failed with "Permission denied" on a file this account owns
+# outright.  Removing the name first replaces the file instead of
+# writing through it.
+#
+# And that is what turned up the missing execute bit.  Copying ONTO a
+# file keeps the mode it had, which is the only reason these ever came
+# out executable; copying to a name that is not there any more creates
+# it fresh under the umask, 664.  There is no chmod here to paper over
+# it - ld sets 0755 on what it writes now, because the thing a linker
+# produces is a program - and cp carries that mode to a new file.
+#
 install: $(TARGET)
 	$(RECURSE)
 	mkdir -p $(INSTDIR)
-	cp $(TARGET) $(INSTDIR)/$(TARGET)
+	rm -f $(INSTDIR)/$(INSTNAME)
+	cp $(TARGET) $(INSTDIR)/$(INSTNAME)
 	$(INSTALLMAN)
 endif
 endif

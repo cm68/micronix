@@ -1,7 +1,7 @@
 #
-# cross build for asz - the assembler.  Replaces the TRASM-derived one, now cmd/asz.old.
+# cross build for wsld - the link editor.  To be renamed ld when it takes that name.
 #
-# cmd/asz/GNUmakefile
+# cmd/wsld/GNUmakefile
 #
 # PROTOTYPE.  The compiler is moving into this tree, and this is the
 # shape it will have when it arrives: one directory per pass and per
@@ -17,7 +17,8 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 DEPTH	= ../..
-DIR	= asz
-CLASS	= cmd
+DIR	= ld
+CLASS	= libexec
+BINDIR	= /libexec
 
 include $(DEPTH)/GNUmakefile.inc

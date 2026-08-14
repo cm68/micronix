@@ -9,7 +9,9 @@
 #ifndef linux
 extern int errno;
 #include <stdio.h>
-#include <stat.h>
+#include <types.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #endif
 
 #ifdef linux

@@ -15,8 +15,14 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
+#
+# -DCCC: this is the driver that runs ON micronix, so the linker it
+# reaches for is /libexec/ld and not /libexec/mxld.  The GNUmakefile
+# beside this one has the #ifdef it switches, and why a driver built
+# without it goes looking for a program named after the other machine.
+#
 CC	= ccc
-CFLAGS	=
+CFLAGS	= -DCCC
 BIN	= /bin
 PROG	= ccc
 OBJS	= ccc.o

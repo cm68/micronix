@@ -14,7 +14,14 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = lib libexec cmd sys
+#
+# include is here now.  It was not, and nothing in the cross build
+# looked at that directory at all: the headers in /usr/src/include
+# were whatever had been copied there in 2023, and four of them had
+# drifted from the tree.  It goes FIRST - what everything else
+# compiles against is installed before anything compiles.
+#
+DIRS = include lib libexec cmd sys
 
 #
 # "cd $$d &&", not "cd $$d ;" - see the note in GNUmakefile.inc.
@@ -120,14 +127,35 @@ sysinstall:
 	@echo "installed: $(SYSINC)/sys, and $(words $(SYSHDRS)) headers beside it"
 	@echo "not installed, ccc owns them: $(CCCOWNED)"
 
-update:
+#
+# The top of the source tree the simulator sees.  The recursion fills
+# in /usr/src/lib, /usr/src/cmd and the rest; this ships the makefile
+# that drives them, which nothing did - /usr/src/makefile was a 2023
+# copy that still had "cd sys" commented out and had never heard of
+# libexec.  Beside it were a Makefile and a GNUmakefile from the same
+# era, neither of which anything reads on that machine.
+#
+# --keep-newer-files, as everywhere else: a makefile edited inside
+# micronix is not to be overwritten by an older one from here.
+#
+ROOT	?= ~/src/micronix/filesystem
+DEST	 = $(ROOT)/usr/src
+NOWARN	 = --warning=no-ignore-newer
+
+src.tar: makefile
+	tar -f src.tar -c makefile
+
+update: src.tar
 	$(RECURSE)
+	mkdir -p $(DEST)
+	tar -f src.tar -C $(DEST) --keep-newer-files -x $(NOWARN)
 
 clean:
 	$(RECURSE)
 
 clobber:
 	$(RECURSE)
+	rm -f src.tar
 
 doc:
 	$(RECURSE)

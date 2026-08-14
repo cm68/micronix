@@ -16,11 +16,35 @@
 
 #include	<stdio.h>
 
+/*
+ * ON MICRONIX THIS HAS TO BE THE SYSTEM'S struct stat, and it was
+ * ccc's.  <stat.h> comes out of the compiler's own include directory
+ * and describes CP/M:
+ *
+ *	short st_mode; long st_atime; long st_mtime; long st_size;
+ *
+ * four fields, st_mtime at offset 6.  The kernel fills in the
+ * structure in <sys/stat.h> - a dev, an ino and the whole on-disk
+ * dsknod - where the modify time is nowhere near offset 6.  So make
+ * stat'ed a file and read four bytes out of the middle of d_addr,
+ * every target came back with a time that no source could be newer
+ * than, and it said "up to date" about files that did not exist.
+ * Nothing failed and nothing was built.
+ *
+ * It compiled because the CP/M header does have an st_mtime, of a
+ * matching type, in the wrong place - the one shape of mistake a
+ * compiler cannot see.
+ *
+ * sys/stat.h needs types.h for UINT and UINT8, and sys/fs.h for
+ * struct dsknod, which it says so itself at the top.
+ */
 #ifdef linux
 #include <sys/types.h>
 #include <sys/stat.h>
 #else
-#include <stat.h>
+#include <types.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #endif
 
 extern struct stat statb;
@@ -175,10 +199,27 @@ docmd(s)
     if (child == 0) {
 
         nice(0);
-        for (i = 0; i < MAXARGS; i++) {
+        /*
+         * ONE ARGUMENT PER RUN OF SPACES, not one per space.  This
+         * split a command at every single space and handed the child
+         * an empty string for each extra one, and the commands here
+         * are full of them: "$(CC) $(CFLAGS) -c $*.c" with CFLAGS
+         * empty expands to "ccc  -c echo.c", two spaces, so ccc was
+         * exec'd with an argument that was the empty string and
+         * answered "unknown file type: " about it.
+         *
+         * Nothing that runs a shell hits this, because a shell has
+         * always collapsed whitespace; docmd() execs the child itself
+         * to save a fork, and inherited none of that.
+         */
+        for (i = 0; i < MAXARGS - 1; i++) {
+            while (*s == ' ')
+                s++;
+            if (!*s)
+                break;
             args[i] = s;
             /*
-             * skip to null or space 
+             * skip to null or space
              */
             while (*s && (*s != ' ')) {
                 s++;
@@ -186,10 +227,8 @@ docmd(s)
             if (*s) {
                 *s++ = '\0';
             }
-            if (!*s)
-                break;
         }
-        args[++i] = 0;
+        args[i] = 0;
         for (i = 0; paths[i]; i++) {
             sprintf(path, "%s/%s", paths[i], fn);
             if (access(path, 1) == -1)

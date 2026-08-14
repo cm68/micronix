@@ -1,0 +1,1 @@
+/home/curt/src/ccc/src/ccclib/astops.h

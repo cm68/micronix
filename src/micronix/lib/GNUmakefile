@@ -42,11 +42,14 @@ update: lib.tar
 	tar -f lib.tar -C $(DEST) --keep-newer-files -x $(NOWARN)
 
 #
-# The cross build does not install these: it links them into the
-# commands it builds out of the tree, and putting them on the running
-# system is the native install's job - lib/libc/makefile and its
-# neighbours copy the archives into /lib.  The rule is here so that a
-# tree-wide "make install" walks without stopping.
+# This used to say that the cross build does not install these -
+# that it links them into the commands it builds and putting them on
+# the running system is the native install's job.  That was a circle:
+# the native build cannot link anything until /lib has libc.a in it,
+# and it was the native build that was supposed to put it there.  The
+# archives install now, from GNUmakefile.inc, and lib/libc/makefile
+# and its neighbours still install them again when the machine
+# rebuilds itself.
 #
 install:
 	$(RECURSE)

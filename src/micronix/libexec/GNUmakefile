@@ -15,8 +15,11 @@
 # libc.a, crt0.o, the headers - and a person reading it should see
 # those and nothing else.
 #
-# cpp, c0, c1 and peep are here; asz and astpp are passes too and are
-# still in cmd.
+# EVERYTHING ccc RUNS IS HERE NOW: cpp, c0, c1, peep, and asz, astpp
+# and ld, which were still in cmd.  ld is the one that reads oddly -
+# a person does type a linker - but ccc builds its path as
+# libexecdir/ld and cannot find one in /bin, and the driver is the
+# thing that runs it a thousand times for every once somebody does.
 #
 # All four build.  The three passes used to link against nothing and
 # fail on _fmtlong and _fmtstr; those are in ccc's ccclib and there is
@@ -30,7 +33,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = cpp c0 c1 peep
+DIRS = cpp c0 c1 peep asz astpp ld
 
 RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \
@@ -45,6 +48,24 @@ NOWARN	 = --warning=no-ignore-newer
 all:
 	$(RECURSE)
 
+#
+# update was named in .PHONY and given no rule, so "make update"
+# walked in here, matched a phony target with no recipe, did nothing
+# and said nothing - and /usr/src had no libexec in it at all.  A
+# target named in .PHONY and nowhere else fails exactly this quietly.
+#
+# It ships this directory's native makefile the way cmd and lib ship
+# theirs: the recursion alone would leave /usr/src/libexec holding
+# four subdirectories and nothing to drive them.
+#
+libexec.tar: makefile
+	tar -f libexec.tar -c makefile
+
+update: libexec.tar
+	$(RECURSE)
+	mkdir -p $(DEST)
+	tar -f libexec.tar -C $(DEST) --keep-newer-files -x $(NOWARN)
+
 install:
 	$(RECURSE)
 
@@ -56,6 +77,7 @@ clean:
 
 clobber:
 	$(RECURSE)
+	rm -f libexec.tar
 
 doc:
 	$(RECURSE)

@@ -18,6 +18,7 @@
 
 DEPTH	= ../..
 DIR	= astpp
-CLASS	= cmd
+CLASS	= libexec
+BINDIR	= /libexec
 
 include $(DEPTH)/GNUmakefile.inc
