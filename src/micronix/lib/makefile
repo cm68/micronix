@@ -23,18 +23,22 @@ all:
 	cd libu ; make all
 	cd libc ; make all
 	cd libutil ; make all
+	cd libccc ; make all
 
 install:
 	cd libu ; make install
 	cd libc ; make install
 	cd libutil ; make install
+	cd libccc ; make install
 
 clean:
 	cd libu ; make clean
 	cd libc ; make clean
 	cd libutil ; make clean
+	cd libccc ; make clean
 
 clobber:
 	cd libu ; make clobber
 	cd libc ; make clobber
 	cd libutil ; make clobber
+	cd libccc ; make clobber

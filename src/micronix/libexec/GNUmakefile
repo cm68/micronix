@@ -18,16 +18,9 @@
 # cpp, c0, c1 and peep are here; asz and astpp are passes too and are
 # still in cmd.
 #
-# ONLY peep IS IN DIRS.  The other three compile and then fail to
-# link, for one reason:
-#
-#	ld: undefined symbol: _fmtlong
-#	ld: undefined symbol: _fmtstr
-#
-# which are in ccc's ccclib, and this tree has no lib/libccc to link
-# against - lib holds libc, libu and libutil and nothing else.  That
-# is the piece missing before the compiler can build its own passes
-# here, and it is a directory of its own rather than a flag.
+# All four build.  The three passes used to link against nothing and
+# fail on _fmtlong and _fmtstr; those are in ccc's ccclib and there is
+# a lib/libccc now, which each of them names in LIBS.
 #
 # Their sources are symlinks into ~/src/ccc and the sets had drifted:
 # c0 was missing eleven p1*.h, all three wanted astops.h, format.h
@@ -37,7 +30,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = peep
+DIRS = cpp c0 c1 peep
 
 RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \

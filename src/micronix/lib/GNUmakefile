@@ -10,7 +10,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = libu libc libutil
+DIRS = libu libc libutil libccc
 
 RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \

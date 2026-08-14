@@ -25,4 +25,11 @@ CLASS	= libexec
 #
 BINDIR	= /libexec
 
+#
+# The compiler's own runtime: fmtlong and libutil.  Every pass calls
+# them and none of them contains them, which is what left this
+# undefined at _fmtlong and _fmtstr before lib/libccc existed.
+#
+LIBS	= $(DEPTH)/lib/libccc/libccc.a
+
 include $(DEPTH)/GNUmakefile.inc
