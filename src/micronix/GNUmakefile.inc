@@ -45,7 +45,22 @@ CCC	?= /usr/local/bin/ccc
 #
 LIB	?= $(DEPTH)/mxar
 NM	?= /usr/local/bin/wsnm
-CCFLAGS	?= -m micronix
+#
+# -O IS THE PEEPHOLE PASS, and this tree was not using it while ccc's
+# own build was: its libc compiles with -O, and so do its passes.  So
+# every binary here was a little larger than the same source built two
+# directories away, for no reason but the flag.
+#
+# On this machine that is not a nicety.  The heap is what is left of
+# 64k after the image, so a byte of text is a byte the program cannot
+# allocate - and c0 was failing to compile declare.c, the largest
+# source in the compiler, by less than a kilobyte.  -O takes 829 bytes
+# off c0 and that is the difference between it building the compiler
+# and not.
+#
+# peep is in libexec and is built by this tree.
+#
+CCFLAGS	?= -m micronix -O
 
 # -i and -I are not the same list, and the difference is the whole
 # reason the commands would not compile.  ccc resolves <sys/...> out

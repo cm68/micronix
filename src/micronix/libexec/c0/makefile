@@ -24,7 +24,12 @@ CC	= ccc
 # same.  Without it the link ends at _fmtlong and _fmtstr.
 #
 LIBS	= /lib/libccc.a
-CFLAGS	=
+#
+# -O is the peephole pass.  The cross build passes it too - see
+# GNUmakefile.inc, which explains why it is not optional on a machine
+# where the heap is whatever is left of 64k after the image.
+#
+CFLAGS	= -O
 LIBEXEC	= /libexec
 PROG	= c0
 OBJS	= decl.o declare.o error.o eutil.o expr.o fold.o init.o \
