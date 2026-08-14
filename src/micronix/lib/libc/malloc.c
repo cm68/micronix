@@ -135,7 +135,7 @@ extern void	exit(int);
  *
  * Nothing on a machine this size can do anything useful with a failed
  * allocation, and the evidence is that nobody even tried: cpp had
- * thirteen call sites and checked none of them, wsld had thirteen and
+ * thirteen call sites and checked none of them, ld had thirteen and
  * checked none of them.  What that costs is not a null pointer
  * dereference and a core file - there is no core file here.  The first
  * write through the null lands in page zero, on top of the rst 08

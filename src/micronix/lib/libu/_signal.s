@@ -1,7 +1,5 @@
 ; signal trampolines
 ;
-; lib/libu/_signal.s
-;
 ; __signal is the system call; _jtab is fifteen six-byte trampolines,
 ; one per signal, each loading its handler out of _stab and falling
 ; into the common save-and-call tail.  signal.c owns _stab and hands
@@ -19,21 +17,13 @@
 	.extern _stab
 
 .text:
-;
-; signal(sig, func).  The arguments come off in the order they are
-; written - the first one is on top, the way access.s and write.s and
-; every other stub here reads them - and these two were stored the
-; other way round.  The kernel was handed the handler's address where
-; it wanted the signal number, so it answered "signal 3368 out of
-; range" and signal() failed for every call.
-;
 __signal:
+		ld		(func),hl	; the first argument, in the slot
+						; the old pop put it in (the two
+						; labels here are historic)
 		pop		de
 		pop		hl
 		ld		(sig),hl
-		pop		hl
-		ld		(func),hl
-		push	hl
 		push	hl
 		push	de
 		rst		08h

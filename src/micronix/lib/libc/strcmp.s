@@ -1,21 +1,16 @@
 	psect	text
 	global	_strcmp
 
-;	bc is a register-variable home, and this used it to shuffle the
-;	return address - which destroys the caller's copy before there
-;	is any chance to save it.  So the save goes first, and the
-;	arguments are read where they lie rather than popped.  Two bytes
-;	here, on the stack, against two at every call site in the
-;	compiler and a static that recursion would tread on.
+;	bc is a register-variable home and nothing here touches it.  An
+;	old body used it to shuffle the return address - destroying the
+;	caller's copy - and the save that guarded against that outlived
+;	the shuffle; both are gone.  The first string arrives in hl, the
+;	second is read where it lies rather than popped.
 
 _strcmp:
-	push	bc		;the caller's register variable
-	ld	hl,4
-	add	hl,sp		;past the save and the return address
-	ld	e,(hl)
-	inc	hl
-	ld	d,(hl)		;de = first string
-	inc	hl
+	ex	de,hl		;de = first string, which arrived in hl
+	ld	hl,2
+	add	hl,sp		;past the return address
 	ld	a,(hl)
 	inc	hl
 	ld	h,(hl)
@@ -29,14 +24,12 @@ _strcmp:
 	or	a
 	jr	nz,1b
 	ld	hl,0
-	pop	bc
 	ret
 
 2:	ld	hl,1
-	jr	nc,3f
+	ret	nc
 	dec	hl
 	dec	hl
-3:	pop	bc
 	ret
 
 ; vim: tabstop=4 shiftwidth=4 noexpandtab:

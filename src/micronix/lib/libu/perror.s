@@ -5,10 +5,7 @@
 
 	.text
 _perror::
-	pop	hl
-	pop	de	; get message pointer
-	push	de
-	push	hl
+	ex	de,hl		; the message arrives in hl
 
 ;
 ;	Range-check errno against etab, which has 33 entries: eunk at

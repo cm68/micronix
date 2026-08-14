@@ -17,11 +17,7 @@
 
 	.text
 __break:
-	pop 	de		; ret addr
-	pop 	hl		; addr
-	ld 	(addr),hl
-	push 	hl
-	push 	de
+	ld 	(addr),hl		; the argument arrives in hl
 
 	rst 	08h
 	.db 	000h

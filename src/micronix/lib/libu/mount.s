@@ -22,15 +22,14 @@
 
 	.text
 _mount:
+	ld 	(dev),hl		; the first argument arrives in hl
 	pop 	hl		; discard ret addr
-	pop 	hl		; device
-	ld 	(dev),hl
-	pop 	hl		; on
+	pop 	hl		; second argument
 	ld 	(dir),hl
-	pop 	hl		; ronly
+	pop 	hl		; third argument
 	ld 	(ronly),hl
 
-	ld 	hl,-8		; restore stack
+	ld 	hl,-6		; restore stack
 	add 	hl,sp
 	ld 	sp,hl
 

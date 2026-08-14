@@ -1,4 +1,4 @@
-; Generated from doprnt_ws.o by wsnm -g
+; Generated from doprnt_ws.o by nm -g
 	.extern __ctype_
 	.extern __pnum
 	.extern _atoi

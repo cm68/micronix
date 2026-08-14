@@ -21,20 +21,19 @@
 
 	.text
 _read:
-	pop 	hl		; discard ret addr
-	pop 	de		; fd in e
-	ld 	a,e
+	ld 	a,l		; fd arrives in hl
 	ld 	(fd),a		; save fd for fdadd
+	pop 	hl		; discard ret addr
 	pop 	hl		; buffer
 	ld 	(buf),hl
 	pop 	hl		; nbytes
 	ld 	(count),hl
 
-	ld 	hl,-8		; restore stack
+	ld 	hl,-6		; restore stack
 	add 	hl,sp
 	ld 	sp,hl
 
-	ld 	l,e		; fd in hl
+	ld 	l,a		; fd in hl
 	ld 	h,0
 	rst 	08h
 	.db 	000h

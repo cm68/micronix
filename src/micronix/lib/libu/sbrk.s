@@ -23,13 +23,9 @@
 
 	.text
 _brk:
-	pop	de		; return address
-	pop	hl		; addr
-	push	hl
-	push	de
-	push	hl		; arg for _break
-	call	__break
-	pop	de		; clean arg; de = addr
+	push	hl		; addr, kept across the call
+	call	__break		; whose argument rides in hl
+	pop	de		; de = addr
 	ld	a,h
 	or	l
 	ret	nz		; failed: hl = -1
@@ -38,11 +34,7 @@ _brk:
 
 _sbrk:
 	push	bc		; callee-saved (C register variables)
-	ld	hl,4		; [bc][ret][increment]
-	add	hl,sp
-	ld	e,(hl)
-	inc	hl
-	ld	d,(hl)		; de = increment
+	ex	de,hl		; de = increment, which arrived in hl
 	ld	hl,(_memtop)
 	ld	a,h
 	or	l

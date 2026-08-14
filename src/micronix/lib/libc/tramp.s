@@ -9,10 +9,23 @@
 ;
 ;	Entry: HL = address to call, arguments already pushed.
 
+;	With arguments, HL carries the first one and cannot carry the
+;	address too, so the address arrives in DE - dead at every call -
+;	and the borrowed return address goes on the stack before it:
+;	push the target, ret into it, and the function's own ret still
+;	comes back to the original caller.
+;
+;	Entry: DE = address to call, first argument in HL (HL':HL when
+;	long), the rest already pushed.
+
 	psect	text
-	global	tramp
+	global	tramp, trampde
 
 tramp:
 	jp	(hl)
+
+trampde:
+	push	de
+	ret
 
 ; vim: tabstop=4 shiftwidth=4 noexpandtab:

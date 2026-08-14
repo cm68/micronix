@@ -15,11 +15,7 @@
 
 	.text
 _chdir:
-	pop 	de		; ret addr
-	pop 	hl		; dirname
-	ld 	(path),hl
-	push 	hl
-	push 	de
+	ld 	(path),hl		; the argument arrives in hl
 
 	rst 	08h
 	.db 	000h

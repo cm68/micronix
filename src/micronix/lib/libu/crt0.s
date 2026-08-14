@@ -39,11 +39,11 @@ bsszap:
 	jr	bssclr
 bssdone:
 
-	pop	bc	; this is argc
+	pop	de	; this is argc
 	ld	hl,0	; load argv
 	add	hl,sp
-	push	hl
-	push	bc
+	push	hl	; argv, the second argument, on the stack
+	ex	de,hl	; argc, the first, rides in hl
 	call	_main	; call main
 	push	hl	; return value
 	jp	sexit	; no-return entry of exit(): takes bare

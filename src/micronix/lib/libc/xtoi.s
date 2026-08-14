@@ -22,18 +22,12 @@ hexdig:	cp	'0'
 	sub	'a'-0ah
 	ret
 
-;	The return address comes back through hl, not bc: bc is the
-;	caller's register variable and this uses it to add the digit in,
-;	so it has to be saved - and it cannot be saved after the shuffle
-;	has already overwritten it.  The save goes on the stack once the
-;	arguments are back the way they came in, so it costs two bytes
-;	and survives recursion and any depth of nesting.
+;	bc is the caller's register variable and this uses it to add
+;	the digit in, so the save goes first, on the stack, where it
+;	survives recursion and any depth of nesting.
 
-_xtoi:	pop	hl	;return address
-	pop	de
-	push	de
-	push	hl
-	push	bc
+_xtoi:	push	bc		;the caller's register variable
+	ex	de,hl		;the string arrives in hl and walks in de
 	ld	hl,0
 1:
 	ld	a,(de)
@@ -51,11 +45,7 @@ _xtoi:	pop	hl	;return address
 9:	pop	bc		;the caller's, back
 	ret
 
-_ishex:	pop	hl
-	pop	de
-	push	de
-	push	hl
-	ld	a,e
+_ishex:	ld	a,l		;the character arrives in hl
 	ld	hl,0
 	call	hexdig
 	ret	c

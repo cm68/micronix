@@ -14,8 +14,7 @@
 
 	.text
 __exit:
-	pop 	hl		; discard ret addr
-	pop 	hl		; status
+				; status arrives in hl, where the kernel wants it
 	rst 	08h
 	.db 	001h
 

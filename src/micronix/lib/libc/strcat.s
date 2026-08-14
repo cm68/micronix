@@ -10,12 +10,9 @@
 	global	_strcat
 
 _strcat:
+	ex	de,hl		;de = destination, which arrived in hl
 	ld	hl,2
 	add	hl,sp		;past the return address
-	ld	e,(hl)
-	inc	hl
-	ld	d,(hl)		;de = destination
-	inc	hl
 	ld	a,(hl)
 	inc	hl
 	ld	h,(hl)

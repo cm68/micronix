@@ -15,10 +15,6 @@
 
 	.text
 _setuid:
-	pop 	de		; ret addr
-	pop 	hl		; uid
-	push 	hl
-	push 	de
 
 	rst 	08h
 	.db 	017h

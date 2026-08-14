@@ -2,11 +2,7 @@
 
 	psect	text
 _toupper:
-	pop	de		;return address
-	pop	hl
-	push	hl
-	push	de
-	ld	a,h		;check for a char
+	ld	a,h		;check for a char - the argument is in hl
 	or	a
 	ret	nz
 	ld	a,l

@@ -21,13 +21,12 @@
 
 	.text
 _exec:
+	ld 	(name),hl		; the first argument arrives in hl
 	pop 	hl		; discard ret addr
-	pop 	hl		; name
-	ld 	(name),hl
-	pop 	hl		; argv
+	pop 	hl		; second argument
 	ld 	(argv),hl
 
-	ld 	hl,-6		; restore stack
+	ld 	hl,-4		; restore stack
 	add 	hl,sp
 	ld 	sp,hl
 

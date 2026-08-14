@@ -19,13 +19,12 @@
 
 	.text
 _open:
+	ld 	(path),hl		; the first argument arrives in hl
 	pop 	hl		; discard ret addr
-	pop 	hl		; path
-	ld 	(path),hl
-	pop 	hl		; mode
+	pop 	hl		; second argument
 	ld 	(mode),hl
 
-	ld 	hl,-6		; restore stack
+	ld 	hl,-4		; restore stack
 	add 	hl,sp
 	ld 	sp,hl
 

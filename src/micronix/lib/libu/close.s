@@ -19,10 +19,6 @@
 
 	.text
 _close:
-	pop 	de		; ret addr
-	pop 	hl		; fd in l (byte arg: high byte is junk)
-	push 	hl
-	push 	de
 
 	ld 	h,0		; fd in hl
 	rst 	08h

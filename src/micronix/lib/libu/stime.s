@@ -17,10 +17,6 @@
 
 	.text
 _stime:
-	pop 	de		; ret addr
-	pop 	hl		; tp pointer
-	push 	hl
-	push 	de
 
 	; load 32-bit time from *tp (little-endian)
 	ld 	e,(hl)

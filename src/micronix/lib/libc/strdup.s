@@ -11,12 +11,8 @@
 	.text
 _strdup:
 	push	bc		; callee-saved
-	ld	hl,4
-	add	hl,sp
-	ld	e,(hl)
-	inc	hl
-	ld	d,(hl)		; de = s
-	push	de		; save s
+	push	hl		; save s, which arrived in hl
+	ex	de,hl		; de walks it
 	ld	hl,0
 1:	ld	a,(de)		; hl = strlen(s) + 1 (count incl NUL)
 	inc	de
@@ -24,9 +20,7 @@ _strdup:
 	or	a
 	jr	nz,1b
 	push	hl		; save count
-	push	hl		; arg: malloc(count)
-	call	_malloc
-	pop	af		; clean arg
+	call	_malloc		; malloc(count): the count rides in hl
 	pop	bc		; bc = count
 	pop	de		; de = s
 	ld	a,h

@@ -27,15 +27,14 @@
 
 	.text
 _seekraw:
+	ld 	a,l		; fd arrives in hl
 	pop 	hl		; discard ret addr
-	pop 	hl		; fd in l (byte arg: high byte is junk)
-	ld 	a,l
 	pop 	hl		; offset
 	ld 	(offset),hl
 	pop 	hl		; whence
 	ld 	(whence),hl
 
-	ld 	hl,-8		; restore stack
+	ld 	hl,-6		; restore stack
 	add 	hl,sp
 	ld 	sp,hl
 

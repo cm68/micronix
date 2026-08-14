@@ -22,11 +22,7 @@
 
 	.text
 _unlink:
-	pop 	de		; ret addr
-	pop 	hl		; name
-	ld 	(name),hl
-	push 	hl
-	push 	de
+	ld 	(name),hl		; the argument arrives in hl
 
 	rst 	08h
 	.db 	000h

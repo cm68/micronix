@@ -13,10 +13,6 @@
 
 	.text
 _time:
-	pop 	de		; ret addr
-	pop 	hl		; tp
-	push 	hl
-	push 	de
 
 	push	bc		; the caller's register variable: tp
 				; lands in bc below and bc is a home
@@ -41,6 +37,16 @@ _time:
 	ld 	a,d
 	ld 	(bc),a
 9:	pop	bc
+;
+; time returns a long, and ccc's long lives in HL':HL - the kernel
+; hands back de:hl (de high), so the high word crosses to the shadow
+; bank before the return.  Every caller in the tree uses the *tp
+; store instead, but the declared return type is owed its convention.
+;
+	push	de
+	exx
+	pop	hl		; hl' = high word
+	exx
 	ret
 
 ; vim: tabstop=8 shiftwidth=8 noexpandtab:

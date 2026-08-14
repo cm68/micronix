@@ -22,10 +22,6 @@
 
 	.text
 _dup:
-	pop 	de		; ret addr
-	pop 	hl		; fd in l (byte arg: high byte is junk)
-	push 	hl
-	push 	de
 	ld 	a,l
 	ld 	(fd),a		; save old fd for fdcpy
 

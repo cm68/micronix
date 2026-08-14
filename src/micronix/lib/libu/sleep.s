@@ -12,10 +12,6 @@
 
 	.text
 _sleep:
-	pop 	de		; ret addr
-	pop 	hl		; seconds
-	push 	hl
-	push 	de
 
 	rst 	08h
 	.db 	023h

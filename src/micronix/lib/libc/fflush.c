@@ -16,10 +16,9 @@ register FILE *	f;
 	 * _ptr - _base, not BUFSIZ - _cnt.  The two agree while a
 	 * stream is only ever written, because fputc moves them in
 	 * step, and they part company after a seek: fseek leaves _cnt
-	 * at 0 and _ptr at _base, so the subtraction says a full
+	 * at 0 and _ptr at _base, so the subtraction claims a full
 	 * buffer is pending when the buffer is empty, and BUFSIZ bytes
-	 * of stale data go out at the seek target.  _flsbuf had the
-	 * same assumption and the same fix.
+	 * of stale data go out at the seek target.
 	 */
 	if (!(f->_flag & _IOWRT) || 
 		f->_base == (char *)NULL || 

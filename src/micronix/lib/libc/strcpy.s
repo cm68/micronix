@@ -8,12 +8,9 @@
 
 _strcpy:
 	push	bc		;the caller's register variable
+	ex	de,hl		;de = destination, which arrived in hl
 	ld	hl,4
 	add	hl,sp		;past the save and the return address
-	ld	e,(hl)
-	inc	hl
-	ld	d,(hl)		;de = destination
-	inc	hl
 	ld	a,(hl)
 	inc	hl
 	ld	h,(hl)

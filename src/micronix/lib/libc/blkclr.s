@@ -14,12 +14,13 @@
 	global	_blkclr
 
 _blkclr:
-	pop	de	;return address - de is caller-scratch
+	push	hl	;the pointer crosses to the shadow bank
 	exx
 	pop	hl	;pointer
+	pop	af	;return address, held across the shuffle
 	pop	bc	;count
-	push	bc	;the argument slots go back for the
-	push	hl	;caller's cleanup
+	push	bc	;the argument slot goes back for the
+	push	af	;caller's cleanup, the return under it
 	ld	e,0
 
 1:
@@ -33,7 +34,6 @@ _blkclr:
 
 2:
 	exx
-	push	de
 	ret
 
 ; vim: tabstop=4 shiftwidth=4 noexpandtab:

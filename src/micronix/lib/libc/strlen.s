@@ -1,9 +1,6 @@
 	psect	text
 	global	_strlen
-_strlen:	pop	hl
-	pop	de
-	push	de
-	push	hl
+_strlen:	ex	de,hl		;the string arrives in hl
 	ld	hl,0
 
 1:	ld	a,(de)

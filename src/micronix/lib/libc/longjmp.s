@@ -39,13 +39,7 @@
 	global	_setjmp, _longjmp
 
 _setjmp:
-	ld	hl,2
-	add	hl,sp
-	ld	e,(hl)
-	inc	hl
-	ld	d,(hl)		;de = buf
-	ex	de,hl		;hl = cursor into buf, de = ferry
-
+				;buf arrives in hl: the cursor, ready-made
 	push	iy
 	pop	de
 	ld	(hl),e
@@ -83,12 +77,9 @@ _setjmp:
 	ret
 
 _longjmp:
+	ex	de,hl		;de = buf, which arrived in hl
 	ld	hl,2
 	add	hl,sp
-	ld	e,(hl)
-	inc	hl
-	ld	d,(hl)		;de = buf
-	inc	hl
 	ld	c,(hl)
 	inc	hl
 	ld	b,(hl)		;bc = the value, parked where nothing

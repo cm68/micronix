@@ -6,12 +6,9 @@ digit:	sub	'0'
 	ret
 
 	global	_atoi
-_atoi:	pop	hl	;return address - hl, not bc: bc is the
-	pop	de		;caller's register variable and this uses
-	push	de		;it as a multiply scratch below, so it has
-	push	hl		;to be saved, and it cannot be saved after
-	push	bc		;something has already overwritten it
-	ld	hl,0
+_atoi:	push	bc		;bc is the caller's register variable and
+	ex	de,hl		;this uses it as a multiply scratch below.
+	ld	hl,0		;the string arrives in hl and walks in de
 1:
 	ld	a,(de)
 	inc	de

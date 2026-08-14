@@ -20,11 +20,7 @@
 
 	.text
 _umount:
-	pop 	de		; ret addr
-	pop 	hl		; device
-	ld 	(dev),hl
-	push 	hl
-	push 	de
+	ld 	(dev),hl		; the argument arrives in hl
 
 	rst 	08h
 	.db 	000h

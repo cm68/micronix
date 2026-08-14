@@ -34,10 +34,11 @@
 ; Added the other way round, the position reached lseek with its
 ; halves swapped: a file read to its end at 31 bytes was 0x001f0000,
 ; and ftell, which is that value less what is still in the buffer,
-; answered 0x001effe5 where it meant 4.  Everything that seeks back
-; over what it has written is on this - asz assembles into a temp
-; file and copies it back out - and nothing fails loudly: the seek
-; simply lands somewhere else.
+; answered 0x001effe5 where it meant 4.  peep's pool notes with ftell
+; where each string block begins, so every seek back to one landed
+; nowhere, no two blocks ever compared equal, and the pass that folds
+; duplicate strings folded none.  Nothing failed - the output was
+; simply bigger, on 15 of the 55 sources the footprint check measures.
 ;
 ; INC and DEC on a register pair leave the flags alone, and so do
 ; LD A,(HL) and LD (HL),A, so the carry survives the walk back down.

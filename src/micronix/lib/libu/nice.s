@@ -18,10 +18,6 @@
 
 	.text
 _nice:
-	pop 	de		; ret addr
-	pop 	hl		; nice value
-	push 	hl
-	push 	de
 
 	rst 	08h
 	.db 	022h

@@ -5,20 +5,21 @@
 
 _movmem:
 _bmove:
-	pop	hl		;return address
+	push	hl		;from, crossing to the shadow bank on the stack
 	exx
 	pop	hl		;from
+	pop	af		;the return address, held across the pops
 	pop	de		;to
 	pop	bc		;count
+	push	bc		;stack is as it was
+	push	de
+	push	af		;the return address back in place
 	ld	a,b
 	or	c
 	jr	z,1f
 	ldir
 1:
-	push	bc		;stack is as it was
-	push	de
-	push	hl
 	exx
-	jp	(hl)
+	ret
 
 ; vim: tabstop=4 shiftwidth=4 noexpandtab:

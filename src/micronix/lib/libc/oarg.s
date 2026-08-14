@@ -23,9 +23,7 @@ oarg:
 	ld	d,(hl)
 	inc	hl
 	push	hl		; the real return address
-	push	de		; the argument
-	call	_out
-	pop	de		; discard the argument
-	ret
+	ex	de,hl		; the argument, in hl
+	jp	_out		; whose own ret goes straight back
 
 ; vim: tabstop=4 shiftwidth=4 noexpandtab:

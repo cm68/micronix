@@ -23,27 +23,9 @@
 
 	.text
 _wait:
-	pop 	hl		; discard ret addr
-	pop 	de		; pstat
-
-;
-; Put the stack back the way the caller left it, the same way write
-; does: the two pops moved sp up by four, so four comes back off it
-; and the return address is on top again for the ret at the end.
-;
-; This used to add -4 to pstat rather than to sp, and then add THAT
-; to sp - so sp came out as sp+pstat-4, somewhere out in the caller's
-; frame, and the ret went to whatever was lying there.  pstat was
-; left four bytes low as well, so the status would have been written
-; into the wrong place had it ever got that far.
-;
-	ld 	hl,-4		; restore stack
-	add 	hl,sp
-	ld 	sp,hl
-
 	push	bc		; the caller's register variable: bc is a
 				; home, and pstat lands in it below
-	push 	de		; save pstat
+	push 	hl		; save pstat, which arrives in hl
 	rst 	08h
 	.db 	007h
 	; returns: hl = pid, de = status

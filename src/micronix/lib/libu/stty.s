@@ -17,13 +17,11 @@
 
 	.text
 _stty:
+	ld 	a,l		; fd arrives in hl
 	pop 	de		; ret addr
-	pop 	hl		; fd in l (byte arg: high byte is junk)
-	ld 	a,l
 	pop 	hl		; vec
 	ld 	(buf),hl
-	push 	hl
-	push 	af		; slot filler (caller cleans; contents unused)
+	push 	hl		; the slot back for the caller's cleanup
 	push 	de
 
 	ld 	h,0

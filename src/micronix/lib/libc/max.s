@@ -8,12 +8,9 @@
 	psect	text
 
 _max:
+	ex	de,hl		;de = arg 1, which arrived in hl
 	ld	hl,2
 	add	hl,sp		;past the return address
-	ld	e,(hl)
-	inc	hl
-	ld	d,(hl)		;de = arg 1
-	inc	hl
 	ld	a,(hl)
 	inc	hl
 	ld	h,(hl)

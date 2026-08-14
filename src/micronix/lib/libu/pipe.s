@@ -21,14 +21,7 @@
 
 	.text
 _pipe:
-	pop 	hl		; discard ret addr
-	pop 	de		; fds pointer
-
-	ld 	hl,-4		; restore stack
-	add 	hl,sp
-	ld 	sp,hl
-
-	push 	de		; save fds pointer
+	push 	hl		; save the fds pointer, which arrives in hl
 	rst 	08h
 	.db 	02ah
 
@@ -54,6 +47,8 @@ _pipe:
 	ld 	hl,0
 	ret
 error:
+	pop 	de		; the saved pointer off again - without
+				; this, ret jumped to the fds array
 	ld 	(_errno),hl
 	ld 	hl,-1
 	ret

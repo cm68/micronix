@@ -70,13 +70,8 @@ IOSTRG_BIT	equ	6
 _fgetc:
 	push	bc			;the caller's register variable
 	push	iy			;and frame pointer; f rides here
-	ld	hl,6
-	add	hl,sp			;past the saves and the return
-	ld	e,(hl)
-	inc	hl
-	ld	d,(hl)
-	push	de
-	pop	iy			;iy = f
+	push	hl
+	pop	iy			;iy = f, which arrived in hl
 
 	ld	a,(iy+flag)		;get flag bits
 ;
@@ -144,9 +139,9 @@ retch:
 fill:
 	bit	IOSTRG_BIT,(iy+flag)	;end of string?
 	jr	nz,reteof		;yes, return EOF
-	push	iy			;pass f as the argument
+	push	iy
+	pop	hl			;pass f as the argument, in hl
 	call	__filbuf		;refill; returns the char or EOF
-	pop	de			;the argument off again
 	bit	7,h
 	jr	nz,reteof		;the refill met the end
 	ld	a,l

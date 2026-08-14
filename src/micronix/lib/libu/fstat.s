@@ -19,13 +19,12 @@
 
 	.text
 _fstat:
-	pop 	hl		; ret addr
-	pop 	hl		; fd in l (byte arg: high byte is junk)
-	ld 	a,l
+	ld 	a,l		; fd arrives in hl
+	pop 	hl		; discard ret addr
 	pop 	hl		; buf
 	ld 	(buf),hl
 
-	ld	hl,-6
+	ld	hl,-4
 	add	hl,sp
 	ld	sp,hl
 
