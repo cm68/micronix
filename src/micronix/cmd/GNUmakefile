@@ -3,32 +3,26 @@
 #
 # cmd/GNUmakefile
 #
-# whitesmith is not in DIRS.  Its sources and its own makefiles are
-# still in the tree, but nothing here builds them.
+# WHAT THIS DIRECTORY IS FOR: the source of everything that goes into
+# /bin.  One directory per program, and if a program is on the system
+# its source is here.
 #
-# ld is not in DIRS either, and for the same reason hitech left the
-# build: it is a link editor for the hitech object format, which
-# nothing here produces any more.  wsld is the linker this toolchain
-# uses, and it is to be renamed ld and take this one's place.  The
-# source stays until then.
+# What does not go into /bin is in ../attic - dead compilers, the
+# assembler that came before asz, two makes that lost the name, and
+# the shells that were read before this one.  Nothing there is built
+# and nothing here refers to it.
 #
-# pp.xx is out for the same kind of reason - a post-processor for a
-# compiler this tree stopped using, which has not tracked anything in
-# a long time.  Kept, not built.
+# Still here and still not in DIRS, because they are programs that DO
+# belong on the system and are not ready:
 #
-# cc is out too: it is the v7 cc driver swizzled to run hitech's and
-# whitesmith's passes - cp1, cp2, optim, link, with -H to pick hitech -
-# and both of those compilers have left this build.  ccc is the driver
-# now.  Kept, not built.
+#   ld      a link editor for the hitech object format, which nothing
+#           here produces any more.  wsld is the linker this toolchain
+#           uses and is to be renamed ld and take its place; the
+#           source stays until then.
+#   pp.xx   a post-processor for a compiler this tree stopped using.
+#   far, nroff, croff, cpmtools, ansi2kr, mkfs, mt
 #
-# These have a GNUmakefile but are not in DIRS, and so are not built:
-#	ash asz cpmtools far msh nroff yacc yacc.d
-#
-# make is the make micronix uses - it was cmd/Make until the v7 one
-# gave up the name, and that one is cmd/v7make now.  make.d is a third
-# make and is also not built.
-#
-# The compiler is moving into this tree, one directory per pass and
+# And the compiler, moving into this tree one directory per pass and
 # per tool:
 #
 #	cpp c0 c1 peep		the passes
@@ -38,10 +32,7 @@
 # which is still where they are edited, and they are not in DIRS: they
 # are host programs today, and building them here means building the
 # compiler for the Z80, which is where this is going but is not there
-# yet.  asz among them replaces the TRASM-derived assembler, which is
-# cmd/asz.old.
-# That was true before this file was rewritten and is left alone; add
-# them when they have been made to compile with ccc.
+# yet.  Add them when they have been made to compile with ccc.
 #
 # init builds.  It is a reconstruction from the disassembly of the 1.6
 # binary, and the helpers that binary carries are now written into it -

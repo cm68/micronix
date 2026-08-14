@@ -89,8 +89,8 @@ INC	?= -I/usr/local/lib/include -I$(DEPTH)/include
 # itself.  ccc appends /usr/local/lib/libc.a and libu.a to the link by
 # absolute path, so -L cannot redirect it and a command would other-
 # wise be linked against whatever was last installed rather than
-# against what this build just produced.  cmd/Make is where that shows
-# up: system() is in lib/libc and not in the installed libc.a, so Make
+# against what this build just produced.  attic/Make is where that
+# showed up: system() is in lib/libc and not in the installed libc.a, so Make
 # failed to link with "undefined symbol: _system" while the source of
 # system() sat two directories away, freshly compiled.  wsld resolves
 # in order, so listing them first is enough.

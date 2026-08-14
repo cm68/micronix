@@ -1,37 +1,43 @@
 #
-# makefile for post-upgrade builds
-# /makefile
+# the native build: in the simulator, and on the hardware
 #
-# Changed: <2023-07-04 10:23:43 curt>
+# micronix/makefile
 #
-# if both Makefile and makefile are present, the new make uses this
-# file, while the old make uses Makefile.
+# There are two makefiles here and only two.  This one is read by the
+# make that runs on micronix; GNUmakefile beside it is the cross build
+# and is read on the host.  Nothing has to look at which make it is
+# running any more.
 #
-# so, if you have both Makefile and makefile, it depends on which
-# make you are running.
-#
-# this mechanism will be used to bootstrap the new make on a system where
-# the new make does not exist yet.
+# There used to be a third - a Makefile, capital M, which the OLD make
+# preferred and which existed to bootstrap the new one by building
+# cmd/Make first.  That is retired: the cross compiler works, so a
+# system without a make gets one built for it on the host rather than
+# having to climb out of the hole by itself.  Make is in ../attic with
+# the other two that lost the name.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
+#
+# lib, sys and cmd, the same three the GNUmakefile beside this one
+# descends into.  sys was commented out here and is not any more.
+#
 all:
 	cd include ; make install
 	cd lib ; make install
 	cd cmd ; make install
-	# cd sys ; make install
+	cd sys ; make install
 
 clean:
 	cd include ; make clean
 	cd lib ; make clean
 	cd cmd ; make clean
-	# cd sys ; make clean
+	cd sys ; make clean
 
 clobber: clean
 	cd include ; make clobber
 	cd lib ; make clobber
 	cd cmd ; make clobber
-	# cd sys ; make clobber
+	cd sys ; make clobber
 
 #
 # this rule populates /old with the stock micronix binaries

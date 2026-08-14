@@ -1,0 +1,56 @@
+The attic
+=========
+
+Source that is kept but is not part of the system.
+
+cmd/ holds one directory per program that goes into /bin, and the
+intent is that everything on the system has its source there.  That
+only reads clearly if the things which are NOT on the system live
+somewhere else.  This is somewhere else.
+
+Nothing here is built.  It is not in any DIRS, no makefile above it
+descends into it, and moving something in here is how a program stops
+being part of the tree without being deleted.
+
+What is in it, and why it is not in cmd:
+
+    whitesmith  The Whitesmiths compiler - pp, p1, p2, asm, util and
+                the rest.  Its object format and its calling
+                convention are both documented in cmd/sh/NOTES and
+                lib/objects, because reading its binaries is still
+                how the reconstructions are done, but ccc is the
+                compiler now.
+
+    cc          The v7 cc driver, swizzled to run hitech's and
+                whitesmith's passes - cp1, cp2, optim, link, with -H
+                to pick hitech.  Both of those compilers have left the
+                build; ccc is the driver.
+
+    asz.old     The TRASM-derived assembler, replaced by cmd/asz.
+
+    Make        The make micronix used, until the v7 one gave up the
+                name to it.  It was also what the retired top-level
+                Makefile bootstrapped, back when a system without a
+                make had to climb out of the hole by itself; the cross
+                compiler builds one now.
+    v7make      The v7 make, which had the name first.
+    make.d      A third make.
+                cmd/make is the one that is built.
+
+    ash         The v7 Bourne shell.
+    msh         A small shell.
+    osh         An older shell.
+                cmd/sh is the shell, reconstructed from the 1.67
+                binary - see cmd/sh/README.  These are here because
+                they were read while working out what that one does,
+                and a shell to compare against is worth keeping.
+
+    yacc        yacc, and
+    yacc.d      a second copy of it.
+
+Nothing above is dead in the sense of being wrong; it is dead in the
+sense that the system does not contain it.  Anything here can be read,
+and several of them are read regularly - the point of an attic is that
+you can go up and look.
+
+vim: tabstop=4 shiftwidth=4 noexpandtab:
