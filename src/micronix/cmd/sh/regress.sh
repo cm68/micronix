@@ -41,6 +41,31 @@ runsh()
 		grep -v '^ran-dot-sh$'
 }
 
+#
+# The same, but on a pty, because some of what the shell does it only
+# does for a terminal - history is expanded for what is typed and not
+# for what is read out of a file.  script(1) gives us the terminal.
+# The whole input arrives at once, so the prompts and the answers
+# interleave oddly, but they interleave the SAME oddly for both
+# shells, and it is stable run to run.
+#
+runtty()
+{
+	shell=$1
+	shift
+	for line in "$@"; do printf '%s\n' "$line"; done
+	printf 'exit\n'
+}
+
+ttysh()
+{
+	sh=$1
+	shift
+	runtty "$sh" "$@" |
+		timeout 30 setsid script -q -c "$SIM -d $ROOT $sh" /dev/null 2>&1 |
+		grep -v '^ran-dot-sh$'
+}
+
 pass=0
 fail=0
 skip=0
@@ -90,6 +115,30 @@ differs()
 	else
 		known=`expr $known + 1`
 		test -n "$VERBOSE" && printf 'known   %s  (%s)\n' "$1" "$2"
+	fi
+}
+
+#
+# One interactive case: several lines typed at a terminal.
+#
+checktty()
+{
+	case "$*" in
+	*"$SELECT"*) ;;
+	*) skip=`expr $skip + 1`; return ;;
+	esac
+
+	ttysh $STOCK "$@" > $TMP.a
+	ttysh $OURS  "$@" > $TMP.b
+
+	if cmp -s $TMP.a $TMP.b; then
+		pass=`expr $pass + 1`
+		test -n "$VERBOSE" && printf 'ok tty  %s\n' "$*"
+	else
+		fail=`expr $fail + 1`
+		printf 'DIFFER  (tty) %s\n' "$*"
+		sed 's/^/          stock: /' $TMP.a
+		sed 's/^/          ours:  /' $TMP.b
 	fi
 }
 
@@ -160,6 +209,26 @@ check 'echo /etc/passwd'
 check 'echo x >'
 check 'nosuchcmd'
 check 'ls /etc | grep passwd'
+
+#
+# History, which happens only at a terminal.  Fed a file the shell
+# runs "!e" as a command name, and the first case here says so.
+#
+check 'echo one ; !e'
+checktty 'echo one' 'echo two' '!e'
+checktty 'echo one' '!1'
+checktty 'echo one' '!t'
+checktty 'echo one' '!!'
+checktty 'echo one' '!$'
+checktty 'echo one' 'echo !e'
+checktty 'echo one' 'echo a!$b'
+checktty 'echo one' 'echo x!!'
+checktty 'echo one' 'echo a!!b'
+checktty 'echo one' '!:'
+checktty 'echo one' '! e'
+checktty 'echo one' '!e-tail'
+checktty 'echo one' 'echo !e' '!e'
+checktty 'echo plain'
 
 #
 # The differences we mean.

@@ -1042,6 +1042,22 @@ char **argv;
     while (nextline(line, sizeof(line))) {
         if (verbose)
             fputs(line, stderr);
+
+        /*
+         * References are expanded only for what is typed.  Fed a
+         * file the image runs "!e" as a command and answers "!e:
+         * Command not found.", so a script is never rewritten under
+         * itself - and nsrc is what tells the two apart, the same
+         * test that decides whether to prompt.
+         */
+        if (interactive && nsrc == 1) {
+            i = histexpand(line, sizeof(line));
+            if (i < 0)
+                continue;               /* it has said what was wrong */
+            if (i > 0)
+                fputs(line, stdout);    /* show what it came to */
+            histadd(line);
+        }
         runline(line);
     }
 

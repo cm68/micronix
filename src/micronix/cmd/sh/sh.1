@@ -176,6 +176,25 @@ now sync (1).
 .sp 2
 .in -5
 .bd
+HISTORY
+.in +5
+.br
+Only when the input is a terminal, and only in one form:
+.sp
+.nf
+     !word	the last line beginning with word
+.fi
+.sp
+The word runs to the next space, and the reference may be anywhere in
+the line, so "echo !e" runs echo followed by the last line beginning
+with e.  What is remembered is the line after it was expanded.  A line
+with a ! in it is written out as it will be run.
+.sp
+There are no event numbers: !1 looks for a line beginning with 1.  If
+there is none, the shell writes "Event not found." and runs nothing.
+.sp 2
+.in -5
+.bd
 FILES
 .in +5
 .br
@@ -206,8 +225,8 @@ The one it replaces is a Whitesmiths binary with no source.  Keep a
 copy of it: this is read back out of that binary and is not finished,
 and the parts of it that are guesses are named in cmd/sh/NOTES.
 .sp
-One thing the original does and this does not: csh's ! history, which
-answers "Event not found.".
+The parts of it that are guesses are named in cmd/sh/NOTES, and
+cmd/sh/regress.sh runs the two side by side.
 .sp 2
 .in -5
 .bd

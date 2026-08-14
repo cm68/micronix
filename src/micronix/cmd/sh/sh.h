@@ -149,6 +149,10 @@ void warn();
  */
 int  parse(/* char **pp, struct pipeline *p */);
 
+/* hist.c */
+void histadd();
+int  histexpand(/* char *line, int size */);
+
 /* glob.c */
 int  ispattern();
 int  globword(/* char *w, struct cmd *c */);

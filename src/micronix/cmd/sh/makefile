@@ -16,7 +16,7 @@ MAN	= sh.1
 MANDIR	= /usr/man/man1
 PROG	= sh
 HDRS	= sh.h
-OBJS	= sh.o parse.o glob.o
+OBJS	= sh.o parse.o glob.o hist.o
 
 all: $(PROG)
 
