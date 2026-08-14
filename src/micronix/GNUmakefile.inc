@@ -116,6 +116,15 @@ NOWARN	= --warning=no-ignore-newer
 BINDIR	?= /bin
 INSTDIR	 = $(ROOT)$(BINDIR)
 
+#
+# Where man(1) looks: /usr/man/man<section>, then /usr/help - see
+# man/README, which read that out of the /bin/man binary.  A
+# directory whose page is not in section 1 sets MANSEC itself.
+#
+MANSEC	?= 1
+MANDIR	?= /usr/man/man$(MANSEC)
+MANINSTDIR = $(ROOT)$(MANDIR)
+
 CSRCS	?= $(wildcard *.c)
 HSRCS	?= $(wildcard *.h)
 ASSRCS	?= $(wildcard *.s)
@@ -145,7 +154,19 @@ RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \
 	done
 
-.PHONY: all update install clean clobber doc disas
+#
+# The man page goes in beside the program it documents.  MANSRCS is
+# the wildcard, so a directory with no page of its own installs
+# nothing and says nothing about it; the test is here rather than in a
+# conditional so that one canned recipe serves both "install" and
+# "install-man".
+#
+INSTALLMAN = @if [ -n "$(strip $(MANSRCS))" ] ; then \
+		mkdir -p $(MANINSTDIR) ; \
+		cp $(MANSRCS) $(MANINSTDIR) ; \
+	fi
+
+.PHONY: all update install install-man clean clobber doc disas
 
 #
 # cross build
@@ -182,17 +203,29 @@ all: $(TARGET) $(TARGETS)
 ifeq ($(strip $(TARGET)),)
 install:
 	$(RECURSE)
+	$(INSTALLMAN)
 else
 ifeq ($(suffix $(TARGET)),.a)
 install:
 	$(RECURSE)
+	$(INSTALLMAN)
 else
 install: $(TARGET)
 	$(RECURSE)
 	mkdir -p $(INSTDIR)
 	cp $(TARGET) $(INSTDIR)/$(TARGET)
+	$(INSTALLMAN)
 endif
 endif
+
+#
+# The pages on their own, without rebuilding or reinstalling anything
+# - which is what you want after fixing a page, and what the native
+# makefiles have always had.
+#
+install-man:
+	$(RECURSE)
+	$(INSTALLMAN)
 
 clean:
 	$(RECURSE)

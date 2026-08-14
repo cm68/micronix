@@ -124,11 +124,12 @@ sorted:
      *      any run of characters, including none
      ?      one character
      [...]  one of these; a-z is a range
+     [^...] one character that is not one of these
 .fi
 .sp
 A pattern may appear in any part of a path, so /e*/passwd finds it.
-There is no way to say "not these"; a leading dot is matched like any
-other character, though . and .. are never matched.
+A leading dot is matched like any other character, though . and ..
+are never matched.
 .sp
 A pattern that matches nothing is left out.  Only when nothing in the
 whole command matched is it an error, and then the shell writes "No
@@ -143,7 +144,7 @@ BUILTINS
      cd, chdir  change directory
      home       what cd with no argument means
      echo       write the arguments
-     type       where a command would be run from
+     type       print the named files
      path       set or show the search path
      prompt     set the prompt
      alias      make or show an abbreviation

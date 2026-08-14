@@ -13,12 +13,20 @@
  *	*	any run of characters, including none
  *	?	exactly one character
  *	[...]	one of these, and a-z is a range
+ *	[^...]	one character that is NOT one of these
  *
- * with two absences worth writing down, because both are what a
- * modern shell would do and neither is what this one does.  There is
- * no negation: "[!bg]*" in /etc answers banner and group, so the "!"
- * is just another character in the set.  And a leading dot is not
- * special: "/*" answers /.login and /.sh along with the rest.
+ * The negation is spelled with a CARET and not a bang.  I had it
+ * written here that there was no negation at all, on the strength of
+ * "[!bg]*" in /etc answering banner and group - which it does,
+ * because "!" is not the character and was going into the set as an
+ * ordinary member.  man1/sh.1 says "[^...] Matches any single
+ * character NOT within the brackets", and the image agrees:
+ * "/etc/[^bg]*" answers everything except those two.  Testing the
+ * spelling a modern shell uses, and reading the answer as a fact
+ * about the feature, is how that went wrong.
+ *
+ * A leading dot is not special: "/*" answers /.login and /.sh along
+ * with the rest.
  *
  * A pattern applies to every component of a path and not only the
  * last, so "/e*'/'passwd" finds /etc/passwd.  What comes back is
@@ -95,6 +103,7 @@ char *s;
 {
 	int lo;
 	int ok;
+	int neg;
 
 	while (*p) {
 		if (*p == '*') {
@@ -117,6 +126,11 @@ char *s;
 		}
 		if (*p == '[') {
 			p++;
+			neg = 0;
+			if (*p == '^') {
+				neg = 1;
+				p++;
+			}
 			ok = 0;
 			while (*p && *p != ']') {
 				lo = *p;
@@ -132,6 +146,8 @@ char *s;
 			}
 			if (*p == ']')
 				p++;
+			if (neg)
+				ok = !ok;
 			if (!ok)
 				return 0;
 			s++;

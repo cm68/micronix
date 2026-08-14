@@ -81,7 +81,7 @@ ROOT	?= ~/src/micronix/filesystem
 DEST	 = $(ROOT)/usr/src/cmd
 NOWARN	 = --warning=no-ignore-newer
 
-.PHONY: all update install clean clobber doc
+.PHONY: all update install install-man clean clobber doc
 
 all:
 	$(RECURSE)
@@ -95,6 +95,13 @@ update: cmd.tar
 	tar -f cmd.tar -C $(DEST) --keep-newer-files -x $(NOWARN)
 
 install:
+	$(RECURSE)
+
+#
+# Nothing of its own here; this exists so that the rule reaches the
+# directories below, which do have pages.
+#
+install-man:
 	$(RECURSE)
 
 clean:

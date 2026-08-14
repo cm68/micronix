@@ -512,23 +512,26 @@ struct cmd *c;
         printf("%d\n", getpid());
         return 0;
 
-    case B_TYPE:                        /* where would this be run from */
+    case B_TYPE:                        /* print the named files */
+        /*
+         * type is CAT.  man1/sh.1: "The contents of each of the named
+         * files are printed verbatim on the standard output."
+         *
+         * What was here was the meaning the word has had in every
+         * shell since - where would this command be run from - and
+         * both the page and the image say otherwise: "type /etc/motd"
+         * prints the file.  It was written from the name rather than
+         * from either source, and neither had been read for it.
+         */
         for (i = 1; i < c->argc; i++) {
-            /*
-             * The alias first, because that is what the word turns
-             * into before anything else looks at it.  Without this
-             * "type dir" answered "not found" the moment dir stopped
-             * being a builtin, which is true of the name and no use
-             * to the person asking.
-             */
-            if ((p = getalias(c->argv[i])))
-                printf("%s is aliased to %s\n", c->argv[i], p);
-            else if (isbuiltin(c->argv[i]))
-                printf("%s is a builtin\n", c->argv[i]);
-            else if ((p = findcmd(c->argv[i])))
-                printf("%s is %s\n", c->argv[i], p);
-            else
-                printf("%s not found\n", c->argv[i]);
+            if ((f = fopen(c->argv[i], "r")) == NULL) {
+                fprintf(stderr, "%s: No such file or directory\n",
+                    c->argv[i]);
+                continue;               /* and on to the next one */
+            }
+            while ((j = getc(f)) != EOF)
+                putc(j, stdout);
+            fclose(f);
         }
         return 0;
 

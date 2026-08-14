@@ -621,11 +621,17 @@ Patterns
     ?       exactly one character
     [...]   one of these, and a-z is a range
 
-Two absences, both of them things a modern shell does and this one
-does not.  There is no negation - "/etc/[!bg]*" answers banner and
-group, so the "!" is one more character in the set - and a leading
-dot is not hidden: "/*" answers /.login and /.sh with the rest.  "."
-and ".." are skipped, and they are the only two.
+Negation is spelled with a CARET: "[^...]" is one character that is
+NOT one of these, and "/etc/[^bg]*" answers everything except banner
+and group.  A leading dot is not hidden - "/*" answers /.login and
+/.sh with the rest - and "." and ".." are skipped, the only two.
+
+I had it written here that there was no negation at all, on the
+strength of "[!bg]*" answering banner and group.  It does, because
+"!" is not the character and goes into the set as an ordinary member.
+man1/sh.1 says the caret and the image agrees.  Testing the spelling
+a modern shell uses, and reading the answer as a fact about the
+feature rather than about the spelling, is how that went wrong.
 
 A pattern applies to every component and not only the last, so
 "/e*/passwd" finds it.  What comes back is sorted: /etc holds ttys,

@@ -30,8 +30,10 @@ $(PROG): $(OBJS)
 $(OBJS): $*.c $(HDRS)
 	$(CC) $(CFLAGS) -c $*.c
 
-install: $(PROG)
-	cp $(PROG) $(BIN)/nsh
+install: $(PROG) install-man
+	cp $(PROG) $(BIN)/$(PROG)
+
+install-man:
 	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:

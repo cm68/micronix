@@ -28,7 +28,7 @@ ROOT	?= ~/src/micronix/filesystem
 DEST	 = $(ROOT)/usr/src/lib
 NOWARN	 = --warning=no-ignore-newer
 
-.PHONY: all update install clean clobber doc
+.PHONY: all update install install-man clean clobber doc
 
 all:
 	$(RECURSE)
@@ -49,6 +49,13 @@ update: lib.tar
 # tree-wide "make install" walks without stopping.
 #
 install:
+	$(RECURSE)
+
+#
+# Nothing of its own here; this exists so that the rule reaches the
+# directories below, which do have pages.
+#
+install-man:
 	$(RECURSE)
 
 clean:

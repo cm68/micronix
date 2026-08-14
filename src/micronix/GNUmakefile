@@ -56,7 +56,7 @@ SUDO	?= sudo
 CCCOWNED = cpm.h errno.h hitech.h setjmp.h stdio.h time.h
 SYSHDRS  = $(filter-out $(CCCOWNED),$(notdir $(wildcard include/*.h)))
 
-.PHONY: all update install clean clobber doc sysinstall
+.PHONY: all update install install-man clean clobber doc sysinstall
 
 #
 # First, because make takes the first target in the file as the
@@ -70,6 +70,14 @@ all:
 	$(RECURSE)
 
 install:
+	$(RECURSE)
+
+#
+# The man pages alone, without rebuilding or reinstalling anything -
+# what you want after fixing a page.  The rule reaches every leaf
+# that has one; the ones that do not install nothing.
+#
+install-man:
 	$(RECURSE)
 
 sysinstall:

@@ -233,6 +233,8 @@ check 'echo /etc/*ss*'
 check 'echo /etc/pass?d'
 check 'echo /etc/[bg]*'
 check 'echo /etc/[a-i]*'
+check 'echo /etc/[^bg]*'
+check 'echo /etc/[^a-i]*'
 check 'echo /etc/[!bg]*'
 check 'echo /e*/passwd'
 check 'echo /etc/*'
@@ -254,6 +256,11 @@ check 'echo /etc/passwd'
 check 'echo x >'
 check 'nosuchcmd'
 check 'ls /etc | grep passwd'
+check 'type /etc/motd'
+check 'type nosuchfile'
+check 'type dir'
+check 'type /etc/motd /etc/motd'
+check 'type'
 
 #
 # History, which happens only at a terminal.  Fed a file the shell
@@ -292,8 +299,6 @@ checkscript 'echo /etc/pass* $1' alpha
 #
 # The differences we mean.
 #
-differs 'type dir' \
-	'dir is a builtin there and a seeded alias here, deliberately'
 differs 'echo x |' \
 	'a pipeline with an empty last stage: the stock shell runs it
 	 and says nothing, and we call it a syntax error.  Not a
