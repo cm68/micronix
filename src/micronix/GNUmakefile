@@ -14,7 +14,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = lib cmd sys
+DIRS = lib libexec cmd sys
 
 #
 # "cd $$d &&", not "cd $$d ;" - see the note in GNUmakefile.inc.

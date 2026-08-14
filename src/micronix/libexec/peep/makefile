@@ -8,10 +8,12 @@
 # it cross builds the same program on the host.
 #
 # peep is a PASS and not a command.  ccc runs it, nobody types it, so
-# it goes into /lib beside the other passes rather than /bin - the
-# driver works out where they are from its own path, bin/../lib, so
-# the two have to stay together.  That is also why there is no man
-# page here: nothing on the system invokes it by name.
+# it goes into /libexec beside the other passes rather than /bin -
+# which is what libexec has always been for, programs run by other
+# programs.  The driver works out where they are from its own path,
+# bin/../libexec, so the two have to stay together.  /lib is for
+# things to link against and keeps none of these.  That is also why
+# there is no man page here: nothing invokes it by name.
 #
 # The sources are symlinks into ~/src/ccc, which is where they are
 # edited.  Building this on micronix is the point of the exercise -
@@ -23,7 +25,7 @@
 
 CC	= ccc
 CFLAGS	=
-LIB	= /lib
+LIBEXEC	= /libexec
 PROG	= peep
 HDRS	= peep.h
 OBJS	= peep.o pool.o regs.o rules.o
@@ -41,7 +43,7 @@ $(OBJS): $*.c $(HDRS)
 	$(CC) $(CFLAGS) -c $*.c
 
 install: $(PROG)
-	cp $(PROG) $(LIB)/$(PROG)
+	cp $(PROG) $(LIBEXEC)/$(PROG)
 
 clean:
 	rm -f $(OBJS)

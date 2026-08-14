@@ -18,6 +18,11 @@
 
 DEPTH	= ../..
 DIR	= peep
-CLASS	= cmd
+CLASS	= libexec
+
+#
+# Not /bin.  ccc runs this; nobody types it.
+#
+BINDIR	= /libexec
 
 include $(DEPTH)/GNUmakefile.inc
