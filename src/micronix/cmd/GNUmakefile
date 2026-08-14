@@ -21,7 +21,7 @@
 # per tool:
 #
 #	cpp c0 c1 peep		the passes
-#	asz ld nm wslib wssize ccc astpp	the tools
+#	asz ld nm ar size ccc astpp	the tools
 #
 # Those are prototypes.  Their sources are symlinks into ~/src/ccc,
 # which is still where they are edited, and they are not in DIRS: they

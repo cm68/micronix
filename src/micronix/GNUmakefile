@@ -66,7 +66,32 @@ SYSHDRS  = $(filter-out $(CCCOWNED),$(notdir $(wildcard include/*.h)))
 # a separate thing to ask for - GNUmakefile.inc orders these the same
 # way for the same reason.
 #
-all:
+# The librarian, built for the HOST.
+#
+# The archives this tree makes are read by a linker that also runs on
+# the host, so the program that writes them has to be a host binary -
+# and cmd/ar builds the z80 one, which cannot.  Same source, two
+# targets.
+#
+# It is called mxar and not ar because /usr/local/bin/ar would shadow
+# the system's for everything on this machine.  The "mx" prefix is
+# what this tree uses for a host program that speaks micronix - see
+# mxccc in ccc - and NOT the ".mx" suffix, which means a micronix
+# executable, which this is not: it is an ELF binary that reads and
+# writes micronix archives.
+#
+# It is built HERE and not in cmd/ar because DIRS is "lib cmd sys",
+# and the libraries are archived before cmd is reached.
+#
+ARMX	 = mxar
+ARSRC	 = cmd/ar/ar.c
+HOSTCC	?= gcc
+HOSTCFLAGS ?= -w -std=gnu89 -Dlinux
+
+$(ARMX): $(ARSRC)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(ARSRC)
+
+all: $(ARMX)
 	$(RECURSE)
 
 install:

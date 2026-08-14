@@ -37,7 +37,13 @@ MAKEFLAGS += --no-builtin-variables
 # the installed toolchain
 #
 CCC	?= /usr/local/bin/ccc
-LIB	?= /usr/local/bin/wslib
+#
+# The librarian is ar, built for the host as $(DEPTH)/mxar - see the
+# top level GNUmakefile.  It was wslib, which wrote the whitesmiths
+# archive format; ar writes the v7 one, which is what ar(1) has always
+# written and what ld now reads as well.
+#
+LIB	?= $(DEPTH)/mxar
 NM	?= /usr/local/bin/wsnm
 CCFLAGS	?= -m micronix
 
@@ -182,7 +188,7 @@ ifneq ($(strip $(TARGET)),)
 ifeq ($(suffix $(TARGET)),.a)
 $(TARGET): $(OBJS)
 	rm -f $(TARGET)
-	$(LIB) -cr $(TARGET) $(OBJS)
+	$(LIB) cr $(TARGET) $(OBJS)
 else
 # TREELIBS is not a prerequisite: lib is built before cmd from the top,
 # and making it one would leave a leaf built on its own reporting "no

@@ -17,7 +17,7 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 DEPTH	= ../..
-DIR	= wssize
+DIR	= size
 CLASS	= cmd
 
 include $(DEPTH)/GNUmakefile.inc
