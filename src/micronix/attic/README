@@ -28,6 +28,12 @@ What is in it, and why it is not in cmd:
 
     asz.old     The TRASM-derived assembler, replaced by cmd/asz.
 
+    ld          The v7 link editor, ported to consume hitech object
+                files.  Nothing has emitted a hitech object in years
+                and the name was wanted: cmd/ld is the linker this
+                toolchain actually uses, which was called wsld until
+                it took the name.
+
     Make        The make micronix used, until the v7 one gave up the
                 name to it.  It was also what the retired top-level
                 Makefile bootstrapped, back when a system without a

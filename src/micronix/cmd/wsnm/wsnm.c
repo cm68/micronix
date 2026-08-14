@@ -1,1 +1,0 @@
-/home/curt/src/ccc/src/tools/wsnm.c

@@ -15,17 +15,13 @@
 # Still here and still not in DIRS, because they are programs that DO
 # belong on the system and are not ready:
 #
-#   ld      a link editor for the hitech object format, which nothing
-#           here produces any more.  wsld is the linker this toolchain
-#           uses and is to be renamed ld and take its place; the
-#           source stays until then.
 #   far cpmtools mkfs mt
 #
 # And the compiler, moving into this tree one directory per pass and
 # per tool:
 #
 #	cpp c0 c1 peep		the passes
-#	asz wsld wslib wsnm wssize ccc astpp	the tools
+#	asz ld nm wslib wssize ccc astpp	the tools
 #
 # Those are prototypes.  Their sources are symlinks into ~/src/ccc,
 # which is still where they are edited, and they are not in DIRS: they
