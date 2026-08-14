@@ -52,7 +52,24 @@ CCFLAGS	?= -m micronix
 # of its system include directory, which defaults to a place beside
 # the compiler holding a CP/M stat.h and nothing else, and that lookup
 # happens BEFORE -I - so no amount of reordering -I could reach the
-# tree's sys/stat.h.  Every command that stats a file got the CP/M
+# tree's sys/stat.h.
+#
+# WHERE THAT DIRECTORY IS: libdir/../usr/include, and libdir is
+# argv[0]/../lib - so a compiler run as desthost/bin/ccc reads
+# desthost/usr/include, and one run as /usr/local/bin/ccc reads
+# /usr/local/usr/include.  NOT the lib/include beside it, which also
+# holds a full set of headers and is the obvious place to look and to
+# fix.  Both exist, only one is read, and they can differ for as long
+# as nobody notices.
+#
+# They did differ, for an afternoon.  A change to stdio.h was made in
+# ccc's src/include and copied into every installed copy that could be
+# found by eye - lib/include, /usr/local/lib/include, the simulated
+# filesystem - but not into usr/include, and ccc's own "make install"
+# was failing before it reached the headers, so nothing refreshed it.
+# Every object built in that time was compiled against the old
+# definition while the header on screen said otherwise.  "ccc -n"
+# prints the -i it will use and is the way to settle it.  Every command that stats a file got the CP/M
 # struct, which has st_mode and st_size and no st_uid, st_gid, st_ino
 # or st_mtime, and c0 reported them one at a time as missing members
 # of a structure that was never the right one.
