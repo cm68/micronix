@@ -19,7 +19,7 @@
 
 CC	= ccc
 CFLAGS	=
-AR	= wslib
+AR	= ar
 LIBDIR	= /lib
 TARGET	= libu.a
 
@@ -40,7 +40,7 @@ all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	rm -f $(TARGET)
-	$(AR) -cr $(TARGET) $(OBJS)
+	$(AR) cr $(TARGET) $(OBJS)
 
 #
 # One entry for each group: $* is the target without its suffix,
