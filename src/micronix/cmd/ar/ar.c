@@ -350,9 +350,111 @@ qcmd()
 	}
 }
 
+/*
+ * The header is 26 bytes on disk, and these are what make it so.
+ *
+ * It used to be read and written as a struct, which put the compiler
+ * in charge of the file format.  sizeof(int) is 2 here and 4 on the
+ * host; sizeof(long) is 4 here and 8 there; and a host build pads the
+ * struct besides.  Two builds of this one file produced archives the
+ * other could not read.  That did not matter while ar was only ever a
+ * guest program, and it matters now that it is to be the librarian
+ * for the cross build as well - the library a host ar writes has to
+ * be the library the linker reads on either side.
+ *
+ * So every field goes out a byte at a time, low byte first, which is
+ * the order a z80 stores them in and the order the archives already
+ * on disk are written in.  wslib has always done it this way and that
+ * is exactly why it works as a cross tool.
+ *
+ *	name	14	as typed, null padded
+ *	date	 4
+ *	uid	 1
+ *	gid	 1
+ *	mode	 2
+ *	size	 4
+ */
+#define	AR_HDRSIZ	26
+
+putfield(p, v, n)
+char *p;
+long v;
+{
+	while (n--) {
+		*p++ = v & 0xff;
+		v >>= 8;
+	}
+}
+
+long
+getfield(p, n)
+char *p;
+{
+	long v;
+
+	v = 0;
+	while (--n >= 0)
+		v = (v << 8) | (p[n] & 0xff);
+	return (v);
+}
+
+/*
+ * the two byte magic, likewise
+ */
+putmag(fd, mag)
+{
+	char b[2];
+
+	b[0] = mag & 0xff;
+	b[1] = (mag >> 8) & 0xff;
+	if (write(fd, b, 2) != 2)
+		wrerr();
+}
+
+getmag(fd)
+{
+	char b[2];
+
+	if (read(fd, b, 2) != 2)
+		return (-1);
+	return ((b[0] & 0xff) | ((b[1] & 0xff) << 8));
+}
+
+puthdr(fd)
+{
+	char b[AR_HDRSIZ];
+	register i;
+
+	for (i = 0; i < 14; i++)
+		b[i] = arbuf.ar_name[i];
+	putfield(&b[14], arbuf.ar_date, 4);
+	b[18] = arbuf.ar_uid;
+	b[19] = arbuf.ar_gid;
+	putfield(&b[20], (long)arbuf.ar_mode, 2);
+	putfield(&b[22], arbuf.ar_size, 4);
+	if (write(fd, b, AR_HDRSIZ) != AR_HDRSIZ)
+		wrerr();
+}
+
+gethdr(fd)
+{
+	char b[AR_HDRSIZ];
+	register i;
+
+	if (read(fd, b, AR_HDRSIZ) != AR_HDRSIZ)
+		return (0);
+	for (i = 0; i < 14; i++)
+		arbuf.ar_name[i] = b[i];
+	arbuf.ar_date = getfield(&b[14], 4);
+	arbuf.ar_uid = b[18];
+	arbuf.ar_gid = b[19];
+	arbuf.ar_mode = getfield(&b[20], 2);
+	arbuf.ar_size = getfield(&b[22], 4);
+	return (AR_HDRSIZ);
+}
+
 init()
 {
-	static mbuf = ARMAG;
 
 	tfnam = mktemp(tmpnam);
 	close(creat(tfnam, 0600));
@@ -361,18 +463,15 @@ init()
 		fprintf(stderr, "ar: cannot create temp file\n");
 		done(1);
 	}
-	if (write(tf, (char *)&mbuf, sizeof(int)) != sizeof(int))
-		wrerr();
+	putmag(tf, ARMAG);
 }
 
 getaf()
 {
-	int mbuf;
-
 	af = open(arnam, 0);
 	if(af < 0)
 		return(1);
-	if (read(af, (char *)&mbuf, sizeof(int)) != sizeof(int) || mbuf!=ARMAG) {
+	if (getmag(af) != ARMAG) {
 		fprintf(stderr, "ar: %s not in archive format\n", arnam);
 		done(1);
 	}
@@ -381,8 +480,6 @@ getaf()
 
 getqf()
 {
-	int mbuf;
-
 	if ((qf = open(arnam, 2)) < 0) {
 		if(!flg['c'-'a'])
 			fprintf(stderr, "ar: creating %s\n", arnam);
@@ -391,12 +488,9 @@ getqf()
 			fprintf(stderr, "ar: cannot create %s\n", arnam);
 			done(1);
 		}
-		mbuf = ARMAG;
-		if (write(qf, (char *)&mbuf, sizeof(int)) != sizeof(int))
-			wrerr();
+		putmag(qf, ARMAG);
 	}
-	else if (read(qf, (char *)&mbuf, sizeof(int)) != sizeof(int)
-		|| mbuf!=ARMAG) {
+	else if (getmag(qf) != ARMAG) {
 		fprintf(stderr, "ar: %s not in archive format\n", arnam);
 		done(1);
 	}
@@ -565,8 +659,7 @@ copyfil(fi, fo, flag)
 	int pe;
 
 	if(flag & HEAD)
-		if (write(fo, (char *)&arbuf, sizeof arbuf) != sizeof arbuf)
-			wrerr();
+		puthdr(fo);
 	pe = 0;
 	while(arbuf.ar_size > 0) {
 		i = o = 512;
@@ -594,8 +687,8 @@ getdir()
 {
 	register i;
 
-	i = read(af, (char *)&arbuf, sizeof arbuf);
-	if(i != sizeof arbuf) {
+	i = gethdr(af);
+	if(i != AR_HDRSIZ) {
 		if(tf1nam) {
 			i = tf;
 			tf = tf1;
