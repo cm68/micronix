@@ -1,0 +1,158 @@
+/bin/sh - what is done, what is not, and what nobody understands
+================================================================
+
+This is a reconstruction.  There is no source for the shell Micronix
+shipped, so this one was read back out of that binary, mostly by
+running the two side by side and comparing what came out.
+
+Read NOTES for the reconnaissance - the addresses, the tables, and how
+each thing was established.  This file is the short version of what is
+left.
+
+
+Where things are
+----------------
+
+    sh.c        main, the read-eval loop, the builtins, spawn
+    parse.c     one statement into a pipeline; words, quoting, "( )"
+    glob.c      filename patterns
+    hist.c      "!", the history reference
+    hash.c      the search path, remembered
+    job.c       the background jobs, and kill by name
+    sh.1        our man page
+    regress.sh  the test
+
+    man/man1/sh.1   THE ORIGINAL PAGE, dated 4/18/82, recovered from
+                    the disk image.  A second authority beside the
+                    binary, and worth reading: two mistakes here were
+                    found by it and nothing else.  It is not a BETTER
+                    authority - its list of special characters omits
+                    ";" and includes ")", and the binary is right
+                    about both - and it never mentions the positional
+                    parameters at all.
+
+
+How to check it
+---------------
+
+    ./regress.sh            everything
+    ./regress.sh pattern    only the cases matching it
+    VERBOSE=1 ./regress.sh  name every case as it passes
+
+Ninety cases, each run through BOTH shells under the simulator with
+the two answers compared.  Nothing in it records what the stock shell
+is expected to say: a file of expected output would only preserve what
+we believed the day we wrote it and would go on passing while being
+wrong.  Three harnesses, because some behaviour only appears under
+some conditions - fed a file, typed at a terminal (script(1), for
+history), and run as a script with arguments (for $1).
+
+    89 the same as the stock shell, 1 differ on purpose
+
+A case known to answer differently is listed WITH its reason and
+asserted the other way round: if one starts matching, the reason has
+gone stale and the run says NOW SAME and fails.  A difference nobody
+wrote a reason for is a regression.
+
+
+Different on purpose
+--------------------
+
+  - dir and era are seeded ALIASES, not builtins.  In the image they
+    are builtins with their own lister.  They are cp/m spellings
+    rather than shell work, and as aliases they can be seen with
+    alias and redefined; the table is down to what needs the shell's
+    own state.  sync was a builtin too and is now cmd/sync.
+
+  - "echo x |", a pipeline whose last stage is empty.  The image runs
+    it, prints nothing and does not complain; we call it a syntax
+    error.  It is not a line continuation - "echo x |" followed by
+    "echo SECOND" prints SECOND there - so the trailing pipe is
+    swallowed somehow and whatever echo wrote goes into a pipe nobody
+    reads.  This is the one case the suite counts as differing.
+
+  - The search tables are not trusted blindly.  The image believes
+    them and loses when they are stale, which is what its page means
+    by "it may be necessary to enter the command's name twice".  Here
+    a name no directory claims is searched for anyway, and a path
+    that will not exec sends spawn() back to rebuild and search
+    before giving up.
+
+
+Missing
+-------
+
+Each of these was checked against the image; none is written.
+
+  - BARE "echo" TOGGLES COMMAND ECHOING.  The page: "The first
+    command toggles the shell's command echoing feature."  It does -
+    after a bare echo the image echoes every line before running it,
+    "exit" included.  Ours prints a blank line.  This is -v under
+    another name and the flag is already there, so it is small.
+
+  - "prompt" WITH NO ARGUMENT says nothing in the image; ours prints
+    the current prompt.  The page documents only "prompt word".
+
+  - NOTIFICATION.  "When an asynchronous command completes or is
+    abnormally terminated, the shell gives notification."  Not
+    tested either way.  job.c already holds what it would need - the
+    pid and the name of every background job - so this is mostly a
+    matter of finding where the image prints it and what it says.
+
+  - "wait" INTERRUPTIBLE.  "Wait may be prematurely interrupted by
+    pressing the RUB-OUT or DELETE key."  Not tested either way.
+
+
+Not understood
+--------------
+
+Written down because guessing at them wasted time once already.
+
+  - WHAT RAISES "Missing (." at 0x179c.  Not an unterminated "(",
+    which gives "Missing ).", and not a bare ")", which is an
+    ordinary character.  Neither of the obvious ways reaches it.
+
+  - WHY "echo `echo`" ANSWERS "No match.".  An empty substitution
+    ends up in the globber somehow, and yet a substitution's output
+    is NOT globbed: "echo `cat f`" with /etc/pass* in f prints
+    /etc/pass* unexpanded.
+
+  - WHICH END OF THE PATH findcmd SEARCHES FROM.  The image keeps
+    three char * at 0x9741 laid out backwards, like the builtin
+    table, and it has not been read which way it walks them.
+
+  - WHETHER H5f06 really is "resume the popped input source".
+
+
+Guesses
+-------
+
+Things here that are OURS rather than read, and would be worth
+settling against the image:
+
+  - ignoresigs() is called for BACKGROUND children only.  That is the
+    v6 arrangement and it is what a ^C for the foreground ought to
+    do, but NOTES has the two signal() calls at H4287 and not what
+    guards them.
+
+  - MAXCMD (16) and MAXARG (64).  Neither is read from the binary.
+
+  - NHIST (16), how many lines of history are kept.  There is no
+    history builtin and no message that depends on it, so nothing in
+    the image says.
+
+
+Known wart
+----------
+
+pipe1, the parse buffer, is 2274 bytes - sixteen commands of
+sixty-four arguments each, allocated permanently because the
+dimensions are compile-time constants.  It is 46% of our bss and a
+line like "ls" uses one command and one argument slot.  The image
+does the same job inside a 3054-byte data segment total, so it
+plainly does not reserve a worst case; it presumably grows the
+argument list as it reads, or points into the line buffer instead of
+copying.  Nothing is wrong, and it is the obvious kilobyte to find if
+one is ever wanted.
+
+vim: tabstop=4 shiftwidth=4 noexpandtab:
