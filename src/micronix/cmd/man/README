@@ -1,0 +1,113 @@
+man, reconstructed from /bin/man
+================================
+
+There is no source for man, so this is the disassembly, and the names in
+man.ctl are what man.c is written against.  man.dist is a copy of the
+9203-byte /bin/man off the 1.6 filesystem; man.dis is disas's output from
+it, regenerated with "make man.dis".
+
+nm -v gives the shape: text 8662 bytes at 0x0100, data 525 at 0x3000, no
+bss and no symbol table.  With no bss the zeroed globals live in the data
+segment, which is why nm -b reads mostly as zeros.  man's own text is
+0x0116..0x0885 and everything above that is library.
+
+It is Whitesmith's C, laid out exactly like /etc/init:
+
+	                man       init
+	c.switch      0x2256    0x3f62
+	c.ent         0x227b    0x3f87
+	c.ret         0x2282    0x3f8e
+	c.ent2        0x2286    0x3f92
+	c.ret2        0x229c    0x3fa8
+
+and, as in init, the syscall stubs are in the DATA segment rather than the
+text.  They are reached by the indirect trap form - "cf 00" followed by
+the address of a stub, itself "cf <n>" and the argument words - so the
+nine at 0x31c3..0x31ef are what named sbrk, creat, exec, gtty, open, read,
+seek, stat and write.  close, exit, fork and wait trap directly and disas
+labels those itself.
+
+
+How the names were found
+------------------------
+
+Not from a symbol table; there isn't one.  The order was:
+
+  - nm -v for the segment layout, nm -b for the data.  Two structures fall
+    out of the data dump: a NULL-terminated table of 34 pointers into the
+    text at 0x3177, which is perror's message list (and which is why the
+    function right after those strings, 0x19a0, is perror), and the
+    syscall stubs at 0x31c3.
+  - calltree.py over the raw disassembly for the shape.  64 call targets;
+    the two called most, 19 and 18 times, are c.ent and c.ent2, and the
+    two jumped to most, 33 and 28, are their returns.
+  - the string literals, which Whitesmith's puts in the TEXT segment, so
+    they sit between the functions that use them and say what those
+    functions are for.
+  - and then reading the code.
+
+The two man pages already in the tree - usr/man/man1/man.1 and help.1,
+copied in beside this - turned out to confirm the search order after it
+had been read out of the code rather than before.  man.1: "it omits
+searching /usr/help, and searches /usr/man/man0, ..., /usr/man/man9 in
+order".  help.1: "looks first in /usr/help ... Then, like man, it searches
+/usr/man/man0, ..., /usr/man/man9".  That is what show() does.
+
+
+Two things in the binary that are wrong
+---------------------------------------
+
+Reproduced in man.c, both of them, because they are what it does.
+
+  1. The /usr/bin fallback in run() cannot work.  The child tries /bin/
+     and then /usr/bin, and the strings are
+
+	0x04e2  "/usr/bin"
+	0x04eb  "/bin/"
+
+     - the second has a trailing slash and the first does not, so the
+     path built for the fallback is "/usr/binform".  /bin/form exists, so
+     the first exec always succeeds and this has never been reached.
+
+  2. show() complains about an empty name, or one starting with '.', and
+     then carries on looking for it anyway - the object calls nodoc and
+     falls through instead of returning.  The search then fails and says
+     so a second time.
+
+And one that is only odd: the exit status is 1 when man has shown
+something and 0 from the usage, which is the wrong way round.  Nothing in
+the system looks at it.
+
+
+What the pages do not say
+-------------------------
+
+  - "-" as an argument.  It clears the flag that otherwise passes -t to
+    form, and the flag is set by asking descriptor 1 for its modes, so
+    normally -t goes when the output is a terminal and does not when it
+    is a pipe.  Neither page mentions the argument.
+  - The lettered subsections.  man.ctl's issection() takes a run of
+    digits and nothing else, so "man 3s printf" reads 3s as a page name.
+    The printed manual has 3s, 3m and 3c pages; this program cannot ask
+    for them by section.
+
+
+Library routines
+----------------
+
+man calls three that this tree's libc does not carry - equal 0x1647,
+concat 0x1692, putstr 0x16f7 - and they are the same three /etc/init
+needed.  Both files now have a copy, which is one too many; libc is where
+they belong, and the addresses in each file say what to check a libc
+version against.
+
+The rest it uses are ordinary: fopen 0x0886, fclose 0x0b4f, fread 0x0bee,
+exit 0x155e, perror 0x19a0, execv 0x1b54.
+
+
+Not run yet
+-----------
+
+man.c compiles into the cross build.  It has not been run: the thing to
+try it on is a Micronix boot with form(1) present, comparing its output
+against the original binary's for the same page.

@@ -24,10 +24,14 @@
 #	asz ld nm ar size ccc astpp	the tools
 #
 # Those are prototypes.  Their sources are symlinks into ~/src/ccc,
-# which is still where they are edited, and they are not in DIRS: they
-# are host programs today, and building them here means building the
+# which is still where they are edited.  Most are not in DIRS: they are
+# host programs today, and building them here means building the
 # compiler for the Z80, which is where this is going but is not there
 # yet.  Add them when they have been made to compile with ccc.
+#
+# ld, nm and size are in DIRS now - they took their real names from
+# wsld, wsnm and wssize, and they are ordinary commands rather than
+# passes.
 #
 # init builds.  It is a reconstruction from the disassembly of the 1.6
 # binary, and the helpers that binary carries are now written into it -
@@ -40,9 +44,17 @@
 # It has never been run.  Linking is not the same as working, and this
 # is process 1: the thing to try it on is a boot, not a shell.
 #
+# man is a reconstruction too, from /bin/man, and is built here for the
+# same reason.  It is also help - one binary under two names, which main()
+# tells apart by looking for "help" inside argv[0] - so the native install
+# links /bin/help to it rather than building a second program.  Its two
+# man pages were already in the tree and agree with what the disassembly
+# says; cmd/man/README has the details, including the two bugs in the
+# original that man.c reproduces.
+#
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = ar cp echo form init ls make mkdir mknod pwd rm s sh sync vi
+DIRS = ar cp echo form init ld ls make man mkdir mknod nm pwd rm s sh size sync vi
 
 #
 # "cd $$d &&", not "cd $$d ;".  With the semicolon, a directory named
