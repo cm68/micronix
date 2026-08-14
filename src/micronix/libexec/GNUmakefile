@@ -15,10 +15,25 @@
 # libc.a, crt0.o, the headers - and a person reading it should see
 # those and nothing else.
 #
-# Only peep is here so far.  asz, c0, c1, cpp and astpp are passes
-# too and belong beside it; they are still in cmd, where their
-# sources are symlinks into ~/src/ccc, and they move when someone
-# has a reason to move them rather than for tidiness alone.
+# cpp, c0, c1 and peep are here; asz and astpp are passes too and are
+# still in cmd.
+#
+# ONLY peep IS IN DIRS.  The other three compile and then fail to
+# link, for one reason:
+#
+#	ld: undefined symbol: _fmtlong
+#	ld: undefined symbol: _fmtstr
+#
+# which are in ccc's ccclib, and this tree has no lib/libccc to link
+# against - lib holds libc, libu and libutil and nothing else.  That
+# is the piece missing before the compiler can build its own passes
+# here, and it is a directory of its own rather than a flag.
+#
+# Their sources are symlinks into ~/src/ccc and the sets had drifted:
+# c0 was missing eleven p1*.h, all three wanted astops.h, format.h
+# and libutil.h out of ccclib, and c0 and c1 wanted lexeme.h and
+# lexops.h out of cpp - pass1 compiles with -I../cpp there.  Those
+# are linked now, so what is left really is only the library.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
