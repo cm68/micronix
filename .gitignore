@@ -39,7 +39,6 @@ src/lib/*.a
 src/hwsim/*.o
 src/hwsim/d1/*.o
 src/hwsim/d1/d1
-src/hwsim/d1/logfile
 
 src/micronix/lib/libc/*.o
 src/micronix/lib/libc/*.a
@@ -93,3 +92,14 @@ disks/hdinstall/hddma-1
 typescript
 typescript.*
 *.typescript
+
+#
+# Trace output.  -l points the simulator's trace at a file called logfile
+# and it takes a megabyte a second with the interesting bits switched on;
+# hwsim/resources/logfile reached 62MB before anyone noticed.  Named
+# rather than scoped to src/hwsim/d1, which is where it lands today,
+# because it has landed in two other places already.
+#
+logfile
+logfile.*
+*.trace
