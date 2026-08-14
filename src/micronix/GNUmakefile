@@ -88,11 +88,19 @@ ARSRC	 = cmd/ar/ar.c
 HOSTCC	?= gcc
 HOSTCFLAGS ?= -w -std=gnu89 -Dlinux
 
-$(ARMX): $(ARSRC)
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(ARSRC)
-
 all: $(ARMX)
 	$(RECURSE)
+
+#
+# BELOW "all", not above it.  The first explicit target in a makefile
+# is the default goal, and with this rule above, "make" here meant
+# "make mxar": it checked one binary, recursed into nothing, and
+# exited 0 with the libraries it was asked to rebuild still missing.
+# GNUmakefile.inc has the same warning over $(OBJS): $(HSRCS), for
+# the same reason, and this is the second time.
+#
+$(ARMX): $(ARSRC)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(ARSRC)
 
 install:
 	$(RECURSE)

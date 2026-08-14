@@ -107,8 +107,19 @@ char *argv[];
 			signal(signum[i], sigdone);
 	if(argc < 3)
 		usage();
+	/*
+	 * The key, with or without a leading dash.
+	 *
+	 * v6 ar takes it bare - "ar cr lib obj..." - and everything
+	 * written since takes "-cr" as well, which is what a makefile
+	 * that used to call some other librarian will already say.
+	 * Accepting both costs one line and saves the reader of a
+	 * makefile from having to know which era it is in.
+	 */
 	cp = argv[1];
-	for(cp = argv[1]; *cp; cp++)
+	if(*cp == '-')
+		cp++;
+	for(; *cp; cp++)
 	switch(*cp) {
 	case 'l':
 	case 'v':
