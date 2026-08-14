@@ -340,10 +340,24 @@ What the language actually is
 -----------------------------
 
 Read out of the binary by running it, which is the only way to settle
-this: usersim -d <fs> /newer/bin/sh with the lines fed to it.  Left
-is what the image does, right is what the C did before any of this
-was written.  The C matches the image on every line below now, and
-these are the regression cases - run them against both.
+this.  THE BASELINE IS THE STOCK SHELL - not a list of expected
+answers kept in a file here, which would only record what we believed
+on the day we wrote it.  regress.sh runs every case through both
+shells under the simulator and compares the two, so there is nothing
+to keep up to date: when the stock shell surprises us, it simply
+starts disagreeing.
+
+    ./regress.sh            everything
+    ./regress.sh pattern    only the cases matching it
+
+Cases known to answer differently are listed in it with the reason,
+and asserted the other way - if one starts MATCHING, the reason has
+gone stale and it says so.  Two at present: "type dir", because dir is
+a builtin there and a seeded alias here on purpose, and "echo x |",
+below.
+
+Left is what the image does, right is what the C did before any of
+this was written.
 
     echo a ; echo b         a / b           a ; echo b
     echo one;echo two       one / two       one;echo two
@@ -642,6 +656,12 @@ Quoting interacts with it in two ways worth writing down:
 
 Still open:
 
+  - "echo x |", a pipeline whose last stage is empty.  The stock
+    shell runs it, prints nothing and does not complain; we call it a
+    syntax error.  Not a continuation onto the next line - "echo x |"
+    followed by "echo SECOND" prints SECOND there - so the trailing
+    pipe is swallowed somehow and whatever echo wrote goes into a
+    pipe nobody reads.
   - H1c7b is where -v, -c and "read" (0x1c70) are handled, and where
     ~/.login and ~/.sh (0x1bea, 0x1bf2) must be read from
   - H2c12 reads and parses a line and is the bulk of the program;
