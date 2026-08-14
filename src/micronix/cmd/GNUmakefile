@@ -19,8 +19,7 @@
 #           here produces any more.  wsld is the linker this toolchain
 #           uses and is to be renamed ld and take its place; the
 #           source stays until then.
-#   pp.xx   a post-processor for a compiler this tree stopped using.
-#   far, nroff, croff, cpmtools, ansi2kr, mkfs, mt
+#   far cpmtools mkfs mt
 #
 # And the compiler, moving into this tree one directory per pass and
 # per tool:

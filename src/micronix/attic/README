@@ -48,6 +48,22 @@ What is in it, and why it is not in cmd:
     yacc        yacc, and
     yacc.d      a second copy of it.
 
+    nroff       a roff, in command.c / escape.c / macros.c, and
+    croff       the v6 one, n1.c through n10.c with the hyphenation
+                digram tables in hytab.c.
+                Micronix does not format with either.  /bin/man execs
+                form(1) and the pages call its primitive requests
+                directly - there are no macros anywhere in the tree,
+                and man/README says so at length.  cmd/form is the
+                formatter this system has.
+
+    ansi2kr     ansi2knr, dated 1996: converts ANSI C to K&R C.  A
+                tool for porting things IN, not a program that belongs
+                on a Z80 running a v6 kernel.
+
+    pp.xx       a post-processor for a compiler this tree stopped
+                using, which had not tracked anything in a long time.
+
 Nothing above is dead in the sense of being wrong; it is dead in the
 sense that the system does not contain it.  Anything here can be read,
 and several of them are read regularly - the point of an attic is that
