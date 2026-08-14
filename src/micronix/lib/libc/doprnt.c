@@ -49,7 +49,7 @@ register char *		f;
 int *		a;
 {
 	char	c, prec;
-	uchar	fill, left;
+	uchar	fill, left, plus;
 	uchar	i;
 	uchar	base, width, sign, len;
 	uchar	ftype;
@@ -65,10 +65,31 @@ int *		a;
 			sign = 0;
 			left = 0;
 			ftype = 0;
+			plus = 0;
 			len = sizeof(int)/sizeof *a;
-			if(*f == '-') {
-				f++;
-				left++;
+			/*
+			 * Flags, in any order.  "+" was not among them, and
+			 * an unknown one is worse here than being ignored:
+			 * the switch below took the "+" as the conversion
+			 * character, printed it, CONSUMED NO ARGUMENT, and
+			 * left the "d" to come out as an ordinary letter.
+			 * So "%+d" printed "+d" and every argument after it
+			 * in the call was off by one - "[%+d] [%d] [%x]" of
+			 * 4, 4, 255 gave "[+d] [4] [4]".  nm's disassembler
+			 * writes "(iy%+d)" and got "(iy+d)".
+			 */
+			for (;;) {
+				if(*f == '-') {
+					f++;
+					left++;
+					continue;
+				}
+				if(*f == '+') {
+					f++;
+					plus++;
+					continue;
+				}
+				break;
 			}
 			fill = *f == '0';
 			if(isdigit((unsigned)*f)) {
@@ -102,7 +123,12 @@ int *		a;
 				break;
 			case 'd':
 			case 'D':
-				sign = 1;
+				/*
+				 * 2 asks _pnum for a "+" on a value that is
+				 * not negative.  Only the signed conversions
+				 * take the flag, which is what C says.
+				 */
+				sign = plus ? 2 : 1;
 				break;
 
 			case 'x':
@@ -164,6 +190,14 @@ dostring:
 				left = width;
 				width = 0;
 			}
+			/*
+			 * AN UPPER CASE CONVERSION MEANS LONG.  %X is long
+			 * hex, %D long decimal, and so on - it is not the
+			 * C meaning, where %X is upper case hex, and man3
+			 * printf.3 documents only "dox" and never says so.
+			 * Worth knowing before reading "%X" of an int and
+			 * wondering why four bytes went by.
+			 */
 			if(isupper(c))
 				len = sizeof(long)/sizeof *a;
 			if(prec < 0)
