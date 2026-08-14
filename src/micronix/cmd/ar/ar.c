@@ -69,9 +69,16 @@ char	**namv;
 int	namc;
 char	*arnam;
 char	*ponam;
-char	*tmpnam		=	{ "/tmp/vXXXXX" };
-char	*tmp1nam	=	{ "/tmp/v1XXXXX" };
-char	*tmp2nam	=	{ "/tmp/v2XXXXX" };
+/*
+ * ARRAYS, not pointers to literals.  mktemp() writes the XXXXX in
+ * place, and a literal is writable on micronix and read only here -
+ * so a host ar segfaulted before it had created anything.  The -l
+ * flag below rewrites these to sit in the current directory, which is
+ * a strcpy now and not an assignment.
+ */
+char	tmpltnam[16]	=	"/tmp/vXXXXXX";
+char	tmplt1nam[16]	=	"/tmp/v1XXXXXX";
+char	tmp2nam[16]	=	"/tmp/v2XXXXXX";
 char	*tfnam;
 char	*tf1nam;
 char	*tf2nam;
@@ -147,9 +154,9 @@ char *argv[];
 		done(1);
 	}
 	if(flg['l'-'a']) {
-		tmpnam = "vXXXXX";
-		tmp1nam = "v1XXXXX";
-		tmp2nam = "v2XXXXX";
+		strcpy(tmpltnam, "vXXXXXX");
+		strcpy(tmplt1nam, "v1XXXXXX");
+		strcpy(tmp2nam, "v2XXXXXX");
 		}
 	if(flg['i'-'a'])
 		flg['b'-'a']++;
@@ -456,7 +463,7 @@ gethdr(fd)
 init()
 {
 
-	tfnam = mktemp(tmpnam);
+	tfnam = mktemp(tmpltnam);
 	close(creat(tfnam, 0600));
 	tf = open(tfnam, 2);
 	if(tf < 0) {
@@ -626,7 +633,11 @@ movefil(f)
 	 * away entirely and every archive member would be recorded at
 	 * its size modulo 64K.
 	 */
+#ifdef linux
+	arbuf.ar_size = stbuf.st_size;
+#else
 	arbuf.ar_size = ((long)stbuf.st_size0 << 16) + stbuf.st_size1;
+#endif
 	arbuf.ar_date = stbuf.st_mtime;
 	arbuf.ar_uid = stbuf.st_uid;
 	arbuf.ar_gid = stbuf.st_gid;
@@ -733,7 +744,7 @@ bamatch()
 
 	case 2:
 		bastate = 0;
-		tf1nam = mktemp(tmp1nam);
+		tf1nam = mktemp(tmplt1nam);
 		close(creat(tf1nam, 0600));
 		f = open(tf1nam, 2);
 		if(f < 0) {
@@ -823,10 +834,10 @@ pmode()
 	register int **mp;
 
 	for (mp = &m[0]; mp < &m[9];)
-		select(*mp++);
+		arselect(*mp++);
 }
 
-select(pairp)
+arselect(pairp)
 int *pairp;
 {
 	register int n, *ap;
