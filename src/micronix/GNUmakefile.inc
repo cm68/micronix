@@ -241,7 +241,19 @@ else
 # TREELIBS is not a prerequisite: lib is built before cmd from the top,
 # and making it one would leave a leaf built on its own reporting "no
 # rule to make target ../../lib/libc/libc.a" instead of building.
-$(TARGET): $(OBJS)
+#
+# THE LIBRARIES ARE PREREQUISITES TOO.  This read "$(TARGET): $(OBJS)",
+# so editing libc and rebuilding relinked nothing: make saw every
+# object still newer than its source, said the program was up to date,
+# and install copied the old binary out.  A change to the C library
+# reached a program only when that program's own source happened to
+# change as well.
+#
+# It cost an afternoon of measuring an allocator that was not in the
+# binary being measured - the instrumented malloc.o sat in libc.a
+# while c0 went on running the one it was linked with.
+#
+$(TARGET): $(OBJS) $(LIBS) $(TREELIBS)
 	$(CCC) $(CCFLAGS) -o $(TARGET) $(OBJS) $(LIBS) $(TREELIBS)
 endif
 endif
