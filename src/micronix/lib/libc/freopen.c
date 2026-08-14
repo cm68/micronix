@@ -33,15 +33,17 @@ register FILE *	iob;
 
 	/*
 	 * The modifiers come in either order - "w+b" and "wb+" mean the
-	 * same thing - so read all of them.  Looking only at mode[1]
-	 * meant "w+b" never got _IOBINARY, and the assignment that did
-	 * it threw away the _IONBF just preserved above.
+	 * same thing - so read all of them.
+	 *
+	 * "b" is accepted and recorded nowhere.  It used to set
+	 * _IOBINARY, which nothing ever tested; that bit is _IORW now,
+	 * and setting it here would tell fseek that every "rb" stream
+	 * was read-write.  There is no text mode on this system to be
+	 * the other half of the distinction.
 	 */
 	for (p = mode + 1; *p; p++) {
 		if (*p == '+')
 			plus++;
-		else if (*p == 'b')
-			iob->_flag |= _IOBINARY;
 	}
 
 	/*

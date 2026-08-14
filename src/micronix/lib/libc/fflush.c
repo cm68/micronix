@@ -12,10 +12,18 @@ register FILE *	f;
 {
 	unsigned	cnt;
 
-	/* if nothing to flush, done */
+	/*
+	 * _ptr - _base, not BUFSIZ - _cnt.  The two agree while a
+	 * stream is only ever written, because fputc moves them in
+	 * step, and they part company after a seek: fseek leaves _cnt
+	 * at 0 and _ptr at _base, so the subtraction says a full
+	 * buffer is pending when the buffer is empty, and BUFSIZ bytes
+	 * of stale data go out at the seek target.  _flsbuf had the
+	 * same assumption and the same fix.
+	 */
 	if (!(f->_flag & _IOWRT) || 
 		f->_base == (char *)NULL || 
-		(cnt = BUFSIZ - f->_cnt) == 0)
+		(cnt = f->_ptr - f->_base) == 0)
 		return 0;
 
 	if (write(fileno(f), f->_base, cnt) != cnt)

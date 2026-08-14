@@ -30,13 +30,26 @@ extern uchar _setup;
 
 #define	_IOREAD		01	/* 0x01 */
 #define	_IOWRT		02	/* 0x02 */
-#define	_IORW		03	/* 0x03 */
+/*
+ * _IORW IS ITS OWN BIT, and used to be the OR of the two above it.
+ * That cannot work: fseek asks "is this stream read-write" with it and
+ * then clears _IOREAD and _IOWRT to leave the direction undecided, so
+ * using the answer destroyed it.  The first seek worked and the stream
+ * never came back - once a read or a write had claimed the direction,
+ * the next seek saw a single bit and concluded the stream had never
+ * been read-write at all.
+ *
+ * It takes 0200, which was _IOBINARY.  That flag recorded the "b" of a
+ * mode string and NOTHING EVER TESTED IT - fputc.s and fgetc.s each say
+ * so, where the CP/M \r\n translation used to be.  A file written here
+ * is read back here and there is nothing to translate.
+ */
+#define	_IORW		0200	/* 0x80 */
 #define	_IONBF		04	/* 0x04 */
 #define	_IOMYBUF	010	/* 0x08 */
 #define	_IOEOF		020	/* 0x10 */
 #define	_IOERR		040	/* 0x20 */
 #define	_IOSTRG		0100	/* 0x40 */
-#define	_IOBINARY	0200	/* 0x80 */
 
 #ifndef NULL
 #define	NULL		(void *)0

@@ -64,8 +64,22 @@ _fputc:
 	push	de
 	pop	iy			;iy = f
 
+;
+;	NOT open for write is not the same as "cannot write".  fseek
+;	leaves a read-write stream with neither direction bit set, and
+;	the first operation afterwards is what decides which it is -
+;	_filbuf takes _IOREAD when a read comes, _flsbuf takes _IOWRT
+;	when a write does.  Returning EOF here meant the write never
+;	reached _flsbuf and the stream was never decided, so nothing
+;	could be written to a "w+" file after seeking in it.
+;
+;	So hand it to _flsbuf, which decides: it takes the stream if it
+;	is undecided, and refuses with _IOERR if it is genuinely a
+;	read-only one.  _cnt is 0 after a seek in any case, which is
+;	the same path a full buffer takes.
+;
 	bit	IOWRT_BIT,(iy+flag)	;open for write?
-	jr	z,reteof
+	jr	z,flush
 ;
 ; This is a Unix stdio, so \n is a byte and goes out on its own.  The
 ; \r that used to be written ahead of it - and the ctrl-Z that fclose
@@ -105,10 +119,6 @@ flush:
 	call	__flsbuf		;returns the character or EOF
 	pop	de			;the arguments off again
 	pop	de
-	jr	done
-
-reteof:
-	ld	hl,-1
 	jr	done
 
 ; vim: tabstop=8 shiftwidth=8 noexpandtab:

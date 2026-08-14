@@ -29,8 +29,24 @@ register FILE *	f;
 	 * nothing to read from.
 	 */
 	if (!(f->_flag & _IOREAD)) {
-		if (f->_flag & _IOWRT)
-			return(EOF);
+		if (f->_flag & _IOWRT) {
+			/*
+			 * A read-write stream that has been WRITING and is
+			 * now being read, with no seek in between - the
+			 * mirror of the case _flsbuf handles.  What is in
+			 * the buffer has to reach the file before the read
+			 * can see it, and after fflush the descriptor is
+			 * exactly where the writer left it, so the read
+			 * carries on from there.
+			 *
+			 * A stream that is only writable gets the refusal
+			 * it deserves.
+			 */
+			if (!(f->_flag & _IORW))
+				return(EOF);
+			fflush(f);
+			f->_flag &= ~_IOWRT;
+		}
 		f->_flag |= _IOREAD;
 	}
 	if (f->_base == (char *)NULL) {

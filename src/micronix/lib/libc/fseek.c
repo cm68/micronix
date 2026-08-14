@@ -44,13 +44,15 @@ fseek(FILE *fp, long off, int whence)
 	fp->_ptr = fp->_base;
 
 	/*
-	 * Both bits, not either.  _IORW is _IOREAD|_IOWRT, so the bare
-	 * "& _IORW" is true of every open stream - and stripping
-	 * _IOREAD from a read-only stream made every read after a
-	 * seek come back EOF.  Only a genuinely read-write stream
-	 * goes back to undecided here.
+	 * _IORW is a bit of its own now, set by fopen for a "+" mode and
+	 * never cleared, so this asks what it means to ask: is this
+	 * stream allowed to go either way.  It used to be _IOREAD|_IOWRT
+	 * and the test had to be "both bits, not either" - which was
+	 * right for the first seek and wrong for every one after it,
+	 * because the direction the stream had since taken was the very
+	 * thing being tested.
 	 */
-	if ((fp->_flag & _IORW) == _IORW)
+	if (fp->_flag & _IORW)
 		fp->_flag &= ~(_IOREAD | _IOWRT);
 	fp->_flag &= ~_IOEOF;
 
