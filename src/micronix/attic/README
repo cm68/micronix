@@ -28,6 +28,15 @@ What is in it, and why it is not in cmd:
 
     asz.old     The TRASM-derived assembler, replaced by cmd/asz.
 
+    wslib       The whitesmiths archive librarian, replaced by ar.
+                It wrote a 16-byte member header - a 14 byte name and
+                a 2 byte length, ended by a null name - where a v7
+                archive carries the date, uid, gid and mode as well,
+                and ld reads both.  Only the directory goes: the
+                source is a symlink into ~/src/ccc, where wslib is
+                still what ccc archives ITS libc with, and it stays
+                until that is ar too.
+
     ld          The v7 link editor, ported to consume hitech object
                 files.  Nothing has emitted a hitech object in years
                 and the name was wanted: cmd/ld is the linker this
