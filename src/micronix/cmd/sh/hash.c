@@ -54,6 +54,8 @@
 #include <types.h>
 #include <stdio.h>
 #include <sys/dir.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include "sh.h"
 
 #define DIRSIZ  14
@@ -97,40 +99,56 @@ struct hdir *d;
 }
 
 /*
- * Read one directory into hashes.  Twice over, as glob does: once to
- * count so the room taken is the room needed, once to fill.
+ * Read one directory into hashes, in one pass.
+ *
+ * The room needed is bounded by the directory's own size, and the file
+ * system already knows it: a v6 entry is sixteen bytes and a directory
+ * holds nothing else, so size/16 is the number of slots.  That counts
+ * the free ones too and so over-allocates by two bytes each, which buys
+ * a whole pass over the directory - on /bin that was five reads, a
+ * rewind, and four reads again.
+ *
+ * This read twice, and cited glob as the precedent.  It is not one:
+ * what glob counts is the names MATCHING a pattern, and nothing but
+ * reading them will say how many that is.  What this counts is the ones
+ * with an inode, which is bounded above without reading anything.
+ *
+ * A directory of 64K or more would need d_size0 as well, and rather
+ * than carry that arithmetic for a case that cannot arise - 65536/16 is
+ * four thousand entries in one directory - such a directory gets no
+ * table and is searched instead.  That is also why the size is checked
+ * before anything is allocated: under-allocating is the one outcome
+ * that would be dangerous rather than slow, because a table too short
+ * says "certainly not here" about a name that is there, and the command
+ * would not be found at all.  Refusing to cache is always safe -
+ * inhash() answers -1 and the caller asks the file system.
  */
 static void
 readdir(d, name)
 struct hdir *d;
 char *name;
 {
+	struct stat st;
 	struct dir e;
 	char nm[DIRSIZ + 1];
 	FILE *f;
-	int count;
+	int room;
 	int i;
 
 	freedir(d);
-	if (!(f = fopen(name, "r")))
+	if (stat(name, &st) < 0 || st.st_size0)
 		return;                     /* no cache: it will be searched */
-
-	count = 0;
-	while (fread((char *)&e, sizeof(e), 1, f) == 1)
-		if (e.ino)
-			count++;
-	if (count == 0) {
-		fclose(f);
+	if ((room = st.st_size1 / sizeof(struct dir)) == 0)
 		return;
-	}
-	if (!(d->h = (UINT *)malloc(count * sizeof(UINT)))) {
+	if (!(f = fopen(name, "r")))
+		return;
+	if (!(d->h = (UINT *)malloc(room * sizeof(UINT)))) {
 		fclose(f);
 		return;
 	}
 
-	rewind(f);
 	i = 0;
-	while (i < count && fread((char *)&e, sizeof(e), 1, f) == 1) {
+	while (i < room && fread((char *)&e, sizeof(e), 1, f) == 1) {
 		if (!e.ino)
 			continue;
 		strncpy(nm, e.name, DIRSIZ);
