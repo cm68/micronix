@@ -594,16 +594,51 @@ The three the delimiter set turned up are done: ";" separates
 statements, backticks substitute, "( )" is a subshell, and single
 quoting has gone back out.  What that leaves:
 
-  - FILENAME GLOBBING.  The image expands "*" - "echo /etc/pass*"
-    answers /etc/passwd - and says "No match." at 0x02cb when nothing
-    matches.  The C does neither; it prints the pattern.  This is the
-    largest thing still missing and it is used everywhere.
   - HISTORY.  "Event not found." at 0x4f9d says the image has "!"
     event designators, csh's.  Nothing else about it is read yet.
 
-Both were found while reading the tokeniser and neither has been
-looked into.  Note that "No match." is also what "echo `echo`" gives,
-so an empty substitution ends up in the globber somehow.
+Globbing is done - see below.  One thing it did not explain: "echo
+`echo`" also answers "No match.", and a substitution's output is NOT
+globbed ("echo `cat f`" where f holds /etc/pass* prints /etc/pass*),
+so what an empty substitution reaches to raise it is still unknown.
+
+
+Patterns
+--------
+
+    *       any run of characters, including none
+    ?       exactly one character
+    [...]   one of these, and a-z is a range
+
+Two absences, both of them things a modern shell does and this one
+does not.  There is no negation - "/etc/[!bg]*" answers banner and
+group, so the "!" is one more character in the set - and a leading
+dot is not hidden: "/*" answers /.login and /.sh with the rest.  "."
+and ".." are skipped, and they are the only two.
+
+A pattern applies to every component and not only the last, so
+"/e*/passwd" finds it.  What comes back is sorted: /etc holds ttys,
+group, init, signon ... in that order on the disk and the image
+answers alphabetically.
+
+A pattern that matches nothing contributes nothing, and "No match."
+is raised only when NOTHING in the statement matched -
+"echo /nosuch/* /etc/pass*" prints /etc/passwd and says nothing about
+the first.  It gives up that statement and not the line: "echo *.nope
+; echo after" says No match. and then after.
+
+Quoting interacts with it in two ways worth writing down:
+
+  - A double quote DELIMITS.  It does not quote a run inside a word
+    the way a modern shell would: "echo /etc/"pass"*" is the three
+    words /etc/, pass, and * expanded against the current directory.
+    A quoted word is never a pattern - "echo "/etc/*"" prints
+    /etc/* - and never has a backtick run in it.
+  - A backslash does NOT protect a pattern character.  "echo \*"
+    answers "No match.", which is neither a literal * nor the
+    directory, so what the image looks for is the text as written
+    with the backslash still in it.  The backslash only comes out of
+    a word that turns out not to be a pattern: "echo a\b" is ab.
 
 Still open:
 

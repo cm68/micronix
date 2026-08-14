@@ -802,11 +802,20 @@ char *line;
     char *s;
     int n;
 
+    /*
+     * On what is left of the line rather than on the answer, because
+     * a statement can come to nothing without the line being over: a
+     * pattern that matched nothing says "No match." and hands back
+     * none, and what follows the semicolon still has to run.  A parse
+     * that actually failed gives up the whole line.
+     */
     s = line;
-    while ((n = parse(&s, &pipe1)) != 0) {
+    while (*s) {
+        n = parse(&s, &pipe1);
         if (n < 0)
             break;
-        execute(&pipe1);
+        if (n > 0)
+            execute(&pipe1);
     }
 }
 

@@ -54,8 +54,15 @@ char *metachars = "<>&|";
  * ")", and "echo a)" prints a) with the paren still on.  A close
  * paren only means anything to the scan that is already looking for
  * one.
+ *
+ * The double quote is here because it DELIMITS.  It does not quote a
+ * run inside a word the way a modern shell would: the image reads
+ * "echo /etc/"pass"*" as the three words /etc/, pass and *, and globs
+ * the last of them.  So a quote ends the word before it, the run
+ * inside is a word of its own, and what follows the closing quote
+ * starts another.
  */
-static char *wordstop = "<>&|;`(";
+static char *wordstop = "<>&|;`(\"";
 
 /*
  * The operators, longest first.  The order is the binary's own and
@@ -101,7 +108,7 @@ static int  wordused;
  */
 static int wordbad;
 
-static char *
+char *
 saveword(s, n)
 char *s;
 int n;
@@ -143,10 +150,14 @@ int *len;
 }
 
 /*
- * Copy one word, dealing with quotes.  Returns a pointer to the saved
- * word and leaves *pp past it, or null at the end of the line.  A
- * quote does not survive into the word; a backslash protects exactly
- * the character after it.
+ * Copy one word.  Returns a pointer to the saved word and leaves *pp
+ * past it, or null at the end of the line.  A backslash protects
+ * exactly the character after it and does not survive into the word.
+ *
+ * Quoting is not done here.  The double quote is a delimiter, so a
+ * quoted run is its own word and the parse loop reads it - which is
+ * also why a backtick or a pattern inside quotes is left alone: the
+ * word never comes through here to be looked at.
  */
 static char *
 getword(pp)
@@ -155,10 +166,13 @@ char **pp;
     char buf[MAXLINE];
     char *s = *pp;
     char *q = buf;
-    int quote;
+    char *start;
+    char *t;
+    int escaped = 0;
 
     while (*s == ' ' || *s == '\t')
         s++;
+    start = s;
     if (*s == '\0') {
         *pp = s;
         return (char *)0;
@@ -168,39 +182,10 @@ char **pp;
         if (strchr(wordstop, *s))
             break;
         if (*s == '\\' && s[1]) {
+            escaped = 1;
             s++;
             if (q < buf + sizeof(buf) - 1)
                 *q++ = *s++;
-            continue;
-        }
-        /*
-         * The double quote, and only the double quote.  The single
-         * one used to be here and was ours: the image's set at 0x17c0
-         * has no "'" in it, there is no "Missing '." beside the other
-         * four messages, and running the image settles it - "echo
-         * 'x'" prints 'x' with the quotes still on.
-         *
-         * A quoted run is copied out whole, which is also why a
-         * backtick inside one is never substituted: it never reaches
-         * the parse loop that would act on it.  The image agrees -
-         * "a `echo b` c" quoted comes back with the backticks still
-         * in it.
-         */
-        if (*s == '"') {
-            quote = *s++;
-            while (*s && *s != quote) {
-                if (q < buf + sizeof(buf) - 1)
-                    *q++ = *s++;
-                else
-                    s++;
-            }
-            if (*s != quote) {
-                perr("Missing \".");
-                wordbad = 1;
-                *pp = s;
-                return (char *)0;
-            }
-            s++;
             continue;
         }
         if (q < buf + sizeof(buf) - 1)
@@ -211,6 +196,26 @@ char **pp;
     *pp = s;
     if (q == buf)
         return (char *)0;
+
+    /*
+     * A backslash does not protect a pattern character.
+     *
+     * The image answers "echo \*" with "No match." - not with a
+     * literal * and not with the directory - so what it looks for is
+     * the text as written, backslash and all, and the backslash only
+     * comes out of a word that turns out not to be a pattern.  "echo
+     * a\b" is ab, and "echo \*" asks the disk for \* and does not
+     * find it.
+     *
+     * So when the word came out a pattern and an escape was taken out
+     * of it, put the raw text back.  No second buffer for a case this
+     * rare: the span is still there to be copied again.
+     */
+    if (escaped && ispattern(buf)) {
+        q = buf;
+        for (t = start; t < s && q < buf + sizeof(buf) - 1; t++)
+            *q++ = *t;
+    }
     return saveword(buf, q - buf);
 }
 
@@ -244,6 +249,72 @@ char **pp;
 }
 
 /*
+ * Add one word to a command, as it stands.  glob.c calls this for
+ * each name a pattern came to.
+ */
+int
+addmatch(name, c)
+char *name;
+struct cmd *c;
+{
+    char *w;
+
+    if (c->argc >= MAXARG - 1) {
+        warn("too many arguments", 0);
+        return -1;
+    }
+    if (!(w = saveword(name, strlen(name)))) {
+        warn("out of room for words", 0);
+        return -1;
+    }
+    c->argv[c->argc++] = w;
+    c->argv[c->argc] = (char *)0;
+    return 1;
+}
+
+/*
+ * A quoted word.
+ *
+ * *pp is on the opening quote.  What is inside is one word however
+ * much whitespace is in it, and it is taken as it stands: no pattern
+ * in it is expanded - the image answers "/etc/*" with /etc/* - and no
+ * backtick in it is run.
+ *
+ * The quote delimits rather than quoting a run inside a word, so this
+ * word ends at the closing quote and whatever follows begins another.
+ * "echo /etc/"pass"*" is /etc/, pass, and * expanded.
+ */
+static int
+quoted(pp, c)
+char **pp;
+struct cmd *c;
+{
+    char buf[MAXLINE];
+    char *s;
+    char *q;
+
+    s = *pp + 1;                        /* past the opening quote */
+    q = buf;
+    while (*s && *s != '"') {
+        if (q < buf + sizeof(buf) - 1)
+            *q++ = *s;
+        s++;
+    }
+    if (*s != '"') {
+        perr("Missing \".");
+        return -1;
+    }
+    *q = '\0';
+    *pp = s + 1;                        /* past the closing one */
+
+    if (c->sub) {
+        perr("Syntax error.");
+        return -1;
+    }
+    return addmatch(buf, c) < 0 ? -1 : 0;
+}
+
+/*
  * Command substitution.
  *
  * *pp is on the opening backtick.  Everything up to the closing one
@@ -254,10 +325,10 @@ char **pp;
  * "`ls -l /etc | grep passwd`" arrives as eight of them.
  *
  * An unterminated one is the image's "Missing `." and gives up the
- * line.  A backtick inside double quotes never reaches here: getword
- * copies a quoted run out whole, which is why the image prints
- * "a `echo b` c" for the quoted form and substitutes for the bare
- * one.
+ * line.  A backtick inside double quotes never reaches here, because
+ * a quoted run is taken as its own word without being scanned, which
+ * is why the image prints "a `echo b` c" for the quoted form and
+ * substitutes for the bare one.
  */
 static int
 subst(pp, c)
@@ -430,9 +501,12 @@ struct pipeline *p;
     char *s;
     char *w;
     int code, len;
+    int npat;                           /* patterns seen in this statement */
+    int nmatch;                         /* and names they came to */
 
     wordused = 0;
     wordbad = 0;
+    npat = nmatch = 0;
     p->ncmd = 0;
     c = &p->cmd[0];
     clearcmd(c);
@@ -460,8 +534,11 @@ struct pipeline *p;
         if (*s == '\0')
             break;
 
-        if (*s == '#')                  /* a comment runs to the end */
+        if (*s == '#') {                /* a comment runs to the end */
+            while (*s)                  /* and takes the line with it */
+                s++;
             break;
+        }
 
         /*
          * The end of this statement.  Step over it so the next call
@@ -470,6 +547,12 @@ struct pipeline *p;
         if (*s == ';') {
             s++;
             break;
+        }
+
+        if (*s == '"') {
+            if (quoted(&s, c) < 0)
+                return -1;
+            continue;
         }
 
         if (*s == '`') {
@@ -544,15 +627,44 @@ struct pipeline *p;
             perr("Syntax error.");
             return -1;
         }
-        if (c->argc >= MAXARG - 1) {
-            warn("too many arguments", 0);
-            return -1;
+
+        /*
+         * A word with a pattern in it is asked of the disk; one
+         * without is the word itself, and is not looked for.  A
+         * pattern that finds nothing adds nothing and is not an error
+         * on its own - see the end of this function.
+         */
+        if (ispattern(w)) {
+            npat++;
+            if ((len = globword(w, c)) < 0)
+                return -1;
+            nmatch += len;
+            continue;
         }
-        c->argv[c->argc++] = w;
-        c->argv[c->argc] = (char *)0;
+        if (addmatch(w, c) < 0)
+            return -1;
     }
 
     *pp = s;
+
+    /*
+     * Nothing the statement asked for was there.
+     *
+     * Only when NOTHING matched: the image prints /etc/passwd and
+     * says not a word about the first half of
+     * "echo /nosuch/* /etc/pass*", and complains only when every
+     * pattern in the statement came to nothing.  A word with no
+     * pattern in it is not asked and does not count either way.
+     *
+     * This gives up the statement and not the line - "echo *.nope ;
+     * echo after" says No match. and then after - so it is a nothing
+     * to run rather than a parse that failed, and runline() carries
+     * on to what follows the semicolon.
+     */
+    if (npat && !nmatch) {
+        perr("No match.");
+        return 0;
+    }
 
     /*
      * A pipeline whose last stage has no words is "cmd |" with

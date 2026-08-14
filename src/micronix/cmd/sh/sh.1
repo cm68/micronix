@@ -78,9 +78,13 @@ Longest first, which is the order they are matched in:
 QUOTING AND SUBSTITUTION
 .in +5
 .br
-A double quote takes what is inside it as one word.  There is no
-single quote: 'x' is the three characters that were typed.  A
-backslash protects the character after it.
+A double quote takes what is inside it as one word, and ends the word
+before it: /etc/"pass"* is the three words /etc/, pass, and the
+expansion of *.  What is quoted is taken as it stands - no pattern in
+it is expanded and no command in it is run.  There is no single
+quote: 'x' is the three characters that were typed.  A backslash
+protects the character after it from the shell, but not from pattern
+matching.
 .sp
 A command between backquotes is run and what it writes takes its
 place, split into words.  The backquote ends a word rather than
@@ -107,6 +111,28 @@ words cannot be mixed in one command.
 .sp
 An unterminated quote, backquote or parenthesis is an error and the
 line is abandoned.
+.sp 2
+.in -5
+.bd
+PATTERNS
+.in +5
+.br
+A word holding one of these is replaced by the files it matches,
+sorted:
+.sp
+.nf
+     *      any run of characters, including none
+     ?      one character
+     [...]  one of these; a-z is a range
+.fi
+.sp
+A pattern may appear in any part of a path, so /e*/passwd finds it.
+There is no way to say "not these"; a leading dot is matched like any
+other character, though . and .. are never matched.
+.sp
+A pattern that matches nothing is left out.  Only when nothing in the
+whole command matched is it an error, and then the shell writes "No
+match." and runs no part of that command.
 .sp 2
 .in -5
 .bd
@@ -180,9 +206,8 @@ The one it replaces is a Whitesmiths binary with no source.  Keep a
 copy of it: this is read back out of that binary and is not finished,
 and the parts of it that are guesses are named in cmd/sh/NOTES.
 .sp
-Two things the original does and this does not: it expands filename
-patterns, answering "No match." when none fit, and it has csh's !
-history.  Neither is written here.
+One thing the original does and this does not: csh's ! history, which
+answers "Event not found.".
 .sp 2
 .in -5
 .bd

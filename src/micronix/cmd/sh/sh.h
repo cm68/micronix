@@ -122,6 +122,8 @@ void aliasexpand();
 int  pushredir();
 void popredir();
 int  runpipeline();
+int  addmatch();
+char *saveword();
 void runline();
 int  backtick();
 int  nextline();
@@ -146,3 +148,7 @@ void warn();
  * at all.  NOTES has the behaviour of each, read by running it.
  */
 int  parse(/* char **pp, struct pipeline *p */);
+
+/* glob.c */
+int  ispattern();
+int  globword(/* char *w, struct cmd *c */);
