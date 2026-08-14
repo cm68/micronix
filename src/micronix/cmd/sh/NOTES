@@ -604,17 +604,14 @@ Going the other way, what the C has that the image does not:
 Next
 ----
 
-The three the delimiter set turned up are done: ";" separates
+The three the delimiter set turned up are done - ";" separates
 statements, backticks substitute, "( )" is a subshell, and single
-quoting has gone back out.  What that leaves:
+quoting has gone back out - and so are patterns and history, below.
 
-  - HISTORY.  "Event not found." at 0x4f9d says the image has "!"
-    event designators, csh's.  Nothing else about it is read yet.
-
-Globbing is done - see below.  One thing it did not explain: "echo
-`echo`" also answers "No match.", and a substitution's output is NOT
-globbed ("echo `cat f`" where f holds /etc/pass* prints /etc/pass*),
-so what an empty substitution reaches to raise it is still unknown.
+One thing patterns did not explain: "echo `echo`" also answers "No
+match.", and a substitution's output is NOT globbed ("echo `cat f`"
+where f holds /etc/pass* prints /etc/pass*), so what an empty
+substitution reaches to raise it is still unknown.
 
 
 Patterns
@@ -675,3 +672,41 @@ Still open:
   - whether ignoresigs() is on the background children only, which is
     where the C puts it on a v6 reading, and not read from the image
   - sh.1 gives the whole language; the binary settles the details
+
+
+History
+-------
+
+"Event not found." at 0x4f9d, with "Line too long." beside it at
+0x4f8d.  There is no "history" builtin - eighteen names at 0x9755 and
+that is not one of them - so a reference is the whole of the feature:
+nothing will tell you what the shell remembers.
+
+IT IS INTERACTIVE ONLY, which is why none of it turned up until the
+harness grew a pty.  Fed from a file the image runs "!e" as a command
+name and answers "!e: Command not found.", so a script is never
+rewritten under itself.  regress.sh drives these through script(1);
+the whole input arrives at once so prompts and answers interleave
+oddly, but identically for both shells and the same every run.
+
+    !word   the last line that STARTS WITH word
+
+and that is all there is.  No event numbers: "!1" and "!2" both
+answer "Event not found." where "!e" finds one, because 1 and 2 are
+being looked for as prefixes and nothing begins with them.  None of
+csh's other forms either - "!!" and "!$" are left alone entirely and
+run as command names, where "!:", "!^" and "!#" all go looking and
+fail.  So the trigger is any character but those two and whitespace,
+and the word runs to the next space: "!e-tail" looks for e-tail.
+
+A reference can sit anywhere in the line - "echo !e" becomes "echo
+echo one" - and what goes into the history is the line AFTER
+expansion, so a later "!e" finds the expanded one.
+
+The echo rule is not what it looks like at first.  A line holding a
+"!" ANYWHERE is printed before it runs, whether or not anything
+expanded: "echo a!$b" and "echo x!!" are both echoed back as typed
+and neither holds a reference.  The test is the bare character.
+
+Not read from the image: how many lines are kept.  Nothing shows it
+and no message depends on it.

@@ -1,6 +1,5 @@
+*.o
 sh
 sh.mx
 sh.host
-parse.o
-sh.o
 sh.tar
