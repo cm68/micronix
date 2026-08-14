@@ -155,7 +155,21 @@ main(argc, argv)
     }
 }
 
-#define MAXARGS 50
+/*
+ * MAXARGS was 50, and the list was truncated to fit without a word
+ * said.  lib/libc names 145 objects, so "ar cr libc.a $(OBJS)" ran as
+ * "ar cr libc.a" and the first forty-six of them - and produced an
+ * 8,024 byte libc.a that installed itself over the good one.  Every
+ * link on the machine after that failed on _printf.  Nothing reported
+ * an error, because this make does not look at the status of what it
+ * runs either.
+ *
+ * The kernel takes NBLKS*512, 2048 bytes of argument text (sys/exec.c),
+ * which those 145 names fit inside; 200 slots is 400 bytes of stack
+ * here and more than the kernel will accept anyway, so the check
+ * below is the one that will fire first, and it says so now.
+ */
+#define MAXARGS 200
 
 /*
  * this function replaces system(), which fires off a subshell
@@ -178,7 +192,12 @@ docmd(s)
     int status;
     int pid = 0;
     char *args[MAXARGS];
-    register unsigned char i;
+    /*
+     * int, not unsigned char: it counts up to MAXARGS and an
+     * unsigned char stops at 255 by wrapping to zero, silently,
+     * which is the same class of quiet truncation as the one above.
+     */
+    register int i;
     char *fn = s;
     char path[30];
     char *p;
@@ -227,6 +246,11 @@ docmd(s)
             if (*s) {
                 *s++ = '\0';
             }
+        }
+        if (i >= MAXARGS - 1) {
+            fprintf(stderr, "make: more than %d arguments in a command\n",
+                MAXARGS - 1);
+            exit(1);
         }
         args[i] = 0;
         for (i = 0; paths[i]; i++) {
