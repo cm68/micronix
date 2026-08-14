@@ -142,9 +142,29 @@ char *name;
 }
 
 /*
- * Build, or build again.  The path builtin calls this after changing
- * pathv, since the old tables describe directories that are no longer
- * being looked in.
+ * Throw the tables away.
+ *
+ * This rather than rebuilding on the spot, because the moment a table
+ * goes stale is not the moment anyone wants it back: cd three times
+ * before running anything and an eager rebuild does the work three
+ * times, and a path set to directories that do not exist would have
+ * them read for nothing.  Nothing is read until a command is looked
+ * for, and until then findcmd falls back to searching, which is what
+ * it did before there were tables at all.
+ */
+void
+hashflush()
+{
+	int i;
+
+	for (i = 0; i < MAXPATHV; i++)
+		freedir(&hdirs[i]);
+	hashed = 0;
+}
+
+/*
+ * Build, from whatever pathv says now.  Called on demand rather than
+ * by anyone who changes things - see hashflush above.
  */
 void
 hashpath()

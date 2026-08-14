@@ -153,6 +153,7 @@ int  parse(/* char **pp, struct pipeline *p */);
 
 /* hash.c - the search path, remembered */
 void hashpath();
+void hashflush();
 int  inhash(/* int i, char *name */);
 
 /* hist.c */

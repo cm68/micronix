@@ -466,7 +466,7 @@ int pout;
         if ((path = findcmd(c->argv[0])))
             doexec(path, c->argv);
 
-        hashpath();
+        hashflush();
         if ((path = searchpath(pathbuf, c->argv[0])))
             doexec(path, c->argv);
 
@@ -548,7 +548,7 @@ struct cmd *c;
         if (chdir(p) < 0)
             warn("cannot change to %s", p);
         else
-            hashpath();                 /* "." is a different place now */
+            hashflush();                /* "." is a different place now */
         return 0;
 
     case B_WAIT:
@@ -615,10 +615,12 @@ struct cmd *c;
                 pathv[i - 1] = strsave(c->argv[i]);
             pathv[i - 1] = (char *)0;
             /*
-             * The old tables describe directories we no longer look
-             * in, so they go now rather than being found wrong later.
+             * The old tables describe directories nobody looks in
+             * now, so they go.  Nothing is read back until something
+             * is looked for, and the search until then is the one
+             * that asks the file system.
              */
-            hashpath();
+            hashflush();
         } else {
             for (i = 0; i < MAXPATHV && pathv[i]; i++)
                 printf("%s%s", i ? " " : "", pathv[i]);

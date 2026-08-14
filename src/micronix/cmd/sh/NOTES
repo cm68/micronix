@@ -802,6 +802,14 @@ What is still missing, each checked against the image:
     built is found the first time, and one removed since is reported
     missing rather than answered wrongly.
 
+    Nothing rebuilds eagerly.  cd and path THROW THE TABLES AWAY and
+    the next command looked for builds them again, because the moment
+    a table goes stale is not the moment anyone wants it back: cd
+    three times before running anything and an eager rebuild does the
+    work three times over, and a path set to directories that do not
+    exist would have them read for nothing.  Until they are built,
+    findcmd searches, which is what it did before there were tables.
+
   - The page's list of special characters is "< > & | ` " ( )".  It
     omits ";" which the binary has, and includes ")" which the
     binary's set at 0x17c0 does not.  The binary is right about both:
