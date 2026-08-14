@@ -749,3 +749,56 @@ shows in the two cases that answer differently:
 The first moved the window along to the script; the second did not
 move it at all, so $1 is still the flag.  That second one is not
 useful and is what the image does, so it is what we do.
+
+
+What man1/sh.1 says that this does not do
+-----------------------------------------
+
+The page is in the tree at man/man1/sh.1, recovered from the disk
+image and dated 4/18/82.  It is a SECOND AUTHORITY beside the binary
+and worth reading against it: two things below were mistakes here
+that the binary alone had not caught, and are now fixed - "[^...]"
+negates, and "type" is cat.
+
+What is still missing, each checked against the image:
+
+  - BARE "echo" TOGGLES COMMAND ECHOING.  "The first command toggles
+    the shell's command echoing feature.  The second prints the
+    arguments."  It does: after a bare "echo", the image echoes each
+    line before running it, "exit" included.  Ours prints a blank
+    line.  This is -v under another name and the flag is already
+    there, so it is a small thing to add.
+
+  - "kill name" KILLS BY COMMAND NAME.  "The second version kills the
+    process with the given command name."  The image answers
+    "nosuchname: No such process"; ours says nothing at all, atoi
+    having made the name a zero.  Needs a way to read the process
+    table, which under usersim is not the host's.
+
+  - "prompt" WITH NO ARGUMENT says nothing in the image; ours prints
+    the current prompt.  The page documents only "prompt word".
+
+  - DIRECTORY HASHING.  "The shell internalizes the contents of the
+    directories in the search path, so that in order to locate a
+    command, it does not need to refer to the file system."  We stat
+    every candidate every time.  The page notes the visible
+    consequence: a program added to the path mid-session may need its
+    name typed twice.  Worth having - findcmd is on the hot path of
+    every command - and nothing else depends on it.
+
+  - The page's list of special characters is "< > & | ` " ( )".  It
+    omits ";" which the binary has, and includes ")" which the
+    binary's set at 0x17c0 does not.  The binary is right about both:
+    ";" separates and "echo a)" prints a).  A reminder that the page
+    is a second authority and not a better one.
+
+  - USAGE is "sh [-v] [-c command]" and says nothing about a script
+    file, though the image takes one and the positional parameters
+    depend on it.  The page never mentions $0 or $1 at all.
+
+Not tested either way:
+
+  - "When an asynchronous command completes or is abnormally
+    terminated, the shell gives notification."
+  - "Wait may be prematurely interrupted by pressing the RUB-OUT or
+    DELETE key."
