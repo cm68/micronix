@@ -78,3 +78,18 @@ src/micronix/stand/zout/
 #
 disks/hdinstall/hddma-0
 disks/hdinstall/hddma-1
+
+#
+# script(1) captures.  A typescript is a recording of a terminal session
+# - the console output of a simulator run, with the escape sequences it
+# was drawn with - and it grows without limit while the thing runs.  Two
+# got committed: disks/hdinstall/typescript at 11MB, and a run2 at 215MB
+# which GitHub refuses outright, its file limit being 100MB.  Neither is
+# a source and neither is reproducible, which is the test.
+#
+# What is worth keeping out of a session goes in a document written from
+# it - disks/hdinstall/REGEN is one - not in the recording.
+#
+typescript
+typescript.*
+*.typescript
