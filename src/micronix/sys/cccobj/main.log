@@ -1,0 +1,3 @@
+main.c:204: need lvalue
+Error: c0 failed on main.c
+=== Compiling main.c ===

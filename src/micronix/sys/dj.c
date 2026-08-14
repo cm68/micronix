@@ -890,7 +890,14 @@ getstat(a)
      */
 
     D[0] = SETDMA;
-    *(char **) (D + 1) = kbuf;
+    /*
+     * D is djcomm and kbuf is unsigned char; a and p below are plain
+     * char.  The controller does not care which, the bytes being an
+     * address it is handed, but ccc will not convert unsigned char *
+     * to char * silently.  Every cast in this file that looks like
+     * this one is that and nothing more.
+     */
+    *(char **) (D + 1) = (char *) kbuf;
     D[3] = KERNEL;
 
     D[4] = SREAD;               /* move to cyl 3 */
@@ -1122,7 +1129,7 @@ getstat(a)
         if (kbuf[0x81] & 4) {   /* Morrow double bit set */
             static char *p, n, s;
 
-            p = kbuf + 80;
+            p = (char *) (kbuf + 80);
             n = 25;             /* 25 bytes to xor */
             s = 0;              /* preset sum */
 
@@ -1240,7 +1247,7 @@ djstty(dev, flag)
          * D[9] = NOSTAT;       
          */
 
-        a = D + 2;
+        a = (char *) (D + 2);
         haltstat = D + 9;
     }
 
@@ -1263,7 +1270,7 @@ djstty(dev, flag)
          * D[7] = NOSTAT;               
          */
 
-        a = D + 3;
+        a = (char *) (D + 3);
         haltstat = D + 7;
     }
 

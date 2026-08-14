@@ -71,7 +71,15 @@ cinit()
     top = &clist[CSIZE] - 16;
 
     for (; p <= top; p += 16) {
-        b = p;
+        /*
+         * clist is a char array being carved into cblocks, so the
+         * walking pointer is a char * and this is the point where a
+         * sixteen byte lump of it becomes a struct.  ccc will not
+         * convert between unrelated pointer types on its own; the
+         * cast says what the loop above has already arranged, which
+         * is that p is aligned on a cblock boundary.
+         */
+        b = (struct cblock *) p;
 
         b->next = cfree;        /* free it */
         cfree = b;

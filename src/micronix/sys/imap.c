@@ -79,7 +79,13 @@ imapi(ip, n, rap)
     register int bn;
 
     *rap = 0;
-    p = &ip->i_addr[n];
+    /*
+     * i_addr is UINT[8] on disk - see d_addr in sys/fs.h - and this
+     * walks it as ints, taking the entry and the one after it.  Same
+     * width and same object; the cast says so, which ccc requires
+     * between int * and unsigned short *.
+     */
+    p = (int *) &ip->i_addr[n];
     if (*p == 0)
         if (plug(p, ip->i_dev))
             ip->flags |= IMOD;

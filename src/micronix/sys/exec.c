@@ -24,7 +24,14 @@
  */
 struct obj cpmhdr = {
     OBJECT,                     /* standard ident byte */
-    NORELOC,                    /* no relocation bits */
+    /*
+     * CONF_NORELO, not NORELOC.  The name written here is not defined
+     * in obj.h or anywhere else in the tree - both copies of the
+     * header have only CONF_NORELO - so this has never been the
+     * constant it reads as.  0x80 in the conf byte is the no
+     * relocation flag, which is what the comment says it wants.
+     */
+    CONF_NORELO,                /* no relocation bits */
     0, 0, 0, 0, 0,              /* table, text, data, bss, heap size */
     0x100,                      /* text offset */
     0,                          /* data offset */
@@ -155,13 +162,21 @@ putargs()
     static UINT ac, count;
     extern char usrtop;
 
-    a = d = &usrtop - nbytes;
-    av = (char **) a - nargs - 1;
-    u.sp = &av[-1];
+    /*
+     * s, a, d, t and av are UINT8; usrtop is a plain char, bp->data is
+     * a char *, and u.sp is a UINT *.  The bytes are the same bytes -
+     * this is building the argument block at the top of user memory
+     * and the types are only saying how each line means to read it -
+     * but ccc will not convert between them without being told, so
+     * each crossing is spelled out.
+     */
+    a = d = (UINT8 *) (&usrtop - nbytes);
+    av = (UINT8 **) ((char **) a - nargs - 1);
+    u.sp = (UINT *) &av[-1];
     valid(u.sp, 4 + nargs + nargs + nbytes);
 
     for (c = 0, ac = 0, n = 1; n <= nblks; n++) {
-        s = bp[n]->data;
+        s = (UINT8 *) bp[n]->data;
         t = s + 512;
 
         do {

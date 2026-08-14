@@ -94,8 +94,18 @@ drain(q)
 
     di();
 
-    x = q->first;
-    y = q->last;
+/*
+ * q->first and q->last are char * in struct que and are used both
+ * ways: walked a byte at a time by putc and getc - "*q->last++ = c" -
+ * and, when they sit on a sixteen byte boundary, treated as the
+ * address of the cblock that begins there.  The header is right to
+ * call them char *, and every place that means the second reading has
+ * to say so.  ccc will not convert char * to struct cblock * on its
+ * own, and should not: it is exactly the kind of thing that is a
+ * mistake everywhere except here.
+ */
+    x = (struct cblock *) q->first;
+    y = (struct cblock *) q->last;
 
     if (x && y) {
         x = calign(x);
@@ -273,7 +283,7 @@ qalloc(q)
     static struct cblock *new, *old;
 
     if (q->count == 0 && q->last) {
-        new = q->last;
+        new = (struct cblock *) q->last;
         new--;
         q->last = 0;
     }
@@ -287,7 +297,7 @@ qalloc(q)
     }
 
     if (q->last) {              /* link */
-        old = q->last;
+        old = (struct cblock *) q->last;
         old--;
         old->next = new;
     } else {
@@ -305,12 +315,12 @@ qrelse(q)
 {
     static struct cblock *b;
 
-    b = q->first;
+    b = (struct cblock *) q->first;
     if (b) {
-        b = ((int) b - 1) & ~15;
+        b = (struct cblock *) (((int) b - 1) & ~15);
         b++;
-        q->first = b;
-        q->last = b;
+        q->first = (char *) b;
+        q->last = (char *) b;
         qfree(q);
     }
 }
@@ -321,7 +331,7 @@ qfree(q)
 {
     static struct cblock *new, *old;
 
-    old = q->first;             /* the cblock to be freed */
+    old = (struct cblock *) q->first;   /* the cblock to be freed */
 
     if (!old) {
         qinit(q);

@@ -255,7 +255,13 @@ ttyout(tty)
     register char *state;
     char cold;
 
-    state = &tty->state;
+    /*
+     * state is a UINT8 in struct tty and this walks it as a char.
+     * Same object either way on this machine - the bits below are
+     * tested and set, never compared for order - so the cast is safe
+     * and ccc wants it said.
+     */
+    state = (char *) &tty->state;
 
     /*
      * if (*state & STOPIN) { *state &= ~STOPIN; (*tty->put)(tty, XOFF);

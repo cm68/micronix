@@ -68,9 +68,32 @@ objects: $(OBJS)
 # drives.  makedate.c is not either - it is a host program that writes
 # build.h, not part of the kernel.
 #
-# It reports and exits 0.  Twelve of the forty do not compile today,
-# so making it a gate would only mean it always fails; drop the
-# "; true" at the end when that stops being true.
+# mset.c is out too, and for a better reason than it not compiling.
+# It is in none of LOW_C, IO_C or HIGH_C in the Makefile beside this,
+# so the native build does not compile it either; the only mention it
+# gets there is a stale dependency line.  It reads the mio line
+# control register through MBASE, LCONTROL, BAUDREG, MU_WORD8,
+# MU_STOP2, MU_PARITY and MU_EVEN, and of those only MBASE is defined
+# anywhere in the tree - in multio.c, which is a different translation
+# unit.  So it cannot compile without inventing a hardware interface,
+# and a survey that counts it is measuring the wrong thing.  What was
+# wrong with it that CAN be told - an undeclared variable and a use of
+# rates[] before its definition - is fixed and commented in the file.
+#
+# It reports and exits 0.  Three of the thirty-nine do not compile
+# today, so making it a gate would only mean it always fails; drop the
+# "; true" at the end when that stops being true.  It was twelve until
+# the source was gone through; what is left is the compiler's:
+#
+#   cus   *p++ = ((unsigned) djcomm >> 0), where the ">> 0" folds away
+#         and leaves a symbol's ADDRESS being stored into a byte.  No
+#         rule builds it: (ASSIGN:byte (DEREF:byte) (SYMREFptr)).
+#   mw    ichan[0] = &cmd - a symbol's address stored through a
+#         pointer held in a register.  Same shape one width up:
+#         (ASSIGN:short (DEREF:short) (SYMREFptr)).
+#   main  char (*buffer)[512] - a pointer to an array.  c0 reads the
+#         declarator as an array, so "buffer = 0" is "need lvalue" and
+#         "buffer[1][2]" is "bad index".  Three lines reproduce it.
 #
 CCCTREE  ?= $(HOME)/src/ccc
 CCC      ?= $(CCCTREE)/desthost/bin/ccc
@@ -88,7 +111,7 @@ CCCDIR    = cccobj
 CCCOUT    = kernel.o
 CCCFLAGS  = -O -c -i../include -I.
 
-CCCSRCS   = $(filter-out makedate.c,$(wildcard *.c))
+CCCSRCS   = $(filter-out makedate.c mset.c,$(wildcard *.c))
 
 #
 # main.c includes it, the native build generates it with makedate, and

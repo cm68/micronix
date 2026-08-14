@@ -22,8 +22,30 @@ mset(tty)                       /* called during stty system call and at open
                                  */
     struct tty *tty;
 {
-    char lc;
+    /*
+     * This was "char lc;", declared and never used once, while r is
+     * assigned and read eight times below and declared nowhere at all.
+     * They are the same variable under two names: lc for line control,
+     * r for the register, and every use of r here is the line control
+     * register being read, masked and written back.  The declaration
+     * was left behind by the rename; the uses were not.
+     *
+     * A compiler that takes an undeclared name for an external int -
+     * which is what this was built with - turns that into a global
+     * called r that nothing defines, and the mistake survives until
+     * something links.  ccc says so instead, which is how it was
+     * found.
+     */
+    char r;
     int baud;
+
+    /*
+     * rates[] is defined at the bottom of this file and used here,
+     * which needs saying first.  Whitesmith's took an unknown name in
+     * an expression for an external int and got away with it; a
+     * subscript of one is what "bad index" was complaining about.
+     */
+    extern int rates[];
 
     if ((tty->dev & 3) == 0)
         return;

@@ -10,6 +10,12 @@
 #include <sys/proc.h>
 #include <sys/file.h>
 #include <sys/lock.h>
+/*
+ * u.error is set to EBUSY and ENFILE below and this was the only file
+ * in sys that used those names without including the header that
+ * defines them - the other twenty-four all do.
+ */
+#include <errno.h>
 
 struct lock llist[NLOCK] = { 0 };
 

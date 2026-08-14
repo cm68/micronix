@@ -36,7 +36,14 @@ clock()
      */
 
     if (!(++ticks & 7)) {       /* once a second */
-        sec = &seconds;         /* avoid longs in interrupt code */
+        /*
+         * seconds is a long and this reads it as two ints on purpose
+         * - see NOT PORTABLE below - so the cast is the whole point
+         * of the line rather than an accident of it.  Without it ccc
+         * refuses long * to int *, which is the right refusal to make
+         * everywhere except here.
+         */
+        sec = (int *) &seconds; /* avoid longs in interrupt code */
 
         if (++sec[1] == 0) {    /* NOT PORTABLE */
             ++sec[0];

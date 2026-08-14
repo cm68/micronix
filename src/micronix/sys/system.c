@@ -32,6 +32,51 @@ struct syscall
 #define SYSCALL 0317            /* 8080 rst 1 instruction */
 #define INDIR	0               /* index of a indirect call in syssw */
 
+/*
+ * Everything the table below takes the address of.
+ *
+ * Written the way con.c writes the same thing for its device
+ * switches: as int-returning functions, grouped by the file that
+ * defines them, because that is the fact a reader wants.  None of
+ * this was declared at all before; Whitesmith's took an unknown name
+ * for an external int and an "&" of one for its address, which is why
+ * a table of forty-eight function pointers compiled with no
+ * declarations in sight.  ccc asks, so here they are.
+ *
+ * indir, unimp and badcall are in this file, below the table.
+ */
+extern int indir(), unimp(), badcall();
+
+extern int brake(), chdir(), chmod(), chown(), sync();      /* sys1.c */
+extern int pause(), stat();                                 /* sys2.c */
+extern int permission();                                    /* access.c */
+extern int mount(), umount();                               /* mount.c */
+extern int link(), unlink();                                /* link.c */
+extern int exec();                                          /* exec.c */
+extern int mknod();                                         /* create.c */
+
+extern int r_alarm(), r_close(), r_creat(), r_csw();        /* reg.c */
+extern int r_dup(), r_exit(), r_fork(), r_fstat();
+extern int r_getpid(), r_getuid(), r_gtty(), r_kill();
+extern int r_nice(), r_open(), r_pipe(), r_read();
+extern int r_seek(), r_setuid(), r_signal(), r_sleep();
+extern int r_ssw(), r_stime(), r_stty(), r_time();
+extern int r_wait(), r_write();
+
+/*
+ * These two are entries 49 and 50 and NOTHING DEFINES THEM.  reg.c
+ * has both, commented out, at lines 173 and 175:
+ *
+ *      r_lock () { reclock (u.hl, arg [0]); }
+ *      r_unlock () { unlock (u.hl); }
+ *
+ * and lock.c has the reclock() and unlock() they would call.  So the
+ * kernel does not link as it stands, and has not for as long as those
+ * two lines have been comments.  Declaring them here is what lets this
+ * file compile; it does not make them exist, and the link will say so.
+ */
+extern int r_lock(), r_unlock();
+
        /*
         * System call branch table. Arguments from registers,
         * and returns to registers, are handled by r_ functions.
@@ -50,8 +95,15 @@ struct syscall syssw[] = {
     2, &unlink,                 /* 10 */
     4, &exec,                   /* 11 */
     2, &chdir,                  /* 12 */
-    0, &r_time                  /* 13 */
-        6, &mknod,              /* 14 */
+    /*
+     * The comma after r_time was missing, which ran entry 13 into
+     * entry 14 - "&r_time 6" - and is a syntax error, not a table
+     * that comes out one short.  So this file has not compiled since
+     * the line went in (2020-10-30, 90b8a345); the odd indentation on
+     * the mknod line below is the same edit.
+     */
+    0, &r_time,                 /* 13 */
+    6, &mknod,                  /* 14 */
     4, &chmod,                  /* 15 */
     4, &chown,                  /* 16 */
     2, &brake,                  /* 17 */
