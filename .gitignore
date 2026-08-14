@@ -103,3 +103,21 @@ typescript.*
 logfile
 logfile.*
 *.trace
+
+#
+# Objects, everywhere.
+#
+# Each directory used to name its own, one file at a time, and that
+# fails the same way every time somebody adds a source: cmd/sh listed
+# parse.o and sh.o, so glob.o and hist.o were committed the day they
+# were written, and src/usersim listed "sim" and not "usersim", so the
+# program that directory exists to build sat in the untracked list.
+# cmd/mkfs had no .gitignore at all.
+#
+# The 264 objects already tracked - lib/objects/libu, which are the
+# whitesmiths dumps kept as a reference for reading their binaries,
+# and the ones that came in with the imported trees under extra - are
+# unaffected: this only decides what an untracked file does, and a
+# deliberate new one still goes in with "git add -f".
+#
+*.o
