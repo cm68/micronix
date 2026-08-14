@@ -151,6 +151,11 @@ void warn();
  */
 int  parse(/* char **pp, struct pipeline *p */);
 
+/* job.c - the background jobs */
+void jobadd();
+void jobdone();
+int  jobpid();
+
 /* hash.c - the search path, remembered */
 void hashpath();
 void hashflush();

@@ -512,13 +512,27 @@ struct pipeline *p;
     }
 
     if (p->cmd[p->ncmd - 1].bg) {
-        printf("%d\n", pid[p->ncmd - 1]);
+        /*
+         * Remembered under the name of the stage whose pid is the one
+         * announced, so that "kill name" and the number printed here
+         * mean the same process.  A group has no name to give.
+         */
+        i = p->ncmd - 1;
+        if (p->cmd[i].argc > 0)
+            jobadd(pid[i], p->cmd[i].argv[0]);
+        printf("%d\n", pid[i]);
         return 0;
     }
 
     st = 0;
     for (i = 0; i < p->ncmd; i++) {
         while ((w = wait(&st)) != -1) {
+            /*
+             * Anything reaped here is finished, background jobs of
+             * the user's included - a slot left behind would name a
+             * pid the system is free to hand to somebody else.
+             */
+            jobdone(w);
             if (w == pid[p->ncmd - 1])
                 status = (st >> 8) & 0xff;
             if (w == pid[i])
@@ -552,8 +566,8 @@ struct cmd *c;
         return 0;
 
     case B_WAIT:
-        while (wait((int *)0) != -1)
-            ;
+        while ((i = wait((int *)0)) != -1)
+            jobdone(i);
         return 0;
 
     case B_EXIT:
@@ -636,13 +650,26 @@ struct cmd *c;
         return 0;
 
     case B_KILL:
-        if (c->argc < 2) {
-            warn("kill needs a process", 0);
-            return 1;
-        }
+        /*
+         * "kill N" and "kill name".  A word beginning with a digit is
+         * the number; anything else is looked up among the background
+         * jobs we started - see job.c for why that is the whole of
+         * the mechanism and the process table is not involved.
+         *
+         * The image says nothing at all to a bare "kill", so neither
+         * do we.
+         */
         for (i = 1; i < c->argc; i++) {
-            if (kill(atoi(c->argv[i]), 9) < 0)
-                warn("cannot kill %s", c->argv[i]);
+            p = c->argv[i];
+            if (*p >= '0' && *p <= '9')
+                j = atoi(p);
+            else
+                j = jobpid(p);
+            if (j <= 0 || kill(j, 9) < 0) {
+                fprintf(stderr, "%s: No such process\n", p);
+                continue;
+            }
+            jobdone(j);
         }
         return 0;
 
