@@ -13,8 +13,11 @@
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
 
+#include <types.h>
 #include <stdio.h>
 #include <signal.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 #include "sh.h"
 
 int  login;                 /* argv[0] began with '-'   (0x9004) */
@@ -220,6 +223,44 @@ char *name;
 }
 
 /*
+ * Is this a regular file?
+ *
+ * The one question a directory entry cannot answer about itself, and
+ * the one that matters most, because getting it wrong does not fail
+ * cleanly.  The execute bit on a DIRECTORY means it may be searched,
+ * so access(name, 1) says yes to one:
+ *
+ *	cd /usr/src/cmd ; ls
+ *
+ * found the ls SUBDIRECTORY and handed it to exec.  Traced, that is
+ * "exec(\"./ls\")" with no access() in front of it at all - the tables
+ * had been built from the entries in ".", one of which is called ls,
+ * and a claim from the tables is believed.
+ *
+ * S_IFREG is 0 here, this being the v6 encoding, so the test is that
+ * the two type bits are clear rather than that they hold something.
+ */
+static int
+isreg(name)
+char *name;
+{
+    struct stat st;
+
+    return stat(name, &st) >= 0 && (st.st_mode & S_IFMT) == S_IFREG;
+}
+
+/*
+ * Can this be run?  Regular first, since that rejects a directory and
+ * a missing file in the same one call, and only then the permission.
+ */
+static int
+execok(name)
+char *name;
+{
+    return isreg(name) && access(name, 1) == 0;
+}
+
+/*
  * The honest search: ask the file system about every directory in
  * turn.  What findcmd did before there were any tables, and what it
  * falls back to when they turn out not to be worth believing.
@@ -233,7 +274,7 @@ char *name;
 
     for (i = 0; i < MAXPATHV && pathv[i]; i++) {
         joinpath(buf, pathv[i], name);
-        if (access(buf, 1) == 0)
+        if (execok(buf))
             return buf;
     }
     return (char *)0;
@@ -273,7 +314,7 @@ char *name;
     int i;
 
     if (strchr(name, '/'))
-        return access(name, 1) == 0 ? name : (char *)0;
+        return execok(name) ? name : (char *)0;
 
     for (i = 0; i < MAXPATHV && pathv[i]; i++) {
         switch (inhash(i, name)) {
@@ -281,10 +322,23 @@ char *name;
             continue;                   /* certainly not here */
         case 1:
             joinpath(buf, pathv[i], name);
-            return buf;                 /* believed */
+            /*
+             * Believed - but not about being a FILE.  That is the one
+             * thing the entry it was hashed from does not say, and
+             * the one thing exec will not simply refuse, so it costs
+             * a stat here.  Two syscalls to run a command instead of
+             * one, against three for the honest search: still the
+             * win, and it no longer hands exec a directory.
+             *
+             * Permission is still left to exec and to the retry in
+             * spawn(), which is what the rest of this believes.
+             */
+            if (isreg(buf))
+                return buf;
+            continue;
         }
         joinpath(buf, pathv[i], name);  /* no tables for this one */
-        if (access(buf, 1) == 0)
+        if (execok(buf))
             return buf;
     }
     return searchpath(buf, name);
