@@ -168,6 +168,8 @@ char **pp;
     char *q = buf;
     char *start;
     char *t;
+    char *p;
+    int i;
     int escaped = 0;
 
     while (*s == ' ' || *s == '\t')
@@ -186,6 +188,42 @@ char **pp;
             s++;
             if (q < buf + sizeof(buf) - 1)
                 *q++ = *s++;
+            continue;
+        }
+
+        /*
+         * A positional parameter.  ONE digit: the image answers "$10"
+         * with the first argument and then a literal 0, so there is
+         * no way to reach a tenth.  "$*" is all of them from $1 with
+         * a space between.
+         *
+         * A "$" in front of anything else is just a "$" - there are
+         * no named variables here, and "$HOME" comes out as it was
+         * written.  It is done in the middle of copying a word rather
+         * than to a finished one, because "$" does not delimit: the
+         * word "A$1B" is one word and becomes AalphaB.  That is also
+         * why a backslash in front of it works without anything more
+         * being written - the escape above has already taken the "$"
+         * out of the way.
+         */
+        if (*s == '$' && s[1] >= '0' && s[1] <= '9') {
+            i = s[1] - '0';
+            if (i < shargc)
+                for (p = shargv[i]; *p; p++)
+                    if (q < buf + sizeof(buf) - 1)
+                        *q++ = *p;
+            s += 2;
+            continue;
+        }
+        if (*s == '$' && s[1] == '*') {
+            for (i = 1; i < shargc; i++) {
+                if (i > 1 && q < buf + sizeof(buf) - 1)
+                    *q++ = ' ';
+                for (p = shargv[i]; *p; p++)
+                    if (q < buf + sizeof(buf) - 1)
+                        *q++ = *p;
+            }
+            s += 2;
             continue;
         }
         if (q < buf + sizeof(buf) - 1)

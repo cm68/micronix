@@ -710,3 +710,36 @@ and neither holds a reference.  The test is the bare character.
 
 Not read from the image: how many lines are kept.  Nothing shows it
 and no message depends on it.
+
+
+Positional parameters
+---------------------
+
+Found by asking rather than by reading, and it is worth saying why it
+was nearly missed: "$" IS NOT IN THE DELIMITER SET at 0x17c0.  Reading
+that set finds everything which splits a word and nothing which does
+not, and substitution happens in the middle of a word without ending
+it - "A$1B" is one word.  Anything else that works that way will be
+invisible to the same method.
+
+    $0      the script
+    $1..$9  its arguments
+    $*      all of them from $1, space between
+
+ONE digit: "$10" answers the first argument and then a literal 0, so
+there is no way to reach a tenth.  There are no named variables -
+"$HOME" comes out as it was written - which fits a shell where path,
+home and prompt are builtins rather than variables.  A bare "$" is a
+"$", a backslash in front of one protects it, and a quoted "$1" is
+not expanded, quoting suppressing this the way it suppresses patterns
+and backticks.
+
+They are a WINDOW ON THE SHELL'S OWN ARGV rather than a copy, which
+shows in the two cases that answer differently:
+
+    sh /tmp/args alpha beta     $0 is /tmp/args and $1 is alpha
+    sh -c 'echo $1'             $1 is -c
+
+The first moved the window along to the script; the second did not
+move it at all, so $1 is still the flag.  That second one is not
+useful and is what the image does, so it is what we do.

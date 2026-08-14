@@ -66,6 +66,21 @@ ttysh()
 		grep -v '^ran-dot-sh$'
 }
 
+#
+# And as a script with arguments, which is the only place the
+# positional parameters show: $0 is the script and $1 upwards are what
+# followed it.
+#
+SCRIPT=$ROOT/tmp/regress.tmp
+
+scriptsh()
+{
+	sh=$1
+	shift
+	timeout 20 setsid $SIM -d $ROOT $sh /tmp/regress.tmp "$@" \
+		< /dev/null 2>&1 | grep -v '^ran-dot-sh$'
+}
+
 pass=0
 fail=0
 skip=0
@@ -140,6 +155,36 @@ checktty()
 		sed 's/^/          stock: /' $TMP.a
 		sed 's/^/          ours:  /' $TMP.b
 	fi
+}
+
+#
+# One script.  The first argument is its body, the rest are its
+# arguments.
+#
+checkscript()
+{
+	case "$1" in
+	*"$SELECT"*) ;;
+	*) skip=`expr $skip + 1`; return ;;
+	esac
+
+	body=$1
+	shift
+	printf '%s\n' "$body" > $SCRIPT
+
+	scriptsh $STOCK "$@" > $TMP.a
+	scriptsh $OURS  "$@" > $TMP.b
+
+	if cmp -s $TMP.a $TMP.b; then
+		pass=`expr $pass + 1`
+		test -n "$VERBOSE" && printf 'ok scr  %s\n' "$body"
+	else
+		fail=`expr $fail + 1`
+		printf 'DIFFER  (script) %s\n' "$body"
+		sed 's/^/          stock: /' $TMP.a
+		sed 's/^/          ours:  /' $TMP.b
+	fi
+	rm -f $SCRIPT
 }
 
 SELECT="$1"
@@ -229,6 +274,20 @@ checktty 'echo one' '! e'
 checktty 'echo one' '!e-tail'
 checktty 'echo one' 'echo !e' '!e'
 checktty 'echo plain'
+
+#
+# The positional parameters.
+#
+checkscript 'echo zero=$0 one=$1 two=$2 nine=$9' alpha beta
+checkscript 'echo ten=$10' alpha beta
+checkscript 'echo q="$1" bare=$1' alpha beta
+checkscript 'echo star=$*' alpha beta
+checkscript 'echo none=$*' 
+checkscript 'echo dollar=$' alpha
+checkscript 'echo esc=\$1' alpha
+checkscript 'echo name=$HOME' alpha
+checkscript 'echo A$1B' alpha
+checkscript 'echo /etc/pass* $1' alpha
 
 #
 # The differences we mean.

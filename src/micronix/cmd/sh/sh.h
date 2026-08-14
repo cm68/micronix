@@ -113,6 +113,8 @@ extern int  status;         /* what exit is given      (0x9008) */
 extern char *prompt;
 extern char *homedir;
 extern char *pathv[MAXPATHV];
+extern char **shargv;       /* $0 upwards - a window on our argv */
+extern int  shargc;
 
 int  isbuiltin();
 int  dobuiltin();

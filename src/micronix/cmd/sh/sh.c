@@ -48,6 +48,24 @@ char line[MAXLINE];
 struct pipeline pipe1;
 
 /*
+ * The positional parameters, $0 upwards.
+ *
+ * They are a WINDOW ON OUR OWN ARGV rather than a copy of anything,
+ * which is what the image does and is visible in the two cases it
+ * answers differently:
+ *
+ *	sh /tmp/args alpha beta	$0 is /tmp/args and $1 is alpha
+ *	sh -c 'echo $1'		$1 is -c
+ *
+ * The first has moved the window along to the script, so the script
+ * is $0 and its own arguments follow.  The second has not moved it at
+ * all, so $1 is still the flag - which is not useful, and is what it
+ * does.
+ */
+char **shargv;
+int  shargc;
+
+/*
  * The stack of input sources.  The binary keeps it at 0x9648 with the
  * pointer in 0x9646, pushes stdin onto it at startup, and pops one
  * level every time a source runs dry - which is what makes the source
@@ -980,6 +998,14 @@ char **argv;
         login = 1;
 
     /*
+     * Until a script moves it along, the window sits where it starts:
+     * $0 is the shell's own name and $1 is its first argument, flag
+     * or not.
+     */
+    shargv = argv;
+    shargc = argc;
+
+    /*
      * dir and era are cp/m spellings, kept so that fingers trained on
      * that system reach something.  They are not shell work, so they
      * are seeded here rather than built in: "alias dir" says what dir
@@ -1019,6 +1045,11 @@ char **argv;
             fatal("cannot open %s", argv[i]);
         srcstack[nsrc++] = f;
         interactive = 0;
+        /*
+         * The script is $0 and what follows it is $1 upwards.
+         */
+        shargv = &argv[i];
+        shargc = argc - i;
     } else {
         srcstack[nsrc++] = stdin;
         interactive = isatty(0);
