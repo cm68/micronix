@@ -1,4 +1,5 @@
 *.o
 *.dSYM/
 sim
+usersim
 maketables
