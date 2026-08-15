@@ -1,11 +1,1 @@
-	psect	text
-	global	__getargs, startup, __argc_
-
-startup:
-	jp	__getargs
-
-	psect	bss
-__argc_:
-	defs	2
-
-; vim: tabstop=4 shiftwidth=4 noexpandtab:
+/home/curt/src/ccc/src/libc/start1.s

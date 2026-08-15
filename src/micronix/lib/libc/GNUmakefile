@@ -9,8 +9,16 @@
 #
 # A .c and a .s of the same name are NOT a mistake.  The .c is the
 # reference implementation, the .s is a hand written one defining the
-# same symbol, and the .s wins.  The .c stays in the tree and is
-# listed below, so that it reads as deliberate rather than forgotten.
+# same symbol, and the .s wins.  The .c stays in the tree so that it
+# reads as deliberate rather than forgotten.
+#
+# It wins because of the filter below, and not on its own: listing the
+# .c in CSRCS as well used to mean the .c was the one built.  make
+# resolves memcpy.o by the first implicit rule that matches, that is
+# the C one, and the hand written assembly was never assembled at all.
+# atoi, index, rindex, strdup, strncmp and memcpy were all in that
+# state - six files of assembly in the archive's source list and none
+# of it in the archive.
 #
 # The lists are explicit rather than globbed.  Globbing loses the
 # reasons: the float files cannot be assembled at all (they use deff,
@@ -24,6 +32,9 @@ DEPTH	= ../..
 DIR	= libc
 CLASS	= lib
 TARGET	= libc.a
+
+# What ASSRCS defines, CSRCS does not get to define as well.
+ASOVERRIDE = $(patsubst %.s,%.c,$(ASSRCS))
 
 ASSRCS = \
 	abs.s allsh.s alrsh.s asallsh.s asalrsh.s asar.s \
@@ -41,11 +52,11 @@ ASSRCS = \
 	shar.s shl16.s shll.s shlr.s strcat.s \
 	strchr.s strcmp.s strcpy.s swdisp.s swdispw.s oarg.s strlen.s \
 	strncat.s strncmp.s strncpy.s strrchr.s tolower.s toupper.s \
-	xtoi.s fputc.s fgetc.s
+	xtoi.s fputc.s fgetc.s memcpy.s
 
 CSRCS = \
 	rand.c srand1.c mkstemp.c mktemp.c isatty.c permaloc.c timezone.c ctime.c \
-	assert.c calloc.c malloc.c memcmp.c memcpy.c memset.c \
+	assert.c calloc.c malloc.c memcmp.c memset.c \
 	blkcpy.c ctype_.c cleanup.c fclose.c fflush.c filbuf.c \
 	flsbuf.c puts.c fopen.c fread.c freopen.c fwrite.c \
 	setbuf.c gets.c ungetc.c buf.c getenv.c pnum.c \
@@ -55,11 +66,16 @@ CSRCS = \
 	opendir.c system.c
 
 # superseded by the .s beside them: kept, not built
+#
+# atoi, index, rindex, strdup, strncmp and memcpy used to be here too.
+# Their C is now a comment at the head of the .s that replaced it,
+# which is where a reference implementation can do no harm: a .c of
+# the same name is a source the makefile can pick up by accident, and
+# for as long as both existed, did.
 NOTBUILT_C = \
-	acos.c asin.c atan.c atan2.c atoi.c ceil.c \
+	acos.c asin.c atan.c atan2.c ceil.c \
 	cos.c cosh.c evalpoly.c exp.c fabs.c floor.c \
-	index.c log.c rindex.c sin.c sinh.c sqrt.c \
-	strdup.c strncmp.c tan.c tanh.c
+	log.c sin.c sinh.c sqrt.c tan.c tanh.c
 
 # cannot be assembled - deff no longer exists
 NOTBUILT_S = \
@@ -67,8 +83,9 @@ NOTBUILT_S = \
 	frelop.s frexp.s frndint.s ftol.s imul816.s ltof.s \
 	srand.s start1.s start2.s
 
-# held out: ccc's longjmp.s already defines _setjmp, and which file
-# should own it is still being decided.
-HELD = setjmp.s
+# Decided: ccc's longjmp.s owns _setjmp and _longjmp both, and the
+# setjmp.s that also defined them is gone.  It was never built, so
+# nothing linked changes.
+HELD =
 
 include $(DEPTH)/GNUmakefile.inc
