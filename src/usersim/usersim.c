@@ -72,6 +72,23 @@ void SystemCall();
 extern WINDOW **win;
 
 int traceflags;
+/*
+ * V_CYCLE: what the program cost the Z80.
+ *
+ * The core has counted clocks all along - z80emu returns the cycles
+ * each instruction took and emushim keeps the running total, because
+ * hwsim's timers are driven off it.  Nothing on this side ever asked
+ * for the number, so the one question a simulator is uniquely able to
+ * answer went unanswered: not how long a program took to simulate,
+ * which is a fact about this machine, but how long it would take on
+ * the one being simulated.
+ *
+ * Counted from the image, not from the simulator's start.  exec is
+ * where a program begins, so that is where the baseline is taken, for
+ * the same reason the stack and text-write counters are reset there -
+ * otherwise every program is billed for its predecessors.
+ */
+unsigned long long cyc_base;    /* the count when this image was loaded */
 int sp_report;                  /* -S: report stack low-water at exit */
 unsigned short sp_lowater = 0xffff;
 unsigned short sp_initial;
@@ -124,6 +141,7 @@ char *initfile[] = {
 #define V_SFAIL (1 << 7)        /* breakpoint on syscall fail */
 #define V_FUNC  (1 << 8)        /* trace functions */
 #define V_FUNC0 (1 << 9)        /* skip tracing c helpers */
+#define V_CYCLE (1 << 10)       /* cycles the image cost, at exit */
 
 /*
  * memory driver for trivial 64k used in usersim
@@ -319,7 +337,7 @@ char *progname;
 char *vopts[] = {
     "V_SYS", "V_DATA", "V_EXEC", "V_INST", 
     "V_ASYS", "V_SYS0", "V_ERROR", "V_SFAIL", 
-    "V_FUNC", "V_FUNC0", 0
+    "V_FUNC", "V_FUNC0", "V_CYCLE", 0
 };
 
 char *seekoff[] = { "SET", "CUR", "END" };
@@ -1377,6 +1395,7 @@ do_exec(char *name, char **argv)
     sp_lowater = 0xffff;
     sp_initial = 0;
     sp_overflow = 0;
+    cyc_base = sim_cycles;      /* the new image starts owing nothing */
     free_syms();
 
     for (i = 0; i < 65536; i++) {
@@ -2680,6 +2699,10 @@ SystemCall()
                 "stack: initial %04x low %04x used %d brk %04x gap %d\n",
                 sp_initial, sp_lowater, sp_initial - sp_lowater,
                 brake, sp_lowater - brake);
+            fflush(repfp);
+        }
+        if (verbose & V_CYCLE) {
+            fprintf(repfp, "cycles: %llu\n", sim_cycles - cyc_base);
             fflush(repfp);
         }
         if (tprot_report && tprot_hits) {
