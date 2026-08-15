@@ -18,12 +18,15 @@
 
 .text:
 __signal:
-		ld		(func),hl	; the first argument, in the slot
-						; the old pop put it in (the two
-						; labels here are historic)
-		pop		de
-		pop		hl
-		ld		(sig),hl
+		ld		(sig),hl	; the signal number is the first
+						; argument, and the first argument
+						; arrives in hl.  it belongs in the
+						; sig slot, which is the word the
+						; kernel reads as arg[0] - see
+						; r_signal() in sys/reg.c.
+		pop		de		; the return address
+		pop		hl		; the handler, the second argument
+		ld		(func),hl
 		push	hl
 		push	de
 		rst		08h
