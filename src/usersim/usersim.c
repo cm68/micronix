@@ -89,7 +89,7 @@ int traceflags;
  * otherwise every program is billed for its predecessors.
  */
 unsigned long long cyc_base;    /* the count when this image was loaded */
-char cyc_name[64];              /* and which image, for the rollup */
+char cyc_name[192];             /* and which image with what args */
 int sp_report;                  /* -S: report stack low-water at exit */
 unsigned short sp_lowater = 0xffff;
 unsigned short sp_initial;
@@ -1397,8 +1397,27 @@ do_exec(char *name, char **argv)
     sp_initial = 0;
     sp_overflow = 0;
     cyc_base = sim_cycles;      /* the new image starts owing nothing */
-    strncpy(cyc_name, name, sizeof(cyc_name) - 1);
-    cyc_name[sizeof(cyc_name) - 1] = 0;
+    /*
+     * the name alone does not say which file this instance worked on,
+     * and "c1 cost 666 million cycles" is not actionable without it.
+     * keep the arguments too, up to what the buffer holds.
+     */
+    {
+        int ci, cl;
+
+        strncpy(cyc_name, name, sizeof(cyc_name) - 1);
+        cyc_name[sizeof(cyc_name) - 1] = 0;
+        cl = strlen(cyc_name);
+        for (ci = 1; argv[ci]; ci++) {
+            int need = strlen(argv[ci]) + 1;
+
+            if (cl + need >= sizeof(cyc_name))
+                break;
+            cyc_name[cl++] = ' ';
+            strcpy(cyc_name + cl, argv[ci]);
+            cl += need - 1;
+        }
+    }
     free_syms();
 
     for (i = 0; i < 65536; i++) {
