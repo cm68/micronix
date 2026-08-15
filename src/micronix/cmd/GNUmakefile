@@ -84,8 +84,19 @@ NOWARN	 = --warning=no-ignore-newer
 all:
 	$(RECURSE)
 
-cmd.tar: makefile
-	tar -f cmd.tar -c makefile
+#
+# reset rides with it.  It is a shell script and not a program, so it
+# has no directory of its own and no makefile to ship it; the native
+# makefile beside this one installs it with "cp/cp reset /bin/reset"
+# and had nothing to copy, because update shipped the makefile that
+# names it and not the file itself.  Every native build ended with
+# "cp: reset : No such file or directory" and no reset on the system.
+#
+# The same shape as crt0.s in lib/libu: a file no rule mentions is not
+# missed until something asks for it.
+#
+cmd.tar: makefile reset
+	tar -f cmd.tar -c makefile reset
 
 update: cmd.tar
 	$(RECURSE)
