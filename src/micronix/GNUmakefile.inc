@@ -240,12 +240,22 @@ INSTALLMAN = @if [ -n "$(strip $(MANSRCS))" ] ; then \
 #
 # cross build
 #
-%.o : %.c
-	$(CCC) $(CCFLAGS) $(INC) -c $<
-
-
+# The assembly rule comes FIRST, and the order is the whole of it.
+# make takes the first pattern rule that matches, so with these the
+# other way round a name having both a .c and a .s built the .c and
+# the assembly beside it was never assembled at all.  libc has six of
+# those - atoi, index, rindex, strdup, strncmp and memcpy - five of
+# them listed in that directory's NOTBUILT_C as superseded, and none
+# of them actually superseding anything.
+#
+# These are the only pairs in the tree, so this reaches them and
+# nothing else.
 %.o : %.s
 	$(CCC) $(CCFLAGS) -c $<
+
+
+%.o : %.c
+	$(CCC) $(CCFLAGS) $(INC) -c $<
 
 ifneq ($(strip $(TARGET)),)
 ifeq ($(suffix $(TARGET)),.a)
@@ -372,8 +382,25 @@ ifeq ($(strip $(SRCS)$(MKFILE)),)
 update:
 	$(RECURSE)
 else
+#
+# -h, and then checked, because a source here may be a symlink into
+# the ccc tree - the
+# passes under libexec have been that way for a while and libc is now
+# too, there being one libc rather than two copies drifting apart.
+# What ships has to be the file, not the link: /home/curt/src/ccc does
+# not exist inside the filesystem the simulator boots.  Worse than
+# dangling: micronix has no symlinks at all, so tar x would refuse the
+# entry outright and the source would simply not arrive.  usersim
+# hides this - it resolves an absolute host path quite happily - so
+# the check is here, where it fails on the machine doing the building.
+#
 $(DIR).tar: $(SRCS) $(MKFILE)
-	tar -f $(DIR).tar --ignore-failed-read -c $(MKFILE) $(SRCS)
+	tar -f $(DIR).tar -h --ignore-failed-read -c $(MKFILE) $(SRCS)
+	@if tar -tvf $(DIR).tar | grep -q '^l'; then \
+		echo "$(DIR).tar ships a symlink; micronix cannot extract one" >&2; \
+		tar -tvf $(DIR).tar | grep '^l' >&2; \
+		rm -f $(DIR).tar; exit 1; \
+	fi
 
 update: $(DIR).tar
 	$(RECURSE)
