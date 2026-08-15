@@ -104,6 +104,23 @@ int sp_overflow;                /* the stack has been below the break */
  * find a man section) writes its own text on purpose.  the count is
  * therefore only a curiosity, reported under -W.
  */
+/*
+ * the hole between the break and the stack.  the kernel has granted
+ * memory up to the break, and the stack comes down from the top; what
+ * lies between belongs to neither and a store there is a segmentation
+ * violation on the hardware.  this let it pass, which is how a libc
+ * sbrk that moved its own idea of the break without ever telling the
+ * kernel went unnoticed: every allocation past the real break landed
+ * in the hole and worked perfectly here.
+ *
+ * armed only while the guest is running - the loader writes the image
+ * in through the same put_byte, before there is a stack to speak of.
+ */
+extern unsigned short brake;    /* defined below, used in put_byte */
+int gap_check = 1;              /* -B turns it off */
+int gap_armed;
+int gap_hits;
+
 int tprot_report;               /* -W: report writes into text */
 unsigned short tprot_lo;
 unsigned short tprot_hi;
@@ -164,6 +181,24 @@ put_byte(unsigned short addr, unsigned char value)
         message("watchpoint: write %04x %02x -> %02x at pc %04x\n",
             addr, memory[addr], value, z80_get_reg16(pc_reg));
         watchpoint_touched = 1;
+    }
+    if (gap_check && gap_armed && brake) {
+        unsigned short xsp = z80_get_reg16(sp_reg);
+
+        /*
+         * the core writes the two bytes of a push before it moves sp,
+         * so during one the live sp stands just above the bytes going
+         * down - every push looks like a store below the stack.  a
+         * few bytes of slack covers the instruction in flight, and
+         * costs nothing against what this is looking for, which
+         * misses the stack by thousands.
+         */
+        if (addr >= brake && xsp > 4 && addr < xsp - 4) {
+            if (gap_hits++ < 5)
+                message(
+                    "segv: write %04x is between the break %04x and sp %04x, at pc %04x\n",
+                    addr, brake, xsp, z80_get_reg16(pc_reg));
+        }
     }
     if (tprot_hi && addr >= tprot_lo && addr < tprot_hi) {
         if (tprot_hits++ == 0) {
@@ -816,7 +851,8 @@ usage(char *complaint, char *arg)
         progname);
     fprintf(stderr, "\t-r\trun as root\n");
     fprintf(stderr, "\t-S\treport stack low-water and final break at exit\n");
-    fprintf(stderr, "\t-W\treport writes into the text segment\n");
+    fprintf(stderr, "\t-W\treport writes into the text segment\n"
+	    "\t-B\tallow stores between the break and the stack\n");
     fprintf(stderr, "\t-w <addr>[,<addr>]  write watchpoints\n");
     fprintf(stderr, "\t-T\topen a debug terminal window\n");
     fprintf(stderr, "\t-d <root dir>\n");
@@ -900,6 +936,9 @@ main(int argc, char **argv)
                 break;
             case 'S':
                 sp_report = 1;
+                break;
+            case 'B':
+                gap_check = 0;
                 break;
             case 'W':
                 tprot_report = 1;
@@ -1396,6 +1435,8 @@ do_exec(char *name, char **argv)
     sp_lowater = 0xffff;
     sp_initial = 0;
     sp_overflow = 0;
+    gap_armed = 0;              /* the loader is about to write the image */
+    gap_hits = 0;
     cyc_base = sim_cycles;      /* the new image starts owing nothing */
     /*
      * the name alone does not say which file this instance worked on,
@@ -1493,6 +1534,7 @@ do_exec(char *name, char **argv)
     push(argc);
     push(header.textoff);
     free(ao);
+    gap_armed = 1;              /* the image is in; the guest runs now */
     /*
      * if (verbose & V_DATA) dumpmem(&get_byte,
      * cp->state.registers.word[Z80_SP], 256); 
