@@ -46,6 +46,7 @@ all:
 	cd sh ; make all
 	cd size ; make all
 	cd sync ; make all
+	cd tar ; make all
 	cd vi ; make all
 
 #
@@ -73,6 +74,7 @@ install:
 	cd sh ; make install
 	cd size ; make install
 	cd sync ; make install
+	cd tar ; make install
 	cd vi ; make install
 
 clean:
@@ -94,6 +96,7 @@ clean:
 	cd sh ; make clean
 	cd size ; make clean
 	cd sync ; make clean
+	cd tar ; make clean
 	cd vi ; make clean
 
 clobber:
@@ -115,4 +118,5 @@ clobber:
 	cd sh ; make clobber
 	cd size ; make clobber
 	cd sync ; make clobber
+	cd tar ; make clobber
 	cd vi ; make clobber

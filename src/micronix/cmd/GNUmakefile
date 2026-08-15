@@ -54,7 +54,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = ar ccc cp echo form init ls make man mkdir mknod nm pwd rm s sh size sync vi
+DIRS = ar ccc cp echo form init ls make man mkdir mknod nm pwd rm s sh size sync tar vi
 
 #
 # "cd $$d &&", not "cd $$d ;".  With the semicolon, a directory named
