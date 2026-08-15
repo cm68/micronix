@@ -36,7 +36,43 @@ ASSRCS = access.s alarm.s _break.s chdir.s chmod.s chown.s close.s \
 #
 CSRCS = signal.c lseek.c seek.c rename.c
 
+#
+# crt0 rides beside the archive and not inside it: it is the startup
+# the linker puts in front of a program, named by the driver, so it
+# must not be one of the members ar packs into libu.a.  That is why
+# it is not in ASSRCS - OBJS is built from that list and OBJS is what
+# is archived - and it is named here instead, so that SRCS ships it
+# and a rule of its own builds and installs it.
+#
+# It had neither before.  crt0.s was in no source list, so update
+# never copied it into the simulator's tree; crt0.o was in no object
+# list, so nothing built it and nothing installed it.  The copy in
+# /lib was put there by hand when the system was bootstrapped and
+# then owned by no makefile at all, which is how it was still calling
+# main with argc and argv both on the stack long after the first
+# argument had moved into HL.  Every native build linked against it
+# and produced programs that read their own arguments as garbage.
+#
+CRT0	= crt0.o
+SRCS	= $(CSRCS) $(HSRCS) $(ASSRCS) $(MANSRCS) crt0.s
+
 include $(DEPTH)/GNUmakefile.inc
+
+all: $(CRT0)
+
+$(CRT0): crt0.s
+	$(CCC) $(CCFLAGS) -c crt0.s
+
+install: installcrt0
+
+installcrt0: $(CRT0)
+	mkdir -p $(LIBINSTDIR)
+	cp $(CRT0) $(LIBINSTDIR)/$(CRT0)
+
+clean: cleancrt0
+
+cleancrt0:
+	rm -f $(CRT0)
 
 # What the shell needed and could not have: prove the symbols that
 # signal() is built from are actually exported.  _signal.s had no

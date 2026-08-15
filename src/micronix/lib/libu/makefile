@@ -41,7 +41,23 @@ COBJS	= signal.o lseek.o seek.o rename.o
 
 OBJS	= $(AOBJS) $(COBJS)
 
-all: $(TARGET)
+#
+# crt0 is not in the archive.  It is the startup the linker puts in
+# front of every program, named by the driver, so it is installed
+# beside libu.a rather than packed into it.
+#
+# It is built here because nothing built it anywhere.  It sat in /lib
+# as a bootstrap leftover that no makefile owned, and when the first
+# argument moved into HL it went on calling main by the old
+# convention - argc and argv both on the stack - against a main
+# compiled for the new one.  Every native build after that linked a
+# program that read its own arguments as garbage, and the compiler
+# that came out could not parse its own command line.  A file no rule
+# mentions cannot go stale loudly; it goes stale silently.
+#
+CRT0	= crt0.o
+
+all: $(TARGET) $(CRT0)
 
 $(TARGET): $(OBJS)
 	rm -f $(TARGET)
@@ -58,11 +74,15 @@ $(AOBJS): $*.s
 $(COBJS): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
-install: $(TARGET)
+$(CRT0): crt0.s
+	$(CC) $(CFLAGS) -c crt0.s
+
+install: $(TARGET) $(CRT0)
 	cp $(TARGET) $(LIBDIR)/$(TARGET)
+	cp $(CRT0) $(LIBDIR)/$(CRT0)
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJS) $(CRT0)
 
 clobber: clean
 	rm -f $(TARGET)
