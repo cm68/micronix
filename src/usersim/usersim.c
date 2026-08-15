@@ -89,6 +89,7 @@ int traceflags;
  * otherwise every program is billed for its predecessors.
  */
 unsigned long long cyc_base;    /* the count when this image was loaded */
+char cyc_name[64];              /* and which image, for the rollup */
 int sp_report;                  /* -S: report stack low-water at exit */
 unsigned short sp_lowater = 0xffff;
 unsigned short sp_initial;
@@ -1396,6 +1397,8 @@ do_exec(char *name, char **argv)
     sp_initial = 0;
     sp_overflow = 0;
     cyc_base = sim_cycles;      /* the new image starts owing nothing */
+    strncpy(cyc_name, name, sizeof(cyc_name) - 1);
+    cyc_name[sizeof(cyc_name) - 1] = 0;
     free_syms();
 
     for (i = 0; i < 65536; i++) {
@@ -2702,7 +2705,8 @@ SystemCall()
             fflush(repfp);
         }
         if (verbose & V_CYCLE) {
-            fprintf(repfp, "cycles: %llu\n", sim_cycles - cyc_base);
+            fprintf(repfp, "cycles: %llu %s\n",
+                sim_cycles - cyc_base, cyc_name);
             fflush(repfp);
         }
         if (tprot_report && tprot_hits) {
