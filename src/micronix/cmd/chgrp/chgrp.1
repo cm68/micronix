@@ -1,0 +1,63 @@
+.he "chgrp (1)                    8/16/26                    chgrp (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+chgrp
+- change group
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+chgrp [ -fR ] group file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Chgrp changes the group of each file to group, which may be a decimal
+gid or a group name looked up in /etc/group.
+.sp
+Only the super-user may change a file's group.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-f	Do not report errors.
+
+.ti -10
+-R	Change a directory and everything under it, recursively.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The Berkeley chgrp let an owner who belonged to the new group change
+their own file to it.  Micronix has no such membership test, and the
+kernel lets only the super-user chown at all, so here chgrp is root's
+tool; the check in the original was only advice.
+.sp
+A group name is looked up in /etc/group by hand, since libc has no
+getgrnam.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ls (1), chmod (1)

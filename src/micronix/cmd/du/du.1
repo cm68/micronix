@@ -1,0 +1,69 @@
+.he "du (1)                       8/16/26                       du (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+du
+- summarize disk usage
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+du [ -s ] [ -a ] [ name ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Du gives the number of blocks in all files and, recursively, the
+directories within each name.  With no name, the current directory is
+used.
+.sp
+A file that has two links to it is counted only once.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-s	Give only the grand total of each name.
+
+.ti -10
+-a	Give an entry for each file as well as each directory.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The original counted kilobytes; here a block is 512 bytes, the way du
+counted before Berkeley changed it, because the inode keeps a size and
+not a block count.  Indirect blocks are not counted.
+.sp
+A special file counts as nothing - its device number lives where a
+file keeps its size, and it is not a size.
+.sp
+A file named as an argument is not listed unless -a or -s is given.
+.sp
+The list of files already counted through a second link holds two
+hundred entries; beyond that, a file with several links is counted
+once per link.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ls (1)

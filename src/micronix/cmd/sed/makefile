@@ -17,6 +17,8 @@ CC	= ccc
 #
 CFLAGS	= -O
 BIN	= /bin
+MAN	= sed.1
+MANDIR	= /usr/man/man1
 PROG	= sed
 HDRS	= sed.h
 OBJS	= sed0.o sed1.o
@@ -35,6 +37,7 @@ $(OBJS): $*.c $(HDRS)
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/$(PROG)
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS)

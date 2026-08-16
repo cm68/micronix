@@ -1,0 +1,70 @@
+.he "mkfs (1)                     8/16/26                     mkfs (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+mkfs
+- construct a file system
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+mkfs [ -f ] [ -i bootfile ] device [ size | -exclude ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Mkfs makes an empty file system on the block device.  The size, when
+given, is the number of 512-byte blocks the file system is to hold; a
+number written -exclude instead leaves that many blocks at the end of
+the device, which is how swap space is kept out of the file system.
+Given neither, the whole device is used.  The size of the device is
+worked out from the drive, so it never has to be told.
+.sp
+Cylinder 0 is reserved for the boot and the disk label, whether or
+not a boot is written.  The blocks are owned by a file, /boot/bootmw,
+so the free list never hands them out.  The boot itself is read from
+/bootmw.bin, or from bootfile with -i.
+.sp
+A disk that already holds a file system is left alone unless -f is
+given.  The number of i-nodes is chosen from the size.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-f	Destroy a file system that is already there.
+
+.ti -10
+-i bootfile	Write bootfile into the boot area instead of /bootmw.bin.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This is not the v7 mkfs: there is no prototype file, and it builds
+only an empty file system.  The size is in blocks and may be given as
+an exclusion, and the device size comes from the drive, not from the
+command line.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+mknod (1), sync (1)

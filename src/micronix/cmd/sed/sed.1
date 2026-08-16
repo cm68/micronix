@@ -1,0 +1,181 @@
+.he "sed (1)                      8/16/26                      sed (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+sed
+- stream editor
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+sed [ -n ] [ -g ] [ -e script ] [ -f sfile ] [ file ] ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Sed copies the named files, or the standard input, to the standard
+output, edited by a script of commands.  The -f option takes the
+script from a file and the -e option from its argument; the two may be
+mixed, and a single -e with no -f may be left off.  The -n option
+turns off the default output.
+.sp
+A script is a list of commands, one to a line:
+.sp
+.nf
+     [address [, address]] function [arguments]
+.fi
+.sp
+In normal operation sed copies a line of input into the pattern space,
+applies in order every command whose address selects it, and at the
+end of the script copies the pattern space to the standard output,
+unless -n was given, and starts again.
+.sp
+An address is a decimal line number counted across all the files, a $
+for the last line of input, or /regular expression/ in the style of
+ed.  The escape \n matches a newline embedded in the pattern space.
+.sp
+A command with no address selects every line; one address selects the
+lines that match it; two select the range from the first line matching
+the first through the next line matching the second.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-n	Do not print the pattern space at the end of each cycle.
+
+.ti -10
+-e script	Take the next argument as a command; several -e and -f options pile up.
+
+.ti -10
+-f sfile	Take the script from sfile.
+
+.ti -10
+-g	Make every s command global, as if each carried the g flag.
+
+.in -10
+.sp 2
+.in -5
+.bd
+COMMANDS
+.in +5
+.br
+The number in parentheses is the most addresses the command may take.
+An argument written text is one or more lines, all but the last ending
+in \ to hide the newline.
+.sp
+.in +10
+.ti -10
+a\ text	Append.  Put text on the output before reading the next line.  (1)
+
+.ti -10
+b label	Branch to the : command bearing label; with no label, to the end of the script.  (2)
+
+.ti -10
+c\ text	Change.  Delete the pattern space, put text on the output, and start the next cycle.  (2)
+
+.ti -10
+d	Delete the pattern space and start the next cycle.  (2)
+
+.ti -10
+D	Delete the part of the pattern space up to the first newline and start the next cycle.  (2)
+
+.ti -10
+g	Replace the pattern space with the hold space.  (2)
+
+.ti -10
+G	Append the hold space to the pattern space.  (2)
+
+.ti -10
+h	Replace the hold space with the pattern space.  (2)
+
+.ti -10
+H	Append the pattern space to the hold space.  (2)
+
+.ti -10
+i\ text	Insert.  Put text on the output.  (1)
+
+.ti -10
+l	List.  Print the pattern space with non-graphic characters shown as escapes.  (2)
+
+.ti -10
+n	Print the pattern space and read the next line into it.  (2)
+
+.ti -10
+N	Append the next line to the pattern space with a newline between.  (2)
+
+.ti -10
+p	Print the pattern space.  (2)
+
+.ti -10
+P	Print the part of the pattern space up to the first newline.  (2)
+
+.ti -10
+q	Quit.  Print the pattern space and stop.  (1)
+
+.ti -10
+r rfile	Read rfile and put its contents on the output before the next line is read.  (1)
+
+.ti -10
+s/regular expression/replacement/flags	Substitute the replacement for the regular expression; any character may stand for /.  The flags are g to replace every non-overlapping instance, p to print the pattern space if a replacement was made, P to print just the first line of it, and w wfile to append it to wfile.  (2)
+
+.ti -10
+t label	Branch to the : command bearing label if a substitution has been made since the last line read or t.  (2)
+
+.ti -10
+w wfile	Append the pattern space to wfile.  (2)
+
+.ti -10
+x	Exchange the pattern space and the hold space.  (2)
+
+.ti -10
+y/string1/string2/	Replace each character of string1 with the one under it in string2, which must be the same length.  (2)
+
+.ti -10
+! function	Apply function only to the lines not selected by the address.  (2)
+
+.ti -10
+: label	Do nothing; a place for b and t to branch to.  (0)
+
+.ti -10
+=	Print the current line number.  (1)
+
+.ti -10
+{	Group; apply the commands through the matching } only when the pattern space is selected.  (2)
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The -g option, the l command and the P flag of s are in this sed but
+not in the manual it came from, and the r command here takes one
+address where the manual said two.
+.sp
+The buffers are smaller than the original's to fit one 64k image: the
+longest line is 2000 characters, a script holds 128 commands and 128
+line-number addresses, and the compiled commands share 5000 bytes.  A
+script that overruns any of them says so and exits, and at most nine
+w files can be named.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ed (1), grep (1)

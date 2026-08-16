@@ -1,0 +1,110 @@
+.he "tar (1)                      8/16/26                      tar (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+tar
+- tape archiver
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+tar -key [ name ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Tar saves and restores files on a single archive, usually a tape but
+any file will do.  Its action is set by the key, a string of
+characters holding one function letter and any number of modifiers.
+The remaining arguments are file or directory names; a directory
+stands for the files and subdirectories under it, recursively.
+.sp 2
+.in -5
+.bd
+FUNCTIONS
+.in +5
+.br
+.in +10
+.ti -10
+r	Append the named files to the archive.
+
+.ti -10
+x	Extract the named files, or the whole archive if none are named.
+
+.ti -10
+t	List the named files, or the whole archive.
+
+.ti -10
+c	Create a new archive; implies r.
+
+.in -10
+.sp 2
+.in -5
+.bd
+MODIFIERS
+.in +5
+.br
+.in +10
+.ti -10
+f file	Use file as the archive; - means the standard output or input.  The default is /dev/mt0.
+
+.ti -10
+b n	Use a blocking factor of n 512-byte blocks; the default is 20.
+
+.ti -10
+v	List each file as it is treated.
+
+.ti -10
+w	Ask before each file; a y answer goes ahead.
+
+.ti -10
+l	Complain about links that cannot all be resolved.
+
+.ti -10
+o	Leave directory entries out of the archive.
+
+.ti -10
+p	Restore files to their original modes, ignoring the umask.
+
+.ti -10
+i	Ignore checksum errors on directories.
+
+.ti -10
+B	Force blocking to twenty blocks a record.
+
+.ti -10
+F	Skip SCCS and RCS directories and core and errs files; given twice, also .o and a.out.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The port dropped the u flag, which leaned on sort and awk, and the h
+flag along with symbolic links, which this machine does not have;
+extracting an entry that is a symbolic link prints a complaint and
+moves on.  Modification times are not restored, since there is no
+utime to restore them with.  File names are limited to 100
+characters, and the default archive is /dev/mt0, not /dev/rmt?.
+.sp
+A name argument of -C directory changes to that directory for the
+names that follow it when writing.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ar (1), cp (1)

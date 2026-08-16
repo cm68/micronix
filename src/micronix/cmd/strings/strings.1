@@ -1,0 +1,73 @@
+.he "strings (1)                  8/16/26                  strings (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+strings
+- print the printable strings in a binary file
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+strings [ - ] [ -o ] [ -# ] [ file ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Strings reads a binary file and writes every sequence of printing
+characters it finds that is long enough.  A string is four or more
+printing characters, and is shown one to a line; a longer run is not
+broken up.
+.sp
+When the file is a micronix object file, strings reads only the text
+and data, the parts a program keeps its literals in, and skips the
+header in front and the symbols behind.  The - flag makes it search
+the whole file, bookkeeping and all.  With a plain data file that has
+no object header, everything is searched either way.
+.sp
+With no file, strings reads the standard input.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-	Search the whole file rather than only the program parts.
+
+.ti -10
+-o	Precede each string by its offset in the file, in octal.
+
+.ti -10
+-#	Take # as the minimum string length instead of 4.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The port inverted one assumption the original carried.  On the VAX
+the compiler put a program's strings in its initialized data, so
+strings skipped the text and searched only there.  The micronix
+compiler keeps them in text, so this strings searches text and data
+together and skips only the header and symbols - the same idea,
+"read the program, not the bookkeeping", turned to fit the machine.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+od (1)

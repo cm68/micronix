@@ -1,0 +1,77 @@
+.he "mv (1)                       8/16/26                       mv (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+mv
+- move or rename files
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+mv [ -i ] [ -f ] [ - ] file1 file2
+.bd
+mv [ -i ] [ -f ] [ - ] file ... directory
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Mv moves (changes the name of) file1 to file2.  If file2 already
+exists, it is removed first.  If file2 has a mode that forbids
+writing, mv prints the mode and asks; a line beginning with y lets the
+move go on, and anything else stops it.  Mv refuses to move a file
+onto itself.
+.sp
+In the second form, one or more files are moved to directory under
+their own names.
+.sp
+If the two names are on different file systems, mv must copy the file
+and delete the original.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-i	Ask before replacing an existing file; only a y answer lets it happen.
+
+.ti -10
+-f	Force: override -i and the check of a file's write permission.
+
+.ti -10
+-	Take every following argument as a file name, so that a name beginning with a minus sign can be moved.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+A directory can be renamed only within its own parent.  Rename here is
+unlink and link, and a directory's .. entry would otherwise point at
+the wrong parent.
+.sp
+Across file systems the copied file belongs to whoever runs mv, its
+links to other files are lost, and its modification time is now -
+micronix has no call to set a time.
+.sp
+The prompts appear only when the input is a terminal.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+cp (1), ln (1)

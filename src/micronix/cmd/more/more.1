@@ -1,0 +1,68 @@
+.he "more (1)                     8/16/26                     more (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+more
+- page through a file on a terminal
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+more [ -n ] [ name ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+More reads the named files, or the standard input, and writes them a
+screenful at a time to a terminal, pausing after each with --More--.
+A space writes the next screenful, return writes one more line, and q
+- or the interrupt character - quits.  Anything else writes another
+screenful too; this pager has a small vocabulary.
+.sp
+In a pipeline the keystrokes are read from the terminal on the
+standard error, so the text being paged is not eaten.  If the
+standard output is not a terminal there is nobody to page for, and
+more copies its input straight through, like cat.  With more than one
+file a banner is written before each.
+.sp
+The screen is taken to be twenty-four lines and eighty columns, and a
+screenful is one line less.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-n	Take n lines in a screenful rather than the default.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The more that came with the system had options and commands this one
+does not.  The flags -c -d -f -l -s and -u are gone, as are the
++linenumber and +/pattern forms, the search and skip commands, the
+MORE environment variable and the termcap lookup; the window size is
+fixed.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+less (1)

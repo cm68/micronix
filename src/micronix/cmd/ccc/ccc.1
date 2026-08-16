@@ -1,0 +1,104 @@
+.he "ccc (1)                      8/16/26                      ccc (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+ccc
+- the micronix C compiler
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+ccc [ option ] file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Ccc compiles C programs for micronix.  It drives the compiler passes,
+c0, c1, c2 and peep, assembles with as, and links with ld, so a single
+command turns source into a running program.  A file ending in .c is
+compiled, one in .s is assembled, and .o and .a files are handed to
+the linker.  With no -c or -s, the result is an executable called
+a.out, or the name given with -o.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-o name	Name the output file rather than a.out.
+
+.ti -10
+-c	Compile and assemble, but do not link; leave the .o.
+
+.ti -10
+-s	Compile only; leave the assembly in a .s.
+
+.ti -10
+-k	Keep every intermediate file the passes produce.
+
+.ti -10
+-O	Run the peephole optimizer.  Not optional in practice: it is what makes the image small enough to leave the program any heap.
+
+.ti -10
+-S	Strip symbols from the output.
+
+.ti -10
+-I dir	Add dir to the include search path.
+
+.ti -10
+-i dir	Set the system include directory.
+
+.ti -10
+-D var	Define a preprocessor macro.
+
+.ti -10
+-E	Preprocess only; write the result to the standard output.
+
+.ti -10
+-l lib	Link with liblib.a.
+
+.ti -10
+-L dir	Add dir to the library search path.
+
+.ti -10
+-m system	Choose the target: micronix (the default) or cpm.
+
+.ti -10
+-x	Print each command as it is run.
+
+.ti -10
+-n	Print the commands without running them.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The compiler and its passes live beside ccc, in /libexec, and are
+looked up from where ccc was found, so a copy of ccc built for CP/M
+would look for its own passes rather than micronix's.
+.sp
+The -O flag is the difference between a program that fits a 64k image
+and one that does not: every byte of code is a byte the program cannot
+allocate for its data.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ld (1), nm (1), size (1)

@@ -1,0 +1,64 @@
+.he "date (1)                     8/16/26                     date (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+date
+- print and set the date
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+date [ -u ] [ yymmddhhmm [ .ss ] ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+With no argument, date prints the current date and time.  With an
+argument it sets the clock, which only the super-user may do.
+.sp
+The argument is yymmddhhmm: two digits each of year, month, day, hour
+and minute, with an optional .ss for seconds.  The hour is on the 24
+hour clock.  The year, month and day may be left off, and then the
+current ones are used.  For example, date 8506131627 sets the clock
+to June 13 1985 at 4:27 PM.
+.sp
+The kernel keeps Greenwich mean time.  An argument is taken to be
+local time, and date adds the correction before it stores it.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-u	Print universal time, or take the argument as universal time rather than local.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The Berkeley date had flags to set the kernel's daylight-saving and
+timezone values, and to talk to timed over the network.  Micronix has
+no such kernel state and no network, so only -u remains; the timezone
+is a single minutes-west figure in libc.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+sh (1)

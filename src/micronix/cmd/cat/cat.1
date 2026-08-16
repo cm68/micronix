@@ -1,0 +1,77 @@
+.he "cat (1)                      8/16/26                      cat (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+cat
+- catenate and print files
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+cat [ -benstuv ] [ file ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Cat reads each file in turn and writes it to the standard output, so
+cat file prints one file and cat file1 file2 > file3 concatenates the
+first two into the third.  With no file, or where a file is -, it
+reads the standard input.
+.sp
+Output is buffered in 512 byte blocks unless -u makes it unbuffered.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-n	Number the output lines, from 1.
+
+.ti -10
+-b	Like -n, but leave blank lines unnumbered.
+
+.ti -10
+-s	Crush a run of blank lines into a single blank line.
+
+.ti -10
+-v	Make non-printing characters visible.  Control characters print as ^X, the delete character as ^?, and a byte with the high bit set as M- followed by its low seven bits.
+
+.ti -10
+-e	Print a $ at the end of each line; implies -v.
+
+.ti -10
+-t	Print tab characters as ^I; implies -v.
+
+.ti -10
+-u	Write the output unbuffered.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+Beware of cat a b > a, which destroys the input before it is read.
+.sp
+The Berkeley cat sized its buffer from the file system; micronix has
+no such size, so the copy reads 512 bytes, the disk block, at a time.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+cp (1), sh (1)

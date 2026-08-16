@@ -1,0 +1,122 @@
+.he "od (1)                       8/16/26                       od (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+od
+- octal, decimal, hex, ascii dump
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+od [ -format ] [ file ] [ [ + ] offset [ . ] [ b ] [ label ] ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Od displays file, or its standard input, in one or more dump formats
+picked by the first argument.  With no format argument, -o is the
+default.  Dumping goes on to the end of the file.
+.sp
+More than one format character may be given, and each is applied to
+the same data, one conversion to a line.
+.sp
+The offset argument is the byte offset into the file where dumping
+begins.  It is taken in octal unless a . is appended, which makes it
+decimal, or it begins with x or 0x, which makes it hexadecimal.  A
+trailing b multiplies it by 512 and a trailing B by 1024, as a block
+count.  The addresses printed are in the same radix as the offset, or
+octal if there is none.
+.sp
+If file is not given, the offset must be written with a leading +.
+.sp
+The label argument is a pseudo-address shown in parentheses after the
+file offset; it is meant for core images and is written like an
+offset.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-a	Name the bytes as ASCII characters.
+
+.ti -10
+-b	Bytes as unsigned octal.
+
+.ti -10
+-c	Bytes as ASCII characters; the non-graphic ones appear as C escapes or octal numbers.
+
+.ti -10
+-d	Short words as unsigned decimal.
+
+.ti -10
+-o	Short words as unsigned octal - the default; -B means the same.
+
+.ti -10
+-x	Short words as unsigned hexadecimal; -h means the same.
+
+.ti -10
+-i	Short words as signed decimal.
+
+.ti -10
+-D	Long words as unsigned decimal.
+
+.ti -10
+-O	Long words as unsigned octal.
+
+.ti -10
+-H	Long words as unsigned hexadecimal; -X means the same.
+
+.ti -10
+-I	Long words as signed decimal; -l and -L mean the same.
+
+.ti -10
+-s[n]	Print runs of graphic characters that end in a null, at least n long (3 by default).
+
+.ti -10
+-v	Show every line; by default a line like the one before it is shown as *.
+
+.ti -10
+-w[n]	Take n bytes to a line (16 by default, 32 with no n).
+
+.ti -10
+-p	With -a, underline the bytes of even parity.
+
+.ti -10
+-P	With -a, underline the bytes of odd parity.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The e, f and F conversions are gone with the floating point this
+machine does not have; od says so and exits rather than dump question
+marks that look like data.
+.sp
+A width asked for with -w is cut off at 512, the size of the buffer
+the input is read into.
+.sp
+A file name cannot begin with +, a hexadecimal offset cannot be a
+block count, and only one file can be named.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+strings (1)

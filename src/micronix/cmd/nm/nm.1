@@ -1,0 +1,72 @@
+.he "nm (1)                       8/16/26                       nm (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+nm
+- list the symbols in an object file
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+nm [ -bdgrv ] file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Nm reads a Whitesmiths object file, or an archive of them, and lists
+the symbol table.  Each symbol is one line: its value, the segment it
+lives in, whether it is local or global, whether it is defined, and
+its name.  With no option this is all it prints.
+.sp
+An archive is listed member by member, each under its own heading.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-b	Hex dump the text and data segments.
+
+.ti -10
+-d	Disassemble the text segment.
+
+.ti -10
+-g	Generate an assemblable .s file for the object, named after it.
+
+.ti -10
+-r	List the relocations.
+
+.ti -10
+-v	Show the header before the rest.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This is not the BSD nm; it reads Whitesmiths object files, not a.out.
+The name-list letters of the original are gone, and the flags have
+other meanings: the original -g took only global symbols and -r
+sorted in reverse, where here -g writes a .s file and -r lists
+relocations.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ar (1), size (1)

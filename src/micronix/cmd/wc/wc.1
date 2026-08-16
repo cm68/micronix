@@ -1,0 +1,49 @@
+.he "wc (1)                       8/16/26                       wc (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+wc
+- word count
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+wc [ -lwc ] [ name ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Wc counts the lines, words and characters in the named files, or in
+the standard input when no name is given.  A word is a run of
+characters that are not space, tab or newline.  When more than one
+file is counted a line of totals is printed too.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-l	Count lines only.
+
+.ti -10
+-w	Count words only.
+
+.ti -10
+-c	Count characters only.
+
+.in -10
+.sp
+The default is -lwc; the counts print in the order lines, words,
+characters.

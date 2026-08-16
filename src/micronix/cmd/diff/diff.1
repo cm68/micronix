@@ -1,0 +1,112 @@
+.he "diff (1)                     8/16/26                     diff (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+diff
+- differential file and directory comparator
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+diff [ options ] file1 file2
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Diff tells what lines must be changed to bring two files into
+agreement, or, if both arguments are directories, compares the two
+sets of files by name.  Either file may be -, in which case the
+standard input is used.
+.sp
+The default output looks like ed commands: a range with a letter a, d
+or c for add, delete or change, followed by the affected lines, those
+from file1 flagged < and those from file2 flagged >.
+.sp
+When both arguments are directories, text files that differ are run
+through the file diff, and files found in only one directory, binary
+files that differ, and common subdirectories are listed.  If one
+argument is a directory and the other a file, the file in the
+directory with the same name is used.
+.sp
+The exit code is 0 for no differences, 1 for some, and 2 for trouble.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-e	Produce an ed script that recreates file2 from file1.
+
+.ti -10
+-f	Like -e, but in the opposite order; not useful with ed.
+
+.ti -10
+-n	Like -e, but in the opposite order and with a count of changed lines on each command, the form rcsdiff uses.
+
+.ti -10
+-c	Produce a diff with lines of context.  The default is 3 lines; -c10 asks for 10.
+
+.ti -10
+-h	Do a fast, half-hearted job.  It works only when changed stretches are short and well separated, but does work on files of unlimited length.
+
+.ti -10
+-D string	Produce a merged version of the two files with C preprocessor #ifdef string controls, so compiling without string defined yields file1 and with it defined yields file2.
+
+.ti -10
+-b	Ignore trailing blanks, and compare other runs of blanks as equal.
+
+.ti -10
+-w	Ignore all whitespace.
+
+.ti -10
+-i	Ignore the case of letters.
+
+.ti -10
+-t	Expand tabs in output lines, to keep the original indentation readable.
+
+.ti -10
+-l	For directories, the long format: pipe each text diff through pr and summarize the other differences at the end.
+
+.ti -10
+-r	For directories, descend into common subdirectories and compare them too.
+
+.ti -10
+-s	Report files that are the same, which are otherwise not mentioned.
+
+.ti -10
+-Sname	Start a directory diff at the file name.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The port dropped the -E, -1, -2 and -I companions of -D, which the
+v7 diff had; only -D string remains.
+.sp
+The halfhearted diff is /bin/diffh, not /usr/libexec/diffh, and diff
+itself lives at /bin/diff.
+.sp
+Scripts made with -e or -f are naive about lines consisting of a
+single dot.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+cmp (1), ed (1)

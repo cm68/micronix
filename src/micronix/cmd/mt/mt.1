@@ -1,0 +1,45 @@
+.he "mt (1)                       8/16/26                       mt (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+mt
+- print the raw mtime words of a file
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+mt file
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Mt stats the named file and prints the two sixteen-bit words that make
+up its modification time, in the order they sit in memory.  The kernel
+stores the time as a pair of words, and the order they come back in
+shows whether a program that reads them is getting them right.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This is a diagnostic written for the port, not the magnetic tape
+manipulator the name meant on the BSD system.  It takes a file name,
+not a tape command.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ls (1)

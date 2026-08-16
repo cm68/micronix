@@ -1,0 +1,122 @@
+.he "dd (1)                       8/16/26                       dd (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+dd
+- convert and copy a file
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+dd [ option=value ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Dd copies the standard input to the standard output, converting on the
+way if it is asked to, unless if= or of= points it at files.  The
+block sizes may be set to suit raw devices.
+.sp
+A size argument is a number, which may end in k, b or w to multiply by
+1024, 512 or 2, and two numbers may be multiplied by putting x between
+them.  After the copy, dd reports the number of whole and partial
+records read and written.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+if=file	Read from file rather than the standard input.
+
+.ti -10
+of=file	Write to file rather than the standard output.
+
+.ti -10
+ibs=n	Read in blocks of n bytes; the default is 512.
+
+.ti -10
+obs=n	Write in blocks of n bytes; the default is 512.
+
+.ti -10
+bs=n	Set both input and output block size to n, superseding ibs and obs.  With no conversion this also skips the copy from the input buffer to the output buffer.
+
+.ti -10
+cbs=n	Set the conversion buffer size, used by the ascii, ebcdic, ibm, block and unblock conversions.
+
+.ti -10
+skip=n	Skip n input records before copying.
+
+.ti -10
+seek=n	Seek n records into the output file before copying.
+
+.ti -10
+count=n	Copy only n input records.
+
+.ti -10
+files=n	Copy n input files before stopping; useful only on a device such as a tape.
+
+.ti -10
+conv=ascii	Convert EBCDIC to ASCII.
+
+.ti -10
+conv=ebcdic	Convert ASCII to EBCDIC.
+
+.ti -10
+conv=ibm	A slightly different map of ASCII to EBCDIC.
+
+.ti -10
+conv=block	Convert variable length records to fixed length, padding with blanks to cbs.
+
+.ti -10
+conv=unblock	Convert fixed length records to variable length, trimming trailing blanks and adding a newline.
+
+.ti -10
+conv=lcase	Map upper case to lower case.
+
+.ti -10
+conv=ucase	Map lower case to upper case.
+
+.ti -10
+conv=swab	Swap each pair of bytes.
+
+.ti -10
+conv=noerror	Do not stop on a read error.
+
+.ti -10
+conv=sync	Pad every input record to ibs.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+Several conversions may be given after conv=, separated by commas.  Of
+ascii, ebcdic, ibm, block and unblock only the last named is used.
+When copying a raw disk with bad sectors, conv=noerror,sync keeps dd
+in step.
+.sp
+The port made the record counts long, so a copy is no longer cut off
+at 32k records as it was on the PDP-11; block sizes, however, are
+still capped at 32000 bytes, and a larger one is refused.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+cp (1)

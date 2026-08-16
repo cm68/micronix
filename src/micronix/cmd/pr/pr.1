@@ -1,0 +1,84 @@
+.he "pr (1)                       8/16/26                       pr (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+pr
+- print file
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+pr [ option ] ... [ file ] ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Pr produces a printed listing of one or more files.  The output is
+split into pages headed by the date, the name of the file or a header
+given with -h, and the page number.  With no file, pr reads its
+standard input.
+.sp
+Options apply to all the files after them and may be reset between
+files.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-n	Produce n columns, as in -3.
+
+.ti -10
++n	Begin printing with page n.
+
+.ti -10
+-h header	Take the next argument as the page header.
+
+.ti -10
+-wn	Take the width of the page as n characters instead of the default 72.
+
+.ti -10
+-ln	Take the length of the page as n lines instead of the default 66.
+
+.ti -10
+-f	Use formfeeds rather than blank lines to separate pages.
+
+.ti -10
+-t	Print no page header and no trailer.
+
+.ti -10
+-sc	Separate columns by the single character c; a bare -s means a tab.
+
+.ti -10
+-m	Print all the files at once, each in its own column.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+Pr no longer blocks write (1) messages to the terminal while it
+prints.  The original did it by chmod'ing the tty and putting the
+mode back on the way out, which wanted ttyname and this libc has
+none.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+cat (1)

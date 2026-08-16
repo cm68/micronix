@@ -1,0 +1,100 @@
+.he "chmod (1)                    8/16/26                    chmod (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+chmod
+- change mode
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+chmod [ -Rf ] mode file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Chmod changes the mode of each file.  The mode may be absolute or
+symbolic.  An absolute mode is an octal number made by ORing the bits
+below.
+.sp
+.in +10
+.ti -10
+4000	set user id on execution
+
+.ti -10
+2000	set group id on execution
+
+.ti -10
+1000	sticky bit
+
+.ti -10
+0400	read by owner
+
+.ti -10
+0200	write by owner
+
+.ti -10
+0100	execute, or search a directory, by owner
+
+.ti -10
+0070	read, write and execute by group
+
+.ti -10
+0007	read, write and execute by others
+
+.in -10
+.sp
+A symbolic mode is one or more clauses separated by commas, each of
+the form who op permission.  who is any of u, g and o for user, group
+and other, or a for all three; left out, it means a.  op is + to add
+permission, - to take it away, or = to set the mode exactly, clearing
+the other bits.  permission is any of r, w and x, X to add execute
+only if the file is a directory or already executable by someone, s
+to set the set-id bit, and t to set the sticky bit.  A permission of
+u, g or o copies the corresponding bits from the current mode.  The
+clauses are worked left to right.  The letter s is only useful with
+u or g.
+.sp
+Only the owner of a file, or the super-user, may change its mode.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-R	Change a directory and everything under it, recursively.
+
+.ti -10
+-f	Do not complain about a file whose mode cannot be changed.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The Berkeley chmod, when who was left out, let the umask trim the
+bits set by +; micronix has no umask, so a clause with no who acts on
+all three classes outright, as it did in v7.
+.sp
+Micronix has no symbolic links, so -R has nothing to skip.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ls (1), chgrp (1), find (1)

@@ -17,6 +17,8 @@ CC	= ccc
 #
 CFLAGS	= -O
 BIN	= /bin
+MAN	= less.1
+MANDIR	= /usr/man/man1
 LIB	= /usr/lib
 PROG	= less
 HDRS	= less.h position.h funcs.h
@@ -41,6 +43,7 @@ $(OBJS): $*.c $(HDRS)
 #
 install: $(PROG)
 	cp $(PROG) $(BIN)/$(PROG)
+	cp $(MAN) $(MANDIR)/$(MAN)
 	cp less.help $(LIB)/less.help
 
 clean:

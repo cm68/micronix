@@ -1,0 +1,63 @@
+.he "cmp (1)                      8/16/26                      cmp (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+cmp
+- compare two files
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+cmp [ -ls ] file1 file2 [ skip1 [ skip2 ] ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Cmp compares two files and says nothing if they are the same.  If they
+differ, it reports the byte and line number of the first difference;
+if one file is an initial piece of the other, it says so.  Where file1
+is -, the standard input is used.
+.sp
+The exit code is 0 for identical files, 1 for different files, and 2
+for trouble such as a missing file.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-l	Print every difference, as a decimal byte number and the two bytes in octal.
+
+.ti -10
+-s	Print nothing; the exit code alone tells whether the files differ.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The skip arguments, which the Berkeley man page left out though the
+program has always taken them, tell cmp to start that many bytes into
+each file.  A number with a leading 0 is octal; otherwise it is
+decimal.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+diff (1)

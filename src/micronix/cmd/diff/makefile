@@ -21,6 +21,8 @@ CC	= ccc
 #
 CFLAGS	= -O
 BIN	= /bin
+MAN	= diff.1
+MANDIR	= /usr/man/man1
 PROG	= diff
 OBJS	= diff.o diffdir.o diffreg.o
 
@@ -45,6 +47,7 @@ diffh.o: diffh.c
 
 install: $(PROG) diffh
 	cp $(PROG) $(BIN)/$(PROG)
+	cp $(MAN) $(MANDIR)/$(MAN)
 	cp diffh $(BIN)/diffh
 
 clean:

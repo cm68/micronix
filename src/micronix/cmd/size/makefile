@@ -21,6 +21,8 @@ CC	= ccc
 #
 CFLAGS	= -O
 BIN	= /bin
+MAN	= size.1
+MANDIR	= /usr/man/man1
 PROG	= size
 HDRS	= wsobj.h
 OBJS	= size.o
@@ -39,6 +41,7 @@ $(OBJS): $*.c $(HDRS)
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/size
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS)

@@ -1,0 +1,95 @@
+.he "grep (1)                     8/16/26                     grep (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+grep
+- search a file for a pattern
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+grep [ option ] ... expression [ file ] ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Grep searches the named files, or the standard input if there are
+none, for lines matching a pattern, and copies each line found to the
+standard output.  The pattern is a limited regular expression in the
+style of ed: . [ ] * ^ and $ have their usual meanings, \( and \)
+group, \1 through \9 name a group again, and \< and \> match a word
+boundary.
+.sp
+When there is more than one file, each line found is preceded by the
+name of the file it came from.
+.sp
+Several of those characters are also special to the shell, so it is
+safest to put the whole expression in single quotes.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-v	Print the lines that do not match.
+
+.ti -10
+-c	Print only a count of the matching lines.
+
+.ti -10
+-l	Print only the names of the files that have a matching line, once each.
+
+.ti -10
+-n	Precede each line by its line number in the file.
+
+.ti -10
+-b	Precede each line by its block number.
+
+.ti -10
+-i	Ignore the case of letters, so that upper and lower case match each other.  The spelling -y means the same.
+
+.ti -10
+-w	Match the expression only as a whole word, as if it were written \<...\>.
+
+.ti -10
+-s	Print nothing; use the exit status to test for a match.
+
+.ti -10
+-h	Do not precede a line by the name of its file, even when there is more than one file.
+
+.ti -10
+-e expression	Take the expression from the next argument, which helps when it begins with a minus sign.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The -b flag prints the block number, but the port never writes the
+counter it reads, so it is always 0.
+.sp
+A line longer than 512 characters is truncated.
+.sp
+The exit status is 0 when a match is found, 1 when there is none, and
+2 for a bad expression or a file that cannot be read.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+fgrep (1), sed (1), ed (1), sh (1)

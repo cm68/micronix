@@ -1,0 +1,44 @@
+.he "size (1)                     8/16/26                     size (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+size
+- the size of an object file
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+size file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Size prints, for each Whitesmiths object file, the number of bytes in
+its text, data and bss segments, and their total in decimal and hex.
+An archive is walked and each member reported as name(member).
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The BSD size used a.out when no file was named; this one requires at
+least one file and reads Whitesmiths objects instead.  It also prints
+a heading line and both a decimal and a hex total.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ar (1), nm (1)

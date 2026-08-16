@@ -1,0 +1,164 @@
+.he "less (1)                     8/16/26                     less (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+less
+- a pager that goes backward
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+less [ option ] [ +cmd ] [ file ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Less is a pager, like more, but it can move backward as well as
+forward through the file, and it starts before reading the whole
+input, so a large file comes up fast.  A command may be preceded by a
+number, called N below, that some commands use.
+.sp
+With no file, less reads the standard input.
+.sp 2
+.in -5
+.bd
+COMMANDS
+.in +5
+.br
+.in +10
+.ti -10
+h	Show a summary of the commands.
+
+.ti -10
+space or f	Scroll forward N lines, default one screen.
+
+.ti -10
+b	Scroll backward N lines, default one screen.
+
+.ti -10
+return or j	Scroll forward one line; y or k scrolls backward one line.
+
+.ti -10
+d and u	Scroll forward and backward N lines, default ten.
+
+.ti -10
+g and G	Go to line N, default the beginning and the end.
+
+.ti -10
+/pattern and ?pattern	Search forward and backward for the N-th line with pattern.
+
+.ti -10
+n	Repeat the last search.
+
+.ti -10
+m c	Mark the position with letter c; ' c returns to it.
+
+.ti -10
+E [ file ]	Examine a new file; N and P step to the next and previous file.
+
+.ti -10
+- c	Toggle the setting of command line option c.
+
+.ti -10
+r or ^L	Repaint the screen.
+
+.ti -10
+= or ^G	Print the file name, byte offset and, if known, the length.
+
+.ti -10
+v	Edit the current file, with the editor named by EDITOR or vi.
+
+.ti -10
+! command	Run a shell command.
+
+.ti -10
+q	Quit.
+
+.in -10
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-c	Assume the data is clean; do not repaint so much.
+
+.ti -10
+-d	Run as if on a hardcopy terminal.
+
+.ti -10
+-e	Quit when the end of the file is reached, rather than ringing the bell.
+
+.ti -10
+-h N	Never scroll more than N lines backward at once.
+
+.ti -10
+-p	Repaint by scrolling from the bottom of the screen.
+
+.ti -10
+-x N	Set tab stops every N columns, default 8.
+
+.ti -10
+-s	Squeeze runs of blank lines down to one.
+
+.ti -10
+-t	Start a forward search from the bottom of the screen rather than the top.
+
+.ti -10
+-w	Do not print ~ on the lines after the end of the file.
+
+.ti -10
+-m and -M	Use the medium or the long prompt, which shows the percent into the file.
+
+.ti -10
+-q and -Q	Quiet the bell at the end of the file, or everywhere.
+
+.ti -10
+-u and -U	Show underlined text as underline, overstrike, or ^H.
+
+.ti -10
+-z N	Set the scroll window to N lines, default 24.
+
+.ti -10
+-b[f|p] N	Set the number of read-ahead buffers.
+
+.ti -10
+-P[m|M] string	Set the prompt string, with letters F (file), b (byte), p (percent) and O (file n of n).
+
+.ti -10
+-l file	Write the input to file as it is read, as a log.
+
+.ti -10
++cmd	Run cmd each time a new file is opened.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+Options may also be read from the environment variable LESS, and a
+- command inside less toggles them one at a time.
+.sp
+The port asks the terminal its size, so it knows how many lines to a
+screen; on a terminal that cannot answer, the default is 24.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+more (1), vi (1)

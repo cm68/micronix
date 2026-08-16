@@ -1,0 +1,67 @@
+.he "ln (1)                       8/16/26                       ln (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+ln
+- make links
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+ln [ -f ] sourcename [ targetname ]
+.bd
+ln [ -f ] sourcename1 sourcename2 ... targetdirectory
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+A link is a directory entry that refers to a file; the same file, with
+its size, protection and the rest, may have several links to it.  A
+hard link is indistinguishable from the original entry, and a change
+to the file shows through either name.  Hard links may not span file
+systems and may not refer to directories.
+.sp
+Given one or two arguments, ln makes a link to sourcename.  If
+targetname is given, the link has that name; if targetname is a
+directory, the link is put in it under the last part of sourcename.
+With no targetname, the link is made in the current directory.
+.sp
+Given more than two arguments, ln makes links in targetdirectory to
+all the named source files, each under its own name.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-f	Make the link even when the source is a directory.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The -s option is gone with the symbolic links it would have made:
+micronix has no symbolic links, so ln says so and exits rather than
+silently making a hard link a script did not want.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+rm (1), cp (1), mv (1)
