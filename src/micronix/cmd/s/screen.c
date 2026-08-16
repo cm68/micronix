@@ -90,7 +90,9 @@ int nrows;
 int ncols;
 #endif
 
-int scroll_size;
+char scroll_size;           /* only ever nrows/2, and only ever
+                             * written - address.c shadows it with
+                             * a local of its own */
 
 int cur_row;
 int cur_col;                /* cursor location */

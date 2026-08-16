@@ -111,26 +111,35 @@ struct	stat stbuf;
  */
 long	hsize;
 
-int	rflag;
-int	xflag;
-int	vflag;
-int	tflag;
-int	cflag;
-int	fflag;
-int	iflag;
-int	oflag;
-int	pflag;
-int	wflag;
-int	Bflag;
-int	Fflag;
+/*
+ * The flags are counters in name only: every one is ++'d in the
+ * option loop and read as a truth value - except Fflag, whose
+ * "given twice" test survives any sane command line - so a byte
+ * holds each of them.  mt is a descriptor, 0..15 or -1, and signed
+ * for the -1.  What stays int has to: chksum's address goes to
+ * sscanf, which writes a word through it; recno runs to nblock;
+ * and nblock is whatever -b said, unclamped.
+ */
+unsigned char	rflag;
+unsigned char	xflag;
+unsigned char	vflag;
+unsigned char	tflag;
+unsigned char	cflag;
+unsigned char	fflag;
+unsigned char	iflag;
+unsigned char	oflag;
+unsigned char	pflag;
+unsigned char	wflag;
+unsigned char	Bflag;
+unsigned char	Fflag;
 
-int	mt;
-int	term;
+char	mt;
+unsigned char	term;
 int	chksum;
 int	recno;
-int	first;
-int	prtlinkerr;
-int	freemem = 1;
+unsigned char	first;
+unsigned char	prtlinkerr;
+unsigned char	freemem = 1;
 int	nblock = 0;
 int	onintr();
 int	onquit();

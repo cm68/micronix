@@ -10,15 +10,15 @@
 #include "less.h"
 #include "position.h"
 
-extern int pr_type;
-extern int ispipe;
+extern char pr_type;
+extern char ispipe;
 extern int hit_eof;
-extern int new_file;
+extern char new_file;
 extern int sc_width;
 extern char current_file[];
-extern int ac;
+extern unsigned char ac;
 extern char **av;
-extern int curr_ac;
+extern unsigned char curr_ac;
 
 /*
  * Prototypes for the three flavors of prompts.

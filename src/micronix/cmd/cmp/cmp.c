@@ -48,9 +48,13 @@
 #define OK	0			/* didn't find differences */
 #define YES	1			/* yes/true */
 
-int	fd1, fd2;			/* file descriptors */
-int	silent = NO;			/* if silent run */
-int	all = NO;			/* if report all differences */
+/*
+ * bytes: a descriptor is 0..15 or the -1 open hands back, and the
+ * two switches are yes or no.
+ */
+char	fd1, fd2;			/* file descriptors */
+char	silent = NO;			/* if silent run */
+char	all = NO;			/* if report all differences */
 unsigned char	buf1[MAXBSIZE],		/* read buffers */
 		buf2[MAXBSIZE];
 char	*file1, *file2;			/* file names */

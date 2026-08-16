@@ -22,7 +22,7 @@
 #include <errno.h>
 
 struct	stat stb;
-int	fflag;		/* force flag set? */
+char	fflag;		/* force flag set? - a truth value */
 char	name[BUFSIZ];
 char	*rindex();
 extern	int errno;

@@ -38,35 +38,43 @@ struct lbuf {
 	char	ltype;
 	short	lnum;
 	short	lflags;
-	short	lnl;
-	short	luid;
-	short	lgid;
+	/*
+	 * nlink, uid and gid are single bytes in the micronix inode -
+	 * UINT8s in dsknod - so a byte holds each here too.  lflags
+	 * cannot shrink: ISARG rides bit fifteen.  An lbuf is malloc'd
+	 * for every file listed, a thousand of them for a big
+	 * directory, so three bytes here is three fewer kilobytes at
+	 * the worst.
+	 */
+	unsigned char	lnl;
+	unsigned char	luid;
+	unsigned char	lgid;
 	long	lsize;
 	long	lmtime;
 };
 
-int lwide;
+unsigned char lwide;	/* digits in the widest link count */
 int errors;
-int fc;
-int maxn;
-int xflg = 1;
-int	aflg;
-int dflg;
-int lflg;
-int sflg;
-int tflg;
-int uflg;
-int iflg;
-int fflg;
-int gflg;
-int cflg;
-int	rflg = 1;
+unsigned char fc;	/* column cursor, bounded by the screen */
+unsigned char maxn;	/* widest name, 14 at most */
+unsigned char xflg = 1;
+unsigned char	aflg;
+unsigned char dflg;
+unsigned char lflg;
+unsigned char sflg;
+unsigned char tflg;
+unsigned char uflg;
+unsigned char iflg;
+unsigned char fflg;
+unsigned char gflg;
+unsigned char cflg;
+char	rflg = 1;		/* the sort direction: 1 or -1 */
 long	year;
 int	flags;
 int	lastuid	= -1;
 char	tbuf[16];
 long	tblocks;
-int	statreq;
+unsigned char	statreq;
 struct	lbuf	*flist[NFILES];
 struct	lbuf	**lastp = flist;
 struct	lbuf	**firstp = flist;

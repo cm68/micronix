@@ -28,7 +28,7 @@
 #define	MAXCOLS		80
 #define FILELENG 16000
 
-extern int State;
+extern char State;
 extern int Rows;
 extern int Columns;
 extern char *Realscreen;
@@ -46,8 +46,8 @@ extern int Cursrow;
 extern int Curscol;
 extern int Cursvcol;
 extern int Prenum;
-extern int Debug;
-extern int Changed;
+extern char Debug;
+extern char Changed;
 
 extern char Redobuff[], Undobuff[], Insbuff[], msgbuf[], cmdbuf[];
 extern char *Uncurschar, *Insptr;

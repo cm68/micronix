@@ -14,9 +14,10 @@
 
 extern int errno;
 
-int pflag;
-int nflag;
-int vflag;
+/* truth values, so bytes */
+char pflag;
+char nflag;
+char vflag;
 char *pname;
 
 usage()

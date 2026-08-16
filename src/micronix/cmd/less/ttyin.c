@@ -11,9 +11,9 @@
  * {{ There are probably some race conditions here
  *    involving the variable "reading". }}
  */
-public int reading;
+public char reading;
 
-static int tty;
+static char tty;
 
 /*
  * Open keyboard for input.

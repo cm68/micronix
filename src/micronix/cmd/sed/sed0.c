@@ -35,26 +35,35 @@ char	*lbend;
 char	*hend;
 char	*lcomend;
 struct	reptr *ptrend;
+/*
+ * The small state is char: every flag below is a truth value or a
+ * count with a single-digit ceiling, provable at its check.  eflag
+ * stays int - it counts -e arguments before settling at -1, and
+ * nothing bounds that count except the exec arg space, which is not
+ * this file's fact to assert.  nlno is unsigned: it legitimately
+ * reaches NLINES, 128, at its own overflow check, and it is stored
+ * into expbuf as a byte opcode operand besides.
+ */
 int	eflag;
-int	dolflag;
-int	sflag;
-int	jflag;
-int	numbra;
-int	delflag;
+char	dolflag;
+char	sflag;
+char	jflag;
+char	numbra;
+char	delflag;
 long	lnum;
 char	linebuf[LBSIZE+1];
 char	holdsp[LBSIZE+1];
 char	*spend;
 char	*hspend;
-int	nflag;
-int	gflag;
+char	nflag;
+char	gflag;
 char	*braelist[NBRA];
 char	*braslist[NBRA];
 long	tlno[NLINES];
-int	nlno;
+unsigned char	nlno;
 char	fname[12][40];
 FILE	*fcode[12];
-int	nfiles;
+char	nfiles;
 char	*cp;
 struct	reptr ptrspace[PTRSIZE];
 struct	reptr *rep;
@@ -62,8 +71,8 @@ char	respace[RESIZE];
 struct	label ltab[LABSIZE];
 struct	label *lab;
 struct	label *labend;
-int	f;
-int	depth;
+char	f;		/* -1 momentarily, else 0..15 */
+char	depth;		/* -1 transiently at the underflow check */
 int	eargc;
 char	**eargv;
 struct	reptr **cmpend[DEPTH];
@@ -123,7 +132,7 @@ char	*argv[];
 		switch (eargv[0][1]) {
 
 		case 'n':
-			nflag++;
+			nflag = 1;
 			continue;
 
 		case 'f':
@@ -145,7 +154,7 @@ char	*argv[];
 			continue;
 
 		case 'g':
-			gflag++;
+			gflag = 1;
 			continue;
 
 		default:

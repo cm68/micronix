@@ -38,11 +38,11 @@ char	obuf[BUFSIZ];
 #define	FF	014
 int	line;
 char	*colp[72];
-int	nofile;
+char	nofile;		/* -1..10: the open loop backs up one on a failed open */
 char	isclosed[10];
 FILE	*ifile[10];
 char	**lastarg;
-int	peekc;
+unsigned char	peekc;	/* only ever 0 or the pushed-back tab */
 int	fpage;
 int	page;
 int	colw;
@@ -50,11 +50,11 @@ int	nspace;
 int	width	= 72;
 int	length	= 66;
 int	plength = 61;
-int	margin	= 10;
-int	ntflg;
-int	fflg;
-int	mflg;
-int	tabc;
+unsigned char	margin	= 10;	/* 10, or 0 under -t */
+unsigned char	ntflg;
+unsigned char	fflg;
+unsigned char	mflg;
+unsigned char	tabc;	/* the column separator character, or 0 */
 char	*ctime();
 long	time();
 

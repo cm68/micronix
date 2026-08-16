@@ -94,7 +94,7 @@ int Cursvcol INIT;
 /*
  * This is the current state of the command interpreter.
  */
-int State = NORMAL;
+char State = NORMAL;	/* NORMAL, CMDLINE or INSERT - a byte compares cheaper */
 
 /*
  * The (optional) number before a command. 
@@ -110,9 +110,9 @@ char *Insstart INIT;
  * Set to 1 if something in the file has been 
  * changed and not written out. 
  */
-int Changed INIT;
+char Changed INIT;	/* a truth value */
 
-int Debug INIT;
+char Debug INIT;	/* a truth value */
 
 int Tabstop INIT;
 

@@ -50,8 +50,8 @@ static int ln_state;		/* Currently in normal/underline/bold/etc mode? */
 public char *line;		/* Pointer to the current line.
 				   Usually points to linebuf. */
 
-extern int bs_mode;
-extern int tabstop;
+extern char bs_mode;
+extern char tabstop;
 extern int bo_width, be_width;
 extern int ul_width, ue_width;
 extern int sc_width, sc_height;
@@ -73,31 +73,8 @@ prewind()
  * Returns 0 if ok, 1 if couldn't fit in buffer.
  */
 
-/*
- * This was a macro comparing "(newcol) + ((ln_state)?ue_width:0)"
- * against sc_width in one expression, and c1 builds that compare
- * wrong: an addend that is a ternary poisons the comparison, which
- * then answers the same way regardless of the values.  Every
- * pappend "failed", every line came out empty, and the screen was
- * 23 blank lines and a correct prompt.  Taken apart into plain
- * statements it compiles correctly.
- */
-	static int
-newcolumn(newcol)
-	int newcol;
-{
-	register int nc;
-
-	nc = newcol;
-	if (ln_state)
-		nc += ue_width;
-	if (nc > sc_width)
-		return (1);
-	column = newcol;
-	return (0);
-}
-
-#define	NEW_COLUMN(newcol)	if (newcolumn(newcol)) return (1)
+#define	NEW_COLUMN(newcol)	if ((newcol) + ((ln_state)?ue_width:0) > sc_width) \
+					return (1); else column = (newcol)
 
 	public int
 pappend(c)

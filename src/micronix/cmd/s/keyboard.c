@@ -192,7 +192,7 @@ k_redo()
 /*
  * keyboard input mode 
  */
-static int k_raw;
+static char k_raw;
 
 /*
  * k_keyin - get a character from the keyboard

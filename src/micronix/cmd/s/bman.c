@@ -129,7 +129,7 @@
 #define REPLACE		3
 
 int b_count;                /* number of lines in the buffer */
-int changed;                /* did last command change the buffer? */
+char changed;               /* did last command change the buffer? */
 int cur_line;
 int cur_pos;                /* cursor location */
 int line_prev;
@@ -139,14 +139,15 @@ int pos_start;              /* origin of this user command */
 int mark_id;
 int mark_pos;               /* ID of marked line; position of mark in
                                  * line */
-int modified;               /* does buffer differ from external file? */
+char modified;              /* does buffer differ from external file? */
 
 /*
  * definition of a modification record 
  */
 struct mod_rec
 {
-    int type;                   /* DELETE, INSERT or REPLACE */
+    char type;                  /* DELETE, INSERT or REPLACE - three
+                                 * values, one byte, once per record */
     int line;                   /* line number in the buffer */
     char *del_text;             /* deleted text (NULL for INSERT) */
     struct mod_rec *next;       /* link to next modification record */

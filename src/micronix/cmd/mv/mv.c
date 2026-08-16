@@ -62,8 +62,9 @@
 extern	int errno;
 char	*dname();
 struct	stat s1, s2;
-int	iflag = 0;	/* interactive mode */
-int	fflag = 0;	/* force overwriting */
+/* truth values, so bytes */
+char	iflag = 0;	/* interactive mode */
+char	fflag = 0;	/* force overwriting */
 
 main(argc, argv)
 	register char *argv[];

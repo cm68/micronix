@@ -58,9 +58,10 @@
 #define	ATOI2(ar)	(ar[0] - '0') * 10 + (ar[1] - '0'); ar += 2;
 
 static long	tv;
-static int	retval;
+static char	retval;		/* 0 or 1 */
 
-static int	dmsize[] =
+/* month lengths fit a byte */
+static char	dmsize[] =
 	{ -1, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
 long	time();

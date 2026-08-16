@@ -1170,8 +1170,8 @@ main(int argc, char **argv)
      * the emulate loop consults the program's own disposition and
      * does what the machine would - deliver, drop, or die.
      */
-    signal(SIGINT, int_handler);
-    signal(SIGQUIT, quit_handler);
+    catchsig(SIGINT, int_handler);
+    catchsig(SIGQUIT, quit_handler);
 
     if (debug_terminal) {
         makewins(tty);
@@ -1336,6 +1336,47 @@ sig_death(int sig)
     signal(h, SIG_DFL);
     raise(h);
     exit(128 + h);              /* not reached */
+}
+
+/*
+ * install a handler for a host signal WITHOUT SA_RESTART, so that a
+ * blocked read comes back EINTR when it fires.  signal() gives the
+ * BSD semantics, and under those the alarm that guards less's
+ * screen-size probe could schedule its guest signal all day while
+ * the host restarted the read it was supposed to break.
+ */
+void
+catchsig(int hsig, void (*fn)())
+{
+    struct sigaction sa;
+
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = (void (*)(int))fn;
+    sa.sa_flags = 0;
+    sigaction(hsig, &sa, 0);
+}
+
+/*
+ * a blocking system call came back EINTR.  v6 semantics: an ignored
+ * signal never wakes a sleeper, a caught one aborts the call with
+ * EINTR, and default is death.  Returns nonzero if the guest should
+ * see the interruption; zero means everything pending was ignored
+ * and the call should simply be retried.
+ */
+int
+sig_pending_action()
+{
+    int i;
+
+    for (i = 0; i < 16; i++) {
+        if (!(signalled & (1 << i)))
+            continue;
+        if (signal_handler[i] == 0)
+            sig_death(i);
+        if (signal_handler[i] == 1)
+            signalled &= ~(1 << i);
+    }
+    return (signalled != 0);
 }
 
 struct itimerval timer;
@@ -1513,8 +1554,8 @@ do_exec(char *name, char **argv)
         signal_handler[i] = 0;
         signal(i, SIG_DFL);
     }
-    signal(SIGINT, int_handler);
-    signal(SIGQUIT, quit_handler);
+    catchsig(SIGINT, int_handler);
+    catchsig(SIGQUIT, quit_handler);
 
     /*
      * the new image gets its own accounting: the counters below belong
@@ -2910,8 +2951,24 @@ SystemCall()
             df->offset += ret;
         } else {
             if ((ret = seekfile(fd)) == 0) {
-                ret = read(fd, iobuf, arg2);
-                copyout(iobuf, arg1, ret);
+                /*
+                 * EINTR comes back now that the handlers do not
+                 * restart.  Retry when everything pending is
+                 * ignored - v6 never wakes a sleeper for an
+                 * ignored signal - and hand the guest EINTR when
+                 * a handler will run or the default will kill it.
+                 * And copy out only what was read: this used to
+                 * copyout with ret of 0xffff on a failed read.
+                 */
+                for (;;) {
+                    ret = read(fd, iobuf, arg2);
+                    if (ret != 0xffff || errno != EINTR)
+                        break;
+                    if (sig_pending_action())
+                        break;
+                }
+                if (ret != 0xffff)
+                    copyout(iobuf, arg1, ret);
             }
         }
         if (ret == 0xffff) {
@@ -3024,12 +3081,19 @@ SystemCall()
             pid();
             message("wait\n");
         }
-        if ((ret = wait(&i)) == 0xffff) {
+        for (;;) {
+            ret = wait(&i);
+            if (ret != 0xffff || errno != EINTR)
+                break;
+            if (sig_pending_action())
+                break;
+        }
+        if (ret == 0xffff) {
             if (verbose & V_SYS) {
                 pid();
                 message("no children\n");
             }
-            ret = ECHILD;
+            ret = errno;
             carry_set();
             break;
         }
@@ -3759,7 +3823,10 @@ SystemCall()
 #endif
         }
         if (i) {
-            signal(i, handler);
+            if (handler == SIG_IGN || handler == SIG_DFL)
+                signal(i, handler);
+            else
+                catchsig(i, handler);
         }
         carry_clear();
         break;

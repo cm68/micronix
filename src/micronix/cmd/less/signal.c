@@ -35,7 +35,7 @@ public int sigs;
 #define	S_STOP		02
 #endif
 
-extern int reading;
+extern char reading;
 extern char *first_cmd;
 extern jmp_buf main_loop;
 

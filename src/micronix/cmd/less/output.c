@@ -11,9 +11,9 @@ extern int sc_width, sc_height;
 extern int ul_width, ue_width;
 extern int so_width, se_width;
 extern int bo_width, be_width;
-extern int tabstop;
-extern int twiddle;
-extern int any_display;
+extern char tabstop;
+extern char twiddle;
+extern char any_display;
 extern char *line;
 extern char *first_cmd;
 
@@ -26,7 +26,7 @@ put_line()
 	register char *p;
 	register int c;
 	register int column;
-	extern int auto_wrap, ignaw;
+	extern char auto_wrap, ignaw;
 
 	if (sigs)
 		/*

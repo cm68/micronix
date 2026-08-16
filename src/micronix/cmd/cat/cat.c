@@ -24,8 +24,16 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 
-int	bflg, eflg, nflg, sflg, tflg, uflg, vflg;
-int	spaced, col, lno, inline;
+/*
+ * The flags are truth values and the line-state pair is 0 or 1, so
+ * they are bytes.  A flag letter repeated exactly 256 times on the
+ * command line would wrap one back to zero; that is the whole cost.
+ * lno is a line NUMBER and stays int; col was never used by anything
+ * and is gone.
+ */
+char	bflg, eflg, nflg, sflg, tflg, uflg, vflg;
+char	spaced, inline;
+int	lno;
 
 main(argc, argv)
 char **argv;

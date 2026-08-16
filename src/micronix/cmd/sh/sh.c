@@ -20,10 +20,10 @@
 #include <sys/stat.h>
 #include "sh.h"
 
-int  login;                 /* argv[0] began with '-'   (0x9004) */
-int  verbose;               /* -v: echo lines as they are run */
-int  status;            /* what exit is given       (0x9008) */
-int  interactive = 1;       /* the flag tested at the top of the loop */
+char login;                 /* argv[0] began with '-'   (0x9004) */
+char verbose;               /* -v: echo lines as they are run */
+unsigned char status;   /* what exit is given, 0..255  (0x9008) */
+char interactive = 1;       /* the flag tested at the top of the loop */
 
 char *prompt = "# ";        /* 0x1c6a */
 char *homedir = "/";
@@ -75,7 +75,7 @@ int  shargc;
  * builtin and script arguments work.
  */
 FILE *srcstack[MAXSRC];
-int  nsrc;
+char nsrc;                  /* 0..MAXSRC, sixteen */
 
 /*
  * Aliases.  alias with no argument lists, with one argument shows,
@@ -85,7 +85,7 @@ struct alias {
     char *name;
     char *value;
 } aliases[MAXALIAS];
-int naliases;
+char naliases;              /* 0..MAXALIAS, thirty-two */
 
 /*
  * The builtin names, in the binary's own order, each with the number

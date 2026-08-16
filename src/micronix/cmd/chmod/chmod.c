@@ -41,8 +41,9 @@
 
 char	*modestring, *ms;
 int	status;
-int	fflag;
-int	rflag;
+/* truth values, so bytes; status counts failures and stays int */
+char	fflag;
+char	rflag;
 long	telldir();
 
 main(argc, argv)

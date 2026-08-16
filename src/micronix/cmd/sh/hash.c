@@ -70,7 +70,7 @@ struct hdir {
 };
 
 static struct hdir hdirs[MAXPATHV];
-static int hashed;                      /* built at least once */
+static char hashed;                     /* built at least once */
 
 /*
  * Any cheap spread will do - this is a filter, not a dictionary, and

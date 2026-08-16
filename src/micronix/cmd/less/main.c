@@ -6,32 +6,32 @@
 #include "position.h"
 #include <setjmp.h>
 
-public int	ispipe;
+public char	ispipe;
 public jmp_buf	main_loop;
 public char *	first_cmd;
 public char *	every_first_cmd;
-public int	new_file;
-public int	is_tty;
+public char	new_file;
+public char	is_tty;
 public char 	current_file[128];
-public int	any_display;
-public int	ac;
+public char	any_display;
+public unsigned char	ac;
 public char **	av;
-public int 	curr_ac;
+public unsigned char 	curr_ac;
 #if LOGFILE
-public int	logfile = -1;
+public char	logfile = -1;
 public char *	namelogfile = NULL;
 #endif
 #if EDITOR
 public char *	editor;
 #endif
 
-extern int file;
+extern char file;
 extern int nbufs;
 extern int sigs;
-extern int quit_at_eof;
+extern char quit_at_eof;
 extern int p_nbufs, f_nbufs;
-extern int back_scroll;
-extern int top_scroll;
+extern char back_scroll;
+extern char top_scroll;
 extern int sc_height;
 extern int errmsgs;
 

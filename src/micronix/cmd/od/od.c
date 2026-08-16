@@ -73,11 +73,17 @@ int	l_put();
 int	st_put();
 
 struct dfmt {
-	int	df_field;	/* external field required for object */
+	/*
+	 * field is 3..11, radix 8, 10 or 16, and the two flags are
+	 * flags, so each is a byte; twelve of these structs sit in
+	 * data.  df_size stays a word: -s takes a run length in
+	 * digits the user chooses.
+	 */
+	char	df_field;	/* external field required for object */
 	int	df_size;	/* size (bytes) of object */
-	int	df_radix;	/* conversion radix */
-	int	df_signed;	/* signed? flag */
-	int	df_paddr;	/* "put address on each line?" flag */
+	char	df_radix;	/* conversion radix */
+	char	df_signed;	/* signed? flag */
+	char	df_paddr;	/* "put address on each line?" flag */
 	int	(*df_put)();	/* function to output object */
 	char	*df_fmt;	/* output string format */
 } *conv_vec[32];		/* vector of conversions to be done */
@@ -99,13 +105,13 @@ struct dfmt	string	= { 0,               0,  8,        0,    NO, st_put, 0};
 char	usage[]	="usage: od [-abcdhilopswvx] [file] [[+]offset[.][b] [label]]";
 char	dbuf[DBUF_SIZE];
 char	lastdbuf[DBUF_SIZE];
-int	addr_base	= 8;		/* default address base is OCTAL */
+char	addr_base	= 8;		/* 8, 10 or 16 */
 long	addr		= 0L;		/* current file offset */
 long	label		= -1L;		/* current label; -1 is "off" */
 int	dbuf_size	= 16;		/* file bytes / display line */
-int	_parity		= NO;		/* show parity on ascii bytes */
+char	_parity		= NO;		/* NO, EVEN (-1) or ODD (1) */
 char	fmt[]	= "            %s";	/* 12 blanks */
-char	*odcvt();
+char	*icvt();
 char	*scvt();
 char	*underline();
 char	*pad();
@@ -388,9 +394,9 @@ long	a;
 long	l;
 char	c;
 {
-	fputs(odcvt(a, addr_base, UNSIGNED, 7), stdout);
+	fputs(icvt(a, addr_base, UNSIGNED, 7), stdout);
 	if (l >= 0)
-		printf(" (%s)", odcvt(l, addr_base, UNSIGNED, 7));
+		printf(" (%s)", icvt(l, addr_base, UNSIGNED, 7));
 	putchar(c);
 }
 
@@ -430,7 +436,7 @@ s_put(n, d)
 short	*n;
 struct dfmt	*d;
 {
-	printf(d->df_fmt, odcvt((long)*n, d->df_radix, d->df_signed, d->df_field));
+	printf(d->df_fmt, icvt((long)*n, d->df_radix, d->df_signed, d->df_field));
 	return(d->df_size);
 }
 
@@ -438,7 +444,7 @@ us_put(n, d)
 unsigned short	*n;
 struct dfmt	*d;
 {
-	printf(d->df_fmt, odcvt((long)*n, d->df_radix, d->df_signed, d->df_field));
+	printf(d->df_fmt, icvt((long)*n, d->df_radix, d->df_signed, d->df_field));
 	return(d->df_size);
 }
 
@@ -446,7 +452,7 @@ l_put(n, d)
 long	*n;
 struct dfmt	*d;
 {
-	printf(d->df_fmt, odcvt(*n, d->df_radix, d->df_signed, d->df_field));
+	printf(d->df_fmt, icvt(*n, d->df_radix, d->df_signed, d->df_field));
 	return(d->df_size);
 }
 
@@ -525,7 +531,7 @@ b_put(b, d)
 char	*b;
 struct dfmt *d;
 {
-	printf(d->df_fmt, odcvt((long)*b & 0377, d->df_radix, d->df_signed, d->df_field));
+	printf(d->df_fmt, icvt((long)*b & 0377, d->df_radix, d->df_signed, d->df_field));
 	return(1);
 }
 
@@ -576,7 +582,7 @@ struct dfmt	*d;
 				s[0] = c;
 				return(s);
 			}
-			return(odcvt((long)c, d->df_radix, d->df_signed, d->df_field));
+			return(icvt((long)c, d->df_radix, d->df_signed, d->df_field));
 	}
 }
 
@@ -675,10 +681,6 @@ int	end;
  *
  * This code has been rearranged to produce optimized runtime code.
  *
- * odcvt, not icvt as 2.11 had it: libc's doprnt has an icvt of its
- * own, static in the source and global in the object, because static
- * functions do not get local linkage yet - CODEGENGAPS 16.  The name
- * goes back when it does.
  */
 
 #define MAXINTLENGTH	32
@@ -687,7 +689,7 @@ static char	_icv_buf[MAXINTLENGTH+1];
 static long	_mask = 0x7fffffff;
 
 char *
-odcvt (value, radix, xsigned, ndigits)
+icvt (value, radix, xsigned, ndigits)
 long	value;
 int	radix;
 int	xsigned;

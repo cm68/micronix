@@ -55,7 +55,7 @@
 #define NHIST   16
 
 static char *hist[NHIST];
-static int hnext;                       /* where the next one goes */
+static char hnext;                      /* 0..NHIST-1, sixteen */
 
 /*
  * Does a "!" here begin a reference?

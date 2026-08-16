@@ -47,7 +47,8 @@
 struct	stat stbuf;
 int	gid;
 int	status;
-int	fflag, rflag;
+/* truth values, so bytes; status counts failures and stays int */
+char	fflag, rflag;
 long	telldir();
 
 main(argc, argv)

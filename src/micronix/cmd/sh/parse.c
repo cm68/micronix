@@ -106,7 +106,7 @@ static int  wordused;
  * getword() has nowhere to return an error - a word and no word look
  * the same from outside - so it says so here and parse() looks.
  */
-static int wordbad;
+static char wordbad;
 
 char *
 saveword(s, n)

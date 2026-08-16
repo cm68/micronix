@@ -30,21 +30,21 @@
 public int p_nbufs, f_nbufs;	/* Number of buffers.  There are two values,
 				   one used for input from a pipe and 
 				   the other for input from a file. */
-public int clean_data;		/* Can we assume the data is "clean"? 
+public char clean_data;		/* Can we assume the data is "clean"? 
 				   (That is, free of nulls, etc) */
-public int quiet;		/* Should we suppress the audible bell? */
-public int top_search;		/* Should forward searches start at the top 
+public char quiet;		/* Should we suppress the audible bell? */
+public char top_search;		/* Should forward searches start at the top 
 				   of the screen? (alternative is bottom) */
-public int top_scroll;		/* Repaint screen from top?
+public char top_scroll;		/* Repaint screen from top?
 				   (alternative is scroll from bottom) */
-public int pr_type;		/* Type of prompt (short, medium, long) */
-public int bs_mode;		/* How to process backspaces */
-public int know_dumb;		/* Don't complain about dumb terminals */
-public int quit_at_eof;		/* Quit after hitting end of file twice */
-public int squeeze;		/* Squeeze multiple blank lines into one */
-public int tabstop;		/* Tab settings */
-public int back_scroll;		/* Repaint screen on backwards movement */
-public int twiddle;		/* Display "~" for lines after EOF */
+public char pr_type;		/* Type of prompt (short, medium, long) */
+public char bs_mode;		/* How to process backspaces */
+public char know_dumb;		/* Don't complain about dumb terminals */
+public char quit_at_eof;		/* Quit after hitting end of file twice */
+public char squeeze;		/* Squeeze multiple blank lines into one */
+public char tabstop;		/* Tab settings */
+public char back_scroll;		/* Repaint screen on backwards movement */
+public char twiddle;		/* Display "~" for lines after EOF */
 
 /*
  * getnum is defined at the bottom and called above it; without this
@@ -55,7 +55,7 @@ static int getnum();
 
 extern char *prproto[];
 extern int nbufs;
-extern int sc_window;
+extern char sc_window;
 extern char *first_cmd;
 extern char *every_first_cmd;
 #if LOGFILE
@@ -70,7 +70,16 @@ static struct option
 	char oletter;		/* The controlling letter (a-z) */
 	char otype;		/* Type of the option */
 	int odefault;		/* Default value */
-	int *ovar;		/* Pointer to the associated variable */
+	/*
+	 * char, not int, and CHAR, NOT UNSIGNED: every variable behind
+	 * this pointer is a truth value, a three-state, or a number
+	 * small enough for a byte - and back_scroll and sc_window carry
+	 * -1 as "not set yet".  On this machine a byte is the honest
+	 * size for all of them, and the byte store is also the spelling
+	 * of "x = !x" the code generator has a rule for - the word form
+	 * is CODEGENGAPS 20, still open, no longer exercised here.
+	 */
+	char *ovar;		/* Pointer to the associated variable */
 	char *odesc[3];		/* Description of each value */
 } option[] =
 {
@@ -217,13 +226,8 @@ toggle_option(c)
 			/*
 			 * Boolean option: 
 			 * just toggle it.
-			 *
-			 * The ternary, not "! *(o->ovar)": a logical
-			 * not stored through a pointer fetched from a
-			 * struct member is a shape c1 has no rule
-			 * for, here and in scan_option below.
 			 */
-			*(o->ovar) = *(o->ovar) ? 0 : 1;
+			*(o->ovar) = ! *(o->ovar);
 		} else if ((o->otype & TRIPLE) && (o->oletter == c))
 		{
 			/*
@@ -362,8 +366,7 @@ scan_option(s)
 	{
 		if ((o->otype & BOOL) && (o->oletter == c))
 		{
-			/* the ternary again - see toggle_option */
-			*(o->ovar) = o->odefault ? 0 : 1;
+			*(o->ovar) = ! o->odefault;
 			goto next;
 		} else if ((o->otype & TRIPLE) && (o->oletter == c))
 		{

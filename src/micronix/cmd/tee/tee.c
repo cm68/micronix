@@ -26,10 +26,14 @@
 #include <errno.h>
 
 #define	BUFSIZ	8192
-int openf[20] = { 1 };
-int n = 1;
-int t = 0;
-int aflag;
+/*
+ * bytes: a descriptor is -1 or 0..15, n counts at most twenty of
+ * them, t never passes the argument count, and aflag is a truth.
+ */
+char openf[20] = { 1 };
+char n = 1;
+char t = 0;
+char aflag;
 
 char in[BUFSIZ];
 

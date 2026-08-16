@@ -37,9 +37,9 @@
 #define	COLS	80
 
 int	plines = LINES - 1;			/* text lines per screenful */
-int	kfd = -1;					/* the keystroke fd, -1 = no paging */
+char	kfd = -1;					/* the keystroke fd, -1 = no paging */
 int	left;						/* lines before the next prompt */
-int	col;						/* output column, for wrapped lines */
+char	col;						/* output column, 0..COLS */
 char	obuf[512];
 int	ocnt;
 

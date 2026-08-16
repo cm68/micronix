@@ -8,13 +8,13 @@
 
 extern jmp_buf main_loop;
 extern int erase_char, kill_char;
-extern int pr_type;
+extern char pr_type;
 extern int sigs;
-extern int ispipe;
-extern int quit_at_eof;
+extern char ispipe;
+extern char quit_at_eof;
 extern int hit_eof;
 extern int sc_width, sc_height;
-extern int sc_window;
+extern char sc_window;
 extern char *first_cmd;
 extern char *every_first_cmd;
 extern char version[];
@@ -26,7 +26,7 @@ static char *cp;		/* Pointer into cmdbuf */
 static int cmd_col;		/* Current column of the multi-char command */
 static char mcc;		/* The multi-char command letter (e.g. '/') */
 static char last_mcc;		/* The previous mcc */
-static int screen_trashed;	/* The screen has been overwritten */
+static char screen_trashed;	/* The screen has been overwritten */
 
 /*
  * Reset command buffer (to empty).

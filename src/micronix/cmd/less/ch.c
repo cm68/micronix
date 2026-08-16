@@ -2,82 +2,58 @@
  * Low level character input from the input file.
  * We use these special purpose routines which optimize moving
  * both forward and backward from the current read pointer.
- *
- * cmd/less/ch.c
- *
- * THE POOL IS PARALLEL SCALAR ARRAYS, and the original's circular
- * list of kilobyte structs is gone.  Not by preference - by
- * casualty count.  The struct spelling was ported four times over:
- * chained member stores, then plain temporaries, then counted
- * walks, then the loops hoisted into their own small functions,
- * and each version worked until an unrelated edit moved the stack
- * frame around it and c1 built some member access wrong again -
- * a chain pointer into the middle of the pool, a search that
- * matched address 1, an init stride of four bytes where sizeof
- * said a thousand.  Every one of those failures needed a kilobyte
- * struct: the big member offsets and the pointer-to-pointer stores
- * are what the generator keeps getting wrong, and no local
- * spelling of them stayed compiled correctly.
- *
- * What is left uses only shapes that have never broken: word
- * arrays indexed by a small int, and one flat character array
- * walked by a char pointer.  A buffer is a slot number.  Its data
- * is pool_data + slot * BUFSIZ, its block number is pool_block[i],
- * and recency is a clock stamp in pool_age[i] instead of a list -
- * the LRU victim is the smallest stamp, found by scanning at most
- * sixteen words, which on this machine costs less than the pointer
- * relinking it replaces ever did.
  */
 
 #include "less.h"
 
-public int file = -1;	/* File descriptor of the input file */
-
-#define BUFSIZ	1024
+public char file = -1;	/* File descriptor of the input file */
 
 /*
- * The pool.  Sixteen slots is sixteen kilobytes of bss; the b
- * command on a pipe can reach back that far and no farther, which
- * is why POOLBUFS wants to be as big as the image can afford.
+ * Pool of buffers holding the most recently used blocks of the input file.
  */
-#define	POOLBUFS	16
-#define	NOBLOCK		((unsigned)-1)
-
-static char	pool_data[POOLBUFS * BUFSIZ];
-static unsigned	pool_block[POOLBUFS];	/* which block, NOBLOCK = empty */
-static unsigned	pool_age[POOLBUFS];	/* recency stamp, bigger = newer */
-static unsigned	ch_clock;		/* the stamp source */
-
+#define BUFSIZ	1024
+struct buf {
+	struct buf *next, *prev;
+	long block;
+	char data[BUFSIZ];
+};
+static struct buf *bufs = NULL;
 public int nbufs;
 
 /*
- * The macro ch_get() checks these instead of chasing a chain head:
- * the data of the slot that satisfied the last request, and the
- * block it held.  Both are plain scalars on purpose.
+ * The buffer pool is kept as a doubly-linked circular list,
+ * in order from most- to least-recently used.
+ * The circular list is anchored by buf_anchor.
  */
-static char	*ch_dp;			/* data of the last-used slot */
-static unsigned	ch_cblock = NOBLOCK;	/* block in that slot */
+static struct {
+	struct buf *next, *prev;
+} buf_anchor;
+#define	END_OF_CHAIN	((struct buf *)&buf_anchor)
+#define	buf_head	buf_anchor.next
+#define	buf_tail	buf_anchor.prev
 
-extern int clean_data;
-extern int ispipe;
+/*
+ * If we fail to allocate enough memory for buffers, we try to limp
+ * along with a minimum number of buffers.  
+ */
+#define	DEF_NBUFS	2	/* Minimum number of buffers */
+
+extern char clean_data;
+extern char ispipe;
 extern int sigs;
 
 #if LOGFILE
-extern int logfile;
+extern char logfile;
 #endif
 
 /*
  * Current position in file.
  * Stored as a block number and an offset into the block.
- *
- * A word of block number addresses 64 megabytes of file; the
- * original carried a long, and long members were among the
- * casualties described above.
  */
-static unsigned ch_block;
+static long ch_block;
 static int ch_offset;
 
-/*
+/* 
  * Length of file, needed if input is a pipe.
  */
 static POSITION ch_fsize;
@@ -85,108 +61,51 @@ static POSITION ch_fsize;
 /*
  * Largest block number read if input is standard input (a pipe).
  */
-static int last_piped_block;
-
-#define	ch_get()	((ch_cblock == ch_block) ? \
-				ch_dp[ch_offset] : fch_get())
-
-static int fch_get();
+static long last_piped_block;
 
 /*
- * The data address of a slot: a word multiply and an add, in a
- * function small enough that the generator has never missed it.
+ * Get the character pointed to by the read pointer.
+ * ch_get() is a macro which is more efficient to call
+ * than fch_get (the function), in the usual case 
+ * that the block desired is at the head of the chain.
  */
-	static char *
-ch_data(slot)
-	int slot;
-{
-	return (pool_data + (unsigned)slot * BUFSIZ);
-}
-
-/*
- * Which slot holds a block; -1 if none does.
- */
-	static int
-ch_slot(want)
-	unsigned want;
-{
-	register int i;
-
-	for (i = 0;  i < nbufs;  i++)
-		if (pool_block[i] == want)
-			return (i);
-	return (-1);
-}
-
-/*
- * The least recently used slot: the smallest clock stamp.
- */
-	static int
-ch_victim()
-{
-	register int i;
-	register int v;
-	unsigned best;
-
-	v = 0;
-	best = pool_age[0];
-	for (i = 1;  i < nbufs;  i++)
-		if (pool_age[i] < best)
-		{
-			best = pool_age[i];
-			v = i;
-		}
-	return (v);
-}
-
-/*
- * Get the character pointed to by the read pointer,
- * reading its block into a pool slot if no slot holds it.
- */
+#define	ch_get()   ((buf_head->block == ch_block) ? \
+			buf_head->data[ch_offset] : fch_get())
 	static int
 fch_get()
 {
-	register char *dp;
-	int slot;
-	int n;
-	int end;
+	register struct buf *bp;
+	register int n;
+	register int end;
 	POSITION pos;
 
-	slot = ch_slot(ch_block);
-	if (slot >= 0)
-	{
-		dp = ch_data(slot);
-		goto found;
-	}
-
 	/*
-	 * Block is not in a buffer.
-	 * Take the least recently used slot
+	 * Look for a buffer holding the desired block.
+	 */
+	for (bp = buf_head;  bp != END_OF_CHAIN;  bp = bp->next)
+		if (bp->block == ch_block)
+			goto found;
+	/*
+	 * Block is not in a buffer.  
+	 * Take the least recently used buffer 
 	 * and read the desired block into it.
 	 */
-	slot = ch_victim();
-	pool_block[slot] = ch_block;
-	pos = (POSITION)ch_block * BUFSIZ;
+	bp = buf_tail;
+	bp->block = ch_block;
+	pos = ch_block * BUFSIZ;
 	if (ispipe)
 	{
 		/*
 		 * The block requested should be one more than
 		 * the last block read.
 		 */
-		if ((int)ch_block != ++last_piped_block)
+		if (ch_block != ++last_piped_block)
 		{
-			/*
-			 * A pipe cannot be reseeked, so a block that has
-			 * left the pool is gone; this is where a b that
-			 * reached back past POOLBUFS worth of input ends
-			 * up.  The original called it "should not happen"
-			 * and printed the two block numbers through a
-			 * sprintf; the message is static now - the numbers
-			 * never told the user anything the sentence does
-			 * not, and the sprintf came out unformatted in
-			 * this frame anyway.
-			 */
-			error("cannot go back that far in a pipe");
+			/* This "should not happen". */
+			char message[80];
+			sprintf(message, "Pipe error: last %ld, want %ld\n",
+				(long)last_piped_block-1, (long)ch_block);
+			error(message);
 			quit();
 		}
 	} else
@@ -196,9 +115,8 @@ fch_get()
 	 * Read the block.  This may take several reads if the input
 	 * is coming from standard input, due to the nature of pipes.
 	 */
-	dp = ch_data(slot);
 	end = 0;
-	while ((n = read(file, dp + end, BUFSIZ-end)) > 0)
+	while ((n = read(file, &bp->data[end], BUFSIZ-end)) > 0)
 		if ((end += n) >= BUFSIZ)
 			break;
 
@@ -213,34 +131,45 @@ fch_get()
 	 * If we have a log file, write this block to it.
 	 */
 	if (logfile >= 0 && end > 0)
-		write(logfile, dp, end);
+		write(logfile, bp->data, end);
 #endif
 
 	/*
 	 * Set an EOF marker in the buffered data itself.
-	 * Then ensure the data is "clean": there are no
+	 * Then ensure the data is "clean": there are no 
 	 * extra EOF chars in the data and that the "meta"
 	 * bit (the 0200 bit) is reset in each char.
 	 */
 	if (end < BUFSIZ)
 	{
 		ch_fsize = pos + end;
-		dp[end] = EOF;
+		bp->data[end] = EOF;
 	}
 
 	if (!clean_data)
 		while (--end >= 0)
 		{
-			dp[end] &= 0177;
-			if (dp[end] == EOF)
-				dp[end] = '@';
+			bp->data[end] &= 0177;
+			if (bp->data[end] == EOF)
+				bp->data[end] = '@';
 		}
 
     found:
-	pool_age[slot] = ++ch_clock;
-	ch_dp = dp;
-	ch_cblock = ch_block;
-	return (dp[ch_offset]);
+	/* if (buf_head != bp) {this is guaranteed by the ch_get macro} */
+	{
+		/*
+		 * Move the buffer to the head of the buffer chain.
+		 * This orders the buffer chain, most- to least-recently used.
+		 */
+		bp->next->prev = bp->prev;
+		bp->prev->next = bp->next;
+
+		bp->next = buf_head;
+		bp->prev = END_OF_CHAIN;
+		buf_head->prev = bp;
+		buf_head = bp;
+	}
+	return (bp->data[ch_offset]);
 }
 
 #if LOGFILE
@@ -277,9 +206,14 @@ end_logfile()
  */
 	static int
 buffered(block)
-	unsigned block;
+	long block;
 {
-	return (ch_slot(block) >= 0);
+	register struct buf *bp;
+
+	for (bp = buf_head;  bp != END_OF_CHAIN;  bp = bp->next)
+		if (bp->block == block)
+			return (1);
+	return (0);
 }
 
 /*
@@ -290,10 +224,10 @@ buffered(block)
 ch_seek(pos)
 	register POSITION pos;
 {
-	unsigned new_block;
+	long new_block;
 
 	new_block = pos / BUFSIZ;
-	if (!ispipe || (int)new_block == last_piped_block + 1 || buffered(new_block))
+	if (!ispipe || new_block == last_piped_block + 1 || buffered(new_block))
 	{
 		/*
 		 * Set read pointer.
@@ -333,8 +267,7 @@ ch_end_seek()
 	public int
 ch_beg_seek()
 {
-	register int i;
-	unsigned low;
+	register struct buf *bp, *firstbp;
 
 	/*
 	 * Try a plain ch_seek first.
@@ -344,15 +277,15 @@ ch_beg_seek()
 
 	/*
 	 * Can't get to position 0.
-	 * Look for the buffered block closest to position 0.
+	 * Look thru the buffers for the one closest to position 0.
 	 */
-	low = NOBLOCK;
-	for (i = 0;  i < nbufs;  i++)
-		if (pool_block[i] < low)
-			low = pool_block[i];
-	if (low == NOBLOCK)
+	firstbp = bp = buf_head;
+	if (bp == END_OF_CHAIN)
 		return (1);
-	ch_block = low;
+	while ((bp = bp->next) != END_OF_CHAIN)
+		if (bp->block < firstbp->block)
+			firstbp = bp;
+	ch_block = firstbp->block;
 	ch_offset = 0;
 	return (0);
 }
@@ -374,7 +307,7 @@ ch_length()
 	public POSITION
 ch_tell()
 {
-	return ((POSITION)ch_block * BUFSIZ + ch_offset);
+	return (ch_block * BUFSIZ + ch_offset);
 }
 
 /*
@@ -404,7 +337,7 @@ ch_back_get()
 
 	if (--ch_offset < 0)
 	{
-		if (ch_block == 0 || (ispipe && !buffered(ch_block-1)))
+		if (ch_block <= 0 || (ispipe && !buffered(ch_block-1)))
 		{
 			ch_offset = 0;
 			return (EOF);
@@ -424,24 +357,61 @@ ch_back_get()
 ch_init(want_nbufs)
 	int want_nbufs;
 {
-	register int i;
+	register struct buf *bp;
+	char *calloc();
+
+	if (nbufs < want_nbufs)
+	{
+		/*
+		 * We don't have enough buffers.  
+		 * Free what we have (if any) and allocate some new ones.
+		 */
+		if (bufs != NULL)
+			free((char *)bufs);
+		bufs = (struct buf *) calloc(want_nbufs, sizeof(struct buf));
+		nbufs = want_nbufs;
+		if (bufs == NULL)
+		{
+			/*
+			 * Couldn't get that many.
+			 * Try for a small default number of buffers.
+			 */
+			char message[80];
+			sprintf(message,
+			  "Cannot allocate %d buffers.  Using %d buffers.", 
+			  nbufs, DEF_NBUFS);
+			error(message);
+			bufs = (struct buf *) calloc(DEF_NBUFS, sizeof(struct buf));
+			nbufs = DEF_NBUFS;
+			if (bufs == NULL)
+			{
+				/*
+				 * Couldn't even get the smaller number of bufs.
+				 * Something is wrong here, don't continue.
+				 */
+				sprintf(message, 
+				"Cannot even allocate %d buffers!  Quitting.",
+				  DEF_NBUFS);
+				error(message);
+				quit();
+				/*NOTREACHED*/
+			}
+		}
+	}
 
 	/*
-	 * The pool is static; all there is to "allocate" is
-	 * deciding how much of it to mark empty.
+	 * Initialize the buffers to empty.
+	 * Set up the circular list.
 	 */
-	if (want_nbufs > POOLBUFS)
-		want_nbufs = POOLBUFS;
-	if (nbufs < want_nbufs)
-		nbufs = want_nbufs;
-
-	for (i = 0;  i < nbufs;  i++)
+	for (bp = &bufs[0];  bp < &bufs[nbufs];  bp++)
 	{
-		pool_block[i] = NOBLOCK;
-		pool_age[i] = 0;
+		bp->next = bp + 1;
+		bp->prev = bp - 1;
+		bp->block = (long)(-1);
 	}
-	ch_clock = 0;
-	ch_cblock = NOBLOCK;
+	bufs[0].prev = bufs[nbufs-1].next = END_OF_CHAIN;
+	buf_head = &bufs[0];
+	buf_tail = &bufs[nbufs-1];
 	last_piped_block = -1;
 	ch_fsize = NULL_POSITION;
 	(void) ch_seek((POSITION)0);

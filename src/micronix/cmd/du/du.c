@@ -42,8 +42,8 @@
 #define	fsize(sp)	(((long)(sp)->d.d_size0 << 16) + (sp)->d.d_size1)
 
 char	path[BUFSIZ], name[BUFSIZ];
-int	aflg;
-int	sflg;
+char	aflg;		/* truth values */
+char	sflg;
 char	*dot = ".";
 
 /*
@@ -54,7 +54,7 @@ struct {
 	int	dev;
 	UINT	ino;
 } ml[ML];
-int	mlx;
+unsigned char	mlx;		/* 0..ML, and ML is 200 */
 
 long	descend();
 long	telldir();

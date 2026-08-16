@@ -40,8 +40,8 @@
 #define	SWAB	04
 #define NERR	010
 #define SYNC	020
-int	cflag;
-int	fflag;
+char	cflag;		/*five  conv bits, 01..020 */
+char	fflag;		/* truth value */
 long	skip;
 long	seekn;
 long	count;
@@ -66,8 +66,8 @@ long	nipr;
 long	nofr;
 long	nopr;
 long	ntrunc;
-int	ibf;
-int	obf;
+char	ibf;		/* descriptors: -1 or 0..15 */
+char	obf;
 char	*op;
 int	nspace;
 char	etoa[] = {

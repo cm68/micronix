@@ -85,7 +85,7 @@ extern scr_dlr();
                                  */
 
 int first_line;             /* line number of first screen row */
-int keyboard;               /* is command coming from keyboard? */
+char keyboard;              /* is command coming from keyboard? */
 int last_row;               /* last row displaying buffer contents */
 
 int *id;

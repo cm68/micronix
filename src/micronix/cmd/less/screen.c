@@ -21,17 +21,17 @@
 #include <types.h>		/* sgtty.h speaks in UINT8s */
 #include <sys/sgtty.h>
 
-public int auto_wrap = 1;	/* Terminal does \r\n when write past margin */
-public int ignaw = 1;		/* Terminal ignores \n immediately after wrap */
+public char auto_wrap = 1;	/* Terminal does \r\n when write past margin */
+public char ignaw = 1;		/* Terminal ignores \n immediately after wrap */
 public int erase_char, kill_char; /* The user's erase and line-kill chars */
 public int sc_width, sc_height;	/* Height & width of screen */
-public int sc_window = -1;	/* window size for forward and backward */
+public char sc_window = -1;	/* window size for forward and backward */
 public int bo_width, be_width;	/* Printing width of boldface sequences */
 public int ul_width, ue_width;	/* Printing width of underline sequences */
 public int so_width, se_width;	/* Printing width of standout sequences */
 public int in_raw_mode;		/* For output.c's newline mapping */
 
-extern int quiet;		/* If VERY_QUIET, use visual bell for bell */
+extern char quiet;		/* If VERY_QUIET, use visual bell for bell */
 
 /*
  * The capabilities, spelled ANSI.
@@ -101,10 +101,10 @@ probe_alarm()
  * in-and-out as the keystroke reads.
  *
  * The alarm is the escape hatch for a terminal that does not speak
- * ANSI and never answers: the kernel breaks the read and the sizes
- * stay 24 by 80.  Under usersim the alarm cannot break a read the
- * host has restarted, but the terminal there is the host's own
- * emulator, which always answers.
+ * ANSI and never answers: after a second the read is broken, the
+ * parse fails, and the sizes stay 24 by 80.  This works under
+ * usersim too - its handlers no longer restart a blocked read, and
+ * an interrupted one comes back EINTR the way the machine's would.
  */
 	static
 probe_size()
@@ -125,7 +125,7 @@ probe_size()
 	flush();
 
 	signal(14, probe_alarm);
-	alarm(2);
+	alarm(1);
 	i = 0;
 	while (i < sizeof buf - 1)
 	{
@@ -159,7 +159,7 @@ probe_size()
 	 * Believe an answer that describes a terminal somebody could
 	 * be sitting at; anything else keeps the default.
 	 */
-	if (rows >= 3 && rows <= 100 && cols >= 40 && cols <= 200)
+	if (rows >= 3 && rows < 100 && cols >= 40 && cols <= 200)
 	{
 		sc_height = rows;
 		sc_width = cols;

@@ -10,7 +10,7 @@
 
 #include "less.h"
 
-extern int squeeze;
+extern char squeeze;
 extern char *line;
 
 /*

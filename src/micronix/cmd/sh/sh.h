@@ -107,9 +107,9 @@ struct builtin {
 extern struct builtin builtins[];
 
 /* sh.c */
-extern int  login;          /* argv[0] began with '-'  (0x9004) */
-extern int  verbose;        /* -v */
-extern int  status;         /* what exit is given      (0x9008) */
+extern char login;          /* argv[0] began with '-'  (0x9004) */
+extern char verbose;        /* -v */
+extern unsigned char status;    /* what exit is given  (0x9008) */
 extern char *prompt;
 extern char *homedir;
 extern char *pathv[MAXPATHV];

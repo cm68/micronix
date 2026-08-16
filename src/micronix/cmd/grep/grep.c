@@ -45,21 +45,28 @@ char	expbuf[ESIZE];
 long	lnum;
 char	linebuf[LBSIZE+1];
 char	ybuf[ESIZE];
-int	bflag;
-int	lflag;
-int	nflag;
-int	cflag;
-int	vflag;
+/*
+ * The flags are set once in the option loop and read as truth
+ * values, so they are bytes.  nfile is argc's shadow and a glob
+ * can push it past 255, so it stays a word.  blkno stays as it
+ * arrived: nothing in this port ever writes it, so -b prints 0 -
+ * a quirk inherited from the port, recorded here.
+ */
+unsigned char	bflag;
+unsigned char	lflag;
+unsigned char	nflag;
+unsigned char	cflag;
+unsigned char	vflag;
 int	nfile;
-int	hflag	= 1;
-int	sflag;
-int	yflag;
-int	wflag;
-int	retcode = 0;
-int	circf;
+unsigned char	hflag	= 1;
+unsigned char	sflag;
+unsigned char	yflag;
+unsigned char	wflag;
+unsigned char	retcode = 0;
+unsigned char	circf;
 int	blkno;
 long	tln;
-int	nsucc;
+unsigned char	nsucc;
 char	*braslist[NBRA];
 char	*braelist[NBRA];
 char	bittab[] = {

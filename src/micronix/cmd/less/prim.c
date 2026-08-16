@@ -11,10 +11,10 @@ public int hit_eof;	/* Keeps track of how many times we hit end of file */
 static int match();	/* defined below its callers; see option.c's getnum */
 #endif
 
-extern int quiet;
-extern int top_search;
-extern int top_scroll;
-extern int back_scroll;
+extern char quiet;
+extern char top_search;
+extern char top_scroll;
+extern char back_scroll;
 extern int sc_width, sc_height;
 extern int sigs;
 extern char *line;
@@ -66,7 +66,7 @@ forw(n, pos, force, only_last)
 	int eof = 0;
 	int nlines = 0;
 	int repaint_flag;
-	static int first_time = 1;
+	static char first_time = 1;
 
 	/*
 	 * repaint_flag tells us not to display anything till the end, 

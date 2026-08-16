@@ -27,8 +27,9 @@
 #define INIT = 0
 #endif
 
-int iflag INIT;
-int rflag INIT;
+/* truth values, so bytes */
+char iflag INIT;
+char rflag INIT;
 char *rindex();
 
 main(argc, argv)
