@@ -611,15 +611,6 @@ dirdump(char *buf, int size)
     }
 }
 
-/*
- * we wrap the on-disk inode to put an inumber
- */
-struct i_node {
-    struct dsknod ondisk;
-    struct super *fs;
-    int inum;
-};
-
 struct dsknod inodeblk[I_PER_BLK];
 int inblkno = 0;
 

@@ -50,6 +50,7 @@ int fsinfo();
 int iinfo();
 int blkcmd();
 int setblkcmd();
+int tarcmd();
 
 struct cmdtab
 {
@@ -70,7 +71,8 @@ struct cmdtab
     {"mkdir", mkdircmd, "mkdir <directory>" },
     {"rmdir", rmdircmd, "rmdir <directory>" },
     {"block", blkcmd, "block [-e] <blkno>" },
-    {"setblk", setblkcmd, "setblk <path> <blkno> ..." }
+    {"setblk", setblkcmd, "setblk <path> <blkno> ..." },
+    {"tar", tarcmd, "tar x <tarfile> | tar c <tarfile> [path ...]" }
 };
 
 void
@@ -756,6 +758,311 @@ fsinfo(int c, char **a)
         }
     }
     if (k) printf("\n");
+}
+
+/*
+ * tar archive support, using the classic V7 tar format that cmd/tar
+ * reads and writes: a 512-byte header, the data padded out to 512-byte
+ * blocks, and a zero block to end.
+ */
+
+#define TBLOCK	512
+#define NAMSIZ	100
+
+union hblock {
+	char dummy[TBLOCK];
+	struct header {
+		char name[NAMSIZ];
+		char mode[8];
+		char uid[8];
+		char gid[8];
+		char size[12];
+		char mtime[12];
+		char chksum[8];
+		char linkflag;
+		char linkname[NAMSIZ];
+	} dbuf;
+};
+
+union hblock dblock;
+
+int
+checksum()
+{
+	register int i;
+	register char *cp;
+
+	for (cp = dblock.dbuf.chksum;
+	     cp < &dblock.dbuf.chksum[sizeof(dblock.dbuf.chksum)]; cp++)
+		*cp = ' ';
+	i = 0;
+	for (cp = dblock.dummy; cp < &dblock.dummy[TBLOCK]; cp++)
+		i += *cp;
+	return i;
+}
+
+/*
+ * make a directory at path.  The parent must already be there - a tar
+ * archive lists a directory before its contents, so it always is.
+ */
+int
+imagemkdir(char *path)
+{
+	char *dir, *name;
+	char *save;
+	struct dsknod *parent;
+	struct dsknod *dp;
+	struct dir dirbuf[32];
+	int inum;
+
+	save = dir = strdup(path);
+	name = rindex(dir, '/');
+	if (!name) {
+		parent = iget(fs, 1);
+		name = dir;
+	} else {
+		*name++ = 0;
+		parent = namei(fs, dir);
+	}
+	if (!parent) {
+		printf("tar: %s: parent directory not found\n", path);
+		free(save);
+		return -1;
+	}
+
+	inum = ialloc(fs, IFDIR | 0777);
+	if (inum == 0) {
+		ifree(parent);
+		free(save);
+		return -1;
+	}
+
+	filelink(fs, path, inum);
+
+	dp = iget(fs, inum);
+	memset(dirbuf, 0, sizeof dirbuf);
+	dirbuf[0].ino = inum;
+	dirbuf[0].name[0] = '.';
+	dirbuf[1].ino = ((struct i_node *)parent)->inum;
+	dirbuf[1].name[0] = '.';
+	dirbuf[1].name[1] = '.';
+	filewrite(dp, 0, (char *)dirbuf);
+	dp->d_size0 = 0;
+	dp->d_size1 = 2 * sizeof(struct dir);
+	iput(dp);
+	ifree(dp);
+	ifree(parent);
+	free(save);
+	return 0;
+}
+
+/*
+ * tar x <tarfile>: extract the archive into the image.
+ */
+int
+tarx(char *tarfile)
+{
+	int infd;
+	int i;
+	long size;
+	int mode;
+	int nblocks;
+	char buf[TBLOCK];
+	struct dsknod *dp;
+	int inum;
+
+	infd = open(tarfile, O_RDONLY);
+	if (infd < 0) {
+		printf("tar: can't open %s: %d\n", tarfile, errno);
+		return 2;
+	}
+
+	for (;;) {
+		if (read(infd, &dblock, TBLOCK) != TBLOCK)
+			break;
+		if (dblock.dbuf.name[0] == '\0')
+			break;
+		sscanf(dblock.dbuf.mode, "%o", &mode);
+		sscanf(dblock.dbuf.size, "%lo", &size);
+
+		/* a directory's name ends with a slash, as cmd/tar writes it */
+		{
+			int nlen = strlen(dblock.dbuf.name);
+
+			if (nlen > 0 && dblock.dbuf.name[nlen - 1] == '/') {
+				dblock.dbuf.name[nlen - 1] = '\0';
+				/* the root is already there; skip it */
+				if (dblock.dbuf.name[0] == '\0')
+					continue;
+				imagemkdir(dblock.dbuf.name);
+				continue;
+			}
+		}
+
+		dp = namei(fs, dblock.dbuf.name);
+		if (!dp) {
+			inum = ialloc(fs, IFREG | (mode & 07777));
+			if (inum == 0) {
+				printf("tar: can't create %s\n", dblock.dbuf.name);
+				lseek(infd, ((size + TBLOCK - 1) / TBLOCK) * TBLOCK, SEEK_CUR);
+				continue;
+			}
+			filelink(fs, dblock.dbuf.name, inum);
+			dp = namei(fs, dblock.dbuf.name);
+		}
+		if (!dp) {
+			printf("tar: can't create %s\n", dblock.dbuf.name);
+			lseek(infd, ((size + TBLOCK - 1) / TBLOCK) * TBLOCK, SEEK_CUR);
+			continue;
+		}
+
+		filefree(dp);
+		nblocks = (size + TBLOCK - 1) / TBLOCK;
+		for (i = 0; i < nblocks; i++) {
+			read(infd, buf, TBLOCK);
+			filewrite(dp, i * TBLOCK, buf);
+		}
+		dp->d_size0 = (size >> 16) & 0xff;
+		dp->d_size1 = size & 0xffff;
+		iput(dp);
+		ifree(dp);
+	}
+	close(infd);
+	return 0;
+}
+
+/*
+ * walk one path into the archive, recursing into directories.
+ */
+void
+tarput(char *path, int outfd)
+{
+	struct dsknod *dp;
+	struct dir *dirp;
+	long size;
+	int i;
+	int entries;
+	int isdir;
+	char child[512];
+	char tarname[NAMSIZ];
+	char buf[TBLOCK];
+
+	dp = namei(fs, path);
+	if (!dp) {
+		printf("tar: %s: not found\n", path);
+		return;
+	}
+
+	isdir = ((dp->d_mode & IFMT) == IFDIR);
+	size = ((long)dp->d_size0 << 16) + dp->d_size1;
+
+	/*
+	 * the root is not itself an entry; its children are the top level
+	 * of the archive, and a tar name has no leading slash.
+	 */
+	if (path[0] == '/' && path[1] == '\0') {
+		entries = size / sizeof(struct dir);
+		for (i = 0; i < entries; i++) {
+			dirp = getdirent(dp, i);
+			if (dirp->ino == 0)
+				continue;
+			if (strcmp(dirp->name, ".") == 0 || strcmp(dirp->name, "..") == 0)
+				continue;
+			strncpy(child, dirp->name, sizeof child - 1);
+			child[sizeof child - 1] = 0;
+			tarput(child, outfd);
+		}
+		ifree(dp);
+		return;
+	}
+
+	/* the archive name: a directory carries a trailing slash */
+	strncpy(tarname, path, sizeof tarname - 1);
+	tarname[sizeof tarname - 1] = 0;
+	if (isdir && tarname[strlen(tarname) - 1] != '/')
+		strcat(tarname, "/");
+
+	memset(&dblock, 0, TBLOCK);
+	strncpy(dblock.dbuf.name, tarname, NAMSIZ - 1);
+	sprintf(dblock.dbuf.mode, "%6o ", dp->d_mode & 07777);
+	sprintf(dblock.dbuf.uid, "%6o ", dp->d_uid);
+	sprintf(dblock.dbuf.gid, "%6o ", dp->d_gid);
+	sprintf(dblock.dbuf.size, "%11lo ", isdir ? 0L : size);
+	sprintf(dblock.dbuf.mtime, "%11lo ", (long)dp->d_mtime);
+	sprintf(dblock.dbuf.chksum, "%6o", checksum());
+	write(outfd, &dblock, TBLOCK);
+
+	if (isdir) {
+		entries = size / sizeof(struct dir);
+		for (i = 0; i < entries; i++) {
+			dirp = getdirent(dp, i);
+			if (dirp->ino == 0)
+				continue;
+			if (strcmp(dirp->name, ".") == 0 || strcmp(dirp->name, "..") == 0)
+				continue;
+			if (path[0] == '/' && path[1] == '\0')
+				sprintf(child, "/%s", dirp->name);
+			else
+				sprintf(child, "%s/%s", path, dirp->name);
+			tarput(child, outfd);
+		}
+	} else {
+		for (i = 0; i < size; i += TBLOCK) {
+			memset(buf, 0, TBLOCK);
+			fileread(dp, i, buf);
+			write(outfd, buf, TBLOCK);
+		}
+	}
+	ifree(dp);
+}
+
+/*
+ * tar c <tarfile> [path ...]: write the image, or the named paths, to
+ * the archive.
+ */
+int
+tarc(int c, char **a)
+{
+	int outfd;
+	int i;
+
+	outfd = open(a[0], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+	if (outfd < 0) {
+		printf("tar: can't create %s: %d\n", a[0], errno);
+		return 2;
+	}
+
+	if (c == 1)
+		tarput("/", outfd);
+	else
+		for (i = 1; i < c; i++)
+			tarput(a[i], outfd);
+
+	memset(&dblock, 0, TBLOCK);
+	write(outfd, &dblock, TBLOCK);
+	write(outfd, &dblock, TBLOCK);
+	close(outfd);
+	return 0;
+}
+
+int
+tarcmd(int c, char **a)
+{
+	a++;
+	c--;
+	if (c == 0)
+		return -1;
+	if (strcmp(a[0], "x") == 0) {
+		if (c != 2)
+			return -1;
+		return tarx(a[1]);
+	}
+	if (strcmp(a[0], "c") == 0) {
+		if (c < 2)
+			return -1;
+		return tarc(c - 1, a + 1);
+	}
+	return -1;
 }
 
 /*

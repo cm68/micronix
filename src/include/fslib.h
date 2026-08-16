@@ -23,6 +23,17 @@ struct statb {
 	struct dsknod d;
 };
 
+/*
+ * an in-memory inode: the on-disk inode wrapped with its inumber and
+ * the filesystem it belongs to.  iget returns a pointer to the ondisk
+ * member, and inumber() reaches back to the wrapper.
+ */
+struct i_node {
+	struct dsknod ondisk;
+	struct super *fs;
+	int inum;
+};
+
 #define	INODE_TO_BLK(i)	(INODES_START + (i / I_PER_BLK))
 #define	INODE_OFF(i)	(i % I_PER_BLK)
 
@@ -55,6 +66,8 @@ extern int balloc(struct super *f);
 extern void bfree(struct super *f, int b);
 extern void filefree(struct dsknod *ip);
 extern void fileunlink(struct super *f, char *name);
+extern int ialloc(struct super *f, UINT mode);
+extern void filelink(struct super *f, char *path, int inum);
 extern struct dsknod *filecreate(struct super *f, char *name);
 extern int dircreate(struct super *f, char *name);
 extern int dirrm(struct super *f, char *name);
