@@ -48,6 +48,7 @@ all:
 	cd form ; make all
 	cd grep ; make all
 	cd init ; make all
+	cd less ; make all
 	cd ln ; make all
 	cd ls ; make all
 	cd man ; make all
@@ -92,6 +93,7 @@ install:
 	cd form ; make install
 	cd grep ; make install
 	cd init ; make install
+	cd less ; make install
 	cd ln ; make install
 	cd ls ; make install
 	cd man ; make install
@@ -130,6 +132,7 @@ clean:
 	cd form ; make clean
 	cd grep ; make clean
 	cd init ; make clean
+	cd less ; make clean
 	cd ln ; make clean
 	cd ls ; make clean
 	cd man ; make clean
@@ -168,6 +171,7 @@ clobber:
 	cd form ; make clobber
 	cd grep ; make clobber
 	cd init ; make clobber
+	cd less ; make clobber
 	cd ln ; make clobber
 	cd ls ; make clobber
 	cd man ; make clobber
