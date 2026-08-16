@@ -145,11 +145,26 @@ main(argc, argv)
          */
         make(dolist->name);
         if (!madesomething) {
-            if (knowhow)
-                fprintf(stderr, "make: %s is up to date.\n", dolist->name);
-            else
+            /*
+             * Nothing was made.  Either there was no rule, or there
+             * was one and it had nothing to do.
+             *
+             * "up to date" is only true of a file, and a target with
+             * an empty rule is not one.  include/makefile says
+             *
+             *	clean:
+             *
+             * and means it - there is nothing there to remove - and
+             * "make: clean is up to date." was the answer, about a
+             * file that does not exist and never did.  It reads as a
+             * clean that declined to run, which is what it was taken
+             * for.  Say it only of something on the disk.
+             */
+            if (!knowhow)
                 fprintf(stderr, "make: don't know how to make %s.\n",
                     dolist->name);
+            else if (FileTime(dolist->name))
+                fprintf(stderr, "make: %s is up to date.\n", dolist->name);
         }
         dolist = dolist->next;
     }
