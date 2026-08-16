@@ -45,6 +45,9 @@ all:
 	cd diff ; make all
 	cd du ; make all
 	cd echo ; make all
+	cd ed ; make all
+	cd fgrep ; make all
+	cd find ; make all
 	cd form ; make all
 	cd grep ; make all
 	cd init ; make all
@@ -65,6 +68,7 @@ all:
 	cd sed ; make all
 	cd sh ; make all
 	cd size ; make all
+	cd strings ; make all
 	cd sync ; make all
 	cd tar ; make all
 	cd tee ; make all
@@ -90,6 +94,9 @@ install:
 	cd diff ; make install
 	cd du ; make install
 	cd echo ; make install
+	cd ed ; make install
+	cd fgrep ; make install
+	cd find ; make install
 	cd form ; make install
 	cd grep ; make install
 	cd init ; make install
@@ -110,6 +117,7 @@ install:
 	cd sed ; make install
 	cd sh ; make install
 	cd size ; make install
+	cd strings ; make install
 	cd sync ; make install
 	cd tar ; make install
 	cd tee ; make install
@@ -129,6 +137,9 @@ clean:
 	cd diff ; make clean
 	cd du ; make clean
 	cd echo ; make clean
+	cd ed ; make clean
+	cd fgrep ; make clean
+	cd find ; make clean
 	cd form ; make clean
 	cd grep ; make clean
 	cd init ; make clean
@@ -149,6 +160,7 @@ clean:
 	cd sed ; make clean
 	cd sh ; make clean
 	cd size ; make clean
+	cd strings ; make clean
 	cd sync ; make clean
 	cd tar ; make clean
 	cd tee ; make clean
@@ -168,6 +180,9 @@ clobber:
 	cd diff ; make clobber
 	cd du ; make clobber
 	cd echo ; make clobber
+	cd ed ; make clobber
+	cd fgrep ; make clobber
+	cd find ; make clobber
 	cd form ; make clobber
 	cd grep ; make clobber
 	cd init ; make clobber
@@ -188,6 +203,7 @@ clobber:
 	cd sed ; make clobber
 	cd sh ; make clobber
 	cd size ; make clobber
+	cd strings ; make clobber
 	cd sync ; make clobber
 	cd tar ; make clobber
 	cd tee ; make clobber
