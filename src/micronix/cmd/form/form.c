@@ -58,7 +58,9 @@ char *skipsp();
 /*
  * The request table.  The binary looks its requests up in a table of
  * {name, code} pairs and switches on the code; the names are exactly
- * these sixteen.  Order here is the binary's own.
+ * these seventeen.  Order here is the binary's own, save the last
+ * entry - "..", the literal-dot escape - which the binary did not
+ * have and this reconstruction adds.
  */
 struct req {
     char *name;
@@ -81,6 +83,7 @@ struct req {
 #define R_UL 14
 #define R_BD 15
 #define R_TA 16
+#define R_DOT 17
 
 struct req reqs[] = {
     "bp", R_BP,
@@ -99,6 +102,7 @@ struct req reqs[] = {
     "ul", R_UL,
     "bd", R_BD,
     "ta", R_TA,
+    "..", R_DOT,
     0, 0
 };
 
@@ -556,6 +560,17 @@ char *s;
 
     case R_FO:
         gettext(a, footer);
+        break;
+
+    case R_DOT:
+        /*
+         * "...": emit the rest of the line as text with a literal
+         * leading dot.  s+2 skips two of the three dots, leaving the
+         * third to begin the text.  This is how a line of prose that
+         * begins with a period is written, since a bare "." is read
+         * as a request and a request that does not exist vanishes.
+         */
+        dotext(s + 2);
         break;
     }
 }

@@ -79,6 +79,7 @@ one and none is given, the default below is used.
      .ta n   tab stop                    (8)
      .ti n   indent the next line only   (0)
      .ul n   underline the next n lines  (1)
+     ...     insert a literal .
 .fi
 .sp
 An indent written +n or -n is relative to the one in force; written
@@ -97,7 +98,9 @@ NOTES
 .br
 A request form does not know makes its line vanish rather than
 producing a diagnostic, so prose that begins with a period is lost.
-Several pages of the original manual are short a line for this reason.
+To begin a line of text with a literal period, write three dots: ...
+emits one dot and then the rest of the line as text.  Several pages
+of the original manual are short a line for want of this.
 .sp
 The text of the header and the footer is taken in quotes and used
 literally, except that a number sign in it is replaced by the page
