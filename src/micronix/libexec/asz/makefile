@@ -21,6 +21,8 @@ CC	= ccc
 # where the heap is whatever is left of 64k after the image.
 #
 CFLAGS	= -O
+MAN	= asz.1
+MANDIR	= /usr/man/man1
 LIBEXEC	= /libexec
 PROG	= asz
 HDRS	= asm.h wsobj.h
@@ -40,6 +42,7 @@ $(OBJS): $*.c $(HDRS)
 
 install: $(PROG)
 	cp $(PROG) $(LIBEXEC)/asz
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS)

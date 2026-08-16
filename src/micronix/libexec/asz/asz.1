@@ -1,0 +1,124 @@
+.he "asz (1)                      8/16/26                      asz (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+asz
+- the micronix Z80 assembler
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+asz [ -m98l ] [ -o file ] [ source ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Asz reads Z80 assembly and writes a relocatable object in Whitesmith's
+format, the one ld links.  For a source file foo.s it writes foo.o;
+reading the standard input it writes a.out.  It is the pass ccc runs
+after c1, so most of what it assembles comes straight out of the
+compiler, but it reads hand-written assembly the same way.
+.sp
+A program is three segments, text, data and bss, switched with the
+pseudo-ops below.  Symbols are fifteen characters, or nine with -m.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-m and -9	Use nine-character symbol names instead of fifteen, the old Whitesmith limit, for an object that must match one made that way.
+
+.ti -10
+-8	Do not relax a jp into a jr.  The 8080 has no jr, so this keeps the output 8080-compatible.
+
+.ti -10
+-l	Write a listing file, foo.lst beside foo.o.
+
+.ti -10
+-o file	Name the object file rather than taking it from the source or a.out.
+
+.ti -10
+-n	No timeout.  On the host this turns off a five-second hang guard; here it is accepted and does nothing.
+
+.in -10
+.sp 2
+.in -5
+.bd
+PSEUDO-OPS
+.in +5
+.br
+.in +10
+.ti -10
+...text, .data, .bss	Switch to the text, data or bss segment.  psect text, data or bss is the HiTech-C spelling of the same thing.
+
+.ti -10
+...globl name	Make name visible to the linker; .global and a bare global do the same, and several names may follow, separated by commas.
+
+.ti -10
+...extern name	Declare name defined in another object; several names may follow.
+
+.ti -10
+...defb n or "s"	Emit a byte, a run of bytes, or the bytes of a string.  .db and a bare defb are the same.
+
+.ti -10
+...defw n	Emit a sixteen-bit word; .dw and defw are the same.
+
+.ti -10
+...defl n	Emit a thirty-two-bit long; .dl is the same.
+
+.ti -10
+...ds n	Reserve n bytes of space; defs is the same.
+
+.ti -10
+name = expr and name equ expr	Give name the value of the expression, absolute or segment-relative.
+
+.ti -10
+name:	Define name as a label at the current address; name:: also exports it.
+
+.ti -10
+N:	A numeric local label; a reference to Nf means the next one forward, Nb the last one backward.
+
+.ti -10
+...error text	Print text and stop.  The compiler's later pass uses it to put a real message where an "unknown directive" would otherwise be.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The pseudo-op set is deliberately small, and a page written for
+another assembler will miss some of what it expects.  There is no
+...org, no .include, no .if or .endif, no macros, no .ascii or .asciz -
+a string goes in a .defb - no .comm, and the data names are the
+Whitesmith .defb, .defw and .defl rather than .byte, .word and .long.
+.sp
+Every object asz writes carries two symbols, .edata and .ebss.  They
+are not pseudo-ops and never appear in source: the linker reads them
+to merge the same uninitialised global defined in forty objects, and
+the leading dot is what keeps them from ever colliding with a C
+identifier.
+.sp
+A jp whose target is near is shortened to a jr automatically, which is
+what makes the compiler's output fit; -8 turns that off.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ccc (1), nm (1), size (1)
