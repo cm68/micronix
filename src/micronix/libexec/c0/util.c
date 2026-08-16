@@ -59,7 +59,7 @@ staticName(char *buf, unsigned short id, unsigned short fid,
 	return fmtstr(fmtstr(buf, "_%s", nameOf(fid)), ".%d", sid - 1);
 }
 
-#ifndef CCC
+#ifdef __GNUC__
 char patspace[PSIZE];
 
 char *

@@ -28,7 +28,7 @@ extern int (*signal())();
 #include "dbgtags.c"
 #endif
 
-#ifndef CCC
+#ifdef __GNUC__
 /*
  * Signal handler for compilation timeout
  *
@@ -108,7 +108,7 @@ process(char *f, char *o1, char *o2)
     /* Open output file for AST (o1 from ccc: base.ast) */
     astFd = creat(o1, 0644);
     if (astFd & 0x80) {
-#ifndef CCC
+#ifdef __GNUC__
         perror(o1);
 #endif
         exit(1);
@@ -117,7 +117,7 @@ process(char *f, char *o1, char *o2)
     /* Open output file for global data assembly (o2 from ccc: base.2) */
     asmFd = creat(o2, 0644);
     if (asmFd & 0x80) {
-#ifndef CCC
+#ifdef __GNUC__
         perror(o2);
 #endif
         exit(1);
@@ -221,7 +221,7 @@ usage(char *complaint)
     write(2, usagebuf, p - usagebuf);
 #ifdef DEBUG
     fdprintf(2,"\t-v <verbosity>\n");
-#ifndef CCC
+#ifdef __GNUC__
     {
         int i;
         for (i = 0; vopts[i]; i++) {
@@ -310,7 +310,7 @@ main(int argc, char **argv)
     int i;
 #endif
 
-#ifndef CCC
+#ifdef __GNUC__
     /* Set up timeout handler to catch infinite loops */
     signal(SIGALRM, timeoutHdlr);
     alarm(5);  /* 5 second timeout */
@@ -355,7 +355,7 @@ main(int argc, char **argv)
     }
 
 #ifdef DEBUG
-#ifndef CCC
+#ifdef __GNUC__
     if (verbose) {
         int j = 0;
 
@@ -381,7 +381,7 @@ main(int argc, char **argv)
 #endif
 #endif
 #ifdef __UNIX__
-#ifndef CCC
+#ifdef __GNUC__
     setvbuf(stdout, 0, _IONBF, 0);
 #endif
 #endif

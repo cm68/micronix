@@ -45,6 +45,6 @@ HOSTSRCS = pass1.c error.c lexread.c fold.c pfx.c post.c name.c \
 	   init.c istream.c eutil.c expr.c parse.c pblock.c pstmt2.c \
 	   swcnt.c decl.c type.c tparse.c declare.c outast.c outh.c \
 	   outfn.c regalloc.c util.c
-HOSTPROG = c0
+HOSTPROG = mxc0
 
 include $(DEPTH)/libexec/host.mk

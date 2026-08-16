@@ -13,7 +13,7 @@
 #include "p1lex.h"
 #include "p1pblk.h"
 
-#ifndef CCC
+#ifdef __GNUC__
 char *kindname[] = {
     "prim", "etag", "stag", "utag", "vari", "elem", "tdef", "fdef",
     "bitf", "farg", "locl"

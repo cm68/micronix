@@ -67,6 +67,28 @@ char libexecdir[LIBDIRMAX];
  * cross-building, and only picks which runtime is linked - every
  * target's libraries live side by side in the one lib directory.
  */
+/*
+ * The prefix on everything that makes or reads a micronix object and
+ * runs on the host.
+ *
+ * On micronix these are the system's own programs and wear their own
+ * names.  On the host they share a machine with programs of the same
+ * name that mean something else entirely - ld, nm, ar, size, cc - so
+ * every one of them is mx-prefixed, and the compiler is mxccc.  That
+ * used to be a special case for the linker alone, spelled as an
+ * ifdef around ld and mxld; the fork made the whole toolchain live on
+ * both machines, so it is a rule now rather than an exception.
+ *
+ * CCC is the test because it answers exactly the right question: it
+ * is defined when this driver was compiled by ccc, and a driver
+ * compiled by ccc is one running on micronix.
+ */
+#ifdef CCC
+#define MXPFX ""
+#else
+#define MXPFX "mx"
+#endif
+
 #ifndef DEFTARGET
 #define DEFTARGET "micronix"
 #endif
@@ -567,23 +589,13 @@ main(int argc, char **argv)
      * down - and keeping the two apart means a person reading /lib
      * sees things to link against and nothing else.
      */
-    sprintf(cpp_path, "%s/pass0", libexecdir);
-    sprintf(cc1_path, "%s/c0", libexecdir);
-    sprintf(cc2_path, "%s/c1", libexecdir);
-    sprintf(asm_path, "%s/asz", libexecdir);
-    /*
-     * The linker beside us.  On micronix it is ld, the system's own;
-     * on the host it is mxld, because "ld" there is the host's linker
-     * and this is not it.  Same program, and the name says which
-     * machine it runs on rather than what it reads.
-     */
-#ifdef CCC
-    sprintf(ld_path, "%s/ld", libexecdir);
-#else
-    sprintf(ld_path, "%s/mxld", libexecdir);
-#endif
-    sprintf(astpp_path, "%s/astpp", libexecdir);
-    sprintf(peep_path, "%s/peep", libexecdir);
+    sprintf(cpp_path, "%s/%spass0", libexecdir, MXPFX);
+    sprintf(cc1_path, "%s/%sc0", libexecdir, MXPFX);
+    sprintf(cc2_path, "%s/%sc1", libexecdir, MXPFX);
+    sprintf(asm_path, "%s/%sasz", libexecdir, MXPFX);
+    sprintf(ld_path, "%s/%sld", libexecdir, MXPFX);
+    sprintf(astpp_path, "%s/%sastpp", libexecdir, MXPFX);
+    sprintf(peep_path, "%s/%speep", libexecdir, MXPFX);
 
     /*
      * The runtime is per target and cannot be resolved until -m has
@@ -951,7 +963,27 @@ main(int argc, char **argv)
         cpp_argc = 0;
         cpp_args[cpp_argc++] = cpp_base[0];     /* argv[0], the program */
         cpp_args[cpp_argc++] = sysinc_path;
+        /*
+         * Three flags, three questions, and they are not the same
+         * question.
+         *
+         * CCC says which compiler is compiling this - the calling
+         * sequence, the structure packing, the byte order, the word
+         * length, and what the language and library do not have.  It
+         * is always defined, because the only compiler that defines
+         * it is this one.
+         *
+         * MICRONIX and CPM say which system the result runs on -
+         * crt0, libc, where the headers are - and exactly one of
+         * them is defined, from -m.  A source asking "am I on
+         * micronix" was asking CCC before, which answered a
+         * different question and happened to agree.
+         *
+         * Anything host-side asks the host compiler instead: gcc
+         * defines __GNUC__ without being told.
+         */
         cpp_args[cpp_argc++] = "-DCCC";
+        cpp_args[cpp_argc++] = cpm_target ? "-DCPM" : "-DMICRONIX";
         for (j = 1; j < cpp_base_argc; j++)
             cpp_args[cpp_argc++] = cpp_base[j];
         cpp_args[cpp_argc++] = "-o";

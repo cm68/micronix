@@ -130,10 +130,19 @@ die(char *fmt, char *arg)
 /*
  * System include path for #include <foo.h>
  */
-#ifdef CCC
-char *sysIncPath = "/usr/include";
-#else
+/*
+ * Where <foo.h> is looked for when nothing on the command line says.
+ *
+ * On a target it is /usr/include, which is where the headers are on
+ * both micronix and CP/M.  In the host build there is no target
+ * filesystem to read, so it is the tree the headers are built from.
+ * That is a question about which machine this cpp runs on, not about
+ * which compiler built it, and it asks the host compiler now.
+ */
+#ifdef __GNUC__
 char *sysIncPath = "libsrc/include";
+#else
+char *sysIncPath = "/usr/include";
 #endif
 
 /*

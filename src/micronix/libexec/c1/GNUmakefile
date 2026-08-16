@@ -61,7 +61,7 @@ include $(DEPTH)/GNUmakefile.inc
 # and the same sources built for this machine: the cross compiler
 # everything else in the tree is compiled by.  See libexec/host.mk.
 #
-HOSTPROG = c1
+HOSTPROG = mxc1
 #
 # mkruleidx.c is a host program of its own and not part of the
 # pass; ruleidx.c is generated and is.

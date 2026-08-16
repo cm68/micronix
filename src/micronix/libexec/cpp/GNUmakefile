@@ -58,6 +58,6 @@ include $(DEPTH)/GNUmakefile.inc
 HOSTWARNS = -Wall -Wno-builtin-declaration-mismatch -Werror=declaration-after-statement
 HOSTCFLAGS = -m32 -std=c89 $(HOSTDEBUG) $(HOSTDEFS) $(HOSTWARNS) -I. -I$(DEPTH)/lib/libccc
 HOSTSRCS = $(CSRCS)
-HOSTPROG = pass0
+HOSTPROG = mxpass0
 
 include $(DEPTH)/libexec/host.mk

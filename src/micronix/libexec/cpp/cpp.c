@@ -13,7 +13,7 @@
 #include "cpp.h"
 #include <fcntl.h>
 #include <unistd.h>
-#ifndef CCC
+#ifdef __GNUC__
 #include <sys/wait.h>
 #endif
 
@@ -97,7 +97,7 @@ usage(void)
     errout("  -h             Show this help\n");
 #ifdef DEBUG
     errout("  -v <mask>      Set verbosity (hex bitmask)\n");
-#ifndef CCC
+#ifdef __GNUC__
     {
         int i;
         for (i = 0; vopts[i]; i++) {
@@ -262,7 +262,7 @@ main(int argc, char **argv)
     fmtstr(idFile, "%s.nam", outbase);
 
 #ifdef DEBUG
-#ifndef CCC
+#ifdef __GNUC__
     if (verbose) {
         int j = 0;
 
@@ -320,7 +320,7 @@ main(int argc, char **argv)
      * a process on a debugging aid.  Run xdump over the .x by hand
      * there - it is the same program with the same arguments.
      */
-#ifndef CCC
+#ifdef __GNUC__
     if (ppOutput) {
         int pid = fork();
         if (pid == 0) {

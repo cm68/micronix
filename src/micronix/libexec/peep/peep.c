@@ -603,21 +603,17 @@ main(int argc, char **argv)
 		fprintf(stderr, "peep: cannot create %s\n", outf);
 		exit(1);
 	}
-#ifdef CCC
 	/*
 	 * The target's stdio has CP/M text mode in it: a \r slipped in
 	 * ahead of every \n on the way out, \r eaten and ctrl-Z taken
 	 * for the end on the way in.  This is a byte-for-byte rewrite
-	 * of an LF-only file - what comes out must be what went in,
-	 * less what the rules removed - so both streams run binary.
-	 * The host's stdio has no such mode and no such flag.
+	 * of an LF-only file, so both streams would want to run binary.
+	 *
+	 * Nothing does that here any more.  _IOBINARY is gone - nothing
+	 * ever tested it, and its bit is _IORW now, so setting it would
+	 * tell fseek these streams were read-write when they are not -
+	 * and what was left was an ifdef around two comments.
 	 */
-	/*
-	 * _IOBINARY is gone: nothing ever tested it, and its bit is
-	 * _IORW now - setting it here would tell fseek these streams
-	 * were read-write when they are not.
-	 */
-#endif
 
 	/*
 	 * Before the window starts: find the literal blocks that spell

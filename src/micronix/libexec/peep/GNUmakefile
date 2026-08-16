@@ -33,6 +33,6 @@ include $(DEPTH)/GNUmakefile.inc
 #
 HOSTDEFS =
 HOSTCFLAGS = -m32 $(HOSTDEBUG) $(HOSTWARNS) -I. -I$(DEPTH)/lib/libccc
-HOSTPROG = peep
+HOSTPROG = mxpeep
 
 include $(DEPTH)/libexec/host.mk

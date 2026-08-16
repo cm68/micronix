@@ -40,7 +40,7 @@ usage(char *complaint)
 	errout("usage: c1 [options] <.ast> <.dat> <out.s>\n");
 #ifdef DEBUG
 	errout("  -v <mask>    Set verbosity (hex bitmask)\n");
-#ifndef CCC
+#ifdef __GNUC__
 	{
 		int i;
 		for (i = 0; vopts[i]; i++) {
@@ -111,7 +111,7 @@ main(int argc, char **argv)
 	}
 
 #ifdef DEBUG
-#ifndef CCC
+#ifdef __GNUC__
 	if (verbose) {
 		int i, j = 0;
 		char buf[128];

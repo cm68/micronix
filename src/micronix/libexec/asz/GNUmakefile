@@ -33,6 +33,6 @@ include $(DEPTH)/GNUmakefile.inc
 HOSTDEFS = -Dlinux
 HOSTWARNS = -Wall
 HOSTCFLAGS = -m32 -std=c99 -g -O0 $(HOSTDEFS) $(HOSTWARNS) -I.
-HOSTPROG = asz
+HOSTPROG = mxasz
 
 include $(DEPTH)/libexec/host.mk

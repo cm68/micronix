@@ -68,7 +68,7 @@ void process(char *f, char *o1, char *o2);
 void usage(char *complaint);
 
 /* util.c */
-#ifndef CCC
+#ifdef __GNUC__
 char *bitdef(unsigned char v, char **defs);
 #endif
 char *fmtstr(char *buf, char *fmt, ...);

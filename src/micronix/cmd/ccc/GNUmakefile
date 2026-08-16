@@ -44,7 +44,7 @@ include $(DEPTH)/GNUmakefile.inc
 # emphatically not ours.  It goes in bin and not libexec, being the
 # one part of the compiler a person types.
 #
-HOSTPROG	= ccc
+HOSTPROG	= mxccc
 HOSTBIN		= bin
 HOSTDEFS	=
 HOSTWARNS	= -Wall
