@@ -152,7 +152,11 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
+#ifdef linux
+	outfd = creat(argv[2], 0600);	/* host: no group bits - the ls gitignore marker */
+#else
 	outfd = creat(argv[2], 0644);
+#endif
 	if (outfd < 0) {
 		errout("cannot create output file\n");
 		exit(1);

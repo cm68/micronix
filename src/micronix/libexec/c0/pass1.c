@@ -106,7 +106,11 @@ process(char *f, char *o1, char *o2)
 #endif
 
     /* Open output file for AST (o1 from ccc: base.ast) */
+#ifdef linux
+    astFd = creat(o1, 0600);	/* host: no group bits - the ls gitignore marker */
+#else
     astFd = creat(o1, 0644);
+#endif
     if (astFd & 0x80) {
 #ifdef __GNUC__
         perror(o1);
@@ -115,7 +119,11 @@ process(char *f, char *o1, char *o2)
     }
 
     /* Open output file for global data assembly (o2 from ccc: base.2) */
+#ifdef linux
+    asmFd = creat(o2, 0600);	/* host: no group bits - the ls gitignore marker */
+#else
     asmFd = creat(o2, 0644);
+#endif
     if (asmFd & 0x80) {
 #ifdef __GNUC__
         perror(o2);

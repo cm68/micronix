@@ -206,7 +206,11 @@ internWrite(char *fname)
     char *once;
     struct ient *e;
 
+#ifdef linux
+    fd = creat(fname, 0600);	/* host: no group bits - the ls gitignore marker */
+#else
     fd = creat(fname, 0644);
+#endif
     if (fd < 0)
         return -1;
     once = permalloc(nb);       /* zeroed */

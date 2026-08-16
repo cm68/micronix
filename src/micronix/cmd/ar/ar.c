@@ -562,7 +562,11 @@ getqf()
 	if ((qf = open(arnam, 2)) < 0) {
 		if(!flg['c'-'a'])
 			fprintf(stderr, "ar: creating %s\n", arnam);
+#ifdef linux
+		close(creat(arnam, 0600));	/* host: no group bits - the ls gitignore marker */
+#else
 		close(creat(arnam, 0666));
+#endif
 		if ((qf = open(arnam, 2)) < 0) {
 			fprintf(stderr, "ar: cannot create %s\n", arnam);
 			done(1);
@@ -936,7 +940,11 @@ ranlib()
 	close(fd);
 
 	/* over the top of the original */
+#ifdef linux
+	if ((fd = creat(arnam, 0600)) < 0) {
+#else
 	if ((fd = creat(arnam, 0666)) < 0) {
+#endif
 		fprintf(stderr, "ar: cannot rewrite %s\n", arnam);
 		close(ofd);
 		unlink(tname);
@@ -985,7 +993,11 @@ install()
 		if(!flg['c'-'a'])
 			fprintf(stderr, "ar: creating %s\n", arnam);
 	close(af);
+#ifdef linux
+	af = creat(arnam, 0600);	/* host: no group bits - the ls gitignore marker */
+#else
 	af = creat(arnam, 0666);
+#endif
 	if(af < 0) {
 		fprintf(stderr, "ar: cannot create %s\n", arnam);
 		done(1);

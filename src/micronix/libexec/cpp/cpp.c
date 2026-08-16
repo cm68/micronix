@@ -64,7 +64,11 @@ errout(char *buf)
 int
 opcreat(char *file)
 {
+#ifdef linux
+    int fd = creat(file, 0600);	/* host: no group bits - the ls gitignore marker */
+#else
     int fd = creat(file, 0644);
+#endif
     if (fd < 0) {
         char buf[140];
         fmtstr(buf, "cannot create: %s\n", file);

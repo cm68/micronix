@@ -2616,7 +2616,11 @@ pass2_output()
      * -r output is not a program.  It is a relocatable object to be
      * linked again, and it gets 0644 like any other .o.
      */
+#ifdef linux
+    close(creat(outfile, rflag ? 0600 : 0700));	/* host: no group bits */
+#else
     close(creat(outfile, rflag ? 0644 : 0755));
+#endif
 
     /*
      * "w+b", not "wb": a segment too big to hold is copied out and
