@@ -46,7 +46,12 @@ unsigned char cppkw[] = {
  * It uses skip-optimization for fast lookup.
  */
 
-#ifdef ASMKWLOOK
+/*
+ * Z80 machine code, so the host is excluded whatever compiles it -
+ * see the note over advance() in io.c.  ASMKWLOOK is the separate
+ * question of whether this version is wanted at all.
+ */
+#if defined(ASMKWLOOK) && !defined(__linux__)
 /*
  * Look up keyword in compressed table (Z80 assembly implementation)
  *

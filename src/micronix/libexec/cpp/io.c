@@ -499,13 +499,21 @@ static void advslow();
  * Nothing is written until every test has passed, so a fall-through
  * leaves the state exactly as it was found.
  *
+ * Guarded on the host and not on the compiler.  What is below is Z80
+ * machine code: it cannot be assembled for this machine whatever
+ * compiles it, and it is wanted on the target whatever compiles it
+ * there.  That is a question about where the code lands, so it asks
+ * __linux__ - CCC would answer "did ccc build me", which is not the
+ * same question and would be the wrong one the day a second compiler
+ * targets the Z80.
+ *
  * The offsets are struct textbuf's, by hand - storage 3, offset 5,
  * valid 7 - which is the price of an asm block that cannot see a C
  * declaration.  The note over the struct in cpp.h is what keeps them
  * honest.  bc and ix are the compiler's to keep, so this uses only hl,
  * de and a.
  */
-#ifdef CCC
+#ifndef __linux__
 
 void
 advance()
