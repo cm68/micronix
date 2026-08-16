@@ -235,6 +235,19 @@ INSTALLMAN = @if [ -n "$(strip $(MANSRCS))" ] ; then \
 #
 .DELETE_ON_ERROR:
 
+#
+# "make" means "make all".
+#
+# The default goal is otherwise the first real target below, which is
+# $(TARGET) - right in every directory that builds one thing, and
+# wrong in the first one that does not.  cmd/diff builds diffh beside
+# diff and names it in TARGETS; all knows about it, $(TARGET) does
+# not, so a bare make left diffh unbuilt and make install then had
+# nothing to install.  The native makefile beside this one puts all
+# first and has always meant it.
+#
+.DEFAULT_GOAL := all
+
 .PHONY: all update install install-man clean clobber doc disas
 
 #
