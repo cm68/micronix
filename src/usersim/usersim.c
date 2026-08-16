@@ -827,9 +827,7 @@ stop_handler()
 void
 pid()
 {
-#ifdef notdef
     message("%x: ", mypid);
-#endif
 }
 
 unsigned int
@@ -1272,6 +1270,21 @@ void
 bg_handler()
 {
     schedule_signal(6);
+}
+
+/*
+ * the guest's own alarm clock: signal 14, armed by the alarm
+ * syscall.  Without this arm of case 48, a guest that set a handler
+ * and an alarm got the HOST default when it rang - the emulator
+ * died where the guest had planned to be woken.  Note that guest 7
+ * (termio) also rides host SIGALRM, through alarm_handler and the
+ * itimer; a program using both at once gets whichever was installed
+ * last, which no program in the tree does.
+ */
+void
+galarm_handler()
+{
+    schedule_signal(14);
 }
 
 /*
@@ -3705,6 +3718,11 @@ SystemCall()
                 set_itv_usec(200 * 1000);
                 set_alarm();
             }
+            break;
+        case 14:               // alarm
+            signal_handler[14] = arg2;
+            i = SIGALRM;
+            handler = galarm_handler;
             break;
         default:
 
