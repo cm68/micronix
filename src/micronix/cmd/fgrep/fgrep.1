@@ -1,0 +1,90 @@
+.he "fgrep (1)                    8/16/26                    fgrep (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+fgrep
+- print lines containing any of a set of strings
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+fgrep [ option ] [ strings ] [ file ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Fgrep reads the named files, or the standard input with no file, and
+writes every line that contains one of the strings.  The strings are
+the first argument, or a list of lines in a file named with -f.  A
+string is matched as it stands: none of its characters are special,
+which is what makes fgrep faster than grep and the one to use for a
+literal word or several of them.
+.sp
+With more than one file, each printed line is preceded by its file
+name.  Exit status is 0 if a line matched, 1 if none did, 2 on an
+error.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-e strings	Treat strings as the string list even if it begins with -.
+
+.ti -10
+-f file	Take the string list, one string to a line, from file.
+
+.ti -10
+-v	Print lines that match none of the strings.
+
+.ti -10
+-x	Only a line whose whole text is one of the strings matches.
+
+.ti -10
+-c	Print a count of matching lines, not the lines themselves.
+
+.ti -10
+-l	Print the name of each file that has a match, once.
+
+.ti -10
+-n	Precede each line by its line number in the file.
+
+.ti -10
+-b	Precede each line by its block number.
+
+.ti -10
+-s	Print nothing, only set the exit status.
+
+.ti -10
+-h	Do not print the file name with each line, even when there are several files.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The keyword machine is built in a fixed array, and the port made that
+array smaller than v7's to fit a 64k image, so a very long list of
+strings - more than a thousand or so - overflows with "wordlist too
+large".
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+grep (1)

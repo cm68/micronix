@@ -1,0 +1,163 @@
+.he "ed (1)                       8/16/26                       ed (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+ed
+- text editor
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+ed [ - ] [ name ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Ed is the line editor.  It reads the named file into a buffer, lets
+you change it with commands, and writes it back only when you say so;
+editing a file and quitting without writing leaves the file as it was.
+With no name, ed starts on an empty buffer and the file must be named
+with the e command.
+.sp
+A command is zero or more addresses, then one command letter, then
+whatever the command takes.  Addresses name lines in the buffer; a
+missing address is supplied by default, usually the current line.
+Text is added to the buffer with a, c and i, and ended by a line
+containing only a period.
+.sp
+Most commands take a range of two addresses separated by a comma.
+The address before a command names the first line, the one after the
+second; a single address is both.
+.sp 2
+.in -5
+.bd
+ADDRESSES
+.in +5
+.br
+.in +10
+.ti -10
+n	Line n, counted from the start; $ is the last line.
+
+.ti -10
+...	The current line.
+
+.ti -10
+/re/ and ?re?	The next or previous line containing the regular expression re.
+
+.ti -10
+'c	The line marked with k c.
+
+.ti -10
++ and -	The current line moved that many lines; +3 or -2.
+
+.in -10
+.sp 2
+.in -5
+.bd
+COMMANDS
+.in +5
+.br
+.in +10
+.ti -10
+a	Append text after the addressed line.
+
+.ti -10
+c	Delete the addressed lines, then accept text in their place.
+
+.ti -10
+d	Delete the addressed lines.
+
+.ti -10
+e name	Edit name, throwing away any changes not written.
+
+.ti -10
+f name	Remember name as the file name, or print it with no argument.
+
+.ti -10
+g/re/cmd	Run cmd on every line containing re; v does it on every line that does not.
+
+.ti -10
+i	Insert text before the addressed line.
+
+.ti -10
+j	Join the addressed lines into one.
+
+.ti -10
+kc	Mark the addressed line as c.
+
+.ti -10
+l and p	Print the addressed lines; l shows non-printing characters.
+
+.ti -10
+m addr	Move the addressed lines to after addr.
+
+.ti -10
+q	Quit; q refuses if changes would be lost, Q always quits.
+
+.ti -10
+r name	Read name into the buffer after the addressed line.
+
+.ti -10
+s/re/new/g	Substitute new for re; the trailing g changes every occurrence on the line.
+
+.ti -10
+t addr	Copy the addressed lines to after addr.
+
+.ti -10
+u	Undo the last substitution.
+
+.ti -10
+w	Write the buffer to the file; W appends.
+
+.ti -10
+=	Print the line number of the addressed line.
+
+.ti -10
+!	Run a subshell; leaving it returns to ed.
+
+.in -10
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-	Suppress the explanatory output, the byte counts and the ? on an error, for use when the standard input is a script.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The regular expressions are the compact ones ed has always used, not
+the extended set: ( ) for grouping and \\1 for a back-reference, with
+no | or +.
+.sp
+The ! command runs a plain subshell.  v7 passed the shell a -t to ask
+for one line; micronix sh has no such flag, so the shell stays up
+until you end it, which is the one behaviour that differs from the
+original.
+.sp
+A file being edited is kept in a temporary file under /tmp, so /tmp
+must exist and be writable.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+grep (1), vi (1)

@@ -1,0 +1,123 @@
+.he "find (1)                     8/16/26                     find (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+find
+- find files
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+find path-list predicate-list
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Find descends the directory tree under each name in the path-list,
+looking for files that satisfy the predicate-list, which is a boolean
+expression built from the primaries below.  A primary is tested
+against the file being looked at, and prints or acts only when the
+whole expression is true.
+.sp
+A number argument n is a decimal integer.  +n means more than n, -n
+means less than n, and n means exactly n.
+.sp 2
+.in -5
+.bd
+PRIMARIES
+.in +5
+.br
+.in +10
+.ti -10
+-name name	True if the file name matches, using the shell's * ? and [ ] characters.
+
+.ti -10
+-perm onum	True if the permission bits are exactly onum; with -onum, the bits in onum must all be set.
+
+.ti -10
+-type c	True if the file is of type c, one of b, c, d or f for block device, character device, directory or plain file.
+
+.ti -10
+-links n	True if the file has n links.
+
+.ti -10
+-user name	True if the file belongs to name, a login name or numeric user id.
+
+.ti -10
+-group name	True if the file belongs to name, a group name or numeric group id.
+
+.ti -10
+-size n	True if the file is n blocks long, a block being 512 bytes.
+
+.ti -10
+-inum n	True if the file has inode number n.
+
+.ti -10
+-atime n	True if the file was read n days ago.
+
+.ti -10
+-mtime n	True if the file was written n days ago.
+
+.ti -10
+-newer file	True if the file was written more recently than file.
+
+.ti -10
+-exec command ;	Run command, replacing the argument { } with the pathname; true if the command exits zero.  The command must be a path - there is no PATH search.
+
+.ti -10
+-ok command ;	Like -exec, but write the command to the terminal and run it only after a y answer.
+
+.ti -10
+-print	Always true; print the pathname.
+
+.in -10
+.sp 2
+.in -5
+.bd
+OPERATORS
+.in +5
+.br
+.in +10
+.ti -10
+! primary	True if primary is false.
+
+.ti -10
+primary -a primary	Both must be true; the -a may be left out, and two primaries written together are anded.
+
+.ti -10
+primary -o primary	Either may be true.
+
+.ti -10
+( expression )	Grouping; the parentheses must be quoted for the shell.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The port dropped two primaries the v7 find had.  -ctime is gone
+because the micronix inode keeps no change time, and -cpio because it
+needed fields the inode does not have and an endianness test that only
+made sense between the PDP-11 and the VAX.
+.sp
+The path-list is looked at with stat, so a file argument works as well
+as a directory: it is tested once and reported if it matches.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ls (1), chmod (1), sh (1)
