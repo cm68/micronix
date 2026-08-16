@@ -40,7 +40,17 @@ put_line()
 	column = 0;
 	for (p = line;  *p != '\0';  p++)
 	{
-		switch (c = *p)
+		/*
+		 * & 0xff, and not just c = *p.  The high-bit marker chars
+		 * - UL_CHAR, BO_CHAR and their exits - are 0x81..0x84, and
+		 * char is signed here, so *p sign-extends to a negative int
+		 * whose high byte is 0xff.  The switch dispatch below checks
+		 * that high byte first and jumps to the default on any nonzero
+		 * value, so every marker fell through to the "^" fallback and
+		 * bold text came out as ^NAME^.  Masking keeps the byte a
+		 * byte and lets the cases match.
+		 */
+		switch (c = *p & 0xff)
 		{
 		case UL_CHAR:
 			ul_enter();
