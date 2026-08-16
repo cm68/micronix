@@ -3,16 +3,16 @@
  *
  * cmd/diff/diff.c
  *
- * Ported from 2.11BSD usr/src/bin/diff/diff.c.  diffh is not ported,
- * so -h is accepted and then falls through to the full algorithm; on
- * a machine whose files fit in 64k that is not the loss it is on a
- * PDP-11.  The program names were carried in from the 2.11 Makefile
- * as -D strings; here they are plain strings and diffh is gone.
+ * Ported from 2.11BSD usr/src/bin/diff/diff.c.  The program names were
+ * carried in from the 2.11 Makefile as -D strings; here they are plain
+ * strings.  diffh is the halfhearted diff that -h execs, built in this
+ * directory beside diff.
  */
 
 #include "diff.h"
 
 char	diff[] = "/bin/diff";
+char	diffh[] = "/bin/diffh";
 char	pr[] = "/bin/pr";
 
 main(argc, argv)
@@ -94,7 +94,7 @@ main(argc, argv)
 				context = 3;
 			continue;
 		case 'h':
-			hflag++;
+			hflag = 1;
 			continue;
 		case 'S':
 			if (*argp == 0) {
@@ -105,13 +105,13 @@ main(argc, argv)
 			*--argp = 0;		/* don't pass it on */
 			continue;
 		case 'r':
-			rflag++;
+			rflag = 1;
 			continue;
 		case 's':
-			sflag++;
+			sflag = 1;
 			continue;
 		case 'l':
-			lflag++;
+			lflag = 1;
 			continue;
 		default:
 			fprintf(stderr, "diff: -%s: unknown option\n",

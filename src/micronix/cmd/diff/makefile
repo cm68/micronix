@@ -1,15 +1,15 @@
 #
-# makefile for diff
+# makefile for diff and diffh
 #
 # micronix/cmd/diff/makefile
 #
 # The native build: this runs inside micronix, under the make in
 # cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
-# it cross builds the same program on the host.
+# it cross builds the same programs on the host.
 #
-# Ported from 2.11BSD usr/src/bin/diff.  diffh is not ported, so -h
-# is accepted and falls through to the full algorithm; on a machine
-# whose files fit in 64k that is not the loss it is on a PDP-11.
+# diffh is the halfhearted diff that diff's -h execs.  It is a second
+# program built here, with its own object, so it is not part of
+# $(OBJS).
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
@@ -24,23 +24,31 @@ BIN	= /bin
 PROG	= diff
 OBJS	= diff.o diffdir.o diffreg.o
 
-all: $(PROG)
+all: $(PROG) diffh
 
 $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
+diffh: diffh.o
+	$(CC) $(CFLAGS) -o $@ diffh.o
+
 #
 # One entry for every object: $* is the target without its suffix, so
 # this reads as "each of these comes from the .c of the same name".
+# diffh.o has its own rule because it is not in $(OBJS).
 #
 $(OBJS): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
-install: $(PROG)
+diffh.o: diffh.c
+	$(CC) $(CFLAGS) -c diffh.c
+
+install: $(PROG) diffh
 	cp $(PROG) $(BIN)/$(PROG)
+	cp diffh $(BIN)/diffh
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJS) diffh.o
 
 clobber: clean
-	rm -f $(PROG)
+	rm -f $(PROG) diffh

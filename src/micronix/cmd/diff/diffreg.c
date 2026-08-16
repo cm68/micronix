@@ -151,6 +151,28 @@ diffreg()
 	FILE *f1, *f2;
 	char buf1[BUFSIZ], buf2[BUFSIZ];
 
+	if (hflag) {
+		/*
+		 * Exec diffh with a fresh argv, not diffargv.  Micronix
+		 * does not NULL-terminate the argv main() receives - the
+		 * loader leaves a 0xffff sentinel - so passing diffargv
+		 * back to exec would make diffh read past the two files.
+		 */
+		char *dhav[5];
+		int n;
+
+		n = 0;
+		dhav[n++] = "diffh";
+		if (bflag)
+			dhav[n++] = "-b";
+		dhav[n++] = file1;
+		dhav[n++] = file2;
+		dhav[n] = 0;
+		execv(diffh, dhav);
+		fprintf(stderr, "diff: ");
+		perror(diffh);
+		done();
+	}
 	chrtran = (iflag? cup2low : clow2low);
 	if ((stb1.st_mode & S_IFMT) == S_IFDIR) {
 		file1 = splice(file1, file2);

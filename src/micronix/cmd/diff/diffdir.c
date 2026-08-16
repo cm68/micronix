@@ -34,7 +34,7 @@ struct dent {
 };
 
 struct	dent *setupdir();
-int	header;
+char	header;		/* 0 or 1; see diff.h on the flags */
 char	title[2*BUFSIZ], *etitle;
 
 diffdir(argv)
