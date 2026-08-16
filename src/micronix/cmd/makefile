@@ -73,6 +73,7 @@ all:
 	cd tar ; make all
 	cd tee ; make all
 	cd vi ; make all
+	cd wc ; make all
 
 #
 # reset is a script rather than a program, and it is copied with the
@@ -122,6 +123,7 @@ install:
 	cd tar ; make install
 	cd tee ; make install
 	cd vi ; make install
+	cd wc ; make install
 
 clean:
 	cd make ; make clean
@@ -165,6 +167,7 @@ clean:
 	cd tar ; make clean
 	cd tee ; make clean
 	cd vi ; make clean
+	cd wc ; make clean
 
 clobber:
 	cd make ; make clobber
@@ -208,3 +211,4 @@ clobber:
 	cd tar ; make clobber
 	cd tee ; make clobber
 	cd vi ; make clobber
+	cd wc ; make clobber
