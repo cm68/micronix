@@ -22,6 +22,7 @@
 #include <sys/time.h>
 #include <signal.h>
 #include "sim.h"
+#include "z80glue.h"
 #include "hwsim.h"
 #include "mnix.h"
 #include "util.h"

@@ -8,7 +8,7 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 INCLUDE = -I../../include -I..
-LDFLAGS = -L../../lib -lsim -lchips -lcurses
+LDFLAGS = -L../../lib -lsim -lcurses
 
 TARGETS=d1
 DRIVERS=djdma.o multio.o hddma.o hdca.o mpz80.o micronix.o
@@ -20,7 +20,7 @@ SIM = ../hwsim.o ../s100.o
 # them here a change to libsim.a - the disassembler, the monitor, the
 # syscall formatter - relinks nothing, and the simulator keeps running
 # the code you just replaced while you wonder why the fix did nothing.
-LIBS = ../../lib/libsim.a ../../lib/libchips.a
+LIBS = ../../lib/libsim.a
 
 include ../../Makefile.inc
 

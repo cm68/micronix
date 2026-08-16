@@ -131,19 +131,21 @@ extern int config_sw;
 
 #endif
 
-// the instruction set simulator interface
-void z80_init();
-void z80_run();
-
-enum reg8 { 
-    a_reg, f_reg, b_reg, c_reg, d_reg, e_reg, h_reg, l_reg, 
-    a1_reg, f1_reg, b1_reg, c1_reg, d1_reg, e1_reg, h1_reg, l1_reg, 
-    i_reg, r_reg, iff_reg, im_reg, control_reg, status_reg 
+/*
+ * the register model the debugger and the drivers speak: the enums
+ * and the status/control/interrupt bits.  The accessors that read and
+ * write the CPU with these are per-emulator and live in z80glue.h,
+ * inline over the chips z80; a simulator owns its own instance.
+ */
+enum reg8 {
+    a_reg, f_reg, b_reg, c_reg, d_reg, e_reg, h_reg, l_reg,
+    a1_reg, f1_reg, b1_reg, c1_reg, d1_reg, e1_reg, h1_reg, l1_reg,
+    i_reg, r_reg, iff_reg, im_reg, control_reg, status_reg
 };
-enum reg16 { 
-    pc_reg, sp_reg, 
-    bc_reg, de_reg, hl_reg, 
-    bc1_reg, de1_reg, hl1_reg, 
+enum reg16 {
+    pc_reg, sp_reg,
+    bc_reg, de_reg, hl_reg,
+    bc1_reg, de1_reg, hl1_reg,
     ix_reg, iy_reg };
 
 // control register bits
@@ -158,12 +160,6 @@ enum reg16 {
 
 #define IFF1    0x01
 #define IFF2    0x02
-
-byte z80_get_reg8(enum reg8 r8);
-word z80_get_reg16(enum reg16 r16);
-
-void z80_set_reg8(enum reg8 r8, byte v);
-void z80_set_reg16(enum reg16, word v);
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

@@ -20,6 +20,7 @@
 
 #include "gui.h"
 #include "sim.h"
+#include "z80glue.h"
 #include "disz80.h"
 #include "mnix.h"
 

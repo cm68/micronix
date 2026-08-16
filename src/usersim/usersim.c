@@ -55,6 +55,82 @@
 #endif
 
 /*
+ * The chips Z80 instance and its pin-level tick callback - the raw
+ * interface, no longer behind a pluggable shim.  The memory accessors
+ * this tick reaches (get_byte, put_byte, input, output, int_ack) are
+ * what differ between usersim and hwsim/d1, which is why the CPU lives
+ * here rather than in a shared library.  The register accessors the
+ * debugger uses are inline in ../include/z80glue.h.
+ */
+#define CHIPS_IMPL
+#include "../include/z80glue.h"
+
+z80_t z80;
+z80_desc_t context;
+unsigned long long sim_cycles;
+byte status;
+int int_pin;
+int nmi_pin;
+byte control;
+byte unhalt;
+
+uint64_t
+z80_tick(int num_ticks, uint64_t pins, void *user_data)
+{
+	if (int_pin) {
+		pins |= Z80_INT;
+	}
+	if (nmi_pin) {
+		pins |= Z80_NMI;
+	}
+	if (unhalt) {
+		status &= ~S_HLTA;
+		pins &= ~Z80_HALT;
+		z80_set_pc(&z80, z80_pc(&z80) + 1);
+		unhalt = 0;
+	}
+	if (pins & Z80_HALT) {
+		status |= S_HLTA;
+	}
+	if (pins & Z80_MREQ) {
+		if (pins & Z80_RD) {
+			if (pins & Z80_M1) {
+				status |= S_M1;
+			}
+			Z80_SET_DATA(pins, get_byte(Z80_GET_ADDR(pins)));
+			status &= ~S_M1;
+		} else if (pins & Z80_WR) {
+			put_byte(Z80_GET_ADDR(pins), Z80_GET_DATA(pins));
+		}
+	} else if (pins & Z80_IORQ) {
+		if (pins & Z80_M1) {
+			Z80_SET_DATA(pins, int_ack() & 0xff);
+		} else if (pins & Z80_RD) {
+			Z80_SET_DATA(pins, input(Z80_GET_ADDR(pins)));
+		} else if (pins & Z80_WR) {
+			output(Z80_GET_ADDR(pins), Z80_GET_DATA(pins));
+		}
+	}
+	return pins;
+}
+
+void
+z80_init()
+{
+	context.tick_cb = z80_tick;
+	z80init(&z80, &context);
+}
+
+void
+z80_run()
+{
+	do {
+		z80_exec(&z80, 1);
+		sim_cycles++;
+	} while (!z80_opdone(&z80));
+}
+
+/*
  * include files from micronix source
  */
 #include "../micronix/include/obj.h"

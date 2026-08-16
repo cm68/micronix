@@ -39,6 +39,7 @@
 #include <setjmp.h>
 
 #include "sim.h"
+#include "z80glue.h"
 #include "hwsim.h"
 #include "gui.h"
 #include "util.h"
