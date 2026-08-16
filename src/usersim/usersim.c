@@ -66,6 +66,9 @@
 static int do_exec(char *name, char **argv);
 static void emulate();
 void SystemCall();
+void int_handler();
+void quit_handler();
+int hostsig(int gsig);
 
 #define	DEFROOT	"filesystem"
 
@@ -1158,6 +1161,19 @@ main(int argc, char **argv)
     logfd = fileno(tty);
     setvbuf(tty, 0, _IOLBF, 0);
     signal(SIGUSR1, stop_handler);
+    /*
+     * Interrupt and quit belong to the simulation from the first
+     * instruction, not from the first signal() system call.  Without
+     * this, a program that never installs a handler - od on a big
+     * file - leaves the host default in place, and ^C kills the
+     * EMULATOR: raw exit, no accounting, and when the program was
+     * run from the simulated shell, the shell's usersim dies with it
+     * and the whole session is gone.  The handlers only schedule;
+     * the emulate loop consults the program's own disposition and
+     * does what the machine would - deliver, drop, or die.
+     */
+    signal(SIGINT, int_handler);
+    signal(SIGQUIT, quit_handler);
 
     if (debug_terminal) {
         makewins(tty);
@@ -1256,6 +1272,57 @@ void
 bg_handler()
 {
     schedule_signal(6);
+}
+
+/*
+ * what the exit syscall reports, factored so that a signal death
+ * reports it too - a run killed at the terminal is exactly the run
+ * whose cycle count was being watched.
+ */
+void
+exit_reports()
+{
+    if (sp_report) {
+        fprintf(repfp,
+            "stack: initial %04x low %04x used %d brk %04x gap %d\n",
+            sp_initial, sp_lowater, sp_initial - sp_lowater,
+            brake, sp_lowater - brake);
+        fflush(repfp);
+    }
+    if (verbose & V_CYCLE) {
+        fprintf(repfp, "cycles: %llu %s\n",
+            sim_cycles - cyc_base, cyc_name);
+        fflush(repfp);
+    }
+    if (tprot_report && tprot_hits) {
+        fprintf(repfp,
+            "text writes: %d (first: addr %04x pc %04x)\n",
+            tprot_hits, tprot_addr, tprot_pc);
+        fflush(repfp);
+    }
+}
+
+/*
+ * a signal whose disposition is default kills the process, which is
+ * this whole program.  Die the way the machine would: release the
+ * descriptors, then take the real signal, so a parent's wait() sees
+ * a termination status and not an exit code - the simulated shell
+ * reads it through case 7 as d=1, e=signal.
+ */
+void
+sig_death(int sig)
+{
+    int h = hostsig(sig);
+
+    if (verbose & V_SYS) {
+        pid();
+        message("killed by signal %d\n", sig);
+    }
+    exit_reports();
+    relefds();
+    signal(h, SIG_DFL);
+    raise(h);
+    exit(128 + h);              /* not reached */
 }
 
 struct itimerval timer;
@@ -1419,10 +1486,22 @@ do_exec(char *name, char **argv)
     set_itv_usec(0);
     set_alarm();
 
+    /*
+     * exec's arrangement, which is v6's: a caught signal resets to
+     * default, an IGNORED one stays ignored - the kernel keeps the
+     * odd values.  This reset everything, so a shell that ignored
+     * interrupt handed every child a ^C target.  And interrupt and
+     * quit stay with our handlers regardless: the disposition lives
+     * in signal_handler[], and the emulate loop is what acts on it.
+     */
     for (i = 0; i < 16; i++) {
+        if (signal_handler[i] == 1)
+            continue;
         signal_handler[i] = 0;
         signal(i, SIG_DFL);
     }
+    signal(SIGINT, int_handler);
+    signal(SIGQUIT, quit_handler);
 
     /*
      * the new image gets its own accounting: the counters below belong
@@ -1784,18 +1863,29 @@ emulate()
                     break;
                 }
             }
-            if (signal_handler[i]) {
+            signalled &= ~(1 << i);
+            /*
+             * 0 and 1 are the two values that mean themselves.  A
+             * handler is delivered; 1 is ignore and the signal is
+             * dropped; 0 is default, and the default for every
+             * signal on this machine is death.  This used to read
+             * "no handler, ignore it", which was never the machine's
+             * arrangement - it only looked right while the host
+             * default did the dying.
+             */
+            if (signal_handler[i] > 1) {
                 if (verbose & V_SYS) {
                     message("invoking signal %d %x\n", i, signal_handler[i]);
                 }
                 push(pc);
                 z80_set_reg16(pc_reg, signal_handler[i]);
-            } else {
+            } else if (signal_handler[i] == 1) {
                 if (verbose & V_SYS) {
                     message("ignoring signal %d\n", i);
                 }
+            } else {
+                sig_death(i);
             }
-            signalled &= ~(1 << i);
         }
         if (z80_get_reg8(status_reg) & S_HLTA) {
             SystemCall();
@@ -2758,24 +2848,7 @@ SystemCall()
         break;
 
     case 1:                    /* exit (hl) */
-        if (sp_report) {
-            fprintf(repfp,
-                "stack: initial %04x low %04x used %d brk %04x gap %d\n",
-                sp_initial, sp_lowater, sp_initial - sp_lowater,
-                brake, sp_lowater - brake);
-            fflush(repfp);
-        }
-        if (verbose & V_CYCLE) {
-            fprintf(repfp, "cycles: %llu %s\n",
-                sim_cycles - cyc_base, cyc_name);
-            fflush(repfp);
-        }
-        if (tprot_report && tprot_hits) {
-            fprintf(repfp,
-                "text writes: %d (first: addr %04x pc %04x)\n",
-                tprot_hits, tprot_addr, tprot_pc);
-            fflush(repfp);
-        }
+        exit_reports();
         /* the descriptors go with the process */
         relefds();
         exit(fd);
@@ -3644,7 +3717,15 @@ SystemCall()
 
             break;
         }
-        if ((arg2 == 0) || (arg2 == 1)) {
+        /*
+         * Interrupt and quit never leave our hands: the host handler
+         * stays int_handler/quit_handler whatever the disposition,
+         * and the emulate loop reads signal_handler[] to deliver,
+         * drop, or die.  The others still map 0 and 1 onto the host
+         * default and ignore, as before.
+         */
+        if (((arg2 == 0) || (arg2 == 1))
+            && i != SIGINT && i != SIGQUIT) {
             handler = arg2 ? SIG_IGN : SIG_DFL;
 
 #ifdef notdef

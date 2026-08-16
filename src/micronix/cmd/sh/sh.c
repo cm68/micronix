@@ -483,19 +483,20 @@ int pout;
         /*
          * A background child stops listening to the keyboard's
          * interrupt and quit, so that a ^C meant for whatever is in
-         * front does not take it with it.  A foreground child keeps
-         * them, because a ^C is how you stop it.
-         *
-         * The call was here unconditionally while ignoresigs() was
-         * empty, where it cost nothing.  Now that it does something,
-         * doing it for every child would mean nothing could be
-         * interrupted.  Which of the two the original does is not
-         * read - NOTES has the two signal() calls at H4287 and not
-         * what guards them - so this is the v6 arrangement rather
-         * than the binary's, and is worth confirming against it.
+         * front does not take it with it.  A foreground child of an
+         * interactive shell puts them BACK: the parent ignores both
+         * (see main), the child inherits that through fork, and exec
+         * preserves ignores - so without the reset here, no command
+         * could ever be interrupted.  A non-interactive shell leaves
+         * its children's signals as its own arrived, which is what
+         * lets "sh script &" shelter everything the script runs.
          */
         if (c->bg)
             ignoresigs();
+        else if (interactive) {
+            signal(2, 0);               /* interrupt back to default */
+            signal(3, 0);               /* quit too */
+        }
         redirect(c, pin, pout);
 
         /*
@@ -1224,6 +1225,19 @@ char **argv;
         srcstack[nsrc++] = stdin;
         interactive = isatty(0);
     }
+
+    /*
+     * The interactive shell ignores interrupt and quit, and this is
+     * not optional: the kernel hands the keyboard's signals to EVERY
+     * process on the terminal, the shell included, so a ^C meant for
+     * a runaway od would take the shell with it and the session
+     * would end.  The other half of the arrangement is in run() -
+     * the foreground child puts both back to default before its
+     * exec, because exec preserves ignores, and a command that
+     * cannot be interrupted is worse than a shell that can be.
+     */
+    if (interactive)
+        ignoresigs();
 
     /*
      * ~/.sh is every shell and ~/.login is only the one you log in
