@@ -53,6 +53,7 @@ all:
 	cd man ; make all
 	cd mkdir ; make all
 	cd mknod ; make all
+	cd more ; make all
 	cd mv ; make all
 	cd nm ; make all
 	cd od ; make all
@@ -96,6 +97,7 @@ install:
 	cd man ; make install
 	cd mkdir ; make install
 	cd mknod ; make install
+	cd more ; make install
 	cd mv ; make install
 	cd nm ; make install
 	cd od ; make install
@@ -133,6 +135,7 @@ clean:
 	cd man ; make clean
 	cd mkdir ; make clean
 	cd mknod ; make clean
+	cd more ; make clean
 	cd mv ; make clean
 	cd nm ; make clean
 	cd od ; make clean
@@ -170,6 +173,7 @@ clobber:
 	cd man ; make clobber
 	cd mkdir ; make clobber
 	cd mknod ; make clobber
+	cd more ; make clobber
 	cd mv ; make clobber
 	cd nm ; make clobber
 	cd od ; make clobber
