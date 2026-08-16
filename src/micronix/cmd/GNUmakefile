@@ -54,7 +54,13 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = ar ccc cp echo form init ls make man mkdir mknod nm pwd rm s sh size sync tar vi
+#
+# The 2.11BSD ports - cat chgrp chmod cmp date dd diff du grep ln mv
+# od pr sed tee - came in through a NEW list that nothing invoked,
+# and moved up here once they had built, tested against their host
+# counterparts, and shed their compiler workarounds.
+#
+DIRS = ar cat ccc chgrp chmod cmp cp date dd diff du echo form grep init ln ls make man mkdir mknod mv nm od pr pwd rm s sed sh size sync tar tee vi
 
 #
 # "cd $$d &&", not "cd $$d ;".  With the semicolon, a directory named
