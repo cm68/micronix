@@ -109,6 +109,53 @@ all: $(ARMX)
 $(ARMX): $(ARSRC)
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(ARSRC)
 
+#
+# The cross compiler, built here from these sources.
+#
+# Before the fork the tree compiled with /usr/local/bin/ccc, which is
+# installed out of ~/src/ccc - so "this tree's compiler" was the other
+# tree's.  These sources are ours now and this builds them: the seven
+# passes and the driver, with the machine's own cc, into desthost.
+#
+# Then the runtime beside it, because the driver adds crt0.o and
+# libc.a from its own lib directory whatever else is on the link line,
+# and works that directory out from argv[0] - desthost/bin/mxccc
+# reads desthost/lib and desthost/usr/include.  The archives have to
+# exist before anything links, which is why this is a target you ask
+# for and not part of all: the libraries are built by the compiler it
+# installs.
+#
+#	make hostcc		build the compiler
+#	make			build the tree with it, once lib is made
+#	make hostrt		put the runtime where it can find it
+#
+HOSTCCDIRS = libexec/cpp libexec/c0 libexec/c1 libexec/peep \
+	     libexec/asz libexec/ld libexec/astpp cmd/ccc
+
+.PHONY: hostcc hostrt
+
+hostcc: $(ARMX)
+	@for d in $(HOSTCCDIRS); do $(MAKE) -C $$d host || exit 1; done
+	@echo "host compiler in desthost/bin/mxccc"
+
+hostrt:
+	@mkdir -p desthost/lib desthost/usr/include/sys
+	cp lib/libc/libc.a lib/libu/libu.a lib/libu/crt0.o \
+	   lib/libccc/libccc.a desthost/lib
+	#
+	# The system headers first and the C library's over them.  Six
+	# names are in both sets - cpm.h errno.h hitech.h setjmp.h
+	# stdio.h time.h - and the library's are the ones that count:
+	# include/GNUmakefile calls them CCCOWNED and installs its own
+	# copies of everything BUT those.  The tree's time.h is the v6
+	# one, struct time in UINTs, and c0 will not read it.
+	#
+	cp include/*.h desthost/usr/include
+	cp include/sys/*.h desthost/usr/include/sys
+	cp lib/include/*.h desthost/usr/include
+	cp lib/include/sys/*.h desthost/usr/include/sys
+	@echo "runtime in desthost/lib"
+
 install:
 	$(RECURSE)
 

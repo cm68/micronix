@@ -34,9 +34,27 @@ MAKEFLAGS += --no-builtin-variables
 .SUFFIXES:
 
 #
-# the installed toolchain
+# THE COMPILER IS THIS TREE'S OWN.
 #
-CCC	?= /usr/local/bin/ccc
+# It was /usr/local/bin/ccc, which is installed out of ~/src/ccc, so
+# the tree that forked the compiler sources went on being built by the
+# other tree's binary - and a correctness fix made here was not in the
+# compiler that compiled the next thing.
+#
+# desthost/bin/mxccc is built from the sources in libexec and cmd/ccc
+# by "make hostcc" at the top of this tree.  It has to exist before
+# anything compiles, and the runtime it links against has to exist
+# before anything links, so a tree with nothing built in it goes:
+#
+#	make hostcc		the passes and the driver, with cc
+#	make -C lib		libc, libu, libccc, with mxccc
+#	make hostrt		the archives where mxccc looks for them
+#	make			everything else
+#
+# Override CCC on the command line to build with something else -
+# /usr/local/bin/ccc still works and is how the two trees get compared.
+#
+CCC	?= $(DEPTH)/desthost/bin/mxccc
 #
 # The librarian is ar, built for the host as $(DEPTH)/mxar - see the
 # top level GNUmakefile.  It was wslib, which wrote the whitesmiths
@@ -116,7 +134,20 @@ CCFLAGS	?= -m micronix -O
 # of a structure that was never the right one.  That is ar, cp, ls,
 # mkdir, pwd, rm and vi - seven of the eight commands still failing.
 #
-INC	?= -I/usr/local/lib/include -I$(DEPTH)/include
+#
+# THE HEADERS ARE THIS TREE'S OWN, both sets.
+#
+# lib/include is the C library's - stdio.h, ctype.h, fcntl.h, the
+# ones a program includes - and it was reached at
+# /usr/local/lib/include, which is installed out of ~/src/ccc.  The
+# fork copied libc's sources and left its headers behind, so the tree
+# compiled its own libc against another tree's declarations of it.
+#
+# include is the system's - the v6 headers, struct time and the rest -
+# and has always been here.  The two are different sets and both are
+# wanted: /usr/include on micronix holds them merged.
+#
+INC	?= -I$(DEPTH)/lib/include -I$(DEPTH)/include
 
 #
 # where the simulated filesystem lives, and where in it these sources
