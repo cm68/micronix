@@ -43,6 +43,7 @@ src/hwsim/d1/d1
 
 src/micronix/lib/libc/*.o
 src/micronix/lib/libc/*.a
+src/micronix/lib/libcpm/*.a
 
 src/tools/dumpsec
 src/tools/setdev
