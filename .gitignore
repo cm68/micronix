@@ -2,6 +2,7 @@ sim
 core
 filesystem
 extra
+attic
 *.tar
 
 #

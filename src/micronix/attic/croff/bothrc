@@ -1,4 +1,0 @@
-as t.s
-mv a.out t.o
-as hytab.s
-mv a.out hytab.o
