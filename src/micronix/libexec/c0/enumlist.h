@@ -1,1 +1,1 @@
-/home/curt/src/ccc/src/pass1/enumlist.h
+/* generated from token.h - DO NOT EDIT */

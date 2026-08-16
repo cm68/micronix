@@ -1,2 +1,4 @@
 *.o
 c1
+mkruleidx
+ruleidx.c

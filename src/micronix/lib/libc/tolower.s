@@ -1,1 +1,17 @@
-/home/curt/src/ccc/src/libc/tolower.s
+	global	_tolower
+
+	psect	text
+_tolower:
+	ld	a,h		;check for a char - the argument is in hl
+	or	a
+	ret	nz
+	ld	a,l
+	cp	'A'
+	ret	c		;Less than a
+	cp	'Z'+1
+	ret	nc		;More than z
+	sub	'A'-'a'
+	ld	l,a
+	ret
+
+; vim: tabstop=4 shiftwidth=4 noexpandtab:

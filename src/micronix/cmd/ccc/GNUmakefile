@@ -4,9 +4,8 @@
 # cmd/ccc/GNUmakefile
 #
 # The compiler is moving into this tree and this is the shape it has:
-# one directory per pass and per tool.  The source here is a symlink
-# into ~/src/ccc/src/tools, which is still where it is edited, so
-# nothing is duplicated while both trees exist.
+# one directory per pass and per tool.  The source lives here now,
+# forked from ~/src/ccc/src/tools and edited here.
 #
 # IT IS IN cmd/GNUmakefile's DIRS NOW.  What used to be here said
 # these were host programs built by gcc -m32 in the ccc tree, and that
@@ -38,3 +37,17 @@ CLASS	= cmd
 CCFLAGS	= -m micronix -DCCC
 
 include $(DEPTH)/GNUmakefile.inc
+
+#
+# and the host driver: the same source without -DCCC, so it looks for
+# mxld rather than ld - on this machine "ld" is the host's linker and
+# emphatically not ours.  It goes in bin and not libexec, being the
+# one part of the compiler a person types.
+#
+HOSTPROG	= ccc
+HOSTBIN		= bin
+HOSTDEFS	=
+HOSTWARNS	= -Wall
+HOSTCFLAGS	= -m32 $(HOSTDEBUG) $(HOSTWARNS) -I. -I$(DEPTH)/lib/libccc
+
+include $(DEPTH)/libexec/host.mk

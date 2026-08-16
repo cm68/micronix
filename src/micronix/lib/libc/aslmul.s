@@ -1,1 +1,10 @@
-/home/curt/src/ccc/src/libc/aslmul.s
+	psect	text
+	global	iregset, iregstore, asalmul, asllmul, almul
+
+asalmul:
+asllmul:
+	call	iregset
+	call	almul
+	jp	iregstore
+
+; vim: tabstop=4 shiftwidth=4 noexpandtab:

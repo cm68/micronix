@@ -10,8 +10,7 @@
 # The second pass: the code generator.
 #
 # ccc runs this; nobody types it, so it goes into /libexec and has no
-# man page.  The sources are symlinks into ~/src/ccc, which is where
-# they are edited, and the object list is spelled out because this
+# man page.  The sources are copies, forked from ~/src/ccc and edited here, and the object list is spelled out because this
 # make has no wildcard.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
@@ -32,12 +31,26 @@ LIBS	= /lib/libccc.a
 CFLAGS	= -O
 LIBEXEC	= /libexec
 PROG	= c1
-OBJS	= astio.o expr.o lower.o parseast.o pass2.o rewrite.o rules.o
+OBJS	= astio.o expr.o lower.o parseast.o pass2.o rewrite.o rules.o ruleidx.o
 
 all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LIBS)
+
+#
+# mkruleidx writes the rule index from the rule table - see mkruleidx.c.
+# It links rules.o so it walks the very table it indexes, and refuses to
+# write anything if any opcode's rules are not one unbroken run, so a
+# misfiled rule stops the build instead of never being tried.  Built
+# natively, with ccc, because on this machine ccc's target is this
+# machine.
+#
+mkruleidx: mkruleidx.c rules.o
+	$(CC) $(CFLAGS) -o $@ mkruleidx.c rules.o
+
+ruleidx.c: mkruleidx rules.c
+	./mkruleidx > ruleidx.c
 
 #
 # One entry for every object: $* is the target without its suffix, so
@@ -50,7 +63,7 @@ install: $(PROG)
 	cp $(PROG) $(LIBEXEC)/c1
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJS) mkruleidx ruleidx.c
 
 clobber: clean
 	rm -f $(PROG)

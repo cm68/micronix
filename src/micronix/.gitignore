@@ -1,1 +1,12 @@
 mxar
+
+#
+# The host build of the compiler: objects, the host libccc, the
+# tracing tables makedebug.sh writes, and the tree the passes and
+# driver are linked into.  All generated, none of it checked in.
+#
+*.ho
+desthost/
+lib/libccc/libccc-host.a
+libexec/*/dbgtags.c
+libexec/*/debug.h

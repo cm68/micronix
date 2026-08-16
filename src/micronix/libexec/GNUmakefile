@@ -25,11 +25,12 @@
 # fail on _fmtlong and _fmtstr; those are in ccc's ccclib and there is
 # a lib/libccc now, which each of them names in LIBS.
 #
-# Their sources are symlinks into ~/src/ccc and the sets had drifted:
+# Their sources were symlinks into ~/src/ccc and the sets had drifted:
 # c0 was missing eleven p1*.h, all three wanted astops.h, format.h
 # and libutil.h out of ccclib, and c0 and c1 wanted lexeme.h and
-# lexops.h out of cpp - pass1 compiles with -I../cpp there.  Those
-# are linked now, so what is left really is only the library.
+# lexops.h out of cpp - pass1 compiles with -I../cpp there.  The
+# fork copied all of it in, so what is left really is only the
+# library.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 

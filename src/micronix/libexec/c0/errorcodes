@@ -1,0 +1,96 @@
+# type errors
+ER_T_PT		bad type decl
+ER_T_TD		bad typedef
+ER_T_ED		bad enum
+ER_T_ET		bad enum tag
+ER_T_SA		dup aggregate
+ER_T_GB		no basetype
+ER_T_SB		struct too big
+ER_T_UB		union bitfield
+ER_T_SE		bad struct elem
+ER_T_SD		no struct def
+ER_T_DT		multi basetype
+ER_T_RT		dup type def
+ER_T_PA		bad type ref
+ER_T_UT		unknown type
+
+# decl errors
+ER_D_DP		decl parens
+ER_D_MV		multi vars
+ER_D_BD		bitfield dim
+ER_D_BM		bitfield big
+ER_D_AD		array dim
+ER_D_FA		fn array
+ER_D_FM		old style arg
+ER_D_FO		multi arg type
+ER_D_UT		bad decl token
+ER_D_TL		bad sclass
+ER_D_OF		too many names
+ER_D_DN		dup name
+ER_D_IN		bad init
+ER_D_AI		auto aggr init
+ER_D_RD		redecl disagrees
+ER_D_IA		sizeof indeterminate
+ER_D_UI		union init
+
+# parse errors
+ER_P_SC		bad sclass
+
+# statement errors
+ER_S_CC		need }
+ER_S_NP		cond parens
+ER_S_SN		need ;
+ER_S_OE		orphan else
+ER_S_NC		case not const
+ER_S_NL		label :
+ER_S_DO		bad do
+ER_S_WH		need while
+ER_S_GL		goto label
+ER_S_SB		switch {
+ER_S_UK		bad stmt
+
+# lexer or cpp errors
+ER_C_BD		bad cpp op
+ER_C_CU		endif no if
+ER_C_ME		multi else
+ER_C_MN		no macro name
+ER_C_ID		bad include
+ER_C_IF		no include
+ER_C_DP		bad macro args
+ER_C_CE		cpp const
+ER_C_CD		bad literal
+ER_C_BC		bad char
+ER_C_NR		char range
+ER_C_NX		bad number
+ER_C_UT		bad char
+ER_C_TL		id too long
+
+# expression errors
+ER_E_LV		need lvalue
+ER_E_DP		bad deref
+ER_E_SC		scalar op
+ER_E_CP		cast paren
+ER_E_SP		expr paren
+ER_E_IT		bad index
+ER_E_IB		need ]
+ER_E_FN		need fn ptr
+ER_E_FA		bad fn args
+ER_E_UO		bad op
+ER_E_UD		undefined symbol
+ER_E_CF		no fold
+ER_E_PT		ptr compat
+ER_E_AG		struct value
+ER_E_RA		addr of register
+
+# resource errors
+ER_NOMEM	out of memory
+
+# warnings
+ER_W_SYMTRUNC	sym truncated
+
+# limits
+ER_S_IF		too many ifs
+ER_D_FL		locals too large
+ER_S_FN		too many functions
+ER_S_BLK	too many blocks
+ER_E_IC		incomplete type

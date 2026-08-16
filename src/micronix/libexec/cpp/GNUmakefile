@@ -35,4 +35,29 @@ INSTNAME = pass0
 #
 LIBS	= $(DEPTH)/lib/libccc/libccc.a
 
+#
+# Spelled out, because the wildcard is wrong here in three ways: it
+# would sweep in dbgtags.c, which cpp.c includes rather than compiles;
+# and mkkw.c and xdump.c, which are programs of their own with their
+# own main - the Z80 link said so, twice over, as duplicate _main.
+#
+CSRCS = cpp.c lex.c io.c macro.c kw.c emit.c util.c kwtab.c \
+	lexdata.c tdsrc.c cfold.c knr.c norm.c filtutil.c
+
 include $(DEPTH)/GNUmakefile.inc
+
+#
+# and the same sources built for this machine: the cross compiler
+# everything else in the tree is compiled by.  See libexec/host.mk.
+#
+#
+# c89 and not gnu89, and the builtin-mismatch warning off:
+# cpp declares strdup itself, as it must - it has to compile with a
+# compiler whose library does not.
+#
+HOSTWARNS = -Wall -Wno-builtin-declaration-mismatch -Werror=declaration-after-statement
+HOSTCFLAGS = -m32 -std=c89 $(HOSTDEBUG) $(HOSTDEFS) $(HOSTWARNS) -I. -I$(DEPTH)/lib/libccc
+HOSTSRCS = $(CSRCS)
+HOSTPROG = pass0
+
+include $(DEPTH)/libexec/host.mk

@@ -23,7 +23,8 @@
 #	cpp c0 c1 peep		the passes
 #	asz ld nm ar size ccc astpp	the tools
 #
-# Those are prototypes.  Their sources are symlinks into ~/src/ccc,
+# Those were prototypes.  Their sources are this tree's own now,
+# forked from ~/src/ccc,
 # which is still where they are edited.  Most are not in DIRS: they are
 # host programs today, and building them here means building the
 # compiler for the Z80, which is where this is going but is not there

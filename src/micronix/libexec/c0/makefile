@@ -10,8 +10,7 @@
 # The first pass: the parser and the AST writer.
 #
 # ccc runs this; nobody types it, so it goes into /libexec and has no
-# man page.  The sources are symlinks into ~/src/ccc, which is where
-# they are edited, and the object list is spelled out because this
+# man page.  The sources are copies, forked from ~/src/ccc and edited here, and the object list is spelled out because this
 # make has no wildcard.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
