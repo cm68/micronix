@@ -29,13 +29,16 @@ int headpr;
 
 /*
  * The options.  -t tests every block for readability, -n makes no
- * changes, -b hunts for bad blocks, and -v is verbose.  The man page
- * documents -t and -n; the binary takes all four.
+ * changes, -b hunts for bad blocks, and -v is verbose.  -y repairs
+ * without asking (it is the default: nothing here is interactive, so a
+ * plain run repairs too).  The man page documents -t and -n; the binary
+ * takes all five.
  */
 int	tflag;
 int	nflag;
 int	bflag;
 int	vflag;
+int	yflag;
 
 char	*fsname;		/* the file system being checked */
 
@@ -109,6 +112,7 @@ main(int argc, char *argv[])
 		if (strcmp(arg, "-t") == 0) { tflag = 1; continue; }
 		if (strcmp(arg, "-v") == 0) { vflag = 1; continue; }
 		if (strcmp(arg, "-n") == 0) { nflag = 1; continue; }
+		if (strcmp(arg, "-y") == 0) { yflag = 1; continue; }
 		if (strcmp(arg, "-b") == 0) { bflag = 1; continue; }
 		if (fsname) {
 			fprintf(stderr, "usage: fsck filesystem ... \n");
@@ -159,7 +163,13 @@ out:
 int
 readsuper(void)
 {
-	if (openfs(fsname, &fs) < 0) {
+	/*
+	 * Open for writing only when repairs are wanted: -n reports without
+	 * touching the image, and opening it read-only is what makes the
+	 * repair paths' writes (iput) fail on a -n run rather than quietly
+	 * modifying it.
+	 */
+	if (openfsrw(fsname, &fs, nflag ? 0 : 1) < 0) {
 		printf("Can't read the super block\n");
 		return 0;
 	}
