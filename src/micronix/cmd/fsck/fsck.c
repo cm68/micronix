@@ -513,10 +513,39 @@ summary(void)
 }
 
 /*
+ * patchbad - replace a bad block with a fresh one (H0940).  Allocates
+ * the replacement from the free list, copies whatever can be read of
+ * the bad block onto it, and repoints the block map so the free list
+ * pass sees the new block as used and the old one as gone.
+ */
+static void
+patchbad(int b)
+{
+	char buf[512];
+	int nb;
+
+	if (nflag)
+		return;
+
+	nb = balloc(fs);
+	if (nb == 0) {
+		printf("Can't patch new block number %u\n", b);
+		return;
+	}
+	printf("Patching %u at location %u\n", b, (unsigned)blockmap[b].b_offset);
+
+	memset(buf, 0, sizeof(buf));
+	readblk(fs, b, buf);
+	writeblk(fs, nb, buf);
+
+	blockmap[nb] = blockmap[b];
+	blockmap[b].b_count = 0;
+}
+
+/*
  * huntbad - the -t surface scan (H4672).  Reads every block; a block
  * that cannot be read is reported and, unless -n, patched with a fresh
- * block from the free list.  The patch itself (H0940 - find the inode
- * that names the block and repoint it) is still to be read out.
+ * block from the free list.
  */
 static void
 huntbad(void)
@@ -529,7 +558,7 @@ huntbad(void)
 			continue;
 		printf("Bad block: %u\n", b);
 		nbad++;
-		/* TODO: H0940 - allocate a new block and patch the inode */
+		patchbad(b);
 	}
 }
 
