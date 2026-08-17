@@ -841,6 +841,7 @@ imagemkdir(char *path)
 	struct dsknod *dp;
 	struct dir dirbuf[32];
 	int inum;
+	int pinum;
 
 	save = dir = strdup(path);
 	name = rindex(dir, '/');
@@ -857,6 +858,13 @@ imagemkdir(char *path)
 		return -1;
 	}
 
+	/*
+	 * filelink fetches the parent again itself and changes its size, so
+	 * this handle is stale after it returns.  Keep the number; the parent
+	 * is re-read below when its link count has to change.
+	 */
+	pinum = ((struct i_node *)parent)->inum;
+
 	inum = ialloc(fs, IFDIR | 0777);
 	if (inum == 0) {
 		ifree(parent);
@@ -870,14 +878,30 @@ imagemkdir(char *path)
 	memset(dirbuf, 0, sizeof dirbuf);
 	dirbuf[0].ino = inum;
 	dirbuf[0].name[0] = '.';
-	dirbuf[1].ino = ((struct i_node *)parent)->inum;
+	dirbuf[1].ino = pinum;
 	dirbuf[1].name[0] = '.';
 	dirbuf[1].name[1] = '.';
 	filewrite(dp, 0, (char *)dirbuf);
 	dp->d_size0 = 0;
 	dp->d_size1 = 2 * sizeof(struct dir);
+	/*
+	 * filelink counted the name entry only.  The . and .. entries just
+	 * written are links as well and nothing counts them: . is another
+	 * link to this inode, .. a link to the parent.  Leave them out and
+	 * every directory mnix makes is one short and its parent short one
+	 * per child - the damage dcheck reports on hddma-0.
+	 */
+	dp->d_nlink++;
 	iput(dp);
 	ifree(dp);
+
+	/* the .. link: count it on a fresh read of the parent, post-filelink */
+	dp = iget(fs, pinum);
+	if (dp) {
+		dp->d_nlink++;
+		iput(dp);
+		ifree(dp);
+	}
 	ifree(parent);
 	free(save);
 	return 0;
