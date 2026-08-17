@@ -12,7 +12,7 @@
 
 SIMTARGETS = \
 	ar nm size imd disas dump \
-	mnix dcheck icheck ncheck readall imdd dumpsec setdev
+	mnix dcheck icheck ncheck fsck readall imdd dumpsec setdev
 	#mar  hitech
 
 LDFLAGS = -lcurses
@@ -54,6 +54,9 @@ icheck.o: ../micronix/cmd/icheck/icheck.c
 ncheck.o: ../micronix/cmd/ncheck/ncheck.c
 	$(CC) $(CFLAGS) -I../include -I../micronix/include -c ../micronix/cmd/ncheck/ncheck.c -o $@
 
+fsck.o: ../micronix/cmd/fsck/fsck.c
+	$(CC) $(CFLAGS) -I../include -I../micronix/include -c ../micronix/cmd/fsck/fsck.c -o $@
+
 setdev.o: ../micronix/cmd/setdev/setdev.c
 	$(CC) $(CFLAGS) -c ../micronix/cmd/setdev/setdev.c -o $@
 
@@ -65,6 +68,9 @@ icheck:	icheck.o
 
 ncheck:	ncheck.o
 	$(CC) $(CFLAGS) -o ncheck ncheck.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+
+fsck:	fsck.o
+	$(CC) $(CFLAGS) -o fsck fsck.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 readall:	readall.o
 	$(CC) $(CFLAGS) -o readall readall.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
@@ -115,6 +121,12 @@ testn:	ncheck
 	for i in ../../disks/dist/*.IMD ; do \
 		echo $$i ; \
 		./ncheck $$i ; \
+	done;
+
+testf:	fsck
+	for i in ../../disks/dist/*.IMD ; do \
+		echo $$i ; \
+		./fsck -n $$i ; \
 	done;
 
 install: disas

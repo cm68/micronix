@@ -24,6 +24,9 @@
 #include <sys/dir.h>
 #include <fslib.h>
 
+int traceflags;			/* the host fslib's trace controls */
+int headpr;
+
 /*
  * The options.  -t tests every block for readability, -n makes no
  * changes, -b hunts for bad blocks, and -v is verbose.  The man page
@@ -125,6 +128,7 @@ main(int argc, char *argv[])
 	 * with the free list and directory checks between the two I-list
 	 * passes - see the driver at H021b in fsck.dis.
 	 */
+	printf("** Checking I-list, first pass\n");
 	if (!checkilist1())
 		goto out;
 	printf("** Checking the free list\n");
@@ -316,51 +320,63 @@ freeblock(int b, int chain)
 }
 
 /*
- * checkfree - walk the free list.  The super block holds s_nfree block
- * numbers in s_free[100], with s_free[0] the link to the next block of
- * free numbers (or 0 at the end).  Once the chain has been walked, any
- * block that is neither used nor free is missing and is recovered.
+ * freewalk - mark every block the free list names.  The list is a
+ * chain: the super block holds s_nfree numbers in s_free[100], and
+ * s_free[0] links to a block whose word 0 is the count of the next
+ * batch and words 1..100 the numbers (the fslib bfree/balloc shape).
+ */
+static void
+freewalk(void)
+{
+	UINT buf[256];
+	UINT list[100];
+	int n;
+	int i;
+	int b;
+
+	memcpy(list, fs->s_free, sizeof(list));
+	n = fs->s_nfree;
+	if (n > 100)
+		n = 100;
+
+	for (;;) {
+		for (i = n - 1; i >= 1; i--) {
+			b = list[i];
+			if (b == 0)
+				return;
+			freeblock(b, 0);
+		}
+		b = list[0];
+		if (b == 0)
+			return;
+		freeblock(b, 1);
+		if (b >= fs->s_fsize)
+			return;
+		if (readblk(fs, b, (char *)buf))
+			return;
+		memcpy(list, buf + 1, sizeof(list));
+		n = buf[0];
+		if (n > 100)
+			n = 100;
+	}
+}
+
+/*
+ * checkfree - walk the free list, then find the blocks that are
+ * neither allocated nor free and rebuild the list to take them back.
  */
 int
 checkfree(void)
 {
-	UINT freebuf[100];
-	int n;
 	int b;
-	int i;
 	int missing;
 
 	freemap = calloc(fs->s_fsize, 1);
 	if (freemap == 0)
 		lose("out of memory");
 
-	/*
-	 * walk the chain.  The super block holds s_nfree numbers in
-	 * s_free[100]; s_free[0] chains to the next block of numbers
-	 * (buf[0] of that block is its count, buf[1..100] the numbers).
-	 */
-	memcpy(freebuf, fs->s_free, sizeof(freebuf));
-	n = fs->s_nfree;
-	for (;;) {
-		for (i = n - 1; i >= 1; i--) {
-			b = freebuf[i];
-			if (b == 0)
-				goto missing;
-			freeblock(b, 0);
-		}
-		b = freebuf[0];
-		if (b == 0)
-			goto missing;
-		freeblock(b, 1);
-		readblk(fs, b, (char *)freebuf);
-		n = freebuf[0];
-	}
+	freewalk();
 
-missing:
-	/*
-	 * blocks that are neither allocated nor free are lost; count them
-	 * and rebuild the free list to take them back.
-	 */
 	missing = 0;
 	for (b = fs->s_isize + INODES_START; b < fs->s_fsize; b++) {
 		if (!blockmap[b].b_count && !freemap[b])
