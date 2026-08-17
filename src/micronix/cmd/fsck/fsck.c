@@ -71,6 +71,10 @@ struct bmap {
 	short	b_type;		/* what kind of block it is */
 };
 
+#define	BT_DATA	1		/* a block holding file data */
+#define	BT_INDIR	2		/* a single-indirect block */
+#define	BT_IN2DIR	3		/* the double-indirect block */
+
 struct bmap *blockmap;		/* H700e - the block map */
 char	*freemap;		/* H7010 - one byte per block, set if free */
 char	*isallocated;		/* H7012 - one byte per inode */
@@ -173,7 +177,7 @@ readsuper(void)
  * an out-of-range block is reported; a second claim is a duplicate.
  */
 static void
-countblock(int inum, int off, int b)
+countblock(int inum, int off, int b, int type)
 {
 	struct bmap *bp;
 
@@ -191,6 +195,7 @@ countblock(int inum, int off, int b)
 	} else {
 		bp->b_inode = inum;
 		bp->b_offset = off;
+		bp->b_type = type;
 	}
 }
 
@@ -206,10 +211,10 @@ countindir(int inum, int b)
 
 	if (b == 0)
 		return;
-	countblock(inum, 0, b);
+	countblock(inum, 0, b, BT_INDIR);
 	readblk(fs, b, (char *)blk);
 	for (i = 0; i < 256; i++)
-		countblock(inum, i, blk[i]);
+		countblock(inum, i, blk[i], BT_DATA);
 }
 
 /*
@@ -276,14 +281,14 @@ checkilist1(void)
 			for (i = 0; i < 7; i++)
 				countindir(inum, ip->d_addr[i]);
 			if (ip->d_addr[7]) {
-				countblock(inum, 0, ip->d_addr[7]);
+				countblock(inum, 0, ip->d_addr[7], BT_IN2DIR);
 				readblk(fs, ip->d_addr[7], (char *)blk);
 				for (i = 0; i < 256; i++)
 					countindir(inum, blk[i]);
 			}
 		} else {
 			for (i = 0; i < 8; i++)
-				countblock(inum, i, ip->d_addr[i]);
+				countblock(inum, i, ip->d_addr[i], BT_DATA);
 		}
 		iput(ip);
 	}
@@ -495,20 +500,32 @@ int
 summary(void)
 {
 	int b;
+	int nindir = 0;
+	int nin2dir = 0;
+	int ndata = 0;
 
 	nused = 0;
 	nfree = 0;
 	nbad = 0;
 	for (b = fs->s_isize + INODES_START; b < fs->s_fsize; b++) {
-		if (blockmap[b].b_count)
+		if (blockmap[b].b_count) {
 			nused++;
-		else if (freemap[b])
+			if (blockmap[b].b_type == BT_INDIR)
+				nindir++;
+			else if (blockmap[b].b_type == BT_IN2DIR)
+				nin2dir++;
+			else
+				ndata++;
+		} else if (freemap[b]) {
 			nfree++;
+		}
 	}
 
 	printf("%u files, %u special, %u directories, %u small, %u large, %u huge\n",
 	    nfiles, nspecial, ndir, nsmall, nlarge, nhuge);
 	printf("%u used, %u free, %u bad\n", nused, nfree, nbad);
+	printf("%u blocks, %u I-list, %u indir, %u in2dir, %u data\n",
+	    fs->s_fsize, fs->s_isize + INODES_START, nindir, nin2dir, ndata);
 	return 1;
 }
 
