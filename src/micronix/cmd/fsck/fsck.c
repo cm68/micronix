@@ -497,6 +497,27 @@ summary(void)
 }
 
 /*
+ * huntbad - the -t surface scan (H4672).  Reads every block; a block
+ * that cannot be read is reported and, unless -n, patched with a fresh
+ * block from the free list.  The patch itself (H0940 - find the inode
+ * that names the block and repoint it) is still to be read out.
+ */
+static void
+huntbad(void)
+{
+	char buf[512];
+	int b;
+
+	for (b = 0; b < fs->s_fsize; b++) {
+		if (readblk(fs, b, buf) == 0)
+			continue;
+		printf("Bad block: %u\n", b);
+		nbad++;
+		/* TODO: H0940 - allocate a new block and patch the inode */
+	}
+}
+
+/*
  * reorg - whatever is left to fix once the passes have decided.  The
  * original hunts for bad blocks here when -t was given.
  */
@@ -505,7 +526,7 @@ reorg(void)
 {
 	if (tflag) {
 		printf("Hunting for bad blocks\n");
-		/* TODO: read the .dis from H4672 */
+		huntbad();
 	}
 	return 1;
 }
