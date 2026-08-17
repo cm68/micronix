@@ -1,7 +1,7 @@
 #
-# cross build for wsld - the link editor.  To be renamed ld when it takes that name.
+# cross build for ld - the link editor.
 #
-# cmd/wsld/GNUmakefile
+# cmd/ld/GNUmakefile
 #
 # PROTOTYPE.  The compiler is moving into this tree, and this is the
 # shape it will have when it arrives: one directory per pass and per
@@ -18,8 +18,7 @@
 
 DEPTH	= ../..
 DIR	= ld
-CLASS	= libexec
-BINDIR	= /libexec
+CLASS	= cmd
 
 include $(DEPTH)/GNUmakefile.inc
 
@@ -31,5 +30,6 @@ HOSTDEFS = -Dlinux
 HOSTWARNS = -Wall
 HOSTCFLAGS = -m32 -std=c99 -g -O0 $(HOSTDEFS) $(HOSTWARNS) -I.
 HOSTPROG = mxld
+HOSTBIN  = bin
 
 include $(DEPTH)/libexec/host.mk

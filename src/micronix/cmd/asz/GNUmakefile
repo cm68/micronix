@@ -18,8 +18,7 @@
 
 DEPTH	= ../..
 DIR	= asz
-CLASS	= libexec
-BINDIR	= /libexec
+CLASS	= cmd
 
 include $(DEPTH)/GNUmakefile.inc
 
@@ -34,5 +33,6 @@ HOSTDEFS = -Dlinux
 HOSTWARNS = -Wall
 HOSTCFLAGS = -m32 -std=c99 -g -O0 $(HOSTDEFS) $(HOSTWARNS) -I.
 HOSTPROG = mxasz
+HOSTBIN  = bin
 
 include $(DEPTH)/libexec/host.mk

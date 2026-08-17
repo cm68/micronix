@@ -145,7 +145,7 @@ $(NMX): $(NMSRC)
 #	make hostrt		put the runtime where it can find it
 #
 HOSTCCDIRS = libexec/cpp libexec/c0 libexec/c1 libexec/peep \
-	     libexec/asz libexec/ld libexec/astpp cmd/ccc
+	     cmd/asz cmd/ld libexec/astpp cmd/ccc
 
 hostcc: $(ARMX)
 	@for d in $(HOSTCCDIRS); do $(MAKE) -C $$d host || exit 1; done

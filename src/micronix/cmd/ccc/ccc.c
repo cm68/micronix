@@ -59,6 +59,7 @@ char *progname;
 #define LIBDIRMAX 512
 char libdir[LIBDIRMAX];
 char libexecdir[LIBDIRMAX];
+char bindir[LIBDIRMAX];
 
 /*
  * The target this installation is for, when -m does not say.  A
@@ -112,6 +113,10 @@ char libexecdir[LIBDIRMAX];
 
 #ifndef DEFLIB
 #define DEFLIB "/lib"
+#endif
+
+#ifndef DEFBIN
+#define DEFBIN "/bin"
 #endif
 
 /*
@@ -568,22 +573,24 @@ main(int argc, char **argv)
 
             if (n > LIBDIRMAX - 16)
                 n = LIBDIRMAX - 16;
-            strncpy(libdir, progname, n);
-            libdir[n] = '\0';
-            strcpy(libexecdir, libdir);
+            strncpy(bindir, progname, n);
+            bindir[n] = '\0';
+            strcpy(libdir, bindir);
+            strcpy(libexecdir, bindir);
             strcat(libdir, "/../lib");
             strcat(libexecdir, "/../libexec");
         } else {
+            strcpy(bindir, DEFBIN);
             strcpy(libdir, DEFLIB);
             strcpy(libexecdir, DEFLIBEXEC);
         }
     }
 
     /*
-     * The passes, the assembler and the linker live in LIBEXEC, which
-     * is what that directory has always been for: programs run by
-     * other programs.  They are not user commands and do not belong
-     * on a search path.
+     * The passes live in LIBEXEC, which is what that directory has
+     * always been for: programs run by other programs.  The assembler
+     * and the linker are user commands - a person types them - so they
+     * live beside the driver in BIN.
      *
      * lib is for libraries - libc.a, crt0.o and the headers, further
      * down - and keeping the two apart means a person reading /lib
@@ -592,8 +599,8 @@ main(int argc, char **argv)
     sprintf(cpp_path, "%s/%spass0", libexecdir, MXPFX);
     sprintf(cc1_path, "%s/%sc0", libexecdir, MXPFX);
     sprintf(cc2_path, "%s/%sc1", libexecdir, MXPFX);
-    sprintf(asm_path, "%s/%sasz", libexecdir, MXPFX);
-    sprintf(ld_path, "%s/%sld", libexecdir, MXPFX);
+    sprintf(asm_path, "%s/%sasz", bindir, MXPFX);
+    sprintf(ld_path, "%s/%sld", bindir, MXPFX);
     sprintf(astpp_path, "%s/%sastpp", libexecdir, MXPFX);
     sprintf(peep_path, "%s/%speep", libexecdir, MXPFX);
 

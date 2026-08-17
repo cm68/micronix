@@ -15,11 +15,9 @@
 # libc.a, crt0.o, the headers - and a person reading it should see
 # those and nothing else.
 #
-# EVERYTHING ccc RUNS IS HERE NOW: cpp, c0, c1, peep, and asz, astpp
-# and ld, which were still in cmd.  ld is the one that reads oddly -
-# a person does type a linker - but ccc builds its path as
-# libexecdir/ld and cannot find one in /bin, and the driver is the
-# thing that runs it a thousand times for every once somebody does.
+# cpp, c0, c1, peep and astpp are the passes ccc runs.  The assembler
+# and the linker - asz and ld - are user commands, so they live in
+# cmd; the driver finds them beside itself in bin.
 #
 # All four build.  The three passes used to link against nothing and
 # fail on _fmtlong and _fmtstr; those are in ccc's ccclib and there is
@@ -34,7 +32,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = cpp c0 c1 peep asz astpp ld
+DIRS = cpp c0 c1 peep astpp
 
 RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \
