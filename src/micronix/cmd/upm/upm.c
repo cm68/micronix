@@ -36,6 +36,7 @@
 #include <types.h>
 #include <hitech.h>
 #include <stdio.h>
+#include <string.h>
 
 /*
  * The globals the small handlers touch.  Addresses are from the .dis and
@@ -692,14 +693,9 @@ extern int read();
 extern int open();
 extern int close();
 extern int write();
-extern int cpybuf();
-extern int cmpstr();
 extern int match();
 extern int cname();
-extern int lenstr();
-extern int fill();
 extern int uc();
-extern int element();
 extern int cseek();
 extern int seqincr();
 extern int seek();
@@ -804,7 +800,7 @@ char *dst;
 		buildpr(fcb, buf);
 		close(dirfd);
 		dirfd = open(buf, 0);
-		cpybuf(pattern, fcb, 13);
+		memcpy(pattern, fcb, 13);
 	}
 
 	for (;;) {
@@ -818,9 +814,9 @@ char *dst;
 
 		if (dirbuf[0] == 0 && dirbuf[1] == 0)
 			continue;
-		if (cmpstr(".", &dirbuf[2]) != 0)
+		if (strcmp(".", &dirbuf[2]) == 0)
 			continue;
-		if (cmpstr("..", &dirbuf[2]) != 0)
+		if (strcmp("..", &dirbuf[2]) == 0)
 			continue;
 		if (match(pattern, dirbuf) == 0)
 			continue;
@@ -845,13 +841,13 @@ char *dst;
 	int i;
 	char *dot;
 
-	dot = src + lenstr(src) - 1;
+	dot = src + strlen(src) - 1;
 	while (dot >= src && *dot != '.')
 		dot--;
 	if (dot < src)
 		dot = 0;
 
-	fill(dst + 1, 11, ' ');
+	memset(dst + 1, ' ', 11);
 
 	i = 0;
 	while (i < 8 && *src && src != dot) {
@@ -946,8 +942,7 @@ char *name;
  * lowercased the pattern.  The two strings have to end together - a
  * match is exact, not a prefix of one side.
  *
- * cmpstr returns 1 on equal, 0 on difference, which is the opposite of
- * strcmp; the test below reads it that way.
+ * strcmp returns 0 on equal, so the test below reads it that way.
  */
 match(entry, pattern)
 char *entry;
@@ -961,7 +956,7 @@ char *pattern;
 	name(pattern, buf);
 	p = buf;
 
-	while (element('/', p))
+	while (strchr(p, '/'))
 		p++;
 
 	for (;;) {
@@ -978,7 +973,7 @@ char *pattern;
 		}
 
 		if (ec == 0) {
-			if (cmpstr(p, "") != 0)
+			if (strcmp(p, "") == 0)
 				return 1;	/* both ended: a match */
 			return 0;		/* entry ended, pattern continues */
 		}
@@ -1021,7 +1016,7 @@ struct fcb *fcb;
 
 	seqincr(fn, fcb);
 	if (n != 0x80) {
-		fill(dma + n, 0x80 - n, 0x1A);	/* pad with ^Z */
+		memset(dma + n, 0x1A, 0x80 - n);	/* pad with ^Z */
 		fcb->rrec = 0;
 	}
 	return 0;
@@ -1514,8 +1509,8 @@ char *name;
  * banner, read a line, and dispatch.  A line beginning with '!' runs as
  * a micronix command; a drive letter or a descriptor sets the mapping;
  * the built-ins are ERA, DIR, TYPE, REN, EXIT and STAT; anything else is
- * a CP/M program to load and run.  cmpstr returns 1 on equal, so every
- * test here reads "!= 0" for a match.
+ * a CP/M program to load and run.  strcmp returns 0 on equal, so every
+ * test here reads "== 0" for a match.
  */
 ccp()
 {
@@ -1543,7 +1538,7 @@ ccp()
 		if (ccword[0] == ':')
 			continue;
 
-		if (cmpstr("=", ccword) != 0) {
+		if (strcmp("=", ccword) == 0) {
 			prdes();
 			continue;
 		}
@@ -1568,33 +1563,33 @@ ccp()
 
 		raise(ccword);
 
-		if (cmpstr("ERA", ccword) != 0) {
+		if (strcmp("ERA", ccword) == 0) {
 			getword(ccword, p);
 			era(ccword);
 			continue;
 		}
-		if (cmpstr("DIR", ccword) != 0) {
+		if (strcmp("DIR", ccword) == 0) {
 			getword(ccword, p);
 			dir(ccword);
 			continue;
 		}
-		if (cmpstr("TYPE", ccword) != 0) {
+		if (strcmp("TYPE", ccword) == 0) {
 			getword(ccword, p);
 			type(ccword);
 			continue;
 		}
-		if (cmpstr("REN", ccword) != 0) {
+		if (strcmp("REN", ccword) == 0) {
 			ren(p);
 			continue;
 		}
-		if (cmpstr("EXIT", ccword) != 0) {
+		if (strcmp("EXIT", ccword) == 0) {
 			cexit();
 		}
 
 		/* the binary compares USER here and throws the result away */
-		cmpstr("USER", ccword);
+		strcmp("USER", ccword);
 
-		if (cmpstr("STAT", ccword) != 0) {
+		if (strcmp("STAT", ccword) == 0) {
 			getword(ccword, p);
 			dostat(ccword);
 			continue;
@@ -1607,7 +1602,7 @@ ccp()
 		 * while the parent waits.
 		 */
 		argname(fcb, ccword);
-		cpybuf(&fcb[9], "COM", 3);
+		memcpy(&fcb[9], "COM", 3);
 		name(fcb, buf);
 		if (access(buf, 4) < 0) {
 			puts(ccword);
@@ -1625,7 +1620,7 @@ ccp()
 			p[0x7E] = 0;			/* cap the command tail */
 			cpystr((char *)0x81, p, 0);
 			raise((char *)0x81);
-			taillen = lenstr(p);	/* c1 has no rule for a store of a
+			taillen = strlen(p);	/* c1 has no rule for a store of a
 						   call result to a literal address */
 			*(char *)0x80 = taillen;	/* the tail length */
 
@@ -1909,10 +1904,10 @@ char *b;
 {
 	int n;
 
-	n = lenstr(a) - lenstr(b);
+	n = strlen(a) - strlen(b);
 	if (n < 0)
 		return 0;
-	return cmpstr(a + n, b);
+	return strcmp(a + n, b) == 0;
 }
 
 /*
@@ -2022,7 +2017,7 @@ char *s;
 {
 	char *p;
 
-	p = alloc(lenstr(s) + 1);
+	p = alloc(strlen(s) + 1);
 	if (p == 0) {
 		puts("Out of memory\r\n");
 		cexit();
@@ -2074,7 +2069,7 @@ char *word;
 {
 	if ((*word >= 'a' && *word <= 'z') || (*word >= 'A' && *word <= 'Z')) {
 		if (word[1] == ':') {
-			if (element('/', word) != 0)
+			if (strchr(word, '/') != 0)
 				return 1;
 		}
 	}
@@ -2120,7 +2115,7 @@ char *word;
 {
 	int i;
 
-	if (lenstr(word) < 4)
+	if (strlen(word) < 4)
 		return 0;
 	if (word[3] != ':')
 		return 0;
@@ -2180,7 +2175,7 @@ char *word;
 
 	cpystr(buf, dev, 0);
 
-	if (cmpstr("LST", buf) != 0)
+	if (strcmp("LST", buf) == 0)
 		devop(lstdesc, word + 4, lstdev);
 }
 
@@ -2287,13 +2282,13 @@ char *name;
 		}
 	}
 
-	dot = name + lenstr(name) - 1;
+	dot = name + strlen(name) - 1;
 	while (dot >= name && *dot != '.')
 		dot--;
 	if (dot < name)
 		dot = 0;
 
-	fill(&fcb->name[0], 11, ' ');
+	memset(&fcb->name[0], ' ', 11);
 
 	i = 0;
 	while (i < 8 && *name && name != dot) {
@@ -2371,7 +2366,7 @@ patch()
 
 	u = (int)bios;			/* c1: no rule for the nested cast */
 	biospage = (char *)(u & 0xFF00);
-	cpybuf(biospage, bios, 0x33);
+	memcpy(biospage, bios, 0x33);
 
 	*(char *)0 = 0xC3;
 	*(char **)1 = biospage + 3;
@@ -2457,7 +2452,7 @@ char **argv;
 
 	for (i = 1; i < argc; i++) {
 		a = argv[i];
-		if (cmpstr("-v", a) != 0) {
+		if (strcmp("-v", a) == 0) {
 			verbose = 1;
 			continue;
 		}
@@ -2490,9 +2485,9 @@ char **argv;
 	if (loadfil) {
 		dofcbs(argc, argv);
 		doargs(argc, argv);
-		if (element('/', loadfil) == 0) {
+		if (strchr(loadfil, '/') == 0) {
 			argname(&fcb, loadfil);
-			cpybuf(&fcb.ft[0], "COM", 3);
+			memcpy(&fcb.ft[0], "COM", 3);
 			name(&fcb, path);
 			loadfil = path;
 		}
@@ -2595,9 +2590,9 @@ char *name;
 		for (p = bbuf; p < bbuf + n; p += 16) {
 			if (p[0] | p[1] == 0)
 				continue;
-			if (cmpstr(".", p + 2) != 0)
+			if (strcmp(".", p + 2) == 0)
 				continue;
-			if (cmpstr("..", p + 2) != 0)
+			if (strcmp("..", p + 2) == 0)
 				continue;
 			if (p[15] != 0)
 				continue;
@@ -2656,9 +2651,9 @@ char *name;
 	while (read(fd, dirbuf, 16) == 16) {
 		if (dirbuf[0] | dirbuf[1] == 0)
 			continue;
-		if (cmpstr(".", &dirbuf[2]) != 0)
+		if (strcmp(".", &dirbuf[2]) == 0)
 			continue;
-		if (cmpstr("..", &dirbuf[2]) != 0)
+		if (strcmp("..", &dirbuf[2]) == 0)
 			continue;
 		if (!match(fcb, dirbuf))
 			continue;
@@ -2872,7 +2867,7 @@ int n;
 	len = itob(buf, n, 10);
 	buf[len] = 0;
 
-	pad = 5 - lenstr(buf);
+	pad = 5 - strlen(buf);
 	while (pad-- > 0)
 		putch(' ');
 
@@ -2992,9 +2987,9 @@ char *name;
 
 			if (p[0] | p[1] == 0)
 				continue;
-			if (cmpstr(".", p + 2) != 0)
+			if (strcmp(".", p + 2) == 0)
 				continue;
-			if (cmpstr("..", p + 2) != 0)
+			if (strcmp("..", p + 2) == 0)
 				continue;
 			if (p[15] != 0)
 				continue;
@@ -3042,7 +3037,7 @@ char **dev;
 
 	if (*arg == '|') {
 		arg++;
-		if (element('/', arg) == 0) {
+		if (strchr(arg, '/') == 0) {
 			cpystr(bbuf, "/bin/", arg, 0);
 			arg = bbuf;
 		}
@@ -3201,47 +3196,21 @@ keyboard:
 
 /*
  * ---------------------------------------------------------------------
- * The Whitesmith string and stdio helpers.
+ * The helpers the micronix libc does not provide.
  *
- * These are library routines, not upm's own: they are what the original
- * binary linked from the Whitesmith C library, and they carry the
- * Whitesmith names - cmpstr not strcmp, cpystr not strcat, and so on.
- * This tree's libc is the Hitech one and does not provide them, so they
- * are written here, read out of the .dis, until libc grows them - the
- * same way init.c carries its helpers.
+ * The string and byte routines the original linked from Whitesmith's
+ * library are the micronix libc's own now - strlen, strcmp, memset,
+ * memcpy, strchr - and upm calls those directly.  What is left here are
+ * the ones libc does not have: cpystr, the variadic concatenate; puts
+ * and putb, which write through putch rather than stdio; itob; and
+ * signal, libu's, moved here so _stab stays resident where a running
+ * .com cannot clobber it.
  *
- * The one that is not obvious is cpystr, the variadic concatenate: it
- * copies its source strings into dst until it reads a null argument,
- * then writes the terminating nul and returns where it finished.  The
- * null argument is what every call ends in.
+ * The one that is not obvious is cpystr: it copies its source strings
+ * into dst until it reads a null argument, then writes the terminating
+ * nul and returns where it finished.  The null argument is what every
+ * call ends in.
  */
-
-/*
- * lenstr - the length of a string.  strcmp and strlen under the names
- * the Whitesmith library used, which is why they are here at all.
- */
-lenstr(s)
-char *s;
-{
-	int n;
-
-	n = 0;
-	while (*s++)
-		n++;
-	return n;
-}
-
-/*
- * fill - fill n bytes of buf with the byte c.
- */
-fill(buf, n, c)
-char *buf;
-int n;
-int c;
-{
-	while (n--)
-		*buf++ = c;
-}
 
 /*
  * puts - print a string through putch, one character at a time, with no
@@ -3278,36 +3247,6 @@ char *s;
 }
 
 /*
- * cmpstr - compare two strings.  Returns 1 when they are equal and 0
- * when they differ, the opposite of strcmp.
- */
-cmpstr(a, b)
-char *a;
-char *b;
-{
-	for (;;) {
-		if (*a != *b)
-			return 0;
-		if (*a == 0)
-			return 1;
-		a++;
-		b++;
-	}
-}
-
-/*
- * cpybuf - copy n bytes from src to dst.
- */
-cpybuf(dst, src, n)
-char *dst;
-char *src;
-int n;
-{
-	while (n--)
-		*dst++ = *src++;
-}
-
-/*
  * cpystr - concatenate the source strings into dst.  The sources are a
  * variable number of char * arguments, ended by a null argument; each is
  * copied in turn, a single nul is written, and the position after it is
@@ -3328,21 +3267,6 @@ char *s;
 	}
 	*dst = 0;
 	return dst;
-}
-
-/*
- * element - is the byte c in the string s.  Returns 1 or 0.
- */
-element(c, s)
-int c;
-char *s;
-{
-	while (*s) {
-		if (c == *s)
-			return 1;
-		s++;
-	}
-	return 0;
 }
 
 /*
