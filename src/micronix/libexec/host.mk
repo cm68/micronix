@@ -53,12 +53,14 @@ HOSTCFLAGS	?= -m32 $(HOSTDEBUG) $(HOSTDEFS) $(HOSTWARNS) \
 HOSTLDFLAGS	?= -m32 $(HOSTDEBUG)
 
 #
-# Where the host compiler lands.  Not /usr/local - that is what
-# "make hostinstall" at the top of the tree is for - and not beside
+# Where the host compiler lands: the top of the tree, in bin/ for the
+# driver and libexec/ for the passes.  Not /usr/local, and not beside
 # the Z80 binary either, which has the same name and would be
-# overwritten by whichever build ran last.
+# overwritten by whichever build ran last.  The driver works out where
+# everything is from its own argv[0] - bin/../libexec for the passes,
+# bin/../lib for the runtime - so the tree moves anywhere intact.
 #
-HOSTDIR		?= $(DEPTH)/desthost
+HOSTDIR		?= $(DEPTH)/../..
 HOSTBIN		?= libexec
 HOSTINSTDIR	= $(HOSTDIR)/$(HOSTBIN)
 

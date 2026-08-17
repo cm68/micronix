@@ -9,7 +9,7 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 OBJECTS = util.o imdlib.o openx.o disz80.o \
-	mnix_sys.o whitesmith.o fslib.o gui.o monitor.o hdcdmadisk.o
+	mnix_sys.o whitesmith.o fslib.o gui.o monitor.o hdcdmadisk.o lockfile.o
 
 LIBRARY = libsim.a
 

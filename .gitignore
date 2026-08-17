@@ -1,4 +1,3 @@
-sim
 core
 filesystem
 extra
@@ -49,6 +48,19 @@ src/tools/dumpsec
 src/tools/setdev
 
 src/micronix/cmd/mkfs/mkfs
+
+#
+# The top-level host bin and the runtime beside it.  install-hwsim and
+# install-usersim copy the simulators into bin/, and hostcc/hostrt put
+# the cross compiler and its libraries and headers beside them.  bin,
+# libexec, lib and usr only exist at the top of the tree because the
+# compiler resolves its own pieces from argv[0] (bin/../libexec,
+# bin/../lib, bin/../usr/include), so they are anchored to the root.
+#
+/bin/
+/libexec/
+/lib/
+/usr/
 
 #
 # stand/ builds a .com and several intermediates, but mwboot1.s and

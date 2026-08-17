@@ -54,15 +54,19 @@ MAKEFLAGS += --no-builtin-variables
 # Override CCC on the command line to build with something else -
 # /usr/local/bin/ccc still works and is how the two trees get compared.
 #
-CCC	?= $(DEPTH)/desthost/bin/mxccc
+HOSTROOT	?= $(DEPTH)/../..
+BIN		?= $(HOSTROOT)/bin
+CCC		?= $(BIN)/mxccc
 #
-# The librarian is ar, built for the host as $(DEPTH)/mxar - see the
-# top level GNUmakefile.  It was wslib, which wrote the whitesmiths
-# archive format; ar writes the v7 one, which is what ar(1) has always
-# written and what ld now reads as well.
+# The librarian is ar, built for the host as $(BIN)/mxar - see the top
+# level GNUmakefile.  It was wslib, which wrote the whitesmiths archive
+# format; ar writes the v7 one, which is what ar(1) has always written
+# and what ld now reads as well.  The symbol lister is nm on micronix
+# and mxnm on the host - mx-prefixed like mxccc and mxar, and not the
+# obsolete Whitesmiths name wsnm.
 #
-LIB	?= $(DEPTH)/mxar
-NM	?= /usr/local/bin/wsnm
+LIB	?= $(BIN)/mxar
+NM	?= $(BIN)/mxnm
 #
 # -O IS THE PEEPHOLE PASS, and this tree was not using it while ccc's
 # own build was: its libc compiles with -O, and so do its passes.  So
@@ -279,7 +283,8 @@ INSTALLMAN = @if [ -n "$(strip $(MANSRCS))" ] ; then \
 #
 .DEFAULT_GOAL := all
 
-.PHONY: all update install install-man clean clobber doc disas
+.PHONY: all update install install-man clean clobber doc disas \
+	install-hwsim install-usersim
 
 #
 # cross build
@@ -408,6 +413,56 @@ endif
 install-man:
 	$(RECURSE)
 	$(INSTALLMAN)
+
+#
+# The simulators' host binaries go into the top level bin/ as copies,
+# not symlinks, which break when the tree is moved.  install-usersim
+# does that for the userland simulator.  hwsim, though, boots a disk
+# image rather than the filesystem directory, so install-hwsim puts the
+# built source and binaries ONTO that image instead: it builds a tar of
+# the tree install+update assembled in $(ROOT) and imports it with
+# mnix tar x.
+#
+install-usersim:
+	$(MAKE) -C $(HOSTROOT)/src/usersim
+	mkdir -p $(BIN)
+	cp $(HOSTROOT)/src/usersim/sim $(BIN)/
+
+#
+# The image hwsim boots, and the tool that writes into it.  Both live
+# beside the tree; override on the command line for a scratch copy.
+#
+# The image is built ab initio rather than copied from a "blessed"
+# snapshot: initialize simulates what FORMATMW does, mkfs makes the
+# filesystem, and tar x puts the built source and binaries on it.
+#
+HWIMAGE   ?= $(HOSTROOT)/disks/hdinstall/hddma-0
+HWBLESSED ?= $(HOSTROOT)/disks/hdinstall/hddma-0.blessed
+HWMEDIA   ?= m5
+BOOTIMG   ?= $(HOSTROOT)/src/micronix/stand/boot/bootimg-$(HWMEDIA)
+MNIX      ?= $(HOSTROOT)/src/tools/mnix
+
+#
+# The userland that goes on the image, enumerated by name rather than
+# by tarring the whole filesystem directory - which holds the source,
+# the man pages, ccc's temporaries and whatever a compile left behind.
+# The compiler and its headers (lib, libexec, include, usr/include) are
+# deliberately not here: they are the build tree, not the running system.
+#
+HWSIM_FILES = bin dev etc usr \
+	finstall hdinit m5init m10init m16init \
+	.sh .login
+
+install-hwsim: $(MNIX)
+	$(MNIX) initialize $(HWMEDIA) $(HWIMAGE)
+	$(MNIX) mkfs -i $(BOOTIMG) $(HWIMAGE)
+	$(MNIX) -f $(HWBLESSED) read /micronix $(HOSTROOT)/micronix.k
+	$(MNIX) -f $(HWIMAGE) write $(HOSTROOT)/micronix.k /micronix
+	rm -f $(HOSTROOT)/micronix.k
+	tar -C $(ROOT) -c -f $(HOSTROOT)/hwsim.tar \
+	    --exclude='usr/src' --exclude='usr/man' $(HWSIM_FILES)
+	$(MNIX) -f $(HWIMAGE) tar x $(HOSTROOT)/hwsim.tar
+	rm -f $(HOSTROOT)/hwsim.tar
 
 clean:
 	$(RECURSE)

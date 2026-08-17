@@ -24,11 +24,14 @@
 DIRS = include lib libexec cmd sys
 
 #
-# "cd $$d &&", not "cd $$d ;" - see the note in GNUmakefile.inc.
+# The top GNUmakefile is a leaf like the rest: DEPTH is the distance to
+# GNUmakefile.inc, which sits here, so it is ".".  Everything shared
+# comes from there - the compiler and librarian, the install/clean/
+# update rules, and install-hwsim/install-usersim for the simulators.
+# What stays below is only what is top-specific: the host tools built
+# here rather than in a DIR, and the header install that needs sudo.
 #
-RECURSE = @for d in $(DIRS) ; do \
-		( cd $$d && $(MAKE) $@ ) || exit 1 ; \
-	done
+DEPTH = .
 
 #
 # Put the system headers where the compiler looks for them.
@@ -63,15 +66,10 @@ SUDO	?= sudo
 CCCOWNED = cpm.h errno.h hitech.h setjmp.h stdio.h time.h
 SYSHDRS  = $(filter-out $(CCCOWNED),$(notdir $(wildcard include/*.h)))
 
-.PHONY: all update install install-man clean clobber doc sysinstall
+include $(DEPTH)/GNUmakefile.inc
 
-#
-# First, because make takes the first target in the file as the
-# default goal and .PHONY is not one.  Typing "make" here compiles the
-# tree with the cross compiler and stops; it does not copy anything
-# into the filesystem the simulator boots.  That is install, and it is
-# a separate thing to ask for - GNUmakefile.inc orders these the same
-# way for the same reason.
+.PHONY: hostcc hostrt sysinstall
+
 #
 # The librarian, built for the HOST.
 #
@@ -80,34 +78,50 @@ SYSHDRS  = $(filter-out $(CCCOWNED),$(notdir $(wildcard include/*.h)))
 # and cmd/ar builds the z80 one, which cannot.  Same source, two
 # targets.
 #
-# It is called mxar and not ar because /usr/local/bin/ar would shadow
-# the system's for everything on this machine.  The "mx" prefix is
-# what this tree uses for a host program that speaks micronix - see
-# mxccc in ccc - and NOT the ".mx" suffix, which means a micronix
-# executable, which this is not: it is an ELF binary that reads and
-# writes micronix archives.
+# It is called mxar and not ar because the system's ar would shadow
+# the one that reads micronix archives for everything on this machine.
+# The "mx" prefix is what this tree uses for a host program that speaks
+# micronix - see mxccc and mxnm - and NOT the ".mx" suffix, which means
+# a micronix executable, which this is not: it is an ELF binary that
+# reads and writes micronix archives.
 #
-# It is built HERE and not in cmd/ar because DIRS is "lib cmd sys",
-# and the libraries are archived before cmd is reached.
+# It is built HERE and not in cmd/ar because DIRS is "include lib
+# libexec cmd sys", and the libraries are archived before cmd is
+# reached.  The symbol lister is the same shape: cmd/nm builds the z80
+# one, and this builds mxnm beside mxar, in $(BIN).
 #
-ARMX	 = mxar
+ARMX	 = $(BIN)/mxar
 ARSRC	 = cmd/ar/ar.c
+NMX	 = $(BIN)/mxnm
+NMSRC	 = cmd/nm/nm.c cmd/nm/wsobj.c
 HOSTCC	?= gcc
 HOSTCFLAGS ?= -w -std=gnu89 -Dlinux
 
-all: $(ARMX)
-	$(RECURSE)
+#
+# The host tools are prerequisites of all, not part of the recursion,
+# so the librarian exists before lib is archived.  This is a
+# prerequisite line only - the recipe is GNUmakefile.inc's.
+#
+all: $(ARMX) $(NMX)
 
 #
-# BELOW "all", not above it.  The first explicit target in a makefile
-# is the default goal, and with this rule above, "make" here meant
-# "make mxar": it checked one binary, recursed into nothing, and
-# exited 0 with the libraries it was asked to rebuild still missing.
-# GNUmakefile.inc has the same warning over $(OBJS): $(HSRCS), for
-# the same reason, and this is the second time.
+# clobber removes the host tools and src.tar as well as what the
+# recursion removes.  GNUmakefile.inc's clobber reads GENERATED.
 #
+GENERATED = src.tar $(ARMX) $(NMX)
+
 $(ARMX): $(ARSRC)
+	mkdir -p $(BIN)
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(ARSRC)
+
+#
+# The host symbol lister.  nm on micronix, mx-prefixed here like mxar
+# and mxccc: it reads micronix objects, which the system nm cannot.
+# Built from the same sources as cmd/nm, with the machine's own cc.
+#
+$(NMX): $(NMSRC)
+	mkdir -p $(BIN)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(NMSRC)
 
 #
 # The cross compiler, built here from these sources.
@@ -115,12 +129,13 @@ $(ARMX): $(ARSRC)
 # Before the fork the tree compiled with /usr/local/bin/ccc, which is
 # installed out of ~/src/ccc - so "this tree's compiler" was the other
 # tree's.  These sources are ours now and this builds them: the seven
-# passes and the driver, with the machine's own cc, into desthost.
+# passes and the driver, with the machine's own cc, into $(BIN) and
+# $(HOSTROOT)/libexec.
 #
 # Then the runtime beside it, because the driver adds crt0.o and
 # libc.a from its own lib directory whatever else is on the link line,
-# and works that directory out from argv[0] - desthost/bin/mxccc
-# reads desthost/lib and desthost/usr/include.  The archives have to
+# and works that directory out from argv[0] - $(BIN)/mxccc reads
+# $(HOSTROOT)/lib and $(HOSTROOT)/usr/include.  The archives have to
 # exist before anything links, which is why this is a target you ask
 # for and not part of all: the libraries are built by the compiler it
 # installs.
@@ -132,16 +147,26 @@ $(ARMX): $(ARSRC)
 HOSTCCDIRS = libexec/cpp libexec/c0 libexec/c1 libexec/peep \
 	     libexec/asz libexec/ld libexec/astpp cmd/ccc
 
-.PHONY: hostcc hostrt
-
 hostcc: $(ARMX)
 	@for d in $(HOSTCCDIRS); do $(MAKE) -C $$d host || exit 1; done
-	@echo "host compiler in desthost/bin/mxccc"
+	@echo "host compiler in $(BIN)/mxccc"
 
 hostrt:
-	@mkdir -p desthost/lib desthost/usr/include/sys
+	@mkdir -p $(HOSTROOT)/lib/include/sys $(HOSTROOT)/usr/include/sys
+	#
+	# lib/include is where -m cpm looks: CP/M has no /usr, so the
+	# driver points its include path at the compiler's own lib
+	# directory and the C library's headers are all there is.
+	#
+	cp lib/include/*.h $(HOSTROOT)/lib/include
+	cp lib/include/sys/*.h $(HOSTROOT)/lib/include/sys
 	cp lib/libc/libc.a lib/libu/libu.a lib/libu/crt0.o \
-	   lib/libccc/libccc.a desthost/lib
+	   lib/libccc/libccc.a $(HOSTROOT)/lib
+	#
+	# and the CP/M runtime, which -m cpm links instead of libu.a
+	# and starts with crtcpm.o instead of crt0.o.
+	#
+	cp lib/libcpm/libcpm.a lib/libcpm/crtcpm.o $(HOSTROOT)/lib
 	#
 	# The system headers first and the C library's over them.  Six
 	# names are in both sets - cpm.h errno.h hitech.h setjmp.h
@@ -150,22 +175,11 @@ hostrt:
 	# copies of everything BUT those.  The tree's time.h is the v6
 	# one, struct time in UINTs, and c0 will not read it.
 	#
-	cp include/*.h desthost/usr/include
-	cp include/sys/*.h desthost/usr/include/sys
-	cp lib/include/*.h desthost/usr/include
-	cp lib/include/sys/*.h desthost/usr/include/sys
-	@echo "runtime in desthost/lib"
-
-install:
-	$(RECURSE)
-
-#
-# The man pages alone, without rebuilding or reinstalling anything -
-# what you want after fixing a page.  The rule reaches every leaf
-# that has one; the ones that do not install nothing.
-#
-install-man:
-	$(RECURSE)
+	cp include/*.h $(HOSTROOT)/usr/include
+	cp include/sys/*.h $(HOSTROOT)/usr/include/sys
+	cp lib/include/*.h $(HOSTROOT)/usr/include
+	cp lib/include/sys/*.h $(HOSTROOT)/usr/include/sys
+	@echo "runtime in $(HOSTROOT)/lib"
 
 sysinstall:
 	$(SUDO) mkdir -p $(SYSINC)/sys
@@ -185,6 +199,10 @@ sysinstall:
 # --keep-newer-files, as everywhere else: a makefile edited inside
 # micronix is not to be overwritten by an older one from here.
 #
+# This update is top-specific: it ships src.tar (the makefile above),
+# which GNUmakefile.inc's update does not know about, so it overrides
+# that rule.
+#
 ROOT	?= ~/src/micronix/filesystem
 DEST	 = $(ROOT)/usr/src
 NOWARN	 = --warning=no-ignore-newer
@@ -196,13 +214,3 @@ update: src.tar
 	$(RECURSE)
 	mkdir -p $(DEST)
 	tar -f src.tar -C $(DEST) --keep-newer-files -x $(NOWARN)
-
-clean:
-	$(RECURSE)
-
-clobber:
-	$(RECURSE)
-	rm -f src.tar
-
-doc:
-	$(RECURSE)

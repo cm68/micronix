@@ -1088,7 +1088,7 @@ bmap(struct dsknod *dp, int offset, int alloc)
     }
 
     iindex = lblk / 256;
-    if (iindex == 7) {       // double indirect
+    if (iindex >= 7) {       // double indirect: d_addr[7] is a block of 256
         if (dp->d_addr[7] == 0) {
             if (!alloc) {
                 return 0;
@@ -1103,7 +1103,7 @@ bmap(struct dsknod *dp, int offset, int alloc)
             readblk(ip->fs, iiblkno, (char *)iiblk);
         }
         aa = iiblk;
-        iindex -= 7 * 256;
+        iindex -= 7;
     } else {
         aa = dp->d_addr;
     }
@@ -1355,9 +1355,10 @@ filelink(struct super *fs, char *path, int inum)
     /* fell off bottom */
     if (i >= entries) {
         dp->d_size1 += 16;
-        /* if we need a new block */
-        if ((dp->d_size1 & 511) == 0) {
-            dirp = realloc(dirp, dp->d_size1);
+        /* if we need a new block: the directory was a whole block before,
+         * and the buffer has to grow by a block, not by one entry */
+        if (entries % DENTS == 0) {
+            dirp = realloc(dirp, (dp->d_size1 + 511) & ~511);
         }
     }
     dirp[i].ino = inum;
@@ -1389,9 +1390,31 @@ lose:
 }
 
 /*
- * get an inode from the freelist and allocate it.
- * if the freelist is empty, fail - too lazy to code
+ * Refill the superblock's free inode list by scanning the ilist, as
+ * sys/ialloc.c does.  mkfs seeds s_inode[] with the first hundred free
+ * inodes; everything beyond that has to be found again by reading the
+ * ilist blocks.
  */
+int
+ifill(struct super *fs)
+{
+    char buf[512];
+    struct dsknod *dp;
+    int iblk, n, inum;
+
+    for (iblk = INODES_START; iblk < INODES_START + fs->s_isize; iblk++) {
+        readblk(fs, iblk, buf);
+        inum = (iblk - INODES_START) * I_PER_BLK + 1;
+        for (n = I_PER_BLK, dp = (struct dsknod *)buf; n; n--, dp++, inum++) {
+            if ((dp->d_mode & IALLOC) == 0 && fs->s_ninode < 100)
+                fs->s_inode[fs->s_ninode++] = inum;
+        }
+        if (fs->s_ninode >= 100)
+            break;
+    }
+    return fs->s_ninode != 0;
+}
+
 int
 ialloc(struct super *fs, UINT mode)
 {
@@ -1401,7 +1424,7 @@ ialloc(struct super *fs, UINT mode)
 
     mode &= ~ILARG;
 
-    if (fs->s_ninode <= 0) {
+    if (fs->s_ninode <= 0 && ifill(fs) == 0) {
         return 0;
     }
     inum = fs->s_inode[--fs->s_ninode];

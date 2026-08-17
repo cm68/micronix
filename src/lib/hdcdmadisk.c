@@ -21,43 +21,9 @@
 #include <errno.h>
 #include <limits.h>
 
-#define	DEF_SECSIZE	2048			// largest possible
-#define MAGIC		0xD15CC0DE		// whoo-hoo, aren't we clever
+#include "../include/lockfile.h"
+#include "../include/disklabel.h"
 
-/*
- * every drive has a fixed size label.
- */
-struct disklabel {
-    int magic;              // a marker
-	int secsize;	    	// bytes per sector
-	int cylinders;		    // number of cylinders
-	int heads;			    // number of heads
-	int spt;			    // sectors per track
-
-	/*
-	 * What a sector header says, recorded when the volume is
-	 * formatted.  A format command carries this - the sector count,
-	 * the size code, the gap and the fill - and the controller lays
-	 * it down on the track; read header hands it back.  Keeping it
-	 * only in the sectors themselves loses it, because the sectors
-	 * hold data and not their own ids.
-	 *
-	 * One copy for the volume rather than one per track: a format
-	 * here is homogeneous, and the headers of one track differ from
-	 * another's only in which track they name, which is the one part
-	 * that does not have to be stored.
-	 *
-	 * Appended to the label, so a drive file written before these
-	 * existed reads back zero and is treated as unformatted.
-	 */
-	int firstsec;           // number of the first sector on a track
-	int seccode;            // the size code the format command used
-	int gap3;               // inter sector gap
-	int fill;               // what the data was filled with
-	int formatted;          // nonzero once a format has been seen
-};
-
-#define DATAOFF 2048         // first 2k is label
 
 /*
  * This is in lib, which does not have the simulator's trace flags, and
@@ -70,6 +36,7 @@ static int hd_debug = 0;
 struct drive {
     struct disklabel label;
     int fd;
+    int lock_fd;            /* advisory lock held on the drive file */
     char *name;
     int nexthdr;            /* rotational position, for read header */
 } drive[NDRIVES];
@@ -199,6 +166,11 @@ drive_open(char *name)
     dp->fd = open(path, O_RDWR|O_CREAT, 0777);
     if (dp->fd < 0) {
         printf("open of %s failed %d\n", path, errno);
+        return 0;
+    }
+    dp->lock_fd = acquire_lock(path);
+    if (dp->lock_fd < 0) {
+        close(dp->fd);
         return 0;
     }
     // get the label or make a new one

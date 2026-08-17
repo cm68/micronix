@@ -7,14 +7,32 @@
 # to build this, we have some prerequsites:
 # bison, lib32ncurses-dev
 
-all: sim filesystem
+all: sim d1 filesystem
 	cd src ; make
 
-sim:
-	ln -s src/usersim/sim sim
+#
+# The simulators, installed as copies into bin/ - not symlinks, which
+# break when the tree is moved.  bin/ is also where the cross tools
+# (mxccc, mxar, mxnm) land; the simulators are their peers there.
+#
+sim: bin/sim
+
+d1: bin/d1
+
+bin/sim: src/usersim/sim
+	mkdir -p bin
+	cp src/usersim/sim bin/sim
+
+bin/d1: src/hwsim/d1/d1
+	mkdir -p bin
+	cp src/hwsim/d1/d1 bin/d1
 
 src/usersim/sim src/tools/readall:
 	cd src ; make
+
+src/hwsim/d1/d1:
+	cd src ; make
+	cd src/hwsim/d1 ; make
 
 test: filesystem  src/usersim/sim
 	src/usersim/sim
@@ -46,7 +64,7 @@ clobber:
 	for dir in src ; do \
 		(cd $$dir ; make clobber) \
 	done
-	rm -rf filesystem sim
+	rm -rf filesystem bin sim
 
 rebuildfs:
 	rm -rf filesystem

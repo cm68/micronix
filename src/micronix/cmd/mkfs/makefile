@@ -26,7 +26,7 @@ BIN	= /bin
 MAN	= mkfs.1
 MANDIR	= /usr/man/man1
 PROG	= mkfs
-OBJS	= mkfs.o
+OBJS	= mkfs.o mkfsfunc.o
 
 all: $(PROG)
 

@@ -27,28 +27,32 @@ nm:	nm.o
 	$(CC) $(CFLAGS) -o nm nm.o ../lib/disz80.o ../lib/util.o ../lib/whitesmith.o ../lib/mnix_sys.c $(LDFLAGS)
 
 imd:	imd.o
-	$(CC) $(CFLAGS) -o imd imd.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
+	$(CC) $(CFLAGS) -o imd imd.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 dumpsec: dumpsec.o
-	$(CC) $(CFLAGS) -o dumpsec dumpsec.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
+	$(CC) $(CFLAGS) -o dumpsec dumpsec.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 disas:	disas.o
 	$(CC) $(CFLAGS) -o disas disas.o ../lib/mnix_sys.o $(LDFLAGS)
 
-mnix:	mnix.o
-	$(CC) $(CFLAGS) -o mnix mnix.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
+mnix:	mnix.o mkfsfunc.o
+	$(CC) $(CFLAGS) -o mnix mnix.o mkfsfunc.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+
+# the mkfs worker, shared with cmd/mkfs and compiled here for the host.
+mkfsfunc.o: ../micronix/cmd/mkfs/mkfsfunc.c
+	$(CC) $(CFLAGS) -I../micronix/include -c ../micronix/cmd/mkfs/mkfsfunc.c -o $@
 
 dcheck:	dcheck.o
-	$(CC) $(CFLAGS) -o dcheck dcheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
+	$(CC) $(CFLAGS) -o dcheck dcheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 icheck:	icheck.o
-	$(CC) $(CFLAGS) -o icheck icheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
+	$(CC) $(CFLAGS) -o icheck icheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 ncheck:	ncheck.o
-	$(CC) $(CFLAGS) -o ncheck ncheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
+	$(CC) $(CFLAGS) -o ncheck ncheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 readall:	readall.o
-	$(CC) $(CFLAGS) -o readall readall.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o $(LDFLAGS)
+	$(CC) $(CFLAGS) -o readall readall.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 zmac: zmac.o mio.o doc.o zi80dis.o
 	$(CXX) -Wall $(CXXFLAGS) -o zmac zmac.o mio.o doc.o zi80dis.o

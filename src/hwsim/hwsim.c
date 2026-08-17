@@ -1137,6 +1137,15 @@ main(int argc, char **argv)
         }
     }
 
+    /*
+     * Default the boot rom to one in the current directory, so the
+     * simulator finds its resource files without -b; -b still overrides.
+     */
+    if (access("roms/mon447.bin", F_OK) == 0)
+        rom_filename = "roms/mon447.bin";
+    else if (access("mon447.bin", F_OK) == 0)
+        rom_filename = "mon447.bin";
+
     argc--;
 
     while (argc) {

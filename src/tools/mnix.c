@@ -29,6 +29,8 @@
 #include "../micronix/include/sys/dir.h"
 #include "../include/fslib.h"
 #include "../include/util.h"
+#include "../include/disklabel.h"
+#include "../micronix/cmd/mkfs/mkfs.h"
 
 int traceflags;
 
@@ -51,6 +53,8 @@ int iinfo();
 int blkcmd();
 int setblkcmd();
 int tarcmd();
+int initcmd();
+int mkfscmd();
 
 struct cmdtab
 {
@@ -72,7 +76,9 @@ struct cmdtab
     {"rmdir", rmdircmd, "rmdir <directory>" },
     {"block", blkcmd, "block [-e] <blkno>" },
     {"setblk", setblkcmd, "setblk <path> <blkno> ..." },
-    {"tar", tarcmd, "tar x <tarfile> | tar c <tarfile> [path ...]" }
+    {"tar", tarcmd, "tar x [-C prefix] <tarfile> | tar c <tarfile> [path ...]" },
+    {"initialize", initcmd, "initialize <medium> <image>" },
+    {"mkfs", mkfscmd, "mkfs <image> [size|-exclude] [-i bootfile] [-f]" }
 };
 
 void
@@ -152,6 +158,11 @@ main(argc, argv)
         usage(pname);
         exit(0);
     }
+    /* initialize and mkfs make a filesystem; there is nothing to open yet */
+    if (strcmp(*argv, "initialize") == 0)
+        return initcmd(argc, argv);
+    if (strcmp(*argv, "mkfs") == 0)
+        return mkfscmd(argc, argv);
     if (!filesystem) {
         filesystem = "testfs";
     }
@@ -785,6 +796,7 @@ union hblock {
 };
 
 union hblock dblock;
+char *tarprefix;	/* -C: import the archive under this prefix */
 
 int
 checksum()
@@ -857,6 +869,31 @@ imagemkdir(char *path)
 }
 
 /*
+ * mkdir -p: make path and every directory in it that is not there yet.
+ * This is what tar x -C's prefix wants - the prefix names directories
+ * that an archive, which lists its own files, does not contain.
+ */
+int
+imagemkdirs(char *path)
+{
+	char buf[512];
+	char *p;
+
+	strcpy(buf, path);
+	for (p = buf + 1; *p; p++) {
+		if (*p == '/') {
+			*p = '\0';
+			if (!namei(fs, buf))
+				imagemkdir(buf);
+			*p = '/';
+		}
+	}
+	if (!namei(fs, buf))
+		imagemkdir(buf);
+	return 0;
+}
+
+/*
  * tar x <tarfile>: extract the archive into the image.
  */
 int
@@ -868,6 +905,7 @@ tarx(char *tarfile)
 	int mode;
 	int nblocks;
 	char buf[TBLOCK];
+	char fullname[512];
 	struct dsknod *dp;
 	int inum;
 
@@ -876,6 +914,9 @@ tarx(char *tarfile)
 		printf("tar: can't open %s: %d\n", tarfile, errno);
 		return 2;
 	}
+
+	if (tarprefix)
+		imagemkdirs(tarprefix);
 
 	for (;;) {
 		if (read(infd, &dblock, TBLOCK) != TBLOCK)
@@ -888,30 +929,47 @@ tarx(char *tarfile)
 		/* a directory's name ends with a slash, as cmd/tar writes it */
 		{
 			int nlen = strlen(dblock.dbuf.name);
+			int isdir = 0;
 
 			if (nlen > 0 && dblock.dbuf.name[nlen - 1] == '/') {
 				dblock.dbuf.name[nlen - 1] = '\0';
-				/* the root is already there; skip it */
-				if (dblock.dbuf.name[0] == '\0')
-					continue;
-				imagemkdir(dblock.dbuf.name);
+				isdir = 1;
+			}
+			/* a host tar roots the archive at "." and names every
+			 * entry "./..."; strip that, matching what tar c writes */
+			if (dblock.dbuf.name[0] == '.' && dblock.dbuf.name[1] == '/')
+				memmove(dblock.dbuf.name, dblock.dbuf.name + 2,
+				    strlen(dblock.dbuf.name + 2) + 1);
+			/* the archive's "." root is not an entry to create */
+			if (dblock.dbuf.name[0] == '.' && dblock.dbuf.name[1] == '\0')
+				continue;
+			/* the full path: -C's prefix, then the name */
+			if (tarprefix && dblock.dbuf.name[0] != '\0')
+				sprintf(fullname, "%s/%s", tarprefix, dblock.dbuf.name);
+			else
+				strcpy(fullname, dblock.dbuf.name);
+			/* the root is already there; skip it */
+			if (fullname[0] == '\0')
+				continue;
+			if (isdir) {
+				imagemkdir(fullname);
 				continue;
 			}
 		}
 
-		dp = namei(fs, dblock.dbuf.name);
+		dp = namei(fs, fullname);
 		if (!dp) {
 			inum = ialloc(fs, IFREG | (mode & 07777));
 			if (inum == 0) {
-				printf("tar: can't create %s\n", dblock.dbuf.name);
+				printf("tar: can't create %s\n", fullname);
 				lseek(infd, ((size + TBLOCK - 1) / TBLOCK) * TBLOCK, SEEK_CUR);
 				continue;
 			}
-			filelink(fs, dblock.dbuf.name, inum);
-			dp = namei(fs, dblock.dbuf.name);
+			filelink(fs, fullname, inum);
+			dp = namei(fs, fullname);
 		}
 		if (!dp) {
-			printf("tar: can't create %s\n", dblock.dbuf.name);
+			printf("tar: can't create %s\n", fullname);
 			lseek(infd, ((size + TBLOCK - 1) / TBLOCK) * TBLOCK, SEEK_CUR);
 			continue;
 		}
@@ -1045,6 +1103,239 @@ tarc(int c, char **a)
 	return 0;
 }
 
+/*
+ * The drives FORMATMW formats, keyed by name.  Geometry is sys/mw.c's
+ * specs[]; the sector size is 512, the only size Micronix reads.
+ */
+struct medium {
+    char *name;
+    int tracks;
+    int heads;
+    int spt;
+} mediums[] = {
+    {"m5",  153, 4, 17},
+    {"m10", 306, 4, 17},
+    {"m16", 306, 6, 17},
+    {"m32", 640, 6, 17},
+    {"m40", 733, 5, 17},
+};
+
+/*
+ * initialize <medium> <image>: simulate what FORMATMW does.  A format
+ * writes the out-of-band volume label - the geometry and the sector
+ * header values - and leaves the data area blank for mkfs.  This is
+ * the whole of it.
+ */
+int
+initcmd(int c, char **a)
+{
+    struct disklabel label;
+    struct medium *m;
+    long nblocks;
+    long size;
+    int fd;
+    int i;
+
+    a++;
+    c--;
+
+    if (c != 2)
+        return -1;
+
+    for (i = 0; i < sizeof(mediums) / sizeof(mediums[0]); i++)
+        if (strcmp(mediums[i].name, a[0]) == 0)
+            break;
+    if (i == sizeof(mediums) / sizeof(mediums[0])) {
+        printf("initialize: unknown medium %s\n", a[0]);
+        return 2;
+    }
+    m = &mediums[i];
+
+    fd = open(a[1], O_RDWR | O_CREAT | O_TRUNC, 0666);
+    if (fd < 0) {
+        printf("initialize: can't create %s: %d\n", a[1], errno);
+        return 2;
+    }
+
+    memset(&label, 0, sizeof label);
+    label.magic = MAGIC;
+    label.secsize = 512;
+    label.cylinders = m->tracks;
+    label.heads = m->heads;
+    label.spt = m->spt;
+    label.firstsec = 0;
+    label.seccode = 3;      /* 512-byte sectors, the specify form */
+    label.gap3 = 43;
+    label.fill = 0xe5;
+    label.formatted = 1;
+
+    if (write(fd, &label, sizeof label) != sizeof label) {
+        printf("initialize: can't write label on %s: %d\n", a[1], errno);
+        close(fd);
+        return 2;
+    }
+
+    nblocks = (long)m->tracks * m->heads * m->spt;
+    size = DATAOFF + nblocks * 512;
+    if (ftruncate(fd, size) < 0) {
+        printf("initialize: can't size %s: %d\n", a[1], errno);
+        close(fd);
+        return 2;
+    }
+    close(fd);
+
+    printf("initialized %s: %d cylinders, %d heads, %d sectors, %ld blocks\n",
+        a[1], m->tracks, m->heads, m->spt, nblocks);
+    return 0;
+}
+
+/*
+ * The block i/o for the host: fslib's rotation-aware read/write against
+ * the simulated drive image.  These are the same two names mkfs.c's
+ * driver defines against the raw unix device; mkfsfunc.c calls them.
+ */
+void
+rdblk(bn, buf)
+    UINT bn;
+    char *buf;
+{
+    readblk(fs, bn, buf);
+}
+
+void
+wrblk(bn, buf)
+    UINT bn;
+    char *buf;
+{
+    if (bn == 0)
+        return;     /* block 0 is reserved and always reads zero */
+    writeblk(fs, bn, buf);
+}
+
+/*
+ * mkfs <image> [size|-exclude] [-i bootfile] [-f]: make a filesystem on
+ * a drive image initialize made.  The geometry comes out of the label,
+ * so the medium is not named again.
+ */
+int
+mkfscmd(int c, char **a)
+{
+    struct disklabel label;
+    char *image;
+    char *bfile;
+    UINT dsize;
+    UINT fsize;
+    UINT isize;
+    UINT bootfirst;
+    UINT bootnblk;
+    UINT spc;
+    UINT given;
+    UINT exclude;
+    int type;
+    int f;
+    int fd;
+    int i;
+
+    a++;
+    c--;
+
+    image = 0;
+    bfile = DEFBOOT;
+    given = 0;
+    exclude = 0;
+    f = 0;
+
+    while (c > 0) {
+        char *arg = *a++;
+
+        c--;
+        if (arg[0] == '-' && arg[1] >= '0' && arg[1] <= '9') {
+            exclude = atoi(arg + 1);
+        } else if (arg[0] == '-') {
+            if (arg[1] == 'f' && arg[2] == 0) {
+                f = 1;
+                continue;
+            }
+            if (arg[1] != 'i' || arg[2] != 0 || c < 1)
+                return -1;
+            c--;
+            bfile = *a++;
+        } else if (arg[0] >= '0' && arg[0] <= '9') {
+            given = atoi(arg);
+        } else {
+            if (image)
+                return -1;
+            image = arg;
+        }
+    }
+    if (!image)
+        return -1;
+    if (given && exclude) {
+        printf("mkfs: give a size or an exclusion, not both\n");
+        return 2;
+    }
+
+    /* the geometry, out of the label initialize wrote */
+    fd = open(image, O_RDONLY);
+    if (fd < 0 || read(fd, &label, sizeof label) != sizeof label) {
+        printf("mkfs: can't read the label on %s\n", image);
+        if (fd >= 0)
+            close(fd);
+        return 2;
+    }
+    close(fd);
+    if (label.magic != MAGIC || !label.formatted) {
+        printf("mkfs: %s is not formatted - run initialize first\n", image);
+        return 2;
+    }
+    for (type = 0; type < NDRIVE; type++)
+        if (dtracks[type] == label.cylinders && dheads[type] == label.heads
+            && dsecs[type] == label.spt)
+            break;
+    if (type == NDRIVE) {
+        printf("mkfs: %d/%d/%d is not a drive this tree knows\n",
+            label.cylinders, label.heads, label.spt);
+        return 2;
+    }
+
+    dsize = (UINT) label.cylinders * label.heads * label.spt;
+    if (given) {
+        fsize = given;
+        if (fsize > dsize) {
+            printf("mkfs: that is bigger than the device\n");
+            return 2;
+        }
+    } else {
+        if (exclude >= dsize) {
+            printf("mkfs: nothing left after the exclusion\n");
+            return 2;
+        }
+        fsize = dsize - exclude;
+    }
+    if (fsize < 50) {
+        printf("mkfs: too small to be a filesystem\n");
+        return 2;
+    }
+    isize = fsize / 43 + fsize / 1000;
+    if (isize < 1)
+        isize = 1;
+
+    spc = (UINT) label.heads * label.spt;
+    bootfirst = (label.cylinders - (label.cylinders >> 1)) * spc;
+    bootnblk = spc;
+
+    i = openfsrw(image, &fs, 1);
+    if (i < 0) {
+        printf("mkfs: can't open %s\n", image);
+        return 2;
+    }
+
+    pname = "mkfs";
+    domkfs(fsize, isize, bootfirst, bootnblk, dsize, type, bfile, f);
+    closefs(fs);
+    return 0;
+}
+
 int
 tarcmd(int c, char **a)
 {
@@ -1053,9 +1344,17 @@ tarcmd(int c, char **a)
 	if (c == 0)
 		return -1;
 	if (strcmp(a[0], "x") == 0) {
-		if (c != 2)
+		a++;
+		c--;
+		tarprefix = 0;
+		if (c >= 2 && strcmp(a[0], "-C") == 0) {
+			tarprefix = a[1];
+			a += 2;
+			c -= 2;
+		}
+		if (c != 1)
 			return -1;
-		return tarx(a[1]);
+		return tarx(a[0]);
 	}
 	if (strcmp(a[0], "c") == 0) {
 		if (c < 2)

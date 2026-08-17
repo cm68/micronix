@@ -16,6 +16,7 @@
 
 #include "../include/imd.h"
 #include "../include/util.h"
+#include "../include/lockfile.h"
 
 int trace_imd;
 
@@ -164,13 +165,26 @@ imd_close(void *vp)
  * name and layout, so writing to a raw disk behaves exactly as writing to
  * an IMD one and neither original image is ever touched.
  */
-static void
+static int
 attach_delta(struct imd *ip, char *fname, int create_delta)
 {
     struct imd_trk *tp;
     char *namebuf;
     int fd;
     int cyl, head, sec, offset;
+
+    /*
+     * A writable image is locked so two tools never write the same disk
+     * at once.  The lock is held for the life of the process and dropped
+     * by the kernel when it exits, so a short-lived tool and a long-lived
+     * simulator contend on it the same way.
+     */
+    ip->lock_fd = -1;
+    if (create_delta) {
+        ip->lock_fd = acquire_lock(fname);
+        if (ip->lock_fd < 0)
+            return -1;
+    }
 
     // now, create the delta file or read it - make sure it's full sized
 #define DELTASUFFIX "-delta"
@@ -217,6 +231,7 @@ attach_delta(struct imd *ip, char *fname, int create_delta)
         memset(ip->delta_map, 0, DELTA_SIZE);
     }
     free(namebuf);
+    return 0;
 }
 
 /*
@@ -459,7 +474,11 @@ raw_load(char *fname, int drive, int create_delta)
     }
     close(fd);
 
-    attach_delta(ip, fname, create_delta);
+    if (attach_delta(ip, fname, create_delta) < 0) {
+        free(ip->comment);
+        free(ip);
+        return 0;
+    }
     return ip;
 }
 
@@ -531,7 +550,11 @@ imd_load(char *fname, int drive, int create_delta)
     ip->heads++;
     ip->delta_fd = 0;
 
-    attach_delta(ip, fname, create_delta);
+    if (attach_delta(ip, fname, create_delta) < 0) {
+        free(ip->comment);
+        free(ip);
+        return 0;
+    }
     return ip;
 }
 

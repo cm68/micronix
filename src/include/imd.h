@@ -73,6 +73,7 @@ struct imd {
     int cyls;                           // number of cylinders
     struct imd_trk *tracks[TRACKS];     // array of tracks - indexed by trknum(c, h)
     int delta_fd;                       // file descriptor for writes
+    int lock_fd;                        // advisory lock held on the image
     char delta_map[DELTA_SIZE];         // the dirty map
 };
 
