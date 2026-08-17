@@ -17,6 +17,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <types.h>
 #include <sys/fs.h>
@@ -68,6 +69,7 @@ struct bmap {
 };
 
 struct bmap *blockmap;		/* H700e - the block map */
+char	*freemap;		/* H7010 - one byte per block, set if free */
 char	*isallocated;		/* H7012 - one byte per inode */
 
 /*
@@ -81,6 +83,8 @@ int	checkdirs(void);
 int	checkilist2(void);
 int	summary(void);
 int	reorg(void);
+
+static void rebuildfree(void);
 
 /*
  * main - parse the options, then check each file system named on the
@@ -282,15 +286,101 @@ checkilist1(void)
 }
 
 /*
- * checkfree - walk the free list.  The original rebuilds it from
- * scratch if it finds a duplicate, an allocated block, or a bad block
- * in the chain.
+ * freeblock - classify one free block.  b is the block number and
+ * chain is nonzero when it is the link block at the bottom of a free
+ * list block rather than a plain free block.  Reports the out-of-range,
+ * bad, duplicate and allocated cases and marks the block free in the
+ * map otherwise.
+ */
+static void
+freeblock(int b, int chain)
+{
+	char *what = chain ? "Free chain" : "Free";
+
+	if (b == 0)
+		return;
+	if (b >= fs->s_fsize) {
+		printf("Out of range block in Free, Block %u, Type %s\n", b, what);
+		return;
+	}
+	if (freemap[b]) {
+		printf("Dup in Free, Block %u, Type %s\n", b, what);
+		return;
+	}
+	if (blockmap[b].b_count) {
+		printf("Allocated block in Free, Block %u, Type %s\n", b, what);
+		return;
+	}
+	freemap[b] = 1;
+}
+
+/*
+ * checkfree - walk the free list.  The super block holds s_nfree block
+ * numbers in s_free[100], with s_free[0] the link to the next block of
+ * free numbers (or 0 at the end).  Once the chain has been walked, any
+ * block that is neither used nor free is missing and is recovered.
  */
 int
 checkfree(void)
 {
-	/* TODO: read the .dis from H287f */
+	UINT freebuf[100];
+	int n;
+	int b;
+	int i;
+	int missing;
+
+	freemap = calloc(fs->s_fsize, 1);
+	if (freemap == 0)
+		lose("out of memory");
+
+	/*
+	 * walk the chain.  The super block holds s_nfree numbers in
+	 * s_free[100]; s_free[0] chains to the next block of numbers
+	 * (buf[0] of that block is its count, buf[1..100] the numbers).
+	 */
+	memcpy(freebuf, fs->s_free, sizeof(freebuf));
+	n = fs->s_nfree;
+	for (;;) {
+		for (i = n - 1; i >= 1; i--) {
+			b = freebuf[i];
+			if (b == 0)
+				goto missing;
+			freeblock(b, 0);
+		}
+		b = freebuf[0];
+		if (b == 0)
+			goto missing;
+		freeblock(b, 1);
+		readblk(fs, b, (char *)freebuf);
+		n = freebuf[0];
+	}
+
+missing:
+	/*
+	 * blocks that are neither allocated nor free are lost; count them
+	 * and rebuild the free list to take them back.
+	 */
+	missing = 0;
+	for (b = fs->s_isize + INODES_START; b < fs->s_fsize; b++) {
+		if (!blockmap[b].b_count && !freemap[b])
+			missing++;
+	}
+	if (missing) {
+		printf("%u missing blocks\n", missing);
+		rebuildfree();
+	}
 	return 1;
+}
+
+/*
+ * rebuildfree - rewrite the free list from the block map.  TODO: read
+ * the .dis from H1315.
+ */
+static void
+rebuildfree(void)
+{
+	printf("** Rebuilding the free list\n");
+	/* TODO */
 }
 
 /*
