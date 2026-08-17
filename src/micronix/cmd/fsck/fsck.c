@@ -582,8 +582,16 @@ huntbad(void)
 /*
  * findorphans - hunt for inodes that are allocated but have no
  * directory entry (H2b08).  This is the detection half: it finds and
- * reports the casualties.  Relinking them into lost+found, and the
- * "." / ".." repair H2b34 does, is still to be read out.
+ * reports the casualties.
+ *
+ * The relink is H2b34, not here yet.  Read from the .dis, its shape is
+ * a recursive walk: it takes the lost+found directory and walks its
+ * sixteen-byte entries; for each entry it decrements the casualty
+ * count, and for a subdirectory it recurses, fixing "." and ".." (the
+ * two-byte strings at H2b32/H2b2f) as it goes, until every orphaned
+ * inode has an entry somewhere reachable.  fslib has no directory-write
+ * helper, so relinking means carving an entry into lost+found's blocks
+ * through bmap/writeblk - the one piece of the port still to write.
  */
 static void
 findorphans(void)
