@@ -2652,8 +2652,21 @@ pass2_output()
     write_byte(config);
     write_word(sflag ? 0 : num_globals * (symlen + 3));   /* symtab size */
     write_word(total_text);
-    write_word(total_data);
-    write_word(total_bss);
+    if (rflag) {
+        write_word(total_data);
+        write_word(total_bss);
+    } else {
+        /*
+         * bss is folded into data: the zero bytes are emitted below,
+         * so exec() reads them into FULL pages instead of leaving them
+         * GROW.  The original toolchain wrote bss: 0; the kernel only
+         * nails down what is in the file, so a separate bss stays GROW
+         * and is swept up (and clobbered) by the first sbrk that moves
+         * the grow segment.
+         */
+        write_word(total_data + total_bss);
+        write_word(0);
+    }
     write_word(0);              /* heap */
     write_word(text_base);      /* text offset */
     write_word(data_base);      /* data offset */
@@ -2697,6 +2710,23 @@ pass2_output()
         if (fwrite(xferbuf, 1, n, outfp) != n)
             error("write error");
     fclose(datafp);
+
+    /*
+     * The bss rides after the data as zeros.  Written to the file it is
+     * part of the data segment, so exec() nails the pages FULL; left out
+     * of the file it stays GROW and shares the grow segment with the
+     * heap, which the first sbrk clobbers.
+     */
+    if (!rflag && total_bss) {
+        int m;
+
+        memset(xferbuf, 0, sizeof(xferbuf));
+        for (n = total_bss; n > 0; n -= m) {
+            m = n > sizeof(xferbuf) ? sizeof(xferbuf) : n;
+            if (fwrite(xferbuf, 1, m, outfp) != m)
+                error("write error");
+        }
+    }
 
     /* write symbol table (after text and data) unless stripped */
     if (!sflag) {
