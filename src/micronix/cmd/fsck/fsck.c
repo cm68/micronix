@@ -71,6 +71,7 @@ struct bmap {
 struct bmap *blockmap;		/* H700e - the block map */
 char	*freemap;		/* H7010 - one byte per block, set if free */
 char	*isallocated;		/* H7012 - one byte per inode */
+short	*refcount;		/* H7014 - one short per inode, link refs */
 
 /*
  * the passes, in the order the driver runs them.  Each returns 0 on
@@ -396,24 +397,78 @@ rebuildfree(void)
 }
 
 /*
- * checkdirs - walk the directories, fixing link counts, orphans, and
- * the "." and ".." links.
+ * checkdirs - walk the directories.  Counts every directory entry's
+ * reference to an inode into refcount, and reports entries whose inode
+ * number is out of range.  The reference counts are what checkilist2
+ * reconciles against the inode link counts.
+ *
+ * NOTE: the orphan (lost+found) and "." / ".." repair in the original
+ * are not here yet - this is the counting half of H2fdc.
  */
 int
 checkdirs(void)
 {
-	/* TODO: read the .dis from H2fdc */
+	struct dsknod *ip;
+	struct dir *dp;
+	int inum;
+	int i;
+
+	refcount = calloc(fs->s_isize * I_PER_BLK, sizeof(short));
+	if (refcount == 0)
+		lose("out of memory");
+
+	for (inum = 1; inum < fs->s_isize * I_PER_BLK; inum++) {
+		ip = iget(fs, inum);
+		if (!(ip->d_mode & IALLOC)) {
+			iput(ip);
+			continue;
+		}
+		if ((ip->d_mode & IFMT) != IFDIR) {
+			iput(ip);
+			continue;
+		}
+
+		for (i = 0; (dp = getdirent(ip, i)) != 0; i++) {
+			if (dp->ino == 0)
+				continue;
+			if (dp->ino >= fs->s_isize * I_PER_BLK) {
+				printf("Dir. entry inumber out of range,"
+				    " Inode %u, Entry %u\n", inum, dp->ino);
+				continue;
+			}
+			refcount[dp->ino]++;
+		}
+		iput(ip);
+	}
 	return 1;
 }
 
 /*
- * checkilist2 - second pass over the I-list.  Reconciles the directory
- * link counts against the inode link counts.
+ * checkilist2 - second pass over the I-list.  Reconciles each inode's
+ * link count against the directory entries that referenced it, resolved
+ * in favour of the directory entries, as the man page puts it.  This is
+ * the counting half of H2ab9; the orphan (lost+found) repair and the
+ * "." / ".." patching are still to read out of the second-pass handlers.
  */
 int
 checkilist2(void)
 {
-	/* TODO: read the .dis from H2ab9 */
+	struct dsknod *ip;
+	int inum;
+
+	for (inum = 1; inum < fs->s_isize * I_PER_BLK; inum++) {
+		ip = iget(fs, inum);
+		if (!(ip->d_mode & IALLOC)) {
+			iput(ip);
+			continue;
+		}
+		if (refcount[inum] != ip->d_nlink) {
+			printf("Inode %u, %u Directory entries, Link count %u\n",
+			    inum, (unsigned)refcount[inum], ip->d_nlink);
+			ip->d_nlink = refcount[inum];
+		}
+		iput(ip);
+	}
 	return 1;
 }
 
