@@ -51,13 +51,13 @@
 
 uchar	lstdesc;	/* ee83 - the list device descriptor, 1 = console */
 char	*lstdev;		/* ee84 - the list device path */
-char	*op;		/* ee1b - the console output pointer */
-char	*ip;		/* ee1d - the console input pointer */
-char	*lp;		/* ee1f - the list output pointer */
-char	obuf[32];	/* edcb - the console output buffer */
-char	ibuf[16];	/* edeb - the console input buffer, to lbuf */
-char	lbuf[32];	/* edfb - the list output buffer */
-char	sgtty[6];	/* ef0a - a struct sgtty, to dirbuf */
+uchar	*op;		/* ee1b - the console output pointer */
+uchar	*ip;		/* ee1d - the console input pointer */
+uchar	*lp;		/* ee1f - the list output pointer */
+uchar	obuf[32];	/* edcb - the console output buffer */
+uchar	ibuf[16];	/* edeb - the console input buffer, to lbuf */
+uchar	lbuf[32];	/* edfb - the list output buffer */
+uchar	sgtty[6];	/* ef0a - a struct sgtty, to dirbuf */
 ushort	dma;		/* ee86 - the CP/M DMA address */
 uchar	iobyte;	/* ee88 - the CP/M I/O byte */
 uchar	call;		/* ee89 - the BDOS function number, from cpm */
@@ -1531,14 +1531,14 @@ ccp()
 	for (;;) {
 		getline();
 
-		if (line[0] == '!') {
+		if (line[2] == '!') {
 			trestor();
-			system(&line[1]);
+			system(&line[3]);
 			tset();
 			continue;
 		}
 
-		p = getword(ccword, line);
+		p = getword(ccword, line + 2);
 
 		if (ccword[0] == ':')
 			continue;
@@ -3150,8 +3150,6 @@ int sublines;
  */
 getline()
 {
-	int n;
-
 	if (disktab[0] != 0)
 		cpystr(subfile, disktab[0], "/$$$.sub", 0);
 	else
@@ -3168,12 +3166,8 @@ getline()
 					sublines = 0;
 			}
 		}
-		if (sublines == 0) {
-			unlink(subfile);
-			subflag = 0;
-			close(subfd);
+		if (!subflag)
 			goto keyboard;
-		}
 	}
 
 	if (sublines == 0) {
@@ -3185,8 +3179,8 @@ getline()
 
 	sublines--;
 	seek(subfd, sublines * 128, 0);
-	n = read(subfd, line + 1, 128);
-	line[1 + n] = 0;
+	read(subfd, line + 1, 128);
+	line[2 + line[1]] = 0;
 	prompt();
 	puts(line + 2);
 	puts("\r\n");

@@ -11,14 +11,14 @@
 #   - the crt is upmhead.s (start, entry, bios, tint), not lib/libu's
 #     crt0, and it has to be the FIRST object so start lands at the text
 #     base;
-#   - the link drives ld directly with -Ttext=0xa000.  ccc would add
+#   - the link drives ld directly with -Ttext=0xd500.  ccc would add
 #     crt0.o (whose start would clash with upmhead's) and -Ttext=0x100
 #     (which would load upm on top of the TPA).
 #
-# 0xa000 is not the original's d645: the reconstruction compiles larger
-# than the Whitesmith original, and d645 leaves no room for the ~20k
-# image before it wraps past ffff.  0xa000 keeps a 40k TPA and the whole
-# image below ffff.
+# 0xd500 is not the original's d645: the reconstruction's text (the
+# resident BDOS) compiles ~0x220 bytes larger than the Whitesmith
+# original's, so its base sits that much lower.  The text ends at fc00-
+# ish, which leaves the stack below ffff the room the original gave it.
 #
 # upm.ctl and upm.dis are data, not sources, and are not shipped by the
 # update rule - the same as init's.
@@ -55,5 +55,5 @@ upm.o: upm.c splitupm
 # is larger than the Whitesmith original's, so its base is lower than
 # d645 - the TPA it leaves is still ~53k, which is the point.
 $(TARGET): $(OBJS) $(TREELIBS)
-	$(BIN)/mxld -o $(TARGET) -Ttext=0xd300 -Tdata=0x0100 \
+	$(BIN)/mxld -o $(TARGET) -Ttext=0xd500 -Tdata=0x0100 \
 		$(OBJS) $(LIBC) $(LIBU) $(LIBC)
