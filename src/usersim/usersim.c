@@ -1704,6 +1704,17 @@ do_exec(char *name, char **argv)
     fread(iobuf, 1, header.data, file);
     copyout(iobuf, header.dataoff, header.data);
 
+    /*
+     * A final executable folds bss into data - the linker emits the zero
+     * bytes, so the header carries bss: 0 and the zeros arrive with the
+     * data above.  A relocatable object (-r) still has a real bss
+     * segment, and crt0 no longer clears it (it relies on the fold), so
+     * a non-zero bss has to be cleared here.  The whole 64k was zeroed
+     * just above, but say what is happening rather than depend on it.
+     */
+    if (header.bss)
+        memset(memory + header.dataoff + header.data, 0, header.bss);
+
     if (header.table) {
         if (header.conf == CONF_9) {
             symsize = 12;
