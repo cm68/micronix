@@ -14,6 +14,7 @@
 #include "wsobj.h"
 
 char *progname;
+int verbose;
 
 void
 usage()
@@ -30,6 +31,26 @@ read16(buf)
 unsigned char *buf;
 {
     return buf[0] | (buf[1] << 8);
+}
+
+/*
+ * dump the 16-byte object header, every field in hex
+ */
+void
+dumpHeader(buf, name)
+unsigned char *buf;
+char *name;
+{
+    printf("%s: header\n", name);
+    printf("    magic   %02x\n", buf[HDR_MAGIC]);
+    printf("    config  %02x\n", buf[HDR_CONFIG]);
+    printf("    symtab  %04x\n", read16(buf + HDR_SYMTAB));
+    printf("    text    %04x\n", read16(buf + HDR_TEXT));
+    printf("    data    %04x\n", read16(buf + HDR_DATA));
+    printf("    bss     %04x\n", read16(buf + HDR_BSS));
+    printf("    heap    %04x\n", read16(buf + HDR_HEAP));
+    printf("    textoff %04x\n", read16(buf + HDR_TEXTOFF));
+    printf("    dataoff %04x\n", read16(buf + HDR_DATAOFF));
 }
 
 /*
@@ -61,6 +82,9 @@ char *name;
 
     printf("%7u\t%7u\t%7u\t%7lu\t%7lx\t%s\n",
            text_size, data_size, bss_size, total, total, name);
+
+    if (verbose)
+        dumpHeader(buf, name);
 
     return 0;
 }
@@ -123,6 +147,18 @@ char **argv;
 
     progname = *argv++;
     argc--;
+
+    while (argc > 0 && **argv == '-') {
+        switch ((*argv)[1]) {
+        case 'v':
+            verbose = 1;
+            break;
+        default:
+            usage();
+        }
+        argc--;
+        argv++;
+    }
 
     if (argc == 0)
         usage();
