@@ -52,6 +52,9 @@ int fsinfo();
 int iinfo();
 int blkcmd();
 int setblkcmd();
+int mknodcmd();
+int devlistcmd();
+int imagemkdir(char *path);
 int tarcmd();
 int initcmd();
 int mkfscmd();
@@ -76,6 +79,8 @@ struct cmdtab
     {"rmdir", rmdircmd, "rmdir <directory>" },
     {"block", blkcmd, "block [-e] <blkno>" },
     {"setblk", setblkcmd, "setblk <path> <blkno> ..." },
+    {"mknod", mknodcmd, "mknod <path> <b|c> <major> <minor>" },
+    {"devlist", devlistcmd, "devlist" },
     {"tar", tarcmd, "tar x [-C prefix] <tarfile> | tar c <tarfile> [path ...]" },
     {"initialize", initcmd, "initialize <medium> <image>" },
     {"mkfs", mkfscmd, "mkfs <image> [size|-exclude] [-i bootfile] [-f]" }
@@ -470,7 +475,11 @@ writecmd(int c, char **a)
     destname = *++a;
     dp = namei(fs, destname);
     if (!dp) {
-        printf("can't find file %s\n", destname);
+        /*
+         * The destination is not there yet, which is the usual case
+         * for write - it creates what it writes.  Nothing to say
+         * about it: filecreate reports a real failure below.
+         */
         dp = filecreate(fs, destname);
         if (!dp) {
             printf("can't create file %s\n", destname);
@@ -604,10 +613,16 @@ rmdircmd(int c, char **a)
     return 1;
 }
 
-int 
+int
 mkdircmd(int c, char **a)
 {
-    return 1;
+    a++;
+    c--;
+    if (c != 1)
+        return -1;
+    if (imagemkdir(a[0]) < 0)
+        return 2;
+    return 0;
 }
 
 
@@ -890,6 +905,97 @@ imagemkdirs(char *path)
 	}
 	if (!namei(fs, buf))
 		imagemkdir(buf);
+	return 0;
+}
+
+/*
+ * mknod <path> <b|c> <major> <minor>: make a device node.
+ *
+ * The device number is (major << 8) | minor, the same word the kernel's
+ * cio/bio open routines read out of i_addr[0].  The node is made the way
+ * mkfs and tar make a file - ialloc the inode, then link it into the
+ * directory - except the type is IFBLK or IFCHR rather than IFREG and
+ * the first address word carries the device number instead of a block.
+ */
+int
+mknodcmd(int c, char **a)
+{
+	char *path;
+	int isblk, major, minor;
+	int dev, inum;
+	struct dsknod *dp;
+
+	a++;
+	c--;
+	if (c != 4)
+		return -1;
+	path = a[0];
+	if (a[1][0] == 'b')
+		isblk = 1;
+	else if (a[1][0] == 'c')
+		isblk = 0;
+	else
+		return -1;
+	major = atoi(a[2]);
+	minor = atoi(a[3]);
+
+	if (namei(fs, path)) {
+		printf("mknod: %s already exists\n", path);
+		return 2;
+	}
+	dev = (major << 8) | minor;
+	inum = ialloc(fs, (isblk ? IFBLK : IFCHR) | 0666);
+	if (inum == 0) {
+		printf("mknod: no inode for %s\n", path);
+		return 2;
+	}
+	dp = iget(fs, inum);
+	dp->d_addr[0] = dev;
+	iput(dp);
+	ifree(dp);
+	filelink(fs, path, inum);
+	return 0;
+}
+
+/*
+ * devlist: print the device nodes in /dev, one per line, as
+ *
+ *	type major minor name
+ *
+ * where type is b or c.  This is the prototype device list, read from a
+ * working filesystem and replayed onto a new one with mknod.
+ */
+int
+devlistcmd(int c, char **a)
+{
+	struct dsknod *devdir;
+	struct dsknod *dp;
+	struct dir *dirp;
+	int i, type, major, minor;
+
+	devdir = namei(fs, "/dev");
+	if (!devdir) {
+		printf("devlist: no /dev\n");
+		return 2;
+	}
+	for (i = 0; (dirp = getdirent(devdir, i)) != 0; i++) {
+		if (dirp->ino == 0 || dirp->name[0] == '.')
+			continue;
+		dp = iget(fs, dirp->ino);
+		if ((dp->d_mode & IFMT) == IFBLK)
+			type = 'b';
+		else if ((dp->d_mode & IFMT) == IFCHR)
+			type = 'c';
+		else {
+			ifree(dp);
+			continue;
+		}
+		major = (dp->d_addr[0] >> 8) & 0xff;
+		minor = dp->d_addr[0] & 0xff;
+		printf("%c %d %d %s\n", type, major, minor, dirp->name);
+		ifree(dp);
+	}
+	ifree(devdir);
 	return 0;
 }
 

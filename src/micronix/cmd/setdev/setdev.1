@@ -1,0 +1,43 @@
+.he "setdev (1)                 8/16/26                    setdev (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+setdev
+- show or set a Micronix kernel's root and swap devices
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+setdev kernel [ root swap ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Setdev reads the symbol table of a Micronix kernel and prints or
+changes the _rootdev and _swapdev words in it.  With no devices it
+prints them; with two it writes them.
+.sp
+A device is written either as major/minor - 3/0 - or as a plain
+number, decimal or 0x hex, so 3/0, 0x300 and 768 all agree.
+.sp
+This replaces the old ddt recipe, which searched the kernel for the
+bytes of the root device it expected to find.  The kernel carries a
+symbol table, so _rootdev and _swapdev say where they are, and nothing
+has to be guessed.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ddt (1)

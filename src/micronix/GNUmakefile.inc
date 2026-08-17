@@ -438,9 +438,19 @@ install-usersim:
 #
 HWIMAGE   ?= $(HOSTROOT)/disks/hdinstall/hddma-0
 HWBLESSED ?= $(HOSTROOT)/disks/hdinstall/hddma-0.blessed
-HWMEDIA   ?= m5
+HWMEDIA   ?= m16
+#
+# The kernel is copied from the blessed image, whose root device is the
+# 5 meg m5a (3/0).  It is re-patched here for the volume HWMEDIA names:
+# m5 is 3/0, m10 is 3/4, m16 is 3/8, m32 is 3/12, m40 is 3/16 - see
+# hddma.4.
+#
+HWROOTDEV ?= 3/8
+HWROOTMAJ = $(firstword $(subst /, ,$(HWROOTDEV)))
+HWROOTMIN = $(lastword $(subst /, ,$(HWROOTDEV)))
 BOOTIMG   ?= $(HOSTROOT)/src/micronix/stand/boot/bootimg-$(HWMEDIA)
 MNIX      ?= $(HOSTROOT)/src/tools/mnix
+SETDEV    ?= $(BIN)/setdev
 
 #
 # The userland that goes on the image, enumerated by name rather than
@@ -449,20 +459,33 @@ MNIX      ?= $(HOSTROOT)/src/tools/mnix
 # The compiler and its headers (lib, libexec, include, usr/include) are
 # deliberately not here: they are the build tree, not the running system.
 #
-HWSIM_FILES = bin dev etc usr \
+# dev is not tar'd: its entries are device nodes, which a tar archive
+# cannot carry.  They are made below with mknod, from the list read out
+# of the blessed image.
+HWSIM_FILES = bin etc usr \
 	finstall hdinit m5init m10init m16init \
 	.sh .login
 
-install-hwsim: $(MNIX)
+install-hwsim: $(MNIX) $(SETDEV)
 	$(MNIX) initialize $(HWMEDIA) $(HWIMAGE)
 	$(MNIX) mkfs -i $(BOOTIMG) $(HWIMAGE)
 	$(MNIX) -f $(HWBLESSED) read /micronix $(HOSTROOT)/micronix.k
+	$(SETDEV) $(HOSTROOT)/micronix.k $(HWROOTDEV) 0/0
 	$(MNIX) -f $(HWIMAGE) write $(HOSTROOT)/micronix.k /micronix
 	rm -f $(HOSTROOT)/micronix.k
 	tar -C $(ROOT) -c -f $(HOSTROOT)/hwsim.tar \
 	    --exclude='usr/src' --exclude='usr/man' $(HWSIM_FILES)
 	$(MNIX) -f $(HWIMAGE) tar x $(HOSTROOT)/hwsim.tar
 	rm -f $(HOSTROOT)/hwsim.tar
+	$(MNIX) -f $(HWIMAGE) mkdir /dev
+	$(MNIX) -f $(HWBLESSED) devlist > $(HOSTROOT)/devlist
+	while read type major minor name; do \
+		if [ "$$name" = root ] || [ "$$name" = swap ]; then continue; fi; \
+		$(MNIX) -f $(HWIMAGE) mknod /dev/$$name $$type $$major $$minor; \
+	done < $(HOSTROOT)/devlist
+	rm -f $(HOSTROOT)/devlist
+	$(MNIX) -f $(HWIMAGE) mknod /dev/root b $(HWROOTMAJ) $(HWROOTMIN)
+	$(MNIX) -f $(HWIMAGE) mknod /dev/swap b $(HWROOTMAJ) $(HWROOTMIN)
 
 clean:
 	$(RECURSE)

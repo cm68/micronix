@@ -8,16 +8,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../micronix/include/types.h"
-#include "../micronix/include/sys/fs.h"
-#include "../micronix/include/sys/dir.h"
-#include "../include/fslib.h"
-#include "../include/util.h"
+#include <types.h>
+#include <sys/fs.h>
+#include <sys/dir.h>
+#include <fslib.h>
 
 int traceflags;
-extern int trace_fs;
-int verbose;
-int extra;
 
 struct super *fs;
 int sflg;
@@ -194,8 +190,7 @@ main(argc, argv)
         if (**argv == '-')
             switch ((*argv)[1]) {
             case 'v':
-                if (traceflags & verbose) traceflags |= trace_fs;
-                traceflags |= verbose;
+                traceflags = -1;
                 continue;
             case 's':
                 sflg++;
@@ -221,14 +216,6 @@ main(argc, argv)
         check(*argv);
     }
     return (nerror);
-}
-
-__attribute__((constructor))
-void
-main_init()
-{
-    verbose = register_trace("verbose");
-    extra = register_trace("extraverbose");
 }
 
 /*

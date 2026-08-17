@@ -14,12 +14,11 @@
  */
 #include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
 
-#include "../micronix/include/types.h"
-#include "../micronix/include/sys/fs.h"
-#include "../micronix/include/sys/dir.h"
-#include "../include/fslib.h"
+#include <types.h>
+#include <sys/fs.h>
+#include <sys/dir.h>
+#include <fslib.h>
 
 int traceflags;
 int headpr;

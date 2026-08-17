@@ -373,7 +373,7 @@ attention(portaddr p, byte v)
          * name.
          */
         drive_format(handle[drv], 0, (secsize[drv] / 128) - 1,
-            nsect, gaplen, command.fill);
+            nsect, gaplen, command.fill, curcyl[drv], head);
 
         for (i = 0; i < nsect; i++) {
         	if (drive_write(handle[drv], curcyl[drv], head, i, (char *)secbuf) != secsize[drv]) {

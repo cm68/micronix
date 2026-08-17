@@ -1,0 +1,61 @@
+.he "dcheck (1)                 8/16/26                   dcheck (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+dcheck
+- check the link count of every file
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+dcheck [ -v ] [ -i inumber ... ] filesystem
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Dcheck makes two passes over the directories of the named file system.
+The first counts how many directory entries name each inode; the
+second compares that count against the link count stored in the inode
+itself.  An inode whose link count differs from the number of
+references to it is printed, with both numbers.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-v	Be verbose.
+
+.ti -10
+-i inumber	Print the name of the given inode, in the form
+inumber directory/name, as it is found in the first pass.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This is the v6 dcheck: it validates link counts, which is what the
+name comes from, and does nothing else.  It does not look at the free
+list or the blocks; icheck (1) does that.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+icheck (1), ncheck (1)

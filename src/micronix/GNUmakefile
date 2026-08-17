@@ -94,6 +94,8 @@ ARMX	 = $(BIN)/mxar
 ARSRC	 = cmd/ar/ar.c
 NMX	 = $(BIN)/mxnm
 NMSRC	 = cmd/nm/nm.c cmd/nm/wsobj.c
+SETDEVX	 = $(BIN)/setdev
+SETDEVSRC = cmd/setdev/setdev.c
 HOSTCC	?= gcc
 HOSTCFLAGS ?= -w -std=gnu89 -Dlinux
 
@@ -102,13 +104,13 @@ HOSTCFLAGS ?= -w -std=gnu89 -Dlinux
 # so the librarian exists before lib is archived.  This is a
 # prerequisite line only - the recipe is GNUmakefile.inc's.
 #
-all: $(ARMX) $(NMX)
+all: $(ARMX) $(NMX) $(SETDEVX)
 
 #
 # clobber removes the host tools and src.tar as well as what the
 # recursion removes.  GNUmakefile.inc's clobber reads GENERATED.
 #
-GENERATED = src.tar $(ARMX) $(NMX)
+GENERATED = src.tar $(ARMX) $(NMX) $(SETDEVX)
 
 $(ARMX): $(ARSRC)
 	mkdir -p $(BIN)
@@ -122,6 +124,10 @@ $(ARMX): $(ARSRC)
 $(NMX): $(NMSRC)
 	mkdir -p $(BIN)
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(NMSRC)
+
+$(SETDEVX): $(SETDEVSRC)
+	mkdir -p $(BIN)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(SETDEVSRC)
 
 #
 # The cross compiler, built here from these sources.

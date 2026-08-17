@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+# boot the m16 hard disk image in the Decision 1 hardware simulator
+#
+# m16boot
+#
+# Runs d1 against the image install-hwsim builds.  The console and the
+# debug terminal each get their own xterm, so this needs an X display.
+#
+# The image is disks/hdinstall/hddma-0, which is built - from scratch -
+# by
+#
+#	make -C src/micronix install-hwsim
+#
+# which formats an m16, makes the filesystem, patches the kernel's root
+# device, tars in the userland, and mknods the devices in /dev.  See
+# src/micronix/GNUmakefile.inc for the recipe.
+#
+
+root=$(cd "$(dirname "$0")" && pwd)
+
+image="$root/disks/hdinstall/hddma-0"
+d1="$root/src/hwsim/d1/d1"
+
+if [ ! -x "$d1" ]; then
+	echo "building d1 ..."
+	make -C "$root/src/hwsim/d1"
+fi
+
+if [ ! -f "$image" ]; then
+	echo "no image at $image" >&2
+	echo "build it first: make -C $root/src/micronix install-hwsim" >&2
+	exit 1
+fi
+
+# the simulator finds roms/mon447.bin and its resource files by being
+# run from this directory
+cd "$root/src/hwsim/d1" || exit 1
+
+export TERMINAL_FONTSIZE="${TERMINAL_FONTSIZE:-14}"
+
+# -c 0x10c, in the config switch bits:
+#	0x100	uart 0 in an xterm (otherwise it wants the controlling tty)
+#	0x08	boot the HDC-DMA controller (nuboot)
+#	0x04	skip the monitor and boot straight away
+# hdcdma0: is the drive - controller hdcdma, unit 0 - and the image.
+"$d1" -b roms/mon447.bin -c 0x10c "hdcdma0:$image"
+
+stty cooked echo echoe 2>/dev/null

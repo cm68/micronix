@@ -1,0 +1,71 @@
+.he "icheck (1)                 8/16/26                   icheck (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+icheck
+- check the block allocation of a file system
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+icheck [ -sv ] [ -b block ... ] filesystem
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Icheck reads every inode of the named file system and accounts for the
+blocks it uses, checking each against the free list and against the
+blocks already accounted for.  A block that appears twice is a
+duplicate, and a block outside the file system is out of range; both
+are reported.  It finishes with a count of the special, regular and
+directory files and of the used and free blocks.
+.sp
+A check that only checks opens the file system read-only.  It is only
+with -s, which rebuilds the free list, that anything is written.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-s	Rebuild the free list from the blocks the inodes say are in use.
+The file system is opened for writing.
+
+.ti -10
+-v	Be verbose.
+
+.ti -10
+-b block	Report the inode and class of each use of block.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The free list is scanned before the inodes, so a block that is both in
+the free list and in a file comes out as a duplicate.
+.sp
+Icheck is a read-only pass over the blocks, unlike fsck; it finds
+duplicates and bad blocks but does not rewrite the inodes.  What it
+finds, -s puts right.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+dcheck (1), ncheck (1)

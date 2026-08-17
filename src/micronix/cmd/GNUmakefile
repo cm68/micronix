@@ -61,7 +61,7 @@
 # and moved up here once they had built, tested against their host
 # counterparts, and shed their compiler workarounds.
 #
-DIRS = ar asz cat ccc chgrp chmod cmp cp date dd diff du echo ed fgrep find form grep init ld less ln ls make man mkdir mknod more mv nm od pr pwd rm s sed sh size strings sync tar tee upm vi wc
+DIRS = ar asz cat ccc chgrp chmod cmp cp date dcheck dd diff du echo ed fgrep find form grep icheck init ld less ln ls make man mkdir mknod more mv ncheck nm od pr pwd rm s sed setdev sh size strings sync tar tee upm vi wc
 
 #
 # "cd $$d &&", not "cd $$d ;".  With the semicolon, a directory named

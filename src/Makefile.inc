@@ -24,7 +24,7 @@ CFLAGS = $(DEBUG) $(OPTIMIZE) $(INCLUDE) $(WARNS) $(GCCFLAGS) $(DEFINES)
 CXXFLAGS = $(CFLAGS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $<
+	$(CC) $(CFLAGS) -c $< -o $@
 
 %: %.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)

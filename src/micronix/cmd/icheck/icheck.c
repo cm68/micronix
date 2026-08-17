@@ -9,14 +9,12 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <strings.h>
+#include <string.h>
 
-#include "../micronix/include/types.h"
-#include "../micronix/include/sys/fs.h"
-#include "../micronix/include/sys/dir.h"
-#include "../include/fslib.h"
-#include "../include/util.h"
+#include <types.h>
+#include <sys/fs.h>
+#include <sys/dir.h>
+#include <fslib.h>
 
 #define	NB	10
 
@@ -102,7 +100,7 @@ check(file)
     }
     bmapsize = (fs->s_fsize + 7) / 8;
     bitmap = malloc(bmapsize);
-    bzero(bitmap, bmapsize);
+    memset(bitmap, 0, bmapsize);
 
     /*
      * if we are rebuilding the freelist, no point in scanning it
@@ -113,7 +111,7 @@ check(file)
     }
 
     /* copy the freelist from superblock to fl */
-    bcopy(fs->s_free, fl, sizeof(fl));
+    memcpy(fl, fs->s_free, sizeof(fl));
     i = fs->s_nfree - 1;
 
     /* scan through whole freelist from end */
@@ -121,7 +119,7 @@ check(file)
         if (!i) {
             readblk(fs, b, (char *)buf);
             i = buf[0] - 1;
-            bcopy(&buf[1], fl, sizeof(fl));
+            memcpy(fl, &buf[1], sizeof(fl));
         } else { 
             i--;
         }

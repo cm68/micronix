@@ -425,7 +425,11 @@ usage(char *complaint, char *p)
 {
     int i;
 
-    fprintf(stderr, "%s", complaint);
+    if (complaint[0]) {
+        fprintf(stderr, "%s", complaint);
+        if (complaint[strlen(complaint) - 1] != '\n')
+            fprintf(stderr, "\n");
+    }
     fprintf(stderr, "usage: %s [<options>] [<drive> ...]\n", p);
     fprintf(stderr, "  a drive is <controller><unit>:<file> - djdma0:boot.IMD,\n");
     fprintf(stderr, "  hdcdma0:hddma-0, hdca1:/tmp/scratch - or a bare file,\n");
@@ -434,7 +438,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-b\t<boot rom file>\n");
     fprintf(stderr, "\t-B\t<djdma|hdcdma|hdca> boot from this, and skip the monitor\n");
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
-    fprintf(stderr, "\t-S\t<symbol file file>\n");
+    fprintf(stderr, "\t-S\t<symbol file>\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
     fprintf(stderr, "\t-T\t<space:addr>[,count] trace from here, for count instructions\n");
     fprintf(stderr, "\t-W\t<addr>[-<addr>] report writes to this range and keep going\n");
@@ -1269,9 +1273,13 @@ main(int argc, char **argv)
             case 'h':
                 usage("", progname);
                 break;
-            default:
-                usage("unrecognized option", progname);
+            default: {
+                char msg[32];
+
+                sprintf(msg, "unrecognized option: %c\n", s[-1]);
+                usage(msg, progname);
                 break;
+            }
             }
         }
     }

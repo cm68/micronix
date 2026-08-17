@@ -1,0 +1,56 @@
+.he "ncheck (1)                 8/16/26                   ncheck (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+ncheck
+- print the names that correspond to inumbers
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+ncheck [ -av ] [ -i inumber ... ] filesystem
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Ncheck walks the directories of the named file system and prints, for
+each directory entry, the inumber and the path that reaches it.
+With no -i, every entry is printed; with -i, only the entries whose
+inumber is named.
+.sp
+It is the way to find which file an inode is, which is what you want
+after icheck or dcheck has complained about one by number.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-a	Print the . and .. entries, which are otherwise left out.
+
+.ti -10
+-v	Be verbose.
+
+.ti -10
+-i inumber	Print only the entry or entries that name inumber.
+
+.in -10
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+icheck (1), dcheck (1)

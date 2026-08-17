@@ -528,12 +528,6 @@ writeblk(struct super *fs, int blkno, char *buf)
     return 0;
 }
 
-void
-lose(char *s)
-{
-    fprintf(stderr, "%s\n", s);
-    exit(1);
-}
 
 char *itype[] = {
     "IFREG",
@@ -583,11 +577,6 @@ dump(unsigned char *b, int size)
 }
 #endif
 
-int
-filesize(struct dsknod *ip)
-{
-    return (ip->d_size0 << 16) + ip->d_size1;
-}
 
 void
 secdump(unsigned char *buf)
@@ -611,52 +600,11 @@ dirdump(char *buf, int size)
     }
 }
 
-struct dsknod inodeblk[I_PER_BLK];
-int inblkno = 0;
 
 /*
  * read an inode, given the inum
  */
-struct dsknod *
-iget(struct super *fs, int inum)
-{
-    int iblk;
-    int offset;
-    struct i_node *ip = malloc(sizeof(struct i_node));
 
-    ip->inum = inum;
-    ip->fs = fs;
-    inum--;
-
-    iblk = INODES_START + (inum / I_PER_BLK);
-    if (inblkno != iblk) {
-        inblkno = iblk;
-        readblk(fs, inblkno, (char *)inodeblk);
-    } 
-    bcopy(&inodeblk[inum % I_PER_BLK], &ip->ondisk, sizeof(struct dsknod));
-
-    // isummary("", &ip->ondisk);
-    return &ip->ondisk;
-}
-
-void
-iput(struct dsknod *dp)
-{
-    int iblk;
-    int offset;
-    struct i_node *ip = (struct i_node *)dp;
-    int inum = ip->inum;
-
-    inum--;
-
-    iblk = INODES_START + (inum / I_PER_BLK);
-    if (inblkno != iblk) {
-        inblkno = iblk;
-        readblk(ip->fs, inblkno, (char *)inodeblk);
-    } 
-    bcopy(&ip->ondisk, &inodeblk[inum % I_PER_BLK], sizeof(struct dsknod));
-    writeblk(ip->fs, inblkno, (char *)inodeblk);
-}
 
 int 
 inumof(struct dsknod *dp)
@@ -665,12 +613,6 @@ inumof(struct dsknod *dp)
     return ip->inum;
 }
 
-void
-ifree(struct dsknod *dp)
-{
-    struct i_node *ip = (struct i_node *)dp;
-    free(ip);
-}
 
 UINT32
 timeswap(UINT32 x)
@@ -852,10 +794,6 @@ idump(char *name, struct dsknod *dp, int always)
     }
 }
 
-#define DENTS 32
-
-static struct dir dirbuf[DENTS];
-static int dblk = -1;
 
 /*
  * snarf an entire directory
@@ -891,26 +829,6 @@ putdir(struct dsknod *dp, struct dir *dirp)
     for (i = 0; i < size; i += 512) {
         writeblk(ip->fs, bmap(dp, i, 1), (UINT8 *)&dirp[i / 16]);
     }
-}
-
-/*
- * return a pointer to the i'th directory entry
- */
-struct dir *
-getdirent(struct dsknod *dp, int i)
-{
-    int b;
-    struct i_node *ip = (struct i_node *)dp;
-
-    if (i * 16 > filesize(dp)) {
-        return 0;
-    }
-    b = bmap(dp, i * 16, 0);
-    if (dblk != b) {
-        dblk = b;
-        readblk(ip->fs, dblk, (char *) dirbuf);
-    }
-    return &dirbuf[i % DENTS];
 }
 
 /*
@@ -979,70 +897,11 @@ namei(struct super *fs, char *name)
 /*
  * allocate a block
  */
-int
-balloc(struct super *fs)
-{
-    int b, i;
-    UINT buf[256];
 
-    i = --fs->s_nfree;
-    /* nfree is the current head.  we manage it */
-    if (i < 0 || i >= 100) {
-        printf("bad freeblock\n");
-        return (0);
-    }
-    b = fs->s_free[i];
-
-    if (b == 0) {
-        printf("no space\n");
-        return (0);
-    }
-
-    /*
-     * we have an empty free list. 
-     * read our block, copy the free list
-     * and zero the block
-     */
-    if (fs->s_nfree <= 0) {
-        readblk(fs, b, (UINT8 *)buf);
-        fs->s_nfree = buf[0];
-        for (i = 0; i < 100; i++) {
-            fs->s_free[i] = buf[i + 1];
-        }
-        for (i = 0; i < 256; i++) {
-            buf[i] = 0;
-        }
-        writeblk(fs, b, (UINT8 *)buf);
-    }
-    fs->s_fmod = 1;
-    return (b);
-}
-
-void
-bfree(struct super *fs, int blkno)
-{
-    int i;
-    UINT buf[256];
-
-    if (fs->s_nfree >= 100) {
-        buf[0] = fs->s_nfree;
-        for (i = 0; i < 100; i++)
-            buf[i + 1] = fs->s_free[i];
-        fs->s_nfree = 0; 
-        writeblk(fs, blkno, (UINT8 *)buf);
-    }
-    fs->s_free[fs->s_nfree++] = blkno;
-    fs->s_fmod = 1;
-}
 
 /*
  * a cheap read cache 
  */
-UINT iblk[256];
-int iblkno = -1;
-
-UINT iiblk[256];
-int iiblkno = -1;
 
 /*
  * this code does all the heavy lifting of knowing about the
@@ -1054,149 +913,15 @@ int iiblkno = -1;
  *
  * return 0 for a hole.
  */
-int
-bmap(struct dsknod *dp, int offset, int alloc)
-{
-    struct i_node *ip = (struct i_node *)dp;
-    int lblk = offset / 512;    // logical block number
-    UINT *aa;                   // address array
-    int iindex;                 // indirect index
-    int i;
-
-    if (!(dp->d_mode & ILARG)) {      // file is within 4k limit
-        if (lblk <= 7) {
-            if ((dp->d_addr[lblk] == 0) && alloc) {
-                dp->d_addr[lblk] = balloc(ip->fs);
-            }
-            return dp->d_addr[lblk];
-        } else if (!alloc) {
-            return 0;
-        }
-
-        // convert to ILARG
-        iblkno = balloc(ip->fs);
-        bzero((char *)iblk, 512);
-        for (i = 0; i < 8; i++) {
-            iblk[i] = dp->d_addr[i];
-            dp->d_addr[i] = 0;
-        }
-        dp->d_addr[0] = iblkno;
-        dp->d_mode |= ILARG;
-        writeblk(ip->fs, iblkno, (char *)iblk);
-        iput(dp);     
-        // fall into ILARG case
-    }
-
-    iindex = lblk / 256;
-    if (iindex >= 7) {       // double indirect: d_addr[7] is a block of 256
-        if (dp->d_addr[7] == 0) {
-            if (!alloc) {
-                return 0;
-            }
-            iiblkno = dp->d_addr[7] = balloc(ip->fs);
-            bzero((char *)iiblk, 512);
-            writeblk(ip->fs, iiblkno, (char *)iiblk);
-            iput(dp);
-        }
-        if (iiblkno != dp->d_addr[7]) {
-            iiblkno = dp->d_addr[7];
-            readblk(ip->fs, iiblkno, (char *)iiblk);
-        }
-        aa = iiblk;
-        iindex -= 7;
-    } else {
-        aa = dp->d_addr;
-    }
-
-    // an indirect hole
-    if (aa[iindex] == 0) {
-        if (!alloc) {
-            return 0;
-        }
-        aa[iindex] = balloc(ip->fs);
-        if (aa == dp->d_addr) {
-            iput(dp);
-        } else {
-            writeblk(ip->fs, iiblkno, (char *)iiblk);
-        }
-    }
-
-    if (iblkno != aa[iindex]) {
-        iblkno = aa[iindex];
-        readblk(ip->fs, iblkno, (char *)iblk);
-    }
-
-    if ((iblk[lblk % 256] == 0) && alloc) {
-        iblk[lblk % 256] = balloc(ip->fs);
-        writeblk(ip->fs, iblkno, (char *)iblk);
-    }
-    return iblk[lblk % 256];
-}
 
 /*
  * free all 256 blocks in an indirect block
  * and then free the indirect block.
  */
-void
-iblkfree(struct super *fs, UINT *bp)
-{
-    int i;
-
-    if (!*bp)
-        return;
-
-    readblk(fs, *bp, (char *)iblk);
-    for (i = 0; i < 256; i++) {
-        if (iblk[i]) {
-            bfree(fs, iblk[i]);
-            iblk[i] = 0;
-        }
-    }
-    writeblk(fs, *bp, (char *)iblk);
-    bfree(fs, *bp);
-    *bp = 0;
-}
 
 /*
  * free all the blocks in a file
  */
-void
-filefree(struct dsknod *dp)
-{
-    struct i_node *ip = (struct i_node *)dp;
-    int i, j;
-
-    if (dp->d_mode & IIO) {
-        return;
-    }
-    if (!(dp->d_mode & ILARG)) {
-        for (i = 0; i < 8; i++) {
-            if (dp->d_addr[i]) {
-                bfree(ip->fs, dp->d_addr[i]);
-                dp->d_addr[i] = 0;
-            }
-        }
-        goto done;
-    }
-    iblkno = -1;
-    iiblkno = -1;
-
-    for (i = 0; i < 7; i++) {
-        iblkfree(ip->fs, &dp->d_addr[i]);
-    }
-    if (dp->d_addr[7]) {
-        readblk(ip->fs, dp->d_addr[7], (char *)iiblk);
-        for (i = 0; i < 256; i++) {
-            iblkfree(ip->fs, &iiblk[i]);
-        }
-        writeblk(ip->fs, dp->d_addr[7], (char *)iiblk);
-    }
-done:
-    dp->d_mode &= ~ILARG;
-    dp->d_size0 = 0;
-    dp->d_size1 = 0;
-    iput(dp);
-}
 
 /*
  * remove a file name.  if this is the last link, remove the inode
@@ -1357,7 +1082,7 @@ filelink(struct super *fs, char *path, int inum)
         dp->d_size1 += 16;
         /* if we need a new block: the directory was a whole block before,
          * and the buffer has to grow by a block, not by one entry */
-        if (entries % DENTS == 0) {
+        if (entries % 32 == 0) {
             dirp = realloc(dirp, (dp->d_size1 + 511) & ~511);
         }
     }

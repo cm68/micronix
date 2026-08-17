@@ -289,7 +289,7 @@ diskoff(struct drive *dp, int cylinder, int head, int sector)
  */
 void
 drive_format(struct drive *dp, int firstsec, int seccode, int spt,
-    int gap3, int fill)
+    int gap3, int fill, int cyl, int head)
 {
     dp->label.firstsec = firstsec;
     dp->label.seccode = seccode;
@@ -297,6 +297,18 @@ drive_format(struct drive *dp, int firstsec, int seccode, int spt,
     dp->label.fill = fill;
     if (spt)
         dp->label.spt = spt;
+    /*
+     * The format command is per-track and carries only the sector count,
+     * not how many cylinders or heads the whole drive has.  FORMATMW
+     * walks every track though, so the geometry is the largest cylinder
+     * and head the format reaches.  Grow them, as a blank drive's diskoff
+     * does, instead of stamping formatted=1 on the first track and
+     * locking in 0/0 - which made every later access out of range.
+     */
+    if (cyl + 1 > dp->label.cylinders)
+        dp->label.cylinders = cyl + 1;
+    if (head + 1 > dp->label.heads)
+        dp->label.heads = head + 1;
     dp->label.formatted = 1;
 
     lseek(dp->fd, 0, SEEK_SET);

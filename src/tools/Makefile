@@ -12,7 +12,7 @@
 
 SIMTARGETS = \
 	ar nm size imd disas dump \
-	mnix dcheck icheck ncheck readall imdd dumpsec
+	mnix dcheck icheck ncheck readall imdd dumpsec setdev
 	#mar  hitech
 
 LDFLAGS = -lcurses
@@ -36,23 +36,38 @@ disas:	disas.o
 	$(CC) $(CFLAGS) -o disas disas.o ../lib/mnix_sys.o $(LDFLAGS)
 
 mnix:	mnix.o mkfsfunc.o
-	$(CC) $(CFLAGS) -o mnix mnix.o mkfsfunc.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+	$(CC) $(CFLAGS) -o mnix mnix.o mkfsfunc.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 # the mkfs worker, shared with cmd/mkfs and compiled here for the host.
 mkfsfunc.o: ../micronix/cmd/mkfs/mkfsfunc.c
 	$(CC) $(CFLAGS) -I../micronix/include -c ../micronix/cmd/mkfs/mkfsfunc.c -o $@
 
+# the checkers and setdev moved into cmd/; compile them from there.  The
+# checkers include <fslib.h> (host) and <types.h>/<sys/...> (micronix),
+# so they need both include directories, in that order.
+dcheck.o: ../micronix/cmd/dcheck/dcheck.c
+	$(CC) $(CFLAGS) -I../include -I../micronix/include -c ../micronix/cmd/dcheck/dcheck.c -o $@
+
+icheck.o: ../micronix/cmd/icheck/icheck.c
+	$(CC) $(CFLAGS) -I../include -I../micronix/include -c ../micronix/cmd/icheck/icheck.c -o $@
+
+ncheck.o: ../micronix/cmd/ncheck/ncheck.c
+	$(CC) $(CFLAGS) -I../include -I../micronix/include -c ../micronix/cmd/ncheck/ncheck.c -o $@
+
+setdev.o: ../micronix/cmd/setdev/setdev.c
+	$(CC) $(CFLAGS) -c ../micronix/cmd/setdev/setdev.c -o $@
+
 dcheck:	dcheck.o
-	$(CC) $(CFLAGS) -o dcheck dcheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+	$(CC) $(CFLAGS) -o dcheck dcheck.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 icheck:	icheck.o
-	$(CC) $(CFLAGS) -o icheck icheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+	$(CC) $(CFLAGS) -o icheck icheck.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 ncheck:	ncheck.o
-	$(CC) $(CFLAGS) -o ncheck ncheck.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+	$(CC) $(CFLAGS) -o ncheck ncheck.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 readall:	readall.o
-	$(CC) $(CFLAGS) -o readall readall.o ../lib/fslib.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+	$(CC) $(CFLAGS) -o readall readall.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 zmac: zmac.o mio.o doc.o zi80dis.o
 	$(CXX) -Wall $(CXXFLAGS) -o zmac zmac.o mio.o doc.o zi80dis.o
@@ -69,6 +84,9 @@ zmac.c: zmac.y
 
 imdd: imdd.c
 	cc -o imdd imdd.c
+
+setdev:	setdev.o
+	$(CC) $(CFLAGS) -o setdev setdev.o $(LDFLAGS)
 
 test: disas
 	./disas tests/mw.o
