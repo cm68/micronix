@@ -55,6 +55,22 @@ int	nblocks;
 int	nerrors;		/* number of things fixed */
 
 /*
+ * the block map - one entry per block, recording who first claimed it
+ * and how many times.  The original allocates it 8 bytes to the block
+ * (two maps of s_fsize entries); a struct of four shorts is the same
+ * thing, read back out of the disassembly's use of it in pass one.
+ */
+struct bmap {
+	short	b_count;	/* reference count: 0 free, 1 used, >1 dup */
+	short	b_inode;	/* the inode that first claimed it */
+	short	b_offset;	/* its block offset in that inode */
+	short	b_type;		/* what kind of block it is */
+};
+
+struct bmap *blockmap;		/* H700e - the block map */
+char	*isallocated;		/* H7012 - one byte per inode */
+
+/*
  * the passes, in the order the driver runs them.  Each returns 0 on
  * success, nonzero to stop the check.
  */
@@ -144,15 +160,124 @@ readsuper(void)
 }
 
 /*
- * checkilist1 - first pass over the I-list.  Counts each block the
- * inodes name, so the free list and the directory checks know what is
- * really used.
+ * countblock - record one block in the map.  A zero block is a hole;
+ * an out-of-range block is reported; a second claim is a duplicate.
+ */
+static void
+countblock(int inum, int off, int b)
+{
+	struct bmap *bp;
+
+	if (b == 0)
+		return;
+	if (b >= fs->s_fsize) {
+		printf("Out of range block in I-list, Inode %u, Block %u\n",
+		    inum, b);
+		return;
+	}
+	bp = &blockmap[b];
+	if (bp->b_count++) {
+		printf("Dup in I-list, Inode %u, Block %u\n",
+		    bp->b_inode, b);
+	} else {
+		bp->b_inode = inum;
+		bp->b_offset = off;
+	}
+}
+
+/*
+ * countindir - walk one single-indirect block: the block itself, then
+ * the 256 blocks it names.
+ */
+static void
+countindir(int inum, int b)
+{
+	UINT blk[256];
+	int i;
+
+	if (b == 0)
+		return;
+	countblock(inum, 0, b);
+	readblk(fs, b, (char *)blk);
+	for (i = 0; i < 256; i++)
+		countblock(inum, i, blk[i]);
+}
+
+/*
+ * checkilist1 - first pass over the I-list.  Walks every inode, counts
+ * each block it names into the block map, and detects duplicates and
+ * out-of-range blocks, so the free list and directory passes know what
+ * is really used.  The classification - small, large, huge - is the V6
+ * addressing: small files are eight direct blocks, large files use the
+ * seven single-indirect blocks, huge files the double-indirect block as
+ * well.
  */
 int
 checkilist1(void)
 {
-	printf("** Checking I-list, first pass\n");
-	/* TODO: read the .dis from H289e */
+	struct dsknod *ip;
+	UINT blk[256];
+	int inum;
+	int i;
+
+	blockmap = calloc(fs->s_fsize, sizeof(struct bmap));
+	if (blockmap == 0)
+		lose("out of memory");
+
+	isallocated = calloc(fs->s_isize * I_PER_BLK, 1);
+	if (isallocated == 0)
+		lose("out of memory");
+
+	for (inum = 1; inum < fs->s_isize * I_PER_BLK; inum++) {
+		ip = iget(fs, inum);
+		if ((ip->d_mode & IALLOC) == 0) {
+			iput(ip);
+			continue;
+		}
+		isallocated[inum] = 1;
+
+		/* classify the inode */
+		switch (ip->d_mode & IFMT) {
+		case IFDIR:
+			ndir++;
+			break;
+		case IFCHR:
+		case IFBLK:
+			nspecial++;
+			break;
+		default:
+			nfiles++;
+			if (ip->d_mode & ILARG) {
+				if (ip->d_addr[7])
+					nhuge++;
+				else
+					nlarge++;
+			} else {
+				nsmall++;
+			}
+			break;
+		}
+
+		/* count the blocks it names; a device names none */
+		if (ip->d_mode & IIO) {
+			iput(ip);
+			continue;
+		}
+		if (ip->d_mode & ILARG) {
+			for (i = 0; i < 7; i++)
+				countindir(inum, ip->d_addr[i]);
+			if (ip->d_addr[7]) {
+				countblock(inum, 0, ip->d_addr[7]);
+				readblk(fs, ip->d_addr[7], (char *)blk);
+				for (i = 0; i < 256; i++)
+					countindir(inum, blk[i]);
+			}
+		} else {
+			for (i = 0; i < 8; i++)
+				countblock(inum, i, ip->d_addr[i]);
+		}
+		iput(ip);
+	}
 	return 1;
 }
 
