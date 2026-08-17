@@ -245,7 +245,7 @@ checkilist1(void)
 	for (inum = 1; inum < fs->s_isize * I_PER_BLK; inum++) {
 		ip = iget(fs, inum);
 		if ((ip->d_mode & IALLOC) == 0) {
-			iput(ip);
+			ifree(ip);
 			continue;
 		}
 		isallocated[inum] = 1;
@@ -274,7 +274,7 @@ checkilist1(void)
 
 		/* count the blocks it names; a device names none */
 		if (ip->d_mode & IIO) {
-			iput(ip);
+			ifree(ip);
 			continue;
 		}
 		if (ip->d_mode & ILARG) {
@@ -290,7 +290,7 @@ checkilist1(void)
 			for (i = 0; i < 8; i++)
 				countblock(inum, i, ip->d_addr[i], BT_DATA);
 		}
-		iput(ip);
+		ifree(ip);
 	}
 	return 1;
 }
@@ -389,7 +389,8 @@ checkfree(void)
 	}
 	if (missing) {
 		printf("%u missing blocks\n", missing);
-		rebuildfree();
+		if (!nflag)
+			rebuildfree();
 	}
 	return 1;
 }
@@ -441,11 +442,11 @@ checkdirs(void)
 	for (inum = 1; inum < fs->s_isize * I_PER_BLK; inum++) {
 		ip = iget(fs, inum);
 		if (!(ip->d_mode & IALLOC)) {
-			iput(ip);
+			ifree(ip);
 			continue;
 		}
 		if ((ip->d_mode & IFMT) != IFDIR) {
-			iput(ip);
+			ifree(ip);
 			continue;
 		}
 
@@ -459,7 +460,7 @@ checkdirs(void)
 			}
 			refcount[dp->ino]++;
 		}
-		iput(ip);
+		ifree(ip);
 	}
 	return 1;
 }
@@ -480,15 +481,19 @@ checkilist2(void)
 	for (inum = 1; inum < fs->s_isize * I_PER_BLK; inum++) {
 		ip = iget(fs, inum);
 		if (!(ip->d_mode & IALLOC)) {
-			iput(ip);
+			ifree(ip);
 			continue;
 		}
 		if (refcount[inum] != ip->d_nlink) {
 			printf("Inode %u, %u Directory entries, Link count %u\n",
 			    inum, (unsigned)refcount[inum], ip->d_nlink);
-			ip->d_nlink = refcount[inum];
+			if (!nflag) {
+				ip->d_nlink = refcount[inum];
+				iput(ip);
+				continue;
+			}
 		}
-		iput(ip);
+		ifree(ip);
 	}
 	return 1;
 }
@@ -596,11 +601,11 @@ findlostfound(void)
 			continue;
 		if (strcmp(dp->name, "lost+found") == 0) {
 			struct dsknod *lfd = iget(fs, dp->ino);
-			iput(root);
+			ifree(root);
 			return lfd;
 		}
 	}
-	iput(root);
+	ifree(root);
 	return 0;
 }
 
@@ -654,7 +659,7 @@ findorphans(void)
 	for (inum = 1; inum < fs->s_isize * I_PER_BLK; inum++) {
 		ip = iget(fs, inum);
 		if (!(ip->d_mode & IALLOC)) {
-			iput(ip);
+			ifree(ip);
 			continue;
 		}
 		if (refcount[inum] == 0 && ip->d_nlink != 0) {
@@ -662,14 +667,17 @@ findorphans(void)
 			if (!nflag) {
 				if (lfd == 0)
 					lfd = findlostfound();
-				if (lfd && relinkone(lfd, inum))
+				if (lfd && relinkone(lfd, inum)) {
 					ip->d_nlink = 1;
+					iput(ip);
+					continue;
+				}
 			}
 		}
-		iput(ip);
+		ifree(ip);
 	}
 	if (lfd)
-		iput(lfd);
+		ifree(lfd);
 	if (norphans)
 		printf("** Hunting up file names of casualties\n");
 }
