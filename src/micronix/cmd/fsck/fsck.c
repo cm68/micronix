@@ -580,22 +580,73 @@ huntbad(void)
 }
 
 /*
+ * findlostfound - the lost+found directory, or 0.  Inode 1 is the root;
+ * scan it for the name "lost+found".
+ */
+static struct dsknod *
+findlostfound(void)
+{
+	struct dsknod *root;
+	struct dir *dp;
+	int i;
+
+	root = iget(fs, 1);
+	for (i = 0; (dp = getdirent(root, i)) != 0; i++) {
+		if (dp->ino == 0)
+			continue;
+		if (strcmp(dp->name, "lost+found") == 0) {
+			struct dsknod *lfd = iget(fs, dp->ino);
+			iput(root);
+			return lfd;
+		}
+	}
+	iput(root);
+	return 0;
+}
+
+/*
+ * relinkone - carve an entry "N" (N = the inode number) into a free
+ * slot of lost+found.  Returns 1 if it found room.
+ */
+static int
+relinkone(struct dsknod *lfd, int inum)
+{
+	char blk[512];
+	struct dir *de;
+	char name[14];
+	int off;
+	int b;
+	int i;
+
+	for (off = 0; off < filesize(lfd); off += 512) {
+		b = bmap(lfd, off, 0);
+		if (b == 0)
+			break;
+		readblk(fs, b, blk);
+		for (i = 0; i < 32; i++) {
+			de = (struct dir *)(blk + i * 16);
+			if (de->ino != 0)
+				continue;
+			de->ino = inum;
+			sprintf(name, "%u", inum);
+			strncpy(de->name, name, 14);
+			writeblk(fs, b, blk);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/*
  * findorphans - hunt for inodes that are allocated but have no
- * directory entry (H2b08).  This is the detection half: it finds and
- * reports the casualties.
- *
- * The relink is H2b34, not here yet.  Read from the .dis, its shape is
- * a recursive walk: it takes the lost+found directory and walks its
- * sixteen-byte entries; for each entry it decrements the casualty
- * count, and for a subdirectory it recurses, fixing "." and ".." (the
- * two-byte strings at H2b32/H2b2f) as it goes, until every orphaned
- * inode has an entry somewhere reachable.  fslib has no directory-write
- * helper, so relinking means carving an entry into lost+found's blocks
- * through bmap/writeblk - the one piece of the port still to write.
+ * directory entry (H2b08), and unless -n relink them into lost+found.
+ * This is a first approximation of H2b34: it does not yet fix "." /
+ * ".." or recurse into orphaned directories.
  */
 static void
 findorphans(void)
 {
+	struct dsknod *lfd = 0;
 	struct dsknod *ip;
 	int inum;
 	int norphans = 0;
@@ -606,10 +657,19 @@ findorphans(void)
 			iput(ip);
 			continue;
 		}
-		if (refcount[inum] == 0 && ip->d_nlink != 0)
+		if (refcount[inum] == 0 && ip->d_nlink != 0) {
 			norphans++;
+			if (!nflag) {
+				if (lfd == 0)
+					lfd = findlostfound();
+				if (lfd && relinkone(lfd, inum))
+					ip->d_nlink = 1;
+			}
+		}
 		iput(ip);
 	}
+	if (lfd)
+		iput(lfd);
 	if (norphans)
 		printf("** Hunting up file names of casualties\n");
 }
