@@ -1394,13 +1394,15 @@ unsigned char cond;
 {
 
     /*
-     * The segment test comes before the pass test so that both
-     * passes reach the counter on exactly the same instructions.
-     * A jp outside text is not indexed by either of them.
+     * The counter runs over every jp, text and data alike, because
+     * is_relaxed() reads jidx-1 for the jump just counted and would
+     * otherwise pick up the previous jump's bit.  Only a text jump is
+     * recorded below, so only one can be relaxed; a data jump keeps
+     * its zero bit and stays a jp.
      */
+    jidx++;
     if (segment != SEG_TEXT)
         return;
-    jidx++;
     if (pass != 0)
         return;
     /*

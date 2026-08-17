@@ -207,8 +207,13 @@ monitor()
         s = cmdline;
 
         if (i < 0) {
-            printf("read_line returned %d\n", i);
-            exit(4);
+            /*
+             * End of input - stdin is not a terminal or the user typed
+             * ^D.  There is nothing to read a command from, so stop
+             * breaking and let the image run instead of killing the
+             * simulator (which also left the host tty in raw mode).
+             */
+            return 0;
         }
         skipwhite(&s);
         c = *s++;

@@ -1108,13 +1108,17 @@ char **argv;
             switch (o) {
             case 0xd:
                 add_sym(&line[3], v);
-                // add_sym(&line[3], v + seg[SEG_TEXT].base);
-                reg_target(v + seg[SEG_TEXT].base, CODE);
+                if (obj.conf & CONF_NORELO)
+                    reg_target(v, CODE);
+                else
+                    reg_target(v + seg[SEG_TEXT].base, CODE);
                 break;
             case 0xe:
                 add_sym(&line[3], v);
-                // add_sym(&line[3], v + seg[SEG_DATA].base);
-				reg_target(v + seg[SEG_DATA].base, REF);
+                if (obj.conf & CONF_NORELO)
+                    reg_target(v, REF);
+                else
+                    reg_target(v + seg[SEG_DATA].base, REF);
                 break;
             case 0x8:
                 add_sym(&line[3], seg[SEG_UNDEF].base + undefs++);
@@ -1693,7 +1697,7 @@ reg_target(word v, byte flags)
 {
 	int i;
 
-    if (seg[SEG_UNDEF].base && (v >= seg[SEG_UNDEF].base))
+    if (seg[SEG_UNDEF].length && (v >= seg[SEG_UNDEF].base))
         return;
 	for (i = 0; i < ntarg; i++) {
 		if (targets[i].addr == v) {

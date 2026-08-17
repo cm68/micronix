@@ -146,6 +146,23 @@ void int_handler();
 void quit_handler();
 int hostsig(int gsig);
 
+/*
+ * The terminal as we found it, saved at startup and put back at exit.
+ * The guest - upm, say - drives the host tty through the stty syscall,
+ * and an exit that skips the guest's own restore (the monitor's q, a
+ * fault, a killed process) would otherwise leave the user's tty in
+ * raw/cbreak mode.
+ */
+struct termios orig_tty;
+int tty_saved;
+
+void
+restore_tty()
+{
+    if (tty_saved)
+        tcsetattr(0, TCSANOW, &orig_tty);
+}
+
 #define	DEFROOT	"filesystem"
 
 extern WINDOW **win;
@@ -1249,6 +1266,14 @@ main(int argc, char **argv)
     catchsig(SIGINT, int_handler);
     catchsig(SIGQUIT, quit_handler);
 
+    /*
+     * Remember the terminal so the guest cannot leave it raw.  Saved
+     * here, once the debug terminal - which also pokes at tty modes -
+     * is in place, and restored on every exit path via atexit.
+     */
+    tty_saved = tcgetattr(0, &orig_tty) == 0;
+    atexit(restore_tty);
+
     if (debug_terminal) {
         makewins(tty);
     }
@@ -1701,6 +1726,16 @@ do_exec(char *name, char **argv)
     z80_set_reg16(pc_reg, header.textoff);
 
     brake = header.dataoff + header.data + header.bss + header.heap;
+    /*
+     * the break is the highest loaded address, not just the end of the
+     * data: upm's layout is backwards, text above data, so the text end
+     * is the top.  This is what the kernel's exec()/fit() does - the
+     * break is max(dataoff+data+bss, textoff+text) - and a break below
+     * the text is why the gap check was complaining about every write
+     * to a global in the text segment.
+     */
+    if (header.textoff + header.text > brake)
+        brake = header.textoff + header.text;
 
     /*
      * image is in place: note where its text is.  a raw image has no
@@ -1870,7 +1905,13 @@ cpmsys()
     }
     message(vbuf);
     dumpcpu();
-    z80_set_reg16(pc_reg, pop());
+    /*
+     * Trace only - do not pop the return address.  That was the sim's
+     * own BDOS emulation, and it intercepts the guest's CALL 0x0005
+     * before the jump to entry it has parked there runs, so a guest
+     * that emulates CP/M itself - upm - never sees the call and its
+     * programs' output never appears.
+     */
 }
 
 strdump(int p)

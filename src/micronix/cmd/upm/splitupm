@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+#
+# splitupm - direct upm's code into two segments the way the original did.
+#
+# cmd/upm/splitupm
+#
+# upm links like the Whitesmith original: the BDOS and everything a running
+# .com needs live in the TEXT segment, loaded high at 0xd300, and the CCP -
+# the interactive command processor - lives in the DATA segment, loaded low
+# at 0x0100 where a .com is free to clobber it.  ccc has no per-function
+# segment control: it puts every function in .text and every global in
+# .bss/.data.  This reads the generated assembly and rewrites the psect
+# directives so that the CCP's functions and its buffers land in .data and
+# everything else in .text.  (bss is emptied; asz zero-fills .ds in text
+# and data, so the globals stay zeroed, and the crt's bss-clear is a no-op.)
+#
+# The CCP set is read out of the original binary's symbol table (upm.ctl):
+# the DATA segment there holds the CCP and its buffers, so those are the
+# names that move.  Everything else stays resident.
+#
+# The compiler hoists and tail-merges small functions - a `; FUNC _x:s`
+# comment is not followed by the `_x::` label, and one function's label can
+# sit after another's comment - so the split keys off the global label,
+# not off the `; FUNC` comment.
+#
+# stdin: the .s ccc produced.  stdout: the .s to assemble.
+#
+
+import re
+import sys
+
+# functions the original kept in the DATA (clobberable) segment
+CCP_FUNCS = {
+    '_dofcbs', '_init', '_rc', '_getword', '_tset', '_setsig', '_doargs',
+    '_patch', '_argname', '_isarg', '_dodes', '_environ', '_suffix',
+    '_bfree', '_issel', '_dosel', '_free', '_banner', '_getline', '_ccp',
+    '_Lower', '_prompt', '_isdes', '_prdes', '_dir', '_global', '_type',
+    '_isdev', '_dodev', '_quest', '_devop', '_di', '_ren', '_intrep',
+    '_era', '_isplain', '_dostat', '_statone', '_rnum', '_system', '_itob',
+    '_signal',
+}
+
+# globals the original kept in the DATA segment (the CCP's own buffers)
+CCP_GLOBS = {
+    '_ccword', '_line', '_rcbuf', '_bbuf', '_pip', '_intstat',
+    '_subfile', '_subfd', '_subflag', '_sublines', '_statdriv',
+    '_farg1', '_farg2',
+}
+
+LABEL = re.compile(r'^(\w+)::$')
+
+cur = None          # current segment we are emitting into
+
+
+def emit(seg):
+    global cur
+    if seg != cur:
+        print('.%s' % seg)
+        cur = seg
+
+
+emit('text')
+
+for line in sys.stdin:
+    s = line.rstrip('\n')
+
+    # the compiler's own directives are irrelevant: the segment is set
+    # below from the global label that follows.
+    if s.strip() in ('.text', '.data', '.bss'):
+        continue
+
+    m = LABEL.match(s)
+    if m:
+        name = m.group(1)
+        if name in CCP_FUNCS or name in CCP_GLOBS:
+            emit('data')
+        else:
+            emit('text')
+
+    print(s)

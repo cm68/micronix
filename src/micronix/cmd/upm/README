@@ -1,0 +1,75 @@
+/bin/upm from the Micronix 1.6 standalone
+
+upm is "CP/M for Micronix" - the bridge that lets a CP/M program think
+it is on a CP/M disk while it runs as a process under Micronix.  It is
+the thing that ran our cross-built CP/M hello world, and it is the part
+of that story we cannot read, because its source is not in the tree.
+
+This directory is the reconstruction.  Unlike init and man, upm ships
+its own symbol table - 222 of them - so the names in upm.ctl are not
+guesses.  They are read straight out of the binary.  The question the
+names did not answer was whether upm is assembly or Whitesmith's C; the
+function signatures do.
+
+    disas -f upm.ctl upm
+
+It is Whitesmith's C.  88 functions open with a CALL to c.ent or
+c.ents - the frame helper that is the signature of a compiled function
+- so the bulk of it is reconstructed as C.  The rest is not:
+
+    _upmhead _entry _endentr   the crt and the CP/M entry bridge
+    _bios _wboot _badbios      the BIOS jump table and its two stubs
+    _tint                      the interrupt handler
+    _main _cexit _go _null     hand-written for the same reason as crt
+
+and everything else is library - the syscall stubs that say SYS in the
+listing, the string/stdio helpers, and the c.* compiler runtime.  Those
+are lib/libu and lib/libc and libexec, not upm.
+
+The layout is the odd thing.  The text segment loads at d645 and the
+data at 0100, backwards from every other program, because the CP/M TPA
+a .com is loaded into lives at the bottom of the address space and
+upm's own code sits above it.  disas assumed segments lay text-data-bss
+in increasing order, so before 08-2026 it could not disassemble this at
+all; the two fixes are in src/tools/disas.c.
+
+The structure, from _main down:
+
+    _main(argc, argv)           _init() to set up the tables, then
+                                _load() if a program was named (DIRECT
+                                mode) or _ccp() (INTERACTIVE mode)
+
+    _entry / _endentr           the door a CP/M program comes through:
+                                save the micronix stack, switch to
+                                _stack, run _cpm, switch back
+
+    _cpm(func, arg)             the BDOS dispatcher.  Reads the function
+                                number, indexes _cpmtab, jumps to the
+                                handler.  >= 40 goes to _null.
+
+    _cpmtab                     40 words: one handler per BDOS function
+
+    _cconin _cconsta _cdirio     console I/O (funcs 1, 11, 6)
+    _copen _cclose _cread        file I/O through FCBs (15, 16, 20...)
+    _cwrite _cseek _search
+    _cmake _delete _rename       directory operations
+    _cdma _csize _rrand _wrand   DMA, size, random records
+    _clogin _cgetro _cuser ...   the small ones that read/write a global
+
+    _ccp                         the command processor: banner, getline,
+                                 the built-ins _dir _type _era _ren
+                                 _save _pip, and _system for a "!" line
+
+The reconstruction order that makes sense is the order the symbol table
+sorts by address: the FCB layer (_copen down through _cseek) is one
+sitting-next-to-another block of C, then the CCP, then the console
+handlers.  The data - _fcb, _disktab, _tabs, _ntab, _files, the buffers
+- is read out of the .dis as the functions that touch it are named.
+
+upm is in cmd/DIRS now and builds.  The reconstruction links a little
+differently from the original: it compiles larger than the Whitesmith
+binary, so it does not keep the backwards d645/0100 split.  Everything
+links above the TPA at -Ttext=0xa000, leaving a 40k TPA for the .com,
+and the CCP sits up with the BDOS instead of down in the clobbered
+region.  The .dis and .ctl here remain the source of the truth for the
+parts that were read rather than written.

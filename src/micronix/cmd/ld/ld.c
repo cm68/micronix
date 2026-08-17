@@ -50,6 +50,8 @@ char out_symlen;       /* output symbol length (0=15, set by -9) */
 unsigned short text_base;
 unsigned short data_base;
 unsigned short bss_base;
+int data_set;                   /* -Tdata given, so it is absolute */
+int bss_set;                    /* -Tbss given, so it is absolute */
 
 /*
  * running totals for segment layout
@@ -1897,6 +1899,17 @@ pass1_layout()
     total_data = data_pos;
     total_bss = bss_pos;
 
+    /*
+     * data and bss bases are absolute addresses, like text_base.  When
+     * neither was given, data follows the text and bss follows the data -
+     * the ordinary layout.  An explicit -Tdata/-Tbss is used as-is, which
+     * is how upm loads its CCP at 0x0100 below the text.
+     */
+    if (!data_set)
+        data_base = text_base + total_text;
+    if (!bss_set)
+        bss_base = data_base + total_data;
+
     /* find linker-defined symbols and save original offsets BEFORE resolution */
     {
         int i;
@@ -1929,11 +1942,11 @@ pass1_layout()
                 s->value = text_base + s->obj->text_off + s->value;
                 break;
             case SEG_DATA:
-                s->value = data_base + total_text + s->obj->data_off +
+                s->value = data_base + s->obj->data_off +
                            (s->value - s->obj->text_size);
                 break;
             case SEG_BSS:
-                s->value = bss_base + total_text + total_data + s->obj->bss_off +
+                s->value = bss_base + s->obj->bss_off +
                            (s->value - s->obj->text_size - s->obj->data_size);
                 break;
             }
@@ -1954,10 +1967,10 @@ pass1_layout()
 
         vals[LSYM_LTEXT] = text_base;
         vals[LSYM_HTEXT] = text_base + total_text;
-        vals[LSYM_LDATA] = data_base + total_text;
-        vals[LSYM_HDATA] = data_base + total_text + total_data;
-        vals[LSYM_LBSS]  = bss_base + total_text + total_data;
-        vals[LSYM_HBSS]  = bss_base + total_text + total_data + total_bss;
+        vals[LSYM_LDATA] = data_base;
+        vals[LSYM_HDATA] = data_base + total_data;
+        vals[LSYM_LBSS]  = bss_base;
+        vals[LSYM_HBSS]  = bss_base + total_bss;
 
         for (i = 0; i < LSYM_COUNT; i++) {
             s = sym_lookup(lnksyms[i].name);
@@ -1989,9 +2002,9 @@ int ctrl;
     case 0x44:  /* text segment */
         return text_base + obj->text_off;
     case 0x48:  /* data segment */
-        return data_base + total_text + obj->data_off;
+        return data_base + obj->data_off;
     case 0x4c:  /* bss segment */
-        return bss_base + total_text + total_data + obj->bss_off;
+        return bss_base + obj->bss_off;
     default:
         /* symbol reference */
         if (ctrl >= 0x50 && ctrl < 0xfc) {
@@ -2223,14 +2236,14 @@ int is_text;
                     }
                     break;
                 case 0x48:  /* data segment */
-                    add = data_base + total_text + obj->data_off;
+                    add = data_base + obj->data_off;
                     if (rflag) {
                         need_reloc = 1;
                         outseg = SEG_DATA;
                     }
                     break;
                 case 0x4c:  /* bss segment */
-                    add = bss_base + total_text + total_data + obj->bss_off;
+                    add = bss_base + obj->bss_off;
                       bssrel = 1;
                     if (rflag) {
                         need_reloc = 1;
@@ -2249,9 +2262,9 @@ int is_text;
                         if (s->seg == SEG_TEXT)
                             add = text_base + obj->text_off;
                         else if (s->seg == SEG_DATA)
-                            add = data_base + total_text + obj->data_off - obj->text_size;
+                            add = data_base + obj->data_off - obj->text_size;
                         else if (s->seg == SEG_BSS)
-                            add = bss_base + total_text + total_data + obj->bss_off
+                            add = bss_base + obj->bss_off
                                   - obj->text_size - obj->data_size;
                         else
                             add = s->value;
@@ -2282,9 +2295,9 @@ int is_text;
                         if (s->seg == SEG_TEXT)
                             add = text_base + obj->text_off;
                         else if (s->seg == SEG_DATA)
-                            add = data_base + total_text + obj->data_off - obj->text_size;
+                            add = data_base + obj->data_off - obj->text_size;
                         else if (s->seg == SEG_BSS)
-                            add = bss_base + total_text + total_data + obj->bss_off
+                            add = bss_base + obj->bss_off
                                   - obj->text_size - obj->data_size;
                         else
                             add = s->value;
@@ -2405,10 +2418,10 @@ unsigned short seg_base;
                 target_val = text_base + obj->text_off;
                 break;
             case SEG_DATA:
-                target_val = data_base + total_text + obj->data_off;
+                target_val = data_base + obj->data_off;
                 break;
             case SEG_BSS:
-                target_val = bss_base + total_text + total_data + obj->bss_off;
+                target_val = bss_base + obj->bss_off;
                 break;
             default:
                 target_val = 0;
@@ -2457,10 +2470,10 @@ int seg_size;
 
     vals[LSYM_LTEXT] = text_base;
     vals[LSYM_HTEXT] = text_base + total_text;
-    vals[LSYM_LDATA] = data_base + total_text;
-    vals[LSYM_HDATA] = data_base + total_text + total_data;
-    vals[LSYM_LBSS]  = bss_base + total_text + total_data;
-    vals[LSYM_HBSS]  = bss_base + total_text + total_data + total_bss;
+    vals[LSYM_LDATA] = data_base;
+    vals[LSYM_HDATA] = data_base + total_data;
+    vals[LSYM_LBSS]  = bss_base;
+    vals[LSYM_HBSS]  = bss_base + total_bss;
 
     for (i = 0; i < LSYM_COUNT; i++) {
         if (lnksyms[i].obj == obj && lnksyms[i].off + 1 < seg_size) {
@@ -2643,7 +2656,7 @@ pass2_output()
     write_word(total_bss);
     write_word(0);              /* heap */
     write_word(text_base);      /* text offset */
-    write_word(text_base + total_text);     /* data offset */
+    write_word(data_base);      /* data offset */
 
     /*
      * One pass over the inputs.
@@ -2671,7 +2684,7 @@ pass2_output()
                      text_base + obj->text_off, 1, outfp);
         copy_segment(obj, 16 + obj->text_size, obj->data_size,
                      obj->dataRelocOff,
-                     data_base + total_text + obj->data_off, 0, datafp);
+                     data_base + obj->data_off, 0, datafp);
 
         fclose(obj->fp);
         obj->fp = NULL;
@@ -2747,19 +2760,19 @@ print_map()
     fprintf(stderr, "  text: 0x%04x - 0x%04x (%d bytes)\n",
             text_base, text_base + total_text - 1, total_text);
     fprintf(stderr, "  data: 0x%04x - 0x%04x (%d bytes)\n",
-            data_base + total_text,
-            data_base + total_text + total_data - 1, total_data);
+            data_base,
+            data_base + total_data - 1, total_data);
     fprintf(stderr, "  bss:  0x%04x - 0x%04x (%d bytes)\n",
-            bss_base + total_text + total_data,
-            bss_base + total_text + total_data + total_bss - 1, total_bss);
+            bss_base,
+            bss_base + total_bss - 1, total_bss);
 
     fprintf(stderr, "\nObjects:\n");
     for (obj = objects; obj; obj = obj->next) {
         fprintf(stderr, "  %-20s text@%04x data@%04x bss@%04x\n",
                 obj->name,
                 text_base + obj->text_off,
-                data_base + total_text + obj->data_off,
-                bss_base + total_text + total_data + obj->bss_off);
+                data_base + obj->data_off,
+                bss_base + obj->bss_off);
     }
 
     fprintf(stderr, "\nSymbols:\n");
@@ -3015,6 +3028,7 @@ char **argv;
                         data_base = parse_addr(argv[i]);
                     else
                         usage();
+                    data_set = 1;
                 } else if (strncmp(&arg[2], "bss", 3) == 0) {
                     if (arg[5] == '=')
                         bss_base = parse_addr(&arg[6]);
@@ -3022,6 +3036,7 @@ char **argv;
                         bss_base = parse_addr(argv[i]);
                     else
                         usage();
+                    bss_set = 1;
                 } else {
                     usage();
                 }
@@ -3089,12 +3104,6 @@ char **argv;
             printf("archive pass %d: added %d objects\n", pass, added);
         }
     } while (added > 0 && has_undefined());
-
-    /* default data/bss base to text_base if not explicitly set */
-    if (data_base == 0 && text_base != 0)
-        data_base = text_base;
-    if (bss_base == 0 && text_base != 0)
-        bss_base = text_base;
 
     /* Pass 1: assign addresses and resolve symbols */
     pass1_layout();
