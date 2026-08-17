@@ -373,14 +373,26 @@ missing:
 }
 
 /*
- * rebuildfree - rewrite the free list from the block map.  TODO: read
- * the .dis from H1315.
+ * rebuildfree - rewrite the free list from the block map.  Clears the
+ * list and adds every unused data block back, highest first (H1315 in
+ * fsck.dis walks s_fsize-1 down to s_isize+2).  fslib's bfree chains
+ * the list when it overflows a block of one hundred numbers.
  */
 static void
 rebuildfree(void)
 {
+	int b;
+
 	printf("** Rebuilding the free list\n");
-	/* TODO */
+
+	fs->s_nfree = 0;
+	memset(fs->s_free, 0, sizeof(fs->s_free));
+
+	for (b = fs->s_fsize - 1; b >= fs->s_isize + INODES_START; b--) {
+		if (blockmap[b].b_count)
+			continue;
+		bfree(fs, b);
+	}
 }
 
 /*
