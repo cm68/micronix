@@ -478,6 +478,18 @@ checkilist2(void)
 int
 summary(void)
 {
+	int b;
+
+	nused = 0;
+	nfree = 0;
+	nbad = 0;
+	for (b = fs->s_isize + INODES_START; b < fs->s_fsize; b++) {
+		if (blockmap[b].b_count)
+			nused++;
+		else if (freemap[b])
+			nfree++;
+	}
+
 	printf("%u files, %u special, %u directories, %u small, %u large, %u huge\n",
 	    nfiles, nspecial, ndir, nsmall, nlarge, nhuge);
 	printf("%u used, %u free, %u bad\n", nused, nfree, nbad);
