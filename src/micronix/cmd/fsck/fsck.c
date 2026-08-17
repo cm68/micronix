@@ -555,7 +555,7 @@ patchbad(int b)
 	readblk(fs, b, buf);
 	writeblk(fs, nb, buf);
 
-	blockmap[nb] = blockmap[b];
+	memcpy(&blockmap[nb], &blockmap[b], sizeof(struct bmap));
 	blockmap[b].b_count = 0;
 }
 
@@ -580,8 +580,36 @@ huntbad(void)
 }
 
 /*
+ * findorphans - hunt for inodes that are allocated but have no
+ * directory entry (H2b08).  This is the detection half: it finds and
+ * reports the casualties.  Relinking them into lost+found, and the
+ * "." / ".." repair H2b34 does, is still to be read out.
+ */
+static void
+findorphans(void)
+{
+	struct dsknod *ip;
+	int inum;
+	int norphans = 0;
+
+	for (inum = 1; inum < fs->s_isize * I_PER_BLK; inum++) {
+		ip = iget(fs, inum);
+		if (!(ip->d_mode & IALLOC)) {
+			iput(ip);
+			continue;
+		}
+		if (refcount[inum] == 0 && ip->d_nlink != 0)
+			norphans++;
+		iput(ip);
+	}
+	if (norphans)
+		printf("** Hunting up file names of casualties\n");
+}
+
+/*
  * reorg - whatever is left to fix once the passes have decided.  The
- * original hunts for bad blocks here when -t was given.
+ * original hunts for bad blocks here when -t was given, then hunts up
+ * the orphaned files.
  */
 int
 reorg(void)
@@ -590,5 +618,6 @@ reorg(void)
 		printf("Hunting for bad blocks\n");
 		huntbad();
 	}
+	findorphans();
 	return 1;
 }
