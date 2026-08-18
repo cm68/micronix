@@ -1,0 +1,53 @@
+.he "strchr (3)                   4/6/83                    strchr (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE
+.in +5
+.br
+.bd
+strchr
+- find first occurrence of a character
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd 3
+char *strchr(s, c)
+char *s;
+char c;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+strchr returns a pointer to the first occurrence of the
+character c in the string s.  The terminating null is
+considered part of the string, so strchr(s, '\0') returns a
+pointer to the terminator.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+a pointer to c in s, or 0 if c does not appear.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+index is the pre-ANSI name for strchr; the two are the same
+routine.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+strrchr (3), strlen (3)

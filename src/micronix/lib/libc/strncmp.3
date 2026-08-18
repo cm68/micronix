@@ -1,0 +1,46 @@
+.he "strncmp (3)                  4/6/83                   strncmp (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE
+.in +5
+.br
+.bd
+strncmp
+- compare at most n characters of two strings
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd 4
+strncmp(s1, s2, n)
+char *s1;
+char *s2;
+int n;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+strncmp compares at most the first n characters of s1 and s2.
+Comparison stops at a difference, when n characters have been
+compared, or at the end of a string, whichever comes first.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+0 if the compared characters are equal, negative if s1 sorts
+before s2, positive if s1 sorts after s2.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+strcmp (3)

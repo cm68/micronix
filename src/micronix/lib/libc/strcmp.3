@@ -1,0 +1,44 @@
+.he "strcmp (3)                   4/6/83                    strcmp (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE
+.in +5
+.br
+.bd
+strcmp
+- compare two strings
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd 3
+strcmp(s1, s2)
+char *s1;
+char *s2;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+strcmp compares s1 and s2.  Comparison stops at the first
+character that differs or at the end of a string.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+0 if the strings are equal, negative if s1 sorts before s2,
+positive if s1 sorts after s2.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+strncmp (3)

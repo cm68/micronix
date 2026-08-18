@@ -1,0 +1,46 @@
+.he "strcat (3)                   4/6/83                    strcat (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE
+.in +5
+.br
+.bd
+strcat
+- concatenate two strings
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd 3
+char *strcat(s1, s2)
+char *s1;
+char *s2;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+strcat appends a copy of s2 to the end of s1.  The first
+character of s2 overwrites the terminating null of s1.
+
+s1 must point to a region large enough to hold both strings
+and the terminating null.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+s1, the destination string.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+strcpy (3), strncat (3)

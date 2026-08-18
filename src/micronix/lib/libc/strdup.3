@@ -1,0 +1,51 @@
+.he "strdup (3)                   4/6/83                    strdup (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE
+.in +5
+.br
+.bd
+strdup
+- duplicate a string
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd 2
+char *strdup(s)
+char *s;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+strdup returns a pointer to a new copy of s, obtained with
+malloc.  The copy belongs to the caller, who should return it
+with free.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+the new copy of s.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+strdup is a common extension rather than part of the original
+C standard.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+strcpy (3), malloc (3)

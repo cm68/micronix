@@ -1,0 +1,43 @@
+.he "strcpy (3)                   4/6/83                    strcpy (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE
+.in +5
+.br
+.bd
+strcpy
+- copy a string
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd 3
+char *strcpy(s1, s2)
+char *s1;
+char *s2;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+strcpy copies s2, terminating null and all, into s1.  s1 must
+be large enough to hold the copy.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+s1, the destination string.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+strncpy (3), strcat (3), strdup (3)

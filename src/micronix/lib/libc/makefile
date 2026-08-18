@@ -28,6 +28,14 @@ AR	= ar
 LIBDIR	= /lib
 TARGET	= libc.a
 
+#
+# The man3 pages, listed outright: cmd/make has no $(wildcard), so a
+# page added here does not install until it is named in this list.
+#
+MAN	= strcat.3 strchr.3 strcmp.3 strcpy.3 strdup.3 \
+	strlen.3 strncat.3 strncmp.3 strncpy.3 strrchr.3
+MANDIR	= /usr/man/man3
+
 AOBJS	= abs.o allsh.o alrsh.o asallsh.o asalrsh.o asar.o \
 	strdup.o exit.o asdiv.o asladd.o asland.o asll.o \
 	asllrsh.o aslmul.o aslor.o aslr.o aslsub.o aslxor.o \
@@ -76,6 +84,7 @@ $(COBJS): $*.c
 
 install: $(TARGET)
 	cp $(TARGET) $(LIBDIR)/$(TARGET)
+	cp $(MAN) $(MANDIR)
 
 clean:
 	rm -f $(OBJS)

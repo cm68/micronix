@@ -1,0 +1,46 @@
+.he "strncat (3)                  4/6/83                   strncat (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE
+.in +5
+.br
+.bd
+strncat
+- concatenate at most n characters
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd 4
+char *strncat(s1, s2, n)
+char *s1;
+char *s2;
+int n;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+strncat appends at most n characters of s2 to the end of s1,
+then terminates the result with a null.  If s2 is shorter than
+n, the null that ends s2 is copied and nothing more is
+appended.  s1 must be large enough for the result.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+s1, the destination string.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+strcat (3), strncpy (3)

@@ -1,0 +1,45 @@
+.he "strncpy (3)                  4/6/83                   strncpy (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE
+.in +5
+.br
+.bd
+strncpy
+- copy at most n characters
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd 4
+char *strncpy(s1, s2, n)
+char *s1;
+char *s2;
+int n;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+strncpy copies at most n characters of s2 to s1.  If s2 is
+shorter than n, the remaining characters of s1 are set to
+null.  s1 must be large enough for n characters.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+s1, the destination string.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+strcpy (3), strncat (3)

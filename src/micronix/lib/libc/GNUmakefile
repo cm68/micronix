@@ -33,6 +33,13 @@ DIR	= libc
 CLASS	= lib
 TARGET	= libc.a
 
+# Section 3: the library subroutines.  A man page ships beside the
+# source it documents (see GNUmakefile.inc), and these are the .3
+# pages.  That file defaults MANSEC to 1 and MANSRCS to *.1, so both
+# are said here to make install-man find and place these.
+MANSEC	 = 3
+MANSRCS	 = $(wildcard *.3)
+
 # What ASSRCS defines, CSRCS does not get to define as well.
 ASOVERRIDE = $(patsubst %.s,%.c,$(ASSRCS))
 

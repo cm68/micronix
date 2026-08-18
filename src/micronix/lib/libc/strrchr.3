@@ -1,0 +1,53 @@
+.he "strrchr (3)                  4/6/83                   strrchr (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE
+.in +5
+.br
+.bd
+strrchr
+- find last occurrence of a character
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd 3
+char *strrchr(s, c)
+char *s;
+char c;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+strrchr returns a pointer to the last occurrence of the
+character c in the string s.  The terminating null is
+considered part of the string, so strrchr(s, '\0') returns a
+pointer to the terminator.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+a pointer to c in s, or 0 if c does not appear.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+rindex is the pre-ANSI name for strrchr; the two are the same
+routine.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+strchr (3), strlen (3)
