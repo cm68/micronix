@@ -1,0 +1,86 @@
+.he "ld (1)                       8/18/26                       ld (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+ld
+- the micronix Z80 link editor
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+ld [ -vV9rs ] [ -o file ] [ -Ldir ] [ -llib ] [ -Ttext=addr ] [ -Tdata=addr ] [ -Tbss=addr ] file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Ld links Whitesmiths object files and archives into one executable, or,
+with -r, into a relocatable object for a later link.  It reads the
+relocations asz wrote, lays out the text, data and bss segments, and
+patches symbol references to their final addresses.  The output is a
+program and is created executable.
+.sp
+An archive is read for the members it needs and not linked whole: a
+library can hold many objects, and a program pulls in only those that
+resolve an undefined symbol.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-v	Verbose; say it again for more detail.
+
+.ti -10
+-V	List each object file as it is linked.
+
+.ti -10
+-9	Write nine-character symbol names in the output instead of fifteen, for an object that must match one made that way.
+
+.ti -10
+-r	Write a relocatable object rather than an executable, keeping the relocations for a later link.
+
+.ti -10
+-s	Strip the symbol table from the output.
+
+.ti -10
+-o file	Name the output file; the default is a.out.
+
+.ti -10
+-Ldir	Search dir for libraries named with -l.
+
+.ti -10
+-llib	Link liblib.a, resolving undefined symbols out of it.
+
+.ti -10
+-Ttext=addr, -Tdata=addr, -Tbss=addr	Set the origin of a segment.  Text and data default to the origins in the first object; bss follows data.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+An undefined symbol that no object or library defines is reported and
+the link fails.  The symbol tables of the objects are merged into the
+output, one table, so nm reads a linked program the same way it reads an
+object.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ar (1), asz (1), ccc (1), nm (1), size (1)

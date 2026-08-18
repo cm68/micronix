@@ -68,7 +68,7 @@ SYSHDRS  = $(filter-out $(CCCOWNED),$(notdir $(wildcard include/*.h)))
 
 include $(DEPTH)/GNUmakefile.inc
 
-.PHONY: hostcc hostrt sysinstall
+.PHONY: hostcc hostrt bootstrap sysinstall
 
 #
 # The librarian, built for the HOST.
@@ -97,7 +97,12 @@ NMSRC	 = cmd/nm/nm.c cmd/nm/wsobj.c
 SETDEVX	 = $(BIN)/setdev
 SETDEVSRC = cmd/setdev/setdev.c
 HOSTCC	?= gcc
-HOSTCFLAGS ?= -w -std=gnu89 -Dlinux
+#
+# -idirafter, not -I: include/ holds the old Whitesmith stdio.h and the
+# v6 sys/*.h, and putting it on the -I path would shadow the host's own.
+# obj.h is not a host header, so it falls through to include/.
+#
+HOSTCFLAGS ?= -w -std=gnu89 -Dlinux -idirafter $(DEPTH)/include
 
 #
 # The host tools are prerequisites of all, not part of the recursion,
@@ -186,6 +191,24 @@ hostrt:
 	cp lib/include/*.h $(HOSTROOT)/usr/include
 	cp lib/include/sys/*.h $(HOSTROOT)/usr/include/sys
 	@echo "runtime in $(HOSTROOT)/lib"
+
+#
+# The bootstrap: build the cross compiler, build the runtime it links
+# against, then cross-build every Z80 binary and install it into the
+# filesystem the simulator boots.  That filesystem is the seed the
+# native build - "cd /usr/src ; make install" - rebuilds from.
+#
+# The order is the whole of it:
+#
+#	hostcc		the cross compiler (mxccc) and its passes
+#	lib		libc, libu, libccc, crt0 - built with mxccc
+#	hostrt		those archives where mxccc looks for them
+#	install		every Z80 binary, into the filesystem
+#
+bootstrap: hostcc
+	$(MAKE) -C lib
+	$(MAKE) hostrt
+	$(MAKE) install
 
 sysinstall:
 	$(SUDO) mkdir -p $(SYSINC)/sys

@@ -24,33 +24,25 @@ all:
 	cd c0 ; make all
 	cd c1 ; make all
 	cd peep ; make all
-	cd asz ; make all
 	cd astpp ; make all
-	cd ld ; make all
 
 install:
 	cd cpp ; make install
 	cd c0 ; make install
 	cd c1 ; make install
 	cd peep ; make install
-	cd asz ; make install
 	cd astpp ; make install
-	cd ld ; make install
 
 clean:
 	cd cpp ; make clean
 	cd c0 ; make clean
 	cd c1 ; make clean
 	cd peep ; make clean
-	cd asz ; make clean
 	cd astpp ; make clean
-	cd ld ; make clean
 
 clobber:
 	cd cpp ; make clobber
 	cd c0 ; make clobber
 	cd c1 ; make clobber
 	cd peep ; make clobber
-	cd asz ; make clobber
 	cd astpp ; make clobber
-	cd ld ; make clobber

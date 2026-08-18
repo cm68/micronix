@@ -7,8 +7,9 @@
 # cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
 # it cross builds the same program on the host.
 #
-# The assembler.  ccc runs it as the pass after c1, so it goes into
-# /libexec beside the others.
+# The assembler.  ccc runs it as the pass after c1, and it is the one
+# a person types to assemble by hand - so it goes into /bin, on the
+# path, beside the driver.
 #
 # The object list is spelled out because this make has no wildcard.
 #
@@ -23,9 +24,9 @@ CC	= ccc
 CFLAGS	= -O
 MAN	= asz.1
 MANDIR	= /usr/man/man1
-LIBEXEC	= /libexec
+BIN	= /bin
 PROG	= asz
-HDRS	= asm.h wsobj.h
+HDRS	= asm.h
 OBJS	= asm.o asmz80.o asz.o wsobj.o
 
 all: $(PROG)
@@ -41,7 +42,7 @@ $(OBJS): $*.c $(HDRS)
 	$(CC) $(CFLAGS) -c $*.c
 
 install: $(PROG)
-	cp $(PROG) $(LIBEXEC)/asz
+	cp $(PROG) $(BIN)/asz
 	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:

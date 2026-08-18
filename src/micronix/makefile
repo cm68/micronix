@@ -28,16 +28,22 @@
 #
 #	include		the headers, before anything compiles
 #	lib		libc, libu, libutil, libccc and crt0
-#	libexec		the passes - and they link against libccc
-#	cmd		the commands, and ccc among them
+#	cmd/toolchain	ld, asz and ccc - linker, assembler and driver
+#	libexec		the passes - cpp, c0, c1, peep, astpp
+#	cmd		the commands, everything else
 #	sys		the kernel
 #
+# The build assumes a working toolchain is already installed - the seed
+# - and replaces it from the bottom up.
+#
 # libexec was missing from this list entirely, so a native build never
-# built the compiler it was running.
+# built the compiler it was running.  It once ran ahead of cmd too, so
+# a changed ccc never propagated into the passes it drives.
 #
 all:
 	cd include ; make install
 	cd lib ; make install
+	cd cmd ; make toolchain
 	cd libexec ; make install
 	cd cmd ; make install
 	cd sys ; make install
