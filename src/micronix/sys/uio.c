@@ -13,9 +13,9 @@
 #include <errno.h>
 
 extern long seconds;            /* see clock.c */
-UINT8 nbuf;                     /* initialized in binit(), main.c */
-char (*buffer)[512];            /* ditto */
-struct buf *btop;               /* ditto */
+extern UINT8 nbuf;               /* initialized in binit(), main.c */
+extern char (*buffer)[512];         /* ditto */
+extern struct buf *btop;            /* ditto */
 
 /*
  * Get a buffer for the block
