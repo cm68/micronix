@@ -977,6 +977,29 @@ declare(struct type **btp, unsigned char struct_elem)
              * is cheaper than deciding not to arrive.
              */
             ;
+        } else if (paren && nm->type && (nm->type->flags & TF_POINTER) &&
+                   !(nm->type->flags & TF_ARRAY) &&
+                   (suffix->flags & TF_FUNC) && nm->type->sub &&
+                   (nm->type->sub->flags & TF_FUNC)) {
+            /*
+             * A pointer to a function, declared again - "(*fp)()"
+             * after "extern int (*fp)();" or the like.  The entry the
+             * recursion reused already carries the finished type, so
+             * the anonymous-pointer case above ("!nm->type->sub") no
+             * longer matches, and with nothing to catch it the name
+             * fell to the plain "nm->type = suffix" below and was
+             * flattened to a bare function type.
+             *
+             * This is the same shape as the pointer-to-array second
+             * walk just above, but it is not a second walk: it is the
+             * phase 1 pass over a LATER declaration of the same name,
+             * so it cannot be refused entry (the phase 1 test lets it
+             * in unconditionally).  The paren flag tells this from
+             * "int fp()", a plain function, which has no parentheses
+             * and must still be allowed to disagree with the pointer
+             * and be reported.
+             */
+            ;
         } else if (nm->type && (nm->type->flags & TF_FUNC) &&
                    nm->type->sub && (nm->type->sub->flags & TF_POINTER) &&
                    !(nm->type->sub->flags & TF_ARRAY) &&
@@ -1028,14 +1051,14 @@ declare(struct type **btp, unsigned char struct_elem)
              * silent, and a stated one wins.  Two different stated
              * ones do not agree at all.
              */
-            if (redeclOld->sub != nm->type->sub)
+            if (!sameType(redeclOld->sub, nm->type->sub))
                 gripe(ER_D_RD);
             else if (nm->type->count <= 0 && redeclOld->count > 0)
                 nm->type = redeclOld;
             else if (nm->type->count > 0 && redeclOld->count > 0 &&
                      nm->type->count != redeclOld->count)
                 gripe(ER_D_RD);
-        } else if (redeclOld != nm->type) {
+        } else if (!sameType(redeclOld, nm->type)) {
             gripe(ER_D_RD);
         }
     }

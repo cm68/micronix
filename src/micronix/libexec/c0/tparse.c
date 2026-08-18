@@ -125,6 +125,32 @@ compatFnTyp(struct type *t1, struct type *t2)
 }
 
 /*
+ * Do two type trees name the same type?
+ *
+ * Identity is the fast path and what the interner makes common, but a
+ * function type is built fresh from its parameter list (fnParams) and
+ * never interned, so a pointer to one has a fresh sub each time it is
+ * spelled.  Walk the tree instead: a function compares its return
+ * (loosely, by size, as sameRet does), a pointer its target, an array
+ * its element and extent.  Anything else is a primitive or an
+ * aggregate, each keyed to a single node, so a bare mismatch means
+ * different.
+ */
+char
+sameType(struct type *a, struct type *b)
+{
+	if (a == b || !a || !b)
+		return 1;
+	if ((a->flags & TF_FUNC) && (b->flags & TF_FUNC))
+		return sameRet(a->sub, b->sub);
+	if ((a->flags & TF_POINTER) && (b->flags & TF_POINTER))
+		return sameType(a->sub, b->sub);
+	if ((a->flags & TF_ARRAY) && (b->flags & TF_ARRAY))
+		return a->count == b->count && sameType(a->sub, b->sub);
+	return 0;
+}
+
+/*
  * Find or create a type in the unified type system
  *
  * Implements type sharing where two variables of the same type have

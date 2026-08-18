@@ -96,6 +96,7 @@ int typesize(struct type *t);
 struct type *fnArgType(struct type *t, unsigned char i);
 extern char compatFnTyp(struct type *t1, struct type *t2);
 extern char sameRet(struct type *t1, struct type *t2);
+extern char sameType(struct type *a, struct type *b);
 
 /*
  * Moved out of p1stmt.h, where they sat beside the switch
