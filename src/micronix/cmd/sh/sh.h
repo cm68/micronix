@@ -129,7 +129,7 @@ char *saveword();
 void runline();
 int  backtick();
 int  nextline();
-char *strsave();
+char *strdup();
 void fatal();
 void perr();
 void warn();

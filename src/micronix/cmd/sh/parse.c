@@ -512,7 +512,7 @@ struct cmd *c;
      * overwritten by the very words being read out of it.  It lives
      * on the heap instead, where nothing else is going to reach.
      */
-    c->sub = strsave(buf);
+    c->sub = strdup(buf);
     return 0;
 }
 

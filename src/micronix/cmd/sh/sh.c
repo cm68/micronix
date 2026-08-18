@@ -39,8 +39,6 @@ char *pathv[MAXPATHV] = { ".", "/bin", "/usr/bin", 0 };
 
 char *progname = "sh";
 
-char *strsave();
-
 /*
  * The line and the pipeline built from it live out here rather than
  * in main's frame.  Between them they are more than two kilobytes,
@@ -115,9 +113,10 @@ warn(s, a)
 char *s;
 char *a;
 {
-    fprintf(stderr, "%s: ", progname);
-    fprintf(stderr, s, a);
-    fprintf(stderr, "\n");
+    char msg[160];              /* longest message plus a MAXPATH name */
+
+    sprintf(msg, s, a);
+    fprintf(stderr, "%s: %s\n", progname, msg);
 }
 
 /*
@@ -184,7 +183,7 @@ char *value;
     for (i = 0; i < naliases; i++) {
         if (strcmp(aliases[i].name, name) == 0) {
             free(aliases[i].value);
-            aliases[i].value = strsave(value);
+            aliases[i].value = strdup(value);
             return;
         }
     }
@@ -192,22 +191,9 @@ char *value;
         warn("too many aliases", 0);
         return;
     }
-    aliases[naliases].name = strsave(name);
-    aliases[naliases].value = strsave(value);
+    aliases[naliases].name = strdup(name);
+    aliases[naliases].value = strdup(value);
     naliases++;
-}
-
-char *
-strsave(s)
-char *s;
-{
-    char *p;
-
-    p = malloc(strlen(s) + 1);
-    if (!p)
-        fatal("out of memory", 0);
-    strcpy(p, s);
-    return p;
 }
 
 static void
@@ -380,17 +366,6 @@ int fd;
 }
 
 /*
- * H7e5f.  Its whole body is pushing two arguments and calling the
- * exec stub, so that is all this is.
- */
-doexec(path, argv)
-char *path;
-char **argv;
-{
-    execv(path, argv);
-}
-
-/*
  * Put one command's redirections in place.  This runs in the child,
  * after the fork, so the shell's own descriptors are untouched.  The
  * dance is always the same: open the new file, close the descriptor
@@ -519,11 +494,11 @@ int pout;
          * costs one failed exec here and never a command.
          */
         if ((path = findcmd(c->argv[0])))
-            doexec(path, c->argv);
+            execv(path, c->argv);
 
         hashflush();
         if ((path = searchpath(pathbuf, c->argv[0])))
-            doexec(path, c->argv);
+            execv(path, c->argv);
 
         /* 0x1212 in the image, printed after the name */
         fprintf(stderr, "%s: Command not found.\n", c->argv[0]);
@@ -639,7 +614,7 @@ struct cmd *c;
 
     case B_PROMPT:
         if (c->argc > 1)
-            prompt = strsave(c->argv[1]);
+            prompt = strdup(c->argv[1]);
         else
             printf("%s\n", prompt);
         return 0;
@@ -681,7 +656,7 @@ struct cmd *c;
     case B_PATH:
         if (c->argc > 1) {
             for (i = 1; i < c->argc && i <= MAXPATHV; i++)
-                pathv[i - 1] = strsave(c->argv[i]);
+                pathv[i - 1] = strdup(c->argv[i]);
             pathv[i - 1] = (char *)0;
             /*
              * The old tables describe directories nobody looks in
@@ -699,7 +674,7 @@ struct cmd *c;
 
     case B_HOME:
         if (c->argc > 1)
-            homedir = strsave(c->argv[1]);
+            homedir = strdup(c->argv[1]);
         else
             printf("%s\n", homedir);
         return 0;
@@ -830,7 +805,7 @@ struct cmd *c;
         return;
     if ((v = getalias(c->argv[0])) == (char *)0)
         return;
-    v = strsave(v);
+    v = strdup(v);
     n = 0;
     w = v;
     while (*w && n < MAXARG - 1) {
