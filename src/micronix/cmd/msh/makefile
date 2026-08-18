@@ -34,10 +34,8 @@ $(PROG): $(OBJS)
 $(OBJS): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
-install: $(PROG) install-man
+install: $(PROG)
 	cp $(PROG) $(BIN)/$(PROG)
-
-install-man:
 	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
