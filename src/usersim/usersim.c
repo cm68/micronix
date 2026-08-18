@@ -139,12 +139,19 @@ z80_run()
 #define	STACKTOP	0xffff
 #define MAXIMUM_STRING_LENGTH   100
 
-static int do_exec(char *name, char **argv);
+static int do_exec(char *name, char *guest, char **argv);
 static void emulate();
 void SystemCall();
 void int_handler();
 void quit_handler();
 int hostsig(int gsig);
+void initmemdev();
+void procroot(int lpid);
+void procfork(int child_gpid, int parent_gpid);
+void procsetcmd(int gpid, char *name);
+void procfree(int gpid);
+int selfgpid();
+char *base_name(char *p);
 
 /*
  * The terminal as we found it, saved at startup and put back at exit.
@@ -186,10 +193,22 @@ int traceflags;
  */
 unsigned long long cyc_base;    /* the count when this image was loaded */
 char cyc_name[192];             /* and which image with what args */
-int sp_report;                  /* -S: report stack low-water at exit */
+int sp_report;                  /* -S: process accounting at exit */
 unsigned short sp_lowater = 0xffff;
 unsigned short sp_initial;
 int sp_overflow;                /* the stack has been below the break */
+/*
+ * Process accounting, reported at exit under -S.  The disk counters
+ * count the guest's read and write system calls against regular files
+ * and directories, and the bytes they moved - tty, pipe and /dev/mem
+ * traffic is not disk.  brk0 is the break exec established, so the
+ * heap the program grew since is brake - brk0.
+ */
+unsigned long long acct_reads;  /* disk read system calls */
+unsigned long long acct_writes; /* disk write system calls */
+unsigned long long acct_rbytes; /* bytes read */
+unsigned long long acct_wbytes; /* bytes written */
+unsigned short brk0;            /* the break at exec, before any sbrk */
 
 /*
  * text segment writes: [tprot_lo, tprot_hi) is the text of the image
@@ -492,6 +511,7 @@ struct openfile {
     int minor;
     char dt;
     int special;        // is a special file needing sector hackery
+    int memdev;         // the fake /dev/mem: served from the shared image
     int ofile;          // the open file it names, -1 for none
     int filesize;
     int noseek;         // pipe, tty or socket: the host holds the position
@@ -944,7 +964,7 @@ usage(char *complaint, char *arg)
     fprintf(stderr, "usage: %s [<options>] [program [<program options>]]\n",
         progname);
     fprintf(stderr, "\t-r\trun as root\n");
-    fprintf(stderr, "\t-S\treport stack low-water and final break at exit\n");
+    fprintf(stderr, "\t-S\tprocess accounting: cycles, disk i/o, memory at exit\n");
     fprintf(stderr, "\t-W\treport writes into the text segment\n"
 	    "\t-B\tallow stores between the break and the stack\n");
     fprintf(stderr, "\t-w <addr>[,<addr>]  write watchpoints\n");
@@ -1159,6 +1179,7 @@ main(int argc, char **argv)
     initpids();
     initfiles();
     initinums();
+    initmemdev();
 
     /*
      * make our rootdir absolute
@@ -1177,6 +1198,7 @@ main(int argc, char **argv)
     }
 
     mypid = getpid();
+    procroot(mypid);
 
     /* before the tty below, so this only sees what we were handed */
     adoptfds();
@@ -1186,6 +1208,20 @@ main(int argc, char **argv)
      * whatever the simulator has open behind them.
      */
     fdmap_init();
+
+    /*
+     * The controlling terminal is the console, a character device, so
+     * that fstat(stdin) reports a device number - 0x0101, ttyA - the
+     * way the real console does.  ps reads that number and only lists
+     * the processes on the same terminal.
+     */
+    for (i = 0; i < 3; i++) {
+        if (files[i].ofile >= 0) {
+            files[i].dt = 'c';
+            files[i].major = 1;
+            files[i].minor = 1;
+        }
+    }
 
     /*
      * we might be piping the simulator.  let's get an open file for our 
@@ -1291,9 +1327,10 @@ main(int argc, char **argv)
     }
     argvec[i] = 0;
 
-    if (do_exec(fname(argvec[0]), argvec)) {
+    if (do_exec(fname(argvec[0]), argvec[0], argvec)) {
         return (EXIT_FAILURE);
     }
+    procsetcmd(selfgpid(), base_name(argvec[0]));
     free(argvec);
 
     z80_set_reg16(pc_reg, pop());
@@ -1394,13 +1431,27 @@ galarm_handler()
  * whose cycle count was being watched.
  */
 void
-exit_reports()
+exit_reports(int status, int signalled)
 {
     if (sp_report) {
+        unsigned int stack_used = sp_initial - sp_lowater;
+        unsigned int heap_used = brake - brk0;
+
+        /*
+         * One line per process, so a whole build can be read back as a
+         * table.  stack and heap are what grew since exec, memory is
+         * their sum, and the gap is the hole between the break and the
+         * stack's low-water mark - the memory the process never used.
+         */
         fprintf(repfp,
-            "stack: initial %04x low %04x used %d brk %04x gap %d\n",
-            sp_initial, sp_lowater, sp_initial - sp_lowater,
-            brake, sp_lowater - brake);
+            "acct: %s cycles=%llu io:reads=%llu writes=%llu in=%llu "
+            "out=%llu mem:stack=%u heap=%u total=%u gap=%d %s=%d\n",
+            cyc_name,
+            sim_cycles - cyc_base,
+            acct_reads, acct_writes, acct_rbytes, acct_wbytes,
+            stack_used, heap_used, stack_used + heap_used,
+            sp_lowater - brake,
+            signalled ? "signal" : "exit", status);
         fflush(repfp);
     }
     if (verbose & V_CYCLE) {
@@ -1432,7 +1483,7 @@ sig_death(int sig)
         pid();
         message("killed by signal %d\n", sig);
     }
-    exit_reports();
+    exit_reports(sig, 1);
     relefds();
     signal(h, SIG_DFL);
     raise(h);
@@ -1579,7 +1630,7 @@ lookup_sym(char *name)
  * this is the exec function - slightly different from the standard unix
  */
 static int
-do_exec(char *name, char **argv)
+do_exec(char *name, char *guest, char **argv)
 {
     FILE *file;
     struct obj header;
@@ -1672,6 +1723,7 @@ do_exec(char *name, char **argv)
     gap_armed = 0;              /* the loader is about to write the image */
     gap_hits = 0;
     cyc_base = sim_cycles;      /* the new image starts owing nothing */
+    acct_reads = acct_writes = acct_rbytes = acct_wbytes = 0;
     /*
      * the name alone does not say which file this instance worked on,
      * and "c1 cost 666 million cycles" is not actionable without it.
@@ -1680,7 +1732,7 @@ do_exec(char *name, char **argv)
     {
         int ci, cl;
 
-        strncpy(cyc_name, name, sizeof(cyc_name) - 1);
+        strncpy(cyc_name, guest, sizeof(cyc_name) - 1);
         cyc_name[sizeof(cyc_name) - 1] = 0;
         cl = strlen(cyc_name);
         for (ci = 1; argv[ci]; ci++) {
@@ -1747,6 +1799,7 @@ do_exec(char *name, char **argv)
      */
     if (header.textoff + header.text > brake)
         brake = header.textoff + header.text;
+    brk0 = brake;               /* the heap starts here, for the -S report */
 
     /*
      * image is in place: note where its text is.  a raw image has no
@@ -2397,7 +2450,281 @@ allocinum(int ui)
 }
 
 /*
- * a version 6 directory entry 
+ * The fake /dev/mem.
+ *
+ * ps reads the kernel's process table straight out of physical memory:
+ * a two-byte pointer at 0x1003 names the table, and each slot in it is
+ * a 141-byte struct proc - the layout the installed ps binary was
+ * compiled against, which is older than sys/proc.h.  We build that
+ * image in a shared segment so every simulated process, the root and
+ * all its forked children alike, updates the one copy - the same way
+ * the pid registry and the file table are shared.
+ *
+ * The image is the whole 64K address space because that is what ps
+ * seeks, and the bookkeeping rides in the same mapping: which guest
+ * pid holds each slot, whose child it is, and the command name exec
+ * put there.  The table is rendered out of that on every change.
+ */
+#define MEMSZ       65536           /* the Z80 address space ps seeks */
+#define PTAB        0x2000          /* where the process table lives */
+#define TTY         0x2a00          /* the one tty struct we hand ps */
+#define NPROCSL     17              /* the ps binary's NPROC */
+#define PROCSTRIDE  141             /* its sizeof(struct proc) */
+
+/* mode bits, as ps tests them */
+#define P_ALLOC     0001
+#define P_ALIVE     0002
+#define P_AWAKE     0004
+#define P_LOADED    0010
+
+/* field offsets within the 141-byte struct proc, as ps reads them */
+#define P_ARGS      0
+#define P_MODE      18
+#define P_PRI       19
+#define P_NICE      22
+#define P_EVENT     25
+#define P_TTY       27
+#define P_PARENT    39
+#define P_UID       45
+
+struct memdev {
+    pthread_mutex_t mutex;
+    unsigned char mem[MEMSZ];
+    unsigned short slotpid[NPROCSL];    /* guest pid in the slot, 0 is free */
+    unsigned short parent[NPROCSL];     /* parent slot, 0xffff for none */
+    char cmd[NPROCSL][8];               /* command name exec put there */
+    unsigned short nextslot;            /* where to start looking */
+} *memdev;
+
+/*
+ * write a 16-bit value into the fake memory image
+ */
+void
+put16(unsigned char *m, unsigned short v)
+{
+    m[0] = v & 0xff;
+    m[1] = (v >> 8) & 0xff;
+}
+
+void
+initmemdev()
+{
+    pthread_mutexattr_t attr;
+    int i;
+
+    memdev = (struct memdev *)mmap((void *)NULL, sizeof(struct memdev),
+        PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0);
+    if (memdev == (struct memdev *)-1) {
+        perror("initmemdev");
+        exit(2);
+    }
+    /*
+     * The lock lives in memory other processes hold too, so it has to
+     * be one they can use.
+     */
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+    pthread_mutex_init(&memdev->mutex, &attr);
+
+    memset(&memdev->mem[0], 0, MEMSZ);
+    for (i = 0; i < NPROCSL; i++) {
+        memdev->slotpid[i] = 0;
+        memdev->parent[i] = 0xffff;
+        memdev->cmd[i][0] = 0;
+    }
+    /*
+     * Slots 0 and 1 stay empty: the ps binary prints "Swapper" and
+     * "Init" for them no matter what is there, and neither is a
+     * process this simulator actually runs.
+     */
+    memdev->nextslot = 2;
+
+    /*
+     * The one tty struct, dev 0x0101 - ttyA, the console - to match
+     * what fstat(stdin) reports, so a process with a controlling
+     * terminal is shown by default.
+     */
+    put16(&memdev->mem[TTY + 8], 0x0101);
+
+    /*
+     * The pointer ps chases at 0x1003.
+     */
+    put16(&memdev->mem[0x1003], PTAB);
+}
+
+/*
+ * Rebuild the process table in the image from the bookkeeping.  Called
+ * with the mutex held; the image is shared so every reader sees the
+ * same table the writer just made.
+ */
+void
+procrender()
+{
+    int slot;
+    int addr;
+    int i;
+
+    memset(&memdev->mem[PTAB], 0, NPROCSL * PROCSTRIDE);
+
+    for (slot = 0; slot < NPROCSL; slot++) {
+        if (!memdev->slotpid[slot])
+            continue;
+        addr = PTAB + slot * PROCSTRIDE;
+
+        for (i = 0; i < 8; i++)
+            memdev->mem[addr + P_ARGS + i] = memdev->cmd[slot][i];
+        memdev->mem[addr + P_MODE] = P_ALLOC | P_ALIVE | P_AWAKE | P_LOADED;
+        memdev->mem[addr + P_PRI] = 0;
+        memdev->mem[addr + P_NICE] = 0;
+        put16(&memdev->mem[addr + P_EVENT], 0);     /* not waiting */
+        put16(&memdev->mem[addr + P_TTY], TTY);
+        /*
+         * The parent is the address of its own entry, so that ps's
+         * (parent - ptab) / stride yields the parent's slot.  A
+         * process with no parent points at slot 0 - the swapper - and
+         * ps reads that as ppid 0.
+         */
+        put16(&memdev->mem[addr + P_PARENT],
+            PTAB + ((memdev->parent[slot] != 0xffff)
+                        ? memdev->parent[slot] : 0) * PROCSTRIDE);
+        memdev->mem[addr + P_UID] = 0;
+    }
+}
+
+/*
+ * the slot a guest pid holds, or -1
+ */
+int
+procslot(int gpid)
+{
+    int slot;
+
+    for (slot = 0; slot < NPROCSL; slot++)
+        if (memdev->slotpid[slot] == gpid)
+            return slot;
+    return -1;
+}
+
+/*
+ * The first process, at startup: the first free slot, nobody's child.
+ * Its command name is what exec will overwrite anyway, so the
+ * placeholder only has to be printable until then.
+ */
+void
+procroot(int lpid)
+{
+    int gpid = allocpid(lpid);
+    int slot;
+
+    pthread_mutex_lock(&memdev->mutex);
+    if (procslot(gpid) < 0) {
+        for (slot = memdev->nextslot; slot < NPROCSL; slot++) {
+            if (!memdev->slotpid[slot]) {
+                memdev->slotpid[slot] = gpid;
+                memdev->parent[slot] = 0xffff;
+                strncpy(memdev->cmd[slot], "sh", 8);
+                memdev->nextslot = (slot == NPROCSL - 1) ? 2 : slot + 1;
+                break;
+            }
+        }
+    }
+    procrender();
+    pthread_mutex_unlock(&memdev->mutex);
+}
+
+/*
+ * A fork: the parent makes the child a slot, pointed at the parent's
+ * own, and hands it the parent's command name - exec replaces it.
+ */
+void
+procfork(int child_gpid, int parent_gpid)
+{
+    int slot;
+    int pslot;
+
+    if (child_gpid <= 0)
+        return;
+    pthread_mutex_lock(&memdev->mutex);
+    if (procslot(child_gpid) < 0) {
+        pslot = procslot(parent_gpid);
+        for (slot = memdev->nextslot; slot < NPROCSL; slot++) {
+            if (!memdev->slotpid[slot]) {
+                memdev->slotpid[slot] = child_gpid;
+                memdev->parent[slot] = (pslot >= 0) ? pslot : 0xffff;
+                if (pslot >= 0)
+                    strncpy(memdev->cmd[slot], memdev->cmd[pslot], 8);
+                else
+                    strncpy(memdev->cmd[slot], "sh", 8);
+                memdev->nextslot = (slot == NPROCSL - 1) ? 2 : slot + 1;
+                break;
+            }
+        }
+    }
+    procrender();
+    pthread_mutex_unlock(&memdev->mutex);
+}
+
+/*
+ * exec put a new command name on the process.
+ */
+void
+procsetcmd(int gpid, char *name)
+{
+    int slot;
+    int i;
+    int n;
+
+    pthread_mutex_lock(&memdev->mutex);
+    if ((slot = procslot(gpid)) >= 0) {
+        for (n = 0; name[n] && n < 8; n++)
+            ;
+        for (i = 0; i < 8; i++)
+            memdev->cmd[slot][i] = (i < n) ? name[i] : 0;
+        procrender();
+    }
+    pthread_mutex_unlock(&memdev->mutex);
+}
+
+/*
+ * A process is gone: its slot is free.  Called on exit and again on
+ * wait, so either path alone is enough.
+ */
+void
+procfree(int gpid)
+{
+    int slot;
+
+    pthread_mutex_lock(&memdev->mutex);
+    if ((slot = procslot(gpid)) >= 0) {
+        memdev->slotpid[slot] = 0;
+        memdev->parent[slot] = 0xffff;
+        memdev->cmd[slot][0] = 0;
+        procrender();
+    }
+    pthread_mutex_unlock(&memdev->mutex);
+}
+
+/*
+ * the guest pid of the process we are running as
+ */
+int
+selfgpid()
+{
+    return allocpid(getpid());
+}
+
+/*
+ * the last component of a path, for the command name ps prints
+ */
+char *
+base_name(char *p)
+{
+    char *s = strrchr(p, '/');
+    return s ? s + 1 : p;
+}
+
+/*
+ * a version 6 directory entry
  */
 struct v6dir
 {
@@ -3030,9 +3357,10 @@ SystemCall()
         break;
 
     case 1:                    /* exit (hl) */
-        exit_reports();
+        exit_reports(fd, 0);
         /* the descriptors go with the process */
         relefds();
+        procfree(selfgpid());
         exit(fd);
         break;
 
@@ -3061,6 +3389,7 @@ SystemCall()
         }
         if (ret) {
             ret = allocpid(ret);
+            procfork(ret, selfgpid());
             push(pop() + 3);
         } else {
             mypid = getpid();
@@ -3070,7 +3399,25 @@ SystemCall()
         break;
 
     case 3:                    /* read (hl), buffer, len */
-        if ((df = dirget(fd))) {
+        if (files[fd].memdev) {
+            /*
+             * The memory device has no host descriptor; it serves the
+             * fake image.  The position is the shared seek pointer,
+             * advanced below the way a host read would be.
+             */
+            long pos = getoff(fd);
+
+            if (pos < 0 || pos >= MEMSZ) {
+                ret = 0;
+            } else {
+                ret = arg2;
+                if (pos + ret > MEMSZ)
+                    ret = MEMSZ - pos;
+                pthread_mutex_lock(&memdev->mutex);
+                copyout(&memdev->mem[pos], arg1, ret);
+                pthread_mutex_unlock(&memdev->mutex);
+            }
+        } else if ((df = dirget(fd))) {
             ret = df->bufsize - df->offset;
             if (arg2 < ret) {
                 ret = arg2;
@@ -3104,6 +3451,10 @@ SystemCall()
             carry_set();
         } else {
             addoff(fd, ret);
+            if (files[fd].dt == 'r' || files[fd].dt == 'b' || dirget(fd)) {
+                acct_reads++;
+                acct_rbytes += ret;
+            }
             carry_clear();
         }
         break;
@@ -3118,6 +3469,10 @@ SystemCall()
             carry_set();
         } else {
             addoff(fd, ret);
+            if (files[fd].dt == 'r' || files[fd].dt == 'b') {
+                acct_writes++;
+                acct_wbytes += ret;
+            }
             carry_clear();
         }
         break;
@@ -3130,6 +3485,32 @@ SystemCall()
         filename = fname(fn);
         if (strcmp(fn, "/dev/console") == 0) {
             filename = "/dev/tty";
+        }
+        if (strcmp(fn, "/dev/mem") == 0) {
+            /*
+             * The memory device.  ps reads the process table out of
+             * it, and it has no backing file - the read path serves
+             * the shared image instead - so a host descriptor only
+             * stands in for it.  /dev/zero is a harmless placeholder
+             * whose number never reaches the guest.
+             */
+            ret = open("/dev/zero", O_RDONLY);
+            if (ret == 0xffff) {
+                if (verbose & V_ERROR)
+                    message("%s: %s\n", strerror(errno), filename);
+                goto lose;
+            }
+            if (adoptfd(ret) < 0) {
+                close(ret);
+                ret = ENFILE;
+                carry_set();
+                break;
+            }
+            files[ret].dt = 'c';
+            files[ret].major = 2;
+            files[ret].minor = 0;
+            files[ret].memdev = 1;
+            goto mapfds;
         }
         if (!stat(filename, &sbuf)) {
             if (S_ISDIR(sbuf.st_mode)) {
@@ -3154,6 +3535,7 @@ SystemCall()
                     break;
                 }
                 files[ret].dt = 'r';
+                files[ret].memdev = 0;
                 devnum(filename, &files[ret].dt,
                     &files[ret].major, &files[ret].minor);
                 if (files[ret].dt == 'b') {
@@ -3166,6 +3548,7 @@ SystemCall()
              * directory came from dirsnarf, which hands back the DIR's
              * own descriptor, so it is named the same way as the rest.
              */
+          mapfds:
             if ((i = mapfd(ret)) < 0) {
                 dropfd(ret);
                 if (dirget(ret))
@@ -3195,6 +3578,7 @@ SystemCall()
         }
         if (fd <= MAXFILE) {
             files[fd].special = 0;
+            files[fd].memdev = 0;
             files[fd].noseek = 0;
             dropfd(fd);
             unmapfd(gfd);
@@ -3245,6 +3629,7 @@ SystemCall()
          */
         i = ret;
         ret = allocpid(i);
+        procfree(ret);
         freepid(i);
         carry_clear();
         break;
@@ -3263,6 +3648,16 @@ SystemCall()
                 carry_set();
                 break;
             }
+            /*
+             * open records the device a name is; creat was skipping
+             * this, so a file created through /dev/null - the way the
+             * shell makes its redirects - looked like a regular file
+             * to fstat and to the disk accounting.
+             */
+            files[ret].dt = 'r';
+            files[ret].memdev = 0;
+            devnum(filename, &files[ret].dt,
+                &files[ret].major, &files[ret].minor);
             if ((i = mapfd(ret)) < 0) {
                 dropfd(ret);
                 ret = EMFILE;
@@ -3342,11 +3737,12 @@ SystemCall()
             argvec[i] = strdup(name2);
         }
         argvec[i] = 0;
-        ret = do_exec(fname(fn), argvec);
+        ret = do_exec(fname(fn), fn, argvec);
         if (ret) {
             ret = errno;
             carry_set();
         } else {
+            procsetcmd(selfgpid(), base_name(argvec[0]));
             carry_clear();
         }
         for (i = 0; argvec[i]; i++) {
