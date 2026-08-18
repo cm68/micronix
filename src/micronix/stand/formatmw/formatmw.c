@@ -35,22 +35,20 @@
 
 /*
  * The Whitesmiths run time library this was written against is gone, and
- * what it did provide is not worth chasing: putfmt, sort, btoi/itob and
- * the str/buf routines have no modern equivalent, only near relatives with
- * different contracts.  Everything the program used lives below instead,
- * so the file builds with ccc -m cpm against an ordinary libc.  There is
- * no path back to the original library and no attempt to keep one.
+ * the private routines it did not provide - putfmt, sort, cmpstr, lenstr,
+ * cpybuf, btoi and itob - go with it.  The ordinary library does the same
+ * jobs now: printf for itob and putfmt, strcmp, memcpy, atoi and qsort.
  *
- * Two other things the original spelling could not survive, both in
+ * Two things the original spelling could not survive, both in
  * ccc/src/RESTRICTIONS.md: the aggregates it initialised with "= 0" are
  * declared plainly and left to bss, and the sector size switch is scaled
  * because a case label is one byte wide.
  */
 
 #include <stdio.h>
-#include <stdarg.h>
 #include <ctype.h>
-#include <conio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <sys.h>
 
 typedef unsigned char	UTINY;
@@ -58,278 +56,22 @@ typedef unsigned int	UCOUNT;
 
 #define	YES		1
 #define	NO		0
-#ifndef NULL
-#define	NULL		0
-#endif
-
-#define	iswhite(c)	((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\r')
-#define	out(p, v)	outp((p), (v))
 
 /*
- * CP/M BDOS calls, as the program uses them: 2 is console out, 6 with
- * 0xff is direct console in (0 when nothing is waiting) and 11 is
- * console status.
+ * num returns YES when s starts with a decimal digit and leaves the value
+ * in *v.  atoi alone cannot tell "0" from "not a number", which matters
+ * here because 0 is a legal drive, track and head.
  */
-cpm (fn, arg)
-	int fn, arg;
+num (s, v)
+	char *s;
+	int *v;
 	{
-	switch (fn)
-		{
-	case 2:
-		putch (arg);
-		return (0);
-	case 6:
-		return (kbhit () ? getch () : 0);
-	case 11:
-		return (kbhit ());
-		}
-	return (0);
+	if (!isdigit (*s))
+		return (NO);
+	*v = atoi (s);
+	return (YES);
 	}
 
-/*
- * These four are the library's own code - the contracts are odd enough
- * that reimplementing them from the names would get them wrong.
- * cmpstr is a match predicate, not a difference: it returns YES when the
- * strings are equal, which is why the callers read "if (cmpstr (a, b))".
- */
-cmpstr (s1, s2)
-	register char *s1, *s2;
-	{
-	while (*s2)
-		if (*s1++ != *s2++)
-			return (NO);
-	return (*s1 == '\0');
-	}
-
-lenstr (is)
-	register char *is;
-	{
-	register char *s;
-
-	for (s = is; *s; ++s)
-		;
-	return (s - is);
-	}
-
-cpybuf (s1, s2, an)
-	register char *s1, *s2;
-	unsigned an;
-	{
-	register unsigned n;
-
-	for (n = an; 0 < n; --n)
-		*s1++ = *s2++;
-	return (an);
-	}
-
-/*
- * itob writes the digits without a terminator and returns how many it
- * wrote, so callers punctuate with buf[itob (buf, v, base)] = 0.
- */
-itob (is, n, base)
-	register char *is;
-	int n, base;
-	{
-	register unsigned u;
-	register char *s;
-
-	u = n;
-	s = is;
-	if (base <= 0)
-		base = 10;
-	if (base <= u)
-		s += itob (s, u / base, base);
-	*s = (u % base) + '0';
-	if ('9' < *s)
-		*s += ('a' - ('9' + 1));
-	return (s - is + 1);
-	}
-
-/*
- * btoi returns the number of characters consumed, so zero means the
- * argument was not a number at all - that is the caller's error test.
- */
-btoi (s, n, ip, base)
-	register char *s;
-	int n, *ip, base;
-	{
-	register int val, dig;
-	char *is;
-	int neg, cnt;
-
-	is = s;
-	val = cnt = 0;
-	neg = NO;
-	for (; 0 < n && iswhite (*s); --n, ++s)
-		;
-	if (0 < n && (*s == '-' || *s == '+'))
-		{
-		neg = (*s == '-');
-		++s, --n;
-		}
-	for (; 0 < n; --n, ++s)
-		{
-		if (*s >= '0' && *s <= '9')
-			dig = *s - '0';
-		else if (*s >= 'a' && *s <= 'z')
-			dig = *s - 'a' + 10;
-		else if (*s >= 'A' && *s <= 'Z')
-			dig = *s - 'A' + 10;
-		else
-			break;
-		if (base <= dig)
-			break;
-		val = val * base + dig;
-		++cnt;
-		}
-	if (!cnt)
-		return (0);
-	*ip = neg ? -val : val;
-	return (s - is);
-	}
-
-/*
- * The library sort does not move elements itself.  It is handed an
- * ordering function and an exchange function, both taking a pair of
- * indices, and the caller keeps the data wherever it likes - which is
- * why report() passes &order and &ex.  curbad caps at 128, so an
- * insertion sort is the right amount of machinery.
- */
-sort (n, ordf, excf)
-	int n;
-	int (*ordf) ();
-	int (*excf) ();
-	{
-	register int i, j;
-
-	for (i = 1; i < n; i++)
-		for (j = i; 0 < j && 0 < (*ordf) (j - 1, j); j--)
-			(*excf) (j - 1, j);
-	}
-
-/*
- * putfmt is NOT printf, and the difference bites.  From the library's
- * own _putf, the conversion is
- *
- *	%[-|+]<fill>[width][.prec][a|h|o|u]<conv>
- *
- * where '-' left justifies and '+' right justifies, and in both cases
- * the character FOLLOWING the flag is the pad character.  '+' is not a
- * sign flag.  So "%+ 5i" is printf's "%5d" - pad with the space that
- * comes after the '+' - and "%+05i" would be "%05d".
- *
- * The conversions differ too: 'i' is a signed int, and 'p' is a NUL
- * terminated string, printf's %s, not a pointer.  Report() uses both,
- * so getting this wrong silently scrambles the bad sector table.
- */
-static
-_pfout (s, n)
-	register char *s;
-	register int n;
-	{
-	for (; 0 < n; --n, ++s)
-		{
-		if (*s == '\n')
-			cpm (2, '\r');
-		cpm (2, *s);
-		}
-	}
-
-putfmt (char *fmt, ...)
-	{
-	va_list ap;
-	register char *q;
-	char buf[24], *s;
-	char cfill, mod;
-	int rjust, width, prec, base, n;
-
-	va_start (ap, fmt);
-	for (q = fmt; *q; )
-		{
-		if (*q != '%')
-			{
-			for (s = q; *q && *q != '%'; ++q)
-				;
-			_pfout (s, q - s);
-			continue;
-			}
-		++q;
-		rjust = YES;
-		cfill = ' ';
-		if (*q == '-')
-			{
-			rjust = NO;
-			cfill = *++q;
-			++q;
-			}
-		else if (*q == '+')
-			{
-			cfill = *++q;
-			++q;
-			}
-		for (width = 0; isdigit (*q); ++q)
-			width = width * 10 + *q - '0';
-		prec = 0;
-		if (*q == '.')
-			for (++q; isdigit (*q); ++q)
-				prec = prec * 10 + *q - '0';
-		mod = '\0';
-		if (*q == 'a' || *q == 'h' || *q == 'o' || *q == 'u')
-			mod = *q++;
-		base = (mod == 'h') ? 16 : (mod == 'o') ? 8 : 10;
-
-		if (*q == 'p')			/* a string, not a pointer */
-			{
-			++q;
-			s = va_arg (ap, char *);
-			n = lenstr (s);
-			if (prec && prec < n)
-				n = prec;
-			}
-		else if (*q == 'x')		/* consumes nothing */
-			{
-			++q;
-			s = buf;
-			n = 0;
-			}
-		else if (*q == 'c')
-			{
-			++q;
-			buf[0] = va_arg (ap, int);
-			s = buf;
-			n = 1;
-			}
-		else if (*q == 'i' || *q == 's' || *q == 'l' || mod)
-			{
-			if (*q == 'i' || *q == 's' || *q == 'l')
-				++q;
-			n = va_arg (ap, int);
-			s = buf;
-			if (base == 10 && !mod && n < 0)
-				{
-				buf[0] = '-';
-				n = 1 + itob (buf + 1, -n, 10);
-				}
-			else
-				n = itob (buf, n, base);
-			}
-		else				/* %% and anything unknown */
-			{
-			s = q++;
-			n = 1;
-			}
-
-		if (rjust)
-			for (; n < width; --width)
-				_pfout (&cfill, 1);
-		if (0 < n)
-			_pfout (s, n);
-		if (!rjust)
-			for (; n < width; --width)
-				_pfout (&cfill, 1);
-		}
-	va_end (ap);
-	}
 
 
 struct	drives 
@@ -382,6 +124,8 @@ struct	drives
 	{"st506", 	153, 4,  64, 128,  30,  30,   0, 10416},
 	{"st412",	306, 4, 128, 128,   0,  30,   0, 10416},
 	{"m10",		306, 4, 128, 128,   0,  30,   0, 10416},
+	{"st4038",	733, 5, 300, 733,  30,  30,   0, 10416},	/* Seagate 40 meg */
+	{"m40",		733, 5, 300, 733,  30,  30,   0, 10416},
 
 	{"tandon",	153, 4,   0, 128,  30,  30,   0, 10416},
 	{"tm602",	153, 4,   0, 128,  30,  30,   0, 10416},
@@ -566,16 +310,6 @@ int	drive 	= DDRIVE,	/* Drive number				*/
 	hard	= 0,		/* Number of hard disc errors		*/
 	soft	= 0;		/* Number of soft disc errors		*/
 
-/*
- *	Parse CP/M command line arguments
- *
- *	# include <std.h>
- */
-
-# define isblack(a) (!iswhite(a))
-# define BUFFER 0x80
-
-
 main (ac, av)
 	int	ac;
 	char	*av[];
@@ -590,7 +324,8 @@ main (ac, av)
 	 */
 	for (i = 1; i < ac; i++)
 		for (p = av[i]; *p; p++)
-			*p = tolower (*p);
+			if (isupper (*p))
+				*p = tolower (*p);
 
 	ac--; av++;
 	
@@ -600,7 +335,7 @@ main (ac, av)
 	search = &dtab[0];
 	while (search->name != 0)
 		{
-		if (cmpstr (av[0], search->name))
+		if (!strcmp (av[0], search->name))
 			{
 			info = search;
 			break;
@@ -613,12 +348,12 @@ main (ac, av)
 
 	while (ac--)
 		{
-		if (cmpstr (av[0], "drive"))
+		if (!strcmp (av[0], "drive"))
 			{
 			if (ac)
 				{
 				ac--; av++;
-				if (!(btoi (av[0], lenstr (av[0]), &drive, 10))
+				if (!(num (av[0], &drive))
 					|| (drive < 0) || (drive > 3))
 						error ("Bad drive arg.");
 				av++;
@@ -626,12 +361,12 @@ main (ac, av)
 			continue;
 			}
 
-		if (cmpstr (av[0], "track"))
+		if (!strcmp (av[0], "track"))
 			{
 			if (ac)
 				{
 				ac--; av++;
-				if (!(btoi (av[0], lenstr (av[0]), &tracks, 10))
+				if (!(num (av[0], &tracks))
 					|| (tracks < 0)
 					|| (tracks > info->cyl - 1))
 						error ("Bad track number.");
@@ -640,12 +375,12 @@ main (ac, av)
 			continue;
 			}
 
-		if (cmpstr (av[0], "head"))
+		if (!strcmp (av[0], "head"))
 			{
 			if (ac)
 				{
 				ac--; av++;
-				if (!(btoi (av[0], lenstr (av[0]), &heads, 10))
+				if (!(num (av[0], &heads))
 					|| (heads < 0)
 					|| (heads > info->heads-1))
 						error ("Bad head number.");
@@ -654,12 +389,12 @@ main (ac, av)
 			continue;
 			}
 
-		if (cmpstr (av[0], "skew"))
+		if (!strcmp (av[0], "skew"))
 			{
 			if (ac)
 				{
 				ac--; av++;
-				if (!(btoi (av[0], lenstr (av[0]), &skew, 10))
+				if (!(num (av[0], &skew))
 					|| (skew < 0) || (skew > 64))
 						error ("Bad skew factor.");
 				av++;
@@ -667,12 +402,12 @@ main (ac, av)
 			continue;
 			}
 
-		if (cmpstr (av[0], "size"))
+		if (!strcmp (av[0], "size"))
 			{
 			if (ac)
 				{
 				ac--; av++;
-				btoi (av[0], lenstr (av[0]), &size, 10);
+				size = atoi (av[0]);
 				/*
 				 * Switched on size/128 rather than on size.
 				 * A case label here is one byte wide, and
@@ -713,21 +448,21 @@ main (ac, av)
 			continue;
 			}
 		
-		if (cmpstr (av[0], "verify"))
+		if (!strcmp (av[0], "verify"))
 			{
 			av++;
 			verify = YES;
 			continue;
 			}
 
-		if (cmpstr (av[0], "test"))
+		if (!strcmp (av[0], "test"))
 			{
 			av++;
 			test = YES;
 			continue;
 			}
 
-		if (cmpstr (av[0], "nosoft"))
+		if (!strcmp (av[0], "nosoft"))
 			{
 			av++;
 			nosoft = YES;
@@ -749,15 +484,14 @@ main (ac, av)
 
 usage ()
 	{
-	prs ("\nMorrow Designs HDDMA format/test program.  Version 1.7\n\n");
-	prs ("Usage: formatmw drive-type [arguments]\n");
-	exit ();	
+	printf ("\nMorrow Designs HDDMA format/test program.  Version 1.7\n\n");
+	printf ("Usage: formatmw drive-type [arguments]\n");
+	exit (0);
 	}
 
 error (mes)
 	{
-	prs (mes);
-	prs ("\n");
+	printf ("%s\n", mes);
 	exit (-1);
 	}
 
@@ -795,7 +529,7 @@ fmt ()
 	builds ();		/* Build sector numbers */
 	cmd.dma = (UCOUNT) image;
 	home ();
-	prs ("Formatting.\n");
+	printf ("Formatting.\n");
 	for (ctrack = tmin; ctrack <= tmax; ctrack++)
 		{
 		seek (ctrack);
@@ -813,7 +547,7 @@ fmt ()
  	 * Verify format
 	 */
 
-	prs ("Checking format.\n");
+	printf ("Checking format.\n");
 	cmd.dma = (UCOUNT) buffer;
 	cmd.xdma = 0;
 	for (ctrack = tmin; ctrack <= tmax; ctrack++)
@@ -904,12 +638,7 @@ fmthead (track, head, value)
 		return YES;	
 	else
 		{
-		prs (errors[cmd.stat]);
-		prs (" error. Track: ");
-		prn (track);
-		prs (" Head: ");
-		prn (head);
-		prs ("\n");
+		printf ("%s error. Track: %d Head: %d\n", errors[cmd.stat], track, head);
 		return NO;
 		}
 	}
@@ -988,12 +717,12 @@ select ()
 restore (track)
 	int track;
 	{
-	cpybuf (&tcmd, &cmd, sizeof (cmd));
+	memcpy (&tcmd, &cmd, sizeof (cmd));
 	reset ();
 	select ();
 	home ();
 	seek (track);
-	cpybuf (&cmd, &tcmd, sizeof (cmd));
+	memcpy (&cmd, &tcmd, sizeof (cmd));
 	}
 
 /*
@@ -1014,8 +743,8 @@ home ()
 
 	if (issue () == NO)
 		{
-		putfmt ("Load constants timeout in home.\n");
-		exit ();
+		printf ("Load constants timeout in home.\n");
+		exit (0);
 		}
 
 	cmd.steps  = 0xffff;
@@ -1023,8 +752,8 @@ home ()
 		
 	if (issue () == NO)
 		{
-		putfmt ("Can't recalibrate drive.\n");
-		exit ();
+		printf ("Can't recalibrate drive.\n");
+		exit (0);
 		}
 	cmd.steps  = 0;
 	cmd.arg1   = info->stepdl;
@@ -1032,8 +761,8 @@ home ()
 
 	if (issue () == NO)
 		{
-		putfmt ("Load constants timeout in home.\n");
-		exit ();
+		printf ("Load constants timeout in home.\n");
+		exit (0);
 		}
 
 	curtrk = 0;		/* Save current track number	*/
@@ -1046,8 +775,6 @@ home ()
 seek (trk)
 	int trk;
 	{
-	register char *p = (char *) CHAN;
-
 	if (curtrk == -1)
 		home ();	/* Home drive if track unknown	*/
 
@@ -1070,8 +797,8 @@ seek (trk)
 	cmd.stat = 0;
 	if (issue () == NO)
 		{
-		putfmt ("Seek timeout\n");
-		exit ();
+		printf ("Seek timeout\n");
+		exit (0);
 		}
 
 	curtrk = trk;
@@ -1087,7 +814,6 @@ tverify (track, head, data)
 	{
 	register unsigned char *sector, *p, retry;
 	static unsigned char save;
-	static unsigned char value;
 
 	cmd.seksel = drive;
 	cmd.steps  = 0;
@@ -1105,13 +831,8 @@ tverify (track, head, data)
 			{
 			if (issue () == NO)
 				{
-				prs ("Verify timeout: track: ");
-				prn (track);
-				prs (" head: ");
-				prn (head);
-				prs (" sector: ");
-				prn (*sector);
-				prs ("\n");
+				printf ("Verify timeout: track: %d head: %d sector: %d\n",
+					track, head, *sector);
  				return;
 				}
 
@@ -1138,41 +859,27 @@ tverify (track, head, data)
 verr (errnum, track, head, sector, count)
 	int errnum, track, head, sector, count;
 	{
-	prs ("Verify: ");
-	prs (errors[errnum]);
-	prs (" error. Track: ");
-	prn (track);
-	prs (" Head: ");
-	prn (head);
-	prs (" Sector: ");
-	prn (sector);
+	printf ("Verify: %s error. Track: %d Head: %d Sector: %d",
+		errors[errnum], track, head, sector);
 	if (count != RETRIES)
 		{
-		prs (" Count: ");
-		prn (count);
+		printf (" Count: %d", count);
 		addto (track, head, sector, SOFT);
 		}
 	else
 		{
-		prs (" FATAL!");
+		printf (" FATAL!");
 		restore (track);
 		addto (track, head, sector, HARD);
 		}
-	prs ("\n");
+	printf ("\n");
 	}
 
 merr (track, head, sector, byte)
 	int track, head, sector, byte;
 	{
-	prs ("Data compare: Track: ");
-	prn (track);
-	prs (" Head: ");
-	prn (head);
-	prs (" Sector: ");
-	prn (sector);
-	prs (" Byte: ");
-	prn (byte);
-	prs ("\n");
+	printf ("Data compare: Track: %d Head: %d Sector: %d Byte: %d\n",
+		track, head, sector, byte);
 	addto (track, head, sector, HARD);
 	}
 
@@ -1185,7 +892,6 @@ twrite (track, head)
 	{
 	register unsigned char *sector, *p, retry;
 	static unsigned char save;
-	static unsigned char value;
 
 	cmd.seksel = drive;
 	cmd.steps  = 0;
@@ -1203,13 +909,8 @@ twrite (track, head)
 			{
 			if (issue () == NO)
 				{
-				prs ("Verify timeout: track: ");
-				prn (track);
-				prs (" head: ");
-				prn (head);
-				prs (" sector: ");
-				prn (*sector);
-				prs ("\n");
+				printf ("Verify timeout: track: %d head: %d sector: %d\n",
+					track, head, *sector);
  				return;
 				}
 
@@ -1227,27 +928,20 @@ twrite (track, head)
 werr (errnum, track, head, sector, count)
 	int errnum, track, head, sector, count;
 	{
-	prs ("Write: ");
-	prs (errors[errnum]);
-	prs (" error. Track: ");
-	prn (track);
-	prs (" Head: ");
-	prn (head);
-	prs (" Sector: ");
-	prn (sector);
+	printf ("Write: %s error. Track: %d Head: %d Sector: %d",
+		errors[errnum], track, head, sector);
 	if (count != RETRIES)
 		{
-		prs (" Count: ");
-		prn (count);
+		printf (" Count: %d", count);
 		addto (track, head, sector, SOFT);
 		}
 	else
 		{
-		prs (" FATAL!");
+		printf (" FATAL!");
 		restore (track);
 		addto (track, head, sector, HARD);
 		}
-	prs ("\n");
+	printf ("\n");
 	}
 
 /*
@@ -1256,7 +950,7 @@ werr (errnum, track, head, sector, count)
 
 attn ()
 	{
-	out (ATTN, 0);
+	outp (ATTN, 0);
 	}
 
 /*
@@ -1269,53 +963,14 @@ attn ()
 
 reset ()
 	{
-	out (RESET, 0);
+	outp (RESET, 0);
 	}
 
-prn (a)
-	{
-	char buf[5];
-	buf[itob (buf, a, 10)] = 0;
-	prs (buf);
-	}
-
-prb (a)	
-	{
-	char buf[17];
-	buf[itob (buf, a | 0x8000, 2)] = 0;
-	prs (&buf[8]);
-	}
-
-prs (a)	
-	char	*a;
-	{
-	char c;
-
-	for (;*a;a++)
-		{
-		if (cpm (11))			/* Console status ready */
-			{
-			c = cpm (6, 0xff);	/* Read the character */
-			if (c == 3)
-				exit ();
-			if (c == 19)		/* Ctrl S ? */
-				{
-				while (!(cpm (11)))
-					;
-				if (cpm (6, 0xff) == 3)
-					exit ();
-				}
-			}
-		if (*a == '\n')
-			cpm (2, '\r');
-		cpm (2, *a);
-		}
-	}
 
 dotest ()
 	{
 	int c;
-	prs ("Testing disc.\n");
+	printf ("Testing disc.\n");
 
 	for (c = 0; pattern[c] >= 0; c++)
 		testit (pattern[c], c);
@@ -1327,7 +982,7 @@ testit (c, pass)
 	{	
 	static int hmin, hmax, tmin, tmax;
 	static int ctrack, chead;
-	register unsigned char *p;
+	int i;
 
 	reset ();
 	spt = (info->bpt-(GAP1+GAP4)) / (SYNC+ID+GAP2+DATA+size+gap3[sectyp]);
@@ -1355,19 +1010,17 @@ testit (c, pass)
 		hmax = heads;	
 		}
 
-	prs ("Writing - pass: ");
-	prn (pass);
-	prs (" data: ");
-	prb (c);
-	prs ("\n");
+	printf ("Writing - pass: %d data: ", pass);
+	for (i = 0x80; i; i >>= 1)
+		printf ("%d", (c & i) != 0);
+	printf ("\n");
 
 	home ();
 
 	cmd.dma = (UCOUNT) buffer;
 	cmd.xdma = 0;
 
-	for (p = buffer; p < &buffer[size]; *(p++) = c)
-		;
+	memset (buffer, c, size);
 
 	for (ctrack = tmin; ctrack <= tmax; ctrack++)
 		{
@@ -1382,9 +1035,7 @@ testit (c, pass)
  	 * Verify format
 	 */
 
-	prs ("Reading - pass: ");
-	prn (pass);
-	prs ("\n");
+	printf ("Reading - pass: %d\n", pass);
 
 	cmd.dma = (UCOUNT) buffer;
 	cmd.xdma = 0;
@@ -1426,63 +1077,43 @@ addto (track, head, sector, type)
 	curbad++;
 	}
 
-int order (), ex ();
+badcmp (a, b)
+	void *a, *b;
+	{
+	struct bad *x = (struct bad *) a;
+	struct bad *y = (struct bad *) b;
+	int v;
+
+	if ((v = x->track - y->track) != 0)
+		return v;
+	if ((v = x->head - y->head) != 0)
+		return v;
+	return x->sector - y->sector;
+	}
 
 report ()
 	{
 	int count;
 
-	putfmt ("\n\nBad sector report:\n");
+	printf ("\n\nBad sector report:\n");
 
 	if (curbad == 0)
 		{
-		putfmt ("No bad sectors detected.\n");
+		printf ("No bad sectors detected.\n");
 		return;
 		}
 
-	sort (curbad, &order, &ex);
-	putfmt ("Track  Head  Sector  Type\n");
+	qsort (bad, curbad, sizeof (struct bad), badcmp);
+	printf ("Track  Head  Sector  Type\n");
 	for (count = 0; count < curbad; count++)
-		putfmt ("%+ 5i  %+ 4i  %+ 6i  %p\n",
+		printf ("%5d  %4d  %6d  %s\n",
 			bad[count].track,
 			bad[count].head,
 			bad[count].sector,
 			(bad[count].type == SOFT) ? "Soft" : "Hard");
-	putfmt ("\n");
+	printf ("\n");
 	}
 
-order (j, i)
-	int j, i;
-	{
-	int value;
-		
-	if ((value = bad[j].track - bad[i].track) != 0)
-		return value;	
-	if ((value = bad[j].head - bad[i].head) != 0)
-		return value;
-	return bad[j].sector - bad[i].sector;
-	}
-
-ex (j, i)
-	int j, i;
-	{
-	int track, head, sector, type;
-
-	track  = bad[i].track;
-	head   = bad[i].head;
-	sector = bad[i].sector;
-	type   = bad[i].type;
-
-	bad[i].track  = bad[j].track;
-	bad[i].head   = bad[j].head;
-	bad[i].sector = bad[j].sector;
-	bad[i].type   = bad[j].type;
-
-	bad[j].track  = track;
-	bad[j].head   = head;
-	bad[j].sector = sector;
-	bad[j].type   = type;
-	}
 
 /*
  * Write bad sector map out
@@ -1490,7 +1121,6 @@ ex (j, i)
 
 writebad ()
 	{
-	static unsigned char *p;
 	static int count;
 	static int sector;
 	static int maxbad;
@@ -1498,8 +1128,7 @@ writebad ()
 	if ((BADTRK >= info->cyl) || (BADHED >= info->heads))
 		error ("No room for a bad map on this drive.");
 
-	for (p = buffer; p < &buffer[2048];)	
-		*p++ = 0;
+	memset (buffer, 0, sizeof buffer);
 	
 	maxbad = spt * info->heads - spt * ALTHED - ALTSEC;
 
@@ -1507,8 +1136,7 @@ writebad ()
 		{
 		curbad = maxbad;
 
-		putfmt (
-"Too many bad sectors.  Assigning alternates for the first %i sectors.\n",
+		printf ("Too many bad sectors.  Assigning alternates for the first %d sectors.\n",
 			curbad);
 		}
 
