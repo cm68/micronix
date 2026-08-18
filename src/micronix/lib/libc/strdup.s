@@ -32,6 +32,16 @@
 ; as the malloc size.  BC is preserved (callee-saved register
 ; variables in both hitech and ccc).
 ;
+; The inline count below is deliberate, and cpir is not.  strdup
+; wants n+1 as a value - the malloc size and the ldir count - not
+; strlen's n, and the loop counts n+1 straight into hl with nothing
+; to convert.  cpir would hand the length over free but inverted:
+; hl one past the NUL and bc holding -count, and turning that back
+; into a positive count costs a 5-byte negate plus a push to keep
+; the end pointer.  Every cpir shape assembles a byte larger (30
+; against 29) for a faster scan (21 against ~35 cycles a byte) that
+; nobody sees next to the malloc it feeds.
+;
 	.extern	_malloc
 	.global	_strdup
 
