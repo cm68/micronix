@@ -222,7 +222,7 @@ skiptoeol()
  *   - Stops at first invalid character
  *
  * Error handling:
- *   - If no digits consumed for base 2 or 16, reports ER_C_NX error
+ *   - If no digits consumed for base 2 or 16, reports ER_C_CD error
  *   - Base 8/10 allow zero-length (return 0)
  *
  * Parameters:
@@ -259,6 +259,10 @@ getint(unsigned char base)
             c -= '0';
         }
         if ((c+1) > base) {
+            /* decimal digit out of range for this base (e.g. 9 in octal) */
+            if (c < 10) {
+                gripe(ER_C_BD);
+            }
             break;
         }
         d = c;
@@ -268,7 +272,7 @@ getint(unsigned char base)
     }
     /* if no characters are consumed, note the error if base 2 or 16 */
     if ((len == 0) && ((base == 2) || (base == 16))) {
-        gripe(ER_C_NX);
+        gripe(ER_C_CD);
     }
     return i;
 }
@@ -845,6 +849,9 @@ doCpp(unsigned char t)
         advance();
         macundefine(strbuf);
         return;
+    case PP_PRAGMA:
+        skiptoeol();
+        return;
     case PP_INCLUDE:
 #ifdef DEBUG
         if (VERBOSE(V_CPP)) {
@@ -1234,7 +1241,7 @@ gettoken()
                      */
                     continue;
                 }
-                gripe(ER_C_BD);
+                gripe(ER_C_ID);
             }
             if (isnumber()) {
                 lineno = next.v.numeric;

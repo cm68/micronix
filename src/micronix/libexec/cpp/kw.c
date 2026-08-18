@@ -37,6 +37,7 @@ unsigned char cppkw[] = {
             'd'|HI, 4, 'e', 'f', 0xff, PP_IFDEF,
             'n'|HI, 5, 'd', 'e', 'f', 0xff, PP_IFNDEF,
         'n', 'c', 'l', 'u', 'd', 'e', 0xff, PP_INCLUDE,
+    'p', 'r', 'a', 'g', 'm', 'a', 0xff, PP_PRAGMA,
     'u', 'n', 'd', 'e', 'f', 0xff, PP_UNDEF,
     0   /* end of table */
 };

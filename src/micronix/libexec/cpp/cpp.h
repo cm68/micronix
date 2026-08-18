@@ -43,6 +43,7 @@ typedef unsigned char token_t;
 #define PP_ENDIF 246
 #define PP_ELIF 247
 #define PP_ELSE 248
+#define PP_PRAGMA 249
 #define NONE 255
 
 /*
