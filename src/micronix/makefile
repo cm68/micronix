@@ -46,7 +46,8 @@ all:
 	cd cmd ; make toolchain
 	cd libexec ; make install
 	cd cmd ; make install
-	cd sys ; make install
+	
+# cd sys ; make install
 
 clean:
 	cd include ; make clean
@@ -62,11 +63,3 @@ clobber: clean
 	cd cmd ; make clobber
 	cd sys ; make clobber
 
-#
-# There was an "upgrade" here which ran "make upgrade" in include, lib
-# and cmd.  Only include had such a rule and it did what install does
-# now; the other two never had one, and this make does not look at the
-# status of a command it runs - see the loop at the end of make.c,
-# which calls docmd and throws the answer away - so the target had
-# been printing two errors and reporting success for some years.
-#
