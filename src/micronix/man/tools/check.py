@@ -20,7 +20,7 @@ def check(path):
     for i, l in enumerate(lines, 1):
         if not l.startswith('.'):
             continue
-        m = re.match(r'\.([a-zA-Z]+)', l)
+        m = re.match(r'\.([a-zA-Z]+|\.\.)', l)
         if not m:
             notes.append("line %d: bare dot - form will eat this line" % i)
         elif m.group(1) not in manlib.REQUESTS:

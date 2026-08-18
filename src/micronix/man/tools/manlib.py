@@ -17,7 +17,7 @@ FOOT = re.compile(r'^\s*-\s*[\d?]+\s*-\s*$')
 DATE = re.compile(r'(\d{1,2}/\d{1,2}/\d{2})')
 
 # every request form(1) actually implements
-REQUESTS = set("bd bp br ce fi fo he in ls nf pl rm sp ta ti ul".split())
+REQUESTS = set("bd bp br ce fi fo he in ls nf pl rm sp ta ti ul ..".split())
 
 
 def is_header(line):
