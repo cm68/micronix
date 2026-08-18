@@ -576,6 +576,13 @@ yyparse() {
 	register yystate, *yyps, yyn;
 	register YYSTYPE *yypv;
 	register *yyxi;
+	/*
+	 * ccc's c1 miscompiles `++yyps > &yys[YYMAXDEPTH]` for frame
+	 * operands (CODEGENGAPS entry 22): the bound address is dropped
+	 * and the compare runs against the size constant.  Pre-compute
+	 * the bound and split the increment.
+	 */
+	int *yyslim = &yys[YYMAXDEPTH];
 
 	yystate = 0;
 	yychar = -1;
@@ -587,7 +594,8 @@ yyparse() {
  yystack:    /* put a state and value onto the stack */
 
 	if( yydebug  ) printf( "state %d, value %d, char %d\n",yystate,yyval,yychar );
-		if( ++yyps> &yys[YYMAXDEPTH] ) yyerror( "yacc stack overflow" );
+		++yyps;
+		if( yyps> yyslim ) yyerror( "yacc stack overflow" );
 		*yyps = yystate;
 		++yypv;
 		YYVCOPY(*yypv,yyval);
