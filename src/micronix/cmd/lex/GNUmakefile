@@ -23,9 +23,6 @@
 #
 # -Dunix is what turns ldefs.c's ASCII tables on and selects the
 # /usr/lib/lex/ncform path in once.c; without it neither is defined.
-# -DSMALL picks ldefs.c's small table sizes (TREESIZE 600 etc.); the
-# full ones allocate a parse tree and state tables that do not fit
-# what is left of 64k after the 42k image.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
@@ -39,7 +36,7 @@ LIBS	= ../yacc/liby.a
 
 include $(DEPTH)/GNUmakefile.inc
 
-CCFLAGS += -Dunix -DSMALL
+CCFLAGS += -Dunix
 
 SRCS += parser.y ncform
 

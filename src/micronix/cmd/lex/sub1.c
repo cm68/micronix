@@ -389,6 +389,8 @@ eof = TRUE;
 mn2(a,d,c)
 int a, d, c;
 	{
+	if(tptr >= treesize)
+		growtree();
 	name[tptr] = a;
 	left[tptr] = d;
 	right[tptr] = c;
@@ -418,13 +420,13 @@ int a, d, c;
 		break;
 #endif
 		}
-	if(tptr > treesize)
-		error("Parse tree too big %s",(treesize == TREESIZE?"\nTry using %e num":""));
 	return(tptr++);
 	}
 mn1(a,d)
 int a, d;
 	{
+	if(tptr >= treesize)
+		growtree();
 	name[tptr] = a;
 	left[tptr] = d;
 	parent[tptr] = 0;
@@ -456,13 +458,13 @@ int a, d;
 		break;
 #endif
 		}
-	if(tptr > treesize)
-		error("Parse tree too big %s",(treesize == TREESIZE?"\nTry using %e num":""));
 	return(tptr++);
 	}
 mn0(a)
 int a;
 	{
+	if(tptr >= treesize)
+		growtree();
 	name[tptr] = a;
 	parent[tptr] = 0;
 	nullstr[tptr] = 0;
@@ -474,8 +476,6 @@ case RNULLS: nullstr[tptr] = TRUE; break;
 		break;
 #endif
 	}
-	if(tptr > treesize)
-		error("Parse tree too big %s",(treesize == TREESIZE?"\nTry using %e num":""));
 	return(tptr++);
 	}
 munput(t,p)	/* implementation dependent */

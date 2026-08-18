@@ -34,21 +34,19 @@
 #define STARTCHAR 100
 #define STARTSIZE 256
 #define CCLSIZE 1000
-#ifdef SMALL
-#define TREESIZE 600
-#define NTRANS 1500
-#define NSTATES 300
-#define MAXPOS 1500
-#define NOUTPUT 1500
-#endif
-
-#ifndef SMALL
-#define TREESIZE 1000
-#define NSTATES 500
-#define MAXPOS 2500
-#define NTRANS 2000
-#define NOUTPUT 3000
-#endif
+/*
+ * These were fixed worst-case sizes, chosen at build time between the
+ * SMALL and the full set, and a grammar smaller than either still paid
+ * for the whole table.  Now they are only the initial allocation: each
+ * table doubles in place (realloc) when it fills, so a small spec costs
+ * a small table and a big one grows to what it needs.  See the grow*()
+ * helpers in main.c.
+ */
+#define TREESIZE 128
+#define NTRANS 256
+#define NSTATES 64
+#define MAXPOS 256
+#define NOUTPUT 256
 #define NACTIONS 100
 #define ALITTLEEXTRA 30
 
@@ -156,6 +154,6 @@ extern int optim;
 extern int *verify, *advance, *stoff;
 extern int scon;
 extern char *psave;
-extern char *calloc(), *lxalloc();
+extern char *calloc(), *lxalloc(), *realloc();
 extern int buserr(), segviol();
  

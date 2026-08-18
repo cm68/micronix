@@ -200,6 +200,74 @@ i = calloc(a, b);
 		}
 	return(i);
 	}
+/*
+ * grow-on-demand for the tables that used to be fixed worst-case
+ * arrays.  Each doubles in place when it fills; the initial sizes are
+ * the TREESIZE/NTRANS/NSTATES/MAXPOS/NOUTPUT macros in ldefs.c, now
+ * deliberately small.  Index-addressed tables are a plain realloc;
+ * positions is the one table other pointers point into, so growing it
+ * re-bases every state[] and foll[] pointer.
+ */
+growtree(){
+	int ns;
+	ns = treesize + treesize;
+	name = (int *)realloc((char *)name, ns * sizeof(*name));
+	left = (int *)realloc((char *)left, ns * sizeof(*left));
+	right = (int *)realloc((char *)right, ns * sizeof(*right));
+	parent = (int *)realloc((char *)parent, ns * sizeof(*parent));
+	nullstr = (char *)realloc(nullstr, ns * sizeof(*nullstr));
+	if(name == 0 || left == 0 || right == 0 || parent == 0 || nullstr == 0)
+		error("out of memory growing parse tree");
+	treesize = ns;
+	}
+growstates(){
+	int ns;
+	ns = nstates + nstates;
+	state = (int **)realloc((char *)state, ns * sizeof(*state));
+	atable = (int *)realloc((char *)atable, ns * sizeof(*atable));
+	sfall = (int *)realloc((char *)sfall, ns * sizeof(*sfall));
+	cpackflg = (char *)realloc(cpackflg, ns * sizeof(*cpackflg));
+	gotof = (int *)realloc((char *)gotof, ns * sizeof(*gotof));
+	if(state == 0 || atable == 0 || sfall == 0 || cpackflg == 0 || gotof == 0)
+		error("out of memory growing state tables");
+	nstates = ns;
+	}
+growtrans(){
+	int ns;
+	ns = ntrans + ntrans;
+	nexts = (int *)realloc((char *)nexts, ns * sizeof(*nexts));
+	nchar = (char *)realloc(nchar, ns * sizeof(*nchar));
+	if(nexts == 0 || nchar == 0)
+		error("out of memory growing transition tables");
+	ntrans = ns;
+	}
+growpos(){
+	int ns, i;
+	int *old, *new;
+	old = positions;
+	ns = maxpos + maxpos;
+	new = (int *)realloc((char *)old, ns * sizeof(*positions));
+	if(new == 0)
+		error("out of memory growing position tables");
+	for(i = 0; i <= stnum; i++)
+		if(state[i])
+			state[i] = new + (state[i] - old);
+	for(i = 0; i <= tptr; i++)
+		if(foll[i])
+			foll[i] = new + (foll[i] - old);
+	nxtpos = new + (nxtpos - old);
+	positions = new;
+	maxpos = ns;
+	}
+growout(){
+	int ns;
+	ns = outsize + outsize;
+	verify = (int *)realloc((char *)verify, ns * sizeof(*verify));
+	advance = (int *)realloc((char *)advance, ns * sizeof(*advance));
+	if(verify == 0 || advance == 0)
+		error("out of memory growing output table");
+	outsize = ns;
+	}
 #ifdef DEBUG
 buserr(){
 	fflush(errorf);

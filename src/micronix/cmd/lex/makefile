@@ -16,7 +16,7 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 CC	= ccc
-CFLAGS	= -O -Dunix -DSMALL
+CFLAGS	= -O -Dunix
 BIN	= /bin
 LIBDIR	= /lib
 AUXDIR	= /usr/lib/lex

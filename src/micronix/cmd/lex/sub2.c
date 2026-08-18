@@ -94,6 +94,8 @@ int **array;
 int n; {
 	register int i, *temp;
 	register char *ctemp;
+	if(nxtpos + count + 1 >= positions + maxpos)
+		growpos();
 temp = nxtpos;
 ctemp = tmpstat;
 	array[n] = nxtpos;		/* note no packing is done in positions */
@@ -102,8 +104,6 @@ ctemp = tmpstat;
 		if(ctemp[i] == TRUE)
 			*temp++ = i;
 nxtpos = temp;
-	if(nxtpos >= positions+maxpos)
-		error("Too many positions %s",(maxpos== MAXPOS?"\nTry using %p num":""));
 	return;
 	}
 follow(v)
@@ -283,7 +283,7 @@ xstate = notin(stnum);
 				if(xstate == -2) warning("bad state  %d %o",s,i);
 				else if(xstate == -1){
 					if(stnum >= nstates)
-						error("Too many states %s",(nstates == NSTATES ? "\nTry using %n num":""));
+						growstates();
 					add(state,++stnum);
 #ifdef DEBUG
 					if(debug)pstate(stnum);
@@ -503,6 +503,8 @@ goto nopack;
 	else {
 #endif
 nopack:
+	if(nptr + cnt >= ntrans)
+		growtrans();
 	/* stick it in */
 		gotof[st] = nptr;
 		nexts[nptr] = cnt;
@@ -518,9 +520,6 @@ nopack:
 		gotof[st] = -1;
 		nptr--;
 		}
-	else
-		if(nptr > ntrans)
-			error("Too many transitions %s",(ntrans==NTRANS?"\nTry using %a num":""));
 	return;
 	}
 #ifdef DEBUG
@@ -715,7 +714,7 @@ startup = omin;
 			do {
 startup += 1;
 				if(startup > outsize - NCH)
-					error("output table overflow");
+					growout();
 				for(j = bot; j<= top; j++){
 					k=startup+ctable[nchar[j]];
 					if(verify[k])break;
@@ -733,7 +732,7 @@ k = startup + ctable[nchar[j]];
 			do {
 startup += 1;
 				if(startup > outsize - NCH)
-					error("output table overflow");
+					growout();
 				for(j = bot; j<= top; j++){
 k = startup + nchar[j];
 					if(verify[k])break;
@@ -882,6 +881,8 @@ int n; {
 	register int i, *j, k;
 	array[n] = nxtpos;
 	if(count == 0){
+		if(nxtpos + 1 >= positions + maxpos)
+			growpos();
 		*nxtpos++ = 0;
 		return;
 		}
