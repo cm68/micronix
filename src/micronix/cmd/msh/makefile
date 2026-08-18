@@ -1,7 +1,7 @@
 #
-# makefile for pwbsh
+# makefile for msh
 #
-# micronix/cmd/pwbsh/makefile
+# micronix/cmd/msh/makefile
 #
 # The native build: this runs inside micronix, under the make in
 # cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
@@ -17,7 +17,9 @@ CC	= ccc
 #
 CFLAGS	= -O
 BIN	= /bin
-PROG	= pwbsh
+PROG	= msh
+MAN	= msh.1
+MANDIR	= /usr/man/man1
 OBJS	= sh.o libpw.o
 
 all: $(PROG)
@@ -32,8 +34,11 @@ $(PROG): $(OBJS)
 $(OBJS): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
-install: $(PROG)
+install: $(PROG) install-man
 	cp $(PROG) $(BIN)/$(PROG)
+
+install-man:
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS)
