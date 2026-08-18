@@ -118,6 +118,7 @@ sizes(argc, argv) int argc; char *argv[]; {
 	nnonter = -1;
 	nprod = 1;
 	ndefout = 3;
+	extval = 0;
 	lineno = 1;
 	nstate = 0;
 	nlset = 0;

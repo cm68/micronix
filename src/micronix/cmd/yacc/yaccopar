@@ -59,7 +59,11 @@ yyparse() {
 		if( yychar<0 ) if( (yychar=yylex())<0 ) yychar = 0;
 		/* look through exception table */
 
-		for( yyxi=yyexca; (*yyxi!= (-1)) || (yyxi[1]!=yystate) ; yyxi += 2 ) ; /* VOID */
+		yyxi = yyexca;
+		for(;;){
+			if( (*yyxi == (-1)) && (yyxi[1] == yystate) ) break;
+			yyxi += 2;
+			}
 
 		while( *(yyxi+=2) >= 0 ){
 			if( *yyxi == yychar ) break;
@@ -129,7 +133,8 @@ yyparse() {
 			/* consult goto table to find next state */
 		yyn = yyr1[yyn];
 		yyj = yypgo[yyn] + *yyps + 1;
-		if( yyj>=yylast || yychk[ yystate = yyact[yyj] ] != -yyn ) yystate = yyact[yypgo[yyn]];
+		yystate = yyact[yyj];
+		if( yyj>=yylast || (yychk[yystate] + yyn) ) yystate = yyact[yypgo[yyn]];
 		switch(yym){
 			$A
 		}
