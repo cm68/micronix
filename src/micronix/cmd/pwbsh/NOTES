@@ -1,0 +1,40 @@
+The PWB shell on micronix
+=========================
+
+sh.c is the PWB (Mashey) shell, version 2.44 of 5/26/77, from
+extra/pwb/spencer/sys/source/s2/sh.c.  It is a second shell beside
+cmd/sh - the one with switch/goto/while flow control, onintr, and the
+dollar-bang accounting hooks - rather than a replacement for it.
+
+The port normalised the v6 C it was written in to what ccc accepts:
+
+  - the initializer syntax.  V6 wrote `int wide 5;`, `char *p &x;`,
+    `char s[] "str";` and `int a[] { ... }` without the `=`; all of
+    these gained one.  Same for the reversed assignment operators
+    `=|`, `=+`, `=&`, which became `|=`, `+=`, `&=`.
+
+  - the headers.  `errnos.h` and `stat.h` are errno.h and
+    sys/stat.h here (the latter through types.h and sys/fs.h); the
+    two mode bits the shell tests are named IFMT and IFDIR, so those
+    are #defined to S_IFMT and S_IFDIR.  The stat buffer is struct
+    stat, and the three fields it reads are st_mode, st_size0 and
+    st_size1.
+
+  - two shapes c1 cannot build code for.  The loop
+    `while((c = getc(...)) != c1)` in word() is rewritten as a
+    for(;;) with an early break, and `t[DCOM] = tline` in texec() is
+    made to compile by giving tline a static lifetime so its address
+    is a link-time constant.
+
+  - the v6 long-divide helper.  itoa() called ldiv(0, j, 10) and read
+    the remainder out of the global ldivr; it now uses j / 10 and
+    j % 10, which c1 already compiles.
+
+  - the libPW functions.  logname, logdir and logtty fed the login
+    accounting and are fixed strings in libpw.c until there is a real
+    utmp to read; tell is lseek to the current position; setexit and
+    reset are setjmp/longjmp; times is a no-op because there is no
+    accounting file.
+
+The PWB build recipe (sh.rc) is not carried over: its ed step that
+renamed .data to .text was a PWB a.out trick that has no meaning here.
