@@ -2088,12 +2088,12 @@ spilled:	;
 			if (addr->op == NUMBER) {
 				e->left = mkunary(DEREF, e->width, addr);
 				e->right = rewrite1(e->right);
-				goto children_done;
+				goto children_end;
 			}
 			if (islocdesc(addr)) {
 				e->left = addr;
 				e->right = rewrite1(e->right);
-				goto children_done;
+				goto children_end;
 			}
 			/*
 			 * The address is only worth pushing if it is
@@ -2151,7 +2151,7 @@ spilled:	;
 				if (w)
 					return w;
 			}
-			goto children_done;
+			goto children_end;
 		} else if ((e->op == AND || e->op == OR || e->op == XOR) &&
 			   e->dest == DEST_FLAGS && e->left &&
 			   (e->left->op == WIDEN || e->left->op == SEXT) &&
@@ -2213,7 +2213,7 @@ spilled:	;
 			if (!(n->op == INDEX || n->op == INHL ||
 			      (n->op == REGVAR && n->u.var.reg == R_IX)))
 				e->left = rewrite1(e->left);
-			goto children_done;
+			goto children_end;
 		} else if (e->left && e->left->op == REGVAR &&
 			   ISBYTE(e->width) &&
 			   (e->op == ASSIGN ||
@@ -2293,7 +2293,7 @@ spilled:	;
 				w = spiltstore(e, e->left);
 				if (w)
 					return w;
-				goto children_done;
+				goto children_end;
 			}
 		} else if ((e->op == PREINC || e->op == PREDEC ||
 			    e->op == POSTINC || e->op == POSTDEC) &&
@@ -2395,7 +2395,7 @@ spilled:	;
 			e->right = rewrite1(e->right);
 			e->right = movetotgt(e->right, rtgt);
 			e->left = rewrite1(e->left);
-			goto children_done;
+			goto children_end;
 		} else if (!e->left || !(e->left->nored & NR_NORED)) {
 			e->left = rewrite1(e->left);
 		}
@@ -2407,7 +2407,7 @@ spilled:	;
 			else
 				e->right = rewrite1(e->right);
 		}
-	children_done: ;
+	children_end: ;
 		/*
 		 * The fixups below all ask whether this is a narrow node,
 		 * and most of them whether both children are there.  They
