@@ -1,0 +1,126 @@
+.he "lex (1)                      8/18/26                      lex (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+lex
+- generate programs for simple lexical tasks
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+lex [ -rctvfn ] [ file ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Lex generates programs to be used in simple lexical analysis of text.
+The input files hold strings and expressions to be searched for, and C
+text to be executed when one is found.  A file lex.yy.c is generated
+which, loaded with the library, copies input to output except when a
+string in the file is found; then the corresponding program text is
+executed.  The actual string matched is left in yytext, an external
+character array.  Matching is done in the order of the strings in the
+file.
+.sp
+Strings may contain square brackets for character classes, as in
+.nf
+	[abx-z]
+.fi
+which means a, b, x, y and z; the operators *, + and ? mean any
+non-negative number of, any positive number of, and zero or one
+occurrences of the previous character or class.  A dot is the class of
+all ASCII characters except newline.  Parentheses group and a vertical
+bar is alternation.  A leading ^ permits a match only immediately after
+a newline, and a trailing $ requires one.  A / in an expression marks
+trailing context: only the part before the slash is returned in yytext,
+but the remainder must follow in the input.  An operator character may
+be used as an ordinary symbol inside "" or preceded by \.
+.sp
+Three macros are expected: input() to read a character, unput(c) to
+replace one, and output(c) to write one.  They are defined in terms of
+the standard streams, but may be overridden.  The program generated is
+yylex(), and the library holds a main() which calls it.  REJECT on the
+right of a rule rejects the match and tries the next suitable one;
+yymore() accumulates more characters into yytext; yyless(p) pushes back
+the part of the match from p on.  input and output use the files yyin
+and yyout, which default to stdin and stdout.
+.sp
+Any line beginning with a blank is taken as C text and copied; before
+the first %% it goes into the external definition area of lex.yy.c.
+All rules follow a %%, as in yacc.  A line before the %% beginning with
+a non-blank character defines the string on its left to be the rest of
+the line; it is called out later by surrounding it with {}.  Curly
+brackets do not imply parentheses; only string substitution is done.
+Example:
+.nf
+	D	[0-9]
+	%%
+	if	printf("IF statement\n");
+	[a-z]+	printf("tag, value %s\n", yytext);
+	0{D}+	printf("octal number %s\n", yytext);
+	{D}+	printf("decimal number %s\n", yytext);
+	"++"	printf("unary op\n");
+	"+"	printf("binary op\n");
+.fi
+.sp
+The external names lex generates all begin with yy or YY.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-r	Ratfor actions.
+
+.ti -10
+-c	C actions; the default.
+
+.ti -10
+-t	Write lex.yy.c to the standard output rather than to a file.
+
+.ti -10
+-v	Print a one-line summary of the machine generated.
+
+.ti -10
+-f	Faster compilation: no packing, for much smaller machines only.
+
+.ti -10
+-n	Suppress the summary.
+
+.in -10
+.sp
+The flags must come before any files.  Multiple files are treated as a
+single file; with no file the standard input is used.
+.sp
+In the definitions section %p num, %n num, %t num and %a num set the
+maximum number of positions, states, parse tree nodes and transitions,
+defaults 2000, 500, 1000 and 3000.  Using any of them implies -v unless
+-n is given.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+yacc (1)
+.sp
+Lex - Lexical Analyzer Generator, by M. E. Lesk and E. Schmidt.
+.sp 2
+.in -5
+.bd
+BUGS
+.in +5
+.br
+The Ratfor option is not yet fully operational.

@@ -1,0 +1,4 @@
+*.o
+lex
+liblc.a
+lex.tar
