@@ -3359,6 +3359,16 @@ struct rule rules[] = {
 	R(PREINC,REGVAR,0,0,0,1, PREINC, P_L, P_NONE, P_L, RF_B, "\tinc b\n\tld a,b\n", R_A),
 	R(PREINC,REGVAR,0,0,0,1, PREINC, P_L, P_NONE, P_L, RF_C, "\tinc c\n\tld a,c\n", R_A),
 	R(PREINC,INA,0,0,0,1, PREINC, P_L, P_NONE, P_NONE, 0, "\tinc a\n", R_A),
+	/*
+	 * inc/dec a literal address - "*(char *)0x1000" - the same place
+	 * the ASSIGN(DEREF,P_NUM) rules reach, only stepped.  Load the
+	 * address and step through it: a byte is inc/dec (hl), a word is
+	 * loaded, stepped and stored back.
+	 */
+	R(PREINC,P_NUM,0,0,0,1, PREINC, P_L, P_NONE, P_NONE, 0,
+		"\tld hl,$La\n\tinc (hl)\n\tld a,(hl)\n", R_A),
+	R(PREINC,P_NUM,0,0,0,2, PREINC, P_L, P_NONE, P_NONE, 0,
+		"\tld hl,($La)\n\tinc hl\n\tld ($La),hl\n", R_HL),
 
 	/*
 	 * Stepping a long in memory.  The helper takes the address in HL,
@@ -3459,6 +3469,11 @@ struct rule rules[] = {
 	/* postfix wants the old value, so take a copy before stepping */
 	R(POSTINC,REGVAR,0,0,0,1, POSTINC, P_L, P_NONE, P_L, RF_B, "\tld a,b\n\tinc b\n", R_A),
 	R(POSTINC,REGVAR,0,0,0,1, POSTINC, P_L, P_NONE, P_L, RF_C, "\tld a,c\n\tinc c\n", R_A),
+	/* postfix step of a literal address: old value is the read */
+	R(POSTINC,P_NUM,0,0,0,1, POSTINC, P_L, P_NONE, P_NONE, 0,
+		"\tld hl,$La\n\tld a,(hl)\n\tinc (hl)\n", R_A),
+	R(POSTINC,P_NUM,0,0,0,2, POSTINC, P_L, P_NONE, P_NONE, 0,
+		"\tld hl,($La)\n\tinc hl\n\tld ($La),hl\n\tdec hl\n", R_HL),
 	R(PREDEC,SYMREF,0,0,0,27, PREDEC, P_L, P_NONE, P_NONE, 0, RT313, R_HL),
 	R(PREDEC,SYMREF,0,0,0,3, PREDEC, P_L, P_NONE, P_NONE, 0,
 		F_LDHLL F_CALLLADEC F_EXX F_LDHLL2 F_EXX F_LDHLL3, R_HL),
@@ -3512,6 +3527,11 @@ struct rule rules[] = {
 	R(PREDEC,REGVAR,0,0,0,1, PREDEC, P_L, P_NONE, P_L, RF_B, "\tdec b\n\tld a,b\n", R_A),
 	R(PREDEC,REGVAR,0,0,0,1, PREDEC, P_L, P_NONE, P_L, RF_C, "\tdec c\n\tld a,c\n", R_A),
 	R(PREDEC,INA,0,0,0,1, PREDEC, P_L, P_NONE, P_NONE, 0, "\tdec a\n", R_A),
+	/* prefix decrement of a literal address, as PREINC above */
+	R(PREDEC,P_NUM,0,0,0,1, PREDEC, P_L, P_NONE, P_NONE, 0,
+		"\tld hl,$La\n\tdec (hl)\n\tld a,(hl)\n", R_A),
+	R(PREDEC,P_NUM,0,0,0,2, PREDEC, P_L, P_NONE, P_NONE, 0,
+		"\tld hl,($La)\n\tdec hl\n\tld ($La),hl\n", R_HL),
 	R(POSTDEC,SYMREF,0,0,0,3, POSTDEC, P_L, P_NONE, P_NONE, 0, RT313, R_HL),
 	R(POSTDEC,INDEX,0,0,0,3, POSTDEC, P_L, P_NONE, P_NONE, 0, RT430, R_HL),
 	R(POSTDEC,INHL,0,0,0,3, POSTDEC, P_L, P_NONE, P_NONE, 0, RT363, R_HL),
@@ -3552,6 +3572,11 @@ struct rule rules[] = {
 	R(POSTDEC,INHL,0,0,0,26, POSTDEC, P_L, P_NONE, P_NONE, 0, RT113, 0),
 	R(POSTDEC,REGVAR,0,0,0,1, POSTDEC, P_L, P_NONE, P_L, RF_B, "\tld a,b\n\tdec b\n", R_A),
 	R(POSTDEC,REGVAR,0,0,0,1, POSTDEC, P_L, P_NONE, P_L, RF_C, "\tld a,c\n\tdec c\n", R_A),
+	/* postfix decrement of a literal address */
+	R(POSTDEC,P_NUM,0,0,0,1, POSTDEC, P_L, P_NONE, P_NONE, 0,
+		"\tld hl,$La\n\tld a,(hl)\n\tdec (hl)\n", R_A),
+	R(POSTDEC,P_NUM,0,0,0,2, POSTDEC, P_L, P_NONE, P_NONE, 0,
+		"\tld hl,($La)\n\tdec hl\n\tld ($La),hl\n\tinc hl\n", R_HL),
 
 
 	/* REGVAR -> IN* (value is in register) */
