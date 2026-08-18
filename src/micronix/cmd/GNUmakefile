@@ -17,6 +17,10 @@
 #
 #   far cpmtools mkfs mt
 #
+# yacc is here too and builds - cmd/yacc - but is not in DIRS yet: the
+# two-pass table sizing is in, but nothing has compiled the parser it
+# generates, so liby.a and the templates have only been smoke-tested.
+#
 # And the compiler, moving into this tree one directory per pass and
 # per tool:
 #
