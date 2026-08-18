@@ -18,6 +18,8 @@ CFLAGS	= -O
 BIN	= /bin
 LIBDIR	= /lib
 AUXDIR	= /usr/lib
+MAN	= yacc.1
+MANDIR	= /usr/man/man1
 PROG	= yacc
 OBJS	= y0.o y1.o y2.o y3.o y4.o y5.o
 LIBOBJS	= libmai.o libpar.o libzac.o libzer.o libzin.o
@@ -39,6 +41,7 @@ install: $(PROG) liby.a
 	cp $(PROG) $(BIN)/$(PROG)
 	cp liby.a $(LIBDIR)/liby.a
 	cp yaccopar yaccepar yaccrpar $(AUXDIR)/
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS) $(LIBOBJS)

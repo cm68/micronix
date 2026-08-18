@@ -1,0 +1,94 @@
+.he "yacc (1)                     8/18/26                      yacc (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+yacc
+- yet another compiler-compiler
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+yacc [ -vrd ] grammar
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Yacc converts a context-free grammar into a set of tables for a simple
+automaton which executes an LR(1) parsing algorithm.  The grammar may
+be ambiguous; specified precedence rules are used to break ambiguities.
+.sp
+The output is y.tab.c, which must be compiled by the C compiler and
+loaded with any other routines required, perhaps a lexical analyzer,
+and the yacc library:
+.nf
+	cc y.tab.c other.o -ly
+.fi
+.sp
+If the -v flag is given, the file y.output is prepared, containing a
+description of the parsing tables and a report on conflicts generated
+by ambiguities in the grammar.
+.sp
+The -r flag causes yacc to accept grammars with Ratfor actions and
+produce Ratfor output on y.tab.r.
+.sp
+If the -d flag is used, the file y.tab.h is generated with the define
+statements that associate the yacc-assigned token codes with the
+user-declared token names.  This allows source files other than y.tab.c
+to access the token codes.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+.nf
+	y.output	description of the parsing tables, with -v
+	y.tab.c		the C parser
+	y.tab.r		the Ratfor parser, with -r
+	y.tab.h		defines for token names, with -d
+	yacc.tmp, yacc.acts
+			temporary files
+	/lib/liby.a	runtime library
+	/usr/lib/yaccopar
+			parser prototype for C programs
+	/usr/lib/yaccepar
+			parser prototype for EFL programs
+	/usr/lib/yaccrpar
+			parser prototype for Ratfor programs
+.fi
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+lex (1)
+.sp
+Yacc - Yet Another Compiler Compiler, by S. C. Johnson.
+.sp 2
+.in -5
+.bd
+DIAGNOSTICS
+.in +5
+.br
+The number of reduce-reduce and shift-reduce conflicts is reported on
+the standard output; a more detailed report is found in the y.output
+file.
+.sp 2
+.in -5
+.bd
+BUGS
+.in +5
+.br
+Because file names are fixed, at most one yacc process can be active in
+a given directory at a time.
