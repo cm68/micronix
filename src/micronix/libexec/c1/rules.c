@@ -3069,9 +3069,18 @@ struct rule rules[] = {
 	/* negation */
 	/* a byte in A negates in place - the Z80 has the instruction */
 	R(NEG,INA,0,0,0,1, NEG, P_L, P_NONE, P_NONE, 0, "\tneg\n", R_A),
-	R(NEG,INBC,0,0,0,0, NEG, P_L, P_NONE, P_NONE, 0, F_LDA0 "\tsub c\n" F_LDLA F_LDA0 "\tsbc a,b\n" F_LDHA, R_HL),
-	R(NEG,INHL,0,0,0,0, NEG, P_L, P_NONE, P_NONE, 0, F_XORA "\tsub l\n" F_LDLA F_LDA0 "\tsbc a,h\n" F_LDHA, R_HL),
-	R(NEG,INDE,0,0,0,0, NEG, P_L, P_NONE, P_NONE, 0, F_LDA0 F_SUBE F_LDLA F_LDA0 "\tsbc a,d\n" F_LDHA, R_HL),
+	/*
+	 * A word negates through A into wherever it was asked for, which
+	 * $t/$u name.  As the right operand of a comparison the target is
+	 * DE, and always answering in HL put the result on top of the left
+	 * operand: the compare then read two values both claiming HL, which
+	 * no rule builds.  "a != -b" in a flag context reached exactly that
+	 * and emitted nothing.  Only A is scratch, so a register variable in
+	 * BC is negated into DE without being lost.
+	 */
+	R(NEG,INBC,0,0,0,0, NEG, P_L, P_NONE, P_NONE, 0, F_LDA0 "\tsub c\n\tld $t,a\n" F_LDA0 "\tsbc a,b\n\tld $u,a\n", 0),
+	R(NEG,INHL,0,0,0,0, NEG, P_L, P_NONE, P_NONE, 0, F_XORA "\tsub l\n\tld $t,a\n" F_LDA0 "\tsbc a,h\n\tld $u,a\n", 0),
+	R(NEG,INDE,0,0,0,0, NEG, P_L, P_NONE, P_NONE, 0, F_LDA0 F_SUBE "\tld $t,a\n" F_LDA0 "\tsbc a,d\n\tld $u,a\n", 0),
 
 	/* complement of a word; the long form is handled in rewrite.c,
 	 * beside the long negation it shares its shape with */
