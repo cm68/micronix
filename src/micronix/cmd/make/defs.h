@@ -1,7 +1,7 @@
 /*
- * pwbmake - the v7 make, ported to micronix
+ * make - the v7 make, ported to micronix
  *
- * cmd/pwbmake/defs
+ * cmd/make/defs
  *
  * The shared header, kept named "defs" as in v7; every translation
  * unit pulls it in with  #include "defs".  The headers are this

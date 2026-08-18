@@ -34,17 +34,6 @@ $(PROG): $(OBJS)
 diffh: diffh.o
 	$(CC) $(CFLAGS) -o $@ diffh.o
 
-#
-# One entry for every object: $* is the target without its suffix, so
-# this reads as "each of these comes from the .c of the same name".
-# diffh.o has its own rule because it is not in $(OBJS).
-#
-$(OBJS): $*.c
-	$(CC) $(CFLAGS) -c $*.c
-
-diffh.o: diffh.c
-	$(CC) $(CFLAGS) -c diffh.c
-
 install: $(PROG) diffh
 	cp $(PROG) $(BIN)/$(PROG)
 	cp $(MAN) $(MANDIR)/$(MAN)

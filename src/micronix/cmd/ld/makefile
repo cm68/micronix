@@ -26,19 +26,12 @@ MAN	= ld.1
 MANDIR	= /usr/man/man1
 BIN	= /bin
 PROG	= ld
-OBJS	= ld.o wsobj.o
+OBJS	= ld.o
 
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $(OBJS)
-
-#
-# One entry for every object: $* is the target without its suffix, so
-# this reads as "each of these comes from the .c of the same name".
-#
-$(OBJS): $*.c
-	$(CC) $(CFLAGS) -c $*.c
+	$(CC) $(CFLAGS) -o $@ $(OBJS) /lib/libutil.a
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/ld

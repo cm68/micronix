@@ -28,12 +28,7 @@ all: $(PROG)
 $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-#
-# One entry for every object: $* is the target without its suffix, so
-# this reads as "each of these comes from the .c of the same name".
-#
-$(OBJS): $*.c $(HDRS)
-	$(CC) $(CFLAGS) -c $*.c
+$(OBJS): $(HDRS)
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/$(PROG)

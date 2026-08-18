@@ -34,8 +34,7 @@ liby.a: $(LIBOBJS)
 	rm -f $@
 	ar r $@ $(LIBOBJS)
 
-$(OBJS) $(LIBOBJS): $*.c $(HDRS)
-	$(CC) $(CFLAGS) -c $*.c
+$(OBJS) $(LIBOBJS): $(HDRS)
 
 install: $(PROG) liby.a
 	cp $(PROG) $(BIN)/$(PROG)

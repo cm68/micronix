@@ -7,36 +7,30 @@
 # cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
 # it cross builds the same program on the host.
 #
+# y.tab.c is the parser yacc generated from gram.y, committed so the
+# native build does not have to run yacc first.  defs.h is the shared
+# header every .c includes.
+#
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 CC	= ccc
-#
-# -O is the peephole pass.  The cross build passes it too - see
-# GNUmakefile.inc, which explains why it is not optional on a machine
-# where the heap is whatever is left of 64k after the image.
-#
 CFLAGS	= -O
 BIN	= /bin
 MAN	= make.1
 MANDIR	= /usr/man/man1
 PROG	= make
-HDRS	= make.h
-OBJS	= make.o makeinit.o makeread.o maketime.o
+OBJS	= main.o doname.o misc.o files.o dosys.o y.tab.o ident.o
+HDRS	= defs.h
 
 all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-#
-# One entry for every object: $* is the target without its suffix, so
-# this reads as "each of these comes from the .c of the same name".
-#
-$(OBJS): $*.c $(HDRS)
-	$(CC) $(CFLAGS) -c $*.c
+$(OBJS): $(HDRS)
 
 install: $(PROG)
-	cp $(PROG) $(BIN)/make
+	cp $(PROG) $(BIN)/$(PROG)
 	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:

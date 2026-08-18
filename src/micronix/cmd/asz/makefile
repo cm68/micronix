@@ -27,19 +27,14 @@ MANDIR	= /usr/man/man1
 BIN	= /bin
 PROG	= asz
 HDRS	= asm.h
-OBJS	= asm.o asmz80.o asz.o wsobj.o
+OBJS	= asm.o asmz80.o asz.o
 
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) /lib/libutil.a
 
-#
-# One entry for every object: $* is the target without its suffix, so
-# this reads as "each of these comes from the .c of the same name".
-#
-$(OBJS): $*.c $(HDRS)
-	$(CC) $(CFLAGS) -c $*.c
+$(OBJS): $(HDRS)
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/asz

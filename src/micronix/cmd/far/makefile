@@ -35,8 +35,7 @@ all: $(PROG)
 $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-$(OBJS): $*.c $(HDRS)
-	$(CC) $(CFLAGS) -c $*.c
+$(OBJS): $(HDRS)
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/$(PROG)

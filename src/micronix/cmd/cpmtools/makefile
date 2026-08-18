@@ -24,9 +24,6 @@ all: $(PROG)
 $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-$(OBJS): $*.c
-	$(CC) $(CFLAGS) -c $*.c
-
 install:
 
 clean:

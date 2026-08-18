@@ -29,9 +29,6 @@ all: $(PROG)
 $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-$(OBJS): $*.c
-	$(CC) $(CFLAGS) -c $*.c
-
 install: $(PROG)
 	cp $(PROG) $(BIN)/setdev
 	cp $(MAN) $(MANDIR)/$(MAN)

@@ -33,9 +33,6 @@ all: $(PROG)
 $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-$(OBJS): $*.c
-	$(CC) $(CFLAGS) -c $*.c
-
 install: $(PROG)
 	cp $(PROG) $(BIN)/$(PROG)
 	cp $(MAN) $(MANDIR)/$(MAN)
