@@ -803,7 +803,7 @@ TTSIZE4=152
 	.globl	_mputc, _mset, _console, intrupt, slint, m1int, m2int
 	.globl	m3int, m0int, clkint
 	.extern	_di, _ei, dicount, _mttys, _ppint, _ttyin, _ttyout
-	.extern	_mumint, _ttyerro, _clock
+	.extern	_mumint, _ttyerror, _clock
 MBASE=0x48
 SLBASE=0x58
 MUDATA=MBASE+0
@@ -941,7 +941,7 @@ main:
 	in	a,(MUSTATUS)
 	and	ERROR
 	jp	z,L100
-	call	_ttyerro
+	call	_ttyerror
 	pop	af
 	ret
 L100:
