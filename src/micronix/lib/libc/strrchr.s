@@ -1,6 +1,10 @@
 	psect	text
 	global	rcsv, rcret, _strrchr
-
+;
+; strrchr(s, c) - last c in s, or 0.  strrchr is rindex under its
+; ANSI name, and the terminator is matched like any other character,
+; so strrchr(s, '\0') returns the terminator rather than 0.
+;
 _strrchr:
 	call	rcsv
 
@@ -13,6 +17,8 @@ _strrchr:
 	ld	a,(hl)
 	or	a
 	jr	nz,6b
+	cp	e
+	jr	z,4f
 1:
 	dec	hl
 	ld	a,c

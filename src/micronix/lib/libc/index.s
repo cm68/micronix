@@ -24,15 +24,14 @@
 
 _index:	call	rcsv
 
-	jr	3f
 1:
-	inc	hl
-3:
 	ld	a,(hl)
+	cp	e
+	jr	z,4f
 	or	a
 	jr	z,2f
-	cp	e
-	jr	nz,1b
+	inc	hl
+	jr	1b
 4:	jp	rcret
 
 2:	ld	hl,0

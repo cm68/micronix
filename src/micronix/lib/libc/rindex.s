@@ -36,6 +36,8 @@ _rindex:
 	ld	a,(hl)
 	or	a
 	jr	nz,6b
+	cp	e
+	jr	z,4f
 1:
 	dec	hl
 	ld	a,c
