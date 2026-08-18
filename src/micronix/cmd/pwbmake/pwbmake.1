@@ -1,0 +1,101 @@
+.he "pwbmake (1)                  8/18/26                      pwbmake (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+pwbmake
+- maintain program groups
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+pwbmake [ -f makefile ] [ option ] ... [ name ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Pwbmake executes commands in a description file to bring one or more
+target names up to date.  A target is remade if it does not exist, or
+if any file it depends on has been modified since the target was last
+modified.
+.sp
+If no -f option is given, "makefile" and then "Makefile" are tried in
+order; a description of "-" means the standard input.
+.sp
+A description file holds a sequence of entries.  The first line of an
+entry is a blank-separated list of targets, a colon, and a list of
+prerequisite files.  Text after a semicolon, and every following line
+that begins with a tab, is a shell command run to update the target.
+Lines beginning with # are comments.
+.sp
+Entries of the form "string = value" define a macro; later $(string)
+(or $s for a single character) is replaced by its value.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-d	Print debugging information.
+
+.ti -10
+-p	Print the dependency graph.
+
+.ti -10
+-s	Silent mode; do not print commands before running them.
+
+.ti -10
+-i	Ignore nonzero exit codes (as the .IGNORE entry).
+
+.ti -10
+-k	On a failure, abandon the current entry but continue
+branches that do not depend on it.
+
+.ti -10
+-S	Stop at the first failed command.
+
+.ti -10
+-n	Print, but do not run, the commands.
+
+.ti -10
+-t	Touch the targets (update their times) instead of running
+commands.
+
+.ti -10
+-q	Do nothing; exit 0 if the target is up to date, -1 if not.
+
+.ti -10
+-r	Start with no implicit rules (an empty .SUFFIXES).
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The special names .SUFFIXES, .DEFAULT, .IGNORE, .SILENT and .PRECIOUS
+control implicit rules, defaults, error and interrupt handling.  The
+macros $*, $@, $< and $? name the stem, the target, the prerequisites
+and the out-of-date prerequisites.
+.sp
+Archive members a(b) are dated by the archive as a whole: micronix's
+object format is not a.out, so a member's own timestamp is not read.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ccc (1), sh (1), make (1)
