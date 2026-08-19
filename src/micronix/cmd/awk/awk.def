@@ -104,7 +104,7 @@ typedef long obj;
 #define	objptr(o)	((cell *)((o) & 0xffffL))
 #define	objtype(o)	((char)(((o) >> 16) & 0xff))
 #define	objsub(o)	((char)(((o) >> 24) & 0xff))
-#define	objmk(p,t,s)	((obj)((long)(p) | ((long)(t) << 16) | ((long)(s) << 24)))
+#define	objmk(p,t,s)	((obj)(((long)(p) & 0xffffL) | ((long)(t) << 16) | ((long)(s) << 24)))
 
 #define BOTCH	1
 struct nd {

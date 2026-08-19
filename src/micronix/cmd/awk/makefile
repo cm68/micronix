@@ -17,7 +17,7 @@ CFLAGS	= -O
 BIN	= /bin
 PROG	= awk
 OBJS	= b.o lib.o main.o parse.o run.o token.o tran.o freeze.o popen.o \
-	  intmath.o y.tab.o lex.yy.o proctab.o
+	  intmath.o y.tab.o yylex.o proctab.o
 
 all: $(PROG)
 
