@@ -522,9 +522,12 @@ yylexreg()
 			yylval = c2;
 		return CHAR;
 	case '/':
+		/* end of regex: return the closing '/' as a token.  The
+		 * original awk.lx.l rule switches back to state A and
+		 * unput()s the slash so it is re-lexed as the operator;
+		 * returning it directly is equivalent. */
 		lexstate = 0;
-		ungetch('/');
-		return 0;	/* end of regex; parser sees the '/' next */
+		return '/';
 	case '\n':
 		yyerror("newline in regular expression");
 		lexstate = 0;
