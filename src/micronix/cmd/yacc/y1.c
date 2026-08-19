@@ -105,9 +105,16 @@ sizes(argc, argv) int argc; char *argv[]; {
 	tlim = nt + 2;
 	ntlim = nnt + 2;
 	prdlim = np + 2;
-	memsiz = mc + 2*(mc + np) + 16;
+	/* The item memory (mem0's item sets) is not a small multiple of
+	 * the production storage: a grammar with many operators - expr,
+	 * with its eight %left binary operators - builds far more LR(1)
+	 * items than productions.  The old 2*(mc+np) tail under-allocated
+	 * expr and it died "out of state space".  The 8x item tail and the
+	 * doubled state bound cover it with room for the lookahead sets
+	 * the extra items drag along. */
+	memsiz = mc + 8*(mc + np) + 64;
 	cnamsz = cc + 2;
-	stsize = mc + np + 4;
+	stsize = 2*(mc + np) + 16;
 	lsetsz = wssize = stsize;
 	actsiz = stsize * (nt + 2) + 4;
 	allocgrammar();
