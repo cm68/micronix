@@ -7,11 +7,16 @@
 #include "cpp.h"
 #include "lexeme.h"
 
-#define CFSV_MAX 21	/* SZQ_MAX >= CFSV_MAX + 1: a bail replays all.
-			 * 21 holds the three-field pack expression the
+#define CFSV_MAX 40	/* SZQ_MAX >= CFSV_MAX + 1: a bail replays all.
+			 * 21 held the three-field pack expression the
 			 * rules table is made of - nineteen tokens - with
-			 * a little to grow; 16 silently unfolded all 455
-			 * of them and handed c0 back 2728 folds */
+			 * a little to grow, and 16 before that silently
+			 * unfolded all 455 of them.  The awk port's objmk
+			 * is 37 tokens, longer than any expression the old
+			 * limits were sized for; at 21 its left terms were
+			 * replayed unfolded and only the rightmost folded,
+			 * so a long global built by objmk came out two
+			 * bytes of zero. */
 
 /* norm.c: the walker's replay queue, drained at the chokepoint */
 extern struct token szq[];
@@ -211,6 +216,48 @@ cfpm(void)
 	case LPAR:
 		if (cfstep())
 			return 0;
+		/*
+		 * A type cast, "(type)expr".  The folder's own arithmetic is
+		 * long-wide - capply works in long - so a widening cast only
+		 * has to set cflong, and a narrowing one truncates the value
+		 * here.  Before this, "(long)1 << 24" bailed out at the
+		 * keyword, c0's "never fold longs" left it a tree, and a
+		 * static initialiser wrote two bytes of zero where a four-byte
+		 * long belonged.
+		 *
+		 * Only the integer keywords are folded.  A pointer or struct
+		 * cast names a place, not a number: "(char *)" meets the '*'
+		 * where the ')' belongs and bails, leaving pass1 to handle it
+		 * exactly as before.
+		 */
+		if (szkw(cfcur.type)) {
+			unsigned short size = 0;
+
+			while (szkw(cfcur.type)) {
+				size = kwsz(cfcur.type, size);
+				if (cfstep())
+					return 0;
+			}
+			if (cfcur.type != RPAR) {
+				cfbad = 1;
+				return 0;
+			}
+			cfstep();
+			cfops++;
+			v = cfpm();
+			if (cfbad)
+				return 0;
+			/* the cast's width is the answer's, whatever came in */
+			if (size > 2)
+				cflong = 1;
+			else if (size == 2)
+				cfbin = 1;
+			if (size == 1)
+				v &= 0xff;
+			else if (size == 2)
+				v &= 0xffff;
+			return v;
+		}
 		v = cfxp(13);
 		if (cfbad)
 			return 0;

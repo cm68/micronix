@@ -281,14 +281,22 @@ label(Expr *e)
 	 * templates write through $t and $T and so land wherever they
 	 * were asked to.  Everything else - a global, a register variable
 	 * - names l and h outright.
+	 *
+	 * But the $t/$T forms only step by one.  A step by more than one
+	 * - a pointer to anything wider than a byte - has no such rule:
+	 * it is lowered to a compound assignment, which loads through HL
+	 * whatever register it was asked for.  Costing that two, the same
+	 * as the non-frame forms above, stops a parent from leaving its
+	 * own operand in HL for the load to walk over.
 	 */
 	case PREINC:
 	case POSTINC:
 	case PREDEC:
 	case POSTDEC:
 		e->regs = l;
-		if (e->left->op != LOCALVAR &&
-		    e->left->op != INDEX && e->regs < 2)
+		if (e->regs < 2 &&
+		    (e->u.incdec.amt != 1 ||
+		     (e->left->op != LOCALVAR && e->left->op != INDEX)))
 			e->regs = 2;
 		if (!e->regs)
 			e->regs = 1;
