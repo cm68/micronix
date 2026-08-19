@@ -1,0 +1,101 @@
+.he "awk (1)                     8/19/26                      awk (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+awk
+- pattern scanning and processing language
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+awk [ -Fc ] [ -f progfile | 'program' ] [ file ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Awk scans each input file for lines that match any of a set of patterns
+specified in the program, which appears literally on the command line
+or in a file named by -f progfile.  With each pattern there can be an
+associated action, performed when a line matches.  Files are read in
+order; with no files, the standard input is read.  A file name of -
+means the standard input, and an argument of the form var=value is
+treated as an assignment rather than a file name.
+.sp
+An input line is made up of fields separated by white space (changeable
+with FS or -Fc).  The fields are $1, $2, ...; $0 is the whole line, and
+$expr refers to a field indirectly.  NF, NR and FILENAME are the number
+of fields in the current record, the number of records read so far, and
+the name of the current input file.
+.sp
+A pattern-action statement has the form:
+.nf
+	pattern { action }
+.fi
+.sp
+A missing { action } prints the line; a missing pattern always matches.
+An action is a sequence of statements - if, while, for, break, continue,
+next, exit, assignment, print, printf and getline - terminated by
+semicolons, newlines or right braces.  Variables are created on first
+use and take string or numeric values as appropriate; array subscripts
+are strings, so arrays give associative memory.
+.sp
+Patterns are boolean combinations of regular expressions (as in egrep,
+surrounded by slashes) and relational expressions (the six C relations,
+plus ~ and !~ for match).  A pattern of two expressions separated by a
+comma selects the range of lines between them.  BEGIN and END match
+before the first input line and after the last.
+.sp
+The builtin functions are length, substr, index, split, sprintf, int,
+log, exp and sqrt.  Numbers in this awk are 32-bit signed integers:
+division truncates toward zero, and log, exp and sqrt return integer
+approximations.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+Print lines longer than 72 characters:
+.nf
+	length > 72
+.fi
+.sp
+Print the first two fields in opposite order:
+.nf
+	{ print $2, $1 }
+.fi
+.sp
+Sum the first column, print sum and average:
+.nf
+	{ s += $1 }
+	END { print "sum is", s, " average is", s/NR }
+.fi
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+sed (1), grep (1), lex (1)
+.sp 2
+.in -5
+.bd
+BUGS
+.in +5
+.br
+There is no floating point; numbers are 32-bit signed integers.
+.sp
+getline has no var or < file forms, and a relational expression is not
+a general expression, so it can appear only in an if(...) test or a
+pattern.  NF is 0 in an END block (the empty record read at end of
+file is re-split).

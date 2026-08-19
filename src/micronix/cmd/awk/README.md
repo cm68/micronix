@@ -83,7 +83,23 @@ awk.
 
 ## Not ported (faithfully)
 
-The relational-expression grammar is the original 2.11BSD one: a
-comparison is an expression only inside `if (...)` and patterns, so
-`x = (a == b)` and `print (a == b)` are syntax errors, and `print a > b`
-parses as redirection.  This is the stock grammar, not a port bug.
+A few things are stock 2.11BSD behavior, not port bugs:
+
+- The relational-expression grammar: a comparison is an expression only
+  inside `if (...)` and patterns, so `x = (a == b)` and `print (a == b)`
+  are syntax errors, and `print a > b` parses as redirection.
+- `getline` has no `var` or `< file` forms; only bare `getline` (read the
+  next record) is in the grammar.
+- `NF` is 0 in an `END` block: `getrec` re-splits the empty record read at
+  end of file.
+- There is no `-v`; `var=value` is a file argument, processed after
+  `BEGIN`, so `BEGIN` cannot see it.
+
+Everything else has been exercised against the tree's own files - field
+splitting and assignment, `NF`/`NR`/`FILENAME`, all six comparisons plus
+string comparison, `if`/`for`/`while`/`break`/`continue`/`next`/`exit`,
+arrays and `in`, `split`/`substr`/`index`/`length`, regex with classes,
+anchors, alternation, `~`/`!~` and range patterns, `printf`/`sprintf`,
+`> file` redirection, and `getline` - and it agrees with host awk.
+
+`awk.1` is the man page, in the tree's `.he`/`.fo` roff form.

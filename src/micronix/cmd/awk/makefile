@@ -15,6 +15,8 @@
 CC	= ccc
 CFLAGS	= -O
 BIN	= /bin
+MAN	= awk.1
+MANDIR	= /usr/man/man1
 PROG	= awk
 OBJS	= b.o lib.o main.o parse.o run.o token.o tran.o freeze.o popen.o \
 	  intmath.o y.tab.o yylex.o proctab.o
@@ -29,6 +31,7 @@ $(OBJS): $*.c
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/$(PROG)
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS)
