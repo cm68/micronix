@@ -159,3 +159,16 @@ src/micronix/cmd/size/size
 src/tools/fsck
 src/micronix/lib/fslib/libfs.a
 src/hwsim/resources/cold_boot_loader.bin
+
+#
+# Runtime litter, never a source: the simulator's lock files, its
+# scratch and working disk images, editor autosaves, and the .nfs
+# files a build under a mounted tree leaves behind.
+#
+*.lock
+disks/hdinstall/m16scratch
+disks/hdinstall/m5scratch
+disks/hdinstall/m40mnix
+disks/hdinstall/m5mnix
+\#*#
+.nfs*
