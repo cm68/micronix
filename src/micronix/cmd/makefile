@@ -61,6 +61,8 @@ all:
 	cd du ; make all
 	cd echo ; make all
 	cd ed ; make all
+	cd expr ; make all
+	cd fd2 ; make all
 	cd fgrep ; make all
 	cd find ; make all
 	cd form ; make all
@@ -118,6 +120,8 @@ install:
 	cd du ; make install
 	cd echo ; make install
 	cd ed ; make install
+	cd expr ; make install
+	cd fd2 ; make install
 	cd fgrep ; make install
 	cd find ; make install
 	cd form ; make install
@@ -169,6 +173,8 @@ clean:
 	cd du ; make clean
 	cd echo ; make clean
 	cd ed ; make clean
+	cd expr ; make clean
+	cd fd2 ; make clean
 	cd fgrep ; make clean
 	cd find ; make clean
 	cd form ; make clean
@@ -220,6 +226,8 @@ clobber:
 	cd du ; make clobber
 	cd echo ; make clobber
 	cd ed ; make clobber
+	cd expr ; make clobber
+	cd fd2 ; make clobber
 	cd fgrep ; make clobber
 	cd find ; make clobber
 	cd form ; make clobber
