@@ -10,7 +10,6 @@
  */
 
 #include "stdio.h"
-#include "awk.def"
 #include "awk.h"
 
 #define	CBUFLEN	150

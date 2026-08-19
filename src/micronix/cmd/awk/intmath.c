@@ -4,7 +4,7 @@
  * builtins collapse to integer approximations, and ftoa formats a
  * plain decimal number.
  */
-#include "awk.def"
+#include "awk.h"
 
 /*
  * compare two awkfloats: -1, 0, +1.  A function, not a macro, because

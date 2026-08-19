@@ -3,7 +3,6 @@ static char sccsid[] = "@(#)lib.c	4.4 9/17/84";
 #endif
 
 #include "stdio.h"
-#include "awk.def"
 #include "awk.h"
 #include "ctype.h"
 

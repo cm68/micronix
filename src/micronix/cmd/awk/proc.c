@@ -66,7 +66,7 @@ char *names[SIZE];
 main()
 {	struct xx *p;
 	int i;
-	printf("#include \"awk.def\"\n");
+	printf("#include \"awk.h\"\n");
 	printf("obj nullproc();\n");
 	for(p=proc;p->token!=0;p++)
 		if(p==proc || strcmp(p->name, (p-1)->name))

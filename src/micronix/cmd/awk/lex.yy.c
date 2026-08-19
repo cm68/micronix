@@ -32,7 +32,6 @@ extern struct yysvf yysvec[], *yybgin;
 # define reg 10
 # define comment 12
 #include	"awk.h"
-#include	"awk.def"
 #undef	input	/* defeat lex */
 extern int	yylval;
 extern int	mustfld;

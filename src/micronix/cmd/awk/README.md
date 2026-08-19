@@ -24,7 +24,7 @@ Two things ccc cannot do shaped it:
   ccc rejects, so `obj` is packed into a `long` - cell pointer in the low
   word, otype in the next byte, osub on top - and every `x.optr` /
   `x.otype` / `x.osub` access went through the `objptr` / `objtype` /
-  `objsub` / `objmk` macros in `awk.def`.
+  `objsub` / `objmk` macros in `awk.h`.
 
 ## The lexer
 

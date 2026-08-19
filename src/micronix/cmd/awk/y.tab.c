@@ -76,7 +76,7 @@
 # define INDIRECT 332
 # define LASTTOKEN 333
 
-#include "awk.def"
+#include "awk.h"
 #ifndef	DEBUG	
 #	define	PUTS(x)
 #endif

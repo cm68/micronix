@@ -1,4 +1,4 @@
-#include "awk.def"
+#include "awk.h"
 obj nullproc();
 extern obj program();
 extern obj boolop();

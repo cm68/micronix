@@ -2,7 +2,6 @@
 static char sccsid[] = "@(#)run.c	4.5 12/4/84";
 #endif
 
-#include "awk.def"
 #include "awk.h"
 #include "stdio.h"
 #define RECSIZE BUFSIZ
