@@ -47,6 +47,7 @@ all:
 	cd make ; make all
 	cd ar ; make all
 	cd asz ; make all
+	cd awk ; make all
 	cd cat ; make all
 	cd ccc ; make all
 	cd chgrp ; make all
@@ -102,6 +103,7 @@ install:
 	cd make ; make install
 	cd ar ; make install
 	cd asz ; make install
+	cd awk ; make install
 	cd cat ; make install
 	cd ccc ; make install
 	cd chgrp ; make install
@@ -153,6 +155,7 @@ clean:
 	cd make ; make clean
 	cd ar ; make clean
 	cd asz ; make clean
+	cd awk ; make clean
 	cd cat ; make clean
 	cd ccc ; make clean
 	cd chgrp ; make clean
@@ -203,6 +206,7 @@ clobber:
 	cd make ; make clobber
 	cd ar ; make clobber
 	cd asz ; make clobber
+	cd awk ; make clobber
 	cd cat ; make clobber
 	cd ccc ; make clobber
 	cd chgrp ; make clobber
