@@ -684,7 +684,7 @@ output()
 #undef c
 	}
 	if (anychange && opt == D_CONTEXT)
-		dump_context_vec();
+		dump_context();
 }
 
 /*
@@ -699,9 +699,9 @@ struct context_vec {
 	int	d;	/* end line in new file */
 };
 
-struct	context_vec	*context_vec_start,
-			*context_vec_end,
-			*context_vec_ptr;
+struct	context_vec	*cv_start,
+			*cv_end,
+			*cv_ptr;
 
 #define	MAX_CONTEXT	128
 
@@ -729,11 +729,11 @@ change(a,b,c,d)
 			stat(file2, &stbuf);
 			printf("%s", ctime(&stbuf.st_mtime));
 
-			context_vec_start = (struct context_vec *) 
+			cv_start = (struct context_vec *) 
 						malloc(MAX_CONTEXT *
 						   sizeof(struct context_vec));
-			context_vec_end = context_vec_start + MAX_CONTEXT;
-			context_vec_ptr = context_vec_start - 1;
+			cv_end = cv_start + MAX_CONTEXT;
+			cv_ptr = cv_start - 1;
 		}
 	}
 	if (a <= b && c <= d)
@@ -748,17 +748,17 @@ change(a,b,c,d)
 		 * change is more than 'context' lines from the previous
 		 * change, dump the record, reset it & add the new change.
 		 */
-		if ( context_vec_ptr >= context_vec_end ||
-		     ( context_vec_ptr >= context_vec_start &&
-		       a > (context_vec_ptr->b + 2*context) &&
-		       c > (context_vec_ptr->d + 2*context) ) )
-			dump_context_vec();
+		if ( cv_ptr >= cv_end ||
+		     ( cv_ptr >= cv_start &&
+		       a > (cv_ptr->b + 2*context) &&
+		       c > (cv_ptr->d + 2*context) ) )
+			dump_context();
 
-		context_vec_ptr++;
-		context_vec_ptr->a = a;
-		context_vec_ptr->b = b;
-		context_vec_ptr->c = c;
-		context_vec_ptr->d = d;
+		cv_ptr++;
+		cv_ptr->a = a;
+		cv_ptr->b = b;
+		cv_ptr->c = c;
+		cv_ptr->d = d;
 		return;
 	}
 	switch (opt) {
@@ -972,21 +972,21 @@ asciifile(f)
 
 
 /* dump accumulated "context" diff changes */
-dump_context_vec()
+dump_context()
 {
 	register int	a, b, c, d;
 	register char	ch;
-	register struct	context_vec *cvp = context_vec_start;
+	register struct	context_vec *cvp = cv_start;
 	register int	lowa, upb, lowc, upd;
 	register int	do_output;
 
-	if ( cvp > context_vec_ptr )
+	if ( cvp > cv_ptr )
 		return;
 
 	lowa = max(1, cvp->a - context);
-	upb  = min(len[0], context_vec_ptr->b + context);
+	upb  = min(len[0], cv_ptr->b + context);
 	lowc = max(1, cvp->c - context);
-	upd  = min(len[1], context_vec_ptr->d + context);
+	upd  = min(len[1], cv_ptr->d + context);
 
 	printf("***************\n*** ");
 	range(lowa,upb,",");
@@ -998,15 +998,15 @@ dump_context_vec()
 	 * the "old" lines as context in the "new" list).
 	 */
 	do_output = 0;
-	for ( ; cvp <= context_vec_ptr; cvp++)
+	for ( ; cvp <= cv_ptr; cvp++)
 		if (cvp->a <= cvp->b) {
-			cvp = context_vec_start;
+			cvp = cv_start;
 			do_output++;
 			break;
 		}
 	
 	if ( do_output ) {
-		while (cvp <= context_vec_ptr) {
+		while (cvp <= cv_ptr) {
 			a = cvp->a; b = cvp->b; c = cvp->c; d = cvp->d;
 
 			if (a <= b && c <= d)
@@ -1032,15 +1032,15 @@ dump_context_vec()
 	printf(" ----\n");
 
 	do_output = 0;
-	for (cvp = context_vec_start; cvp <= context_vec_ptr; cvp++)
+	for (cvp = cv_start; cvp <= cv_ptr; cvp++)
 		if (cvp->c <= cvp->d) {
-			cvp = context_vec_start;
+			cvp = cv_start;
 			do_output++;
 			break;
 		}
 	
 	if (do_output) {
-		while (cvp <= context_vec_ptr) {
+		while (cvp <= cv_ptr) {
 			a = cvp->a; b = cvp->b; c = cvp->c; d = cvp->d;
 
 			if (a <= b && c <= d)
@@ -1060,5 +1060,5 @@ dump_context_vec()
 		fetch(ixnew, d+1, upd, input[1], "  ");
 	}
 
-	context_vec_ptr = context_vec_start - 1;
+	cv_ptr = cv_start - 1;
 }

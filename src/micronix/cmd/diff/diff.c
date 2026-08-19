@@ -168,7 +168,7 @@ savestr(cp)
 
 /*
  * min and max are macros in types.h, so diff has no functions under
- * those names; diffreg.c's dump_context_vec() calls the macros.
+ * those names; diffreg.c's dump_context() calls the macros.
  */
 done()
 {

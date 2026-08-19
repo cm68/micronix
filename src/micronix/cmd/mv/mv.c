@@ -105,7 +105,7 @@ main(argc, argv)
 	if (stat(dest, &s2) >= 0 && ISDIR(s2)) {
 		r = 0;
 		for (i = 1; i < argc-1; i++)
-			r |= movewithshortname(argv[i], dest);
+			r |= moveshort(argv[i], dest);
 		exit(r);
 	}
 	if (argc > 3)
@@ -119,7 +119,7 @@ usage:
 	return (1);
 }
 
-movewithshortname(src, dest)
+moveshort(src, dest)
 	char *src, *dest;
 {
 	register char *shortname;
