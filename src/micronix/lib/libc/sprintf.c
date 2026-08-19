@@ -2,21 +2,26 @@
  * formatted output to string
  *
  */
-#include	<stdio.h>
+extern int	_doprnt();
 
-static	FILE	spf;
+static char *	sptr;
+
+static
+emit_str(c)
+int	c;
+{
+	*sptr++ = c;
+}
 
 sprintf(wh, f, a)
 char *	wh;
 char *	f;
 int	a;
 {
-	spf._cnt = 32767;
-	spf._ptr = wh;
-	spf._flag = _IOWRT|_IOSTRG;
-	_doprnt(&spf, f, &a);
-	*spf._ptr = 0;
-	return spf._ptr - wh;
+	sptr = wh;
+	_doprnt(emit_str, f, &a);
+	*sptr = 0;
+	return sptr - wh;
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

@@ -1,0 +1,22 @@
+/*
+ *	fopen.c - stdio fopen
+ */
+
+#include	<stdio.h>
+
+
+FILE *
+fopen(name, mode)
+char *	name, * mode;
+{
+	register FILE *	f;
+
+	for(f = _iob ; f != &_iob[_NFILE] ; f++)
+		if(!(f->_flag & (_IOREAD|_IOWRT)))
+			break;
+	if(f == &_iob[_NFILE])
+		return((FILE *)0);
+	return freopen(name, mode, f);
+}
+
+/* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

@@ -3,22 +3,34 @@
  *
  */
 
-#include	<stdio.h>
-#include	<string.h>
+#include	<types.h>
 
 extern int	_doscan();
+
+static char *	sptr;
+
+static
+gstr()
+{
+	return *sptr ? *sptr++ : EOF;
+}
+
+static
+ungstr(c)
+int	c;
+{
+	if (c != EOF)
+		--sptr;
+	return c;
+}
 
 sscanf(str, fmt, args)
 char *	str;
 char *	fmt;
 int	args;
 {
-	FILE	file;
-
-	file._base = file._ptr = str;
-	file._cnt = strlen(str);
-	file._flag = _IOSTRG|_IOREAD;
-	return _doscan(&file, fmt, &args);
+	sptr = str;
+	return _doscan(gstr, ungstr, fmt, &args);
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

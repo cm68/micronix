@@ -45,7 +45,7 @@ ASOVERRIDE = $(patsubst %.s,%.c,$(ASSRCS))
 
 ASSRCS = \
 	abs.s allsh.s alrsh.s asallsh.s asalrsh.s asar.s \
-	strdup.s exit.s asdiv.s asladd.s asland.s asll.s \
+	strdup.s asdiv.s asladd.s asland.s asll.s \
 	asllrsh.s aslmul.s aslor.s aslr.s aslsub.s aslxor.s \
 	asmod.s asmul.s atoi.s bitfield.s blkclr.s bmove.s \
 	csv.s brelop.s wrelop.s getsp.s idiv.s imul.s \
@@ -59,18 +59,14 @@ ASSRCS = \
 	shar.s shl16.s shll.s shlr.s strcat.s \
 	strchr.s strcmp.s strcpy.s swdisp.s swdispw.s oarg.s strlen.s \
 	strncat.s strncmp.s strncpy.s strrchr.s tolower.s toupper.s \
-	xtoi.s fputc.s fgetc.s memcpy.s
+	xtoi.s memcpy.s
 
 CSRCS = \
-	rand.c srand1.c mkstemp.c mktemp.c isatty.c permaloc.c timezone.c ctime.c \
+	rand.c srand1.c mkstemp.c mktemp.c permaloc.c timezone.c ctime.c \
 	assert.c calloc.c malloc.c memcmp.c memset.c \
-	blkcpy.c ctype_.c cleanup.c fclose.c fflush.c filbuf.c \
-	flsbuf.c puts.c fopen.c fread.c freopen.c fwrite.c \
-	setbuf.c gets.c ungetc.c buf.c getenv.c pnum.c \
-	qsort.c remove.c rewind.c fseek.c ftell.c fprintf.c \
-	sprintf.c printf.c doprnt.c putchar.c atol.c fscanf.c \
-	scanf.c sscanf.c doscan.c fnum.c atof.c mkdir.c \
-	opendir.c system.c
+	blkcpy.c ctype_.c getenv.c pnum.c qsort.c remove.c \
+	sprintf.c doprnt.c atol.c sscanf.c doscan.c fnum.c \
+	atof.c mkdir.c opendir.c system.c
 
 # superseded by the .s beside them: kept, not built
 #

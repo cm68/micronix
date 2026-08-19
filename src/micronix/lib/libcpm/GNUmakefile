@@ -58,3 +58,19 @@ ASSRCS	= $(filter-out crtcpm.s fakecpcl.s, $(wildcard *.s))
 TARGETS	= crtcpm.o fakecpcl.o
 
 include $(DEPTH)/GNUmakefile.inc
+
+#
+# The CP/M runtime goes under /lib/cpm, not /lib beside libu.a, so a
+# target directory is self-contained.  Point LIBINSTDIR at that tree
+# and the archive install below puts libcpm.a there; crtcpm.o and the
+# CP/M copy of the (target-independent) libc.a are not the archive
+# target, so installcpm ships them.
+#
+LIBINSTDIR = $(ROOT)/lib/cpm
+
+install: installcpm
+
+installcpm: crtcpm.o
+	mkdir -p $(LIBINSTDIR)
+	cp crtcpm.o $(LIBINSTDIR)/crtcpm.o
+	cp ../libc/libc.a $(LIBINSTDIR)/libc.a

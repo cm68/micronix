@@ -257,56 +257,71 @@ getBaseNoExt(char *filename)
 }
 
 /*
- * Drop the 16-byte object header from a linked image, in place, so
- * what is left is what CP/M loads at 0x100.  Reads the whole file:
- * a .com is 64KB at the very most and usually a great deal less.
+ * Drop the 16-byte object header from a linked image so what is left
+ * is what CP/M loads at 0x100.  The image is copied a fixed buffer at
+ * a time through a temp file rather than into one heap allocation: a
+ * .com can approach 64KB, and on the 64K machine the image plus that
+ * buffer will not fit beside the heap the driver has already spent.
+ * The whole-file read that used to be here malloc'd the image and
+ * then came back short - the file was complete, the buffer was not.
  */
 #define WSHDRLEN 16
+#define STRIPBUF 512
 
 int
 stripHeader(char *path)
 {
-    FILE *f;
-    char *buf;
+    FILE *in, *out;
+    char tmp[64];
+    char buf[STRIPBUF];
     long len;
-    size_t got;
+    size_t n, total;
 
-    f = fopen(path, "rb");
-    if (!f) {
+    in = fopen(path, "rb");
+    if (!in) {
         perror(path);
         return -1;
     }
-    fseek(f, 0L, SEEK_END);
-    len = ftell(f);
+    fseek(in, 0L, SEEK_END);
+    len = ftell(in);
     if (len <= WSHDRLEN) {
         fprintf(stderr, "%s: too short to be an image\n", path);
-        fclose(f);
+        fclose(in);
         return -1;
     }
-    buf = malloc(len - WSHDRLEN);
-    if (!buf) {
-        fprintf(stderr, "%s: out of memory\n", path);
-        fclose(f);
-        return -1;
-    }
-    fseek(f, (long)WSHDRLEN, SEEK_SET);
-    got = fread(buf, 1, len - WSHDRLEN, f);
-    fclose(f);
-    if (got != (size_t)(len - WSHDRLEN)) {
-        fprintf(stderr, "%s: short read\n", path);
-        free(buf);
+    fseek(in, (long)WSHDRLEN, SEEK_SET);
+
+    sprintf(tmp, "%s/cccstrip_%d", TMPDIR, (int)getpid());
+    out = fopen(tmp, "wb");
+    if (!out) {
+        perror(tmp);
+        fclose(in);
         return -1;
     }
 
-    f = fopen(path, "wb");
-    if (!f) {
-        perror(path);
-        free(buf);
+    total = 0;
+    while ((n = fread(buf, 1, sizeof(buf), in)) > 0) {
+        if (fwrite(buf, 1, n, out) != n) {
+            fclose(in);
+            fclose(out);
+            unlink(tmp);
+            return -1;
+        }
+        total += n;
+    }
+    fclose(in);
+    fclose(out);
+
+    if (total != (size_t)(len - WSHDRLEN)) {
+        fprintf(stderr, "%s: short read\n", path);
+        unlink(tmp);
         return -1;
     }
-    fwrite(buf, 1, got, f);
-    fclose(f);
-    free(buf);
+    if (moveover(tmp, path) != 0) {
+        perror(path);
+        unlink(tmp);
+        return -1;
+    }
     return 0;
 }
 
@@ -818,12 +833,13 @@ main(int argc, char **argv)
     }
 
     /*
-     * Now that -m is known, resolve the runtime.  libc and libccc are
-     * system-independent and are in both trees; the system-call layer
-     * and the startup object are not, so they are named per target.
+     * Now that -m is known, resolve the runtime.  libc is the pure C
+     * library, the same object for either target, but each target's
+     * tree keeps its own copy beside its own runtime so a target
+     * directory is self-contained; the system-call layer and the
+     * startup object genuinely differ, so they are named per target.
      */
     cpm_target = (strcmp(target, "cpm") == 0);
-    sprintf(libc_path, "%s/libc.a", libdir);
     /*
      * The headers do not live beside the passes on a Unix, they live
      * in /usr/include, and that is where the Micronix tree keeps them
@@ -832,22 +848,20 @@ main(int argc, char **argv)
      * Nothing about where the tree lives is compiled in, the same way
      * libdir itself is worked out from argv[0].
      *
-     * CP/M has no /usr and its install is flat, so it keeps the
-     * headers beside everything else the driver owns.
-     *
-     * Getting this wrong cost the native build every program with an
-     * include in it: the driver asked for /lib/include, which does
-     * not exist, and pass0 said "cannot find include file: stdio.h"
-     * for a header sitting in /usr/include the whole time.
+     * CP/M's headers live in a tree of their own, /usr/cpm/include,
+     * because its stdio is not Micronix's: the FILE layer there sits
+     * over fcb's rather than file descriptors, and the flag bits and
+     * the stdio.h that spells them differ.  One -i root per target is
+     * the whole of the difference as far as a source sees it.
      */
-    if (cpm_target)
-        sprintf(sysinc_path, "-i%s/include", libdir);
-    else
-        sprintf(sysinc_path, "-i%s/../usr/include", libdir);
     if (cpm_target) {
-        sprintf(libu_path, "%s/libcpm.a", libdir);
-        sprintf(chdr_path, "%s/crtcpm.o", libdir);
+        sprintf(libc_path, "%s/cpm/libc.a", libdir);
+        sprintf(sysinc_path, "-i%s/../usr/cpm/include", libdir);
+        sprintf(libu_path, "%s/cpm/libcpm.a", libdir);
+        sprintf(chdr_path, "%s/cpm/crtcpm.o", libdir);
     } else {
+        sprintf(libc_path, "%s/libc.a", libdir);
+        sprintf(sysinc_path, "-i%s/../usr/include", libdir);
         sprintf(libu_path, "%s/libu.a", libdir);
         sprintf(chdr_path, "%s/crt0.o", libdir);
     }

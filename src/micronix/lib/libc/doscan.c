@@ -3,12 +3,29 @@
  *
  */
 
-#include	<stdio.h>
+#include	<types.h>
 #include 	<ctype.h>
 
-static FILE *	fp;
+static int	(*gch)();
+static int	(*ungch)();
+static int	eofflag;
 extern int	_atof();	/* stub in atof.c - see math.h */
 extern int	atoi(char *);
+
+/*
+ * getch wraps the caller's get: EOF is remembered, so the return-value
+ * logic can tell "nothing matched" from "end of input" without asking
+ * the stream.
+ */
+static
+getch()
+{
+	int	c;
+
+	if ((c = (*gch)()) == EOF)
+		eofflag = 1;
+	return c;
+}
 
 static
 range(c, base)
@@ -36,14 +53,15 @@ wspace()
 {
 	int	c;
 
-	while(isspace(c = getc(fp)))
+	while(isspace(c = getch()))
 		continue;
 	if(c != EOF)
-		ungetc(c, fp);
+		(*ungch)(c);
 }
 
-_doscan(file, fmt, args)
-FILE *		file;
+_doscan(get, unget, fmt, args)
+int	(*get)();
+int	(*unget)();
 register char *	fmt;
 int **		args;
 {
@@ -54,7 +72,9 @@ int **		args;
 	long	val;
 	char	buf[60];
 
-	fp = file;
+	gch = get;
+	ungch = unget;
+	eofflag = 0;
 	n = 0;
 	while(c = *fmt++) {
 
@@ -70,7 +90,7 @@ loop:
 			switch(c = *fmt++) {
 
 			case '\0':
-				return n ? n : feof(fp) ? EOF : 0;
+				return n ? n : eofflag ? EOF : 0;
 
 			case '*':
 				noass++;
@@ -84,39 +104,39 @@ loop:
 				if(width == 0)
 					width = sizeof buf - 1;
 				sign = 0;	/* really decimal point seen */
-				ch = getc(fp);
+				ch = getch();
 				if(ch == '-') {
 					*sptr++ = ch;
-					ch = getc(fp);
+					ch = getch();
 					width--;
 				}
 				while(width && isdigit(ch) || !sign && ch == '.') {
 					*sptr++ = ch;
 					if(ch == '.')
 						sign++;
-					ch = getc(fp);
+					ch = getch();
 					width--;
 				}
 				if(width && (ch == 'e' || ch == 'E')) {
 					*sptr++ = ch;
-					ch = getc(fp);
+					ch = getch();
 					width--;
 					if(width && (ch == '-' || ch == '+')) {
 						*sptr++ = ch;
-						ch = getc(fp);
+						ch = getch();
 						width--;
 					}
 					while(width && isdigit(ch)) {
 						*sptr++ = ch;
-						ch = getc(fp);
+						ch = getch();
 						width--;
 					}
 				}
 				*sptr = 0;
 				if(ch != EOF)
-					ungetc(ch, fp);
+					(*ungch)(ch);
 				if(sptr == buf)
-					return n ? n : feof(fp) ? EOF : 0;
+					return n ? n : eofflag ? EOF : 0;
 				n++;
 				/*
 				 * The digits were consumed and counted, but
@@ -156,7 +176,7 @@ loop:
 				wspace();
 				if ( !noass )
 					sptr = (char *)*args++;
-				if ((ch = getc(fp)) == EOF )
+				if ((ch = getch()) == EOF )
 					return n ? n : EOF;
 				while(ch && ch != EOF && !isspace(ch)) {
 					if(ch == *fmt) {
@@ -167,7 +187,7 @@ loop:
 						*sptr++ = ch;
 					if(--width == 0)
 						break;
-					ch = getc(fp);
+					ch = getch();
 				}
 				n++;
 				if(!noass)
@@ -178,7 +198,7 @@ loop:
 				if ( !noass )
 					sptr = (char *)*args++;
 				do {
-					if ((ch = getc(fp)) == EOF) 
+					if ((ch = getch()) == EOF) 
 						return n ? n : EOF;
 					if ( !noass )
 						*sptr++ = ch;
@@ -192,11 +212,11 @@ loop:
 						fmt++;
 					goto loop;
 				}
-				if(c != (ch = getc(fp)))
+				if(c != (ch = getch()))
 					if(ch == EOF)
 						return n ? n : EOF;
 					else {
-						ungetc(ch, fp);
+						(*ungch)(ch);
 						return n;
 					}
 				continue;
@@ -204,21 +224,21 @@ loop:
 			wspace();
 			val = 0;
 			sign = 0;
-			ch = getc(fp);
+			ch = getch();
 			if(ch == '-') {
 				sign++;
-				ch = getc(fp);
+				ch = getch();
 			}
 			if(range(ch, base) == -1) {
-				ungetc(ch, fp);
-				return n ? n : feof(fp) ? EOF : 0;
+				(*ungch)(ch);
+				return n ? n : eofflag ? EOF : 0;
 			}
 			do {
 				val = val * base + range(ch, base);
-			} while (( --width != 0 ) && ( range(ch = getc(fp),base) != -1 )) ;
+			} while (( --width != 0 ) && ( range(ch = getch(),base) != -1 )) ;
 			n++;
 			if (range(ch,base) == -1)
-				ungetc(ch, fp);
+				(*ungch)(ch);
 			if(sign)
 				val = -val;
 			if ( !noass )
@@ -227,9 +247,9 @@ loop:
 				else
 					**args++ = val;
 			continue;
-		} else if(c != (ch = getc(fp))) {
+		} else if(c != (ch = getch())) {
 			if(ch != EOF) {
-				ungetc(ch, fp);
+				(*ungch)(ch);
 				return n;
 			} else
 				return n ? n : EOF;

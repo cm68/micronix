@@ -21,7 +21,7 @@
 # drifted from the tree.  It goes FIRST - what everything else
 # compiles against is installed before anything compiles.
 #
-DIRS = include lib libexec cmd sys
+DIRS = include lib libexec cmd sys cpm
 
 #
 # The top GNUmakefile is a leaf like the rest: DEPTH is the distance to
@@ -163,21 +163,18 @@ hostcc: $(ARMX)
 	@echo "host compiler in $(BIN)/mxccc"
 
 hostrt:
-	@mkdir -p $(HOSTROOT)/lib/include/sys $(HOSTROOT)/usr/include/sys
-	#
-	# lib/include is where -m cpm looks: CP/M has no /usr, so the
-	# driver points its include path at the compiler's own lib
-	# directory and the C library's headers are all there is.
-	#
-	cp lib/include/*.h $(HOSTROOT)/lib/include
-	cp lib/include/sys/*.h $(HOSTROOT)/lib/include/sys
+	@mkdir -p $(HOSTROOT)/lib/cpm $(HOSTROOT)/usr/include/sys \
+		$(HOSTROOT)/usr/cpm/include
 	cp lib/libc/libc.a lib/libu/libu.a lib/libu/crt0.o \
 	   lib/libccc/libccc.a $(HOSTROOT)/lib
 	#
-	# and the CP/M runtime, which -m cpm links instead of libu.a
-	# and starts with crtcpm.o instead of crt0.o.
+	# The CP/M runtime lives under /lib/cpm, beside its own copy of
+	# the (target-independent) libc, so a target directory is
+	# self-contained: -m cpm links libcpm.a and starts with crtcpm.o
+	# instead of libu.a and crt0.o.
 	#
-	cp lib/libcpm/libcpm.a lib/libcpm/crtcpm.o $(HOSTROOT)/lib
+	cp lib/libc/libc.a $(HOSTROOT)/lib/cpm
+	cp lib/libcpm/libcpm.a lib/libcpm/crtcpm.o $(HOSTROOT)/lib/cpm
 	#
 	# The system headers first and the C library's over them.  Six
 	# names are in both sets - cpm.h errno.h hitech.h setjmp.h
@@ -190,6 +187,14 @@ hostrt:
 	cp include/sys/*.h $(HOSTROOT)/usr/include/sys
 	cp lib/include/*.h $(HOSTROOT)/usr/include
 	cp lib/include/sys/*.h $(HOSTROOT)/usr/include/sys
+	#
+	# CP/M's header tree: the C library's headers, with the CP/M
+	# stdio.h over the Micronix one.  Its FILE sits over fcb's and
+	# the flag bits differ, so the two stdio.h cannot be shared.
+	#
+	cp lib/include/*.h $(HOSTROOT)/usr/cpm/include
+	cp lib/include/sys/*.h $(HOSTROOT)/usr/cpm/include
+	cp cpm/include/*.h $(HOSTROOT)/usr/cpm/include
 	@echo "runtime in $(HOSTROOT)/lib"
 
 #

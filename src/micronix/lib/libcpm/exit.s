@@ -13,15 +13,16 @@
 ;	the boot.  The return code is a register the system keeps for
 ;	this, and nothing else writes it.
 ;
-	global	_exit, __cpm_clean
+	global	_exit, __cpm_clean, __cleanup
 
 RETCODE	equ	108		;bdos: get/set program return code
 
 	psect	text
 _exit:
-	push	hl		;__cpm_clean flushes files and will not
-	call	__cpm_clean	;  bring hl back - the old code stored the
-	pop	de		;  status before calling it for this reason
+	push	hl		;the cleanups will not bring hl back - the
+	call	__cleanup	;  old code stored the status before calling
+	call	__cpm_clean	;  them for this reason
+	pop	de		;status
 	ld	c,RETCODE
 	call	5
 	jp	0		;warm boot

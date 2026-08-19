@@ -30,14 +30,18 @@ TARGET	= libu.a
 
 AOBJS	= access.o alarm.o _break.o chdir.o chmod.o chown.o \
 	close.o creat.o dup.o errno.o exec.o execv.o \
-	exit.o fdpos.o fork.o fstat.o getpid.o getuid.o \
+	exit.o _exit.o fdpos.o fork.o fstat.o getpid.o getuid.o \
 	gtty.o kill.o link.o mknod.o mount.o nice.o \
 	open.o pause.o perror.o pipe.o read.o seekraw.o \
 	setuid.o _signal.o sleep.o stat.o stime.o sbrk.o \
 	stty.o sync.o time.o umount.o unlink.o wait.o \
-	write.o
+	write.o fputc.o fgetc.o
 
-COBJS	= signal.o lseek.o seek.o rename.o
+COBJS	= signal.o lseek.o seek.o rename.o \
+	buf.o cleanup.o fclose.o fflush.o filbuf.o flsbuf.o \
+	fopen.o fread.o freopen.o fwrite.o fseek.o ftell.o \
+	rewind.o setbuf.o ungetc.o gets.o puts.o putchar.o \
+	printf.o fprintf.o scanf.o fscanf.o isatty.o
 
 OBJS	= $(AOBJS) $(COBJS)
 

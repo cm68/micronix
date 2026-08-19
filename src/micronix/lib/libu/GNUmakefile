@@ -19,11 +19,11 @@ CLASS	= lib
 TARGET	= libu.a
 
 ASSRCS = access.s alarm.s _break.s chdir.s chmod.s chown.s close.s \
-	creat.s dup.s errno.s exec.s execv.s exit.s fdpos.s fork.s fstat.s \
+	creat.s dup.s errno.s exec.s execv.s exit.s _exit.s fdpos.s fork.s fstat.s \
 	getpid.s getuid.s gtty.s kill.s link.s mknod.s mount.s nice.s open.s \
 	pause.s perror.s pipe.s read.s seekraw.s setuid.s _signal.s sleep.s \
 	stat.s stime.s sbrk.s stty.s sync.s time.s umount.s unlink.s wait.s \
-	write.s
+	write.s fputc.s fgetc.s
 
 #
 # rename.c is here rather than in libc because the API is what is
@@ -34,7 +34,11 @@ ASSRCS = access.s alarm.s _break.s chdir.s chmod.s chown.s close.s \
 # It is a system call as far as anything calling it is concerned, so
 # it lives with the system calls.
 #
-CSRCS = signal.c lseek.c seek.c rename.c
+CSRCS = signal.c lseek.c seek.c rename.c \
+	buf.c cleanup.c fclose.c fflush.c filbuf.c flsbuf.c \
+	fopen.c fread.c freopen.c fwrite.c fseek.c ftell.c \
+	rewind.c setbuf.c ungetc.c gets.c puts.c putchar.c \
+	printf.c fprintf.c scanf.c fscanf.c isatty.c
 
 #
 # crt0 rides beside the archive and not inside it: it is the startup

@@ -44,7 +44,7 @@ base	equ	4
 flag	equ	6
 file	equ	7
 
-IOREAD_BIT	equ	1
+IOREAD_BIT	equ	0
 IOEOF_BIT	equ	4
 IOBINARY_BIT	equ	7
 IOSTRG_BIT	equ	6

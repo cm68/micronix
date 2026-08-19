@@ -19,6 +19,20 @@
 typedef char INT8;
 typedef unsigned char UINT8;
 
+/*
+ * The Whitesmith's spelling for an unsigned char.  stdio.h has always
+ * supplied it (as a macro), and the formatters want it without dragging
+ * in the rest of stdio, so it belongs here.  It is a macro rather than
+ * a typedef only to match stdio.h's spelling exactly.
+ */
+#define uchar	unsigned char
+
+/*
+ * EOF is the sentinel the formatters and the streams pass back and
+ * forth, so it belongs here rather than in either of them.
+ */
+#define EOF		(-1)
+
 typedef short INT16;
 typedef unsigned short UINT16;
 

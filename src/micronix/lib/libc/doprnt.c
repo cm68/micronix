@@ -3,12 +3,12 @@
  *
  */
 
-#include	<stdio.h>
+#include	<types.h>
 #include	<ctype.h>
 
 static uchar	ival;
 static char *	x;
-static FILE *	ffile;
+static int	(*emit)();
 extern int	atoi(char *);
 extern int	strlen(char *);
 
@@ -16,7 +16,7 @@ static
 pputc(c)
 int	c;
 {
-	putc(c, ffile);
+	(*emit)(c);
 }
 
 static char *
@@ -43,8 +43,8 @@ register char *	cp;
 #define FLTSIZE 4
 #endif
 
-_doprnt(file, f, a)
-FILE *	file;
+_doprnt(emitfn, f, a)
+void	(*emitfn)();
 register char *		f;
 int *		a;
 {
@@ -55,7 +55,7 @@ int *		a;
 	uchar	ftype;
 	extern	short _pnum(), _fnum();
 
-	ffile = file;
+	emit = emitfn;
 	while(c = *f++)
 		if(c != '%')
 			pputc(c);

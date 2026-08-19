@@ -37,7 +37,7 @@ MAN	= strcat.3 strchr.3 strcmp.3 strcpy.3 strdup.3 \
 MANDIR	= /usr/man/man3
 
 AOBJS	= abs.o allsh.o alrsh.o asallsh.o asalrsh.o asar.o \
-	strdup.o exit.o asdiv.o asladd.o asland.o asll.o \
+	strdup.o asdiv.o asladd.o asland.o asll.o \
 	asllrsh.o aslmul.o aslor.o aslr.o aslsub.o aslxor.o \
 	asmod.o asmul.o atoi.o bitfield.o blkclr.o bmove.o \
 	csv.o brelop.o wrelop.o getsp.o idiv.o imul.o \
@@ -51,17 +51,13 @@ AOBJS	= abs.o allsh.o alrsh.o asallsh.o asalrsh.o asar.o \
 	shar.o shl16.o shll.o shlr.o strcat.o \
 	strchr.o strcmp.o strcpy.o swdisp.o swdispw.o oarg.o \
 	strlen.o strncat.o strncmp.o strncpy.o strrchr.o tolower.o \
-	toupper.o xtoi.o fputc.o fgetc.o
+	toupper.o xtoi.o
 
-COBJS	= rand.o srand1.o mkstemp.o mktemp.o isatty.o permaloc.o \
+COBJS	= rand.o srand1.o mkstemp.o mktemp.o permaloc.o \
 	timezone.o ctime.o assert.o calloc.o malloc.o memcmp.o \
-	memcpy.o memset.o blkcpy.o ctype_.o cleanup.o fclose.o \
-	fflush.o filbuf.o flsbuf.o puts.o fopen.o fread.o \
-	freopen.o fwrite.o setbuf.o gets.o ungetc.o buf.o \
-	getenv.o pnum.o qsort.o remove.o rewind.o fseek.o \
-	ftell.o fprintf.o sprintf.o printf.o doprnt.o putchar.o \
-	atol.o fscanf.o scanf.o sscanf.o doscan.o fnum.o \
-	atof.o mkdir.o opendir.o system.o
+	memcpy.o memset.o blkcpy.o ctype_.o getenv.o pnum.o \
+	qsort.o remove.o sprintf.o doprnt.o atol.o sscanf.o \
+	doscan.o fnum.o atof.o mkdir.o opendir.o system.o
 
 OBJS	= $(AOBJS) $(COBJS)
 
