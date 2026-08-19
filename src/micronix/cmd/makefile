@@ -13,8 +13,6 @@
 # apart from it: ccc, init, man, nm, size and sync were built by the
 # cross build and not by this one, so the machine could not rebuild
 # six of the programs it was running - the compiler driver among them.
-# There is no wildcard in this make, so the only thing keeping the two
-# together is somebody reading both.
 #
 # make goes first, and is the one entry whose order matters: it is
 # what is running.

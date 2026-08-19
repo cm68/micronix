@@ -11,8 +11,6 @@
 # only part of the compiler that does.  It finds its passes from
 # its own path, as bin/../libexec.
 #
-# The object list is spelled out because this make has no wildcard.
-#
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 #

@@ -11,8 +11,6 @@
 # a person types to assemble by hand - so it goes into /bin, on the
 # path, beside the driver.
 #
-# The object list is spelled out because this make has no wildcard.
-#
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 CC	= ccc

@@ -11,8 +11,6 @@
 # are no macros in this world - and installs two pages, its own
 # and help's.
 #
-# The object list is spelled out because this make has no wildcard.
-#
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 CC	= ccc

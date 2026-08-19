@@ -10,8 +10,6 @@
 # Process 1.  It goes into /etc and not /bin, which is where a v6
 # system keeps it.
 #
-# The object list is spelled out because this make has no wildcard.
-#
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 CC	= ccc
