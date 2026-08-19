@@ -95,6 +95,8 @@ all:
 	cd tee ; make all
 	cd vi ; make all
 	cd wc ; make all
+	cd yacc ; make all
+	cd lex ; make all
 
 #
 # reset is a script rather than a program, and it is copied with the
@@ -154,6 +156,8 @@ install:
 	cd tee ; make install
 	cd vi ; make install
 	cd wc ; make install
+	cd yacc ; make install
+	cd lex ; make install
 
 clean:
 	cd make ; make clean
@@ -207,6 +211,8 @@ clean:
 	cd tee ; make clean
 	cd vi ; make clean
 	cd wc ; make clean
+	cd yacc ; make clean
+	cd lex ; make clean
 
 clobber:
 	cd make ; make clobber
@@ -260,3 +266,5 @@ clobber:
 	cd tee ; make clobber
 	cd vi ; make clobber
 	cd wc ; make clobber
+	cd yacc ; make clobber
+	cd lex ; make clobber
