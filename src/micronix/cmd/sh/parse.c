@@ -169,6 +169,7 @@ char **pp;
     char *start;
     char *t;
     char *p;
+    char st[4];
     int i;
     int escaped = 0;
 
@@ -223,6 +224,21 @@ char **pp;
                     if (q < buf + sizeof(buf) - 1)
                         *q++ = *p;
             }
+            s += 2;
+            continue;
+        }
+        /*
+         * The exit status of the last command, as a decimal number.
+         * The manual says there are no other variables, but without
+         * this the "?" in "$?" is just a pattern character and
+         * "echo $?" comes back "No match." - the one exception worth
+         * making.
+         */
+        if (*s == '$' && s[1] == '?') {
+            sprintf(st, "%d", status);
+            for (p = st; *p; p++)
+                if (q < buf + sizeof(buf) - 1)
+                    *q++ = *p;
             s += 2;
             continue;
         }

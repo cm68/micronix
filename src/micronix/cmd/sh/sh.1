@@ -181,8 +181,9 @@ PARAMETERS
 .in +5
 .br
 In a script, $0 is the script and $1 through $9 are the arguments
-after it; $* is all of them.  Only one digit is taken, so $10 is the
-first argument followed by a zero.
+after it; $* is all of them, and $? is the exit status of the last
+command.  Only one digit is taken, so $10 is the first argument
+followed by a zero.
 .sp
 There are no other variables.  $ before anything else, or before
 nothing, is a $; a backslash protects it, and a $ inside double

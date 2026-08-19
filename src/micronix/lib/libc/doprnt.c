@@ -50,7 +50,7 @@ int *		a;
 {
 	char	c, prec;
 	uchar	fill, left, plus;
-	uchar	i;
+	int	i;
 	uchar	base, width, sign, len;
 	uchar	ftype;
 	extern	short _pnum(), _fnum();

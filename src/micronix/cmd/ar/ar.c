@@ -25,6 +25,7 @@
  * the time it mattered and ARMAG happened to be an int.
  */
 #include "ar.h"
+#include <obj.h>
 
 struct	stat	stbuf;
 
@@ -213,29 +214,37 @@ rcmd()
 	register f;
 
 	init();
-	getaf();
-	while(!getdir()) {
-		bamatch();
-		if(namc == 0 || match()) {
-			f = stats();
-			if(f < 0) {
-				if(namc)
-					fprintf(stderr, "ar: cannot open %s\n", file);
-				goto cp;
-			}
-			if(flg['u'-'a'])
-				if(stbuf.st_mtime <= arbuf.ar_date) {
-					close(f);
+	/*
+	 * getaf() opens the archive to read what is already in it, and
+	 * returns 1 when there is nothing to read - a new archive, the
+	 * "c" case.  The loop below walks that existing content, so it
+	 * must not run against the failed open, which would read from
+	 * fd -1.
+	 */
+	if (!getaf()) {
+		while(!getdir()) {
+			bamatch();
+			if(namc == 0 || match()) {
+				f = stats();
+				if(f < 0) {
+					if(namc)
+						fprintf(stderr, "ar: cannot open %s\n", file);
 					goto cp;
 				}
-			mesg('r');
-			copyfil(af, -1, IODD+SKIP);
-			movefil(f);
-			continue;
+				if(flg['u'-'a'])
+					if(stbuf.st_mtime <= arbuf.ar_date) {
+						close(f);
+						goto cp;
+					}
+				mesg('r');
+				copyfil(af, -1, IODD+SKIP);
+				movefil(f);
+				continue;
+			}
+		cp:
+			mesg('c');
+			copyfil(af, tf, IODD+OODD+HEAD);
 		}
-	cp:
-		mesg('c');
-		copyfil(af, tf, IODD+OODD+HEAD);
 	}
 	cleanup();
 }
@@ -446,14 +455,10 @@ qcmd()
 #define	ARMAXOFF 16777215L
 
 /*
- * Two things out of the object format, spelled here rather than by
- * including wsobj.h: that header is the linker's and brings a great
- * deal else with it, and these are the only two an archiver needs to
- * know to tell an object from anything else in the archive.  They are
- * MAGIC and CONF_SYMASK there, and must agree.
+ * MAGIC and CONF_SYMASK - the two things out of the object format an
+ * archiver needs to tell an object from anything else in an archive -
+ * come from <obj.h>.
  */
-#define	OBJMAGIC	0x99
-#define	CONF_SYMASK	0x07
 
 putfield(p, v, n)
 char *p;
@@ -674,7 +679,7 @@ char *arg;
 		return (0);
 	if (read(fd, hdr, 16) != 16)
 		return (0);
-	if ((hdr[0] & 0xff) != OBJMAGIC)
+	if ((hdr[0] & 0xff) != MAGIC)
 		return (0);
 
 	symlen = (hdr[1] & CONF_SYMASK) * 2 + 1;
