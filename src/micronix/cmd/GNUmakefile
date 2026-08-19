@@ -17,6 +17,10 @@
 #
 #   far cpmtools mkfs mt
 #
+# awk is here too and not in DIRS: the 2.11BSD port compiles and links
+# but is ~72K, too large for micronix's flat 64K address space, so it
+# has to be slimmed down first.  cmd/awk/README.md has the size analysis.
+#
 # yacc is here too and builds - cmd/yacc - but is not in DIRS yet: the
 # two-pass table sizing is in, but nothing has compiled the parser it
 # generates, so liby.a and the templates have only been smoke-tested.
