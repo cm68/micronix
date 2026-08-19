@@ -137,9 +137,7 @@ obj arrayel(a,b) node *a; obj b;
 		x->tval |= ARR;
 		x->sval = (char *) makesymtab();
 	}
-	y = objmk(setsymtab(s, tostring(""), 0L, STR|NUM, x->sval), objtype(y), objsub(y));
-	y = objmk(objptr(y), OCELL, objsub(y));
-	y = objmk(objptr(y), objtype(y), CVAR);
+	y = objmk(setsymtab(s, tostring(""), 0L, STR|NUM, x->sval), OCELL, CVAR);
 	return(y);
 }
 
@@ -260,9 +258,7 @@ obj indirect(a,n) node **a;
 	x = execute(a[0]);
 	m = getfval(objptr(x));
 	tempfree(x);
-	x = objmk(fieldadr(m), objtype(x), objsub(x));
-	x = objmk(objptr(x), OCELL, objsub(x));
-	x = objmk(objptr(x), objtype(x), CFLD);
+	x = objmk(fieldadr(m), OCELL, CFLD);
 	return(x);
 }
 
@@ -770,7 +766,7 @@ obj jump(a,n) node **a;
 {
 	obj x, y;
 
-	x = objmk(objptr(x), OJUMP, objsub(x));
+	x = objmk((cell *)0, OJUMP, 0);
 	switch (n) {
 	default:
 		error(FATAL, "illegal jump type %d", n);
