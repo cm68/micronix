@@ -1,0 +1,60 @@
+.he "fd2 (1)                      8/19/26                      fd2 (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+fd2
+- redirect file descriptor 2 (diagnostic output)
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+fd2
+[ fd2arg ] command [ command-arg ] ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.it Fd2
+executes
+.it command
+with file descriptor 2 (the diagnostic output) redirected to a file
+or to the standard output.  There are three forms:
+.sp
+.in +5
+fd2 \-file comd ...	[write on
+.it file
+]
+.br
+fd2 \-\-file comd ...	[append to
+.it file
+]
+.br
+fd2 + comd ...	[causes file descriptor 2 to be made the same as
+file descriptor 1]
+.in -5
+.sp
+In either of the first two cases, omission of
+.it file
+causes
+.bd msg.out
+to be used as the output file.  Omission of
+.it fd2arg
+has the effect of
+.bd \-msg.out.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+sh (1), msh (1)

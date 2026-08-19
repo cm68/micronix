@@ -1,0 +1,81 @@
+.he "expr (1)                      8/19/26                      expr (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+expr
+- evaluate arguments as an algebraic expression
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+expr
+arg ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+The arguments are taken as an expression.  After evaluation, the
+result is written on the standard output.  Terms of the expression
+must be separated by blanks.  Characters special to the shell - `*',
+`&', `(' and `)' - must be escaped.
+.sp
+The operators and keywords, in order of increasing precedence, are:
+.sp
+.in +5
+expr \|| expr
+.br
+expr \|& expr
+.br
+expr \|{ +, \*- } expr
+.br
+expr \|{ \\*, /, % } expr
+.br
+substr expr expr expr
+.br
+length expr
+.br
+index expr expr
+.br
+( expr )
+.in -5
+.sp
+.it Substr
+returns that portion of the first expression (possibly null) defined
+by the offset (second expression, starting at 1) and the span (third
+expression).  A large span gives the remainder of the string.
+.sp
+.it Length
+returns the length in characters of the expression that follows.
+.sp
+.it Index
+returns the character position of the first character of the first
+expression that matches any character of the second, or `0' if none
+matches.
+.sp
+Note that `0' is returned to indicate a zero value, rather than the
+null string.
+.sp 2
+.in -5
+.bd
+DIAGNOSTICS
+.in +5
+.br
+`Non-numeric argument' if an argument needs to be, but is not, an
+integer.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+msh (1), sh (1)
