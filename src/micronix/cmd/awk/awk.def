@@ -39,7 +39,13 @@ typedef	AWKFLOAT	awkfloat;
 #define fneg(a)   (-(a))
 #define fabs(a)   ((a) < 0 ? -(a) : (a))
 #define floor(a)  (a)
-#define fcmp(a,b) ((a) > (b) ? 1 : (a) < (b) ? -1 : 0)
+/*
+ * fcmp is a function, not the macro it started as: the nested ternary
+ * `(a)>(b)?1:(a)<(b)?-1:0` returns 255 for the -1 when the operands are
+ * 32-bit struct fields (relop) - the same sign-extension loss the
+ * README warns about.  if/else is the workaround (CODEGENGAPS 23).
+ */
+awkfloat fcmp();
 #define fatof(s)  atol(s)
 
 /* integer replacements for the math builtins and number formatting */
@@ -101,10 +107,16 @@ char	*tostring(), *tokname(), *malloc();
    optr in the low word, otype in the next byte, osub on top. */
 typedef long obj;
 
-#define	objptr(o)	((cell *)((o) & 0xffffL))
+/*
+ * objptr takes the low 16 bits of the packed long.  ccc miscompiles
+ * the direct cast `(cell *)((o) & 0xffffL)` - it drops the mask and
+ * hands over the HIGH word - so the long is narrowed to int first,
+ * which ccc does truncate to the low word.  (CODEGENGAPS entry 23.)
+ */
+#define	objptr(o)	((cell *)(int)(o))
 #define	objtype(o)	((char)(((o) >> 16) & 0xff))
 #define	objsub(o)	((char)(((o) >> 24) & 0xff))
-#define	objmk(p,t,s)	((obj)(((long)(p) & 0xffffL) | ((long)(t) << 16) | ((long)(s) << 24)))
+#define	objmk(p,t,s)	((obj)(((long)(unsigned)(p)) | ((long)(t) << 16) | ((long)(s) << 24)))
 
 #define BOTCH	1
 struct nd {

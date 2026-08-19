@@ -24,8 +24,13 @@ node *winner = (node *)NULL;
 #define MAXTMP 20
 cell tmps[MAXTMP];
 static cell nullval ={EMPTY,EMPTY,0L,NUM,0};
-obj	true	= objmk(0, OBOOL, BTRUE);
-obj	false	= objmk(0, OBOOL, BFALSE);
+/*
+ * ccc folds `objmk(0, OBOOL, BTRUE)` - the shift expression in a global
+ * initializer - down to 16 bits, so `true`/`false` came out two bytes
+ * and zero.  Literals are the workaround (CODEGENGAPS entry 23).
+ */
+obj	true	= 0x01020000L;	/* objmk(0, OBOOL, BTRUE) */
+obj	false	= 0x02020000L;	/* objmk(0, OBOOL, BFALSE) */
 
 run()
 {

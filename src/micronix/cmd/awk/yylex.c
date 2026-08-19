@@ -208,8 +208,8 @@ yylex()
 				ungetch(c2);
 				return INDIRECT;
 			}
-			ungetch(c2);	/* fall through as a bare '$'? */
-			return '$';
+			ungetch(c2);	/* $ followed by an expression: INDIRECT */
+			return INDIRECT;
 
 		case '\\':		/* line continuation */
 			if ((c = getch()) == '\n')

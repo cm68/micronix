@@ -17,10 +17,6 @@
 #
 #   far mkfs
 #
-# awk is here too and not in DIRS: the 2.11BSD port compiles and links
-# but is ~72K, too large for micronix's flat 64K address space, so it
-# has to be slimmed down first.  cmd/awk/README.md has the size analysis.
-#
 # yacc is here too and builds - cmd/yacc - but is not in DIRS yet: the
 # two-pass table sizing is in, but nothing has compiled the parser it
 # generates, so liby.a and the templates have only been smoke-tested.
@@ -69,7 +65,7 @@
 # and moved up here once they had built, tested against their host
 # counterparts, and shed their compiler workarounds.
 #
-DIRS = ar asz cat ccc chgrp chmod cmp cp date dcheck dd diff du echo ed fgrep find form grep icheck init ld less ln ls make man mkdir mknod more mv ncheck nm od pr pwd rm s sed setdev sh size strings sync tar tee upm vi wc
+DIRS = ar asz awk cat ccc chgrp chmod cmp cp date dcheck dd diff du echo ed fgrep find form grep icheck init ld less ln ls make man mkdir mknod more mv ncheck nm od pr pwd rm s sed setdev sh size strings sync tar tee upm vi wc
 
 #
 # "cd $$d &&", not "cd $$d ;".  With the semicolon, a directory named

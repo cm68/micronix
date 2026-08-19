@@ -6,6 +6,22 @@
  */
 #include "awk.def"
 
+/*
+ * compare two awkfloats: -1, 0, +1.  A function, not a macro, because
+ * ccc turns the -1 in `(a)>(b)?1:(a)<(b)?-1:0` into 255 when the
+ * operands are 32-bit struct fields (relop's fcmp).  (CODEGENGAPS 23.)
+ */
+AWKFLOAT
+fcmp(a, b)
+AWKFLOAT a, b;
+{
+	if (a > b)
+		return 1;
+	if (a < b)
+		return -1;
+	return 0;
+}
+
 /* floor(sqrt(x)) by Newton's method on the bit level */
 AWKFLOAT
 isqrt(x)
