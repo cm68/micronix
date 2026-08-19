@@ -135,3 +135,27 @@ logfile.*
 # deliberate new one still goes in with "git add -f".
 #
 *.o
+
+#
+# Default linker output and assembler listings.  a.out is what gcc and
+# mxccc leave when no -o names one, and a .lst is the listing a build
+# drops beside its source.
+#
+a.out
+*.lst
+
+#
+# The built command binaries.  Each cmd/ directory builds a program
+# named after itself, and not all of them carry a .gitignore of their
+# own yet, so name the ones that show up untracked.
+#
+src/micronix/cmd/dcheck/dcheck
+src/micronix/cmd/icheck/icheck
+src/micronix/cmd/ncheck/ncheck
+src/micronix/cmd/msh/msh
+src/micronix/cmd/nm/nm
+src/micronix/cmd/setdev/setdev
+src/micronix/cmd/size/size
+src/tools/fsck
+src/micronix/lib/fslib/libfs.a
+src/hwsim/resources/cold_boot_loader.bin
