@@ -393,13 +393,16 @@ yylex()
 							yylval = kp->val;
 						else if (kp->val != -1)
 							yylval = kp->val;
-						if (kp->token == VAR) {
-							mustfld = 1;
-							yylval = (hack)setsymtab(id,
-							    EMPTY, 0L, NUM, symtab);
-						}
 						return kp->token;
 					}
+				/* NF is special: a reference must force field
+				 * splitting (the original awk.lx.l rule). */
+				if (strcmp(id, "NF") == 0) {
+					mustfld = 1;
+					yylval = (hack)setsymtab(id, EMPTY,
+					    0L, NUM, symtab);
+					return VAR;
+				}
 				yylval = (hack)setsymtab(id, tostring(""), 0L,
 				    STR|NUM, symtab);
 				return VAR;
