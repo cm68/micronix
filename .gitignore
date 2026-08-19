@@ -172,3 +172,6 @@ disks/hdinstall/m40mnix
 disks/hdinstall/m5mnix
 \#*#
 .nfs*
+.@__thumb/
+benchmem.log
+benchmem.tsv
