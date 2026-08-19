@@ -15,7 +15,7 @@
 # Still here and still not in DIRS, because they are programs that DO
 # belong on the system and are not ready:
 #
-#   far mkfs mt
+#   far mkfs
 #
 # awk is here too and not in DIRS: the 2.11BSD port compiles and links
 # but is ~72K, too large for micronix's flat 64K address space, so it
