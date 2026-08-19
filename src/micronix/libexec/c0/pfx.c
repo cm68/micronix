@@ -158,16 +158,27 @@ pfxCast(void)
          * nobody emitted it.
          */
         if (e1) {
-            int plain;
+            int srcval, plain;
 
-            plain = e1->type && tp &&
-                !(tp->flags & (TF_POINTER | TF_ARRAY | TF_FUNC |
-                               TF_AGGREGATE)) &&
+            /*
+             * A cast is a width change only when the source is a
+             * plain value: an address or an aggregate is not shrunk
+             * the same way.  The target may still be a pointer -
+             * sixteen bits on this machine - so "(struct cell *)
+             * (long)" narrows rather than relabels.  Relabelling it
+             * typed the AND underneath as a pointer, the folder's
+             * "x & 0xffff -> x" dropped the mask as word-width, and
+             * objptr() handed the high word over as the pointer.
+             */
+            srcval = e1->type && tp &&
                 !(e1->type->flags & (TF_POINTER | TF_ARRAY | TF_FUNC |
                                      TF_AGGREGATE)) &&
                 !(e1->flags & E_CONST);
+            plain = srcval &&
+                !(tp->flags & (TF_POINTER | TF_ARRAY | TF_FUNC |
+                               TF_AGGREGATE));
 
-            if (plain && tp->size < e1->type->size) {
+            if (srcval && tp->size < e1->type->size) {
                 e = mkexpr(NARROW, e1);
                 e->type = tp;
             } else if (plain && tp->size > e1->type->size) {
