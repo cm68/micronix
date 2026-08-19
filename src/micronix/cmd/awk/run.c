@@ -389,8 +389,12 @@ char *format(s,a) char *s; node *a;
 		if (flag != 4)	/* watch out for converting to numbers! */
 			xf = getfval(objptr(x));
 		if (flag==1) ftoa(p, xf, 6);
-		else if (flag==2) sprintf(p, fmt, (long)ftoi(xf));
-		else if (flag==3) sprintf(p, fmt, (int)ftoi(xf));
+		/* xf is already a 32-bit long; the original cast (long)xf from
+		 * float is now a no-op, and the integer port's (long)ftoi(xf)
+		 * truncated the long to 16 bits, so %d/%ld/%lo/%lx lost the
+		 * high word. */
+		else if (flag==2) sprintf(p, fmt, xf);
+		else if (flag==3) sprintf(p, fmt, (int)xf);
 		else if (flag==4) sprintf(p, fmt, objptr(x)->sval==NULL ? "" : getsval(objptr(x)));
 		tempfree(x);
 		p += strlen(p);
