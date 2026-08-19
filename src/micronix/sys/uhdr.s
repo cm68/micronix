@@ -3,15 +3,11 @@
 ; sys/uhdr.s  --  Z80 translation of sys/uhdr.anat (asz dialect)
 ; =====================================================================
 ;
-; ------- COMPLETE ORIGINAL A-NATURAL SOURCE (every line preserved) -------
+; ------- A-NATURAL SOURCE: declarations -------
+; Decision firmware references
+; sys/uhdr.s
+; Changed: <2026-08-17 20:01:38 curt>
 ;
-; /*
-;  * Decision firmware references
-;  *
-;  * sys/uhdr.s
-;  * Changed: <2022-01-04 11:29:52 curt>
-;  */
-; 
 ; _trapstack := &8
 ; _cmask	:= &7
 ; _ctask	:= &6
@@ -25,15 +21,15 @@
 ; _map1	:= &0x620
 ; _image0 := &0x200
 ; _image1 := &0x220
-; 
+;
 ; /ram configuration
-; 
+;
 ; _usrtop := &0xffff
 ; _memtop := &0xffff
-; 
+;
 ; /Making these references public AFTER their definitions
 ; /seems to appease A-Natural
-; 
+;
 ; public	_trapstack
 ; public	_oldstack
 ; public	_cmask
@@ -52,58 +48,12 @@
 ; public	_map1
 ; public	_image0
 ; public	_image1
-; 
+;
 ; /Power-up entry _point
 ; /Decision firmware expects this to be at 0x1000
-; 
+;
 ; 	jump	:= 0303
 ; 	jump
-; 
-; _trapvec:
-; 	&boot
-; 
-; /Hook for ps (at address 0x1003)
-; 	&_plist
-; 
-; boot:
-; 	sp = &0x1000
-; 	jmp _start
-; 
-; /Halt intruction for use in _trapc
-; _hlt:
-; 	hlt
-; 	ret
-; 
-; /System call to execute "init".
-; /Called from start() in _trapc
-; 	EXEC	:= 11
-; 	SYS	:= rst1
-; 
-; _xinit:
-; 	/
-; 	SYS; EXEC; &name1; &iargs;
-; 	ret		/error return
-; 	/
-; 
-; name1:
-; 	/
-; 	"/etc/init\0";
-; 	/
-; 
-; iargs:
-; 	/
-; 	&iarg0;
-; 	&0;
-; 	/
-; 
-; iarg0:
-; 	/
-; 	"init\0";
-; 	/
-;
-; ------- END A-NATURAL SOURCE -------
-;
-; ------- Z80 TRANSLATION -------
 ;
 _trapstack=8
 _cmask=7
@@ -124,26 +74,100 @@ _memtop=0xFFFF
 	.globl	_trapad, _status, _wtask, _usrtop, _memtop, _trapvec
 	.globl	_hlt, _xinit, _map0, _map1, _image0, _image1
 	.extern	_plist, _start
-	.defb	0xC3		; jump := 0303 (jp opcode)
+
+;
+; this is the kernel program entry point, and it expects to be at 0x1000
+;
+
+	.defb	0xC3		; jump opcode
+
+; ------- A-NATURAL SOURCE: _trapvec -------
+; _trapvec:
+; 	&boot
+;
+; /Hook for ps (at address 0x1003)
+; 	&_plist
+;
 _trapvec:
 	.defw	boot
+
+;
+; this is the address of the process list so ps can find it.
+;
 	.defw	_plist
+
+;
+; boot lands here
+;
+
+; ------- A-NATURAL SOURCE: boot -------
+; boot:
+; 	sp = &0x1000
+; 	jmp _start
+;
 boot:
-	ld	sp,0x1000
-	jp	_start
+	ld	sp,0x1000	; an initial stack pointer at an odd place
+	jp	_start		; enter the kernel
+
+; ------- A-NATURAL SOURCE: _hlt -------
+; /Halt intruction for use in _trapc
+; _hlt:
+; 	hlt
+; 	ret
+;
 _hlt:
 	halt
 	ret
-_xinit:
+
+;
+; this is the initial program that gets copied out to process 1
+; it simply executes /etc/init
+;
+
+; ------- A-NATURAL SOURCE: _xinit -------
+; /System call to execute "init".
+; /Called from start() in _trapc
+; 	EXEC	:= 11
+; 	SYS	:= rst1
+;
+; _xinit:
+; 	/
+; 	SYS; EXEC; &name1; &iargs;
+; 	ret		/error return
+; 	/
+;
+_xinit::
 	rst	8		; SYS := rst1  (RST 1 -> vector 0x08)
 	.defb	11		; EXEC := 11  (syscall number)
-	.defw	name1
+	.defw	initprog
 	.defw	iargs
 	ret
-name1:
+
+; ------- A-NATURAL SOURCE: name1 -------
+; name1:
+; 	/
+; 	"/etc/init\0";
+; 	/
+;
+initprog:
 	.defb	"/etc/init", 0
+
+; ------- A-NATURAL SOURCE: iargs -------
+; iargs:
+; 	/
+; 	&iarg0;
+; 	&0;
+; 	/
+;
 iargs:
-	.defw	iarg0
+	.defw	iarg0		; argv
 	.defw	0
+
+; ------- A-NATURAL SOURCE: iarg0 -------
+; iarg0:
+; 	/
+; 	"init\0";
+; 	/
+;
 iarg0:
-	.defb	"init", 0
+	.defb	"init", 0	; argv[0]

@@ -3,8 +3,7 @@
 ; sys/intrpt.s  --  Z80 translation of sys/intrpt.anat (asz dialect)
 ; =====================================================================
 ;
-; ------- COMPLETE ORIGINAL A-NATURAL SOURCE (every line preserved) -------
-;
+; ------- A-NATURAL SOURCE: declarations -------
 ; /*
 ;  * Interrupt dispatch table
 ;  * Extra space allows us to move the vectors to a 32-byte
@@ -14,14 +13,23 @@
 ;  * sys/intrpt.s
 ;  * Changed: <2021-12-24 06:08:17 curt>
 ;  */
-; 
+;
 ; public	vectors
-; 
+;
 ; 	&0; &0; &0; &0;
 ; 	&0; &0; &0; &0;
 ; 	&0; &0; &0; &0;
 ; 	&0; &0; &0; &0;
-; 
+;
+	.globl	vectors
+	.extern	intrupt, _mwint, _djint, slint, m1int, m2int
+	.extern	m3int, m0int, clkint
+	.defw	0,0,0,0
+	.defw	0,0,0,0
+	.defw	0,0,0,0
+	.defw	0,0,0,0
+
+; ------- A-NATURAL SOURCE: vectors -------
 ; vectors:
 ; 	jmp int0; 0
 ; 	jmp int1; 0
@@ -31,7 +39,7 @@
 ; 	jmp int5; 0
 ; 	jmp int6; 0
 ; 	jmp int7; 0
-; 
+;
 ; int0:	call intrupt; &_mwint		/see below
 ; int1:	call intrupt; &_djint		/floppy disk interrupt
 ; int2:	call intrupt; &slint		/ slave Mult I/O (s)
@@ -40,23 +48,12 @@
 ; int5:	call intrupt; &m3int		/ Master ACE 3
 ; int6:	call intrupt; &m0int		/ Master parallel port
 ; int7:	call intrupt; &clkint		/ clock int
-; 
+;
 ; /hint:					/hard disk interrupts
 ; 	/call _mwint			/mw.c
 ;        /call _hdint			/wn.s
 ; 	/ret
 ;
-; ------- END A-NATURAL SOURCE -------
-;
-; ------- Z80 TRANSLATION -------
-;
-	.globl	vectors
-	.extern	intrupt, _mwint, _djint, slint, m1int, m2int
-	.extern	m3int, m0int, clkint
-	.defw	0,0,0,0
-	.defw	0,0,0,0
-	.defw	0,0,0,0
-	.defw	0,0,0,0
 vectors:
 	jp	int0
 	.defb	0
