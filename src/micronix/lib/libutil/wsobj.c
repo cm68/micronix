@@ -1,7 +1,8 @@
 /*
  * wsobj.c - Whitesmith's object file format common functions
  *
- * Shared between assembler (asz) and linker (ld)
+ * Lives in libutil, shared by the assembler (asz), the linker (ld)
+ * and nm: the segment-name table and the relocation-table writer.
  */
 
 #include <stdio.h>
@@ -9,7 +10,7 @@
 #include <stdlib.h>
 #endif
 
-#include "wsobj.h"
+#include <obj.h>
 
 /*
  * segment name strings for debugging

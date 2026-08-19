@@ -28,7 +28,7 @@ AR	= ar
 LIBDIR	= /lib
 TARGET	= libutil.a
 
-COBJS	= hexdump.o logmsg.o
+COBJS	= hexdump.o logmsg.o wsobj.o
 
 OBJS	= $(COBJS)
 

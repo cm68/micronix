@@ -11,7 +11,7 @@
 #include <stdio.h>
 #endif
 
-#include "wsobj.h"
+#include <obj.h>
 
 char *progname;
 int verbose;

@@ -63,7 +63,7 @@ struct jump {
  *   last    - symbol from most recent N: definition (for Nb refs)
  * Stored in hash table keyed by label number.
  */
-#define LOCAL_HASH_SIZE 32
+#define LOCAL_HASHSZ 32
 
 struct local_state {
     int num;                    /* label number */

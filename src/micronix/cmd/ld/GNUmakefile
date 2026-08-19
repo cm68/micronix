@@ -20,15 +20,21 @@ DEPTH	= ../..
 DIR	= ld
 CLASS	= cmd
 
+#
+# wsobj.c, shared with asz and nm, lives in libutil.
+#
+LIBS	= $(DEPTH)/lib/libutil/libutil.a
+
 include $(DEPTH)/GNUmakefile.inc
 
 #
 # and the same sources built for this machine: the cross compiler
 # everything else in the tree is compiled by.  See libexec/host.mk.
+# c99 and -Dlinux, not the pass defaults (gnu89, -DDEBUG).
 #
-HOSTDEFS = -Dlinux
-HOSTWARNS = -Wall
-HOSTCFLAGS = -m32 -std=c99 -g -O0 $(HOSTDEFS) $(HOSTWARNS) -I.
+# wsobj is shared; the host build compiles the copy in libutil.
+HOSTSRCS = $(CSRCS) $(DEPTH)/lib/libutil/wsobj.c
+HOSTCFLAGS = -m32 -std=c99 -g -O0 -Dlinux -Wall -I. -idirafter $(DEPTH)/include
 HOSTPROG = mxld
 HOSTBIN  = bin
 

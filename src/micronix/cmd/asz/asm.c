@@ -22,7 +22,15 @@
 #endif
 
 #include "asm.h"
-#include "wsobj.h"
+#include <obj.h>
+
+/*
+ * segment names and the relocation writer, both in wsobj.c
+ */
+extern char *wsSegNames[];
+extern void wsEncBump();
+extern void wsEncReloc();
+extern void wsEndReloc();
 
 #ifdef DEBUG
 extern char verbose;
@@ -610,7 +618,7 @@ struct jump *jumps;
  * local labels - synthetic name architecture
  * hash table mapping label number to pending/last symbols
  */
-struct local_state *local_hash[LOCAL_HASH_SIZE];
+struct local_state *local_hash[LOCAL_HASHSZ];
 int local_seq;
 
 struct symbol *symbols;
@@ -729,7 +737,7 @@ local_reset()
 
     {
     register struct local_state **bp = local_hash;
-    for (i = LOCAL_HASH_SIZE; i; i--, bp++) {
+    for (i = LOCAL_HASHSZ; i; i--, bp++) {
         for (ls = *bp; ls; ls = next) {
             next = ls->next;
             free(ls);
@@ -751,7 +759,7 @@ int create;
     int h;
     struct local_state *ls;
 
-    h = n % LOCAL_HASH_SIZE;
+    h = n % LOCAL_HASHSZ;
     for (ls = local_hash[h]; ls; ls = ls->next) {
         if (ls->num == n)
             return ls;

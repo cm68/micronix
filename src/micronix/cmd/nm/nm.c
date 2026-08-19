@@ -12,7 +12,7 @@
 #include <stdio.h>
 #endif
 
-#include "wsobj.h"
+#include <obj.h>
 #ifdef DO_HITECH
 #include "hiobj.h"
 #endif
@@ -30,7 +30,7 @@ int vflag;      /* -v: show header */
 FILE *gfile;    /* output file for -g */
 char gname[256]; /* output filename for -g */
 
-/* use wsSegNames from wsobj.c */
+extern char *wsSegNames[];	/* segment names, in wsobj.c */
 
 /*
  * Decode Whitesmith symbol type to text

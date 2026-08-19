@@ -20,4 +20,9 @@ DEPTH	= ../..
 DIR	= nm
 CLASS	= cmd
 
+#
+# wsobj.c, shared with asz and ld, lives in libutil.
+#
+LIBS	= $(DEPTH)/lib/libutil/libutil.a
+
 include $(DEPTH)/GNUmakefile.inc

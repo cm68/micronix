@@ -26,10 +26,10 @@ include $(DEPTH)/GNUmakefile.inc
 # no later dialect.  -Dlinux selects the host's headers (stdlib, string).
 #
 HOSTCC		?= gcc
-HOSTCFLAGS	?= -w -std=gnu89 -Dlinux
+HOSTCFLAGS	?= -w -std=gnu89 -Dlinux -idirafter $(DEPTH)/include
 MXSIZE		 = $(BIN)/mxsize
 
-$(MXSIZE): size.c wsobj.h
+$(MXSIZE): size.c
 	mkdir -p $(BIN)
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ size.c
 

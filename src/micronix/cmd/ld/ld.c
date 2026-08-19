@@ -31,12 +31,18 @@
 #endif
 #endif
 
-#include "wsobj.h"
+#include <obj.h>
 #ifdef DO_HITECH
 #include "hiobj.h"
 #endif
 
-/* use wsSegNames from wsobj.c */
+/*
+ * segment names and the relocation writer, both in wsobj.c
+ */
+extern char *wsSegNames[];
+extern void wsEncBump();
+extern void wsEncReloc();
+extern void wsEndReloc();
 
 char verbose;
 char Vflag;            /* -V: list object files */
@@ -1549,13 +1555,13 @@ char *membername;
             break;
 
         case HT_END:
-            goto done_ar_parsing;
+            goto done_ar;
         }
 
         off += reclen;
     }
 
-done_ar_parsing:
+done_ar:
     obj->ht_text = textbuf;
     obj->ht_data = databuf;
     obj->text_size = textsize;

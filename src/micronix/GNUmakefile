@@ -93,7 +93,7 @@ include $(DEPTH)/GNUmakefile.inc
 ARMX	 = $(BIN)/mxar
 ARSRC	 = cmd/ar/ar.c
 NMX	 = $(BIN)/mxnm
-NMSRC	 = cmd/nm/nm.c cmd/nm/wsobj.c
+NMSRC	 = cmd/nm/nm.c lib/libutil/wsobj.c
 SETDEVX	 = $(BIN)/setdev
 SETDEVSRC = cmd/setdev/setdev.c
 HOSTCC	?= gcc
