@@ -853,9 +853,7 @@ obj nodetoobj(a) node *a;
 {
 	obj x;
 
-	x = objmk((cell *) a->nobj, objtype(x), objsub(x));
-	x = objmk(objptr(x), OCELL, objsub(x));
-	x = objmk(objptr(x), objtype(x), a->subtype);
+	x = objmk((cell *) a->nobj, OCELL, a->subtype);
 	if (isfld(x)) fldbld();
 	return(x);
 }
