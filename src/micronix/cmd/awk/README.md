@@ -1,9 +1,17 @@
 # awk — 2.11BSD port
 
-**Status: tabled.** The port compiles and links, but the binary is ~72 KB
-and does not fit micronix's flat 64 K address space. This file records the
-work done, the compiler gaps hit along the way, and the size analysis, so
-the effort can be resumed without re-deriving any of it.
+**Status: integer, still over budget.** The soft-float runtime described
+below has been replaced with plain integer arithmetic (`AWKFLOAT` is a
+signed 32-bit `long`; `intmath.c` supplies `isqrt`/`ilog`/`iexp`/`ftoa`),
+which drops `float.c` + `mathf.c` and the tables were trimmed (`RECSIZE`
+512, `MAXFLD` 50, `MAXSYM` 32).  The image is now ~62 KB (text 44.6 K,
+data 17.7 K) instead of 72 KB, but that still leaves only ~3 KB of heap,
+and the parser's `++yyps > &yys[YYMAXDEPTH]` also needed the CODEGENGAPS
+entry 22 workaround in `y.tab.c`.  It builds and links, but a running awk
+collides its stack into the heap.  The remaining levers are the same ones
+below: shrink `printf`, and regenerate the lexer with fewer states.
+
+The original write-up of the soft-float port (now superseded) follows.
 
 ## What this directory is
 

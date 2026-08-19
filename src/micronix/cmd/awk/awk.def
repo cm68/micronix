@@ -1,9 +1,15 @@
 /*	awk.def	4.3	83/12/09	*/
 
-#include "float.h"
-
+/*
+ * Integer arithmetic.  awk's numbers are a signed 32-bit long; the
+ * soft-float library (float.c/mathf.c) is not linked, and the float
+ * operations below collapse to native integer ops.  A long still has
+ * considerable range (~2 billion), so ordinary awk arithmetic - field
+ * counts, totals, string lengths - is unaffected; only the fractional
+ * part of a division and the transcendental builtins are gone.
+ */
 #define hack	int
-#define	AWKFLOAT	unsigned long
+#define	AWKFLOAT	long
 #define	xfree(a)	{ if(a!=NULL) { yfree(a); a=NULL;} }
 #define	strfree(a)	{ if(a!=NULL && a!=EMPTY) { yfree(a);} a=EMPTY; }
 #define yfree free
@@ -15,6 +21,33 @@
 #	define	dprintf(x1, x2, x3, x4)
 #endif
 typedef	AWKFLOAT	awkfloat;
+
+/*
+ * The soft-float runtime's entry points, as integer macros.  fdiv and
+ * fmod guard the divisor so a zero denominator yields 0 rather than a
+ * trap; the call sites pass simple lvalues, so the second evaluation
+ * of the divisor is safe.
+ */
+#define itof(x)   ((AWKFLOAT)(x))
+#define ftoi(x)   ((int)(x))
+#define ftrunc(x) (x)
+#define fadd(a,b) ((a) + (b))
+#define fsub(a,b) ((a) - (b))
+#define fmul(a,b) ((a) * (b))
+#define fdiv(a,b) ((b) ? (a) / (b) : 0)
+#define fmod(a,b) ((b) ? (a) % (b) : 0)
+#define fneg(a)   (-(a))
+#define fabs(a)   ((a) < 0 ? -(a) : (a))
+#define floor(a)  (a)
+#define fcmp(a,b) ((a) > (b) ? 1 : (a) < (b) ? -1 : 0)
+#define fatof(s)  atol(s)
+
+/* integer replacements for the math builtins and number formatting */
+AWKFLOAT isqrt(AWKFLOAT);
+AWKFLOAT ilog(AWKFLOAT);
+AWKFLOAT iexp(AWKFLOAT);
+char *ftoa(char *, AWKFLOAT, int);
+extern long atol();	/* fatof: string -> number, must return the 32-bit long */
 
 extern char	**FS;
 extern char	**RS;
@@ -133,6 +166,6 @@ extern int	pairstack[], paircnt;
 obj	nullproc();
 obj	relop();
 
-#define MAXSYM	50
+#define MAXSYM	32
 #define	HAT	0177	/* matches ^ in regular expr */
 			/* watch out for mach dep */

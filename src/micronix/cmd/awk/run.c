@@ -798,13 +798,13 @@ obj fncn(a,n) node **a;
 	if (t == FLENGTH)
 		u = itof(strlen(getsval(objptr(x))));
 	else if (t == FLOG)
-		u = log(getfval(objptr(x)));
+		u = ilog(getfval(objptr(x)));
 	else if (t == FINT)
 		u = itof(ftrunc(getfval(objptr(x))));
 	else if (t == FEXP)
-		u = exp(getfval(objptr(x)));
+		u = iexp(getfval(objptr(x)));
 	else if (t == FSQRT)
-		u = sqrt(getfval(objptr(x)));
+		u = isqrt(getfval(objptr(x)));
 	else
 		error(FATAL, "illegal function type %d", t);
 	tempfree(x);

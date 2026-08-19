@@ -421,6 +421,9 @@ yyparse() {
 	register short yystate, *yyps, yyn;
 	register YYSTYPE *yypv;
 	register short *yyxi;
+	/* c1 miscompiles `++yyps > &yys[YYMAXDEPTH]` (CODEGENGAPS
+	   entry 22): pre-compute the bound and split the increment. */
+	short *yyslim = &yys[YYMAXDEPTH];
 
 	yystate = 0;
 	yychar = -1;
@@ -434,7 +437,8 @@ yyparse() {
 #ifdef YYDEBUG
 	if( yydebug  ) printf( "state %d, char 0%o\n", yystate, yychar );
 #endif
-		if( ++yyps> &yys[YYMAXDEPTH] ) { yyerror( "yacc stack overflow" ); return(1); }
+		++yyps;
+		if( yyps> yyslim ) { yyerror( "yacc stack overflow" ); return(1); }
 		*yyps = yystate;
 		++yypv;
 		*yypv = yyval;

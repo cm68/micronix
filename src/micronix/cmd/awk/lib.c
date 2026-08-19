@@ -9,12 +9,12 @@ static char sccsid[] = "@(#)lib.c	4.4 9/17/84";
 
 FILE	*infile	= NULL;
 char	*file;
-#define	RECSIZE	(5 * 512)
+#define	RECSIZE	(1 * 512)
 char	record[RECSIZE];
 char	fields[RECSIZE];
 char	EMPTY[] = "";
 
-#define	MAXFLD	100
+#define	MAXFLD	50
 int	donefld;	/* 1 = implies rec broken into fields */
 int	donerec;	/* 1 = record is valid (no flds have changed) */
 int	mustfld;	/* 1 = NF seen, so always break*/
