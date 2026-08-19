@@ -1,0 +1,70 @@
+
+=== cpp (pass0): worst offenders (smallest gap) ===
+     gap    heap     bytes  source
+    4639   13674      7873  /usr/src/libexec/c0/outfn.c
+    4698   13416     43729  /usr/src/cmd/msh/sh.c
+    5063   12900     75294  /usr/src/libexec/asz/asm.c
+    5071   12900     75579  /usr/src/cmd/asz/asm.c
+    5355   13029      5536  /usr/src/libexec/c0/pstmt2.c
+    5467   12513     12506  /usr/src/libexec/c0/parse.c
+    5700   12642      6138  /usr/src/libexec/c0/pblock.c
+    5702   12642      5843  /usr/src/ccc/pass1/pblock.c
+    5856   12126     12123  /usr/src/ccc/pass1/parse.c
+    5953   12255     37636  /usr/src/libexec/cpp/norm.c
+    6017   12384    156045  /usr/src/libexec/c1/rules.c
+    6113   12126     34903  /usr/src/ccc/cpp/norm.c
+    6131   12255      4713  /usr/src/ccc/pass1/pstmt2.c
+    6147   12126     10954  /usr/src/libexec/c0/pass1.c
+    6205   11868     10173  /usr/src/libexec/c0/outh.c
+    6214   11997     48049  /usr/src/libexec/c0/declare.c
+    6233   11997     18845  /usr/src/libexec/c0/expr.c
+    6318   11997      4504  /usr/src/ccc/pass1/outfn.c
+    6380   11868     25613  /usr/src/libexec/c0/decl.c
+    6407   11868     10102  /usr/src/ccc/pass1/pass1.c
+
+=== pass1 (c0): worst offenders (smallest gap) ===
+     gap    heap     bytes  source
+     417   15996     65937  /usr/src/cmd/upm/upm.c
+    2496   13545     48049  /usr/src/libexec/c0/declare.c
+    2754   13287     39589  /usr/src/ccc/pass1/declare.c
+    3107   13158     43729  /usr/src/cmd/msh/sh.c
+    3271   13029     34903  /usr/src/ccc/cpp/norm.c
+    3271   13029     37636  /usr/src/libexec/cpp/norm.c
+    3467   12900      7873  /usr/src/libexec/c0/outfn.c
+    4083   12513     10346  /usr/src/libexec/cpp/cpp.c
+    4083   12513      9850  /usr/src/ccc/cpp/cpp.c
+    4210   11997     24158  /usr/src/libexec/c0/outast.c
+    4452   11868      8912  /usr/src/ccc/cpp/emit.c
+    4452   11868      9403  /usr/src/libexec/cpp/emit.c
+    4645   11481     86594  /usr/src/libexec/c1/lower.c
+    4774   11352     84304  /usr/src/ccc/pass2/lower.c
+    4786   11610     17365  /usr/src/libexec/c0/eutil.c
+    4800   11610      6138  /usr/src/libexec/c0/pblock.c
+    4881   11610     14698  /usr/src/ccc/cpp/util.c
+    4881   11610     15211  /usr/src/libexec/cpp/util.c
+    4957   11481     21530  /usr/src/libexec/cpp/io.c
+    4970   11223     75579  /usr/src/cmd/asz/asm.c
+
+=== pass2 (c1): worst offenders (smallest gap) ===
+     gap    heap     bytes  source
+    4061    3354     48049  /usr/src/libexec/c0/declare.c
+    4112    3354     39589  /usr/src/ccc/pass1/declare.c
+    4781    2580     84304  /usr/src/ccc/pass2/lower.c
+    4781    2580     86594  /usr/src/libexec/c1/lower.c
+    5118    2322     48957  /usr/src/ccc/pass2/rewrite.c
+    5118    2322     51554  /usr/src/libexec/c1/rewrite.c
+    5660    1806     13993  /usr/src/libexec/c0/fold.c
+    5688    1806     10846  /usr/src/ccc/pass1/fold.c
+    5792    1548     93620  /usr/src/libexec/ld/ld.c
+    5792    1548     94819  /usr/src/cmd/ld/ld.c
+    5816    1677     17465  /usr/src/cmd/s/address.c
+    5836    1677      5871  /usr/src/ccc/peep/pool.c
+    5836    1677      6480  /usr/src/libexec/peep/pool.c
+    6067    1290     17332  /usr/src/ccc/pass1/expr.c
+    6067    1290     18845  /usr/src/libexec/c0/expr.c
+    6073    1419     24158  /usr/src/libexec/c0/outast.c
+    6091    1290     64453  /usr/src/ccc/tools/wsld.c
+    6102    1419      9351  /usr/src/ccc/peep/regs.c
+    6102    1419      9351  /usr/src/libexec/peep/regs.c
+    6190    1032     97488  /usr/src/cmd/nm/nm.c
+
