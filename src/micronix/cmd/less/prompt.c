@@ -71,7 +71,7 @@ ap_byte()
 {
 	POSITION pos, len;
 
-	pos = position(BOTTOM_PLUS_ONE);
+	pos = position(BOTTOM_PLUS1);
 	if (pos == NULL_POSITION)
 		pos = ch_length();
 	if (pos != NULL_POSITION)
@@ -97,7 +97,7 @@ ap_percent(must_print)
 {
 	POSITION pos,len;
 
-	pos = position(BOTTOM_PLUS_ONE);
+	pos = position(BOTTOM_PLUS1);
 	len = ch_length();
 	if (len > 0 && pos != NULL_POSITION)
 	{

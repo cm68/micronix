@@ -134,13 +134,13 @@ pappend(c)
 				break;
 
 			if (c == curr[-2])
-				goto enter_boldface;
+				goto enter_bold;
 			if (c == '_' || curr[-2] == '_')
-				goto enter_underline;
+				goto enter_uline;
 			curr -= 2;
 			break;
 
-enter_boldface:
+enter_bold:
 			/*
 			 * We have "X\bX" (including the current char).
 			 * Switch into boldface mode.
@@ -171,7 +171,7 @@ enter_boldface:
 			}
 			goto ln_bo_xb_case;
 
-enter_underline:
+enter_uline:
 			/*
 			 * We have either "_\bX" or "X\b_" (including
 			 * the current char).  Switch into underline mode.

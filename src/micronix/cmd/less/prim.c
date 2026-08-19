@@ -45,7 +45,7 @@ eof_check()
 	 * If the bottom line ends at the file length,
 	 * we must be just at EOF.
 	 */
-	pos = position(BOTTOM_PLUS_ONE);
+	pos = position(BOTTOM_PLUS1);
 	if (pos == NULL_POSITION || pos == ch_length())
 		hit_eof++;
 }
@@ -93,7 +93,7 @@ forw(n, pos, force, only_last)
 			clear_eol();
 		}
 
-		if (pos != position(BOTTOM_PLUS_ONE))
+		if (pos != position(BOTTOM_PLUS1))
 		{
 			/*
 			 * This is not contiguous with what is
@@ -167,7 +167,7 @@ back(n, pos, force, only_last)
 	int nlines = 0;
 	int repaint_flag;
 
-	repaint_flag = (n > get_back_scroll() || (only_last && n > sc_height-1));
+	repaint_flag = (n > get_bscroll() || (only_last && n > sc_height-1));
 	hit_eof = 0;
 	while (--n >= 0)
 	{
@@ -216,7 +216,7 @@ forward(n, only_last)
 {
 	POSITION pos;
 
-	pos = position(BOTTOM_PLUS_ONE);
+	pos = position(BOTTOM_PLUS1);
 	if (pos == NULL_POSITION)
 	{
 		eof_bell();
@@ -401,7 +401,7 @@ jump_loc(pos)
 	tpos = position(TOP);
 	if (tpos != NULL_POSITION && pos < tpos)
 	{
-		int bs = get_back_scroll();
+		int bs = get_bscroll();
 		for (nline = 1;  nline <= bs;  nline++)
 		{
 			tpos = back_line(tpos);
@@ -419,7 +419,7 @@ jump_loc(pos)
 		 * The line is currently displayed.  
 		 * Just scroll there.
 		 */
-		forw(nline, position(BOTTOM_PLUS_ONE), 1, 0);
+		forw(nline, position(BOTTOM_PLUS1), 1, 0);
 		return;
 	}
 
@@ -518,7 +518,7 @@ gomark(c)
  * top_scroll, as well as back_scroll.
  */
 	public int
-get_back_scroll()
+get_bscroll()
 {
 	if (back_scroll < 0)
 		return (sc_height - 1 - top_scroll);
@@ -638,7 +638,7 @@ search(direction, pattern, n)
 		 * Forward search but don't "start from top".
 		 * Start just after the bottom line displayed on the screen.
 		 */
-		pos = position(BOTTOM_PLUS_ONE);
+		pos = position(BOTTOM_PLUS1);
 	}
 
 	if (pos == NULL_POSITION)

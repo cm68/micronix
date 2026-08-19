@@ -16,7 +16,7 @@
 	public void setmark ();
 	public void lastmark ();
 	public void gomark ();
-	public int get_back_scroll ();
+	public int get_bscroll ();
 	public void search ();
 	public void end_logfile ();
 	public int ch_seek ();

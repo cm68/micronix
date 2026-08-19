@@ -57,7 +57,7 @@ extern char *prproto[];
 extern int nbufs;
 extern char sc_window;
 extern char *first_cmd;
-extern char *every_first_cmd;
+extern char *every_cmd;
 #if LOGFILE
 extern char *namelogfile;
 #endif
@@ -172,7 +172,7 @@ init_option()
 	/*
 	 * First do special cases, not in option table.
 	 */
-	first_cmd = every_first_cmd = NULL;
+	first_cmd = every_cmd = NULL;
 	f_nbufs = DEF_F_NBUFS;		/* -bf */
 	p_nbufs = DEF_P_NBUFS;		/* -bp */
 
@@ -246,7 +246,7 @@ toggle_option(c)
 		{
 			sprintf(message, o->odesc[0], 
 				(o->ovar == &back_scroll) ? 
-				get_back_scroll() : *(o->ovar));
+				get_bscroll() : *(o->ovar));
 			error(message);
 			return;
 		} else
@@ -314,7 +314,7 @@ scan_option(s)
 		goto next;
 	case '+':
 		if (*s == '+')
-			every_first_cmd = ++s;
+			every_cmd = ++s;
 		first_cmd = s;
 		s = optstring(s);
 		goto next;

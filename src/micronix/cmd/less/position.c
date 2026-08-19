@@ -30,13 +30,13 @@ position(where)
 	int where;
 {
 	/*
-	 * BOTTOM and BOTTOM_PLUS_ONE are negative, and a case label
+	 * BOTTOM and BOTTOM_PLUS1 are negative, and a case label
 	 * on this machine is one byte - c1 refuses a switch whose
 	 * arm could never be reached.  The if says the same thing.
 	 */
 	if (where == BOTTOM)
 		where = sc_height - 2;
-	else if (where == BOTTOM_PLUS_ONE)
+	else if (where == BOTTOM_PLUS1)
 		where = sc_height - 1;
 	return (table[where]);
 }

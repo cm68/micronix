@@ -16,7 +16,7 @@ extern int hit_eof;
 extern int sc_width, sc_height;
 extern char sc_window;
 extern char *first_cmd;
-extern char *every_first_cmd;
+extern char *every_cmd;
 extern char version[];
 extern char current_file[];
 extern char *editor;
@@ -280,11 +280,11 @@ commands()
 				case '+':
 					for (p = cmdbuf;  *p == '+' || *p == ' ';  p++) ;
 					if (*p == '\0')
-						every_first_cmd = NULL;
+						every_cmd = NULL;
 					else
 					{
 						strtcpy(fcbuf, p, sizeof(fcbuf));
-						every_first_cmd = fcbuf;
+						every_cmd = fcbuf;
 					}
 					break;
 				case 'E':

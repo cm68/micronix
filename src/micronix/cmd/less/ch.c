@@ -61,7 +61,7 @@ static POSITION ch_fsize;
 /*
  * Largest block number read if input is standard input (a pipe).
  */
-static long last_piped_block;
+static long last_pipe_blk;
 
 /*
  * Get the character pointed to by the read pointer.
@@ -99,12 +99,12 @@ fch_get()
 		 * The block requested should be one more than
 		 * the last block read.
 		 */
-		if (ch_block != ++last_piped_block)
+		if (ch_block != ++last_pipe_blk)
 		{
 			/* This "should not happen". */
 			char message[80];
 			sprintf(message, "Pipe error: last %ld, want %ld\n",
-				(long)last_piped_block-1, (long)ch_block);
+				(long)last_pipe_blk-1, (long)ch_block);
 			error(message);
 			quit();
 		}
@@ -227,7 +227,7 @@ ch_seek(pos)
 	long new_block;
 
 	new_block = pos / BUFSIZ;
-	if (!ispipe || new_block == last_piped_block + 1 || buffered(new_block))
+	if (!ispipe || new_block == last_pipe_blk + 1 || buffered(new_block))
 	{
 		/*
 		 * Set read pointer.
@@ -412,7 +412,7 @@ ch_init(want_nbufs)
 	bufs[0].prev = bufs[nbufs-1].next = END_OF_CHAIN;
 	buf_head = &bufs[0];
 	buf_tail = &bufs[nbufs-1];
-	last_piped_block = -1;
+	last_pipe_blk = -1;
 	ch_fsize = NULL_POSITION;
 	(void) ch_seek((POSITION)0);
 }

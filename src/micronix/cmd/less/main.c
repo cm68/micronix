@@ -9,7 +9,7 @@
 public char	ispipe;
 public jmp_buf	main_loop;
 public char *	first_cmd;
-public char *	every_first_cmd;
+public char *	every_cmd;
 public char	new_file;
 public char	is_tty;
 public char 	current_file[128];
@@ -174,8 +174,8 @@ edit(filename)
 	ch_init( (ispipe) ? p_nbufs : f_nbufs );
 	init_mark();
 
-	if (every_first_cmd != NULL)
-		first_cmd = every_first_cmd;
+	if (every_cmd != NULL)
+		first_cmd = every_cmd;
 
 	if (is_tty)
 	{

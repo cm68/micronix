@@ -20,7 +20,7 @@
  *	    Added E, N, P commands			2/1/84    markn
  *	    Added '=' command, 'stop' signal handling	4/17/84   markn
  *	    Added line folding				4/20/84   markn
- *	v2: Fixed '=' command to use BOTTOM_PLUS_ONE, 
+ *	v2: Fixed '=' command to use BOTTOM_PLUS1, 
  *	    instead of TOP, added 'p' & 'v' commands	4/27/84   markn
  *	v3: Added -m and -t options, '-' command	5/3/84    markn
  *	v4: Added LESS environment variable		5/3/84    markn
