@@ -1,155 +1,89 @@
 # awk — 2.11BSD port
 
-**Status: integer, still over budget.** The soft-float runtime described
-below has been replaced with plain integer arithmetic (`AWKFLOAT` is a
-signed 32-bit `long`; `intmath.c` supplies `isqrt`/`ilog`/`iexp`/`ftoa`),
-which drops `float.c` + `mathf.c` and the tables were trimmed (`RECSIZE`
-512, `MAXFLD` 50, `MAXSYM` 32).  The image is now ~62 KB (text 44.6 K,
-data 17.7 K) instead of 72 KB, but that still leaves only ~3 KB of heap,
-and the parser's `++yyps > &yys[YYMAXDEPTH]` also needed the CODEGENGAPS
-entry 22 workaround in `y.tab.c`.  It builds and links, but a running awk
-collides its stack into the heap.  The remaining levers are the same ones
-below: shrink `printf`, and regenerate the lexer with fewer states.
-
-The original write-up of the soft-float port (now superseded) follows.
+**Status: works.** awk runs in micronix's flat 64 K address space as
+integer arithmetic: `AWKFLOAT` is a signed 32-bit `long`, the lexer is a
+hand-written recognizer instead of lex-generated tables, and four ccc
+codegen bugs are worked around in source.  The image is ~54 KB
+(text 41,407 + data 12,885) and it is in DIRS, so it builds with the
+rest of the tree.
 
 ## What this directory is
 
-A port of 2.11BSD `awk` (from `extra/2.11/pdp11/usr/src/bin/awk`) to
-micronix, using **no compiler changes**. Two rewrites cover the two things
-ccc cannot do:
+A port of 2.11BSD awk (`extra/2.11/pdp11/usr/src/bin/awk`) to micronix.
+Two things ccc cannot do shaped it:
 
-1. **Floating point.** ccc has no `float`/`double` type. awk's numeric model
-   (`AWKFLOAT float` in `awk.def`) became `unsigned long`, and every infix
-   float operation became a call into a small soft-float library:
+- **Floating point.** ccc has no `float`/`double`, so awk's numeric model
+  (`AWKFLOAT`) is a signed 32-bit `long`.  Ordinary awk arithmetic - field
+  counts, running totals, string lengths - is exact; only the fractional
+  part of a division and the transcendental builtins are gone, and
+  `log`/`exp`/`sqrt` collapse to integer approximations.  `intmath.c`
+  supplies `isqrt`/`ilog`/`iexp`, `ftoa` (a number as `%ld`), and `fcmp`
+  (the three-way compare).  No soft-float library is linked.
 
-   - `+ - * / %` → `fadd fsub fmul fdiv fmod`
-   - `< <= == != >= >` → `fcmp`
-   - `atof` → `fatof` (string→float)
-   - `%g`/`%.20g` output → `ftoa` (float→string)
-   - `log exp sqrt sin cos atan2` → the same-named functions in `mathf.c`
+- **Struct-by-value.** awk passes its 4-byte `obj` around by value, which
+  ccc rejects, so `obj` is packed into a `long` - cell pointer in the low
+  word, otype in the next byte, osub on top - and every `x.optr` /
+  `x.otype` / `x.osub` access went through the `objptr` / `objtype` /
+  `objsub` / `objmk` macros in `awk.def`.
 
-2. **Struct-by-value.** ccc rejects passing a struct by value
-   (`ER_E_AG "struct value"`). awk passes its 4-byte `obj` around by value
-   everywhere, so `obj` was packed into a `long`:
+## The lexer
 
-   ```c
-   typedef long obj;
-   #define objptr(o)  ((cell *)((o) & 0xffffL))
-   #define objtype(o) ((char)(((o) >> 16) & 0xff))
-   #define objsub(o)  ((char)(((o) >> 24) & 0xff))
-   #define objmk(p,t,s) ((obj)((long)(p) | ((long)(t) << 16) | ((long)(s) << 24)))
-   ```
+`yylex.c` is hand-written.  awk's lexical grammar is just keywords,
+operators, numbers, quoted strings and inline `/regex/`, so a brute-force
+scan with a one-character pushback is a fraction of the DFA tables' size
+(`yylex.o` 4.1 K vs the generated `lex.yy.o` 10.1 K).  `lex.yy.c` is kept
+for reference but is not built.
 
-   and ~95 `x.optr`/`x.otype`/`x.osub` accesses were rewritten to the macros.
-   The one remaining `cell`-by-value copy (`tmps[i] = nullval`) was expanded
-   field by field.
+## ccc codegen bugs worked around
 
-## The soft-float stack (lives in the ccc tree)
+Getting awk to run surfaced four more codegen bugs, all places c1 loses
+one half of a two-word `long` (CODEGENGAPS entry 23):
 
-`/home/curt/src/ccc/src/libc/float.c` + `float.h` + `mathf.c` are the
-compiler-free float runtime, usable by any program, not just awk:
+- `(long)(x) & 0xffffL` returns the **high** word, not the low.  This is
+  why `print` dumped the text segment: in `nodetoobj`, `(cell *)a->nobj`
+  lowered to a four-byte load of the struct field - `nobj` *and* the
+  neighbouring `narg[0]` - and the mask returned `narg[0]`.  `objptr`
+  narrows through `int`, `objmk` widens through `unsigned`.
+- a `long` global initialised from a shift folds to 16 bits, so `true`
+  and `false` came out two bytes and zero; they are literals now.
+- the `fcmp` nested ternary `(a)>(b)?1:(a)<(b)?-1:0` returns 255 for the
+  -1 when the operands are 32-bit struct fields, so `1 > 3` was true;
+  `fcmp` is now a real `if`/`else` function.
 
-- Representation: `unsigned long` holding bit 31 = sign, bits 24–30 =
-  exponent (bias 64), bits 0–23 = mantissa (the same format as the old
-  `float.s` assembly runtime).
-- `float.c`: `itof ftoi ftrunc fadd fsub fmul fdiv fmod fcmp fneg fatof ftoa`.
-- `mathf.c`: `sqrt exp log sin cos atan atan2 pow floor fabs`, rewritten
-  from the old `double`-based libc sources, coefficients pre-encoded as hex.
-
-## ccc quirks found and worked around
-
-These are compiler bugs/limits worth remembering for any future port:
-
-- **`index()`/`rindex()` name collision** (in the *lex* generator, not awk):
-  the 2.11BSD lex defines its own `index(char, string)`, whose arguments are
-  reversed from libc's `index`/`strchr`. gcc resolved the call against the
-  libc one, so `%Start` silently produced **no** start-condition states.
-  Renamed to `lindex`.
-- **`while(cond) label: switch()`** — a bare label as a loop body is not
-  parsed by c0; wrapped the lexer's `yyfussy` loop in braces.
-- **`!=` in the parser** generated an unreduced `LNOT(EQ(...))` node ("no
-  rule could build code for"); rewritten as nonzero tests (`a + 1` / `a - b`).
-- **`-var` in a loop bound** fails codegen; use a sign flag + if/else.
-- **ternary with a negative literal in the false branch** miscompiles
-  (`sa ? 1 : -1` gave 255 for the `-1`); use if/else.
-- **implicit function declarations return `int` (16-bit)** — any
-  `FLOAT`-returning function not declared in a header gets truncated on
-  return. Everything float must be declared.
-- **`(long)&global[i]`** (address of a global array element) is a `SYMREFptr`
-  ccc can't widen; load into a local pointer first.
-- **`getline` / `proctab` redeclaration** — ccc flags `extern obj
-  (*proctab[])()` against its definition; the extern was dropped from
-  `awk.def` and moved to `run.c`.
+The parser's `++yyps > &yys[YYMAXDEPTH]` overflow check also needed the
+entry-22 workaround (a pre-computed `yyslim` and a split increment) in
+`y.tab.c`, the same fix as v7 make's parser.
 
 ## How it builds
 
-The parser and lexer are generated on the **host** (not micronix):
+The generated files are committed so the native build needs only ccc:
 
-- `yacc` (2.11BSD, built with `gcc -std=gnu89`) on `awk.g.y` → `y.tab.c`
-  (+ `awk.h` from `y.tab.h`).
-- `lex` (2.11BSD, built with `gcc -m32 -std=gnu89`; needed the `index`→
-  `lindex` rename and the `yyfussy` brace fix) on `awk.lx.l` → `lex.yy.c`.
-- `proctab.c` is generated by `proc` (a host program: `gcc -m32 proc.c
-  token.c`), which emits the `proctab[]` function-pointer table and
-  `printname[]`.
-- `popen.c` is a stub (`popen`/`pclose` return NULL/0) — micronix has no
-  shell to pipe through, so awk's `cmd | getline` / `print | cmd` are dead.
+- `y.tab.c` from `awk.g.y` by yacc (on the host),
+- `proctab.c` from `proc.c` + `token.c` (a host program),
+- `yylex.c` is hand-written (replaces `lex.yy.c`).
 
-Full link:
+`GNUmakefile` cross builds it; the lowercase `makefile` builds it inside
+micronix.  `popen.c` is a stub (`popen`/`pclose` return NULL/0): micronix
+has no shell to pipe through, so `print | cmd` and `cmd | getline` are
+dead.
 
-```
-ccc -m micronix -O -I<ccc>/src/libc -I/usr/local/lib/include -I. \
-    -o awk b.c lib.c main.c parse.c run.c token.c tran.c freeze.c popen.c \
-    y.tab.c lex.yy.c proctab.c <ccc>/src/libc/float.c <ccc>/src/libc/mathf.c
-```
-
-## Why it's tabled: size
-
-The linked image is over the 64 K budget:
+## Size
 
 | segment | bytes |
 |---|---|
-| text | 49,998 |
-| data | 12,775 |
-| bss | 9,816 |
-| **total** | **72,589** |
+| text | 41,407 |
+| data | 12,885 |
+| **total** | **54,292** |
 
-It crashes in the simulator as soon as it runs: `break` at 0xc44e, stack
-colliding below it.
+The 32-bit `long` arithmetic is the price of awk's numeric range: the
+`q*`/`l*` helper routines the Z80 calls for every 32-bit operation are
+~690 bytes of the text, shared across all the call sites.  Using 16-bit
+`int` would drop them but cap numbers at ±32767, which is not a usable
+awk.
 
-### Where the text goes (per object)
+## Not ported (faithfully)
 
-| source | text | what |
-|---|---|---|
-| `run.c` | 11,072 | the interpreter: `execute arith relop assign format` |
-| `b.c` | 5,561 | main loop, field-splitting, regex `match` |
-| `lex.yy.c` | 5,014 | the lexer |
-| `y.tab.c` | 4,710 | the parser |
-| `float.c` | 3,940 | soft-float `fadd fmul fdiv …` |
-| `lib.c` | 3,294 | builtins, `fldbld getrec` |
-| `mathf.c` | 2,397 | `sqrt exp log sin cos atan2` |
-| `tran.c` | 2,383 | string↔number coercion |
-| small files | ~2,784 | `main parse token freeze proctab popen` |
-| **libc/libu** | **~8,840** | printf/malloc/stdio/string, the `q*` long helpers, crt0 |
-
-Data is dominated by the parse/DFA tables (`y.tab.c` 5,474 + `lex.yy.c`
-4,162); bss by `record[2560]` + `fields[2560]` (5,128) and `fldtab[100]`
-(2,308).
-
-### What it would take to fit
-
-Closing ~10 KB and leaving heap headroom is a real squeeze, not a quick
-fix. The levers, roughly in order of yield:
-
-1. Shrink `printf` (the fat part of libc; awk only needs `%s %d %c %o %x`,
-   and does its own float formatting via `ftoa`).
-2. Regenerate the lexer with fewer states (`%n`/`-S`), which trims the DFA
-   tables in data.
-3. Cut `RECSIZE` (record/field buffers) and `MAXFLD` (field table) — bss.
-4. Drop the trig functions awk doesn't actually call, and trim `mathf.c`.
-
-Even all of these together is a tight fit. awk, like yacc and lex, was
-written for the PDP-11's separate I/D space, where ~49 KB of text and
-~12 KB of tables each had their own 64 K. On micronix's single 64 K, the
-three passes and awk are each at or over the ceiling.
+The relational-expression grammar is the original 2.11BSD one: a
+comparison is an expression only inside `if (...)` and patterns, so
+`x = (a == b)` and `print (a == b)` are syntax errors, and `print a > b`
+parses as redirection.  This is the stock grammar, not a port bug.
