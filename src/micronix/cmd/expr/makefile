@@ -8,9 +8,9 @@
 # it cross builds the same program on the host.
 #
 # y.tab.c is the parser yacc generated from expr.y, committed so the
-# native build does not have to run yacc first.  expr links -ly for
-# yyerror; liby.a's yyparse and main members are not pulled because
-# y.tab.o already defines both symbols.
+# native build does not have to run yacc first.  expr is
+# self-contained - yyinit and yyerror are inlined in expr.y - so it
+# does not link -ly.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
@@ -25,7 +25,7 @@ OBJS	= y.tab.o
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $(OBJS) -ly
+	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
 install: $(PROG)
 	cp $(PROG) $(BIN)/$(PROG)

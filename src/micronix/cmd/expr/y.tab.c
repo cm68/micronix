@@ -181,6 +181,21 @@ itoa(n) register int n; {
 copy(source, sink) register char *source, *sink; {
 	 while(*sink++ = *source++);
 }
+
+/* The two yacc-runtime entry points, inlined so expr does not have to
+ * link liby.a (see expr.y's header).  yyinit is the v6 no-op the
+ * parser's main calls before yyparse; yyerror is what yyparse
+ * reports through.
+ */
+yyinit()
+{
+}
+
+yyerror(s)
+char *s;
+{
+	printf("%s\n", s);
+}
 int yyexca[] = {
 -1, 1,
 	0, -1,

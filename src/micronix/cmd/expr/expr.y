@@ -15,8 +15,12 @@
  *
  *   - the `=`-less initializers: `int yyline 0`, `register i 0`,
  *     `register neg 0` gain `=`; implicit-int registers gain int.
- *   - `int yyline` is dropped: the yacc runtime (liby.a) defines it
- *     for yyerror, and a second definition would not link.
+ *   - `int yyline` is dropped, and yyinit() and yyerror() are defined
+ *     at the foot of the file.  The v6 expr linked them out of the
+ *     yacc runtime, but that would make expr depend on liby.a, which
+ *     cmd does not build before this directory - so they are inlined
+ *     and expr is self-contained, the way cmd/make carries its own
+ *     yyerror.
  *   - itoa()'s buffer was `static char *str[10]`, a pointer array
  *     where a char array was wanted; it is `char str[10]` now.
  *
@@ -216,4 +220,18 @@ itoa(n) register int n; {
 }
 copy(source, sink) register char *source, *sink; {
 	 while(*sink++ = *source++);
+}
+
+/* The two yacc-runtime entry points, inlined so expr does not have to
+ * link liby.a (see the header).  yyinit is the v6 no-op the parser's
+ * main calls before yyparse; yyerror is what yyparse reports through.
+ */
+yyinit()
+{
+}
+
+yyerror(s)
+char *s;
+{
+	printf("%s\n", s);
 }
