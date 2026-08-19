@@ -77,16 +77,24 @@ getname(word addr)
  * - stat("/dev/ttyB") loses its answer to a wait() from the child.  A
  * slot per task would fix it and has not been needed yet.
  */
-static word retpc;
-static char *retname;
-static int armed;
+#define NSLOTS 8
+static word retpc[NSLOTS];
+static char *retname[NSLOTS];
+static int armed[NSLOTS];
 
 static void
 syscall_arm(word addr, char *name)
 {
-    retpc = addr;
-    retname = name;
-    armed = 1;
+    int i;
+
+    for (i = 0; i < NSLOTS; i++) {
+        if (!armed[i]) {
+            retpc[i] = addr;
+            retname[i] = name;
+            armed[i] = 1;
+            return;
+        }
+    }
 }
 
 void
@@ -94,18 +102,21 @@ syscall_return(word addr)
 {
     word hl;
     byte f;
+    int i;
 
-    if (!armed || addr != retpc) {
+    for (i = 0; i < NSLOTS; i++) {
+        if (!armed[i] || addr != retpc[i])
+            continue;
+        armed[i] = 0;
+        hl = z80_get_reg16(hl_reg);
+        f = z80_get_reg8(f_reg);
+        if (f & 1) {
+            printf("micronix %s = ERROR %d\n", retname[i] ? retname[i] : "?", hl);
+        } else {
+            printf("micronix %s = %d (0x%04x)\n", retname[i] ? retname[i] : "?",
+                (short) hl, hl);
+        }
         return;
-    }
-    armed = 0;
-    hl = z80_get_reg16(hl_reg);
-    f = z80_get_reg8(f_reg);
-    if (f & 1) {
-        printf("micronix %s = ERROR %d\n", retname ? retname : "?", hl);
-    } else {
-        printf("micronix %s = %d (0x%04x)\n", retname ? retname : "?",
-            (short) hl, hl);
     }
 }
 
