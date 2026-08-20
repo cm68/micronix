@@ -52,13 +52,14 @@ src/micronix:
     libraries, commands and the kernel.
 	this is gradually being fleshed out with replacements for the micronix
 	utilities that I don't have source for, namely all of them.
-	notable additions:  
-		a much better make, 
+	notable additions:
+		a v7 make
+		the PWB yacc, lex, expr and fd2, and 2.11's awk
+		tar, msh (the shell), less, diff and mv
 		an in-memory, ansi-only, vi subset derived from stevie
 		2.11's ls and cp
 		a working pwd, rm, mknod
-		a cc that deals with whitesmith's and hitech when that compiler
-		is ready
+		the ccc compiler, described below
 	
 src/micronix/lib:
 	additions and replacements for the whitesmith's library.
@@ -127,20 +128,13 @@ src/hwsim:
 src/include:
 	library include files for the emulation
 
-src/hitechc:
-	the hitech c compiler.  this is not capable of running yet, but a big
-	start has been made to replace the bottom level i/o with micronix versions.
-	this is facilitated by a binary patch tool that effectively pattern
-	matches library fragments and patches on top of them.   it's good
-	enough to work for cpp already, but the compiler passes use a different
-	library implementation.
-	when that's done, then we are in business with the most modern native
-	c compiler in existence.
-
-extra/qc:
-	plan B, if the hitech c effort is too large.  this compiler is a bit lame,
-	as it is small-c derived, so args get pushed wrong, no ansi, etc. 
-	but it is native, and it is source.
+ccc:
+	this tree's own c compiler, written from scratch - cpp, c0, c1, peep,
+	asz and ld, the passes in src/micronix/libexec and the driver and
+	friends in src/micronix/cmd.  it cross builds on the host (mxccc) and
+	natively inside micronix (ccc), and targets both micronix and cp/m -
+	-m micronix links libu, -m cpm links libcpm, and both link the one
+	pure libc.  everything in this tree builds with it.
 
 extra/v6, extra/v7, extra/2.11
 	oh, yeah.  this is the real mc-coy.  this is useful for reference and
@@ -176,6 +170,40 @@ extra/decomp:
 extra/sim:
 	a bunch of 8 bit simulators for cribbing ideas/code from.
 	these all are licensed by thier original authors, so...
+
+running the hardware simulator, from a standing start
+----------------------------------------------------
+
+you can make a hard disk image and boot micronix without any blessed
+snapshot, starting from the kernel source.  m16 is the largest volume
+with a reliable kernel.
+
+	# build the host cross-tools (once)
+	make hostcc				the compiler: mxccc, mxasz, mxld
+	make -C src/tools			mnix, the image reader/writer
+	make -C src/micronix/stand/boot		the boot blocks, bootimg-m16
+
+	# build the kernel.  sys is three overlays at a fixed base, so the
+	# cross build does not link it - build "unix" with the host tools:
+	#	compile each .c:	bin/mxccc -m micronix -O -i../include -c foo.c
+	#	assemble each .s:	bin/mxccc -m micronix -c foo.s
+	#	link:			bin/mxld -r -Ttext=0x1000 -L lib -lccc -lc -o unix *.o
+	# (the native sys/Makefile has the full object list) - ~49k.
+
+	# make the m16 disk
+	src/tools/mnix initialize m16 disks/hdinstall/hddma-0
+	src/tools/mnix mkfs -i src/micronix/stand/boot/bootimg-m16 \
+		disks/hdinstall/hddma-0
+	bin/setdev unix 3/8 0/0		# root 3/8 (m16), swap nodev
+	src/tools/mnix -f disks/hdinstall/hddma-0 write unix /micronix
+
+	# boot it
+	cd src/hwsim/d1
+	./d1 -B hdcdma -d ../../disks/hdinstall hdcdma0:hddma-0
+
+-B says boot straight from the hdcdma controller, skipping the monitor;
+the boot block that mkfs put on cylinder 0 loads /micronix.  the shell
+prompt is '#'.
 
 TODO:
 
