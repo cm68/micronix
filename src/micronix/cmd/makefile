@@ -98,11 +98,6 @@ all:
 	cd yacc ; make all
 	cd lex ; make all
 
-#
-# reset is a script rather than a program, and it is copied with the
-# cp just built here rather than with whatever /bin/cp is, which is
-# the point of doing it after cp installs itself.
-#
 install:
 	cd make ; make install
 	cd ar ; make install
@@ -114,7 +109,6 @@ install:
 	cd chmod ; make install
 	cd cmp ; make install
 	cd cp ; make install
-	cp/cp reset /bin/reset
 	cd date ; make install
 	cd dcheck ; make install
 	cd dd ; make install
