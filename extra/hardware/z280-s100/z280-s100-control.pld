@@ -1,0 +1,215 @@
+Name     Z280 S-100 CPU card - control CPLD ;
+PartNo   ATF1508 ;
+Date     2026-08-20 ;
+Revision 0 ;
+Designer ;
+Company  ;
+Assembly ;
+Location ;
+Device   f1508ispplcc84 ;
+
+/* ============================================================================
+ * Z280 S-100 CPU card - control CPLD (CPLD A)
+ *
+ * The Z280's bus master + local memory. Owns the Z-BUS interface, the master
+ * bridge FSM (with the 16->8 split), the S-100 status/control byte, the
+ * address decode, SRAM/flash control, and HOLD->BUSREQ->pHLDA arbitration.
+ *
+ * Feeds the data-path CPLD (B) the six steering decisions it can't see for
+ * itself: SLAVE, SLAVE_WIN, MASTER_ACTIVE, MASTER_WRITE, BYTE_SEL, XFR16.
+ * This CPLD only READS SIXTN/pRDY/XRDY (the open-drain drive lives in B).
+ *
+ * Pinout verified against the ATF1508 84-pin PLCC: JTAG = TDI 14 / TMS 23 /
+ * TCK 62 / TDO 71 (dedicated); Z_CLK_IN on GCK1 (83) for the global-clock net.
+ * ========================================================================== */
+
+/* *************** INPUT PINS *********************/
+PIN 1   = Z_AS;       /* Z-BUS address strobe, active low */
+PIN 2   = Z_DS;       /* Z-BUS data strobe, active low */
+PIN 4   = Z_RW;       /* read/write, low = write */
+PIN 5   = Z_BW;       /* byte/word, low = word */
+PIN 6   = Z_ST0;
+PIN 8   = Z_ST1;
+PIN 9   = Z_ST2;
+PIN 10   = Z_ST3;
+PIN 11   = Z_IE;       /* input enable (read), active low */
+PIN 12  = Z_OE;       /* output enable (write), active low */
+PIN 15  = Z_BUSACK;   /* BUSACK: 0=relinquished(slave) 1=owns(master) */
+PIN 83  = Z_CLK_IN;
+PIN 16  = Z_RESET;
+PIN 17  = S100_INT;   /* backplane interrupt, active low */
+PIN 18  = S100_NMI;
+PIN 20  = S100_HOLD;  /* temporary-master request, active low */
+PIN 21  = S100_pRDY;  /* master ready (read only here) */
+PIN 22  = S100_XRDY;
+PIN 24  = S100_SIXTN; /* 16-bit ack from slave (read only here) */
+PIN 25  = SLAVE_ONLY; /* strap: permanent bus slave (memory-only debug) */
+PIN 27  = LA0;        /* latched address bit 0 = byte select */
+PIN 28  = LA1;        /* latched addr bit 1 = SRAM A0 (burst count LSB) */
+PIN 29  = LA2;        /* latched addr bit 2 = SRAM A1 (burst count MSB) */
+PIN 30  = SRAM_WIN;    /* from B: 2 MB window */
+PIN 31  = FLASH_WIN;   /* from B */
+PIN 33  = BANK;        /* from B: bank select (A20) */
+PIN 62  = TCK;        /* JTAG */
+PIN 23  = TMS;
+PIN 14  = TDI;
+
+/* *************** OUTPUT PINS *********************/
+PIN 34  = !Z_WAIT;    /* hold the Z280, active low */
+PIN 35  = !Z_INT;
+PIN 36  = !Z_NMI;
+PIN 37  = !Z_BUSREQ;  /* request Z280 bus, active low */
+PIN 39  = CPLD_sMEMR; /* status byte (bidirectional: drive master, read slave) */
+PIN 40  = !CPLD_sWO;
+PIN 41  = CPLD_sINP;
+PIN 44  = CPLD_sOUT;
+PIN 45  = CPLD_sINTA;
+PIN 46  = CPLD_sHLTA;
+PIN 48  = !CPLD_sXTRQ;
+PIN 49  = CPLD_pSYNC;
+PIN 50  = !CPLD_pSTVAL;
+PIN 51  = CPLD_pDBIN;
+PIN 52  = !CPLD_pWR;
+PIN 54  = CPLD_pHLDA;
+PIN 55  = !MEM_CE0;
+PIN 56  = !MEM_CE1;
+PIN 57  = !MEM_OE;
+PIN 58  = !MEM_WE_L;
+PIN 60  = !MEM_WE_H;
+PIN 61  = !FLASH_CE;
+PIN 63  = !FLASH_OE;
+PIN 64  = LATCH_LE;
+PIN 65  = SRAM_A0;    /* SRAM word-address bit 0 (from burst counter) */
+PIN 67  = SRAM_A1;    /* SRAM word-address bit 1 (from burst counter) */
+PIN 68  = SLAVE;         /* -> B */
+PIN 69  = MASTER_ACTIVE; /* -> B (= S100_ACTIVE) */
+PIN 70  = MASTER_WRITE;  /* -> B (= WRITE) */
+PIN 73  = BYTE_SEL;      /* -> B, and drives S-100 A0 via U16 */
+PIN 74  = XFR16;         /* -> B */
+PIN 71  = TDO;        /* JTAG */
+
+/* *************** STATE REGISTER *************** */
+node S1;   /* master FSM: IDLE=00, SYNC=01, DATA=10 */
+node S0;
+node SPLIT;/* 16->8 split: 1 = second byte in progress */
+node B0;    /* burst addr counter LSB = SRAM A0 (byte A1) */
+node B1;    /* burst addr counter MSB = SRAM A1 (byte A2) */
+
+S1.CK = Z_CLK_IN;
+S0.CK = Z_CLK_IN;
+SPLIT.CK = Z_CLK_IN;
+B0.CK = Z_CLK_IN;
+B1.CK = Z_CLK_IN;
+S1.AR = !Z_RESET;
+S0.AR = !Z_RESET;
+SPLIT.AR = !Z_RESET;
+B0.AR = !Z_RESET;
+B1.AR = !Z_RESET;
+
+/* *************** COMBINATIONAL DECODE *************** */
+MEM   = Z_ST3 & !Z_ST2 & !Z_ST1;              /* 1000/1001 memory */
+IO    = !Z_ST3 & !Z_ST2 & Z_ST1 & !Z_ST0;     /* 0010 I/O */
+WRITE = !Z_RW;
+WORD  = !Z_BW;
+
+/* SRAM_WIN / FLASH_WIN arrive decoded from CPLD B (2 MB window). */
+LOCAL_ADDR = SRAM_WIN # FLASH_WIN;
+
+S100_CYCLE = (MEM & !LOCAL_ADDR) # IO;
+READY      = S100_pRDY # S100_XRDY;
+
+SLAVE  = !Z_BUSACK # SLAVE_ONLY;   /* 1 = board is a bus slave */
+MASTER = Z_BUSACK & !SLAVE_ONLY;   /* 1 = board is the bus master */
+
+START      = S100_CYCLE & MASTER;
+S100_ACTIVE = (S1 # S0) & MASTER;
+
+SPLIT16 = WORD & !S100_SIXTN;   /* word access, slave did NOT ack 16-bit */
+
+/* *************** MASTER BRIDGE FSM *************** */
+S1.D = (S0 & !S1)
+     # (S1 & !S0 & !READY);
+
+S0.D = (!S1 & !S0 & START)
+     # (S1 & !S0 & READY & SPLIT16 & !SPLIT);
+
+SPLIT.D = (S1 & !S0 & READY & SPLIT16 & !SPLIT)
+        # (SPLIT & !(S1 & !S0 & READY));
+
+/* *************** BURST ADDRESS COUNTER *************** */
+/* 2-bit loadable counter on the SRAM word-address low bits (byte A1,A2).
+ * Loads the latched address on AS, increments on each DS stroke. A normal
+ * access (1 DS) leaves SRAM A0/A1 at the latched value; a burst (1 AS + 4 DS)
+ * steps them 00->01->10->11. byte A0 stays 0 (word transfers). */
+LOAD  = !Z_AS;
+COUNT = !Z_DS;
+
+B0.D = (LOAD & LA1) # (!LOAD & (B0 $ COUNT));
+B1.D = (LOAD & LA2) # (!LOAD & (B1 $ (COUNT & B0)));
+
+SRAM_A0 = B0;
+SRAM_A1 = B1;
+
+/* *************** S-100 CONTROL / STATUS *************** */
+CPLD_pSYNC   = S0 & !S1;
+CPLD_pSTVAL  = S0 & !S1;
+CPLD_pDBIN   = S1 & !S0 & !WRITE;
+CPLD_pWR     = S1 & !S0 & WRITE;
+
+Z_WAIT       = S100_ACTIVE;
+
+CPLD_sMEMR   = MEM & S100_ACTIVE;
+CPLD_sWO     = WRITE & S100_ACTIVE;
+CPLD_sINP    = IO & !WRITE & S100_ACTIVE;
+CPLD_sOUT    = IO & WRITE & S100_ACTIVE;
+CPLD_sINTA   = !Z_ST3 & Z_ST2 & S100_ACTIVE;
+CPLD_sHLTA   = !Z_ST3 & !Z_ST2 & Z_ST1 & Z_ST0 & S100_ACTIVE;
+CPLD_sXTRQ   = WORD & S100_ACTIVE & !SPLIT;
+
+CPLD_sMEMR.OE  = S100_ACTIVE;
+CPLD_sWO.OE    = S100_ACTIVE;
+CPLD_sINP.OE   = S100_ACTIVE;
+CPLD_sOUT.OE   = S100_ACTIVE;
+CPLD_sINTA.OE  = S100_ACTIVE;
+CPLD_sHLTA.OE  = S100_ACTIVE;
+CPLD_sXTRQ.OE  = S100_ACTIVE;
+CPLD_pSYNC.OE  = S100_ACTIVE;
+CPLD_pSTVAL.OE = S100_ACTIVE;
+CPLD_pDBIN.OE  = S100_ACTIVE;
+CPLD_pWR.OE    = S100_ACTIVE;
+
+/* *************** LOCAL MEMORY *************** */
+MEM_CE0 = (MEM & SRAM_WIN & MASTER & !BANK)
+        # (SLAVE & SLAVE_WIN & CPLD_sMEMR & !BANK);
+MEM_CE1 = (MEM & SRAM_WIN & MASTER &  BANK)
+        # (SLAVE & SLAVE_WIN & CPLD_sMEMR &  BANK);
+
+MEM_OE  = (Z_IE & MASTER & SRAM_WIN)
+        # (SLAVE & SLAVE_WIN & CPLD_sMEMR & !CPLD_sWO);
+
+MEM_WE_L = (WRITE & Z_DS & (WORD # !LA0) & SRAM_WIN & MASTER)
+         # (SLAVE & SLAVE_WIN & CPLD_sMEMR & CPLD_sWO & !BYTE_SEL);
+MEM_WE_H = (WRITE & Z_DS & (WORD #  LA0) & SRAM_WIN & MASTER)
+         # (SLAVE & SLAVE_WIN & CPLD_sMEMR & CPLD_sWO &  BYTE_SEL);
+
+FLASH_CE = MEM & FLASH_WIN & MASTER;
+FLASH_OE = Z_IE & FLASH_WIN & MASTER;
+
+/* *************** SLAVE MODE / ARBITRATION *************** */
+SLAVE_WIN = SRAM_WIN;   /* same 2 MB window, decoded by B */
+
+Z_BUSREQ = !S100_HOLD & !SLAVE_ONLY;
+
+/* pHLDA is the permanent master's exclusive output; always driven, never
+ * CDSB-gated (one master, temporaries return through it). */
+CPLD_pHLDA = !Z_BUSACK;
+CPLD_pHLDA.OE = 1;
+
+/* *************** STEERING DECISIONS (-> B) *************** */
+XFR16   = (MASTER & WORD & S100_SIXTN) # (SLAVE & CPLD_sXTRQ);
+BYTE_SEL = LA0 # SPLIT;      /* S-100 A0: 0=even, 1=odd */
+
+/* *************** LATCH + INTERRUPTS *************** */
+LATCH_LE = !Z_AS;
+Z_INT = !S100_INT;
+Z_NMI = !S100_NMI;

@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "z280s100")(type "KiCad")(uri "${KIPRJMOD}/z280-s100.kicad_sym")(options "")(descr "Z280 S-100 CPU card"))
+)
