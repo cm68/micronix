@@ -177,9 +177,9 @@ benchmem.log
 benchmem.tsv
 
 #
-# The Z280 S-100 CPU card design lives under extra/, which is blanket-ignored
-# above.  Re-include just that design: un-ignore the parent chain, re-ignore
-# each level's other contents, then un-ignore the specific paths.
+# The Z280 S-100 CPU card's docs and library live under extra/, which is
+# blanket-ignored above.  Re-include just those: un-ignore the parent chain,
+# re-ignore each level's other contents, then un-ignore the specific paths.
 #
 !extra/
 extra/*
@@ -188,15 +188,11 @@ extra/docs/*
 !extra/docs/z280-s100-cpu-card.md
 !extra/hardware/
 extra/hardware/*
-!extra/hardware/z280-s100/
 !extra/hardware/kicadlib/
 extra/hardware/kicadlib/*
 !extra/hardware/kicadlib/S100/
 extra/hardware/kicadlib/S100/*
 !extra/hardware/kicadlib/S100/ATF1508-AS (84-PLCC).lib
 
-# Regenerated and cached files inside the tracked design stay out.
-extra/hardware/z280-s100/fp-info-cache
-extra/hardware/z280-s100/__pycache__/
-extra/hardware/z280-s100/z280-s100-backups/
+# Local KiCad preference files never belong in the tree.
 *.kicad_prl
