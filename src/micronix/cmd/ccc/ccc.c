@@ -36,7 +36,7 @@ char *progname;
  * library sits beside that directory rather than under it:
  *
  *	/bin/ccc		->  /lib
- *	/usr/local/bin/ccc	->  /usr/local/lib
+ *	/usr/local/bin/mxccc	->  /usr/local/ccc/lib
  *	desthost/bin/ccc	->  desthost/lib
  *	ccc			->  ./../lib
  *
@@ -88,6 +88,30 @@ char bindir[LIBDIRMAX];
 #define MXPFX ""
 #else
 #define MXPFX "mx"
+#endif
+
+/*
+ * Where the runtime lives, relative to the driver.
+ *
+ * On Micronix the driver is /bin/ccc and the runtime is v7's - the
+ * libraries in /lib, the headers in /usr/include, the CP/M headers in
+ * /usr/cpm/include - and CCC (above) selects that arrangement.
+ *
+ * On the host the runtime is namespaced under a ccc/ directory beside
+ * the bin the driver was installed into, so /usr/local/bin/mxccc reads
+ * /usr/local/ccc/lib and /usr/local/ccc/include, leaving /usr/local/lib
+ * and /usr/local/usr/include to the ccc this tree forked from.  The
+ * suffix is the only difference between the two builds; the mechanism
+ * below is the same either way.
+ */
+#ifdef CCC
+#define LIBSUF	"/../lib"
+#define INCSUF	"/../usr/include"
+#define CPMSUF	"/../usr/cpm/include"
+#else
+#define LIBSUF	"/../ccc/lib"
+#define INCSUF	"/../include"
+#define CPMSUF	"/../include/cpm"
 #endif
 
 #ifndef DEFTARGET
@@ -592,7 +616,7 @@ main(int argc, char **argv)
             bindir[n] = '\0';
             strcpy(libdir, bindir);
             strcpy(libexecdir, bindir);
-            strcat(libdir, "/../lib");
+            strcat(libdir, LIBSUF);
             strcat(libexecdir, "/../libexec");
         } else {
             strcpy(bindir, DEFBIN);
@@ -843,8 +867,8 @@ main(int argc, char **argv)
     /*
      * The headers do not live beside the passes on a Unix, they live
      * in /usr/include, and that is where the Micronix tree keeps them
-     * - so libdir/../usr/include, which is /usr/include when the
-     * driver is /bin/ccc and lib/../usr/include in an install tree.
+     * - so libdir + INCSUF, which is /usr/include when the driver is
+     * /bin/ccc and ccc/include in a host install tree.
      * Nothing about where the tree lives is compiled in, the same way
      * libdir itself is worked out from argv[0].
      *
@@ -856,12 +880,12 @@ main(int argc, char **argv)
      */
     if (cpm_target) {
         sprintf(libc_path, "%s/cpm/libc.a", libdir);
-        sprintf(sysinc_path, "-i%s/../usr/cpm/include", libdir);
+        sprintf(sysinc_path, "-i%s%s", libdir, CPMSUF);
         sprintf(libu_path, "%s/cpm/libcpm.a", libdir);
         sprintf(chdr_path, "%s/cpm/crtcpm.o", libdir);
     } else {
         sprintf(libc_path, "%s/libc.a", libdir);
-        sprintf(sysinc_path, "-i%s/../usr/include", libdir);
+        sprintf(sysinc_path, "-i%s%s", libdir, INCSUF);
         sprintf(libu_path, "%s/libu.a", libdir);
         sprintf(chdr_path, "%s/crt0.o", libdir);
     }

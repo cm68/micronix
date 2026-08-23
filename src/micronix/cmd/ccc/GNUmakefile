@@ -49,8 +49,9 @@ include $(DEPTH)/GNUmakefile.inc
 # ordinary case for a compiler on the path.  ccc.c defaults them to
 # /bin /lib /libexec, which is Micronix's layout; a host driver has to
 # look in the install prefix instead, or "mxccc foo.c" hunts for the
-# assembler in /bin.  The cross build below does not set them - there
-# the defaults are right.
+# assembler in /bin.  The runtime is namespaced under ccc/ (LIBSUF in
+# ccc.c), so DEFLIB points into $(PREFIX)/ccc.  The cross build below
+# does not set them - there the defaults are right.
 #
 PREFIX		?= /usr/local
 HOSTPROG	= mxccc
@@ -59,7 +60,7 @@ HOSTDEFS	=
 HOSTWARNS	= -Wall
 HOSTCFLAGS	= -m32 $(HOSTDEBUG) $(HOSTWARNS) -I. -I$(DEPTH)/lib/libccc \
 		  -DDEFBIN='"$(PREFIX)/bin"' \
-		  -DDEFLIB='"$(PREFIX)/lib"' \
+		  -DDEFLIB='"$(PREFIX)/ccc/lib"' \
 		  -DDEFLIBEXEC='"$(PREFIX)/libexec"'
 
 include $(DEPTH)/libexec/host.mk

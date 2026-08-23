@@ -37,7 +37,7 @@ DEPTH = .
 # Put the system headers where the compiler looks for them.
 #
 # ccc resolves <sys/...> out of its system include directory - libdir
-# up one and into usr/include, see tools/ccc.c - and that search runs
+# up one and into include, see cmd/ccc/ccc.c - and that search runs
 # before -I.  These are the headers that directory should be holding:
 # sys/stat.h, sys/fs.h, sys/dir.h, types.h and the rest are the
 # system's, and the system is this tree.  Until they are installed,
@@ -47,7 +47,7 @@ DEPTH = .
 # DESTDIR you already own.
 #
 PREFIX	?= /usr/local
-SYSINC	 = $(DESTDIR)$(PREFIX)/usr/include
+SYSINC	 = $(DESTDIR)$(PREFIX)/ccc/include
 SUDO	?= sudo
 
 #
@@ -68,7 +68,7 @@ SYSHDRS  = $(filter-out $(CCCOWNED),$(notdir $(wildcard include/*.h)))
 
 include $(DEPTH)/GNUmakefile.inc
 
-.PHONY: hostcc hostrt bootstrap sysinstall
+.PHONY: hostcc hostrt bootstrap sysinstall sysrt
 
 #
 # The librarian, built for the HOST.
@@ -146,7 +146,7 @@ $(SETDEVX): $(SETDEVSRC)
 # Then the runtime beside it, because the driver adds crt0.o and
 # libc.a from its own lib directory whatever else is on the link line,
 # and works that directory out from argv[0] - $(BIN)/mxccc reads
-# $(HOSTROOT)/lib and $(HOSTROOT)/usr/include.  The archives have to
+# $(HOSTROOT)/ccc/lib and $(HOSTROOT)/ccc/include.  The archives have to
 # exist before anything links, which is why this is a target you ask
 # for and not part of all: the libraries are built by the compiler it
 # installs.
@@ -163,18 +163,18 @@ hostcc: $(ARMX)
 	@echo "host compiler in $(BIN)/mxccc"
 
 hostrt:
-	@mkdir -p $(HOSTROOT)/lib/cpm $(HOSTROOT)/usr/include/sys \
-		$(HOSTROOT)/usr/cpm/include
+	@mkdir -p $(HOSTROOT)/ccc/lib/cpm $(HOSTROOT)/ccc/include/sys \
+		$(HOSTROOT)/ccc/include/cpm
 	cp lib/libc/libc.a lib/libu/libu.a lib/libu/crt0.o \
-	   lib/libccc/libccc.a $(HOSTROOT)/lib
+	   lib/libccc/libccc.a $(HOSTROOT)/ccc/lib
 	#
 	# The CP/M runtime lives under /lib/cpm, beside its own copy of
 	# the (target-independent) libc, so a target directory is
 	# self-contained: -m cpm links libcpm.a and starts with crtcpm.o
 	# instead of libu.a and crt0.o.
 	#
-	cp lib/libc/libc.a $(HOSTROOT)/lib/cpm
-	cp lib/libcpm/libcpm.a lib/libcpm/crtcpm.o $(HOSTROOT)/lib/cpm
+	cp lib/libc/libc.a $(HOSTROOT)/ccc/lib/cpm
+	cp lib/libcpm/libcpm.a lib/libcpm/crtcpm.o $(HOSTROOT)/ccc/lib/cpm
 	#
 	# The system headers first and the C library's over them.  Six
 	# names are in both sets - cpm.h errno.h hitech.h setjmp.h
@@ -183,21 +183,50 @@ hostrt:
 	# copies of everything BUT those.  The tree's time.h is the v6
 	# one, struct time in UINTs, and c0 will not read it.
 	#
-	cp include/*.h $(HOSTROOT)/usr/include
-	cp include/sys/*.h $(HOSTROOT)/usr/include/sys
-	cp lib/include/*.h $(HOSTROOT)/usr/include
-	cp lib/include/sys/*.h $(HOSTROOT)/usr/include/sys
+	cp include/*.h $(HOSTROOT)/ccc/include
+	cp include/sys/*.h $(HOSTROOT)/ccc/include/sys
+	cp lib/include/*.h $(HOSTROOT)/ccc/include
+	cp lib/include/sys/*.h $(HOSTROOT)/ccc/include/sys
 	#
 	# CP/M's header tree: the C library's headers, with the CP/M
 	# stdio.h over the Micronix one.  Its FILE sits over fcb's and
 	# the flag bits differ, so the two stdio.h cannot be shared.
 	#
-	cp lib/include/*.h $(HOSTROOT)/usr/cpm/include
-	cp lib/include/sys/*.h $(HOSTROOT)/usr/cpm/include
-	cp cpm/include/*.h $(HOSTROOT)/usr/cpm/include
-	@echo "runtime in $(HOSTROOT)/lib"
+	cp lib/include/*.h $(HOSTROOT)/ccc/include/cpm
+	cp lib/include/sys/*.h $(HOSTROOT)/ccc/include/cpm
+	cp cpm/include/*.h $(HOSTROOT)/ccc/include/cpm
+	@echo "runtime in $(HOSTROOT)/ccc/lib"
 
 #
+# The same runtime, for the installed host compiler: under $(PREFIX)/ccc
+# rather than the tree, with sudo because $(PREFIX) is not ours.  The
+# layout is hostrt's, only the root differs; the driver reads it out of
+# /usr/local/ccc when run from /usr/local/bin (LIBSUF in ccc.c), which
+# keeps this tree's runtime out of /usr/local/lib and
+# /usr/local/usr/include where the ccc this tree forked from still lives.
+#
+sysrt:
+	$(SUDO) mkdir -p $(PREFIX)/ccc/lib/cpm $(PREFIX)/ccc/include/sys \
+		$(PREFIX)/ccc/include/cpm
+	$(SUDO) cp lib/libc/libc.a lib/libu/libu.a lib/libu/crt0.o \
+	   lib/libccc/libccc.a $(PREFIX)/ccc/lib
+	$(SUDO) cp lib/libc/libc.a $(PREFIX)/ccc/lib/cpm
+	$(SUDO) cp lib/libcpm/libcpm.a lib/libcpm/crtcpm.o $(PREFIX)/ccc/lib/cpm
+	$(SUDO) cp include/*.h $(PREFIX)/ccc/include
+	$(SUDO) cp include/sys/*.h $(PREFIX)/ccc/include/sys
+	$(SUDO) cp lib/include/*.h $(PREFIX)/ccc/include
+	$(SUDO) cp lib/include/sys/*.h $(PREFIX)/ccc/include/sys
+	$(SUDO) cp lib/include/*.h $(PREFIX)/ccc/include/cpm
+	$(SUDO) cp lib/include/sys/*.h $(PREFIX)/ccc/include/cpm
+	$(SUDO) cp cpm/include/*.h $(PREFIX)/ccc/include/cpm
+	#
+	# sudo runs under the root umask (0077 on this machine), so the cp
+	# above left every file 0600 and unreadable by whoever runs the
+	# compiler.  Make the installed tree readable.
+	#
+	$(SUDO) chmod -R a+rX $(PREFIX)/ccc
+	@echo "runtime in $(PREFIX)/ccc/lib"
+
 # The bootstrap: build the cross compiler, build the runtime it links
 # against, then cross-build every Z80 binary and install it into the
 # filesystem the simulator boots.  That filesystem is the seed the
@@ -217,10 +246,10 @@ bootstrap: hostcc
 
 sysinstall:
 	$(SUDO) mkdir -p $(SYSINC)/sys
-	$(SUDO) cp include/sys/*.h $(SYSINC)/sys
-	(cd include && $(SUDO) cp $(SYSHDRS) $(SYSINC))
+	$(SUDO) install -m 644 include/sys/*.h $(SYSINC)/sys
+	(cd include && $(SUDO) install -m 644 $(SYSHDRS) $(SYSINC))
 	@echo "installed: $(SYSINC)/sys, and $(words $(SYSHDRS)) headers beside it"
-	@echo "not installed, ccc owns them: $(CCCOWNED)"
+	@echo "not installed, the C library owns them: $(CCCOWNED)"
 
 #
 # The top of the source tree the simulator sees.  The recursion fills
