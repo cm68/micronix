@@ -53,8 +53,10 @@ HOSTCFLAGS	?= -m32 $(HOSTDEBUG) $(HOSTDEFS) $(HOSTWARNS) \
 HOSTLDFLAGS	?= -m32 $(HOSTDEBUG)
 
 #
-# Where the host compiler lands: the top of the tree, in bin/ for the
-# driver and libexec/ for the passes.  Not /usr/local, and not beside
+# Where the host compiler is BUILT: the top of the tree, in bin/ for
+# the driver and libexec/ for the passes.  Not /usr/local - host builds
+# do not touch the prefix, which still holds the ccc this tree forked
+# from; hostinstall below is what copies them out there.  And not beside
 # the Z80 binary either, which has the same name and would be
 # overwritten by whichever build ran last.  The driver works out where
 # everything is from its own argv[0] - bin/../libexec for the passes,
@@ -63,6 +65,17 @@ HOSTLDFLAGS	?= -m32 $(HOSTDEBUG)
 HOSTDIR		?= $(DEPTH)/../..
 HOSTBIN		?= libexec
 HOSTINSTDIR	= $(HOSTDIR)/$(HOSTBIN)
+
+#
+# Where hostinstall puts them: under the install prefix, /usr/local by
+# default, so the assembler and linker land in /usr/local/bin beside
+# the driver and the passes in /usr/local/libexec.  PREFIX and SUDO are
+# the ones the top GNUmakefile uses for the header install; SUDO= runs
+# without sudo for a prefix you already own.
+#
+PREFIX		?= /usr/local
+SUDO		?= sudo
+HOSTSYSDIR	= $(PREFIX)/$(HOSTBIN)
 
 HOSTSRCS	?= $(CSRCS)
 HOSTOBJS	= $(HOSTSRCS:.c=.ho)
@@ -75,6 +88,19 @@ HOSTLIBCCC	= $(DEPTH)/lib/libccc/libccc-host.a
 #
 %.ho: %.c
 	$(HOSTCC) $(HOSTCFLAGS) -c $< -o $@
+
+#
+# Every host object depends on every header here, the way the cross
+# build does for the .o objects - GNUmakefile.inc, "EVERY object
+# depends on EVERY header here".  The pattern rule above knows only
+# the .c, so without this, editing a pass's .h rebuilds nothing on the
+# host and the stale .ho objects link into the host compiler compiled
+# against an older declaration of themselves.  asz is how this showed
+# up: asm.h grew, asm.ho was rebuilt only because asm.c changed in the
+# same commit, and asmz80.ho and asz.ho - which include asm.h - stayed
+# their old selves while "make hostinstall" reported nothing to do.
+#
+$(HOSTOBJS): $(HSRCS)
 
 #
 # dbgtags.c and debug.h, where a pass has the script that writes them.
@@ -107,6 +133,8 @@ $(HOSTLIBCCC):
 	$(MAKE) -C $(DEPTH)/lib/libccc libccc-host.a
 
 hostinstall: host
+	$(SUDO) mkdir -p $(HOSTSYSDIR)
+	$(SUDO) install -m 755 $(HOSTINSTDIR)/$(HOSTPROG) $(HOSTSYSDIR)/$(HOSTPROG)
 
 hostclean:
 	rm -f $(HOSTOBJS) $(DBGFILES) $(HOSTINSTDIR)/$(HOSTPROG)

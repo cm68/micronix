@@ -39,3 +39,11 @@ HOSTPROG = mxld
 HOSTBIN  = bin
 
 include $(DEPTH)/libexec/host.mk
+
+#
+# obj.h is the object-format header, in the tree's include/, reached
+# with the -idirafter above since the host has none of its own.  It is
+# not in HSRCS - that is $(wildcard *.h) here - so editing it would
+# rebuild nothing; make the host objects depend on it.
+#
+$(HOSTOBJS): $(DEPTH)/include/obj.h
