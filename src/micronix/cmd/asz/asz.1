@@ -83,6 +83,9 @@ PSEUDO-OPS
 ...ds n	Reserve n bytes of space; defs is the same.
 
 .ti -10
+...align n	Advance to the next multiple of n, padding with zero bytes: none if the location is already there, at most n-1 if it is not.  The boundary is counted from the start of the current segment, not from where the segment will be loaded.  n must be a constant the assembler already knows - a number, or a name equated to one - and it need not be a power of two.
+
+.ti -10
 name = expr and name equ expr	Give name the value of the expression, absolute or segment-relative.
 
 .ti -10
@@ -115,6 +118,17 @@ identifier.
 .sp
 A jp whose target is near is shortened to a jr automatically, which is
 what makes the compiler's output fit; -8 turns that off.
+.sp
+An ...align counts from the start of its segment, which is all a
+relocatable object can promise by itself.  Text begins the program, so
+an alignment there is the one the program sees; an alignment in data
+or bss holds at run time only if the linker puts that segment on the
+same boundary.
+.sp
+The jumps just behind an ...align are settled early, because a jp that
+shortened after the padding had been counted would move the boundary
+out from under it.  A jp within about a jr's reach before an ...align
+may therefore stay three bytes where it could have been two.
 .sp 2
 .in -5
 .bd

@@ -2057,6 +2057,90 @@ ds()
 }
 
 /*
+ * .align <n> - advance to the next multiple of n, padding with zeros.
+ * At most n-1 bytes are emitted, none if we are already there.
+ *
+ * The boundary is measured from the start of the segment, and it has
+ * to be: pass 0 is where the pad is first counted, and pass 0 does not
+ * know text_size yet - it is computing it.  This is also the only
+ * thing a relocatable object can promise on its own.  For an .align in
+ * .data or .bss to hold at run time, the segment it lands in must
+ * itself be placed on that boundary, which is the linker's business
+ * and not something this can check.
+ */
+void
+align()
+{
+    unsigned short n, off, rel;
+    struct expval value;
+
+    operand(&value);
+    /*
+     * Any symbol at all, not just a relocatable one: the boundary has
+     * to be a number this pass already knows, and a reference leaves
+     * its value in sym->value where the modulus below would not see it
+     * - it would read the zero left in num and divide by it.  An
+     * equated constant folds before it gets here and is fine.
+     */
+    if (value.sym != 0) {
+        gripe("align requires absolute argument");
+        return;
+    }
+    n = value.num.w;
+    /*
+     * Zero would divide, and a negative arrives as a huge unsigned the
+     * same way it does in ds().
+     */
+    if (n == 0 || n > 0x7fff) {
+        gripe("bad alignment");
+        return;
+    }
+
+    /*
+     * SETTLE THE JUMPS BEHIND US FIRST.  A jp within JR_HOLD bytes of
+     * here is still an open node, and converting it later calls
+     * jrshrink, which walks cur_address back by one.  The pad is a
+     * count, not an address - it has already been committed by then -
+     * so a shrink after it lands the next byte one short of the
+     * boundary in pass 0, and pass 1 computes the pad from the moved
+     * address and gets a different one.  The two passes then disagree
+     * about the size of everything downstream.
+     *
+     * relax_jmp() is the end-of-pass drain: it runs the fixpoint, so
+     * what can still convert does convert and cur_address is final,
+     * then retires the rest as jp.  The cost is that a jump in the
+     * last JR_HOLD bytes before an .align stays three bytes when it
+     * might have made two.  Alignment is rare and correctness is not
+     * negotiable.
+     */
+    if (!pass)
+        relax_jmp();
+
+    /*
+     * SEGMENT RELATIVE, NOT cur_address.  Pass 1 relocates the location
+     * pointer to where the segment will finally sit - data_top becomes
+     * text_size and bss_top text_size+data_size - while pass 0 counted
+     * every segment from zero.  Taking the modulus of cur_address
+     * therefore pads .data by one amount when the size is being
+     * computed and by another when the bytes are being written, and
+     * the header then describes a data segment longer than the image
+     * that follows it.  emit_exp unbiases the same way, for the same
+     * reason.
+     */
+    rel = cur_address;
+    if (pass == 1) {
+        if (segment == SEG_DATA)
+            rel -= text_size;
+        else if (segment == SEG_BSS)
+            rel -= text_size + data_size;
+    }
+
+    off = rel % n;
+    if (off)
+        fill(n - off);
+}
+
+/*
  * parses an operand, 
  * returns token describing the argument,
  * populate vp if it's passed in.
@@ -2496,6 +2580,15 @@ assemble()
 				 */
 				if (match(token_buf, "ds")) {
 					ds();
+					consume();
+					continue;
+				}
+
+				/*
+				 * .align <n>
+				 */
+				if (match(token_buf, "align")) {
+					align();
 					consume();
 					continue;
 				}
