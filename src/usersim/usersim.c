@@ -48,7 +48,18 @@
 #include "../include/util.h"
 #include "../include/mnix.h"
 #include "../include/fslib.h"
+#include "../include/lockfile.h"
 #include "../include/gui.h"
+
+/*
+ * The on-disk directory entry, which fslib's getdirent hands back.  sys/dir.h
+ * defines it but also #defines d_ino/d_name, which clobbers the host
+ * <dirent.h>, so spell it here and leave the header alone.
+ */
+struct dir {
+    UINT ino;
+    char name[14];
+};
 
 #ifdef __APPLE__
     typedef void (*sighandler_t)(int);
@@ -253,6 +264,29 @@ char curdir[1000] = "";
 char *rootdir;
 char *execprog;
 ino_t rootinode;
+char *devdir;                   /* -D: dir holding bdev(maj,min) images */
+
+/*
+ * The mount table.  Entry 0 is never used as a mount: a resolver result
+ * of -1 means the host tree (the root filesystem), so a live mount is any
+ * entry with used set.  A block device maps to <devdir>/bdev(major,minor),
+ * which fslib opens with the geometry it reads off the minor number.
+ *
+ * It is a shared mmap, like the open-file table: the guest forks are real
+ * host forks, and a mount made by one command (mount(8) in its own process)
+ * has to be visible to the next (ls in a fresh child).  Everything here is
+ * a value - no pointers - because a pointer to one process's heap would be
+ * a dangling pointer in the next.  The image path is reconstructed from
+ * major/minor and devdir, and the filesystem handle is reopened on demand.
+ */
+#define NMOUNT  8
+struct mnt {
+    int used;
+    int major, minor;
+    int ronly;
+    char mpath[PATH_MAX];       /* canonical guest mount point, e.g. "/mnt" */
+};
+struct mnt *mlist;
 
 /* i/o buffer used for real system calls */
 char iobuf[65536];
@@ -502,6 +536,25 @@ char namebuf[PATH_MAX];
 char workbuf[PATH_MAX];
 
 #define MAXFILE 63
+
+/*
+ * A file served out of a mounted Micronix filesystem image (or a raw block
+ * device), read and written through fslib.  There is no host descriptor for
+ * it; the fd is a placeholder (/dev/zero) that never reaches the guest, and
+ * the shared seek pointer lives in the open file table like any other.
+ */
+struct mopen {
+    int isdev;                  /* 1 = raw block device, 0 = inode */
+    int writable;               /* opened for writing: iput on close */
+    struct super *fs;           /* the open fslib filesystem */
+    struct dsknod *ip;          /* iget()'d inode; ifree on close */
+    int size;                   /* logical size: file, dir entries, or device */
+    int lockfd;                 /* the image lock, -1 when none */
+    char blk[512];              /* block scratch buffer */
+    unsigned char *dirbuf;      /* directory snarf buffer */
+    int dirend;
+};
+
 /*
  * colossal hack for special files
  * the file offset to do alternate sector skew
@@ -515,6 +568,7 @@ struct openfile {
     int ofile;          // the open file it names, -1 for none
     int filesize;
     int noseek;         // pipe, tty or socket: the host holds the position
+    struct mopen *mo;   // mounted-filesystem / block-device backing
 } files[MAXFILE + 1];
 
 /*
@@ -587,6 +641,26 @@ initfiles()
     }
     for (i = 0; i <= MAXFILE; i++)
         files[i].ofile = -1;
+}
+
+/*
+ * The mount table is shared the same way: a mount made by one guest
+ * process has to be visible to the next.  All-value (no pointers), so
+ * nothing in it names a process's own heap.
+ */
+void
+initmnts()
+{
+    int i;
+
+    mlist = (struct mnt *)mmap((void *)NULL, sizeof(struct mnt) * NMOUNT,
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0);
+    if (mlist == (struct mnt *)-1) {
+        perror("initmnts");
+        exit(2);
+    }
+    for (i = 0; i < NMOUNT; i++)
+        mlist[i].used = 0;
 }
 
 /*
@@ -923,11 +997,191 @@ fname(char *orig)
      * to fake out cdev and bdevs, so only resolve up to that point
      */
     slash = strrchr(workbuf, '/');
-    *slash = '\0'; 
+    *slash = '\0';
     realpath(workbuf, namebuf);
     *slash = '/';
     strcat(namebuf, slash);
     return (namebuf);
+}
+
+/*
+ * Collapse ".", ".." and "//" in an absolute guest path, lexically.  A
+ * path into a mounted filesystem does not exist on the host, so this
+ * cannot use realpath; it is pure string work and needs no host round
+ * trip.  dst and src may be the same buffer.
+ */
+void
+canonpath(char *dst, const char *src)
+{
+    char buf[PATH_MAX];
+    char *comp[256];
+    char *tok;
+    int n = 0;
+    int i;
+
+    strncpy(buf, src, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = 0;
+
+    for (tok = strtok(buf, "/"); tok; tok = strtok(0, "/")) {
+        if (strcmp(tok, ".") == 0)
+            continue;
+        if (strcmp(tok, "..") == 0) {
+            if (n > 0)
+                n--;
+            continue;
+        }
+        comp[n++] = tok;
+    }
+    if (n == 0) {
+        strcpy(dst, "/");
+        return;
+    }
+    dst[0] = 0;
+    for (i = 0; i < n; i++) {
+        strcat(dst, "/");
+        strcat(dst, comp[i]);
+    }
+}
+
+/*
+ * Where a guest path lives: midx is a mount table index, or -1 for the
+ * host tree.  rest is the path inside the image ("" or "/x/y"); it is only
+ * meaningful when midx >= 0.
+ */
+struct resolved {
+    int midx;
+    char rest[PATH_MAX];
+};
+
+void
+resolve(const char *guest, struct resolved *r)
+{
+    char abs[PATH_MAX];
+    size_t len;
+    int i;
+    int best = -1;
+    size_t bestlen = 0;
+
+    if (*guest == '/')
+        strncpy(abs, guest, sizeof(abs) - 1);
+    else
+        snprintf(abs, sizeof(abs), "%s/%s", curdir, guest);
+    abs[sizeof(abs) - 1] = 0;
+    canonpath(abs, abs);
+
+    for (i = 0; i < NMOUNT; i++) {
+        if (!mlist[i].used)
+            continue;
+        len = strlen(mlist[i].mpath);
+        if (strncmp(abs, mlist[i].mpath, len) == 0 &&
+            (abs[len] == 0 || abs[len] == '/') && len > bestlen) {
+            best = i;
+            bestlen = len;
+        }
+    }
+
+    r->midx = best;
+    if (best < 0) {
+        strncpy(r->rest, abs, sizeof(r->rest) - 1);
+        r->rest[sizeof(r->rest) - 1] = 0;
+    } else {
+        strncpy(r->rest, abs + bestlen, sizeof(r->rest) - 1);
+        r->rest[sizeof(r->rest) - 1] = 0;
+        if (r->rest[0] == 0)
+            strcpy(r->rest, "/");
+    }
+}
+
+/*
+ * Find a mount by device number.
+ */
+static int
+mfind(int major, int minor)
+{
+    int i;
+
+    for (i = 0; i < NMOUNT; i++)
+        if (mlist[i].used && mlist[i].major == major &&
+            mlist[i].minor == minor)
+            return i;
+    return -1;
+}
+
+/*
+ * Does a guest path resolve into a mounted filesystem?  The name-taking
+ * syscalls that only know about the host tree (creat, link, unlink, ...)
+ * use this to refuse rather than touch the wrong backing store.
+ */
+static int
+inmount(const char *path)
+{
+    struct resolved r;
+
+    resolve(path, &r);
+    return r.midx >= 0;
+}
+
+/*
+ * namei() into a mounted filesystem, re-opening the image in this
+ * process.  Returns the inode (or 0), and on success *fsp/*lockfdp are the
+ * open handle the caller must close.  Read-only: path lookup never writes.
+ */
+static int devopen(int maj, int min, int writable, struct super **fsp,
+    int *lockfdp);
+
+static struct dsknod *
+mnamei(int midx, const char *rest, struct super **fsp, int *lockfdp)
+{
+    if (devopen(mlist[midx].major, mlist[midx].minor, 0, fsp, lockfdp) < 0)
+        return 0;
+    return namei(*fsp, rest);
+}
+
+/*
+ * Open a block device image, recovering its geometry from the minor
+ * number the way fslib does - through a symlink whose target is the
+ * literal "bdev(maj,min)" string, which devnum() decodes.  The image is
+ * <devdir>/bdev(maj,min), itself a symlink to the data, so the pair of
+ * links in a scratch directory gives fslib both the name and the file.
+ *
+ * A writable open takes the image lock first - the same protocol the
+ * host tools and hwsim use, so a simulator and a tool never write one
+ * image at once.  The lockfd is handed back for the caller to hold.
+ */
+static int
+devopen(int maj, int min, int writable, struct super **fsp, int *lockfdp)
+{
+    char dir[64];
+    char p[PATH_MAX];
+    char t[PATH_MAX];
+
+    *lockfdp = -1;
+    if (writable) {
+        snprintf(t, sizeof(t), "%s/bdev(%d,%d)", devdir, maj, min);
+        if ((*lockfdp = acquire_lock(t)) < 0)
+            return -1;
+    }
+
+    snprintf(dir, sizeof(dir), "/tmp/usimdev-%d", getpid());
+    mkdir(dir, 0700);
+
+    /* <dir>/bdev(maj,min) -> the image data */
+    snprintf(p, sizeof(p), "%s/bdev(%d,%d)", dir, maj, min);
+    unlink(p);
+    snprintf(t, sizeof(t), "%s/bdev(%d,%d)", devdir, maj, min);
+    if (symlink(t, p) < 0)
+        return -1;
+
+    /* <dir>/x -> "bdev(maj,min)", the name devnum() decodes */
+    snprintf(p, sizeof(p), "%s/x", dir);
+    unlink(p);
+    snprintf(t, sizeof(t), "bdev(%d,%d)", maj, min);
+    if (symlink(t, p) < 0)
+        return -1;
+
+    if (openfsrw(p, fsp, writable) < 0)
+        return -1;
+    return 0;
 }
 
 void
@@ -970,6 +1224,7 @@ usage(char *complaint, char *arg)
     fprintf(stderr, "\t-w <addr>[,<addr>]  write watchpoints\n");
     fprintf(stderr, "\t-T\topen a debug terminal window\n");
     fprintf(stderr, "\t-d <root dir>\n");
+    fprintf(stderr, "\t-D <device dir>\n");
     fprintf(stderr, "\t-b\t\tstart with breakpoint\n");
     fprintf(stderr, "\t-v <verbosity>\n");
     for (i = 0; vopts[i]; i++) {
@@ -1085,6 +1340,12 @@ main(int argc, char **argv)
                 }
                 rootdir = *argv++;
                 break;
+            case 'D':
+                if (!argc--) {
+                    usage("device directory not specified\n", 0);
+                }
+                devdir = *argv++;
+                break;
             case 'v':
                 if (!argc--) {
                     usage("verbosity not specified\n", 0);
@@ -1180,6 +1441,7 @@ main(int argc, char **argv)
     initfiles();
     initinums();
     initmemdev();
+    initmnts();
 
     /*
      * make our rootdir absolute
@@ -3140,6 +3402,167 @@ degrime(char *s)
  * in any event, we need to adjust the return address on the stack to
  * to skip over the system call args. and return to after the syscall.
  */
+
+/*
+ * Snarf a mounted directory's entries into the same 16-byte V6 entry
+ * format dirsnarf produces, so the guest readdir sees the same layout.
+ */
+static void
+msnarfdir(struct mopen *mo)
+{
+    int i;
+    int n = filesize(mo->ip) / 16;
+    struct v6dir *v;
+
+    mo->dirbuf = malloc((n + 1) * 16);
+    mo->dirend = 0;
+    for (i = 0; i < n; i++) {
+        struct dir *de = getdirent(mo->ip, i);
+
+        v = (struct v6dir *)&mo->dirbuf[mo->dirend];
+        v->inum = de->ino;
+        strncpy(v->name, de->name, 14);
+        mo->dirend += 16;
+    }
+    mo->size = mo->dirend;
+}
+
+/*
+ * Read from a mounted file, directory or block device.  The position is
+ * the shared seek pointer (getoff); the caller advances it with addoff.
+ * Returns the byte count, or -1 with errno set.
+ */
+static int
+mread(int fd, char *buf, int len)
+{
+    struct mopen *mo = files[fd].mo;
+    long pos = getoff(fd);
+    int got = 0;
+
+    if (mo->dirbuf) {
+        if (pos < 0)
+            pos = 0;
+        if (pos < mo->dirend) {
+            got = mo->dirend - pos;
+            if (got > len)
+                got = len;
+            memcpy(buf, mo->dirbuf + pos, got);
+        }
+        return got;
+    }
+    while (got < len && pos + got < mo->size) {
+        long off = pos + got;
+        int blk = off / 512;
+        int inblk = off % 512;
+        int n = 512 - inblk;
+
+        if (n > len - got)
+            n = len - got;
+        if (n > mo->size - off)
+            n = mo->size - off;
+
+        readblk(mo->fs, mo->isdev ? blk : bmap(mo->ip, off, 0), mo->blk);
+        memcpy(buf + got, mo->blk + inblk, n);
+        got += n;
+    }
+    return got;
+}
+
+/*
+ * Write to a mounted file or block device.  Blocks are read-modify-written
+ * through mo->blk so a partial block does not clobber its neighbours.
+ */
+static int
+mwrite(int fd, char *buf, int len)
+{
+    struct mopen *mo = files[fd].mo;
+    long pos = getoff(fd);
+    int done = 0;
+
+    if (mo->dirbuf) {
+        errno = EISDIR;
+        return -1;
+    }
+    if (!mo->writable) {
+        errno = EBADF;
+        return -1;
+    }
+    while (done < len) {
+        long off = pos + done;
+        int inblk = off % 512;
+        int n = 512 - inblk;
+        int real;
+
+        if (n > len - done)
+            n = len - done;
+
+        real = mo->isdev ? (off / 512) : bmap(mo->ip, off, 1);
+
+        if (inblk == 0 && n == 512)
+            memcpy(mo->blk, buf + done, 512);
+        else {
+            readblk(mo->fs, real, mo->blk);
+            memcpy(mo->blk + inblk, buf + done, n);
+        }
+        writeblk(mo->fs, real, mo->blk);
+        done += n;
+
+        if (!mo->isdev && off + n > mo->size) {
+            mo->size = off + n;
+            mo->ip->d_size0 = mo->size >> 16;
+            mo->ip->d_size1 = mo->size & 0xffff;
+        }
+    }
+    return done;
+}
+
+/*
+ * Release a mounted/device open: free the inode (writing it back), the
+ * directory buffer, and the struct itself.  The device's fslib filesystem
+ * is closed by the caller when it was a device open (closefs).
+ */
+static void
+mopen_free(struct mopen *mo)
+{
+    if (mo->ip) {
+        if (mo->writable)
+            iput(mo->ip);
+        ifree(mo->ip);
+    }
+    if (mo->dirbuf)
+        free(mo->dirbuf);
+    if (mo->fs)
+        closefs(mo->fs);
+    if (mo->lockfd >= 0)
+        close(mo->lockfd);
+    free(mo);
+}
+
+/*
+ * Build the guest's 36-byte struct statb from an on-disk inode.  The
+ * times and size are already in Micronix byte order, so they copy
+ * straight through (unlike the host stat path, which swizzles).
+ */
+static void
+dsktostatb(struct dsknod *dp, struct statb *ip, int inum)
+{
+    memset(ip, 0, sizeof(*ip));
+    ip->inum = inum;
+    ip->d.d_mode = dp->d_mode;
+    ip->d.d_nlink = dp->d_nlink;
+    ip->d.d_uid = dp->d_uid;
+    ip->d.d_gid = dp->d_gid;
+    ip->d.d_atime = dp->d_atime;
+    ip->d.d_mtime = dp->d_mtime;
+    ip->d.d_addr[0] = dp->d_addr[0];
+    ip->d.d_size0 = dp->d_size0;
+    ip->d.d_size1 = dp->d_size1;
+}
+
+/*
+ * in any event, we need to adjust the return address on the stack to
+ * to skip over the system call args. and return to after the syscall.
+ */
 void
 SystemCall()
 {
@@ -3424,6 +3847,9 @@ SystemCall()
             }
             copyout(&df->buffer[df->offset], arg1, ret);
             df->offset += ret;
+        } else if (files[fd].mo) {
+            ret = mread(fd, iobuf, arg2);
+            copyout(iobuf, arg1, ret);
         } else {
             if ((ret = seekfile(fd)) == 0) {
                 /*
@@ -3451,7 +3877,8 @@ SystemCall()
             carry_set();
         } else {
             addoff(fd, ret);
-            if (files[fd].dt == 'r' || files[fd].dt == 'b' || dirget(fd)) {
+            if (files[fd].dt == 'r' || files[fd].dt == 'b' ||
+                dirget(fd) || files[fd].mo) {
                 acct_reads++;
                 acct_rbytes += ret;
             }
@@ -3460,7 +3887,10 @@ SystemCall()
         break;
 
     case 4:                    /* write (hl), buffer, len */
-        if ((ret = seekfile(fd)) == 0) {
+        if (files[fd].mo) {
+            copyin(iobuf, arg1, arg2);
+            ret = mwrite(fd, iobuf, arg2);
+        } else if ((ret = seekfile(fd)) == 0) {
             copyin(iobuf, arg1, arg2);
             ret = write(fd, iobuf, arg2);
         }
@@ -3469,7 +3899,7 @@ SystemCall()
             carry_set();
         } else {
             addoff(fd, ret);
-            if (files[fd].dt == 'r' || files[fd].dt == 'b') {
+            if (files[fd].dt == 'r' || files[fd].dt == 'b' || files[fd].mo) {
                 acct_writes++;
                 acct_wbytes += ret;
             }
@@ -3512,6 +3942,120 @@ SystemCall()
             files[ret].memdev = 1;
             goto mapfds;
         }
+        /*
+         * A block device special file.  /dev/dja is a symlink to the
+         * literal "bdev(2,0)", which is not a host file, so open the
+         * image fslib would and read/write it as a device.
+         */
+        {
+            char dt;
+            int Maj, Min;
+
+            if (devdir && lstat(filename, &sbuf) == 0 &&
+                S_ISLNK(sbuf.st_mode) &&
+                devnum(filename, &dt, &Maj, &Min) == 0 && dt == 'b') {
+                char img[PATH_MAX];
+                struct stat st;
+                struct mopen *mo;
+                struct super *fs;
+                int lockfd;
+                int writable = (arg2 != 0);
+
+                if (devopen(Maj, Min, writable, &fs, &lockfd) < 0) {
+                    if (verbose & V_ERROR)
+                        message("%s: %s\n", strerror(errno), filename);
+                    ret = errno;
+                    carry_set();
+                    break;
+                }
+                ret = open("/dev/zero", O_RDONLY);
+                if (ret == 0xffff) {
+                    closefs(fs);
+                    if (lockfd >= 0)
+                        close(lockfd);
+                    goto lose;
+                }
+                if (adoptfd(ret) < 0) {
+                    close(ret);
+                    closefs(fs);
+                    if (lockfd >= 0)
+                        close(lockfd);
+                    ret = ENFILE;
+                    carry_set();
+                    break;
+                }
+                mo = calloc(1, sizeof(*mo));
+                mo->isdev = 1;
+                mo->writable = writable;
+                mo->fs = fs;
+                mo->lockfd = lockfd;
+                sprintf(img, "%s/bdev(%d,%d)", devdir, Maj, Min);
+                mo->size = (stat(img, &st) == 0) ? st.st_size : 0;
+                files[ret].dt = 'b';
+                files[ret].major = Maj;
+                files[ret].minor = Min;
+                files[ret].mo = mo;
+                goto mapfds;
+            }
+        }
+        /*
+         * A path under a mounted filesystem: read it out of the image
+         * rather than the host tree.  The filesystem is reopened here, in
+         * the process that will read it, since the mount only recorded the
+         * device.
+         */
+        {
+            struct resolved r;
+
+            resolve(fn, &r);
+            if (r.midx >= 0) {
+                struct mopen *mo;
+                struct dsknod *dp;
+                struct super *fs;
+                int lockfd;
+                int writable = (arg2 != 0) && !mlist[r.midx].ronly;
+
+                if (devopen(mlist[r.midx].major, mlist[r.midx].minor,
+                    writable, &fs, &lockfd) < 0) {
+                    ret = errno;
+                    carry_set();
+                    break;
+                }
+                dp = namei(fs, r.rest);
+                if (!dp) {
+                    closefs(fs);
+                    if (lockfd >= 0)
+                        close(lockfd);
+                    ret = ENOENT;
+                    carry_set();
+                    break;
+                }
+                mo = calloc(1, sizeof(*mo));
+                mo->isdev = 0;
+                mo->writable = writable;
+                mo->fs = fs;
+                mo->lockfd = lockfd;
+                mo->ip = dp;
+                mo->size = filesize(dp);
+                if ((dp->d_mode & IFMT) == IFDIR)
+                    msnarfdir(mo);
+                ret = open("/dev/zero", O_RDONLY);
+                if (ret == 0xffff) {
+                    mopen_free(mo);
+                    goto lose;
+                }
+                if (adoptfd(ret) < 0) {
+                    close(ret);
+                    mopen_free(mo);
+                    ret = ENFILE;
+                    carry_set();
+                    break;
+                }
+                files[ret].dt = 'm';
+                files[ret].mo = mo;
+                goto mapfds;
+            }
+        }
         if (!stat(filename, &sbuf)) {
             if (S_ISDIR(sbuf.st_mode)) {
                 ret = dirsnarf(filename);
@@ -3551,7 +4095,11 @@ SystemCall()
           mapfds:
             if ((i = mapfd(ret)) < 0) {
                 dropfd(ret);
-                if (dirget(ret))
+                if (files[ret].mo) {
+                    mopen_free(files[ret].mo);
+                    files[ret].mo = 0;
+                    close(ret);
+                } else if (dirget(ret))
                     dirclose(ret);
                 else
                     close(ret);
@@ -3571,7 +4119,11 @@ SystemCall()
         break;
 
     case 6:                    /* close */
-        if (dirget(fd)) {
+        if (files[fd].mo) {
+            mopen_free(files[fd].mo);
+            close(fd);
+            files[fd].mo = 0;
+        } else if (dirget(fd)) {
             dirclose(fd);
         } else {
             close(fd);
@@ -3635,6 +4187,11 @@ SystemCall()
         break;
 
     case 8:                    /* creat <name> <mode> */
+        if (inmount(fn)) {
+            ret = EPERM;
+            carry_set();
+            break;
+        }
         ret = creat(filename = fname(fn), arg2);
         if (ret == 0xffff) {
             if (verbose & V_ERROR)
@@ -3670,8 +4227,13 @@ SystemCall()
         break;
 
     case 9:                    /* link <old> <new> */
+        if (inmount(fn) || inmount(fn2)) {
+            ret = EPERM;
+            carry_set();
+            break;
+        }
         /*
-         * special case code when doing a mkdir:  
+         * special case code when doing a mkdir:
          * our applications put links to . and .. in the
          * directory, and we need to ignore these system calls
          */
@@ -3695,6 +4257,11 @@ SystemCall()
         break;
 
     case 10:                   /* unlink <file> */
+        if (inmount(fn)) {
+            ret = EPERM;
+            carry_set();
+            break;
+        }
         /*
          * special case code when doing a rmdir
          */
@@ -3752,31 +4319,74 @@ SystemCall()
         break;
 
     case 12:                   /* chdir <ptr to name> */
-        /*
-         * again, because of chroot being privileged, we need to do some
-         * pretty sleazy stuff 
-         */
-        if (*fn == '/') {           /* if absolute path */
-            strcpy(namebuf, fn);
-        } else {                    /* if relative path */
-            sprintf(namebuf, "%s/%s", curdir, fn);
-        }
-        sprintf(workbuf, "%s/%s", rootdir, namebuf);
-        realpath(workbuf, namebuf);
-        ret = stat(filename = namebuf, &sbuf);
-        if (ret || !(S_ISDIR(sbuf.st_mode))) {
-            ret = 20;
-            carry_set();
-        } else {
+        {
+            char abs[PATH_MAX];
+            struct resolved r;
+
             /*
-             * we are good to go - strip out root again 
+             * again, because of chroot being privileged, we need to do
+             * some pretty sleazy stuff.  A path into a mounted filesystem
+             * does not exist on the host, so canonicalise it lexically and
+             * check it against the mount table first.
              */
-            if (strncmp(namebuf, rootdir, strlen(rootdir)) == 0) {
-                strcpy(curdir, &namebuf[strlen(rootdir)]);
-            } else {
-                strcpy(curdir, "");
+            if (*fn == '/')
+                strncpy(abs, fn, sizeof(abs) - 1);
+            else
+                snprintf(abs, sizeof(abs), "%s/%s", curdir, fn);
+            abs[sizeof(abs) - 1] = 0;
+            canonpath(abs, abs);
+            resolve(abs, &r);
+
+            if (r.midx >= 0) {
+                struct super *fs;
+                int lockfd;
+                struct dsknod *dp = mnamei(r.midx, r.rest, &fs, &lockfd);
+
+                if (!dp) {
+                    if (fs)
+                        closefs(fs);
+                    if (lockfd >= 0)
+                        close(lockfd);
+                    ret = ENOENT;
+                    carry_set();
+                    break;
+                }
+                if ((dp->d_mode & IFMT) != IFDIR) {
+                    ifree(dp);
+                    closefs(fs);
+                    if (lockfd >= 0)
+                        close(lockfd);
+                    ret = ENOTDIR;
+                    carry_set();
+                    break;
+                }
+                ifree(dp);
+                closefs(fs);
+                if (lockfd >= 0)
+                    close(lockfd);
+                strcpy(curdir, abs);
+                ret = 0;
+                carry_clear();
+                break;
             }
-            carry_clear();
+
+            sprintf(workbuf, "%s/%s", rootdir, abs);
+            realpath(workbuf, namebuf);
+            ret = stat(filename = namebuf, &sbuf);
+            if (ret || !(S_ISDIR(sbuf.st_mode))) {
+                ret = 20;
+                carry_set();
+            } else {
+                /*
+                 * we are good to go - strip out root again
+                 */
+                if (strncmp(namebuf, rootdir, strlen(rootdir)) == 0) {
+                    strcpy(curdir, &namebuf[strlen(rootdir)]);
+                } else {
+                    strcpy(curdir, "");
+                }
+                carry_clear();
+            }
         }
         break;
     case 13:                   /* time */
@@ -3786,6 +4396,11 @@ SystemCall()
         carry_clear();
         break;
     case 14:                   /* mknod <name> mode dev (dev == 0) for dir */
+        if (inmount(fn)) {
+            ret = EPERM;
+            carry_set();
+            break;
+        }
         filename = fname(fn);
         switch (arg2 & IFMT) {
         case IFDIR:
@@ -3814,6 +4429,11 @@ SystemCall()
         break;
 
     case 15:                   /* chmod <name> <mode> */
+        if (inmount(fn)) {
+            ret = EPERM;
+            carry_set();
+            break;
+        }
         filename = fname(fn);
         if (chmod(filename, arg2 & 07777) != 0) {
             ret = errno;
@@ -3838,6 +4458,54 @@ SystemCall()
     case 18:                   /* stat fn buf */
     case 28:                   /* fstat fd buf */
         ip = (struct statb *) iobuf;
+
+        if (code == 28 && files[fd].mo) {
+            struct mopen *mo = files[fd].mo;
+
+            if (mo->isdev) {
+                memset(ip, 0, sizeof(*ip));
+                ip->d.d_mode = IFBLK | 0600;
+                ip->d.d_addr[0] = ((files[fd].major & 0xff) << 8) |
+                    (files[fd].minor & 0xff);
+                ip->d.d_size0 = mo->size >> 16;
+                ip->d.d_size1 = mo->size & 0xffff;
+            } else {
+                dsktostatb(mo->ip, ip, ((struct i_node *)mo->ip)->inum);
+            }
+            copyout(iobuf, arg1, 36);
+            ret = 0;
+            carry_clear();
+            break;
+        }
+        if (code == 18) {
+            struct resolved r;
+
+            resolve(fn, &r);
+            if (r.midx >= 0) {
+                struct super *fs;
+                int lockfd;
+                struct dsknod *dp = mnamei(r.midx, r.rest, &fs, &lockfd);
+
+                if (!dp) {
+                    if (fs)
+                        closefs(fs);
+                    if (lockfd >= 0)
+                        close(lockfd);
+                    ret = ENOENT;
+                    carry_set();
+                    break;
+                }
+                dsktostatb(dp, ip, ((struct i_node *)dp)->inum);
+                ifree(dp);
+                closefs(fs);
+                if (lockfd >= 0)
+                    close(lockfd);
+                copyout(iobuf, arg2, 36);
+                ret = 0;
+                carry_clear();
+                break;
+            }
+        }
 
         if (code == 28) {
             ret = fstat(fd, &sbuf);
@@ -3997,6 +4665,23 @@ SystemCall()
                 break;
             }
             df->offset = i;
+        } else if (files[fd].mo) {
+            switch (arg2) {
+            case 0:
+                break;
+            case 1:
+                i += getoff(fd);
+                break;
+            case 2:
+                i += files[fd].mo->size;
+                break;
+            }
+            if (i < 0) {
+                ret = EINVAL;
+                carry_set();
+                break;
+            }
+            setoff(fd, i);
         } else {
             switch (arg2) {
             case 0:
@@ -4045,11 +4730,106 @@ SystemCall()
         break;
 
     case 21:                   /* mount */
-        carry_set();
+        {
+            char dt;
+            int Maj, Min;
+            struct super *fs;
+            int lockfd;
+            char abs[PATH_MAX];
+            int i;
+            int ronly = arg3;
+
+            if (!devdir) {
+                ret = ENODEV;
+                carry_set();
+                break;
+            }
+            filename = fname(fn);
+            if (lstat(filename, &sbuf) != 0 ||
+                !S_ISLNK(sbuf.st_mode) ||
+                devnum(filename, &dt, &Maj, &Min) != 0 || dt != 'b') {
+                ret = ENOTBLK;
+                carry_set();
+                break;
+            }
+            if (mfind(Maj, Min) >= 0) {
+                ret = EBUSY;
+                carry_set();
+                break;
+            }
+            /* the mount point must be a host directory */
+            filename = fname(fn2);
+            if (stat(filename, &sbuf) != 0 || !S_ISDIR(sbuf.st_mode)) {
+                ret = ENOTDIR;
+                carry_set();
+                break;
+            }
+            /* the canonical guest path of the mount point */
+            if (*fn2 == '/')
+                strncpy(abs, fn2, sizeof(abs) - 1);
+            else
+                snprintf(abs, sizeof(abs), "%s/%s", curdir, fn2);
+            abs[sizeof(abs) - 1] = 0;
+            canonpath(abs, abs);
+
+            for (i = 0; i < NMOUNT; i++)
+                if (!mlist[i].used)
+                    break;
+            if (i == NMOUNT) {
+                ret = EBUSY;
+                carry_set();
+                break;
+            }
+
+            /*
+             * Open the device just far enough to prove it holds a
+             * filesystem, then let it go: the table records the device,
+             * and every later access reopens the image in the process
+             * that will read it.  The validation is read-only, so it
+             * takes no image lock.
+             */
+            if (devopen(Maj, Min, 0, &fs, &lockfd) < 0) {
+                if (verbose & V_ERROR)
+                    message("%s: %s\n", strerror(errno), fn);
+                ret = errno;
+                carry_set();
+                break;
+            }
+            closefs(fs);
+            mlist[i].used = 1;
+            mlist[i].major = Maj;
+            mlist[i].minor = Min;
+            strncpy(mlist[i].mpath, abs, PATH_MAX - 1);
+            mlist[i].mpath[PATH_MAX - 1] = 0;
+            mlist[i].ronly = ronly;
+            ret = 0;
+            carry_clear();
+        }
         break;
 
     case 22:                   /* umount */
-        carry_set();
+        {
+            char dt;
+            int Maj, Min;
+            int i;
+
+            filename = fname(fn);
+            if (lstat(filename, &sbuf) != 0 ||
+                !S_ISLNK(sbuf.st_mode) ||
+                devnum(filename, &dt, &Maj, &Min) != 0 || dt != 'b') {
+                ret = ENOTBLK;
+                carry_set();
+                break;
+            }
+            if ((i = mfind(Maj, Min)) < 0) {
+                ret = EINVAL;
+                carry_set();
+                break;
+            }
+            memset(&mlist[i], 0, sizeof(mlist[i]));
+            ret = 0;
+            carry_clear();
+        }
         break;
 
     case 23:                   /* setuid */
@@ -4121,6 +4901,48 @@ SystemCall()
         break;
 
     case 33:                   /* access <name> <mode> */
+        if (inmount(fn)) {
+            struct resolved r;
+            struct super *fs;
+            int lockfd;
+            struct dsknod *dp;
+
+            resolve(fn, &r);
+            dp = mnamei(r.midx, r.rest, &fs, &lockfd);
+            if (dp) {
+                ifree(dp);
+                closefs(fs);
+                if (lockfd >= 0)
+                    close(lockfd);
+                ret = 0;
+                carry_clear();
+            } else {
+                if (fs)
+                    closefs(fs);
+                if (lockfd >= 0)
+                    close(lockfd);
+                ret = ENOENT;
+                carry_set();
+            }
+            break;
+        }
+        /*
+         * A block device is accessible whether or not the host can see it:
+         * the symlink it names has no host target, but we can open the image.
+         */
+        {
+            char dt;
+            int Maj, Min;
+
+            filename = fname(fn);
+            if (devdir && lstat(filename, &sbuf) == 0 &&
+                S_ISLNK(sbuf.st_mode) &&
+                devnum(filename, &dt, &Maj, &Min) == 0 && dt == 'b') {
+                ret = 0;
+                carry_clear();
+                break;
+            }
+        }
         i = 0;
         if (arg2 & 4)
             i |= R_OK;

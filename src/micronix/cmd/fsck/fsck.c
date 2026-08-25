@@ -260,16 +260,20 @@ checkilist1(void)
 		}
 		isallocated[inum] = 1;
 
-		/* classify the inode */
+		/*
+		 * Classify the inode.  A directory is a small file: its block
+		 * list holds direct block numbers, not indirect blocks, so it
+		 * counts in nfiles and nsmall as well as ndir.  Only devices
+		 * are excluded from the file counts.
+		 */
 		switch (ip->d_mode & IFMT) {
-		case IFDIR:
-			ndir++;
-			break;
 		case IFCHR:
 		case IFBLK:
 			nspecial++;
 			break;
 		default:
+			if ((ip->d_mode & IFMT) == IFDIR)
+				ndir++;
 			nfiles++;
 			if (ip->d_mode & ILARG) {
 				if (ip->d_addr[7])
@@ -538,9 +542,9 @@ summary(void)
 
 	printf("%u files, %u special, %u directories, %u small, %u large, %u huge\n",
 	    nfiles, nspecial, ndir, nsmall, nlarge, nhuge);
-	printf("%u used, %u free, %u bad\n", nused, nfree, nbad);
 	printf("%u blocks, %u I-list, %u indir, %u in2dir, %u data\n",
-	    fs->s_fsize, fs->s_isize + INODES_START, nindir, nin2dir, ndata);
+	    fs->s_fsize, fs->s_isize, nindir, nin2dir, ndata);
+	printf("%u used, %u free, %u bad\n", nused, nfree, nbad);
 	return 1;
 }
 
