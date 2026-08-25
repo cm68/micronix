@@ -248,6 +248,10 @@ char *fragtab[] = {
 #define T_IDX_R_ADDR	"\tpush $Rr\n" F_POPHL "\tld de,$Ro\n" F_ADDHLDE
 /* four bytes of a constant written through the address in HL */
 #define T_ST_IHL_N	F_LDHLR2 F_INCHL F_LDHLR3 F_INCHL F_LDHLRL F_INCHL F_LDHLRH
+/* a long constant into HL':HL - the low word into HL, exx, the high
+ * word into HL', exx back.  Two ld hl,nn (three bytes each) beat the
+ * four byte-sized loads (two bytes each) by two bytes. */
+#define T_LDHL_LONG	"\tld hl,$Rw\n" F_EXX "\tld hl,$RW\n" F_EXX
 /* address on the stack, value in HL -> address in HL, value in DE */
 #define T_SWAP_ADDR	F_POPDE F_EXDEHL
 /* store DE through HL, then bring the value back to HL */
@@ -2307,7 +2311,7 @@ struct rule rules[] = {
 	R(ASSIGN,DEREF,P_NUM,P_NUM,0,19, ASSIGN, P_L, P_R, P_NONE, 0,
 	    "\tld hl,$LLa\n" F_LDHLR2 F_INCHL F_LDHLR3
 	    F_INCHL F_LDHLRL F_INCHL F_LDHLRH
-	    "\tld l,$Rl\n\tld h,$Rh\n" F_EXX "\tld l,$R2\n\tld h,$R3\n" F_EXX, R_HL),
+	    T_LDHL_LONG, R_HL),
 
 	R(ASSIGN,SYMREF,INHL,0,0,2, ASSIGN, P_L, P_R, P_NONE, 0, F_LDLHL, R_HL),
 	/* narrowing store: a word result keeps only its low byte */
@@ -2348,7 +2352,7 @@ struct rule rules[] = {
 	 * bytes with DE left holding whatever was there before.
 	 */
 	R(ASSIGN,INHL,P_NUM,0,0,3, ASSIGN, P_L, P_R, P_NONE, 0,
-		"\tld l,$Rl\n\tld h,$Rh\n" F_EXX "\tld l,$R2\n\tld h,$R3\n" F_EXX, R_HL),
+		T_LDHL_LONG, R_HL),
 	R(ASSIGN,INBC,P_NUM,0,0,0, ASSIGN, P_L, P_R, P_NONE, 0, RT128, R_BC),
 	R(ASSIGN,INDE,P_NUM,0,0,0, ASSIGN, P_L, P_R, P_NONE, 0, RT275, R_DE),
 	R(ASSIGN,INHL,P_NUM,0,0,0, ASSIGN, P_L, P_R, P_NONE, 0, RT323, R_HL),
@@ -2434,7 +2438,7 @@ struct rule rules[] = {
 	R(ASSIGN,INDEX,P_NUM,0,0,19, ASSIGN, P_L, P_R, P_NONE, 0,
 		"\tld ($L),$R2\n\tld ($L+),$R3\n"
 		"\tld ($L++),$Rl\n\tld ($L+++),$Rh\n"
-		"\tld l,$Rl\n\tld h,$Rh\n" F_EXX "\tld l,$R2\n\tld h,$R3\n" F_EXX, R_HL),
+		T_LDHL_LONG, R_HL),
 	R(ASSIGN,INDEX,P_NUM,0,0,3, ASSIGN, P_L, P_R, P_NONE, 0,
 		"\tld ($L),$R2\n\tld ($L+),$R3\n"
 		"\tld ($L++),$Rl\n\tld ($L+++),$Rh\n", 0),
@@ -2443,7 +2447,7 @@ struct rule rules[] = {
 	R(ASSIGN,SYMREF,P_NUM,0,0,19, ASSIGN, P_L, P_R, P_NONE, 0,
 		F_LDHLL F_LDHLR2 F_INCHL F_LDHLR3
 		F_INCHL F_LDHLRL F_INCHL F_LDHLRH
-		"\tld l,$Rl\n\tld h,$Rh\n" F_EXX "\tld l,$R2\n\tld h,$R3\n" F_EXX, R_HL),
+		T_LDHL_LONG, R_HL),
 	R(ASSIGN,SYMREF,P_NUM,0,0,3, ASSIGN, P_L, P_R, P_NONE, 0,
 		F_LDHLL F_LDHLR2 F_INCHL F_LDHLR3
 		F_INCHL F_LDHLRL F_INCHL F_LDHLRH, 0),
@@ -2461,7 +2465,7 @@ struct rule rules[] = {
 	R(ASSIGN,DEREF,P_NUM,SYMREF,0,19, ASSIGN, P_L, P_R, P_NONE, 0,
 		"\tld hl,($LL)\n\tld (hl),$R2\n" F_INCHL "\tld (hl),$R3\n"
 		F_INCHL "\tld (hl),$Rl\n" F_INCHL "\tld (hl),$Rh\n"
-		"\tld l,$Rl\n\tld h,$Rh\n" F_EXX "\tld l,$R2\n\tld h,$R3\n" F_EXX, R_HL),
+		T_LDHL_LONG, R_HL),
 	/* a long already in HL:DE is the return value as it stands */
 	R(ASSIGN,INHL,CODE,0,0,3, ASSIGN, P_L, P_R, P_NONE, 0, RT0, R_HL),
 
@@ -2582,7 +2586,7 @@ struct rule rules[] = {
 		"\tld hl,($LL)\n" T_ST_IHL_N, 0),
 	/* the value form: store, then put the constant back in HL:DE */
 	R(ASSIGN,DEREF,P_NUM,INHL,0,19, ASSIGN, P_L, P_R, P_NONE, 0,
-		T_ST_IHL_N "\tld l,$Rl\n\tld h,$Rh\n" F_EXX "\tld l,$R2\n\tld h,$R3\n" F_EXX,
+		T_ST_IHL_N T_LDHL_LONG,
 		R_HL),
 	R(ASSIGN,DEREF,P_NUM,INHL,0,3, ASSIGN, P_L, P_R, P_NONE, 0, T_ST_IHL_N, 0),
 	/*
