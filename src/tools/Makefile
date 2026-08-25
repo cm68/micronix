@@ -75,8 +75,8 @@ fsck:	fsck.o
 readall:	readall.o
 	$(CC) $(CFLAGS) -o readall readall.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
-zmac: zmac.o mio.o doc.o zi80dis.o
-	$(CXX) -Wall $(CXXFLAGS) -o zmac zmac.o mio.o doc.o zi80dis.o
+zmac: zmac.o mio.o doc.o
+	$(CC) $(CFLAGS) -o zmac zmac.o mio.o doc.o
 
 doc.o: doc.inl
 

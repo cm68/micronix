@@ -205,7 +205,6 @@
 #include <unistd.h>	// just for unlink
 #endif
 
-#include "zi80dis.h"
 
 #ifdef vax11c
 #define unlink(filename) delete(filename)
@@ -372,8 +371,6 @@ int	dollarsign ;	/* location counter */
 int	olddollar ;	/* kept to put out binary */
 int	oldothdollar;	// output address of next .cmd/.cas/.lcas block
 int	emit_addr;	// where code and data are being placed in memory
-int	tstates;	// cumulative T-states
-int	ocf;		// cumulative op code fetches
 int	llseq;		// local label sequence number
 int	mras;		// MRAS semi-compatibility mode
 int	trueval = 1;	// Value returned for boolean true
@@ -550,8 +547,7 @@ char	bin[1024];
 char	listf[1024];
 char	oth[1024];
 
-char	copt = 1,	/* cycle counts in listings by default */
-	edef = 1,
+char	edef = 1,
 	eopt = 1,
 	fdef = 0,
 	fopt = 0,
@@ -594,10 +590,7 @@ char memflag[1 << 16];
 enum {
 	MEM_DATA = 1,
 	MEM_INST = 2,
-	MEM_T_SET = 4
 };
-int tstatesum[1 << 16];
-int ocfsum[1 << 16];
 
 // GWP - expression handling extensions for .rel output.
 void advance_segment(int step);
@@ -737,18 +730,6 @@ void addtoline(int ac)
 	*lineptr++ = ac;
 }
 
-int get_tstates(unsigned char *inst, int *low, int *high, int *fetch)
-{
-	int len;
-
-	if (z80)
-		len = zi_tstates(inst, low, high, fetch, 0, 0);
-	else
-		len = zi_tstates(inst, 0, 0, fetch, low, high);
-
-	return len;
-}
-
 /*
  *  put values in buffer for outputing
  */
@@ -776,7 +757,7 @@ void emit(int bytes, int desc, struct expr *data, ...)
 
 	// Check emit is not adding instructions to the buffer.
 	if (desc != E_DATA && emitptr != emitbuf)
-		fprintf(stderr, "internal inconsistency in t-state counting\n");
+		fprintf(stderr, "internal inconsistency in emit buffer\n");
 
 	dsize = 0;
 	args = bytes;
@@ -817,8 +798,6 @@ void emit(int bytes, int desc, struct expr *data, ...)
 
 	if (desc != E_DATA)
 	{
-		int eaddr = emit_addr, low, fetch, addr_after;
-
 		// emitbuf is OK since this only happens with single emits
 
 		if (!z80) {
@@ -832,52 +811,6 @@ void emit(int bytes, int desc, struct expr *data, ...)
 				err[zflag]++;
 			}
 		}
-
-		get_tstates(emitbuf, &low, 0, &fetch);
-
-		// Sanity check
-		if (low <= 0)
-		{
-			fprintf(stderr, "undefined instruction on %02x %02x (assembler or diassembler broken)\n",
-				emitbuf[0], emitbuf[1]);
-		}
-
-		// Special case to catch promotion of djnz to DEC B JP NZ
-		// Even update the tstatesum[] counter though that seems to
-		// me to be above and beyond.
-		if (emitbuf[0] == 5 && args == 2) {
-			tstatesum[eaddr] = tstates;
-			ocfsum[eaddr] = ocf;
-			memflag[eaddr] |= MEM_T_SET;
-			eaddr++;
-			tstates += low;
-			ocf += fetch;
-			low = 10;
-			// still 1 fetch
-		}
-
-		// Double setting of both sides of tstatesum[] seems like too
-		// much, but must be done in the isolated instruction case:
-		// org x ; inc a ; org y
-
-		tstatesum[eaddr] = tstates;
-		ocfsum[eaddr] = ocf;
-		memflag[eaddr] |= MEM_T_SET;
-
-		// Well, OK, should we default to high or low???
-		// Guess it should be whatever makes sense for you
-		// to get here which, generally, is the low.
-
-		// low it is.
-
-		tstates += low;
-		ocf += fetch;
-
-		addr_after = (emit_addr + (emitptr - emitbuf)) & 0xffff;
-
-		tstatesum[addr_after] = tstates;
-		ocfsum[addr_after] = ocf;
-		memflag[addr_after] |= MEM_T_SET;
 	}
 
 	if (relopt && outpass && dsize > 0) {
@@ -1388,34 +1321,6 @@ void list_out(int optarg, char *line_str, char type)
 			if (nopt)
 				fprintf(fout, "%4d:", linein[now_in]);
 
-			if (copt)
-			{
-			    if (emitptr > emitbuf && (memflag[emit_addr] & MEM_INST))
-			    {
-			        int low, high, fetch;
-			        get_tstates(memory + emit_addr, &low, &high, &fetch);
-
-				// Special case to catch promotion of djnz to DEC B JP NZ
-				if (memory[emit_addr] == 5 && emitptr - emitbuf == 4) {
-					low += 10;
-					high += 10;
-				}
-
-			    	fprintf(fout, nopt ? "%5d" : "%4d", tstatesum[emit_addr]);
-
-				fprintf(fout, "+%d", low);
-				if (low != high)
-				    fprintf(fout, "+%d", high - low);
-			    }
-			    else
-			    {
-			        fprintf(fout, nopt ? "%5s-" : "%4s-", "");
-			    }
-			}
-
-			if (nopt || copt)
-				fprintf(fout, "\t");
-
 			puthex(optarg >> 8, fout);
 			puthex(optarg, fout);
 			if (relopt)
@@ -1624,8 +1529,6 @@ void list1()
 			lineout();
 			if (nopt)
 				fprintf(fout, "%4d:\t", linein[now_in]);
-			if (copt)
-				fprintf(fout, "\t");
 			fprintf(fout, "\t\t%s", linebuf);
 			lsterr2(lst);
 		}
@@ -1745,12 +1648,6 @@ void do_defl(struct item *sym, struct expr *val, int call_list);
 %token END
 %token ORG
 %token ASSERT
-%token TSTATE
-%token <ival> T
-%token <ival> TILO
-%token <ival> TIHI
-%token SETOCF
-%token <ival> OCF
 %token <ival> LOW
 %token <ival> HIGH
 %token DC
@@ -3380,26 +3277,6 @@ operation:
 			expr_free($2);
 		}
 |
-	TSTATE expression
-		{
-			list_dollarsign = 0;
-			list_addr = $2->e_value;
-			expr_number_check($2);
-			tstates = $2->e_value;
-			tstatesum[emit_addr] = tstates;
-			expr_free($2);
-		}
-|
-	SETOCF expression
-		{
-			list_dollarsign = 0;
-			list_addr = $2->e_value;
-			expr_number_check($2);
-			ocf = $2->e_value;
-			ocfsum[emit_addr] = ocf;
-			expr_free($2);
-		}
-|
 	DEFB { full_exprs = 1; } db.list { full_exprs = 0; }
 |
 	DEFW { full_exprs = 1; } dw.list { full_exprs = 0; }
@@ -3910,38 +3787,6 @@ noparenexpr:
 	MROP_SUB expression
 		{	$$ = expr_op($2, '-', 0, -$2->e_value);	}
 |
-	T expression %prec UNARY
-		{
-			expr_reloc_check($2);
-			$$ = expr_num(tstatesum[phaseaddr($2->e_value)]);
-			expr_free($2);
-		}
-|
-	TILO expression %prec UNARY
-		{
-			int low;
-			expr_reloc_check($2);
-			get_tstates(memory + phaseaddr($2->e_value), &low, 0, 0);
-			$$ = expr_num(low);
-			expr_free($2);
-		}
-|
-	TIHI expression %prec UNARY
-		{
-			int high;
-			expr_reloc_check($2);
-			get_tstates(memory + phaseaddr($2->e_value), 0, &high, 0);
-			$$ = expr_num(high);
-			expr_free($2);
-		}
-|
-	OCF expression %prec UNARY
-		{
-			expr_reloc_check($2);
-			$$ = expr_num(ocfsum[phaseaddr($2->e_value)]);
-			expr_free($2);
-		}
-|
 	LOW expression %prec UNARY
 		{
 			$$ = expr_op($2, LOW, 0, $2->e_value & 0xff);
@@ -4316,7 +4161,6 @@ struct	item	keytab[] = {
 	{"nul",		0,	NUL,		0 },
 	{"nv",		040,	COND,		Z80 },
 	{"nz",		0,	SPCOND,		Z80 },
-	{"ocf",		0,	OCF,		0 },
 	{"or",		6,	OR,		VERB | Z80 | TERM },
 	{".or.",	6,	MROP_OR,	TERM | MRASOP },
 	{"ora",		6,	LOGICAL,	VERB | I8080 },
@@ -4405,8 +4249,6 @@ struct	item	keytab[] = {
 	{"sded",	0xed53,	LDST16,		VERB | Z80 | ZNONSTD },
 	{"set",		0145700,BIT,		VERB | Z80 },
 	{"setb",	0145700,BIT,		VERB | Z80 | ZNONSTD },
-	{".setocf",	0,	SETOCF,		VERB },
-	{".sett",	0,	TSTATE,		VERB },
 	{"setx",	0xddc6,	BIT_XY,		VERB | Z80 | ZNONSTD },
 	{"sety",	0xfdc6,	BIT_XY,		VERB | Z80 | ZNONSTD },
 	{"shl",		0,	SHL,		TERM },
@@ -4448,12 +4290,8 @@ struct	item	keytab[] = {
 	{"subx",	0xdd96,	ALU_XY,		VERB | Z80 | ZNONSTD },
 	{"suby",	0xfd96,	ALU_XY,		VERB | Z80 | ZNONSTD },
 	{"sui",		0326,	ALUI8,		VERB | I8080 },
-	{"t",		0,	T,		0 },
 	{".text",	0,	DEFB,		VERB },
-	{"tihi",	0,	TIHI,		0 },
-	{"tilo",	0,	TILO,		0 },
 	{".title",	SPTITL,	SPECIAL,	VERB },
-	{".tstate",	0,	TSTATE,		VERB },
 	{"v",		050,	COND,		Z80 },
 	{".word",	0,	DEFW,		VERB },
 	{".wsym",	PSWSYM,	ARGPSEUDO,	VERB },
@@ -5785,7 +5623,6 @@ void help()
 	fprintf(stderr, "   --help\tshow this help message\n");
 	fprintf(stderr, "   -8\t\tuse 8080 interpretation of mnemonics\n");
 	fprintf(stderr, "   -b\t\tno binary (.hex,.cmd,.cas, etc.) output\n");
-	fprintf(stderr, "   -c\t\tno cycle counts in listing\n");
 	fprintf(stderr, "   -e\t\terror list only\n");
 	fprintf(stderr, "   -f\t\tprint if skipped lines\n");
 	fprintf(stderr, "   -g\t\tdo not list extra code\n");
@@ -5942,10 +5779,6 @@ int main(int argc, char *argv[])
 				for (j = 0; j < CNT_OUTF; j++)
 					if (strcmp(outf[j].suffix, "lst") != 0)
 						outf[j].no_open = 1;
-				continue;
-
-			case 'c':	/*  no cycle counts in listing */
-				copt-- ;
 				continue;
 
 #ifdef DBUG
@@ -6599,8 +6432,6 @@ void setvars()
 	oldothdollar = 0;
 	phaseflag = 0;
 	for (i=0; i<FLAGS; i++) err[i] = 0;
-	tstates = 0;
-	ocf = 0;
 	llseq = 0;
 	passfail = 0;
 	passretry = 0;
@@ -6668,7 +6499,6 @@ void clear()
 	{
 		memory[i] = 0;
 		memflag[i] = 0;
-		tstatesum[i] = 0;
 	}
 }
 
@@ -7695,10 +7525,7 @@ void incbin(char *filename)
 		if (nopt)
 			fprintf(fout, "%4d:", linein[now_in]);
 
-		if (copt)
-		        fprintf(fout, nopt ? "%5s-" : "%4s-", "");
-
-		if (nopt || copt)
+		if (nopt)
 			fprintf(fout, "\t");
 
 		puthex(start >> 8, fout);
@@ -7764,10 +7591,7 @@ void dc(int count, int value)
 		if (nopt)
 			fprintf(fout, "%4d:", linein[now_in]);
 
-		if (copt)
-		        fprintf(fout, nopt ? "%5s-" : "%4s-", "");
-
-		if (nopt || copt)
+		if (nopt)
 			fprintf(fout, "\t");
 
 		puthex(start >> 8, fout);

@@ -21,7 +21,7 @@ install: $(OBJ) $(SYM)
 	#dd if=$< of=$@ bs=1024 skip=2 count=2 seek=2
 
 %.lst %.cim: %.s
-	../../../tools/zmac --oo lst,cim --od . -n -c $<
+	../../../tools/zmac --oo lst,cim --od . -n $<
 
 %.sym: %.lst
 	cat $< | awk ' \
