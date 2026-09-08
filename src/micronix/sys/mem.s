@@ -50,14 +50,8 @@ IMAGE1=0x0220
 ; 	ret
 ;
 _getbyte:
-	ld	hl,2
-	add	hl,sp
-	ld	a,(hl)
-	inc	hl
-	ld	h,(hl)
-	ld	l,a
-	call	getw
-	ld	b,0
+	call	getw		; hl = word at addr (arg0 arrives in hl)
+	ld	h,0		; hl = byte, zero-extended
 	ret
 
 ; ------- A-NATURAL SOURCE: _getword -------
@@ -68,13 +62,7 @@ _getbyte:
 ; 	hl =a^ hl		/hl = addr
 ; 				/drop thru to getw
 ;
-_getword:
-	ld	hl,2
-	add	hl,sp
-	ld	a,(hl)
-	inc	hl
-	ld	h,(hl)
-	ld	l,a
+_getword:			; addr (arg0) already in hl; fall through to getw
 
 ; ------- A-NATURAL SOURCE: getw -------
 ; / getw	  bc = word at address hl
@@ -108,6 +96,7 @@ _getword:
 ; 	jmp _ei
 ;
 getw:
+	push	bc		; save bc (callee-saved)
 	ld	a,h
 	and	0xF0
 	rrca
@@ -130,10 +119,13 @@ getw:
 	ld	c,(hl)
 	inc	hl
 	ld	b,(hl)
+	ld	l,c
+	ld	h,b		; hl = word (return value)
 	ld	a,(IMAGE0+2)
 	ld	(MAP0+2),a
 	ld	a,(IMAGE0+4)
 	ld	(MAP0+4),a
+	pop	bc		; restore bc
 	jp	_ei
 
 ; ------- A-NATURAL SOURCE: _putbyte -------
@@ -146,16 +138,17 @@ getw:
 ; 				/drop thru to putb
 ;
 _putbyte:
-	ld	hl,2
-	add	hl,sp
-	ld	c,(hl)
-	inc	hl
-	ld	b,(hl)
-	inc	hl
+	push	bc		; save bc (callee-saved)
+	ld	c,l		; c = data low byte (arg0 in hl)
+	ld	hl,4
+	add	hl,sp		; hl = &addr (arg1, now at sp+4)
 	ld	a,(hl)
 	inc	hl
 	ld	h,(hl)
-	ld	l,a
+	ld	l,a		; hl = addr
+	call	putb		; put c at [hl]
+	pop	bc		; restore bc
+	ret
 
 ; ------- A-NATURAL SOURCE: putb -------
 ; / putb	  put byte c to address hl
@@ -225,24 +218,24 @@ putb:
 ; 	jmp putb		/put b
 ;
 _putword:
-	ld	hl,2
-	add	hl,sp
-	ld	c,(hl)
+	push	bc		; save bc (callee-saved)
+	ld	a,h		; a = data high byte (arg0 in hl)
+	ld	c,l		; c = data low byte
+	ld	hl,4
+	add	hl,sp		; hl = &addr (arg1, now at sp+4)
+	ld	e,(hl)
 	inc	hl
-	ld	b,(hl)
-	inc	hl
-	ld	a,(hl)
-	inc	hl
-	ld	h,(hl)
-	ld	l,a
-	push	bc
-	push	hl
-	call	putb
-	pop	hl
-	pop	bc
-	inc	hl
-	ld	c,b
-	jp	putb
+	ld	d,(hl)		; de = addr
+	push	de
+	pop	hl		; hl = addr
+	call	putb		; put c (low byte) at addr
+	inc	de		; de = addr+1
+	ld	c,a		; c = high byte
+	push	de
+	pop	hl		; hl = addr+1
+	call	putb		; put c (high byte) at addr+1
+	pop	bc		; restore bc
+	ret
 
 ; ------- A-NATURAL SOURCE: _copyin -------
 ; / copyin(from, to, count)
@@ -299,31 +292,24 @@ _putword:
 ; 	jmp _ei
 ;
 _copyin:
-	push	de
 	ld	a,(IMAGE0+2)
 	push	af
 	ld	a,(IMAGE0+4)
 	push	af
-	ld	hl,13
-	add	hl,sp
-	ld	b,(hl)
-	dec	hl
-	ld	c,(hl)
-	dec	hl
-	ld	d,(hl)
-	dec	hl
-	ld	e,(hl)
-	dec	hl
-	ld	a,(hl)
-	dec	hl
-	ld	l,(hl)
-	ld	h,a
-	ld	a,h
+	push	ix
+	ld	ix,0
+	add	ix,sp		; ix = sp
+	push	bc		; save bc (callee-saved)
+	ld	e,(ix+8)
+	ld	d,(ix+9)	; de = to (arg1)
+	ld	c,(ix+10)
+	ld	b,(ix+11)	; bc = count (arg2)
+	ld	a,h		; hl = from (arg0)
 	and	0xF0
 	rrca
 	rrca
 	rrca			/now a = 2 * high nibble of from
-	push	bc
+	push	bc		; save count
 	ld	bc,IMAGE1
 	add	a,c
 	ld	c,a
@@ -336,23 +322,24 @@ _copyin:
 	ld	a,(bc)
 	ld	(IMAGE0+4),a
 	ld	(MAP0+4),a
-	pop	bc
+	pop	bc		; restore count
 	ld	a,h
 	and	0x0F
 	or	0x10
-	ld	h,a
+	ld	h,a		; hl = windowed from
 	ld	a,b
 	or	c
 	jp	z,4f
 	ldir
 4:
+	pop	bc		; restore caller's bc
+	pop	ix
 	pop	af
 	ld	(IMAGE0+4),a
 	ld	(MAP0+4),a
 	pop	af
 	ld	(IMAGE0+2),a
 	ld	(MAP0+2),a
-	pop	de
 	jp	_ei
 
 ; ------- A-NATURAL SOURCE: _copyout -------
@@ -410,31 +397,24 @@ _copyin:
 ; 	jmp _ei
 ;
 _copyout:
-	push	de
 	ld	a,(IMAGE0+2)
 	push	af
 	ld	a,(IMAGE0+4)
 	push	af
-	ld	hl,13
-	add	hl,sp
-	ld	b,(hl)
-	dec	hl
-	ld	c,(hl)
-	dec	hl
-	ld	d,(hl)
-	dec	hl
-	ld	e,(hl)
-	dec	hl
-	ld	a,(hl)
-	dec	hl
-	ld	l,(hl)
-	ld	h,a
-	ld	a,d
+	push	ix
+	ld	ix,0
+	add	ix,sp		; ix = sp
+	push	bc		; save bc (callee-saved)
+	ld	e,(ix+8)
+	ld	d,(ix+9)	; de = to (arg1)
+	ld	c,(ix+10)
+	ld	b,(ix+11)	; bc = count (arg2)
+	ld	a,d		; de = to
 	and	0xF0
 	rrca
 	rrca
 	rrca			/now a = 2 * high nibble of to
-	push	bc
+	push	bc		; save count
 	ld	bc,IMAGE1
 	add	a,c
 	ld	c,a
@@ -447,23 +427,24 @@ _copyout:
 	ld	a,(bc)
 	ld	(IMAGE0+4),a
 	ld	(MAP0+4),a
-	pop	bc
+	pop	bc		; restore count
 	ld	a,d
 	and	0x0F
 	or	0x10
-	ld	d,a
+	ld	d,a		; de = windowed to
 	ld	a,b
 	or	c
 	jp	z,5f
-	ldir
+	ldir			; hl = from (arg0), de = windowed to, bc = count
 5:
+	pop	bc		; restore caller's bc
+	pop	ix
 	pop	af
 	ld	(IMAGE0+4),a
 	ld	(MAP0+4),a
 	pop	af
 	ld	(IMAGE0+2),a
 	ld	(MAP0+2),a
-	pop	de
 	jp	_ei
 
 ; ------- A-NATURAL SOURCE: _memrw -------
@@ -544,33 +525,22 @@ _copyout:
 ; 	jmp _ei
 ;
 _memrw:
-	push	de
+	push	ix
+	ld	ix,0
+	add	ix,sp		; ix = sp
 	ld	a,(IMAGE0+2)
 	push	af
 	ld	a,(IMAGE0+4)
 	push	af
-	ld	hl,17
-	add	hl,sp
-	ld	b,(hl)
-	dec	hl
-	ld	c,(hl)
-	push	bc
-	dec	hl
-	dec	hl
-	ld	c,(hl)
-	push	bc
-	dec	hl
-	ld	d,(hl)
-	dec	hl
-	ld	e,(hl)
-	dec	hl
-	dec	hl
-	ld	b,(hl)
-	dec	hl
-	ld	a,(hl)
-	dec	hl
-	ld	l,(hl)
-	ld	h,a
+	push	bc		; save bc (callee-saved)
+	ld	c,(ix+10)
+	ld	b,(ix+11)	; bc = count (arg3)
+	push	bc		; save count
+	ld	a,(ix+8)	; a = direction (arg2 low byte)
+	push	af		; save direction
+	ld	d,(ix+7)	; d = space middle byte (arg1)
+	ld	e,(ix+6)	; e = space low byte
+	ld	b,(ix+4)	; b = space high byte
 	call	_di
 	ld	a,b
 	and	0x0F
@@ -587,8 +557,8 @@ _memrw:
 	ld	a,d
 	and	0x0F
 	or	0x20
-	ld	d,a
-	ld	a,h
+	ld	d,a		; de = windowed space addr
+	ld	a,h		; hl = user (arg0)
 	and	0xF0
 	rrca
 	rrca
@@ -602,14 +572,13 @@ _memrw:
 	ld	a,h
 	and	0x0F
 	or	0x10
-	ld	h,a
-	pop	bc
-	ld	a,c
-	or	c
+	ld	h,a		; hl = windowed user addr
+	pop	af		; a = direction
+	or	a
 	jp	nz,6f
-	ex	de,hl
+	ex	de,hl		; direction == 0: space -> user
 6:
-	pop	bc
+	pop	bc		; bc = count
 	ld	a,b
 	or	c
 	jp	z,7f
@@ -617,13 +586,14 @@ _memrw:
 	ldir
 	call	_di
 7:
+	pop	bc		; restore caller's bc
 	pop	af
 	ld	(IMAGE0+4),a
 	ld	(MAP0+4),a
 	pop	af
 	ld	(IMAGE0+2),a
 	ld	(MAP0+2),a
-	pop	de
+	pop	ix		; restore ix
 	jp	_ei
 
 ; ------- A-NATURAL SOURCE: _segcopy -------
@@ -666,20 +636,19 @@ _memrw:
 ; 	jmp _ei
 ;
 _segcopy:
-	push	de
-	ld	hl,4
-	add	hl,sp
+	push	ix
+	ld	ix,0
+	add	ix,sp		; ix = sp
 	ld	a,(IMAGE0+2)
 	push	af
 	ld	a,(IMAGE0+4)
 	push	af
+	push	bc		; save bc (callee-saved, for ldir count)
 	call	_di
-	ld	a,(hl)
+	ld	a,l		; a = from (arg0, low byte)
 	ld	(IMAGE0+2),a
 	ld	(MAP0+2),a
-	inc	hl
-	inc	hl
-	ld	a,(hl)
+	ld	a,(ix+4)	; a = to (arg1, low byte)
 	ld	(IMAGE0+4),a
 	ld	(MAP0+4),a
 	call	_ei
@@ -688,11 +657,12 @@ _segcopy:
 	ld	bc,4096
 	ldir
 	call	_di
+	pop	bc		; restore bc
 	pop	af
 	ld	(MAP0+4),a
 	ld	(IMAGE0+4),a
 	pop	af
 	ld	(MAP0+2),a
 	ld	(IMAGE0+2),a
-	pop	de
+	pop	ix		; restore ix
 	jp	_ei

@@ -372,10 +372,8 @@ slave:
 ; 	return;
 ;
 m0int:
-	ld	bc,_mttys
-	push	bc
+	ld	hl,_mttys	; tty = &_mttys (arg0)
 	call	_ppint
-	pop	bc
 	ret
 
 ; ------- A-NATURAL SOURCE: m1int -------
@@ -441,7 +439,7 @@ m3int:
 ;
 maint:
 	out	(MSELECT),a
-	push	hl
+	ex	de,hl		; de = tty (save), hl = scratch
 	in	a,(MIIR)
 	cp	ININT
 	jp	z,main
@@ -449,7 +447,6 @@ maint:
 	jp	z,maout
 	cp	MODINT
 	jp	z,mashake
-	pop	af
 	ret
 
 ; ------- A-NATURAL SOURCE: main -------
@@ -481,20 +478,23 @@ maint:
 ; 	/
 ;
 main:
+	; de = tty
 	in	a,(MUDATA)
 	ld	c,a
-	ld	b,0
+	ld	b,0		; bc = char
 	in	a,(MUSTATUS)
 	and	ERROR
 	jp	z,L100
+	ld	h,d
+	ld	l,e		; hl = tty (arg0)
 	call	_ttyerror
-	pop	af
 	ret
 L100:
-	push	bc
+	push	de		; push tty (arg1)
+	ld	l,c
+	ld	h,b		; hl = char (arg0)
 	call	_ttyin
-	pop	af
-	pop	af
+	pop	af		; drop tty
 	ret
 
 ; ------- A-NATURAL SOURCE: maout -------
@@ -532,30 +532,30 @@ L100:
 ; 	/
 ;
 maout:
+	; de = tty
 	in	a,(MUSTATUS)
 	and	EMPTY
 	jp	z,endint
-	ld	c,l
-	ld	b,h
 	ld	hl,MODE+1
-	add	hl,bc
+	add	hl,de		; hl = &tty->mode[1]
 	ld	a,(hl)
 	and	SHAKE
 	jp	nz,maout2
+	ld	h,d
+	ld	l,e		; hl = tty (arg0)
 	call	_ttyout
-	pop	af
 	ret
 maout2:
 	in	a,(MMSTATUS)
 	and	CLR2SND
 	jp	z,maout1
+	ld	h,d
+	ld	l,e		; hl = tty (arg0)
 	call	_ttyout
-	pop	af
 	ret
 maout1:
 	ld	a,ODSABLE
 	out	(MUABLE),a
-	pop	af
 	ret
 
 ; ------- A-NATURAL SOURCE: mashake -------
@@ -567,8 +567,9 @@ maout1:
 ; 	/
 ;
 mashake:
+	ld	h,d
+	ld	l,e		; hl = tty (arg0)
 	call	_mumint
-	pop	af
 	ret
 
 ; ------- A-NATURAL SOURCE: tty -------
@@ -733,10 +734,8 @@ slave3:
 	ld	a,(irr)
 	and	IRP
 	jp	z,slave4
-	ld	hl,(tty)
-	push	hl
+	ld	hl,(tty)	; hl = tty (arg0)
 	call	_ppint
-	pop	af
 slave4:
 	ld	hl,(tty)
 	ld	bc,TTSIZE
@@ -893,18 +892,14 @@ ace51:
 	.defb	UABLE
 	ret
 ace4:
-	ld	hl,(tty)
-	push	hl
+	ld	hl,(tty)	; hl = tty (arg0)
 	call	_ttyout
-	pop	af
 	ret
 ace3:
 	cp	MODINT
 	jp	nz,ace6
-	ld	hl,(tty)
-	push	hl
+	ld	hl,(tty)	; hl = tty (arg0)
 	call	_mumint
-	pop	af
 	ret
 ace6:
 	cp	ININT
@@ -915,13 +910,13 @@ ace6:
 ace8:
 	.defb	UDATA
 	ld	b,0
-	ld	c,a
+	ld	c,a		; bc = char
 	ld	hl,(tty)
-	push	hl
-	push	bc
+	push	hl		; push tty (arg1)
+	ld	l,c
+	ld	h,b		; hl = char (arg0)
 	call	_ttyin
-	pop	af
-	pop	af
+	pop	af		; drop tty
 	ret
 
 ; ------- A-NATURAL SOURCE: endint -------
@@ -932,7 +927,6 @@ ace8:
 ; 	/
 ;
 endint:
-	pop	af
 	ret
 
 ; ------- A-NATURAL SOURCE: _mstart -------
@@ -1055,14 +1049,14 @@ mstart3:
 ; 		/
 ;
 _mstop:
-	call	select
+	call	select		; tty (arg0) in hl
 	ld	a,(ace)
 	cp	0
 	jp	z,dstop
 	ld	a,(miobase)
 	inc	a
 	ld	(mstop1),a
-	ld	hl,4
+	ld	hl,2
 	add	hl,sp
 	ld	a,(hl)
 	or	a
@@ -1073,7 +1067,7 @@ turnoff:
 	.defb	0xD3
 mstop1:
 	.defb	UABLE
-	ld	hl,4
+	ld	hl,2
 	add	hl,sp
 	ld	a,(hl)
 	or	a
@@ -1116,11 +1110,11 @@ mstop3:
 ; 	/
 ;
 _mputc:
-	call	select
+	call	select		; tty (arg0) in hl
 	ld	a,(miobase)
 	ld	(mputc3),a
-	ld	hl,4
-	add	hl,sp
+	ld	hl,2
+	add	hl,sp		; hl = &c (arg1, at sp+2)
 	ld	a,(hl)
 	.defb	0xD3
 mputc3:
@@ -1175,10 +1169,13 @@ mputc3:
 ; 	/* struct tty *select (); */
 ;
 _mset:
-	call	select
+	push	bc		; save bc (callee-saved)
+	push	hl		; save tty (for the baud-rate read below)
+	call	select		; tty (arg0) in hl
+	pop	hl		; hl = tty
 	ld	a,(ace)
 	or	a
-	jp	z,_ei
+	jp	z,mset_exit
 	ld	a,(miobase)
 	add	a,LOBAUD
 	ld	(mset2),a
@@ -1196,7 +1193,7 @@ _mset:
 	.defb	0xD3
 mset1:
 	.defb	REGSET
-	ld	a,(bc)
+	ld	a,(hl)		; a = tty->baud
 	and	15
 	add	a,a
 	ld	c,a
@@ -1220,6 +1217,8 @@ mset4:
 	.defb	0xD3
 mset5:
 	.defb	MCNTRL
+mset_exit:
+	pop	bc		; restore bc
 	jp	_ei
 
 ; ------- A-NATURAL SOURCE: select -------
@@ -1247,12 +1246,10 @@ mset5:
 ; 	/
 ;
 select:
+	push	bc		; preserve bc (callee-saved)
 	call	_di
-	ld	hl,4
-	add	hl,sp
-	ld	c,(hl)
-	inc	hl
-	ld	b,(hl)
+	ld	c,l
+	ld	b,h		; bc = tty (arg0 arrives in hl)
 	ld	hl,DEV
 	add	hl,bc
 	ld	a,(hl)
@@ -1270,6 +1267,7 @@ select:
 	.defb	0xD3
 select1:
 	.defb	SELECT
+	pop	bc		; restore bc
 	ret
 
 ; ------- A-NATURAL SOURCE: _rates -------
@@ -1330,16 +1328,15 @@ _rates:
 ; 	/
 ;
 _console:
-	pop	hl
-	pop	bc
-	push	bc
-	push	hl
-	ld	a,c
+	ld	a,l		; a = c (arg0 in hl)
 	cp	'\n'
-	push	bc
-	ld	c,'\r'
-	call	z,spout
-	pop	bc
+	jp	nz,spout	; not newline: output c
+	push	af		; save c
+	ld	l,'\r'
+	call	spout		; output '\r'
+	pop	af		; restore c
+	ld	l,a		; l = c
+	jp	spout		; output c
 
 ; ------- A-NATURAL SOURCE: spout -------
 ; /* fall into ... */
@@ -1355,14 +1352,16 @@ _console:
 ; 	/
 ;
 spout:
-	push	bc
+	push	bc		; save bc (callee-saved)
+	ld	b,0
+	ld	c,l		; bc = c (char)
+	push	bc		; push c (arg1 for conout)
 	ld	bc,TTSIZE
 	ld	hl,_mttys
-	add	hl,bc
-	push	hl
-	call	conout
-	pop	af
-	pop	af
+	add	hl,bc		; hl = &_mttys[1] (tty, arg0)
+	call	conout		; conout(tty, c)
+	pop	af		; drop c
+	pop	bc		; restore bc
 	ret
 
 ; ------- A-NATURAL SOURCE: conout -------
@@ -1388,7 +1387,7 @@ spout:
 ; 	/
 ;
 conout:
-	call	select
+	call	select		; tty (arg0) in hl
 	ld	a,(miobase)
 	ld	(c3),a
 	add	a,USTATUS
@@ -1399,8 +1398,8 @@ c2:
 	.defb	USTATUS
 	and	EMPTY
 	jp	z,c1
-	ld	hl,4
-	add	hl,sp
+	ld	hl,2
+	add	hl,sp		; hl = &c (arg1, at sp+2)
 	ld	a,(hl)
 	.defb	0xD3
 c3:

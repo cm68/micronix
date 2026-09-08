@@ -3,18 +3,12 @@
 #
 # sys/GNUmakefile
 #
-# "all" does not build a kernel yet, and does not pretend to.  The
-# kernel is not a program ccc can drive to completion: Makefile beside
-# this one links three overlays at a fixed text base
-#
-#	link -tb0x1000 -r -o unix low.o io.o -lm.a high.o
-#
-# and compiles two of the files with overlay numbers (-x0, -x7).  ccc
-# has no -tb, no -r and no -x, so the link has to be done by calling
-# wsld directly, with the segment layout worked out.  That is its own
-# piece of work; until it is done this builds the objects, which is
-# the part that can be checked, and says so rather than reporting a
-# kernel it did not produce.
+# "all" builds the kernel: unix, at a fixed text base of 0x1000.  ccc
+# has no -tb, no overlay -r and no -x, so the link is done by calling
+# mxld directly with -Ttext=0x1000.  The native Makefile beside this
+# one stages low.o/io.o/high.o overlays and links them with
+# "link -tb0x1000 -r"; the flat link here is the same image without the
+# overlays, in one pass.
 #
 # update, clean and clobber are real.  update used to be
 #
@@ -32,8 +26,7 @@ DIR	= sys
 CLASS	=
 SRCDIR	= /usr/src/sys
 
-# no ccc driver can link this yet - see above
-TARGET	=
+TARGET	= unix
 
 # the kernel includes its own headers, not the C library's.  -i, as
 # the native Makefile beside this has always done.
@@ -42,6 +35,26 @@ INC	= -i$(DEPTH)/include
 # build.h is written by the ccc survey below; GNUmakefile.inc's clobber
 # takes GENERATED away.
 GENERATED = build.h
+
+# the tree's ccc and its linker - GNUmakefile.inc's ?= defaults point
+# at an installed mxccc that is not here, so these are set before the
+# include.
+CCCTREE ?= $(HOME)/src/ccc
+CCC      = $(CCCTREE)/desthost/bin/ccc
+MXLD     = $(CCCTREE)/desthost/libexec/mxld
+
+# the kernel's objects, in link order: the entry header (uhdr.s) first
+# so its jump lands at 0x1000.  inout.s is here though the native
+# Makefile's AS_OBJS never listed it: memdev.c, multio.c, mw.c, dj.c
+# and cus.c all call in()/out().  makedate.c (a host program), mset.c
+# (no hardware interface) and lock.c (dead) are left out.
+KERNEL_AS = uhdr.o mem.o sub8.o inout.o intrpt.o mio.o inits.o
+KERNEL_C  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
+	ialloc.o iget.o imap.o link.o user.o malloc.o name.o open.o queue.o \
+	rdwri.o reg.o sig.o sleep.o subc.o swap.o sys1.o sys2.o system.o time.o \
+	trap.o tty.o uio.o con.o dj.o memdev.o multio.o mw.o main.o cus.o
+OBJS     = $(KERNEL_AS) $(KERNEL_C)
+TREELIBS =
 
 include $(DEPTH)/GNUmakefile.inc
 
@@ -113,11 +126,11 @@ SURVEYCC ?= $(CCCTREE)/desthost/bin/ccc
 #
 # The linker and the object tools are not on the path and are not in
 # desthost/bin either - bin holds the driver and the things a user
-# runs, and the driver reaches into lib for the passes and for wsld.
+# runs, and the driver reaches into libexec for the passes and mxld.
 #
-WSLD     ?= $(CCCTREE)/desthost/lib/wsld
-WSSIZE   ?= $(CCCTREE)/desthost/bin/wssize
-WSNM     ?= $(CCCTREE)/desthost/bin/wsnm
+MXLD     ?= $(CCCTREE)/desthost/libexec/mxld
+MXSIZE   ?= $(CCCTREE)/desthost/bin/mxsize
+MXNM     ?= $(CCCTREE)/desthost/bin/mxnm
 
 CCCDIR    = cccobj
 CCCOUT    = kernel.o
@@ -190,19 +203,19 @@ ccc-link:
 	n=`echo $$objs | wc -w`; \
 	in=0; \
 	for o in $$objs; do \
-		b=`$(WSSIZE) $$o | awk 'NR==2{print $$3}'`; \
+		b=`$(MXSIZE) $$o | awk 'NR==2{print $$3}'`; \
 		in=`expr $$in + $$b`; \
 	done; \
 	echo "linking $$n objects, $$in bytes of bss between them"; \
 	echo "-------------------------------------------------------"; \
-	if $(WSLD) -r -o $(CCCDIR)/$(CCCOUT) $$objs; then \
-		out=`$(WSSIZE) $(CCCDIR)/$(CCCOUT) | awk 'NR==2{print $$3}'`; \
+	if $(MXLD) -r -o $(CCCDIR)/$(CCCOUT) $$objs; then \
+		out=`$(MXSIZE) $(CCCDIR)/$(CCCOUT) | awk 'NR==2{print $$3}'`; \
 		echo "-------------------------------------------------------"; \
 		echo "linked bss $$out, was $$in, reclaimed `expr $$in - $$out`"; \
-		echo "u is at `$(WSNM) $(CCCDIR)/$(CCCOUT) | awk '$$5==\"_u\"{print $$1, $$2}'`"; \
+		echo "u is at `$(MXNM) $(CCCDIR)/$(CCCOUT) | awk '$$5==\"_u\"{print $$1, $$2}'`"; \
 	else \
 		echo "-------------------------------------------------------"; \
-		echo "wsld failed"; exit 1; \
+		echo "mxld failed"; exit 1; \
 	fi
 
 #
@@ -212,4 +225,16 @@ ccc-link:
 ccc-clean:
 	rm -rf $(CCCDIR)
 
-.PHONY: objects ccc-try ccc-link ccc-clean
+#
+# ---- the kernel ----------------------------------------------------
+#
+# ccc builds the whole kernel flat - no overlays - and mxld links it at
+# the same fixed text base the native link used.  The entry header
+# (uhdr.s) is first so its jump lands at 0x1000.
+#
+main.o: build.h
+
+unix: $(OBJS)
+	$(MXLD) -Ttext=0x1000 -L$(CCCTREE)/desthost/lib -lccc -lc -o unix $(OBJS)
+
+.PHONY: objects ccc-try ccc-link ccc-clean unix

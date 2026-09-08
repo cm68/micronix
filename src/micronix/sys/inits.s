@@ -1,15 +1,8 @@
 ;
-; =====================================================================
-; sys/inits.s  --  Z80 translation of sys/inits.anat (asz dialect)
-; =====================================================================
-;
-; ------- A-NATURAL SOURCE: declarations -------
-; /*
-;  * Initialize the Wunderbuss/Multio
-;  *
-;  * sys/inits.s
-;  * Changed: <2026-08-17 19:49:08 curt>
-;  */
+; sys/inits.s
+; 
+; Initialize the Wunderbuss/Multio
+; Changed: <2026-08-21 15:02:51 curt>
 ;
 ; /*
 ;  * Load this module in the data area above _main
@@ -256,31 +249,49 @@ ARMSLAVE=0xC7
 ; 	sp => de	/recover C frame pointer
 ; 	return;
 ;
+
+;
+; initialize the MultIO - 
+; interrupt controller(s), serial ports, real time clock and a parallel port
+; called from cus()
+;
+; registers: hl, de are scratch.  bc, ix, iy need to be saved if used
+
 _minit:
-	push	de
-	ld	c,3
+	push	bc			; callee saves bc
+
+	; clear the usarts by reading the recv registers
+	; and writing 0 to all the interrupt enable bits
+
+	ld	b,3			; we have 3 uarts (groups 3,2,1)
 minit1:
-	ld	a,c
-	out	(MSELECT),a
-	in	a,(MUDATA)
+	ld	a,b
+	out	(MBASE+SELECT),a	; select group for uarts in turn
+
+	in	a,(MBASE+UDATA)		; read any data
 	xor	a
-	out	(MUABLE),a
-	dec	c
-	jp	nz,minit1
-	xor	a
-	out	(MSELECT),a
-	ld	a,TIMSET
-	out	(CLOCK),a
-	ld	a,TIMSTRB
-	out	(CLOCK),a
-	ld	a,TIMSET
-	out	(CLOCK),a
+	out	(MBASE+UABLE),a		; disable all interrupts
+	djnz	minit1
+
+	xor	a			; select group 0 (control)
+	out	(MBASE+SELECT),a
+
+	; the multio manual is clear as mud about the clock register
+	; the strobe bit (0x20) needs to toggle
+
+	ld	a,0x08			; load clock (2) << 2
+	out	(MBASE+2),a
+	ld	a,0x08+0x20		; load clock + strobe
+	out	(MBASE+2),a
+	ld	a,0x08			; clear strobe
+	out	(MBASE+2),a		
+
+	ld	a,0x1c			; 32 hz clock (7) << 2
+	out	(MBASE+2),a
+	ld	a,0x1c+0x20
+	out	(MBASE+2),a
 	ld	a,CLKRATE
-	out	(CLOCK),a
-	ld	a,CLKSTRB
-	out	(CLOCK),a
-	ld	a,CLKRATE
-	out	(CLOCK),a
+	out	(MBASE+2),a
 	in	a,(CLKCLR)
 	ld	hl,vectors
 	ld	e,l
@@ -310,7 +321,7 @@ minit1:
 	out	(MSELECT),a
 	ld	a,ARMMASTER
 	out	(ICNTRL1),a
-	pop	de
+	pop	bc
 	ret
 
 ; ------- A-NATURAL SOURCE: _coninit -------
@@ -327,10 +338,8 @@ minit1:
 ; 	return;
 ;
 _coninit:
-	ld	bc,0x0101
-	push	bc
+	ld	hl,0x0101	; dev (arg0) in hl
 	call	_muopen
-	pop	af
 	ret
 
 ; ------- A-NATURAL SOURCE: findn -------

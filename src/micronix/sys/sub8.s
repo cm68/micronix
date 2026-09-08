@@ -44,26 +44,23 @@
 ; 	ret
 ;
 _saveframe:
-	pop	bc		; bc = return address
-	pop	hl		; hl = &u->frmptr
-	push	hl
-	push	bc
+	push	ix		; save ix (callee-saved under ccc)
+	ld	ix,0
+	add	ix,sp		; ix = sp, so arg1 is at (ix+4)
+	push	iy
+	pop	de		; de = iy, the ccc frame pointer
 	ld	(hl),e
 	inc	hl
-	ld	(hl),d
+	ld	(hl),d		; *frmptr = frame pointer
 	ld	hl,6
-	add	hl,sp
-	ld	c,l
-	ld	b,h
-	dec	hl
-	dec	hl
-	ld	a,(hl)
+	add	hl,sp		; hl = pre-call sp (entry_sp + 4)
+	ex	de,hl		; de = pre-call sp
+	ld	l,(ix+4)
+	ld	h,(ix+5)	; hl = &stkptr (arg1)
+	ld	(hl),e
 	inc	hl
-	ld	h,(hl)
-	ld	l,a
-	ld	(hl),c
-	inc	hl
-	ld	(hl),b
+	ld	(hl),d		; *stkptr = pre-call sp
+	pop	ix		; restore ix
 	ret
 
 ; ------- A-NATURAL SOURCE: _setframe -------
@@ -77,13 +74,13 @@ _saveframe:
 ; 	ret
 ;
 _setframe:
-	pop	bc		; bc = return address
-	pop	de		; de = frmptr
-	pop	hl		; hl = stkptr
-	ld	sp,hl
-	push	bc
-	push	bc
-	push	bc
+	push	hl
+	pop	iy		; iy = frmptr (arg0)
+	pop	de		; de = return address
+	pop	hl		; hl = stkptr (arg1)
+	ld	sp,hl		; sp = stkptr
+	push	de
+	push	de		; return address x2 (1 for ret, 1 for caller's arg1 drop)
 	ret
 
 ; ------- A-NATURAL SOURCE: _zero -------
@@ -113,30 +110,26 @@ _setframe:
 ; 	ret
 ;
 _zero:
-	push	de
-	ld	hl,4
-	add	hl,sp
-	ld	e,(hl)
-	inc	hl
-	ld	d,(hl)
-	inc	hl
-	ld	c,(hl)
-	inc	hl
-	ld	b,(hl)
-	ex	de,hl
+	push	ix
+	ld	ix,0
+	add	ix,sp		; ix = sp
+	push	bc		; save bc (callee-saved)
+	ld	c,(ix+4)
+	ld	b,(ix+5)	; bc = count (arg1)
 	ld	a,b
 	or	c
 	jp	z,2f
-	ld	e,0
+	ld	e,0		; e = 0 (the zero byte)
 1:
-	ld	(hl),e
+	ld	(hl),e		; hl = buf (arg0)
 	inc	hl
 	dec	bc
 	ld	a,b
 	or	c
 	jp	nz,1b
 2:
-	pop	de
+	pop	bc
+	pop	ix
 	ret
 
 ; ------- A-NATURAL SOURCE: _copy -------
@@ -165,27 +158,21 @@ _zero:
 ; 	ret
 ;
 _copy:
-	push	de
-	ld	hl,9
-	add	hl,sp
-	ld	b,(hl)
-	dec	hl
-	ld	c,(hl)
-	dec	hl
-	ld	d,(hl)
-	dec	hl
-	ld	e,(hl)
-	dec	hl
-	ld	a,(hl)
-	dec	hl
-	ld	l,(hl)
-	ld	h,a
+	push	ix
+	ld	ix,0
+	add	ix,sp		; ix = sp
+	push	bc		; save bc (callee-saved)
+	ld	e,(ix+4)
+	ld	d,(ix+5)	; de = dest (arg1)
+	ld	c,(ix+6)
+	ld	b,(ix+7)	; bc = count (arg2)
 	ld	a,b
 	or	c
 	jp	z,3f
-	ldir
+	ldir			; hl = source (arg0), de = dest, bc = count
 3:
-	pop	de
+	pop	bc
+	pop	ix
 	ret
 
 ; ------- A-NATURAL SOURCE: _x3to4 -------
@@ -204,29 +191,26 @@ _copy:
 ; 	ret
 ;
 _x3to4:
-	ld	hl,2
-	add	hl,sp
-	ld	c,(hl)
-	inc	hl
-	ld	b,(hl)
-	inc	hl
-	ld	a,(hl)
-	inc	hl
-	ld	h,(hl)
-	ld	l,a
-	ld	a,(bc)
+	push	ix
+	ld	ix,0
+	add	ix,sp		; ix = sp
+	ex	de,hl		; de = &three (arg0)
+	ld	l,(ix+4)
+	ld	h,(ix+5)	; hl = &long (arg1)
+	ld	a,(de)
 	ld	(hl),a
 	xor	a
 	inc	hl
 	ld	(hl),a
-	inc	bc
-	ld	a,(bc)
+	inc	de
+	ld	a,(de)
 	inc	hl
 	ld	(hl),a
-	inc	bc
-	ld	a,(bc)
+	inc	de
+	ld	a,(de)
 	inc	hl
 	ld	(hl),a
+	pop	ix
 	ret
 
 ; ------- A-NATURAL SOURCE: _x4to3 -------
@@ -242,27 +226,24 @@ _x3to4:
 ; 	ret
 ;
 _x4to3:
-	ld	hl,2
-	add	hl,sp
-	ld	c,(hl)
-	inc	hl
-	ld	b,(hl)
-	inc	hl
-	ld	a,(hl)
-	inc	hl
-	ld	h,(hl)
-	ld	l,a
-	ld	a,(bc)
+	push	ix
+	ld	ix,0
+	add	ix,sp		; ix = sp
+	ex	de,hl		; de = &long (arg0)
+	ld	l,(ix+4)
+	ld	h,(ix+5)	; hl = &three (arg1)
+	ld	a,(de)
 	ld	(hl),a
-	inc	bc
-	inc	bc
-	ld	a,(bc)
+	inc	de
+	inc	de
+	ld	a,(de)
 	inc	hl
 	ld	(hl),a
-	inc	bc
-	ld	a,(bc)
+	inc	de
+	ld	a,(de)
 	inc	hl
 	ld	(hl),a
+	pop	ix
 	ret
 
 ; ------- A-NATURAL SOURCE: _di -------
@@ -292,10 +273,8 @@ _di:
 	push	hl
 	ld	hl,dicount
 	ld	(hl),1
-	ld	hl,badmsg
-	push	hl
+	ld	hl,badmsg	; hl = badmsg (arg0 for _pr)
 	call	_pr
-	pop	hl
 	pop	hl
 	ret
 

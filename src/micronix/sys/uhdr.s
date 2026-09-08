@@ -1,8 +1,4 @@
 ;
-; =====================================================================
-; sys/uhdr.s  --  Z80 translation of sys/uhdr.anat (asz dialect)
-; =====================================================================
-;
 ; ------- A-NATURAL SOURCE: declarations -------
 ; Decision firmware references
 ; sys/uhdr.s

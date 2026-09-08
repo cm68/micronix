@@ -55,21 +55,29 @@
 ; 	/ret
 ;
 vectors:
-	jp	int0
+	.defb	0xC3		; jp int0 -- explicit, so asz won't relax jp to jr
+	.defw	int0
 	.defb	0
-	jp	int1
+	.defb	0xC3
+	.defw	int1
 	.defb	0
-	jp	int2
+	.defb	0xC3
+	.defw	int2
 	.defb	0
-	jp	int3
+	.defb	0xC3
+	.defw	int3
 	.defb	0
-	jp	int4
+	.defb	0xC3
+	.defw	int4
 	.defb	0
-	jp	int5
+	.defb	0xC3
+	.defw	int5
 	.defb	0
-	jp	int6
+	.defb	0xC3
+	.defw	int6
 	.defb	0
-	jp	int7
+	.defb	0xC3
+	.defw	int7
 	.defb	0
 int0:
 	call	intrupt

@@ -27,12 +27,12 @@
 ; 	/
 ;
 _in:
-	pop	hl		; hl = return address
-	pop	bc		; bc = port
-	push	bc
-	push	hl
-	in	c,(c)
-	ld	b,0
+	push	bc		; save bc (callee-saved under ccc)
+	ld	b,h
+	ld	c,l		; bc = port (arg0 arrives in hl)
+	in	l,(c)		; l = result
+	ld	h,0		; hl = result, zero-extended
+	pop	bc		; restore bc
 	ret
 
 ; ------- A-NATURAL SOURCE: _out -------
@@ -46,11 +46,12 @@ _in:
 ; 	/
 ;
 _out:
-	ld	hl,2
-	add	hl,sp
-	ld	c,(hl)		; c = port
-	inc	hl
-	inc	hl
+	push	bc		; save bc (callee-saved under ccc)
+	ld	b,h
+	ld	c,l		; bc = port (arg0 arrives in hl)
+	ld	hl,4
+	add	hl,sp		; hl = &data (arg1, now at sp+4 after the push)
 	ld	a,(hl)		; a = data
 	out	(c),a
+	pop	bc		; restore bc
 	ret
