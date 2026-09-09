@@ -230,11 +230,15 @@ ccc-clean:
 #
 # ccc builds the whole kernel flat - no overlays - and mxld links it at
 # the same fixed text base the native link used.  The entry header
-# (uhdr.s) is first so its jump lands at 0x1000.
+# (uhdr.s) is first so its jump lands at 0x1000.  mem.s and the rest of
+# the asm go *after* the C objects, though: mem.s remaps segment 1
+# (0x1000-0x1fff) through MAP0[2] to reach user memory, and if it sat in
+# that segment it would remap its own code out from under itself.
+# Whitesmith's overlay link put mem.s at 0x46xx for the same reason.
 #
 main.o: build.h
 
 unix: $(OBJS)
-	$(MXLD) -Ttext=0x1000 -L$(CCCTREE)/desthost/lib -lccc -lc -o unix $(OBJS)
+	$(MXLD) -Ttext=0x1000 -L$(CCCTREE)/desthost/lib -lccc -lc -o unix uhdr.o $(KERNEL_C) mem.o sub8.o inout.o intrpt.o mio.o inits.o
 
 .PHONY: objects ccc-try ccc-link ccc-clean unix

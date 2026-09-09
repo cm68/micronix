@@ -25,8 +25,13 @@ KERNEL_C  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
 
 CFLAGS = -m micronix -O -i $(INC)/
 
+# uhdr.o must stay at 0x1000 (the firmware's entry point).  The rest of the
+# asm - mem.s above all - remaps segment 1 (0x1000-0x1fff) through MAP0[2] to
+# reach user memory, so it must not live in that segment or it remaps its own
+# code out from under itself.  Link it after the C objects, out of segment 1/2,
+# the way Whitesmith's overlay placed mem.s up at 0x46xx.
 unix: $(KERNEL_AS) $(KERNEL_C)
-	$(LD) -Ttext=0x1000 -lccc -lc -o unix $(KERNEL_AS) $(KERNEL_C)
+	$(LD) -Ttext=0x1000 -lccc -lc -o unix uhdr.o $(KERNEL_C) mem.o sub8.o inout.o intrpt.o mio.o inits.o
 
 %.o: %.s
 	$(CC) -m micronix -c $<
