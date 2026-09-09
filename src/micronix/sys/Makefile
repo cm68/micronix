@@ -17,9 +17,9 @@ SYS = ../include/sys
 CC = ccc
 LD = mxld
 
-KERNEL_AS = uhdr.o mem.o sub8.o inout.o intrpt.o mio.o inits.o
+KERNEL_AS = uhdr.o mem.o sub8.o inout.o intrpt.o mio.o inits.o textpad.o
 KERNEL_C  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
-	ialloc.o iget.o imap.o link.o user.o malloc.o name.o open.o queue.o \
+	ialloc.o iget.o imap.o link.o malloc.o name.o open.o queue.o \
 	rdwri.o reg.o sig.o sleep.o subc.o swap.o sys1.o sys2.o system.o time.o \
 	trap.o tty.o uio.o con.o dj.o memdev.o multio.o mw.o main.o cus.o
 
@@ -30,8 +30,8 @@ CFLAGS = -m micronix -O -i $(INC)/
 # reach user memory, so it must not live in that segment or it remaps its own
 # code out from under itself.  Link it after the C objects, out of segment 1/2,
 # the way Whitesmith's overlay placed mem.s up at 0x46xx.
-unix: $(KERNEL_AS) $(KERNEL_C)
-	$(LD) -Ttext=0x1000 -lccc -lc -o unix uhdr.o $(KERNEL_C) mem.o sub8.o inout.o intrpt.o mio.o inits.o
+unix: $(KERNEL_AS) user.o $(KERNEL_C)
+	$(LD) -Ttext=0x1000 -lccc -lc -o unix uhdr.o user.o $(KERNEL_C) mem.o sub8.o inout.o intrpt.o mio.o inits.o textpad.o
 
 %.o: %.s
 	$(CC) -m micronix -c $<

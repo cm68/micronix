@@ -48,12 +48,12 @@ MXLD     = $(CCCTREE)/desthost/libexec/mxld
 # Makefile's AS_OBJS never listed it: memdev.c, multio.c, mw.c, dj.c
 # and cus.c all call in()/out().  makedate.c (a host program), mset.c
 # (no hardware interface) and lock.c (dead) are left out.
-KERNEL_AS = uhdr.o mem.o sub8.o inout.o intrpt.o mio.o inits.o
+KERNEL_AS = uhdr.o mem.o sub8.o inout.o intrpt.o mio.o inits.o textpad.o
 KERNEL_C  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
-	ialloc.o iget.o imap.o link.o user.o malloc.o name.o open.o queue.o \
+	ialloc.o iget.o imap.o link.o malloc.o name.o open.o queue.o \
 	rdwri.o reg.o sig.o sleep.o subc.o swap.o sys1.o sys2.o system.o time.o \
 	trap.o tty.o uio.o con.o dj.o memdev.o multio.o mw.o main.o cus.o
-OBJS     = $(KERNEL_AS) $(KERNEL_C)
+OBJS     = $(KERNEL_AS) user.o $(KERNEL_C)
 TREELIBS =
 
 include $(DEPTH)/GNUmakefile.inc
@@ -239,6 +239,6 @@ ccc-clean:
 main.o: build.h
 
 unix: $(OBJS)
-	$(MXLD) -Ttext=0x1000 -L$(CCCTREE)/desthost/lib -lccc -lc -o unix uhdr.o $(KERNEL_C) mem.o sub8.o inout.o intrpt.o mio.o inits.o
+	$(MXLD) -Ttext=0x1000 -L$(CCCTREE)/desthost/lib -lccc -lc -o unix uhdr.o user.o $(KERNEL_C) mem.o sub8.o inout.o intrpt.o mio.o inits.o textpad.o
 
 .PHONY: objects ccc-try ccc-link ccc-clean unix
