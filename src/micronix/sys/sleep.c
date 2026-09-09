@@ -91,6 +91,15 @@ next()
 {
     register struct proc *n;        /* force stacking of reg variables */
     static int temp[12];        /* for use while changing stacks */
+    /*
+     * ccc compiles a leaf function with no stack locals to a bare
+     * "pop ix; ret" epilogue that resumes through SP.  The context
+     * switch here must resume through the frame pointer instead -
+     * the fork child's frame has its return address at (iy+2), not on
+     * the top of its stack - so force a real frame.  The variable is
+     * never read; it only buys the IY-based fexit epilogue.
+     */
+    volatile int force_frame;
 
     if ((n = sched()) != u.p) {
         saveframe(&u.p->frmptr, &u.p->stkptr);
