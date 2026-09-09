@@ -257,6 +257,21 @@ CONNECT=3
 ;
 intrupt:
 	ex	(sp),hl
+	; Whitesmith's C only touched af/bc/de/hl, so the original save
+	; list stopped there.  ccc also uses IX (struct pointer), IY (frame
+	; ptr) and - through its lmul/ldiv/fexb runtime - the shadow set.
+	; Save ix/iy and af'/bc'/de'/hl' exactly as the firmware trap code
+	; (alltrp) does, or a handler clobbers whatever it interrupts.
+	ex	af,af'
+	exx
+	push	hl
+	push	de
+	push	bc
+	push	af
+	exx
+	ex	af,af'
+	push	ix
+	push	iy
 	push	de
 	push	bc
 	push	af
@@ -276,6 +291,16 @@ intrupt:
 	pop	af
 	pop	bc
 	pop	de
+	pop	iy
+	pop	ix
+	ex	af,af'
+	exx
+	pop	af
+	pop	bc
+	pop	de
+	pop	hl
+	exx
+	ex	af,af'
 	pop	hl
 	ei
 	ret
