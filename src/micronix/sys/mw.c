@@ -12,6 +12,7 @@
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <sys/con.h>
+#include <sys/dlabel.h>
 #include <errno.h>
 
 /*
@@ -60,6 +61,7 @@ struct info
 
     UINT maxblk;                /* max legal block number */
     UINT spc;                   /* number of sectors per cylinder */
+    UINT roll;                  /* what mwcyl adds to blk / spc */
     UINT curtrk;                /* current track */
     UINT8 flags;                /* see below */
     UINT8 type;                 /* index into specs table above */
@@ -157,6 +159,13 @@ static UINT8 retry = 0,         /* number of retries so far */
     mwstate = 0;                /* see below */
 
 /*
+ * Where the disk label lands when mwopen reads it.  One 512 byte sector,
+ * held statically so it costs nothing in the kernel image beyond the bss
+ * it already has room for.
+ */
+static char labelbuf[512] = 0;
+
+/*
  * States for mwstate (above)
  */
 #define VIRGIN	0
@@ -168,12 +177,21 @@ static UINT8 retry = 0,         /* number of retries so far */
 
 /*
  * Device open
+ *
+ * The geometry comes off the disk, from the label mkfs writes into the
+ * second half of the boot sector (physical cylinder 0, head 0, sector 0).
+ * The compiled-in specs[] table is a starting point and a thing to compare
+ * against, not the answer: a drive whose minor number names the wrong row
+ * is detected here, and a drive with no table row at all is still mounted
+ * from the label alone.
  */
 mwopen(dev, mode)
     UINT dev, mode;
 {
     static struct info *info;
+    static struct dlabel *lp;
     static UINT8 drive, type;
+    static UINT nspec;
     static struct buf *b;
 
     drive = dev & 3;
@@ -190,7 +208,67 @@ mwopen(dev, mode)
     if (info->flags & OPEN)
         return;
     info->type = type;
-    copy(&specs[type], info, sizeof(struct spec));
+
+    /*
+     * A starting geometry.  If the minor names a real row in specs[],
+     * copy it; otherwise leave the geometry zero and pick conservative
+     * controller tuning - the label carries only tracks/heads/spt/roll
+     * and not the three drive-specific timings.
+     */
+    nspec = sizeof specs / sizeof specs[0];
+    if (type < nspec) {
+        copy(&specs[type], info, sizeof(struct spec));
+        info->roll = info->tracks >> 1;
+    } else {
+        info->tracks = 0;
+        info->heads = 0;
+        info->sectors = 0;
+        info->stpdel = 30;      /* the boot loader's step delay */
+        info->precomp = 0;
+        info->lowcur = 0;
+        info->roll = 0;
+    }
+
+    /*
+     * The label, read straight off cylinder 0 before any block is mapped
+     * - the mapping needs the geometry the label holds, so this has to be
+     * a raw read and not a bread().
+     */
+    if (mwreadlabel(drive, labelbuf)) {
+        lp = (struct dlabel *)&labelbuf[DL_OFFSET];
+        if (lp->d_magic[0] == DL_MAGIC[0] && lp->d_magic[1] == DL_MAGIC[1] &&
+            lp->d_magic[2] == DL_MAGIC[2] && lp->d_magic[3] == DL_MAGIC[3] &&
+            lp->d_tracks && lp->d_heads && lp->d_spt) {
+            /*
+             * Say so when the label and the table disagree: this is the
+             * disagreement that used to mount the wrong geometry.
+             */
+            if (type < nspec &&
+                (lp->d_tracks != specs[type].tracks ||
+                 lp->d_heads != specs[type].heads ||
+                 lp->d_spt != specs[type].sectors))
+                pr("mw%d: label %d/%d/%d disagrees with table %d/%d/%d, using label\n",
+                    drive, lp->d_tracks, lp->d_heads, lp->d_spt,
+                    specs[type].tracks, specs[type].heads, specs[type].sectors);
+
+            info->tracks = lp->d_tracks;
+            info->heads = lp->d_heads;
+            info->sectors = lp->d_spt;
+            info->roll = lp->d_roll;
+        } else if (type >= nspec) {
+            /*
+             * No table row and no label: there is no geometry at all,
+             * so no block number can be mapped.
+             */
+            u.error = ENXIO;
+            return;
+        }
+        /* else: no label but a table row - the copy above already stands */
+    } else if (type >= nspec) {
+        u.error = ENXIO;
+        return;
+    }
+
     info->maxblk = info->tracks * info->heads * info->sectors - 1;
     info->spc = info->heads * info->sectors;
     if ((b = bread(1, dev)) != 0) {
@@ -211,12 +289,69 @@ mwclose(dev)
     static struct buf *b;
 
     info = &mws[dev & 3];
-    b = bread(info->spc * (info->tracks >> 1), dev);
+    b = bread(info->spc * info->roll, dev);
     if (b) {
         brelse(b);
         bzero(b);
     }
     info->flags &= ~OPEN;
+}
+
+/*
+ * Read the boot sector - physical cylinder 0, head 0, sector 0 - the one
+ * sector reachable without knowing the geometry.  The block mapping in
+ * rwcmd needs the geometry this sector carries, so this bypasses it: the
+ * controller is reset, the drive homed, and one 512 byte sector read
+ * straight into buf, all synchronous.  Interrupts stay off through the
+ * spin so the completion interrupt cannot run into the not-yet-queued
+ * mwbuf, and the drive is left calibrated and stopped for the normal
+ * strategy path that follows.
+ *
+ * Returns 1 if the sector was read, 0 otherwise.
+ */
+mwreadlabel(drive, buf)
+    UINT8 drive;
+    char *buf;
+{
+    reset();
+    curdrv = drive;
+    mwinfo = &mws[drive];
+
+    di();
+    cmd.steps = 0;
+    cmd.seksel = drive;
+    cmd.hedsel = drive;
+    cmd.arg2 = SETTLE;
+    cmd.arg3 = SECSIZE;
+    cmd.arg0.byte.high = HOMDEL | INT;
+    cmd.hedsel |= LCONST;
+    cmd.op = LOAD;
+    mwwait();
+
+    cmd.steps = -1;
+    cmd.seksel = drive | STEPOUT;
+    cmd.op = HOME;
+    mwwait();
+    mwinfo->curtrk = 0;
+
+    cmd.steps = 0;
+    cmd.seksel = drive;
+    cmd.hedsel = drive | ((~0 & 7) << 2);
+    cmd.arg0.word = 0;          /* cylinder 0 */
+    cmd.arg2 = 0;               /* head 0 */
+    cmd.arg3 = 0;               /* sector 0 */
+    cmd.dma = (UINT)buf;
+    cmd.xdma = KERNEL;
+    cmd.count = 512;
+    cmd.op = READS;
+    mwwait();
+
+    mwinfo->flags |= CALIB;
+    mwstate = STOPPED;
+    ei();
+
+    mwcheck();                  /* the watchdog reset() starts normally */
+    return (cmd.stat == OK);
 }
 
 /*
@@ -446,13 +581,12 @@ mwcyl(blk, info)
     UINT blk;
     struct info *info;
 {
-    static UINT cyl, roll;
+    static UINT cyl;
 
     cyl = blk / info->spc;
-    roll = info->tracks;
-    cyl += roll >> 1;
-    if (cyl >= roll)
-        cyl -= roll;
+    cyl += info->roll;
+    if (cyl >= info->tracks)
+        cyl -= info->tracks;
     return cyl;
 }
 
