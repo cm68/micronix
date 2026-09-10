@@ -57,6 +57,10 @@ struct image {
     int cyls;
     int heads;
     int roll;   /* what mw.c adds to blk / spc before wrapping */
+    int label_fsize;    /* the label's filesystem fields, for cross-checking */
+    int label_isize;
+    int label_swap;
+    int haslabel;       /* a Micronix label was present and readable */
 #ifdef USE_LIBDSK
     DSK_PDRIVER *drive;
 #endif
@@ -189,12 +193,17 @@ hdlabels(struct image *i)
          * will want to know a guess was made.
          */
         i->roll = i->cyls >> 1;
+        i->haslabel = 0;
         trace(trace_fs, "openfs: no %s label, assuming roll %d\n",
             DL_MAGIC, i->roll);
         return 1;
     }
 
     i->roll = dl->d_roll;
+    i->haslabel = 1;
+    i->label_fsize = dl->d_fsize;
+    i->label_isize = dl->d_isize;
+    i->label_swap = dl->d_swap;
     if (dl->d_tracks != i->cyls || dl->d_heads != i->heads ||
         dl->d_spt != i->spt) {
         fprintf(stderr,
@@ -289,6 +298,20 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
             i->driver = DRIVER_HD;
             *fsp = (struct super *)i;
             readblk(*fsp, 1, i->sb.superblock);
+            /*
+             * The label records the filesystem it was written with; if the
+             * superblock disagrees, the disk has been rewritten under a
+             * different size since, and every block count the caller is
+             * about to trust is the superblock's, not the label's.  Say so.
+             */
+            if (i->haslabel && i->label_fsize &&
+                (i->label_fsize != (*fsp)->s_fsize ||
+                 i->label_isize != (*fsp)->s_isize)) {
+                fprintf(stderr,
+                    "warning: label filesystem %d/%d, superblock %d/%d\n",
+                    i->label_fsize, i->label_isize,
+                    (*fsp)->s_fsize, (*fsp)->s_isize);
+            }
             (*fsp)->s_fmod = 0;
             return ret;
         }
