@@ -297,6 +297,15 @@ syscall_at(word sc)
 		break;
 	case 18:	/* stat fn buf */
 		printf("stat(\"%s\", %x\n", fn, arg2);
+		{
+			word f = 0xf9e1; int i;
+			printf("  frame:");
+			for (i = 0; i < 6 && f >= 0x100 && f < 0x10000; i++) {
+				printf(" de=%04x ra=%04x", f, fuword(f + 2));
+				f = fuword(f);
+			}
+			printf("\n");
+		}
 		break;
 	case 28:	/* fstat fd buf */
 		printf("fstat(%d, %x\n", fd, arg2);

@@ -116,6 +116,28 @@ _hlt:
 	ret
 
 ;
+; task0 is entered by the firmware with its return address on the
+; firmware stack; task0_body()'s setframe() moves SP to the kernel
+; stack.  Park the firmware SP in BC (callee-saved) and hand it back
+; in _retask so the ret lands in the firmware, not in u.stack.
+;
+	.globl	_task0, _retask
+	.extern	_task0_body
+_task0:
+	ld	hl,0
+	add	hl,sp		; hl = firmware SP
+	ld	b,h
+	ld	c,l		; bc = firmware SP
+	call	_task0_body	; never returns - ends in retask()
+	ret			; not reached
+
+_retask:
+	ld	h,b
+	ld	l,c		; hl = firmware SP
+	ld	sp,hl
+	ret
+
+;
 ; this is the initial program that gets copied out to process 1
 ; it simply executes /etc/init
 ;
@@ -156,14 +178,4 @@ initprog:
 ; 	/
 ;
 iargs:
-	.defw	iarg0		; argv
-	.defw	0
-
-; ------- A-NATURAL SOURCE: iarg0 -------
-; iarg0:
-; 	/
-; 	"init\0";
-; 	/
-;
-iarg0:
-	.defb	"init", 0	; argv[0]
+	.defw	0		; empty argv, as the reference kernel passes

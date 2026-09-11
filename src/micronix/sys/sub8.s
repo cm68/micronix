@@ -74,6 +74,17 @@ _saveframe:
 ; 	ret
 ;
 _setframe:
+	;
+	; Set the frame pointer and stack pointer so the process resumes
+	; when next() returns.  next()'s exit is the ONE-argument variant:
+	; next() is declared with a dummy argument (see sleep.c) precisely
+	; so its exit skips argument 0 at (iy+4).  The frame being resumed -
+	; procopy(child) for the fork child - has that argument; a
+	; zero-argument exit would leave sp on the argument and the process
+	; would return to the wrong address (the fork child came back at
+	; 0x0080 instead of fork()'s caller).  The skip is done by next()'s
+	; exit, so this just restores iy and sp.
+	;
 	push	hl
 	pop	iy		; iy = frmptr (arg0)
 	pop	de		; de = return address

@@ -323,7 +323,7 @@ mwreadlabel(drive, buf)
     cmd.hedsel = drive;
     cmd.arg2 = SETTLE;
     cmd.arg3 = SECSIZE;
-    cmd.arg0.byte.high = HOMDEL | INT;
+    cmd.arg0.byte.high = HOMDEL;    /* no INT: mwwait() spins, nothing to interrupt */
     cmd.hedsel |= LCONST;
     cmd.op = LOAD;
     mwwait();

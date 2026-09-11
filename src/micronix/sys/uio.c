@@ -22,7 +22,7 @@ extern struct buf *btop;            /* ditto */
  */
 struct buf *
 bget(blk, dev)
-    UINT8 blk, dev;
+    UINT blk, dev;
 {
     register struct buf *b, *f;
 

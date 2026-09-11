@@ -140,8 +140,10 @@ mget(p)
     static UINT8 grow, i;
     static struct mem *m;
 
-    if (p->nsegs > nsegs)
+    if (p->nsegs > nsegs) {
+        pr("mget: p->nsegs %d > free nsegs %d\n", p->nsegs, nsegs);
         return 0;
+    }
     grow = 0;
     for (i = 0; i < 17; i++) {
         m = &p->mem[i];

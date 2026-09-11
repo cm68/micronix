@@ -32,9 +32,7 @@ fork()
         if (!(child->mode & ALLOC))
             goto found;
 
-    /*
-     * pr("Process table is full!"); 
-     */
+    pr("fork: process table full\n");
 
     u.error = EAGAIN;
     return;
@@ -182,7 +180,7 @@ exit(stat)
     u.p->mode &= ~(ALIVE | AWAKE);
     wakeup(u.p->parent);
     mfree(u.p);
-    next();
+    next(0);
 }
 
 /*

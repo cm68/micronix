@@ -299,6 +299,8 @@ select_ace()
     return &ace[line];
 }
 
+static void multio_set_int_line();
+
 static void
 wr_pic_port_0(portaddr p, byte v)
 {
@@ -326,13 +328,25 @@ wr_pic_port_0(portaddr p, byte v)
         switch (ocw2 & OCW2_CMD) {
         case OCW2_NSEOIR:
             intlevel = bitnum(isr);
-            trace(trace_multio, "multio: NSEOIR isr:%02x lvl:%d pri:%d\n", 
+            trace(trace_multio, "multio: NSEOIR isr:%02x lvl:%d pri:%d\n",
                 isr, intlevel, priority);
             priority = (intlevel + 1) % 8;
             isr ^= (1 << intlevel);
+            /*
+             * Clearing the in-service bit can reveal a request that
+             * arrived while this one was being serviced.  The hddma
+             * completes synchronously here (no step/rotation latency),
+             * so the driver issues the next read inside the interrupt
+             * handler and the request re-asserts before this EOI.  A
+             * real 8259 re-asserts INT when a pending unmasked request
+             * is left, so re-evaluate the line rather than dropping the
+             * interrupt and waiting for a clock tick to recover it.
+             */
+            multio_set_int_line();
             break;
         case OCW2_NSEOI:
             isr = 0;
+            multio_set_int_line();
             break;
         default:
             l("pic bogus ocw2 write command %x\n", ocw2);

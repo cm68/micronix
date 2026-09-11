@@ -42,7 +42,10 @@ static struct buf *bp[NBLKS] = 0;
 static UINT nargs = 0;
 static UINT nbytes = 0;
 static UINT8 nblks = 0;
+extern int zerouser();
+
 static struct obj hdr = 0;
+char zpage[512] = 0;   /* zero page for clearing bss */
 
 /*
  * Exec system call.
@@ -232,6 +235,17 @@ readin()
     nread(ip, hdr.textoff, hdr.text);
     valid(hdr.dataoff, hdr.data);
     nread(ip, hdr.dataoff, hdr.data);
+
+    /*
+     * Zero the bss.  The Whitesmith's compiler never emitted a bss
+     * (it put everything in data), so no code has ever done this;
+     * ccc does, and a segment handed back by segalloc() still holds
+     * whatever its previous owner left.  zerouser() ldir's a shared
+     * zero page into the region.
+     */
+    valid(hdr.dataoff + hdr.data, hdr.bss);
+    zerouser((char *) (hdr.dataoff + hdr.data), hdr.bss);
+
     u.p->mode &= ~LOCKED;       /* no core lock across exec */
 }
 

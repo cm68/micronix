@@ -198,18 +198,22 @@ binit()
     struct buf *b;
     UINT space;
     extern char usrtop;
+    extern char ebss[];
 
-    space = (UINT) (&usrtop) - (UINT) (blist);
-    nbuf = space / (512 + sizeof(struct buf));
     /*
-     * The buffer pool starts where the headers stop.  blist is an
-     * array of struct buf and buffer is a pointer to a 512 byte
-     * block, so this is a deliberate change of mind about what the
-     * memory above the headers is, and the cast says so - the two
-     * types have nothing to do with each other and ccc is right to
-     * ask.
+     * The buffer pool is two pieces that must not collide with anything
+     * else: the struct buf headers stay at blist, and the 512-byte data
+     * blocks sit above the very end of the data *and* bss segments
+     * (_ebss, put there by textpad.s linking last).  Counting only the
+     * data blocks against the space above _ebss - not headers+data
+     * against the space above blist - is what keeps the data from
+     * landing on the .bss that holds function-scope statics (mw.c's
+     * mwinfo/mwbuf/curdrv, ...), which ccc emits after the .data blist
+     * lives in.
      */
-    buffer = (char (*)[512]) &blist[nbuf];
+    space = (UINT) (&usrtop) - (UINT) (ebss);
+    nbuf = space / 512;
+    buffer = (char (*)[512]) ebss;
     btop = blist + nbuf;
     for (b = blist; b < btop; b++) {
         zero(b, sizeof(*b));

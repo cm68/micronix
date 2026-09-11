@@ -73,7 +73,7 @@ sleep(event, pri)
     u.p->mode &= ~AWAKE;
     if (memwant && !(u.p->mode & LOCKED))
         run(swapproc);
-    next();
+    next(0);
     abort();                    /* abort on signal and low priority */
     enable();
 }
@@ -87,7 +87,8 @@ sleep(event, pri)
  * enables fork to distinguish between parent and child.
  * Warning: this is intimately connected with C's stack framing.
  */
-next()
+next(dummy)
+    int dummy;      /* unused: forces a 1-argument frame, see setframe in sub8.s */
 {
     register struct proc *n;        /* force stacking of reg variables */
     static int temp[12];        /* for use while changing stacks */

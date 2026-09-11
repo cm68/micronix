@@ -66,7 +66,7 @@ struct ciovec ciosw[] = {
 /*
  * Globals
  */
-UINT rootdev = 0x0208;          /* djdma alternate sectoring drive 0 */
+UINT rootdev = 0x0300;          /* hddma drive 0 (Seagate 5 meg) */
 UINT swapdev = 0x0000;          /* m16 drive A */
 
 UINT swapsize = 0;           /* no. of swap blocks if rootdev != swapdev */

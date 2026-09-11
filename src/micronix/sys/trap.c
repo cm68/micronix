@@ -83,9 +83,9 @@ start()
  * but we still are executing from the same
  * physical memory.
  */
-task0()
+task0_body()
 {
-    extern int trap();
+    extern int trap(), retask();
 
     /*
      * Set traps appropriately for
@@ -132,6 +132,13 @@ task0()
      * to the parallel code in task 1.
      */
     di();
+
+    /*
+     * The firmware's return address is on its own stack, and
+     * setframe() moved SP to the kernel stack.  retask() hands the
+     * firmware SP back - parked in BC by the _task0 stub - and returns.
+     */
+    retask();
 }
 
 /*
@@ -184,7 +191,7 @@ trap()
      * switch processes
      */
     if (resched)
-        next();
+        next(0);
 
     /*
      * Process any waiting signal

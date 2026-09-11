@@ -30,8 +30,8 @@
 ; LDIR	:= &0xB0ED		/z80 do *de++ = *hl++ while --bc != 0
 ;
 	.globl	_getbyte, _getword, _putbyte, _putword, _copyin, _copyout
-	.globl	_memrw, _segcopy
-	.extern	_di, _ei, _meminit
+	.globl	_memrw, _segcopy, _zerouser
+	.extern	_di, _ei, _meminit, _zpage
 MAP0=0x0600
 IMAGE0=0x0200
 MAP1=0x0620
@@ -447,7 +447,74 @@ _copyout:
 	ld	(MAP0+2),a
 	jp	_ei
 
+; ------- _zerouser -------
+; zerouser(addr, count) -- zero count bytes of the active task at addr.
+; addr in hl (arg0), count on the stack (arg1).  Maps the user's page and
+; the next into the window and ldir's from the zero page, 512 bytes at a
+; time.  count must fit the two-page window.
+_zerouser:
+	ld	a,(IMAGE0+2)
+	push	af
+	ld	a,(IMAGE0+4)
+	push	af
+	push	ix
+	ld	ix,0
+	add	ix,sp
+	push	bc		; save bc (callee-saved)
+	ld	c,(ix+8)
+	ld	b,(ix+9)	; bc = count (arg1)
+	ld	a,h
+	and	0xF0
+	rrca
+	rrca
+	rrca		; a = 2 * high nibble of addr
+	push	bc		; save count
+	ld	bc,IMAGE1
+	add	a,c
+	ld	c,a		; bc = &image1[2*page]
+	call	_di
+	ld	a,(bc)
+	ld	(IMAGE0+2),a
+	ld	(MAP0+2),a	; map page N
+	inc	bc
+	inc	bc
+	ld	a,(bc)
+	ld	(IMAGE0+4),a
+	ld	(MAP0+4),a	; map page N+1
+	pop	bc		; restore count
+	ld	a,h
+	and	0x0F
+	or	0x10
+	ld	h,a		; hl = windowed addr
+	ex	de,hl		; de = windowed addr
+	ld	hl,_zpage	; hl = zero source
+1:	ld	a,b
+	or	c
+	jp	z,2f		; count == 0
+	ld	a,b
+	cp	2
+	jr	c,3f		; count < 512, last chunk
+	push	bc
+	ld	bc,512
+	ldir		; zero 512 bytes
+	pop	bc
+	dec	b
+	dec	b		; count -= 512
+	ld	hl,_zpage	; reset source
+	jr	1b
+3:	ldir		; zero the last (< 512) bytes
+2:	pop	bc
+	pop	ix
+	pop	af
+	ld	(IMAGE0+4),a
+	ld	(MAP0+4),a
+	pop	af
+	ld	(IMAGE0+2),a
+	ld	(MAP0+2),a
+	jp	_ei
+
 ; ------- A-NATURAL SOURCE: _memrw -------
+
 ; / memrw(user, space, direction, count)
 ; / Copy count bytes in the specified direction between
 ; / user space and outer space (an absolute long address).

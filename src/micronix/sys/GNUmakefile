@@ -241,4 +241,20 @@ main.o: build.h
 unix: $(OBJS)
 	$(MXLD) -Ttext=0x1000 -L$(CCCTREE)/desthost/lib -lccc -lc -o unix uhdr.o user.o $(KERNEL_C) mem.o sub8.o inout.o intrpt.o mio.o inits.o textpad.o
 
+#
+# Generate the assembly ccc would assemble for a C file, for reading:
+# "make system.s" writes system.s beside system.c, peepholed exactly as
+# ccc builds system.o (-s is "compile only, keep the .s").  The output
+# is the asz dialect ccc drives, not the A-Natural .s files KERNEL_AS
+# names - those were hand-ported and checked in.
+#
+# The rule is idle while a normal build runs: .o is made straight from
+# .c.  Once a .s has been generated, the %.o : %.s rule in
+# GNUmakefile.inc assembles it in place of the .c - the same "the
+# assembly wins" ordering the tree relies on everywhere else - so
+# delete the .s to go back to compiling the .c.
+#
+%.s : %.c
+	$(CCC) $(CCFLAGS) $(INC) -s $<
+
 .PHONY: objects ccc-try ccc-link ccc-clean unix
