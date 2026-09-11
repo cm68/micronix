@@ -25,6 +25,7 @@ stat(name, buf)
 
     if ((ip = iname(name)) != 0)
         istat(ip, buf);
+    u.hl = 0;                   /* success: the caller's wrapper reads HL */
 }
 
 /*
