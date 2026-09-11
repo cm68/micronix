@@ -219,7 +219,7 @@ putb:
 ;
 _putword:
 	push	bc		; save bc (callee-saved)
-	ld	a,h		; a = data high byte (arg0 in hl)
+	ld	b,h		; b = data high byte (putb clobbers a, not b)
 	ld	c,l		; c = data low byte
 	ld	hl,4
 	add	hl,sp		; hl = &addr (arg1, now at sp+4)
@@ -230,7 +230,7 @@ _putword:
 	pop	hl		; hl = addr
 	call	putb		; put c (low byte) at addr
 	inc	de		; de = addr+1
-	ld	c,a		; c = high byte
+	ld	c,b		; c = high byte (survived the putb)
 	push	de
 	pop	hl		; hl = addr+1
 	call	putb		; put c (high byte) at addr+1
