@@ -68,10 +68,10 @@ r_fork()
 {
     int id;
 
-    if ((id = fork()) != 0) {   /* no reg changes in child */
+    id = fork();
+    if (id != 0)                /* no reg changes in child */
         u.pc += 3;              /* old process return */
-        u.hl = id;
-    }
+    u.hl = id;                  /* parent gets pid, child gets 0 */
 }
 
 r_fstat()
