@@ -94,6 +94,29 @@ extern int writes(char *insn);
 extern int isdead(int reg, int from);
 extern int isbranch(char *insn);
 extern int memok(char *p);
+extern void mnemof(char *insn, char *buf, int n);
+extern char *operof(char *insn);
+extern char *oper2(char *op);
+
+/* value.c */
+struct vstate {
+	unsigned short r[7];	/* A B C D E H L: value number, 0 = unknown */
+	unsigned char c;		/* carry: 0 unknown, 1 clear, 2 set */
+};
+#define VA 0
+#define VB 1
+#define VC 2
+#define VD 3
+#define VE 4
+#define VH 5
+#define VL 6
+extern struct vstate vbase;
+extern void vinit(struct vstate *s);
+extern void vreset(struct vstate *s);
+extern void vnext(struct vstate *s, char *insn);
+extern int viszero(struct vstate *s, int idx);
+extern int visclear(struct vstate *s);
+extern int vredundant(struct vstate *s, char *insn);
 
 /* rules.c */
 extern int applyrules(void);

@@ -574,6 +574,8 @@ usage(void)
 	exit(1);
 }
 
+struct vstate vbase;
+
 int
 main(int argc, char **argv)
 {
@@ -622,6 +624,7 @@ main(int argc, char **argv)
 	 */
 	poolscan(in);
 
+	vinit(&vbase);
 	fill();
 	while (nwin > 0) {
 		if (poolskip(win[0].key)) {
@@ -650,6 +653,10 @@ main(int argc, char **argv)
 			poolmap(win[0].text, mapped, sz);
 			nfemit(mapped, win[0].key);
 			free(mapped);
+			if (win[0].kind == L_LABEL)
+				vreset(&vbase);
+			else if (win[0].kind == L_INSN)
+				vnext(&vbase, win[0].key);
 			delline(0, 1);
 		}
 		fill();

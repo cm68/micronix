@@ -32,7 +32,7 @@ CFLAGS	= -O
 LIBEXEC	= /libexec
 PROG	= peep
 HDRS	= peep.h
-OBJS	= peep.o pool.o regs.o rules.o
+OBJS	= peep.o pool.o regs.o value.o rules.o
 
 all: $(PROG)
 

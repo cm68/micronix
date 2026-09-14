@@ -42,6 +42,8 @@ long n_frame = 0;
 long n_invjp = 0;
 long n_outi = 0;
 long n_exx = 0;
+long n_constdup = 0;
+long n_orclr = 0;
 long n_m1cmp = 0;
 long n_ccall = 0;
 long n_cret = 0;
@@ -771,6 +773,52 @@ r_exx(void)
 }
 
 /*
+ * A constant load into a register that already holds that constant.
+ * The value state knows what every register holds, so this is one
+ * query and no forward scan.  It is what turns func(0,0,0) into one
+ * ld hl,0 and three pushes, and it subsumes the ld h,0 zero-extend
+ * rule that used to live here - that was this same check, hard-wired
+ * to the one constant 0.
+ */
+int
+r_constdup(void)
+{
+	int n = vredundant(&vbase, win[0].key);
+
+	if (!n)
+		return 0;
+	delline(0, 1);
+	n_constdup++;
+	saved += n;
+	return 1;
+}
+
+/*
+ * or a before sbc clears the carry a 16-bit subtract borrows.  When
+ * the carry is already clear the or a is a byte spent on a flag that
+ * is already the right way.  The value state carries the carry across
+ * the run, so this is one query instead of a forward scan and a
+ * whitelist of what leaves C alone.
+ */
+int
+r_orclr(void)
+{
+	int j;
+
+	if (!is(0, "or a"))
+		return 0;
+	j = nextsig(0);
+	if (j < 0 || !starts(j, "sbc "))
+		return 0;
+	if (!visclear(&vbase))
+		return 0;
+	delline(0, 1);
+	n_orclr++;
+	saved += 1;
+	return 1;
+}
+
+/*
  * Which rules can possibly match, rather than all of them.
  *
  * Every rule opens by demanding a particular opcode at the head of
@@ -797,6 +845,8 @@ applyrules(void)
 		return r_hlarg();
 	case 'i':
 		return r_incsp();
+	case 'o':
+		return r_orclr();
 	case 'p':
 		if (r_fenter())
 			return 1;
@@ -812,19 +862,19 @@ applyrules(void)
 	case 'l':
 		if (k[1] != 'd' || k[2] != ' ')
 			return 0;
-		switch (k[3]) {
-		case 's':
+		if (k[3] == 's')
 			return r_fexit();	/* ld sp,iy */
-		case 'h':
-			return r_outi();	/* ld hl,n */
-		case 'd':
-			return r_m1cmp();	/* ld de,-1 */
-		case 'a':
+		if (k[3] == 'h' && r_outi())	/* ld hl,n -> oarg */
+			return 1;
+		if (k[3] == 'd' && r_m1cmp())	/* ld de,-1 */
+			return 1;
+		if (k[3] == 'a') {
 			if (r_bounce())		/* ld a,x then ld r,a */
 				return 1;
-			return r_and0();	/* ld a,x then and 0 */
+			if (r_and0())		/* ld a,x then and 0 */
+				return 1;
 		}
-		return 0;
+		return r_constdup();		/* ld reg,const already there */
 	}
 	return 0;
 }
@@ -846,6 +896,7 @@ report(void)
 		"  jpnext %ld  hlarg %ld  noframe %ld  pool %ld = %ld bytes\n",
 		n_exx, n_m1cmp, n_ccall, n_cret, n_jpnext, n_hlarg,
 		n_noframe, poolmerged, saved);
+	fprintf(stderr, "peep: constdup %ld  orclr %ld\n", n_constdup, n_orclr);
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */
