@@ -1578,6 +1578,12 @@ struct rule rules[] = {
 	R(RSHIFT,INHL,P_EIGHT,0,0,0, RSHIFT, P_L, P_R, P_NONE, RF_SIGNL,
 		"\tld l,h\n" F_LDAH F_RLA F_SBCAA F_LDHA, R_HL),
 	R(RSHIFT,INHL,P_EIGHT,0,0,0, RSHIFT, P_L, P_R, P_NONE, 0, "\tld l,h\n" F_LDH0, R_HL),
+	/* The same move when the value sits in its BC register home - the
+	 * high byte is B, not H.  P_EIGHT must precede the P_NUM forms for
+	 * the same reason the INHL pair does. */
+	R(RSHIFT,INBC,P_EIGHT,0,0,0, RSHIFT, P_L, P_R, P_NONE, RF_SIGNL,
+		"\tld l,b\n" F_LDAB F_RLA F_SBCAA F_LDHA, R_HL),
+	R(RSHIFT,INBC,P_EIGHT,0,0,0, RSHIFT, P_L, P_R, P_NONE, 0, "\tld l,b\n" F_LDH0, R_HL),
 	R(RSHIFT,INHL,P_SMALL,0,0,0, RSHIFT, P_L, P_R, P_NONE, RF_SIGNL, RT26, R_HL),
 	R(RSHIFT,INHL,P_SMALL,0,0,0, RSHIFT, P_L, P_R, P_NONE, 0, RT28, R_HL),
 	R(RSHIFT,INBC,P_SMALL,0,0,0, RSHIFT, P_L, P_R, P_NONE, RF_SIGNL, RT390, R_HL),
@@ -1600,6 +1606,9 @@ struct rule rules[] = {
 		"$[\tld b,c\n\tinc b\n\tjr $$+6\n\tsrl h\n\trr l\n\tdjnz $$-4\n$]", R_HL),
 	R(RSHIFT,INBC,P_NUM,0,0,0, RSHIFT, P_L, P_R, P_NONE, RF_SIGNL, RT390, R_HL),
 	R(RSHIFT,INBC,P_NUM,0,0,0, RSHIFT, P_L, P_R, P_NONE, 0, RT391, R_HL),
+	/* The whole-byte move for a value in its BC home: the low byte C
+	 * climbs to H and L clears.  First, before the P_NUM form. */
+	R(LSHIFT,INBC,P_EIGHT,0,0,0, LSHIFT, P_L, P_R, P_NONE, 0, "\tld h,c\n\tld l,0\n", R_HL),
 	R(LSHIFT,INBC,P_NUM,0,0,0, LSHIFT, P_L, P_R, P_NONE, 0, T_BC_HL "%(" T_ADD_HL_HL ")", R_HL),
 	/* and against a frame slot, which the other four widths of this
 	 * had and the subtraction did not */
@@ -1614,6 +1623,13 @@ struct rule rules[] = {
 	 */
 
 	/* shifts */
+	/*
+	 * A shift left by a whole byte is a register move, not a loop -
+	 * ld h,l; ld l,0 is two bytes against the sixteen the repeated
+	 * form would emit.  It has to precede the general P_NUM form,
+	 * which a count of eight would otherwise match first.
+	 */
+	R(LSHIFT,INHL,P_EIGHT,0,0,0, LSHIFT, P_L, P_R, P_NONE, 0, "\tld h,l\n\tld l,0\n", R_HL),
 	R(LSHIFT,INHL,P_NUM,0,0,0, LSHIFT, P_L, P_R, P_NONE, 0, "%(" T_ADD_HL_HL ")", R_HL),
 	R(LSHIFT,INA,P_NUM,0,0,1, LSHIFT, P_L, P_R, P_NONE, 0, "%(\tsla a\n)", R_A),
 	/*
@@ -1658,7 +1674,6 @@ struct rule rules[] = {
 	R(LSHIFT,INA,INHL,0,0,1, LSHIFT, P_L, P_R, P_NONE, 0,
 		"$[\tld b,l\n\tinc b\n"
 		"\tjr $$+4\n\tsla a\n\tdjnz $$-2\n$]", R_A),
-	R(LSHIFT,INHL,P_EIGHT,0,0,0, LSHIFT, P_L, P_R, P_NONE, 0, "\tld h,l\n\tld l,0\n", R_HL),
 	/*
 	 * By a count that is not a constant: djnz over the one-shift
 	 * body, entered at the test so a count of nought runs it not at
