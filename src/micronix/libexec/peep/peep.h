@@ -117,6 +117,8 @@ extern void vnext(struct vstate *s, char *insn);
 extern int viszero(struct vstate *s, int idx);
 extern int visclear(struct vstate *s);
 extern int vredundant(struct vstate *s, char *insn);
+extern int vnumber(char *p, int *out);
+extern int vpairconst(struct vstate *s, int hi, int lo, int n);
 
 /* rules.c */
 extern int applyrules(void);

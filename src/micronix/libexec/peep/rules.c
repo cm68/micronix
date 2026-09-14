@@ -44,6 +44,7 @@ long n_outi = 0;
 long n_exx = 0;
 long n_constdup = 0;
 long n_orclr = 0;
+long n_reuse = 0;
 long n_m1cmp = 0;
 long n_ccall = 0;
 long n_cret = 0;
@@ -794,6 +795,64 @@ r_constdup(void)
 }
 
 /*
+ * Register reuse: pass2 materialises a constant into a pair right
+ * before an add that consumes it, even when the constant is already
+ * sitting in the other pair.  Reuse it instead of loading it again:
+ *
+ *	ld de,2             add hl,bc
+ *	add hl,de     ->
+ *
+ * which is "bcreg = 2; func(someint+2)" compiling to add hl,bc.  The
+ * pair being discarded has to be dead after the add, because the
+ * rewrite leaves it holding whatever it held before the load.
+ */
+int
+r_reuse(void)
+{
+	char m[8];
+	char buf[KLEN + 8];
+	char *op, *o2, *jop;
+	int hi, lo, ohi, olo, n, j;
+
+	mnemof(win[0].key, m, sizeof(m));
+	if (strcmp(m, "ld") != 0)
+		return 0;
+	op = operof(win[0].key);
+	o2 = oper2(op);
+
+	if (strncmp(op, "de,", 3) == 0) { hi = VD; lo = VE; ohi = VB; olo = VC; }
+	else if (strncmp(op, "bc,", 3) == 0) { hi = VB; lo = VC; ohi = VD; olo = VE; }
+	else
+		return 0;
+
+	if (!vnumber(o2, &n))
+		return 0;
+	if (!vpairconst(&vbase, ohi, olo, n))
+		return 0;
+
+	j = nextsig(0);
+	if (j < 0 || win[j].kind != L_INSN)
+		return 0;
+	jop = operof(win[j].key);
+	if (strncmp(win[j].key, "add ", 4) != 0 || strncmp(jop, "hl,", 3) != 0)
+		return 0;
+	if (strncmp(jop + 3, op, 2) != 0)	/* the add consumes this pair */
+		return 0;
+
+	/* the discarded pair must be dead after the add */
+	if (!isdead(hi | lo, j + 1))
+		return 0;
+
+	sprintf(buf, "\tadd hl,%s\n", (hi == VD) ? "bc" : "de");
+	delline(j, 1);
+	delline(0, 1);
+	insline(0, buf);
+	n_reuse++;
+	saved += 3;
+	return 1;
+}
+
+/*
  * or a before sbc clears the carry a 16-bit subtract borrows.  When
  * the carry is already clear the or a is a byte spent on a flag that
  * is already the right way.  The value state carries the carry across
@@ -874,6 +933,8 @@ applyrules(void)
 			if (r_and0())		/* ld a,x then and 0 */
 				return 1;
 		}
+		if (r_reuse())			/* ld de,n ; add hl,de -> add hl,bc */
+			return 1;
 		return r_constdup();		/* ld reg,const already there */
 	}
 	return 0;
@@ -896,7 +957,8 @@ report(void)
 		"  jpnext %ld  hlarg %ld  noframe %ld  pool %ld = %ld bytes\n",
 		n_exx, n_m1cmp, n_ccall, n_cret, n_jpnext, n_hlarg,
 		n_noframe, poolmerged, saved);
-	fprintf(stderr, "peep: constdup %ld  orclr %ld\n", n_constdup, n_orclr);
+	fprintf(stderr, "peep: constdup %ld  orclr %ld  reuse %ld\n",
+		n_constdup, n_orclr, n_reuse);
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

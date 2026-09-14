@@ -95,7 +95,7 @@ setfresh(struct vstate *s, int idx)
 }
 
 /* parse a constant: decimal, 0x hex, or trailing-h hex; 1 on success */
-static int
+int
 vnumber(char *p, int *out)
 {
 	int n = 0, neg = 0, hex = 0, c, got = 0;
@@ -161,6 +161,14 @@ int
 visclear(struct vstate *s)
 {
 	return s->c == C_CLR;
+}
+
+/* does the 16-bit pair (hi, lo) hold the constant n? */
+int
+vpairconst(struct vstate *s, int hi, int lo, int n)
+{
+	return vnconst(s->r[hi]) == ((n >> 8) & 0xff) &&
+	       vnconst(s->r[lo]) == (n & 0xff);
 }
 
 /*
