@@ -326,6 +326,27 @@ writes(char *insn)
 }
 
 /*
+ * The window index of the label named by p - the operand of a jump - or
+ * -1.  Matches the whole name, so a jump to _foo does not land on _foob.
+ */
+static int
+findlabel(char *p)
+{
+	int i, n;
+
+	while (*p == ' ')
+		p++;
+	n = strlen(p);
+	for (i = 0; i < nwin; i++) {
+		if (win[i].kind != L_LABEL)
+			continue;
+		if (strncmp(win[i].key, p, n) == 0 && win[i].key[n] == ':')
+			return i;
+	}
+	return -1;
+}
+
+/*
  * Is every bit of reg overwritten before any of it is read?
  *
  * Partial writes are why this accumulates rather than testing one
@@ -333,6 +354,13 @@ writes(char *insn)
  * the high half is not, and a later "ld h,0" is what finishes the job.
  * Reading a part that has not yet been overwritten is what proves the
  * value is still wanted.
+ *
+ * A forward conditional jump is not the wall it is for the straight
+ * scan: if both its fall-through and its target overwrite reg before
+ * reading it, the value is dead on both paths and the scan may carry on
+ * down the fall-through.  Only a forward target is followed - a backward
+ * one is a loop top this window cannot see into, and following it would
+ * be the mistake that made target_forward unsound.
  */
 int
 isdead(int reg, int from)
@@ -357,8 +385,17 @@ isdead(int reg, int from)
 		got |= writes(win[i].key);
 		if ((got & reg) == reg)
 			return 1;
-		if (isbranch(win[i].key))
+		if (isbranch(win[i].key)) {
+			char *comma = strchr(win[i].key + 3, ',');
+
+			if (comma) {
+				int t = findlabel(comma + 1);
+
+				if (t >= 0 && t > i && isdead(reg, t + 1))
+					continue;	/* dead on both paths */
+			}
 			return 0;
+		}
 	}
 	return 0;					/* fell off the window: assume wanted */
 }
