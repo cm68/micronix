@@ -50,6 +50,8 @@ long n_ptrload = 0;
 long n_ixcopy = 0;
 long n_autozero = 0;
 long n_xordup = 0;
+long n_exde = 0;
+long n_ldazero = 0;
 long n_m1cmp = 0;
 long n_ccall = 0;
 long n_cret = 0;
@@ -1024,6 +1026,47 @@ r_xordup(void)
 }
 
 /*
+ * ex de,hl is its own inverse, so two of them in a row - in either
+ * spelling - are two bytes that do nothing.  The same shape r_exx
+ * already catches for the shadow set.
+ */
+int
+r_exde(void)
+{
+	if (!starts(0, "ex ") || !starts(1, "ex "))
+		return 0;
+	if ((strcmp(win[0].key + 3, "de,hl") != 0 &&
+	     strcmp(win[0].key + 3, "hl,de") != 0) ||
+	    (strcmp(win[1].key + 3, "de,hl") != 0 &&
+	     strcmp(win[1].key + 3, "hl,de") != 0))
+		return 0;
+
+	delline(0, 2);
+	n_exde++;
+	saved += 2;
+	return 1;
+}
+
+/*
+ * ld a,0 is a two-byte zero of A that leaves the flags alone.  xor a is
+ * the one-byte form; it clobbers the flags, so they have to be dead.
+ */
+int
+r_ldazero(void)
+{
+	if (!is(0, "ld a,0"))
+		return 0;
+	if (!isdead(R_F, 1))
+		return 0;
+
+	delline(0, 1);
+	insline(0, "\txor a\n");
+	n_ldazero++;
+	saved += 1;
+	return 1;
+}
+
+/*
  * or a before sbc clears the carry a 16-bit subtract borrows.  When
  * the carry is already clear the or a is a byte spent on a flag that
  * is already the right way.  The value state carries the carry across
@@ -1070,7 +1113,9 @@ applyrules(void)
 
 	switch (k[0]) {
 	case 'e':
-		return r_exx();
+		if (r_exx())
+			return 1;
+		return r_exde();
 	case 'c':
 		return r_hlarg();
 	case 'i':
@@ -1104,6 +1149,8 @@ applyrules(void)
 			if (r_bounce())		/* ld a,x then ld r,a */
 				return 1;
 			if (r_and0())		/* ld a,x then and 0 */
+				return 1;
+			if (r_ldazero())	/* ld a,0 -> xor a */
 				return 1;
 		}
 		if (k[3] == 'l' && r_pushsrc())	/* ld l,c ; ld h,b ; push hl -> push bc */
@@ -1142,6 +1189,7 @@ report(void)
 		"  ptrload %ld  ixcopy %ld  autozero %ld  xordup %ld\n",
 		n_constdup, n_orclr, n_reuse, n_pushsrc, n_ptrload, n_ixcopy,
 		n_autozero, n_xordup);
+	fprintf(stderr, "peep: exde %ld  ldazero %ld\n", n_exde, n_ldazero);
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */
