@@ -45,6 +45,11 @@ long n_exx = 0;
 long n_constdup = 0;
 long n_orclr = 0;
 long n_reuse = 0;
+long n_pushsrc = 0;
+long n_ptrload = 0;
+long n_ixcopy = 0;
+long n_autozero = 0;
+long n_xordup = 0;
 long n_m1cmp = 0;
 long n_ccall = 0;
 long n_cret = 0;
@@ -853,6 +858,172 @@ r_reuse(void)
 }
 
 /*
+ * ld l,c / ld h,b / push hl copies BC into HL only to push it.  push
+ * bc does the same thing directly, two bytes shorter.  HL has to be
+ * dead after the push - the rewrite leaves it holding whatever it held
+ * before the copy.
+ */
+int
+r_pushsrc(void)
+{
+	int j, k;
+
+	if (!is(0, "ld l,c"))
+		return 0;
+	j = nextsig(0);
+	if (j < 0 || !is(j, "ld h,b"))
+		return 0;
+	k = nextsig(j);
+	if (k < 0 || !is(k, "push hl"))
+		return 0;
+	if (!isdead(R_HL, k + 1))
+		return 0;
+
+	delline(k, 1);
+	delline(j, 1);
+	delline(0, 1);
+	insline(0, "\tpush bc\n");
+	n_pushsrc++;
+	saved += 2;
+	return 1;
+}
+
+/*
+ * ld l,c / ld h,b / ld a,(hl) copies a pointer from BC into HL only to
+ * dereference it once.  ld a,(bc) reads through BC directly, two bytes
+ * shorter - the Z80 keeps the 8080's LDAX B.  As with r_pushsrc, HL has
+ * to be dead after the load, because the rewrite leaves it holding
+ * whatever it held before the copy.
+ */
+int
+r_ptrload(void)
+{
+	int j, k;
+
+	if (!is(0, "ld l,c"))
+		return 0;
+	j = nextsig(0);
+	if (j < 0 || !is(j, "ld h,b"))
+		return 0;
+	k = nextsig(j);
+	if (k < 0 || !is(k, "ld a,(hl)"))
+		return 0;
+	if (!isdead(R_HL, k + 1))
+		return 0;
+
+	delline(k, 1);
+	delline(j, 1);
+	delline(0, 1);
+	insline(0, "\tld a,(bc)\n");
+	n_ptrload++;
+	saved += 2;
+	return 1;
+}
+
+/*
+ * ld c,ixl / ld b,ixh copies IX into BC two bytes at a time through the
+ * undocumented half registers.  push ix / pop bc is the same move one
+ * byte shorter, and it needs no liveness proof: the destination ends
+ * up holding IX either way, and neither form disturbs the flags.
+ */
+int
+r_ixcopy(void)
+{
+	char buf[KLEN + 8];
+	char *src, *dst;
+
+	if (is(0, "ld c,ixl") && is(1, "ld b,ixh")) { src = "ix"; dst = "bc"; }
+	else if (is(0, "ld e,ixl") && is(1, "ld d,ixh")) { src = "ix"; dst = "de"; }
+	else if (is(0, "ld l,ixl") && is(1, "ld h,ixh")) { src = "ix"; dst = "hl"; }
+	else
+		return 0;
+
+	sprintf(buf, "\tpush %s\n\tpop %s\n", src, dst);
+	delline(0, 2);
+	insline(0, buf);
+	n_ixcopy++;
+	saved += 1;
+	return 1;
+}
+
+/* is window line i a zeroing of an auto: ld (iy+d),0 or ld (ix+d),0 */
+static int
+is_zerostore(int i)
+{
+	char *op;
+
+	if (i >= nwin || win[i].kind != L_INSN)
+		return 0;
+	if (strncmp(win[i].key, "ld (", 4) != 0)
+		return 0;
+	op = operof(win[i].key);
+	if (strncmp(op, "(iy", 3) != 0 && strncmp(op, "(ix", 3) != 0)
+		return 0;
+	return strcmp(oper2(op), "0") == 0;
+}
+
+/*
+ * A run of autos initialised to zero - "int a,b,c,d;" - is emitted as
+ * one "ld (iy+d),0" per byte, four bytes each.  Load A with zero once
+ * and store it instead: "xor a" and one "ld (iy+d),a" per byte, three
+ * bytes each.  A run of n stores is n-1 bytes shorter, at the cost of
+ * one line - the xor a - which is what the slack slot in the window is
+ * for.  A and the flags are the price of the xor, so both have to be
+ * dead once the run is past.
+ */
+int
+r_autozero(void)
+{
+	int n = 0, i;
+	char buf[KLEN + 8];
+	char full[KLEN + 16];
+	char *p;
+
+	while (is_zerostore(n))
+		n++;
+	if (n < 2)
+		return 0;
+	if (!isdead(R_A | R_F, n))
+		return 0;
+
+	/* back to front so the indices stay true: each store retargets to A */
+	for (i = n - 1; i >= 0; i--) {
+		strcpy(buf, win[i].key);	/* "ld (iy+d),0" */
+		p = strrchr(buf, ',');
+		p[1] = 'a';
+		p[2] = 0;				/* "ld (iy+d),a" */
+		sprintf(full, "\t%s\n", buf);
+		delline(i, 1);
+		insline(i, full);
+	}
+	insline(0, "\txor a\n");
+	n_autozero++;
+	saved += n - 1;
+	return 1;
+}
+
+/*
+ * xor a when A is already known to be zero.  It still clears the carry
+ * and sets Z, so the flags have to be dead after it; the value state
+ * says the value is already there, which is the only thing this rule
+ * needs beyond that.
+ */
+int
+r_xordup(void)
+{
+	if (!is(0, "xor a"))
+		return 0;
+	if (!viszero(&vbase, VA))
+		return 0;
+	if (!isdead(R_F, 1))
+		return 0;
+	delline(0, 1);
+	n_xordup++;
+	saved += 1;
+	return 1;
+}
+
+/*
  * or a before sbc clears the carry a 16-bit subtract borrows.  When
  * the carry is already clear the or a is a byte spent on a flag that
  * is already the right way.  The value state carries the carry across
@@ -906,6 +1077,8 @@ applyrules(void)
 		return r_incsp();
 	case 'o':
 		return r_orclr();
+	case 'x':
+		return r_xordup();
 	case 'p':
 		if (r_fenter())
 			return 1;
@@ -933,6 +1106,14 @@ applyrules(void)
 			if (r_and0())		/* ld a,x then and 0 */
 				return 1;
 		}
+		if (k[3] == 'l' && r_pushsrc())	/* ld l,c ; ld h,b ; push hl -> push bc */
+			return 1;
+		if (k[3] == 'l' && r_ptrload())	/* ld l,c ; ld h,b ; ld a,(hl) -> ld a,(bc) */
+			return 1;
+		if (r_ixcopy())			/* ld c,ixl ; ld b,ixh -> push ix ; pop bc */
+			return 1;
+		if (r_autozero())		/* ld (iy+d),0 ... -> xor a ; ld (iy+d),a */
+			return 1;
 		if (r_reuse())			/* ld de,n ; add hl,de -> add hl,bc */
 			return 1;
 		return r_constdup();		/* ld reg,const already there */
@@ -957,8 +1138,10 @@ report(void)
 		"  jpnext %ld  hlarg %ld  noframe %ld  pool %ld = %ld bytes\n",
 		n_exx, n_m1cmp, n_ccall, n_cret, n_jpnext, n_hlarg,
 		n_noframe, poolmerged, saved);
-	fprintf(stderr, "peep: constdup %ld  orclr %ld  reuse %ld\n",
-		n_constdup, n_orclr, n_reuse);
+	fprintf(stderr, "peep: constdup %ld  orclr %ld  reuse %ld  pushsrc %ld"
+		"  ptrload %ld  ixcopy %ld  autozero %ld  xordup %ld\n",
+		n_constdup, n_orclr, n_reuse, n_pushsrc, n_ptrload, n_ixcopy,
+		n_autozero, n_xordup);
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

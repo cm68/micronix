@@ -12,7 +12,9 @@
  * byte at a time.  Those are the patterns here.
  */
 
-#define WINDOW	16			/* lines held for matching */
+#define WINDOW	17			/* lines held for matching: 16 of
+					 * lookahead plus one slot of slack, so
+					 * a rule may grow its match by one line */
 
 /*
  * How long a KEY can be - not a line.  The rules match against keys,

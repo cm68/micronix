@@ -207,11 +207,13 @@ readline(int i)
 	}
 }
 
-/* top up the window */
+/* top up the window.  It fills to one short of the slot count, so a
+ * rule that grows its match by a line - r_autozero's xor a - always has
+ * somewhere to put it. */
 void
 fill(void)
 {
-	while (nwin < WINDOW && readline(nwin))
+	while (nwin < WINDOW - 1 && readline(nwin))
 		nwin++;
 }
 
