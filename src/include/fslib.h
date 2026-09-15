@@ -65,13 +65,15 @@ extern struct dir *getdirent(struct dsknod *ip, int index);
 extern int balloc(struct super *f);
 extern void bfree(struct super *f, int b);
 extern void filefree(struct dsknod *ip);
-extern void fileunlink(struct super *f, char *name);
+extern int fileunlink(struct super *f, char *name);
 extern int ialloc(struct super *f, UINT mode);
-extern void filelink(struct super *f, char *path, int inum);
+extern int filelink(struct super *f, char *path, int inum);
 extern struct dsknod *filecreate(struct super *f, char *name);
 extern int dircreate(struct super *f, char *name);
 extern int dirrm(struct super *f, char *name);
 extern int filesize(struct dsknod *ip);
+extern int bootrange(struct super *f, int *first, int *nblk, char **name);
+extern int installboot(struct super *f, int first, int nblk, char *name);
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
