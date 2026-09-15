@@ -81,71 +81,12 @@ extern int r_lock(), r_unlock();
         * System call branch table. Arguments from registers,
         * and returns to registers, are handled by r_ functions.
         */
-struct syscall syssw[] = {
-    2, &indir,                  /* 0 */
-    0, &r_exit,                 /* 1 */
-    0, &r_fork,                 /* 2 */
-    4, &r_read,                 /* 3 */
-    4, &r_write,                /* 4 */
-    4, &r_open,                 /* 5 */
-    0, &r_close,                /* 6 */
-    0, &r_wait,                 /* 7 */
-    4, &r_creat,                /* 8 */
-    4, &link,                   /* 9 */
-    2, &unlink,                 /* 10 */
-    4, &exec,                   /* 11 */
-    2, &chdir,                  /* 12 */
-    /*
-     * The comma after r_time was missing, which ran entry 13 into
-     * entry 14 - "&r_time 6" - and is a syntax error, not a table
-     * that comes out one short.  So this file has not compiled since
-     * the line went in (2020-10-30, 90b8a345); the odd indentation on
-     * the mknod line below is the same edit.
-     */
-    0, &r_time,                 /* 13 */
-    6, &mknod,                  /* 14 */
-    4, &chmod,                  /* 15 */
-    4, &chown,                  /* 16 */
-    2, &brake,                  /* 17 */
-    4, &stat,                   /* 18 */
-    4, &r_seek,                 /* 19 */
-    0, &r_getpid,               /* 20 */
-    6, &mount,                  /* 21 */
-    2, &umount,                 /* 22 */
-    0, &r_setuid,               /* 23 */
-    0, &r_getuid,               /* 24 */
-    0, &r_stime,                /* 25 */
-    6, &unimp,                  /* 25 &ptrace */
-    0, &r_alarm,                /* 27 */
-    2, &r_fstat,                /* 28 */
-    0, &pause,                  /* 29 */
-    0, &badcall,                /* */
-    2, &r_stty,                 /* 31 */
-    2, &r_gtty,                 /* 32 */
-    4, &permission,             /* 33 */
-    0, &r_nice,                 /* 34 */
-    0, &r_sleep,                /* 35 */
-    0, &sync,                   /* 36 */
-    2, &r_kill,                 /* 37 */
-    0, &r_csw,                  /* 38 */
-    0, &r_ssw,                  /* 39 */
-    0, &badcall,                /* */
-    0, &r_dup,                  /* 41 */
-    0, &r_pipe,                 /* 42 */
-    2, &unimp,                  /* 43 &times */
-    8, &unimp,                  /* 44 &profil */
-    0, &badcall,                /* */
-    0, &badcall,                /* */
-    0, &badcall,                /* */
-    4, &r_signal,               /* 48 */
-
-#ifdef notdef
-    2, &r_lock,                 /* 49 */
-    0, &r_unlock,               /* 50 */
-#endif
-};
-
-int ncalls = sizeof(syssw) / sizeof(struct syscall);
+/*
+ * syssw and ncalls live in leaf/consts.c, parked in the u page; the
+ * table is read-only so a per-process copy is harmless.
+ */
+extern struct syscall syssw[];
+extern int ncalls;
 
 /*
  * Entry point for system calls. A typical call:

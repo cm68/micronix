@@ -42,6 +42,10 @@ unix: $(KERNEL_AS) user.o $(KERNEL_C)
 makedate: makedate.c
 	$(CC) -o makedate makedate.c
 
+# Phony so makedate runs on every build and writes a fresh date.  The
+# file would otherwise sit there and main.o (which includes it) would
+# keep the old date in the kernel.
+.PHONY: build.h
 build.h: makedate
 	./makedate
 

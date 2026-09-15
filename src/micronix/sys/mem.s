@@ -36,6 +36,7 @@ MAP0=0x0600
 IMAGE0=0x0200
 MAP1=0x0620
 IMAGE1=0x0220
+	.data			; leaf code, parked in the u page (see user.c)
 
 ; ------- A-NATURAL SOURCE: _getbyte -------
 ; / getbyte(addr) -- Get a byte from the active _task

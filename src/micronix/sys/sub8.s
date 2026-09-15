@@ -24,8 +24,9 @@
 ; public	dicount
 ;
 	.globl	_saveframe, _setframe, _zero, _copy, _x3to4, _x4to3
-	.globl	_di, _ei, _enable, _disable, dicount
-	.extern	_pr
+	.globl	_di, _ei, _enable, _disable
+	.extern	_pr, dicount, badmsg
+	.data			; leaf code, parked in the u page (see user.c)
 
 ; ------- A-NATURAL SOURCE: _saveframe -------
 ; /saveframe(&u->frmptr, &u->stkptr);
@@ -345,12 +346,3 @@ _disable:
 	ld	a,1
 	ld	(dicount),a
 	ret
-
-; ------- A-NATURAL SOURCE: dicount -------
-; /disable count
-; dicount:	0
-;
-dicount:
-	.defb	0
-badmsg:
-	.defb	"di < 0", 0

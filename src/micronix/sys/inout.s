@@ -15,6 +15,7 @@
 ; OUTA	:= &0x79ED		/Z80 output a to port (c)
 ;
 	.globl	_in, _out
+	.data			; leaf code, parked in the u page (see user.c)
 
 ; ------- A-NATURAL SOURCE: _in -------
 ; /in(port)

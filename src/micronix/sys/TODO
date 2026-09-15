@@ -19,3 +19,39 @@ tracking this down is simply a matter of searching for the string 'static'.
 
 --------------------
 
+The u struct lives in its own 4K segment (USERSEG), remapped per
+process, and the rest of that page is padding.  Pack that padding with
+pure-text leaf functions - the ccc runtime (csv / q* / ldiv / tramp) and
+whatever other dataless helpers fit - so the page is not wasted, and
+move as much of it in there as possible.
+
+Identify and move constant data onto the page too: the static strings
+(the devname / panic messages), the syscall dispatch table (syssw), the
+block and char switch tables (biosw / ciosw), the specs / mws drive
+tables.  They are identical across processes and read but never written,
+so they belong on the filled-out page and fork skips copying them the
+same way.  Audit each one for writes first - anything ever written has
+to stay in ordinary data.
+
+Then on fork, rather than segcopy-ing the whole page (the u struct plus
+the shared leaf code) into a fresh segment each time, keep a freelist
+of "filled out" pages that already carry the leaf code.  fork takes one
+of those, copies only the ~629 byte u struct into it, and skips the text
+copy; exit returns the page to the list instead of freeing it.  The leaf
+code is identical across every process, so this saves both the copy and
+the re-fill on every fork.
+
+Open: where the list lives, how a fresh page is primed the first time
+(one segcopy of the leaf code), and how a swapped-out process interacts
+with it.
+
+The boot loader's stack sits at the very top of memory (mwboot1.s parks
+sp at 0xffff) and loads the kernel in 512-byte blocks from 0x0ff0 up, so
+the image may not fill the last segment to the brim: the last block both
+wraps its DMA write past 0xffff and walks over that stack.  user.c leaves
+1K slack at the top for it.  When the leaf code moves in and the text
+shrinks, that slack can tighten again - but never past what keeps the
+load at 119 blocks and clear of the loader's stack.
+
+--------------------
+

@@ -17,7 +17,7 @@
 #define MINRUN	2               /* minimum run time before swapout */
 #define MAXMEM	0xffff          /* maximum process size */
 #define MAXSEG	256             /* max 4K memory segments, not inc. kernel */
-#define USERSEG 10              /* segment 10. See user.c and malloc.c */
+#define USERSEG 15              /* last 4K segment. See user.c and malloc.c */
 
 /*
  * Priorities

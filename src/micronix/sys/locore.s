@@ -1,9 +1,11 @@
 ;
-; ------- A-NATURAL SOURCE: declarations -------
-; Decision firmware references
-; sys/uhdr.s
-; Changed: <2026-08-17 20:01:38 curt>
+; sys/locore.s was sys/uhdr.s
+; Changed: <2026-08-24 07:46:36 curt>
 ;
+; this object file is loaded at a lower address than everthing else
+; in particular, the loader places this in memory at 0x1000
+; and jumps to it in task 1
+
 ; _trapstack := &8
 ; _cmask	:= &7
 ; _ctask	:= &6
@@ -76,84 +78,36 @@ _memtop=0xF000
 ;
 
 	.defb	0xC3		; jump opcode
-
-; ------- A-NATURAL SOURCE: _trapvec -------
-; _trapvec:
-; 	&boot
-;
-; /Hook for ps (at address 0x1003)
-; 	&_plist
-;
 _trapvec:
 	.defw	boot
+	
+	.defw	_plist 		; the process list so ps can find it.
 
-;
-; this is the address of the process list so ps can find it.
-;
-	.defw	_plist
-
-;
-; boot lands here
-;
-
-; ------- A-NATURAL SOURCE: boot -------
-; boot:
-; 	sp = &0x1000
-; 	jmp _start
-;
 boot:
-	ld	sp,0x1000	; an initial stack pointer at an odd place
-	jp	_start		; enter the kernel
+	ld	sp,0x1000	; task 1 has ram here.
+	jp	_start		; enter the kernel start trampoline
 
-; ------- A-NATURAL SOURCE: _hlt -------
+;
 ; /Halt intruction for use in _trapc
-; _hlt:
-; 	hlt
-; 	ret
 ;
 _hlt:
 	halt
 	ret
 
 ;
-; task0 is entered by the firmware with its return address on the
-; firmware stack; task0_body()'s setframe() moves SP to the kernel
-; stack.  Park the firmware SP in BC (callee-saved) and hand it back
-; in _retask so the ret lands in the firmware, not in u.stack.
+; the interrupt vector table used by the i8259 in 4 byte mode
+; this must be aligned on a 32 byte boundary, and this depends
+; on this segment being loaded at an absolute address
 ;
-	.globl	_task0, _retask
-	.extern	_task0_body
-_task0:
-	ld	hl,0
-	add	hl,sp		; hl = firmware SP
-	ld	b,h
-	ld	c,l		; bc = firmware SP
-	call	_task0_body	; never returns - ends in retask()
-	ret			; not reached
-
-_retask:
-	ld	h,b
-	ld	l,c		; hl = firmware SP
-	ld	sp,hl
-	ret
+	.align	32
+vector:
+	.ds	32
 
 ;
 ; this is the initial program that gets copied out to process 1
 ; it simply executes /etc/init
 ;
 
-; ------- A-NATURAL SOURCE: _xinit -------
-; /System call to execute "init".
-; /Called from start() in _trapc
-; 	EXEC	:= 11
-; 	SYS	:= rst1
-;
-; _xinit:
-; 	/
-; 	SYS; EXEC; &name1; &iargs;
-; 	ret		/error return
-; 	/
-;
 _xinit::
 	rst	8		; SYS := rst1  (RST 1 -> vector 0x08)
 	.defb	11		; EXEC := 11  (syscall number)
@@ -161,21 +115,12 @@ _xinit::
 	.defw	iargs
 	ret
 
-; ------- A-NATURAL SOURCE: name1 -------
-; name1:
-; 	/
-; 	"/etc/init\0";
-; 	/
-;
 initprog:
 	.defb	"/etc/init", 0
 
-; ------- A-NATURAL SOURCE: iargs -------
-; iargs:
-; 	/
-; 	&iarg0;
-; 	&0;
-; 	/
-;
 iargs:
-	.defw	0		; empty argv, as the reference kernel passes
+	.defw	iarg0		; argv
+	.defw	0
+
+iarg0:
+	.defb	"init", 0	; argv[0]

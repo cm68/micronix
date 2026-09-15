@@ -43,17 +43,6 @@ extern UINT nsegs;
 extern int nodev();             /* con.c */
 
 /*
- * This module must be compiled with the -x0 option and
- * loaded last of all. The buffer initialization routine
- * binit will use all space above the blist for buffer
- * area, including the main() code below. Since this code
- * may need up to 4 buffers (2 for bopens, 1 for tmount,
- * and 1 for iget), the following padding is necessary
- * to allow initial use of the blist and still protect main().
- */
-static char pad[5 * 512] = 0;
-
-/*
  * System initialization
  */
 main()
