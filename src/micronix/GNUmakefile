@@ -21,7 +21,7 @@
 # drifted from the tree.  It goes FIRST - what everything else
 # compiles against is installed before anything compiles.
 #
-DIRS = include lib libexec cmd sys cpm
+DIRS = include lib libexec cmd sys stand cpm
 
 #
 # The top GNUmakefile is a leaf like the rest: DEPTH is the distance to
