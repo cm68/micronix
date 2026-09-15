@@ -52,6 +52,7 @@ long n_autozero = 0;
 long n_xordup = 0;
 long n_exde = 0;
 long n_ldazero = 0;
+long n_bitset = 0;
 long n_m1cmp = 0;
 long n_ccall = 0;
 long n_cret = 0;
@@ -1066,6 +1067,102 @@ r_ldazero(void)
 	return 1;
 }
 
+/* the bit index of n, which must be a power of two */
+static int
+bitindex(int n)
+{
+	int k = 0;
+
+	while (n > 1) {
+		n >>= 1;
+		k++;
+	}
+	return k;
+}
+
+/*
+ * Is a scratch register - A, or the flags - free to clobber along the
+ * fall-through?  Unlike isdead, which proves a register variable has
+ * been overwritten, a scratch register only has to be unread: it is
+ * loaded afresh each time it is wanted, so falling off the window with
+ * no read is dead.  A label does not end the scan - the rule only
+ * rewrites the fall-through - but a branch does.
+ */
+static int
+deadfall(int reg, int from)
+{
+	int i, got = 0;
+
+	for (i = from; i < nwin; i++) {
+		if (win[i].kind != L_INSN)
+			continue;		/* labels, directives, blanks */
+		if (((reads(win[i].key) & reg) | got) != got)
+			return 0;
+		got |= writes(win[i].key);
+		if ((got & reg) == reg)
+			return 1;
+		if (isbranch(win[i].key))
+			return 0;
+	}
+	return 1;					/* unread: scratch is dead */
+}
+
+/*
+ * A read-modify-write of a byte through a pointer, setting or clearing
+ * one bit, is what the Z80's SET and RES do in one instruction:
+ *
+ *	ld a,(hl) / or 32 / ld (hl),a      ->  set 5,(hl)
+ *	ld a,(ix+d) / and 191 / ld (ix+d),a ->  res 6,(ix+d)
+ *
+ * The load-modify-store leaves A holding the new value and sets the
+ * flags; SET and RES touch neither, so both A and the flags have to be
+ * dead past the run.  The result in memory is bit for bit the same.
+ */
+int
+r_bitset(void)
+{
+	char m[8];
+	char *op0, *op2, *o2;
+	char buf[KLEN + 8];
+	int n, k, set;
+
+	if (!starts(0, "ld a,(") || !starts(2, "ld ("))
+		return 0;
+	mnemof(win[1].key, m, sizeof(m));
+	if (strcmp(m, "or") != 0 && strcmp(m, "and") != 0)
+		return 0;
+	op0 = oper2(operof(win[0].key));	/* "(ix+d)" */
+	op2 = operof(win[2].key);		/* "(ix+d),a" */
+	if (strncmp(op2, op0, strlen(op0)) != 0 || op2[strlen(op0)] != ',')
+		return 0;				/* the store is to another address */
+	o2 = operof(win[1].key);
+	if (!vnumber(o2, &n))
+		return 0;
+
+	if (strcmp(m, "or") == 0) {
+		if (n <= 0 || n > 255 || (n & (n - 1)) != 0)
+			return 0;			/* not a single bit */
+		k = bitindex(n);
+		set = 1;
+	} else {
+		n = (~n) & 0xff;			/* the bit AND clears */
+		if (n == 0 || (n & (n - 1)) != 0)
+			return 0;
+		k = bitindex(n);
+		set = 0;
+	}
+
+	if (!deadfall(R_A | R_F, 3))
+		return 0;
+
+	sprintf(buf, "\t%s %d,%s\n", set ? "set" : "res", k, op0);
+	delline(0, 3);
+	insline(0, buf);
+	n_bitset++;
+	saved += (strncmp(op0, "(hl", 3) == 0) ? 2 : 4;
+	return 1;
+}
+
 /*
  * or a before sbc clears the carry a 16-bit subtract borrows.  When
  * the carry is already clear the or a is a byte spent on a flag that
@@ -1152,6 +1249,8 @@ applyrules(void)
 				return 1;
 			if (r_ldazero())	/* ld a,0 -> xor a */
 				return 1;
+			if (r_bitset())		/* ld a,(p) ; or/and N ; ld (p),a -> set/res */
+				return 1;
 		}
 		if (k[3] == 'l' && r_pushsrc())	/* ld l,c ; ld h,b ; push hl -> push bc */
 			return 1;
@@ -1189,7 +1288,8 @@ report(void)
 		"  ptrload %ld  ixcopy %ld  autozero %ld  xordup %ld\n",
 		n_constdup, n_orclr, n_reuse, n_pushsrc, n_ptrload, n_ixcopy,
 		n_autozero, n_xordup);
-	fprintf(stderr, "peep: exde %ld  ldazero %ld\n", n_exde, n_ldazero);
+	fprintf(stderr, "peep: exde %ld  ldazero %ld  bitset %ld\n",
+		n_exde, n_ldazero, n_bitset);
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */
