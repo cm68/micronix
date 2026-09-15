@@ -51,8 +51,6 @@ UINT8 *hdrbuf = (UINT8 *)0x84;          /* where read header lands a head */
  */
 #define	INIT	= 0
 
-extern char disk0buf[];		/* boot.c's, and not yet in use */
-
 char tries INIT;
 int curcyl INIT;
 
@@ -124,8 +122,8 @@ reset()
 	 *
 	 * Physical cylinder 0, head 0, sector 0 needs no geometry to
 	 * reach, which is what makes this possible before the geometry is
-	 * known.  disk0buf is boot.c's and nothing has been read into it
-	 * yet.
+	 * known.  The label is read into the working buffer, boot.c's
+	 * buf0 at 0x1000, and nothing else has used it yet.
 	 */
 	cmd.steps = curcyl;
 	cmd.drvsel = STEPOUT;
@@ -134,7 +132,7 @@ reset()
 	cmd.byte2 = 0;			/* head */
 	cmd.byte3 = 0;			/* sector */
 	cmd.headsel = (~0 & 7) << 2;
-	cmd.dma = (UINT)disk0buf;
+	cmd.dma = (UINT)0x1000;
 	cmd.xdma = 0;
 
 	tries = 0;
@@ -145,7 +143,7 @@ reset()
 	if (tries > 10)
 		outstr("label read failed\n");
 
-	lp = (struct dlabel *)&disk0buf[DL_OFFSET];
+	lp = (struct dlabel *)(0x1000 + DL_OFFSET);
 	if (lp->d_magic[0] == DL_MAGIC[0] && lp->d_magic[1] == DL_MAGIC[1] &&
 	    lp->d_magic[2] == DL_MAGIC[2] && lp->d_magic[3] == DL_MAGIC[3] &&
 	    lp->d_tracks && lp->d_heads && lp->d_spt) {

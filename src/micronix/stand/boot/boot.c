@@ -28,7 +28,7 @@
  * seems to go fine and then enters nothing.  Both of the faults that
  * this file has had were that, wearing different clothes:
  *
- *	the block list left in indirbuf, which straddles 0ff0, so the
+ *	the block list left in the buffer, which straddles 0ff0, so the
  *	load overwrote the list of blocks it was reading
  *
  *	the buffers declared "= 0", which reserved two bytes each and so
@@ -56,8 +56,18 @@ int inumber = 1;
 struct dsknod *inode INIT;
 
 /*
- * disk buffers - we need at most 2 to be valid at one time
- * we care about this for space reasons.
+ * Two buffers, pointed at, not in the loader's own 4k.
+ *
+ * The loader's code and its block list have to stay below 0ff0 - the
+ * kernel loads there and everything above is about to be kernel.  The
+ * buffers are only needed while the loader runs, though: by the time
+ * the kernel load writes over them they are done with.  So they live
+ * above the kernel's load address, at fixed addresses, and cost the
+ * loader nothing.
+ *
+ * buf0 is the working buffer - the directory, then the indirect block,
+ * then the object header.  buf1 is the inode buffer: iget() reads into
+ * it while the directory is still in buf0.
  */
 union diskbuf {
 	struct dsknod ibuf[16];
@@ -67,57 +77,28 @@ union diskbuf {
 	char bytes[512];
 };
 
+#define BUF0	0x1000
+#define BUF1	0x1200
+#define buf0	(*(union diskbuf *) BUF0)
+#define buf1	(*(union diskbuf *) BUF1)
+
 /*
- * Real storage for the two buffers.
- *
- * These were "union diskbuf disk0 INIT", and INIT is "= 0", which
- * reserved two bytes rather than 512: a union initialised with a scalar
- * is sized from the initialiser and not from its type.  Braces do not
- * help - "= { 0 }" reserves two as well - while arrays and structs are
- * both sized properly, so the bytes are declared as an array and the
- * union taken as a view of them.
- *
- * Uninitialised, so they land in bss and cost nothing in the file - the
- * boot has to stay small - and crt0 clears bss before main runs.
- *
- * What the old declaration looked like from outside: every readblock
- * wrote its 512 bytes over disk1, inputbuf, spec and cmd, which all sat
- * within a few bytes of disk0.  Reading the root inode set spec.limit
- * to zero, and the next readblock answered "Block out of range" for a
- * block that was perfectly good.
- */
-/*
- * The block list, copied out of the indirect block before the load
- * begins.
- *
- * It cannot be left in indirbuf and walked from there.  The kernel lands
- * at its textoff - 0x10, which is 0ff0, and indirbuf straddles that: the
- * load was overwriting the very list it was reading, so after a few
- * blocks the next "block number" was kernel image and the jump went
- * somewhere that was not the kernel.
- *
- * Declared first so it and disk0buf sit below the load address.  An
- * indirect block holds 256 numbers, but a file that has to fit in a 64k
- * address space cannot be more than 128 blocks, so that is the ceiling -
- * and one too big is refused rather than quietly truncated.
+ * The block list, in the image - it must survive the load, so it
+ * cannot live in a buffer the kernel writes over.  select() fills it
+ * and load() walks it.  An indirect block holds 256 numbers, but a
+ * file that fits in a 64k address space cannot be more than 128
+ * blocks, so that is the ceiling and one too big is refused rather
+ * than quietly truncated.
  */
 #define NBLIST	128
 UINT16 blist[NBLIST];
 
-char disk0buf[512];
-char disk1buf[512];
-
-#define disk0	(*(union diskbuf *) disk0buf)
-#define disk1	(*(union diskbuf *) disk1buf)
-
-#define	bytebuf		disk0.bytes
-#define	objbuf		disk0.obj
-#define	indirbuf	disk1.indir
-
-#define	inodebuf	disk0.ibuf
-#define	dirbuf		disk1.dir
-
-char inputbuf[15];              /* bss: INIT would size it from the scalar */
+/*
+ * readline's buffer, above the load address too: it is used only while
+ * select() is choosing a file, before the load.
+ */
+#define INPUTSIZE 15
+#define inputbuf ((char *) 0x1400)
 
 int (*loadbase)() = 0x1000;
 
@@ -141,46 +122,36 @@ bail()
 }
 
 /*
- * given an inode that has been read, read the executable into memory
- * we require that the inode be IFREG and ILARG, > 4k
- * buffers that need to be valid: indirbuf and objbuf.
+ * load the file select() chose, now that its block list is in blist.
+ * The first block is the object header; it says how big the file is
+ * and where it wants to go.  The rest are the kernel.
  */
 load()
 {
 	register int i;
 	int nblk;
 
-	iget();
-
-	if (!readblock(inode->d_addr[0], indirbuf)) {
-		outstr("read indir failed");
-		bail();
-	}
-
-	if (!readblock(indirbuf[0], &objbuf)) {
+	if (!readblock(blist[0], buf0.bytes)) {
 		outstr("read header failed");
 		bail();
 	}
-	if (objbuf.ident == OBJECT) {
-		loadbase = objbuf.textoff;
-		loadptr = (char *) (objbuf.textoff - 0x10);
-		loadsize = objbuf.text + objbuf.data + 0x10;
+	if (buf0.obj.ident == OBJECT) {
+		loadbase = buf0.obj.textoff;
+		loadptr = (char *) (buf0.obj.textoff - 0x10);
+		loadsize = buf0.obj.text + buf0.obj.data + 0x10;
 	} else {
 		loadsize = inode->d_size1;
 	}
 
 	/*
-	 * Take the block list somewhere the load will not reach, and count
-	 * the blocks up front - counting down through loadsize would have
-	 * to go negative to stop, which is what it cannot do.
+	 * Count the blocks up front - counting down through loadsize
+	 * would have to go negative to stop, which is what it cannot do.
 	 */
 	nblk = (loadsize + 511) / 512;
 	if (nblk > NBLIST) {
 		outstr("boot file is too big\n");
 		bail();
 	}
-	for (i = 0; i < nblk; i++)
-		blist[i] = indirbuf[i];
 
 	outstr("Loading\n");
 	for (i = 0; i < nblk; i++) {
@@ -207,26 +178,31 @@ register char *s;
 }
 
 /*
- * set inumber to the file we want to boot.  if there is only one,
- * use it.
+ * set inumber to the file we want to boot, and build its block list.
+ * if there is only one, use it.
  *
  * XXX - only support first 32 files in the root directory
  * wouldn't be hard to fix, but probably not worth it
- * buffers in use:  directory and inode
+ *
+ * The directory is read into buf0 and stays there while each
+ * candidate's inode is read into buf1 to test for a bootable file.
+ * Once one is chosen, its inode and first indirect block are read and
+ * the block list copied into blist for load().
  */
 select()
 {
 	register struct dir *dirp;
+	register int i;
 
-    iget();
+	iget();
 
-    if (!readblock(inode->d_addr[0], dirbuf)) {
+	if (!readblock(inode->d_addr[0], buf0.bytes)) {
 		outstr("read directory failed\n");
 		bail();
-    }
+	}
 
-    outstr("Files:\n");
-	for (dirp = dirbuf; dirp < &dirbuf[32]; dirp++) {
+	outstr("Files:\n");
+	for (dirp = buf0.dir; dirp < &buf0.dir[32]; dirp++) {
 		if ((dirp->name[0] != '.') && (dirp->ino != 0)) {
 			inumber = dirp->ino;
 			iget();
@@ -237,28 +213,42 @@ select()
 			filecount++;
 			found = inumber;
 		}
-   	} 
+	}
 	inumber = found;
 
-    if (filecount == 0) {
-        outstr("No bootable files\n");
-        bail();
-    }
+	if (filecount == 0) {
+		outstr("No bootable files\n");
+		bail();
+	}
 
-    if (filecount != 1) {
-        while (1) {
-            outstr("File to boot: ");
-            readline();
-            dirp = dirbuf;
-    		for (dirp = dirbuf; dirp < &dirbuf[32]; dirp++) {
+	if (filecount != 1) {
+		for (;;) {
+			outstr("File to boot: ");
+			readline();
+			for (dirp = buf0.dir; dirp < &buf0.dir[32]; dirp++) {
 				if (strcmp(dirp->name, inputbuf) == 0) {
 					inumber = dirp->ino;
-					return;
+					goto picked;
 				}
-            }
-            outstr("File not found\n");
-        }
-    }
+			}
+			outstr("File not found\n");
+		}
+	}
+
+picked:
+	/*
+	 * Build the block list.  The chosen inode is read again (buf1),
+	 * its first indirect block is read into buf0 - the directory is
+	 * done with - and the first 128 block numbers are copied into
+	 * blist, which the load will not reach.
+	 */
+	iget();
+	if (!readblock(inode->d_addr[0], buf0.bytes)) {
+		outstr("read indir failed");
+		bail();
+	}
+	for (i = 0; i < NBLIST; i++)
+		blist[i] = buf0.indir[i];
 }
 
 /*
@@ -279,10 +269,10 @@ iget()
 	 * returned /boot, whose block list then led somewhere that is not
 	 * a directory.  mkfs computes it the same way, in getdsk.
 	 */
-	if (!readblock(2 + ((inumber - 1) / 16), inodebuf)) {
+	if (!readblock(2 + ((inumber - 1) / 16), buf1.bytes)) {
 		outstr("inode read failed\n");
 	}
-	inode = &inodebuf[(inumber - 1) % 16];
+	inode = &buf1.ibuf[(inumber - 1) % 16];
 }
 
 conout(a)
@@ -312,7 +302,7 @@ readline()
 top:
     s = inputbuf;
 
-	while (s < (&inputbuf[sizeof(inputbuf)] - 1)) {
+	while (s < (&inputbuf[INPUTSIZE] - 1)) {
 		*s = '\0';
 		c = conin();
 		if (c == '\b') {

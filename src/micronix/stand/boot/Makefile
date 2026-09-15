@@ -5,12 +5,12 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-all:	mwboot.com mwboot1.bin bootimgs
+all:	mwboot.com mwboot1.bin bootimgs djboot1.bin djload
 
 install:
 
 clean:
-	rm -f *.o *.abs *.cim *.hex mwboot.com mwboot1.bin bootimg bootimg-* mkbootimg zout core.*
+	rm -f *.o *.abs *.cim *.hex mwboot.com mwboot1.bin djboot1.bin djload bootimg bootimg-* mkbootimg zout core.*
 
 clobber: clean
 
@@ -45,6 +45,7 @@ INC = /usr/local/usr/include
 CCCLIB = /usr/local/lib
 ASZ = $(CCCLIB)/asz
 WSLD = $(CCCLIB)/wsld
+MXLD = mxld
 
 #
 # The first level is a sector, not a program: the rom reads 512 bytes to
@@ -65,6 +66,14 @@ mwboot1.bin: mwboot1.s
 	$(ASZ) mwboot1.s
 	$(WSLD) -s -Ttext=0x100 -o mwboot1.abs mwboot1.o
 	dd if=mwboot1.abs of=mwboot1.bin bs=16 skip=1
+
+# djboot1.s is the same sector, for the DJ-DMA floppy controller.  It
+# reads the second level with a channel program instead of the HD-DMA
+# command block; everything else is mwboot1.s.
+djboot1.bin: djboot1.s
+	$(ASZ) djboot1.s
+	$(WSLD) -s -Ttext=0x100 -o djboot1.abs djboot1.o
+	dd if=djboot1.abs of=djboot1.bin bs=16 skip=1
 
 #
 # what mkfs -i writes: the first level in block 0, the second level from
@@ -118,10 +127,30 @@ $(BOOTIMGS): mwboot1.bin mwboot.com mkbootimg
 bootimg: bootimg-m5
 	cp bootimg-m5 bootimg
 
-# sexit.s answers crt0's "jp sexit" so that the library's exit - and the
-# stdio it flushes - stays out.  It is worth 618 bytes of text and 578 of
-# bss, which is the difference between the loader fitting under the
-# kernel's load address and running into it.
-mwboot.com: boot.c mwio.c sexit.s
-	$(CCC) -S -i$(INC) -o mwboot.com boot.c mwio.c sexit.s
+# The floppy boot image: djboot1.bin in sector 0, mwboot.com in sectors
+# 1 through 8, which is what djboot1.s reads.
+djload: djboot1.bin mwboot.com
+	dd if=/dev/zero of=djload bs=512 count=9
+	dd if=djboot1.bin of=djload bs=512 conv=notrunc
+	dd if=mwboot.com of=djload bs=512 seek=1 conv=notrunc
+
+# The second level is linked manually, not by ccc, so its own crt0
+# (sexit.s) replaces the library's.  ccc always links crt0.o, whose
+# start() reads argc/argv off the stack - and the loader has none: it is
+# entered by mwboot1 with an empty stack.  sexit.s provides start() and
+# sexit(), so the library's exit and the stdio it flushes stay out,
+# which is worth 618 bytes of text and 578 of bss.
+#
+# The objects are built with ccc -c and handed to mxld in order; sexit.o
+# first so start() lands at the text offset mwboot1 jumps to.
+mwboot.com: boot.o mwio.o sexit.o
+	$(MXLD) -s -o mwboot.com -Ttext=0x100 -L$(CCCLIB) \
+	    sexit.o boot.o mwio.o $(CCCLIB)/libc.a $(CCCLIB)/libu.a $(CCCLIB)/libc.a
+
+boot.o: boot.c
+	$(CCC) -c -i$(INC) -o boot.o boot.c
+mwio.o: mwio.c
+	$(CCC) -c -i$(INC) -o mwio.o mwio.c
+sexit.o: sexit.s
+	$(CCC) -c -o sexit.o sexit.s
 

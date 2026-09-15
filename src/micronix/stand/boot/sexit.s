@@ -1,21 +1,26 @@
 ;
-; sexit for the boot loader
+; crt0 for the boot loader, linked manually instead of the library's.
 ;
-; micronix/stand/sexit.s
+; micronix/stand/boot/sexit.s
 ;
-; crt0 ends with "jp sexit", so something has to answer to that name.
-; Left to the library it is exit(), and exit() flushes stdio - which
-; brings in fflush, the FILE table, stdin/stdout/stderr and a 512 byte
-; buffer, none of which the loader ever touches.  Defining it here means
-; the linker is satisfied before it looks in the archive.
+; A normal program links crt0.o, whose start() reads argc/argv off the
+; stack exec() left and calls main(argc, argv).  The loader is entered
+; by mwboot1 jumping straight to its text offset with an empty stack,
+; so there is no argc/argv to read: start() here does the one thing
+; that matters and calls main with nothing.  Because the loader links
+; without crt0.o, the library's exit() and its stdio flush never come
+; in - which is what this file, as sexit, used to arrange for alone.
 ;
-; main() does not return: it jumps to the kernel it loaded.  The only
-; thing that arrives here is a fall through, and the answer then is the
-; same one bail() gives - back to the rom.
+; main() does not return: load() jumps to the kernel it loaded.  If it
+; did, sexit is the same answer bail() gives - back to the rom at 0.
 ;
-	.global	sexit
+	.global	start, sexit
+	.extern	_main
 
 	.text
+start:
+	call	_main
+	jp	sexit
 sexit:
 	jp	0
 
