@@ -21,6 +21,22 @@ TARGETS = $(SIMTARGETS) zmac
 
 include ../Makefile.inc
 
+# The objects the filesystem tools link against ../lib.  They are named
+# as prerequisites - not merely linked - so that make recurses into
+# ../lib to rebuild them when their sources change; ../lib/Makefile
+# knows the .c -> .o dependencies this Makefile cannot see.  The rule
+# below is the whole of that recursion: an empty prerequisite list makes
+# each object always out of date, and the inner make decides (cheaply)
+# whether anything actually has to be rebuilt.
+FSLIBS = ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o
+
+$(FSLIBS): FORCE
+	$(MAKE) -C ../lib $(notdir $@)
+
+FORCE:
+
+.PHONY: FORCE
+
 $(SIMTARGETS): ../lib/libsim.a
 
 nm:	nm.o
@@ -35,8 +51,8 @@ dumpsec: dumpsec.o
 disas:	disas.o
 	$(CC) $(CFLAGS) -o disas disas.o ../lib/mnix_sys.o $(LDFLAGS)
 
-mnix:	mnix.o mkfsfunc.o
-	$(CC) $(CFLAGS) -o mnix mnix.o mkfsfunc.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+mnix:	mnix.o mkfsfunc.o $(FSLIBS)
+	$(CC) $(CFLAGS) -o mnix mnix.o mkfsfunc.o $(FSLIBS) $(LDFLAGS)
 
 # the mkfs worker, shared with cmd/mkfs and compiled here for the host.
 mkfsfunc.o: ../micronix/cmd/mkfs/mkfsfunc.c
@@ -60,20 +76,20 @@ fsck.o: ../micronix/cmd/fsck/fsck.c
 setdev.o: ../micronix/cmd/setdev/setdev.c
 	$(CC) $(CFLAGS) -c ../micronix/cmd/setdev/setdev.c -o $@
 
-dcheck:	dcheck.o
-	$(CC) $(CFLAGS) -o dcheck dcheck.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+dcheck:	dcheck.o $(FSLIBS)
+	$(CC) $(CFLAGS) -o dcheck dcheck.o $(FSLIBS) $(LDFLAGS)
 
-icheck:	icheck.o
-	$(CC) $(CFLAGS) -o icheck icheck.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+icheck:	icheck.o $(FSLIBS)
+	$(CC) $(CFLAGS) -o icheck icheck.o $(FSLIBS) $(LDFLAGS)
 
-ncheck:	ncheck.o
-	$(CC) $(CFLAGS) -o ncheck ncheck.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+ncheck:	ncheck.o $(FSLIBS)
+	$(CC) $(CFLAGS) -o ncheck ncheck.o $(FSLIBS) $(LDFLAGS)
 
-fsck:	fsck.o
-	$(CC) $(CFLAGS) -o fsck fsck.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+fsck:	fsck.o $(FSLIBS)
+	$(CC) $(CFLAGS) -o fsck fsck.o $(FSLIBS) $(LDFLAGS)
 
-readall:	readall.o
-	$(CC) $(CFLAGS) -o readall readall.o ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+readall:	readall.o $(FSLIBS)
+	$(CC) $(CFLAGS) -o readall readall.o $(FSLIBS) $(LDFLAGS)
 
 zmac: zmac.o mio.o doc.o
 	$(CC) $(CFLAGS) -o zmac zmac.o mio.o doc.o

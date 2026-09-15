@@ -58,6 +58,7 @@ int imagemkdir(char *path);
 int tarcmd();
 int initcmd();
 int mkfscmd();
+int bootflopcmd();
 
 struct cmdtab
 {
@@ -83,7 +84,8 @@ struct cmdtab
     {"devlist", devlistcmd, "devlist" },
     {"tar", tarcmd, "tar x [-C prefix] <tarfile> | tar c <tarfile> [path ...]" },
     {"initialize", initcmd, "initialize <medium> <image>" },
-    {"mkfs", mkfscmd, "mkfs <image> [size|-exclude] [-i bootfile] [-f]" }
+    {"mkfs", mkfscmd, "mkfs <image> [size|-exclude] [-i bootfile] [-f]" },
+    {"bootflop", bootflopcmd, "bootflop <bootfile> <image>" }
 };
 
 void
@@ -163,11 +165,14 @@ main(argc, argv)
         usage(pname);
         exit(0);
     }
-    /* initialize and mkfs make a filesystem; there is nothing to open yet */
+    /* initialize, mkfs and bootflop make a filesystem or a boot image;
+     * there is nothing to open yet */
     if (strcmp(*argv, "initialize") == 0)
         return initcmd(argc, argv);
     if (strcmp(*argv, "mkfs") == 0)
         return mkfscmd(argc, argv);
+    if (strcmp(*argv, "bootflop") == 0)
+        return bootflopcmd(argc, argv);
     if (!filesystem) {
         filesystem = "testfs";
     }
@@ -553,7 +558,8 @@ rmcmd(int c, char **a)
         return -1;
     }
 
-    fileunlink(fs, *a);
+    if (fileunlink(fs, *a) < 0)
+        return 2;
     return 0;
 }
 
@@ -872,7 +878,11 @@ imagemkdir(char *path)
 		return -1;
 	}
 
-	filelink(fs, path, inum);
+	if (filelink(fs, path, inum) < 0) {
+		ifree(parent);
+		free(save);
+		return -1;
+	}
 
 	dp = iget(fs, inum);
 	memset(dirbuf, 0, sizeof dirbuf);
@@ -977,7 +987,8 @@ mknodcmd(int c, char **a)
 	dp->d_addr[0] = dev;
 	iput(dp);
 	ifree(dp);
-	filelink(fs, path, inum);
+	if (filelink(fs, path, inum) < 0)
+		return 2;
 	return 0;
 }
 
@@ -1095,7 +1106,11 @@ tarx(char *tarfile)
 				lseek(infd, ((size + TBLOCK - 1) / TBLOCK) * TBLOCK, SEEK_CUR);
 				continue;
 			}
-			filelink(fs, fullname, inum);
+			if (filelink(fs, fullname, inum) < 0) {
+				printf("tar: can't create %s\n", fullname);
+				lseek(infd, ((size + TBLOCK - 1) / TBLOCK) * TBLOCK, SEEK_CUR);
+				continue;
+			}
 			dp = namei(fs, fullname);
 		}
 		if (!dp) {
@@ -1463,6 +1478,78 @@ mkfscmd(int c, char **a)
     pname = "mkfs";
     domkfs(fsize, isize, bootfirst, bootnblk, dsize, type, bfile, f);
     closefs(fs);
+    return 0;
+}
+
+/*
+ * bootflop <bootfile> <image>: build a boot floppy.
+ *
+ * initialize and mkfs are the hard disk pair; this is the floppy half.
+ * A raw five inch floppy image is a flat run of 512 byte sectors - 80
+ * tracks, two heads to a cylinder, ten sectors to a track, so 40
+ * cylinders of 800 sectors and 409600 bytes.  The rom reads sector 0,
+ * so the boot file - djload, the DJ-DMA first level in sector 0 and the
+ * shared second level behind it - goes at the front and the rest is
+ * left blank for mkfs to build a filesystem on later, if one is wanted.
+ *
+ * The image is a raw sector run, not an IMD file, and is named bdev(2,N)
+ * - N the Micronix minor device number for the drive - so fslib and the
+ * simulator read the same geometry out of the name.
+ */
+int
+bootflopcmd(int c, char **a)
+{
+    char *bootfile;
+    char *image;
+    char buf[512];
+    long size;
+    int fd;
+    int bfd;
+    int n;
+    int got;
+
+    a++;
+    c--;
+    if (c != 2)
+        return -1;
+    bootfile = a[0];
+    image = a[1];
+
+    size = 800L * 512;          /* 40 cylinders, 2 heads, 10 sectors */
+
+    fd = open(image, O_RDWR | O_CREAT | O_TRUNC, 0666);
+    if (fd < 0) {
+        printf("bootflop: can't create %s: %d\n", image, errno);
+        return 2;
+    }
+    if (ftruncate(fd, size) < 0) {
+        printf("bootflop: can't size %s: %d\n", image, errno);
+        close(fd);
+        return 2;
+    }
+
+    bfd = open(bootfile, O_RDONLY);
+    if (bfd < 0) {
+        printf("bootflop: can't open %s: %d\n", bootfile, errno);
+        close(fd);
+        return 2;
+    }
+
+    n = 0;
+    while ((got = read(bfd, buf, sizeof(buf))) > 0) {
+        if (write(fd, buf, got) != got) {
+            printf("bootflop: write failed on %s\n", image);
+            close(bfd);
+            close(fd);
+            return 2;
+        }
+        n++;
+    }
+    close(bfd);
+    close(fd);
+
+    printf("bootflop: %d sectors from %s written to %s\n",
+        n, bootfile, image);
     return 0;
 }
 
