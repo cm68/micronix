@@ -39,6 +39,7 @@ int	nflag;
 int	bflag;
 int	vflag;
 int	yflag;
+int	iflag;
 
 char	*fsname;		/* the file system being checked */
 
@@ -114,6 +115,7 @@ main(int argc, char *argv[])
 		if (strcmp(arg, "-n") == 0) { nflag = 1; continue; }
 		if (strcmp(arg, "-y") == 0) { yflag = 1; continue; }
 		if (strcmp(arg, "-b") == 0) { bflag = 1; continue; }
+		if (strcmp(arg, "-i") == 0) { iflag = 1; continue; }
 		if (fsname) {
 			fprintf(stderr, "usage: fsck filesystem ... \n");
 			exit(1);
@@ -130,6 +132,21 @@ main(int argc, char *argv[])
 		exit(1);
 
 	printf("Checking %s:\n", fsname);
+
+	/*
+	 * -i installs the boot: build the inode that owns the boot blocks,
+	 * without writing the boot itself.  This runs before the passes so
+	 * the first I-list pass counts the new inode's blocks and the free
+	 * list check then leaves them allocated.
+	 */
+	if (iflag) {
+		int first, nblk;
+		char *bootname;
+		if (bootrange(fs, &first, &nblk, &bootname))
+			installboot(fs, first, nblk, bootname);
+		else
+			printf("No boot area to install\n");
+	}
 
 	/*
 	 * the five passes.  The original interleaves them exactly so,
@@ -169,7 +186,7 @@ readsuper(void)
 	 * repair paths' writes (iput) fail on a -n run rather than quietly
 	 * modifying it.
 	 */
-	if (openfsrw(fsname, &fs, nflag ? 0 : 1) < 0) {
+	if (openfsrw(fsname, &fs, iflag || !nflag) < 0) {
 		printf("Can't read the super block\n");
 		return 0;
 	}

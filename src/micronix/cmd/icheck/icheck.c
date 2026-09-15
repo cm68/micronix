@@ -21,6 +21,7 @@
 int traceflags;
 
 int sflg;
+int iflag;
 
 int nfile;
 int nspcl;
@@ -64,6 +65,8 @@ check(file)
 {
     int b;
     int i;
+    int first, nblk;
+    char *bootname;
     struct dsknod *dp;
     unsigned short fl[100];
 
@@ -74,11 +77,25 @@ check(file)
      * all the work.  A check that is only checking should still not be
      * able to write.
      */
-    i = openfsrw(file, &fs, sflg);
+    i = openfsrw(file, &fs, sflg || iflag);
     if (i < 0) {
         printf("cannot open %s\n", file);
         nerror |= 04;
         return;
+    }
+
+    /*
+     * -i installs the boot: it builds the inode that owns the reserved
+     * boot blocks, without writing the boot itself.  It implies -s, so
+     * the free list is rebuilt in the same pass and the blocks come out
+     * allocated rather than free.
+     */
+    if (iflag) {
+        if (bootrange(fs, &first, &nblk, &bootname))
+            installboot(fs, first, nblk, bootname);
+        else
+            printf("%s: no boot area to install\n", file);
+        sflg = 1;
     }
 
     printf("%s:\n", file);
@@ -280,9 +297,10 @@ blockcheck(blkno, mesg)
 void
 usage(char *pname)
 {
-    fprintf(stderr, "usage:\n%s -[vsh] [-b <blocknum> ...] <filesystem>\n",
+    fprintf(stderr, "usage:\n%s -[vish] [-b <blocknum> ...] <filesystem>\n",
         pname);
     fprintf(stderr, "\t-s\trebuild freelist\n");
+    fprintf(stderr, "\t-i\tinstall the boot inode, then rebuild\n");
     fprintf(stderr, "\t-v\tbe verbose\n");
     fprintf(stderr, "\t-b\tlist of blocks to find in inodes\n");
     exit(1);
@@ -306,6 +324,9 @@ main(argc, argv)
                 continue;
             case 's':
                 sflg++;
+                continue;
+            case 'i':
+                iflag++;
                 continue;
             case 'b':
                 lp = blist;

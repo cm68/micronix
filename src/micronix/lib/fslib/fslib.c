@@ -94,3 +94,16 @@ closefs(struct super *fs)
 	close(u->fd);
 	free(u);
 }
+
+/*
+ * Where the boot area is.  The label that names it sits at physical
+ * cylinder 0, which this driver reaches only through the kernel's block
+ * device - whose rotation is the very thing the label describes - so a
+ * tool running on micronix cannot know it.  The host fslib, which reads
+ * the label directly, is where bootrange is real.
+ */
+int
+bootrange(struct super *fs, int *first, int *nblk, char **name)
+{
+	return 0;
+}

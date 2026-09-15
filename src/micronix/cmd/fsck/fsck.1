@@ -15,7 +15,7 @@ fsck
 USAGE
 .in +5
 .br
-fsck [-t] [-n] filesystem
+fsck [-t] [-n] [-i] filesystem
 .sp 2
 .in -5
 .bd
@@ -80,6 +80,11 @@ Options:
 -t	Test all of the blocks on the file system to
 see that each is readable.  Systems on large disks may take some 
 time to complete.
+.sp
+.ti -5
+-i	Install the boot: build the inode that owns the reserved boot
+blocks, without writing the boot.  Implies writing the superblock's
+block count out to include them.
 .sp
 .ti -5
 -n	No changes will be made.  

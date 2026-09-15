@@ -16,7 +16,7 @@ SYNTAX
 .in +5
 .br
 .bd
-icheck [ -sv ] [ -b block ... ] filesystem
+icheck [ -siv ] [ -b block ... ] filesystem
 .sp 2
 .in -5
 .bd
@@ -42,6 +42,11 @@ OPTIONS
 .ti -10
 -s	Rebuild the free list from the blocks the inodes say are in use.
 The file system is opened for writing.
+
+.ti -10
+-i	Install the boot.  Builds the inode that owns the reserved boot
+blocks, without writing the boot, and then rebuilds the free list as
+-s does.  The file system is opened for writing.
 
 .ti -10
 -v	Be verbose.

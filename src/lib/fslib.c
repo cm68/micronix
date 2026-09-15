@@ -57,6 +57,8 @@ struct image {
     int cyls;
     int heads;
     int roll;   /* what mw.c adds to blk / spc before wrapping */
+    int cyl0;       /* d_cyl0 - fs block at physical cylinder 0 */
+    int bootblks;   /* d_bootblks - how many blocks the boot owns */
     int label_fsize;    /* the label's filesystem fields, for cross-checking */
     int label_isize;
     int label_swap;
@@ -193,6 +195,8 @@ hdlabels(struct image *i)
          * will want to know a guess was made.
          */
         i->roll = i->cyls >> 1;
+        i->cyl0 = 0;
+        i->bootblks = 0;
         i->haslabel = 0;
         trace(trace_fs, "openfs: no %s label, assuming roll %d\n",
             DL_MAGIC, i->roll);
@@ -200,6 +204,8 @@ hdlabels(struct image *i)
     }
 
     i->roll = dl->d_roll;
+    i->cyl0 = dl->d_cyl0;
+    i->bootblks = dl->d_bootblks;
     i->haslabel = 1;
     i->label_fsize = dl->d_fsize;
     i->label_isize = dl->d_isize;
@@ -287,6 +293,9 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
         i->spt = 15;
         i->dt = ' ';
         i->altsec = 0;
+        i->cyl0 = 0;
+        i->bootblks = 0;
+        i->haslabel = 0;
 
         /*
          * A hard disk file says what it is in its first four bytes, so
@@ -423,6 +432,37 @@ int
 openfs(char *filesystem, struct super **fsp)
 {
     return openfsrw(filesystem, fsp, 0);
+}
+
+/*
+ * Where the boot area is, and what its file is called.  A hard disk
+ * carries a label at physical cylinder 0 naming d_cyl0 blocks beginning
+ * at d_cyl0 - the /boot/bootmw file.  A floppy has no label; its boot is
+ * the reserved tracks in front of the filesystem, which the roll maps to
+ * the blocks just past s_fsize - the /boot/bootdj file.
+ */
+int
+bootrange(struct super *fs, int *first, int *nblk, char **name)
+{
+    struct image *i = (struct image *)fs;
+
+    if (i->haslabel && i->bootblks) {
+        /* a hard disk: the label at cylinder 0 names the boot area */
+        *first = i->cyl0;
+        *nblk = i->bootblks;
+        *name = "bootmw";
+        return 1;
+    }
+    if (i->offset) {
+        /* a floppy: its boot is the reserved tracks in front, which the
+         * roll maps to the blocks just past the filesystem.  The offset
+         * is how many blocks those tracks hold. */
+        *first = fs->s_fsize;
+        *nblk = i->offset;
+        *name = "bootdj";
+        return 1;
+    }
+    return 0;
 }
 
 /*
@@ -949,7 +989,7 @@ namei(struct super *fs, char *name)
 /*
  * remove a file name.  if this is the last link, remove the inode
  */
-void
+int
 fileunlink(struct super *fs, char *name)
 {
     char *dirname = strdup(name);
@@ -970,6 +1010,14 @@ fileunlink(struct super *fs, char *name)
         dp = namei(fs, dirname);
     }
 
+    /* namei returns 0 when a path component is missing - rm /dev/x
+     * before mkdir /dev - so say so instead of dereferencing it below. */
+    if (!dp) {
+        printf("fileunlink: %s: parent directory not found\n", dirname);
+        free(dirname);
+        return -1;
+    }
+
     /*
      * The entry to look for is the last component, not the path.  This
      * compared whole paths against directory entries, so "/bin/fp" never
@@ -985,7 +1033,7 @@ fileunlink(struct super *fs, char *name)
     free(dirname);
 
     if ((dp->d_mode & IFMT) != IFDIR) {
-        return;
+        return -1;
     }
 
     /*
@@ -1026,7 +1074,7 @@ fileunlink(struct super *fs, char *name)
     ifree(dp);
     
     if (inum == 0) {
-        return;
+        return 0;
     }
 
     /*
@@ -1056,12 +1104,13 @@ fileunlink(struct super *fs, char *name)
     iput(dp);
     ifree(dp);
     fs->s_fmod = 1;
+    return 0;
 }
 
 /*
  * link an inode to a name
  */
-void
+int
 filelink(struct super *fs, char *path, int inum)
 {
     char *dirname = strdup(path);
@@ -1071,6 +1120,7 @@ filelink(struct super *fs, char *path, int inum)
     int entries;
     int size;
     int i;
+    int ret = 0;
  
     /*
      * get the directory inode
@@ -1084,7 +1134,19 @@ filelink(struct super *fs, char *path, int inum)
         dp = namei(fs, dirname);
     }
 
+    /*
+     * namei returns 0 when a path component is missing, so a link into
+     * a directory that does not exist - mknod /dev/x before mkdir /dev -
+     * used to dereference it here.  Say so instead of crashing.
+     */
+    if (!dp) {
+        printf("filelink: %s: parent directory not found\n", dirname);
+        ret = -1;
+        goto lose;
+    }
+
     if ((dp->d_mode & IFMT) != IFDIR) {
+        ret = -1;
         goto lose;
     }
 
@@ -1135,6 +1197,7 @@ filelink(struct super *fs, char *path, int inum)
 lose:
     if (dp) ifree(dp);
     free(dirname);
+    return ret;
 }
 
 /*
@@ -1209,7 +1272,8 @@ filecreate(struct super *fs, char *name)
         printf("ialloc failed\n");
         return 0;
     }
-    filelink(fs, name, inum);
+    if (filelink(fs, name, inum) < 0)
+        return 0;
     return (namei(fs, name));
 }
 

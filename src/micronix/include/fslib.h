@@ -43,3 +43,5 @@ extern void iblkfree(struct super *f, UINT *bp);
 extern void filefree(struct dsknod *ip);
 
 extern struct dir *getdirent(struct dsknod *ip, int index);
+extern int bootrange(struct super *f, int *first, int *nblk, char **name);
+extern int installboot(struct super *f, int first, int nblk, char *name);
