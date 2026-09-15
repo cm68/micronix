@@ -277,3 +277,21 @@ update: src.tar
 	$(RECURSE)
 	mkdir -p $(DEST)
 	tar -f src.tar -C $(DEST) --keep-newer-files -x $(NOWARN)
+
+#
+# One tar of the whole source tree - sources only, no .o or built
+# binaries - for create_vol to ship onto a volume.  It reuses update,
+# which stages exactly the sources (SRCS) per directory, but points it
+# at a scratch tree so the tar is not polluted by whatever an earlier
+# update left in the filesystem's /usr/src.  create_vol puts it on the
+# volume with "mnix tar x -C /usr/src".
+#
+SRCTREE = srctree
+SRCTAR = srctar.tar
+
+.PHONY: tarfile
+tarfile:
+	rm -rf $(SRCTREE)
+	$(MAKE) update ROOT=$(abspath $(SRCTREE))
+	cd $(abspath $(SRCTREE))/usr/src && tar -f $(abspath $(SRCTAR)) -c .
+	rm -rf $(SRCTREE)
