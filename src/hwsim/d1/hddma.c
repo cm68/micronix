@@ -405,7 +405,7 @@ attention(portaddr p, byte v)
             lc("secsize %d\n", i);
         }
         if (i != secsize[drv]) {
-        	lc("\tdrive %d sectorsize mismatch on specify %d expected %d\n", 
+        	tracec(trace_hddma, "\tdrive %d sectorsize mismatch on specify %d expected %d\n", 
                 drv, i, secsize[drv]);
         }
         // secsz[drv] = secsize;

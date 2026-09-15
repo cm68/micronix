@@ -151,17 +151,30 @@ open_terminal(char *name, int signum, int *in_p, int *out_p, int cooked, char *l
             FD_SET(in, &readfds);
             FD_SET(pipe_down[0], &readfds);
             select(fds, &readfds, 0, 0, 0);
-            ioctl(in, FIONREAD, &i);
-            if (i) {
-                read(in, &c, 1);
+
+            if (FD_ISSET(in, &readfds)) {
+                i = read(in, &c, 1);
+                if (i <= 0) {
+                    /*
+                     * The xterm is gone - its pty master closed - so the
+                     * slave reads EOF.  Hang up the simulator so closing
+                     * the window tears the whole thing down instead of
+                     * leaving d1 running behind it.
+                     */
+                    kill(mypid, SIGHUP);
+                    _exit(0);
+                }
                 write(pipe_up[1], &c, 1);
                 if (signum) {
                     kill(mypid, signum);
                 }
             }
-            ioctl(pipe_down[0], FIONREAD, &i);
-            if (i) {
-                read(pipe_down[0], &c, 1);
+
+            if (FD_ISSET(pipe_down[0], &readfds)) {
+                i = read(pipe_down[0], &c, 1);
+                if (i <= 0) {
+                    _exit(0);
+                }
                 write(in, &c, 1);
             }
         }

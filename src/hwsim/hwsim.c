@@ -1004,6 +1004,48 @@ bootdev(char *name)
 }
 
 /*
+ * Send stdout - the trace, via logfd - to both the invoking terminal and
+ * a logfile.  This is for when uart 0 (the console) is in an xterm: the
+ * terminal this program was started from is then free, so the trace can
+ * be watched there instead of tailing the logfile.  A child copies a
+ * pipe to the two places; the parent's stdout is the pipe.
+ */
+static void
+tee_stdout(char *logfile)
+{
+    int termfd = dup(1);    /* the invoking terminal */
+    int lfd;
+    int p[2];
+    int n;
+    char buf[4096];
+
+    lfd = open(logfile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (termfd < 0 || lfd < 0) {
+        perror(logfile);
+        exit(1);
+    }
+
+    pipe(p);
+    if (fork() == 0) {
+        close(p[1]);
+        while ((n = read(p[0], buf, sizeof buf)) > 0) {
+            write(termfd, buf, n);
+            write(lfd, buf, n);
+        }
+        close(termfd);
+        close(lfd);
+        _exit(0);
+    }
+
+    close(p[0]);
+    dup2(p[1], 1);
+    close(p[1]);
+    close(termfd);
+    close(lfd);
+    setvbuf(stdout, 0, _IONBF, 0);
+}
+
+/*
  * A drive named on the command line: <controller><unit>:<file>, as in
  *
  *	djdma0:boot.IMD  hdcdma0:hddma-0  hdca1:/tmp/scratch
@@ -1358,12 +1400,18 @@ main(int argc, char **argv)
         setvbuf(stdout, 0, _IONBF, 0);
     } else {
         inst_countdown = -1;
-        stdout = freopen(LOGFILE, "w+", stdout);
-        if (!stdout) {
-            perror("lose");
+        if ((config_sw >> 8) & 0x1) {
+            /* uart 0 is in an xterm, so the invoking terminal is free:
+             * mirror the trace there as well as the logfile */
+            tee_stdout(LOGFILE);
+        } else {
+            stdout = freopen(LOGFILE, "w+", stdout);
+            if (!stdout) {
+                perror("lose");
+            }
+            setvbuf(stdout, 0, _IONBF, 0);
+            printf("log file\n");
         }
-        setvbuf(stdout, 0, _IONBF, 0);
-        printf("log file\n");
     }
 
     if (traceflags) {
