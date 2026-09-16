@@ -28,7 +28,13 @@
  */
 struct uxfs {
 	struct super sb;
+	/* the superblock is a full 512-byte block; the struct only names
+	 * the 415 bytes that are used, so readblk's block read would run
+	 * past the malloc'd handle and into the next heap block without
+	 * this pad. */
+	char pad[BSIZE - sizeof(struct super)];
 	int fd;
+	int writable;
 };
 
 int
@@ -68,6 +74,7 @@ openfsrw(char *name, struct super **fsp, int writable)
 {
 	struct uxfs *u = malloc(sizeof(struct uxfs));
 
+	u->writable = writable;
 	u->fd = open(name, writable ? 2 : 0);
 	if (u->fd < 0) {
 		free(u);
@@ -89,7 +96,7 @@ closefs(struct super *fs)
 {
 	struct uxfs *u = (struct uxfs *)fs;
 
-	if (fs->s_fmod)
+	if (fs->s_fmod && u->writable)
 		writeblk(fs, 1, (char *)&u->sb);
 	close(u->fd);
 	free(u);
