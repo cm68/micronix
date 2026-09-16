@@ -60,7 +60,7 @@ int	nfree;
 int	nbad;
 int	nblocks;
 
-int	nerrors;		/* number of things fixed */
+int	nerrors;		/* problems found - the exit status */
 
 /*
  * the block map - one entry per block, recording who first claimed it
@@ -169,7 +169,7 @@ main(int argc, char *argv[])
 
 out:
 	closefs(fs);
-	return 1;
+	return nerrors != 0;
 }
 
 /*
@@ -213,12 +213,14 @@ countblock(int inum, int off, int b, int type)
 	if (b >= fs->s_fsize) {
 		printf("Out of range block in I-list, Inode %u, Block %u\n",
 		    inum, b);
+		nerrors++;
 		return;
 	}
 	bp = &blockmap[b];
 	if (bp->b_count++) {
 		printf("Dup in I-list, Inode %u, Block %u\n",
 		    bp->b_inode, b);
+		nerrors++;
 	} else {
 		bp->b_inode = inum;
 		bp->b_offset = off;
@@ -342,14 +344,17 @@ freeblock(int b, int chain)
 		return;
 	if (b >= fs->s_fsize) {
 		printf("Out of range block in Free, Block %u, Type %s\n", b, what);
+		nerrors++;
 		return;
 	}
 	if (freemap[b]) {
 		printf("Dup in Free, Block %u, Type %s\n", b, what);
+		nerrors++;
 		return;
 	}
 	if (blockmap[b].b_count) {
 		printf("Allocated block in Free, Block %u, Type %s\n", b, what);
+		nerrors++;
 		return;
 	}
 	freemap[b] = 1;
@@ -420,6 +425,7 @@ checkfree(void)
 	}
 	if (missing) {
 		printf("%u missing blocks\n", missing);
+		nerrors++;
 		if (!nflag)
 			rebuildfree();
 	}
@@ -487,6 +493,7 @@ checkdirs(void)
 			if (dp->ino >= fs->s_isize * I_PER_BLK) {
 				printf("Dir. entry inumber out of range,"
 				    " Inode %u, Entry %u\n", inum, dp->ino);
+				nerrors++;
 				continue;
 			}
 			refcount[dp->ino]++;
@@ -518,6 +525,7 @@ checkilist2(void)
 		if (refcount[inum] != ip->d_nlink) {
 			printf("Inode %u, %u Directory entries, Link count %u\n",
 			    inum, (unsigned)refcount[inum], ip->d_nlink);
+			nerrors++;
 			if (!nflag) {
 				ip->d_nlink = refcount[inum];
 				iput(ip);
@@ -611,6 +619,7 @@ huntbad(void)
 			continue;
 		printf("Bad block: %u\n", b);
 		nbad++;
+		nerrors++;
 		patchbad(b);
 	}
 }
@@ -695,6 +704,7 @@ findorphans(void)
 		}
 		if (refcount[inum] == 0 && ip->d_nlink != 0) {
 			norphans++;
+			nerrors++;
 			if (!nflag) {
 				if (lfd == 0)
 					lfd = findlostfound();
