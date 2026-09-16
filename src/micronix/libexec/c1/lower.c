@@ -648,6 +648,30 @@ bytepair(Expr *e)
 }
 
 /*
+ * Park a word left operand (in HL) on the stack, reduce the right into
+ * DE, and take the left back.  A compound assignment whose right side
+ * has to be computed works in HL - a shift, a call, a load through a
+ * pointer - which is where the left operand is already sitting; the
+ * stack is the only temporary there is.
+ */
+void
+wordpair(Expr *e)
+{
+	char w;
+
+	out("\tpush hl\n");
+	e->right = rewrite1(e->right);
+	if (e->right->op == INHL) {
+		w = e->right->width;
+		out("\tex de,hl\n");
+		freeexpr(e->right);
+		e->right = mkcode(w, R_DE);
+		e->right->op = INDE;
+	}
+	out("\tpop hl\n");
+}
+
+/*
  * A reduced operand does not always land where it was asked to: a byte
  * operation can only end in A and a call only in HL, whatever target
  * they were given.  Move it, for the cases where something else is
@@ -800,6 +824,8 @@ docompound(Expr *e)
 	 */
 	if (isbyte && rhs->op != NUMBER && !reduced(rhs))
 		bytepair(sum);
+	else if (!isbyte && rhs->op != NUMBER && !reduced(rhs))
+		wordpair(sum);
 	sum = rewrite(sum);
 	/*
 	 * The store below asserts the answer landed in A or HL.  When no
