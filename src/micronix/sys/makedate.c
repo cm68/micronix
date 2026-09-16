@@ -22,8 +22,9 @@ main()
 	
 	fd = creat("build.h", 0777);
 	write(fd, comment, strlen(comment));
-	sprintf(buf, "#define	BUILD_DATE \"Created %2d/%2d/%2d\\n\"\n", 
-		tm->month + 1, tm->day_month, tm->year + 1900);
+	sprintf(buf, "#define	BUILD_DATE \"Created %2d/%2d/%2d %2d:%02d:%02d\\n\"\n",
+		tm->month + 1, tm->day_month, tm->year + 1900,
+		tm->hours, tm->minutes, tm->seconds);
 	write(fd, buf, strlen(buf));
 	close(fd);
 	exit(0);
