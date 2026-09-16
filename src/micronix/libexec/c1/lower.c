@@ -295,6 +295,44 @@ dupableloc(Expr *e)
 }
 
 /*
+ * Does this lvalue's address read a pointer out of memory to find the
+ * place?  A DEREF whose child is a memory location - a symbol, a frame
+ * slot, an index - is that load.  "u.p->mode" is the address
+ * *(u+545)+8, the DEREF being the load of u.p.  A DEREF over a register
+ * pointer or a literal address is not: the pointer is already in hand.
+ */
+static int
+hasptrload(Expr *e)
+{
+	while (e) {
+		if (e->op == DEREF && e->left &&
+		    e->left->op != REGVAR && e->left->op != NUMBER)
+			return 1;
+		if (hasptrload(e->right))
+			return 1;
+		e = e->left;
+	}
+	return 0;
+}
+
+/*
+ * Is this lvalue cheap to name twice?  Naming a location twice is the
+ * whole of lowercompound's expansion, and a place the load rules reach
+ * where it stands - a register home, a frame slot, a symbol, an index -
+ * costs nothing more than a second addressing mode.  A location reached
+ * through a pointer that has to be LOADED is not: naming it twice loads
+ * the pointer twice.  Those are the lvalues for docompound, which works
+ * the address out once.  A bare "*p" - DEREF at the top - is cheap
+ * enough either way and stays here, because docompound's address step
+ * reads a top-level DEREF as a value, not as the place.
+ */
+int
+cheapaddr(Expr *e)
+{
+	return !e || e->op == DEREF || !hasptrload(e);
+}
+
+/*
  * The same location read rather than written.  A location and the
  * value in it are different expressions, and the difference is one
  * load for every level of indirection:
@@ -351,6 +389,20 @@ lowercompound(Expr *e)
 		return 0;
 
 	w = e->width;
+
+	/*
+	 * Naming a location twice is the whole of this expansion, and a
+	 * pointer that has to be loaded before it can be dereferenced is
+	 * not cheap to load twice.  docompound works the address out once
+	 * for exactly those.  Two kinds stay here: longs, which docompound
+	 * is not byte or word enough to carry, and a byte multiply, divide
+	 * or remainder, whose promotion to word width is what the block
+	 * below is for and which docompound has no rules for.
+	 */
+	if (!ISLONG(w) && !cheapaddr(e->left) &&
+	    !(ISBYTE(w) && (op == STAR || op == DIV || op == MOD)))
+		return 0;
+
 	loc = e->left;
 	rhs = e->right;
 	e->left = e->right = 0;
@@ -584,6 +636,13 @@ bytepair(Expr *e)
 		freeexpr(e->right);
 		e->right = mkcode(w, R_E);
 		e->right->op = INE;
+	} else if (e->right->op == INHL && ISBYTE(e->right->width)) {
+		/* a call's byte result sits in L, not A */
+		w = e->right->width;
+		out("\tld e,l\n");
+		freeexpr(e->right);
+		e->right = mkcode(w, R_E);
+		e->right->op = INE;
 	}
 	out("\tpop af\n");
 }
@@ -650,6 +709,7 @@ docompound(Expr *e)
 	char w = e->width;
 	int isbyte = ISBYTE(w);
 	Expr *addr, *val, *rhs, *sum, *n;
+	int keep;
 
 	if (!op || !e->left || !e->right)
 		return 0;
@@ -670,7 +730,52 @@ docompound(Expr *e)
 		return 0;
 	}
 	freeexpr(addr);
-	out("\tpush hl\n");
+
+	/*
+	 * One bit set or cleared in a byte is worked in place: set b,(hl) /
+	 * res b,(hl) need neither the read, the store, nor the stack that
+	 * preserves the address while the value is worked out.  The value
+	 * is read back only when the expression's value is wanted.
+	 */
+	if (isbyte && e->right->op == NUMBER) {
+		long m = e->right->u.val;
+		int bit;
+
+		if (op == OR && (bit = ispow2(m & 0xff)) >= 0) {
+			out("\tset ");
+			outc('0' + bit);
+			out(",(hl)\n");
+		} else if (op == AND && (bit = ispow2((~m) & 0xff)) >= 0) {
+			out("\tres ");
+			outc('0' + bit);
+			out(",(hl)\n");
+		} else
+			bit = -1;
+		if (bit >= 0) {
+			if (e->dest == DEST_VALUE || e->dest == DEST_STACK)
+				out("\tld a,(hl)\n");
+			else if (e->dest == DEST_FLAGS)
+				out("\tld a,(hl)\n\tor a\n");
+			n = mkcode(w, R_A);
+			n->op = INA;
+			freeexpr(e->right);
+			e->right = 0;
+			n->dest = e->dest;
+			freeexpr(e);
+			return n;
+		}
+	}
+
+	/*
+	 * A byte worked against a constant applies the operator to A and
+	 * leaves the address in HL alone, so there is nothing to preserve
+	 * across it.  Anything else - a word, whose own arithmetic uses HL,
+	 * or a right side that has to be worked out - parks the address on
+	 * the stack while the value is computed.
+	 */
+	keep = !isbyte || e->right->op != NUMBER;
+	if (keep)
+		out("\tpush hl\n");
 
 	/* read through it */
 	if (isbyte)
@@ -718,7 +823,7 @@ docompound(Expr *e)
 
 	/* store it back through the address that was waiting */
 	if (isbyte) {
-		out("\tpop hl\n\tld (hl),a\n");
+		out(keep ? "\tpop hl\n\tld (hl),a\n" : "\tld (hl),a\n");
 		n = mkcode(w, R_A);
 		n->op = INA;
 	} else {
@@ -728,6 +833,130 @@ docompound(Expr *e)
 	}
 	freeexpr(sum);
 	n->dest = e->dest;
+	freeexpr(e);
+	return n;
+}
+
+/*
+ * Byte |= (1<<b) and &= ~(1<<b) where the byte is reached through an
+ * index register or a register pointer: set b,(ix+d) / res b,(ix+d)
+ * work the byte in place - no read, no store, and the address needs no
+ * HL.  A pointer in BC or DE is moved to HL first, since the Z80 bit
+ * ops have no (bc) or (de) form.  The address is already in hand here,
+ * which is what keeps it cheap: this is for INDEX and DEREF(REGVAR),
+ * while the pointer-loaded-from-memory shape still goes to docompound.
+ *
+ * Returns a node, or 0 to fall through to the ordinary compound paths.
+ */
+Expr *
+trybitset(Expr *e)
+{
+	unsigned char op = baseop(e->op);
+	char w = e->width;
+	Expr *loc, *n;
+	long m;
+	int bit, isres;
+	unsigned char reg = 0;	/* index register, 0 = none */
+	int off = 0;
+	int hl = 0;		/* the address is (or has moved to) HL */
+
+	if (!op || !ISBYTE(w) || !e->right || e->right->op != NUMBER)
+		return 0;
+	m = e->right->u.val;
+	if (op == OR && (bit = ispow2(m & 0xff)) >= 0)
+		isres = 0;
+	else if (op == AND && (bit = ispow2((~m) & 0xff)) >= 0)
+		isres = 1;
+	else
+		return 0;
+
+	loc = e->left;
+	if (loc->op == INDEX) {
+		reg = loc->u.var.reg;
+		off = loc->u.var.off;
+	} else if (loc->op == DEREF && loc->left && loc->left->op == REGVAR) {
+		unsigned char r = loc->left->u.var.reg;
+
+		if (r == R_IX || r == R_IY)
+			reg = r;
+		else if (r == R_HL)
+			hl = 1;
+		else if (r == R_BC || r == R_DE) {
+			out(r == R_BC ? "\tpush bc\n\tpop hl\n" :
+			    "\tpush de\n\tpop hl\n");
+			hl = 1;
+		} else
+			return 0;
+	} else if (loc->op == PLUS && loc->left && loc->right &&
+	    loc->left->op == REGVAR && loc->right->op == NUMBER) {
+		/*
+		 * A member of a register pointer - "p->mode" is p+8 before
+		 * it has folded to INDEX.  The index registers take the
+		 * offset as (ix+d); anything else lands in HL first.
+		 */
+		unsigned char r = loc->left->u.var.reg;
+		int o = (int)loc->right->u.val;
+
+		if ((r == R_IX || r == R_IY) && o >= -128 && o <= 127) {
+			reg = r;
+			off = o;
+		} else if (r == R_HL) {
+			if (o != 0) {
+				out("\tld de,");
+				outd(o);
+				out("\n\tadd hl,de\n");
+			}
+			hl = 1;
+		} else if (r == R_BC || r == R_DE) {
+			out(r == R_BC ? "\tpush bc\n\tpop hl\n" :
+			    "\tpush de\n\tpop hl\n");
+			if (o != 0) {
+				out("\tld de,");
+				outd(o);
+				out("\n\tadd hl,de\n");
+			}
+			hl = 1;
+		} else
+			return 0;
+	} else
+		return 0;
+
+	out(isres ? "\tres " : "\tset ");
+	outc('0' + bit);
+	if (hl) {
+		out(",(hl)\n");
+	} else {
+		out(",(");
+		out(idxregname(reg));
+		if (off >= 0)
+			outc('+');
+		outd(off);
+		out(")\n");
+	}
+
+	if (e->dest == DEST_VALUE || e->dest == DEST_STACK ||
+	    e->dest == DEST_FLAGS) {
+		if (hl)
+			out("\tld a,(hl)\n");
+		else {
+			out("\tld a,(");
+			out(idxregname(reg));
+			if (off >= 0)
+				outc('+');
+			outd(off);
+			out(")\n");
+		}
+		if (e->dest == DEST_FLAGS)
+			out("\tor a\n");
+	}
+
+	n = mkcode(w, R_A);
+	n->op = INA;
+	n->dest = e->dest;
+	freeexpr(e->left);
+	e->left = 0;
+	freeexpr(e->right);
+	e->right = 0;
 	freeexpr(e);
 	return n;
 }
@@ -1641,6 +1870,22 @@ rewrite1(Expr *e)
 	}
 
 	/*
+	 * A shift whose left operand is a bare symbol.  The address is
+	 * the value, and the shift rules take it from HL, so load it up
+	 * front and let the (H,num) forms carry every context.  Without
+	 * it "(unsigned)djcomm >> 8" - how a driver writes a 24-bit
+	 * controller address one byte at a time - emitted no shift at
+	 * all, and the store that followed read whatever HL last held.
+	 */
+	if ((e->op == LSHIFT || e->op == RSHIFT) && e->left && e->right &&
+	    issymish(e->left)) {
+		/* a bare SYM reduces to SYMREF first, emitting nothing */
+		e->left = rewrite1(e->left);
+		if (e->left->op == SYMREF)
+			e->left = symtohl(e->left);
+	}
+
+	/*
 	 * A 32-bit binary operator, before the children are reduced: both
 	 * operands want HL:DE, so the ordinary depth-first walk would put
 	 * the second one on top of the first.
@@ -1723,6 +1968,15 @@ rewrite1(Expr *e)
 	if (baseop(e->op)) {
 		unsigned char tgt = e->tgt ? e->tgt : R_HL;
 		unsigned char dst = e->dest;
+
+		/*
+		 * A byte |= single bit or &= its complement, through a place
+		 * the bit ops reach directly - an index register or a pointer
+		 * in a register.  Emit the set/res in place and be done.
+		 */
+		n = trybitset(e);
+		if (n)
+			return n;
 
 		n = lowercompound(e);
 		if (n) {
