@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+# Boot the new ccc kernel from the hard disk.
+#
+# Writes the freshly built kernel (../../kernels/micronix.ccc) onto the
+# drive as /micronix, then boots it off the HD-DMA path - the same boot
+# the hardware does: the monitor ROM reads the first-level loader off
+# cylinder 0 and that reads /micronix off the filesystem.  -B hdcdma is
+# the "skip the monitor, boot the HD-DMA" switch.  ./run is the
+# floppy-side boot; this one boots straight off the drive.
+#
+#	./runh			the console is this window, nothing else
+#	./runh -t 0x100000	trace syscalls into the logfile
+#	./runh -c 0x114		console in an xterm of its own
+#	./runh work.hddma	boot a specific drive (default hddma-0)
+#
+# The drive is written in place, so start from a copy of the blessed
+# drive rather than the blessed drive itself:
+#
+#	cp hddma-0.blessed mine
+#	./runh mine
+#
+# Build the kernel first if ../../kernels/micronix.ccc is missing:
+#	make -C ../../src/micronix/sys unix
+#	cp ../../src/micronix/sys/unix ../../kernels/micronix.ccc
+#
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+root=`cd "$here/../.." && pwd`
+
+# First positional argument names the drive file; the rest go to d1.
+drive=hddma-0
+case "$1" in
+-*|"")	;;
+*)	drive=$1; shift ;;
+esac
+
+kernel="$root/kernels/micronix.ccc"
+if [ ! -f "$kernel" ]; then
+	echo "runh: $kernel not found" >&2
+	echo "runh: build it first:" >&2
+	echo "runh:   make -C ../../src/micronix/sys unix" >&2
+	echo "runh:   cp ../../src/micronix/sys/unix ../../kernels/micronix.ccc" >&2
+	exit 1
+fi
+
+# Put the new kernel on the drive.  Plain write (not -k): the ccc
+# kernel is a different size than what shipped, so the file moves.
+"$root/src/tools/mnix" -f "$here/$drive" write "$kernel" /micronix
+
+# Writes to a drive image go to a -delta beside it and stay there, so
+# without this every run starts from wherever the last one left off.
+for d in "$here"/*-delta; do
+	if [ -f "$d" ]; then
+		echo "runh: discarding $d"
+		rm -f "$d"
+	fi
+done
+
+# -l only when there is something to log
+log=
+for a in "$@"; do
+	case "$a" in
+	-t) log=-l ;;
+	esac
+done
+
+cd "$root/src/hwsim/d1" || exit 1
+
+exec ./d1 -b roms/mon447.bin -B hdcdma $log "hdcdma0:$here/$drive" "$@"

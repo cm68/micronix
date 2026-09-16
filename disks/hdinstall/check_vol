@@ -1,0 +1,60 @@
+#!/bin/sh
+#
+# Check a hard disk volume with the host filesystem tools.
+#
+#	./check_vol <volume>
+#
+# <volume> is the drive file create_vol made.  The host versions of
+# ncheck, icheck, dcheck and fsck - the same sources as the ones in
+# /bin, compiled for the host against the host fslib - read the image
+# directly, so the volume can be checked without booting it or running
+# the simulator.
+#
+# The tools run read-only: ncheck and dcheck only read, icheck without
+# -s only reads, and fsck -n makes no changes.  Nothing here writes to
+# the volume.
+#
+# The tools take the image path directly.  The geometry comes from the
+# volume's own labels (the host fslib reads the simlabel/dlabel), so
+# there is no device number to name - the file is the whole story.
+#
+# Each tool returns 0 when the volume is clean and non-zero when it
+# found a problem, and check_vol does the same: it runs all four, shows
+# each report and status, and only the last status is its own.
+#
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+root=`cd "$here/../.." && pwd`
+
+vol="$1"
+if [ -z "$vol" ]; then
+	echo "usage: $0 <volume>" >&2
+	exit 1
+fi
+case "$vol" in
+/*)	;;
+*)	vol="$here/$vol" ;;
+esac
+if [ ! -f "$vol" ]; then
+	echo "$0: $vol not found" >&2
+	exit 1
+fi
+
+tools="$root/src/tools"
+status=0
+
+for tool in ncheck icheck dcheck; do
+	echo "=== $tool ==="
+	"$tools/$tool" "$vol"
+	st=$?
+	echo "--- $tool exit $st ---"
+	[ $st -ne 0 ] && status=1
+done
+echo "=== fsck ==="
+"$tools/fsck" -n "$vol"
+st=$?
+echo "--- fsck exit $st ---"
+[ $st -ne 0 ] && status=1
+
+exit $status
