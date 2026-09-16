@@ -12,6 +12,7 @@
  * than rewriting the refresh logic.
  */
 #define NCURSES_INTERNALS 1
+#define _GNU_SOURCE         /* vdprintf, for message() under -n */
 #include <curses.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -23,6 +24,11 @@
 #include "z80glue.h"
 #include "disz80.h"
 #include "mnix.h"
+
+/* util.h's trace() collides with the curses trace() macro, so declare
+ * just the two things message() needs instead of including the header. */
+extern int logfd;
+extern int no_console_log;
 
 extern unsigned short lookup_sym(char *);
 extern int mypid;
@@ -409,11 +415,13 @@ message(char *fmt, ...)
     va_list args;
     va_start(args, fmt);
 
-    if (!win) {
-        vfprintf(stderr, fmt, args);
-    } else {
+    if (win) {
         vw_printw(win[W_CMD], fmt, args);
         wrefresh(win[W_CMD]);
+    } else if (no_console_log) {
+        vdprintf(logfd, fmt, args);
+    } else {
+        vfprintf(stderr, fmt, args);
     }
     va_end(args);
 }

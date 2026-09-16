@@ -22,6 +22,7 @@ extern char *tracenames[];
 extern int traceflags;
 
 extern int logfd;
+extern int no_console_log;
 
 void l(const char *format, ...);
 void lc(const char *format, ...);

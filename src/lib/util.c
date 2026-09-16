@@ -26,6 +26,7 @@
 #include "../include/util.h"
 
 int logfd = 1;
+int no_console_log;    /* -n: message() writes to the logfile, not stderr */
 
 u64
 now64()

@@ -447,6 +447,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-x\topen a debug terminal window\n");
     fprintf(stderr, "\t-t\t<tracebits>, or names: -t syscall,trap\n");
     fprintf(stderr, "\t-l\tproduce logfile\n");
+    fprintf(stderr, "\t-n\tno console log: trace to the logfile, not the terminal\n");
     for (i = 0; tracenames[i]; i++) {
         fprintf(stderr, "\t%x %s\n", 1 << i, tracenames[i]);
     }
@@ -1045,7 +1046,8 @@ tee_stdout(char *logfile)
     if (fork() == 0) {
         close(p[1]);
         while ((n = read(p[0], buf, sizeof buf)) > 0) {
-            write(termfd, buf, n);
+            if (!no_console_log)
+                write(termfd, buf, n);
             write(lfd, buf, n);
         }
         close(termfd);
@@ -1229,6 +1231,9 @@ main(int argc, char **argv)
             switch (*s++) {
             case 'l':
                 log_output = 1;
+                break;
+            case 'n':
+                no_console_log = 1;
                 break;
             case 'x':
                 inst_countdown = 0;
