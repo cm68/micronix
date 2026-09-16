@@ -493,6 +493,8 @@ struct mframe {
 	unsigned char nbrk;
 	unsigned char pd;
 	unsigned char inbrk;
+	unsigned char name;	/* the declarator's name has been seen */
+	unsigned char fn;	/* inside the function's parameter list */
 	unsigned char bad;
 };
 #define MAXMFR 4
@@ -521,6 +523,8 @@ mmember(struct mframe *m)
 	m->ptr = 0;
 	m->arr = 0;
 	m->nbrk = 0;
+	m->name = 0;
+	m->fn = 0;
 }
 
 static void
@@ -542,6 +546,8 @@ mpush(char *tag, unsigned char isu)
 	m->nbrk = 0;
 	m->pd = 0;
 	m->inbrk = 0;
+	m->name = 0;
+	m->fn = 0;
 	m->bad = 0;
 }
 
@@ -616,18 +622,32 @@ mtok(struct token *t)
 		return;
 	}
 	switch (t->type) {
-	case STAR:	if (!m->pd) m->ptr++; break;
-	case LPAR:	m->pd++; break;
+	case STAR:	if (!m->fn) m->ptr++; break;
+	case LPAR:
+		/* A '(' once the name is out is the function's parameter
+		 * list; a '(' before the name is the parenthesised
+		 * declarator of "unsigned (*slist[8])()" - an array of
+		 * function pointers, which proc.h keeps its signal
+		 * dispositions in - and the '*' and '[]' inside it are
+		 * the member's own, not parameter noise. */
+		if (m->name && !m->pd)
+			m->fn = 1;
+		else
+			m->pd++;
+		break;
 	case RPAR:	if (m->pd) m->pd--; break;
-	case LBRACK:	if (!m->pd) m->inbrk = 1; break;
-	case COMMA:	if (!m->pd) mmember(m); break;
+	case LBRACK:	if (!m->fn) m->inbrk = 1; break;
+	case SYM:	if (!m->fn) m->name = 1; break;
+	case COMMA:	if (!m->fn && !m->pd) mmember(m); break;
 	case SEMI:	mmember(m);
 			m->base = 0;
+			m->name = 0;
+			m->fn = 0;
 			break;
 	case BEGIN:	mpush(0, 0); break;	/* anonymous body */
 	case END:	mpop(); break;
 	default:
-		if (szkw(t->type))
+		if (szkw(t->type) && !m->fn)
 			m->base = kwsz(t->type, m->base);
 		break;
 	}
