@@ -127,6 +127,7 @@ docall(addr, direct)
     int direct;
 {
     register int call, nbytes;
+    int dummy;
 
     if (direct)
         call = getbyte(addr++);
@@ -140,7 +141,7 @@ docall(addr, direct)
     copyin(addr, arg, nbytes);
     if (direct) {
         u.pc += nbytes + 1;
-        saveframe(&u.abort[0], &u.abort[1]);
+        saveframe(&u.abort, &dummy);
     }
     if (trace && call)
         pr(" %d:%d ", procid(u.p), call);

@@ -189,14 +189,16 @@ core()
  * If priority is low and a signal is waiting,
  * abort the current system call. Called by sleep.
  */
-abort()
+abort(dummy)
+    int dummy;      /* unused: forces a 1-argument frame, see setframe */
 {
-    register int s;
+    int s;
+    volatile int force_frame;   /* force an IY-based exit, like next() */
 
     if ((s = sig()) == 0 || s == SIGTINT)
         return;
     u.error = EINTR;
-    setframe(u.abort[0], u.abort[1]);
+    setframe(u.abort, u.abort);
 }
 
 /*
