@@ -196,7 +196,7 @@ abort()
     if ((s = sig()) == 0 || s == SIGTINT)
         return;
     u.error = EINTR;
-    setframe(u.abort, u.abort);
+    setframe(u.abort[0], u.abort[1]);
 }
 
 /*

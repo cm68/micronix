@@ -93,7 +93,7 @@ struct user {
     UINT8 egid;                 /* effective group id */
 #endif
     char *brake;                /* end of code-data segment + 1 */
-    int *abort;                 /* see docall (system.c) */
+    int *abort[2];              /* see docall (system.c): frame & stack ptr */
     struct inode *cdir;         /* current directory */
     struct file *olist[NOPEN];  /* open files */
     struct inode *iparent;      /* temp for create, link */
