@@ -127,6 +127,7 @@ struct object {
     FILE *fp;
     long file_base;                 /* base offset in file (for archives) */
     unsigned char config;
+    unsigned char placed;           /* -r object: segments at absolute addrs */
     unsigned char symlen;
     unsigned short symtab_size;
     unsigned short text_size;
@@ -1885,19 +1886,50 @@ pass1_layout()
 
     bss_merge();
 
-    /* assign segment offsets to each object */
-    for (obj = objects; obj; obj = obj->next) {
-        obj->text_off = text_pos;
-        obj->data_off = data_pos;
-        obj->bss_off = bss_pos;
+    /*
+     * Mark placed objects: a -r object whose header records absolute
+     * segment addresses.  The assembler writes textoff=0 and
+     * dataoff=text_size, so anything else means "linked once already,
+     * at these addresses".  A data-only -r link (text_base 0) has
+     * textoff=0 too, which is why the dataoff half matters.
+     */
+    for (obj = objects; obj; obj = obj->next)
+        obj->placed = !(obj->hdr_text_off == 0 &&
+                        obj->hdr_data_off == obj->text_size);
 
-        text_pos += obj->text_size;
-        data_pos += obj->data_size;
-        bss_pos += obj->bss_size;
+    /*
+     * assign segment offsets to each object.  Placed objects go at the
+     * absolute addresses their -r header recorded; everyone else packs
+     * contiguously, as before.
+     */
+    for (obj = objects; obj; obj = obj->next) {
+        if (obj->placed) {
+            if (obj->hdr_text_off == 0) {
+                /* A -Tdata-only -r link left the text at 0: it is
+                 * relative, not absolute, so pack it into the main text
+                 * like any other object.  The data's file offset is
+                 * 16 + text_size, so the size must survive. */
+                obj->text_off = text_pos;
+                text_pos += obj->text_size;
+            } else {
+                obj->text_off = obj->hdr_text_off - text_base;
+            }
+            obj->data_off = 0;      /* filled in once data_base is known */
+            obj->bss_off = 0;
+        } else {
+            obj->text_off = text_pos;
+            obj->data_off = data_pos;
+            obj->bss_off = bss_pos;
+
+            text_pos += obj->text_size;
+            data_pos += obj->data_size;
+            bss_pos += obj->bss_size;
+        }
 
         if (verbose) {
-            printf("%s: text@0x%04x data@0x%04x bss@0x%04x\n",
-                   obj->name, obj->text_off, obj->data_off, obj->bss_off);
+            printf("%s: text@0x%04x data@0x%04x bss@0x%04x%s\n",
+                   obj->name, obj->text_off, obj->data_off, obj->bss_off,
+                   obj->placed ? " (placed)" : "");
         }
     }
 
@@ -1915,6 +1947,41 @@ pass1_layout()
         data_base = text_base + total_text;
     if (!bss_set)
         bss_base = data_base + total_data;
+
+    /*
+     * Now that data_base is fixed, resolve the placed objects' data and
+     * bss offsets and widen the totals so the segments span them.  A
+     * placed object's bss rides just after its own data; refusing it
+     * here is honest rather than silently placing it wrong.
+     */
+    for (obj = objects; obj; obj = obj->next) {
+        unsigned short end;
+
+        if (!obj->placed)
+            continue;
+        if (obj->bss_size != 0) {
+            fprintf(stderr, "ld: placed object %s has bss (unsupported)\n",
+                    obj->name);
+            exit(1);
+        }
+        obj->data_off = obj->hdr_data_off - data_base;
+        obj->bss_off = obj->data_off + obj->data_size;
+
+        /* A data-only placed object (hdr_text_off 0) has no text, and
+         * text_off wraps to a huge value when text_base is nonzero;
+         * its (empty) text must not widen the segment.  Same for an
+         * empty data segment. */
+        if (obj->text_size != 0) {
+            end = obj->text_off + obj->text_size;
+            if (end > total_text)
+                total_text = end;
+        }
+        if (obj->data_size != 0) {
+            end = obj->data_off + obj->data_size;
+            if (end > total_data)
+                total_data = end;
+        }
+    }
 
     /* find linker-defined symbols and save original offsets BEFORE resolution */
     {
@@ -1941,8 +2008,10 @@ pass1_layout()
         if (s->seg == SEG_ABS)
             continue;
 
-        /* adjust value based on object's segment offset */
-        if (s->obj) {
+        /* adjust value based on object's segment offset.  A placed
+         * object's symbols were resolved to absolute addresses by the
+         * -r link that produced it, so they are left alone. */
+        if (s->obj && !s->obj->placed) {
             switch (s->seg) {
             case SEG_TEXT:
                 s->value = text_base + s->obj->text_off + s->value;
@@ -2235,21 +2304,25 @@ int is_text;
                     add = 0;
                     break;
                 case 0x44:  /* text segment */
-                    add = text_base + obj->text_off;
+                    /* -r preserves the relocation, so the operand must
+                     * stay relative to the output segment; adding the
+                     * base here would be applied again on the final
+                     * link. */
+                    add = rflag ? obj->text_off : text_base + obj->text_off;
                     if (rflag) {
                         need_reloc = 1;
                         outseg = SEG_TEXT;
                     }
                     break;
                 case 0x48:  /* data segment */
-                    add = data_base + obj->data_off;
+                    add = rflag ? obj->data_off : data_base + obj->data_off;
                     if (rflag) {
                         need_reloc = 1;
                         outseg = SEG_DATA;
                     }
                     break;
                 case 0x4c:  /* bss segment */
-                    add = bss_base + obj->bss_off;
+                    add = rflag ? obj->bss_off : bss_base + obj->bss_off;
                       bssrel = 1;
                     if (rflag) {
                         need_reloc = 1;
@@ -2367,14 +2440,18 @@ int is_text;
                 }
             }
 
-            /* collect reloc for -r output */
+            /* collect reloc for -r output.  The offset is relative to
+             * the output segment, so it is pos plus the object's own
+             * offset within that segment - not seg_base, which already
+             * carries the segment base (text_base/data_base) and would
+             * turn a -Tdata=-r link's offsets absolute. */
             if (need_reloc) {
                 if (is_text)
                     add_outreloc(&text_relocs, &textRelocTl,
-                                 seg_base + pos, s, outseg, hilo);
+                                 pos + obj->text_off, s, outseg, hilo);
                 else
                     add_outreloc(&data_relocs, &dataRelocTl,
-                                 seg_base + pos, s, outseg, hilo);
+                                 pos + obj->data_off, s, outseg, hilo);
             }
 
             pos += size;
@@ -2601,6 +2678,28 @@ FILE *dest;
 /*
  * Pass 2: write output file
  */
+/*
+ * Write n zero bytes.  This is what fills the gap a placed object leaves
+ * between itself and the segment before it, so the loader's one
+ * contiguous copy lands each piece at its own address.
+ */
+void
+write_zeros(fp, n)
+FILE *fp;
+int n;
+{
+    static unsigned char zbuf[512];
+
+    memset(zbuf, 0, sizeof(zbuf));
+    while (n > 0) {
+        int m = n > sizeof(zbuf) ? sizeof(zbuf) : n;
+
+        if (fwrite(zbuf, 1, m, fp) != m)
+            error("write error");
+        n -= m;
+    }
+}
+
 void
 pass2_output()
 {
@@ -2611,6 +2710,7 @@ pass2_output()
     char tmpname[32];
     unsigned char xferbuf[512];
     int n;
+    unsigned short data_extent;
 
     /* default to 15-char symbols */
     symlen = out_symlen ? out_symlen : 15;
@@ -2657,6 +2757,21 @@ pass2_output()
         config |= CONF_NORELO;
     write_byte(config);
     write_word(sflag ? 0 : num_globals * (symlen + 3));   /* symtab size */
+    /*
+     * A placed object can open a gap in the data that the bss must
+     * precede (see pass1_layout).  The data stream then runs through
+     * the placed object, and the bss sits inside the gap rather than
+     * after the data, so the data length is the further of the last
+     * data object and the end of the bss at its own base - not the
+     * sum of the two.
+     */
+    data_extent = total_data;
+    if (!rflag) {
+        unsigned short bss_end =
+            (unsigned short)(bss_base - data_base) + total_bss;
+        if (bss_end > data_extent)
+            data_extent = bss_end;
+    }
     write_word(total_text);
     if (rflag) {
         write_word(total_data);
@@ -2670,7 +2785,7 @@ pass2_output()
          * and is swept up (and clobbered) by the first sbrk that moves
          * the grow segment.
          */
-        write_word(total_data + total_bss);
+        write_word(data_extent);
         write_word(0);
     }
     write_word(0);              /* heap */
@@ -2693,20 +2808,64 @@ pass2_output()
         error2("cannot create", tmpname);
     unlink(tmpname);            /* it lives only as long as the handle */
 
-    for (obj = objects; obj; obj = obj->next) {
-        obj->fp = fopen(obj->path, "rb");
-        if (obj->fp == NULL)
-            error2("cannot reopen", obj->path);
+    {
+        unsigned short cur_text = 0, cur_data = 0;
 
-        copy_segment(obj, 16, obj->text_size,
-                     obj->textRelocOff,
-                     text_base + obj->text_off, 1, outfp);
-        copy_segment(obj, 16 + obj->text_size, obj->data_size,
-                     obj->dataRelocOff,
-                     data_base + obj->data_off, 0, datafp);
+        for (obj = objects; obj; obj = obj->next) {
+            obj->fp = fopen(obj->path, "rb");
+            if (obj->fp == NULL)
+                error2("cannot reopen", obj->path);
 
-        fclose(obj->fp);
-        obj->fp = NULL;
+            if (obj->text_size) {
+                if (obj->text_off < cur_text)
+                    error("objects out of address order (text)");
+                write_zeros(outfp, obj->text_off - cur_text);
+                copy_segment(obj, 16, obj->text_size,
+                             obj->textRelocOff,
+                             text_base + obj->text_off, 1, outfp);
+                cur_text = obj->text_off + obj->text_size;
+            }
+            if (obj->data_size) {
+                if (obj->data_off < cur_data)
+                    error("objects out of address order (data)");
+                write_zeros(datafp, obj->data_off - cur_data);
+                copy_segment(obj, 16 + obj->text_size, obj->data_size,
+                             obj->dataRelocOff,
+                             data_base + obj->data_off, 0, datafp);
+                cur_data = obj->data_off + obj->data_size;
+            }
+
+            fclose(obj->fp);
+            obj->fp = NULL;
+        }
+
+        if (cur_text < total_text)
+            write_zeros(outfp, total_text - cur_text);
+        if (cur_data < total_data)
+            write_zeros(datafp, total_data - cur_data);
+    }
+
+    /*
+     * The bss rides after the data as zeros.  Written to the file it is
+     * part of the data segment, so exec() nails the pages FULL; left out
+     * of the file it stays GROW and shares the grow segment with the
+     * heap, which the first sbrk clobbers.
+     *
+     * It goes into the data stream at its own base, not appended to the
+     * end: a placed object can have opened a gap in the data that the
+     * bss precedes, and appended it would land past that object.
+     */
+    if (!rflag && total_bss) {
+        int m;
+
+        if (fseek(datafp, (long)bss_base - (long)data_base, SEEK_SET) != 0)
+            error("seek error");
+        memset(xferbuf, 0, sizeof(xferbuf));
+        for (n = total_bss; n > 0; n -= m) {
+            m = n > sizeof(xferbuf) ? sizeof(xferbuf) : n;
+            if (fwrite(xferbuf, 1, m, datafp) != m)
+                error("write error");
+        }
     }
 
     /* and now the data, onto the end of the text */
@@ -2716,23 +2875,6 @@ pass2_output()
         if (fwrite(xferbuf, 1, n, outfp) != n)
             error("write error");
     fclose(datafp);
-
-    /*
-     * The bss rides after the data as zeros.  Written to the file it is
-     * part of the data segment, so exec() nails the pages FULL; left out
-     * of the file it stays GROW and shares the grow segment with the
-     * heap, which the first sbrk clobbers.
-     */
-    if (!rflag && total_bss) {
-        int m;
-
-        memset(xferbuf, 0, sizeof(xferbuf));
-        for (n = total_bss; n > 0; n -= m) {
-            m = n > sizeof(xferbuf) ? sizeof(xferbuf) : n;
-            if (fwrite(xferbuf, 1, m, outfp) != m)
-                error("write error");
-        }
-    }
 
     /* write symbol table (after text and data) unless stripped */
     if (!sflag) {
