@@ -16,7 +16,9 @@ struct buf {
     UINT cyl;                   /* for use by strategy routine */
     UINT8 error;                /* error return */
     UINT time;                  /* "time" of last access */
-} blist[];
+};
+
+extern struct buf blist[];      /* boot headers; textpad.s links blist last */
 
 /*
  * flag bits - originally in octal, but screw that.
@@ -36,6 +38,10 @@ struct buf {
  * xmem value
  */
 #define KERNEL	0               /* extended address of kernel memory */
+
+extern int bwin();              /* map a segment into the 0xe000 window */
+extern int bsup();              /* map a buffer into the 0xd000 window */
+extern int bcopy();             /* copy between two buffers via 0xe000/0xd000 */
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

@@ -36,12 +36,9 @@ INC	= -i$(DEPTH)/include
 # takes GENERATED away.
 GENERATED = build.h
 
-# the tree's ccc and its linker - GNUmakefile.inc's ?= defaults point
-# at an installed mxccc that is not here, so these are set before the
-# include.
-CCCTREE ?= $(HOME)/src/ccc
-CCC      = $(CCCTREE)/desthost/bin/ccc
-MXLD     = $(CCCTREE)/desthost/libexec/mxld
+# The compiler and linker are this tree's own.  CCC defaults to
+# $(BIN)/mxccc in GNUmakefile.inc; the linker mxld is beside it.
+MXLD     = $(BIN)/mxld
 
 # the kernel's objects, in link order: the entry header (uhdr.s) first
 # so its jump lands at 0x1000.  inout.s is here though the native
@@ -55,7 +52,7 @@ MXLD     = $(CCCTREE)/desthost/libexec/mxld
 LEAF_LIBC = leaf/csv.o leaf/idiv.o leaf/imul.o leaf/qadd.o leaf/qsub.o \
 	leaf/qand.o leaf/qor.o leaf/qcmp.o leaf/qshl.o leaf/qsar.o leaf/qshr.o \
 	leaf/qldst.o leaf/tramp.o leaf/swdisp.o leaf/swdispw.o leaf/oarg.o
-LEAF_AS   = mem.o inout.o sub8.o expandbuf.o $(LEAF_LIBC)
+LEAF_AS   = mem.o inout.o sub8.o $(LEAF_LIBC)
 # Read-only kernel tables (syssw, biosw, ciosw) that also live in the u page.
 LEAF_C    = leaf/consts.o
 
@@ -68,7 +65,7 @@ leaf/%.o : leaf/%.s
 leaf/%.o : leaf/%.c
 	$(CCC) $(CCFLAGS) $(INC) -c -o $@ $<
 
-KERNEL_AS = uhdr.o sub8d.o intrpt.o mio.o inits.o textpad.o
+KERNEL_AS = uhdr.o intrpt.o mio.o inits.o textpad.o
 KERNEL_C  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o link.o malloc.o name.o open.o queue.o \
 	rdwri.o reg.o sig.o sleep.o subc.o swap.o sys1.o sys2.o system.o time.o \
@@ -140,17 +137,14 @@ objects: $(OBJS)
 # that compiled by hand with the tree's compiler, because the two were
 # not the same program.
 #
-CCCTREE  ?= $(HOME)/src/ccc
-SURVEYCC ?= $(CCCTREE)/desthost/bin/ccc
+SURVEYCC ?= $(BIN)/mxccc
 
 #
-# The linker and the object tools are not on the path and are not in
-# desthost/bin either - bin holds the driver and the things a user
-# runs, and the driver reaches into libexec for the passes and mxld.
+# The linker and the object tools sit in $(BIN) beside the driver.
 #
-MXLD     ?= $(CCCTREE)/desthost/libexec/mxld
-MXSIZE   ?= $(CCCTREE)/desthost/bin/mxsize
-MXNM     ?= $(CCCTREE)/desthost/bin/mxnm
+MXLD     ?= $(BIN)/mxld
+MXSIZE   ?= $(BIN)/mxsize
+MXNM     ?= $(BIN)/mxnm
 
 CCCDIR    = cccobj
 CCCOUT    = kernel.o
@@ -271,7 +265,7 @@ user.rel: user.o $(LEAF_AS) $(LEAF_C)
 	$(MXLD) -r -Tdata=0xf000 -o user.rel user.o $(LEAF_AS) $(LEAF_C)
 
 unix: $(OBJS) user.rel
-	$(MXLD) -Ttext=0x1000 -L$(CCCTREE)/desthost/lib -lccc -lc -o unix uhdr.o $(KERNEL_C) sub8d.o intrpt.o mio.o inits.o textpad.o user.rel
+	$(MXLD) -Ttext=0x1000 -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix uhdr.o $(KERNEL_C) intrpt.o mio.o inits.o textpad.o user.rel
 
 #
 # Generate the assembly ccc would assemble for a C file, for reading:

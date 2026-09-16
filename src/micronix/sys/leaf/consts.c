@@ -94,9 +94,10 @@ extern int muopen(), muclose(), muread(), muwrite(), mustty();
 extern int kread(), kwrite(), ioread(), iowrite();
 extern int djmopen(), djmclose(), djmread(), djmwrite(), djstty();
 
-/* Device names for diagnostics.  String literals ride the u page
- * now that ccc parks them in .data. */
-char *devname[] = {
+/* Device names for diagnostics.  A char array keeps the strings in .data
+ * (and so in the u page); a char * array would leave them as .text string
+ * literals, and user.rel's linker placement has no room for text. */
+char devname[][11] = {
     "nodev", "hdca(rev4)", "djdma", "hddma",
 };
 

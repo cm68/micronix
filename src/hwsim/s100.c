@@ -94,12 +94,22 @@ int trace_ior;                  // i/o registration trace
 static byte physmem[16*1024*1024];
 
 /*
+ * How much of the 24 bit space is backed by ram.  Reading above this
+ * returns the open-bus value 0xff and writing is lost, so a machine
+ * with a smaller memory board presents exactly the absent pages that
+ * meminit() probes for.  Default is the full 16 meg.
+ */
+paddr ram_size = 16*1024*1024;
+
+/*
  * access memory in the 24 bit S100 space using a physical address
  */
 byte
 physread(paddr p)
 {
     p &= 0xffffff;
+    if (p >= ram_size)
+        return 0xff;            /* open bus */
     return physmem[p];
 }
 
@@ -107,6 +117,8 @@ void
 physwrite(paddr p, byte v)
 {
     p &= 0xffffff;
+    if (p >= ram_size)
+        return;                 /* no ram there */
     physmem[p] = v;
 }
 

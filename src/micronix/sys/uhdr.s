@@ -179,3 +179,15 @@ initprog:
 ;
 iargs:
 	.defw	0		; empty argv, as the reference kernel passes
+
+;
+; dicount - the interrupt-disable nesting counter for _di/_ei/_enable/
+; _disable in sub8.s.  It is mutable, so it cannot live in the cloned
+; u page, and it must sit below blist so the buffer headers' expansion
+; never overwrites it.  uhdr.o links first, so defining it here puts it
+; at the very front of the data segment.
+;
+	.data
+	.globl	dicount
+dicount:
+	.defb	0

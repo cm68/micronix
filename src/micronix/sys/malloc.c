@@ -331,6 +331,7 @@ swapinit()
 
     if (swapdev == rootdev) {
         b = getsb(rootdev);
+        bwin(b->xmem);
         s = (struct super *)b->data;
         swapaddr = s->s_fsize;
         brelse(b);

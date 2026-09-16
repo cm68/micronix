@@ -25,7 +25,7 @@
 ;
 	.globl	_saveframe, _setframe, _zero, _copy, _x3to4, _x4to3
 	.globl	_di, _ei, _enable, _disable
-	.extern	_pr, dicount, badmsg
+	.extern	_pr, dicount
 	.data			; leaf code, parked in the u page (see user.c)
 
 ; ------- A-NATURAL SOURCE: _saveframe -------
@@ -346,3 +346,11 @@ _disable:
 	ld	a,1
 	ld	(dicount),a
 	ret
+
+;
+; badmsg - the "di < 0" diagnostic that _di passes to _pr.  Read-only,
+; so it rides in this leaf module (the u page) where it is never
+; overlaid, instead of in the kernel data segment below blist.
+;
+badmsg:
+	.defb	"di < 0", 0

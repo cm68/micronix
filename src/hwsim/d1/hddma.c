@@ -213,7 +213,14 @@ attention(portaddr p, byte v)
     select_drive(drv);
 
     steps = command.step_low + (command.step_high << 8);
-    dmaaddr = command.dma_low + (command.dma_mid << 8) + (command.dma_high << 16);
+    /* The boot loaders pass a flat 16-bit address (dma_high == 0); the
+     * kernel passes a 4K segment + 12-bit offset (dma_high == segment),
+     * matching the MMU (mpz80.c getpte): physical = seg<<12 | off. */
+    if (command.dma_high == 0)
+        dmaaddr = command.dma_low + (command.dma_mid << 8);
+    else
+        dmaaddr = (command.dma_high << 12) |
+            ((command.dma_low + (command.dma_mid << 8)) & 0xfff);
     link = command.link_low + (command.link_mid << 8) + (command.link_high << 16);
     head = ((command.selhd & HEAD_MASK) >> HEAD_SHIFT) ^ HEAD_CMP;
 

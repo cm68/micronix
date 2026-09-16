@@ -14,7 +14,6 @@
 
 extern long seconds;            /* see clock.c */
 extern UINT8 nbuf;               /* initialized in binit(), main.c */
-extern char (*buffer)[512];         /* ditto */
 extern struct buf *btop;            /* ditto */
 
 /*
@@ -383,9 +382,16 @@ bflush(dev)
 bzero(b)
     struct buf *b;
 {
+    char *data;
+    UINT8 xmem;
+
+    /* data/xmem are the buffer's fixed window address and segment, set
+     * once by binit()/expand_bufs(); preserve them across the zero. */
+    data = b->data;
+    xmem = b->xmem;
     zero(b, sizeof(*b));
-    b->data = buffer[b - blist];
-    b->xmem = KERNEL;
+    b->data = data;
+    b->xmem = xmem;
 }
 
 /*
@@ -397,6 +403,7 @@ bsync()
     register struct super *s;
 
     b = getsb(rootdev);
+    bwin(b->xmem);
     s = (struct super *)b->data;
 
     if (!s->s_flock) {            /* not read-only */

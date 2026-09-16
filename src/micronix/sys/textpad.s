@@ -11,6 +11,9 @@
 ; from _ebss up to _usrtop == _memtop == 0xf000, just below it.
 ;
 	.bss
+	.globl	_blist
+_blist:
+	.ds	152		; 8 * sizeof(struct buf) = 8*19, the boot headers
 	.globl	_ebss
 _ebss:
 	.ds	0

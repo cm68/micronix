@@ -41,18 +41,19 @@ ialloc(dev)
     register struct inode *ip;
 
     sb = getsb(dev);
-    sup = (struct super *)sb->data;
+    sup = (struct super *)bsup(sb);
 
     for (;;) {
         ip = 0;              /* no I-node yet. */
 
-        if (sup->s_ninode <= 0 && ifill(sup, dev) == 0) {
+        if (sup->s_ninode <= 0 && ifill(sb, dev) == 0) {
             break;              /* no more free I-nodes */
         }
 
+        sup = (struct super *)bsup(sb); /* re-pin after ifill()'s sleeps */
         if ((ip = iget(sup->s_inode[--sup->s_ninode], dev)) == 0) {
             /*
-             * this particular I-node not obtainable 
+             * this particular I-node not obtainable
              */
             continue;
         }
@@ -85,8 +86,8 @@ ialloc(dev)
 /*
  * Put some inumbers in the superblock's inode freelist
  */
-ifill(sup, dev)
-    register struct super *sup;
+ifill(sb, dev)
+    struct buf *sb;
     int dev;
 {
     register int inum;
@@ -96,6 +97,7 @@ ifill(sup, dev)
     static struct buf *bp;
     static struct dsknod *dp;
     static struct inode *ip;
+    register struct super *sup;
 
     /*
      * We do a sync here so that what we find later by reading the I-list
@@ -104,6 +106,7 @@ ifill(sup, dev)
 
     isync();
 
+    sup = (struct super *)bsup(sb);
     iblk = lastiblock;          /* First Inode block to search */
     limit = sup->s_isize;         /* Max no. of blocks to search */
     itop = limit + 1;           /* Top I-block number. */
@@ -114,11 +117,13 @@ ifill(sup, dev)
         }
 
         /*
-         * unreadable I-list block 
+         * unreadable I-list block
          */
         if ((bp = bread(iblk, dev)) == 0) {
             continue;
         }
+        bwin(bp->xmem);
+        sup = (struct super *)bsup(sb); /* re-pin after bread()'s sleep */
 
         inum = 16 * iblk - 31;
 
@@ -147,7 +152,7 @@ ifill(sup, dev)
     u.error = ENOSPC;           /* Closest error I could find */
 
     /*
-     * pr("ifill: no inodes on dev %h\n", dev); 
+     * pr("ifill: no inodes on dev %h\n", dev);
      */
     return 0;
 }
@@ -177,7 +182,7 @@ ifree(ip)
     static struct super *sup;
 
     sb = getsb(ip->i_dev);
-    sup = (struct super *)sb->data;
+    sup = (struct super *)bsup(sb);
 
     if (sup->s_ninode < 100) {    /* Fit in super block free list ? */
         sup->s_inode[sup->s_ninode++] = ip->i_inum;

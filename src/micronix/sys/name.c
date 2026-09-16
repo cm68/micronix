@@ -101,6 +101,7 @@ dlook(ip, np)
             continue;
         if ((b = bread(phys, ip->i_dev)) == 0)
             continue;
+        bwin(b->xmem);
         end = (struct dir *)(b->data + ((tail && log == nblks - 1) ? tail : 512));
         for (d = (struct dir *)b->data; d < end; d++, place++) {
             if (d->inum == 0) {

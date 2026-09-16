@@ -25,6 +25,7 @@ balloc(dev)
     register int bn;
 
     sb = getsb(dev);
+    bwin(sb->xmem);
     sup = (struct super *)sb->data;
     if (sup->s_flock) {           /* mounted read-only */
         u.error = EROFS;
@@ -37,9 +38,10 @@ balloc(dev)
     if (sup->s_nfree == 0) {
         if ((fb = bread(bn, dev)) == 0)
             goto bad;
-        copy(fb->data, &sup->s_nfree, 202);       /* PORT */
+        bcopy(fb, 0, sb, 4, 202);       /* PORT: refill free list */
     } else {
         fb = bget(bn, dev);
+        bwin(fb->xmem);
     }
 
     zero(fb->data, 512);
@@ -49,6 +51,7 @@ balloc(dev)
   full:
     u.error = ENOSPC;
   bad:
+    bwin(sb->xmem);            /* re-map: bread() above may have slept */
     sup->s_nfree = 0;
     prdev("No more space", dev);
     bdwrite(sb);
@@ -68,6 +71,7 @@ bfree(bn, dev)
     if (bn == 0)
         return;
     sb = getsb(dev);
+    bwin(sb->xmem);
     sup = (struct super *)sb->data;
     if (bcheck(bn, sup, dev) == 0)
         goto done;
@@ -76,7 +80,7 @@ bfree(bn, dev)
         sup->s_nfree = 1;
     } else if (sup->s_nfree >= 100) {
         fb = bget(bn, dev);
-        copy(&sup->s_nfree, fb->data, 202);       /* PORT */
+        bcopy(sb, 4, fb, 0, 202);       /* PORT: spill free list */
         bawrite(fb);
         sup->s_nfree = 0;
     }

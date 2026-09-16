@@ -346,6 +346,7 @@ djopen(dev, mode)
     }
 
     b->dev |= DISCARD;
+    bwin(b->xmem);
     s = (struct status *)b->data;
 
     /*
@@ -682,6 +683,7 @@ djint()
          */
 
       kwrite:
+        bwin(curbuf->xmem);
         copy(curbuf->data, kbuf + off, togo);
 
         djack();                  /* acknowledge old int. */
@@ -727,6 +729,7 @@ djint()
 
     if (dev & GETSTAT) {        /* stat req. */
         if (getstat(dev)) {
+            bwin(curbuf->xmem);
             copy(djcomm, curbuf->data, sizeof(struct status));
             goto finished;
         } else {

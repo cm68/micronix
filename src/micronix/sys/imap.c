@@ -52,6 +52,7 @@ imap(ip, log, rap)
         if ((bn = balloc(dev)) == 0)
             return (0);
         bp = bget(bn, dev);
+        bwin(bp->xmem);
         zero(bp->data, 512);
         copy(ip->i_addr, bp->data, 16);
         zero(ip->i_addr, 16);
@@ -111,6 +112,7 @@ imapb(ind, n, dev, rap)
         return (0);
     if ((bp = bread(ind, dev)) == 0)
         return (0);
+    bwin(bp->xmem);
     p = (int *)(bp->data + n * sizeof(int));
     if (*p == 0 && plug(p, dev))
         bdwrite(bp);

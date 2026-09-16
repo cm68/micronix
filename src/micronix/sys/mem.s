@@ -98,34 +98,43 @@ _getword:			; addr (arg0) already in hl; fall through to getw
 ;
 getw:
 	push	bc		; save bc (callee-saved)
+	push	de		; save de (callee-saved)
 	ld	a,h
 	and	0xF0
 	rrca
 	rrca
 	rrca			/now a = 2 * high nibble of addr
-	ld	bc,IMAGE1
-	add	a,c
-	ld	c,a
+	ld	de,IMAGE1
+	add	a,e
+	ld	e,a		; de = &IMAGE1[2*page]
 	ld	a,h
 	and	0x0F
-	or	0x10
-	ld	h,a
+	or	0xD0		; window nibble -> the 0xd000 remap page
+	ld	h,a		; hl = 0xd000 | offset
 	call	_di
-	ld	a,(bc)
-	ld	(MAP0+2),a
-	inc	bc
-	inc	bc
-	ld	a,(bc)
-	ld	(MAP0+4),a
-	ld	c,(hl)
-	inc	hl
-	ld	b,(hl)
+	ld	a,(de)
+	ld	(MAP0+26),a	; map the user's page into 0xd000
+	ld	c,(hl)		; c = low byte
+	ld	a,h
+	cp	0xDF		; offset high byte 0xf?
+	jr	nz,1f
+	ld	a,l
+	cp	0xFF		; offset exactly 0xfff -> word straddles a page
+	jr	nz,1f
+	inc	de
+	inc	de
+	ld	a,(de)		; next page's segment
+	ld	(MAP0+26),a	; map the next page
+	ld	a,(0xD000)	; high byte from the start of the window
+	jr	2f
+1:	inc	hl
+	ld	a,(hl)		; high byte from the same page
+2:	ld	b,a		; b = high byte
 	ld	l,c
 	ld	h,b		; hl = word (return value)
-	ld	a,(IMAGE0+2)
-	ld	(MAP0+2),a
-	ld	a,(IMAGE0+4)
-	ld	(MAP0+4),a
+	ld	a,(IMAGE0+26)
+	ld	(MAP0+26),a	; restore the remap page
+	pop	de		; restore de
 	pop	bc		; restore bc
 	jp	_ei
 
@@ -191,14 +200,14 @@ putb:
 	ld	e,a
 	ld	a,h
 	and	0x0F
-	or	0x10
+	or	0xD0		; window nibble -> the 0xd000 remap page
 	ld	h,a
 	call	_di
 	ld	a,(de)
-	ld	(MAP0+2),a
+	ld	(MAP0+26),a
 	ld	(hl),c
-	ld	a,(IMAGE0+2)
-	ld	(MAP0+2),a
+	ld	a,(IMAGE0+26)
+	ld	(MAP0+26),a
 	pop	de
 	jp	_ei
 
@@ -293,55 +302,113 @@ _putword:
 ; 	jmp _ei
 ;
 _copyin:
-	ld	a,(IMAGE0+2)
-	push	af
-	ld	a,(IMAGE0+4)
-	push	af
 	push	ix
 	ld	ix,0
 	add	ix,sp		; ix = sp
 	push	bc		; save bc (callee-saved)
-	ld	e,(ix+8)
-	ld	d,(ix+9)	; de = to (arg1)
-	ld	c,(ix+10)
-	ld	b,(ix+11)	; bc = count (arg2)
-	ld	a,h		; hl = from (arg0)
+	push	iy		; save iy (callee-saved)
+	push	hl
+	pop	iy		; iy = from (arg0)
+	ld	e,(ix+4)
+	ld	d,(ix+5)	; de = to (arg1)
+	ld	c,(ix+6)
+	ld	b,(ix+7)	; bc = count (arg2)
+	call	_di		; hold interrupts across the window juggling
+
+1:	; iy = from, de = to, bc = count remaining
+	ld	a,b
+	or	c
+	jp	z,9f		; done
+
+	push	bc		; [count_old]
+	push	de		; [to], [count_old]
+
+	; remaining = 0x1000 - (from & 0xfff)
+	push	iy
+	pop	hl		; hl = from
+	ld	a,h
+	and	0x0F
+	ld	b,a
+	ld	c,l		; bc = offset
+	ld	hl,0x1000
+	or	a
+	sbc	hl,bc		; hl = remaining
+
+	; n = min(count_old, remaining)
+	ex	de,hl		; de = remaining, hl = (discard)
+	ld	hl,2
+	add	hl,sp		; hl = &count_old
+	ld	c,(hl)
+	inc	hl
+	ld	b,(hl)		; bc = count_old
+	ld	a,b
+	sub	d
+	jr	c,2f		; count_old < remaining
+	jr	nz,3f		; count_old > remaining
+	ld	a,c
+	sub	e
+	jr	c,2f
+3:	ld	l,e
+	ld	h,d		; hl = n = remaining
+	jr	4f
+2:	ld	l,c
+	ld	h,b		; hl = n = count_old
+4:	push	hl		; [n], [to], [count_old]
+
+	; map the page containing from
+	push	iy
+	pop	hl		; hl = from
+	ld	a,h
 	and	0xF0
 	rrca
 	rrca
 	rrca			/now a = 2 * high nibble of from
-	push	bc		; save count
-	ld	bc,IMAGE1
-	add	a,c
-	ld	c,a
-	call	_di
-	ld	a,(bc)
-	ld	(IMAGE0+2),a
-	ld	(MAP0+2),a
-	inc	bc
-	inc	bc
-	ld	a,(bc)
-	ld	(IMAGE0+4),a
-	ld	(MAP0+4),a
-	pop	bc		; restore count
+	ld	de,IMAGE1
+	add	a,e
+	ld	e,a		; de = &IMAGE1[2*page]
+	ld	a,(de)
+	ld	(MAP0+26),a	; map the page
+
+	; windowed source = 0xd000 | offset
+	push	iy
+	pop	hl		; hl = from
 	ld	a,h
 	and	0x0F
-	or	0x10
-	ld	h,a		; hl = windowed from
-	ld	a,b
-	or	c
-	jp	z,4f
-	ldir
-4:
-	pop	bc		; restore caller's bc
+	or	0xD0
+	ld	h,a		; hl = windowed source
+
+	; LDIR: hl = source, de = to, bc = n
+	pop	bc		; bc = n
+	pop	de		; de = to
+	push	bc		; [n], [count_old]
+	ldir			; de = to + n, bc = 0
+
+	; update from += n, count -= n
+	pop	bc		; bc = n
+	push	iy
+	pop	hl		; hl = from
+	add	hl,bc		; hl = from + n
+	push	hl
+	pop	iy		; iy = from + n
+	ld	hl,0
+	add	hl,sp		; hl = &count_old
+	ld	a,(hl)		; a = count_old lo
+	sub	c		; a = count_old_lo - n_lo
+	ld	c,a		; c = count_new_lo
+	inc	hl
+	ld	a,(hl)		; a = count_old hi
+	sbc	a,b		; a = count_old_hi - n_hi - borrow
+	ld	b,a		; bc = count_new
+	pop	hl		; discard count_old
+	jp	1b
+
+9:	ld	a,(IMAGE0+26)
+	ld	(MAP0+26),a	; restore the remap page
+	call	_ei
+	pop	iy
+	pop	bc
 	pop	ix
-	pop	af
-	ld	(IMAGE0+4),a
-	ld	(MAP0+4),a
-	pop	af
-	ld	(IMAGE0+2),a
-	ld	(MAP0+2),a
-	jp	_ei
+	ret
 
 ; ------- A-NATURAL SOURCE: _copyout -------
 ; / copyout(from, to, count)
@@ -398,55 +465,118 @@ _copyin:
 ; 	jmp _ei
 ;
 _copyout:
-	ld	a,(IMAGE0+2)
-	push	af
-	ld	a,(IMAGE0+4)
-	push	af
 	push	ix
 	ld	ix,0
 	add	ix,sp		; ix = sp
 	push	bc		; save bc (callee-saved)
-	ld	e,(ix+8)
-	ld	d,(ix+9)	; de = to (arg1)
-	ld	c,(ix+10)
-	ld	b,(ix+11)	; bc = count (arg2)
-	ld	a,d		; de = to
+	push	iy		; save iy (callee-saved)
+	ld	e,l
+	ld	d,h		; de = from (arg0, kernel source)
+	ld	l,(ix+4)
+	ld	h,(ix+5)	; hl = to (arg1, user dest)
+	push	hl
+	pop	iy		; iy = to (user dest)
+	ld	c,(ix+6)
+	ld	b,(ix+7)	; bc = count (arg2)
+	call	_di		; hold interrupts across the window juggling
+
+1:	; iy = to, de = from, bc = count remaining
+	ld	a,b
+	or	c
+	jp	z,9f		; done
+
+	push	bc		; [count_old]
+	push	de		; [from], [count_old]
+
+	; remaining = 0x1000 - (to & 0xfff)
+	push	iy
+	pop	hl		; hl = to
+	ld	a,h
+	and	0x0F
+	ld	b,a
+	ld	c,l		; bc = offset
+	ld	hl,0x1000
+	or	a
+	sbc	hl,bc		; hl = remaining
+
+	; n = min(count_old, remaining)
+	ex	de,hl		; de = remaining, hl = (discard)
+	ld	hl,2
+	add	hl,sp		; hl = &count_old
+	ld	c,(hl)
+	inc	hl
+	ld	b,(hl)		; bc = count_old
+	ld	a,b
+	sub	d
+	jr	c,2f		; count_old < remaining
+	jr	nz,3f		; count_old > remaining
+	ld	a,c
+	sub	e
+	jr	c,2f
+3:	ld	l,e
+	ld	h,d		; hl = n = remaining
+	jr	4f
+2:	ld	l,c
+	ld	h,b		; hl = n = count_old
+4:	push	hl		; [n], [from], [count_old]
+
+	; map the page containing to
+	push	iy
+	pop	hl		; hl = to
+	ld	a,h
 	and	0xF0
 	rrca
 	rrca
 	rrca			/now a = 2 * high nibble of to
-	push	bc		; save count
-	ld	bc,IMAGE1
-	add	a,c
-	ld	c,a
-	call	_di
-	ld	a,(bc)
-	ld	(IMAGE0+2),a
-	ld	(MAP0+2),a
-	inc	bc
-	inc	bc
-	ld	a,(bc)
-	ld	(IMAGE0+4),a
-	ld	(MAP0+4),a
-	pop	bc		; restore count
-	ld	a,d
+	ld	de,IMAGE1
+	add	a,e
+	ld	e,a		; de = &IMAGE1[2*page]
+	ld	a,(de)
+	ld	(MAP0+26),a	; map the page
+
+	; windowed destination = 0xd000 | offset
+	push	iy
+	pop	hl		; hl = to
+	ld	a,h
 	and	0x0F
-	or	0x10
-	ld	d,a		; de = windowed to
-	ld	a,b
-	or	c
-	jp	z,5f
-	ldir			; hl = from (arg0), de = windowed to, bc = count
-5:
-	pop	bc		; restore caller's bc
+	or	0xD0
+	ld	h,a		; hl = windowed destination
+	ex	de,hl		; de = windowed dest, hl = (discard)
+
+	; LDIR: hl = from, de = windowed dest, bc = n
+	pop	bc		; bc = n
+	pop	hl		; hl = from (kernel source)
+	push	bc		; [n], [count_old]
+	ldir			; hl = from + n, de = windowed + n
+
+	; update from += n, to += n, count -= n
+	pop	bc		; bc = n
+	ld	d,h
+	ld	e,l		; de = from + n (kernel source)
+	push	iy
+	pop	hl		; hl = to
+	add	hl,bc		; hl = to + n
+	push	hl
+	pop	iy		; iy = to + n
+	ld	hl,0
+	add	hl,sp		; hl = &count_old
+	ld	a,(hl)		; a = count_old lo
+	sub	c		; a = count_old_lo - n_lo
+	ld	c,a		; c = count_new_lo
+	inc	hl
+	ld	a,(hl)		; a = count_old hi
+	sbc	a,b		; a = count_old_hi - n_hi - borrow
+	ld	b,a		; bc = count_new
+	pop	hl		; discard count_old
+	jp	1b
+
+9:	ld	a,(IMAGE0+26)
+	ld	(MAP0+26),a	; restore the remap page
+	call	_ei
+	pop	iy
+	pop	bc
 	pop	ix
-	pop	af
-	ld	(IMAGE0+4),a
-	ld	(MAP0+4),a
-	pop	af
-	ld	(IMAGE0+2),a
-	ld	(MAP0+2),a
-	jp	_ei
+	ret
 
 ; ------- _zerouser -------
 ; zerouser(addr, count) -- zero count bytes of the active task at addr.

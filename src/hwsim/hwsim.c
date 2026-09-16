@@ -440,6 +440,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
     fprintf(stderr, "\t-S\t<symbol file>\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
+    fprintf(stderr, "\t-m\t<bytes> ram size - 768k, 0xc0000, 1m (default 16m)\n");
     fprintf(stderr, "\t-T\t<space:addr>[,count] trace from here, for count instructions\n");
     fprintf(stderr, "\t-W\t<addr>[-<addr>] report writes to this range and keep going\n");
     fprintf(stderr, "\t-5\t<file> a floppy on the 5 1/4 inch port\n");
@@ -455,6 +456,21 @@ usage(char *complaint, char *p)
         }
     }
     exit(1);
+}
+
+/*
+ * Parse a size with an optional k/m suffix, base 0 so 0x hex works too.
+ */
+static paddr
+parsesize(char *s)
+{
+    paddr n = strtol(s, &s, 0);
+
+    if (*s == 'k' || *s == 'K')
+        n <<= 10;
+    else if (*s == 'm' || *s == 'M')
+        n <<= 20;
+    return n;
 }
 
 char **drivenames;
@@ -1256,6 +1272,12 @@ main(int argc, char **argv)
                     usage("drive directory missing\n", progname);
                 }
                 drive_setdir(*argv++);
+                break;
+            case 'm':
+                if (!argc--) {
+                    usage("memory size missing\n", progname);
+                }
+                ram_size = parsesize(*argv++);
                 break;
             case '5':
                 if (!argc--) {

@@ -143,6 +143,7 @@ getargs(args)
                 if (nblks < NBLKS) {
                     nblks++;
                     bp[nblks] = bget(nblks, NODEV);
+                    bwin(bp[nblks]->xmem);
                     d = bp[nblks]->data;
                 } else {
                     u.error = E2BIG;
@@ -179,6 +180,7 @@ putargs()
     valid(u.sp, 4 + nargs + nargs + nbytes);
 
     for (c = 0, ac = 0, n = 1; n <= nblks; n++) {
+        bwin(bp[n]->xmem);
         s = (UINT8 *) bp[n]->data;
         t = s + 512;
 
@@ -200,6 +202,7 @@ putargs()
         d += count;
     }
 
+    bwin(bp[1]->xmem);
     copy(bp[1]->data, u.p->args, 8);    /* for ps */
     putword(-1, &av[nargs]);    /* as per unix specs */
     putword(nargs, u.sp);

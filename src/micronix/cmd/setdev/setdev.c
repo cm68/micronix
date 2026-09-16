@@ -41,15 +41,14 @@
 #include <fcntl.h>
 
 #define HDRLEN      16
-#define SYMLEN      12          /* 2 value + 1 type + 9 name */
+#define MAXSYMLEN   15          /* longest name: (conf & 7) * 2 + 1, conf==7 */
 #define NAMEOFF     3
-#define NAMELEN     9
 #define WS_IDENT    0x99
 
 #define STDOUT      1
 #define STDERR      2
 
-static unsigned k_text, k_data, k_table, k_dataoff;
+static unsigned k_text, k_data, k_table, k_dataoff, k_symlen;
 static int fd;
 
 /*
@@ -142,18 +141,18 @@ symoffset(want)
     char *want;
 {
     long base, off, end;
-    unsigned char ent[SYMLEN];
-    char name[NAMELEN + 1];
+    unsigned char ent[MAXSYMLEN + 3];
+    char name[MAXSYMLEN + 1];
     unsigned addr;
     int i;
 
     base = (long) HDRLEN + k_text + k_data;
     end = base + k_table;
-    for (off = base; off + SYMLEN <= end; off += SYMLEN) {
-        readat(off, ent, SYMLEN);
-        for (i = 0; i < NAMELEN; i++)
+    for (off = base; off + k_symlen + 3 <= end; off += k_symlen + 3) {
+        readat(off, ent, k_symlen + 3);
+        for (i = 0; i < k_symlen; i++)
             name[i] = ent[NAMEOFF + i];
-        name[NAMELEN] = '\0';
+        name[k_symlen] = '\0';
         if (!sameName(name, want))
             continue;
         addr = get16(ent);
@@ -292,6 +291,7 @@ main(argc, argv)
     k_text = get16(hdr + 4);
     k_data = get16(hdr + 6);
     k_dataoff = get16(hdr + 14);
+    k_symlen = (hdr[1] & 0x7) * 2 + 1;
     if (k_table == 0)
         die("no symbol table - do not strip the kernel");
 

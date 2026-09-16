@@ -102,6 +102,7 @@ tmount(dev, ip, ronly)
         return 0;
     }
     sb->flags |= BLOCK;
+    bwin(sb->xmem);
     sp = (struct super *)sb->data;
     sp->s_flock = ronly;        /* flock means read-only */
     if (dev == rootdev) {       /* part of power-up */

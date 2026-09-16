@@ -18,6 +18,8 @@ extern void physwrite(paddr addr, byte value);
 extern void s100_output(portaddr p, byte v);
 extern byte s100_input(portaddr p);
 
+extern paddr ram_size;          // bytes of ram backed in the 24 bit space
+
 extern int register_trace(char *tracename);
 
 /* a driver registers one of these */

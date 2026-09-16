@@ -304,9 +304,14 @@ pulse_djdma(portaddr p, byte v)
 static unsigned char
 setdma()
 {
-    dmaaddr = physread(channel + 1) + 
-        (physread(channel + 2) << 8) +
-        (physread(channel + 3) << 16);
+    /* The boot loaders pass a flat 16-bit address (high byte == 0); the
+     * kernel passes a 4K segment + 12-bit offset (high byte == segment),
+     * matching the MMU (mpz80.c getpte): physical = seg<<12 | off. */
+    if (physread(channel + 3) == 0)
+        dmaaddr = physread(channel + 1) + (physread(channel + 2) << 8);
+    else
+        dmaaddr = (physread(channel + 3) << 12) |
+            ((physread(channel + 1) + (physread(channel + 2) << 8)) & 0xfff);
     tracec(trace_djdma, "%x", dmaaddr);
     return 0;
 }
