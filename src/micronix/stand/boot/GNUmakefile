@@ -30,9 +30,12 @@ TARGETS	= mwboot1.bin bootimgs djboot.com djboot1.bin djload
 # libc must not be a prerequisite of the link.
 TREELIBS =
 
-CCCTREE ?= $(HOME)/src/ccc
-CCC	 = $(CCCTREE)/desthost/bin/ccc
-MXLD	 = $(CCCTREE)/desthost/libexec/mxld
+# The compiler and linker are this tree's own.  CCC defaults to
+# $(BIN)/mxccc in GNUmakefile.inc; the linker and the runtime libc it
+# links against live beside it, the latter under $(HOSTROOT)/ccc/lib
+# where hostrt puts it.
+MXLD	 = $(BIN)/mxld
+CCCLIB	 = $(HOSTROOT)/ccc/lib
 
 include $(DEPTH)/GNUmakefile.inc
 
@@ -44,10 +47,10 @@ include $(DEPTH)/GNUmakefile.inc
 # offset mwboot1 jumps to.
 #
 mwboot.com: boot.o mwio.o sexit.o
-	$(MXLD) -s -o $@ -Ttext=0x100 -L$(CCCTREE)/desthost/lib \
+	$(MXLD) -s -o $@ -Ttext=0x100 -L$(CCCLIB) \
 	    sexit.o boot.o mwio.o \
-	    $(CCCTREE)/desthost/lib/libc.a $(CCCTREE)/desthost/lib/libu.a \
-	    $(CCCTREE)/desthost/lib/libc.a
+	    $(CCCLIB)/libc.a $(CCCLIB)/libu.a \
+	    $(CCCLIB)/libc.a
 
 #
 # The floppy second level: the same boot.c, with the DJ-DMA driver
@@ -56,10 +59,10 @@ mwboot.com: boot.o mwio.o sexit.o
 # unchanged.
 #
 djboot.com: boot.o djio.o sexit.o
-	$(MXLD) -s -o $@ -Ttext=0x100 -L$(CCCTREE)/desthost/lib \
+	$(MXLD) -s -o $@ -Ttext=0x100 -L$(CCCLIB) \
 	    sexit.o boot.o djio.o \
-	    $(CCCTREE)/desthost/lib/libc.a $(CCCTREE)/desthost/lib/libu.a \
-	    $(CCCTREE)/desthost/lib/libc.a
+	    $(CCCLIB)/libc.a $(CCCLIB)/libu.a \
+	    $(CCCLIB)/libc.a
 
 #
 # The first level is a sector: the rom reads 512 bytes to 0100 and

@@ -14,7 +14,9 @@ CC = gcc
 WARNS = -Wno-builtin-declaration-mismatch -Wformat-overflow=0 -Wno-pointer-sign \
 	-fdiagnostics-color=always
 
-GCCFLAGS = $(MACHINE)
+# 64-bit off_t: the trace logfile and the disk images routinely exceed
+# 2G, and a 32-bit off_t stops every stdio write dead at 0x7fffffff.
+GCCFLAGS = $(MACHINE) -D_FILE_OFFSET_BITS=64
 DEBUG = -g
 # the simulator spends all its time in one interpreter loop, and built
 # without this it runs at about half speed.  -g stays: we still want the
