@@ -731,6 +731,21 @@ r_m1cmp(void)
 	comma = strchr(win[j3].key + 3, ',');
 	if (!comma)
 		return 0;			/* unconditional: nothing to translate */
+	/*
+	 * A branch to a local "$+N" target is not the branch that consumes
+	 * the answer.  It is the short skip over an scf that a relational
+	 * compare against 0ffffh emits:
+	 *
+	 *	ld de,-1 / or a / sbc hl,de / jr nz,$+3 / scf / jp c,L
+	 *
+	 * the flag the skip tests is read again by that scf and the real
+	 * branch after it, so rewriting z/nz to c/nc here changes what the
+	 * scf sees and corrupts the comparison.  This rule is for the
+	 * == -1 test, whose consuming branch names a label right after the
+	 * sbc.  Leave a skip alone.
+	 */
+	if (comma[1] == '$')
+		return 0;
 	n = comma - (win[j3].key + 3);
 	if (n < 1 || n > 2)
 		return 0;
@@ -1132,6 +1147,8 @@ r_bitset(void)
 	if (strcmp(m, "or") != 0 && strcmp(m, "and") != 0)
 		return 0;
 	op0 = oper2(operof(win[0].key));	/* "(ix+d)" */
+	if (!memok(op0))
+		return 0;				/* set/res has no (nn) form */
 	op2 = operof(win[2].key);		/* "(ix+d),a" */
 	if (strncmp(op2, op0, strlen(op0)) != 0 || op2[strlen(op0)] != ',')
 		return 0;				/* the store is to another address */
