@@ -1,0 +1,6 @@
+# footprint.sh scratch: the staged source tree, the per-pass output,
+# and the per-source directories it names fpwNNN.  All removed on a
+# clean run, left behind only if the run is interrupted.
+fpwork/
+fpwork-out/
+fpw[0-9][0-9][0-9]/

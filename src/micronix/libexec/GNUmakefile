@@ -42,7 +42,7 @@ ROOT	?= ~/src/micronix/filesystem
 DEST	 = $(ROOT)/usr/src/libexec
 NOWARN	 = --warning=no-ignore-newer
 
-.PHONY: all update install install-man clean clobber doc
+.PHONY: all update install install-man clean clobber doc footprint hostpasses
 
 all:
 	$(RECURSE)
@@ -80,3 +80,18 @@ clobber:
 
 doc:
 	$(RECURSE)
+
+#
+# The tipping-point guard: can the compiler compile itself on the
+# user-mode simulator?  footprint.sh cross-builds the four passes,
+# runs them over every one of their own sources under the simulator,
+# and reads each run's brk/gap, failing on out-of-memory, a gap below
+# FLOOR (default 256), or divergence from the host.  The host passes
+# are the reference the simulated ones are checked against, so they
+# are built first.
+#
+footprint: hostpasses
+	sh footprint.sh
+
+hostpasses:
+	@for d in cpp c0 c1 peep; do $(MAKE) -C $$d host || exit 1; done

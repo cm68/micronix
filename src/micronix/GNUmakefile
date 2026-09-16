@@ -68,7 +68,7 @@ SYSHDRS  = $(filter-out $(CCCOWNED),$(notdir $(wildcard include/*.h)))
 
 include $(DEPTH)/GNUmakefile.inc
 
-.PHONY: hostcc hostrt bootstrap sysinstall sysrt
+.PHONY: hostcc hostrt bootstrap sysinstall sysrt footprint
 
 #
 # The librarian, built for the HOST.
@@ -295,3 +295,11 @@ tarfile:
 	$(MAKE) update ROOT=$(abspath $(SRCTREE))
 	cd $(abspath $(SRCTREE))/usr/src && tar -f $(abspath $(SRCTAR)) -c .
 	rm -rf $(SRCTREE)
+
+#
+# The tipping-point guard (see libexec/GNUmakefile): can the compiler
+# compile itself on the user-mode simulator?  Fails on out-of-memory,
+# a gap below FLOOR (default 256), or divergence from the host.
+#
+footprint:
+	$(MAKE) -C libexec footprint
