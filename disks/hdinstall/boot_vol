@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Boot the hardware simulator from a hard disk volume.
+#
+#	./boot_vol <volume>
+#
+# <volume> is the name of the drive file to boot - the thing create_vol
+# makes.  The simulator reads the monitor ROM, which reads the first
+# level loader off cylinder 0, which reads the second level, which loads
+# /micronix off the filesystem.
+#
+# -c 0x10c is the configuration switch, one number that says three things
+# at once: 0x08 boot the HD-DMA, 0x04 skip the monitor and go straight to
+# the boot, and 0x100 put uart 0 - the console - in an xterm of its own
+# rather than borrowing this window.  That last bit is what lets this
+# script be run from anywhere, and what keeps the console from wedging
+# the shell it was started from.
+#
+# Every argument before <volume> is a simulator flag, so the usual
+# -t/-T/-W/-c switches are available without editing this.
+#
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+root=`cd "$here/../.." && pwd`
+
+# The volume is the last argument; every argument before it is a
+# simulator flag, passed through in order.
+flags=""
+while [ $# -gt 1 ]; do
+	flags="$flags $1"
+	shift
+done
+vol="$1"
+
+if [ -z "$vol" ]; then
+	echo "usage: $0 [simulator flags] <volume>" >&2
+	exit 1
+fi
+
+case "$vol" in
+/*)	;;
+*)	vol="$here/$vol" ;;
+esac
+
+# A fresh run: writes to a drive image go to a -delta beside it and
+# stay there, so drop the one the last run left behind.
+[ -f "$vol-delta" ] && rm -f "$vol-delta"
+
+cd "$root/src/hwsim/d1" || exit 1
+exec ./d1 -b roms/mon447.bin -c 0x10c $flags "hdcdma0:$vol"
