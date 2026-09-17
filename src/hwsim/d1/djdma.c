@@ -25,8 +25,10 @@
 #include <stdio.h>
 
 
+#ifndef NODEBUG
 int trace_djdma;
 extern int trace_bio;
+#endif
 
 extern char *printable(char);       // multio.c
 
@@ -204,7 +206,9 @@ physdrive(int logical)
 static int need_intack;
 static int int_posted;      // the interrupt line is actually asserted
 static int int_pending;     // asked for, not raised yet - see setintr
+#ifndef NODEBUG
 int trace_djint;            // command/interrupt handshake
+#endif
 
 /*
  * The controller has finished; put the line up.  This runs from a
@@ -1016,8 +1020,10 @@ djdma_init()
 int
 djdma_setup()
 {
+#ifndef NODEBUG
     trace_djdma = register_trace("djdma");
     trace_djint = register_trace("djint");
+#endif
     return 0;
 }
 

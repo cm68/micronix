@@ -13,6 +13,8 @@ extern unsigned char dis_byte(unsigned short addr);
 
 #include "../include/disz80.h"
 
+#ifndef NODEBUG
+
 struct optab {
 	char *op;
 	unsigned char flags;
@@ -615,6 +617,8 @@ format_instr(unsigned short addr, char *outbuf)
 	// printf("format_instr: %x -> %d\n", addr, bcount);
 	return bcount;
 }
+
+#endif
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

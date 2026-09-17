@@ -18,7 +18,9 @@
 #include "../include/util.h"
 #include "../include/lockfile.h"
 
+#ifndef NODEBUG
 int trace_imd;
+#endif
 
 static void
 dump_secmap(char *label, char *m, int s)
@@ -628,9 +630,11 @@ translate_sector(struct imd_trk *tp, int sec, int head)
     }
     if (mysec == -1) {
         printf("imd: translate sector not found %d\n", sec);
+#ifndef NODEBUG
         if (traceflags & trace_imd) {
             imd_dump_track(tp);
         }
+#endif
         return 0;
     }
     return mysec;
@@ -675,7 +679,9 @@ imd_write(void *vp, int cyl, int head, int osec, char *buf)
         ip->drive, cyl, head, tsec, osec, offset);
     lseek(ip->delta_fd, offset, SEEK_SET);
     write(ip->delta_fd, buf, tp->secsize);
+#ifndef NODEBUG
     if (traceflags & trace_imd) hexdump(buf, tp->secsize);
+#endif
     return (tp->secsize);
 }
 
@@ -707,7 +713,9 @@ imd_read(void *vp, int cyl, int head, int osec, char *buf)
         bzero(tp->data[tsec], tp->secsize);
     }
     memcpy(buf, tp->data[tsec], tp->secsize); 
+#ifndef NODEBUG
     if (traceflags & trace_imd) hexdump(buf, tp->secsize);
+#endif
     return (tp->secsize);
 }
 
@@ -719,7 +727,9 @@ __attribute__((constructor))
 void
 register_imd_driver()
 {
+#ifndef NODEBUG
     trace_imd = register_trace("imd");
+#endif
 }
 
 /*

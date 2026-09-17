@@ -37,8 +37,10 @@ struct drivetype {
     { "M10", 244, 4, 21, 20496 }
 };
 
+#ifndef NODEBUG
 extern int trace_bio;
 int trace_hdca;
+#endif
 
 #define SPT     32      // like an m26
 #define HEADS   8       // like m26 and m20    
@@ -224,9 +226,11 @@ wr_hdca_cmd(portaddr p, byte v)
         }
         bcopy(&iobuf[0], &buffer[2], 510);
         bcopy(&iobuf[510], &buffer[0], 2);
+#ifndef NODEBUG
         if (traceflags & trace_bio) {
             hexdump(iobuf, 512);
         }
+#endif
         psr |= PSR_OPDONE;
         psr &= ~PSR_HALT;
         rampage = SECTOR;
@@ -243,7 +247,9 @@ wr_hdca_cmd(portaddr p, byte v)
         	l("write fail drv: %d c: %d h: %d s: %d ret: %d\n", 
                 drv, track, head, sector, ret);
         }
+#ifndef NODEBUG
         if (traceflags & trace_bio) hexdump(buffer, 512);
+#endif
         psr |= PSR_OPDONE;
         psr &= ~PSR_HALT;
         break;
@@ -383,7 +389,9 @@ hdca_init()
 static int
 hdca_setup()
 {
+#ifndef NODEBUG
     trace_hdca = register_trace("hdca");
+#endif
     return 0;
 }
 

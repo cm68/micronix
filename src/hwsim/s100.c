@@ -86,7 +86,9 @@ set_vi(int line, int card, int value)
 outhandler output_handler[256];
 inhandler input_handler[256];
 
+#ifndef NODEBUG
 int trace_ior;                  // i/o registration trace
+#endif
 
 /*
  * the S100 bus memory space
@@ -119,6 +121,7 @@ physwrite(paddr p, byte v)
     p &= 0xffffff;
     if (p >= ram_size)
         return;                 /* no ram there */
+    phys_watch_check(p, v);
     physmem[p] = v;
 }
 
@@ -219,7 +222,9 @@ io_init()
 {
     int i;
 
+#ifndef NODEBUG
     trace_ior = register_trace("ioregister");
+#endif
     for (i = 0; i < 256; i++) {
         input_handler[i] = undef_in;
         output_handler[i] = undef_out;

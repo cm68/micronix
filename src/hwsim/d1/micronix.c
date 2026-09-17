@@ -28,6 +28,7 @@
 #include "util.h"
 #include "disz80.h"
 
+#ifndef NODEBUG
 extern byte fubyte(word addr);
 extern word fuword(word addr);
 
@@ -384,4 +385,5 @@ syscall_at(word sc)
 	}
 	syscall_arm(retaddr, sp->name);
 }
+#endif
 

@@ -71,14 +71,17 @@
 
 #define LOGFILE     "logfile"
 
+#ifndef NODEBUG
 int program_counter;
 
 int debug_terminal;
 int log_output;
+#endif
 int mypid;
 int running;
 int listing;
 
+#ifndef NODEBUG
 int traceflags;
 
 int trace_inst;
@@ -86,7 +89,9 @@ int trace_bio;
 int trace_io;
 int trace_symbols;
 int trace_timer;
+#endif
 
+#ifndef NODEBUG
 /*
  * A trace trigger, like the one on a logic analyzer: run quietly until
  * the machine reaches a place, then start recording.  Held as the string
@@ -94,6 +99,7 @@ int trace_timer;
  * how a space is spelled and testing it is a compare.
  */
 char tracetrig[16];
+#endif
 
 /*
  * Floppies on the 5 1/4 inch port.  The positional arguments fill the
@@ -103,6 +109,7 @@ char tracetrig[16];
  */
 char **fivenames;
 
+#ifndef NODEBUG
 /*
  * How many instructions to record once it fires.  Zero means until the
  * machine stops, which is what you want when you do not yet know how far
@@ -140,7 +147,9 @@ stop_handler()
     // printf("breakpoint signal\n");
     stop();
 }
+#endif
 
+#ifndef NODEBUG
 /*
  * The disassembler used to be handed its callbacks - format_instr took
  * &get_byte, &lookup_sym, &reloc and &mnix_sc - and now calls these two
@@ -176,7 +185,9 @@ pverbose()
     }
     message("\n");
 }
+#endif
 
+#ifndef NODEBUG
 struct sym {
     char *name;
     vaddr value;
@@ -276,6 +287,7 @@ load_symfile(char *s)
     printf("added %d symbols from %s\n", i, s);
     fclose(sf);
 }
+#endif
 
 /*
  * The root filesystem image, named by the disk controller as it opens
@@ -283,6 +295,7 @@ load_symfile(char *s)
  * now - the message carries the device number, but the simulator does
  * not yet keep a device -> image table.
  */
+#ifndef NODEBUG
 static char *ctl_image;
 
 void
@@ -366,6 +379,7 @@ load_task_syms(int task, int dev, int inum)
     ifree(dp);
     closefs(fs);
 }
+#endif
 
 /*
  * The kernel's control port.  exec() writes five bytes here - task
@@ -375,12 +389,15 @@ load_task_syms(int task, int dev, int inum)
  * user code); the device selects which filesystem image holds the
  * inode.
  */
+#ifndef NODEBUG
 static int ctrl_n;              /* bytes seen so far */
 static int ctrl_task, ctrl_dev, ctrl_inum;
+#endif
 
 void
 ctrl_out(portaddr port, byte val)
 {
+#ifndef NODEBUG
     switch (ctrl_n++) {
     case 0:
         ctrl_task = val;
@@ -400,6 +417,12 @@ ctrl_out(portaddr port, byte val)
         load_task_syms(ctrl_task, ctrl_dev, ctrl_inum);
         return;
     }
+#else
+    /* the kernel writes these bytes on every exec; there is no symbol
+     * table to load in a hardware build, so discard them */
+    (void)port;
+    (void)val;
+#endif
 }
 
 void
@@ -565,12 +588,15 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-b\t<boot rom file>\n");
     fprintf(stderr, "\t-B\t<djdma|hdcdma|hdca> boot from this, and skip the monitor\n");
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
-    fprintf(stderr, "\t-S\t<symbol file>\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
     fprintf(stderr, "\t-m\t<bytes> ram size - 768k, 0xc0000, 1m (default 16m)\n");
+    fprintf(stderr, "\t-5\t<file> a floppy on the 5 1/4 inch port\n");
+#ifndef NODEBUG
+    fprintf(stderr, "\t-F\trun the fast build (d1p) instead\n");
+    fprintf(stderr, "\t-S\t<symbol file>\n");
     fprintf(stderr, "\t-T\t<space:addr>[,count] trace from here, for count instructions\n");
     fprintf(stderr, "\t-W\t<addr>[-<addr>] report writes to this range and keep going\n");
-    fprintf(stderr, "\t-5\t<file> a floppy on the 5 1/4 inch port\n");
+    fprintf(stderr, "\t-P\t<physaddr>[-<physaddr>] report writes to this physical range\n");
     fprintf(stderr, "\t-x\topen a debug terminal window\n");
     fprintf(stderr, "\t-t\t<tracebits>, or names: -t syscall,trap\n");
     fprintf(stderr, "\t-l\tproduce logfile\n");
@@ -578,6 +604,7 @@ usage(char *complaint, char *p)
     for (i = 0; tracenames[i]; i++) {
         fprintf(stderr, "\t%x %s\n", 1 << i, tracenames[i]);
     }
+#endif
     for (i = 0; i < ndrivers; i++) {
         if (drivers[i]->usage_hook) {
             (*drivers[i]->usage_hook)();
@@ -725,10 +752,12 @@ check_time_outs()
                 tp->handler = 0;
                 tp->arg = 0;
             }
+#ifndef NODEBUG
             if (traceflags & trace_timer) {
                 printf("timeout %s at %llu\n",
                     tp->name ? tp->name : "?", sim_cycles);
             }
+#endif
             (*handler)(arg);
         }
     }
@@ -1147,6 +1176,7 @@ bootdev(char *name)
     return -1;
 }
 
+#ifndef NODEBUG
 /*
  * Send stdout - the trace, via logfd - to both the invoking terminal and
  * a logfile.  This is for when uart 0 (the console) is in an xterm: the
@@ -1189,6 +1219,7 @@ tee_stdout(char *logfile)
     close(lfd);
     setvbuf(stdout, 0, _IONBF, 0);
 }
+#endif
 
 /*
  * A drive named on the command line: <controller><unit>:<file>, as in
@@ -1264,6 +1295,7 @@ drivearg(char *arg)
     return 0;
 }
 
+#ifndef NODEBUG
 /*
  * Trace bits, by number or by name: -t 0x100000 and -t syscall are the
  * same thing, and -t syscall,trap is the pair.  The names are the ones
@@ -1302,10 +1334,57 @@ traceparse(char *s, char *progname)
     }
     return bits;
 }
+#endif
+
+#ifndef NODEBUG
+/*
+ * -F runs the fast build.  d1p is the -DNODEBUG simulator linked beside
+ * this one; exec it with the same arguments, minus the -F, so a run that
+ * wants speed does not pay for a tracer that is not there.
+ */
+static void
+exec_perf(char **argv, int argc, int pindex)
+{
+    char *prog = argv[0];
+    char *slash = strrchr(prog, '/');
+    char path[4096];
+    char **nargv;
+    int n, i;
+
+    if (slash)
+        snprintf(path, sizeof(path), "%.*sd1p", (int)(slash - prog + 1), prog);
+    else
+        snprintf(path, sizeof(path), "d1p");
+
+    nargv = malloc(sizeof(char *) * argc);
+    n = 0;
+    for (i = 0; i < argc; i++) {
+        if (i == pindex)            /* drop the -P */
+            continue;
+        nargv[n++] = (i == 0) ? path : argv[i];
+    }
+    nargv[n] = 0;
+
+    execv(path, nargv);
+    fprintf(stderr, "%s: cannot exec %s: %s\n", prog, path, strerror(errno));
+    exit(1);
+}
+#endif
 
 int
 main(int argc, char **argv)
 {
+#ifndef NODEBUG
+    {
+        int pj;
+
+        for (pj = 1; pj < argc; pj++) {
+            if (strcmp(argv[pj], "-F") == 0)
+                exec_perf(argv, argc, pj);
+        }
+    }
+#endif
+
     char *progname = *argv++;
     char *s;
     char **argvec;
@@ -1356,6 +1435,7 @@ main(int argc, char **argv)
          */
         while (*s) {
             switch (*s++) {
+#ifndef NODEBUG
             case 'l':
                 log_output = 1;
                 break;
@@ -1366,6 +1446,7 @@ main(int argc, char **argv)
                 inst_countdown = 0;
                 debug_terminal = 1;
                 break;
+#endif
             case 'c':
                 if (!argc--) {
                     usage("configuration switch value missing\n", progname);
@@ -1393,12 +1474,14 @@ main(int argc, char **argv)
                     config_sw = sw | CONF_SET;
                 }
                 break;
+#ifndef NODEBUG
             case 'S':
                 if (!argc--) {
                     usage("symfile name missing\n", progname);
                 }
                 sym_filename = strdup(*argv++);
                 break;
+#endif
             case 'd':
                 if (!argc--) {
                     usage("drive directory missing\n", progname);
@@ -1426,6 +1509,7 @@ main(int argc, char **argv)
                     fivenames[n + 1] = 0;
                 }
                 break;
+#ifndef NODEBUG
             case 'W':
                 if (!argc--) {
                     usage("watch address not specified\n", progname);
@@ -1436,6 +1520,18 @@ main(int argc, char **argv)
                     unsigned lo = strtol(w, 0, 0);
 
                     add_write_watch(lo, dash ? strtol(dash + 1, 0, 0) : lo);
+                }
+                break;
+            case 'P':
+                if (!argc--) {
+                    usage("physical watch address not specified\n", progname);
+                }
+                {
+                    char *w = *argv++;
+                    char *dash = strchr(w, '-');
+                    unsigned lo = strtol(w, 0, 0);
+
+                    add_phys_watch(lo, dash ? strtol(dash + 1, 0, 0) : lo);
                 }
                 break;
             case 'T':
@@ -1466,6 +1562,7 @@ main(int argc, char **argv)
             case 's':
                 inst_countdown = 0;
                 break;
+#endif
             case 'h':
                 usage("", progname);
                 break;
@@ -1531,6 +1628,7 @@ main(int argc, char **argv)
      * also, if we specified to open a debug window, let's connect the 
      * emulator's file descriptors to an xterm or something.
      */
+#ifndef NODEBUG
     if (debug_terminal) {
         char namebuf[100];
         int debugin;
@@ -1577,6 +1675,7 @@ main(int argc, char **argv)
         }
         printf("\n");
     }
+#endif
 
     /*
      * load the boot rom if there is one
@@ -1600,14 +1699,17 @@ main(int argc, char **argv)
             exit(errno);
         }
         close(fd);
+#ifndef NODEBUG
         i = strlen(rom_filename);
         // if there's a similarly named symfile, use it
         if (!sym_filename && (rom_filename[i-4] == '.')) {
             sym_filename = strdup(rom_filename);
             strcpy(&sym_filename[i-3], "sym");
         }
+#endif
     }
 
+#ifndef NODEBUG
     if (sym_filename) {
         load_symfile(sym_filename);
     }
@@ -1620,6 +1722,7 @@ main(int argc, char **argv)
      */
     verbose = traceflags;
     mon_init();
+#endif
 
     setup_sim_ports();
     z80_init();
@@ -1639,7 +1742,9 @@ main(int argc, char **argv)
      * the main emulation loop
      */
     while (1) {
+#ifndef NODEBUG
         program_counter = z80_get_reg16(pc_reg);
+#endif
 
         /*
          * run the driver poll hooks
@@ -1649,6 +1754,7 @@ main(int argc, char **argv)
                 (*drivers[i]->poll_hook)();
             }
         }
+#ifndef NODEBUG
         /*
          * The monitor owns breakpoints now, so there is no separate
          * check for the temporary one that "step over" plants: it goes
@@ -1695,6 +1801,7 @@ main(int argc, char **argv)
         if (inst_countdown == 0) {
             monitor();
         }
+#endif
 
 #ifdef notdef
         /*
@@ -1735,9 +1842,11 @@ main(int argc, char **argv)
         running = 0;
         check_time_outs();
         take_pending_trap();
+#ifndef NODEBUG
         if (inst_countdown != -1) {
             inst_countdown--;
         }
+#endif
     }
     exit(0);
 }
@@ -1776,6 +1885,7 @@ console_claim(int who)
     fprintf(stderr, "console: input follows %s\n", console_names[who]);
 }
 
+#ifndef NODEBUG
 __attribute__((constructor))
 void
 init_trace()
@@ -1785,6 +1895,7 @@ init_trace()
         *def_traces[i].valuep = register_trace(def_traces[i].name);
     }
 }
+#endif
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

@@ -19,6 +19,8 @@
 #include <string.h>
 #include <ctype.h>
 
+#ifndef NODEBUG
+
 struct syscall syscalls[] = {
 /* 0  */	{3, "indir", SF_ARG1 },
 /* 1  */	{1, "exit", SF_FD },
@@ -201,6 +203,8 @@ get_syscall(char **sp)
     }
     return i;
 }
+
+#endif
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

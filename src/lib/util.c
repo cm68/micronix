@@ -191,6 +191,7 @@ ptime()
 }
 
 // unconditionally log with timestamp  (just log)
+#ifndef NODEBUG
 void
 l(const char *format, ...)
 {
@@ -212,10 +213,12 @@ lc(const char *format, ...)
     vdprintf(logfd, format, args);
     va_end(args);
 }
+#endif
 
 /*
  * a named trace level facility
  */
+#ifndef NODEBUG
 char *tracenames[32];
 int traces;
 
@@ -225,8 +228,10 @@ register_trace(char *name)
     tracenames[traces] = name;
     return 1 << traces++;
 }
+#endif
 
 // conditionally log with time stamp  (trace line)
+#ifndef NODEBUG
 void
 trace(int bits, const char *format, ...)
 {
@@ -252,6 +257,7 @@ tracec(int bits, const char *format, ...)
         va_end(args);
     }
 }
+#endif
 
 int
 devnum(char *name, char *dtp, int *majorp, int *minorp)

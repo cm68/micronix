@@ -8,24 +8,34 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 INCLUDE = -I../../include -I..
-LDFLAGS = -L../../lib -lsim -lcurses
+LDFLAGS = -L../../lib -lsim$(LIBSUFFIX) -lcurses
 
-TARGETS=d1
-DRIVERS=djdma.o multio.o hddma.o hdca.o mpz80.o micronix.o
+# The normal build is d1 and the -DNODEBUG build is d1p - the performance
+# simulator d1 execs when it is run with -P.  OBJSUFFIX keeps the two
+# builds' objects apart (djdma.o beside djdma-nodbg.o) so both binaries
+# can be linked and left in place.
+ifdef NODEBUG
+TARGET = d1p
+else
+TARGET = d1
+endif
+TARGETS = $(TARGET)
+DRIVERS = djdma$(OBJSUFFIX).o multio$(OBJSUFFIX).o hddma$(OBJSUFFIX).o \
+	hdca$(OBJSUFFIX).o mpz80$(OBJSUFFIX).o micronix$(OBJSUFFIX).o
 GENERATED = roms/mon447.bin roms/mon447.sym roms/mon375.bin roms/mon375.sym
 DIRS = roms
-SIM = ../hwsim.o ../s100.o
+SIM = ../hwsim$(OBJSUFFIX).o ../s100$(OBJSUFFIX).o
 
 # The libraries are prerequisites, not just link arguments.  Without
 # them here a change to libsim.a - the disassembler, the monitor, the
 # syscall formatter - relinks nothing, and the simulator keeps running
 # the code you just replaced while you wonder why the fix did nothing.
-LIBS = ../../lib/libsim.a
+LIBS = ../../lib/libsim$(LIBSUFFIX).a
 
 include ../../Makefile.inc
 
-d1: $(DRIVERS) $(GENERATED) $(SIM) $(LIBS)
-	$(CC) $(DEBUG) $(GCCFLAGS) -o d1 $(DRIVERS) $(SIM) $(LDFLAGS)
+$(TARGET): $(DRIVERS) $(GENERATED) $(SIM) $(LIBS)
+	$(CC) $(DEBUG) $(GCCFLAGS) -o $(TARGET) $(DRIVERS) $(SIM) $(LDFLAGS)
 	-pkill d1
 
 $(GENERATED):   

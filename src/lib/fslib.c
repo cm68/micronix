@@ -30,8 +30,10 @@
 
 /* int spt = 15; */
 
+#ifndef NODEBUG
 extern int traceflags;
 int trace_fs;
+#endif
 
 /*
  * wrapper struct.  we pass around struct super but cast it to
@@ -537,9 +539,11 @@ readblk(struct super *fs, int blkno, char *buf)
             lose("readblk seek");
         if (read(i->fd, buf, 512) != 512)
             lose("readblk");
+#ifndef NODEBUG
         if (traceflags & trace_fs) {
             hexdump(buf, 512);
         }
+#endif
     } else if (i->driver == DRIVER_IMD) {
         blktopos(i->drive, realblk, &cyl, &head, &sec); 
         ret = imd_read(i->drive, cyl, head, sec, buf);
@@ -1312,7 +1316,9 @@ __attribute__((constructor))
 void
 libfs_init()
 {
+#ifndef NODEBUG
     trace_fs = register_trace("fslib");
+#endif
 }
 
 /*

@@ -25,6 +25,8 @@
 #include "disz80.h"
 #include "mnix.h"
 
+#ifndef NODEBUG
+
 /* util.h's trace() collides with the curses trace() macro, so declare
  * just the two things message() needs instead of including the header. */
 extern int logfd;
@@ -425,6 +427,8 @@ message(char *fmt, ...)
     }
     va_end(args);
 }
+
+#endif
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

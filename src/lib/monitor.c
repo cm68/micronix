@@ -21,6 +21,8 @@
 #include "disz80.h"
 #include "mnix.h"
 
+#ifndef NODEBUG
+
 extern unsigned short lookup_sym(char *);
 extern unsigned char get_byte(unsigned short addr);
 extern int mypid;
@@ -572,6 +574,8 @@ mon_init()
         rwatch_cmd);
     register_mon_cmd('h', "\t\t\thelp", help_cmd);
 }
+
+#endif
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

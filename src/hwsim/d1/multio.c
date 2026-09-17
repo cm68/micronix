@@ -26,11 +26,13 @@
 #include <string.h>
 #include <errno.h>
 
+#ifndef NODEBUG
 int trace_multio;
 int trace_uart;
 int trace_clock;
 int trace_intr;
 int trace_intack;
+#endif
 
 #define HZ_1    0x800
 #define NOCLOCK 0x1000
@@ -507,6 +509,17 @@ multio_intack()
             iv_isrbit = 0;
         } else {
             iv_isrbit = mask;
+            /*
+             * A level-triggered 8259 clears the request bit when it
+             * acknowledges, and the IRQ line has to fall and rise again to
+             * set it back.  Keeping irr set here meant a device that left
+             * its line high - the hddma holds it from completion until the
+             * next command - re-asserted the interrupt the moment the EOI
+             * cleared isr, and the kernel took it as a second, spurious
+             * interrupt.  Drop the request now; the line's own low/high
+             * edges in multio_vi_change will re-raise it for real.
+             */
+            irr &= ~mask;
             vecaddr = (icw1 & ICW1_VECL) + (level * ((icw1 & ICW1_ADI) ? 4 : 8)) + (icw2 << 8);
             vector[0] = 0xcd;
             vector[1] = vecaddr & 0xff;
@@ -1364,7 +1377,9 @@ multio_init()
     reg_intbit(1, "djdma");
     reg_intbit(2, "slave");
     reg_intbit(7, "clock");
+#ifndef NODEBUG
     register_mon_cmd('M', "\tdump multio state", multio_dump);
+#endif
 
     return 0;
 }
@@ -1383,11 +1398,13 @@ multio_setup()
     char *tty = ttyname(0);
 
     myttyname = tty ? strdup(tty) : 0;
+#ifndef NODEBUG
     trace_multio = register_trace("multio");
     trace_uart = register_trace("uart");
     trace_clock = register_trace("clock");
     trace_intr = register_trace("intr");
     trace_intack = register_trace("intack");
+#endif
     return 0;
 }
 

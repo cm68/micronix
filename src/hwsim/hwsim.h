@@ -20,8 +20,6 @@ extern byte s100_input(portaddr p);
 
 extern paddr ram_size;          // bytes of ram backed in the 24 bit space
 
-extern int register_trace(char *tracename);
-
 /* a driver registers one of these */
 struct driver {
     char *name;
@@ -38,9 +36,14 @@ extern void register_input(portaddr portnum, inhandler func);
 extern void register_output(portaddr portnum, outhandler func);
 
 // control port 0xd0: the kernel writes task, device and inode so the
-// simulator can load the symbol table of the program being exec'd
+// simulator can load the symbol table of the program being exec'd.  The
+// kernel writes these bytes unconditionally on every exec, so the port
+// handler stays registered under -DNODEBUG (as a no-op) rather than
+// letting the write fall through to the "undefined port" diagnostic.
 extern void ctrl_out(portaddr port, byte val);
+#ifndef NODEBUG
 extern void set_ctl_image(char *path);   // name the root filesystem image
+#endif
 
 /*
  * actual control line at the bus
@@ -128,6 +131,19 @@ void console_claim(int who);
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
+/*
+ * Watchpoints are checked on every physical write (and the virtual one on
+ * every cpu store), so a hardware build drops them to no-ops under
+ * -DNODEBUG rather than paying the range test in the hot path.
+ */
+#ifdef NODEBUG
+#define add_write_watch(lo, hi)         ((void)0)
+#define add_phys_watch(lo, hi)          ((void)0)
+#define phys_watch_check(p, v)          ((void)0)
+#else
 extern void add_write_watch(unsigned short lo, unsigned short hi);
+extern void add_phys_watch(unsigned int lo, unsigned int hi);
+extern void phys_watch_check(unsigned int p, unsigned char v);
+#endif
 extern unsigned long long simnow64();
 extern void take_pending_trap();

@@ -194,10 +194,12 @@ byte switchreg;
 #define     SW_IPEND    0x02
 static char *swt_bits[] = { "reset", "ipend", "monitor", 0, 0, 0, 0, 0 };
 
+#ifndef NODEBUG
 int trace_mpz80;
 int trace_map;
 int trace_mem;
 int trace_syscall;
+#endif
 
 byte trapstat;
 #define STAT    0x403       // trap status register
@@ -250,6 +252,7 @@ setrom(int page)
 char *wregname[] = { "fpseg", "fpcol", "trap", "mask" };
 char *pattr[] = { "no access", "r/o", "execute", "full" };
 
+#ifndef NODEBUG
 // dump out memory map
 int
 map_cmd(char **sp)
@@ -273,12 +276,13 @@ map_cmd(char **sp)
         page = task * 32 + (i << 1);
         attr = maps[page + 1];
         printf("0x%04x 0x%06x %s%s\n",
-            i << 12, 
+            i << 12,
             maps[page] << 12,
             pattr[attr & 0x3], (attr & 0x4) ? " r10" : "");
     }
     return 0;
 }
+#endif
 
 int 
 super()
@@ -304,7 +308,9 @@ super()
  * and implement the trap function
  */
 int trapcount;
+#ifndef NODEBUG
 int trace_trap;
+#endif
 
 /*
  * Addresses to report writes to, from -W.  A watchpoint in the monitor
@@ -319,12 +325,18 @@ int trace_trap;
  * tell a process writing its own memory from something writing through
  * it.
  */
+#ifndef NODEBUG
 int stub_reported;
+#endif
 
+#ifndef NODEBUG
 #define NWATCH 8
 static vaddr watchlo[NWATCH];
 static vaddr watchhi[NWATCH];
 static int nwatch;
+static paddr pwatchlo[NWATCH];
+static paddr pwatchhi[NWATCH];
+static int npwatch;
 
 /*
  * A range rather than an address, because the thing worth watching is
@@ -339,6 +351,51 @@ add_write_watch(vaddr lo, vaddr hi)
         nwatch++;
     }
 }
+
+/*
+ * The same, keyed on the 24 bit physical address the MMU resolves rather
+ * than the virtual address the cpu drove.  The buffer cache moves through
+ * the 0xe000/0xd000 windows, so a physical range is the way to pin a
+ * specific buffer or segment without guessing which virtual offset it is
+ * mapped at this instruction.
+ */
+void
+add_phys_watch(paddr lo, paddr hi)
+{
+    if (npwatch < NWATCH) {
+        pwatchlo[npwatch] = lo;
+        pwatchhi[npwatch] = hi;
+        npwatch++;
+    }
+}
+
+/*
+ * Called from physwrite() on every byte that reaches physical memory, so
+ * the physical watch covers the DMA's copyin/copyout as well as the cpu's
+ * own stores - the virtual -W cannot see a controller moving a disk block
+ * into the buffer cache.
+ */
+void
+phys_watch_check(paddr p, unsigned char v)
+{
+    int w;
+
+    if (npwatch == 0)
+        return;
+    for (w = 0; w < npwatch; w++) {
+        if (p < pwatchlo[w] || p > pwatchhi[w])
+            continue;
+        {
+            char sbuf[16];
+
+            printf("pwatch: physical %06x <- %02x %s from %s\n",
+                p, v,
+                (v >= 0x20 && v < 0x7f) ? (char[]){'\'', v, '\'', 0} : "   ",
+                dis_space(z80_get_reg16(pc_reg), sbuf, sizeof(sbuf)));
+        }
+    }
+}
+#endif /* NODEBUG */
 
 /*
  * the program counter when the trap hit
@@ -370,6 +427,7 @@ trap(byte trapbits)
      * The place it prints is the place -T takes, so a trap worth looking
      * at can be handed straight back as a trace trigger.
      */
+#ifndef NODEBUG
     if (traceflags & trace_trap) {
         char sbuf[16];
         char *why;
@@ -384,6 +442,7 @@ trap(byte trapbits)
         trace(trace_trap, "trap: %-9s from %s\n", why,
             dis_space(z80_get_reg16(pc_reg), sbuf, sizeof(sbuf)));
     }
+#endif
     trace(trace_mpz80, "trap 0x%x %s\n", trapbits, bitdef(trapbits, stat_bits));
     taskreg = 0;
     trapcount = 15;
@@ -516,9 +575,12 @@ getpte(word addr, paddr *paddrp, byte *attrp)
 }
 
 static int prefix;      // was the last M1 a prefix instruction
+#ifndef NODEBUG
 int inst_disabled = 0;
 extern int trace_inst;
+#endif
 
+#ifndef NODEBUG
 byte
 fubyte(word addr)
 {
@@ -528,7 +590,9 @@ fubyte(word addr)
     getpte(addr, &pa, &attr);
     return physread(pa);
 }
+#endif
 
+#ifndef NODEBUG
 /*
  * Which space an address is in, for display.  Three answers here: the
  * trap window while a trap sequence is running, the supervisor's on
@@ -549,7 +613,9 @@ dis_space(word addr, char *buf, int len)
     }
     return buf;
 }
+#endif
 
+#ifndef NODEBUG
 /*
  * The inverse of dis_space: normalise what someone typed into the string
  * dis_space would print, so a caller can watch for a place by comparing
@@ -583,7 +649,9 @@ dis_parse(char *spec, char *buf, int len)
     }
     return 0;
 }
+#endif
 
+#ifndef NODEBUG
 /*
  * The disassembler's fetch.  It has to decode an address exactly the way
  * get_byte does - supervisor sees the on board ram, registers, eprom and
@@ -662,6 +730,7 @@ fuword(word addr)
 {
     return fubyte(addr) + (fubyte(addr+1) << 8);
 }
+#endif
 
 /*
  * the mpz80 inhibits reads and writes for a fixed number of memory cycles after a trap
@@ -798,6 +867,7 @@ get_byte(vaddr addr)
      * is a program that has just executed something that was not code,
      * and rst pushed the address after it, so the stack says where.
      */
+#ifndef NODEBUG
     if (z80_get_reg8(status_reg) & S_M1) {
         if ((addr >= 0x38) && (addr <= 0x4c)) {
             if (!stub_reported) {
@@ -812,7 +882,9 @@ get_byte(vaddr addr)
             stub_reported = 0;
         }
     }
+#endif
 
+#ifndef NODEBUG
     /*
      * A call that was traced going in gets its answer reported coming
      * out, which is the first thing fetched back in user mode at the
@@ -822,10 +894,11 @@ get_byte(vaddr addr)
         (traceflags & trace_syscall)) {
         syscall_return(addr);
     }
+#endif
 
-    if ((!super()) && 
-        (z80_get_reg8(status_reg) & S_M1) && 
-        (retval == 0x76) && 
+    if ((!super()) &&
+        (z80_get_reg8(status_reg) & S_M1) &&
+        (retval == 0x76) &&
         (!prefix) && (maskreg & MASK_HALT)) {
         /*
          * Every system call arrives as a halt trapping out of user mode,
@@ -840,26 +913,30 @@ get_byte(vaddr addr)
          * return address for the rst (0xcf) or the call (0xcd) that got
          * there, and says so if it finds neither.  Let it decide.
          */
+#ifndef NODEBUG
         if (traceflags & trace_syscall) {
             syscall_at(fuword(z80_get_reg16(sp_reg)));
         }
+#endif
         trap(ST_RESET & ~ST_HALT);
         seg = "nop:";
         retval = 0;
     }
 
-    if (running && (z80_get_reg8(status_reg) & S_M1) && 
+    if (running && (z80_get_reg8(status_reg) & S_M1) &&
         ((retval == 0xED) || (retval == 0xDD) || (retval == 0xFD) || (retval == 0xCB))) {
         prefix = 1;
     } else {
         prefix = 0;
     }
 
-    if ((running && ((traceflags & trace_mem)) || 
+#ifndef NODEBUG
+    if ((running && ((traceflags & trace_mem)) ||
         (local && (traceflags & trace_mpz80)))) {
-        l("mem: read %04x (%s%06x) %s got %02x %s\n", 
+        l("mem: read %04x (%s%06x) %s got %02x %s\n",
             orig, seg, pa, regname, retval, desc);
-    } 
+    }
+#endif
     return retval;
 }
 
@@ -877,6 +954,7 @@ put_byte(vaddr addr, unsigned char value)
  
     local = super() && (addr < 0x1000);
 
+#ifndef NODEBUG
     if (nwatch) {
         int w;
 
@@ -901,6 +979,7 @@ put_byte(vaddr addr, unsigned char value)
             }
         }
     }
+#endif
 
     if (!local) {                           // mapped ram
         seg = "mapped:";
@@ -947,6 +1026,7 @@ put_byte(vaddr addr, unsigned char value)
         paddr offset = addr & 0x1ff;
         byte task = (addr >> 5) & 0xf;
         byte page = (addr >> 1) & 0xf;
+#ifndef NODEBUG
         if (traceflags & trace_map) {
             l("map register %x write %x task %d page %x ", addr, value, task, page);
             if (addr & 0x01) {
@@ -955,6 +1035,7 @@ put_byte(vaddr addr, unsigned char value)
                 lc("physical 0x%2x000\n", value);
             }
         }
+#endif
         maps[offset] = value;
         break;
     case EPROM: case EPROM + 0x200:         // fung wha?!
@@ -974,10 +1055,12 @@ put_byte(vaddr addr, unsigned char value)
         }
         break;
     }
-    if ((running && ((traceflags & trace_mem)) || 
+#ifndef NODEBUG
+    if ((running && ((traceflags & trace_mem)) ||
         (local && (traceflags & trace_mpz80)))) {
         l("mem: write %04x (%s%06x) %s put %02x %s\n", addr, seg, pa, regname, value, desc);
-    } 
+    }
+#endif
 }
 
 byte
@@ -1043,12 +1126,14 @@ mpz80_setup()
     keybreg = 0;
     taskreg = 0;
 
+#ifndef NODEBUG
     trace_mpz80 = register_trace("mpz80");
     trace_trap = register_trace("trap");
     trace_map = register_trace("map");
     trace_mem = register_trace("mem");
     trace_syscall = register_trace("syscall");
     register_mon_cmd('m', "[task]\tdump memory map", map_cmd);
+#endif
     register_output(0xd0, ctrl_out);   /* kernel -> sim control port */
     return 0;
 }

@@ -45,8 +45,10 @@ static int curcyl[DRIVES];	// where are we - used for format and seek
 static int secsize[DRIVES];   	// sector size from specify/format
 static void *handle[DRIVES];	// our handle to the harddisk module
 
+#ifndef NODEBUG
 int trace_hddma;
 extern int trace_bio;
+#endif
 
 /*
  * the in-ram format for a hd-dma command block
@@ -179,8 +181,10 @@ select_drive(int id)
     if (!handle[id]) {
         printf("open of %s failed\n", drivename);
     }
+#ifndef NODEBUG
     if (id == 0)
         set_ctl_image(drive_resolve(drivename));   /* the root filesystem image */
+#endif
     secsize[id] = drive_sectorsize(handle[id], 0);
 }
 
@@ -226,6 +230,7 @@ attention(portaddr p, byte v)
     link = command.link_low + (command.link_mid << 8) + (command.link_high << 16);
     head = ((command.selhd & HEAD_MASK) >> HEAD_SHIFT) ^ HEAD_CMP;
 
+#ifndef NODEBUG
     if (traceflags & trace_hddma) {
     	if ((command.opcode >= 0) && (command.opcode <= OP_NOP)) {
     		lc("%s ", cmdname[command.opcode]);
@@ -234,13 +239,14 @@ attention(portaddr p, byte v)
 		}
         lc("drive: %d track: %d step: %d %s head: %x %s%s",
             drv, curcyl[drv], steps, command.seldir & STEP_DOWN ? "down" : "up",
-            head, command.selhd & LOW_CURR ? "lowcurr " : "", 
+            head, command.selhd & LOW_CURR ? "lowcurr " : "",
             command.selhd & PRECOMP ? "precomp " : "");
-        lc("args %x %x %x %x ", 
+        lc("args %x %x %x %x ",
             command.arg0, command.arg1, command.arg2, command.arg3);
-        lc("dmaaddr: 0x%x link 0x%x secsize %d\n", 
+        lc("dmaaddr: 0x%x link 0x%x secsize %d\n",
             dmaaddr, link, secsize[drv]);
     }
+#endif
 
     // do the stepping that can be in every command
     if (command.seldir & STEP_DOWN) {
@@ -269,7 +275,9 @@ attention(portaddr p, byte v)
     	// do boot magic here
     	}
 #endif
+#ifndef NODEBUG
         if (traceflags & trace_bio) hexdump(secbuf, i);
+#endif
         command.status = GOOD;
         break;
     case OP_WRITE:
@@ -282,7 +290,9 @@ attention(portaddr p, byte v)
         if (i != secsize[drv]) {
         	lc("\twrite sector size mismatch %d expected %d\n", i, secsize[drv]);
         }
+#ifndef NODEBUG
         if (traceflags & trace_bio) hexdump(secbuf, i);
+#endif
         command.status = GOOD;
         break;
     case OP_RHEAD:
@@ -310,6 +320,7 @@ attention(portaddr p, byte v)
             break;
         }
         copyout(secbuf, dmaaddr, i);
+#ifndef NODEBUG
         if (traceflags & trace_hddma) {
             lc("\theader c %d h %d = %02x %02x %02x %02x %02x %02x %02x %02x"
                " (cyl %d head %d sector %d)\n",
@@ -318,6 +329,7 @@ attention(portaddr p, byte v)
                 secbuf[4], secbuf[5], secbuf[6], secbuf[7],
                 secbuf[2] + (secbuf[3] << 8), secbuf[4], secbuf[5]);
         }
+#endif
         command.status = GOOD;
         break;
     case OP_FMT:                                // format a whole track
@@ -355,6 +367,7 @@ attention(portaddr p, byte v)
          * This read 8 and dumped twice the table, the back half being
          * whatever followed it in memory.
          */
+#ifndef NODEBUG
         if (traceflags & trace_hddma) {
             int n = nsect * 4;
 
@@ -366,6 +379,7 @@ attention(portaddr p, byte v)
             for (i = 0; i < secsize[drv]; i++)  // hexdump reused secbuf
                 secbuf[i] = command.fill;
         }
+#endif
 
         /*
          * Sectors are numbered from zero.  This passed 1, so every
@@ -408,11 +422,13 @@ attention(portaddr p, byte v)
          * micronix at 512, and both have to work, so take what is sent.
          */
         i = SSECSIZE(command.sseccode);
+#ifndef NODEBUG
         if (traceflags & trace_hddma) {
             lc("\tsteprate: %d ms ", command.steprate & 0x7f);
             lc("settle: %d ms ", command.settle & 0x7f);
             lc("secsize %d\n", i);
         }
+#endif
         if (i != secsize[drv]) {
         	tracec(trace_hddma, "\tdrive %d sectorsize mismatch on specify %d expected %d\n", 
                 drv, i, secsize[drv]);
@@ -468,7 +484,9 @@ hddma_init()
 static int
 hddma_setup()
 {
+#ifndef NODEBUG
     trace_hddma = register_trace("hddma");
+#endif
     return 0;
 }
 
