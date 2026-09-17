@@ -3711,11 +3711,12 @@ SystemCall()
     case 49:                    /* lock */
     case 50:                    /* unlock */
         gfd = fd;
-        if ((fd = hostfd(gfd)) < 0) {
+        if (hostfd(gfd) < 0) {
             ret = EBADF;
             carry_set();
             goto sysdone;
         }
+        fd = hostfd(gfd);
         break;
     }
     if (sp->flag & SF_NAME) {
