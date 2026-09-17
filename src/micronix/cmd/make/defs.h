@@ -35,7 +35,7 @@ typedef long TIMETYPE;
 
 #define unequal strcmp
 #define HASHSIZE 509
-#define NLEFTS 40
+#define NLEFTS 128
 #define NCHARS 500
 #define NINTS  250
 #define INMAX 1500
