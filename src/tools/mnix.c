@@ -1043,6 +1043,7 @@ tarx(char *tarfile)
 	int infd;
 	int i;
 	long size;
+	long mtime;
 	int mode;
 	int nblocks;
 	char buf[TBLOCK];
@@ -1066,6 +1067,7 @@ tarx(char *tarfile)
 			break;
 		sscanf(dblock.dbuf.mode, "%o", &mode);
 		sscanf(dblock.dbuf.size, "%lo", &size);
+		sscanf(dblock.dbuf.mtime, "%lo", &mtime);
 
 		/* a directory's name ends with a slash, as cmd/tar writes it */
 		{
@@ -1127,6 +1129,8 @@ tarx(char *tarfile)
 		}
 		dp->d_size0 = (size >> 16) & 0xff;
 		dp->d_size1 = size & 0xffff;
+		dp->d_mtime = mtime;
+		dp->d_atime = mtime;
 		iput(dp);
 		ifree(dp);
 	}

@@ -7,15 +7,14 @@
 # <volume> is the name of the drive file to make.  It is built from
 # scratch: initialize lays down the blank drive with its geometry label,
 # mkfs -i writes the filesystem and the m40 hard disk boot, and then the
-# whole userland is copied across from the blessed drive.  The kernel is
-# then replaced with the freshly built ccc one.
+# whole userland is copied across from the source tree's filesystem
+# directory, which "make install" populates.  The kernel is then
+# replaced with the freshly built ccc one.
 #
-# The blessed drive (hddma-0.blessed) is the source of "all the
-# binaries" - the original userland exactly as distributed, kept as a
-# fixed reference.  /boot is not copied: mkfs -i has just built it for
-# the m40, and copying the blessed drive's would put the m5 boot over
-# it.  /dev is recreated node by node rather than carried, because tar
-# does not carry device nodes.
+# /boot is not copied: mkfs -i has just built it for the m40, and
+# copying it from elsewhere would put the wrong boot over it.  /dev is
+# recreated node by node rather than carried, because tar does not carry
+# device nodes - the list of devices still comes from the blessed drive.
 #
 # The volume is made in this directory unless an absolute path is given,
 # and it is truncated if it already exists.
@@ -32,6 +31,7 @@ bootimg="$root/src/micronix/stand/boot/bootimg-m40"
 kernel="$root/src/micronix/sys/unix"
 srcdir="$root/src/micronix"
 srctar="$srcdir/srctar.tar"
+filesystem="$root/filesystem"
 
 vol="$1"
 if [ -z "$vol" ]; then
@@ -62,11 +62,11 @@ trap 'rm -f "$tmp" "$tmp.dev" "$tmp.k"' 0
 # 2. the filesystem, with the hard disk boot in /boot/bootmw
 "$mnix" mkfs "$vol" -i "$bootimg" -f || exit 1
 
-# 3. the userland, from the blessed drive
-"$mnix" -f "$blessed" tar c "$tmp" \
-	/micronix /bin /etc /usr \
-	/finstall /hdinit /m5init /m10init /m16init \
-	/.sh /.login || exit 1
+# 3. the userland, from the source tree's filesystem (make install).
+# The kernel is not carried here: step 5 writes the freshly built one.
+tar -C "$filesystem" -c -f "$tmp" \
+	--exclude='usr/src' --exclude='usr/man' \
+	bin lib libexec etc usr finstall hdinit m5init m10init m16init .sh .login || exit 1
 "$mnix" -f "$vol" tar x "$tmp" || exit 1
 
 # 4. the device nodes, replayed from the blessed drive's /dev
