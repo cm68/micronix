@@ -681,29 +681,11 @@ inumof(struct dsknod *dp)
 }
 
 
-UINT32
-timeswap(UINT32 x)
-{
-    UINT32 ret;
-    union
-    {
-        UINT32 t;
-        UINT tw[2];
-        UINT8 tb[4];
-    } tu;
-
-    tu.t = x;
-
-    ret = tu.tb[1];
-    ret |= tu.tb[0] << 8;
-    ret |= tu.tb[3] << 16;
-    ret |= tu.tb[2] << 24;
-
-    return ret;
-}
-
 /*
- * micronix timestamps seem to longs in a bizarre byte order
+ * micronix timestamps are a long in word-swapped byte order: ccc stores
+ * a 32-bit long with the high 16-bit word at the lower address, so a
+ * host long read straight off the disk has its two words swapped.  Swap
+ * them back for display.
  */
 char *
 mytime(UINT32 t)
@@ -732,7 +714,7 @@ dumpsb(struct super *fs)
 {
     printf("isize: %d fsize: %d nfree: %d ninode: %d time: %s\n",
         fs->s_isize, fs->s_fsize, fs->s_nfree, fs->s_ninode,
-        mytime(timeswap(fs->s_time)));
+        mytime(fs->s_time));
 }
 
 void
