@@ -77,7 +77,7 @@ imapi(ip, n, rap)
     int n, *rap;
 {
     register int *p;
-    register int bn;
+    UINT bn;
 
     *rap = 0;
     /*
@@ -87,9 +87,12 @@ imapi(ip, n, rap)
      * between int * and unsigned short *.
      */
     p = (int *) &ip->i_addr[n];
-    if (*p == 0)
-        if (plug(p, ip->i_dev))
-            ip->flags |= IMOD;
+    if (*p == 0) {
+        if ((bn = plug(ip->i_dev)) == 0)
+            return 0;
+        *p = bn;                /* i_addr is in the (unpaged) inode */
+        ip->flags |= IMOD;
+    }
     if (n < 7)
         *rap = *(p + 1);
     return (*p);
@@ -105,7 +108,7 @@ imapb(ind, n, dev, rap)
 {
     register struct buf *bp;
     register int *p;
-    register int bn;
+    UINT bn;
 
     *rap = 0;
     if (ind == 0)
@@ -114,9 +117,16 @@ imapb(ind, n, dev, rap)
         return (0);
     bwin(bp->xmem);
     p = (int *)(bp->data + n * sizeof(int));
-    if (*p == 0 && plug(p, dev))
+    if (*p == 0) {
+        if ((bn = plug(dev)) == 0) {
+            brelse(bp);
+            return (0);
+        }
+        bwin(bp->xmem);         /* plug()'s balloc() remapped the window */
+        p = (int *)(bp->data + n * sizeof(int));
+        *p = bn;
         bdwrite(bp);
-    else
+    } else
         brelse(bp);
     if (n < 255)
         *rap = *(p + 1);
@@ -124,21 +134,16 @@ imapb(ind, n, dev, rap)
 }
 
 /*
- * Allocate a block for a file
+ * Allocate a block for a file.  Returns the block number, or 0.  The
+ * caller installs it: its pointer may be into a paged buffer, and
+ * balloc() remaps the 0xe000 window, so nothing here may dereference a
+ * buffer address across that call.
  */
-plug(p, dev)
-    int *p, dev;
+UINT
+plug(dev)
+    int dev;
 {
-    static UINT bn;
-
-    if ((bn = balloc(dev)) != 0) {
-        if (*p == 0) {
-            *p = bn;
-            return 1;
-        }
-        bfree(bn);
-    }
-    return 0;
+    return balloc(dev);
 }
 
 /*

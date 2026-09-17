@@ -138,7 +138,13 @@ bfree(struct super *fs, int blkno)
 	int i;
 	UINT buf[256];
 
-	if (fs->s_nfree >= 100) {
+	if (fs->s_nfree == 0) {
+		/* an empty list still needs its end-of-list marker, so the
+		 * next balloc() stops here instead of reading the freed
+		 * block's old contents as a link */
+		fs->s_free[0] = 0;
+		fs->s_nfree = 1;
+	} else if (fs->s_nfree >= 100) {
 		buf[0] = fs->s_nfree;
 		for (i = 0; i < 100; i++)
 			buf[i + 1] = fs->s_free[i];

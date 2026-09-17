@@ -251,12 +251,23 @@ indfree(ind, level, dev)
     if ((bp = bread(ind, dev)) == 0) {
 
         /*
-         * pr("indfree: bad freelist dev %h\n", dev); 
+         * pr("indfree: bad freelist dev %h\n", dev);
          */
         return;
     }
-    for (p = (int *)&bp->data[510]; p >= (int *)bp->data; p--)
-        indfree(*p, level - 1, dev);
+    for (p = (int *)&bp->data[510]; p >= (int *)bp->data; p--) {
+        int bn;
+
+        /*
+         * Re-map before every read: the recursive indfree() below does
+         * its own bread()/bwin(), so 0xe000 no longer shows this block
+         * when it returns.  Reading through a stale bp->data would walk
+         * whatever page is mapped then.
+         */
+        bwin(bp->xmem);
+        bn = *p;
+        indfree(bn, level - 1, dev);
+    }
     brelse(bp);
     bfree(ind, dev);
 }

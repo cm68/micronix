@@ -39,6 +39,9 @@ balloc(dev)
         if ((fb = bread(bn, dev)) == 0)
             goto bad;
         bcopy(fb, 0, sb, 4, 202);       /* PORT: refill free list */
+        pr("refill blk %d: count %d e0 %d e1 %d e2 %d\n",
+            bn, ((UINT *)fb->data)[0], ((UINT *)fb->data)[1],
+            ((UINT *)fb->data)[2], ((UINT *)fb->data)[3]);
     } else {
         fb = bget(bn, dev);
         bwin(fb->xmem);
@@ -93,13 +96,17 @@ bfree(bn, dev)
  * Check the validity of a file block number
  */
 bcheck(bn, sup, dev)
-    int bn, dev;
+    UINT bn;
+    int dev;
     struct super *sup;
 {
     if (sup->s_isize + 1 < bn && bn < sup->s_fsize)
         return 1;
-    prdev("Out of range block number", dev);
-    return 0;
+    pr("bcheck: bn %d (0%o) out of range [isize %d fsize %d]\n",
+        bn, bn, sup->s_isize, sup->s_fsize);
+    di();
+    for (;;)
+        ;
 }
 
 /*
