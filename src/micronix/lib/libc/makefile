@@ -36,22 +36,29 @@ MAN	= strcat.3 strchr.3 strcmp.3 strcpy.3 strdup.3 \
 	strlen.3 strncat.3 strncmp.3 strncpy.3 strrchr.3
 MANDIR	= /usr/man/man3
 
-AOBJS	= abs.o allsh.o alrsh.o asallsh.o asalrsh.o asar.o \
+# The archive is built in chunks: a single "ar cr libc.a $(OBJS)" line
+# is too long for the system to exec (v6-era Micronix has no room for a
+# 115-object command).  Each chunk stays under one argument block.
+AOBJS1	= abs.o allsh.o alrsh.o asallsh.o asalrsh.o asar.o \
 	strdup.o asdiv.o asladd.o asland.o asll.o \
 	asllrsh.o aslmul.o aslor.o aslr.o aslsub.o aslxor.o \
 	asmod.o asmul.o atoi.o bitfield.o blkclr.o bmove.o \
-	csv.o brelop.o wrelop.o getsp.o idiv.o imul.o \
-	index.o inout.o iregset.o isalpha.o isdigit.o islower.o \
+	csv.o brelop.o wrelop.o getsp.o idiv.o imul.o
+
+AOBJS2	= index.o inout.o iregset.o isalpha.o isdigit.o islower.o \
 	isspace.o isupper.o ladd.o land.o lcom.o ldiv.o \
 	linc.o lldst.o llrsh.o lmul.o longjmp.o lor.o \
 	lrelop.o lsub.o lushr.o lxor.o max.o swap.o \
-	qadd.o qsub.o qand.o qor.o qxor.o qcom.o \
-	qcmp.o qshl.o qsar.o qshr.o qinc.o qldst.o \
+	qadd.o qsub.o qand.o qor.o qxor.o qcom.o
+
+AOBJS3	= qcmp.o qshl.o qsar.o qshr.o qinc.o qldst.o \
 	qmul.o qdiv.o op16.o tramp.o rcsv.o rindex.o \
 	shar.o shl16.o shll.o shlr.o strcat.o \
 	strchr.o strcmp.o strcpy.o swdisp.o swdispw.o oarg.o \
 	strlen.o strncat.o strncmp.o strncpy.o strrchr.o tolower.o \
 	toupper.o xtoi.o
+
+AOBJS	= $(AOBJS1) $(AOBJS2) $(AOBJS3)
 
 COBJS	= rand.o srand1.o mkstemp.o mktemp.o permaloc.o \
 	timezone.o ctime.o assert.o calloc.o malloc.o memcmp.o \
@@ -65,7 +72,10 @@ all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	rm -f $(TARGET)
-	$(AR) cr $(TARGET) $(OBJS)
+	$(AR) cr $(TARGET) $(AOBJS1)
+	$(AR) r $(TARGET) $(AOBJS2)
+	$(AR) r $(TARGET) $(AOBJS3)
+	$(AR) r $(TARGET) $(COBJS)
 
 #
 # One entry for each group: $* is the target without its suffix,

@@ -28,14 +28,21 @@ AR	= ar
 LIBDIR	= /lib
 TARGET	= libu.a
 
-AOBJS	= access.o alarm.o _break.o chdir.o chmod.o chown.o \
+# The archive is built in chunks because a single "ar cr libu.a $(OBJS)"
+# command line is too long for the system to exec - v6-era Micronix has
+# no room for an 80-object command.  Each chunk stays comfortably under
+# one argument block.
+AOBJS1	= access.o alarm.o _break.o chdir.o chmod.o chown.o \
 	close.o creat.o dup.o errno.o exec.o execv.o \
 	exit.o _exit.o fdpos.o fork.o fstat.o getpid.o getuid.o \
-	gtty.o kill.o link.o mknod.o mount.o nice.o \
-	open.o pause.o perror.o pipe.o read.o seekraw.o \
+	gtty.o kill.o link.o mknod.o mount.o nice.o
+
+AOBJS2	= open.o pause.o perror.o pipe.o read.o seekraw.o \
 	setuid.o _signal.o sleep.o stat.o stime.o sbrk.o \
 	stty.o sync.o time.o umount.o unlink.o wait.o \
 	write.o fputc.o fgetc.o
+
+AOBJS	= $(AOBJS1) $(AOBJS2)
 
 COBJS	= signal.o lseek.o seek.o rename.o \
 	buf.o cleanup.o fclose.o fflush.o filbuf.o flsbuf.o \
@@ -65,7 +72,9 @@ all: $(TARGET) $(CRT0)
 
 $(TARGET): $(OBJS)
 	rm -f $(TARGET)
-	$(AR) cr $(TARGET) $(OBJS)
+	$(AR) cr $(TARGET) $(AOBJS1)
+	$(AR) r $(TARGET) $(AOBJS2)
+	$(AR) r $(TARGET) $(COBJS)
 
 #
 # One entry for each group: $* is the target without its suffix,
