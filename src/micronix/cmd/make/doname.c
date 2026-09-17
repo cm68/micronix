@@ -9,6 +9,50 @@ p->done = 2   file already exists in current state
 p->done = 3   file make failed
 */
 
+/*
+ * The stem of a name: everything before its last '.' extension, which
+ * is what $* means for an explicit prerequisite - "abs.o" -> "abs".
+ */
+static
+stemof(name, buf)
+char *name, *buf;
+{
+char *dot = strrchr(name, '.');
+
+if(dot && dot != name)
+	{
+	while(name < dot) *buf++ = *name++;
+	*buf = '\0';
+	}
+else
+	strcpy(buf, name);
+}
+
+/*
+ * Substitute $* (the stem) and $@ (the target name) into a prerequisite
+ * string.  These are the two automatic variables that name the target
+ * itself; $< and $? name prerequisites and mean nothing here.
+ */
+static
+subst_dep(src, name, stem, dest)
+char *src, *name, *stem, *dest;
+{
+char *v;
+
+while(*src)
+	{
+	if(*src == '$' && (src[1] == '*' || src[1] == '@'))
+		{
+		v = (src[1] == '*') ? stem : name;
+		src += 2;
+		while(*v) *dest++ = *v++;
+		}
+	else
+		*dest++ = *src++;
+	}
+*dest = '\0';
+}
+
 doname(p, reclevel, tval)
 register struct nameblock *p;
 int reclevel;
@@ -20,11 +64,12 @@ int didwork;
 TIMETYPE td, td1, tdep, ptime, ptime1, prestime();
 register struct depblock *q;
 struct depblock *qtemp, *srchdir(), *suffp, *suffp1;
-struct nameblock *p1, *p2;
+struct nameblock *p1, *p2, *dn;
 struct shblock *implcom, *explcom;
 register struct lineblock *lp;
 struct lineblock *lp1, *lp2;
 char sourcename[100], prefix[100], temp[100], concsuff[20];
+char stem[100], depbuf[100];
 char *pnamep, *p1namep;
 char *mkqlist();
 struct chain *qchain, *appendq();
@@ -58,12 +103,19 @@ p->done = 1;	/* avoid infinite loops */
 
 qchain = NULL;
 
-/* Expand any names that have embedded metacharaters */
+/* The stem of this target, for $* in prerequisites */
+
+stemof(p->namep, stem);
+
+/* Expand metacharacters in prerequisites; a name holding $ is an
+ * automatic variable, expanded per target below, not globbed. */
 
 for(lp = p->linep ; lp ; lp = lp->nxtlineblock)
 	for(q = lp->depp ; q ; q=qtemp )
 		{
 		qtemp = q->nxtdepblock;
+		if(strchr(q->depname->namep, '$'))
+			continue;
 		expand(q);
 		}
 
@@ -74,12 +126,19 @@ for(lp = p->linep ; lp ; lp = lp->nxtlineblock)
 	td = 0;
 	for(q = lp->depp ; q ; q = q->nxtdepblock)
 		{
-		errstat += doname(q->depname, reclevel+1, &td1);
+		dn = q->depname;
+		if(strchr(dn->namep, '$'))
+			{
+			subst_dep(dn->namep, p->namep, stem, depbuf);
+			dn = srchname(depbuf);
+			if(dn == 0) dn = makename(copys(depbuf));
+			}
+		errstat += doname(dn, reclevel+1, &td1);
 		if(dbgflag)
-		    printf("TIME(%s)=%ld\n", q->depname->namep, td1);
+		    printf("TIME(%s)=%ld\n", dn->namep, td1);
 		if(td1 > td) td = td1;
 		if(ptime < td1)
-			qchain = appendq(qchain, q->depname->namep);
+			qchain = appendq(qchain, dn->namep);
 		}
 	if(p->septype == SOMEDEPS)
 		{

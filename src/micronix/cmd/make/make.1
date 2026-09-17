@@ -88,7 +88,10 @@ NOTES
 The special names .SUFFIXES, .DEFAULT, .IGNORE, .SILENT and .PRECIOUS
 control implicit rules, defaults, error and interrupt handling.  The
 macros $*, $@, $< and $? name the stem, the target, the prerequisites
-and the out-of-date prerequisites.
+and the out-of-date prerequisites.  Unlike v7 make, $* and $@ are also
+expanded in a prerequisite: in "obj.o: $*.c" each target's own stem
+replaces $*, so obj.o depends on obj.c.  $* is the target name with its
+last "." extension removed.
 .sp
 Archive members a(b) are dated by the archive as a whole: micronix's
 object format is not a.out, so a member's own timestamp is not read.

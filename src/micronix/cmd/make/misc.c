@@ -180,6 +180,14 @@ if(a!=0)  while(*a)
 			b = subst(vbp->varval, b);
 			vbp->used = YES;
 			}
+		else if( s == vname+1 && (vname[0]=='*' || vname[0]=='@') )
+			{
+			/* $* and $@ name the target's stem and name, which have no
+			 * value while a dependency line is being read.  Keep them
+			 * literal so doname() can fill them in per target. */
+			*b++ = '$';
+			*b++ = vname[0];
+			}
 		}
 	}
 
