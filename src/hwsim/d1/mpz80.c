@@ -1049,6 +1049,7 @@ mpz80_setup()
     trace_mem = register_trace("mem");
     trace_syscall = register_trace("syscall");
     register_mon_cmd('m', "[task]\tdump memory map", map_cmd);
+    register_output(0xd0, ctrl_out);   /* kernel -> sim control port */
     return 0;
 }
 

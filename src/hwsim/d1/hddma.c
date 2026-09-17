@@ -179,6 +179,8 @@ select_drive(int id)
     if (!handle[id]) {
         printf("open of %s failed\n", drivename);
     }
+    if (id == 0)
+        set_ctl_image(drive_resolve(drivename));   /* the root filesystem image */
     secsize[id] = drive_sectorsize(handle[id], 0);
 }
 

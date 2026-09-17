@@ -37,6 +37,11 @@ extern void register_driver(struct driver *d);
 extern void register_input(portaddr portnum, inhandler func);
 extern void register_output(portaddr portnum, outhandler func);
 
+// control port 0xd0: the kernel writes task, device and inode so the
+// simulator can load the symbol table of the program being exec'd
+extern void ctrl_out(portaddr port, byte val);
+extern void set_ctl_image(char *path);   // name the root filesystem image
+
 /*
  * actual control line at the bus
  */
@@ -81,6 +86,7 @@ sighandler_t mysignal(int signum, sighandler_t handler);
 void drive_setdir(char *dir);   // where drive_open looks for unit files
 int drive_setunit(char *unit, char *path); // name one unit's file outright
 void *drive_open(char *name);
+char *drive_resolve(char *name); // the file a unit name opens
 int drive_sectorsize(void *dhandle, int secsize);
 int drive_write(void *dhandle, int cyl, int head, int sec, char *buf);
 int drive_read(void *dhandle, int cyl, int head, int sec, char *buf);

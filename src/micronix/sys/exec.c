@@ -43,6 +43,7 @@ static UINT nargs = 0;
 static UINT nbytes = 0;
 static UINT8 nblks = 0;
 extern int zerouser();
+extern int out();
 
 static struct obj hdr = 0;
 char zpage[512] = 0;   /* zero page for clearing bss */
@@ -64,6 +65,17 @@ exec(name, args)
         putargs();
         setusr();
         readin();
+        /*
+         * Tell the simulator which task now runs which inode, so its
+         * tracer can load the new image's symbol table.  Port 0xd0 is
+         * the simulator's control port: task byte, device (major then
+         * minor), then the inode number, low byte first.
+         */
+        out(0xd0, 1);                          /* task byte: user task */
+        out(0xd0, ip->i_major);                /* device: major */
+        out(0xd0, ip->i_minor);                /* device: minor */
+        out(0xd0, (UINT8) ip->i_inum);         /* inode number, low */
+        out(0xd0, (UINT8) (ip->i_inum >> 8));  /* inode number, high */
         if (u.error)
             send(u.p, SIGKILL);
     }

@@ -46,6 +46,10 @@
 #include "imd.h"
 #include "disz80.h"
 #include "mnix.h"
+#include "../micronix/include/types.h"
+#include "../micronix/include/sys/fs.h"
+#include <fslib.h>
+#include "../micronix/include/obj.h"
 
 #define S_FLAG  0x80
 #define Z_FLAG  0x40
@@ -177,15 +181,15 @@ struct sym {
     char *name;
     vaddr value;
     struct sym *next;
-} *syms;
+} *syms[2];
 
 void
-add_sym(char *name, vaddr v)
+add_sym(int task, char *name, vaddr v)
 {
     struct sym *s;
     s = malloc(sizeof(*s));
-    s->next = syms;
-    syms = s;
+    s->next = syms[task & 1];
+    syms[task & 1] = s;
     s->name = strdup(name);
     s->value = v;
 }
@@ -193,7 +197,7 @@ add_sym(char *name, vaddr v)
 int
 find_symbol(char *ls)
 {
-    struct sym *s = syms;
+    struct sym *s = syms[0];
 
     while (s) {
         if (strcasecmp(s->name, ls) == 0) {
@@ -207,10 +211,8 @@ find_symbol(char *ls)
 char *
 lookup_sym(unsigned int symaddr)
 {
-    struct sym *s = syms;
+    struct sym *s = syms[super() ? 0 : 1];
     unsigned short addr = symaddr & 0xffff;
-
-    if (!super()) return 0;
 
     while (s) {
         if (s->value == addr) {
@@ -268,11 +270,136 @@ load_symfile(char *s)
                 continue;
             }
         }
-        add_sym(namebuf, v);
+        add_sym(0, namebuf, v);
         i++;
     }
     printf("added %d symbols from %s\n", i, s);
     fclose(sf);
+}
+
+/*
+ * The root filesystem image, named by the disk controller as it opens
+ * its backing store.  image_for_dev() returns it for any device for
+ * now - the message carries the device number, but the simulator does
+ * not yet keep a device -> image table.
+ */
+static char *ctl_image;
+
+void
+set_ctl_image(char *path)
+{
+    ctl_image = strdup(path);
+}
+
+static char *
+image_for_dev(int dev)
+{
+    return ctl_image;
+}
+
+/*
+ * Read the symbol table of inode `inum` from the filesystem image for
+ * `dev`, and add its symbols to `task`'s table.  A stripped object has
+ * a zero table size and is skipped.
+ */
+void
+load_task_syms(int task, int dev, int inum)
+{
+    struct super *fs;
+    struct dsknod *dp;
+    struct obj hdr;
+    char *img;
+    char blk[512];
+    unsigned char *tab;
+    int symoff, symlen, n, i, off, got;
+    char namebuf[16];
+
+    img = image_for_dev(dev);
+    if (!img || openfs(img, &fs) < 0)
+        return;
+    dp = iget(fs, inum);
+    if (!dp) {
+        closefs(fs);
+        return;
+    }
+    if (fileread(dp, 0, blk) < (int)sizeof(hdr)) {
+        ifree(dp);
+        closefs(fs);
+        return;
+    }
+    memcpy(&hdr, blk, sizeof(hdr));
+    if (hdr.ident != OBJECT || hdr.table == 0) {
+        /* not an object, or stripped */
+        ifree(dp);
+        closefs(fs);
+        return;
+    }
+    symlen = (hdr.conf & CONF_SYMASK) * 2 + 1;
+    n = hdr.table / (symlen + 3);
+    symoff = sizeof(hdr) + hdr.text + hdr.data;
+    tab = malloc(hdr.table);
+    if (!tab) {
+        ifree(dp);
+        closefs(fs);
+        return;
+    }
+    off = symoff;
+    got = 0;
+    while (got < hdr.table) {
+        int within = off & 511;
+        int chunk = 512 - within;
+        fileread(dp, off, blk);
+        if (chunk > hdr.table - got)
+            chunk = hdr.table - got;
+        memcpy(tab + got, blk + within, chunk);
+        got += chunk;
+        off += chunk;
+    }
+    for (i = 0; i < n; i++) {
+        unsigned char *p = tab + i * (symlen + 3);
+        unsigned short value = p[0] | (p[1] << 8);
+        memcpy(namebuf, p + 3, symlen);
+        namebuf[symlen] = 0;
+        add_sym(task, namebuf, value);
+    }
+    free(tab);
+    ifree(dp);
+    closefs(fs);
+}
+
+/*
+ * The kernel's control port.  exec() writes five bytes here - task
+ * byte, device major, device minor, inode number low then high - and
+ * the fifth byte triggers the symbol-table load for that task.  The
+ * task byte is the Z280 task register the new program runs in (1 for
+ * user code); the device selects which filesystem image holds the
+ * inode.
+ */
+static int ctrl_n;              /* bytes seen so far */
+static int ctrl_task, ctrl_dev, ctrl_inum;
+
+void
+ctrl_out(portaddr port, byte val)
+{
+    switch (ctrl_n++) {
+    case 0:
+        ctrl_task = val;
+        return;
+    case 1:
+        ctrl_dev = val << 8;    /* major */
+        return;
+    case 2:
+        ctrl_dev |= val;        /* minor */
+        return;
+    case 3:
+        ctrl_inum = val;        /* inode low */
+        return;
+    default:
+        ctrl_inum |= val << 8;  /* inode high */
+        ctrl_n = 0;
+        load_task_syms(ctrl_task, ctrl_dev, ctrl_inum);
+        return;
+    }
 }
 
 void

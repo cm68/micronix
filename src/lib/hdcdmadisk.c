@@ -122,6 +122,28 @@ drive_override(char *name)
 }
 
 /*
+ * The file a unit name resolves to, the same way drive_open resolves it.
+ * The symbol loader needs the resolved path: a unit named on the command
+ * line (hdcdma0:image) overrides the bare "hddma-0", which would otherwise
+ * open the wrong file.
+ */
+char *
+drive_resolve(char *name)
+{
+    char *over = drive_override(name);
+    char path[PATH_MAX];
+
+    if (over) {
+        snprintf(path, sizeof(path), "%s", over);
+    } else if (drive_dir && !strchr(name, '/')) {
+        snprintf(path, sizeof(path), "%s/%s", drive_dir, name);
+    } else {
+        snprintf(path, sizeof(path), "%s", name);
+    }
+    return strdup(path);
+}
+
+/*
  * when we format the drive, we write the label if it is not present, and whenever we
  * increase they cylinder or head count, we update the label.
  * note that this only will work if we format all the heads on a cylinder, before we
