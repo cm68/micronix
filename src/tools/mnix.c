@@ -1129,8 +1129,14 @@ tarx(char *tarfile)
 		}
 		dp->d_size0 = (size >> 16) & 0xff;
 		dp->d_size1 = size & 0xffff;
-		dp->d_mtime = mtime;
-		dp->d_atime = mtime;
+		/* A 32-bit field is word-swapped on disk: the kernel (ccc on
+		 * the Z280) stores a long with the high 16-bit word at the
+		 * lower address, so a timestamp the host writes as a little-
+		 * endian long has to swap its two words to be read back as
+		 * the same value.  The host fslib's mytime() does the inverse
+		 * for display. */
+		dp->d_mtime = ((UINT32)mtime >> 16) | ((UINT32)mtime << 16);
+		dp->d_atime = dp->d_mtime;
 		iput(dp);
 		ifree(dp);
 	}
