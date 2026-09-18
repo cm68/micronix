@@ -129,6 +129,8 @@ found:
 
 extern int	write(int, void *, int);
 extern void	exit(int);
+extern unsigned memtop;	/* the break, from libu/sbrk.s */
+unsigned getsp(void);		/* current SP, from libu/sbrk.s */
 
 /*
  * malloc does not come back empty.
@@ -159,6 +161,9 @@ unsigned nw;
 
 	p = __malloc(nw);
 	if (p == NULL) {
+		unsigned sp = getsp();
+		write(2, (char *)&memtop, 2);	/* break, low byte first */
+		write(2, (char *)&sp, 2);	/* SP, low byte first */
 		write(2, "out of memory\n", 14);
 		exit(ENOMEM);
 	}

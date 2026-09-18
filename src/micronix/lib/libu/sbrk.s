@@ -76,6 +76,14 @@ _sbrk:
 	pop	bc
 	ret
 
+; return the current stack pointer - a diagnostic aid for the malloc
+; out-of-memory path, so the break and SP can be seen together.
+	.global	_getsp
+_getsp:
+	ld	hl,0
+	add	hl,sp
+	ret
+
 	.data
 _memtop:
 	.dw	0
