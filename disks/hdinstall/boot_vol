@@ -24,6 +24,12 @@ here=`dirname "$0"`
 here=`cd "$here" && pwd` || exit 1
 root=`cd "$here/../.." && pwd`
 
+# The kernel this volume boots is the one create_vol wrote to /micronix:
+# the freshly linked ccc kernel at src/micronix/sys/unix.  Point -S at
+# that same file, so the tracer resolves kernel symbols against the
+# kernel that actually boots - not a stale copy from kernels/.
+kernel="$root/src/micronix/sys/unix"
+
 # The volume is the last argument; every argument before it is a
 # simulator flag, passed through in order.
 flags=""
@@ -48,4 +54,4 @@ esac
 [ -f "$vol-delta" ] && rm -f "$vol-delta"
 
 cd "$root/src/hwsim/d1" || exit 1
-exec ./d1 -b roms/mon447.bin -c 0x10c $flags "hdcdma0:$vol"
+exec ./d1 -b roms/mon447.bin -c 0x10c -S "$kernel" $flags "hdcdma0:$vol"
