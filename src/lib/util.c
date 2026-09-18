@@ -28,17 +28,6 @@
 int logfd = 1;
 int no_console_log;    /* -n: message() writes to the logfile, not stderr */
 
-u64
-now64()
-{
-    struct timeval tv;
-    u64 u64useconds;
-
-    gettimeofday(&tv,NULL);
-    u64useconds = (1000000L * tv.tv_sec) + tv.tv_usec;
-    return u64useconds;
-}
-
 /*
  * byte bitoff formatter.
  * usage:  char *foo = { "0", "1", "2", "3", 0, "5", "6", "7" };
@@ -169,35 +158,13 @@ hexdump(void *addr, int len)
     dumpmem(getbyte, 0, len);
 }
 
-/*
- * timestamp logging
- */
-static u64 lasttime;
-
-/*
- * print a relative time
- */
-void
-ptime()
-{
-    u64 now, diff;
-
-    now = now64();
-    if (lasttime == 0) lasttime = now;
-    diff = now - lasttime;
-    lasttime = now;
-
-    dprintf(logfd, "%7lld ", diff);
-}
-
-// unconditionally log with timestamp  (just log)
+// unconditionally log  (just log)
 #ifndef NODEBUG
 void
 l(const char *format, ...)
 {
     va_list args;
 
-    ptime();
     va_start(args, format);
     vdprintf(logfd, format, args);
     va_end(args);
@@ -230,7 +197,7 @@ register_trace(char *name)
 }
 #endif
 
-// conditionally log with time stamp  (trace line)
+// conditionally log  (trace line)
 #ifndef NODEBUG
 void
 trace(int bits, const char *format, ...)
@@ -238,7 +205,6 @@ trace(int bits, const char *format, ...)
     if (traceflags & bits) {
         va_list args;
 
-        ptime();
         va_start(args, format);
         vdprintf(logfd, format, args);
         va_end(args);

@@ -343,12 +343,14 @@ dumpcpu()
         if (s) {
             message("%s:\n", s);
         }
+        message("%s %s\n", dis_space(pc, abuf, sizeof(abuf)), outbuf);
         f = z80_get_reg8(f_reg);
         fflags(f, fbuf);
-        message("bc: %04x de: %04x hl: %04x sp: %04x: af: %04x %s %-9s %s\n",
-            z80_get_reg16(bc_reg), z80_get_reg16(de_reg), z80_get_reg16(hl_reg), 
-            z80_get_reg16(sp_reg), z80_get_reg8(a_reg) << 8 | z80_get_reg8(f_reg), 
-            fbuf, dis_space(pc, abuf, sizeof(abuf)), outbuf);
+        message("bc: %04x de: %04x hl: %04x ix: %04x iy: %04x sp: %04x af: %04x %s\n",
+            z80_get_reg16(bc_reg), z80_get_reg16(de_reg), z80_get_reg16(hl_reg),
+            z80_get_reg16(ix_reg), z80_get_reg16(iy_reg),
+            z80_get_reg16(sp_reg), z80_get_reg8(a_reg) << 8 | z80_get_reg8(f_reg),
+            fbuf);
         return;
     }
 

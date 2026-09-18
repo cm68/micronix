@@ -9,7 +9,6 @@ typedef unsigned long long u64;
 typedef unsigned short u16;
 typedef unsigned char u8;
 
-extern u64 now64();
 extern char *bitdef(u8 v, char**defs);
 void skipwhite(char **s);
 
