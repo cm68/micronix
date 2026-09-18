@@ -661,7 +661,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-W\t<addr>[-<addr>] report writes to this range and keep going\n");
     fprintf(stderr, "\t-P\t<physaddr>[-<physaddr>] report writes to this physical range\n");
     fprintf(stderr, "\t-x\topen a debug terminal window\n");
-    fprintf(stderr, "\t-t\t<tracebits>, or names: -t syscall,trap\n");
+    fprintf(stderr, "\t-t\t<tracebits>, or names: -t syscall,trap,all\n");
     fprintf(stderr, "\t-l\tproduce logfile\n");
     fprintf(stderr, "\t-n\tno console log: trace to the logfile, not the terminal\n");
     for (i = 0; tracenames[i]; i++) {
@@ -1385,15 +1385,19 @@ traceparse(char *s, char *progname)
         if ((comma = strchr(p, ','))) {
             *comma++ = 0;
         }
-        for (i = 0; tracenames[i]; i++) {
-            if (strcmp(tracenames[i], p) == 0) {
-                bits |= 1 << i;
-                break;
+        if (strcmp(p, "all") == 0) {
+            bits = ~0;
+        } else {
+            for (i = 0; tracenames[i]; i++) {
+                if (strcmp(tracenames[i], p) == 0) {
+                    bits |= 1 << i;
+                    break;
+                }
             }
-        }
-        if (!tracenames[i]) {
-            fprintf(stderr, "no trace called %s\n", p);
-            usage("", progname);
+            if (!tracenames[i]) {
+                fprintf(stderr, "no trace called %s\n", p);
+                usage("", progname);
+            }
         }
         p = comma;
     }
