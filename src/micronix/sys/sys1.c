@@ -20,11 +20,15 @@
 brake(addr)
     int addr;
 {
+    UINT old;
+
     if (addr > u.sp - 12 && u.brake < u.sp) {
         u.error = ENOMEM;
         return;
     }
+    old = u.brake;
     u.brake = addr;
+    valid(old, addr - old);         /* nail down the pages the break just claimed */
 }
 
 /*

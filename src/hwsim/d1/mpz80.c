@@ -528,12 +528,14 @@ trap(byte trapbits)
  */
 static int int_pending_trap;
 static int mem_pending_fault;
+static byte fault_trapreg;      /* trap-address latched at the faulting reference */
 
 void
 take_pending_trap()
 {
     if (mem_pending_fault) {
         mem_pending_fault = 0;
+        trapreg = fault_trapreg;        /* the shift register kept shifting since the fault */
         trap((ST_RESET & ~ST_INT) | ST_R10);
     }
     if (int_pending_trap) {
@@ -824,12 +826,15 @@ get_byte(vaddr addr)
             int ok = exec ? (attr & 0x2) : (attr & 0x1);
 
             if (!ok) {
+                fault_trapreg = trapreg;
                 mem_pending_fault = 1;      /* violation: block the read */
                 retval = 0xff;
             } else {
                 retval = physread(pa);
-                if (attr & 0x4)
+                if (attr & 0x4) {
+                    fault_trapreg = trapreg;
                     mem_pending_fault = 1;  /* grow: access completed, now trap */
+                }
             }
         } else {
             retval = physread(pa);
@@ -1032,11 +1037,14 @@ put_byte(vaddr addr, unsigned char value)
         trapreg = ((addr >> 12) << 4) | (trapreg >> 4);
         if (!super()) {
             if ((attr & 0x3) != 3) {
+                fault_trapreg = trapreg;
                 mem_pending_fault = 1;      /* violation: block the write */
             } else {
                 physwrite(pa, value);
-                if (attr & 0x4)
+                if (attr & 0x4) {
+                    fault_trapreg = trapreg;
                     mem_pending_fault = 1;  /* grow: access completed, now trap */
+                }
             }
         } else {
             physwrite(pa, value);
