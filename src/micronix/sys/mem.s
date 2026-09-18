@@ -849,12 +849,13 @@ _segcopy:
 	ld	a,(ix+4)	; a = to (arg1, low byte)
 	ld	(IMAGE0+4),a
 	ld	(MAP0+4),a
-	call	_ei
+	; interrupts stay off across the copy, as in copyin/copyout: with
+	; MAP0[2]/MAP0[4] remapped to the user segments, an interrupt taken
+	; mid-ldir runs through the user's pages and corrupts the child.
 	ld	hl,0x1000
 	ld	de,0x2000
 	ld	bc,4096
 	ldir
-	call	_di
 	pop	bc		; restore bc
 	pop	af
 	ld	(MAP0+4),a
