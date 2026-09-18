@@ -41,8 +41,10 @@ extern void register_output(portaddr portnum, outhandler func);
 // handler stays registered under -DNODEBUG (as a no-op) rather than
 // letting the write fall through to the "undefined port" diagnostic.
 extern void ctrl_out(portaddr port, byte val);
+extern void name_out(portaddr port, byte val);   // 0xd1: program name, NUL-term
 #ifndef NODEBUG
 extern void set_ctl_image(char *path);   // name the root filesystem image
+extern char prog_name[16][32];           // exec'd program name per task
 #endif
 
 /*

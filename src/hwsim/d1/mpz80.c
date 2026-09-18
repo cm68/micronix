@@ -608,6 +608,12 @@ dis_space(word addr, char *buf, int len)
         snprintf(buf, len, "trap:%02d", addr - trapaddr);
     } else if ((tr & 0xf) == 0) {
         snprintf(buf, len, "sys:%04x", addr);
+    } else if (prog_name[tr & 0xf][0]) {
+        char *b = prog_name[tr & 0xf], *p;
+        for (p = prog_name[tr & 0xf]; *p; p++)
+            if (*p == '/')
+                b = p + 1;
+        snprintf(buf, len, "%s:%04x", b, addr);
     } else {
         snprintf(buf, len, "tsk%d:%04x", tr & 0xf, addr);
     }
@@ -1146,6 +1152,7 @@ mpz80_setup()
     register_mon_cmd('m', "[task]\tdump memory map", map_cmd);
 #endif
     register_output(0xd0, ctrl_out);   /* kernel -> sim control port */
+    register_output(0xd1, name_out);   /* kernel -> sim program name */
     return 0;
 }
 

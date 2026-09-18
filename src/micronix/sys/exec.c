@@ -61,17 +61,34 @@ exec(name, args)
     execing = 1;
 
     if (xchk(name) && getargs(args) && rdhdr() && fit()) {
+        /*
+         * Tell the tracer the user task's id, then its program name,
+         * before mrelse() drops the old image's pages (after which
+         * `name` is no longer readable).  Port 0xd1 carries the task
+         * byte followed by the name, NUL-terminated.  The device and
+         * inode of the new image follow on 0xd0 after readin().
+         */
+        out(0xd1, u.task);                     /* user task id */
+        {
+            char *p;
+            for (p = name; ; p++) {
+                UINT8 c = getbyte(p);
+                out(0xd1, c);
+                if (c == 0)
+                    break;
+            }
+        }
         mrelse();
         putargs();
         setusr();
         readin();
         /*
-         * Tell the simulator which task now runs which inode, so its
-         * tracer can load the new image's symbol table.  Port 0xd0 is
-         * the simulator's control port: task byte, device (major then
-         * minor), then the inode number, low byte first.
+         * Tell the simulator which task, device and inode now runs, so
+         * its tracer can load the new image's symbol table.  Task byte,
+         * device (major then minor), then the inode number, low byte
+         * first.
          */
-        out(0xd0, 1);                          /* task byte: user task */
+        out(0xd0, u.task);                     /* task byte */
         out(0xd0, ip->i_major);                /* device: major */
         out(0xd0, ip->i_minor);                /* device: minor */
         out(0xd0, (UINT8) ip->i_inum);         /* inode number, low */

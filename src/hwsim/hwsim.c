@@ -43,6 +43,7 @@
 #include "hwsim.h"
 #include "gui.h"
 #include "util.h"
+#include "../micronix/include/obj.h"
 #include "imd.h"
 #include "disz80.h"
 #include "mnix.h"
@@ -287,6 +288,56 @@ load_symfile(char *s)
     printf("added %d symbols from %s\n", i, s);
     fclose(sf);
 }
+
+/*
+ * Load the kernel's symbols straight out of the object file, so -S takes
+ * the freshly linked unix binary rather than a separately generated .sym
+ * file.  The object header gives the text and data sizes; the symbol
+ * table follows them, and each entry is value(2) + flag(1) + name.
+ */
+void
+load_kernel_syms(char *s)
+{
+    FILE *kf;
+    struct obj hdr;
+    unsigned char *tab;
+    int symlen, n, off;
+    char namebuf[16];
+
+    kf = fopen(s, "r");
+    if (!kf) return;
+    if (fread(&hdr, sizeof(hdr), 1, kf) != 1 || hdr.ident != OBJECT) {
+        fclose(kf);
+        load_symfile(s);        /* not an object: a text .sym file */
+        return;
+    }
+    symlen = (hdr.conf & 0x07) * 2 + 1;    /* 9 or 15 characters */
+    tab = malloc(hdr.table ? hdr.table : 1);
+    if (!tab) {
+        fclose(kf);
+        return;
+    }
+    fseek(kf, 16 + hdr.text + hdr.data, SEEK_SET);
+    n = fread(tab, 1, hdr.table, kf);
+    fclose(kf);
+
+    off = 0;
+    while (off + 3 <= n) {
+        vaddr value = tab[off] | (tab[off + 1] << 8);
+        unsigned char flag = tab[off + 2];
+        int len = symlen;
+        if (off + 3 + len > n)
+            len = n - off - 3;
+        if ((flag & SF_GLOBAL) && (flag & SF_DEF)) {
+            memcpy(namebuf, (char *)&tab[off + 3], len);
+            namebuf[len] = 0;
+            add_sym(0, namebuf, value);
+        }
+        off += 3 + symlen;
+    }
+    free(tab);
+    printf("added kernel symbols from %s\n", s);
+}
 #endif
 
 /*
@@ -420,6 +471,41 @@ ctrl_out(portaddr port, byte val)
 #else
     /* the kernel writes these bytes on every exec; there is no symbol
      * table to load in a hardware build, so discard them */
+    (void)port;
+    (void)val;
+#endif
+}
+
+#ifndef NODEBUG
+/* The exec'd program's name, written by the kernel to port 0xd1 on each
+ * exec so the tracer can label user-space addresses with "make" instead
+ * of "tsk1".  Indexed by the full task register - task 0 is the kernel,
+ * tasks 1-15 are user processes.  The message is a task byte followed
+ * by the NUL-terminated name. */
+char prog_name[16][32];
+static int name_task;
+static int name_n;             /* 0 = expecting task byte; else 1 + length */
+#endif
+
+void
+name_out(portaddr port, byte val)
+{
+#ifndef NODEBUG
+    if (name_n == 0) {
+        name_task = val & 0xf;              /* first byte: the task id */
+        name_n = 1;
+        return;
+    }
+    if (val == 0) {
+        if (name_n <= (int)sizeof(prog_name[name_task]))
+            prog_name[name_task][name_n - 1] = 0;
+        name_n = 0;
+        return;
+    }
+    if (name_n < (int)sizeof(prog_name[name_task]))
+        prog_name[name_task][name_n - 1] = val;
+    name_n++;
+#else
     (void)port;
     (void)val;
 #endif
@@ -593,7 +679,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-5\t<file> a floppy on the 5 1/4 inch port\n");
 #ifndef NODEBUG
     fprintf(stderr, "\t-F\trun the fast build (d1p) instead\n");
-    fprintf(stderr, "\t-S\t<symbol file>\n");
+    fprintf(stderr, "\t-S\t<kernel binary>\n");
     fprintf(stderr, "\t-T\t<space:addr>[,count] trace from here, for count instructions\n");
     fprintf(stderr, "\t-W\t<addr>[-<addr>] report writes to this range and keep going\n");
     fprintf(stderr, "\t-P\t<physaddr>[-<physaddr>] report writes to this physical range\n");
@@ -631,6 +717,7 @@ parsesize(char *s)
 char **drivenames;
 char *rom_filename;
 char *sym_filename;
+char *kern_filename;
 char *rom_image;
 int rom_size;
 int config_sw = 0;
@@ -1477,9 +1564,9 @@ main(int argc, char **argv)
 #ifndef NODEBUG
             case 'S':
                 if (!argc--) {
-                    usage("symfile name missing\n", progname);
+                    usage("kernel name missing\n", progname);
                 }
-                sym_filename = strdup(*argv++);
+                kern_filename = strdup(*argv++);
                 break;
 #endif
             case 'd':
@@ -1712,6 +1799,9 @@ main(int argc, char **argv)
 #ifndef NODEBUG
     if (sym_filename) {
         load_symfile(sym_filename);
+    }
+    if (kern_filename) {
+        load_kernel_syms(kern_filename);
     }
 
     mysignal(SIGUSR1, stop_handler);
