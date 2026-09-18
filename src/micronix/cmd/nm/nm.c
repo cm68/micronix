@@ -158,6 +158,11 @@ struct syscall {
     {5, "signal"},  /* 48 */
     {3, "lock"},    /* 49 */
     {1, "unlock"},  /* 50 */
+    {1, "bad"},     /* 51 */
+    {1, "bad"},     /* 52 */
+    {1, "bad"},     /* 53 */
+    {1, "bad"},     /* 54 */
+    {3, "reboot"},  /* 55 */
     {0, 0}
 };
 #define NSYS (sizeof(syscalls)/sizeof(syscalls[0]) - 1)

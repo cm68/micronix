@@ -19,7 +19,7 @@ extern int indir(), r_exit(), r_fork(), r_read(), r_write(), r_open(),
     r_time(), mknod(), chmod(), chown(), brake(), stat(), r_seek(),
     r_getpid(), mount(), umount(), r_setuid(), r_getuid(), r_stime(),
     unimp(), r_alarm(), r_fstat(), pause(), badcall(), r_stty(), r_gtty(),
-    permission(), r_nice(), r_sleep(), sync(), r_kill(), r_csw(), r_ssw(),
+    permission(), r_nice(), r_sleep(), sync(), reboot(), r_kill(), r_csw(), r_ssw(),
     r_dup(), r_pipe(), r_signal();
 
 /*
@@ -76,6 +76,13 @@ struct syscall syssw[] = {
     0, &badcall,                /* */
     0, &badcall,                /* */
     4, &r_signal,               /* 48 */
+    0, &badcall,                /* 49 lock (reserved) */
+    0, &badcall,                /* 50 unlock (reserved) */
+    0, &badcall,                /* 51 */
+    0, &badcall,                /* 52 */
+    0, &badcall,                /* 53 */
+    0, &badcall,                /* 54 */
+    2, &reboot,                 /* 55 */
 };
 
 int ncalls = sizeof(syssw) / sizeof(struct syscall);

@@ -1,0 +1,37 @@
+.he "halt (1)                     9/17/26                    halt (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+halt
+- stop the machine
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+halt
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Halt calls the reboot system call with the RB_HALT flag, which drops
+the cpu in kernel mode.  On real hardware this traps to the monitor;
+the simulators end the run.
+.sp
+Only the super-user may halt the machine.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+reboot (2), sync (1)

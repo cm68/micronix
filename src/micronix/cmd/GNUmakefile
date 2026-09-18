@@ -69,7 +69,7 @@
 # so yacc has to be reached first.  The rest of the list is
 # alphabetical; these two are not, on purpose.
 #
-DIRS = ar asz awk cat ccc chgrp chmod cmp cp date dcheck dd diff du echo ed expr fd2 fgrep find form grep icheck init ld less ln ls make man mkdir mknod more mv ncheck nm od pr pwd rm s sed setdev sh size strings sync tar tee upm vi wc yacc lex
+DIRS = ar asz awk cat ccc chgrp chmod cmp cp date dcheck dd diff du echo ed expr fd2 fgrep find form grep halt icheck init ld less ln ls make man mkdir mknod more mv ncheck nm od pr pwd rm s sed setdev sh size strings sync tar tee upm vi wc yacc lex
 
 #
 # "cd $$d &&", not "cd $$d ;".  With the semicolon, a directory named

@@ -362,6 +362,9 @@ syscall_at(word sc)
 	case 48:	/* set signal handler */
 		printf("signal(%d, %x)\n", arg1, arg2);
 		break;
+	case 55:	/* reboot */
+		printf("reboot(%x)\n", arg1);
+		break;
 	default:
 		printf("unrecognized syscall %d %x\n", code, code);
 		break;

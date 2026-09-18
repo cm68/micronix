@@ -5177,6 +5177,16 @@ SystemCall()
         }
         carry_clear();
         break;
+    case 55:                   /* reboot */
+        /*
+         * Only root reaches here on real hardware; usersim is
+         * single-user and keeps no buffer cache, so there is nothing
+         * to sync.  End the run.
+         */
+        message("micronix: reboot: system halted\n");
+        exit(0);
+        /*NOTREACHED*/
+        break;
     default:
         pid();
         message("unrecognized syscall %d %x\n", code, code);

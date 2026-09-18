@@ -11,6 +11,7 @@
 #include <sys/inode.h>
 #include <sys/file.h>
 #include <sys/proc.h>
+#include <sys/reboot.h>
 #include <errno.h>
 
 /*
@@ -116,6 +117,21 @@ sync()
 {
     isync();
     bsync();
+}
+
+/*
+ * Reboot system call
+ */
+reboot(howto)
+    int howto;
+{
+    if (!super())
+        return;
+    sync();
+    if ((howto & RB_HALT) == 0)
+        pr("reboot: autoboot not implemented, halting\n");
+    for (;;)
+        hlt();
 }
 
 /*

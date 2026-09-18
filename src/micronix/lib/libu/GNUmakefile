@@ -21,7 +21,7 @@ TARGET	= libu.a
 ASSRCS = access.s alarm.s _break.s chdir.s chmod.s chown.s close.s \
 	creat.s dup.s errno.s exec.s execv.s exit.s _exit.s fdpos.s fork.s fstat.s \
 	getpid.s getuid.s gtty.s kill.s link.s mknod.s mount.s nice.s open.s \
-	pause.s perror.s pipe.s read.s seekraw.s setuid.s _signal.s sleep.s \
+	pause.s perror.s pipe.s read.s reboot.s seekraw.s setuid.s _signal.s sleep.s \
 	stat.s stime.s sbrk.s stty.s sync.s time.s umount.s unlink.s wait.s \
 	write.s fputc.s fgetc.s
 

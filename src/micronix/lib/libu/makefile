@@ -37,7 +37,7 @@ AOBJS1	= access.o alarm.o _break.o chdir.o chmod.o chown.o \
 	exit.o _exit.o fdpos.o fork.o fstat.o getpid.o getuid.o \
 	gtty.o kill.o link.o mknod.o mount.o nice.o
 
-AOBJS2	= open.o pause.o perror.o pipe.o read.o seekraw.o \
+AOBJS2	= open.o pause.o perror.o pipe.o read.o reboot.o seekraw.o \
 	setuid.o _signal.o sleep.o stat.o stime.o sbrk.o \
 	stty.o sync.o time.o umount.o unlink.o wait.o \
 	write.o fputc.o fgetc.o

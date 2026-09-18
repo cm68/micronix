@@ -923,6 +923,17 @@ get_byte(vaddr addr)
         retval = 0;
     }
 
+    if ((super()) && (z80_get_reg8(status_reg) & S_M1) &&
+        (retval == 0x76) && (!prefix)) {
+        /*
+         * A halt fetched in task 0 is the kernel stopping itself: the
+         * reboot() system call drops the cpu here.  Real hardware
+         * traps to the monitor; the simulation just ends.
+         */
+        printf("micronix: reboot: system halted\n");
+        exit(0);
+    }
+
     if (running && (z80_get_reg8(status_reg) & S_M1) &&
         ((retval == 0xED) || (retval == 0xDD) || (retval == 0xFD) || (retval == 0xCB))) {
         prefix = 1;

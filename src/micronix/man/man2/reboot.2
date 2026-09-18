@@ -1,0 +1,64 @@
+.he "reboot (2)                    9/17/26                    reboot (2)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+reboot
+- halt or reboot the system
+.sp 2
+.in -5
+.bd
+SYNOPSIS
+.in +5
+.br
+.bd
+reboot(howto)
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+Reboot restarts the system.  If howto has the RB_HALT bit set, the
+machine is halted instead of rebooted.
+
+Only the super-user may call reboot.
+
+The machine is halted by dropping the cpu in kernel mode.  On real
+hardware this traps to the monitor; the simulators end the run.
+Only RB_HALT is implemented - there is no bootstrap to return to, so
+an RB_AUTOBOOT request still halts rather than pretending to reboot.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+If the caller is not the super-user, reboot returns -1 and errno is
+set to EPERM.  Otherwise it does not return.
+.sp 2
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(reboot = 49)
+.br
+.bd
+(howto in the instruction stream)
+.br
+.bd
+sys; reboot
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+.bd
+halt (1), sync (2)
