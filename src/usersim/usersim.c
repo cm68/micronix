@@ -2967,6 +2967,34 @@ procfree(int gpid)
 }
 
 /*
+ * halt/reboot: end the whole simulation, not just this process.  Each
+ * live guest process is a real host process, so signal them all; the
+ * caller exits on its own.  Only live slots are signalled, so a pid the
+ * host has since reused is never touched.
+ */
+void
+haltall()
+{
+    int gpid[NPROCSL];
+    int slot;
+    int n;
+    int lpid;
+
+    pthread_mutex_lock(&memdev->mutex);
+    n = 0;
+    for (slot = 0; slot < NPROCSL; slot++)
+        if (memdev->slotpid[slot])
+            gpid[n++] = memdev->slotpid[slot];
+    pthread_mutex_unlock(&memdev->mutex);
+
+    for (slot = 0; slot < n; slot++) {
+        lpid = hostpid(gpid[slot]);
+        if (lpid > 0 && lpid != getpid())
+            kill(lpid, SIGTERM);
+    }
+}
+
+/*
  * the guest pid of the process we are running as
  */
 int
@@ -5181,9 +5209,12 @@ SystemCall()
         /*
          * Only root reaches here on real hardware; usersim is
          * single-user and keeps no buffer cache, so there is nothing
-         * to sync.  End the run.
+         * to sync.  The reboot syscall halts the machine, not just the
+         * process that made the call, so end every live guest process
+         * and then this one.
          */
         message("micronix: reboot: system halted\n");
+        haltall();
         exit(0);
         /*NOTREACHED*/
         break;
