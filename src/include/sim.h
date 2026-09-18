@@ -128,6 +128,7 @@ extern int running;
 
 #define	CONF_SET	0x80000000	// config specified
 extern int config_sw;
+extern int halt_exit;		// exit the simulation on a task-0 halt
 
 #endif
 

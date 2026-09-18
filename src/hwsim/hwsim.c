@@ -61,7 +61,6 @@
 #define N_FLAG  0x02
 #define C_FLAG  0x01
 
-#define EXIT_PORT   0   // output to here ends the simulator
 #define DUMP_PORT   1   // output to here makes a memory dump with registers
 #define INPUT_PORT  2   // this is for patching into pip for import
 #define OUTPUT_PORT 2   // this is for patching into pip for export
@@ -511,28 +510,6 @@ name_out(portaddr port, byte val)
 #endif
 }
 
-void
-exit_port_handler(portaddr p, byte v)
-{
-    /*
-     * Port 0 is ours, not Morrow's - a way for a test program to stop
-     * the simulator.  Nothing in a real machine answers there, so a
-     * guest that reaches it has usually gone somewhere it did not mean
-     * to, and quietly exiting 0 makes a crash look like a clean finish.
-     * That is exactly what it did once: a runaway init executed OUT (0)
-     * out of whatever it had wandered into, the simulator stopped, and
-     * the trace ended with no indication that anything was wrong.
-     *
-     * So say where it came from, say it on stderr where the rest of the
-     * bad news goes, and exit non zero.
-     */
-    fprintf(stderr, "exit port tickled with %02x from pc %04x\n",
-        v, z80_get_reg16(pc_reg));
-    printf("exit port tickled %02x from pc %04x\n",
-        v, z80_get_reg16(pc_reg));
-    exit(1);
-}
-
 #define dumpreg8(rn) r = z80_get_reg8(rn) ; write(fd, &r, 1)
 #define dumpreg16(rn) rr = z80_get_reg16(rn) ; write(fd, &rr, 2)
 
@@ -629,7 +606,6 @@ pip_output_handler(portaddr p, byte v)
 void
 setup_sim_ports()
 {
-    register_output(EXIT_PORT, exit_port_handler);
     register_output(DUMP_PORT, dump_port_handler);
     register_input(INPUT_PORT, pip_input_handler);
     register_output(OUTPUT_PORT, pip_output_handler);
@@ -677,6 +653,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
     fprintf(stderr, "\t-m\t<bytes> ram size - 768k, 0xc0000, 1m (default 16m)\n");
     fprintf(stderr, "\t-5\t<file> a floppy on the 5 1/4 inch port\n");
+    fprintf(stderr, "\t-H\tdon't exit the simulation on a task-0 halt\n");
 #ifndef NODEBUG
     fprintf(stderr, "\t-F\trun the fast build (d1p) instead\n");
     fprintf(stderr, "\t-S\t<kernel binary>\n");
@@ -721,6 +698,7 @@ char *kern_filename;
 char *rom_image;
 int rom_size;
 int config_sw = 0;
+int halt_exit = 1;		/* exit the simulation on a task-0 halt */
 
 sigset_t mysignalmask;
 
@@ -1580,6 +1558,9 @@ main(int argc, char **argv)
                     usage("memory size missing\n", progname);
                 }
                 ram_size = parsesize(*argv++);
+                break;
+            case 'H':
+                halt_exit = 0;
                 break;
             case '5':
                 if (!argc--) {

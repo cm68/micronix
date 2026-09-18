@@ -527,10 +527,15 @@ trap(byte trapbits)
  * way this was.
  */
 static int int_pending_trap;
+static int mem_pending_fault;
 
 void
 take_pending_trap()
 {
+    if (mem_pending_fault) {
+        mem_pending_fault = 0;
+        trap((ST_RESET & ~ST_INT) | ST_R10);
+    }
     if (int_pending_trap) {
         int_pending_trap = 0;
         trap(ST_RESET & ~ST_INT);
@@ -812,8 +817,23 @@ get_byte(vaddr addr)
 
     if (!local) {                           // if we are accessing mapped ram
         getpte(addr, &pa, &attr);
+        trapreg = ((addr >> 12) << 4) | (trapreg >> 4);
         seg = "mapped:";
-        retval = physread(pa);
+        if (!super()) {
+            int exec = z80_get_reg8(status_reg) & S_M1;
+            int ok = exec ? (attr & 0x2) : (attr & 0x1);
+
+            if (!ok) {
+                mem_pending_fault = 1;      /* violation: block the read */
+                retval = 0xff;
+            } else {
+                retval = physread(pa);
+                if (attr & 0x4)
+                    mem_pending_fault = 1;  /* grow: access completed, now trap */
+            }
+        } else {
+            retval = physread(pa);
+        }
     } else switch (addr & 0xe00) {
     case RAM: case RAM + 0x200:             // 1k static ram
         local = 0;
@@ -932,12 +952,20 @@ get_byte(vaddr addr)
     if ((super()) && (z80_get_reg8(status_reg) & S_M1) &&
         (retval == 0x76) && (!prefix)) {
         /*
-         * A halt fetched in task 0 is the kernel stopping itself: the
-         * reboot() system call drops the cpu here.  Real hardware
-         * traps to the monitor; the simulation just ends.
+         * A halt fetched in task 0.  On real hardware this traps to the
+         * monitor, which looks for a "double halt" - two halts in a row
+         * - as the test programs' way of handing control back to it.
+         * Micronix's reboot() syscall also drops the cpu here in an
+         * endless halt loop, and for that the simulation just ends.
+         * -H restores the hardware behaviour.
          */
-        printf("micronix: reboot: system halted\n");
-        exit(0);
+        if (halt_exit) {
+            printf("micronix: reboot: system halted\n");
+            exit(0);
+        }
+        trap(ST_RESET & ~ST_HALT);
+        seg = "nop:";
+        retval = 0;
     }
 
     if (running && (z80_get_reg8(status_reg) & S_M1) &&
@@ -1001,7 +1029,18 @@ put_byte(vaddr addr, unsigned char value)
     if (!local) {                           // mapped ram
         seg = "mapped:";
         getpte(addr, &pa, &attr);
-        physwrite(pa, value);
+        trapreg = ((addr >> 12) << 4) | (trapreg >> 4);
+        if (!super()) {
+            if ((attr & 0x3) != 3) {
+                mem_pending_fault = 1;      /* violation: block the write */
+            } else {
+                physwrite(pa, value);
+                if (attr & 0x4)
+                    mem_pending_fault = 1;  /* grow: access completed, now trap */
+            }
+        } else {
+            physwrite(pa, value);
+        }
     } else switch(addr & 0xe00) {
     case RAM: case RAM + 0x200:             // 1k static ram
         local = 0;
