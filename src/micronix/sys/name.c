@@ -70,6 +70,7 @@ dlook(ip, np)
 {
     register UINT nblks, tail, log;
     static UINT phys, end, dummy;
+    static UINT8 nents;
     static char c, *p, *nambuf;
     static struct buf *b;
     static struct dir *d;
@@ -102,8 +103,14 @@ dlook(ip, np)
         if ((b = bread(phys, ip->i_dev)) == 0)
             continue;
         bwin(b->xmem);
-        end = (struct dir *)(b->data + ((tail && log == nblks - 1) ? tail : 512));
-        for (d = (struct dir *)b->data; d < end; d++, place++) {
+        /*
+         * Scan by entry count, not by an end pointer: a buffer's data can
+         * sit at 0xfe00, the top of the 0xf000 window, where b->data + 512
+         * wraps past 0xffff and the old `d < end` test was never true, so
+         * the whole block was skipped.  The last block may be short.
+         */
+        nents = ((tail && log == nblks - 1) ? tail : 512) >> 4;   /* 16-byte entries */
+        for (d = (struct dir *)b->data; nents; nents--, d++, place++) {
             if (d->inum == 0) {
                 if (slot == 0)
                     slot = place;
