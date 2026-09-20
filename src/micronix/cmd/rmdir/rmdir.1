@@ -1,0 +1,39 @@
+.he "rmdir (1)                    9/19/26                     rmdir (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+rmdir
+- remove directories
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+rmdir directory ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Rmdir removes each named directory, which must be empty.  The entry is
+removed from its parent, then the two entries every directory carries -
+"." pointing at itself and ".." at the parent - are unlinked, so the
+directory's inode is freed.
+.sp
+Micronix has no rmdir system call.  The directory is removed the way
+rm -d removes one, and - as with rm -d - only the super-user can do it.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+mkdir (1), rm (1)

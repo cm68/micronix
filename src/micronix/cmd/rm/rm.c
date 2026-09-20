@@ -140,7 +140,7 @@ dotname(s)
 rmdir(f, iflg)
     char *f;
 {
-    int status, i;
+    int status;
 	char namebuf[100];
 	sprintf(namebuf, "%s/..", f);
 	status = 0;
@@ -153,8 +153,7 @@ rmdir(f, iflg)
             return (0);
     }
 	status += unlink(namebuf);
-	i = strlen(namebuf);
-	namebuf[i] = '\0';
+	sprintf(namebuf, "%s/.", f);
 	status += unlink(namebuf);
 	status += unlink(f);
 	return status;
