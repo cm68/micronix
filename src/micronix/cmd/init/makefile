@@ -31,7 +31,9 @@ $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
 install: $(PROG)
+	mkdir -p $(ETC)
 	cp $(PROG) $(ETC)/init
+	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)
 
 clean:

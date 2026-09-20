@@ -24,7 +24,7 @@ all:
 
 install:
 	cd sys ; make install
-	mkdir /usr/include
+	mkdir -p /usr/include
 	cp $(HDRS) /usr/include
 
 clean:

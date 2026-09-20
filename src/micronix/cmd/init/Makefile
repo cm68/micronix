@@ -11,6 +11,7 @@ init: init.c
 	cc -I/usr/include -o init init.c -lS
 
 install: init
+	mkdir -p /bin
 	cp init /bin/init
 
 upgrade: init

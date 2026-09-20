@@ -23,7 +23,9 @@ $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
 install: $(PROG)
+	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/halt
+	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:

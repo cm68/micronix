@@ -38,6 +38,7 @@ $(PROG): $(OBJS)
 $(OBJS): $(HDRS)
 
 install: $(PROG)
+	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/$(PROG)
 
 clean:

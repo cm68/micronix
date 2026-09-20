@@ -91,6 +91,7 @@ $(CRT0): crt0.s
 	$(CC) $(CFLAGS) -c crt0.s
 
 install: $(TARGET) $(CRT0)
+	mkdir -p $(LIBDIR)
 	cp $(TARGET) $(LIBDIR)/$(TARGET)
 	cp $(CRT0) $(LIBDIR)/$(CRT0)
 

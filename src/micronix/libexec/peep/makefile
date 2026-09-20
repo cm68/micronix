@@ -47,6 +47,7 @@ $(OBJS): $*.c $(HDRS)
 	$(CC) $(CFLAGS) -c $*.c
 
 install: $(PROG)
+	mkdir -p $(LIBEXEC)
 	cp $(PROG) $(LIBEXEC)/$(PROG)
 
 clean:

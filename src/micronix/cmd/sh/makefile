@@ -31,9 +31,11 @@ $(PROG): $(OBJS)
 $(OBJS): $(HDRS)
 
 install: $(PROG) install-man
+	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/$(PROG)
 
 install-man:
+	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:

@@ -12,6 +12,7 @@ man: man.c
 	cc -I/usr/include -o man man.c -lS
 
 install: man
+	mkdir -p /bin
 	cp man /bin/man
 	rm -f /bin/help
 	ln /bin/man /bin/help

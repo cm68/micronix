@@ -18,7 +18,7 @@ HDRS = access.h buf.h con.h dir.h dj.h dlabel.h file.h fs.h inode.h \
 all:
 
 install:
-	mkdir /usr/include/sys
+	mkdir -p /usr/include/sys
 	cp $(HDRS) /usr/include/sys
 
 clean:

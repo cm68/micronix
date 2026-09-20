@@ -30,7 +30,9 @@ $(OBJS): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
 install: $(PROG)
+	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/$(PROG)
+	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:

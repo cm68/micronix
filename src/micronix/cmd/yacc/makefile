@@ -37,9 +37,13 @@ liby.a: $(LIBOBJS)
 $(OBJS) $(LIBOBJS): $(HDRS)
 
 install: $(PROG) liby.a
+	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/$(PROG)
+	mkdir -p $(LIBDIR)
 	cp liby.a $(LIBDIR)/liby.a
+	mkdir -p $(AUXDIR)
 	cp yaccopar yaccepar yaccrpar $(AUXDIR)/
+	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:

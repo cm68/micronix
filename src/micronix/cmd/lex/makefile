@@ -39,10 +39,13 @@ liblc.a: $(LIBOBJS)
 $(OBJS) $(LIBOBJS): $(HDRS)
 
 install: $(PROG) liblc.a
+	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/$(PROG)
+	mkdir -p $(LIBDIR)
 	cp liblc.a $(LIBDIR)/liblc.a
 	mkdir -p $(AUXDIR)
 	cp ncform $(AUXDIR)/ncform
+	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:

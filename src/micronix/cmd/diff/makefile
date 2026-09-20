@@ -35,7 +35,9 @@ diffh: diffh.o
 	$(CC) $(CFLAGS) -o $@ diffh.o
 
 install: $(PROG) diffh
+	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/$(PROG)
+	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)/$(MAN)
 	cp diffh $(BIN)/diffh
 

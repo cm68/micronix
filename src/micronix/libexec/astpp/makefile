@@ -38,6 +38,7 @@ $(OBJS): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
 install: $(PROG)
+	mkdir -p $(LIBEXEC)
 	cp $(PROG) $(LIBEXEC)/astpp
 
 clean:

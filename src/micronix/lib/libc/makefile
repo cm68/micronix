@@ -89,7 +89,9 @@ $(COBJS): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
 install: $(TARGET)
+	mkdir -p $(LIBDIR)
 	cp $(TARGET) $(LIBDIR)/$(TARGET)
+	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)
 
 clean:

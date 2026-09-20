@@ -37,8 +37,11 @@ $(OBJS): $(HDRS)
 # the help file rides along: the h command runs another less over it.
 #
 install: $(PROG)
+	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/$(PROG)
+	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)/$(MAN)
+	mkdir -p $(LIB)
 	cp less.help $(LIB)/less.help
 
 clean:
