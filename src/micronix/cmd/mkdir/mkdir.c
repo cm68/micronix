@@ -79,20 +79,21 @@ char *n;
             n[i] = '\0';
             if (*n) {
                 e = stat(n, &statb);
-                if ((e == -1) && (errno != ENOENT)) {
-                    fprintf(stderr, "stat of %s failed %d\n", n, errno);
+                if (e == 0 && (statb.st_mode & S_IFMT) == S_IFDIR) {
+                    /* already a directory: leave it and keep walking */
+                } else {
+                    if ((e == -1) && (errno != ENOENT)) {
+                        fprintf(stderr, "stat of %s failed %d\n", n, errno);
+                    }
+                    if (vflag) {
+                        fprintf(stderr, "mkdir %s\n", n);
+                    }
+                    e = 0;
+                    if (!nflag) {
+                        e = mkdir(n, 0777);
+                    }
+                    if (e) return e;
                 }
-                if ((statb.st_mode & S_IFMT) == S_IFDIR) {
-                    return 0;
-                }
-                if (vflag) {
-                    fprintf(stderr, "mkdir %s\n", n);
-                }
-                e = 0;
-                if (!nflag) {
-                    e = mkdir(n, 0777);
-                }
-                if (e) return e;
             }
             n[i] = '/';
         }
