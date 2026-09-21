@@ -17,6 +17,8 @@ extern UINT trapvec, trapstack;
 
 extern char resched;            /* sleep.c defines and initializes it */
 
+extern int fork(), expand_bufs(), swap();
+
 /*
  * Permission masks.
  * Bit 7        8080 io mode (A0-A7 = A8-A15)
@@ -103,14 +105,23 @@ task0_body()
     trapstack = &u.save;
 
     /*
-     * Main() initializes the kernel
-     * and forks the swap process.
+     * Main() initializes the kernel.
      * On return, the kernel code will
      * have been copied into a new bank,
      * and task 1's map will have been
      * re-written to point to that bank.
      */
     main();
+    /*
+     * Create the init process.  fork() here is a plain call, not the
+     * system call mechanism: the parent (the swapper) grows the cache
+     * and never returns, while the child (process 1) falls through to
+     * become init.
+     */
+    if (fork()) {
+        expand_bufs();          /* grow the cache, then start init */
+        swap();                 /* no return */
+    }
     /*
      * We are still in task 0, and in
      * the original memory bank.

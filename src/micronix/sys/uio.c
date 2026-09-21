@@ -15,6 +15,44 @@
 extern long seconds;            /* see clock.c */
 extern UINT8 nbuf;               /* initialized in binit(), main.c */
 extern struct buf *btop;            /* ditto */
+extern UINT8 map0[], image0[];   /* MMU map registers (uhdr.s) */
+extern int copy();               /* leaf mem.s: kernel-to-kernel copy */
+
+/*
+ * Hash the (dev, blk) pair into a bucket.  Consecutive block numbers have
+ * consecutive low bits, so blk's low bits spread evenly; dev is folded in
+ * so two block devices don't always collide.
+ */
+#define NHASH   64
+
+static struct buf *bhash[NHASH];
+
+static int
+hash(blk, dev)
+    UINT blk, dev;
+{
+    return ((blk ^ dev) & (NHASH - 1));
+}
+
+/*
+ * Remove a buffer from its hash bucket, called before its blk/dev change.
+ */
+static void
+unhash(b)
+    struct buf *b;
+{
+    struct buf **pp;
+    int h;
+
+    h = hash(b->blk, b->dev);
+    for (pp = &bhash[h]; *pp; pp = &(*pp)->b_hash) {
+        if (*pp == b) {
+            *pp = b->b_hash;
+            b->b_hash = 0;
+            return;
+        }
+    }
+}
 
 /*
  * Get a buffer for the block
@@ -24,37 +62,49 @@ bget(blk, dev)
     UINT blk, dev;
 {
     register struct buf *b, *f;
+    int h;
+
+    h = hash(blk, dev);
 
   loop:
-    f = 0;
-    for (b = blist; b < btop; b++) {
+    /*
+     * search the hash bucket for the block
+     */
+    for (b = bhash[h]; b; b = b->b_hash) {
         if (b->blk == blk && b->dev == dev) {
             if (block(b))
                 return (b);
             else
-                goto loop;
+                goto loop;      /* busy: retry */
         }
+    }
+    /*
+     * block not found: pick the least-recently-used free buffer
+     */
+    f = 0;
+    for (b = blist; b < btop; b++) {
         if (b->flags & (BBUSY | BLOCK))
             continue;
         if (f == 0 || b->time < f->time)
             f = b;
     }
-    /*
-     * block not found
-     */
     if ((b = f) == 0)        /* no available buffers */
         goto loop;
-    block(b);
+    if (!block(b))           /* raced: someone else took it, retry */
+        goto loop;
     if (b->flags & BDELWRI) {
         bwrite(b);
         goto loop;
     }
+    unhash(b);               /* drop it from its old blk's bucket */
     b->blk = blk;
     b->dev = dev;
     b->flags &= ~BDONE;
+    b->b_hash = bhash[h];
+    bhash[h] = b;
 
     /*
-     * zero(b->data, 512); 
+     * zero(b->data, 512);
      */
     return (b);
 }
@@ -372,6 +422,7 @@ bflush(dev)
                 bwrite(b);
             else
                 brelse(b);
+            unhash(b);
             bzero(b);
         }
 }
@@ -417,6 +468,49 @@ bsync()
     for (b = blist; b < btop; b++)
         if ((b->flags & (BBUSY | BDELWRI)) == BDELWRI)
             bawrite(b);
+}
+
+/*
+ * Map a buffer's segment into the 0xf000 window so its data (0xf000 +
+ * offset) becomes reachable.  b->xmem carries the segment; segment 15 is
+ * the window, so its map register is map0[2*15] == map0[30].
+ */
+bwin(seg)
+    int seg;
+{
+    map0[30] = image0[30] = seg;
+}
+
+/*
+ * Map a buffer into the 0xd000 window (the copyin/copyout page, free while
+ * we are not touching process address space) and return its address there.
+ * Used for the superblock so it stays reachable alongside another buffer in
+ * 0xf000 (e.g. ifill's inode-block scan).
+ */
+bsup(sb)
+    struct buf *sb;
+{
+    map0[26] = image0[26] = sb->xmem;
+    return (0xd000 + ((int)sb->data & 0xfff));
+}
+
+/*
+ * Copy between two buffers in (possibly) different segments.  Maps the
+ * source into 0xf000 and the destination into 0xd000 - the copyin/copyout
+ * page, which is free here because we are not touching process address
+ * space during superblock/freelist handling - then ldir's between the two
+ * windows.  soff/doff are byte offsets within the buffers.
+ */
+bcopy(sb, soff, db, doff, count)
+    struct buf *sb, *db;
+    int soff, doff, count;
+{
+    di();
+    map0[30] = image0[30] = sb->xmem;
+    map0[26] = image0[26] = db->xmem;
+    copy(sb->data + soff,
+        (char *)(0xd000 + ((int)db->data & 0xfff) + doff), count);
+    ei();
 }
 
 /*

@@ -1,9 +1,9 @@
 #
-# micronix makefile for compiling the kernel with ccc
+# micronix makefile for compiling the kernel with ccc (native build)
 #
 # micronix/sys/Makefile
 #
-# Changed: <2026-09-08>
+# Changed: <2026-09-20>
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
@@ -11,27 +11,69 @@ INC = ../include
 SYS = ../include/sys
 
 # ccc runs natively; the flat link (mxld -Ttext) replaces the old
-# Whitesmith's overlay link (link -tb0x1000 -r low.o io.o high.o).  The
-# entry header (uhdr.s) is first so its jump lands at 0x1000.  inout.s
-# is here too: memdev.c, multio.c, mw.c, dj.c and cus.c all call in()/out().
+# Whitesmith's overlay link (link -tb0x1000 -r low.o io.o high.o).  This
+# mirrors the structure of GNUmakefile, which cross-builds the same image
+# from the host: the init-only code folds into highmem.o and is reclaimed
+# as buffer headers once it has run, and the leaf code lives in the u page.
 CC = ccc
 LD = mxld
 
-KERNEL_AS = uhdr.o mem.o sub8.o inout.o intrpt.o mio.o inits.o textpad.o
+# Leaf code that lives in the u page (see user.c).  It is assembled as
+# .data and linked into user.rel after u, not into the main image.
+# leaf/ holds the libccc runtime (csv/q*/ldiv/tramp/sw*/oarg), copied
+# from src/libc and re-sectioned to psect data.
+LEAF_LIBC = leaf/csv.o leaf/idiv.o leaf/imul.o leaf/qadd.o leaf/qsub.o \
+	leaf/qand.o leaf/qor.o leaf/qcmp.o leaf/qshl.o leaf/qsar.o leaf/qshr.o \
+	leaf/qldst.o leaf/tramp.o leaf/swdisp.o leaf/swdispw.o leaf/oarg.o
+LEAF_AS   = mem.o inout.o sub8.o leaf/unixtobcd.o leaf/rtcglue.o $(LEAF_LIBC)
+# Read-only kernel tables (syssw, biosw, ciosw) that also live in the u page.
+LEAF_C    = leaf/consts.o leaf/rtc.o
+
+KERNEL_AS = uhdr.o intrpt.o mio.o textpad.o highmem.o
 KERNEL_C  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o link.o malloc.o name.o open.o queue.o \
 	rdwri.o reg.o sig.o sleep.o subc.o swap.o sys1.o sys2.o system.o time.o \
-	trap.o tty.o uio.o con.o dj.o memdev.o multio.o mw.o main.o cus.o
+	trap.o tty.o uio.o dj.o memdev.o multio.o mw.o main.o
+HIGHMEM   = main_init.o cus.o inits.o
+OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o user.rel $(KERNEL_C) $(HIGHMEM)
 
 CFLAGS = -m micronix -O -i $(INC)/
 
-# uhdr.o must stay at 0x1000 (the firmware's entry point).  The rest of the
-# asm - mem.s above all - remaps segment 1 (0x1000-0x1fff) through MAP0[2] to
-# reach user memory, so it must not live in that segment or it remaps its own
-# code out from under itself.  Link it after the C objects, out of segment 1/2,
-# the way Whitesmith's overlay placed mem.s up at 0x46xx.
-unix: $(KERNEL_AS) user.o $(KERNEL_C)
-	$(LD) -Ttext=0x1000 -lccc -lc -o unix uhdr.o user.o $(KERNEL_C) mem.o sub8.o inout.o intrpt.o mio.o inits.o textpad.o
+# leaf/*.s assemble to leaf/*.o.  The generic %.o:%.s rule names its
+# output after the source's basename (dropping the leaf/ prefix), so the
+# leaf objects need -o to land beside their sources.
+leaf/%.o : leaf/%.s
+	$(CC) -m micronix -c -o $@ $<
+
+leaf/%.o : leaf/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# rtc.c is pure code (no static data), so re-section its single .text
+# block to .data and park it in the u page, like the leaf libccc
+# runtime.  leaf/rtc.o is then made by the generic leaf/%.o:%.s rule.
+leaf/rtc.s: rtc.c
+	$(CC) $(CFLAGS) -s -o $@ $<
+	sed 's/\.text/.data/' $@ > $@.tmp && mv $@.tmp $@
+
+# user.rel is the u page: user.o (the u struct) first so it sits at the
+# base of segment 14, then the leaf code (LEAF_AS), all as .data placed
+# at 0xe000.
+user.rel: user.o $(LEAF_AS) $(LEAF_C)
+	$(LD) -r -Tdata=0xe000 -o user.rel user.o $(LEAF_AS) $(LEAF_C)
+
+# highmem.o is the init-only code (main_init, cus, the MIO/console init
+# in inits.s, and bcd2unix in leaf/unbcd.s) folded into one data-only
+# object with -Sdata.  The main link parks a data-only object after bss,
+# so it sits at _ebss and expand_bufs() mints buffer headers over it once
+# init has returned.
+highmem.o: main_init.o cus.o inits.o leaf/unbcd.o
+	$(LD) -r -Sdata -o highmem.o main_init.o cus.o inits.o leaf/unbcd.o
+
+# uhdr.o must stay at 0x1000 (the firmware's entry point).  textpad.o is
+# last among the resident objects so _ebss is the end of .bss; highmem.o
+# follows it, then user.rel (the u page at 0xe000).
+unix: $(OBJS) user.rel
+	$(LD) -Ttext=0x1000 -lccc -lc -o unix uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o highmem.o user.rel
 
 %.o: %.s
 	$(CC) -m micronix -c $<
@@ -43,8 +85,8 @@ makedate: makedate.c
 	$(CC) -o makedate makedate.c
 
 # Phony so makedate runs on every build and writes a fresh date.  The
-# file would otherwise sit there and main.o (which includes it) would
-# keep the old date in the kernel.
+# file would otherwise sit there and main_init.o (which includes it)
+# would keep the old date in the kernel.
 .PHONY: build.h
 build.h: makedate
 	./makedate
@@ -52,7 +94,7 @@ build.h: makedate
 install: unix
 
 clean:
-	rm *.o unix
+	rm -f *.o leaf/*.o user.rel highmem.o unix
 
 # dependencies generated by
 #
@@ -65,7 +107,6 @@ clean:
 access.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h
 balloc.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h
 cio.o: $(SYS)/sys.h $(SYS)/con.h $(SYS)/file.h $(SYS)/inode.h $(SYS)/proc.h
-con.o: $(SYS)/sys.h $(SYS)/con.h
 create.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h
 cus.o: $(SYS)/sys.h $(SYS)/tty.h
 dj.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h
@@ -76,13 +117,11 @@ ialloc.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/buf.h
 iget.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/buf.h $(SYS)/proc.h
 imap.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/buf.h $(SYS)/proc.h
 link.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h
-lock.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/lock.h
-main.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/buf.h $(SYS)/con.h build.h
-makedate.o: $(INC)/std.h $(INC)/time.h
+main.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/buf.h $(SYS)/con.h
+main_init.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/buf.h $(SYS)/con.h build.h
 malloc.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/con.h
 memdev.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/con.h
 mount.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h $(SYS)/buf.h
-mset.o: $(SYS)/tty.h
 multio.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
 mw.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h
 name.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/inode.h

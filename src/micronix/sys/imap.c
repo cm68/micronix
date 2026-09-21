@@ -136,7 +136,7 @@ imapb(ind, n, dev, rap)
 /*
  * Allocate a block for a file.  Returns the block number, or 0.  The
  * caller installs it: its pointer may be into a paged buffer, and
- * balloc() remaps the 0xe000 window, so nothing here may dereference a
+ * balloc() remaps the 0xf000 window, so nothing here may dereference a
  * buffer address across that call.
  */
 UINT

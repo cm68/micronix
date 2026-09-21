@@ -14,6 +14,7 @@
 #include <errno.h>
 
 extern long seconds;
+extern int rtcwrite();
 
 /*
  * Stat system call
@@ -76,6 +77,7 @@ stime(high, low)
     di();
     seconds = ((long) high << 16) | low;
     ei();
+    rtcwrite(seconds);
 }
 
 /*

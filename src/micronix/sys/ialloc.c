@@ -260,7 +260,7 @@ indfree(ind, level, dev)
 
         /*
          * Re-map before every read: the recursive indfree() below does
-         * its own bread()/bwin(), so 0xe000 no longer shows this block
+         * its own bread()/bwin(), so 0xf000 no longer shows this block
          * when it returns.  Reading through a stale bp->data would walk
          * whatever page is mapped then.
          */

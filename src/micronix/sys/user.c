@@ -18,7 +18,7 @@
  *
  * u is linked first among the objects that fill USERSEG: GNUmakefile
  * links "user.rel" from user.o, then the leaf code (mem.o, inout.o, and
- * later the libccc runtime) at -Tdata=0xf000, so u sits at the base of
+ * later the libccc runtime) at -Tdata=0xe000, so u sits at the base of
  * the segment and the pure-text leaf code fills the space after it.
  * That code is assembled as .data, not .text, because the loader reads
  * text and then data - text placed here would be overwritten by the

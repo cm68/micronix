@@ -20,8 +20,8 @@
 ;
 ; /ram configuration
 ;
-; _usrtop := &0xf000
-; _memtop := &0xf000
+; _usrtop := &0xffff
+; _memtop := &0xffff
 ;
 ; /Making these references public AFTER their definitions
 ; /seems to appease A-Natural
@@ -64,8 +64,8 @@ _map0=0x600
 _map1=0x620
 _image0=0x200
 _image1=0x220
-_usrtop=0xF000
-_memtop=0xF000
+_usrtop=0xFFFF
+_memtop=0xFFFF
 	.globl	_trapstack, _oldstack, _cmask, _ctask, _mask, _rst1
 	.globl	_trapad, _status, _wtask, _usrtop, _memtop, _trapvec
 	.globl	_hlt, _xinit, _map0, _map1, _image0, _image1

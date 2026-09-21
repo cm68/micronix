@@ -6,14 +6,14 @@
 ; mwbuf, curdrv, ...), which ccc puts after the .data blist lives in.
 ;
 ; u (see user.c) no longer needs the text padded up to a 4K boundary:
-; the link now places user.rel at 0xf000 outright (see GNUmakefile), so
-; u and its segpad occupy the last 4K segment and the buffer pool runs
-; from _ebss up to _usrtop == _memtop == 0xf000, just below it.
+; the link now places user.rel at 0xe000 outright (see GNUmakefile), so
+; u and its segpad occupy segment 14 and the buffer pool runs
+; from _ebss up to _usrtop == _memtop == 0xe000, just below it.
 ;
 	.bss
 	.globl	_blist
 _blist:
-	.ds	152		; 8 * sizeof(struct buf) = 8*19, the boot headers
+	.ds	168		; 8 * sizeof(struct buf) = 8*21, the boot headers
 	.globl	_ebss
 _ebss:
 	.ds	0

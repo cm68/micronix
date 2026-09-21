@@ -15,6 +15,7 @@
 
 extern int rootdev;
 extern long seconds;
+extern int rtcinit();
 extern struct inode ilist[];
 
 /*
@@ -105,11 +106,8 @@ tmount(dev, ip, ronly)
     bwin(sb->xmem);
     sp = (struct super *)sb->data;
     sp->s_flock = ronly;        /* flock means read-only */
-    if (dev == rootdev) {       /* part of power-up */
-        di();
-        seconds = sp->s_time;
-        ei();
-    }
+    if (dev == rootdev)         /* part of power-up */
+        rtcinit(sp->s_time);
     m->isize = sp->s_isize;
     m->fsize = sp->s_fsize;
     m->dev = dev;

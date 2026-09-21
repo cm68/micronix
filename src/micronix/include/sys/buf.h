@@ -16,6 +16,7 @@ struct buf {
     UINT cyl;                   /* for use by strategy routine */
     UINT8 error;                /* error return */
     UINT time;                  /* "time" of last access */
+    struct buf *b_hash;         /* hash chain link */
 };
 
 extern struct buf blist[];      /* boot headers; textpad.s links blist last */

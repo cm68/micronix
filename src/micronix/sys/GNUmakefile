@@ -52,9 +52,9 @@ MXLD     = $(BIN)/mxld
 LEAF_LIBC = leaf/csv.o leaf/idiv.o leaf/imul.o leaf/qadd.o leaf/qsub.o \
 	leaf/qand.o leaf/qor.o leaf/qcmp.o leaf/qshl.o leaf/qsar.o leaf/qshr.o \
 	leaf/qldst.o leaf/tramp.o leaf/swdisp.o leaf/swdispw.o leaf/oarg.o
-LEAF_AS   = mem.o inout.o sub8.o $(LEAF_LIBC)
+LEAF_AS   = mem.o inout.o sub8.o leaf/unixtobcd.o leaf/rtcglue.o $(LEAF_LIBC)
 # Read-only kernel tables (syssw, biosw, ciosw) that also live in the u page.
-LEAF_C    = leaf/consts.o
+LEAF_C    = leaf/consts.o leaf/rtc.o
 
 # leaf/*.s assemble to leaf/*.o.  The generic %.o:%.s rule names its
 # output after the source's basename (dropping the leaf/ prefix), so the
@@ -65,12 +65,20 @@ leaf/%.o : leaf/%.s
 leaf/%.o : leaf/%.c
 	$(CCC) $(CCFLAGS) $(INC) -c -o $@ $<
 
-KERNEL_AS = uhdr.o intrpt.o mio.o inits.o textpad.o
+# rtc.c is pure code (no static data), so re-section its single .text
+# block to .data and park it in the u page, like the leaf libccc
+# runtime.  leaf/rtc.o is then made by the generic leaf/%.o:%.s rule.
+leaf/rtc.s: rtc.c
+	$(CCC) $(CCFLAGS) $(INC) -s -o $@ $<
+	sed -i 's/\.text/.data/' $@
+
+KERNEL_AS = uhdr.o intrpt.o mio.o textpad.o highmem.o
 KERNEL_C  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o link.o malloc.o name.o open.o queue.o \
 	rdwri.o reg.o sig.o sleep.o subc.o swap.o sys1.o sys2.o system.o time.o \
-	trap.o tty.o uio.o con.o dj.o memdev.o multio.o mw.o main.o cus.o
-OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o user.rel $(KERNEL_C)
+	trap.o tty.o uio.o dj.o memdev.o multio.o mw.o main.o
+HIGHMEM   = main_init.o cus.o inits.o
+OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o user.rel $(KERNEL_C) $(HIGHMEM)
 TREELIBS =
 
 include $(DEPTH)/GNUmakefile.inc
@@ -253,19 +261,32 @@ ccc-clean:
 # that segment it would remap its own code out from under itself.
 # Whitesmith's overlay link put mem.s at 0x46xx for the same reason.
 #
-main.o: build.h
+main_init.o: build.h
 
 # user.rel is the u page: user.o (the u struct) first so it sits at the
-# base of segment 15, then the leaf code (LEAF_AS), all as .data placed
-# at 0xf000.  The code must be .data, not .text - the loader reads text
+# base of segment 14, then the leaf code (LEAF_AS), all as .data placed
+# at 0xe000.  The code must be .data, not .text - the loader reads text
 # and then data, so text parked here would be overwritten.  textpad.o
 # stays last in the main link so _ebss is the end of .bss and binit()'s
-# buffer pool runs up to 0xf000 below u.
+# buffer pool runs up to 0xe000 below u.
 user.rel: user.o $(LEAF_AS) $(LEAF_C)
-	$(MXLD) -r -Tdata=0xf000 -o user.rel user.o $(LEAF_AS) $(LEAF_C)
+	$(MXLD) -r -Tdata=0xe000 -o user.rel user.o $(LEAF_AS) $(LEAF_C)
+
+# highmem.o is the init-only code - main_init, cus, the MIO/console init
+# in inits.s, and bcd2unix (leaf/unbcd.s) - folded into one data-only
+# object with -Sdata.  The -Sdata fold sets a CONF_HIGH bit in the
+# output's header, and the main link parks any CONF_HIGH object after
+# bss, so it sits exactly at _ebss and binit()'s expand_bufs() mints
+# buffer headers over it once init has returned.  No address is given
+# here - the linker derives it from the resident .data/.bss, so it
+# tracks the kernel as it grows without re-tuning.  bcd2unix's
+# lifetime-0 .ds workspace rides here as data rather than pushing _ebss
+# up from the resident .bss.
+highmem.o: main_init.o cus.o inits.o leaf/unbcd.o
+	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o leaf/unbcd.o
 
 unix: $(OBJS) user.rel
-	$(MXLD) -Ttext=0x1000 -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix uhdr.o $(KERNEL_C) intrpt.o mio.o inits.o textpad.o user.rel
+	$(MXLD) -Ttext=0x1000 -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o highmem.o user.rel
 
 #
 # Generate the assembly ccc would assemble for a C file, for reading:
