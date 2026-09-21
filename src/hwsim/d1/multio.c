@@ -200,9 +200,14 @@ byte icw4;
 
 byte ocw2;
 #define OCW2_LEVEL  0x07        // level mask
-#define OCW2_CMD    0xe0        // command mask
+#define OCW2_CMD    0xe0        // command mask (R|SL|EOI)
+#define OCW2_ROTCLR 0x00        // clear rotate in auto-eoi mode
 #define OCW2_NSEOI  0x20        // non-specific eoi
+#define OCW2_SEOI   0x60        // specific eoi
+#define OCW2_ROTSET 0x80        // set rotate in auto-eoi mode
 #define OCW2_NSEOIR 0xa0        // non-specific eoi with rotate
+#define OCW2_SETPRI 0xc0        // set priority (rotate, no eoi)
+#define OCW2_SEOIR  0xe0        // specific eoi with rotate
 
 byte ocw3;
 #define OCW3_RIS    0x01        // register to read
@@ -217,6 +222,8 @@ byte isr;           // in-service register
 
 
 int priority;       // interrupt with current highest priority
+byte auto_eoi;      // auto-eoi mode: clear isr on the INTA, no EOI needed
+byte rotate;        // rotate the priority in auto-eoi mode
 
 int pic_state = 0;
 #define PS_UNDEF    0
@@ -267,25 +274,72 @@ multio_dump(char **p)
     return 0;
 }
 
-int
-bitnum(byte m)
+/*
+ * The 8259 priority is a rotating scheme: `priority` names the level
+ * that is currently highest, and levels wrap around, so the rank of a
+ * level - 0 being highest, 7 lowest - is its distance from `priority`.
+ */
+static int
+pic_rank(int level)
+{
+    return (level - priority + 8) & 7;
+}
+
+/*
+ * The highest-priority in-service level, or -1 when none is in service.
+ * In fully-nested mode an in-service level blocks every request of equal
+ * or lower priority, so this is the level a pending request must beat.
+ */
+static int
+highest_isr(void)
 {
     int i;
-    int b;
+    int best = -1;
+    int bestrank = 8;
 
     for (i = 0; i < 8; i++) {
-        b = (priority + i) % 8;
-        if (m & (1 << b)) {
-            if (m != (1 << b)) {
-                l("bitnum multiple bits %02x\n", m);
-                multio_dump(0);
+        if (isr & (1 << i)) {
+            int r = pic_rank(i);
+
+            if (r < bestrank) {
+                bestrank = r;
+                best = i;
             }
-            return b;
         }
     }
-    l("bitnum for no bits set\n");
-    multio_dump(0);
-    return 0;
+    return best;
+}
+
+/*
+ * The 8259 priority resolver: the highest-priority pending request that
+ * is unmasked and higher priority than the highest-priority in-service
+ * level.  A lower-priority request is held until the in-service level is
+ * ended.  Returns the level, or -1 when nothing is serviceable.
+ */
+static int
+highest_serviceable(void)
+{
+    int i;
+    int best = -1;
+    int bestrank = 8;
+    int isr_level = highest_isr();
+    int isrrank = (isr_level < 0) ? 8 : pic_rank(isr_level);
+
+    for (i = 0; i < 8; i++) {
+        int mask = 1 << i;
+
+        if (!(mask & irr))          /* not pending */
+            continue;
+        if (mask & imr)             /* masked */
+            continue;
+        if (pic_rank(i) >= isrrank) /* not higher priority than in-service */
+            continue;
+        if (pic_rank(i) < bestrank) {
+            bestrank = pic_rank(i);
+            best = i;
+        }
+    }
+    return best;
 }
 
 struct ace *
@@ -329,11 +383,15 @@ wr_pic_port_0(portaddr p, byte v)
         ocw2 = v;
         switch (ocw2 & OCW2_CMD) {
         case OCW2_NSEOIR:
-            intlevel = bitnum(isr);
+            /* non-specific EOI, then rotate: the serviced level becomes
+             * the new lowest priority */
+            intlevel = highest_isr();
             trace(trace_multio, "multio: NSEOIR isr:%02x lvl:%d pri:%d\n",
                 isr, intlevel, priority);
-            priority = (intlevel + 1) % 8;
-            isr ^= (1 << intlevel);
+            if (intlevel >= 0) {
+                isr ^= (1 << intlevel);
+                priority = (intlevel + 1) % 8;
+            }
             /*
              * Clearing the in-service bit can reveal a request that
              * arrived while this one was being serviced.  The hddma
@@ -347,8 +405,38 @@ wr_pic_port_0(portaddr p, byte v)
             multio_set_int_line();
             break;
         case OCW2_NSEOI:
-            isr = 0;
+            /* non-specific EOI clears the highest-priority in-service
+             * level, without rotating the priorities */
+            intlevel = highest_isr();
+            if (intlevel >= 0)
+                isr ^= (1 << intlevel);
             multio_set_int_line();
+            break;
+        case OCW2_SEOI:
+            /* specific EOI clears one named level, no rotation */
+            isr &= ~(1 << (ocw2 & OCW2_LEVEL));
+            multio_set_int_line();
+            break;
+        case OCW2_SEOIR:
+            /* specific EOI, then rotate so the named level is lowest */
+            intlevel = ocw2 & OCW2_LEVEL;
+            isr &= ~(1 << intlevel);
+            priority = (intlevel + 1) % 8;
+            multio_set_int_line();
+            break;
+        case OCW2_ROTSET:
+            /* rotate in auto-eoi mode: each acknowledge clears the isr
+             * and rotates, with no EOI command from the CPU */
+            auto_eoi = 1;
+            rotate = 1;
+            break;
+        case OCW2_ROTCLR:
+            auto_eoi = 0;
+            rotate = 0;
+            break;
+        case OCW2_SETPRI:
+            /* set priority: the named level becomes the lowest, no EOI */
+            priority = ((ocw2 & OCW2_LEVEL) + 1) % 8;
             break;
         default:
             l("pic bogus ocw2 write command %x\n", ocw2);
@@ -428,13 +516,10 @@ multio_set_int_line()
 {
     int line;
 
-    // if any unmasked, unserviced interrupts are high, assert int
-    if ((irr & ~imr) & ~isr) {
-        line = 1;
-    } else {
-        line = 0;
-    }
-    trace(trace_multio, "multio: %s imr:%x irr:%x isr:%x\n", 
+    // a request is serviceable only when it is pending, unmasked and
+    // higher priority than the highest-priority in-service interrupt
+    line = (highest_serviceable() >= 0) ? 1 : 0;
+    trace(trace_multio, "multio: %s imr:%x irr:%x isr:%x\n",
         line ? "set":"clear", imr, irr, isr);
     (*int_change)(line);
 }
@@ -488,26 +573,20 @@ multio_intack()
     // the vector is empty, so let's calculate it
     if (ivecstate == IV_EMPTY) {
         /*
-         * find the interrupt request line, starting from the current highest
-         * priority
+         * Select the highest-priority pending request that is unmasked
+         * and higher priority than the highest-priority in-service level,
+         * exactly as the 8259 priority resolver does.
          */
-        for (i = 0; i < 8; i++) {
-            level = (priority + i) % 8;
-            mask = 1 << level;
-
-            // if we have an unmasked request, we found our request
-            if ((mask & irr) && !(mask & imr)) {
-                break;
-            }
-        }
+        level = highest_serviceable();
 
         // we didn't find a cause for our interrupt
-        if (i == 8) {
+        if (level < 0) {
             l("lose: no unmasked request found!\n");
             multio_dump(0);
             ivecstate = IV_INVALID;
             iv_isrbit = 0;
         } else {
+            mask = 1 << level;
             iv_isrbit = mask;
             /*
              * A level-triggered 8259 clears the request bit when it
@@ -527,7 +606,7 @@ multio_intack()
             ivecstate = IV_FILLED;
             trace(trace_multio, "multio: vector %d (%s) %04x\n",
                     level, intbits[level], vecaddr);
-            trace(trace_intr, "vectoring to %02x %s handler at 0x%04x\n", 
+            trace(trace_intr, "vectoring to %02x %s handler at 0x%04x\n",
                     mask, intbits[level], vecaddr);
         }
     }
@@ -559,7 +638,20 @@ multio_intack()
 
     // if we just sent the last ivec byte, set the isr bit
     if (ivecstate == IV_EMPTY) {
-        isr |= iv_isrbit;
+        if (auto_eoi) {
+            /* auto-eoi: the 8259 drops the in-service bit on its own
+             * and, with rotation, demotes the serviced level to lowest */
+            if (rotate && iv_isrbit) {
+                int lvl;
+
+                for (lvl = 0; lvl < 8; lvl++)
+                    if (iv_isrbit & (1 << lvl))
+                        break;
+                priority = (lvl + 1) % 8;
+            }
+        } else {
+            isr |= iv_isrbit;
+        }
         // clear the interrupt if there are no more enabled
         multio_set_int_line();
     }
@@ -764,8 +856,16 @@ wr_txb(portaddr p, byte v)
     ap->lsr &= ~LSR_TXE;
     ap->txe_ack = 0;        // this character will empty the register again
 
-    if (((ap->mcr & MCR_LOOP) == 0) && (ap->outfd != -1)) {
-        write(ap->outfd, &v, 1);
+    /*
+     * Tee the console to the log file independent of the terminal fd: the
+     * -L log must keep working even when uart0 has no xterm (outfd == -1),
+     * otherwise a headless run loses all its console output.
+     */
+    if ((ap->mcr & MCR_LOOP) == 0) {
+        if (ap->outfd != -1)
+            write(ap->outfd, &v, 1);
+        if (ap == &ace[0] && console_logfd != -1)
+            write(console_logfd, &v, 1);
     }
     trace(trace_uart, "%s: write txb %s%s\n", 
         ap->name, ap->mcr & MCR_LOOP ? "(loopback) " : "", printable(v));
@@ -1007,6 +1107,10 @@ clock_handler()
  */
 byte rtc[5] = { 0x25, 0x34, 0x12, 0x25, 0x76 };
 int rtcptr;
+static byte wrclock[5];             /* shift register being written (CC_SET) */
+static int wrclockptr;
+static int wrclock_dirty;           /* a bit was shifted since the last ENSR/SET */
+static time_t rtc_offset;           /* rtc = host time + this offset */
 static byte last_wrclock;
 time_t nowtime;
 char *clk_cmd[] = { "SHOLD", "ENSR", "SET", "GET", "64Hz", "256Hz", "2kHz", "32Hz" };
@@ -1035,11 +1139,42 @@ wr_clock(portaddr p, byte v)
             break;
         case CC_ENSR:       // reset shift register
             rtcptr = 0;
+            wrclockptr = 0;
+            wrclock_dirty = 0;
             break;
-        case CC_SET:        // set time - no, we not going to do that
-            break; 
-        case CC_GET:        // read the unix time and populate the array
-            nowtime = time(0);
+        case CC_SET:        // set time: shift register -> clock
+        {
+            /*
+             * The real 1990's "time set & counter hold" command only loads
+             * the shift register when data has been shifted in; the kernel's
+             * _minit() strokes it with an empty register just to hold the
+             * counter.  Honour that: with nothing shifted, do not touch the
+             * time offset.
+             */
+            if (wrclock_dirty) {
+                struct tm st = { 0 };
+                struct tm *now;
+                time_t t = time(0);
+
+                now = localtime(&t);
+                st.tm_year = now->tm_year;  /* the 40-bit rtc has no year */
+                st.tm_mon  = (wrclock[4] >> 4) & 0xf;
+                st.tm_mday = ((wrclock[3] >> 4) & 0xf) * 10 + (wrclock[3] & 0xf);
+                st.tm_hour = ((wrclock[2] >> 4) & 0xf) * 10 + (wrclock[2] & 0xf);
+                st.tm_min  = ((wrclock[1] >> 4) & 0xf) * 10 + (wrclock[1] & 0xf);
+                st.tm_sec  = ((wrclock[0] >> 4) & 0xf) * 10 + (wrclock[0] & 0xf);
+                st.tm_isdst = -1;
+                rtc_offset = mktime(&st) - t;
+#ifndef NODEBUG
+                fprintf(stderr, "CC_SET: wr=%02x %02x %02x %02x %02x off=%ld\n",
+                    wrclock[0], wrclock[1], wrclock[2], wrclock[3], wrclock[4], (long)rtc_offset);
+#endif
+            }
+            wrclock_dirty = 0;
+            break;
+        }
+        case CC_GET:        // read the clock and populate the array
+            nowtime = time(0) + rtc_offset;
             tm = localtime(&nowtime);
             rtc[0] = bcd(tm->tm_sec / 10, tm->tm_sec % 10);
             rtc[1] = bcd(tm->tm_min / 10, tm->tm_min % 10);
@@ -1080,12 +1215,19 @@ wr_clock(portaddr p, byte v)
         }
     }
 
-    // if falling edge on DSTROBE and command the same, advance the data bit pointer
+    // if falling edge on DSTROBE and command the same, shift a bit
     if ((!(v & CLK_SHIFT)) && (last_wrclock & CLK_SHIFT) &&
         ((v & CLK_CMD) == (last_wrclock & CLK_CMD))) {
-        if (++rtcptr == 40) {
+        /* the data pin shifts into the write register, lsb first */
+        if (v & 1)
+            wrclock[wrclockptr / 8] |= 1 << (wrclockptr % 8);
+        else
+            wrclock[wrclockptr / 8] &= ~(1 << (wrclockptr % 8));
+        wrclock_dirty = 1;
+        if (++rtcptr == 40)
             rtcptr = 0;
-        }
+        if (++wrclockptr == 40)
+            wrclockptr = 0;
     }
     last_wrclock = v;
 }
@@ -1232,15 +1374,16 @@ multio_slave_select(portaddr p, byte v)
 int terminal_fd_in;
 int terminal_fd_out;
 
-int termfd;
+int termfd = -1;
 char *myttyname;
 
 static struct termios original_tio;
 
-static void
-exit_hook()
+void
+multio_restore_terminal()
 {
-    tcsetattr(termfd, TCSANOW, &original_tio);
+    if (termfd >= 0)
+        tcsetattr(termfd, TCSANOW, &original_tio);
 }
 
 /*
@@ -1281,7 +1424,7 @@ multio_init()
     int pollpid;
     char tname[10];
 
-    atexit(exit_hook);
+    atexit(multio_restore_terminal);
 
     for (i = 0; i < 3; i++) {
         ace[i].infd = -1;

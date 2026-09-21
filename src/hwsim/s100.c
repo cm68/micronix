@@ -169,7 +169,9 @@ byte
 undef_in(portaddr p)
 {
     p &= 0xff;
+#ifndef NODEBUG
     printf("input from undefined port %x\n", p);
+#endif
     return 0xff;
 }
 
@@ -177,7 +179,9 @@ void
 undef_out(portaddr p, byte v)
 {
     p &= 0xff;
+#ifndef NODEBUG
     printf("output to  undefined port %x -> %x\n", p, v);
+#endif
 }
 
 byte

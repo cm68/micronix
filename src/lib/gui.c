@@ -422,10 +422,8 @@ message(char *fmt, ...)
     if (win) {
         vw_printw(win[W_CMD], fmt, args);
         wrefresh(win[W_CMD]);
-    } else if (no_console_log) {
-        vdprintf(logfd, fmt, args);
     } else {
-        vfprintf(stderr, fmt, args);
+        vdprintf(logfd, fmt, args);
     }
     va_end(args);
 }

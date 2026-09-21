@@ -545,7 +545,9 @@ sense()
         dsb = SB3_INDEX | SB3_RDY;
         break;
     default:
+#ifndef NODEBUG
         printf("fung wha secsize %d nsecs %d\n", secsize, nsecs);
+#endif
     }
 
     /*
@@ -819,7 +821,9 @@ djdma_poll_func()
         ioctl(terminal_fd_in, FIONREAD, &bytes);
         if (bytes) {
             if (read(terminal_fd_in, &conschar, 1) != 1) {
+#ifndef NODEBUG
                 printf("djdma_poll_func: read problem\n");
+#endif
                 return 1;
             }
             djserial_in++;
@@ -892,7 +896,9 @@ write_djmem()
     dest = physread(channel + 6) + (physread(channel + 7) << 8); 
     
     if (dest < DPARAM || (dest + count - DPARAM) > sizeof(dparams)) {
+#ifndef NODEBUG
         printf("\twrite_djmem 0x%x outside of DPARAM\n", dest);
+#endif
         return S_NORMAL;
     }
     dest -= DPARAM;
@@ -963,8 +969,10 @@ djdma_init()
         for (i = 0; drivenames[i] && i < FIVE; i++) {
             imdp[i] = imd_load(drivenames[i], i, 1);
             if (!imdp[i]) {
+#ifndef NODEBUG
                 printf("djdma_init: could not open %s\n",
                     drivenames[i]);
+#endif
                 return 1;
             }
         }
@@ -973,8 +981,10 @@ djdma_init()
         for (i = 0; fivenames[i] && i < FIVE; i++) {
             imdp[FIVE + i] = imd_load(fivenames[i], FIVE + i, 1);
             if (!imdp[FIVE + i]) {
+#ifndef NODEBUG
                 printf("djdma_init: could not open %s\n",
                     fivenames[i]);
+#endif
                 return 1;
             }
         }
@@ -988,7 +998,9 @@ djdma_init()
      * drive has to answer to 0 afterwards.
      */
     if (!imdp[0] && imdp[FIVE]) {
+#ifndef NODEBUG
         printf("djdma: booting the 5 1/4 inch port, its drives are now 0-3\n");
+#endif
         five_first = 1;
     }
 
@@ -1011,7 +1023,9 @@ djdma_init()
             imd_firstsec(imdp[physdrive(0)], 0, 0), secbuf);
         copyout(secbuf, 0x80, 0x80);
     } else {
+#ifndef NODEBUG
         printf("djdma: no disk to boot from\n");
+#endif
     }
     physwrite(0x4a, 0x40);
     return 0;

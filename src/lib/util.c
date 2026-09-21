@@ -26,7 +26,8 @@
 #include "../include/util.h"
 
 int logfd = 1;
-int no_console_log;    /* -n: message() writes to the logfile, not stderr */
+int no_console_log;    /* -n: debug stream goes to the logfile, not the terminal */
+int console_logfd = -1; /* -L: tee the console (uart0) output to this file */
 
 /*
  * byte bitoff formatter.

@@ -77,6 +77,7 @@ unsigned char int_ack();
 
 // terminal creates an xterm that generates a signal when something is ready to read
 extern void open_terminal(char *name, int signum, int *infdp, int *outfdp, int cooked, char *logfile);
+extern void multio_restore_terminal(void);
 
 // generally useful timed callout facility
 void time_out(char *name, int usec, void (*func)(int a), int arg);

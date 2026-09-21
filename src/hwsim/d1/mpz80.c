@@ -966,6 +966,7 @@ get_byte(vaddr addr)
          */
         if (halt_exit) {
             printf("micronix: reboot: system halted\n");
+            multio_restore_terminal();
             exit(0);
         }
         trap(ST_RESET & ~ST_HALT);

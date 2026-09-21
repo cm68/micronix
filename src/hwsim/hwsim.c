@@ -33,6 +33,7 @@
 #include <limits.h>
 #include <string.h>
 #include <sys/time.h>
+#include <sys/select.h>
 #include <signal.h>
 #include <unistd.h>
 
@@ -76,6 +77,9 @@ int program_counter;
 
 int debug_terminal;
 int log_output;
+int debug_suppress;      /* -q: gate the debug terminal output on debugger entry */
+int debug_logfd = -1;    /* -D: named debug log file */
+int debug_gate_fd = -1;  /* write end of the gate control pipe, set by route_debug */
 #endif
 int mypid;
 int running;
@@ -654,6 +658,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-m\t<bytes> ram size - 768k, 0xc0000, 1m (default 16m)\n");
     fprintf(stderr, "\t-5\t<file> a floppy on the 5 1/4 inch port\n");
     fprintf(stderr, "\t-H\tdon't exit the simulation on a task-0 halt\n");
+    fprintf(stderr, "\t-L\t<file> tee the console (uart0) output to this file\n");
 #ifndef NODEBUG
     fprintf(stderr, "\t-F\trun the fast build (d1p) instead\n");
     fprintf(stderr, "\t-S\t<kernel binary>\n");
@@ -664,6 +669,8 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-t\t<tracebits>, or names: -t syscall,trap,all\n");
     fprintf(stderr, "\t-l\tproduce logfile\n");
     fprintf(stderr, "\t-n\tno console log: trace to the logfile, not the terminal\n");
+    fprintf(stderr, "\t-D\t<file> tee the debug/trace stream to this file\n");
+    fprintf(stderr, "\t-q\tsuppress the debug stream until the debugger is entered\n");
     for (i = 0; tracenames[i]; i++) {
         fprintf(stderr, "\t%x %s\n", 1 << i, tracenames[i]);
     }
@@ -692,6 +699,7 @@ parsesize(char *s)
 }
 
 char **drivenames;
+int anydrive;                   /* a hdcdma/hdca unit was named on the command line */
 char *rom_filename;
 char *sym_filename;
 char *kern_filename;
@@ -776,6 +784,11 @@ struct timeout {
  */
 #define CPU_HZ  4000000
 
+extern unsigned long long sim_cycles;   /* d1/mpz80.c: one per instruction */
+
+/* wall-clock time the simulation started, for the exit report */
+static struct timeval sim_wall_start;
+
 struct timeout timeouts[MAXTIMEOUTS];
 
 /*
@@ -792,6 +805,45 @@ unsigned long long
 simnow64()
 {
     return sim_cycles / (CPU_HZ / 1000000);
+}
+
+/*
+ * Report the simulation speed at exit: how many simulated cycles the run
+ * got through per wall-clock second, and what fraction that is of a real
+ * Z80 clocked at 4 MHz (sim_cycles is one per instruction, so the ratio is
+ * approximate - a real Z80 averages several clocks per instruction).
+ */
+void
+sim_report(void)
+{
+    struct timeval now;
+    double wall, cyc_per_sec, ratio;
+
+    if (gettimeofday(&now, NULL) != 0)
+        return;
+    wall = (now.tv_sec - sim_wall_start.tv_sec)
+         + (now.tv_usec - sim_wall_start.tv_usec) / 1e6;
+    if (wall <= 0)
+        return;
+
+    cyc_per_sec = sim_cycles / wall;
+    ratio = cyc_per_sec / (double)CPU_HZ;
+
+    printf("sim: %llu cycles in %.2f s = %.0f cyc/s (%.3fx a 4 MHz Z80)\n",
+           (unsigned long long)sim_cycles, wall, cyc_per_sec, ratio);
+    fflush(stdout);
+}
+
+/*
+ * SIGINT/SIGTERM: report the run and go, so a Ctrl-C on the sim prints
+ * the same speed line a normal exit would.  _exit() skips the atexit
+ * handler, so the report is called explicitly.
+ */
+void
+signal_report(int sig)
+{
+    sim_report();
+    _exit(0);
 }
 
 /*
@@ -1243,46 +1295,97 @@ bootdev(char *name)
 
 #ifndef NODEBUG
 /*
- * Send stdout - the trace, via logfd - to both the invoking terminal and
- * a logfile.  This is for when uart 0 (the console) is in an xterm: the
- * terminal this program was started from is then free, so the trace can
- * be watched there instead of tailing the logfile.  A child copies a
- * pipe to the two places; the parent's stdout is the pipe.
+ * Route the debug stream (fd 1: l()/trace()/dumpcpu()/monitor()) to a
+ * debug log file and, optionally, the invoking terminal.  A child copies
+ * a pipe to the two places; the parent's stdout is the pipe.
+ *
+ * term selects how the terminal is treated:
+ *   DBG_TERM_OFF     - never write the terminal (the console owns it, or -n)
+ *   DBG_TERM_ON      - write the terminal, but only once the debugger has
+ *                      been entered (-q): the gate starts closed
+ *   DBG_TERM_ALWAYS  - write the terminal from the start
+ *
+ * logfd is written unconditionally (when >= 0), so the pre-debugger trace
+ * is never lost even while the terminal is gated off.
  */
+#define DBG_TERM_OFF     0
+#define DBG_TERM_ON      1
+#define DBG_TERM_ALWAYS  2
+
 static void
-tee_stdout(char *logfile)
+route_debug(int logfd, int term)
 {
-    int termfd = dup(1);    /* the invoking terminal */
-    int lfd;
-    int p[2];
+    int termfd = dup(1);        /* the invoking terminal */
+    int p[2], ctl[2];
+    int nfds;
     int n;
     char buf[4096];
 
-    lfd = open(logfile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (termfd < 0 || lfd < 0) {
-        perror(logfile);
-        exit(1);
-    }
-
     pipe(p);
+    if (term == DBG_TERM_ON)
+        pipe(ctl);              /* the gate control pipe, only for -q */
     if (fork() == 0) {
+        int gate = (term == DBG_TERM_ALWAYS);
+        fd_set fds;
+
         close(p[1]);
-        while ((n = read(p[0], buf, sizeof buf)) > 0) {
-            if (!no_console_log)
-                write(termfd, buf, n);
-            write(lfd, buf, n);
+        if (term == DBG_TERM_ON)
+            close(ctl[1]);
+        nfds = p[0] + 1;
+        if (term == DBG_TERM_ON && ctl[0] >= nfds)
+            nfds = ctl[0] + 1;
+        for (;;) {
+            FD_ZERO(&fds);
+            FD_SET(p[0], &fds);
+            if (term == DBG_TERM_ON)
+                FD_SET(ctl[0], &fds);
+            select(nfds, &fds, 0, 0, 0);
+            if (term == DBG_TERM_ON && FD_ISSET(ctl[0], &fds)) {
+                char c;
+                if (read(ctl[0], &c, 1) <= 0)
+                    break;
+                gate = 1;       /* debugger entered: open the gate */
+            }
+            if (FD_ISSET(p[0], &fds)) {
+                n = read(p[0], buf, sizeof buf);
+                if (n <= 0)
+                    break;
+                if (logfd >= 0)
+                    write(logfd, buf, n);
+                if (term != DBG_TERM_OFF && gate)
+                    write(termfd, buf, n);
+            }
         }
         close(termfd);
-        close(lfd);
+        if (logfd >= 0)
+            close(logfd);
+        sim_report();           /* _exit() skips the atexit handler */
         _exit(0);
     }
 
     close(p[0]);
     dup2(p[1], 1);
     close(p[1]);
+    if (term == DBG_TERM_ON) {
+        close(ctl[0]);
+        debug_gate_fd = ctl[1]; /* the parent opens the gate on debugger entry */
+    }
     close(termfd);
-    close(lfd);
     setvbuf(stdout, 0, _IONBF, 0);
+}
+
+/*
+ * Un-suppress the debug stream.  Idempotent; the first call to reach here
+ * after -q has suppressed the terminal is what flips the gate open.
+ */
+static void
+open_debug_gate(void)
+{
+    if (debug_gate_fd == -1)
+        return;
+    write(debug_gate_fd, "g", 1);
+    close(debug_gate_fd);
+    debug_gate_fd = -1;
 }
 #endif
 
@@ -1351,11 +1454,17 @@ drivearg(char *arg)
     }
     if (strcmp(ctl, "hdcdma") == 0) {
         snprintf(unit, sizeof(unit), "hddma-%d", n);
-        return drive_setunit(unit, colon + 1) == 0 ? 1 : -1;
+        if (drive_setunit(unit, colon + 1) != 0)
+            return -1;
+        anydrive = 1;
+        return 1;
     }
     if (strcmp(ctl, "hdca") == 0) {
         snprintf(unit, sizeof(unit), "hdca-%d", n);
-        return drive_setunit(unit, colon + 1) == 0 ? 1 : -1;
+        if (drive_setunit(unit, colon + 1) != 0)
+            return -1;
+        anydrive = 1;
+        return 1;
     }
     return 0;
 }
@@ -1411,6 +1520,27 @@ traceparse(char *s, char *progname)
  * this one; exec it with the same arguments, minus the -F, so a run that
  * wants speed does not pay for a tracer that is not there.
  */
+/*
+ * Options only the debug build understands.  d1p (the -DNODEBUG build
+ * linked beside us) has no tracer and no debugger, so those options -
+ * and their values - must not be passed through -F.  Returns 2 for a
+ * debug option that eats the next argument, 1 for one that does not,
+ * 0 for anything else.
+ */
+static int
+perf_option(char *arg)
+{
+    if (arg[0] != '-' || arg[1] == 0)
+        return 0;
+    switch (arg[1]) {
+    case 'D': case 'S': case 'W': case 'P': case 'T': case 't':
+        return 2;               /* debug option with a value */
+    case 'l': case 'n': case 'x': case 'q': case 's':
+        return 1;               /* debug option, no value */
+    }
+    return 0;
+}
+
 static void
 exec_perf(char **argv, int argc, int pindex)
 {
@@ -1428,7 +1558,16 @@ exec_perf(char **argv, int argc, int pindex)
     nargv = malloc(sizeof(char *) * argc);
     n = 0;
     for (i = 0; i < argc; i++) {
-        if (i == pindex)            /* drop the -P */
+        int drop;
+
+        if (i == pindex)            /* drop the -F */
+            continue;
+        drop = perf_option(argv[i]);
+        if (drop == 2) {
+            i++;                    /* skip the option's value too */
+            continue;
+        }
+        if (drop == 1)
             continue;
         nargv[n++] = (i == 0) ? path : argv[i];
     }
@@ -1443,6 +1582,8 @@ exec_perf(char **argv, int argc, int pindex)
 int
 main(int argc, char **argv)
 {
+    gettimeofday(&sim_wall_start, NULL);
+    atexit(sim_report);
 #ifndef NODEBUG
     {
         int pj;
@@ -1515,7 +1656,36 @@ main(int argc, char **argv)
                 inst_countdown = 0;
                 debug_terminal = 1;
                 break;
+            case 'q':
+                debug_suppress = 1;
+                break;
+            case 'D':
+                if (!argc--) {
+                    usage("debug log file missing\n", progname);
+                }
+                {
+                    char *f = *argv++;
+                    debug_logfd = open(f, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+                    if (debug_logfd < 0) {
+                        perror(f);
+                        exit(1);
+                    }
+                }
+                break;
 #endif
+            case 'L':
+                if (!argc--) {
+                    usage("console log file missing\n", progname);
+                }
+                {
+                    char *f = *argv++;
+                    console_logfd = open(f, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+                    if (console_logfd < 0) {
+                        perror(f);
+                        exit(1);
+                    }
+                }
+                break;
             case 'c':
                 if (!argc--) {
                     usage("configuration switch value missing\n", progname);
@@ -1682,7 +1852,7 @@ main(int argc, char **argv)
      * booting off the other port, and quietly occupying the 8 inch one
      * would take that boot away - the controller tries 8 inch first.
      */
-    if (!drivenames && !fivenames) {
+    if (!drivenames && !fivenames && !anydrive) {
         drivenames = malloc(sizeof(char *) * 2);
         drivenames[0] = "DRIVE_A.IMD";
         drivenames[1] = 0;
@@ -1723,19 +1893,29 @@ main(int argc, char **argv)
         }
         setvbuf(stdout, 0, _IONBF, 0);
     } else {
+        int logfd = debug_logfd;    /* -D <file>, else -1 */
+        int term;
+
         inst_countdown = -1;
+        if (logfd < 0 && log_output)
+            logfd = open(LOGFILE, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+
         if ((config_sw >> 8) & 0x1) {
-            /* uart 0 is in an xterm, so the invoking terminal is free:
-             * mirror the trace there as well as the logfile */
-            tee_stdout(LOGFILE);
+            /* uart 0 is in an xterm, so the invoking terminal is free for
+             * the debug stream */
+            if (no_console_log)
+                term = DBG_TERM_OFF;
+            else if (debug_suppress)
+                term = DBG_TERM_ON;
+            else
+                term = DBG_TERM_ALWAYS;
         } else {
-            stdout = freopen(LOGFILE, "w+", stdout);
-            if (!stdout) {
-                perror("lose");
-            }
-            setvbuf(stdout, 0, _IONBF, 0);
-            printf("log file\n");
+            /* the console owns the terminal: debug goes to a file only */
+            term = DBG_TERM_OFF;
+            if (logfd < 0)
+                logfd = open(LOGFILE, O_WRONLY | O_CREAT | O_TRUNC, 0666);
         }
+        route_debug(logfd, term);
     }
 
     if (traceflags) {
@@ -1802,6 +1982,9 @@ main(int argc, char **argv)
     setup_sim_ports();
     z80_init();
 
+    mysignal(SIGINT, signal_report);
+    mysignal(SIGTERM, signal_report);
+
     // another driver hook
     for (i = 0; i < ndrivers; i++) {
         if (drivers[i]->startup_hook) {
@@ -1852,29 +2035,40 @@ main(int argc, char **argv)
                 tracetrig[0] = 0;
             }
         }
-        if (watchpoint_hit()) {
-            printf("watchpoint\n");
-            inst_countdown = 0;
-        }
-        if (breakpoint_at(program_counter)) {
-            printf("breakpoint\n");
-            inst_countdown = 0;
-        }
-        if ((traceflags & trace_inst) || (inst_countdown == 0) || ((traceflags & trace_symbols) && lookup_sym(program_counter))) {
-            dumpcpu();
-        }
-        /*
-         * capture length.  only counts while the trace is actually on, so
-         * a count given with a trigger measures from the trigger
-         */
-        if (tracelen && (traceflags & trace_inst)) {
-            if (--tracelen == 0) {
-                traceflags &= ~trace_inst;
-                printf("trace: capture complete\n");
+        {
+            int reason = 0;
+            if (watchpoint_hit()) {
+                open_debug_gate();
+                printf("watchpoint\n");
+                inst_countdown = 0;
+                reason = 1;
             }
-        }
-        if (inst_countdown == 0) {
-            monitor();
+            if (breakpoint_at(program_counter)) {
+                open_debug_gate();
+                printf("breakpoint\n");
+                inst_countdown = 0;
+                reason = 1;
+            }
+            if ((traceflags & trace_inst) || (inst_countdown == 0) || ((traceflags & trace_symbols) && lookup_sym(program_counter))) {
+                dumpcpu();
+            }
+            /*
+             * capture length.  only counts while the trace is actually on, so
+             * a count given with a trigger measures from the trigger
+             */
+            if (tracelen && (traceflags & trace_inst)) {
+                if (--tracelen == 0) {
+                    traceflags &= ~trace_inst;
+                    printf("trace: capture complete\n");
+                }
+            }
+            if (inst_countdown == 0) {
+                if (!reason && !debug_terminal) {
+                    open_debug_gate();
+                    printf("single-step\n");
+                }
+                monitor();
+            }
         }
 #endif
 
@@ -1957,7 +2151,9 @@ console_claim(int who)
         return;
     }
     console_owner = who;
+#ifndef NODEBUG
     fprintf(stderr, "console: input follows %s\n", console_names[who]);
+#endif
 }
 
 #ifndef NODEBUG
