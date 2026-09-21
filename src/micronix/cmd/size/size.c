@@ -177,7 +177,15 @@ char **argv;
         size = ftell(fp);
         fseek(fp, 0L, SEEK_SET);
 
-        buf = (unsigned char *)malloc(size);
+        /*
+         * size is a long, ftell's return; malloc and fread each take a
+         * 16-bit unsigned, and neither is prototyped in this build's
+         * stdio.h.  Undeclared, a long pushes four bytes where the body
+         * reads two, so fread's stream argument came out of the long's
+         * second word and fread answered 0 - the "Unknown error" size
+         * printed for every file.  Cast to the width the body reads.
+         */
+        buf = (unsigned char *)malloc((unsigned)size);
         if (!buf) {
             fprintf(stderr, "%s: out of memory\n", progname);
             fclose(fp);
@@ -185,7 +193,7 @@ char **argv;
             continue;
         }
 
-        if (fread(buf, 1, size, fp) != size) {
+        if (fread(buf, 1, (unsigned)size, fp) != size) {
             perror(name);
             free(buf);
             fclose(fp);
