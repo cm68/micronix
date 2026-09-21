@@ -47,28 +47,27 @@ MXLD     = $(BIN)/mxld
 # (no hardware interface) and lock.c (dead) are left out.
 # Leaf code that lives in the u page (see user.c).  It is assembled as
 # .data and linked into user.rel after u, not into the main image.
-# leaf/ holds the libccc runtime (csv/q*/ldiv/tramp/sw*/oarg), copied
-# from src/libc and re-sectioned to psect data.
-LEAF_LIBC = leaf/csv.o leaf/idiv.o leaf/imul.o leaf/qadd.o leaf/qsub.o \
-	leaf/qand.o leaf/qor.o leaf/qcmp.o leaf/qshl.o leaf/qsar.o leaf/qshr.o \
-	leaf/qldst.o leaf/tramp.o leaf/swdisp.o leaf/swdispw.o leaf/oarg.o
-LEAF_AS   = mem.o inout.o sub8.o leaf/unixtobcd.o leaf/rtcglue.o $(LEAF_LIBC)
+# csv/q*/ldiv/tramp/sw*/oarg are the libccc runtime, copied from
+# src/libc and re-sectioned to psect data.  They sat in leaf/ until that
+# directory was flattened; the generic %.o:%.s rule assembles them here,
+# with the rest of the kernel's sources.
+LEAF_LIBC = csv.o idiv.o imul.o qadd.o qsub.o \
+	qand.o qor.o qcmp.o qshl.o qsar.o qshr.o \
+	qldst.o tramp.o swdisp.o swdispw.o oarg.o
+LEAF_AS   = mem.o inout.o sub8.o unixtobcd.o rtcglue.o $(LEAF_LIBC)
 # Read-only kernel tables (syssw, biosw, ciosw) that also live in the u page.
-LEAF_C    = leaf/consts.o leaf/rtc.o
-
-# leaf/*.s assemble to leaf/*.o.  The generic %.o:%.s rule names its
-# output after the source's basename (dropping the leaf/ prefix), so the
-# leaf objects need -o to land beside their sources.
-leaf/%.o : leaf/%.s
-	$(CCC) $(CCFLAGS) -c -o $@ $<
-
-leaf/%.o : leaf/%.c
-	$(CCC) $(CCFLAGS) $(INC) -c -o $@ $<
+LEAF_C    = consts.o rtc.o
 
 # rtc.c is pure code (no static data), so re-section its single .text
-# block to .data and park it in the u page, like the leaf libccc
-# runtime.  leaf/rtc.o is then made by the generic leaf/%.o:%.s rule.
-leaf/rtc.s: rtc.c
+# block to .data and park it in the u page, like the libccc runtime.
+# rtc.o is then made from rtc.s by the generic %.o:%.s rule.
+#
+# This is the one .s here that is not a listing: an explicit rule beats
+# the %.s : %.c listing rule further down, so "make rtc.s" writes the u
+# page rendering, the .data one.  A .text rtc.s dropped here by hand
+# would be assembled into rtc.o, and the loader reads text and then data
+# - it would overwrite the u page with it.
+rtc.s: rtc.c
 	$(CCC) $(CCFLAGS) $(INC) -s -o $@ $<
 	sed -i 's/\.text/.data/' $@
 
@@ -273,7 +272,7 @@ user.rel: user.o $(LEAF_AS) $(LEAF_C)
 	$(MXLD) -r -Tdata=0xe000 -o user.rel user.o $(LEAF_AS) $(LEAF_C)
 
 # highmem.o is the init-only code - main_init, cus, the MIO/console init
-# in inits.s, and bcd2unix (leaf/unbcd.s) - folded into one data-only
+# in inits.s, and bcd2unix (unbcd.s) - folded into one data-only
 # object with -Sdata.  The -Sdata fold sets a CONF_HIGH bit in the
 # output's header, and the main link parks any CONF_HIGH object after
 # bss, so it sits exactly at _ebss and binit()'s expand_bufs() mints
@@ -282,8 +281,8 @@ user.rel: user.o $(LEAF_AS) $(LEAF_C)
 # tracks the kernel as it grows without re-tuning.  bcd2unix's
 # lifetime-0 .ds workspace rides here as data rather than pushing _ebss
 # up from the resident .bss.
-highmem.o: main_init.o cus.o inits.o leaf/unbcd.o
-	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o leaf/unbcd.o
+highmem.o: main_init.o cus.o inits.o unbcd.o
+	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o
 
 unix: $(OBJS) user.rel
 	$(MXLD) -Ttext=0x1000 -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o highmem.o user.rel

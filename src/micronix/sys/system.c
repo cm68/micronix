@@ -82,7 +82,7 @@ extern int r_lock(), r_unlock();
         * and returns to registers, are handled by r_ functions.
         */
 /*
- * syssw and ncalls live in leaf/consts.c, parked in the u page; the
+ * syssw and ncalls live in consts.c, parked in the u page; the
  * table is read-only so a per-process copy is harmless.
  */
 extern struct syscall syssw[];

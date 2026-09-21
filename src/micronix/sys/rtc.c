@@ -6,8 +6,8 @@
  * The Master Mult I/O board carries a NEC uPD1990 calendar/clock, a 40-bit
  * bit-banged shift register (seconds, minutes, hours, day-of-month, month and
  * weekday, BCD) at port 0x4a (MBASE+2).  There is no year.  The epoch<->date
- * math lives in leaf/unbcd.s (BCD -> unix) and leaf/unixtobcd.s (unix ->
- * BCD), wrapped for the ccc long ABI by leaf/rtcglue.s.
+ * math lives in unbcd.s (BCD -> unix) and unixtobcd.s (unix -> BCD),
+ * wrapped for the ccc long ABI by rtcglue.s.
  *
  * The 1990's month field is plain binary, 0-based (0..11), packed with the
  * weekday in the low nibble of the same byte; bcd2unix()/unixtobcd() use a
@@ -38,8 +38,8 @@
 extern int in(), out();
 extern int di(), ei();
 extern long seconds;
-extern long bcd2unix();         /* leaf/rtcglue.s -> leaf/unbcd.s */
-extern void unixtobcd();        /* leaf/rtcglue.s -> leaf/unixtobcd.s */
+extern long bcd2unix();         /* rtcglue.s -> unbcd.s */
+extern void unixtobcd();        /* rtcglue.s -> unixtobcd.s */
 
 /* stroke a command: cmd, cmd|CSTROBE, cmd (falling edge commits) */
 static void

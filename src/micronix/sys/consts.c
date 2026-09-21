@@ -5,7 +5,7 @@
  * segcopy cloning them per process is harmless.  They are linked into
  * user.rel after the leaf code.
  *
- * sys/leaf/consts.c
+ * sys/consts.c
  */
 
 struct syscall
