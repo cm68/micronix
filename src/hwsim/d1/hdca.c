@@ -172,18 +172,28 @@ wr_hdca_control(portaddr p, byte v)
     control = v;
 }
 
-static void
+/*
+ * returns 0 if the drive is there, -1 if it is not.  A unit with no
+ * image behind it must fail the command: drive_open answers null when
+ * the image is locked against us or cannot be opened, and every use of
+ * handle[drv] below would then be a null dereference.
+ */
+static int
 select_drive(int id)
 {
-    int fd;
     char drivename[20];
 
     if (handle[id]) {
-    	return;
+    	return 0;
     }
     sprintf(drivename, "hdca-%d", id);
     handle[id] = drive_open(drivename);
+    if (!handle[id]) {
+        printf("hdca: no drive %s, command refused\n", drivename);
+        return -1;
+    }
     drive_sectorsize(handle[id], SECLEN);
+    return 0;
 }
 
 /*
@@ -201,7 +211,14 @@ wr_hdca_cmd(portaddr p, byte v)
     int key = buffer[HEADER+3];
     int ret;
 
-    select_drive(drv);
+    /*
+     * The operation is refused rather than run against a null handle.
+     * Nothing is completed, so the guest sees the command that never
+     * finished, which is what a missing unit looks like.
+     */
+    if (select_drive(drv) < 0) {
+        return;
+    }
 
     psr &= ~PSR_OPDONE;
 

@@ -188,12 +188,12 @@ drive_open(char *name)
     dp->fd = open(path, O_RDWR|O_CREAT, 0777);
     if (dp->fd < 0) {
         printf("open of %s failed %d\n", path, errno);
-        return 0;
+        goto fail;
     }
     dp->lock_fd = acquire_lock(path);
     if (dp->lock_fd < 0) {
         close(dp->fd);
-        return 0;
+        goto fail;
     }
     // get the label or make a new one
     if (read(dp->fd, &dp->label, sizeof(dp->label)) != sizeof (dp->label)) {
@@ -204,15 +204,27 @@ drive_open(char *name)
         if (write(dp->fd, &dp->label, sizeof(dp->label)) != sizeof (dp->label)) {
             printf("could not write empty label\n");
             close(dp->fd);
-            return 0;
+            goto fail;
         }
     }
     if (dp->label.magic != MAGIC) {
         printf("label had bad magic %x\n", dp->label.magic);
         close(dp->fd);
-        return 0;
+        goto fail;
     }
     return (dp);
+
+fail:
+    /*
+     * Give the slot back.  The name is what the loop above matches on,
+     * so leaving it behind would let the next drive_open find this entry
+     * and hand back a drive whose fd is already closed - and a read
+     * through that stale descriptor lands on whatever file has since
+     * taken the number.
+     */
+    free(dp->name);
+    dp->name = 0;
+    return 0;
 }
 
 /*

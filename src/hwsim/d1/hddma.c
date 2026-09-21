@@ -168,24 +168,33 @@ static int enable_intr;
 /*
  * let's open the backing store
  */
-static void
+static int
 select_drive(int id)
 {
     char drivename[20];
 
     if (handle[id]) {
-    	return;
+    	return 0;
     }
     sprintf(drivename, "hddma-%d", id);
     handle[id] = drive_open(drivename);
     if (!handle[id]) {
-        printf("open of %s failed\n", drivename);
+        /*
+         * Not debug chatter.  d1p compiles the message out, and a unit
+         * with nothing behind it then reads as a bare segfault in the
+         * sector size call below - the disk image is held by another
+         * process, or is unreadable, and the command has to be refused
+         * rather than run against a null handle.
+         */
+        printf("hddma: no drive %s, command refused\n", drivename);
+        return -1;
     }
 #ifndef NODEBUG
     if (id == 0)
         set_ctl_image(drive_resolve(drivename));   /* the root filesystem image */
 #endif
     secsize[id] = drive_sectorsize(handle[id], 0);
+    return 0;
 }
 
 static char *sense_b[] = { "trk0", "wfault", "ready", "seekcomplete", "index", 0, 0, 0 };
@@ -216,7 +225,6 @@ attention(portaddr p, byte v)
     copyin((byte *)&command, channel, sizeof(command));
 
     drv = command.seldir & DRV_MASK;
-    select_drive(drv);
 
     steps = command.step_low + (command.step_high << 8);
     /* The boot loaders pass a flat 16-bit address (dma_high == 0); the
@@ -229,6 +237,17 @@ attention(portaddr p, byte v)
             ((command.dma_low + (command.dma_mid << 8)) & 0xfff);
     link = command.link_low + (command.link_mid << 8) + (command.link_high << 16);
     head = ((command.selhd & HEAD_MASK) >> HEAD_SHIFT) ^ HEAD_CMP;
+
+    /*
+     * Open the drive before anything is done with it.  The address
+     * fields above are decoded from the command and belong to the
+     * channel, not the drive, so they are computed first and the
+     * command is finished off with them either way.
+     */
+    if (select_drive(drv) < 0) {
+        command.status = BADCMD;
+        goto done;
+    }
 
 #ifndef NODEBUG
     if (traceflags & trace_hddma) {
@@ -451,6 +470,7 @@ attention(portaddr p, byte v)
         command.status = BADCMD;
         break;
     }
+done:
     copyout((byte *)&command, channel, sizeof(command));
     channel = link;
     if (enable_intr) {
