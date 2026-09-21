@@ -1,4 +1,4 @@
-.he "make (1)                  8/18/26                      make (1)"
+.he "make (1)                  9/21/26                      make (1)"
 .fo "                               -#-"
 .in 5
 .rm 65
@@ -31,14 +31,95 @@ modified.
 If no -f option is given, "makefile" and then "Makefile" are tried in
 order; a description of "-" means the standard input.
 .sp
+If no name arguments are given, make builds the first target named in
+the description file that does not begin with a dot or that contains a
+slash.  A name argument of the form name=value defines a macro before
+the description file is read and cannot be redefined there.
+.sp 2
+.in -5
+.bd
+INPUT LANGUAGE
+.in +5
+.br
 A description file holds a sequence of entries.  The first line of an
 entry is a blank-separated list of targets, a colon, and a list of
 prerequisite files.  Text after a semicolon, and every following line
 that begins with a tab, is a shell command run to update the target.
-Lines beginning with # are comments.
+Lines beginning with # are comments.  A \ at the end of a line joins it
+to the next; the backslash and newline become a blank.
 .sp
-Entries of the form "string = value" define a macro; later $(string)
-(or $s for a single character) is replaced by its value.
+A rule takes the form
+.nf
+	target ... : prerequisite ... [; command]
+		command
+		command
+.fi
+.sp
+Several targets may share one rule, in which case each is considered
+separately.  A prerequisite may be another target in the file, whose
+own rule is then run first; a prerequisite that names no target in the
+file is simply a file.  A rule with a single colon collects all the
+prerequisites of every rule for that target into one list, and only
+one list of commands is taken.  A rule with a double colon (::) is
+independent: each such rule for a target is examined and, if need be,
+run on its own.
+.sp
+A prerequisite containing *, ? or [ is expanded against the directory,
+so "*.o" names every .o file.  This happens before the rule is used,
+so newly made files are not included.
+.sp
+Entries of the form "string = value" define a macro; later $(string),
+${string}, or $s for a single character, is replaced by its value.
+Macros may refer to other macros.  A $$ is a literal $.  Macro values
+are substituted on rule lines as the lines are read, and into the
+commands just before they are run.  A definition on the make command
+line, as in "make CC=ccc", overrides the description file.
+.sp
+The characters $*, $@, $< and $? are replaced as follows.
+.nf
+	$@	the target name
+	$*	the target name with its last . extension removed
+	$<	the prerequisite source of an implicit rule
+	$?	the out-of-date prerequisites, blank separated
+.fi
+.sp
+$@ and $* are also expanded in a prerequisite, so "obj.o: $*.c" makes
+obj.o depend on obj.c.  $< is set only for suffix rules and for the
+.DEFAULT rule; $* is set only for suffix rules.
+.sp
+A suffix rule names a transformation between two suffixes.  The entry
+.nf
+	.SUFFIXES : .c .o
+	.c.o :
+		ccc -O -c $<
+.fi
+.sp
+says how a .o file is made from a .c file: a target x.o whose source
+x.c exists is remade with the commands of the .c.o rule, with $< set
+to x.c, $* to x, and $@ to x.o.  Both suffixes must appear in the
+.SUFFIXES list.  If x.c does not exist, make looks for a further rule
+to make it, so chains of suffix rules work.
+.sp
+The built-in suffix list is
+.nf
+	.out .o .c .f .e .r .y .yr .ye .l .s
+.fi
+.sp
+with rules for .c.o, .s.o, .c.out, .s.out, .o.out and the yacc, lex
+and f77 suffixes, among others.  The built-in macros are CC=ccc,
+AS=asz, CFLAGS=, LOADLIBES= and the like.  The -r option suppresses
+the built-in rules and macros; a .SUFFIXES entry with no dependents
+clears the list.
+.sp
+A command that begins with @ is not echoed.  A command that begins
+with - is run and its nonzero exit ignored.  The two may be combined,
+in either order.  A command with no shell metacharacter is run
+directly; otherwise it is given to sh -c.
+.sp
+Several names are special.  .DEFAULT supplies commands for a target
+that has no rule of its own; $< is then the target name.  .IGNORE and
+.SILENT act like the -i and -s options.  .PRECIOUS lists files that
+are not removed when make is interrupted.
 .sp 2
 .in -5
 .bd
@@ -50,7 +131,7 @@ OPTIONS
 -d	Print debugging information.
 
 .ti -10
--p	Print the dependency graph.
+-p	Print the dependency graph and the macros.
 
 .ti -10
 -s	Silent mode; do not print commands before running them.
@@ -63,7 +144,8 @@ OPTIONS
 branches that do not depend on it.
 
 .ti -10
--S	Stop at the first failed command.
+-S	Stop at the first failed command (the default; it
+overrides an earlier -k).
 
 .ti -10
 -n	Print, but do not run, the commands.
@@ -76,29 +158,72 @@ commands.
 -q	Do nothing; exit 0 if the target is up to date, -1 if not.
 
 .ti -10
--r	Start with no implicit rules (an empty .SUFFIXES).
+-r	Start with no built-in suffix rules or macros.
+
+.ti -10
+-f name	Read the description file name; - is the standard input.
 
 .in -10
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+To build prog from prog.o and util.o, using the built-in rules to make
+the .o files from their .c files:
+.nf
+	prog: prog.o util.o
+		ccc -O -o prog prog.o util.o
+.fi
+.sp
+The same, with macros and an explicit suffix rule:
+.nf
+	CC = ccc
+	CFLAGS = -O
+
+	prog: prog.o util.o
+		$(CC) $(CFLAGS) -o $@ prog.o util.o
+
+	.c.o:
+		$(CC) $(CFLAGS) -c $<
+.fi
+.sp
+A lex source turned into an object with its own suffix rule, showing
+$< and $@:
+.nf
+	.SUFFIXES: .l .o
+
+	.l.o:
+		lex $<
+		ccc -O -c lex.yy.c
+		mv lex.yy.o $@
+.fi
+.sp
+A target with two independent groups of commands: each group runs in
+turn, which a single-colon rule would not allow:
+.nf
+	all::
+		ccc -O -o prog prog.o
+
+	all::
+		ccc -O -o test test.o
+.fi
 .sp 2
 .in -5
 .bd
 NOTES
 .in +5
 .br
-The special names .SUFFIXES, .DEFAULT, .IGNORE, .SILENT and .PRECIOUS
-control implicit rules, defaults, error and interrupt handling.  The
-macros $*, $@, $< and $? name the stem, the target, the prerequisites
-and the out-of-date prerequisites.  Unlike v7 make, $* and $@ are also
-expanded in a prerequisite: in "obj.o: $*.c" each target's own stem
-replaces $*, so obj.o depends on obj.c.  $* is the target name with its
-last "." extension removed.
-.sp
 Archive members a(b) are dated by the archive as a whole: micronix's
 object format is not a.out, so a member's own timestamp is not read.
+.sp
+Make stops at the first command that fails; use -k to continue with
+independent targets.
 .sp 2
 .in -5
 .bd
 SEE ALSO
 .in +5
 .br
-ccc (1), sh (1), make (1)
+ccc (1), sh (1), asz (1), lex (1)
