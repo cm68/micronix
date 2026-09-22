@@ -1,0 +1,303 @@
+.he "scanf (3s)                   3/24/82                   scanf (3s)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE(S)
+.in +5
+.br
+.bd
+scanf, fscanf, sscanf
+- formatted input conversion
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+#include <stdio.h>
+.sp
+.bd 2
+scanf(format [, pointer]...)
+.br
+char *format;
+.sp
+.bd 3
+fscanf(stream, format [, pointer]...)
+.br
+FILE *stream;
+.br
+char *format;
+.sp
+.bd 2
+sscanf(s, format [, pointer]...)
+.br
+char *s, *format;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Scanf
+reads from 
+.bd
+stdin,
+the standard input stream.
+
+.bd
+Fscanf
+reads from the named input,
+.bd
+stream.
+
+.bd
+Sscanf
+reads from the
+.bd
+s
+character string.
+
+Each of these functions read and interpret characters
+according to a format, then store the results in its argument.
+A control string
+.bd
+format
+and a set of 
+.bd
+pointer
+arguments indicating where the converted input is stored are
+arguments expected by these routines.  These are described below.
+.sp 2
+.in +4
+Blanks, tabs or newlines, which match optional white space in the input.
+
+Any ordinary character besides % that must match the next character
+of the input stream.
+
+Optional conversion specifications, which consist of an assignment
+suppressing character (*), maximum field width number, a conversion
+character and the % character.
+
+.in -4
+The control string usually contains conversion specifications that
+direct interpretation of the next input field.  Unless assignment
+suppression was indicated (using the * character), the result is placed
+in the variable pointed to by the corresponding argument.
+
+An input field is a string of non-space characters.  The field extends
+to the next inappropriate character, or until the field width (if
+specified) is exhausted.
+
+The interpretation of the input field is indicated by the conversion
+character.  Corresponding pointer arguments are usually of a restricted
+type.  A list and description of legal conversion characters follows:
+.sp 2
+.in +4
+.ti -1
+.bd
+%
+.br
+A single percent sign (%) is expected.  No assignment is done.
+.sp
+.ti -1
+.bd
+d
+.br
+Decimal integer is expected.  Corresponding argument should be integer
+pointer.
+.sp
+.ti -1
+.bd
+o
+.br
+Octal integer expected.  Corresponding argument should be integer pointer.
+.sp
+.ti -1
+.bd
+x
+.br
+Hexadecimaì integeò expected® Correspondinç argumenô shoulä bå 
+integeò pointer.
+.sp
+.ti -1
+.bd
+s
+.br
+Character string expected.  Corresponding argument should be a character
+pointer pointing to an array of characters.  Array must be large enough
+to accept string and terminating "\0" character that will be added.  A
+space character or newline terminates the input field.
+.sp
+.ti -1
+.bd
+c
+.br
+Character expected.  Corresponding argument should be a character pointer. 
+The normal skip-over-space characters are suppressed.  Use "%ls" to
+read the next non-space character.  
+
+Corresponding argument should refer
+to a character array and indicate number of characters read if a field
+width is given.
+.sp
+.ti -1
+.bd
+e, f
+.br
+Floating point number is expected.  Next field is converted and stored
+through the corresponding argument which should be a pointer to a 
+.bd
+float.
+
+The format for floating point numbers is an optionally signed string
+of digits that may contain a decimal point followed by an optional
+exponent field consisting of E (or e), followed by an optionally signed
+integer.
+.bp
+.ti -1
+.bd
+[
+.br
+Left bracket indicates a string not to be delimited by space
+characters. The string is defined by characters followed by a right bracket.
+A
+.bd
+^
+as the first character after the left bracket defines the input field
+as all characters in the set of characters following the 
+.bd
+^ 
+sign®  Absencå oæ thió sign meanó thå inpuô fielä ió alì thå 
+characteró withiî the brackets.  Corresponding argument must point to
+a character array.
+.sp 2
+.in -4
+The conversion characters
+.bd
+d, o
+and
+.bd
+x
+may be either capitalized or preceded by an
+.bd
+l
+to indicate that a pointer to
+.bd
+long
+rather than
+.bd
+int
+is in the argument list. If these are preceded by
+.bd
+h,
+indicates a pointer to 
+.bd
+short
+rather than
+.bd
+int.
+
+The
+.bd
+e
+and
+.bd
+f
+conversion characters may also be capitalized or preceded by
+.bd
+l
+to indicate a pointer to
+.bd
+double
+rather than
+.bd
+float.
+
+.bd
+Scanf
+returns the number of input items successfully matched and assigned.
+This may also be used to decide how many items were actually found.
+The constant end of file is returned upon end of input.  This is different
+froí 0¬ whicè maù bå interpreteä tï meaî nï conversioî waó done®  
+Iæ conversion was intended, it was frustrated by an inappropriate 
+character in the input.  As an example:
+.sp
+.in +8
+.bd 2
+int i; float x; char name[50];
+.br
+scanf("%d%f%s", &i, &x, name);
+.sp
+.in -8
+with the input
+.sp
+.in +8
+.bd
+25 54.32E-1 McCleary
+.sp
+.in -8
+assigns to
+.bd
+i
+the value 25, 
+.bd
+x
+the value 5.432.  Name contains "mccleary\0". Another example:
+.sp
+.in +8
+.bd 2
+int i; float x; char name[50];
+.br
+scanf("%2d%f%*d%[1234567890]", &i, &x, name
+.sp
+.in -8
+with the input
+.sp
+.in +8
+.bd
+56789 0123 56a72
+.sp
+.in -8
+assigns 56 to
+.bd
+i,
+789.0 to
+.bd
+x,
+skips "0123" and places the string "56\0" in 
+.bd
+name.
+The next call to
+.bd
+getchar
+will return "a".
+.bp
+.in -5
+.bd
+ERRORS
+.in +5
+.br
+The success of matches and suppressed assignments can be determined
+only indirectly.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+In cases of missing or illegal data,
+.bd
+scanf
+returns an end of file on end of input.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+atof (3), getc (3), printf (3)
+
+

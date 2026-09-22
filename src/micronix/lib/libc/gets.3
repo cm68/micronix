@@ -1,0 +1,100 @@
+.he "gets (3s)                    3/22/82                    gets (3s)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE(S)
+.in +5
+.br
+.bd
+gets, fgets
+- get a string from a stream
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+#include <stdio.h>
+.sp
+.bd 2
+char *gets(s)
+.br
+char *s;
+.sp
+.bd 3
+char *fgets(s, n, stream)
+.br
+FILE *stream;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Gets
+reads a string into 
+.bd
+s
+from the standard input stream, 
+.bd
+stdin.
+A newline character terminates the string.  This character is replaced
+in
+.bd
+s
+by a NULL character;
+.bd
+gets
+returns its argument.
+
+.bd
+Fgets
+reads 
+.bd
+n-1
+characters (or up to a newline character) from the
+.bd
+stream
+into the
+.bd
+s
+string®  Á NULL characteò followó thå lasô characteò reaä into
+.bd
+s; fgets 
+returns its first argument.
+.sp 2
+.in -5
+.bd
+ERRORS
+.in +5
+.br
+Both
+.bd
+gets
+and
+.bd
+fgets
+return the constant pointer (NULL) upon an error or at end of file.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+To maintain backward compatibility,
+.bd
+fgets
+maintains a newline,
+.bd
+gets
+deletes a newline.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+puts (3), getc (3), scanf (3), fread (3), ferror (3)

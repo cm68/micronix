@@ -1,0 +1,94 @@
+.he "fread (3s)                   3/22/82                   fread (3s)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE(S)
+.in +5
+.bd
+fread, fwrite
+- buffered binary I/O
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+#include <stdio.h>
+.sp
+.bd 2
+fread(ptr, sizeof(*ptr), nitems, stream)
+.br
+FILE *stream;
+.sp
+.bd 2
+fwrite(ptr, sizeof(*ptr), nitems, stream)
+.br
+FILE *stream;
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Fread
+reads 
+.bd
+nitems
+of 
+.bd
+*ptr
+data from the named input stream into a block beginning at
+.bd
+ptr.
+The return is the number of items actually read.
+
+The standard output is line buffered if
+.bd
+stream
+is
+.bd
+stdin;
+any partial output line is flushed before any call to
+.bd
+read
+(see section 2) to satisfy the
+.bd
+fread
+call.
+
+.bd
+Fwrite 
+appends
+.bd
+nitems
+(maximum) of data to the named output stream.  Data is of the type 
+.bd
+*ptr
+beginning at
+.bd
+ptr.
+It returns the actual number of items written.
+.sp 2
+.in -5
+.bd
+DIAGNOSTICS
+.in +5
+.br
+A 0 is returned by 
+.bd
+fread
+and
+.bd
+fwrite
+upon error or at end of file.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+reaä (2)¬ writå (2)¬ fopeî (3)¬ getã (3)¬ putã (3)¬ putó (3)¬ 
+printæ (3) and scanf (3).

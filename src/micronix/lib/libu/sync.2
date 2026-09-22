@@ -1,0 +1,63 @@
+.he "sync (2)                     3/19/82                     sync (2)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+sync 
+- update the disks
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+sync()
+
+
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+.bd
+Sync 
+causes all information in core memory that should
+be on disk to be written out.
+This includes modified super-blocks, modified inodes,
+and delayed block I/O.
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+No information is returned.  
+.bd
+Sync
+always succeeds.
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(sync = 36)
+.br
+.bd
+sys; sync
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+No error indication is returned.

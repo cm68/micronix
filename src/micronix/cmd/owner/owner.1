@@ -1,0 +1,81 @@
+.he "owner (1)                    9/21/26                    owner (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+owner
+- file ownership
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+owner [ -newowner ] file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Every Micronix file has associated with it a user I.D. number, the
+owner of the file.  Owner reports that number, and with an option
+changes it.
+.sp
+With no option, owner reports the owner of each named file.  The
+number is looked up in /etc/passwd and printed as a user name where
+there is one, and as a number where there is not.
+.sp
+With -newowner, owner changes the owner of each named file.  Newowner
+may be a decimal user I.D. or a user name looked up in /etc/passwd.
+.sp
+Only the super-user may change the owner of a file; anyone may ask
+who owns one.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-newowner	Change the owner to newowner instead of reporting it.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The Berkeley chown this comes from takes its argument plainly -
+"chown root a.out" - and only ever changes.  The micronix command
+reports as well, and takes the new owner behind a dash; what the port
+kept is everything below the argument scan.
+.sp
+A user name is looked up in /etc/passwd by hand, since libc has no
+getpwnam.  The report reads the same file the other way, by the same
+reader.
+.sp
+Chown here sets an owner and a group at once, the pair packed as
+uid | gid << 8, and has no -1 to leave a field alone.  So every change
+stats the file first and carries its group through unchanged.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/passwd - user I.D. and name relationships
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+chgrp (1), chmod (1), ls (1)

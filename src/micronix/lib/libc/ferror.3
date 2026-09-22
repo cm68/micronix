@@ -1,0 +1,80 @@
+.he "ferror (3s)                  3/22/82                  ferror (3s)
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE(S)
+.in +5
+.br
+.bd
+feof, ferror, clearerr, fileno
+- stream status inquiries
+.sp 2
+.in -5
+.bd
+C         
+.in +5
+.br
+.bd
+#include <stdio.h>
+.sp
+.bd 2
+feof(stream)
+.br
+FILE *stream;
+.sp
+.bd 2
+ferror(stream)
+.br
+FILE *stream
+.sp
+.bd 2
+clearerr(stream)
+.br
+FILE *stream
+.sp
+.bd 2
+fileno(stream)
+.br
+FILE *stream
+.sp 2
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+The following functions are implemented as macros and cannot
+be redeclared:
+
+.bd
+Feof
+returns a non-zero when an end of file is read on the named input
+stream; otherwise a zero is returned.
+
+.bd
+Ferror
+returns a non-zero when an error occurs while reading or writing
+the named 
+.bd
+stream.  Error must be cleared by
+.bd
+clearerr
+or the error indication lasts until the stream is closed.  A zero
+is returned if no error occurs.
+
+.bd
+Fileno
+returns an integer file descriptor associated with 
+.bd
+stream
+[see
+.bd
+open
+(2)].
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+fopen (3), open (2)

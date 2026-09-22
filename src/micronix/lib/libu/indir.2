@@ -1,0 +1,56 @@
+.he "indir (2)                    3/19/82                    indir (2)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+indir
+- indirect system call
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(indir = 0)
+.br
+.bd
+sys; indir; syscall
+
+
+.in -5
+.bd
+FUNCTION    
+.in +5
+.br
+The system call at the location syscall is executed.
+Execution resumes after the
+.bd
+indir
+call.
+
+The main purpose of
+.bd
+indir
+is to allow programs to
+construct system calls in their data segments,
+avoiding modifications to their code.
+
+The system call at syscall must begin with the
+"sys" byte. An
+.bd
+indir
+executed indirectly is a no-op.
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The returns depend on the indirectly executed call.

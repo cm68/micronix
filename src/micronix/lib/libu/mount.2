@@ -1,0 +1,77 @@
+.he "mount (2)                    3/19/82                    mount (2)" 
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+mount 
+- mount a file system
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+mount(device, on, ronly)
+.bd
+.br
+char *device, *on;
+
+
+.in -5
+.bd
+FUNCTION       
+.in +5
+.br
+.bd
+Mount
+informs the system that the given
+block device contains a file system.
+Subsequent references to the file "on"
+will refer to the root directory of the
+new file system. The old contents of "on"
+are inaccessible until the device is
+unmounted.
+
+If ronly is non-zero, the system will not
+allow writing on the device. If the device
+is physically write protected, it should
+still be mounted read-only to prevent
+the system from trying to update access times.
+
+This call is restricted to the super-user.
+There is a limit to the number of devices
+that can be mounted concurrently.
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+A 0 indicates success, a -1 indicates failure.
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(mount = 21)
+.br
+.bd
+sys; mount; device; on; ronly
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The carry flag is cleared on success, or set on failure.

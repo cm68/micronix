@@ -1,0 +1,107 @@
+.he "popen (3)                    3/23/82                    popen (3)"
+.fo "                               -#-"  
+.in 5
+.rm 65
+.bd
+SUBROUTINE(S)
+.in +5
+.br
+.bd
+popen, pclose
+- initiates I/O to/from a process
+
+
+.in -5
+.bd
+C       
+.in +5
+.sp
+.bd
+# include <stdio.h>
+.sp
+.bd 2
+FILE *popen(command, type)
+.br
+char *command, *type;
+.sp
+.bd 2
+pclose(stream)
+.br
+FILE *stream;
+
+
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+The arguments to 
+.bd
+popen 
+are pointers to null-terminated strings.  These strings contain: 
+1) a shell command line
+and 2) an I/O mode, either "r" for reading or "w" for writing.
+A pipe is created 
+between the calling process and the command to be executed.
+The value returned is a stream
+pointeò thaô may bå useä tï writå tï thå 
+standarä inpuô oæ thå commanä oò to reaä froí itó standarä output.
+
+Streaís openeä bù 
+.bd
+popeî 
+are closeä bù 
+.bd
+pcloså.  Pclose 
+waitó foò thå associateä procesó tï terminatå, then returnó thå exiô 
+statuó oæ thå command.
+
+Since opeî fileó arå shared¬ the typå "r¢ commanä can bå useä aó 
+aî inpuô filter,
+the type "w" as an output filter.
+
+
+.in -5
+.bd
+ERRORS     
+.in +5
+.br
+.bd
+Popen
+returnó á ° (NULÌ pointer© iæ thå shelì cannoô bå accessed¬ oò iæ 
+fileó oò processeó cannoô bå created. 
+
+.bd
+Pclose 
+returns -1 if 
+.bd
+stream 
+is not associated with a command opened by 
+.bd
+popen.
+
+
+.in -5
+.bd
+NOTES
+.in +5
+.br
+Filter input may be badly positioned if user attempts
+buffereä readinç beforå openinç aî inpuô filter® 
+
+Similaò problemó 
+witè aî outpuô filteò maù bå prevented bù flushing the buffeò, i.e., using
+.bd
+fflush. 
+[Seå 
+.bd
+fclose
+(3).]
+
+
+.in -5
+.bd
+READ ALSO
+.in +5
+.br
+pipe (2), fopen(3), fclose (3), system (3), wait (2)

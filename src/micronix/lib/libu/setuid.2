@@ -1,0 +1,63 @@
+.he "setuid (2)                   3/19/82                   setuid (2)"  
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+setuid 
+- set process user IDs
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+setuid(uid)
+
+
+.in -5
+.bd
+FUNCTION          
+.in +5
+.br
+This call sets the real group and user IDs
+and the effective group and user IDs.
+The group IDs are set to the high byte of the argument,
+and the user IDs are set to the low byte.
+This call can be used to set the effective IDs to the real IDs.
+Only the super-user is permitted to change the real IDs.
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+A 0 indicates success, a -1 indicates failure.
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(setuid = 23)
+.br
+.bd
+(uid in hl)
+.br
+.bd
+sys; setuid;
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The carry flag is cleared on success, or set on failure.

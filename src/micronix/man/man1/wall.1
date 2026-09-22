@@ -1,0 +1,55 @@
+.he "wall (1)                    6/17/82                      wall (1)"       
+.fo "                              -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+wall 
+- write to all users
+
+
+.in -5
+.bd
+SYNOPSIS
+.in +5
+.br
+wall
+
+
+.in -5
+.bd
+DESCRIPTION
+.br
+.in +5
+.bd
+Wall 
+reads the standard input up to an end of file,
+then sends this to the terminal of each currently logged in user.
+
+Its normal use is to inform users of immediate system status.
+Only the super-user may use 
+.bd
+wall.
+
+
+.in -5
+.bd
+EXAMPLE
+.in +5
+.ti +10
+.bd
+wall
+
+System going down in 3 minutes -- Please prepare
+^D
+
+After which, each user would see:
+
+.ti +10
+.bd
+Broadcast message ...
+
+followed by what appears above.

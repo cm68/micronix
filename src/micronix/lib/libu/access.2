@@ -1,0 +1,75 @@
+.he "access (2)		          3/18/81              access (2)"
+.fo "			           -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+access
+- test file access permissions
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+access(name, mode)
+.br
+char *name;
+.br
+int mode;
+.sp 2
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+Permission to access the named file, in the specified mode,
+is tested. The test is based on the real user and group IDs,
+rather than the effective IDs, so that a set-user-id program
+may test the permissions of its invoker.
+Mode is the 
+.ul
+sum 
+of any of the following:
+
+.nf
+.in +8
+.bd 3
+4  read
+2  write
+1  execute
+.in -8
+
+.in -5
+.bd
+RETURNS
+.in +5
+.fi
+.br
+.bd
+Access
+returns a 0 if permission is granted, -1 if not.
+.sp 2
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(access = 33)
+.br
+.bd
+sys; access; name; mode
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+.bd
+Access 
+returns with the error bit clear if the permissions
+are granted, or with the error bit set if they are not.

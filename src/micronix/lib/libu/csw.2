@@ -1,0 +1,53 @@
+.he "csw (2)		          3/19/82                 csw (2)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+csw
+- read the console switches
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+getcsw()
+.sp 2
+.in -5
+.bd
+FUNCTION   
+.in +5
+.br
+The setting of the console switches is returned.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The setting of the console switches is returned.
+.sp 2
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(csw = 38)
+.br
+.bd
+sys; csw
+.br
+.bd
+(switch setting in hl)
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The switch setting is returned in hl.

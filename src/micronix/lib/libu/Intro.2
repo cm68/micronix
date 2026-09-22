@@ -1,0 +1,428 @@
+.fo "		               -#-"
+.rm 65
+.in 5
+.bd
+		INTRODUCTION TO SYSTEM CALLS
+
+
+This section of the manual lists all Micronix system calls.
+The syntax for these calls is in most cases identical
+with that for Unix Version 6 system calls, differing
+only in the assembly language register names.
+For most purposes, Section II of the Unix V6 Programmer's Manual
+can be used as a reference in place of this one.
+
+Call syntax for both C and assembly language is given.
+Familiarity with one of these languages is necessary to
+understand this section.
+
+Many system calls take a file name.
+This can be an arbitrary path name,
+of unlimited length,
+but it must be terminated by a 0-byte,
+and the calling process must have search permission on
+all directories in the path.
+
+An error during a system call never causes an automatic
+error message,
+but an error number is always available (see below),
+and the program can request a standard error message
+if it wants [see
+.bd
+perror 
+(3)].
+
+
+.ce
+.bd
+C System Calls
+
+The type of declarations given for system call arguments
+are not meant to be copied literally;
+they are simply indications of how the system
+will treat the arguments.
+A string, for example,
+is always acceptable in place of a 
+.bd
+(char *)
+argument.  When no declaration is given, an 
+.bd
+int 
+is expected.
+
+From C, an error is indicated by an otherwise impossible
+return value. This is usually -1; the individual sections
+specify the details.
+The error number is always left in
+the external variable,
+.bd
+errno.
+This variable is not cleared on successful calls,
+so that it remains available across message writes, etc.
+
+
+.ce
+.bd
+Assembly Language System Calls
+
+Syntax is given for A-Natural (Whitesmith's)
+assembly language.
+Translation to Intel or Zilog mneumonics is straightforward.
+For example, the 
+.bd
+chmod 
+system call in A-Natural is
+.ti +8
+
+.bd
+sys; chmod; name; mode
+.bp
+In Intel assembly language, this looks like
+.in +8
+
+.bd 
+db sys
+.br
+.bd
+db chmod
+.br
+.bd
+dw name
+.br
+.bd
+dw mode
+.in -8
+.sp 2
+.fi
+The "sys" byte that begins each system call
+is a synonym for "restart 1".
+The names of the calls themselves are
+synonyms for 1-byte quantities that can be found
+in the individual sections, or by
+inspecting or including the files
+/include/an.h and /include/intel.h.
+Succeeding in-line arguments, if any, are always 2-byte quantities.
+A "name" argument is always a pointer to a null-terminated string.
+
+Registers are preserved across system calls,
+except for the error flag and error number (see below),
+and for any return values (see the individual sections).
+For the sake of portability, however, it is unwise to
+depend on this.
+
+From assembly language, an error is always indicated by
+turning on the carry bit of the condition flags. Thus a
+system call can be followed by a
+jc
+(jump on carry) to handle an error return, or a
+jnc
+(jump on no carry) to handle an error-free return.
+The error number is returned in register hl.
+
+
+.ce
+.bd
+Error Numbers
+
+Following is a list of error numbers, their names in the
+system source code, the standard error message available
+thru
+.bd
+perror,
+and a short explanation.
+
+.ta 5
+.in +5
+.ti -5
+.nf
+.bd
+0	(not used)
+.fi
+
+.ti -5
+.nf
+.bd
+1	EPERM	Not super user
+.fi
+The current user was attempting something reserved
+for the super-user.
+
+.ti -5
+.nf
+.bd
+2	ENOENT	No such file or directory
+.fi
+The last component of a path name does not exist.
+
+.ti -5
+.nf
+.bd
+3	ESRCH	No such process
+.fi
+The process whose number was given to
+.bd
+signal
+does not exist, or is already dead.
+
+.ti -5
+.nf
+.bd
+4	EINTR	Interrupted system call
+.fi
+A slow system call (such as read or write on a tty,
+but never on a disk) was interrupted by a caught signal.
+.bp
+.ti -5
+.nf
+.bd
+5	EIO		I/O error
+.fi
+A physical I/O error occurred during a read or write.
+
+.ti -5
+.nf
+.bd
+6	ENXIO	No such device or address
+.fi
+An I/O call was made to a non-existent device, or beyond the
+limits of the device.
+
+.ti -5
+.nf
+.bd
+7	E2BIG	Arg list too long
+.fi
+A call to 
+.bd
+exec 
+was made with an argument list longer than 512 bytes.
+
+.ti -5
+.nf
+.bd
+8	ENOEXEC	Exec format error
+.fi
+An attempt was made to execute an inappropriate file
+(such as a directory or special file), even though
+the user had execute permission on the file.
+
+.ti -5
+.nf
+.bd
+9	EBADF	Bad file number
+.fi
+A file descriptor refers to no open file,
+or a read or write request is made to a file
+not opened for that activity.
+
+.ti -5
+.nf
+.bd
+10	ECHILD	No children
+.fi
+There were no child processes to
+.bd
+wait
+for.
+
+.ti -5
+.nf
+.bd
+11	EAGAIN	No more processes
+.fi
+.bd
+Fork
+found the system process table temporarily full.
+
+.ti -5
+.nf
+.bd
+12	ENOMEM	Not enough core
+.fi
+During an
+.bd
+exec
+or
+.bd
+break,
+the program asked for more core than the system could supply.
+This is not a temporary condition: the maximum program size is
+a system parameter.
+
+.ti -5
+.nf
+.bd
+13	EACCES	Permission denied
+.fi
+The user attempted a file access forbidden by the file's
+permission bits.
+
+.ti -5
+.nf
+.bd
+14	ESYS		System error
+.fi
+The system has detected an "impossible" error, caused
+by corrupted disk, memory, or a system bug,
+but not yet severe enough to warrant a panic stop.
+This should be reported.
+
+.ti -5
+.nf
+.bd
+15	ENOTBLK	Block device required
+.fi
+A plain file or a directory was given where a block device
+was required, (in
+.bd
+mount,
+for example).
+
+.ti -5
+.nf
+.bd
+16	EBUSY	Device busy
+.fi
+An attempt was made to mount a device that was already mounted,
+to unmount a device on which there was an open file or
+a current directory,
+or to open a one-user-only device that is already busy.
+.bp
+.ti -5
+.nf
+.bd
+17	EEXIST	File exists
+.fi
+The new file name passed to
+.bd
+link
+or
+.bd
+mknod
+is already taken.
+
+.ti -5
+.nf
+.bd
+18	EXDEV	Cross-device link
+.fi
+A link to a file on another device was attempted.
+
+.ti -5
+.nf
+.bd
+19	ENODEV	No such device
+.fi
+An attempt was made to open a non-existent device.
+
+.ti -5
+.nf
+.bd
+20	ENOTDIR	Not a directory
+.fi
+A non-directory was specified where a directory was required,
+as an intermediate component in a path name, for example, or
+as an argument to
+.bd
+chdir
+.
+
+.ti -5
+.nf
+.bd
+21	EISDIR	Is a directory
+.fi
+An attempt was made to write on a directory.
+
+.ti -5
+.nf
+.bd
+22	EINVAL	Invalid argument
+.fi
+An invalid argument was given to a system call:
+currently, unmounting a non-mounted device, mentioning
+an unknown signal in
+.bd
+signal,
+or invoking a non-existing system call.
+Ordinarily, the latter case generates a fatal signal;
+the error is returned only if the signal is caught or ignored.
+
+.ti -5
+.nf
+.bd
+23	ENFILE	File table overflow
+.fi
+The system's table of open files is temporarily full.
+
+.ti -5
+.nf
+.bd
+24	EMFILE	Too many open files
+.fi
+Only 16 files can be open per process
+
+.ti -5
+.nf
+.bd
+25	ENOTTY	Not a typewriter
+.fi
+The file mentioned to
+.bd
+stty
+or
+.bd
+gtty
+is not a typewriter or other character-device.
+
+.ti -5
+.nf
+.bd
+26	ETXTBSY	Text file busy
+.fi
+Not currently used.
+
+.ti -5
+.nf
+.bd
+27	EFBIG	File too big
+.fi
+The user attempted to extend a file beyond the
+maximum size of 2^24 bytes.
+
+.ti -5
+.nf
+.bd
+28	ENOSPC	No space left on device
+.fi
+The disk's free space has been exhausted.
+
+.ti -5
+.nf
+.bd
+29	ESPIPE	Illegal seek
+.fi
+A seek was issued to a pipe.
+
+.ti -5
+.nf
+.bd
+30	EROFS	Read-only file system
+.fi
+An attempt was made to write to a device mounted read-only.
+.bp
+.ti -5
+.nf
+.bd
+31	EMLINK	Too many links
+.fi
+The program attempted to make a 256th link to a file.
+
+.ti -5
+.nf
+.bd
+32	EPIPE	Broken pipe
+.fi
+The program wrote on a pipe that had no reader.
+Ordinarily this generates a fatal signal; the error is
+returned if the signal is caught or ignored.

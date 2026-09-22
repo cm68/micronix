@@ -1,0 +1,163 @@
+.he "boot (1)			 6/17/82		 boot (1)"
+.fo "				   -#-"
+.in 8
+.rm 65
+.bd
+.ti -6
+NAME
+.br
+.bd
+boot
+- Micronix bootstrap procedures
+
+
+.ti -6
+.bd
+SYNOPSIS
+.br
+djboot, hdboot, m5boot, m10boot, m16boot
+
+
+.ti -6
+.bd
+DESCRIPTION
+.br
+The CP/M diskette that comes with Micronix includes the following
+bootstrap programs:
+
+.in +8
+.ti -8
+djboot	Boot from the DJDMA controller
+with a 5 inch or an 8 inch drive.
+
+.ti -8
+hdboot	Boot from the HDCA controller
+the 10, 20, or 26 megabyte drive
+
+.ti -8
+m5boot	Boot from the HDDMA controller
+with the 5 megabyte drive
+
+.ti -8
+m10boot	Boot from the HDDMA controller
+with the 10 megabyte drive
+
+.ti -8
+m16boot	Boot from the HDDMA controller
+with the 16 megabyte drive
+.in -8
+
+These are CP/M programs, ie, they are stored on the CP/M
+diskette as djboot.com, hdboot.com, etc, and are invoked
+from CP/M by typing the name without the .com extension.
+
+In each case, they assume that the target disk contains
+a Micronix file system, and they search its root
+directory for files that could be Micronix kernels.
+If exactly one such file is found, it is loaded and
+executed. If more than one kernel
+is found, the names are listed and the operator is asked
+choose one. This allows backup copies or alternate
+versions to be kept.
+
+CP/M's only role in this process is the invocation of
+the bootstrap program. Once the bootstrap begins
+executing, it is independent of CP/M, and CP/M itself
+is overwritten as Micronix is loaded.
+
+CP/M can be eliminated entirely by placing the desired
+bootstrap program on the "system tracks" of a floppy disk.
+Then as long as that diskette is in drive A, Micronix will
+boot automatically from the appropriate hard disk
+every time the Decision's RESET button is hit. This
+should save the operator about 5 seconds per day.
+(CAUTION: if Micronix is already running, make
+sure you type sync before hitting RESET.)
+
+The loaders that can be placed on a floppy's system tracks
+are stored as files on the Micronix CP/M diskette,
+and are called hdload, m5load, m10load, and m16load,
+corresponding to the similarly-named bootstrap programs.
+See below for an installation example.
+The djboot program has already been placed on the
+system tracks of the Micronix stand-alone floppy,
+so if you put this in drive A and hit RESET, it
+will boot automatically.
+
+
+.ti -6
+.bd
+EXAMPLES
+
+.nf
+				SCREEN
+COMMENTS			DISPLAY
+
+
+To boot the Micronix
+  stand-alone floppy:
+
+Make sure the diskette is
+  write-enabled
+Insert the diskette into
+  drive A
+Hit RESET
+Machine responds		FFFF
+Machine types :, you type b	:b
+Loader takes over		DJDMA loader ...
+
+
+To boot Micronix from the m5:
+
+Insert the Micronix CP/M
+  diskette in drive A
+Hit RESET
+Machine responds		FFFF
+Machine types :, you type b	:b
+CP/M announces itself		Morrow Designs CP/M
+Type m5boot			A> m5boot
+Loader takes over		HDDMA loader ...
+
+
+To prepare an auto-boot
+  floppy for the m5:
+
+Insert the Micronix CP/M
+  diskette in drive A
+Hit RESET
+Machine responds		FFFF
+Machine types :	 you type b	:b
+CP/M announces itself		Morrow Designs CP/M
+Type formatdj. Follow the	A> formatdj
+  instructions to format a
+  new diskette. 512 byte
+  sectors are recommended.
+Type sysgen m5load		A> sysgen m5load
+Type an A			Destination drive? A
+Insert the formatted		Insert a write
+  diskette in drive A		 enabled diskette
+  and hit RETURN.		 in drive A
+The diskette is ready to use	Function complete...
+
+
+To use the m5 auto-boot:
+
+Insert the auto-boot
+  diskette in drive A
+Hit RESET
+Machine responds		FFFF
+Machine types :, you type b	:b
+Loader takes over		HDDMA loader ...
+
+
+.ti -6
+.bd
+BUGS
+
+.fi
+The bootstrap programs only search the first block
+of the root directory, so you should limit your
+root directory to 32 entries (which is a good idea
+anyway, to speed up rooted file-name searches),
+or else you should make sure that the Micronix
+kernel occurs as one of the first 32 entries.

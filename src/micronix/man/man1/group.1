@@ -1,0 +1,92 @@
+.he "group (1)                    4/18/82                    group (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd        
+PROGRAM
+.in +5
+.br
+.bd
+group 
+- examine or change the group of a list of files
+.sp 2
+.in -5
+.bd
+USAGE   
+.in +5
+.br
+group [-name] file ...
+.sp 2
+.in -5
+.bd
+FUNCTION    
+.in +5
+.br
+Associated with each Micronix file is a group number.
+The group number is used to determine group access permission.
+If you are running a single user, informal, or very low
+user-population system, the whole concept of groups
+may be irrelevant to you.
+
+The 
+.bd
+group
+command can be used to view the group names of files.
+The relationship of group names to group numbers is entirely
+established by the file "/etc/group" [see 
+.bd
+group 
+(5)].
+.sp
+.bd
+Group 
+prints the group name for each file given.
+If the file's group number has no name, the group number is printed in
+decimal instead.
+
+If the first argument to 
+.bd
+group 
+is a group name preceded by a hyphen,
+.bd
+group 
+attempts to change 
+the group of each of the named files to the given name.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.sp
+.in +5
+.ti +5
+.bd	
+group file1 file2 file3
+
+to discover which group each of these files belongs to.
+.sp 2
+.ti +5
+.bd
+group file1 file2 file3
+
+to discover which group each of these file belongs to.
+.sp 2
+.ti +5
+.bd
+group -sales file1 file2 file3
+
+to "give" each of the files to the group named "sales."
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+group (5)
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/group - group name <-> group number relationships
+

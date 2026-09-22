@@ -1,0 +1,432 @@
+.he "pilot (1) 	     		 7/19/82                pilot (1)"	
+.fo "				   -#-"
+.rm 65
+.in 10
+.bd
+.ti -5
+.bd
+NAME
+.br
+.bd
+pilot
+- an author language
+.sp 2
+.ti -5
+.bd
+DESCRIPTION
+.br
+This program gets its name from and is loosely based upon
+that set of programs written for the CP/M system under the generic name
+PILOT, itself based upon some complex IBM software.
+
+The present incarnation has adopted many of the ideas,
+but is not totally faithful to the original PILOT standard.
+
+Pilot is an author language in the sense that it should
+be possible for "authors," i.e. non-programmers, to
+successfully and fairly rapidly get something working in the pilot 
+language.
+
+Pilot is a non-structured language,
+but structured language enthusiasts may be assured that
+"rp" (a rational pilot) is available as a preprocessor.
+(See rp (1)).
+
+In order to run something in pilot, one issues the command:
+.sp
+.bd
+.ti +10
+pilot filename
+.sp
+where the given filename refers to a "pilot script".
+Pilot will simply read the script and do whatever is requested.
+
+To write a "pilot script" one needs only a way to get text
+into a file.
+Most text editors will suffice.
+
+
+.bd
+.ce
+Pilot Operation
+
+In general, pilot reads its input file, one line at a time,
+performing the described actions before proceeding.
+The general layout of a pilot command is:
+
+.ti +5
+.bd
+*label command conditional : word1 word2 word3 ...
+
+.bd
+*label 
+is a tag by which one may refer to this line elsewhere in the script.
+It is optional, and in practice, most commands will not have labels.
+A label may appear on a line by itself.
+
+.bd
+command
+is a single letter command, discussed in detail
+below.
+.bp
+.bd
+conditional
+is either the letter Y or N.
+A conditional specifier is optional.
+If one appears, the command will only do something
+if the Y or N matches the current state of pilot's condition flag.
+
+.bd
+words 
+are optional and specific to individual commands.
+
+
+.bd
+.ce
+Instruction Summary
+
+.nf
+.in +20
+A - accept
+C - call
+D - define
+E - exit
+J - jump 
+M - match
+N - new file
+R - return
+S - save
+T - type
+U - unix
+W - wait
+.fi
+.in -20
+.sp 2
+.bd
+.ce
+Instruction Descriptions
+
+.ti -5
+.bd
+A - accept - a: [variable]
+.br
+One line of input is accepted from the standard input.
+If a variable name is given,
+a copy of the accepted data will be stored in the variable.
+.sp
+Examples
+.in +10
+.nf
+a:
+a: $save
+.sp 2
+.fi
+.in -10
+.ti -5
+.bd
+C - call - c: *label
+.br
+Jump to the given label, but remember where you were.
+If a return instruction (r:)
+is encountered in the program flow after
+the label, pilot will jump
+back
+to the instruction following
+the call.
+.sp
+Example
+.in +10
+.nf
+c: *output
+e:
+*output
+t: Hello world!
+r:
+
+1) Call instruction jump down to "*output".
+
+2) Type instruction - type "Hello world!"
+.bp
+3) Return - go back to just after the last call
+
+4) exit - all done!
+.fi
+.in -10
+.sp 2
+.ti -5
+.bd
+D - define - d: $move data
+.br
+The string "data"
+is evaluated if necessary and then
+a copy of the resulting string
+of characters is stored in the 
+string variable "name".
+Note that "$" denotes string variables.
+.sp
+Example
+.in +10
+.nf
+d: $x The cheese
+t: $x
+
+1) Definition $x is set to "The cheese"
+
+2) Type - "The cheese" will be typed.
+.sp 2
+.fi
+.in -10
+.ti -5
+.bd
+E - exit - e:
+.br
+This is a simple instruction.
+Pilot quits when it encounters
+an exit instruction.
+Anything to the right of the colon is ignored.
+.sp
+Example
+.nf
+.in +10
+e:
+
+Stop the whole works right now.
+.in -10
+.fi
+.sp 2
+.ti -5
+.bd
+J - jump - j: *label
+.br
+Go to some other part of the current
+pilot
+script file and
+continue executing instructions
+from that point on.
+If no label name is given,
+pilot prints "Missing label"
+and stops.
+If there is no such label to be found
+in the current
+pilot script file,
+"name: Label not found" is printed and pilot stops.
+.sp
+Example
+.in +10
+.nf
+*top
+t:Hello
+j:*top
+.sp
+.fi
+.in -10
+This would print "Hello"
+over and over again forever.
+
+A more useful example:
+.sp
+.in +10
+.nf
+a:
+m:yes
+jn: *default
+t: you typed yes
+e:
+* default
+t: you didn't type yes
+e:
+
+1) Accept a line from the controlling terminal
+
+2) Match it against "Yes"
+
+3) Jump to *default if the previous match failed.
+
+4) type - "you typed yes" otherwise
+.sp 2
+.fi
+.in -10
+.ti -5
+.bd
+M - match - m: pattern,pattern,pattern, ...
+.br
+Compare the most recent input against the given list of patterns
+and set pilot's condition flag based on the outcome.
+The following instructions may base their behavior on the outcome
+of these pattern comparisons.
+Two results are possible:
+
+1) The input matched one of the patterns (success).
+.sp
+2) The input matched none of them (failure).
+.sp
+Comparison of each pattern is by a marching window scan.
+.sp
+Case is ignored, that is, a capital Q is considered to be the same
+as a lower case q.
+.sp 
+Example
+.in +10
+.nf
+m:a
+m:one,two,three
+.fi
+.in -10
+
+The first will succeed whenever the most recent terminal input
+contained the letter "a" anywhere.
+
+The second will succeed if the most recent input contained
+any of the three given character sequences which form the words
+one, two, three.
+.sp 2
+.ti -5
+.bd
+N - new file - n: filename
+.br
+Fairly straightforward:
+Pilot has been marching along executing instructions
+in its pilot script file.
+When it encounters the line
+.sp
+.nf
+.bd
+	n: newfile
+.sp
+.fi
+pilot will have done with the current file and start executing instructions
+with the first line in the file
+named "newfile".
+(There must, of course exist such a file, and it must be readable.)
+Pilot stops if it can't read the given file.
+.sp 2
+.ti -5
+.bd
+R - return - r:
+.br
+Discussed in C - call (above).
+A return instruction causes a jump to the line following the 
+most recently executed call
+instruction.
+If there are no calls for which there have been no returns,
+pilot stops.
+It returns out of pilot to the calling program, as it were.
+Anything to the right of the colon is ignored.
+.sp
+Example
+.in +10
+.nf
+r:
+.fi
+.in -10
+.sp 2
+.ti -5
+.bd
+S - save - s: $variable
+.br
+The current value of the input
+terminal input register
+is saved in the string variable whose name is given.
+If no name is given,
+no action is taken.
+.sp
+Example
+.in +10
+.nf
+s: $phial
+.sp
+.in -10
+.fi
+The most recently accepted input
+is saved in "phial".
+.sp 2
+.ti -5
+.bd
+T - type - t: text
+.br
+A simple command, really.
+That which follows the colon is simply sent verbatim
+to the standard output, (usually the terminal).
+If the last character of the line is a left slant (\),
+then no "newline" character is sent at the end of the line.
+
+Example
+.nf
+.in +10
+t: A) First selection
+t: B) Second selection
+t:
+t: Your choice ==>\
+a:
+.sp
+.fi
+.in -10
+The four lines above are typed.
+
+
+.ti -5
+.bd
+U - unix - u: command
+.br
+The command to the right of the colon
+is executed just as if it had been
+typed as a command to the shell.
+This command gives you access to the rest of the system.
+This instruction can take much longer than any of the others
+just to get set up.
+If the sub-process created by a U instruction is interrupted
+or otherwise abnormally terminated, pilot will stop.
+.bp
+Example
+.nf
+.in +10
+u: ls
+u: cat $file | form | lpr &
+u: pilot zzz
+.in -10
+.fi
+
+Each command is executed.
+Note that it is possible for pilot
+to continue before the command
+finishes (ex. 2) or for there to
+coexist several layers of pilot programs (ex. 3).
+
+
+.ti -5
+.bd
+W - wait - w: [$variable] [number]
+.br
+Wait is just like "accept" above only it "times out"
+after a certain period.
+The default period is six seconds.
+One can select a different period by placing a numeric value to
+the right of the colon as one of the arguments.
+If the specified time interval expires before
+the RETURN key has been pressed, then the data returned
+is the single word "TIMEOUT"
+which can later be tested.
+
+Example
+.in +10
+.nf
+w:
+w: $data
+w: 9
+w: $fast 2
+
+1) Accept data for a six second period.
+
+2) Accept data; wait for six seconds; store it in "data"
+
+3) Accept data; wait for nine seconds.
+
+4) Accept data; wait for two seconds; store it in "fast"
+.sp 2
+.fi
+.in 
+.in 10
+.ti -5
+SEE ALSO
+.br
+rp - rational pilot

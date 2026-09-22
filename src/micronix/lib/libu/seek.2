@@ -1,0 +1,118 @@
+.he "seek (2)                     3/19/82                     seek (2)"
+.fo "				   -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+seek 
+- move read/write pointer
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+seek(descriptor, offset, from)
+
+
+.in -5
+.bd
+FUNCTION           
+.in +5
+.br
+Each open file has an associated read/write pointer.
+.bd
+Seek 
+moves this pointer as follows:
+
+.in +2
+.ti -2
+- If 
+.bd
+from 
+is 0, the pointer is set to offset.
+.sp
+.ti -2
+- If 
+.bd
+from 
+is 1, the pointer is set to its current location plus offset.
+.sp 
+.ti -2
+- If 
+.bd
+from 
+is 2, the pointer is set to the size of the file         
+plus offset.                                                              
+.sp
+.ti -2
+- If 
+.bd
+from 
+is 3, 4, or 5, the meaning is the same as for 0, 1, or 2,
+except that offset is multiplied by 512.
+.sp
+.ti -2
+- If 
+.bd
+from 
+is 0 or 3, offset is treated as signed.
+Otherwise it is unsigned.
+.sp
+.in -2
+.nf
+.ce
+.bd
+IN SUMMARY:
+
+.ta 8
+.bd 6
+Byte	Block
+seeks	seeks	Motion is relative to
+
+0	3	Beginning of file (unsigned)
+1	4	Current location (signed)
+2	5	End of file (signed)
+
+.fi
+.bd
+Seeks 
+are not allowed on pipes, but are allowed on character devices,
+although most such devices ignore them.
+Seeking far past the end of a file and writing
+will create a "hole" in the file that occupies no space.
+Reading the hole will allocate zero-filled space.
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+A 0 indicates success, a -1 indicates failure.
+.bp
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(seek = 19)
+.br
+.bd
+(descriptor in hl)
+.br
+.bd
+sys; seek; offset; from
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br 
+The carry flag is cleared on success, or set on failure.

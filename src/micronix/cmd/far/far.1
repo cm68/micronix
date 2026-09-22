@@ -1,0 +1,141 @@
+.he "far (1)                      6/25/82                      far (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+far
+- floppy archiver
+
+
+.in -5
+.bd
+USAGE          
+.in +5
+.br
+.bd
+far device [flags] [files]
+
+
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Far
+provides a simple interface to CP/M floppy diskettes.
+Device is
+assumed to be
+the name of a Micronix special file
+(such as /dev/fla)
+containing a CP/M diskette.
+Names such as /dev/fla may be abbreviated as fla.
+
+The flags are:
+
+.ta 10
+.in +10
+.ti -10
+.bd
+-d	Delete.  
+Delete the named files from the floppy diskette.
+If no file names are given, no action is taken.
+
+.ti -10
+.bd
+-p	Print.
+Each named file is sent to the standard output.	
+
+.ti -10
+.bd
+-r	Replace.
+Each named file is copied
+.ul
+to
+the floppy.
+If no file names are given, no action is taken.
+If a file already exists on the floppy, it is
+silently overwritten.
+
+.ti -10
+.bd
+-t	Table.
+Print a table of contents of the floppy diskette.
+If any files are named, only those named and present are listed.
+
+.ti -10
+.bd
+-x	Extract.
+Each named file is copied 
+.ul
+from
+the diskette
+.ul
+to
+the current Micronix directory.
+If no file names are given, 
+.ul
+the entire contents
+of the diskette
+is extracted.
+
+.ti -10
+.bd
+-v	Verbose.
+Be verbose about it.
+Each operation is printed along with the affected file name.
+Files deleted are preceded by a "d", 
+those replaced are preceded by an "r",
+those extracted are preceded by "x".
+
+.in -10
+At most, one of the flags -
+.bd
+d, t, r, x 
+- may be present.
+If none are present, 
+.bd
+-t 
+is assumed.
+
+The file list may contain wild card matching patterns
+to be applied to the set of file names in the CP/M
+diskette's directory.
+
+The rules for file name matching patterns are
+exactly the same as those for the shell (see sh (I)).
+
+
+.in -5
+.bd
+EXAMPLES
+.br
+.in +5
+You receive a new CP/M software package in the mail on diskette
+and want to run it under Micronix.
+.sp 2
+To copy its contents to Micronix,
+insert the diskette into floppy drive A and
+type:
+
+.ce
+.bd	
+far fla -xv
+
+To copy a file from a diskette, changing its name in the process:
+
+.ce
+.bd
+far dja -p filename > newname
+
+
+To copy only the ".doc" files over from a CP/M mini-floppy:
+
+.ce
+.bd
+far mfa -xv "*.doc"
+

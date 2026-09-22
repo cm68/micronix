@@ -1,0 +1,78 @@
+.he "puts (3s)                    3/24/82                    puts (3s)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE(S)
+.in +5
+.br
+.bd
+puts, fputs
+- put a string on a stream
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+#include <stdio.h>
+.sp
+.bd 2
+puts(s)
+.br
+char *s;
+.sp
+.bd 3
+fputs(s, stream)
+.br
+char *s;
+.br
+FILE *stream;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Puts
+copies 
+.bd
+s
+(null-terminated string) to
+.bd
+stdout,
+the standard output stream.  It also appends a newline character.
+
+.bd
+Fputs
+copies
+.bd
+s
+to the named output,
+.bd
+stream.
+
+Neither of these routines copies the terminal NULL character.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+To maintain backward compatibility, 
+.bd
+puts
+appends a newline,
+.bd
+fputs
+does not.
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+fopeî (3)¬ getó (3)¬ putã (3)¬ printæ (3)¬ ferroò (3)¬ fwritå iî 
+freaä (3)
