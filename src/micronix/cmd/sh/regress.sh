@@ -23,7 +23,7 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 ROOT=${ROOT:-/vault/src/micronix/filesystem}
-SIM=${SIM:-/vault/src/micronix/src/usersim/usersim}
+SIM=${SIM:-/vault/src/micronix/src/usersim/sim}
 STOCK=${STOCK:-/newer/bin/sh}		# the binary with no source
 OURS=${OURS:-/bin/sh}
 TMP=${TMPDIR:-/tmp}/shregress.$$
@@ -261,9 +261,6 @@ check 'type nosuchfile'
 check 'type dir'
 check 'type /etc/motd /etc/motd'
 check 'type'
-check 'kill nosuchname'
-check 'kill 9999'
-check 'kill'
 
 #
 # History, which happens only at a terminal.  Fed a file the shell
@@ -307,6 +304,28 @@ differs 'echo x |' \
 	 and says nothing, and we call it a syntax error.  Not a
 	 continuation - "echo x |" then "echo SECOND" prints SECOND
 	 there, so the next line is an ordinary one'
+
+#
+# kill, three ways.  The shell had a kill builtin and no longer does
+# - it is out of the build behind BUILTIN_KILL and /bin/kill is the
+# command now, which is a command the stock shell does not have and
+# a builtin we do not.  Every one of these reaches a different
+# program with different words, so all three differ, and none of
+# them is a regression: see cmd/kill/kill.c for what replaced them.
+#
+differs 'kill nosuchname' \
+	'the builtin took job names and ours takes process ids from
+	 /bin/kill, so an argument that is not a number is refused
+	 here and looked up as a job there: "kill: nosuchname: not a
+	 process id" against "nosuchname: No such process"'
+differs 'kill 9999' \
+	'the same, with a number that is a pid: the stock shell has no
+	 name to put in front of the message and says "9999: No such
+	 process", and perror() prints the space on both sides of its
+	 colon, so ours is "kill: 9999 : No such process"'
+differs 'kill' \
+	'the same, with nothing to kill: the stock shell says nothing
+	 at all and ours prints the usage and exits 2'
 
 printf '\n%d the same as the stock shell' $pass
 test $known -gt 0 && printf ', %d differ on purpose' $known

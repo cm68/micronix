@@ -70,6 +70,13 @@ struct pipeline {
  * and era needed none of it - they are cp/m spellings, seeded into
  * the alias table in main() where a user can redefine them - and sync
  * is a system call with a program of its own in cmd/sync.
+ *
+ * kill is the one that failed that test and has gone the way of sync:
+ * it reached no further than this shell's own children, and only by a
+ * name this shell made up, where the system call under it takes any
+ * pid on the system - so the command for it is cmd/kill.  The number
+ * stays here and the code stays behind BUILTIN_KILL, so the two can be
+ * compared; nothing defines it.
  */
 #define B_CD        1
 #define B_WAIT      4

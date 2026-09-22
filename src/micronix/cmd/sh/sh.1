@@ -151,7 +151,6 @@ BUILTINS
      unalias    take one away
      source     read a file as input
      nice       run the rest more politely
-     kill       signal a process
      wait       wait for the background ones
      pid        the process id
      exit       exit, with a status if given
@@ -173,7 +172,9 @@ and ~/.sh are read:
 .sp
 They are cp/m spellings rather than shell work, and as aliases they
 can be seen with alias and changed with it.  sync was a builtin and is
-now sync (1).
+now sync (1), and kill was a builtin and is now kill (1): what it
+needs is a table of every process on the system, and the shell has
+only its own children.
 .sp 2
 .in -5
 .bd

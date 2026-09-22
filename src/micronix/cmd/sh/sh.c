@@ -88,6 +88,12 @@ char naliases;              /* 0..MAXALIAS, thirty-two */
 /*
  * The builtin names, in the binary's own order, each with the number
  * its dispatch uses.  cd and chdir share a number.
+ *
+ * kill is out of the table: cmd/kill is the command now, and a builtin
+ * shadows the path, so leaving it in would mean the command could only
+ * ever be reached as /bin/kill.  It is still here behind BUILTIN_KILL
+ * for anyone who wants the old one back - see the case in dobualtin
+ * and jobpid in job.c, which go with it.
  */
 struct builtin builtins[] = {
     "cd",       B_CD,
@@ -101,7 +107,9 @@ struct builtin builtins[] = {
     "source",   B_SOURCE,
     "path",     B_PATH,
     "home",     B_HOME,
+#ifdef BUILTIN_KILL
     "kill",     B_KILL,
+#endif
     "alias",    B_ALIAS,
     "unalias",  B_UNALIAS,
     "nice",     B_NICE,
@@ -679,6 +687,7 @@ struct cmd *c;
             printf("%s\n", homedir);
         return 0;
 
+#ifdef BUILTIN_KILL
     case B_KILL:
         /*
          * "kill N" and "kill name".  A word beginning with a digit is
@@ -688,6 +697,14 @@ struct cmd *c;
          *
          * The image says nothing at all to a bare "kill", so neither
          * do we.
+         *
+         * OUT OF THE BUILD.  cmd/kill sends a signal to a pid, which
+         * is what kill is for; this reaches only the children of this
+         * particular shell, only by a name that shell made up, and
+         * only with SIGKILL - it cannot be told 9 from HUP.  Its one
+         * advantage was "kill name", and a name is not worth a second
+         * and weaker kill on the system.  Everything it needs is
+         * still here behind BUILTIN_KILL.
          */
         for (i = 1; i < c->argc; i++) {
             p = c->argv[i];
@@ -714,6 +731,7 @@ struct cmd *c;
             jobdone(j);
         }
         return 0;
+#endif
 
     case B_ALIAS:
         if (c->argc == 1) {

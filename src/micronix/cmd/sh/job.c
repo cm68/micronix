@@ -92,8 +92,15 @@ int pid;
 			jobs[i].pid = 0;
 }
 
+#ifdef BUILTIN_KILL
 /*
  * The pid we started under this name, most recent first, or -1.
+ *
+ * Looking a name up is what the shell's own kill builtin did with it,
+ * and it is the only reader the names ever had - see the B_KILL case
+ * in sh.c.  With that builtin out of the build jobadd() still records
+ * them, because the notification the page promises would want them,
+ * and this goes with the builtin rather than sitting here dead.
  */
 int
 jobpid(name)
@@ -106,5 +113,6 @@ char *name;
 			return jobs[i].pid;
 	return -1;
 }
+#endif
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

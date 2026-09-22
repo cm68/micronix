@@ -18,18 +18,18 @@ Where things are
     glob.c      filename patterns
     hist.c      "!", the history reference
     hash.c      the search path, remembered
-    job.c       the background jobs, and kill by name
+    job.c       the background jobs; the kill builtin, out of the build
     sh.1        our man page
     regress.sh  the test
 
-    man/man1/sh.1   THE ORIGINAL PAGE, dated 4/18/82, recovered from
-                    the disk image.  A second authority beside the
-                    binary, and worth reading: two mistakes here were
-                    found by it and nothing else.  It is not a BETTER
-                    authority - its list of special characters omits
-                    ";" and includes ")", and the binary is right
-                    about both - and it never mentions the positional
-                    parameters at all.
+    man/man1/oldsh.1  THE ORIGINAL PAGE, dated 4/18/82, recovered from
+                      the disk image.  A second authority beside the
+                      binary, and worth reading: two mistakes here were
+                      found by it and nothing else.  It is not a BETTER
+                      authority - its list of special characters omits
+                      ";" and includes ")", and the binary is right
+                      about both - and it never mentions the positional
+                      parameters at all.
 
 
 How to check it
@@ -69,7 +69,19 @@ Different on purpose
     error.  It is not a line continuation - "echo x |" followed by
     "echo SECOND" prints SECOND there - so the trailing pipe is
     swallowed somehow and whatever echo wrote goes into a pipe nobody
-    reads.  This is the one case the suite counts as differing.
+    reads.  This is the case the suite has differed on from the start;
+    the kill cases below joined it later.
+
+  - kill IS NOT A BUILTIN ANY MORE.  The image's kill reaches only the
+    children of the shell that runs it, only by a name that shell made
+    up, and only with SIGKILL: it cannot be told -HUP from -9.  A pid
+    and a signal are what the system call takes and what /bin/kill
+    passes, so the builtin is compiled out behind BUILTIN_KILL, which
+    nothing defines.  The number stays in the table and the code stays
+    there with it, so the two can still be compared - see
+    cmd/kill/kill.c.  Three regress cases go with it: what the stock
+    shell says about a bad name, a dead pid and no arguments at all is
+    its own builtin talking, and all three now reach /bin/kill instead.
 
   - The search tables are not trusted blindly.  The image believes
     them and loses when they are stale, which is what its page means

@@ -15,6 +15,9 @@ CC	= ccc
 # GNUmakefile.inc, which explains why it is not optional on a machine
 # where the heap is whatever is left of 64k after the image.
 #
+# The kill builtin is out of the build; /bin/kill replaced it.  Add
+# -DBUILTIN_KILL to put the old one back - see GNUmakefile.
+#
 CFLAGS	= -O
 BIN	= /bin
 MAN	= sh.1
