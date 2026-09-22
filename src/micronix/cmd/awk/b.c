@@ -2,7 +2,7 @@
 static char sccsid[] = "@(#)b.c	4.2 8/11/83";
 #endif
 
-#include "stdio.h"
+#include <stdio.h>
 #include "awk.h"
 
 extern node *op2();

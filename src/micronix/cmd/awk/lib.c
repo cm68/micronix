@@ -2,9 +2,9 @@
 static char sccsid[] = "@(#)lib.c	4.4 9/17/84";
 #endif
 
-#include "stdio.h"
+#include <stdio.h>
 #include "awk.h"
-#include "ctype.h"
+#include <ctype.h>
 
 FILE	*infile	= NULL;
 char	*file;

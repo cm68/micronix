@@ -9,7 +9,7 @@
  * exactly, so the yacc parser and the rest of awk are untouched.
  */
 
-#include "stdio.h"
+#include <stdio.h>
 #include "awk.h"
 
 #define	CBUFLEN	150

@@ -2,7 +2,7 @@
 static char sccsid[] = "@(#)freeze.c	4.2 8/11/83";
 #endif
 
-#include "stdio.h"
+#include <stdio.h>
 freeze(s) char *s;
 {	int fd;
 	unsigned int *len;
