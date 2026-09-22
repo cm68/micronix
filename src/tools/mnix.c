@@ -583,6 +583,10 @@ infocmd(int c, char **a)
     }
 
     dp = namei(fs, *a);
+    if (!dp) {
+        printf("can't find %s\n", *a);
+        return 2;
+    }
     idump(*a, dp, 0);
 
     return 0;
@@ -608,6 +612,10 @@ emptycmd(int c, char **a)
     }
 
     dp = namei(fs, *a);
+    if (!dp) {
+        printf("can't find %s\n", *a);
+        return 2;
+    }
     filefree(dp);
 
     return 0;
@@ -1097,6 +1105,28 @@ tarx(char *tarfile)
 			if (isdir) {
 				imagemkdir(fullname);
 				continue;
+			}
+		}
+
+		/*
+		 * The path to the file, before the file.  A tar of
+		 * enumerated files carries no directory entries, so the
+		 * directories they live in are nobody's member and would
+		 * never be made - the file would be created inside a
+		 * directory that is not there, and the extraction would
+		 * report it could not be created.  imagemkdirs is mkdir
+		 * -p and does nothing for the parts that already exist,
+		 * so an archive that DOES carry its directory entries -
+		 * the per-directory ones do, and always have - takes
+		 * exactly the route it took before.
+		 */
+		{
+			char *slash = strrchr(fullname, '/');
+
+			if (slash != NULL && slash != fullname) {
+				*slash = '\0';
+				imagemkdirs(fullname);
+				*slash = '/';
 			}
 		}
 
