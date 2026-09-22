@@ -139,17 +139,37 @@ volatile int inst_countdown = -1;
 
 int stops[10];
 
+/*
+ * Stop at the next instruction boundary, the way a watchpoint does.
+ * This is the version for code inside the emulation loop; a signal
+ * cannot use it (see stop_handler).
+ */
 void
 stop()
 {
     inst_countdown = 0;
 }
 
+/*
+ * SIGUSR1: kick the running machine into the debugger.
+ *
+ * The handler cannot plant the stop in inst_countdown.  The emulation
+ * loop counts that down at the bottom, and a signal blocked through
+ * z80_run() is delivered by mysigunblock() just above the countdown -
+ * so the zero the handler wrote became -1 before the top of the loop
+ * tested it, and kill -USR1 looked like it did nothing.  stop_request is
+ * read at the top of the loop, where nothing decrements it.
+ *
+ * The handler only sets the latch.  It runs in the middle of the
+ * emulation, so it does not print and does not touch the monitor; the
+ * loop does both when it sees the flag.
+ */
+volatile sig_atomic_t stop_request;
+
 void
 stop_handler()
 {
-    // printf("breakpoint signal\n");
-    stop();
+    stop_request = 1;
 }
 #endif
 
@@ -671,6 +691,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-n\tno console log: trace to the logfile, not the terminal\n");
     fprintf(stderr, "\t-D\t<file> tee the debug/trace stream to this file\n");
     fprintf(stderr, "\t-q\tsuppress the debug stream until the debugger is entered\n");
+    fprintf(stderr, "\t\t(kill -USR1 stops the machine in the debugger)\n");
     for (i = 0; tracenames[i]; i++) {
         fprintf(stderr, "\t%x %s\n", 1 << i, tracenames[i]);
     }
@@ -2037,6 +2058,18 @@ main(int argc, char **argv)
         }
         {
             int reason = 0;
+            /*
+             * A stop asked for from outside (SIGUSR1).  Taken here, and
+             * turned into the same stop the watchpoints use, so the
+             * registers are dumped and the monitor comes up.
+             */
+            if (stop_request) {
+                stop_request = 0;
+                open_debug_gate();
+                printf("stopped by SIGUSR1\n");
+                inst_countdown = 0;
+                reason = 1;
+            }
             if (watchpoint_hit()) {
                 open_debug_gate();
                 printf("watchpoint\n");
