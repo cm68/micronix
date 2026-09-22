@@ -70,10 +70,12 @@ extern int r_wait(), r_write();
  *      r_lock () { reclock (u.hl, arg [0]); }
  *      r_unlock () { unlock (u.hl); }
  *
- * and lock.c has the reclock() and unlock() they would call.  So the
- * kernel does not link as it stands, and has not for as long as those
- * two lines have been comments.  Declaring them here is what lets this
- * file compile; it does not make them exist, and the link will say so.
+ * and the reclock() and unlock() they would call are not in the tree
+ * either: they lived in lock.c, which has been removed (see git
+ * history).  So the kernel does not link as it stands, and has not for
+ * as long as those two lines have been comments.  Declaring them here
+ * is what lets this file compile; it does not make them exist, and the
+ * link will say so.
  */
 extern int r_lock(), r_unlock();
 

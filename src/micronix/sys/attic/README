@@ -1,0 +1,240 @@
+the kernel's attic
+==================
+
+sys/attic/README
+
+This is what used to be sys/UNUSED.
+
+Fourteen files that are not built, are not included, and are not going
+to be - and are kept anyway, because in most cases they are the only
+copy of what they are.  This README is the fifteenth thing here and the
+only one that is not one of those files.
+
+It was sys/UNUSED, which was ignored (sys/.gitignore named it), so
+nothing put there could be seen in git status and nothing put there
+after 2020 was ever added.  The name it has now is the honest one, but
+"attic" is ignored too, at any depth, by the root .gitignore - so the
+root file re-includes this one directory by name.  That exception is
+deliberate and commented there.  Do not add a rule to sys/.gitignore
+that names this directory again.
+
+what is in here, and where it came from
+---------------------------------------
+
+These are Micronix developers' working files, recovered off floppy
+disks.  Two names are on them.  The MIO driver carries a header -
+
+	/* Morrow Designs multiple Mult I/O driver */
+	/* Len Edmondson */
+	/* February, 1982 */
+
+- and "L.W.E. March 1984" is on the inode-locking fix in the open.c
+lineage below, which reads as the same person a second time, two years
+later.  Morrow Designs is the vendor the S-100 machines in this tree
+are built around; the changelog here is a Micronix developer's.
+
+Which of them came off a floppy can be read off the file.  CP/M marks
+end of file with ^Z and pads the last 128-byte record out with it, so a
+file with a tail of ^Z, or with CRLF line endings, came through a CP/M
+disk.  Four did:
+
+	c		61 ^Z
+	mio.bak		31 ^Z
+	tty.bak		17 ^Z
+	mset.bak	122 ^Z, 69 CR, and 140 NULs
+
+The rest are plain ASCII with Unix line endings, so they were moved by
+something that translated them on the way - a terminal, or a utility.
+
+ps.c was one of those.  It is now cmd/ps/ps.c; see that directory.
+
+the files
+---------
+
+changes		The developer's own changelog, about twenty-five entries,
+		and the single most informative thing here.  It dates
+		the rest: "Eliminated cpu member from proc structure /
+		Eliminated cpu accounting as such" is why ps has its CPU
+		column commented out; "Add argument value for proc 0 and
+		proc 1 'swap' and 'init'.  Garbage appears under ps
+		otherwise" is a change made for ps; and the 8-hertz
+		clock, the IBM PC floppy support with DOS diskette
+		auto-recognition, and the record locking below are all
+		described here first.
+
+		It also records the segalloc/segfree and ifill rewrites -
+		"pick up where you left off search instead of brute
+		force algorithm" - which is the shape the live
+		sys/malloc.c still has.
+
+omakefil	The kernel's original makefile, and the earliest one
+		surviving.  It is a CP/M build through the Whitesmiths
+		toolchain - AS = cpm a80, CC = cpm c80, LD = cpm lnk,
+		ADDR = -tb0x1000 - and it links l1.o l2.o l3.o l4.o
+		low.o io.o high.o through lnk -R.  The two makefiles in
+		sys/ both describe the overlay link they replaced; this
+		is what that link actually was.
+
+		It has a line "# lock.o: lock.c inode.h proc.h sys.h
+		lock.h" commented out, and it names sup.h, which is in
+		no tree here.
+
+		Not buildable, or useful to build: the compiler it calls
+		has not existed for forty years.  It is here to be read
+		when a question about the old link comes up.
+
+omio.s		The A-Natural original of sys/mio.s.  The live file is a
+		port - "Z80 translation of sys/mio.anat (asz dialect)" -
+		so this is the source that port was made from, kept in
+		the Whitesmiths assembler's dialect that nothing here
+		runs.
+
+mio.bak		The same driver, fourteen lines different.  An earlier
+		or later revision of omio.s; the ^Z tail says it came
+		off a disk.
+
+multio.bak	An old sys/multio.c.  About 700 lines differ from the
+		live one.
+
+tty.bak		An old sys/tty.c.  About 1200 lines differ - much the
+		longest divergence here.
+
+mset.bak	The ONE surviving mset.c; sys/mset.c is gone from the
+		tree.  "Set the baud rate on serial ports."  Its first
+		128 bytes are not source at all - they are a stray CP/M
+		record of binary garbage sitting in front of the real
+		file, which is intact behind them and CRLF throughout.
+
+getc.s,		A-Natural sources for _getc, with the C they were
+ogetc.s		written from preserved in the driver's own comments.
+		The two differ by whitespace on one line.  No live
+		counterpart.
+
+		The "/" at the start of a line in these files is
+		A-Natural's comment marker, not corruption - the tree's
+		own intrpt.s uses the same scaffolding to quote the
+		original declarations.
+
+open.bak,	Two versions of open.c - really one version twice, see
+oopen.c		below.
+
+pc.c		A developer's process watcher: opens /dev/mem, reads the
+		table pointer at 0x1003, then loops seeking each
+		process's u page and printing u.pc.  It is the same
+		kernel hook ps uses, and it is the only other thing
+		here that reads the running kernel rather than being
+		part of it.
+
+README.filesystem
+		A design note on the filesystem's superblock: 100 free
+		inodes held there, repopulation by scanning the inode
+		blocks, allocation from the end, and a block free list
+		whose entry 0 is the indirect head.  It cites the v6
+		manual and names ialloc.c and balloc.c, both of which
+		are still in the tree and still work that way.
+
+ps.c		Moved to cmd/ps/ps.c and ported there.  It compiles
+		and links, it is in cmd/GNUmakefile's DIRS, and ps.c's
+		own header comment is the record of what the port cost.
+		This is the only ps.c there ever was - the ps binary
+		installed in filesystem/bin is an older, different
+		build, not another copy of this.
+
+c		Not a source file.  One 128-byte CP/M record - a
+		fragment of C:
+
+			if (!tty->mstate & DILcount && ...
+
+		- padded out with 61 ^Z.  It is one record off a disk,
+		kept only because it is not identifiable as anything
+		else.
+
+the three open.c versions
+-------------------------
+
+sys/open.c is the live one.  open.bak and oopen.c here are the history
+behind it, and they answer differently than they look:
+
+  * open.bak and oopen.c are THE SAME CODE.  The function set is
+    identical - open, pipe, iopen, close, fclose, iclose, falloc,
+    oalloc, ofile, imode - and a line-by-line diff of the two is
+    entirely formatting.  open.bak is Whitesmiths house style:
+    tab-indented bodies, the opening brace alone on its own indented
+    line, seven-space comment indents, "irelse (ip)" with a space
+    before the paren.  oopen.c is that same code reformatted to
+    4-space K&R.  oopen.c is 625 bytes larger only because spaces
+    replaced tabs.  They are v6 C throughout - fast, NULL, ip->mode,
+    ITYPE, IDIR, ICIO, IBIO - and include "sys.h" and friends by bare
+    name, out of the flat /usr/include.
+
+  * Both carry the same fix, in iopen()'s ICIO case:
+
+	/*
+	 * Don't sleep with a locked inode.
+	 * L.W.E. March 1984
+	 */
+	ip->count++;
+	irelse(ip);
+	copen(dev, writ);	/* sets u.p->tty */
+	ilock(ip);
+	ip->count--;
+
+    iopen() takes the inode lock, so it must drop it across copen() or
+    the process sleeps holding a lock.  The date says the bug was found
+    and this is the repair.
+
+  * The live open.c is that same file ported: v7 inode names (i_mode,
+    i_addr[], IFMT, IFDIR, IFCHR, IFBLK), ccc dialect (register, 0 for
+    NULL), and <types.h> / <sys/...> / <errno.h> includes.  It keeps
+    the March 1984 note, cleanly indented.
+
+    It also carries ONE behavioural change that is written down
+    nowhere.  iclose()'s IFCHR case gained the same discipline iopen
+    applies to copen:
+
+	ip->count++;
+	irelse(ip);
+	cclose(dev, writ);
+	ilock(ip);
+	ip->count--;
+
+    - the count/irelse/ilock/count dance, with no comment at all.
+    The tell is the formatting: the block above it still has
+    open.bak's seven-space "       /*" and "\t *" continuation, while
+    every other comment in the live file is indented normally.  So the
+    live file descends from the open.bak lineage, and the close-side
+    lock protection was added later by someone who did not write it
+    down.  Whoever changes iclose() should know it is there and why.
+
+two things recorded here that are not in the tree any more
+----------------------------------------------------------
+
+Record locking.  The changelog describes it in full: two system calls,
+numbers 49 and 50, "lock (fd, count)" and "unlock (fd)", locking the
+region from the current seek position for count bytes, largest 64K-1,
+returning EBUSY if the region is locked and ENFILE if the lock table is
+full, with close() releasing a file's locks and no sleeps in either
+call.  omakefil has a lock.o rule commented out.  include/sys/lock.h is
+still in the tree with the table definitions.  lock.c is gone.
+
+The cpu member of struct proc.  Removed, with cpu accounting, per the
+changelog - and include/sys/proc.h still has the "UCHAR cpu" it used to
+be, inside an #ifdef notdef, with a comment asking "why ?".  ps.c has
+its CPU column commented out in three places to match, and the
+recovered man page in man/man1/ps.1 still documents a CPU column that
+no longer exists.
+
+Both were real features with real code.  Neither has a source file
+here.  That is the argument for this directory existing: these files
+are what is left of the work, and the tree is where the parts that
+survived it live.
+
+what was thrown away
+--------------------
+
+Seven files came with a compiler's scratch: oopen.nam, oopen.tok,
+oopen.x, pc.nam, pc.tok, pc.x and ps.x, from a build someone ran in the
+directory in September.  A .nam, a .tok and a .x are what ccc leaves
+beside a source, and sys/.gitignore already ignores them by extension.
+They were deleted rather than kept: they are regenerable from the .c
+beside them, and they are not history.

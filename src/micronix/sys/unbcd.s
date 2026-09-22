@@ -3,6 +3,19 @@
 ;============================================================================
 ; unbcd.s -- packed-BCD calendar time -> Unix seconds.
 ;
+;   _bcd2unix, called from rtcinit() in rtc.c and from nowhere else.
+;   This is the C entry point itself, not a leaf behind a wrapper:
+;   fenterw builds ccc's frame (csv.s) and the argument arrives in HL,
+;   which is where the body wants it anyway, so a separate boundary
+;   file had nothing to do but name it.
+;
+;   BC is the caller's on return.  It is what ccc homes a register
+;   variable in - rtcinit keeps its year in BC across this call - and
+;   every other C-callable entry in this runtime honours that: amul and
+;   adiv push BC, and ccc's own functions enter through fentbw/fentbq,
+;   which save it in the frame.  The body here uses BC throughout, so
+;   it is pushed below the frame, in the callee-save gap.
+;
 ;   Entry:  HL = pointer to 6-byte packed-BCD buffer:
 ;                [0] year (2-digit: 0x00..0x38 => 2000..2038,
 ;                                  0x70..0x99 => 1970..1999)
@@ -14,7 +27,7 @@
 ;   Exit:   HL' = high word, HL = low word of Unix seconds since 1970.
 ;
 ;   Valid 1970-01-01 .. 2038-01-19 (leap = n&3 == 2).  Clobbers
-;   AF, BC, DE, HL, DE', HL'.
+;   AF, DE, HL, DE', HL'; BC is saved.
 ;
 ;   seconds = days*86400 + (hour*60 + minute)*60 + second, where
 ;       days = 365*n + (n+1)>>2 + day-of-year,  n = years since 1970.
@@ -22,9 +35,11 @@
 ;   + days*20864 (the latter via a 16x16 multiply).
 ;============================================================================
 
-	global	bcd2unix
+	global	_bcd2unix
 
-bcd2unix:
+_bcd2unix:
+	call	fenterw			; hl = b, ccc's frame
+	push	bc			; the caller's, given back below
 	ld	a,(hl)			; year
 	inc	hl
 	call	bcd2bin
@@ -164,7 +179,8 @@ b2u_doydone:
 	exx
 	ld	hl,(acc+2)
 	exx
-	ret
+	pop	bc
+	call	fexitw			; drop the spilled argument, return
 
 ;--------------------------------------------------------------------------
 ; bcd2bin -- A = packed BCD -> A = binary

@@ -55,3 +55,22 @@ load at 119 blocks and clear of the loader's stack.
 
 --------------------
 
+V7's big exec change over V6 was the environment: exec(2) takes a third
+argument, an array of "NAME=value" strings (envp), that it copies onto the
+child's stack next to argv.  Micronix has none of it - no getenv/putenv in
+libc, no `environ` in crt0, no shell variables to export.
+
+It is not a big lift: envp is just another pointer array laid on the stack
+with a string payload, exactly like argv, and exec already builds that
+stack in putargs().  The pieces are:
+
+  - exec(2) / execve: a third parameter (envp), stacked after argv, plus
+    an `environ` pointer (u.environ) and argc/argv/envp aligned the way
+    crt0 expects.
+  - crt0: set up `environ` from the stack and pass it to main.
+  - libc: getenv(3) / putenv(3) (or setenv), and `extern char **environ`.
+  - the shell: export/name=value syntax and passing its environment to
+    each exec.
+
+--------------------
+

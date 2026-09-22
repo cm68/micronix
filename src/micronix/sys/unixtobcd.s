@@ -3,21 +3,42 @@
 ;============================================================================
 ; unixtobcd.s -- Unix seconds -> packed-BCD calendar time.
 ;
+;   _unixtobcd, called from rtcinit() and rtcwrite() in rtc.c.  This is
+;   the C entry point itself, not a leaf behind a wrapper: fenterq
+;   builds ccc's frame (csv.s), which spills the long into it, so the
+;   entry reads the two halves back out and loads the buffer pointer.
+;
+;   BC and IX come back to the caller - see the note in unbcd.s.  IX is
+;   the register ccc homes a walking pointer in (qldix/qstix exist for
+;   exactly that), and this body uses it for the output buffer, so both
+;   are pushed below the frame and the body keeps its own copies.
+;
 ;   Entry:  HL' = high word, HL = low word of Unix seconds since 1970.
-;           DE = pointer to 6-byte output buffer.
+;           DE = pointer to 6-byte output buffer (as C passes them).
 ;   Exit:   buffer: [0] year (2-digit BCD)  [1] month  [2] day
 ;                   [3] hour  [4] minute  [5] second
 ;   Valid 1970-01-01 .. 2038-01-19 (leap = year&3 == 0).  Clobbers
-;   AF, BC, DE, HL, IX, HL'.
+;   AF, DE, HL, HL'; BC and IX are saved.
 ;
 ;   Each divisor in C is < 128, so the 8-bit remainder register in
 ;   div32x8 never overflows.  seconds = days*86400 + sod, and days is
 ;   found by dividing by 60, 60, 24.
 ;============================================================================
 
-	global	unixtobcd
+	global	_unixtobcd
 
-unixtobcd:
+_unixtobcd:
+	call	fenterq			; t spilled: (iy+4)=hi,(iy+6)=lo,(iy+8)=b
+	push	bc			; the caller's, given back below
+	push	ix
+	ld	l,(iy+6)
+	ld	h,(iy+7)		; HL = low
+	exx
+	ld	l,(iy+4)
+	ld	h,(iy+5)		; HL' = high
+	exx
+	ld	e,(iy+8)
+	ld	d,(iy+9)		; DE = output buffer
 	push	de
 	pop	ix			; ix = output buffer
 
@@ -101,7 +122,9 @@ cbt_mdone:
 	call	yr100
 	call	bcd8
 	ld	(ix+0),a		; year (2-digit)
-	ret
+	pop	ix
+	pop	bc
+	call	fexitq			; drop the long's two slots, return
 
 ;--------------------------------------------------------------------------
 ; div32x8 -- HL':HL / C -> quotient HL':HL, remainder A.  C must be < 128.

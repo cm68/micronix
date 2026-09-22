@@ -185,7 +185,7 @@ bcheck(bn, sup, dev)
         bn, bn, sup->s_isize, sup->s_fsize);
     di();
     for (;;)
-        ;
+        hlt();
 }
 
 /*

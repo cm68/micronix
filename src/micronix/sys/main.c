@@ -55,6 +55,18 @@ UINT8 map0[], image0[];
 
 extern int segalloc();          /* malloc.c */
 
+#ifdef DEBUGBUFS
+/*
+ * Clamp the buffer pool so a cache bug shows up quickly instead of an
+ * hour into a recompile.  This is the opt-in, not the configuration:
+ * the kernel ships unclamped and expand_bufs() mints to the full
+ * 0xd000 budget, which is whatever the resident .bss leaves it - see
+ * the bound in expand_bufs() below.  "make DEBUGBUFS=1" in sys is how
+ * the host build asks for the clamp.
+ */
+#define MAXBUFS  32
+#endif
+
 /*
  * Grow the buffer cache to the full 0x1000-0xcfff budget.  Mint headers
  * contiguously off &blist[8] (== _ebss) until they reach 0xd000, pulling
@@ -69,7 +81,11 @@ expand_bufs()
     int j;
 
     b = blist + 8;
-    while ((int)b + sizeof(*b) <= 0xd000) {
+    while ((int)b + sizeof(*b) <= 0xd000
+#ifdef DEBUGBUFS
+           && nbuf < MAXBUFS
+#endif
+          ) {
         seg = segalloc();
         for (j = 0; j < 8 && (int)b + sizeof(*b) <= 0xd000; j++, b++) {
             zero(b, sizeof(*b));

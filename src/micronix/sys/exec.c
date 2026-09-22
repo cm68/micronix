@@ -191,8 +191,8 @@ getargs(args)
  */
 putargs()
 {
-    static UINT8 n, c, *s, *a, *d, *t, **av;
-    static UINT ac, count;
+    static UINT8 n, c, *s, *a, *d, **av;
+    static UINT ac, count, rem;
     extern char usrtop;
 
     /*
@@ -211,9 +211,9 @@ putargs()
     for (c = 0, ac = 0, n = 1; n <= nblks; n++) {
         bwin(bp[n]->xmem);
         s = (UINT8 *) bp[n]->data;
-        t = s + 512;
+        rem = 512;
 
-        do {
+        while (rem) {
             if (c == 0) {
                 putword(a, &av[ac]);
                 if (++ac >= nargs)
@@ -222,8 +222,8 @@ putargs()
             c = *s;
             s++;
             a++;
+            rem--;
         }
-        while (s < t);
 
         count = min(512, nbytes);
         copyout(bp[n]->data, d, count);

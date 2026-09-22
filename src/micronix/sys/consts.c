@@ -3,7 +3,7 @@
  *
  * These are identical across processes and never written, so fork's
  * segcopy cloning them per process is harmless.  They are linked into
- * user.rel after the leaf code.
+ * upage.o after the leaf code.
  *
  * sys/consts.c
  */
@@ -103,7 +103,7 @@ extern int djmopen(), djmclose(), djmread(), djmwrite(), djstty();
 
 /* Device names for diagnostics.  A char array keeps the strings in .data
  * (and so in the u page); a char * array would leave them as .text string
- * literals, and user.rel's linker placement has no room for text. */
+ * literals, and upage.o's linker placement has no room for text. */
 char devname[][11] = {
     "nodev", "hdca(rev4)", "djdma", "hddma",
 };
