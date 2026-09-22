@@ -15,10 +15,9 @@
 # things to link against and keeps none of these.  That is also why
 # there is no man page here: nothing invokes it by name.
 #
-# The sources are copies, forked from ~/src/ccc and edited here.  Building this on micronix is the point of the exercise -
-# the compiler compiling its own passes - so the object list is
-# spelled out rather than wildcarded, because this make has no
-# wildcard.
+# Building this on micronix is the point of the exercise - the
+# compiler compiling its own passes - so the object list is spelled
+# out rather than wildcarded, because this make has no wildcard.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 

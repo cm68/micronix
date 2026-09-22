@@ -18,6 +18,20 @@ DIR	= libu
 CLASS	= lib
 TARGET	= libu.a
 
+#
+# Section 2: the system calls.  A man page ships beside the source it
+# documents (see GNUmakefile.inc), and these are the .2 pages.  That
+# file defaults MANSEC to 1 and MANSRCS to *.1, so both are said here
+# to make install-man find and place these.
+#
+# They came off the 1.3 distribution floppy, which is why they read as
+# the 1982 originals rather than as the port: the pages in cmd/ were
+# written for this port, these were not.  Intro.2 is the section
+# introduction and belongs with them.
+#
+MANSEC	 = 2
+MANSRCS	 = $(wildcard *.2)
+
 ASSRCS = access.s alarm.s _break.s chdir.s chmod.s chown.s close.s \
 	creat.s dup.s errno.s exec.s execv.s exit.s _exit.s fdpos.s fork.s fstat.s \
 	getpid.s getuid.s gtty.s kill.s link.s mknod.s mount.s nice.s open.s \

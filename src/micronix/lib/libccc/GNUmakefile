@@ -9,9 +9,7 @@
 # and _fmtstr, because there was nothing in the tree to link them
 # against.
 #
-# The sources live here now.  They were symlinks into ~/src/ccc/src/
-# ccclib until the fork; this tree holds its own copies and is where
-# they are edited.
+# The sources live here.
 #
 # Built twice, like the passes that link it: libccc.a is the Z80
 # archive, built with ccc, and libccc-host.a is the same sources

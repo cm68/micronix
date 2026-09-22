@@ -1,17 +1,17 @@
 #
-# cross build for cpp
+# cross build for pass0
 #
-# libexec/cpp/GNUmakefile
+# libexec/pass0/GNUmakefile
 #
-# The preprocessor.  ccc runs it as the first pass and installs it
-# under the name pass0, which is what the driver has always called it
-# - the file here is cpp because that is its name in ~/src/ccc, where
-# these sources live and are edited.
+# ccc's first pass: the lexer and the normalizer, which emits the .x
+# lexeme stream that c0 reads.  Not a preprocessor, whatever name it
+# used to carry.  The sources inside are still cpp.c and cpp.h,
+# because that is what they have always been called.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 DEPTH	= ../..
-DIR	= cpp
+DIR	= pass0
 CLASS	= libexec
 
 #
@@ -20,11 +20,9 @@ CLASS	= libexec
 BINDIR	= /libexec
 
 #
-# And it installs as pass0, because that is the name the driver runs
-# it by: ccc.c has sprintf(cpp_path, "%s/pass0", libexecdir), while
-# every other pass is called after itself.  The native makefile beside
-# this one has always copied it out under that name; the cross build
-# left a /libexec/cpp nothing ever executed.
+# The driver runs it by the name pass0, and every other pass is called
+# after itself - ccc.c builds this path as libexecdir + "/pass0".  The
+# cross build used to leave a /libexec/cpp that nothing ever executed.
 #
 INSTNAME = pass0
 

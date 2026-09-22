@@ -14,8 +14,7 @@
 # pass0, and the directory says so now too.
 #
 # ccc runs this; nobody types it, so it goes into /libexec and has no
-# man page.  The sources are copies, forked from ~/src/ccc and edited
-# here, and the object list is spelled out because this make has no
+# man page.  The object list is spelled out because this make has no
 # wildcard.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:

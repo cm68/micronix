@@ -26,6 +26,8 @@ CC	= ccc
 #
 CFLAGS	= -O
 BIN	= /bin
+MAN	= far.1
+MANDIR	= /usr/man/man1
 PROG	= far
 HDRS	= far.h
 OBJS	= far1.o far2.o far3.o far4.o far5.o
@@ -40,9 +42,11 @@ $(OBJS): $(HDRS)
 install: $(PROG)
 	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/$(PROG)
+	mkdir -p $(MANDIR)
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJS) *.nam *.tok *.x
 
 clobber: clean
 	rm -f $(PROG)

@@ -32,8 +32,25 @@ TARGET	= libc.a
 # The man3 pages, listed outright: cmd/make has no $(wildcard), so a
 # page added here does not install until it is named in this list.
 #
+# Two batches.  The first ten are this tree's own, written for the
+# port.  The rest came off the 1.3 distribution floppy and are the
+# 1982 originals.
+#
+# Section 3 is the library calls, and it is the section that decides
+# where a page goes, not the archive the code was packed into: the
+# stdio family is built into libu.a and documented here anyway,
+# because fopen is a library call and the manual says so by putting
+# it in section 3.  getpwent, popen and ttyname are in the 1.3 manual
+# and in nothing this port builds; they are here because the manual
+# is the manual.  floor.3 sits beside a floor.c that is kept and not
+# built, which is what NOTBUILT_C below is for.
+#
 MAN	= strcat.3 strchr.3 strcmp.3 strcpy.3 strdup.3 \
-	strlen.3 strncat.3 strncmp.3 strncpy.3 strrchr.3
+	strlen.3 strncat.3 strncmp.3 strncpy.3 strrchr.3 \
+	alloc.3 ctime.3 fclose.3 ferror.3 floor.3 fopen.3 \
+	fread.3 fseek.3 getpwent.3 gets.3 perror.3 popen.3 \
+	printf.3 putc.3 puts.3 scanf.3 setbuf.3 stdio.3 \
+	system.3 ttyname.3
 MANDIR	= /usr/man/man3
 
 # The archive is built in chunks: a single "ar cr libc.a $(OBJS)" line
@@ -95,7 +112,7 @@ install: $(TARGET)
 	cp $(MAN) $(MANDIR)
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJS) *.nam *.tok *.x
 
 clobber: clean
 	rm -f $(TARGET)

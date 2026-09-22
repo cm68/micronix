@@ -3,16 +3,11 @@
 #
 # cmd/asz/GNUmakefile
 #
-# PROTOTYPE.  The compiler is moving into this tree, and this is the
-# shape it will have when it arrives: one directory per pass and per
-# tool.  The sources live here.  They were symlinks into ~/src/ccc until
-# the fork; this tree holds its own copies and is where they are
-# edited now.
-#
-# Not in cmd/GNUmakefile's DIRS.  These are host programs today, built
-# by gcc -m32 in the ccc tree; building them here with ccc means
-# building the compiler for the Z80, which is the point of moving them
-# but is not something that works yet.
+# Built twice from the one set of sources.  The framework below builds
+# it WITH ccc, FOR the Z80, which is the assembler that runs on micronix
+# and the one the driver execs beside itself in bin.  host.mk at the
+# foot builds the same sources with gcc -m32, to run here - that is
+# mxasz, the assembler the cross build needs.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 

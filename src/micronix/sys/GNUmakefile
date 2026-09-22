@@ -5,10 +5,11 @@
 #
 # "all" builds the kernel: unix, at a fixed text base of 0x1000.  ccc
 # has no -tb, no overlay -r and no -x, so the link is done by calling
-# mxld directly with -Ttext=0x1000.  The native Makefile beside this
-# one stages low.o/io.o/high.o overlays and links them with
-# "link -tb0x1000 -r"; the flat link here is the same image without the
-# overlays, in one pass.
+# mxld directly with -Ttext=0x1000.  The native Makefile beside this one
+# does that same flat link, with the same linker source built for that
+# host - it is plain "ld" over there, where it IS the system's linker.
+# The Whitesmith's overlay link they both replaced (low.o/io.o/high.o
+# through "link -tb0x1000 -r") is gone.
 #
 # update, clean and clobber are real.  update used to be
 #
@@ -32,8 +33,9 @@ TARGET	= unix
 # the native Makefile beside this has always done.
 INC	= -i$(DEPTH)/include
 
-# build.h is written by the ccc survey below; GNUmakefile.inc's clobber
-# takes GENERATED away.
+# build.h is written by the rule below; GNUmakefile.inc's clobber takes
+# GENERATED away, so it is not left lying in the directory for the next
+# build to include.
 GENERATED = build.h
 
 # The compiler and linker are this tree's own.  CCC defaults to
@@ -41,12 +43,15 @@ GENERATED = build.h
 MXLD     = $(BIN)/mxld
 
 # the kernel's objects, in link order: the entry header (uhdr.s) first
-# so its jump lands at 0x1000.  inout.s is here though the native
-# Makefile's AS_OBJS never listed it: memdev.c, multio.c, mw.c, dj.c
-# and cus.c all call in()/out().  makedate.c (a host program), mset.c
-# (no hardware interface) and lock.c (dead) are left out.
+# so its jump lands at 0x1000.  inout.s is here because memdev.c,
+# multio.c, mw.c, dj.c and cus.c all call in()/out(), though the old
+# Whitesmiths-era makefile never listed it.  makedate.c is left out: it
+# is not kernel source.  It is a micronix program - the native build
+# compiles it with ccc and runs it under the simulator to write build.h -
+# and the one thing this host cannot do with it is run it, which is what
+# the build.h rule below works around.
 # Leaf code that lives in the u page (see user.c).  It is assembled as
-# .data and linked into user.rel after u, not into the main image.
+# .data and linked into upage.o after u, not into the main image.
 # csv/q*/ldiv/tramp/sw*/oarg are the libccc runtime, copied from
 # src/libc and re-sectioned to psect data.  They sat in leaf/ until that
 # directory was flattened; the generic %.o:%.s rule assembles them here,
@@ -54,22 +59,21 @@ MXLD     = $(BIN)/mxld
 LEAF_LIBC = csv.o idiv.o imul.o qadd.o qsub.o \
 	qand.o qor.o qcmp.o qshl.o qsar.o qshr.o \
 	qldst.o tramp.o swdisp.o swdispw.o oarg.o
-LEAF_AS   = mem.o inout.o sub8.o unixtobcd.o rtcglue.o $(LEAF_LIBC)
+LEAF_AS   = mem.o inout.o sub8.o unixtobcd.o $(LEAF_LIBC)
 # Read-only kernel tables (syssw, biosw, ciosw) that also live in the u page.
 LEAF_C    = consts.o rtc.o
 
 # rtc.c is pure code (no static data), so re-section its single .text
 # block to .data and park it in the u page, like the libccc runtime.
-# rtc.o is then made from rtc.s by the generic %.o:%.s rule.
-#
-# This is the one .s here that is not a listing: an explicit rule beats
-# the %.s : %.c listing rule further down, so "make rtc.s" writes the u
-# page rendering, the .data one.  A .text rtc.s dropped here by hand
-# would be assembled into rtc.o, and the loader reads text and then data
-# - it would overwrite the u page with it.
-rtc.s: rtc.c
-	$(CCC) $(CCFLAGS) $(INC) -s -o $@ $<
-	sed -i 's/\.text/.data/' $@
+# ccc compiles it to rtc.rel as .text, and the -r -Sdata link folds every
+# section of that into .data - the same fold highmem.o uses for the
+# init-only code, where the old recipe re-sectioned the listing with sed.
+# The explicit rule beats the %.o:%.c rule below, which would leave the
+# object as .text and let the loader's data pass write it over the u page.
+rtc.o: rtc.c
+	$(CCC) $(CCFLAGS) $(INC) -c -o rtc.rel $<
+	$(MXLD) -r -Sdata -o rtc.o rtc.rel
+	rm -f rtc.rel
 
 KERNEL_AS = uhdr.o intrpt.o mio.o textpad.o highmem.o
 KERNEL_C  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
@@ -77,177 +81,52 @@ KERNEL_C  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	rdwri.o reg.o sig.o sleep.o subc.o swap.o sys1.o sys2.o system.o time.o \
 	trap.o tty.o uio.o dj.o memdev.o multio.o mw.o main.o
 HIGHMEM   = main_init.o cus.o inits.o
-OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o user.rel $(KERNEL_C) $(HIGHMEM)
+OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) $(HIGHMEM) low.o
 TREELIBS =
 
 include $(DEPTH)/GNUmakefile.inc
 
 #
-# what "all" would produce if the overlay link existed
+# The buffer pool.  Unclamped by default: expand_bufs() mints headers up
+# to the 0xd000 budget and the pool is whatever fits between _ebss and
+# there.  A cache bug that only shows itself with the full pool costs an
+# hour of recompiling to find, so the clamp is still here, as an
+# opt-in:
+#
+#	make DEBUGBUFS=1	32 buffers instead of the full budget
+#
+# It is a switch and not a value because the budget is not a tunable:
+# the pool is sized by where .bss ends, which moves as the kernel grows,
+# and MAXBUFS only ever shortens it.
+#
+# Appended to CCFLAGS here, after the include that sets it, so the
+# default stays in one place.
+#
+ifdef DEBUGBUFS
+CCFLAGS += -DDEBUGBUFS
+endif
+
+#
+# Every object: the ones "all" links into unix, and the ones folded into
+# one of those first (the u-page leaf code into upage.o, the init-only
+# code into highmem.o).
 #
 objects: $(OBJS)
 
-# ---- the kernel through ccc ---------------------------------------
 #
-# A survey, not a build.  It compiles each kernel source with the Z80
-# C compiler in ~/src/ccc and says which ones it got through; it does
-# not link, and what comes out is not a kernel.  The point is to find
-# out what that compiler cannot yet do, using the largest body of
-# Whitesmiths-era C in the tree as the sample.
-#
-# Objects go in their own directory.  The native build leaves its .o
-# files here, built by cc for the same machine, and two compilers'
-# output under one name in one directory is a trap - see the same
-# arrangement in ccc's own src/tools.
-#
-# The .s files are not in this: they are A-Natural for as(1), which is
-# a different assembler and a different syntax from the asz that ccc
-# drives.  makedate.c is not either - it is a host program that writes
-# build.h, not part of the kernel.
-#
-# mset.c is out too, and for a better reason than it not compiling.
-# It is in none of LOW_C, IO_C or HIGH_C in the Makefile beside this,
-# so the native build does not compile it either; the only mention it
-# gets there is a stale dependency line.  It reads the mio line
-# control register through MBASE, LCONTROL, BAUDREG, MU_WORD8,
-# MU_STOP2, MU_PARITY and MU_EVEN, and of those only MBASE is defined
-# anywhere in the tree - in multio.c, which is a different translation
-# unit.  So it cannot compile without inventing a hardware interface,
-# and a survey that counts it is measuring the wrong thing.  What was
-# wrong with it that CAN be told - an undeclared variable and a use of
-# rates[] before its definition - is fixed and commented in the file.
-#
-# It reports and exits 0.  Three of the thirty-nine do not compile
-# today, so making it a gate would only mean it always fails; drop the
-# "; true" at the end when that stops being true.  It was twelve until
-# the source was gone through; what is left is the compiler's:
-#
-#   cus   *p++ = ((unsigned) djcomm >> 0), where the ">> 0" folds away
-#         and leaves a symbol's ADDRESS being stored into a byte.  No
-#         rule builds it: (ASSIGN:byte (DEREF:byte) (SYMREFptr)).
-#   mw    ichan[0] = &cmd - a symbol's address stored through a
-#         pointer held in a register.  Same shape one width up:
-#         (ASSIGN:short (DEREF:short) (SYMREFptr)).
-#   main  char (*buffer)[512] - a pointer to an array.  c0 reads the
-#         declarator as an array, so "buffer = 0" is "need lvalue" and
-#         "buffer[1][2]" is "bad index".  Three lines reproduce it.
-#
-#
-# SURVEYCC and not CCC.  GNUmakefile.inc is included above and sets
-# CCC ?= /usr/local/bin/ccc, so a "CCC ?=" here is a no-op and the
-# survey quietly measured whatever was last INSTALLED rather than what
-# is in the tree.  That is the wrong compiler to be asking about: the
-# point of this target is to find out what the one being worked on
-# cannot do, and an install can be days behind.
-#
-# It cost real confusion once - three files reported as failing here
-# that compiled by hand with the tree's compiler, because the two were
-# not the same program.
-#
-SURVEYCC ?= $(BIN)/mxccc
-
-#
-# The linker and the object tools sit in $(BIN) beside the driver.
-#
-MXLD     ?= $(BIN)/mxld
-MXSIZE   ?= $(BIN)/mxsize
-MXNM     ?= $(BIN)/mxnm
-
-CCCDIR    = cccobj
-CCCOUT    = kernel.o
-CCCFLAGS  = -O -c -i../include -I.
-
-CCCSRCS   = $(filter-out makedate.c mset.c,$(wildcard *.c))
-
-#
-# main.c includes it, the native build generates it with makedate, and
-# makedate is itself a Micronix program - it wants types.h, std.h and
-# a struct time this host has not got.  All the header carries is the
-# date, so the survey writes its own rather than fail main.c for a
+# main_init.c includes it, and the native build generates it with
+# makedate - a Micronix program that wants types.h, std.h and a struct
+# time this host has not got.  All the header carries is the date, so
+# the cross build writes its own rather than fail main_init.c for a
 # reason that has nothing to do with the compiler.
 #
 # Phony so the date is written afresh on every build: build.h has no
 # prerequisite to be newer than, so a real file would otherwise be
-# left in place and main.o (which includes it) would keep the old date.
+# left in place and main_init.o (which includes it) would keep the old
+# date.
 build.h:
-	@echo '/* Generated by GNUmakefile for the ccc survey */' > $@
+	@echo '/* Generated by GNUmakefile */' > $@
 	@printf '#define\tBUILD_DATE "Created %s\\n"\n' "`date +%m/%d/%Y\ %H:%M:%S`" >> $@
-
-ccc-try: build.h
-	@mkdir -p $(CCCDIR)
-	@ok=0; bad=0; fail=""; \
-	for f in $(CCCSRCS); do \
-		b=`basename $$f .c`; \
-		printf "%-12s" "$$b: "; \
-		if $(SURVEYCC) $(CCCFLAGS) -o $(CCCDIR)/$$b.o $$f \
-				> $(CCCDIR)/$$b.log 2>&1; then \
-			echo "ok"; ok=`expr $$ok + 1`; \
-			rm -f $(CCCDIR)/$$b.log; \
-		else \
-			echo "FAIL"; bad=`expr $$bad + 1`; fail="$$fail $$b"; \
-		fi \
-	done; \
-	echo "-------------------------------------------------------"; \
-	echo "$$ok compiled, $$bad did not:$$fail"; \
-	echo "(the ones that failed left $(CCCDIR)/<name>.log)"; \
-	true
-
-#
-# ---- linking what compiled -----------------------------------------
-#
-# A partial link - "-r", relocatable out - because the survey does not
-# compile the whole kernel yet, and a final link would fail on the
-# symbols the missing files define, which says nothing about whether
-# the objects agree with each other.  What is left undefined is those
-# files' routines and the compiler's own frame helpers, which live in
-# libccc.a and are not offered here.
-#
-# The bss numbers are the interesting part.  A header of this vintage
-# writes "struct user u;" and every file including it gets its own u,
-# and wsld folds those together and takes the duplicated bytes back.
-# But where one file also initializes the object, its copy is in data
-# and the rest are in bss, and those are NOT one object to be merged -
-# the initialized one is the definition and the others are a mistake
-# the header should have written extern.  wsld refuses that pair, and
-# refusing it is what found the eight in this kernel.
-#
-# With those declared extern the duplicates never reach the linker at
-# all: the compiler stops emitting them.  So "reclaimed 0" is the
-# right answer here and not a sign the merge is broken - there is
-# nothing left for it to merge but the .ebss sentinel.
-#
-# wssize prints text, data, bss, total, total-in-hex, name; bss is the
-# third, on the second line under the header.
-#
-ccc-link:
-	@test -d $(CCCDIR) || { echo "no $(CCCDIR) - run 'make ccc-try' first"; exit 1; }
-	@rm -f $(CCCDIR)/$(CCCOUT)
-	@objs=`ls $(CCCDIR)/*.o 2>/dev/null | grep -v '$(CCCOUT)$$'`; \
-	test -n "$$objs" || { echo "no objects in $(CCCDIR)"; exit 1; }; \
-	n=`echo $$objs | wc -w`; \
-	in=0; \
-	for o in $$objs; do \
-		b=`$(MXSIZE) $$o | awk 'NR==2{print $$3}'`; \
-		in=`expr $$in + $$b`; \
-	done; \
-	echo "linking $$n objects, $$in bytes of bss between them"; \
-	echo "-------------------------------------------------------"; \
-	if $(MXLD) -r -o $(CCCDIR)/$(CCCOUT) $$objs; then \
-		out=`$(MXSIZE) $(CCCDIR)/$(CCCOUT) | awk 'NR==2{print $$3}'`; \
-		echo "-------------------------------------------------------"; \
-		echo "linked bss $$out, was $$in, reclaimed `expr $$in - $$out`"; \
-		echo "u is at `$(MXNM) $(CCCDIR)/$(CCCOUT) | awk '$$5==\"_u\"{print $$1, $$2}'`"; \
-	else \
-		echo "-------------------------------------------------------"; \
-		echo "mxld failed"; exit 1; \
-	fi
-
-#
-# the survey's objects live in their own directory, so removing them is
-# a directory removal and not something clean's "rm -f" can express.
-#
-ccc-clean:
-	rm -rf $(CCCDIR)
 
 #
 # ---- the kernel ----------------------------------------------------
@@ -262,14 +141,14 @@ ccc-clean:
 #
 main_init.o: build.h
 
-# user.rel is the u page: user.o (the u struct) first so it sits at the
+# upage.o is the u page: user.o (the u struct) first so it sits at the
 # base of segment 14, then the leaf code (LEAF_AS), all as .data placed
 # at 0xe000.  The code must be .data, not .text - the loader reads text
 # and then data, so text parked here would be overwritten.  textpad.o
 # stays last in the main link so _ebss is the end of .bss and binit()'s
 # buffer pool runs up to 0xe000 below u.
-user.rel: user.o $(LEAF_AS) $(LEAF_C)
-	$(MXLD) -r -Tdata=0xe000 -o user.rel user.o $(LEAF_AS) $(LEAF_C)
+upage.o: user.o $(LEAF_AS) $(LEAF_C)
+	$(MXLD) -r -Tdata=0xe000 -o upage.o user.o $(LEAF_AS) $(LEAF_C)
 
 # highmem.o is the init-only code - main_init, cus, the MIO/console init
 # in inits.s, and bcd2unix (unbcd.s) - folded into one data-only
@@ -284,8 +163,24 @@ user.rel: user.o $(LEAF_AS) $(LEAF_C)
 highmem.o: main_init.o cus.o inits.o unbcd.o
 	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o
 
-unix: $(OBJS) user.rel
-	$(MXLD) -Ttext=0x1000 -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o highmem.o user.rel
+# low.o is the resident kernel folded by a link of its own: the entry
+# header, the C objects and the hand-written assembly, in the order the
+# image needs them.  It is not a section fold like highmem.o's - a plain
+# -r leaves text, data and bss as they are - so the final link places
+# the one object where it packed the thirty-eight, and _ebss lands at
+# the end of textpad.o's .bss exactly as it did.
+#
+# The native build is why the fold exists: the words of that link are
+# more than the shell there will carry, and the Makefile beside this one
+# has the count and why make needs a shell at all.  The host build makes
+# the same fold rather than a shorter list of its own, so the two link
+# the same way and a difference between the images is a difference in
+# the code.
+low.o: uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
+	$(MXLD) -r -o low.o uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
+
+unix: $(OBJS)
+	$(MXLD) -Ttext=0x1000 -Shigh -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix low.o highmem.o upage.o
 
 #
 # Generate the assembly ccc would assemble for a C file, for reading:
@@ -303,4 +198,4 @@ unix: $(OBJS) user.rel
 %.s : %.c
 	$(CCC) $(CCFLAGS) $(INC) -s $<
 
-.PHONY: objects ccc-try ccc-link ccc-clean unix build.h
+.PHONY: objects unix build.h

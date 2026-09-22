@@ -10,38 +10,35 @@
 # This make has no wildcard and no macros to speak of, so each
 # directory is named twice per rule, as lib/makefile does.
 #
-# cpp, c0 and c1 are named here and do not link yet: they want
-# _fmtlong and _fmtstr, which live in ccc's ccclib, and there is no
-# lib/libccc in this tree to link against.  They are listed because
-# the day that arrives they should build, and a directory left out of
-# a makefile is a directory nobody notices - which is how cmd/size
-# came to have no wsobj.h.
+# pass0, c0 and c1 are named here.  They want _fmtlong and _fmtstr out
+# of lib/libccc, which each of their makefiles names in LIBS, and which
+# installs as /lib/libccc.a.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 all:
-	cd cpp ; make all
+	cd pass0 ; make all
 	cd c0 ; make all
 	cd c1 ; make all
 	cd peep ; make all
 	cd astpp ; make all
 
 install:
-	cd cpp ; make install
+	cd pass0 ; make install
 	cd c0 ; make install
 	cd c1 ; make install
 	cd peep ; make install
 	cd astpp ; make install
 
 clean:
-	cd cpp ; make clean
+	cd pass0 ; make clean
 	cd c0 ; make clean
 	cd c1 ; make clean
 	cd peep ; make clean
 	cd astpp ; make clean
 
 clobber:
-	cd cpp ; make clobber
+	cd pass0 ; make clobber
 	cd c0 ; make clobber
 	cd c1 ; make clobber
 	cd peep ; make clobber

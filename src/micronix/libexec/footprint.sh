@@ -2,11 +2,11 @@
 #
 # The memory footprint of the self-host, measured, with a floor.
 #
-# All four simulated passes - cpp, c0, c1 and peep - compile every one
+# All four simulated passes - pass0, c0, c1 and peep - compile every one
 # of the compiler's own sources, the set that defines the tipping
 # point, and each run's brk/gap is read out of the simulator's -S
 # report.  Correctness rides along: every pass must produce
-# byte-identical output to its host counterpart (cpp is compared with
+# byte-identical output to its host counterpart (pass0 is compared with
 # matching relative paths, because the spelling of the source path
 # lands in the line markers).
 #
@@ -49,8 +49,8 @@ rm -rf "$work"
 base=$(dirname "$work")
 out="$work-out"
 rm -rf "$out"; mkdir -p "$out"
-mkdir -p "$work/cpp" "$work/c0" "$work/c1" "$work/inc" "$work/lib"
-for d in cpp c0 c1; do
+mkdir -p "$work/pass0" "$work/c0" "$work/c1" "$work/inc" "$work/lib"
+for d in pass0 c0 c1; do
 	cp "$mxroot"/libexec/$d/*.c "$mxroot"/libexec/$d/*.h "$work/$d/" 2>/dev/null || true
 done
 # The staging above is the whole test vector, so an empty one measures
@@ -58,7 +58,7 @@ done
 # until the tree moved under src/, and the "|| true" that lets a
 # directory without headers through hid it: fifty-five sources became
 # none and the table came out empty rather than wrong.
-for d in cpp c0 c1; do
+for d in pass0 c0 c1; do
 	set -- "$work/$d"/*.c
 	[ -f "$1" ] || { echo "footprint: no sources staged for $d" >&2; exit 1; }
 done
@@ -70,11 +70,11 @@ cp -r "$mxroot"/lib/include/sys "$work/lib/" 2>/dev/null || true
 # The passes cross-built for micronix by the fork's own makefiles - the
 # binaries the native build would run - renamed to the .mx names the
 # rest of the script invokes them by.
-make -C "$mxroot/libexec/cpp" >/dev/null
+make -C "$mxroot/libexec/pass0" >/dev/null
 make -C "$mxroot/libexec/c0" >/dev/null
 make -C "$mxroot/libexec/c1" >/dev/null
 make -C "$mxroot/libexec/peep" >/dev/null
-cp "$mxroot/libexec/cpp/cpp" "$work/cpp.mx"
+cp "$mxroot/libexec/pass0/pass0" "$work/pass0.mx"
 cp "$mxroot/libexec/c0/c0"   "$work/c0.mx"
 cp "$mxroot/libexec/c1/c1"   "$work/c1.mx"
 cp "$mxroot/libexec/peep/peep" "$work/peep.mx"
@@ -113,15 +113,15 @@ measure() {
 	 "$mxhost"/mxc0 $h.x $h.ast $h.dat &&
 	 "$mxhost"/mxc1 $h.ast $h.dat $h.s) >/dev/null 2>&1 || true
 
-	(cd "$jd" && timeout 300 $SIM cpp.mx -I$d -Ilib -Iinc \
-		-o $s $d/$b.c </dev/null) >"$o.cpp" 2>&1 || true
-	gc=$(gapof "$o.cpp"); : "${gc:=?}"
-	if grep -q "out of memory" "$o.cpp"; then
-		bad "$d/$b: cpp OUT OF MEMORY (the tipping point)"
+	(cd "$jd" && timeout 300 $SIM pass0.mx -I$d -Ilib -Iinc \
+		-o $s $d/$b.c </dev/null) >"$o.pass0" 2>&1 || true
+	gc=$(gapof "$o.pass0"); : "${gc:=?}"
+	if grep -q "out of memory" "$o.pass0"; then
+		bad "$d/$b: pass0 OUT OF MEMORY (the tipping point)"
 		printf '%-18s %-13s %-13s %-13s %-13s\n' "$d/$b" OOM - - - >>"$res"
 		return 0
 	fi
-	cmp -s "$jd/$s.x" "$jd/$h.x" || bad "$d/$b: cpp DIVERGES"
+	cmp -s "$jd/$s.x" "$jd/$h.x" || bad "$d/$b: pass0 DIVERGES"
 
 	(cd "$jd" && timeout 300 $SIM c0.mx $s.x $s.ast $s.dat \
 		</dev/null) >"$o.c0" 2>&1 || true
@@ -198,7 +198,7 @@ measure() {
 	return 0
 }
 list=""
-for d in cpp c0 c1; do
+for d in pass0 c0 c1; do
 	for f in "$work"/$d/*.c; do
 		b=$(basename "$f" .c)
 		[ "$b" = test ] && continue
@@ -206,7 +206,7 @@ for d in cpp c0 c1; do
 	done
 done
 
-printf '%-18s %-13s %-13s %-13s %-13s\n' source "cpp gap" "c0 gap" "c1 gap" "peep gap"
+printf '%-18s %-13s %-13s %-13s %-13s\n' source "pass0 gap" "c0 gap" "c1 gap" "peep gap"
 
 # a batch at a time, JOBS wide.  Every source is independent now that
 # the scratch names carry its tag, so the only thing to wait for is

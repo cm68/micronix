@@ -10,12 +10,9 @@
 # everything else in the tree is built by - including the Z80 build
 # of these same sources.
 #
-# That circle is why this file exists.  The sources used to live in
-# ~/src/ccc and were reached from here by symlink; the host build was
-# over there and this tree only ever cross built.  With the sources
-# forked into this tree there is nowhere else for the host build to
-# be, and a tree that cannot build its own compiler cannot be checked
-# out and used.
+# That circle is why this file exists: the compiler it builds is the
+# one that builds the compiler, so a tree that cannot build its own
+# compiler cannot be checked out and used.
 #
 # What a directory has to say for itself:
 #
@@ -40,8 +37,8 @@
 # have to compile with ccc as well, which has no later dialect in it.
 #
 # -I../../lib/libccc for fmtlong and libutil, which every pass calls,
-# and -I../cpp for lexeme.h: the token numbers cpp emits are the ones
-# the passes consume, and a compiler that must also build on CP/M
+# and -I../pass0 for lexeme.h: the token numbers pass0 emits are the
+# ones the passes consume, and a compiler that must also build on CP/M
 # cannot spell a directory in an #include.
 #
 HOSTCC		?= gcc
@@ -49,18 +46,18 @@ HOSTDEBUG	?= -ggdb3 -O0
 HOSTDEFS	?= -DDEBUG
 HOSTWARNS	?= -Wall -std=gnu89 -Werror=declaration-after-statement
 HOSTCFLAGS	?= -m32 $(HOSTDEBUG) $(HOSTDEFS) $(HOSTWARNS) \
-		   -I. -I$(DEPTH)/lib/libccc -I$(DEPTH)/libexec/cpp
+		   -I. -I$(DEPTH)/lib/libccc -I$(DEPTH)/libexec/pass0
 HOSTLDFLAGS	?= -m32 $(HOSTDEBUG)
 
 #
 # Where the host compiler is BUILT: the top of the tree, in bin/ for
 # the driver and libexec/ for the passes.  Not /usr/local - host builds
-# do not touch the prefix, which still holds the ccc this tree forked
-# from; hostinstall below is what copies them out there.  And not beside
-# the Z80 binary either, which has the same name and would be
-# overwritten by whichever build ran last.  The driver works out where
-# everything is from its own argv[0] - bin/../libexec for the passes,
-# bin/../lib for the runtime - so the tree moves anywhere intact.
+# do not touch the prefix; hostinstall below is what copies them out
+# there.  And not beside the Z80 binary either, which has the same name
+# and would be overwritten by whichever build ran last.  The driver
+# works out where everything is from its own argv[0] - bin/../libexec
+# for the passes, bin/../ccc/lib for the runtime - so the tree moves
+# anywhere intact.
 #
 HOSTDIR		?= $(DEPTH)/../..
 HOSTBIN		?= libexec

@@ -27,9 +27,7 @@
 #	cpp c0 c1 peep		the passes
 #	asz ld nm ar size ccc astpp	the tools
 #
-# Those were prototypes.  Their sources are this tree's own now,
-# forked from ~/src/ccc,
-# which is still where they are edited.  Most are not in DIRS: they are
+# Those sources are this tree's own.  Most are not in DIRS: they are
 # host programs today, and building them here means building the
 # compiler for the Z80, which is where this is going but is not there
 # yet.  Add them when they have been made to compile with ccc.
@@ -69,7 +67,13 @@
 # so yacc has to be reached first.  The rest of the list is
 # alphabetical; these two are not, on purpose.
 #
-DIRS = ar asz awk cat ccc chgrp chmod cmp cp date dcheck dd diff du echo ed expr fd2 fgrep find form grep halt icheck init ld less ln ls make man mkdir mknod more mv ncheck nm od pr pwd rm rmdir s sed setdev sh size strings sync tar tee upm vi wc yacc lex
+# owner is the one v7 port here.  It is not in the 2.11BSD list above
+# because 2.11BSD has no chown source at all, only the section 2 page
+# for the system call, and v7's chown.c is what the command was built
+# from.  It is also the one command whose micronix interface differs
+# from the one it was ported from - see the head of cmd/owner/owner.c.
+#
+DIRS = ar asz awk cat ccc chgrp chmod cmp cp date dcheck dd diff du echo ed expr fd2 fgrep find form grep halt icheck init ld less ln ls make man mkdir mknod more mv ncheck nm od owner pr ps pwd rm rmdir s sed setdev sh size strings sync tar tee upm vi wc yacc lex
 
 #
 # "cd $$d &&", not "cd $$d ;".  With the semicolon, a directory named

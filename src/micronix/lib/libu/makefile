@@ -28,6 +28,19 @@ AR	= ar
 LIBDIR	= /lib
 TARGET	= libu.a
 
+#
+# The man2 pages, listed outright: cmd/make has no $(wildcard), so a
+# page added here does not install until it is named in this list.
+# They are the 1.3 originals off the distribution floppy.
+#
+MAN	= Intro.2 access.2 break.2 chdir.2 chmod.2 chown.2 \
+	close.2 creat.2 csw.2 dup.2 exec.2 exit.2 fork.2 \
+	fstat.2 getpid.2 getuid.2 gtty.2 indir.2 kill.2 link.2 \
+	mknod.2 mount.2 nice.2 open.2 pipe.2 read.2 seek.2 \
+	setuid.2 signal.2 sleep.2 stat.2 stime.2 stty.2 sync.2 \
+	time.2 umount.2 unlink.2 wait.2 write.2
+MANDIR	= /usr/man/man2
+
 # The archive is built in chunks because a single "ar cr libu.a $(OBJS)"
 # command line is too long for the system to exec - v6-era Micronix has
 # no room for an 80-object command.  Each chunk stays comfortably under
@@ -94,9 +107,11 @@ install: $(TARGET) $(CRT0)
 	mkdir -p $(LIBDIR)
 	cp $(TARGET) $(LIBDIR)/$(TARGET)
 	cp $(CRT0) $(LIBDIR)/$(CRT0)
+	mkdir -p $(MANDIR)
+	cp $(MAN) $(MANDIR)
 
 clean:
-	rm -f $(OBJS) $(CRT0)
+	rm -f $(OBJS) $(CRT0) *.nam *.tok *.x
 
 clobber: clean
 	rm -f $(TARGET)

@@ -9,8 +9,25 @@ all:	mwboot.com mwboot1.bin bootimgs djboot1.bin djload
 
 install:
 
+#
+# Every name is written out, the bootimg-* among them from $(BOOTIMGS),
+# which is the same list the rule that makes them reads.  A glob is the
+# same names only for as long as this file and it agree; a list cannot
+# disagree with itself.  The micronix-side makefiles follow the same
+# rule for a harder reason - see sys/Makefile, where "rm -f *.o" came to
+# more words than the shell would take, so the rm never ran at all and
+# the names that did not fit were read back as a command of their own.
+#
+# Four entries are gone rather than enumerated.  *.cim, *.hex and zout
+# are the Whitesmiths build's: nothing here has produced them since
+# mwboot1.cim stopped being cat'd in front of mwboot.com, and zout is a
+# directory of that assembler's listings.  core.* is a crash dump - not
+# a build product, and named core.<pid>, so there is no list to write.
 clean:
-	rm -f *.o *.abs *.cim *.hex mwboot.com mwboot1.bin djboot1.bin djload bootimg bootimg-* mkbootimg zout core.*
+	rm -f $(OBJS) *.nam *.tok *.x
+	rm -f mwboot1.abs djboot1.abs mwboot1.bin djboot1.bin
+	rm -f mwboot.com djload mkbootimg
+	rm -f $(BOOTIMGS) bootimg
 
 clobber: clean
 
@@ -142,8 +159,12 @@ djload: djboot1.bin mwboot.com
 # which is worth 618 bytes of text and 578 of bss.
 #
 # The objects are built with ccc -c and handed to mxld in order; sexit.o
-# first so start() lands at the text offset mwboot1 jumps to.
-mwboot.com: boot.o mwio.o sexit.o
+# first so start() lands at the text offset mwboot1 jumps to.  That link
+# order is not the one below, so the list is here for the dependency and
+# the recipe spells the order it means.
+OBJS = boot.o mwio.o sexit.o
+
+mwboot.com: $(OBJS)
 	$(MXLD) -s -o mwboot.com -Ttext=0x100 -L$(CCCLIB) \
 	    sexit.o boot.o mwio.o $(CCCLIB)/libc.a $(CCCLIB)/libu.a $(CCCLIB)/libc.a
 

@@ -19,7 +19,7 @@
 # of guessed at.
 #
 # Deliberately not in all: c1 dies on this file today, so a default
-# build would stop here.  See ~/src/ccc/ARRAY_ERROR.
+# build would stop here.
 #
 CCC = ccc
 

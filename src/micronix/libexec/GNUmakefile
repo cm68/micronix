@@ -15,24 +15,17 @@
 # libc.a, crt0.o, the headers - and a person reading it should see
 # those and nothing else.
 #
-# cpp, c0, c1, peep and astpp are the passes ccc runs.  The assembler
+# pass0, c0, c1, peep and astpp are the passes ccc runs.  The assembler
 # and the linker - asz and ld - are user commands, so they live in
 # cmd; the driver finds them beside itself in bin.
 #
 # All four build.  The three passes used to link against nothing and
-# fail on _fmtlong and _fmtstr; those are in ccc's ccclib and there is
-# a lib/libccc now, which each of them names in LIBS.
-#
-# Their sources were symlinks into ~/src/ccc and the sets had drifted:
-# c0 was missing eleven p1*.h, all three wanted astops.h, format.h
-# and libutil.h out of ccclib, and c0 and c1 wanted lexeme.h and
-# lexops.h out of cpp - pass1 compiles with -I../cpp there.  The
-# fork copied all of it in, so what is left really is only the
-# library.
+# fail on _fmtlong and _fmtstr; those are in lib/libccc now, which
+# each of them names in LIBS.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = cpp c0 c1 peep astpp
+DIRS = pass0 c0 c1 peep astpp
 
 RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \
@@ -94,4 +87,4 @@ footprint: hostpasses
 	sh footprint.sh
 
 hostpasses:
-	@for d in cpp c0 c1 peep; do $(MAKE) -C $$d host || exit 1; done
+	@for d in pass0 c0 c1 peep; do $(MAKE) -C $$d host || exit 1; done
