@@ -1,7 +1,0 @@
-#
-# build output.  upmhead.s and upmsys.s are source and stay tracked;
-# the rest is what ccc and ld leave behind.
-#
-upm
-*.o
-*.rel

@@ -5,6 +5,25 @@ attic
 *.tar
 
 #
+# The one exception to "attic" above, and the reason it is written here
+# rather than as a second rule in src/micronix/sys/.gitignore.
+#
+# That pattern has no slash, so it matches at any depth - which is what
+# the top-level attic wants.  The junk drawer is at the root, and a
+# nested one is nearly always the same kind of thing.  Nearly: the
+# kernel's attic is the opposite.  It holds the only copy of everything
+# in it (see the README beside those files), and a directory git will
+# not even list is the one place a file can be lost by moving it there.
+# So the directory is re-included by name.
+#
+# The pattern names the directory and not the files under it.  Git does
+# not descend into an excluded directory, so a rule about its contents
+# has no effect however it is written; re-including the directory is
+# what lets git look inside at all.
+#
+!src/micronix/sys/attic/
+
+#
 # Core dumps under any name.  "core" above only catches the bare one.
 #
 core.*
@@ -47,18 +66,23 @@ src/micronix/lib/libcpm/*.a
 src/tools/dumpsec
 src/tools/setdev
 
-src/micronix/cmd/mkfs/mkfs
-
 #
 # The top-level host bin and the runtime beside it.  install-hwsim and
 # install-usersim copy the simulators into bin/, and hostcc/hostrt put
 # the cross compiler and its libraries and headers beside them.  bin,
-# libexec, lib and usr only exist at the top of the tree because the
-# compiler resolves its own pieces from argv[0] (bin/../libexec,
-# bin/../lib, bin/../usr/include), so they are anchored to the root.
+# libexec and ccc only exist at the top of the tree because the
+# compiler resolves its own pieces from argv[0] - the passes from
+# bin/../libexec, the runtime from bin/../ccc/lib and the headers from
+# bin/../ccc/include - so they are anchored to the root.
+#
+# lib and usr are the same three under the names ccc.c uses when it is
+# compiled by ccc, for /bin/ccc on micronix: bin/../lib and
+# bin/../usr/include.  A host build reads neither; a -DCCC build of the
+# driver would, so the names stay ignored.
 #
 /bin/
 /libexec/
+/ccc/
 /lib/
 /usr/
 
@@ -137,6 +161,18 @@ logfile.*
 *.o
 
 #
+# ccc's per-source intermediates, written beside the .o for every .c:
+# the name table (.nam), the readable tokens (.tok) and the tokenized
+# source (.x).  ccc keeps its own copies in /tmp under pid names and
+# deletes them; these are what an older build left in place.  The three
+# .x files already tracked under extra/ are recovered artifacts, not
+# these, and are unaffected.
+#
+*.nam
+*.tok
+*.x
+
+#
 # Default linker output and assembler listings.  a.out is what gcc and
 # mxccc leave when no -o names one, and a .lst is the listing a build
 # drops beside its source.
@@ -146,18 +182,125 @@ a.out
 
 #
 # The built command binaries.  Each cmd/ directory builds a program
-# named after itself, and not all of them carry a .gitignore of their
-# own yet, so name the ones that show up untracked.
+# named after itself, the libexec/ passes and lib/ archives build the
+# same way, and src/tools builds its own host tools.  These used to be
+# one-to-a-file in the directory that builds them; they are gathered
+# here so the ignore rules have one home, and a new one is added here
+# rather than as a new .gitignore.
 #
+src/micronix/cmd/ar/ar
+src/micronix/cmd/asz/asz
+src/micronix/cmd/awk/awk
+src/micronix/cmd/cat/cat
+src/micronix/cmd/ccc/ccc
+src/micronix/cmd/chgrp/chgrp
+src/micronix/cmd/chmod/chmod
+src/micronix/cmd/cmp/cmp
+src/micronix/cmd/cp/cp
+src/micronix/cmd/date/date
 src/micronix/cmd/dcheck/dcheck
+src/micronix/cmd/dd/dd
+src/micronix/cmd/diff/diff
+src/micronix/cmd/diff/diffh
+src/micronix/cmd/du/du
+src/micronix/cmd/echo/echo
+src/micronix/cmd/ed/ed
+src/micronix/cmd/expr/expr
+src/micronix/cmd/fd2/fd2
+src/micronix/cmd/fgrep/fgrep
+src/micronix/cmd/find/find
+src/micronix/cmd/form/form
+src/micronix/cmd/fsck/fsck
+src/micronix/cmd/grep/grep
+src/micronix/cmd/halt/halt
 src/micronix/cmd/icheck/icheck
-src/micronix/cmd/ncheck/ncheck
+src/micronix/cmd/init/init
+src/micronix/cmd/init/init.dbg
+src/micronix/cmd/ld/ld
+src/micronix/cmd/less/less
+src/micronix/cmd/lex/lex
+src/micronix/cmd/lex/liblc.a
+src/micronix/cmd/ln/ln
+src/micronix/cmd/login/login
+src/micronix/cmd/ls/ls
+src/micronix/cmd/make/make
+src/micronix/cmd/man/man
+src/micronix/cmd/mkdir/mkdir
+src/micronix/cmd/mkfs/mkfs
+src/micronix/cmd/mknod/mknod
+src/micronix/cmd/more/more
 src/micronix/cmd/msh/msh
+src/micronix/cmd/mv/mv
+src/micronix/cmd/ncheck/ncheck
 src/micronix/cmd/nm/nm
+src/micronix/cmd/nm/wsnm
+src/micronix/cmd/od/od
+src/micronix/cmd/pr/pr
+src/micronix/cmd/ps/ps
+src/micronix/cmd/pwd/pwd
+src/micronix/cmd/rm/rm
+src/micronix/cmd/rmdir/rmdir
+src/micronix/cmd/s/s
+src/micronix/cmd/sed/sed
 src/micronix/cmd/setdev/setdev
+src/micronix/cmd/sh/sh
+src/micronix/cmd/sh/sh.mx
+src/micronix/cmd/sh/sh.host
 src/micronix/cmd/size/size
-src/tools/fsck
+src/micronix/cmd/size/wssize
+src/micronix/cmd/strings/strings
+src/micronix/cmd/sync/sync
+src/micronix/cmd/tar/tar
+src/micronix/cmd/tee/tee
+src/micronix/cmd/upm/upm
+src/micronix/cmd/upm/*.rel
+src/micronix/cmd/vi/vi
+src/micronix/cmd/vi/svi
+src/micronix/cmd/vi/mk
+src/micronix/cmd/vi/*.obj
+src/micronix/cmd/vi/*.com
+src/micronix/cmd/vi/*.$$$
+src/micronix/cmd/wc/wc
+src/micronix/cmd/yacc/yacc
+src/micronix/cmd/yacc/liby.a
+src/micronix/libexec/astpp/astpp
+src/micronix/libexec/c0/c0
+src/micronix/libexec/c1/c1
+src/micronix/libexec/c1/mkruleidx
+src/micronix/libexec/c1/ruleidx.c
+src/micronix/libexec/pass0/pass0
+src/micronix/libexec/peep/peep
+src/micronix/lib/libccc/libccc.a
+src/micronix/lib/libu/libu.a
+src/micronix/lib/libutil/libutil.a
 src/micronix/lib/fslib/libfs.a
+src/micronix/sys/build.h
+src/micronix/sys/unix
+src/lib/maketables
+src/tools/*.a
+src/tools/ar
+src/tools/dcheck
+src/tools/destdir
+src/tools/disas
+src/tools/doc.inl
+src/tools/dump
+src/tools/fsck
+src/tools/icheck
+src/tools/imd
+src/tools/imdd
+src/tools/mnix
+src/tools/ncheck
+src/tools/nm
+src/tools/readall
+src/tools/size
+src/tools/test
+src/tools/testfs
+src/tools/zmac
+src/tools/zmac.c
+src/usersim/sim
+src/usersim/usersim
+src/usersim/maketables
+src/gui
 src/hwsim/resources/cold_boot_loader.bin
 
 #
@@ -178,3 +321,13 @@ benchmem.tsv
 
 # Local KiCad preference files never belong in the tree.
 *.kicad_prl
+
+#
+# Editor and tool indices.  A ctags/etags index, macOS debug-symbol
+# bundles from a gcc or clang build, and Python bytecode caches.  All
+# regenerable, none is a source.
+#
+tags
+*.dSYM/
+__pycache__/
+*.pyc
