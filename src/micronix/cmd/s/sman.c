@@ -58,8 +58,7 @@ extern scr_instr();		/* was scr_inst, which is nothing */
  * compile to "call _expand" while the calls below the definition
  * compile to the local label.  One function, two call targets, and a
  * link that fails on a symbol defined in the same file.  The compiler
- * accepts the contradiction without a word; see STATICLATEDEF in the
- * ccc tree.
+ * accepts the contradiction without a word.
  */
 static int expand();
 static int good_first();

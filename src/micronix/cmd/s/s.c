@@ -38,7 +38,7 @@
 /*
  * static, and defined below the function that calls it.  Without this
  * the call is implicitly extern and compiles to "call _get_count",
- * which nothing defines; see STATICLATEDEF in the ccc tree.
+ * which nothing defines.
  */
 static int get_count();
 
