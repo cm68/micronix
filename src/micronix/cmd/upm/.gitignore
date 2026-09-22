@@ -1,9 +1,7 @@
 #
-# build output.  upm.s and upm.split.s are the generated assembly the
-# splitupm step makes from upm.c; upmhead.s and upmsys.s are source and
-# stay tracked.
+# build output.  upmhead.s and upmsys.s are source and stay tracked;
+# the rest is what ccc and ld leave behind.
 #
 upm
 *.o
-upm.s
-upm.split.s
+*.rel
