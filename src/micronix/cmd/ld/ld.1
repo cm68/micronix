@@ -1,4 +1,4 @@
-.he "ld (1)                       8/18/26                       ld (1)"
+.he "ld (1)                       9/21/26                       ld (1)"
 .fo "                               -#-"
 .in 5
 .rm 65
@@ -16,7 +16,7 @@ SYNTAX
 .in +5
 .br
 .bd
-ld [ -vV9rs ] [ -o file ] [ -Ldir ] [ -llib ] [ -Ttext=addr ] [ -Tdata=addr ] [ -Tbss=addr ] file ...
+ld [ -vV9rs ] [ -o file ] [ -Ldir ] [ -llib ] [ -Ttext=addr ] [ -Tdata=addr ] [ -Tbss=addr ] [ -Sdata|-Stext ] [ -Shigh ] file ...
 .sp 2
 .in -5
 .bd
@@ -65,6 +65,15 @@ OPTIONS
 
 .ti -10
 -Ttext=addr, -Tdata=addr, -Tbss=addr	Set the origin of a segment.  Text and data default to the origins in the first object; bss follows data.
+
+.ti -10
+-Sdata	Fold every section of the input objects - text, data and bss - into the data segment, instead of the usual three-segment layout.  The bss is written out as zero bytes rather than left as a segment, because nothing will clear it.  With -r this is how a piece of code is made into a data-only object that can be parked at a high address.
+
+.ti -10
+-Stext	The same fold, but into the text segment.
+
+.ti -10
+-Shigh	In a final link, park an unplaced data-only object - a -r -Sdata fold - after bss, at _ebss, rather than in the data segment.  Only objects of that form are moved; ordinary data-only objects still pack normally.
 
 .in -10
 .sp 2
