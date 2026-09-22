@@ -1,0 +1,132 @@
+.he "kill (1)                     9/22/26                     kill (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+kill
+- send a signal to a process
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+kill [ -sig ] pid ...
+.br
+.bd
+kill -h
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Kill sends a signal to each process named.  The signal is SIGTERM
+(15) unless -sig names another, and may be given as a number or as a
+name: -9 and -KILL are the same signal, and a leading SIG is optional,
+so -HUP, -hup and -SIGHUP are the same word as well.
+.sp
+Only the super-user may signal a process belonging to another user,
+and no process may signal itself.
+.sp
+With -h, kill lists the signals it can send, one to a line, and stops.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-sig		Send signal sig.  A number from 1 to 15, or one of the
+		names below.
+.sp
+.ti -10
+-h		List the signals and stop.
+.sp 2
+.in -5
+.bd
+SIGNALS
+.in +5
+.br
+.in +5
+ 1  HUP   hangup
+.br
+ 2  INT   interrupt
+.br
+ 3  QUIT  quit
+.br
+ 4  ILL   illegal instruction
+.br
+ 5  TRAP  trace trap
+.br
+ 6  BACK  control-B typed
+.br
+ 7  TINT  tty input record available
+.br
+ 8  FPE   floating point exception
+.br
+ 9  KILL  kill (cannot be caught or ignored)
+.br
+10  BUS   bus error
+.br
+11  SEGV  segmentation violation
+.br
+12  SYS   bad argument to system call
+.br
+13  PIPE  write on a pipe with no one to read it
+.br
+14  ALRM  alarm clock
+.br
+15  TERM  software termination signal
+.sp
+The two names that are not the familiar ones are the kernel's: 6 and 7
+are the signals the terminal driver raises, and this system has no IOT
+or EMT for them to mean.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The distribution shipped no kill, so this is not a port: the v6 and v7
+sources are on the disks and the interface above is v7's, with the
+names and -h added.  The system call is the one that was always here.
+.sp
+Signal 0 and signals of 16 and above are refused rather than sent.
+The kernel does not range-check the signal.  It looks the signal up in
+slist, the sixteen dispositions belonging to the process being
+signalled, and slist is a field of that process's entry in the process
+table rather than a table of its own: an index of 16 or more reads
+past it, into the rest of the entry and the next one along, and what
+it finds there is compared with "ignore" to decide whether the signal
+is delivered at all.  If it is, the delivery indexes the same array
+with the same number a second time - reading a disposition nobody set
+and clearing it - so the process is either terminated on that number
+or jumped to whatever address the word it found held.  signal (2),
+which does set dispositions, range-checks and answers EINVAL, so
+nothing out there was put there on purpose.
+.sp
+A process id of 0 is refused for the same kind of reason.  The system
+call documents it as "all other processes with the same controlling
+tty", and sends it to ALL of them: the shell that ran kill is one of
+them, and it does not come back.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/bin/kill
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+kill (2), signal (2), ps (1), sh (1)

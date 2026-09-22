@@ -216,6 +216,7 @@ src/micronix/cmd/halt/halt
 src/micronix/cmd/icheck/icheck
 src/micronix/cmd/init/init
 src/micronix/cmd/init/init.dbg
+src/micronix/cmd/kill/kill
 src/micronix/cmd/ld/ld
 src/micronix/cmd/less/less
 src/micronix/cmd/lex/lex

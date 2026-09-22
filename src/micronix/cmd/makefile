@@ -69,6 +69,7 @@ all:
 	cd grep ; make all
 	cd icheck ; make all
 	cd init ; make all
+	cd kill ; make all
 	cd ld ; make all
 	cd less ; make all
 	cd ln ; make all
@@ -125,6 +126,7 @@ install:
 	cd grep ; make install
 	cd icheck ; make install
 	cd init ; make install
+	cd kill ; make install
 	cd ld ; make install
 	cd less ; make install
 	cd ln ; make install
