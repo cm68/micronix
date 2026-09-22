@@ -38,7 +38,7 @@ install: $(TARGET)
 	cp $(TARGET) $(LIBDIR)/$(TARGET)
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJS) *.nam *.tok *.x
 
 clobber: clean
 	rm -f $(TARGET)

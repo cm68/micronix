@@ -38,7 +38,7 @@ install: $(PROG)
 	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJS) *.nam *.tok *.x
 
 clobber: clean
 	rm -f $(PROG)

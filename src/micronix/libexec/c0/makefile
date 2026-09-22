@@ -53,7 +53,7 @@ install: $(PROG)
 	cp $(PROG) $(LIBEXEC)/c0
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJS) *.nam *.tok *.x
 
 clobber: clean
 	rm -f $(PROG)

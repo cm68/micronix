@@ -1,19 +1,22 @@
 #
-# makefile for cpp
+# makefile for pass0
 #
-# micronix/libexec/cpp/makefile
+# micronix/libexec/pass0/makefile
 #
 # The native build: this runs inside micronix, under the make in
 # cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
 # it cross builds the same program on the host.
 #
-# The preprocessor.  It installs as pass0 and not as cpp: that is
-# the name the driver calls it by, and has been since before this
-# tree had a directory for it.
+# pass0 is ccc's first pass: the lexer and the normalizer.  What it
+# emits is a .x stream - "compact token format" - and that is what c0
+# reads.  It is not a preprocessor, and the name it was carrying, cpp,
+# belonged to a different program; the driver has always run it as
+# pass0, and the directory says so now too.
 #
 # ccc runs this; nobody types it, so it goes into /libexec and has no
-# man page.  The sources are copies, forked from ~/src/ccc and edited here, and the object list is spelled out because this
-# make has no wildcard.
+# man page.  The sources are copies, forked from ~/src/ccc and edited
+# here, and the object list is spelled out because this make has no
+# wildcard.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
@@ -32,7 +35,7 @@ LIBS	= /lib/libccc.a
 #
 CFLAGS	= -O
 LIBEXEC	= /libexec
-PROG	= cpp
+PROG	= pass0
 OBJS	= cfold.o cpp.o emit.o filtutil.o io.o knr.o kw.o kwtab.o \
 	lex.o lexdata.o macro.o norm.o tdsrc.o util.o
 
@@ -50,10 +53,10 @@ $(OBJS): $*.c
 
 install: $(PROG)
 	mkdir -p $(LIBEXEC)
-	cp $(PROG) $(LIBEXEC)/pass0
+	cp $(PROG) $(LIBEXEC)/$(PROG)
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJS) *.nam *.tok *.x
 
 clobber: clean
 	rm -f $(PROG)

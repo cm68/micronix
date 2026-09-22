@@ -42,7 +42,7 @@ install: $(PROG) diffh
 	cp diffh $(BIN)/diffh
 
 clean:
-	rm -f $(OBJS) diffh.o
+	rm -f $(OBJS) diffh.o *.nam *.tok *.x
 
 clobber: clean
 	rm -f $(PROG) diffh

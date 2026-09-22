@@ -45,7 +45,7 @@ install: $(PROG)
 	cp less.help $(LIB)/less.help
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJS) *.nam *.tok *.x
 
 clobber: clean
 	rm -f $(PROG)

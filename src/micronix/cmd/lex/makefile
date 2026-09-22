@@ -49,7 +49,7 @@ install: $(PROG) liblc.a
 	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
-	rm -f $(OBJS) $(LIBOBJS)
+	rm -f $(OBJS) $(LIBOBJS) *.nam *.tok *.x
 
 clobber: clean
 	rm -f $(PROG) liblc.a

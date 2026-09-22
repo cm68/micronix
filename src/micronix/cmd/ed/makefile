@@ -36,7 +36,7 @@ install: $(PROG)
 	ln $(BIN)/$(PROG) $(BIN)/e
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJS) *.nam *.tok *.x
 
 clobber: clean
 	rm -f $(PROG)

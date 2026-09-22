@@ -64,7 +64,7 @@ install: $(PROG)
 	cp $(PROG) $(LIBEXEC)/c1
 
 clean:
-	rm -f $(OBJS) mkruleidx ruleidx.c
+	rm -f $(OBJS) mkruleidx ruleidx.c *.nam *.tok *.x
 
 clobber: clean
 	rm -f $(PROG)

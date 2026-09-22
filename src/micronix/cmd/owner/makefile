@@ -1,7 +1,7 @@
 #
-# makefile for icheck
+# makefile for owner
 #
-# micronix/cmd/icheck/makefile
+# micronix/cmd/owner/makefile
 #
 # The native build: this runs inside micronix, under the make in
 # cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
@@ -17,16 +17,15 @@ CC	= ccc
 #
 CFLAGS	= -O
 BIN	= /bin
-MAN	= icheck.1
+MAN	= owner.1
 MANDIR	= /usr/man/man1
-PROG	= icheck
-OBJS	= icheck.o
-LIBS	= /lib/libfs.a
+PROG	= owner
+OBJS	= owner.o
 
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
 install: $(PROG)
 	mkdir -p $(BIN)
