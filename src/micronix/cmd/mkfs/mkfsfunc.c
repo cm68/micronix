@@ -18,6 +18,17 @@
 
 #include "mkfs.h"
 
+/*
+ * The clock, for the superblock stamp.  This is the declaration the
+ * tree's own unistd.h carries - ccc rejects any other as a disagreement
+ * with it - and it is repeated here because a host build's unistd.h is
+ * the system one, which declares no time() at all.  The return is the
+ * one part of it not to trust: libu's time.s explains that a micronix
+ * long comes back in the shadow bank, so every caller in the tree,
+ * this one included, reads the value from the *tp store instead.
+ */
+int time(long *);
+
 char *pname;
 
 char sbbuf[BSIZE];
@@ -46,6 +57,7 @@ struct super *sb;
 #define S_NINODE    (sb->s_ninode)
 #define S_FREE(i)   (sb->s_free[i])
 #define S_INODE(i)  (sb->s_inode[i])
+#define S_TIME      (sb->s_time)
 
 void die(s)
     char *s;
@@ -211,6 +223,7 @@ domkfs(fs, is, bfirst, bnblk, dsize, type, bfile, f)
     UINT dirino;
     UINT filino;
     UINT n;
+    long now;                   /* the clock, for the superblock */
     int bfd;
     int got;
     int i;
@@ -267,6 +280,31 @@ domkfs(fs, is, bfirst, bnblk, dsize, type, bfile, f)
         sbbuf[i] = 0;
     S_ISIZE = isize;
     S_FSIZE = fsize;
+
+    /*
+     * The volume's time.  The kernel has no year of its own - the rtc
+     * chip has no year register - so rtcinit() takes the year from the
+     * superblock when the root is mounted (sys/mount.c), and the only
+     * writer of s_time is the sync in sys/uio.c, which stores back a
+     * time it derived from s_time in the first place.  Nothing seeded
+     * that loop, so it had a fixed point at 1970: every file the system
+     * wrote was stamped 1970, and make - whose rule is "the source is
+     * newer, build it" - rebuilt everything on every run, forever.
+     * Seed it from the clock of whoever makes the filesystem; from the
+     * first sync on, the loop sustains itself.
+     *
+     * A 32-bit field on a micronix disk carries its high word at the
+     * lower address, which is the host's long the other way up (see
+     * the swap in lib/fslib.c).  A guest's longs are already in the
+     * disk's order, so only a host build swaps.  INTEGER_32 is
+     * types.h's mark for the host builds - linux, apple.
+     */
+    time(&now);
+#ifdef INTEGER_32
+    S_TIME = ((UINT32) now >> 16) | ((UINT32) now << 16);
+#else
+    S_TIME = (UINT32) now;
+#endif
 
     nextblk = INOSTART + isize;
     nextino = ROOTINO;

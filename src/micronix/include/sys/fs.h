@@ -24,6 +24,19 @@ struct super {
     UINT8 s_ilock;
     UINT8 s_fmod;               /* dirty */
 
+    /*
+     * Spelled out, and it has to be.  The three bytes above leave the
+     * struct at an odd offset, and s_time is 32 bits: a host compiler
+     * aligns it to 4 and slides a byte of padding in here, ccc aligns
+     * to 2 and does not.  That one byte was the whole difference
+     * between mkfs writing s_time where the kernel reads it and
+     * writing it one byte late - the kernel then read the padding plus
+     * three bytes of the stamp, and its year, counting from 1970, ran
+     * off the end of the 2-digit field.  Naming the byte puts it in
+     * both layouts, at offset 412.
+     */
+    UINT8 s_pad;
+
     UINT32 s_time;              /* last umount time */
 };
 

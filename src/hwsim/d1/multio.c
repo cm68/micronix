@@ -71,6 +71,7 @@ struct ace {
     byte txe_ack;       // THRE interrupt was reset by an IIR read
 
     int line;
+    int want_xterm;     // uart1/uart2: open the xterm on first traffic
     u64 chartime;       // shift time through the uart
 } ace[3];
 
@@ -820,11 +821,27 @@ rd_rxb(portaddr p)
 }
 
 /*
+ * Lazily open the xterm for a non-console uart.  Called from wr_txb the
+ * first time a character is actually transmitted - the login prompt -
+ * not at startup.  multio_init leaves want_xterm set on uart1/uart2
+ * instead of opening their windows up front.
+ */
+static void
+lazy_open_xterm(struct ace *ap)
+{
+    char tname[10];
+
+    sprintf(tname, "multio-%d", ap->line);
+    open_terminal(tname, 0, &ap->infd, &ap->outfd, 0, 0);
+    ap->want_xterm = 0;
+}
+
+/*
  * transmitter buffer
  * if LCR_DLAB is set, access to lsb of baud rate divisor
  */
 static void
-wr_txb(portaddr p, byte v) 
+wr_txb(portaddr p, byte v)
 {
     struct ace *ap = select_ace();
 
@@ -845,6 +862,14 @@ wr_txb(portaddr p, byte v)
         ap->dll = v;
         return;
     }
+
+    /*
+     * The first actual character sent on a non-console uart opens its
+     * xterm.  The baud-rate setup above (DLAB) has already gone by
+     * without one, so the window appears with the login prompt in it.
+     */
+    if (ap->want_xterm && ap->outfd == -1)
+        lazy_open_xterm(ap);
 
     // detect overrun
     if (!(ap->lsr & LSR_TXE)) {
@@ -1110,6 +1135,25 @@ int rtcptr;
 static byte wrclock[5];             /* shift register being written (CC_SET) */
 static int wrclockptr;
 static int wrclock_dirty;           /* a bit was shifted since the last ENSR/SET */
+/*
+ * The clock the guest reads is UTC, not the host's local time.
+ *
+ * Micronix has no timezone - it is v6 underneath, and its timestamps
+ * are plain counts of seconds from 1970 - so a file's time means
+ * whatever frame the clock it was written with was in.  Everything
+ * that reaches a volume from outside, though, carries a UTC epoch: the
+ * host tools store st_mtime as it comes off the host, and "mnix tar"
+ * puts a source file's mtime on disk untouched.  Read the RTC as local
+ * time and the guest's clock lands one offset away from every file
+ * installed that way, which is fatal to make: the sources are ahead of
+ * the clock that stamps the objects built from them, so every target
+ * is remade on every run and never converges.  Reading UTC puts the
+ * guest's clock in the frame its own files are already in.
+ *
+ * The offset then means what it looks like: the guest's own error,
+ * after it has set the clock, against real time.  CC_SET has to build
+ * its epoch the same way round, hence timegm below and not mktime.
+ */
 static time_t rtc_offset;           /* rtc = host time + this offset */
 static byte last_wrclock;
 time_t nowtime;
@@ -1156,7 +1200,7 @@ wr_clock(portaddr p, byte v)
                 struct tm *now;
                 time_t t = time(0);
 
-                now = localtime(&t);
+                now = gmtime(&t);
                 st.tm_year = now->tm_year;  /* the 40-bit rtc has no year */
                 st.tm_mon  = (wrclock[4] >> 4) & 0xf;
                 st.tm_mday = ((wrclock[3] >> 4) & 0xf) * 10 + (wrclock[3] & 0xf);
@@ -1164,7 +1208,7 @@ wr_clock(portaddr p, byte v)
                 st.tm_min  = ((wrclock[1] >> 4) & 0xf) * 10 + (wrclock[1] & 0xf);
                 st.tm_sec  = ((wrclock[0] >> 4) & 0xf) * 10 + (wrclock[0] & 0xf);
                 st.tm_isdst = -1;
-                rtc_offset = mktime(&st) - t;
+                rtc_offset = timegm(&st) - t;
 #ifndef NODEBUG
                 fprintf(stderr, "CC_SET: wr=%02x %02x %02x %02x %02x off=%ld\n",
                     wrclock[0], wrclock[1], wrclock[2], wrclock[3], wrclock[4], (long)rtc_offset);
@@ -1175,7 +1219,7 @@ wr_clock(portaddr p, byte v)
         }
         case CC_GET:        // read the clock and populate the array
             nowtime = time(0) + rtc_offset;
-            tm = localtime(&nowtime);
+            tm = gmtime(&nowtime);
             rtc[0] = bcd(tm->tm_sec / 10, tm->tm_sec % 10);
             rtc[1] = bcd(tm->tm_min / 10, tm->tm_min % 10);
             rtc[2] = bcd(tm->tm_hour / 10, tm->tm_hour % 10);
@@ -1502,8 +1546,22 @@ multio_init()
     // create xterms
     for (i = 0; i < 3; i++) {
         if (termmask & (1 << i)) {
-            sprintf(tname, "multio-%d", i);
-            open_terminal(tname, 0, &ace[i].infd, &ace[i].outfd, 0, 0);
+            /*
+             * uart0 is the console, and it is special: the boot rom,
+             * the loader and pr() write to it from reset, before init
+             * has opened anything, so its window must exist up front or
+             * that output is lost.  uart1 and uart2 have no such
+             * firmware - nothing reaches them until init opens
+             * /dev/ttyB or /dev/ttyC and a login starts writing - so
+             * their xterms are opened lazily, on first traffic, from
+             * wr_txb.
+             */
+            if (i == 0) {
+                sprintf(tname, "multio-%d", i);
+                open_terminal(tname, 0, &ace[i].infd, &ace[i].outfd, 0, 0);
+            } else {
+                ace[i].want_xterm = 1;
+            }
         }
     }
 
