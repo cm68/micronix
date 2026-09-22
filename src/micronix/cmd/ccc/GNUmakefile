@@ -4,13 +4,10 @@
 # cmd/ccc/GNUmakefile
 #
 # The compiler is moving into this tree and this is the shape it has:
-# one directory per pass and per tool.  The source lives here now,
-# forked from ~/src/ccc/src/tools and edited here.
+# one directory per pass and per tool.  The source lives here.
 #
-# IT IS IN cmd/GNUmakefile's DIRS NOW.  What used to be here said
-# these were host programs built by gcc -m32 in the ccc tree, and that
-# building them with ccc meant building the compiler for the Z80,
-# which was the point of moving them and did not work yet.  It works.
+# IT IS IN cmd/GNUmakefile's DIRS NOW, and it builds both ways: with
+# gcc -m32 for the host, and with ccc for the Z80.
 #
 # -DCCC IS WHAT MAKES IT THE NATIVE DRIVER, and it is the whole
 # difference between the two builds of this file.  ccc.c reads

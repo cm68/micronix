@@ -75,10 +75,7 @@ char bindir[LIBDIRMAX];
  * On micronix these are the system's own programs and wear their own
  * names.  On the host they share a machine with programs of the same
  * name that mean something else entirely - ld, nm, ar, size, cc - so
- * every one of them is mx-prefixed, and the compiler is mxccc.  That
- * used to be a special case for the linker alone, spelled as an
- * ifdef around ld and mxld; the fork made the whole toolchain live on
- * both machines, so it is a rule now rather than an exception.
+ * every one of them is mx-prefixed, and the compiler is mxccc.
  *
  * CCC is the test because it answers exactly the right question: it
  * is defined when this driver was compiled by ccc, and a driver
@@ -99,10 +96,10 @@ char bindir[LIBDIRMAX];
  *
  * On the host the runtime is namespaced under a ccc/ directory beside
  * the bin the driver was installed into, so /usr/local/bin/mxccc reads
- * /usr/local/ccc/lib and /usr/local/ccc/include, leaving /usr/local/lib
- * and /usr/local/usr/include to the ccc this tree forked from.  The
- * suffix is the only difference between the two builds; the mechanism
- * below is the same either way.
+ * /usr/local/ccc/lib and /usr/local/ccc/include, and the tree's own
+ * bin/mxccc reads bin/../ccc/lib and bin/../ccc/include.  The suffix is
+ * the only difference between the two builds; the mechanism below is
+ * the same either way.
  */
 #ifdef CCC
 #define LIBSUF	"/../lib"
