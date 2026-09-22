@@ -286,7 +286,17 @@ struct lbuf *ap;
 	register char *cp;
     char lprec[10];
 
-	if (xflg) {
+	/*
+	 * In columns this is not a printer but a cursor: the loop in
+	 * main that walks a directory prints the names itself, a row at
+	 * a time, and calls here only to count the column off.  An
+	 * argument is not in that loop.  It reaches here from the
+	 * branch below, which has no printer of its own, so it has to
+	 * come through and be printed.  v7 had no columns and no test
+	 * to make - every entry was printed here - and the added test
+	 * is what stopped "ls file" from saying anything at all.
+	 */
+	if (xflg && (ap->lflags & ISARG) == 0) {
 		t = WIDTH / (maxn + 1);
 		if (++fc == t) {
 			printf("\n");
