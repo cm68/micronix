@@ -863,14 +863,6 @@ wr_txb(portaddr p, byte v)
         return;
     }
 
-    /*
-     * The first actual character sent on a non-console uart opens its
-     * xterm.  The baud-rate setup above (DLAB) has already gone by
-     * without one, so the window appears with the login prompt in it.
-     */
-    if (ap->want_xterm && ap->outfd == -1)
-        lazy_open_xterm(ap);
-
     // detect overrun
     if (!(ap->lsr & LSR_TXE)) {
         l("multio: send overrun on line %d\n", ap->line);
@@ -887,6 +879,16 @@ wr_txb(portaddr p, byte v)
      * otherwise a headless run loses all its console output.
      */
     if ((ap->mcr & MCR_LOOP) == 0) {
+        /*
+         * The first character actually delivered to a non-console uart
+         * opens its xterm, so the window appears with the login prompt
+         * in it.  Only writes that reach the line count: the baud-rate
+         * setup goes by under DLAB, and the boot rom probes every uart
+         * by putting it in loopback and sending two nulls, neither of
+         * which is traffic on the terminal.
+         */
+        if (ap->want_xterm && ap->outfd == -1)
+            lazy_open_xterm(ap);
         if (ap->outfd != -1)
             write(ap->outfd, &v, 1);
         if (ap == &ace[0] && console_logfd != -1)
