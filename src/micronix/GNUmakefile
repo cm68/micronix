@@ -135,12 +135,8 @@ $(SETDEVX): $(SETDEVSRC)
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(SETDEVSRC)
 
 #
-# The cross compiler, built here from these sources.
-#
-# Before the fork the tree compiled with /usr/local/bin/ccc, which is
-# installed out of ~/src/ccc - so "this tree's compiler" was the other
-# tree's.  These sources are ours now and this builds them: the seven
-# passes and the driver, with the machine's own cc, into $(BIN) and
+# The cross compiler, built here from these sources: the seven passes
+# and the driver, with the machine's own cc, into $(BIN) and
 # $(HOSTROOT)/libexec.
 #
 # Then the runtime beside it, because the driver adds crt0.o and
@@ -155,7 +151,7 @@ $(SETDEVX): $(SETDEVSRC)
 #	make			build the tree with it, once lib is made
 #	make hostrt		put the runtime where it can find it
 #
-HOSTCCDIRS = libexec/cpp libexec/c0 libexec/c1 libexec/peep \
+HOSTCCDIRS = libexec/pass0 libexec/c0 libexec/c1 libexec/peep \
 	     cmd/asz cmd/ld libexec/astpp cmd/ccc
 
 hostcc: $(ARMX)
@@ -176,25 +172,37 @@ hostrt:
 	cp lib/libc/libc.a $(HOSTROOT)/ccc/lib/cpm
 	cp lib/libcpm/libcpm.a lib/libcpm/crtcpm.o $(HOSTROOT)/ccc/lib/cpm
 	#
-	# The system headers first and the C library's over them.  Six
-	# names are in both sets - cpm.h errno.h hitech.h setjmp.h
-	# stdio.h time.h - and the library's are the ones that count:
-	# include/GNUmakefile calls them CCCOWNED and installs its own
-	# copies of everything BUT those.  The tree's time.h is the v6
-	# one, struct time in UINTs, and c0 will not read it.
+	# No micronix headers go here any more, and that is the change.
+	# The compiler resolves <sys/...> out of this directory when a
+	# build does not say otherwise, so filling it meant a second
+	# copy of the tree's headers, refreshed whenever somebody
+	# remembered to run this.  It cost a day: mkfs wrote s_time at
+	# one offset and the kernel read it at another, out of two
+	# vintages of sys/fs.h.  GNUmakefile.inc sets -i to the tree's
+	# lib/include now, so no build reads a copy and there is nothing
+	# here to keep in step.  Taken out rather than left, so a build
+	# that does depend on the default directory stops at the include
+	# and says so, instead of compiling against something stale.
 	#
-	cp include/*.h $(HOSTROOT)/ccc/include
-	cp include/sys/*.h $(HOSTROOT)/ccc/include/sys
-	cp lib/include/*.h $(HOSTROOT)/ccc/include
-	cp lib/include/sys/*.h $(HOSTROOT)/ccc/include/sys
+	rm -f $(HOSTROOT)/ccc/include/*.h
+	rm -f $(HOSTROOT)/ccc/include/sys/*.h
 	#
-	# CP/M's header tree: the C library's headers, with the CP/M
-	# stdio.h over the Micronix one.  Its FILE sits over fcb's and
-	# the flag bits differ, so the two stdio.h cannot be shared.
+	# CP/M keeps a header tree here, and the reason is FILE.  -m cpm
+	# is a target directory, self-contained by design: it links
+	# libcpm.a and starts with crtcpm.o, and its stdio.h sits over
+	# fcb's and has different flag bits, so it cannot share the
+	# micronix one.  Nothing in the tree builds -m cpm with an -i of
+	# its own - stand/formatmw is the one that does - which is why
+	# this stays.
 	#
-	cp lib/include/*.h $(HOSTROOT)/ccc/include/cpm
-	cp lib/include/sys/*.h $(HOSTROOT)/ccc/include/cpm
-	cp cpm/include/*.h $(HOSTROOT)/ccc/include/cpm
+	# The C library's headers, with the CP/M ones over them.  cp
+	# onto a link would write through it, into the tree, so -f
+	# unlinks first.
+	#
+	@for f in lib/include/*.h lib/include/sys/*.h cpm/include/*.h; do \
+		ln -sf ../../../src/micronix/$$f \
+			$(HOSTROOT)/ccc/include/cpm/$${f##*/}; \
+	done
 	@echo "runtime in $(HOSTROOT)/ccc/lib"
 
 #
@@ -202,8 +210,8 @@ hostrt:
 # rather than the tree, with sudo because $(PREFIX) is not ours.  The
 # layout is hostrt's, only the root differs; the driver reads it out of
 # /usr/local/ccc when run from /usr/local/bin (LIBSUF in ccc.c), which
-# keeps this tree's runtime out of /usr/local/lib and
-# /usr/local/usr/include where the ccc this tree forked from still lives.
+# keeps this tree's runtime out of the /usr/local/lib and
+# /usr/local/usr/include an installed cc looks in.
 #
 sysrt:
 	$(SUDO) mkdir -p $(PREFIX)/ccc/lib/cpm $(PREFIX)/ccc/include/sys \

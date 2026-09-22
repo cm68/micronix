@@ -36,11 +36,6 @@ MAKEFLAGS += --no-builtin-variables
 #
 # THE COMPILER IS THIS TREE'S OWN.
 #
-# It was /usr/local/bin/ccc, which is installed out of ~/src/ccc, so
-# the tree that forked the compiler sources went on being built by the
-# other tree's binary - and a correctness fix made here was not in the
-# compiler that compiled the next thing.
-#
 # desthost/bin/mxccc is built from the sources in libexec and cmd/ccc
 # by "make hostcc" at the top of this tree.  It has to exist before
 # anything compiles, and the runtime it links against has to exist
@@ -51,8 +46,7 @@ MAKEFLAGS += --no-builtin-variables
 #	make hostrt		the archives where mxccc looks for them
 #	make			everything else
 #
-# Override CCC on the command line to build with something else -
-# /usr/local/bin/ccc still works and is how the two trees get compared.
+# Override CCC on the command line to build with something else.
 #
 HOSTROOT	?= $(DEPTH)/../..
 BIN		?= $(HOSTROOT)/bin
@@ -68,15 +62,11 @@ CCC		?= $(BIN)/mxccc
 LIB	?= $(BIN)/mxar
 NM	?= $(BIN)/mxnm
 #
-# -O IS THE PEEPHOLE PASS, and this tree was not using it while ccc's
-# own build was: its libc compiles with -O, and so do its passes.  So
-# every binary here was a little larger than the same source built two
-# directories away, for no reason but the flag.
-#
-# On this machine that is not a nicety.  The heap is what is left of
-# 64k after the image, so a byte of text is a byte the program cannot
-# allocate - and c0 was failing to compile declare.c, the largest
-# source in the compiler, by less than a kilobyte.  -O takes 829 bytes
+# -O IS THE PEEPHOLE PASS, and on this machine it is not a nicety.  The
+# heap is what is left of 64k after the image, so a byte of text is a
+# byte the program cannot allocate - and c0 was failing to compile
+# declare.c, the largest source in the compiler, by less than a
+# kilobyte.  -O takes 829 bytes
 # off c0 and that is the difference between it building the compiler
 # and not.
 #
@@ -84,89 +74,57 @@ NM	?= $(BIN)/mxnm
 #
 CCFLAGS	?= -m micronix -O
 
-# -i and -I are not the same list, and the difference is the whole
-# reason the commands would not compile.  ccc resolves <sys/...> out
-# of its system include directory, which defaults to a place beside
-# the compiler holding a CP/M stat.h and nothing else, and that lookup
-# happens BEFORE -I - so no amount of reordering -I could reach the
-# tree's sys/stat.h.
+# -i and -I are not the same list.
 #
-# WHERE THAT DIRECTORY IS: libdir/../usr/include, and libdir is
-# argv[0]/../lib - so a compiler run as desthost/bin/ccc reads
-# desthost/usr/include, and one run as /usr/local/bin/ccc reads
-# /usr/local/usr/include.  NOT the lib/include beside it, which also
-# holds a full set of headers and is the obvious place to look and to
-# fix.  Both exist, only one is read, and they can differ for as long
-# as nobody notices.
+# ccc resolves <sys/...> out of its system include directory, and that
+# lookup happens BEFORE -I - so no amount of reordering -I can reach a
+# header the system directory shadows.  Left to itself the system
+# directory is libdir + INCSUF: bin/../ccc/include, a second copy of
+# these headers that something has to keep in step with the tree, and
+# a silent disagreement the day it is not.  That is not a worry to
+# carry, it is a bug we have already had: mkfs and the kernel were
+# built against two vintages of sys/fs.h and wrote s_time to two
+# different offsets, and the guest's clock came up in the wrong year
+# because of it.  So INC names the system directory itself - the
+# tree's own lib/include - and there is no copy left to go stale.  A
+# host tool compiling with -I$(DEPTH)/micronix/include now reads the
+# same files this does.
 #
-# They did differ, for an afternoon.  A change to stdio.h was made in
-# ccc's src/include and copied into every installed copy that could be
-# found by eye - lib/include, /usr/local/lib/include, the simulated
-# filesystem - but not into usr/include, and ccc's own "make install"
-# was failing before it reached the headers, so nothing refreshed it.
-# Every object built in that time was compiled against the old
-# definition while the header on screen said otherwise.  "ccc -n"
-# prints the -i it will use and is the way to settle it.  Every command that stats a file got the CP/M
-# struct, which has st_mode and st_size and no st_uid, st_gid, st_ino
-# or st_mtime, and c0 reported them one at a time as missing members
-# of a structure that was never the right one.
-#
-# -i points the system include search at this tree, which is what the
-# native micronix build has always done - sys/Makefile says
-# "CFLAGS = -i $(INC)/" and has since it was written.
-#
-# -I still puts ccc's headers ahead of the tree's, so the five that
-# exist in both - cpm.h hitech.h setjmp.h stdio.h time.h - come from
-# the compiler that has to agree with them.  The tree's stdio.h is the
-# old Whitesmith one and shares almost nothing with ccc's; a command
-# linked against the libc built here has to use ccc's.
-#
-# NOT -i$(DEPTH)/include, tempting as it is.  -i is searched before -I
-# and falls through to it, so that one flag would fix sys/stat.h - but
-# it also puts the tree's stdio.h, time.h and setjmp.h ahead of ccc's,
-# and the tree's stdio.h is the old Whitesmith one with a different
-# FILE.  A command compiled against that and linked against the libc
-# built here would not fail to build, it would corrupt its own buffers
-# at run time.  The five colliding headers are shipped into the
-# simulated filesystem's /include for the native compiler, so they
-# cannot simply be retired either.
-#
-# What that leaves shadowed is sys/stat.h: ccc's system directory has
-# a CP/M one, with st_mode and st_size and no st_uid, st_gid, st_ino or
-# st_mtime, and no S_IFDIR or S_IFMT.  Every command that stats a file
-# gets it, and c0 reports the fields one at a time as missing members
-# of a structure that was never the right one.  That is ar, cp, ls,
-# mkdir, pwd, rm and vi - seven of the eight commands still failing.
+# Which set goes in -i is not a choice.  The system directory is
+# searched first, so the set that has to win the six names below has
+# to be the one in -i, and that is the C library's.
 #
 #
 # THE HEADERS ARE THIS TREE'S OWN, both sets.
 #
-# lib/include is the C library's - stdio.h, ctype.h, fcntl.h, the
-# ones a program includes - and it was reached at
-# /usr/local/lib/include, which is installed out of ~/src/ccc.  The
-# fork copied libc's sources and left its headers behind, so the tree
-# compiled its own libc against another tree's declarations of it.
+# lib/include is the C library's - stdio.h, ctype.h, fcntl.h, the ones
+# a program includes.  include is the system's - the v6 headers, struct
+# time and the rest.  The two are different sets and both are wanted:
+# /usr/include on micronix holds them merged.
 #
-# include is the system's - the v6 headers, struct time and the rest -
-# and has always been here.  The two are different sets and both are
-# wanted: /usr/include on micronix holds them merged.
+# Six names are in both - cpm.h errno.h hitech.h setjmp.h stdio.h
+# time.h - and the library's are the ones that count: include/GNUmakefile
+# calls them CCCOWNED and installs its own copies of everything BUT
+# those.  The tree's stdio.h is the old Whitesmith one with a different
+# FILE, so a command linked against the libc built here has to use the
+# library's; the tree's time.h is the v6 one, struct time in UINTs, and
+# c0 will not read it.
 #
-INC	?= -I$(DEPTH)/lib/include -I$(DEPTH)/include
+INC	?= -i$(DEPTH)/lib/include -I$(DEPTH)/include
 
 #
 # where the simulated filesystem lives, and where in it these sources
 # belong
 #
 #
-# The libraries this tree builds, named ahead of the ones ccc links by
-# itself.  ccc appends /usr/local/lib/libc.a and libu.a to the link by
-# absolute path, so -L cannot redirect it and a command would other-
-# wise be linked against whatever was last installed rather than
-# against what this build just produced.  attic/Make is where that
-# showed up: system() is in lib/libc and not in the installed libc.a, so Make
-# failed to link with "undefined symbol: _system" while the source of
-# system() sat two directories away, freshly compiled.  wsld resolves
-# in order, so listing them first is enough.
+# The libraries this tree builds, named ahead of the runtime ccc appends
+# to the link by absolute path.  -L cannot redirect that, so without
+# these a command would be linked against whatever was last installed
+# rather than against what this build just produced.
+#
+# ld resolves the archives by fixpoint, not in order: it rescans until a
+# pass adds nothing, so naming them here is enough and the order does
+# not matter.
 #
 TREELIBS ?= $(DEPTH)/lib/libc/libc.a $(DEPTH)/lib/libu/libu.a
 
@@ -489,7 +447,7 @@ install-hwsim: $(MNIX) $(SETDEV)
 
 clean:
 	$(RECURSE)
-	rm -f $(OBJS) $(DOCFILES)
+	rm -f $(OBJS) $(DOCFILES) *.nam *.tok *.x
 
 clobber: clean
 	$(RECURSE)
@@ -505,16 +463,11 @@ update:
 	$(RECURSE)
 else
 #
-# -h, and then checked, because a source here may be a symlink into
-# the ccc tree - the
-# passes under libexec have been that way for a while and libc is now
-# too, there being one libc rather than two copies drifting apart.
-# What ships has to be the file, not the link: /home/curt/src/ccc does
-# not exist inside the filesystem the simulator boots.  Worse than
-# dangling: micronix has no symlinks at all, so tar x would refuse the
-# entry outright and the source would simply not arrive.  usersim
-# hides this - it resolves an absolute host path quite happily - so
-# the check is here, where it fails on the machine doing the building.
+# -h, and then checked: what ships has to be the file, not the link.
+# micronix has no symlinks at all, so tar x would refuse the entry
+# outright and the source would simply not arrive.  usersim hides
+# this - it resolves an absolute host path quite happily - so the
+# check is here, where it fails on the machine doing the building.
 #
 $(DIR).tar: $(SRCS) $(MKFILE)
 	tar -f $(DIR).tar -h --ignore-failed-read -c $(MKFILE) $(SRCS)

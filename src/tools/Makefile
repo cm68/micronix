@@ -54,6 +54,16 @@ disas:	disas.o
 mnix:	mnix.o mkfsfunc.o $(FSLIBS)
 	$(CC) $(CFLAGS) -o mnix mnix.o mkfsfunc.o $(FSLIBS) $(LDFLAGS)
 
+# The include path here is the tree's own system headers, and the cross
+# build reads the same files: ccc resolves <sys/...> out of its system
+# include directory, which GNUmakefile.inc points at the tree's
+# lib/include rather than at a copy under $(HOSTROOT)/ccc.  That is what
+# makes a host tool and a command agree about a struct both of them put
+# on disk - they did not, once, and mkfs wrote s_time where the kernel
+# was not reading it.  If a layout ever disagrees between the two sides
+# again, this path and INC in GNUmakefile.inc are the two halves of the
+# question.
+#
 # the mkfs worker, shared with cmd/mkfs and compiled here for the host.
 mkfsfunc.o: ../micronix/cmd/mkfs/mkfsfunc.c
 	$(CC) $(CFLAGS) -I../micronix/include -c ../micronix/cmd/mkfs/mkfsfunc.c -o $@
