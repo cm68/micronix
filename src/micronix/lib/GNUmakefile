@@ -36,10 +36,26 @@ all:
 lib.tar: makefile
 	tar -f lib.tar -c makefile
 
-update: lib.tar
+#
+# The C library's own headers, lib/include.  Not a build directory - it
+# has no makefile of its own - so the recursion above never reaches it,
+# and without this the source tree is missing /usr/src/lib/include: a
+# from-scratch native rebuild cannot find stdio.h.  These are the modern
+# set, the ones lib/libc and lib/libu are compiled against, whose FILE
+# agrees with the library - distinct from include/ at the top, which is
+# the old Whitesmith set.  Shipped the same way makefile is.
+#
+LIBHDRS	   = $(wildcard include/*.h)
+LIBSYSHDRS = $(wildcard include/sys/*.h)
+
+libinclude.tar: $(LIBHDRS) $(LIBSYSHDRS)
+	tar -f libinclude.tar -c $(LIBHDRS) $(LIBSYSHDRS)
+
+update: lib.tar libinclude.tar
 	$(RECURSE)
 	mkdir -p $(DEST)
 	tar -f lib.tar -C $(DEST) --keep-newer-files -x $(NOWARN)
+	tar -f libinclude.tar -C $(DEST) --keep-newer-files -x $(NOWARN)
 
 #
 # This used to say that the cross build does not install these -
@@ -66,7 +82,7 @@ clean:
 
 clobber:
 	$(RECURSE)
-	rm -f lib.tar
+	rm -f lib.tar libinclude.tar
 
 doc:
 	$(RECURSE)
