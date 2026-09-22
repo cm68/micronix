@@ -20,14 +20,28 @@
 static int ntermpids;
 static int *termpids;
 
-static void
-kill_terminal_children()
+/*
+ * Kill the windows, and the pollers behind them.
+ *
+ * The atexit handler below covers every orderly end - a guest halt, a
+ * bad argument, anything that calls exit().  It does not cover a signal:
+ * the simulator's handlers call _exit() on purpose, so that a Ctrl-C
+ * prints the run's speed line without the rest of the teardown running
+ * under a signal.  That left the windows standing, because an xterm is a
+ * CHILD of the simulator and a child outlives its parent - close d1 and
+ * the terminals it was talking to are still there, with nothing behind
+ * them.  So the signal paths ask for this by name as well, which is why
+ * it is idempotent: the second caller finds the list already empty.
+ */
+void
+close_terminals()
 {
     int i;
 
     for (i = 0; i < ntermpids ; i++) {
         kill(termpids[i], SIGTERM);
     }
+    ntermpids = 0;
 }
 
 /*
@@ -192,7 +206,7 @@ __attribute__((constructor))
 void
 terminal_cleanup_setup()
 {
-    atexit(kill_terminal_children);
+    atexit(close_terminals);
 }
 
 /*

@@ -856,14 +856,19 @@ sim_report(void)
 }
 
 /*
- * SIGINT/SIGTERM: report the run and go, so a Ctrl-C on the sim prints
- * the same speed line a normal exit would.  _exit() skips the atexit
- * handler, so the report is called explicitly.
+ * SIGINT/SIGTERM/SIGHUP: report the run and go, so a Ctrl-C on the sim
+ * prints the same speed line a normal exit would.  _exit() skips the
+ * atexit handlers, so both of them are asked for by name here: the
+ * report, and hanging up the xterms, which the atexit handler would
+ * otherwise have done.  An xterm is a child of the simulator, so it
+ * outlives it - without this the windows stay up with nothing behind
+ * them, attached to a machine that is gone.
  */
 void
 signal_report(int sig)
 {
     sim_report();
+    close_terminals();
     _exit(0);
 }
 
@@ -2005,6 +2010,15 @@ main(int argc, char **argv)
 
     mysignal(SIGINT, signal_report);
     mysignal(SIGTERM, signal_report);
+    /*
+     * SIGHUP is how an xterm tells us its window has gone: the poller
+     * behind it hangs up the simulator when the pty reads EOF
+     * (lib/openx.c), which is what makes closing a window end the run
+     * instead of leaving d1 behind it.  Catching it here hangs up the
+     * OTHER windows on the way out too, so closing one closes them all
+     * rather than leaving them attached to a machine that has stopped.
+     */
+    mysignal(SIGHUP, signal_report);
 
     // another driver hook
     for (i = 0; i < ndrivers; i++) {
