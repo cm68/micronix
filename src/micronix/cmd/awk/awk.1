@@ -1,4 +1,4 @@
-.he "awk (1)                     8/19/26                      awk (1)"
+.he "awk (1)                     9/22/26                      awk (1)"
 .fo "                               -#-"
 .in 5
 .rm 65
@@ -16,49 +16,322 @@ SYNTAX
 .in +5
 .br
 .bd
-awk [ -Fc ] [ -f progfile | 'program' ] [ file ... ]
+awk [ -Fc ] [ -f progfile | 'program' ] [ var=value ... ] [ file ... ]
 .sp 2
 .in -5
 .bd
 DESCRIPTION
 .in +5
 .br
-Awk scans each input file for lines that match any of a set of patterns
-specified in the program, which appears literally on the command line
-or in a file named by -f progfile.  With each pattern there can be an
-associated action, performed when a line matches.  Files are read in
-order; with no files, the standard input is read.  A file name of -
-means the standard input, and an argument of the form var=value is
-treated as an assignment rather than a file name.
+Awk scans each input file for records that match any of a set of patterns
+given in the program, which appears literally on the command line or in a
+file named by -f progfile.  With each pattern there can be an action, run
+when a record matches.  A pattern with no action prints the record; an
+action with no pattern runs for every record.  BEGIN and END match before
+the first record and after the last.
 .sp
-An input line is made up of fields separated by white space (changeable
-with FS or -Fc).  The fields are $1, $2, ...; $0 is the whole line, and
-$expr refers to a field indirectly.  NF, NR and FILENAME are the number
-of fields in the current record, the number of records read so far, and
-the name of the current input file.
+Files are read in order; with no files, the standard input is read.  A
+file name of - means the standard input, and an argument of the form
+var=value is an assignment rather than a file name.
 .sp
-A pattern-action statement has the form:
+awk is 2.11BSD awk, ported to micronix.  There is no floating point:
+numbers are 32-bit signed integers, so awk's numeric model and the
+transcendental builtins differ from a full awk.  See NUMBERS and
+LIMITATIONS below.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-Fc	Set the input field separator to the single character c, as if by FS=c.  -Ft sets it to a tab.
+
+.ti -10
+-f progfile	Take the program from progfile.
+
+.ti -10
+'program'	The program itself, as the first argument.
+
+.ti -10
+var=value	Assign var before scanning.  The assignment happens after BEGIN, which therefore cannot see it.
+
+.in -10
+.sp 2
+.in -5
+.bd
+RECORDS AND FIELDS
+.in +5
+.br
+The input is a sequence of records separated by RS, a newline by
+default.  Each record is split into fields on the field separator FS,
+which is a single blank by default; a blank FS means runs of blanks and
+tabs separate fields, and leading blanks are stripped.
+.sp
+$0 is the whole record, $1 through $NF its fields, and $(expr) refers to
+a field indirectly.  NF is the number of fields in the current record,
+NR the number of records read so far, and FILENAME the name of the
+current input file.  Setting FS or RS changes the way later records are
+split; setting NF truncates or extends the fields.
+.sp
+OFS is written between fields by print, ORS at the end of a record; both
+default as for input.
+.sp 2
+.in -5
+.bd
+PATTERNS
+.in +5
+.br
+A pattern selects the records whose action runs.  The forms are:
+.sp
 .nf
-	pattern { action }
+	/regex/		$0 matches the regular expression
+	expr relop expr	the six comparisons, and ~ !~ for match
+	pattern && pattern   logical and
+	pattern || pattern   logical or
+	! pattern		logical not
+	pattern, pattern	every record from the first that matches
+				the first pattern through the next that
+				matches the second
+	BEGIN		before the first record
+	END		after the last
 .fi
 .sp
-A missing { action } prints the line; a missing pattern always matches.
-An action is a sequence of statements - if, while, for, break, continue,
-next, exit, assignment, print, printf and getline - terminated by
-semicolons, newlines or right braces.  Variables are created on first
-use and take string or numeric values as appropriate; array subscripts
-are strings, so arrays give associative memory.
+An expression alone is true when it is both non-empty and non-zero; a
+missing pattern matches every record.  A comparison is not a general
+expression and can appear only here and in if, while and for, not in an
+assignment or an argument to print.
+.sp 2
+.in -5
+.bd
+STATEMENTS
+.in +5
+.br
+An action is a sequence of statements separated by semicolons, newlines
+or right braces.  The statements are:
 .sp
-Patterns are boolean combinations of regular expressions (as in egrep,
-surrounded by slashes) and relational expressions (the six C relations,
-plus ~ and !~ for match).  A pattern of two expressions separated by a
-comma selects the range of lines between them.  BEGIN and END match
-before the first input line and after the last.
+.in +10
+.ti -10
+if ( cond ) statement [ else statement ]	Run the statement if cond is true, the else one otherwise.
+
+.ti -10
+while ( cond ) statement	Repeat while cond is true.
+
+.ti -10
+for ( init ; cond ; incr ) statement	Run init once, then repeat statement while cond is true, running incr after each.
+
+.ti -10
+for ( var in array ) statement	Run statement with var set to each subscript of array in turn.
+
+.ti -10
+break	Leave the innermost enclosing while or for.
+
+.ti -10
+continue	Begin the next iteration of the innermost enclosing while or for.
+
+.ti -10
+next	Read the next record and start the pattern-action sequence over.
+
+.ti -10
+exit [ expr ]	Stop, with expr as the status if given.
+
+.ti -10
+print [ list ] [ > file | >> file | | cmd ]	Print $0, or list, to the standard output or the redirected file.
+
+.ti -10
+printf format [ , list ] [ > file | ... ]	Print list formatted as format, as in the C library.
+
+.ti -10
+getline	Read the next record into $0 and set NF, NR and FILENAME; 1 if a record was read, 0 at end of input.
+
+.ti -10
+{ list }	A group; a statement like any other.
+
+.in -10
+.sp 2
+.in -5
+.bd
+EXPRESSIONS
+.in +5
+.br
+The operators of an expression, highest precedence first:
 .sp
-The builtin functions are length, substr, index, split, sprintf, int,
-log, exp and sqrt.  Numbers in this awk are 32-bit signed integers:
-division truncates toward zero, and log, exp and sqrt return integer
-approximations.
+.nf
+	$		field, and $expr for the indirect field
+	++ --		increment and decrement, before or after
+	- +		unary minus and plus
+	* / %		multiply, divide, remainder
+	+ -		add, subtract
+	(space)		string concatenation
+	= += -= *= /= %=	assignment
+.fi
+.sp
+Concatenation is written as juxtaposition, so x y is x followed by y;
+parentheses are needed in x (y) z to keep x from joining y.  A string
+that looks like a number is a number in an arithmetic context, and a
+number is a string in a string context.
+.sp
+The comparisons < <= > >= == !=, the match operators ~ !~, and the
+logical !, && and || are not expression operators: they combine
+conditions, so they appear only in a pattern or in if, while and for.
+A comparison is numeric when both sides are numeric, otherwise the
+strings are compared.  There is no ternary operator.
+.sp
+Array subscripts are strings, so arrays are associative.  There is no
+declaration: an array grows as subscripts are assigned, and for (var in
+array) visits them in no particular order.
+.sp 2
+.in -5
+.bd
+BUILTIN VARIABLES
+.in +5
+.br
+.in +10
+.ti -10
+NR	records read so far.
+
+.ti -10
+NF	fields in the current record.
+
+.ti -10
+FILENAME	the current input file.
+
+.ti -10
+FS	the input field separator, blank by default.
+
+.ti -10
+OFS	the output field separator, blank by default.
+
+.ti -10
+ORS	the output record separator, newline by default.
+
+.ti -10
+RS	the input record separator, newline by default.
+
+.ti -10
+OFMT	the format for printing numbers, %.6g by default; see NUMBERS.
+
+.in -10
+.sp 2
+.in -5
+.bd
+BUILTIN FUNCTIONS
+.in +5
+.br
+.in +10
+.ti -10
+length [ s ]	The length of s, or of $0 with no argument.
+
+.ti -10
+substr ( s , m [ , n ] )	The substring of s starting at character m, at most n characters long; to the end with no n.
+
+.ti -10
+index ( s , t )	The position in s where t first occurs, 1 for the start, or 0 if t is not in s.
+
+.ti -10
+split ( s , a [ , fs ] )	Split s into a[1], a[2], ... on the separator fs (FS by default), returning the number of fields.
+
+.ti -10
+sprintf ( format , ... )	Format as printf, returning the result as a string.
+
+.ti -10
+int ( x )	The integer part of x.
+
+.ti -10
+log ( x ) , exp ( x ) , sqrt ( x )	Integer approximations of the natural logarithm, its inverse, and the square root.  See NUMBERS.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NUMBERS
+.in +5
+.br
+All numbers are 32-bit signed integers, from -2147483648 to
+2147483647.  There is no floating point, and no soft-float library:
+arithmetic is exact, division truncates toward zero, and % is the
+remainder.  A string in a numeric context takes the leading integer of
+what it spells, so "3.14" + 0 is 3 and "-7" is -7; a string with no
+leading digits is zero.
+.sp
+The transcendental builtins collapse to integer approximations: log(x)
+is roughly the natural logarithm (scaled floor(log2 x)), exp(x) is a
+power of two close to e^x, and sqrt(x) is the integer square root.  A
+number always prints as a plain decimal integer - OFMT is kept for
+compatibility but has no effect, and %f, %e and %g in printf all print
+the integer.
+.sp 2
+.in -5
+.bd
+REGULAR EXPRESSIONS
+.in +5
+.br
+Regular expressions are those of egrep.  The operators are:
+.sp
+.nf
+	.	any character
+	[...]	one of the enclosed characters; a-z is a range
+	[^...]	one character not enclosed
+	^ $	start and end of the string
+	* + ?	zero or more, one or more, zero or one
+	|	alternation
+	( )	grouping
+.fi
+.sp
+Inside [...] a backslash quotes a character, so \] is a literal bracket,
+and \n and \t are newline and tab.  Elsewhere \ddd is the character in
+octal and \c the literal character c.
+.sp 2
+.in -5
+.bd
+PRINTF
+.in +5
+.br
+printf and sprintf take a format of the C library's form.  The
+conversions are %d (a 32-bit decimal, always), %o and %x (octal and
+hexadecimal of the low 16 bits), %lo and %lx (of the whole 32 bits),
+%c (a character), %s (a string), and %f, %e and %g (the integer, its
+precision ignored).  Width, and the - and 0 flags, are honoured.
+.sp 2
+.in -5
+.bd
+LIMITATIONS
+.in +5
+.br
+Deviations from a full awk:
+.sp
+.in +10
+.ti -10
+No floating point.  Numbers are integers, as under NUMBERS.
+
+.ti -10
+A small builtin set.  There are no sub, gsub, match, close or system, no
+delete for arrays, no do/while, and no user-defined functions.
+
+.ti -10
+getline is bare only.  There is no getline var and no getline < file,
+and neither print | cmd nor cmd | getline works, because micronix has no
+shell to pipe through.
+
+.ti -10
+A comparison is not a general expression.  It can appear only in a
+pattern or in if, while and for; x = (a == b) and print (a == b) are
+syntax errors, and print a > b is always redirection, never a
+comparison.
+
+.ti -10
+NF is 0 in an END block.  The empty record read at end of file is
+re-split.
+
+.ti -10
+No -v flag.  A var=value argument is applied after BEGIN runs.
+
+.ti -10
+The port's own knobs are not standard: -d and -l turn on debugging, -S
+saves the compiled program to awk.out and -R thaws one back.
+
+.in -10
 .sp 2
 .in -5
 .bd
@@ -75,10 +348,16 @@ Print the first two fields in opposite order:
 	{ print $2, $1 }
 .fi
 .sp
-Sum the first column, print sum and average:
+Sum the first column, print the sum and average:
 .nf
 	{ s += $1 }
 	END { print "sum is", s, " average is", s/NR }
+.fi
+.sp
+Count how often each word appears:
+.nf
+	{ for (i = 1; i <= NF; i++) count[$i]++ }
+	END { for (w in count) print count[w], w }
 .fi
 .sp 2
 .in -5
@@ -87,15 +366,3 @@ SEE ALSO
 .in +5
 .br
 sed (1), grep (1), lex (1)
-.sp 2
-.in -5
-.bd
-BUGS
-.in +5
-.br
-There is no floating point; numbers are 32-bit signed integers.
-.sp
-getline has no var or < file forms, and a relational expression is not
-a general expression, so it can appear only in an if(...) test or a
-pattern.  NF is 0 in an END block (the empty record read at end of
-file is re-split).
