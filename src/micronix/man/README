@@ -38,7 +38,7 @@ are documented and never invoked.
 
 A line whose first character is a period is a command.  Five of the
 original pages have prose that begins with one and loses a line as a
-result - see link.1 line 111 (".data sections."), sh.1, edit.1,
+result - see link.1 line 111 (".data sections."), oldsh.1, edit.1,
 update.1 (".BD", which form does not match because it is upper case)
 and Intro.2.  Watch for this when reversing.
 
