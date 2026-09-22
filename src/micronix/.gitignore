@@ -10,3 +10,13 @@ desthost/
 lib/libccc/libccc-host.a
 libexec/*/dbgtags.c
 libexec/*/debug.h
+
+#
+# The compiler's per-source intermediates, written beside the .o for
+# every .c: the name table (.nam), the readable tokens (.tok) and the
+# tokenized source (.x).  ccc keeps its own copies in /tmp under pid
+# names and deletes them; these are what an older build left in place.
+#
+*.nam
+*.tok
+*.x
