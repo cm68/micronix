@@ -64,14 +64,28 @@ run(p)
 
 /*
  * Sleep until a wakeup for event.
+ *
+ * The two registers ccc lets a caller keep live across a call are BC
+ * (integers) and IX (pointers), and a prologue saves only the ones the
+ * function's own body uses.  A process switch is not a call: once the
+ * cpu has moved on, the physical registers belong to whatever ran in
+ * the meantime, so a caller's value survives only if a copy of it was
+ * pushed before the switch.  Both register variables below exist to buy
+ * that copy - the int for BC, the pointer for IX.  Without them sleep
+ * compiles to a prologue that saves neither (fenterw), and a caller
+ * holding an int in BC across the sleep - outwait's count, muopen's dev
+ * - resumes holding the wrong process's BC.
  */
 sleep(event, pri)
-    int event, pri;
+    register int event, pri;
 {
-    u.p->event = event;
-    u.p->pri = pri;
-    u.p->mode &= ~AWAKE;
-    if (memwant && !(u.p->mode & LOCKED))
+    register struct proc *p;
+
+    p = u.p;
+    p->event = event;
+    p->pri = pri;
+    p->mode &= ~AWAKE;
+    if (memwant && !(p->mode & LOCKED))
         run(swapproc);
     next(0);
     abort();                    /* abort on signal and low priority */
