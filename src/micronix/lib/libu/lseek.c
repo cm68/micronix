@@ -16,14 +16,14 @@
 
 #define NFDS 16
 
-extern long _fdpos[];
+extern unsigned long _fdpos[];
 extern int errno;
 extern int seekraw(unsigned char fd, int offset, int whence);
 
 long
 lseek(unsigned char fd, long offset, int whence)
 {
-	long pos;
+	unsigned long pos;	/* a file position is unsigned, up to ~15M */
 	char sb[36];
 
 	if (fd >= NFDS) {
@@ -32,25 +32,30 @@ lseek(unsigned char fd, long offset, int whence)
 	}
 	switch (whence) {
 	case SEEK_SET:
-		pos = offset;
+		pos = (unsigned long) offset;
 		break;
 	case SEEK_CUR:
+		if (offset < 0 && (unsigned long)(-offset) > _fdpos[fd]) {
+			errno = 22;			/* EINVAL: ran past the start */
+			return -1;
+		}
 		pos = _fdpos[fd] + offset;
 		if (offset == 0)
-			return pos;	/* ftell: no seek needed */
+			return (long) pos;	/* ftell: no seek needed */
 		break;
 	case SEEK_END:
 		if (fstat(fd, sb) < 0)
 			return -1;
-		pos = ((long)(sb[9] & 0377) << 16) +
-			((long)(sb[11] & 0377) << 8) +
-			(sb[10] & 0377) + offset;
+		pos = ((unsigned long)(sb[9] & 0377) << 16) +
+			((unsigned long)(sb[11] & 0377) << 8) +
+			(sb[10] & 0377);
+		if (offset < 0 && (unsigned long)(-offset) > pos) {
+			errno = 22;			/* EINVAL: ran past the start */
+			return -1;
+		}
+		pos += offset;
 		break;
 	default:
-		errno = 22;			/* EINVAL */
-		return -1;
-	}
-	if (pos < 0) {
 		errno = 22;			/* EINVAL */
 		return -1;
 	}
@@ -65,7 +70,7 @@ lseek(unsigned char fd, long offset, int whence)
 			return -1;
 	}
 	_fdpos[fd] = pos;
-	return pos;
+	return (long) pos;
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

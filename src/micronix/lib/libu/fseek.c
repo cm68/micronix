@@ -35,7 +35,7 @@ fseek(FILE *fp, long off, int whence)
 	else if (whence == SEEK_CUR && (fp->_flag & _IOREAD))
 		off -= fp->_cnt; /* adjust for buffered but unread data */
 
-	if (lseek(fp->_file, off, whence) < 0) {
+	if (lseek(fp->_file, off, whence) == -1) {
 		fp->_flag |= _IOERR;
 		return EOF;
 	}

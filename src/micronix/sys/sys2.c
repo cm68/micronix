@@ -90,7 +90,7 @@ seek(fd, disp, from)
     register unsigned from;
 {
     static struct file *fp;
-    static long offset;
+    static UINT32 offset;       /* file positions are unsigned (to ~15M) */
 
     if ((fp = ofile(fd)) == 0)
         return;
@@ -118,10 +118,14 @@ seek(fd, disp, from)
         offset += fp->inode->size;
         break;
     }
-    if (offset < 0)
-        u.error = EINVAL;
-    else
-        fp->rwptr = offset;
+    /*
+     * The "before the start" test is done by lseek() before it reaches
+     * here: seekraw() is only ever handed a non-negative block or byte
+     * displacement, so offset is already non-negative and the unsigned
+     * arithmetic above is exact.  A signed "offset < 0" here would
+     * wrongly reject any position with bit 15 set.
+     */
+    fp->rwptr = offset;
     /* XXX - we should return offset in hl, de */
 }
 
