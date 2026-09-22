@@ -2716,8 +2716,9 @@ allocinum(int ui)
  *
  * ps reads the kernel's process table straight out of physical memory:
  * a two-byte pointer at 0x1003 names the table, and each slot in it is
- * a 141-byte struct proc - the layout the installed ps binary was
- * compiled against, which is older than sys/proc.h.  We build that
+ * a struct proc - 98 bytes, the layout of the tree's own
+ * include/sys/proc.h, which is what the ps in cmd/ps was compiled
+ * against and what the kernel itself lays down.  We build that
  * image in a shared segment so every simulated process, the root and
  * all its forked children alike, updates the one copy - the same way
  * the pid registry and the file table are shared.
@@ -2730,8 +2731,8 @@ allocinum(int ui)
 #define MEMSZ       65536           /* the Z80 address space ps seeks */
 #define PTAB        0x2000          /* where the process table lives */
 #define TTY         0x2a00          /* the one tty struct we hand ps */
-#define NPROCSL     17              /* the ps binary's NPROC */
-#define PROCSTRIDE  141             /* its sizeof(struct proc) */
+#define NPROCSL     20              /* NPROC, as ps and the kernel read it */
+#define PROCSTRIDE  98              /* sizeof(struct proc) */
 
 /* mode bits, as ps tests them */
 #define P_ALLOC     0001
@@ -2739,15 +2740,23 @@ allocinum(int ui)
 #define P_AWAKE     0004
 #define P_LOADED    0010
 
-/* field offsets within the 141-byte struct proc, as ps reads them */
+/*
+ * Field offsets within struct proc, as ps reads them.  These are
+ * include/sys/proc.h's own offsets, and the ps that reads them is the
+ * one in cmd/ps, built against that same header - so they move
+ * together.  Note that pri precedes nice here; the older struct had
+ * them the other way round, which is one of the things that makes the
+ * two layouts unalike beyond their size.
+ */
 #define P_ARGS      0
-#define P_MODE      18
-#define P_PRI       19
-#define P_NICE      22
-#define P_EVENT     25
-#define P_TTY       27
-#define P_PARENT    39
-#define P_UID       45
+#define P_MODE      8
+#define P_UID       9
+#define P_EVENT     10
+#define P_PARENT    18
+#define P_TTY       20
+#define P_NICE      91
+#define P_PRI       92
+#define P_PID       97
 
 struct memdev {
     pthread_mutex_t mutex;
@@ -2828,6 +2837,22 @@ procrender()
 
     memset(&memdev->mem[PTAB], 0, NPROCSL * PROCSTRIDE);
 
+    /*
+     * Slots 0 and 1 are the two processes this simulator does not
+     * run, and ps names them by their pid: 0 is the swapper, 1 is
+     * init.  They have to be rendered rather than left empty, because
+     * this ps drops any entry without ALLOC set - the older binary
+     * printed them regardless, which is why the table used to be
+     * cleared and left that way.
+     */
+    for (slot = 0; slot < 2; slot++) {
+        addr = PTAB + slot * PROCSTRIDE;
+        memdev->mem[addr + P_MODE] = P_ALLOC | P_ALIVE | P_AWAKE | P_LOADED;
+        memdev->mem[addr + P_PID] = slot;
+        put16(&memdev->mem[addr + P_TTY], TTY);
+        put16(&memdev->mem[addr + P_PARENT], PTAB);
+    }
+
     for (slot = 0; slot < NPROCSL; slot++) {
         if (!memdev->slotpid[slot])
             continue;
@@ -2836,6 +2861,12 @@ procrender()
         for (i = 0; i < 8; i++)
             memdev->mem[addr + P_ARGS + i] = memdev->cmd[slot][i];
         memdev->mem[addr + P_MODE] = P_ALLOC | P_ALIVE | P_AWAKE | P_LOADED;
+        /*
+         * proc.pid is one byte in the kernel, and the simulated pid
+         * space is wider than that, so this is where it narrows - the
+         * same thing the kernel would have done to the number.
+         */
+        memdev->mem[addr + P_PID] = memdev->slotpid[slot] & 0xff;
         memdev->mem[addr + P_PRI] = 0;
         memdev->mem[addr + P_NICE] = 0;
         put16(&memdev->mem[addr + P_EVENT], 0);     /* not waiting */

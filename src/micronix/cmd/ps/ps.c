@@ -1,12 +1,65 @@
 /*
- * ps.c 
+ * ps - process status
+ *
+ * cmd/ps/ps.c
+ *
+ * The 1982 original.  It came out of sys/UNUSED - now sys/attic - and
+ * before that off a floppy owned by a Micronix developer.  This is
+ * that program ported: the logic is unchanged, and what follows is
+ * every place the twenty years between the source and this tree
+ * forced a difference.
+ *
+ *	- The includes.  The original asked for <sys/types.h> and the
+ *	  flat /usr/include of 1982.  There is no <sys/types.h> here -
+ *	  the host build of cmd/ar wants it and guards it with #ifdef
+ *	  linux - and the kernel's headers are under <sys/>.
+ *
+ *	- "int *s = state; s[0] = '--';" blanked two letters of the
+ *	  state string with a single sixteen-bit store, six times.  ccc
+ *	  has no multi-character constant and stops there with "bad
+ *	  numeric constant", which is as far as it gets on the original.
+ *	  The same bytes are now written two at a time.
+ *
+ *	- stat.  The one this was written against had flags, addr[] and
+ *	  S_TYPE/S_ISCHAR.  The tree's has st_mode, st_addr and
+ *	  S_IFMT/S_IFCHR.  Same fields, new spellings.
+ *
+ *	- findtty() read the /dev directory sixteen bytes at a time
+ *	  itself.  That still works - a micronix directory IS a file of
+ *	  sixteen byte entries, and readdir() is a call to read() with
+ *	  that size - but readdir() terminates the name, which the
+ *	  original relied on the following byte for, and the rest of the
+ *	  tree reads directories that way.
+ *
+ *	- lenstr() and cpystr() were old-Micronix libc routines that
+ *	  this libc does not carry.  strlen() does lenstr()'s job, and
+ *	  cpystr() is copied from cmd/upm, which had already solved it
+ *	  the same way - see the note on it below.
+ *
+ * The kernel side did not have to change, and that is the point of the
+ * port being possible at all: sys/uhdr.s still emits ".defw _plist" at
+ * 0x1003 under a comment calling it the "Hook for ps", so the table
+ * address this program seeks is exactly where it looks for it.
+ *
+ * One thing is carried over rather than fixed, because it is a
+ * decision about the program and not about the port: the original
+ * exits YES - which is 1 - from main, and NO - which is 0 - from
+ * fail().  ps therefore reports success as a failure status, the
+ * opposite of every other command in the tree.
  */
+
 #include <stdio.h>
-#include <sys/types.h>
-#include <stat.h>
-#include "sys.h"
-#include "proc.h"
-#include "tty.h"
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <types.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
+#include <sys/dir.h>
+#include <sys/sys.h>
+#include <sys/proc.h>
+#include <sys/tty.h>
+#include <dirent.h>
 
 /*
  * Mnemonics. See detail[], quick[], and pro[] below.
@@ -21,7 +74,7 @@
 #define PRI	7
 
 /*
- * #define CPU 8 
+ * #define CPU 8
  */
 #define EVENT	8
 #define STATE	9
@@ -39,7 +92,7 @@ char detail[] = {
     PID, COMMAND, TERM, UID,
     PARENT, SIZE, NICE, PRI,
     /*
-     * CPU, 
+     * CPU,
      */
     EVENT, STATE, PC
 };
@@ -49,6 +102,9 @@ char detail[] = {
  * contains a field width
  * for that entry. The titles should have the same length as
  * this field width.
+ *
+ * value carries both numbers and strings - the original relies on the
+ * two being the same width, which on this machine they are.
  */
 struct
 {
@@ -56,20 +112,20 @@ struct
     char *title;
     int value;
 } pro[] = {
-    {"%6u", "   PID",}
-    {"%-8.8s", "COMMAND ",}
-    {"%-4.4s", "TTY ",}
-    {"%3u", "UID",}
-    {"%3u", "PAR",}
-    {"%3u", "SIZ",}
-    {"%3d", "NIC",}
-    {"%3u", "PRI",}
+    {"%6u", "   PID"},
+    {"%-8.8s", "COMMAND "},
+    {"%-4.4s", "TTY "},
+    {"%3u", "UID"},
+    {"%3u", "PAR"},
+    {"%3u", "SIZ"},
+    {"%3d", "NIC"},
+    {"%3u", "PRI"},
     /*
-     * {"%3u",              "CPU",} 
+     * {"%3u", "CPU"},
      */
-    {"%4x", "WAIT",}
-    {"%-12.12s", "STATE       ",}
-    {"%5x", "  PC ",}
+    {"%4x", "WAIT"},
+    {"%-12.12s", "STATE       "},
+    {"%5x", "  PC "}
 };
 
 #define SEPERATOR	"  "    /* between entries */
@@ -85,10 +141,10 @@ struct proc plist[NPROC] = 0;
 /*
  * Command line flags
  */
-BOOL aflag = NO,                /* show processes belonging to all ttys */
-    lflag = NO,                 /* give long listing */
-    pflag = NO,                 /* display the current PC - if in memory */
-    xflag = NO;                 /* show processes not belonging to any tty */
+int aflag = 0,                  /* show processes belonging to all ttys */
+    lflag = 0,                  /* give long listing */
+    pflag = 0,                  /* display the current PC - if in memory */
+    xflag = 0;                  /* show processes not belonging to any tty */
 
 int myterm = 0;                 /* device number of local tty */
 
@@ -100,7 +156,7 @@ main(ac, av)
 {
     init(ac, av);
     ps();
-    exit(YES);
+    exit(1);
 }
 
 init(ac, av)
@@ -108,7 +164,7 @@ init(ac, av)
     register char **av;
 {
     static char *arg;
-    static n;
+    static int n;
     struct stat s;
 
     for (n = 1; n < ac; n++) {
@@ -118,24 +174,24 @@ init(ac, av)
 
     findtty();
 
-    if (fstat(STDIN, &s) < 0)
+    if (fstat(0, &s) < 0)       /* stdin - the tree spells it 0 */
         myterm = 0;
     else
-        myterm = s.addr[0];
+        myterm = s.st_addr[0];
 }
 
 ps()
 {
-    static mem, addr;
+    static int mem, addr;
     struct proc *p, *ptab;
     struct tty tty;
     char *tname;
 
-    if ((mem = open(MEMORY, READ)) < 0 || seek(mem, 0x1003, 0) < 0      /* pointer 
-                                                                         * to 
-                                                                         * process 
-                                                                         * table 
-                                                                         */
+    if ((mem = open(MEMORY, O_RDONLY)) < 0 || seek(mem, 0x1003, 0) < 0      /* pointer
+                                                                             * to
+                                                                             * process
+                                                                             * table
+                                                                             */
         || read(mem, &ptab, sizeof ptab) != sizeof ptab)
         fail();
 
@@ -146,14 +202,14 @@ ps()
 
     for (p = plist; p < plist + NPROC; p++) {
         /*
-         * discard empty entries 
+         * discard empty entries
          */
 
         if (!(p->mode & ALLOC))
             continue;
 
         /*
-         * get the tty structure (for the device number) 
+         * get the tty structure (for the device number)
          */
 
         if (p->tty) {           /* proc. assoc. with terminal */
@@ -170,10 +226,10 @@ ps()
             tname = NOTTY;
         }
 
-        pro[TERM].value = tname;
+        pro[TERM].value = (int)tname;
 
         /*
-         * Numerical values 
+         * Numerical values
          */
         {
             pro[UID].value = p->uid;
@@ -185,62 +241,74 @@ ps()
             pro[NICE].value = 128 - p->nice;
             pro[PRI].value = p->pri;
             /*
-             * pro[CPU].value         = p->cpu; 
+             * pro[CPU].value         = p->cpu;
              */
             pro[EVENT].value = p->event;
 
             if (p->mem[16].seg) {
                 seek(mem, 8 * p->mem[16].seg, 3);
                 read(mem, &u, sizeof u);
-                pro[PC].value = u.pc;
+                pro[PC].value = (int)u.pc;
             } else {
                 pro[PC].value = 0;
             }
         }
 
         /*
-         * Process state 
+         * Process state
          */
         {
             static char state[13];
-            int *s = state;
+            char *s = state;
 
             cpystr(state, "AlAwLdSwLkSy", 0);
-            if (!(p->mode & ALIVE))
-                s[0] = '--';
-            if (!(p->mode & AWAKE))
-                s[1] = '--';
-            if (!(p->mode & LOADED))
-                s[2] = '--';
-            if (!(p->mode & SWAPPED))
-                s[3] = '--';
-            if (!(p->mode & LOCKED))
-                s[4] = '--';
-            if (!(p->mode & SYS))
-                s[5] = '--';
+            if (!(p->mode & ALIVE)) {
+                s[0] = '-';
+                s[1] = '-';
+            }
+            if (!(p->mode & AWAKE)) {
+                s[2] = '-';
+                s[3] = '-';
+            }
+            if (!(p->mode & LOADED)) {
+                s[4] = '-';
+                s[5] = '-';
+            }
+            if (!(p->mode & SWAPPED)) {
+                s[6] = '-';
+                s[7] = '-';
+            }
+            if (!(p->mode & LOCKED)) {
+                s[8] = '-';
+                s[9] = '-';
+            }
+            if (!(p->mode & SYS)) {
+                s[10] = '-';
+                s[11] = '-';
+            }
 
-            pro[STATE].value = state;
+            pro[STATE].value = (int)state;
         }
 
         /*
-         * Command 
+         * Command
          */
         {
             if (p->pid == 0)
-                pro[COMMAND].value = "System";
+                pro[COMMAND].value = (int)"System";
             else if (p->pid == 1)
-                pro[COMMAND].value = "Init";
+                pro[COMMAND].value = (int)"Init";
             else if ((p->mode & ALIVE) == 0)
-                pro[COMMAND].value = "DEFUNCT";
+                pro[COMMAND].value = (int)"DEFUNCT";
             else
-                pro[COMMAND].value = p->args;
+                pro[COMMAND].value = (int)p->args;
         }
 
         /*
-         * Print 
+         * Print
          */
         {
-            unsigned char *pp;
+            char *pp;
             int ss, j;
 
             pp = lflag ? detail : quick;
@@ -257,7 +325,7 @@ ps()
 
 heading()
 {
-    unsigned char *pp;
+    char *pp;
     int ss, j;
 
     pp = lflag ? detail : quick;
@@ -273,7 +341,7 @@ heading()
 fail()
 {
     perror(MEMORY);
-    exit(NO);
+    exit(0);
 }
 
 doflag(a)
@@ -282,19 +350,19 @@ doflag(a)
     for (; *a; a++) {
         switch (*a) {
         case 'a':
-            aflag = YES;
+            aflag = 1;
             break;
 
         case 'l':
-            lflag = YES;
+            lflag = 1;
             break;
 
         case 'x':
-            xflag = YES;
+            xflag = 1;
             break;
 
         case 'p':
-            pflag = YES;
+            pflag = 1;
             break;
         }
     }
@@ -307,15 +375,7 @@ struct table
     struct table *next;
 };
 
-struct table *table = NULL;
-
-struct mydir
-{
-    COUNT ino;
-    TEXT name[16];
-};
-
-INTERN struct mydir dir = { 0 };
+struct table *table = 0;
 
 /*
  * ttyname - find name of terminal
@@ -338,40 +398,46 @@ ttyname(a)
 
 /*
  * read the contents of the "/dev" directory into memory
+ *
+ * This is the one routine whose shape changed rather than its
+ * spelling. The original read sixteen bytes at a time into its own
+ * struct mydir and passed dir.name to stat() on the strength of the
+ * byte after it being zero. readdir() returns the same entry with that
+ * byte written for it.
  */
 
 findtty()
 {
-    static char f;
+    DIR *f;
+    struct dir *dp;
     struct stat found;
     static struct table *t;
+    char buf[32];
 
-    if ((f = open("/dev", READ)) < 0)
+    if ((f = opendir("/dev")) == 0)
         return;                 /* can't read dev directory */
 
-    for (;;) {
-        char buf[32];
+    while ((dp = (struct dir *)readdir(f)) != 0) {
 
-        if (read(f, &dir, 16) != 16)
-            break;              /* end of file */
-
-        if (!dir.ino)
+        if (!dp->ino)
             continue;
 
-        cpystr(buf, "/dev/", dir.name, NULL);
+        cpystr(buf, "/dev/", dp->name, 0);
 
         if (stat(buf, &found) < 0)
             continue;           /* can't stat it */
 
-        if ((found.flags & S_TYPE) != S_ISCHAR)
+        if ((found.st_mode & S_IFMT) != S_IFCHR)
             continue;
 
         t = calloc(1, sizeof(*t));
-        t->name = save(dir.name);
-        t->number = found.addr[0];
+        t->name = save(dp->name);
+        t->number = found.st_addr[0];
         t->next = table;
         table = t;
     }
+
+    closedir(f);
 }
 
 save(a)
@@ -379,9 +445,37 @@ save(a)
 {
     char *b;
 
-    b = alloc(lenstr(a) + 1);
-    cpystr(b, a, NULL);
+    b = malloc(strlen(a) + 1);
+    cpystr(b, a, 0);
     return b;
+}
+
+/*
+ * cpystr - concatenate the source strings into dst.  The sources are a
+ * variable number of char * arguments, ended by a null argument; each is
+ * copied in turn, a single nul is written, and the position after it is
+ * returned.
+ *
+ * Copied from cmd/upm, which carries the same routine for the same
+ * reason: it was a Micronix libc routine and this libc does not have
+ * it.  It reads its arguments by walking the stack from the address of
+ * the first one, which is what the original did too.
+ */
+char *
+cpystr(dst, s)
+char *dst;
+char *s;
+{
+    char **ap;
+    char *q;
+
+    ap = &s;
+    while ((q = *ap++) != 0) {
+        while (*q)
+            *dst++ = *q++;
+    }
+    *dst = 0;
+    return dst;
 }
 
 /*
