@@ -36,12 +36,21 @@
  * man and help are the same program.  main() looks for "help" inside
  * argv[0], so it works through either name and through any path.
  */
-#include <types.h>
 #include <stdio.h>
 #include <stdarg.h>
+#ifdef linux
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#else
+#include <types.h>
 #include <sys/stat.h>
 #include <sys/sgtty.h>
 #include <sys/dir.h>
+#endif
 
 /*
  * A directory is read raw, sixteen bytes at a time, so this is the v6
@@ -91,7 +100,22 @@ static char *found;				/* 0x301a */
 static char sectbuf[2];
 static char *sectp;
 
+#ifdef linux
+static char *root = "/usr/local/micronix";      /* the /usr of the man tree; $MXMAN overrides */
+static char *formprog = "mxform";               /* the host formatter */
+static char found_name[64];     /* find()'s result, good until the next call */
+#else
+static char *root = "/usr";
+static char *formprog = "form";
+#endif
+
+#ifdef linux
+extern char *concat(char *, ...);
+extern int putstr(int, ...);
+#else
 extern char *concat();
+extern int putstr();
+#endif
 
 /*
  * The section argument is a run of digits.  An empty string is a section
@@ -152,9 +176,13 @@ char *hay;
 exists(path)
 char *path;
 {
+#ifdef linux
+	struct stat sb;
+	return stat(path, &sb) >= 0;
+#else
 	char buf[512];
-
 	return stat(path, buf) >= 0;
+#endif
 }
 
 /*
@@ -186,6 +214,40 @@ char *a0;
  * The return points into dent, so it is only good until the next call.
  * show() uses it immediately and does not keep it.
  */
+#ifdef linux
+char *
+find(name, dir)
+char *name;
+char *dir;
+{
+	DIR *dp;
+	struct dirent *de;
+	char stem[64];
+	char *p;
+
+	if ((dp = opendir(dir)) == 0)
+		return 0;
+
+	while ((de = readdir(dp)) != 0) {
+		if (equal(de->d_name, ".") || equal(de->d_name, ".."))
+			continue;
+		concat(stem, de->d_name, 0);
+		for (p = stem; *p; p++) {
+			if (*p == '.') {
+				*p = 0;
+				break;
+			}
+		}
+		if (equal(name, stem)) {
+			strcpy(found_name, de->d_name);
+			closedir(dp);
+			return found_name;
+		}
+	}
+	closedir(dp);
+	return 0;
+}
+#else
 char *
 find(name, dir)
 char *name;
@@ -228,6 +290,7 @@ char *dir;
 	fclose(fp);
 	return 0;
 }
+#endif
 
 /*
  * Run form on the page.
@@ -259,10 +322,14 @@ char **av;
 		return;
 	}
 
+#ifdef linux
+	execvp(av[0], av);
+#else
 	concat(path, "/bin/", av[0], 0);
 	execv(path, av);
 	concat(path, "/usr/bin", av[0], 0);
 	execv(path, av);
+#endif
 	perror(av[0]);
 	exit(0);
 }
@@ -305,7 +372,7 @@ char *name;
 	}
 
 	if (section) {
-		concat(dir, "/usr/man/man", section, "/", 0);
+		concat(dir, root, "/man/man", section, "/", 0);
 		if ((found = find(name, dir)) == 0) {
 			nodoc(name);
 			return;
@@ -314,13 +381,13 @@ char *name;
 	} else {
 		found = 0;
 		if (helpmode) {
-			concat(spare, "/usr/help/", 0);
+			concat(spare, root, "/help/", 0);
 			found = find(name, spare);
 		}
 		for (sectp = sectbuf, *sectp = '0';
 		     *sectp <= '9' && found == 0;
 		     (*sectp)++) {
-			concat(spare, "/usr/man/man", sectp, "/", 0);
+			concat(spare, root, "/man/man", sectp, "/", 0);
 			found = find(name, spare);
 		}
 		if (found == 0) {
@@ -336,7 +403,7 @@ char *name;
 	}
 
 	av = argvec;
-	*av++ = "form";
+	*av++ = formprog;
 	if (istty)
 		*av++ = "-t";
 	*av++ = path;
@@ -392,11 +459,22 @@ main(argc, argv)
 int argc;
 char **argv;
 {
+#ifdef linux
+	char *r;
+#else
 	struct sgtty sg;
+#endif
 
 	if (contains("help", argv[0]))
 		helpmode = 1;
+#ifdef linux
+	r = getenv("MXMAN");
+	if (r && r[0])
+		root = r;
+	istty = isatty(1);
+#else
 	istty = gtty(1, &sg) >= 0;
+#endif
 	doargs(argc, argv);
 	exit(1);
 }
@@ -441,6 +519,25 @@ register char *b;
  * and return a pointer to the terminating NUL rather than to the start.
  * Nothing here uses the return.
  */
+#ifdef linux
+char *
+concat(char *dst, ...)
+{
+	va_list ap;
+	char *s;
+	char *d;
+
+	d = dst;
+	va_start(ap, dst);
+	while ((s = va_arg(ap, char *)) != 0) {
+		while (*s)
+			*d++ = *s++;
+	}
+	va_end(ap);
+	*d = 0;
+	return d;
+}
+#else
 char *
 concat(dst, va_alist)
 char *dst;
@@ -459,6 +556,7 @@ char *dst;
 	*d = 0;
 	return d;
 }
+#endif
 
 /*
  * Write each string to fd, stopping at a null pointer.  One write per
@@ -466,6 +564,18 @@ char *dst;
  * write, and does not buffer.  That is why the messages come out in the
  * right order against form's output.
  */
+#ifdef linux
+putstr(int fd, ...)
+{
+	va_list ap;
+	char *s;
+
+	va_start(ap, fd);
+	while ((s = va_arg(ap, char *)) != 0)
+		write(fd, s, strlen(s));
+	va_end(ap);
+}
+#else
 putstr(fd, va_alist)
 {
 	va_list ap;
@@ -476,6 +586,7 @@ putstr(fd, va_alist)
 		write(fd, s, strlen(s));
 	va_end(ap);
 }
+#endif
 
 /*
  * vim: tabstop=4 shiftwidth=4 noexpandtab:

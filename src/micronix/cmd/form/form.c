@@ -11,6 +11,9 @@
  */
 
 #include <stdio.h>
+#ifdef linux
+#include <stdlib.h>
+#endif
 
 #define MAXLINE     512     /* an input line */
 #define MAXOUT      256     /* a built output line */

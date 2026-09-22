@@ -68,7 +68,7 @@ SYSHDRS  = $(filter-out $(CCCOWNED),$(notdir $(wildcard include/*.h)))
 
 include $(DEPTH)/GNUmakefile.inc
 
-.PHONY: hostcc hostrt bootstrap sysinstall sysrt footprint
+.PHONY: hostcc hostrt bootstrap sysinstall sysrt install-man-host install-host footprint
 
 #
 # The librarian, built for the HOST.
@@ -252,6 +252,81 @@ sysinstall:
 	@echo "not installed, the C library owns them: $(CCCOWNED)"
 
 #
+# Every man page in the tree, mirrored onto the host under $(MXMAN) so
+# mxman can read them without booting anything.  The mx* tools are in
+# $(PREFIX)/bin and this is their page tree, one directory per section
+# like /usr/man.
+#
+# These are NOT the pages the system installs.  What installs is one
+# page per command beside its source, plus libu's section 2 and libc's
+# section 3, and that is what lands in the simulator's /usr/man.  This
+# is a superset: it carries the recovered 1.61 pages and the 1.3 ones
+# off the floppy as well, including the pages for commands this tree
+# has not built yet (sort, tail, ps, wall and the rest), which are the
+# reason for having it - they are readable nowhere else.
+#
+# Listed rather than globbed together because the order IS the
+# precedence: where two directories hold a page of the same name, the
+# first one read is the one that lands.  Nothing collides today.  The
+# one name that did - sh, in cmd/sh as this port's page and in man/man1
+# as the 1982 original - is now man/man1/oldsh.1, named for the shell
+# it documents, so both pages ship and neither has to win.  That makes
+# the rule a guard rather than a decision, and it reports what it
+# shadowed when it shadows anything.
+#
+MXROOT	 = $(DESTDIR)$(PREFIX)/micronix
+MXMAN	 = $(MXROOT)/man
+HOSTMANS = $(wildcard cmd/*/*.1) $(wildcard lib/libu/*.2) \
+	   $(wildcard lib/libc/*.3) $(wildcard man/man1/*.1) \
+	   $(wildcard man/man2/*.2) $(wildcard man/man4/*.4) \
+	   $(wildcard man/man5/*.5)
+
+#
+# The shadowing is worked out here, in the shell, and not by testing
+# the target for the name already being there.  Testing does not work:
+# $(SUDO) runs under the root umask, so the directory it just made is
+# 0700 and a test by anyone else fails with EACCES rather than ENOENT -
+# "no such file", so nothing is ever a duplicate, every page is copied,
+# and the LAST one to claim a name is the one that lands - the reverse
+# of the precedence the list above is written to express.  A name seen
+# once is remembered instead, and the file is copied only if it has not
+# been.
+#
+# The chmod at the end is not tidiness.  $(SUDO) runs under the root
+# umask - 0077 on this machine - so every copy lands 0600 in a 0700
+# directory and mxman, which does not run as root, could read none of
+# it.  Same line sysrt ends with, for the same reason, and it has to
+# start at $(MXROOT) rather than at the man directory: the directory
+# above the pages is one of the 0700 ones, and a readable page inside
+# an unsearchable directory is still unreadable.
+#
+install-man-host:
+	@for s in 1 2 3 4 5 ; do $(SUDO) mkdir -p $(MXMAN)/man$$s ; done
+	@seen=" " ; n=0 ; dup=0 ; for f in $(HOSTMANS) ; do \
+		s=$${f##*.} ; b=$${f##*/} ; \
+		case "$$seen" in *" $$b "*) \
+			echo "  shadowed, another page has $$b: $$f" ; \
+			dup=$$((dup+1)) ; continue ;; \
+		esac ; \
+		seen="$$seen$$b " ; \
+		$(SUDO) cp $$f $(MXMAN)/man$$s/$$b ; n=$$((n+1)) ; \
+	done ; \
+	echo "$$n pages in $(MXMAN), $$dup shadowed in the tree"
+	$(SUDO) chmod -R a+rX $(MXROOT)
+
+#
+# The cross man and formatter, built for the host and installed beside
+# the man pages: mxman reads $(MXMAN) and execs mxform by name, so the
+# two live in the same $(MXROOT)/bin directory.
+#
+install-host:
+	$(MAKE) -C cmd/man host
+	$(MAKE) -C cmd/form host
+	$(SUDO) mkdir -p $(MXROOT)/bin
+	$(SUDO) install -m 755 $(BIN)/mxman $(BIN)/mxform $(MXROOT)/bin/
+	$(SUDO) chmod -R a+rX $(MXROOT)
+
+#
 # The top of the source tree the simulator sees.  The recursion fills
 # in /usr/src/lib, /usr/src/cmd and the rest; this ships the makefile
 # that drives them, which nothing did - /usr/src/makefile was a 2023
@@ -289,11 +364,31 @@ update: src.tar
 SRCTREE = srctree
 SRCTAR = srctar.tar
 
+#
+# The files, listed, and not the directory they live in.  "tar -c ."
+# archives every entry it finds, which is not the same set as the one
+# update just staged: it is whatever is in the directory, and it puts a
+# member in the archive for each directory as well.  Naming the files
+# makes the archive the staged set and nothing else.
+#
+# The list is built after the staging, from the staged tree, rather
+# than from SRCS - the recursion is what knows which files, per
+# directory, and asking it twice would be a second answer to the same
+# question.  Names go in without the leading "./" that find writes, so
+# the archive reads as "cmd/ar/ar.c" and matches what the
+# per-directory tars carry.
+#
+# mnix tar x makes the path to each file it writes, so an archive of
+# files alone extracts whole.  See tarx in src/tools/mnix.c.
+#
 .PHONY: tarfile
 tarfile:
 	rm -rf $(SRCTREE)
 	$(MAKE) update ROOT=$(abspath $(SRCTREE))
-	cd $(abspath $(SRCTREE))/usr/src && tar -f $(abspath $(SRCTAR)) -c .
+	cd $(abspath $(SRCTREE))/usr/src && \
+		find . -type f -print | sed 's|^\./||' > $(abspath $(SRCTAR)).list && \
+		tar -f $(abspath $(SRCTAR)) -c -T $(abspath $(SRCTAR)).list
+	rm -f $(abspath $(SRCTAR)).list
 	rm -rf $(SRCTREE)
 
 #

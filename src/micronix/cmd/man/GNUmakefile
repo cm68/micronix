@@ -24,6 +24,17 @@ CLASS	= cmd
 include $(DEPTH)/GNUmakefile.inc
 
 #
+# The host build: mxman, the cross man.  It reads the man tree at
+# /usr/local/micronix/man (overridable with $MXMAN) and execs mxform to
+# format the page.
+#
+HOSTSRCS = man.c
+HOSTCFLAGS = -m32 -std=gnu89 -g -O0 -Dlinux -Wall -I.
+HOSTPROG = mxman
+HOSTBIN  = bin
+include $(DEPTH)/libexec/host.mk
+
+#
 # The disassembly of the original, regenerated from the control file.
 # Not part of "all" - it needs src/tools/disas, which is a host program,
 # and the output is checked in.

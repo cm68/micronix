@@ -13,3 +13,13 @@ DIR	= form
 CLASS	= cmd
 
 include $(DEPTH)/GNUmakefile.inc
+
+#
+# The host build: mxform, the cross formatter.  mxman execs it by name,
+# so it is installed beside mxman.
+#
+HOSTSRCS = form.c
+HOSTCFLAGS = -m32 -std=gnu89 -g -O0 -Dlinux -Wall -I.
+HOSTPROG = mxform
+HOSTBIN  = bin
+include $(DEPTH)/libexec/host.mk
