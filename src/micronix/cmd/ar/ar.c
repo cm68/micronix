@@ -30,6 +30,7 @@
 struct	stat	stbuf;
 
 int magic;
+int errors;			/* members that could not be opened */
 #define	V7ARMAG	0177545
 #define	V6ARMAG	0177555
 #define	WSARMAG	0177565
@@ -195,7 +196,7 @@ char *argv[];
 		setcom(rcmd);
 	}
 	(*comfun)();
-	done(notfound());
+	done(notfound() + errors);
 }
 
 setcom(fun)
@@ -229,6 +230,7 @@ rcmd()
 				if(f < 0) {
 					if(namc)
 						fprintf(stderr, "ar: cannot open %s\n", file);
+					errors++;
 					goto cp;
 				}
 				if(flg['u'-'a'])
@@ -373,6 +375,7 @@ qcmd()
 		f = stats();
 		if(f < 0) {
 			fprintf(stderr, "ar: %s cannot open\n", file);
+			errors++;
 			continue;
 		}
 		tf = qf;
@@ -981,6 +984,7 @@ cleanup()
 		f = stats();
 		if(f < 0) {
 			fprintf(stderr, "ar: %s cannot open\n", file);
+			errors++;
 			continue;
 		}
 		movefil(f);
