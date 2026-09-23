@@ -1379,26 +1379,18 @@ uint32_t z80_exec(z80_t* cpu, uint32_t num_ticks) {
             }
         }
         map_bits &= ~(_BIT_USE_IX|_BIT_USE_IY);
-        pins&=~Z80_INT;
-        /* delay-enable interrupt flags */
-        if (r2 & _BIT_EI) {
-            r2 &= ~_BIT_EI;
-            r2 |= (_BIT_IFF1 | _BIT_IFF2);
-        }
-        /*
-         * The trap callback runs here, after the interrupt pin has been
-         * cleared and the EI flag propagated, so that a callback that
-         * stops the loop (returning nonzero) leaves the same state a
-         * num_ticks exit would.  Firing it before pins&=~Z80_INT left a
-         * stale INT pin in cpu->pins, which the next z80_exec() read
-         * back as a spurious interrupt once EI had re-enabled IFF.
-         */
         if (trap) {
             int trap_id = trap(pc,ticks,pins,cpu->trap_user_data);
             if (trap_id) {
                 cpu->trap_id=trap_id;
                 break;
             }
+        }
+        pins&=~Z80_INT;
+        /* delay-enable interrupt flags */
+        if (r2 & _BIT_EI) {
+            r2 &= ~_BIT_EI;
+            r2 |= (_BIT_IFF1 | _BIT_IFF2);
         }
         pre_pins = pins;
     } while (ticks < num_ticks);

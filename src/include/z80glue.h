@@ -35,13 +35,11 @@ extern z80_t z80;
  */
 void z80_init();
 void z80_run();
-void z80_run_batch();			/* NODEBUG: run many instructions per call */
 
 /*
  * The machine/bus state shared between the CPU and the drivers.
  */
 extern unsigned long long sim_cycles;	/* the clock everything is timed by */
-extern unsigned long long batch_stop;	/* NODEBUG: run the batch until this cycle */
 extern byte status;			/* S_M1 | S_HLTA | S_INTA */
 extern int int_pin;			/* Z80 INT input, set by the interrupt controller */
 extern int nmi_pin;			/* Z80 NMI input */
