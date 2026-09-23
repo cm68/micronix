@@ -154,6 +154,27 @@ byte next_taskreg;          // taskreg after countdown
 byte taskreg;
 #define TASK    0x402       // task register
 
+/*
+ * Cached from taskreg so the memory accessor does not recompute them on
+ * every cycle.  super_flag and segbase are the supervisor bit and the
+ * segment selector; maptab points at this task's page table in maps[].
+ * taskreg is only ever written through set_taskreg() (dis_byte's
+ * temporary look-ahead is the exception, and it uses getpte, not these),
+ * so the cache is always in step with it.
+ */
+static byte super_flag;
+static paddr segbase;
+static byte *maptab;
+
+static void
+set_taskreg(byte t)
+{
+    taskreg = t;
+    super_flag = (t & 0xf) == 0;
+    segbase = (paddr)(t & 0xf0) << 16;
+    maptab = &maps[(t & 0xf) << 5];
+}
+
 byte maskreg;
 #define MASK    0x403       // mask register
 #define     MASK_STOP   0x01
@@ -453,7 +474,7 @@ trap(byte trapbits, word from)
     }
 #endif
     trace(trace_mpz80, "trap 0x%x %s\n", trapbits, bitdef(trapbits, stat_bits));
-    taskreg = 0;
+    set_taskreg(0);
     trapcount = 15;
     /*
      * The window starts at the instruction AFTER the trapping one, not at
@@ -808,6 +829,7 @@ get_byte(vaddr addr)
 {
     byte attr;
     byte retval;
+    byte m1 = status & S_M1;   /* stable for this fetch */
 
     vaddr orig = addr;
     paddr pa = addr;
@@ -859,24 +881,30 @@ get_byte(vaddr addr)
 
     // the task register starts a countdown for instruction fetches
     if (delay != 0) {
-        if (z80_get_reg8(status_reg) & S_M1) {
+        if (m1) {
             delay--;
         }
         if (delay == 0) {
             trace(trace_mpz80, "switching taskreg to %02x\n", next_taskreg);
-            taskreg = next_taskreg;
+            set_taskreg(next_taskreg);
             interrupt_check();          // this may cause an interrupt
         }
     }
 
-    local = super() && (addr < 0x1000);
+    local = super_flag && (addr < 0x1000);
 
     if (!local) {                           // if we are accessing mapped ram
-        getpte(addr, &pa, &attr);
+        {
+            byte page = addr >> 12;
+            byte *pte = &maptab[page << 1];
+
+            pa = segbase | (pte[0] << 12) | (addr & 0xfff);
+            attr = pte[1];
+        }
         trapreg = ((addr >> 12) << 4) | (trapreg >> 4);
         seg = "mapped:";
-        if (!super()) {
-            int exec = z80_get_reg8(status_reg) & S_M1;
+        if (!super_flag) {
+            int exec = m1;
             int ok = exec ? (attr & 0x2) : (attr & 0x1);
 
             if (!ok) {
@@ -953,7 +981,7 @@ get_byte(vaddr addr)
      * and rst pushed the address after it, so the stack says where.
      */
 #ifndef NODEBUG
-    if (z80_get_reg8(status_reg) & S_M1) {
+    if (m1) {
         if ((addr >= 0x38) && (addr <= 0x4c)) {
             if (!stub_reported) {
                 char sbuf[16];
@@ -975,14 +1003,14 @@ get_byte(vaddr addr)
      * out, which is the first thing fetched back in user mode at the
      * address the caller resumes from.
      */
-    if ((!super()) && (z80_get_reg8(status_reg) & S_M1) &&
+    if ((!super()) && (m1) &&
         (traceflags & trace_syscall)) {
         syscall_return(addr);
     }
 #endif
 
-    if ((!super()) &&
-        (z80_get_reg8(status_reg) & S_M1) &&
+    if ((!super_flag) &&
+        (m1) &&
         (retval == 0x76) &&
         (!prefix) && (maskreg & MASK_HALT)) {
         /*
@@ -1008,7 +1036,7 @@ get_byte(vaddr addr)
         retval = 0;
     }
 
-    if ((super()) && (z80_get_reg8(status_reg) & S_M1) &&
+    if ((super_flag) && (m1) &&
         (retval == 0x76) && (!prefix)) {
         /*
          * A halt fetched in task 0.  On real hardware this traps to the
@@ -1028,7 +1056,7 @@ get_byte(vaddr addr)
         retval = 0;
     }
 
-    if (running && (z80_get_reg8(status_reg) & S_M1) &&
+    if (running && (m1) &&
         ((retval == 0xED) || (retval == 0xDD) || (retval == 0xFD) || (retval == 0xCB))) {
         prefix = 1;
     } else {
@@ -1057,7 +1085,7 @@ put_byte(vaddr addr, unsigned char value)
     char *desc = "";
     char *cmd;
  
-    local = super() && (addr < 0x1000);
+    local = super_flag && (addr < 0x1000);
 
 #ifndef NODEBUG
     if (nwatch) {
@@ -1088,9 +1116,15 @@ put_byte(vaddr addr, unsigned char value)
 
     if (!local) {                           // mapped ram
         seg = "mapped:";
-        getpte(addr, &pa, &attr);
+        {
+            byte page = addr >> 12;
+            byte *pte = &maptab[page << 1];
+
+            pa = segbase | (pte[0] << 12) | (addr & 0xfff);
+            attr = pte[1];
+        }
         trapreg = ((addr >> 12) << 4) | (trapreg >> 4);
-        if (!super()) {
+        if (!super_flag) {
             if ((attr & 0x3) != 3) {
                 fault_trapreg = trapreg;
                 mem_pending_fault = 1;      /* violation: block the write */
@@ -1243,7 +1277,7 @@ mpz80_setup()
     switchreg = SW_HDDMA | SW_NOMON;    // set diagnostic, monitor or boot mode
     switchreg = SW_DJDMA | SW_NOMON;    // set diagnostic, monitor or boot mode
     keybreg = 0;
-    taskreg = 0;
+    set_taskreg(0);
 
 #ifndef NODEBUG
     trace_mpz80 = register_trace("mpz80");
