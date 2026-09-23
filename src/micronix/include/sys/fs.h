@@ -38,7 +38,31 @@ struct super {
     UINT8 s_pad;
 
     UINT32 s_time;              /* last umount time */
+    UINT32 s_magic;             /* filesystem signature */
+    UINT s_bfree;               /* total free blocks */
+    UINT s_ifree;               /* total free inodes */
 };
+
+/*
+ * The filesystem signature, stamped into the superblock by mkfs and
+ * checked by df (and fsck) in one field instead of three block reads.
+ * A 32-bit field, so it rides the same host/guest NUXI word order as
+ * s_time above - see the swap in cmd/mkfs/mkfsfunc.c.
+ */
+#define FsMAGIC 0xDEADBEEFL
+
+/*
+ * The value as it sits on the disk.  A 32-bit field on a micronix disk
+ * carries its high word at the lower address, which a host build's
+ * little-endian long writes the other way up; a guest's long is already
+ * in the disk's order.  INTEGER_32 (types.h) marks the host builds, so
+ * only they swap - the same convention s_time uses in mkfsfunc.c.
+ */
+#ifdef INTEGER_32
+#define FsMAGIC_DISK    (((UINT32) FsMAGIC >> 16) | ((UINT32) FsMAGIC << 16))
+#else
+#define FsMAGIC_DISK    FsMAGIC
+#endif
 
 /*
  * the on-disk inode - these fields have the d_ prefix to

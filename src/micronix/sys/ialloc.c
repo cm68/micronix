@@ -77,6 +77,7 @@ ialloc(dev)
         ip->i_count = 0;
         ip->i_mount = 0;
         ip->i_size = 0;
+        sup->s_ifree--;
     }
 
     bdwrite(sb);
@@ -201,6 +202,7 @@ ifree(ip)
 
     zero(&ip->i_mode, sizeof(struct dsknod));
     ip->i_flags |= IMOD;
+    sup->s_ifree++;
     bdwrite(sb);
 }
 

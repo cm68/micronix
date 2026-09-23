@@ -121,6 +121,7 @@ balloc(dev)
 
     zero(fb->data, 512);
     bdwrite(fb);
+    sup->s_bfree--;
     bdwrite(sb);
     return (bn);
   full:
@@ -167,6 +168,7 @@ bfree(bn, dev)
         sup->s_nfree = 0;
     }
     sup->s_free[sup->s_nfree++] = bn;
+    sup->s_bfree++;
   done:
     bdwrite(sb);
 }
