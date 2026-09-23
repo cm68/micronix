@@ -111,8 +111,16 @@ install: $(TARGET)
 	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)
 
+# clean removes every .o and every ccc intermediate, via find | xargs so
+# the argument list never trips the shell's "too many arguments".
+#
+# The patterns are double-quoted on purpose.  This shell (cmd/sh) has
+# no single quotes at all - "find -name '*.o'" leaves the quotes in the
+# word and globs nothing, so it says "No match." and rm never runs -
+# and a backslash does not protect a pattern character either.  Double
+# quotes are the one thing that stops the shell expanding the *.
 clean:
-	rm -f $(OBJS) *.nam *.tok *.x
+	find . -name "*.o" -print -o -name "*.nam" -print -o -name "*.tok" -print -o -name "*.x" -print | xargs rm -f
 
 clobber: clean
 	rm -f $(TARGET)

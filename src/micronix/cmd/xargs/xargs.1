@@ -1,0 +1,58 @@
+.he "xargs (1)                    9/23/26                    xargs (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+xargs
+- run a command with arguments read from stdin
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+xargs command [argument ...]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Xargs reads words from its standard input and runs
+.bd
+command
+with those words as arguments, in batches small enough for the shell
+to exec.  It is how a
+.bd
+find
+pipeline removes any number of files without tripping the shell's
+"too many arguments":
+.sp
+.ti +5
+.bd
+find . -name '*.o' -print | xargs rm -f
+.sp
+If
+.bd
+command
+has no slash in its name, it is looked for in
+.bd
+. ,
+.bd
+/bin
+and
+.bd
+/usr/bin ,
+the way the shell does.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+find (1), rm (1)
