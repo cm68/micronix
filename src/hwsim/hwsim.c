@@ -957,7 +957,7 @@ cancel_time_out(void (*handler)(), int arg)
 {
     int i;
     struct timeout *tp;
-    
+
     for (i = 0; i < MAXTIMEOUTS; i++) {
         tp = &timeouts[i];
         if (tp->handler == handler && tp->arg == arg) {
@@ -966,6 +966,29 @@ cancel_time_out(void (*handler)(), int arg)
         }
 	}
 }
+
+#ifdef NODEBUG
+/*
+ * The cycle the fast build's batch runs to: the next device timeout, so
+ * it fires on its exact cycle, or a short input-service bound, so the
+ * poll hooks still see the console.  The bound is 250 microseconds of
+ * simulated time - a person typing cannot feel it - and a guest waiting
+ * on a timer due sooner is stopped at the timer instead.
+ */
+static unsigned long long
+next_deadline()
+{
+    unsigned long long next = sim_cycles + (CPU_HZ / 4000);
+    int i;
+
+    for (i = 0; i < MAXTIMEOUTS; i++) {
+        if (timeouts[i].handler && timeouts[i].when < next) {
+            next = timeouts[i].when;
+        }
+    }
+    return next;
+}
+#endif
 
 char fbuf[0];
 
@@ -2135,6 +2158,17 @@ main(int argc, char **argv)
         running = 1;
         mysigblock();
         {
+#ifdef NODEBUG
+            /*
+             * Run a batch of instructions: the trap callback in
+             * mpz80.c stops it when a trap is pending or sim_cycles
+             * reaches batch_stop.  The signal mask, the timeout scan
+             * and the polls below are paid once a batch, not once an
+             * instruction.
+             */
+            batch_stop = next_deadline();
+            z80_run_batch();
+#else
             unsigned long long before = sim_cycles;
 
             z80_run();
@@ -2155,6 +2189,7 @@ main(int argc, char **argv)
             if (sim_cycles == before) {
                 sim_cycles += 4;
             }
+#endif
         }
         mysigunblock();
         running = 0;
