@@ -100,6 +100,10 @@ src/micronix/stand/boot/mwboot.hex
 src/micronix/stand/boot/mwboot1.abs
 src/micronix/stand/boot/mwboot1.bin
 src/micronix/stand/boot/mwboot1.cim
+src/micronix/stand/boot/djboot.com
+src/micronix/stand/boot/djboot1.abs
+src/micronix/stand/boot/djboot1.bin
+src/micronix/stand/boot/djload
 src/micronix/stand/boot/bootimg
 src/micronix/stand/boot/bootimg-*
 src/micronix/stand/boot/mkbootimg
@@ -200,6 +204,7 @@ src/micronix/cmd/cp/cp
 src/micronix/cmd/date/date
 src/micronix/cmd/dcheck/dcheck
 src/micronix/cmd/dd/dd
+src/micronix/cmd/df/df
 src/micronix/cmd/diff/diff
 src/micronix/cmd/diff/diffh
 src/micronix/cmd/du/du
@@ -217,6 +222,7 @@ src/micronix/cmd/icheck/icheck
 src/micronix/cmd/init/init
 src/micronix/cmd/init/init.dbg
 src/micronix/cmd/kill/kill
+src/micronix/cmd/kstat/kstat
 src/micronix/cmd/ld/ld
 src/micronix/cmd/less/less
 src/micronix/cmd/lex/lex
@@ -236,6 +242,7 @@ src/micronix/cmd/ncheck/ncheck
 src/micronix/cmd/nm/nm
 src/micronix/cmd/nm/wsnm
 src/micronix/cmd/od/od
+src/micronix/cmd/owner/owner
 src/micronix/cmd/pr/pr
 src/micronix/cmd/ps/ps
 src/micronix/cmd/pwd/pwd

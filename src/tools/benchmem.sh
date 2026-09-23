@@ -42,7 +42,7 @@ WORK=/tmp/bench
 # The include directories a source may need, as paths inside the sim's
 # filesystem (the -d root).  The source's own directory is added first,
 # then every place a header lives, then the system include dir.
-INC_BASE="-I/usr/src/libexec/cpp -I/usr/src/libexec/c0 -I/usr/src/libexec/c1 \
+INC_BASE="-I/usr/src/libexec/pass0 -I/usr/src/libexec/c0 -I/usr/src/libexec/c1 \
 -I/usr/src/lib/libccc -I/usr/src/lib/include -I/usr/src/include \
 -i/usr/include"
 

@@ -81,6 +81,11 @@ extern void open_terminal(char *name, int signum, int *infdp, int *outfdp, int c
 extern void close_terminals(void);
 extern void multio_restore_terminal(void);
 
+// SIGUSR2: dump the guest kernel's tables (d1/kdump.c)
+extern void kdump_init(void);
+extern void kdump_poll(void);
+extern void multio_ace_dump(void);
+
 // generally useful timed callout facility
 void time_out(char *name, int usec, void (*func)(int a), int arg);
 void recurring_time_out(char *name, int hertz, void (*func)(int a), int arg);

@@ -1,0 +1,1 @@
+path /bin /usr/bin

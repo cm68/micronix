@@ -32,9 +32,14 @@ ttyopen(tty)
 ttyclose(tty)
     register struct tty *tty;
 {
-    if (!--tty->count) {
+    /*
+     * count is a UINT8.  The old "if (!--count)" decremented before it
+     * tested, so a close that arrived with the count already at zero
+     * wrapped it to 255, and OPEN stayed set forever.  Decrement only a
+     * positive count, and drop OPEN when the last open goes away.
+     */
+    if (tty->count != 0 && --tty->count == 0)
         tty->state &= ~OPEN;
-    }
 }
 
 /*

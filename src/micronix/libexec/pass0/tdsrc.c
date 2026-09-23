@@ -176,6 +176,7 @@ struct tdent {
 	char *name;			/* interned */
 	struct token *spec, *pre, *post;
 	unsigned char nspec, npre, npost;
+	unsigned char flat;		/* declarator has no hole - see expand */
 	struct tdent *next;
 };
 static struct tdent *tdefs;
@@ -491,6 +492,24 @@ expand(struct tdent *e, struct token *t, struct tokarray *sink)
 		wrap(e, pre, &name, post, sink);
 		if (t->type == ASSIGN) {
 			sink1(sink, t);
+			/*
+			 * An initialiser is not ours to read.  With no
+			 * hole in the declarator there is nothing left
+			 * to emit for the declarators that follow, so
+			 * the rest of the declaration can go back to
+			 * the stream - and drain(), which would pull
+			 * the whole brace initialiser through the queue
+			 * only to find a comma this loop no longer
+			 * cares about, never runs.  "cell fldtab
+			 * [MAXFLD] = { ... }" is that case, and it is
+			 * what overflows pass0.  Only when the output
+			 * is the queue: a sink is a collection this
+			 * call is already holding.
+			 */
+			if (e->flat && !sink) {
+				xdepth--;
+				return;
+			}
 			drain(t, sink);
 			if (t->type != COMMA)
 				break;
@@ -616,6 +635,13 @@ capture2(struct token *t)
 		e->spec = keep(&tdspec, &e->nspec);
 		e->pre = keep(&pres[0], &e->npre);
 		e->post = keep(&posts[0], &e->npost);
+		/*
+		 * A declarator with no hole needs no composing: the use
+		 * site's own tokens are already what came out, so the
+		 * spec can simply stand in for the name.  Decided here,
+		 * once, rather than re-derived at every use.
+		 */
+		e->flat = !e->npre && !e->npost;
 		e->next = tdefs;
 		tdefs = e;
 

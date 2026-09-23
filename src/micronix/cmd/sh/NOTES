@@ -36,8 +36,8 @@ reading this binary and nothing else.  They are listings, not
 assembler input - asz stops on their symbol table - and their ABI is
 the wrong one.  They must not become the source of libu.
 
-The real source is /vault/src/ccc/src/libu: 44 files in asz syntax
-with a Makefile that archives them.  Two notes on it:
+The real source is lib/libu: 48 .s files in asz syntax with a
+GNUmakefile that archives them.  Two notes on it:
 
   - _signal.s had no .global declarations, unlike every other file
     there, so it assembled to an object that defined nothing:

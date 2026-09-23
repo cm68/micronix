@@ -1996,6 +1996,7 @@ main(int argc, char **argv)
     }
 
     mysignal(SIGUSR1, stop_handler);
+    kdump_init();
 
     /*
      * the monitor's command table is built at runtime by mon_init, so
@@ -2084,6 +2085,7 @@ main(int argc, char **argv)
                 inst_countdown = 0;
                 reason = 1;
             }
+            kdump_poll();
             if (watchpoint_hit()) {
                 open_debug_gate();
                 printf("watchpoint\n");

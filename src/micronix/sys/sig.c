@@ -70,6 +70,22 @@ killall(tty, sig)
 }
 
 /*
+ * Kill every process except the caller, for shutdown.
+ *
+ * init (process 1) is left alone: a dead process 1 is a panic.  Its
+ * respawning of the logins it has lost is harmless - the buffer drain in
+ * reboot() flushes the fresh prompts like everything else.
+ */
+killemall()
+{
+    register struct proc *p;
+
+    for (p = &plist[2]; p < plist + NPROC; p++)
+        if (p != u.p && (p->mode & ALIVE))
+            send(p, SIGKILL);
+}
+
+/*
  * Send a signal to a process.
  */
 send(p, sig)

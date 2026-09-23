@@ -1,0 +1,211 @@
+/bin/login from the Micronix 1.6 distribution
+
+There is no source for login, so this is the disassembly, and the names in
+login.ctl come from reading the code against the structure every 1980s
+login has: main takes a name and calls login(), which accounts for the
+session, fixes the terminal, and execs the shell.
+
+    disas -f login.ctl login.dist
+
+login.dist is the binary off inode 45 of disks/dist/1011-8_dist_1.IMD,
+23023 bytes, dated Aug 1982, stripped.  It is a Whitesmiths a.out: magic
+9994, text at file offset 16 based at 0100 running to 557a, data based at
+6000 running to 6565, no bss, and no relocations left to apply.
+
+login.c is that disassembly read back into C - login's own functions, in
+address order, ending where the library it was linked against begins.
+It is K&R throughout and is compiled here with the tree's ccc.  It is a
+reconstruction of behaviour and not the original source, and it does not
+rebuild this binary.  See the caveats.
+
+It is written against THIS tree's library and not the one the binary was
+linked with.  login was built with Whitesmiths C, whose library - libwsc.a
+and libu.a on the C system disk - this tree does not have, so the calls
+are made by the names the tree uses now: lenstr is strlen, cmpstr is
+strcmp, cpystr is strcpy followed by strcat, and instr is strchr.  The
+comments in login.c still record which of the 1982 entries each call site
+was.  The rest the binary called - gets, malloc, exit, perror, ctime,
+execv, the syscall wrappers - are libc and libu here under the same names,
+with ctime() taking one argument instead of two.
+
+
+the Whitesmiths runtime
+-----------------------
+
+The calling convention is not a guess.  The compiler's own library is on
+the V2-1 disk as LIBC.80, and it carries the runtime as two members whose
+code is byte-for-byte what login links at 53c1:
+
+                        ent.o, codelen 11
+
+    c.ent   21 00 00 39 eb e3 e9   ld hl,0; add hl,sp; ex de,hl; ex (sp),hl; jp (hl)
+    c.ihl   e9                     jp (hl)          - indirect call
+    c.ret   eb f9 d1 c9            ex de,hl; ld sp,hl; pop de; ret
+
+                        ents.o, codelen 41
+
+    c.ents  c1 21 fe ff 39 eb e5   pop bc; ld hl,-2; add hl,sp; ex de,hl; push hl;
+            2a<r4> e5 2a<r3> e5    save the three register cells
+            2a<r2> e5 69 60 e9     ld l,c; ld h,b; jp (hl)
+    c.rets  21 fa ff 19 f9 e1      ld hl,-6; add hl,de; ld sp,hl; pop hl;
+            22<r2> e1 22<r3> e1    restore them
+            22<r4> d1 c9           pop de; ret
+
+There is no frame-size byte hiding in either one: the members are complete
+at 11 and 41 bytes, and searching every image under disks/ for a variant
+that skips an inline operand finds nothing but coincidental byte pairs.
+A function's locals are allocated by compiler-emitted code placed
+immediately after the prologue call, as in main here:
+
+    015e: call c.ents
+    0161: ld hl,fe00h ; add hl,sp ; ld sp,hl      frame 200
+
+The frames in login are 200 (main), 202 (login, and the password check),
+2a (acct), 204 (lastlogin) and 600 (the shell exec, which holds an argv
+array).
+
+From that, the convention.  The caller pushes arguments right to left, so
+arg0 is on top, then calls.  The callee opens with call c.ent or c.ents,
+which leaves DE two words below the frame bottom, so
+
+    DE+0   scratch, where the old DE is parked
+    DE+2   the return address into the caller
+    DE+4   arg0
+    DE+6   arg1
+
+and a char argument is the low byte at DE+4.  Results come back in BC, or
+in C for a char.  c.ret/c.rets return past the callee's own prologue call
+straight to the caller, so the pair is invisible from outside.  The caller
+discards the arguments with one pop af per two-byte argument - as many
+pops as pushes, and no more.  Three register variables live in the cells
+c.r2, c.r3 and c.r4, at 655f, 6561 and 6563 here; a function that uses the
+plain c.ent prologue cannot touch them, so its register variables are put
+in the data segment instead, which is why the signal loops keep their
+counters at 607e, 607f and 6080.
+
+The same convention is spelled out in the A-Natural listing ECHO.8 on the
+V2-0 disk, which is the compiler's own output for echo.c: its main reads
+hl=&04+de for arg0 and hl=&06+de for arg1, and its c.r2/c.r3/c.r4 are the
+same three cells.
+
+
+the layout
+----------
+
+0100  chdr.r, the startup: pops the argument count into BC, computes the
+      argv base from the stack, pushes argv then count, calls main, and
+      passes main's result to exit.
+0111  login's own literals begin - /etc/utmp, /usr/spool/mail/,
+      /usr/adm/lastlog, /usr/adm/wtmp, "Name: ", /etc/banner, and then the
+      rest, interleaved with the code as the compiler emits them.
+015e  login's own code: main, login, acct, type, chkname, nographic,
+      alnumdash, lastlogin, and the password and signal machinery.
+      A library routine is one that has no business in login: the
+      formatted output engine is at 12d3 (_doprnt), and the stdio layer -
+      fopen, getfile, openfile, finit, fclose - follows it.  The passwd
+      reader that owns the /etc/passwd literal at 1151 is a library
+      getpwnam, not login's own.
+53c1  the runtime above, c.ent through c.rets, ending at 53f4.
+557a  end of text.
+6000  login's own data, up to about 6236; the library's stdio pool of
+      sixteen 16-byte FILE slots starts at 6237.
+6565  end of data.  Nothing is in bss.
+
+
+the library above it
+--------------------
+
+login's own text ends well below where an earlier reading of this put it,
+and everything above the seam is the C library that was statically bound
+into the binary.  The addresses, and the names read off their behaviour:
+
+    12d3  _doprnt                190d  fopen        1a29  getfile
+    1a9b  openfile               1b64  finit        1bd6  fclose
+    1e7b  fseek                  1ff4  rewind       2062  gets
+    2118  fgets                  2220  strlen       2258  _filbuf
+    2411  _flsbuf                256e  _findbuf     2681  fclose's
+                                                                buffer
+                                                                release
+    2693  calloc                 2712  free-list    2739  size
+                                        head            conversion
+    275d  malloc                 2869  free         29c2  exit
+    2b14  ctime                  35e7  ttyname      3719  ttyslot
+    3a0f  streq                  3a5a  strcpy       3b8e  contains
+    3e59  strlen                 40c0  perror       4274  execv
+    42a7  lseek                  4629  setuid       4e05  16x16
+                                                                multiply
+    50f9  32-bit multiply        53c1  the runtime above
+
+and between 3e59 and 4e05 the system-call wrappers the calls above name -
+chdir, chmod, chown, close, creat, exec, exit, fork, fstat, getpid,
+getuid, gtty, kill, link, mknod, mount, nice, open, pause, pipe, read,
+seek, signal, _signal, sleep, stat, stime, stty, sync, time, umount,
+unlink, wait, write.
+
+The names are argued, not read: the binary is stripped, so each is what
+the routine does.  Corroboration comes from the C system disk
+(disks/dist/1014-8_c_1.IMD), whose /lib holds the same library by member
+name - libwsc.a carries lenstr.o, cmpstr.o, cpystr.o, instr.o, crypt.o,
+alloc.o, exit.o, ckfd.o and ent.o/ents.o (the runtime itself), and libu.a
+is exactly the system-call wrappers listed above.  So the library's own
+names for four routines login calls are lenstr, cmpstr, cpystr and instr,
+which is what the behaviour-derived names streq/strcpy/contains/strlen
+above really are.
+
+What is NOT there is worth as much: getpwnam, endpwent, ttyname and
+ttyslot appear in no archive on that disk and in no library this tree
+builds.  That is why the passwd module in the upper middle of login's
+text is read as login's own rather than as a library call.
+
+The library's storage is the other half of the data segment.  The stdio
+FILE is sixteen bytes and the pool of sixteen of them starts at 6237, so
+stdin is &_iob[0] and its _flag byte is at 623d; the allocator keeps an
+address-ordered circular free list in four-byte units with a four-byte
+header in front of every block.  login's own globals stop at about 6236.
+
+
+caveats
+-------
+
+This is a reconstruction of behaviour, not byte-identical source.  The
+original was written for the compiler that made the binary, and the tree's
+ccc is a different compiler with a different calling convention, so
+login.c says what the disassembly does and does not produce these bytes.
+
+It builds.  ccc -c takes it clean against this tree's headers with no ws
+name left in it, and ccc -o links it against libc.a and libu.a with no
+undefined symbols - text 10265, data 2252, bss 0.
+
+That took three routines the tree does not have, which are written at the
+end of login.c rather than called from a library.  In 1982 all three were
+members of something: getpwent.o for the reader, and ttyname/ttyslot for
+the /dev scan.  No library this tree builds carries any of them, and
+owner.c and ps.c report the same gap and answer it the same way, so
+these follow the tree and not the archive:
+
+    getpwnam, endpwent   the /etc/passwd reader at 1103 and 119b,
+                         with getpwent at 0f0b and fld at 1035
+    ttyname, ttyslot     the /dev directory scan at 35e7 and 3719
+    crypt                the password hash at 0c37
+
+crypt is the one that was login's own all along and not a library call:
+its seed "Here is is !?!" is in login's literal pool, and it is the
+pre-DES big-multiply hash and not the DES one whose object is in libwsc.a.
+
+The library boundary in the middle of the text remains the weakest part
+of the map.  The linker's order is what settles it - chdr.r first, then
+login.r, then the library members - so login's own text is the low region,
+but where exactly it stops among the string and system-call helpers in the
+middle is argued from what each routine does rather than from a symbol
+table, because the binary is stripped.  The passwd module at 0f08-11b8 was
+matched byte for byte against getpwent.o in libS.a on the C system disk,
+which is the one place a symbol table did settle it; that match also
+confirms the record layout, because the module's own DB directives at
+61cc and 61cd say uid and gid are one byte each, exactly as <pwd.h> here
+has them.
+
+Two things are still not wired: the makefile and GNUmakefile beside this
+README are not in the tree, so login is not in cmd/DIRS and nothing in
+the build reaches this directory.  And nothing here has been run - the
+reconstruction is read, not exercised, and crypt in particular is a
+reconstruction of an algorithm whose output nothing has checked.

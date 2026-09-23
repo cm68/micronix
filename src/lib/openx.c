@@ -32,6 +32,13 @@ static int *termpids;
  * the terminals it was talking to are still there, with nothing behind
  * them.  So the signal paths ask for this by name as well, which is why
  * it is idempotent: the second caller finds the list already empty.
+ *
+ * The signal is SIGHUP, not SIGTERM: a terminal is hung up, not just
+ * asked politely to leave.  xterm's hangup path closes the window and
+ * hangs up the shell inside it, which is the only way the bash loop that
+ * runs behind each window dies promptly; SIGTERM only sometimes reached
+ * that far, so the windows occasionally sat there for the whole grace
+ * period waiting for /proc/<pid> to disappear.
  */
 void
 close_terminals()
@@ -39,7 +46,7 @@ close_terminals()
     int i;
 
     for (i = 0; i < ntermpids ; i++) {
-        kill(termpids[i], SIGTERM);
+        kill(termpids[i], SIGHUP);
     }
     ntermpids = 0;
 }

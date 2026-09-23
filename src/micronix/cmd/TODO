@@ -1,0 +1,154 @@
+#
+# TODO - cmd
+#
+# Untracked working notes: what /bin still carries without a source.
+#
+# /bin has 118 entries and exactly two build signatures.  Fifty-nine
+# begin "99 97 ... d1 21" and are ccc's, built and installed by this
+# tree.  Fifty-nine begin "99 94 ... c1 21", or carry no 16 byte a.out
+# header at all and start straight into a c1 21 prologue, and are
+# Whitesmiths' - the binaries the distribution floppies seeded.  The
+# split is exact, 59 and 59, with nothing left over, so the question is
+# not what is in /bin but which of the 59 the distribution left we have
+# a source for.
+#
+# Of those 59, in order of how little is missing:
+#
+#	3  the source is here and the build never installs it -
+#	   mkfs, fsck, far
+#	1  cpp - /bin/cpp has no counterpart in this tree at all.  See
+#	   below.
+#	2  the source is a part of a bigger program -
+#	   edit (cmd/vi), help (cmd/less)
+#	8  the Whitesmith toolchain: as cc link lib obj hex lord anat.
+#	   attic/ has sources for all of them, and it does not matter -
+#	   see below.
+#	17 the source is in extra/, v6 and v7, unported -
+#	   cal comm cu df file login lpr mail passwd ps su sum tail tty
+#	   update wall who
+#	28 nothing in the repository.
+#
+# THE WHITESMITH TOOLCHAIN IS NOT A WORK ITEM
+#
+# as cc link lib obj hex lord anat are the compiler chain the
+# distribution was built with, and every one of them is superseded by
+# something this tree builds: as by asz, cc by ccc, link by ld, lib by
+# ar, obj by nm.  Regenerating them from attic/ is not wanted, so their
+# /bin copies are history rather than a gap - there is nothing to
+# rebuild them for, and no reason to carry their sources forward.
+# Where /bin has one and we have a replacement, the fix is to drop the
+# old name or let it age out, not to find it a build.
+#
+# /BIN/CPP IS NOT pass0
+#
+# ccc runs five programs out of /libexec, and not one of them is a
+# preprocessor:
+#
+#	pass0	the lexer and normalizer; its source directory is
+#		libexec/pass0
+#	c0	pass1, the parser
+#	c1	pass2, the code generator
+#	peep	the peephole, under -O
+#	astpp	AST pretty printer - a debugging aid, not in the
+#		compile path at all
+#
+# pass0 emits a .x stream, "compact token format", and that stream is
+# its output: it is what c0 reads, not text anything else consumes.  It
+# has text modes, -p writing a readable .i beside the .x and -E handing
+# the .x to xdump to render as text, but both are debugging aids over
+# the lexeme stream, not a preprocessor's macro-expanded source.
+#
+# The name cpp is inherited from where the code came from and is wrong.
+# The program is pass0, /libexec holds it as pass0, ccc's driver builds
+# the path with "pass0" in the format string, and the source directory
+# is libexec/pass0 now.  What still says cpp is inside the sources
+# themselves - cpp.c and cpp.h - and the driver's own variable and
+# header comment ("Orchestrates cpp, c0 (parser), and c1 (code
+# generator)").  Renaming those is cosmetic and has not been done.
+#
+# So /bin/cpp is not the same program as anything this tree builds: it
+# is a standalone preprocessor of the ordinary filter kind, and it is a
+# gap rather than a duplicate whose install path wants fixing.
+#
+# If a standalone cpp is wanted, the only source for one here is
+# attic/hitech/cpp - John Reiser's cpp, the 1978 one, as maintained by
+# Schilling and Ogden, not Whitesmith's.  It targets CP/M and would
+# need the usual porting.
+#
+# Two more in the 28 are the same kind of thing and are marked in place
+# below: cxr, ptc and rp are Whitesmith's own tools (a C
+# cross-referencer, the Pascal compiler, a macro processor) and ddt is
+# a debugger.  None of them is a utility anyone is missing.
+#
+# THE 28 WITH NO SOURCE ANYWHERE IN THE REPOSITORY
+#
+# What each is, read off the binary where the binary says - a usage
+# string, a keyword table.  Six say nothing at all and are marked so
+# rather than guessed at: clean, dc, ddt, down, pilot, unique.
+#
+#	chars	count characters; with lines and words, the three text
+#		counters, all about 5.5k and near-identical
+#	clean	?
+#	cp1	the first half of the overlay-based cp
+#	cp2	the second half.  We build cp, so the pair is obsolete.
+#	cptree	recursive copy: "Cptree is used to copy an entire tree
+#		of files and ..."
+#	crypt	crypt(1): "usage: crypt key"
+#	cxr	Whitesmith: C cross-referencer, carries the C type keywords
+#		VOID TINY ULONG UCOUNT TEXT LOCAL
+#	dc	?
+#	ddt	? - a debugger, the DDT name
+#	down	? - 384 bytes, the smallest thing in /bin
+#	group	chgrp by another name: "usage: group [-newgroup] file ..."
+#	lines	count lines
+#	lprm	printer queue, remove entries
+#	lprq	printer queue, query
+#	mount	"usage: mount [special directory [-r]]"
+#	newuser	add a user
+#	owner	chown: "usage: owner [-newowner] file ..."
+#	pilot	?
+#	print	"usage: print [-l#] [-w#] [-#] [file ...]"
+#	ptc	Whitesmith: the Pascal compiler - "goto target", "file in
+#		value argument" (disks/1070-8_pascal.image, disks/whitesmith)
+#	rp	Whitesmith: a macro processor of the include-file kind -
+#		"can't open include file", "arg stack overflow"
+#	sort	"usage: sort [-bdfrtx] [+key] [-o output] input ..."
+#	stty	terminal modes
+#	td	tape dump: "Dump destination must be either block special
+#		or directory."
+#	umount	"usage: umount device"
+#	unique	?
+#	words	count words
+#	write	write(1) - to another user's terminal
+#
+# WHICH OF THEM MATTER
+#
+# A full /bin is not the goal.  What has to exist for the system to
+# come up and rebuild itself is a shell, the toolchain, make, and the
+# file utilities those need - and all of that is in the 59 this tree
+# builds, so none of the 28 blocks a bootstrap.  The nearest to it are
+# mount and umount, which bring up a filesystem beyond the root, and
+# stty, which the terminal needs before anything interactive is
+# pleasant.  The rest is a userland that can wait.
+#
+# The same test is worth applying to the cross DIRS list in
+# GNUmakefile: a name belongs there when it is needed to bootstrap the
+# others, not merely because a source exists for it.  Everything on
+# that list has to be buildable before the thing that builds it.
+#
+# WHAT THAT MAKES ACTIONABLE
+#
+# mkfs and fsck pass the bootstrap test and fail the wiring one.  Their
+# sources are here, their makefiles are maintained, and the guest
+# builds them - filesystem/usr/src/cmd/mkfs/mkfs is 12187 bytes and
+# ccc's 99 97, the /bin one is 6894 and Whitesmiths' 99 94.  Neither
+# name is in the guest cmd/makefile DIRS or in the cross GNUmakefile
+# DIRS, so the built copies are never installed and /bin keeps running
+# the 1980s ones.  mkfs is what makes the filesystem we install onto,
+# which makes it the first thing that list should carry.
+#
+# halt and upm are the mirror image: in the cross DIRS, not in the
+# guest's, so /bin has our ccc-built copies that the guest could not
+# rebuild for itself.
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:

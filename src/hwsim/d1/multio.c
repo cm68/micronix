@@ -677,11 +677,21 @@ multio_set_inti(struct ace *ap)
         ap->inti = INTI_NOINT;
     }
 
-    // only call set_vi on a change
-    if ((before == INTI_NOINT) && (ap->inti != INTI_NOINT)) {
-        set_vi(ap->vi_line, 0, 1);
-    } else if ((before != INTI_NOINT) && (ap->inti == INTI_NOINT)) {
+    /*
+     * The 8259 clears the request bit when it acknowledges (see
+     * multio_intack) and re-arms it only on a fresh line edge.  So the
+     * line must edge on every change of cause, not only when the
+     * interrupt goes away entirely: a still-pending TXE that loses the
+     * IIR slot to a higher-priority RDAV changes the cause TXE->RDAV and
+     * later RDAV->TXE without ever touching INTI_NOINT.  Without an edge
+     * there, the second cause is never re-latched and its wakeup is
+     * dropped - the output channel stalls, and the next receive is lost
+     * with it.
+     */
+    if (before != ap->inti) {
         set_vi(ap->vi_line, 0, 0);
+        if (ap->inti != INTI_NOINT)
+            set_vi(ap->vi_line, 0, 1);
     }
 }
 
@@ -1459,6 +1469,33 @@ multio_poll()
         set_vi(7, 0, 1);
     }
     return 0;
+}
+
+/*
+ * Dump the uart register state, for SIGUSR2 / kdump.  This is the sim's
+ * view of the ACEs - the interrupt enables and line status - which the
+ * guest's tty struct does not record and a wedged output line cannot be
+ * diagnosed without.
+ */
+void
+multio_ace_dump(void)
+{
+    int i;
+
+    for (i = 0; i < 3; i++) {
+        struct ace *ap = &ace[i];
+
+        printf(" uart%d %-8s inte=%02x(RDAV=%d TXE=%d MDM=%d) "
+            "inti=%02x lsr=%02x(DR=%d TXE=%d TE=%d) txe_ack=%d rxb=%02x txb=%02x "
+            "mcr=%02x(DTR=%d)\n",
+            i, ap->name, ap->inte,
+            !!(ap->inte & INTE_RDAV), !!(ap->inte & INTE_TXE),
+            !!(ap->inte & INTE_MDM),
+            ap->inti,
+            ap->lsr, !!(ap->lsr & LSR_DR), !!(ap->lsr & LSR_TXE),
+            !!(ap->lsr & LSR_TE), ap->txe_ack, ap->rxb, ap->txb,
+            ap->mcr, !!(ap->mcr & MCR_DTR));
+    }
 }
 
 static int

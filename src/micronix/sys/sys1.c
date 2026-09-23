@@ -129,11 +129,29 @@ sync()
 reboot(howto)
     int howto;
 {
+    register int n;
+
     if (!super())
         return;
-    sync();
     if ((howto & RB_HALT) == 0)
         pr("reboot: autoboot not implemented, halting\n");
+
+    /* stop every process but this one, so nothing dirties more buffers */
+    killemall();
+
+    /*
+     * Flush the inodes and write the dirty buffers out, reporting how many
+     * remain, until the cache is clean - then halt.  isync() runs each
+     * pass, so inode changes a dying process left behind are caught too.
+     */
+    for (;;) {
+        isync();
+        n = ndirty();
+        pr("halt: %d dirty buffers\n", n);
+        if (n == 0)
+            break;
+        bdrain();
+    }
     for (;;)
         hlt();
 }

@@ -1,20 +1,21 @@
 #!/bin/sh
 #
-# Make a fresh, bootable 40 meg hard disk volume.
+# Make a fresh, bootable m16 hard disk volume.
 #
 #	./create_vol <volume>
 #
 # <volume> is the name of the drive file to make.  It is built from
 # scratch: initialize lays down the blank drive with its geometry label,
-# mkfs -i writes the filesystem and the m40 hard disk boot, and then the
-# whole userland is copied across from the source tree's filesystem
-# directory, which "make install" populates.  The kernel is then
-# replaced with the freshly built ccc one.
+# mkfs -i writes the filesystem and the m16 hard disk boot, and then the
+# userland is copied across - the built binaries from the filesystem
+# directory that "make install" populates, and the config (/etc, the
+# root-level scripts, /dev) straight from the src/micronix tree.  The
+# kernel is then replaced with the freshly built ccc one.
 #
-# /boot is not copied: mkfs -i has just built it for the m40, and
+# /boot is not copied: mkfs -i has just built it for the m16, and
 # copying it from elsewhere would put the wrong boot over it.  /dev is
 # recreated node by node rather than carried, because tar does not carry
-# device nodes - the list of devices still comes from the blessed drive.
+# device nodes - the list comes from the source tree's dev/devlist.
 #
 # The volume is made in this directory unless an absolute path is given,
 # and it is truncated if it already exists.
@@ -26,11 +27,12 @@ root=`cd "$here/../.." && pwd`
 
 mnix="$root/src/tools/mnix"
 setdev="$root/src/tools/setdev"
-blessed="$here/hddma-0.blessed"
-bootimg="$root/src/micronix/stand/boot/bootimg-m40"
+bootimg="$root/src/micronix/stand/boot/bootimg-m16"
+devlist="$root/src/micronix/dev/devlist"
 kernel="$root/src/micronix/sys/unix"
 srcdir="$root/src/micronix"
 srctar="$srcdir/srctar.tar"
+rootfiles="$srcdir/rootfiles"
 filesystem="$root/filesystem"
 
 vol="$1"
@@ -43,8 +45,8 @@ case "$vol" in
 *)	vol="$here/$vol" ;;
 esac
 
-if [ ! -f "$blessed" ]; then
-	echo "$0: $blessed not found - nothing to populate from" >&2
+if [ ! -f "$devlist" ]; then
+	echo "$0: $devlist not found - nothing to populate /dev from" >&2
 	exit 1
 fi
 if [ ! -f "$bootimg" ]; then
@@ -52,38 +54,59 @@ if [ ! -f "$bootimg" ]; then
 	echo "$0:   make -C $root/src/micronix/stand INC=/usr/local/usr/include bootimgs" >&2
 	exit 1
 fi
+if [ ! -f "$filesystem/etc/init" ]; then
+	echo "$0: $filesystem/etc/init not found - make install has not built init" >&2
+	exit 1
+fi
 
 tmp=`mktemp` || exit 1
-trap 'rm -f "$tmp" "$tmp.dev" "$tmp.k"' 0
+trap 'rm -f "$tmp" "$tmp.k"' 0
 
 # 1. a blank 40 meg drive
-"$mnix" initialize m40 "$vol" || exit 1
+"$mnix" initialize m16 "$vol" || exit 1
 
 # 2. the filesystem, with the hard disk boot in /boot/bootmw
 "$mnix" mkfs "$vol" -i "$bootimg" -f || exit 1
 
-# 3. the userland, from the source tree's filesystem (make install).
-# The kernel is not carried here: step 5 writes the freshly built one.
+# 3. the userland.  The built binaries come from the source tree's
+# filesystem (make install); the root-level scripts and /etc config are
+# source files and come straight from the tree.  The kernel is not
+# carried here - step 5 writes the freshly built one - and neither is
+# init, which make install built into filesystem/etc/init and which is
+# written below because it is a binary, not a source file.
 tar -C "$filesystem" -c -f "$tmp" \
 	--exclude='usr/src' --exclude='usr/man' \
-	bin lib libexec etc usr finstall hdinit m5init m10init m16init .sh .login || exit 1
+	bin lib libexec usr || exit 1
 "$mnix" -f "$vol" tar x "$tmp" || exit 1
 
-# 4. the device nodes, replayed from the blessed drive's /dev
-"$mnix" -f "$vol" mkdir /dev || exit 1
-"$mnix" -f "$blessed" devlist > "$tmp.dev" || exit 1
-while read type major minor name; do
-	"$mnix" -f "$vol" mknod "/dev/$name" "$type" "$major" "$minor" || exit 1
-done < "$tmp.dev"
+tar -C "$rootfiles" -c -f "$tmp" \
+	finstall hdinit m5init m10init m16init .sh .login || exit 1
+"$mnix" -f "$vol" tar x "$tmp" || exit 1
 
-# 5. the freshly built kernel, over the blessed one.  The ccc kernel's
-# root device defaults to 3/0 - the m5 drive type - and the m40 is minor
+tar -C "$srcdir" -c -f "$tmp" etc || exit 1
+"$mnix" -f "$vol" tar x "$tmp" || exit 1
+"$mnix" -f "$vol" write "$filesystem/etc/init" /etc/init || exit 1
+
+# 4. the device nodes, from the source tree's dev/devlist, and /tmp,
+# which the tar above does not carry - it archives files, not empty
+# directories.
+"$mnix" -f "$vol" mkdir /dev || exit 1
+"$mnix" -f "$vol" mkdir /tmp || exit 1
+while read type major minor name; do
+	case "$type" in
+	''|\#*)	continue ;;
+	esac
+	"$mnix" -f "$vol" mknod "/dev/$name" "$type" "$major" "$minor" || exit 1
+done < "$devlist"
+
+# 5. the freshly built kernel, over the one mkfs -i left.  The ccc kernel's
+# root device defaults to 3/0 - the m5 drive type - and the m16 is minor
 # 16, so point it there first: the minor's upper bits are the specs[]
 # index that supplies the drive timing the label does not carry.  setdev
 # patches in place, so work on a copy.
 if [ -f "$kernel" ]; then
 	cp "$kernel" "$tmp.k" || exit 1
-	"$setdev" "$tmp.k" 3/16 0/0 || exit 1
+	"$setdev" "$tmp.k" 3/8 0/0 || exit 1
 	"$mnix" -f "$vol" write "$tmp.k" /micronix || exit 1
 fi
 

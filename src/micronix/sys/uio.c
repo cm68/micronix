@@ -471,6 +471,42 @@ bsync()
 }
 
 /*
+ * Count the buffers still carrying a delayed write - the length of the
+ * dirty list.  A busy buffer is being written, not waiting, so only the
+ * not-busy delayed-write buffers count, as in bsync().
+ */
+int
+ndirty()
+{
+    register struct buf *b;
+    register int n = 0;
+
+    for (b = blist; b < btop; b++)
+        if ((b->flags & (BBUSY | BDELWRI)) == BDELWRI)
+            n++;
+    return n;
+}
+
+/*
+ * Write every delayed-write buffer out synchronously.  bwrite waits for
+ * the write to finish, so across the reboot() loop the count really does
+ * drain to zero rather than just being issued.
+ */
+int
+bdrain()
+{
+    register struct buf *b;
+    register int n = 0;
+
+    for (b = blist; b < btop; b++)
+        if ((b->flags & (BBUSY | BDELWRI)) == BDELWRI) {
+            bwrite(b);
+            n++;
+        }
+    return n;
+}
+
+/*
  * Map a buffer's segment into the 0xf000 window so its data (0xf000 +
  * offset) becomes reachable.  b->xmem carries the segment; segment 15 is
  * the window, so its map register is map0[2*15] == map0[30].

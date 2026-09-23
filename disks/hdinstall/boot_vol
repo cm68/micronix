@@ -9,12 +9,13 @@
 # level loader off cylinder 0, which reads the second level, which loads
 # /micronix off the filesystem.
 #
-# -c 0x10c is the configuration switch, one number that says three things
+# -c 0x70c is the configuration switch, one number that says four things
 # at once: 0x08 boot the HD-DMA, 0x04 skip the monitor and go straight to
-# the boot, and 0x100 put uart 0 - the console - in an xterm of its own
-# rather than borrowing this window.  That last bit is what lets this
-# script be run from anywhere, and what keeps the console from wedging
-# the shell it was started from.
+# the boot, and 0x700 put all three uarts in xterms of their own - uart 0,
+# the console, plus ttyB and ttyC - rather than borrowing this window.
+# The console bit is what lets this script be run from anywhere and keeps
+# the console from wedging the shell it was started from; the ttyB/ttyC
+# bits are what give the multiuser logins a window to live in.
 #
 # Every argument before <volume> is a simulator flag, so the usual
 # -t/-T/-W/-c switches are available without editing this.
@@ -54,4 +55,4 @@ esac
 [ -f "$vol-delta" ] && rm -f "$vol-delta"
 
 cd "$root/src/hwsim/d1" || exit 1
-exec ./d1 -b roms/mon447.bin -c 0x10c -S "$kernel" $flags "hdcdma0:$vol"
+exec ./d1 -b roms/mon447.bin -c 0x70c -S "$kernel" $flags "hdcdma0:$vol"
