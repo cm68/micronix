@@ -414,8 +414,17 @@ static byte delay;
 static byte local;
 
 void
-trap(byte trapbits)
+trap(byte trapbits, word from)
 {
+    /*
+     * `from` is the address of the trapping instruction, passed by the
+     * caller.  It cannot be read back from pc_reg here: in a batch the
+     * cpu's stored pc is only written at the end of z80_exec(), so by the
+     * time a trap is taken mid-batch pc_reg still holds the address the
+     * batch started at, and the trap window would be built in the wrong
+     * place.  get_byte knows the real address it is fetching.
+     */
+
     /*
      * Everything that enters the kernel comes through here, and the same
      * mechanism carries all of it: a halt out of user mode is a system
@@ -481,7 +490,7 @@ trap(byte trapbits)
      * happened to have at the user's pc - here d2, a jp into unmapped
      * space, and from there a nop slide, a wrecked stack and a reboot.
      */
-    trapaddr = z80_get_reg16(pc_reg);
+    trapaddr = from;
     if (trapbits & ST_INT) {            // a halt or a reset, not an interrupt
         trapaddr++;
     }
@@ -536,13 +545,58 @@ take_pending_trap()
     if (mem_pending_fault) {
         mem_pending_fault = 0;
         trapreg = fault_trapreg;        /* the shift register kept shifting since the fault */
-        trap((ST_RESET & ~ST_INT) | ST_R10);
+        trap((ST_RESET & ~ST_INT) | ST_R10, z80_get_reg16(pc_reg));
     }
     if (int_pending_trap) {
         int_pending_trap = 0;
-        trap(ST_RESET & ~ST_INT);
+        trap(ST_RESET & ~ST_INT, z80_get_reg16(pc_reg));
     }
 }
+
+#ifdef NODEBUG
+/*
+ * The fast build runs many instructions per host-loop pass, so the
+ * per-instruction overhead - the signal mask, the timeout scan, the
+ * device polls - is paid once a batch instead of once an instruction.
+ * The trap callback fires at the end of every instruction and is where
+ * the batch decides to stop.  Two things force it:
+ *
+ *   - a trap is pending.  mem_pending_fault and int_pending_trap are
+ *     latched inside get_byte/put_byte during the instruction, and
+ *     take_pending_trap() in the main loop must see them before the
+ *     NEXT instruction runs, or the fault/interrupt is taken one
+ *     instruction late.
+ *
+ *   - sim_cycles has reached batch_stop.  The main loop sets that to
+ *     the next device timeout, so a timeout fires on its exact cycle
+ *     rather than at the end of a longer batch, or to a short
+ *     input-service bound, so the console is polled often enough -
+ *     whichever comes first.
+ *
+ * sim_cycles is counted here, one per instruction.  The debug build
+ * counts it in z80_run() instead, and the two differ by a cycle on a
+ * DD/FD-prefixed instruction (once here, twice there), which is below
+ * the noise of a count that is already a rough proxy for time.
+ */
+unsigned long long batch_stop;
+
+static int
+batch_trap(uint16_t pc, int ticks, uint64_t pins, void *user_data)
+{
+    (void)pc; (void)ticks; (void)pins; (void)user_data;
+    sim_cycles++;
+    if (mem_pending_fault || int_pending_trap)
+        return 1;                       /* a trap must be taken before the next instruction */
+    return sim_cycles >= batch_stop;
+}
+
+void
+z80_run_batch()
+{
+    z80_trap_cb(&z80, batch_trap, 0);
+    z80_exec(&z80, 0xffffffffu);
+}
+#endif
 
 void
 interrupt_check()
@@ -949,7 +1003,7 @@ get_byte(vaddr addr)
             syscall_at(fuword(z80_get_reg16(sp_reg)));
         }
 #endif
-        trap(ST_RESET & ~ST_HALT);
+        trap(ST_RESET & ~ST_HALT, orig);
         seg = "nop:";
         retval = 0;
     }
@@ -969,7 +1023,7 @@ get_byte(vaddr addr)
             multio_restore_terminal();
             exit(0);
         }
-        trap(ST_RESET & ~ST_HALT);
+        trap(ST_RESET & ~ST_HALT, orig);
         seg = "nop:";
         retval = 0;
     }
@@ -1163,7 +1217,7 @@ mpz80_startup()
     }
     z80_set_reg16(pc_reg, 0);
     int_change = mpz80_intr;
-    trap(ST_RESET);
+    trap(ST_RESET, 0);
     return 0;
 }
 
