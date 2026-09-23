@@ -43,6 +43,7 @@
 #include <sys/sgtty.h>
 #include <sys/dir.h>
 #include <sys/signal.h>
+#include <sys/reboot.h>
 #include <sys/access.h>
 #include <utmp.h>
 #include <mtab.h>
@@ -204,6 +205,14 @@ main()
 	dbgopen();          /* nothing without INITDBG; must precede closeall */
 	closeall();
 
+	/*
+	 * Catch SIGTERM as early as possible: a halt sent before the console
+	 * session exists must still shut the machine down.  shutdown() is
+	 * safe to run this early - findpid() returns 0 for a pid not in the
+	 * tty table and logout() takes a 0 pointer, so an empty ttys is fine.
+	 */
+	signal(SIGTERM, shutdown);
+
 	rootfd = open("/dev/root", 0);
 	swapfd = open("/dev/swap", 0);
 	/*
@@ -221,7 +230,7 @@ main()
 #endif
 
 	mkempty("/etc/utmp");
-	mkempty("/etc/mtab");
+	mkmtab();
 
 	bootrecord();
 	resetttys();
@@ -347,8 +356,6 @@ console()
 	}
 
 	if (pid != 0) {
-		/* only now is it safe to be told to shut down */
-		signal(SIGTERM, shutdown);
 		while (wait(&status) != pid)
 			;
 		return 1;
@@ -687,6 +694,28 @@ char *name;
 	sync();
 }
 
+/*
+ * Seed /etc/mtab with the root filesystem.  Every other entry is written
+ * by the mount program, but root is mounted by the kernel before init
+ * runs, so nothing ever wrote it - which left /etc/mtab without an entry
+ * for the one filesystem that is always there.  This truncates whatever
+ * shutdown left behind and writes the single entry df reads.
+ */
+mkmtab()
+{
+	struct mtab m;
+	int fd;
+
+	if ((fd = creat("/etc/mtab", 0644)) < 0)
+		return;
+	setmem(&m, sizeof m, 0);
+	concat(m.directory, "/", 0);
+	concat(m.special, "root", 0);
+	write(fd, &m, sizeof m);
+	close(fd);
+	sync();
+}
+
 ignoresigs()
 {
 	signal(SIGHUP, SIG_IGN);
@@ -945,8 +974,10 @@ int pid;
  * so that utmp and wtmp are correct on the disk we are about to unmount.
  *
  * Then it unmounts everything /etc/mtab claims is mounted, drops its own
- * holds on the root and swap devices, prints its epitaph on the console and
- * sleeps forever.  It never exits: a dead process 1 is a panic.
+ * holds on the root and swap devices, prints its epitaph on the console
+ * and halts.  reboot(RB_HALT) drops the cpu and does not return; the
+ * sleep below is only reached if it somehow does, because a dead process
+ * 1 is a panic.
  *
  * Note that the mtab record is unmounted by its special-file name with
  * "/dev/" pasted on the front, over the top of the record's own directory
@@ -990,6 +1021,8 @@ shutdown()
 	sync();
 	write(i, downmsg, strlen(downmsg));
 	sync();
+
+	reboot(RB_HALT);
 
 	for (;;)
 		sleep(3600);
