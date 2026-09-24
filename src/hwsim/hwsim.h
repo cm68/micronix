@@ -13,8 +13,7 @@ extern inhandler input_handler[256];
 extern outhandler output_handler[256];
 
 // raw memory and i/o access - defined by bus
-extern byte physread(paddr addr);
-extern void physwrite(paddr addr, byte value);
+extern byte physmem[];          // the 24 bit S100 memory space, in s100.c
 extern void s100_output(portaddr p, byte v);
 extern byte s100_input(portaddr p);
 
@@ -156,5 +155,27 @@ extern void add_write_watch(unsigned short lo, unsigned short hi);
 extern void add_phys_watch(unsigned int lo, unsigned int hi);
 extern void phys_watch_check(unsigned int p, unsigned char v);
 #endif
+/*
+ * Physical memory access, inline so the emulation's hot path does not
+ * pay a call on every memory cycle.  physmem and ram_size live in s100.c.
+ */
+static inline byte
+physread(paddr p)
+{
+    p &= 0xffffff;
+    if (p >= ram_size)
+        return 0xff;            /* open bus */
+    return physmem[p];
+}
+
+static inline void
+physwrite(paddr p, byte v)
+{
+    p &= 0xffffff;
+    if (p >= ram_size)
+        return;                 /* no ram there */
+    phys_watch_check(p, v);
+    physmem[p] = v;
+}
 extern unsigned long long simnow64();
 extern void take_pending_trap();
