@@ -51,7 +51,7 @@ MXLD     = $(BIN)/mxld
 # and the one thing this host cannot do with it is run it, which is what
 # the build.h rule below works around.
 # Leaf code that lives in the u page (see user.c).  It is assembled as
-# .data and linked into upage.o after u, not into the main image.
+# .data and linked into upage.o, not into the main image.
 # csv/q*/ldiv/tramp/sw*/oarg are the libccc runtime, copied from
 # src/libc and re-sectioned to psect data.  They sat in leaf/ until that
 # directory was flattened; the generic %.o:%.s rule assembles them here,
@@ -75,6 +75,18 @@ rtc.o: rtc.c
 	$(MXLD) -r -Sdata -o rtc.o rtc.rel
 	rm -f rtc.rel
 
+# consts.c needs the same fold for the same reason, one literal at a
+# time: ccc puts the device-name strings the tables point at in .text,
+# and the tables themselves are in the u page.  consts.o is where that
+# showed what it costs - the final link pads text in upage.o out to
+# 0xe000, twenty-five kilobytes of zeros in the middle of the image,
+# which is past the blocks the boot loader reads and cost the machine
+# its boot.
+consts.o: consts.c
+	$(CCC) $(CCFLAGS) $(INC) -c -o consts.rel $<
+	$(MXLD) -r -Sdata -o consts.o consts.rel
+	rm -f consts.rel
+
 KERNEL_AS = uhdr.o intrpt.o mio.o textpad.o highmem.o
 KERNEL_C  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o link.o malloc.o name.o open.o queue.o \
@@ -88,10 +100,13 @@ include $(DEPTH)/GNUmakefile.inc
 
 #
 # The buffer pool.  Unclamped by default: expand_bufs() mints headers up
-# to the 0xd000 budget and the pool is whatever fits between _ebss and
-# there.  A cache bug that only shows itself with the full pool costs an
-# hour of recompiling to find, so the clamp is still here, as an
-# opt-in:
+# to _upage (0xe000, the base of the u page) and the pool is whatever
+# fits between _ebss and there.  The 0xd000 page used to be reserved for
+# the superblock's window; the superblock is plain memory now (getsb, in
+# uio.c) and mem.s puts back the page it borrows for user memory, so the
+# headers carry on through it.  A cache bug that only shows itself with
+# the full pool costs an hour of recompiling to find, so the clamp is
+# still here, as an opt-in:
 #
 #	make DEBUGBUFS=1	32 buffers instead of the full budget
 #
@@ -139,16 +154,46 @@ build.h:
 # that segment it would remap its own code out from under itself.
 # Whitesmith's overlay link put mem.s at 0x46xx for the same reason.
 #
+# THE FINAL LINK IS AN ORDINARY LINK - text, then data, then bss, and
+# -Ttext=0x1000 is the only address it is given.  It has no case for the
+# u page and none for the init-only code; that the u page lands at 0xe000
+# and the init-only code at _ebss is the work of the -r links above it,
+# each of which has already decided what its sections are:
+#
+#	low.o		a plain fold.  text, data and bss come through as
+#			they are, so the resident kernel lands where it
+#			always has and _ebss is the end of textpad.o's bss.
+#
+#	upage.o		.data, all of it, at 0xe000 by -Tdata.  Text has
+#			no address here to be placed at - 0xe000 is a data
+#			address - so every .c that goes in has to be folded
+#			to .data first, which is what rtc.o's and consts.o's
+#			own rules are for.  Left as .text, mxld appends it to
+#			the resident text and pads the text section out to
+#			reach 0xe000, and the image stops fitting in the boot
+#			loader's block list.
+#
+#	highmem.o	.data only, which sets CONF_HIGH in its header.  -Shigh
+#			below is what keys on that bit to park the object
+#			after bss, where expand_bufs() mints buffer headers
+#			over it once init has returned.
+#
+# A new object for either place is the same bargain: fold it upstream,
+# because this link has nowhere to put its text.
+#
 main_init.o: build.h
 
-# upage.o is the u page: user.o (the u struct) first so it sits at the
-# base of segment 14, then the leaf code (LEAF_AS), all as .data placed
-# at 0xe000.  The code must be .data, not .text - the loader reads text
-# and then data, so text parked here would be overwritten.  textpad.o
+# upage.o is the u page: the leaf code (LEAF_AS) first at the base of
+# segment 14, then user.o, whose data is ustack (512 bytes, the system
+# stack) below the u struct.  All of it is .data placed at 0xe000; the
+# code must be .data, not .text - the loader reads text and then data,
+# so text parked here would be overwritten.  u's register save area ends
+# up at the base of the struct, which is where the firmware's trap entry
+# leaves SP, so the kernel stack grows down into ustack.  textpad.o
 # stays last in the main link so _ebss is the end of .bss and binit()'s
 # buffer pool runs up to 0xe000 below u.
-upage.o: user.o $(LEAF_AS) $(LEAF_C)
-	$(MXLD) -r -Tdata=0xe000 -o upage.o user.o $(LEAF_AS) $(LEAF_C)
+upage.o: $(LEAF_AS) $(LEAF_C) user.o
+	$(MXLD) -r -Tdata=0xe000 -o upage.o $(LEAF_AS) $(LEAF_C) user.o
 
 # highmem.o is the init-only code - main_init, cus, the MIO/console init
 # in inits.s, and bcd2unix (unbcd.s) - folded into one data-only
@@ -179,6 +224,10 @@ highmem.o: main_init.o cus.o inits.o unbcd.o
 low.o: uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
 	$(MXLD) -r -o low.o uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
 
+#
+# the final link: three objects, in the order the image wants them, and
+# nothing here is a special case (see the kernel section above).
+#
 unix: $(OBJS)
 	$(MXLD) -Ttext=0x1000 -Shigh -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix low.o highmem.o upage.o
 

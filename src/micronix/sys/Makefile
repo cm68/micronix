@@ -138,7 +138,7 @@ all: unix
 $(UPAGE_AS_OBJ) $(UPAGE_LIBC_OBJ) $(KERNEL_AS_OBJ) $(HIGHMEM_AS_OBJ): $*.s
 	$(CC) -m micronix -c $*.s
 
-$(UPAGE_C_OBJ) $(KERNEL_C_OBJ) $(HIGHMEM_C_OBJ) $(USER_C_OBJ): $*.c
+$(KERNEL_C_OBJ) $(HIGHMEM_C_OBJ) $(USER_C_OBJ): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
 # The u page: user.o (the u struct) first so it sits at the base of
@@ -170,12 +170,37 @@ rtc.o: rtc.c
 	$(LD) -r -Sdata -o rtc.o rtc.rel
 	rm -f rtc.rel
 
+# consts.o is made the same way, for the same reason and one literal at a
+# time: ccc compiles the device-name strings the u page's read-only
+# tables point at into .text, and text in upage.o is what the final link
+# pads out to 0xe000 - twenty-five kilobytes of zeros in the middle of
+# the image, past the blocks the boot loader reads.  Folded, upage.o has
+# no text and the image is the size it has always been.
+consts.o: consts.c
+	$(CC) $(CFLAGS) -c -o consts.rel consts.c
+	$(LD) -r -Sdata -o consts.o consts.rel
+	rm -f consts.rel
+
 # uhdr.o must stay at 0x1000 (the firmware's entry point).  The asm
 # follows the C objects: mem.s remaps segment 1 (0x1000-0x1fff) through
 # MAP0[2] to reach user memory, and if it sat in that segment it would
 # remap its own code out from under itself.  textpad.o is last among the
 # resident objects so _ebss is the end of .bss; highmem.o (data-only)
 # follows it, then upage.o, the u page at 0xe000.
+#
+# THE FINAL LINK IS AN ORDINARY LINK - text, then data, then bss, with
+# -Ttext=0x1000 the only address in it - and it has no case for the u
+# page and none for the init-only code.  What it places is decided by the
+# -r links above it: upage.o is .data at 0xe000 by -Tdata, highmem.o is
+# data-only, which is the CONF_HIGH -Shigh keys on to park it after bss,
+# and low.o is a plain fold that lands where the resident kernel always
+# has.  Text has no address to be placed at in the u page, so a .c that
+# goes there is folded to .data by a rule of its own (rtc.o, consts.o);
+# left as .text, ld appends it to the resident text and pads the text
+# section out to reach 0xe000, and the image stops fitting in the blocks
+# the boot loader will read.  A new object for either place is the same
+# bargain: fold it upstream, because this link has nowhere to put its
+# text.
 #
 # THE LINK IS TWO LINKS BECAUSE OF THE ARGUMENT COUNT, and the count is
 # the shell's.  make runs a recipe through "sh -c" when metas() finds a
@@ -248,7 +273,7 @@ install: unix
 # file that matters.  A stray .o left in the directory is not swept up
 # any more, but nothing links one either: unix is built from $(OBJS).
 clean:
-	rm -f $(OBJS) rtc.rel *.nam *.tok *.x
+	rm -f $(OBJS) rtc.rel consts.rel *.nam *.tok *.x
 
 # clobber is clean plus the kernel, the makedate host program, and
 # build.h, the one file here that is written rather than compiled.
