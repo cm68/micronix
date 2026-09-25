@@ -77,7 +77,7 @@ which is booted off the DJ-DMA floppy port:
 	./d1 -b roms/mon447.bin -B djdma \
 	    djdma0:../../../disks/dist/1009-8_cold-boot.IMD \
 	    djdma1:../../../disks/dist/947-1.IMD \
-	    hdcdma0:../../../disks/hdinstall/hddma-0
+	    hdcdma0:../../../disks/hdinstall/hddma-0.vol
 
 The cold boot disk carries FORMATMW 1.6, which predates the part number
 names: "m5" is rejected there, "seagate" and "st506" are the same drive
@@ -105,7 +105,7 @@ Boot the 1.67 standalone on the 5 1/4 port, with the formatted drive
 attached:
 
 	./d1 -b roms/mon447.bin -B djdma -5 ../../../disks/hdinstall/sa67.5.skew.1k \
-	    hdcdma0:../../../disks/hdinstall/hddma-0
+	    hdcdma0:../../../disks/hdinstall/hddma-0.vol
 
 Use 1.67 and not 1.6: 1.6's kernel has its root device as djdma/12, the
 single sided minor for a disk that is double sided, and it stops in the
@@ -148,7 +148,7 @@ stage 3: boot from the hard disk
 --------------------------------
 
 	./d1 -b roms/mon447.bin -B hdcdma \
-	    hdcdma0:../../../disks/hdinstall/hddma-0
+	    hdcdma0:../../../disks/hdinstall/hddma-0.vol
 
 -B hdcdma is the HDC-DMA path with the monitor skipped, which is the
 configuration switch 0x0c that everything used to be written down as.
@@ -185,7 +185,7 @@ That file can be rewritten from the host, which is much quicker than
 reinstalling:
 
 	make -C src/micronix/stand INC=/usr/local/usr/include bootimg
-	mnix -f hddma-0 write -k <image> /boot/boot
+	mnix -f hddma-0.vol write -k <image> /boot/boot
 
 write -k is the important half.  Plain write frees the file first, so
 the blocks go back on the free list and come off it again in reverse -
@@ -195,7 +195,7 @@ or info shows it.  -k keeps the block list and writes through it.
 There is no in-band disk label.  The drive's geometry - what the
 machine runs on - is out of band, in a fixed 2k header at the front of
 the simulator's drive file: struct disklabel in lib/hdcdmadisk.c,
-DATAOFF.  hddma-0 is 5328896 bytes, which is that 2k and then 10404
+DATAOFF.  hddma-0.vol is 5328896 bytes, which is that 2k and then 10404
 blocks.  Nothing in the block space describes the drive.
 
 The second half of the boot block is used for something else, and it is
@@ -215,7 +215,7 @@ entry in the table in its Makefile - bootimg-m5, -m10, -m16, -m32,
 the whole file and nothing has to be preserved from what was there:
 
 	make -C src/micronix/stand INC=/usr/local/usr/include bootimgs
-	mnix -f hddma-0 write -k bootimg-m5 /boot/boot
+	mnix -f hddma-0.vol write -k bootimg-m5 /boot/boot
 
 The image has to be padded to the file's full size, 34816, so the size
 stays what it was and all 68 blocks stay claimed.  write -k refuses to
@@ -299,10 +299,18 @@ It is the thing to copy, not the thing to work on.  Nothing writes to
 it, so it stays a fixed point that two people can start from at the
 same time:
 
-	cp hddma-0.blessed mine
-	mnix -f mine write ../../src/micronix/cmd/init/init /etc/init
+	cp hddma-0.blessed mine.vol
+	mnix -f mine.vol write ../../src/micronix/cmd/init/init /etc/init
 	cd ../../src/hwsim/d1
-	./d1 -b roms/mon447.bin -B hdcdma hdcdma0:<somewhere>/mine
+	./d1 -b roms/mon447.bin -B hdcdma hdcdma0:<somewhere>/mine.vol
+
+A working drive is named with a .vol suffix and the blessed one is not,
+which is the whole of the difference between a volume and a reference:
+everything here that ends in .vol is a disk image the last run or the
+last experiment left behind, and .gitignore can drop the lot on that one
+pattern.  The scripts take the name without the suffix and add it -
+create_vol makes <name>.vol, and boot_vol, check_vol and runh look for
+it under that name.
 
 The last line is why the drive can be anywhere: a unit named on the
 command line is an exact file, so a copy under your own name is as good
@@ -332,9 +340,9 @@ kernel's own symbol table rather than searching for the bytes of a
 device number, which is why it works on 1.67 where the old ddt recipe
 silently did nothing:
 
-	mnix -f hddma-0 read /micronix micronix.k
+	mnix -f hddma-0.vol read /micronix micronix.k
 	setdev micronix.k 3/0 0/0
-	mnix -f hddma-0 write -k micronix.k /micronix
+	mnix -f hddma-0.vol write -k micronix.k /micronix
 
 3/0 is hddma drive 0; swap stays nodev.  write -k because the kernel is
 found through the filesystem and its size does not change, so there is
@@ -343,7 +351,7 @@ no reason to let it move.
 An init can be replaced the same way, and that is how the reconstructed
 one got onto this disk:
 
-	mnix -f hddma-0 write cmd/init/init /etc/init
+	mnix -f hddma-0.vol write cmd/init/init /etc/init
 
 plain write there, not -k: it is bigger than the 1.6 binary it replaces
 and -k refuses to grow a file.  Nothing depends on where /etc/init

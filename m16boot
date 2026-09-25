@@ -7,7 +7,7 @@
 # Runs d1 against the image install-hwsim builds.  The console and the
 # debug terminal each get their own xterm, so this needs an X display.
 #
-# The image is disks/hdinstall/hddma-0, which is built - from scratch -
+# The image is disks/hdinstall/hddma-0.vol, which is built - from scratch -
 # by
 #
 #	make -C src/micronix install-hwsim
@@ -19,7 +19,7 @@
 
 root=$(cd "$(dirname "$0")" && pwd)
 
-image="$root/disks/hdinstall/hddma-0"
+image="$root/disks/hdinstall/hddma-0.vol"
 d1="$root/src/hwsim/d1/d1"
 
 if [ ! -x "$d1" ]; then

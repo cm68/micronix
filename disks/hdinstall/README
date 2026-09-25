@@ -98,8 +98,13 @@ what is here
 
     standalone167.bin	the 1.67 standalone, exactly as distributed
     sa67.5.skew.1k	the name that gives it its geometry, via bdev(2,93)
-    hddma-0		the drive to install on, blank, 5 meg
-    hddma-1		a spare, blank
+    hddma-0.vol		the drive to install on, blank, 5 meg
+    hddma-1.vol		a spare, blank
+
+A drive a run writes into is named with a .vol suffix; the two above are
+the blank ones this directory ships, and everything else ending in .vol
+is what some experiment left behind.  Nothing else here carries that
+suffix, which is what lets .gitignore tell the images from the scripts.
 
 Nothing is patched.  An earlier version of this directory had the swap
 device changed and that was a mistake - see above.

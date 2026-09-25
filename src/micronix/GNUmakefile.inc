@@ -394,7 +394,7 @@ install-usersim:
 # snapshot: initialize simulates what FORMATMW does, mkfs makes the
 # filesystem, and tar x puts the built source and binaries on it.
 #
-HWIMAGE   ?= $(HOSTROOT)/disks/hdinstall/hddma-0
+HWIMAGE   ?= $(HOSTROOT)/disks/hdinstall/hddma-0.vol
 HWBLESSED ?= $(HOSTROOT)/disks/hdinstall/hddma-0.blessed
 HWMEDIA   ?= m16
 #

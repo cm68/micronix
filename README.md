@@ -175,16 +175,16 @@ with a reliable kernel.
 	#	link:			bin/mxld -r -Ttext=0x1000 -L lib -lccc -lc -o unix *.o
 	# (the native sys/Makefile has the full object list) - ~49k.
 
-	# make the m16 disk
-	src/tools/mnix initialize m16 disks/hdinstall/hddma-0
+	# make the m16 disk.  A volume is named with a .vol suffix.
+	src/tools/mnix initialize m16 disks/hdinstall/hddma-0.vol
 	src/tools/mnix mkfs -i src/micronix/stand/boot/bootimg-m16 \
-		disks/hdinstall/hddma-0
+		disks/hdinstall/hddma-0.vol
 	bin/setdev unix 3/8 0/0		# root 3/8 (m16), swap nodev
-	src/tools/mnix -f disks/hdinstall/hddma-0 write unix /micronix
+	src/tools/mnix -f disks/hdinstall/hddma-0.vol write unix /micronix
 
 	# boot it
 	cd src/hwsim/d1
-	./d1 -B hdcdma -d ../../disks/hdinstall hdcdma0:hddma-0
+	./d1 -B hdcdma -d ../../disks/hdinstall hdcdma0:hddma-0.vol
 
 -B says boot straight from the hdcdma controller, skipping the monitor;
 the boot block that mkfs put on cylinder 0 loads /micronix.  the shell

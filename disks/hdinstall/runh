@@ -12,12 +12,14 @@
 #	./runh			the console is this window, nothing else
 #	./runh -t 0x100000	trace syscalls into the logfile
 #	./runh -c 0x114		console in an xterm of its own
-#	./runh work.hddma	boot a specific drive (default hddma-0)
+#	./runh work		boot a specific drive (default hddma-0)
+#
+# A drive is named without its .vol suffix, the way create_vol makes it.
 #
 # The drive is written in place, so start from a copy of the blessed
 # drive rather than the blessed drive itself:
 #
-#	cp hddma-0.blessed mine
+#	cp hddma-0.blessed mine.vol
 #	./runh mine
 #
 # Build the kernel first if ../../kernels/micronix.ccc is missing:
@@ -30,10 +32,16 @@ here=`cd "$here" && pwd` || exit 1
 root=`cd "$here/../.." && pwd`
 
 # First positional argument names the drive file; the rest go to d1.
+# The .vol suffix is added here unless it is already there, the same way
+# create_vol names what it makes.
 drive=hddma-0
 case "$1" in
 -*|"")	;;
 *)	drive=$1; shift ;;
+esac
+case "$drive" in
+*.vol)	;;
+*)	drive="$drive.vol" ;;
 esac
 
 kernel="$root/kernels/micronix.ccc"

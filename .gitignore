@@ -115,28 +115,32 @@ src/micronix/stand/formatmw/formatmw.com
 src/micronix/stand/zout/
 
 #
-# The working hard disk images.  hddma-0.blessed is the one that is
-# kept - a drive that boots, to be copied and written into - and the
-# rest are whatever the last thing to run left behind: a 15MB volume per
-# experiment and a .lock sidecar the host tools write beside each.  They
-# are named back in rather than listed, because the directory is scripts
-# and reference images and an unnamed file in it is a run leftover by
-# default - so a new script or a new blessed drive has to be named here
-# the way these were.  See disks/hdinstall/REGEN.
+# The working hard disk images.  A volume is named with a .vol suffix -
+# hddma-0.vol, m16a.vol, whatever an experiment is called - so one
+# pattern covers all of them however they are named.
 #
-disks/hdinstall/*
-!disks/hdinstall/README
-!disks/hdinstall/REGEN
-!disks/hdinstall/bdev(2,93)
-!disks/hdinstall/boot_vol
-!disks/hdinstall/check_vol
-!disks/hdinstall/create_vol
-!disks/hdinstall/hddma-0.blessed
-!disks/hdinstall/mw167.sym
-!disks/hdinstall/run
-!disks/hdinstall/runh
-!disks/hdinstall/sa67.5.skew.1k
-!disks/hdinstall/standalone167.bin
+# The suffix is what makes that possible.  The rule here used to be
+# "everything in disks/hdinstall is a leftover unless it is named back
+# in", which is the awkward way round: a new script or a new reference
+# image had to be added to a list here by hand, and a file that was
+# neither was invisible.  Naming the volumes instead turns the directory
+# around, so what is not a .vol is a real file.  disks/hdinstall holds
+# the prose (README, REGEN), the scripts (create_vol, check_vol,
+# boot_vol, runh, run), the distributed standalone and its symlinks, and
+# hddma-0.blessed - the drive that is kept, one that boots, to be copied
+# and written into, deliberately not a volume.
+#
+# A .vol is never tracked.  A drive worth keeping is kept the way
+# hddma-0.blessed is, under a name that says what it is.  See
+# disks/hdinstall/REGEN.
+#
+*.vol
+
+#
+# A convenience symlink in that directory, to the kernel's own sys
+# directory, and not a volume.  It is nobody's source.
+#
+disks/hdinstall/sys
 
 #
 # script(1) captures.  A typescript is a recording of a terminal session
@@ -351,15 +355,12 @@ src/gui
 src/hwsim/resources/cold_boot_loader.bin
 
 #
-# Runtime litter, never a source: the simulator's lock files, its
-# scratch and working disk images, editor autosaves, and the .nfs
-# files a build under a mounted tree leaves behind.
+# Runtime litter, never a source: the simulator's lock files - one
+# beside each disk image it holds open for writing, so a volume's is
+# <volume>.vol.lock - editor autosaves, and the .nfs files a build under
+# a mounted tree leaves behind.
 #
 *.lock
-disks/hdinstall/m16scratch
-disks/hdinstall/m5scratch
-disks/hdinstall/m40mnix
-disks/hdinstall/m5mnix
 \#*#
 .nfs*
 .@__thumb/

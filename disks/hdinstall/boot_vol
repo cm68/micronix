@@ -5,9 +5,9 @@
 #	./boot_vol <volume>
 #
 # <volume> is the name of the drive file to boot - the thing create_vol
-# makes.  The simulator reads the monitor ROM, which reads the first
-# level loader off cylinder 0, which reads the second level, which loads
-# /micronix off the filesystem.
+# makes - given without its .vol suffix.  The simulator reads the monitor
+# ROM, which reads the first level loader off cylinder 0, which reads the
+# second level, which loads /micronix off the filesystem.
 #
 # -c 0x70c is the configuration switch, one number that says four things
 # at once: 0x08 boot the HD-DMA, 0x04 skip the monitor and go straight to
@@ -45,6 +45,10 @@ if [ -z "$vol" ]; then
 	exit 1
 fi
 
+case "$vol" in
+*.vol)	;;
+*)	vol="$vol.vol" ;;
+esac
 case "$vol" in
 /*)	;;
 *)	vol="$here/$vol" ;;
