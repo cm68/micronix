@@ -31,7 +31,15 @@
  * every boot and every install.  Off unless somebody turns it on here.
  */
 static int hd_debug = 0;
-#define NDRIVES 8
+
+/*
+ * The table is allocated on demand, one entry per unit actually opened,
+ * and a machine that fills it is a machine whose controllers asked for
+ * more drives than there are.  hdca claims four units and hddma four, so
+ * those two alone used to account for the whole of it; the ide card's two
+ * are what the extra room is for.
+ */
+#define NDRIVES 12
 
 struct drive {
     struct disklabel label;

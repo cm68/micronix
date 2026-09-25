@@ -58,7 +58,7 @@ extern void dump(unsigned char *buf, int size);
 extern void dumpsb(struct super *sb);
 extern void secdump(unsigned char *buf);
 extern UINT secmap(struct super *fs, UINT blkno);
-extern int bmap(struct dsknod *ip, int offset, int alloc);
+extern int bmap(struct dsknod *ip, off_t offset, int alloc);
 extern struct dsknod *namei(struct super *f, char *name);
 extern struct dir *getdir(struct dsknod *ip);
 extern struct dir *getdirent(struct dsknod *ip, int index);
@@ -71,7 +71,7 @@ extern int filelink(struct super *f, char *path, int inum);
 extern struct dsknod *filecreate(struct super *f, char *name);
 extern int dircreate(struct super *f, char *name);
 extern int dirrm(struct super *f, char *name);
-extern int filesize(struct dsknod *ip);
+extern off_t filesize(struct dsknod *ip);
 extern int bootrange(struct super *f, int *first, int *nblk, char **name);
 extern int installboot(struct super *f, int first, int nblk, char *name);
 

@@ -23,7 +23,10 @@ CC	= ccc
 # GNUmakefile.inc, which explains why it is not optional on a machine
 # where the heap is whatever is left of 64k after the image.
 #
-CFLAGS	= -O
+# -x prints each pass's command as ccc runs it, so a compile that dies
+# partway shows exactly which pass and how it was invoked.
+#
+CFLAGS	= -O -x
 AR	= ar
 LIBDIR	= /lib
 TARGET	= libu.a
@@ -47,7 +50,7 @@ MANDIR	= /usr/man/man2
 # one argument block.
 AOBJS1	= access.o alarm.o _break.o chdir.o chmod.o chown.o \
 	close.o creat.o dup.o errno.o exec.o execv.o \
-	exit.o _exit.o fdpos.o fork.o fstat.o getpid.o getuid.o \
+	exit.o _exit.o fork.o fstat.o getpid.o getuid.o \
 	gtty.o kill.o link.o mknod.o mount.o nice.o
 
 AOBJS2	= open.o pause.o perror.o pipe.o read.o reboot.o seekraw.o \

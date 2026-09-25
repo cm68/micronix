@@ -184,12 +184,14 @@ idOf(char *s)
  */
 /*
  * The sidecar fd is private - opened, written, seeked, closed right
- * here - and nothing ever asks for its tracked position, so the
- * Z80 build can use the bare seek syscall and leave lseek's _fdpos
- * machinery (and its 600 bytes) out of the binary entirely.
+ * here - and nothing ever asks for its tracked position, so the Z80
+ * build can use the bare seek syscall and leave lseek, which reads
+ * the position back and splits a displacement too big for a word,
+ * out of the binary entirely.  The bare call answers with the new
+ * position; nothing here wants it.
  */
 #ifdef CCC
-extern int seekraw();
+extern long seekraw();
 #define NSEEK(fd, off) seekraw(fd, (int)(off), 0)
 #else
 #define NSEEK(fd, off) lseek(fd, (long)(off), 0)

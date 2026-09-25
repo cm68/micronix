@@ -30,12 +30,15 @@ static int pushback = -1;
 static int nidfd = -1;
 
 /*
- * Sidecar seeks bypass lseek's _fdpos tracking on the Z80: this fd
- * is only ever read at seeked positions, nothing asks where it is,
- * and lseek would drag 600 bytes of position machinery into c1.
+ * Sidecar seeks use the bare syscall rather than lseek: this fd is
+ * only ever read at seeked positions, nothing asks where it is, and
+ * lseek - which reads the position back from the kernel and splits a
+ * displacement too big for a word - has no business in c1.  What the
+ * call returns is the new position now, not 0; nothing here wants
+ * either.
  */
 #ifdef CCC
-extern int seekraw();
+extern long seekraw();
 #define NSEEK(fd, off) seekraw(fd, (int)(off), 0)
 #else
 #define NSEEK(fd, off) lseek(fd, (long)(off), 0)

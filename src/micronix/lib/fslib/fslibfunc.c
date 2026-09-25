@@ -79,10 +79,10 @@ ifree(struct dsknod *dp)
 	free(ip);
 }
 
-int
+off_t
 filesize(struct dsknod *ip)
 {
-	return (ip->d_size0 << 16) + ip->d_size1;
+	return (((off_t)ip->d_size0 << 16) + ip->d_size1);
 }
 
 struct dir *
@@ -90,10 +90,11 @@ getdirent(struct dsknod *dp, int i)
 {
 	int b;
 	struct i_node *ip = (struct i_node *)dp;
+	off_t offset = (off_t)i * sizeof(struct dir);
 
-	if (i * sizeof(struct dir) > filesize(dp))
+	if (offset > filesize(dp))
 		return 0;
-	b = bmap(dp, i * sizeof(struct dir), 0);
+	b = bmap(dp, offset, 0);
 	if (dblk != b) {
 		dblk = b;
 		readblk(ip->fs, dblk, (char *)dirbuf);
@@ -161,10 +162,10 @@ bfree(struct super *fs, int blkno)
  * double, and the inode holds eight addresses either way.
  */
 int
-bmap(struct dsknod *dp, int offset, int alloc)
+bmap(struct dsknod *dp, off_t offset, int alloc)
 {
 	struct i_node *ip = (struct i_node *)dp;
-	int lblk = offset / 512;
+	off_t lblk = offset / 512;
 	UINT *aa;
 	int iindex;
 	int i;
@@ -294,13 +295,14 @@ done:
  *
  * installboot is the repair half of what mkfs's domkfs does when it
  * reserves the boot area: it builds the /boot directory and the
- * /boot/<name> file (bootmw on a hard disk, bootdj on a floppy) whose
- * indirect block lists blocks first through
+ * /boot/<name> file whose indirect block lists blocks first through
  * first+nblk-1, so those blocks are owned by an inode and the free list
  * cannot hand them out.  It does NOT write the boot itself - the blocks
  * keep whatever a rom-bootable loader or dd put there - so it runs on a
- * floppy whose boot is already installed and which has only lost the
- * inode that protects it.
+ * device whose boot is already installed and which has only lost the
+ * inode that protects it.  The name comes from bootrange and is the same
+ * on every device: the file's job does not depend on which controller
+ * reads the blocks.
  *
  * The caller (icheck -i, fsck -i) rebuilds the free list afterwards; the
  * blocks this inode now owns come out of that rebuild allocated rather

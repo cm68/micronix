@@ -437,22 +437,32 @@ openfs(char *filesystem, struct super **fsp)
 }
 
 /*
- * Where the boot area is, and what its file is called.  A hard disk
- * carries a label at physical cylinder 0 naming d_cyl0 blocks beginning
- * at d_cyl0 - the /boot/bootmw file.  A floppy has no label; its boot is
- * the reserved tracks in front of the filesystem, which the roll maps to
- * the blocks just past s_fsize - the /boot/bootdj file.
+ * Where the boot area is, and what its file is called.
+ *
+ * Where it is has two answers, and neither of them is about which
+ * controller drives the disk.  A labeled device carries its own answer:
+ * the label at physical cylinder 0 names d_cyl0 blocks beginning at
+ * d_cyl0.  A device with no label - a floppy - keeps its boot in the
+ * reserved tracks in front of the filesystem, which the roll maps to the
+ * blocks just past s_fsize; the offset is how many blocks those tracks
+ * hold.
+ *
+ * What it is called is one answer for every device.  The file's whole
+ * job is to own the blocks the rom will read, and that job is the same
+ * whether an HD-DMA, a DJ-DMA or an IDE card is doing the reading, so
+ * the name says what the blocks are for and not who fetches them.
  */
 int
 bootrange(struct super *fs, int *first, int *nblk, char **name)
 {
     struct image *i = (struct image *)fs;
 
+    *name = "boot";
+
     if (i->haslabel && i->bootblks) {
-        /* a hard disk: the label at cylinder 0 names the boot area */
+        /* a labeled device: the label names the boot area */
         *first = i->cyl0;
         *nblk = i->bootblks;
-        *name = "bootmw";
         return 1;
     }
     if (i->offset) {
@@ -461,7 +471,6 @@ bootrange(struct super *fs, int *first, int *nblk, char **name)
          * is how many blocks those tracks hold. */
         *first = fs->s_fsize;
         *nblk = i->offset;
-        *name = "bootdj";
         return 1;
     }
     return 0;

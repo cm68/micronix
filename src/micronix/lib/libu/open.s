@@ -14,7 +14,6 @@
 ; returns -1 on error, else file descriptor
 ;
 	.extern _errno
-	.extern fdclr
 	.global _open
 
 	.text
@@ -31,9 +30,7 @@ _open:
 	rst 	08h
 	.db 	000h
 	.dw 	scall
-	jr 	c,err		; fd in hl
-	ld 	a,l
-	jp 	fdclr		; zero _fdpos[fd], fd in hl
+	ret 	nc		; fd in hl
 err:	ld 	(_errno),hl
 	ld 	hl,-1
 	ret

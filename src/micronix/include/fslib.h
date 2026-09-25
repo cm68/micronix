@@ -35,8 +35,8 @@ extern struct dsknod *iget(struct super *f, int inum);
 extern void iput(struct dsknod *ip);
 extern void ifree(struct dsknod *ip);
 
-extern int filesize(struct dsknod *ip);
-extern int bmap(struct dsknod *ip, int offset, int alloc);
+extern off_t filesize(struct dsknod *ip);
+extern int bmap(struct dsknod *ip, off_t offset, int alloc);
 extern int balloc(struct super *f);
 extern void bfree(struct super *f, int b);
 extern void iblkfree(struct super *f, UINT *bp);

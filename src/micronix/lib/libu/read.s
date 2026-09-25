@@ -16,13 +16,11 @@
 ; returns -1 on error, 0 on EOF, else bytes read
 ;
 	.extern _errno
-	.extern fdadd
 	.global _read
 
 	.text
 _read:
 	ld 	a,l		; fd arrives in hl
-	ld 	(fd),a		; save fd for fdadd
 	pop 	hl		; discard ret addr
 	pop 	hl		; buffer
 	ld 	(buf),hl
@@ -38,9 +36,7 @@ _read:
 	rst 	08h
 	.db 	000h
 	.dw 	scall
-	jr 	c,err		; read count in hl
-	ld 	a,(fd)
-	jp 	fdadd		; advance _fdpos[fd], count in hl
+	ret 	nc		; read count in hl
 err:	ld 	(_errno),hl
 	ld 	hl,-1
 	ret
@@ -50,6 +46,5 @@ scall:	.db 	0cfh
 	.db 	003h
 buf:	.dw 	0
 count:	.dw 	0
-fd:	.db 	0
 
 ; vim: tabstop=8 shiftwidth=8 noexpandtab:

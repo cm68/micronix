@@ -2716,7 +2716,7 @@ allocinum(int ui)
  *
  * ps reads the kernel's process table straight out of physical memory:
  * a two-byte pointer at 0x1003 names the table, and each slot in it is
- * a struct proc - 98 bytes, the layout of the tree's own
+ * a struct proc - 99 bytes, the layout of the tree's own
  * include/sys/proc.h, which is what the ps in cmd/ps was compiled
  * against and what the kernel itself lays down.  We build that
  * image in a shared segment so every simulated process, the root and
@@ -2732,7 +2732,7 @@ allocinum(int ui)
 #define PTAB        0x2000          /* where the process table lives */
 #define TTY         0x2a00          /* the one tty struct we hand ps */
 #define NPROCSL     20              /* NPROC, as ps and the kernel read it */
-#define PROCSTRIDE  98              /* sizeof(struct proc) */
+#define PROCSTRIDE  99              /* sizeof(struct proc) */
 
 /* mode bits, as ps tests them */
 #define P_ALLOC     0001
@@ -2756,7 +2756,7 @@ allocinum(int ui)
 #define P_TTY       20
 #define P_NICE      91
 #define P_PRI       92
-#define P_PID       97
+#define P_PID       97              /* int, two bytes, last in the struct */
 
 struct memdev {
     pthread_mutex_t mutex;
@@ -2848,7 +2848,7 @@ procrender()
     for (slot = 0; slot < 2; slot++) {
         addr = PTAB + slot * PROCSTRIDE;
         memdev->mem[addr + P_MODE] = P_ALLOC | P_ALIVE | P_AWAKE | P_LOADED;
-        memdev->mem[addr + P_PID] = slot;
+        put16(&memdev->mem[addr + P_PID], slot);
         put16(&memdev->mem[addr + P_TTY], TTY);
         put16(&memdev->mem[addr + P_PARENT], PTAB);
     }
@@ -2861,12 +2861,7 @@ procrender()
         for (i = 0; i < 8; i++)
             memdev->mem[addr + P_ARGS + i] = memdev->cmd[slot][i];
         memdev->mem[addr + P_MODE] = P_ALLOC | P_ALIVE | P_AWAKE | P_LOADED;
-        /*
-         * proc.pid is one byte in the kernel, and the simulated pid
-         * space is wider than that, so this is where it narrows - the
-         * same thing the kernel would have done to the number.
-         */
-        memdev->mem[addr + P_PID] = memdev->slotpid[slot] & 0xff;
+        put16(&memdev->mem[addr + P_PID], memdev->slotpid[slot]);
         memdev->mem[addr + P_PRI] = 0;
         memdev->mem[addr + P_NICE] = 0;
         put16(&memdev->mem[addr + P_EVENT], 0);     /* not waiting */
@@ -3751,6 +3746,20 @@ SystemCall()
         fd = z80_get_reg16(hl_reg);
 
     /*
+     * Step the return address over the inline descriptor.  It has to
+     * happen before anything can hand the guest back its PC, which is
+     * why it is up here and not down at nolog with the rest of the
+     * call setup: the bad-descriptor exit below returns early, and a
+     * guest sent back to the byte after the rst 08 executes the
+     * descriptor as code.  The library's stubs are indirect - their
+     * descriptor is a zero byte and the address of a two-byte
+     * "rst 08 / number" - so what the guest runs there is a call into
+     * whatever lives at that address, and the syscall it eventually
+     * makes is not the one it asked for.
+     */
+    push(pop() + syscalls[indirect ? 0 : code].argbytes);
+
+    /*
      * SF_FD only says HL carried the first argument, and for exit,
      * alarm, sleep and kill that is not a descriptor.  These are the
      * calls where it is one, so these are the ones translated; the
@@ -3820,14 +3829,13 @@ SystemCall()
         }
     }
   nolog:
-
     /*
-     * let's fixup the return address from the table 
+     * the return address was stepped over the descriptor above, so
+     * every path from here to sysdone hands the guest a PC past it.
      */
-    push(pop() + syscalls[indirect ? 0 : code].argbytes);
 
     /*
-     * let's make the assumption that all calls fail 
+     * let's make the assumption that all calls fail
      */
     carry_set();
 
@@ -4763,24 +4771,23 @@ SystemCall()
         }
 //message("seek fd %d to %d\n", fd, i);
         /*
-         * Nothing comes back but the carry.  sys/sys2.c sets rwptr
-         * and returns, and says so itself:
+         * The new position comes back as HL':HL - high word in the
+         * shadow bank's HL, low word in HL.  r_seek in sys/reg.c does
+         * it, and it is the shape the compiler already returns a long
+         * in, so libu's seekraw stub is a bare ret.  DE is untouched:
+         * it is the frame pointer of every Whitesmiths binary, and
+         * seek's original returned nothing at all, so their lseek is
+         * not written to save it.  Both halves are set here rather
+         * than left over from whatever ran before, since a program can
+         * now ask where it is instead of guessing through lseek.
          *
-         *      / * XXX - we should return offset in hl, de * /
-         *
-         * so there is no way for a program to ask where it is.  That
-         * is why lseek in libu keeps _fdpos[] and answers out of it,
-         * and why that answer goes stale the moment a fork or a dup
-         * gives the open file a second owner - the position moved and
-         * there is no call that would say so.  Real machine, same
-         * hole; we inherit it rather than invent a way out of it.
-         *
-         * Which is exactly why SEEK_CUR above has to add to the
-         * shared pointer and not to a copy of our own: the kernel
-         * adds to fp->rwptr, the one thing every owner shares, and it
-         * is the only place the true position exists.
+         * The shared pointer is still the one that gets moved, and
+         * still the only place the true position exists: two fds from
+         * a dup name one fp->rwptr, and that is what SEEK_CUR above
+         * adds to.
          */
-        ret = 0;
+        ret = i & 0xffff;
+        z80_set_reg16(hl1_reg, (i >> 16) & 0xffff);
         carry_clear();
         break;
 

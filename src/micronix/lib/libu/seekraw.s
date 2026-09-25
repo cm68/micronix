@@ -3,10 +3,10 @@
 ;
 ; seekraw(fd, offset, whence)
 ;
-; this is the bare kernel call, used only by lseek and the
-; seek() wrapper in seek.c, which keep the tracked file
-; position (_fdpos) current.  user code should not call it
-; directly, since it bypasses the tracking.
+; this is the bare kernel call.  lseek and the seek()
+; wrapper in seek.c are the front doors; user code should
+; go through one of them, since they know how a 32-bit
+; position is split across the two argument forms.
 ;
 ; Moves the read/write pointer of an open file:
 ;   whence 0: set to offset (from beginning)
@@ -20,7 +20,7 @@
 ;
 ; passes fd in hl
 ;
-; returns 0 on success, -1 on failure
+; returns the new position, or -1 on failure
 ;
 	.extern _errno
 	.global _seekraw
@@ -43,11 +43,20 @@ _seekraw:
 	rst 	08h
 	.db 	000h
 	.dw 	scall
-	ex 	de,hl
-	ld 	hl,0
-	ret 	nc
-	ld 	(_errno),de
-	dec 	hl
+	ret 	nc		; kernel: hl' = high word, hl = low word,
+				; which is ccc's long already - and DE it
+				; never touched, so there is nothing to
+				; cross and nothing to give back
+	ld 	(_errno),hl
+	;
+	; A failed long is -1 in both halves.  Setting hl' means swapping
+	; the bank in, and the set has to be done on both sides of the swap
+	; so that each bank keeps the other registers it came in with.
+	;
+	ld 	hl,-1
+	exx
+	ld 	hl,-1
+	exx
 	ret
 
 	.data

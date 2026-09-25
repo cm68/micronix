@@ -2755,13 +2755,27 @@ spilled:	;
 			e->right = valtohl(e->right);
 
 		/*
-		 * The descriptor on the LEFT of a subtraction: "&buf[NDIG]
-		 * - cp", the span of what a routine has filled in so far.
+		 * The descriptor on the LEFT of a binary operator, left
+		 * standing as a bare INDEX: "&buf[NDIG] - cp", the span of
+		 * what a routine has filled in so far, or the segment an
+		 * address is shifted down to.  A bare INDEX is never a value
+		 * to read - a scalar's contents arrive as D(I) and reduce
+		 * through the load rules well before this - so what is left
+		 * here is a local array's name, whose value IS its address.
+		 *
 		 * PLUS has +(I,H), +(I,E) and +(I,B) because a subscript
-		 * reaches the frame slot without a register, but MINUS does
+		 * reaches the frame slot without a register, and folds (I,N)
+		 * into an INDEX of its own.  Nothing else does.  MINUS does
 		 * not commute and there is no -(I,x) at all - so nothing
 		 * matched and nothing was emitted.  Every -(H,x) form does
 		 * exist, so putting the address in HL is all it takes.
+		 *
+		 * AND, OR, XOR, both shifts, *, / and % had the same hole and
+		 * no (I,x) row either.  The shift is the one that bit: the
+		 * kernel's buffer pool keeps a segment number as
+		 * (UINT)ptr >> 12, the pointer being an array in a struct, and
+		 * the store of it was silently dropped - an xmem of 0x6c,
+		 * the low byte of the address it was being stored to.
 		 *
 		 * Only where HL is free: against a right already in HL the
 		 * existing -(H,I) rule is the better code.
@@ -2772,11 +2786,20 @@ spilled:	;
 		 * Forming the address costs DE when the slot has an offset,
 		 * and the right operand has already been worked out by now -
 		 * "buf + 6 - q" loaded q into DE and then overwrote it with
-		 * the offset, subtracting the offset from itself.
+		 * the offset, subtracting the offset from itself.  A constant
+		 * right holds no register - the rule that names it writes it
+		 * into the instruction - so it is free too, which is what
+		 * makes "p >> 12" reach here.  MINUS is left out of that
+		 * half: a constant is folded against the slot's own offset
+		 * long before this, and "buf - 4" is a bare REGVAR by now.
 		 */
-		if (e->op == MINUS && both &&
-		    e->left->op == INDEX && narrow &&
-		    reduced(e->right) && e->right->op != INHL) {
+		if (both && e->left->op == INDEX && narrow &&
+		    e->right->op != INHL &&
+		    (e->op == MINUS || e->op == AND || e->op == OR ||
+		     e->op == XOR || e->op == LSHIFT || e->op == RSHIFT ||
+		     e->op == STAR || e->op == DIV || e->op == MOD) &&
+		    (reduced(e->right) ||
+		     (e->op != MINUS && e->right->op == NUMBER))) {
 			int keepde = e->right->op == INDE &&
 			    e->left->u.var.off;
 

@@ -50,7 +50,6 @@ extern int open(char *path, int flags);
 extern int pause(void);
 extern int pipe(int *fds);
 extern int read(unsigned char fd, char *buf, int count);
-extern long lseek(unsigned char fd, long offset, int whence);
 extern int seek(unsigned char fd, int offset, int whence);
 extern int setuid(int uid);
 extern void *sbrk(int incr);
