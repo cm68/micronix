@@ -24,7 +24,7 @@
 #	   attic/ has sources for all of them, and it does not matter -
 #	   see below.
 #	17 the source is in extra/, v6 and v7, unported -
-#	   cal comm cu df file login lpr mail passwd ps su sum tail tty
+#	   cal comm cu file login lpr mail passwd ps su sum tail tty
 #	   update wall who
 #	28 nothing in the repository.
 #
@@ -103,7 +103,6 @@
 #	lines	count lines
 #	lprm	printer queue, remove entries
 #	lprq	printer queue, query
-#	mount	"usage: mount [special directory [-r]]"
 #	newuser	add a user
 #	owner	chown: "usage: owner [-newowner] file ..."
 #	pilot	?
@@ -116,7 +115,6 @@
 #	stty	terminal modes
 #	td	tape dump: "Dump destination must be either block special
 #		or directory."
-#	umount	"usage: umount device"
 #	unique	?
 #	words	count words
 #	write	write(1) - to another user's terminal
@@ -125,9 +123,8 @@
 #
 # A full /bin is not the goal.  What has to exist for the system to
 # come up and rebuild itself is a shell, the toolchain, make, and the
-# file utilities those need - and all of that is in the 59 this tree
-# builds, so none of the 28 blocks a bootstrap.  The nearest to it are
-# mount and umount, which bring up a filesystem beyond the root, and
+# file utilities those need - and all of that is in the 63 this tree
+# builds, so none of the 26 blocks a bootstrap.  The nearest to it is
 # stty, which the terminal needs before anything interactive is
 # pleasant.  The rest is a userland that can wait.
 #

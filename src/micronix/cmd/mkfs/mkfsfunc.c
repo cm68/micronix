@@ -58,6 +58,9 @@ struct super *sb;
 #define S_FREE(i)   (sb->s_free[i])
 #define S_INODE(i)  (sb->s_inode[i])
 #define S_TIME      (sb->s_time)
+#define S_MAGIC     (sb->s_magic)
+#define S_BFREE     (sb->s_bfree)
+#define S_IFREE     (sb->s_ifree)
 
 void die(s)
     char *s;
@@ -305,6 +308,7 @@ domkfs(fs, is, bfirst, bnblk, dsize, type, bfile, f)
 #else
     S_TIME = (UINT32) now;
 #endif
+    S_MAGIC = FsMAGIC_DISK;
 
     nextblk = INOSTART + isize;
     nextino = ROOTINO;
@@ -370,8 +374,6 @@ domkfs(fs, is, bfirst, bnblk, dsize, type, bfile, f)
         ((struct dir *) dirbuf)[2].name[1] = 'o';
         ((struct dir *) dirbuf)[2].name[2] = 'o';
         ((struct dir *) dirbuf)[2].name[3] = 't';
-        ((struct dir *) dirbuf)[2].name[4] = 'm';
-        ((struct dir *) dirbuf)[2].name[5] = 'w';
         wrblk(dirblk, dirbuf);
 
         ip = getdsk(dirino, blkbuf);
@@ -424,6 +426,14 @@ domkfs(fs, is, bfirst, bnblk, dsize, type, bfile, f)
     S_NINODE = 0;
     for (n = nextino; n <= isize * IPERBLK && S_NINODE < NICINOD; n++)
         S_INODE(S_NINODE++) = n;
+
+    /*
+     * The running totals, so df reads two words instead of walking the
+     * free lists.  Everything from nextblk up is free except the boot
+     * area, and every inode from nextino up is free.
+     */
+    S_BFREE = fsize - nextblk - bootnblk;
+    S_IFREE = isize * IPERBLK - nextino + 1;
 
     /*
      * The boot itself, into the blocks the file now owns.  The first of

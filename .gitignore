@@ -87,10 +87,10 @@ src/tools/setdev
 /usr/
 
 #
-# stand/ builds a .com and several intermediates, but mwboot1.s and
-# sexit.s beside them are sources, so the assembly cannot be ignored by
-# extension - boot.s and mwio.s are named because they are what ccc
-# leaves behind for boot.c and mwio.c.
+# stand/ builds a .com and several intermediates, but mwboot1.s,
+# ideboot1.s and sexit.s beside them are sources, so the assembly cannot
+# be ignored by extension - boot.s and mwio.s are named because they are
+# what ccc leaves behind for boot.c and mwio.c.
 #
 src/micronix/stand/boot/*.o
 src/micronix/stand/boot/boot.s
@@ -103,6 +103,10 @@ src/micronix/stand/boot/mwboot1.cim
 src/micronix/stand/boot/djboot.com
 src/micronix/stand/boot/djboot1.abs
 src/micronix/stand/boot/djboot1.bin
+src/micronix/stand/boot/ideboot.com
+src/micronix/stand/boot/ideboot1.abs
+src/micronix/stand/boot/ideboot1.bin
+src/micronix/stand/boot/idebootimg-*
 src/micronix/stand/boot/djload
 src/micronix/stand/boot/bootimg
 src/micronix/stand/boot/bootimg-*
@@ -112,13 +116,27 @@ src/micronix/stand/zout/
 
 #
 # The working hard disk images.  hddma-0.blessed is the one that is
-# kept - a drive that boots, to be copied and written into - and these
-# are whatever the last thing to run left behind.  hddma-1 is a blank,
-# which is a thing mkfs makes rather than a thing history carries.
-# See disks/hdinstall/REGEN.
+# kept - a drive that boots, to be copied and written into - and the
+# rest are whatever the last thing to run left behind: a 15MB volume per
+# experiment and a .lock sidecar the host tools write beside each.  They
+# are named back in rather than listed, because the directory is scripts
+# and reference images and an unnamed file in it is a run leftover by
+# default - so a new script or a new blessed drive has to be named here
+# the way these were.  See disks/hdinstall/REGEN.
 #
-disks/hdinstall/hddma-0
-disks/hdinstall/hddma-1
+disks/hdinstall/*
+!disks/hdinstall/README
+!disks/hdinstall/REGEN
+!disks/hdinstall/bdev(2,93)
+!disks/hdinstall/boot_vol
+!disks/hdinstall/check_vol
+!disks/hdinstall/create_vol
+!disks/hdinstall/hddma-0.blessed
+!disks/hdinstall/mw167.sym
+!disks/hdinstall/run
+!disks/hdinstall/runh
+!disks/hdinstall/sa67.5.skew.1k
+!disks/hdinstall/standalone167.bin
 
 #
 # script(1) captures.  A typescript is a recording of a terminal session
@@ -223,6 +241,7 @@ src/micronix/cmd/init/init
 src/micronix/cmd/init/init.dbg
 src/micronix/cmd/kill/kill
 src/micronix/cmd/kstat/kstat
+src/micronix/cmd/label/label
 src/micronix/cmd/ld/ld
 src/micronix/cmd/less/less
 src/micronix/cmd/lex/lex
@@ -236,6 +255,7 @@ src/micronix/cmd/mkdir/mkdir
 src/micronix/cmd/mkfs/mkfs
 src/micronix/cmd/mknod/mknod
 src/micronix/cmd/more/more
+src/micronix/cmd/mount/mount
 src/micronix/cmd/msh/msh
 src/micronix/cmd/mv/mv
 src/micronix/cmd/ncheck/ncheck
@@ -260,6 +280,7 @@ src/micronix/cmd/strings/strings
 src/micronix/cmd/sync/sync
 src/micronix/cmd/tar/tar
 src/micronix/cmd/tee/tee
+src/micronix/cmd/umount/umount
 src/micronix/cmd/upm/upm
 src/micronix/cmd/upm/*.rel
 src/micronix/cmd/vi/vi
@@ -269,6 +290,7 @@ src/micronix/cmd/vi/*.obj
 src/micronix/cmd/vi/*.com
 src/micronix/cmd/vi/*.$$$
 src/micronix/cmd/wc/wc
+src/micronix/cmd/xargs/xargs
 src/micronix/cmd/yacc/yacc
 src/micronix/cmd/yacc/liby.a
 src/micronix/libexec/astpp/astpp

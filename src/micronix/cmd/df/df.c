@@ -3,40 +3,18 @@
  *
  * cmd/df/df.c
  *
- * THIS IS A RECONSTRUCTION.  There is no surviving source for /bin/df;
- * this file was written from the disassembly of the /bin/df binary on the
- * Micronix 1.6 filesystem - see df.dist, df.dis and df.ctl beside this
- * file, and "make disas" to regenerate the disassembly from the binary.
- * Every function below corresponds to one function in that binary, and
- * the names here are the ones df.ctl assigns.
+ * df reports the free blocks and free inodes of each filesystem.  A
+ * filesystem that is mounted gets its numbers read live out of the
+ * kernel's mount table, which the allocators keep current on every
+ * allocation (a static array, so it costs nothing); an unmounted one
+ * gets them from its superblock, which mkfs seeds and sync() refreshes.
  *
- * It is Whitesmith's C, the way every 1.6 command is: c.ent and c.ret at
- * the top of the library, the three register variables in fixed cells,
- * and the syscall stubs in the data segment rather than the text.
- *
- * What it does, per filesystem named on the command line: opens the
- * device, makes sure it holds a Micronix filesystem, counts the free
- * blocks by walking the free list, and prints the count and the name.
- * A name that is not already a device path - one that does not stat, is
- * shorter than 15 characters, and has no slash - gets "/dev/" put in
- * front of it, so "df root" and "df /dev/root" mean the same thing.
- *
- * The free list is walked the way the kernel's alloc() pops it: off the
- * top of s_free[] until s_nfree runs out, then into the block the list
- * came from, which holds the next count and the next 100 block numbers.
- *
- * The odd bits are reproduced rather than tidied away, because they are
- * what the system shipped with:
- *
- *   -v lists every free block, right-justified in a five-column field,
- *	one to a line, ahead of the summary.  It is not in the man page.
- *
- *	The exit status is 1 after a normal run and 0 only from the usage
- *	message - the wrong way round - and nothing in the system looks.
- *
- *	A block number or count above 32767 prints as a negative number:
- *	the value is 16 bits and is printed signed, though the block
- *	numbers themselves are compared unsigned, as they must be.
+ * The mount table is reached through a pointer in low memory (0x1005,
+ * next to ps's process-table pointer at 0x1003) and /dev/mem.  "Mounted"
+ * is decided by /etc/mtab, which init seeds with root and the mount
+ * program keeps.  With no argument every mounted filesystem is reported;
+ * an argument is reported whether mounted or not, and may be given with
+ * or without a "/dev/" prefix.
  *
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
@@ -46,181 +24,185 @@
 #include <string.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
-#include <sys/dir.h>
+#include <sys/mount.h>
+#include <mtab.h>
 
-#define	SUPERBLK 1		/* the superblock */
-#define	INOSTART 2		/* the first inode block */
+#define NMOUNT 4		/* the kernel's NMOUNT (sys/sys.h) */
+#define SUPERBLK 1		/* the superblock */
+#define MEMORY "/dev/mem"
+#define MPTAB 0x1005		/* low memory: &mlist, beside &plist at 0x1003 */
 
-int	vflag;			/* -v: list every free block */
+struct mtab mtab[NMOUNT];
+struct mount mountab[NMOUNT];
+struct super sblock;
+int nmount;
 
-struct super sblock;		/* the superblock, and the free list */
-
-void parse();
-void usage();
-void process();
-int isfs();
-int countfree();
+int readmtab();
+int readmounts();
+int mounted();
+int finddev();
+void report();
+void super();
 
 main(argc, argv)
     int argc;
     char **argv;
 {
-    struct stat stb;
-    char buf[32];
-    register char *np;
-    register int i;
+    int i;
+    char *np, *special;
 
-    parse(argc, argv);
+    nmount = readmtab();
+    readmounts();
+
+    if (argc == 1) {
+        for (i = 0; i < nmount; i++)
+            report(mtab[i].special);
+        exit(0);
+    }
+
     for (i = 1; i < argc; i++) {
         np = argv[i];
-        if (strcmp(np, "-v") == 0)
-            continue;
-        if (stat(np, &stb) < 0 && strlen(np) < 15 && strchr(np, '/') == 0) {
-            strcpy(buf, "/dev/");
-            strcat(buf, np);
-            np = buf;
-        }
-        process(np);
+        if ((special = strrchr(np, '/')) != 0)
+            special++;          /* the name after the last slash */
+        else
+            special = np;
+        report(special);
     }
-    exit(1);
-}
-
-/*
- * Look for -v, and print the usage message when there is nothing else.
- * The flag is scanned here and the arguments are skipped again in main,
- * so "df -v root" and "df root -v" both work.
- */
-void
-parse(argc, argv)
-    int argc;
-    char **argv;
-{
-    register int i;
-
-    if (argc == 1)
-        usage();
-    for (i = 1; i < argc; i++)
-        if (strcmp(argv[i], "-v") == 0)
-            vflag = 1;
-}
-
-void
-usage()
-{
-    fprintf(stderr, "usage: df filesystem ...\n");
     exit(0);
 }
 
 /*
- * One filesystem: open it, make sure it is one, count its free blocks,
- * and print the count and the name.  It is opened twice - once here and
- * once by isfs, which opens its own descriptor and closes it again.
+ * Read /etc/mtab, one 64-byte record at a time.
  */
-void
-process(name)
-    char *name;
+int
+readmtab()
 {
     int fd;
-    int count;
+    int n;
 
-    if ((fd = open(name, 0)) < 0) {
-        perror(name);
-        return;
+    n = 0;
+    if ((fd = open("/etc/mtab", 0)) < 0)
+        return 0;
+    while (n < NMOUNT && read(fd, &mtab[n], sizeof mtab[n]) == sizeof mtab[n]) {
+        if (mtab[n].directory[0] == 0 || mtab[n].special[0] == 0)
+            continue;
+        n++;
     }
-    if (!isfs(name)) {
-        fprintf(stderr, ": Not a file system\n");
-        close(fd);
-        return;
-    }
-    count = countfree(name, fd);
-    printf("%5d %s\n", count, name);
     close(fd);
+    return n;
 }
 
 /*
- * Is the device a Micronix filesystem?  Read the superblock, then the
- * root inode - the first inode in the first inode block - and its data
- * block, the first data block, and ask for a directory whose first two
- * entries are "." and "..", both with inumber 1.  That is what mkfs
- * writes and nothing else is.
+ * Read the kernel's mount table through /dev/mem: a two-byte pointer at
+ * MPTAB names the table, the way ps reads the process table at 0x1003.
  */
-isfs(name)
-    char *name;
+int
+readmounts()
 {
-    struct dsknod root;
-    struct dir dot[2];
-    int fd;
+    unsigned mptr;
+    int mem;
+    int n;
 
-    if ((fd = open(name, 0)) < 0)
+    if ((mem = open(MEMORY, 0)) < 0)
         return 0;
-    seek(fd, SUPERBLK, 3);
-    if (read(fd, (char *)&sblock, sizeof sblock) != sizeof sblock)
-        goto bad;
-    seek(fd, INOSTART, 3);
-    if (read(fd, (char *)&root, sizeof root) != sizeof root)
-        goto bad;
-    if ((root.d_mode & S_IFMT) != S_IFDIR)
-        goto bad;
-    seek(fd, sblock.s_isize + INOSTART, 3);
-    if (read(fd, (char *)dot, sizeof dot) != sizeof dot)
-        goto bad;
-    close(fd);
-    if (dot[0].ino != 1 || dot[1].ino != 1)
+    if (seek(mem, MPTAB, 0) < 0 || read(mem, &mptr, sizeof mptr) != sizeof mptr) {
+        close(mem);
         return 0;
-    if (strcmp(dot[0].name, ".") != 0 || strcmp(dot[1].name, "..") != 0)
+    }
+    if (seek(mem, mptr, 0) < 0) {
+        close(mem);
         return 0;
-    return 1;
+    }
+    n = read(mem, (char *)mountab, sizeof mountab);
+    close(mem);
+    return n / sizeof(struct mount);
+}
 
-bad:
-    close(fd);
+/*
+ * Is this device name in /etc/mtab?
+ */
+int
+mounted(special)
+    char *special;
+{
+    int i;
+
+    for (i = 0; i < nmount; i++)
+        if (strcmp(mtab[i].special, special) == 0)
+            return 1;
     return 0;
 }
 
 /*
- * Count the free blocks.  The superblock is read into the global sblock
- * and the free list is popped off s_free[]; when s_nfree runs out, the
- * block the list came from holds the next list, in exactly the layout of
- * s_nfree and s_free, and is read straight back into them.
+ * Find the mount entry for a device number and return its live counts.
  */
-countfree(name, fd)
-    char *name;
-    int fd;
+int
+finddev(devnum, bfreep, ifreep)
+    int devnum;
+    int *bfreep, *ifreep;
 {
-    int count;
-    UINT b;
+    int i;
 
-    count = 0;
+    for (i = 0; i < NMOUNT; i++) {
+        if (mountab[i].dev == 0 || mountab[i].dev != devnum)
+            continue;
+        *bfreep = mountab[i].bfree;
+        *ifreep = mountab[i].ifree;
+        return 1;
+    }
+    return 0;
+}
+
+/*
+ * Report one filesystem: if it is mounted, its live counts come from the
+ * mount table; if not, its last-synced counts come from the superblock.
+ */
+void
+report(special)
+    char *special;
+{
+    struct stat st;
+    char dev[32];
+    int bfree, ifree;
+
+    strcpy(dev, "/dev/");
+    strcat(dev, special);
+
+    if (mounted(special)) {
+        if (stat(dev, &st) < 0 || !finddev(st.st_addr[0], &bfree, &ifree)) {
+            fprintf(stderr, "%s: not mounted\n", dev);
+            return;
+        }
+        printf("%5u %5u %s\n", bfree, ifree, dev);
+    } else {
+        super(dev);
+    }
+}
+
+/*
+ * Read an unmounted filesystem's counts straight from its superblock.
+ */
+void
+super(dev)
+    char *dev;
+{
+    int fd;
+
+    if ((fd = open(dev, 0)) < 0) {
+        perror(dev);
+        return;
+    }
     seek(fd, SUPERBLK, 3);
     if (read(fd, (char *)&sblock, sizeof sblock) != sizeof sblock) {
-        perror(name);
-        return count;
+        perror(dev);
+        close(fd);
+        return;
     }
-    for (;;) {
-        if (sblock.s_nfree == 0)
-            return count;
-        sblock.s_nfree--;
-        b = sblock.s_free[sblock.s_nfree];
-        if (b == 0)
-            return count;
-        if (b >= sblock.s_fsize) {
-            fprintf(stderr, "Bad block in free list\n");
-            return count;
-        }
-        count++;
-        if (count == 0xffff) {
-            fprintf(stderr, "Block count overflow\n");
-            return count;
-        }
-        if (vflag)
-            printf("%5d\n", b);
-        if (sblock.s_nfree == 0) {
-            seek(fd, b, 3);
-            if (read(fd, (char *)&sblock.s_nfree,
-                sizeof sblock.s_nfree + sizeof sblock.s_free)
-                != sizeof sblock.s_nfree + sizeof sblock.s_free) {
-                perror(name);
-                return count;
-            }
-        }
+    close(fd);
+
+    if (sblock.s_magic != FsMAGIC) {
+        fprintf(stderr, "%s: not a file system\n", dev);
+        return;
     }
+    printf("%5u %5u %s\n", sblock.s_bfree, sblock.s_ifree, dev);
 }

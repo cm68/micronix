@@ -97,6 +97,7 @@ int	summary(void);
 int	reorg(void);
 
 static void rebuildfree(void);
+static void fixsuper(void);
 
 /*
  * main - parse the options, then check each file system named on the
@@ -166,6 +167,8 @@ main(int argc, char *argv[])
 		goto out;
 	summary();
 	reorg();
+	if (!nflag)
+		fixsuper();
 
 out:
 	closefs(fs);
@@ -659,7 +662,7 @@ relinkone(struct dsknod *lfd, int inum)
 	char blk[512];
 	struct dir *de;
 	char name[14];
-	int off;
+	off_t off;
 	int b;
 	int i;
 
@@ -737,4 +740,30 @@ reorg(void)
 	}
 	findorphans();
 	return 1;
+}
+
+/*
+ * fixsuper - stamp the signature and refresh the running free counts.
+ * mkfs seeds s_magic/s_bfree/s_ifree and the kernel's allocators keep
+ * them current while the filesystem is mounted; this is the repair path
+ * for a volume made before they existed, and the reconciliation after a
+ * crash.  The block count is the one the free-list pass settled on; the
+ * inode count is a fresh walk, because it is kept nowhere else.
+ */
+static void
+fixsuper(void)
+{
+	struct dsknod *ip;
+	int inum;
+
+	fs->s_magic = FsMAGIC_DISK;
+	fs->s_bfree = nfree;
+	fs->s_ifree = 0;
+	for (inum = 1; inum <= fs->s_isize * I_PER_BLK; inum++) {
+		ip = iget(fs, inum);
+		if ((ip->d_mode & IALLOC) == 0)
+			fs->s_ifree++;
+		ifree(ip);
+	}
+	fs->s_fmod = 1;
 }

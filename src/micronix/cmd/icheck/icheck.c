@@ -66,6 +66,7 @@ check(file)
     int b;
     int i;
     int first, nblk;
+    int ifree_count;
     char *bootname;
     struct dsknod *dp;
     unsigned short fl[100];
@@ -120,28 +121,32 @@ check(file)
     memset(bitmap, 0, bmapsize);
 
     /*
-     * if we are rebuilding the freelist, no point in scanning it
+     * if we are rebuilding the freelist, no point in scanning it - the
+     * list has just been emptied, so the scan would walk whatever the
+     * stack still holds under fl[0] and mark phantom blocks in the
+     * bitmap.  The rebuild below counts nfree from the bitmap instead.
      */
     if (sflg) {
         fs->s_nfree = 0;
         fs->s_free[0] = 0;
-    }
+        nfree = 0;
+    } else {
+        /* copy the freelist from superblock to fl */
+        memcpy(fl, fs->s_free, sizeof(fl));
+        i = fs->s_nfree - 1;
 
-    /* copy the freelist from superblock to fl */
-    memcpy(fl, fs->s_free, sizeof(fl));
-    i = fs->s_nfree - 1;
-
-    /* scan through whole freelist from end */
-    while ((b = fl[i]) != 0) {
-        if (!i) {
-            readblk(fs, b, (char *)buf);
-            i = buf[0] - 1;
-            memcpy(fl, &buf[1], sizeof(fl));
-        } else { 
-            i--;
+        /* scan through whole freelist from end */
+        while ((b = fl[i]) != 0) {
+            if (!i) {
+                readblk(fs, b, (char *)buf);
+                i = buf[0] - 1;
+                memcpy(fl, &buf[1], sizeof(fl));
+            } else {
+                i--;
+            }
+            blockcheck(b, "free");
+            nfree++;
         }
-        blockcheck(b, "free");
-        nfree++;
     }
 
     if (ndup) {
@@ -150,17 +155,26 @@ check(file)
     }
 
     /*
-     * process all the inodes - now we know all the used blocks
+     * process all the inodes - now we know all the used blocks.  The
+     * bound is inclusive: inode isize*IPERBLK is the last valid one (the
+     * kernel's ifill allocates it), so it is counted too.
      */
-    for (ino = 1; ino < fs->s_isize * I_PER_BLK; ino++) {
+    ifree_count = 0;
+    for (ino = 1; ino <= fs->s_isize * I_PER_BLK; ino++) {
         dp = iget(fs, ino);
+        if (!(dp->d_mode & IALLOC))
+            ifree_count++;
         pass(dp);
         ifree(dp);
     }
 
     /*
-     * count the allocated blocks in the bitmap 
+     * count the allocated blocks in the bitmap, and rebuild the free
+     * list from the unused ones when -s was given.  nfree counts the
+     * blocks that go onto the free list.
      */
+    if (sflg)
+        nfree = 0;
     for (i = fs->s_isize + 2; i < fs->s_fsize; i++) {
 #define BITINDEX(b)   ((b) >> 3)
 #define BITMASK(b)  (1 << ((b) & 7))
@@ -169,6 +183,7 @@ check(file)
         } else {
             if (sflg) {
                 bfree(fs, i);
+                nfree++;
             }
         }
     }
@@ -187,6 +202,20 @@ check(file)
         printf("indir2%6d\n", nvindir);
     printf("used  %6d\n", nused);
     printf("free  %6d\n", nfree);
+
+    /*
+     * Stamp the signature and refresh the running totals, so df reads
+     * them instead of walking the free list.  This is also the repair
+     * path for a volume made before the fields existed.  Only when
+     * writing is wanted - a plain check opens read-only.
+     */
+    if (sflg || iflag) {
+        fs->s_magic = FsMAGIC_DISK;
+        fs->s_bfree = nfree;
+        fs->s_ifree = ifree_count;
+        fs->s_fmod = 1;
+    }
+
     closefs(fs);
 }
 
@@ -196,8 +225,8 @@ check(file)
 void
 pass(struct dsknod *dp)
 {
-    int i;
-    int size;
+    off_t i;
+    off_t size;
     int b;
 
     if (!(dp->d_mode & IALLOC))
@@ -213,7 +242,14 @@ pass(struct dsknod *dp)
     else
         nfile++;
 
-    size = (dp->d_size0 << 16) + dp->d_size1;
+    /*
+     * The size is 24 bits - d_size0 its high byte, d_size1 the low
+     * word - so it is an off_t, and the cast to one matters: without it
+     * the shift drops out where int is 16 bits and the sample offset
+     * walks past 32K, wrapping the loop index instead of ending the
+     * file.
+     */
+    size = ((off_t)dp->d_size0 << 16) + dp->d_size1;
     for (i = 0; i < size; i += 512) {
         b = bmap(dp, i, 0);
         if (b) {

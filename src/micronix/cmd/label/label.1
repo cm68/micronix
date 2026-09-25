@@ -1,0 +1,154 @@
+.he "label (1)                  9/25/26                   label (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+label
+- read and write a hard disk's label
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+label device
+.br
+label -w cylinders/heads/sectors device
+.br
+label -s device slice start [ end ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Label reads or writes the label of a hard disk: the description of the
+drive that the disk carries itself.  It holds the geometry - cylinders,
+heads and sectors per track - the roll, the size of the filesystem that
+was put on the disk, the boot extent, and a table of eight slices.
+.sp
+The label is in the second half of the boot sector, the sector the rom
+reads: physical cylinder 0, head 0, sector 0.  It begins at byte 256 so
+that the first half can hold boot code, and only the bytes from 256 on
+are ever changed, so the boot half survives every write label makes.
+.sp
+The device named must be the whole-disk slice, which is
+.bd
+c
+: hd0c, hd1c, ide0c.  Every other slice is placed by the table in the
+label itself, so block 0 of one is somewhere in the middle of a
+filesystem - and a label written there would be written over that
+filesystem.  Slice
+.bd
+c
+is the one slice the table does not place: it starts at cylinder 0 of
+the drive and is never rolled, on every disk, so its block 0 is physical
+block 0 and reading it is reading the label.  That is what lets label
+work on a drive it knows nothing about; a program that needed the
+geometry to find the geometry would be no use at all.  Label refuses to
+write to any other slice.
+.sp
+With no options label writes nothing.  It reads block 0, reports what
+the label says, and exits non-zero if there is no label there.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-w cylinders/heads/sectors	Declare the drive geometry, written as three
+decimal numbers separated by slashes.  None may be zero: the driver
+refuses a label with a zero in it.
+.sp
+On a disk that already has a label, only these three numbers change.
+The roll, the boot extent, the filesystem size and the slice table are
+left exactly as they were, because they describe what is on the disk and
+correcting a geometry does not put it there.
+.sp
+On a disk with no label, this is the write that describes it for the
+first time.  A fresh label is written with the roll set to half the
+cylinders, which is what the driver assumes for a disk with no label, so
+the disk maps the same way after the label as it did before it and
+nothing declared here can move data that is already on the drive.
+.sp
+There is no way yet to set the roll to anything else, so this form
+cannot describe a disk whose filesystem is placed by an offset rather
+than by a roll.
+
+.ti -10
+-s device slice start [ end ]	Set one slice of the table.  The slice is
+named by letter a to h, or by number 0 to 7 as a minor number encodes
+it; the start and the end are cylinder numbers, and the end is
+inclusive.  With no end the slice runs to the last cylinder of the
+drive.
+.sp
+The extent is stored as an offset and a length, so an end is converted:
+"2 9000" is stored as offset 2, length 8999.  A slice whose entry is
+left at zero and zero is the whole drive.
+.sp
+Slice
+.bd
+c
+is accepted but nothing is stored for it that means anything: it is
+always the whole drive from cylinder 0, so its entry is not consulted.
+.sp
+A slice that runs past the last cylinder is refused, and nothing is
+written - not that entry, and not a geometry named on the same command
+line either, since the sector is written once, at the end.  The driver
+refuses to open such a slice at mount, so a label that named one would be
+a disk contradicting itself.  Use -w first if the drive is really larger
+than the label says it is.
+.sp
+-s needs a label to put the slice in.  On a disk with none, use -w
+first.  Both may appear on one command line, and the sector is written
+once.
+
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+A drive gets one mapping, and the driver keeps it per drive rather than
+per open.  A drive that is already open - the root filesystem, most
+often - cannot be opened again through another slice, and label reports
+that as a busy device.  Label the drive the system is not running from.
+.sp
+A label carries geometry and no timing.  The delay between step pulses,
+the cylinder where write pre-compensation starts and the one where low
+current starts come from the driver's table of drive models, chosen by
+the drive's device number, and there is nowhere in a label to put them.
+A geometry written here that disagrees with the row the device number
+names is therefore mapped by its label and timed by that row, and the
+kernel says so, once per open:
+.sp
+.in +5
+mw1: label 925/9/17 disagrees with table 306/6/17, using label
+.in -5
+.sp
+The label is what wins for the geometry, because the disk is the only
+thing that knows how it was written.
+.sp
+Slices are cylinder-granular.  The table says where a slice begins and
+how many cylinders it runs; the last cylinder of one slice and the first
+of the next cannot share.
+.sp
+The label of a disk made before this tool existed is the label the
+driver wrote: its table is empty, every entry meaning the whole drive
+with the disk's roll.  Reading one with no options shows that, and it is
+not an error - a disk made today and a disk made years ago both describe
+themselves, and the description is what label prints.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+mkfs (1), icheck (1), filesystem (5)

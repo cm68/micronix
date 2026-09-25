@@ -70,6 +70,7 @@ all:
 	cd icheck ; make all
 	cd init ; make all
 	cd kill ; make all
+	cd label ; make all
 	cd ld ; make all
 	cd less ; make all
 	cd ln ; make all
@@ -127,6 +128,7 @@ install:
 	cd icheck ; make install
 	cd init ; make install
 	cd kill ; make install
+	cd label ; make install
 	cd ld ; make install
 	cd less ; make install
 	cd ln ; make install
@@ -183,6 +185,7 @@ clean:
 	cd grep ; make clean
 	cd icheck ; make clean
 	cd init ; make clean
+	cd label ; make clean
 	cd ld ; make clean
 	cd less ; make clean
 	cd ln ; make clean
@@ -239,6 +242,7 @@ clobber:
 	cd grep ; make clobber
 	cd icheck ; make clobber
 	cd init ; make clobber
+	cd label ; make clobber
 	cd ld ; make clobber
 	cd less ; make clobber
 	cd ln ; make clobber
