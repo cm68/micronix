@@ -14,6 +14,7 @@
  */
 extern UINT8 status, cmask, ctask, mask, oldstack, rst1[];
 extern UINT trapvec, trapstack;
+extern char ustack[];           /* the image's .bss, zeroed in task0_body */
 
 extern char resched;            /* sleep.c defines and initializes it */
 
@@ -99,7 +100,13 @@ task0_body()
      * Copy the stack from the place where the
      * firmware put it to the user structure,
      * and arrange for the firmware to keep it there.
+     *
+     * ustack and u are the image's only .bss, and the loader's stack
+     * sits over them, so what is there now is the loader's garbage.
+     * Zero it - the copy below lands inside it - and u starts the
+     * session as it did when the file carried its zeros.
      */
+    zero(&ustack, (char *) &u + sizeof(struct user) - (char *) &ustack);
     copy(&oldstack, &u.stack, (UINT) & u.save - (UINT) & u.stack);
     setframe(&u.stack, &u.stack);
     trapstack = &u.save;

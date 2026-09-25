@@ -5,9 +5,9 @@ Status: plan (not implemented). Serves as the doc for when we build this.
 ## Context
 
 The 64K logical address space is full. The kernel text runs 0x1000 → ~0xa000,
-the data/bss plus the minted buffer headers fill to 0xd000, and 0xd000/0xe000/
-0xf000 are already the copyin/out page, the buffer window, and the u page. There
-is no room for more resident code.
+the data/bss plus the minted buffer headers fill to 0xe000, and 0xd000/0xe000/
+0xf000 are already the borrowed copyin/out page, the buffer window, and the u
+page. There is no room for more resident code.
 
 The device drivers (`dj`, `mw`, `multio`, `memdev`, `cus`, …) are reached *only*
 through the `biosw[]`/`ciosw[]` switch tables, and they never call each other.

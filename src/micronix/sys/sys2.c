@@ -83,7 +83,15 @@ stime(high, low)
 /*
  * Seek system call
  * Seek(character-special, 0, 1 or 3) fails.
+ *
+ * Returns the new position.  That is the kernel's half of the contract
+ * that lets libu drop the _fdpos[] shadow table it keeps: user space
+ * cannot know where a descriptor stands, because dup shares one rwptr
+ * between two fds and an exec carries a position across with no record
+ * of it.  On failure, -1 with u.error set, which r_seek turns into the
+ * carry the stubs test.
  */
+UINT32
 seek(fd, disp, from)
     int fd;
     register int disp;
@@ -93,10 +101,10 @@ seek(fd, disp, from)
     static UINT32 offset;       /* file positions are unsigned (to ~15M) */
 
     if ((fp = ofile(fd)) == 0)
-        return;
+        return (-1);            /* ofile set u.error = EBADF */
     if (fp->mode & PIPE) {
         u.error = ESPIPE;
-        return;
+        return (-1);
     }
     from %= 6;
     if (from == 0 || from == 3)
@@ -126,7 +134,7 @@ seek(fd, disp, from)
      * wrongly reject any position with bit 15 set.
      */
     fp->rwptr = offset;
-    /* XXX - we should return offset in hl, de */
+    return (offset);
 }
 
 /*

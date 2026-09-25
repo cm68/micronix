@@ -83,6 +83,31 @@ mlook(dev)
 }
 
 /*
+ * Copy each mount entry's live counts into its superblock, so the
+ * sync() that follows writes them out.  The allocators keep mlist's
+ * bfree and ifree real (a static array, so it costs nothing to touch);
+ * the superblock is their on-disk backing store, and is only updated
+ * here and at mount.
+ */
+void
+syncsuper()
+{
+    register struct mount *m;
+    struct buf *sb;
+    struct super *sp;
+
+    for (m = mlist; m < mlist + NMOUNT; m++) {
+        if (m->dev == 0)
+            continue;
+        sb = getsb(m->dev);
+        sp = (struct super *)sb->data;
+        sp->s_bfree = m->bfree;
+        sp->s_ifree = m->ifree;
+        bdwrite(sb);
+    }
+}
+
+/*
  * Make an entry in the mount table.
  */
 tmount(dev, ip, ronly)
@@ -103,8 +128,14 @@ tmount(dev, ip, ronly)
         return 0;
     }
     sb->flags |= BLOCK;
-    bwin(sb->xmem);
-    sp = (struct super *)sb->data;
+    /*
+     * read(1, dev) directly rather than getsb(): a device that will not
+     * mount is an error here, not a panic, so the superblock is still in
+     * the buffer's own segment and needs the window.  getsb() attaches a
+     * slot; if it already has one, this mapping is harmless - sb->data is
+     * the slot either way.
+     */
+    sp = (struct super *)bhold(sb);
     sp->s_flock = ronly;        /* flock means read-only */
     if (dev == rootdev)         /* part of power-up */
         rtcinit(sp->s_time);
@@ -113,6 +144,9 @@ tmount(dev, ip, ronly)
     m->dev = dev;
     m->inode = ip;
     m->ronly = ronly;
+    m->bfree = sp->s_bfree;     /* the live counts start at the seeded ones */
+    m->ifree = sp->s_ifree;
+    brel();
     brelse(sb);
     return m;
 }
@@ -150,6 +184,9 @@ umount(ioname)
             }
     iflush(dev);
     sb = getsb(dev);
+    ((struct super *)sb->data)->s_bfree = m->bfree;    /* persist the live counts */
+    ((struct super *)sb->data)->s_ifree = m->ifree;
+    bdwrite(sb);
     sb->flags &= ~BLOCK;
     brelse(sb);
     irelse(io);                 /* avoid deadlock */

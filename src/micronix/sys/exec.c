@@ -163,18 +163,24 @@ getargs(args)
     char **args;
 {
     static char *s, *d;
+    int held;
 
+    held = 0;
     nargs = nbytes = nblks = 0;
     while ((s = getword(args++)) != 0) {
         nargs++;
         do {
             if ((nbytes & 511) == 0) {
                 if (nblks < NBLKS) {
+                    if (held)           /* the last block is full */
+                        brel();
                     nblks++;
                     bp[nblks] = bget(nblks, NODEV);
-                    bwin(bp[nblks]->xmem);
-                    d = bp[nblks]->data;
+                    d = bhold(bp[nblks]);
+                    held = 1;
                 } else {
+                    if (held)
+                        brel();
                     u.error = E2BIG;
                     return 0;
                 }
@@ -183,6 +189,8 @@ getargs(args)
         }
         while ((*d++ = getbyte(s++)) != '\0');
     }
+    if (held)
+        brel();
     return 1;
 }
 
@@ -209,8 +217,7 @@ putargs()
     valid(u.sp, 4 + nargs + nargs + nbytes);
 
     for (c = 0, ac = 0, n = 1; n <= nblks; n++) {
-        bwin(bp[n]->xmem);
-        s = (UINT8 *) bp[n]->data;
+        s = (UINT8 *) bhold(bp[n]);
         rem = 512;
 
         while (rem) {
@@ -229,10 +236,12 @@ putargs()
         copyout(bp[n]->data, d, count);
         nbytes -= count;
         d += count;
+        brel();
     }
 
-    bwin(bp[1]->xmem);
-    copy(bp[1]->data, u.p->args, 8);    /* for ps */
+    s = (UINT8 *) bhold(bp[1]);
+    copy(s, u.p->args, 8);      /* for ps */
+    brel();
     putword(-1, &av[nargs]);    /* as per unix specs */
     putword(nargs, u.sp);
 }

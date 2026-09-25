@@ -48,31 +48,49 @@ struct mount mlist[NMOUNT] = 0;
 /*
  * Buffer stuff initialized in binit
  */
-UINT8 nbuf = 0;
+UINT nbuf = 0;                  /* buffered by nothing but MAXBUFS */
 struct buf *btop = 0;
 
 UINT8 map0[], image0[];
 
 extern int segalloc();          /* malloc.c */
 
-#ifdef DEBUGBUFS
 /*
- * Clamp the buffer pool so a cache bug shows up quickly instead of an
- * hour into a recompile.  This is the opt-in, not the configuration:
- * the kernel ships unclamped and expand_bufs() mints to the full
- * 0xd000 budget, which is whatever the resident .bss leaves it - see
- * the bound in expand_bufs() below.  "make DEBUGBUFS=1" in sys is how
- * the host build asks for the clamp.
+ * The ceiling on the pool.  expand_bufs() would otherwise mint whatever
+ * the resident .bss leaves between _ebss and BUFWIN, which is past what
+ * the count can carry - 412 buffers at present, and nbuf wrapped at 256.
+ * 256 is also 32 of the 4K segments the blocks come from, which is what
+ * the budget is really made of, and no filesystem here wants more cache
+ * than that.
+ *
+ * DEBUGBUFS is the opt-in for a much smaller clamp, so a cache bug shows
+ * up quickly instead of an hour into a recompile.  "make DEBUGBUFS=1" in
+ * sys is how the host build asks for it.
  */
+#ifdef DEBUGBUFS
 #define MAXBUFS  32
+#else
+#define MAXBUFS  256
 #endif
 
 /*
- * Grow the buffer cache to the full 0x1000-0xcfff budget.  Mint headers
- * contiguously off &blist[8] (== _ebss) until they reach 0xd000, pulling
+ * Grow the buffer cache to the full budget: the .bss end up to BUFWIN,
+ * the base of the segment the buffers are reached through.  Mint headers
+ * contiguously off &blist[8] (== _ebss) until they reach BUFWIN, pulling
  * one 4K segment (8 blocks) from segalloc() per group of 8 headers.  The
- * pool blocks themselves live in those unmapped segments, reached through
- * the 0xf000 window: block i has data = 0xf000 + (i&7)*512, xmem = seg.
+ * pool blocks themselves live in those unmapped segments, reached
+ * through the BUFSEG window: block i has data = BUFWIN + (i&7)*512,
+ * xmem = seg.
+ *
+ * The ceiling is the window's own page, not _upage above it: bwin()
+ * leaves a segment mapped for the whole of a buffer access, so a header
+ * parked in that page would be read back as buffer data.  Raising the
+ * pool past it means borrowing the window back at every site that uses
+ * it - see TODO.
+ *
+ * 0xd000's page used to be reserved for the superblock's window; the
+ * superblock is now plain memory (getsb) and mem.s restores the page it
+ * borrows for user memory, so the headers may carry on through it.
  */
 expand_bufs()
 {
@@ -81,21 +99,28 @@ expand_bufs()
     int j;
 
     b = blist + 8;
-    while ((int)b + sizeof(*b) <= 0xd000
-#ifdef DEBUGBUFS
-           && nbuf < MAXBUFS
-#endif
-          ) {
+    while ((int)b + sizeof(*b) <= (int)BUFWIN && nbuf < MAXBUFS) {
         seg = segalloc();
-        for (j = 0; j < 8 && (int)b + sizeof(*b) <= 0xd000; j++, b++) {
+        /*
+         * The inner loop carries the MAXBUFS test too.  The group is
+         * eight headers, so stopping only at the top of the while would
+         * overshoot the ceiling by up to seven - and one past it is a
+         * counter that has wrapped.  The segment is already in hand at
+         * that point, so the last group may leave some of its eight
+         * blocks unused; the pool does not have to be a whole segment.
+         */
+        for (j = 0; j < 8 && nbuf < MAXBUFS &&
+                     (int)b + sizeof(*b) <= (int)BUFWIN; j++, b++) {
             zero(b, sizeof(*b));
-            b->data = (char *)(0xf000 + j * 512);
+            b->data = (char *)BUFWIN + j * 512;
             b->xmem = seg;
             nbuf++;
         }
     }
     btop = b;
     pr("expanded to %d buffers\n", nbuf);
+    pr("hdr range %x..%x; mmu img0[2]=%d img0[26]=%d img0[28]=%d\n",
+        blist + 8, btop - 1, image0[2], image0[26], image0[28]);
 }
 
 /*

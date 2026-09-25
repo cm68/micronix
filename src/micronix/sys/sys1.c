@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <sys/inode.h>
 #include <sys/file.h>
+#include <sys/mount.h>
 #include <sys/proc.h>
 #include <sys/reboot.h>
 #include <errno.h>
@@ -120,6 +121,7 @@ dup(fd)
 sync()
 {
     isync();
+    syncsuper();
     bsync();
 }
 

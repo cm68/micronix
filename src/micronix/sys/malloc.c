@@ -59,8 +59,14 @@ segalloc()
     ei();
 
     /*
-     * panic("Mem all."); 
+     * The buffer cache (binit()/expand_bufs()) now also allocates from
+     * here, so a segment shortage no longer means a process can be
+     * swapped out to make room.  Returning silently plants a garbage
+     * segment and aliases two buffers or two process pages, which shows
+     * up later as a block read that is not the block asked for.
      */
+    pr("segalloc: out of segments (nsegs %d)\n", nsegs);
+    panic("segalloc: out of segments");
 }
 
 /*
@@ -331,7 +337,6 @@ swapinit()
 
     if (swapdev == rootdev) {
         b = getsb(rootdev);
-        bwin(b->xmem);
         s = (struct super *)b->data;
         swapaddr = s->s_fsize;
         brelse(b);

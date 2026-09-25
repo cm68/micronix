@@ -93,6 +93,6 @@ The syscall dispatch in `system.c` already passes three register words:
   function is single-threaded under the exec lock, so that's fine, but
   any new helper must not sleep while those are live.
 - The `+ 512` 16-bit wrap: any new block-walk must use a count, not an
-  end pointer, or it bites at the top of the 0xf000 window.
+  end pointer, or it bites at the top of the BUFSEG window (0xee00).
 - `ps` (u.p->args, 8 bytes) and the `0xd1` exec trace both read the
   old layout - update them for the third array.

@@ -58,7 +58,7 @@ LD = ld
 CFLAGS = -m micronix -O -i$(INC)/
 
 #
-# The u page (see user.c), all of it .data at 0xe000: the hand-written
+# The u page (see user.c), all of it .data at 0xf000: the hand-written
 # leaf code (these sat in leaf/ until that directory was flattened), then
 # the libccc runtime copied from src/libc and re-sectioned to psect data,
 # then the read-only kernel tables.
@@ -83,11 +83,11 @@ KERNEL_AS_OBJ = uhdr.o intrpt.o mio.o textpad.o
 KERNEL_C_SRC  = mount.c access.c balloc.c cio.c create.c exec.c fio.c fork.c \
 	ialloc.c iget.c imap.c link.c malloc.c name.c open.c queue.c \
 	rdwri.c reg.c sig.c sleep.c subc.c swap.c sys1.c sys2.c system.c \
-	time.c trap.c tty.c uio.c dj.c memdev.c multio.c mw.c main.c
+	time.c trap.c tty.c uio.c dj.c memdev.c multio.c dlabel.c mw.c main.c
 KERNEL_C_OBJ  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o link.o malloc.o name.o open.o queue.o \
 	rdwri.o reg.o sig.o sleep.o subc.o swap.o sys1.o sys2.o system.o \
-	time.o trap.o tty.o uio.o dj.o memdev.o multio.o mw.o main.o
+	time.o trap.o tty.o uio.o dj.o memdev.o multio.o dlabel.o mw.o main.o
 
 #
 # Init-only code, folded into data-only highmem.o by the rule below and
@@ -99,7 +99,7 @@ HIGHMEM_C_OBJ  = main_init.o cus.o
 HIGHMEM_AS_SRC = inits.s unbcd.s
 HIGHMEM_AS_OBJ = inits.o unbcd.o
 
-# The u struct itself, which sits at the base of segment 14.
+# The u struct itself, which lives in the u page's segment (USERSEG).
 USER_C_SRC = user.c
 USER_C_OBJ = user.o
 
@@ -142,13 +142,13 @@ $(KERNEL_C_OBJ) $(HIGHMEM_C_OBJ) $(USER_C_OBJ): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
 # The u page: user.o (the u struct) first so it sits at the base of
-# segment 14, then the leaf code, all as .data placed at 0xe000.  The
-# code must be .data, not .text - the loader reads text and then data,
-# so text parked here would be overwritten.  It is a relocatable object
-# like every other here, and the .o says so; it was user.rel, which
-# collides with user.o besides.
+# segment USERSEG, then the leaf code, all as .data placed at 0xf000.
+# The code must be .data, not .text - the loader reads text and then
+# data, so text parked here would be overwritten.  It is a relocatable
+# object like every other here, and the .o says so; it was user.rel,
+# which collides with user.o besides.
 upage.o: $(USER_C_OBJ) $(LEAF_AS) $(LEAF_C)
-	$(LD) -r -Tdata=0xe000 -o upage.o $(USER_C_OBJ) $(LEAF_AS) $(LEAF_C)
+	$(LD) -r -Tdata=0xf000 -o upage.o $(USER_C_OBJ) $(LEAF_AS) $(LEAF_C)
 
 # highmem.o is the init-only code - main_init, cus, the MIO/console init
 # in inits.s, and bcd2unix in unbcd.s - folded into one data-only object
@@ -173,7 +173,7 @@ rtc.o: rtc.c
 # consts.o is made the same way, for the same reason and one literal at a
 # time: ccc compiles the device-name strings the u page's read-only
 # tables point at into .text, and text in upage.o is what the final link
-# pads out to 0xe000 - twenty-five kilobytes of zeros in the middle of
+# pads out to the u page - tens of kilobytes of zeros in the middle of
 # the image, past the blocks the boot loader reads.  Folded, upage.o has
 # no text and the image is the size it has always been.
 consts.o: consts.c
@@ -186,18 +186,18 @@ consts.o: consts.c
 # MAP0[2] to reach user memory, and if it sat in that segment it would
 # remap its own code out from under itself.  textpad.o is last among the
 # resident objects so _ebss is the end of .bss; highmem.o (data-only)
-# follows it, then upage.o, the u page at 0xe000.
+# follows it, then upage.o, the u page at 0xf000.
 #
 # THE FINAL LINK IS AN ORDINARY LINK - text, then data, then bss, with
 # -Ttext=0x1000 the only address in it - and it has no case for the u
 # page and none for the init-only code.  What it places is decided by the
-# -r links above it: upage.o is .data at 0xe000 by -Tdata, highmem.o is
-# data-only, which is the CONF_HIGH -Shigh keys on to park it after bss,
+# -r links above it: upage.o is .data at 0xf000 by -Tdata, highmem.o is
+# the data-only, unplaced shape -Shigh parks after bss,
 # and low.o is a plain fold that lands where the resident kernel always
 # has.  Text has no address to be placed at in the u page, so a .c that
 # goes there is folded to .data by a rule of its own (rtc.o, consts.o);
 # left as .text, ld appends it to the resident text and pads the text
-# section out to reach 0xe000, and the image stops fitting in the blocks
+# section out to reach 0xf000, and the image stops fitting in the blocks
 # the boot loader will read.  A new object for either place is the same
 # bargain: fold it upstream, because this link has nowhere to put its
 # text.

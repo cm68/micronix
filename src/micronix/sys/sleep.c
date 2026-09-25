@@ -10,6 +10,7 @@
 
 extern char memwant, swapping;
 extern struct proc *swapproc;
+extern UINT8 bholdn;            /* buffer holds up; uio.c */
 
 /*
  * Rescheduling flag. If 1, switch processes at next
@@ -81,6 +82,14 @@ sleep(event, pri)
 {
     register struct proc *p;
 
+    /*
+     * A held buffer window must not be slept on: the next process would
+     * run with this one's buffer mapped over the window's page, and any
+     * code or data of the kernel's that lives there would be gone.  See
+     * bhold() in uio.c.
+     */
+    if (bholdn)
+        panic("sleep with the buffer window held");
     p = u.p;
     p->event = event;
     p->pri = pri;

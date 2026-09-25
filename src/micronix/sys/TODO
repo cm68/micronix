@@ -195,3 +195,77 @@ rather than gaining a row.
 
 --------------------
 
+
+--------------------
+
+sys/scsi.c is an NCR 5380 SCSI host adapter, written and compiling
+clean, and NOT LINKED.  It does not fit.
+
+The driver is 4241 bytes (text 3636, data 540, bss 65) and the resident
+kernel has 3086 to spare - short by 1155.  The budget, measured on the
+linked image (mxnm unix, and mxnm -b on the folds; the same numbers are
+the first sixteen bytes of unix, a Whitesmiths header - text 0x8cff,
+data 0x5fdf, bss 0x275, text_base 0x1000, data_base 0x9cff):
+
+	text + data + bss ends at _ebss = 0xcb58
+	-Shigh parks highmem.o (2202 bytes) AFTER bss, and win.o is
+	pinned at 0xe000, so the link wants _ebss <= 0xe000-2202 = 0xd766
+	0xd766 - 0xcb58 = 3086 bytes of headroom
+	4241 - 3086 = 1155 bytes short
+
+That is the link's budget.  The pool is a second one, and it is much
+tighter, because MAXBUFS (256, main.c) now binds before BUFWIN does:
+blist's 8 boot headers at 0xcab0 plus 248 minted off _ebss end at
+0xdfb0, 80 bytes under 0xe000.  So the pool is full: the first 80 bytes
+of growth are free, and every 21 after that costs one buffer.  1K of new
+driver costs 44 of the 256; a driver that used the whole 3086 would
+leave 112.  scsi.o never gets that far - it overruns the link by 1155
+before the pool is reached - but the count is the one to watch, because
+it is the resource that runs out first.  The resident kernel's space is
+bounded by memory; its cache is bounded by MAXBUFS.
+
+Room for this was bought once already, by moving code rather than
+deleting it: mw.c's and ide.c's separate label decodes became
+sys/dlabel.c and the two 512-byte labelbufs went away, which is
+text -580, data -1024, bss +66 and _ebss down 1538.  The same lever is
+what option 2 below means.
+
+KMEM.md's layout map carries these numbers too - it is the place to read
+the shape rather than recompute it, and it went stale by about 3.8K once
+before this.  The link fails with "objects out of address order (data)"
+the moment _ebss+2202 crosses 0xe000.
+
+There is no page to move it to either: win.o is 3915 of 4096 and
+upage.o is 3294 + 629 of 4096.
+
+What is wired and what is not.  scsi.c is complete: ports 0x40-0x47, a
+READ(10)/WRITE(10) command path, selection, the REQ/ACK handshake, the
+label read and the slice mapping ide.c uses, and scsii2int() to share
+VI2 with the IDE card.  What is NOT in the tree is the three lines that
+put it in the kernel - scsi.o in KERNEL_C in GNUmakefile, an extern /
+devname / biosw row in consts.c (major 5), and int2 pointing at
+_scsii2int in intrpt.s.  intrpt.s carries a note saying where it went.
+
+The three ways it could be made to fit, none of them taken:
+
+  1. a build option that links scsi.o in place of another disk driver,
+     the way DEBUGBUFS is already an option.  A machine has one hard
+     disk controller.  Needs a rootdev decision in main.c too.
+
+  2. reclaim ~1.2K elsewhere.  Nothing obvious turned up: main.c's
+     tables (plist, ilist, flist, mlist) are all live, and the drivers
+     are all doing something.  dlabel.c is what a reclaim looks like
+     when it works - the two label decodes were one decode written
+     twice, and the second copy was not free.
+
+  3. sys/overlay.md, which names the SCSI driver as its motivating case
+     and was written for exactly this wall.
+
+One thing about the driver itself is worth knowing before it is linked.
+A 5380 cannot interrupt on "a data byte is ready" - that is DRQ, the
+DMA pin, and there is no DMA controller here - so the byte handshake is
+polled by the cpu in the caller's context.  The interrupt covers the
+bus going free (MONITOR BSY in the mode register) and parity faults,
+which is what the chip has to offer an initiator with no DMA.  Sleeping
+through the seek needs the target to disconnect and be reselected, and
+this driver has no reselect.

@@ -75,7 +75,7 @@ dlook(ip, np)
     static struct buf *b;
     static struct dir *d;
     struct dir *place;
-    UINT slot;
+    UINT slot, inum;
 
     nambuf = u.dir.name;
     copyin(*np, nambuf, 14);
@@ -102,24 +102,26 @@ dlook(ip, np)
             continue;
         if ((b = bread(phys, ip->i_dev)) == 0)
             continue;
-        bwin(b->xmem);
         /*
          * Scan by entry count, not by an end pointer: a buffer's data can
-         * sit at 0xfe00, the top of the 0xf000 window, where b->data + 512
+         * sit at 0xee00, the top of the BUFSEG window, where b->data + 512
          * wraps past 0xffff and the old `d < end` test was never true, so
          * the whole block was skipped.  The last block may be short.
          */
         nents = ((tail && log == nblks - 1) ? tail : 512) >> 4;   /* 16-byte entries */
-        for (d = (struct dir *)b->data; nents; nents--, d++, place++) {
+        for (d = (struct dir *)bhold(b); nents; nents--, d++, place++) {
             if (d->inum == 0) {
                 if (slot == 0)
                     slot = place;
             } else if (direqu(d->name, u.dir.name)) {
                 u.offset = place;
+                inum = d->inum;     /* read it before the window goes */
+                brel();
                 brelse(b);
-                return (d->inum);
+                return (inum);
             }
         }
+        brel();
         brelse(b);
     }
     /*

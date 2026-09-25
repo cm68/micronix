@@ -6,9 +6,9 @@
 ; mwbuf, curdrv, ...), which ccc puts after the .data blist lives in.
 ;
 ; u (see user.c) no longer needs the text padded up to a 4K boundary:
-; the link now places upage.o at 0xe000 outright (see GNUmakefile), so
-; u and its segpad occupy segment 14 and the buffer pool runs
-; from _ebss up to _usrtop == _memtop == 0xe000, just below it.
+; the link places upage.o at 0xf000 outright (see GNUmakefile), so u
+; and its segpad occupy segment 15 and the buffer pool runs from _ebss
+; up to BUFWIN (0xe000, the base of the window's page), one page below.
 ;
 	.bss
 	.globl	_blist

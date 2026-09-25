@@ -79,7 +79,7 @@ rtc.o: rtc.c
 # time: ccc puts the device-name strings the tables point at in .text,
 # and the tables themselves are in the u page.  consts.o is where that
 # showed what it costs - the final link pads text in upage.o out to
-# 0xe000, twenty-five kilobytes of zeros in the middle of the image,
+# the u page, tens of kilobytes of zeros in the middle of the image,
 # which is past the blocks the boot loader reads and cost the machine
 # its boot.
 consts.o: consts.c
@@ -88,25 +88,28 @@ consts.o: consts.c
 	rm -f consts.rel
 
 KERNEL_AS = uhdr.o intrpt.o mio.o textpad.o highmem.o
-KERNEL_C  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
-	ialloc.o iget.o imap.o link.o malloc.o name.o open.o queue.o \
-	rdwri.o reg.o sig.o sleep.o subc.o swap.o sys1.o sys2.o system.o time.o \
-	trap.o tty.o uio.o dj.o memdev.o multio.o mw.o main.o
+KERNEL_C  = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
+	ialloc.o iget.o imap.o malloc.o name.o queue.o \
+	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
+	trap.o tty.o uio.o dj.o multio.o dlabel.o mw.o ide.o main.o
+WIN_C     = open.o sys2.o rdwri.o memdev.o link.o access.o
 HIGHMEM   = main_init.o cus.o inits.o
-OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) $(HIGHMEM) low.o
+OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) $(WIN_C) $(HIGHMEM) low.o win.o
 TREELIBS =
 
 include $(DEPTH)/GNUmakefile.inc
 
 #
 # The buffer pool.  Unclamped by default: expand_bufs() mints headers up
-# to _upage (0xe000, the base of the u page) and the pool is whatever
-# fits between _ebss and there.  The 0xd000 page used to be reserved for
-# the superblock's window; the superblock is plain memory now (getsb, in
-# uio.c) and mem.s puts back the page it borrows for user memory, so the
-# headers carry on through it.  A cache bug that only shows itself with
-# the full pool costs an hour of recompiling to find, so the clamp is
-# still here, as an opt-in:
+# to BUFWIN (sys.h, the base of the page the buffers are reached
+# through) and the pool is whatever fits between _ebss and there.  It is
+# that page and not _upage above it because bwin() holds a segment in it
+# for the whole of a buffer access.  The 0xd000 page used to be reserved
+# for the superblock's window; the superblock is plain memory now (getsb,
+# in uio.c) and mem.s puts back the page it borrows for user memory, so
+# the headers carry on through it.  A cache bug that only shows itself
+# with the full pool costs an hour of recompiling to find, so the clamp
+# is still here, as an opt-in:
 #
 #	make DEBUGBUFS=1	32 buffers instead of the full budget
 #
@@ -156,7 +159,7 @@ build.h:
 #
 # THE FINAL LINK IS AN ORDINARY LINK - text, then data, then bss, and
 # -Ttext=0x1000 is the only address it is given.  It has no case for the
-# u page and none for the init-only code; that the u page lands at 0xe000
+# u page and none for the init-only code; that the u page lands at 0xf000
 # and the init-only code at _ebss is the work of the -r links above it,
 # each of which has already decided what its sections are:
 #
@@ -164,17 +167,17 @@ build.h:
 #			they are, so the resident kernel lands where it
 #			always has and _ebss is the end of textpad.o's bss.
 #
-#	upage.o		.data, all of it, at 0xe000 by -Tdata.  Text has
-#			no address here to be placed at - 0xe000 is a data
+#	upage.o		.data, all of it, at 0xf000 by -Tdata.  Text has
+#			no address here to be placed at - 0xf000 is a data
 #			address - so every .c that goes in has to be folded
 #			to .data first, which is what rtc.o's and consts.o's
 #			own rules are for.  Left as .text, mxld appends it to
 #			the resident text and pads the text section out to
-#			reach 0xe000, and the image stops fitting in the boot
+#			reach 0xf000, and the image stops fitting in the boot
 #			loader's block list.
 #
-#	highmem.o	.data only, which sets CONF_HIGH in its header.  -Shigh
-#			below is what keys on that bit to park the object
+#	highmem.o	.data only: no text, no bss, and no address of
+#			its own.  That shape is what -Shigh below parks
 #			after bss, where expand_bufs() mints buffer headers
 #			over it once init has returned.
 #
@@ -184,23 +187,25 @@ build.h:
 main_init.o: build.h
 
 # upage.o is the u page: the leaf code (LEAF_AS) first at the base of
-# segment 14, then user.o, whose data is ustack (512 bytes, the system
-# stack) below the u struct.  All of it is .data placed at 0xe000; the
-# code must be .data, not .text - the loader reads text and then data,
-# so text parked here would be overwritten.  u's register save area ends
-# up at the base of the struct, which is where the firmware's trap entry
-# leaves SP, so the kernel stack grows down into ustack.  textpad.o
+# segment USERSEG, then user.o, whose data is ustack (512 bytes, the
+# system stack) below the u struct.  All of it is .data placed at 0xf000;
+# the code must be .data, not .text - the loader reads text and then
+# data, so text parked here would be overwritten.  u's register save area
+# ends up at the base of the struct, which is where the firmware's trap
+# entry leaves SP, so the kernel stack grows down into ustack.  textpad.o
 # stays last in the main link so _ebss is the end of .bss and binit()'s
-# buffer pool runs up to 0xe000 below u.
+# buffer pool runs up to BUFWIN below u.
 upage.o: $(LEAF_AS) $(LEAF_C) user.o
-	$(MXLD) -r -Tdata=0xe000 -o upage.o $(LEAF_AS) $(LEAF_C) user.o
+	$(MXLD) -r -Tdata=0xf000 -o upage.o $(LEAF_AS) $(LEAF_C) user.o
 
 # highmem.o is the init-only code - main_init, cus, the MIO/console init
 # in inits.s, and bcd2unix (unbcd.s) - folded into one data-only
-# object with -Sdata.  The -Sdata fold sets a CONF_HIGH bit in the
-# output's header, and the main link parks any CONF_HIGH object after
-# bss, so it sits exactly at _ebss and binit()'s expand_bufs() mints
-# buffer headers over it once init has returned.  No address is given
+# object with -Sdata.  The fold leaves the object with no text and no
+# bss, and no address of its own - and -Shigh on the main link parks an
+# unplaced object of exactly that shape after bss, so it sits at _ebss
+# and binit()'s expand_bufs() mints buffer headers over it once init has
+# returned.  The test is the object's shape, not a bit in its header:
+# nothing marks highmem.o as init-only beyond having been folded.  No address is given
 # here - the linker derives it from the resident .data/.bss, so it
 # tracks the kernel as it grows without re-tuning.  bcd2unix's
 # lifetime-0 .ds workspace rides here as data rather than pushing _ebss
@@ -208,11 +213,35 @@ upage.o: $(LEAF_AS) $(LEAF_C) user.o
 highmem.o: main_init.o cus.o inits.o unbcd.o
 	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o
 
+# win.o is the window-page cluster: the part of the resident kernel that
+# can live at BUFSEG, in the very page bhold() maps buffers into, so its
+# bytes stop competing with buffer headers for the space below.  The
+# image is what costs here - sizeof(struct buf) is 21, so every 21 bytes
+# below BUFWIN is one buffer - and this was 3915 of them.
+#
+# The criterion is execution, not linkage: code in this page runs only
+# when no hold is up, so no object here may contain a hold site, and none
+# may be reachable from the interrupt or boot paths (an interrupt can
+# take the window, and getsb() takes one before a scheduler exists).
+# Nothing here calls bhold(), and nothing in the closure of intrpt.s,
+# uhdr.s and highmem.o calls into it - checked as a text-relocation graph
+# rooted at the hold sites.  The residual gap is table dispatch, which a
+# relocation graph cannot see: syssw is unreachable while holding because
+# a syscall needs a trap and kernel mode takes none, which is exactly
+# what sleep()'s bholdn panic protects.  Data here would be harmless, the
+# page only shows buffer bytes during a hold, but every object chosen has
+# none anyway, so -Sdata leaves the fold all-code.
+#
+# -Sdata is upage.o's reason, not an aesthetic: the loader writes text
+# and then data in address order, so text parked up here is overwritten.
+win.o: $(WIN_C)
+	$(MXLD) -r -Sdata -Tdata=0xe000 -o win.o $(WIN_C)
+
 # low.o is the resident kernel folded by a link of its own: the entry
 # header, the C objects and the hand-written assembly, in the order the
 # image needs them.  It is not a section fold like highmem.o's - a plain
 # -r leaves text, data and bss as they are - so the final link places
-# the one object where it packed the thirty-eight, and _ebss lands at
+# the one object where it packed the thirty-two, and _ebss lands at
 # the end of textpad.o's .bss exactly as it did.
 #
 # The native build is why the fold exists: the words of that link are
@@ -225,11 +254,13 @@ low.o: uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
 	$(MXLD) -r -o low.o uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
 
 #
-# the final link: three objects, in the order the image wants them, and
+# the final link: four objects, in the order the image wants them, and
 # nothing here is a special case (see the kernel section above).
+# highmem.o precedes win.o because it is unplaced and parked at _ebss,
+# and win.o precedes upage.o because 0xe000 is below 0xf000.
 #
 unix: $(OBJS)
-	$(MXLD) -Ttext=0x1000 -Shigh -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix low.o highmem.o upage.o
+	$(MXLD) -Ttext=0x1000 -Shigh -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix low.o highmem.o win.o upage.o
 
 #
 # Generate the assembly ccc would assemble for a C file, for reading:

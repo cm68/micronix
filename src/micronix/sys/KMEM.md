@@ -20,22 +20,43 @@ Segments 0-15 are the kernel's own 64K; segments 16-255 are the pool
 that `segalloc()`/`segfree()` (malloc.c) hand out for user pages, the
 buffer cache, and swap.
 
-## Current layout (post u-move, leaf code started)
+## Current layout
+
+The target below is what the kernel links to now: the u page moved up
+to segment 15, so the two adjacent pages are the buffer window (14) and
+the scratch window (13) under it.
 
 ```
 0x0000 - 0x0fff   ROM + I/O page            (not in the image)
-0x1000 - 0x8b82   text                      35714 bytes
-0x9b82 - 0xcdf2   data + bss
-0xcdf2 - 0xefff   buffer pool               binit() places 512-byte blocks
-0xf000 - 0xf274   struct user u             629 bytes
-0xf275 - 0xf8ef   leaf code                 mem.s + inout.s + libccc runtime
-0xf8f0 - 0xffff   free                      future leaf code; loader-stack slack
+0x1000 - 0x9cff   text                      36095 bytes
+0x9cff - 0xcb58   data + bss                11865 bytes; ends at _ebss
+0xcb58 - 0xdfb0   buffer pool               248 headers minted off _ebss
+0xdfb0 - 0xdfff   free                      80 bytes
+0xe000 - 0xefff   buffer-cache window       BUFSEG; bwin() maps here
+0xf000 - 0xfcde   leaf code + constants     USERSEG; 3294 bytes
+0xfcde - 0xfede   ustack                    512 bytes, .bss
+0xfede - 0xff53   struct user u             117 bytes, .bss
+0xff53 - 0xffff   free                      172 bytes; loader-stack slack
 ```
 
-`_usrtop`/`_memtop` = 0xf000 (uhdr.s); the kernel image must not reach
-0xffff because the HD-DMA loader parks its stack there.
+`blist` is the last object in .bss: the 8 boot headers at 0xcab0..0xcb58,
+which is why the pool's minted range starts at `_ebss`.  With them the
+pool is 256 headers, or 5376 bytes from 0xcab0 to `btop` = 0xdfb0.
 
-## Target layout
+The pool is 80 bytes short of BUFWIN and that is not a coincidence: at
+256 headers `MAXBUFS` (main.c) binds before the ceiling does, so the
+pool is sized by the count and not by memory.  The 0xe000 page is the
+wall for the resident kernel as well - `-Shigh` parks highmem.o (2202)
+at `_ebss` and win.o is pinned there, so the kernel links only while
+`_ebss <= 0xe000-2202` = 0xd766.  Today's slack is 0xd766-0xcb58 = 3086
+bytes, and the first 80 of it go to the pool's gap before the cache
+starts to shrink, one buffer per 21 bytes.  See TODO, the scsi section.
+
+The file's data stream runs from 0x9cff to 0xfcde - through the pool and
+the window page, which carry no image bytes - and the boot loader reads
+it as one 119-block flat image.  `_usrtop`/`_memtop` = 0xffff (uhdr.s).
+
+## Window layout
 
 ```
 seg 12 (0xc000)   end of kernel text+data+bss
@@ -53,12 +74,18 @@ at a time.  The scratch window is at 0xd000, not 0x1000, because
 segments 1-2 hold the kernel text and remapping there during copyout
 swaps out the running code (debug-hostile).
 
+0xd000 is *borrowed*, not reserved, which is why the map above shows the
+pool running through it.  It was the superblock's window once; the
+superblock is plain memory now (getsb, uio.c), so the page's only
+remaining claim is the mapping a copy takes and mem.s puts back.  main.c
+has the same note where the pool's ceiling is set.
+
 ## The u page (segment 15)
 
-`struct user u` (629 bytes) plus pure-text leaf code and read-only
-constants, all in one 4K segment remapped per process via
-`map0[2*USERSEG]`.  Nothing in the page may be writable data, or fork's
-`segcopy` clones it per process.
+`struct user u` (117 bytes) and its 512-byte system stack, ustack, plus
+pure-text leaf code and read-only constants, all in one 4K segment
+remapped per process via `map0[2*USERSEG]`.  Nothing in the page may be
+writable data, or fork's `segcopy` clones it per process.
 
 Filling it, from the leaf code inward:
 
@@ -82,18 +109,30 @@ plus mutable state.
 
 ## Buffer cache
 
-Currently a contiguous pool above `_ebss` (binit() computes
-`nbuf = (usrtop - ebss) / 512`), ~15 blocks.
+The pool is not itself resident: the 8 boot headers are `blist` (the
+last .bss object, textpad.s) and `expand_bufs()` (main.c) mints the rest
+contiguously off `&blist[8] == _ebss`, up to `BUFWIN` — the base of the
+window's own page, because `bwin()` holds a segment there for the whole
+of a buffer access and a header in that page would be read back as
+buffer data.  The count is what binds, not that ceiling: `MAXBUFS`
+(256, main.c) is reached first, so the pool is 8 boot headers plus 248
+minted, the first 2202 bytes of which are the reclaimed init-only
+object, and 80 bytes of the `_ebss`..BUFWIN region go unused.  Minting
+to the ceiling alone would be 251 - the count is within one group of
+eight of the ceiling now, so which of the two binds is nearly a
+coincidence, and the next kilobyte of kernel growth spends the gap and
+starts eating buffers.  See TODO, the scsi section.
 
-Target: a 64K cache (16 pool segments, 128 x 512-byte blocks — 48K is
-fine too) reached through the single 0xe000 window.  Block `i` has
-`data = 0xe000 + (i&7)*512` and `xmem` = its page's physical segment.
-The buffer headers (`blist`) stay static in main.o.  DMA ignores the
-window: physical = `xmem<<12 | (data & 0xfff)`.
+The blocks are 512 bytes each, minted `data = BUFWIN + (i&7)*512` with
+`xmem` = a fresh page from `segalloc()` (8 blocks per page).  DMA
+ignores the window: physical = `xmem<<12 | (data & 0xfff)`.
+
+Raising the ceiling to `_upage` (0xf000) doubles the pool and needs the
+window borrowed at every site that uses it — see TODO.
 
 A fork can then reuse a filled-out page: keep a freelist of u pages
-that already carry the leaf code, copy only the 629-byte u struct, and
-skip the text copy (see TODO).
+that already carry the leaf code, copy only the 629 bytes of ustack and
+u, and skip the text copy (see TODO).
 
 ## Constraints
 
@@ -102,8 +141,9 @@ skip the text copy (see TODO).
   last block wraps its DMA write into the rom and walks over the stack.
   This is a boot-time wrinkle, not an architectural brake — the loader's
   stack can move (backward-compatible: it reads the same header and
-  loads contiguously), and after the leaf-code move there is ~2.8K of
-  slack anyway.
+  loads contiguously), and the image the kernel links to now stops at
+  0xfcde, 768 bytes clear of the loader's deepest sp (0xffde).  What
+  binds the leaf code today is the u page's own 4K, not the loader.
 - **48K fit**: for the scratch window at 0xd000, text+data+bss must fit
   0x1000-0xcfff.  Gated by the leaf-code move above shrinking the text.
 - **.data, not .text**: leaf code in the u page (see above).

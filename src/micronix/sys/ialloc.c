@@ -9,6 +9,7 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <sys/inode.h>
+#include <sys/mount.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
 #include <errno.h>
@@ -41,7 +42,7 @@ ialloc(dev)
     register struct inode *ip;
 
     sb = getsb(dev);
-    sup = (struct super *)bsup(sb);
+    sup = (struct super *)sb->data;
 
     for (;;) {
         ip = 0;              /* no I-node yet. */
@@ -50,7 +51,6 @@ ialloc(dev)
             break;              /* no more free I-nodes */
         }
 
-        sup = (struct super *)bsup(sb); /* re-pin after ifill()'s sleeps */
         if ((ip = iget(sup->s_inode[--sup->s_ninode], dev)) == 0) {
             /*
              * this particular I-node not obtainable
@@ -77,7 +77,7 @@ ialloc(dev)
         ip->i_count = 0;
         ip->i_mount = 0;
         ip->i_size = 0;
-        sup->s_ifree--;
+        mlook(dev)->ifree--;
     }
 
     bdwrite(sb);
@@ -107,7 +107,7 @@ ifill(sb, dev)
 
     isync();
 
-    sup = (struct super *)bsup(sb);
+    sup = (struct super *)sb->data;
     iblk = lastiblock;          /* First Inode block to search */
     limit = sup->s_isize;         /* Max no. of blocks to search */
     itop = limit + 1;           /* Top I-block number. */
@@ -123,8 +123,7 @@ ifill(sb, dev)
         if ((bp = bread(iblk, dev)) == 0) {
             continue;
         }
-        bwin(bp->xmem);
-        sup = (struct super *)bsup(sb); /* re-pin after bread()'s sleep */
+        bhold(bp);
 
         inum = 16 * iblk - 31;
 
@@ -137,6 +136,7 @@ ifill(sb, dev)
                 if (sup->s_ninode < 100)
                     sup->s_inode[sup->s_ninode++] = inum;
 
+        brel();
         brelse(bp);
 
         if (sup->s_ninode >= 100) {
@@ -183,7 +183,7 @@ ifree(ip)
     static struct super *sup;
 
     sb = getsb(ip->i_dev);
-    sup = (struct super *)bsup(sb);
+    sup = (struct super *)sb->data;
 
     if (sup->s_ninode < 100) {    /* Fit in super block free list ? */
         sup->s_inode[sup->s_ninode++] = ip->i_inum;
@@ -202,7 +202,7 @@ ifree(ip)
 
     zero(&ip->i_mode, sizeof(struct dsknod));
     ip->i_flags |= IMOD;
-    sup->s_ifree++;
+    mlook(ip->i_dev)->ifree++;
     bdwrite(sb);
 }
 
@@ -261,13 +261,13 @@ indfree(ind, level, dev)
         int bn;
 
         /*
-         * Re-map before every read: the recursive indfree() below does
-         * its own bread()/bwin(), so 0xf000 no longer shows this block
-         * when it returns.  Reading through a stale bp->data would walk
-         * whatever page is mapped then.
+         * Read the entry under a hold and give the window back before the
+         * recursive call: indfree() does its own bread() and bhold(), and
+         * that one can sleep.
          */
-        bwin(bp->xmem);
+        bhold(bp);
         bn = *p;
+        brel();
         indfree(bn, level - 1, dev);
     }
     brelse(bp);

@@ -54,6 +54,25 @@ typedef long INT32;
 typedef unsigned long UINT32;
 #endif
 
+/*
+ * off_t - a file's size, or a byte offset into one.
+ *
+ * The inode says how big a file is in 24 bits (d_size0 the high byte,
+ * d_size1 the low word), so 32 holds any of it.  The host compilers
+ * already have an off_t from <sys/types.h>, 64 bits there; take theirs
+ * rather than define a second one over the top of it, which is a
+ * redefinition error.
+ *
+ * This names parameters, returns and locals.  A structure whose layout
+ * is shared with the target - u.offset, the inode's own size fields -
+ * keeps its fixed-width UINT32.
+ */
+#ifdef INTEGER_32
+#include <sys/types.h>
+#else
+typedef unsigned long off_t;	/* UINT32; ccc cannot typedef a typedef */
+#endif
+
 union bytepair {
 	struct {
 		UINT8 low;

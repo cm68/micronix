@@ -52,9 +52,10 @@ imap(ip, log, rap)
         if ((bn = balloc(dev)) == 0)
             return (0);
         bp = bget(bn, dev);
-        bwin(bp->xmem);
+        bhold(bp);
         zero(bp->data, 512);
         copy(ip->i_addr, bp->data, 16);
+        brel();
         zero(ip->i_addr, 16);
         ip->i_addr[0] = bn;
         bdwrite(bp);
@@ -115,28 +116,29 @@ imapb(ind, n, dev, rap)
         return (0);
     if ((bp = bread(ind, dev)) == 0)
         return (0);
-    bwin(bp->xmem);
-    p = (int *)(bp->data + n * sizeof(int));
+    p = (int *)(bhold(bp) + n * sizeof(int));
     if (*p == 0) {
+        brel();                     /* plug() reaches balloc() and sleeps */
         if ((bn = plug(dev)) == 0) {
             brelse(bp);
             return (0);
         }
-        bwin(bp->xmem);         /* plug()'s balloc() remapped the window */
-        p = (int *)(bp->data + n * sizeof(int));
+        p = (int *)(bhold(bp) + n * sizeof(int));
         *p = bn;
         bdwrite(bp);
     } else
         brelse(bp);
     if (n < 255)
         *rap = *(p + 1);
-    return (*p);
+    bn = *p;                        /* read it out before the window goes */
+    brel();
+    return (bn);
 }
 
 /*
  * Allocate a block for a file.  Returns the block number, or 0.  The
  * caller installs it: its pointer may be into a paged buffer, and
- * balloc() remaps the 0xf000 window, so nothing here may dereference a
+ * balloc() remaps the BUFSEG window, so nothing here may dereference a
  * buffer address across that call.
  */
 UINT

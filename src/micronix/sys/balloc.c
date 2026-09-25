@@ -8,6 +8,7 @@
 #include <sys/sys.h>
 #include <sys/buf.h>
 #include <sys/fs.h>
+#include <sys/mount.h>
 #include <sys/proc.h>
 #include <errno.h>
 
@@ -19,15 +20,64 @@
  * entry means the list was corrupted earlier; panic stops the machine
  * so the trace shows how the bad block got in.
  */
-checkfreelist(sup)
+/*
+ * Report where a corrupt superblock sits and what it holds, then stop.
+ * The address is the point: it says whether the slot was overwritten by
+ * the buffer headers (expand_bufs) or by something that mapped a page
+ * over it.  sup->s_free is printed raw, so a garbage count shows where
+ * the first sane word begins.
+ */
+sbdump(sup, what)
     struct super *sup;
+    char *what;
+{
+    register UINT *w;
+    register int i;
+    register struct buf *b, *b13;
+    extern struct buf *btop;
+    extern UINT8 image0[];
+
+    pr("sbdump(%s) sup %x slot0 %x blist %x btop %x\n",
+        what, sup, blist, btop);
+    /*
+     * Task 0's page table, as the kernel's own copy has it.  index 26 is
+     * page 13 - 0xd000 - the page mem.s borrows for user copies and
+     * restores from here, and the page the upper buffer headers live in.
+     */
+    pr("mmu: img0[2]=%d img0[4]=%d img0[26]=%d img0[28]=%d\n",
+        image0[2], image0[4], image0[26], image0[28]);
+    w = (UINT *)sup;
+    for (i = 0; i < 8; i++)
+        pr(" %x", w[i]);
+    pr("\n");
+    b13 = 0;
+    for (b = blist; b < btop; b++)
+        if ((int)b >= 0xd000) {
+            b13 = b;
+            break;
+        }
+    if (b13) {
+        pr("hdr %x: blk %d dev %d data %x xmem %d flags %x time %x\n",
+            b13, b13->blk, b13->dev, (int)b13->data, b13->xmem,
+            b13->flags, b13->time);
+        w = (UINT *)b13;
+        for (i = 0; i < 10; i++)
+            pr(" %x", w[i]);
+        pr("\n");
+    }
+    panic("freelist nfree out of range");
+}
+
+checkfreelist(sup, what)
+    struct super *sup;
+    char *what;
 {
     register int i;
     register UINT bn;
 
     if (sup->s_nfree > 100) {
         pr("freelist: nfree %d out of range\n", sup->s_nfree);
-        panic("freelist nfree out of range");
+        sbdump(sup, what);
     }
     for (i = 0; i < sup->s_nfree; i++) {
         bn = sup->s_free[i];
@@ -89,8 +139,9 @@ balloc(dev)
     register int bn;
 
     sb = getsb(dev);
-    bwin(sb->xmem);
     sup = (struct super *)sb->data;
+    if (sup->s_nfree > 100)
+        sbdump(sup, "balloc entry");
     if (sup->s_flock) {           /* mounted read-only */
         u.error = EROFS;
         return (0);
@@ -105,9 +156,15 @@ balloc(dev)
 #ifdef FREEDEBUG
         dumpbuf(fb, "refill");
 #endif
-        bcopy(fb, 0, sb, 4, 202);       /* PORT: refill free list */
-        sup = (struct super *)bsup(sb); /* bcopy left fb in the 0xf000 window */
-        checkfreelist(sup);
+        /*
+         * Refill the in-core free list from the chunk block.  Only fb's
+         * data has to be mapped; the superblock is plain memory (getsb).
+         */
+        di();
+        bhold(fb);
+        copy(fb->data, sb->data + 4, 202);
+        ei();
+        checkfreelist(sup, "refill");
 #ifdef FREEDEBUG
         dumpsb(sup, "fill");
         pr("refill blk %d: count %d e0 %d e1 %d e2 %d\n",
@@ -116,18 +173,18 @@ balloc(dev)
 #endif
     } else {
         fb = bget(bn, dev);
-        bwin(fb->xmem);
+        bhold(fb);
     }
 
     zero(fb->data, 512);
+    brel();
     bdwrite(fb);
-    sup->s_bfree--;
+    mlook(dev)->bfree--;
     bdwrite(sb);
     return (bn);
   full:
     u.error = ENOSPC;
   bad:
-    bwin(sb->xmem);            /* re-map: bread() above may have slept */
     sup->s_nfree = 0;
     prdev("No more space", dev);
     bdwrite(sb);
@@ -147,15 +204,16 @@ bfree(bn, dev)
     if (bn == 0)
         return;
     sb = getsb(dev);
-    bwin(sb->xmem);
     sup = (struct super *)sb->data;
+    if (sup->s_nfree > 100)
+        sbdump(sup, "bfree entry");
     if (bcheck(bn, sup, dev) == 0)
         goto done;
     if (sup->s_nfree == 0) {
         sup->s_free[0] = 0;
         sup->s_nfree = 1;
     } else if (sup->s_nfree >= 100) {
-        checkfreelist(sup);
+        checkfreelist(sup, "spill");
 #ifdef FREEDEBUG
         dumpsb(sup, "spill");
 #endif
@@ -163,12 +221,20 @@ bfree(bn, dev)
 #ifdef FREEDEBUG
         dumpbuf(fb, "spill");
 #endif
-        bcopy(sb, 4, fb, 0, 202);       /* PORT: spill free list */
+        /*
+         * Spill the in-core free list into the chunk block.  Only fb's
+         * data has to be mapped; the superblock is plain memory (getsb).
+         */
+        di();
+        bhold(fb);
+        copy(sb->data + 4, fb->data, 202);
+        brel();
+        ei();
         bawrite(fb);
         sup->s_nfree = 0;
     }
     sup->s_free[sup->s_nfree++] = bn;
-    sup->s_bfree++;
+    mlook(dev)->bfree++;
   done:
     bdwrite(sb);
 }

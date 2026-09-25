@@ -13,6 +13,14 @@ extern long seconds;
 extern int arg[];               /* in-line arguments from system() */
 
 /*
+ * The return type has to be said, and this is the only caller that
+ * needs it.  An undeclared function returns int, so seek's position
+ * would be read out of HL alone and everything above 64K - the whole
+ * reason r_seek hands back two words - would arrive as its low half.
+ */
+extern UINT32 seek(int fd, int disp, unsigned from);
+
+/*
  * Handle register passing across system calls
  */
 
@@ -123,9 +131,34 @@ r_read()
     u.hl = read(u.hl, arg[0], arg[1]);
 }
 
+/*
+ * seek returns the new position, so the carry has to mean something:
+ * r_system's idiom, and for the same reason - the stubs decide success
+ * and failure on it.
+ *
+ * The position goes back as HL':HL - high half in the shadow bank's HL,
+ * low half in HL - which is how the compiler passes and returns a long.
+ * DE is deliberately left alone.  It is where a Whitesmiths binary keeps
+ * its frame pointer, and unlike time() and wait(), whose long returns
+ * the original kernel also put in de, seek's original returned nothing
+ * at all: an lseek stub from the distribution reads _fdpos and no
+ * register, so it has no save of DE to give back and would lose its
+ * frame to this call.  Keeping the whole answer in HL':HL costs the
+ * stub nothing and is a convention old binaries are already safe under.
+ */
 r_seek()
 {
-    seek(u.hl, arg[0], arg[1]);
+    UINT32 off;
+
+    off = seek(u.hl, arg[0], arg[1]);
+    if (u.error) {
+        u.af |= ERRBIT;
+        u.hl = u.error;
+    } else {
+        u.af &= ~ERRBIT;
+        u.hl = (UINT) off;
+        u.hl2 = (UINT) (off >> 16);
+    }
 }
 
 r_setuid()

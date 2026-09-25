@@ -17,7 +17,9 @@
 #define MINRUN	2               /* minimum run time before swapout */
 #define MAXMEM	0xffff          /* maximum process size */
 #define MAXSEG	256             /* max 4K memory segments, not inc. kernel */
-#define USERSEG 14              /* u page segment; the buffer window is 15 */
+#define USERSEG 15              /* u page segment; the buffer window is 14 */
+#define BUFSEG  14              /* the buffer-cache window (bwin, uio.c) */
+#define BUFWIN  (BUFSEG * 0x1000)   /* ... its page base, and the pool's top */
 
 /*
  * Priorities

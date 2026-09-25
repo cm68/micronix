@@ -13,7 +13,7 @@
 #include <errno.h>
 
 extern long seconds;            /* see clock.c */
-extern UINT8 nbuf;               /* initialized in binit(), main.c */
+extern UINT nbuf;                /* initialized in binit(), main.c */
 extern struct buf *btop;            /* ditto */
 extern UINT8 map0[], image0[];   /* MMU map registers (uhdr.s) */
 extern int copy();               /* leaf mem.s: kernel-to-kernel copy */
@@ -97,6 +97,7 @@ bget(blk, dev)
         goto loop;
     }
     unhash(b);               /* drop it from its old blk's bucket */
+    sbrel(b);                /* and from a superblock slot, if it had one */
     b->blk = blk;
     b->dev = dev;
     b->flags &= ~BDONE;
@@ -170,17 +171,88 @@ aread(blk, dev)
 }
 
 /*
+ * The superblock's home in the kernel's own address space.
+ *
+ * It used to be read through the 0xd000 window, held there across calls
+ * that map other buffers and across sleeps.  A held window is exactly what
+ * the buffer pool cannot have: that page now carries buffer headers, and
+ * whoever holds the window has to reach headers between mapping it and
+ * restoring it.  So each device's superblock gets a slot of plain memory
+ * instead, and its buffer's data/xmem are pointed at it.  That keeps
+ * sb->data an ordinary pointer - no mapping, nothing to re-pin after a
+ * sleep - and the driver still writes the right bytes, because its DMA
+ * address is (xmem << 12) | (data & 0xfff), not the window address.
+ *
+ * The mapping to restore is saved here because the buffer's data/xmem are
+ * assigned once by binit()/expand_bufs() and bzero() preserves them: on
+ * umount the buffer goes back into the pool and must get its window
+ * mapping back (sbrel).
+ */
+struct sbslot {
+    struct buf *b;              /* the buffer this slot belongs to, 0 = free */
+    char *wdata;                /* that buffer's window address, saved */
+    UINT8 wxmem;                /* and its segment */
+    char data[512];             /* the superblock, a block like any other */
+};
+
+struct sbslot sbslot[NMOUNT];
+
+/*
  * Read the super-block (block 1) on the device.
+ *
+ * bread() leaves the block in the buffer's own segment; the first call for
+ * a device copies it into a slot and points the buffer there.  Later calls
+ * find it already attached - the copy must not be repeated then, because
+ * the segment copy is stale the moment the superblock is modified.
  */
 struct buf *
 getsb(dev)
     UINT dev;
 {
-    struct buf *b;
+    register struct buf *b;
+    register struct sbslot *s, *f;
 
     if ((b = bread(1, dev)) == 0)
         panic("cant get superblock");   /* should be locked in core */
+
+    f = 0;
+    for (s = sbslot; s < sbslot + NMOUNT; s++) {
+        if (s->b == b)
+            return (b);                 /* already attached */
+        if (s->b == 0 && f == 0)
+            f = s;
+    }
+    if (f == 0)
+        panic("too many superblocks");
+    di();
+    copy(bhold(b), f->data, 512);
+    brel();
+    ei();
+    f->wdata = b->data;
+    f->wxmem = b->xmem;
+    b->data = f->data;
+    b->xmem = (UINT8)((UINT)f->data >> 12);
+    f->b = b;
     return (b);
+}
+
+/*
+ * Give the superblock buffer its window mapping back and free its slot.
+ * Called when the device is unmounted: the buffer returns to the pool, and
+ * its data may not still be pointing at the slot.
+ */
+sbrel(sb)
+    struct buf *sb;
+{
+    register struct sbslot *s;
+
+    for (s = sbslot; s < sbslot + NMOUNT; s++)
+        if (s->b == sb) {
+            sb->data = s->wdata;
+            sb->xmem = s->wxmem;
+            s->b = 0;
+            return;
+        }
 }
 
 /*
@@ -436,8 +508,10 @@ bzero(b)
     char *data;
     UINT8 xmem;
 
-    /* data/xmem are the buffer's fixed window address and segment, set
-     * once by binit()/expand_bufs(); preserve them across the zero. */
+    /* A buffer recycled by bflush() may still be a superblock's (getsb
+     * pointed its data at a slot).  Detach it first - that is what puts
+     * its window address and segment back - and then preserve them. */
+    sbrel(b);
     data = b->data;
     xmem = b->xmem;
     zero(b, sizeof(*b));
@@ -454,7 +528,6 @@ bsync()
     register struct super *s;
 
     b = getsb(rootdev);
-    bwin(b->xmem);
     s = (struct super *)b->data;
 
     if (!s->s_flock) {            /* not read-only */
@@ -507,46 +580,82 @@ bdrain()
 }
 
 /*
- * Map a buffer's segment into the 0xf000 window so its data (0xf000 +
- * offset) becomes reachable.  b->xmem carries the segment; segment 15 is
- * the window, so its map register is map0[2*15] == map0[30].
+ * Map a buffer's segment into the BUFSEG window so its data (BUFWIN +
+ * offset) becomes reachable.  b->xmem carries the segment; the window is
+ * segment BUFSEG, so its map register is map0[2*BUFSEG] == map0[28].
+ *
+ * This is the raw mapping and it leaves the segment in place.  bhold()
+ * below is what a buffer access uses: the same write, but the segment
+ * that was mapped goes on a stack and comes back at brel().  Held that
+ * way the window's page is the kernel's own memory whenever no hold is
+ * up, which is what lets the page carry code - see TODO.
+ *
+ * The pool still stops below the window's page (BUFWIN, see
+ * expand_bufs): a header there would be read back as buffer data for as
+ * long as a hold is up, and holds are taken all over the filesystem.
  */
 bwin(seg)
     int seg;
 {
-    map0[30] = image0[30] = seg;
+    map0[2 * BUFSEG] = image0[2 * BUFSEG] = seg;
 }
 
 /*
- * Map a buffer into the 0xd000 window (the copyin/copyout page, free while
- * we are not touching process address space) and return its address there.
- * Used for the superblock so it stays reachable alongside another buffer in
- * 0xf000 (e.g. ifill's inode-block scan).
+ * Hold the window on a buffer's data and return the address of its 512
+ * bytes.  brel() gives the window back.
+ *
+ * Holds stack: the segment in place before one goes on a small stack and
+ * brel() puts it back, so a callee's hold does not lose the caller's and
+ * a hold taken in an interrupt does not lose the one it interrupted.
+ * Since nothing puts a segment in this window except through here, the
+ * window is the kernel's own segment whenever bholdn is 0 - the image
+ * the firmware left it at, which is the page this kernel's code is in.
+ *
+ * The stack holds image0, not map0: the map registers are write only,
+ * so reading one back is not the segment in place, it is bus garbage.
+ * Saving map0 here and restoring it at brel() left the window mapped to
+ * page 0 - the rom's page - after the first hold, which went unnoticed
+ * while nothing but buffers was reached through that page.
+ *
+ * Two rules keep a hold short enough for that to be worth anything:
+ *
+ *   - Never sleep while holding one.  sleep() panics on it: the next
+ *     process would run with this one's buffer over the window's page.
+ *   - No header access (bget/brelse/bdwrite) and no call that maps the
+ *     window for its own use while one is held.  The hold you get back
+ *     is the one you took - imapb() is the shape: it drops its hold
+ *     before plug(), which reaches balloc() and can sleep.
+ *
+ * bhold() returns b->data.  A superblock buffer is the exception: getsb()
+ * moved its data to a slot in the kernel's own memory and its xmem
+ * followed, so a hold on one maps a kernel segment where nothing needs
+ * it.
  */
-bsup(sb)
-    struct buf *sb;
+#define NHOLD   8
+
+UINT8 bholdn;                   /* holds up: sleep() panics on a nonzero */
+static UINT8 holdstk[NHOLD];
+
+char *
+bhold(b)
+    register struct buf *b;
 {
-    map0[26] = image0[26] = sb->xmem;
-    return (0xd000 + ((int)sb->data & 0xfff));
+    if (bholdn >= NHOLD)
+        panic("bhold: too deep");
+    holdstk[bholdn++] = image0[2 * BUFSEG];
+    map0[2 * BUFSEG] = image0[2 * BUFSEG] = b->xmem;
+    return (b->data);
 }
 
 /*
- * Copy between two buffers in (possibly) different segments.  Maps the
- * source into 0xf000 and the destination into 0xd000 - the copyin/copyout
- * page, which is free here because we are not touching process address
- * space during superblock/freelist handling - then ldir's between the two
- * windows.  soff/doff are byte offsets within the buffers.
+ * Release the innermost hold, putting back the segment it saved.
  */
-bcopy(sb, soff, db, doff, count)
-    struct buf *sb, *db;
-    int soff, doff, count;
+void
+brel()
 {
-    di();
-    map0[30] = image0[30] = sb->xmem;
-    map0[26] = image0[26] = db->xmem;
-    copy(sb->data + soff,
-        (char *)(0xd000 + ((int)db->data & 0xfff) + doff), count);
-    ei();
+    if (bholdn == 0)
+        panic("brel: no hold");
+    map0[2 * BUFSEG] = image0[2 * BUFSEG] = holdstk[--bholdn];
 }
 
 /*

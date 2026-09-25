@@ -30,7 +30,7 @@
  */
 extern struct proc *swapproc;
 extern struct inode *rootdir;
-extern UINT8 nbuf;
+extern UINT nbuf;
 extern struct buf *btop;
 extern UINT8 map0[], image0[];
 extern UINT8 segmap[];          /* malloc.c */
@@ -184,8 +184,8 @@ binit()
 
     /*
      * Seed the 8 boot buffers from one 4K segment.  Buffer data now lives
-     * in the unmapped physical segments, reached through the 0xf000 window:
-     * block i has data = 0xf000 + (i&7)*512 and xmem = its segment.  blist
+     * in the unmapped physical segments, reached through the BUFSEG window:
+     * block i has data = BUFWIN + (i&7)*512 and xmem = its segment.  blist
      * holds exactly the 8 boot headers (the last .bss object, see
      * textpad.s); expand_bufs() mints the rest contiguously off &blist[8]
      * once the init-only functions have returned.
@@ -195,7 +195,7 @@ binit()
     btop = blist + nbuf;
     for (b = blist; b < btop; b++) {
         zero(b, sizeof(*b));
-        b->data = (char *)(0xf000 + ((b - blist) & 7) * 512);
+        b->data = (char *)BUFWIN + ((b - blist) & 7) * 512;
         b->xmem = seg;
     }
 }

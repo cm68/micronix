@@ -98,6 +98,7 @@ timein()
 {
     static char tmbusy = 0;
     register struct tmout *t;
+    int (*f)();
 
     if (tmbusy)
         return;
@@ -105,8 +106,17 @@ timein()
     tmbusy = 1;
     for (t = tlist; t < tlist + NTMOUTS; t++)
         if (t->func != 0 && --t->ticks == 0) {
-            (*(t->func)) (t->arg);
+            /*
+             * Free the slot before the call and not after it.  Both of
+             * the kernel's timers - mwcheck and djgoose - re-arm
+             * themselves from inside their own call, so the slot has to
+             * be free for them to take back; holding it until they
+             * return makes a self-continuing timer want two slots, one
+             * per turn, and refuses it outright if the table is full.
+             */
+            f = t->func;
             t->func = 0;
+            (*f) (t->arg);
         }
     tmbusy = 0;
 }
@@ -129,6 +139,14 @@ timeout(func, arg, ticks)
             ei();
             return;
         }
+    /*
+     * A full table is a bug, but panic() syncs every mounted disk before
+     * it prints a word, and sync() sleeps - which needs the interrupts
+     * this di() is holding off.  Dying with them off hangs the machine
+     * in silence and says nothing about why, so let them back on and let
+     * the panic be read.
+     */
+    ei();
     panic("Timeout slots are full");
 }
 

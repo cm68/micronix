@@ -69,7 +69,7 @@ _memtop=0xFFFF
 	.globl	_trapstack, _oldstack, _cmask, _ctask, _mask, _rst1
 	.globl	_trapad, _status, _wtask, _usrtop, _memtop, _trapvec
 	.globl	_hlt, _xinit, _map0, _map1, _image0, _image1
-	.extern	_plist, _start
+	.extern	_plist, _mlist, _start
 
 ;
 ; this is the kernel program entry point, and it expects to be at 0x1000
@@ -91,6 +91,11 @@ _trapvec:
 ; this is the address of the process list so ps can find it.
 ;
 	.defw	_plist
+
+;
+; this is the address of the mount table so df can find it.
+;
+	.defw	_mlist
 
 ;
 ; boot lands here

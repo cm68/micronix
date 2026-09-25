@@ -44,6 +44,18 @@ struct ciovec {
 #define major(dev)	((UINT16)(dev) >> 8)
 
 /*
+ * The minor number of a disk, cut into the three things its driver wants
+ * from it: which drive, which row of its geometry table, and which slice
+ * (sys/dlabel.h).  The slice sits at the top so that every device number
+ * in use before slices existed keeps its meaning and names slice 'a'; the
+ * price is that a driver's table is eight rows rather than sixty four.
+ * The drive bits below these are the driver's own - two for mw.c's four
+ * drives, one for the ide card's two.
+ */
+#define devslice(dev)	((minor(dev) >> 5) & 7)
+#define devtype(dev)	((minor(dev) >> 2) & 7)
+
+/*
  * Globals initialized in con.c
  */
 extern UINT nbdev;              /* number of block devices */

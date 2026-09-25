@@ -38,6 +38,16 @@ MAP1=0x0620
 IMAGE1=0x0220
 	.data			; leaf code, parked in the u page (see user.c)
 
+; ------- the base of the u page -------
+; The first byte of the page the partial link places .data at (USERSEG,
+; 0xf000 - see sys.h).  Nothing branches on it any more; it is here to
+; name the page in a symbol dump, the way _ebss names the end of .bss.
+; The buffer pool's ceiling is the base of the page below it (BUFWIN,
+; sys.h) and not this address, because bwin() holds a segment in that
+; page for the whole of a buffer access.
+	.globl	_upage
+_upage:
+
 ; ------- A-NATURAL SOURCE: _getbyte -------
 ; / getbyte(addr) -- Get a byte from the active _task
 ;

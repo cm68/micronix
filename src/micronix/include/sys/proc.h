@@ -39,7 +39,7 @@ struct proc {
 
     UINT time;                  /* residency time in core or on disk */
     UINT alarm;                 /* seconds to alarm */
-    UINT8 pid;                  /* process Id number */
+    int pid;                    /* process Id number */
 } plist[];
 
 #define priority(p)	(*(unsigned short *)(&(p)->nice))
@@ -65,10 +65,16 @@ struct proc {
 
 /*
  * User structure
+ *
+ * The system stack is not a member here: it is the 512-byte object
+ * ustack (user.c), which the linker places immediately below u in
+ * USERSEG.  The register save area has to come first in the struct
+ * because the firmware pushes the trap frame down from trapstack and
+ * leaves SP at &u.stack (see trap.c): the kernel's C stack grows down
+ * out of the base of the struct and into ustack, so every other member
+ * of u is out of its way.
  */
 struct user {
-    char s[512];                /* this processes' system stack */
-
     UINT stack;                 /* see trap0() in trap.c */
     UINT ret;                   /* dummy place holder */
     UINT8 task;                 /* Registers saved by firmware */
@@ -79,7 +85,22 @@ struct user {
     UINT bc;
     UINT de;
     UINT hl;
-    char zregs[14];
+    /*
+     * The firmware saves more than the primary bank, and these are the
+     * rest of it in the order it pushes them - the MPZ80 manual's "Task
+     * Save Areas", which gotask in the monitor pops back.  Exposed by
+     * name because the kernel returns a long as HL':HL, high half in
+     * hl2 and low half in hl, so that DE comes back to a Whitesmiths
+     * binary with its frame pointer still in it.  Only hl2 is written,
+     * and only by the calls that return a long.
+     */
+    UINT ireg;                  /* interrupt register + flags */
+    UINT ix;                    /* the user's index registers */
+    UINT iy;
+    UINT af2;                   /* the alternate bank */
+    UINT bc2;
+    UINT de2;
+    UINT hl2;                   /* high half of a returned long */
     char save;                  /* dummy for top of save area */
 
     struct proc *p;             /* this process */

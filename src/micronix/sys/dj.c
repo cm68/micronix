@@ -346,8 +346,7 @@ djopen(dev, mode)
     }
 
     b->dev |= DISCARD;
-    bwin(b->xmem);
-    s = (struct status *)b->data;
+    s = (struct status *)bhold(b);
 
     /*
      * deal with the Write Protect bit
@@ -356,8 +355,10 @@ djopen(dev, mode)
     if (s->dstat & S_WP) {      /* note write enable/disable status */
         d->flags |= F_WP;
 
-        if (mode != READ)
+        if (mode != READ) {
+            brel();
             goto err;           /* read only */
+        }
     } else {
         d->flags &= ~F_WP;
     }
@@ -412,6 +413,7 @@ djopen(dev, mode)
         }
     }
 
+    brel();
     brelse(b);
 
     if ((d->flags & ISOPEN) && sp != d->specs) {
@@ -683,8 +685,8 @@ djint()
          */
 
       kwrite:
-        bwin(curbuf->xmem);
-        copy(curbuf->data, kbuf + off, togo);
+        copy(bhold(curbuf), kbuf + off, togo);
+        brel();
 
         djack();                  /* acknowledge old int. */
 
@@ -729,8 +731,8 @@ djint()
 
     if (dev & GETSTAT) {        /* stat req. */
         if (getstat(dev)) {
-            bwin(curbuf->xmem);
-            copy(djcomm, curbuf->data, sizeof(struct status));
+            copy(djcomm, bhold(curbuf), sizeof(struct status));
+            brel();
             goto finished;
         } else {
             goto fail;

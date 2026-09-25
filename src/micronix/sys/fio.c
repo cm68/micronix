@@ -56,8 +56,8 @@ iread(ip)
             aread(rahead, dev);
         if ((bp = bread(phys, dev)) == 0)
             break;
-        bwin(bp->xmem);
-        iomove(READ, bp->data + into, nbytes);
+        iomove(READ, bhold(bp) + into, nbytes);
+        brel();
         brelse(bp);
         log++;
         into = 0;
@@ -102,8 +102,8 @@ iwrite(ip)
             bp = bget(phys, dev);
         else if ((bp = bread(phys, dev)) == 0)
             break;
-        bwin(bp->xmem);
-        iomove(WRITE, bp->data + into, nbytes);
+        iomove(WRITE, bhold(bp) + into, nbytes);
+        brel();
         if ((into + nbytes == 512) && !pipe)
             bawrite(bp);
         else
