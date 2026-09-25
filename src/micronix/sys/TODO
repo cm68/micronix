@@ -45,13 +45,92 @@ Open: where the list lives, how a fresh page is primed the first time
 (one segcopy of the leaf code), and how a swapped-out process interacts
 with it.
 
-The boot loader's stack sits at the very top of memory (mwboot1.s parks
-sp at 0xffff) and loads the kernel in 512-byte blocks from 0x0ff0 up, so
-the image may not fill the last segment to the brim: the last block both
-wraps its DMA write past 0xffff and walks over that stack.  user.c leaves
-1K slack at the top for it.  When the leaf code moves in and the text
-shrinks, that slack can tighten again - but never past what keeps the
-load at 119 blocks and clear of the loader's stack.
+The u page is laid out by the linker as three objects in one segment
+(USERSEG, sys.h): the leaf code first at the base, then ustack (user.c)
+- the system stack - and then the u struct itself, whose register save
+area comes first in the struct because that is where the firmware's
+trap entry leaves SP.  So the kernel's C stack grows down from
+&u.stack into ustack.
+
+ustack and u are .bss, and the file carries no bytes for either.  That
+is what let the page move up to segment 15: the kernel and the loader
+never run at the same time, so the loader's stack lands on the u
+struct's addresses during the load, and the page only has to keep its
+*code* below the loader.  task0_body() zeroes u before it is used,
+since what the loader leaves there is its own stack.
+
+--------------------
+
+Three window pages used to have to exist at once: 0xd000 for the
+superblock, 0xe000 for the u page, 0xf000 for the buffer data window.
+The same three pages are in play, but the u page has moved up into 15
+(0xf000) and the buffer window took its place at 0xe000, so what is
+held now is 0xe000 by the window and 0xd000 only for the length of a
+user-memory copy (mem.s borrows and restores it).  It matters because
+the buffer pool's headers are minted contiguously off &blist[8] ==
+_ebss, so a page held by anything else hides whatever headers land in
+it - 0xd000's page was dead space for exactly that reason.
+
+The superblock used to hold 0xd000 across calls and sleeps, which meant
+that page could not carry headers - the pool stopped at 0xd000.  It is
+plain memory now: getsb() (uio.c) copies the block into a per-device
+sbslot in .bss once and points the buffer's data/xmem at the slot, so
+sb->data stays an ordinary pointer, nothing has to be re-pinned after a
+sleep, and the driver still writes the right bytes because its DMA
+address is (xmem << 12) | (data & 0xfff), not the window address.  mem.s
+restores the page it borrows for user memory from IMAGE0+26, so with the
+superblock out of the window system nothing holds 0xd000 and the headers
+carry on through it.  bzero() and bget()'s reuse path call sbrel() to
+give a recycled buffer its window mapping back.
+
+The cost is the slots: NMOUNT * (512 + 6) = 2072 bytes of .bss, about 98
+headers, so the pool gains ~90 rather than the ~195 the page is worth.
+The two leftovers are still available if the pool ever needs to be
+bigger again:
+
+  - Put the superblock back in a segment and borrow window 13 for each
+    access (save the mapping, map, copy, restore), with bcopy() moved
+    into the u page so only u-page code runs while the borrow is held.
+    That gives up the ~2072 bytes of slots and frees the page for
+    headers - the full ~195 - but requires a discipline the slot design
+    does not: no header access (bget/brelse/bdwrite) between mapping the
+    window and restoring it.  A miss there is silent filesystem
+    corruption, which is why the slots went in first.
+
+  - The u page is in segment 15 now, so the pool's ceiling is one page
+    away (0xf000 instead of the window's 0xe000) and it roughly
+    doubles.  It needs the buffer data window to become borrowed at
+    every site that uses it: bwin() holds its segment for the whole of
+    a buffer access, so headers parked in 0xe000's page would be read
+    back as buffer data.  Borrowing means save the map register, map,
+    copy, restore - and no header access (bget/brelse/bdwrite) while a
+    borrow is held, the same discipline the superblock slots avoided.
+    expand_bufs()'s bound is BUFWIN (sys.h) today; this is the change
+    that moves it up to _upage.
+
+The boot loader's own stack sits at the very top of memory (mwboot1.s
+parks sp at 0xffff and the second level inherits it), and the loader
+keeps using it for the whole kernel load.  Measured in d1 by sampling sp
+per instruction over the whole trap-free pre-kernel window (cycle 462452
+to 709169), the loader's deepest sp is 0xffde - thirty-three bytes below
+the top, so the loader's stack is not what caps the image.  What caps it
+is the block rounding: boot.c's load() writes whole 512 byte blocks from
+0x0ff0, so the last block starts at 0xfdf0, and the 128-block list
+reaches past the top of memory before it runs out - the practical ceiling
+is 120 blocks.
+
+The kernel is linked so the file's data stream stops short of the
+loader's stack: 0x1000 + text + data, which today is 0xf000 + the leaf
+code's size, ends at 0xfcc9 - 119 blocks, 789 bytes clear of the
+loader's deepest sp.  What actually binds the leaf code now is the u
+page itself, not the loader: leaf + ustack (512) + u (117) has to fit
+in 4096, so the leaf code has 0xf3e bytes and is using 0xcc9, leaving
+194 bytes to grow into.
+
+The same sampling gives the kernel's own stack: the deepest supervisor
+sp is 0xede5 at adiv+21, 228 bytes of the 512 byte ustack, so the
+number in user.c is generous and is the one to turn if the page ever
+has to get smaller.
 
 --------------------
 
@@ -71,6 +150,48 @@ stack in putargs().  The pieces are:
   - libc: getenv(3) / putenv(3) (or setenv), and `extern char **environ`.
   - the shell: export/name=value syntax and passing its environment to
     each exec.
+
+--------------------
+
+mw.c stops at 8 heads, and 16 is not a table entry away.  The head
+select field in the command structure is three bits:
+
+	hedsel = pcmp<<7 | hicur<<6 | (~head&7)<<2 | drv
+
+so the 8th head is the last one that fits.  The two bits above the head
+field are per-track flags the driver sets out of the table, and they are
+not the same kind of thing:
+
+	bit 6, hicur - the write current control.  mw.c sets HIGHCUR 0x40
+	there and clears it at track >= lowcur, so the driver drops to low
+	current partway out.
+
+	bit 7, pcmp - write precompensation.  This is a different function
+	and not a current setting at all: it retimes the write data on the
+	inner tracks to compensate for bit shift, so it changes the data
+	clocking.  It stays.
+
+On the HD-DMA cable bit 6's wire is the same wire as the fourth head
+select line, so a 16-head drive overloads it - and only it.
+
+Nothing worth having is lost by giving the pin to head select.  Low
+current on the larger MFM drives is generated by the drive itself - it
+knows what cylinder it is on and modulates its own write current - and
+the line exists for the early drives that had to be told.  Even smaller
+later 8-head drives routinely ignore it.  So the wire was on its way
+out anyway, and the drives large enough to want 16 heads are the ones
+that stopped needing to be told.
+
+That makes specs[]'s lowcur, and the HIGHCUR half of hedsel, things to
+remove rather than work around, and it is the removal that has to come
+first: hedsel widens to (~head&15)<<2, bit 6 goes with it, and the
+precompensation at bit 7 does not move.  Any drive that does still want
+its current commanded needs the decision made before the field widens,
+not after.
+
+None of the types are in the way - struct info.heads is a UINT8 and 16
+fits - and neither is specs[]: it is a table, and it loses a column
+rather than gaining a row.
 
 --------------------
 
