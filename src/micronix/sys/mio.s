@@ -23,13 +23,8 @@
 ; TTSIZE	:= 38		/* sizeof (struct tty) */
 ; TTSIZE2 := 76		/* X 2 */
 ; TTSIZE3 := 114		/* X 3 */
-; TTSIZE4 := 152		/* X 4 */
 ;
-; public	tty
-; public	doslave
-; public	doace
 ; public	miobase
-; public	_nmio
 ; public	_mttys
 ; public	_mstart
 ; public	_mstop
@@ -37,7 +32,6 @@
 ; public	_mset
 ; public	_console
 ; public	intrupt
-; public	slint
 ; public	m1int
 ; public	m2int
 ; public	m3int
@@ -48,7 +42,6 @@
 ;
 ;
 ; MBASE	:= 0x48		/base io address for master multiboard
-; SLBASE	:= 0x58
 ; MUDATA	:= MBASE	 /port for uart data
 ; MLOBAUD := MBASE	 /port for low byte of baud rate
 ; MUABLE	:= MBASE[1]	 /port to enable uart interrupts
@@ -61,7 +54,6 @@
 ; ICNTRL	:= MBASE[4]	 /port to interrupt controller
 ; ICNTRL1 := MBASE[5]	 /another
 ; MOCW1	:= MBASE[5]	 /* Operation control word 1 */
-; MOCW3	:= MBASE[4]
 ; MUSTATUS := MBASE[5]	 /* Master Uart(ace) status */
 ; MMSTATUS := MBASE[6]	/* Master Modem status */
 ; MSELECT := MBASE[7]	/offset to select uart or _int controller
@@ -77,26 +69,18 @@
 ; INDAISY := 0
 ; LODAISY := 0
 ; HIDAISY := 1
-; IIR	:= 2
 ; MCNTRL	:= 4
 ; USTATUS := 5
-; MSTATUS := 6
 ; SELECT	:= 7
 ; REGSET	:= 3
 ; OCW1	:= 5
 ; OCW2	:= 4
-; OCW3	:= 4
 ; ICW1	:= 4
 ; ICW2	:= 5
 ; ICW3	:= 5
 ; ICW4	:= 5
 ;
 ; /*	masks and bits */
-;
-; IRP	:= 0100		/* interrupt _req parallel */
-; IRA1	:= 010		/* _int _req ACE 1 */
-; IRA2	:= 020
-; IRA3	:= 040
 ;
 ; /* Line status register. */
 ;
@@ -128,7 +112,6 @@
 ; BOUND32 := 0340		/mask off least significant 5 bits
 ; ICWORD1 := 037		/level triggered, 4 byte vectors, 1 controller
 ; ICWORD4 := 014
-; SLICW4	:= 016		/* auto EOI */
 ; ENDINT	:= 0240		/most recent interrupt is done, rotate priorities
 ;
 ; PENABLE := 050		/enable PIC and Paralell printer
@@ -145,8 +128,6 @@
 ;
 ;
 ; ARMMASTER  := 0103	/allow interrupts 2 - 7 (ttys, clock, slaves)
-; ARMSLAVE:= 0307		/allow 3-5	(ACEs only)
-; GETIRR	:= 10
 ;
 ; CONNECT := 3		/data terminal ready, request to send
 ;
@@ -174,14 +155,12 @@ DEV=8
 TTSIZE=38
 TTSIZE2=76
 TTSIZE3=114
-TTSIZE4=152
-	.globl	tty, doslave, doace, miobase, _nmio, _mstart, _mstop
-	.globl	_mputc, _mset, _console, intrupt, slint, m1int, m2int
+	.globl	miobase, _mstart, _mstop
+	.globl	_mputc, _mset, _console, intrupt, m1int, m2int
 	.globl	m3int, m0int, clkint
 	.extern	_di, _ei, dicount, _mttys, _ppint, _ttyin, _ttyout
 	.extern	_mumint, _ttyerror, _clock
 MBASE=0x48
-SLBASE=0x58
 MUDATA=MBASE+0
 MUABLE=MBASE+1
 MIIR=MBASE+2
@@ -194,15 +173,12 @@ UDATA=0
 LOBAUD=0
 HIBAUD=1
 UABLE=1
-IIR=2
 REGSET=3
 MCNTRL=4
 USTATUS=5
-MSTATUS=6
 SELECT=7
 OCW1=5
 OCW2=4
-OCW3=4
 ERROR=0x18
 EMPTY=0x20
 CLR2SND=0x10
@@ -213,16 +189,11 @@ MODINT=0
 OENABLE=0x0B
 ODSABLE=0x09
 IODSABLE=0
-IRP=0x40
-IRA1=0x08
-IRA2=0x10
-IRA3=0x20
 PENABLE=0x28
 ENDINT=0xA0
 MACE1=0x29
 MACE2=0x2A
 MACE3=0x2B
-GETIRR=10
 NORMAL=7
 BAUDREG=0x80
 CONNECT=3
@@ -377,18 +348,6 @@ ace:
 ; 	miobase: 0	/* base I/O address of current MIO board */
 ;
 miobase:
-	.defb	0
-
-; ------- A-NATURAL SOURCE: _nmio -------
-; 	_nmio:	 0
-;
-_nmio:
-	.defb	0
-
-; ------- A-NATURAL SOURCE: slave -------
-; 	slave:	 0
-;
-slave:
 	.defb	0
 
 ; ------- A-NATURAL SOURCE: m0int -------
@@ -595,353 +554,6 @@ mashake:
 	ld	h,d
 	ld	l,e		; hl = tty (arg0)
 	call	_mumint
-	ret
-
-; ------- A-NATURAL SOURCE: tty -------
-; /*	in; MMSTATUS; a & CLR2SND; jz endint /* if (stat & CLEAR ) */
-; /*		/
-; /*		call _cstart;	/* cstart(tty); */
-; /*		/
-; /*
-; /*	jmp endint;
-;
-;
-;
-;
-;
-; /* slint - slave Mult I/O _int */
-;
-; tty: &0;
-;
-tty:
-	.defw	0
-
-; ------- A-NATURAL SOURCE: slint -------
-; slint:
-; 	/
-;
-; /*	for (slave = 0; slave < nmio; slave++)	*/
-; /*		doslave ();			*/
-; /*	Service all the _ints on each of the slaves */
-;
-; 	bc = &_mttys; hl = TTSIZE4 + bc -> tty;		/* tty = &mttys[4]; */
-; 	a = SLBASE -> miobase;				/* base = SLBASE; */
-; 	slave = (a ^ a);	/* slave = 0; */
-;
-; 	slint2:
-;
-; 	a = slave;
-; 	hl = &_nmio;
-; 	a :: *hl; rz;
-; 		/
-; 		call doslave;
-; 		slave = (a = slave + 1);	/* slave++; */
-; 		miobase = (a = miobase + 0x10); /* miobase += 0x10; */
-; 		jmp slint2;
-; 		/
-; 	/
-;
-slint:
-	ld	bc,_mttys
-	ld	hl,TTSIZE4
-	add	hl,bc
-	ld	(tty),hl
-	ld	a,SLBASE
-	ld	(miobase),a
-	xor	a
-	ld	(slave),a
-slint2:
-	ld	a,(slave)
-	ld	hl,_nmio
-	cp	(hl)
-	ret	z
-	call	doslave
-	ld	a,(slave)
-	inc	a
-	ld	(slave),a
-	ld	a,(miobase)
-	add	a,0x10
-	ld	(miobase),a
-	jp	slint2
-
-; ------- A-NATURAL SOURCE: irr -------
-; /* doslave - service the slave mio whose base I/O address */
-; /* is given in miobase */
-; /* bc contains a pointer to the _app tty structure */
-; /* update bc */
-;
-; irr: 0
-;
-irr:
-	.defb	0
-
-; ------- A-NATURAL SOURCE: doslave -------
-; doslave:
-; 	/
-;
-; /* we want to read the _int _req _reg on the current PIC */
-;
-;
-; 	a = miobase + SELECT -> slave0
-; 	a = miobase + OCW3 -> slave1 -> slave2
-;
-; 	a = PENABLE; out; slave0: SELECT;	/* select _grp 0 */
-;
-; 	a = GETIRR; out; slave1: OCW3		/* ask for _int _req _reg */
-;
-; 	in; slave2: OCW3; a-> irr;	/* save _int _req _reg */
-;
-; 	slave3:
-;
-; /* now irr contains high bits for active _ints */
-;
-; /* check the parallel port */
-;
-; 	a = irr & IRP; jz slave4		/* if (c & DAISY) */
-; 		/
-; 		hl = tty => sp; call _ppint; sp => af; /* ppint (tty); */
-; 		/
-;
-; 	slave4:
-;
-; 	hl = tty + (bc = TTSIZE) -> tty;	/* tty++ */
-;
-; 	a = irr & IRA1; jz slave5	/* ACE # 1 */
-; 		/
-; 		h = MACE1; call doace;
-; 		/
-;
-; 	slave5:
-;
-; 	hl = tty + (bc = TTSIZE) -> tty;	/* tty++ */
-; 	a = irr & IRA2; jz slave6	/* ACE #2 */
-; 		/
-; 		h = MACE2; call doace;
-; 		/
-;
-; 	slave6:
-;
-; 	hl = tty + (bc = TTSIZE) -> tty;	/* tty++ */
-;
-; 	a = irr & IRA3; jz slave7	/* ACE #3 */
-; 		/
-; 		h = MACE3; call doace;
-; 		/
-;
-; 	slave7:
-;
-; 	hl = tty + (bc = TTSIZE) -> tty;	/* tty++ */
-;
-; 	return;
-; 	/
-;
-doslave:
-	ld	a,(miobase)
-	add	a,SELECT
-	ld	(slave0),a
-	ld	a,(miobase)
-	add	a,OCW3
-	ld	(slave1),a
-	ld	(slave2),a
-	ld	a,PENABLE
-	.defb	0xD3
-slave0:
-	.defb	SELECT
-	ld	a,GETIRR
-	.defb	0xD3
-slave1:
-	.defb	OCW3
-	.defb	0xDB
-slave2:
-	.defb	OCW3
-	ld	(irr),a
-slave3:
-	ld	a,(irr)
-	and	IRP
-	jp	z,slave4
-	ld	hl,(tty)	; hl = tty (arg0)
-	call	_ppint
-slave4:
-	ld	hl,(tty)
-	ld	bc,TTSIZE
-	add	hl,bc
-	ld	(tty),hl
-	ld	a,(irr)
-	and	IRA1
-	jp	z,slave5
-	ld	h,MACE1
-	call	doace
-slave5:
-	ld	hl,(tty)
-	ld	bc,TTSIZE
-	add	hl,bc
-	ld	(tty),hl
-	ld	a,(irr)
-	and	IRA2
-	jp	z,slave6
-	ld	h,MACE2
-	call	doace
-slave6:
-	ld	hl,(tty)
-	ld	bc,TTSIZE
-	add	hl,bc
-	ld	(tty),hl
-	ld	a,(irr)
-	and	IRA3
-	jp	z,slave7
-	ld	h,MACE3
-	call	doace
-slave7:
-	ld	hl,(tty)
-	ld	bc,TTSIZE
-	add	hl,bc
-	ld	(tty),hl
-	ret
-
-; ------- A-NATURAL SOURCE: doace -------
-; /* service one ACE on a slave board */
-; /* h contains the ace # */
-;
-; doace:
-; 	a = miobase + SELECT -> ace1;
-; 	a = h; out; ace1: SELECT     /* select proper group */
-;
-; 	a = miobase + IIR -> ace2;
-; 	in; ace2: IIR;			/* read _int _id _reg */
-;
-; 	a :: OUTINT;  jnz ace3;
-; 		/
-; 		a = miobase + USTATUS -> ace9;	/* if (!ready) return; */
-; 		in; ace9: USTATUS; a & EMPTY; rz;
-;
-; 		hl = tty -> bc;		/* bc = tty; */
-; 		a = *(hl = MODE[1] + bc) & SHAKE; jz ace4;
-; 			/
-; 			ace5 = (a = miobase + MSTATUS);
-;
-; 			in; ace5: MSTATUS; a & CLR2SND; jnz ace4;
-; 				/
-; 				ace51 = (a = miobase + UABLE);
-; 				a = ODSABLE; out; ace51: UABLE;
-; 				return;
-; 				/
-; 			/
-;
-; 		ace4:
-; 		hl = tty => sp; call _ttyout; sp => af;
-; 		return;
-; 		/
-; ace3:
-; 	a :: MODINT; jnz ace6;
-; 		/
-; 		hl = tty => sp; call _mumint;	/* mumint (tty); */
-; 		sp => af;
-; 		ret;
-; 		/
-;
-;
-;
-;
-; /*		ace7 = (a = miobase + MSTATUS);
-;  *		in; ace7: MSTATUS; a & CLR2SND; rz;
-;  *			/
-;  *			hl = tty => sp; call _cstart; sp => af;
-;  *			/
-;  *		return;
-;  *		/
-;  */
-;
-;
-; 	ace6:
-; 	a :: ININT; rnz
-; 		/
-; 		ace8 = (a = miobase); /* + UDATA */
-; 		in; ace8: UDATA; b = 0; c = a;
-;
-; 		hl = tty => sp;
-; 		bc => sp;
-;
-; 		call _ttyin;		/* ttyin (c, tty); */
-; 		sp => af => af;
-;
-; 		return;
-; 		/
-; 	/
-;
-doace:
-	ld	a,(miobase)
-	add	a,SELECT
-	ld	(ace1),a
-	ld	a,h
-	.defb	0xD3
-ace1:
-	.defb	SELECT
-	ld	a,(miobase)
-	add	a,IIR
-	ld	(ace2),a
-	.defb	0xDB
-ace2:
-	.defb	IIR
-	cp	OUTINT
-	jp	nz,ace3
-	ld	a,(miobase)
-	add	a,USTATUS
-	ld	(ace9),a
-	.defb	0xDB
-ace9:
-	.defb	USTATUS
-	and	EMPTY
-	ret	z
-	ld	hl,(tty)
-	ld	c,l
-	ld	b,h
-	ld	hl,MODE+1
-	add	hl,bc
-	ld	a,(hl)
-	and	SHAKE
-	jp	z,ace4
-	ld	a,(miobase)
-	add	a,MSTATUS
-	ld	(ace5),a
-	.defb	0xDB
-ace5:
-	.defb	MSTATUS
-	and	CLR2SND
-	jp	nz,ace4
-	ld	a,(miobase)
-	inc	a
-	ld	(ace51),a
-	ld	a,ODSABLE
-	.defb	0xD3
-ace51:
-	.defb	UABLE
-	ret
-ace4:
-	ld	hl,(tty)	; hl = tty (arg0)
-	call	_ttyout
-	ret
-ace3:
-	cp	MODINT
-	jp	nz,ace6
-	ld	hl,(tty)	; hl = tty (arg0)
-	call	_mumint
-	ret
-ace6:
-	cp	ININT
-	ret	nz
-	ld	a,(miobase)
-	ld	(ace8),a
-	.defb	0xDB
-ace8:
-	.defb	UDATA
-	ld	b,0
-	ld	c,a		; bc = char
-	ld	hl,(tty)
-	push	hl		; push tty (arg1)
-	ld	l,c
-	ld	h,b		; hl = char (arg0)
-	call	_ttyin
-	pop	af		; drop tty
 	ret
 
 ; ------- A-NATURAL SOURCE: endint -------

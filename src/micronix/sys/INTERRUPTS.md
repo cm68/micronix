@@ -47,14 +47,27 @@ That `card` argument is why `hwsim/d1/hdca.c` can say
 sit on VI0 with different card ids, and clearing one does not clear the
 other. `set_vi` calls the `vi_change` hook only on an actual transition.
 
-| Line | Owner | Registered at |
-|------|-------|---------------|
-| VI0 | hard disk (hdca / hddma) | `multio.c` `reg_intbit(0, "hd")` |
-| VI1 | djdma floppy | `reg_intbit(1, "djdma")` |
-| VI2 | slave MultIO | `reg_intbit(2, "slave")` |
-| VI3-5 | the three 8250 ACEs | `ace_init(i, name, 3 + i)` |
-| VI6 | master parallel port | disabled at the PIC, see `mio.s` |
-| VI7 | RTC clock tick | `reg_intbit(7, "clock")` |
+Only three of the eight are bus lines. The MultIO's jumper area brings VI0,
+VI1 and VI2 to the PIC's inputs 0, 1 and 2, and that is the whole of what a
+card elsewhere on the bus can interrupt through. The other five inputs go to
+devices on the board itself — the three ACEs, pin 5 of the parallel input
+port, and the clock's timed pulse — so they are not bus lines at all. The
+names below are therefore 8259 *input* numbers:
+
+| Input | Owner | Registered at |
+|-------|-------|---------------|
+| 0 | hard disk (hdca / hddma) | `multio.c` `reg_intbit(0, "hd")` |
+| 1 | djdma floppy | `reg_intbit(1, "djdma")` |
+| 2 | ide hard disk | `reg_intbit(2, "ide")` |
+| 3-5 | the three 8250 ACEs | `ace_init(i, name, 3 + i)` |
+| 6 | master parallel port | disabled at the PIC, see `mio.s` |
+| 7 | RTC clock tick | `reg_intbit(7, "clock")` |
+
+The simulator routes the board's own devices through `set_vi` as well —
+`ace_init` passes `3 + i`, and the clock passes 7 — which lands on the right
+IRR bit, because `multio_vi_change` is the bus hook and the bit it sets is
+the input number. It models a bus line the board does not bring in, though,
+and that is worth knowing before reading anything into a VI number.
 
 ## 2. The 8259 on the MultIO card
 
@@ -209,7 +222,7 @@ of `vectors`.
 |-------|---------|---------|
 | 0 | `_mwint` | hard disk |
 | 1 | `_djint` | floppy disk |
-| 2 | `slint` | slave MultIO |
+| 2 | `_ideint` | ide hard disk |
 | 3 | `m1int` | master ACE 1 |
 | 4 | `m2int` | master ACE 2 |
 | 5 | `m3int` | master ACE 3 |
@@ -250,8 +263,7 @@ The level just serviced drops to lowest priority, which is what makes the
 rotating scan in `multio_intack` fair across devices.
 
 The master is not in auto-EOI mode — `ICWORD4 := 014` is master + buffered
-with the auto-EOI bit clear, so the explicit write above is required. Only
-the slave uses auto-EOI (`SLICW4 := 016`).
+with the auto-EOI bit clear, so the explicit write above is required.
 
 ## 6. The user-mode path, end to end
 

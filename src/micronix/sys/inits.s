@@ -18,7 +18,6 @@
 ;  * absolute I/O addresses on the Master Mult I/O
 ;  */
 ; MBASE	:= 0x48		/base io address for master multiboard
-; SLBASE	:= 0x58
 ; MUDATA	:= MBASE	 /port for uart data
 ; MLOBAUD := MBASE	 /port for low byte of baud rate
 ; MUABLE	:= MBASE[1]	 /port to enable uart interrupts
@@ -92,11 +91,8 @@
 ; BOUND32 := 0340		/mask off least significant 5 bits
 ; ICWORD1 := 037		/level triggered, 4 byte vectors, 1 controller
 ; ICWORD4 := 014
-; SLICW4	:= 016		/* auto EOI */
-; ENDINT	:= 0240		/most recent interrupt is done, rotate priorities
 ;
 ; PENABLE := 050		/enable PIC and Paralell printer
-; PICONLY := 010
 ;
 ; MACE1	:= 051
 ; MACE2	:= 052
@@ -108,9 +104,7 @@
 ; /* the parallel port is diabled at the PIC int line */
 ;
 ;
-; ARMMASTER  := 0103	/allow interrupts 2 - 7 (ttys, clock, slaves)
-; ARMSLAVE:= 0307		/allow 3-5	(ACEs only)
-; GETIRR	:= 10
+; ARMMASTER  := 0103	/allow interrupts 2 - 7 (ttys, clock)
 ;
 ; CONNECT := 3		/data terminal ready, request to send
 ;
@@ -138,13 +132,12 @@
 ;
 	.data
 	.globl	_minit, _coninit
-	.extern	_di, _ei, _muopen, vectors, _nmio
+	.extern	_di, _ei, _muopen, vectors
 ; 
 ; /*
 ;  * port addresses of the Master Mult I/O
 ;  */
 ; MBASE := 0x48         /base io address for master multiboard
-; SLBASE        := 0x58
 ; MUDATA        := MBASE         /port for uart data
 ; MLOBAUD := MBASE       /port for low byte of baud rate
 ; MUABLE        := MBASE[1]      /port to enable uart interrupts
@@ -163,7 +156,6 @@
 ; MSELECT := MBASE[7]   /offset to select uart or _int controller
 
 MBASE=0x48		; base address of master mio
-SLBASE=0x58		; base address of slave mio
 
 MUDATA=MBASE+0		; uart data
 MUABLE=MBASE+1		; uart interrupt enables
@@ -178,12 +170,7 @@ MSELECT=MBASE+7		; uart group select
 
 UDATA=0
 UABLE=1
-ICW1=4
-ICW2=5
-ICW4=5
 SELECT=7
-OCW1=5
-OCW2=4
 TIMSET=0x08
 TIMSTRB=0x28
 CLKRATE=0x1C
@@ -191,13 +178,9 @@ CLKSTRB=0x3C
 BOUND32=0xE0
 ICWORD1=0x1F
 ICWORD4=0x0C
-SLICW4=0x0E
-ENDINT=0xA0
 PENABLE=0x28
-PICONLY=0x08
 INTSOFF=0xFF
 ARMMASTER=0x43
-ARMSLAVE=0xC7
 
 ; ------- A-NATURAL SOURCE: _minit -------
 ; _minit:			/Called from cus(). Interrupts must be _off
@@ -240,7 +223,6 @@ ARMSLAVE=0xC7
 ; 	a = d; out; ICNTRL1    /* send rest of address (ICW2) */
 ; 	a = ICWORD4; out; ICNTRL1 /* ICW4 */
 ; 	a = INTSOFF; out; ICNTRL1 /* disable int on master pic */
-; 	call findn;	/* set up slave mio's */
 ; 	call _ei;
 ;
 ; 	a = PENABLE; out; MSELECT	/* select PIC */
@@ -315,7 +297,6 @@ minit1:
 	out	(ICNTRL1),a
 	ld	a,INTSOFF
 	out	(ICNTRL1),a
-	call	findn
 	call	_ei
 	ld	a,PENABLE
 	out	(MSELECT),a
@@ -340,180 +321,4 @@ minit1:
 _coninit:
 	ld	hl,0x0101	; dev (arg0) in hl
 	call	_muopen
-	ret
-
-; ------- A-NATURAL SOURCE: findn -------
-; /* find the number of slave boards and */
-; /* initialize each of them */
-;
-; findn:
-;
-; 	b = 0;
-; 	find1 = (a = 0x58);
-;
-;
-; find2:
-; 	find0 = (a = find1 + 7);
-; 	a = 0; out; find0: SELECT;	/* group zero */
-;
-; 	in; find1: 0
-; 	a :: 0xff; jz find3	/* if (in (BASE) == 0xFF) break; */
-;
-;
-; /* yes, there is a slave mio board here */
-;
-; /* so initialize it */
-;
-; /* set up the output port numbers for all the out insructions */
-;
-;
-; a = find1 -> find10;				/* UDATA */
-; a = find1 + UABLE -> find11;
-; a = find1 + ICW1 -> find5 -> find17;
-; a = find1 + ICW2 -> find6->find7->find14;
-; a = find1 + SELECT -> find4->find9->find16;
-; a = find1 + 2 -> find15;
-;
-; a = 0; out; find16: SELECT;
-; in; find15: CLKCLR;		/* clear the clock latch */
-;
-;
-; /* clear and disable each of the 3 ACE's on this board */
-;
-;
-; c = 3			/* for (c = 3; c; c--) */
-; find12:
-; 	/
-; 	a = c; out; find9: SELECT;	/* select _grp */
-; 	in; find10: UDATA		/* read and discard a _char */
-; 	a ^ a; out; find11: UABLE;	/* no ACE _ints */
-; 	c - 1; jnz find12;		/* if (!--c) break; */
-; 	/
-;
-;
-;
-;
-; /* run the PIC initialization sequence */
-;
-;
-; call _di;
-;
-; a = PICONLY; out; find4: SELECT		/* select _grp 0 */
-; a = ICWORD1; out; find5: ICW1		/* ICW1 */
-; a = 0;	     out; find6: ICW2		/* ICW2 */
-; a = SLICW4; out; find7: ICW4		/* ICW4 */
-; a = ARMSLAVE; out; find14: OCW1;	/* enable 4 pic _int lines */
-; a = ENDINT; out; find17: OCW2;		/* reset the _int _pin */
-;
-; call _ei;
-;
-;
-;
-; 	b + 1;			/* nmio++; */
-;
-; 	find1 = (a = find1 + 0x10);	/* find1 += 0x10; (next mio) */
-;
-; 	jmp find2;
-;
-; find3:
-;
-; 	_nmio = (a = b);		/* nmio = b; */
-; 	return;
-; 	/
-;
-findn:
-	ld	b,0
-	ld	a,0x58
-	ld	(find1),a
-find2:
-	ld	a,(find1)
-	add	a,SELECT
-	ld	(find0),a
-	ld	a,0
-	.defb	0xD3		; out (n),a  -- port patched at runtime
-find0:
-	.defb	SELECT
-	.defb	0xDB		; in a,(n)  -- port patched at runtime
-find1:
-	.defb	0
-	cp	0xFF
-	jp	z,find3
-	ld	a,(find1)
-	ld	(find10),a
-	ld	a,(find1)
-	inc	a
-	ld	(find11),a
-	ld	a,(find1)
-	add	a,ICW1
-	ld	(find5),a
-	ld	(find17),a
-	ld	a,(find1)
-	add	a,ICW2
-	ld	(find6),a
-	ld	(find7),a
-	ld	(find14),a
-	ld	a,(find1)
-	add	a,SELECT
-	ld	(find4),a
-	ld	(find9),a
-	ld	(find16),a
-	ld	a,(find1)
-	add	a,2
-	ld	(find15),a
-	ld	a,0
-	.defb	0xD3
-find16:
-	.defb	SELECT
-	.defb	0xDB
-find15:
-	.defb	CLKCLR
-	ld	c,3
-find12:
-	ld	a,c
-	.defb	0xD3
-find9:
-	.defb	SELECT
-	.defb	0xDB
-find10:
-	.defb	UDATA
-	xor	a
-	.defb	0xD3
-find11:
-	.defb	UABLE
-	dec	c
-	jp	nz,find12
-	call	_di
-	ld	a,PICONLY
-	.defb	0xD3
-find4:
-	.defb	SELECT
-	ld	a,ICWORD1
-	.defb	0xD3
-find5:
-	.defb	ICW1
-	ld	a,0
-	.defb	0xD3
-find6:
-	.defb	ICW2
-	ld	a,SLICW4
-	.defb	0xD3
-find7:
-	.defb	ICW4
-	ld	a,ARMSLAVE
-	.defb	0xD3
-find14:
-	.defb	OCW1
-	ld	a,ENDINT
-	.defb	0xD3
-find17:
-	.defb	OCW2
-	call	_ei
-	inc	b
-	ld	a,(find1)
-	add	a,0x10
-	ld	(find1),a
-	jp	find2
-find3:
-	ld	a,b
-	ld	(_nmio),a
 	ret

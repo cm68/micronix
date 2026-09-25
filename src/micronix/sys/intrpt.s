@@ -22,7 +22,7 @@
 ; 	&0; &0; &0; &0;
 ;
 	.globl	vectors
-	.extern	intrupt, _mwint, _djint, slint, m1int, m2int
+	.extern	intrupt, _mwint, _djint, _ideint, m1int, m2int
 	.extern	m3int, m0int, clkint
 	.defw	0,0,0,0
 	.defw	0,0,0,0
@@ -42,7 +42,7 @@
 ;
 ; int0:	call intrupt; &_mwint		/see below
 ; int1:	call intrupt; &_djint		/floppy disk interrupt
-; int2:	call intrupt; &slint		/ slave Mult I/O (s)
+; int2:	call intrupt; &_ideint		/ide hard disk (was: slave Mult I/O)
 ; int3:	call intrupt; &m1int		/ Master ACE 1
 ; int4:	call intrupt; &m2int		/ Master ACE 2
 ; int5:	call intrupt; &m3int		/ Master ACE 3
@@ -53,6 +53,14 @@
 ; 	/call _mwint			/mw.c
 ;        /call _hdint			/wn.s
 ; 	/ret
+;
+; int2 answers the IDE card's drive, which is the only thing on the bus
+; that drives this line.  sys/ide.c's ideint() explains the choice.
+;
+; sys/scsi.c is a second driver for this line - an NCR 5380 host adapter
+; sharing VI2, with scsii2int() chaining both handlers in one entry - and
+; it is written but not linked.  The resident kernel has no room for it;
+; see its entry in sys/TODO.
 ;
 vectors:
 	.defb	0xC3		; jp int0 -- explicit, so asz won't relax jp to jr
@@ -87,7 +95,7 @@ int1:
 	.defw	_djint
 int2:
 	call	intrupt
-	.defw	slint
+	.defw	_ideint
 int3:
 	call	intrupt
 	.defw	m1int

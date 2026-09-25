@@ -90,12 +90,6 @@ static int ttinit();
 
 #define PENABLE 	050     /* parallel port enable */
 
-extern char nmio;               /* The number of mult I/O boards present */
-
-static unsigned char base = MBASE, hiport = MBASE, loport = MBASE;
-
-static unsigned char mother = 1;
-
 /*
  * Hardware fiddlers in mio.s
  */
@@ -122,13 +116,10 @@ muopen(dev, mode)
     register dev;
 {
     struct tty *tty;
-    char board;
 
     tty = ttdev(dev);
 
-    board = (dev & 15) >> 2;
-
-    if ((dev & 15) >= NMIO || board >= nmio + 1) {
+    if ((dev & 15) >= NMIO) {
         u.error = ENXIO;        /* No such dev. */
         return;
     }
@@ -385,25 +376,15 @@ mumstatus(dev)
 ppint(tty)
     register struct tty *tty;
 {
+    unsigned char dataport, strobeport;
 
     /*
-     * Find the I/O port base address for this interrupt.
-     * Bits 2 and 3 of the minor device number give the board desigation.
-     * The drivers supports at most 4 boards.
-     * The port addresses progress 16 per board.
-     * The following magic formula computes an I/O base address from a 
-     * device number.
+     * There is one Mult I/O board, at MBASE.  See if the printer is ready.
      */
 
-    base = MBASE + ((tty->dev & 014) << 2);
+    out(MBASE + MUSELECT, PENABLE);     /* select group zero */
 
-    /*
-     * see if the printer is ready
-     */
-
-    out(base + MUSELECT, PENABLE);      /* select group zero */
-
-    if ((in(base) & PREADY) == 0) {
+    if ((in(MBASE) & PREADY) == 0) {
         return;                 /* not ready */
     }
 
@@ -426,31 +407,28 @@ ppint(tty)
     }
 
     /*
-     * Determine which version of the multio we are dealing with. 
+     * The character and its strobe sit on the board's two parallel
+     * ports, but which is which depends on the board: a Wunderbuss I/O
+     * motherboard carries the character high, the Mult I/O board low.
+     * The port the board does not drive reads back 0xff, which is what
+     * tells the two apart.
      */
-    /*
-     * mother is set for wb I/O mother board style 
-     */
-    /*
-     * table top mom or mult I/O ? 
-     */
-
-    mother = (in(base + 1) != 0xff);
-
-    hiport = loport = base;
-
-    if (mother)
-        loport++;
-    else
-        hiport++;
 
 #define HIGH (~0)
 
-    out(loport, cookout(tty));  /* set the character */
+    if (in(MBASE + 1) != 0xff) {        /* wunderbuss mother board */
+        dataport = MBASE + 1;
+        strobeport = MBASE;
+    } else {                            /* mult I/O */
+        dataport = MBASE;
+        strobeport = MBASE + 1;
+    }
 
-    out(hiport, HIGH);          /* strobe it out */
-    out(hiport, HIGH ^ PSTROBE);
-    out(hiport, HIGH);
+    out(dataport, cookout(tty));        /* set the character */
+
+    out(strobeport, HIGH);              /* strobe it out */
+    out(strobeport, HIGH ^ PSTROBE);
+    out(strobeport, HIGH);
 }
 
 #define MBASE (0x48)

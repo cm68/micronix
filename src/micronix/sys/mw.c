@@ -28,6 +28,19 @@ static int error();
 #define RETRIES 10              /* no. of retries on r/w error */
 
 /*
+ * The row of specs[] that dev/devlist's hd<N>c nodes name, and so the
+ * type field of the device number mwopen builds for a drive's whole-disk
+ * slice.  It picks no row here: mws[] is keyed by drive and already
+ * holds the row the caller's minor named, so this one never reaches the
+ * controller, and the label's own sector is at cylinder 0 with no step
+ * to take.  It is part of the *name* of that sector and nothing else -
+ * and the label is read and written as the disk block it is, so a tool
+ * opening hd0c and this driver reading drive 0's label must name it the
+ * same way, or the cache will hold two copies of the one sector.
+ */
+#define HDCROW  2
+
+/*
  * Drive specfications.
  * Copied into info structure (below) during open.
  */
@@ -48,23 +61,32 @@ struct spec
 };
 
 /*
- * Drive configuration information
+ * Drive configuration information, one per drive.
+ *
+ * The first seven fields are struct dlgeom (sys/dlabel.h), in its order
+ * and of its types, because sys/dlabel.c decodes the label through a
+ * view of them - mwopen passes this struct as one.  The timings and the
+ * bookkeeping below them are this driver's own and may be moved freely;
+ * moving any of the seven breaks the decode in a way the compiler will
+ * not report.
  */
 struct info
 {
     UINT tracks;                /* number of tracks per surface */
     UINT8 heads;                /* number of heads */
     UINT8 sectors;              /* number of sectors per track */
+    UINT maxblk;                /* max legal block number in the slice */
+    UINT spc;                   /* number of sectors per cylinder */
+    UINT roll;                  /* what mwcyl adds to blk / spc */
+    UINT cylstart;              /* first cylinder of the slice being read */
+
     UINT8 stpdel;               /* delay between step pulses, 100 us */
     UINT precomp;               /* track where precomp begins */
     UINT lowcur;                /* track where low current begins */
-
-    UINT maxblk;                /* max legal block number */
-    UINT spc;                   /* number of sectors per cylinder */
-    UINT roll;                  /* what mwcyl adds to blk / spc */
     UINT curtrk;                /* current track */
     UINT8 flags;                /* see below */
     UINT8 type;                 /* index into specs table above */
+    UINT8 slice;                /* the slice this open is bound to */
 } mws[NDRIVES] = 0;
 
 /*
@@ -159,13 +181,6 @@ static UINT8 retry = 0,         /* number of retries so far */
     mwstate = 0;                /* see below */
 
 /*
- * Where the disk label lands when mwopen reads it.  One 512 byte sector,
- * held statically so it costs nothing in the kernel image beyond the bss
- * it already has room for.
- */
-static char labelbuf[512] = 0;
-
-/*
  * States for mwstate (above)
  */
 #define VIRGIN	0
@@ -178,24 +193,33 @@ static char labelbuf[512] = 0;
 /*
  * Device open
  *
- * The geometry comes off the disk, from the label mkfs writes into the
- * second half of the boot sector (physical cylinder 0, head 0, sector 0).
- * The compiled-in specs[] table is a starting point and a thing to compare
- * against, not the answer: a drive whose minor number names the wrong row
- * is detected here, and a drive with no table row at all is still mounted
- * from the label alone.
+ * Two things can say what the drive is, and they are not equal.  The disk
+ * can say: the label mkfs writes at physical cylinder 0, head 0, sector 0
+ * is marked with a magic number and sits at the one address that can be
+ * found knowing nothing at all, so if it is there it is believed and
+ * used.  The minor number can say: it names a row of specs[] below, which
+ * is what is fallen back on for a disk laid down by something that wrote
+ * no label.  Neither is a reason to refuse on its own - a disk with a
+ * label mounts from the label whatever the minor names, and a minor
+ * naming no row mounts from the label alone.  Only a disk with neither is
+ * refused, because then there is no geometry and no block number can be
+ * mapped at all.
+ *
+ * The label itself, and the slice it names, are decoded in sys/dlabel.c,
+ * which knows nothing about this controller - what is here is the table
+ * that stands in for a label, and the handling of a disk that has none.
  */
 mwopen(dev, mode)
     UINT dev, mode;
 {
     static struct info *info;
-    static struct dlabel *lp;
     static UINT8 drive, type;
-    static UINT nspec;
+    static UINT nspec, sl;
     static struct buf *b;
 
     drive = dev & 3;
-    type = minor(dev) >> 2;
+    type = devtype(dev);
+    sl = devslice(dev);
     if (drive >= NDRIVES) {
         u.error = ENXIO;
         return;
@@ -205,19 +229,43 @@ mwopen(dev, mode)
         u.error = ENXIO;
         return;
     }
-    if (info->flags & OPEN)
+    /*
+     * One mapping per drive, not one per open - mws[] is keyed by drive
+     * and holds the slice's offset and roll - so a second open asking for
+     * a different slice would be served the first one's mapping and would
+     * read and write the wrong cylinders while reporting success.  That
+     * is the one failure this format is meant to make impossible, so it
+     * is refused.  The same slice, or the same minor, is the same mapping
+     * and is let through as before.
+     */
+    if (info->flags & OPEN) {
+        if (info->type != type || info->slice != sl)
+            u.error = EBUSY;
         return;
+    }
     info->type = type;
+    info->slice = sl;
 
     /*
-     * A starting geometry.  If the minor names a real row in specs[],
-     * copy it; otherwise leave the geometry zero and pick conservative
-     * controller tuning - the label carries only tracks/heads/spt/roll
-     * and not the three drive-specific timings.
+     * What the minor number says the drive is.  If it names a real row in
+     * specs[], copy it, geometry and timing together; otherwise leave the
+     * geometry zero and pick conservative controller tuning - the label
+     * carries only tracks/heads/spt/roll and not the three drive-specific
+     * timings.  The label, if there is one, replaces the geometry below
+     * either way; the timing is never the label's to give.
+     *
+     * The fields are copied one by one rather than as a block: struct
+     * info is struct dlgeom first (above) and struct spec is not, so the
+     * two no longer start alike.
      */
     nspec = sizeof specs / sizeof specs[0];
     if (type < nspec) {
-        copy(&specs[type], info, sizeof(struct spec));
+        info->tracks = specs[type].tracks;
+        info->heads = specs[type].heads;
+        info->sectors = specs[type].sectors;
+        info->stpdel = specs[type].stpdel;
+        info->precomp = specs[type].precomp;
+        info->lowcur = specs[type].lowcur;
         info->roll = info->tracks >> 1;
     } else {
         info->tracks = 0;
@@ -230,47 +278,46 @@ mwopen(dev, mode)
     }
 
     /*
-     * The label, read straight off cylinder 0 before any block is mapped
-     * - the mapping needs the geometry the label holds, so this has to be
-     * a raw read and not a bread().
+     * The label, as block 0 of this drive's 'c'.  The device number is
+     * built here rather than taken from dev, because the type field of a
+     * 'c' number is not the caller's - it names the same sector devlist's
+     * hd<N>c node names, so that a tool labelling this drive and this
+     * open reading it hold one cache entry between them rather than two
+     * copies of one sector.
      */
-    if (mwreadlabel(drive, labelbuf)) {
-        lp = (struct dlabel *)&labelbuf[DL_OFFSET];
-        if (lp->d_magic[0] == DL_MAGIC[0] && lp->d_magic[1] == DL_MAGIC[1] &&
-            lp->d_magic[2] == DL_MAGIC[2] && lp->d_magic[3] == DL_MAGIC[3] &&
-            lp->d_tracks && lp->d_heads && lp->d_spt) {
-            /*
-             * Say so when the label and the table disagree: this is the
-             * disagreement that used to mount the wrong geometry.
-             */
-            if (type < nspec &&
-                (lp->d_tracks != specs[type].tracks ||
-                 lp->d_heads != specs[type].heads ||
-                 lp->d_spt != specs[type].sectors))
-                pr("mw%d: label %d/%d/%d disagrees with table %d/%d/%d, using label\n",
-                    drive, lp->d_tracks, lp->d_heads, lp->d_spt,
-                    specs[type].tracks, specs[type].heads, specs[type].sectors);
-
-            info->tracks = lp->d_tracks;
-            info->heads = lp->d_heads;
-            info->sectors = lp->d_spt;
-            info->roll = lp->d_roll;
-        } else if (type >= nspec) {
-            /*
-             * No table row and no label: there is no geometry at all,
-             * so no block number can be mapped.
-             */
+    switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | (HDCROW << 2) | drive,
+                    sl, (struct dlgeom *)info)) {
+    case -1:
+        return;                 /* no such slice; dllabel set u.error */
+    case 0:
+        /*
+         * No label on the disk.  A row of the table above stands for
+         * one, and that is what a disk laid down by something that wrote
+         * no label gets.  A disk with neither - no row and no label -
+         * has no geometry at all, and then no block number can be
+         * mapped.
+         */
+        if (type >= nspec) {
             u.error = ENXIO;
             return;
         }
-        /* else: no label but a table row - the copy above already stands */
-    } else if (type >= nspec) {
-        u.error = ENXIO;
-        return;
+        break;
+    default:
+        /*
+         * Say so when the label and the table disagree.  The disk decides
+         * how it is laid out and that is what is used, but the timing
+         * above came from the row the minor named, and timing from the
+         * wrong row is a seek that quietly misses.
+         */
+        if (type < nspec &&
+            (info->tracks != specs[type].tracks ||
+             info->heads != specs[type].heads ||
+             info->sectors != specs[type].sectors))
+            pr("mw%d: label %d/%d/%d disagrees with table %d/%d/%d, using label\n",
+                drive, info->tracks, info->heads, info->sectors,
+                specs[type].tracks, specs[type].heads, specs[type].sectors);
     }
 
-    info->maxblk = info->tracks * info->heads * info->sectors - 1;
-    info->spc = info->heads * info->sectors;
     if ((b = bread(1, dev)) != 0) {
         info->flags |= OPEN;
         brelse(b);
@@ -298,61 +345,15 @@ mwclose(dev)
 }
 
 /*
- * Read the boot sector - physical cylinder 0, head 0, sector 0 - the one
- * sector reachable without knowing the geometry.  The block mapping in
- * rwcmd needs the geometry this sector carries, so this bypasses it: the
- * controller is reset, the drive homed, and one 512 byte sector read
- * straight into buf, all synchronous.  Interrupts stay off through the
- * spin so the completion interrupt cannot run into the not-yet-queued
- * mwbuf, and the drive is left calibrated and stopped for the normal
- * strategy path that follows.
- *
- * Returns 1 if the sector was read, 0 otherwise.
+ * Reading the label used to be its own synchronous sequence here - reset,
+ * load constants, home, one read, with interrupts off throughout - to get
+ * the boot sector in before any block could be mapped.  It does not have
+ * to be: the label sits at block 0 of the drive's 'c', which is a block
+ * number like any other, and the strategy path below calibrates itself on
+ * the first request it is given (mwstart, on VIRGIN).  So the label is
+ * read with a bread() of that block and this driver has one path to a
+ * sector instead of two.  sys/dlabel.c does the reading.
  */
-mwreadlabel(drive, buf)
-    UINT8 drive;
-    char *buf;
-{
-    reset();
-    curdrv = drive;
-    mwinfo = &mws[drive];
-
-    di();
-    cmd.steps = 0;
-    cmd.seksel = drive;
-    cmd.hedsel = drive;
-    cmd.arg2 = SETTLE;
-    cmd.arg3 = SECSIZE;
-    cmd.arg0.byte.high = HOMDEL;    /* no INT: mwwait() spins, nothing to interrupt */
-    cmd.hedsel |= LCONST;
-    cmd.op = LOAD;
-    mwwait();
-
-    cmd.steps = -1;
-    cmd.seksel = drive | STEPOUT;
-    cmd.op = HOME;
-    mwwait();
-    mwinfo->curtrk = 0;
-
-    cmd.steps = 0;
-    cmd.seksel = drive;
-    cmd.hedsel = drive | ((~0 & 7) << 2);
-    cmd.arg0.word = 0;          /* cylinder 0 */
-    cmd.arg2 = 0;               /* head 0 */
-    cmd.arg3 = 0;               /* sector 0 */
-    cmd.dma = (UINT)buf;
-    cmd.xdma = KERNEL;
-    cmd.count = 512;
-    cmd.op = READS;
-    mwwait();
-
-    mwinfo->flags |= CALIB;
-    mwstate = STOPPED;
-    ei();
-
-    mwcheck();                  /* the watchdog reset() starts normally */
-    return (cmd.stat == OK);
-}
 
 /*
  * Strategy
@@ -389,7 +390,7 @@ mwstart()
         return;
     if (mwstate == VIRGIN) {
         reset();
-        mwcheck();              /* start timeout "daemon" */
+        mwgoose();              /* start timeout "daemon" */
     }
     cmd.steps = 0;
     cmd.arg0.byte.high = INT;
@@ -529,6 +530,12 @@ newdrv()
  */
 newrw()
 {
+    /*
+     * The buffer's block number is a filesystem block and stays one.  The
+     * slice's cylinder offset is added in mwcyl, after the division that
+     * turns a block into a cylinder, so nothing here has to hold a device
+     * block number - which is what a large drive could not be counted in.
+     */
     cmd.blk = mwbuf->blk;
     cmd.dma = mwbuf->data;
     cmd.xdma = mwbuf->xmem;
@@ -577,6 +584,17 @@ rwcmd()
     issue();
 }
 
+/*
+ * Which cylinder a filesystem block lands on.
+ *
+ * The block's cylinder is its number divided by the sectors per cylinder,
+ * shifted by the slice it lives in and rotated by d_roll.  Both terms are
+ * cylinders and both are added after the division, so neither is ever a
+ * block number: a slice's position on a large drive could not be one.
+ * On every disk made before slices the slice term is zero and the
+ * rotation is tracks >> 1, which is byte for byte what this has always
+ * computed.
+ */
 mwcyl(blk, info)
     UINT blk;
     struct info *info;
@@ -584,6 +602,7 @@ mwcyl(blk, info)
     static UINT cyl;
 
     cyl = blk / info->spc;
+    cyl += info->cylstart;
     cyl += info->roll;
     if (cyl >= info->tracks)
         cyl -= info->tracks;
@@ -654,8 +673,28 @@ mwwait()
 }
 
 /*
+ * Start the timeout watchdog, once, however many times a disk is opened.
+ * mwcheck() re-arms itself and is never stopped, so it is started rather
+ * than armed, and a second start leaves a second chain of it in tlist[]
+ * for the rest of the boot, each turn of the clock spending another slot
+ * - and tlist[] has five slots for the whole kernel.  Four opens of an
+ * mw disk (the root device's is one, and a labeler opens the disk it is
+ * labelling) would fill the table, and the next timer to arm would find
+ * nowhere to go.  This is the one owner of the watchdog.
+ */
+static char mwarmed = 0;
+
+mwgoose()
+{
+    if (mwarmed)
+        return;
+    mwarmed = 1;
+    mwcheck();
+}
+
+/*
  * Simulate missing timeout hardware.
- * Started by mwstart(). Self-continuing.
+ * Started once by mwgoose(). Self-continuing.
  */
 mwcheck()
 {

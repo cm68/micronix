@@ -8,14 +8,6 @@ c 1 1 console
 c 1 1 ttyA
 c 1 2 ttyB
 c 1 3 ttyC
-c 1 4 diab1
-c 1 5 ttyD
-c 1 6 ttyE
-c 1 7 ttyF
-c 1 8 diab2
-c 1 9 ttyG
-c 1 10 ttyH
-c 1 11 ttyI
 c 1 16 cent0
 c 2 0 mem
 c 3 0 io
@@ -43,3 +35,18 @@ b 3 8 m16a
 b 3 9 m16b
 b 3 10 m16c
 b 3 11 m16d
+b 4 0 ide0
+b 4 1 ide1
+#
+# The whole-disk slice, 'c': the drive at cylinder 0 with no roll, so its
+# block 0 is physical block 0 and reading it is reading the label.  The
+# minor is the slice and the type in the high bits as everywhere else -
+# 72 is slice 2 of the m16 row (2), drive 0; the IDE card has one board,
+# so its type bits are zero.  This is the slice label(1) opens.
+#
+b 3 72 hd0c
+b 3 73 hd1c
+b 3 74 hd2c
+b 3 75 hd3c
+b 4 64 ide0c
+b 4 65 ide1c

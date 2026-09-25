@@ -97,6 +97,7 @@ int ncalls = sizeof(syssw) / sizeof(struct syscall);
 extern int nodev(), nulldev(), nullwrite();
 extern int djopen(), djclose(), djstrat();
 extern int mwopen(), mwclose(), mwstrat();
+extern int ideopen(), ideclose(), idestrat();
 extern int muopen(), muclose(), muread(), muwrite(), mustty();
 extern int kread(), kwrite(), ioread(), iowrite();
 extern int djmopen(), djmclose(), djmread(), djmwrite(), djstty();
@@ -105,7 +106,7 @@ extern int djmopen(), djmclose(), djmread(), djmwrite(), djstty();
  * (and so in the u page); a char * array would leave them as .text string
  * literals, and upage.o's linker placement has no room for text. */
 char devname[][11] = {
-    "nodev", "hdca(rev4)", "djdma", "hddma",
+    "nodev", "hdca(rev4)", "djdma", "hddma", "ide",
 };
 
 /* Device 0 must be nodev. */
@@ -114,6 +115,7 @@ struct biovec biosw[] = {
     &nodev, &nodev, &nodev,             /* 1 = HDCA - removed, obsolete */
     &djopen, &djclose, &djstrat,        /* 2 = DJ-DMA */
     &mwopen, &mwclose, &mwstrat,        /* 3 = HD-DMA */
+    &ideopen, &ideclose, &idestrat,     /* 4 = IDE (ATA), PIO only */
 };
 
 struct ciovec ciosw[] = {
