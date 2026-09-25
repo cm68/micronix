@@ -201,8 +201,8 @@ rather than gaining a row.
 sys/scsi.c is an NCR 5380 SCSI host adapter, written and compiling
 clean, and NOT LINKED.  It does not fit.
 
-The driver is 4241 bytes (text 3636, data 540, bss 65) and the resident
-kernel has 3086 to spare - short by 1155.  The budget, measured on the
+The driver is 3241 bytes (text 3034, data 146, bss 61) and the resident
+kernel has 3086 to spare - short by 155.  The budget, measured on the
 linked image (mxnm unix, and mxnm -b on the folds; the same numbers are
 the first sixteen bytes of unix, a Whitesmiths header - text 0x8cff,
 data 0x5fdf, bss 0x275, text_base 0x1000, data_base 0x9cff):
@@ -211,7 +211,7 @@ data 0x5fdf, bss 0x275, text_base 0x1000, data_base 0x9cff):
 	-Shigh parks highmem.o (2202 bytes) AFTER bss, and win.o is
 	pinned at 0xe000, so the link wants _ebss <= 0xe000-2202 = 0xd766
 	0xd766 - 0xcb58 = 3086 bytes of headroom
-	4241 - 3086 = 1155 bytes short
+	3241 - 3086 = 155 bytes short
 
 That is the link's budget.  The pool is a second one, and it is much
 tighter, because MAXBUFS (256, main.c) now binds before BUFWIN does:
@@ -219,16 +219,20 @@ blist's 8 boot headers at 0xcab0 plus 248 minted off _ebss end at
 0xdfb0, 80 bytes under 0xe000.  So the pool is full: the first 80 bytes
 of growth are free, and every 21 after that costs one buffer.  1K of new
 driver costs 44 of the 256; a driver that used the whole 3086 would
-leave 112.  scsi.o never gets that far - it overruns the link by 1155
-before the pool is reached - but the count is the one to watch, because
-it is the resource that runs out first.  The resident kernel's space is
-bounded by memory; its cache is bounded by MAXBUFS.
+leave 112.  scsi.o is now close enough to that ceiling to be worth
+saying which side it is on: at 3241 it is 155 over the link, and if it
+were trimmed to 3086 it would arrive with a pool of about 112 buffers.
+The resident kernel's space is bounded by memory; its cache is bounded
+by MAXBUFS.
 
 Room for this was bought once already, by moving code rather than
 deleting it: mw.c's and ide.c's separate label decodes became
 sys/dlabel.c and the two 512-byte labelbufs went away, which is
-text -580, data -1024, bss +66 and _ebss down 1538.  The same lever is
-what option 2 below means.
+text -580, data -1024, bss +66 and _ebss down 1538.  scsi.c has since
+been moved onto the same decode - it had the third copy of it, and its
+own 512-byte labelbuf - and that is text -602, data -394, bss -4, so
+scsi.o went 4241 -> 3241 and the shortfall 1155 -> 155.  The same lever
+is what option 2 below means, and it is the one that has worked.
 
 KMEM.md's layout map carries these numbers too - it is the place to read
 the shape rather than recompute it, and it went stale by about 3.8K once
@@ -240,11 +244,15 @@ upage.o is 3294 + 629 of 4096.
 
 What is wired and what is not.  scsi.c is complete: ports 0x40-0x47, a
 READ(10)/WRITE(10) command path, selection, the REQ/ACK handshake, the
-label read and the slice mapping ide.c uses, and scsii2int() to share
-VI2 with the IDE card.  What is NOT in the tree is the three lines that
-put it in the kernel - scsi.o in KERNEL_C in GNUmakefile, an extern /
-devname / biosw row in consts.c (major 5), and int2 pointing at
-_scsii2int in intrpt.s.  intrpt.s carries a note saying where it went.
+label decode out of sys/dlabel.c and the slice mapping ide.c uses, and
+scsii2int() to share VI2 with the IDE card.  What is NOT in the tree is
+the three lines that put it in the kernel - scsi.o in KERNEL_C in
+GNUmakefile, an extern / devname / biosw row in consts.c (major 5), and
+int2 pointing at _scsii2int in intrpt.s.  intrpt.s carries a note saying
+where it went.  There is a fourth line for the day it does link:
+dev/devlist has no scsi node yet, and the target is the low three bits
+of the minor, so scsi0..scsi7 are b 5 0..7 and the whole-disk slices
+scsi0c..scsi7c are b 5 64..71.
 
 The three ways it could be made to fit, none of them taken:
 
@@ -252,11 +260,12 @@ The three ways it could be made to fit, none of them taken:
      the way DEBUGBUFS is already an option.  A machine has one hard
      disk controller.  Needs a rootdev decision in main.c too.
 
-  2. reclaim ~1.2K elsewhere.  Nothing obvious turned up: main.c's
-     tables (plist, ilist, flist, mlist) are all live, and the drivers
-     are all doing something.  dlabel.c is what a reclaim looks like
-     when it works - the two label decodes were one decode written
-     twice, and the second copy was not free.
+  2. reclaim ~155 bytes elsewhere, or ~1.2K to leave a pool worth
+     having.  Nothing obvious turned up in the kernel: main.c's tables
+     (plist, ilist, flist, mlist) are all live, and the drivers are all
+     doing something.  dlabel.c is what a reclaim looks like when it
+     works - three label decodes were one decode written thrice, and the
+     copies were not free.
 
   3. sys/overlay.md, which names the SCSI driver as its motivating case
      and was written for exactly this wall.

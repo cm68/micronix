@@ -12,14 +12,23 @@
  * Changed: <2026-09-25 curt>
  *
  * NOT LINKED.  This driver compiles clean but nothing builds it - the
- * resident kernel has no room for its 4241 bytes, and the link fails
+ * resident kernel has no room for its 3241 bytes, and the link fails
  * with "objects out of address order (data)" when scsi.o is added to
- * KERNEL_C.  sys/TODO has the measured budget and the three ways it
- * could be made to fit; sys/overlay.md is the one written for this.
+ * KERNEL_C.  155 bytes short, and the buffer pool is the tighter budget
+ * of the two; sys/TODO works both out and names the three ways it could
+ * be made to fit, and sys/overlay.md is the one written for this.
  *
  * Wiring it up is three lines: scsi.o in KERNEL_C (GNUmakefile), an
  * extern, a devname and a biosw row at major 5 (consts.c), and int2
- * pointing at _scsii2int instead of _ideint (intrpt.s).
+ * pointing at _scsii2int instead of _ideint (intrpt.s).  A fourth is
+ * dev/devlist, which has no scsi node: the target is the low three bits
+ * of the minor, so scsi0..scsi7 are b 5 0..7 and scsi0c..scsi7c are the
+ * whole-disk slices at b 5 64..71.
+ *
+ * The label decode is sys/dlabel.c's, shared with mw.c and ide.c, so
+ * what a slice means is decided in one place - which matters more here
+ * than the bytes it saves, since a disk read by one driver and written
+ * by another is the failure the label exists to prevent.
  *
  * Terms used throughout, in the order they first matter:
  *
@@ -106,12 +115,14 @@
  * returns at once when its card has nothing in flight.
  *
  * The shape of the driver is ide.c's, because the filesystem is the same
- * one.  Open reads the disk label mkfs writes into the boot sector, the
- * block mapping is the same one (a cylinder is blk/spc shifted by the
- * slice the minor names and rotated by d_roll, wrapped at tracks)
- * flattened the way lib/fslib.c flattens it, and the strategy routine is
- * the same entry point with the same contract.  A volume laid out for the
- * HD-DMA therefore reads back block for block here.
+ * one.  Open reads the disk label mkfs writes into the boot sector - the
+ * decode is sys/dlabel.c's, shared with mw.c and ide.c so that what a
+ * slice means is decided in one place - the block mapping is the same one
+ * (a cylinder is blk/spc shifted by the slice the minor names and rotated
+ * by d_roll, wrapped at tracks) flattened the way lib/fslib.c flattens it,
+ * and the strategy routine is the same entry point with the same contract.
+ * A volume laid out for the HD-DMA therefore reads back block for block
+ * here.
  *
  * What differs is that ide.c's drive is addressed by somebody else's
  * idea of where a block is, and this one by SCSI's own.  So the transfer
@@ -132,11 +143,13 @@
  * by default and the definitions say static.
  */
 static int scsibsy(), scsistart(), scsifinish();
-static int scsireadlabel(), scsireset(), scsiselect();
+static int scsireset(), scsiselect();
 
 /*
- * How many targets the bus can hold.  Eight is the bus's own limit and
- * not a choice: the select mask is one bit per id in a single byte.
+ * How many targets the bus can hold, and so how many rows scs[] below
+ * carries.  Eight is the bus's own limit and not a choice: the select
+ * mask is one bit per id in a single byte, and the target number is the
+ * low three bits of the minor.
  */
 #define NTARGET 8
 
@@ -431,10 +444,17 @@ static struct scsiif boards[] = {
 
 /*
  * Target configuration.  Unlike mw.c's info there is nothing in here that
- * the label does not carry: a SCSI disk is told an LBA and finds the
- * block itself, so there is no per-model table of step rates, write
- * precompensation and the rest.  What is here is the geometry the label
- * gave, and the mapping built from it.
+ * a table holds: a SCSI disk is told an LBA and finds the block itself, so
+ * there is no per-model row of step rates, write precompensation and the
+ * rest, and mw.c's table - which stands in for a label the disk does not
+ * have - has nothing to stand in for here.  What is here is the geometry
+ * sys/dlabel.c decoded, and the mapping built from it.
+ *
+ * The first seven fields are struct dlgeom (sys/dlabel.h), in its order
+ * and of its types, because sys/dlabel.c decodes the label through a view
+ * of them - scsiopen passes this struct as one.  The bookkeeping below
+ * them is this driver's own; moving any of the seven breaks the decode in
+ * a way the compiler will not report.
  */
 struct info
 {
@@ -449,26 +469,9 @@ struct info
     UINT8 flags;                /* see below */
     UINT8 type;                 /* index into boards[] */
     UINT8 slice;                /* the slice this open is bound to */
-} scs[] = 0;
+} scs[NTARGET] = 0;
 
 #define OPEN    2               /* target is open */
-
-/*
- * Where the disk label lands when scsiopen reads it.  The label is struct
- * dlabel (sys/dlabel.h) - a magic number and the disk's geometry - which
- * mkfs writes at DL_OFFSET into the boot sector, block 0.  It is how the
- * driver learns the geometry without a compiled-in table, and why block 0
- * is read before any block is mapped: the mapping is what the label is
- * for.
- *
- * One 512 byte block of the kernel's own memory, not a cache buffer.  A
- * cache buffer is only reachable through the window, and the window's
- * machinery wants a mounted filesystem; this has to work before one.
- * ide.c keeps the same buffer for the same reason, and it is one buffer
- * between them because only one of the two drivers is ever in a position
- * to read a label at a time.
- */
-static char labelbuf[512] = 0;
 
 /*
  * Wait for the bus to be free - BSY and SEL both down - and return the
@@ -952,28 +955,6 @@ scsilba(blk, info)
 }
 
 /*
- * Read block 0 and no other: the one block reachable knowing no geometry
- * at all, and where mkfs leaves the label.  The destination is the
- * kernel's own buffer rather than a cache buffer, so there is no window
- * to take.
- */
-static int
-scsireadlabel(ip, target, buf)
-    register struct scsiif *ip;
-    UINT8 target;
-    char *buf;
-{
-    if (scsistart(ip, target, 1, (UINT32)0, 1) < 0)
-        return (0);
-    if (scsiio(ip, buf, 512, 0) < 0) {
-        ip->busy = 0;
-        wakeup(ip);
-        return (0);
-    }
-    return (scsifinish(ip, target) == 0);
-}
-
-/*
  * Device open.
  *
  * A device number packs two things, the way every disk driver here does
@@ -986,16 +967,16 @@ scsireadlabel(ip, target, buf)
  * The geometry comes off the disk, from the label mkfs writes into the
  * second half of the boot sector, and there is no table to disagree with
  * it.  Block 0 is read before any block is mapped, because the mapping is
- * what the label is needed for.
+ * what the label is needed for; sys/dlabel.c does the reading, off block
+ * 0 of the drive's own 'c'.
  */
 scsiopen(dev, mode)
     UINT dev, mode;
 {
     static struct info *info;
-    static struct dlabel *lp;
     static struct scsiif *ip;
     static UINT8 target, type;
-    static UINT ncyl, sl;
+    static UINT sl;
     static struct buf *b;
 
     target = minor(dev) & 7;
@@ -1020,6 +1001,7 @@ scsiopen(dev, mode)
         return;
     }
     info->type = type;
+    info->slice = sl;
     ip = &boards[type];
 
     if (scsireset(ip) < 0) {
@@ -1027,30 +1009,38 @@ scsiopen(dev, mode)
         return;
     }
     /*
-     * The label, and there is nothing to fall back on.  A target that
-     * says nothing about itself is a target this driver cannot map, so it
-     * is refused rather than guessed at.  (A target can be asked directly,
-     * with INQUIRY and READ CAPACITY, which this driver does not send;
-     * that is what a fallback would be made of if one is ever wanted, and
-     * it is the one thing that would make an unlabelled disk usable.)
+     * The label, as block 0 of this target's own 'c'.  The device number
+     * needs no type field built into it the way mw.c's does - this card
+     * has one board and boards[] is indexed by a type that must be zero -
+     * so the target's 'c' is the target's number with the slice field set
+     * and nothing else moved: minor 64 + N, the scsi<N>c node dev/devlist
+     * would carry beside ide0c's 64 and for the same reason.
      */
-    if (!scsireadlabel(ip, target, labelbuf)) {
-        u.error = ENXIO;
-        return;
-    }
-
-    lp = (struct dlabel *)&labelbuf[DL_OFFSET];
-    if (lp->d_magic[0] != DL_MAGIC[0] || lp->d_magic[1] != DL_MAGIC[1] ||
-        lp->d_magic[2] != DL_MAGIC[2] || lp->d_magic[3] != DL_MAGIC[3] ||
-        !lp->d_tracks || !lp->d_heads || !lp->d_spt) {
+    switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | target,
+                    sl, (struct dlgeom *)info)) {
+    case -1:
+        return;                 /* no such slice; dllabel set u.error */
+    case 0:
         /*
-         * No label, and no table to fall back on either - so there is no
-         * geometry and no block can be mapped.  The exception is 'c',
-         * which needs no geometry to find block 0: it starts at cylinder
-         * 0 and is never rolled, so its block 0 is LBA 0, which is where
-         * this failed to find a label and where one can be written.  That
-         * is the whole of what the target permits until it has been: block
-         * 0 and nothing else, maxblk 0.
+         * No label, and nothing to fall back on: boards[] below holds
+         * the adapter's protocol and not a disk's geometry - the whole
+         * point of this card is that the geometry is the target's and not
+         * a table's.  mw.c has specs[] for a disk laid down before labels
+         * existed; a target that says nothing about itself is a target
+         * this driver cannot map, and it is refused rather than guessed
+         * at.  (A target can be asked directly, with INQUIRY and READ
+         * CAPACITY, which this driver does not send; that is what a
+         * fallback would be made of if one is ever wanted, and it is the
+         * one thing that would make an unlabelled disk usable.)
+         *
+         * The exception is 'c', which needs no geometry to find block 0:
+         * it starts at cylinder 0 and is never rolled, so its block 0 is
+         * LBA 0 - where this failed to find a label and where one can be
+         * written.  That is the whole of what the target permits until it
+         * has been: block 0 and nothing else, which is a geometry of no
+         * cylinders and a maxblk of 0.  (scsilba() answers LBA 0 for any
+         * block when the geometry is empty, and this is the only case
+         * that reaches it.)
          */
         if (sl != DL_WHOLE) {
             u.error = ENXIO;
@@ -1066,53 +1056,6 @@ scsiopen(dev, mode)
         info->flags |= OPEN;
         return;
     }
-    info->tracks = lp->d_tracks;
-    info->heads = lp->d_heads;
-    info->sectors = lp->d_spt;
-    info->roll = lp->d_roll;
-
-    /*
-     * The slice the minor number named.  Its offset is a cylinder, added
-     * in scsicyl after the division that turns a block into a cylinder, so
-     * it never has to be a block number - which is the point of it, since
-     * a block number is 16 bits and this is a disk that has more blocks
-     * than that.
-     */
-    if (sl == DL_WHOLE) {
-        info->cylstart = 0;
-        info->roll = 0;
-        ncyl = info->tracks;
-    } else {
-        info->cylstart = lp->d_slice[sl].d_off;
-        ncyl = lp->d_slice[sl].d_len;
-        if (info->cylstart >= info->tracks) {
-            u.error = ENXIO;
-            return;
-        }
-        if (ncyl == 0)
-            ncyl = info->tracks - info->cylstart;
-        /*
-         * A table naming more cylinders than the disk has is refused
-         * rather than wrapped, since wrapping would silently map the
-         * slice onto the front of the disk.
-         */
-        if (info->cylstart + ncyl > info->tracks) {
-            u.error = ENXIO;
-            return;
-        }
-    }
-    info->spc = info->heads * info->sectors;
-
-    /*
-     * A block number is a UINT, so 64K blocks is as far as anything above
-     * this driver can address, and a filesystem lives within one slice.  A
-     * slice longer than that is used up to the limit rather than wrapping
-     * the count.
-     */
-    if (ncyl > 0xffff / info->spc)
-        info->maxblk = 0xffff;
-    else
-        info->maxblk = ncyl * info->spc - 1;
 
     if ((b = bread(1, dev)) != 0) {
         info->flags |= OPEN;
