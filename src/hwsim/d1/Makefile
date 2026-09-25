@@ -21,9 +21,10 @@ TARGET = d1
 endif
 TARGETS = $(TARGET)
 DRIVERS = djdma$(OBJSUFFIX).o multio$(OBJSUFFIX).o hddma$(OBJSUFFIX).o \
-	hdca$(OBJSUFFIX).o mpz80$(OBJSUFFIX).o micronix$(OBJSUFFIX).o \
-	kdump$(OBJSUFFIX).o
-GENERATED = roms/mon447.bin roms/mon447.sym roms/mon375.bin roms/mon375.sym
+	hdca$(OBJSUFFIX).o ide$(OBJSUFFIX).o mpz80$(OBJSUFFIX).o \
+	micronix$(OBJSUFFIX).o kdump$(OBJSUFFIX).o
+GENERATED = roms/mon447.bin roms/mon447.sym roms/mon375.bin roms/mon375.sym \
+	roms/mon500.bin roms/mon500.sym
 DIRS = roms
 SIM = ../hwsim$(OBJSUFFIX).o ../s100$(OBJSUFFIX).o
 

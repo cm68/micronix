@@ -74,7 +74,7 @@ struct k_proc {
 	k16 slist[K_NSIG];
 	k8 nice, pri;
 	k16 time, alarm;
-	k8 pid;
+	k16 pid;
 } __attribute__((packed));
 
 struct k_buf {

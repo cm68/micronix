@@ -281,6 +281,28 @@ get_symname(unsigned short addr)
     return lookup_sym(addr);
 }
 
+/*
+ * The floors report an address in the middle of a function, and the
+ * kernel's table holds globals only, so lookup_sym - exact match - would
+ * answer nothing for almost every one of them.  The nearest symbol below
+ * is what a stack report wants: the enclosing function.
+ */
+char *
+nearest_sym(unsigned short addr, unsigned short *offp)
+{
+    struct sym *s = syms[0];
+    struct sym *best = 0;
+
+    while (s) {
+        if (s->value <= addr && (!best || s->value > best->value))
+            best = s;
+        s = s->next;
+    }
+    if (offp)
+        *offp = best ? addr - best->value : 0;
+    return best ? best->name : 0;
+}
+
 void
 load_symfile(char *s)
 {
@@ -668,11 +690,13 @@ usage(char *complaint, char *p)
     }
     fprintf(stderr, "usage: %s [<options>] [<drive> ...]\n", p);
     fprintf(stderr, "  a drive is <controller><unit>:<file> - djdma0:boot.IMD,\n");
-    fprintf(stderr, "  hdcdma0:hddma-0, hdca1:/tmp/scratch - or a bare file,\n");
+    fprintf(stderr, "  hdcdma0:hddma-0, hdca1:/tmp/scratch, ide0:disk.img\n");
+    fprintf(stderr, "  - or a bare file,\n");
     fprintf(stderr, "  which is the next floppy.  controllers are the -B names.\n");
     fprintf(stderr, "\t-h\thelp\n");
     fprintf(stderr, "\t-b\t<boot rom file>\n");
-    fprintf(stderr, "\t-B\t<djdma|hdcdma|hdca> boot from this, and skip the monitor\n");
+    fprintf(stderr, "\t-B\t<djdma|hdcdma|hdca|ide> boot from this, and skip the monitor\n");
+    fprintf(stderr, "\t\t(hdca needs mon447, ide needs mon500 - see -b)\n");
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
     fprintf(stderr, "\t-m\t<bytes> ram size - 768k, 0xc0000, 1m (default 16m)\n");
@@ -684,7 +708,14 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-S\t<kernel binary>\n");
     fprintf(stderr, "\t-T\t<space:addr>[,count] trace from here, for count instructions\n");
     fprintf(stderr, "\t-W\t<addr>[-<addr>] report writes to this range and keep going\n");
+    fprintf(stderr, "\t-K\t<addr>[-<addr>][,<pclo>-<pchi>] supervisor sp floor:\n");
+    fprintf(stderr, "\t\t\tthe deepest sp seen in the range, pc-filtered if\n");
+    fprintf(stderr, "\t\t\ta second range is given, reported at exit\n");
     fprintf(stderr, "\t-P\t<physaddr>[-<physaddr>] report writes to this physical range\n");
+    fprintf(stderr, "\t-R\t<addr>[-<addr>] the boot loader's sp floor: no trap\n");
+    fprintf(stderr, "\t\t\tentry, no task switch, and no kernel yet\n");
+    fprintf(stderr, "\t-G\t<addr>[-<addr>] the -K floor, counting user-mode\n");
+    fprintf(stderr, "\t\t\tsamples too\n");
     fprintf(stderr, "\t-x\topen a debug terminal window\n");
     fprintf(stderr, "\t-t\t<tracebits>, or names: -t syscall,trap,all\n");
     fprintf(stderr, "\t-l\tproduce logfile\n");
@@ -839,6 +870,8 @@ sim_report(void)
 {
     struct timeval now;
     double wall, cyc_per_sec, ratio;
+
+    floor_report();
 
     if (gettimeofday(&now, NULL) != 0)
         return;
@@ -1306,10 +1339,10 @@ struct moncmd moncmds[MONCMDS] = {
  * The boot device, by name.
  *
  * The rom decides what to boot from the top five bits of the
- * configuration switch - mon447.s at tstsw - and the numbers are not
- * memorable:
+ * configuration switch - at tstsw, in mon447.s and again in mon500.s -
+ * and the numbers are not memorable:
  *
- *	0x00	boothd, which is the HDCA
+ *	0x00	the local hard disk
  *	0x08	nuboot, which is the HDC-DMA
  *	0x10	the DJ-DMA floppy
  *
@@ -1318,12 +1351,20 @@ struct moncmd moncmds[MONCMDS] = {
  * "switches 0x0c" and then explains what 0x0c is; this says hdcdma and
  * does not need explaining.  -c still takes the number for anything
  * these three do not cover, and a -c after -B wins.
+ *
+ * 0x00 has two names because it has two meanings, and which one it is
+ * depends on the rom: mon447 boots the hdca from it, mon500 boots the
+ * ide.  That is the ordinary way a machine gets a new boot device - the
+ * rom installed is the rom that knows the card - so -B names the device
+ * the rom being loaded will find, and naming the other one boots
+ * whatever that rom does have.  See mpz80_usage().
  */
 static struct {
     char *name;
     int sw;
 } bootdevs[] = {
     { "hdca",   0x00 },
+    { "ide",    0x00 },
     { "hdcdma", 0x08 },
     { "djdma",  0x10 },
     { 0, 0 }
@@ -1441,12 +1482,13 @@ open_debug_gate(void)
 /*
  * A drive named on the command line: <controller><unit>:<file>, as in
  *
- *	djdma0:boot.IMD  hdcdma0:hddma-0  hdca1:/tmp/scratch
+ *	djdma0:boot.IMD  hdcdma0:hddma-0  hdca1:/tmp/scratch  ide0:disk
  *
  * The controller names are the ones -B takes, so the same word means
  * the same thing in both places.  A floppy goes on the list the DJ-DMA
  * reads in order; a hard unit is recorded against the file name its
- * controller will ask drive_open for, which is hddma-<n> or hdca-<n>.
+ * controller will ask drive_open for, which is hddma-<n>, hdca-<n> or
+ * ide-<n>.
  *
  * Returns 0 if the argument was not of this shape, so that a bare file
  * name still means what it always did.
@@ -1510,6 +1552,13 @@ drivearg(char *arg)
     }
     if (strcmp(ctl, "hdca") == 0) {
         snprintf(unit, sizeof(unit), "hdca-%d", n);
+        if (drive_setunit(unit, colon + 1) != 0)
+            return -1;
+        anydrive = 1;
+        return 1;
+    }
+    if (strcmp(ctl, "ide") == 0) {
+        snprintf(unit, sizeof(unit), "ide-%d", n);
         if (drive_setunit(unit, colon + 1) != 0)
             return -1;
         anydrive = 1;
@@ -1583,6 +1632,7 @@ perf_option(char *arg)
         return 0;
     switch (arg[1]) {
     case 'D': case 'S': case 'W': case 'P': case 'T': case 't':
+    case 'K': case 'G':
         return 2;               /* debug option with a value */
     case 'l': case 'n': case 'x': case 'q': case 's':
         return 1;               /* debug option, no value */
@@ -1625,6 +1675,39 @@ exec_perf(char **argv, int argc, int pindex)
     execv(path, nargv);
     fprintf(stderr, "%s: cannot exec %s: %s\n", prog, path, strerror(errno));
     exit(1);
+}
+#endif
+
+#ifndef NODEBUG
+/*
+ * A floor's argument: <lo>[-<hi>] for the stack pointer range, and an
+ * optional ,<pclo>[-<pchi>] to count only while the pc is in that range.
+ * The pc filter is what separates the loader's own stack use from the
+ * trap entry, which runs one instruction on the *user's* stack pointer
+ * before the firmware loads the kernel one - a sample that lands in the
+ * top of memory and has nothing to do with the boot stack.
+ */
+static void
+parse_floor(char *w, char *name, int superonly, int notrap)
+{
+    char *comma = strchr(w, ',');
+    char *dash;
+    unsigned lo, hi, pclo = 0, pchi = 0xffff;
+
+    if (comma)
+        *comma++ = 0;
+    dash = strchr(w, '-');
+    lo = strtol(w, 0, 0);
+    hi = dash ? strtol(dash + 1, 0, 0) : lo;
+    if (comma) {
+        dash = strchr(comma, '-');
+        pclo = strtol(comma, 0, 0);
+        pchi = dash ? strtol(dash + 1, 0, 0) : pclo;
+    }
+    if (notrap)
+        add_boot_floor(name, lo, hi);
+    else
+        add_floor(name, lo, hi, superonly, pclo, pchi);
 }
 #endif
 
@@ -1824,6 +1907,24 @@ main(int argc, char **argv)
 
                     add_phys_watch(lo, dash ? strtol(dash + 1, 0, 0) : lo);
                 }
+                break;
+            case 'K':
+                if (!argc--) {
+                    usage("floor range not specified\n", progname);
+                }
+                parse_floor(*argv++, "supervisor", 1, 0);
+                break;
+            case 'R':
+                if (!argc--) {
+                    usage("floor range not specified\n", progname);
+                }
+                parse_floor(*argv++, "boot", 1, 1);
+                break;
+            case 'G':
+                if (!argc--) {
+                    usage("floor range not specified\n", progname);
+                }
+                parse_floor(*argv++, "any-mode", 0, 0);
                 break;
             case 'T':
                 {

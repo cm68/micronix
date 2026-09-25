@@ -7,9 +7,9 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-OBJ = mon375.bin mon447.bin
-SYM = mon375.sym mon447.sym
-SRC = mon375.s mon447.s
+OBJ = mon375.bin mon447.bin mon500.bin
+SYM = mon375.sym mon447.sym mon500.sym
+SRC = mon375.s mon447.s mon500.s
 
 all: $(OBJ) $(SYM)
 

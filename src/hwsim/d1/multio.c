@@ -78,7 +78,6 @@ struct ace {
 #define TXE_TIMEOUT     5000     // how long to wait before setting LSR_TXE
 
 #define	MULTIO_MASTER	0x48	// multio master standard port
-#define	MULTIO_SLAVE	0x58	// multio slave standard port
 
 // linestat                 base + 5    0x4d
 #define LSR_DR      0x01    // input data ready
@@ -527,9 +526,16 @@ multio_set_int_line()
 
 /*
  * set the level of the interrupt line
- * this set irr in the interrupt controller and possibly sets the s100 
- * interrupt line the s100 interrupt line is reset by the interrupt 
+ * this set irr in the interrupt controller and possibly sets the s100
+ * interrupt line the s100 interrupt line is reset by the interrupt
  * vector generation.
+ *
+ * Bit n of the mask is input n of the 8259.  That is only true because of
+ * how the Decision I leaves the board: it ships with the three bus lines
+ * the board brings in, VI0, VI1 and VI2, jumpered to inputs 0, 1 and 2.
+ * The jumpers can be moved - the manual says so - and the model does not
+ * represent them, so a machine jumpered any other way would put a bus
+ * line somewhere this mask does not say.
  */
 void
 multio_vi_change(unsigned char new)
@@ -1411,22 +1417,6 @@ multio_select(portaddr p, byte v)
     }
 }
 
-byte
-rd_fake_daisy(portaddr p)
-{
-    return 0xff;
-}
-
-/*
- * this is for the second multio in a system, not present in ours
- */
-void
-multio_slave_select(portaddr p, byte v)
-{
-    register_input(MULTIO_SLAVE + 0, &rd_fake_daisy);
-    return;
-}
-
 int terminal_fd_in;
 int terminal_fd_out;
 
@@ -1608,14 +1598,24 @@ multio_init()
     terminal_fd_out = ace[0].outfd;
 
 	register_output(MULTIO_MASTER+7, &multio_select);
-	register_output(MULTIO_SLAVE+7, &multio_slave_select);
 
     vi_change = &multio_vi_change;
     get_intack = &multio_intack;
 
+    /*
+     * Names for the eight inputs of the 8259, for the state dump below.
+     * Three of them are the three S-100 bus lines this board's jumper
+     * area brings in, VI0, VI1 and VI2, which is why hd, djdma and ide
+     * are here: those names belong to the machines that sit on the bus,
+     * not to this board, and only the machine as a whole can say what
+     * drove one.  The other five inputs go to this board's own devices -
+     * the three serial ports, the parallel printer and the clock - and
+     * the one with a name so far is the clock; the rest are unnamed
+     * rather than absent, and the dump shows their numbers.
+     */
     reg_intbit(0, "hd");
     reg_intbit(1, "djdma");
-    reg_intbit(2, "slave");
+    reg_intbit(2, "ide");
     reg_intbit(7, "clock");
 #ifndef NODEBUG
     register_mon_cmd('M', "\tdump multio state", multio_dump);

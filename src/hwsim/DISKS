@@ -388,14 +388,24 @@ installing it
 -------------
 
     mkdir /boot
-    touch /boot/bootmw
+    touch /boot/boot
     sync
     umount the filesystem
     patch the inode on the raw device: block list c*spc upward, size spc*512
     icheck -s to rebuild the free list
     mount the filesystem
-    open /boot/bootmw and write the boot area through it
+    open /boot/boot and write the boot area through it
     sync, umount, chmod 0 the file and the directory
+
+The file is called boot on every device.  It used to be named after the
+controller that would read the blocks - bootmw for the HD-DMA, bootdj for
+the floppy - and that was the wrong axis: the inode's job is to keep the
+blocks out of the free list, which is the same job whether an HD-DMA, a
+DJ-DMA or an IDE card does the reading, and a name that changed with the
+card is one more thing to get wrong.  The same goes for where the area
+is: a labeled device takes d_cyl0 and d_bootblks from its own label, and
+only the unlabeled one falls back to the reserved tracks in front of the
+filesystem.  Nothing in either answer is about the controller.
 
 Three things about that order are load bearing.
 

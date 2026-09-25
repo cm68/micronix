@@ -145,15 +145,26 @@ void console_claim(int who);
  * Watchpoints are checked on every physical write (and the virtual one on
  * every cpu store), so a hardware build drops them to no-ops under
  * -DNODEBUG rather than paying the range test in the hot path.
+ *
+ * A floor (-K/-G) is the same hook with a different answer: it keeps the
+ * lowest address written in a range instead of printing each one, which
+ * is how a stack gets measured.
  */
 #ifdef NODEBUG
 #define add_write_watch(lo, hi)         ((void)0)
 #define add_phys_watch(lo, hi)          ((void)0)
 #define phys_watch_check(p, v)          ((void)0)
+#define add_floor(name, lo, hi, sup, pclo, pchi)    ((void)0)
+#define add_boot_floor(name, lo, hi)                ((void)0)
+#define floor_report()                  ((void)0)
 #else
 extern void add_write_watch(unsigned short lo, unsigned short hi);
 extern void add_phys_watch(unsigned int lo, unsigned int hi);
 extern void phys_watch_check(unsigned int p, unsigned char v);
+extern void add_floor(char *name, unsigned short lo, unsigned short hi,
+    int superonly, unsigned short pclo, unsigned short pchi);
+extern void add_boot_floor(char *name, unsigned short lo, unsigned short hi);
+extern void floor_report(void);
 #endif
 /*
  * Physical memory access, inline so the emulation's hot path does not

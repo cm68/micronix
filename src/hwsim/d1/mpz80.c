@@ -95,6 +95,11 @@ z80_init()
 	z80init(&z80, &context);
 }
 
+#ifndef NODEBUG
+static int nfloor;
+static void sp_check(vaddr sp);
+#endif
+
 void
 z80_run()
 {
@@ -102,6 +107,10 @@ z80_run()
 		z80_exec(&z80, 1);
 		sim_cycles++;
 	} while (!z80_opdone(&z80));
+#ifndef NODEBUG
+	if (nfloor)
+		sp_check(z80_get_reg16(sp_reg));
+#endif
 }
 #include "util.h"
 
@@ -202,6 +211,8 @@ static char *keyb_bits[] = { 0, "diag", 0, 0, 0, 0, 0, 0 };
 extern void syscall_at(word pc);
 extern void syscall_return(word pc);
 char *dis_space(word addr, char *buf, int len);
+char *get_symname(word addr);
+char *nearest_sym(word addr, unsigned short *offp);
 
 // this register is negated:  if the switch is on, the value reads low
 byte switchreg;
@@ -389,6 +400,226 @@ add_phys_watch(paddr lo, paddr hi)
         npwatch++;
     }
 }
+
+/*
+ * A watchpoint answers "did anything write this byte"; a floor answers
+ * "how far down did this range get used".  That is a measurement and not
+ * an event, and it exists for the stacks: a watchpoint on a stack prints
+ * a line per push and still leaves the deepest one to be found by reading
+ * a screenful of addresses.
+ *
+ * The stack pointer is read at the end of every instruction, in the
+ * debug build's one-instruction-at-a-time path.  That is the measurement
+ * itself rather than an address that has to be interpreted: no pushes to
+ * count, no DD/FD prefix subtleties, and no confusion between a stack and
+ * the same addresses used as anything else.  An earlier version watched
+ * memory writes in a range instead, and the u page range drew 39M of them
+ * from a user task's own segment 14 - which is a different address space
+ * that happens to use the same numbers.  Sampling SP and asking which
+ * mode the cpu is in separates the two.
+ *
+ * No instruction leaves SP lower in the middle than it does at the end
+ * (push is the only thing that lowers it, and nothing pops what it just
+ * pushed), so the sample at an instruction boundary sees the deepest the
+ * stack ever was.  Supervisor and user are tracked apart, and -K/-G add
+ * named ranges (-K supervisor only, -G any mode) reported once, at exit,
+ * beside the run speed.  The cycle count of the deepest hit is kept so a
+ * floor left by the loader can be told from one left by the kernel.
+ */
+#ifndef NODEBUG
+#define NFLOOR 4
+struct floor {
+    char *name;
+    vaddr lo, hi;
+    int superonly;              /* ignore user-mode samples */
+    int notrap;                 /* the boot floor: no trap window, no kernel */
+    vaddr pclo, pchi;           /* and samples outside this pc range */
+    int set;
+    vaddr min;                  /* the lowest sp seen in the range */
+    unsigned long n;            /* samples in the range */
+    vaddr minpc;                /* the pc that got there */
+    int minmode;                /* was it supervisor mode there */
+    int mintask;
+    unsigned long long mincycles;
+    unsigned long long lastcycles;  /* the last sample taken, to show the span */
+};
+struct spill {
+    int set;
+    vaddr min;
+    unsigned long n;
+    vaddr minpc;
+    int mintask;
+    unsigned long long mincycles;
+};
+static struct floor floors[NFLOOR];
+static int nfloor;
+static struct spill supspill;   /* every supervisor-mode sample */
+static struct spill userspill;  /* every user-mode sample */
+
+/*
+ * "symbol+offset" for a report line.  The address is inside a function,
+ * so the exact-match lookup answers nothing; one static buffer is enough
+ * because each line asks once.
+ */
+static char *
+pcsym(vaddr pc)
+{
+    static char buf[40];
+    unsigned short off = 0;
+    char *s = nearest_sym(pc, &off);
+
+    if (s)
+        snprintf(buf, sizeof(buf), "%s+%u", s, off);
+    else
+        snprintf(buf, sizeof(buf), "no symbol");
+    return buf;
+}
+
+void
+add_floor(char *name, vaddr lo, vaddr hi, int superonly, vaddr pclo, vaddr pchi)
+{
+    struct floor *f;
+
+    if (nfloor >= NFLOOR) {
+        fprintf(stderr, "floor: %s not watched, %d ranges is the limit\n",
+            name, NFLOOR);
+        return;
+    }
+    f = &floors[nfloor++];
+    f->name = name;
+    f->lo = lo;
+    f->hi = hi;
+    f->superonly = superonly;
+    f->pclo = pclo;
+    f->pchi = pchi;
+}
+
+/*
+ * The boot floor.  Every trap entry runs the firmware's fifteen byte
+ * sequence on the *trapping* stack pointer before it loads the kernel's,
+ * and that sequence runs at the trapping program's pc, so neither the pc
+ * nor the task register separates it from the loader - trap() zeroes the
+ * task register on the way in, and a user process traps from whatever
+ * address it likes.  trapcount is the one signal that does: it is nonzero
+ * exactly across those fifteen fetches and zero everywhere else.  The task
+ * switch is the other such path (it loads the outgoing task's sp while the
+ * task register is already clear), and both are post-kernel, so the floor
+ * stops at the kernel's entry as well.
+ *
+ * Note the mode: the loader runs with a nonzero task register, so it is a
+ * *user* sample by the simulator's reckoning and a supervisor-only filter
+ * sees none of it.
+ */
+void
+add_boot_floor(char *name, vaddr lo, vaddr hi)
+{
+    add_floor(name, lo, hi, 0, 0, 0xffff);
+    floors[nfloor - 1].notrap = 1;
+}
+
+/*
+ * "boot" is the loader's stack, and only the loader's.  Two firmware paths
+ * run a *user's* stack pointer in supervisor mode: the fifteen byte trap
+ * entry, caught by trapcount, and the task switch, which loads the outgoing
+ * task's sp into the register while the task register has already been
+ * cleared.  Both are after the kernel has started, so the floor stops at
+ * the kernel's entry - the jump to textoff, which is the first fetch of
+ * 0x1000 and happens before any kernel code can run.
+ */
+static int kernel_in;
+
+static void
+sp_keep(struct spill *s, vaddr sp)
+{
+    s->n++;
+    if (!s->set || sp < s->min) {
+        s->set = 1;
+        s->min = sp;
+        s->minpc = z80_get_reg16(pc_reg);
+        s->mintask = taskreg & 0xf;
+        s->mincycles = sim_cycles;
+    }
+}
+
+static void
+sp_check(vaddr sp)
+{
+    struct floor *f;
+    vaddr pc = z80_get_reg16(pc_reg);
+    int i;
+
+    if (super_flag)
+        sp_keep(&supspill, sp);
+    else
+        sp_keep(&userspill, sp);
+
+    for (i = 0; i < nfloor; i++) {
+        f = &floors[i];
+        if (f->superonly && !super_flag)
+            continue;
+        if (f->notrap && (trapcount || kernel_in))
+            continue;
+        if (sp < f->lo || sp > f->hi)
+            continue;
+        if (pc < f->pclo || pc > f->pchi)
+            continue;
+        f->n++;
+        f->lastcycles = sim_cycles;
+        if (!f->set || sp < f->min) {
+            f->set = 1;
+            f->min = sp;
+            f->minpc = pc;
+            f->minmode = super_flag != 0;
+            f->mintask = taskreg & 0xf;
+            f->mincycles = sim_cycles;
+        }
+    }
+
+    if (super_flag && pc == 0x1000)
+        kernel_in = 1;
+}
+
+static void
+spill_report(char *who, struct spill *s)
+{
+    if (!s->set) {
+        printf("floor: %s sp never sampled\n", who);
+        return;
+    }
+    printf("floor: %s deepest sp %04x (%lu samples; lowest at %04x %s, "
+        "task %d, cycle %llu)\n", who, s->min, s->n, s->minpc,
+        pcsym(s->minpc), s->mintask, s->mincycles);
+}
+
+void
+floor_report(void)
+{
+    struct floor *f;
+    int i;
+
+    spill_report("supervisor", &supspill);
+    spill_report("user", &userspill);
+    for (i = 0; i < nfloor; i++) {
+        f = &floors[i];
+        if (!f->set) {
+            printf("floor: %s %04x-%04x never used\n",
+                f->name, f->lo, f->hi);
+            continue;
+        }
+        printf("floor: %s %04x-%04x deepest sp %04x, %u bytes below %04x "
+            "(%lu samples; lowest at %04x %s in %s mode, task %d, "
+            "cycle %llu%s)\n",
+            f->name, f->lo, f->hi, f->min, f->hi - f->min, f->hi,
+            f->n, f->minpc, pcsym(f->minpc),
+            f->minmode ? "supervisor" : "user", f->mintask,
+            f->mincycles, f->notrap ? ", trap-free" : "");
+        if (f->notrap)
+            printf("floor:   %s samples span cycle %llu to %llu\n",
+                f->name, f->mincycles, f->lastcycles);
+    }
+    fflush(stdout);
+}
+#endif /* NODEBUG */
 
 /*
  * Called from physwrite() on every byte that reaches physical memory, so
@@ -1261,7 +1492,8 @@ mpz80_usage()
     printf("config switch values:\n");
     printf("\t0x04 - no monitor entry\n");
     printf("\t0xf8 - start address mask\n");
-    printf("\t0x00 - boot hdca\n");
+    printf("\t0x00 - boot the local hard disk - hdca under mon447,\n");
+    printf("\t       ide under mon500, so pick the rom to match\n");
     printf("\t0x08 - boot hddma\n");
     printf("\t0x10 - boot djdma\n");
 }
