@@ -28,24 +28,39 @@ The ACEs communicate via standard RS232 serial interface.
 The parallel port is a standard Diablo (50-pin daisy-wheel) interface.
 
 Each Mult/IO board must have its I/O port addresses set by means of
-switches on the circuit board.  For proper operation, the base I/O 
+switches on the circuit board.  For proper operation, the base I/O
 address must be 48 (hex) for the first Mult/IO board.
 
-In a Micronix system in which there are possibly many Mult/IO boards,
-the boards form a series.  In the Decision I Table Top model, the
-Wunderbuss I/O motherboard functions as the first of the series.
-Micronix expects to find the Mult/IO boards (or Wunderbuss) as
-I/O (hex) locations 48, 58, 68, 78, 88,...
+The first minor device number of each group of four refers to
+the parallel printer on that board.  Minor device number 0 is the
+parallel printer; 1, 2 and 3 are the board's three ACEs.
 
-Minor device numbers 0-3 
-refer to the Mult/IO board addresses at I/O location 48 hex.
+Each board also carries an interrupt controller - an 8259 - with
+eight interrupt request inputs, and a jumper area that decides what
+is wired to three of them.
 
-Minor device numbers 4-7 refer to the Mult/IO board addresses at 
-location 58 hex, and so on with 68, 78 ...
+Five of the eight are wired on the board itself, to the board's own
+devices: the three ACEs, pin 5 of the parallel input port (the daisy
+wheel's print wheel ready), and the real time clock's timed pulse
+line.
 
-The first minor device number of each group of four refers to 
-the parallel printer on that board.
-Minor device numbers 0, 4, 8, etc. refer to parallel printers.
+The other three are jumpered to the first three of the S-100 bus's
+vectored interrupt lines, VI0, VI1 and VI2.  Those three are
+therefore the whole of what a card elsewhere on the bus can
+interrupt through, and everything else on the bus has no way in.
+
+The Decision I leaves the jumper area with VI0 on the controller's
+input 0, VI1 on input 1 and VI2 on input 2, and wires the cards on the
+bus to match: the hard disk controller drives VI0 and the floppy
+controller drives VI1.  Micronix is written for that arrangement and
+reads the board's own five as inputs 3, 4 and 5 for the three ACEs, 6
+for the parallel port and 7 for the clock, so the handler for a bus
+line is the entry of the input its jumper reaches in sys/intrpt.s: the
+hard disk's is entry 0 and the floppy's entry 1.
+
+The jumpers may be moved, and a machine jumpered otherwise delivers a
+bus line to a different input than Micronix expects.  See ide (4) for
+the card that takes the last of the three bus lines, VI2.
 
 Bytes sent to the parallel printer device have the following format:
 .sp

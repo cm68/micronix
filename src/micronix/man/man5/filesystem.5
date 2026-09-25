@@ -44,7 +44,10 @@ struct
 		fmod;
 .sp
 .bd 2
-	long	time;
+	long	time,
+		magic;
+	unsigned	bfree,
+		ifree;
 	};
 .sp 2
 .fi
@@ -184,7 +187,22 @@ During a reboot, the time of the super-block for the root file
 system is used to set the system's idea of the time.
 .sp
 .bd
-I-numbers 
+Magic
+is a signature, stamped by mkfs, that says this is a Micronix
+file system; df and the mount command use it to tell a file system
+from a bare block in one word instead of several reads.
+.sp
+.bd
+Bfree
+and
+.bd
+ifree
+are the running totals of free blocks and free inodes, kept
+current by the block and inode allocators.  df reads them instead
+of walking the free list.
+.sp
+.bd
+I-numbers
 begin at 1 and the storage for i-nodes begins in block 2.
 Also, i-nodes are 32 bytes long,
 so 16 of them fit into a block.

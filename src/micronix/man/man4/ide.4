@@ -1,0 +1,108 @@
+.he "ide (4)                      9/24/26                      ide (4)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+DEVICE
+.in +5
+.br
+.bd
+ide
+- an IDE hard disk on the MYIDE board
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+The
+.bd
+ide
+device reads and writes an IDE (formerly AT attachment, ATA) hard
+disk attached to an S100Computers MYIDE board.  The board carries an
+8255 programmable peripheral interface between the S-100 bus and the
+drive's own pins, at ports 0x30 through 0x34.  The drive's registers
+are not mapped into the bus at all: the cpu puts a register number
+and a strobe on one port, the byte on another, and moves a sector a
+16-bit word at a time.  The cpu does all of it - the board carries no
+dma controller.  The drive raises an interrupt when a command
+finishes, and the driver sleeps on it, so the time a seek takes is
+time the machine spends on something else.
+
+The device number packs two things.  The major number is 4.  The low
+bit of the minor number names which drive, and the bits above it name
+the kind of controller, the way an HDDMA's name the drive's size;
+this driver has one kind, which carries two drives.
+
+.in +5
+.nf
+4/0  ide0       the board's first drive
+4/1  ide1       the board's second drive
+.in -5
+.fi
+
+Unlike an HDDMA drive, the size is not part of the name.  The
+geometry comes off the disk, from the label that
+.bd
+mkfs
+writes into the second half of the boot sector: a magic number, the
+number of cylinders, heads and sectors, the rotation below, and the
+size of the file system made on it.  The driver reads that label when
+the device is opened, so there is no table of drive sizes to disagree
+with it, and a disk carrying no label cannot be opened at all.
+
+A block number is a file system block, and the driver turns it into a
+cylinder and a sector.  Block 0 is not at cylinder 0: the volume is
+rolled, so that the superblock and the inode list sit in the middle
+of the platter rather than at its edge.  On an HDDMA the roll is
+derived from the drive's size; here it is read from the label, so a
+volume keeps whatever rotation it was made with.
+
+The layout is otherwise the one the HDDMA uses, so a volume made for
+either controller reads back block for block on the other.  The label
+is what tells this driver that it can.
+
+Booting from a drive on this card needs a monitor rom that knows the
+card, which is MON 5.0.  The rom in a machine with an earlier monitor
+boots a hard disk through the HDCA, and will not find this one, so a
+machine that is to boot from an IDE drive needs that rom installed.
+
+The card's interrupt is the bus line a slave Mult I/O board used for
+its serial ports.  This driver takes that line, so a machine cannot
+carry a slave Mult I/O board alongside this card.
+
+The boot itself is the two level loader under
+.bd
+stand/boot:
+a first level in the first sector of the boot cylinder, which the
+rom reads and jumps to, and a second level, which the first level
+reads from the sectors after it and enters.  A boot for an IDE drive
+is not the same image as a boot for an HDDMA drive, because the two
+drive different hardware;
+.bd
+mkfs -i
+is handed the image when the volume is made.
+
+A request is one 512 byte sector.  The driver issues the command and
+sleeps until the drive interrupts for it; the sector's own 256 words
+are then moved with interrupts off, because an interrupt taken
+between the two port writes of a word would be taken for the drive's
+answer and would advance the drive a word.  Every byte goes
+through the cpu, so a transfer holds the machine for its length, and
+an IDE drive cannot serve as the swap device: the kernel swaps a
+whole 4096 byte page in one request, and this driver serves one 512
+byte sector at a time and refuses the rest.  A machine that swaps
+must keep its swap space on another disk.
+
+A drive that does not answer a reset, a label that cannot be read,
+and a label that is either not a Micronix label or names no geometry
+all fail the open with ENXIO.  A request for a block past the end of
+the volume fails the same way.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+.bd
+boot (1), filesystem (5), hdca (4), hddma (4)

@@ -28,6 +28,11 @@ machine is halted instead of rebooted.
 
 Only the super-user may call reboot.
 
+Before halting, reboot flushes the inodes and waits for the buffer
+pool to drain, so a halt does not lose data.  It does not touch the
+processes - the caller has either already stopped them, or wants to
+die now.
+
 The machine is halted by dropping the cpu in kernel mode.  On real
 hardware this traps to the monitor; the simulators end the run.
 Only RB_HALT is implemented - there is no bootstrap to return to, so
@@ -47,7 +52,7 @@ ASSEMBLER
 .in +5
 .br
 .bd
-(reboot = 49)
+(reboot = 55)
 .br
 .bd
 (howto in the instruction stream)
