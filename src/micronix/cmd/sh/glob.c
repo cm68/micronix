@@ -337,11 +337,13 @@ struct cmd *c;
 /*
  * Expand one word onto the end of a command.
  *
- * Returns how many names it came to.  ZERO IS NOT AN ERROR HERE: a
- * pattern that matches nothing contributes nothing and the caller
- * decides what to say about it, because the image only complains when
- * NOTHING in the whole statement matched - "echo /nosuch/* /etc/pass*"
- * prints /etc/passwd and says not a word about the first.
+ * Returns how many names it came to, or -1 if there was no room for
+ * them.  ZERO IS NOT AN ERROR AND NOT THE END OF THE WORD: a pattern
+ * that matches nothing contributes nothing here, and the caller puts
+ * the word itself in its place - "echo *.x" is the word *.x when no
+ * such file is there.  The image does not do that; it gives up the
+ * statement with "No match.".  See parse.c, where the fallback is and
+ * where the divergence is argued.
  */
 int
 globword(w, c)

@@ -241,16 +241,45 @@ check 'echo /etc/*'
 check 'echo /*'
 check 'echo /etc/s????n'
 check 'echo /etc/pass* /etc/mt*'
-check 'echo /nosuch/* /etc/pass*'
-check 'echo /nosuch/* /alsonone/*'
-check 'echo *.nosuchthing ; echo after'
 check 'echo "/etc/*"'
 check 'echo "/etc/"*'
 check 'echo /etc/"pass"*'
-check 'echo \*'
-check 'echo /etc/pas\s*'
 check 'echo plain'
 check 'echo /etc/passwd'
+
+#
+# The glob cases that used to sit in the run above, now differs()es.
+#
+# A pattern that finds nothing stands as the word itself here, where
+# the image gives up the statement with "No match.".  That is the one
+# place this shell deliberately answers differently, and it is argued
+# at the end of parse(): "rm -f *.x foo" is an ordinary thing to type
+# and the image will not run it because the first pattern happened to
+# find nothing.  Every other glob case above still matches the image
+# name for name, which is what makes this a decision rather than a
+# drift.
+#
+differs 'echo /nosuch/* /etc/pass*' \
+	'a pattern that found nothing is left as the word itself: the
+	 image drops the whole statement and says "No match.", and ours
+	 prints /nosuch/* /etc/passwd - the miss left alone, the hit
+	 expanded'
+differs 'echo /nosuch/* /alsonone/*' \
+	'the same divergence with every pattern missing: "No match."
+	 against /nosuch/* /alsonone/*'
+differs 'echo *.nosuchthing ; echo after' \
+	'the same again, and it shows the image gives up the statement
+	 and not the line: No match. then after, against *.nosuchthing
+	 then after'
+differs 'echo \*' \
+	'the same divergence on a word with an escape in it.  A
+	 backslash does not protect a pattern character - see NOTES -
+	 so the word looked for is the text as written, \*, and under
+	 the new rule a word that finds nothing stands as itself, so
+	 ours prints \*.  The image says No match.'
+differs 'echo /etc/pas\s*' \
+	'the same as echo \*, on a two-character pattern that is
+	 looked for in one directory: /etc/pas\s* against No match.'
 
 # redirection and the rest
 check 'echo x >'

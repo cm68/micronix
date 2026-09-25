@@ -131,9 +131,11 @@ A pattern may appear in any part of a path, so /e*/passwd finds it.
 A leading dot is matched like any other character, though . and ..
 are never matched.
 .sp
-A pattern that matches nothing is left out.  Only when nothing in the
-whole command matched is it an error, and then the shell writes "No
-match." and runs no part of that command.
+A pattern that matches nothing stands as the word that was written, so
+"echo *.x" is *.x when no such file is there, and "rm -f *.x foo" runs
+and removes foo.  This is not what the 1982 shell did - it gave up the
+whole command with "No match." - and it is the one place this shell
+deliberately answers differently.
 .sp 2
 .in -5
 .bd

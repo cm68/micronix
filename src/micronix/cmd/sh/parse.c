@@ -230,9 +230,10 @@ char **pp;
         /*
          * The exit status of the last command, as a decimal number.
          * The manual says there are no other variables, but without
-         * this the "?" in "$?" is just a pattern character and
-         * "echo $?" comes back "No match." - the one exception worth
-         * making.
+         * this the "?" in "$?" is just a pattern character - the word
+         * $? goes to the disk, finds nothing, and stands as $? now
+         * that a miss is not an error.  (The image wrote "No match.";
+         * the exception is worth making either way.)
          */
         if (*s == '$' && s[1] == '?') {
             sprintf(st, "%d", status);
@@ -264,6 +265,13 @@ char **pp;
      * So when the word came out a pattern and an escape was taken out
      * of it, put the raw text back.  No second buffer for a case this
      * rare: the span is still there to be copied again.
+     *
+     * Ours prints \* where the image said No match. - the word that
+     * found nothing is the word that stands, and it stands as the
+     * shell looked for it.  A backslash buying a literal * would be a
+     * change to this rule and not to the one in parse(); sh.1 already
+     * says a backslash protects from the shell and not from pattern
+     * matching, so what is here is what the manual describes.
      */
     if (escaped && ispattern(buf)) {
         q = buf;
@@ -555,12 +563,9 @@ struct pipeline *p;
     char *s;
     char *w;
     int code, len;
-    int npat;                           /* patterns seen in this statement */
-    int nmatch;                         /* and names they came to */
 
     wordused = 0;
     wordbad = 0;
-    npat = nmatch = 0;
     p->ncmd = 0;
     c = &p->cmd[0];
     clearcmd(c);
@@ -685,14 +690,14 @@ struct pipeline *p;
         /*
          * A word with a pattern in it is asked of the disk; one
          * without is the word itself, and is not looked for.  A
-         * pattern that finds nothing adds nothing and is not an error
-         * on its own - see the end of this function.
+         * pattern that finds nothing is the word itself too - see
+         * below.
          */
         if (ispattern(w)) {
-            npat++;
             if ((len = globword(w, c)) < 0)
                 return -1;
-            nmatch += len;
+            if (len == 0 && addmatch(w, c) < 0)
+                return -1;
             continue;
         }
         if (addmatch(w, c) < 0)
@@ -702,23 +707,25 @@ struct pipeline *p;
     *pp = s;
 
     /*
-     * Nothing the statement asked for was there.
+     * A pattern that found nothing was added as the word itself, so
+     * there is nothing to give up here and no complaint to make.
      *
-     * Only when NOTHING matched: the image prints /etc/passwd and
-     * says not a word about the first half of
-     * "echo /nosuch/* /etc/pass*", and complains only when every
-     * pattern in the statement came to nothing.  A word with no
-     * pattern in it is not asked and does not count either way.
+     * This is where the reconstruction leaves the image.  The 1982
+     * shell answers "echo *.nope" with "No match." and runs nothing -
+     * it gives up the statement and not the line, so "echo *.nope ;
+     * echo after" says No match. and then after.  That is a shell
+     * refusing to do something ordinary: "rm -f *.x foo" is a command
+     * anyone would type, and the image will not run it because the
+     * first pattern happened to find nothing, while an editor's "*.o"
+     * with no object files in the directory is the commonest thing
+     * there is.  So the pattern stands as written, the way every shell
+     * since has done it.
      *
-     * This gives up the statement and not the line - "echo *.nope ;
-     * echo after" says No match. and then after - so it is a nothing
-     * to run rather than a parse that failed, and runline() carries
-     * on to what follows the semicolon.
+     * regress.sh carries the five cases this changes under differs()
+     * rather than check(), with the reason beside each; a divergence
+     * nobody wrote a reason for would be a regression, and this one is
+     * deliberate.
      */
-    if (npat && !nmatch) {
-        perr("No match.");
-        return 0;
-    }
 
     /*
      * A pipeline whose last stage has no words is "cmd |" with

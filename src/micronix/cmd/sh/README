@@ -127,7 +127,11 @@ Written down because guessing at them wasted time once already.
   - WHY "echo `echo`" ANSWERS "No match.".  An empty substitution
     ends up in the globber somehow, and yet a substitution's output
     is NOT globbed: "echo `cat f`" with /etc/pass* in f prints
-    /etc/pass* unexpanded.
+    /etc/pass* unexpanded.  Explained by the rule the divergence in
+    parse() was measured against: the empty word reaches the globber,
+    finds nothing, and a pattern that found nothing is what the image
+    complains about.  Ours prints a blank line, and "echo a `echo` b"
+    is "a b" on both.
 
   - WHICH END OF THE PATH findcmd SEARCHES FROM.  The image keeps
     three char * at 0x9741 laid out backwards, like the builtin

@@ -638,11 +638,26 @@ A pattern applies to every component and not only the last, so
 group, init, signon ... in that order on the disk and the image
 answers alphabetically.
 
-A pattern that matches nothing contributes nothing, and "No match."
-is raised only when NOTHING in the statement matched -
+A pattern that matches nothing contributes nothing, and the image
+raises "No match." only when NOTHING in the statement matched -
 "echo /nosuch/* /etc/pass*" prints /etc/passwd and says nothing about
 the first.  It gives up that statement and not the line: "echo *.nope
 ; echo after" says No match. and then after.
+
+WE DO NOT DO THIS.  A pattern that finds nothing stands as the word
+itself - "echo *.x" is *.x, "rm -f *.x foo" runs and removes foo - and
+"No match." is never written.  The image will not run an ordinary
+command because some pattern in it happened to find nothing, and "*.o"
+in a directory with no object files in it is the commonest thing there
+is.  This is the one deliberate divergence in the shell; it is argued
+at the end of parse(), and regress.sh carries the five cases it
+changes under differs() with the reason beside each.
+
+The image's own rule, for the record, since it was read off it and
+differs from what this file used to say: it complains when the command
+word itself came to nothing, or when nothing but the command word
+survived and some pattern was present.  A statement that comes to
+nothing at all is silently ignored, not complained about.
 
 Quoting interacts with it in two ways worth writing down:
 
@@ -656,6 +671,9 @@ Quoting interacts with it in two ways worth writing down:
     directory, so what the image looks for is the text as written
     with the backslash still in it.  The backslash only comes out of
     a word that turns out not to be a pattern: "echo a\b" is ab.
+    Ours prints \* now, since the word is what stands when the search
+    finds nothing, and it is worth knowing that a backslash buys
+    nothing here either way - see sh.1, which says as much.
 
 Still open:
 

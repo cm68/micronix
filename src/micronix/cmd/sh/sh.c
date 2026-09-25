@@ -986,10 +986,11 @@ char *line;
 
     /*
      * On what is left of the line rather than on the answer, because
-     * a statement can come to nothing without the line being over: a
-     * pattern that matched nothing says "No match." and hands back
-     * none, and what follows the semicolon still has to run.  A parse
-     * that actually failed gives up the whole line.
+     * a statement can come to nothing without the line being over: an
+     * empty statement - a leading or a doubled ";" - parses to
+     * nothing and hands back none, and what follows the semicolon
+     * still has to run.  A parse that actually failed gives up the
+     * whole line.
      */
     s = line;
     while (*s) {
