@@ -179,13 +179,13 @@ The loader is two levels: a sector the rom reads to 0100 and jumps to,
 and a second level that reads the filesystem to find the kernel.  Both
 live in the boot area, which is cylinder 0 - block 5236 on the 5 meg,
 because sys/mw.c rotates the mapping and does not put block 0 there -
-and the area is owned by /boot/bootmw so nothing allocates over it.
+and the area is owned by /boot/boot so nothing allocates over it.
 
 That file can be rewritten from the host, which is much quicker than
 reinstalling:
 
 	make -C src/micronix/stand INC=/usr/local/usr/include bootimg
-	mnix -f hddma-0 write -k <image> /boot/bootmw
+	mnix -f hddma-0 write -k <image> /boot/boot
 
 write -k is the important half.  Plain write frees the file first, so
 the blocks go back on the free list and come off it again in reverse -
@@ -215,7 +215,7 @@ entry in the table in its Makefile - bootimg-m5, -m10, -m16, -m32,
 the whole file and nothing has to be preserved from what was there:
 
 	make -C src/micronix/stand INC=/usr/local/usr/include bootimgs
-	mnix -f hddma-0 write -k bootimg-m5 /boot/bootmw
+	mnix -f hddma-0 write -k bootimg-m5 /boot/boot
 
 The image has to be padded to the file's full size, 34816, so the size
 stays what it was and all 68 blocks stay claimed.  write -k refuses to

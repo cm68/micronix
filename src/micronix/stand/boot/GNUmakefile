@@ -15,16 +15,18 @@ DEPTH	= ../..
 DIR	= boot
 CLASS	= stand
 
-# mkbootimg.c is a host program and mwboot1.s/djboot1.s are sectors, so
-# none of them belongs in the source lists the standard rules turn into
-# objects.  boot.c is the filesystem code, shared by both boots; mwio.c
-# and djio.c are the two device drivers, one per controller.
-CSRCS	= boot.c mwio.c djio.c
+# mkbootimg.c is a host program and mwboot1.s/djboot1.s/ideboot1.s are
+# sectors, so none of them belongs in the source lists the standard rules
+# turn into objects.  boot.c is the filesystem code, shared by all three
+# boots; mwio.c, djio.c and ideio.c are the device drivers, one per
+# controller - HD-DMA, DJ-DMA and the IDE card.
+CSRCS	= boot.c mwio.c djio.c ideio.c
 ASSRCS	= sexit.s
 
 # The main artifact, and the things built beside it.
 TARGET	= mwboot.com
-TARGETS	= mwboot1.bin bootimgs djboot.com djboot1.bin djload
+TARGETS	= mwboot1.bin bootimgs djboot.com djboot1.bin djload \
+	  ideboot.com ideboot1.bin idebootimgs
 
 # The loader links ccc's own libc, named by path below, so the tree's
 # libc must not be a prerequisite of the link.
@@ -65,6 +67,17 @@ djboot.com: boot.o djio.o sexit.o
 	    $(CCCLIB)/libc.a
 
 #
+# The IDE second level: the same boot.c again, with the driver for the
+# S100Computers MYIDE board (ideio.c) in place of mwio.c.  None of boot.c
+# changes and none of it needs to know which card it is talking to.
+#
+ideboot.com: boot.o ideio.o sexit.o
+	$(MXLD) -s -o $@ -Ttext=0x100 -L$(CCCLIB) \
+	    sexit.o boot.o ideio.o \
+	    $(CCCLIB)/libc.a $(CCCLIB)/libu.a \
+	    $(CCCLIB)/libc.a
+
+#
 # The first level is a sector: the rom reads 512 bytes to 0100 and
 # jumps, so there is nowhere to put a header and nothing to strip one.
 # The link is stripped and the 16-byte object header cut off.
@@ -84,6 +97,20 @@ djboot1.bin: djboot1.s
 	$(CCC) $(CCFLAGS) -c -o djboot1.o djboot1.s
 	$(MXLD) -s -Ttext=0x100 -o djboot1.abs djboot1.o
 	dd if=djboot1.abs of=$@ bs=16 skip=1
+
+#
+# The IDE first level, ideboot1.s, built the same way.  It differs from
+# mwboot1.s in the read as well: the HD-DMA is told where the sector goes
+# by a command block in memory, and the IDE card has no such block, so
+# this one writes the drive's task file and moves the sector through the
+# 8255 port by port.  It also has to be shorter than the other two - the
+# label sits at byte 256 of the sector and mkbootimg refuses an image
+# whose first level runs into it.
+#
+ideboot1.bin: ideboot1.s
+	$(CCC) $(CCFLAGS) -c -o ideboot1.o ideboot1.s
+	$(MXLD) -s -Ttext=0x100 -o ideboot1.abs ideboot1.o
+	dd if=ideboot1.abs of=$@ bs=16 skip=1
 
 #
 # What mkfs -i writes: the first level in block 0, the second level
@@ -126,6 +153,33 @@ bootimg: bootimg-m5
 	cp bootimg-m5 bootimg
 
 #
+# And the same for the IDE card.  One image per drive for the same
+# reason: the label is what carries the geometry, this loader reads it,
+# and a card that addresses by LBA still has to be told where a
+# filesystem block is on the platter.
+#
+# These are separate files from the bootimg-* above rather than the same
+# ones built twice, because what goes in them differs: bootimg-* holds
+# mwboot1/mwboot, which speak HD-DMA, and these hold ideboot1/ideboot,
+# which speak the 8255.  An image is a boot for one card and cannot be
+# both.
+#
+IDEBOOTIMGS = $(foreach d,$(DRIVES),idebootimg-$(word 1,$(subst :, ,$(d))))
+
+idebootimgs: $(IDEBOOTIMGS)
+
+$(IDEBOOTIMGS): ideboot1.bin ideboot.com mkbootimg
+	@set -e; for d in $(DRIVES); do \
+		n=`echo $$d | cut -d: -f1`; \
+		[ idebootimg-$$n = $@ ] || continue; \
+		./mkbootimg ideboot1.bin ideboot.com \
+		    `echo $$d | cut -d: -f2` \
+		    `echo $$d | cut -d: -f3` \
+		    `echo $$d | cut -d: -f4` $@; \
+		echo "$@: `echo $$d | cut -d: -f2`/`echo $$d | cut -d: -f3`/`echo $$d | cut -d: -f4`"; \
+	done
+
+#
 # The floppy boot image: djboot1.bin in sector 0, djboot.com in sectors
 # 1 through 8.  The DJ-DMA first level reads sectors 1-8 to STAGE and
 # unpacks them; the second level is the floppy second level above.
@@ -139,8 +193,9 @@ djload: djboot1.bin djboot.com
 # boot images out of this directory.  What it builds instead is
 # cleaned up here - mwboot1.o/mwboot1.abs and djboot1.o/djboot1.abs are
 # made inside the *.bin recipes, and mkbootimg is a host tool.
-GENERATED = mwboot1.o mwboot1.abs djboot1.o djboot1.abs mkbootimg \
-	bootimg bootimg-* djboot.com djload
+GENERATED = mwboot1.o mwboot1.abs djboot1.o djboot1.abs \
+	ideboot1.o ideboot1.abs mkbootimg \
+	bootimg bootimg-* djboot.com djload idebootimg-*
 
 install:
 

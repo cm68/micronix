@@ -5,7 +5,8 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-all:	mwboot.com mwboot1.bin bootimgs djboot1.bin djload
+all:	mwboot.com mwboot1.bin bootimgs djboot1.bin djload \
+	ideboot.com ideboot1.bin idebootimgs
 
 install:
 
@@ -24,10 +25,11 @@ install:
 # directory of that assembler's listings.  core.* is a crash dump - not
 # a build product, and named core.<pid>, so there is no list to write.
 clean:
-	rm -f $(OBJS) *.nam *.tok *.x
+	rm -f $(OBJS) ideio.o *.nam *.tok *.x
+	rm -f ideboot.com
 	rm -f mwboot1.abs djboot1.abs mwboot1.bin djboot1.bin
-	rm -f mwboot.com djload mkbootimg
-	rm -f $(BOOTIMGS) bootimg
+	rm -f ideboot1.abs ideboot1.bin mwboot.com djload mkbootimg
+	rm -f $(BOOTIMGS) $(IDEBOOTIMGS) bootimg
 
 clobber: clean
 
@@ -92,6 +94,15 @@ djboot1.bin: djboot1.s
 	$(WSLD) -s -Ttext=0x100 -o djboot1.abs djboot1.o
 	dd if=djboot1.abs of=djboot1.bin bs=16 skip=1
 
+# ideboot1.s is the same sector again, for the IDE card.  It writes the
+# drive's task file and moves the sector through the 8255 a word at a
+# time instead of handing the HD-DMA a command block; everything else is
+# mwboot1.s.
+ideboot1.bin: ideboot1.s
+	$(ASZ) ideboot1.s
+	$(WSLD) -s -Ttext=0x100 -o ideboot1.abs ideboot1.o
+	dd if=ideboot1.abs of=ideboot1.bin bs=16 skip=1
+
 #
 # what mkfs -i writes: the first level in block 0, the second level from
 # block 1, which is where the first level looks for it.
@@ -144,6 +155,27 @@ $(BOOTIMGS): mwboot1.bin mwboot.com mkbootimg
 bootimg: bootimg-m5
 	cp bootimg-m5 bootimg
 
+#
+# The same table again for the IDE card, and a second set of images: what
+# goes in these is ideboot1/ideboot, which drive the 8255, and an image
+# is a boot for one card.  They are per drive for the reason above - the
+# label carries the geometry and this loader reads it.
+#
+IDEBOOTIMGS = $(foreach d,$(DRIVES),idebootimg-$(word 1,$(subst :, ,$(d))))
+
+idebootimgs: $(IDEBOOTIMGS)
+
+$(IDEBOOTIMGS): ideboot1.bin ideboot.com mkbootimg
+	@set -e; for d in $(DRIVES); do \
+		n=`echo $$d | cut -d: -f1`; \
+		[ idebootimg-$$n = $@ ] || continue; \
+		./mkbootimg ideboot1.bin ideboot.com \
+		    `echo $$d | cut -d: -f2` \
+		    `echo $$d | cut -d: -f3` \
+		    `echo $$d | cut -d: -f4` $@; \
+		echo "$@: `echo $$d | cut -d: -f2`/`echo $$d | cut -d: -f3`/`echo $$d | cut -d: -f4`"; \
+	done
+
 # The floppy boot image: djboot1.bin in sector 0, mwboot.com in sectors
 # 1 through 8, which is what djboot1.s reads.
 djload: djboot1.bin mwboot.com
@@ -168,10 +200,21 @@ mwboot.com: $(OBJS)
 	$(MXLD) -s -o mwboot.com -Ttext=0x100 -L$(CCCLIB) \
 	    sexit.o boot.o mwio.o $(CCCLIB)/libc.a $(CCCLIB)/libu.a $(CCCLIB)/libc.a
 
+#
+# The IDE second level: the same boot.c with ideio.o in place of mwio.o.
+# reset() and readblock() keep their names and their meaning across the
+# three drivers, so nothing in boot.c knows which card it is.
+#
+ideboot.com: boot.o ideio.o sexit.o
+	$(MXLD) -s -o ideboot.com -Ttext=0x100 -L$(CCCLIB) \
+	    sexit.o boot.o ideio.o $(CCCLIB)/libc.a $(CCCLIB)/libu.a $(CCCLIB)/libc.a
+
 boot.o: boot.c
 	$(CCC) -c -i$(INC) -o boot.o boot.c
 mwio.o: mwio.c
 	$(CCC) -c -i$(INC) -o mwio.o mwio.c
+ideio.o: ideio.c
+	$(CCC) -c -i$(INC) -o ideio.o ideio.c
 sexit.o: sexit.s
 	$(CCC) -c -o sexit.o sexit.s
 
