@@ -306,6 +306,23 @@ src/micronix/lib/libutil/libutil.a
 src/micronix/lib/fslib/libfs.a
 src/micronix/sys/build.h
 src/micronix/sys/unix
+
+#
+# Kernel images kept by hand.  kernels/ carries a set of dated ones -
+# micronix.14, .161, .167, .new - that are history and are tracked, but a
+# copy of the kernel under a name of its own goes stale the moment the
+# kernel is rebuilt, and create_vol copies sys/unix rather than any of
+# them.  See src/micronix/sys/TODO.
+#
+micronix.k
+kernels/micronix.ccc
+kernels/micronix.ccc.sym
+kernels/unix.*
+
+#
+# A symlink to the usersim build, so it can be run from the tree root.
+#
+sim
 src/lib/maketables
 src/tools/*.a
 src/tools/ar

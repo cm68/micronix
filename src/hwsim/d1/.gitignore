@@ -14,7 +14,11 @@ hddma-0
 hddma-1
 hddma-2
 hddma-3
+ide-0
+ide-1
 .last
 .gdbargs
+mmu_test
 mon*.sym
 mon*.bin
+mon*.cim
