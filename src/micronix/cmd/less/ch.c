@@ -254,7 +254,7 @@ ch_end_seek()
 			;
 	} else
 	{
-		(void) ch_seek((POSITION)(lseek(file, (off_t)0, 2)));
+		(void) ch_seek((POSITION)(lseek(file, (long)0, 2)));
 	}
 	return (0);
 }
@@ -298,7 +298,7 @@ ch_length()
 {
 	if (ispipe)
 		return (ch_fsize);
-	return ((POSITION)(lseek(file, (off_t)0, 2)));
+	return ((POSITION)(lseek(file, (long)0, 2)));
 }
 
 /*

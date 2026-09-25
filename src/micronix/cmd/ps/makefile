@@ -20,12 +20,11 @@
 # install ships the binary and only the binary.
 #
 # One thing to know when reading a proc table by hand, because it is
-# not visible from here: a ps built against today's include/sys/proc.h
-# reads a 98-byte struct proc and NPROC 20.  The ps binary installed in
-# filesystem/bin is an older build that reads 141 bytes and NPROC 17,
-# and src/usersim/usersim.c builds that older layout by hand for it.
-# The kernel still publishes the table where both of them look - see
-# the "Hook for ps" in sys/uhdr.s.
+# not visible from here: include/sys/proc.h's struct proc is 99 bytes
+# and NPROC is 20.  The kernel publishes the table where this ps looks
+# for it - see the "Hook for ps" in sys/uhdr.s.  Whoever reads that
+# table without the header has to be kept in step with it by hand, and
+# two of them do: src/usersim/usersim.c and hwsim/d1/kdump.c.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 

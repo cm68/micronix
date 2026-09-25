@@ -805,7 +805,10 @@ getpwent()
         pwent.dir = cp;
         cp = fld(cp);
         pwent.shell = cp;
-        cp = fld(cp);
+        /* The shell field is NOT ended by a fld call: the strip below
+           turns its '\n' (or '\r') into the NUL.  A fld here would run
+           past the newline and leave cp at end-of-string, which the
+           *cp==0 test below reads as a malformed line and skips. */
         if (cp == NULL)
             continue;
         while (*cp && *cp != '\r' && *cp != '\n')

@@ -9,8 +9,8 @@
  * any one program, so the choices live where they can be read:
  *
  *	VOID 1		ccc has void
- *	off_t		micronix has no off_t; lseek takes and
- *			returns long
+ *	lseek		takes and returns long; less casts to long,
+ *			not off_t - types.h owns off_t now
  *	TERMIO 0	and no sgtty either - screen.c is rewritten
  *			for the micronix tty driver and an ANSI
  *			terminal, and reads neither flag
@@ -28,7 +28,6 @@
  *	HELPFILE	/usr/lib/less.help, which install ships
  */
 #define	VOID		1
-#define	off_t		long
 #define	TERMIO		0
 #define	SIGSETMASK	0
 #define	REGCMP		0
@@ -90,6 +89,6 @@ typedef long		POSITION;
 #define	SIGNAL(sig,func)	signal(sig,func)
 
 /* Library function declarations */
-off_t lseek();
+long lseek();
 
 #include "funcs.h"

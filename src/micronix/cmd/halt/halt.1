@@ -16,16 +16,24 @@ SYNTAX
 .in +5
 .br
 .bd
-halt
+halt [ -f ]
 .sp 2
 .in -5
 .bd
 DESCRIPTION
 .in +5
 .br
-Halt calls the reboot system call with the RB_HALT flag, which drops
-the cpu in kernel mode.  On real hardware this traps to the monitor;
-the simulators end the run.
+With no argument, halt sends init a terminate signal, and init shuts
+the machine down: every process is killed and logged out, the file
+systems are unmounted, a message is written on the console, and the
+machine halts.
+.sp
+With
+.bd
+-f,
+halt calls the reboot system call directly, which flushes the buffer
+pool and drops the cpu with none of init's grace.  Use it when the
+system is too sick to shut down the long way.
 .sp
 Only the super-user may halt the machine.
 .sp 2
@@ -34,4 +42,4 @@ Only the super-user may halt the machine.
 SEE ALSO
 .in +5
 .br
-reboot (2), sync (1)
+init (1), reboot (2), sync (1)

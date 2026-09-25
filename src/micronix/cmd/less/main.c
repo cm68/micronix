@@ -131,7 +131,7 @@ edit(filename)
 			break;
 		case 'A': case 'a':
 			logfile = open(namelogfile, 1);
-			if (lseek(logfile, (off_t)0, 2) < 0)
+			if (lseek(logfile, (long)0, 2) < 0)
 			{
 				close(logfile);
 				logfile = -1;

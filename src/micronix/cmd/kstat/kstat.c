@@ -45,13 +45,13 @@
 static int memfd;
 
 /*
- * the raw kernel seek.  This is private to libu (lseek.c declares it
- * itself), but kstat needs it directly: lseek() and seek() both bail
- * out on seekraw's return value, which is -1 even when the kernel has
- * moved the pointer (the carry the stub tests is not the kernel's
- * error flag).  So drive the kernel seek here and ignore the return.
+ * kstat is not linked with libu - it is a /micronix reader that the
+ * kernel build and the tools share - so it says for itself what it
+ * wants of lseek.  The declaration matters as much as the call: without
+ * it the compiler assumes an int return and keeps only the low word of
+ * a file position.
  */
-extern int seekraw(unsigned char fd, int offset, int whence);
+extern long lseek(unsigned char fd, long offset, int whence);
 
 /*
  * a bit-name table for printbits().
@@ -110,16 +110,15 @@ symaddr(name)
 
 	for (i = 0; i < nsym; i++) {
 		/*
-		 * move fd to off in block + byte steps, driving seekraw
-		 * directly (see above): seekraw reports -1 even when the
-		 * kernel moves the pointer, so lseek() bails out early.
+		 * The symbol table sits past the 64K a word-sized seek
+		 * reaches, and lseek splits the offset for that - the
+		 * split this loop used to make itself.
 		 */
-		if (off >> 9) {
-			seekraw(fd, (int)(off >> 9), 3);
-			if ((int)off & 511)
-				seekraw(fd, (int)off & 511, 1);
-		} else
-			seekraw(fd, (int)off, 0);
+		if (lseek(fd, off, 0) < 0) {
+			printf("kstat: seek to %u failed at sym %d\n",
+			    (unsigned)off, i);
+			break;
+		}
 		if (read(fd, entry, symlen + 3) != symlen + 3) {
 			printf("kstat: read at %u failed at sym %d\n",
 			    (unsigned)off, i);

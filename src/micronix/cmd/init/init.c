@@ -1196,9 +1196,9 @@ char **av;
 		break;
 
 	case 8:                     /* era */
-		av++;
-		if (unlink(*av) < 0)
-			perror(*av);
+		while (*++av)
+			if (unlink(*av) < 0)
+				perror(*av);
 		break;
 
 	case 9:                     /* type */
