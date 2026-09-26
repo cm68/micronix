@@ -130,16 +130,35 @@ It fits a page comfortably — the page turns out not to be what binds.
 ## The link
 
 Each driver is linked on its own at `OVLBASE`, producing a blob of no more than
-4K. The blobs are folded into one data-only object with `-Sdata`, parked after
-bss with `-Shigh`, and read in as part of the image — which is exactly what
-`highmem.o` already does. At init, before `expand_bufs()` mints anything, each
-blob is copied into a `segalloc()`d page and its segment number recorded. After
-that the region they were parked in is just memory, and the pool mints buffer
-headers over it.
+4K, and the blobs are appended to the kernel image after the normal load pages.
+They ride in with the kernel and are parked in the region after bss; **kernel
+init code then `segalloc()`s a page per blob and copies each one into it**, and
+the region they were parked in is handed to the pool as buffer headers.
 
-The ordering is the whole trick and is not new: `highmem.o` already runs *as*
-the region it is about to be reclaimed from, and the driver blobs are that with a
-copy inserted between reading and reclaiming.
+That copy costs nothing, and that is the whole reason it is done there. Init-only
+code already lives in that region and is already reclaimed: `highmem.o` is folded
+data-only with `-Sdata`, parked after bss with `-Shigh`, and `expand_bufs()` mints
+headers over it once init has returned. So the loader is not touched, and has no
+budget of its own to stay inside — the copy is init code, and init code is free
+because its address space comes back. The blobs are resident only for the length
+of the boot, and so is the code that moves them.
+
+The ordering is the one thing to get right: the copy has to finish before
+`expand_bufs()` runs, because it is reading memory the pool is about to hand out.
+`highmem.o` already lives under exactly that constraint — it runs *as* the region
+it is about to be reclaimed from.
+
+Two things this has to settle:
+
+- **Who owns the segment numbers.** The pages are taken by init, so the kernel
+  knows what it took — but `meminit()` sets `nsegs` and `segalloc()` sweeps from
+  16 upward, so where the overlay pages are taken from decides whether anything
+  else has to be told about them. Taking them from the top of the 1M, where the
+  upward sweep never reaches, is the version with the least to go wrong.
+- **The park has to fit.** The blobs are resident while init runs, so they have to
+  fit in the headroom, which is what makes `sys/TODO`'s budget the thing that
+  gates this plan — and why the `dj.c` change was the entry fee. One blob at a
+  time is the version that fits; all of them at once is not.
 
 **But the park does not fit, and that is the first thing the budget says.**
 Everything parked has to lie between `_ebss` and BUFWIN, because win.o is pinned
@@ -195,6 +214,89 @@ out, none of them equivalent:
 Recommended: (1), for the same reason the tree prefers one decode in
 `dlabel.c` over three — the thing that has to be correct is small and in one
 place.
+
+## Building a driver page
+
+A driver page is a self-contained object: linked on its own at `OVLBASE`, with a
+device switch entry as its first bytes — a table of the driver's own entry
+points. The resident side reaches the driver only through it.
+
+That is what makes the two halves independent. The resident code knows nothing
+about the page's layout — not where `djstrat` landed, not how big the driver is —
+only which major it is dispatching on.
+
+And the major is enough, because it can index the array of pages directly. A
+resident `ovlseg[]`, indexed the way `biosw[]` and `ciosw[]` already are, holds
+each overlaid driver's segment, and the dispatcher is then one piece of code for
+all of them:
+
+	seg = ovlseg[major];
+	if (seg) {
+		swap in seg;
+		jump through *(struct biovec *) OVLBASE;
+	} else {
+		call biosw[major] as today;
+	}
+
+A zero entry means "resident", so the two kinds coexist and drivers move one at a
+time. That is the migration path, and it is the reason this wants to be an array
+of segment numbers rather than a set of per-driver thunks.
+
+For block devices there is already a single funnel to put that in: `strat()`
+(uio.c:368) is the only route to a strategy routine, so the block half is one
+place. Character devices have no such funnel — `ciosw[]` has five entries and
+several call sites — so the block side is the one to do first, and `dj.c` is a
+block driver.
+
+The page's header is then not a new ABI at all. It is a `struct biovec` or a
+`struct ciovec` (`sys/con.h`) at `OVLBASE` — the same shapes the switch tables
+hold — which is what makes "jump through table[slot]" a single dereference.
+
+One thing has to be placed: `ovlseg[]` is *written*, at init, so it cannot live in
+the u page beside `biosw[]` and `ciosw[]`. That page must stay read-only or
+fork's `segcopy` clones it per process. It belongs in the kernel's own data, and
+it is `nbdev + ncdev` bytes of it — or 256 for one array covering both.
+
+The table is first in the page because it has to be at a known address, and the
+obvious one is `OVLBASE` itself. So a page is two objects linked together: a small
+assembly file emitting the table with `.defw` against the driver's entry points —
+resolved inside the standalone link, needing nothing from the kernel — and then
+the driver.
+
+`biosw[]` and `ciosw[]` are different shapes, three entries against five, so the
+table follows the class the driver is registered in. A page is one or the other;
+a device that is both is two drivers, as it is today.
+
+### The other direction, which the table does not solve
+
+The table is how the kernel reaches the driver. It says nothing about how the
+driver reaches the kernel, and that is the harder half: the driver still calls
+`bhold`, `iodone`, `sleep`, `di`, `copy`, `swin`, and those are relocations
+against symbols a standalone link cannot see.
+
+The symmetric answer is a resident vector table the driver calls through, and what
+makes it work is a **fixed absolute address**. If the table's address is a
+constant, the driver links against the constant and the circle is broken. If it is
+wherever the linker put it, the kernel must be linked first and the driver second
+— the two-pass build, and a change to `mxld`.
+
+The tree already has a home for pinned read-only kernel constants: the u page,
+where `syssw`, `biosw` and `ciosw` live. It is identical across processes, which
+is the property a vector table needs, and pinning it means an absolute symbol
+rather than a linker-chosen offset — so a later change to the kernel's layout
+cannot move it out from under the drivers.
+
+### What else a page has to hold
+
+A driver's *state* stays resident — that is the resident set above — but a driver
+that needs a scratch page of its own has a problem once `OVLSEG` is `0xd000`,
+because both kernel windows are then spoken for: 0xd000 is the driver's own code
+and 0xe000 is whatever buffer it is copying to. `dj.c` is that driver. Its 1K
+staging exists because the controller has no scatter/gather, and it has to be
+visible *beside* the buffer it copies to, which is why it does not sit in BUFSEG
+today. Overlaying `dj.c` therefore needs one of: room in its own page for the
+staging, a page of its own, or a driver whose transfer needs only one mapped
+window. Worth settling before `dj.c` is picked as the first one.
 
 ## The switch tables and the trampolines
 
