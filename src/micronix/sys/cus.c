@@ -22,7 +22,7 @@
  * down says static - two different linkages for one name.  The error
  * lands on the definition, a page away from the call that caused it.
  */
-static int cinit(), djinit(), hdinit();
+static int cinit(), hdinit();
 
 cus()
 {
@@ -42,9 +42,9 @@ cus()
     minit();                    /* in inits.s */
 
     /*
-     * coninit (); /* in inits.s 
+     * coninit (); /* in inits.s
      */
-    djinit();
+    ovlstart();                 /* the stamped root driver, in sys/ovl.c */
     hdinit();
 
     /*
@@ -85,62 +85,6 @@ cinit()
         cfree = b;
     }
 
-}
-
-#define SERIAL		0x2c
-#define DISABLE	0
-#define DJPORT		0xef
-#define DJINT		1
-#define LOGICAL	0x2e
-#define EIGHTFIRST	0
-#define NOSTAT		0
-#define SETCHANNEL	0x27
-#define HALT		0x25
-#define SETTRACK	0x2d
-#define MAXTRACK	80
-#define NDJDRIVE	8
-
-static
-djinit()
-{
-    extern unsigned char djcomm[];
-    extern char map0[], image0[];
-    static char *p, i;
-
-    p = 0x1050;
-
-    map0[2] = 0;                /* contort the map */
-
-    *p++ = SERIAL;              /* disable the serial port */
-    *p++ = DISABLE;
-
-    *p++ = LOGICAL;             /* set to 8" drives first */
-    *p++ = EIGHTFIRST;
-    *p++ = NOSTAT;
-
-    *p++ = SETCHANNEL;          /* set the command address */
-
-    *p++ = ((unsigned) djcomm >> 0);
-    *p++ = ((unsigned) djcomm >> 8);
-    *p++ = ((unsigned) djcomm >> 16);
-
-    for (i = 0; i < NDJDRIVE; i++) {
-        *p++ = SETTRACK;
-        *p++ = i;
-        *p++ = MAXTRACK;
-        *p++ = NOSTAT;
-    }
-
-    *p++ = HALT;
-    *p++ = NOSTAT;
-
-    map0[2] = image0[2];        /* restore the map */
-
-    out(DJPORT, 0);
-
-    inton(DJINT);
-
-    djgoose();                  /* start up dj watchdog */
 }
 
 /*

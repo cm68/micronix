@@ -33,10 +33,12 @@ TARGET	= unix
 # the native Makefile beside this has always done.
 INC	= -i$(DEPTH)/include
 
-# build.h is written by the rule below; GNUmakefile.inc's clobber takes
-# GENERATED away, so it is not left lying in the directory for the next
-# build to include.
-GENERATED = build.h
+# build.h is written by the rule below, and unix.link is the half-built
+# image unix is made from; GNUmakefile.inc's clobber takes GENERATED
+# away, so neither is left lying in the directory for the next build to
+# include or to copy.  unix itself is $(TARGET), which clobber removes
+# for the same reason.
+GENERATED = build.h unix.link
 
 # The compiler and linker are this tree's own.  CCC defaults to
 # $(BIN)/mxccc in GNUmakefile.inc; the linker mxld is beside it.
@@ -56,12 +58,27 @@ MXLD     = $(BIN)/mxld
 # src/libc and re-sectioned to psect data.  They sat in leaf/ until that
 # directory was flattened; the generic %.o:%.s rule assembles them here,
 # with the rest of the kernel's sources.
+#
+# They have to be here and not in a library, because a driver module is
+# linked against the kernel and nothing else: whatever the compiler emits
+# a call to has to be resident, or the module does not link.  qinc is the
+# one that showed it - a UINT32 postfix ++ in a driver's wait loop is a
+# call.  qmul is here for the same reason, and it cannot be avoided by
+# writing the multiply out longhand: which of the runtime's multiplies an
+# expression costs is the compiler's to choose, and a driver's geometry
+# math multiplies two 16-bit counts into a 32-bit block number.
+# (A cheaper qmul for that case was tried and does not exist: qmul is 49
+# bytes and almost all of it is the shift-and-add body, so a 16-turn
+# version is the same code with a smaller counter, and the C version
+# costs 119 - every access to a 32-bit local is a call.)
 LEAF_LIBC = csv.o idiv.o imul.o qadd.o qsub.o \
 	qand.o qor.o qcmp.o qshl.o qsar.o qshr.o \
+	qmul.o qinc.o \
 	qldst.o tramp.o swdisp.o swdispw.o oarg.o
 LEAF_AS   = mem.o inout.o sub8.o unixtobcd.o $(LEAF_LIBC)
-# Read-only kernel tables (syssw, biosw, ciosw) that also live in the u page.
-LEAF_C    = consts.o rtc.o
+# Kernel C that also lives in the u page: the read-only tables (syssw,
+# biosw, ciosw), the clock, and the bus lock two driver modules share.
+LEAF_C    = consts.o rtc.o bus.o
 
 # rtc.c is pure code (no static data), so re-section its single .text
 # block to .data and park it in the u page, like the libccc runtime.
@@ -87,14 +104,29 @@ consts.o: consts.c
 	$(MXLD) -r -Sdata -o consts.o consts.rel
 	rm -f consts.rel
 
+# bus.c is the DMA bus lock mw.c and dj.c both call, which is what puts
+# it in the u page: the two are modules and cannot call into each other,
+# and the u page is resident, so a module finds busget/busgive in the
+# kernel's symbol table (-Aunix) the way it finds qadd and the rest of
+# the leaf runtime.  It is folded like the two above - it is code, and
+# without the fold the loader's data pass would write it over the u page.
+bus.o: bus.c
+	$(CCC) $(CCFLAGS) $(INC) -c -o bus.rel $<
+	$(MXLD) -r -Sdata -o bus.o bus.rel
+	rm -f bus.rel
+
 KERNEL_AS = uhdr.o intrpt.o mio.o textpad.o highmem.o
 KERNEL_C  = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o malloc.o name.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
-	trap.o tty.o uio.o dj.o multio.o dlabel.o mw.o ide.o main.o
+	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o
 WIN_C     = open.o sys2.o rdwri.o memdev.o link.o access.o
-HIGHMEM   = main_init.o cus.o inits.o
-OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) $(WIN_C) $(HIGHMEM) low.o win.o
+HIGHMEM   = main_init.o cus.o inits.o djinit.o
+# dj, mw and ide are not here: they are driver modules, linked at OVLBASE
+# and stamped into the slot (the module rules below).  Their header
+# objects are named on the module links and no longer in the kernel
+# either - a module's header is the module's own first bytes.
+OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) $(WIN_C) $(HIGHMEM) low.o win.o $(OVLSLOT)
 TREELIBS =
 
 include $(DEPTH)/GNUmakefile.inc
@@ -123,6 +155,33 @@ include $(DEPTH)/GNUmakefile.inc
 ifdef DEBUGBUFS
 CCFLAGS += -DDEBUGBUFS
 endif
+
+#
+# The overlay frame (sys/ovl.h): OVLSEG is the one segment of the
+# kernel's address space a driver module is mapped into, and OVLBASE is
+# where that is.  One variable, passed to the C and used by the module
+# links below, because the two have to agree and a segment that moved on
+# one side only would be a module mapped nowhere.  The segment is a
+# property of the build and not a choice: it is the page just past the
+# end of the resident text, so it moves when the text grows past its
+# page, and this is the place it moves.
+#
+# The frame is opened by OVLDATA, one page above OVLBASE: the final link
+# is told the data segment starts there and ovlslot.o is linked at
+# OVLBASE, so the page between them is the slot - text with nothing in it
+# but the slot object, data below it at its own page, and so a page that
+# can be overwritten with a driver without disturbing anything.  ovlslot.o
+# is what makes the text reach that far: the linker sizes the text segment
+# by its last object, so a slot that were only a gap in the addresses
+# would be a slot the file has no bytes for and setdev nothing to write
+# onto.
+#
+OVLSEG  = 9
+OVLBASE = $(shell printf 0x%x $$(( $(OVLSEG) * 4096 )))
+OVLDATA = $(shell printf 0x%x $$(( ($(OVLSEG) + 1) * 4096 )))
+PAGESZ  = 4096
+OVLSLOT = ovlslot.o
+CCFLAGS += -DOVLSEG=$(OVLSEG)
 
 #
 # Every object: the ones "all" links into unix, and the ones folded into
@@ -199,8 +258,9 @@ upage.o: $(LEAF_AS) $(LEAF_C) user.o
 	$(MXLD) -r -Tdata=0xf000 -o upage.o $(LEAF_AS) $(LEAF_C) user.o
 
 # highmem.o is the init-only code - main_init, cus, the MIO/console init
-# in inits.s, and bcd2unix (unbcd.s) - folded into one data-only
-# object with -Sdata.  The fold leaves the object with no text and no
+# in inits.s, bcd2unix (unbcd.s), and the disk drivers' own bring-up
+# (djinit.c and its siblings as they are split out) - folded into one
+# data-only object with -Sdata.  The fold leaves the object with no text and no
 # bss, and no address of its own - and -Shigh on the main link parks an
 # unplaced object of exactly that shape after bss, so it sits at _ebss
 # and binit()'s expand_bufs() mints buffer headers over it once init has
@@ -210,8 +270,15 @@ upage.o: $(LEAF_AS) $(LEAF_C) user.o
 # tracks the kernel as it grows without re-tuning.  bcd2unix's
 # lifetime-0 .ds workspace rides here as data rather than pushing _ebss
 # up from the resident .bss.
-highmem.o: main_init.o cus.o inits.o unbcd.o
-	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o
+#
+# A driver's init belongs here and not in the driver because the driver
+# is what has to fit a page.  A driver is linked as a module at OVLBASE
+# and copied into one 4K segment; its init runs once, before anything can
+# reach it, so the page it occupies is the page it holds for the whole
+# boot.  Split out, the init is reclaimed instead, and the page holds
+# only what running the driver needs.
+highmem.o: main_init.o cus.o inits.o unbcd.o djinit.o
+	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o djinit.o
 
 # win.o is the window-page cluster: the part of the resident kernel that
 # can live at BUFSEG, in the very page bhold() maps buffers into, so its
@@ -253,14 +320,122 @@ win.o: $(WIN_C)
 low.o: uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
 	$(MXLD) -r -o low.o uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
 
+# ovlslot.o is the overlay slot (sys/ovlslot.s): one page of text at
+# OVLBASE, which setdev later writes the root driver's page onto.  The
+# -r link is what holds it at that address.  Assembled, the object is an
+# ordinary one - the slot is wherever the assembler's section starts,
+# which is the assembler's business, not the kernel's - and -Ttext says
+# where that is, so the object's own header carries the page and mxld's
+# final link places it there instead of packing it after the resident
+# text.  win.o and upage.o are the same trick on the data side; there is
+# no way to say it in the assembly, because asz's .align counts from the
+# start of the section it is assembling and this address is a property
+# of the link.
+ovlslot.o: ovlslot.s
+	$(CCC) $(CCFLAGS) -c -o ovlslot.rel $<
+	$(MXLD) -r -Ttext=$(OVLBASE) -o ovlslot.o ovlslot.rel
+	rm -f ovlslot.rel
+
 #
-# the final link: four objects, in the order the image wants them, and
+# the final link: five objects, in the order the image wants them, and
 # nothing here is a special case (see the kernel section above).
 # highmem.o precedes win.o because it is unplaced and parked at _ebss,
-# and win.o precedes upage.o because 0xe000 is below 0xf000.
+# win.o precedes upage.o because 0xe000 is below 0xf000, and ovlslot.o
+# is last because it is the top of the text.
 #
-unix: $(OBJS)
-	$(MXLD) -Ttext=0x1000 -Shigh -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix low.o highmem.o win.o upage.o
+# -Tdata is what opens the overlay frame: the data segment starts at
+# OVLDATA, one page above the slot, and the linker pads the text out to
+# reach it.  Without it the data would start at the end of the resident
+# text, which is inside the slot.
+#
+# The output is unix.link and not unix, because unix is the *bootable*
+# image: this link has an empty slot and no modules behind it, so it
+# cannot be booted.  It is kept under its own name because it is what the
+# module links are resolved against (-A below), and because unix - the
+# thing create_vol copies to /micronix and the tracer resolves symbols
+# against - is this file with the module pages on the end and a driver
+# stamped into the slot.
+unix.link: $(OBJS)
+	$(MXLD) -Ttext=0x1000 -Tdata=$(OVLDATA) -Shigh -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix.link low.o highmem.o win.o upage.o $(OVLSLOT)
+
+#
+# Driver modules, and the bootable image they go into.
+#
+# A driver is built twice while the kernel still holds it: linked in, as
+# it always was, and linked a second time as a module.  The objects are
+# the same ones; only the link differs.  What makes the two one driver is
+# that a module's first bytes are its header (sys/ovl.h), which is what
+# the kernel reads at OVLBASE and which tells it everything it will ever
+# know about the driver.
+#
+# The header is an object of its own, named first, and the link is
+# -Sdata.  That flag folds every section into the data segment, and an
+# object's data is placed in the order the objects are named on the link
+# line - so the header's 28 bytes are the page's first 28 and nothing the
+# driver holds can get in front of them.  The same ordering is why the
+# header object holds the struct and nothing else, and why the name in it
+# is a character list: sys/ovl.h has what a string would cost.
+#
+# -Aunix is the other direction.  A module is linked against the kernel's
+# own symbol table, so it can name anything in the kernel and be given a
+# real address; nothing in the kernel names the module, which is what
+# lets the kernel be linked with no disk drivers at all.  The image it is
+# linked against has to be one without modules in it, which is why the
+# pages go on a copy (the rule below) rather than onto unix.link - a
+# second make would otherwise stack a second set of pages on the first.
+#
+# -s drops the symbol table.  A module is linked against and never linked
+# from, so it has no use for one and the page should not carry it.
+#
+# While the drivers are still in $(KERNEL_C) the linker says so - "-A:
+# _djopen: the module defines this too", once per symbol - and that
+# warning is the measure of what is left to do: it goes away when the
+# driver leaves the kernel.
+#
+MODS = dj mw ide
+
+$(MODS:%=%.mod): %.mod: %hdr.o %.o unix.link
+	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ $*hdr.o $*.o
+
+#
+# One module is one page.  What the link produced is a 16 byte object
+# header followed by the page's bytes - all of them, because -Sdata puts
+# every section there and -s leaves nothing after - so the page is what
+# follows the header.  dd takes it and truncate brings a short module up
+# to the 4K the kernel will read, which is the ordinary case.  A module
+# that does not fit is too big for its page and is worth stopping on
+# rather than silently halving.
+#
+$(MODS:%=%.page): %.page: %.mod
+	@if [ `wc -c < $<` -gt $$((16 + $(PAGESZ))) ]; then \
+		echo "$< is larger than a page"; exit 1; fi
+	dd if=$< of=$@ bs=1 skip=16 count=$(PAGESZ) 2>/dev/null
+	truncate -s $(PAGESZ) $@
+
+#
+# The bootable kernel: the link, the module pages stacked above its
+# extent, and the root driver stamped into the slot.
+#
+# The pages go at the first page boundary past the object, which is what
+# setdev() calls modbase and computes for itself out of the object's own
+# header - text, data and symbol table all three.  The two agree because
+# this pads the file and the file is exactly that extent, and a
+# disagreement is not silent: setdev reads the major out of each page and
+# dies if it finds no module for the root device.
+#
+# The stamp is the last step and it is what makes the image bootable: the
+# kernel is linked with a page-sized hole where its root driver goes, and
+# setdev fills it with the module whose header serves the major that
+# _rootdev already names.  -i is that mode - it stamps the driver for the
+# kernel's own root device and writes no device numbers, so the default
+# in main.c is the only place it is stated.
+#
+unix: unix.link $(MODS:%=%.page)
+	cp unix.link $@
+	@sz=`wc -c < $@`; \
+	 truncate -s $$(( (sz + $(PAGESZ) - 1) / $(PAGESZ) * $(PAGESZ) )) $@
+	cat $(MODS:%=%.page) >> $@
+	$(SETDEV) -i $@
 
 #
 # Generate the assembly ccc would assemble for a C file, for reading:

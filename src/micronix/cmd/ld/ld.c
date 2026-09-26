@@ -49,6 +49,7 @@ char Vflag;            /* -V: list object files */
 char rflag;            /* -r: emit relocatable output */
 char sflag;            /* -s: strip symbols */
 char out_symlen;       /* output symbol length (0=15, set by -9) */
+char *absfile;         /* -A<image>: resolve undefined symbols from it */
 
 /*
  * segment base addresses (command line settable)
@@ -75,6 +76,7 @@ unsigned short high_pos;        /* data-only objects parked after bss */
 unsigned short total_text;
 unsigned short total_data;
 unsigned short total_bss;
+unsigned short placed_bss;      /* a placed object's bss: in the header, not the file */
 
 /*
  * symbol table entry
@@ -109,6 +111,31 @@ struct symbol {
 
 struct symbol *symbols;
 int num_globals;
+
+/*
+ * -A<image>: the symbols a linked image already resolved, to fill in
+ * the externals of an object linked on its own.
+ *
+ * A linked image is written in the same format it reads, and its
+ * symbol table holds the addresses its own link arrived at.  The
+ * values are final, so this needs nothing else - no segment, no
+ * defining object, no relocating at output.
+ *
+ * It is deliberately not the link's own symbol list.  These are
+ * answers, not definitions: they must not reach the output symbol
+ * table, which is sized by num_globals and would then have to carry
+ * every name the kernel has, and they must not displace anything the
+ * object under link defines.  Shadowing is the point - it is how a
+ * driver keeps its interrupt-path state in the kernel and takes the
+ * rest of itself from the module.  See OVERLAY-DRIVERS.md.
+ */
+struct abssym {
+    struct abssym *next;
+    unsigned short value;
+    char name[1];           /* variable length tail */
+};
+
+struct abssym *abssyms;
 
 /*
  * object file info
@@ -267,11 +294,12 @@ struct lnksym {
 void
 usage()
 {
-    fprintf(stderr, "usage: ld [-vV9rs] [-o outfile] [-L<dir>] [-l<lib>] [-Ttext=addr] [-Tdata=addr] [-Tbss=addr] file...\n");
+    fprintf(stderr, "usage: ld [-vV9rs] [-o outfile] [-A<image>] [-L<dir>] [-l<lib>] [-Ttext=addr] [-Tdata=addr] [-Tbss=addr] file...\n");
     fprintf(stderr, "  -V            list object files linked\n");
     fprintf(stderr, "  -r            emit relocatable output (for subsequent links)\n");
     fprintf(stderr, "  -s            strip symbol table from output\n");
     fprintf(stderr, "  -9            use 9-char symbols in output (default 15)\n");
+    fprintf(stderr, "  -A<image>     resolve undefined symbols from a linked image\n");
     fprintf(stderr, "  -L<dir>       add <dir> to library search path\n");
     fprintf(stderr, "  -l<lib>       link with library lib<lib>.a\n");
     fprintf(stderr, "  -Ttext=addr   set text segment base address\n");
@@ -1904,6 +1932,96 @@ bss_merge()
     }
 }
 
+/*
+ * lookup symbol by name among the image's answers
+ */
+struct abssym *
+abs_lookup(name)
+char *name;
+{
+    struct abssym *a;
+
+    for (a = abssyms; a; a = a->next)
+        if (strcmp(a->name, name) == 0)
+            return a;
+    return 0;
+}
+
+/*
+ * -A<image>: read the symbol table of an image that is linked already.
+ *
+ * The image is in the same object format its own inputs are, so this is
+ * a header read and a walk: HDR_SIZE + text + data to the entries, then
+ * symtab_size bytes of value(2) type(1) name(symlen).  Every global
+ * entry - type bit 0x08 - becomes an answer.  The local entries are the
+ * names an -r fold was linked from, and no relocation refers to them.
+ *
+ * The value is taken as it stands: it is the address the image's own
+ * link assigned, and the image does not move, so there is nothing to
+ * add and no segment to keep.  decode_seg is not used for the same
+ * reason it exists - it folds segments under -Sdata, and a folded
+ * answer is no longer the address.
+ */
+void
+read_abssyms(name)
+char *name;
+{
+    FILE *fp;
+    struct abssym *a;
+    struct symbol *s;
+    unsigned char magic, config, type;
+    unsigned short symtab_size, text_size, data_size, val;
+    int symlen, nsyms, i;
+    char symname[16];
+
+    fp = fopen(name, "rb");
+    if (fp == NULL)
+        error2("cannot open", name);
+
+    magic = read_byte(fp);
+    if (magic != MAGIC)
+        error2("not an object file", name);
+
+    config = read_byte(fp);
+    symlen = (config & CONF_SYMASK) * 2 + 1;
+    symtab_size = read_word(fp);
+    text_size = read_word(fp);
+    data_size = read_word(fp);
+
+    if (symtab_size == 0)
+        error2("no symbol table in", name);
+
+    fseek(fp, (long)(HDR_SIZE + text_size + data_size), SEEK_SET);
+
+    nsyms = symtab_size / (symlen + 3);
+    for (i = 0; i < nsyms; i++) {
+        val = read_word(fp);
+        type = read_byte(fp);
+        fread(symname, 1, symlen, fp);
+        symname[symlen] = '\0';
+
+        if ((type & 0x08) == 0)
+            continue;                   /* local: nothing refers to it */
+
+        /*
+         * A name the object under link defines too.  The object's
+         * definition wins, and saying so is how a driver that is still
+         * in the kernel shows up.
+         */
+        s = sym_lookup(symname);
+        if (s && s->seg != SEG_EXT)
+            fprintf(stderr, "ld: -A: %s: the module defines this too\n",
+                    symname);
+
+        a = (struct abssym *)permalloc(sizeof(struct abssym) + symlen);
+        strcpy(a->name, symname);
+        a->value = val;
+        a->next = abssyms;
+        abssyms = a;
+    }
+    fclose(fp);
+}
+
 void
 pass1_layout()
 {
@@ -2014,19 +2132,15 @@ pass1_layout()
     /*
      * Now that data_base is fixed, resolve the placed objects' data and
      * bss offsets and widen the totals so the segments span them.  A
-     * placed object's bss rides just after its own data; refusing it
-     * here is honest rather than silently placing it wrong.
+     * placed object's bss rides just after its own data, in the gap the
+     * -r link left at the object's own address rather than in the bss
+     * segment the packed objects built.
      */
     for (obj = objects; obj; obj = obj->next) {
         unsigned short end;
 
         if (!obj->placed)
             continue;
-        if (obj->bss_size != 0) {
-            fprintf(stderr, "ld: placed object %s has bss (unsupported)\n",
-                    obj->name);
-            exit(1);
-        }
         obj->data_off = obj->hdr_data_off - data_base;
         obj->bss_off = obj->data_off + obj->data_size;
 
@@ -2044,6 +2158,25 @@ pass1_layout()
             if (end > total_data)
                 total_data = end;
         }
+    }
+
+    /*
+     * A placed object's bss is not in the file.  copy_segment never
+     * writes bss, and the resident bss is folded into the data stream
+     * on purpose (see the header write below), but folding this one
+     * would put its zeros back in front of the loader, which is the
+     * whole thing the placed object's bss is there to avoid.  It rides
+     * just after its own data instead, and the header reports it so
+     * whoever clears bss knows where it is.
+     */
+    for (obj = objects; obj; obj = obj->next) {
+        unsigned short bend;
+
+        if (!obj->placed)
+            continue;
+        bend = obj->data_off + obj->data_size + obj->bss_size;
+        if (bend > total_data && bend - total_data > placed_bss)
+            placed_bss = bend - total_data;
     }
 
     /* find linker-defined symbols and save original offsets BEFORE resolution */
@@ -2064,6 +2197,21 @@ pass1_layout()
     int undef_count = 0;
     for (s = symbols; s; s = s->next) {
         if (s->seg == SEG_EXT) {
+            struct abssym *a;
+
+            /*
+             * -A: the image is linked already, so its answer is the
+             * value, and SEG_ABS is what says so - it is what keeps the
+             * object's own placement from being added to it below.
+             * Only symbols still undefined get here, so anything the
+             * object defines has already won.
+             */
+            a = abs_lookup(s->name);
+            if (a) {
+                s->value = a->value;
+                s->seg = SEG_ABS;
+                continue;
+            }
             /* -r emits a relocatable object for a later link, so an
              * extern still undefined here is expected and is not worth
              * reporting; the final link is what names and fails on it. */
@@ -3005,9 +3153,14 @@ pass2_output()
          * nails down what is in the file, so a separate bss stays GROW
          * and is swept up (and clobbered) by the first sbrk that moves
          * the grow segment.
+         *
+         * A placed object's bss is the exception, and is what the bss
+         * word reports: its bytes are deliberately not in the file, so
+         * the data length stops at the placed data's end and the field
+         * says how much bss follows it.
          */
         write_word(data_extent);
-        write_word(0);
+        write_word(placed_bss);
     }
     write_word(0);              /* heap */
     write_word(text_base);      /* text offset */
@@ -3423,6 +3576,16 @@ char **argv;
                 out_symlen = 9;
                 break;
 
+            case 'A':
+                /* -A<image>: resolve undefined symbols from a linked image */
+                if (arg[2])
+                    absfile = &arg[2];
+                else if (++i < argc)
+                    absfile = argv[i];
+                else
+                    usage();
+                break;
+
             case 'o':
                 if (arg[2])
                     outfile = &arg[2];
@@ -3563,6 +3726,15 @@ char **argv;
             printf("archive pass %d: added %d objects\n", pass, added);
         }
     } while (added > 0 && has_undefined());
+
+    /*
+     * -A<image>: read the image's symbol table now, after every object
+     * is in.  Doing it earlier would make each name the object defines
+     * look like a name the image shadows, which is the one thing the
+     * read has to be able to tell apart.
+     */
+    if (absfile)
+        read_abssyms(absfile);
 
     /* Pass 1: assign addresses and resolve symbols */
     pass1_layout();

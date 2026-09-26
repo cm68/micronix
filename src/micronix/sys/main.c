@@ -58,7 +58,7 @@ extern int segalloc();          /* malloc.c */
 /*
  * The ceiling on the pool.  expand_bufs() would otherwise mint whatever
  * the resident .bss leaves between _ebss and BUFWIN, which is past what
- * the count can carry - 412 buffers at present, and nbuf wrapped at 256.
+ * the count can carry - 282 buffers at present, and nbuf wrapped at 256.
  * 256 is also 32 of the 4K segments the blocks come from, which is what
  * the budget is really made of, and no filesystem here wants more cache
  * than that.

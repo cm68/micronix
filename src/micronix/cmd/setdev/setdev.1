@@ -8,7 +8,8 @@ NAME
 .br
 .bd
 setdev
-- show or set a Micronix kernel's root and swap devices
+- show or set a Micronix kernel's root and swap devices, and stamp the
+root device's driver into it
 .sp 2
 .in -5
 .bd
@@ -29,6 +30,14 @@ prints them; with two it writes them.
 .sp
 A device is written either as major/minor - 3/0 - or as a plain
 number, decimal or 0x hex, so 3/0, 0x300 and 768 all agree.
+.sp
+It also prints the appended driver modules the kernel carries and what
+its slot holds.  Setting the devices stamps one of those modules into
+the slot as well: the kernel is linked with no disk drivers and a
+page-sized hole in its text, and the driver it needs to mount root is
+chosen here, at install time.  The driver is not named - it is the
+module whose header says it serves the major that root names - so the
+stamp and root are written in one pass and cannot disagree.
 .sp
 This replaces the old ddt recipe, which searched the kernel for the
 bytes of the root device it expected to find.  The kernel carries a

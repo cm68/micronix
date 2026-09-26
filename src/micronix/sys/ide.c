@@ -133,6 +133,8 @@
 #include <sys/proc.h>
 #include <sys/con.h>
 #include <sys/dlabel.h>
+#include <sys/ide.h>
+#include <sys/ovl.h>
 #include <errno.h>
 
 /*
@@ -143,32 +145,6 @@ static int idebsy(), idewait(), idestart(), idefinish();
 static int idereset();
 
 #define NDRIVES 2               /* the board's two drives */
-
-/*
- * The interrupt line the card drives.  The S-100 bus carries eight
- * vectored interrupt lines, VI0 to VI7, and a card asserts one of them;
- * which of those reach the Mult I/O board's 8259 is the board's jumper
- * area's business, and it brings in three - VI0, VI1 and VI2.  The other
- * five inputs are wired on the board itself to its own devices (three
- * serial ports, the parallel printer and the clock), so those five are
- * not bus lines at all and the three are the whole of what a card on the
- * bus can claim.  Two of the three are spoken for, and by what the
- * machine shipped with: the Decision 1 leaves the jumper area with VI0 on
- * the hard disk controller and VI1 on the floppy controller, which is the
- * jumpering Micronix is written for - mw.c claims VI0 as it comes up with
- * inton(MWINT) and cus.c claims VI1 with inton(DJINT), both of which are
- * numbers 0 and 1 because that is where the jumpers put them.
- *
- * VI2 is the one left, and it is left in the literal sense: no card on
- * the bus drives it, so nothing is behind the line.
- *
- * Past the jumpers the line is simply input 2 of the 8259, and the
- * kernel's numbering means 8259 inputs from here on.  ARMMASTER in
- * inits.s masks inputs 0, 1 and 6 and allows 2 through 7, so this one is
- * already unmasked and needs no inton() call to claim it.  sys/intrpt.s
- * routes input 2 to ideint() below.
- */
-#define IDEINT  2
 
 /*
  * Task file register numbers.  These are ATA's names and not ports: the
@@ -507,11 +483,14 @@ struct info
 
     UINT maxblk;                /* max legal block number in the slice */
     UINT spc;                   /* sectors per cylinder */
-    UINT roll;                  /* what idecyl adds to blk / spc */
+    UINT roll;                  /* what a block's cylinder is rotated by */
     UINT cylstart;              /* first cylinder of the slice being read */
     UINT8 flags;                /* see below */
     UINT8 type;                 /* index into boards[] */
     UINT8 slice;                /* the slice this open is bound to */
+
+    UINT32 lbase;               /* what idelba adds to a block */
+    UINT32 trackblks;           /* one track-set: tracks * spc */
 } ides[NDRIVES] = 0;
 
 #define OPEN    2               /* drive is open */
@@ -764,63 +743,54 @@ idereset(ip, unit)
 }
 
 /*
- * Which cylinder a filesystem block lands on.
+ * The block's LBA.
  *
- * A block's cylinder is its number divided by the sectors per cylinder,
- * shifted by the slice it lives in and rotated by d_roll.  The rotation
- * is what keeps block 0 - the boot sector, the label, the superblock -
- * from always landing on the disk's outermost track; the slice shift is
- * what lets a filesystem live anywhere on a drive far larger than a block
- * number can count.  Both are cylinders and both are added after the
- * division, which is why neither has to be a block number.  A disk laid
- * out as one whole-disk slice carries d_roll tracks >> 1 the way every
- * disk made before slices does, and mw.c applies exactly the same two;
- * lib/fslib.c inverts the same two on the host, which is what makes the
- * three agree.
- */
-static UINT
-idecyl(blk, info)
-    UINT blk;
-    register struct info *info;
-{
-    static UINT cyl;
-
-    cyl = blk / info->spc;
-    cyl += info->cylstart;
-    cyl += info->roll;
-    if (cyl >= info->tracks)
-        cyl -= info->tracks;
-    return (cyl);
-}
-
-/*
- * The block's LBA.  The block is turned into the cylinder, head and
- * sector the HD-DMA would have put it at, and that triple is then
- * flattened - lib/fslib.c's ((cyl * heads + head) * spt + sec) * 512,
- * divided back out.  Doing it in that order is the entire compatibility
- * argument: handing the drive the block number as an LBA would be
- * simpler and would read a different disk.
+ * The block is turned into the cylinder, head and sector the HD-DMA would
+ * have put it at, and that triple is then flattened - lib/fslib.c's
+ * ((cyl * heads + head) * spt + sec) * 512, divided back out.  Doing it
+ * in that order is the entire compatibility argument: handing the drive
+ * the block number as an LBA would be simpler and would read a different
+ * disk.
+ *
+ * The flattening and the split it undoes cancel, which is why neither a
+ * wide multiply nor a division is needed to do it.  Writing spt for the
+ * sectors per track and spc for heads * spt, and csec for the block's
+ * offset within its cylinder, csec is under spc, so
+ *
+ *     (cyl * heads + csec / spt) * spt + csec % spt
+ *         = cyl * heads * spt + (csec / spt) * spt + csec % spt
+ *         = cyl * spc + csec
+ *
+ * The block is cylraw * spc + csec for its unwrapped cylinder, so the
+ * difference between the two is (cyl - cylraw) * spc - a constant number
+ * of blocks, (cylstart + roll) * spc, less tracks * spc when the
+ * rotation wraps past the end of the drive.  ideopen precomputes those
+ * two as lbase and trackblks; what is left here is one add and a compare.
+ *
+ * The compare is the wrap test itself: cyl >= tracks exactly when
+ * cyl * spc + csec >= tracks * spc, because csec < spc.  The single
+ * subtraction mirrors the single one the cylinder's own arithmetic does,
+ * so a mapping asked for more than one wrap past the end is out of range
+ * here in the same way and by the same amount.
  */
 static UINT32
 idelba(blk, info)
     UINT blk;
     register struct info *info;
 {
-    static UINT csec, cyl;
     static UINT32 lba;
 
     /*
      * A drive opened with no label has no geometry and permits block 0
-     * and only block 0 (see ideopen) - and block 0 is LBA 0 whatever the
-     * geometry turns out to be, so the answer is known without one.  The
-     * division below would trap.
+     * and only block 0 (see ideopen).  Block 0 is LBA 0 whatever the
+     * geometry turns out to be, and the two constants are zero here, so
+     * it is answered rather than computed.
      */
     if (info->spc == 0)
         return (0);
-    csec = blk % info->spc;
-    cyl = idecyl(blk, info);
-    lba = (UINT32)cyl * info->heads + csec / info->sectors;
-    lba = lba * info->sectors + csec % info->sectors;
+    lba = (UINT32)blk + info->lbase;
+    if (lba >= info->trackblks)
+        lba -= info->trackblks;
     return (lba);
 }
 
@@ -924,6 +894,29 @@ ideopen(dev, mode)
         return;
     }
 
+    /*
+     * The block-to-LBA mapping's two constants, and the whole of what the
+     * mapping costs at run time.
+     *
+     * A block's cylinder is its number divided by the sectors per
+     * cylinder, shifted by the slice it lives in and rotated by d_roll.
+     * The rotation is what keeps block 0 - the boot sector, the label,
+     * the superblock - from always landing on the disk's outermost track;
+     * the slice shift is what lets a filesystem live anywhere on a drive
+     * far larger than a block number can count.  Both terms are cylinders
+     * and both are added after the division, so all they can change is
+     * which cylinder a block lands on, and idelba() is written in terms
+     * of that: a fixed number of blocks added, and a track-set taken back
+     * when the rotation runs past the end of the drive.
+     *
+     * A disk laid out as one whole-disk slice carries d_roll tracks >> 1
+     * the way every disk made before slices does, and mw.c applies
+     * exactly the same two; lib/fslib.c inverts the same two on the host,
+     * which is what makes the three agree.
+     */
+    info->lbase = ((UINT32)info->cylstart + info->roll) * info->spc;
+    info->trackblks = (UINT32)info->tracks * info->spc;
+
     if ((b = bread(1, dev)) != 0) {
         info->flags |= OPEN;
         brelse(b);
@@ -994,9 +987,9 @@ idestrat(b)
 
     /*
      * b->blk is a filesystem block and stays one: the slice's cylinder
-     * offset is added in idecyl, after the division that turns a block
-     * into a cylinder, so nothing here has to hold a device block number -
-     * which is what a large drive could not be counted in.
+     * offset and the rotation are folded into idelba()'s constant, so
+     * nothing here has to hold a device block number - which is what a
+     * large drive could not be counted in.
      */
     lba = idelba(b->blk, info);
 
@@ -1019,6 +1012,32 @@ idestrat(b)
 
     iodone(b);
 }
+
+/*
+ * The module's initialization - the one hook, in sys/ovl.h.
+ *
+ * This driver has nothing to set up that a driver can set up here, and
+ * that is the point of it being written out rather than left out.  The
+ * board's interrupt is already unmasked (the note above ideint(), which
+ * is also why there is no inton() call), and the drive's own reset is
+ * not a bring-up step: it happens in ideopen(), against a unit, because
+ * that is where the driver learns which drive it is talking to.  What is
+ * left for init() is to say the driver is here, which is registration
+ * and nothing else.
+ *
+ * A driver whose init() is only registration is the ordinary case, not
+ * the exception: the hook exists because a module has to be introduced
+ * before it can be used, and introducing yourself is all that some
+ * drivers need to do.
+ */
+/*
+ * The entries the driver's header hands the kernel (sys/idehdr.c).  It is
+ * a different object because a module's first bytes have to be the
+ * header's, and an object's data is placed in the order the objects are
+ * named - so the header is alone in the object named first, and this is
+ * the driver's own.
+ */
+struct biovec idebvec = { &ideopen, &ideclose, &idestrat };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

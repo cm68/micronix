@@ -11,8 +11,8 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-HDRS = access.h buf.h con.h dir.h dj.h dlabel.h file.h fs.h inode.h \
-	lock.h mount.h mw.h proc.h reboot.h reg.h sgtty.h signal.h stat.h \
+HDRS = access.h buf.h con.h dir.h dj.h dlabel.h file.h fs.h ide.h inode.h \
+	lock.h mount.h mw.h ovl.h proc.h reboot.h reg.h sgtty.h signal.h stat.h \
 	sys.h tty.h
 
 all:

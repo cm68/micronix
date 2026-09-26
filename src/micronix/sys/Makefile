@@ -93,8 +93,8 @@ KERNEL_C_OBJ  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
 # Init-only code, folded into data-only highmem.o by the rule below and
 # reclaimed as buffer headers by expand_bufs() once init has returned.
 #
-HIGHMEM_C_SRC  = main_init.c cus.c
-HIGHMEM_C_OBJ  = main_init.o cus.o
+HIGHMEM_C_SRC  = main_init.c cus.c djinit.c
+HIGHMEM_C_OBJ  = main_init.o cus.o djinit.o
 
 HIGHMEM_AS_SRC = inits.s unbcd.s
 HIGHMEM_AS_OBJ = inits.o unbcd.o

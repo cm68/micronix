@@ -12,6 +12,8 @@
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <sys/con.h>
+#include <sys/mw.h>
+#include <sys/ovl.h>
 #include <sys/dlabel.h>
 #include <errno.h>
 
@@ -23,8 +25,6 @@ static int error();
 
 #define NDRIVES 4               /* Number of drives. See mws[] below. */
 #define SECSIZE 3               /* Sector size (512 bytes) */
-#define CHKTIME	(1 * HERTZ)     /* timeout ticks between controller status
-                                 * checks */
 #define RETRIES 10              /* no. of retries on r/w error */
 
 /*
@@ -169,7 +169,6 @@ struct
 #define GRPSEL	BASE+7
 #define PICMASK 050             /* enable PIC interrupts */
 #define VI	1               /* Interrput 0 (PIC mask bit) */
-#define MWINT	0
 
 /*
  * Globals
@@ -388,10 +387,8 @@ mwstart()
 {
     if (!busget(&mwstart))
         return;
-    if (mwstate == VIRGIN) {
+    if (mwstate == VIRGIN)
         reset();
-        mwgoose();              /* start timeout "daemon" */
-    }
     cmd.steps = 0;
     cmd.arg0.byte.high = INT;
     cmd.hedsel |= LCONST;
@@ -673,28 +670,18 @@ mwwait()
 }
 
 /*
- * Start the timeout watchdog, once, however many times a disk is opened.
- * mwcheck() re-arms itself and is never stopped, so it is started rather
- * than armed, and a second start leaves a second chain of it in tlist[]
- * for the rest of the boot, each turn of the clock spending another slot
- * - and tlist[] has five slots for the whole kernel.  Four opens of an
- * mw disk (the root device's is one, and a labeler opens the disk it is
- * labelling) would fill the table, and the next timer to arm would find
- * nowhere to go.  This is the one owner of the watchdog.
- */
-static char mwarmed = 0;
-
-mwgoose()
-{
-    if (mwarmed)
-        return;
-    mwarmed = 1;
-    mwcheck();
-}
-
-/*
- * Simulate missing timeout hardware.
- * Started once by mwgoose(). Self-continuing.
+ * Simulate missing timeout hardware.  This is the driver's tick, run once
+ * a second by the resident side (sys/ovl.c), and it is named as the tick
+ * in this driver's header at the end of this file - not a timer of its
+ * own, and that is deliberate: it re-arms itself in the sense that it
+ * wants to keep being called, and a driver-owned timer that is never
+ * stopped would hold one of the kernel's five timeout slots for the rest
+ * of the boot, one per time the disk was opened.
+ *
+ * A controller that has stopped talking raises no interrupt, which is the
+ * whole reason this exists.  VIRGIN, STOPPED and INTRPT fall through the
+ * switch below and change nothing, so being called from bring-up onwards
+ * costs a comparison until a command is actually issued.
  */
 mwcheck()
 {
@@ -713,56 +700,34 @@ mwcheck()
         panic("hddma hung");
     }
     ei();
-    timeout(&mwcheck, 0, CHKTIME);
     if (mwstate == TOOLATE)
         mwint();
 }
 
 /*
- * Synchronization for the HD-DMA and the DJ-DMA.
- * Since the HD must hog the bus,
- * it might close some of the DJ's transfer
- * windows if they were allowed to be active
- * simultaneously.
- * Note that this code does not know anything
- * about the DJ drivers.
+ * busget() and busgive(), the bus lock this driver shares with the
+ * floppy's, are in sys/bus.c: they are resident in the u page now,
+ * because two modules cannot call into each other (sys/bus.c says why).
+ *
+ * Bring the driver up.  Where the kernel used to name mwopen, mwclose and
+ * mwstrat in its own switch table, and name mwint on interrupt line 0,
+ * the driver names itself, and this is where.  Registering is what makes
+ * it reachable, so it comes last; a driver that cannot find its hardware
+ * returns without registering and its major answers as nodev does.
+ *
+ * seg is the page the driver was placed in, and 0 means the kernel
+ * already contains it - see sys/ovl.c.  The controller's reset() and the
+ * inton(MWINT) that unmasks line 0 still happen at open, as they always
+ * have.
  */
-
-static int (*bus)() = 0;        /* bus master */
-static int (*next)() = 0;       /* bus heir */
-
-busget(func)
-    int *(func) ();
-{
-    di();
-    if (bus != 0 && bus != func) {   /* someone else has it */
-        if (next == 0)       /* register the heir */
-            next = func;
-        ei();
-        return 0;              /* didn't get it */
-    } else {
-        bus = func;             /* application accepted */
-        ei();
-        return 1;             /* got it */
-    }
-}
-
-busgive(func)
-    int *(func) ();
-{
-    di();
-    if (next) {                 /* there is an heir */
-        bus = next;             /* give bus to heir */
-        next = func;            /* register next heir */
-        ei();
-        (*bus) ();              /* invoke new master */
-        return 1;             /* bus was given away */
-    } else {
-        bus = 0;             /* no bus master */
-        ei();
-        return 0;              /* no one took bus */
-    }
-}
+/*
+ * The entries the driver's header hands the kernel (sys/mwhdr.c).  It is
+ * a different object because a module's first bytes have to be the
+ * header's, and an object's data is placed in the order the objects are
+ * named - so the header is alone in the object named first, and this is
+ * the driver's own.
+ */
+struct biovec mwbvec = { &mwopen, &mwclose, &mwstrat };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

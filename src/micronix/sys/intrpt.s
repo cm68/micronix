@@ -22,7 +22,7 @@
 ; 	&0; &0; &0; &0;
 ;
 	.globl	vectors
-	.extern	intrupt, _mwint, _djint, _ideint, m1int, m2int
+	.extern	intrupt, _ovlint0, _ovlint1, _ovlint2, m1int, m2int
 	.extern	m3int, m0int, clkint
 	.defw	0,0,0,0
 	.defw	0,0,0,0
@@ -62,6 +62,14 @@
 ; it is written but not linked.  The resident kernel has no room for it;
 ; see its entry in sys/TODO.
 ;
+; The three lines that belong to a disk controller no longer name the
+; driver's handler.  mwint, djint and ideint are in modules, so the
+; kernel has no address for them at link time; each line hands intrupt a
+; dispatcher in sys/ovl.c instead, and the module that claimed the line
+; with intrset has its handler called from there.  A line nothing has
+; claimed returns without doing anything.  int3 through int7 are the
+; resident ACE, parallel and clock handlers and are unchanged.
+;
 vectors:
 	.defb	0xC3		; jp int0 -- explicit, so asz won't relax jp to jr
 	.defw	int0
@@ -89,13 +97,13 @@ vectors:
 	.defb	0
 int0:
 	call	intrupt
-	.defw	_mwint
+	.defw	_ovlint0
 int1:
 	call	intrupt
-	.defw	_djint
+	.defw	_ovlint1
 int2:
 	call	intrupt
-	.defw	_ideint
+	.defw	_ovlint2
 int3:
 	call	intrupt
 	.defw	m1int

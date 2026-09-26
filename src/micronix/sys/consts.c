@@ -93,29 +93,37 @@ int ncalls = sizeof(syssw) / sizeof(struct syscall);
  */
 #include <types.h>
 #include <sys/con.h>
+#include <sys/ovl.h>
 
 extern int nodev(), nulldev(), nullwrite();
-extern int djopen(), djclose(), djstrat();
-extern int mwopen(), mwclose(), mwstrat();
-extern int ideopen(), ideclose(), idestrat();
 extern int muopen(), muclose(), muread(), muwrite(), mustty();
 extern int kread(), kwrite(), ioread(), iowrite();
-extern int djmopen(), djmclose(), djmread(), djmwrite(), djstty();
+extern int ovlopen(), ovlclose(), ovlstrat();
+extern int ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcmode();
 
 /* Device names for diagnostics.  A char array keeps the strings in .data
  * (and so in the u page); a char * array would leave them as .text string
- * literals, and upage.o's linker placement has no room for text. */
+ * literals, and upage.o's linker placement has no room for text.
+ *
+ * These are the names for a major nothing has claimed.  A module brings
+ * its own name in its header and registers it with nameset (sys/ovl.c)
+ * when it initializes, so what pcon() prints for a disk major is what
+ * the driver that answered for it called itself. */
 char devname[][11] = {
     "nodev", "hdca(rev4)", "djdma", "hddma", "ide",
 };
 
-/* Device 0 must be nodev. */
+/* Device 0 must be nodev.  The disk rows point at the module trampolines
+ * (sys/ovl.c), not at drivers: the kernel has no djopen, mwstrat or
+ * idestrat to name, because the drivers are modules and are not in it.
+ * Which module answers for a major is decided when that module's init()
+ * registers - see sys/ovl.h. */
 struct biovec biosw[] = {
     &nodev, &nulldev, &nulldev,         /* 0 = no device */
     &nodev, &nodev, &nodev,             /* 1 = HDCA - removed, obsolete */
-    &djopen, &djclose, &djstrat,        /* 2 = DJ-DMA */
-    &mwopen, &mwclose, &mwstrat,        /* 3 = HD-DMA */
-    &ideopen, &ideclose, &idestrat,     /* 4 = IDE (ATA), PIO only */
+    &ovlopen, &ovlclose, &ovlstrat,     /* 2 = DJ-DMA, a module */
+    &ovlopen, &ovlclose, &ovlstrat,     /* 3 = HD-DMA, a module */
+    &ovlopen, &ovlclose, &ovlstrat,     /* 4 = IDE (ATA), a module */
 };
 
 struct ciovec ciosw[] = {
@@ -123,7 +131,7 @@ struct ciovec ciosw[] = {
     &muopen, &muclose, &muread, &muwrite, &mustty,
     &nulldev, &nulldev, &kread, &kwrite, &nodev,
     &nulldev, &nulldev, &ioread, &iowrite, &nodev,
-    &djmopen, &djmclose, &djmread, &djmwrite, &djstty,
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,
 };
 
 UINT nbdev = sizeof(biosw) / sizeof(struct biovec);

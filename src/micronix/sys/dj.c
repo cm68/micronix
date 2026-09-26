@@ -11,6 +11,7 @@
 #include <sys/proc.h>
 #include <errno.h>
 #include <sys/dj.h>
+#include <sys/ovl.h>
 
 /*
  * The static routines below, declared before anything calls them.
@@ -31,7 +32,15 @@ static int djbusy(), memio(), busready(), busplease(), busthanks();
  * same reason they save image0 and not map0.
  */
 extern int segalloc();
-extern UINT8 image0[];
+extern UINT8 image0[], map0[];
+
+/*
+ * This driver's initialization, which is not in this object: it is
+ * init-only code and folded into the reclaimed region beside cus(), so
+ * that the page this file is built into holds only what running the
+ * driver needs (sys/djinit.c).  The driver's header (sys/djhdr.c) is
+ * what names it, so this file does not have to.
+ */
 
 /*
  * Micronix driver for Disk Jockey DMA
@@ -1278,6 +1287,19 @@ djack()
     haltstat = 0;
 }
 
+/*
+ * The deadman switch, run on the resident tick (sys/ovl.c) rather than on
+ * a timer of the driver's own.  A command list is outstanding while
+ * haltstat is set, and the board is supposed to raise an interrupt for
+ * it; djint clears djtimer every time it runs.  DJTHRESHHOLD periods
+ * with a list outstanding and no interrupt serviced is a controller that
+ * has stopped talking, and the operation in flight is failed rather than
+ * waited on: the watchdog supplies the completion the board did not.
+ *
+ * djgoose is not the tick itself.  The tick is a second - the pulse mw's
+ * controller check needs - and this watchdog's period is longer, so the
+ * count is kept here.
+ */
 djgoose()
 {
     if (haltstat && ++djtimer >= DJTHRESHHOLD) {
@@ -1285,8 +1307,16 @@ djgoose()
         INTSTAT = OKSTAT;
         djint();
     }
+}
 
-    timeout(djgoose, 0, DJINTERVAL);
+static char djticker = 0;
+
+djtick()
+{
+    if (++djticker < DJTICKS)
+        return (0);
+    djticker = 0;
+    return (djgoose());
 }
 
 djmclose()
@@ -1500,6 +1530,18 @@ busthanks()
 {
     busgive(0);
 }
+
+/*
+ * The entries the driver's header hands the kernel (sys/djhdr.c), which
+ * is where the header is and why it is not here: a module's first bytes
+ * are the header's, and an object's data is placed in the order the
+ * objects are named, so the header is alone in the object named first.
+ * These two are ordinary objects of the driver's own, named by that
+ * header and by nothing else - and named, not static, because the header
+ * that points at them is a different object.
+ */
+struct biovec djbvec = { &djopen, &djclose, &djstrat };
+struct ciovec djcvec = { &djmopen, &djmclose, &djmread, &djmwrite, &djstty };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

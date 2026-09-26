@@ -310,6 +310,16 @@ src/micronix/lib/libutil/libutil.a
 src/micronix/lib/fslib/libfs.a
 src/micronix/sys/build.h
 src/micronix/sys/unix
+src/micronix/sys/unix.link
+
+#
+# The overlay driver modules.  mxld links one .mod per driver against the
+# kernel and cuts a page out of it, and the page is what setdev stamps
+# into the slot - so both are the object files' output and neither is a
+# source.  The driver's .c and the .h that describes its interface are.
+#
+src/micronix/sys/*.mod
+src/micronix/sys/*.page
 
 #
 # Kernel images kept by hand.  kernels/ carries a set of dated ones -

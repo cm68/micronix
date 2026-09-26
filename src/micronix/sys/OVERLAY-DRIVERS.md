@@ -86,6 +86,15 @@ sense `overlay.md` describes. Nothing in this plan lets an overlaid frame sleep
 and expect to be resident when it wakes — the mapping is restored, but the
 *bytes* are whatever process's overlay the scheduler put there.
 
+**What is built takes the entry half of this and leaves this half open.** A
+trampoline maps the major's segment at entry (`ovlmap`), and `ovlcall` saves and
+restores `image0[2 * OVLSEG]` around an interrupt or a tick — which is correct
+because neither can sleep. The per-process overlay segment this section describes
+is not built: a driver whose `strat` sleeps can wake to another major's page. No
+driver does that today, so nothing is broken today; it is the constraint a driver
+must meet before it is moved out, and the reason the discipline above has to be
+settled before the first one is.
+
 ## Interrupts are the wild card
 
 An interrupt can arrive with any driver's page mapped, so an interrupt entry
@@ -109,23 +118,32 @@ fits *completely*. The price is paid instead in:
 
 ## The resident set
 
-Whatever the interrupt path touches must be resident, or a resident handler
-chases pointers into a page that now belongs to another driver. That is not only
-the transfer state. In `dj.c`:
+This section used to argue that part of a driver's state had to stay resident,
+because a resident interrupt handler would otherwise chase pointers into a page
+that now belongs to another driver. The design does not work that way, and the
+measurement is different because of it.
 
-| resident | why |
-|---|---|
-| `dm[NDRIVES]`, `curbuf`, `qhead`, `qtail` | the queue and drive state the handler walks |
-| `kdev`, `ksec`, `kw`, `kseg` | the staging state the handler updates |
-| `djcomm[26]` | the controller command block, shared with `memio` |
-| `specs[]`, `delay[]` | **read-only tables the handler reads**: `getstat` reaches `d->specs` and `d->step`/`d->settle`; 297 + 32 = 329 bytes |
+An interrupt handler runs with **its own segment mapped**: the line carries the
+segment its handler lives in, and the dispatcher puts that page in place before it
+calls (`ovlntr`, `sys/ovl.c`), because an interrupt can land at any moment, with
+any module mapped or none. The driver's tick is served the same way, and so is
+every call the kernel makes into a driver — a trampoline maps the major's segment
+before it calls the entry it registered. So a driver runs with its page in place
+whichever door it came in through, and everything it owns can live in that page:
+the queue state the handler walks (`dm[NDRIVES]`, `curbuf`, `qhead`, `qtail`), the
+staging state it updates (`kdev`, `ksec`, `kw`, `kseg`), `djcomm[26]`, and the
+read-only `specs[]`/`delay[]` tables `getstat` reaches through `d->specs` and
+`d->step`/`d->settle`.
 
-The last row is the one that is easy to miss: 329 bytes of tables that look like
-data and belong to the driver, but are read on the interrupt path. (An earlier
-draft of this file said 318; `specs[]` is 27 rows of 11 bytes.) So "fits in a
-page" has to be measured as text + data + bss **minus the resident set**, not as
-the whole object. Summed, this table is **391 bytes**, so `dj.o`'s blob is 3333.
-It fits a page comfortably — the page turns out not to be what binds.
+The last of those is the one that is easy to miss — 329 bytes of tables that look
+like data and belong to the driver, read on the interrupt path (`specs[]` is 27
+rows of 11 bytes). It lives in the page with everything else.
+
+The cost is therefore that the **whole object** has to fit, not the object less a
+resident set. Measured with `mxnm`: `dj.o` is 3789 bytes against the page's 4096,
+307 spare; `mw.o` is 2749 and `ide.o` 2805. The page is not what binds — a 4K slot
+is comfortable for all three — but it is the number to watch, per object and
+measured rather than estimated.
 
 ## The link
 
@@ -227,10 +245,15 @@ the loader exactly as it is today — with the module region appended after it, 
 module padded to a 4K boundary, running to EOF. Nothing in the header says so, and
 nothing needs to:
 
-	the object's extent is in its own header (text + data + 0x10)
+	the object's extent is text + data + symbol table + 0x10
 	the module region starts at the next 4K boundary after that
 	module n is at modbase + n * 4096
-	the count is the file size over 4096
+	the count is (file size - modbase) over 4096
+
+The symbol table is in that extent and is the term that is easy to drop: in the
+kernel this was written against it is 9090 bytes, so leaving it out would put the
+region at 0xf000 and it would start inside the table. `setdev` computes it, so
+the number is not one anybody has to keep in step.
 
 Position and count are both derived, so there is no constant for the kernel and
 the file to keep in step — the same argument that put the inode in HL rather than
@@ -479,156 +502,196 @@ as it stands.
 
 ## Building a driver page
 
-A driver page is a self-contained object: linked on its own at `OVLBASE`, with a
-device switch entry as its first bytes — a table of the driver's own entry
-points. The resident side reaches the driver only through it.
+A driver page is a self-contained object: linked on its own at `OVLBASE`, with its
+**header** as the first bytes — a `struct ovlhdr` (`sys/ovl.h`) — and the driver
+behind it. The resident side reaches the driver only through the header.
 
 That is what makes the two halves independent. The resident code knows nothing
 about the page's layout — not where `djstrat` landed, not how big the driver is —
 only which major it is dispatching on.
 
 And the major is enough, because it can index the array of pages directly. A
-resident `ovlseg[]`, indexed the way `biosw[]` and `ciosw[]` already are, holds
-each overlaid driver's segment, and the dispatcher is then one piece of code for
-all of them:
+resident `ovlseg[]` (`sys/ovl.c`), indexed the way `biosw[]` and `ciosw[]` already
+are, holds each overlaid driver's segment. A zero segment is a driver the kernel
+still holds, whose header is a kernel object and whose data pointer is a kernel
+address; that is what makes resident and overlaid one mechanism seen twice, and it
+is why drivers move out one at a time.
 
-	seg = ovlseg[major];
-	if (seg) {
-		swap in seg;
-		jump through *(struct biovec *) OVLBASE;
-	} else {
-		call biosw[major] as today;
-	}
+`biosw[]` and `ciosw[]` no longer point at drivers at all. Every entry points at a
+resident **trampoline** — `ovlopen`/`ovlclose`/`ovlstrat` for the block entries,
+five more against `ciosw[]` — and the kernel links those tables whether a driver
+is resident, is a module, or is not there at all. A trampoline recovers its major
+from the device it was handed, maps that major's module (`ovlmap`), and calls the
+entry the header registered; with none registered it answers the way `nodev` does.
+So the kernel names no driver symbol, and `strat()` (`uio.c`) does not have to be
+a funnel any more: the only place a driver's code address is held is the table in
+`ovl.c` that the header filled.
 
-A zero entry means "resident", so the two kinds coexist and drivers move one at a
-time. That is the migration path, and it is the reason this wants to be an array
-of segment numbers rather than a set of per-driver thunks.
+The page's header is not a new ABI either. It is `struct ovlhdr` — the major, the
+entries as `bvec`/`cvec` pointers, the interrupt line and handler, the tick, the
+name `devname[]` reports, and a pointer to the driver's own data — and it is the
+whole of the interface in both directions. **Nothing calls in.** A driver declares
+itself here; it does not register itself, and `bvecset`, `cvecset`, `intrset`,
+`nameset` and `tickset` are static in `ovl.c` for that reason.
 
-For block devices there is already a single funnel to put that in: `strat()`
-(uio.c:368) is the only route to a strategy routine, so the block half is one
-place. Character devices have no such funnel — `ciosw[]` has five entries and
-several call sites — so the block side is the one to do first, and `dj.c` is a
-block driver.
+None of `ovl.c`'s tables may live in the u page beside the switch tables they
+feed. They are *written* when a driver is placed, and the u page must stay
+read-only or fork's `segcopy` clones it per process — one table per process, each
+holding the segment the driver was placed in. They belong to the kernel's own
+data, which is where they are: `consts.c` links into `upage.o`, `ovl.c` does not.
 
-The page's header is then not a new ABI at all. It is a `struct biovec` or a
-`struct ciovec` (`sys/con.h`) at `OVLBASE` — the same shapes the switch tables
-hold — which is what makes "jump through table[slot]" a single dereference.
+The header is first in the page because it has to be at a known address, and the
+one address that is known is `OVLBASE` itself. So a page is one object linked at
+`OVLBASE`, with `djhdr` (or `mwhdr`, `idehdr`) declared first in it and the driver
+behind it. Nothing is assembled separately to put it there.
 
-One thing has to be placed: `ovlseg[]` is *written*, at init, so it cannot live in
-the u page beside `biosw[]` and `ciosw[]`. That page must stay read-only or
-fork's `segcopy` clones it per process. It belongs in the kernel's own data, and
-it is `nbdev + ncdev` bytes of it — or 256 for one array covering both.
+`biosw[]` and `ciosw[]` are different shapes, three entries against five, so a
+driver fills `bvec`, `cvec`, or both. `dj` is the both case — the floppy, with its
+raw character mode — and one header carries the two tables.
 
-The table is first in the page because it has to be at a known address, and the
-obvious one is `OVLBASE` itself. So a page is two objects linked together: a small
-assembly file emitting the table with `.defw` against the driver's entry points —
-resolved inside the standalone link, needing nothing from the kernel — and then
-the driver.
+### Init runs first, and decides whether anything else happens
 
-`biosw[]` and `ciosw[]` are different shapes, three entries against five, so the
-table follows the class the driver is registered in. A page is one or the other;
-a device that is both is two drivers, as it is today.
+The order in `ovlplace` (`sys/ovl.c`) is the load-bearing part of this. The
+placement itself comes first, because init is what has to find the driver's own
+data: `ovldata(major)` maps the major, and for a driver the kernel still holds
+that is the resident header. Then **init runs, and nothing else is taken until it
+returns zero.** The entries, the name, the tick, the interrupt line are all read
+from the header only afterwards.
 
-### The other direction, which the table does not solve
+A driver whose hardware is not on this machine says so by failing. A driver that
+fails is not registered at all: its major goes on answering the way `nodev` does,
+and the only thing spent is the page. There is nothing partial to unwind, because
+registration has not happened yet.
 
-The table is how the kernel reaches the driver. It says nothing about how the
-driver reaches the kernel, and that is the harder half: the driver still calls
-`bhold`, `iodone`, `sleep`, `di`, `copy`, `swin`, and those are relocations
-against symbols a standalone link cannot see.
+That is what lets one kernel carry a driver for a card that is not plugged in — a
+SCSI driver that probes, finds nothing, and returns ENODEV costs a page of address
+space and nothing else. It is also why init is allowed to be hardware only: it
+runs before the header is worth anything, so it cannot be the thing that names the
+driver's entries, and it does not have to be.
 
-The symmetric answer is a resident vector table the driver calls through, and what
-makes it work is a **fixed absolute address**. If the table's address is a
-constant, the driver links against the constant and the circle is broken. If it is
-wherever the linker put it, the kernel must be linked first and the driver second
-— the two-pass build, and a change to `mxld`.
+### The other direction
 
-The tree already has a home for pinned read-only kernel constants: the u page,
-where `syssw`, `biosw` and `ciosw` live. It is identical across processes, which
-is the property a vector table needs, and pinning it means an absolute symbol
-rather than a linker-chosen offset — so a later change to the kernel's layout
-cannot move it out from under the drivers.
+The header is how the kernel reaches the driver. A driver reaching the kernel is
+the same problem seen backwards — it calls `bhold`, `iodone`, `sleep`, `di`,
+`copy`, and those are relocations against symbols a page linked on its own cannot
+see — and it is what `mxld`'s `-A<image>` answers: *resolve undefined symbols from
+a linked image*. So a module is linked `-Ttext=OVLBASE -Aunix`, the kernel having
+been linked first, and every kernel entry it names is filled in with the real
+address out of the kernel's own symbol table.
+
+That is the whole of the mechanism, and it is deliberately not a vector table. The
+driver makes an ordinary call; there is no extra indirection, and there is no
+second description of the kernel's interface to fall out of step with the first.
+It does mean the kernel must be linked before any module is, which is the same
+direction the append-to-the-kernel-file arrangement already runs.
 
 ### What else a page has to hold
 
-A driver's *state* stays resident — that is the resident set above — but a driver
-that needs a scratch page of its own has a problem once `OVLSEG` is `0xd000`,
-because both kernel windows are then spoken for: 0xd000 is the driver's own code
-and 0xe000 is whatever buffer it is copying to. `dj.c` is that driver. Its 1K
+A driver's state lives in its own page — that is the section above — but a driver
+that needs a **borrowed window** at the same time has a problem, because only one
+segment of the overlay can be the driver's own. `dj.c` is that driver: its 1K
 staging exists because the controller has no scatter/gather, and it has to be
-visible *beside* the buffer it copies to, which is why it does not sit in BUFSEG
-today. Overlaying `dj.c` therefore needs one of: room in its own page for the
-staging, a page of its own, or a driver whose transfer needs only one mapped
-window. Worth settling before `dj.c` is picked as the first one.
+visible *beside* the buffer it copies to. If the driver's page is at `OVLSEG` and
+its buffer is at BUFSEG, both are mapped and the copy works — the staging is a
+*segment* apart from the data, not a page apart, so `swin`/`srel` is the thing
+that would get in the way, not the overlay. Worth re-checking against the built
+`dj.c` before it is the first driver moved out.
 
-## The switch tables and the trampolines
+## The trampolines, the interrupt path, and the tick
 
-`biosw[]`/`ciosw[]` are in `consts.c`, which links into `upage.o` — the
-per-process u page — so they are read-only data in a remapped page, which is
-fine. Each entry points at a **resident thunk**: swap in that driver's segment,
-jump to `OVERLAY + offset`. The thunk is a few bytes and lives in kernel text;
-nothing above the driver layer knows the code moved.
+All of it is built, in `sys/ovl.c`, and it is one page's worth of state:
 
-The open question is which logical page `OVLSEG` is. It has to be 4K-aligned and
-mappable, and there is no free one: the kernel holds 0x1000 to 0xc8d9, and
-everything from `_ebss` to BUFWIN is pool. The only 4K-aligned address in the
-free range is **0xd000**, which is the scratch window — so `OVLSEG` and `SCRSEG`
-would have to be the same page.
+| table | indexed by | holds |
+|---|---|---|
+| `ovlseg[]`, `ovlloc[]` | major | the segment a module was placed in, or the resident header |
+| `ovlbvec[]`, `ovlcvec[]` | major | the entries the header declared |
+| `ovlintc[]`, `ovlintseg[]` | line | the handler and the segment it lives in |
+| `ovltickc[]` | major | the tick the header asked for |
 
-That is less alarming than it sounds, because mem.s restores the mapping from
-`IMAGE0[26]` after every borrow rather than restoring bytes; if the overlay's
-segment is what `IMAGE0[26]` holds, the restore puts the driver back for free. It
-does mean an overlaid driver must never call `swin`/`srel`, which *replace*
-`image0[26]` instead of restoring it — which is already why `dj.c`'s staging
-lives in BUFSEG and not the scratch page.
+The block and character trampolines are one piece of code per entry, not per
+driver: each recovers its major from the device it was handed, maps, and calls
+through `ovlbvec[maj]`/`ovlcvec[maj]`. A major with nothing behind it answers the
+way `nodev` does, so a disk that is not loaded is indistinguishable from one that
+was never there — except that a request against it completes with an error instead
+of hanging, which is what a major that may be loaded later has to do.
 
-The cost lands on the pool, and `expand_bufs()` mints contiguously from
-`&blist[8]`, so whichever page is taken it has to be excluded from the mint. The
-three ways, by what each costs against the 256 buffers the pool holds now:
+`ovlmap(major)` returns 0 only if the major is past the table. A major with no
+segment is a driver the kernel still holds: it returns the resident header and
+writes no map register. Otherwise it maps `OVLSEG` and returns `OVLBASE`. **The
+entry in the table is what says whether a driver is there, not the segment** —
+that is the one thing to keep straight, and it is why the trampolines test
+`ovlbvec[maj].open` rather than `ovlseg[maj]`.
 
-| `OVLSEG` | `_ebss` must reach | extra reclaim | minted | total pool |
-|---|---|---|---|---|
-| 0xd000, as it stands | 0xc8d9 (now) | none | 87 | 95 |
-| 0xc000 | 0xc000 | **2265** | 195 | 203 |
-| 0xd000, pool above it | 0xbba8 | 3377 | 248 | 256 |
+Interrupts never go through a call site of the kernel's choosing, so the line
+carries its own segment (`ovlintseg[]`) and `ovlntr` maps it before calling. The
+tick is the same problem arriving by a different door, and is served the same way
+by `ovlcall`. `ovlcall`'s save/restore is `image0[2 * OVLSEG]`, written the way
+`newmap()` writes it — `image0` is the kernel's readable copy of the map, the
+registers themselves being write-only — which is the same discipline the rest of
+the kernel's window handling already uses.
 
-4096 bytes at 21 bytes a header is the 195 this file used to quote, and 195 is
-what a *free* page is worth — but only when it is not a hole in the mint. As a
-hole at 0xd000 it is worth 161 buffers (256 down to 95); moved to 0xc000, where
-the pool can sit above it, it is worth 53 (256 down to 203) for 2265 bytes of
-`_ebss`. The middle row is the one to aim at: it pays for the page out of address
-space instead of out of the cache, and it is 3.5 times what `dj.c` has reclaimed
-so far. The third row buys the last 53 buffers back at 21 bytes each — the
-standing rate, and no better.
+The tick is **one resident clock for the whole system**, walked across the modules
+that asked, not a timer per driver. `tlist[]` (`time.c`) holds five timeouts for
+the entire kernel and a driver's watchdog is never stopped, so a driver that armed
+its own held a slot for the rest of the boot — one per time the disk was opened.
+`ovltick` takes one, only for as long as something wants one, and re-arms itself
+at `TICKINT` = `HERTZ`, fast enough for the shortest period any driver wants;
+a driver that wants a longer period counts its own turns (`DJTICKS` is 10, one
+`djticker` per resident tick, before `djgoose` looks at the controller).
+
+`OVLSEG` is `9`, the page at `0x9000`, and it is a property of the build rather
+than a choice: the frame moves when the kernel's text grows past its page, so the
+kernel link and every module link come out of one make variable (`CCFLAGS`) and
+cannot disagree. Measured: the resident text ends at `0xa6d0` with the drivers
+still linked in and `0x8388` without, so `0x9000` is the page that works once they
+are modules and a page higher would cost the pool four fifths of itself. While
+they are still resident nothing is mapped at `OVLSEG` at all — `ovlseg[]` is zero
+for each of them — which is why the two states can coexist during the migration
+without the frame having to be clear yet.
 
 ## What is already in place
 
-- `highmem.o`'s reclaim: the park-after-bss, copy-out, mint-over-it pattern.
-- The u page's per-process remap, which is the shape the overlay's restore wants.
-- `segalloc()`/`segfree()` for the physical pages.
-- `SCRSEG`/`swin`/`srel`, the transient-mapping idiom the staging buffer uses —
-  the same borrow-and-restore mem.s has always done at 0xd000.
-- `intrpt.s`'s per-line stubs, which are already one indirection away from being
-  mapping trampolines.
+Built and verified:
+
+- `sys/ovl.h`, the header — the whole interface, and `struct ovlhdr` itself.
+- `sys/ovl.c`, the resident half: `ovlplace`, `ovlmap`, `ovldata`, the eight
+  trampolines, `ovlntr`/`ovlint0..2`, `ovltick`/`ovlarm`, `ovlattach`,
+  `ovlresident`.
+- The three headers: `djhdr`, `mwhdr`, `idehdr`, at the end of `dj.c`, `mw.c`,
+  `ide.c`. All three register and the kernel boots with them — `disks: djdma
+  hddma ide`, an mw root, and a shell.
+- `sys/djinit.c`: dj's initialization split out of `dj.c` and folded into
+  `highmem.o`, so `dj.o` fits a page. It reaches the driver's command block
+  through `ovldata(2)` and names nothing in the module.
+
+Still to build:
+
+- The module link: `mxld -Ttext=OVLBASE -Aunix`, and extracting the 4K page.
+- Removing the three drivers from `KERNEL_C`, and appending the pages to the
+  kernel file 4K-aligned past its extent.
+- Emptying `ovlres[]` once nothing is resident, and having the loader call
+  `ovlattach` instead of `ovlresident`.
+- `setdev`: copy the Nth page onto the slot and patch `rootdev`.
 
 ## Order of work
 
-1. Decide `OVLSEG` and take it out of the pool deliberately — and decide it
-   together with the parked set, because the two compete for the same bytes.
-   Getting `_ebss` to 0xc000 is 2265 bytes of reclaim and is the partner of the
-   0xc000 page; the park, at one blob, is affordable at 3725.
-2. Put an overlay segment in the process's map state and write it beside the u
-   page's, so the restore exists before anything depends on it.
-3. Do one driver end to end. `dj.c` is the candidate: it is the freshest, it has
-   the smallest resident set, and its transfer path is not yet exercised — so it
-   wants a test run with a floppy attached regardless.
-4. Only then the other two, and the vector table, and the interrupt trampolines.
+1. Write the module build rule and get `dj.mod` linking against `unix` with
+   `-Aunix`, with no undefined symbols.
+2. Move `dj` out of `KERNEL_C` first, with `OVLSEG` zeroed out of the resident
+   table for it, and prove that booting from an mw root with a dj module placed
+   by init still reaches a shell. `dj` is the candidate: it is the freshest, it
+   has the smallest page margin, and its transfer path wants a test run with a
+   floppy attached regardless.
+3. Then `mw` and `ide`, then empty `ovlres[]`.
+4. Only then the setdev slot, the loader reading the appended region, and the
+   swapping that is the point of all of it.
 
 ## Caveats
 
-Nothing here has been built. The budget figures are measured; the mechanism is
-argued from the code that exists. The three things most likely to be wrong when
-it is tried: the relocation answer; the size of the resident set, because it is
-easy to count the state a driver *writes* on the interrupt path and miss the
-tables it only *reads*; and the reclaim, which is measured at 639 bytes against
-the 2265 the OVLSEG page wants, so the budget is the part that is *known* to be
-short rather than the part that might be.
+The mechanism is built and the resident half is booted; what has not been tried
+is a driver *actually placed from a module* rather than resident. The two things
+most likely to be wrong when that is tried: the `-A` link, in that the module's
+relocations have to come out right against a kernel that was linked without the
+drivers and so has a different text extent; and the frame, because `OVLSEG` is
+derived from where the text ends and that number moves the moment the drivers
+leave — the kernel link and every module link must take it from one variable.

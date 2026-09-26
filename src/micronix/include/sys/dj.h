@@ -5,7 +5,13 @@
  * Changed: <2021-12-23 15:20:02 curt>
  */
 
-# define	DJINTERVAL	(10 * HERTZ)
+/*
+ * The watchdog's period, in resident ticks - the calls sys/ovl.c's
+ * ovltick makes, one a second.  This was ten seconds when the driver
+ * armed its own timer; the tick the driver is given is a fixed one, so
+ * the period is counted here instead.
+ */
+# define	DJTICKS		10
 # define	DJTHRESHHOLD	2
 
 # define	NONE		255
