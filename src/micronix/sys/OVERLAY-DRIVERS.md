@@ -417,6 +417,66 @@ Two things to get right, both of which the tree has already been bitten by:
   root device belongs beside it — so the kernel can compare what it was stamped
   with against what the disk says, and refuse rather than mount.
 
+## The slot, and setdev
+
+This resolves the two sections above and takes the loader out of the decision
+entirely.
+
+The format is a vanilla kernel with **one 4K-aligned slot in its text for the root
+device's driver**, and **four whole 4K segments appended past the object's extent,
+one per driver** — mw, dj, ide, scsi. The appended four are not loaded at boot,
+being past the extent the loader reads; they are there to be copied from, and to
+be read at runtime.
+
+`setdev` is the installer's tool and it does two things: it copies the Nth
+driver's 4K page onto the slot in the kernel text, and it patches `rootdev`. One
+pass, two facts, written together, so they cannot disagree — which is the whole of
+the answer to "which module".
+
+**The modules are fully relocated at the slot address and have no unresolved
+symbols**, which is what lets the copy be a copy. Nothing in `setdev` relocates,
+and there is no linker in the tool.
+
+That is reachable with the linker this tree already has, by linking the kernel
+**once per driver with that driver in the slot** and cutting the 4K page out of
+each. Every one of those links is an ordinary single-pass kernel link, so every
+symbol resolves normally and nothing new is needed; the four extracted pages are
+the four drivers as they sit in place. The vanilla artifact is the same link with
+the slot blanked.
+
+And `setdev` needs no constants. The slot is a symbol — `unix` is not stripped —
+so the tool reads its address from the symbol table and derives the file offset;
+the module region starts at the next 4K past the object's extent; module *n* is at
+`modbase + n*4096`.
+
+### What it costs
+
+The slot is one 4K page of the kernel's text, resident always, of which about a
+kilobyte is padding: dj is 3020 and the largest of the four, so 1076 bytes of it
+go unused, and the smaller drivers waste more. Against a kernel that carries one
+driver's text in any case, that is roughly a kilobyte for page alignment and a
+one-page copy. It comes out of the same budget as `OVLSEG` and belongs in that
+table — and the two are different pages: the slot is the driver that is never
+swapped, `OVLSEG` is where the others appear.
+
+The appended 16K costs the file and not the kernel. It is past the object's
+extent, so the loader never reads it; the kernel reads it at runtime, when an
+overlaid driver is first used.
+
+### What it does not do
+
+It overlays nothing. The root driver is resident on purpose — that is what lets
+the kernel read its own file — and the other drivers are no better off than they
+are today until there is machinery to swap them. So this is shippable on its own:
+`setdev`, the slot, and the appended modules, with the overlays still to come.
+
+And it retracts one thing above. The handoff does **not** need to outgrow a
+register. A boot-info block was there to carry the boot device, because the loader
+might have booted a kernel whose root was elsewhere; once the installer stamps
+both the driver and `rootdev`, the boot device and the root device agree by
+construction, the inode in HL is unambiguous, and the built `_kino` path is enough
+as it stands.
+
 ## Building a driver page
 
 A driver page is a self-contained object: linked on its own at `OVLBASE`, with a
