@@ -2,6 +2,11 @@
 
 Status: plan (not implemented). Serves as the doc for when we build this.
 
+This is the general case, written when the 64K had no room for a whole driver
+and the seam fell between the top end and the resident FSM. `OVERLAY-DRIVERS.md`
+is the concrete plan for this kernel now that the budget covers a whole driver
+per page: same repacking, different interrupt answer.
+
 ## Context
 
 The 64K logical address space is full. The kernel text runs 0x1000 → ~0xa000,

@@ -22,6 +22,26 @@
 #define BUFWIN  (BUFSEG * 0x1000)   /* ... its page base, and the pool's top */
 
 /*
+ * The scratch window, and the only page left that a driver may hold.
+ *
+ * It is the page the firmware has always remapped to reach another
+ * segment: mem.s's getbyte/putbyte/memrw borrow it and put it back, which
+ * is what the superblock's window used to do before getsb() moved the
+ * superblock into a slot of the kernel's own memory (uio.c).  A driver
+ * that needs a segment of its own visible *beside* a buffer cannot have
+ * BUFSEG for it, because that is where the buffer is, and this is the one
+ * other page there is.
+ *
+ * swin()/srel() (uio.c) hold it the way bhold()/brel() hold the buffer
+ * window, and carry the same two rules: never sleep holding one, and call
+ * nothing that maps this window while one is held.  Sharing it with mem.s
+ * is safe because mem.s holds interrupts off across its own borrow, so no
+ * handler can ever see the register half borrowed.
+ */
+#define SCRSEG  13              /* the scratch window (swin, uio.c) */
+#define SCRWIN  (SCRSEG * 0x1000)   /* ... its page base, 0xd000 */
+
+/*
  * Priorities
  */
 #define PRIMEM	100

@@ -24,6 +24,16 @@ static int sio(), djwait(), djstart(), getstat(), readone();
 static int djbusy(), memio(), busready(), busplease(), busthanks();
 
 /*
+ * From the kernel rather than from a header: the staging page's
+ * allocator, and the kernel's own copy of task zero's map registers.  The
+ * map registers are write only, so the segment in place is only ever
+ * known from image0 - see bhold/brel and swin/srel in uio.c, which is the
+ * same reason they save image0 and not map0.
+ */
+extern int segalloc();
+extern UINT8 image0[];
+
+/*
  * Micronix driver for Disk Jockey DMA
  * 
  *      Len Edmondson, Morrow Designs  1982
@@ -236,12 +246,63 @@ struct dm {
 #endif
 
 static unsigned char kw = 0,   /* 1K write operation */
-*haltstat = 0, djtimer = 0, djtaken = 0, kbuf[K] = { 0 };
+*haltstat = 0, djtimer = 0, djtaken = 0;
 
 unsigned char djcomm[26] = { 0 };
 
 static kdev = ~0,               /* cached sector's device */
     ksec = ~0;                  /* cached sector's number */
+
+/*
+ * The staging page.
+ *
+ * A diskette whose sector is longer than a filesystem block - 1024 bytes
+ * is the case, and 8" DS/DD is where it comes from - cannot be read or
+ * written a block at a time.  The controller has no scatter/gather: it is
+ * handed one address and moves a whole sector to or from it, so the 1024
+ * bytes have to be contiguous in physical memory *and* reachable by the
+ * kernel, and that is the only thing this page is for.  A 512-byte block
+ * is then half of what the controller moved.
+ *
+ * It used to be kbuf[1024] in the kernel's own segment, which cost the 64K
+ * address space 1024 bytes - the budget that actually binds here, see
+ * sys/TODO - to hold a buffer only ever needed while such a diskette is in
+ * a drive.  The page is somewhere else now and the kernel maps it only to
+ * copy, which is the whole of the change: 1024 bytes of the resident
+ * kernel for one byte, and four 1K sector buffers for the drives to share
+ * rather than one.
+ *
+ * segalloc()'s unit is the 4K MMU page, so this is one page and not a
+ * kilobyte: NSLOT slots fall out of it for nothing, and a page is what the
+ * DMA wants anyway.  One page serves every drive, because only one
+ * transfer is ever in flight - inservice is held for the whole of one, and
+ * djint() returns at once while it is up.
+ *
+ * The page is taken on the first open and never given back: one page of
+ * the 256, against a driver that can be reopened at any moment.
+ */
+static UINT8 kseg = 0;          /* 0 = not taken; segalloc() starts at 16 */
+#define NSLOT   4               /* 1K sector buffers in the page */
+#define SLOTW   1024            /* ... one slot is this big */
+#define SLOT(d) ((d & 3) * SLOTW)   /* ... and this is a drive's, in it */
+
+/*
+ * Take the staging page, if it has not been taken already.
+ *
+ * PROCESS CONTEXT ONLY.  segalloc() brackets itself in di()/ei(), so
+ * calling this from the interrupt path would turn interrupts back on
+ * inside the handler.  That is why it is called from djopen() and not
+ * from where the page is used: every transfer is behind an open, so by
+ * the time djint() or getstat() reaches for kseg it has been taken.
+ * djmio() is the one other caller, and it runs in process context too.
+ */
+static UINT8
+kstg()
+{
+    if (!kseg)
+        kseg = (UINT8) segalloc();
+    return (kseg);
+}
 
 static struct dm dm[NDRIVES] = { 0 };
 
@@ -320,6 +381,13 @@ djopen(dev, mode)
 
     if (djtaken)
         return djbusy();
+
+    /*
+     * The staging page, before anything can want it.  This is the one
+     * place it is taken: djopen() is process context, so segalloc()'s
+     * di()/ei() is safe here and not in the handler - see kstg().
+     */
+    kstg();
 
     d = &dm[dev & 7];
 
@@ -547,6 +615,7 @@ djint()
     static unsigned addr, xaddr, sec, off, blk, bps, count, togo, dev;
     static struct dm *d;
     static struct specs *sp;
+    static char *p, *q;         /* the staging and the buffer, windowed */
 
     pr("");                     /* timing delay kludge */
 
@@ -654,7 +723,21 @@ djint()
              */
           kread:
 
-            copy(kbuf + off, addr, togo);
+            /*
+             * Both windows, and this is why the read path needs the
+             * buffer's: the staging is the scratch window and the buffer
+             * is BUFSEG, so the two are visible at once and neither
+             * address can be confused for the other.  addr is the
+             * buffer's *physical* address - what the DMA was handed -
+             * and would be no use here at all; the window address is
+             * bhold's to give, and kwrite below has to say the same
+             * thing.
+             */
+            p = swin(kseg) + SLOT(dev);
+            q = bhold(curbuf);
+            copy(p + off, q, togo);
+            brel();
+            srel();
 
           secdone:
             count -= togo;
@@ -685,8 +768,11 @@ djint()
          */
 
       kwrite:
-        copy(bhold(curbuf), kbuf + off, togo);
+        p = swin(kseg) + SLOT(dev);
+        q = bhold(curbuf);
+        copy(q, p + off, togo);
         brel();
+        srel();
 
         djack();                  /* acknowledge old int. */
 
@@ -695,7 +781,7 @@ djint()
          * but would be discarded as spurious because inservice is set.
          */
 
-        sio(d, kbuf, KERNEL, SWRITE, ksec, dev);        /* setup new comm. */
+        sio(d, (char *) SLOT(dev), kseg, SWRITE, ksec, dev);
 
         kw = 1;               /* doing the write portion of a 1K req. */
 
@@ -823,7 +909,7 @@ djint()
 
     if (ksec != sec || kdev != dev) {   /* not in cache */
         kdev = -1;              /* cache invalid */
-        sio(d, kbuf, KERNEL, SREAD, sec, dev);
+        sio(d, (char *) SLOT(dev), kseg, SREAD, sec, dev);
         kw = 0;
     }
 
@@ -858,6 +944,7 @@ getstat(a)
     static unsigned astep, asettle;
     static struct delay *d;
     static struct status *s;
+    static char *kp;            /* the staging, windowed, for the peeks */
 
     kdev = -1;                  /* cache invalid */
 
@@ -891,19 +978,22 @@ getstat(a)
     memio(WRITE, &d->settle, asettle, sizeof d->settle);
 
     /*
-     * set the dma address to kbuf
+     * Set the DMA address to this drive's staging slot.  The controller
+     * is handed a physical address - a segment and an offset inside it -
+     * so nothing here has to be mapped.  The page is mapped only while a
+     * block is being copied into it or out of it; see kseg above.
      */
 
     D[0] = SETDMA;
     /*
-     * D is djcomm and kbuf is unsigned char; a and p below are plain
-     * char.  The controller does not care which, the bytes being an
-     * address it is handed, but ccc will not convert unsigned char *
-     * to char * silently.  Every cast in this file that looks like
-     * this one is that and nothing more.
+     * D is djcomm and the staging is in a segment; a and p below are
+     * plain char.  The controller does not care which, the bytes being an
+     * address it is handed, but ccc will not convert unsigned char * to
+     * char * silently.  Every cast in this file that looks like this one
+     * is that and nothing more.
      */
-    *(char **) (D + 1) = (char *) kbuf;
-    D[3] = KERNEL;
+    *(char **) (D + 1) = (char *) SLOT(a);
+    D[3] = kseg;
 
     D[4] = SREAD;               /* move to cyl 3 */
     D[5] = 3;                   /* cylinder */
@@ -997,7 +1087,16 @@ getstat(a)
         if (D[4] != OKSTAT)
             return 0;
 
-        S->config = kbuf[0x5C]; /* copy the configuration byte */
+        /*
+         * The staging is in a segment, so the sector just read is
+         * reachable only through a window.  These peeks are a handful of
+         * bytes each and the read that filled it has already returned,
+         * so a map per peek is the right trade against holding the
+         * window across a transfer.
+         */
+        kp = swin(kseg);
+        S->config = kp[0x5C];   /* copy the configuration byte */
+        srel();
     }
 
     else if (S->slength == S512 && (a & FIVE)) {        /* IBM maybe */
@@ -1051,20 +1150,22 @@ getstat(a)
 
         readone();
 
+        kp = swin(kseg);
         if (D[4] == OKSTAT      /* read worked */
-            && kbuf[1] == 0xff  /* valid dos fat */
-            && kbuf[2] == 0xff && (*kbuf & 0xfc) == 0xfc        /* valid
-                                                                 * config.
-                                                                 * byte */
+            && kp[1] == 0xff    /* valid dos fat */
+            && kp[2] == 0xff && (*kp & 0xfc) == 0xfc    /* valid config
+                                                         * byte */
             ) {
-            if (*kbuf & 1)
+            if (*kp & 1)
                 S->config = DOUBSIDE;
 
-            if (!(*kbuf & 2))
+            if (!(*kp & 2))
                 S->spt = 9;
 
+            srel();
             return 1;         /* short cut */
         }
+        srel();
 
         /*
          * Attempt reading sector 9 of track 0 to discriminate
@@ -1131,10 +1232,11 @@ getstat(a)
 
         readone();
 
-        if (kbuf[0x81] & 4) {   /* Morrow double bit set */
+        kp = swin(kseg);
+        if (kp[0x81] & 4) {     /* Morrow double bit set */
             static char *p, n, s;
 
-            p = (char *) (kbuf + 80);
+            p = kp + 80;
             n = 25;             /* 25 bytes to xor */
             s = 0;              /* preset sum */
 
@@ -1144,6 +1246,7 @@ getstat(a)
             if (s == 0)
                 S->config = DOUBSIDE;
         }
+        srel();
     }
 
     return 1;
@@ -1313,6 +1416,7 @@ djmio(flag)
 {
     static char *a;
     static unsigned b;
+    static UINT8 save;
 
     a = u.offset;               /* djcontroller mem address */
     b = u.count;                /* number of bytes to transfer */
@@ -1324,17 +1428,30 @@ djmio(flag)
     if (b > K)
         return u.error = EINVAL;
 
+    /*
+     * The staging goes in the buffer window here and not the scratch one,
+     * because iomove reaches user space through mem.s, which borrows
+     * 0xd000 for the user's page - staging there would collide with the
+     * driver's own copy.  Nothing is held in BUFSEG at this point, and
+     * bwin() is the raw mapping with no stack of its own, so the segment
+     * in place is saved and put back by hand.
+     */
+    save = image0[2 * BUFSEG];
+    bwin(kstg());
+
     if (flag == WRITE)
-        iomove(WRITE, kbuf, b);
+        iomove(WRITE, (char *) BUFWIN, b);
 
     busplease();
 
-    memio(flag, kbuf, a, b);
+    memio(flag, (char *) BUFWIN, a, b);
 
     busthanks();
 
     if (flag == READ)
-        iomove(READ, kbuf, b);
+        iomove(READ, (char *) BUFWIN, b);
+
+    bwin(save);
 }
 
 static

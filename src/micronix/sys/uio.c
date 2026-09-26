@@ -659,5 +659,55 @@ brel()
 }
 
 /*
+ * Hold the scratch window on a segment of the kernel's own choosing, and
+ * return the address its bytes become reachable at.  srel() gives the
+ * page back.
+ *
+ * This is bhold()/brel() on the other window, and it is here for a driver
+ * that has to see a segment of its own *and* a buffer at the same time:
+ * bhold() puts the buffer at BUFSEG, so the segment has to be reached
+ * somewhere else, and SCRSEG is the one page left.  The two are otherwise
+ * the same shape, down to saving image0 rather than map0 - the map
+ * registers are write only, so reading one back is bus garbage and not
+ * the segment in place.
+ *
+ * Sharing SCRSEG with mem.s's getbyte/putbyte/memrw, which borrow the
+ * same register for the same page, is safe because those hold interrupts
+ * off across the borrow (mem.s), so nothing can be entered in the middle
+ * of one and find the register part way between two segments.  The rules
+ * the caller keeps are the buffer window's - never sleep with one held,
+ * and call nothing that maps this window while one is up - plus one that
+ * follows from the sharing: a hold taken in a handler is fine, but a hold
+ * taken in process context must not be held across anything that reaches
+ * mem.s.
+ */
+#define NSHOLD  4               /* holds stack, as bhold's do */
+
+static UINT8 sholdn;                    /* scratch holds up */
+static UINT8 sholdstk[NSHOLD];
+
+char *
+swin(seg)
+    int seg;
+{
+    if (sholdn >= NSHOLD)
+        panic("swin: too deep");
+    sholdstk[sholdn++] = image0[2 * SCRSEG];
+    map0[2 * SCRSEG] = image0[2 * SCRSEG] = seg;
+    return ((char *)SCRWIN);
+}
+
+/*
+ * Release the innermost scratch hold, putting back the segment it saved.
+ */
+void
+srel()
+{
+    if (sholdn == 0)
+        panic("srel: no hold");
+    map0[2 * SCRSEG] = image0[2 * SCRSEG] = sholdstk[--sholdn];
+}
+
+/*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
