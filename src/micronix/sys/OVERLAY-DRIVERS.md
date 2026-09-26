@@ -266,6 +266,157 @@ How a major finds its module. Either the modules are in major order, or a small
 resident `ovlmod[major]` holds the index. The table is `nbdev` bytes and survives
 a driver being dropped or reordered; order alone is cheaper and breaks quietly.
 
+## Which module the loader places
+
+The section above leaves the kernel needing a resident driver for the device it
+was booted from — and *which* one depends on the loader. A kernel that bakes one
+in is a kernel per boot device: floppy, mw, ide, scsi, four artifacts out of one
+source. That is the thing to avoid, and the way out is that the loader places the
+module.
+
+**Only one module varies.** The console is `multio` and every machine here has the
+Mult I/O board, so the console driver stays resident in the kernel without making
+it device-specific. What varies is the boot disk's controller alone — which is
+precisely the driver the section above says can never be overlaid anyway. So this
+is a one-module problem, not a four-kernel one.
+
+**And the loader is already the right place for it.** `stand/boot` builds three
+loaders today — `mwboot.com`, `djboot.com`, `ideboot.com` — from one `boot.c` plus
+one io.c each. Device knowledge is already there and already a small, per-device
+artifact. The kernel is the thing one least wants four of.
+
+Two shapes for the loader to do it:
+
+### The loader parks it
+
+The loader reads module *k* out of the kernel file and stores it in the kernel's
+own 64K, where init code copies it to a `segalloc()`d page and the region is
+reclaimed as headers. No segment allocator in the loader, no window, no new
+handoff — and it costs the park for the length of init, which is the 3725 that
+fits **exactly one** module. That is the same arithmetic that ruled the park out
+when it had to hold all of them, and this is the one case it fits.
+
+The awkward part is the address. It cannot be derived from the object's extent
+the way the module region is, because the extent already runs past BUFWIN into
+the window and u pages. So it is either a constant the loader and the kernel
+share, or a field in the object header.
+
+### The loader maps it into a segment
+
+The loader puts the module into a segment itself, which is literally "place it in
+the address map". It has the whole 64K to itself before the kernel starts, so it
+has a window to copy through; but it has no `segalloc`, and `segalloc()` sweeps
+16 upward to 255, so any segment it takes has to be marked in `segmap[]` by the
+kernel or it will be handed out again later.
+
+### Either way the handoff outgrows one register
+
+`HL` carries the inode. A segment number makes two values, and what survives a
+third is a **pointer to a boot-info block** — the inode, the segments the loader
+took, and a marker for "the loader did not say". That also disposes of the
+sentinel problem: zero in a field of a block is unambiguous, where zero in HL was
+doing double duty.
+
+The kernel's entry header is already a fixed-agreement interface — `_trapvec`,
+`_plist` and `_mlist` sit at 0x1001 to 0x1005 — so one more cell there is in
+keeping with how the entry works rather than a new kind of coupling.
+
+### The coupling to design first
+
+The loader must not know a module *index*. Module ordering is a build-time
+agreement between the loader and the kernel build, and it breaks silently — the
+failure mode this plan keeps trying to avoid. Give each module a small
+identification header — a magic and its major — and have the loader **scan** for
+the one matching its own controller. Then the loaders are independent of where a
+build puts the modules, and a module can be added or dropped without touching
+them.
+
+That header also has to sit in front of the devsw table described below, which
+pushes the entry points off offset zero. Worth deciding as one thing.
+
+### The baseline it has to beat
+
+One source, four kernels, selected by a build flag. No loader change at all, four
+artifacts, each self-consistent. Strictly worse than either shape above — but it
+is a working fallback if the loader work stalls, and a useful rig for testing
+everything else in this file, since it makes the boot driver's presence a build
+choice rather than a loader behaviour.
+
+### The assumption underneath it
+
+The chain, as it stands: the hardware switch picks the device, which gives a
+device-specific first level; that knows how to read the second level, which is on
+disk contiguous and out of band; the second level reads the disk through its own
+wired-in driver, finds the superblock, offers a list of kernels; one is loaded
+from 0x1000 to 0xfe00; the inode is handed over and the processor enters task 0,
+which is the first thing with MMU access. And then that kernel needs its root
+device, whose driver therefore has to be there with it.
+
+That last step rests on an assumption nobody has written down: **that the device
+the loader read the kernel from is the device the kernel will mount as root.** It
+is doing two separate jobs, and they come apart in the same case.
+
+The first is choosing the module. If the two devices are the same, the loader's
+own controller is the one the kernel needs, so the loader looks like the right
+thing to ask. It is not — the kernel needs the driver for `rootdev`, which is a
+property of the *kernel build*, not of the loader. Booting a kernel off a floppy
+with a hard disk for root is an ordinary thing to do, and there the loader's
+controller and the required module are simply different. The module should be
+selected by the root major the kernel declares — in its header, or as a field the
+loader can read — and the loader then loads whatever that names, reading it off
+whatever device it happens to boot from, which it can.
+
+The second is what `_kino` *means*. An inode number is only an inode number on a
+device. If the kernel was booted from a floppy and its root is a hard disk, that
+number names a different file on root — or nothing — and the kernel would open
+the wrong one. Silently: an inode is a number, and there is no name to compare.
+So the handoff should carry the boot device alongside the inode, and the kernel
+should use `_kino` only when the boot device *is* `rootdev`.
+
+Which leaves the general case costing one more resident module: the boot device's
+driver, needed for nothing except re-reading the file the kernel came out of. It
+cannot be overlaid, because reading it back needs the root mounted, and the root
+is the other device.
+
+The cheap first cut is to **enforce the assumption rather than support its
+negation**: the kernel takes `_kino` only when the boot device matches `rootdev`,
+and otherwise says so and carries on without it — no modules, no overlays, the
+kernel it booted as. That is strictly less than the general case and strictly
+more honest than reading a number that means something else.
+
+### Or the installer stamps both
+
+Everything above assumes the loader decides. It need not. `rootdev` is already a
+value that belongs to the *installation* rather than to the build — it is
+`main.c:32`, `UINT rootdev = 0x0300`, a compile-time constant that nothing stamps
+at install time, so today changing the root device means editing source and
+rebuilding the kernel. That is this same problem in its smallest form.
+
+So let the thing that patches `rootdev` choose the driver as well. One stamp,
+two facts, and they cannot disagree — because they are written together, in one
+pass, by the tool that already knows what it is installing. That:
+
+- takes the decision away from the loader entirely, and with it the assumption
+  above: "boot device is not root device" stops being something the loader can
+  get wrong and becomes something the installer can *say*, which is what it is.
+- makes the kernel a single artifact. The module identification header then does
+  the narrower job of saying what each module **is**; the stamp says which one the
+  installation **wants**, and the loader only has to read the stamp and load that
+  module off whatever device it booted from.
+
+Two things to get right, both of which the tree has already been bitten by:
+
+- **Patch the file that boots.** The caution in `disks/hdinstall/README` — "Nothing
+  is patched. An earlier version of this directory had the swap device changed and
+  that was a mistake" — is about a *stale copy*, the hand-copied kernel in
+  `kernels/`, not about stamping as such: `create_vol` now copies `sys/unix`
+  straight in precisely so the thing stamped is the thing booted.
+- **Make the stamp checkable.** A stamp that is wrong is a kernel that boots and
+  mounts something else, and the failure is silent because a device number is a
+  number. The label already carries the geometry for exactly this reason, and the
+  root device belongs beside it — so the kernel can compare what it was stamped
+  with against what the disk says, and refuse rather than mount.
+
 ## Building a driver page
 
 A driver page is a self-contained object: linked on its own at `OVLBASE`, with a
