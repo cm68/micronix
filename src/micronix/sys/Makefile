@@ -83,11 +83,11 @@ KERNEL_AS_OBJ = uhdr.o intrpt.o mio.o textpad.o
 KERNEL_C_SRC  = mount.c access.c balloc.c cio.c create.c exec.c fio.c fork.c \
 	ialloc.c iget.c imap.c link.c malloc.c name.c open.c queue.c \
 	rdwri.c reg.c sig.c sleep.c subc.c swap.c sys1.c sys2.c system.c \
-	time.c trap.c tty.c uio.c dj.c memdev.c multio.c dlabel.c mw.c main.c
+	time.c trap.c tty.c uio.c dj.c memdev.c multio.c dlabel.c mw.c main.c rtc.c
 KERNEL_C_OBJ  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o link.o malloc.o name.o open.o queue.o \
 	rdwri.o reg.o sig.o sleep.o subc.o swap.o sys1.o sys2.o system.o \
-	time.o trap.o tty.o uio.o dj.o memdev.o multio.o dlabel.o mw.o main.o
+	time.o trap.o tty.o uio.o dj.o memdev.o multio.o dlabel.o mw.o main.o rtc.o
 
 #
 # Init-only code, folded into data-only highmem.o by the rule below and
@@ -104,11 +104,11 @@ USER_C_SRC = user.c
 USER_C_OBJ = user.o
 
 #
-# rtc.c is the one .c that is not on a list above.  It is pure code with
-# no static data, so its single .text block has to be re-sectioned to
-# .data and parked in the u page with the runtime - a thing ccc cannot
-# say in C - so its object is made by its own rule below, from a listing
-# generated and edited there, and not by the rule over these lists.
+# rtc.c is ordinary resident C: its only callers are mount() and sys2.c,
+# which are resident, so no driver module links against it and it needs
+# no fold.  It lived in the u page - pure code with no static data, so
+# it could be parked there with the runtime - until the leaf code grew
+# past what the page holds.
 #
 
 #
@@ -117,7 +117,7 @@ USER_C_OBJ = user.o
 # links.
 #
 LEAF_AS   = $(UPAGE_AS_OBJ) $(UPAGE_LIBC_OBJ)
-LEAF_C    = $(UPAGE_C_OBJ) rtc.o
+LEAF_C    = $(UPAGE_C_OBJ)
 KERNEL_AS = $(KERNEL_AS_OBJ) highmem.o
 KERNEL_C  = $(KERNEL_C_OBJ)
 HIGHMEM   = $(HIGHMEM_C_OBJ) $(HIGHMEM_AS_OBJ)
@@ -158,18 +158,6 @@ upage.o: $(USER_C_OBJ) $(LEAF_AS) $(LEAF_C)
 highmem.o: $(HIGHMEM)
 	$(LD) -r -Sdata -o highmem.o $(HIGHMEM)
 
-# rtc.o is made in one recipe, under a name nothing else reads, and the
-# intermediate object is thrown away with it.  The recipe is explicit
-# because otherwise the built-in .c.o rule would compile rtc.c into rtc.o
-# - as .text, which the data pass of the loader would then write over the
-# u page.  The -r -Sdata link folds that .text into .data, the thing the
-# old sed swizzle did by hand, and it is the same fold highmem.o uses for
-# the init-only code.
-rtc.o: rtc.c
-	$(CC) $(CFLAGS) -c -o rtc.rel rtc.c
-	$(LD) -r -Sdata -o rtc.o rtc.rel
-	rm -f rtc.rel
-
 # consts.o is made the same way, for the same reason and one literal at a
 # time: ccc compiles the device-name strings the u page's read-only
 # tables point at into .text, and text in upage.o is what the final link
@@ -195,7 +183,7 @@ consts.o: consts.c
 # the data-only, unplaced shape -Shigh parks after bss,
 # and low.o is a plain fold that lands where the resident kernel always
 # has.  Text has no address to be placed at in the u page, so a .c that
-# goes there is folded to .data by a rule of its own (rtc.o, consts.o);
+# goes there is folded to .data by a rule of its own (consts.o);
 # left as .text, ld appends it to the resident text and pads the text
 # section out to reach 0xf000, and the image stops fitting in the blocks
 # the boot loader will read.  A new object for either place is the same
@@ -273,7 +261,7 @@ install: unix
 # file that matters.  A stray .o left in the directory is not swept up
 # any more, but nothing links one either: unix is built from $(OBJS).
 clean:
-	rm -f $(OBJS) rtc.rel consts.rel *.nam *.tok *.x
+	rm -f $(OBJS) consts.rel *.nam *.tok *.x
 
 # clobber is clean plus the kernel, the makedate host program, and
 # build.h, the one file here that is written rather than compiled.

@@ -77,20 +77,13 @@ LEAF_LIBC = csv.o idiv.o imul.o qadd.o qsub.o \
 	qldst.o tramp.o swdisp.o swdispw.o oarg.o
 LEAF_AS   = mem.o inout.o sub8.o unixtobcd.o $(LEAF_LIBC)
 # Kernel C that also lives in the u page: the read-only tables (syssw,
-# biosw, ciosw), the clock, and the bus lock two driver modules share.
-LEAF_C    = consts.o rtc.o bus.o
-
-# rtc.c is pure code (no static data), so re-section its single .text
-# block to .data and park it in the u page, like the libccc runtime.
-# ccc compiles it to rtc.rel as .text, and the -r -Sdata link folds every
-# section of that into .data - the same fold highmem.o uses for the
-# init-only code, where the old recipe re-sectioned the listing with sed.
-# The explicit rule beats the %.o:%.c rule below, which would leave the
-# object as .text and let the loader's data pass write it over the u page.
-rtc.o: rtc.c
-	$(CCC) $(CCFLAGS) $(INC) -c -o rtc.rel $<
-	$(MXLD) -r -Sdata -o rtc.o rtc.rel
-	rm -f rtc.rel
+# biosw, ciosw) and the bus lock two driver modules share.  rtc.o was
+# here too - it is pure code with no static data, so it could be folded
+# to .data and parked like the runtime - until the leaf code grew past
+# what the page holds.  Its callers are mount() and sys2.c and both are
+# resident, so nothing a driver module links against reaches it and it
+# is ordinary resident C again (KERNEL_C).
+LEAF_C    = consts.o bus.o
 
 # consts.c needs the same fold for the same reason, one literal at a
 # time: ccc puts the device-name strings the tables point at in .text,
@@ -119,7 +112,7 @@ KERNEL_AS = uhdr.o intrpt.o mio.o textpad.o highmem.o
 KERNEL_C  = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o malloc.o name.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
-	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o
+	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o rtc.o
 WIN_C     = open.o sys2.o rdwri.o memdev.o link.o access.o
 HIGHMEM   = main_init.o cus.o inits.o djinit.o
 # dj, mw and ide are not here: they are driver modules, linked at OVLBASE
@@ -229,8 +222,8 @@ build.h:
 #	upage.o		.data, all of it, at 0xf000 by -Tdata.  Text has
 #			no address here to be placed at - 0xf000 is a data
 #			address - so every .c that goes in has to be folded
-#			to .data first, which is what rtc.o's and consts.o's
-#			own rules are for.  Left as .text, mxld appends it to
+#			to .data first, which is what consts.o's own rule is
+#			for.  Left as .text, mxld appends it to
 #			the resident text and pads the text section out to
 #			reach 0xf000, and the image stops fitting in the boot
 #			loader's block list.
