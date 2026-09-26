@@ -28,10 +28,10 @@ the scratch window (13) under it.
 
 ```
 0x0000 - 0x0fff   ROM + I/O page            (not in the image)
-0x1000 - 0x9cff   text                      36095 bytes
-0x9cff - 0xcb58   data + bss                11865 bytes; ends at _ebss
-0xcb58 - 0xdfb0   buffer pool               248 headers minted off _ebss
-0xdfb0 - 0xdfff   free                      80 bytes
+0x1000 - 0x9e73   text                      36467 bytes
+0x9e73 - 0xc8d9   data + bss                10854 bytes; ends at _ebss
+0xc8d9 - 0xdd31   buffer pool               248 headers minted off _ebss
+0xdd31 - 0xdfff   free                      719 bytes
 0xe000 - 0xefff   buffer-cache window       BUFSEG; bwin() maps here
 0xf000 - 0xfcde   leaf code + constants     USERSEG; 3294 bytes
 0xfcde - 0xfede   ustack                    512 bytes, .bss
@@ -39,20 +39,23 @@ the scratch window (13) under it.
 0xff53 - 0xffff   free                      172 bytes; loader-stack slack
 ```
 
-`blist` is the last object in .bss: the 8 boot headers at 0xcab0..0xcb58,
+`blist` is the last object in .bss: the 8 boot headers at 0xc831..0xc8d9,
 which is why the pool's minted range starts at `_ebss`.  With them the
-pool is 256 headers, or 5376 bytes from 0xcab0 to `btop` = 0xdfb0.
+pool is 256 headers, or 5376 bytes from 0xc831 to `btop` = 0xdd31.
 
-The pool is 80 bytes short of BUFWIN and that is not a coincidence: at
+The pool is 719 bytes short of BUFWIN and that is not a coincidence: at
 256 headers `MAXBUFS` (main.c) binds before the ceiling does, so the
-pool is sized by the count and not by memory.  The 0xe000 page is the
-wall for the resident kernel as well - `-Shigh` parks highmem.o (2202)
-at `_ebss` and win.o is pinned there, so the kernel links only while
-`_ebss <= 0xe000-2202` = 0xd766.  Today's slack is 0xd766-0xcb58 = 3086
-bytes, and the first 80 of it go to the pool's gap before the cache
-starts to shrink, one buffer per 21 bytes.  See TODO, the scsi section.
+pool is sized by the count and not by memory.  Minting to the ceiling
+alone would be 282 headers, so the count binds 34 short of it - it was 3
+short before the 1K staging buffer left the kernel, which is the change
+that made the ceiling stop mattering.  See OVERLAY-DRIVERS.md.  The
+0xe000 page is the wall for the resident kernel as well - `-Shigh` parks
+highmem.o (2202) at `_ebss` and win.o is pinned there, so the kernel
+links only while `_ebss <= 0xe000-2202` = 0xd766.  Today's slack is
+0xd766-0xc8d9 = 3725 bytes, none of it reachable by the cache, and it is
+where the driver blobs would have to park.  See TODO, the scsi section.
 
-The file's data stream runs from 0x9cff to 0xfcde - through the pool and
+The file's data stream runs from 0x9e73 to 0xfcde - through the pool and
 the window page, which carry no image bytes - and the boot loader reads
 it as one 119-block flat image.  `_usrtop`/`_memtop` = 0xffff (uhdr.s).
 
@@ -116,12 +119,14 @@ window's own page, because `bwin()` holds a segment there for the whole
 of a buffer access and a header in that page would be read back as
 buffer data.  The count is what binds, not that ceiling: `MAXBUFS`
 (256, main.c) is reached first, so the pool is 8 boot headers plus 248
-minted, the first 2202 bytes of which are the reclaimed init-only
-object, and 80 bytes of the `_ebss`..BUFWIN region go unused.  Minting
-to the ceiling alone would be 251 - the count is within one group of
-eight of the ceiling now, so which of the two binds is nearly a
-coincidence, and the next kilobyte of kernel growth spends the gap and
-starts eating buffers.  See TODO, the scsi section.
+minted, running 0xc831 to 0xdd31, the first 2202 bytes of which are over
+the reclaimed init-only object, and 719 bytes of the `_ebss`..BUFWIN
+region go unused.  Minting to the ceiling alone would be 282, so the
+count binds 34 short of it - it bound by 3 before the 1K staging buffer
+left the kernel, which is what moved the ceiling out of the way and left
+the pool sized by `MAXBUFS` alone.  The 719 bytes are growth room: the
+next kilobyte of kernel growth spends them and then starts eating
+buffers, at 21 bytes each.  See TODO, the scsi section.
 
 The blocks are 512 bytes each, minted `data = BUFWIN + (i&7)*512` with
 `xmem` = a fresh page from `segalloc()` (8 blocks per page).  DMA

@@ -21,18 +21,39 @@ interesting.
 ## The budget, and why the dj.c change was the entry fee
 
 Taking three drivers out of the 64K and putting one page back leaves the
-difference free, and that difference is where the aligned page comes from.
+difference free, and that difference is where the aligned page comes from. That
+is the intent. What the measurements below say is that the *park* binds before
+the page does, and that it does not fit yet.
 
 `sys/dj.c` was the first instalment. Its 1K sector buffer `kbuf[1024]` was in the
 kernel's own segment; it is now a `segalloc()`d page reached through the scratch
-window (`SCRSEG`/`swin`/`srel`), which took `dj.o` from `text 3001 data 1419 bss
-57` to `text 3264 data 396 bss 64` and moved `_ebss` from 0xcb58 to **0xc8d9** —
-about 750 bytes of resident address space for one byte of state and one page of
-the 1M. `sys/TODO` has the arithmetic for both budgets; the pool's cap
-(`MAXBUFS`) binds before the ceiling does, so address space returned is worth
-more than image bytes returned.
+window (`SCRSEG`/`swin`/`srel`). Both revisions compiled, so this is measured
+rather than remembered:
 
-Measured with `mxnm unix | grep _ebss`, which is the way to re-check it — the
+| | text | data | bss | total |
+|---|---|---|---|---|
+| `dj.o` before | 3001 | 1419 | 57 | 4477 |
+| `dj.o` after  | 3264 |  396 | 64 | 3724 |
+
+The object lost 753 bytes, and the kernel's own segments moved like this:
+
+| | before | after | delta |
+|---|---|---|---|
+| text, from 0x1000 | 36095 | 36467 | +372 |
+| data + bss        | 11865 | 10854 | -1011 |
+| `_ebss`           | 0xcb58 | 0xc8d9 | **-639** |
+
+The buffer that left is 1016 bytes. The code that reaches it is 372, of which 263
+is `dj.c`'s own `swin`/`srel` call sites and 109 is `uio.c`'s new `swin`/`srel`
+plus its 5 bytes of hold stack. **The reclaim is 639 bytes** — not the 1016 the
+buffer's size suggests, and 639 is the number the overlay has to spend.
+
+None of it became buffers. `MAXBUFS` (256, main.c) caps the pool either way, so
+what changed is the gap between the last minted header and BUFWIN: 80 bytes
+before, 719 after. It is growth room, not cache.
+
+`mxnm unix | grep _ebss` is the way to re-check the end and `mxnm -b <obj>` the
+segments — text and data only, so bss comes from `.ebss` minus `.edata`. The
 numbers here went stale once already.
 
 ## The switch, and the one discipline that matters
@@ -97,13 +118,14 @@ the transfer state. In `dj.c`:
 | `dm[NDRIVES]`, `curbuf`, `qhead`, `qtail` | the queue and drive state the handler walks |
 | `kdev`, `ksec`, `kw`, `kseg` | the staging state the handler updates |
 | `djcomm[26]` | the controller command block, shared with `memio` |
-| `specs[]`, `delay[]` | **read-only tables the handler reads**: `getstat` reaches `d->specs` and `d->step`/`d->settle` |
+| `specs[]`, `delay[]` | **read-only tables the handler reads**: `getstat` reaches `d->specs` and `d->step`/`d->settle`; 297 + 32 = 329 bytes |
 
-The last row is the one that is easy to miss: 318 bytes of tables that look like
-data and belong to the driver, but are read on the interrupt path. So "fits in a
+The last row is the one that is easy to miss: 329 bytes of tables that look like
+data and belong to the driver, but are read on the interrupt path. (An earlier
+draft of this file said 318; `specs[]` is 27 rows of 11 bytes.) So "fits in a
 page" has to be measured as text + data + bss **minus the resident set**, not as
-the whole object. `dj.o` is 3724 bytes today and would fit; that does not settle
-it until the split is drawn.
+the whole object. Summed, this table is **391 bytes**, so `dj.o`'s blob is 3333.
+It fits a page comfortably — the page turns out not to be what binds.
 
 ## The link
 
@@ -118,6 +140,38 @@ headers over it.
 The ordering is the whole trick and is not new: `highmem.o` already runs *as*
 the region it is about to be reclaimed from, and the driver blobs are that with a
 copy inserted between reading and reclaiming.
+
+**But the park does not fit, and that is the first thing the budget says.**
+Everything parked has to lie between `_ebss` and BUFWIN, because win.o is pinned
+at 0xe000:
+
+    0xe000 - 0xc8d9   =  5927 bytes of park, all told
+    less highmem.o      2202
+    ------------------------------
+    for the blobs       3725
+
+and the blobs, each measured as its object less its resident set:
+
+| driver | text | data | bss | total | resident | blob |
+|---|---|---|---|---|---|---|
+| `dj.o`  | 3264 | 396 | 64 | 3724 | 391 | 3333 |
+| `mw.o`  | 2552 | 165 | 28 | 2745 | 165 | 2580 |
+| `ide.o` | 2659 |  48 | 60 | 2767 |  48 | 2719 |
+|         |      |     |    |      |     | **8632** |
+
+8632 bytes wanted, 3725 available: **over by 4907**, and `dj.c`'s 639 is 13% of
+what is missing. Nor do any two fit together (dj + ide is 6052). Exactly one
+driver can be parked today, whichever one that is.
+
+For scale, `scsi.o` (3034/146/61), which is not in the build, would want about
+3095 more. `dlabel.o` (599/0/74) is shared by `mw.c`, `ide.c` and `scsi.c`, so it
+stays resident whichever way this goes. `multio.o` (989/152/0) is a character
+driver on its own `ciosw[]` entry, so it is a candidate but not a block one.
+
+So either the parked set is one driver, or the blobs do not travel in the image
+at all and are loaded from the root disk at boot — which needs one driver
+resident to read them, and is the arrangement this plan was trying to avoid. The
+budget forces that decision; the plan does not currently make it.
 
 **Relocations are the hard part, not the addressing.** A blob linked at `OVLBASE`
 is self-contained for its own internals, but it still calls resident kernel
@@ -151,12 +205,36 @@ jump to `OVERLAY + offset`. The thunk is a few bytes and lives in kernel text;
 nothing above the driver layer knows the code moved.
 
 The open question is which logical page `OVLSEG` is. It has to be 4K-aligned and
-mappable, and per `KMEM.md` there is no free one: everything from `_ebss` to
-BUFWIN is minted pool, and 0xd000 within that range is the scratch window mem.s
-borrows and restores. So the page comes out of the pool's range — 4K at 21 bytes
-a header is around 195 buffers, roughly three times what the `dj.c` change
-returned. That is a decision to take deliberately, with the pool's ceiling
-dropped to match, not a side effect.
+mappable, and there is no free one: the kernel holds 0x1000 to 0xc8d9, and
+everything from `_ebss` to BUFWIN is pool. The only 4K-aligned address in the
+free range is **0xd000**, which is the scratch window — so `OVLSEG` and `SCRSEG`
+would have to be the same page.
+
+That is less alarming than it sounds, because mem.s restores the mapping from
+`IMAGE0[26]` after every borrow rather than restoring bytes; if the overlay's
+segment is what `IMAGE0[26]` holds, the restore puts the driver back for free. It
+does mean an overlaid driver must never call `swin`/`srel`, which *replace*
+`image0[26]` instead of restoring it — which is already why `dj.c`'s staging
+lives in BUFSEG and not the scratch page.
+
+The cost lands on the pool, and `expand_bufs()` mints contiguously from
+`&blist[8]`, so whichever page is taken it has to be excluded from the mint. The
+three ways, by what each costs against the 256 buffers the pool holds now:
+
+| `OVLSEG` | `_ebss` must reach | extra reclaim | minted | total pool |
+|---|---|---|---|---|
+| 0xd000, as it stands | 0xc8d9 (now) | none | 87 | 95 |
+| 0xc000 | 0xc000 | **2265** | 195 | 203 |
+| 0xd000, pool above it | 0xbba8 | 3377 | 248 | 256 |
+
+4096 bytes at 21 bytes a header is the 195 this file used to quote, and 195 is
+what a *free* page is worth — but only when it is not a hole in the mint. As a
+hole at 0xd000 it is worth 161 buffers (256 down to 95); moved to 0xc000, where
+the pool can sit above it, it is worth 53 (256 down to 203) for 2265 bytes of
+`_ebss`. The middle row is the one to aim at: it pays for the page out of address
+space instead of out of the cache, and it is 3.5 times what `dj.c` has reclaimed
+so far. The third row buys the last 53 buffers back at 21 bytes each — the
+standing rate, and no better.
 
 ## What is already in place
 
@@ -170,7 +248,10 @@ dropped to match, not a side effect.
 
 ## Order of work
 
-1. Decide `OVLSEG` and take it out of the pool deliberately.
+1. Decide `OVLSEG` and take it out of the pool deliberately — and decide it
+   together with the parked set, because the two compete for the same bytes.
+   Getting `_ebss` to 0xc000 is 2265 bytes of reclaim and is the partner of the
+   0xc000 page; the park, at one blob, is affordable at 3725.
 2. Put an overlay segment in the process's map state and write it beside the u
    page's, so the restore exists before anything depends on it.
 3. Do one driver end to end. `dj.c` is the candidate: it is the freshest, it has
@@ -181,7 +262,9 @@ dropped to match, not a side effect.
 ## Caveats
 
 Nothing here has been built. The budget figures are measured; the mechanism is
-argued from the code that exists. The two things most likely to be wrong when it
-is tried: the relocation answer, and the size of the resident set — the second
-because it is easy to count the state a driver *writes* on the interrupt path and
-miss the tables it only *reads*.
+argued from the code that exists. The three things most likely to be wrong when
+it is tried: the relocation answer; the size of the resident set, because it is
+easy to count the state a driver *writes* on the interrupt path and miss the
+tables it only *reads*; and the reclaim, which is measured at 639 bytes against
+the 2265 the OVLSEG page wants, so the budget is the part that is *known* to be
+short rather than the part that might be.
