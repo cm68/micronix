@@ -106,8 +106,16 @@ _trapvec:
 ; 	sp = &0x1000
 ; 	jmp _start
 ;
+; HL arrives holding the inode the loader booted this kernel from - the
+; loader's last act is to put it there, see stand/boot/sexit.s.  The
+; kernel wants it because its overlays ride in its own file: it opens
+; itself with iget(_rootdev, _kino) rather than by name.  Zero means the
+; loader did not say, which is not the same as inode zero, there being no
+; inode zero - see _kino below.
+;
 boot:
 	ld	sp,0x1000	; an initial stack pointer at an odd place
+	ld	(_kino),hl	; what the loader booted us from
 	jp	_start		; enter the kernel
 
 ; ------- A-NATURAL SOURCE: _hlt -------
@@ -196,3 +204,17 @@ iargs:
 	.globl	dicount
 dicount:
 	.defb	0
+
+;
+; _kino - the inode the loader booted this kernel from, stashed by boot:
+; above before _start could clobber HL.  It is mutable, so it cannot live
+; in the cloned u page, and it sits here for dicount's reason: uhdr.o
+; links first, so this is the front of the data segment and below blist.
+;
+; Zero means the loader did not say - a boot path that does not go through
+; stand/boot, or one that failed to pick a file.  It is not a valid inode:
+; inodes are numbered from one, the root being the first.
+;
+	.globl	_kino
+_kino:
+	.defw	0

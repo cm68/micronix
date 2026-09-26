@@ -163,8 +163,16 @@ load()
 	}
 	outstr("Entering\n");
 	out(0x41, 0);
-	(*loadbase)();
+	enterk();
 }
+
+/*
+ * enterk() is in sexit.s.  It is what jumps to loadbase, and it does it
+ * with inumber in HL - which C cannot say, and which the kernel wants:
+ * it opens the file it was booted from, because its overlays ride in it.
+ * See the comment there.
+ */
+int enterk();
 
 outstr(s)
 register char *s;
