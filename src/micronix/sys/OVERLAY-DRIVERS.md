@@ -190,7 +190,8 @@ driver on its own `ciosw[]` entry, so it is a candidate but not a block one.
 So either the parked set is one driver, or the blobs do not travel in the image
 at all and are loaded from the root disk at boot — which needs one driver
 resident to read them, and is the arrangement this plan was trying to avoid. The
-budget forces that decision; the plan does not currently make it.
+budget forces that decision; **the section after this one makes it, and the
+resident driver turns out to cost less than the park does.**
 
 **Relocations are the hard part, not the addressing.** A blob linked at `OVLBASE`
 is self-contained for its own internals, but it still calls resident kernel
@@ -214,6 +215,56 @@ out, none of them equivalent:
 Recommended: (1), for the same reason the tree prefers one decode in
 `dlabel.c` over three — the thing that has to be correct is small and in one
 place.
+
+## The kernel object file
+
+The budget above forces a decision, and this is it: **the modules do not travel in
+the image. They are appended to the kernel object file and read out of it at
+runtime.**
+
+The file is a standard object file — the a.out `mxld` already writes, loaded by
+the loader exactly as it is today — with the module region appended after it, each
+module padded to a 4K boundary, running to EOF. Nothing in the header says so, and
+nothing needs to:
+
+	the object's extent is in its own header (text + data + 0x10)
+	the module region starts at the next 4K boundary after that
+	module n is at modbase + n * 4096
+	the count is the file size over 4096
+
+Position and count are both derived, so there is no constant for the kernel and
+the file to keep in step — the same argument that put the inode in HL rather than
+in a cell. The 4K slots also make the reader's arithmetic free: 4096 is a whole
+number of 512-byte blocks and the page size, so the file offset, the block offset
+and the in-page offset are the same number shifted.
+
+The reader already exists. `readi()`/`bmap()` reads any offset of any inode — it
+is how every file is read — so `iget(rootdev, kino)` plus a read at
+`modbase + n*4096` needs no new machinery. It does need the root mounted, so
+module loads happen after mount and in process context, which is where a driver's
+first open is anyway.
+
+### One driver stays resident, unavoidably
+
+To read a module you need a working driver for the disk it lives on and a mounted
+filesystem. So the driver for the device the kernel reads itself from can never be
+overlaid, and neither can the console — the failure cannot be reported without
+one. `multio` and whichever of `mw`/`dj`/`ide` the machine boots from are permanent
+residents.
+
+That is not a cost this arrangement introduces. The park pays it too: the kernel
+has to read its root filesystem to run at all. What the park buys instead is the
+ability to overlay the *root* driver as well — and the arithmetic above says it
+buys exactly that one, because 3725 bytes fits one of these drivers and not two
+(dj 3020, ide 2767, and not with `multio`). So the park is one overlaid and two
+resident; reading from the file is two overlaid and one resident, and a fourth
+driver costs nothing more.
+
+### What is left to decide
+
+How a major finds its module. Either the modules are in major order, or a small
+resident `ovlmod[major]` holds the index. The table is `nbdev` bytes and survives
+a driver being dropped or reordered; order alone is cheaper and breaks quietly.
 
 ## Building a driver page
 
