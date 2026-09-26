@@ -173,7 +173,13 @@ DOCSRCS	?= $(wildcard *.mp *.ic)
 # beside it has something to install when the native build runs.
 #
 MANSRCS	?= $(wildcard *.1)
-SRCS	?= $(CSRCS) $(HSRCS) $(ASSRCS) $(MANSRCS)
+#
+# Anything else a directory ships that none of the wildcards above
+# catch - a data file, a termcap entry - lists itself here.  It rides
+# the tar beside the sources but is not a build input.
+#
+EXTRA	?=
+SRCS	?= $(CSRCS) $(HSRCS) $(ASSRCS) $(MANSRCS) $(EXTRA)
 
 MKFILE	 = $(wildcard ?akefile)
 DOCFILES = $(DOCSRCS:.mp=.0) $(DOCSRCS:.ic=.3)
