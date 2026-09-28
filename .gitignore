@@ -273,6 +273,7 @@ src/micronix/cmd/lex/liblc.a
 src/micronix/cmd/ln/ln
 src/micronix/cmd/login/login
 src/micronix/cmd/ls/ls
+src/micronix/cmd/lz4/lz4
 src/micronix/cmd/make/make
 src/micronix/cmd/man/man
 src/micronix/cmd/mkdir/mkdir
@@ -306,6 +307,7 @@ src/micronix/cmd/sync/sync
 src/micronix/cmd/tar/tar
 src/micronix/cmd/tee/tee
 src/micronix/cmd/umount/umount
+src/micronix/cmd/unlz4/unlz4
 src/micronix/cmd/upm/upm
 src/micronix/cmd/upm/*.rel
 src/micronix/cmd/vi/vi

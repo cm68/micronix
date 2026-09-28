@@ -132,6 +132,7 @@ unsigned char	pflag;
 unsigned char	wflag;
 unsigned char	Bflag;
 unsigned char	Fflag;
+unsigned char	zflag;
 
 char	mt;
 unsigned char	term;
@@ -256,6 +257,10 @@ char	*argv[];
 			Fflag++;
 			break;
 
+		case 'z':
+			zflag++;
+			break;
+
 		default:
 			fprintf(stderr, "tar: %c: unknown option\n", *cp);
 			usage();
@@ -263,6 +268,10 @@ char	*argv[];
 
 	if (!rflag && !xflag && !tflag)
 		usage();
+	if (zflag && rflag && !cflag) {
+		fprintf(stderr, "tar: can only create or read compressed archives\n");
+		done(1);
+	}
 	if (rflag) {
 		if (signal(SIGINT, SIG_IGN) != SIG_IGN)
 			(void) signal(SIGINT, onintr);
@@ -271,21 +280,34 @@ char	*argv[];
 		if (signal(SIGQUIT, SIG_IGN) != SIG_IGN)
 			(void) signal(SIGQUIT, onquit);
 		mt = openmt(usefile, 1);
+		if (zflag) {
+			(void) signal(SIGPIPE, SIG_IGN);
+			mt = startfilter(1, mt);
+		}
 		dorep(argv);
+		if (zflag)
+			endfilter();
 		done(0);
 	}
 	mt = openmt(usefile, 0);
+	if (zflag) {
+		(void) signal(SIGPIPE, SIG_IGN);
+		mt = startfilter(0, mt);
+		Bflag++;
+	}
 	if (xflag)
 		doxtract(argv);
 	else
 		dotable(argv);
+	if (zflag)
+		endfilter();
 	done(0);
 }
 
 usage()
 {
 	fprintf(stderr,
-"tar: usage: tar -{txr}[cvfblopwBiF] [tapefile] [blocksize] file1 file2...\n");
+"tar: usage: tar -{txr}[cvfblopwBiFz] [tapefile] [blocksize] file1 file2...\n");
 	done(1);
 }
 
@@ -332,6 +354,80 @@ openmt(tape, writing)
 		}
 	}
 	return(mt);
+}
+
+/*
+ * Fork the LZ4 filter.  On the create path (compress != 0) the child
+ * reads tar's block stream from a pipe and writes the compressed frame
+ * to the real archive fd; on the read path it reads the archive and
+ * writes the decompressed block stream to a pipe.  Either way tar keeps
+ * reading and writing the pipe end this returns, so the 512-byte block
+ * layer never knows a filter is there.
+ */
+startfilter(compress, rfd)
+	int compress;
+	int rfd;
+{
+	int pfd[2];
+	int pid;
+	char *av[2];
+
+	if (compress)
+		av[0] = "/bin/lz4";
+	else
+		av[0] = "/bin/unlz4";
+	av[1] = 0;
+	if (pipe(pfd) < 0) {
+		fprintf(stderr, "tar: ");
+		perror("pipe");
+		done(1);
+	}
+	if ((pid = fork()) < 0) {
+		fprintf(stderr, "tar: ");
+		perror("fork");
+		done(1);
+	}
+	if (pid == 0) {
+		if (compress) {
+			close(pfd[1]);
+			close(0);
+			dup(pfd[0]);
+			close(pfd[0]);
+			close(1);
+			dup(rfd);
+			close(rfd);
+		} else {
+			close(pfd[0]);
+			close(0);
+			dup(rfd);
+			close(rfd);
+			close(1);
+			dup(pfd[1]);
+			close(pfd[1]);
+		}
+		execv(av[0], av);
+		fprintf(stderr, "tar: ");
+		perror(av[0]);
+		exit(1);
+	}
+	if (compress) {
+		close(pfd[0]);
+		return (pfd[1]);
+	}
+	close(pfd[1]);
+	return (pfd[0]);
+}
+
+/*
+ * Close the pipe to the filter and wait for it, so its output reaches
+ * the archive before tar exits.
+ */
+endfilter()
+{
+	int status;
+
+	close(mt);
+	(void)wait(&status);
 }
 
 dorep(argv)

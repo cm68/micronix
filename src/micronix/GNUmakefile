@@ -96,6 +96,23 @@ NMX	 = $(BIN)/mxnm
 NMSRC	 = cmd/nm/nm.c lib/libutil/wsobj.c
 SETDEVX	 = $(BIN)/setdev
 SETDEVSRC = cmd/setdev/setdev.c
+#
+# lz4, the same shape again: cmd/lz4 builds the z80 one for the guest,
+# and this builds the host one.  Both are needed by the same thing - tar
+# z compresses and decompresses through whichever of the pair is local
+# - so the distribution packer, which runs here, wants mxlz4 and the
+# guest wants lz4.  They speak one stream format, the LZ4 frame
+# format with the history window narrowed to 16K, so a stream written
+# by either is read by the other.
+#
+# mxunlz4 is the reverse and is built beside it: not because anything
+# on the host decompresses in anger, but because it is the only way to
+# check a stream the packer wrote without booting a machine to do it.
+#
+MXLZ4	 = $(BIN)/mxlz4
+MXLZ4SRC = cmd/lz4/lz4.c
+MXUNLZ4	 = $(BIN)/mxunlz4
+MXUNLZ4SRC = cmd/unlz4/unlz4.c
 HOSTCC	?= gcc
 #
 # -idirafter, not -I: include/ holds the old Whitesmith stdio.h and the
@@ -109,13 +126,13 @@ HOSTCFLAGS ?= -w -std=gnu89 -Dlinux -idirafter $(DEPTH)/include
 # so the librarian exists before lib is archived.  This is a
 # prerequisite line only - the recipe is GNUmakefile.inc's.
 #
-all: $(ARMX) $(NMX) $(SETDEVX)
+all: $(ARMX) $(NMX) $(SETDEVX) $(MXLZ4) $(MXUNLZ4)
 
 #
 # clobber removes the host tools and src.tar as well as what the
 # recursion removes.  GNUmakefile.inc's clobber reads GENERATED.
 #
-GENERATED = src.tar $(ARMX) $(NMX) $(SETDEVX)
+GENERATED = src.tar $(ARMX) $(NMX) $(SETDEVX) $(MXLZ4) $(MXUNLZ4)
 
 $(ARMX): $(ARSRC)
 	mkdir -p $(BIN)
@@ -133,6 +150,20 @@ $(NMX): $(NMSRC)
 $(SETDEVX): $(SETDEVSRC)
 	mkdir -p $(BIN)
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(SETDEVSRC)
+
+#
+# The compressor and its reverse, for the host.  One source each, and
+# neither reads a micronix object, so they want no library - the plain
+# HOSTCFLAGS rule the three above use, and not host.mk, which exists to
+# link the compiler's passes against libccc.
+#
+$(MXLZ4): $(MXLZ4SRC)
+	mkdir -p $(BIN)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(MXLZ4SRC)
+
+$(MXUNLZ4): $(MXUNLZ4SRC)
+	mkdir -p $(BIN)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(MXUNLZ4SRC)
 
 #
 # The cross compiler, built here from these sources: the seven passes

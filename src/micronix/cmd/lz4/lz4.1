@@ -1,0 +1,21 @@
+.TH LZ4 1
+.SH NAME
+lz4 \- compress a stream into the LZ4 frame format
+.SH SYNOPSIS
+.B lz4
+[ infile [ outfile ] ]
+.SH DESCRIPTION
+.I lz4
+reads its input and writes it as a single LZ4 frame, the format the
+standard lz4 tool produces, on the output.  With no arguments, or with
+.B -
+as a name, the standard input and output are used.
+.PP
+The input is compressed block by block with bounded memory, so it may
+be arbitrarily large.  The one narrowing from standard LZ4 is the match
+window: an offset never exceeds 16383 bytes, so the decoder's history
+ring fits a 64K address space.  A stream written here is read by
+.IR unlz4 (1),
+by the standard lz4 tool, and by mxunlz4 on the host.
+.SH "SEE ALSO"
+unlz4(1), tar(1)
