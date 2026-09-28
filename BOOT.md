@@ -3,7 +3,7 @@
 Every way this machine gets from a reset to a running kernel, and where each
 piece of code lives.
 
-This is the map. `DJBOOT.md` is the deep dive on one of the four paths — the
+This is the map. `DJBOOT.md` is the deep dive on one of the five paths — the
 DJ-DMA floppy — and is not repeated here.
 
 Sources are named as they are used. The three monitor ROMs are
@@ -67,20 +67,25 @@ tstsw:  ld  a,(switch)
         jp  z,nuboot            ;  -- the DMA hard disk
         cp  10h                 ; switch 4 off, others on
         jr  z,djdma             ;  -- the DJ-DMA floppy
+        cp  18h                 ; switches 5 and 4 off (mon500 only)
+        jp  z,ncrboot           ;  -- the NCR 5380 SCSI disk
 ```
 
-The three ROMs differ in exactly one row:
+The three ROMs differ in two rows:
 
 | `sw & 0f8h` | `mon375.s`, `mon447.s` | `mon500.s` |
 |---|---|---|
 | `0x00` | `boothd` — HDCA Winchester | `ideboot` — IDE |
 | `0x08` | `nuboot` — DMA hard disk | `nuboot` — DMA hard disk |
 | `0x10` | `djdma` — DJ-DMA floppy | `djdma` — DJ-DMA floppy |
+| `0x18` | — (no such entry) | `ncrboot` — NCR 5380 SCSI |
 
 `mon500` is the later ROM. Its all-switches-on position was re-pointed at an
 IDE drive, and `boothd` and its entire HDCA register sequence are **gone from
 the source** — `grep boothd mon500.s` finds nothing. The HDCA Winchester is
-reachable only under the older two ROMs.
+reachable only under the older two ROMs. `0x18` is the one row `mon500` has
+that the others do not: it was added to spend the budget the on-board
+diagnostics left when they came out.
 
 A fourth decision is folded into the same byte: **bit 2 (`0x04`) is tested
 separately at `check`, and if it is set the monitor is skipped** and the
@@ -103,9 +108,9 @@ the higher bits are the simulator's own (`0x100` = put uart 0 in an xterm).
 
 ---
 
-## 2. The four ways in
+## 2. The five ways in
 
-All four land a first level somewhere, and the first level's job is always
+All five land a first level somewhere, and the first level's job is always
 the same: get a second level into memory and jump to it. What differs is how
 much room the ROM gives it — and that is decided entirely by which controller
 did the reading.
@@ -116,6 +121,7 @@ did the reading.
 | **HDC-DMA** hard disk | `nuboot` | the ROM builds a channel program and polls it | **512 bytes** at `0x0100` |
 | **DJ-DMA** floppy | `djdma` | the *controller's own firmware* does the read; the ROM only polls | **128 bytes** at `0x0080` |
 | **IDE** | `ideboot` (mon500) | the ROM drives an 8255 and the drive's task file | **512 bytes** at `0x0100` |
+| **NCR 5380** SCSI | `ncrboot` (mon500) | the ROM drives the 5380's registers, one REQ/ACK byte at a time | **512 bytes** at `0x0100` |
 
 The asymmetry is the whole story of why the floppy's first level has to be
 tiny and the others do not.
@@ -274,9 +280,27 @@ port A: the drive is not driving it, but the read is what keeps the loop from
 being dead code", then loads the first sector to `0x1100` and jumps to
 `0x0100`.
 
-The tree's `ideboot1.s` is 243 bytes — the largest of the three first
-levels — because BIOS parameter blocks and LBA arithmetic cost more than a
-controller that already knows how to find sector 1.
+The tree's `ideboot1.s` is 243 bytes — large, for a first level — because
+BIOS parameter blocks and LBA arithmetic cost more than a controller that
+already knows how to find sector 1.
+
+### 2.5 NCR 5380 SCSI — `ncrboot` (mon500 only)
+
+Added to spend the budget the diagnostics left when they came out (the commit
+that removed them says so). The card is eight registers at `0x40` — `CSD`
+data, `ICR` initiator command, `MR` mode, `CSBS` status — driven by hand with
+no DMA and no arbitration: the ROM resets the bus, selects target 0, sends a
+ten-byte `READ(10)` for LBA 0, and reads 512 bytes one REQ/ACK round trip at
+a time. Two subroutines carry the bytes — `ncrout` (command) and `ncrin`
+(data) — and the wire they drive is exactly `sys/ncr.c`'s protocol.
+
+The tree's `ncrboot1.s` is 254 bytes, the largest of the four first levels:
+the byte handshake and the per-sector selection cost more than the IDE task
+file. To fit the 256-byte budget ahead of the label it drops its sign-on —
+the second level prints the banner — and its selection-timeout message. The
+selection's "wait for the bus to be free" is one read, not a poll: a command
+ends one status read after the read that saw REQ low, so one `in a,(scsistat)`
+is all it takes.
 
 ---
 
@@ -317,7 +341,7 @@ the jump.
 
 ## 4. The tree's modern chain
 
-`src/micronix/stand/boot/` reimplements the second level for all three
+`src/micronix/stand/boot/` reimplements the second level for all four
 devices and shares one C file between them.
 
 | target | size | role |
@@ -325,20 +349,23 @@ devices and shares one C file between them.
 | `mwboot1.s` | 181 B | HDC-DMA first level |
 | `djboot1.s` | 334 B | DJ-DMA levels 0 and 1 — one file, split at byte 128 |
 | `ideboot1.s` | 243 B | IDE first level |
+| `ncrboot1.s` | 254 B | NCR 5380 first level |
 | `mwboot.com` | 3149 B | HDC-DMA second level |
 | `djboot.com` | 2509 B | DJ-DMA second level |
 | `ideboot.com` | 3448 B | IDE second level |
+| `ncrboot.com` | 3856 B | NCR 5380 second level |
 | `djload` | 5120 B | 10 × 512 B: level 0 in block 0, level 1 in block 1, `djboot.com` from block 2 |
 | `bootimg-m*` | 3661 B | the HDC-DMA images, one per `DRIVES` row |
 | `idebootimg-m*` | 3960 B | the IDE images |
+| `ncrbootimg-m*` | 4368 B | the NCR 5380 images |
 
-`CSRCS = boot.c mwio.c djio.c ideio.c`, `ASSRCS = sexit.s`. The second level
-links `-Ttext=0x100 -L$(CCCLIB) sexit.o boot.o mwio.o` plus libc/libu/libc;
+`CSRCS = boot.c mwio.c djio.c ideio.c ncrio.c`, `ASSRCS = sexit.s`. The second
+level links `-Ttext=0x100 -L$(CCCLIB) sexit.o boot.o mwio.o` plus libc/libu/libc;
 `boot.c` is shared and only the `*io.c` differs. The first levels are
 assembled, linked, and then stripped of their 16-byte object header by
 `dd ... bs=16 skip=1`.
 
-Three of the four ways in need only one first level, because there the ROM is
+Four of the five ways in need only one first level, because there the ROM is
 level 0: it reads a whole 512-byte sector and jumps. The DJ-DMA cannot — it
 delivers 128 bytes to `0x80` — so `djboot1.s` is two levels in one file. Its
 first 128 bytes are a level 0 that does nothing but read block 1 and jump into
@@ -357,9 +384,11 @@ the disk to do the arithmetic.
 Three layout constraints worth stating:
 
 - **The first block also holds a `struct dlabel`** — the geometry — at byte
-  256 from the start of the disk, the second half of block 0. `ideboot1`
-  "has to be shorter than the other two - the label sits at byte 256 of the
-  sector and `mkbootimg` refuses an image whose first level runs into it."
+  256 from the start of the disk, the second half of block 0. `ideboot1`'s
+  own comment puts it: "has to be shorter than the other two - the label sits
+  at byte 256 of the sector and `mkbootimg` refuses an image whose first level
+  runs into it." (`ncrboot1` lives under the same ceiling, and has the
+  tightest fit of all: 254 of the 256 bytes.)
 - **The floppy's image is laid out around that same byte**, and that is why
   its level 1 cannot share block 0 with level 0: level 1 is 206 bytes and
   would run from 128 to 333, straight through 256. So block 0 is level 0 with
@@ -504,6 +533,7 @@ program that actually knows the medium.
 | document | what it holds |
 |---|---|
 | `DJBOOT.md` | the DJ-DMA floppy path in full: the manual's wording, the UX141_SA cascade, the `ABOOT&.ASM` variants |
+| `INSTALLATION.md` | how to build and install the tree, and boot each card |
 | `disks/loaders/README` | the two-stage floppy boot, the extraction commands, the 1.41 image's disassembly |
 | `disks/loaders/coldboot/README` | the cold boot set, the two ways in, the `*LOAD` layout |
 | `src/hwsim/DISKS` | the sector-size hazard, per controller |
@@ -512,7 +542,7 @@ program that actually knows the medium.
 
 Sources for each path: `src/hwsim/d1/roms/mon{375,447,500}.s` and their
 equate blocks; `src/hwsim/d1/djdma.c` (`bootstrap[]`, `djdma_init()`) and
-`hdca.c`/`hddma.c`/`ide.c`; `src/hwsim/d1/mpz80.c` (`SWT`, the `SW_*`
+`hdca.c`/`hddma.c`/`ide.c`/`ncr5380.c`; `src/hwsim/d1/mpz80.c` (`SWT`, the `SW_*`
 defines, `switchreg = config_sw & 0xff`); `src/hwsim/hwsim.c`
 (`bootdevs[]`); `extra/hardware/djdma/Morrow/decision/djdma_firmware/DJ49.MAC`
 (the controller's own firmware); `src/hwsim/resources/cpm22/E3/ABOOT&.ASM`.
