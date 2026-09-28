@@ -155,6 +155,17 @@ disks/hdinstall/hddma-0
 disks/bootdisks/*.img
 
 #
+# The distribution sets "make dist" generates, mx2.0-8-1.IMD and its
+# fellows.  Same kind of thing again: written by dist/create_dist out of
+# the built tree, and never a source.  Both suffixes are scoped to dist/
+# so that what is not an image there - the script and pack.awk - stays
+# visible, which is the whole reason the rule is scoped rather than
+# *.IMD.
+#
+dist/*.IMD
+dist/*.img
+
+#
 # A convenience symlink in that directory, to the kernel's own sys
 # directory, and not a volume.  It is nobody's source.
 #
@@ -289,6 +300,7 @@ src/micronix/cmd/nm/nm
 src/micronix/cmd/nm/wsnm
 src/micronix/cmd/od/od
 src/micronix/cmd/owner/owner
+src/micronix/cmd/packsrc/packsrc
 src/micronix/cmd/pr/pr
 src/micronix/cmd/ps/ps
 src/micronix/cmd/pwd/pwd

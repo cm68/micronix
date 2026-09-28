@@ -113,6 +113,31 @@ MXLZ4	 = $(BIN)/mxlz4
 MXLZ4SRC = cmd/lz4/lz4.c
 MXUNLZ4	 = $(BIN)/mxunlz4
 MXUNLZ4SRC = cmd/unlz4/unlz4.c
+#
+# The distribution packer, the same shape a third time: cmd/packsrc
+# builds the z80 one for the guest, and this builds the host one that
+# create_dist runs.  It reads a directory tree and writes tar files
+# right-sized to a volume, and it is in C rather than shell and awk so
+# that it needs nothing the tree does not build itself - no sort, no
+# find -printf, no gawk, and the same source runs on micronix.
+#
+MXPAKSRC = $(BIN)/packsrc
+MXPAKSRCSRC = cmd/packsrc/packsrc.c
+#
+# And the tar the packer's archives have to be readable by, built for the
+# host for the same reason: the distribution is put together here, and
+# the thing that reads an archive on the other end is cmd/tar.  A host
+# tar means an archive can be checked against the reader that will
+# actually open it, instead of against the system's tar - which is a
+# stricter checker and a different format, and so a good second opinion
+# but not the one that decides.
+#
+# Both tars now speak the same bytes: packsrc's headers are spelled the
+# way cmd/tar/tar.c spells them, so an archive from either compares equal
+# to the other but for the owner.
+#
+MXTAR	 = $(BIN)/mxtar
+MXTARSRC = cmd/tar/tar.c
 HOSTCC	?= gcc
 #
 # -idirafter, not -I: include/ holds the old Whitesmith stdio.h and the
@@ -126,13 +151,13 @@ HOSTCFLAGS ?= -w -std=gnu89 -Dlinux -idirafter $(DEPTH)/include
 # so the librarian exists before lib is archived.  This is a
 # prerequisite line only - the recipe is GNUmakefile.inc's.
 #
-all: $(ARMX) $(NMX) $(SETDEVX) $(MXLZ4) $(MXUNLZ4)
+all: $(ARMX) $(NMX) $(SETDEVX) $(MXLZ4) $(MXUNLZ4) $(MXPAKSRC) $(MXTAR)
 
 #
 # clobber removes the host tools and src.tar as well as what the
 # recursion removes.  GNUmakefile.inc's clobber reads GENERATED.
 #
-GENERATED = src.tar $(ARMX) $(NMX) $(SETDEVX) $(MXLZ4) $(MXUNLZ4)
+GENERATED = src.tar $(ARMX) $(NMX) $(SETDEVX) $(MXLZ4) $(MXUNLZ4) $(MXPAKSRC) $(MXTAR)
 
 $(ARMX): $(ARSRC)
 	mkdir -p $(BIN)
@@ -164,6 +189,14 @@ $(MXLZ4): $(MXLZ4SRC)
 $(MXUNLZ4): $(MXUNLZ4SRC)
 	mkdir -p $(BIN)
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(MXUNLZ4SRC)
+
+$(MXPAKSRC): $(MXPAKSRCSRC)
+	mkdir -p $(BIN)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(MXPAKSRCSRC)
+
+$(MXTAR): $(MXTARSRC)
+	mkdir -p $(BIN)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(MXTARSRC)
 
 #
 # The cross compiler, built here from these sources: the seven passes

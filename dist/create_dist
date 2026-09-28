@@ -1,0 +1,247 @@
+#!/bin/sh
+#
+# Make the distribution diskettes.
+#
+#	./create_dist <medium> [<first>]
+#
+# <medium> is 8 or 5 - 8 and 5 1/4 inch, both double sided - and <first>
+# is the number to start at, 1 by default.  The images are made in this
+# directory as mx2.0-<medium>-<n>.IMD.
+#
+# DRYRUN=1 prints the partition and stops before anything is written.
+#
+# What these are, and how they differ from the install diskettes beside
+# them in disks/bootdisks: an install diskette is one article that mkfs's
+# a hard disk and copies itself onto it.  A distribution diskette is one
+# slice of a numbered set carrying the whole system - runtime, sources
+# and documentation - which a running machine pulls in one at a time
+# with finstall, and finstall is "mount /dev/fla /f -r; cptree /f / -v".
+# cptree merges into an existing tree and makes the directories it needs,
+# so the disks go in in order and each is mounted once.
+#
+# The disks are packed a directory at a time: a disk is "the /bin disk",
+# not an arbitrary slice of bytes.  A directory that will not fit on one
+# disk is split, and nothing else is.
+#
+# Raw first, convert last, and that order is not a style choice.  fslib's
+# IMD reader cannot read a double sided image: blktopos hardcodes
+# "*head = 0; *cyl = 2 + trk", so on an 8 inch double sided image
+# filesystem block 15 lands on cylinder 3 head 0 instead of cylinder 2
+# head 1 and every write goes to the wrong track.  So the whole disk is
+# built as a flat image, checked flat, and written out as an IMD exactly
+# once at the end - where the only reader is the simulator, which reads
+# IMD natively and does not care.
+#
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+root=`cd "$here/.." && pwd`
+
+mnix="$root/src/tools/mnix"
+imd="$root/src/tools/imd"
+icheck="$root/src/tools/icheck"
+packsrc="$root/bin/packsrc"
+filesystem="$root/filesystem"
+bootdir="$root/src/micronix/stand/boot"
+srctar="$root/src/micronix/srctar.tar"
+
+medium="$1"
+first="$2"
+if [ -z "$medium" ]; then
+	echo "usage: DRYRUN=1 $0 <medium> [<first>]" >&2
+	echo "media: 8 5" >&2
+	exit 1
+fi
+[ -z "$first" ] && first=1
+
+#
+# The medium table.  fsize is the filesystem's size in blocks and it is
+# the only number here that is not derived: mkfs takes it from the drive
+# type, and cmd/mkfs/mkfs.h's dtracks/dheads/dsecs are where it comes
+# from - 77 x 2 x 15 and 40 x 2 x 10, less the 60 and 40 blocks of boot
+# area that dtoff=2 reserves in front of the filesystem.
+#
+# isize is mkfs's own formula: fsize/43 + fsize/1000 blocks of inodes,
+# 16 to a block (IPERBLK in mkfs.h).  Two blocks come off the top for
+# the superblock and the root directory's first block.  The budget then
+# keeps 2% back: the estimate below is a forecast and not the truth,
+# because mnix's tarx discards filewrite's return, so a failed balloc
+# leaves d_addr[0] zero and the next write lands on block 0.  icheck
+# after each disk is what says whether the forecast held.
+#
+case "$medium" in
+8)	mnixmed=d8ds
+	bootimg="djbootimg-d8ds"
+	fsize=2250
+	what="8 inch" ;;
+5)	mnixmed=d5ds
+	bootimg="djbootimg-d5ds"
+	fsize=760
+	what="5 1/4 inch" ;;
+*)	echo "$0: $medium is not a medium this tree builds" >&2
+	echo "$0: media: 8 5" >&2
+	exit 1 ;;
+esac
+isize=`expr $fsize / 43 + $fsize / 1000`
+usable=`expr $fsize - $isize - 2`
+maxino=`expr $isize \* 16`
+blocks=`expr $usable - $usable / 50`
+inos=`expr $maxino - $maxino / 50`
+
+for f in "$mnix" "$imd" "$icheck" "$packsrc" "$srctar" "$bootdir/$bootimg"; do
+	if [ ! -f "$f" ]; then
+		echo "$0: $f not found - build the tree first:" >&2
+		echo "$0:   make filesystem; make -C src/micronix install ROOT=\$PWD/filesystem" >&2
+		echo "$0:   make -C src/micronix && make -C src/micronix/stand/boot djbootimgs" >&2
+		exit 1
+	fi
+done
+
+tmp=`mktemp -d` || exit 1
+trap 'rm -rf "$tmp"' 0
+
+#
+# /usr/src comes from srctar.tar and never from filesystem/usr/src, which
+# the root makefile's "filesystem" target inflates by cp -r'ing the
+# build directories in - it is 15 MB there and 5 MB here, and the
+# difference is object files.  tarfile built this tar out of the staged
+# sources, so it is the source tree by construction.
+#
+mkdir -p "$tmp/tree/usr/src"
+tar -xf "$srctar" -C "$tmp/tree/usr/src" || exit 1
+
+#
+# The manifest: "size path", one file to a line, path relative to the
+# image's root.  Sorted by path, so that the directories come out in a
+# fixed order and two runs make the same disks.
+#
+# The runtime is an explicit list of directories, not "everything in
+# filesystem" - that directory is a scratch the install scripts and the
+# source staging also write to, and it has a/ b/ f/ old/ newer/ tmp/
+# spool/ and a .sh and a .login from one or another of them.  Shipping
+# everything would ship the scratch.
+#
+# /bin/unix is the one file dropped from a directory that is otherwise
+# shipped whole: "make install" in sys puts the cross built kernel there,
+# and the kernel a running system boots is /micronix, which m16init
+# supplies.  A distribution disk carrying a stale copy of it under a name
+# nothing reads is a trap and 86 KB of a 1 MB disk.
+#
+{
+	(cd "$filesystem" && find bin lib libexec include etc \
+	    usr/include usr/bin usr/lib usr/man usr/help usr/cpm \
+	    -type f ! -path 'bin/unix' -printf '%s %p\n')
+	(cd "$tmp/tree" && find usr/src -type f -printf '%s %p\n')
+} | sort -k2 > "$tmp/manifest" || exit 1
+
+echo "$0: $medium ($what), budget $blocks of $usable blocks and $inos of $maxino inodes"
+echo "$0: `wc -l < "$tmp/manifest"` files, `awk '{s+=$1} END {printf "%.2f", s/1048576}' "$tmp/manifest"` MB"
+
+#
+# The packing.  A unit is one directory's own files; a unit goes on one
+# disk whole unless it alone will not fit on an empty one, in which case
+# its files go one at a time.  Cost per file is bmap's - see
+# fslibfunc.c - which is the v6 scheme: eight addresses in the inode are
+# direct, the ninth is one indirect block, and past 1792 blocks a second
+# level is added one block per 256.
+#
+# Directories cost blocks and inodes too, and neither is negligible:
+# /usr/man/man1 has 224 entries and at 16 bytes each that is 32 to a
+# block.  So each disk carries an entry count per directory, '.' and '..'
+# included, and a directory that is not the root also costs one entry in
+# its parent - which is why a disk holding one file from /usr/src/cmd
+# still has to build /usr, /usr/src and /usr/src/cmd to hold it.
+#
+# walk() is the same recur once with docommit 0 to price the placement
+# and once with 1 to apply it.  The chain is walked from the root down,
+# so a directory created a moment ago is already at zero entries when its
+# child is charged to it and the arithmetic comes out once.  A negative
+# disk number is a disk with nothing on it, which is how the "would this
+# unit fit at all" question is asked without disturbing the real one.
+#
+# It is cmd/packsrc doing the partition, not an awk: packsrc part is the
+# same algorithm written in C, and the reason it is C is that the tooling
+# has to be self-contained.  Micronix awk is 2.11BSD awk, which has no
+# user-defined functions and no sub(), so pack.awk cannot run on the
+# machine this distribution is for - and the shell there has no if and no
+# while either, so nothing else here could drive it.  packsrc tar, the
+# same program's other half, is what builds the source tars for the same
+# reason: no host awk, no host tar.
+#
+# pack.awk beside this script is now the reference and not the packer.
+# It is the same arithmetic and it agrees with packsrc on every disk of
+# every medium - which is how the port was checked - so it is worth
+# keeping to check a change against.  Run it the way the line above used
+# to, with mawk rather than the host gawk.
+#
+"$packsrc" part "$tmp/manifest" "$tmp" "$blocks" "$inos"
+
+ndisk=0
+while [ -f "$tmp/list.$((ndisk + 1))" ]; do
+	ndisk=$((ndisk + 1))
+done
+if [ "$ndisk" -eq 0 ]; then
+	echo "$0: the packer placed nothing" >&2
+	exit 1
+fi
+
+if [ -n "$DRYRUN" ]; then
+	echo "$0: DRYRUN - nothing written"
+	exit 0
+fi
+
+#
+# One disk at a time, raw first and the IMD written once at the end.  The
+# two tar passes are because the payload has two roots: the runtime comes
+# out of filesystem/, which is what "make install" filled, and /usr/src
+# out of the tarfile's own tree.  mnix tar x makes the directories a
+# member needs - imagemkdirs is mkdir -p - so a list of files and no
+# directory entries extracts the same way a whole-directory archive does.
+#
+#
+# The packer numbers its lists from 1 whatever <first> is; <first> is the
+# number the first IMAGE carries, so a set can be extended without
+# renumbering what is already out.
+#
+n=1
+while [ "$n" -le "$ndisk" ]; do
+	raw="$tmp/mx2.0-$medium-$n.img"
+	out="$here/mx2.0-$medium-$((n + first - 1)).IMD"
+	rm -f "$raw" "$raw-delta" "$out"
+
+	#
+	# bootflop and imd -m both talk about what they found, once per
+	# disk; the one line below is what this script has to say.
+	#
+	"$mnix" bootflop "$bootdir/$bootimg" "$raw" > /dev/null || exit 1
+
+	grep '^usr/src/' "$tmp/list.$n" > "$tmp/src.$n"
+	grep -v '^usr/src/' "$tmp/list.$n" > "$tmp/run.$n"
+	if [ -s "$tmp/run.$n" ]; then
+		tar -C "$filesystem" -c -f "$tmp/t.tar" -T "$tmp/run.$n" || exit 1
+		"$mnix" -f "$raw" tar x "$tmp/t.tar" || exit 1
+	fi
+	if [ -s "$tmp/src.$n" ]; then
+		tar -C "$tmp/tree" -c -f "$tmp/t.tar" -T "$tmp/src.$n" || exit 1
+		"$mnix" -f "$raw" tar x "$tmp/t.tar" || exit 1
+	fi
+
+	#
+	# icheck says what the disk really holds, which is the only thing
+	# that says whether the forecast held - see the budget note above.
+	# Every disk is checked, not just the tight ones.
+	#
+	free=`"$icheck" "$raw" | awk '$1 == "free" {print $2}'`
+	if [ -z "$free" ] || [ "$free" -lt 0 ]; then
+		echo "$0: disk $n: icheck says free is '$free'" >&2
+		exit 1
+	fi
+	echo "$0: disk $n of $ndisk: `wc -l < "$tmp/list.$n"` files, $free blocks free"
+
+	rm -f "$raw-delta"
+	"$imd" -m "$raw" > /dev/null 2>&1 || exit 1
+	mv "$raw-merge" "$out" || exit 1
+	n=$((n + 1))
+done
+
+echo "$0: $ndisk diskettes in $here"

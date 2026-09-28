@@ -1,0 +1,88 @@
+.TH PACKSRC 1
+.SH NAME
+packsrc \- pack a tree into tar files, or a manifest into disks
+.SH SYNOPSIS
+.B packsrc tar
+tree outdir budget
+.br
+.B packsrc part
+manifest outdir blocks inodes
+.SH DESCRIPTION
+.I packsrc
+sorts a set of files into volumes under a size budget.  It has two
+modes, because a distribution has two kinds of payload.
+.PP
+.B packsrc tar
+walks
+.I tree
+and writes a series of tar files into
+.IR outdir ,
+each one as close to
+.I budget
+512 byte blocks as the tree allows, with the members of each written to
+.BR list. N
+and the archive itself to
+.BR src.tar. N ,
+numbered from 1.  This is for the text-heavy parts of a distribution,
+which compress and which are cheaper to write as one member that is a
+tar than as a thousand members that are files.
+.PP
+The unit of packing is one directory's own files, and a directory with
+no subdirectories is never split.  Units are taken in sorted order and
+accumulated into one tar until it would go over budget, at which point
+the last unit is backed off and starts the next tar.  One pass, and no
+search: a candidate's size is computed from the file sizes rather than
+found by building it.
+.PP
+A unit that is over budget on its own goes into a tar by itself rather
+than being cut in half, and the tar it lands in is reported as over.
+.PP
+.B packsrc part
+reads
+.IR manifest ,
+a list of "size path" lines with the path relative to the image's
+root, and writes
+.BR list. N
+into
+.IR outdir
+for each volume, one path to a line.  The output is a partition: every
+path of the manifest appears exactly once, on one disk.
+.PP
+.I blocks
+is the volume's free blocks, two below the filesystem size less the
+inodes \- the boot area is in front of the filesystem and is not
+counted either.  A file costs what
+.I bmap
+charges, which is not its length in blocks: eight addresses in the
+inode are direct, the ninth is one indirect block, and past 1792 blocks
+a second level is added one block per 256.
+.PP
+.I inodes
+limits the volume too, and it is not a formality.  A directory costs an
+inode and costs blocks, 32 entries to a block at 16 bytes an entry, so
+224 names in one directory is seven blocks that hold no file data.
+Every directory above a file has to exist for the file to land, and a
+directory's parent grows by a block each time the parent's own entry
+count crosses a multiple of 32 \- which a disk holding one file from
+.B /usr/src/cmd
+pays for, having to build
+.BR /usr ,
+.B /usr/src
+and
+.B /usr/src/cmd
+to hold it.
+.PP
+The unit is again one directory's own files, and a unit again goes on
+one disk whole.  A unit that will not fit on an empty disk goes a file
+at a time instead, because on the five inch media most units will not:
+.B /bin
+is 4200 blocks against a budget of 727.
+.PP
+The partition is printed as it is made, a line per disk with the blocks
+and inodes used and the percentage of the budget, and a total.  A disk
+that comes out over 100 per cent is reported rather than refused: it is
+the caller's to judge, and the caller's
+.IR icheck
+that says whether the forecast held.
+.SH "SEE ALSO"
+tar(1), mkfs(1)

@@ -56,11 +56,18 @@
 
 #include <types.h>
 #include <stdio.h>
+#ifdef	linux
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sys/signal.h>
+#include <unistd.h>
+#else
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <sys/dir.h>
 #include <dirent.h>
 #include <sys/signal.h>
+#endif
 
 #define TBLOCK	512
 #define NBLOCK	20
@@ -70,10 +77,65 @@
 #define	writetape(b)	writetbuf(b, 1)
 
 /*
- * the inode keeps the size as a high byte over a low word; this is
- * the long it means.  min() and max() come from types.h.
+ * The directory entry: 16 bytes on disk, a two byte inode number and a
+ * 14 byte name that is null terminated only when it is shorter than
+ * that.  readdir hands one back for the walk in putfile, and getcwd
+ * reads them raw out of a directory file to climb the .. chain, so the
+ * record has to be the on-disk shape and not whatever the machine's own
+ * readdir happens to use.
+ *
+ * micronix has it as struct dir in sys/dir.h, beside the v7 field names
+ * mapped onto it.  The host cannot take that header even though a
+ * sys/dir.h is there: the host's is a compatibility shim over dirent.h
+ * that defines nothing, so including it would shadow the tree's and
+ * leave struct dir unknown.  And the host's own readdir record cannot
+ * stand in for the on-disk one - its inode number is wider than two
+ * bytes and its name does not begin at offset two - so readdir gets a
+ * type of its own, RDDIR, whose fields are then read directly instead of
+ * through the v7 macros.
  */
+#ifdef	linux
+struct	dir {
+	UINT	ino;
+	char	name[14];
+};
+typedef	struct dirent RDDIR;
+#else
+typedef	struct dir RDDIR;
+#endif
+
+/*
+ * the inode keeps the size as a high byte over a low word; this is
+ * the long it means.  min() and max() come from types.h.  The v7 stat
+ * that -Dlinux compiles against has the long itself.
+ */
+#ifdef	linux
+#define	fsize(sp)	((long)(sp)->st_size)
+#else
 #define	fsize(sp)	(((long)(sp)->d.d_size0 << 16) + (sp)->d.d_size1)
+#endif
+
+/*
+ * The working directory, as a path.  micronix has no getcwd and the one
+ * at the bottom of this file is written to its calls - one argument,
+ * the buffer - while the host reads its own from unistd, which wants
+ * the buffer length as well.  The callers are the same either way, so
+ * the host's two-argument form is reached through the one-argument
+ * spelling they already use.  The macro does not expand into itself:
+ * getcwd is withheld while its own body is being substituted.
+ */
+#ifdef	linux
+#define	getcwd(b)	getcwd((b), MAXPATHLEN)
+
+/*
+ * micronix packs the owner into one argument, uid in the low byte and
+ * gid in the next, and the host takes the two separately.  Unpacked
+ * here for the same reason as getcwd: the callers are written once.
+ * The call is the super-user's and its failure is ignored either way,
+ * so an ordinary user simply gets the host's own refusal.
+ */
+#define	chown(f, p)	chown((f), (p) & 0377, ((p) >> 8) & 0377)
+#endif
 
 union hblock {
 	char dummy[TBLOCK];
@@ -161,7 +223,9 @@ long	lseek();
 long	telldir();
 char	*ctime();
 char	*rindex();
+#ifndef	linux
 char	*getcwd();
+#endif
 char	*getmem();
 
 main(argc, argv)
@@ -557,7 +621,7 @@ putfile(longname, shortname, parent)
 	char buf[TBLOCK];
 	char *bigbuf;
 	register char *cp;
-	struct direct *dp;
+	RDDIR *dp;
 	DIR *dirp;
 	register int i;
 	long l;
@@ -1218,6 +1282,7 @@ bread(fd, buf, size)
 	return (count);
 }
 
+#ifndef	linux
 /*
  * the library has no getcwd, so this is one, done the way pwd does
  * it: stat the directory some rungs of .. up, scan one more .. for
@@ -1228,6 +1293,11 @@ bread(fd, buf, size)
  * Like pwd, this trusts the inode number to identify the entry, which
  * holds within one filesystem; a path that climbs through a mount
  * point is beyond it, and beyond pwd too.
+ *
+ * The host gets the library's, and not only because it has one: this
+ * reads a directory file to find the entry, and the host will not read
+ * a directory at all - the call fails on the first rung and the whole
+ * thing gives up.  Nothing above cares which of the two it is.
  */
 char *
 getcwd(buf)
@@ -1286,6 +1356,7 @@ nocwd()
 	fprintf(stderr, "tar: cannot determine current directory\n");
 	done(1);
 }
+#endif	/* !linux */
 
 getbuf()
 {
