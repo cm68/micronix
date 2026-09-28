@@ -10,8 +10,13 @@ struct drivespec {
 	UINT8 heads;
 	UINT8 spt;			/* sectors per track */
 	UINT limit;			/* max block number */
-	UINT8 spc;			/* sectors per track */
+	UINT spc;			/* sectors per cylinder.  Not UINT8:
+					 * an eight head drive at 32 sectors
+					 * is 256, and it truncated to 0 */
 	UINT roll;			/* what mw.c adds to blk / spc */
+	UINT cylstart;			/* the slice's first cylinder: the
+					 * diskette's boot tracks, 0 on a
+					 * rolled disk */
 } spec = {
 	/*
 	 * Nothing.  The geometry comes off the disk and there is no
@@ -21,7 +26,7 @@ struct drivespec {
 	 * zeroes because Whitesmith's will not link a bss symbol
 	 * without one, the same reason as INIT below.
 	 */
-	0, 0, 0, 0, 0, 0
+	0, 0, 0, 0, 0, 0, 0
 };
 
 #define	STEPDELAY	30
@@ -66,6 +71,7 @@ struct hddma_cmd cmd = { 0 };   /* braces: a struct is sized from its type */
 reset()
 {
 	register struct dlabel *lp;
+	int sl;
 
     outstr("Micronix loader for the HD-DMA\n");
 
@@ -152,7 +158,24 @@ reset()
 		spec.spt = lp->d_spt;
 		spec.spc = lp->d_heads * lp->d_spt;
 		spec.roll = lp->d_roll;
-		spec.limit = lp->d_tracks * spec.spc - 1;
+
+		/*
+		 * And the slice the boot is in, which on a rolled disk is
+		 * the empty one: d_slice[0].d_off is 0, so cylstart is 0
+		 * and the two lines below are exactly what they were
+		 * before there were tables.  A disk whose filesystem does
+		 * not begin at cylinder 0 - a diskette - says so here, and
+		 * this is where the boot tracks get out of the filesystem's
+		 * way.  See sys/dlabel.h.
+		 */
+		sl = lp->d_bootslice;
+		if (sl >= NSLICE)
+			sl = 0;
+		spec.cylstart = lp->d_slice[sl].d_off;
+		if (lp->d_slice[sl].d_len)
+			spec.limit = lp->d_slice[sl].d_len * spec.spc - 1;
+		else
+			spec.limit = (lp->d_tracks - spec.cylstart) * spec.spc - 1;
 	} else {
 		/*
 		 * There is nothing to fall back on, and that is deliberate.
@@ -206,7 +229,7 @@ char *buffer;
 	 * at all.
 	 */
 	secnum = blocknum % spec.spc;
-	cyl = blocknum / spec.spc + spec.roll;
+	cyl = blocknum / spec.spc + spec.roll + spec.cylstart;
 	if (cyl >= spec.cylinders)
 		cyl -= spec.cylinders;
 	head = secnum / spec.spt;

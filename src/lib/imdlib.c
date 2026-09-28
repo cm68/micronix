@@ -256,13 +256,37 @@ static struct rawfmt {
     int firstsec;               // lowest numbered sector on a track
     char *what;
 } rawfmts[] = {
-    { 40*2*10*512, 40, 2, 10, 512, 0, 1, "5 1/4 inch, 40 track, double sided, 512 byte sectors" },
-    { 40*1*10*512, 40, 1, 10, 512, 0, 1, "5 1/4 inch, 40 track, single sided, 512 byte sectors" },
-    { 35*2*10*512, 35, 2, 10, 512, 0, 1, "5 1/4 inch, 35 track, double sided, 512 byte sectors" },
-    { 35*1*10*512, 35, 1, 10, 512, 0, 1, "5 1/4 inch, 35 track, single sided, 512 byte sectors" },
-    { 80*2*10*512, 80, 2, 10, 512, 0, 1, "5 1/4 inch, 80 track, double sided, 512 byte sectors" },
+    /*
+     * Ten sectors on a five inch disk is the hard sectored format - see
+     * the firmware tables in raw_geometry below - so these count from
+     * zero, which is what a name of bdev(2,N) already said and what this
+     * table has to say too.  It said one, which put every sector of such
+     * an image one place out: the loader's own label check catches that
+     * now, and did not before there was one.
+     */
+    { 40*2*10*512, 40, 2, 10, 512, 0, 0, "5 1/4 inch, 40 track, double sided, 512 byte sectors" },
+    { 40*1*10*512, 40, 1, 10, 512, 0, 0, "5 1/4 inch, 40 track, single sided, 512 byte sectors" },
+    { 35*2*10*512, 35, 2, 10, 512, 0, 0, "5 1/4 inch, 35 track, double sided, 512 byte sectors" },
+    { 35*1*10*512, 35, 1, 10, 512, 0, 0, "5 1/4 inch, 35 track, single sided, 512 byte sectors" },
+    { 80*2*10*512, 80, 2, 10, 512, 0, 0, "5 1/4 inch, 80 track, double sided, 512 byte sectors" },
     { 77*2*8*512,  77, 2,  8, 512, 0, 1, "8 inch, double sided, 512 byte sectors" },
     { 77*1*26*128, 77, 1, 26, 128, 0, 1, "8 inch, single sided, 128 byte sectors" },
+
+    /*
+     * The two eight inch media this tree builds bootable diskettes for -
+     * see stand/boot/GNUmakefile's FLOPPIES and cmd/mkfs/mkfs.h.  They
+     * have to be here rather than left to the name, because the name
+     * cannot say them: a bdev minor encodes five inch against eight and
+     * a sector size, and then derives the heads from which of the two it
+     * was (raw_geometry below), so there is no minor for an eight inch
+     * drive with two heads and no way to write one down.  The size is
+     * unambiguous, so the size is what says it.
+     *
+     * firstsec is one: eight inch soft sectored media number from one,
+     * per the firmware tables quoted in raw_geometry.
+     */
+    { 77*1*15*512, 77, 1, 15, 512, 0, 1, "8 inch, single sided, 512 byte sectors" },
+    { 77*2*15*512, 77, 2, 15, 512, 0, 1, "8 inch, double sided, 512 byte sectors" },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
@@ -635,7 +659,17 @@ translate_sector(struct imd_trk *tp, int sec, int head)
             imd_dump_track(tp);
         }
 #endif
-        return 0;
+        /*
+         * Not zero: zero is a sector index, and the track's first
+         * sector lives there.  Returning it would answer a request
+         * for a sector this track does not have with the contents of
+         * the one it does - the boot sector, usually - which reads as
+         * success and hides the mistake.  That is how a loader asking
+         * for sector 0 of a medium that numbers from 1 looked, on the
+         * simulation, like a loader that had found what it wanted.
+         * -1 is what the caller tests for; see imd_read and imd_write.
+         */
+        return -1;
     }
     return mysec;
 }
@@ -665,6 +699,9 @@ imd_write(void *vp, int cyl, int head, int osec, char *buf)
 
     tp = ip->tracks[trk];
     tsec = translate_sector(tp, osec, head);
+    if (tsec < 0) {
+        return 0;               /* no such sector on this track */
+    }
 
     /* could be an absent block */
     if (!tp->data[tsec]) {
@@ -706,13 +743,17 @@ imd_read(void *vp, int cyl, int head, int osec, char *buf)
 
     trace(trace_imd, "imd_read drive %d cyl %d head %d tsec %d osec %d\n",
         ip->drive, cyl, head, tsec, osec);
-    
+
+    if (tsec < 0) {
+        return 0;               /* no such sector on this track */
+    }
+
     // if reading an absent block, supply zeros
     if (!tp->data[tsec]) {
         tp->data[tsec] = malloc(tp->secsize);
         bzero(tp->data[tsec], tp->secsize);
     }
-    memcpy(buf, tp->data[tsec], tp->secsize); 
+    memcpy(buf, tp->data[tsec], tp->secsize);
 #ifndef NODEBUG
     if (traceflags & trace_imd) hexdump(buf, tp->secsize);
 #endif

@@ -27,6 +27,7 @@
 #include "../micronix/include/types.h"
 #include "../micronix/include/sys/fs.h"
 #include "../micronix/include/sys/dir.h"
+#include "../micronix/include/sys/dlabel.h"
 #include "../include/fslib.h"
 #include "../include/util.h"
 #include "../include/disklabel.h"
@@ -85,7 +86,7 @@ struct cmdtab
     {"tar", tarcmd, "tar x [-C prefix] <tarfile> | tar c <tarfile> [path ...]" },
     {"initialize", initcmd, "initialize <medium> <image>" },
     {"mkfs", mkfscmd, "mkfs <image> [size|-exclude] [-i bootfile] [-f]" },
-    {"bootflop", bootflopcmd, "bootflop <bootfile> <image>" }
+    {"bootflop", bootflopcmd, "bootflop <bootimage> <image>" }
 };
 
 void
@@ -516,9 +517,19 @@ writecmd(int c, char **a)
     } else {
         filefree(dp);
     }
+    /*
+     * Ask before writing, not after.  A do-while that wrote first and
+     * tested the count afterwards ran one extra time when the source's
+     * size was an exact multiple of 512: the read came back 0 at end of
+     * input, the write went in anyway, and the block it allocated at
+     * offset == size was reachable by nothing.  One block lost per such
+     * file - the kernel is 168 blocks exactly, so every image this
+     * writes leaked one - and the two checkers disagreed about it
+     * because icheck walks a file by its offsets and fsck by its
+     * allocation.
+     */
     i = 0;
-    do {
-        valid = read(infd, buf, 512);
+    while ((valid = read(infd, buf, 512)) != 0) {
         if (valid < 0) {
             /*
              * Whatever has been written stays; the size is what was
@@ -531,7 +542,7 @@ writecmd(int c, char **a)
             printf("write failed\n");
         }
         i += valid;
-    } while (valid == 512);
+    }
     dp->d_size0 = i >> 16;
     dp->d_size1 = i & 0xffff;
     iput(dp);
@@ -1398,14 +1409,114 @@ wrblk(bn, buf)
 }
 
 /*
+ * The geometry a diskette image declares, out of the label that came in
+ * with its boot - or -1 if there is no such label on it.
+ *
+ * The label is in device block 0, which is raw sector 0 of the image:
+ * nothing has to be skipped to reach it, because that block is the one
+ * the rom reads and the label is put where it can be found knowing
+ * nothing.  See sys/dlabel.h.
+ *
+ * The caller gets the whole structure rather than a few numbers because
+ * the row it names and the numbers it carries have to be the same
+ * medium: this is the only description of a diskette there is, and the
+ * reason the medium is never named twice.
+ */
+static int
+floppylabel(image, dl)
+    char *image;
+    struct dlabel *dl;
+{
+    char buf[BSIZE];
+    int fd;
+
+    fd = open(image, O_RDONLY);
+    if (fd < 0)
+        return -1;
+    if (read(fd, buf, BSIZE) != BSIZE) {
+        close(fd);
+        return -1;
+    }
+    close(fd);
+    memcpy((char *)dl, &buf[DL_OFFSET], sizeof(struct dlabel));
+    if (strncmp(dl->d_magic, DL_MAGIC, 4) != 0)
+        return -1;
+    return 0;
+}
+
+/*
+ * Which row of mkfs.h's table a diskette's label describes, or -1 if the
+ * label is of no medium this tree knows.  Only rows with a track offset
+ * are candidates: the three diskettes, not the five hard disks.
+ */
+static int
+floptype(dl)
+    struct dlabel *dl;
+{
+    int t;
+
+    for (t = 0; t < NDRIVE; t++)
+        if (dtoff[t] && dtracks[t] == dl->d_tracks &&
+            dheads[t] == dl->d_heads && dsecs[t] == dl->d_spt)
+            return (t);
+    return (-1);
+}
+
+/*
+ * Put the label back, with the filesystem's own numbers now in it.
+ *
+ * The worker cannot do this itself.  A diskette's label is in device
+ * block 0, and the filesystem's block 0 is the first block after the
+ * boot, forty blocks further in - so the block the label is in is a
+ * block no filesystem number reaches, and wrblk(0) is the no-op it has
+ * always been.  Hence the raw read and write here.
+ *
+ * putlabel is the worker's, and stays the worker's: this supplies a
+ * buffer and a file descriptor, and the description of the medium is
+ * written in exactly one place, so the block mkfs believes in and the
+ * block the loader reads cannot drift apart.
+ */
+static int
+patchlabel(image, type)
+    char *image;
+    int type;
+{
+    struct dlabel *lp;
+    char buf[BSIZE];
+    int fd;
+
+    fd = open(image, O_RDWR);
+    if (fd < 0)
+        return -1;
+    if (read(fd, buf, BSIZE) != BSIZE) {
+        close(fd);
+        return -1;
+    }
+    lp = (struct dlabel *) &buf[DL_OFFSET];
+    if (strncmp(lp->d_magic, DL_MAGIC, 4) != 0) {
+        close(fd);
+        return -1;
+    }
+    putlabel(buf, type);
+    if (lseek(fd, 0L, 0) < 0 || write(fd, buf, BSIZE) != BSIZE) {
+        close(fd);
+        return -1;
+    }
+    close(fd);
+    return 0;
+}
+
+/*
  * mkfs <image> [size|-exclude] [-i bootfile] [-f]: make a filesystem on
- * a drive image initialize made.  The geometry comes out of the label,
- * so the medium is not named again.
+ * a drive image initialize made, or on a diskette image bootflop made.
+ * Either way the geometry comes out of a label, so the medium is not
+ * named again.
  */
 int
 mkfscmd(int c, char **a)
 {
     struct disklabel label;
+    struct dlabel dl;
     char *image;
     char *bfile;
     UINT dsize;
@@ -1460,7 +1571,21 @@ mkfscmd(int c, char **a)
         return 2;
     }
 
-    /* the geometry, out of the label initialize wrote */
+    /*
+     * The geometry, out of whichever label the image carries.
+     *
+     * A hard disk has initialize's struct disklabel at offset 0 - the
+     * out-of-band volume label the formatter writes, which is a
+     * different structure from the Micronix label and a different
+     * question: it says how the drive is built, and its geometry picks
+     * the row of mkfs.h's table that the boot is placed by.
+     *
+     * A diskette has a struct dlabel at DL_OFFSET instead, because that
+     * is what came in with its boot, and it is the same structure the
+     * loader and fslib read.  Nothing is initialized first: bootflop
+     * makes the whole article, and this path is for remaking the
+     * filesystem on one of those.
+     */
     fd = open(image, O_RDONLY);
     if (fd < 0 || read(fd, &label, sizeof label) != sizeof label) {
         printf("mkfs: can't read the label on %s\n", image);
@@ -1469,21 +1594,47 @@ mkfscmd(int c, char **a)
         return 2;
     }
     close(fd);
-    if (label.magic != MAGIC || !label.formatted) {
-        printf("mkfs: %s is not formatted - run initialize first\n", image);
-        return 2;
-    }
-    for (type = 0; type < NDRIVE; type++)
-        if (dtracks[type] == label.cylinders && dheads[type] == label.heads
-            && dsecs[type] == label.spt)
-            break;
-    if (type == NDRIVE) {
-        printf("mkfs: %d/%d/%d is not a drive this tree knows\n",
-            label.cylinders, label.heads, label.spt);
-        return 2;
+    if (label.magic == MAGIC && label.formatted) {
+        for (type = 0; type < NDRIVE; type++)
+            if (dtracks[type] == label.cylinders && dheads[type] == label.heads
+                && dsecs[type] == label.spt && dtoff[type] == 0)
+                break;
+        if (type == NDRIVE) {
+            printf("mkfs: %d/%d/%d is not a drive this tree knows\n",
+                label.cylinders, label.heads, label.spt);
+            return 2;
+        }
+        dsize = (UINT) label.cylinders * label.heads * label.spt;
+        spc = (UINT) label.heads * label.spt;
+        bootfirst = (label.cylinders - (label.cylinders >> 1)) * spc;
+        bootnblk = spc;
+    } else {
+        if (floppylabel(image, &dl) < 0) {
+            printf("mkfs: %s is not formatted - run initialize first\n",
+                image);
+            return 2;
+        }
+        type = floptype(&dl);
+        if (type < 0) {
+            printf("mkfs: %d/%d/%d is not a medium this tree knows\n",
+                dl.d_tracks, dl.d_heads, dl.d_spt);
+            return 2;
+        }
+        dsize = (UINT) dl.d_tracks * dl.d_heads * dl.d_spt;
+        /*
+         * No boot inside the filesystem: on a diskette the boot is the
+         * device blocks in front of it, which no filesystem block number
+         * reaches, so there is nothing for domkfs to place.  What that
+         * costs is subtracted from the size below, out of the exclusion
+         * the label itself names - the boot area's own length - so the
+         * filesystem still ends at the end of the medium.
+         */
+        bootfirst = 0;
+        bootnblk = 0;
+        if (!given && !exclude)
+            exclude = dl.d_bootblks;
     }
 
-    dsize = (UINT) label.cylinders * label.heads * label.spt;
     if (given) {
         fsize = given;
         if (fsize > dsize) {
@@ -1505,10 +1656,6 @@ mkfscmd(int c, char **a)
     if (isize < 1)
         isize = 1;
 
-    spc = (UINT) label.heads * label.spt;
-    bootfirst = (label.cylinders - (label.cylinders >> 1)) * spc;
-    bootnblk = spc;
-
     i = openfsrw(image, &fs, 1);
     if (i < 0) {
         printf("mkfs: can't open %s\n", image);
@@ -1522,27 +1669,55 @@ mkfscmd(int c, char **a)
 }
 
 /*
- * bootflop <bootfile> <image>: build a boot floppy.
+ * bootflop <bootimage> <image>: build a bootable diskette.
  *
- * initialize and mkfs are the hard disk pair; this is the floppy half.
- * A raw five inch floppy image is a flat run of 512 byte sectors - 80
- * tracks, two heads to a cylinder, ten sectors to a track, so 40
- * cylinders of 800 sectors and 409600 bytes.  The rom reads sector 0,
- * so the boot file - djload, the DJ-DMA first level in sector 0 and the
- * shared second level behind it - goes at the front and the rest is
- * left blank for mkfs to build a filesystem on later, if one is wanted.
+ * initialize and mkfs are the hard disk pair; this is the diskette's,
+ * and it makes the whole article at once: the boot in the sectors in
+ * front of the filesystem, the filesystem behind it, and one label
+ * describing both.
  *
- * The image is a raw sector run, not an IMD file, and is named bdev(2,N)
- * - N the Micronix minor device number for the drive - so fslib and the
- * simulator read the same geometry out of the name.
+ * The medium is not named here and does not have to be, because it is on
+ * the disk: the boot image carries a struct dlabel - mkbootimg -d wrote
+ * it - the label carries the geometry, and the geometry is what sizes
+ * the image.  So this knows how big a diskette is the same way the
+ * loader will, by reading the medium off it, and there is no second
+ * place where 40/2/10 could be written down wrong.
+ *
+ * The boot image is written at the front whole, because block 0 is where
+ * the rom reads from and the label is in the second half of it.  The
+ * filesystem then goes in the device blocks after it, which is to say
+ * from cylinder toff on - so filesystem block 0 is device block
+ * toff*spc, and no filesystem block number reaches the boot at all.
+ * That is the whole of what makes this idiom the slice idiom.  See
+ * sys/dlabel.h.
+ *
+ * Last the label is rewritten with the filesystem's numbers in it.  It
+ * came in with d_fsize and d_isize zero, because when mkbootimg ran
+ * there was no filesystem to describe; this is the other half of that.
+ * putlabel is mkfsfunc's, so the block mkfs believes in and the block
+ * the loader reads are written by one piece of code.
+ *
+ * The image is a raw run of 512 byte sectors, not an IMD file, and is
+ * named bdev(2,N) - N the Micronix minor device number for the drive -
+ * so that the simulator read the same way the real controller does.  The
+ * name matters for one thing only: it must not carry the skew bit (minor
+ * 8), because the shipped standalone images are skewed and this is not.
  */
 int
 bootflopcmd(int c, char **a)
 {
+    struct dlabel dl;
     char *bootfile;
     char *image;
     char buf[512];
     long size;
+    long bootsize;
+    UINT dsize;
+    UINT fsize;
+    UINT isize;
+    UINT bootblks;
+    UINT spc;
+    int type;
     int fd;
     int bfd;
     int n;
@@ -1555,22 +1730,60 @@ bootflopcmd(int c, char **a)
     bootfile = a[0];
     image = a[1];
 
-    size = 800L * 512;          /* 40 cylinders, 2 heads, 10 sectors */
+    if (floppylabel(bootfile, &dl) < 0) {
+        printf("bootflop: %s carries no %s label - build it with "
+            "mkbootimg -d\n", bootfile, DL_MAGIC);
+        return 2;
+    }
+    type = floptype(&dl);
+    if (type < 0) {
+        printf("bootflop: %d/%d/%d is not a medium this tree knows\n",
+            dl.d_tracks, dl.d_heads, dl.d_spt);
+        return 2;
+    }
 
-    fd = open(image, O_RDWR | O_CREAT | O_TRUNC, 0666);
-    if (fd < 0) {
-        printf("bootflop: can't create %s: %d\n", image, errno);
-        return 2;
-    }
-    if (ftruncate(fd, size) < 0) {
-        printf("bootflop: can't size %s: %d\n", image, errno);
-        close(fd);
-        return 2;
-    }
+    spc = (UINT) dheads[type] * dsecs[type];
+    dsize = (UINT) dtracks[type] * spc;
+    bootblks = (UINT) dtoff[type] * spc;
+    fsize = dsize - bootblks;
+    isize = fsize / 43 + fsize / 1000;
+    if (isize < 1)
+        isize = 1;
 
     bfd = open(bootfile, O_RDONLY);
     if (bfd < 0) {
         printf("bootflop: can't open %s: %d\n", bootfile, errno);
+        return 2;
+    }
+    bootsize = lseek(bfd, 0L, 2);
+    if (bootsize < 0 || lseek(bfd, 0L, 0) < 0) {
+        printf("bootflop: can't read %s: %d\n", bootfile, errno);
+        close(bfd);
+        return 2;
+    }
+    /*
+     * It has to fit in front of the filesystem, and that is a real bound
+     * rather than a formality: the label promises the boot owns those
+     * blocks, and a boot image one block longer would run into filesystem
+     * block 0 and be overwritten by the first thing the filesystem does.
+     */
+    if (bootsize > (long) bootblks * 512) {
+        printf("bootflop: %s is %ld bytes and the boot area is %d blocks\n",
+            bootfile, bootsize, bootblks);
+        close(bfd);
+        return 2;
+    }
+
+    size = (long) dsize * 512;
+    fd = open(image, O_RDWR | O_CREAT | O_TRUNC, 0666);
+    if (fd < 0) {
+        printf("bootflop: can't create %s: %d\n", image, errno);
+        close(bfd);
+        return 2;
+    }
+    if (ftruncate(fd, size) < 0) {
+        printf("bootflop: can't size %s: %d\n", image, errno);
+        close(bfd);
         close(fd);
         return 2;
     }
@@ -1588,8 +1801,22 @@ bootflopcmd(int c, char **a)
     close(bfd);
     close(fd);
 
-    printf("bootflop: %d sectors from %s written to %s\n",
-        n, bootfile, image);
+    /* and the filesystem, in the blocks behind it */
+    if (openfsrw(image, &fs, 1) < 0) {
+        printf("bootflop: can't open %s\n", image);
+        return 2;
+    }
+    pname = "bootflop";
+    domkfs(fsize, isize, 0, 0, dsize, type, DEFBOOT, 1);
+    closefs(fs);
+
+    if (patchlabel(image, type) < 0) {
+        printf("bootflop: can't put the label back on %s\n", image);
+        return 2;
+    }
+
+    printf("bootflop: %d/%d/%d, %d sectors of boot, %d block filesystem\n",
+        dtracks[type], dheads[type], dsecs[type], n, fsize);
     return 0;
 }
 

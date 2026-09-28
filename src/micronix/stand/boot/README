@@ -5,22 +5,66 @@ in a pinch, the boot code could put all buffers except the indirect
 block into a non-loaded BSS above 4k; that will gain 512 bytes.
 
 this directory contains the standalone and cp/m boot programs
-for the djdma and hddma controllers
+for the djdma, hddma and ide controllers.
 
-mwboot.com is the second level, and it is linked at 0100 - which is both
-where cp/m loads a .com and where the monitor's hard disk boot enters, so
-the one binary serves either way in.
+a boot happens in three levels.  level 0 is the rom's own step, and on
+three of the four ways in it is nothing this directory builds: the
+monitor reads a whole 512 byte sector to 0100 and jumps to it, so the
+rom is level 0 and the sector it read is level 1.  level 1 is that
+sector - it moves itself out of the way, reads the second level to
+8000, unpacks the object header and jumps to its text.  level 2 is the
+filesystem code, boot.c, which finds the kernel on the disk and loads
+it.
 
-mwboot1.s is the first level for the monitor's way in, and only for that.
-The rom reads one sector, 512 bytes, to 0100 and jumps to it; mwboot.com
-is several sectors, so something has to fetch the rest, and that sector
-is this.  It moves itself to c000 first, because what it is loading is
-linked at 0100 and would otherwise land on the loop doing the loading.
+the DJ-DMA is the exception, because its rom cannot be level 0.  that
+controller has its own z80, running a channel program out of the host's
+memory, and all the firmware leaves behind is the first 128 bytes of
+the first sector, copied to 0080.  that is not enough to hold a level 1,
+so the floppy's first stage builds one: djboot1.s leads with a 128 byte
+level 0 whose whole job is to read the next block and jump into it, and
+the level 1 behind it is mwboot1.s with a channel program for a read.
 
-It sets up almost nothing.  The rom used the channel at 0080 to read the
+the second level is one source - boot.c - and three drivers, because
+what differs is how a block is read: mwio.c for the HD-DMA, djio.c for
+the floppy, ideio.c for the IDE card.  so there are three second
+levels, and each belongs to the first level that loads it:
+
+	mwboot.com	the hard disk		loaded by mwboot1.s
+	djboot.com	the floppy		loaded by djboot1.s
+	ideboot.com	the ide card		loaded by ideboot1.s
+
+all three are linked at 0100, which is both where cp/m loads a .com and
+where the monitor's hard disk boot enters, so one binary serves either
+way in.
+
+mwboot1.s is the first level for the monitor's way in.  the rom reads
+one sector, 512 bytes, to 0100 and jumps to it; mwboot.com is several
+sectors, so something has to fetch the rest, and that sector is this.
+it moves itself to c000 first, because what it is loading is linked at
+0100 and would otherwise land on the loop doing the loading.
+
+it sets up almost nothing.  the rom used the channel at 0080 to read the
 first level in, so the constants are loaded, the drive is selected and
 the heads are at cylinder 0 - only the sector, the dma address and the
 opcode change.  65 bytes of the 512.
 
-mkfs -i puts the two of them in a file that owns cylinder 0, block 0
-being the first level and block 1 onward the second.
+ideboot1.s is the same sector for the IDE card, except that the card
+has no command block in memory to be handed a sector with: this one
+writes the drive's task file and moves the sector through the 8255 by
+hand.  it has to fit in the half of the sector ahead of the label, so
+it is written shorter than the other two.
+
+the floppy image is laid out around the same label, which is why its
+first level cannot all be in block 0:
+
+	block 0		level 0, its first 128 bytes
+	block 1		level 1, which reads blocks 2 through 9
+	blocks 2-9	the second level, djboot.com
+	blocks 10-39	unused; the filesystem starts at block 40
+
+mkfs -i puts mwboot1/mwboot in a file that owns cylinder 0, block 0
+being the first level and block 1 onward the second.  the second half
+of block 0 holds the disk label (sys/dlabel.h), which is why the first
+level has to fit in the first half - and why the floppy's level 1, 206
+bytes, cannot share block 0 with level 0 and the label both, and has a
+block of its own instead.

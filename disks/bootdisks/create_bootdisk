@@ -1,0 +1,193 @@
+#!/bin/sh
+#
+# Make a bootable install diskette.
+#
+#	./create_bootdisk <medium> [<image>]
+#
+# <medium> is one of the three this tree builds for, by the same names
+# stand/boot's FLOPPIES table and mkbootimg use:
+#
+#	d8ss	8 inch, single sided	77 cyl, 1 head,  15 x 512, 1125 blocks
+#	d8ds	8 inch, double sided	77 cyl, 2 heads, 15 x 512, 2250 blocks
+#	d5ds	5 1/4 inch, double sided 40 cyl, 2 heads, 10 x 512, 760 blocks
+#
+# The image is made as <medium>.img in this directory unless the second
+# argument names another path, and it is truncated if it already exists.
+#
+# It is one article, made in one pass.  mnix bootflop lays down the boot
+# in the sectors in front of the filesystem and the filesystem behind it,
+# both described by one struct dlabel that came in with the boot - which
+# is why the medium is named once, here, and nowhere else.  What is left
+# is to fill the filesystem: the userland a hard disk install needs, the
+# device nodes, and the kernel, pointed at the diskette as its own root.
+#
+# What the diskette is for: booting it gives a system whose root is the
+# floppy, off which m16init mkfs's a hard disk, copies this whole
+# filesystem onto it with cptree, and points that kernel at the drive.
+# So the contents are not a tool bag, they are the smallest micronix
+# that can do that - see the knapsack in the README beside this file.
+# Nothing that is only useful on a running system with a hard disk is
+# here: no compiler, no sources, no man pages.
+#
+# /b and /f are made because that is where m16init and finstall mount:
+# an empty directory is a mount point, and mount does not make one.
+#
+# The kernel's root device is the diskette's own.  The number is the
+# DJ-DMA's minor for drive 0 of that size - bit 2 set is 5 1/4 inch,
+# clear is 8 inch - and the alternation bit is deliberately clear: this
+# is an unskewed image, which is what mnix and the loader both read.
+# See imdlib.c's raw_geometry for what the bits mean and REGEN for why
+# the shipped standalone, which is skewed, cannot be written this way.
+#
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+root=`cd "$here/../.." && pwd`
+
+mnix="$root/src/tools/mnix"
+setdev="$root/src/tools/setdev"
+devlist="$root/src/micronix/dev/devlist"
+kernel="$root/src/micronix/sys/unix"
+srcdir="$root/src/micronix"
+rootfiles="$srcdir/rootfiles"
+filesystem="$root/filesystem"
+bootdir="$srcdir/stand/boot"
+
+#
+# The hard disk boot the install writes.  m16init mkfs's the drive and
+# then reads a boot into the area mkfs reserved for it, out of the file
+# mkfs names by default - /bootmw.bin, on the diskette that is running
+# the install (mkfs.h DEFBOOT).  Without it the drive comes out with a
+# zeroed boot area, which mounts and passes fsck and does not boot, so
+# the file is here or the diskette cannot do the one job it has.
+#
+# It is the m16 image because m16init is the script this diskette
+# carries: the diskette is one article for one target.  3792 bytes, so
+# eight blocks of the five inch diskette's twenty-five free.
+#
+hdinit="$bootdir/bootimg-m16"
+
+#
+# What goes in /bin.  Not a copy of the tree's bin: this is the list the
+# install runs on, and one command short of it is an install that stops
+# half way - mkfs, fsck, mount, cptree, mknod and setdev are m16init's
+# own steps, and sh, login and init are how a session starts at all.
+#
+# era is deliberately absent, and m16init does not call it: it is a
+# Whitesmiths command this tree has never built, so a diskette that
+# carried m16init's original text would leave the new hard disk's
+# /dev/root pointing at the floppy.  See rootfiles/m16init.
+#
+BINS="sh login ls cp mv rm cat mkdir mkfs fsck mount umount chmod cptree
+	mknod setdev ln sync echo"
+
+medium="$1"
+image="$2"
+if [ -z "$medium" ]; then
+	echo "usage: $0 <medium> [<image>]" >&2
+	echo "media: d8ss d8ds d5ds" >&2
+	exit 1
+fi
+
+#
+# The medium table, and the only place the three answers are written
+# down: which boot image, which minor the diskette's own root node
+# carries, and what to call it when saying what was made.
+#
+case "$medium" in
+d8ss)	bootimg="djbootimg-d8ss"; rootmin=0 ;;
+d8ds)	bootimg="djbootimg-d8ds"; rootmin=0 ;;
+d5ds)	bootimg="djbootimg-d5ds"; rootmin=4 ;;
+*)	echo "$0: $medium is not a medium this tree builds" >&2
+	echo "$0: media: d8ss d8ds d5ds" >&2
+	exit 1 ;;
+esac
+bootimg="$bootdir/$bootimg"
+
+if [ -z "$image" ]; then
+	image="$here/$medium.img"
+fi
+case "$image" in
+/*)	;;
+*)	image="$here/$image" ;;
+esac
+
+if [ ! -f "$devlist" ]; then
+	echo "$0: $devlist not found - nothing to populate /dev from" >&2
+	exit 1
+fi
+if [ ! -f "$bootimg" ]; then
+	echo "$0: $bootimg not found - build the boot images first:" >&2
+	echo "$0:   make -C $srcdir/stand INC=/usr/local/usr/include djbootimgs" >&2
+	exit 1
+fi
+if [ ! -f "$hdinit" ]; then
+	echo "$0: $hdinit not found - build the boot images first:" >&2
+	echo "$0:   make -C $srcdir/stand INC=/usr/local/usr/include bootimgs" >&2
+	exit 1
+fi
+if [ ! -f "$filesystem/etc/init" ]; then
+	echo "$0: $filesystem/etc/init not found - make install has not built init" >&2
+	exit 1
+fi
+
+tmp=`mktemp` || exit 1
+trap 'rm -f "$tmp" "$tmp.k"' 0
+
+# clear any sidecar lock file the host tools leave at "<image>.lock"
+rm -f "$image.lock"
+
+# 1. the boot and the filesystem, one label describing both
+"$mnix" bootflop "$bootimg" "$image" || exit 1
+
+# 2. the userland.  The built binaries come from the source tree's
+# filesystem (make install); the config is that same directory's etc,
+# which is where the built init is and where signon2 lives - the signon
+# m16init installs in place of the plain one.
+set --
+for f in $BINS; do
+	set -- "$@" "bin/$f"
+done
+tar -C "$filesystem" -c -f "$tmp" "$@" || exit 1
+"$mnix" -f "$image" tar x "$tmp" || exit 1
+
+tar -C "$filesystem" -c -f "$tmp" etc || exit 1
+"$mnix" -f "$image" tar x "$tmp" || exit 1
+
+tar -C "$rootfiles" -c -f "$tmp" m16init .sh || exit 1
+"$mnix" -f "$image" tar x "$tmp" || exit 1
+
+# 3. the device nodes, from the source tree's dev/devlist, and the
+# mount points and /tmp, which no tar carried - it archives files, not
+# empty directories.
+"$mnix" -f "$image" mkdir /dev || exit 1
+"$mnix" -f "$image" mkdir /tmp || exit 1
+"$mnix" -f "$image" mkdir /b || exit 1
+"$mnix" -f "$image" mkdir /f || exit 1
+while read type major minor name; do
+	case "$type" in
+	''|\#*)	continue ;;
+	esac
+	"$mnix" -f "$image" mknod "/dev/$name" "$type" "$major" "$minor" || exit 1
+done < "$devlist"
+
+# 4. the freshly built kernel, and the diskette's own root node.  The
+# ccc kernel's root device defaults to 3/0 and this diskette's root is
+# the floppy it booted from, so point it there: setdev patches in place,
+# so work on a copy.  Swap stays nodev, which is what a floppy system
+# wants - a system that does not swap is better than one that swaps onto
+# the diskette it is running from.
+if [ -f "$kernel" ]; then
+	cp "$kernel" "$tmp.k" || exit 1
+	"$setdev" "$tmp.k" "2/$rootmin" 0/0 || exit 1
+	"$mnix" -f "$image" write "$tmp.k" /micronix || exit 1
+	"$mnix" -f "$image" mknod /dev/root b 2 "$rootmin" || exit 1
+fi
+
+# 5. the hard disk's boot image, under the name mkfs reads by default.
+# It is not the diskette's own boot - that is in the sectors in front of
+# the filesystem and came in with step 1 - but the boot of the drive the
+# install is about to make.
+"$mnix" -f "$image" write "$hdinit" /bootmw.bin || exit 1
+
+echo "$0: made $image"

@@ -5,7 +5,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-all:	mwboot.com mwboot1.bin bootimgs djboot1.bin djload \
+all:	mwboot.com mwboot1.bin bootimgs djboot.com djboot1.bin djload \
 	ideboot.com ideboot1.bin idebootimgs
 
 install:
@@ -25,8 +25,8 @@ install:
 # directory of that assembler's listings.  core.* is a crash dump - not
 # a build product, and named core.<pid>, so there is no list to write.
 clean:
-	rm -f $(OBJS) ideio.o *.nam *.tok *.x
-	rm -f ideboot.com
+	rm -f $(OBJS) djio.o ideio.o *.nam *.tok *.x
+	rm -f ideboot.com djboot.com
 	rm -f mwboot1.abs djboot1.abs mwboot1.bin djboot1.bin
 	rm -f ideboot1.abs ideboot1.bin mwboot.com djload mkbootimg
 	rm -f $(BOOTIMGS) $(IDEBOOTIMGS) bootimg
@@ -86,12 +86,19 @@ mwboot1.bin: mwboot1.s
 	$(WSLD) -s -Ttext=0x100 -o mwboot1.abs mwboot1.o
 	dd if=mwboot1.abs of=mwboot1.bin bs=16 skip=1
 
-# djboot1.s is the same sector, for the DJ-DMA floppy controller.  It
-# reads the second level with a channel program instead of the HD-DMA
-# command block; everything else is mwboot1.s.
+# djboot1.s is the floppy's first stage, and on the DJ-DMA it is two
+# levels in one file.  The firmware copies only 128 bytes to 0080, so
+# the file leads with a 128-byte level 0 that does nothing but read the
+# next block and jump into it; the level 1 behind it is mwboot1.s with a
+# channel program for a read instead of the HD-DMA command block.  The
+# link base is therefore 0080, not 0100: level 1's labels are counted
+# from there, and they come out at 0100 - where level 0 puts the block -
+# only because level 0 and its pad are exactly 128 bytes.  djload checks
+# that, since nothing else about the image would look wrong if it were
+# not.
 djboot1.bin: djboot1.s
 	$(ASZ) djboot1.s
-	$(WSLD) -s -Ttext=0x100 -o djboot1.abs djboot1.o
+	$(WSLD) -s -Ttext=0x80 -o djboot1.abs djboot1.o
 	dd if=djboot1.abs of=djboot1.bin bs=16 skip=1
 
 # ideboot1.s is the same sector again, for the IDE card.  It writes the
@@ -176,12 +183,26 @@ $(IDEBOOTIMGS): ideboot1.bin ideboot.com mkbootimg
 		echo "$@: `echo $$d | cut -d: -f2`/`echo $$d | cut -d: -f3`/`echo $$d | cut -d: -f4`"; \
 	done
 
-# The floppy boot image: djboot1.bin in sector 0, mwboot.com in sectors
-# 1 through 8, which is what djboot1.s reads.
-djload: djboot1.bin mwboot.com
-	dd if=/dev/zero of=djload bs=512 count=9
-	dd if=djboot1.bin of=djload bs=512 conv=notrunc
-	dd if=mwboot.com of=djload bs=512 seek=1 conv=notrunc
+# The floppy boot image: one side of cylinder 0, ten blocks.  Block 0 is
+# djboot1.bin's first 128 bytes - level 0, which is all the firmware
+# takes - block 1 is the rest of it - level 1, which reads blocks 2
+# through 9 into STAGE and unpacks the second level from them.  The
+# second level is the DJ boot, not mwboot.com: it is the floppy's, and
+# mwboot.com speaks the HD-DMA.
+#
+# Splitting at 128 is the one thing that has to be right: level 1's
+# labels are counted from 0080, so they only come out at 0100, where
+# level 0's SETDMA puts its block, if level 0 is exactly what the
+# firmware copies.  So it is checked - byte 128 must be level 1's first
+# opcode, ld hl,BASE (21).
+djload: djboot1.bin djboot.com
+	@set -e; \
+	b=`od -An -tx1 -j 128 -N 1 djboot1.bin | tr -d ' \n'`; \
+	[ "$$b" = 21 ] || { echo "djload: byte 128 of djboot1.bin is $$b, not 21: level 0 is not 128 bytes"; exit 1; }
+	dd if=/dev/zero of=djload bs=512 count=10
+	dd if=djboot1.bin of=djload bs=1 count=128 conv=notrunc
+	dd if=djboot1.bin of=djload bs=1 skip=128 seek=512 conv=notrunc
+	dd if=djboot.com of=djload bs=512 seek=2 conv=notrunc
 
 # The second level is linked manually, not by ccc, so its own crt0
 # (sexit.s) replaces the library's.  ccc always links crt0.o, whose
@@ -201,6 +222,15 @@ mwboot.com: $(OBJS)
 	    sexit.o boot.o mwio.o $(CCCLIB)/libc.a $(CCCLIB)/libu.a $(CCCLIB)/libc.a
 
 #
+# The floppy second level: the same boot.c with djio.o in place of
+# mwio.o.  Both read a block, and boot.c does not know which it is
+# talking to.
+#
+djboot.com: boot.o djio.o sexit.o
+	$(MXLD) -s -o djboot.com -Ttext=0x100 -L$(CCCLIB) \
+	    sexit.o boot.o djio.o $(CCCLIB)/libc.a $(CCCLIB)/libu.a $(CCCLIB)/libc.a
+
+#
 # The IDE second level: the same boot.c with ideio.o in place of mwio.o.
 # reset() and readblock() keep their names and their meaning across the
 # three drivers, so nothing in boot.c knows which card it is.
@@ -213,6 +243,8 @@ boot.o: boot.c
 	$(CCC) -c -i$(INC) -o boot.o boot.c
 mwio.o: mwio.c
 	$(CCC) -c -i$(INC) -o mwio.o mwio.c
+djio.o: djio.c
+	$(CCC) -c -i$(INC) -o djio.o djio.c
 ideio.o: ideio.c
 	$(CCC) -c -i$(INC) -o ideio.o ideio.c
 sexit.o: sexit.s

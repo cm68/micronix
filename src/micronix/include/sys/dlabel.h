@@ -163,12 +163,44 @@ struct dlabel {
      * the older code made needs nothing done to it.
      */
     struct dslice d_slice[NSLICE];
+
+    /*
+     * The number of the first sector on a track, which is not always
+     * zero and is not derivable from the geometry above: a soft sectored
+     * medium numbers its sectors from one and a hard sectored one from
+     * zero, and that is a property of the medium - whether the sectors
+     * are marked by index holes in the jacket or written into the track
+     * - not of how many there are.
+     *
+     * The kernel gets this from the drive: sys/dj.c reads the drive
+     * characteristics byte, sees that a soft sectored diskette has no
+     * format table to look in because it names no configuration, and
+     * sets ORG1 from that.  The loader has nothing to ask - the rom has
+     * already read the boot sector and the controller knows only what it
+     * is told - so the medium says it here instead.  A loader that
+     * ignores this reads every sector one place out on a soft sectored
+     * diskette, and invents a sector past the end of every track.
+     *
+     * Appended, so a label written before this field existed reads zero,
+     * which is the right answer for a hard disk and for a hard sectored
+     * diskette, and is what the five rolled rows in cmd/mkfs write.
+     */
+    UINT d_firstsec;
 };
 
 #define DL_MAGIC    "MWDL"      /* Morrow Winchester disk label */
 #define DL_VERSION  1           /* 1 = the roll idiom, 2 = the slice idiom;
                                  * consulted by tools, which must know
                                  * whether an inode owns the boot */
+#define DL_VERS_SLICE 2         /* the slice idiom's version, written by
+                                 * whoever writes a table: a diskette, and
+                                 * any hard disk cmd/label gives a table.
+                                 * Spelled short because ccc keeps fifteen
+                                 * significant characters and silently
+                                 * drops a longer macro: DL_VERSION_SLICE
+                                 * is one too many, and comes out as an
+                                 * undefined symbol at use and a
+                                 * truncated one at the definition. */
 
 /*
  * The geometry a driver needs to map a block: the label as the kernel

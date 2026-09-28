@@ -65,6 +65,7 @@ struct image {
     int label_isize;
     int label_swap;
     int haslabel;       /* a Micronix label was present and readable */
+    int bootbelow;      /* the boot is under the filesystem, not in it */
 #ifdef USE_LIBDSK
     DSK_PDRIVER *drive;
 #endif
@@ -143,7 +144,7 @@ is_sticky(char *fn)
  *	sec  = (blk mod spc) mod spt
  */
 static long
-hdpos(struct image *i, int blkno)
+hdpos(struct image *i, int blkno, long base)
 {
     int spc = i->heads * i->spt;
     int cyl, head, sec;
@@ -154,8 +155,7 @@ hdpos(struct image *i, int blkno)
     head = (blkno % spc) / i->spt;
     sec = (blkno % spc) % i->spt;
 
-    return (long) HD_DATAOFF +
-        (((long) cyl * i->heads + head) * i->spt + sec) * 512;
+    return base + (((long) cyl * i->heads + head) * i->spt + sec) * 512;
 }
 
 /*
@@ -222,6 +222,107 @@ hdlabels(struct image *i)
     trace(trace_fs, "openfs: %s label, %d/%d/%d roll %d, fs %d blocks\n",
         DL_MAGIC, dl->d_tracks, dl->d_heads, dl->d_spt,
         dl->d_roll, dl->d_fsize);
+    return 1;
+}
+
+/*
+ * The same label on a diskette - or on any disk reached as a plain run
+ * of sectors, which is what a raw floppy image is.
+ *
+ * hdlabels() reads a simulator hard disk file, whose 2048 byte prefix is
+ * the simulator's own label and whose sectors follow in physical order.
+ * This reads the file itself: sector 0 is device block 0, so the
+ * Micronix label is at DL_OFFSET in the first 512 bytes and nothing has
+ * to be skipped to reach it.
+ *
+ * What the label buys here is that the geometry comes off the medium
+ * instead of out of a name.  Before it, this branch took the sectors per
+ * track from the minor number and then *probed* for where the filesystem
+ * began, trying no offset, two cylinders and four - a guess that has to
+ * be right about a disk it knows nothing about, made from a filename.
+ * A diskette made by mnix bootflop says what it is, so there is nothing
+ * to guess: slice d_bootslice starts the filesystem, at cylinder
+ * d_off, and its first block is that many cylinders into the device.
+ *
+ *	1   a slice idiom label - the geometry and the offset are taken
+ *	0   no label, or one whose mapping is not this flat one: a rolled
+ *	    disk is read through hdpos() or not at all, and the caller's
+ *	    own probing still applies to it
+ *     -1   a label that contradicts the image it is on.  Refusing is the
+ *	    point: silently reading 800 blocks' worth of geometry off a
+ *	    file that holds 400 is how a filesystem gets written over.
+ */
+static int
+dllabels(struct image *i)
+{
+    struct dlabel *dl;
+    char buf[512];
+    long imgblks;
+    int spc;
+    int sl;
+    int dsize;
+
+    if (lseek(i->fd, 0L, 0) < 0 || read(i->fd, buf, 512) != 512)
+        return 0;
+
+    dl = (struct dlabel *) &buf[DL_OFFSET];
+    if (strncmp(dl->d_magic, DL_MAGIC, 4) != 0)
+        return 0;
+
+    /*
+     * A rolled label is not this reader's: the flat mapping below has no
+     * rotation in it, so on such a disk every block would land in the
+     * wrong place and the read would still look like a read.  Say no and
+     * let the caller carry on as it did before there were labels here.
+     */
+    if (dl->d_roll)
+        return 0;
+    if (!dl->d_tracks || !dl->d_heads || !dl->d_spt)
+        return 0;
+    sl = dl->d_bootslice;
+    if (sl >= NSLICE)
+        return 0;
+
+    spc = dl->d_heads * dl->d_spt;
+    dsize = dl->d_tracks * spc;
+    imgblks = lseek(i->fd, 0L, 2) / 512;
+    if (dsize > imgblks) {
+        fprintf(stderr,
+            "warning: %s says %d/%d/%d - %d blocks, the file holds %ld\n",
+            DL_MAGIC, dl->d_tracks, dl->d_heads, dl->d_spt,
+            dsize, imgblks);
+        return -1;
+    }
+
+    i->cyls = dl->d_tracks;
+    i->heads = dl->d_heads;
+    i->spt = dl->d_spt;
+    i->bps = 512;
+    i->altsec = 0;              /* dj.c does not skew */
+    i->major = 2;
+    i->minor = 0;
+    i->roll = 0;
+    i->cyl0 = dl->d_cyl0;
+    i->bootblks = dl->d_bootblks;
+    i->haslabel = 1;
+    i->label_fsize = dl->d_fsize;
+    i->label_isize = dl->d_isize;
+    i->label_swap = dl->d_swap;
+
+    /* the slice's offset is in cylinders; a block number is in sectors */
+    i->offset = (int) dl->d_slice[sl].d_off * spc;
+
+    /*
+     * And whether the boot is below the filesystem rather than inside
+     * it.  A filesystem that does not begin at cylinder 0 has blocks
+     * before it that are not its own, and on a diskette that is where
+     * the boot is - at device block 0, where no filesystem block number
+     * reaches it.
+     */
+    i->bootbelow = (i->offset != 0);
+
+    trace(trace_fs, "openfs: %s label, %d/%d/%d, fs at block %d\n",
+        DL_MAGIC, dl->d_tracks, dl->d_heads, dl->d_spt, i->offset);
     return 1;
 }
 
@@ -298,6 +399,7 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
         i->cyl0 = 0;
         i->bootblks = 0;
         i->haslabel = 0;
+        i->bootbelow = 0;
 
         /*
          * A hard disk file says what it is in its first four bytes, so
@@ -325,6 +427,37 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
             }
             (*fsp)->s_fmod = 0;
             return ret;
+        }
+
+        /*
+         * A diskette carries the same label at the same place, and it
+         * says everything the block above took from the simulator's.  A
+         * label that names the slices is the whole answer: there is no
+         * probing, and the minor number is not consulted.
+         */
+        if (i->driver == DRIVER_IMAGE) {
+            int dl;
+
+            dl = dllabels(i);
+            if (dl < 0) {
+                close(i->fd);
+                free((struct super *)i);
+                return -1;
+            }
+            if (dl > 0) {
+                *fsp = (struct super *)i;
+                readblk(*fsp, 1, i->sb.superblock);
+                if (i->haslabel && i->label_fsize &&
+                    (i->label_fsize != (*fsp)->s_fsize ||
+                     i->label_isize != (*fsp)->s_isize)) {
+                    fprintf(stderr,
+                        "warning: label filesystem %d/%d, superblock %d/%d\n",
+                        i->label_fsize, i->label_isize,
+                        (*fsp)->s_fsize, (*fsp)->s_isize);
+                }
+                (*fsp)->s_fmod = 0;
+                return ret;
+            }
         }
 
         devnum(filesystem, &i->dt, &i->major, &i->minor);
@@ -439,13 +572,25 @@ openfs(char *filesystem, struct super **fsp)
 /*
  * Where the boot area is, and what its file is called.
  *
- * Where it is has two answers, and neither of them is about which
- * controller drives the disk.  A labeled device carries its own answer:
- * the label at physical cylinder 0 names d_cyl0 blocks beginning at
- * d_cyl0.  A device with no label - a floppy - keeps its boot in the
- * reserved tracks in front of the filesystem, which the roll maps to the
- * blocks just past s_fsize; the offset is how many blocks those tracks
- * hold.
+ * Where it is has three answers, and none of them is about which
+ * controller drives the disk.  A rolled device carries its own: the
+ * label's d_cyl0 names the filesystem block that sits at physical
+ * cylinder 0, and the boot owns d_bootblks of them from there - inside
+ * the filesystem, which is why an inode can own it.
+ *
+ * A device whose filesystem does not begin at cylinder 0 has blocks
+ * before it that are not its own, and that is where its boot is.  No
+ * filesystem block number reaches those, so there is no inode to make
+ * and nothing here to install: a diskette's boot lives at device block 0
+ * and is read by the rom, not by the filesystem.
+ *
+ * A device with no label at all - a floppy made before they existed, or
+ * one of the .trim20k images - keeps its boot in reserved tracks too, but
+ * everything about it is a guess: the offset was found by probing and the
+ * filesystem is numbered from wherever the probe landed, so the tracks
+ * appear at the far end of the block range rather than in front of it.
+ * That is the one case where the boot really is inside the filesystem and
+ * installboot has to build the inode.
  *
  * What it is called is one answer for every device.  The file's whole
  * job is to own the blocks the rom will read, and that job is the same
@@ -459,6 +604,10 @@ bootrange(struct super *fs, int *first, int *nblk, char **name)
 
     *name = "boot";
 
+    if (i->bootbelow) {
+        /* the boot is under the filesystem, at device block 0 */
+        return 0;
+    }
     if (i->haslabel && i->bootblks) {
         /* a labeled device: the label names the boot area */
         *first = i->cyl0;
@@ -466,9 +615,9 @@ bootrange(struct super *fs, int *first, int *nblk, char **name)
         return 1;
     }
     if (i->offset) {
-        /* a floppy: its boot is the reserved tracks in front, which the
-         * roll maps to the blocks just past the filesystem.  The offset
-         * is how many blocks those tracks hold. */
+        /* an unlabeled floppy: its boot is the reserved tracks in front,
+         * which the roll maps to the blocks just past the filesystem.
+         * The offset is how many blocks those tracks hold. */
         *first = fs->s_fsize;
         *nblk = i->offset;
         return 1;
@@ -541,7 +690,8 @@ readblk(struct super *fs, int blkno, char *buf)
     trace(trace_fs, "readblk: %d -> %d\n", blkno, realblk);
 
     if (i->driver == DRIVER_HD || i->driver == DRIVER_IMAGE) {
-        long off = (i->driver == DRIVER_HD) ? hdpos(i, blkno)
+        long off = (i->driver == DRIVER_HD)
+            ? hdpos(i, blkno, (long) HD_DATAOFF)
             : 512L * (realblk + i->offset);
 
         if (lseek(i->fd, off, SEEK_SET) < 0)
@@ -584,7 +734,8 @@ writeblk(struct super *fs, int blkno, char *buf)
     trace(trace_fs, "writeblk: %d -> %d\n", blkno, realblk);
 
     if (i->driver == DRIVER_HD || i->driver == DRIVER_IMAGE) {
-        long off = (i->driver == DRIVER_HD) ? hdpos(i, blkno)
+        long off = (i->driver == DRIVER_HD)
+            ? hdpos(i, blkno, (long) HD_DATAOFF)
             : 512L * (realblk + i->offset);
 
         if (lseek(i->fd, off, SEEK_SET) < 0)

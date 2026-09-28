@@ -4,14 +4,14 @@ fsck /dev/m10a -t
 mount /dev/m10a /b
 chmod 755 /b
 cptree / /b -v
-era /b/dev/root /b/dev/swap
+rm -f /b/dev/root /b/dev/swap
 mknod /b/dev/root b 3 4
 mknod /b/dev/swap b 3 4
 setdev /b/micronix 3/4 3/4
-era /b/hdinit /b/m5init /b/m10init /b/m16init
-era /b/etc/signon
+rm -f /b/hdinit /b/m5init /b/m10init /b/m16init
+rm -f /b/etc/signon
 ln /b/etc/signon2 /b/etc/signon
-era /b/etc/signon2
+rm -f /b/etc/signon2
 umount /dev/m10a
 sync
 echo

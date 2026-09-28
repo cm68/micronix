@@ -1,0 +1,126 @@
+bootable install diskettes
+==========================
+
+	make bootdisks
+
+at the top of the tree builds three, here:
+
+	d8ss.img	8 inch, single sided	77 cyl, 1 head,  15 x 512	1125 blocks
+	d8ds.img	8 inch, double sided	77 cyl, 2 heads, 15 x 512	2250 blocks
+	d5ds.img	5 1/4, double sided	40 cyl, 2 heads, 10 x 512	 760 blocks
+
+They are build output, regenerated from the tree the way a .vol is, and
+.gitignore drops them; the script that makes them is the only real file
+in this directory.  Nothing here is the distributed standalone: see
+REGEN in ../hdinstall for what patching that costs, and for why the two
+ways forward it names are this one and teaching mnix the skew.
+
+The five inch single sided medium is deliberately absent.  194 K is not
+a running system, and a diskette that can only be a data carrier is not
+worth a media row.
+
+what one is
+-----------
+
+A whole small micronix, on one diskette, whose root is the diskette.
+The loader is in the sectors in front of the filesystem and the
+filesystem behind it, and one struct dlabel at byte 256 of block 0
+describes both - so the diskette says what it is rather than the name it
+is reached by.  A reader with the file in its hands and no device number
+at all can mount it.  See src/micronix/sys/DISKLABEL.md for the label,
+and src/micronix/stand/boot/README for the loader.
+
+To boot one:
+
+	cd ../../src/hwsim/d1
+	./d1 -b roms/mon447.bin -B djdma -5 <the d5ds image>
+
+The bare filename of an eight inch image goes on the eight inch port;
+the five inch one needs -5.  Both are unskewed raw images - the DJ's
+alternate sectoring bit is clear - which is what the loader and the host
+tools both read.
+
+what is on it, and why so little
+--------------------------------
+
+The install diskette is not a tool bag.  m16init mkfs's a hard disk,
+mounts it on /b and copies the running system across with cptree, so
+what has to fit is the smallest micronix that can do that, and the
+medium it has to fit in is 760 blocks:
+
+	/micronix	the kernel, 86 K, the largest thing here
+	/bootmw.bin	the hard disk boot the install writes into the new
+			drive's boot area - mkfs.h's DEFBOOT, read from the
+			diskette that is running the install
+	/m16init	the install script
+	/.sh		the shell's path
+	/bin		sh login ls cp mv rm cat mkdir mkfs fsck mount
+			umount chmod cptree mknod setdev ln sync echo
+	/dev		every node in ../../src/micronix/dev/devlist
+	/etc		the config and init
+	/b /f /tmp	the mount points m16init and finstall use, and a
+			scratch directory
+
+That is 724 of the 760 blocks on the five inch, leaving 17.  The eight
+inch media carry the same files with the room they have over.  So the
+knapsack is full: anything added to that list has to displace
+something, which is the reason there is one m16init here and not all
+four of the inits with a boot image each.
+
+install, from the diskette
+--------------------------
+
+Boot it, wait for the welcome and then for the shell's "#", and type
+
+	source m16init
+
+which mkfs's /dev/m16a, fsck's it, mounts it on /b, copies the system
+across with cptree, points the copy's kernel at the drive with setdev,
+relinks /dev/root, and unmounts.  It prints "Disk initialization
+complete." when it is done, and cptree is copying a filesystem through
+a simulated Z80, so give it time.
+
+Then boot the drive:
+
+	./d1 -b roms/mon447.bin -c 0x0c hdcdma0:<volume>
+
+which is the HD-DMA path with the monitor skipped - the configuration
+switch 0x0c everything used to be written down as.  See ../hdinstall
+for the volume to point it at and for the rest of that run.
+
+"source m16init" rather than "m16init", because the console shell's path
+is /bin and /usr/bin and m16init is in the root directory.  source is a
+builtin and reads the file where you name it.
+
+what is not here
+----------------
+
+	/.login		rootfiles/.login is "cd /usr/src; make" - the
+			volume's build login, which on a diskette with no
+			sources would only fail
+	era		a Whitesmiths command this tree has never built; the
+			install uses rm -f where the original used it
+	a compiler, sources, man pages, and the rest of /bin - a system
+	with a hard disk installs those from the media that carry them
+
+the format byte, which is only on the five inch
+------------------------------------------------
+
+A hard sectored medium's geometry cannot be worked out from the drive;
+the controller does not report it.  What dj.c does instead is read byte
+0x5C of sector 0 - the level 0 boot that the firmware copies - and look
+it up in its table of Morrow formats (sys/dj.c, specs[]).  d5ds carries
+0xD0: 40 cylinders, two heads, ten sectors, 512 bytes.  A diskette
+without it does not fail to boot - the driver quietly keeps its default
+row for a five inch drive, 35 cylinders one head, and reads the first
+330 filesystem blocks correctly and nothing after them, which is exactly
+where the kernel's overlay modules are.  The symptom is a mounted
+filesystem, a healthy-looking loader, "ovl: 0 not placed" and then a
+panic.
+
+The eight inch media are soft sectored and the driver never looks, so
+they carry zero.  src/micronix/stand/boot/GNUmakefile's FLOPPIES table
+has the byte per medium, and mkbootimg writes it and the Makefile reads
+it back; the whole story is in mkbootimg.c's DJCONFIG.
+
+vim: tabstop=4 shiftwidth=4 noexpandtab:

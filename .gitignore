@@ -107,6 +107,7 @@ src/micronix/stand/boot/ideboot.com
 src/micronix/stand/boot/ideboot1.abs
 src/micronix/stand/boot/ideboot1.bin
 src/micronix/stand/boot/idebootimg-*
+src/micronix/stand/boot/djbootimg-*
 src/micronix/stand/boot/djload
 src/micronix/stand/boot/bootimg
 src/micronix/stand/boot/bootimg-*
@@ -135,6 +136,16 @@ src/micronix/stand/zout/
 # disks/hdinstall/REGEN.
 #
 *.vol
+
+#
+# The bootable diskettes "make bootdisks" generates.  Small where a
+# volume is not - 400K to 1.1M - but the same kind of thing: build
+# output, regenerated from the tree by disks/bootdisks/create_bootdisk,
+# and never a source.  The .img suffix is that directory's alone so that
+# what is not an .img there is a real file, the way *.vol turns
+# disks/hdinstall around.
+#
+disks/bootdisks/*.img
 
 #
 # A convenience symlink in that directory, to the kernel's own sys

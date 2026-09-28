@@ -25,7 +25,7 @@ ASSRCS	= sexit.s
 
 # The main artifact, and the things built beside it.
 TARGET	= mwboot.com
-TARGETS	= mwboot1.bin bootimgs djboot.com djboot1.bin djload \
+TARGETS	= mwboot1.bin bootimgs djboot.com djboot1.bin djbootimgs \
 	  ideboot.com ideboot1.bin idebootimgs
 
 # The loader links ccc's own libc, named by path below, so the tree's
@@ -88,14 +88,19 @@ mwboot1.bin: mwboot1.s
 	dd if=mwboot1.abs of=$@ bs=16 skip=1
 
 #
-# The floppy first level, djboot1.s, built the same way.  It differs
-# from mwboot1.s only in the read: the DJ-DMA runs a channel program,
-# so djboot1 plants SETDMA/SREAD/HALT at the channel address and pulses
-# 00ef instead of writing the HD-DMA command block.
+# The floppy first level, djboot1.s, built differently, because on this
+# controller the first level is two levels.  The firmware copies only
+# 128 bytes to 0080, so the file leads with a 128-byte level 0 whose
+# whole job is to read the next block and jump into it; the level 1
+# behind it is mwboot1.s with a channel program for a read, and it links
+# at 0100 because that is where level 0 puts it.  So the link base is
+# 0080, not 0100, and the 128 bytes between are the pad the head does
+# not use - which is also why level 1's labels need the padding to be
+# exact (see the djload rule).
 #
 djboot1.bin: djboot1.s
 	$(CCC) $(CCFLAGS) -c -o djboot1.o djboot1.s
-	$(MXLD) -s -Ttext=0x100 -o djboot1.abs djboot1.o
+	$(MXLD) -s -Ttext=0x80 -o djboot1.abs djboot1.o
 	dd if=djboot1.abs of=$@ bs=16 skip=1
 
 #
@@ -180,14 +185,82 @@ $(IDEBOOTIMGS): ideboot1.bin ideboot.com mkbootimg
 	done
 
 #
-# The floppy boot image: djboot1.bin in sector 0, djboot.com in sectors
-# 1 through 8.  The DJ-DMA first level reads sectors 1-8 to STAGE and
-# unpacks them; the second level is the floppy second level above.
+# The floppy boot images: one per medium, because the label is what
+# carries the geometry and the medium is what the label describes.  Block
+# 0 is djboot1.bin's first 128 bytes - level 0, which is all the firmware
+# takes - then the label at DL_OFFSET, block 1 is the rest of djboot1.bin
+# - level 1, which reads blocks 2 through 9 into STAGE and unpacks the
+# second level from them.
 #
-djload: djboot1.bin djboot.com
-	dd if=/dev/zero of=$@ bs=512 count=9 2>/dev/null
-	dd if=djboot1.bin of=$@ bs=512 conv=notrunc 2>/dev/null
-	dd if=djboot.com of=$@ bs=512 seek=1 conv=notrunc 2>/dev/null
+# Splitting at 128 is the one thing that has to be right: level 1's
+# labels are the linker's, counted from 0080, so they only come out at
+# 0100 - where level 0's SETDMA puts that block - if level 0 is exactly
+# what the firmware copies.  Get it wrong and level 1 runs at the wrong
+# address, and nothing about the image would look wrong.  So it is
+# checked: byte 128 must be level 1's first opcode, ld hl,BASE (21 00 01).
+# The split itself is mkbootimg's (-d), not a pair of dd lines, so the
+# same boundary the check tests is the one the image is built with.
+#
+# The media, as cmd/mkfs/mkfs.h's table has them: name:cylinders:heads:
+# sectors:firstsec:toff.  Three, and not the 5 1/4 single sided 40/1/10 -
+# 194 K cannot hold a running system, so it is not a medium this builds
+# for.
+#
+# firstsec is where the medium numbers its sectors from, and it is one
+# for the soft sectored eight inch media and zero for the hard sectored
+# five inch one.  It is not decoration: the loader reads the label by
+# finding its magic in the first sector of track 0, which it can only do
+# if it guesses the numbering right, and it then uses this field for
+# every block after that.  Level 0 cannot wait for the label - it has to
+# name a sector to read the label's own block - so mkbootimg writes the
+# same number into level 0's last two bytes as well, and both places are
+# checked below.  See sys/dlabel.h, djboot1.s's FSEC and mkbootimg.c.
+#
+# The last field is the medium's format byte, in hex, and only the hard
+# sectored five inch medium has one.  The driver identifies that medium by
+# looking the byte up in its table of formats, and a byte of zero means no
+# lookup at all, which leaves the driver on the default row for a five inch
+# drive: 35 cylinders, one head, ten sectors per cylinder, 330 blocks - the
+# filesystem still mounts and everything past block 330 reads as nothing,
+# which is where the kernel's own modules are.  0xD0 is 40 cylinders, two
+# heads, 10 sectors, 512 bytes, which is what d5ds is.  The eight inch
+# media are soft sectored and the driver never looks, so they carry zero.
+# mkbootimg writes the byte inside level 0's 128 bytes, which is the only
+# part of sector 0 the driver can read it out of; it is checked below.
+#
+FLOPPIES = d8ss:77:1:15:1:2:00 d8ds:77:2:15:1:2:00 d5ds:40:2:10:0:2:d0
+DJBOOTIMGS = $(foreach f,$(FLOPPIES),djbootimg-$(word 1,$(subst :, ,$(f))))
+
+djbootimgs: $(DJBOOTIMGS)
+
+$(DJBOOTIMGS): djboot1.bin djboot.com mkbootimg
+	@set -e; \
+	b=`od -An -tx1 -j 128 -N 1 djboot1.bin | tr -d ' \n'`; \
+	[ "$$b" = 21 ] || { echo "$@: byte 128 of djboot1.bin is $$b, not 21: level 0 is not 128 bytes"; exit 1; }; \
+	for d in $(FLOPPIES); do \
+		n=`echo $$d | cut -d: -f1`; \
+		[ djbootimg-$$n = $@ ] || continue; \
+		./mkbootimg -d djboot1.bin djboot.com \
+		    `echo $$d | cut -d: -f2` \
+		    `echo $$d | cut -d: -f3` \
+		    `echo $$d | cut -d: -f4` \
+		    `echo $$d | cut -d: -f5` \
+		    `echo $$d | cut -d: -f6` \
+		    0x`echo $$d | cut -d: -f7` $@; \
+		v=`od -An -tx1 -j 260 -N 2 $@ | tr -d ' \n'`; \
+		[ "$$v" = 0200 ] || { echo "$@: label version is $$v, not 2: not the slice idiom"; exit 1; }; \
+		f=`echo $$d | cut -d: -f5`; \
+		v=`od -An -tx1 -j 314 -N 1 $@ | tr -d ' \n'`; \
+		[ "$$v" = "0$$f" ] || { echo "$@: the label's first sector is $$v, not 0$$f"; exit 1; }; \
+		v=`od -An -tx1 -j 127 -N 1 $@ | tr -d ' \n'`; \
+		[ "$$v" = a5 ] || { echo "$@: level 0's marker is $$v, not a5: level 0 is not 128 bytes"; exit 1; }; \
+		v=`od -An -tx1 -j 126 -N 1 $@ | tr -d ' \n'`; \
+		[ "$$v" = "0$$f" ] || { echo "$@: level 0 asks for sector $$v first, not 0$$f"; exit 1; }; \
+		c=`echo $$d | cut -d: -f7`; \
+		v=`od -An -tx1 -j 92 -N 1 $@ | tr -d ' \n'`; \
+		[ "$$v" = "$$c" ] || { echo "$@: the format byte is $$v, not $$c"; exit 1; }; \
+		echo "$@: `echo $$d | cut -d: -f2`/`echo $$d | cut -d: -f3`/`echo $$d | cut -d: -f4` first $$f toff `echo $$d | cut -d: -f6`"; \
+	done
 
 # The loader is not a program to install: install-hwsim reads the
 # boot images out of this directory.  What it builds instead is
@@ -195,8 +268,8 @@ djload: djboot1.bin djboot.com
 # made inside the *.bin recipes, and mkbootimg is a host tool.
 GENERATED = mwboot1.o mwboot1.abs djboot1.o djboot1.abs \
 	ideboot1.o ideboot1.abs mkbootimg \
-	bootimg bootimg-* djboot.com djload idebootimg-*
+	bootimg bootimg-* djboot.com djbootimg-* idebootimg-*
 
 install:
 
-.PHONY: bootimgs
+.PHONY: bootimgs djbootimgs idebootimgs

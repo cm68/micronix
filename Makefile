@@ -69,3 +69,23 @@ clobber:
 rebuildfs:
 	rm -rf filesystem
 	$(MAKE) filesystem
+
+#
+# The bootable install diskettes: one per medium stand/boot builds a
+# boot image for, made by the script in disks/bootdisks.  Three things
+# have to exist first and each is a different part of the tree - the
+# boot images (stand, cross built), the installer (src/tools) and the
+# userland they carry (make filesystem).  The medium is named once, to
+# the script; the geometry, the filesystem size and the diskette's own
+# root minor all come out of the tree from there.
+#
+# They land in disks/bootdisks as <medium>.img and are gitignored build
+# output, like a .vol - generated, never committed.
+#
+BOOTDISKS = d8ss d8ds d5ds
+
+bootdisks: filesystem src/tools/mnix src/tools/setdev
+	$(MAKE) -C src/micronix/stand/boot djbootimgs bootimgs
+	for i in $(BOOTDISKS) ; do \
+		disks/bootdisks/create_bootdisk $$i || exit 1 ; \
+	done
