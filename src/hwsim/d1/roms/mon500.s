@@ -351,148 +351,12 @@ rom0	equ	$			;Local ROM, visible only to task 0
 ;****************************************************************
 
 
-; Check all the readable registers
+;* Reset is executed only once, and the on-board diagnostics are gone,
+;* so reset falls straight through to the boot path.  getsw stays as the
+;* reset entry: start jumps here, and it hands off to reset0.
+;
 
-
-regrd:  out	(0ffh),a		;sync
-	ld	hl,trpadd
-	ld	a,(hl)			;read trap address reg @ 400h
-	inc	hl			
-	ld	a,(hl)			;read keyboard reg @ 401h
-	inc	hl
-	ld	a,(hl)			;read switch reg @ 402h
-	inc	hl
-	ld	a,(hl)			;read trap status reg @ 403h
-	jr	getsw
-
-
-; Check all the writable registers
-
-regwr:	xor	a			;loop till switch not 00
-regwr1:	out	(0ffh),a		;sync
-	ld	(mask),a		;write to the mask register
-	ld	(dspcol),a		;write to the display column register
-	ld	(dspseg),a		;write to the display segment reg.
-	cpl	
-	cp	0ffh
-	jr	z,regwr1
-	jr	getsw
-
-
-; Check the Map RAMs
-
-tmap:   xor	a			;write to map ram / protection ram
-	ld	hl,mapram
-	out	(0ffh),a		;sync
-	ld	(hl),a			;write location 600,0
-	inc	hl
-	ld	(hl),a			;write 601,0
-	cpl
-	ld	(hl),a			;write 601,0ffh
-	dec	hl
-	ld	(hl),a			;write 600,0ffh
-	ld	hl,mapram + 01feh
-	ld	(hl),a			;write 7fe,0ff
-	inc	hl
-	ld	(hl),a			;write 7ff,0ff
-	cpl
-	ld	(hl),a			;write 7ff,00
-	dec	hl
-	ld	(hl),a			;write 7fe,00
-	jr	getsw
-
-
-; Check the R/W RAMs
-
-
-tram:	ld	hl,0000h		;write to read/write ram
-	out	(0ffh),a
-tram1:	xor	a
-	ld	(hl),a			;write a 00 to ram 
-	cp	(hl)			;read it back
-	cpl
-	ld	(hl),a			;write an ffh to ram 
-	cp	(hl)			;read it back
-	bit	0,h
-	jr	nz,getsw
-	ld	hl,03ffh
-	jr      tram1			;write to 3ffh a ffh
-
-
-; Check the Floating Point Processor
-
-tfpp:   xor	a			;check FPP
-	out	(0ffh),a		;sync
-	ld	(0c00h),a		;write a 00 to location C00h
-	ld	a,(0c00h)		;read c00h
-
-
-getsw:	ld	a,(keybd)		
-	bit	1,a
-reset:	jp	z,reset0		;go to the montior if  low
-	ld	a,(switch)
-	bit	2,a
-	jp	z,reset0		;go to the monitor if S6 is on
-	and	070h			;strip insignificant bits
-	rrc	a			;4 byte offset
-	rrc	a
-	ld	hl,jtable		;point to beginning of table
-	add	a,l
-	ld	l,a
-	jp	(hl)
-
-; Check the S-100 bus addr and data lines
-
-
-tbus:   ld	hl,task
-	ld	a,0f0h
-	ld	(hl),a			;force upper task bits high
-	ld	a,0ffh			;init the T0 map
-	ld	(61eh),a
-	ld	a,03
-	ld	(61fh),a
-	ld	(603h),a
-	xor	a
-	ld	(602h),a
-	out	(0ffh),a		;sync
-	ld	(0ffffh),a		;write - bus addresses A0-23 are high
-	ld	(hl),a			;upper task bits low
-	ld	(1000h),a		;write - bus addresses A0-23 are low
-	or	0f0h
-	ld	(hl),a			;force upper task bits high
-	ld	a,(0ffffh)		;read  - bus addresses A0-23 are high
-	xor	a
-	ld	(hl),a		 	;force upper task bits low
-	ld	a,(1000h)		;read  - bus addresses A0-23 are low
-	jr	getsw
-
-
-ntbus:  ld	hl,task
-	ld	a,0A0h
-	ld	(hl),a			;force upper task bits high
-        ld	a,0aah			;init the T0 map
-	ld	(61eh),a
-	ld	a,03
-	ld	(61fh),a
-	ld	(603h),a
-	ld	a,55h
-	ld	(602h),a
-	out	(0ffh),a		;sync
-	cpl
-	ld	(0faaah),a		;write - bus addresses A0-23 = AAAAAA
-	ld	a,50h
-	ld	(hl),a			;upper task bits low = 5
-	or	05h
-	ld	(1555h),a		;write - bus addresses A0-23 are low
-	ld	a,0A0h
-	ld	(hl),a			;force upper task bits high
-	ld	a,(0faaah)		;read  - bus addresses A0-23 are high
-	ld	a,050h
-	ld	(hl),a			;force upper task bits low
-	ld	a,(1555h)		;read  - bus addresses A0-23 are low
-	jp	getsw
-
-	
+getsw:	jp	reset0
 ; Initialize the maps and jump vectors
 
 
@@ -1137,27 +1001,7 @@ rdtbl:	db	0			;no seek
 endrd 	equ	$
 
 
-; Dispatch table for the on-board diagnostic routines
-
-jtable	equ 	$
-	jp	regrd			;test all the readable registers
-	db	0
-	jp	regwr			;check all the writable registers but
- 					; -task register
-	db	0
-	jp	tmap			;check map rams
-	db	0
-	jp	tram			;check read/write ram
-	db 	0
-	jp	tfpp			;check fpp
-	db	0
-	jp	tbus			;check bus read/write addresses
-	db	0
-	jp	ntbus			;R/W bus with 055h and 0aah
-	db	0
-	jr	start			;yet to be defined
-	
-	
+;* The on-board diagnostics are gone, and their dispatch table with them.
 ecode0  equ	$			;End of reset prom code
 
 	ds	3f0h-(ecode0-rom0)	;Fill out the prom
