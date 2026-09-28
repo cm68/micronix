@@ -102,6 +102,27 @@ r_gtty()
     gtty(u.hl, arg[0]);
 }
 
+/*
+ * ioctl(fd, cmd, arg) - run a raw command block against a block device
+ * (include/sys/ioctl.h).  The two arguments are the request code and the
+ * caller's structure; bioctl is where the copying, the block and the
+ * data movement live, and this is only the register convention.
+ *
+ * The error path is r_seek's, and for the same reason: the stubs decide
+ * success and failure on the carry, not on the value, so a failure has
+ * to raise it and put the reason in hl for the stub to store in errno.
+ */
+r_ioctl()
+{
+    u.hl = bioctl(u.hl, arg[0], arg[1]);
+    if (u.error) {
+        u.af |= ERRBIT;
+        u.hl = u.error;
+    } else {
+        u.af &= ~ERRBIT;
+    }
+}
+
 r_kill()
 {
     kill(u.hl, arg[0]);

@@ -15,18 +15,20 @@ DEPTH	= ../..
 DIR	= boot
 CLASS	= stand
 
-# mkbootimg.c is a host program and mwboot1.s/djboot1.s/ideboot1.s are
-# sectors, so none of them belongs in the source lists the standard rules
-# turn into objects.  boot.c is the filesystem code, shared by all three
-# boots; mwio.c, djio.c and ideio.c are the device drivers, one per
-# controller - HD-DMA, DJ-DMA and the IDE card.
-CSRCS	= boot.c mwio.c djio.c ideio.c
+# mkbootimg.c is a host program and mwboot1.s/djboot1.s/ideboot1.s/
+# ncrboot1.s are sectors, so none of them belongs in the source lists the
+# standard rules turn into objects.  boot.c is the filesystem code, shared
+# by all four boots; mwio.c, djio.c, ideio.c and ncrio.c are the device
+# drivers, one per controller - HD-DMA, DJ-DMA, the IDE card and the NCR
+# 5380 SCSI card.
+CSRCS	= boot.c mwio.c djio.c ideio.c ncrio.c
 ASSRCS	= sexit.s
 
 # The main artifact, and the things built beside it.
 TARGET	= mwboot.com
 TARGETS	= mwboot1.bin bootimgs djboot.com djboot1.bin djbootimgs \
-	  ideboot.com ideboot1.bin idebootimgs
+	  ideboot.com ideboot1.bin idebootimgs \
+	  ncrboot.com ncrboot1.bin ncrbootimgs
 
 # The loader links ccc's own libc, named by path below, so the tree's
 # libc must not be a prerequisite of the link.
@@ -78,6 +80,17 @@ ideboot.com: boot.o ideio.o sexit.o
 	    $(CCCLIB)/libc.a
 
 #
+# The NCR 5380 second level: the same boot.c again, with the driver for the
+# NCR 5380 host adapter (ncrio.c) in place of mwio.c.  None of boot.c
+# changes and none of it needs to know which card it is talking to.
+#
+ncrboot.com: boot.o ncrio.o sexit.o
+	$(MXLD) -s -o $@ -Ttext=0x100 -L$(CCCLIB) \
+	    sexit.o boot.o ncrio.o \
+	    $(CCCLIB)/libc.a $(CCCLIB)/libu.a \
+	    $(CCCLIB)/libc.a
+
+#
 # The first level is a sector: the rom reads 512 bytes to 0100 and
 # jumps, so there is nowhere to put a header and nothing to strip one.
 # The link is stripped and the 16-byte object header cut off.
@@ -116,6 +129,20 @@ ideboot1.bin: ideboot1.s
 	$(CCC) $(CCFLAGS) -c -o ideboot1.o ideboot1.s
 	$(MXLD) -s -Ttext=0x100 -o ideboot1.abs ideboot1.o
 	dd if=ideboot1.abs of=$@ bs=16 skip=1
+
+#
+# The NCR 5380 first level, ncrboot1.s, built the same way.  It differs from
+# ideboot1.s in the read as well: the IDE card's registers are behind an
+# 8255, and the 5380 is driven one byte at a time through a REQ/ACK
+# handshake, so every sector here is its own command - select the target,
+# send a READ(10), take the data, take the status and message.  It has the
+# same 256-byte budget: the label sits at byte 256 of the sector and
+# mkbootimg refuses an image whose first level runs into it.
+#
+ncrboot1.bin: ncrboot1.s
+	$(CCC) $(CCFLAGS) -c -o ncrboot1.o ncrboot1.s
+	$(MXLD) -s -Ttext=0x100 -o ncrboot1.abs ncrboot1.o
+	dd if=ncrboot1.abs of=$@ bs=16 skip=1
 
 #
 # What mkfs -i writes: the first level in block 0, the second level
@@ -178,6 +205,30 @@ $(IDEBOOTIMGS): ideboot1.bin ideboot.com mkbootimg
 		n=`echo $$d | cut -d: -f1`; \
 		[ idebootimg-$$n = $@ ] || continue; \
 		./mkbootimg ideboot1.bin ideboot.com \
+		    `echo $$d | cut -d: -f2` \
+		    `echo $$d | cut -d: -f3` \
+		    `echo $$d | cut -d: -f4` $@; \
+		echo "$@: `echo $$d | cut -d: -f2`/`echo $$d | cut -d: -f3`/`echo $$d | cut -d: -f4`"; \
+	done
+
+#
+# And the same for the NCR 5380 card.  The geometry argument is the same
+# DRIVES table for the same reason: the label is what carries it, this
+# loader reads it, and a card that addresses by LBA still has to be told
+# where a filesystem block is on the platter.  The NCR 5380 card's own target
+# 0 speaks to a volume laid out for the HD-DMA block for block, so the
+# images are byte-compatible with the ones above and differ only in which
+# loader is in them.
+#
+NCRBOOTIMGS = $(foreach d,$(DRIVES),ncrbootimg-$(word 1,$(subst :, ,$(d))))
+
+ncrbootimgs: $(NCRBOOTIMGS)
+
+$(NCRBOOTIMGS): ncrboot1.bin ncrboot.com mkbootimg
+	@set -e; for d in $(DRIVES); do \
+		n=`echo $$d | cut -d: -f1`; \
+		[ ncrbootimg-$$n = $@ ] || continue; \
+		./mkbootimg ncrboot1.bin ncrboot.com \
 		    `echo $$d | cut -d: -f2` \
 		    `echo $$d | cut -d: -f3` \
 		    `echo $$d | cut -d: -f4` $@; \
@@ -267,9 +318,9 @@ $(DJBOOTIMGS): djboot1.bin djboot.com mkbootimg
 # cleaned up here - mwboot1.o/mwboot1.abs and djboot1.o/djboot1.abs are
 # made inside the *.bin recipes, and mkbootimg is a host tool.
 GENERATED = mwboot1.o mwboot1.abs djboot1.o djboot1.abs \
-	ideboot1.o ideboot1.abs mkbootimg \
-	bootimg bootimg-* djboot.com djbootimg-* idebootimg-*
+	ideboot1.o ideboot1.abs ncrboot1.o ncrboot1.abs mkbootimg \
+	bootimg bootimg-* djboot.com djbootimg-* idebootimg-* ncrbootimg-*
 
 install:
 
-.PHONY: bootimgs djbootimgs idebootimgs
+.PHONY: bootimgs djbootimgs idebootimgs ncrbootimgs

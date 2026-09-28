@@ -10,6 +10,10 @@
 #include <sys/buf.h>
 #include <sys/con.h>
 #include <sys/fs.h>
+#include <sys/stat.h>
+#include <sys/inode.h>
+#include <sys/file.h>
+#include <sys/ioctl.h>
 #include <errno.h>
 
 extern long seconds;            /* see clock.c */
@@ -17,6 +21,7 @@ extern UINT nbuf;                /* initialized in binit(), main.c */
 extern struct buf *btop;            /* ditto */
 extern UINT8 map0[], image0[];   /* MMU map registers (uhdr.s) */
 extern int copy();               /* leaf mem.s: kernel-to-kernel copy */
+extern int copyin(), copyout();  /* leaf mem.s: the user side of it */
 
 /*
  * Hash the (dev, blk) pair into a bucket.  Consecutive block numbers have
@@ -399,6 +404,125 @@ bclose(dev, mode)
 }
 
 /*
+ * Run a raw command block against a block device (include/sys/ioctl.h).
+ *
+ * The caller names the device the way read and write do, with a
+ * descriptor, and the device number comes off the inode the file is open
+ * on - ip->i_addr[0], which is where an io node keeps its device, and the
+ * same field iread finds its breads' dev in (fio.c).  A descriptor that
+ * is not open, or is not a block device, is refused here; whether the
+ * command suits the device is the driver's business below.
+ *
+ * The rest of the caller's structure says which bytes are the block,
+ * which way the data goes, and where it lands.  The block itself is never
+ * looked into: only the driver's bus has an opinion about what a CDB or a
+ * task file means, and that is the whole point of the call.
+ *
+ * What the kernel owes the driver is a place for the data the window can
+ * hold - a buffer from the cache.  That is the same one-block object a
+ * strategy routine is handed, so it is the only shape a driver already
+ * knows how to move, and the ioctl entry is written against it for
+ * exactly that reason.  It comes out of the pool for the length of the
+ * call and goes back, so a burst of command blocks costs the cache
+ * nothing lasting.
+ *
+ * A data phase past that one block gets no buffer and is the driver's to
+ * move, since the kernel has no second shape to move it in and the driver
+ * has a page of its own or can get one.  Up to CDBDATA, which is a page,
+ * because a driver that stages is staging into one.
+ *
+ * The buffer is not any block of any device, and that is worth saying
+ * out loud: its identity is (0, 0), and major 0 is nodev, so nothing can
+ * ever bread a block with the same key and be handed this.  A scratch
+ * header that aliased a real block would hand a filesystem this data and
+ * call it a disk read.
+ *
+ * The copies around the driver are the read and write paths' own
+ * (fio.c): a hold on the buffer's window with copyin/copyout through it.
+ * BUFSEG is the window that may be held across those copies.  The
+ * scratch window may not, because mem.s borrows that one for the copies
+ * themselves.
+ */
+int
+bioctl(fd, cmd, arg)
+    UINT fd, cmd;
+    char *arg;
+{
+    struct cdb r;
+    register struct buf *b;
+    register struct file *fp;
+    register struct inode *ip;
+    UINT dev;
+    int maj, err;
+
+    if (cmd != CDBCMD) {
+        u.error = EINVAL;
+        return (-1);
+    }
+    if ((fp = ofile(fd)) == 0)
+        return (-1);            /* ofile set u.error = EBADF */
+    ip = fp->inode;
+    if ((ip->i_mode & IFMT) != IFBLK) {
+        u.error = ENOTTY;
+        return (-1);
+    }
+    dev = ip->i_addr[0];
+    maj = bmajor(dev);
+    if (biosw[maj].ioctl == 0) {
+        u.error = ENOTTY;
+        return (-1);
+    }
+
+    copyin(arg, (char *) &r, sizeof r);
+    if (r.len < 1 || r.len > CDBMAX || r.count < 0 || r.count > CDBDATA) {
+        u.error = EINVAL;
+        return (-1);
+    }
+
+    /*
+     * A data phase that fits in a block is one the kernel moves, and the
+     * driver is handed the block.  A bigger one it moves itself: no block
+     * is taken, b is zero, and r.buf is left for the driver to reach
+     * through a page of its own.  The driver can tell the two apart from
+     * b, and r.count says how much there is either way.
+     */
+    b = 0;
+    if (r.count && r.count <= 512) {
+        b = bget(0, 0);
+        b->count = r.count;
+        if ((r.flags & CDB_IN) == 0) {
+            copyin(r.buf, bhold(b), r.count);
+            brel();
+        }
+    }
+
+    err = (*biosw[maj].ioctl) (dev, cmd, &r, b);
+
+    if (err == 0 && b && r.count && (r.flags & CDB_IN)) {
+        copyout(bhold(b), r.buf, r.count);
+        brel();
+    }
+    if (b)
+        brelse(b);
+
+    /*
+     * The block goes back to the caller as it came, except for what the
+     * driver wrote in it: a bus that answers a command inside the command
+     * block - the DJDMA leaves a status byte in each command it runs -
+     * has no other way to be heard, and this costs a caller who set
+     * nothing the same bytes it sent.
+     */
+    copyout((char *) &r, arg, sizeof r);
+
+    if (err) {
+        if (u.error == 0)
+            u.error = EIO;
+        return (-1);
+    }
+    return (0);
+}
+
+/*
  * Return the major device number.
  */
 unsigned
@@ -500,7 +624,15 @@ bflush(dev)
 }
 
 /*
- * Zero a buffer
+ * Zero a buffer, taking it out of the cache first.
+ *
+ * unhash() has to come before the zero: it finds a buffer by hashing its
+ * blk and dev, so once those are cleared the buffer can never be unhooked
+ * again.  It would stay in its bucket while bget() handed it out for other
+ * blocks, linking it into a second bucket and closing a loop in the chain
+ * - and the lookup walk in bget() only ends at a null link, so it would
+ * spin there forever.  A driver that drops a buffer it read (mwclose) is
+ * the case this guards.
  */
 bzero(b)
     struct buf *b;
@@ -508,6 +640,7 @@ bzero(b)
     char *data;
     UINT8 xmem;
 
+    unhash(b);
     /* A buffer recycled by bflush() may still be a superblock's (getsb
      * pointed its data at a slot).  Detach it first - that is what puts
      * its window address and segment back - and then preserve them. */

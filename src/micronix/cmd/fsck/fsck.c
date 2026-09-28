@@ -63,26 +63,41 @@ int	nblocks;
 int	nerrors;		/* problems found - the exit status */
 
 /*
- * the block map - one entry per block, recording who first claimed it
- * and how many times.  The original allocates it 8 bytes to the block
- * (two maps of s_fsize entries); a struct of four shorts is the same
- * thing, read back out of the disassembly's use of it in pass one.
+ * the maps.  The blocks and the inode allocation are bitmaps, one bit to
+ * the unit, because that is the shape an m16 leaves room for: the
+ * original allocates its block map (s_fsize>>3)+2 bytes and sets a bit
+ * as byte b>>3, mask 1<<(b&7) (H0c8b), and eight bytes to the block is
+ * 249,696 of them against a process of sixty kilobytes.  A bit does not
+ * carry what the byte entries carried - who claimed a block and at what
+ * offset - so the duplicate message names the inode making the claim
+ * being reported rather than the first one, patchbad has no offset to
+ * print, and the kind of block, which only the summary needs, is counted
+ * as pass one walks.
+ *
+ * The link counts are not a bitmap: H7012 is one byte to the inode,
+ * holding how many directory entries name it, up to 255, and the second
+ * pass repairs a wrong d_nlink by copying that byte into the inode.
  */
-struct bmap {
-	short	b_count;	/* reference count: 0 free, 1 used, >1 dup */
-	short	b_inode;	/* the inode that first claimed it */
-	short	b_offset;	/* its block offset in that inode */
-	short	b_type;		/* what kind of block it is */
-};
+#define	BSET(m, b)	((m)[(b) >> 3] |= 1 << ((b) & 7))
+#define	BCLR(m, b)	((m)[(b) >> 3] &= ~(1 << ((b) & 7)))
+#define	BTEST(m, b)	((m)[(b) >> 3] & (1 << ((b) & 7)))
 
-#define	BT_DATA	1		/* a block holding file data */
-#define	BT_INDIR	2		/* a single-indirect block */
-#define	BT_IN2DIR	3		/* the double-indirect block */
+#define	BT_DATA		1	/* a block holding file data */
+#define	BT_INDIR	2	/* a single-indirect block */
+#define	BT_IN2DIR	3	/* the double-indirect block */
 
-struct bmap *blockmap;		/* H700e - the block map */
-char	*freemap;		/* H7010 - one byte per block, set if free */
-char	*isallocated;		/* H7012 - one byte per inode */
-short	*refcount;		/* H7014 - one short per inode, link refs */
+char	*blockmap;		/* H700e - a bit to the block, set if claimed */
+char	*freemap;		/* H7010 - a bit to the block, set if free */
+char	*isallocated;		/* H7016 - a bit to the inode, set if in use */
+char	*refcount;		/* H7012 - a byte to the inode: entries naming it */
+
+/*
+ * what the claimed blocks are, counted by pass one over the range the
+ * summary reports on, so that the three add up to the blocks used.
+ */
+int	nindir;
+int	nin2dir;
+int	ndata;
 
 /*
  * the passes, in the order the driver runs them.  Each returns 0 on
@@ -207,10 +222,8 @@ readsuper(void)
  * an out-of-range block is reported; a second claim is a duplicate.
  */
 static void
-countblock(int inum, int off, int b, int type)
+countblock(int inum, int b, int type)
 {
-	struct bmap *bp;
-
 	if (b == 0)
 		return;
 	if (b >= fs->s_fsize) {
@@ -219,15 +232,24 @@ countblock(int inum, int off, int b, int type)
 		nerrors++;
 		return;
 	}
-	bp = &blockmap[b];
-	if (bp->b_count++) {
-		printf("Dup in I-list, Inode %u, Block %u\n",
-		    bp->b_inode, b);
+	if (BTEST(blockmap, b)) {
+		printf("Dup in I-list, Inode %u, Block %u\n", inum, b);
 		nerrors++;
-	} else {
-		bp->b_inode = inum;
-		bp->b_offset = off;
-		bp->b_type = type;
+		return;
+	}
+	BSET(blockmap, b);
+	if (b < fs->s_isize + INODES_START)
+		return;
+	switch (type) {
+	case BT_INDIR:
+		nindir++;
+		break;
+	case BT_IN2DIR:
+		nin2dir++;
+		break;
+	default:
+		ndata++;
+		break;
 	}
 }
 
@@ -243,10 +265,10 @@ countindir(int inum, int b)
 
 	if (b == 0)
 		return;
-	countblock(inum, 0, b, BT_INDIR);
+	countblock(inum, b, BT_INDIR);
 	readblk(fs, b, (char *)blk);
 	for (i = 0; i < 256; i++)
-		countblock(inum, i, blk[i], BT_DATA);
+		countblock(inum, blk[i], BT_DATA);
 }
 
 /*
@@ -266,11 +288,11 @@ checkilist1(void)
 	int inum;
 	int i;
 
-	blockmap = calloc(fs->s_fsize, sizeof(struct bmap));
+	blockmap = calloc((fs->s_fsize >> 3) + 2, 1);
 	if (blockmap == 0)
 		lose("out of memory");
 
-	isallocated = calloc(fs->s_isize * I_PER_BLK, 1);
+	isallocated = calloc(((fs->s_isize * I_PER_BLK) >> 3) + 1, 1);
 	if (isallocated == 0)
 		lose("out of memory");
 
@@ -280,7 +302,7 @@ checkilist1(void)
 			ifree(ip);
 			continue;
 		}
-		isallocated[inum] = 1;
+		BSET(isallocated, inum);
 
 		/*
 		 * Classify the inode.  A directory is a small file: its block
@@ -317,14 +339,14 @@ checkilist1(void)
 			for (i = 0; i < 7; i++)
 				countindir(inum, ip->d_addr[i]);
 			if (ip->d_addr[7]) {
-				countblock(inum, 0, ip->d_addr[7], BT_IN2DIR);
+				countblock(inum, ip->d_addr[7], BT_IN2DIR);
 				readblk(fs, ip->d_addr[7], (char *)blk);
 				for (i = 0; i < 256; i++)
 					countindir(inum, blk[i]);
 			}
 		} else {
 			for (i = 0; i < 8; i++)
-				countblock(inum, i, ip->d_addr[i], BT_DATA);
+				countblock(inum, ip->d_addr[i], BT_DATA);
 		}
 		ifree(ip);
 	}
@@ -350,17 +372,17 @@ freeblock(int b, int chain)
 		nerrors++;
 		return;
 	}
-	if (freemap[b]) {
+	if (BTEST(freemap, b)) {
 		printf("Dup in Free, Block %u, Type %s\n", b, what);
 		nerrors++;
 		return;
 	}
-	if (blockmap[b].b_count) {
+	if (BTEST(blockmap, b)) {
 		printf("Allocated block in Free, Block %u, Type %s\n", b, what);
 		nerrors++;
 		return;
 	}
-	freemap[b] = 1;
+	BSET(freemap, b);
 }
 
 /*
@@ -415,7 +437,7 @@ checkfree(void)
 	int b;
 	int missing;
 
-	freemap = calloc(fs->s_fsize, 1);
+	freemap = calloc((fs->s_fsize >> 3) + 2, 1);
 	if (freemap == 0)
 		lose("out of memory");
 
@@ -423,7 +445,7 @@ checkfree(void)
 
 	missing = 0;
 	for (b = fs->s_isize + INODES_START; b < fs->s_fsize; b++) {
-		if (!blockmap[b].b_count && !freemap[b])
+		if (!BTEST(blockmap, b) && !BTEST(freemap, b))
 			missing++;
 	}
 	if (missing) {
@@ -452,7 +474,7 @@ rebuildfree(void)
 	memset(fs->s_free, 0, sizeof(fs->s_free));
 
 	for (b = fs->s_fsize - 1; b >= fs->s_isize + INODES_START; b--) {
-		if (blockmap[b].b_count)
+		if (BTEST(blockmap, b))
 			continue;
 		bfree(fs, b);
 	}
@@ -475,7 +497,7 @@ checkdirs(void)
 	int inum;
 	int i;
 
-	refcount = calloc(fs->s_isize * I_PER_BLK, sizeof(short));
+	refcount = calloc(fs->s_isize * I_PER_BLK, 1);
 	if (refcount == 0)
 		lose("out of memory");
 
@@ -547,25 +569,15 @@ int
 summary(void)
 {
 	int b;
-	int nindir = 0;
-	int nin2dir = 0;
-	int ndata = 0;
 
 	nused = 0;
 	nfree = 0;
 	nbad = 0;
 	for (b = fs->s_isize + INODES_START; b < fs->s_fsize; b++) {
-		if (blockmap[b].b_count) {
+		if (BTEST(blockmap, b))
 			nused++;
-			if (blockmap[b].b_type == BT_INDIR)
-				nindir++;
-			else if (blockmap[b].b_type == BT_IN2DIR)
-				nin2dir++;
-			else
-				ndata++;
-		} else if (freemap[b]) {
+		else if (BTEST(freemap, b))
 			nfree++;
-		}
 	}
 
 	printf("%u files, %u special, %u directories, %u small, %u large, %u huge\n",
@@ -596,14 +608,15 @@ patchbad(int b)
 		printf("Can't patch new block number %u\n", b);
 		return;
 	}
-	printf("Patching %u at location %u\n", b, (unsigned)blockmap[b].b_offset);
+	printf("Patching %u\n", b);
 
 	memset(buf, 0, sizeof(buf));
 	readblk(fs, b, buf);
 	writeblk(fs, nb, buf);
 
-	memcpy(&blockmap[nb], &blockmap[b], sizeof(struct bmap));
-	blockmap[b].b_count = 0;
+	/* nb takes b's place in the map; the type counts are unmoved */
+	BSET(blockmap, nb);
+	BCLR(blockmap, b);
 }
 
 /*

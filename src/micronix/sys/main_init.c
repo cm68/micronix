@@ -9,7 +9,7 @@
  * btop, rootdir, map0, image0) lives in main_data.c.
  *
  * sys/main_init.c
- * Changed: <2026-09-20 curt>
+ * Changed: <2026-09-26 curt>
  */
 #include <types.h>
 #include <sys/fs.h>
@@ -22,6 +22,8 @@
 #include <sys/buf.h>
 #include <sys/con.h>
 #include <sys/signal.h>
+#include <obj.h>
+#include <sys/ovl.h>
 
 #include "build.h"
 
@@ -37,6 +39,14 @@ extern UINT8 segmap[];          /* malloc.c */
 extern UINT nsegs;
 extern int segalloc();          /* malloc.c */
 extern int nodev();             /* con.c */
+extern UINT kino;               /* uhdr.s's _kino: the inode we booted from */
+
+/*
+ * A module page.  setdev.c has its own copy of these two numbers for the
+ * same file it reads here; the loader has to agree with it.
+ */
+#define PAGESHIFT 12
+#define PAGESZ	(1 << PAGESHIFT)
 
 /*
  * System initialization
@@ -69,6 +79,165 @@ main()
     rootdir->count = 2;
     irelse(rootdir);
     u.p->tty = 0;               /* not tied to any tty */
+    ovlplaceall();              /* the driver modules riding in our own file */
+}
+
+/*
+ * Copy one 512-byte block into the module page under construction.
+ *
+ * The destination is the overlay window itself, and pointedly not the
+ * scratch window: this is init-only code, folded to data and parked at
+ * _ebss (sys/GNUmakefile), and the park runs from 0xcbc9 up past 0xdfff -
+ * so the page the scratch window shows is the page this function is
+ * executing from, and holding it pulls the code out from under the
+ * instruction pointer.  0x9000 is below the park and is where the page is
+ * going anyway, so the page is built where it will run.  Nothing else
+ * wants the frame for the moment the copy is on: the read that fills it
+ * has already happened, and reading is what maps the frame back.
+ *
+ * image0 and not map0 all the way through, as newmap() writes it: the map
+ * registers are write-only.
+ */
+static
+putblk(bp, seg, off)
+    struct buf *bp;
+    UINT seg, off;
+{
+    UINT8 save;
+
+    save = image0[2 * OVLSEG];
+    map0[2 * OVLSEG] = image0[2 * OVLSEG] = (UINT8) seg;
+    copy(bhold(bp), (char *) OVLBASE + off, 512);
+    brel();
+    map0[2 * OVLSEG] = image0[2 * OVLSEG] = save;
+}
+
+/*
+ * Place the driver modules that ride in the kernel's own file.
+ *
+ * The build appends one 4K page per driver past the object's own extent,
+ * and setdev stamps the root driver's page into the slot the kernel is
+ * already running with.  The rest are reachable only by reading the file
+ * back, and that is what this does: the loader left the inode it booted
+ * this kernel from in kino, the object header at the front of that file
+ * gives the extent the build padded to - the same arithmetic setdev's
+ * modbase() does, and it must include the symbol table, which an
+ * unstripped kernel carries - and every whole page past it is a module.
+ * A page's first bytes are the major it serves, so the order they were
+ * appended in does not matter and there is no table of them here.
+ *
+ * This is init-only code, so it costs no resident space, and it runs
+ * before the swapper forks (trap.c), so nothing else is in flight while
+ * the frame is spoken for.  The page is built through the frame itself
+ * rather than through the scratch window (putblk below).
+ */
+ovlplaceall()
+{
+    struct obj hdr;
+    struct ovlhdr *oh;
+    struct inode *ip;
+    long modbase;
+    UINT nmod, n, i, seg, maj;
+    int ra, bad;
+    struct buf *bp;
+    char *s;
+
+    if (kino == 0)              /* the loader did not say: nothing to read */
+        return;
+    if ((ip = iget(kino, rootdev)) == 0)
+        return;
+
+    u.offset = 0;
+    u.segflg = KSEG;
+    if (nread(ip, (char *) &hdr, sizeof(hdr)) < 0) {
+        irelse(ip);
+        return;
+    }
+    /*
+     * Round the extent up to a page with shifts, not division: a long
+     * divide would pull a member out of libc.a, and libc's objects are
+     * plain ones the linker parks below the slot (cmd/ld/ld.c's
+     * pass1_layout), where the text of an earlier object has already
+     * been written.  The shifts are qshl/qshr, which are in the u page
+     * and linked either way.
+     */
+    modbase = (long) sizeof(hdr) + hdr.table + hdr.text + hdr.data;
+    modbase = ((modbase + PAGESZ - 1) >> PAGESHIFT) << PAGESHIFT;
+    if (modbase >= (long) ip->i_size) {     /* nothing was appended */
+        irelse(ip);
+        return;
+    }
+    nmod = (UINT) ((ip->i_size - modbase) >> PAGESHIFT);
+
+    for (n = 0; n < nmod; n++) {
+        /*
+         * The page's first block is the module's header, and the major in
+         * it settles whether the page is worth placing.  The driver the
+         * kernel was booted from is already running out of the slot
+         * setdev stamped into, so its appended page is a second copy of a
+         * driver that is already here - and placing it again is not the
+         * harmless thing it looks like.  A second placement puts a second
+         * handler on the driver's interrupt line, so every interrupt its
+         * card raises is served twice and the second pass runs a chip the
+         * first has already drained; it arms a second tick over the same
+         * driver; and it moves the driver to a segment of its own while
+         * the copy the kernel is running from stays where it was.
+         *
+         * So the header is read before the segment is spent, and a page
+         * whose major is placed is skipped.  ovlmap answers for a driver
+         * the kernel still holds as well as one in a segment, which is
+         * what makes this the same test for either; its mapping of the
+         * frame is the answer to a question about a driver already
+         * mapped, and the next putblk saves and restores around it.
+         */
+        bp = bread(imap(ip, (int) (modbase >> 9) + n * 8, &ra), rootdev);
+        if (bp == 0) {
+            pr("ovl: page %d will not read\n", n);
+            continue;
+        }
+        s = bhold(bp);
+        maj = ((struct ovlhdr *) s)->major;
+        brel();
+        if (ovlmap(maj) != 0) {
+            if (maj < nbdev)
+                pr("ovl: %s already placed\n", devname[maj]);
+            else
+                pr("ovl: %d already placed\n", maj);
+            brelse(bp);
+            continue;
+        }
+        seg = segalloc();
+        putblk(bp, seg, 0);
+        brelse(bp);
+        bad = 0;
+        for (i = 1; i < PAGESZ / 512; i++) {
+            bp = bread(imap(ip, (int) (modbase >> 9) + n * 8 + i, &ra),
+                       rootdev);
+            if (bp == 0) {      /* a short page is not a page: place none of it */
+                bad = 1;
+                continue;
+            }
+            putblk(bp, seg, i * 512);
+            brelse(bp);
+        }
+        if (bad) {
+            pr("ovl: page %d is short\n", n);
+            continue;
+        }
+        /*
+         * ovlattach maps the page into the frame before it reads the
+         * header, so afterwards OVLBASE is this module's header whether
+         * the driver's init accepted it or refused.
+         */
+        ra = ovlattach(seg);
+        if (ra)
+            pr("ovl: %d not placed\n", maj);
+        else {
+            oh = (struct ovlhdr *) OVLBASE;
+            pr("placed %s at seg %d\n", devname[oh->major], seg);
+        }
+    }
+    irelse(ip);
 }
 
 /*

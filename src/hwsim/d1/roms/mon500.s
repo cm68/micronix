@@ -443,6 +443,8 @@ tstsw:	ld	a,(switch)		;get contents of switch
 	jp	z,nuboot		; - boot DMA controller
 	cp	10h			;If switches 4 is off, others on
 	jr	z,djdma			; - boot the DJ-DMA floppy device
+	cp	18h			;If switches 4 and 5 are off
+	jp	z,ncrboot		; - boot the NCR SCSI device
 
 check:	ld	a,(switch)		;test monitor switch
 	bit  	2,a
@@ -1000,6 +1002,138 @@ rdtbl:	db	0			;no seek
 
 endrd 	equ	$
 
+
+;****************************************************************
+;*								*
+;* NCR 5380 SCSI boot program for Decision 1 EPROM.		*
+;*								*
+;* For a machine fitted with the NCR 5380 SCSI host adapter, an	*
+;* eight-register chip at 40h, in place of the Morrow HDCA.  A	*
+;* disk is a SCSI target addressed by LBA, like the IDE board,	*
+;* and sector 0 is read with a READ(10) into 100h as the		*
+;* first-level bootstrap - the nuboot convention - and entered	*
+;* as task 1 at 100h.						*
+;*								*
+;* The card is driven by hand: no DMA and no arbitration, one	*
+;* initiator.  A byte is one REQ/ACK round trip - wait for REQ,	*
+;* move the byte, pulse ACK, wait for REQ to drop - and the two	*
+;* halves are ncrout (the command) and ncrin (the data).		*
+;*								*
+;****************************************************************
+
+; the card's ports, and the bits the two sides drive
+scsidat	equ	40h		;data register (CSD), read and write
+scsiicr	equ	41h		;initiator command: RST ACK BSY SEL DATA
+scsimr	equ	42h		;mode: MONBSY
+scsistat equ	44h		;current bus status: BSY REQ
+icr_rst	equ	80h
+icr_ack	equ	10h
+icr_bsy	equ	08h
+icr_sel	equ	04h
+icr_data equ	01h
+scsi_bsy equ	40h
+scsi_req equ	20h
+scsi_mon equ	04h
+
+ncrboot:
+	ld	a,icr_rst		;reset the bus
+	out	(scsiicr),a
+	xor	a
+	out	(scsiicr),a
+	ld	a,scsi_mon
+	out	(scsimr),a
+
+	ld	a,81h			;host id 7 and target 0 on the data lines
+	out	(scsidat),a
+	ld	a,icr_data
+	out	(scsiicr),a
+	ld	a,icr_data+icr_sel
+	out	(scsiicr),a
+	ld	a,icr_data+icr_sel+icr_bsy
+	out	(scsiicr),a
+	ld	de,0			;wait for the target to answer
+ncrsel0: in	a,(scsistat)
+	and	scsi_bsy
+	jr	nz,ncrsel1
+	dec	de
+	ld	a,d
+	or	e
+	jr	nz,ncrsel0
+	jp	ncrerr
+ncrsel1: ld	a,icr_sel+icr_bsy	;the id bits come off
+	out	(scsiicr),a
+	ld	a,icr_bsy		;then SEL
+	out	(scsiicr),a
+	xor	a			;then our BSY; the target keeps its own
+	out	(scsiicr),a
+
+	ld	hl,ncrcdb		;the command: a ten-byte READ(10)
+	ld	b,10
+ncrloop: ld	a,(hl)
+	call	ncrout
+	inc	hl
+	djnz	ncrloop
+
+	xor	a			;open the window: task 0 seg 1 -> page 0
+	ld	(mapram + 2),a
+	ld	hl,01100h		;the sector lands here, 100h to task 1
+	ld	de,0200h		;512 bytes
+ncrdata: call	ncrin
+	ld	(hl),a
+	inc	hl
+	dec	de
+	ld	a,d
+	or	e
+	jr	nz,ncrdata
+
+	call	ncrin			;the status byte (ignored)
+	call	ncrin			;the message byte (ignored)
+
+	ld	de,0100h		;the bootstrap just read
+	ld	a,1			;run it as task 1
+	jp	check
+
+ncrerr:	ld	c,'S'			;S for SCSI
+	ld	b,0
+	ld	d,b
+	jp	derror
+
+; output a byte in A: wait REQ, drive, pulse ACK, wait REQ to drop
+ncrout:	ld	c,a
+ncrout0: in	a,(scsistat)
+	and	scsi_req
+	jr	z,ncrout0
+	ld	a,c
+	out	(scsidat),a
+	ld	a,icr_data
+	out	(scsiicr),a
+	ld	a,icr_data+icr_ack
+	out	(scsiicr),a
+	ld	a,icr_data
+	out	(scsiicr),a
+ncrout1: in	a,(scsistat)
+	and	scsi_req
+	jr	nz,ncrout1
+	ret
+
+; input a byte into A: wait REQ, read, pulse ACK, wait REQ to drop
+ncrin:	in	a,(scsistat)
+	and	scsi_req
+	jr	z,ncrin
+	in	a,(scsidat)
+	ld	c,a
+	ld	a,icr_ack
+	out	(scsiicr),a
+	xor	a
+	out	(scsiicr),a
+ncrin1:	in	a,(scsistat)
+	and	scsi_req
+	jr	nz,ncrin1
+	ld	a,c
+	ret
+
+; the READ(10) command block: opcode, then a zero LBA, one block
+ncrcdb:	db	28h,0,0,0,0,0,0,1,0,0
 
 ;* The on-board diagnostics are gone, and their dispatch table with them.
 ecode0  equ	$			;End of reset prom code

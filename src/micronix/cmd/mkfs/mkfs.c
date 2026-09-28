@@ -6,12 +6,31 @@
  *	mkfs device [size]
  *	mkfs device [-exclude]
  *	mkfs -i bootfile device [size|-exclude]
+ *	mkfs -b blocks device [size|-exclude]
  *
  * A numerical argument without a leading minus is the size to make the
  * filesystem, in blocks.  With a leading minus it is a count of blocks to
  * leave at the end of the device, which is how swap space is kept out of
  * the filesystem.  Given neither, the whole device is used.  The device
- * size is worked out from the drive, so it never has to be told.
+ * size is worked out from the drive: the minor number of the node names
+ * the model - the model is bits 2 and up of it - and the model's geometry
+ * is the size.
+ *
+ * -b <blocks> says the size outright instead, for the nodes that name no
+ * drive at all (dev/devlist's ide0c and scsi0c are minor 64, hd1c is 73)
+ * and for a disk whose node names one model while the disk is another.
+ *
+ * It takes a block count and not a geometry because here those are the
+ * same fact: the tables below are a list of models, each one a geometry
+ * and the capacity that geometry multiplies out to, so the capacity names
+ * the row.  A count that is no model's is refused rather than guessed at,
+ * because the boot area and the label both go where the geometry puts
+ * them, and there is nowhere to put them without one.
+ *
+ * The drivers read that geometry off the disk itself (sys/dlabel.c, and
+ * the label in the boot sector).  mkfs cannot: the label is at cylinder
+ * 0, and where cylinder 0 is is the thing the geometry is being asked
+ * for.
  *
  * This is the command driver: it works out the device and the geometry,
  * opens the raw unix device, and hands the building over to mkfsfunc.c,
@@ -86,18 +105,25 @@ void wrblk(bn, buf)
 
 void usage()
 {
-    fprintf(stderr, "usage: %s [-i bootfile] device [size|-exclude]\n", pname);
+    fprintf(stderr, "usage: %s [-i bootfile] [-b blocks] device [size|-exclude]\n",
+        pname);
     fprintf(stderr, "\tsize is in 512 byte blocks, -exclude leaves that\n");
     fprintf(stderr, "\tmany at the end of the device, say for swap\n");
     fprintf(stderr, "\t-i gives cylinder 0 to a file and writes the boot\n");
     fprintf(stderr, "\tinto it, so the free list never offers it\n");
+    fprintf(stderr, "\t-b is the size of the device, for a node whose\n");
+    fprintf(stderr, "\tminor number does not name the drive\n");
     exit(1);
 }
 
 /*
  * Which drive, from the minor number of the block special file we were
- * given.  Being told would be worse than working it out - a wrong answer
- * here puts the boot area somewhere inside the filesystem.
+ * given, or -1 if the minor names none.  Being told would be worse than
+ * working it out - a wrong answer here puts the boot area somewhere
+ * inside the filesystem - so the minor is only believed when it says
+ * something.  It says nothing on the nodes the hard disks are reached by
+ * (dev/devlist's ide0c is minor 64, and 64 is bigger than any model), and
+ * then -b has to.
  */
 int
 drivetype(device)
@@ -113,8 +139,30 @@ drivetype(device)
 
     type = (sbuf.st_addr[0] & 0377) >> 2;
     if (type >= NDRIVE)
-        die("no drive of that minor number");
-    return type;
+        return (-1);
+    return (type);
+}
+
+/*
+ * The drive with that many blocks, or -1.  The tables are a list of
+ * models and a model's capacity is its geometry multiplied out, so a
+ * number off the drive names the row the way the row names the number.
+ *
+ * A bare count is not enough to write with - the boot area goes at a
+ * block the geometry picks out, the label goes with the boot area, and
+ * nothing else in mkfs knows a geometry - so a count no model has is the
+ * caller's mistake and is reported as one.
+ */
+int
+blocksdrive(blocks)
+    UINT blocks;
+{
+    int t;
+
+    for (t = 0; t < NDRIVE; t++)
+        if (dtracks[t] * (UINT) dheads[t] * dsecs[t] == blocks)
+            return (t);
+    return (-1);
 }
 
 main(argc, argv)
@@ -124,6 +172,8 @@ main(argc, argv)
     char *device;
     char *arg;
     UINT dsize;                 /* the whole device */
+    UINT blocks;                /* -b: the whole device, told outright */
+    int bset;                   /* and whether it was told */
     UINT exclude;
     UINT given;
     UINT fsize;
@@ -139,15 +189,17 @@ main(argc, argv)
     bfile = DEFBOOT;
     exclude = 0;
     given = 0;
+    blocks = 0;
+    bset = 0;
     f = 0;
 
     /*
      * The manual says "mkfs device [size]" and m5init says
      * "mkfs -f -1024 /dev/m5a", so the shipped one takes them in either
-     * order and so does this.  Every argument is one of four things and
-     * each says which it is: -i takes the boot file, a minus and digits
-     * is an exclusion, digits alone are a size, and what is left is the
-     * device.
+     * order and so does this.  Every argument is one of five things and
+     * each says which it is: -i takes the boot file, -b the block count
+     * of the device, a minus and digits is an exclusion, digits alone are
+     * a size, and what is left is the device.
      *
      * -f is what m5init has always passed, and it now means what it
      * looks like: go ahead and destroy what is there.  Without it, a
@@ -163,6 +215,14 @@ main(argc, argv)
         } else if (arg[0] == '-') {
             if (arg[1] == 'f' && arg[2] == 0) {
                 f = 1;
+                continue;
+            }
+            if (arg[1] == 'b' && arg[2] == 0) {
+                if (argc < 1)
+                    usage();
+                argc--;
+                blocks = atoi(*argv++);
+                bset = 1;
                 continue;
             }
             if (arg[1] != 'i' || arg[2] != 0 || argc < 1)
@@ -183,6 +243,13 @@ main(argc, argv)
         die("give a size or an exclusion, not both");
 
     type = drivetype(device);
+    if (bset) {
+        type = blocksdrive(blocks);
+        if (type < 0)
+            die("no drive of that many blocks");
+    } else if (type < 0) {
+        die("no drive of that minor number");
+    }
     dsize = dtracks[type] * (UINT) dheads[type] * dsecs[type];
     printf("Device size: %d blocks\n", dsize);
 

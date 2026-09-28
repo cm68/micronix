@@ -173,6 +173,7 @@ extern int trace_bio;
  */
 #define CREAD       0x20        /* read sector(s), with retry */
 #define CWRITE      0x30        /* write sector(s), with retry */
+#define CIDENTIFY   0xec        /* identify device: geometry and capacity */
 
 #define SECLEN      512         /* a sector, and the transfer unit */
 #define NWORD       (SECLEN / 2)
@@ -345,6 +346,32 @@ ide_lba()
  * left to the caller, because raising it is what the caller does after any
  * command write and the two belong together.
  */
+/*
+ * IDENTIFY DEVICE: the 512 bytes a drive returns to describe itself.  The
+ * guest asks for the capacity, so that is what is filled in - the geometry
+ * and the LBA count - and the rest is left zero.
+ */
+static void
+ide_identify(int unit)
+{
+    unsigned long total;
+
+    total = (unsigned long)cyls[unit] * heads[unit] * spt[unit];
+    bzero(buf, SECLEN);
+    buf[0] = 0x40;              /* word 0: ATA, fixed drive */
+    buf[2] = cyls[unit];        /* word 1: cylinders */
+    buf[3] = cyls[unit] >> 8;
+    buf[6] = heads[unit];       /* word 3: heads */
+    buf[7] = heads[unit] >> 8;
+    buf[12] = spt[unit];        /* word 6: sectors per track */
+    buf[13] = spt[unit] >> 8;
+    buf[99] = 0x02;             /* word 49, bit 9: LBA supported */
+    buf[120] = total;           /* words 60-61: total LBA sectors */
+    buf[121] = total >> 8;
+    buf[122] = total >> 16;
+    buf[123] = total >> 24;
+}
+
 static void
 ide_command(byte cmd)
 {
@@ -377,6 +404,10 @@ ide_command(byte cmd)
         break;
     case CWRITE:
         writing = 1;
+        break;
+    case CIDENTIFY:
+        writing = 0;
+        ide_identify(unit);
         break;
     default:
         l("ide: unknown command 0x%x\n", cmd);

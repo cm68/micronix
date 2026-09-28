@@ -11,6 +11,7 @@
 #include <sys/buf.h>
 #include <sys/fs.h>
 #include <sys/con.h>
+#include <sys/ovl.h>
 #include <sys/signal.h>
 #include <errno.h>
 
@@ -310,6 +311,7 @@ newmap(n)
     u.p = n;                    /* fork() did not set this */
     copy(&u.p->mem, &image1, 32);
     copy(&u.p->mem, &map1, 32);
+    ovlremap();                 /* and the driver this process is inside */
     ei();
 }
 

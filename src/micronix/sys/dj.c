@@ -11,6 +11,7 @@
 #include <sys/proc.h>
 #include <errno.h>
 #include <sys/dj.h>
+#include <sys/ioctl.h>
 #include <sys/ovl.h>
 
 /*
@@ -33,6 +34,16 @@ static int djbusy(), memio(), busready(), busplease(), busthanks();
  */
 extern int segalloc();
 extern UINT8 image0[], map0[];
+/*
+ * Also from the kernel and not from a header: the raw user-memory copies
+ * and the raw window mapping.  bhold()/brel() and swin()/srel() are the
+ * same writes with a stack of their own (uio.c); the one place the driver
+ * wants the mapping without one is the command block's data phase, where
+ * the segment is only wanted for the length of a transfer and is put back
+ * before anything else can take a hold.
+ */
+extern int copyin(), copyout();
+extern bwin();
 
 /*
  * This driver's initialization, which is not in this object: it is
@@ -93,7 +104,6 @@ extern UINT8 image0[], map0[];
 #define	SINGSIDE	0
 
 #define	GETSTAT		(1 << 7)
-#define	DISCARD		0xff
 #define	TYPE		((1 << 4) | (1 << 5))
 #define	D		djcomm
 #define	IOSTAT		djcomm[8]
@@ -132,12 +142,10 @@ extern UINT8 image0[], map0[];
 #define	SETDMA		0x23    /* Set DMA address */
 #define	SETINT		0x24    /* Set interrupt */
 #define	HALT		0x25    /* Controller halt */
-#define	DJHALT		0x25    /* Controller halt */
 #define	SETCHANNEL	0x27    /* Set channel address */
 #define	SETTRACK	0x2D    /* Set max. track */
 #define	MEMREAD		0xA0    /* read controller memory */
 #define	MEMWRITE	0xA1    /* write controller memory */
-#define	DJEXEC		0xA2
 
 #define	VERSO		0200    /* other side */
 
@@ -255,7 +263,7 @@ struct dm {
 #endif
 
 static unsigned char kw = 0,   /* 1K write operation */
-*haltstat = 0, djtimer = 0, djtaken = 0;
+*haltstat = 0, djtimer = 0;
 
 unsigned char djcomm[26] = { 0 };
 
@@ -303,7 +311,7 @@ static UINT8 kseg = 0;          /* 0 = not taken; segalloc() starts at 16 */
  * inside the handler.  That is why it is called from djopen() and not
  * from where the page is used: every transfer is behind an open, so by
  * the time djint() or getstat() reaches for kseg it has been taken.
- * djmio() is the one other caller, and it runs in process context too.
+ * djioctl() is the one other caller, and it runs in process context too.
  */
 static UINT8
 kstg()
@@ -388,9 +396,6 @@ djopen(dev, mode)
     static struct specs *sp, *S;
     static struct buf *b;
 
-    if (djtaken)
-        return djbusy();
-
     /*
      * The staging page, before anything can want it.  This is the one
      * place it is taken: djopen() is process context, so segalloc()'s
@@ -422,7 +427,21 @@ djopen(dev, mode)
         return;
     }
 
-    b->dev |= DISCARD;
+    /*
+     * The status has to be read every open: it is what says a diskette
+     * was changed (the specs comparison at the end of this routine).
+     * Clear BDONE - "io done, data valid" - so the next bread() for this
+     * block issues the command again instead of handing back this copy.
+     *
+     * This used to be "b->dev |= DISCARD", with DISCARD 0xff: dev is half
+     * the buffer cache's hash key, so ORing 0xff into it moved the
+     * buffer's identity to another bucket while the buffer stayed linked
+     * in the old one.  unhash() (uio.c) finds a buffer by hashing its blk
+     * and dev, so it could never unhook this one again; the next bget()
+     * linked it into a second bucket, and the chain closed into a loop
+     * that bget()'s lookup walk spins in forever.  Nothing reads DISCARD.
+     */
+    b->flags &= ~BDONE;
     s = (struct status *)bhold(b);
 
     /*
@@ -633,12 +652,6 @@ djint()
      * at the beginning of djint, curbuf determines
      * whether this int. came from the contoller or the strat routine
      */
-
-    if (djtaken) {              /* a djexec command */
-        djack();
-        wakeup(djcomm);
-        return;
-    }
 
     di();
 
@@ -1319,23 +1332,129 @@ djtick()
     return (djgoose());
 }
 
-djmclose()
+/*
+ * A command block from above (include/sys/ioctl.h).
+ *
+ * The block is a program written in the controller's own instructions
+ * (sys/dj.h), and the driver runs it as it stands: the bytes go to
+ * djcomm, the address of the data phase is planted where the caller said
+ * it goes, and the controller is started.  Not one opcode is looked at.
+ * That is the whole of the contract, and it is what lets a formatter -
+ * which needs commands this driver has no reason to know, and a routine
+ * of its own to run them - use the same door a sector read does.
+ *
+ * The address is the caller's one hole: it knows its buffer as a virtual
+ * address and the board wants a physical one, so req.hole says where in
+ * the program the three bytes go and the driver writes them (three, not
+ * two, because the board's address is a segment and an offset).
+ *
+ * What comes back is the status byte the board leaves inside each command
+ * it runs.  The wait below is on the program's last byte, which is the
+ * last command's status, so a program has to end with a command that has
+ * one - a halt.  Every earlier command's status is in the block too, and
+ * bioctl copies the block back out to the caller when this returns.
+ *
+ * The data phase has two shapes.  A block's worth arrives in b, the
+ * pooled buffer bioctl staged it in, and the board is pointed at the
+ * window it is mapped into; bhold() returns the address with the mapping
+ * up, so the window is given back here.  More than a block arrives in
+ * nothing - bioctl takes no buffer for it and leaves the caller's buf to
+ * the driver - and is staged in the page the 1024 byte sectors already
+ * use.  One transfer is in flight at a time, so the page is free for it,
+ * but the block path caches a sector there and this writes over it, hence
+ * the cached number is dropped.
+ *
+ * The bus is taken around the transfer, busplease() to busget it back.  A program
+ * that asks to be interrupted (SETINT) will be, and djint() will find no
+ * request of its own to serve and return, which is the intent: this wait
+ * polls and does not need one.
+ */
+int
+djioctl(dev, cmd, r, b)
+    UINT dev, cmd;
+    register struct cdb *r;
+    struct buf *b;
 {
-    djtaken = 0;
-}
+    static char *p;             /* the staging, as the kernel reaches it */
+    static unsigned phys;       /* ... and as the board is told it */
+    static UINT8 save;
+    static int i, len, count, hole, flags, st;
 
-djmopen()
-{
-    static char i;
+    /*
+     * The block's own words come off the caller's structure once.  ccc
+     * puts the pointer in a register pair and reaches each member by
+     * adding its offset to a fresh copy of it, so a field read twice is
+     * a field read twice; this is a page with 313 bytes to spare and
+     * every one of them is counted (sys/ovl.h).
+     */
+    len = r->len;
+    count = r->count;
+    hole = r->hole;
+    flags = r->flags;
 
-    if (curbuf)
-        return djbusy();
+    if (len < 2 || len > sizeof djcomm || count < 0 || count > CDBDATA
+        || (hole >= 0 && hole + 3 > len)) {
+        u.error = EINVAL;
+        return (-1);
+    }
 
-    for (i = 0; i < 8; i++)
-        if (dm[i].flags & ISOPEN)
-            return djbusy();
+    if (count > 512) {
+        kstg();
+        save = image0[2 * BUFSEG];
+        bwin(kseg);
+        p = (char *) BUFWIN;
+        phys = (unsigned) kseg << 12;
+        ksec = ~0;              /* the cached sector was in this page */
 
-    djtaken = 1;
+        if ((flags & CDB_IN) == 0)
+            copyin(r->buf, p, count);
+
+    } else if (count) {
+        p = bhold(b);
+        phys = (b->xmem << 12) | ((unsigned) p & 0xfff);
+
+    } else {
+        p = 0;
+        phys = 0;
+    }
+
+    for (i = 0; i < len; i++)
+        D[i] = r->cmd[i];
+
+    if (hole >= 0) {
+        D[hole] = phys;
+        D[hole + 1] = phys >> 8;
+        D[hole + 2] = phys >> 16;
+    }
+
+    busplease();
+
+    haltstat = &D[len - 1];
+    djstart();
+    djwait(haltstat);
+
+    busthanks();
+
+    st = *haltstat;
+
+    for (i = 0; i < len; i++)
+        r->cmd[i] = D[i];
+
+    if (count > 512) {
+        if (st != NOSTAT && (flags & CDB_IN))
+            copyout(p, r->buf, count);
+
+        bwin(save);
+
+    } else if (count) {
+        brel();
+    }
+
+    if (st == NOSTAT) {         /* the controller never answered */
+        u.error = EIO;
+        return (-1);
+    }
+    return (0);
 }
 
 static
@@ -1345,145 +1464,12 @@ djbusy()
 }
 
 /*
- * djexec () - execute contoller routine 
- *
+ * The controller's own memory, moved in and out for a command the driver
+ * runs itself.  getstat() is the only caller: the character side that
+ * once reached it directly from user space is gone, and a formatter's
+ * own reach into controller memory goes through the command block like
+ * everything else (djioctl above).
  */
-
-djstty(dev, flag)
-{
-    static char *a;
-
-    busplease();
-
-    iomove(WRITE, &a, sizeof a);        /* copy in argument */
-
-    if (flag == READ) {         /* status command */
-        D[0] = STATUS;
-        D[1] = a;
-
-        /*
-         * D[2] = NOSTAT;       
-         */
-        /*
-         * D[3] = NOSTAT;       
-         */
-        /*
-         * D[4] = NOSTAT;       
-         */
-
-        /*
-         * D[5] = NOSTAT;       
-         */
-
-        D[6] = SETINT;
-        /*
-         * D[7] = NOSTAT;       
-         */
-
-        D[8] = HALT;
-        /*
-         * D[9] = NOSTAT;       
-         */
-
-        a = (char *) (D + 2);
-        haltstat = D + 9;
-    }
-
-    else {
-        D[0] = DJEXEC;
-
-        *(char **) (D + 1) = a; /* controller mem. address */
-
-        /*
-         * D[3] = NOSTAT;               
-         */
-
-        D[4] = SETINT;
-        /*
-         * D[5] = NOSTAT;               
-         */
-
-        D[6] = DJHALT;
-        /*
-         * D[7] = NOSTAT;               
-         */
-
-        a = (char *) (D + 3);
-        haltstat = D + 7;
-    }
-
-    di();
-
-    djtimer = 0;
-    djstart();
-
-    sleep(djcomm, DJPRIORITY);
-
-    busthanks();
-
-    iomove(READ, a, 4);         /* return status */
-}
-
-/*
- * write to DJ controller memory
- */
-
-djmwrite()
-{
-    djmio(WRITE);
-}
-
-/*
- * read from controller memory
- */
-
-djmread()
-{
-    djmio(READ);
-}
-
-djmio(flag)
-{
-    static char *a;
-    static unsigned b;
-    static UINT8 save;
-
-    a = u.offset;               /* djcontroller mem address */
-    b = u.count;                /* number of bytes to transfer */
-
-    /*
-     * memory address range checking
-     */
-
-    if (b > K)
-        return u.error = EINVAL;
-
-    /*
-     * The staging goes in the buffer window here and not the scratch one,
-     * because iomove reaches user space through mem.s, which borrows
-     * 0xd000 for the user's page - staging there would collide with the
-     * driver's own copy.  Nothing is held in BUFSEG at this point, and
-     * bwin() is the raw mapping with no stack of its own, so the segment
-     * in place is saved and put back by hand.
-     */
-    save = image0[2 * BUFSEG];
-    bwin(kstg());
-
-    if (flag == WRITE)
-        iomove(WRITE, (char *) BUFWIN, b);
-
-    busplease();
-
-    memio(flag, (char *) BUFWIN, a, b);
-
-    busthanks();
-
-    if (flag == READ)
-        iomove(READ, (char *) BUFWIN, b);
-
-    bwin(save);
-}
-
 static
 memio(flag, memaddr, djaddr, count)
 {
@@ -1536,12 +1522,13 @@ busthanks()
  * is where the header is and why it is not here: a module's first bytes
  * are the header's, and an object's data is placed in the order the
  * objects are named, so the header is alone in the object named first.
- * These two are ordinary objects of the driver's own, named by that
+ * This one is an ordinary object of the driver's own, named by that
  * header and by nothing else - and named, not static, because the header
- * that points at them is a different object.
+ * that points at it is a different object.  There is no char vector: the
+ * floppy is a block device and nothing else, and the header says so with
+ * a zero where the character entries would go.
  */
-struct biovec djbvec = { &djopen, &djclose, &djstrat };
-struct ciovec djcvec = { &djmopen, &djmclose, &djmread, &djmwrite, &djstty };
+struct biovec djbvec = { &djopen, &djclose, &djstrat, &djioctl };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

@@ -15,6 +15,7 @@
 #include <sys/mw.h>
 #include <sys/ovl.h>
 #include <sys/dlabel.h>
+#include <sys/ioctl.h>
 #include <errno.h>
 
 /*
@@ -616,29 +617,92 @@ error()
 }
 
 /*
+ * Bring the driver up.  Nothing here touches the controller - its reset
+ * is at open, below, where it has always been - but the driver has to be
+ * told which page the kernel put it in, and this is the only moment
+ * anything knows: ovlattach maps the page and calls this with the
+ * segment (sys/ovl.c), and 0 means the kernel already contains the driver
+ * and there is no segment to learn.
+ *
+ * reset() needs it because the controller is handed the address of cmd,
+ * and cmd is a data object in this module.  The address this driver's own
+ * code computes for cmd is the window address OVLBASE + offset, which is
+ * where cmd *appears* while the page is mapped - not where it is.  The
+ * board has no map of its own and follows a physical address, so a placed
+ * module has to convert: (page << 12) | offset.  Handed the window
+ * address instead, the controller reads whatever the kernel keeps at
+ * OVLBASE + offset - the slot page, which is another driver's code - and
+ * halts on the first byte of it that is not a command, writing no status:
+ * the interrupt mwwait() is waiting for never comes.  The field is 24
+ * bits and an unsigned is 16, so the shift has to be done in a UINT32.
+ *
+ * sys/djinit.c makes the same conversion for the same reason.  The
+ * difference is placement: dj's init is folded into the kernel's init-only
+ * region and can name nothing inside its module, so it asks for the
+ * command block through the header's data field.  This one runs from the
+ * driver's own page and names cmd directly, which is why it is here and
+ * not in a file of its own.
+ */
+static UINT mwseg = 0;          /* the page we were placed in, 0 = resident */
+
+mwinit(seg)
+    UINT seg;
+{
+    mwseg = seg;
+    return (0);
+}
+
+/*
  * Reset (initialize) the controller
  */
 reset()
 {
     extern char map0[], image0[];
     int *ichan;
+    char *cp;
+    UINT32 phys;
+
+    /*
+     * Where cmd really is.  cp is the address this driver's own code
+     * computes for the command block: the window address OVLBASE +
+     * offset, which is where cmd *appears* while this page is mapped and
+     * not where it is.  A resident driver's address is already physical
+     * and there is nothing to do; a placed module's is not, and the
+     * controller has no map of its own - it follows the address it is
+     * given.  Handed the window address it would read the page the kernel
+     * runs mapped at OVLBASE, which is the slot and holds another
+     * driver's code; it would halt on the first byte of that which is not
+     * a command and write no status, so the interrupt mwwait() waits for
+     * never comes.  The physical address is (page << 12) | offset, and
+     * since the field is 24 bits where an unsigned is 16 the shift has to
+     * be done in a UINT32.
+     *
+     * cp is a pointer variable rather than &cmd taken straight into the
+     * cast: c1 has a rule for converting a pointer to an integer, but
+     * none for a pointer-to-object, which is what &cmd is.
+     */
+    cp = (char *) &cmd;
+    if (mwseg)
+        phys = ((UINT32) mwseg << 12) | ((unsigned) cp & 0xfff);
+    else
+        phys = (unsigned) cp;
 
     ichan = 0x1050;
     di();
     map0[2] = 0;
-    ichan[0] = &cmd;
-    ichan[1] = KERNEL;
+    ichan[0] = (UINT) phys;             /* the channel command address, */
+    ichan[1] = (UINT) (phys >> 16);     /* three bytes at physical 0x50 */
     map0[2] = image0[2];
 
     /*
      * out(GRPSEL, 0 | PICMASK); /* select PIC * out(PIC1, in(PIC1) & ~VI);
-     * /* enable interrupts * 
+     * /* enable interrupts *
      */
     inton(MWINT);
     ei();
     out(RESET, 0);
-    cmd.link = &cmd;
-    cmd.xlink = KERNEL;
+    cmd.link = (UINT) phys;             /* and the chain, which the board */
+    cmd.xlink = (UINT8) (phys >> 16);   /* follows after each command */
 }
 
 /*
@@ -706,8 +770,10 @@ mwcheck()
 
 /*
  * busget() and busgive(), the bus lock this driver shares with the
- * floppy's, are in sys/bus.c: they are resident in the u page now,
- * because two modules cannot call into each other (sys/bus.c says why).
+ * floppy's, are in sys/bus.c: leaf code, resident in the u page, because
+ * two modules cannot call into each other (sys/bus.c says why).  The
+ * lock's own words are in sys/ovl.c - one bus for the machine, and the
+ * u page is one page per process.
  *
  * Bring the driver up.  Where the kernel used to name mwopen, mwclose and
  * mwstrat in its own switch table, and name mwint on interrupt line 0,
@@ -721,13 +787,214 @@ mwcheck()
  * have.
  */
 /*
+ * Format one track of the drive named by dev: the controller's FORMAT
+ * command, run once per head.  The track comes in through the block
+ * switch's fourth entry (mwioctl below), one ioctl per track, so the
+ * /bin/mwformat program driving it can show progress track by track - the
+ * work stand/formatmw does from the boot ROM (its seek and fmthead), with
+ * the loop, the drive table and the reporting moved into that program.
+ *
+ * A format blanks the track: every sector header rewritten and every data
+ * field filled with 0xe5.  Geometry is the open drive's (mws[]), and the
+ * sector size is the 512 bytes this driver reads.  That fixes the three
+ * one's-complement arguments the controller wants - the gap3, the sector
+ * count and the size code are all inverted because the 8x300 counts up to
+ * overflow rather than down to zero (hwsim/d1/hddma.c decodes them that
+ * way) - and the fill and the skew, formatmw's own defaults.
+ *
+ * The whole of it is polled, not interrupt driven: the LOAD that begins it
+ * carries INTOFF and every command finishes under mwwait().  mwstate stays
+ * STOPPED so the tick and a stray interrupt leave it alone.  The buffer b
+ * is held across the loop - its window is where the header table is built
+ * and where the controller DMAs it from, and a hold must not sleep (uio.c)
+ * - so the bus is claimed before the hold and given back after it, and a
+ * drive with transfers already queued is refused rather than left half
+ * done.
+ */
+#define FORMGAP3 43            /* gap3 for 512-byte sectors */
+#define FORMSKEW 3             /* the interleave, formatmw's default */
+#define FORMFILL 0xe5          /* data-field fill */
+
+static
+mwbusready()
+{
+    wakeup(mwbusready);
+}
+
+/*
+ * Wait for the DMA bus and take it, the floppy's own dance (sys/dj.c):
+ * busget registers this as the heir when the bus is held, and the sleep
+ * ends when busgive calls it back.
+ */
+static
+mwbusplease()
+{
+    di();
+    if (!busget(mwbusready))
+        sleep(mwbusready, PRIBIO);
+    else
+        ei();
+}
+
+/*
+ * Step to a track: the controller's NOP (HOME, here) with a step count.
+ */
+static int
+mwseek(track)
+    UINT track;
+{
+    if (mwinfo->curtrk == track)
+        return (0);
+    cmd.seksel = curdrv;
+    if (track > mwinfo->curtrk)
+        cmd.steps = track - mwinfo->curtrk;
+    else {
+        cmd.steps = mwinfo->curtrk - track;
+        cmd.seksel |= STEPOUT;
+    }
+    mwinfo->curtrk = track;
+    cmd.op = HOME;
+    mwwait();
+    return (cmd.stat == OK ? 0 : -1);
+}
+
+/*
+ * Format one head.  img holds the sector-header table the controller reads:
+ * four bytes an entry - cylinder low, high, head, sector - with the sector
+ * numbers laid down in skew order, which is what a read header hands back
+ * later.
+ */
+static int
+mwfhead(track, head, img)
+    UINT track, head;
+    char *img;
+{
+    static UINT i, j, spt;
+
+    spt = mwinfo->sectors;
+    for (i = 0; i < spt; i++)
+        img[i * 4 + 3] = spt + 1;
+    for (i = j = 0; j < spt; i = (i + FORMSKEW) % spt) {
+        while (img[i * 4 + 3] <= spt)
+            i = (i + 1) % spt;
+        img[i * 4 + 3] = j++;
+    }
+    for (i = 0; i < spt; i++) {
+        img[i * 4] = track & 0377;
+        img[i * 4 + 1] = (track >> 8) & 0377;
+        img[i * 4 + 2] = head;
+    }
+
+    cmd.seksel = curdrv;
+    cmd.steps = 0;
+    cmd.hedsel = curdrv | ((~head & 7) << 2) | HIGHCUR;
+    if (track >= mwinfo->precomp)
+        cmd.hedsel |= PRECOMP;
+    if (track >= mwinfo->lowcur)
+        cmd.hedsel &= ~HIGHCUR;
+    cmd.arg0.byte.low = ~(FORMGAP3 - 1);
+    cmd.arg0.byte.high = ~spt;
+    cmd.arg2 = ~SECSIZE;        /* the 512-byte code, inverted as FORMAT wants */
+    cmd.arg3 = FORMFILL;
+    cmd.op = FORM;
+    mwwait();
+    return (cmd.stat == OK ? 0 : -1);
+}
+
+static int
+mwformat(dev, track, b)
+    UINT dev, track;
+    struct buf *b;
+{
+    static struct info *info;
+    static UINT head;
+
+    info = &mws[dev & 3];
+    if (!(info->flags & OPEN)) {
+        u.error = ENXIO;
+        return (-1);
+    }
+    if (track >= info->tracks) {
+        u.error = ENXIO;
+        return (-1);
+    }
+    di();
+    if (mwbuf != 0) {
+        ei();
+        u.error = EBUSY;
+        return (-1);
+    }
+    ei();
+    mwbusplease();
+
+    mwstate = STOPPED;
+    curdrv = dev & 3;
+    mwinfo = info;
+
+    bhold(b);
+    cmd.dma = b->data;
+    cmd.xdma = b->xmem;
+
+    /* re-select the drive and load its constants, polled */
+    cmd.steps = 0;
+    cmd.seksel = curdrv;
+    cmd.hedsel = curdrv;
+    cmd.arg2 = SETTLE;
+    cmd.arg3 = SECSIZE;
+    cmd.arg0.byte.high = mwinfo->stpdel | INTOFF;
+    cmd.hedsel |= LCONST;
+    cmd.op = LOAD;
+    mwwait();
+    if (cmd.stat != OK)
+        goto fail;
+
+    if (mwseek(track) < 0)
+        goto fail;
+    for (head = 0; head < mwinfo->heads; head++)
+        if (mwfhead(track, head, b->data) < 0)
+            goto fail;
+
+    brel();
+    mwstop();
+    return (0);
+
+  fail:
+    brel();
+    mwstop();
+    u.error = EIO;
+    return (-1);
+}
+
+/*
+ * The block switch's fourth entry (include/sys/con.h).  The one command
+ * this driver takes is FORMAT - r->cmd[0] holds the controller's opcode -
+ * and r->cmd[1..2] the track to format, little-endian.  It is one track
+ * per call; /bin/mwformat walks the drive and shows the progress.
+ */
+int
+mwioctl(dev, cmd, r, b)
+    UINT dev, cmd;
+    struct cdb *r;
+    struct buf *b;
+{
+    UINT track;
+
+    if (r->cmd[0] != FORM) {
+        u.error = EINVAL;
+        return (-1);
+    }
+    track = (r->cmd[1] & 0377) | ((r->cmd[2] & 0377) << 8);
+    return (mwformat(dev, track, b));
+}
+
+/*
  * The entries the driver's header hands the kernel (sys/mwhdr.c).  It is
  * a different object because a module's first bytes have to be the
  * header's, and an object's data is placed in the order the objects are
  * named - so the header is alone in the object named first, and this is
  * the driver's own.
  */
-struct biovec mwbvec = { &mwopen, &mwclose, &mwstrat };
+struct biovec mwbvec = { &mwopen, &mwclose, &mwstrat, &mwioctl };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

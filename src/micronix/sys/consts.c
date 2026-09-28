@@ -19,6 +19,7 @@ extern int indir(), r_exit(), r_fork(), r_read(), r_write(), r_open(),
     r_time(), mknod(), chmod(), chown(), brake(), stat(), r_seek(),
     r_getpid(), mount(), umount(), r_setuid(), r_getuid(), r_stime(),
     unimp(), r_alarm(), r_fstat(), pause(), badcall(), r_stty(), r_gtty(),
+    r_ioctl(),
     permission(), r_nice(), r_sleep(), sync(), reboot(), r_kill(), r_csw(), r_ssw(),
     r_dup(), r_pipe(), r_signal();
 
@@ -81,7 +82,7 @@ struct syscall syssw[] = {
     0, &badcall,                /* 51 */
     0, &badcall,                /* 52 */
     0, &badcall,                /* 53 */
-    0, &badcall,                /* 54 */
+    4, &r_ioctl,                /* 54 ioctl */
     2, &reboot,                 /* 55 */
 };
 
@@ -98,7 +99,7 @@ int ncalls = sizeof(syssw) / sizeof(struct syscall);
 extern int nodev(), nulldev(), nullwrite();
 extern int muopen(), muclose(), muread(), muwrite(), mustty();
 extern int kread(), kwrite(), ioread(), iowrite();
-extern int ovlopen(), ovlclose(), ovlstrat();
+extern int ovlopen(), ovlclose(), ovlstrat(), ovlioctl();
 extern int ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcmode();
 
 /* Device names for diagnostics.  A char array keeps the strings in .data
@@ -110,7 +111,7 @@ extern int ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcmode();
  * when it initializes, so what pcon() prints for a disk major is what
  * the driver that answered for it called itself. */
 char devname[][11] = {
-    "nodev", "hdca(rev4)", "djdma", "hddma", "ide",
+    "nodev", "hdca(rev4)", "djdma", "hddma", "ide", "ncr5380",
 };
 
 /* Device 0 must be nodev.  The disk rows point at the module trampolines
@@ -119,11 +120,12 @@ char devname[][11] = {
  * Which module answers for a major is decided when that module's init()
  * registers - see sys/ovl.h. */
 struct biovec biosw[] = {
-    &nodev, &nulldev, &nulldev,         /* 0 = no device */
-    &nodev, &nodev, &nodev,             /* 1 = HDCA - removed, obsolete */
-    &ovlopen, &ovlclose, &ovlstrat,     /* 2 = DJ-DMA, a module */
-    &ovlopen, &ovlclose, &ovlstrat,     /* 3 = HD-DMA, a module */
-    &ovlopen, &ovlclose, &ovlstrat,     /* 4 = IDE (ATA), a module */
+    &nodev, &nulldev, &nulldev, 0,              /* 0 = no device */
+    &nodev, &nodev, &nodev, 0,                  /* 1 = HDCA - removed, obsolete */
+    &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 2 = DJ-DMA, a module */
+    &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 3 = HD-DMA, a module */
+    &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 4 = IDE (ATA), a module */
+    &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 5 = NCR 5380 SCSI, a module */
 };
 
 struct ciovec ciosw[] = {

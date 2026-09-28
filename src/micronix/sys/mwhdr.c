@@ -12,12 +12,17 @@
  * driver's own rather than statics inside it (sys/mw.c) - an address a
  * header names has to be visible to the object holding the header.
  *
- * There is no init: this controller needs no bring-up before it is
- * reachable, and its drive reset belongs at open, where it already is.
+ * The init is mwinit, whose whole job is to remember the segment the
+ * kernel placed the page in (sys/mw.c).  It is not the controller's
+ * bring-up - that is still the reset at open - but the driver cannot be
+ * handed the address of its own command block without it: the block is a
+ * data object in this module, the address the driver computes for it is
+ * the window address it appears at, and the board follows a physical one.
+ * Being module code, mwinit names the block itself, so nothing here
+ * reaches the driver's data and the data field stays 0.
+ *
  * The tick is mwcheck, the controller check that used to arm a timer of
- * its own and now rides the resident tick (sys/ovl.c).  Nothing here
- * reaches the driver's data, so there is no data structure to point at
- * yet.
+ * its own and now rides the resident tick (sys/ovl.c).
  *
  * name is a character list rather than the string it reads as; sys/ovl.h
  * says why, and it is the same reason this file is one struct.
@@ -32,9 +37,10 @@
 
 extern int mwopen(), mwclose(), mwstrat();
 extern int mwcheck(), mwint();
+extern int mwinit();
 extern struct biovec mwbvec;
 
-struct ovlhdr mwhdr = { 3, 0, &mwcheck, 0, &mwbvec, 0, MWINT, &mwint,
+struct ovlhdr mwhdr = { 3, &mwinit, &mwcheck, 0, &mwbvec, 0, MWINT, &mwint,
 	{ 'h', 'd', 'd', 'm', 'a' } };
 
 /*

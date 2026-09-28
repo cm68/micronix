@@ -7,7 +7,7 @@
 
 #include "far.h"
 
-BOOL cflag = NO, dflag = NO,    /* delete */
+int cflag = NO, dflag = NO,    /* delete */
     pflag = NO,                 /* print */
     rflag = NO,                 /* replace */
     tflag = NO,                 /* table */
@@ -18,14 +18,14 @@ BOOL cflag = NO, dflag = NO,    /* delete */
 	complete[512] = { 0 }, 
 	gmap[MAXGROUP] = { 0 };
 
-TEXT **files = NULL, 
+char **files = NULL, 
 	*device = NULL;
 
-TINY fd = -1;
+int fd = -1;
 
-COUNT errno;                    /* external UNIX error number */
+extern int errno;             /* the library's, libu's errno.s */
 
-UCOUNT nfiles, userno;
+UINT nfiles, userno, drive;
 
 struct fcb thedir[MAXGDIR * GENT] = { 0 };
 
@@ -82,11 +82,11 @@ struct disk disk[] = {
 };
 
 init(ac, av)
-    FAST COUNT ac;
-    FAST TEXT **av;
+    int ac;
+    char **av;
 {
-    INTERN TEXT buf[32];
-    INTERN *arg, sum;
+    static char buf[32];
+    static int *arg, sum;
 
     if (ac == 1)
         inter();                /* interactive questioning */
@@ -121,8 +121,9 @@ init(ac, av)
      * if the device name was given as simple file name
      * see if prepending /dev/ will make things better
      */
-    if (!fexists(device) && !element('/', device) && lenstr(device) < 16) {
-        cpystr(buf, "/dev/", device, NULL);
+    if (!fexists(device) && !strchr(device, '/') && strlen(device) < 16) {
+        strcpy(buf, "/dev/");
+        strcat(buf, device);
         device = buf;
     }
 }
@@ -132,9 +133,7 @@ init(ac, av)
  */
 arglist()
 {
-    extern char **files;
-    extern unsigned nfiles;
-    static f;
+    static int f;
     static struct stat s;
 
     struct dir {
@@ -154,7 +153,7 @@ arglist()
 
     fstat(f, &s);               /* measure the directory */
 
-    files = calloc(s.size1 / 16, sizeof *files);
+    files = calloc(s.st_size1 / 16, sizeof *files);
     nfiles = 0;
 
     for (;;) {
@@ -171,8 +170,8 @@ arglist()
 }
 
 main(ac, av)
-    FAST UCOUNT ac;
-    FAST TEXT **av;
+    UINT ac;
+    char **av;
 {
     init(ac, av);
     far();
@@ -182,7 +181,7 @@ main(ac, av)
 
 finish()
 {
-    INTERN UCOUNT i;
+    static UINT i;
 
     if (!rflag) {
         for (i = 0; i < nfiles; i++) {
@@ -198,9 +197,9 @@ finish()
 }
 
 doflag(a)
-    FAST TEXT *a;
+    char *a;
 {
-    INTERN sum;
+    static int sum;
 
     for (; *a; a++) {
         *a = tolower(*a);
@@ -262,20 +261,34 @@ atmost()
 }
 
 put(a)
-    FAST TEXT *a;
+    char *a;
 {
-    write(STDOUT, a, lenstr(a));
+    write(STDOUT, a, strlen(a));
+}
+
+/*
+ * the same on the error stream, which is where the Whitesmiths
+ * putstr(fd, s, NULL, ...) wrote and where the diagnostics below want
+ * to go whether or not anything is being extracted
+ */
+eput(a)
+    char *a;
+{
+    write(STDERR, a, strlen(a));
 }
 
 /*
  * read or write 1 group
+ *
+ * c is READ or WRITE, not a function: every transfer below is one ioctl,
+ * so the direction is a flag the controller's command block carries.
  */
 gio(a, b, c)
-    FAST UCOUNT a;
-    FAST TEXT *b;
-	FAST(*c) ();
+    UINT a;
+    char *b;
+	int c;
 {
-    INTERN UTINY i, ret;
+    static UINT8 i, ret;
 
     ret = YES;
 
@@ -295,14 +308,26 @@ gio(a, b, c)
 /*
  * sio - sector I/O
  *      read or write 1 sector
+ *
+ * One ioctl carries the sector, and what it carries is the controller's
+ * own program for the transfer: where the data goes, which sector to read
+ * or write, and a halt.  Nothing here seeks - a command block names a
+ * place on the diskette, not an offset into a device - and the kernel
+ * moves d->bps bytes between b and wherever the controller put them.
+ *
+ * The sector size is far's to state and is not always 512: the diskettes
+ * far reads were written by CP/M, whose sectors are 128, 256, 512 or 1024
+ * bytes, and the whole reason for the command block is that the block path
+ * cannot ask for anything but the one size a Micronix filesystem is made
+ * of.
  */
 sio(a, b, c)
-    FAST UCOUNT a;
-    FAST TEXT *b;
-	FAST(*c) ();
+    UINT a;
+    char *b;
+	int c;                      /* READ or WRITE */
 {
-    INTERN UCOUNT s, t, n;
-    INTERN ULONG o;
+    static struct cdb req;
+    static UINT s, t, n, hard, toff;
 
     a += d->offset;
 
@@ -427,30 +452,92 @@ sio(a, b, c)
             n = s * 3;
         }
     } else {
-        putstr(STDERR, "Unknown sector size\n", NULL);
+        eput("Unknown sector size\n");
         exit(NO);
     }
 
     n %= d->spt;                /* bring into the range [0, spt] */
 
-    n += t * d->spt;            /* now n is the real sector number */
+    /*
+     * t is a track number in the drive's physical order, and a
+     * double-sided diskette's is side 0 first: side 0 of every cylinder,
+     * then side 1.  So the low bit of t is the head and the rest is the
+     * cylinder - true of the eight inch disks, whose tracks far numbers
+     * that way already, and of the five inch ones, whose convolution
+     * above has just doubled t for exactly this reason.
+     */
 
-    o = n;                      /* offset in sectors */
+    /*
+     * The controller's numbering is not the medium's, and the two places
+     * they part are what the driver used to apply to a block number on its
+     * way out (sys/dj.c's sio).  It is far's to apply now, because far is
+     * the one that knows the medium:
+     *
+     *	toff	the cylinders ahead of the ones CP/M's track 0 lands on.
+     *		An eight inch diskette is a CP/M system diskette, and its
+     *		first two tracks are the system's; the controller is
+     *		told to count cylinders past them.  A five inch diskette
+     *		with soft sectors keeps its reserve in the format table
+     *		above, in d->offset, so it has none left over here - and
+     *		the hard sectored five inch formats, which are the ones
+     *		with no offset at all, do reserve two.
+     *
+     *	the sector origin.  Soft sectored media number their sectors
+     *		from one and hard sectored media from zero, which is
+     *		where the convolution above starts counting, so it is
+     *		the hard sectored formats that need no correction.
+     */
 
-    o *= d->bps;                /* o is the offset in bytes */
+    hard = (d->inches == 5 && d->offset == 0);
+    toff = (d->inches == 8 || hard) ? 2 : 0;
 
-    lseek(fd, o);               /* seek to the spot */
+    if (!hard)
+        n++;                    /* 1-origin sectors */
 
-    if ((*c) (fd, b, d->bps) == d->bps) {
+    /*
+     * The three bytes of the DMA address are the one thing far cannot
+     * write: buf is a virtual address and the controller wants a physical
+     * one, so req.hole says which bytes they are and the driver fills them
+     * in (include/sys/ioctl.h).
+     */
+
+    req.len = 11;               /* SETDMA, the transfer, HALT */
+    req.hole = 1;               /* the address is the SETDMA operand */
+
+    req.cmd[0] = SETDMA;
+    req.cmd[1] = 0;             /* the driver writes the three address */
+    req.cmd[2] = 0;             /* bytes here */
+    req.cmd[3] = 0;
+
+    req.cmd[4] = (c == READ) ? SREAD : SWRITE;
+    req.cmd[5] = ((d->sides == 2) ? t >> 1 : t) + toff;
+    req.cmd[6] = n | ((d->sides == 2 && (t & 1)) ? VERSO : 0);
+    req.cmd[7] = drive;         /* which of the board's eight drives */
+    req.cmd[8] = 0;             /* the transfer's own answer */
+
+    req.cmd[9] = HALT;
+    req.cmd[10] = 0;            /* ... and the halt's */
+
+    req.count = d->bps;         /* the caller's sector size */
+    req.flags = (c == READ) ? CDB_IN : 0;
+    req.buf = b;
+
+    /*
+     * The transfer's own answer is in the block that comes back, at the end
+     * of the SREAD or SWRITE command - which is where the controller left
+     * it, and the reason the block is handed back at all.  An ioctl that
+     * worked only says the program ran.
+     */
+
+    if (ioctl(fd, CDBCMD, &req) >= 0 && req.cmd[8] == OKSTAT)
         return YES;
-    } else {                    /* I/O didn't work */
-        perror(device);
 
-        if (c == read)
-            fill(b, d->bps, NOENT);
+    perror(device);             /* I/O didn't work */
 
-        return NO;
-    }
+    if (c == READ)
+        memset(b, NOENT, d->bps);
+
+    return NO;
 }
 
 /*

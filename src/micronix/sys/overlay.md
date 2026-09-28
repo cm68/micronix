@@ -113,6 +113,13 @@ is cut along that line first.
 
 ## Big drivers (SCSI): overlay region, not one page
 
+**Superseded for this kernel.** The SCSI driver turned out to fit one 4K page — 3241
+bytes of object, 3268 of page, as `sys/ncr.c`, major 5. So there is no group, no region
+sized to a group, and no resident/overlaid seam: the whole driver is one module in one
+page. The seam below is for a driver that does not fit a page, and nothing in this tree
+is one, so the packing question it raises does not arise either. The rest of this
+section is kept as the shape for the first driver that is.
+
 A driver larger than 4K — the SCSI driver is the motivating case — spans several
 4K chunks, and because its functions call each other those chunks form a *group*:
 swapped in and out together. So the overlay is not a single page but a **region**
@@ -135,12 +142,22 @@ means the error path runs only while the overlay is mapped.
 
 ## The interrupt path is resolved by the seam
 
-The disk drivers (`dj`, `mw`) and `multio` have interrupt entry points (`djint`,
+**Taken, and it is fallback 1 below.** The bottom ends did not have to stay resident:
+the interrupt dispatcher swaps the overlay itself. `ovlntr` (sys/ovl.c) holds two
+handlers per line, each with the segment it lives in, and calls each through `ovlcall`,
+which maps that handler's page for the call and restores the interrupted map after. So
+`djint`, `mwint`, `ideint` and `ncrint` are all module code reached from a resident
+dispatcher, and the shared state they touch is in their own module's data — no resident
+copy of it, and no pointers chased into a swapped-out overlay. The re-entrancy the
+fallback warns about is the reason `ovlcall` saves and restores the map itself.
+
+The problem as it was first read, kept because it is what the seam was for: the disk
+drivers (`dj`, `mw`) and `multio` have interrupt entry points (`djint`,
 `mwint`, `mumint`) that run asynchronously — a disk DMA completes while the
-console driver is the active overlay. The seam handles this by making the bottom
-end (the FSM) resident, so the interrupt entry is always reachable. The one thing
-to get right is that the *shared state* the FSM touches (`mwbuf`, `cmd`, `mws[]`,
-the active CDB) is resident too — otherwise a resident handler would chase
+console driver is the active overlay. Read that way, the seam resolves it by making
+the bottom end (the FSM) resident, so the interrupt entry is always reachable, and
+the thing to get right is that the *shared state* the FSM touches (`mwbuf`, `cmd`,
+`mws[]`, the active CDB) is resident too — otherwise a resident handler chases
 pointers into a swapped-out overlay.
 
 Fallbacks if a driver's bottom end can't be made resident:

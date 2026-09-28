@@ -8,22 +8,30 @@
  * no REQUEST SENSE, and the geometry comes off the disk label the same
  * way it does for every other disk here.
  *
- * sys/scsi.c
- * Changed: <2026-09-25 curt>
+ * sys/ncr.c
+ * Changed: <2026-09-26 curt>
  *
- * NOT LINKED.  This driver compiles clean but nothing builds it - the
- * resident kernel has no room for its 3241 bytes, and the link fails
- * with "objects out of address order (data)" when scsi.o is added to
- * KERNEL_C.  155 bytes short, and the buffer pool is the tighter budget
- * of the two; sys/TODO works both out and names the three ways it could
- * be made to fit, and sys/overlay.md is the one written for this.
+ * This driver is a module (sys/OVERLAY-DRIVERS.md), and that is what let
+ * it be linked at all.  As resident kernel text its 3241 bytes did not
+ * fit: the link failed with "objects out of address order (data)" 155
+ * bytes short of the frame, and the buffer pool was the tighter of the
+ * two budgets.  sys/TODO works both out and names the three ways it
+ * could have been made to fit; sys/overlay.md is the one written for
+ * this, and it is the one that was taken.  The build names it in MODS
+ * (GNUmakefile) and appends its page to the kernel file, the loader
+ * places it at boot (ovlplaceall, sys/main_init.c), and major 5
+ * (sys/consts.c) reaches it through the same ovlopen/ovlclose/ovlstrat
+ * trampolines the other three drivers do.
  *
- * Wiring it up is three lines: scsi.o in KERNEL_C (GNUmakefile), an
- * extern, a devname and a biosw row at major 5 (consts.c), and int2
- * pointing at _scsii2int instead of _ideint (intrpt.s).  A fourth is
- * dev/devlist, which has no scsi node: the target is the low three bits
- * of the minor, so scsi0..scsi7 are b 5 0..7 and scsi0c..scsi7c are the
- * whole-disk slices at b 5 64..71.
+ * The names it exports are the module's interface - ncropen, ncrclose,
+ * ncrstrat and ncrint, handed over in ncrbvec and the header
+ * (sys/ncrhdr.c) - and they are named for the card where the routines
+ * below are named for the bus.  SCSI is the protocol: the handshake, the
+ * phases and the command blocks are SCSI's on any adapter, and the four
+ * routines above are this adapter's.  The device nodes stay scsi*
+ * (dev/devlist) for the same reason - scsi0..scsi7 are b 5 0..7, the
+ * target being the low three bits of the minor, and the whole-disk
+ * slices scsi0c..scsi7c are b 5 64..71.
  *
  * The label decode is sys/dlabel.c's, shared with mw.c and ide.c, so
  * what a slice means is decided in one place - which matters more here
@@ -74,7 +82,7 @@
  *               the S-100 bus's eight interrupt lines, and the 8259 on the
  *               Mult I/O board which ranks them and hands the cpu a vector
  *               when it acknowledges one.  This card shares VI2 with the
- *               IDE card; see SCSIINT below.
+ *               IDE card; see NCRINT, include/sys/ncr.h.
  *   strategy    the entry point the buffer cache calls to start a
  *               transfer (uio.c).  mw.c's and ide.c's are the models.
  *   window      the single page of address space that bhold() maps a
@@ -105,14 +113,20 @@
  * a READ arrives after the seek.  SCSI's own answer is for the target to
  * disconnect and be reselected - and a reselect is an interrupt - but
  * that is a state machine this driver does not have, so the wait is the
- * bounded poll in scsidata() and its bound is why it is bounded.
+ * bounded poll in scsibyte() and its bound is why it is bounded.
  *
- * Sharing VI2 with the IDE card is why scsii2int() below exists rather
- * than a plain handler: the line is level triggered and the 8259 is told
- * the interrupt is over when intrupt (mio.s) returns, so both cards on
- * the line must be serviced in one entry.  Each handler reads its own
- * card's registers, which is what takes its own line down, and each
- * returns at once when its card has nothing in flight.
+ * Sharing VI2 with the IDE card no longer asks anything of this file.
+ * The line is level triggered and the 8259 is told the interrupt is over
+ * once, when intrupt (mio.s) returns, so both cards on the line have to
+ * be serviced in that one entry - and the resident dispatcher does it:
+ * ovlntr (sys/ovl.c) holds two handlers per line and calls each in turn,
+ * mapping each handler's own segment (ovlcall) because a handler runs at
+ * a moment its page is not necessarily the one mapped.  Each handler
+ * reads its own card's registers, which is what takes its own line down,
+ * and each returns at once when its card has nothing in flight.  This
+ * driver used to chain the two by hand (scsii2int); that routine is gone
+ * with the module split, since ideint is in another module now and this
+ * one cannot name it.
  *
  * The shape of the driver is ide.c's, because the filesystem is the same
  * one.  Open reads the disk label mkfs writes into the boot sector - the
@@ -136,6 +150,8 @@
 #include <sys/proc.h>
 #include <sys/con.h>
 #include <sys/dlabel.h>
+#include <sys/ioctl.h>
+#include <sys/ncr.h>
 #include <errno.h>
 
 /*
@@ -161,49 +177,25 @@ static int scsireset(), scsiselect();
 #define HOSTID  7
 
 /*
- * The interrupt line the card drives, and it is not the card's own.
- *
- * ide.c reads the S-100 jumpers out: the Mult I/O board brings in three
- * of the bus's eight vectored interrupt lines - VI0, VI1 and VI2 - and
- * the other five inputs are wired on the board itself to its own devices.
- * All three are spoken for - VI0 is mw.c's HD-DMA, VI1 is cus.c's floppy,
- * VI2 is ide.c - so this card shares.
- *
- * VI2 and not one of the others because VI2 is the one the bus leaves
- * free in the literal sense: ide.c's card is the only thing that has ever
- * driven it, and a machine with a SCSI disk has no particular reason to
- * have the MYIDE board in it as well.  Two cards on one line is what
- * scsii2int() is for, and it costs nothing when only one of them is
- * installed: the card that is not there never raises the line, and its
- * handler finds nothing in flight and returns.
- *
- * Past the jumpers the line is input 2 of the 8259, and ARMMASTER in
- * inits.s unmasks it already, so no inton() call claims it.
+ * The interrupt line, the card's ports, and the command register the
+ * presence probe reads are in include/sys/ncr.h, because the resident half
+ * of this driver needs them and resident code cannot name anything in a
+ * module: sys/ncrhdr.c carries NCRINT to the interrupt dispatcher,
+ * sys/ncrinit.c is the probe, and neither is linked into the page below.
+ * They are numbers, so they travel; the driver's own tables do not, and
+ * the probe is written to need none of them.
  */
-#define SCSIINT 2
-
-/*
- * The card's ports.  Eight consecutive Z80 I/O addresses - a number space
- * of its own, separate from memory, reached with in() and out() rather
- * than by a load or a store (inout.s) - and the register number is the
- * low three bits of the address, A0 to A2 straight into the chip.
- *
- * The range is free on this machine: 0x30-0x34 is the MYIDE board,
- * 0x48-0x4f and 0x58-0x5f the Mult I/O console, 0x50-0x53 the obsolete
- * HDCA, 0x54-0x55 the HD-DMA, 0xd0-0xd1 the simulator's own ports, and
- * 0xef the DJ-DMA.  0x40 is what a SCSI host adapter on this bus has
- * always been strapped to, and nothing else here wants it.
- */
-#define SCSIBASE    0x40        /* register 0; 0x40..0x47 are registers 0..7 */
 
 /*
  * The register set, by number.  Five of the eight mean one thing read and
  * another written, which is why they have two names each; the number is
- * the address.
+ * the address.  ICR is the one number not below - it is in <sys/ncr.h>
+ * with the probe that reads it back.
  */
 #define CSD     0               /* read: current data on the bus
                                    write: output data, what we drive */
-#define ICR     1               /* initiator command: SEL, BSY, ACK, RST... */
+/*                               ICR, 1 - the initiator command register:
+                                 SEL, BSY, ACK, RST, ATN, DATA */
 #define MR      2               /* mode */
 #define TCR     3               /* target command: unused, we are initiator */
 #define CSBS    4               /* read: current SCSI bus status
@@ -435,7 +427,7 @@ myintr(on)
 /*
  * Boards, indexed by the two type bits of the minor number the way
  * ide.c's boards[] is indexed by devtype(dev).  One card today, so the
- * field must be zero - which is what the bound check in scsiopen() is
+ * field must be zero - which is what the bound check in ncropen() is
  * for.
  */
 static struct scsiif boards[] = {
@@ -452,7 +444,7 @@ static struct scsiif boards[] = {
  *
  * The first seven fields are struct dlgeom (sys/dlabel.h), in its order
  * and of its types, because sys/dlabel.c decodes the label through a view
- * of them - scsiopen passes this struct as one.  The bookkeeping below
+ * of them - ncropen passes this struct as one.  The bookkeeping below
  * them is this driver's own; moving any of the seven breaks the decode in
  * a way the compiler will not report.
  */
@@ -665,11 +657,13 @@ scsibuild(ip, read, lba, nblk)
 /*
  * The interrupt handler, the card's half of the shared line.
  *
- * sys/intrpt.s routes VI2 here through scsii2int below, and intrupt
- * (mio.s) has already saved the machine state, taken interrupts off for
- * the duration and will write the end-of-interrupt to the 8259 when this
- * returns - so there is nothing to save here and nothing to acknowledge
- * beyond the chip itself.
+ * sys/intrpt.s routes VI2 to the resident dispatcher (ovlint2), which
+ * holds this handler's segment in its line table and calls ncrint through
+ * ovlcall with this module's page mapped - and intrupt (mio.s) has
+ * already saved the machine state, taken interrupts off for the duration
+ * and will write the end-of-interrupt to the 8259 when this returns, so
+ * there is nothing to save here and nothing to acknowledge beyond the
+ * chip itself.
  *
  * The acknowledgement is the read of RPI, and it comes first: the 5380
  * holds IRQ down until that register is read, the 8259 is level
@@ -686,7 +680,7 @@ scsibuild(ip, read, lba, nblk)
  * even been called.  So the flag is only set when a command really is in
  * flight.
  */
-scsiint()
+ncrint()
 {
     register struct scsiif *ip;
 
@@ -705,28 +699,6 @@ scsiint()
         ip->done = 1;
         wakeup(&ip->done);
     }
-}
-
-/*
- * The line's entry point.  Two cards are jumpered to VI2 - this one and
- * the IDE board - and the 8259 is told the interrupt is over once, by
- * intrupt, so both have to be serviced inside that single entry rather
- * than by two passes through intrupt.
- *
- * Order does not matter: each handler reads its own card's registers,
- * which is what takes its own line down, and each returns immediately
- * when its card has nothing in flight.  On a machine with only one of the
- * two cards installed the other handler is a read of a port nothing
- * answers, which the bus returns as 0xff - a byte with every bit set, and
- * so one that no test here reads as a condition.
- *
- * If the SCSI card is ever taken out of the machine, sys/intrpt.s's int2
- * goes back to naming _ideint directly and this routine goes with it.
- */
-scsii2int()
-{
-    ideint();
-    scsiint();
 }
 
 /*
@@ -768,7 +740,7 @@ sciwait(ip)
  *
  * Nothing is held across the sleep that waits for the card: the window
  * discipline in uio.c forbids sleeping with a buffer held, which is why
- * bhold() sits in scsistrat() and not here.
+ * bhold() sits in ncrstrat() and not here.
  */
 static int
 scsistart(ip, target, read, lba, nblk)
@@ -941,7 +913,7 @@ scsilba(blk, info)
 
     /*
      * A target opened with no label has no geometry and permits block 0
-     * and only block 0 (see scsiopen) - and block 0 is LBA 0 whatever the
+     * and only block 0 (see ncropen) - and block 0 is LBA 0 whatever the
      * geometry turns out to be, so the answer is known without one.  The
      * division below would trap.
      */
@@ -970,7 +942,7 @@ scsilba(blk, info)
  * what the label is needed for; sys/dlabel.c does the reading, off block
  * 0 of the drive's own 'c'.
  */
-scsiopen(dev, mode)
+ncropen(dev, mode)
     UINT dev, mode;
 {
     static struct info *info;
@@ -1068,7 +1040,7 @@ scsiopen(dev, mode)
  * a SCSI disk spins itself down on its own schedule, and a command that
  * has been finished has already left the bus free.
  */
-scsiclose(dev)
+ncrclose(dev)
     int dev;
 {
     scs[dev & 7].flags &= ~OPEN;
@@ -1096,7 +1068,7 @@ scsiclose(dev)
  * handler never touches it, so an interrupt taken mid-byte costs nothing
  * but the interrupt.
  */
-scsistrat(b)
+ncrstrat(b)
     register struct buf *b;
 {
     static struct info *info;
@@ -1160,6 +1132,97 @@ scsistrat(b)
 
     iodone(b);
 }
+
+/*
+ * A command block from above (include/sys/ioctl.h).
+ *
+ * The block is a SCSI CDB, and its length is the caller's: the ten bytes
+ * this driver builds for itself are one shape of CDB among several, and
+ * the six-byte commands - INQUIRY, REQUEST SENSE, MODE SENSE, TEST UNIT
+ * READY - are the ones a driver without a sense path has the most use
+ * for.  So the bytes go to the target straight from the caller's
+ * structure and never through ip->cdb, which stays the read/write path's
+ * own.  scsiio() moves them, which is to say one byte per REQ/ACK
+ * handshake, the same handshake the data phase uses; a CDB is not a
+ * special case of the bus, only a phase of it.
+ *
+ * Everything else is scsistart() and scsifinish() with the middle left to
+ * the caller: the card is taken before anything is put on the bus, the
+ * data phase - when the block has one - is the buffer bioctl() passed in,
+ * and the hold is taken after the select and released before the finish,
+ * because the window's rule is that nothing sleeps with it held (uio.c).
+ *
+ * A block with no data phase is the ordinary case here rather than the
+ * exception, and it needs nothing special: a target that has nothing to
+ * transfer goes straight to the status phase, and scsifinish() is already
+ * waiting on the bus for it rather than on the card's interrupt - so a
+ * TEST UNIT READY costs a select, six bytes and two.
+ *
+ * The sense data a CHECK CONDITION leaves behind is still not read.
+ * scsifinish() reports the command as failed and that is all; a caller
+ * that wants the reason can have it by sending REQUEST SENSE itself, as
+ * the six-byte block this call exists to make possible.
+ */
+int
+ncrioctl(dev, cmd, r, b)
+    UINT dev, cmd;
+    register struct cdb *r;
+    register struct buf *b;
+{
+    static struct info *info;
+    static struct scsiif *ip;
+    static char *p;
+
+    info = &scs[dev & 7];
+    ip = &boards[info->type];
+
+    for (;;) {
+        di();
+        if (!ip->busy)
+            break;
+        sleep(ip, PRIBIO);
+    }
+    ip->busy = 1;
+    ip->done = 0;
+    ip->error = 0;
+    ei();
+
+    if (scsiselect(ip, dev & 7) < 0 || scsiio(ip, r->cmd, r->len, 1) < 0) {
+        ip->busy = 0;
+        wakeup(ip);
+        u.error = ip->error ? ip->error : EIO;
+        return (-1);
+    }
+
+    if (r->count) {
+        p = bhold(b);
+        if (scsiio(ip, p, r->count, !(r->flags & CDB_IN)) < 0)
+            ip->error = EIO;
+        brel();
+    }
+
+    /*
+     * The status and the message are read whatever the data phase did.
+     * A target left holding the bus mid-command is worse than a failed
+     * request - it takes the next command's select with it - so the
+     * finish is not conditional on the transfer having gone well, which
+     * is ncrstrat()'s order too.
+     */
+    if (scsifinish(ip, dev & 7) < 0) {
+        u.error = ip->error ? ip->error : EIO;
+        return (-1);
+    }
+    return (0);
+}
+
+/*
+ * The entries the driver's header hands the kernel (sys/ncrhdr.c).  It is
+ * a different object because a module's first bytes have to be the
+ * header's, and an object's data is placed in the order the objects are
+ * named - so the header is alone in the object named first, and this is
+ * the driver's own.
+ */
+struct biovec ncrbvec = { &ncropen, &ncrclose, &ncrstrat, &ncrioctl };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

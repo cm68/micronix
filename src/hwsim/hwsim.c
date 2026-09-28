@@ -690,9 +690,11 @@ usage(char *complaint, char *p)
     }
     fprintf(stderr, "usage: %s [<options>] [<drive> ...]\n", p);
     fprintf(stderr, "  a drive is <controller><unit>:<file> - djdma0:boot.IMD,\n");
-    fprintf(stderr, "  hdcdma0:hddma-0, hdca1:/tmp/scratch, ide0:disk.img\n");
+    fprintf(stderr, "  hdcdma0:hddma-0, hdca1:/tmp/scratch, ide0:disk.img,\n");
+    fprintf(stderr, "  scsi3:target.img\n");
     fprintf(stderr, "  - or a bare file,\n");
-    fprintf(stderr, "  which is the next floppy.  controllers are the -B names.\n");
+    fprintf(stderr, "  which is the next floppy.  controllers are the -B names,\n");
+    fprintf(stderr, "  and scsi, which has no boot path.\n");
     fprintf(stderr, "\t-h\thelp\n");
     fprintf(stderr, "\t-b\t<boot rom file>\n");
     fprintf(stderr, "\t-B\t<djdma|hdcdma|hdca|ide> boot from this, and skip the monitor\n");
@@ -1483,12 +1485,15 @@ open_debug_gate(void)
  * A drive named on the command line: <controller><unit>:<file>, as in
  *
  *	djdma0:boot.IMD  hdcdma0:hddma-0  hdca1:/tmp/scratch  ide0:disk
+ *	scsi3:target.img
  *
  * The controller names are the ones -B takes, so the same word means
- * the same thing in both places.  A floppy goes on the list the DJ-DMA
+ * the same thing in both places - except scsi, which is a drive name
+ * here but has no entry in the boot list, there being no SCSI boot
+ * path on this machine.  A floppy goes on the list the DJ-DMA
  * reads in order; a hard unit is recorded against the file name its
- * controller will ask drive_open for, which is hddma-<n>, hdca-<n> or
- * ide-<n>.
+ * controller will ask drive_open for, which is hddma-<n>, hdca-<n>,
+ * ide-<n> or scsi-<n>.
  *
  * Returns 0 if the argument was not of this shape, so that a bare file
  * name still means what it always did.
@@ -1559,6 +1564,13 @@ drivearg(char *arg)
     }
     if (strcmp(ctl, "ide") == 0) {
         snprintf(unit, sizeof(unit), "ide-%d", n);
+        if (drive_setunit(unit, colon + 1) != 0)
+            return -1;
+        anydrive = 1;
+        return 1;
+    }
+    if (strcmp(ctl, "scsi") == 0) {
+        snprintf(unit, sizeof(unit), "scsi-%d", n);
         if (drive_setunit(unit, colon + 1) != 0)
             return -1;
         anydrive = 1;

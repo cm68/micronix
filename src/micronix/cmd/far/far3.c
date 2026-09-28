@@ -6,8 +6,8 @@
 delete()
 {
     char buf[32];
-    INTERN n;
-    INTERN struct fcb *f;
+    static int n;
+    static struct fcb *f;
 
     if (!nfiles)
         return;                 /* don't delete everything ! */
@@ -97,7 +97,9 @@ findsize()
         }
     }
 
-    putstr(STDERR, "Device size ", itoa(s), ": Unknown format\n", NULL);
+    eput("Device size ");
+    eput(itoa(s));
+    eput(": Unknown format\n");
 
     exit(NO);
 }
@@ -107,7 +109,7 @@ findsize()
  */
 replace()
 {
-    INTERN UCOUNT i;
+    static UINT i;
 
     /*
      * make sure in advance that all the named files
@@ -142,14 +144,14 @@ replace()
 }
 
 repone(a)
-    FAST TEXT *a;
+    char *a;
 {
-    INTERN BOOL found;
-    INTERN in;
-    INTERN UCOUNT ex, nex, g;   /* number of extents */
-    INTERN LONG l;
-    INTERN struct fcb *f;
-    INTERN struct stat s;
+    static int found;
+    static in;
+    static UINT ex, nex, g;   /* number of extents */
+    static INT32 l;
+    static struct fcb *f;
+    static struct stat s;
 
     in = open(a, READ);
 
@@ -163,9 +165,9 @@ repone(a)
     if (fstat(in, &s) < 0)
         perror(a), exit(NO);
 
-    l = s.size0;
+    l = s.st_size0;
     l <<= 16;
-    l |= s.size1;               /* bytes in the file */
+    l |= s.st_size1;               /* bytes in the file */
 
     l += d->bpe - 1;
     l /= d->bpe;
@@ -211,15 +213,15 @@ repone(a)
 /*
  * write one extent
  */
-BOOL
+int
 exwrite(a, b, c)
-    FAST struct fcb *a;         /* make changes in this fcb */
-    FAST b;                     /* read from this file desc. */
-    FAST TEXT *c;               /* the unix file name if you need it */
+    struct fcb *a;         /* make changes in this fcb */
+    b;                     /* read from this file desc. */
+    char *c;               /* the unix file name if you need it */
 {
-    TEXT buf[GSIZE];
-    INTERN n;
-    INTERN UCOUNT i, nrec, new, totrec;
+    char buf[GSIZE];
+    static n;
+    static UINT i, nrec, new, totrec;
 
     totrec = 0;
 
@@ -235,7 +237,7 @@ exwrite(a, b, c)
             break;              /* end of file */
 
         if (n != d->bpg)        /* partial read */
-            fill(buf + n, d->bpg - n, 26);
+            memset(buf + n, 26, d->bpg - n);
 
         /*
          * no. of records garnered this read
@@ -251,7 +253,7 @@ exwrite(a, b, c)
             return NO;
         }
 
-        gio(new, buf, write);
+        gio(new, buf, WRITE);
 
         if (d->npoint == NPOINT)        /* word-size pointers */
             a->point.word[i] = new;
@@ -277,10 +279,10 @@ exwrite(a, b, c)
 
 findfree()
 {
-    INTERN UCOUNT group, p;
-    INTERN struct fcb *f;
+    static UINT group, p;
+    static struct fcb *f;
 
-    fill(gmap, d->ngroup, NULL);        /* all unused */
+    memset(gmap, 0, d->ngroup);        /* all unused */
 
     for (f = thedir; f < &thedir[d->epd]; f++) {        /* for each dir. ent. 
                                                          */
@@ -301,7 +303,7 @@ findfree()
 
 galloc()
 {
-    INTERN UCOUNT g = 10000, n;
+    static UINT g = 10000, n;
 
     for (n = d->ngroup - d->gdir; n; n--, g++) {
         if (d->ngroup <= g)
@@ -317,16 +319,16 @@ galloc()
 }
 
 isfile(a)
-    FAST TEXT *a;
+    char *a;
 {
-    INTERN UCOUNT i;
+    static UINT i;
 
     if (!nfiles)
         return YES;
 
     for (i = 0; i < nfiles; i++) {
         if (rflag) {            /* for replacement, names must match exactly */
-            if (cmpstr(a, files[i])) {
+            if (strcmp(a, files[i])) {
                 return i;
             }
         } else {

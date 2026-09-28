@@ -133,6 +133,7 @@
 #include <sys/proc.h>
 #include <sys/con.h>
 #include <sys/dlabel.h>
+#include <sys/ioctl.h>
 #include <sys/ide.h>
 #include <sys/ovl.h>
 #include <errno.h>
@@ -175,6 +176,13 @@ static int idereset();
  */
 #define CREAD   0x20            /* read sector(s), with retry */
 #define CWRITE  0x30            /* write sector(s), with retry */
+
+/*
+ * The task file is seven registers - the seven an ATA command is written
+ * into - and a command block from above is exactly those seven bytes
+ * (include/sys/ioctl.h).
+ */
+#define IDELEN  7
 
 /*
  * What goes in the drive/head register: LBA addressing, head 0.  The
@@ -488,9 +496,6 @@ struct info
     UINT8 flags;                /* see below */
     UINT8 type;                 /* index into boards[] */
     UINT8 slice;                /* the slice this open is bound to */
-
-    UINT32 lbase;               /* what idelba adds to a block */
-    UINT32 trackblks;           /* one track-set: tracks * spc */
 } ides[NDRIVES] = 0;
 
 #define OPEN    2               /* drive is open */
@@ -764,8 +769,13 @@ idereset(ip, unit)
  * The block is cylraw * spc + csec for its unwrapped cylinder, so the
  * difference between the two is (cyl - cylraw) * spc - a constant number
  * of blocks, (cylstart + roll) * spc, less tracks * spc when the
- * rotation wraps past the end of the drive.  ideopen precomputes those
- * two as lbase and trackblks; what is left here is one add and a compare.
+ * rotation wraps past the end of the drive.  Those two are computed here,
+ * of the geometry the drive holds at this moment, rather than kept in its
+ * struct: sys/dlabel.c reads the label through this very mapping and
+ * rewrites the geometry as it does, so a copy kept across calls is one
+ * the label read itself invalidates - and the second open of a drive read
+ * its label from the block the first open's mapping named, found none
+ * there, and refused the drive.
  *
  * The compare is the wrap test itself: cyl >= tracks exactly when
  * cyl * spc + csec >= tracks * spc, because csec < spc.  The single
@@ -778,19 +788,20 @@ idelba(blk, info)
     UINT blk;
     register struct info *info;
 {
-    static UINT32 lba;
+    static UINT32 lba, trackblks;
 
     /*
      * A drive opened with no label has no geometry and permits block 0
      * and only block 0 (see ideopen).  Block 0 is LBA 0 whatever the
-     * geometry turns out to be, and the two constants are zero here, so
-     * it is answered rather than computed.
+     * geometry turns out to be, and the two terms are zero here, so it
+     * is answered rather than computed.
      */
     if (info->spc == 0)
         return (0);
-    lba = (UINT32)blk + info->lbase;
-    if (lba >= info->trackblks)
-        lba -= info->trackblks;
+    lba = (UINT32)blk + ((UINT32)info->cylstart + info->roll) * info->spc;
+    trackblks = (UINT32)info->tracks * info->spc;
+    if (lba >= trackblks)
+        lba -= trackblks;
     return (lba);
 }
 
@@ -895,27 +906,18 @@ ideopen(dev, mode)
     }
 
     /*
-     * The block-to-LBA mapping's two constants, and the whole of what the
-     * mapping costs at run time.
-     *
-     * A block's cylinder is its number divided by the sectors per
-     * cylinder, shifted by the slice it lives in and rotated by d_roll.
-     * The rotation is what keeps block 0 - the boot sector, the label,
-     * the superblock - from always landing on the disk's outermost track;
-     * the slice shift is what lets a filesystem live anywhere on a drive
-     * far larger than a block number can count.  Both terms are cylinders
-     * and both are added after the division, so all they can change is
-     * which cylinder a block lands on, and idelba() is written in terms
-     * of that: a fixed number of blocks added, and a track-set taken back
-     * when the rotation runs past the end of the drive.
+     * The slice's offset and the rotation are cylinders, added after the
+     * division that turns a block into one, so all they can change is
+     * which cylinder a block lands on: a fixed number of blocks added,
+     * and a track-set taken back when the rotation runs past the end of
+     * the drive.  idelba() applies the two; it is also where they are
+     * computed, since the geometry is sys/dlabel.c's to rewrite.
      *
      * A disk laid out as one whole-disk slice carries d_roll tracks >> 1
      * the way every disk made before slices does, and mw.c applies
      * exactly the same two; lib/fslib.c inverts the same two on the host,
      * which is what makes the three agree.
      */
-    info->lbase = ((UINT32)info->cylstart + info->roll) * info->spc;
-    info->trackblks = (UINT32)info->tracks * info->spc;
 
     if ((b = bread(1, dev)) != 0) {
         info->flags |= OPEN;
@@ -1031,13 +1033,126 @@ idestrat(b)
  * drivers need to do.
  */
 /*
+ * A command block from above (include/sys/ioctl.h).
+ *
+ * The block is ATA's own task file: seven bytes, one per register, in the
+ * order the register set is written - DRVHD, then features, sector count,
+ * the three LBA bytes, then the command.  That order is idecmd()'s and it
+ * is not the order the registers are numbered in, which is why it is
+ * spelled out as a table here rather than left implicit; nothing else in
+ * the file needs the mapping be written down, because nothing else ever
+ * issues a command this driver did not choose itself.
+ *
+ * The bytes themselves are not interpreted.  An LBA command says so in
+ * DRVHD's top bits and an IDENTIFY DEVICE says 0xec in the last byte, and
+ * the drive is the only thing with an opinion about either - so the seven
+ * bytes go out as they came in, and the driver's own commands are the
+ * special case, not this.
+ *
+ * The card is claimed as idestart() claims it: the board is taken before
+ * a register is touched, because the drive-select latch is shared by the
+ * board's two drives and a second request reaching the card early would
+ * be talking to whichever drive the latch named last.
+ *
+ * The data phase, when the block has one, is the buffer bioctl() passed
+ * in.  A command with a data phase holds the sector and interrupts for
+ * it, so the wait comes first and the window is taken after it and for
+ * the transfer only - the order idestrat() uses and the window's own rule
+ * (uio.c).  A command with no data phase (SET FEATURES, RECALIBRATE) has
+ * nothing to interrupt about, so it is polled to its end instead.
+ */
+int
+ideioctl(dev, cmd, r, b)
+    UINT dev, cmd;
+    register struct cdb *r;
+    register struct buf *b;
+{
+    static UINT8 taskfile[IDELEN] = {
+        DRVHD, ERRST, SCOUNT, LBA0, LBA1, LBA2, STAT,
+    };
+    static struct info *info;
+    static struct ideif *ip;
+    static char *p;
+    static int i, st;
+
+    if (r->len != IDELEN) {
+        u.error = EINVAL;
+        return (-1);
+    }
+    info = &ides[dev & 1];
+    ip = &boards[info->type];
+
+    for (;;) {
+        di();
+        if (!ip->busy)
+            break;
+        sleep(ip, PRIBIO);
+    }
+    ip->busy = 1;
+    ip->done = 0;
+    ei();
+
+    (*ip->sel) (dev & 1);
+
+    if ((st = idebsy(ip)) < 0 || !(st & SDRDY) || (st & SERR))
+        goto fail;
+
+    for (i = 0; i < IDELEN; i++)
+        (*ip->wr) (taskfile[i], r->cmd[i]);
+
+    if (r->count == 0) {
+        st = 0;
+        for (i = 0; i < SPIN; i++) {
+            st = (*ip->rd) (STAT);
+            if (st & (SDRDY | SERR))
+                break;
+        }
+        ip->busy = 0;
+        wakeup(ip);
+        if ((st & (SDRDY | SERR)) != SDRDY)
+            goto err;
+        return (0);
+    }
+
+    idewait(ip);
+    if (!(ip->status & SDRQ) || (ip->status & SERR))
+        goto fail;
+
+    p = bhold(b);
+    if (ip->xfer(p, r->count, r->flags & CDB_IN) < 0) {
+        brel();
+        goto fail;
+    }
+    brel();
+
+    /*
+     * The drive is free once the data is moved.  The status poll is
+     * idefinish()'s and is here for its second job as well as its first:
+     * it is the read that takes a write's completion interrupt down.
+     */
+    st = idebsy(ip);
+    ip->busy = 0;
+    wakeup(ip);
+    if (st < 0 || (st & SERR))
+        goto err;
+    return (0);
+
+  fail:
+    ip->busy = 0;
+    wakeup(ip);
+  err:
+    u.error = EIO;
+    return (-1);
+}
+
+/*
  * The entries the driver's header hands the kernel (sys/idehdr.c).  It is
  * a different object because a module's first bytes have to be the
  * header's, and an object's data is placed in the order the objects are
  * named - so the header is alone in the object named first, and this is
  * the driver's own.
  */
-struct biovec idebvec = { &ideopen, &ideclose, &idestrat };
+struct biovec idebvec = { &ideopen, &ideclose, &idestrat, &ideioctl };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

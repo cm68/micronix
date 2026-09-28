@@ -114,11 +114,14 @@ KERNEL_C  = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
 	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o rtc.o
 WIN_C     = open.o sys2.o rdwri.o memdev.o link.o access.o
-HIGHMEM   = main_init.o cus.o inits.o djinit.o
-# dj, mw and ide are not here: they are driver modules, linked at OVLBASE
-# and stamped into the slot (the module rules below).  Their header
-# objects are named on the module links and no longer in the kernel
-# either - a module's header is the module's own first bytes.
+HIGHMEM   = main_init.o cus.o inits.o djinit.o ncrinit.o
+# dj, mw, ide and ncr are not here: they are driver modules, linked at
+# OVLBASE and stamped into the slot (the module rules below).  Their
+# header objects are named on the module links and no longer in the
+# kernel either - a module's header is the module's own first bytes.
+# What IS here from a module is its init (djinit, ncrinit): it runs once,
+# from the kernel's side of the seam, and folding it into highmem.o is
+# what keeps it out of the driver's one 4K page.
 OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) $(WIN_C) $(HIGHMEM) low.o win.o $(OVLSLOT)
 TREELIBS =
 
@@ -270,8 +273,8 @@ upage.o: $(LEAF_AS) $(LEAF_C) user.o
 # reach it, so the page it occupies is the page it holds for the whole
 # boot.  Split out, the init is reclaimed instead, and the page holds
 # only what running the driver needs.
-highmem.o: main_init.o cus.o inits.o unbcd.o djinit.o
-	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o djinit.o
+highmem.o: main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o
+	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o
 
 # win.o is the window-page cluster: the part of the resident kernel that
 # can live at BUFSEG, in the very page bhold() maps buffers into, so its
@@ -385,7 +388,7 @@ unix.link: $(OBJS)
 # warning is the measure of what is left to do: it goes away when the
 # driver leaves the kernel.
 #
-MODS = dj mw ide
+MODS = dj mw ide ncr
 
 $(MODS:%=%.mod): %.mod: %hdr.o %.o unix.link
 	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ $*hdr.o $*.o

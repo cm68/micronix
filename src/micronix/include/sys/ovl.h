@@ -78,8 +78,8 @@
  * declares itself here and that is all it does.
  *
  * bvec and cvec are the entries the kernel will call through - a block
- * driver fills in bvec, a character driver cvec, one that is both (dj:
- * the floppy, and its raw character mode) fills in both.  The kernel
+ * driver fills in bvec, a character driver cvec, and a driver can be
+ * both.  The kernel
  * copies them into its own tables when the driver is placed, because a
  * function that lives in a module is only a function while that module
  * is the one mapped; a module that puts entries here and no driver
@@ -162,6 +162,8 @@ struct ovlhdr {
  * and cloned by fork.
  */
 extern struct ovlhdr *ovlmap(); /* ovlmap(major): map that module, return its header */
+extern int ovlremap();          /* ovlremap(): put this process's driver back */
 extern char *ovldata();         /* ovldata(major): the driver's data, or 0 */
+extern int ovlcall();           /* ovlcall(fn, seg): run fn with its own page mapped */
 extern int ovlattach();         /* ovlattach(seg): place a module, run its init */
 extern int ovlstart();          /* place the driver stamped into the slot */

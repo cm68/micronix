@@ -73,7 +73,7 @@
 # from.  It is also the one command whose micronix interface differs
 # from the one it was ported from - see the head of cmd/owner/owner.c.
 #
-DIRS = ar asz awk cat ccc chgrp chmod cmp cp date dcheck dd df diff du echo ed expr fd2 fgrep find form grep halt icheck init kill kstat label ld less ln ls make man mkdir mknod more mount mv ncheck nm od owner pr ps pwd rm rmdir s sed setdev sh size strings sync tar tee umount upm vi wc xargs yacc lex
+DIRS = ar asz awk cat ccc chgrp chmod cmp cp date dcheck dd df diff djformat du echo ed expr fd2 fgrep find form grep halt icheck init kill kstat label ld less ln ls make man mkdir mknod more mount mv mwformat ncheck nm od owner pr ps pwd rm rmdir s sed setdev sh size strings sync tar tee umount upm vi wc xargs yacc lex
 
 #
 # "cd $$d &&", not "cd $$d ;".  With the semicolon, a directory named

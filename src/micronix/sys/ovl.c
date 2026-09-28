@@ -16,7 +16,9 @@
 #include <sys/sys.h>
 #include <sys/buf.h>
 #include <sys/con.h>
+#include <sys/ioctl.h>
 #include <sys/ovl.h>
+#include <sys/proc.h>
 #include <errno.h>
 
 extern UINT nbdev, ncdev;
@@ -31,10 +33,42 @@ static UINT ovlseg[OVLMAJ];		/* each major's module segment, 0 = none */
 static struct ovlhdr *ovlloc[OVLMAJ];	/* a resident driver's header, in the kernel */
 static struct biovec ovlbvec[OVLMAJ];	/* entries its init() registered */
 static struct ciovec ovlcvec[OVLMAJ];
-static int (*ovlintc[NOVLINE]) ();	/* each line's handler ... */
-static UINT ovlintseg[NOVLINE];		/* ... and the module it lives in */
+#define	OVLSHARE	2		/* handlers one line can carry */
+
+/*
+ * A handler on an interrupt line, and the module it lives in.  A line
+ * carries one of these per card wired to it - VI2 has two - and they sit
+ * end to end, so the entries for line n are n*OVLSHARE through
+ * n*OVLSHARE+OVLSHARE-1.  Flat, not ovlint[line][slot]: c0 cannot parse
+ * a two-dimensional declarator at all.
+ */
+struct ovlintr {
+    int (*fn) ();
+    UINT seg;
+};
+
+static struct ovlintr ovlint[NOVLINE * OVLSHARE];
 static int (*ovltickc[OVLMAJ]) ();	/* each major's tick, 0 = none */
 static char ovltickarmed = 0;		/* the resident tick is running */
+
+/*
+ * The DMA bus lock's words (sys/bus.c): the module driving the bus, and
+ * the module waiting for it.  busget and busgive are leaf code - two
+ * driver modules call them and cannot call into each other - so they are
+ * in the u page, but what they read and write is one bus for the whole
+ * machine and so is here, for the reason the tables above are.  In the u
+ * page every process had its own copy, and a transfer's busget to its
+ * busgive is not inside one process: it spans a sleep, mw and dj both
+ * sleep holding the bus (mw's mwstop waits for the controller, dj's
+ * busplease sleeps for the heir to call).  A busgive run in another
+ * process read its own heir, found 0, and dropped the heir the first
+ * process had registered - a transfer that never started and never
+ * completed, with nothing left to notice.
+ */
+int (*busmaster) ();		/* module driving the bus, 0 = none */
+UINT busmasterseg = 0;		/* the segment busmaster lives in */
+int (*busheir) ();		/* module waiting for it, 0 = none */
+UINT busheirseg = 0;		/* the segment busheir lives in */
 
 /*
  * Call something that lives in a module: put its page in place for the
@@ -48,13 +82,27 @@ static char ovltickarmed = 0;		/* the resident tick is running */
  * The map is written the way newmap() writes it (sys/malloc.c): image0
  * is the kernel's readable copy of the map, the registers themselves
  * being write-only.
+ *
+ * Named and not static because the bus lock calls through it too
+ * (sys/bus.c): the heir it wakes is a function in another module, and
+ * giving up the bus is one more of the doors into a driver - a driver
+ * calling a driver - that the trampolines above do not cover.
+ *
+ * u.drv goes with the map register, and that is what makes a callee that
+ * sleeps in its own module safe: the heir the bus lock calls is dj's
+ * busready (sys/dj.c), which sleeps for the bus, and it is running in
+ * whatever process called busgive - whose u.drv names the caller's module
+ * and not this one.  Putting the callee's segment there is what ovlremap()
+ * finds after the switch, so the process comes back to the page it is
+ * really in.  The caller's goes back with its page, so a driver that
+ * returns from here and sleeps later in its own code is still right.
  */
-static
+int
 ovlcall(fn, seg)
     int (*fn) ();
     UINT seg;
 {
-    UINT8 save;
+    UINT8 save, drv;
 
     if (seg == 0) {
         (*fn) ();
@@ -62,8 +110,19 @@ ovlcall(fn, seg)
     }
 
     save = image0[2 * OVLSEG];
+    drv = u.drv;
+
+    /*
+     * u.drv goes before the register, and the caller's comes back
+     * before the register too.  A switch between the pair restores the
+     * page from u.drv, so the order decides which page a callee's first
+     * instruction runs in; the other order puts the page being left
+     * back under it.
+     */
+    u.drv = (UINT8) seg;
     map0[2 * OVLSEG] = image0[2 * OVLSEG] = (UINT8) seg;
     (*fn) ();
+    u.drv = drv;
     map0[2 * OVLSEG] = image0[2 * OVLSEG] = save;
     return (0);
 }
@@ -85,8 +144,41 @@ ovlmap(maj)
         return (0);
     if (ovlseg[maj] == 0)
         return (ovlloc[maj]);
+    u.drv = (UINT8) ovlseg[maj];        /* before the register - ovlcall() */
     map0[2 * OVLSEG] = image0[2 * OVLSEG] = (UINT8) ovlseg[maj];
     return ((struct ovlhdr *) OVLBASE);
+}
+
+/*
+ * Put this process's module back in the window.
+ *
+ * The window is one page for the whole system, but the driver a process
+ * is inside is the process's own business: a driver's strategy routine
+ * sleeps - ide's idestart, ncr's scsistart and dj's busplease all do,
+ * waiting on their board - and a process parked in one is switched out
+ * with its driver's page in the window, another process runs another
+ * driver, and the page is gone when the first wakes.  It would resume
+ * with another driver's bytes at OVLBASE and that driver's data under
+ * them, which is the same runaway the bus lock hit from the other
+ * direction (sys/bus.c).
+ *
+ * What makes it per-process is u.drv, the segment of the page the process
+ * is running in, which ovlmap() and ovlcall() record as they map it, each
+ * writing u.drv before the map register so that a switch taken between
+ * the two writes puts this page back and not the one being left - so the
+ * door into a module the trampolines do not cover, the bus lock's heir,
+ * is recorded too.  newmap() calls this at every switch with the u
+ * page already the incoming process's, so u.drv is that process's page
+ * and it is written back as it stands: what was recorded is the value the
+ * register wants, and there is no major to look up.  A process that is
+ * not inside a driver has nothing to put back and is left alone - the
+ * next ovlmap at a module entry is what sets the window, and leaving a
+ * stale page mapped costs nothing because no resident code reads OVLBASE.
+ */
+ovlremap()
+{
+    if (u.drv)
+        map0[2 * OVLSEG] = image0[2 * OVLSEG] = u.drv;
 }
 
 /*
@@ -109,9 +201,9 @@ ovldata(maj)
 
 /*
  * The block trampolines.  Each recovers its major from the device it was
- * handed, which every call site passes (bopen, bclose, strat in
- * sys/uio.c), and that is why three of them serve every major rather
- * than three for each.  A major with no driver behind it answers the way
+ * handed, which every call site passes (bopen, bclose, strat and bioctl
+ * in sys/uio.c), and that is why four of them serve every major rather
+ * than four for each.  A major with no driver behind it answers the way
  * the table's nodev row does, so an unloaded disk is indistinguishable
  * from one that was never there - except that a request against it
  * completes with an error rather than hanging, which is what a major
@@ -167,6 +259,31 @@ ovlstrat(b)
         return (0);
     }
     return ((*ovlbvec[maj].strat) (b));
+}
+
+/*
+ * Run a command block against a module's device (sys/uio.c's bioctl, which
+ * has already copied the request in and found the block it moves the data
+ * through).  The answer is the driver's, except for a driver that
+ * declared no command block at all: that is not a failure of the request
+ * but of the request against this device, and ENOTTY says so the way the
+ * character side's mode() has always said it.
+ */
+int
+ovlioctl(dev, cmd, r, b)
+    UINT dev, cmd;
+    struct cdb *r;
+    struct buf *b;
+{
+    UINT maj;
+
+    maj = bmajor(dev);
+    ovlmap(maj);
+    if (ovlbvec[maj].ioctl == 0) {
+        u.error = ENOTTY;
+        return (-1);
+    }
+    return ((*ovlbvec[maj].ioctl) (dev, cmd, r, b));
 }
 
 /*
@@ -257,17 +374,19 @@ ovlcmode(dev, flag)
  * has.
  */
 static
-bvecset(maj, open, close, strat)
+bvecset(maj, open, close, strat, ioctl)
     UINT maj;
     int (*open) ();
     int (*close) ();
     int (*strat) ();
+    int (*ioctl) ();
 {
     if (maj == 0 || maj >= nbdev || maj >= OVLMAJ)
         return (-1);
     ovlbvec[maj].open = open;
     ovlbvec[maj].close = close;
     ovlbvec[maj].strat = strat;
+    ovlbvec[maj].ioctl = ioctl;
     return (0);
 }
 
@@ -294,16 +413,31 @@ cvecset(maj, open, close, read, write, mode)
  * Claim an interrupt line.  The segment comes with the handler because a
  * handler's address is only an address while its module is the one
  * mapped, and the dispatcher below has to do the mapping itself.
+ *
+ * A line carries as many handlers as there are cards wired to it - VI2
+ * has two, the IDE card and the SCSI adapter - so the claim goes in the
+ * first free slot and the dispatcher below runs them all.  The cards on
+ * one line share it open-collector and each has to be asked, since
+ * reading a card's status is what clears its own request and no card can
+ * speak for another.  A full line is refused the way a bad one is; the
+ * driver then has no interrupt and says so with the -1.
  */
 static
 intrset(line, fn, seg)
     UINT line, seg;
     int (*fn) ();
 {
+    register UINT i;
+
     if (line >= NOVLINE)
         return (-1);
-    ovlintc[line] = fn;
-    ovlintseg[line] = seg;
+    for (i = 0; i < OVLSHARE; i++)
+        if (ovlint[line * OVLSHARE + i].fn == 0)
+            break;
+    if (i == OVLSHARE)
+        return (-1);
+    ovlint[line * OVLSHARE + i].fn = fn;
+    ovlint[line * OVLSHARE + i].seg = seg;
     return (0);
 }
 
@@ -335,14 +469,26 @@ nameset(maj, nm)
  * carries the segment its handler lives in, and the line - not the
  * interrupted process - decides what is mapped.  That is what lets the
  * interrupt path work with one overlay page.
+ *
+ * Every handler the line carries is called, each with its own segment
+ * mapped in turn (ovlcall).  A card's handler returns nothing useful -
+ * mio.s calls through the vector and throws the result away - and it
+ * cannot be asked to stand down for another card's sake, because the
+ * only thing that clears a card's request is that card's own status
+ * read.  So this is not a chain that stops at the first taker; it is
+ * every card on the line, in the order they were placed.
  */
 static
 ovlntr(line)
     UINT line;
 {
-    if (ovlintc[line] == 0)
-        return (0);
-    return (ovlcall(ovlintc[line], ovlintseg[line]));
+    register UINT i;
+
+    for (i = 0; i < OVLSHARE; i++)
+        if (ovlint[line * OVLSHARE + i].fn)
+            ovlcall(ovlint[line * OVLSHARE + i].fn,
+                    ovlint[line * OVLSHARE + i].seg);
+    return (0);
 }
 
 int
@@ -475,7 +621,8 @@ ovlplace(hdr, seg)
     tickset(maj, hdr->tick);
     nameset(maj, hdr->name);
     if (hdr->bvec)
-        bvecset(maj, hdr->bvec->open, hdr->bvec->close, hdr->bvec->strat);
+        bvecset(maj, hdr->bvec->open, hdr->bvec->close, hdr->bvec->strat,
+                hdr->bvec->ioctl);
     if (hdr->cvec)
         cvecset(maj, hdr->cvec->open, hdr->cvec->close, hdr->cvec->read,
                 hdr->cvec->write, hdr->cvec->mode);

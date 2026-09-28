@@ -21,7 +21,7 @@ mcheck(a, s)
         return;
 
     for (;;) {
-        static n;
+        static int n;
 
         n = read(f, &mtab, sizeof(mtab));
 
@@ -35,12 +35,13 @@ mcheck(a, s)
          * build full path name
          */
 
-        cpystr(buf, "/dev/", mtab.special, NULL);
+        strcpy(buf, "/dev/");
+        strcat(buf, mtab.special);
 
         if (stat(buf, &st) < 0)
             continue;
 
-        if (st.addr[0] != s->addr[0])
+        if (st.st_addr[0] != s->st_addr[0])
             continue;           /* different major dev no. */
 
         errno = EBUSY;
@@ -60,7 +61,7 @@ fexists(a)
 
 far()
 {
-    INTERN mode;
+    static int mode;
     struct stat s;
 
     if (dflag || rflag)
@@ -77,7 +78,7 @@ far()
      * make sure we are dealing with a block special file
      */
 
-    if ((s.flags & S_TYPE) != S_ISBLOCK) {
+    if ((s.st_mode & S_IFMT) != S_IFBLK) {
         put(device);
         put(": Not block special\n");
         exit(NO);
@@ -97,7 +98,9 @@ far()
     if (fd < 0)
         perror(device), exit(NO);
 
-    alt = !!(s.addr[0] & ALT);
+    alt = !!(s.st_addr[0] & ALT);
+
+    drive = s.st_addr[0] & 7;   /* which drive the node names */
 
     findsize();
 
@@ -131,9 +134,9 @@ far()
 
 table()
 {
-    TEXT buf[32];
-    INTERN n;
-    INTERN struct fcb *f;
+    char buf[32];
+    static int n;
+    static struct fcb *f;
 
     for (f = thedir; f < &thedir[d->epd]; f++) {
         unsigned ex;
@@ -158,9 +161,9 @@ table()
 }
 
 tableone(f)
-    FAST struct fcb *f;
+    struct fcb *f;
 {
-    TEXT buf[32];
+    char buf[32];
 
     name(f, buf);
     put(buf);
@@ -171,11 +174,11 @@ tableone(f)
  * convert a CP/M FCB to a UNIX file name
  */
 name(a, c)
-    FAST struct fcb *a;
-    FAST TEXT *c;
+    struct fcb *a;
+    char *c;
 {
-    INTERN TEXT z;
-    INTERN UTINY i;
+    static char z;
+    static UINT8 i;
 
     for (i = 0; i < 8; i++) {
         z = a->name[i];
@@ -218,30 +221,30 @@ name(a, c)
  *      act as the user would
  */
 cname(a, b)
-    FAST TEXT *a;
-    FAST struct fcb *b;
+    char *a;
+    struct fcb *b;
 {
-    FAST TEXT *per;
-    INTERN TEXT z;
-    INTERN UTINY i;
+    char *per;
+    static char z;
+    static UINT8 i;
 
     a = tail(a);
 
-    fill(b, sizeof(*b), NULL);
+    memset(b, 0, sizeof(*b));
 
     /*
      * find the last period
      */
 
-    for (per = a + lenstr(a) - 1; per >= a; per--)
+    for (per = a + strlen(a) - 1; per >= a; per--)
         if (*per == '.')
             break;
 
     if (per < a)
         per = NULL;
 
-    fill(b->name, sizeof(b->name), ' ');
-    fill(b->type, sizeof(b->type), ' ');
+    memset(b->name, ' ', sizeof(b->name));
+    memset(b->type, ' ', sizeof(b->type));
 
     for (i = 0; i < sizeof(b->name); i++) {
         if (!*a || a == per)
@@ -275,10 +278,10 @@ cname(a, b)
  */
 extract()
 {
-    TEXT buf[32];
-    INTERN n;
+    char buf[32];
+    static n;
     struct fcb *f;
-    INTERN UTINY g;
+    static UINT8 g;
 
     for (f = thedir; f < &thedir[d->epd]; f++) {
         unsigned ex;
@@ -304,12 +307,12 @@ extract()
  * extract one file
  */
 exone(a, b)
-    FAST struct fcb *a;
-    FAST TEXT *b;
+    struct fcb *a;
+    char *b;
 {
-    INTERN BOOL found;
-    INTERN out;
-    INTERN UCOUNT ex, g;
+    static int found;
+    static out;
+    static UINT ex, g;
     struct fcb *f;
 
     if (verbose)
@@ -332,7 +335,7 @@ exone(a, b)
             if (f->user != userno)
                 continue;
 
-            if (!cmpbuf(f->name, a->name, 11))
+            if (!memcmp(f->name, a->name, 11))
                 continue;
 
             if (d->epe == 1 && ex != (f->ex | (f->s2 << 5)))
@@ -364,12 +367,12 @@ exone(a, b)
 }
 
 readex(a, b, c)
-    FAST struct fcb *a;
-    FAST b;                     /* file desc. */
-    FAST TEXT *c;               /* file name */
+    struct fcb *a;
+    b;                     /* file desc. */
+    char *c;               /* file name */
 {
-    TEXT buf[GSIZE];
-    INTERN UCOUNT g, nrecs, nbytes, togo, p, rpg;
+    char buf[GSIZE];
+    static UINT g, nrecs, nbytes, togo, p, rpg;
 
     rpg = (d->bps / 128) * d->spg;      /* recs. per grp. */
     nrecs = a->rc;              /* no. of records left in this extent */
@@ -389,7 +392,7 @@ readex(a, b, c)
         if (g == 0)             /* unallocated group pointer */
             break;
 
-        gio(g, buf, read);      /* read the group */
+        gio(g, buf, READ);      /* read the group */
 
         togo = nrecs;           /* no. of records to transfer this time */
 

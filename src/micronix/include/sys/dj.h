@@ -31,7 +31,6 @@
 
 
 # define	GETSTAT		(1 << 7)
-# define	DISCARD		0xff
 # define	TYPE		((1 << 4) | (1 << 5))
 # define	D		djcomm
 # define	IOSTAT		djcomm[8]
@@ -61,26 +60,91 @@
 # define	IMAGE		((char *) (0x202))
 
 /*
- * DJDMA command codes
+ * DJDMA command codes.
+ *
+ * These are not a packet the board decodes: they are the instructions of
+ * a program the board runs.  The controller holds a channel address, and
+ * at each command it fetches the byte there, does what it says, leaves a
+ * status byte inside the command at a fixed offset, and moves on by the
+ * command's own length - until it reaches a HALT, or a BRANCH sends it
+ * somewhere else.  That is the whole of the board's control model, and it
+ * is why nothing here is a "read a sector of a Micronix filesystem"
+ * command: the caller writes a program out of these, and the driver runs
+ * it without reading a byte of it.
+ *
+ * The lengths are not in the table below and cannot be: each one is
+ * spelled out at its own define, because the caller has to lay the
+ * program out and the board has to step over it, and those two had better
+ * agree.  The status offset - always the last byte of the command - is
+ * where the controller writes the handler's answer, and it is the byte
+ * the caller has to look at.
+ *
+ * The three at the end are the way out of the instruction set: MEMREAD
+ * and MEMWRITE reach any address in the controller's own memory, which is
+ * where its per-drive tables live (0x1340, DJTAB), and DJEXEC runs a
+ * routine there.  That is how a formatter works - it writes the drive's
+ * parameter table and a routine, and runs it - and it is the reason a
+ * driver that knows only these commands can format a diskette it does not
+ * understand.
  */
 
 
-# define	SREAD		0x20
-# define	SWRITE		0x21
-# define	STATUS		0x22		/* Get drive status */
-# define	SETDMA		0x23		/* Set DMA address */
-# define	SETINT		0x24		/* Set interrupt */
-# define	HALT		0x25		/* Controller halt */
-# define	DJHALT		0x25		/* Controller halt */
-# define	SETCHANNEL	0x27		/* Set channel address */
-# define	SETTRACK	0x2D		/* Set max. track */
-# define	MEMREAD		0xA0		/* read controller memory */
-# define	MEMWRITE	0xA1		/* write controller memory */
-# define	DJEXEC		0xA2
+# define	SREAD		0x20		/* [op,cyl,sec,drv] read a sector */
+# define	SWRITE		0x21		/* [op,cyl,sec,drv] write one */
+# define	STATUS		0x22		/* [op,drv] -> dcb,slc,dsb */
+# define	SETDMA		0x23		/* [op,lo,hi,seg] where data goes */
+# define	SETINT		0x24		/* [op] raise the interrupt line */
+# define	HALT		0x25		/* [op] end of the program */
+# define	BRANCH		0x26		/* [op,lo,hi,seg] go there next */
+# define	SETCHANNEL	0x27		/* [op,lo,hi,seg] where programs start */
+# define	SETRETRY	0x28		/* [op,n] error retries */
+# define	READTRK		0x29		/* [op,cyl,hd,drv,tab] whole track */
+# define	WRITETRK	0x2A		/* [op,cyl,hd,drv,tab] whole track */
+# define	SEROUT		0x2B		/* [op,c] the serial line */
+# define	SERIN		0x2C		/* [op] ... and the other way */
+# define	SETTRACK	0x2D		/* [op,drv,n] tracks on the drive */
+# define	SETDRIVE	0x2E		/* [op,p] which drives are the 5" */
+# define	SETTIMING	0x2F		/* [op,n] step and settle */
+# define	MEMREAD		0xA0		/* [op,src,lo,hi,n,lo,hi,dst] */
+# define	MEMWRITE	0xA1		/* [op,src,lo,hi,n,lo,hi,dst] */
+# define	DJEXEC		0xA2		/* [op,lo,hi] run a routine there */
+
+/*
+ * Where the controller's own tables are, and how long a row is: eight
+ * drives, one struct dparam each (djdma.c).  A formatter writes these,
+ * and anything that wants to know a drive's geometry reads them rather
+ * than being told by the driver - the driver would only be repeating what
+ * it read here at open.
+ */
+# define	DJTAB		0x1340		/* base of the per-drive tables */
+# define	DJROWSZ		16		/* bytes to a drive's row */
 
 # define	VERSO		0200		/* other side */
 
 # define	STATRET		5
+
+/*
+ * The block a caller hands the driver through ioctl(fd, CDBCMD, &req) is
+ * a program out of the commands above, and the driver runs it as it
+ * stands.  The driver's own reads and writes are the same thing: sio()
+ * lays out a SETDMA, a SREAD or SWRITE, a SETINT and a HALT, thirteen
+ * bytes of program in djcomm, and waits for it.  A caller's is its own
+ * to write, and longer than those thirteen if it has more to say.
+ *
+ * Position is physical because the caller is the one that knows the
+ * medium.  A Micronix filesystem's sectors are numbered by the drive's
+ * table and the driver converts a block number into a track and a
+ * sector; a diskette some other system wrote is skewed and laid out in
+ * ways that table does not describe, so a caller states the track and
+ * sector it wants and the driver does not second-guess it.  The drive is
+ * stated the same way, in the command, because the descriptor names the
+ * board and the board has eight drives.
+ *
+ * The address a program's data phase lands at is the one thing the
+ * caller cannot write, since buf is a virtual address and the board
+ * wants a physical one: req.hole says where in cmd[] the three bytes for
+ * it go, and the driver fills them in (include/sys/ioctl.h).
+ */
 
 /* 
  * Status byte 1

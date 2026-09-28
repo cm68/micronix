@@ -6,6 +6,7 @@
  *	label device				dump the label
  *	label -w cylinders/heads/sectors device	set the drive geometry
  *	label -s device slice start [end]	set one slice
+ *	label -i device				ask the drive its capacity
  *
  * The label is what a disk says about itself: the geometry, where the
  * boot is, the roll, the size of the filesystem that was put on it, and a
@@ -54,8 +55,16 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <sys/dlabel.h>
+#include <sys/ioctl.h>
 
 #define BSIZE	512			/* the boot sector, and the block size */
+
+/*
+ * The block device majors (dev/devlist): 4 is the ide card and 5 the scsi
+ * adapter.  They are the two drivers with an inquiry ioctl.
+ */
+#define IDEMAJ	4
+#define NCRMAJ	5
 
 extern int errno;			/* errno.h has the numbers, not the
 					 * object - each program declares it */
@@ -64,6 +73,8 @@ char *pname = "label";
 char *devname = 0;
 int devfd = -1;
 char buf[BSIZE];
+unsigned char idbuf[512];	/* the identify block -i reads */
+unsigned char capbuf[8];	/* the read-capacity answer -i reads */
 
 /*
  * What the command line asked for.  -w is the geometry, at most once;
@@ -87,6 +98,7 @@ usage()
 	fprintf(stderr, "usage: %s device\n", pname);
 	fprintf(stderr, "       %s -w cylinders/heads/sectors device\n", pname);
 	fprintf(stderr, "       %s -s device slice start [end]\n", pname);
+	fprintf(stderr, "       %s -i device\n", pname);
 	fprintf(stderr, "  device is the whole-disk slice: hd0c, hd1c, ide0c\n");
 	exit(1);
 }
@@ -392,15 +404,88 @@ writeslice(op)
 		devname, 'a' + op->so_sl, off, op->so_len);
 }
 
+/*
+ * -i.  Ask the drive itself what it is, not the label.  The door is the
+ * block switch's ioctl (ideioctl, ncrioctl), which passes a raw command
+ * block to the drive and moves its data phase.  For the ide card the
+ * block is IDENTIFY DEVICE, which answers with the geometry and the LBA
+ * count; for the scsi adapter it is READ CAPACITY, which answers with the
+ * last LBA and the block size.  The LBA count is what a label's geometry
+ * should multiply out to.
+ */
+inquire()
+{
+	struct stat st;
+	struct cdb r;
+	unsigned long cyls, heads, spt, nblk, bsize;
+	int i;
+
+	if (fstat(devfd, (char *) &st) < 0)
+		die("cannot stat the device");
+
+	switch (st.st_addr[0] >> 8) {
+	case IDEMAJ:
+		r.cmd[0] = 0xe0;	/* DRVHD: master, LBA mode */
+		r.cmd[1] = 0;		/* features */
+		r.cmd[2] = 1;		/* sector count */
+		r.cmd[3] = 0;		/* LBA 0-7 */
+		r.cmd[4] = 0;		/* LBA 8-15 */
+		r.cmd[5] = 0;		/* LBA 16-23 */
+		r.cmd[6] = 0xec;	/* IDENTIFY DEVICE */
+		r.len = 7;
+		r.count = 512;
+		r.flags = CDB_IN;
+		r.buf = (char *) idbuf;
+		r.hole = -1;
+		if (ioctl(devfd, CDBCMD, &r) < 0)
+			die("identify device failed");
+		cyls = idbuf[2] | (idbuf[3] << 8);
+		heads = idbuf[6] | (idbuf[7] << 8);
+		spt = idbuf[12] | (idbuf[13] << 8);
+		nblk = idbuf[120] | (idbuf[121] << 8) |
+			((unsigned long) idbuf[122] << 16) |
+			((unsigned long) idbuf[123] << 24);
+		printf("%s: %lu cylinders, %lu heads, %lu sectors/track, "
+			"%lu blocks of 512 bytes\n",
+			devname, cyls, heads, spt, nblk);
+		break;
+
+	case NCRMAJ:
+		for (i = 0; i < 12; i++)
+			r.cmd[i] = 0;
+		r.cmd[0] = 0x25;	/* READ CAPACITY */
+		r.len = 10;
+		r.count = 8;
+		r.flags = CDB_IN;
+		r.buf = (char *) capbuf;
+		r.hole = -1;
+		if (ioctl(devfd, CDBCMD, &r) < 0)
+			die("read capacity failed");
+		nblk = ((unsigned long) capbuf[0] << 24) |
+			((unsigned long) capbuf[1] << 16) |
+			((unsigned long) capbuf[2] << 8) | capbuf[3];
+		nblk++;			/* the last LBA, plus one */
+		bsize = ((unsigned long) capbuf[4] << 24) |
+			((unsigned long) capbuf[5] << 16) |
+			((unsigned long) capbuf[6] << 8) | capbuf[7];
+		printf("%s: %lu blocks of %lu bytes\n", devname, nblk, bsize);
+		break;
+
+	default:
+		die("this drive has no inquiry command");
+	}
+}
+
 main(argc, argv)
 	int argc;
 	char **argv;
 {
-	int i, asked;
+	int i, asked, inq;
 	UINT sl, off, len;
 
 	pname = argv[0];
 	asked = 0;
+	inq = 0;
 
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "-w") == 0) {
@@ -436,6 +521,10 @@ main(argc, argv)
 			sets[nsets].so_off = off;
 			sets[nsets].so_len = len;
 			nsets++;
+		} else if (strcmp(argv[i], "-i") == 0) {
+			if (inq++ || ++i >= argc)
+				usage();
+			devname = argv[i];
 		} else if (argv[i][0] == '-') {
 			usage();
 		} else if (devname == 0) {
@@ -461,6 +550,15 @@ main(argc, argv)
 			fprintf(stderr, "%s: %s: drive is already open\n",
 				pname, devname);
 		exit(1);
+	}
+
+	/*
+	 * An inquiry is a read too, and the one that does not touch the label
+	 * sector at all: the drive answers from its own hardware.
+	 */
+	if (inq) {
+		inquire();
+		exit(0);
 	}
 
 	/*

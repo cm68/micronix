@@ -54,19 +54,23 @@
 ;        /call _hdint			/wn.s
 ; 	/ret
 ;
-; int2 answers the IDE card's drive, which is the only thing on the bus
-; that drives this line.  sys/ide.c's ideint() explains the choice.
+; int2 is a shared line: the IDE card's drive and an NCR 5380 host adapter
+; (sys/ncr.c) are both jumpered to VI2, and neither is the only thing on
+; the bus that drives it.  The line is level triggered and the 8259 is
+; told the interrupt is over once, when intrupt returns, so both cards
+; have to be serviced inside that one entry - which is the dispatcher's
+; business below and not this file's: ovlntr (sys/ovl.c) holds two
+; handlers per line and calls each with its own module mapped (ovlcall).
+; sys/ide.c's ideint() and sys/ncr.c's ncrint() each read their own card's
+; registers, which is what takes their own line down, and each returns at
+; once when its card has nothing in flight.  A driver that used to chain
+; the two by hand (sys/scsi.c's scsii2int) is gone with the module split.
 ;
-; sys/scsi.c is a second driver for this line - an NCR 5380 host adapter
-; sharing VI2, with scsii2int() chaining both handlers in one entry - and
-; it is written but not linked.  The resident kernel has no room for it;
-; see its entry in sys/TODO.
-;
-; The three lines that belong to a disk controller no longer name the
-; driver's handler.  mwint, djint and ideint are in modules, so the
-; kernel has no address for them at link time; each line hands intrupt a
-; dispatcher in sys/ovl.c instead, and the module that claimed the line
-; with intrset has its handler called from there.  A line nothing has
+; The lines that belong to a disk controller no longer name the driver's
+; handler.  mwint, djint, ideint and ncrint are in modules, so the kernel
+; has no address for them at link time; each line hands intrupt a
+; dispatcher in sys/ovl.c instead, and the modules that claimed the line
+; with intrset have their handlers called from there.  A line nothing has
 ; claimed returns without doing anything.  int3 through int7 are the
 ; resident ACE, parallel and clock handlers and are unchanged.
 ;

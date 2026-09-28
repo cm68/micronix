@@ -45,7 +45,7 @@ djinit(seg)
 {
     static char *p, i;
     char *d;
-    unsigned chan;
+    UINT32 chan;
 
     /*
      * The command block is in the driver's own segment, and this code is
@@ -59,10 +59,16 @@ djinit(seg)
      */
     d = ovldata(2);
 
+    /*
+     * The address is 24 bits.  An unsigned is 16, so seg << 12 drops the
+     * segment: the page is at 0x11cef and the card would be handed 0x1cef
+     * - a different place, holding no command stream, where it halts on
+     * the first unknown code without writing a status.
+     */
     if (seg == 0)
         chan = (unsigned) d;
     else
-        chan = (unsigned) ((seg << 12) | ((unsigned) d & 0xfff));
+        chan = ((UINT32) seg << 12) | ((unsigned) d & 0xfff);
 
     p = DEFCHAN + 0x1000;
 
@@ -76,9 +82,9 @@ djinit(seg)
     *p++ = NOSTAT;
 
     *p++ = SETCHANNEL;          /* set the command address */
-    *p++ = chan >> 0;
-    *p++ = chan >> 8;
-    *p++ = chan >> 16;
+    *p++ = (UINT8) (chan >> 0);
+    *p++ = (UINT8) (chan >> 8);
+    *p++ = (UINT8) (chan >> 16);
 
     for (i = 0; i < NDRIVES; i++) {
         *p++ = SETTRACK;

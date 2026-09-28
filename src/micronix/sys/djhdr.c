@@ -39,15 +39,13 @@
 #include <sys/dj.h>
 #include <sys/ovl.h>
 
-extern int djopen(), djclose(), djstrat();
-extern int djmopen(), djmclose(), djmread(), djmwrite(), djstty();
+extern int djopen(), djclose(), djstrat(), djioctl();
 extern int djinit(), djtick(), djint();
 extern unsigned char djcomm[];
 extern struct biovec djbvec;
-extern struct ciovec djcvec;
 
 struct ovlhdr djhdr = { 2, &djinit, &djtick, (char *) djcomm,
-	&djbvec, &djcvec, DJINT, &djint, { 'd', 'j', 'd', 'm', 'a' } };
+	&djbvec, 0, DJINT, &djint, { 'd', 'j', 'd', 'm', 'a' } };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

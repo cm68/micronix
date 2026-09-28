@@ -56,7 +56,7 @@ AOBJS1	= access.o alarm.o _break.o chdir.o chmod.o chown.o \
 AOBJS2	= open.o pause.o perror.o pipe.o read.o reboot.o seekraw.o \
 	setuid.o _signal.o sleep.o stat.o stime.o sbrk.o \
 	stty.o sync.o time.o umount.o unlink.o wait.o \
-	write.o fputc.o fgetc.o
+	write.o ioctl.o fputc.o fgetc.o
 
 AOBJS	= $(AOBJS1) $(AOBJS2)
 

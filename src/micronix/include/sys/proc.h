@@ -119,6 +119,19 @@ struct user {
     struct file *olist[NOPEN];  /* open files */
     struct inode *iparent;      /* temp for create, link */
     UINT8 segflg;               /* base in KERNEL or USER */
+    /*
+     * The overlay page this process is running in, as a segment, 0 for
+     * none.  The overlay window is one page for the whole system, so a
+     * process parked in a driver's strategy routine - ide's idestart,
+     * ncr's scsistart and dj's busplease all sleep there - would be
+     * switched out, another process would map another driver, and the
+     * first would wake up executing the second's bytes.  Having it here
+     * makes the window per-process: ovlmap() and ovlcall() (sys/ovl.c)
+     * record the segment as they map it, and ovlremap() puts that page
+     * back at every switch, because the u page is the incoming process's
+     * by then.
+     */
+    UINT8 drv;
     UINT32 offset;              /* for file access */
     char *base;                 /* ditto */
     UINT count;                 /* ditto */

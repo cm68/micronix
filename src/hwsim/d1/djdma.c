@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <stdio.h>
+#include <string.h>
 
 
 #ifndef NODEBUG
@@ -102,7 +103,7 @@ static struct djcmd {
     { 0x2d, 4, 3, settrk, "set track size" },
     { 0xa0, 8, 0, read_djmem, "read controller memory" },
     { 0xa1, 8, 0, write_djmem, "write controller memory" },
-    { 0xa2, 3, 0, djexec, "execute controller" }
+    { 0xa2, 4, 3, djexec, "execute controller" }
 };
 struct djcmd unknown = { 0, 0, 0, djunknown, "unknown command" };
 
@@ -181,6 +182,25 @@ static paddr dmaaddr;                   // the 24 bit dma address
 static int retrylimit = 10;
 static int djdma_running = 0;
 static char secbuf[2048];
+
+/*
+ * A routine downloaded to run on the controller's z80, and what a run of
+ * the format routine is about to do.  The board cannot run the downloaded
+ * z80, so DJEXEC emulates its effect instead: when it is asked to run the
+ * routine at DJCODE - which is where the firmware's stack is, and where
+ * FORMATDJ puts its formatter - the track the routine would have laid down
+ * is filled with FMTFILL, which is all a format does to a medium whose
+ * layout is already fixed by the image.  fmt_cyl is the track, advanced by
+ * the second routine the host runs after each format (the one that
+ * increments the formatter's track byte); fmt_drive is the drive.
+ */
+#define DJCODE   0x1030   /* where a downloaded routine runs: the firmware stack */
+#define DJCODESZ 0x310    /* room up to the drive parameter tables at 0x1340 */
+#define FMTFILL  0xe5     /* the data byte a format lays down (FORMATDJ) */
+static char djcode[DJCODESZ];
+static int fmt_cyl;             /* track the format routine will write next */
+static int fmt_drive;           /* the drive it writes */
+static int fmt_advance;         /* last exec was a format; this one advances */
 /*
  * Physical drives: 0-3 are the 8 inch port, 4-7 the 5 1/4 inch port.
  * That split is the controller's, and Micronix inherits it - djdma.4
@@ -506,6 +526,12 @@ sense()
     byte dsb;       // drive status byte
 
     drive = physdrive(physread(channel + 1));
+
+    /*
+     * The drive a format will write is the one the host is talking to;
+     * sense is the call it makes before it starts, so remember it here.
+     */
+    fmt_drive = drive;
 
     /*
      * An empty drive is not an error to ask about - software senses all
@@ -892,9 +918,25 @@ write_djmem()
     int i;
 
     source = physread(channel + 1) + (physread(channel + 2) << 8) + (physread(channel + 3) << 16);
-    count = physread(channel + 4) + physread(channel + 5); 
-    dest = physread(channel + 6) + (physread(channel + 7) << 8); 
-    
+    count = physread(channel + 4) + physread(channel + 5);
+    dest = physread(channel + 6) + (physread(channel + 7) << 8);
+
+    /*
+     * A write into the code area is a routine being downloaded - FORMATDJ's
+     * formatter, loaded at DJCODE.  Keep the bytes, and treat a download
+     * that starts at DJCODE as a fresh format: the first track it will be
+     * asked to write is 0.
+     */
+    if (dest >= DJCODE && dest + count <= DJCODE + DJCODESZ) {
+        for (i = 0; i < count; i++)
+            djcode[dest - DJCODE + i] = physread(source + i);
+        if (dest == DJCODE) {
+            fmt_cyl = 0;
+            fmt_advance = 0;
+        }
+        return S_NORMAL;
+    }
+
     if (dest < DPARAM || (dest + count - DPARAM) > sizeof(dparams)) {
 #ifndef NODEBUG
         printf("\twrite_djmem 0x%x outside of DPARAM\n", dest);
@@ -930,11 +972,54 @@ read_djmem()
 }
 
 /*
- * execute controller code
+ * Write a format's fill to one track: every sector on every side the image
+ * has.  The medium's layout is fixed, so a format can only lay down the
+ * data byte, FMTFILL, and this is that.
+ */
+static void
+fmt_track(drive, cyl)
+    int drive, cyl;
+{
+    int head, secs, secsize, firstsec, i;
+
+    if (!imdp[drive])
+        return;
+    for (head = 0; head < 2; head++) {
+        imd_trkinfo(imdp[drive], cyl, head, &secs, &secsize);
+        if (secs == 0)
+            continue;
+        firstsec = imd_firstsec(imdp[drive], cyl, head);
+        memset(secbuf, FMTFILL, secsize);
+        for (i = 0; i < secs; i++)
+            imd_write(imdp[drive], cyl, head, firstsec + i, secbuf);
+    }
+}
+
+/*
+ * Execute controller code.
+ *
+ * The board's z80 is not emulated, so a routine the host downloaded is not
+ * run byte for byte; its effect is.  The one routine a host downloads and
+ * runs is FORMATDJ's formatter, at DJCODE: it writes one track, and the
+ * host follows it by running a second, shorter routine that advances the
+ * formatter's track byte.  So an exec at DJCODE fills the track fmt_cyl
+ * names, and the exec right after it - the advance - moves fmt_cyl on.
+ * Anything else is a routine with no effect on the medium and passes as
+ * success.
  */
 static unsigned char
 djexec()
 {
+    vaddr target;
+
+    target = physread(channel + 1) + (physread(channel + 2) << 8);
+    if (target == DJCODE) {
+        fmt_track(fmt_drive, fmt_cyl);
+        fmt_advance = 1;
+    } else if (fmt_advance) {
+        fmt_cyl++;
+        fmt_advance = 0;
+    }
     return S_NORMAL;
 }
 

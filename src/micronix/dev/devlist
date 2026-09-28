@@ -38,6 +38,23 @@ b 3 11 m16d
 b 4 0 ide0
 b 4 1 ide1
 #
+# The NCR 5380 host adapter.  SCSI is a bus and not a drive, so these name
+# targets and not units: the low three bits of the minor are the target's
+# id, which is what the select mask is built from, and the type bits above
+# them are zero because this card has one board and boards[] (sys/ncr.c)
+# has one row.  Nothing here is a drive letter: a target reports its own
+# geometry when asked, and what a slice means comes from its label like
+# every other disk on this machine.
+#
+b 5 0 scsi0
+b 5 1 scsi1
+b 5 2 scsi2
+b 5 3 scsi3
+b 5 4 scsi4
+b 5 5 scsi5
+b 5 6 scsi6
+b 5 7 scsi7
+#
 # The whole-disk slice, 'c': the drive at cylinder 0 with no roll, so its
 # block 0 is physical block 0 and reading it is reading the label.  The
 # minor is the slice and the type in the high bits as everywhere else -
@@ -50,3 +67,11 @@ b 3 74 hd2c
 b 3 75 hd3c
 b 4 64 ide0c
 b 4 65 ide1c
+b 5 64 scsi0c
+b 5 65 scsi1c
+b 5 66 scsi2c
+b 5 67 scsi3c
+b 5 68 scsi4c
+b 5 69 scsi5c
+b 5 70 scsi6c
+b 5 71 scsi7c

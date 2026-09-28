@@ -58,6 +58,7 @@ src/lib/*.a
 src/hwsim/*.o
 src/hwsim/d1/*.o
 src/hwsim/d1/d1
+src/hwsim/d1/scsi-0
 
 src/micronix/lib/libc/*.o
 src/micronix/lib/libc/*.a
@@ -107,6 +108,10 @@ src/micronix/stand/boot/ideboot.com
 src/micronix/stand/boot/ideboot1.abs
 src/micronix/stand/boot/ideboot1.bin
 src/micronix/stand/boot/idebootimg-*
+src/micronix/stand/boot/ncrboot.com
+src/micronix/stand/boot/ncrboot1.abs
+src/micronix/stand/boot/ncrboot1.bin
+src/micronix/stand/boot/ncrbootimg-*
 src/micronix/stand/boot/djbootimg-*
 src/micronix/stand/boot/djload
 src/micronix/stand/boot/bootimg
@@ -119,6 +124,8 @@ src/micronix/stand/zout/
 # The working hard disk images.  A volume is named with a .vol suffix -
 # hddma-0.vol, m16a.vol, whatever an experiment is called - so one
 # pattern covers all of them however they are named.
+disks/hdinstall/hddma-0
+*.swp
 #
 # The suffix is what makes that possible.  The rule here used to be
 # "everything in disks/hdinstall is a leftover unless it is named back
@@ -240,10 +247,12 @@ src/micronix/cmd/dd/dd
 src/micronix/cmd/df/df
 src/micronix/cmd/diff/diff
 src/micronix/cmd/diff/diffh
+src/micronix/cmd/djformat/djformat
 src/micronix/cmd/du/du
 src/micronix/cmd/echo/echo
 src/micronix/cmd/ed/ed
 src/micronix/cmd/expr/expr
+src/micronix/cmd/far/far
 src/micronix/cmd/fd2/fd2
 src/micronix/cmd/fgrep/fgrep
 src/micronix/cmd/find/find
@@ -273,6 +282,7 @@ src/micronix/cmd/more/more
 src/micronix/cmd/mount/mount
 src/micronix/cmd/msh/msh
 src/micronix/cmd/mv/mv
+src/micronix/cmd/mwformat/mwformat
 src/micronix/cmd/ncheck/ncheck
 src/micronix/cmd/nm/nm
 src/micronix/cmd/nm/wsnm

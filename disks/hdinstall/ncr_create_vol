@@ -1,0 +1,144 @@
+#!/bin/sh
+#
+# Make a fresh, bootable hard disk volume for the NCR 5380 SCSI card.
+#
+#	./ncr_create_vol <volume>
+#
+# This is create_vol with the boot and the root device pointed at the
+# NCR 5380 host adapter (major 5) instead of the HD-DMA (major 3).  The
+# drive geometry and the volume layout are the same - a target on the
+# 5380 reports its own geometry, and a volume laid out for the HD-DMA
+# reads back block for block through the 5380, which is the whole
+# compatibility argument (src/hwsim/d1/ncr5380.c, sys/ncr.c).  What
+# differs is which first level is in block 0, and which device the
+# kernel mounts root from.
+#
+# <volume> is the name of the drive file to make, given without its
+# suffix: the file is made as <volume>.vol.  It is built from scratch:
+# initialize lays down the blank drive with its geometry label, mkfs -i
+# writes the filesystem and the NCR 5380 hard disk boot, and then the
+# userland is copied across - the built binaries from the filesystem
+# directory that "make install" populates, and the config (/etc, the
+# root-level scripts, /dev) straight from the src/micronix tree.  The
+# kernel is then replaced with the freshly built ccc one.
+#
+# /boot is not copied: mkfs -i has just built it for this card, and
+# copying it from elsewhere would put the wrong boot over it.  /dev is
+# recreated node by node rather than carried, because tar does not carry
+# device nodes - the list comes from the source tree's dev/devlist.
+#
+# The volume is made in this directory unless an absolute path is given,
+# and it is truncated if it already exists.
+#
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+root=`cd "$here/../.." && pwd`
+
+mnix="$root/src/tools/mnix"
+setdev="$root/src/tools/setdev"
+bootimg="$root/src/micronix/stand/boot/ncrbootimg-m16"
+devlist="$root/src/micronix/dev/devlist"
+kernel="$root/src/micronix/sys/unix"
+srcdir="$root/src/micronix"
+srctar="$srcdir/srctar.tar"
+rootfiles="$srcdir/rootfiles"
+filesystem="$root/filesystem"
+
+vol="$1"
+if [ -z "$vol" ]; then
+	echo "usage: $0 <volume>" >&2
+	exit 1
+fi
+# The suffix is added here rather than left to the caller, so that every
+# volume this directory makes is named the one way.  Given with it
+# already, the name is left alone.
+case "$vol" in
+*.vol)	;;
+*)	vol="$vol.vol" ;;
+esac
+case "$vol" in
+/*)	;;
+*)	vol="$here/$vol" ;;
+esac
+
+if [ ! -f "$devlist" ]; then
+	echo "$0: $devlist not found - nothing to populate /dev from" >&2
+	exit 1
+fi
+if [ ! -f "$bootimg" ]; then
+	echo "$0: $bootimg not found - build the boot first:" >&2
+	echo "$0:   make -C $root/src/micronix/stand INC=/usr/local/usr/include ncrbootimgs" >&2
+	exit 1
+fi
+if [ ! -f "$filesystem/etc/init" ]; then
+	echo "$0: $filesystem/etc/init not found - make install has not built init" >&2
+	exit 1
+fi
+
+tmp=`mktemp` || exit 1
+trap 'rm -f "$tmp" "$tmp.k"' 0
+
+# clear any sidecar lock file the host tools leave at "<volume>.lock"
+rm -f "$vol.lock"
+
+# 1. a blank 40 meg drive
+"$mnix" initialize m16 "$vol" || exit 1
+
+# 2. the filesystem, with the NCR 5380 hard disk boot in /boot/boot
+"$mnix" mkfs "$vol" -i "$bootimg" -f || exit 1
+
+# 3. the userland.  The built binaries come from the source tree's
+# filesystem (make install); the root-level scripts and /etc config are
+# source files and come straight from the tree.  The kernel is not
+# carried here - step 5 writes the freshly built one - and neither is
+# init, which make install built into filesystem/etc/init and which is
+# written below because it is a binary, not a source file.
+tar -C "$filesystem" -c -f "$tmp" \
+	--exclude='usr/src' --exclude='usr/man' \
+	bin lib libexec usr || exit 1
+"$mnix" -f "$vol" tar x "$tmp" || exit 1
+
+tar -C "$rootfiles" -c -f "$tmp" \
+	finstall hdinit m5init m10init m16init .sh .login || exit 1
+"$mnix" -f "$vol" tar x "$tmp" || exit 1
+
+tar -C "$srcdir" -c -f "$tmp" etc || exit 1
+"$mnix" -f "$vol" tar x "$tmp" || exit 1
+"$mnix" -f "$vol" write "$filesystem/etc/init" /etc/init || exit 1
+
+# 4. the device nodes, from the source tree's dev/devlist, and /tmp,
+# which the tar above does not carry - it archives files, not empty
+# directories.
+"$mnix" -f "$vol" mkdir /dev || exit 1
+"$mnix" -f "$vol" mkdir /tmp || exit 1
+while read type major minor name; do
+	case "$type" in
+	''|\#*)	continue ;;
+	esac
+	"$mnix" -f "$vol" mknod "/dev/$name" "$type" "$major" "$minor" || exit 1
+done < "$devlist"
+
+# 5. the freshly built kernel, over the one mkfs -i left.  The ccc kernel's
+# root device defaults to 3/0 - the HD-DMA m5 - and the NCR 5380 is major
+# 5, so point it at 5/0: major 5 is the 5380's slot in biosw[] and minor
+# 0 is target 0 on the bus (sys/ncr.c).  setdev stamps the major-5 driver
+# module into the kernel's slot as it patches the device numbers, so work
+# on a copy.
+if [ -f "$kernel" ]; then
+	cp "$kernel" "$tmp.k" || exit 1
+	"$setdev" "$tmp.k" 5/0 0/0 || exit 1
+	"$mnix" -f "$vol" write "$tmp.k" /micronix || exit 1
+	# /dev/root names the device setdev just pointed the kernel at (5/0).
+	# It used to be a link the boot script made (ln /dev/scsi0 /dev/root);
+	# make the node here so init, mkmtab and df do not depend on that
+	# script having run, and so the name and the number cannot drift.
+	"$mnix" -f "$vol" mknod /dev/root b 5 0 || exit 1
+fi
+
+# 6. the source tree, sources only, onto /usr/src.  "make tarfile"
+# stages exactly the sources - no .o or built binaries - into one tar.
+make -C "$srcdir" tarfile || exit 1
+"$mnix" -f "$vol" tar x -C /usr/src "$srctar" || exit 1
+
+echo "$0: made $vol"

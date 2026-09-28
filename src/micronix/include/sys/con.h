@@ -6,14 +6,24 @@
  */
 
 /*
- * A block io vector is a list of 3 driver addresses for one major device: an
- * open, close, and strategy routine. Biosw is an an array of such vectors
- * indexed by major device numbers.
+ * A block io vector is a list of 4 driver addresses for one major device:
+ * an open, close, and strategy routine, and the one that runs a raw
+ * command block (include/sys/ioctl.h). Biosw is an an array of such
+ * vectors indexed by major device numbers.
+ *
+ * The fourth entry is the block side's answer to the character switch's
+ * mode() below, and it is a separate entry rather than a ride on that one
+ * because a block device is not a character device: the mode() hook is
+ * reached through ciosw[] and a disk has no row there. A driver whose bus
+ * has no command block to run - the HD-DMA board is the one left -
+ * declares 0, and a call against it answers ENOTTY rather than reaching
+ * anything.
  */
 struct biovec {
     int (*open) ();
     int (*close) ();
     int (*strat) ();
+    int (*ioctl) ();
 } biosw[];
 
 /*

@@ -198,8 +198,11 @@ rather than gaining a row.
 
 --------------------
 
-sys/scsi.c is an NCR 5380 SCSI host adapter, written and compiling
-clean, and NOT LINKED.  It did not fit.  It fits now.
+sys/ncr.c is an NCR 5380 SCSI host adapter.  It did not fit the resident
+kernel, and it is not in it now either: it is the fourth overlay module
+(major 5), placed from its appended page at boot like the other three.
+It was sys/scsi.c until the module split - the file and the module are
+named for the card, the device nodes stay named for the bus (scsi*).
 
 The driver is 3241 bytes (text 3034, data 146, bss 61).  The resident
 kernel had 3086 bytes to spare, which was 155 short; dj.c's 1K staging
@@ -245,38 +248,56 @@ before this.  The link fails with "objects out of address order (data)"
 the moment _ebss+2202 crosses 0xe000.
 
 There is no page to move it to either: win.o is 3915 of 4096 and
-upage.o is 3294 + 629 of 4096.
+upage.o is 2837 + 629 of 4096.
 
-What is wired and what is not.  scsi.c is complete: ports 0x40-0x47, a
-READ(10)/WRITE(10) command path, selection, the REQ/ACK handshake, the
-label decode out of sys/dlabel.c and the slice mapping ide.c uses, and
-scsii2int() to share VI2 with the IDE card.  What is NOT in the tree is
-the three lines that put it in the kernel - scsi.o in KERNEL_C in
-GNUmakefile, an extern / devname / biosw row in consts.c (major 5), and
-int2 pointing at _scsii2int in intrpt.s.  intrpt.s carries a note saying
-where it went.  There is a fourth line for the day it does link:
-dev/devlist has no scsi node yet, and the target is the low three bits
-of the minor, so scsi0..scsi7 are b 5 0..7 and the whole-disk slices
-scsi0c..scsi7c are b 5 64..71.
+What is wired now.  sys/ncr.c is the driver; sys/ncrhdr.c is the module
+header, a separate object because an object's data is placed in the
+order the objects are named, so the header is alone in the one named
+first - major 5, init &ncrinit, bvec &ncrbvec, line 2, intr &ncrint,
+name ncr5380.  sys/ncrinit.c is the probe, and it lives in highmem.o
+with the other module inits rather than in the driver's page: a probe
+that runs once at boot does not belong in the 4K it is testing for, and
+highmem is parked past bss and reclaimed as buffer headers, so it costs
+the running kernel nothing.  GNUmakefile has ncr in MODS and ncrinit.o
+in HIGHMEM, consts.c has the sixth devname[] slot and the sixth biosw[]
+row - which is what takes nbdev to 6, ovlplace refusing a major at or
+past both nbdev and ncdev - and dev/devlist has the nodes.  The target
+is the low three bits of the minor, so scsi0..scsi7 are b 5 0..7 and the
+whole-disk slices scsi0c..scsi7c are b 5 64..71.
 
-The three ways it could be made to fit, none of them taken:
+The probe reads the initiator command register, not the mode register.
+A port with no card behind it reads 0xff, but so does CSBS: current SCSI
+bus status is active-low bus lines, and an idle bus reads all ones, so a
+bare port read cannot tell a card at rest from an empty socket.  ICR is
+the cpu's own latch - the driver writes 0 and reads back, and the six
+bits it can write (RST, ACK, BSY, SEL, ATN, DATA) come back clear on a
+card that is there and set on a port nothing answers.  The mask and the
+rest of the reasoning are in include/sys/ncr.h.
 
-  1. a build option that links scsi.o in place of another disk driver,
-     the way DEBUGBUFS is already an option.  A machine has one hard
-     disk controller.  Needs a rootdev decision in main.c too.
+scsii2int() is gone.  It chained the 5380's handler to ideint() by hand,
+which cannot survive the split - ideint is in another module and the
+kernel has no address for it at link time - so the resident fan-out
+does it instead: ovlntr (sys/ovl.c) holds two handlers per line and
+calls each through ovlcall with its own page mapped.  That fan-out is
+the one resident change the SCSI work needed, and it is what lets ide
+and ncr both live on VI2.
 
-  2. reclaim elsewhere.  The ~155 bytes this used to want are already
-     in hand - dj.c's staging buffer bought 639 - so the link is no
-     longer the obstacle; the 121 buffers are.  Nothing obvious turned
-     up in the kernel: main.c's tables (plist, ilist, flist, mlist) are
-     all live, and the drivers are all doing something.  dlabel.c is
-     what a reclaim looks like when it works - three label decodes were
-     one decode written thrice, and the copies were not free.
+Which way it went: sys/overlay.md's, the third of the three that were
+listed here.  Option 1 was never attractive - it buys the link by giving
+up a driver, and running all four is the point.  Option 2 had already
+been spent: the reclaims that closed the 155-byte link shortfall
+(dlabel.c, dj.c's staging buffer) are in the numbers above, and what is
+left is the pool, which is a budget and not a reclaim.  So the driver
+left the kernel instead, which is what the overlay was written for.
 
-  3. sys/overlay.md, which names the SCSI driver as its motivating case
-     and was written for exactly this wall.
+Verified, negative first because it is the cheap one: with no card and
+no volume the page is not placed (ovl: 5 not placed in the boot log),
+major 5 answers as nodev - ovlopen calls nodev, ovlstrat returns ENXIO
+through iodone, ovlbvec[5] never having been filled - and the pool is
+unchanged at 254 buffers.  A failed probe spends its page and nothing
+else.
 
-One thing about the driver itself is worth knowing before it is linked.
+One thing about the driver itself is worth knowing.
 A 5380 cannot interrupt on "a data byte is ready" - that is DRQ, the
 DMA pin, and there is no DMA controller here - so the byte handshake is
 polled by the cpu in the caller's context.  The interrupt covers the
@@ -284,3 +305,285 @@ bus going free (MONITOR BSY in the mode register) and parity faults,
 which is what the chip has to offer an initiator with no DMA.  Sleeping
 through the seek needs the target to disconnect and be reselected, and
 this driver has no reselect.
+
+------------------
+
+Two drivers calling each other is a door the overlay discipline had no
+answer for, and it cost a boot.
+
+sys/bus.c is the DMA bus lock mw and dj share: a driver that wants the
+bus for a transfer asks for it (busget) and gives it back (busgive), and
+one that asks while another holds it is remembered as the heir and
+called when the holder lets go.  The lock kept a bare pointer per
+caller, and a pointer into a module is an offset from OVLBASE that means
+nothing unless that module's page is the one mapped.  So: dj's djint
+held the bus; mw's strategy routine called busget(&mwstart), found the
+bus taken, and was registered as the heir; dj's busgive then did
+(*bus)() with djdma's page still in the window.  The cpu ran mw's
+offset inside djdma's page - 0x94e6, which in djdma is the middle of
+copy()'s staging block - with djdma's data under it and djdma's bss
+temporaries zeroed, and the LDIR that followed walked across the Z280's
+on-chip register file at 0x0400, wrote the switch register, and the
+emulator switched tasks mid-instruction.  The runaway sled that came out
+the other end hung the shell at sync and at umount, and on another run
+made a mount of /dev/fla report "not a file system" on an image that was
+byte-identical to one that mounted cleanly.
+
+It was found by reading the trace and not the source: -t all, then the
+two hundred instructions before the hang, where LD HL,(0xfae7) is the
+heart of busgive and 0xfae7 is bus.  The heir in next was 0x94e6, and
+nm reports _mwstart: 04ca, which with nm's -0x100 and the module base
+0x901c is 0x94e6.  mw.c:388 is busget(&mwstart) and nothing else
+registers one.
+
+The fix is the same discipline applied to the fourth door: bus.c stores
+a segment beside each pointer, captures it from image0[2 * OVLSEG] where
+the pointer is registered - which is the registrant's own segment,
+because a module registers from inside itself - and calls the heir
+through ovlcall (sys/ovl.c), which is exported for it and maps the page
+for the call and restores the interrupted map after.  All seven call
+sites (dj.c 648, 702, 812, 1522, 1531; mw.c 388, 410) are reached with
+their own module's page mapped, and that is what makes the capture
+sound.  Cost: 42 bytes, all of it in the u page - bus.o 125 -> 167,
+upage.o 2837 + 629 of 4096 as it stood then (2862 + 630 now; the
+paragraph below says what moved it).
+
+Verified: all four filesystems (root on the m16 volume, mw unit 1 on
+/dev/m16b, ide unit 0 on /dev/ide0, the floppy on /dev/fla) mounted at
+once; a file written through each; each read back through another
+driver's path; sums and cmp agreeing; sync; three umounts; and then the
+host tooling - fsck, icheck and dcheck on the three volumes and on the
+floppy with its delta merged - each clean, 0 bad.
+
+What was open here, and what closed it.  A driver that is a module and
+sleeps inside a strat could wake to another major's page, and it was not
+hypothetical: idestart() (ide.c:626), scsistart() (ncr.c:745) and
+busplease() (dj.c:1523) all sleep inside a module, waiting on a board or
+on the bus.  The four-driver test reached it, and did not need a second
+process to do it, because the bus lock is a door: busgive() (sys/bus.c)
+calls its heir through ovlcall(), and dj's heir, busready() (dj.c:1522),
+sleeps on the bus inside dj's page while running in the context of the
+process that gave the bus up, so that process is parked in a module page
+its own u.drv does not name.  The staging below is what came of it.
+
+The fix is the process's own driver, in the process's own u page.
+struct user gains drv (include/sys/proc.h), holding the segment of the
+page the process is in, 0 for none.  ovlmap() records the segment it just
+mapped, and ovlcall() records the callee's, putting the caller's back
+when the call returns - so the door the bus lock uses is covered, and a
+driver that returns from an heir and later sleeps in its own code is
+still right.  ovlremap() (sys/ovl.c) writes that segment back as it
+stands: what was recorded is the value the register wants, so there is no
+major to look up and no ovlseg[] to consult.  Both doors write u.drv
+before the map register, so a switch taken between the two writes puts
+the page being entered back and not the one being left; ovlremap() itself
+runs inside newmap()'s di().  newmap() calls it at every switch
+(sys/malloc.c), which is the one place the map changes under a process -
+and by then the u page is the incoming process's, so u.drv is that
+process's page and not the one that was just running.  A process that is not inside a driver has 0 there and is
+left alone; one that is inside a driver is put back in its own page
+however many other drivers ran while it was out.  The window is still
+one page for the machine.  What became per-process is the knowledge of
+which page a process is owed.
+
+That is also what makes the non-blocking corollary in overlay.md not
+apply here.  A swapped-in frame's bytes would be another driver's only
+in a design that swaps contents; this one maps a window onto a segment
+each module holds for the whole boot, so restoring the window restores
+the bytes.  An overlaid function here may sleep.
+
+Cost: resident text a few bytes either way - the last text symbol,
+_console, is at 0x854a, where the note for the revision this replaced
+recorded 0x8550, because ovlremap() lost the ovlseg[] lookup and ovlmap()
+stores a segment where it stored a major, which pays for ovlcall()'s two
+stores - and no change at all in the u page, because drv stayed one byte:
+struct user
+117 -> 118 as before, upage.o 2862 + 630 of 4096, u ending at 0xfda4 with
+604 bytes free.  _ebss is 0xcbc9, the same figure it had before the fix,
+so both budgets that matter, the resident end and the pool, did not move.
+Verified by booting a fresh create_vol'd volume: the placement lines, the
+buffer count and the hdr range are unchanged (254 buffers, hdr range
+cbc9..dfe2), and the boot runs on into single-user and /usr/src's make.
+
+The race itself was then staged, and what this note first said about the
+staging was wrong; corrected 2026-09-26 from the run logs, which are the
+evidence for all of it.
+
+Three kernels were built, each with its own create_vol'd volume: the fix
+as it stood (the major in u.drv, ovlremap() looking it up in ovlseg());
+the same with ovlremap()'s body emptied; and the fix with a probe in
+ovlremap() that prints whenever the page it is about to write differs
+from the one in place.  All three ran the same work - three filesystems
+mounted (m16b, ide0, fla), a 207375-byte pipeline copy of the floppy's
+lib/*.a onto the ide drive, large enough to force real strat calls
+instead of sitting in the buffer cache, then sums, sync, three umounts,
+and a host-side comparison of what landed on ide against those same files
+read out of the floppy image.  Each of them completed, and the copies
+were identical to the reference.  The probe fired forty times inside the
+first minute of the copy, capped there, turning over between seg 17 (dj)
+and seg 18 (ide): the precondition - a process switched in while the
+window holds another driver's page - is reached constantly, as soon as
+two drivers are in use at once.
+
+What is false is the step from that to "so the consequence is out of
+reach".  It is not: the same kernel text crashes it.  sys/unix as it
+stood at 17:37:58 died inside that copy - r6, and again at 18:03 on
+volumes built separately, rb - both times entering the ROM monitor with
+the same 28-byte dump at 0xFCD4.  And that kernel is the same program as
+the one that completed the copy at 16:53:10: the two images differ in six
+bytes, five of them the Created stamp and the sixth the root device, 3/0 as
+the link leaves it and 3/8 as the copy installed on a volume is stamped.
+Which program ran is not in doubt beyond that - the Created line is the
+kernel's own - and it is the volume's /micronix that executes: -S hands d1
+a symbol file, nothing more, and does not write the kernel it names
+(checked by mtime across a boot).  Text, modules and symbol table are
+identical.  Same program, one completion, two crashes.
+
+The completion was timing, then, and not safety.  hwsim/d1 keeps no clock
+and sleeps nowhere, so the emulated CPU is deterministic, but the harness
+feeds console lines on a wall-clock schedule, and the interleaving of the
+copy's I/O with those lines is not reproducible run to run.  What that
+interleaving sometimes buys is the wrong page: the process parked in
+busready() is inside dj's page, its u.drv names the module it was in
+before, and ovlremap() puts ovlseg[u.drv] back - the caller's driver - so
+the heir resumes in another driver's bytes.  ovlcall() not recording
+u.drv is the whole of it, and the fix above is that gap closed.
+
+The kernel without the fix is no more of a control than the one with it:
+it leaves the window as the last ovlcall() left it, and for the waking
+path that is the callee's own page, so the same park usually comes back
+to the right page by accident.  That is a race in the other direction,
+and it is why three completions were not evidence.
+
+They were not three completions, either, and reading the staging again is
+where this note's last paragraph starts.  The runs are r1 to r6 and ra, rb;
+their consoles are in /tmp/conc and say what the paragraph above does not.
+r1 and r2 did complete, and their copies are identical by the guest's own
+sum and cmp - but what they copied is libmdc.a, 11774 bytes, which fits in
+the 254-buffer cache eleven times over and never reaches the strat path
+that paragraph says the copy exists to force.  The 207375-byte copy was run
+twice.  r3 - Created 17:09:49, the same text r2 ran - completed it:
+big-done, three umounts, a remount, all-done.  r5 did not, and what it ran
+is the probe build, Created 17:27:55, a text of its own: its console ends
+with the harness's own lines echoed and nothing after them, no big-done and
+no all-done, a shell that never got to run them, the probe's last line the
+last thing the kernel printed.  It was read as a completion because r3
+completed, and it was a stall - ten minutes before the crashes at 17:37:58,
+and three quarters of an hour before the runs below.  r3 is the last
+completion, and it is the rare outcome.
+
+Every 207375-byte run since either crashes or stops.  Five of them left a
+destination image behind, and the images say how far each got: ab 80 blocks
+of the copy's 405, cc 100, cd 89, re1 117, rf1 118 - each measured by
+diffing the image against the pristine template it was made from, and each
+a contiguous run from the same first block, with the same all-zero block
+eighth.  Their root volumes say which text ran: ab and cc Created 17:37:58,
+cd 18:12:53, re1 and rf1 18:22:43 - three texts, five depths, and not one
+of the depths shared by the two runs that shared a text.  So where it stops
+is timing, like the crash, and not one place.  The two that were watched to
+a stall sat in the same state and stayed there: everything asleep, the
+source cat on _blist[8] (dev 0308
+blk 758, flags BBUSY|BSYNC|BDELWRI|BWANT and no BDONE, which is the waiter
+that makes the sleep permanent), the destination cat on the pipe inode
+b6c4, sh in wait - while the kernel ran sched()'s `while (next == 0)` loop
+at PC 0x516c on 100% of the emulated cpu, rchar and wchar frozen across
+25-second samples, and no host disk I/O for minutes.  That buffer is the
+only one of the 254 without BDONE, so this is not an avalanche of unfinished
+work: it is one write that never answered.  It is not slowness either -
+nothing in the machine is runnable.
+
+That write is the pipe's, and the pipe's blocks are on the root device, so
+what was lost is a root-disk completion; every ide write has answered.  The
+dump cannot say which door it was lost in, and there are three: the root
+driver's own path, which is the stamped one - ovlseg[3] is OVLSEG itself,
+so putting the window back there is the identity map and a wrong record is
+invisible; the bus lock's heir, called through ovlcall from whatever
+process was holding the bus; and the fan-out over line 2, which is new.  A
+-t all trace of the instructions before the stall separates them, and it
+has not been run.  What the destination device does say is that the copy
+was never a file: its inode did not reach the disk and neither did its
+directory entry, so what is on ide is a run of blocks holding the copy's
+first bytes in order, with nothing pointing at them, and one block inside
+that run that is all zeros - whether a hole or a block no list mentions is
+not tellable without the inode.
+
+ide's own park is still not reached, and the reason for that part of the
+old note stands: hwsim's IDE does the whole sector inside the port write
+and raises its interrupt on the way out (d1/ide.c, ide_command), so
+idewait()'s sleep is satisfied by an interrupt taken inside sched()'s
+enable() and the process is never switched out holding an ide frame.  On
+a real drive it is the ordinary case: the milliseconds idewait and
+scsistart spend asleep there are the whole reason they sleep.  A test that
+reaches that one needs the emulator faithful on this point - a delay
+between the command write and the interrupt - which is written down as
+work and not done.
+
+One smaller thing that fix does not cover, and that nothing today
+reaches.  wakeup() matches on the event address alone, which two modules
+could in principle share because every module is linked at OVLBASE; the
+events in use today do not collide (dj's djcomm, ide's and ncr's
+per-board flags), but dj's two waits are the unguarded kind - a bare
+sleep with no loop re-testing the condition - so a false match there
+would resume a command that had not completed.
+
+The other smaller thing this note used to list was the bug, and the note
+had the facts backwards: "neither heir sleeps (dj's busready() wakes and
+returns)".  busready() does sleep - dj.c:1522-1523, sleep(busready,
+DJPRIORITY) when the bus is not free - and it is the heir that runs in
+the caller's context, so it is the park the crash above is.  mw's
+mwstart() is the heir that does not sleep; it returns when it cannot get
+the bus.  ovlcall() records the segment now, so both heirs are covered.
+
+The trace that last paragraph was waiting on has been run, and the door was
+not one of the three: it was where the lock's own words live.  With the
+buffer clamp on (DEBUGBUFS=1, 32 buffers) the same workload stalls sooner -
+the destination image stops changing at block 20 of the copy's 405, where
+the unclamped runs reached 80 to 148 - and a -t all trace of that run
+carries every access to the four words busget and busgive keep.  They were
+statics in bus.c, and bus.c is leaf code: it links into upage.o, so the
+words were in the u page, and in that run the same four words were touched
+at six different physical addresses, one apiece.  next, the heir, was
+written exactly twice in the whole run, both times by the process
+registering mwstart as the heir, and no read of it ever came back anything
+but 0, so no busgive ever took its heir branch.  The end of the trace is
+the mechanism in order: the heir registered in one process's copy, then a
+busget and a busgive in another process - the one holding the bus - reading
+its own next as 0 and clearing its own bus.  From there the remaining 60 MB
+of trace holds no hddma command at all, and the root device's queue keeps
+the pipe's buffer at BBUSY|BSYNC|BDELWRI|BWANT with no BDONE: mwstart was
+never called, so the command it was to issue was never issued, and the
+sleep waiting for that command had nothing left to wake it.
+
+What makes it fatal is that a transfer's busget to its busgive is not a
+pair inside one process.  mw's mwstop sleeps waiting for its controller
+before it gives the bus up, and dj's busplease sleeps waiting for the bus,
+woken by the heir call itself; either way another process runs between a
+registration and the give, and a busgive run there reads its own copy of
+the heir, finds 0, and drops the heir the sleeping process registered.  One
+bus for the machine cannot live in a page that is one per process.  The
+four words are in ovl.c now, beside the module tables and for the reason
+those are there: kernel data, identity-mapped, one copy for the whole
+machine.  What stays in the u page is the code, because a function two
+modules both call has to be somewhere both can reach, and one module cannot
+call into another; each pointer keeps its segment, because the heir is
+usually in the other module and is entered through ovlcall.  The cost is
+the four words themselves: _ebss 0xcbc9 to 0xcbd1, and the buffer headers
+with it (hdr range cbd1..cdb4).
+
+The fix is checked the same way, at the same clamp: the words are read and
+written at one physical address for the whole run (mapped:00cb25, the
+identity map), the heir branch runs - 549 reads of it that are not 0, both
+ways round, mw handing the bus to dj 226 times and dj handing it to mw 323
+- and the copy finishes, 405 blocks where the broken clamp managed 20.
+ls -l says 207375 bytes and both sums read 24620 406: the copy's names the
+file, the sources' names `-`, and the two are one file.  That is the whole
+of this failure.  The other two doors the note listed were not in it - the
+root driver's own path, which is the stamped one, and the line-2 fan-out
+both stand as they were - and the same class of check was made against the
+rest of the u page and came back clean: the leaf assembly has no writable
+storage (one read-only month table) and consts.c's tables are written when
+a module is placed, before the swapper forks, so every copy of them is the
+same by design.  What those two cases draw, and what bus.c now says at the
+point of the mistake, is the rule: the u page is for code two modules share
+and for tables written before the fork, and anything written after that
+belongs to the kernel's own data.

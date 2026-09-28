@@ -5,8 +5,8 @@
  */
 inter()
 {
-    INTERN TEXT devbuf[128], filebuf[128], *f;
-    TEXT buf[BUFSIZE];
+    static char devbuf[128], filebuf[128], *f;
+    char buf[BUFSIZE];
     struct stat s;
 
     if (gtty(STDIN, buf) < 0 || gtty(STDOUT, buf) < 0) {
@@ -30,9 +30,10 @@ inter()
         if (feof(stdin))
             exit(YES);
 
-        if (!element('/', device) && lenstr(device) <= 14 && !fexists(device)) {
-            cpystr(buf, "/dev/", device, NULL);
-            cpystr(device, buf, NULL);
+        if (!strchr(device, '/') && strlen(device) <= 14 && !fexists(device)) {
+            strcpy(buf, "/dev/");
+            strcat(buf, device);
+            strcpy(device, buf);
         }
 
         if (stat(device, &s) < 0) {
@@ -40,7 +41,7 @@ inter()
             continue;
         }
 
-        if ((s.flags & S_TYPE) != S_ISBLOCK) {
+        if ((s.st_mode & S_IFMT) != S_IFBLK) {
             put(device);
             put(": Not special file\n");
             continue;
@@ -123,29 +124,17 @@ inter()
 
 duptest()
 {
-    INTERN UCOUNT i, j;
+    static UINT i, j;
 
     for (i = 0; i < nfiles; i++) {
         for (j = 0; j < nfiles; j++) {
-            if (i != j && cmpstr(files[i], files[j])) {
+            if (i != j && strcmp(files[i], files[j])) {
                 put(files[i]);
                 put(": duplicate file name\n");
                 exit(NO);
             }
         }
     }
-}
-
-lseek(a, b)
-    FAST a;
-    FAST ULONG b;
-{
-    INTERN UCOUNT c;
-
-    c = b >> 9;
-    seek(a, c, BLOCK);
-    c = b & 511;
-    seek(a, c, RELATIVE);
 }
 
 /*
@@ -156,7 +145,7 @@ lseek(a, b)
 iscpm()
 {
     static struct fcb *f;
-    static m, printed = NO;
+    static int m, printed = NO;
     static char n;
 
     m = 0;
@@ -211,12 +200,10 @@ iscpm()
     }
 
     if (d->bpv == 330 && d->epe == 2 && m <= 16 && !printed) {
-        putstr(STDERR, "Can't determine diskette format\n", NULL);
-        putstr(STDERR, "We will assume Northstar CP/M 2.x\n", NULL);
-        putstr(STDERR,
-            "Note: a file longer that 2K is needed on the diskette\n", NULL);
-        putstr(STDERR, "to make an unambiguous CP/M format determination.\n",
-            NULL);
+        eput("Can't determine diskette format\n");
+        eput("We will assume Northstar CP/M 2.x\n");
+        eput("Note: a file longer that 2K is needed on the diskette\n");
+        eput("to make an unambiguous CP/M format determination.\n");
         printed = YES;
     }
 
@@ -231,9 +218,9 @@ iscpm()
 isempty()
 {
     static unsigned char *p;
-    static n;
+    static int n;
 
-    p = thedir;
+    p = (unsigned char *) thedir;
     n = d->epd * sizeof(*thedir);
 
     for (; n; n--, p++)
@@ -247,16 +234,16 @@ tail(a)
 {
     static char buf[BUFSIZE], *p;
 
-    cpystr(buf, a, NULL);
+    strcpy(buf, a);
 
-    p = buf + lenstr(buf) - 1;
+    p = buf + strlen(buf) - 1;
 
     while (p > buf && *p == '/')
         *p-- = NULL;
 
     p = buf;
 
-    while (element('/', p))
+    while (strchr(p, '/'))
         p++;
 
     return p;
@@ -269,13 +256,13 @@ tail(a)
 fdelete(a)
 {
     char buf[32];
-    INTERN struct fcb *f;
+    static struct fcb *f;
 
     for (f = thedir; f < &thedir[d->epd]; f++) {
         if (f->user == userno) {        /* dir slot in use */
             name(f, buf);
 
-            if (cmpstr(a, buf)) {       /* right file */
+            if (strcmp(a, buf)) {       /* right file */
                 f->user = NOENT;        /* delete it */
                 ddirty = YES;   /* mark dir. dirty */
             }
@@ -289,7 +276,7 @@ fdelete(a)
 
 space()
 {
-    static used, free, percent, g;
+    static int used, free, percent, g;
     static long l;
 
     findfree();
@@ -326,7 +313,7 @@ itoa(a)
 {
     static char buf[16];
 
-    buf[itob(buf, a, 10)] = 0;
+    sprintf(buf, "%d", a);
     return buf;
 }
 
@@ -337,17 +324,17 @@ putnum(a)
 
 readdir()
 {
-    static g;
+    static int g;
     static struct fcb *f;
 
     f = thedir;
 
     for (g = 0; g < d->gdir; g++) {
         if (cflag)
-            fill(f, d->bpg, NOENT);
+            memset(f, NOENT, d->bpg);
 
         else
-            gio(g, f, read);
+            gio(g, f, READ);
 
         f += d->epg;            /* advance to the next group */
     }
@@ -355,13 +342,13 @@ readdir()
 
 writedir()
 {
-    static g;
+    static int g;
     static struct fcb *f;
 
     f = thedir;
 
     for (g = 0; g < d->gdir; g++) {
-        gio(g, f, write);
+        gio(g, f, WRITE);
 
         f += d->epg;            /* advance to the next group */
     }
@@ -372,9 +359,9 @@ writedir()
  *      b is the matching expression
  */
 
-BOOL
+int
 match(a, b)
-    TEXT *a, *b;
+    char *a, *b;
 {
     if (*a == NULL && *b == NULL)       /* end simultaneously */
         return YES;
@@ -383,9 +370,9 @@ match(a, b)
         return NO;
 
     if (*b == '*') {
-        TEXT *p;
+        char *p;
 
-        for (p = a + lenstr(a); a <= p; p--)
+        for (p = a + strlen(a); a <= p; p--)
             if (match(p, b + 1))
                 return YES;
 
@@ -402,12 +389,12 @@ match(a, b)
         return NO;
 }
 
-BOOL
+int
 omatch(a, b)
-    FAST TEXT *a, *b;
+    char *a, *b;
 {
-    BOOL sense;
-    TEXT *start;
+    int sense;
+    char *start;
 
     if (*a != NULL && *b == '?')
         return YES;
@@ -462,9 +449,9 @@ omatch(a, b)
     return NO;
 }
 
-TEXT *
+char *
 nextpat(a)
-    TEXT *a;
+    char *a;
 {
     if (*a == ESCAPE && a[1])
         return a + 2;
@@ -489,7 +476,7 @@ nextpat(a)
     return a + 1;
 }
 
-BOOL
+int
 alphanum(a)
 {
     return isdigit(a) || isalpha(a);
