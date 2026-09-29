@@ -2,7 +2,7 @@
 #
 # Make a bootable install diskette.
 #
-#	./create_bootdisk <medium> [<image>]
+#	./create_bootdisk <medium> [<image>] [<target>]
 #
 # <medium> is one of the three this tree builds for, by the same names
 # stand/boot's FLOPPIES table and mkbootimg use:
@@ -10,6 +10,14 @@
 #	d8ss	8 inch, single sided	77 cyl, 1 head,  15 x 512, 1125 blocks
 #	d8ds	8 inch, double sided	77 cyl, 2 heads, 15 x 512, 2250 blocks
 #	d5ds	5 1/4 inch, double sided 40 cyl, 2 heads, 10 x 512, 760 blocks
+#
+# <target> is the drive type the diskette installs onto - a name from the
+# specs[] table in sys/mw.c, m16 by default.  It picks the boot image the
+# drive gets and the init script that does the install, so a diskette is
+# one article for one target and the default is what "make bootdisks"
+# builds.  An install onto any other drive type wants its own:
+#
+#	./create_bootdisk d8ss /tmp/d8ss-m40.img m40
 #
 # The image is made as <medium>.img in this directory unless the second
 # argument names another path, and it is truncated if it already exists.
@@ -22,27 +30,34 @@
 # device nodes, and the kernel, pointed at the diskette as its own root.
 #
 # What the diskette is for: booting it gives a system whose root is the
-# floppy, off which m16init mkfs's a hard disk, copies this whole
-# filesystem onto it with cptree, and points that kernel at the drive.
+# floppy, off which the target's init script mkfs's a hard disk, copies
+# this whole filesystem onto it with cptree, and points that kernel at
+# the drive.
 # So the contents are not a tool bag, they are the smallest micronix
 # that can do that - see the knapsack in the README beside this file.
 # Nothing that is only useful on a running system with a hard disk is
 # here: no compiler, no sources, no man pages.
 #
-# /b and /f are made because that is where m16init and finstall mount:
-# an empty directory is a mount point, and mount does not make one.
+# /b and /f are made because that is where the init script and finstall
+# mount: an empty directory is a mount point, and mount does not make one.
 #
 # The kernel's root device is the diskette's own.  The number is the
 # DJ-DMA's minor for drive 0 of that size - bit 2 set is 5 1/4 inch,
 # clear is 8 inch - and the alternation bit is deliberately clear: this
 # is an unskewed image, which is what mnix and the loader both read.
-# See imdlib.c's raw_geometry for what the bits mean and REGEN for why
-# the shipped standalone, which is skewed, cannot be written this way.
+# See imdlib.c's raw_geometry for what the bits mean, and REGEN for the
+# shipped standalone, which is skewed and reached by a name that says so;
+# this diskette is read by number instead, by the loader and by mnix.
 #
 
 here=`dirname "$0"`
 here=`cd "$here" && pwd` || exit 1
 root=`cd "$here/../.." && pwd`
+
+# The target is read here, before the boot image below can want it, and
+# not with the other two arguments further down.
+target="$3"
+[ -z "$target" ] && target=m16
 
 mnix="$root/src/tools/mnix"
 setdev="$root/src/tools/setdev"
@@ -54,29 +69,30 @@ filesystem="$root/filesystem"
 bootdir="$srcdir/stand/boot"
 
 #
-# The hard disk boot the install writes.  m16init mkfs's the drive and
-# then reads a boot into the area mkfs reserved for it, out of the file
-# mkfs names by default - /bootmw.bin, on the diskette that is running
-# the install (mkfs.h DEFBOOT).  Without it the drive comes out with a
-# zeroed boot area, which mounts and passes fsck and does not boot, so
-# the file is here or the diskette cannot do the one job it has.
+# The hard disk boot the install writes.  The target's init script mkfs's
+# the drive and then reads a boot into the area mkfs reserved for it, out
+# of the file mkfs names by default - /bootmw.bin, on the diskette that is
+# running the install (mkfs.h DEFBOOT).  Without it the drive comes out
+# with a zeroed boot area, which mounts and passes fsck and does not boot,
+# so the file is here or the diskette cannot do the one job it has.
 #
-# It is the m16 image because m16init is the script this diskette
-# carries: the diskette is one article for one target.  3792 bytes, so
-# eight blocks of the five inch diskette's twenty-five free.
+# It is the target's own image, and it has to be: the boot carries the
+# drive's geometry in its label, so an m16 boot on an m40 drive is a boot
+# that reads the wrong cylinder.  3792 bytes, so eight blocks of the five
+# inch diskette's twenty-five free.
 #
-hdinit="$bootdir/bootimg-m16"
+hdinit="$bootdir/bootimg-$target"
 
 #
 # What goes in /bin.  Not a copy of the tree's bin: this is the list the
 # install runs on, and one command short of it is an install that stops
-# half way - mkfs, fsck, mount, cptree, mknod and setdev are m16init's
-# own steps, and sh, login and init are how a session starts at all.
+# half way - mkfs, fsck, mount, cptree, mknod and setdev are the init
+# script's own steps, and sh, login and init are how a session starts.
 #
-# era is deliberately absent, and m16init does not call it: it is a
+# era is deliberately absent, and no init script calls it: it is a
 # Whitesmiths command this tree has never built, so a diskette that
-# carried m16init's original text would leave the new hard disk's
-# /dev/root pointing at the floppy.  See rootfiles/m16init.
+# carried the original text would leave the new hard disk's /dev/root
+# pointing at the floppy.  See rootfiles/m16init.
 #
 BINS="sh login ls cp mv rm cat mkdir mkfs fsck mount umount chmod cptree
 	mknod setdev ln sync echo"
@@ -84,8 +100,9 @@ BINS="sh login ls cp mv rm cat mkdir mkfs fsck mount umount chmod cptree
 medium="$1"
 image="$2"
 if [ -z "$medium" ]; then
-	echo "usage: $0 <medium> [<image>]" >&2
+	echo "usage: $0 <medium> [<image>] [<target>]" >&2
 	echo "media: d8ss d8ds d5ds" >&2
+	echo "targets: m5 m10 m16 m32 m40 (m16 by default)" >&2
 	exit 1
 fi
 
@@ -126,6 +143,11 @@ if [ ! -f "$hdinit" ]; then
 	echo "$0:   make -C $srcdir/stand INC=/usr/local/usr/include bootimgs" >&2
 	exit 1
 fi
+if [ ! -f "$rootfiles/${target}init" ]; then
+	echo "$0: $rootfiles/${target}init not found - there is no install" >&2
+	echo "$0: for a $target: the init scripts are m5init, m10init, m16init, m40init" >&2
+	exit 1
+fi
 if [ ! -f "$filesystem/etc/init" ]; then
 	echo "$0: $filesystem/etc/init not found - make install has not built init" >&2
 	exit 1
@@ -143,7 +165,7 @@ rm -f "$image.lock"
 # 2. the userland.  The built binaries come from the source tree's
 # filesystem (make install); the config is that same directory's etc,
 # which is where the built init is and where signon2 lives - the signon
-# m16init installs in place of the plain one.
+# the init script installs in place of the plain one.
 set --
 for f in $BINS; do
 	set -- "$@" "bin/$f"
@@ -154,7 +176,7 @@ tar -C "$filesystem" -c -f "$tmp" "$@" || exit 1
 tar -C "$filesystem" -c -f "$tmp" etc || exit 1
 "$mnix" -f "$image" tar x "$tmp" || exit 1
 
-tar -C "$rootfiles" -c -f "$tmp" m16init .sh || exit 1
+tar -C "$rootfiles" -c -f "$tmp" "${target}init" .sh || exit 1
 "$mnix" -f "$image" tar x "$tmp" || exit 1
 
 # 3. the device nodes, from the source tree's dev/devlist, and the
