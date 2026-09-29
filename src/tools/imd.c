@@ -60,21 +60,53 @@ dump_imd(struct imd *imd, char *filename)
 }
 
 /*
+ * Where a filesystem block lands on the medium when the driver is doing
+ * alternate sectoring - the ALT bit, bit 3 of a floppy node's minor.
+ * sio() in sys/dj.c asks for every other sector of a track in turn, so
+ * block l of a track is recorded at the sector numbered 2l, wrapped
+ * back into the track, and stepped over the wrap only on the tracks
+ * that have an even number of sectors.  secmap() in lib/fslib.c is the
+ * same rule on the host side, and the two have to agree: this is what
+ * makes an IMD this tool writes read back the way a shipped diskette
+ * does.
+ */
+static int
+altskew(int l, int spt)
+{
+	int s = l << 1;
+
+	if (!(spt & 1) && s >= spt)
+		s++;
+	return s % spt;
+}
+
+/*
  * write out a new imd file that contains the data for the old data plus the delta
+ *
+ * altcyl, when it is not zero, is the first cylinder that carries
+ * filesystem rather than the boot in front of it: its tracks and every
+ * track after it are written alternated, the way the driver will read
+ * them.  The boot is left alone because no driver stands between the
+ * loader and the controller - it reads sectors by number, and a loader
+ * laid down alternated would not run.  See altskew.
  */
 void
-merge_imd(struct imd *imd, char *filename)
+merge_imd(struct imd *imd, char *filename, int altcyl)
 {
     char merge[100];
     struct imd_trk *tp;
     int trk;
     int sec;
     int i;
+    int l;
+    int nsec;
+    int skew;
+    int inv[SECTORS];
     char value;
     char type;
     char *buf;
     int fd;
- 
+
     /*
      * O_TRUNC: the merge is the whole file written from scratch, and a
      * merge beside an older longer one would otherwise keep that one's
@@ -95,8 +127,19 @@ merge_imd(struct imd *imd, char *filename)
         if (tp->secmap) write(fd, tp->secmap, tp->fixed.nsec);
         if (tp->cylmap) write(fd, tp->cylmap, tp->fixed.nsec);
         if (tp->headmap) write(fd, tp->headmap, tp->fixed.nsec);
-        for (sec = 0; sec < tp->fixed.nsec; sec++) {
-            buf = tp->data[sec];
+        /*
+         * The secmap stays the identity and the alternation goes in the
+         * data, which is where a shipped diskette has it: the sector
+         * written in position sec is the block the driver will look for
+         * there, altskew's inverse.
+         */
+        nsec = tp->fixed.nsec;
+        skew = altcyl && tp->fixed.cyl >= altcyl && nsec <= SECTORS;
+        if (skew)
+            for (l = 0; l < nsec; l++)
+                inv[altskew(l, nsec)] = l;
+        for (sec = 0; sec < nsec; sec++) {
+            buf = tp->data[skew ? inv[sec] : sec];
             if (buf) {
                 type = IMD_FILL;
                 value = buf[0];
@@ -129,6 +172,7 @@ usage(char c)
     if (c) printf("unknown option %c\n", c);
     printf("usage: %s [options] <imd file> ...\n", progname);
     printf("\t-m\tmerge deltas\n");
+    printf("\t-a <cyl>\talternate-sector the tracks from cylinder <cyl> on\n");
     printf("\t-d\tdump data\n");
     printf("\t-s\tsummarize\n");
     exit(1);
@@ -142,6 +186,7 @@ main(int argc, char **argv)
     int dump = 0;
     int merge = 0;
     int summarize = 0;
+    int altcyl = 0;
 
     progname = *argv++;
     argc--;
@@ -163,6 +208,22 @@ main(int argc, char **argv)
             case 'm':
                 merge++;
                 break;
+            case 'a':
+                /*
+                 * -a takes an argument, attached (-a2) or on its own
+                 * (-a 2), so it cannot share a bundle with what
+                 * follows it.
+                 */
+                if (s[1])
+                    s++;
+                else if (argc) {
+                    s = *argv++;
+                    argc--;
+                } else
+                    usage(0);
+                altcyl = atoi(s);
+                s += strlen(s);
+                continue;
             case 'h':
                 usage(0);
                 break;
@@ -188,7 +249,7 @@ main(int argc, char **argv)
             printf("%s\n", ip->comment);
         }
         if (dump) dump_imd(ip, *argv);
-        if (merge) merge_imd(ip, *argv);
+        if (merge) merge_imd(ip, *argv, altcyl);
         if (summarize) summarize_imd(ip, *argv);
         argv++;
     }

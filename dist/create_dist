@@ -82,6 +82,16 @@ case "$medium" in
 	echo "$0: media: 8 5" >&2
 	exit 1 ;;
 esac
+
+#
+# The filesystem starts behind the boot area, dtoff=2 cylinders on both
+# media, and everything from there on is written to the IMD alternated:
+# a floppy node with bit 3 set reads its blocks that way, and a diskette
+# that is not written that way is a diskette finstall cannot mount.  The
+# boot in front of it is not - see imd.c's merge_imd.
+#
+toff=2
+
 isize=`expr $fsize / 43 + $fsize / 1000`
 usable=`expr $fsize - $isize - 2`
 maxino=`expr $isize \* 16`
@@ -239,7 +249,7 @@ while [ "$n" -le "$ndisk" ]; do
 	echo "$0: disk $n of $ndisk: `wc -l < "$tmp/list.$n"` files, $free blocks free"
 
 	rm -f "$raw-delta"
-	"$imd" -m "$raw" > /dev/null 2>&1 || exit 1
+	"$imd" -m -a "$toff" "$raw" > /dev/null 2>&1 || exit 1
 	mv "$raw-merge" "$out" || exit 1
 	n=$((n + 1))
 done

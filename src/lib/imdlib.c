@@ -398,11 +398,16 @@ raw_secmap(char *secmap, int spt, int skew, int firstsec)
      * sector of a track is the nth 512 bytes of that track in the file.
      *
      * It is tempting to bake fslib's interleave into this map, since that
-     * is the only skew anywhere in sight, but that skew belongs to the
-     * filesystem and not to the medium.  The driver maps a filesystem
-     * block to a sector number and then asks for that sector; the medium
-     * only has to find it.  Applying the skew here as well maps every
-     * block twice and lands somewhere unrelated.
+     * is the only skew a raw image is ever read with, but the interleave
+     * is not this map's business.  The driver maps a filesystem block to
+     * a sector number and then asks for that sector; the medium only has
+     * to find it.  Applying the skew here as well maps every block twice
+     * and lands somewhere unrelated.
+     *
+     * Which order the data itself is in is the caller's business, and the
+     * two callers differ: mnix bootflop writes a raw in block order -
+     * unskewed, the order this map describes - and merge_imd in tools/imd.c
+     * writes an IMD in the alternated order a shipped diskette has.
      *
      * The second level boot is the proof.  It is loaded from the sector
      * numbered one, and at that sector's own place in the file it begins
