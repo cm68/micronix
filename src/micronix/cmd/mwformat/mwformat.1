@@ -1,23 +1,48 @@
-.TH MWFORMAT 1
-.SH NAME
-mwformat \- format a Morrow HD\-DMA hard disk
-.SH SYNOPSIS
-.B mwformat
-device [ track ]
-.SH DESCRIPTION
-.I mwformat
-runs the controller's format\-track command across a drive, one track per
-ioctl, printing a line as each track is done.  The device node names the
-drive and the model (its minor number); the model's geometry is how many
-tracks are walked.  A format blanks the disk \- headers and data \- so the
-label and any filesystem go with it, and
-.IR mkfs (1)
-follows.
-.PP
-With a
-.I track
-argument, only that one track is formatted.
-.SH EXAMPLE
-.B mwformat /dev/m16a
-.SH "SEE ALSO"
-mkfs(1)
+.he "mwformat (1)                 9/28/26                 mwformat (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+mwformat
+- format a Morrow HD-DMA hard disk
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+mwformat device [ track ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Mwformat runs the controller's format-track command across a drive, one
+track per ioctl, printing a line as each track is done.  The device node
+names the drive and the model, by the type bits of its minor number, and
+the model's geometry is how many tracks are walked.  A format blanks the
+disk, headers and data, so the label and any filesystem go with it and
+mkfs follows.
+.sp
+With a track argument, only that one track is formatted.
+.sp 2
+.in -5
+.bd
+EXAMPLE
+.in +5
+.br
+.bd
+mwformat /dev/m16a
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+mkfs (1)

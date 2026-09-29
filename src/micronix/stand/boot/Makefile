@@ -6,7 +6,8 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 all:	mwboot.com mwboot1.bin bootimgs djboot.com djboot1.bin djload \
-	ideboot.com ideboot1.bin idebootimgs
+	ideboot.com ideboot1.bin idebootimgs \
+	ncrboot.com ncrboot1.bin ncrbootimgs
 
 install:
 
@@ -25,11 +26,12 @@ install:
 # directory of that assembler's listings.  core.* is a crash dump - not
 # a build product, and named core.<pid>, so there is no list to write.
 clean:
-	rm -f $(OBJS) djio.o ideio.o *.nam *.tok *.x
-	rm -f ideboot.com djboot.com
+	rm -f $(OBJS) djio.o ideio.o ncrio.o *.nam *.tok *.x
+	rm -f ideboot.com djboot.com ncrboot.com
 	rm -f mwboot1.abs djboot1.abs mwboot1.bin djboot1.bin
-	rm -f ideboot1.abs ideboot1.bin mwboot.com djload mkbootimg
-	rm -f $(BOOTIMGS) $(IDEBOOTIMGS) bootimg
+	rm -f ideboot1.abs ideboot1.bin ncrboot1.abs ncrboot1.bin
+	rm -f mwboot.com djload mkbootimg
+	rm -f $(BOOTIMGS) $(IDEBOOTIMGS) $(NCRBOOTIMGS) bootimg
 
 clobber: clean
 
@@ -110,6 +112,18 @@ ideboot1.bin: ideboot1.s
 	$(WSLD) -s -Ttext=0x100 -o ideboot1.abs ideboot1.o
 	dd if=ideboot1.abs of=ideboot1.bin bs=16 skip=1
 
+# ncrboot1.s is the same sector again, for the NCR 5380.  It differs from
+# ideboot1.s in the read: the IDE card's registers are behind an 8255,
+# and the 5380 is driven a byte at a time through a REQ/ACK handshake, so
+# every sector here is its own command - select the target, send a
+# READ(10), take the data, then the status and the message.  It has the
+# same 256 byte budget as ideboot1.s, because the label sits at byte 256
+# of the sector and mkbootimg refuses a first level that runs into it.
+ncrboot1.bin: ncrboot1.s
+	$(ASZ) ncrboot1.s
+	$(WSLD) -s -Ttext=0x100 -o ncrboot1.abs ncrboot1.o
+	dd if=ncrboot1.abs of=ncrboot1.bin bs=16 skip=1
+
 #
 # what mkfs -i writes: the first level in block 0, the second level from
 # block 1, which is where the first level looks for it.
@@ -183,6 +197,30 @@ $(IDEBOOTIMGS): ideboot1.bin ideboot.com mkbootimg
 		echo "$@: `echo $$d | cut -d: -f2`/`echo $$d | cut -d: -f3`/`echo $$d | cut -d: -f4`"; \
 	done
 
+#
+# And the same for the NCR 5380.  The geometry table is the same one for
+# the same reason: the label carries the geometry and this loader reads
+# it, so a card that addresses by LBA still has to be told where a
+# filesystem block is on the platter.  A target on the 5380 reads back a
+# volume laid out for the HD-DMA block for block, so these images are
+# byte-compatible with the ones above and differ only in which loader is
+# in them.
+#
+NCRBOOTIMGS = $(foreach d,$(DRIVES),ncrbootimg-$(word 1,$(subst :, ,$(d))))
+
+ncrbootimgs: $(NCRBOOTIMGS)
+
+$(NCRBOOTIMGS): ncrboot1.bin ncrboot.com mkbootimg
+	@set -e; for d in $(DRIVES); do \
+		n=`echo $$d | cut -d: -f1`; \
+		[ ncrbootimg-$$n = $@ ] || continue; \
+		./mkbootimg ncrboot1.bin ncrboot.com \
+		    `echo $$d | cut -d: -f2` \
+		    `echo $$d | cut -d: -f3` \
+		    `echo $$d | cut -d: -f4` $@; \
+		echo "$@: `echo $$d | cut -d: -f2`/`echo $$d | cut -d: -f3`/`echo $$d | cut -d: -f4`"; \
+	done
+
 # The floppy boot image: one side of cylinder 0, ten blocks.  Block 0 is
 # djboot1.bin's first 128 bytes - level 0, which is all the firmware
 # takes - block 1 is the rest of it - level 1, which reads blocks 2
@@ -239,6 +277,15 @@ ideboot.com: boot.o ideio.o sexit.o
 	$(MXLD) -s -o ideboot.com -Ttext=0x100 -L$(CCCLIB) \
 	    sexit.o boot.o ideio.o $(CCCLIB)/libc.a $(CCCLIB)/libu.a $(CCCLIB)/libc.a
 
+#
+# The NCR 5380 second level: the same boot.c with ncrio.o in place of
+# mwio.o, for the reason the other two give - reset() and readblock()
+# keep their names and their meaning across all four drivers.
+#
+ncrboot.com: boot.o ncrio.o sexit.o
+	$(MXLD) -s -o ncrboot.com -Ttext=0x100 -L$(CCCLIB) \
+	    sexit.o boot.o ncrio.o $(CCCLIB)/libc.a $(CCCLIB)/libu.a $(CCCLIB)/libc.a
+
 boot.o: boot.c
 	$(CCC) -c -i$(INC) -o boot.o boot.c
 mwio.o: mwio.c
@@ -247,6 +294,8 @@ djio.o: djio.c
 	$(CCC) -c -i$(INC) -o djio.o djio.c
 ideio.o: ideio.c
 	$(CCC) -c -i$(INC) -o ideio.o ideio.c
+ncrio.o: ncrio.c
+	$(CCC) -c -i$(INC) -o ncrio.o ncrio.c
 sexit.o: sexit.s
 	$(CCC) -c -o sexit.o sexit.s
 

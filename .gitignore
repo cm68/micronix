@@ -155,12 +155,11 @@ disks/hdinstall/hddma-0
 disks/bootdisks/*.img
 
 #
-# The distribution sets "make dist" generates, mx2.0-8-1.IMD and its
-# fellows.  Same kind of thing again: written by dist/create_dist out of
-# the built tree, and never a source.  Both suffixes are scoped to dist/
-# so that what is not an image there - the script and pack.awk - stays
-# visible, which is the whole reason the rule is scoped rather than
-# *.IMD.
+# The distribution sets dist/create_dist generates, mx2.0-8-1.IMD and
+# its fellows.  Same kind of thing again: built out of the tree and
+# never a source.  Both suffixes are scoped to dist/ so that what is not
+# an image there - create_dist and pack.awk - stays visible, which is
+# the whole reason the rule is scoped rather than *.IMD.
 #
 dist/*.IMD
 dist/*.img

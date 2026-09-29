@@ -75,8 +75,16 @@ merge_imd(struct imd *imd, char *filename)
     char *buf;
     int fd;
  
+    /*
+     * O_TRUNC: the merge is the whole file written from scratch, and a
+     * merge beside an older longer one would otherwise keep that one's
+     * tail past the end of the tracks just written.  Re-merging a disk
+     * is the normal case - the images are built in a loop - and an IMD
+     * with a few hundred stray bytes on the end reads as a track header
+     * where there is no track.
+     */
     sprintf(merge, "%s-merge", filename);
-    fd = open(merge, O_RDWR|O_CREAT, 0777);
+    fd = open(merge, O_RDWR|O_CREAT|O_TRUNC, 0777);
     write(fd, imd->comment, strlen(imd->comment) - 1);
     value = IMD_EOC;
     write(fd, &value, 1);

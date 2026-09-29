@@ -2,8 +2,8 @@ for a blast from the past, type:
 
  make test
 
- you now are running micronix 1.4 shell and can do a lot
- including: (this builds the recovered 1.61 kernel)
+ you now are running the recovered 1.4 shell and can do a lot
+ including: (this builds the kernel)
 
 	cd /usr/src/sys
 	make
@@ -13,6 +13,16 @@ or, for a quite strange experience,
     src/usersim/sim bin/man sh | less
 
 	(run the simulated z80 micronix man program on sh, and pipe it to linux less)
+
+---------------------
+
+three version numbers turn up in here and they do not mean the same
+thing.  this tree is released as micronix 2.0, which is the number the
+kernel prints in its banner and the number the distribution disks in
+dist/ are named for.  1.4 is the distribution userland - the shell and
+the commands in disks/dist, recovered from the original disks.  1.61 is
+where the kernel source was recovered from: it is the provenance of that
+source and not what the tree now is.
 
 ---------------------
 
@@ -50,7 +60,8 @@ src/micronix/lib:
 	additions and replacements for the whitesmith's library.
 		
 src/micronix/sys:
-	recovered kernel source for micronix 1.61, with include files
+	kernel source, recovered from a micronix 1.61 build (see the version
+	note above), with include files.
 	the formatting of the original source was really quirky and archaic,
 	so I re-indented it to a more K&R like style.
 	it is NOT ansi, and compiles on whitesmith's C.

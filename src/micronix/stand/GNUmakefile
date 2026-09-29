@@ -4,9 +4,15 @@
 # stand/GNUmakefile
 #
 # boot is the two-level hard disk loader, cross built with ccc, and the
-# only thing here the cross build touches.  formatmw is a CP/M program
-# that cannot become a micronix one - its own makefile says so - so it
-# is not in DIRS, exactly as the native makefile beside this has it.
+# only thing here the cross build touches.  formatmw is the CP/M
+# original of Morrow's hard disk formatter, and a CP/M program it stays:
+# it hands the controller physical dma addresses, writes the channel
+# address to physical 0x50 and issues out instructions, and none of that
+# survives the MPZ80's map.  So it runs under CP/M on the d1 simulation -
+# which is where its sector id table can be read off the wire instead of
+# guessed at - and it is not in DIRS for that reason.  It does not need
+# to be: what it does inside micronix is cmd/mwformat, which is built and
+# installed like any other command, and djformat beside it.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 

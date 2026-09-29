@@ -1,22 +1,46 @@
-.TH DJFORMAT 1
-.SH NAME
-djformat \- format a Morrow DJ\-DMA floppy diskette
-.SH SYNOPSIS
-.B djformat
-device [ track ]
-.SH DESCRIPTION
-.I djformat
-runs the controller's write\-track command across a diskette, one track
-per ioctl, printing a line as each track is done.  The device node names
-the drive.  A format blanks the diskette, so any filesystem goes with it
-and
-.IR mkfs (1)
-follows.
-.PP
-With a
-.I track
-argument, only that one track is formatted.
-.SH EXAMPLE
-.B djformat /dev/fla
-.SH "SEE ALSO"
-mkfs(1), mwformat(1)
+.he "djformat (1)                 9/28/26                 djformat (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+djformat
+- format a Morrow DJ-DMA floppy diskette
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+djformat device [ track ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Djformat runs the controller's write-track command across a diskette, one
+track per ioctl, printing a line as each track is done.  It walks all 77
+tracks of the 8 inch drive; the device node names the drive.  A format
+blanks the diskette, so any filesystem goes with it and mkfs follows.
+.sp
+With a track argument, only that one track is formatted.
+.sp 2
+.in -5
+.bd
+EXAMPLE
+.in +5
+.br
+.bd
+djformat /dev/fla
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+mkfs (1), mwformat (1)

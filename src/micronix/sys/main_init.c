@@ -270,7 +270,7 @@ pinit()
  */
 plogo()
 {
-    pr("\nMicronix 1.61\n");
+    pr("\nMicronix 2.0\n");
 #ifdef BUILD_DATE
     pr(BUILD_DATE);
 #else

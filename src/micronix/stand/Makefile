@@ -8,9 +8,11 @@
 
 #
 # Two things live here and they are not built the same way.  boot is
-# the two level hard disk loader, cross built with ccc; formatmw is a
-# CP/M program that cannot become a micronix one - see its own
-# makefile.  formatmw is not in all, because c1 still dies on it.
+# the two level hard disk loader, cross built with ccc; formatmw is the
+# CP/M original of Morrow's hard disk formatter, and it stays a CP/M
+# program - see its own makefile.  What it does inside micronix is
+# cmd/mwformat, with cmd/djformat beside it.  formatmw is not in all,
+# because c1 still dies on it.
 #
 DIRS = boot
 

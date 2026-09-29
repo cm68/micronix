@@ -1,20 +1,45 @@
-.TH UNLZ4 1
-.SH NAME
-unlz4 \- decompress the LZ4 frame format
-.SH SYNOPSIS
-.B unlz4
-[ infile [ outfile ] ]
-.SH DESCRIPTION
-.I unlz4
-reads an LZ4 frame and writes the original bytes.  With no arguments,
-or with
-.B -
-as a name, the standard input and output are used.
-.PP
-It accepts frames carrying a content size and block or content
-checksums, skipping them; the header checksum is read but not verified.
-The history window is 16383 bytes, matching
-.IR lz4 (1),
-so offsets beyond that are rejected.
-.SH "SEE ALSO"
-lz4(1), tar(1)
+.he "unlz4 (1)                    9/28/26                    unlz4 (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+unlz4
+- decompress the LZ4 frame format
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+unlz4 [ infile [ outfile ] ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Unlz4 reads an LZ4 frame and writes the original bytes.  With no
+argument, or where a name is -, it reads the standard input and writes
+the standard output.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+A frame carrying a content size or block or content checksums is
+accepted, and those fields are skipped; the header checksum is read but
+not verified.  The history window is 16383 bytes, matching lz4, so a
+larger offset is rejected.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+lz4 (1), tar (1)

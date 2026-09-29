@@ -424,6 +424,7 @@ raw_load(char *fname, int drive, int create_delta)
     struct imd_trk *tp;
     struct stat sb;
     int fd, cyl, head, sec;
+    int sbyte, sz;
 
     if (stat(fname, &sb) < 0)
         return 0;
@@ -463,7 +464,22 @@ raw_load(char *fname, int drive, int create_delta)
 
     ip = malloc(sizeof(*ip));
     memset(ip, 0, sizeof(*ip));
-    ip->comment = strdup(fp->what);
+
+    /*
+     * The comment is the file's header, and it is the same field
+     * imd_load fills from a real IMD: everything through the EOC, which
+     * is what imd -s strips and what merge_imd writes back out ahead of
+     * a fresh one.  A raw image has no header of its own, so one is made
+     * here, magic first - a file that does not begin "IMD " is not one
+     * this library will read back, and a merge of a raw image without it
+     * produced a file nothing could open.
+     */
+    {
+        char hdr[128];
+
+        snprintf(hdr, sizeof(hdr), "IMD %s%c", fp->what, IMD_EOC);
+        ip->comment = strdup(hdr);
+    }
     ip->drive = drive;
     ip->cyls = fp->cyls;
     ip->heads = fp->heads;
@@ -477,6 +493,19 @@ raw_load(char *fname, int drive, int create_delta)
             tp->fixed.nsec = fp->spt;
             tp->head = head;
             tp->secsize = fp->secsize;
+
+            /*
+             * The size byte in a track header is the exponent of the
+             * sector size, not the size: a reader takes it as
+             * 0x80 << size.  get_track fills the pair from one byte and
+             * merge_imd writes the header back out verbatim, so filling
+             * only secsize here merged to a file whose sectors read back
+             * at a quarter of their length - the first track parsed and
+             * the rest of the medium was garbage.
+             */
+            for (sz = 128, sbyte = 0; sz < fp->secsize; sz <<= 1)
+                sbyte++;
+            tp->fixed.size = sbyte;
             tp->secmap = malloc(fp->spt);
             raw_secmap(tp->secmap, fp->spt, fp->skew, fp->firstsec);
             tp->data = malloc(fp->spt * sizeof(char *));
