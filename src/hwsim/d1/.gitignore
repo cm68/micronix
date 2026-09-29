@@ -19,9 +19,3 @@ ide-1
 .last
 .gdbargs
 mmu_test
-mon*.sym
-mon*.bin
-mon*.cim
-multIO.sym
-multIO.bin
-multIO.cim

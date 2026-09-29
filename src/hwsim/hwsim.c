@@ -1764,11 +1764,11 @@ main(int argc, char **argv)
     }
 
     /*
-     * Default the boot rom to one in the current directory, so the
-     * simulator finds its resource files without -b; -b still overrides.
+     * Default the boot rom to the tree's stand/roms, so the simulator
+     * finds its resource files without -b; -b still overrides.
      */
-    if (access("roms/mon447.bin", F_OK) == 0)
-        rom_filename = "roms/mon447.bin";
+    if (access("../../micronix/stand/roms/mon447.bin", F_OK) == 0)
+        rom_filename = "../../micronix/stand/roms/mon447.bin";
     else if (access("mon447.bin", F_OK) == 0)
         rom_filename = "mon447.bin";
 
@@ -1776,8 +1776,8 @@ main(int argc, char **argv)
      * Default the selector boot rom the same way: multIO.bin beside the
      * monitor roms.  -M overrides.
      */
-    if (access("roms/multIO.bin", F_OK) == 0)
-        bootrom_filename = "roms/multIO.bin";
+    if (access("../../micronix/stand/roms/multIO.bin", F_OK) == 0)
+        bootrom_filename = "../../micronix/stand/roms/multIO.bin";
     else if (access("multIO.bin", F_OK) == 0)
         bootrom_filename = "multIO.bin";
 
