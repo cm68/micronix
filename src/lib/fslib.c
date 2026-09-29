@@ -78,8 +78,8 @@ struct image {
 
 /*
  * A simulator hard disk file: a 2048 byte label and then the sectors in
- * physical order, cylinder then head then sector.  lib/harddisk.c writes
- * it; this only reads the label.
+ * physical order, cylinder then head then sector.  lib/hdcdmadisk.c
+ * writes it; this only reads the label.
  */
 #define HD_MAGIC    0xd15cc0de
 #define HD_DATAOFF  2048

@@ -1,9 +1,9 @@
 #!/bin/sh
 #
-# Boot the new ccc kernel from the hard disk.
+# Boot the newly built kernel from the hard disk.
 #
-# Writes the freshly built kernel (../../kernels/micronix.ccc) onto the
-# drive as /micronix, then boots it off the HD-DMA path - the same boot
+# Writes the freshly built kernel (src/micronix/sys/unix) onto the drive
+# as /micronix, then boots it off the HD-DMA path - the same boot
 # the hardware does: the monitor ROM reads the first-level loader off
 # cylinder 0 and that reads /micronix off the filesystem.  -B hdcdma is
 # the "skip the monitor, boot the HD-DMA" switch.  ./run is the
@@ -22,9 +22,13 @@
 #	cp hddma-0.blessed mine.vol
 #	./runh mine
 #
-# Build the kernel first if ../../kernels/micronix.ccc is missing:
+# Build the kernel first if ../../src/micronix/sys/unix is missing:
 #	make -C ../../src/micronix/sys unix
-#	cp ../../src/micronix/sys/unix ../../kernels/micronix.ccc
+#
+# The kernel is read where the build puts it.  It used to be copied to
+# kernels/micronix.ccc first - the suffix told a ccc-built kernel from a
+# Whitesmiths one, which the tree can no longer build - and the copy went
+# stale the moment it was made.
 #
 
 here=`dirname "$0"`
@@ -44,16 +48,15 @@ case "$drive" in
 *)	drive="$drive.vol" ;;
 esac
 
-kernel="$root/kernels/micronix.ccc"
+kernel="$root/src/micronix/sys/unix"
 if [ ! -f "$kernel" ]; then
 	echo "runh: $kernel not found" >&2
 	echo "runh: build it first:" >&2
 	echo "runh:   make -C ../../src/micronix/sys unix" >&2
-	echo "runh:   cp ../../src/micronix/sys/unix ../../kernels/micronix.ccc" >&2
 	exit 1
 fi
 
-# Put the new kernel on the drive.  Plain write (not -k): the ccc
+# Put the new kernel on the drive.  Plain write (not -k): the built
 # kernel is a different size than what shipped, so the file moves.
 "$root/src/tools/mnix" -f "$here/$drive" write "$kernel" /micronix
 
