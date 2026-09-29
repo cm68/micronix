@@ -63,4 +63,4 @@ esac
 [ -f "$vol-delta" ] && rm -f "$vol-delta"
 
 cd "$root/src/hwsim/d1" || exit 1
-exec ./d1 -b roms/mon500.bin -c 0x71c -S "$kernel" $flags "scsi0:$vol"
+exec ./d1 -b ../../micronix/stand/roms/mon500.bin -c 0x71c -S "$kernel" $flags "scsi0:$vol"

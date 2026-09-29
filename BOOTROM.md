@@ -171,7 +171,7 @@ reset -> mon500 (rom0) -> switch decode -> copyrom
 builds the four `.bin`/`.sym` pairs. The simulator serves the selector as a
 read-only `boot_rom` at `0xff0000` (`s100.c`), loaded from `multIO.bin`
 (`hwsim.c`); `-M <file>` overrides the name, and the default is resolved
-relative to the tree. `-b roms/mon500.bin` selects the monitor that knows the
+relative to the tree. `-b ../../micronix/stand/roms/mon500.bin` selects the monitor that knows the
 selector; `-c 0x04` is the all-switches-on + skip-monitor setting that reaches
 `copyrom`.
 

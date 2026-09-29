@@ -59,4 +59,4 @@ esac
 [ -f "$vol-delta" ] && rm -f "$vol-delta"
 
 cd "$root/src/hwsim/d1" || exit 1
-exec ./d1 -b roms/mon447.bin -c 0x70c -S "$kernel" $flags "hdcdma0:$vol"
+exec ./d1 -b ../../micronix/stand/roms/mon447.bin -c 0x70c -S "$kernel" $flags "hdcdma0:$vol"

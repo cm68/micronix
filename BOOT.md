@@ -7,7 +7,7 @@ This is the map. `DJBOOT.md` is the deep dive on one of the five paths — the
 DJ-DMA floppy — and is not repeated here.
 
 Sources are named as they are used. The three monitor ROMs are
-`src/hwsim/d1/roms/mon375.s`, `mon447.s` and `mon500.s`. Each assembles to a
+`src/micronix/stand/roms/mon375.s`, `mon447.s` and `mon500.s`. Each assembles to a
 4096-byte `.cim`, of which the `Makefile` keeps the low half — `dd bs=1024
 skip=2 count=2` — giving a 2048-byte `monNNN.bin`. `mon447` is what the
 simulator loads by default (`mpz80_setup()`), and `m16boot` names it
@@ -540,7 +540,7 @@ program that actually knows the medium.
 | `src/micronix/stand/boot/README` | the tree's chain, and the 4K discipline |
 | `src/micronix/sys/OVERLAY-DRIVERS.md` | what happens after the kernel is entered |
 
-Sources for each path: `src/hwsim/d1/roms/mon{375,447,500}.s` and their
+Sources for each path: `src/micronix/stand/roms/mon{375,447,500}.s` and their
 equate blocks; `src/hwsim/d1/djdma.c` (`bootstrap[]`, `djdma_init()`) and
 `hdca.c`/`hddma.c`/`ide.c`/`ncr5380.c`; `src/hwsim/d1/mpz80.c` (`SWT`, the `SW_*`
 defines, `switchreg = config_sw & 0xff`); `src/hwsim/hwsim.c`

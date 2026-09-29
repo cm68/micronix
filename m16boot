@@ -33,8 +33,8 @@ if [ ! -f "$image" ]; then
 	exit 1
 fi
 
-# the simulator finds roms/mon447.bin and its resource files by being
-# run from this directory
+# run from here, the simulator's default rom lookup reaches back into the
+# tree at ../../micronix/stand/roms; -b names mon447 explicitly
 cd "$root/src/hwsim/d1" || exit 1
 
 export TERMINAL_FONTSIZE="${TERMINAL_FONTSIZE:-14}"
@@ -44,6 +44,6 @@ export TERMINAL_FONTSIZE="${TERMINAL_FONTSIZE:-14}"
 #	0x08	boot the HDC-DMA controller (nuboot)
 #	0x04	skip the monitor and boot straight away
 # hdcdma0: is the drive - controller hdcdma, unit 0 - and the image.
-"$d1" -b roms/mon447.bin -c 0x10c "hdcdma0:$image"
+"$d1" -b ../../micronix/stand/roms/mon447.bin -c 0x10c "hdcdma0:$image"
 
 stty cooked echo echoe 2>/dev/null

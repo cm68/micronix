@@ -49,5 +49,5 @@ done
 
 cd "$here/../../src/hwsim/d1" || exit 1
 
-exec ./d1 -b roms/mon447.bin $log \
+exec ./d1 -b ../../micronix/stand/roms/mon447.bin $log \
 	-d "$here" -5 "$here/sa67.5.skew.1k" "$@"

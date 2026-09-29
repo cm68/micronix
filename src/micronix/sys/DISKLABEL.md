@@ -404,7 +404,7 @@ v1 compatibility that makes an empty table mean the rolled layout.
   superblock on the same cylinder; a small filesystem on a big drive leaves the rest
   of the drive free; a table naming more cylinders than the drive has is refused
   clearly, not wrapped.
-- **IDE:** boot `-b roms/mon500.bin -B ide` to `root dev: ide/0`.
+- **IDE:** boot `-b ../../micronix/stand/roms/mon500.bin -B ide` to `root dev: ide/0`.
 - **A pre-label volume** mounts from the minor number when that names a `specs[]` row,
   and is refused loudly only when it names none.
 
