@@ -12,8 +12,8 @@ at the top of the tree builds three, here:
 They are build output, regenerated from the tree the way a .vol is, and
 .gitignore drops them; the script that makes them is the only real file
 in this directory.  Nothing here is the distributed standalone: see
-REGEN in ../hdinstall for what patching that costs, and for why the two
-ways forward it names are this one and teaching mnix the skew.
+REGEN in ../hdinstall for what patching that costs and for what is left
+open there.
 
 The five inch single sided medium is deliberately absent.  194 K is not
 a running system, and a diskette that can only be a data carrier is not

@@ -3,7 +3,8 @@ rebuilding the hard disk image from source
 
 disks/hdinstall/REGEN
 
-README beside this says how to run the install that is here.  This says
+README beside this says how to run the install that is here - the
+distributed 1.67 standalone on a simulated hard disk.  This says
 how to make the whole thing again from source: a set of floppy images
 carrying binaries this tree built - the reconstructed init among them -
 from which a hard disk can be formatted, installed and booted the way
@@ -21,8 +22,8 @@ stage 1 command as far as CP/M's A> prompt, with the two floppies and
 the drive named the new way - not the format itself.  Stage 3, which
 gets as far as the loader and stops where the last section says.  And
 the loader replacement below, which is how the rebuilt second level got
-onto the disk.  Stage 2 is out of HWSIM.STATUS and the scripts on the
-distribution floppy, not from a run here.
+onto the disk.  Stage 2 is out of the scripts on the distribution floppy
+and the README beside this, not from a run here.
 
 
 what has to be built first
@@ -358,28 +359,37 @@ and -k refuses to grow a file.  Nothing depends on where /etc/init
 sits, so moving it is free.
 
 
-what is still missing for the stated goal
------------------------------------------
+the stated goal, and which half of it is met
+--------------------------------------------
 
-The goal is a set of floppy images carrying binaries built here.  The
-build produces them and the install consumes them, and the join between
-is not made: standalone167.bin is the distributed 1.67 image, and it is
-skewed - its geometry comes from the minor number in the name it is
-reached by, bdev(2,93), and bit 3 of that minor selects the skew.  mnix
-reads and writes an unskewed filesystem, so it cannot put anything into
-that floppy: pointed at it, fsize reads 52481 on a 400k image and the
-root inode looks like a character device.
+The goal is a set of floppy images that carry binaries built here, from
+which a hard disk can be formatted, installed and booted.
 
-So there are two ways forward and neither has been taken:
+Half of it is met.  make bootdisks at the top of the tree builds three
+diskettes - disks/bootdisks/create_bootdisk, with its own README beside
+it - and they are built here rather than patched: mkfs a blank, populate
+it, give it a geometry.  That is the second of the two ways forward this
+section used to name.
 
-  - teach mnix the skew, so the distributed floppy can be written the
-    same way the hard disk image is, or
+What they are not is the authentic install.  They carry this tree's
+kernel and m16init, and install a hard disk the modern way; the
+distributed 1.67 standalone beside them is still what installs one the
+way the hardware did it.  Rebuilding that standalone from source here is
+the part still not done, and it is not the skew that stands in the way -
+nothing has to be taught to mnix:
 
-  - build a floppy image here rather than patching one: mkfs a blank,
-    populate it with mnix, and give it a minor whose geometry matches.
+  sa67.5.skew.1k is a link to bdev(2,93), a five inch drive with the
+  alternate sectoring bit set, and read through that name standalone167.bin
+  is a healthy filesystem - isize 17, fsize 760, the medium's own size.
+  Read by its plain name instead it is garbage, isize 49 and fsize
+  52481, and that is where the number this section used to quote came
+  from: the name is the geometry, fslib's devnum reads the minor out of
+  the link and secmap skews the block numbers with it.
 
-Until then the binaries this tree builds can be put onto the hard disk
-image directly - that is how the rebuilt init got there - but not onto
-the floppy that installs it.
+So a skewed image can be read here, and one can be written too: imd -m -a
+writes an IMD with the filesystem in it alternated, which is the order a
+shipped diskette has, and dist/create_dist passes -a 2.  What is still
+not built is the standalone itself, a flat image rather than an IMD, and
+rebuilding it has not been attempted.
 
 vim: tabstop=4 shiftwidth=4 noexpandtab:

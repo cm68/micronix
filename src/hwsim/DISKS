@@ -28,7 +28,7 @@ logical drive, format a physical drive, continue, and diagnose.
 
 HDDMA is programmable.  The size comes from the format or specify
 channel command (the FSECSIZE and SSECSIZE macros in hddma.c decode it),
-lib/harddisk.c records it in the drive label, and every later transfer
+lib/hdcdmadisk.c records it in the drive label, and every later transfer
 uses the recorded value.  FORMATMW takes "size <n>" with 128, 256, 512,
 1024 or 2048 allowed, and defaults to 1024.
 
@@ -78,7 +78,7 @@ Two ways to see it without guessing:
     the geometry is 9 sectors per track and 153 * 4 * 9 * 1024 is 5508K,
     which is the "5,508 1K sectors" FORMATMW.DOC lists for the st506.
 
-  - The access trace.  lib/harddisk.c prints every cylinder/head/sector
+  - The access trace.  lib/hdcdmadisk.c prints every cylinder/head/sector
     it touches, and the BIOS was walking sectors 0 through 8 - nine to a
     track, which is the 1024 byte geometry, not the seventeen the drive
     had been formatted with.
@@ -100,6 +100,32 @@ and the transfer goes ahead at the label's size.  That is arguably the
 honest behaviour - a real controller cannot reformat a platter because
 the host asked it to - but it means the warning in the log is the only
 notice you get before the corruption starts.
+
+
+what the commands say on the wire
+---------------------------------
+
+The format and read header encodings, which are not written down together
+anywhere but the formatter's own source and hddma.c.
+
+The format command carries the gap size and the sector count
+complemented - 0xd5 is a gap of 43, 0xee is 17 sectors - because the
+8x300 counts up to overflow rather than down to zero.  Its size code is
+the complement of the specify command's, so a 512 byte sector is 0xfc to
+format and 3 to specify.  The sector id table it points at is FOUR bytes
+an entry - cylinder low, cylinder high, head, sector - with sectors
+numbered from zero and interleaved by the skew: seventeen of them came to
+68 bytes and ran 0 6 12 1 7 13 ...
+
+Read Headers takes no sector argument - it answers with whatever comes
+round next - and gives back EIGHT bytes: mark, 0xfe, cylinder low,
+cylinder high, head, sector, then two CRC, per the HDCDMA technical
+manual 2.2.3.  Byte 4 is the head, which is what the probe in
+micronix/stand/boot/mwio.c tested before it was removed.
+
+The simulator decodes and traces all of it - OP_FMT and OP_RHEAD in
+hwsim/d1/hddma.c, which is where these were read off the wire in the
+first place.
 
 
 boot disks
@@ -491,7 +517,7 @@ Not a disk image in the sense the floppies are.  Two differences, and
 both of them will silently give you a disk that does not boot.
 
 There is a label first: 2048 bytes, holding the magic d15cc0de, the
-sector size, and the cylinders, heads and sectors per track.  lib/harddisk.c
+sector size, and the cylinders, heads and sectors per track.  lib/hdcdmadisk.c
 writes one when it creates a drive it cannot find, with the sector size
 at its 2048 byte default and the geometry zero, and grows the geometry
 as the drive gets used.  Data starts at 2048.
@@ -519,7 +545,7 @@ do it itself.
 booting one, which works
 ------------------------
 
-Done end to end in the simulator, off a hand built filesystem:
+The first proof of the path was a hand built filesystem, host side:
 
     make bootimg in micronix/stand	first level padded to a block,
 					second level after it
@@ -542,9 +568,12 @@ second level - which found the drive, read the filesystem and listed the
 root directory.  Nothing bootable in it because that filesystem is empty
 apart from /boot, which is mode 0.
 
-What is left is the part that needs the simulator rather than the host:
-m5init on a real drive from a booted 1.67, with its mkfs given -i, and
-the same path should find a kernel to load.
+That is no longer how a drive gets made.  disks/hdinstall/create_vol
+builds a bootable volume from the tree - the kernel, mkfs -i, the
+userland, /dev - and boot_vol boots it; disks/bootdisks/create_bootdisk
+does the floppy equivalent.  What survives from the experiment is the
+shape it established: the loader in front, a file owning cylinder 0, and
+the geometry taken off the label.
 
 To replace a boot after the fact, dd over the blocks the file already
 owns.  Nothing about the filesystem changes - the inode is what protects

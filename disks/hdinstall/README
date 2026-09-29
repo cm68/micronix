@@ -1,5 +1,5 @@
-installing Micronix 1.67 on a simulated hard disk
-=================================================
+installing the distributed 1.67 on a simulated hard disk
+========================================================
 
 	./run
 
@@ -10,6 +10,12 @@ unless you ask for it:
 	./run -t 0x100000	system calls and what they returned
 	./run -t 0x120000	and every entry to the kernel as well
 	./run -c 0x114		console in an xterm of its own instead
+
+Nothing here is built from this tree.  This is the authentic install:
+the distributed standalone, on a simulated drive, kept because it is
+what the hardware did.  A drive made from the tree does not need a
+floppy at all - create_vol builds a bootable volume and boot_vol boots
+it, and INSTALLATION.md section 3 is where that path is written down.
 
 Tracing goes to src/hwsim/d1/logfile - run adds -l when it sees -t,
 because trace output goes to a file descriptor and -l is what points that
@@ -98,13 +104,19 @@ what is here
 
     standalone167.bin	the 1.67 standalone, exactly as distributed
     sa67.5.skew.1k	the name that gives it its geometry, via bdev(2,93)
-    hddma-0.vol		the drive to install on, blank, 5 meg
-    hddma-1.vol		a spare, blank
+    hddma-0.blessed	a drive that boots, carrying the original userland
+    run			boots the standalone above and drives this install
 
-A drive a run writes into is named with a .vol suffix; the two above are
-the blank ones this directory ships, and everything else ending in .vol
-is what some experiment left behind.  Nothing else here carries that
+A drive a run writes into is named with a .vol suffix, and no .vol is
+tracked - what is here ending in .vol is what the last run or experiment
+left behind.  A drive worth keeping is kept the way hddma-0.blessed is,
+under a name that says what it is.  Nothing else here carries the
 suffix, which is what lets .gitignore tell the images from the scripts.
+
+The other scripts are the host-side path and REGEN is where they are:
+create_vol builds a bootable volume out of the tree, boot_vol boots one,
+check_vol runs the host checkers over one, and ncr_create_vol and
+ncr_boot_vol do the same pair for the NCR 5380.
 
 Nothing is patched.  An earlier version of this directory had the swap
 device changed and that was a mistake - see above.

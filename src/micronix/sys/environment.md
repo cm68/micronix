@@ -77,7 +77,7 @@ The syscall dispatch in `system.c` already passes three register words:
 
 - `name=value` assignment and `export` builtins; keep an internal env
   list and pass it to `execve` (via `exec`'s `environ`).  `sh` today has
-  "no variables, no environment" (BUGS file), so this is the largest
+  "no variables, no environment" (sys/TODO), so this is the largest
   visible piece.
 
 ## Order of work

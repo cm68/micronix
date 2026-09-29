@@ -105,9 +105,10 @@ what is actually in use
 -----------------------
 
 Measured, booting the 1.67 standalone off the 5 1/4 floppy with the hard
-disk attached - disks/hdinstall/run - through the loader's banner and
-directory listing, the kernel's banner, and the whole of the welcome
-text:
+disk attached - disks/hdinstall/run, which drives that distributed
+standalone and not a volume built from this tree - through the loader's
+banner and directory listing, the kernel's banner, and the whole of the
+welcome text:
 
     DJ/DMA serial out      0 characters
     DJ/DMA serial in       0 characters, never armed
@@ -203,8 +204,9 @@ what is tested
 
 Both directions, by running them.
 
-Micronix, disks/hdinstall/run: claims nothing, stays on the multio, and
-the boot is byte for byte what it was before any of this.
+Micronix, the same 1.67 standalone under disks/hdinstall/run: claims
+nothing, stays on the multio, and the boot is byte for byte what it was
+before any of this.
 
 CP/M, disk 925 from the bitsavers Morrow archive - its imd header says
 "djdma as console, blank list" and its cbios is a contyp 4 - boots to

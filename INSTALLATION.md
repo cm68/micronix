@@ -251,6 +251,17 @@ about the diskette. The volume `m16init` builds is a different case and
 gives `/b/dev/swap` the same `m16` node `/dev/root` gets, which is what a
 drive with room wants.
 
+**Driving `d1` from a script needs a pty.** The simulator wants a
+controlling terminal, so an unattended run is `script(1)` or a `forkpty`
+with an expect loop around it — `src/micronix/cmd/sh/regress.sh` is one in
+the tree. Two things bite. Match only on text that can appear in a
+command's *output*: the shell echoes what was typed and the prompt is
+already on the screen, so a pattern naming the command itself matches
+before the command has run. And leave the timeout room — `cptree` through
+a simulated Z80 is minutes and `fsck`'s bad-block hunt longer, so a short
+per-expect timeout reads as the simulator exiting on its own partway
+through.
+
 ## 8. Where to read further
 
 	BOOT.md			every way the machine gets from reset to a
@@ -259,6 +270,7 @@ drive with room wants.
 	disks/bootdisks/README	what is on an install diskette, and why
 	src/micronix/sys/DISKLABEL.md	the disk label, both idioms
 	src/micronix/stand/boot/README	the boot blocks
-	disks/hdinstall/README	the install that is already here
-	disks/hdinstall/REGEN	rebuilding all of it from source, in stages
+	disks/hdinstall/README	the authentic install, on a simulated drive
+	disks/hdinstall/REGEN	rebuilding it from source, in stages, and
+				which half of that goal is met
 	ATTRIBUTIONS.md		where the recovered pieces came from
