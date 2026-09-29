@@ -7,9 +7,9 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-OBJ = mon375.bin mon447.bin mon500.bin
-SYM = mon375.sym mon447.sym mon500.sym
-SRC = mon375.s mon447.s mon500.s
+OBJ = mon375.bin mon447.bin mon500.bin multIO.bin
+SYM = mon375.sym mon447.sym mon500.sym multIO.sym
+SRC = mon375.s mon447.s mon500.s multIO.s
 
 all: $(OBJ) $(SYM)
 
@@ -19,6 +19,12 @@ install: $(OBJ) $(SYM)
 %.bin: %.cim
 	dd if=$< of=$@ bs=1024 skip=2 count=2
 	#dd if=$< of=$@ bs=1024 skip=2 count=2 seek=2
+
+# the selector is a flat 4k image at 0xf000 - no on-board data below it,
+# so the cim is already the code and just needs padding to the full 4k
+multIO.bin: multIO.cim
+	cp multIO.cim $@
+	truncate -s 4096 $@
 
 %.lst %.cim: %.s
 	../../../tools/zmac --oo lst,cim --od . -n $<

@@ -94,6 +94,7 @@ int trace_ior;                  // i/o registration trace
  * the S100 bus memory space
  */
 byte physmem[16*1024*1024];
+byte boot_rom[BOOTROM_SIZE];    /* the 4k selector rom at 0xff0000 */
 
 /*
  * How much of the 24 bit space is backed by ram.  Reading above this

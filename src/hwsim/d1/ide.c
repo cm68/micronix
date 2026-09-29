@@ -219,21 +219,23 @@ ide_unit(int unit)
 {
     char name[20];
     int c, h, s;
+    struct drive *dh;
 
     if (handle[unit])
         return (0);
 
     sprintf(name, "ide-%d", unit);
-    handle[unit] = drive_open(name);
-    if (!handle[unit]) {
+    dh = drive_open(name);
+    if (!dh) {
         printf("ide: no drive %s, command refused\n", name);
         return (-1);
     }
-    drive_sectorsize(handle[unit], SECLEN);
-    if (!drive_geometry(handle[unit], &c, &h, &s) || !h || !s) {
+    drive_sectorsize(dh, SECLEN);
+    if (!drive_geometry(dh, &c, &h, &s) || !h || !s) {
         printf("ide: drive %s has no geometry, command refused\n", name);
         return (-1);
     }
+    handle[unit] = dh;              /* only cache a formatted drive */
     cyls[unit] = c;
     heads[unit] = h;
     spt[unit] = s;
@@ -309,6 +311,8 @@ ide_reset()
     for (i = 0; i < NREG; i++)
         tf[i] = 0;
     status = SDRDY;
+    if (ide_unit(0) < 0)
+        status = 0;             /* empty unit-0 bay: not ready */
     ide_update_irq();
     trace(trace_ide, "ide: reset\n");
 }

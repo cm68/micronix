@@ -283,42 +283,40 @@ static int pbusy;               /* the BUSY ERROR latch, cleared by RPI */
 #define BMSG        5
 
 /*
- * One target's image, and whether there is one.  Returns 0 if a target is
- * there to answer a selection, -1 if there is no disk behind the id - which
- * is the one thing that stops BSY coming back, and so the one thing that
- * tells the driver nobody is home rather than leaving it to spin out its
- * bounded poll on every byte of a command that was never going to be
- * answered.
- *
- * An image that opens but has no label is NOT this case: it is a target
- * that answers and cannot be mapped, and the command is refused with a
- * status byte instead (ncr_command).  That is the split ide.c makes too -
- * a drive that is not there and a drive that will not do the command are
- * both refusals, but only the first one is invisible on the bus.
+ * One target's image, and whether there is a usable one.  Returns 0 if a
+ * formatted target is there to answer a selection, -1 if there is no disk
+ * behind the id or the image has no geometry - either way nothing comes
+ * back with BSY, which is what tells the driver nobody is home rather than
+ * leaving it to spin out its bounded poll on a command that was never
+ * going to be answered.  This mirrors ide.c: an empty bay is invisible on
+ * the bus, not a target that refuses the command.
  */
 static int
 ncr_unit(int id)
 {
     char name[20];
+    struct drive *dh;
 
     if (handle[id])
         return (0);
 
     sprintf(name, "scsi-%d", id);
-    handle[id] = drive_open(name);
-    if (!handle[id]) {
+    dh = drive_open(name);
+    if (!dh) {
         printf("scsi: no target %s, selection unanswered\n", name);
         return (-1);
     }
 
-    drive_sectorsize(handle[id], SECLEN);
-    geomok[id] = drive_geometry(handle[id], &cyls[id], &heads[id], &spt[id]) &&
+    drive_sectorsize(dh, SECLEN);
+    geomok[id] = drive_geometry(dh, &cyls[id], &heads[id], &spt[id]) &&
         heads[id] && spt[id];
-    if (geomok[id])
-        trace(trace_scsi, "scsi: target %d is %d/%d/%d\n", id, cyls[id],
-            heads[id], spt[id]);
-    else
+    if (!geomok[id]) {
         printf("scsi: target %s has no geometry, command refused\n", name);
+        return (-1);
+    }
+    handle[id] = dh;                /* only cache a formatted drive */
+    trace(trace_scsi, "scsi: target %d is %d/%d/%d\n", id, cyls[id],
+        heads[id], spt[id]);
     return (0);
 }
 

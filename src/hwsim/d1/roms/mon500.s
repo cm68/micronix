@@ -257,7 +257,15 @@ regsav:	dw	0			;address of beginning of reg save area
 
 monstk	equ	$			;monitor stack area
 
-	ds	(200h - 01eh) - monstk
+bounce:	ds	100h			;256-byte bounce buffer
+;	The upper 4 bits of the task register gate straight to S-100 A20-A23,
+;	a whole 1M bank at a time with no overlap, so once the supervisor banks
+;	past 1M it can see none of its own low memory.  This buffer is the
+;	non-moving staging area for reading boot roms that live above 1M: it
+;	sits in on-board ram below 0x1000, off the S-100 bus, so it stays put
+;	while a rom is copied through here a chunk at a time.
+
+	ds	(200h - 01eh) - $	;fill to the initialized-stack frame
 ;********************************************************
 ;*							*
 ;*	Initialized stack at 200h contents		*
@@ -437,14 +445,12 @@ tstsw:	ld	a,(switch)		;get contents of switch
 	and	0f8h			;Ignore irrelevent bits
 	ld	d,a			;d & e contain jump address
 	ld	e,0H
-	cp	0			;boot hard disk if switches are all on
-	jp	z,ideboot
+	cp	0			;all switches on -> the 4k selector rom
+	jp	z,copyrom
 	cp	08h			;If switch 5 is off others are on
 	jp	z,nuboot		; - boot DMA controller
 	cp	10h			;If switches 4 is off, others on
 	jr	z,djdma			; - boot the DJ-DMA floppy device
-	cp	18h			;If switches 4 and 5 are off
-	jp	z,ncrboot		; - boot the NCR SCSI device
 
 check:	ld	a,(switch)		;test monitor switch
 	bit  	2,a
@@ -638,206 +644,93 @@ allerr:	xor	a
 	
 ;****************************************************************
 ;*								*
-;* IDE boot program for Decision 1 EPROM.			*
-;* For a machine fitted with the S100Computers MYIDE board, an	*
-;* 8255 PPI wired to an ATA drive's pins, in place of the	*
-;* Morrow HDCA the rest of this rom was written around.		*
+;* Selector boot: copy the 4k selector rom down from bank 15	*
+;* and run it.							*
 ;*								*
-;* The two boards answer the same switch setting and only one	*
-;* of them is in the machine, so the rom installed is what	*
-;* picks the device.  A machine with an HDCA takes MON 4.47,	*
-;* which still has Boothd; this one boots a machine with an	*
-;* IDE card.  That is ordinary practice for a rom change and	*
-;* is why nothing here tries to tell the two apart.		*
+;* The selector lives at physical 0ff0000h - bank 15, page 0f0h	*
+;* - far above the 1M the map alone can reach.  The task		*
+;* register's upper 4 bits gate straight to S-100 A20-A23, so	*
+;* banking there is a whole 1M switch with no overlap: once	*
+;* banked, none of the machine's own low memory is visible.	*
+;* Writing the task register also drops the boot rom, so the	*
+;* loop that does the banking cannot live in rom - it is copied	*
+;* into on-board ram, which stays put across both events, and	*
+;* reads 256 bytes at a time through the bounce buffer.		*
 ;*								*
-;* The drive is addressed by LBA (logical block address: the	*
-;* whole disk as one run of 512-byte sectors numbered from 0)	*
-;* so the rom needs no geometry - the drive finds the sector	*
-;* itself.  Sector 0 is the boot sector and is taken as it	*
-;* lies: nothing here rotates it.  What is read lands in main	*
-;* memory at 100h as a 512-byte first-level bootstrap, the same	*
-;* convention nuboot, the HD-DMA driver, uses, and is entered	*
-;* as task 1 at 100h.  It is not the same as Boothd's, which is	*
-;* being replaced along with the board: that one read a load	*
-;* address out of the sector's first two bytes, which is a rule	*
-;* the two-level loader does not follow.			*
-;*								*
-;* Getting there needs the one trick this driver shares with	*
-;* Boothd.  The rom runs as the supervisor, and while it does,	*
-;* every address below 1000h is the cpu board's own ram and	*
-;* prom - so a store to 100h lands in the board's 1K static	*
-;* ram, not in the memory task 1 will see.  Main memory is	*
-;* reachable only at or above 1000h, through the map.  So the	*
-;* transfer runs with task 0's segment 1 pointed at physical	*
-;* page 0, which makes 1100h in the supervisor the same byte as	*
-;* 100h in task 1.  Check restores that map entry on the way	*
-;* out, which is why the window is opened here and not earlier.	*
+;* The 4k lands at physical 0f000h, task 1's top segment, and	*
+;* is entered as task 1 at 0f000h.				*
 ;*								*
 ;****************************************************************
 
-ideboot:
-	ld	a,idepnrm		;8255 to read mode
-	out	(idepctl),a
+copyrom:
+	ld	hl,ramcode		;the copy loop, assembled at 132h
+	ld	de,0132h
+	ld	bc,ramend - ramcode
+	ldir
+	jp	0132h			;run it
 
 ;
-; Reset the drive.  /RST is asserted by port C bit 7.  The delay
-; that follows has to contain a real bus cycle, so it reads port
-; A: the drive is not driving it, but the read is what keeps the
-; loop from being dead code.
+; The copy loop, built in rom but run from on-board ram (132h).  It
+; banks the task register to 15, reads 256 bytes of the selector into
+; the bounce buffer, banks back to 0, and stores the bounce buffer to
+; physical 0f000h.  Sixteen passes cover the 4k.
 ;
-	ld	a,iderst
-	out	(idepc),a
-	ld	b,0
-idebol:	in	a,(idepa)
-	djnz	idebol
-	xor	a
-	out	(idepc),a		;/RST released
-	out	(idepdrv),a		;unit 0
+ramcode:
+	.phase	132h
+	ld	a,0f0h			;seg 1 -> page 0f0h, the rom
+	ld	(mapram+2),a
+	ld	(map+2),a
+	ld	a,00fh			;seg 2 -> page 0fh, physical 0f000h
+	ld	(mapram+4),a
+	ld	(map+4),a
+	exx
+	ld	b,16			;loop counter lives in the alternate set
+	exx
+	ld	hl,1000h		;the rom, through seg 1
+
+cploop:	ld	a,0f0h			;bank 15 (task 0 stays)
+	call	bank
+	push	hl			;save the source address
+	ld	de,bounce		;read into the bounce buffer
+	ld	bc,0100h
+	ldir
+	xor	a			;bank 0
+	call	bank
+	pop	hl			;source address back
+	push	hl
+	ld	de,1000h		;dest = source + 1000h
+	add	hl,de
+	ex	de,hl			;de = dest
+	ld	hl,bounce
+	ld	bc,0100h
+	ldir
+	pop	hl
+	inc	h			;next 256
+	exx
+	dec	b			;b'-- (8-bit dec sets Z)
+	exx
+	jr	nz,cploop
+
+	jp	0f000h			;enter the selector in task 0
 
 ;
-; Wait for the drive to say it is ready.  A real drive is busy for
-; a while after a reset, and the task file written below would be
-; ignored until it is not.  The counter is large enough to ride
-; that out and bounded, so a machine with no drive reports an
-; error rather than hanging.
+; Write the task register from A and ride out the hardware swap delay.
+; The seven nops cover it.  The caller and this code are both in
+; on-board ram, so the setrom the write triggers does not move them.
 ;
-	ld	de,0
-idebw0:	call	rdstat
-	and	40h			;DRDY
-	jr	nz,idebw1
-	dec	de
-	ld	a,d
-	or	e
-	jr	nz,idebw0
-	jp	ideberr
-
-;
-; Load the task file and issue the command.  The PPI has to be in
-; write mode to put a byte on port A, so all seven writes happen
-; with it switched once at each end rather than once per register.
-;
-; buildtf holds the bytes in register order 1 through 7: features,
-; sector count, the three LBA bytes, drive/head, and last the
-; command.  Drive/head e0h is LBA mode with unit 0 and no bits
-; above bit 23; the count is one sector.
-;
-idebw1:	ld	a,idepwrt
-	out	(idepctl),a
-	ld	hl,buildtf
-	ld	c,1
-	ld	b,7
-idebtf:	ld	a,(hl)
-	call	putreg
-	inc	hl
-	inc	c
-	djnz	idebtf
-	ld	a,idepnrm
-	out	(idepctl),a
-
-;
-; Wait for the drive to offer data.  DRQ (bit 3) rises once the
-; sector is in the drive's own buffer.  Busy and error want no
-; separate test here: a drive that failed clears DRQ, so the
-; timeout below reaches the same error by the other road.
-;
-	ld	de,0
-idebw2:	call	rdstat
-	and	08h			;DRQ
-	jr	nz,idebrd
-	dec	de
-	ld	a,d
-	or	e
-	jr	nz,idebw2
-	jp	ideberr
-
-;
-; Move the sector to 100h, a 16-bit word at a time.  Port A is the
-; low half and port B the high, and both are read inside the one
-; /RD strobe.  The drive advances a word per strobe, so a second
-; read of port A under a strobe of its own would hand back the
-; low half of the next word - which is why the word, and not the
-; byte, is the unit of the transfer here.
-;
-; The loop's first write clears /RD, so the strobe is pulsed
-; rather than held from word to word.
-;
-; The window is opened first, and the address it is written at is
-; the window's, not the bootstrap's: 1100h here is 100h to task 1.
-;
-idebrd:	xor	a
-	ld	(mapram + 2),a		;task 0 seg 1 -> physical page 0
-	ld	hl,01100h
-	ld	b,0			;256 words
-ideblp:	ld	a,idecs0		;register 0, the data register
-	out	(idepc),a
-	or	iderd
-	out	(idepc),a
-	in	a,(idepa)
-	ld	(hl),a
-	inc	hl
-	in	a,(idepb)
-	ld	(hl),a
-	inc	hl
-	djnz	ideblp
-	xor	a
-	out	(idepc),a		;/RD released
-
-	ld	de,0100h		;the bootstrap just read
-	ld	a,01			;run it as task 1
-	jp	check
-
-;
-; Read the status register.  Every task file access has the same
-; shape - port C names the register, a strobe moves the byte, port
-; A carries it - and this one names register 7, which reads as
-; status and writes as command.  It is one address on the drive's
-; pins and the direction picks which of the two is meant.
-;
-rdstat:	ld	a,idecs0|idestat
-	out	(idepc),a
-	or	iderd
-	out	(idepc),a
-	in	a,(idepa)
+bank:	ld	(task),a
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 	ret
 
-;
-; Write one task file register.  The register number arrives in C
-; and the byte in A.  /CS0 is held low across the write and /WR is
-; pulsed, which is how the drive expects to see it; the caller has
-; already put the PPI in write mode.
-;
-putreg:	out	(idepa),a		;the byte onto the data lines
-	ld	a,c
-	or	idecs0
-	out	(idepc),a		;register selected
-	or	idewr
-	out	(idepc),a		;/WR asserted - the write lands
-	ld	a,c
-	or	idecs0
-	out	(idepc),a		;/WR released, /CS0 still low
-	ret
+	.dephase
+ramend:
 
-; The task file as it is written: register 1 through register 7
-
-buildtf:
-	db	0			;1 features - unused by a read
-	db	1			;2 sector count - one sector
-	db	0			;3 LBA 0-7
-	db	0			;4 LBA 8-15
-	db	0			;5 LBA 16-23
-	db	0e0h			;6 drive/head - LBA mode, unit 0
-	db	iderdc			;7 command - read sector(s)
-
-;
-; Nothing answered, or the drive reported a failure.  Report it
-; through the shared error entry the way the other drivers do:
-; C is the device letter, B the status and D the command.
-;
-ideberr:
-	ld	c,'I'			; I for IDE board
-	ld	b,0
-	ld	d,b
-	jp	derror
 
 
 ;****************************************************************
@@ -1003,137 +896,6 @@ rdtbl:	db	0			;no seek
 endrd 	equ	$
 
 
-;****************************************************************
-;*								*
-;* NCR 5380 SCSI boot program for Decision 1 EPROM.		*
-;*								*
-;* For a machine fitted with the NCR 5380 SCSI host adapter, an	*
-;* eight-register chip at 40h, in place of the Morrow HDCA.  A	*
-;* disk is a SCSI target addressed by LBA, like the IDE board,	*
-;* and sector 0 is read with a READ(10) into 100h as the		*
-;* first-level bootstrap - the nuboot convention - and entered	*
-;* as task 1 at 100h.						*
-;*								*
-;* The card is driven by hand: no DMA and no arbitration, one	*
-;* initiator.  A byte is one REQ/ACK round trip - wait for REQ,	*
-;* move the byte, pulse ACK, wait for REQ to drop - and the two	*
-;* halves are ncrout (the command) and ncrin (the data).		*
-;*								*
-;****************************************************************
-
-; the card's ports, and the bits the two sides drive
-scsidat	equ	40h		;data register (CSD), read and write
-scsiicr	equ	41h		;initiator command: RST ACK BSY SEL DATA
-scsimr	equ	42h		;mode: MONBSY
-scsistat equ	44h		;current bus status: BSY REQ
-icr_rst	equ	80h
-icr_ack	equ	10h
-icr_bsy	equ	08h
-icr_sel	equ	04h
-icr_data equ	01h
-scsi_bsy equ	40h
-scsi_req equ	20h
-scsi_mon equ	04h
-
-ncrboot:
-	ld	a,icr_rst		;reset the bus
-	out	(scsiicr),a
-	xor	a
-	out	(scsiicr),a
-	ld	a,scsi_mon
-	out	(scsimr),a
-
-	ld	a,81h			;host id 7 and target 0 on the data lines
-	out	(scsidat),a
-	ld	a,icr_data
-	out	(scsiicr),a
-	ld	a,icr_data+icr_sel
-	out	(scsiicr),a
-	ld	a,icr_data+icr_sel+icr_bsy
-	out	(scsiicr),a
-	ld	de,0			;wait for the target to answer
-ncrsel0: in	a,(scsistat)
-	and	scsi_bsy
-	jr	nz,ncrsel1
-	dec	de
-	ld	a,d
-	or	e
-	jr	nz,ncrsel0
-	jp	ncrerr
-ncrsel1: ld	a,icr_sel+icr_bsy	;the id bits come off
-	out	(scsiicr),a
-	ld	a,icr_bsy		;then SEL
-	out	(scsiicr),a
-	xor	a			;then our BSY; the target keeps its own
-	out	(scsiicr),a
-
-	ld	hl,ncrcdb		;the command: a ten-byte READ(10)
-	ld	b,10
-ncrloop: ld	a,(hl)
-	call	ncrout
-	inc	hl
-	djnz	ncrloop
-
-	xor	a			;open the window: task 0 seg 1 -> page 0
-	ld	(mapram + 2),a
-	ld	hl,01100h		;the sector lands here, 100h to task 1
-	ld	de,0200h		;512 bytes
-ncrdata: call	ncrin
-	ld	(hl),a
-	inc	hl
-	dec	de
-	ld	a,d
-	or	e
-	jr	nz,ncrdata
-
-	call	ncrin			;the status byte (ignored)
-	call	ncrin			;the message byte (ignored)
-
-	ld	de,0100h		;the bootstrap just read
-	ld	a,1			;run it as task 1
-	jp	check
-
-ncrerr:	ld	c,'S'			;S for SCSI
-	ld	b,0
-	ld	d,b
-	jp	derror
-
-; output a byte in A: wait REQ, drive, pulse ACK, wait REQ to drop
-ncrout:	ld	c,a
-ncrout0: in	a,(scsistat)
-	and	scsi_req
-	jr	z,ncrout0
-	ld	a,c
-	out	(scsidat),a
-	ld	a,icr_data
-	out	(scsiicr),a
-	ld	a,icr_data+icr_ack
-	out	(scsiicr),a
-	ld	a,icr_data
-	out	(scsiicr),a
-ncrout1: in	a,(scsistat)
-	and	scsi_req
-	jr	nz,ncrout1
-	ret
-
-; input a byte into A: wait REQ, read, pulse ACK, wait REQ to drop
-ncrin:	in	a,(scsistat)
-	and	scsi_req
-	jr	z,ncrin
-	in	a,(scsidat)
-	ld	c,a
-	ld	a,icr_ack
-	out	(scsiicr),a
-	xor	a
-	out	(scsiicr),a
-ncrin1:	in	a,(scsistat)
-	and	scsi_req
-	jr	nz,ncrin1
-	ld	a,c
-	ret
-
-; the READ(10) command block: opcode, then a zero LBA, one block
-ncrcdb:	db	28h,0,0,0,0,0,0,1,0,0
 
 ;* The on-board diagnostics are gone, and their dispatch table with them.
 ecode0  equ	$			;End of reset prom code

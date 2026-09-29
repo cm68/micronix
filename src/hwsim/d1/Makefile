@@ -24,7 +24,7 @@ DRIVERS = djdma$(OBJSUFFIX).o multio$(OBJSUFFIX).o hddma$(OBJSUFFIX).o \
 	hdca$(OBJSUFFIX).o ide$(OBJSUFFIX).o ncr5380$(OBJSUFFIX).o \
 	mpz80$(OBJSUFFIX).o micronix$(OBJSUFFIX).o kdump$(OBJSUFFIX).o
 GENERATED = roms/mon447.bin roms/mon447.sym roms/mon375.bin roms/mon375.sym \
-	roms/mon500.bin roms/mon500.sym
+	roms/mon500.bin roms/mon500.sym roms/multIO.bin roms/multIO.sym
 DIRS = roms
 SIM = ../hwsim$(OBJSUFFIX).o ../s100$(OBJSUFFIX).o
 
