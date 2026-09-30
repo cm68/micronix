@@ -1,5 +1,5 @@
 /*
- * mkbootimg - the boot image for one kind of drive
+ * mkbootimg - a boot image: the two levels, spliced
  *
  * micronix/stand/boot/mkbootimg.c
  *
@@ -8,25 +8,39 @@
  * loads.  The first level is a sector and the second begins at the
  * next one.
  *
- * The second half of that first sector is not the first level's.  It
- * carries a struct dlabel - the geometry, where the boot area is, and
- * the rotation sys/mw.c applies - which is how a reader can map a block
- * without inverting the arithmetic that put the area where it is.  See
- * sys/dlabel.h, and cmd/mkfs, which writes the same structure when it
- * installs a boot into a filesystem it is making.
+ * The second half of that first sector is not the first level's.  From
+ * DL_OFFSET on it is a struct dlabel - the geometry, where the boot
+ * area is, and the rotation sys/mw.c applies - which is how a reader
+ * maps a block without inverting the arithmetic that put the area where
+ * it is.  See sys/dlabel.h.  Who fills that half in is what -d is for.
  *
- * So the geometry belongs in the image, and an image is per drive: this
- * is built once for each entry in the drive table and the Makefile says
- * which.  Everything that knows a drive's shape then agrees by
- * construction rather than by being told twice.
+ * A diskette's image carries the label itself, because for a diskette
+ * the label is the medium's only description: the loader reads it to
+ * find where the filesystem begins, and mnix bootflop reads it back to
+ * size the image it is making.  So a diskette image is per medium and
+ * -d says which.
+ *
+ * A hard disk's image does not, and cannot: the geometry is the
+ * drive's and no image knows which drive it will land on.  What knows
+ * is the installer, which is handed a boot image and a device -
+ * cmd/mkfs takes the shape from the device node and writes the label
+ * into the block it puts the boot in.  putlabel in cmd/mkfs/mkfsfunc.c
+ * is that writer, and it is the same code that stamps a boot installed
+ * any other way.  So a hard disk's second half is left zero here, for
+ * that writer to fill, and this tool is never told a geometry it would
+ * only be guessing at.
+ *
+ * Zero is what makes that legal, and it is checked rather than assumed:
+ * anything at all in that half is the first level having grown into the
+ * label, which is a boot that would be quietly truncated.
  *
  * This is a host program.  It includes the target's dlabel.h so that
  * the structure it writes cannot drift from the structure mkfs writes
- * and the loader will one day read - the fields are 16 bit and this
- * writes them a byte at a time, little endian, so a host with wider
- * ints or another byte order still produces a Z80 image.
+ * and the loader reads - the fields are 16 bit and this writes them a
+ * byte at a time, little endian, so a host with wider ints or another
+ * byte order still produces a Z80 image.
  *
- *	mkbootimg <level1> <level2> <tracks> <heads> <spt> <out>
+ *	mkbootimg <level1> <level2> <out>
  *	mkbootimg -d <level01> <level2> <tracks> <heads> <spt> <firstsec>
  *	    <toff> <config> <out>
  *
@@ -143,7 +157,8 @@ main(int argc, char **argv)
     int n;
     int off;
     int dflag;
-    unsigned tracks, heads, spt, firstsec, toff, config, spc, roll, cyl0, bootblks;
+    unsigned tracks = 0, heads = 0, spt = 0, firstsec = 0, toff = 0, config = 0;
+    unsigned spc = 0, roll = 0, cyl0 = 0, bootblks = 0;
     int c;
 
     pname = argv[0];
@@ -153,64 +168,57 @@ main(int argc, char **argv)
         argv++;
         argc--;
     }
-    if (dflag ? argc != 10 : argc != 7) {
+    if (dflag ? argc != 10 : argc != 4) {
         fprintf(stderr,
-            "usage: %s [-d] <level1> <level2> <tracks> <heads> <spt>%s<out>\n",
-            pname, dflag ? " <firstsec> <toff> <config>" : "");
+            "usage: %s <level1> <level2> <out>\n"
+            "       %s -d <level01> <level2> <tracks> <heads> <spt>"
+            " <firstsec> <toff> <config> <out>\n",
+            pname, pname);
         exit(1);
     }
     l1name = argv[1];
     l2name = argv[2];
-    tracks = strtoul(argv[3], 0, 0);
-    heads = strtoul(argv[4], 0, 0);
-    spt = strtoul(argv[5], 0, 0);
-    firstsec = dflag ? strtoul(argv[6], 0, 0) : 0;
-    toff = dflag ? strtoul(argv[7], 0, 0) : 0;
-    config = dflag ? strtoul(argv[8], 0, 0) : 0;
-    outname = argv[dflag ? 9 : 6];
-    if (!tracks || !heads || !spt) {
-        die("a geometry of zero");
-    }
-    /*
-     * Zero or one, and nothing else: the firmware's own tables have one
-     * numbering for hard sectored media and one for soft, and a track
-     * that began at sector five would be a format nobody has.
-     */
-    if (firstsec > 1) {
-        die("a first sector that is neither zero nor one");
-    }
-    if (config && !knownformat(config)) {
-        die("a format byte the driver has no row for");
-    }
-    /*
-     * Only a medium that carries one may name a format: the byte is the
-     * hard sectored convention, and the media numbered from one are the
-     * soft sectored ones the driver never looks the byte up for.
-     */
-    if (config && firstsec != 0) {
-        die("a format byte on a medium that does not number from zero");
-    }
-
-    /*
-     * Where the boot area is, and which idiom says so.
-     *
-     * A hard disk is rolled: mw.c rotates the mapping, so physical
-     * cylinder 0 is not block 0 but the block whose cylinder index is
-     * tracks - tracks/2, and the boot is a file inside the filesystem.
-     * Computed the way mkfs computes it, and for the same reason.  A
-     * diskette is not: dj.c adds toff and never rotates, so the boot is
-     * simply the blocks in front of cylinder toff and no filesystem
-     * block reaches them.
-     */
-    spc = heads * spt;
+    outname = argv[dflag ? 9 : 3];
     if (dflag) {
+        tracks = strtoul(argv[3], 0, 0);
+        heads = strtoul(argv[4], 0, 0);
+        spt = strtoul(argv[5], 0, 0);
+        firstsec = strtoul(argv[6], 0, 0);
+        toff = strtoul(argv[7], 0, 0);
+        config = strtoul(argv[8], 0, 0);
+        if (!tracks || !heads || !spt) {
+            die("a geometry of zero");
+        }
+        /*
+         * Zero or one, and nothing else: the firmware's own tables have
+         * one numbering for hard sectored media and one for soft, and a
+         * track that began at sector five would be a format nobody has.
+         */
+        if (firstsec > 1) {
+            die("a first sector that is neither zero nor one");
+        }
+        if (config && !knownformat(config)) {
+            die("a format byte the driver has no row for");
+        }
+        /*
+         * Only a medium that carries one may name a format: the byte is
+         * the hard sectored convention, and the media numbered from one
+         * are the soft sectored ones the driver never looks the byte up
+         * for.
+         */
+        if (config && firstsec != 0) {
+            die("a format byte on a medium that does not number from zero");
+        }
+
+        /*
+         * Where the boot area is.  A diskette is not rolled - dj.c adds
+         * toff and never rotates - so the boot is simply the blocks in
+         * front of cylinder toff and no filesystem block reaches them.
+         */
+        spc = heads * spt;
         roll = 0;
         cyl0 = 0;
         bootblks = toff * spc;
-    } else {
-        roll = tracks >> 1;
-        cyl0 = (tracks - roll) * spc;
-        bootblks = spc;
     }
 
     /*
@@ -273,50 +281,51 @@ main(int argc, char **argv)
     }
 
     /*
-     * And the label, into the second half of it.  Each field is placed
-     * by offsetof rather than by counting: the structure is shared with
-     * mkfs and the loader, and a field added to it should move these
-     * rather than silently shift them all by two.
+     * And the label, into the second half of it - on a diskette only.
+     * A hard disk's half is left as the static buffer found it, zero,
+     * for mkfs to fill: see the header.  Each field is placed by
+     * offsetof rather than by counting, because the structure is shared
+     * with mkfs and the loader and a field added to it should move
+     * these rather than silently shift them all by two.
      */
-    off = DL_OFFSET;
-    if (off + (int)sizeof(struct dlabel) > BSIZE) {
-        die("the label does not fit the sector");
+    if (dflag) {
+        off = DL_OFFSET;
+        if (off + (int)sizeof(struct dlabel) > BSIZE) {
+            die("the label does not fit the sector");
+        }
+        memcpy(&sector[off + offsetof(struct dlabel, d_magic)], DL_MAGIC, 4);
+        put16(off + offsetof(struct dlabel, d_version), DL_VERS_SLICE);
+        put16(off + offsetof(struct dlabel, d_tracks), tracks);
+        put16(off + offsetof(struct dlabel, d_heads), heads);
+        put16(off + offsetof(struct dlabel, d_spt), spt);
+        put16(off + offsetof(struct dlabel, d_cyl0), cyl0);
+        put16(off + offsetof(struct dlabel, d_bootblks), bootblks);
+        put16(off + offsetof(struct dlabel, d_roll), roll);
+        /*
+         * d_fsize, d_isize and d_swap describe a filesystem, and there
+         * is not one yet.  mkfs fills them in when it makes one,
+         * rewriting the whole label as it does.  They are zero here,
+         * and a reader that cares has to tell the difference.
+         */
+        put16(off + offsetof(struct dlabel, d_fsize), 0);
+        put16(off + offsetof(struct dlabel, d_isize), 0);
+        put16(off + offsetof(struct dlabel, d_swap), 0);
+        put16(off + offsetof(struct dlabel, d_bootslice), 0);
+        /*
+         * The one slice a diskette has: 'a', from cylinder toff to the
+         * end of the medium - a length of zero.
+         */
+        put16(off + offsetof(struct dlabel, d_slice[0].d_off), toff);
+        put16(off + offsetof(struct dlabel, d_slice[0].d_len), 0);
+        /*
+         * Where this medium's sectors are numbered from.  The loader
+         * cannot read the label without knowing it, so it reads the
+         * first sector of the track that carries a magic and takes the
+         * answer from there; this is the same answer written down, and
+         * every block after the first needs it.
+         */
+        put16(off + offsetof(struct dlabel, d_firstsec), firstsec);
     }
-    memcpy(&sector[off + offsetof(struct dlabel, d_magic)], DL_MAGIC, 4);
-    put16(off + offsetof(struct dlabel, d_version),
-        dflag ? DL_VERS_SLICE : DL_VERSION);
-    put16(off + offsetof(struct dlabel, d_tracks), tracks);
-    put16(off + offsetof(struct dlabel, d_heads), heads);
-    put16(off + offsetof(struct dlabel, d_spt), spt);
-    put16(off + offsetof(struct dlabel, d_cyl0), cyl0);
-    put16(off + offsetof(struct dlabel, d_bootblks), bootblks);
-    put16(off + offsetof(struct dlabel, d_roll), roll);
-    /*
-     * d_fsize, d_isize and d_swap describe a filesystem, and there is
-     * not one yet.  mkfs fills them in when it makes one, rewriting the
-     * whole label as it does.  They are zero here, and a reader that
-     * cares has to tell the difference.
-     */
-    put16(off + offsetof(struct dlabel, d_fsize), 0);
-    put16(off + offsetof(struct dlabel, d_isize), 0);
-    put16(off + offsetof(struct dlabel, d_swap), 0);
-    put16(off + offsetof(struct dlabel, d_bootslice), 0);
-    /*
-     * The one slice a diskette has: 'a', from cylinder toff to the end
-     * of the medium - a length of zero.  Without -d, toff is zero and
-     * this is the empty table a rolled disk carries, which reads as the
-     * whole drive and is exactly what its d_roll already says.
-     */
-    put16(off + offsetof(struct dlabel, d_slice[0].d_off), toff);
-    put16(off + offsetof(struct dlabel, d_slice[0].d_len), 0);
-    /*
-     * Where this medium's sectors are numbered from.  The loader cannot
-     * read the label without knowing it, so it reads the first sector of
-     * the track that carries a magic and takes the answer from there;
-     * this is the same answer written down, and every block after the
-     * first needs it.
-     */
-    put16(off + offsetof(struct dlabel, d_firstsec), firstsec);
 
     if (!(out = fopen(outname, "wb"))) {
         die("cannot write the image");

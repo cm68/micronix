@@ -186,14 +186,14 @@ reset()
 
 	/*
 	 * The geometry, out of the label in the boot cylinder.  mkfs
-	 * writes it there when it installs a boot, and stand/mkbootimg
-	 * builds one image per drive with it already in - so the answer
-	 * is on the disk and does not have to be guessed.
+	 * writes it there when it installs a boot, and takes it from the
+	 * drive it is installing onto - so the answer is on the disk and
+	 * does not have to be guessed.
 	 *
 	 * Physical cylinder 0, head 0, sector 0 is LBA 0, which is the
 	 * one sector a drive can be asked for knowing nothing about it.
 	 * That is what the rom read this loader's first level from, and
-	 * it is where mkbootimg puts the label.  It lands in the working
+	 * it is where mkfs writes the label.  It lands in the working
 	 * buffer, boot.c's buf0 at 0x1000, which nothing has used yet.
 	 */
 	tries = 0;
@@ -243,7 +243,7 @@ reset()
 		 */
 		outstr("No disk label at cylinder 0.\n");
 		outstr("The geometry is read from there and guessed nowhere.\n");
-		outstr("mkfs -i writes a label; stand/mkbootimg builds one in.\n");
+		outstr("mkfs -i writes one when it installs a boot.\n");
 		bail();
 	}
 }

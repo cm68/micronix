@@ -12,10 +12,10 @@
 #	d5ds	5 1/4 inch, double sided 40 cyl, 2 heads, 10 x 512, 760 blocks
 #
 # <target> is the drive type the diskette installs onto - a name from the
-# specs[] table in sys/mw.c, m16 by default.  It picks the boot image the
-# drive gets and the init script that does the install, so a diskette is
-# one article for one target and the default is what "make bootdisks"
-# builds.  An install onto any other drive type wants its own:
+# specs[] table in sys/mw.c, m16 by default.  It picks the init script
+# that does the install, so a diskette is one article for one target and
+# the default is what "make bootdisks" builds.  An install onto any other
+# drive type wants its own:
 #
 #	./create_bootdisk d8ss /tmp/d8ss-m40.img m40
 #
@@ -76,12 +76,14 @@ bootdir="$srcdir/stand/boot"
 # with a zeroed boot area, which mounts and passes fsck and does not boot,
 # so the file is here or the diskette cannot do the one job it has.
 #
-# It is the target's own image, and it has to be: the boot carries the
-# drive's geometry in its label, so an m16 boot on an m40 drive is a boot
-# that reads the wrong cylinder.  3792 bytes, so eight blocks of the five
-# inch diskette's twenty-five free.
+# One image serves every target, because the geometry is not in it.  The
+# label is written by the mkfs the init script runs, on the target
+# machine, out of the drive node - the only thing that knows what the
+# drive is.  So the target names the init script below and not the boot.
+# 3765 bytes, so eight blocks of the five inch diskette's twenty-five
+# free.
 #
-hdinit="$bootdir/bootimg-$target"
+hdinit="$bootdir/bootimg"
 
 #
 # What goes in /bin.  Not a copy of the tree's bin: this is the list the
@@ -135,12 +137,12 @@ if [ ! -f "$devlist" ]; then
 fi
 if [ ! -f "$bootimg" ]; then
 	echo "$0: $bootimg not found - build the boot images first:" >&2
-	echo "$0:   make -C $srcdir/stand INC=/usr/local/usr/include djbootimgs" >&2
+	echo "$0:   make -C $srcdir/stand/boot djbootimgs" >&2
 	exit 1
 fi
 if [ ! -f "$hdinit" ]; then
 	echo "$0: $hdinit not found - build the boot images first:" >&2
-	echo "$0:   make -C $srcdir/stand INC=/usr/local/usr/include bootimgs" >&2
+	echo "$0:   make -C $srcdir/stand/boot bootimgs" >&2
 	exit 1
 fi
 if [ ! -f "$rootfiles/${target}init" ]; then

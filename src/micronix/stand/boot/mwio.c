@@ -115,9 +115,9 @@ reset()
 
 	/*
 	 * The geometry, out of the label in the block we were loaded
-	 * from.  mkfs writes it there when it installs a boot, and
-	 * stand/mkbootimg builds one image per drive with it already in -
-	 * so the answer is on the disk and does not have to be guessed.
+	 * from.  mkfs writes it there when it installs a boot, and takes
+	 * it from the drive it is installing onto - so the answer is on
+	 * the disk and does not have to be guessed.
 	 *
 	 * This used to probe: read header on each of the eight possible
 	 * heads and see which answered.  The command takes no head
@@ -186,7 +186,7 @@ reset()
 		 */
 		outstr("No disk label at cylinder 0.\n");
 		outstr("The geometry is read from there and guessed nowhere.\n");
-		outstr("mkfs -i writes a label; stand/mkbootimg builds one in.\n");
+		outstr("mkfs -i writes one when it installs a boot.\n");
 		bail();
 	}
 

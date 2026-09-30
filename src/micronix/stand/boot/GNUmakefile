@@ -157,9 +157,17 @@ ncrboot1.bin: ncrboot1.s
 
 #
 # What mkfs -i writes: the first level in block 0, the second level
-# from block 1.  The second half of that first block holds a struct
-# dlabel - the geometry - so an image is per drive, one for each entry
-# in the table below (the drives from specs[] in sys/mw.c):
+# from block 1.  One image, and not one per drive: the second half of
+# that first block is a struct dlabel, and on a hard disk the label is
+# the drive's.  mkfs -i takes the shape from the device node it is
+# handed rather than from the boot file, and writes the label into the
+# block it puts the boot in - putlabel in cmd/mkfs/mkfsfunc.c, the same
+# code that stamps a boot installed any other way.  So the half is left
+# empty here for that writer to fill, and this tool is never told a
+# geometry it would only be guessing at.  See stand/boot/mkbootimg.c.
+#
+# The drives a label can describe, from specs[] in sys/mw.c, which is
+# the table cmd/mkfs carries too - name:tracks:heads:sectors:
 #
 #	153 4 17	10404	 5 meg
 #	306 4 17	20808	10 meg
@@ -167,84 +175,45 @@ ncrboot1.bin: ncrboot1.s
 #	640 6 17	65280	32 meg
 #	733 5 17	62305	40 meg
 #
-DRIVES = m5:153:4:17 m10:306:4:17 m16:306:6:17 m32:640:6:17 m40:733:5:17
-BOOTIMGS = $(foreach d,$(DRIVES),bootimg-$(word 1,$(subst :, ,$(d))))
+BOOTIMGS = bootimg
 
 bootimgs: $(BOOTIMGS)
 
-# A host program that writes the per-drive image; it includes the
-# target's dlabel.h by path so the structure it writes cannot drift.
+# A host program that writes the image; it includes the target's
+# dlabel.h by path so the structure it writes cannot drift.
 mkbootimg: mkbootimg.c
 	cc -o $@ mkbootimg.c
 
-$(BOOTIMGS): mwboot1.bin mwboot.com mkbootimg
-	@set -e; for d in $(DRIVES); do \
-		n=`echo $$d | cut -d: -f1`; \
-		[ bootimg-$$n = $@ ] || continue; \
-		./mkbootimg mwboot1.bin mwboot.com \
-		    `echo $$d | cut -d: -f2` \
-		    `echo $$d | cut -d: -f3` \
-		    `echo $$d | cut -d: -f4` $@; \
-		echo "$@: `echo $$d | cut -d: -f2`/`echo $$d | cut -d: -f3`/`echo $$d | cut -d: -f4`"; \
-	done
+bootimg: mwboot1.bin mwboot.com mkbootimg
+	./mkbootimg mwboot1.bin mwboot.com $@
 
 #
-# bootimg with no drive named is the 5 meg, which is what the images
-# in disks/hdinstall are.
+# And the same for the IDE card: one image, for the same reason, and a
+# separate file from bootimg rather than the same one built twice,
+# because what goes in them differs.  bootimg holds mwboot1/mwboot,
+# which speak the HD-DMA's command block; this holds ideboot1/ideboot,
+# which write the drive's task file and move the sector through the
+# 8255.  An image is a boot for one card and cannot be both.
 #
-bootimg: bootimg-m5
-	cp bootimg-m5 bootimg
-
-#
-# And the same for the IDE card.  One image per drive for the same
-# reason: the label is what carries the geometry, this loader reads it,
-# and a card that addresses by LBA still has to be told where a
-# filesystem block is on the platter.
-#
-# These are separate files from the bootimg-* above rather than the same
-# ones built twice, because what goes in them differs: bootimg-* holds
-# mwboot1/mwboot, which speak HD-DMA, and these hold ideboot1/ideboot,
-# which speak the 8255.  An image is a boot for one card and cannot be
-# both.
-#
-IDEBOOTIMGS = $(foreach d,$(DRIVES),idebootimg-$(word 1,$(subst :, ,$(d))))
+IDEBOOTIMGS = idebootimg
 
 idebootimgs: $(IDEBOOTIMGS)
 
-$(IDEBOOTIMGS): ideboot1.bin ideboot.com mkbootimg
-	@set -e; for d in $(DRIVES); do \
-		n=`echo $$d | cut -d: -f1`; \
-		[ idebootimg-$$n = $@ ] || continue; \
-		./mkbootimg ideboot1.bin ideboot.com \
-		    `echo $$d | cut -d: -f2` \
-		    `echo $$d | cut -d: -f3` \
-		    `echo $$d | cut -d: -f4` $@; \
-		echo "$@: `echo $$d | cut -d: -f2`/`echo $$d | cut -d: -f3`/`echo $$d | cut -d: -f4`"; \
-	done
+idebootimg: ideboot1.bin ideboot.com mkbootimg
+	./mkbootimg ideboot1.bin ideboot.com $@
 
 #
-# And the same for the NCR 5380 card.  The geometry argument is the same
-# DRIVES table for the same reason: the label is what carries it, this
-# loader reads it, and a card that addresses by LBA still has to be told
-# where a filesystem block is on the platter.  The NCR 5380 card's own target
-# 0 speaks to a volume laid out for the HD-DMA block for block, so the
-# images are byte-compatible with the ones above and differ only in which
-# loader is in them.
+# And the same for the NCR 5380 card.  Its target 0 speaks to a volume
+# laid out for the HD-DMA block for block, so this image is
+# byte-compatible with the one above and differs only in which loader is
+# in it.
 #
-NCRBOOTIMGS = $(foreach d,$(DRIVES),ncrbootimg-$(word 1,$(subst :, ,$(d))))
+NCRBOOTIMGS = ncrbootimg
 
 ncrbootimgs: $(NCRBOOTIMGS)
 
-$(NCRBOOTIMGS): ncrboot1.bin ncrboot.com mkbootimg
-	@set -e; for d in $(DRIVES); do \
-		n=`echo $$d | cut -d: -f1`; \
-		[ ncrbootimg-$$n = $@ ] || continue; \
-		./mkbootimg ncrboot1.bin ncrboot.com \
-		    `echo $$d | cut -d: -f2` \
-		    `echo $$d | cut -d: -f3` \
-		    `echo $$d | cut -d: -f4` $@; \
-		echo "$@: `echo $$d | cut -d: -f2`/`echo $$d | cut -d: -f3`/`echo $$d | cut -d: -f4`"; \
-	done
+ncrbootimg: ncrboot1.bin ncrboot.com mkbootimg
+	./mkbootimg ncrboot1.bin ncrboot.com $@
 
 #
 # The floppy boot images: one per medium, because the label is what
@@ -327,10 +296,17 @@ $(DJBOOTIMGS): djboot1.bin djboot.com mkbootimg
 # The loader is not a program to install: install-hwsim reads the
 # boot images out of this directory.  What it builds instead is
 # cleaned up here - mwboot1.o/mwboot1.abs and djboot1.o/djboot1.abs are
-# made inside the *.bin recipes, and mkbootimg is a host tool.
+# made inside the *.bin recipes, and mkbootimg is a host tool.  djload
+# is the native Makefile's dd-built floppy image; the cross build makes
+# djbootimg-* instead, but clobber should clear either.  The
+# bootimg-m* names are the per-drive hard disk images this used to
+# build, before the geometry moved wholly to mkfs; a tree that predates
+# that still has them, so they are cleared by pattern rather than by
+# name.
 GENERATED = mwboot1.o mwboot1.abs djboot1.o djboot1.abs \
 	ideboot1.o ideboot1.abs ncrboot1.o ncrboot1.abs mkbootimg \
-	bootimg bootimg-* djboot.com djbootimg-* idebootimg-* ncrbootimg-*
+	bootimg bootimg-* idebootimg idebootimg-* ncrbootimg ncrbootimg-* \
+	djload djboot.com djbootimg-*
 
 install:
 

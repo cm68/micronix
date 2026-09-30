@@ -30,7 +30,7 @@ root=`cd "$here/../.." && pwd`
 
 mnix="$root/src/tools/mnix"
 setdev="$root/src/tools/setdev"
-bootimg="$root/src/micronix/stand/boot/bootimg-m16"
+bootimg="$root/src/micronix/stand/boot/bootimg"
 devlist="$root/src/micronix/dev/devlist"
 kernel="$root/src/micronix/sys/unix"
 srcdir="$root/src/micronix"
@@ -61,7 +61,7 @@ if [ ! -f "$devlist" ]; then
 fi
 if [ ! -f "$bootimg" ]; then
 	echo "$0: $bootimg not found - build the boot first:" >&2
-	echo "$0:   make -C $root/src/micronix/stand INC=/usr/local/usr/include bootimgs" >&2
+	echo "$0:   make -C $root/src/micronix/stand/boot bootimgs" >&2
 	exit 1
 fi
 if [ ! -f "$filesystem/etc/init" ]; then

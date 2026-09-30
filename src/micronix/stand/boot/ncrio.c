@@ -151,7 +151,7 @@ reset()
 	} else {
 		outstr("No disk label at cylinder 0.\n");
 		outstr("The geometry is read from there and guessed nowhere.\n");
-		outstr("mkfs -i writes a label; stand/mkbootimg builds one in.\n");
+		outstr("mkfs -i writes one when it installs a boot.\n");
 		bail();
 	}
 }

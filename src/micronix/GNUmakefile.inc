@@ -412,7 +412,7 @@ HWMEDIA   ?= m16
 HWROOTDEV ?= 3/8
 HWROOTMAJ = $(firstword $(subst /, ,$(HWROOTDEV)))
 HWROOTMIN = $(lastword $(subst /, ,$(HWROOTDEV)))
-BOOTIMG   ?= $(HOSTROOT)/src/micronix/stand/boot/bootimg-$(HWMEDIA)
+BOOTIMG   ?= $(HOSTROOT)/src/micronix/stand/boot/bootimg
 MNIX      ?= $(HOSTROOT)/src/tools/mnix
 SETDEV    ?= $(BIN)/setdev
 

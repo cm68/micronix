@@ -107,10 +107,12 @@ src/micronix/stand/boot/djboot1.bin
 src/micronix/stand/boot/ideboot.com
 src/micronix/stand/boot/ideboot1.abs
 src/micronix/stand/boot/ideboot1.bin
+src/micronix/stand/boot/idebootimg
 src/micronix/stand/boot/idebootimg-*
 src/micronix/stand/boot/ncrboot.com
 src/micronix/stand/boot/ncrboot1.abs
 src/micronix/stand/boot/ncrboot1.bin
+src/micronix/stand/boot/ncrbootimg
 src/micronix/stand/boot/ncrbootimg-*
 src/micronix/stand/boot/djbootimg-*
 src/micronix/stand/boot/djload
