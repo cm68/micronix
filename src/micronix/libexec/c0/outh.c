@@ -3,6 +3,7 @@
  * unit carries both the emitters and their support machinery.
  */
 
+#include <stdlib.h>
 #include "p1core.h"
 #include "p1expr.h"
 #include "p1type.h"
