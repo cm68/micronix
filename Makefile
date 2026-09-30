@@ -11,9 +11,11 @@ all: sim d1 filesystem
 	cd src ; make
 
 #
-# The simulators, installed as copies into bin/ - not symlinks, which
-# break when the tree is moved.  bin/ is also where the cross tools
-# (mxccc, mxar, mxnm) land; the simulators are their peers there.
+# The simulators, installed as symlinks into bin/.  bin/ is also where
+# the cross tools (mxccc, mxar, mxnm) land; the simulators are their
+# peers there.  The link is relative so that moving the whole tree
+# keeps it pointing at its target, and -f replaces a plain file left
+# behind by the copy-style rule this used to be.
 #
 sim: bin/sim
 
@@ -21,11 +23,11 @@ d1: bin/d1
 
 bin/sim: src/usersim/sim
 	mkdir -p bin
-	cp src/usersim/sim bin/sim
+	ln -sf ../src/usersim/sim bin/sim
 
 bin/d1: src/hwsim/d1/d1
 	mkdir -p bin
-	cp src/hwsim/d1/d1 bin/d1
+	ln -sf ../src/hwsim/d1/d1 bin/d1
 
 src/usersim/sim src/tools/readall:
 	cd src ; make
