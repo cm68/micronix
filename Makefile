@@ -58,15 +58,15 @@ filesystem: src/tools/readall
 	echo "path /bin /usr/bin" > filesystem/.sh
 
 clean:
-	for dir in src ; do \
+	for dir in src src/hwsim src/micronix ; do \
 		(cd $$dir ; make clean) \
 	done
 
 clobber:
-	for dir in src ; do \
+	for dir in src src/hwsim src/micronix ; do \
 		(cd $$dir ; make clobber) \
 	done
-	rm -rf filesystem bin sim
+	rm -rf filesystem bin libexec ccc lib usr sim
 
 rebuildfs:
 	rm -rf filesystem

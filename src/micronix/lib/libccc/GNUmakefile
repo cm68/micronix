@@ -50,3 +50,7 @@ host: libccc-host.a
 
 hostclean:
 	rm -f $(HOSTOBJS) libccc-host.a
+
+# clobber takes the host archive too, so a clobbered tree is a clean
+# checkout (see libexec/host.mk).
+clobber: hostclean

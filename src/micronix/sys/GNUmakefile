@@ -46,9 +46,13 @@ EXTRA	= BUILDING TODO
 # build.h is written by the rule below, and unix.link is the half-built
 # image unix is made from; GNUmakefile.inc's clobber takes GENERATED
 # away, so neither is left lying in the directory for the next build to
-# include or to copy.  unix itself is $(TARGET), which clobber removes
-# for the same reason.
-GENERATED = build.h unix.link
+# include or to copy.  A driver is built twice - linked into unix.link
+# and linked again as a module - so its objects, .mod and .page are not
+# in OBJS; they ride GENERATED for the same reason.  unix itself is
+# $(TARGET), which clobber removes.
+MODS	= dj mw ide ncr
+GENERATED = build.h unix.link $(MODS:%=%.mod) $(MODS:%=%.page) \
+	$(MODS:%=%.o) $(MODS:%=%hdr.o)
 
 # The compiler and linker are this tree's own.  CCC defaults to
 # $(BIN)/mxccc in GNUmakefile.inc; the linker mxld is beside it.
@@ -398,8 +402,6 @@ unix.link: $(OBJS)
 # warning is the measure of what is left to do: it goes away when the
 # driver leaves the kernel.
 #
-MODS = dj mw ide ncr
-
 $(MODS:%=%.mod): %.mod: %hdr.o %.o unix.link
 	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ $*hdr.o $*.o
 

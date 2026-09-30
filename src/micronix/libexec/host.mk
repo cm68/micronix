@@ -135,3 +135,8 @@ hostinstall: host
 
 hostclean:
 	rm -f $(HOSTOBJS) $(DBGFILES) $(HOSTINSTDIR)/$(HOSTPROG)
+
+# clobber takes the host build too: the .ho objects and the generated
+# debug files are as much build product as the Z80 .o's, and a clobbered
+# tree should look like a clean checkout.
+clobber: hostclean

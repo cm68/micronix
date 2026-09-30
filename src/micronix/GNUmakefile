@@ -157,7 +157,7 @@ all: $(ARMX) $(NMX) $(SETDEVX) $(MXLZ4) $(MXUNLZ4) $(MXPAKSRC) $(MXTAR)
 # clobber removes the host tools and src.tar as well as what the
 # recursion removes.  GNUmakefile.inc's clobber reads GENERATED.
 #
-GENERATED = src.tar $(ARMX) $(NMX) $(SETDEVX) $(MXLZ4) $(MXUNLZ4) $(MXPAKSRC) $(MXTAR)
+GENERATED = src.tar srctar.tar $(ARMX) $(NMX) $(SETDEVX) $(MXLZ4) $(MXUNLZ4) $(MXPAKSRC) $(MXTAR)
 
 $(ARMX): $(ARSRC)
 	mkdir -p $(BIN)

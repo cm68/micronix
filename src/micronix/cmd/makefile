@@ -185,6 +185,7 @@ clean:
 	cd grep ; make clean
 	cd icheck ; make clean
 	cd init ; make clean
+	cd kill ; make clean
 	cd label ; make clean
 	cd ld ; make clean
 	cd less ; make clean
@@ -242,6 +243,7 @@ clobber:
 	cd grep ; make clobber
 	cd icheck ; make clobber
 	cd init ; make clobber
+	cd kill ; make clobber
 	cd label ; make clobber
 	cd ld ; make clobber
 	cd less ; make clobber
