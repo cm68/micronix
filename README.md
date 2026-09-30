@@ -181,7 +181,7 @@ and quicker to fill.
 	# build the host cross-tools (once)
 	make hostcc				the compiler: mxccc, mxasz, mxld
 	make -C src/tools			mnix, the image reader/writer
-	make -C src/micronix/stand/boot		the boot blocks, bootimg-m16
+	make -C src/micronix/stand/boot		the boot blocks, bootimg
 
 	# build the kernel.  sys is three overlays at a fixed base, so the
 	# cross build does not link it - build "unix" with the host tools:
@@ -197,7 +197,7 @@ and quicker to fill.
 
 	# make the m16 disk.  A volume is named with a .vol suffix.
 	src/tools/mnix initialize m16 disks/hdinstall/hddma-0.vol
-	src/tools/mnix mkfs -i src/micronix/stand/boot/bootimg-m16 \
+	src/tools/mnix mkfs -i src/micronix/stand/boot/bootimg \
 		disks/hdinstall/hddma-0.vol
 	bin/setdev unix 3/8 0/0		# root 3/8 (m16), swap nodev
 	src/tools/mnix -f disks/hdinstall/hddma-0.vol write unix /micronix

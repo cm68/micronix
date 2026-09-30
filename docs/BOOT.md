@@ -361,14 +361,19 @@ The sizes are the current build's output; they drift with the sources.
 | `djboot1.s` | 338 B | DJ-DMA levels 0 and 1 — one file, split at byte 128 |
 | `ideboot1.s` | 243 B | IDE first level |
 | `ncrboot1.s` | 254 B | NCR 5380 first level |
-| `mwboot.com` | 3280 B | HDC-DMA second level |
-| `djboot.com` | 3339 B | DJ-DMA second level |
-| `ideboot.com` | 3612 B | IDE second level |
-| `ncrboot.com` | 3856 B | NCR 5380 second level |
+| `mwboot.com` | 3253 B | HDC-DMA second level |
+| `djboot.com` | 3333 B | DJ-DMA second level |
+| `ideboot.com` | 3600 B | IDE second level |
+| `ncrboot.com` | 3844 B | NCR 5380 second level |
 | `djload` | 5120 B | 10 × 512 B: level 0 in block 0, level 1 in block 1, `djboot.com` from block 2 |
-| `bootimg-m*` | 3792 B | the HDC-DMA images, one per `DRIVES` row |
-| `idebootimg-m*` | 4124 B | the IDE images |
-| `ncrbootimg-m*` | 4368 B | the NCR 5380 images |
+| `djbootimg-d8ss/-d8ds/-d5ds` | 4357 B | the floppy images, one per medium — the label is the geometry |
+| `bootimg` | 3765 B | the HDC-DMA image, one for every drive |
+| `idebootimg` | 4112 B | the IDE image |
+| `ncrbootimg` | 4356 B | the NCR 5380 image |
+
+The three hard disk images are 512 B + the second level: sector 0 is the first
+level with the label's half of it left zero. One image serves every drive of
+that card, because the geometry is not in it — see below.
 
 `CSRCS = boot.c mwio.c djio.c ideio.c ncrio.c`, `ASSRCS = sexit.s`. The second
 level links `-Ttext=0x100 -L$(CCCLIB) sexit.o boot.o mwio.o` plus libc/libu/libc;
@@ -387,10 +392,14 @@ are exactly 128 bytes. That is the one silent-failure mode in the file, so
 the `djload` recipe asserts it: byte 128 of `djboot1.bin` must be level 1's
 first opcode, `0x21` (`ld hl,BASE`).
 
-`DRIVES = m5:153:4:17 m10:306:4:17 m16:306:6:17 m32:640:6:17 m40:733:5:17`
-— cylinders, heads, sectors. The geometry is baked into the image because a
+The hard disk images carry no geometry. They used to: a `DRIVES =
+m5:153:4:17 m10:306:4:17 m16:306:6:17 m32:640:6:17 m40:733:5:17` table
+(cylinders, heads, sectors) was baked into them, one image per row, because a
 second level that has to find a kernel on a bare disk must know the shape of
-the disk to do the arithmetic.
+the disk to do the arithmetic. That need is real and has not gone away; it is
+met by the label instead. `mkfs -i` writes the label out of the device node it
+is handed, which is the only thing that knows what the drive is, so the image
+is one per card and a drive that cannot say what it is cannot be read.
 
 Three layout constraints worth stating:
 
@@ -400,7 +409,10 @@ Three layout constraints worth stating:
   level "has to be shorter than the other two - the label sits at byte 256 of
   the sector and `mkbootimg` refuses an image whose first level runs into
   it." (`ncrboot1` lives under the same ceiling, and has the tightest fit of
-  all: 254 of the 256 bytes.)
+  all: 254 of the 256 bytes.) On a hard disk the image leaves those 256 bytes
+  zero and `mkfs -i` fills them in; the floppy's image has a real label written
+  into it at build time, because there the medium is the only thing that can
+  say what it is.
 - **The floppy's image is laid out around that same byte**, and that is why
   its level 1 cannot share block 0 with level 0: level 1 is 210 bytes and
   would run from 128 to 338, straight through 256. So block 0 is level 0 with

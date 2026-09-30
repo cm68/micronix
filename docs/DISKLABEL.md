@@ -20,7 +20,7 @@ separate places:
 |---|---|---|
 | `sys/mw.c` | `specs[]`, five rows: tracks/heads/sectors plus stepper timing | `minor >> 2` — **retired**, see below |
 | `cmd/mkfs/mkfs.h` | `dtracks[]`, `dheads[]`, `dsecs[]` | its own `type` argument |
-| `stand/boot/Makefile` | `DRIVES`, one row per drive the images are built for | the image's name |
+| `stand/boot/Makefile` | `DRIVES`, one row per drive the images are built for | the image's name — **retired**, see below |
 | `cmd/mwformat/mwformat.c` | the same five models by name, with the timing | `-m`, or the flags |
 
 Two programs that disagree about those tables do not fail.  They read and write
@@ -194,8 +194,9 @@ correctly with that field zero.  Existing fields keep their positions:
 
 Appending is safe, and the reason is worth stating because the compatibility argument
 rests on it: `mkbootimg` builds the boot sector in a `static` buffer
-(`stand/boot/mkbootimg.c:91`), so the half past the fields it writes is zero, and it
-writes all 512 bytes.  `mkfs`'s `putlabel` then overwrites the fields in a buffer read
+(`stand/boot/mkbootimg.c:109`), so the half past the fields it writes is zero, and it
+writes all 512 bytes.  On a hard disk it writes no fields there at all - the image is
+generic and mkfs fills the label in - so the whole half is zero.  `mkfs`'s `putlabel` then overwrites the fields in a buffer read
 back from that image and writes the block whole.  So on every volume that exists, the
 bytes a new field would occupy are zero.
 
@@ -382,9 +383,17 @@ v1 compatibility that makes an empty table mean the rolled layout.
    boot slice: `mwio.c:171-178,232`, and `ideio.c`, `djio.c`, `ncrio.c` beside it.  The
    `(153, 0)` case below, run before it landed, is what it was for.
 3. **The tools.**  A labeler, for a disk with no label; `mkfs` reading the label
-   instead of `mkfs.h`'s geometry arrays; `mkbootimg` losing its per-drive images.
+   instead of `mkfs.h`'s geometry arrays.  `mkbootimg` losing its per-drive images
+   is **done** (2026-09-30): a hard disk's boot image carries no label, `mkfs -i`
+   writes it from the drive it is installing onto, and there is now one image per
+   card rather than one per drive per card.  The diskette images keep their labels,
+   because there the label is the medium's only description.
+   That leaves a second shape of labeler open, distinct from `label(1)`'s: one that
+   restamps the boot file of a volume already installed, which is the half of
+   `disks/hdinstall/REGEN.md`'s host-side `write -k` recipe that `mnix` cannot do today.
+   `sys/TODO` carries it.
 4. **Docs.**  This file; `filesystem.5`, `mkfs.1`, `src/hwsim/DISKS`,
-   `disks/hdinstall/REGEN`.
+   `disks/hdinstall/REGEN.md`.
 
 ### How it would be checked
 

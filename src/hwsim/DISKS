@@ -554,7 +554,7 @@ booting one, which works
 
 The first proof of the path was a hand built filesystem, host side:
 
-    make bootimg in micronix/stand	first level padded to a block,
+    make bootimg in micronix/stand/boot	first level padded to a block,
 					second level after it
     mkfs -i bootimg <fs>		claims cylinder 0 as it builds the
 					free list, so nothing else is needed

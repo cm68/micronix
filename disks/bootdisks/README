@@ -12,7 +12,7 @@ at the top of the tree builds three, here:
 They are build output, regenerated from the tree the way a .vol is, and
 .gitignore drops them; the script that makes them is the only real file
 in this directory.  Nothing here is the distributed standalone: see
-REGEN in ../hdinstall for what patching that costs and for what is left
+REGEN.md in ../hdinstall for what patching that costs and for what is left
 open there.
 
 The five inch single sided medium is deliberately absent.  194 K is not

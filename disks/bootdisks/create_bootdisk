@@ -45,7 +45,7 @@
 # DJ-DMA's minor for drive 0 of that size - bit 2 set is 5 1/4 inch,
 # clear is 8 inch - and the alternation bit is deliberately clear: this
 # is an unskewed image, which is what mnix and the loader both read.
-# See imdlib.c's raw_geometry for what the bits mean, and REGEN for the
+# See imdlib.c's raw_geometry for what the bits mean, and REGEN.md for the
 # shipped standalone, which is skewed and reached by a name that says so;
 # this diskette is read by number instead, by the loader and by mnix.
 #

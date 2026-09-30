@@ -135,14 +135,14 @@ disks/hdinstall/hddma-0
 # image had to be added to a list here by hand, and a file that was
 # neither was invisible.  Naming the volumes instead turns the directory
 # around, so what is not a .vol is a real file.  disks/hdinstall holds
-# the prose (README, REGEN), the scripts (create_vol, check_vol,
+# the prose (README, REGEN.md), the scripts (create_vol, check_vol,
 # boot_vol, runh, run), the distributed standalone and its symlinks, and
 # hddma-0.blessed - the drive that is kept, one that boots, to be copied
 # and written into, deliberately not a volume.
 #
 # A .vol is never tracked.  A drive worth keeping is kept the way
 # hddma-0.blessed is, under a name that says what it is.  See
-# disks/hdinstall/REGEN.
+# disks/hdinstall/REGEN.md.
 #
 *.vol
 
@@ -181,7 +181,7 @@ disks/hdinstall/sys
 # a source and neither is reproducible, which is the test.
 #
 # What is worth keeping out of a session goes in a document written from
-# it - disks/hdinstall/REGEN is one - not in the recording.
+# it - disks/hdinstall/REGEN.md is one - not in the recording.
 #
 typescript
 typescript.*

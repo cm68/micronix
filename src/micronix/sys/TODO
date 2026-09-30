@@ -657,3 +657,63 @@ same by design.  What those two cases draw, and what bus.c now says at the
 point of the mistake, is the rule: the u page is for code two modules share
 and for tables written before the fork, and anything written after that
 belongs to the kernel's own data.
+
+------------------
+
+A hard disk's boot image carries no geometry any more, and nothing in the
+tree can write the geometry onto a disk that already has a boot.
+
+mkfs -i writes it.  putlabel() (cmd/mkfs/mkfsfunc.c) takes the shape from
+the device node it was handed - drivetype() reads the minor - and stamps
+a struct dlabel at DL_OFFSET in block 0, which is the same block the
+first level occupies.  That is now the only writer, and it is why the
+image can be generic: one bootimg serves every drive of a card, its whole
+second half zero, and the machine that installs it says what the drive
+is.
+
+The path that goes around mkfs is the host's.  disks/hdinstall/REGEN.md
+replaces a loader without reinstalling by writing the image over the file
+that owns cylinder 0:
+
+	mnix -f <vol> write -k <bootimg> /boot/boot
+
+-k because the file already owns its blocks and must go on owning them.
+What that puts down is the image and nothing else, and the image's label
+half is zero, so block 0 comes out holding a boot and no geometry.  mwio.c
+reads the geometry from exactly that block - the one it was loaded from,
+which needs no geometry to reach, which is what makes it possible at all -
+and it has no compiled-in table behind the label to fall back on, by
+design ("No disk label at cylinder 0.  The geometry is read from there and
+guessed nowhere").  So the volume mounts, passes fsck, reads fine through
+mnix, and does not boot.  Nothing about it looks wrong.
+
+What is missing is the labeler: something that reads the drive's geometry
+and stamps it into a boot file already in place, which is the other half
+of the recipe above.  The pieces are there and not joined up.  mnix
+already reads a drive's out-of-band struct disklabel (lib/hdcdmadisk.c,
+DATAOFF) and already has patchlabel(), which stamps in-band fields - but
+patchlabel is reached only from the floppy path (mnix.c bootflopcmd) and
+requires DL_MAGIC, so it cannot fill an empty half by construction; it
+patches a label that exists.  A subcommand that writes one from the drive
+file, or a flag on write -k that does it after the write, is the shape of
+the fix.
+
+Until then the supported way to put a boot on a drive is mnix mkfs -i,
+which is what create_vol, ncr_create_vol and make install-hwsim all use.
+The write -k recipe in REGEN.md is half a recipe and REGEN.md now says so.
+
+Verified: a bootimg built from the tree by make bootimgs, then mnix
+initialize m16 and mnix mkfs -i bootimg on a scratch volume - mkfs
+reporting "Label: MWDL at cylinder 0, 306/6/17 roll 153", and the
+installed /boot/boot read back with a complete label at byte 256 (version
+1; 306/6/17; cyl0 15606; bootblks 102; roll 153; fsize 31212; isize 756;
+slices zero, the roll idiom), 102 blocks long.  mkfs writes that half
+whole, so what the image carried there before cannot reach the volume:
+the pre-change mkbootimg rebuilt from git, told to bake the geometry in,
+and the current one, told nothing, produced images differing in exactly
+those thirteen bytes - the label's fields, and nowhere else, level 1's
+code and all of level 2 identical - and mkfs -i over each produced
+byte-identical volumes.  The diskette images were byte-identical to the
+pre-change build too, the -d path being untouched: the floppy is the one
+case that keeps its label in the image, because there the medium is the
+only thing that can say what it is.

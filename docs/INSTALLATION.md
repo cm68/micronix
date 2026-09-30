@@ -94,7 +94,7 @@ userland is copied on.
 	disks/hdinstall/create_vol myvol	# writes disks/hdinstall/myvol.vol
 	disks/hdinstall/boot_vol myvol
 
-`create_vol` wants three things to exist first: `stand/boot/bootimg-m16`,
+`create_vol` wants three things to exist first: `stand/boot/bootimg`,
 a populated `filesystem/`, and `src/micronix/sys/unix`. If it stops, it
 says which one is missing. The volume it makes is an `m16` — 306
 cylinders, 6 heads, 17 sectors, 31212 blocks, about 16 meg — and its
@@ -119,7 +119,7 @@ The NCR 5380 SCSI card boots the same way, with its own pair of scripts:
 The volume is the same layout — a target on the 5380 reports its own
 geometry and a volume laid out for the HD-DMA reads back block for block
 through it — so only two things differ: the boot in block 0 is `ncrboot`
-(`stand/boot/ncrbootimg-m16`), and the kernel is stamped `rootdev 5/0` —
+(`stand/boot/ncrbootimg`), and the kernel is stamped `rootdev 5/0` —
 major 5 is the 5380's slot in `biosw[]`, minor 0 is target 0 on the bus.
 `ncr_boot_vol` uses `mon500`, the only ROM that has `ncrboot`, and
 `scsi0:` for target 0, with `-c 0x71c` (0x18 boot the 5380). There will be
@@ -278,6 +278,6 @@ through.
 	docs/DISKLABEL.md	the disk label, both idioms
 	src/micronix/stand/boot/README	the boot blocks
 	disks/hdinstall/README	the authentic install, on a simulated drive
-	disks/hdinstall/REGEN	rebuilding it from source, in stages, and
+	disks/hdinstall/REGEN.md	rebuilding it from source, in stages, and
 				which half of that goal is met
 	docs/ATTRIBUTIONS.md		where the recovered pieces came from

@@ -1,0 +1,397 @@
+# rebuilding the hard disk image from source
+
+`disks/hdinstall/REGEN.md`
+
+README beside this says how to run the install that is here - the
+distributed 1.67 standalone on a simulated hard disk.  This says
+how to make the whole thing again from source: a set of floppy images
+carrying binaries this tree built - the reconstructed init among them -
+from which a hard disk can be formatted, installed and booted the way
+the hardware did it.
+
+The four stages are format, install, boot, and the build that feeds
+them.  They are independent: a loader can be replaced without redoing
+the install, and the install can be redone without reformatting.
+
+None of this is a script yet, deliberately: a script written over the
+top of the parts that do not work would hide which those are.
+
+What has been run, as this was written.  The build, all of it.  The
+stage 1 command as far as CP/M's `A>` prompt, with the two floppies and
+the drive named the new way - not the format itself.  Stage 3, which
+gets as far as the loader and stops where the last section says.  And
+the loader replacement below, which is how the rebuilt second level got
+onto the disk.  Stage 2 is out of the scripts on the distribution floppy
+and the README beside this, not from a run here.
+
+## what has to be built first
+
+The compiler is this tree's own.  Its passes live in
+`src/micronix/libexec`, the driver in `src/micronix/cmd`, and it cross
+builds on the host into `bin/mxccc`.  From `src/micronix`, in this order:
+
+```sh
+make hostcc		the passes and the driver, with the host cc
+make -C lib		libc, libu, libccc, with mxccc
+make hostrt		those archives where mxccc looks for them
+make			cmd, sys (the kernel), stand, cpm
+make install		the z80 binaries into filesystem/
+```
+
+which is `make bootstrap` as one target.  Then the image tools and the
+boot images, one per card, out of `src/micronix/stand/boot`:
+
+```sh
+make -C src/tools				mnix, the image reader/writer
+make -C src/micronix/stand/boot bootimgs
+```
+
+A trap that has cost time here: `make` decides what to rebuild from the
+dates on the sources, and a new compiler does not touch them.  After a
+codegen or ABI change in ccc, every object in the tree is stale while
+looking current.  Remove the objects and the archives by hand:
+
+```sh
+rm -f src/micronix/lib/libc/*.o src/micronix/lib/libc/libc.a
+rm -f src/micronix/lib/libu/*.o src/micronix/lib/libu/libu.a
+```
+
+`cmd` does have one: `make -C src/micronix/cmd clean`.
+
+## stage 1: format, under CP/M
+
+The drive is formatted by Morrow's own formatter running under CP/M,
+which is booted off the DJ-DMA floppy port:
+
+```sh
+cd src/hwsim/d1
+./d1 -b ../../micronix/stand/roms/mon447.bin -B djdma \
+    djdma0:../../../disks/dist/1009-8_cold-boot.IMD \
+    djdma1:../../../disks/dist/947-1.IMD \
+    hdcdma0:../../../disks/hdinstall/hddma-0.vol
+```
+
+The cold boot disk carries FORMATMW 1.6, which predates the part number
+names: `m5` is rejected there, `seagate` and `st506` are the same drive
+and both work.  `947-1.IMD` carries 1.7 with the full option set, so it
+goes in as `B:` and the command is
+
+```
+B:FORMATMW M5 SIZE 512
+```
+
+512 because Micronix requires it - see `src/hwsim/DISKS` for why the two
+controllers disagree about sector sizes and what that costs.  The whole
+drive formats and verifies in about six seconds.
+
+What a real format leaves in the drive label - the simulator's own,
+out of band at the front of the drive file, not anything in the blocks -
+worth checking against:
+
+```
+secsize 512  cyl 153  heads 4  spt 17
+firstsec 0  seccode 3  gap3 43  fill 0xe5  formatted 1
+```
+
+## stage 2: install, from the standalone floppy
+
+Boot the 1.67 standalone on the 5 1/4 port, with the formatted drive
+attached:
+
+```sh
+./d1 -b ../../micronix/stand/roms/mon447.bin -B djdma -5 ../../../disks/hdinstall/sa67.5.skew.1k \
+    hdcdma0:../../../disks/hdinstall/hddma-0.vol
+```
+
+Use 1.67 and not 1.6: 1.6's kernel has its root device as `djdma/12`, the
+single sided minor for a disk that is double sided, and it stops in the
+rom monitor before reaching a shell.  1.67 has `76`.
+
+Wait for the welcome and then for the shell's `#`.  Anything typed
+before the prompt is thrown away when the shell sets up the terminal,
+and a machine that welcomes you and then says nothing may be wedged
+rather than waiting - README says how to tell the difference.
+
+The floppy carries the install scripts.  `m5init` is the one that ships,
+and what it does not do is write a boot block; the newer sequence adds
+that with `mkfs -i`, which gives cylinder 0 to a file so the filesystem
+cannot allocate over it:
+
+```sh
+mkfs -i /bootmw.bin /dev/m5a -1024
+fsck /dev/m5a
+mount /dev/m5a /b
+cptree / /b -v
+setdev /b/micronix 3/0 0/0
+```
+
+`cptree` is copying a whole filesystem through a simulated Z80, so give
+it time.  If it reports `No more space on disk djdma/76` the mount did
+not take and `cptree` is filling the floppy's own `/b` - start again from
+a clean disk rather than tidying up.
+
+`setdev` replaces the old `ddt` recipe for pointing the kernel at its
+root device.  It reads `_rootdev` and `_swapdev` out of the kernel's
+symbol table instead of searching for the bytes of `djdma/12`, which is
+1.6's root device - on a 1.67 kernel that search silently did nothing
+and every disk built that way booted a kernel still looking for the
+floppy.
+
+Leave swap as `nodev`.  A standalone with no swap device runs entirely
+in core, which is what a floppy system wants; pointing swap at the drive
+turns a system that does not swap into one that does.  README has the
+detail.
+
+## stage 3: boot from the hard disk
+
+```sh
+./d1 -b ../../micronix/stand/roms/mon447.bin -B hdcdma \
+    hdcdma0:../../../disks/hdinstall/hddma-0.vol
+```
+
+`-B hdcdma` is the HDC-DMA path with the monitor skipped, which is the
+configuration switch `0x0c` that everything used to be written down as.
+The rom decodes the top five bits at `mon447.s:tstsw` - `0x00` is the
+HDCA, a different controller.
+
+What it produced, the once it worked end to end:
+
+```
+mwboot:
+Micronix loader for the HD-DMA
+Files:
+micronix
+Loading
+Entering
+
+Micronix 1.67
+...
+disks: djdma hddma
+root dev: hddma/0
+swap dev: nodev/0
+#
+```
+
+## replacing the loader without redoing the install
+
+The loader is two levels: a sector the rom reads to `0100` and jumps to,
+and a second level that reads the filesystem to find the kernel.  Both
+live in the boot area, which is cylinder 0 - block 5236 on the 5 meg,
+because `sys/mw.c` rotates the mapping and does not put block 0 there -
+and the area is owned by `/boot/boot` so nothing allocates over it.
+
+That file can be rewritten from the host, which is much quicker than
+reinstalling:
+
+```sh
+make -C src/micronix/stand/boot bootimg
+mnix -f hddma-0.vol write -k bootimg /boot/boot
+```
+
+`write -k` is the important half.  Plain `write` frees the file first, so
+the blocks go back on the free list and come off it again in reverse -
+same blocks, same size, boot area written backwards, and nothing in `ls`
+or `info` shows it.  `-k` keeps the block list and writes through it.
+
+What the drive is lives in two places and neither is a filesystem block.
+Out of band, the simulator keeps a 2k header at the front of the drive
+file - `struct disklabel`, `lib/hdcdmadisk.c`, `DATAOFF`.  `hddma-0.vol`
+is 5328896 bytes, that 2k and then 10404 blocks.  In band, in the second
+half of the boot block, is the `struct dlabel` the machine reads, at
+`DL_OFFSET`, 256 bytes into the block the first level occupies, holding
+what the drive is and where the boot area is.
+
+```
+d_tracks d_heads d_spt		the geometry
+d_cyl0				where this area starts
+d_bootblks			how many blocks it is
+d_roll				what mw.c adds to blk / spc
+d_fsize d_isize d_swap		the filesystem laid on top
+```
+
+That label is the drive's and not the image's, which is why the write
+above is only half of installing a boot.  `stand/boot` builds one image
+per card - `bootimg`, `idebootimg`, `ncrbootimg`, each serving every
+drive it can reach - and leaves the second half of its first block
+empty.  `mkfs` fills it in, taking the geometry from the drive node it
+was handed rather than from the boot file:
+
+```sh
+mnix mkfs -i bootimg hddma-0.vol
+```
+
+which is what `create_vol` and `make install-hwsim` do, and the supported
+way.  A `write -k` of a generic image leaves block 0 holding a boot and
+no geometry, and the loader reads the geometry from exactly that block,
+so the volume mounts and does not boot.  Nothing in the tree writes
+that label back yet: that is the missing half of the recipe above, and
+`sys/TODO` carries it.
+
+The second level reads it.  `mwio.c` takes the geometry from the label
+in the block it was loaded from - physical cylinder 0, head 0, sector
+0, which needs no geometry to reach, which is what makes it possible
+before the geometry is known.  There is no fallback and that is
+deliberate: a disk that cannot say what it is cannot be read, so a
+missing label stops the boot rather than making it guess.
+
+That is the point of the label rather than a convenience for the
+loader: a kernel that reads its geometry from the disk does not need
+`specs[]` in `sys/mw.c` compiled into it, and the loader is the first
+reader proving the mechanism.
+
+`setblk` names the blocks a file owns, for building the arrangement in
+the first place.  It does not take them off the free list - run
+`icheck -s` afterwards.
+
+## where this gets to today
+
+All the way to a shell, on the drive in this directory:
+
+```
+mwboot:
+Micronix loader for the HD-DMA
+Files:
+micronix
+Loading
+Entering
+
+Micronix 1.67
+...
+root dev: hddma/0
+swap dev: nodev/0
+
+# /bin/ls
+a          bootmw.bin  f      micronix  patchm5
+bin        dev         etc    tmp       ...
+#
+```
+
+with the reconstructed init as process 1, not the 1.6 binary.  On `^D`
+that shell exits and init starts login on `/dev/ttyA`, which is the
+handover single user is supposed to make.
+
+Two failures on the way here are worth keeping, because both looked
+like something else:
+
+- `No bootable files` was the head probe.  Read header takes no head
+  argument and answers with whatever comes round next, so the probe
+  matched only head 0, gave up at one, and wrote 1 into `spec.heads`.
+  Every block number after that landed on the wrong cylinder, and the
+  block read as the root directory was not the root directory.  The probe
+  is gone; the geometry comes off the label.
+
+- `Block out of range`, before the directory read at all, was a stale
+  loader: the sources had been fixed and the built objects had not, so
+  the disk carried a loader older than its own fixes.  If it comes back,
+  check the dates on the build products against the sources before
+  looking anywhere else.
+
+## the blessed drive, and working on a copy
+
+`hddma-0.blessed` is a drive that boots.  Original userland exactly as
+distributed - the 1.6 init, not the reconstruction - with the two
+things that make it come up off the hard disk: a loader carrying its
+own geometry, and a kernel whose root device is `hddma/0`.
+
+It is the thing to copy, not the thing to work on.  Nothing writes to
+it, so it stays a fixed point that two people can start from at the
+same time:
+
+```sh
+cp hddma-0.blessed mine.vol
+mnix -f mine.vol write ../../src/micronix/cmd/init/init /etc/init
+cd ../../src/hwsim/d1
+./d1 -b ../../micronix/stand/roms/mon447.bin -B hdcdma hdcdma0:<somewhere>/mine.vol
+```
+
+A working drive is named with a `.vol` suffix and the blessed one is not,
+which is the whole of the difference between a volume and a reference:
+everything here that ends in `.vol` is a disk image the last run or the
+last experiment left behind, and `.gitignore` can drop the lot on that one
+pattern.  The scripts take the name without the suffix and add it -
+`create_vol` makes `<name>.vol`, and `boot_vol`, `check_vol` and `runh` look
+for it under that name.
+
+The last line is why the drive can be anywhere: a unit named on the
+command line is an exact file, so a copy under your own name is as good
+as the one in this directory and two simulators can run at once without
+meeting.  See `hwsim -h`.
+
+When a filesystem gets trashed - and it will, this is what the tool
+that writes into it is for - copy the blessed one again rather than
+repairing it.
+
+What is in it is deliberately the original.  A reference that already
+has our binaries in it is not a reference: the point is to put them in
+and see what changes.
+
+## the root device, without redoing the install
+
+stage 2 ends with `setdev`, and a disk that was installed without it
+boots a kernel still looking for the floppy:
+
+```
+root dev: djdma/76
+Read error block 1 on disk djdma/76      (for ever)
+```
+
+That can be put right from the host rather than by installing again.
+`setdev` is a host program - it reads `_rootdev` and `_swapdev` out of
+the kernel's own symbol table rather than searching for the bytes of a
+device number, which is why it works on 1.67 where the old `ddt` recipe
+silently did nothing:
+
+```sh
+mnix -f hddma-0.vol read /micronix micronix.k
+setdev micronix.k 3/0 0/0
+mnix -f hddma-0.vol write -k micronix.k /micronix
+```
+
+`3/0` is hddma drive 0; swap stays `nodev`.  `write -k` because the kernel
+is found through the filesystem and its size does not change, so there
+is no reason to let it move.
+
+An init can be replaced the same way, and that is how the reconstructed
+one got onto this disk:
+
+```sh
+mnix -f hddma-0.vol write cmd/init/init /etc/init
+```
+
+plain `write` there, not `-k`: it is bigger than the 1.6 binary it
+replaces and `-k` refuses to grow a file.  Nothing depends on where
+`/etc/init` sits, so moving it is free.
+
+## the stated goal, and which half of it is met
+
+The goal is a set of floppy images that carry binaries built here, from
+which a hard disk can be formatted, installed and booted.
+
+Half of it is met.  `make bootdisks` at the top of the tree builds three
+diskettes - `disks/bootdisks/create_bootdisk`, with its own README beside
+it - and they are built here rather than patched: mkfs a blank, populate
+it, give it a geometry.  That is the second of the two ways forward this
+section used to name.
+
+What they are not is the authentic install.  They carry this tree's
+kernel and `m16init`, and install a hard disk the modern way; the
+distributed 1.67 standalone beside them is still what installs one the
+way the hardware did it.  Rebuilding that standalone from source here is
+the part still not done, and it is not the skew that stands in the way -
+nothing has to be taught to mnix:
+
+> `sa67.5.skew.1k` is a link to `bdev(2,93)`, a five inch drive with the
+> alternate sectoring bit set, and read through that name
+> `standalone167.bin` is a healthy filesystem - isize 17, fsize 760, the
+> medium's own size.  Read by its plain name instead it is garbage, isize
+> 49 and fsize 52481, and that is where the number this section used to
+> quote came from: the name is the geometry, fslib's `devnum` reads the
+> minor out of the link and `secmap` skews the block numbers with it.
+
+So a skewed image can be read here, and one can be written too: `imd -m -a`
+writes an IMD with the filesystem in it alternated, which is the order a
+shipped diskette has, and `dist/create_dist` passes `-a 2`.  What is still
+not built is the standalone itself, a flat image rather than an IMD, and
+rebuilding it has not been attempted.
+
+<!-- vim: set tabstop=4 shiftwidth=4 noexpandtab: -->

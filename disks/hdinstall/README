@@ -113,7 +113,7 @@ left behind.  A drive worth keeping is kept the way hddma-0.blessed is,
 under a name that says what it is.  Nothing else here carries the
 suffix, which is what lets .gitignore tell the images from the scripts.
 
-The other scripts are the host-side path and REGEN is where they are:
+The other scripts are the host-side path and REGEN.md is where they are:
 create_vol builds a bootable volume out of the tree, boot_vol boots one,
 check_vol runs the host checkers over one, and ncr_create_vol and
 ncr_boot_vol do the same pair for the NCR 5380.
