@@ -186,13 +186,39 @@ parseExpr(unsigned char pri)
              * and the conversion to the destination then threw away
              * the high byte of whichever arm had one: the false arm
              * came back as 96.
+             *
+             * A tie in size with the sign disagreeing has no winner
+             * AT THAT SIZE: "g ? 128 : -1" wants 128 read unsigned
+             * and -1 read signed, and no one-byte type is both, so a
+             * rule that picks an arm - the first, or the signed one -
+             * gets the other arm wrong.
+             *
+             * Promote instead, as C's integer promotions do.  A
+             * one-byte tie goes to int, which holds both arms and
+             * settles the case that was reported: "g ? 1 : -1".  1 is
+             * a ubyte by its value, so the tie used to resolve to
+             * ubyte and the -1 came back 255 - or 65535 once the
+             * result was converted to a long.
+             *
+             * A two-byte tie goes to unsigned int and a four-byte one
+             * to unsigned long, because there int is the same width
+             * and cannot hold all of the unsigned type's values.  The
+             * WIDTH matters as much as the value: yacc passes
+             * "(levprd[i]&ACTFLAG) ? i : 999" to fprintf, a two-byte
+             * tie, and widening it past two bytes moved every
+             * argument after it.
              */
             {
                 struct type *tt = e2 ? e2->type : NULL;
+                struct type *ft = e3 ? e3->type : NULL;
 
-                if (e3->type &&
-                    (!tt || e3->type->size > tt->size))
-                    tt = e3->type;
+                if (ft && (!tt || ft->size > tt->size))
+                    tt = ft;
+                else if (tt && ft && ft->size == tt->size &&
+                    (ft->flags & TF_UNSIGNED) != (tt->flags & TF_UNSIGNED) &&
+                    isBasicType(tt) && isBasicType(ft))
+                    tt = tt->size == 1 ? inttype :
+                         tt->size == 2 ? ushorttype : ulongtype;
                 e = mkbin(QUES, e1, e4, tt);
             }
 
