@@ -67,13 +67,24 @@ cp -r "$mxroot"/include/sys "$work/inc/" 2>/dev/null || true
 cp "$mxroot"/lib/include/*.h "$work/lib/" 2>/dev/null || true
 cp -r "$mxroot"/lib/include/sys "$work/lib/" 2>/dev/null || true
 
-# The passes cross-built for micronix by the fork's own makefiles - the
-# binaries the native build would run - renamed to the .mx names the
-# rest of the script invokes them by.
-make -C "$mxroot/libexec/pass0" >/dev/null
-make -C "$mxroot/libexec/c0" >/dev/null
-make -C "$mxroot/libexec/c1" >/dev/null
-make -C "$mxroot/libexec/peep" >/dev/null
+# Rebuild every pass from scratch, host and native, before measuring.
+# A stale binary silently poisons the comparison - the host peephole once
+# sat a commit behind the native one and every source "diverged" that the
+# rules had since guarded.  make's timestamps cannot be trusted for the
+# host link, so clean and rebuild in SEPARATE invocations: "hostclean
+# host" in one run has make decide "nothing to do" before the clean ever
+# runs, and the stale binary is never relinked.  Host first: the native
+# passes are compiled BY it - the ccc driver execs mxpass0/mxc0/mxc1/mxpeep.
+for d in pass0 c0 c1 peep; do
+	make -C "$mxroot/libexec/$d" hostclean >/dev/null
+	make -C "$mxroot/libexec/$d" host >/dev/null
+done
+for d in pass0 c0 c1 peep; do
+	make -C "$mxroot/libexec/$d" clobber >/dev/null
+	make -C "$mxroot/libexec/$d" all >/dev/null
+done
+# The native binaries, renamed to the .mx names the rest of the script
+# invokes them by.
 cp "$mxroot/libexec/pass0/pass0" "$work/pass0.mx"
 cp "$mxroot/libexec/c0/c0"   "$work/c0.mx"
 cp "$mxroot/libexec/c1/c1"   "$work/c1.mx"
@@ -108,10 +119,24 @@ measure() {
 	# The host passes, named as hostcc installs them.  -Ilib and
 	# -Iinc carry the C-library and system headers the way the tree's
 	# own cross build lays them out; each pass's headers ride beside it.
-	(cd "$jd" &&
-	 "$mxhost"/mxpass0 -I$d -Ilib -Iinc -o $h $d/$b.c &&
-	 "$mxhost"/mxc0 $h.x $h.ast $h.dat &&
-	 "$mxhost"/mxc1 $h.ast $h.dat $h.s) >/dev/null 2>&1 || true
+	# Run each one separately, never chained with &&: c0 recovers from a
+	# bad op (it reports "undefined symbol" and goes on to write a valid
+	# .ast) but exits non-zero, and a chain would then skip c1 and leave
+	# h.s missing - which the c1 compare read as a divergence that was
+	# never there.  The exit code still matters: a recovered error is a
+	# bug to fix, not something to bury, so a non-zero exit is flagged
+	# the way OOM is on the native side, and the byte comparisons below
+	# only run when the host pass actually finished.
+	hp0=0; hc0=0; hc1=0
+	(cd "$jd" && "$mxhost"/mxpass0 -I$d -Ilib -Iinc -o $h $d/$b.c) \
+		>"$o.hpass0" 2>&1 || hp0=$?
+	(cd "$jd" && "$mxhost"/mxc0 $h.x $h.ast $h.dat) \
+		>"$o.hc0" 2>&1 || hc0=$?
+	(cd "$jd" && "$mxhost"/mxc1 $h.ast $h.dat $h.s) \
+		>"$o.hc1" 2>&1 || hc1=$?
+	[ "$hp0" = 0 ] || bad "$d/$b: pass0 ERROR (host exit $hp0)"
+	[ "$hc0" = 0 ] || bad "$d/$b: c0 ERROR (host exit $hc0)"
+	[ "$hc1" = 0 ] || bad "$d/$b: c1 ERROR (host exit $hc1)"
 
 	(cd "$jd" && timeout 300 $SIM pass0.mx -I$d -Ilib -Iinc \
 		-o $s $d/$b.c </dev/null) >"$o.pass0" 2>&1 || true
@@ -121,7 +146,9 @@ measure() {
 		printf '%-18s %-13s %-13s %-13s %-13s\n' "$d/$b" OOM - - - >>"$res"
 		return 0
 	fi
-	cmp -s "$jd/$s.x" "$jd/$h.x" || bad "$d/$b: pass0 DIVERGES"
+	if [ "$hp0" = 0 ]; then
+		cmp -s "$jd/$s.x" "$jd/$h.x" || bad "$d/$b: pass0 DIVERGES"
+	fi
 
 	(cd "$jd" && timeout 300 $SIM c0.mx $s.x $s.ast $s.dat \
 		</dev/null) >"$o.c0" 2>&1 || true
@@ -131,8 +158,10 @@ measure() {
 		printf '%-18s %-13s %-13s %-13s %-13s\n' "$d/$b" "$gc" OOM - - >>"$res"
 		return 0
 	fi
-	cmp -s "$jd/$s.ast" "$jd/$h.ast" && cmp -s "$jd/$s.dat" "$jd/$h.dat" ||
-		bad "$d/$b: c0 DIVERGES"
+	if [ "$hc0" = 0 ]; then
+		cmp -s "$jd/$s.ast" "$jd/$h.ast" && cmp -s "$jd/$s.dat" "$jd/$h.dat" ||
+			bad "$d/$b: c0 DIVERGES"
+	fi
 
 	g1=-
 	gp=-
@@ -149,10 +178,12 @@ measure() {
 		if grep -q "out of memory" "$o.c1"; then
 			bad "$d/$b: c1 OUT OF MEMORY"; g1=OOM
 		else
-			grep -v '^;' "$jd/$s.s" >"$jd/$s.cmp" 2>/dev/null || true
-			grep -v '^;' "$jd/$h.s" >"$jd/$h.cmp" 2>/dev/null || true
-			cmp -s "$jd/$s.cmp" "$jd/$h.cmp" ||
-				bad "$d/$b: c1 DIVERGES"
+			if [ "$hc1" = 0 ]; then
+				grep -v '^;' "$jd/$s.s" >"$jd/$s.cmp" 2>/dev/null || true
+				grep -v '^;' "$jd/$h.s" >"$jd/$h.cmp" 2>/dev/null || true
+				cmp -s "$jd/$s.cmp" "$jd/$h.cmp" ||
+					bad "$d/$b: c1 DIVERGES"
+			fi
 		fi
 	fi
 
