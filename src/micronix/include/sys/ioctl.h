@@ -59,9 +59,20 @@
  * their opcodes are 0x12, 0x25 and 0x28, so the low bit is not the
  * answer.  CDB_IN means the drive fills the buffer; without it the
  * buffer's contents are sent to the drive.
+ *
+ * The widest block is the HD-DMA board's, and it is wider than a caller
+ * can fill.  Its block is sixteen bytes: twelve of them are the command,
+ * through the opcode, and those are the caller's; the twelfth is the
+ * completion status, which the board writes into the block in memory when
+ * it is done; and the last three are the address the board fetches its
+ * next command from, which is a physical address and so nobody's to name
+ * but the driver's.  A caller says twelve for len and reads the status at
+ * cmd[12] afterwards, which is the only way a bus that answers inside the
+ * block can be heard when every byte the caller can address is already
+ * spoken for.
  */
 struct cdb {
-    char cmd[12];               /* the command block, the bus's own format */
+    char cmd[16];               /* the command block, the bus's own format */
     int len;                    /* how many of those bytes are the block */
     int count;                  /* data phase, in bytes; 0 if there is none */
     int flags;                  /* CDB_IN if the data comes back */
@@ -69,7 +80,7 @@ struct cdb {
     int hole;                   /* where in cmd[] its address goes; -1 none */
 };
 
-#define CDBMAX  12              /* the widest command block there is */
+#define CDBMAX  16              /* the widest command block there is */
 #define CDBDATA 4096            /* the most data one command may move */
 #define CDBCMD  0               /* ioctl(fd, ...): run a command block */
 #define CDB_IN  1               /* the data phase reads rather than writes */

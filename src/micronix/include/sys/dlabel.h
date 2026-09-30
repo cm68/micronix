@@ -3,12 +3,12 @@
  *
  * include/sys/dlabel.h
  *
- * A Micronix hard disk is not self describing, and the geometry it needs
- * is not written anywhere on it: sys/mw.c holds a table, specs[], keyed
- * by minor >> 2, and everything - where the superblock is, where the
- * boot area is, how a block becomes a cylinder - comes out of that.  Two
- * programs that disagree about the table do not fail, they read and
- * write different disks while both reporting success.
+ * A Micronix hard disk used to describe itself nowhere: the geometry came
+ * out of a table in the driver, specs[], keyed by the type bits of the
+ * minor number, and everything - where the superblock is, where the boot
+ * area is, how a block becomes a cylinder - came out of that.  Two
+ * programs that disagreed about the table did not fail, they read and
+ * wrote different disks while both reporting success.
  *
  * It is worse than it sounds, because sys/mw.c does not put block 0 at
  * cylinder 0.  It rotates by half the cylinder count, so the superblock
@@ -26,10 +26,10 @@
  * What that buys, in the order it matters:
  *
  *	mkfs records the geometry it believed, so a disagreement with
- *	the kernel's table is detectable rather than silent
+ *	what the driver maps is detectable rather than silent
  *
- *	host tools can read a hard disk image at all, which today they
- *	cannot, without carrying a copy of specs[]
+ *	host tools can read a hard disk image at all, and the first
+ *	ones could only do it by carrying a copy of the driver's table
  *
  *	the first level boot can check it before loading anything - it
  *	is already holding this sector

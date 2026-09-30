@@ -1,4 +1,4 @@
-.he "mwformat (1)                 9/28/26                 mwformat (1)"
+.he "mwformat (1)                 9/29/26                 mwformat (1)"
 .fo "                               -#-"
 .in 5
 .rm 65
@@ -16,33 +16,111 @@ SYNTAX
 .in +5
 .br
 .bd
-mwformat device [ track ]
+mwformat [-c cyl] [-h heads] [-s spt] [-p precomp] [-l lowcur] [-d step]
+[-k skew] [-m model] [-t track] [-e head] device
 .sp 2
 .in -5
 .bd
 DESCRIPTION
 .in +5
 .br
-Mwformat runs the controller's format-track command across a drive, one
-track per ioctl, printing a line as each track is done.  The device node
-names the drive and the model, by the type bits of its minor number, and
-the model's geometry is how many tracks are walked.  A format blanks the
-disk, headers and data, so the label and any filesystem go with it and
-mkfs follows.
+Mwformat lays down a hard disk's sector headers and data fields and writes
+the disk label that says what geometry it laid them down as.  It runs the
+controller's own commands - load the constants, recalibrate, step, format a
+track - from the command line, one track at a time, printing a line as each
+is done.  It is the work Morrow's FORMATMW did under CP/M, with the geometry
+given here rather than looked up.
 .sp
-With a track argument, only that one track is formatted.
+The device must be the drive's whole-disk slice, 'c' - hd0c for drive 0.
+Block 0 of that slice is physical cylinder 0, head 0, sector 0 whatever the
+geometry is, and that is where the label goes: it is the only address that
+can be found before the label has been read, and the only way to open a disk
+that has no label, which a disk being formatted does not.  label (1) needs
+the same node for the same reason.
+.sp
+What the drive is comes from, in order: the flags below, the model named
+with -m, the label the disk already carries, and failing all three, nothing
+- a geometry that has to be stated, because the device node names a drive
+and a slice and no geometry at all.  So a disk that already says what it is
+needs no arguments, and a blank one needs -m or at least -c and -h.
+.sp
+A format blanks the disk: every sector header is rewritten and every data
+field filled with 0xe5, so the label and any filesystem go with it.  The
+label is written again from what was formatted, and mkfs (1) follows to make
+a filesystem on it.
 .sp 2
 .in -5
 .bd
-EXAMPLE
+OPTIONS
 .in +5
 .br
 .bd
-mwformat /dev/m16a
+-c cyl
+.in +5
+.br
+Cylinders, or tracks per surface.  -h heads, -s sectors per track, -p the
+cylinder where write precompensation begins, -l the cylinder where the write
+current drops to the low setting, -d the step pulse delay in units of 100
+microseconds.
+.in -5
+.bd
+-m model
+.in +5
+.br
+A drive this machine has nodes for: m5, m10, m16, m32 or m40.  The name is a
+shorthand for the geometry and the timing together, and any of the flags
+above overrides the part it names.
+.in -5
+.bd
+-k skew
+.in +5
+.br
+The interleave: the order the sectors of a track are laid down in, three by
+default.  It is what a read header reports afterwards, so it is worth
+leaving alone unless the drive needs a different one.
+.in -5
+.bd
+-t track, -e head
+.in +5
+.br
+Format only one cylinder, or only one head of every cylinder - a repair of
+one track that will not read.  The label is rewritten when the walk crosses
+cylinder 0 head 0, because the format has just destroyed the sector it lives
+in; a walk that misses that sector leaves the label alone.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+.bd
+mwformat -m m16 /dev/hd0c
+.sp
+mwformat -c 500 -h 8 -p 400 /dev/hd0c
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The select byte carries four head lines: three bits of it are the head
+field, and the fourth is the low-current line, which an MFM drive with more
+than eight heads uses as head select line 4.  Sixteen heads is therefore the
+most this can lay down, and a drive that has more than eight is not told its
+write current at all - that line is one of its head lines, and by then the
+drive is doing its own current control.
+.sp
+The simulator does not model that line: it decodes three bits, so heads 8 and
+up read back as head 0 there, and a disk with them is real hardware only.
+.sp
+The sector size is 512 bytes and is not an option.  FORMATMW formats at
+1024 unless told otherwise and Micronix reads 512; a disk formatted at any
+other size is a disk the kernel cannot read, so the gap after each sector
+and the sector count that follow from the size are computed and not chosen.
 .sp 2
 .in -5
 .bd
 SEE ALSO
 .in +5
 .br
-mkfs (1)
+label (1), mkfs (1)

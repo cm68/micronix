@@ -319,8 +319,15 @@ same number independently, and the only thing that catches a disagreement is
 
 **A one-board card has no type bits, and the guest `mkfs` believes them.**
 `ide` and `ncr` nodes have `devtype` 0, which is the m5 row of the geometry
-table, so `mkfs` in the guest lays out a 5-meg filesystem on a 16-meg disk with
-the boot area landing in the middle of file space. Only `mw` nodes have ever been
-formatted this way by the tree's install scripts, so the path has never been run
-in anger. The host `mkfs` takes the geometry from the label instead, which is why
-the host-made images are correct.
+table `cmd/mkfs/mkfs.h` carries, so `mkfs` in the guest lays out a 5-meg
+filesystem on a 16-meg disk with the boot area landing in the middle of file
+space. Only `mw` nodes have ever been formatted this way by the tree's install
+scripts, so the path has never been run in anger. The host `mkfs` takes the
+geometry from the label instead, which is why the host-made images are correct.
+
+That the guest `mkfs` still reads the minor at all is now the whole of the
+exposure, because `sys/mw.c` no longer does: the driver maps what the disk's
+label says, and `mkfs` lays out what its own table says, so the two can disagree
+where they used to be one table read twice. What keeps them together is that the
+label was written by the same model the row names - `mwformat -m m16` and
+`mkfs /dev/m16a` - which is the install scripts' habit and, now, load-bearing.

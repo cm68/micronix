@@ -19,10 +19,10 @@
 #define NDRIVE      8
 
 /*
- * The media this can make a filesystem on: the five hard disks from
- * specs[] in sys/mw.c and then the three diskettes, whose rows are
- * specs[] in sys/dj.c as well (the same geometry, and toff is the track
- * offset both carry).  static here so the driver and the worker each
+ * The media this can make a filesystem on: the five hard disk models
+ * mwformat formats, and then the three diskettes, whose rows are specs[]
+ * in sys/dj.c as well (the same geometry, and toff is the track offset
+ * both carry).  static here so the driver and the worker each
  * carry their own copy; the table is eight rows and this is simpler than
  * a third object for them.
  *

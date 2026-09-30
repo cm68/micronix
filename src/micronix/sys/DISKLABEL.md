@@ -11,15 +11,17 @@ already exist keep mounting untouched either way.
 
 ## The problem
 
-A Micronix hard disk does not describe itself, and the geometry it needs is written
-nowhere on it.  Everything — where the superblock is, where the boot area is, which
-cylinder a block lands on — comes from tables compiled into three separate places:
+A Micronix hard disk did not describe itself, and the geometry it needs was
+written nowhere on it.  Everything — where the superblock is, where the boot area
+is, which cylinder a block lands on — came from tables compiled into three
+separate places:
 
 | where | what | keyed by |
 |---|---|---|
-| `sys/mw.c:34-48` | `specs[]`, five rows: tracks/heads/sectors plus stepper timing | `minor >> 2` |
+| `sys/mw.c` | `specs[]`, five rows: tracks/heads/sectors plus stepper timing | `minor >> 2` — **retired**, see below |
 | `cmd/mkfs/mkfs.h` | `dtracks[]`, `dheads[]`, `dsecs[]` | its own `type` argument |
 | `stand/boot/Makefile` | `DRIVES`, one row per drive the images are built for | the image's name |
+| `cmd/mwformat/mwformat.c` | the same five models by name, with the timing | `-m`, or the flags |
 
 Two programs that disagree about those tables do not fail.  They read and write
 different cylinders while both reporting success, which is the worst possible
@@ -32,30 +34,46 @@ That is the sector the boot ROM reads, so it is the only address that works
 before anything is known.  The label goes in the second half of it, at
 `DL_OFFSET` (256), so the boot code can have the first half.
 
-Two things can say what a disk is, and they are not equal.  **The label is the disk
-speaking.**  It is marked with a magic number and sits at a fixed address, so if it
-is there it is believed and used — the kernel does not second-guess it against a
-table.  **The minor number is the person speaking.**  It names a row of `specs[]`
-(`sys/mw.c:34-48`), and that is the fallback, for a disk laid down by something that
-wrote no label.  Neither is a reason to refuse on its own: a disk with a label mounts
-from the label whatever the minor says, and a minor naming no row mounts from the
-label alone.  Only a disk with neither is refused, because then there is no geometry
-and no block number can be mapped at all.
+Two things could say what a disk is, and they were not equal.  **The label is the
+disk speaking.**  It is marked with a magic number and sits at a fixed address, so
+if it is there it is believed and used — the kernel does not second-guess it
+against a table.  **The minor number is the person speaking.**  It used to name a
+row of `specs[]` (`sys/mw.c`), and that was the fallback, for a disk laid down by
+something that wrote no label.
+
+That fallback is gone.  The minor number now names a drive and a slice and nothing
+else, and the label is the only thing that says what geometry to map with.  A disk
+that has no label therefore has no geometry, and no block number can be mapped —
+except one.  Block 0 of the whole-disk slice 'c' is physical cylinder 0, head 0,
+sector 0 whatever the geometry turns out to be, and that is the sector the label
+goes in.  So a label-less disk opens, through 'c' alone, and maps that one sector:
+which is exactly what a tool needs to write a label onto it, and the only thing
+that can be done with it until one is written.  Every other slice is refused, since
+block 0 of one of those is somewhere inside a filesystem that has not been made yet.
 
 The one asymmetry worth knowing is that the boot loader has no minor number to
 consult — it is entered by the monitor with no device number — so `stand/boot/mwio.c`
-refuses a label-less disk outright and says so.  A label-less disk can therefore be
-mounted as a data disk but not booted from.
+refuses a label-less disk outright and says so.  Now the kernel does too, apart from
+that one sector, so a label-less disk can be neither mounted nor booted from: it can
+only be given a label, and it is `cmd/mwformat` and `label(1)` that do that.
 
-What the label does **not** carry is timing.  `specs[]` holds three numbers that
-belong to the drive and not to the filesystem — `stpdel`, `precomp` and `lowcur`, the
-step-pulse delay, the precompensation cylinder and the low-current cylinder
-(`sys/mw.c:34-48`) — and the label has no field for any of them.  So the table never
-retires even once every disk is labeled: a labeled disk still takes its timing from
-the row the minor names, and from conservative defaults when it names none
-(`sys/mw.c:233-244`).  The geometry is the label's and the timing is the table's, and
-a geometry that disagrees with the row is worth warning about (`sys/mw.c:264-270`)
-precisely because the timing has already been taken from it.
+What the label does **not** carry is timing.  Three numbers belong to the drive and
+not to the filesystem — `stpdel`, `precomp` and `lowcur`, the step-pulse delay, the
+precompensation cylinder and the low-current cylinder — and the label has no field
+for any of them.  That is what kept the table alive: a labeled disk still took its
+timing from the row the minor named, and the geometry was the label's while the
+timing was the table's.
+
+It is what retired the table's *use* rather than the table, in the end.  The driver
+no longer reads any row: it steps at one delay and switches its write current at one
+pair of cylinders for every drive (`MWSTPDEL`, `MWPRECOMP` and `MWLOWCUR` in
+`sys/mw.c`) — the conservative values the no-row branch used, which means
+precompensation on every track and the low write current on every track.  The
+per-model timing has not gone away, it has moved to where the geometry is decided:
+`cmd/mwformat` carries the five rows and uses them while formatting, which is the
+one moment they matter most.  A read or a write of a disk formatted that way is done
+at the driver's one tuning, and that is the price of the rule that the label is what
+says what a disk is.
 
 ## The roll, and why it is the thing to fix
 
@@ -286,9 +304,18 @@ Two things the example makes concrete, and both are already on the list:
 	Until `spec.cylstart` lands in `mwio.c`/`ideio.c`, a filesystem at an offset
 	cannot boot — which is what the tests below show happening.
 
-	9 heads does not fit `(~head & 7)`: head 8 wants a fourth bit, and that bit is the
-	wire the controller uses for low current.  A notional format is fine — the
-	simulator does not model the cable — but the real drive waits on `sys/TODO`.
+	9 heads needs a fourth head select line and there are only three, so the
+	low-current line is head select line 4 on a drive that has one.  The
+	fourth bit therefore lives in the select byte's bit 6, where that line
+	is, and not in bit 5, which is spare in the byte and has no wire; heads
+	0 through 7 hold the line high, which is also the high write current, so
+	one encoding serves both.  What a drive with more than eight heads gives
+	up is being told its write current, which by then it does not need.
+	`cmd/mwformat` lays a track down that way and `sys/mw.c`'s `rwcmd`
+	addresses a sector that way.  The simulator decodes three bits and does
+	not model the line, so heads 8 and up read back as head 0 there: a
+	9-head disk can be formatted on the simulator but only used on real
+	hardware.
 
 The letters left over, e through h, are not *absent*: an unwritten entry is (0, 0), which
 reads as the whole disk, so those letters alias the drive.  Harmless, and the price of the
@@ -304,8 +331,8 @@ v1 compatibility that makes an empty table mean the rolled layout.
    slice in the middle would make `m5b` (minor 1) change from "drive 1" to "drive 0, slice
    b" and misaddress the `/dev` on every disk already in the field.  **The price, which is
    the part worth knowing:** the type field shrinks from six bits to three, so a driver's
-   geometry table is eight rows rather than sixty four.  `specs[]` holds five and
-   `boards[]` one, so nothing is displaced — but a sixth through eighth drive size is the
+   geometry table is eight rows rather than sixty four.  The five models and `boards[]`
+   one fit, so nothing is displaced — but a sixth through eighth drive size is the
    last this encoding can take, and `type = minor >> 2` is gone from both drivers.
 2. **The names.**  The drive letter and the slice letter collide: `dev/devlist` has
    `m5a` through `m5d` as four *drives*, not four slices.  They need different
@@ -405,7 +432,8 @@ v1 compatibility that makes an empty table mean the rolled layout.
   of the drive free; a table naming more cylinders than the drive has is refused
   clearly, not wrapped.
 - **IDE:** boot `-b ../../micronix/stand/roms/mon500.bin -B ide` to `root dev: ide/0`.
-- **A pre-label volume** mounts from the minor number when that names a `specs[]` row,
-  and is refused loudly only when it names none.
+- **A pre-label volume** can be opened through its whole-disk slice 'c' and no other,
+  which maps the one sector the label goes in; every other slice is refused loudly.  It
+  is how a label gets written on a disk that has none.
 
 <!-- vim: set tabstop=4 shiftwidth=4 expandtab: -->

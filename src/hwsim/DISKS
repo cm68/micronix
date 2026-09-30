@@ -246,6 +246,13 @@ What the man pages settle:
   each drive must be formatted under CP/M."  That is why every route to
   a Micronix hard disk goes through a CP/M boot disk first.
 
+  Two of those manual pages are the vendor's and say what shipped, so
+  they are left as they are.  The tree has since grown the formatter
+  they say it has not got: cmd/mwformat, which does the same work from
+  the same command blocks and, unlike FORMATMW, writes the disk's label
+  when it is done - a format blanks the sector the label is in, so a
+  formatted disk with no label is a disk nothing can open.
+
   Skew does not matter.  "A sector skew of 6 is recommended, but is not
   critical.  Since these drives are soft-sectored, there is no
   compatibility problem with different skews."  So FORMATMW's default of
@@ -552,7 +559,7 @@ The first proof of the path was a hand built filesystem, host side:
     mkfs -i bootimg <fs>		claims cylinder 0 as it builds the
 					free list, so nothing else is needed
     permute the filesystem into physical order, prepend a label
-    d1 -b roms/mon447.bin -c 0x0c -d <dir>
+    d1 -b ../../micronix/stand/roms/mon447.bin -c 0x0c -d <dir>
 
 -c 0x0c is SW_HDDMA and SW_NOMON, which is what the monitor's switch test
 wants for nuboot; 0x14 is the floppy, and it is the default.

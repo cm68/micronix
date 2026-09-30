@@ -23,43 +23,45 @@
  * by default and the definition says static.
  */
 static int error();
+static int mwlink();
 
 #define NDRIVES 4               /* Number of drives. See mws[] below. */
 #define SECSIZE 3               /* Sector size (512 bytes) */
 #define RETRIES 10              /* no. of retries on r/w error */
 
 /*
- * The row of specs[] that dev/devlist's hd<N>c nodes name, and so the
- * type field of the device number mwopen builds for a drive's whole-disk
- * slice.  It picks no row here: mws[] is keyed by drive and already
- * holds the row the caller's minor named, so this one never reaches the
- * controller, and the label's own sector is at cylinder 0 with no step
- * to take.  It is part of the *name* of that sector and nothing else -
- * and the label is read and written as the disk block it is, so a tool
- * opening hd0c and this driver reading drive 0's label must name it the
- * same way, or the cache will hold two copies of the one sector.
+ * The row dev/devlist's hd<N>c nodes name in their minor number, and so
+ * the type field of the device number mwopen builds for a drive's
+ * whole-disk slice.  Nothing picks a table row by it any more - this
+ * driver has no table - but it is still part of the *name* of the sector
+ * the label is in: the label is read and written as the disk block it is,
+ * so a tool opening hd0c and this driver reading drive 0's label have to
+ * name that block the same way, or the cache holds two copies of one
+ * sector.  It has to go on agreeing with devlist, and nothing checks it.
  */
 #define HDCROW  2
 
 /*
- * Drive specfications.
- * Copied into info structure (below) during open.
+ * The drive's timing, which the label does not carry.
+ *
+ * A disk says what shape it is - tracks, heads, sectors per track, roll -
+ * and that is the whole of its geometry.  A drive also has a step-pulse
+ * delay and two cylinders at which writing changes: where write
+ * precompensation begins, and where the write current drops to the low
+ * setting.  The label has no field for any of the three (sys/DISKLABEL.md
+ * says why the table could not retire while they had nowhere else to
+ * live), so a driver that reads its geometry from the label has nowhere
+ * to read them from, and they are constants here.
+ *
+ * The values are the conservative ones the old no-row branch used: the
+ * step delay the boot loader also uses, and both cylinders at zero -
+ * which means precompensation is on for every track and the low write
+ * current is in force for every track.  Per-model tuning is part of what
+ * this driver gave up when it stopped reading a table by minor number.
  */
-struct spec
-{
-    UINT tracks;                /* number of tracks per surface */
-    UINT8 heads;                /* number of heads */
-    UINT8 sectors;              /* number of sectors per track */
-    UINT8 stpdel;               /* delay between step pulses, 100 us */
-    UINT precomp;               /* track where precomp begins */
-    UINT lowcur;                /* track where low current begins */
-} specs[] = {
-    {153, 4, 17, 30, 128, 128}, /* Seagate 5 meg */
-    {306, 4, 17, 2, 128, 128},  /* generic 10 meg */
-    {306, 6, 17, 2, 128, 128},  /* CMI 16 meg */
-    {640, 6, 17, 0, 256, 256},  /* CMI 32 meg */
-    {733, 5, 17, 30, 300, 733}, /* Seagate 40 meg */
-};
+#define MWSTPDEL 30             /* step pulse delay, 100 us */
+#define MWPRECOMP 0             /* cylinder where precompensation begins */
+#define MWLOWCUR 0              /* cylinder where low write current begins */
 
 /*
  * Drive configuration information, one per drive.
@@ -86,7 +88,6 @@ struct info
     UINT lowcur;                /* track where low current begins */
     UINT curtrk;                /* current track */
     UINT8 flags;                /* see below */
-    UINT8 type;                 /* index into specs table above */
     UINT8 slice;                /* the slice this open is bound to */
 } mws[NDRIVES] = 0;
 
@@ -134,12 +135,13 @@ struct
 } cmd = 0;
 
 /*
- * Controller commands
+ * Controller commands.  Not a format: the opcode for that is OP_FORMAT in
+ * include/sys/mw.h, and a raw command block carries it - what a format
+ * means is the program's business now, not this driver's.
  */
 #define READS		0
 #define WRITES		1
 #define READH		2
-#define FORM		3
 #define LOAD		4
 #define STAT		5
 #define HOME		6
@@ -193,89 +195,65 @@ static UINT8 retry = 0,         /* number of retries so far */
 /*
  * Device open
  *
- * Two things can say what the drive is, and they are not equal.  The disk
- * can say: the label mkfs writes at physical cylinder 0, head 0, sector 0
- * is marked with a magic number and sits at the one address that can be
- * found knowing nothing at all, so if it is there it is believed and
- * used.  The minor number can say: it names a row of specs[] below, which
- * is what is fallen back on for a disk laid down by something that wrote
- * no label.  Neither is a reason to refuse on its own - a disk with a
- * label mounts from the label whatever the minor names, and a minor
- * naming no row mounts from the label alone.  Only a disk with neither is
- * refused, because then there is no geometry and no block number can be
- * mapped at all.
+ * The drive is described by the disk and by nothing else.  The minor
+ * number says which drive (its low two bits) and which slice (the three
+ * above them), and prints no geometry: what the drive *is* comes from the
+ * label at physical cylinder 0, head 0, sector 0, which is the one
+ * address that can be found knowing nothing at all.  A disk laid down by
+ * something that wrote no label has no geometry, and then no block number
+ * can be mapped - except the one the label goes in, and reaching that one
+ * is what makes a label writable in the first place.
  *
  * The label itself, and the slice it names, are decoded in sys/dlabel.c,
- * which knows nothing about this controller - what is here is the table
- * that stands in for a label, and the handling of a disk that has none.
+ * which knows nothing about this controller; what is here is the handling
+ * of a disk that has no label.
  */
 mwopen(dev, mode)
     UINT dev, mode;
 {
     static struct info *info;
-    static UINT8 drive, type;
-    static UINT nspec, sl;
+    static UINT8 drive, sl;
     static struct buf *b;
 
     drive = dev & 3;
-    type = devtype(dev);
     sl = devslice(dev);
     if (drive >= NDRIVES) {
         u.error = ENXIO;
         return;
     }
     info = &mws[drive];
-    if ((info->flags & CALIB) && (info->type != type)) {
-        u.error = ENXIO;
-        return;
-    }
     /*
      * One mapping per drive, not one per open - mws[] is keyed by drive
      * and holds the slice's offset and roll - so a second open asking for
      * a different slice would be served the first one's mapping and would
      * read and write the wrong cylinders while reporting success.  That
      * is the one failure this format is meant to make impossible, so it
-     * is refused.  The same slice, or the same minor, is the same mapping
-     * and is let through as before.
+     * is refused.  The same slice is the same mapping and is let through
+     * as before.
      */
     if (info->flags & OPEN) {
-        if (info->type != type || info->slice != sl)
+        if (info->slice != sl)
             u.error = EBUSY;
         return;
     }
-    info->type = type;
     info->slice = sl;
 
+    info->stpdel = MWSTPDEL;
+    info->precomp = MWPRECOMP;
+    info->lowcur = MWLOWCUR;
+
     /*
-     * What the minor number says the drive is.  If it names a real row in
-     * specs[], copy it, geometry and timing together; otherwise leave the
-     * geometry zero and pick conservative controller tuning - the label
-     * carries only tracks/heads/spt/roll and not the three drive-specific
-     * timings.  The label, if there is one, replaces the geometry below
-     * either way; the timing is never the label's to give.
-     *
-     * The fields are copied one by one rather than as a block: struct
-     * info is struct dlgeom first (above) and struct spec is not, so the
-     * two no longer start alike.
+     * Nothing is known yet, and the decode is handed that: a zero
+     * geometry is how this driver says so, and a label, if there is one,
+     * replaces it whole.  What is left in mws[] from a previous open is
+     * not knowledge and must not be offered as any - the disk may have
+     * been formatted since, and its label, which is what the geometry
+     * comes from, went with it.
      */
-    nspec = sizeof specs / sizeof specs[0];
-    if (type < nspec) {
-        info->tracks = specs[type].tracks;
-        info->heads = specs[type].heads;
-        info->sectors = specs[type].sectors;
-        info->stpdel = specs[type].stpdel;
-        info->precomp = specs[type].precomp;
-        info->lowcur = specs[type].lowcur;
-        info->roll = info->tracks >> 1;
-    } else {
-        info->tracks = 0;
-        info->heads = 0;
-        info->sectors = 0;
-        info->stpdel = 30;      /* the boot loader's step delay */
-        info->precomp = 0;
-        info->lowcur = 0;
-        info->roll = 0;
-    }
+    info->tracks = 0;
+    info->heads = 0;
+    info->sectors = 0;
+    info->roll = 0;
 
     /*
      * The label, as block 0 of this drive's 'c'.  The device number is
@@ -291,31 +269,34 @@ mwopen(dev, mode)
         return;                 /* no such slice; dllabel set u.error */
     case 0:
         /*
-         * No label on the disk.  A row of the table above stands for
-         * one, and that is what a disk laid down by something that wrote
-         * no label gets.  A disk with neither - no row and no label -
-         * has no geometry at all, and then no block number can be
-         * mapped.
+         * No label, so no geometry, so no block number that can be
+         * mapped - but one address is reachable without any of that, and
+         * it is the address the label goes in.  This is the state a
+         * labeler works from, and the 'c' slice is the only way to be in
+         * it: block 0 of any other slice is somewhere inside a filesystem
+         * that has not been made yet, and mapping it "at cylinder 0"
+         * would read a filesystem block as a label.
+         *
+         * One head and one sector of one cylinder maps block 0 to
+         * cylinder 0, head 0, sector 0 and refuses every other block
+         * through maxblk 0.  dllabel leaves the geometry zero, and zero
+         * cannot be mapped with - mwcyl divides by the sectors per
+         * cylinder - so this is also the least that makes the arithmetic
+         * safe.  dlabel.c takes the same view of an unknown drive for the
+         * length of its own read.
          */
-        if (type >= nspec) {
+        if (sl != DL_WHOLE) {
             u.error = ENXIO;
             return;
         }
-        break;
+        info->heads = 1;
+        info->sectors = 1;
+        info->spc = 1;
+        info->maxblk = 0;
+        info->flags |= OPEN;
+        return;
     default:
-        /*
-         * Say so when the label and the table disagree.  The disk decides
-         * how it is laid out and that is what is used, but the timing
-         * above came from the row the minor named, and timing from the
-         * wrong row is a seek that quietly misses.
-         */
-        if (type < nspec &&
-            (info->tracks != specs[type].tracks ||
-             info->heads != specs[type].heads ||
-             info->sectors != specs[type].sectors))
-            pr("mw%d: label %d/%d/%d disagrees with table %d/%d/%d, using label\n",
-                drive, info->tracks, info->heads, info->sectors,
-                specs[type].tracks, specs[type].heads, specs[type].sectors);
+        break;                  /* the label was read; the geometry is set */
     }
 
     if ((b = bread(1, dev)) != 0) {
@@ -398,14 +379,17 @@ mwstart()
 }
 
 /*
- * Stop the controller
+ * Stop the controller.  The select byte is assigned rather than added to:
+ * the block now holds whatever the last caller of the raw ioctl left in it,
+ * and a stop command that carried the head, precompensation and write
+ * current bits of somebody else's command would not be this driver's own.
  */
 mwstop()
 {
     mwstate = STOPPED;
     cmd.steps = 0;
     cmd.arg0.byte.high = INTOFF;
-    cmd.hedsel |= LCONST | 3;   /* select drive 4 - turn off light */
+    cmd.hedsel = LCONST | 3;    /* select drive 4 - turn off light */
     cmd.op = LOAD;
     mwwait();
     busgive(0);
@@ -571,10 +555,23 @@ rwcmd()
     }
     mwinfo->curtrk = track;
 
-    cmd.hedsel = curdrv | ((~head & 7) << 2) | HIGHCUR;
+    /*
+     * The head, and the one line of the select byte that is not a head
+     * line on every drive.  Three bits are the head field; the fourth is
+     * the low-current line, which a drive with more than eight heads uses
+     * as head select line 4.  So the fourth head bit goes in bit 6, where
+     * that line is - bit 5 of the byte is spare and has no wire - and
+     * heads 0 through 7 leave the line high, which is the same thing as
+     * high write current.  One encoding, both drives: the current is
+     * commanded only where the line is still a current line, which is
+     * where the drive's head count says eight or fewer.
+     */
+    cmd.hedsel = curdrv | ((~head & 7) << 2);
+    if (~head & 8)
+        cmd.hedsel |= HIGHCUR;
     if (track >= mwinfo->precomp)
         cmd.hedsel |= PRECOMP;
-    if (track >= mwinfo->lowcur)
+    if (mwinfo->heads <= 8 && track >= mwinfo->lowcur)
         cmd.hedsel &= ~HIGHCUR;
     cmd.arg0.word = track;
     cmd.arg2 = head;
@@ -624,7 +621,7 @@ error()
  * segment (sys/ovl.c), and 0 means the kernel already contains the driver
  * and there is no segment to learn.
  *
- * reset() needs it because the controller is handed the address of cmd,
+ * The page matters because the controller is handed the address of cmd,
  * and cmd is a data object in this module.  The address this driver's own
  * code computes for cmd is the window address OVLBASE + offset, which is
  * where cmd *appears* while the page is mapped - not where it is.  The
@@ -642,13 +639,21 @@ error()
  * command block through the header's data field.  This one runs from the
  * driver's own page and names cmd directly, which is why it is here and
  * not in a file of its own.
+ *
+ * The conversion itself is mwlink(), below, and it is done from reset() as
+ * well as here - both the channel address reset() writes and the block's
+ * own chain come from the one number it works out, and the chain has to be
+ * set again after every raw command block, because the caller's bytes
+ * arrive over it (mwioctl).
  */
 static UINT mwseg = 0;          /* the page we were placed in, 0 = resident */
+static UINT32 mwphys = 0;       /* where cmd really is: (seg << 12) | offset */
 
 mwinit(seg)
     UINT seg;
 {
     mwseg = seg;
+    mwlink();
     return (0);
 }
 
@@ -659,39 +664,14 @@ reset()
 {
     extern char map0[], image0[];
     int *ichan;
-    char *cp;
-    UINT32 phys;
 
-    /*
-     * Where cmd really is.  cp is the address this driver's own code
-     * computes for the command block: the window address OVLBASE +
-     * offset, which is where cmd *appears* while this page is mapped and
-     * not where it is.  A resident driver's address is already physical
-     * and there is nothing to do; a placed module's is not, and the
-     * controller has no map of its own - it follows the address it is
-     * given.  Handed the window address it would read the page the kernel
-     * runs mapped at OVLBASE, which is the slot and holds another
-     * driver's code; it would halt on the first byte of that which is not
-     * a command and write no status, so the interrupt mwwait() waits for
-     * never comes.  The physical address is (page << 12) | offset, and
-     * since the field is 24 bits where an unsigned is 16 the shift has to
-     * be done in a UINT32.
-     *
-     * cp is a pointer variable rather than &cmd taken straight into the
-     * cast: c1 has a rule for converting a pointer to an integer, but
-     * none for a pointer-to-object, which is what &cmd is.
-     */
-    cp = (char *) &cmd;
-    if (mwseg)
-        phys = ((UINT32) mwseg << 12) | ((unsigned) cp & 0xfff);
-    else
-        phys = (unsigned) cp;
+    mwlink();                   /* where cmd is, and the block's own chain */
 
     ichan = 0x1050;
     di();
     map0[2] = 0;
-    ichan[0] = (UINT) phys;             /* the channel command address, */
-    ichan[1] = (UINT) (phys >> 16);     /* three bytes at physical 0x50 */
+    ichan[0] = (UINT) mwphys;           /* the channel command address, */
+    ichan[1] = (UINT) (mwphys >> 16);   /* three bytes at physical 0x50 */
     map0[2] = image0[2];
 
     /*
@@ -701,8 +681,6 @@ reset()
     inton(MWINT);
     ei();
     out(RESET, 0);
-    cmd.link = (UINT) phys;             /* and the chain, which the board */
-    cmd.xlink = (UINT8) (phys >> 16);   /* follows after each command */
 }
 
 /*
@@ -786,35 +764,6 @@ mwcheck()
  * inton(MWINT) that unmasks line 0 still happen at open, as they always
  * have.
  */
-/*
- * Format one track of the drive named by dev: the controller's FORMAT
- * command, run once per head.  The track comes in through the block
- * switch's fourth entry (mwioctl below), one ioctl per track, so the
- * /bin/mwformat program driving it can show progress track by track - the
- * work stand/formatmw does from the boot ROM (its seek and fmthead), with
- * the loop, the drive table and the reporting moved into that program.
- *
- * A format blanks the track: every sector header rewritten and every data
- * field filled with 0xe5.  Geometry is the open drive's (mws[]), and the
- * sector size is the 512 bytes this driver reads.  That fixes the three
- * one's-complement arguments the controller wants - the gap3, the sector
- * count and the size code are all inverted because the 8x300 counts up to
- * overflow rather than down to zero (hwsim/d1/hddma.c decodes them that
- * way) - and the fill and the skew, formatmw's own defaults.
- *
- * The whole of it is polled, not interrupt driven: the LOAD that begins it
- * carries INTOFF and every command finishes under mwwait().  mwstate stays
- * STOPPED so the tick and a stray interrupt leave it alone.  The buffer b
- * is held across the loop - its window is where the header table is built
- * and where the controller DMAs it from, and a hold must not sleep (uio.c)
- * - so the bus is claimed before the hold and given back after it, and a
- * drive with transfers already queued is refused rather than left half
- * done.
- */
-#define FORMGAP3 43            /* gap3 for 512-byte sectors */
-#define FORMSKEW 3             /* the interleave, formatmw's default */
-#define FORMFILL 0xe5          /* data-field fill */
-
 static
 mwbusready()
 {
@@ -837,84 +786,123 @@ mwbusplease()
 }
 
 /*
- * Step to a track: the controller's NOP (HOME, here) with a step count.
+ * The block switch's fourth entry (include/sys/con.h): run one raw command
+ * block against the controller.
+ *
+ * The block is the controller's own - sixteen bytes of it, include/sys/mw.h
+ * - and the caller fills in everything that says what to do: the opcode,
+ * the drive and the step count, the head select byte with its
+ * precompensation and write current bits, the four argument bytes, and, if
+ * the command has a data phase, a buffer for it.  None of that does this
+ * driver read: it has no opinion what a format is, or a read, or a seek,
+ * and nothing here consults a table or a geometry.
+ *
+ * What it does decide is what no caller can:
+ *
+ *	the address of the data phase, because a caller's buffer is a virtual
+ *	address and the board follows a physical one.  The buffer is held
+ *	(bhold) and its address written in the three bytes at r->hole, the
+ *	place the caller said it belongs.
+ *
+ *	the chain.  Bytes 13..15 are the address the board fetches its next
+ *	command from, so they are an address again and are set to this
+ *	block's own - which is what every other command this driver issues
+ *	does, and what reset() sets up once for a placed module.
+ *
+ *	the wait, which is polled rather than interrupt driven: a raw command
+ *	is synchronous, so the ioctl returns when the drive is done and the
+ *	status goes back to the caller in cmd[12], the byte the board writes
+ *	its completion into.  That byte is the only part of the block a
+ *	caller can read but not write, which is why the block is wider than
+ *	the command.
+ *
+ * Everything else - which track, how many heads, the sector-header table a
+ * format points at, and what a status other than OK means - belongs to the
+ * program.  /bin/mwformat is where that lives.
+ *
+ * Two blocks are refused.  One that names a drive other than the one the
+ * node names, because curtrk and CALIB above are keyed by the unit, and a
+ * block that moved another drive would leave this driver's idea of where
+ * the head is describing the wrong drive.  And one that arrives while a
+ * transfer is queued: the read/write path owns the controller from mwstrat
+ * until its queue drains.
+ *
+ * The bus is claimed for the whole command, because the data phase is the
+ * caller's buffer and the controller DMAs out of it (sys/bus.c: one bus
+ * for the machine, shared with the floppy).  A hold must not sleep (uio.c),
+ * so the bus comes first and goes back last.
  */
-static int
-mwseek(track)
-    UINT track;
-{
-    if (mwinfo->curtrk == track)
-        return (0);
-    cmd.seksel = curdrv;
-    if (track > mwinfo->curtrk)
-        cmd.steps = track - mwinfo->curtrk;
-    else {
-        cmd.steps = mwinfo->curtrk - track;
-        cmd.seksel |= STEPOUT;
-    }
-    mwinfo->curtrk = track;
-    cmd.op = HOME;
-    mwwait();
-    return (cmd.stat == OK ? 0 : -1);
-}
+#define MWLEN	12		/* what a caller fills: out through the opcode */
 
 /*
- * Format one head.  img holds the sector-header table the controller reads:
- * four bytes an entry - cylinder low, high, head, sector - with the sector
- * numbers laid down in skew order, which is what a read header hands back
- * later.
+ * Work out where the controller's command block really is, and point the
+ * board at it.
+ *
+ * The board follows a physical address and the address this driver's own
+ * code computes for cmd is the window one, so a placed module has to
+ * convert: (page << 12) | offset.  That is argued where it belongs, at
+ * mwseg above, and this is the one place that does it - reset() takes the
+ * channel address it writes to the controller from here, and the chain
+ * below is the same number.
+ *
+ * The chain has to be set again after every raw command block, because the
+ * caller's bytes are copied over the block and the link is inside it.  The
+ * board fetches its next command from wherever the link points, so a link
+ * the caller filled in - a virtual address, or zero - is a command block
+ * read from another driver's code, or from nothing.
+ *
+ * cp is a pointer variable rather than &cmd taken straight into the cast:
+ * c1 has a rule for converting a pointer to an integer, but none for a
+ * pointer-to-object, which is what &cmd is.
  */
-static int
-mwfhead(track, head, img)
-    UINT track, head;
-    char *img;
+static
+mwlink()
 {
-    static UINT i, j, spt;
+    static char *cp;
 
-    spt = mwinfo->sectors;
-    for (i = 0; i < spt; i++)
-        img[i * 4 + 3] = spt + 1;
-    for (i = j = 0; j < spt; i = (i + FORMSKEW) % spt) {
-        while (img[i * 4 + 3] <= spt)
-            i = (i + 1) % spt;
-        img[i * 4 + 3] = j++;
-    }
-    for (i = 0; i < spt; i++) {
-        img[i * 4] = track & 0377;
-        img[i * 4 + 1] = (track >> 8) & 0377;
-        img[i * 4 + 2] = head;
-    }
-
-    cmd.seksel = curdrv;
-    cmd.steps = 0;
-    cmd.hedsel = curdrv | ((~head & 7) << 2) | HIGHCUR;
-    if (track >= mwinfo->precomp)
-        cmd.hedsel |= PRECOMP;
-    if (track >= mwinfo->lowcur)
-        cmd.hedsel &= ~HIGHCUR;
-    cmd.arg0.byte.low = ~(FORMGAP3 - 1);
-    cmd.arg0.byte.high = ~spt;
-    cmd.arg2 = ~SECSIZE;        /* the 512-byte code, inverted as FORMAT wants */
-    cmd.arg3 = FORMFILL;
-    cmd.op = FORM;
-    mwwait();
-    return (cmd.stat == OK ? 0 : -1);
+    cp = (char *) &cmd;
+    if (mwseg)
+        mwphys = ((UINT32) mwseg << 12) | ((unsigned) cp & 0xfff);
+    else
+        mwphys = (unsigned) cp;
+    cmd.link = (UINT) mwphys;
+    cmd.xlink = (UINT8) (mwphys >> 16);
 }
 
-static int
-mwformat(dev, track, b)
-    UINT dev, track;
-    struct buf *b;
+int
+mwioctl(dev, com, r, b)
+    UINT dev, com;
+    register struct cdb *r;
+    register struct buf *b;
 {
     static struct info *info;
-    static UINT head;
+    static char *p;
+    static UINT i;
+    static int hole;
 
-    info = &mws[dev & 3];
-    if (!(info->flags & OPEN)) {
-        u.error = ENXIO;
+    /*
+     * A block is twelve bytes or it is not a block: those are all the
+     * bytes a caller has, and a shorter one would leave whatever the last
+     * command left in the driver standing as part of this one.  A data
+     * phase is one block at most, which is as much as the kernel will
+     * hand over - a bigger one arrives with no buffer at all and this
+     * driver has no page of its own to move it through.
+     */
+    if (r->len != MWLEN || r->count < 0 || r->count > 512) {
+        u.error = EINVAL;
         return (-1);
     }
-    if (track >= info->tracks) {
+    if (r->count && (r->hole < 0 || r->hole + 3 > MWLEN)) {
+        u.error = EINVAL;
+        return (-1);
+    }
+    hole = r->hole;
+    if ((r->cmd[0] & 3) != (dev & 3)) {
+        u.error = EINVAL;
+        return (-1);
+    }
+    info = &mws[dev & 3];
+    if (!(info->flags & OPEN)) {
         u.error = ENXIO;
         return (-1);
     }
@@ -926,65 +914,69 @@ mwformat(dev, track, b)
     }
     ei();
     mwbusplease();
+    /*
+     * And again with the bus held: mwbusplease() sleeps when the floppy
+     * has it, and a request that arrived while it slept would be issued
+     * into the block this one is about to build.
+     */
+    if (mwbuf != 0) {
+        busgive(0);
+        u.error = EBUSY;
+        return (-1);
+    }
 
-    mwstate = STOPPED;
+    mwstate = STOPPED;          /* polled: no completion interrupt is wanted,
+                                 * and the tick has nothing to time out */
     curdrv = dev & 3;
     mwinfo = info;
 
-    bhold(b);
-    cmd.dma = b->data;
-    cmd.xdma = b->xmem;
+    for (i = 0; i < MWLEN; i++)
+        ((char *) &cmd)[i] = r->cmd[i];
+    mwlink();
 
-    /* re-select the drive and load its constants, polled */
-    cmd.steps = 0;
-    cmd.seksel = curdrv;
-    cmd.hedsel = curdrv;
-    cmd.arg2 = SETTLE;
-    cmd.arg3 = SECSIZE;
-    cmd.arg0.byte.high = mwinfo->stpdel | INTOFF;
-    cmd.hedsel |= LCONST;
-    cmd.op = LOAD;
-    mwwait();
-    if (cmd.stat != OK)
-        goto fail;
-
-    if (mwseek(track) < 0)
-        goto fail;
-    for (head = 0; head < mwinfo->heads; head++)
-        if (mwfhead(track, head, b->data) < 0)
-            goto fail;
-
-    brel();
-    mwstop();
-    return (0);
-
-  fail:
-    brel();
-    mwstop();
-    u.error = EIO;
-    return (-1);
-}
-
-/*
- * The block switch's fourth entry (include/sys/con.h).  The one command
- * this driver takes is FORMAT - r->cmd[0] holds the controller's opcode -
- * and r->cmd[1..2] the track to format, little-endian.  It is one track
- * per call; /bin/mwformat walks the drive and shows the progress.
- */
-int
-mwioctl(dev, cmd, r, b)
-    UINT dev, cmd;
-    struct cdb *r;
-    struct buf *b;
-{
-    UINT track;
-
-    if (r->cmd[0] != FORM) {
-        u.error = EINVAL;
-        return (-1);
+    if (r->count) {
+        /*
+         * The address, three bytes, written the way newrw() writes it for
+         * a read or a write: the low two are the window address the
+         * buffer is reachable at, the third is the segment it lives in.
+         * The board takes those two together as one address, which is why
+         * this is not computed as one - a 24-bit address does not fit a
+         * 16-bit unsigned, and the segment is the top eight bits.
+         */
+        p = bhold(b);
+        ((char *) &cmd)[hole] = (unsigned) p;
+        ((char *) &cmd)[hole + 1] = (unsigned) p >> 8;
+        ((char *) &cmd)[hole + 2] = b->xmem;
     }
-    track = (r->cmd[1] & 0377) | ((r->cmd[2] & 0377) << 8);
-    return (mwformat(dev, track, b));
+
+    mwwait();
+
+    /*
+     * The head is wherever the block left it, so this driver's own idea of
+     * where it is (curtrk, trusted while CALIB is set) is a guess from
+     * here on - and a seek made from a stale guess lands somewhere and
+     * reports that it arrived.  rwint() drops the same flag after a read
+     * error, for the same reason.  The status is read out before mwstop()
+     * reuses the block for its own command.
+     */
+    info->flags &= ~CALIB;
+    r->cmd[MWLEN] = cmd.stat;
+
+    if (r->count)
+        brel();
+    mwstop();
+
+    /*
+     * And the command ran.  How it went is in the status byte, and that is
+     * the caller's to read: a raw command block's status is not one thing -
+     * a read answers with a completion code, a sense answers with the
+     * drive's status bits, and the board answers some commands with a byte
+     * that is neither - so the driver does not decide whether it was good,
+     * and only a refusal above is an error here.  This is the same split
+     * the command block itself makes: the driver moves the bytes, the
+     * program knows what they mean.
+     */
+    return (0);
 }
 
 /*

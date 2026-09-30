@@ -113,9 +113,10 @@ while read type major minor name; do
 done < "$devlist"
 
 # 5. the freshly built kernel, over the one mkfs -i left.  The ccc kernel's
-# root device defaults to 3/0 - the m5 drive type - and the m16 is minor
-# 16, so point it there first: the minor's upper bits are the specs[]
-# index that supplies the drive timing the label does not carry.  setdev
+# root device defaults to 3/0 and the m16 is minor 8, so point it there:
+# the driver reads the unit and the slice out of the minor and the geometry
+# out of the disk's own label, so any node of drive 0's 'a' would do - 3/8
+# is the m16a node the rest of this script and /dev/root use.  setdev
 # patches in place, so work on a copy.
 if [ -f "$kernel" ]; then
 	cp "$kernel" "$tmp.k" || exit 1
