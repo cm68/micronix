@@ -3,8 +3,8 @@
 `stub.c` and `stub_intr.c` are a block-device driver with every hook a
 driver has and none of the code: each routine is a stub that returns
 immediately. This file is the recipe for filling them in. Read it beside
-`INTERRUPTS.md` (how an interrupt reaches a handler) and `overlay.md` /
-`OVERLAY-DRIVERS.md` (what it means to be a driver module).
+`docs/INTERRUPTS.md` (how an interrupt reaches a handler) and `docs/overlay.md` /
+`docs/DRIVERS.md` (what it means to be a driver module).
 
 The two files:
 
@@ -81,8 +81,10 @@ sleeper is `sleep(chan, PRIBIO)`, and the interrupt handler does
 
 Run the raw command block in `b` against the device (`include/sys/ioctl.h`).
 A driver whose bus has no command block leaves the fourth biovec entry `0`
-and answers `ENOTTY` here — the stub's answer. The HD-DMA board is the
-one with no command block.
+and answers `ENOTTY` here — the stub's answer. Every block driver in the tree
+now fills the entry (`mwioctl`, `djioctl`, `ideioctl`, `ncrioctl`, in
+`mwbvec`/`djbvec`/`idebvec`/`ncrbvec`); only the stub itself answers
+`ENOTTY`.
 
 ### `init(seg)`
 
@@ -158,7 +160,7 @@ stops being a stub, split `stubhdr` into `stubhdr.c` and name it first.
 ## 4. The interrupt line
 
 `line` is an 8259 input number (0–7), not a raw bus line. From
-`INTERRUPTS.md`:
+`docs/INTERRUPTS.md`:
 
 | Input | Owner |
 |---|---|
@@ -204,7 +206,7 @@ To add this driver:
 
 A new device that should be bootable also needs a boot driver in the
 selector ROM, `stand/roms/multIO.s` (the 4K program at `0xff0000` that
-MON5.0 copies down to `0xf000` and runs; `BOOTROM.md` is its map). The
+MON5.0 copies down to `0xf000` and runs; `docs/BOOTROM.md` is its map). The
 selector arms the IDE board and the NCR 5380 SCSI, races them, and reads
 sector 0 from the winner into task 1's `0x100`. A third device plugs into
 that same shape in three places.

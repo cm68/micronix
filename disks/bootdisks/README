@@ -27,7 +27,7 @@ The loader is in the sectors in front of the filesystem and the
 filesystem behind it, and one struct dlabel at byte 256 of block 0
 describes both - so the diskette says what it is rather than the name it
 is reached by.  A reader with the file in its hands and no device number
-at all can mount it.  See src/micronix/sys/DISKLABEL.md for the label,
+at all can mount it.  See docs/DISKLABEL.md for the label,
 and src/micronix/stand/boot/README for the loader.
 
 To boot one:

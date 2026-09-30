@@ -278,7 +278,7 @@ The driver is 3241 bytes (text 3034, data 146, bss 61).  The resident
 kernel had 3086 bytes to spare, which was 155 short; dj.c's 1K staging
 buffer leaving the 64K bought 639, so the same driver is 484 to spare.
 That is a change of state rather than a margin, and it is worth saying
-that the reclaim is the whole of it - see OVERLAY-DRIVERS.md, where the
+that the reclaim is the whole of it - see docs/DRIVERS.md, where the
 same 639 bytes are already spoken for.  The budget, measured on the
 linked image (mxnm unix, and mxnm -b on the folds; the same numbers are
 the first sixteen bytes of unix, a Whitesmiths header - text 0x8e73,
@@ -312,7 +312,7 @@ scsi.o went 4241 -> 3241 and the shortfall 1155 -> 155, which dj.c's
 reclaim then closed.  The same lever is what option 2 below means, and
 it is the one that has worked.
 
-KMEM.md's layout map carries these numbers too - it is the place to read
+docs/KMEM.md's layout map carries these numbers too - it is the place to read
 the shape rather than recompute it, and it went stale by about 3.8K once
 before this.  The link fails with "objects out of address order (data)"
 the moment _ebss+2202 crosses 0xe000.
@@ -352,7 +352,7 @@ calls each through ovlcall with its own page mapped.  That fan-out is
 the one resident change the SCSI work needed, and it is what lets ide
 and ncr both live on VI2.
 
-Which way it went: sys/overlay.md's, the third of the three that were
+Which way it went: docs/overlay.md's, the third of the three that were
 listed here.  Option 1 was never attractive - it buys the link by giving
 up a driver, and running all four is the point.  Option 2 had already
 been spent: the reclaims that closed the 155-byte link shortfall
@@ -456,7 +456,7 @@ however many other drivers ran while it was out.  The window is still
 one page for the machine.  What became per-process is the knowledge of
 which page a process is owed.
 
-That is also what makes the non-blocking corollary in overlay.md not
+That is also what makes the non-blocking corollary in docs/overlay.md not
 apply here.  A swapped-in frame's bytes would be another driver's only
 in a design that swaps contents; this one maps a window onto a segment
 each module holds for the whole boot, so restoring the window restores

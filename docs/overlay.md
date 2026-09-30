@@ -1,11 +1,14 @@
 # Kernel overlay strategy
 
-Status: plan (not implemented). Serves as the doc for when we build this.
+Status: historical design note, kept for the reasoning. The overlay scheme it
+describes is implemented — see `docs/DRIVERS.md`. The sections whose outcome
+differs from the plan are marked "Taken" or "Superseded" inline.
 
 This is the general case, written when the 64K had no room for a whole driver
-and the seam fell between the top end and the resident FSM. `OVERLAY-DRIVERS.md`
-is the concrete plan for this kernel now that the budget covers a whole driver
-per page: same repacking, different interrupt answer.
+and the seam fell between the top end and the resident FSM. `docs/DRIVERS.md`
+describes what this kernel actually built once the budget covered a whole
+driver per page: one whole driver per page, and a different answer to the
+interrupt question (see below).
 
 ## Context
 
@@ -15,9 +18,11 @@ the data/bss plus the minted buffer headers fill to 0xe000, and 0xd000/0xe000/
 page. There is no room for more resident code.
 
 The device drivers (`dj`, `mw`, `multio`, `memdev`, `cus`, …) are reached *only*
-through the `biosw[]`/`ciosw[]` switch tables, and they never call each other.
-That is exactly the precondition for overlays: at most one driver is in use at a
-time, so they can all share one 4K page at the same virtual address.
+through the `biosw[]`/`ciosw[]` switch tables, and (with one exception) they
+never call each other. The exception is the bus lock: `busgive` invokes the heir —
+a function in another module — through `ovlcall` (`sys/bus.c`), so a driver can
+call a driver. Overlaying is still sound, because at most one driver is in use at
+a time: they can all share one 4K page at the same virtual address.
 
 ## Core idea
 
@@ -57,9 +62,10 @@ against by both.
 ## Components
 
 ### Overlay page
-- A fixed 4K logical page reserved for the overlay (page 4, 0x4000–0x4fff, say;
-  the exact page is a link-time choice). All overlaid drivers are linked to this
-  base, so they overlap each other in logical space.
+- A fixed 4K logical page reserved for the overlay. It landed at `OVLSEG` 9
+  (`0x9000`), above the resident text; `OVLBASE = OVLSEG * 0x1000` is a
+  link-time choice in `include/sys/ovl.h`. All overlaid drivers are linked to
+  this base, so they overlap each other in logical space.
 
 ### Physical backing
 - `segalloc()` hands out one 4K segment per driver, permanently resident in the
@@ -113,8 +119,9 @@ is cut along that line first.
 
 ## Big drivers (SCSI): overlay region, not one page
 
-**Superseded for this kernel.** The SCSI driver turned out to fit one 4K page — 3241
-bytes of object, 3268 of page, as `sys/ncr.c`, major 5. So there is no group, no region
+**Superseded for this kernel.** The SCSI driver turned out to fit one 4K page —
+3702 bytes of page (`ncr.mod` is 3718: a 16-byte object header plus the page),
+as `sys/ncr.c`, major 5. So there is no group, no region
 sized to a group, and no resident/overlaid seam: the whole driver is one module in one
 page. The seam below is for a driver that does not fit a page, and nothing in this tree
 is one, so the packing question it raises does not arise either. The rest of this

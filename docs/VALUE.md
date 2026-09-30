@@ -1,7 +1,7 @@
 # peep value numbering
 
 A value-tracking layer for the peephole pass.  It replaces the ad-hoc
-per-rule whitelists (r_h0's "is H zero", r_orclr's "is C clear") with
+per-rule whitelists (r_xordup's "is A zero", r_orclr's "is C clear") with
 one structure that knows, at every point in a straight-line run, what
 each register and the carry flag contain.  Rules become reads of that
 structure.
@@ -31,12 +31,13 @@ leaves B's number alone.  A copy chain `ld b,a ; ld c,b` lands B and C
 on one number, so C is A.
 
 The carry flag is tracked separately, as one of CLEAR / SET / UNKNOWN.
-The other flags (Z, S, H, P/V, N) are not tracked yet; they are only
-needed for the `ld a,0 -> xor a` class of rewrite, which is deferred.
+The other flags (Z, S, H, P/V, N) are not tracked: only the carry earns its
+place.  `ld a,0 -> xor a` (`r_ldazero`) needs nothing from the value state
+beyond the flags being dead, and no rule yet needs Z, S, H, P/V or N.
 
-## next(): the transition
+## vnext(): the transition
 
-A pure function `next(state, insn)` that returns the state after one
+A pure function `vnext(s, insn)` that returns the state after one
 instruction.  This is the correctness-critical table; a wrong entry
 costs bytes the way the `or a` case nearly did, so every flag effect is
 spelled out.  Notation: `r←n` constant, `r←r'` copy, `r←⊥` fresh
@@ -131,8 +132,11 @@ after a rule rewrites it, and only the suffix from the modified line:
 
 What the rules ask, each a read of the state at `win[0]`:
 
-  * `iszero(r)`  - r's value number maps to 0       (r_h0)
-  * `isclear()`  - carry is CLEAR                   (r_orclr)
+  * `viszero(s, r)`      - r's value number maps to 0      (r_xordup, on A)
+  * `visclear(s)`        - carry is CLEAR                  (r_orclr)
+  * `vredundant(s, insn)` - the line's effect is already in the state
+  * `vnumber(p, &n)`     - the operand names a known constant `n`
+  * `vpairconst(s, hi, lo, n)` - a 16-bit register pair holds `n`
 
 A rule fires when it can delete or rewrite a line the state says is
 already right; after the rewrite it re-folds the affected suffix.

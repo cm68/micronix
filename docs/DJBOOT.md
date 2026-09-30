@@ -21,7 +21,8 @@ pulses the attention port. The controller's Z80 fetches and runs the
 program, writing status bytes back into the channel as it goes.
 
 - default channel command address: `0x0050` (`DEF_CCA` in `djdma.c`)
-- attention/kick port: `0x00ef` (`DJDMA_PORT` / `djkick`)
+- attention/kick port: `0x00ef` (`DJDMA_PORT` in `djdma.c`; `ABOOT&.ASM`
+  spells the same port `djkick`)
 - command codes (`djdma.c` `djcmd[]`, `djboot1.s`, `ABOOT&.ASM`):
 
 | code | name      | bytes | what it does |
@@ -80,13 +81,19 @@ The CPU spins on the status byte at `0x004a` until the controller writes
 waits.
 
 The simulator models exactly this in `src/hwsim/d1/djdma.c`, `djdma_init()`:
-save/zero `0x0000–0x0037`, plant `bootstrap[]` at `0x0038`, then
+save and zero `0x0000–0x0025`, plant `bootstrap[]` at `0x0038`, then
 
 ```c
 imd_read(imdp[physdrive(0)], 0, 0, imd_firstsec(...), secbuf);
 copyout(secbuf, 0x80, 0x80);   /* 128 bytes to 0x0080, always */
 physwrite(0x4a, 0x40);
 ```
+
+Its 38 is **decimal** — `byte lowmem_save[38]` and
+`for (i = 0; i < 38; i++)` — so the simulator zeroes `0x0000–0x0025` where
+the manual's 38 *hex* would run on to `0x0037`. The bootstrap it plants is
+the manual's, byte for byte; the cleared window in front of it is two
+dozen bytes short.
 
 ## 3. The monitor's side — mon447 / mon375
 
@@ -278,7 +285,7 @@ at `0x3080` and that continuation does the heavy load.
 `src/micronix/stand/boot/djboot1.s` used to be a **206-byte** program linked
 at `BASE equ 0100h` that relocated itself to `0xc000`, looped `SREAD` over
 sectors 1–8 into `STAGE = 0x8000`, unpacked the Whitesmith object it found
-there (`src/include/obj.h`: 16-byte header, magic `0x99`, text/data/bss +
+there (`src/micronix/include/obj.h`: 16-byte header, magic `0x99`, text/data/bss +
 textoff/dataoff), and jumped to its text.
 
 It did not fit the DJ/DMA bootstrap contract in two independent ways — 206 >
@@ -296,8 +303,12 @@ file links at `BASE0 equ 0080h`:
   one `SREAD` of block 1 to `0x0100`, and `jp level1`. A failure loops on the
   status byte forever, because there is nothing to say it with and nothing
   else to do. It pads to exactly 128 bytes.
-- **level 1** — the old program, unchanged but for `ld c,1` becoming
-  `ld c,L2SEC` (2). It relocates `0x0100 → 0xc000`, `SREAD`s blocks 2–9 into
+- **level 1** — the old program, with the sector it reads taken from the
+  medium instead of hardcoded: `ld c,1` became
+  `ld a,(FSEC) / inc a / inc a / ld c,a` (`FSEC` is level 0's last two
+  bytes). It relocates `0x0100 → 0xc000`, `SREAD`s `NSEC` = 8 sectors
+  beginning two on from the medium's first — level 0 was that one and
+  level 1 the next, so level 2 starts the sector after — into
   `STAGE = 0x8000`, unpacks the object, and jumps to its text.
 - **level 2** — `djboot.com`, `boot.c` + `djio.c` + `sexit.s` linked
   `-Ttext=0x100`. `boot.c` loads the kernel to `0x1000`
@@ -310,10 +321,11 @@ level 0's `SETDMA` puts block 1 — only if level 0 is exactly the length the
 firmware copies. Nothing about a wrong image would look wrong, so `djload`
 asserts it: byte 128 of `djboot1.bin` must be `0x21` (`ld hl,BASE`). The
 assembler shortens level 0's trailing `jp` to a `jr`, which is why the head
-is 59 bytes of code and 69 of pad.
+is 61 bytes of code and 65 of pad (then `FSEC` and its marker, to 128).
 
-`djload` is ten blocks — one side of the cylinder-0 track at the tree's
-512-byte-sector geometry:
+`djload` is ten blocks — one side of the cylinder-0 track on the hard
+sectored five inch medium (40 cylinders × 2 heads × 10 sectors), which is
+the geometry its fixed shape was cut for:
 
 | block | contents |
 |---|---|
@@ -321,9 +333,16 @@ is 59 bytes of code and 69 of pad.
 | 1 | level 1 (bytes 128+) |
 | 2–9 | `djboot.com` |
 
-Blocks 10–39 are the rest of the two reserved cylinders and are unused; the
-filesystem starts at block 40. The label's slot is why level 1 has a block of
-its own: 206 bytes from byte 128 would run 128–333, through 256, and `DL_OFFSET`
+Where the boot area ends is the medium's, not the loader's: `mkbootimg -d`
+writes `d_bootblks = toff * heads * spt`, so that five inch medium (`toff`
+2) reserves 40 blocks and its filesystem starts there, while the eight
+inch media — the `FLOPPIES` table's `d8ss` (77 × 1 × 15) and `d8ds`
+(77 × 2 × 15), both `toff` 2 — reserve 30 and 60. Every one of them leaves
+`djload`'s ten blocks in front of the filesystem; only the five inch one
+ends the reservation exactly where `djload` does.
+
+The label's slot is why level 1 has a block of its own: level 1 is longer
+than 128 bytes, so from byte 128 it would run through 256, and `DL_OFFSET`
 is a fixed 256 from the start of the disk.
 
 **This is not UX141_SA's stage structure, and does not need to be.** That disk
@@ -346,12 +365,13 @@ Sources that say the real thing:
 - `src/hwsim/d1/djdma.c` — the simulator's model (`djdma_init` bootstrap,
   `readsec`/`readtrk`/`setdma`/`sense`, `djcmd[]`).
 - `src/hwsim/resources/cpm22/E3/ABOOT&.ASM` — the CP/M cold boot loader and
-  its Micronix variant. (Siblings: `bdos.asm`, `ccp.asm`, `cbios-e4.asm`,
-  `E3/CBIOSE3.ASM`, `E3/FORMATDJ.ASM`.)
+  its Micronix variant. (Its neighbours: in `cpm22/` itself, `bdos.asm`,
+  `ccp.asm`, `cbios-e4.asm`; in `cpm22/E3/`, `CBIOSE3.ASM` and
+  `FORMATDJ.ASM`.)
 - `src/micronix/stand/boot/djboot1.s`, `djio.c`, `boot.c`, `sexit.s`,
   `GNUmakefile` — the tree's floppy boot.
-- `src/include/obj.h` — the Whitesmith object header the tree's first level
-  unpacks.
+- `src/micronix/include/obj.h` — the Whitesmith object header the tree's
+  first level unpacks.
 - `extra/hardware/djdma/Morrow/decision/djdma_firmware/` — DJDMA25 firmware
   binaries (`DJDMA_V2.5_26C2.bin`, `DJDMA_11C.bin`, `DJDMA_12B.bin`,
   `DJDMA_3D.bin`).

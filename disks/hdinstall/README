@@ -15,7 +15,7 @@ Nothing here is built from this tree.  This is the authentic install:
 the distributed standalone, on a simulated drive, kept because it is
 what the hardware did.  A drive made from the tree does not need a
 floppy at all - create_vol builds a bootable volume and boot_vol boots
-it, and INSTALLATION.md section 3 is where that path is written down.
+it, and docs/INSTALLATION.md section 3 is where that path is written down.
 
 Tracing goes to src/hwsim/d1/logfile - run adds -l when it sees -t,
 because trace output goes to a file descriptor and -l is what points that

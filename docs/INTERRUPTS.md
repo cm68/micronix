@@ -58,9 +58,9 @@ names below are therefore 8259 *input* numbers:
 |-------|-------|---------------|
 | 0 | hard disk (hdca / hddma) | `multio.c` `reg_intbit(0, "hd")` |
 | 1 | djdma floppy | `reg_intbit(1, "djdma")` |
-| 2 | ide hard disk | `reg_intbit(2, "ide")` |
+| 2 | ide hard disk (shared with the NCR 5380 host adapter) | `reg_intbit(2, "ide")` |
 | 3-5 | the three 8250 ACEs | `ace_init(i, name, 3 + i)` |
-| 6 | master parallel port | disabled at the PIC, see `mio.s` |
+| 6 | master parallel port | disabled at the PIC, see `inits.s` |
 | 7 | RTC clock tick | `reg_intbit(7, "clock")` |
 
 The simulator routes the board's own devices through `set_vi` as well —
@@ -80,17 +80,21 @@ get_intack  = &multio_intack;
 ```
 
 `multio_vi_change` diffs the old and new line state, sets or clears the
-corresponding bits in the **IRR**, and calls `multio_set_int_line`:
+corresponding bits in the **IRR**, and calls `multio_set_int_line`, which runs
+the 8259 priority resolver:
 
 ```c
-if ((irr & ~imr) & ~isr)  line = 1; else line = 0;
+/* multio.c */
+line = (highest_serviceable() >= 0) ? 1 : 0;
 (*int_change)(line);
 ```
 
 The S-100 `PINT` line is asserted when a request is pending, unmasked in the
-IMR, and not already in service in the ISR.
+IMR, and of higher priority than the highest-priority in-service level — not
+merely "not already in service". `highest_serviceable()` (`multio.c`) is the
+resolver; its own comment says exactly that.
 
-Note that `micronix/sys/mio.s` programs the master with `ICWORD1 := 037` —
+Note that `micronix/sys/inits.s` programs the master with `ICWORD1 := 037` —
 level triggered, 4-byte vector interval, single controller. Edge triggering
 is decoded but not implemented in `multio.c`; it logs
 `"edge triggered not supported"`. Everything assumes level triggered, which
@@ -164,15 +168,12 @@ hands back. `z80_tick` in `mpz80.c` implements exactly that:
 
 `int_ack()` in `s100.c` trampolines through `get_intack` to
 `multio_intack()`, which is the 8259's acknowledge state machine. On the
-first cycle of a sequence (`ivecstate == IV_EMPTY`) it picks a winner by
-rotating priority scan and builds a three byte instruction:
+first cycle of a sequence (`ivecstate == IV_EMPTY`) it picks a winner with the
+same resolver `multio_set_int_line` uses — `level = highest_serviceable()` — and
+builds a three byte instruction:
 
 ```c
-for (i = 0; i < 8; i++) {
-    level = (priority + i) % 8;
-    mask = 1 << level;
-    if ((mask & irr) && !(mask & imr)) break;
-}
+level = highest_serviceable();
 vecaddr = (icw1 & ICW1_VECL) + (level * ((icw1 & ICW1_ADI) ? 4 : 8)) + (icw2 << 8);
 vector[0] = 0xcd;                    // CALL
 vector[1] = vecaddr & 0xff;
@@ -185,10 +186,17 @@ last byte:
 
 ```c
 if (ivecstate == IV_EMPTY) {
-    isr |= iv_isrbit;         // now in service
+    if (auto_eoi) {
+        /* auto-EOI: the PIC drops the in-service bit itself */
+    } else {
+        isr |= iv_isrbit;     // now in service
+    }
     multio_set_int_line();    // drops PINT if nothing else is pending
 }
 ```
+
+`isr |=` is the `else` of `if (auto_eoi)`. This master is not in auto-EOI
+mode (see below), so the `else` is the live path.
 
 The vector is therefore computed **at acknowledge time** from whatever is
 pending then, not from what was pending when the line first went low. That
@@ -220,19 +228,26 @@ of `vectors`.
 
 | Level | Handler | Purpose |
 |-------|---------|---------|
-| 0 | `_mwint` | hard disk |
-| 1 | `_djint` | floppy disk |
-| 2 | `_ideint` | ide hard disk |
+| 0 | `_ovlint0` | hard disk |
+| 1 | `_ovlint1` | floppy disk |
+| 2 | `_ovlint2` | ide hard disk, shared with the NCR 5380 |
 | 3 | `m1int` | master ACE 1 |
 | 4 | `m2int` | master ACE 2 |
 | 5 | `m3int` | master ACE 3 |
 | 6 | `m0int` | master parallel port |
 | 7 | `clkint` | clock |
 
-Each `intN` is a `call intrupt` followed by the inline address of the real
-service routine. `intrupt` in `micronix/sys/mio.s` is the common wrapper: it
-saves registers, pulls the handler address out of the return address, calls
-it, and then issues the EOI:
+Each `intN` is a `call intrupt` followed by the inline address of the service
+routine. For the disk drivers that address is `_ovlintN` (`sys/ovl.c`), not
+the driver's own handler: a driver is a module with no link-time address, so
+the resident `ovlint` fan-out finds it through the line's registered
+`{fn, seg}` pairs. The character devices (`m1int`..`m3int`, `clkint`) are
+resident and name their handlers directly.
+
+`intrupt` in `micronix/sys/mio.s` is the common wrapper. The listing below is
+its tail — the EOI — after the handler returns; the prologue it omits also
+saves IX and IY and the shadow set (`ex af,af'` / `exx`), which ccc's runtime
+uses and Whitesmiths' did not:
 
 ```
 	ld	a,PENABLE
@@ -253,7 +268,7 @@ it, and then issues the EOI:
 
 ```c
 case OCW2_NSEOIR:
-    intlevel = bitnum(isr);
+    intlevel = highest_isr();
     priority = (intlevel + 1) % 8;
     isr ^= (1 << intlevel);
     break;
@@ -334,10 +349,12 @@ to be remembered on the MPZ80 side except the one `int_pending_trap` flag.
 - **The kernel cannot poll the PIC.** `rd_pic_port_0` and `rd_pic_port_1`
   return 0 unconditionally, and OCW3 poll mode is `#define`d but not
   implemented. Cause is only ever learned from which vector was called.
-- **`ARMMASTER` (0103) is the boot-time mask, not the final one.** It arms
-  levels 2-7; `mio.s` has runtime paths that set and clear individual IMR
-  bits as drivers come and go. Remember the IMR's sense is inverted —
-  `multio.c` notes "enables are low".
+- **`ARMMASTER` (0103) is the boot-time mask, not the final one.** Its bits
+  are high for *masked*, so 0x43 masks inputs 0, 1 and 6: it arms levels 2-5
+  and 7, leaving the disk lines (0, 1) and the parallel port (6) masked until
+  their drivers register. Remember the IMR's sense is inverted — `multio.c`
+  notes "enables are low". (The A-natural comment block in `inits.s` reads
+  "allow interrupts 2 - 7" and is loose about level 6.)
 - **`_status` and `_mask` are the same address** (0x403), read and write
   respectively: reading gives `trapstat`, writing sets the MPZ80 mask
   register. See `rregp[]` and `wregp[]` in `mpz80.c`.

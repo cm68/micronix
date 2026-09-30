@@ -25,7 +25,7 @@ There are two problems with this syntax:
 
 * Few if any assemblers other than DRI's ASM80 support this syntax.
 
-This repository contains the CP/M 2.2 CCP adn BDOS source code, reformatted
+This repository contains the CP/M 2.2 CCP and BDOS source code, reformatted
 to cross-assemble with Macro Assembler AS:
 
     http://john.ccac.rwth-aachen.de:8000/as/

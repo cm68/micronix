@@ -22,42 +22,56 @@ buffer cache, and swap.
 
 ## Current layout
 
-The target below is what the kernel links to now: the u page moved up
-to segment 15, so the two adjacent pages are the buffer window (14) and
-the scratch window (13) under it.
+The offsets below are a snapshot of the build in the tree and move
+whenever the kernel does, so re-measure before trusting one:
+
+	mxsize unix.link		text, data and bss totals
+	mxnm unix.link			_ebss, blist, _ustack, _u, the slot
+	od -An -tu1 -N16 x.o		one object's text/data/bss (obj.h)
+	boot.c's nblk			(text + data + 0x10 + 511)/512
+
+The *shape* is what is fixed: the u page has moved up to segment 15, so
+the two adjacent pages are the buffer window (14) and the scratch window
+(13) under it.
 
 ```
 0x0000 - 0x0fff   ROM + I/O page            (not in the image)
-0x1000 - 0x9e73   text                      36467 bytes
-0x9e73 - 0xc8d9   data + bss                10854 bytes; ends at _ebss
-0xc8d9 - 0xdd31   buffer pool               248 headers minted off _ebss
-0xdd31 - 0xdfff   free                      719 bytes
-0xe000 - 0xefff   buffer-cache window       BUFSEG; bwin() maps here
-0xf000 - 0xfcde   leaf code + constants     USERSEG; 3294 bytes
-0xfcde - 0xfede   ustack                    512 bytes, .bss
-0xfede - 0xff53   struct user u             117 bytes, .bss
-0xff53 - 0xffff   free                      172 bytes; loader-stack slack
+0x1000 - 0x8895   resident text             30870 bytes
+0x8896 - 0x8fff   pad                       the linker pads out to the slot
+0x9000 - 0x9fff   overlay module slot       OVLSEG; ovlslot.o, one page
+0xa000 - 0xcbf2   data + bss                11251 bytes: OVLDATA to _ebss
+0xcbf3 - 0xdff6   buffer pool headers       244 minted headers off _ebss
+0xdff7 - 0xdfff   free                      9 bytes
+0xe000 - 0xef4a   window-page cluster       BUFSEG; win.o, 3915 bytes
+0xef4b - 0xefff   free in the window page   181 bytes
+0xf000 - 0xfb31   leaf code + constants     USERSEG; 2866 bytes
+0xfb32 - 0xfd31   ustack                    512 bytes, .bss
+0xfd32 - 0xfda6   struct user u             117 bytes, .bss
+0xfda7 - 0xffff   free                      601 bytes; loader-stack slack
 ```
 
-`blist` is the last object in .bss: the 8 boot headers at 0xc831..0xc8d9,
-which is why the pool's minted range starts at `_ebss`.  With them the
-pool is 256 headers, or 5376 bytes from 0xc831 to `btop` = 0xdd31.
+`blist` is the last object in .bss: the 8 boot headers at 0xcb4b..0xcbf3,
+which is why the pool's minted range starts at `_ebss`.  The headers are
+21 bytes (`sizeof(struct buf)`), so the pool is 252 of them — the 8 boot
+headers plus 244 minted — 5292 bytes from 0xcb4b to `btop` = 0xdff7.
 
-The pool is 719 bytes short of BUFWIN and that is not a coincidence: at
-256 headers `MAXBUFS` (main.c) binds before the ceiling does, so the
-pool is sized by the count and not by memory.  Minting to the ceiling
-alone would be 282 headers, so the count binds 34 short of it - it was 3
-short before the 1K staging buffer left the kernel, which is the change
-that made the ceiling stop mattering.  See OVERLAY-DRIVERS.md.  The
-0xe000 page is the wall for the resident kernel as well - `-Shigh` parks
-highmem.o (2202) at `_ebss` and win.o is pinned there, so the kernel
-links only while `_ebss <= 0xe000-2202` = 0xd766.  Today's slack is
-0xd766-0xc8d9 = 3725 bytes, none of it reachable by the cache, and it is
-where the driver blobs would have to park.  See TODO, the scsi section.
+What binds the pool is the ceiling now, not the count: the room to
+BUFWIN is 244 headers and `MAXBUFS` (256, main.c) is above it.  It was
+the other way round — the ceiling used to leave room for 282 and the
+count bound first — and the kernel's own growth is what closed the gap.
+See docs/DRIVERS.md.  The 0xe000 page is the wall for the resident
+kernel as well: `-Shigh` parks highmem.o (3254) at `_ebss` and win.o is
+pinned at the window, so the kernel links only while
+`_ebss <= 0xe000-3254` = 0xd34a.  Today's slack is 0xd34a-0xcbf3 = 1879
+bytes, none of it reachable by the cache, and it is where the driver
+blobs would have to park.  See TODO, the scsi section.
 
-The file's data stream runs from 0x9e73 to 0xfcde - through the pool and
-the window page, which carry no image bytes - and the boot loader reads
-it as one 119-block flat image.  `_usrtop`/`_memtop` = 0xffff (uhdr.s).
+The image's own bytes run 0x1000 to 0xfb31 — the text and the slot page,
+then the data at 0xa000, win.o at 0xe000 and the leaf code at 0xf000, the
+bss and the pool in between carrying none — and the boot loader reads the
+lot as one flat run: `boot.c` counts `(text + data + 0x10 + 511)/512` =
+118 blocks from 0x0ff0, reaching 0xfbef.  `_usrtop`/`_memtop` = 0xffff
+(uhdr.s).
 
 ## Window layout
 
@@ -117,23 +131,24 @@ last .bss object, textpad.s) and `expand_bufs()` (main.c) mints the rest
 contiguously off `&blist[8] == _ebss`, up to `BUFWIN` — the base of the
 window's own page, because `bwin()` holds a segment there for the whole
 of a buffer access and a header in that page would be read back as
-buffer data.  The count is what binds, not that ceiling: `MAXBUFS`
-(256, main.c) is reached first, so the pool is 8 boot headers plus 248
-minted, running 0xc831 to 0xdd31, the first 2202 bytes of which are over
-the reclaimed init-only object, and 719 bytes of the `_ebss`..BUFWIN
-region go unused.  Minting to the ceiling alone would be 282, so the
-count binds 34 short of it - it bound by 3 before the 1K staging buffer
-left the kernel, which is what moved the ceiling out of the way and left
-the pool sized by `MAXBUFS` alone.  The 719 bytes are growth room: the
-next kilobyte of kernel growth spends them and then starts eating
-buffers, at 21 bytes each.  See TODO, the scsi section.
+buffer data.  The ceiling is what binds, not the count: the room to
+0xe000 is 244 headers, and `MAXBUFS` (256, main.c, which caps the minted
+count) is above it, so the pool is 8 boot headers plus 244 minted,
+running 0xcb4b to 0xdff7, the 3254 bytes from `_ebss` being over the
+reclaimed init-only object, and 9 bytes of the `_ebss`..BUFWIN region go
+unused.  It is the reverse of what it once was — the ceiling used to
+allow 282 and the count bound first — and the kernel's own growth is
+what closed the gap.  Those 9 bytes are all the room there is: the next
+header's worth of growth eats a buffer, at 21 bytes each.  See TODO, the
+scsi section.
 
 The blocks are 512 bytes each, minted `data = BUFWIN + (i&7)*512` with
 `xmem` = a fresh page from `segalloc()` (8 blocks per page).  DMA
 ignores the window: physical = `xmem<<12 | (data & 0xfff)`.
 
-Raising the ceiling to `_upage` (0xf000) doubles the pool and needs the
-window borrowed at every site that uses it — see TODO.
+Raising the ceiling to `_upage` (0xf000) roughly doubles what memory
+would allow, but `MAXBUFS` binds today and would have to go up with it;
+and it needs the window borrowed at every site that uses it — see TODO.
 
 A fork can then reuse a filled-out page: keep a freelist of u pages
 that already carry the leaf code, copy only the 629 bytes of ustack and
@@ -146,9 +161,11 @@ u, and skip the text copy (see TODO).
   last block wraps its DMA write into the rom and walks over the stack.
   This is a boot-time wrinkle, not an architectural brake — the loader's
   stack can move (backward-compatible: it reads the same header and
-  loads contiguously), and the image the kernel links to now stops at
-  0xfcde, 768 bytes clear of the loader's deepest sp (0xffde).  What
-  binds the leaf code today is the u page's own 4K, not the loader.
+  loads contiguously), and the image the kernel links to now ends at
+  0xfb31 — the last block the loader writes ends at 0xfbf0, so the
+  margin to the loader's deepest sp (0xffde) is 1006 bytes.  What binds
+  the leaf code today is the u page's own 4K, not the loader.
 - **48K fit**: for the scratch window at 0xd000, text+data+bss must fit
-  0x1000-0xcfff.  Gated by the leaf-code move above shrinking the text.
+  0x1000-0xcfff.  It ends at `_ebss` = 0xcbf3 today, 1037 bytes under the
+  window.  Gated by the leaf-code move above shrinking the text.
 - **.data, not .text**: leaf code in the u page (see above).

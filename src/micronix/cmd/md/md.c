@@ -5,7 +5,7 @@
  *
  * A reader for the docs/ tree.  It reads CommonMark-flavoured markdown
  * from files (or stdin) and writes a plain-text rendering to stdout, so
- * "md DISKLABEL.md | less" reads like a man page.
+ * "md docs/DISKLABEL.md | less" reads like a man page.
  *
  * Emphasis is overstrike, the house style (see form(1)): bold is the
  * character struck twice, underline is the character struck over an

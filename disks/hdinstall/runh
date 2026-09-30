@@ -60,15 +60,6 @@ fi
 # kernel is a different size than what shipped, so the file moves.
 "$root/src/tools/mnix" -f "$here/$drive" write "$kernel" /micronix
 
-# Writes to a drive image go to a -delta beside it and stay there, so
-# without this every run starts from wherever the last one left off.
-for d in "$here"/*-delta; do
-	if [ -f "$d" ]; then
-		echo "runh: discarding $d"
-		rm -f "$d"
-	fi
-done
-
 # -l only when there is something to log
 log=
 for a in "$@"; do
@@ -79,4 +70,4 @@ done
 
 cd "$root/src/hwsim/d1" || exit 1
 
-exec ./d1 -b roms/mon447.bin -B hdcdma $log "hdcdma0:$here/$drive" "$@"
+exec ./d1 -b ../../micronix/stand/roms/mon447.bin -B hdcdma $log "hdcdma0:$here/$drive" "$@"

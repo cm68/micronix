@@ -3,7 +3,7 @@
 The switch-0 boot path has changed. `mon500` no longer carries an IDE
 driver; instead it copies a 4K selector ROM down from the top of the address
 space and runs it. This file describes that ROM, the monitor that uses it,
-and where the two live. `BOOT.md` remains the map of the other boot paths.
+and where the two live. `docs/BOOT.md` remains the map of the other boot paths.
 
 The monitor ROMs are `src/micronix/stand/roms/mon375.s`, `mon447.s` and
 `mon500.s`; only `mon500` knows about the selector. The selector itself is
@@ -169,8 +169,9 @@ reset -> mon500 (rom0) -> switch decode -> copyrom
 
 `make` in `src/hwsim/d1` recurses into `../../micronix/stand/roms`, which
 builds the four `.bin`/`.sym` pairs. The simulator serves the selector as a
-read-only `boot_rom` at `0xff0000` (`s100.c`), loaded from `multIO.bin`
-(`hwsim.c`); `-M <file>` overrides the name, and the default is resolved
+read-only `boot_rom` at `0xff0000` (`src/hwsim/s100.c`), loaded from
+`multIO.bin` (`src/hwsim/hwsim.c`); `-M <file>` overrides the name, and the
+default is resolved
 relative to the tree. `-b ../../micronix/stand/roms/mon500.bin` selects the monitor that knows the
 selector; `-c 0x04` is the all-switches-on + skip-monitor setting that reaches
 `copyrom`.

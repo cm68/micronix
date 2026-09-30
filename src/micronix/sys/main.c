@@ -57,11 +57,13 @@ extern int segalloc();          /* malloc.c */
 
 /*
  * The ceiling on the pool.  expand_bufs() would otherwise mint whatever
- * the resident .bss leaves between _ebss and BUFWIN, which is past what
- * the count can carry - 282 buffers at present, and nbuf wrapped at 256.
- * 256 is also 32 of the 4K segments the blocks come from, which is what
- * the budget is really made of, and no filesystem here wants more cache
- * than that.
+ * the resident .bss leaves between _ebss and BUFWIN.  That was past what
+ * the count can carry when this was written - 282 buffers, and nbuf
+ * wrapped at 256 - and it is 244 now, under the cap, the kernel having
+ * grown into the headroom; the cap stays as the ceiling-independent
+ * bound.  256 is also 32 of the 4K segments the blocks come from, which
+ * is what the budget is really made of, and no filesystem here wants
+ * more cache than that.
  *
  * DEBUGBUFS is the opt-in for a much smaller clamp, so a cache bug shows
  * up quickly instead of an hour into a recompile.  "make DEBUGBUFS=1" in

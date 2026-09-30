@@ -53,9 +53,9 @@ trap is the whole point: `fault()` → `grow()` privatizes the touched page
 (keeps the shared segment for it) and hands the still-empty pages a fresh
 grow segment.  It is a copy-on-write page.
 
-hwsim never implemented the trap half.  `get_byte()`/`put_byte()` call
+hwsim had not implemented the trap half.  `get_byte()`/`put_byte()` called
 `getpte()` for the address translation and then `physread`/`physwrite`,
-**never looking at the permission byte `getpte()` returned**.  So a user-mode
+**without looking at the permission byte `getpte()` returned**.  So a user-mode
 store into a GROW page completed with no trap, `fault()` was never called for
 the heap, and pages 8 and 9 stayed welded to the one shared segment for the
 life of the process — the aliasing the trace shows.
@@ -63,9 +63,14 @@ life of the process — the aliasing the trace shows.
 This is exactly why usersim does not reproduce it: usersim has a trivial 64K
 flat map with no MMU, so there is no grow segment and nothing to alias.
 
-## The fix
+## The fix — implemented
 
-Enforce the permission byte in the memory accessor (`src/hwsim/d1/mpz80.c`).
+The permission byte is now enforced in the memory accessor
+(`src/hwsim/d1/mpz80.c`): the read path blocks or traps at `:1133-1149` and
+the write path at `:1355-1366`, latching `mem_pending_fault`, and
+`take_pending_trap()` (`:795-810`) raises the deferred MTRAP at the
+instruction boundary.  This is the design.
+
 Each page entry is two bytes: the even byte is the physical page, the odd
 byte is the permission field.  The trap-address register (0x400) is a
 single-stage shift register — upper nibble = current page, lower nibble =

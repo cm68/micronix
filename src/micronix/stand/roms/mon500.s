@@ -657,8 +657,8 @@ allerr:	xor	a
 ;* into on-board ram, which stays put across both events, and	*
 ;* reads 256 bytes at a time through the bounce buffer.		*
 ;*								*
-;* The 4k lands at physical 0f000h, task 1's top segment, and	*
-;* is entered as task 1 at 0f000h.				*
+;* The 4k lands at physical 0f000h - bank 15's top segment - and	*
+;* is entered in task 0, whose segment 2 the loop points there.	*
 ;*								*
 ;****************************************************************
 

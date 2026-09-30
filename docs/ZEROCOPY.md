@@ -58,7 +58,7 @@ is no page-level descriptor that can stand in.
 
 The header is where disk and memory meet: `blk` is the disk address,
 `xmem` + `data` is the memory address (`physical = xmem<<12 | (data & 0xfff)`,
-per `KMEM.md`).  Page alignment is achieved by choosing which eight
+per `docs/KMEM.md`).  Page alignment is achieved by choosing which eight
 headers' slots hold the page's blocks, not by any separate structure.
 
 Consequence: a text page is eight block I/Os no matter what.  The disk
@@ -71,7 +71,7 @@ The header-per-block model does not scale.  A cache covering the whole
 pool — ~960K / 512 = ~1920 blocks — needs ~1920 headers, ~40K of kernel
 address space, against a pool of 256.  Segments are plentiful (256);
 headers are the binding constraint, and the cache is deliberately ~64K
-(128 blocks) for exactly this reason (`KMEM.md`).  Today that 256 is
+(128 blocks) for exactly this reason (`docs/KMEM.md`).  Today that 256 is
 `MAXBUFS` in main.c — a count chosen, not a space measured — but it is
 nearly the space too: the headers reach the 0xe000 window page within
 three of that count, so the kernel has no room to raise it.
@@ -147,7 +147,7 @@ The MPZ80 does real copy-on-write, and it has both fault models; the two
 are not interchangeable:
 
 - **deferred** (GROW, today) — the access completes, then the trap fires,
-  and the instruction resumes at `pc+1` (`MAPBUG.md`).  Valid only because
+  and the instruction resumes at `pc+1` (`docs/MAPBUG.md`).  Valid only because
   a grow page is garbage: the write landing on the shared segment is
   harmless, since the writer then owns it and everyone else gets a fresh
   segment.

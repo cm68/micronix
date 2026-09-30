@@ -75,7 +75,7 @@ The drive is formatted by Morrow's own formatter running under CP/M,
 which is booted off the DJ-DMA floppy port:
 
 	cd src/hwsim/d1
-	./d1 -b roms/mon447.bin -B djdma \
+	./d1 -b ../../micronix/stand/roms/mon447.bin -B djdma \
 	    djdma0:../../../disks/dist/1009-8_cold-boot.IMD \
 	    djdma1:../../../disks/dist/947-1.IMD \
 	    hdcdma0:../../../disks/hdinstall/hddma-0.vol
@@ -105,7 +105,7 @@ stage 2: install, from the standalone floppy
 Boot the 1.67 standalone on the 5 1/4 port, with the formatted drive
 attached:
 
-	./d1 -b roms/mon447.bin -B djdma -5 ../../../disks/hdinstall/sa67.5.skew.1k \
+	./d1 -b ../../micronix/stand/roms/mon447.bin -B djdma -5 ../../../disks/hdinstall/sa67.5.skew.1k \
 	    hdcdma0:../../../disks/hdinstall/hddma-0.vol
 
 Use 1.67 and not 1.6: 1.6's kernel has its root device as djdma/12, the
@@ -148,7 +148,7 @@ detail.
 stage 3: boot from the hard disk
 --------------------------------
 
-	./d1 -b roms/mon447.bin -B hdcdma \
+	./d1 -b ../../micronix/stand/roms/mon447.bin -B hdcdma \
 	    hdcdma0:../../../disks/hdinstall/hddma-0.vol
 
 -B hdcdma is the HDC-DMA path with the monitor skipped, which is the
@@ -303,7 +303,7 @@ same time:
 	cp hddma-0.blessed mine.vol
 	mnix -f mine.vol write ../../src/micronix/cmd/init/init /etc/init
 	cd ../../src/hwsim/d1
-	./d1 -b roms/mon447.bin -B hdcdma hdcdma0:<somewhere>/mine.vol
+	./d1 -b ../../micronix/stand/roms/mon447.bin -B hdcdma hdcdma0:<somewhere>/mine.vol
 
 A working drive is named with a .vol suffix and the blessed one is not,
 which is the whole of the difference between a volume and a reference:

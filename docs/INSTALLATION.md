@@ -99,9 +99,10 @@ a populated `filesystem/`, and `src/micronix/sys/unix`. If it stops, it
 says which one is missing. The volume it makes is an `m16` — 306
 cylinders, 6 heads, 17 sectors, 31212 blocks, about 16 meg — and its
 kernel is stamped `rootdev 3/8` on the way in, so what boots is the
-tree's current kernel and not a copy from `kernels/`. The `8` is the
-`m16`'s slot in the drive table; those bits are what the driver reads
-for the timing the label does not carry.
+tree's current kernel and not a copy from `kernels/`. The `3` is the
+HD-DMA driver's slot in `biosw[]` and the `8` is the `m16a` node's
+minor — drive 0's `a` slice — so the number names a device and the
+geometry comes from the disk's own label, not from it.
 
 `boot_vol` runs `d1` with `-c 0x70c`: boot the HD-DMA (0x08), skip the
 monitor (0x04), and put all three uarts in xterms of their own (0x700) so
@@ -159,12 +160,14 @@ with the target attached:
 
 	src/tools/mnix initialize m16 /tmp/target.vol
 	cd src/hwsim/d1
-	./d1 -b roms/mon447.bin -B djdma -5 ../../disks/bootdisks/d5ds.img \
+	./d1 -B djdma -5 ../../disks/bootdisks/d5ds.img \
 		-H hdcdma0:/tmp/target.vol
 
 An eight-inch diskette goes on the eight-inch port as a bare filename;
 only the 5 1/4 needs `-5`. `-H` is "do not exit when task 0 halts" and is
-worth passing always.
+worth passing always. `d1` finds the monitor rom by itself — `-b`
+defaults to the tree's `stand/roms` — so name it only to run a monitor
+other than `mon447`.
 
 When the welcome finishes and the `#` appears, type
 
@@ -180,7 +183,7 @@ when it is done and not before; `cptree` is copying a filesystem through
 a simulated Z80, so give it minutes on a 16 meg volume. Then boot the
 drive:
 
-	./d1 -b roms/mon447.bin -B hdcdma -H hdcdma0:/tmp/target.vol
+	./d1 -B hdcdma -H hdcdma0:/tmp/target.vol
 
 `source m16init` rather than `m16init`, because the shell's path is
 `/bin` and `/usr/bin` and the script is in the root directory. `source`
@@ -195,10 +198,11 @@ a diskette — and:
 	cd /usr/src
 	make
 
-which recurses over `lib`, `libexec`, `cmd` and `sys` and rebuilds them
-with the compiler that is *inside* Micronix rather than the one on the
-host. The first build of the kernel there takes a while and wants the
-volume to itself.
+which recurses over `include`, `lib`, `cmd` and `libexec` and rebuilds
+them with the compiler that is *inside* Micronix rather than the one on
+the host. The kernel is not in that list — the native `makefile` leaves
+`cd sys` commented out — so build it by hand, as in §2. That first
+kernel build takes a while and wants the volume to itself.
 
 There is a wrinkle worth knowing before you chase it: the clock. The
 machine has no year in its RTC — the year comes out of the filesystem's
@@ -227,12 +231,15 @@ option at all — it is a floppy *file* named `-H` — and `d1` exits before
 running an instruction, with `sim: 0 cycles` and no diagnostic naming the
 argument. It reads exactly like "this image will not boot".
 
-**Writes go to a delta.** A run writes to `<image>-delta` beside the
-image and leaves the image alone. The next run applies it again, so a
-stale delta is a stale disk. `boot_vol` removes it for you; if you are
-running `d1` by hand, remove it yourself. The host checkers apply the
-delta too, so a guest-written disk can be checked on the host with no
-merge step.
+**A diskette is written through a delta; a volume is written in place.**
+A floppy run writes to `<image>-delta` beside the image and leaves the
+image alone, and the next run applies that overlay again — so a stale
+delta is a stale diskette. `run` discards one before it boots; if you are
+running `d1` by hand, remove it yourself. A `.vol` is the opposite: the
+simulator opens it `O_RDWR` and writes into it, with only a `.lock`
+beside it, so a booted volume *is* changed and there is no overlay to
+clear. `check_vol` reads a volume's own bytes, so either kind can be
+checked on the host with no merge step.
 
 **The guest runs the volume's kernel, not the tree's.** A volume booted
 by `boot_vol` runs `/micronix` *on that volume*, and a diskette runs its
@@ -264,13 +271,13 @@ through.
 
 ## 8. Where to read further
 
-	BOOT.md			every way the machine gets from reset to a
+	docs/BOOT.md			every way the machine gets from reset to a
 				running kernel, and where the code lives
-	DJBOOT.md		the DJ/DMA floppy path in depth
+	docs/DJBOOT.md		the DJ/DMA floppy path in depth
 	disks/bootdisks/README	what is on an install diskette, and why
-	src/micronix/sys/DISKLABEL.md	the disk label, both idioms
+	docs/DISKLABEL.md	the disk label, both idioms
 	src/micronix/stand/boot/README	the boot blocks
 	disks/hdinstall/README	the authentic install, on a simulated drive
 	disks/hdinstall/REGEN	rebuilding it from source, in stages, and
 				which half of that goal is met
-	ATTRIBUTIONS.md		where the recovered pieces came from
+	docs/ATTRIBUTIONS.md		where the recovered pieces came from

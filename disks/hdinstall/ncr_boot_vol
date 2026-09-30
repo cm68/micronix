@@ -58,9 +58,5 @@ case "$vol" in
 *)	vol="$here/$vol" ;;
 esac
 
-# A fresh run: writes to a drive image go to a -delta beside it and
-# stay there, so drop the one the last run left behind.
-[ -f "$vol-delta" ] && rm -f "$vol-delta"
-
 cd "$root/src/hwsim/d1" || exit 1
 exec ./d1 -b ../../micronix/stand/roms/mon500.bin -c 0x71c -S "$kernel" $flags "scsi0:$vol"

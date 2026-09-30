@@ -6,7 +6,7 @@ linked at a fixed virtual address and copied at run time into one 4K segment of
 the machine's memory. The kernel reaches it through the same `biosw[]`/`ciosw[]`
 entries it always did, so nothing above a driver knows the difference.
 
-`sys/overlay.md` is the general case; this is what this kernel does.
+`docs/overlay.md` is the general case; this is what this kernel does.
 
 ## The architecture
 
@@ -91,7 +91,8 @@ resident code reads `OVLBASE`.
 put the module's page in place before it calls:
 
 - The trampolines. `biosw[]` and `ciosw[]` point at `ovlopen`/`ovlclose`/
-  `ovlstrat` and `ovlcopen`/`ovlcclose`/`ovlcread`/`ovlcwrite`/`ovlcmode`. Each
+  `ovlstrat`/`ovlioctl` and
+  `ovlcopen`/`ovlcclose`/`ovlcread`/`ovlcwrite`/`ovlcmode`. Each
   recovers its major from the device it was handed (`bmajor`/`cmajor`), maps,
   and calls the entry the header registered.
 - An interrupt line. `ovlint[line * OVLSHARE + i]` holds a `{fn, seg}` pair, and
@@ -177,9 +178,11 @@ says where its data is here, at a link-time constant, and init reaches it throug
 wants it inside this structure. The structure is opaque to the kernel.
 
 **`bvec` and `cvec`** are the entries the kernel will call through. A block
-driver fills `bvec` (three entries), a character driver `cvec` (five), one that
-is both fills both — `dj` is the both case, the floppy with its raw character
-mode. The kernel copies them into its own tables at placement, because a function
+driver fills `bvec` (four entries: open, close, strategy, ioctl), a character
+driver `cvec` (five). A module that is both fills both, but no module in the
+tree is — every one is a block driver, and `dj`'s command interface is
+`djioctl` through `bvec`, not a `cvec`; its header leaves the `cvec` field `0`.
+The kernel copies the entries into its own tables at placement, because a function
 that lives in a module is only a function while that module is the one mapped.
 
 **`line` and `intr`** name the interrupt line and the handler. A line carries
@@ -264,10 +267,10 @@ keeps in step by hand.
 `dev/devlist` is the authority. `major(dev) = dev >> 8`, `minor(dev) = dev &
 0377`, `devslice(dev) = (minor >> 5) & 7`, `devtype(dev) = (minor >> 2) & 7`.
 
-`mw`'s nodes encode the drive in bits 0-1 and the drive *type* in bits 2-3, so
+`mw`'s nodes encode the drive in bits 0-1 and the drive *type* in bits 2-4, so
 `m16a`..`m16d` are minors 8..11. `ide` and `ncr` have one board, so their type
 bits are zero and the minor is a plain unit number — a SCSI target id, for
-`ncr`. The slice is bits 5-7 for all of them; slice `c` (bit 5) is the
+`ncr`. The slice is bits 5-7 for all of them; slice `c` (bit 6) is the
 whole-disk view, the drive at cylinder 0 with no roll, whose block 0 is the
 label.
 
@@ -296,8 +299,9 @@ plugged in costs a segment for the rest of the boot, not just its page.
 **The root driver can never be overlaid.** The stamped page is placed from the
 slot and stays there; `ovlplaceall` skips its major. So the slot is one page of
 the kernel's text spent permanently, and how much of it is wasted depends on
-which driver the installation stamped: an mw root is 2618 bytes and wastes 1478
-of the 4096, `dj` is the largest module at 3783 and wastes 313. It also means
+which driver the installation stamped: in the current build `mw` is 2683 bytes
+and wastes 1413 of the 4096, while `dj` is the largest module at 4085 and leaves
+only 11. It also means
 there is no path for a boot device that is not the root device: the boot
 device's driver would have to be read back out of the file, and reading the file
 needs the root mounted.
@@ -326,7 +330,7 @@ scripts, so the path has never been run in anger. The host `mkfs` takes the
 geometry from the label instead, which is why the host-made images are correct.
 
 That the guest `mkfs` still reads the minor at all is now the whole of the
-exposure, because `sys/mw.c` no longer does: the driver maps what the disk's
+exposure, because `sys/mw.c` no longer reads the type: the driver maps what the disk's
 label says, and `mkfs` lays out what its own table says, so the two can disagree
 where they used to be one table read twice. What keeps them together is that the
 label was written by the same model the row names - `mwformat -m m16` and

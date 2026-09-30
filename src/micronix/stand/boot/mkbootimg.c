@@ -28,7 +28,7 @@
  *
  *	mkbootimg <level1> <level2> <tracks> <heads> <spt> <out>
  *	mkbootimg -d <level01> <level2> <tracks> <heads> <spt> <firstsec>
- *	    <toff> <out>
+ *	    <toff> <config> <out>
  *
  * -d is the diskette layout, and it differs in one sector.  On this
  * controller the firmware copies only 128 bytes to 0080, so the first
@@ -44,6 +44,10 @@
  * ask for a sector before it has read the label.  It is one on the soft
  * sectored eight inch media and zero on the hard sectored five inch one.
  * See sys/dlabel.h, sys/dj.c's ORG1 and djboot1.s's FSEC.
+ *
+ * config, the last of -d's numbers, is the format byte a hard sectored
+ * medium names at DJCONFIG below; a medium numbered from one has none and
+ * passes zero.
  *
  * -d also picks the label idiom.  A diskette is not rolled - dj.c adds a
  * fixed track offset and never rotates - so the label carries a slice

@@ -78,7 +78,7 @@ says what a disk is.
 ## The roll, and why it is the thing to fix
 
 The mapping from a filesystem block number to a CHS address is `mwcyl`
-(`sys/mw.c:618`):
+(`sys/mw.c:598`):
 
     cyl = blk / spc + roll;
     if (cyl >= tracks) cyl -= tracks;
@@ -92,14 +92,15 @@ boot area sits at filesystem block `d_cyl0 = (tracks - roll) * spc` = 5236.
 Three costs, all load-bearing today:
 
 1. **The boot area is a hole in the middle of the filesystem.**  The free list has
-   to be taught to skip it (`inboot()`, `cmd/mkfs/mkfsfunc.c:122,419`) and
+   to be taught to skip it (`inboot()`, `cmd/mkfs/mkfsfunc.c:123,504`) and
    something has to own the blocks so no repair hands them out — that is
    `/boot/boot`, and `installboot()`, `bootrange()` and `icheck -i`/`fsck -i`
    exist to rebuild it.
 2. **A filesystem cannot be larger than 32 MB.**  `s_fsize` is 16 bits
    (`include/sys/fs.h:17`), the buffer's block number is 16 bits (`UINT blk`,
-   `include/sys/buf.h:10`), and `info->maxblk` — `tracks * heads * sectors` — is a
-   `UINT` as well (`sys/mw.c:62,291`), so it wraps at 65536 blocks.  A 200 MB drive
+   `include/sys/buf.h:10`), and `info->maxblk` — filled from the label's slice
+   length — is a `UINT` as well (`sys/dlabel.c:161,163`), so it wraps at 65536
+   blocks.  A 200 MB drive
    is four hundred thousand blocks and six times that limit; it cannot be addressed
    as one filesystem at all.
 3. **The rotation can put the filesystem on top of the label.**  The wrap sends
@@ -193,7 +194,7 @@ correctly with that field zero.  Existing fields keep their positions:
 
 Appending is safe, and the reason is worth stating because the compatibility argument
 rests on it: `mkbootimg` builds the boot sector in a `static` buffer
-(`stand/boot/mkbootimg.c:46`), so the half past the fields it writes is zero, and it
+(`stand/boot/mkbootimg.c:91`), so the half past the fields it writes is zero, and it
 writes all 512 bytes.  `mkfs`'s `putlabel` then overwrites the fields in a buffer read
 back from that image and writes the block whole.  So on every volume that exists, the
 bytes a new field would occupy are zero.
@@ -237,24 +238,25 @@ taken in `reset()`, because the label's memory is `buf0`, which `boot.c`'s first
     cyl = blocknum / spec.spc + spec.roll;
 
 and it becomes `spec.cylstart + blocknum / spec.spc + spec.roll`.  Everything the
-second level reads is a filesystem block — the ilist at block 2 (`boot.c:272`), the
-directory and indirect blocks out of `d_addr[0]` (`boot.c:199,246`) — so one number
+second level reads is a filesystem block — the ilist at block 2 (`boot.c:280`), the
+directory and indirect blocks out of `d_addr[0]` (`boot.c:207,254`) — so one number
 added after one division is the whole of it.  It does not read the superblock at all;
 `boot.c` hardcodes the v6 layout and never touches `s_isize` or `s_fsize`.  The
 requirement is the same either way: it must know where the filesystem begins, and
 that is the one thing only the label can say.
 
-Two of the loader's own fields are too small for the drive this work exists for:
-`struct drivespec` holds `UINT8 spc` (`mwio.c:13`), and `spc` is `heads * spt` — 1008
-on a 16-head/63-sector ATA drive, which truncates.  `spec.limit` is
-`d_tracks * spc - 1` in a `UINT`.  Both are fine on every drive in the tree and
-neither is fine on a 200 MB MFM drive or a 512 MB IDE one.
+One loader field was too small for the drive this work exists for, and is now
+fixed: `struct drivespec` held `UINT8 spc` — `spc` is `heads * spt`, 1008 on a
+16-head/63-sector ATA drive, and it truncated to 0.  It is a `UINT` now
+(`mwio.c:13`, whose comment records the truncation).  The other field is
+`spec.limit`, `d_tracks * spc - 1` in a `UINT`: fine on every drive in the tree,
+not fine on a 200 MB MFM drive or a 512 MB IDE one.
 
 ## The ceiling
 
 A slice's size is bounded by the *filesystem*, not by the label: 64K blocks, 32 MB.
 `blk` is a `UINT` (`include/sys/buf.h:10`), `s_fsize` is a `UINT`
-(`include/sys/fs.h:17`), and `info->maxblk` is a `UINT` (`sys/mw.c:62`), so a
+(`include/sys/fs.h:17`), and `info->maxblk` is a `UINT` (`sys/dlabel.c:161,163`), so a
 filesystem — and therefore a slice — tops out at 32 MB however long the table says it
 is.
 
@@ -293,16 +295,17 @@ meaning, `d_bootblks` is 153 — one cylinder — and `d_bootslice` is 0, slice 
 
 Each slice carries its own superblock at block 1 and its own ilist: `fsize` is the slice's
 block count, and `mkfs` sizes the ilist `fsize / 43 + fsize / 1000`
-(`cmd/mkfs/mkfs.c:209`) — 1,587 blocks for 'a', 251 for 'd'.  The same formula gives the
+(`cmd/mkfs/mkfs.c:276`) — 1,587 blocks for 'a', 251 for 'd'.  The same formula gives the
 m16's 756, which is what a fresh volume's label reads back, so the numbers are checkable
 rather than asserted.
 
-Two things the example makes concrete, and both are already on the list:
+Two things the example makes concrete:
 
-	The loader reads `d_roll` from the label but not the table, so for this drive it
-	would look for block 0 of slice 'a' at cylinder 0 and find the boot area instead.
-	Until `spec.cylstart` lands in `mwio.c`/`ideio.c`, a filesystem at an offset
-	cannot boot — which is what the tests below show happening.
+	The loader reads `d_bootslice` and the named slice's offset from the table and
+	adds it to the cylinder it computes, so a filesystem at an offset boots.  That is
+	`stand/boot/mwio.c:171-178` and `:232`, and the same in `djio.c`, `ideio.c` and
+	`ncrio.c`.  The tests below were run while the loader still read only `d_roll`;
+	the `(153, 0)` case is kept because it is what the loader item was for.
 
 	9 heads needs a fourth head select line and there are only three, so the
 	low-current line is head select line 4 on a drive that has one.  The
@@ -368,15 +371,16 @@ v1 compatibility that makes an empty table mean the rolled layout.
    map the slice onto the front of the drive.  The offset is a no-op when the table is all
    zero, so an untouched v1 volume still mounts — verified booting both ways below.
    One loose end the mapping left: `mwclose` parks the heads with
-   `bread(info->spc * info->roll, dev)` (`sys/mw.c:356`), which is the block that maps to
+   `bread(info->spc * info->roll, dev)` (`sys/mw.c:320`), which is the block that maps to
    cylinder 0 only while `cylstart` is 0 — it reads `roll` and not the slice.  The general
    form is `(tracks - cylstart - roll) % tracks * spc`.  On a sliced disk it parks at the
    slice's first cylinder instead of 0, which is harmless for a landing zone but is not
    what the line says, and `ideclose` has no park at all.
-2. **The loader.**  `spec.cylstart` out of the label in `reset()`, the offset in
-   `readblock`, and the two geometry fields widened.  **This one now blocks something
-   concrete:** a slice-relative root filesystem cannot boot without it, demonstrated
-   below.
+2. **The loader.**  **Done.**  `spec.cylstart` out of the label in `reset()`, the offset
+   in `readblock`, and the geometry fields widened — `spec.spc` is a `UINT` because an
+   eight-head drive at 32 sectors is 256 and truncated to 0.  All four loaders read the
+   boot slice: `mwio.c:171-178,232`, and `ideio.c`, `djio.c`, `ncrio.c` beside it.  The
+   `(153, 0)` case below, run before it landed, is what it was for.
 3. **The tools.**  A labeler, for a disk with no label; `mkfs` reading the label
    instead of `mkfs.h`'s geometry arrays; `mkbootimg` losing its per-drive images.
 4. **Docs.**  This file; `filesystem.5`, `mkfs.1`, `src/hwsim/DISKS`,
@@ -409,19 +413,21 @@ v1 compatibility that makes an empty table mean the rolled layout.
   - **the bound is the slice's extent.**  Slice 1 = `(0, 1)` — `maxblk` 101 — opens root
     and reads the superblock and the first inodes, then fails at the first block past
     101, where `(0, 306)` reaches a shell.
-  - **what this leaves: the loader.**  A volume relabeled with `d_roll` 0 and slice 'a'
-    = `(153, 0)` — arithmetically the v1 mapping exactly — does not boot at all: the
-    loader takes `spec.roll` from the label (`mwio.c:146-154`) and reads no slice offset,
-    so it reads the wrong cylinders and reports `Block out of range / inode read failed
-    ... No bootable files`.  That is the loader item below, demonstrated rather than
-    assumed.  The kernel-side runs above work around it by leaving `d_roll` at the
-    layout the filesystem is really at.
+  - **what this left: the loader — since fixed.**  A volume relabeled with `d_roll` 0 and
+    slice 'a' = `(153, 0)` — arithmetically the v1 mapping exactly — did not boot: the
+    loader then took `spec.roll` from the label (`mwio.c:146-154`) and read no slice
+    offset, so it read the wrong cylinders and reported `Block out of range / inode read
+    failed ... No bootable files`.  That was the loader item, demonstrated rather than
+    assumed; the loader now reads the slice (`mwio.c:171-178`, `:232`).  The kernel-side
+    runs above work around it by leaving `d_roll` at the layout the filesystem is really
+    at.
   - **and one thing to look at:** both failure modes end in a hang at the mount rather
     than a message, so the observable is *where* the log stops.  Whether an unmountable
     root should say so is a kernel question this work did not answer.
 - **v2 end to end:** label a blank volume, `mkfs` a slice, boot it.  The superblock is at
-  the boot slice's block 1, checkable with a raw read at the expected cylinder.  It needs
-  the loader item first, so it is the check the Wren II layout above cannot pass yet.
+  the boot slice's block 1, checkable with a raw read at the expected cylinder.  Nothing
+  blocks it now that the loader reads the slice; it is the check the Wren II layout above
+  could not pass before.
 - **A slice past the 32 MB wall:** put a filesystem at the far end of a large drive
   and confirm the cylinder it lands on — the case a block-number offset could not
   reach, because the offset itself would not fit in 16 bits.

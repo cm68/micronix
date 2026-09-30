@@ -3,7 +3,7 @@
 Every way this machine gets from a reset to a running kernel, and where each
 piece of code lives.
 
-This is the map. `DJBOOT.md` is the deep dive on one of the five paths — the
+This is the map. `docs/DJBOOT.md` is the deep dive on one of the five paths — the
 DJ-DMA floppy — and is not repeated here.
 
 Sources are named as they are used. The three monitor ROMs are
@@ -24,14 +24,11 @@ Main memory is reachable from the ROM only at or above `0x1000`, through the
 memory map. The ROM opens a window instead: it points task 0's segment 1 at
 physical page 0, which makes an address in the `0x1000`–`0x1FFF` range in the
 supervisor the same byte as the corresponding address in the first 4K of main
-memory. `mon500.s`'s `ideboot` states this in as many words:
-
-> The rom runs as the supervisor, and while it does, every address below
-> 1000h is the cpu board's own ram and prom - so a store to 100h lands in the
-> board's 1K static ram, not in the memory task 1 will see. Main memory is
-> reachable only at or above 1000h, through the map. So the transfer runs with
-> task 0's segment 1 pointed at physical page 0, which makes 1100h in the
-> supervisor the same byte as 100h in task 1.
+memory. So a store to `0x100` lands in the board's own 1K static RAM and not in
+the memory task 1 will see, and a transfer that wants `0x100` of main memory
+runs with the window open, making `0x1100` in the supervisor the same byte as
+`0x100` in task 1. `multIO.s`'s `ideboot` and `ncrboot` do this, and so does
+the `copyrom` loop in `mon500.s`.
 
 This explains the monitors' equates, which otherwise look arbitrary:
 
@@ -67,25 +64,32 @@ tstsw:  ld  a,(switch)
         jp  z,nuboot            ;  -- the DMA hard disk
         cp  10h                 ; switch 4 off, others on
         jr  z,djdma             ;  -- the DJ-DMA floppy
-        cp  18h                 ; switches 5 and 4 off (mon500 only)
-        jp  z,ncrboot           ;  -- the NCR 5380 SCSI disk
 ```
 
-The three ROMs differ in two rows:
+Three rows is the whole of it: there is no fourth `cp` in any of the three
+ROMs, and the `de = (sw & 0f8h) << 8` any other value falls through to is the
+monitor's.
+
+The three ROMs differ in one row:
 
 | `sw & 0f8h` | `mon375.s`, `mon447.s` | `mon500.s` |
 |---|---|---|
-| `0x00` | `boothd` — HDCA Winchester | `ideboot` — IDE |
+| `0x00` | `boothd` — HDCA Winchester | `copyrom` — the on-board 4K selector ROM |
 | `0x08` | `nuboot` — DMA hard disk | `nuboot` — DMA hard disk |
 | `0x10` | `djdma` — DJ-DMA floppy | `djdma` — DJ-DMA floppy |
-| `0x18` | — (no such entry) | `ncrboot` — NCR 5380 SCSI |
 
-`mon500` is the later ROM. Its all-switches-on position was re-pointed at an
-IDE drive, and `boothd` and its entire HDCA register sequence are **gone from
+`mon500` is the later ROM. Its all-switches-on position was re-pointed at
+`copyrom`, and `boothd` with its entire HDCA register sequence is **gone from
 the source** — `grep boothd mon500.s` finds nothing. The HDCA Winchester is
-reachable only under the older two ROMs. `0x18` is the one row `mon500` has
-that the others do not: it was added to spend the budget the on-board
-diagnostics left when they came out.
+reachable only under the older two ROMs.
+
+`copyrom` (`mon500.s:665`) is not a boot path itself. It copies the *on-board*
+4K selector ROM — `multIO.s`, assembled at physical `0xff000` — down to
+physical `0xf000` and enters it as task 1. That selector ROM arms an IDE drive
+and an NCR 5380 at once, lets them race, and boots whichever answers ready
+first; `ideboot` and `ncrboot` live there, not in `mon500.s`. So the IDE and
+SCSI paths are reachable only under `mon500` — but through the MultIO ROM it
+carries, which is why the two do not appear as switch rows.
 
 A fourth decision is folded into the same byte: **bit 2 (`0x04`) is tested
 separately at `check`, and if it is set the monitor is skipped** and the
@@ -120,8 +124,8 @@ did the reading.
 | **HDCA** Winchester | `boothd` | the ROM drives the controller's ports itself, reading a header off the disk | **256 bytes** at the address the disk names |
 | **HDC-DMA** hard disk | `nuboot` | the ROM builds a channel program and polls it | **512 bytes** at `0x0100` |
 | **DJ-DMA** floppy | `djdma` | the *controller's own firmware* does the read; the ROM only polls | **128 bytes** at `0x0080` |
-| **IDE** | `ideboot` (mon500) | the ROM drives an 8255 and the drive's task file | **512 bytes** at `0x0100` |
-| **NCR 5380** SCSI | `ncrboot` (mon500) | the ROM drives the 5380's registers, one REQ/ACK byte at a time | **512 bytes** at `0x0100` |
+| **IDE** | `ideboot` (the MultIO selector ROM) | the ROM drives an 8255 and the drive's task file | **512 bytes** at `0x0100` |
+| **NCR 5380** SCSI | `ncrboot` (the MultIO selector ROM) | the ROM drives the 5380's registers, one REQ/ACK byte at a time | **512 bytes** at `0x0100` |
 
 The asymmetry is the whole story of why the floppy's first level has to be
 tiny and the others do not.
@@ -267,27 +271,32 @@ address out of the controller's handshake code rather than hardcoding
 `nstat` is the other half: when the controller has nothing to say it reads
 `0xff`, and the ROM writes a zero back to unblock it.
 
-`DJBOOT.md` §2 quotes the DJ/DMA Technical Manual's own wording for the same
+`docs/DJBOOT.md` §2 quotes the DJ/DMA Technical Manual's own wording for the same
 contract, and §5-§6 work the resulting cascade out of the disk images.
 
-### 2.4 IDE — `ideboot` (mon500 only)
+### 2.4 IDE — `ideboot` (the MultIO selector ROM)
 
-Added in the last ROM. It reaches an 8255 and the drive's task file, and
-because it has to cross the `0x1000` boundary it is the one that spells the
-window out in a comment. It resets the drive by asserting `/RST` through port
-C bit 7, with a delay loop that "has to contain a real bus cycle, so it reads
-port A: the drive is not driving it, but the read is what keeps the loop from
-being dead code", then loads the first sector to `0x1100` and jumps to
-`0x0100`.
+Added in the last ROM: `mon500`'s own header says so — "the HDCA boot driver
+is replaced by one for the S100Computers MYIDE board, an 8255 PPI wired to an
+ATA drive's pins … See ideboot" — but the driver itself is in the on-board
+`multIO.s`, which `mon500`'s `copyrom` carries. It reaches an 8255 and the
+drive's task file, and because it has to cross the `0x1000` boundary it opens
+the window itself (`multIO.s:149-150`, `:237-238`: "task 0 seg 1 -> physical
+page 0"). It resets the drive by asserting `/RST` through port C bit 7, with a
+delay loop that reads port A — "the read keeps the delay real", as its own
+comment has it — then loads the first sector to `0x1100` and enters it as task
+1 at `0x0100`.
 
 The tree's `ideboot1.s` is 243 bytes — large, for a first level — because
 BIOS parameter blocks and LBA arithmetic cost more than a controller that
 already knows how to find sector 1.
 
-### 2.5 NCR 5380 SCSI — `ncrboot` (mon500 only)
+### 2.5 NCR 5380 SCSI — `ncrboot` (the MultIO selector ROM)
 
-Added to spend the budget the diagnostics left when they came out (the commit
-that removed them says so). The card is eight registers at `0x40` — `CSD`
+Reached the same way as `ideboot`, and the selector ROM's own header describes
+the design: it "arms both the IDE board and the NCR 5380 SCSI at once and lets
+them race: the first drive to answer ready wins". The card is eight registers
+at `0x40` — `CSD`
 data, `ICR` initiator command, `MR` mode, `CSBS` status — driven by hand with
 no DMA and no arbitration: the ROM resets the bus, selects target 0, sends a
 ten-byte `READ(10)` for LBA 0, and reads 512 bytes one REQ/ACK round trip at
@@ -344,19 +353,21 @@ the jump.
 `src/micronix/stand/boot/` reimplements the second level for all four
 devices and shares one C file between them.
 
+The sizes are the current build's output; they drift with the sources.
+
 | target | size | role |
 |---|---|---|
 | `mwboot1.s` | 181 B | HDC-DMA first level |
-| `djboot1.s` | 334 B | DJ-DMA levels 0 and 1 — one file, split at byte 128 |
+| `djboot1.s` | 338 B | DJ-DMA levels 0 and 1 — one file, split at byte 128 |
 | `ideboot1.s` | 243 B | IDE first level |
 | `ncrboot1.s` | 254 B | NCR 5380 first level |
-| `mwboot.com` | 3149 B | HDC-DMA second level |
-| `djboot.com` | 2509 B | DJ-DMA second level |
-| `ideboot.com` | 3448 B | IDE second level |
+| `mwboot.com` | 3280 B | HDC-DMA second level |
+| `djboot.com` | 3339 B | DJ-DMA second level |
+| `ideboot.com` | 3612 B | IDE second level |
 | `ncrboot.com` | 3856 B | NCR 5380 second level |
 | `djload` | 5120 B | 10 × 512 B: level 0 in block 0, level 1 in block 1, `djboot.com` from block 2 |
-| `bootimg-m*` | 3661 B | the HDC-DMA images, one per `DRIVES` row |
-| `idebootimg-m*` | 3960 B | the IDE images |
+| `bootimg-m*` | 3792 B | the HDC-DMA images, one per `DRIVES` row |
+| `idebootimg-m*` | 4124 B | the IDE images |
 | `ncrbootimg-m*` | 4368 B | the NCR 5380 images |
 
 `CSRCS = boot.c mwio.c djio.c ideio.c ncrio.c`, `ASSRCS = sexit.s`. The second
@@ -384,25 +395,32 @@ the disk to do the arithmetic.
 Three layout constraints worth stating:
 
 - **The first block also holds a `struct dlabel`** — the geometry — at byte
-  256 from the start of the disk, the second half of block 0. `ideboot1`'s
-  own comment puts it: "has to be shorter than the other two - the label sits
-  at byte 256 of the sector and `mkbootimg` refuses an image whose first level
-  runs into it." (`ncrboot1` lives under the same ceiling, and has the
-  tightest fit of all: 254 of the 256 bytes.)
+  256 from the start of the disk, the second half of block 0. The comment on
+  the `ideboot1.bin` rule in `stand/boot/GNUmakefile` puts it: the IDE first
+  level "has to be shorter than the other two - the label sits at byte 256 of
+  the sector and `mkbootimg` refuses an image whose first level runs into
+  it." (`ncrboot1` lives under the same ceiling, and has the tightest fit of
+  all: 254 of the 256 bytes.)
 - **The floppy's image is laid out around that same byte**, and that is why
-  its level 1 cannot share block 0 with level 0: level 1 is 206 bytes and
-  would run from 128 to 333, straight through 256. So block 0 is level 0 with
+  its level 1 cannot share block 0 with level 0: level 1 is 210 bytes and
+  would run from 128 to 338, straight through 256. So block 0 is level 0 with
   the label at 256, block 1 is level 1, and blocks 2 through 9 are the second
-  level — one side of the ten-sector cylinder-0 track. The label itself is
-  left zeroed, which reads as "no label on the drive, use your own geometry"
-  (`sys/dlabel.h`); nothing on the floppy path reads one yet.
-- `djio.c` carries the fixed geometry the floppy's filesystem is written in:
-  `CYLINDERS 40`, `HEADS 2`, `SPT 10`, `TOFF 2`, `LIMIT
-  ((CYLINDERS-TOFF)*SPC-1)`, and the comment "the filesystem's block 1, the
-  superblock, is block 40 on the disk, and the block numbers boot.c hands
-  readblock are 39 short of the disk's." Note that `cmd/djformat` and
-  `DJBOOT.md` §5 each give a different drive — 77 tracks, and 77 cylinders
-  with one head — so which geometry a floppy label would carry is open.
+  level — one side of the ten-sector cylinder-0 track. `mkbootimg -d` writes a
+  real v2 label there, the same `struct dlabel` a hard disk carries: the
+  cylinder count, heads, sectors, the slice ('a' at the boot track offset) and
+  the medium's first sector number. `djio.c:141` reads it back and checks the
+  magic (`:147-150`), so the floppy's geometry comes off the disk rather than
+  out of a compiled-in table.
+- **`FLOPPIES` in the GNUmakefile is where a floppy image's geometry comes
+  from** — `d8ss:77:1:15:1:2:00`, `d8ds:77:2:15:1:2:00` and
+  `d5ds:40:2:10:0:2:d0` (cylinders, heads, sectors, boot-track offset, label
+  version, first sector). The `djbootimgs` rule asserts the label it wrote:
+  version 2 at byte 260, the slice's first sector at byte 314, level 0's
+  `0xa5` marker at 127. So `djio.c` no longer carries the geometry — the
+  macro block (`CYLINDERS 40`, `HEADS 2`, `SPT 10`, `TOFF 2`) is gone, and the
+  three media above are what a floppy label can now carry. `cmd/djformat`'s 77
+  tracks is the `d8ss`/`d8ds` row and `docs/DJBOOT.md` §5's 77 cylinders with
+  one head is `d8ss`; they are different media, not a disagreement.
 
 `mkfs -i` is what puts the two levels on the disk: "it puts the two of them
 in a file that owns cylinder 0, block 0 being the first level and block 1
@@ -464,9 +482,11 @@ loaddr equ 0100h
 db 0ffh            ; wrap around from ffff00 to 000100
 ```
 
-Its channel program sits at `0x00BE` *inside* the 128-byte boot sector, with
-the flag byte at `0x00D7` — which is why the five `*LOAD` files look
-identical for 256 bytes but are not: the differing bytes are past `0xBE`.
+`commnd` in that listing is the channel program, and the `db 0ffh` that sets
+the 24-bit wrap is its fourth byte. It is not the channel program the `*LOAD`
+images carry, though: those five are byte-identical through `0x0a03` — first
+level, channel program and all — and first differ at `0x0a04`, the operand of
+the second level's crt0 `call`.
 
 The earliest design, in `disks/boot.IMD` and `disks/dist/UX141_SA.IMD`
 (Micronix 1.41 standalone, 8-inch, "micronix 1.3 #1010-8 / stand alone /
@@ -474,7 +494,7 @@ The earliest design, in `disks/boot.IMD` and `disks/dist/UX141_SA.IMD`
 byte-for-byte the same block as `UX141_SA.IMD`'s, and decodes as: set up a
 stack at `0x3080`, plant a BRANCH (`0x26`) into the channel reset address,
 run two small programs, then index a table of pairs at `0x00F5` with the
-drive's sector-length code and jump to `0x3080`. `DJBOOT.md` §5 walks the
+drive's sector-length code and jump to `0x3080`. `docs/DJBOOT.md` §5 walks the
 whole cascade (stages 0–4) out of that image.
 
 ---
@@ -509,18 +529,23 @@ program that actually knows the medium.
   it could never have run. It is now two levels in one file: a 128-byte level
   0 at `0x0080` that chain-loads, and the old level 1 behind it at `0x0100`,
   which is where the level 0's `SETDMA` puts it. The `djload` recipe asserts
-  the 128-byte boundary. `DJBOOT.md` §6 has the contract.
-- **What geometry a floppy label would carry.** The label belongs at byte 256
-  from the start of the disk and the new layout leaves it free, but nothing
-  writes one and the three sources disagree about the drive: `djio.c` says 40
-  cylinders / 2 heads / 10 spt, `cmd/djformat` says 77 tracks, `DJBOOT.md` §5
-  says 77 cylinders / 1 head with track 0 FM 26×128 and 15×512 after. A label
-  exists to settle exactly this, so it waits on the answer.
-- **No image can boot the DJ path end to end.** `djdma_init` loads through
-  `imd_load`, so it wants an IMD; `mnix bootflop` writes a raw 800-sector run,
-  and there is no raw-to-IMD writer in `src/tools`. `mnix initialize`'s
-  `mediums[]` has no 5¼" entry either. So `djload` is verified only as far as
-  its own block map — level 0 to level 1 — and level 1's read of level 2 is
+  the 128-byte boundary. `docs/DJBOOT.md` §6 has the contract.
+- ~~**What geometry a floppy label would carry.**~~ **Answered.** `mkbootimg
+  -d` writes one, from the `FLOPPIES` table in `stand/boot/GNUmakefile`, and
+  `djio.c` reads it back. The three "disagreeing" sources are three media:
+  `d8ss` (77/1/15) and `d8ds` (77/2/15) are `cmd/djformat`'s 77 tracks, and
+  `d8ss` is `docs/DJBOOT.md` §5's 77 cylinders with one head; `d5ds` (40/2/10)
+  is the third row, which is what the old compiled-in `djio.c` constants
+  described.
+- **No image can boot the DJ path end to end.** The tree's half is done:
+  `mnix bootflop` makes the whole diskette — the boot in the sectors in front,
+  the filesystem behind it, one label describing both — and takes the medium
+  off the boot image's own label rather than a compiled-in table, so no
+  `mediums[]` entry is needed. What is missing is on the simulator side:
+  `djdma_init` loads its drives through `imd_load` — both the positional
+  `djdmaN:<file>` and `-5 <file>` — so it wants an IMD, and there is no raw-to-IMD writer in
+  `src/tools` — `imd` and `imdd` only read. So `djload` is verified only as far
+  as its own block map — level 0 to level 1 — and level 1's read of level 2 is
   untested.
 - **`disks/loaders/README` notes a remaining puzzle** about the 1.3 cascade:
   after the two reads, 512 + 128 = 640 bytes land at `0x3080`, and "the bytes
@@ -532,13 +557,13 @@ program that actually knows the medium.
 
 | document | what it holds |
 |---|---|
-| `DJBOOT.md` | the DJ-DMA floppy path in full: the manual's wording, the UX141_SA cascade, the `ABOOT&.ASM` variants |
-| `INSTALLATION.md` | how to build and install the tree, and boot each card |
+| `docs/DJBOOT.md` | the DJ-DMA floppy path in full: the manual's wording, the UX141_SA cascade, the `ABOOT&.ASM` variants |
+| `docs/INSTALLATION.md` | how to build and install the tree, and boot each card |
 | `disks/loaders/README` | the two-stage floppy boot, the extraction commands, the 1.41 image's disassembly |
 | `disks/loaders/coldboot/README` | the cold boot set, the two ways in, the `*LOAD` layout |
 | `src/hwsim/DISKS` | the sector-size hazard, per controller |
 | `src/micronix/stand/boot/README` | the tree's chain, and the 4K discipline |
-| `src/micronix/sys/OVERLAY-DRIVERS.md` | what happens after the kernel is entered |
+| `docs/DRIVERS.md` | what happens after the kernel is entered |
 
 Sources for each path: `src/micronix/stand/roms/mon{375,447,500}.s` and their
 equate blocks; `src/hwsim/d1/djdma.c` (`bootstrap[]`, `djdma_init()`) and

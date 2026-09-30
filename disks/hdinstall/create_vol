@@ -75,7 +75,7 @@ trap 'rm -f "$tmp" "$tmp.k"' 0
 # clear any sidecar lock file the host tools leave at "<volume>.lock"
 rm -f "$vol.lock"
 
-# 1. a blank 40 meg drive
+# 1. a blank 16 meg drive
 "$mnix" initialize m16 "$vol" || exit 1
 
 # 2. the filesystem, with the hard disk boot in /boot/boot

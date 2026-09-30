@@ -5,7 +5,7 @@
  *
  * Every hook a driver has, and none of the code: open, close, strategy,
  * ioctl, init and tick are here as empty stubs; the interrupt handler is
- * in stub_intr.c; docs/STUB.md (this directory) is the recipe for turning this
+ * in stub_intr.c; docs/STUB.md is the recipe for turning this
  * into a real driver.
  *
  * This is a driver module (sys/ovl.h): its first byte is a struct ovlhdr,

@@ -63,8 +63,10 @@ and the override does nothing.
 ## Reproducing
 
 Needs `ocrmypdf`, `tesseract-ocr`, `tesseract-ocr-dan`, and `python3-pikepdf`.
-Note that pikepdf is the system Python's, so `slashzero.py` runs under
-`/usr/bin/python3` rather than whatever `python3` resolves to.
+The helper below is not kept as a file in this directory; save the listing at
+the end of this README as `slashzero.py` before running the second command.
+Note that pikepdf is the system Python's, so it runs under `/usr/bin/python3`
+rather than whatever `python3` resolves to.
 
 ```sh
 ocrmypdf --skip-text --rotate-pages --optimize 0 --output-type pdf \
@@ -109,6 +111,8 @@ the slashed-zero problem, which may well affect them too.
 
 
 ## slashzero.py
+
+Save this listing as `slashzero.py` (it is not shipped as a file here):
 
 ```python
 #!/usr/bin/python3

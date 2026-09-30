@@ -40,7 +40,9 @@ disks:
 	floppy images recovered from the net, version 1.4 and 1.3
 
 wslib:
-	the whitesmith's libraries, burst apart and disassembled
+	the whitesmith's libraries, burst apart and disassembled - gone
+	from the top level; what remains is under attic/wslib and
+	attic/wssrc, with the rest of the retired material
 
 src/micronix:
 	the source tree for things that are to be built natively, including
@@ -108,7 +110,8 @@ src/hwsim:
 
 	cp/m works well, and micronix is getting very close, with interrupt
 	controller, trapping, memory mapping, disk reading and writing for
-	all 3 controllers (djdma, hdc-dma, and hdca).
+	the five disk controllers (djdma, hddma, hdca, ide and ncr5380).
+	the card list is the DRIVERS line in src/hwsim/d1/Makefile.
 
 	there's a means for importing and exporting data to cp/m via the
 	inp: and out: devices in pip, so hex files can be shipped to get
@@ -171,8 +174,9 @@ running the hardware simulator, from a standing start
 ----------------------------------------------------
 
 you can make a hard disk image and boot micronix without any blessed
-snapshot, starting from the kernel source.  m16 is the largest volume
-with a reliable kernel.
+snapshot, starting from the kernel source.  m40 is the largest volume
+with a reliable kernel; the steps below make an m16, which is smaller
+and quicker to fill.
 
 	# build the host cross-tools (once)
 	make hostcc				the compiler: mxccc, mxasz, mxld
@@ -183,8 +187,13 @@ with a reliable kernel.
 	# cross build does not link it - build "unix" with the host tools:
 	#	compile each .c:	bin/mxccc -m micronix -O -i../include -c foo.c
 	#	assemble each .s:	bin/mxccc -m micronix -c foo.s
-	#	link:			bin/mxld -r -Ttext=0x1000 -L lib -lccc -lc -o unix *.o
-	# (the native sys/Makefile has the full object list) - ~49k.
+	#	link:			bin/mxld -Ttext=0x1000 -Shigh -L lib -lccc -lc \
+	#				  -o unix.link *.o
+	# (the native sys/Makefile has the full object list) - ~86k.  -Shigh
+	# is not optional: it parks the folded init-only object after bss.
+	# unix.link is the half-built image - the bootable "unix" written
+	# below is it with the driver pages on the end, which sys/GNUmakefile
+	# links.
 
 	# make the m16 disk.  A volume is named with a .vol suffix.
 	src/tools/mnix initialize m16 disks/hdinstall/hddma-0.vol
