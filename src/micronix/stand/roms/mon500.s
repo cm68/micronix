@@ -74,7 +74,6 @@ deofst	equ	11h		;offset to d,e
 bcofst	equ	0Fh		;offset to b,c
 pcofst	equ	0Dh		;offset to the users pc register
 nxtbyte	equ	076h		;byte after a halt
-ersav	equ	regsav + 2	;temporary error save area
 
 ;****************************************************************
 ;*								*
@@ -253,6 +252,7 @@ u.af:	dw	0
 
 begsav	equ	$
 regsav:	dw	0			;address of beginning of reg save area
+ersav	equ	regsav + 2	;temporary error save area
 	ds	1Ch
 
 monstk	equ	$			;monitor stack area
@@ -1720,4 +1720,5 @@ erom1	equ	$
 fpp0:	ds	8
 fpp1:	ds	1
 
+	.dephase
 	end

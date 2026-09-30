@@ -1,73 +1,73 @@
 ;****************************************************************
 ;*								*
-;* 4k selector boot rom.  Lives at physical 0ff0000H, is copied	*
-;* down to 0f000H by the monitor (see mon500.s copyrom), and	*
+;* 4k selector boot rom.  Lives at physical 0ff0000h, is copied	*
+;* down to 0f000h by the monitor (see mon500.s copyrom), and	*
 ;* runs in task 0.						*
 ;*								*
 ;* Arms both the IDE board and the NCR 5380 SCSI at once and	*
 ;* lets them race: the first drive to answer ready wins, and	*
-;* its sector 0 is read into task 1's 100H and entered.  Chatty,	*
+;* its sector 0 is read into task 1's 100h and entered.  Chatty,	*
 ;* so a dead boot names the device it could not find.		*
 ;*								*
 ;****************************************************************
 
-	ORG	0F000H
+	org	0F000h
 
 ;****************************************************************
 ;* Wunderbus console equates (the monitor already init'd it)	*
 ;****************************************************************
 
-base	EQU	048H
-grpctl	EQU	base+7		;I/O group select port
-group1	EQU	09H		;serial port 1
-lcr	EQU	base+3		;line control register
-lsr	EQU	base+5		;line status register
-thr	EQU	base		;transmitter data buffer
-thre	EQU	20H		;status line TBE
-wls0	EQU	01		;word length select bit 0
-wls1	EQU	02		;word length select bit 1
-stb	EQU	04		;stop bit count (2 stop bits)
+base	equ	048h
+grpctl	equ	base+7		;I/O group select port
+group1	equ	09h		;serial port 1
+lcr	equ	base+3		;line control register
+lsr	equ	base+5		;line status register
+thr	equ	base		;transmitter data buffer
+thre	equ	20h		;status line TBE
+wls0	equ	01		;word length select bit 0
+wls1	equ	02		;word length select bit 1
+stb	equ	04		;stop bit count (2 stop bits)
 
 ;****************************************************************
 ;* IDE board equates (8255 PPI on an ATA drive)			*
 ;****************************************************************
 
-idepa	EQU	30H		;port A: drive data, low byte
-idepb	EQU	31H		;port B: drive data, high byte
-idepc	EQU	32H		;port C: register number, strobes
-idepctl EQU	33H		;8255 mode word
-idepdrv EQU	34H		;drive select latch
-idepnrm EQU	92H		;A and B in, C out
-idepwrt EQU	80H		;A, B and C all out
-idecs0	EQU	08H		;chip select
-idewr	EQU	20H		;/WR
-iderd	EQU	40H		;/RD
-iderst	EQU	80H		;/RST
-iderdc	EQU	20H		;read sector(s), with retry
+idepa	equ	30h		;port A: drive data, low byte
+idepb	equ	31h		;port B: drive data, high byte
+idepc	equ	32h		;port C: register number, strobes
+idepctl equ	33h		;8255 mode word
+idepdrv equ	34h		;drive select latch
+idepnrm equ	92h		;A and B in, C out
+idepwrt equ	80h		;A, B and C all out
+idecs0	equ	08h		;chip select
+idewr	equ	20h		;/WR
+iderd	equ	40h		;/RD
+iderst	equ	80h		;/RST
+iderdc	equ	20h		;read sector(s), with retry
 
 ;****************************************************************
 ;* NCR 5380 SCSI equates						*
 ;****************************************************************
 
-scsidat	EQU	40H		;data register (CSD), read and write
-scsiicr	EQU	41H		;initiator command register
-scsimr	EQU	42H		;mode register
-scsistat EQU	44H		;current bus status
-icr_rst	EQU	80H
-icr_ack	EQU	10H
-icr_bsy	EQU	08H
-icr_sel	EQU	04H
-icr_data EQU	01H
-scsi_bsy EQU	40H
-scsi_req EQU	20H
-scsi_mon EQU	04H
+scsidat	equ	40h		;data register (CSD), read and write
+scsiicr	equ	41h		;initiator command register
+scsimr	equ	42h		;mode register
+scsistat equ	44h		;current bus status
+icr_rst	equ	80h
+icr_ack	equ	10h
+icr_bsy	equ	08h
+icr_sel	equ	04h
+icr_data equ	01h
+scsi_bsy equ	40h
+scsi_req equ	20h
+scsi_mon equ	04h
 
 ;****************************************************************
 ;* on-board registers						*
 ;****************************************************************
 
-mapram	EQU	0600H		;actual map ram (write only)
-gobuff	EQU	01b0H		;ram stub for the task switch
+mapram	equ	0600h		;actual map ram (write only)
+gobuff	equ	01b0h		;ram stub for the task switch
 
 ;****************************************************************
 ;* entry: arm both controllers, then let them race		*
@@ -80,7 +80,7 @@ entry:
 	call	scsisetup	;reset the bus and select target 0
 	ld	de,0		;race timeout
 race:	call	rdstat		;ide status
-	and	40H		;DRDY
+	and	40h		;DRDY
 	jr	nz,idewin
 	in	a,(scsistat)	;scsi status
 	and	scsi_bsy	;target answered
@@ -121,7 +121,7 @@ idebol:	in	a,(idepa)		;the read keeps the delay real
 
 ;****************************************************************
 ;* ide boot: DRDY is already set.  Load the task file, wait for	*
-;* the sector, read it into task 1's 100H, and enter it.		*
+;* the sector, read it into task 1's 100h, and enter it.		*
 ;****************************************************************
 
 ideboot:
@@ -139,7 +139,7 @@ idebtf:	ld	a,(hl)
 	out	(idepctl),a
 	ld	de,0
 idebw2:	call	rdstat
-	and	08H			;DRQ
+	and	08h			;DRQ
 	jr	nz,idebrd
 	dec	de
 	ld	a,d
@@ -148,7 +148,7 @@ idebw2:	call	rdstat
 	ret				;sector never came
 idebrd:	xor	a
 	ld	(mapram + 2),a		;task 0 seg 1 -> physical page 0
-	ld	hl,01100H		;= 100H to task 1
+	ld	hl,01100h		;= 100h to task 1
 	ld	b,0			;256 words
 ideblp:	ld	a,idecs0
 	out	(idepc),a
@@ -163,8 +163,8 @@ ideblp:	ld	a,idecs0
 	djnz	ideblp
 	xor	a
 	out	(idepc),a
-	ld	de,0100H		;the sector just read
-	ld	a,01H			;run it as task 1
+	ld	de,0100h		;the sector just read
+	ld	a,01h			;run it as task 1
 	jp	switch
 
 rdstat:	ld	a,idecs0|7		;register 7: status/command
@@ -188,13 +188,13 @@ putreg:	out	(idepa),a		;the byte onto the data lines
 ; The task file: register 1 through register 7
 
 buildtf:
-	DEFB	0			;1 features
-	DEFB	1			;2 sector count
-	DEFB	0			;3 LBA 0-7
-	DEFB	0			;4 LBA 8-15
-	DEFB	0			;5 LBA 16-23
-	DEFB	0e0H			;6 drive/head LBA unit 0
-	DEFB	iderdc			;7 command read sector(s)
+	db	0			;1 features
+	db	1			;2 sector count
+	db	0			;3 LBA 0-7
+	db	0			;4 LBA 8-15
+	db	0			;5 LBA 16-23
+	db	0e0h			;6 drive/head LBA unit 0
+	db	iderdc			;7 command read sector(s)
 
 ;****************************************************************
 ;* scsi reset + select: arm the bus so target 0 can answer BSY	*
@@ -207,7 +207,7 @@ scsisetup:
 	out	(scsiicr),a
 	ld	a,scsi_mon
 	out	(scsimr),a
-	ld	a,81H			;host id 7, target 0
+	ld	a,81h			;host id 7, target 0
 	out	(scsidat),a
 	ld	a,icr_data
 	out	(scsiicr),a
@@ -219,7 +219,7 @@ scsisetup:
 
 ;****************************************************************
 ;* scsi boot: BSY is already set.  Send READ(10), read sector 0	*
-;* into task 1's 100H, and enter it.				*
+;* into task 1's 100h, and enter it.				*
 ;****************************************************************
 
 ncrboot:
@@ -237,8 +237,8 @@ ncrloop: ld	a,(hl)
 	djnz	ncrloop
 	xor	a			;task 0 seg 1 -> physical page 0
 	ld	(mapram + 2),a
-	ld	hl,01100H		;= 100H to task 1
-	ld	de,0200H		;512 bytes
+	ld	hl,01100h		;= 100h to task 1
+	ld	de,0200h		;512 bytes
 ncrdata: call	ncrin
 	ld	(hl),a
 	inc	hl
@@ -248,7 +248,7 @@ ncrdata: call	ncrin
 	jr	nz,ncrdata
 	call	ncrin			;status byte (ignored)
 	call	ncrin			;message byte (ignored)
-	ld	de,0100H
+	ld	de,0100h
 	ld	a,1
 	jp	switch
 
@@ -287,7 +287,7 @@ ncrin1:	in	a,(scsistat)
 	ret
 
 ; the READ(10) command block: opcode, then a zero LBA, one block
-ncrcdb:	DEFB	28H,0,0,0,0,0,0,1,0,0
+ncrcdb:	db	28h,0,0,0,0,0,0,1,0,0
 
 ;****************************************************************
 ;* console: print the 0-terminated string at hl			*
@@ -319,29 +319,29 @@ uout1:	in	a,(lsr)
 ;****************************************************************
 
 switch:	ld	hl,gobuff
-	ld	(hl),03eH		;ld a,imm
+	ld	(hl),03eh		;ld a,imm
 	inc	hl
 	ld	(hl),a			;task
 	inc	hl
-	ld	(hl),032H		;ld (task),a
+	ld	(hl),032h		;ld (task),a
 	inc	hl
-	ld	(hl),02H
+	ld	(hl),02h
 	inc	hl
-	ld	(hl),04H
+	ld	(hl),04h
 	inc	hl
-	ld	(hl),00H		;6 nops
+	ld	(hl),00h		;6 nops
 	inc	hl
-	ld	(hl),00H
+	ld	(hl),00h
 	inc	hl
-	ld	(hl),00H
+	ld	(hl),00h
 	inc	hl
-	ld	(hl),00H
+	ld	(hl),00h
 	inc	hl
-	ld	(hl),00H
+	ld	(hl),00h
 	inc	hl
-	ld	(hl),00H
+	ld	(hl),00h
 	inc	hl
-	ld	(hl),0c3H		;jp
+	ld	(hl),0c3h		;jp
 	inc	hl
 	ld	(hl),e			;addr low
 	inc	hl
@@ -352,9 +352,9 @@ switch:	ld	hl,gobuff
 ;* strings							*
 ;****************************************************************
 
-strset:	DEFB	'probing ide+scsi',0dH,0aH,0
-stride:	DEFB	'ide',0dH,0aH,0
-strscsi: DEFB	'scsi',0dH,0aH,0
-strfail: DEFB	'no boot device',0dH,0aH,0
+strset:	db	'probing ide+scsi',0dh,0ah,0
+stride:	db	'ide',0dh,0ah,0
+strscsi: db	'scsi',0dh,0ah,0
+strfail: db	'no boot device',0dh,0ah,0
 
-	END
+	end

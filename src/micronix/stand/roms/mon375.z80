@@ -1,5 +1,5 @@
         ; subttl	'(c) 1981 Morrow Designs'
-	TITLE   'MPZ-80  MON3.75-M FIRMWARE'
+	title   'MPZ-80  MON3.75-M FIRMWARE'
 
 ;****************************************************************
 ;*								*
@@ -16,7 +16,7 @@
 ;* Revised 12/28/82	-	Fixed PIC initialization	*	
 ;*								*
 ;* Revised 8/27/82	-	M16 home and load constants	*
-;*				changed.  group EQU changed to 	*
+;*				changed.  group equ changed to 	*
 ;*				add int en bit high.		*
 ;*								*
 ;* Bobby Dale Gifford and Bob Groppo        			*
@@ -24,108 +24,108 @@
 ;*								*
 ;****************************************************************
 
-	ORG	0		;Local Ram in task zero
-nop	EQU	0
-jmpop	EQU	0c3H		;Jump instruction op-code
-callop	EQU	0cdH		;z80 call instruction opcode
-t1mask	EQU	2bH		;unlimited mask... no traps enabled
-t0mask	EQU	2bH		;unlimited mask	
-ssmode	EQU	036H		;single step mode mask
-hstrap	EQU	1AH		;allow traps on halts and stops, interrupts
+	org	0		;Local Ram in task zero
+nop	equ	0
+jmpop	equ	0c3h		;Jump instruction op-code
+callop	equ	0cdh		;z80 call instruction opcode
+t1mask	equ	2bh		;unlimited mask... no traps enabled
+t0mask	equ	2bh		;unlimited mask	
+ssmode	equ	036h		;single step mode mask
+hstrap	equ	1Ah		;allow traps on halts and stops, interrupts
 				;- masked out in task 0 (temporary)
-window	EQU	01H		;task 0 window at location 10000
-ACR	EQU	0DH		;carriage return
-ALF	EQU	0AH		;line feed
-ASP	EQU	' '		;space
-AFF	EQU	0CH		;form feed
-BEl	EQU	07H		;bell
-BSP	EQU	08H		;backspace
-mskofst	EQU	19H		;offset to get to user's mask reg. contents
-spofst	EQU	17H		;offset to stack pointer of user
-afofst	EQU	15H		;offset to user Af register
-hlofst	EQU	13H		;offset to user h,l register
-deofst	EQU	11H		;offset to d,e
-bcofst	EQU	0FH		;offset to b,c
-pcofst	EQU	0DH		;offset to the users pc register
-nxtbyte	EQU	076H		;byte after a halt
+window	equ	01h		;task 0 window at location 10000
+ACR	equ	0Dh		;carriage return
+ALF	equ	0Ah		;line feed
+ASP	equ	' '		;space
+AFF	equ	0Ch		;form feed
+BEl	equ	07H		;bell
+BSP	equ	08H		;backspace
+mskofst	equ	19h		;offset to get to user's mask reg. contents
+spofst	equ	17h		;offset to stack pointer of user
+afofst	equ	15h		;offset to user Af register
+hlofst	equ	13h		;offset to user h,l register
+deofst	equ	11h		;offset to d,e
+bcofst	equ	0Fh		;offset to b,c
+pcofst	equ	0Dh		;offset to the users pc register
+nxtbyte	equ	076h		;byte after a halt
 
 ;****************************************************************
 ;*								*
 ;*		   Wunderbus I/O equates:			*
 ;*								*
 ;****************************************************************
-base	EQU	048H		;I/O base address of wunderbus ports
-group0	EQU	08H
-group1	EQU	09H		;serial port 1
-group2	EQU	0AH		;serial	port 2
-group3	EQU	0BH		;serial port 3
-grpctl	EQU	base+7		;I/O group select port
+base	equ	048h		;I/O base address of wunderbus ports
+group0	equ	08h
+group1	equ	09h		;serial port 1
+group2	equ	0Ah		;serial	port 2
+group3	equ	0Bh		;serial port 3
+grpctl	equ	base+7		;I/O group select port
 
 ;	UART equates
 
-dll	EQU	base		;divisor latch lsb
-dlm	EQU	base+1		;divisor latch msb
-ier	EQU	base+1		;interupt enable register
-lcr	EQU	base+3		;line control register
-mcr	EQU	base+4		;modem control register
-lsr	EQU	base+5		;line status register
-rbr	EQU	base		;read data buffer
-thr	EQU	base		;transmitter data buffer
-dlab	EQU	80H		;divisor latch access bit
-thre	EQU	20H		;status line TBE
-dr	EQU	01		;line status DR bit
-wls0	EQU	01		;word length select bit 0
-wls1	EQU	02		;word length select bit 1 (for 8 bit word)
-stb	EQU	04		;stop bit count (2 stop bits)
-imask	EQU	00		;non interupt mode
-loop	EQU	010H		;UART loop mode
+dll	equ	base		;divisor latch lsb
+dlm	equ	base+1		;divisor latch msb
+ier	equ	base+1		;interupt enable register
+lcr	equ	base+3		;line control register
+mcr	equ	base+4		;modem control register
+lsr	equ	base+5		;line status register
+rbr	equ	base		;read data buffer
+thr	equ	base		;transmitter data buffer
+dlab	equ	80h		;divisor latch access bit
+thre	equ	20h		;status line TBE
+dr	equ	01		;line status DR bit
+wls0	equ	01		;word length select bit 0
+wls1	equ	02		;word length select bit 1 (for 8 bit word)
+stb	equ	04		;stop bit count (2 stop bits)
+imask	equ	00		;non interupt mode
+loop	equ	010h		;UART loop mode
 
 ;	PIC equates
 
-init	EQU	010H		;bit high to initialize the PIC
-icw1	EQU	base + 4	;PIC initialization control word 1
-icw2	EQU	base + 5	;PIC initialization control word 2
-icw3	EQU	base + 5	;PIC initialization control word 3
-icw4	EQU	base + 5	;PIC initialization control word 4
-ocw1	EQU	base + 5	;PIC interrupt mask register
-ocw2	EQU	base + 4	;PIC EOI register
-picmask EQU	0ffH		;mask to turn all interrupts off
-ltim	EQU	08H		;level triggered mode
-adi4	EQU	04H		;call address intervals = 4
-adi8	EQU	00H		;call address intervals = 8
-sngl	EQU	02		;sole system PIC
-ic4	EQU	01H		;icw4 access bit
-lovect	EQU	0		;call vectors begin at 0
-hivect	EQU	0		;call vectors begin at 0
-normal	EQU	0		;Master/Reg. nest/unbuffered/no AEOI/8085					; -normal setting of OCW4 for Morrow Software
-eoi	EQU	20H		;non-specific EOI constant
-ivalu	EQU	init OR ltim OR adi4 OR sngl OR ic4 OR lovect
+init	equ	010h		;bit high to initialize the PIC
+icw1	equ	base + 4	;PIC initialization control word 1
+icw2	equ	base + 5	;PIC initialization control word 2
+icw3	equ	base + 5	;PIC initialization control word 3
+icw4	equ	base + 5	;PIC initialization control word 4
+ocw1	equ	base + 5	;PIC interrupt mask register
+ocw2	equ	base + 4	;PIC EOI register
+picmask equ	0ffh		;mask to turn all interrupts off
+ltim	equ	08h		;level triggered mode
+adi4	equ	04h		;call address intervals = 4
+adi8	equ	00h		;call address intervals = 8
+sngl	equ	02		;sole system PIC
+ic4	equ	01h		;icw4 access bit
+lovect	equ	0		;call vectors begin at 0
+hivect	equ	0		;call vectors begin at 0
+normal	equ	0		;Master/Reg. nest/unbuffered/no AEOI/8085					; -normal setting of OCW4 for Morrow Software
+eoi	equ	20h		;non-specific EOI constant
+ivalu	equ	init OR ltim OR adi4 OR sngl OR ic4 OR lovect
 ;****************************************************************
 ;*								*
 ;*	HDC Winchester controller equates			*
 ;*								*
 ;****************************************************************
 
-revnum	EQU	13		
-ioaddr	EQU	50H
-contrl	EQU	ioaddr
-status	EQU	ioaddr
-data	EQU	ioaddr+3
-functn	EQU	ioaddr+2
-commd	EQU	ioaddr+1
-secstat EQU	ioaddr+1
-dread	EQU	1
-sector	EQU	1
-opdone	EQU	2
-complt	EQU	4
-header	EQU	8H
-drenbl	EQU	5
-dskrun	EQU	7
-ready	EQU	20H
-system	EQU	80H
-stepo	EQU	0F8H
-drivea	EQU	0FCH
-trk0	EQU	1
+revnum	equ	13		
+ioaddr	equ	50H
+contrl	equ	ioaddr
+status	equ	ioaddr
+data	equ	ioaddr+3
+functn	equ	ioaddr+2
+commd	equ	ioaddr+1
+secstat equ	ioaddr+1
+dread	equ	1
+sector	equ	1
+opdone	equ	2
+complt	equ	4
+header	equ	8H
+drenbl	equ	5
+dskrun	equ	7
+ready	equ	20H
+system	equ	80H
+stepo	equ	0F8H
+drivea	equ	0FCH
+trk0	equ	1
 
 ;****************************************************************
 ;*								*
@@ -133,44 +133,44 @@ trk0	EQU	1
 ;*								*
 ;****************************************************************
 
-djstat	EQU	104aH		;adjusted channel address of status byte
+djstat	equ	104ah		;adjusted channel address of status byte
 
 ;****************************************************************
 ;*								*
 ;*  	     DMA Winchester Controller Equates			*
 ;*								*
 ;****************************************************************
-cyl	EQU	153		;number cylinders for Seagate ST-506
-heads	EQU	  4		;number heads for Seagate ST-506
-stpdly	EQU	 01eH		;15 msec for Seagate ST-506
-hdsetl	EQU	 0C8H		;20 msec for Seagate ST-506
-secsiz	EQU	  7		;1024 byte sectors for CPM
-readat	EQU	  0		;DMA controller read sector opcode
-write	EQU	  1		;DMA controller write sector opcode
-rhead	EQU	  2		;DMA controller read header opcode
-format	EQU	  3		;DMA controller format track opcode
-const	EQU	  4		;load drive constants command
-sense	EQU	  5		;return drive status command
-noop	EQU	  6		;command used when seeking
-dmarst	EQU	 54H		;DMA controller reset port
-attn	EQU	 55H		;DMA controller Attention port
-stepout	EQU	 10H		;Step direction to track 0
-stepin	EQU	  0		;Step direction away from track 0
-track0	EQU	  1		;track 0 status
-wfault	EQU	  2		;write fault condition from drive
-dready	EQU	  4		;drive ready status
-sekcmp	EQU	  8		;seek complete status
-hdspt	EQU	 17		;number of sectors per track
-iopb	EQU	1050H		;pointer to the channel
-chan	EQU	1080H		;actual channel
-select	EQU	chan + 3	;select byte in channel
-dmaddr	EQU	chan + 4	;24 bit dma address location
-arg	EQU	chan + 7	;beginning of four arguments to commands
-cmmd	EQU	chan + 11	;actual command location
-statis	EQU	chan + 12	;controller return status location 
-link	EQU	chan + 13	;link field address for next command
-bootad	EQU	1100H		;dma address for first sector from hddma
-good	EQU	0ffH		;good status result
+cyl	equ	153		;number cylinders for Seagate ST-506
+heads	equ	  4		;number heads for Seagate ST-506
+stpdly	equ	 01eh		;15 msec for Seagate ST-506
+hdsetl	equ	 0C8h		;20 msec for Seagate ST-506
+secsiz	equ	  7		;1024 byte sectors for CPM
+readat	equ	  0		;DMA controller read sector opcode
+write	equ	  1		;DMA controller write sector opcode
+rhead	equ	  2		;DMA controller read header opcode
+format	equ	  3		;DMA controller format track opcode
+const	equ	  4		;load drive constants command
+sense	equ	  5		;return drive status command
+noop	equ	  6		;command used when seeking
+dmarst	equ	 54h		;DMA controller reset port
+attn	equ	 55h		;DMA controller Attention port
+stepout	equ	 10h		;Step direction to track 0
+stepin	equ	  0		;Step direction away from track 0
+track0	equ	  1		;track 0 status
+wfault	equ	  2		;write fault condition from drive
+dready	equ	  4		;drive ready status
+sekcmp	equ	  8		;seek complete status
+hdspt	equ	 17		;number of sectors per track
+iopb	equ	1050h		;pointer to the channel
+chan	equ	1080h		;actual channel
+select	equ	chan + 3	;select byte in channel
+dmaddr	equ	chan + 4	;24 bit dma address location
+arg	equ	chan + 7	;beginning of four arguments to commands
+cmmd	equ	chan + 11	;actual command location
+statis	equ	chan + 12	;controller return status location 
+link	equ	chan + 13	;link field address for next command
+bootad	equ	1100h		;dma address for first sector from hddma
+good	equ	0ffh		;good status result
 
 ;****************************************************************
 ;*								*
@@ -178,7 +178,7 @@ good	EQU	0ffH		;good status result
 ;*								*
 ;****************************************************************
 
-ram	EQU	$			;Local RAM, visible only to task 0
+ram	equ	$			;Local RAM, visible only to task 0
 
 ;****************************************************************
 ;*								*
@@ -191,8 +191,8 @@ ram	EQU	$			;Local RAM, visible only to task 0
 super:	jp	super			;Supervisor entry point
 user:	jp	user			;(7) User entry point
 
-ctask:	DEFB	0			;Current task
-cmask:	DEFB	0			;Current mask contents
+ctask:	db	0			;Current task
+cmask:	db	0			;Current mask contents
 
 ;****************************************************************
 ;*								*
@@ -218,37 +218,37 @@ cmask:	DEFB	0			;Current mask contents
 ;*								*
 ;****************************************************************
 
-tasksiz	EQU	26
-tasks:	DEFS	tasksiz		;Task 1
-	DEFS	tasksiz		;Task 2
-	DEFS	tasksiz		;Task 3
-	DEFS	tasksiz		;Task 4
-	DEFS	tasksiz		;Task 5
-	DEFS	tasksiz		;Task 6
-	DEFS	tasksiz		;Task 7
-	DEFS	tasksiz		;Task 8
-	DEFS	tasksiz		;Task 9
-	DEFS	tasksiz		;Task 10
-	DEFS	tasksiz		;Task 11
-	DEFS	tasksiz		;Task 12
-	DEFS	tasksiz		;Task 13
-	DEFS	tasksiz		;Task 14
-	DEFS	tasksiz		;Task 15
+tasksiz	equ	26
+tasks:	ds	tasksiz		;Task 1
+	ds	tasksiz		;Task 2
+	ds	tasksiz		;Task 3
+	ds	tasksiz		;Task 4
+	ds	tasksiz		;Task 5
+	ds	tasksiz		;Task 6
+	ds	tasksiz		;Task 7
+	ds	tasksiz		;Task 8
+	ds	tasksiz		;Task 9
+	ds	tasksiz		;Task 10
+	ds	tasksiz		;Task 11
+	ds	tasksiz		;Task 12
+	ds	tasksiz		;Task 13
+	ds	tasksiz		;Task 14
+	ds	tasksiz		;Task 15
 
 
-u.save:	DEFB	0		;Start of user save area
-u.ir:	DEFB	0		;Temporary user interrupt reg. save
-	DEFW	0,0,0,0,0,0	;ix,iy,bc',de',hl',af'
-u.pc:	DEFW	0		;Temporary user pc storage
-	DEFW	0,0,0		;bc,de,hl
-u.af:	DEFW	0		;Temporary user af storage
-u.sp:   DEFW      0               ;temporary user stack storage
-u.mask:	DEFW	0		;temporary mask storage
-gobuff	EQU	$
-	DEFS	14		;task boot buffer
-ersav	EQU	$	
-      	DEFS	200H-(ersav-ram);Fill out the ram
-stack	EQU	$		;End of local ram
+u.save:	db	0		;Start of user save area
+u.ir:	db	0		;Temporary user interrupt reg. save
+	dw	0,0,0,0,0,0	;ix,iy,bc',de',hl',af'
+u.pc:	dw	0		;Temporary user pc storage
+	dw	0,0,0		;bc,de,hl
+u.af:	dw	0		;Temporary user af storage
+u.sp:   dw      0               ;temporary user stack storage
+u.mask:	dw	0		;temporary mask storage
+gobuff	equ	$
+	ds	14		;task boot buffer
+ersav	equ	$	
+      	ds	200h-(ersav-ram);Fill out the ram
+stack	equ	$		;End of local ram
 
 ;****************************************************************
 ;*								*
@@ -257,7 +257,7 @@ stack	EQU	$		;End of local ram
 ;*								*
 ;****************************************************************
 
-map:	DEFS	200H			;Task Memory map image
+map:	ds	200h			;Task Memory map image
 
 ;****************************************************************
 ;*								*
@@ -267,18 +267,18 @@ map:	DEFS	200H			;Task Memory map image
 ;*								*
 ;****************************************************************
 
-locio	EQU	$			;Local I/O, visible only to task 0
-trpadd:	DEFS	0			;Trapp address register (read)
-dspseg:	DEFS	1			;Display segment register (write)
-keybd:	DEFS	0			;Key board register (read)
-dspcol:	DEFS	1			;Display column register (write)
-switch:	DEFS	0			;CPU switch port (read)
-task:	DEFS	1			;Task register (write)
-stats:	DEFS	0			;Trap status register (read)
-mask:	DEFS	1			;Task mask register (write)
-elocio	EQU	$			;End of local I/O
+locio	equ	$			;Local I/O, visible only to task 0
+trpadd:	ds	0			;Trapp address register (read)
+dspseg:	ds	1			;Display segment register (write)
+keybd:	ds	0			;Key board register (read)
+dspcol:	ds	1			;Display column register (write)
+switch:	ds	0			;CPU switch port (read)
+task:	ds	1			;Task register (write)
+stats:	ds	0			;Trap status register (read)
+mask:	ds	1			;Task mask register (write)
+elocio	equ	$			;End of local I/O
 
-	DEFS	200H-(elocio-locio)	;Fill out local I/O
+	ds	200h-(elocio-locio)	;Fill out local I/O
 
 ;****************************************************************
 ;*								*
@@ -287,7 +287,7 @@ elocio	EQU	$			;End of local I/O
 ;*								*
 ;****************************************************************
 
-mapram:	DEFS	200H			;Memory Map RAM, visible only to task 0
+mapram:	ds	200h			;Memory Map RAM, visible only to task 0
 
 ;****************************************************************
 ;*								*
@@ -296,7 +296,7 @@ mapram:	DEFS	200H			;Memory Map RAM, visible only to task 0
 ;*								*
 ;****************************************************************
 
-rom0	EQU	$			;Local ROM, visible only to task 0
+rom0	equ	$			;Local ROM, visible only to task 0
 					;and is visible only during RESET
 
 ;****************************************************************
@@ -320,15 +320,15 @@ rom0	EQU	$			;Local ROM, visible only to task 0
 ; Check all the readable registers
 
 
-regrd:  out	(0ffH),a		;sync
+regrd:  out	(0ffh),a		;sync
 	ld	hl,trpadd
-	ld	a,(hl)			;read trap address reg @ 400H
+	ld	a,(hl)			;read trap address reg @ 400h
 	inc	hl			
-	ld	a,(hl)			;read keyboard reg @ 401H
+	ld	a,(hl)			;read keyboard reg @ 401h
 	inc	hl
-	ld	a,(hl)			;read switch reg @ 402H
+	ld	a,(hl)			;read switch reg @ 402h
 	inc	hl
-	ld	a,(hl)			;read trap status reg @ 403H
+	ld	a,(hl)			;read trap status reg @ 403h
 	jr	getsw
 
 
@@ -336,12 +336,12 @@ regrd:  out	(0ffH),a		;sync
 ; Check all the writable registers
 
 regwr:	xor	a			;loop till switch not 00
-regwr1:	out	(0ffH),a		;sync
+regwr1:	out	(0ffh),a		;sync
 	ld	(mask),a		;write to the mask register
 	ld	(dspcol),a		;write to the display column register
 	ld	(dspseg),a		;write to the display segment reg.
 	cpl	
-	cp	0ffH
+	cp	0ffh
 	jr	z,regwr1
 	jr	getsw
 
@@ -350,15 +350,15 @@ regwr1:	out	(0ffH),a		;sync
 
 tmap:   xor	a			;write to map ram / protection ram
 	ld	hl,mapram
-	out	(0ffH),a		;sync
+	out	(0ffh),a		;sync
 	ld	(hl),a			;write location 600,0
 	inc	hl
 	ld	(hl),a			;write 601,0
 	cpl
-	ld	(hl),a			;write 601,0ffH
+	ld	(hl),a			;write 601,0ffh
 	dec	hl
-	ld	(hl),a			;write 600,0ffH
-	ld	hl,mapram + 01feH
+	ld	(hl),a			;write 600,0ffh
+	ld	hl,mapram + 01feh
 	ld	(hl),a			;write 7fe,0ff
 	inc	hl
 	ld	(hl),a			;write 7ff,0ff
@@ -372,8 +372,8 @@ tmap:   xor	a			;write to map ram / protection ram
 ; Check the R/W RAMs
 
 
-tram:	ld	hl,0000H		;write to read/write ram
-	out	(0ffH),a
+tram:	ld	hl,0000h		;write to read/write ram
+	out	(0ffh),a
 tram1:	xor	a
 	ld	(hl),a			;write a 00 to ram 
 	cp	(hl)			;read it back
@@ -382,17 +382,17 @@ tram1:	xor	a
 	cp	(hl)			;read it back
 	bit	0,h
 	jr	nz,getsw
-	ld	hl,03ffH
-	jr      tram1			;write to 3ffH a ffh
+	ld	hl,03ffh
+	jr      tram1			;write to 3ffh a ffh
 
 ; Check the Floating Point Processor
 
 
 tfpp:   xor	a			;check FPP
-	out	(0ffH),a		;sync
-	ld	(0c00H),a		;write a 00 to location C00H
-	ld	(0c08H),a		;write a 00 to location C08H
-	ld	a,(0c00H)		;read c00H
+	out	(0ffh),a		;sync
+	ld	(0c00h),a		;write a 00 to location C00h
+	ld	(0c08h),a		;write a 00 to location C08h
+	ld	a,(0c00h)		;read c00h
 
 
 getsw:	ld	a,(keybd)		
@@ -401,7 +401,7 @@ reset:	jp	z,reset0		;go to the montior if  low
 	ld	a,(switch)
 	bit	2,a
 	jp	z,reset0		;go to the monitor if S6 is on
-	and	070H			;strip insignificant bits
+	and	070h			;strip insignificant bits
 	rrc	a			;4 byte offset
 	rrc	a
 	ld	hl,jtable		;point to beginning of table
@@ -412,50 +412,50 @@ reset:	jp	z,reset0		;go to the montior if  low
 ; Check the S-100 bus addr and data lines
 
 
-tbus:   ld	a,0f0H
+tbus:   ld	a,0f0h
 	ld	(task),a		;force upper task bits high
-	ld	a,0ffH			;init the T0 map
-	ld	(61eH),a
+	ld	a,0ffh			;init the T0 map
+	ld	(61eh),a
 	ld	a,03
-	ld	(61fH),a
-	ld	(603H),a
+	ld	(61fh),a
+	ld	(603h),a
 	xor	a
-	ld	(602H),a
-	out	(0ffH),a		;sync
-	ld	(0ffffH),a		;write - bus addresses A0-23 are high
+	ld	(602h),a
+	out	(0ffh),a		;sync
+	ld	(0ffffh),a		;write - bus addresses A0-23 are high
 	ld	(task),a		;upper task bits low
-	ld	(1000H),a		;write - bus addresses A0-23 are low
-	ld	a,0f0H
+	ld	(1000h),a		;write - bus addresses A0-23 are low
+	ld	a,0f0h
 	ld	(task),a		;force upper task bits high
-	ld	a,(0ffffH)		;read  - bus addresses A0-23 are high
+	ld	a,(0ffffh)		;read  - bus addresses A0-23 are high
 	xor	a
 	ld	(task),a		;force upper task bits low
-	ld	a,(1000H)		;read  - bus addresses A0-23 are low
+	ld	a,(1000h)		;read  - bus addresses A0-23 are low
 	jr	getsw
 
 
-ntbus:  ld	a,0A0H
+ntbus:  ld	a,0A0h
 	ld	(task),a		;force upper task bits high
-        ld	a,0aaH			;init the T0 map
-	ld	(61eH),a
+        ld	a,0aah			;init the T0 map
+	ld	(61eh),a
 	ld	a,03
-	ld	(61fH),a
-	ld	(603H),a
-	ld	a,55H
-	ld	(602H),a
-	out	(0ffH),a		;sync
-	ld	a,0aaH
-	ld	(0faaaH),a		;write - bus addresses A0-23 = AAAAAA
-	ld	a,50H
+	ld	(61fh),a
+	ld	(603h),a
+	ld	a,55h
+	ld	(602h),a
+	out	(0ffh),a		;sync
+	ld	a,0aah
+	ld	(0faaah),a		;write - bus addresses A0-23 = AAAAAA
+	ld	a,50h
 	ld	(task),a		;upper task bits low = 5
-	ld	a,55H
-	ld	(1555H),a		;write - bus addresses A0-23 are low
-	ld	a,0A0H
+	ld	a,55h
+	ld	(1555h),a		;write - bus addresses A0-23 are low
+	ld	a,0A0h
 	ld	(task),a		;force upper task bits high
-	ld	a,(0faaaH)		;read  - bus addresses A0-23 are high
-	ld	a,050H
+	ld	a,(0faaah)		;read  - bus addresses A0-23 are high
+	ld	a,050h
 	ld	(task),a		;force upper task bits low
-	ld	a,(1555H)		;read  - bus addresses A0-23 are low
+	ld	a,(1555h)		;read  - bus addresses A0-23 are low
 	jp	getsw
 
 	
@@ -474,28 +474,28 @@ settle:	dec	hl			;wait for the hardware to settle down
 	jr	nz,settle
 	ld	(hl),jmpop		;- this will be overwritten by the
 	inc	hl			;- supervisor but all traps in the 
-	ld	(hl),012H		;- meantime will fall into the monitor.
+	ld	(hl),012h		;- meantime will fall into the monitor.
 	inc 	hl
-	ld	(hl),08H
+	ld	(hl),08h
 
 reslop: xor	a
 	ld	c,3			;New access priviledges
 reslp2: ld	b,a			;New allocation = segment #
 	call	rstmap			;Allocate it
 	inc	a			;Next segment #
-	and	0fH			;Check if all done
+	and	0fh			;Check if all done
 	jr	nz,reslp2		;Continue until done
-        LD	A,10H			;write new task and segment
+        LD	A,10h			;write new task and segment
 	LD	B,0			;TASK 1 gets first 64K of memory
 reslp1: call    rstmap			;Give TASK 1 a full 64k of space
 	inc	B			
 	inc	A			
-	cp      20H			
+	cp      20h			
 	jr	nz,reslp1						
 fmap:	ld	b,a			;fill all the tasks' maps
 	call	rstmap
 	inc	a
-	cp	0H
+	cp	0h
 	jr	nz,fmap
 	ret
 
@@ -511,11 +511,11 @@ setup:	xor	a
 
 ;	Following code checks for ram in system
 
-	ld	hl,0ffffH		;top of ram
-ramchk:	ld	a,0f0H
+	ld	hl,0ffffh		;top of ram
+ramchk:	ld	a,0f0h
 	and	h
 	jr	z,badram		;dont go below task0,seg1	
-	ld	(hl),a			;check it with a 00H
+	ld	(hl),a			;check it with a 00h
 	cp	(hl)			
 	jr	z,nexchk
 	dec	hl			;try the next location
@@ -528,27 +528,27 @@ nexchk:	cpl
 	dec	hl			;try next location
 	jr	ramchk
 
-badram: ld	hl,0badH
+badram: ld	hl,0badh
 	ld	(ersav + 1),hl
 	ld	a,'M'
 	ld	(ersav),a
 	jp 	allerr			;if no ram force entry to monitor
 
 tstsw:	ld	a,(switch)		;get contents of switch
-	and	0f8H			;Ignore irrelevent bits
+	and	0f8h			;Ignore irrelevent bits
 	ld	d,a			;d & e contain jump address
 	ld	e,0H
 	cp	0			;boot hard disk if switches are all on
 	jp	z,boothd
-	cp	08H			;If switch 5 is off others are on
+	cp	08h			;If switch 5 is off others are on
 	jp	z,nuboot		; - boot DMA controller
-	cp	10H			;If switches 4 is off, others on
+	cp	10h			;If switches 4 is off, others on
 	jr	z,djdma			; - boot the DJ-DMA floppy device
 
 check:	ld	a,(switch)		;test monitor switch
 	bit  	2,a
 	ld	a,1			;normal task number
-	ld	(15H),de		;initialize the t1 pc save area
+	ld	(15h),de		;initialize the t1 pc save area
 	ld	(ctask),a
 	jr	nz,nutask		;jump if boot desired
 
@@ -556,15 +556,15 @@ montor:	xor	a			;monitor task number
 	ld	de,cold			;monitor location
 
 nutask: ld	hl,gobuff		;Write a routine to switch to new task
-	ld	(hl),03eH		;- because when the task register is
+	ld	(hl),03eh		;- because when the task register is
 	inc	hl			;- written into, the lower half of the
 	ld	(hl),a			;- prom goes away.
 	inc	hl
-	ld	(hl),032H
+	ld	(hl),032h
 	inc	hl
-	ld	(hl),02H
+	ld	(hl),02h
 	inc	hl
-	ld	(hl),04H
+	ld	(hl),04h
 	inc	hl
 	ld	(hl),nop		;6 nops for countdown sequence
 	inc	hl
@@ -578,7 +578,7 @@ nutask: ld	hl,gobuff		;Write a routine to switch to new task
 	inc	hl
 	ld	(hl),nop
 	inc	hl
-	ld	(hl),0c3H		;the jump op code
+	ld	(hl),0c3h		;the jump op code
 	inc	hl
 	ld	(hl),e
 	inc	hl
@@ -614,14 +614,14 @@ picset:	xor     a
 ;*								*
 ;****************************************************************
 
-djdma:	ld	h,10H			; wait byte for 1 minute 
-djlop0:	ld	bc,0000H
+djdma:	ld	h,10h			; wait byte for 1 minute 
+djlop0:	ld	bc,0000h
 djloop:	ld	a,(djstat)		;read the status back
-	cp	040H
+	cp	040h
 	ld	de,(djstat - 2)		;d & e point to cold boot loader
 	jr	z,check			;if good status continue set gobuff
-	cp	0ffH			; - else loop for good status
-	jr	z,nstat			;if 0ffH then force to a zero
+	cp	0ffh			; - else loop for good status
+	jr	z,nstat			;if 0ffh then force to a zero
 	dec	bc
 	ld	a,b
 	or	c
@@ -654,14 +654,14 @@ nuboot:	ld	bc,endboot - bootbl	;byte count
 	ld	de,chan			;destination
 	ldir				;move the command
 	ld	hl,iopb			;point to default channel addr
-	ld	(hl),80H		;fill in the command channel address
+	ld	(hl),80h		;fill in the command channel address
 	xor	a
-	inc	hl			; -located at 50H to point to channel
-	ld	(hl),a			; -at 80H.
+	inc	hl			; -located at 50h to point to channel
+	ld	(hl),a			; -at 80h.
 	inc	hl
 	ld	(hl),a
 	out	(dmarst),a		;send the controller a reset
-	ld	de,010H
+	ld	de,010h
 
 hdrl:	dec	d			;wait for controller to process reset
 	jr	nz,hdrl
@@ -680,29 +680,29 @@ rdata: 	ld	de,chan			;destination
 	ld	hl,rdtbl		;source
 	ldir				;move the read sector command
 	call	cloop
-	ld	de,0100H		;point to beginning of DMA boot prog.
+	ld	de,0100h		;point to beginning of DMA boot prog.
 	jp	check
 
 
 ; cloop1 = 9.6 us
 
 			
-cloop:	ld	c,020H
+cloop:	ld	c,020h
 cloop0:	out	(attn),a
-	ld	de,0000H
+	ld	de,0000h
 cloop1: ld	a,(statis)		;check drive status
-	cp	0ffH			;an FF means command completed
+	cp	0ffh			;an FF means command completed
 	ret	z
 	dec	de			;wait for controller to respond
 	ld	a,e
 	or	d
 	jr	nz,cloop1		;give it time to respond
-					;END cloop1
+					;end cloop1
 
 ;	Fall through to here on any error
 
 	ld	a,(statis)
-	cp	01H
+	cp	01h
 	jr	nz,cloop2	
 	dec	c			;give it 10 tries if not rdy error
 	jr	nz,cloop0		; - about 20 seconds
@@ -731,7 +731,7 @@ derror:
 allerr:	xor	a
 	ld	(ctask),a
 	ld	de,cold			;pointer to error print
-	ld	(15H),de		;save the pointer in t1 pc
+	ld	(15h),de		;save the pointer in t1 pc
 	jp	nutask			
 	
 
@@ -743,7 +743,7 @@ allerr:	xor	a
 ;*						11/4/81  BJG	*
 ;****************************************************************
 
-hdclop:	ld	de,0000H
+hdclop:	ld	de,0000h
 hdlop1: in	a,(status)
 	and	b
 	ret	nz
@@ -753,7 +753,7 @@ hdlop1: in	a,(status)
 	jr	nz,hdlop1
 	jr	hdcerr
 
-wait:	ld	h,010H
+wait:	ld	h,010h
 wait0:	ld	de,0
 wait1:	in	a,(status)
 	and	b
@@ -828,7 +828,7 @@ waitd:	ld	b,opdone
 	in	a,(data)		;high order byte of
 	ld	h,a			;    bootstrap address
 	ld	d,a
-	and	0f0H			;check for 1st segment of task0
+	and	0f0h			;check for 1st segment of task0
 	jr	z,dxloop
 	xor	a
 	ld	(mapram + 2),a		;T0 map is as normal with no window
@@ -844,8 +844,8 @@ lloop:	in	a,(data)		;load
 	jp	check
 
 dxloop: ld	a,d
-	and	0fH			;strip the segment #
-	or	010H			; force the load into seg 0 task 1
+	and	0fh			;strip the segment #
+	or	010h			; force the load into seg 0 task 1
 	ld	d,a
 	jr	lloop
 
@@ -866,7 +866,7 @@ dxloop: ld	a,d
 ;****************************************************************
 
 rstmap:	ld	l,a             ;Get task and segment numbers       
-        ld	h,0H    
+        ld	h,0h    
 	add	hl,hl           ;multiply times 2       
         ex	de,hl  		;save calculated offset in D,E
         ld	hl,mapram       ;point to beginning of ram map
@@ -899,8 +899,8 @@ uarts0:	ld	a,d
 	rlca
 	rlca
 	rlca
-	and	07H			;mask insignificant bits
-	cp	07H			;all off?
+	and	07h			;mask insignificant bits
+	cp	07h			;all off?
 	ld	d,0
 	jr	z,default		;default if all off
 	ld	hl,btable		;point to baud rate table
@@ -966,78 +966,78 @@ begin0:	in	a,(lsr)
 
 ;  Baud rate selection table for Mult I/o or WB I/O
 
-btable:	DEFW	1047			;110 baud		0 0 0
-	DEFW	384			;300 baud		0 0 1
-	DEFW	96			;1200 baud		0 1 0
-	DEFW	48			;2400 baud		0 1 1
-	DEFW	24			;4800 baud		1 0 0
-	DEFW	12			;9600 baud		1 0 1
-	DEFW	6			;19200 baud		1 1 0
+btable:	dw	1047			;110 baud		0 0 0
+	dw	384			;300 baud		0 0 1
+	dw	96			;1200 baud		0 1 0
+	dw	48			;2400 baud		0 1 1
+	dw	24			;4800 baud		1 0 0
+	dw	12			;9600 baud		1 0 1
+	dw	6			;19200 baud		1 1 0
 
 ; Load constants command for the DMA Winchester controller
 
-bootbl: DEFB	10H			;direction out
-	DEFB	0			;low steps
-	DEFB	0			;high steps
-	DEFB	03cH			;select drive 0
-	DEFB	0			;low dma address
-	DEFB	01			;high dma address
-	DEFB	0			;extended dma address
-	DEFB	0			;argument 0
-	DEFB	stpdly			;argument 1
-	DEFB	hdsetl			;argument 2
-	DEFB	secsiz			;argument 3
-	DEFB	const			;load constants opcode
-	DEFB	0			;clear status byte
-	DEFB	80H			;low link address
-	DEFB	0			;high link address
-	DEFB	0			;extended link address
+bootbl: db	10h			;direction out
+	db	0			;low steps
+	db	0			;high steps
+	db	03ch			;select drive 0
+	db	0			;low dma address
+	db	01			;high dma address
+	db	0			;extended dma address
+	db	0			;argument 0
+	db	stpdly			;argument 1
+	db	hdsetl			;argument 2
+	db	secsiz			;argument 3
+	db	const			;load constants opcode
+	db	0			;clear status byte
+	db	80h			;low link address
+	db	0			;high link address
+	db	0			;extended link address
 
-endboot EQU	$
+endboot equ	$
 
 ; Read sector 1, head 0, cyl 0  command for the HD-DMA:
 
-rdtbl:	DEFB	0			;no seek
-	DEFB	0
-	DEFB	0
-	DEFB	07cH			;select drive 0, head 0 
-	DEFB	0			;dma address of 100H
-	DEFB	1
-	DEFB	0
-	DEFB	0			;low byte cylinder
-	DEFB	0			;high byte cylinder
-	DEFB	0			;head 0
-	DEFB	0			;sector 1
-	DEFB	0			;read command
-	DEFB	0			;clear status
+rdtbl:	db	0			;no seek
+	db	0
+	db	0
+	db	07ch			;select drive 0, head 0 
+	db	0			;dma address of 100h
+	db	1
+	db	0
+	db	0			;low byte cylinder
+	db	0			;high byte cylinder
+	db	0			;head 0
+	db	0			;sector 1
+	db	0			;read command
+	db	0			;clear status
 
-endrd 	EQU	$
+endrd 	equ	$
 
 
 ; Dispatch table for the on-board diagnostic routines
 
-jtable	EQU 	$
+jtable	equ 	$
 	jp	regrd			;test all the readable registers
-	DEFB	0
+	db	0
 	jp	regwr			;check all the writable registers but
  					; -task register
-	DEFB	0
+	db	0
 	jp	tmap			;check map rams
-	DEFB	0
+	db	0
 	jp	tram			;check read/write ram
-	DEFB 	0
+	db 	0
 	jp	tfpp			;check fpp
-	DEFB	0
+	db	0
 	jp	tbus			;check bus read/write addresses
-	DEFB	0
-	jp	ntbus			;R/W bus with 055H and 0aaH
-	DEFB	0
+	db	0
+	jp	ntbus			;R/W bus with 055h and 0aah
+	db	0
 	jr	start			;yet to be defined
 	
 	
-ecode0  EQU	$			;End of reset prom code
+ecode0  equ	$			;End of reset prom code
 
-	DEFS	3f0H-(ecode0-rom0)	;Fill out the prom
+	ds	3f0h-(ecode0-rom0)	;Fill out the prom
 
 ;****************************************************************
 ;*								*
@@ -1046,17 +1046,17 @@ ecode0  EQU	$			;End of reset prom code
 ;*								*
 ;****************************************************************
 	ld	hl,djstat
-	ld	a,0H
+	ld	a,0h
 	ld	(mapram + 2),a		;t0 map points to t1 map seg 0
 	inc	a
 start:	ld	sp,stack
 	jp	getsw 		        ;power-on or reset jump
 	nop				;Fill out the prom.
-erom0   EQU	$
+erom0   equ	$
 
-	DEFS	400H-(erom0-rom0)
+	ds	400h-(erom0-rom0)
 
-	.PHASE 800H  
+	.phase 800h  
 
 ;****************************************************************
 ;*								*
@@ -1068,7 +1068,7 @@ erom0   EQU	$
 ;****************************************************************
 
 
-	rom1	EQU	$
+	rom1	equ	$
 
 ;****************************************************************
 ;*								*
@@ -1140,7 +1140,7 @@ trappd:	ld	de,-15			;back up the users pc
 tskbase:	
 	ld	hl,tasks-tasksiz	;no task zero save area
 	ld	de,tasksiz		;size of save area
-	and 	0fH			;mask off upper bits
+	and 	0fh			;mask off upper bits
 	jr	nz,tsklp		;task 0 and 1 share the same area
 	inc	a
 tsklp:	add     hl,de			
@@ -1163,7 +1163,7 @@ tsklp:	add     hl,de
 
 restor:	ld 	hl,map			;point to beginning of map image
 	ld	de,mapram		;point to beginning of actual map
-	ld	bc,01FH			;all of task 0 map 
+	ld	bc,01Fh			;all of task 0 map 
 	ldir
 
 
@@ -1247,9 +1247,9 @@ dpmap:	ld	a,(ctask)
 	rlc	a
 	rlc	a
 dpmap0: call    gtmap    		;return with values in b,c
-	ld	c,03H			;unlimied access priviledges
+	ld	c,03h			;unlimied access priviledges
 	push	af
-	and	0fH			;force task # to be 0
+	and	0fh			;force task # to be 0
 	call	tsmod
 	ld	de,mapram		;point to T0 actual map
 	add	hl,de
@@ -1259,7 +1259,7 @@ dpmap0: call    gtmap    		;return with values in b,c
 	pop	af
 	inc	a			;next map location
 	ld	c,a
-	and	0fH			
+	and	0fh			
 	ret	z			;do it 16 times for all segments
 	ld	a,c
 	jr	dpmap0
@@ -1537,14 +1537,14 @@ ucon2:	in	a,(lsr)			;get uart status
 	and	dr
 	jr	z,ucon2			;wait until receive data available
 	in	a,(rbr)			;read the uart data register
-	and	07fH			;strip parity
+	and	07fh			;strip parity
 	ret
 
 ucsts:	call	uconinit		
 	in	a,(lsr)			;read uart status
 	and	dr
 	ret	z			;return zero set if no character
-	ld	a,0ffH
+	ld	a,0ffh
 	ret				;return a = ffh if character waiting
 
 uconinit:
@@ -1558,7 +1558,7 @@ uconinit:
 
 ;	CONVERT HEX TO ASCII
 
-UCONV:	AND	00fH
+UCONV:	AND	00fh
 	ADD	A,090H
 	DAA
 	ADC	A,040H
@@ -1659,7 +1659,7 @@ UNIBBLE:
 	sub	' '			;convert to upper case
 unibok:	SUB	030H
 	RET	C
-	cp	017H
+	cp	017h
 	ccf
 	RET	C
 	CP	00AH
@@ -1767,7 +1767,7 @@ uretr1:	ld	a,(ctask)
 	ld	de,mskofst
 	add	hl,de
 	ld	a,(hl)
-	or	08H
+	or	08h
 	ld	(hl),a
 	jp	otask
 
@@ -1783,7 +1783,7 @@ ucont1:	ld	a,(ctask)
 	ld	de,mskofst
 	add	hl,de
 	ld	a,(hl)
-	and	0f6H			;force mask for stop and run enble low
+	and	0f6h			;force mask for stop and run enble low
 	ld	(hl),a
 	jp	otask	
 
@@ -1797,12 +1797,12 @@ uboot1:	ld	a,(ctask)
 	call	tskbase
 	push	hl
 	ld	a,(switch)
-	and	0f8H
+	and	0f8h
 	cp	0			;check for a HDCA hard disk boot
 	jp	z,uboot2
-	cp	08H			;check for DMA hard disk boot
+	cp	08h			;check for DMA hard disk boot
 	jp	z,uboot2
-	cp	010H			;check for DJ-DMA
+	cp	010h			;check for DJ-DMA
 	jp	z,uboot2
 	ld	de,pcofst
 	add	hl,de
@@ -1831,8 +1831,8 @@ UCERR:	LD	B,A
 ;
 
 
-ecode1	EQU	$
-	DEFS	3f0H-(ecode1-rom1)
+ecode1	equ	$
+	ds	3f0h-(ecode1-rom1)
 
 ;********************************************************
 ;*   							*
@@ -1854,13 +1854,13 @@ ecode1	EQU	$
 
 
 	halt				;to allow halts in task 0
-erom1	EQU	$						
-	DEFS	400H-(erom1-rom1)
+erom1	equ	$						
+	ds	400h-(erom1-rom1)
 	
 
 
-fpp0:	DEFS	8
-fpp1:	DEFS	1
+fpp0:	ds	8
+fpp1:	ds	1
 
-	.DEPHASE
-	END
+	.dephase
+	end

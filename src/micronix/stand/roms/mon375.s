@@ -1863,4 +1863,5 @@ erom1	equ	$
 fpp0:	ds	8
 fpp1:	ds	1
 
+	.dephase
 	end
