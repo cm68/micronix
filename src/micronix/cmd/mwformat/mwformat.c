@@ -28,7 +28,7 @@
  * the bad sector map - all of which are more command blocks on the same
  * interface and none of which a disk needs to be mountable.
  *
- * See sys/DISKLABEL.md for the label, and include/sys/ioctl.h for the
+ * See docs/DISKLABEL.md for the label, and include/sys/ioctl.h for the
  * command-block interface the driver runs these through.
  */
 

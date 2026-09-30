@@ -36,12 +36,12 @@ INC	= -i$(DEPTH)/include
 # The prose.  The source tar carries $(SRCS), which is the *.c/*.h/*.s/*.1
 # wildcards plus $(EXTRA), and none of these is any of those - so without
 # this the kernel ships to /usr/src/sys with its code and none of the
-# writing that explains it, including DISKLABEL.md and the overlay
-# driver notes that the rest of the tree points at.
+# writing that explains it.  BUILDING is how this directory is built and
+# TODO is what is left to do in it, so both belong here; the project's
+# design notes used to as well, and they are the repository's docs/ now,
+# which the top-level update ships to /usr/src/docs (GNUmakefile above).
 #
-EXTRA	= BUILDING TODO bufhash.md DISKLABEL.md environment.md \
-	  INTERRUPTS.md KMEM.md MAPBUG.md OVERLAY-DRIVERS.md \
-	  overlay.md ZEROCOPY.md
+EXTRA	= BUILDING TODO
 
 # build.h is written by the rule below, and unix.link is the half-built
 # image unix is made from; GNUmakefile.inc's clobber takes GENERATED

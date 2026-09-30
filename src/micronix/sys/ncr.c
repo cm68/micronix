@@ -11,12 +11,12 @@
  * sys/ncr.c
  * Changed: <2026-09-26 curt>
  *
- * This driver is a module (sys/OVERLAY-DRIVERS.md), and that is what let
+ * This driver is a module (docs/DRIVERS.md), and that is what let
  * it be linked at all.  As resident kernel text its 3241 bytes did not
  * fit: the link failed with "objects out of address order (data)" 155
  * bytes short of the frame, and the buffer pool was the tighter of the
  * two budgets.  sys/TODO works both out and names the three ways it
- * could have been made to fit; sys/overlay.md is the one written for
+ * could have been made to fit; docs/overlay.md is the one written for
  * this, and it is the one that was taken.  The build names it in MODS
  * (GNUmakefile) and appends its page to the kernel file, the loader
  * places it at boot (ovlplaceall, sys/main_init.c), and major 5
@@ -339,7 +339,7 @@ static int scsireset(), scsiselect();
  *
  * The members below the calls are the card's own state, which lives here
  * because there is one card and one command in flight on it at a time.
- * overlay.md's seam puts this struct and the phase engine that reads it
+ * docs/overlay.md's seam puts this struct and the phase engine that reads it
  * on the resident side of the overlay: the handler runs when the
  * overlaid top end is not mapped, so everything a resident handler
  * touches has to be resident too.

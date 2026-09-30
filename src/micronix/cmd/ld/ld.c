@@ -127,7 +127,7 @@ int num_globals;
  * every name the kernel has, and they must not displace anything the
  * object under link defines.  Shadowing is the point - it is how a
  * driver keeps its interrupt-path state in the kernel and takes the
- * rest of itself from the module.  See OVERLAY-DRIVERS.md.
+ * rest of itself from the module.  See docs/DRIVERS.md.
  */
 struct abssym {
     struct abssym *next;

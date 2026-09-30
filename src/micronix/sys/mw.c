@@ -48,7 +48,7 @@ static int mwlink();
  * and that is the whole of its geometry.  A drive also has a step-pulse
  * delay and two cylinders at which writing changes: where write
  * precompensation begins, and where the write current drops to the low
- * setting.  The label has no field for any of the three (sys/DISKLABEL.md
+ * setting.  The label has no field for any of the three (docs/DISKLABEL.md
  * says why the table could not retire while they had nowhere else to
  * live), so a driver that reads its geometry from the label has nowhere
  * to read them from, and they are constants here.

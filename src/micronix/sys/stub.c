@@ -5,7 +5,7 @@
  *
  * Every hook a driver has, and none of the code: open, close, strategy,
  * ioctl, init and tick are here as empty stubs; the interrupt handler is
- * in stub_intr.c; STUB.md (this directory) is the recipe for turning this
+ * in stub_intr.c; docs/STUB.md (this directory) is the recipe for turning this
  * into a real driver.
  *
  * This is a driver module (sys/ovl.h): its first byte is a struct ovlhdr,
@@ -14,7 +14,7 @@
  * is the interface - the kernel holds no driver symbol, and the driver
  * calls no kernel function.  A real driver puts the header in its own
  * object named first on the link line (idehdr.c is the example); it is
- * folded in here so the stub is self-contained, and STUB.md says why and
+ * folded in here so the stub is self-contained, and docs/STUB.md says why and
  * when to split it out.
  *
  * The block-device switch is the four entries in a struct biovec
@@ -78,7 +78,7 @@ stubstrat(b)
      * strat(b): do the I/O described by the buffer header.  The ordinary
      * shape is a filesystem request - one 512-byte sector, count fixed
      * at 512 by strat() - but swapio() can reach this routine directly
-     * with a 4096-byte count; STUB.md says what to refuse.
+     * with a 4096-byte count; docs/STUB.md says what to refuse.
      *
      * The synchronous shape, the one ide.c uses:
      *   - check b->blk is inside the device and b->count is the shape
@@ -91,7 +91,7 @@ stubstrat(b)
      *
      * An interrupt-driven driver starts the transfer, sleeps on the
      * request's done word (sleep(&done, PRIBIO)), and lets stubint()
-     * wake it; STUB.md has both shapes.  The stub refuses everything.
+     * wake it; docs/STUB.md has both shapes.  The stub refuses everything.
      */
     b->flags |= BERROR;
     b->error = EIO;
@@ -145,7 +145,7 @@ struct biovec stubbvec = {
 };
 
 /*
- * The header (sys/ovl.h).  Every field is a placeholder that STUB.md
+ * The header (sys/ovl.h).  Every field is a placeholder that docs/STUB.md
  * tells how to fill in: major 0 is reserved for nodev, line 0 is the
  * hard-disk line, and data 0 means no private structure yet.
  */

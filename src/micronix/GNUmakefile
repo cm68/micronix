@@ -411,11 +411,18 @@ install-host:
 #
 # This update is top-specific: it ships src.tar (the makefile above),
 # which GNUmakefile.inc's update does not know about, so it overrides
-# that rule.
+# that rule.  It ships the prose too, and for the same reason: the
+# project's .md notes live in the repository's top-level docs/, which is
+# outside this directory and so outside $(DIRS) - the recursion cannot
+# reach it and a directory it cannot reach is a directory that does not
+# ship.  They land at /usr/src/docs, which is where the comments that
+# point at them say they are.
 #
 ROOT	?= ~/src/micronix/filesystem
 DEST	 = $(ROOT)/usr/src
 NOWARN	 = --warning=no-ignore-newer
+DOCS	 = ../../docs
+DOCSRCS	 = $(wildcard $(DOCS)/*.md)
 
 src.tar: makefile
 	tar -f src.tar -c makefile
@@ -424,6 +431,8 @@ update: src.tar
 	$(RECURSE)
 	mkdir -p $(DEST)
 	tar -f src.tar -C $(DEST) --keep-newer-files -x $(NOWARN)
+	mkdir -p $(DEST)/docs
+	cp $(DOCSRCS) $(DEST)/docs
 
 #
 # One tar of the whole source tree - sources only, no .o or built

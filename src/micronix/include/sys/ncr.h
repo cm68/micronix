@@ -6,7 +6,7 @@
  * The resident side's view of the card, and the whole of it: the
  * interrupt line, the port the registers answer at, and the one register
  * the presence probe writes.  The driver itself is a module
- * (sys/OVERLAY-DRIVERS.md) and is named for the adapter - sys/ncr.c -
+ * (docs/DRIVERS.md) and is named for the adapter - sys/ncr.c -
  * while the device nodes stay scsi*, because the next host adapter to be
  * supported here will be a different chip behind the same bus.
  *

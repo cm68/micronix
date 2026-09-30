@@ -12,7 +12,7 @@
  * number, decimal or 0x hex, so 3/0 and 0x300 and 768 all agree.
  *
  * Setting them also stamps a driver page into the kernel's 4K slot
- * (sys/OVERLAY-DRIVERS.md, "The slot, and setdev").  The kernel is
+ * (docs/DRIVERS.md, "The slot, and setdev").  The kernel is
  * linked with no disk drivers and a page-sized hole in its text; the
  * driver it needs to mount root is chosen at install time, and this is
  * where.  The driver is not named on the command line: it is the module

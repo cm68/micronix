@@ -8,7 +8,7 @@
  * (sys/mio.s), which saves the registers, calls this routine, and writes
  * the EOI on the way out - so a handler here reads the controller's
  * status, decides whether it has anything to say, and returns; it neither
- * saves registers nor touches the 8259 itself.  INTERRUPTS.md is the full
+ * saves registers nor touches the 8259 itself.  docs/INTERRUPTS.md is the full
  * story from the board to this door.
  *
  * A handler runs with its module's page mapped (the kernel puts it in

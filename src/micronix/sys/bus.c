@@ -39,7 +39,7 @@
  * whether anyone wanted it.
  *
  * Why this is not in mw.c, where it was.  mw and dj are modules now
- * (sys/OVERLAY-DRIVERS.md): each is linked on its own against the
+ * (docs/DRIVERS.md): each is linked on its own against the
  * kernel, so a function one of them defines is one the other cannot
  * reach, and a link of dj.mod naming busgive failed for exactly that
  * reason.  The u page is where the kernel keeps code two modules must
