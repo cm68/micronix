@@ -26,15 +26,14 @@ source and not what the tree now is.
 
 ---------------------
 
-Morrow Designs Micronix and tools					updated 6 Sep 2021
+Morrow Designs Micronix and tools					updated 30 Sep 2026
 
 directories:
 
 filesystem:
 	built by the top level makefile from the distribution disks
 	this is used by the usersim to run against
-	the eventual goal is to have this directory a self-building tree
-	with source
+	it holds the source and rebuilds itself natively (cd /usr/src; make)
 
 disks:
 	floppy images recovered from the net, version 1.4 and 1.3
@@ -66,7 +65,7 @@ src/micronix/sys:
 	note above), with include files.
 	the formatting of the original source was really quirky and archaic,
 	so I re-indented it to a more K&R like style.
-	it is NOT ansi, and compiles on whitesmith's C.
+	it is NOT ansi, and compiles with ccc (see below).
 
 src/micronix/stand:
 	ghidra-driven rewrite of the cold boot loaders for the kernel
@@ -85,33 +84,29 @@ src/lib:
 	libraries for file system, disassembly, and random utility
 	
 src/usersim:
-	micronix user mode simulator mostly works, including upm, the cp/m
-	emulator.  some of the system calls are still not real and always
-	fail.  however, you will find it quite solid. 
+	micronix user mode simulator, including upm, the cp/m emulator.
+	it is quite solid.
 
-	however, I used an interesting method (hack, really)
-	to fake out special files.  special files are a symlink containing
-	a string of the form:  [cb]dev(<decimal major>,<decimal minor>)
-	you can then actually create file named this, and mkfs, fsck, etc
-	inside the usersim will actually think they are dealing with a bdev
-	and be reading and writing the image file.  eventually,
-	I'll implement mount and interface the fslib to the usersim.
+	special files are symlinks that name the device - bdev(maj,min) or
+	cdev(maj,min) - and the block devices are real: mount() and umount()
+	go through the host fslib, with -D <devdir> pointing at a directory of
+	bdev(maj,min) links to images.  mkfs, fsck, icheck and the rest open
+	the raw device the same way.
 
 	build it on any random unix box (centos is baseline),
 	and run:  sim
 
 src/hwsim:
-	most of hardware level mpz80 simulator capable of running the
-	micronix kernel.  it includes the ability to load+run the monitor
-	roms, both version 4.47 and 3.75, load symbol tables, has an ICE-like
-	debugger with breakpoints, single step, disassembler, and so on.
-	furthermore, it has a modular architecture that allows plugging in 
-	different chip simulators.
+	a hardware level mpz80 simulator that boots the micronix kernel.
+	it includes the ability to load+run the monitor roms, load symbol
+	tables, has an ICE-like debugger with breakpoints, single step,
+	disassembler, and so on.  furthermore, it has a modular architecture
+	that allows plugging in different chip simulators.
 
-	cp/m works well, and micronix is getting very close, with interrupt
-	controller, trapping, memory mapping, disk reading and writing for
-	the five disk controllers (djdma, hddma, hdca, ide and ncr5380).
-	the card list is the DRIVERS line in src/hwsim/d1/Makefile.
+	it runs cp/m and boots micronix to a shell, with interrupt controller,
+	trapping, memory mapping, and disk reading and writing for the five
+	disk controllers (djdma, hddma, hdca, ide and ncr5380).  the card list
+	is the DRIVERS line in src/hwsim/d1/Makefile.
 
 	there's a means for importing and exporting data to cp/m via the
 	inp: and out: devices in pip, so hex files can be shipped to get
@@ -121,8 +116,6 @@ src/hwsim:
 	a delta file that is loaded at the next startup, so there's no
 	modification of the original IMD.  the imd utility can generate
 	a merged IMD file that contains any changes.
-
-	finally, I've started on a skeleton for other platforms like compupro.
 
 src/include:
 	library include files for the emulation
@@ -144,23 +137,6 @@ extra/docs:
 	almost everything I could find on the micronix hardware, and miscellaneous
 	morrow stuff that may be useful.
 
-compiler woes:
-
-	it turns out that the whitesmith's C compiler is very lame in one
-	important way:  BSS symbols never get allocated in the object file.
-	that means that code like
-
-	int foo;
-	bar() { foo = 9; }
-
-	does not link.  this is craptastic beyond belief.
-	the only workaround is to modify the source to move foo to data
-	by giving an explicit = 0;
-
-	accordingly, I'm porting a compiler that does not have this lossage.
-	software toolworks c/80 is the only reasonably complete native compiler
-	I have found.   porting it is non-trivial.
-
 extra/decomp:
 	a decompiler that knows about code flow, system calls, and
         with the goal of generating recompilable C.  very much a WIP.
@@ -174,50 +150,22 @@ running the hardware simulator, from a standing start
 ----------------------------------------------------
 
 you can make a hard disk image and boot micronix without any blessed
-snapshot, starting from the kernel source.  m40 is the largest volume
-with a reliable kernel; the steps below make an m16, which is smaller
-and quicker to fill.
+snapshot, starting from the kernel source.  docs/INSTALLATION.md has
+the whole flow; the short of it:
 
-	# build the host cross-tools (once)
-	make hostcc				the compiler: mxccc, mxasz, mxld
-	make -C src/tools			mnix, the image reader/writer
-	make -C src/micronix/stand/boot		the boot blocks, bootimg
+	# build the compiler, the libraries, the commands and the kernel
+	make
+	cd src/micronix
+	make bootstrap
 
-	# build the kernel.  sys is three overlays at a fixed base, so the
-	# cross build does not link it - build "unix" with the host tools:
-	#	compile each .c:	bin/mxccc -m micronix -O -i../include -c foo.c
-	#	assemble each .s:	bin/mxccc -m micronix -c foo.s
-	#	link:			bin/mxld -Ttext=0x1000 -Shigh -L lib -lccc -lc \
-	#				  -o unix.link *.o
-	# (the native sys/Makefile has the full object list) - ~86k.  -Shigh
-	# is not optional: it parks the folded init-only object after bss.
-	# unix.link is the half-built image - the bootable "unix" written
-	# below is it with the driver pages on the end, which sys/GNUmakefile
-	# links.
-
-	# make the m16 disk.  A volume is named with a .vol suffix.
-	src/tools/mnix initialize m16 disks/hdinstall/hddma-0.vol
-	src/tools/mnix mkfs -i src/micronix/stand/boot/bootimg \
-		disks/hdinstall/hddma-0.vol
-	bin/setdev unix 3/8 0/0		# root 3/8 (m16), swap nodev
-	src/tools/mnix -f disks/hdinstall/hddma-0.vol write unix /micronix
-
-	# boot it
-	cd src/hwsim/d1
-	./d1 -B hdcdma -d ../../disks/hdinstall hdcdma0:hddma-0.vol
+	# make a bootable volume and boot it - disks/hdinstall/README has
+	# the detail
+	disks/hdinstall/create_vol myvol
+	disks/hdinstall/boot_vol myvol
 
 -B says boot straight from the hdcdma controller, skipping the monitor;
 the boot block that mkfs put on cylinder 0 loads /micronix.  the shell
 prompt is '#'.
-
-TODO:
-
-replace all the missing utility and application source with the
-sources from actual unix version 6.  this will require a lot of
-textual stuff like getting rid of =- and =+, and fixing initializers.
-
-get an object code improver that will fix the pretty bad stuff that
-whitesmith's generates. 
 
 this github is prettily referenced in my cybernecromancy site:
 
