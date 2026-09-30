@@ -1,0 +1,63 @@
+.he "md (1)                        8/29/26                       md (1)"
+.fo "                               -#-"
+.in 5
+.rm 72
+.bd
+NAME
+.in +5
+.br
+.bd
+md
+- read markdown, write formatted text
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+md [ -w n ] [ file ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Md reads markdown from each file in turn (or the standard input with no
+file, or where a file is -) and writes a plain-text rendering to the
+standard output.  It is meant to be piped into less:
+.sp
+.bd
+md DISKLABEL.md | less
+.sp
+Emphasis is overstrike: bold text is struck twice and underlined text is
+struck over an underscore, so less renders it on a glass tty.
+.sp 2
+.in -5
+.bd
+BLOCKS
+.in +5
+.br
+ATX and setext headings, horizontal rules, filled paragraphs, fenced code
+blocks (verbatim), blockquotes, nested lists, and pipe tables with
+column alignment are recognised.  Inline, **bold**, *italic* and
+`code` are resolved; the backticks of a code span are dropped.  Links are
+not used in the tree's documents and are not handled.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-w n	Fill text to a right margin of n columns, rather than the default
+72.
+.in -10
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+form (1), less (1)

@@ -285,6 +285,7 @@ src/micronix/cmd/login/login
 src/micronix/cmd/ls/ls
 src/micronix/cmd/lz4/lz4
 src/micronix/cmd/make/make
+src/micronix/cmd/md/md
 src/micronix/cmd/man/man
 src/micronix/cmd/mkdir/mkdir
 src/micronix/cmd/mkfs/mkfs
