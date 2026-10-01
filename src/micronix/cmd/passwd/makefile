@@ -30,6 +30,7 @@ $(PROG): $(OBJS)
 install: $(PROG)
 	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/$(PROG)
+	chmod 4711 $(BIN)/$(PROG)
 	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)/$(MAN)
 
