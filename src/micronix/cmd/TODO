@@ -3,16 +3,20 @@
 #
 # Working notes: what /bin still carries without a source.
 #
-# /bin has 129 entries and, as before, two build signatures.  A hundred
-# and two begin "99 97" and are ccc's, built and installed by this tree.
-# Nineteen begin "99 94", and eight carry no 16 byte a.out header at all
-# and start straight into a c1 21 prologue - twenty-seven, all of them
-# Whitesmiths', the binaries the distribution floppies seeded.  The
-# distribution left 59, so 32 of them have a source here now.
+# /bin has 130 entries and, as before, two build signatures.  A hundred
+# and four begin "99 97" and are ccc's, built and installed by this
+# tree.  Eighteen begin "99 94", and eight carry no 16 byte a.out header
+# at all and start straight into a c1 21 prologue - twenty-six, all of
+# them Whitesmiths', the binaries the distribution floppies seeded.
+# The distribution left 59, so 33 of them have a source here now.
 #
-# Of those 27, in order of how little is missing:
+# (One of the 130 is not a command: b1, a ccc-built test program that
+# prints "1", left in /bin by a session on 09-28.  Its source is still
+# in /tmp/b1.c.  It is counted here because it is in the directory, and
+# it wants removing from both.)
 #
-#	1  far - the source is here and the build never installs it
+# Of those 26, in order of how little is missing:
+#
 #	1  cpp - /bin/cpp has no counterpart in this tree at all.  See
 #	   below.
 #	10 the Whitesmith toolchain: as cc link lib obj hex lord anat,
@@ -25,6 +29,9 @@
 #	   anywhere in the repository.
 #	14 nothing in the repository: clean cptree cxr ddt down lpr lprm
 #	   lprq newuser pilot print ptc rp td
+#
+# far was on this list and is not any more - it was rewritten, and it
+# is in both build lists now, so /bin/far is this tree's.
 #
 # THE WHITESMITH TOOLCHAIN IS NOT A WORK ITEM
 #
@@ -123,8 +130,8 @@
 #
 # A full /bin is not the goal.  What has to exist for the system to
 # come up and rebuild itself is a shell, the toolchain, make, and the
-# file utilities those need - and all of that is in the 102 this tree
-# builds, so none of the 27 blocks a bootstrap.  stty was the nearest
+# file utilities those need - and all of that is in the 104 this tree
+# builds, so none of the 26 blocks a bootstrap.  stty was the nearest
 # to it, being what the terminal wants before anything interactive is
 # pleasant; it is ported now.  The rest is a userland that can wait.
 #
@@ -133,23 +140,25 @@
 # others, not merely because a source exists for it.  Everything on
 # that list has to be buildable before the thing that builds it.
 #
-# WHAT THAT MAKES ACTIONABLE
+# THE TWO LISTS
 #
-# THE TWO LISTS HAVE COME APART AGAIN, and this is the live item.
+# They had come apart and they agree now: 96 names in DIRS and 96 in
+# the guest makefile, all four rules, checked as sets.  What it took:
 #
-# Fifteen names are in the cross DIRS and not in the guest makefile, so
-# the machine cannot rebuild them for itself: df djformat halt kstat
-# lz4 md mount mwformat owner packsrc ps umount unlz4 upm xargs.  owner
-# is the plainest case - /bin/owner is ours, and the machine that runs
-# it has no rule to build it.  The guest list wants those fifteen.
+#	fifteen names were in the cross DIRS and not in the guest list -
+#	df djformat halt kstat lz4 md mount mwformat owner packsrc ps
+#	umount unlz4 xargs and upm.  Fourteen had native makefiles and
+#	were simply forgotten; upm had none at all, because its build is
+#	not the generic one - upmhead.s is the crt and the link drives ld
+#	with -Ttext=0xd500 - so cmd/upm/makefile was written.  All
+#	fifteen were then built by the guest's own make, ccc and ld.
 #
-# far is the mirror image still: its source is in cmd/far, its makefile
-# is maintained, and it is in NEITHER list, so /bin keeps Whitesmiths'
-# copy.  mkfs and fsck were the same and are not any more - /bin has
-# ccc-built copies of both now - but neither is in DIRS either, so
-# whatever installed them was done by hand and the next rebuild will
-# not reproduce it.  Wiring all three in is what would keep them
-# current.
+#	far, mkfs and fsck were in NEITHER list.  far and mkfs were kept
+#	out on purpose, because what they write has to be right - a
+#	diskette's directory, a file system - and that wanted checking
+#	first; both are in now, and so is fsck.
+#
+# All three of the new ones build in the guest too.
 #
 # THE PASSWORD COMMANDS, DONE AND WORTH KNOWING ABOUT
 #
@@ -159,5 +168,10 @@
 # and is a library routine now; it is the pre-DES big-multiply hash,
 # not DES, and the salt and the stored string are the same thirteen
 # characters they always were.
+#
+# WHAT IS STILL WORTH DOING
+#
+# /bin/b1 - the stray test program above - wants deleting, along with
+# the copy of its source in /tmp.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:

@@ -15,7 +15,9 @@
 # Still here and still not in DIRS, because they are programs that DO
 # belong on the system and are not ready:
 #
-#   far mkfs
+#   (nothing right now - far and mkfs were the last two and are in the
+#   list above, far since it was rewritten and mkfs once its output had
+#   been checked against what the kernel reads)
 #
 # yacc is here too and builds - cmd/yacc - but is not in DIRS yet: the
 # two-pass table sizing is in, but nothing has compiled the parser it
@@ -73,7 +75,7 @@
 # from.  It is also the one command whose micronix interface differs
 # from the one it was ported from - see the head of cmd/owner/owner.c.
 #
-DIRS = ar asz awk cal cat ccc chgrp chmod chown cmp comm cp crypt cu date dc dcheck dd df diff djformat du echo ed expr fd2 fgrep file find form grep group halt icheck init kill kstat label ld less ln ls lz4 mail make makekey md man mkdir mknod more mount mv mwformat ncheck nm od owner packsrc passwd pr ps pwd rm rmdir s sed setdev sh size sort strings stty su sum sync tail tar tee tty umount unique unlz4 update upm vi wall wc who write xargs yacc lex
+DIRS = ar asz awk cal cat ccc chgrp chmod chown cmp comm cp crypt cu date dc dcheck dd df diff djformat du echo ed expr far fd2 fgrep file find form fsck grep group halt icheck init kill kstat label ld less ln ls lz4 mail make makekey md man mkdir mkfs mknod more mount mv mwformat ncheck nm od owner packsrc passwd pr ps pwd rm rmdir s sed setdev sh size sort strings stty su sum sync tail tar tee tty umount unique unlz4 update upm vi wall wc who write xargs yacc lex
 
 #
 # "cd $$d &&", not "cd $$d ;".  With the semicolon, a directory named

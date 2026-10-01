@@ -45,7 +45,6 @@ toolchain:
 
 all:
 	cd make ; make all
-	cd makekey ; make all
 	cd ar ; make all
 	cd asz ; make all
 	cd awk ; make all
@@ -64,37 +63,52 @@ all:
 	cd dc ; make all
 	cd dcheck ; make all
 	cd dd ; make all
+	cd df ; make all
 	cd diff ; make all
+	cd djformat ; make all
 	cd du ; make all
 	cd echo ; make all
 	cd ed ; make all
 	cd expr ; make all
+	cd far ; make all
 	cd fd2 ; make all
 	cd fgrep ; make all
 	cd file ; make all
 	cd find ; make all
 	cd form ; make all
+	cd fsck ; make all
 	cd grep ; make all
 	cd group ; make all
+	cd halt ; make all
 	cd icheck ; make all
 	cd init ; make all
 	cd kill ; make all
+	cd kstat ; make all
 	cd label ; make all
 	cd ld ; make all
 	cd less ; make all
 	cd ln ; make all
 	cd ls ; make all
+	cd lz4 ; make all
 	cd mail ; make all
+	cd makekey ; make all
+	cd md ; make all
 	cd man ; make all
 	cd mkdir ; make all
+	cd mkfs ; make all
 	cd mknod ; make all
 	cd more ; make all
+	cd mount ; make all
 	cd mv ; make all
+	cd mwformat ; make all
 	cd ncheck ; make all
 	cd nm ; make all
 	cd od ; make all
+	cd owner ; make all
+	cd packsrc ; make all
 	cd passwd ; make all
 	cd pr ; make all
+	cd ps ; make all
 	cd pwd ; make all
 	cd rm ; make all
 	cd rmdir ; make all
@@ -113,19 +127,22 @@ all:
 	cd tar ; make all
 	cd tee ; make all
 	cd tty ; make all
+	cd umount ; make all
 	cd unique ; make all
+	cd unlz4 ; make all
 	cd update ; make all
+	cd upm ; make all
 	cd vi ; make all
 	cd wall ; make all
 	cd wc ; make all
 	cd who ; make all
 	cd write ; make all
+	cd xargs ; make all
 	cd yacc ; make all
 	cd lex ; make all
 
 install:
 	cd make ; make install
-	cd makekey ; make install
 	cd ar ; make install
 	cd asz ; make install
 	cd awk ; make install
@@ -144,37 +161,52 @@ install:
 	cd dc ; make install
 	cd dcheck ; make install
 	cd dd ; make install
+	cd df ; make install
 	cd diff ; make install
+	cd djformat ; make install
 	cd du ; make install
 	cd echo ; make install
 	cd ed ; make install
 	cd expr ; make install
+	cd far ; make install
 	cd fd2 ; make install
 	cd fgrep ; make install
 	cd file ; make install
 	cd find ; make install
 	cd form ; make install
+	cd fsck ; make install
 	cd grep ; make install
 	cd group ; make install
+	cd halt ; make install
 	cd icheck ; make install
 	cd init ; make install
 	cd kill ; make install
+	cd kstat ; make install
 	cd label ; make install
 	cd ld ; make install
 	cd less ; make install
 	cd ln ; make install
 	cd ls ; make install
+	cd lz4 ; make install
 	cd mail ; make install
+	cd makekey ; make install
+	cd md ; make install
 	cd man ; make install
 	cd mkdir ; make install
+	cd mkfs ; make install
 	cd mknod ; make install
 	cd more ; make install
+	cd mount ; make install
 	cd mv ; make install
+	cd mwformat ; make install
 	cd ncheck ; make install
 	cd nm ; make install
 	cd od ; make install
+	cd owner ; make install
+	cd packsrc ; make install
 	cd passwd ; make install
 	cd pr ; make install
+	cd ps ; make install
 	cd pwd ; make install
 	cd rm ; make install
 	cd rmdir ; make install
@@ -193,19 +225,22 @@ install:
 	cd tar ; make install
 	cd tee ; make install
 	cd tty ; make install
+	cd umount ; make install
 	cd unique ; make install
+	cd unlz4 ; make install
 	cd update ; make install
+	cd upm ; make install
 	cd vi ; make install
 	cd wall ; make install
 	cd wc ; make install
 	cd who ; make install
 	cd write ; make install
+	cd xargs ; make install
 	cd yacc ; make install
 	cd lex ; make install
 
 clean:
 	cd make ; make clean
-	cd makekey ; make clean
 	cd ar ; make clean
 	cd asz ; make clean
 	cd awk ; make clean
@@ -224,37 +259,52 @@ clean:
 	cd dc ; make clean
 	cd dcheck ; make clean
 	cd dd ; make clean
+	cd df ; make clean
 	cd diff ; make clean
+	cd djformat ; make clean
 	cd du ; make clean
 	cd echo ; make clean
 	cd ed ; make clean
 	cd expr ; make clean
+	cd far ; make clean
 	cd fd2 ; make clean
 	cd fgrep ; make clean
 	cd file ; make clean
 	cd find ; make clean
 	cd form ; make clean
+	cd fsck ; make clean
 	cd grep ; make clean
 	cd group ; make clean
+	cd halt ; make clean
 	cd icheck ; make clean
 	cd init ; make clean
 	cd kill ; make clean
+	cd kstat ; make clean
 	cd label ; make clean
 	cd ld ; make clean
 	cd less ; make clean
 	cd ln ; make clean
 	cd ls ; make clean
+	cd lz4 ; make clean
 	cd mail ; make clean
+	cd makekey ; make clean
+	cd md ; make clean
 	cd man ; make clean
 	cd mkdir ; make clean
+	cd mkfs ; make clean
 	cd mknod ; make clean
 	cd more ; make clean
+	cd mount ; make clean
 	cd mv ; make clean
+	cd mwformat ; make clean
 	cd ncheck ; make clean
 	cd nm ; make clean
 	cd od ; make clean
+	cd owner ; make clean
+	cd packsrc ; make clean
 	cd passwd ; make clean
 	cd pr ; make clean
+	cd ps ; make clean
 	cd pwd ; make clean
 	cd rm ; make clean
 	cd rmdir ; make clean
@@ -273,19 +323,22 @@ clean:
 	cd tar ; make clean
 	cd tee ; make clean
 	cd tty ; make clean
+	cd umount ; make clean
 	cd unique ; make clean
+	cd unlz4 ; make clean
 	cd update ; make clean
+	cd upm ; make clean
 	cd vi ; make clean
 	cd wall ; make clean
 	cd wc ; make clean
 	cd who ; make clean
 	cd write ; make clean
+	cd xargs ; make clean
 	cd yacc ; make clean
 	cd lex ; make clean
 
 clobber:
 	cd make ; make clobber
-	cd makekey ; make clobber
 	cd ar ; make clobber
 	cd asz ; make clobber
 	cd awk ; make clobber
@@ -304,37 +357,52 @@ clobber:
 	cd dc ; make clobber
 	cd dcheck ; make clobber
 	cd dd ; make clobber
+	cd df ; make clobber
 	cd diff ; make clobber
+	cd djformat ; make clobber
 	cd du ; make clobber
 	cd echo ; make clobber
 	cd ed ; make clobber
 	cd expr ; make clobber
+	cd far ; make clobber
 	cd fd2 ; make clobber
 	cd fgrep ; make clobber
 	cd file ; make clobber
 	cd find ; make clobber
 	cd form ; make clobber
+	cd fsck ; make clobber
 	cd grep ; make clobber
 	cd group ; make clobber
+	cd halt ; make clobber
 	cd icheck ; make clobber
 	cd init ; make clobber
 	cd kill ; make clobber
+	cd kstat ; make clobber
 	cd label ; make clobber
 	cd ld ; make clobber
 	cd less ; make clobber
 	cd ln ; make clobber
 	cd ls ; make clobber
+	cd lz4 ; make clobber
 	cd mail ; make clobber
+	cd makekey ; make clobber
+	cd md ; make clobber
 	cd man ; make clobber
 	cd mkdir ; make clobber
+	cd mkfs ; make clobber
 	cd mknod ; make clobber
 	cd more ; make clobber
+	cd mount ; make clobber
 	cd mv ; make clobber
+	cd mwformat ; make clobber
 	cd ncheck ; make clobber
 	cd nm ; make clobber
 	cd od ; make clobber
+	cd owner ; make clobber
+	cd packsrc ; make clobber
 	cd passwd ; make clobber
 	cd pr ; make clobber
+	cd ps ; make clobber
 	cd pwd ; make clobber
 	cd rm ; make clobber
 	cd rmdir ; make clobber
@@ -353,12 +421,16 @@ clobber:
 	cd tar ; make clobber
 	cd tee ; make clobber
 	cd tty ; make clobber
+	cd umount ; make clobber
 	cd unique ; make clobber
+	cd unlz4 ; make clobber
 	cd update ; make clobber
+	cd upm ; make clobber
 	cd vi ; make clobber
 	cd wall ; make clobber
 	cd wc ; make clobber
 	cd who ; make clobber
 	cd write ; make clobber
+	cd xargs ; make clobber
 	cd yacc ; make clobber
 	cd lex ; make clobber
