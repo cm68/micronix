@@ -1,0 +1,86 @@
+.he "update (1)                   9/30/26                   update (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+update
+- update the file system every thirty seconds
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+update
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Update
+periodically updates the system's on-line mass storage devices.  It
+calls
+.bd
+sync
+(2) once every thirty seconds.
+.bd
+Update
+runs silently, asynchronously.
+.sp
+Asynchronously here means what it says.  Update forks and the parent
+exits at once, so the shell that ran it has its prompt back before any
+of the work is done and never hears from it again.  What does the work
+is the detached child, and it outlives the session that started it.
+.sp
+The child closes the standard input, the standard output and the
+standard error - it has nothing to say and nobody to say it to - and
+opens
+.bd
+/bin,
+.bd
+/usr
+and
+.bd
+/usr/bin
+so that their inodes stay in core rather than being read again for
+every lookup.  It then syncs, sets an alarm for thirty seconds and
+pauses.  Each alarm wakes it to sync again and sets the next one, and
+that is the whole of the program.
+.sp
+There is no option, no argument and no way to stop it: it runs for the
+life of the system.  Its exit status is always 0, because the process
+that exits is the parent, which exits at once whether or not anything
+went right afterwards.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The 1982 page says that update calls sync(2) every 30 seconds and runs
+silently, asynchronously, and that is all it says.  Everything above
+that is not on that page is what the v7 source does, which this port
+keeps.
+.sp
+Nothing is checked and nothing is reported.  A directory that cannot be
+opened is passed over - the opens are for the buffer cache's benefit and
+the program carries on without them - and a sync that fails has no way
+to say so with the standard error closed.
+.sp
+sync(2) is a library call here, the same one the
+.bd
+sync
+(1) command makes.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+sync (1), sync (2)
