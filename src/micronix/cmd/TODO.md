@@ -6,10 +6,9 @@ original distribution binary, with no source anywhere in the tree.
 
 ## to port
 
-    anat      clean     cp1       cp2       cptree    cxr
-    ddt       down      edit      hex       lib       lpr
-    lprm      lprq      newuser   obj       pilot     print
-    rp        td
+    clean     cpp       cptree    cxr       ddt       down
+    edit      lpr       lprm      lprq      newuser   pilot
+    print     rp        td
 
 ## ported since this list was written
 
@@ -42,16 +41,17 @@ checksum and `dc` is a different calculator altogether; each port
 follows the manual and the v7 source and says so in its page.  Check
 the shipped binary before assuming a port preserved its behaviour.
 
-## relegate to /oldbin, then delete
+## moved to /old
 
-Not wanted at all, replaced or dropped:
+Not wanted, replaced or dropped; moved out of /bin into /old for
+eventual deletion - losing them loses nothing but the original binary:
 
-- `as`, `cc`, `cpp`, `link` - the Whitesmiths toolchain (assembler,
-  driver, preprocessor, linker); the tree has asz, ccc, pass0 and ld.
-- `lord` - a library lister; this tree's ar builds an index, so lord
-  is not needed.
-- `ptc` - a Pascal-to-C translator; this tree does no Pascal.
+- `as`, `cc`, `link`, `lib`, `obj`, `hex`, `lord`, `anat`, `cp1`,
+  `cp2` - the Whitesmiths toolchain (assembler, driver, linker,
+  librarian, object lister, and the two passes of the C compiler); the
+  tree has asz, ccc, c0, c1 and ld.
+- `ptc` - the Pascal compiler; this tree does no Pascal.
 
-None of these is built by the tree; they are carried only because the
-distribution disks put them in /bin.  Move them to /oldbin for eventual
-deletion - losing them loses nothing but the original binary.
+`cpp` is not among them: it is a standalone preprocessor with no
+replacement in the tree, so it stays in /bin as a gap rather than a
+duplicate.

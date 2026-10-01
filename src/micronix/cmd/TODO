@@ -3,46 +3,44 @@
 #
 # Working notes: what /bin still carries without a source.
 #
-# /bin has 130 entries and, as before, two build signatures.  A hundred
+# /bin has 119 entries and, as before, two build signatures.  A hundred
 # and four begin "99 97" and are ccc's, built and installed by this
-# tree.  Eighteen begin "99 94", and eight carry no 16 byte a.out header
-# at all and start straight into a c1 21 prologue - twenty-six, all of
-# them Whitesmiths', the binaries the distribution floppies seeded.
+# tree.  Fifteen are the Whitesmith binaries the distribution floppies
+# seeded and still have no source.  Eleven more - the Whitesmith
+# toolchain and ptc - were moved to /old and are no longer in /bin.
 # The distribution left 59, so 33 of them have a source here now.
 #
-# (One of the 130 is not a command: b1, a ccc-built test program that
+# (One of the 119 is not a command: b1, a ccc-built test program that
 # prints "1", left in /bin by a session on 09-28.  Its source is still
 # in /tmp/b1.c.  It is counted here because it is in the directory, and
 # it wants removing from both.)
 #
-# Of those 26, in order of how little is missing:
+# Of the fifteen still in /bin, in order of how little is missing:
 #
 #	1  cpp - /bin/cpp has no counterpart in this tree at all.  See
 #	   below.
-#	10 the Whitesmith toolchain: as cc link lib obj hex lord anat,
-#	   with cp1 and cp2 - the two passes of the Whitesmith C
-#	   compiler, which cp's name has nothing to do with.  attic/ has
-#	   sources for all ten and it does not matter - see below.
 #	1  edit - a line editor of Whitesmith's own, and NOT cmd/vi.
 #	   cmd/vi is STEVIE, a screen editor, and the edit.c in it is one
 #	   of STEVIE's modules rather than this program.  No source
 #	   anywhere in the repository.
-#	14 nothing in the repository: clean cptree cxr ddt down lpr lprm
-#	   lprq newuser pilot print ptc rp td
+#	13 nothing in the repository: clean cptree cxr ddt down lpr lprm
+#	   lprq newuser pilot print rp td
+#
+# The other eleven - the Whitesmith toolchain, as cc link lib obj hex
+# lord anat cp1 cp2, and ptc - were moved to /old on 2026-10-01.
 #
 # far was on this list and is not any more - it was rewritten, and it
 # is in both build lists now, so /bin/far is this tree's.
 #
-# THE WHITESMITH TOOLCHAIN IS NOT A WORK ITEM
+# THE WHITESMITH TOOLCHAIN IS MOVED TO /OLD
 #
-# as cc link lib obj hex lord anat are the compiler chain the
+# as cc link lib obj hex lord anat were the compiler chain the
 # distribution was built with, and every one of them is superseded by
 # something this tree builds: as by asz, cc by ccc, link by ld, lib by
-# ar, obj by nm.  Regenerating them from attic/ is not wanted, so their
-# /bin copies are history rather than a gap - there is nothing to
-# rebuild them for, and no reason to carry their sources forward.
-# Where /bin has one and we have a replacement, the fix is to drop the
-# old name or let it age out, not to find it a build.
+# ar, obj by nm.  Regenerating them from attic/ was never wanted, so
+# their /bin copies were history rather than a gap - there is nothing
+# to rebuild them for, and no reason to carry their sources forward.
+# They are moved to /old, with ptc, until they are deleted.
 #
 # cp1 and cp2 belong with them and are the easiest of the ten to
 # mistake: they are not two halves of an overlay-based cp, which is
@@ -89,11 +87,12 @@
 # need the usual porting.
 #
 # Three more are the same kind of thing and are marked in place below:
-# cxr, ptc and rp are Whitesmith's own tools (a C cross-referencer, the
-# Pascal compiler, a macro processor) and ddt is a debugger.  None of
-# them is a utility anyone is missing.
+# cxr and rp are Whitesmith's own tools (a C cross-referencer and a
+# macro processor) and ddt is a debugger.  None of them is a utility
+# anyone is missing.  ptc, the Pascal compiler, is moved to /old with
+# the toolchain.
 #
-# THE 14 WITH NO SOURCE ANYWHERE IN THE REPOSITORY
+# THE 13 WITH NO SOURCE ANYWHERE IN THE REPOSITORY
 #
 # What each is, read off the binary where the binary says - a usage
 # string, a keyword table.  Four say nothing at all and are marked so
@@ -118,8 +117,6 @@
 #		so the two are a subsystem rather than two commands
 #	print	"usage: print [-l#] [-w#] [-#] [file ...]" - a pr-like
 #		formatter, and not the spooler
-#	ptc	Whitesmith: the Pascal compiler - "goto target", "file in
-#		value argument" (disks/1070-8_pascal.image, disks/whitesmith)
 #	rp	Whitesmith: a macro processor of the include-file kind -
 #		"can't open include file", "arg stack overflow"
 #	td	tape dump: "Dump destination must be either block special
@@ -131,7 +128,8 @@
 # A full /bin is not the goal.  What has to exist for the system to
 # come up and rebuild itself is a shell, the toolchain, make, and the
 # file utilities those need - and all of that is in the 104 this tree
-# builds, so none of the 26 blocks a bootstrap.  stty was the nearest
+# builds, so none of the remaining fifteen blocks a bootstrap.  stty was
+# the nearest
 # to it, being what the terminal wants before anything interactive is
 # pleasant; it is ported now.  The rest is a userland that can wait.
 #
