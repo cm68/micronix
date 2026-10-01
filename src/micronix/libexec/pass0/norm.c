@@ -788,7 +788,41 @@ kscan(struct token *t)
 					ks_name = 0;  /* a function */
 				ks_pd++;
 				break;
-		case RPAR:	if (ks_pd) ks_pd--; break;
+		case RPAR:	if (ks_pd) ks_pd--;
+				/*
+				 * The parenthesis that closes a
+				 * parameter list ends the declarator,
+				 * and its name went at the LPAR.  A
+				 * function is not a thing sizeof may
+				 * be asked about, so there is nothing
+				 * to register - but the return type's
+				 * stars and its size were still
+				 * standing, and a definition's body
+				 * never comes through this scanner
+				 * (stmt takes it), so nothing cleared
+				 * them either.  They landed on the
+				 * next declaration:
+				 *
+				 *	char *f(char *p) { return p; }
+				 *	static struct { short de_ino;
+				 *			char de_name[14]; } de;
+				 *
+				 * filed de as a two-byte pointer, so
+				 * sizeof de folded to 2 where pass1
+				 * would have said 16.  login's
+				 * ttyname read two bytes of a
+				 * sixteen-byte /dev entry, matched
+				 * no device, and answered NULL.
+				 */
+				if (!ks_pd && !ks_name) {
+					ks_stars = 0;
+					ks_cnt = 0;
+					ks_nbrk = 0;
+					ks_base = 0;
+					ks_bad = 0;
+					ks_isagg = 0;
+				}
+				break;
 		case LBRACK:	if (!ks_pd) ks_st = KS_BRK; break;
 		case ASSIGN:	if (ks_pd) break;
 				ksdone();
