@@ -28,6 +28,11 @@ here=`dirname "$0"`
 here=`cd "$here" && pwd` || exit 1
 root=`cd "$here/../.." && pwd`
 
+if [ "$1" = "-h" ]; then
+	echo "usage: $0 <volume>"
+	exit 0
+fi
+
 vol="$1"
 if [ -z "$vol" ]; then
 	echo "usage: $0 <volume>" >&2

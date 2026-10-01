@@ -35,11 +35,19 @@ kernel="$root/src/micronix/sys/unix"
 # simulator flag, passed through in order.
 flags=""
 while [ $# -gt 1 ]; do
+	if [ "$1" = "-h" ]; then
+		echo "usage: $0 [simulator flags] <volume>"
+		exit 0
+	fi
 	flags="$flags $1"
 	shift
 done
 vol="$1"
 
+if [ "$vol" = "-h" ]; then
+	echo "usage: $0 [simulator flags] <volume>"
+	exit 0
+fi
 if [ -z "$vol" ]; then
 	echo "usage: $0 [simulator flags] <volume>" >&2
 	exit 1
