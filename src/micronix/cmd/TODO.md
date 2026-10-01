@@ -6,21 +6,22 @@ original distribution binary, with no source anywhere in the tree.
 
 ## to port
 
-    clean     cpp       cptree    cxr       ddt       down
-    edit      lpr       lprm      lprq      newuser   pilot
-    print     rp        td
+    clean     cpp       cxr       ddt       down      edit
+    lpr       lprm      lprq      newuser   pilot     print
+    rp        td
 
 ## ported since this list was written
 
-cal, chars, comm, e, group, help, lines, sum, tail, tty, unique,
-update, wall, who, words, write.
+cal, chars, comm, cptree, e, group, help, lines, sum, tail, tty,
+unique, update, wall, who, words, write.
 
 `cal`, `comm`, `sum`, `tail`, `unique` and `tty` came from the v7
 sources in `extra/`, `who`, `wall`, `write` and `update` likewise.
 `chars`, `lines` and `words` turned out not to be `wc` with a flag
 after all: they are three binaries of their own, but they count the
 same things, so they are `cmd/wc` under three more names.  `e` is
-`ed` and `help` is `man`, installed as aliases.
+`ed` and `help` is `man`, installed as aliases.  `cptree` is `cp`
+under another name: main() sees the name and forces `-r`.
 
 `chown` and `group` are new and were never on this list: micronix
 shipped `owner` and `group`, and `chown` is v7's name for the first

@@ -30,6 +30,12 @@ $(PROG): $(OBJS)
 install: $(PROG)
 	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/cp
+#
+# cptree is this same binary under a second name - main() reads argv[0]
+# and forces -r.  A hard link, not a copy: the two names are one inode.
+#
+	rm -f $(BIN)/cptree
+	ln $(BIN)/$(PROG) $(BIN)/cptree
 	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)/$(MAN)
 

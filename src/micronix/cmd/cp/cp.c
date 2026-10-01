@@ -30,6 +30,7 @@
 /* truth values, so bytes */
 char iflag INIT;
 char rflag INIT;
+char vflag INIT;
 char *rindex();
 
 main(argc, argv)
@@ -38,6 +39,18 @@ main(argc, argv)
 {
     struct stat stb;
     int rc, i;
+    char *base, *slash;
+
+    /* cptree is this program under a second name: it is always
+     * recursive, because a tree copy is the whole point of it.  The
+     * alias is a link to this binary, so the name is all it takes.
+     */
+    base = argv[0];
+    slash = rindex(argv[0], '/');
+    if (slash)
+        base = slash + 1;
+    if (strcmp(base, "cptree") == 0)
+        rflag++;
 
     argc--, argv++;
     while (argc > 0 && **argv == '-') {
@@ -52,6 +65,10 @@ main(argc, argv)
             case 'R':
             case 'r':
                 rflag++;
+                break;
+
+            case 'v':
+                vflag++;
                 break;
 
             default:
@@ -108,6 +125,8 @@ copy(from, to)
         sprintf(destname, "%s/%s", to, last);
         to = destname;
     }
+    if (vflag)
+        fprintf(stderr, "%s\n", to);
     if (rflag && (stfrom.st_mode & S_IFMT) == S_IFDIR) {
         int fixmode = 0;        /* cleanup mode after rcopy */
 

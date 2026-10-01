@@ -5,7 +5,7 @@
 #
 # /bin has 119 entries and, as before, two build signatures.  A hundred
 # and four begin "99 97" and are ccc's, built and installed by this
-# tree.  Fifteen are the Whitesmith binaries the distribution floppies
+# tree.  Fourteen are the Whitesmith binaries the distribution floppies
 # seeded and still have no source.  Eleven more - the Whitesmith
 # toolchain and ptc - were moved to /old and are no longer in /bin.
 # The distribution left 59, so 33 of them have a source here now.
@@ -15,7 +15,7 @@
 # in /tmp/b1.c.  It is counted here because it is in the directory, and
 # it wants removing from both.)
 #
-# Of the fifteen still in /bin, in order of how little is missing:
+# Of the fourteen still in /bin, in order of how little is missing:
 #
 #	1  cpp - /bin/cpp has no counterpart in this tree at all.  See
 #	   below.
@@ -23,14 +23,18 @@
 #	   cmd/vi is STEVIE, a screen editor, and the edit.c in it is one
 #	   of STEVIE's modules rather than this program.  No source
 #	   anywhere in the repository.
-#	13 nothing in the repository: clean cptree cxr ddt down lpr lprm
-#	   lprq newuser pilot print rp td
+#	12 nothing in the repository: clean cxr ddt down lpr lprm lprq
+#	   newuser pilot print rp td
 #
 # The other eleven - the Whitesmith toolchain, as cc link lib obj hex
 # lord anat cp1 cp2, and ptc - were moved to /old on 2026-10-01.
 #
 # far was on this list and is not any more - it was rewritten, and it
 # is in both build lists now, so /bin/far is this tree's.
+#
+# cptree was on this list and is not any more - it is cp under a second
+# name (cp.c forces -r when called as cptree), so /bin/cptree is this
+# tree's.
 #
 # THE WHITESMITH TOOLCHAIN IS MOVED TO /OLD
 #
@@ -92,17 +96,13 @@
 # anyone is missing.  ptc, the Pascal compiler, is moved to /old with
 # the toolchain.
 #
-# THE 13 WITH NO SOURCE ANYWHERE IN THE REPOSITORY
+# THE 12 WITH NO SOURCE ANYWHERE IN THE REPOSITORY
 #
 # What each is, read off the binary where the binary says - a usage
 # string, a keyword table.  Four say nothing at all and are marked so
 # rather than guessed at: clean, ddt, down, pilot.
 #
 #	clean	?
-#	cptree	recursive copy: "Cptree is used to copy an entire tree
-#		of files and ..."  v7 and 2.11 have no recursive copy to
-#		port - v7's cp is flat - so this one would be written
-#		fresh or dropped.
 #	cxr	Whitesmith: C cross-referencer, carries the C type keywords
 #		VOID TINY ULONG UCOUNT TEXT LOCAL
 #	ddt	? - a debugger, the DDT name
@@ -128,7 +128,7 @@
 # A full /bin is not the goal.  What has to exist for the system to
 # come up and rebuild itself is a shell, the toolchain, make, and the
 # file utilities those need - and all of that is in the 104 this tree
-# builds, so none of the remaining fifteen blocks a bootstrap.  stty was
+# builds, so none of the remaining fourteen blocks a bootstrap.  stty was
 # the nearest
 # to it, being what the terminal wants before anything interactive is
 # pleasant; it is ported now.  The rest is a userland that can wait.
