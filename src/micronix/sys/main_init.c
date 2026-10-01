@@ -304,41 +304,39 @@ pcon()
 
 /*
  * Find out how much memory is present.
- * Set nsegs to the number of 4K segments, and set
- * segmap[n] to 1 if the nth segment is missing.
+ *
+ * Memory runs up from segment 16 with no gap in it, so the first page
+ * that is not there is where the machine ends and there is nothing above
+ * it to ask about.  The probe stops on that page and the rest of the
+ * window is marked used, not left free: segalloc() reads segmap[n] as
+ * "in use" (the map is reused for allocation once this is done), and a
+ * segment past the end of memory left looking free is one it can hand
+ * out - which aliases real memory onto open bus, 0xff reads, and a
+ * system that behaves as though the block it read was the block it
+ * asked for.
+ *
+ * Set nsegs to the number of 4K segments, and set segmap[n] to 1 if the
+ * nth segment is missing.
  */
 meminit()
 {
-    int n, any;
+    int n;
 
     di();
     nsegs = MAXSEG - 16;
     for (n = 16; n < MAXSEG; n++) {
         map0[2] = n;
         ADDR = 0;
-        if (ADDR != 0 || --ADDR != -1) {
-            segmap[n] = 1;
-            nsegs--;
-        }
+        if (ADDR != 0 || --ADDR != -1)
+            break;
+    }
+    for (; n < MAXSEG; n++) {
+        segmap[n] = 1;
+        nsegs--;
     }
     map0[2] = image0[2];
     ei();
 
-    /*
-     * Report the absent pages here, before segalloc() reuses segmap[n]
-     * to mean "allocated", so the list is genuinely the bad memory.
-     */
-    any = 0;
-    for (n = 16; n < MAXSEG; n++)
-        if (segmap[n])
-            any = 1;
-    if (any) {
-        pr("\nBad memory in the following 4K segments (in hex):\n");
-        for (n = 16; n < MAXSEG; n++)
-            if (segmap[n])
-                pr("%x ", n);
-        pr("(These segments will not be used by the system)\n\n");
-    }
     totmem = (nsegs << 2) + 64;     /* full memory, saved for signon() */
 }
 
