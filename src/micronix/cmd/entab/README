@@ -1,0 +1,49 @@
+/usr/bin/entab from the Micronix 1.6 distribution
+
+There is no source for entab, so this is the disassembly, and entab.c is that
+disassembly read back into C.
+
+    disas -f entab.ctl entab.dist
+
+entab.dist is the binary off inode 56 of disks/dist/1012-8_dist_2.IMD, 4256
+bytes, mode 0711, dated 7 August 1982.
+
+Unlike its three neighbours - detab, expand, compress, none of which has a
+header - this one is a Whitesmith a.out: 99 94, a sixteen byte header, text
+at 0100 for 0f31 bytes and data at 2000 for 015f.  It is also built with the
+older of the two runtimes, the one login and init have, and not the one
+newuser has: c.ent at 0fd6, c.ent2 at 0fe1 saving the register variable cells
+at 2159, 215b and 215d.  So it is a different compile from the rest, and the
+library it carries is login's.
+
+What it is: one function, main at 010e, which is a case for every character,
+and one helper at 031b that is the whole of the skill.  Two columns are
+kept, the input's (the word at 2002) and the output's (2000); characters
+that are blank or tab or backspace move the first and write nothing, and a
+visible character calls the helper to bring the second up to the first
+before it is written.  The helper
+
+    backs up with backspaces if the output is past the input
+    writes a blank, not a tab, if the gap is exactly one column
+    writes tabs for as long as a tab stop is not past the input column
+    writes blanks for what is left
+
+so that a gap of one is never a tab, even when the tab would have landed on
+the spot.  Everything that is not a blank, a tab, a backspace, a newline or a
+carriage return and is not in 041 to 0176 - a form feed, a byte over 0176 -
+is written as it stands, after the same catch-up, and does not move either
+column.  A newline or a carriage return writes itself and sets both columns
+to 0.  The blanks at the end of a line and at the end of the file are never
+written, because nothing visible ever asked for them.
+
+The standard output is flushed at each newline when it is a terminal - the
+flag test at 203e after the newline case - and entab.c leaves that to stdio.
+
+The exit status is the same oddity as detab's, with a different number: the
+last getc's value is left in BC, and for the end of the file that is 255.  The
+original exited 255 every time; this exits 0.
+
+Checked in usersim against the original on six thousand random characters of
+blanks, tabs, newlines, backspaces, form feeds and bytes over 0176; on a
+short text with runs of one to nine blanks and blank lines; and on an empty
+file: the same bytes each time.

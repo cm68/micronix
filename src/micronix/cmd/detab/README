@@ -1,0 +1,41 @@
+/usr/bin/detab from the Micronix 1.6 distribution
+
+There is no source for detab, so this is the disassembly, and detab.c is that
+disassembly read back into C.
+
+    disas -f detab.ctl detab.dist
+
+detab.dist is the binary off inode 57 of disks/dist/1012-8_dist_2.IMD, 3407
+bytes, mode 0711, dated 7 August 1982.  It is the second distribution disk,
+and /usr/bin, not /bin.
+
+It has no header.  The first word is code and not the object magic, so the
+kernel's exec loads the whole file as text at 0100 - see ../newuser/README
+for the same thing - and the text runs to 0e4f, with its data after it.  The
+runtime is Whitesmith's, the same as newuser's: c.ent at 0d9f, c.ents at
+0c52.
+
+What it is: main at 010e, which calls getc on the standard input until the
+end of the file and writes each character with putc to the standard output.
+A tab writes a blank and then blanks until the column is one more than a
+multiple of eight (0192 is the test); a newline writes itself and starts the
+column at 1; anything else writes itself and moves the column on by one.  The
+column is a word at 0dd1 that starts at 1.  Nothing else is looked at, so a
+backspace or a carriage return is a column like any other.  The 1.6 manual
+page says as much and no more: tabs at 9, 17, 25.  The rest is the library,
+its stdio from 01cb and its exit at 09a9.
+
+detab.c is that, written with getchar and putchar.  It is byte for byte the
+same output on every input tried.
+
+The exit status is the one difference.  main falls out through c.rets with
+the last getc's -1 still in BC, the startup passes that to exit, and so every
+run of the original ends with status 255.  This exits 0.
+
+Checked in usersim against the original, on a small text with tabs, three
+thousand random characters of blanks, tabs, newlines, carriage returns and
+backspaces, and an empty file: the same bytes each time.
+
+It is installed in /usr/bin, where the distribution had it - see the
+GNUmakefile - and it is not installed over the sim's copy until someone does
+that.

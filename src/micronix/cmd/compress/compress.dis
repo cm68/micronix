@@ -1,0 +1,2849 @@
+;
+;	disas version 3
+;	src/micronix/cmd/compress/compress.dist
+;
+;	symbols loaded from src/micronix/cmd/compress/compress.ctl
+;
+;
+;	text	0100	1535
+;
+;
+
+	org	0100H
+tpa: 	POP	BC		; 0100 .	  c1 
+	LD	HL,boot		; 0101 !..	  21 00 00 
+	ADD	HL,SP		; 0104 9	  39 
+	PUSH	HL		; 0105 .	  e5 
+	PUSH	BC		; 0106 .	  c5 
+	CALL	main		; 0107 .4.	  cd 34 01 
+	PUSH	BC		; 010a .	  c5 
+	CALL	exit		; 010b ...	  cd f3 0d 
+H010e: 	LD	(HL),L		; 010e u	  75 
+	LD	(HL),E		; 010f s	  73 
+	LD	H,C		; 0110 a	  61 
+	LD	H,A		; 0111 g	  67 
+	LD	H,L		; 0112 e	  65 
+	LD	A,(6320H)	; 0113 :.c	  3a 20 63 
+	LD	L,A		; 0116 o	  6f 
+	LD	L,L		; 0117 m	  6d 
+	LD	(HL),B		; 0118 p	  70 
+	LD	(HL),D		; 0119 r	  72 
+	LD	H,L		; 011a e	  65 
+	LD	(HL),E		; 011b s	  73 
+	LD	(HL),E		; 011c s	  73 
+	JR	NZ,H017a	; 011d .[	  20 5b 
+	JR	NZ,H018a	; 011f .i	  20 69 
+	LD	L,(HL)		; 0121 n	  6e 
+	LD	(HL),B		; 0122 p	  70 
+	LD	(HL),L		; 0123 u	  75 
+	LD	(HL),H		; 0124 t	  74 
+	JR	NZ,H0182	; 0125 .[	  20 5b 
+	JR	NZ,H0198	; 0127 .o	  20 6f 
+	LD	(HL),L		; 0129 u	  75 
+	LD	(HL),H		; 012a t	  74 
+	LD	(HL),B		; 012b p	  70 
+	LD	(HL),L		; 012c u	  75 
+	LD	(HL),H		; 012d t	  74 
+	JR	NZ,H018d	; 012e .]	  20 5d 
+	JR	NZ,H018f	; 0130 .]	  20 5d 
+	LD	L,00H		; 0132 ..	  2e 00 
+main: 	CALL	c.ent		; 0134 .A.	  cd 41 13 
+	PUSH	AF		; 0137 .	  f5 
+	PUSH	AF		; 0138 .	  f5 
+	PUSH	AF		; 0139 .	  f5 
+	PUSH	AF		; 013a .	  f5 
+	LD	HL,0004H	; 013b !..	  21 04 00 
+	ADD	HL,DE		; 013e .	  19 
+	LD	A,03H		; 013f >.	  3e 03 
+	SUB	(HL)		; 0141 .	  96 
+	LD	A,00H		; 0142 >.	  3e 00 
+	INC	HL		; 0144 #	  23 
+	SBC	A,(HL)		; 0145 .	  9e 
+	JP	P,H0151		; 0146 .Q.	  f2 51 01 
+	LD	HL,H010e	; 0149 !..	  21 0e 01 
+	PUSH	HL		; 014c .	  e5 
+	CALL	usage		; 014d ...	  cd 8a 03 
+	POP	AF		; 0150 .	  f1 
+H0151: 	LD	HL,0004H	; 0151 !..	  21 04 00 
+	ADD	HL,DE		; 0154 .	  19 
+	LD	A,(HL)		; 0155 ~	  7e 
+	CP	01H		; 0156 ..	  fe 01 
+	JP	NZ,H015f	; 0158 ._.	  c2 5f 01 
+	INC	HL		; 015b #	  23 
+	LD	A,(HL)		; 015c ~	  7e 
+	CP	00H		; 015d ..	  fe 00 
+H015f: 	JP	NZ,H0186	; 015f ...	  c2 86 01 
+	LD	HL,boot		; 0162 !..	  21 00 00 
+	PUSH	HL		; 0165 .	  e5 
+	LD	HL,boot		; 0166 !..	  21 00 00 
+	PUSH	HL		; 0169 .	  e5 
+	LD	HL,H157b	; 016a !{.	  21 7b 15 
+	PUSH	HL		; 016d .	  e5 
+	CALL	finit		; 016e ...	  cd f5 03 
+	POP	AF		; 0171 .	  f1 
+	POP	AF		; 0172 .	  f1 
+	POP	AF		; 0173 .	  f1 
+	LD	HL,FFFFH	; 0174 !..	  21 ff ff 
+	PUSH	HL		; 0177 .	  e5 
+	LD	HL,0001H	; 0178 !..	  21 01 00 
+	PUSH	HL		; 017b .	  e5 
+	LD	HL,H1587	; 017c !..	  21 87 15 
+	PUSH	HL		; 017f .	  e5 
+	CALL	finit		; 0180 ...	  cd f5 03 
+	POP	AF		; 0183 .	  f1 
+	POP	AF		; 0184 .	  f1 
+	POP	AF		; 0185 .	  f1 
+H0186: 	LD	HL,0004H	; 0186 !..	  21 04 00 
+	ADD	HL,DE		; 0189 .	  19 
+H018a: 	LD	A,(HL)		; 018a ~	  7e 
+	SUB	02H		; 018b ..	  d6 02 
+H018d: 	INC	HL		; 018d #	  23 
+	LD	A,(HL)		; 018e ~	  7e 
+H018f: 	SBC	A,00H		; 018f ..	  de 00 
+	JP	M,H01d7		; 0191 ...	  fa d7 01 
+	LD	HL,FFF8H	; 0194 !..	  21 f8 ff 
+	ADD	HL,DE		; 0197 .	  19 
+H0198: 	PUSH	HL		; 0198 .	  e5 
+	LD	HL,0001H	; 0199 !..	  21 01 00 
+	PUSH	HL		; 019c .	  e5 
+	LD	HL,boot		; 019d !..	  21 00 00 
+	PUSH	HL		; 01a0 .	  e5 
+	LD	HL,0006H	; 01a1 !..	  21 06 00 
+	ADD	HL,DE		; 01a4 .	  19 
+	LD	A,(HL)		; 01a5 ~	  7e 
+	INC	HL		; 01a6 #	  23 
+	LD	H,(HL)		; 01a7 f	  66 
+	LD	L,A		; 01a8 o	  6f 
+	INC	HL		; 01a9 #	  23 
+	INC	HL		; 01aa #	  23 
+	LD	C,(HL)		; 01ab N	  4e 
+	INC	HL		; 01ac #	  23 
+	LD	B,(HL)		; 01ad F	  46 
+	PUSH	BC		; 01ae .	  c5 
+	CALL	H1178		; 01af .x.	  cd 78 11 
+	POP	AF		; 01b2 .	  f1 
+	POP	AF		; 01b3 .	  f1 
+	POP	AF		; 01b4 .	  f1 
+	POP	HL		; 01b5 .	  e1 
+	LD	A,C		; 01b6 y	  79 
+	LD	(HL),A		; 01b7 w	  77 
+	LD	A,B		; 01b8 x	  78 
+	INC	HL		; 01b9 #	  23 
+	LD	(HL),A		; 01ba w	  77 
+	DEC	HL		; 01bb +	  2b 
+	INC	HL		; 01bc #	  23 
+	LD	A,(HL)		; 01bd ~	  7e 
+	OR	A		; 01be .	  b7 
+	JP	P,H022c		; 01bf .,.	  f2 2c 02 
+	LD	HL,0006H	; 01c2 !..	  21 06 00 
+	ADD	HL,DE		; 01c5 .	  19 
+	LD	A,(HL)		; 01c6 ~	  7e 
+	INC	HL		; 01c7 #	  23 
+	LD	H,(HL)		; 01c8 f	  66 
+	LD	L,A		; 01c9 o	  6f 
+	INC	HL		; 01ca #	  23 
+	INC	HL		; 01cb #	  23 
+	LD	C,(HL)		; 01cc N	  4e 
+	INC	HL		; 01cd #	  23 
+	LD	B,(HL)		; 01ce F	  46 
+	PUSH	BC		; 01cf .	  c5 
+	CALL	cantopen	; 01d0 ...	  cd c1 03 
+	POP	AF		; 01d3 .	  f1 
+	JP	H022c		; 01d4 .,.	  c3 2c 02 
+
+H01d7: 	LD	HL,0004H	; 01d7 !..	  21 04 00 
+	ADD	HL,DE		; 01da .	  19 
+	LD	A,(HL)		; 01db ~	  7e 
+	SUB	03H		; 01dc ..	  d6 03 
+	INC	HL		; 01de #	  23 
+	LD	A,(HL)		; 01df ~	  7e 
+	SBC	A,00H		; 01e0 ..	  de 00 
+	JP	M,H0245		; 01e2 .E.	  fa 45 02 
+	LD	HL,FFF8H	; 01e5 !..	  21 f8 ff 
+	ADD	HL,DE		; 01e8 .	  19 
+	PUSH	HL		; 01e9 .	  e5 
+	LD	HL,0001H	; 01ea !..	  21 01 00 
+	PUSH	HL		; 01ed .	  e5 
+	LD	HL,0001H	; 01ee !..	  21 01 00 
+	PUSH	HL		; 01f1 .	  e5 
+	LD	HL,0006H	; 01f2 !..	  21 06 00 
+	ADD	HL,DE		; 01f5 .	  19 
+	LD	A,(HL)		; 01f6 ~	  7e 
+	INC	HL		; 01f7 #	  23 
+	LD	H,(HL)		; 01f8 f	  66 
+	LD	L,A		; 01f9 o	  6f 
+	INC	HL		; 01fa #	  23 
+	INC	HL		; 01fb #	  23 
+	INC	HL		; 01fc #	  23 
+	INC	HL		; 01fd #	  23 
+	LD	C,(HL)		; 01fe N	  4e 
+H01ff: 	INC	HL		; 01ff #	  23 
+H0200: 	LD	B,(HL)		; 0200 F	  46 
+	PUSH	BC		; 0201 .	  c5 
+	CALL	create		; 0202 .O.	  cd 4f 0f 
+	POP	AF		; 0205 .	  f1 
+	POP	AF		; 0206 .	  f1 
+	POP	AF		; 0207 .	  f1 
+	POP	HL		; 0208 .	  e1 
+	LD	A,C		; 0209 y	  79 
+	LD	(HL),A		; 020a w	  77 
+	LD	A,B		; 020b x	  78 
+	INC	HL		; 020c #	  23 
+	LD	(HL),A		; 020d w	  77 
+	DEC	HL		; 020e +	  2b 
+	INC	HL		; 020f #	  23 
+	LD	A,(HL)		; 0210 ~	  7e 
+	OR	A		; 0211 .	  b7 
+	JP	P,H029b		; 0212 ...	  f2 9b 02 
+	LD	HL,0006H	; 0215 !..	  21 06 00 
+	ADD	HL,DE		; 0218 .	  19 
+	LD	A,(HL)		; 0219 ~	  7e 
+	INC	HL		; 021a #	  23 
+	LD	H,(HL)		; 021b f	  66 
+	LD	L,A		; 021c o	  6f 
+	INC	HL		; 021d #	  23 
+	INC	HL		; 021e #	  23 
+	INC	HL		; 021f #	  23 
+	INC	HL		; 0220 #	  23 
+	LD	C,(HL)		; 0221 N	  4e 
+	INC	HL		; 0222 #	  23 
+	LD	B,(HL)		; 0223 F	  46 
+	PUSH	BC		; 0224 .	  c5 
+	CALL	cantopen	; 0225 ...	  cd c1 03 
+	POP	AF		; 0228 .	  f1 
+	JP	H029b		; 0229 ...	  c3 9b 02 
+
+H022c: 	LD	HL,boot		; 022c !..	  21 00 00 
+	PUSH	HL		; 022f .	  e5 
+	LD	HL,FFF8H	; 0230 !..	  21 f8 ff 
+	ADD	HL,DE		; 0233 .	  19 
+	LD	C,(HL)		; 0234 N	  4e 
+	INC	HL		; 0235 #	  23 
+	LD	B,(HL)		; 0236 F	  46 
+	PUSH	BC		; 0237 .	  c5 
+	LD	HL,H157b	; 0238 !{.	  21 7b 15 
+	PUSH	HL		; 023b .	  e5 
+	CALL	finit		; 023c ...	  cd f5 03 
+	POP	AF		; 023f .	  f1 
+	POP	AF		; 0240 .	  f1 
+	POP	AF		; 0241 .	  f1 
+	JP	H01d7		; 0242 ...	  c3 d7 01 
+
+H0245: 	LD	HL,H157b	; 0245 !{.	  21 7b 15 
+	PUSH	HL		; 0248 .	  e5 
+	CALL	getc		; 0249 .i.	  cd 69 05 
+	POP	AF		; 024c .	  f1 
+	LD	L,C		; 024d i	  69 
+	LD	H,B		; 024e `	  60 
+	LD	(H1575),HL	; 024f "u.	  22 75 15 
+H0252: 	LD	A,(H1575)	; 0252 :u.	  3a 75 15 
+	CP	FFH		; 0255 ..	  fe ff 
+	JP	NZ,H025f	; 0257 ._.	  c2 5f 02 
+	LD	A,(H1576)	; 025a :v.	  3a 76 15 
+	CP	FFH		; 025d ..	  fe ff 
+H025f: 	JP	Z,H02b4		; 025f ...	  ca b4 02 
+	LD	A,01H		; 0262 >.	  3e 01 
+	LD	(H1577),A	; 0264 2w.	  32 77 15 
+	ADD	A,A		; 0267 .	  87 
+	SBC	A,A		; 0268 .	  9f 
+	LD	(H1578),A	; 0269 2x.	  32 78 15 
+H026c: 	LD	HL,H157b	; 026c !{.	  21 7b 15 
+	PUSH	HL		; 026f .	  e5 
+	CALL	getc		; 0270 .i.	  cd 69 05 
+	POP	AF		; 0273 .	  f1 
+	LD	L,C		; 0274 i	  69 
+	LD	H,B		; 0275 `	  60 
+	LD	(H1573),HL	; 0276 "s.	  22 73 15 
+	LD	HL,H1575	; 0279 !u.	  21 75 15 
+	LD	A,(H1573)	; 027c :s.	  3a 73 15 
+	CP	(HL)		; 027f .	  be 
+	JP	NZ,H0288	; 0280 ...	  c2 88 02 
+	LD	A,(H1574)	; 0283 :t.	  3a 74 15 
+	INC	HL		; 0286 #	  23 
+	CP	(HL)		; 0287 .	  be 
+H0288: 	JP	NZ,H02ba	; 0288 ...	  c2 ba 02 
+	LD	A,(H1577)	; 028b :w.	  3a 77 15 
+	SUB	FEH		; 028e ..	  d6 fe 
+	LD	A,(H1578)	; 0290 :x.	  3a 78 15 
+	SBC	A,00H		; 0293 ..	  de 00 
+	JP	M,H02fa		; 0295 ...	  fa fa 02 
+	JP	H02ba		; 0298 ...	  c3 ba 02 
+
+H029b: 	LD	HL,FFFFH	; 029b !..	  21 ff ff 
+	PUSH	HL		; 029e .	  e5 
+	LD	HL,FFF8H	; 029f !..	  21 f8 ff 
+	ADD	HL,DE		; 02a2 .	  19 
+	LD	C,(HL)		; 02a3 N	  4e 
+	INC	HL		; 02a4 #	  23 
+	LD	B,(HL)		; 02a5 F	  46 
+	PUSH	BC		; 02a6 .	  c5 
+	LD	HL,H1587	; 02a7 !..	  21 87 15 
+	PUSH	HL		; 02aa .	  e5 
+	CALL	finit		; 02ab ...	  cd f5 03 
+	POP	AF		; 02ae .	  f1 
+	POP	AF		; 02af .	  f1 
+	POP	AF		; 02b0 .	  f1 
+	JP	H0245		; 02b1 .E.	  c3 45 02 
+
+H02b4: 	CALL	putlit		; 02b4 .J.	  cd 4a 03 
+	JP	c.ret		; 02b7 .H.	  c3 48 13 
+
+H02ba: 	LD	A,(H1577)	; 02ba :w.	  3a 77 15 
+	SUB	05H		; 02bd ..	  d6 05 
+	LD	A,(H1578)	; 02bf :x.	  3a 78 15 
+	SBC	A,00H		; 02c2 ..	  de 00 
+	JP	P,H0304		; 02c4 ...	  f2 04 03 
+H02c7: 	LD	HL,H1577	; 02c7 !w.	  21 77 15 
+	SUB	A		; 02ca .	  97 
+	SUB	(HL)		; 02cb .	  96 
+	LD	A,00H		; 02cc >.	  3e 00 
+	INC	HL		; 02ce #	  23 
+	SBC	A,(HL)		; 02cf .	  9e 
+	JP	P,H032e		; 02d0 ...	  f2 2e 03 
+	LD	HL,(H1579)	; 02d3 *y.	  2a 79 15 
+	PUSH	HL		; 02d6 .	  e5 
+	LD	HL,(H1579)	; 02d7 *y.	  2a 79 15 
+	INC	HL		; 02da #	  23 
+	LD	(H1579),HL	; 02db "y.	  22 79 15 
+	POP	HL		; 02de .	  e1 
+	LD	BC,H1373	; 02df .s.	  01 73 13 
+	ADD	HL,BC		; 02e2 .	  09 
+	LD	A,(H1575)	; 02e3 :u.	  3a 75 15 
+	LD	(HL),A		; 02e6 w	  77 
+	LD	A,(H1579)	; 02e7 :y.	  3a 79 15 
+	SUB	FEH		; 02ea ..	  d6 fe 
+	LD	A,(H157a)	; 02ec :z.	  3a 7a 15 
+	SBC	A,00H		; 02ef ..	  de 00 
+	JP	M,H0337		; 02f1 .7.	  fa 37 03 
+	CALL	putlit		; 02f4 .J.	  cd 4a 03 
+	JP	H0337		; 02f7 .7.	  c3 37 03 
+
+H02fa: 	LD	HL,(H1577)	; 02fa *w.	  2a 77 15 
+	INC	HL		; 02fd #	  23 
+	LD	(H1577),HL	; 02fe "w.	  22 77 15 
+	JP	H026c		; 0301 .l.	  c3 6c 02 
+
+H0304: 	CALL	putlit		; 0304 .J.	  cd 4a 03 
+	LD	HL,00FFH	; 0307 !..	  21 ff 00 
+	PUSH	HL		; 030a .	  e5 
+	LD	HL,H1587	; 030b !..	  21 87 15 
+	PUSH	HL		; 030e .	  e5 
+	CALL	putc		; 030f ...	  cd 03 06 
+	POP	AF		; 0312 .	  f1 
+	POP	AF		; 0313 .	  f1 
+	LD	HL,(H1575)	; 0314 *u.	  2a 75 15 
+	PUSH	HL		; 0317 .	  e5 
+	LD	HL,H1587	; 0318 !..	  21 87 15 
+	PUSH	HL		; 031b .	  e5 
+	CALL	putc		; 031c ...	  cd 03 06 
+	POP	AF		; 031f .	  f1 
+	POP	AF		; 0320 .	  f1 
+	LD	HL,(H1577)	; 0321 *w.	  2a 77 15 
+	PUSH	HL		; 0324 .	  e5 
+	LD	HL,H1587	; 0325 !..	  21 87 15 
+	PUSH	HL		; 0328 .	  e5 
+	CALL	putc		; 0329 ...	  cd 03 06 
+	POP	AF		; 032c .	  f1 
+	POP	AF		; 032d .	  f1 
+H032e: 	LD	HL,(H1573)	; 032e *s.	  2a 73 15 
+	LD	(H1575),HL	; 0331 "u.	  22 75 15 
+	JP	H0252		; 0334 .R.	  c3 52 02 
+
+H0337: 	LD	A,(H1577)	; 0337 :w.	  3a 77 15 
+	SUB	01H		; 033a ..	  d6 01 
+	LD	(H1577),A	; 033c 2w.	  32 77 15 
+	LD	A,(H1578)	; 033f :x.	  3a 78 15 
+	SBC	A,00H		; 0342 ..	  de 00 
+	LD	(H1578),A	; 0344 2x.	  32 78 15 
+	JP	H02c7		; 0347 ...	  c3 c7 02 
+
+putlit: CALL	c.ent		; 034a .A.	  cd 41 13 
+	LD	HL,H1579	; 034d !y.	  21 79 15 
+	SUB	A		; 0350 .	  97 
+	SUB	(HL)		; 0351 .	  96 
+	LD	A,00H		; 0352 >.	  3e 00 
+	INC	HL		; 0354 #	  23 
+	SBC	A,(HL)		; 0355 .	  9e 
+	JP	M,H035c		; 0356 .\.	  fa 5c 03 
+	JP	c.ret		; 0359 .H.	  c3 48 13 
+
+H035c: 	LD	HL,(H1579)	; 035c *y.	  2a 79 15 
+	PUSH	HL		; 035f .	  e5 
+	LD	HL,H1587	; 0360 !..	  21 87 15 
+	PUSH	HL		; 0363 .	  e5 
+	CALL	putc		; 0364 ...	  cd 03 06 
+	POP	AF		; 0367 .	  f1 
+	POP	AF		; 0368 .	  f1 
+	LD	HL,(H1579)	; 0369 *y.	  2a 79 15 
+	PUSH	HL		; 036c .	  e5 
+	LD	HL,H1373	; 036d !s.	  21 73 13 
+	PUSH	HL		; 0370 .	  e5 
+	LD	HL,H1587	; 0371 !..	  21 87 15 
+	PUSH	HL		; 0374 .	  e5 
+	CALL	write		; 0375 ...	  cd d9 06 
+	POP	AF		; 0378 .	  f1 
+	POP	AF		; 0379 .	  f1 
+	POP	AF		; 037a .	  f1 
+	LD	A,00H		; 037b >.	  3e 00 
+	LD	(H1579),A	; 037d 2y.	  32 79 15 
+	ADD	A,A		; 0380 .	  87 
+	SBC	A,A		; 0381 .	  9f 
+	LD	(H157a),A	; 0382 2z.	  32 7a 15 
+	JP	c.ret		; 0385 .H.	  c3 48 13 
+
+H0388: 	DB	0AH,00H
+usage: 	CALL	c.ent		; 038a .A.	  cd 41 13 
+	LD	HL,boot		; 038d !..	  21 00 00 
+	PUSH	HL		; 0390 .	  e5 
+	LD	HL,H0388	; 0391 !..	  21 88 03 
+	PUSH	HL		; 0394 .	  e5 
+	LD	HL,0004H	; 0395 !..	  21 04 00 
+	ADD	HL,DE		; 0398 .	  19 
+	LD	C,(HL)		; 0399 N	  4e 
+	INC	HL		; 039a #	  23 
+	LD	B,(HL)		; 039b F	  46 
+	PUSH	BC		; 039c .	  c5 
+	LD	HL,0002H	; 039d !..	  21 02 00 
+	PUSH	HL		; 03a0 .	  e5 
+	CALL	remark		; 03a1 ...	  cd ae 0e 
+	POP	AF		; 03a4 .	  f1 
+	POP	AF		; 03a5 .	  f1 
+	POP	AF		; 03a6 .	  f1 
+	POP	AF		; 03a7 .	  f1 
+	LD	HL,boot		; 03a8 !..	  21 00 00 
+	PUSH	HL		; 03ab .	  e5 
+	CALL	exit		; 03ac ...	  cd f3 0d 
+	POP	AF		; 03af .	  f1 
+	JP	c.ret		; 03b0 .H.	  c3 48 13 
+
+H03b3: 	DB	": can't open.",00H
+cantopen: CALL	c.ent		; 03c1 .A.	  cd 41 13 
+	LD	HL,boot		; 03c4 !..	  21 00 00 
+	PUSH	HL		; 03c7 .	  e5 
+	LD	HL,0004H	; 03c8 !..	  21 04 00 
+	ADD	HL,DE		; 03cb .	  19 
+	LD	C,(HL)		; 03cc N	  4e 
+	INC	HL		; 03cd #	  23 
+	LD	B,(HL)		; 03ce F	  46 
+	PUSH	BC		; 03cf .	  c5 
+	LD	HL,0002H	; 03d0 !..	  21 02 00 
+	PUSH	HL		; 03d3 .	  e5 
+	CALL	remark		; 03d4 ...	  cd ae 0e 
+	POP	AF		; 03d7 .	  f1 
+	POP	AF		; 03d8 .	  f1 
+	POP	AF		; 03d9 .	  f1 
+	LD	HL,H03b3	; 03da !..	  21 b3 03 
+	PUSH	HL		; 03dd .	  e5 
+	CALL	usage		; 03de ...	  cd 8a 03 
+	POP	AF		; 03e1 .	  f1 
+	JP	c.ret		; 03e2 .H.	  c3 48 13 
+
+H03e5: 	DW	H0438
+H03e7: 	DW	FFFFH
+H03e9: 	DW	H0438
+H03eb: 	DW	0001H
+H03ed: 	DW	H0438
+H03ef: 	DW	boot
+H03f1: 	DW	boot
+H03f3: 	DW	H04dd
+finit: 	CALL	c.ent		; 03f5 .A.	  cd 41 13 
+	LD	HL,FFD6H	; 03f8 !..	  21 d6 ff 
+	ADD	HL,SP		; 03fb 9	  39 
+	LD	SP,HL		; 03fc .	  f9 
+	LD	HL,0004H	; 03fd !..	  21 04 00 
+	ADD	HL,DE		; 0400 .	  19 
+	LD	A,(HL)		; 0401 ~	  7e 
+	INC	HL		; 0402 #	  23 
+	LD	H,(HL)		; 0403 f	  66 
+	LD	L,A		; 0404 o	  6f 
+	LD	(H1595),HL	; 0405 "..	  22 95 15 
+	LD	HL,0006H	; 0408 !..	  21 06 00 
+	ADD	HL,DE		; 040b .	  19 
+	LD	A,(HL)		; 040c ~	  7e 
+	INC	HL		; 040d #	  23 
+	LD	H,(HL)		; 040e f	  66 
+	LD	L,A		; 040f o	  6f 
+	LD	(H1597),HL	; 0410 "..	  22 97 15 
+	LD	HL,0008H	; 0413 !..	  21 08 00 
+	ADD	HL,DE		; 0416 .	  19 
+	LD	A,(HL)		; 0417 ~	  7e 
+	INC	HL		; 0418 #	  23 
+	LD	H,(HL)		; 0419 f	  66 
+	LD	L,A		; 041a o	  6f 
+	LD	(H1599),HL	; 041b "..	  22 99 15 
+	LD	HL,H1595	; 041e !..	  21 95 15 
+H0421: 	LD	A,(HL)		; 0421 ~	  7e 
+	INC	HL		; 0422 #	  23 
+	OR	(HL)		; 0423 .	  b6 
+	JP	NZ,H042d	; 0424 .-.	  c2 2d 04 
+	LD	BC,boot		; 0427 ...	  01 00 00 
+	JP	c.ret		; 042a .H.	  c3 48 13 
+
+H042d: 	LD	HL,(H1599)	; 042d *..	  2a 99 15 
+	LD	C,L		; 0430 M	  4d 
+	LD	B,H		; 0431 D	  44 
+	LD	HL,H03e5	; 0432 !..	  21 e5 03 
+	JP	H131c		; 0435 ...	  c3 1c 13 
+
+H0438: 	LD	HL,(H1595)	; 0438 *..	  2a 95 15 
+	INC	HL		; 043b #	  23 
+	INC	HL		; 043c #	  23 
+	PUSH	HL		; 043d .	  e5 
+	LD	HL,(H1595)	; 043e *..	  2a 95 15 
+	LD	BC,000AH	; 0441 ...	  01 0a 00 
+	ADD	HL,BC		; 0444 .	  09 
+	PUSH	HL		; 0445 .	  e5 
+	LD	HL,(H1595)	; 0446 *..	  2a 95 15 
+	LD	BC,0008H	; 0449 ...	  01 08 00 
+	ADD	HL,BC		; 044c .	  09 
+	LD	A,00H		; 044d >.	  3e 00 
+	LD	(HL),A		; 044f w	  77 
+	ADD	A,A		; 0450 .	  87 
+	SBC	A,A		; 0451 .	  9f 
+	INC	HL		; 0452 #	  23 
+	LD	(HL),A		; 0453 w	  77 
+	DEC	HL		; 0454 +	  2b 
+	POP	BC		; 0455 .	  c1 
+	LD	A,(HL)		; 0456 ~	  7e 
+	LD	(BC),A		; 0457 .	  02 
+	INC	HL		; 0458 #	  23 
+	LD	A,(HL)		; 0459 ~	  7e 
+	INC	BC		; 045a .	  03 
+	LD	(BC),A		; 045b .	  02 
+	DEC	BC		; 045c .	  0b 
+	POP	HL		; 045d .	  e1 
+	LD	A,(BC)		; 045e .	  0a 
+	LD	(HL),A		; 045f w	  77 
+	INC	BC		; 0460 .	  03 
+	LD	A,(BC)		; 0461 .	  0a 
+	INC	HL		; 0462 #	  23 
+	LD	(HL),A		; 0463 w	  77 
+	LD	HL,(H1595)	; 0464 *..	  2a 95 15 
+	LD	A,(H1597)	; 0467 :..	  3a 97 15 
+	LD	(HL),A		; 046a w	  77 
+	LD	A,(H1598)	; 046b :..	  3a 98 15 
+	INC	HL		; 046e #	  23 
+	LD	(HL),A		; 046f w	  77 
+	LD	HL,H0200	; 0470 !..	  21 00 02 
+	PUSH	HL		; 0473 .	  e5 
+	LD	HL,(H1595)	; 0474 *..	  2a 95 15 
+	PUSH	HL		; 0477 .	  e5 
+	CALL	H09c9		; 0478 ...	  cd c9 09 
+	POP	AF		; 047b .	  f1 
+	POP	AF		; 047c .	  f1 
+	LD	HL,(H1595)	; 047d *..	  2a 95 15 
+	INC	HL		; 0480 #	  23 
+	INC	HL		; 0481 #	  23 
+	INC	HL		; 0482 #	  23 
+	INC	HL		; 0483 #	  23 
+	LD	A,(H1599)	; 0484 :..	  3a 99 15 
+	LD	(HL),A		; 0487 w	  77 
+	LD	A,(H159a)	; 0488 :..	  3a 9a 15 
+	INC	HL		; 048b #	  23 
+	LD	(HL),A		; 048c w	  77 
+	LD	A,(H1599)	; 048d :..	  3a 99 15 
+	CP	01H		; 0490 ..	  fe 01 
+	JP	NZ,H049a	; 0492 ...	  c2 9a 04 
+	LD	A,(H159a)	; 0495 :..	  3a 9a 15 
+	CP	00H		; 0498 ..	  fe 00 
+H049a: 	JP	NZ,H04e3	; 049a ...	  c2 e3 04 
+	LD	HL,FFD6H	; 049d !..	  21 d6 ff 
+	ADD	HL,DE		; 04a0 .	  19 
+	PUSH	HL		; 04a1 .	  e5 
+	LD	HL,(H1597)	; 04a2 *..	  2a 97 15 
+	PUSH	HL		; 04a5 .	  e5 
+	CALL	H1158		; 04a6 .X.	  cd 58 11 
+	POP	AF		; 04a9 .	  f1 
+	POP	AF		; 04aa .	  f1 
+	LD	A,B		; 04ab x	  78 
+	OR	A		; 04ac .	  b7 
+	JP	M,H04e3		; 04ad ...	  fa e3 04 
+	LD	HL,FFDAH	; 04b0 !..	  21 da ff 
+	ADD	HL,DE		; 04b3 .	  19 
+	LD	A,(HL)		; 04b4 ~	  7e 
+	INC	HL		; 04b5 #	  23 
+	LD	H,(HL)		; 04b6 f	  66 
+	LD	L,A		; 04b7 o	  6f 
+	LD	A,L		; 04b8 }	  7d 
+	AND	00H		; 04b9 ..	  e6 00 
+	LD	L,A		; 04bb o	  6f 
+	LD	A,H		; 04bc |	  7c 
+	AND	60H		; 04bd .`	  e6 60 
+	LD	H,A		; 04bf g	  67 
+	LD	A,L		; 04c0 }	  7d 
+	CP	00H		; 04c1 ..	  fe 00 
+	JP	NZ,H04c9	; 04c3 ...	  c2 c9 04 
+	LD	A,H		; 04c6 |	  7c 
+	CP	20H		; 04c7 ..	  fe 20 
+H04c9: 	JP	Z,H04e3		; 04c9 ...	  ca e3 04 
+	LD	HL,(H1595)	; 04cc *..	  2a 95 15 
+	INC	HL		; 04cf #	  23 
+	INC	HL		; 04d0 #	  23 
+	INC	HL		; 04d1 #	  23 
+	INC	HL		; 04d2 #	  23 
+	LD	A,FFH		; 04d3 >.	  3e ff 
+	LD	(HL),A		; 04d5 w	  77 
+	LD	A,FFH		; 04d6 >.	  3e ff 
+	INC	HL		; 04d8 #	  23 
+	LD	(HL),A		; 04d9 w	  77 
+	JP	H04e3		; 04da ...	  c3 e3 04 
+
+H04dd: 	LD	BC,boot		; 04dd ...	  01 00 00 
+	JP	c.ret		; 04e0 .H.	  c3 48 13 
+
+H04e3: 	LD	HL,H15c3	; 04e3 !..	  21 c3 15 
+	LD	(H1593),HL	; 04e6 "..	  22 93 15 
+H04e9: 	LD	HL,H15e3	; 04e9 !..	  21 e3 15 
+	LD	A,(H1593)	; 04ec :..	  3a 93 15 
+	SUB	L		; 04ef .	  95 
+	LD	A,(H1594)	; 04f0 :..	  3a 94 15 
+	SBC	A,H		; 04f3 .	  9c 
+	JP	NC,H0514	; 04f4 ...	  d2 14 05 
+	LD	HL,(H1593)	; 04f7 *..	  2a 93 15 
+	LD	A,(HL)		; 04fa ~	  7e 
+	INC	HL		; 04fb #	  23 
+	OR	(HL)		; 04fc .	  b6 
+	JP	Z,H0514		; 04fd ...	  ca 14 05 
+	LD	HL,(H1593)	; 0500 *..	  2a 93 15 
+	PUSH	HL		; 0503 .	  e5 
+	LD	HL,H1595	; 0504 !..	  21 95 15 
+	POP	BC		; 0507 .	  c1 
+	LD	A,(BC)		; 0508 .	  0a 
+	CP	(HL)		; 0509 .	  be 
+	JP	NZ,H0511	; 050a ...	  c2 11 05 
+	INC	BC		; 050d .	  03 
+	LD	A,(BC)		; 050e .	  0a 
+	INC	HL		; 050f #	  23 
+	CP	(HL)		; 0510 .	  be 
+H0511: 	JP	NZ,H053a	; 0511 .:.	  c2 3a 05 
+H0514: 	LD	HL,H15e3	; 0514 !..	  21 e3 15 
+	LD	A,(H1593)	; 0517 :..	  3a 93 15 
+	SUB	L		; 051a .	  95 
+	LD	A,(H1594)	; 051b :..	  3a 94 15 
+	SBC	A,H		; 051e .	  9c 
+	JP	NC,H0545	; 051f .E.	  d2 45 05 
+	LD	HL,(H1593)	; 0522 *..	  2a 93 15 
+	LD	A,(HL)		; 0525 ~	  7e 
+	INC	HL		; 0526 #	  23 
+	OR	(HL)		; 0527 .	  b6 
+	JP	NZ,H0545	; 0528 .E.	  c2 45 05 
+	LD	HL,(H1593)	; 052b *..	  2a 93 15 
+	LD	A,(H1595)	; 052e :..	  3a 95 15 
+	LD	(HL),A		; 0531 w	  77 
+	LD	A,(H1596)	; 0532 :..	  3a 96 15 
+	INC	HL		; 0535 #	  23 
+	LD	(HL),A		; 0536 w	  77 
+	JP	H0545		; 0537 .E.	  c3 45 05 
+
+H053a: 	LD	HL,(H1593)	; 053a *..	  2a 93 15 
+	INC	HL		; 053d #	  23 
+	INC	HL		; 053e #	  23 
+	LD	(H1593),HL	; 053f "..	  22 93 15 
+	JP	H04e9		; 0542 ...	  c3 e9 04 
+
+H0545: 	LD	HL,(H1595)	; 0545 *..	  2a 95 15 
+	LD	C,L		; 0548 M	  4d 
+	LD	B,H		; 0549 D	  44 
+	JP	c.ret		; 054a .H.	  c3 48 13 
+
+	DB	CDH,"A",13H,"!",E3H,15H,E5H,CDH,"i",05H,F1H,C3H
+	DB	"H",13H,CDH,"A",13H,"!",E3H,15H,E5H,CDH,"i",05H
+	DB	F1H,C3H,"H",13H
+getc: 	CALL	c.ent		; 0569 .A.	  cd 41 13 
+	LD	HL,0004H	; 056c !..	  21 04 00 
+	ADD	HL,DE		; 056f .	  19 
+	LD	A,(HL)		; 0570 ~	  7e 
+	INC	HL		; 0571 #	  23 
+	LD	H,(HL)		; 0572 f	  66 
+	LD	L,A		; 0573 o	  6f 
+	LD	(H159b),HL	; 0574 "..	  22 9b 15 
+	LD	HL,(H159b)	; 0577 *..	  2a 9b 15 
+	INC	HL		; 057a #	  23 
+	INC	HL		; 057b #	  23 
+	LD	A,(HL)		; 057c ~	  7e 
+	INC	HL		; 057d #	  23 
+	OR	(HL)		; 057e .	  b6 
+	JP	NZ,H058a	; 057f ...	  c2 8a 05 
+	LD	HL,(H159b)	; 0582 *..	  2a 9b 15 
+	PUSH	HL		; 0585 .	  e5 
+	CALL	H0848		; 0586 .H.	  cd 48 08 
+	POP	AF		; 0589 .	  f1 
+H058a: 	LD	HL,(H159b)	; 058a *..	  2a 9b 15 
+	INC	HL		; 058d #	  23 
+	INC	HL		; 058e #	  23 
+	LD	A,(HL)		; 058f ~	  7e 
+	INC	HL		; 0590 #	  23 
+	OR	(HL)		; 0591 .	  b6 
+	JP	NZ,H059b	; 0592 ...	  c2 9b 05 
+	LD	BC,FFFFH	; 0595 ...	  01 ff ff 
+	JP	c.ret		; 0598 .H.	  c3 48 13 
+
+H059b: 	LD	HL,(H159b)	; 059b *..	  2a 9b 15 
+	INC	HL		; 059e #	  23 
+	INC	HL		; 059f #	  23 
+	LD	A,(HL)		; 05a0 ~	  7e 
+	SUB	01H		; 05a1 ..	  d6 01 
+	LD	(HL),A		; 05a3 w	  77 
+	INC	HL		; 05a4 #	  23 
+	LD	A,(HL)		; 05a5 ~	  7e 
+	SBC	A,00H		; 05a6 ..	  de 00 
+	LD	(HL),A		; 05a8 w	  77 
+	LD	HL,(H159b)	; 05a9 *..	  2a 9b 15 
+	LD	BC,0006H	; 05ac ...	  01 06 00 
+	ADD	HL,BC		; 05af .	  09 
+	LD	C,(HL)		; 05b0 N	  4e 
+	INC	HL		; 05b1 #	  23 
+	LD	B,(HL)		; 05b2 F	  46 
+	PUSH	BC		; 05b3 .	  c5 
+	LD	HL,(H159b)	; 05b4 *..	  2a 9b 15 
+	LD	BC,0006H	; 05b7 ...	  01 06 00 
+	ADD	HL,BC		; 05ba .	  09 
+	LD	A,(HL)		; 05bb ~	  7e 
+	ADD	A,01H		; 05bc ..	  c6 01 
+	LD	(HL),A		; 05be w	  77 
+	INC	HL		; 05bf #	  23 
+	LD	A,(HL)		; 05c0 ~	  7e 
+	ADC	A,00H		; 05c1 ..	  ce 00 
+	LD	(HL),A		; 05c3 w	  77 
+	POP	HL		; 05c4 .	  e1 
+	LD	A,(HL)		; 05c5 ~	  7e 
+	LD	C,A		; 05c6 O	  4f 
+	ADD	A,A		; 05c7 .	  87 
+	SBC	A,A		; 05c8 .	  9f 
+	LD	B,A		; 05c9 G	  47 
+	LD	A,C		; 05ca y	  79 
+	AND	FFH		; 05cb ..	  e6 ff 
+	LD	C,A		; 05cd O	  4f 
+	LD	A,B		; 05ce x	  78 
+	AND	00H		; 05cf ..	  e6 00 
+	LD	B,A		; 05d1 G	  47 
+	JP	c.ret		; 05d2 .H.	  c3 48 13 
+
+	DB	CDH,"A",13H,"!",04H,00H,19H,"N#F",C5H,"!",EFH
+	DB	15H,E5H,CDH,03H,06H,F1H,F1H,C3H,"H",13H,CDH,"A"
+	DB	13H,"!",04H,00H,19H,"N#F",C5H,"!",EFH,15H,E5H
+	DB	CDH,03H,06H,F1H,F1H,C3H,"H",13H
+putc: 	CALL	c.ent		; 0603 .A.	  cd 41 13 
+	LD	HL,0004H	; 0606 !..	  21 04 00 
+	ADD	HL,DE		; 0609 .	  19 
+	LD	A,(HL)		; 060a ~	  7e 
+	INC	HL		; 060b #	  23 
+	LD	H,(HL)		; 060c f	  66 
+	LD	L,A		; 060d o	  6f 
+	LD	(H159f),HL	; 060e "..	  22 9f 15 
+	LD	HL,0006H	; 0611 !..	  21 06 00 
+	ADD	HL,DE		; 0614 .	  19 
+	LD	A,(HL)		; 0615 ~	  7e 
+	INC	HL		; 0616 #	  23 
+	LD	H,(HL)		; 0617 f	  66 
+	LD	L,A		; 0618 o	  6f 
+	LD	(H159d),HL	; 0619 "..	  22 9d 15 
+	LD	A,(H159e)	; 061c :..	  3a 9e 15 
+	OR	A		; 061f .	  b7 
+	JP	M,H063a		; 0620 .:.	  fa 3a 06 
+	LD	HL,(H159f)	; 0623 *..	  2a 9f 15 
+	INC	HL		; 0626 #	  23 
+	INC	HL		; 0627 #	  23 
+	PUSH	HL		; 0628 .	  e5 
+	LD	HL,(H159f)	; 0629 *..	  2a 9f 15 
+	LD	BC,000AH	; 062c ...	  01 0a 00 
+	ADD	HL,BC		; 062f .	  09 
+	POP	BC		; 0630 .	  c1 
+	LD	A,(BC)		; 0631 .	  0a 
+	SUB	(HL)		; 0632 .	  96 
+	INC	BC		; 0633 .	  03 
+	LD	A,(BC)		; 0634 .	  0a 
+	INC	HL		; 0635 #	  23 
+	SBC	A,(HL)		; 0636 .	  9e 
+	JP	C,H0642		; 0637 .B.	  da 42 06 
+H063a: 	LD	HL,(H159f)	; 063a *..	  2a 9f 15 
+	PUSH	HL		; 063d .	  e5 
+	CALL	H090c		; 063e ...	  cd 0c 09 
+	POP	AF		; 0641 .	  f1 
+H0642: 	LD	A,(H159e)	; 0642 :..	  3a 9e 15 
+	OR	A		; 0645 .	  b7 
+	JP	M,H0677		; 0646 .w.	  fa 77 06 
+	LD	HL,(H159f)	; 0649 *..	  2a 9f 15 
+	LD	BC,0006H	; 064c ...	  01 06 00 
+	ADD	HL,BC		; 064f .	  09 
+	LD	C,(HL)		; 0650 N	  4e 
+	INC	HL		; 0651 #	  23 
+	LD	B,(HL)		; 0652 F	  46 
+	PUSH	BC		; 0653 .	  c5 
+	LD	HL,(H159f)	; 0654 *..	  2a 9f 15 
+	LD	BC,0006H	; 0657 ...	  01 06 00 
+	ADD	HL,BC		; 065a .	  09 
+	LD	A,(HL)		; 065b ~	  7e 
+	ADD	A,01H		; 065c ..	  c6 01 
+	LD	(HL),A		; 065e w	  77 
+	INC	HL		; 065f #	  23 
+	LD	A,(HL)		; 0660 ~	  7e 
+	ADC	A,00H		; 0661 ..	  ce 00 
+	LD	(HL),A		; 0663 w	  77 
+	POP	HL		; 0664 .	  e1 
+	LD	A,(H159d)	; 0665 :..	  3a 9d 15 
+	LD	(HL),A		; 0668 w	  77 
+	LD	HL,(H159f)	; 0669 *..	  2a 9f 15 
+	INC	HL		; 066c #	  23 
+	INC	HL		; 066d #	  23 
+	LD	A,(HL)		; 066e ~	  7e 
+	ADD	A,01H		; 066f ..	  c6 01 
+	LD	(HL),A		; 0671 w	  77 
+	INC	HL		; 0672 #	  23 
+	LD	A,(HL)		; 0673 ~	  7e 
+	ADC	A,00H		; 0674 ..	  ce 00 
+	LD	(HL),A		; 0676 w	  77 
+H0677: 	LD	A,(H159d)	; 0677 :..	  3a 9d 15 
+	CP	0AH		; 067a ..	  fe 0a 
+	JP	NZ,H0684	; 067c ...	  c2 84 06 
+	LD	A,(H159e)	; 067f :..	  3a 9e 15 
+	CP	00H		; 0682 ..	  fe 00 
+H0684: 	JP	NZ,H06ac	; 0684 ...	  c2 ac 06 
+	LD	HL,0004H	; 0687 !..	  21 04 00 
+	ADD	HL,DE		; 068a .	  19 
+	LD	A,(HL)		; 068b ~	  7e 
+	INC	HL		; 068c #	  23 
+	LD	H,(HL)		; 068d f	  66 
+	LD	L,A		; 068e o	  6f 
+	INC	HL		; 068f #	  23 
+	INC	HL		; 0690 #	  23 
+	INC	HL		; 0691 #	  23 
+	INC	HL		; 0692 #	  23 
+	LD	A,(HL)		; 0693 ~	  7e 
+	CP	01H		; 0694 ..	  fe 01 
+	JP	NZ,H069d	; 0696 ...	  c2 9d 06 
+	INC	HL		; 0699 #	  23 
+	LD	A,(HL)		; 069a ~	  7e 
+	CP	00H		; 069b ..	  fe 00 
+H069d: 	JP	NZ,H06ac	; 069d ...	  c2 ac 06 
+	LD	HL,0004H	; 06a0 !..	  21 04 00 
+	ADD	HL,DE		; 06a3 .	  19 
+	LD	C,(HL)		; 06a4 N	  4e 
+	INC	HL		; 06a5 #	  23 
+	LD	B,(HL)		; 06a6 F	  46 
+	PUSH	BC		; 06a7 .	  c5 
+	CALL	H090c		; 06a8 ...	  cd 0c 09 
+	POP	AF		; 06ab .	  f1 
+H06ac: 	LD	HL,0006H	; 06ac !..	  21 06 00 
+	ADD	HL,DE		; 06af .	  19 
+	LD	A,(HL)		; 06b0 ~	  7e 
+	INC	HL		; 06b1 #	  23 
+	LD	H,(HL)		; 06b2 f	  66 
+	LD	L,A		; 06b3 o	  6f 
+	LD	C,L		; 06b4 M	  4d 
+	LD	B,H		; 06b5 D	  44 
+	JP	c.ret		; 06b6 .H.	  c3 48 13 
+
+	DB	CDH,"A",13H,"!",06H,00H,19H,"N#F",C5H,"!",04H
+	DB	00H,19H,"N#F",C5H,"!",EFH,15H,E5H,CDH,FDH,06H
+	DB	F1H,F1H,F1H,C3H,"H",13H
+write: 	CALL	c.ent		; 06d9 .A.	  cd 41 13 
+	LD	HL,0008H	; 06dc !..	  21 08 00 
+	ADD	HL,DE		; 06df .	  19 
+	LD	C,(HL)		; 06e0 N	  4e 
+	INC	HL		; 06e1 #	  23 
+	LD	B,(HL)		; 06e2 F	  46 
+	PUSH	BC		; 06e3 .	  c5 
+	LD	HL,0006H	; 06e4 !..	  21 06 00 
+	ADD	HL,DE		; 06e7 .	  19 
+	LD	C,(HL)		; 06e8 N	  4e 
+	INC	HL		; 06e9 #	  23 
+	LD	B,(HL)		; 06ea F	  46 
+	PUSH	BC		; 06eb .	  c5 
+	LD	HL,0004H	; 06ec !..	  21 04 00 
+	ADD	HL,DE		; 06ef .	  19 
+	LD	C,(HL)		; 06f0 N	  4e 
+	INC	HL		; 06f1 #	  23 
+	LD	B,(HL)		; 06f2 F	  46 
+	PUSH	BC		; 06f3 .	  c5 
+	CALL	H06fd		; 06f4 ...	  cd fd 06 
+	POP	AF		; 06f7 .	  f1 
+	POP	AF		; 06f8 .	  f1 
+	POP	AF		; 06f9 .	  f1 
+	JP	c.ret		; 06fa .H.	  c3 48 13 
+
+H06fd: 	CALL	c.ent		; 06fd .A.	  cd 41 13 
+	LD	HL,0004H	; 0700 !..	  21 04 00 
+	ADD	HL,DE		; 0703 .	  19 
+	LD	A,(HL)		; 0704 ~	  7e 
+	INC	HL		; 0705 #	  23 
+	LD	H,(HL)		; 0706 f	  66 
+	LD	L,A		; 0707 o	  6f 
+	LD	(H15a7),HL	; 0708 "..	  22 a7 15 
+	LD	HL,0006H	; 070b !..	  21 06 00 
+	ADD	HL,DE		; 070e .	  19 
+	LD	A,(HL)		; 070f ~	  7e 
+	INC	HL		; 0710 #	  23 
+	LD	H,(HL)		; 0711 f	  66 
+	LD	L,A		; 0712 o	  6f 
+	LD	(H15a1),HL	; 0713 "..	  22 a1 15 
+	LD	HL,0008H	; 0716 !..	  21 08 00 
+	ADD	HL,DE		; 0719 .	  19 
+	LD	A,(HL)		; 071a ~	  7e 
+	INC	HL		; 071b #	  23 
+	LD	H,(HL)		; 071c f	  66 
+	LD	L,A		; 071d o	  6f 
+	LD	(H15a3),HL	; 071e "..	  22 a3 15 
+H0721: 	LD	HL,(H15a7)	; 0721 *..	  2a a7 15 
+	INC	HL		; 0724 #	  23 
+	INC	HL		; 0725 #	  23 
+	PUSH	HL		; 0726 .	  e5 
+	LD	HL,(H15a7)	; 0727 *..	  2a a7 15 
+	LD	BC,000AH	; 072a ...	  01 0a 00 
+	ADD	HL,BC		; 072d .	  09 
+	POP	BC		; 072e .	  c1 
+	LD	A,(BC)		; 072f .	  0a 
+	SUB	(HL)		; 0730 .	  96 
+	INC	BC		; 0731 .	  03 
+	LD	A,(BC)		; 0732 .	  0a 
+	INC	HL		; 0733 #	  23 
+	SBC	A,(HL)		; 0734 .	  9e 
+	JP	C,H074b		; 0735 .K.	  da 4b 07 
+	LD	HL,(H15a7)	; 0738 *..	  2a a7 15 
+	PUSH	HL		; 073b .	  e5 
+	CALL	H090c		; 073c ...	  cd 0c 09 
+	POP	AF		; 073f .	  f1 
+	LD	A,B		; 0740 x	  78 
+	OR	A		; 0741 .	  b7 
+	JP	P,H074b		; 0742 .K.	  f2 4b 07 
+	LD	BC,FFFFH	; 0745 ...	  01 ff ff 
+	JP	c.ret		; 0748 .H.	  c3 48 13 
+
+H074b: 	LD	HL,(H15a7)	; 074b *..	  2a a7 15 
+	LD	BC,000AH	; 074e ...	  01 0a 00 
+	ADD	HL,BC		; 0751 .	  09 
+	LD	A,(HL)		; 0752 ~	  7e 
+	INC	HL		; 0753 #	  23 
+	LD	H,(HL)		; 0754 f	  66 
+	LD	L,A		; 0755 o	  6f 
+	PUSH	HL		; 0756 .	  e5 
+	LD	HL,(H15a7)	; 0757 *..	  2a a7 15 
+	INC	HL		; 075a #	  23 
+	INC	HL		; 075b #	  23 
+	POP	BC		; 075c .	  c1 
+	LD	A,C		; 075d y	  79 
+	SUB	(HL)		; 075e .	  96 
+	LD	C,A		; 075f O	  4f 
+	LD	A,B		; 0760 x	  78 
+	INC	HL		; 0761 #	  23 
+	SBC	A,(HL)		; 0762 .	  9e 
+	LD	B,A		; 0763 G	  47 
+	LD	L,C		; 0764 i	  69 
+	LD	H,B		; 0765 `	  60 
+	LD	(H15a5),HL	; 0766 "..	  22 a5 15 
+	LD	HL,H15a3	; 0769 !..	  21 a3 15 
+	LD	A,(H15a5)	; 076c :..	  3a a5 15 
+	SUB	(HL)		; 076f .	  96 
+	LD	A,(H15a6)	; 0770 :..	  3a a6 15 
+	INC	HL		; 0773 #	  23 
+	SBC	A,(HL)		; 0774 .	  9e 
+	JP	NC,H0780	; 0775 ...	  d2 80 07 
+	LD	HL,(H15a5)	; 0778 *..	  2a a5 15 
+	LD	C,L		; 077b M	  4d 
+	LD	B,H		; 077c D	  44 
+	JP	H0785		; 077d ...	  c3 85 07 
+
+H0780: 	LD	HL,(H15a3)	; 0780 *..	  2a a3 15 
+	LD	C,L		; 0783 M	  4d 
+	LD	B,H		; 0784 D	  44 
+H0785: 	LD	L,C		; 0785 i	  69 
+	LD	H,B		; 0786 `	  60 
+	LD	(H15a5),HL	; 0787 "..	  22 a5 15 
+	LD	HL,H15a5	; 078a !..	  21 a5 15 
+	LD	A,(HL)		; 078d ~	  7e 
+	INC	HL		; 078e #	  23 
+	OR	(HL)		; 078f .	  b6 
+	JP	NZ,H07da	; 0790 ...	  c2 da 07 
+	LD	HL,(H15a7)	; 0793 *..	  2a a7 15 
+	INC	HL		; 0796 #	  23 
+	INC	HL		; 0797 #	  23 
+	INC	HL		; 0798 #	  23 
+	INC	HL		; 0799 #	  23 
+	LD	A,(HL)		; 079a ~	  7e 
+	CP	01H		; 079b ..	  fe 01 
+	JP	NZ,H07a4	; 079d ...	  c2 a4 07 
+	INC	HL		; 07a0 #	  23 
+	LD	A,(HL)		; 07a1 ~	  7e 
+	CP	00H		; 07a2 ..	  fe 00 
+H07a4: 	JP	NZ,H083b	; 07a4 .;.	  c2 3b 08 
+	LD	HL,0008H	; 07a7 !..	  21 08 00 
+	ADD	HL,DE		; 07aa .	  19 
+	LD	A,(HL)		; 07ab ~	  7e 
+	INC	HL		; 07ac #	  23 
+	OR	(HL)		; 07ad .	  b6 
+	JP	Z,H083b		; 07ae .;.	  ca 3b 08 
+	LD	HL,0008H	; 07b1 !..	  21 08 00 
+	ADD	HL,DE		; 07b4 .	  19 
+	LD	A,(HL)		; 07b5 ~	  7e 
+	INC	HL		; 07b6 #	  23 
+	LD	H,(HL)		; 07b7 f	  66 
+	LD	L,A		; 07b8 o	  6f 
+	LD	BC,FFFFH	; 07b9 ...	  01 ff ff 
+	ADD	HL,BC		; 07bc .	  09 
+	PUSH	HL		; 07bd .	  e5 
+	LD	HL,0006H	; 07be !..	  21 06 00 
+	ADD	HL,DE		; 07c1 .	  19 
+	LD	A,(HL)		; 07c2 ~	  7e 
+	INC	HL		; 07c3 #	  23 
+	LD	H,(HL)		; 07c4 f	  66 
+	LD	L,A		; 07c5 o	  6f 
+	EX	(SP),HL		; 07c6 .	  e3 
+	POP	BC		; 07c7 .	  c1 
+	ADD	HL,BC		; 07c8 .	  09 
+	LD	A,(HL)		; 07c9 ~	  7e 
+	CP	0AH		; 07ca ..	  fe 0a 
+	JP	NZ,H083b	; 07cc .;.	  c2 3b 08 
+	LD	HL,(H15a7)	; 07cf *..	  2a a7 15 
+	PUSH	HL		; 07d2 .	  e5 
+	CALL	H090c		; 07d3 ...	  cd 0c 09 
+	POP	AF		; 07d6 .	  f1 
+	JP	c.ret		; 07d7 .H.	  c3 48 13 
+
+H07da: 	LD	HL,(H15a5)	; 07da *..	  2a a5 15 
+	PUSH	HL		; 07dd .	  e5 
+	LD	HL,(H15a1)	; 07de *..	  2a a1 15 
+	PUSH	HL		; 07e1 .	  e5 
+	LD	HL,(H15a7)	; 07e2 *..	  2a a7 15 
+	LD	BC,0006H	; 07e5 ...	  01 06 00 
+	ADD	HL,BC		; 07e8 .	  09 
+	LD	C,(HL)		; 07e9 N	  4e 
+	INC	HL		; 07ea #	  23 
+	LD	B,(HL)		; 07eb F	  46 
+	PUSH	BC		; 07ec .	  c5 
+	CALL	H0f23		; 07ed .#.	  cd 23 0f 
+	POP	AF		; 07f0 .	  f1 
+	POP	AF		; 07f1 .	  f1 
+	POP	AF		; 07f2 .	  f1 
+	LD	HL,(H15a7)	; 07f3 *..	  2a a7 15 
+	INC	HL		; 07f6 #	  23 
+	INC	HL		; 07f7 #	  23 
+	PUSH	HL		; 07f8 .	  e5 
+	LD	HL,H15a5	; 07f9 !..	  21 a5 15 
+	POP	BC		; 07fc .	  c1 
+	LD	A,(BC)		; 07fd .	  0a 
+	ADD	A,(HL)		; 07fe .	  86 
+	LD	(BC),A		; 07ff .	  02 
+	INC	BC		; 0800 .	  03 
+	LD	A,(BC)		; 0801 .	  0a 
+	INC	HL		; 0802 #	  23 
+	ADC	A,(HL)		; 0803 .	  8e 
+	LD	(BC),A		; 0804 .	  02 
+	LD	HL,H15a5	; 0805 !..	  21 a5 15 
+	LD	A,(H15a3)	; 0808 :..	  3a a3 15 
+	SUB	(HL)		; 080b .	  96 
+	LD	(H15a3),A	; 080c 2..	  32 a3 15 
+	LD	A,(H15a4)	; 080f :..	  3a a4 15 
+	INC	HL		; 0812 #	  23 
+	SBC	A,(HL)		; 0813 .	  9e 
+	LD	(H15a4),A	; 0814 2..	  32 a4 15 
+	LD	HL,(H15a1)	; 0817 *..	  2a a1 15 
+	PUSH	HL		; 081a .	  e5 
+	LD	HL,(H15a5)	; 081b *..	  2a a5 15 
+	EX	(SP),HL		; 081e .	  e3 
+	POP	BC		; 081f .	  c1 
+	ADD	HL,BC		; 0820 .	  09 
+	LD	(H15a1),HL	; 0821 "..	  22 a1 15 
+	LD	HL,(H15a7)	; 0824 *..	  2a a7 15 
+	LD	BC,0006H	; 0827 ...	  01 06 00 
+	ADD	HL,BC		; 082a .	  09 
+	PUSH	HL		; 082b .	  e5 
+	LD	HL,H15a5	; 082c !..	  21 a5 15 
+	POP	BC		; 082f .	  c1 
+	LD	A,(BC)		; 0830 .	  0a 
+	ADD	A,(HL)		; 0831 .	  86 
+	LD	(BC),A		; 0832 .	  02 
+	INC	BC		; 0833 .	  03 
+	LD	A,(BC)		; 0834 .	  0a 
+	INC	HL		; 0835 #	  23 
+	ADC	A,(HL)		; 0836 .	  8e 
+	LD	(BC),A		; 0837 .	  02 
+	JP	H0721		; 0838 .!.	  c3 21 07 
+
+H083b: 	LD	HL,0008H	; 083b !..	  21 08 00 
+	ADD	HL,DE		; 083e .	  19 
+	LD	A,(HL)		; 083f ~	  7e 
+	INC	HL		; 0840 #	  23 
+	LD	H,(HL)		; 0841 f	  66 
+	LD	L,A		; 0842 o	  6f 
+	LD	C,L		; 0843 M	  4d 
+	LD	B,H		; 0844 D	  44 
+	JP	c.ret		; 0845 .H.	  c3 48 13 
+
+H0848: 	CALL	c.ent		; 0848 .A.	  cd 41 13 
+	LD	HL,0004H	; 084b !..	  21 04 00 
+	ADD	HL,DE		; 084e .	  19 
+	LD	A,(HL)		; 084f ~	  7e 
+	INC	HL		; 0850 #	  23 
+	LD	H,(HL)		; 0851 f	  66 
+	LD	L,A		; 0852 o	  6f 
+	LD	(H15a9),HL	; 0853 "..	  22 a9 15 
+	LD	HL,(H15a9)	; 0856 *..	  2a a9 15 
+	INC	HL		; 0859 #	  23 
+	INC	HL		; 085a #	  23 
+	INC	HL		; 085b #	  23 
+	INC	HL		; 085c #	  23 
+	LD	A,(HL)		; 085d ~	  7e 
+	INC	HL		; 085e #	  23 
+	OR	(HL)		; 085f .	  b6 
+	JP	Z,H0866		; 0860 .f.	  ca 66 08 
+	JP	c.ret		; 0863 .H.	  c3 48 13 
+
+H0866: 	LD	HL,(H15a9)	; 0866 *..	  2a a9 15 
+	INC	HL		; 0869 #	  23 
+	INC	HL		; 086a #	  23 
+	LD	A,(HL)		; 086b ~	  7e 
+	INC	HL		; 086c #	  23 
+	OR	(HL)		; 086d .	  b6 
+	JP	Z,H0874		; 086e .t.	  ca 74 08 
+	JP	c.ret		; 0871 .H.	  c3 48 13 
+
+H0874: 	LD	HL,(H15a9)	; 0874 *..	  2a a9 15 
+	LD	BC,000AH	; 0877 ...	  01 0a 00 
+	ADD	HL,BC		; 087a .	  09 
+	LD	A,(HL)		; 087b ~	  7e 
+	INC	HL		; 087c #	  23 
+	OR	(HL)		; 087d .	  b6 
+	JP	NZ,H088e	; 087e ...	  c2 8e 08 
+	LD	HL,H0200	; 0881 !..	  21 00 02 
+	PUSH	HL		; 0884 .	  e5 
+	LD	HL,(H15a9)	; 0885 *..	  2a a9 15 
+	PUSH	HL		; 0888 .	  e5 
+	CALL	H09c9		; 0889 ...	  cd c9 09 
+	POP	AF		; 088c .	  f1 
+	POP	AF		; 088d .	  f1 
+H088e: 	LD	HL,(H15a9)	; 088e *..	  2a a9 15 
+	LD	BC,000AH	; 0891 ...	  01 0a 00 
+	ADD	HL,BC		; 0894 .	  09 
+	LD	C,(HL)		; 0895 N	  4e 
+	INC	HL		; 0896 #	  23 
+	LD	B,(HL)		; 0897 F	  46 
+	PUSH	BC		; 0898 .	  c5 
+	LD	HL,(H15a9)	; 0899 *..	  2a a9 15 
+	LD	BC,0008H	; 089c ...	  01 08 00 
+	ADD	HL,BC		; 089f .	  09 
+	LD	C,(HL)		; 08a0 N	  4e 
+	INC	HL		; 08a1 #	  23 
+	LD	B,(HL)		; 08a2 F	  46 
+	PUSH	BC		; 08a3 .	  c5 
+	LD	HL,(H15a9)	; 08a4 *..	  2a a9 15 
+	LD	C,(HL)		; 08a7 N	  4e 
+	INC	HL		; 08a8 #	  23 
+	LD	B,(HL)		; 08a9 F	  46 
+	PUSH	BC		; 08aa .	  c5 
+	CALL	H119c		; 08ab ...	  cd 9c 11 
+	POP	AF		; 08ae .	  f1 
+	POP	AF		; 08af .	  f1 
+	POP	AF		; 08b0 .	  f1 
+	LD	L,C		; 08b1 i	  69 
+	LD	H,B		; 08b2 `	  60 
+	LD	(H15ab),HL	; 08b3 "..	  22 ab 15 
+	LD	HL,H15ab	; 08b6 !..	  21 ab 15 
+	SUB	A		; 08b9 .	  97 
+	SUB	(HL)		; 08ba .	  96 
+	LD	A,00H		; 08bb >.	  3e 00 
+	INC	HL		; 08bd #	  23 
+	SBC	A,(HL)		; 08be .	  9e 
+	JP	P,H08e6		; 08bf ...	  f2 e6 08 
+	LD	HL,(H15a9)	; 08c2 *..	  2a a9 15 
+	LD	BC,0006H	; 08c5 ...	  01 06 00 
+	ADD	HL,BC		; 08c8 .	  09 
+	PUSH	HL		; 08c9 .	  e5 
+	LD	HL,(H15a9)	; 08ca *..	  2a a9 15 
+	LD	BC,0008H	; 08cd ...	  01 08 00 
+	ADD	HL,BC		; 08d0 .	  09 
+	POP	BC		; 08d1 .	  c1 
+	LD	A,(HL)		; 08d2 ~	  7e 
+	LD	(BC),A		; 08d3 .	  02 
+	INC	HL		; 08d4 #	  23 
+	LD	A,(HL)		; 08d5 ~	  7e 
+	INC	BC		; 08d6 .	  03 
+	LD	(BC),A		; 08d7 .	  02 
+	LD	HL,(H15a9)	; 08d8 *..	  2a a9 15 
+	INC	HL		; 08db #	  23 
+	INC	HL		; 08dc #	  23 
+	LD	A,(H15ab)	; 08dd :..	  3a ab 15 
+	LD	(HL),A		; 08e0 w	  77 
+	LD	A,(H15ac)	; 08e1 :..	  3a ac 15 
+	INC	HL		; 08e4 #	  23 
+	LD	(HL),A		; 08e5 w	  77 
+H08e6: 	LD	HL,(H15a9)	; 08e6 *..	  2a a9 15 
+	LD	C,L		; 08e9 M	  4d 
+	LD	B,H		; 08ea D	  44 
+	JP	c.ret		; 08eb .H.	  c3 48 13 
+
+	DB	CDH,"A",13H,"!",04H,00H,19H,"N#F",C5H,CDH,0CH
+	DB	09H,F1H,C3H,"H",13H
+H0900: 	DW	H092d
+H0902: 	DW	FFFFH
+H0904: 	DW	H092d
+H0906: 	DW	0001H
+H0908: 	DW	boot
+H090a: 	DW	H094a
+H090c: 	CALL	c.ent		; 090c .A.	  cd 41 13 
+	LD	HL,0004H	; 090f !..	  21 04 00 
+	ADD	HL,DE		; 0912 .	  19 
+	LD	A,(HL)		; 0913 ~	  7e 
+	INC	HL		; 0914 #	  23 
+	LD	H,(HL)		; 0915 f	  66 
+	LD	L,A		; 0916 o	  6f 
+	LD	(H15ad),HL	; 0917 "..	  22 ad 15 
+	LD	HL,(H15ad)	; 091a *..	  2a ad 15 
+	INC	HL		; 091d #	  23 
+	INC	HL		; 091e #	  23 
+	INC	HL		; 091f #	  23 
+	INC	HL		; 0920 #	  23 
+	LD	A,(HL)		; 0921 ~	  7e 
+	INC	HL		; 0922 #	  23 
+	LD	H,(HL)		; 0923 f	  66 
+	LD	L,A		; 0924 o	  6f 
+	LD	C,L		; 0925 M	  4d 
+	LD	B,H		; 0926 D	  44 
+	LD	HL,H0900	; 0927 !..	  21 00 09 
+	JP	H131c		; 092a ...	  c3 1c 13 
+
+H092d: 	LD	HL,(H15ad)	; 092d *..	  2a ad 15 
+	LD	BC,000AH	; 0930 ...	  01 0a 00 
+	ADD	HL,BC		; 0933 .	  09 
+	LD	A,(HL)		; 0934 ~	  7e 
+	INC	HL		; 0935 #	  23 
+	OR	(HL)		; 0936 .	  b6 
+	JP	NZ,H0950	; 0937 .P.	  c2 50 09 
+	LD	HL,H0200	; 093a !..	  21 00 02 
+	PUSH	HL		; 093d .	  e5 
+	LD	HL,(H15ad)	; 093e *..	  2a ad 15 
+	PUSH	HL		; 0941 .	  e5 
+	CALL	H09c9		; 0942 ...	  cd c9 09 
+	POP	AF		; 0945 .	  f1 
+	POP	AF		; 0946 .	  f1 
+	JP	H0950		; 0947 .P.	  c3 50 09 
+
+H094a: 	LD	BC,boot		; 094a ...	  01 00 00 
+	JP	c.ret		; 094d .H.	  c3 48 13 
+
+H0950: 	LD	HL,(H15ad)	; 0950 *..	  2a ad 15 
+	INC	HL		; 0953 #	  23 
+	INC	HL		; 0954 #	  23 
+	LD	A,(HL)		; 0955 ~	  7e 
+	INC	HL		; 0956 #	  23 
+	OR	(HL)		; 0957 .	  b6 
+	JP	Z,H0992		; 0958 ...	  ca 92 09 
+	LD	HL,(H15ad)	; 095b *..	  2a ad 15 
+	INC	HL		; 095e #	  23 
+	INC	HL		; 095f #	  23 
+	LD	C,(HL)		; 0960 N	  4e 
+	INC	HL		; 0961 #	  23 
+	LD	B,(HL)		; 0962 F	  46 
+	PUSH	BC		; 0963 .	  c5 
+	LD	HL,(H15ad)	; 0964 *..	  2a ad 15 
+	LD	BC,0008H	; 0967 ...	  01 08 00 
+	ADD	HL,BC		; 096a .	  09 
+	LD	C,(HL)		; 096b N	  4e 
+	INC	HL		; 096c #	  23 
+	LD	B,(HL)		; 096d F	  46 
+	PUSH	BC		; 096e .	  c5 
+	LD	HL,(H15ad)	; 096f *..	  2a ad 15 
+	LD	C,(HL)		; 0972 N	  4e 
+	INC	HL		; 0973 #	  23 
+	LD	B,(HL)		; 0974 F	  46 
+	PUSH	BC		; 0975 .	  c5 
+	CALL	H11c8		; 0976 ...	  cd c8 11 
+	POP	AF		; 0979 .	  f1 
+	POP	AF		; 097a .	  f1 
+	POP	AF		; 097b .	  f1 
+	LD	HL,(H15ad)	; 097c *..	  2a ad 15 
+	INC	HL		; 097f #	  23 
+	INC	HL		; 0980 #	  23 
+	LD	A,C		; 0981 y	  79 
+	CP	(HL)		; 0982 .	  be 
+	JP	NZ,H0989	; 0983 ...	  c2 89 09 
+	LD	A,B		; 0986 x	  78 
+	INC	HL		; 0987 #	  23 
+	CP	(HL)		; 0988 .	  be 
+H0989: 	JP	Z,H0992		; 0989 ...	  ca 92 09 
+	LD	BC,FFFFH	; 098c ...	  01 ff ff 
+	JP	c.ret		; 098f .H.	  c3 48 13 
+
+H0992: 	LD	HL,(H15ad)	; 0992 *..	  2a ad 15 
+	INC	HL		; 0995 #	  23 
+	INC	HL		; 0996 #	  23 
+	LD	A,00H		; 0997 >.	  3e 00 
+	LD	(HL),A		; 0999 w	  77 
+	ADD	A,A		; 099a .	  87 
+	SBC	A,A		; 099b .	  9f 
+	INC	HL		; 099c #	  23 
+	LD	(HL),A		; 099d w	  77 
+	LD	HL,(H15ad)	; 099e *..	  2a ad 15 
+	LD	BC,0006H	; 09a1 ...	  01 06 00 
+	ADD	HL,BC		; 09a4 .	  09 
+	PUSH	HL		; 09a5 .	  e5 
+	LD	HL,(H15ad)	; 09a6 *..	  2a ad 15 
+	LD	BC,0008H	; 09a9 ...	  01 08 00 
+	ADD	HL,BC		; 09ac .	  09 
+	POP	BC		; 09ad .	  c1 
+	LD	A,(HL)		; 09ae ~	  7e 
+	LD	(BC),A		; 09af .	  02 
+	INC	HL		; 09b0 #	  23 
+	LD	A,(HL)		; 09b1 ~	  7e 
+	INC	BC		; 09b2 .	  03 
+	LD	(BC),A		; 09b3 .	  02 
+	LD	BC,boot		; 09b4 ...	  01 00 00 
+	JP	c.ret		; 09b7 .H.	  c3 48 13 
+
+H09ba: 	DB	"Out of memory",0AH,00H
+H09c9: 	CALL	c.ent		; 09c9 .A.	  cd 41 13 
+	LD	HL,0004H	; 09cc !..	  21 04 00 
+	ADD	HL,DE		; 09cf .	  19 
+	LD	A,(HL)		; 09d0 ~	  7e 
+	INC	HL		; 09d1 #	  23 
+	LD	H,(HL)		; 09d2 f	  66 
+	LD	L,A		; 09d3 o	  6f 
+	LD	(H15af),HL	; 09d4 "..	  22 af 15 
+	LD	HL,0006H	; 09d7 !..	  21 06 00 
+	ADD	HL,DE		; 09da .	  19 
+	LD	A,(HL)		; 09db ~	  7e 
+	INC	HL		; 09dc #	  23 
+	LD	H,(HL)		; 09dd f	  66 
+	LD	L,A		; 09de o	  6f 
+	LD	(H15b1),HL	; 09df "..	  22 b1 15 
+	LD	HL,(H15af)	; 09e2 *..	  2a af 15 
+	LD	BC,000AH	; 09e5 ...	  01 0a 00 
+	ADD	HL,BC		; 09e8 .	  09 
+	LD	A,(HL)		; 09e9 ~	  7e 
+	INC	HL		; 09ea #	  23 
+	OR	(HL)		; 09eb .	  b6 
+	JP	Z,H09fe		; 09ec ...	  ca fe 09 
+	LD	HL,(H15af)	; 09ef *..	  2a af 15 
+	LD	BC,0008H	; 09f2 ...	  01 08 00 
+	ADD	HL,BC		; 09f5 .	  09 
+	LD	C,(HL)		; 09f6 N	  4e 
+	INC	HL		; 09f7 #	  23 
+	LD	B,(HL)		; 09f8 F	  46 
+	PUSH	BC		; 09f9 .	  c5 
+	CALL	H0c29		; 09fa .).	  cd 29 0c 
+	POP	AF		; 09fd .	  f1 
+H09fe: 	LD	HL,H15b1	; 09fe !..	  21 b1 15 
+	LD	A,(HL)		; 0a01 ~	  7e 
+	INC	HL		; 0a02 #	  23 
+	OR	(HL)		; 0a03 .	  b6 
+	JP	Z,H0a59		; 0a04 .Y.	  ca 59 0a 
+	LD	HL,(H15af)	; 0a07 *..	  2a af 15 
+	LD	BC,0008H	; 0a0a ...	  01 08 00 
+	ADD	HL,BC		; 0a0d .	  09 
+	PUSH	HL		; 0a0e .	  e5 
+	LD	HL,(H15b1)	; 0a0f *..	  2a b1 15 
+	PUSH	HL		; 0a12 .	  e5 
+	CALL	H0a88		; 0a13 ...	  cd 88 0a 
+	POP	AF		; 0a16 .	  f1 
+	POP	HL		; 0a17 .	  e1 
+	LD	A,C		; 0a18 y	  79 
+	LD	(HL),A		; 0a19 w	  77 
+	LD	A,B		; 0a1a x	  78 
+	INC	HL		; 0a1b #	  23 
+	LD	(HL),A		; 0a1c w	  77 
+	DEC	HL		; 0a1d +	  2b 
+	LD	A,(HL)		; 0a1e ~	  7e 
+	INC	HL		; 0a1f #	  23 
+	OR	(HL)		; 0a20 .	  b6 
+	JP	Z,H0a76		; 0a21 .v.	  ca 76 0a 
+	LD	HL,(H15af)	; 0a24 *..	  2a af 15 
+	LD	BC,000AH	; 0a27 ...	  01 0a 00 
+	ADD	HL,BC		; 0a2a .	  09 
+	LD	A,(H15b1)	; 0a2b :..	  3a b1 15 
+	LD	(HL),A		; 0a2e w	  77 
+	LD	A,(H15b2)	; 0a2f :..	  3a b2 15 
+	INC	HL		; 0a32 #	  23 
+	LD	(HL),A		; 0a33 w	  77 
+	LD	HL,(H15af)	; 0a34 *..	  2a af 15 
+	INC	HL		; 0a37 #	  23 
+	INC	HL		; 0a38 #	  23 
+	LD	A,00H		; 0a39 >.	  3e 00 
+	LD	(HL),A		; 0a3b w	  77 
+	ADD	A,A		; 0a3c .	  87 
+	SBC	A,A		; 0a3d .	  9f 
+	INC	HL		; 0a3e #	  23 
+	LD	(HL),A		; 0a3f w	  77 
+	LD	HL,(H15af)	; 0a40 *..	  2a af 15 
+	LD	BC,0006H	; 0a43 ...	  01 06 00 
+	ADD	HL,BC		; 0a46 .	  09 
+	PUSH	HL		; 0a47 .	  e5 
+	LD	HL,(H15af)	; 0a48 *..	  2a af 15 
+	LD	BC,0008H	; 0a4b ...	  01 08 00 
+	ADD	HL,BC		; 0a4e .	  09 
+	POP	BC		; 0a4f .	  c1 
+	LD	A,(HL)		; 0a50 ~	  7e 
+	LD	(BC),A		; 0a51 .	  02 
+	INC	HL		; 0a52 #	  23 
+	LD	A,(HL)		; 0a53 ~	  7e 
+	INC	BC		; 0a54 .	  03 
+	LD	(BC),A		; 0a55 .	  02 
+	JP	c.ret		; 0a56 .H.	  c3 48 13 
+
+H0a59: 	LD	HL,000EH	; 0a59 !..	  21 0e 00 
+	PUSH	HL		; 0a5c .	  e5 
+	LD	HL,H09ba	; 0a5d !..	  21 ba 09 
+	PUSH	HL		; 0a60 .	  e5 
+	LD	HL,0002H	; 0a61 !..	  21 02 00 
+	PUSH	HL		; 0a64 .	  e5 
+	CALL	H11c8		; 0a65 ...	  cd c8 11 
+	POP	AF		; 0a68 .	  f1 
+	POP	AF		; 0a69 .	  f1 
+	POP	AF		; 0a6a .	  f1 
+	LD	HL,boot		; 0a6b !..	  21 00 00 
+	PUSH	HL		; 0a6e .	  e5 
+	CALL	H1152		; 0a6f .R.	  cd 52 11 
+	POP	AF		; 0a72 .	  f1 
+	JP	c.ret		; 0a73 .H.	  c3 48 13 
+
+H0a76: 	LD	HL,(H15b1)	; 0a76 *..	  2a b1 15 
+	PUSH	HL		; 0a79 .	  e5 
+	LD	HL,0002H	; 0a7a !..	  21 02 00 
+	PUSH	HL		; 0a7d .	  e5 
+	CALL	H12e6		; 0a7e ...	  cd e6 12 
+	POP	HL		; 0a81 .	  e1 
+	LD	(H15b1),HL	; 0a82 "..	  22 b1 15 
+	JP	H09fe		; 0a85 ...	  c3 fe 09 
+
+H0a88: 	CALL	c.ents		; 0a88 ...	  cd f4 11 
+	LD	HL,0004H	; 0a8b !..	  21 04 00 
+	ADD	HL,DE		; 0a8e .	  19 
+	LD	A,(HL)		; 0a8f ~	  7e 
+	INC	HL		; 0a90 #	  23 
+	LD	H,(HL)		; 0a91 f	  66 
+	LD	L,A		; 0a92 o	  6f 
+	LD	(H1633),HL	; 0a93 "3.	  22 33 16 
+	LD	HL,(H1633)	; 0a96 *3.	  2a 33 16 
+	LD	A,L		; 0a99 }	  7d 
+	AND	01H		; 0a9a ..	  e6 01 
+	LD	L,A		; 0a9c o	  6f 
+	LD	A,H		; 0a9d |	  7c 
+	AND	00H		; 0a9e ..	  e6 00 
+	LD	H,A		; 0aa0 g	  67 
+	LD	A,L		; 0aa1 }	  7d 
+	OR	H		; 0aa2 .	  b4 
+	JP	Z,H0aad		; 0aa3 ...	  ca ad 0a 
+	LD	HL,(H1633)	; 0aa6 *3.	  2a 33 16 
+	INC	HL		; 0aa9 #	  23 
+	LD	(H1633),HL	; 0aaa "3.	  22 33 16 
+H0aad: 	LD	A,(H1633)	; 0aad :3.	  3a 33 16 
+	SUB	02H		; 0ab0 ..	  d6 02 
+	LD	A,(H1634)	; 0ab2 :4.	  3a 34 16 
+	SBC	A,00H		; 0ab5 ..	  de 00 
+	JP	NC,H0ac0	; 0ab7 ...	  d2 c0 0a 
+	LD	BC,0002H	; 0aba ...	  01 02 00 
+	JP	H0ac5		; 0abd ...	  c3 c5 0a 
+
+H0ac0: 	LD	HL,(H1633)	; 0ac0 *3.	  2a 33 16 
+	LD	C,L		; 0ac3 M	  4d 
+	LD	B,H		; 0ac4 D	  44 
+H0ac5: 	LD	L,C		; 0ac5 i	  69 
+	LD	H,B		; 0ac6 `	  60 
+	LD	(H1633),HL	; 0ac7 "3.	  22 33 16 
+	LD	HL,H15bb	; 0aca !..	  21 bb 15 
+	LD	A,(HL)		; 0acd ~	  7e 
+	INC	HL		; 0ace #	  23 
+	OR	(HL)		; 0acf .	  b6 
+	JP	NZ,H0b03	; 0ad0 ...	  c2 03 0b 
+	LD	HL,0080H	; 0ad3 !..	  21 80 00 
+	PUSH	HL		; 0ad6 .	  e5 
+	CALL	H1004		; 0ad7 ...	  cd 04 10 
+	POP	AF		; 0ada .	  f1 
+	LD	L,C		; 0adb i	  69 
+	LD	H,B		; 0adc `	  60 
+	LD	(H15b7),HL	; 0add "..	  22 b7 15 
+	LD	HL,H15b7	; 0ae0 !..	  21 b7 15 
+	LD	A,(HL)		; 0ae3 ~	  7e 
+	INC	HL		; 0ae4 #	  23 
+	OR	(HL)		; 0ae5 .	  b6 
+	JP	NZ,H0aef	; 0ae6 ...	  c2 ef 0a 
+	LD	BC,boot		; 0ae9 ...	  01 00 00 
+	JP	c.rets		; 0aec ...	  c3 0a 12 
+
+H0aef: 	LD	HL,(H15b7)	; 0aef *..	  2a b7 15 
+	LD	A,7CH		; 0af2 >|	  3e 7c 
+	LD	(HL),A		; 0af4 w	  77 
+	LD	A,00H		; 0af5 >.	  3e 00 
+	INC	HL		; 0af7 #	  23 
+	LD	(HL),A		; 0af8 w	  77 
+	LD	HL,(H15b7)	; 0af9 *..	  2a b7 15 
+	INC	HL		; 0afc #	  23 
+	INC	HL		; 0afd #	  23 
+	PUSH	HL		; 0afe .	  e5 
+	CALL	H0c29		; 0aff .).	  cd 29 0c 
+	POP	AF		; 0b02 .	  f1 
+H0b03: 	LD	A,00H		; 0b03 >.	  3e 00 
+	LD	(H15b5),A	; 0b05 2..	  32 b5 15 
+	ADD	A,A		; 0b08 .	  87 
+	SBC	A,A		; 0b09 .	  9f 
+	LD	(H15b6),A	; 0b0a 2..	  32 b6 15 
+	LD	HL,(H15bb)	; 0b0d *..	  2a bb 15 
+	LD	(H15b9),HL	; 0b10 "..	  22 b9 15 
+H0b13: 	LD	HL,H15b9	; 0b13 !..	  21 b9 15 
+	LD	A,(HL)		; 0b16 ~	  7e 
+	INC	HL		; 0b17 #	  23 
+	OR	(HL)		; 0b18 .	  b6 
+	JP	Z,H0b32		; 0b19 .2.	  ca 32 0b 
+	LD	HL,(H15b9)	; 0b1c *..	  2a b9 15 
+	LD	A,(HL)		; 0b1f ~	  7e 
+	INC	HL		; 0b20 #	  23 
+	LD	H,(HL)		; 0b21 f	  66 
+	LD	L,A		; 0b22 o	  6f 
+	INC	HL		; 0b23 #	  23 
+	INC	HL		; 0b24 #	  23 
+	PUSH	HL		; 0b25 .	  e5 
+	LD	HL,H1633	; 0b26 !3.	  21 33 16 
+	POP	BC		; 0b29 .	  c1 
+	LD	A,C		; 0b2a y	  79 
+	SUB	(HL)		; 0b2b .	  96 
+	LD	A,B		; 0b2c x	  78 
+	INC	HL		; 0b2d #	  23 
+	SBC	A,(HL)		; 0b2e .	  9e 
+	JP	C,H0b59		; 0b2f .Y.	  da 59 0b 
+H0b32: 	LD	HL,H15b9	; 0b32 !..	  21 b9 15 
+	LD	A,(HL)		; 0b35 ~	  7e 
+	INC	HL		; 0b36 #	  23 
+	OR	(HL)		; 0b37 .	  b6 
+	JP	Z,H0b6e		; 0b38 .n.	  ca 6e 0b 
+	LD	HL,H15b5	; 0b3b !..	  21 b5 15 
+	LD	A,(HL)		; 0b3e ~	  7e 
+	INC	HL		; 0b3f #	  23 
+	OR	(HL)		; 0b40 .	  b6 
+	JP	Z,H0ba1		; 0b41 ...	  ca a1 0b 
+	LD	HL,(H15b5)	; 0b44 *..	  2a b5 15 
+	INC	HL		; 0b47 #	  23 
+	INC	HL		; 0b48 #	  23 
+	PUSH	HL		; 0b49 .	  e5 
+	LD	HL,(H15b9)	; 0b4a *..	  2a b9 15 
+	INC	HL		; 0b4d #	  23 
+	INC	HL		; 0b4e #	  23 
+	POP	BC		; 0b4f .	  c1 
+	LD	A,(HL)		; 0b50 ~	  7e 
+	LD	(BC),A		; 0b51 .	  02 
+	INC	HL		; 0b52 #	  23 
+	LD	A,(HL)		; 0b53 ~	  7e 
+	INC	BC		; 0b54 .	  03 
+	LD	(BC),A		; 0b55 .	  02 
+	JP	H0bad		; 0b56 ...	  c3 ad 0b 
+
+H0b59: 	LD	HL,(H15b9)	; 0b59 *..	  2a b9 15 
+	LD	(H15b5),HL	; 0b5c "..	  22 b5 15 
+	LD	HL,(H15b9)	; 0b5f *..	  2a b9 15 
+	INC	HL		; 0b62 #	  23 
+	INC	HL		; 0b63 #	  23 
+	LD	A,(HL)		; 0b64 ~	  7e 
+	INC	HL		; 0b65 #	  23 
+	LD	H,(HL)		; 0b66 f	  66 
+	LD	L,A		; 0b67 o	  6f 
+	LD	(H15b9),HL	; 0b68 "..	  22 b9 15 
+	JP	H0b13		; 0b6b ...	  c3 13 0b 
+
+H0b6e: 	LD	HL,H0200	; 0b6e !..	  21 00 02 
+	PUSH	HL		; 0b71 .	  e5 
+	CALL	H1004		; 0b72 ...	  cd 04 10 
+	POP	AF		; 0b75 .	  f1 
+	LD	L,C		; 0b76 i	  69 
+	LD	H,B		; 0b77 `	  60 
+	LD	(H15b7),HL	; 0b78 "..	  22 b7 15 
+	LD	HL,H15b7	; 0b7b !..	  21 b7 15 
+	LD	A,(HL)		; 0b7e ~	  7e 
+	INC	HL		; 0b7f #	  23 
+	OR	(HL)		; 0b80 .	  b6 
+	JP	NZ,H0b8a	; 0b81 ...	  c2 8a 0b 
+	LD	BC,boot		; 0b84 ...	  01 00 00 
+	JP	c.rets		; 0b87 ...	  c3 0a 12 
+
+H0b8a: 	LD	HL,(H15b7)	; 0b8a *..	  2a b7 15 
+	LD	A,FCH		; 0b8d >.	  3e fc 
+	LD	(HL),A		; 0b8f w	  77 
+	LD	A,01H		; 0b90 >.	  3e 01 
+	INC	HL		; 0b92 #	  23 
+	LD	(HL),A		; 0b93 w	  77 
+	LD	HL,(H15b7)	; 0b94 *..	  2a b7 15 
+	INC	HL		; 0b97 #	  23 
+	INC	HL		; 0b98 #	  23 
+	PUSH	HL		; 0b99 .	  e5 
+	CALL	H0c29		; 0b9a .).	  cd 29 0c 
+	POP	AF		; 0b9d .	  f1 
+	JP	H0b03		; 0b9e ...	  c3 03 0b 
+
+H0ba1: 	LD	HL,(H15bb)	; 0ba1 *..	  2a bb 15 
+	INC	HL		; 0ba4 #	  23 
+	INC	HL		; 0ba5 #	  23 
+	LD	A,(HL)		; 0ba6 ~	  7e 
+	INC	HL		; 0ba7 #	  23 
+	LD	H,(HL)		; 0ba8 f	  66 
+	LD	L,A		; 0ba9 o	  6f 
+	LD	(H15bb),HL	; 0baa "..	  22 bb 15 
+H0bad: 	LD	HL,(H15b9)	; 0bad *..	  2a b9 15 
+	LD	A,(HL)		; 0bb0 ~	  7e 
+	INC	HL		; 0bb1 #	  23 
+	LD	H,(HL)		; 0bb2 f	  66 
+	LD	L,A		; 0bb3 o	  6f 
+	PUSH	HL		; 0bb4 .	  e5 
+	LD	HL,H1633	; 0bb5 !3.	  21 33 16 
+	POP	BC		; 0bb8 .	  c1 
+	LD	A,C		; 0bb9 y	  79 
+	SUB	(HL)		; 0bba .	  96 
+	LD	C,A		; 0bbb O	  4f 
+	LD	A,B		; 0bbc x	  78 
+	INC	HL		; 0bbd #	  23 
+	SBC	A,(HL)		; 0bbe .	  9e 
+	LD	B,A		; 0bbf G	  47 
+	LD	L,C		; 0bc0 i	  69 
+	LD	H,B		; 0bc1 `	  60 
+	INC	HL		; 0bc2 #	  23 
+	INC	HL		; 0bc3 #	  23 
+	LD	(H15b3),HL	; 0bc4 "..	  22 b3 15 
+	LD	A,(H15b3)	; 0bc7 :..	  3a b3 15 
+	SUB	04H		; 0bca ..	  d6 04 
+	LD	A,(H15b4)	; 0bcc :..	  3a b4 15 
+	SBC	A,00H		; 0bcf ..	  de 00 
+	JP	M,H0c10		; 0bd1 ...	  fa 10 0c 
+	LD	HL,(H15b9)	; 0bd4 *..	  2a b9 15 
+	PUSH	HL		; 0bd7 .	  e5 
+	LD	HL,(H1633)	; 0bd8 *3.	  2a 33 16 
+	LD	BC,0002H	; 0bdb ...	  01 02 00 
+	ADD	HL,BC		; 0bde .	  09 
+	EX	(SP),HL		; 0bdf .	  e3 
+	POP	BC		; 0be0 .	  c1 
+	ADD	HL,BC		; 0be1 .	  09 
+	LD	(H15b7),HL	; 0be2 "..	  22 b7 15 
+	LD	HL,(H15b9)	; 0be5 *..	  2a b9 15 
+	PUSH	HL		; 0be8 .	  e5 
+	LD	HL,H15b3	; 0be9 !..	  21 b3 15 
+	POP	BC		; 0bec .	  c1 
+	LD	A,(BC)		; 0bed .	  0a 
+	SUB	(HL)		; 0bee .	  96 
+	LD	(BC),A		; 0bef .	  02 
+	INC	BC		; 0bf0 .	  03 
+	LD	A,(BC)		; 0bf1 .	  0a 
+	INC	HL		; 0bf2 #	  23 
+	SBC	A,(HL)		; 0bf3 .	  9e 
+	LD	(BC),A		; 0bf4 .	  02 
+	LD	HL,(H15b7)	; 0bf5 *..	  2a b7 15 
+	PUSH	HL		; 0bf8 .	  e5 
+	LD	HL,(H15b3)	; 0bf9 *..	  2a b3 15 
+	LD	BC,FFFCH	; 0bfc ...	  01 fc ff 
+	ADD	HL,BC		; 0bff .	  09 
+	POP	BC		; 0c00 .	  c1 
+	LD	A,L		; 0c01 }	  7d 
+	LD	(BC),A		; 0c02 .	  02 
+	LD	A,H		; 0c03 |	  7c 
+	INC	BC		; 0c04 .	  03 
+	LD	(BC),A		; 0c05 .	  02 
+	LD	HL,(H15b7)	; 0c06 *..	  2a b7 15 
+	INC	HL		; 0c09 #	  23 
+	INC	HL		; 0c0a #	  23 
+	PUSH	HL		; 0c0b .	  e5 
+	CALL	H0c29		; 0c0c .).	  cd 29 0c 
+	POP	AF		; 0c0f .	  f1 
+H0c10: 	LD	HL,(H15b9)	; 0c10 *..	  2a b9 15 
+	INC	HL		; 0c13 #	  23 
+	INC	HL		; 0c14 #	  23 
+	LD	C,L		; 0c15 M	  4d 
+	LD	B,H		; 0c16 D	  44 
+	JP	c.rets		; 0c17 ...	  c3 0a 12 
+
+H0c1a: 	DB	"bad free call",0AH,00H
+H0c29: 	CALL	c.ents		; 0c29 ...	  cd f4 11 
+	LD	HL,0004H	; 0c2c !..	  21 04 00 
+	ADD	HL,DE		; 0c2f .	  19 
+	LD	A,(HL)		; 0c30 ~	  7e 
+	INC	HL		; 0c31 #	  23 
+	LD	H,(HL)		; 0c32 f	  66 
+	LD	L,A		; 0c33 o	  6f 
+	LD	(H1633),HL	; 0c34 "3.	  22 33 16 
+	LD	HL,H1633	; 0c37 !3.	  21 33 16 
+	LD	A,(HL)		; 0c3a ~	  7e 
+	INC	HL		; 0c3b #	  23 
+	OR	(HL)		; 0c3c .	  b6 
+	JP	NZ,H0c43	; 0c3d .C.	  c2 43 0c 
+	JP	c.rets		; 0c40 ...	  c3 0a 12 
+
+H0c43: 	LD	HL,(H1633)	; 0c43 *3.	  2a 33 16 
+	LD	BC,FFFEH	; 0c46 ...	  01 fe ff 
+	ADD	HL,BC		; 0c49 .	  09 
+	LD	(H15bf),HL	; 0c4a "..	  22 bf 15 
+	LD	HL,(H15bf)	; 0c4d *..	  2a bf 15 
+	INC	HL		; 0c50 #	  23 
+	INC	HL		; 0c51 #	  23 
+	LD	A,00H		; 0c52 >.	  3e 00 
+	LD	(HL),A		; 0c54 w	  77 
+	ADD	A,A		; 0c55 .	  87 
+	SBC	A,A		; 0c56 .	  9f 
+	INC	HL		; 0c57 #	  23 
+	LD	(HL),A		; 0c58 w	  77 
+	LD	HL,H15bb	; 0c59 !..	  21 bb 15 
+	LD	A,(HL)		; 0c5c ~	  7e 
+	INC	HL		; 0c5d #	  23 
+	OR	(HL)		; 0c5e .	  b6 
+	JP	NZ,H0c6b	; 0c5f .k.	  c2 6b 0c 
+	LD	HL,(H15bf)	; 0c62 *..	  2a bf 15 
+	LD	(H15bb),HL	; 0c65 "..	  22 bb 15 
+	JP	c.rets		; 0c68 ...	  c3 0a 12 
+
+H0c6b: 	LD	A,00H		; 0c6b >.	  3e 00 
+	LD	(H15bd),A	; 0c6d 2..	  32 bd 15 
+	ADD	A,A		; 0c70 .	  87 
+	SBC	A,A		; 0c71 .	  9f 
+	LD	(H15be),A	; 0c72 2..	  32 be 15 
+	LD	HL,(H15bb)	; 0c75 *..	  2a bb 15 
+	LD	(H15c1),HL	; 0c78 "..	  22 c1 15 
+H0c7b: 	LD	HL,H15c1	; 0c7b !..	  21 c1 15 
+	LD	A,(HL)		; 0c7e ~	  7e 
+	INC	HL		; 0c7f #	  23 
+	OR	(HL)		; 0c80 .	  b6 
+	JP	Z,H0ca2		; 0c81 ...	  ca a2 0c 
+	LD	HL,H15bf	; 0c84 !..	  21 bf 15 
+	LD	A,(H15bd)	; 0c87 :..	  3a bd 15 
+	SUB	(HL)		; 0c8a .	  96 
+	LD	A,(H15be)	; 0c8b :..	  3a be 15 
+	INC	HL		; 0c8e #	  23 
+	SBC	A,(HL)		; 0c8f .	  9e 
+	JP	NC,H0cd1	; 0c90 ...	  d2 d1 0c 
+	LD	HL,H15bf	; 0c93 !..	  21 bf 15 
+	LD	A,(H15c1)	; 0c96 :..	  3a c1 15 
+	SUB	(HL)		; 0c99 .	  96 
+	LD	A,(H15c2)	; 0c9a :..	  3a c2 15 
+	INC	HL		; 0c9d #	  23 
+	SBC	A,(HL)		; 0c9e .	  9e 
+	JP	C,H0cd1		; 0c9f ...	  da d1 0c 
+H0ca2: 	LD	HL,H15c1	; 0ca2 !..	  21 c1 15 
+	LD	A,(H15bf)	; 0ca5 :..	  3a bf 15 
+	CP	(HL)		; 0ca8 .	  be 
+	JP	NZ,H0cb1	; 0ca9 ...	  c2 b1 0c 
+	LD	A,(H15c0)	; 0cac :..	  3a c0 15 
+	INC	HL		; 0caf #	  23 
+	CP	(HL)		; 0cb0 .	  be 
+H0cb1: 	JP	NZ,H0ce6	; 0cb1 ...	  c2 e6 0c 
+	LD	HL,boot		; 0cb4 !..	  21 00 00 
+	PUSH	HL		; 0cb7 .	  e5 
+	LD	HL,H0c1a	; 0cb8 !..	  21 1a 0c 
+	PUSH	HL		; 0cbb .	  e5 
+	LD	HL,0002H	; 0cbc !..	  21 02 00 
+	PUSH	HL		; 0cbf .	  e5 
+	CALL	remark		; 0cc0 ...	  cd ae 0e 
+	POP	AF		; 0cc3 .	  f1 
+	POP	AF		; 0cc4 .	  f1 
+	POP	AF		; 0cc5 .	  f1 
+	LD	HL,boot		; 0cc6 !..	  21 00 00 
+	PUSH	HL		; 0cc9 .	  e5 
+	CALL	exit		; 0cca ...	  cd f3 0d 
+	POP	AF		; 0ccd .	  f1 
+	JP	H0ce6		; 0cce ...	  c3 e6 0c 
+
+H0cd1: 	LD	HL,(H15c1)	; 0cd1 *..	  2a c1 15 
+	LD	(H15bd),HL	; 0cd4 "..	  22 bd 15 
+	LD	HL,(H15c1)	; 0cd7 *..	  2a c1 15 
+	INC	HL		; 0cda #	  23 
+	INC	HL		; 0cdb #	  23 
+	LD	A,(HL)		; 0cdc ~	  7e 
+	INC	HL		; 0cdd #	  23 
+	LD	H,(HL)		; 0cde f	  66 
+	LD	L,A		; 0cdf o	  6f 
+	LD	(H15c1),HL	; 0ce0 "..	  22 c1 15 
+	JP	H0c7b		; 0ce3 .{.	  c3 7b 0c 
+
+H0ce6: 	LD	HL,H15bd	; 0ce6 !..	  21 bd 15 
+	LD	A,(HL)		; 0ce9 ~	  7e 
+	INC	HL		; 0cea #	  23 
+	OR	(HL)		; 0ceb .	  b6 
+	JP	NZ,H0d06	; 0cec ...	  c2 06 0d 
+	LD	HL,(H15bf)	; 0cef *..	  2a bf 15 
+	INC	HL		; 0cf2 #	  23 
+	INC	HL		; 0cf3 #	  23 
+	LD	A,(H15c1)	; 0cf4 :..	  3a c1 15 
+	LD	(HL),A		; 0cf7 w	  77 
+	LD	A,(H15c2)	; 0cf8 :..	  3a c2 15 
+	INC	HL		; 0cfb #	  23 
+	LD	(HL),A		; 0cfc w	  77 
+	LD	HL,(H15bf)	; 0cfd *..	  2a bf 15 
+	LD	(H15bb),HL	; 0d00 "..	  22 bb 15 
+	JP	H0d48		; 0d03 .H.	  c3 48 0d 
+
+H0d06: 	LD	HL,H15c1	; 0d06 !..	  21 c1 15 
+	LD	A,(HL)		; 0d09 ~	  7e 
+	INC	HL		; 0d0a #	  23 
+	OR	(HL)		; 0d0b .	  b6 
+	JP	NZ,H0d2c	; 0d0c .,.	  c2 2c 0d 
+	LD	HL,(H15bf)	; 0d0f *..	  2a bf 15 
+	INC	HL		; 0d12 #	  23 
+	INC	HL		; 0d13 #	  23 
+	LD	A,00H		; 0d14 >.	  3e 00 
+	LD	(HL),A		; 0d16 w	  77 
+	ADD	A,A		; 0d17 .	  87 
+	SBC	A,A		; 0d18 .	  9f 
+	INC	HL		; 0d19 #	  23 
+	LD	(HL),A		; 0d1a w	  77 
+	LD	HL,(H15bd)	; 0d1b *..	  2a bd 15 
+	INC	HL		; 0d1e #	  23 
+	INC	HL		; 0d1f #	  23 
+	LD	A,(H15bf)	; 0d20 :..	  3a bf 15 
+	LD	(HL),A		; 0d23 w	  77 
+	LD	A,(H15c0)	; 0d24 :..	  3a c0 15 
+	INC	HL		; 0d27 #	  23 
+	LD	(HL),A		; 0d28 w	  77 
+	JP	H0d48		; 0d29 .H.	  c3 48 0d 
+
+H0d2c: 	LD	HL,(H15bf)	; 0d2c *..	  2a bf 15 
+	INC	HL		; 0d2f #	  23 
+	INC	HL		; 0d30 #	  23 
+	LD	A,(H15c1)	; 0d31 :..	  3a c1 15 
+	LD	(HL),A		; 0d34 w	  77 
+	LD	A,(H15c2)	; 0d35 :..	  3a c2 15 
+	INC	HL		; 0d38 #	  23 
+	LD	(HL),A		; 0d39 w	  77 
+	LD	HL,(H15bd)	; 0d3a *..	  2a bd 15 
+	INC	HL		; 0d3d #	  23 
+	INC	HL		; 0d3e #	  23 
+	LD	A,(H15bf)	; 0d3f :..	  3a bf 15 
+	LD	(HL),A		; 0d42 w	  77 
+	LD	A,(H15c0)	; 0d43 :..	  3a c0 15 
+	INC	HL		; 0d46 #	  23 
+	LD	(HL),A		; 0d47 w	  77 
+H0d48: 	LD	HL,H15c1	; 0d48 !..	  21 c1 15 
+	LD	A,(HL)		; 0d4b ~	  7e 
+	INC	HL		; 0d4c #	  23 
+	OR	(HL)		; 0d4d .	  b6 
+	JP	Z,H0d9c		; 0d4e ...	  ca 9c 0d 
+	LD	HL,(H15bf)	; 0d51 *..	  2a bf 15 
+	INC	HL		; 0d54 #	  23 
+	INC	HL		; 0d55 #	  23 
+	INC	HL		; 0d56 #	  23 
+	INC	HL		; 0d57 #	  23 
+	PUSH	HL		; 0d58 .	  e5 
+	LD	HL,(H15bf)	; 0d59 *..	  2a bf 15 
+	LD	A,(HL)		; 0d5c ~	  7e 
+	INC	HL		; 0d5d #	  23 
+	LD	H,(HL)		; 0d5e f	  66 
+	LD	L,A		; 0d5f o	  6f 
+	EX	(SP),HL		; 0d60 .	  e3 
+	POP	BC		; 0d61 .	  c1 
+	ADD	HL,BC		; 0d62 .	  09 
+	PUSH	HL		; 0d63 .	  e5 
+	LD	HL,H15c1	; 0d64 !..	  21 c1 15 
+	POP	BC		; 0d67 .	  c1 
+	LD	A,C		; 0d68 y	  79 
+	CP	(HL)		; 0d69 .	  be 
+	JP	NZ,H0d70	; 0d6a .p.	  c2 70 0d 
+	LD	A,B		; 0d6d x	  78 
+	INC	HL		; 0d6e #	  23 
+	CP	(HL)		; 0d6f .	  be 
+H0d70: 	JP	NZ,H0d9c	; 0d70 ...	  c2 9c 0d 
+	LD	HL,(H15bf)	; 0d73 *..	  2a bf 15 
+	PUSH	HL		; 0d76 .	  e5 
+	LD	HL,(H15c1)	; 0d77 *..	  2a c1 15 
+	LD	A,(HL)		; 0d7a ~	  7e 
+	INC	HL		; 0d7b #	  23 
+	LD	H,(HL)		; 0d7c f	  66 
+	LD	L,A		; 0d7d o	  6f 
+	INC	HL		; 0d7e #	  23 
+	INC	HL		; 0d7f #	  23 
+	INC	HL		; 0d80 #	  23 
+	INC	HL		; 0d81 #	  23 
+	POP	BC		; 0d82 .	  c1 
+	LD	A,(BC)		; 0d83 .	  0a 
+	ADD	A,L		; 0d84 .	  85 
+	LD	(BC),A		; 0d85 .	  02 
+	INC	BC		; 0d86 .	  03 
+	LD	A,(BC)		; 0d87 .	  0a 
+	ADC	A,H		; 0d88 .	  8c 
+	LD	(BC),A		; 0d89 .	  02 
+	LD	HL,(H15bf)	; 0d8a *..	  2a bf 15 
+	INC	HL		; 0d8d #	  23 
+	INC	HL		; 0d8e #	  23 
+	PUSH	HL		; 0d8f .	  e5 
+	LD	HL,(H15c1)	; 0d90 *..	  2a c1 15 
+	INC	HL		; 0d93 #	  23 
+	INC	HL		; 0d94 #	  23 
+	POP	BC		; 0d95 .	  c1 
+	LD	A,(HL)		; 0d96 ~	  7e 
+	LD	(BC),A		; 0d97 .	  02 
+	INC	HL		; 0d98 #	  23 
+	LD	A,(HL)		; 0d99 ~	  7e 
+	INC	BC		; 0d9a .	  03 
+	LD	(BC),A		; 0d9b .	  02 
+H0d9c: 	LD	HL,H15bd	; 0d9c !..	  21 bd 15 
+	LD	A,(HL)		; 0d9f ~	  7e 
+	INC	HL		; 0da0 #	  23 
+	OR	(HL)		; 0da1 .	  b6 
+	JP	Z,H0df0		; 0da2 ...	  ca f0 0d 
+	LD	HL,(H15bd)	; 0da5 *..	  2a bd 15 
+	INC	HL		; 0da8 #	  23 
+	INC	HL		; 0da9 #	  23 
+	INC	HL		; 0daa #	  23 
+	INC	HL		; 0dab #	  23 
+	PUSH	HL		; 0dac .	  e5 
+	LD	HL,(H15bd)	; 0dad *..	  2a bd 15 
+	LD	A,(HL)		; 0db0 ~	  7e 
+	INC	HL		; 0db1 #	  23 
+	LD	H,(HL)		; 0db2 f	  66 
+	LD	L,A		; 0db3 o	  6f 
+	EX	(SP),HL		; 0db4 .	  e3 
+	POP	BC		; 0db5 .	  c1 
+	ADD	HL,BC		; 0db6 .	  09 
+	PUSH	HL		; 0db7 .	  e5 
+	LD	HL,H15bf	; 0db8 !..	  21 bf 15 
+	POP	BC		; 0dbb .	  c1 
+	LD	A,C		; 0dbc y	  79 
+	CP	(HL)		; 0dbd .	  be 
+	JP	NZ,H0dc4	; 0dbe ...	  c2 c4 0d 
+	LD	A,B		; 0dc1 x	  78 
+	INC	HL		; 0dc2 #	  23 
+	CP	(HL)		; 0dc3 .	  be 
+H0dc4: 	JP	NZ,H0df0	; 0dc4 ...	  c2 f0 0d 
+	LD	HL,(H15bd)	; 0dc7 *..	  2a bd 15 
+	PUSH	HL		; 0dca .	  e5 
+	LD	HL,(H15bf)	; 0dcb *..	  2a bf 15 
+	LD	A,(HL)		; 0dce ~	  7e 
+	INC	HL		; 0dcf #	  23 
+	LD	H,(HL)		; 0dd0 f	  66 
+	LD	L,A		; 0dd1 o	  6f 
+	INC	HL		; 0dd2 #	  23 
+	INC	HL		; 0dd3 #	  23 
+	INC	HL		; 0dd4 #	  23 
+	INC	HL		; 0dd5 #	  23 
+	POP	BC		; 0dd6 .	  c1 
+	LD	A,(BC)		; 0dd7 .	  0a 
+	ADD	A,L		; 0dd8 .	  85 
+	LD	(BC),A		; 0dd9 .	  02 
+	INC	BC		; 0dda .	  03 
+	LD	A,(BC)		; 0ddb .	  0a 
+	ADC	A,H		; 0ddc .	  8c 
+	LD	(BC),A		; 0ddd .	  02 
+	LD	HL,(H15bd)	; 0dde *..	  2a bd 15 
+	INC	HL		; 0de1 #	  23 
+	INC	HL		; 0de2 #	  23 
+	PUSH	HL		; 0de3 .	  e5 
+	LD	HL,(H15bf)	; 0de4 *..	  2a bf 15 
+	INC	HL		; 0de7 #	  23 
+	INC	HL		; 0de8 #	  23 
+	POP	BC		; 0de9 .	  c1 
+	LD	A,(HL)		; 0dea ~	  7e 
+	LD	(BC),A		; 0deb .	  02 
+	INC	HL		; 0dec #	  23 
+	LD	A,(HL)		; 0ded ~	  7e 
+	INC	BC		; 0dee .	  03 
+	LD	(BC),A		; 0def .	  02 
+H0df0: 	JP	c.rets		; 0df0 ...	  c3 0a 12 
+
+exit: 	CALL	c.ent		; 0df3 .A.	  cd 41 13 
+	LD	HL,FFF6H	; 0df6 !..	  21 f6 ff 
+	ADD	HL,SP		; 0df9 9	  39 
+	LD	SP,HL		; 0dfa .	  f9 
+	LD	HL,FFF6H	; 0dfb !..	  21 f6 ff 
+	ADD	HL,DE		; 0dfe .	  19 
+	LD	BC,H15c3	; 0dff ...	  01 c3 15 
+	LD	A,C		; 0e02 y	  79 
+	LD	(HL),A		; 0e03 w	  77 
+	LD	A,B		; 0e04 x	  78 
+	INC	HL		; 0e05 #	  23 
+	LD	(HL),A		; 0e06 w	  77 
+H0e07: 	LD	HL,FFF6H	; 0e07 !..	  21 f6 ff 
+	ADD	HL,DE		; 0e0a .	  19 
+	LD	BC,H15e3	; 0e0b ...	  01 e3 15 
+	LD	A,(HL)		; 0e0e ~	  7e 
+	SUB	C		; 0e0f .	  91 
+	INC	HL		; 0e10 #	  23 
+	LD	A,(HL)		; 0e11 ~	  7e 
+	SBC	A,B		; 0e12 .	  98 
+	JP	NC,H0e53	; 0e13 .S.	  d2 53 0e 
+	LD	HL,FFF6H	; 0e16 !..	  21 f6 ff 
+	ADD	HL,DE		; 0e19 .	  19 
+	LD	A,(HL)		; 0e1a ~	  7e 
+	INC	HL		; 0e1b #	  23 
+	LD	H,(HL)		; 0e1c f	  66 
+	LD	L,A		; 0e1d o	  6f 
+	LD	A,(HL)		; 0e1e ~	  7e 
+	INC	HL		; 0e1f #	  23 
+	LD	H,(HL)		; 0e20 f	  66 
+	LD	L,A		; 0e21 o	  6f 
+	INC	HL		; 0e22 #	  23 
+	INC	HL		; 0e23 #	  23 
+	INC	HL		; 0e24 #	  23 
+	INC	HL		; 0e25 #	  23 
+	LD	A,(HL)		; 0e26 ~	  7e 
+	CP	01H		; 0e27 ..	  fe 01 
+	JP	NZ,H0e30	; 0e29 .0.	  c2 30 0e 
+	INC	HL		; 0e2c #	  23 
+	LD	A,(HL)		; 0e2d ~	  7e 
+	CP	00H		; 0e2e ..	  fe 00 
+H0e30: 	JP	Z,H0e62		; 0e30 .b.	  ca 62 0e 
+	LD	HL,FFF6H	; 0e33 !..	  21 f6 ff 
+	ADD	HL,DE		; 0e36 .	  19 
+	LD	A,(HL)		; 0e37 ~	  7e 
+	INC	HL		; 0e38 #	  23 
+	LD	H,(HL)		; 0e39 f	  66 
+	LD	L,A		; 0e3a o	  6f 
+	LD	A,(HL)		; 0e3b ~	  7e 
+	INC	HL		; 0e3c #	  23 
+	LD	H,(HL)		; 0e3d f	  66 
+	LD	L,A		; 0e3e o	  6f 
+	INC	HL		; 0e3f #	  23 
+	INC	HL		; 0e40 #	  23 
+	INC	HL		; 0e41 #	  23 
+	INC	HL		; 0e42 #	  23 
+	LD	A,(HL)		; 0e43 ~	  7e 
+	CP	FFH		; 0e44 ..	  fe ff 
+	JP	NZ,H0e4d	; 0e46 .M.	  c2 4d 0e 
+	INC	HL		; 0e49 #	  23 
+	LD	A,(HL)		; 0e4a ~	  7e 
+	CP	FFH		; 0e4b ..	  fe ff 
+H0e4d: 	JP	NZ,H0e9e	; 0e4d ...	  c2 9e 0e 
+	JP	H0e62		; 0e50 .b.	  c3 62 0e 
+
+H0e53: 	LD	HL,0004H	; 0e53 !..	  21 04 00 
+	ADD	HL,DE		; 0e56 .	  19 
+	LD	C,(HL)		; 0e57 N	  4e 
+	INC	HL		; 0e58 #	  23 
+	LD	B,(HL)		; 0e59 F	  46 
+	PUSH	BC		; 0e5a .	  c5 
+	CALL	H1152		; 0e5b .R.	  cd 52 11 
+	POP	AF		; 0e5e .	  f1 
+	JP	c.ret		; 0e5f .H.	  c3 48 13 
+
+H0e62: 	LD	HL,FFF6H	; 0e62 !..	  21 f6 ff 
+	ADD	HL,DE		; 0e65 .	  19 
+	LD	A,(HL)		; 0e66 ~	  7e 
+	INC	HL		; 0e67 #	  23 
+	LD	H,(HL)		; 0e68 f	  66 
+	LD	L,A		; 0e69 o	  6f 
+	LD	A,(HL)		; 0e6a ~	  7e 
+	INC	HL		; 0e6b #	  23 
+	LD	H,(HL)		; 0e6c f	  66 
+	LD	L,A		; 0e6d o	  6f 
+	INC	HL		; 0e6e #	  23 
+	INC	HL		; 0e6f #	  23 
+	LD	C,(HL)		; 0e70 N	  4e 
+	INC	HL		; 0e71 #	  23 
+	LD	B,(HL)		; 0e72 F	  46 
+	PUSH	BC		; 0e73 .	  c5 
+	LD	HL,FFF6H	; 0e74 !..	  21 f6 ff 
+	ADD	HL,DE		; 0e77 .	  19 
+	LD	A,(HL)		; 0e78 ~	  7e 
+	INC	HL		; 0e79 #	  23 
+	LD	H,(HL)		; 0e7a f	  66 
+	LD	L,A		; 0e7b o	  6f 
+	LD	A,(HL)		; 0e7c ~	  7e 
+	INC	HL		; 0e7d #	  23 
+	LD	H,(HL)		; 0e7e f	  66 
+	LD	L,A		; 0e7f o	  6f 
+	LD	BC,0008H	; 0e80 ...	  01 08 00 
+	ADD	HL,BC		; 0e83 .	  09 
+	LD	C,(HL)		; 0e84 N	  4e 
+	INC	HL		; 0e85 #	  23 
+	LD	B,(HL)		; 0e86 F	  46 
+	PUSH	BC		; 0e87 .	  c5 
+	LD	HL,FFF6H	; 0e88 !..	  21 f6 ff 
+	ADD	HL,DE		; 0e8b .	  19 
+	LD	A,(HL)		; 0e8c ~	  7e 
+	INC	HL		; 0e8d #	  23 
+	LD	H,(HL)		; 0e8e f	  66 
+	LD	L,A		; 0e8f o	  6f 
+	LD	A,(HL)		; 0e90 ~	  7e 
+	INC	HL		; 0e91 #	  23 
+	LD	H,(HL)		; 0e92 f	  66 
+	LD	L,A		; 0e93 o	  6f 
+	LD	C,(HL)		; 0e94 N	  4e 
+	INC	HL		; 0e95 #	  23 
+	LD	B,(HL)		; 0e96 F	  46 
+	PUSH	BC		; 0e97 .	  c5 
+	CALL	H11c8		; 0e98 ...	  cd c8 11 
+	POP	AF		; 0e9b .	  f1 
+	POP	AF		; 0e9c .	  f1 
+	POP	AF		; 0e9d .	  f1 
+H0e9e: 	LD	HL,FFF6H	; 0e9e !..	  21 f6 ff 
+	ADD	HL,DE		; 0ea1 .	  19 
+	LD	A,(HL)		; 0ea2 ~	  7e 
+	ADD	A,02H		; 0ea3 ..	  c6 02 
+	LD	(HL),A		; 0ea5 w	  77 
+	INC	HL		; 0ea6 #	  23 
+	LD	A,(HL)		; 0ea7 ~	  7e 
+	ADC	A,00H		; 0ea8 ..	  ce 00 
+	LD	(HL),A		; 0eaa w	  77 
+	JP	H0e07		; 0eab ...	  c3 07 0e 
+
+remark: CALL	c.ents		; 0eae ...	  cd f4 11 
+	LD	HL,0006H	; 0eb1 !..	  21 06 00 
+	ADD	HL,DE		; 0eb4 .	  19 
+	LD	(H1633),HL	; 0eb5 "3.	  22 33 16 
+H0eb8: 	LD	HL,(H1633)	; 0eb8 *3.	  2a 33 16 
+	LD	A,(HL)		; 0ebb ~	  7e 
+	INC	HL		; 0ebc #	  23 
+	OR	(HL)		; 0ebd .	  b6 
+	JP	Z,H0eed		; 0ebe ...	  ca ed 0e 
+	LD	HL,(H1633)	; 0ec1 *3.	  2a 33 16 
+	LD	C,(HL)		; 0ec4 N	  4e 
+	INC	HL		; 0ec5 #	  23 
+	LD	B,(HL)		; 0ec6 F	  46 
+	PUSH	BC		; 0ec7 .	  c5 
+	CALL	H0ef0		; 0ec8 ...	  cd f0 0e 
+	POP	AF		; 0ecb .	  f1 
+	PUSH	BC		; 0ecc .	  c5 
+	LD	HL,(H1633)	; 0ecd *3.	  2a 33 16 
+	LD	C,(HL)		; 0ed0 N	  4e 
+	INC	HL		; 0ed1 #	  23 
+	LD	B,(HL)		; 0ed2 F	  46 
+	PUSH	BC		; 0ed3 .	  c5 
+	LD	HL,0004H	; 0ed4 !..	  21 04 00 
+	ADD	HL,DE		; 0ed7 .	  19 
+	LD	C,(HL)		; 0ed8 N	  4e 
+	INC	HL		; 0ed9 #	  23 
+	LD	B,(HL)		; 0eda F	  46 
+	PUSH	BC		; 0edb .	  c5 
+	CALL	H11c8		; 0edc ...	  cd c8 11 
+	POP	AF		; 0edf .	  f1 
+	POP	AF		; 0ee0 .	  f1 
+	POP	AF		; 0ee1 .	  f1 
+	LD	HL,(H1633)	; 0ee2 *3.	  2a 33 16 
+	INC	HL		; 0ee5 #	  23 
+	INC	HL		; 0ee6 #	  23 
+	LD	(H1633),HL	; 0ee7 "3.	  22 33 16 
+	JP	H0eb8		; 0eea ...	  c3 b8 0e 
+
+H0eed: 	JP	c.rets		; 0eed ...	  c3 0a 12 
+
+H0ef0: 	CALL	c.ents		; 0ef0 ...	  cd f4 11 
+	LD	HL,0004H	; 0ef3 !..	  21 04 00 
+	ADD	HL,DE		; 0ef6 .	  19 
+	LD	A,(HL)		; 0ef7 ~	  7e 
+	INC	HL		; 0ef8 #	  23 
+	LD	H,(HL)		; 0ef9 f	  66 
+	LD	L,A		; 0efa o	  6f 
+	LD	(H1633),HL	; 0efb "3.	  22 33 16 
+H0efe: 	LD	HL,(H1633)	; 0efe *3.	  2a 33 16 
+	LD	A,(HL)		; 0f01 ~	  7e 
+	OR	A		; 0f02 .	  b7 
+	JP	Z,H0f10		; 0f03 ...	  ca 10 0f 
+	LD	HL,(H1633)	; 0f06 *3.	  2a 33 16 
+	INC	HL		; 0f09 #	  23 
+	LD	(H1633),HL	; 0f0a "3.	  22 33 16 
+	JP	H0efe		; 0f0d ...	  c3 fe 0e 
+
+H0f10: 	LD	HL,(H1633)	; 0f10 *3.	  2a 33 16 
+	PUSH	HL		; 0f13 .	  e5 
+	LD	HL,0004H	; 0f14 !..	  21 04 00 
+	ADD	HL,DE		; 0f17 .	  19 
+	POP	BC		; 0f18 .	  c1 
+	LD	A,C		; 0f19 y	  79 
+	SUB	(HL)		; 0f1a .	  96 
+	LD	C,A		; 0f1b O	  4f 
+	LD	A,B		; 0f1c x	  78 
+	INC	HL		; 0f1d #	  23 
+	SBC	A,(HL)		; 0f1e .	  9e 
+	LD	B,A		; 0f1f G	  47 
+	JP	c.rets		; 0f20 ...	  c3 0a 12 
+
+H0f23: 	PUSH	DE		; 0f23 .	  d5 
+	LD	HL,0004H	; 0f24 !..	  21 04 00 
+	ADD	HL,SP		; 0f27 9	  39 
+	LD	E,(HL)		; 0f28 ^	  5e 
+	INC	HL		; 0f29 #	  23 
+	LD	D,(HL)		; 0f2a V	  56 
+	PUSH	DE		; 0f2b .	  d5 
+	INC	HL		; 0f2c #	  23 
+	LD	E,(HL)		; 0f2d ^	  5e 
+	INC	HL		; 0f2e #	  23 
+	LD	D,(HL)		; 0f2f V	  56 
+	INC	HL		; 0f30 #	  23 
+	LD	C,(HL)		; 0f31 N	  4e 
+	INC	HL		; 0f32 #	  23 
+	LD	B,(HL)		; 0f33 F	  46 
+	EX	DE,HL		; 0f34 .	  eb 
+	POP	DE		; 0f35 .	  d1 
+	PUSH	BC		; 0f36 .	  c5 
+	XOR	A		; 0f37 .	  af 
+	ADD	A,03H		; 0f38 ..	  c6 03 
+	JP	PO,H0f4a	; 0f3a .J.	  e2 4a 0f 
+H0f3d: 	LD	A,(HL)		; 0f3d ~	  7e 
+	LD	(DE),A		; 0f3e .	  12 
+	INC	HL		; 0f3f #	  23 
+	INC	DE		; 0f40 .	  13 
+	DEC	BC		; 0f41 .	  0b 
+	LD	A,B		; 0f42 x	  78 
+	OR	C		; 0f43 .	  b1 
+	JP	NZ,H0f3d	; 0f44 .=.	  c2 3d 0f 
+	POP	BC		; 0f47 .	  c1 
+	POP	DE		; 0f48 .	  d1 
+	RET			; 0f49 .	  c9 
+
+H0f4a: 	LDIR			; 0f4a ..	  ed b0 
+	POP	BC		; 0f4c .	  c1 
+	POP	DE		; 0f4d .	  d1 
+	RET			; 0f4e .	  c9 
+
+create: CALL	c.ent		; 0f4f .A.	  cd 41 13 
+	PUSH	AF		; 0f52 .	  f5 
+	PUSH	AF		; 0f53 .	  f5 
+	PUSH	AF		; 0f54 .	  f5 
+	PUSH	AF		; 0f55 .	  f5 
+	LD	HL,FFF8H	; 0f56 !..	  21 f8 ff 
+	ADD	HL,DE		; 0f59 .	  19 
+	PUSH	HL		; 0f5a .	  e5 
+	LD	HL,H01ff	; 0f5b !..	  21 ff 01 
+	PUSH	HL		; 0f5e .	  e5 
+	LD	HL,0004H	; 0f5f !..	  21 04 00 
+	ADD	HL,DE		; 0f62 .	  19 
+	LD	C,(HL)		; 0f63 N	  4e 
+	INC	HL		; 0f64 #	  23 
+	LD	B,(HL)		; 0f65 F	  46 
+	PUSH	BC		; 0f66 .	  c5 
+	CALL	H112e		; 0f67 ...	  cd 2e 11 
+	POP	AF		; 0f6a .	  f1 
+	POP	AF		; 0f6b .	  f1 
+	POP	HL		; 0f6c .	  e1 
+	LD	A,C		; 0f6d y	  79 
+	LD	(HL),A		; 0f6e w	  77 
+	LD	A,B		; 0f6f x	  78 
+	INC	HL		; 0f70 #	  23 
+	LD	(HL),A		; 0f71 w	  77 
+	LD	HL,FFF8H	; 0f72 !..	  21 f8 ff 
+	ADD	HL,DE		; 0f75 .	  19 
+	INC	HL		; 0f76 #	  23 
+	LD	A,(HL)		; 0f77 ~	  7e 
+	OR	A		; 0f78 .	  b7 
+	JP	P,H0f89		; 0f79 ...	  f2 89 0f 
+	LD	HL,FFF8H	; 0f7c !..	  21 f8 ff 
+	ADD	HL,DE		; 0f7f .	  19 
+	LD	A,(HL)		; 0f80 ~	  7e 
+	INC	HL		; 0f81 #	  23 
+	LD	H,(HL)		; 0f82 f	  66 
+	LD	L,A		; 0f83 o	  6f 
+	LD	C,L		; 0f84 M	  4d 
+	LD	B,H		; 0f85 D	  44 
+	JP	c.ret		; 0f86 .H.	  c3 48 13 
+
+H0f89: 	LD	HL,0006H	; 0f89 !..	  21 06 00 
+	ADD	HL,DE		; 0f8c .	  19 
+	LD	A,(HL)		; 0f8d ~	  7e 
+	INC	HL		; 0f8e #	  23 
+	OR	(HL)		; 0f8f .	  b6 
+	JP	NZ,H0fbe	; 0f90 ...	  c2 be 0f 
+	LD	HL,FFF8H	; 0f93 !..	  21 f8 ff 
+	ADD	HL,DE		; 0f96 .	  19 
+	LD	C,(HL)		; 0f97 N	  4e 
+	INC	HL		; 0f98 #	  23 
+	LD	B,(HL)		; 0f99 F	  46 
+	PUSH	BC		; 0f9a .	  c5 
+	CALL	H111f		; 0f9b ...	  cd 1f 11 
+	POP	AF		; 0f9e .	  f1 
+	LD	HL,FFF8H	; 0f9f !..	  21 f8 ff 
+	ADD	HL,DE		; 0fa2 .	  19 
+	PUSH	HL		; 0fa3 .	  e5 
+	LD	HL,boot		; 0fa4 !..	  21 00 00 
+	PUSH	HL		; 0fa7 .	  e5 
+	LD	HL,0004H	; 0fa8 !..	  21 04 00 
+	ADD	HL,DE		; 0fab .	  19 
+	LD	C,(HL)		; 0fac N	  4e 
+	INC	HL		; 0fad #	  23 
+	LD	B,(HL)		; 0fae F	  46 
+	PUSH	BC		; 0faf .	  c5 
+	CALL	H1178		; 0fb0 .x.	  cd 78 11 
+	POP	AF		; 0fb3 .	  f1 
+	POP	AF		; 0fb4 .	  f1 
+	POP	HL		; 0fb5 .	  e1 
+	LD	A,C		; 0fb6 y	  79 
+	LD	(HL),A		; 0fb7 w	  77 
+	LD	A,B		; 0fb8 x	  78 
+	INC	HL		; 0fb9 #	  23 
+	LD	(HL),A		; 0fba w	  77 
+	JP	H0ff7		; 0fbb ...	  c3 f7 0f 
+
+H0fbe: 	LD	HL,0006H	; 0fbe !..	  21 06 00 
+	ADD	HL,DE		; 0fc1 .	  19 
+	LD	A,(HL)		; 0fc2 ~	  7e 
+	CP	02H		; 0fc3 ..	  fe 02 
+	JP	NZ,H0fcc	; 0fc5 ...	  c2 cc 0f 
+	INC	HL		; 0fc8 #	  23 
+	LD	A,(HL)		; 0fc9 ~	  7e 
+	CP	00H		; 0fca ..	  fe 00 
+H0fcc: 	JP	NZ,H0ff7	; 0fcc ...	  c2 f7 0f 
+	LD	HL,FFF8H	; 0fcf !..	  21 f8 ff 
+	ADD	HL,DE		; 0fd2 .	  19 
+	LD	C,(HL)		; 0fd3 N	  4e 
+	INC	HL		; 0fd4 #	  23 
+	LD	B,(HL)		; 0fd5 F	  46 
+	PUSH	BC		; 0fd6 .	  c5 
+	CALL	H111f		; 0fd7 ...	  cd 1f 11 
+	POP	AF		; 0fda .	  f1 
+	LD	HL,FFF8H	; 0fdb !..	  21 f8 ff 
+	ADD	HL,DE		; 0fde .	  19 
+	PUSH	HL		; 0fdf .	  e5 
+	LD	HL,0002H	; 0fe0 !..	  21 02 00 
+	PUSH	HL		; 0fe3 .	  e5 
+	LD	HL,0004H	; 0fe4 !..	  21 04 00 
+	ADD	HL,DE		; 0fe7 .	  19 
+	LD	C,(HL)		; 0fe8 N	  4e 
+	INC	HL		; 0fe9 #	  23 
+	LD	B,(HL)		; 0fea F	  46 
+	PUSH	BC		; 0feb .	  c5 
+	CALL	H1178		; 0fec .x.	  cd 78 11 
+	POP	AF		; 0fef .	  f1 
+	POP	AF		; 0ff0 .	  f1 
+	POP	HL		; 0ff1 .	  e1 
+	LD	A,C		; 0ff2 y	  79 
+	LD	(HL),A		; 0ff3 w	  77 
+	LD	A,B		; 0ff4 x	  78 
+	INC	HL		; 0ff5 #	  23 
+	LD	(HL),A		; 0ff6 w	  77 
+H0ff7: 	LD	HL,FFF8H	; 0ff7 !..	  21 f8 ff 
+	ADD	HL,DE		; 0ffa .	  19 
+	LD	A,(HL)		; 0ffb ~	  7e 
+	INC	HL		; 0ffc #	  23 
+	LD	H,(HL)		; 0ffd f	  66 
+	LD	L,A		; 0ffe o	  6f 
+	LD	C,L		; 0fff M	  4d 
+	LD	B,H		; 1000 D	  44 
+	JP	c.ret		; 1001 .H.	  c3 48 13 
+
+H1004: 	CALL	c.ent		; 1004 .A.	  cd 41 13 
+	PUSH	AF		; 1007 .	  f5 
+	PUSH	AF		; 1008 .	  f5 
+	PUSH	AF		; 1009 .	  f5 
+	PUSH	AF		; 100a .	  f5 
+	LD	HL,FFF8H	; 100b !..	  21 f8 ff 
+	ADD	HL,DE		; 100e .	  19 
+	PUSH	HL		; 100f .	  e5 
+	LD	HL,0004H	; 1010 !..	  21 04 00 
+	ADD	HL,DE		; 1013 .	  19 
+	LD	C,(HL)		; 1014 N	  4e 
+	INC	HL		; 1015 #	  23 
+	LD	B,(HL)		; 1016 F	  46 
+	PUSH	BC		; 1017 .	  c5 
+	CALL	H1046		; 1018 .F.	  cd 46 10 
+	POP	AF		; 101b .	  f1 
+	POP	HL		; 101c .	  e1 
+	LD	A,C		; 101d y	  79 
+	LD	(HL),A		; 101e w	  77 
+	LD	A,B		; 101f x	  78 
+	INC	HL		; 1020 #	  23 
+	LD	(HL),A		; 1021 w	  77 
+	LD	HL,FFF8H	; 1022 !..	  21 f8 ff 
+	ADD	HL,DE		; 1025 .	  19 
+	LD	A,(HL)		; 1026 ~	  7e 
+	CP	FFH		; 1027 ..	  fe ff 
+	JP	NZ,H1030	; 1029 .0.	  c2 30 10 
+	INC	HL		; 102c #	  23 
+	LD	A,(HL)		; 102d ~	  7e 
+	CP	FFH		; 102e ..	  fe ff 
+H1030: 	JP	NZ,H1039	; 1030 .9.	  c2 39 10 
+	LD	BC,boot		; 1033 ...	  01 00 00 
+	JP	c.ret		; 1036 .H.	  c3 48 13 
+
+H1039: 	LD	HL,FFF8H	; 1039 !..	  21 f8 ff 
+	ADD	HL,DE		; 103c .	  19 
+	LD	A,(HL)		; 103d ~	  7e 
+	INC	HL		; 103e #	  23 
+	LD	H,(HL)		; 103f f	  66 
+	LD	L,A		; 1040 o	  6f 
+	LD	C,L		; 1041 M	  4d 
+	LD	B,H		; 1042 D	  44 
+	JP	c.ret		; 1043 .H.	  c3 48 13 
+
+H1046: 	CALL	c.ent		; 1046 .A.	  cd 41 13 
+	LD	HL,FFF6H	; 1049 !..	  21 f6 ff 
+	ADD	HL,SP		; 104c 9	  39 
+	LD	SP,HL		; 104d .	  f9 
+	LD	HL,FFF8H	; 104e !..	  21 f8 ff 
+	ADD	HL,DE		; 1051 .	  19 
+	LD	A,(H15fb)	; 1052 :..	  3a fb 15 
+	LD	(HL),A		; 1055 w	  77 
+	LD	A,(H15fc)	; 1056 :..	  3a fc 15 
+	INC	HL		; 1059 #	  23 
+	LD	(HL),A		; 105a w	  77 
+	LD	HL,FFF6H	; 105b !..	  21 f6 ff 
+	ADD	HL,DE		; 105e .	  19 
+	PUSH	HL		; 105f .	  e5 
+	LD	HL,FFF8H	; 1060 !..	  21 f8 ff 
+	ADD	HL,DE		; 1063 .	  19 
+	LD	A,(HL)		; 1064 ~	  7e 
+	INC	HL		; 1065 #	  23 
+	LD	H,(HL)		; 1066 f	  66 
+	LD	L,A		; 1067 o	  6f 
+	PUSH	HL		; 1068 .	  e5 
+	LD	HL,0004H	; 1069 !..	  21 04 00 
+	ADD	HL,DE		; 106c .	  19 
+	LD	A,(HL)		; 106d ~	  7e 
+	INC	HL		; 106e #	  23 
+	LD	H,(HL)		; 106f f	  66 
+	LD	L,A		; 1070 o	  6f 
+	EX	(SP),HL		; 1071 .	  e3 
+	POP	BC		; 1072 .	  c1 
+	ADD	HL,BC		; 1073 .	  09 
+	POP	BC		; 1074 .	  c1 
+	LD	A,L		; 1075 }	  7d 
+	LD	(BC),A		; 1076 .	  02 
+	LD	A,H		; 1077 |	  7c 
+	INC	BC		; 1078 .	  03 
+	LD	(BC),A		; 1079 .	  02 
+	LD	HL,FFF6H	; 107a !..	  21 f6 ff 
+	ADD	HL,DE		; 107d .	  19 
+	LD	C,(HL)		; 107e N	  4e 
+	INC	HL		; 107f #	  23 
+	LD	B,(HL)		; 1080 F	  46 
+	PUSH	BC		; 1081 .	  c5 
+	CALL	H110b		; 1082 ...	  cd 0b 11 
+	POP	AF		; 1085 .	  f1 
+	LD	A,C		; 1086 y	  79 
+	CP	FFH		; 1087 ..	  fe ff 
+	JP	NZ,H108f	; 1089 ...	  c2 8f 10 
+	LD	A,B		; 108c x	  78 
+	CP	FFH		; 108d ..	  fe ff 
+H108f: 	JP	NZ,H1098	; 108f ...	  c2 98 10 
+	LD	BC,FFFFH	; 1092 ...	  01 ff ff 
+	JP	c.ret		; 1095 .H.	  c3 48 13 
+
+H1098: 	LD	HL,FFF6H	; 1098 !..	  21 f6 ff 
+	ADD	HL,DE		; 109b .	  19 
+	LD	A,(HL)		; 109c ~	  7e 
+	INC	HL		; 109d #	  23 
+	LD	H,(HL)		; 109e f	  66 
+	LD	L,A		; 109f o	  6f 
+	LD	(H15fb),HL	; 10a0 "..	  22 fb 15 
+	LD	HL,FFF8H	; 10a3 !..	  21 f8 ff 
+	ADD	HL,DE		; 10a6 .	  19 
+	LD	A,(HL)		; 10a7 ~	  7e 
+	INC	HL		; 10a8 #	  23 
+	LD	H,(HL)		; 10a9 f	  66 
+	LD	L,A		; 10aa o	  6f 
+	LD	C,L		; 10ab M	  4d 
+	LD	B,H		; 10ac D	  44 
+	JP	c.ret		; 10ad .H.	  c3 48 13 
+
+	DB	CDH,"A",13H,"!",F6H,FFH,"9",F9H,"!",F8H,FFH,19H
+	DB	":",FBH,15H,"w:",FCH,15H,"#w!",F6H,FFH,19H,E5H
+	DB	"!",04H,00H,19H,C1H,"~",02H,"#~",03H,02H,"!",F6H
+	DB	FFH,19H,"N#F",C5H,CDH,0BH,11H,F1H,"y",FEH,FFH
+	DB	C2H,EAH,10H,"x",FEH,FFH,C2H,F3H,10H,01H,FFH,FFH
+	DB	C3H,"H",13H,"!",F6H,FFH,19H,"~#fo",22H,FBH,15H
+	DB	"!",F8H,FFH,19H,"~#foMD",C3H,"H",13H
+H110b: 	POP	BC		; 110b .	  c1 
+	POP	HL		; 110c .	  e1 
+	PUSH	HL		; 110d .	  e5 
+	PUSH	BC		; 110e .	  c5 
+	LD	(H15ff),HL	; 110f "..	  22 ff 15 
+	RST	8		; 1112 .	  cf 
+	NOP			; 1113 .	  00 
+	?			; 1114 ..	  fd 15 
+	LD	BC,boot		; 1116 ...	  01 00 00 
+	RET	NC		; 1119 .	  d0 
+	DEC	BC		; 111a .	  0b 
+	LD	(H161d),HL	; 111b "..	  22 1d 16 
+	RET			; 111e .	  c9 
+
+H111f: 	POP	BC		; 111f .	  c1 
+	POP	HL		; 1120 .	  e1 
+	PUSH	HL		; 1121 .	  e5 
+	PUSH	BC		; 1122 .	  c5 
+	RST	8		; 1123 .	  cf 
+	LD	B,01H		; 1124 ..	  06 01 
+	NOP			; 1126 .	  00 
+	NOP			; 1127 .	  00 
+	RET	NC		; 1128 .	  d0 
+	DEC	BC		; 1129 .	  0b 
+	LD	(H161d),HL	; 112a "..	  22 1d 16 
+	RET			; 112d .	  c9 
+
+H112e: 	LD	HL,0002H	; 112e !..	  21 02 00 
+	ADD	HL,SP		; 1131 9	  39 
+	LD	A,(HL)		; 1132 ~	  7e 
+	INC	HL		; 1133 #	  23 
+	LD	H,(HL)		; 1134 f	  66 
+	LD	L,A		; 1135 o	  6f 
+	LD	(H1603),HL	; 1136 "..	  22 03 16 
+	LD	HL,0004H	; 1139 !..	  21 04 00 
+	ADD	HL,SP		; 113c 9	  39 
+	LD	A,(HL)		; 113d ~	  7e 
+	INC	HL		; 113e #	  23 
+	LD	H,(HL)		; 113f f	  66 
+	LD	L,A		; 1140 o	  6f 
+	LD	(H1605),HL	; 1141 "..	  22 05 16 
+	RST	8		; 1144 .	  cf 
+	NOP			; 1145 .	  00 
+	LD	BC,4D16H	; 1146 ..M	  01 16 4d 
+	LD	B,H		; 1149 D	  44 
+	RET	NC		; 114a .	  d0 
+	LD	BC,FFFFH	; 114b ...	  01 ff ff 
+	LD	(H161d),HL	; 114e "..	  22 1d 16 
+	RET			; 1151 .	  c9 
+
+H1152: 	POP	BC		; 1152 .	  c1 
+	POP	HL		; 1153 .	  e1 
+	PUSH	HL		; 1154 .	  e5 
+	PUSH	BC		; 1155 .	  c5 
+	RST	8		; 1156 .	  cf 
+	LD	BC,H0421	; 1157 .!.	  01 21 04 
+	NOP			; 115a .	  00 
+	ADD	HL,SP		; 115b 9	  39 
+	LD	A,(HL)		; 115c ~	  7e 
+	INC	HL		; 115d #	  23 
+	LD	H,(HL)		; 115e f	  66 
+	LD	L,A		; 115f o	  6f 
+	LD	(H1609),HL	; 1160 "..	  22 09 16 
+	LD	HL,0002H	; 1163 !..	  21 02 00 
+	ADD	HL,SP		; 1166 9	  39 
+	LD	A,(HL)		; 1167 ~	  7e 
+	INC	HL		; 1168 #	  23 
+	LD	H,(HL)		; 1169 f	  66 
+	LD	L,A		; 116a o	  6f 
+	RST	8		; 116b .	  cf 
+	NOP			; 116c .	  00 
+	RLCA			; 116d .	  07 
+	LD	D,01H		; 116e ..	  16 01 
+	NOP			; 1170 .	  00 
+	NOP			; 1171 .	  00 
+	RET	NC		; 1172 .	  d0 
+	DEC	BC		; 1173 .	  0b 
+	LD	(H161d),HL	; 1174 "..	  22 1d 16 
+	RET			; 1177 .	  c9 
+
+H1178: 	LD	HL,0002H	; 1178 !..	  21 02 00 
+	ADD	HL,SP		; 117b 9	  39 
+	LD	A,(HL)		; 117c ~	  7e 
+	INC	HL		; 117d #	  23 
+	LD	H,(HL)		; 117e f	  66 
+	LD	L,A		; 117f o	  6f 
+	LD	(H160d),HL	; 1180 "..	  22 0d 16 
+	LD	HL,0004H	; 1183 !..	  21 04 00 
+	ADD	HL,SP		; 1186 9	  39 
+	LD	A,(HL)		; 1187 ~	  7e 
+	INC	HL		; 1188 #	  23 
+	LD	H,(HL)		; 1189 f	  66 
+	LD	L,A		; 118a o	  6f 
+	LD	(H160f),HL	; 118b "..	  22 0f 16 
+	RST	8		; 118e .	  cf 
+	NOP			; 118f .	  00 
+	DEC	BC		; 1190 .	  0b 
+	LD	D,4DH		; 1191 .M	  16 4d 
+	LD	B,H		; 1193 D	  44 
+	RET	NC		; 1194 .	  d0 
+	LD	BC,FFFFH	; 1195 ...	  01 ff ff 
+	LD	(H161d),HL	; 1198 "..	  22 1d 16 
+	RET			; 119b .	  c9 
+
+H119c: 	LD	HL,0004H	; 119c !..	  21 04 00 
+	ADD	HL,SP		; 119f 9	  39 
+	LD	A,(HL)		; 11a0 ~	  7e 
+	INC	HL		; 11a1 #	  23 
+	LD	H,(HL)		; 11a2 f	  66 
+	LD	L,A		; 11a3 o	  6f 
+	LD	(H1613),HL	; 11a4 "..	  22 13 16 
+	LD	HL,0006H	; 11a7 !..	  21 06 00 
+	ADD	HL,SP		; 11aa 9	  39 
+	LD	A,(HL)		; 11ab ~	  7e 
+	INC	HL		; 11ac #	  23 
+	LD	H,(HL)		; 11ad f	  66 
+	LD	L,A		; 11ae o	  6f 
+	LD	(H1615),HL	; 11af "..	  22 15 16 
+	LD	HL,0002H	; 11b2 !..	  21 02 00 
+	ADD	HL,SP		; 11b5 9	  39 
+	LD	A,(HL)		; 11b6 ~	  7e 
+	INC	HL		; 11b7 #	  23 
+	LD	H,(HL)		; 11b8 f	  66 
+	LD	L,A		; 11b9 o	  6f 
+	RST	8		; 11ba .	  cf 
+	NOP			; 11bb .	  00 
+	LD	DE,4D16H	; 11bc ..M	  11 16 4d 
+	LD	B,H		; 11bf D	  44 
+	RET	NC		; 11c0 .	  d0 
+	LD	BC,FFFFH	; 11c1 ...	  01 ff ff 
+	LD	(H161d),HL	; 11c4 "..	  22 1d 16 
+	RET			; 11c7 .	  c9 
+
+H11c8: 	LD	HL,0004H	; 11c8 !..	  21 04 00 
+	ADD	HL,SP		; 11cb 9	  39 
+	LD	A,(HL)		; 11cc ~	  7e 
+	INC	HL		; 11cd #	  23 
+	LD	H,(HL)		; 11ce f	  66 
+	LD	L,A		; 11cf o	  6f 
+	LD	(H1619),HL	; 11d0 "..	  22 19 16 
+	LD	HL,0006H	; 11d3 !..	  21 06 00 
+	ADD	HL,SP		; 11d6 9	  39 
+	LD	A,(HL)		; 11d7 ~	  7e 
+	INC	HL		; 11d8 #	  23 
+	LD	H,(HL)		; 11d9 f	  66 
+	LD	L,A		; 11da o	  6f 
+	LD	(H161b),HL	; 11db "..	  22 1b 16 
+	LD	HL,0002H	; 11de !..	  21 02 00 
+	ADD	HL,SP		; 11e1 9	  39 
+	LD	A,(HL)		; 11e2 ~	  7e 
+	INC	HL		; 11e3 #	  23 
+	LD	H,(HL)		; 11e4 f	  66 
+	LD	L,A		; 11e5 o	  6f 
+	RST	8		; 11e6 .	  cf 
+	NOP			; 11e7 .	  00 
+	RLA			; 11e8 .	  17 
+	LD	D,4DH		; 11e9 .M	  16 4d 
+	LD	B,H		; 11eb D	  44 
+	RET	NC		; 11ec .	  d0 
+	LD	BC,FFFFH	; 11ed ...	  01 ff ff 
+	LD	(H161d),HL	; 11f0 "..	  22 1d 16 
+	RET			; 11f3 .	  c9 
+
+c.ents: POP	BC		; 11f4 .	  c1 
+	LD	HL,FFFEH	; 11f5 !..	  21 fe ff 
+	ADD	HL,SP		; 11f8 9	  39 
+	EX	DE,HL		; 11f9 .	  eb 
+	PUSH	HL		; 11fa .	  e5 
+	LD	HL,(H1633)	; 11fb *3.	  2a 33 16 
+	PUSH	HL		; 11fe .	  e5 
+	LD	HL,(H1631)	; 11ff *1.	  2a 31 16 
+	PUSH	HL		; 1202 .	  e5 
+	LD	HL,(H162f)	; 1203 */.	  2a 2f 16 
+	PUSH	HL		; 1206 .	  e5 
+	LD	L,C		; 1207 i	  69 
+	LD	H,B		; 1208 `	  60 
+	JP	(HL)		; 1209 .	  e9 
+
+c.rets: LD	HL,FFFAH	; 120a !..	  21 fa ff 
+	ADD	HL,DE		; 120d .	  19 
+	LD	SP,HL		; 120e .	  f9 
+	POP	HL		; 120f .	  e1 
+	LD	(H162f),HL	; 1210 "/.	  22 2f 16 
+	POP	HL		; 1213 .	  e1 
+	LD	(H1631),HL	; 1214 "1.	  22 31 16 
+	POP	HL		; 1217 .	  e1 
+	LD	(H1633),HL	; 1218 "3.	  22 33 16 
+	POP	DE		; 121b .	  d1 
+	RET			; 121c .	  c9 
+
+H121d: 	POP	HL		; 121d .	  e1 
+	PUSH	DE		; 121e .	  d5 
+	LD	DE,boot		; 121f ...	  11 00 00 
+	PUSH	DE		; 1222 .	  d5 
+	PUSH	BC		; 1223 .	  c5 
+	PUSH	HL		; 1224 .	  e5 
+	LD	D,10H		; 1225 ..	  16 10 
+H1227: 	DEC	D		; 1227 .	  15 
+	RET	M		; 1228 .	  f8 
+	LD	HL,0002H	; 1229 !..	  21 02 00 
+	ADD	HL,SP		; 122c 9	  39 
+	LD	A,(HL)		; 122d ~	  7e 
+	ADD	A,A		; 122e .	  87 
+	LD	(HL),A		; 122f w	  77 
+	INC	HL		; 1230 #	  23 
+	LD	A,(HL)		; 1231 ~	  7e 
+	ADC	A,A		; 1232 .	  8f 
+	LD	(HL),A		; 1233 w	  77 
+	INC	HL		; 1234 #	  23 
+	LD	A,(HL)		; 1235 ~	  7e 
+	ADC	A,A		; 1236 .	  8f 
+	LD	(HL),A		; 1237 w	  77 
+	INC	HL		; 1238 #	  23 
+	LD	A,(HL)		; 1239 ~	  7e 
+	ADC	A,A		; 123a .	  8f 
+	LD	(HL),A		; 123b w	  77 
+	DEC	HL		; 123c +	  2b 
+	LD	C,L		; 123d M	  4d 
+	LD	B,H		; 123e D	  44 
+	LD	HL,0010H	; 123f !..	  21 10 00 
+	ADD	HL,SP		; 1242 9	  39 
+	LD	A,(BC)		; 1243 .	  0a 
+	SUB	(HL)		; 1244 .	  96 
+	LD	E,A		; 1245 _	  5f 
+	INC	BC		; 1246 .	  03 
+	LD	A,(BC)		; 1247 .	  0a 
+	INC	HL		; 1248 #	  23 
+	SBC	A,(HL)		; 1249 .	  9e 
+	JP	C,H1227		; 124a .'.	  da 27 12 
+	LD	(BC),A		; 124d .	  02 
+	LD	A,E		; 124e {	  7b 
+	DEC	BC		; 124f .	  0b 
+	LD	(BC),A		; 1250 .	  02 
+	LD	HL,0002H	; 1251 !..	  21 02 00 
+	ADD	HL,SP		; 1254 9	  39 
+	INC	(HL)		; 1255 4	  34 
+	JP	H1227		; 1256 .'.	  c3 27 12 
+
+	DB	E5H,C5H,D5H,1EH,00H,"!",09H,00H,"9~",B7H,F2H,"q"
+	DB	12H,97H,"+",96H,"w>",00H,"#",9EH,"w",1CH,"!",0AH
+	DB	00H,"9N#Fx",B7H,F2H,85H,12H,97H,91H,"O>",00H,98H
+	DB	"G",1CH,CDH,1DH,12H,C1H,F1H,F1H,D2H,95H,12H,97H
+	DB	91H,"O>",00H,98H,"G!",0AH,00H,"9q#p",D1H,C3H,"d"
+	DB	13H,E5H,C5H,D5H,1EH,00H,"!",09H,00H,"9~",B7H,F2H
+	DB	B7H,12H,97H,"+",96H,"w>",00H,"#",9EH,"w!",0AH
+	DB	00H,"9N#Fx",B7H,F2H,CBH,12H,97H,91H,"O>",00H,98H
+	DB	"G",1CH,CDH,1DH,12H,F1H,C1H,F1H,D2H,DBH,12H,97H
+	DB	91H,"O>",00H,98H,"G!",0AH,00H,"9q#p",D1H,C3H,"d"
+	DB	13H
+H12e6: 	PUSH	HL		; 12e6 .	  e5 
+	PUSH	BC		; 12e7 .	  c5 
+	PUSH	DE		; 12e8 .	  d5 
+	LD	HL,000AH	; 12e9 !..	  21 0a 00 
+	ADD	HL,SP		; 12ec 9	  39 
+	LD	C,(HL)		; 12ed N	  4e 
+	INC	HL		; 12ee #	  23 
+	LD	B,(HL)		; 12ef F	  46 
+	CALL	H121d		; 12f0 ...	  cd 1d 12 
+	POP	BC		; 12f3 .	  c1 
+	POP	AF		; 12f4 .	  f1 
+	POP	AF		; 12f5 .	  f1 
+	LD	HL,000AH	; 12f6 !..	  21 0a 00 
+	ADD	HL,SP		; 12f9 9	  39 
+	LD	(HL),C		; 12fa q	  71 
+	INC	HL		; 12fb #	  23 
+	LD	(HL),B		; 12fc p	  70 
+	POP	DE		; 12fd .	  d1 
+	JP	H1364		; 12fe .d.	  c3 64 13 
+
+	DB	E5H,C5H,D5H,"!",0AH,00H,"9N#F",CDH,1DH,12H,F1H
+	DB	C1H,F1H,"!",0AH,00H,"9q#p",D1H,C3H,"d",13H
+H131c: 	LD	A,(HL)		; 131c ~	  7e 
+	INC	HL		; 131d #	  23 
+	OR	(HL)		; 131e .	  b6 
+	JP	NZ,H1328	; 131f .(.	  c2 28 13 
+	INC	HL		; 1322 #	  23 
+	LD	A,(HL)		; 1323 ~	  7e 
+	INC	HL		; 1324 #	  23 
+	LD	H,(HL)		; 1325 f	  66 
+	LD	L,A		; 1326 o	  6f 
+	JP	(HL)		; 1327 .	  e9 
+
+H1328: 	LD	A,C		; 1328 y	  79 
+	INC	HL		; 1329 #	  23 
+	CP	(HL)		; 132a .	  be 
+	JP	NZ,H133c	; 132b .<.	  c2 3c 13 
+	LD	A,B		; 132e x	  78 
+	INC	HL		; 132f #	  23 
+	CP	(HL)		; 1330 .	  be 
+	JP	NZ,H133d	; 1331 .=.	  c2 3d 13 
+	DEC	HL		; 1334 +	  2b 
+	DEC	HL		; 1335 +	  2b 
+	DEC	HL		; 1336 +	  2b 
+	LD	A,(HL)		; 1337 ~	  7e 
+	INC	HL		; 1338 #	  23 
+	LD	H,(HL)		; 1339 f	  66 
+	LD	L,A		; 133a o	  6f 
+	JP	(HL)		; 133b .	  e9 
+
+H133c: 	INC	HL		; 133c #	  23 
+H133d: 	INC	HL		; 133d #	  23 
+	JP	H131c		; 133e ...	  c3 1c 13 
+
+c.ent: 	LD	HL,boot		; 1341 !..	  21 00 00 
+	ADD	HL,SP		; 1344 9	  39 
+	EX	DE,HL		; 1345 .	  eb 
+	EX	(SP),HL		; 1346 .	  e3 
+	JP	(HL)		; 1347 .	  e9 
+
+c.ret: 	EX	DE,HL		; 1348 .	  eb 
+	LD	SP,HL		; 1349 .	  f9 
+	POP	DE		; 134a .	  d1 
+	RET			; 134b .	  c9 
+
+	DB	F5H,"!",06H,00H,"9N#F###q#p",C1H,"+++q",C1H,E1H
+	DB	F1H,F1H,C9H
+H1364: 	LD	HL,0004H	; 1364 !..	  21 04 00 
+	ADD	HL,SP		; 1367 9	  39 
+	LD	C,(HL)		; 1368 N	  4e 
+	INC	HL		; 1369 #	  23 
+	LD	B,(HL)		; 136a F	  46 
+	INC	HL		; 136b #	  23 
+	LD	(HL),C		; 136c q	  71 
+	INC	HL		; 136d #	  23 
+	LD	(HL),B		; 136e p	  70 
+	POP	BC		; 136f .	  c1 
+	POP	HL		; 1370 .	  e1 
+	POP	AF		; 1371 .	  f1 
+	RET			; 1372 .	  c9 
+
+H1373: 	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H
+H1573: 	DW	boot
+H1575: 	DW	boot
+H1577: 	DW	boot
+H1579: 	DW	boot
+H157b: 	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+H1587: 	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+H1593: 	DW	boot
+H1595: 	DW	boot
+H1597: 	DW	boot
+H1599: 	DW	boot
+H159b: 	DW	boot
+H159d: 	DW	boot
+H159f: 	DW	boot
+H15a1: 	DW	boot
+H15a3: 	DW	boot
+H15a5: 	DW	boot
+H15a7: 	DW	boot
+H15a9: 	DW	boot
+H15ab: 	DW	boot
+H15ad: 	DW	boot
+H15af: 	DW	boot
+H15b1: 	DW	boot
+H15b3: 	DW	boot
+H15b5: 	DW	boot
+H15b7: 	DW	boot
+H15b9: 	DW	boot
+H15bb: 	DW	boot
+H15bd: 	DW	boot
+H15bf: 	DW	boot
+H15c1: 	DW	boot
+H15c3: 	DB	EFH,15H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H,00H,00H,00H,00H
+H15e3: 	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	01H,00H,00H,00H,01H,00H,00H,00H,00H,00H,00H,00H
+H15fb: 	DW	1635H
+	DB	CFH,11H
+H15ff: 	DW	boot
+	DB	CFH,08H
+H1603: 	DW	boot
+H1605: 	DW	boot
+	DB	CFH,1CH
+H1609: 	DW	boot
+	DB	CFH,05H
+H160d: 	DW	boot
+H160f: 	DW	boot
+	DB	CFH,03H
+H1613: 	DW	boot
+H1615: 	DW	boot
+	DB	CFH,04H
+H1619: 	DW	boot
+H161b: 	DW	boot
+H161d: 	DW	boot
+	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+	DB	00H,00H,00H,00H
+H162f: 	DW	boot
+H1631: 	DW	boot
+H1633: 	DW	boot

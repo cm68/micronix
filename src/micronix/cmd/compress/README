@@ -1,0 +1,50 @@
+/usr/bin/compress from the Micronix 1.6 distribution
+
+There is no source for compress, so this is the disassembly, and compress.c is
+that disassembly read back into C.
+
+    disas -f compress.ctl compress.dist
+
+compress.dist is the binary off inode 60 of disks/dist/1012-8_dist_2.IMD, 5429
+bytes, mode 0711, dated 7 August 1982.  It has no header - see
+../newuser/README - and uses Whitesmith's runtime, c.ent at 1341 and c.ents
+at 11f4.
+
+Its own code is main at 0134, putlit at 034a and the message routine at 038a;
+the rest is the library and is the same as expand's: finit at 03f5, the stream
+routines getc 0569, putc 0603 and write 06d9, the string writer 0eae and
+create 0f4f.
+
+THE FORMAT is the thing this program is for, and expand reads it back.
+
+    n  b1 ... bn     a literal block: n is 1 to 254
+    0377  b  n       a run block: 0377, the byte, a count of 5 to 254
+
+The loop at 0245 reads a byte c and then reads on while the next byte is the
+same and the count is under 254.  A run of five or more becomes a run block;
+anything shorter is put in a 254 byte holding buffer, which is sent when it
+fills or when a run block has to go ahead of what comes next.  A run of more
+than 254 comes out as a series of blocks, because the byte that ended the
+first is the first of the next.  A literal count is therefore never 255, and
+0377 is never ambiguous.  It is the whole of the compression: "most text files
+are probably not worth compressing", as the manual says, and seven per cent
+on a binary is its own estimate.  The compress of compress.dist is 4800 bytes
+from 5429.
+
+The options are the same as expand's - none, one or two names - and so are
+the mistakes: the usage line, or the name and ": can't open." on the standard
+error and an exit of status 0.  The output is created 0777.
+
+The original's one-name form does not work.  The output stream is attached to
+its file descriptor only when there are two names, so with one the first full
+buffer jumps through a zero pointer - the sim reports a stack overflow at pc 0.
+compress.c does what the manual says: one name in, the standard output out.
+
+The exit status of the original is whatever was in BC at the end of main for
+a good run - which was the return of the flush, a small garbage number - and 0
+for a mistake.  This exits 0 and 1.
+
+Checked in usersim against the original, byte for byte, on a file of long runs
+and short runs and noise (98539 bytes), random bytes, an empty file, small
+cases around five, and the binary itself; then through the original expand and
+this expand both ways.  The messages and the status of every mistake match.

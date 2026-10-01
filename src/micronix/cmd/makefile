@@ -56,19 +56,24 @@ all:
 	cd chown ; make all
 	cd cmp ; make all
 	cd comm ; make all
+	cd compress ; make all
 	cd cp ; make all
+	cd cpp ; make all
 	cd crypt ; make all
 	cd cu ; make all
 	cd date ; make all
 	cd dc ; make all
 	cd dcheck ; make all
 	cd dd ; make all
+	cd detab ; make all
 	cd df ; make all
 	cd diff ; make all
 	cd djformat ; make all
 	cd du ; make all
 	cd echo ; make all
 	cd ed ; make all
+	cd entab ; make all
+	cd expand ; make all
 	cd expr ; make all
 	cd far ; make all
 	cd fd2 ; make all
@@ -109,6 +114,7 @@ all:
 	cd packsrc ; make all
 	cd passwd ; make all
 	cd pr ; make all
+	cd print ; make all
 	cd ps ; make all
 	cd pwd ; make all
 	cd rm ; make all
@@ -126,6 +132,7 @@ all:
 	cd sync ; make all
 	cd tail ; make all
 	cd tar ; make all
+	cd td ; make all
 	cd tee ; make all
 	cd tty ; make all
 	cd umount ; make all
@@ -155,19 +162,24 @@ install:
 	cd chown ; make install
 	cd cmp ; make install
 	cd comm ; make install
+	cd compress ; make install
 	cd cp ; make install
+	cd cpp ; make install
 	cd crypt ; make install
 	cd cu ; make install
 	cd date ; make install
 	cd dc ; make install
 	cd dcheck ; make install
 	cd dd ; make install
+	cd detab ; make install
 	cd df ; make install
 	cd diff ; make install
 	cd djformat ; make install
 	cd du ; make install
 	cd echo ; make install
 	cd ed ; make install
+	cd entab ; make install
+	cd expand ; make install
 	cd expr ; make install
 	cd far ; make install
 	cd fd2 ; make install
@@ -208,6 +220,7 @@ install:
 	cd packsrc ; make install
 	cd passwd ; make install
 	cd pr ; make install
+	cd print ; make install
 	cd ps ; make install
 	cd pwd ; make install
 	cd rm ; make install
@@ -225,6 +238,7 @@ install:
 	cd sync ; make install
 	cd tail ; make install
 	cd tar ; make install
+	cd td ; make install
 	cd tee ; make install
 	cd tty ; make install
 	cd umount ; make install
@@ -254,19 +268,24 @@ clean:
 	cd chown ; make clean
 	cd cmp ; make clean
 	cd comm ; make clean
+	cd compress ; make clean
 	cd cp ; make clean
+	cd cpp ; make clean
 	cd crypt ; make clean
 	cd cu ; make clean
 	cd date ; make clean
 	cd dc ; make clean
 	cd dcheck ; make clean
 	cd dd ; make clean
+	cd detab ; make clean
 	cd df ; make clean
 	cd diff ; make clean
 	cd djformat ; make clean
 	cd du ; make clean
 	cd echo ; make clean
 	cd ed ; make clean
+	cd entab ; make clean
+	cd expand ; make clean
 	cd expr ; make clean
 	cd far ; make clean
 	cd fd2 ; make clean
@@ -307,6 +326,7 @@ clean:
 	cd packsrc ; make clean
 	cd passwd ; make clean
 	cd pr ; make clean
+	cd print ; make clean
 	cd ps ; make clean
 	cd pwd ; make clean
 	cd rm ; make clean
@@ -324,6 +344,7 @@ clean:
 	cd sync ; make clean
 	cd tail ; make clean
 	cd tar ; make clean
+	cd td ; make clean
 	cd tee ; make clean
 	cd tty ; make clean
 	cd umount ; make clean
@@ -353,19 +374,24 @@ clobber:
 	cd chown ; make clobber
 	cd cmp ; make clobber
 	cd comm ; make clobber
+	cd compress ; make clobber
 	cd cp ; make clobber
+	cd cpp ; make clobber
 	cd crypt ; make clobber
 	cd cu ; make clobber
 	cd date ; make clobber
 	cd dc ; make clobber
 	cd dcheck ; make clobber
 	cd dd ; make clobber
+	cd detab ; make clobber
 	cd df ; make clobber
 	cd diff ; make clobber
 	cd djformat ; make clobber
 	cd du ; make clobber
 	cd echo ; make clobber
 	cd ed ; make clobber
+	cd entab ; make clobber
+	cd expand ; make clobber
 	cd expr ; make clobber
 	cd far ; make clobber
 	cd fd2 ; make clobber
@@ -406,6 +432,7 @@ clobber:
 	cd packsrc ; make clobber
 	cd passwd ; make clobber
 	cd pr ; make clobber
+	cd print ; make clobber
 	cd ps ; make clobber
 	cd pwd ; make clobber
 	cd rm ; make clobber
@@ -423,6 +450,7 @@ clobber:
 	cd sync ; make clobber
 	cd tail ; make clobber
 	cd tar ; make clobber
+	cd td ; make clobber
 	cd tee ; make clobber
 	cd tty ; make clobber
 	cd umount ; make clobber

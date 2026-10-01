@@ -1,0 +1,55 @@
+/usr/bin/expand from the Micronix 1.6 distribution
+
+There is no source for expand, so this is the disassembly, and expand.c is
+that disassembly read back into C.
+
+    disas -f expand.ctl expand.dist
+
+expand.dist is the binary off inode 55 of disks/dist/1012-8_dist_2.IMD, 4401
+bytes, mode 0711, dated 7 August 1982.  It has no header, as detab and
+compress have none: see ../newuser/README.  The runtime is Whitesmith's, c.ent
+at 1149 and c.ents at 0ffc.
+
+Its own code is main at 0132 and the two message routines, the usage message
+at 034d and the can't-open message at 0384; the strings are "usage: expand [
+input [ output ] ]." at 010e and ": can't open." at 0376.  After that is the
+library: finit at 03b8, which attaches a stream to a file
+descriptor, then getc at 052c and putc at 05c6, and open and create at 0f80
+and 0d57.  create is creat(name, 0777); open is the system call and nothing
+more.
+
+main takes up to two names.  With none, the standard input and output are
+used, each handed to finit again as it is; with one, it is the input and the
+output stays the standard output; with two, the second is created.  More
+than two is the usage message, and a name that will not open is the name and
+": can't open." - on the standard error, newline-ended - and an exit with
+status 0.
+
+The work is a loop over blocks, and the block formats are compress's - see
+../compress/README.  A byte n that is not 0377 is a literal count: n bytes
+are copied.  The byte 0377 is a run: the next byte is the value and the one
+after it the count, and the value is written that many times.  An end of file
+anywhere ends the run of the program, quietly, with what has been written so
+far written - a truncated literal, a run missing its count.  A literal count of
+0 is a block of nothing.  The manual says expand is not guaranteed to do
+anything sensible with input that did not come from compress, and it is
+no more careful than that.
+
+The one thing to know about the original is that it does not work with one
+name.  With one argument the output stream is never attached - only the input
+is, by the code at 0186 - and the run never finishes: in usersim it does not
+come back.  compress has the same thing, and there the sim reports a stack
+overflow at pc 0.  The manual says one name is read and the expansion written
+to the standard output; expand.c does what the manual says.
+
+The files are binary and read a byte at a time out of a buffer, as the
+original does, and the output is created 0777.  The exit status is 0 for a
+clean run and 1 for a mistake; the original's was whatever was in BC at the
+end of main for a clean run and 0 for a mistake.
+
+Checked in usersim against the original, byte for byte, on what compress
+makes from a file of long runs (98539 bytes to 11529), a file of random bytes,
+an empty file, small cases at each boundary, and the binary of compress
+itself; and on input that is not compress's - 4000 bytes of the bytes that
+matter to it, a literal that ends short, a run that ends short - and on
+every error message.

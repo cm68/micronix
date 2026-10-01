@@ -255,6 +255,7 @@ src/micronix/cmd/chmod/chmod
 src/micronix/cmd/chown/chown
 src/micronix/cmd/cmp/cmp
 src/micronix/cmd/comm/comm
+src/micronix/cmd/compress/compress
 src/micronix/cmd/cp/cp
 src/micronix/cmd/crypt/crypt
 src/micronix/cmd/cu/cu
@@ -262,6 +263,7 @@ src/micronix/cmd/date/date
 src/micronix/cmd/dc/dc
 src/micronix/cmd/dcheck/dcheck
 src/micronix/cmd/dd/dd
+src/micronix/cmd/detab/detab
 src/micronix/cmd/df/df
 src/micronix/cmd/diff/diff
 src/micronix/cmd/diff/diffh
@@ -269,6 +271,8 @@ src/micronix/cmd/djformat/djformat
 src/micronix/cmd/du/du
 src/micronix/cmd/echo/echo
 src/micronix/cmd/ed/ed
+src/micronix/cmd/entab/entab
+src/micronix/cmd/expand/expand
 src/micronix/cmd/expr/expr
 src/micronix/cmd/far/far
 src/micronix/cmd/fd2/fd2
@@ -316,6 +320,7 @@ src/micronix/cmd/passwd/passwd
 src/micronix/cmd/owner/owner
 src/micronix/cmd/packsrc/packsrc
 src/micronix/cmd/pr/pr
+src/micronix/cmd/print/print
 src/micronix/cmd/ps/ps
 src/micronix/cmd/pwd/pwd
 src/micronix/cmd/rm/rm

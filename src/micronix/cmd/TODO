@@ -24,11 +24,12 @@
 #	   cmd/vi is STEVIE, a screen editor, and the edit.c in it is one
 #	   of STEVIE's modules rather than this program.  No source
 #	   anywhere in the repository.
-#	1  newuser - has a source now: cmd/newuser, disassembled off the
-#	   second distribution disk and read back into C.  It builds with
-#	   the cross compiler and has been run in usersim, but it is not
-#	   installed, so /bin/newuser is still the distribution's.
-#	2  nothing in the repository: print td
+#	2  newuser and print - have a source now: cmd/newuser and
+#	   cmd/print, each disassembled off the second distribution disk
+#	   and read back into C.  Both build with the cross compiler and
+#	   have been run in usersim, but neither is installed, so
+#	   /bin/newuser and /bin/print are still the distribution's.
+#	1  nothing in the repository: td
 #
 # The other twenty - the Whitesmith toolchain (as cc link lib obj hex
 # lord anat cp1 cp2), ptc, cxr, ddt, rp, pilot, clean, down, and the
@@ -100,13 +101,12 @@
 # rp's interpreter.  None of them is a utility anyone is missing, and
 # all four are moved to /old.
 #
-# THE 2 WITH NO SOURCE ANYWHERE IN THE REPOSITORY
+# THE 1 WITH NO SOURCE ANYWHERE IN THE REPOSITORY
 #
-# What each is, read off the binary where the binary says - a usage
-# string, a keyword table.  (newuser was the third; see cmd/newuser.)
+# What it is, read off the binary where the binary says - a usage
+# string, a keyword table.  (newuser and print were the other two; see
+# cmd/newuser and cmd/print.)
 #
-#	print	"usage: print [-l#] [-w#] [-#] [file ...]" - a pr-like
-#		formatter, and not the spooler
 #	td	tape dump: "Dump destination must be either block special
 #		or directory." and "Tree dump complete." - not the silent
 #		binary an earlier note here listed it as

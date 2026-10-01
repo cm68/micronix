@@ -1,0 +1,123 @@
+/bin/print from the Micronix 1.6 distribution
+
+There is no source for print, so this is the disassembly, and print.c is that
+disassembly read back into C.
+
+    disas -f print.ctl print.dist
+
+print.dist is the binary off inode 26 of disks/dist/1012-8_dist_2.IMD, 21632
+bytes, mode 0711, dated 7 August 1982 - the second disk, and the one in /bin.
+It is a pr-like formatter and not the spooler (that was lpr).  It has no
+header: see ../newuser/README.  Whitesmith's runtime, c.ent at 474e and c.ents
+at 417a.
+
+The text runs to 5580 and the program's own part of it is only 010f to 0ca4.
+The formatted output engine is at 0dbf and the library follows - stdio,
+malloc, perror, the system call stubs and the arithmetic helpers.  Its
+strings: ": Unknown argument" at 01f3, "%s Page %d %s" at 0855, "pr" at 094b,
+the usage line at 0964.
+
+THE FUNCTIONS, in address order
+
+    010f  main        getargs; then each file, or the standard input
+    0207  getargs     the options, and the arithmetic for the page
+    03cc  (perror and exit)
+    03e6  printfile   a line at a time into pieces; the last page at the end
+    0410  getline     read a line, fold it
+    05d2  addcell     keep a piece; a full page is written
+    0625  flush       the page
+    082a  blanks      n newlines
+    0863  header      printf("%s Page %d %s", name, page, date)
+    0888  puts
+    08a8  numeric     a string of digits, none included
+    08f3  strsave     malloc and copy; "pr" and exit if there is none
+    098f  usage
+    09a5  putcell     a piece into a row, tabs to multiples of eight
+    0adc  atoi        through btoi at 31dc, which is handed 512
+    0b0c  newpage     two blanks, the page number up, the header, two blanks
+    0b36  trailer     four newlines
+    0b50  getword     blanks and controls, then the printable run
+    0be8  swidth      the width of a string: tab to eight, backspace one less
+    0c73  skipblank
+
+WHAT IT DOES
+
+The options are words that begin with a dash and may come anywhere among the
+names: -N is N columns, -lN lines to a page and -wN the width, defaults 1, 66
+and 79.  Anything else - "-x", "--" - is the word and ": Unknown argument" on
+the standard error, and a number of nothing, "-" or "-l", is 0 and the usage
+line.  The usage line goes to the STANDARD OUTPUT.
+
+The page is five lines of heading, the body, four lines at the foot.  The body
+is the page length less nine, and the number of pieces a page holds is the
+body times the columns.  The width of a column is the width over the columns.
+
+The heading is two blank lines, "name Page n date" and two more - and the line
+of the date is ctime's, which ends in a newline, which is why the second pair
+is two blanks and not one.  The date is read once when the command starts.
+Each file is numbered from 1.
+
+A line is read in pieces of up to 512 characters.  It is cut into words (the
+blanks and controls and then the printable run, as getword has it) and the
+words laid onto a piece as long as each is narrower than what is left - the
+column less two for the first piece of a line, the column less the new word
+for the others.  A word that does not fit ends the piece, loses its leading
+blanks and begins the next one.  An empty line is a piece of its own.
+
+When the page is full its pieces are written, a column at a time: row r of the
+page has piece r of column 1, piece body + r of column 2, and so on, each put
+at its column's offset in a row of width + 2 blanks, tabs expanded against the
+start of the piece.  The row is trimmed back from the width's end to its last
+non-blank and then a newline put after it.
+
+It is in the trim that the original has a small error that is reproduced here:
+the test that a row is entirely blank compares the POINTER, not what it points
+at, to a blank, and is never true, so a row that is entirely blank is written
+as one blank and a newline.  That is the last page's padding - a partial page
+is written out to its full number of rows - and every empty row in a column
+layout.
+
+THINGS THAT DO NOT WORK IN THE ORIGINAL
+
+-N, -lN and -wN, here.  The numbers come out of btoi, and atoi gives it a
+length of 512, so btoi works to the string's address plus 512 and stops
+there.  The command's arguments are at the very top of memory - in usersim the
+last of them ends at 0fffe - so the end wraps to a small number, the test is that the pointer
+is already past it, and the number is 0.  -N and -lN are then the usage
+message and -wN is a width of 0, which prints one character to a line.  The
+documentation's example, "print -4 -l188 -w132 file", does not run.  They work
+in print.c.  To test them against the original the sim was given a copy with
+that one constant, at 0aec, changed from 512 to 13, and the options placed
+before a last argument at least that long.
+
+A line of exactly 512 characters has no room for its end, and the NUL goes
+into the first byte of the buffer the next word is cut into, which is
+beside it; the scan goes on out of the line into that word, and cuts it
+again.  The last word of such a line comes out twice.  The buffers are
+beside each other in print.c for that reason, and the comment there says so.
+
+A line of 512 blanks runs away.  The copy of the blanks overwrites the buffer
+it is reading from, 512 characters behind, and never finds the end, and the
+original does not come back.  A 512 character word with no blanks at all
+overflows the piece buffer into the variables after it and does not come back
+either.  print.c stops both: getword cuts a word short at 511 characters,
+which is as much as the buffer holds, and the scan still goes to its end.
+
+A page length under nine leaves a negative number of rows, the allocation for
+them is refused, and the original stops with status 1 and no message.  So does
+print.c.
+
+HOW IT WAS CHECKED
+
+In usersim, against the original with that one constant changed - so, with
+the options working - on a hundred and thirty lines of text with tabs; three
+hundred random lines of words, tabs, backspaces and long words, with LF and
+with CR LF; no newline at the end; blank lines; an empty file; and the
+standard input; with one and two and three and five and six columns, widths
+from 1 to 132, page lengths from 9 to 30, and two and three files at once.
+The error messages and the usage line match, and so does the status for each
+case that ends in an error.  The date line is the only one that is edited
+out, since the two runs are not in the same second.
+
+The exit status of the original is whatever was in BC after the last file
+for a good run, and 1 for the standard input; print.c exits 0 for both.
