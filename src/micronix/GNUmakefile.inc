@@ -4,13 +4,14 @@
 # GNUmakefile.inc
 #
 # THE CROSS BUILD.  Every GNUmakefile in this tree includes this file
-# and builds with the compiler installed in /usr/local, in the tree.
-# The "makefile" beside each GNUmakefile is the native build that runs
-# inside the simulator; it is the check, never the truth, and nothing
-# here knows about it beyond shipping it out with the sources.
+# and builds with this tree's compiler, $(BIN)/mxccc, built by
+# "make hostcc".  The "makefile" beside each GNUmakefile is the native
+# build that runs inside the simulator; it is the check, never the
+# truth, and nothing here knows about it beyond shipping it out with
+# the sources.
 #
 # Nothing below reaches into a compiler build tree.  If a tool is
-# missing from /usr/local, ccc's install rule is what needs fixing.
+# missing from $(BIN), "make hostcc" is what builds it.
 #
 # The four rules every makefile in this tree answers to:
 #	all		cross builds with ccc

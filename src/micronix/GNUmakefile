@@ -7,8 +7,8 @@
 # native build that runs inside the simulator.
 #
 # hitech and whitesmith are deliberately not here.  Neither is part of
-# the build any more: the compiler that builds this tree is ccc, and
-# it is installed in /usr/local.  Their sources are still in the tree,
+# the build any more: the compiler that builds this tree is ccc, built
+# into $(BIN) by "make hostcc".  Their sources are still in the tree,
 # with their own makefiles, and are built by hand if they are built at
 # all.
 #
@@ -223,18 +223,9 @@ hostcc: $(ARMX)
 	@echo "host compiler in $(BIN)/mxccc"
 
 hostrt:
-	@mkdir -p $(HOSTROOT)/ccc/lib/cpm $(HOSTROOT)/ccc/include/sys \
-		$(HOSTROOT)/ccc/include/cpm
+	@mkdir -p $(HOSTROOT)/ccc/include/sys $(HOSTROOT)/ccc/include/cpm
 	cp lib/libc/libc.a lib/libu/libu.a lib/libu/crt0.o \
 	   lib/libccc/libccc.a $(HOSTROOT)/ccc/lib
-	#
-	# The CP/M runtime lives under /lib/cpm, beside its own copy of
-	# the (target-independent) libc, so a target directory is
-	# self-contained: -m cpm links libcpm.a and starts with crtcpm.o
-	# instead of libu.a and crt0.o.
-	#
-	cp lib/libc/libc.a $(HOSTROOT)/ccc/lib/cpm
-	cp lib/libcpm/libcpm.a lib/libcpm/crtcpm.o $(HOSTROOT)/ccc/lib/cpm
 	#
 	# No micronix headers go here any more, and that is the change.
 	# The compiler resolves <sys/...> out of this directory when a
@@ -251,13 +242,11 @@ hostrt:
 	rm -f $(HOSTROOT)/ccc/include/*.h
 	rm -f $(HOSTROOT)/ccc/include/sys/*.h
 	#
-	# CP/M keeps a header tree here, and the reason is FILE.  -m cpm
-	# is a target directory, self-contained by design: it links
-	# libcpm.a and starts with crtcpm.o, and its stdio.h sits over
-	# fcb's and has different flag bits, so it cannot share the
-	# micronix one.  Nothing in the tree builds -m cpm with an -i of
-	# its own - stand/formatmw is the one that does - which is why
-	# this stays.
+	# CP/M keeps a header tree here, and the reason is FILE.  Its
+	# stdio.h sits over fcb's and has different flag bits, so it
+	# cannot share the micronix one.  Nothing in the tree builds
+	# -m cpm with an -i of its own - stand/formatmw is the one that
+	# does - which is why this stays.
 	#
 	# The C library's headers, with the CP/M ones over them.  cp
 	# onto a link would write through it, into the tree, so -f
@@ -278,12 +267,9 @@ hostrt:
 # /usr/local/usr/include an installed cc looks in.
 #
 sysrt:
-	$(SUDO) mkdir -p $(PREFIX)/ccc/lib/cpm $(PREFIX)/ccc/include/sys \
-		$(PREFIX)/ccc/include/cpm
+	$(SUDO) mkdir -p $(PREFIX)/ccc/include/sys $(PREFIX)/ccc/include/cpm
 	$(SUDO) cp lib/libc/libc.a lib/libu/libu.a lib/libu/crt0.o \
 	   lib/libccc/libccc.a $(PREFIX)/ccc/lib
-	$(SUDO) cp lib/libc/libc.a $(PREFIX)/ccc/lib/cpm
-	$(SUDO) cp lib/libcpm/libcpm.a lib/libcpm/crtcpm.o $(PREFIX)/ccc/lib/cpm
 	$(SUDO) cp include/*.h $(PREFIX)/ccc/include
 	$(SUDO) cp include/sys/*.h $(PREFIX)/ccc/include/sys
 	$(SUDO) cp lib/include/*.h $(PREFIX)/ccc/include
@@ -299,21 +285,29 @@ sysrt:
 	$(SUDO) chmod -R a+rX $(PREFIX)/ccc
 	@echo "runtime in $(PREFIX)/ccc/lib"
 
-# The bootstrap: build the cross compiler, build the runtime it links
-# against, then cross-build every Z80 binary and install it into the
-# filesystem the simulator boots.  That filesystem is the seed the
-# native build - "cd /usr/src ; make install" - rebuilds from.
+# The bootstrap: build the cross compiler, the host tools and the boot
+# images the build runs (setdev stamps the kernel, mxnm lists symbols,
+# mxlz4/mxunlz4 and mxtar pack the distribution, bootimg is what the rom
+# reads), build the runtime it links against, then cross-build every Z80
+# binary and install it into the filesystem the simulator boots.  That
+# filesystem is the seed the native build - "cd /usr/src ; make install"
+# - rebuilds from.
 #
-# The order is the whole of it:
+# The host tools go into $(BIN), the tree's own bin/ - not /usr/local -
+# so a bootstrap needs nothing installed outside the tree.
 #
-#	hostcc		the cross compiler (mxccc) and its passes
+# The order is the whole of it, the INSTALLATION.md recipe as one target:
+#
+#	hostcc		the cross compiler (mxccc) and its passes, and mxar
 #	lib		libc, libu, libccc, crt0 - built with mxccc
 #	hostrt		those archives where mxccc looks for them
+#	all		the host tools, the boot images, every Z80 binary
 #	install		every Z80 binary, into the filesystem
 #
 bootstrap: hostcc
 	$(MAKE) -C lib
 	$(MAKE) hostrt
+	$(MAKE) all
 	$(MAKE) install
 
 sysinstall:
