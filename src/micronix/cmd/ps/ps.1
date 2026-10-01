@@ -1,0 +1,206 @@
+.he "ps (1)                       9/30/26                       ps (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+ps
+- process status
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+ps [ -alx ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Ps
+reports on the processes in the system's process table: what each is
+running, whose it is, what it is waiting for, and how much memory it
+holds.
+.sp
+With no options it lists the processes attached to the terminal ps was
+run from - the login and what that session has started - which is what
+a user asking "what is running" almost always means.  The options widen
+that, and one of them lengthens the listing.
+.sp
+The table is read out of
+.bd
+/dev/mem.
+Ps seeks to 0x1003, where the kernel leaves the address of the table
+for it, and reads the whole table from there, so what it reports is the
+live table and not a copy.  Any user may see other users' command
+names.  The data those commands are processing is not readable this
+way.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-a		All.  Also list the processes attached to other
+		terminals.  Without it, a process whose controlling
+		terminal is not ps's own is skipped.
+.sp
+.ti -10
+-l		Long listing.  Print the eleven columns below rather
+		than the default three.
+.sp
+.ti -10
+-x		Also list the processes with no controlling terminal -
+		those the kernel and init run detached from any tty.
+		Used alone it lists only those, since the processes
+		that do have a terminal are still skipped.
+.sp
+.ti -10
+-p		Accepted and ignored.  See NOTES.
+.sp 2
+.in -5
+.bd
+COLUMNS
+.in +5
+.br
+The default listing is
+.bd
+PID, COMMAND
+and
+.bd
+TTY.
+With
+.bd
+-l
+it is
+.bd
+PID, COMMAND, TTY, UID, PAR, SIZ, NIC, PRI, WAIT, STATE
+and
+.bd
+PC.
+.sp
+.in +5
+.ti -5
+PID	The process id.
+.sp
+.ti -5
+COMMAND	The name the process was started with, as the kernel recorded
+	it, cut to eight characters.  The two processes that have no
+	name of their own print what they are: pid 0 is System and pid 1
+	is Init.  A process that has died but whose entry has not been
+	reused prints DEFUNCT.
+.sp
+.ti -5
+TTY	The controlling terminal, found by device number in a scan of
+	/dev and printed under the name that directory gives it.  A
+	process with no terminal prints blanks; a device number that is
+	not in /dev prints ?.
+.sp
+.ti -5
+UID	The user id the process is running as.
+.sp
+.ti -5
+PAR	The parent's process id, or 0 for pid 0, which has none.
+.sp
+.ti -5
+SIZ	The memory the process holds, in kilobytes: the number of 4K
+	segments its entry names, times four.  pid 0 prints 64, which is
+	the kernel's own size rather than a measurement.
+.sp
+.ti -5
+NIC	The user's say in the process's priority: 128 minus the nice
+	value, so an unniced process prints 128.
+.sp
+.ti -5
+PRI	The priority the scheduler is using for it, which is not the
+	same number the user sets.
+.sp
+.ti -5
+WAIT	The address of the event the process is sleeping on, in hex.
+	It is an address in the kernel, and two processes waiting on
+	the same thing print the same one.
+.sp
+.ti -5
+STATE	Six flags, two characters each, in the order below.  A flag
+	that is set prints its pair, and one that is clear prints -- in
+	its place, so the field is always twelve characters and the
+	position of a pair is what says which flag it is.
+.sp
+.ti -5
+PC	The process's program counter, read out of its user structure:
+	where it was when it was last stopped, which for a process that
+	is running is the last switch away from it.  A process that is
+	not in memory prints 0, since there is no user structure to
+	read - so a 0 here means swapped, not stopped at address 0.
+.sp 2
+.in -5
+.bd
+STATE FLAGS
+.in +5
+.br
+.in +5
+  Al	Alive.  The process has not terminated.
+.br
+  Aw	Awake.  It is not waiting for a slow event and may be run at
+	once.
+.br
+  Ld	Loaded.  The image is in memory.
+.br
+  Sw	Swapped.  The image is on the swap device.
+.br
+  Lk	Locked.  The image may not be swapped out.
+.br
+  Sy	System.  The process is in its system phase, inside the
+	kernel.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The exit status is the opposite of what a shell expects, and that is
+carried over from the original rather than fixed here: ps exits 1 after
+a successful listing, and 0 when it cannot read the table.  It cannot
+read the table when
+.bd
+/dev/mem
+cannot be opened or read, and it names that file on the standard error
+first.  A shell script that tests the status of ps gets it backwards.
+.sp
+-p is accepted and does nothing.  The original had it to add the PC to
+the short listing; here the PC is always in the long listing and there
+is no short form of it.
+.sp
+ps is built against this kernel's
+.bd
+<sys/proc.h>
+and reads the table through it.  A change to
+.bd
+struct proc
+changes the size ps reads and the offset of every field after the one
+that changed, so ps has to be rebuilt with the kernel it is to read:
+an older ps binary is not a reader of a newer table.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/bin/ps
+.br
+/dev/mem
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+kill (1), sh (1), signal (2)

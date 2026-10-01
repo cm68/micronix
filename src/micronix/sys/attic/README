@@ -221,8 +221,10 @@ The cpu member of struct proc.  Removed, with cpu accounting, per the
 changelog - and include/sys/proc.h still has the "UCHAR cpu" it used to
 be, inside an #ifdef notdef, with a comment asking "why ?".  ps.c has
 its CPU column commented out in three places to match, and the
-recovered man page in man/man1/ps.1 still documents a CPU column that
-no longer exists.
+recovered man page, man/man1/oldps.1, still documents a CPU column that
+no longer exists.  (It is oldps.1 and not ps.1 because this tree's ps
+has a page of its own beside its source, cmd/ps/ps.1; the rename is the
+same one the 1982 sh page got, to oldsh.1.)
 
 Both were real features with real code.  Neither has a source file
 here.  That is the argument for this directory existing: these files

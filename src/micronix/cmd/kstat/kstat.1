@@ -1,0 +1,193 @@
+.he "kstat (1)                    9/30/26                    kstat (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+kstat
+- dump the kernel's tables
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+kstat
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Kstat
+reports the kernel's internal tables as they stand at the moment it
+runs, by reading them out of the machine's memory.  Where ps answers
+"what is running", kstat answers "what is the kernel holding" - the
+buffer cache, the open files, the inodes in core, the mount table, and
+the terminal structures behind a terminal that has stopped answering.
+.sp
+Two files are read and they are read differently.  The addresses come
+from
+.bd
+/micronix,
+the kernel object file the boot loader loads: kstat reads its symbol
+table and takes each table's address from the symbol that names it.
+The contents then come from
+.bd
+/dev/mem
+at those addresses.  So the tables printed are the live ones, and a
+table whose symbol is not in the kernel is skipped without a word - no
+error, no heading and no line to say it was passed over.
+.sp
+The field offsets are the kernel's by construction, because the
+struct layouts come from the same headers the kernel is built with.
+That is what makes the dump readable at all, and it is also the one
+thing to keep in mind when reading it: a kernel whose structs have
+changed needs kstat rebuilt, not merely rerun.
+.sp
+There are no arguments and no options.  Everything kstat knows how to
+print, it prints.
+.sp 2
+.in -5
+.bd
+WHAT IT PRINTS
+.in +5
+.br
+The sections come in this order.
+.sp
+.in +5
+.ti -5
+config	The root and swap devices, the swap area's size and starting
+	block, and then the addresses of _nbuf, _nbdev and _ncdev.
+	Those last three are printed as addresses rather than as
+	values, so they are where those variables live and not what
+	they hold - the count of each is reported by the section that
+	uses it.
+.sp
+.ti -5
+process table	One line per allocated entry of _plist: its slot and
+	address, pid, the eight characters of args, mode decoded into
+	flag names, uid, priority, nice value, sleep event, tty
+	number and parent.  A second line carries status, nsegs,
+	time, alarm and the swap address.  This is ps's table with
+	the user structure left out, and with the fields ps has no
+	column for.
+.sp
+.ti -5
+tty structures	One per mult I/O port, four of them.  Each shows its
+	device number, input and output speed, erase and kill characters,
+	mode and state decoded, column, line, nextc and nbreak, then
+	its three queues - raw, canonical and output - with the
+	address of each, its count, and its first and last link.  It
+	ends with the open count, mstate decoded, and start, stop,
+	put and set.  This is the section that explains a terminal
+	that has stopped responding: a queue with a count that never
+	drops, or a first link that never advances, is where the
+	characters went.
+.sp
+.ti -5
+buffer headers	One line per buffer, the count from _nbuf: device,
+	block number, flags decoded, count, data address, xmem,
+	error, time, then the forward and back links, the cylinder
+	and the hash.  A header filed under a hash it does not
+	belong under is what a bget() that never returns looks like
+	from here.
+.sp
+.ti -5
+mount table	One line per mounted filesystem still in use: device, the
+	root inode's number, read-only, and the sizes of the free
+	list and the inode list.
+.sp
+.ti -5
+file table	One line per open file: mode, reference count, inode
+	number, and the read/write pointer.  The pointer is a 32-bit
+	offset printed as its two 16-bit words, most significant
+	first, which is the Z280's word-swapped long and not a pair
+	of numbers to read as one.
+.sp
+.ti -5
+inode table	One line per in-core inode in use: device, number, mode,
+	link count, uid, gid, size, flags decoded, reference count,
+	the mount table slot it belongs to, and the time.
+.sp
+.ti -5
+clist	The number of free cblocks, counted by walking the free list
+	from _cfree.  If the list loops it says so and stops rather
+	than spinning, and it names the count it reached.  A cblock
+	free list that loops is exactly the fault this counter
+	exists to catch.
+.sp
+.ti -5
+device switches	The block and character switch tables, _biosw and
+	_ciosw: three words per block entry and five per character.
+	These are the handlers' addresses and nothing is decoded.
+	Compare one against a symbol to find which driver a major
+	number reaches.
+.sp
+.in -5
+.sp
+A field whose bits are none of the ones a table knows prints a single
+.bd
+-
+so that the field is never blank and its position in the line still
+says which field it is.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+kstat writes its errors to the standard output rather than the
+standard error, each one prefixed with
+.bd
+kstat:.
+It exits 0 after a dump, and 1 only when
+.bd
+/dev/mem
+cannot be opened - so, unlike
+.bd
+ps (1),
+whose status is inverted, kstat's status is the one a shell expects.
+.sp
+kstat is not linked with the C library.  It declares for itself what
+it wants of lseek, and there the declaration matters as much as the
+call: without it the compiler assumes an int return, keeps the low
+word of a file position, and reads the wrong symbol.  The symbol table
+sits past the 64K a word-sized offset reaches, so every symbol lookup
+depends on that declaration being there.
+.sp
+The number of mult I/O ports is written into kstat rather than read
+from a header, because the kernel keeps it in a source file and does
+not publish it.  If the kernel gains or loses a port, kstat's copy has
+to be changed by hand to match.
+.sp
+kstat reads the kernel's symbol table, so it names kernel symbols and
+will print a table for any symbol it finds.  It has no notion of a
+kernel that is not the one it is running on: pointed at a stale
+.bd
+/micronix
+it will read the live memory at the stale addresses and print
+something confidently wrong.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/bin/kstat
+.br
+/micronix
+.br
+/dev/mem
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ps (1), nm (1), size (1)

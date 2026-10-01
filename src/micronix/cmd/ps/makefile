@@ -13,11 +13,14 @@
 # and what was done about each.  Read it before changing anything
 # here; there is no second ps.c to compare against.
 #
-# The man page is not here and is not copied from here.  The recovered
-# 1982 page is man/man1/ps.1, which the man tree ships on its own, and
-# a ps.1 beside this file would shadow it - the host man build reads
-# cmd/*/*.1 before man/man1/*.1 and reports what it shadowed.  So
-# install ships the binary and only the binary.
+# ps.1 beside this file is this port's man page, and it is the one that
+# installs: one page per command beside its source is what the guest's
+# /usr/man gets.  The recovered 1982 page is still in the tree as
+# man/man1/oldps.1 - oldps, the way the 1982 sh page is oldsh.1 - so
+# that the host man build ships both instead of reporting one shadowed
+# by the other.  The 1982 page documents the ps this one was ported
+# from; sys/attic/README records where the two diverge, and the CPU
+# column it still lists is the one that is gone.
 #
 # One thing to know when reading a proc table by hand, because it is
 # not visible from here: include/sys/proc.h's struct proc is 99 bytes
@@ -36,6 +39,8 @@ CC	= ccc
 #
 CFLAGS	= -O
 BIN	= /bin
+MAN	= ps.1
+MANDIR	= /usr/man/man1
 PROG	= ps
 OBJS	= ps.o
 
@@ -47,6 +52,8 @@ $(PROG): $(OBJS)
 install: $(PROG)
 	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/$(PROG)
+	mkdir -p $(MANDIR)
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS) *.nam *.tok *.x

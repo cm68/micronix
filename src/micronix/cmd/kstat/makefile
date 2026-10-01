@@ -16,6 +16,8 @@
 CC	= ccc
 CFLAGS	= -O
 BIN	= /bin
+MAN	= kstat.1
+MANDIR	= /usr/man/man1
 PROG	= kstat
 OBJS	= kstat.o
 
@@ -27,6 +29,8 @@ $(PROG): $(OBJS)
 install: $(PROG)
 	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/$(PROG)
+	mkdir -p $(MANDIR)
+	cp $(MAN) $(MANDIR)/$(MAN)
 
 clean:
 	rm -f $(OBJS) *.nam *.tok *.x

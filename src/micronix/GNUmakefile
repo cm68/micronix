@@ -328,17 +328,18 @@ sysinstall:
 # section 3, and that is what lands in the simulator's /usr/man.  This
 # is a superset: it carries the recovered 1.61 pages and the 1.3 ones
 # off the floppy as well, including the pages for commands this tree
-# has not built yet (sort, tail, ps, wall and the rest), which are the
+# has not built yet (sort, wall and the rest), which are the
 # reason for having it - they are readable nowhere else.
 #
 # Listed rather than globbed together because the order IS the
 # precedence: where two directories hold a page of the same name, the
-# first one read is the one that lands.  Nothing collides today.  The
-# one name that did - sh, in cmd/sh as this port's page and in man/man1
-# as the 1982 original - is now man/man1/oldsh.1, named for the shell
-# it documents, so both pages ship and neither has to win.  That makes
-# the rule a guard rather than a decision, and it reports what it
-# shadowed when it shadows anything.
+# first one read is the one that lands.  Nothing collides today.  Two
+# names did, and both the same way - a command this tree has ported
+# whose 1982 original was already in the man tree: sh and ps.  Each
+# original now carries an old- name, man/man1/oldsh.1 and
+# man/man1/oldps.1, named for what it documents, so both pages ship
+# and neither has to win.  That makes the rule a guard rather than a
+# decision, and it reports what it shadowed when it shadows anything.
 #
 MXROOT	 = $(DESTDIR)$(PREFIX)/micronix
 MXMAN	 = $(MXROOT)/man
