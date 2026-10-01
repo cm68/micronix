@@ -167,6 +167,12 @@ the whole flow; the short of it:
 the boot block that mkfs put on cylinder 0 loads /micronix.  the shell
 prompt is '#'.
 
+-F runs the fast build instead: the same simulator compiled without the
+debug machinery.  on a modern cpu that comes out at roughly a 30 mhz z80
+equivalent, which makes it pleasant to actually use rather than watch.
+everything works at that speed, multi-user included - several logins at
+once, compiling on one while ps runs on another.
+
 this github is prettily referenced in my cybernecromancy site:
 
 https://retro.zen-room.org/morrow-micronix/user-mode-simulator
