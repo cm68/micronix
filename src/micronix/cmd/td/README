@@ -1,0 +1,175 @@
+/bin/td from the Micronix 1.6 distribution
+
+There is no source for td, so this is the disassembly, and td.c is that
+disassembly read back into C.
+
+    disas -f td.ctl td.dist
+
+td.dist is the binary off inode 21 of disks/dist/1012-8_dist_2.IMD, 21326
+bytes, mode 4711, owner root, dated 7 August 1982.  It is identical to the one
+that has always been in filesystem/bin.  It is a Whitesmith a.out - 99 94, the
+text at 0100 for 46cb bytes and the data at 5000 - built with the older of the
+two runtimes, the one login, init and entab have: c.ent at 4770 and c.ent2 at
+477b, saving the register variable cells at 5c6d, 5c6f and 5c71.
+
+THE FILE THAT STOOD HERE BEFORE this one was not a faithful reconstruction,
+whatever it was read from, and got the thing the program is for wrong: it made a block device a flat stream of "pathname,
+newline, size, bytes" records, a format that is nowhere in the binary.  What
+td writes is file systems.  The manual page says so - "this program's back-ups
+are in file system form, meaning it is easy to look through a dump", and
+restoring is "mount /dev/dja /f; cd /f; cp file ..." - and the disassembly
+agrees: a device is mounted on a directory made for it in /tmp, the tree is
+copied into that, and when the disk fills, the next is mounted.  That earlier
+version also had none of the options, no dump table that was in the form the
+binary has, no media change, and no interaction.  Nothing of it is kept.
+
+THE FUNCTIONS, in address order.  Td's own code is 010b to 1a73 and the library
+is after it; the names are what each does.
+
+    012d  main        setup; the walk; "Tree dump complete."; cleanup(1)
+    0164  options     one argument that begins with a dash, a letter at a time
+    03b1  setup       the command line, and everything before the walk
+    06ef  interact    the questions asked when nothing is said
+    07db  dump        the walk, begun
+    0847  copyfile    one file, and the next disk if it fills
+    0ace  visit       one thing found in the tree
+    0cbd  errs        write(2, s, strlen(s))
+    0ce2  errn        a number to the same
+    0d19  exists
+    0d46  dirname     into a static buffer
+    0e95  basename
+    0ed1  walk        the tree, a directory at a time
+    1058  sigoff      signal(i, 1) for 1 to 15 but 7, remembering the old
+    10a6  catch       the handler: cleanup(0)
+    10b4  sigon       catch the ones that were not ignored
+    1108  isatty
+    1133  ask         fputs the prompt, gets the answer; end of file is the end
+    12a6  newvolume   unmount, ask for the next disk, mount it
+    1447  cleanup     the end, by any way
+    155e  initsig
+    1587  wanted      whether this file is dumped
+    16ca  mkpath      mkdir -p, by mknod and two links - newuser's, and the library's
+    188e  dtfind      /etc/dtab: the time of the last dump
+    1977  dtput       /etc/dtab: write it
+    1a75  isfs        whether a device holds a file system
+
+WHAT IT DOES
+
+td [-v] [-a] [-i] [-u] [-hN] [-dN] [source [destination]].  The first word
+that does not begin with a dash is the source and the second the destination.
+It will not run unless the standard input, output and error are all terminals -
+gtty of each - and says so, on the standard output, if they are not.  The
+reason is the media change.
+
+The options are read a letter at a time, so "-vai" is three.  -v is verbose and
+-a lifts the limit of a thousand blocks on the size of a file, -i is an
+incremental dump and -u updates /etc/dtab at the end.  -h and -d take a number,
+the number of hours and of days: the time to go back to starts as the time the
+command began, and each -h or -d takes N times 3600 or 86400 seconds off it, so
+they add, as the manual says: -d2 -h12 is two and a half days.  A letter that is
+none of these is not an error: it is the interactive mode, below.
+
+With no source, or with a source and no destination (that is a repair: the
+original stat'ed a null pointer), it asks.  It prints "Td is used to dump an
+entire tree of files and directories.", asks for "Source directory: " and
+"Destination device: ", and ends if either is empty; and then, until it gets
+an F or an I in either case, the three lines "You can dump all the files in
+the directory or / only those files that have changed since / the last
+incremental dump of this directory" and "Do you want a full or an incremental
+dump (F/I) ? ".  An I is -i and -u.  It also turns verbose on.
+
+The source is stat'ed, and for -i the device and inode of it are looked up in
+/etc/dtab.  That file is a string of eight byte records - the device, the inode
+and the time, a word, a word and a long - and a source that has none is
+reported, "Previous table entry not found - defaulting to full dump", and
+dumped in full.  A record found is the time to go back to, and it replaces
+anything -h and -d made, which is why they are for a dump that is not
+incremental.  -u writes the record, over the old one if there is one and at the
+end if there is not, when the dump has finished - and only then: the exit
+that the original called with a 1 for a good dump is the one that does it.
+
+The destination is a block special file or a directory.  A directory is where
+the files go.  A device is mounted on a directory the program makes with mknod,
+"/tmp/<pid>-<clock mod 10000>", and the first disk goes through the same
+routine as every later one: the one mounted is unmounted, "Insert new media and
+press RETURN to continue / or type the name of a new device containing a file
+system." is said and "\t-> " is the prompt, and a name typed is the device from
+then on.  Whether a device holds a file system is whether the block that is the
+first of the data - two past the inode blocks, which is read out of the
+superblock - begins with "." and ".." that are both inode 1.  If it does not,
+"<device>: Not a file system" is said and "Do you want to make a file system on
+this device?" asked, and a Y runs "mkfs <device>" with sh -c, and is asked again.
+If it does, the device is unmounted first - a busy one is "The device is mounted
+and someone else is using it just now!" - and then mounted.  From the second
+disk on it says "The previous file system should be labeled volume #n".
+
+The walk is the one find has: a directory, its entries, and into each.  Every
+path is built in one buffer by appending.  The root of it, and "." and "..",
+are visited and passed over, and so is the destination directory if it is in the
+tree.  What is done to each:
+
+    a regular file   if it is wanted, copied; mode & 06777, the owner, parents made
+    a directory      made, with mknod, mode 0777, and given to nobody
+    anything else    made again, mknod with the mode and the number, if the
+                     super-user is dumping; named and passed over if not
+
+A file is wanted if it was changed at or after the time to go back to (the
+whole of time unless there is one) and is not over a thousand blocks, or -a was
+said.  If it is not, " - Not dumped." is written, with the name in front of it
+if -v - the name is conditional and the rest of the line is not, so a quiet dump
+writes the bare " - Not dumped." for each one.  That is the original's, and
+td.c's.  If it is, and -v, "name - n Blocks".
+
+The copy is in eight thousand byte reads.  A short write on a device with an
+errno of ENOSPC is a full disk: the bell, "This file system is full!.", the
+bell, the output closed and unlinked, the next disk asked for, and the file begun
+again from the start of its input.  Any other failure is reported with perror
+and the file given up.
+
+The end, by any way, ignores the signals, closes the sixteen descriptors - the
+terminal among them, so that nothing said after is heard - unmounts, and takes
+the mount point away.  Only after that does it look at whether it is a good end,
+and write /etc/dtab.
+
+WHAT DOES NOT WORK IN THE ORIGINAL, and does here
+
+-hN and -dN.  The number is converted by a routine handed 512 as the length of
+the string, and it works to the string's address plus 512, which with the
+arguments at the top of memory is a pointer that has wrapped; every number comes
+out 0.  A -h5 reads as -h, which consumes nothing, and then a 5, which is not an
+option, which is the interactive mode.  td.c converts them properly.  The
+original was tested for them with a copy in which the two constants, at 01ed and
+0240, were changed from 512 to 32.
+
+THE EXIT STATUS was inverted: 1 for a good dump and 0 for every mistake.  It is
+0 and 1 here.
+
+HOW IT WAS CHECKED
+
+In usersim on a pseudo terminal, which it requires, against the original, on a
+source of nested directories, an empty one, a hidden one, a set-id file, a
+read-only file, a 600000 byte file, files at 512 and 513 bytes and files of
+different ages: a full dump, a verbose one, -a, -h and -d in their combinations
+(on the original with the constants changed), -i with and without a dump table
+and -u to make one and to update one, an unknown source, an unknown destination,
+a destination that is a file, a source that is a file, a destination that
+does not exist, and the interactive mode
+with F, I, a bad answer, a bad source, an empty one and a letter that is not
+an option.  The destination trees are compared file for file with their modes,
+sizes and checksums, and the messages are compared as typed; they are the same.
+The date a dump table records is the one thing masked, since the runs are not in
+the same second.
+
+The device destination was run on two disk images, one with a file system and
+one without, through the media change: a return, a name typed, a name that does
+not exist, a device with no file system and each answer to the question about
+making one, and a device that does not exist.  usersim mounts the image but
+will not write into it - creat, link and the rest refuse a path in a mounted
+file system with EPERM - so the copying itself, the disk full and the next disk,
+were not run.  What was compared there is the messages, in the order the
+original writes them, and what each file does when it cannot be made, which
+exercises the error paths of copyfile and mkpath.  The full-disk path, and the
+dump table update that comes after a device dump, were read and not run.
+
+The directory walk comes out in the order the host gives the sim, which is the
+same for both.
