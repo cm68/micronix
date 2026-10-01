@@ -11,6 +11,7 @@
 #include <sys/buf.h>
 #include <sys/fs.h>
 #include <sys/con.h>
+#include <sys/dlabel.h>
 #include <sys/ovl.h>
 #include <sys/signal.h>
 #include <errno.h>
@@ -330,18 +331,86 @@ struct map
 swapmap[MAPSIZE] = 0;
 
 /*
- * Initialize the swapmap
+ * Initialize the swapmap.  Called from main(), before the swapper forks
+ * (sys/main_init.c): the first fork can reach swapout against this map,
+ * and a map with a size in it that nobody computed is a map that has the
+ * first child killed.
  */
 swapinit()
 {
     register struct buf *b;
     register struct super *s;
+    struct dlgeom g;
 
     if (swapdev == rootdev) {
+        /*
+         * Sharing the root's drive: the swap area is what the filesystem
+         * on it does not use, and the superblock says how much that is.
+         */
         b = getsb(rootdev);
         s = (struct super *)b->data;
         swapaddr = s->s_fsize;
         brelse(b);
+    } else if (swapdev) {
+        /*
+         * A drive of its own, and the whole of it: swapdev names the
+         * drive's 'c' slice - the one slice whose block numbers are the
+         * drive's own, because it starts at cylinder 0 and is never
+         * rolled.  So a swap block is a device block and nothing has to
+         * be added to it.
+         *
+         * That is also the only way the label can be read from here.
+         * The mapping a label read goes through is the drive's, which
+         * mwopen has just bound to the slice it was opened with, so
+         * block 0 read through any other slice is that slice's first
+         * block - cylinder d_off of the drive - and the label is not
+         * there.  'c' is the exception: its block 0 is device block 0
+         * however it is reached.  mwopen can read the label before
+         * binding because it does it inside the open; nothing outside
+         * the open can, and this is the outside.
+         *
+         * The open is also what puts the label's sector in the cache,
+         * so the read below is a block already in hand rather than a
+         * seek.  Nothing closes afterwards: mwclose breads block 0 to
+         * park the heads, and the swap device is open for the life of
+         * the system.
+         *
+         * One cylinder is left at the front, for two reasons.  The
+         * first block of a swap area must not be zero: salloc hands
+         * back the map's own address and swapout reads a zero as "could
+         * not allocate", which kills the process it was trying to save
+         * (sys/swap.c).  And cylinder 0 is where the label is.
+         *
+         * The count is rounded down to whole 8-block groups.  salloc
+         * asks for 8 blocks per segment (p->nsegs << 3), and a request
+         * of more than one block is bounded only by its first block
+         * (mwstrat), so a part group at the end would be swap space
+         * whose last blocks are past the end of the drive.
+         */
+        bopen(swapdev, WRITE);
+        zero(&g, sizeof g);
+        if (u.error || dllabel(swapdev, devslice(swapdev), &g) != 1) {
+            pr("swap: %s/%d: no usable label, no swap\n",
+                devname[major(swapdev)], minor(swapdev));
+            u.error = 0;
+            swapdev = 0;
+            swapsize = 0;
+            swapaddr = 0;
+        } else {
+            swapaddr = g.spc;
+            swapsize = (g.maxblk + 1 - swapaddr) & ~7;
+            /*
+             * What the map came out holding, which is the one number
+             * that says whether this machine can swap at all and how
+             * far.  Blocks, because that is what the map is kept in and
+             * what a swap address means; kilobytes beside it because a
+             * block count is not a size anyone reads at a glance.  A
+             * half-kilobyte block, so the shift is the conversion.
+             */
+            pr("swap map: %d blocks (%dK) at %d on %s/%d\n", swapsize,
+                swapsize >> 1, swapaddr, devname[major(swapdev)],
+                minor(swapdev));
+        }
     }
     swapmap[0].size = swapsize;
     swapmap[0].addr = swapaddr;

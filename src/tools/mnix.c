@@ -58,6 +58,7 @@ int devlistcmd();
 int imagemkdir(char *path);
 int tarcmd();
 int initcmd();
+int labelcmd();
 int mkfscmd();
 int bootflopcmd();
 
@@ -85,6 +86,7 @@ struct cmdtab
     {"devlist", devlistcmd, "devlist" },
     {"tar", tarcmd, "tar x [-C prefix] <tarfile> | tar c <tarfile> [path ...]" },
     {"initialize", initcmd, "initialize <medium> <image>" },
+    {"label", labelcmd, "label <image> [-s slice start [end]]" },
     {"mkfs", mkfscmd, "mkfs <image> [size|-exclude] [-i bootfile] [-f]" },
     {"bootflop", bootflopcmd, "bootflop <bootimage> <image>" }
 };
@@ -166,10 +168,12 @@ main(argc, argv)
         usage(pname);
         exit(0);
     }
-    /* initialize, mkfs and bootflop make a filesystem or a boot image;
-     * there is nothing to open yet */
+    /* initialize, label, mkfs and bootflop make or describe a volume
+     * rather than read one; there is nothing to open yet */
     if (strcmp(*argv, "initialize") == 0)
         return initcmd(argc, argv);
+    if (strcmp(*argv, "label") == 0)
+        return labelcmd(argc, argv);
     if (strcmp(*argv, "mkfs") == 0)
         return mkfscmd(argc, argv);
     if (strcmp(*argv, "bootflop") == 0)
@@ -1300,8 +1304,13 @@ tarc(int c, char **a)
 }
 
 /*
- * The drives FORMATMW formats, keyed by name.  Geometry is sys/mw.c's
- * specs[]; the sector size is 512, the only size Micronix reads.
+ * The drives FORMATMW formats, keyed by name, and the only place the tree
+ * still keeps a table of them: this is the formatter standing in for the
+ * one that ran under CP/M, so a medium is named the way it was named at
+ * the console and the geometry is whatever FORMATMW would have put on the
+ * drive.  Nothing reads it back - a formatted drive says what it is in
+ * its own label, and everything downstream takes the geometry from there.
+ * The sector size is 512, the only size Micronix reads.
  */
 struct medium {
     char *name;
@@ -1665,6 +1674,390 @@ mkfscmd(int c, char **a)
     pname = "mkfs";
     domkfs(fsize, isize, bootfirst, bootnblk, dsize, type, bfile, f);
     closefs(fs);
+    return 0;
+}
+
+/*
+ * label <image> [-s slice start [end]] ...
+ *
+ * Write the in-band disk label - struct dlabel, the second half of device
+ * block 0 - and read it back.  initialize writes the *out* of band label
+ * the simulator reads, which says what the physical drive is and knows
+ * nothing of slices; this writes the one the machine reads, which is
+ * where the geometry, the roll and the table of eight slices live.  See
+ * sys/dlabel.h for why the second is the one that matters.
+ *
+ * A volume with a label and nothing else is a swap device, and until this
+ * existed no host tool could make one: cmd/label is a Z80 binary and
+ * needs the drive up and mounted.  Nothing else here writes that block
+ * either - putlabel is mkfs's, and mkfs writes it as a side effect of
+ * laying a filesystem down, in the layout a filesystem wants.
+ *
+ * Device block 0 of the image is at DATAOFF and the label is DL_OFFSET
+ * into it, so the whole file is the drive and there is no slice to name.
+ * Only those 256 bytes are ever written: the first half of the block is
+ * the boot on a volume that has one, and it survives.
+ *
+ * There is no -w.  cmd/label has one because a guest talking to a real
+ * drive may be the only thing that knows the geometry and may need to
+ * correct it; here the out-of-band label initialize wrote is the drive
+ * the simulator actually implements, so the geometry is never in doubt
+ * and one declared differently would describe cylinders the file does not
+ * have.  The geometry is taken from it and a -s is the whole of what
+ * there is to say.
+ *
+ * What the command line does keep from cmd/label is what a slice is: a
+ * letter a..h, its position in cylinders, and an "end" that is a cylinder
+ * rather than a length.
+ */
+struct lab_set {
+    UINT ls_sl;                 /* which slice, 0..7 */
+    UINT ls_start;              /* first cylinder */
+    UINT ls_len;                /* cylinders, 0 means to the end */
+} lab_sets[NSLICE];
+static int lab_nsets;
+
+/*
+ * Decimal, with no sign and no base: every number on this command line is
+ * a cylinder, and none can be negative.  ep is left on the first
+ * character that is not a digit.
+ */
+static UINT
+labdec(s, ep)
+    char *s;
+    char **ep;
+{
+    UINT v;
+
+    v = 0;
+    while (*s >= '0' && *s <= '9') {
+        v = v * 10 + (*s - '0');
+        s++;
+    }
+    *ep = s;
+    return v;
+}
+
+/*
+ * A slice is named by letter a..h or by number 0..7: the letters are how
+ * the label reads, and the numbers are how a minor number encodes it.
+ */
+static int
+labslice(s, sp)
+    char *s;
+    UINT *sp;
+{
+    if (*s >= 'a' && *s <= 'a' + NSLICE - 1 && s[1] == 0) {
+        *sp = *s - 'a';
+        return 1;
+    }
+    if (*s >= 'A' && *s <= 'A' + NSLICE - 1 && s[1] == 0) {
+        *sp = *s - 'A';
+        return 1;
+    }
+    if (*s >= '0' && *s < '0' + NSLICE && s[1] == 0) {
+        *sp = *s - '0';
+        return 1;
+    }
+    return 0;
+}
+
+/*
+ * A cylinder number, and nothing after it.
+ */
+static int
+labnum(s, vp)
+    char *s;
+    UINT *vp;
+{
+    char *p;
+
+    *vp = labdec(s, &p);
+    return *p == 0;
+}
+
+static int
+labusage()
+{
+    printf("usage: label <image>\n");
+    printf("       label <image> -s slice start [end]\n");
+    printf("  the in-band label: geometry, roll and the slice table.\n");
+    printf("  slice is a..h or 0..7 and start and end are cylinders;\n");
+    printf("  the geometry comes from the volume label initialize wrote.\n");
+    return 2;
+}
+
+static int
+labislabel(lp)
+    register struct dlabel *lp;
+{
+    return lp->d_magic[0] == DL_MAGIC[0] && lp->d_magic[1] == DL_MAGIC[1] &&
+           lp->d_magic[2] == DL_MAGIC[2] && lp->d_magic[3] == DL_MAGIC[3] &&
+           lp->d_tracks && lp->d_heads && lp->d_spt;
+}
+
+/*
+ * How many blocks a slice of n cylinders holds, on the end of the line
+ * describing it.  A block number is a UINT, so 64K blocks is all any
+ * filesystem can use and more than that is worth saying rather than
+ * wrapping.  The product is taken in 32 bits for the same reason.
+ */
+static void
+labblocks(n, spc)
+    UINT n, spc;
+{
+    if (spc == 0)
+        printf(" (no geometry)");
+    else if ((UINT32) n * (UINT32) spc > 0xffff)
+        printf(", more than 65535 blocks");
+    else
+        printf(", %u blocks", n * spc);
+    printf("\n");
+}
+
+/*
+ * What the volume says about itself - the same report cmd/label prints,
+ * so a label written from here and read from there looks the same.  An
+ * entry that is all zeros is the whole drive: on the whole-disk slice
+ * that is meant literally, and on every other slice it runs through the
+ * roll, which is how a disk made before the table existed describes
+ * itself.
+ */
+static void
+labdump(image, lp)
+    char *image;
+    register struct dlabel *lp;
+{
+    UINT i, spc, off, cyls;
+
+    spc = (UINT) lp->d_heads * lp->d_spt;
+
+    printf("%s: %s version %u\n", image, DL_MAGIC, lp->d_version);
+    printf("\tgeometry\t%u cylinders, %u heads, %u sectors/track "
+        "(%u blocks/cylinder)\n",
+        lp->d_tracks, lp->d_heads, lp->d_spt, spc);
+    printf("\troll\t\t%u\n", lp->d_roll);
+    printf("\tboot\t\t%u blocks, loaded from slice %c\n",
+        lp->d_bootblks, 'a' + lp->d_bootslice);
+    printf("\tfilesystem\t%u blocks, %u inode blocks, %u swap blocks\n",
+        lp->d_fsize, lp->d_isize, lp->d_swap);
+    printf("\tslices\t\t(offset, length) in cylinders, "
+        "0 length = to the end\n");
+    for (i = 0; i < NSLICE; i++) {
+        if (i == DL_WHOLE) {
+            printf("\t  %c\t(-, -)\tcylinders 0 through %u, never rolled",
+                'a' + i, (UINT) (lp->d_tracks - 1));
+            labblocks(lp->d_tracks, spc);
+            continue;
+        }
+        if (!lp->d_slice[i].d_off && !lp->d_slice[i].d_len) {
+            printf("\t  %c\t(0, 0)\tthe whole drive, rolled by %u",
+                'a' + i, lp->d_roll);
+            labblocks(lp->d_tracks, spc);
+            continue;
+        }
+        off = lp->d_slice[i].d_off;
+        cyls = lp->d_slice[i].d_len;
+        if (cyls == 0)
+            cyls = lp->d_tracks - off;
+        printf("\t  %c\t(%u, %u)\tcylinders %u through %u, rolled by %u",
+            'a' + i, off, lp->d_slice[i].d_len, off, off + cyls - 1,
+            lp->d_roll);
+        labblocks(cyls, spc);
+    }
+}
+
+int
+labelcmd(int c, char **a)
+{
+    struct disklabel olab;
+    register struct dlabel *lp;
+    char buf[BSIZE];
+    char *image;
+    UINT sl, start, end, len, off;
+    int i, fd, asked;
+
+    a++;
+    c--;
+
+    image = 0;
+    lab_nsets = 0;
+
+    /*
+     * The image is where every other command here wants it, in front, and
+     * each -s names one slice and is repeatable.  cmd/label takes the
+     * device inside the flag - "label -s device slice start" - because
+     * there is only ever one request on its line; here the image is the
+     * thing being worked on and stays in the same place as it is for
+     * read, write and mkfs, and a -s says what to do to it.
+     *
+     * i is advanced by index rather than by writing the names into the
+     * list, where the order they are evaluated in is not the order they
+     * are written.
+     */
+    for (i = 0; i < c; i++) {
+        char *arg = a[i];
+
+        if (strcmp(arg, "-s") == 0) {
+            if (i + 2 >= c || lab_nsets >= NSLICE)
+                return labusage();
+            if (!labslice(a[i + 1], &sl))
+                return labusage();
+            if (!labnum(a[i + 2], &start))
+                return labusage();
+            i += 2;
+            len = 0;
+            if (i + 1 < c && a[i + 1][0] >= '0' && a[i + 1][0] <= '9') {
+                if (!labnum(a[i + 1], &end))
+                    return labusage();
+                i++;
+                /*
+                 * An end cylinder, not a length: what was asked for is
+                 * "from here to there", and the two are only the same
+                 * when the slice is one cylinder long.
+                 */
+                if (end < start) {
+                    printf("label: the end cylinder is before the start\n");
+                    return 2;
+                }
+                len = end - start + 1;
+            }
+            lab_sets[lab_nsets].ls_sl = sl;
+            lab_sets[lab_nsets].ls_start = start;
+            lab_sets[lab_nsets].ls_len = len;
+            lab_nsets++;
+        } else if (arg[0] == '-') {
+            return labusage();
+        } else if (image == 0) {
+            image = a[i];
+        } else {
+            return labusage();
+        }
+    }
+    if (image == 0)
+        return labusage();
+
+    fd = open(image, O_RDWR);
+    if (fd < 0) {
+        printf("label: can't open %s: %d\n", image, errno);
+        return 2;
+    }
+
+    /*
+     * initialize's label, out of band, is what the simulated drive
+     * actually is - how many cylinders its file holds and how the
+     * simulator seeks them.  A geometry declared in band that disagrees
+     * with it describes a drive that is not there, so the two are
+     * required to agree rather than merely warned about.
+     */
+    if (read(fd, &olab, sizeof olab) != sizeof olab) {
+        printf("label: can't read %s: %d\n", image, errno);
+        close(fd);
+        return 2;
+    }
+    if (olab.magic != MAGIC || !olab.formatted) {
+        printf("label: %s carries no volume label - run initialize first\n",
+            image);
+        close(fd);
+        return 2;
+    }
+
+    if (lseek(fd, (long) DATAOFF, 0) < 0 ||
+        read(fd, buf, BSIZE) != BSIZE) {
+        printf("label: can't read block 0 of %s: %d\n", image, errno);
+        close(fd);
+        return 2;
+    }
+    lp = (struct dlabel *) &buf[DL_OFFSET];
+    asked = lab_nsets;
+
+    if (!asked) {
+        if (!labislabel(lp)) {
+            printf("label: %s carries no %s label\n", image, DL_MAGIC);
+            close(fd);
+            return 2;
+        }
+        labdump(image, lp);
+        close(fd);
+        return 0;
+    }
+
+    if (!labislabel(lp)) {
+        /*
+         * A drive being described for the first time.  The roll is
+         * written as zero and not as half the cylinders, which is what
+         * cmd/label writes and what a rolled disk needs: a rolled label
+         * describes a filesystem whose boot sits at physical cylinder 0
+         * from inside it, and this is the other idiom - a table, no
+         * rotation, and slices that therefore never wrap onto cylinder
+         * 0, where this label is.  sys/dlabel.h calls a disk with a
+         * table unrolled, and this is where that is decided.
+         */
+        for (i = DL_OFFSET; i < BSIZE; i++)
+            buf[i] = 0;
+        for (i = 0; i < 4; i++)
+            lp->d_magic[i] = DL_MAGIC[i];
+        lp->d_version = DL_VERS_SLICE;
+        lp->d_tracks = (UINT) olab.cylinders;
+        lp->d_heads = (UINT) olab.heads;
+        lp->d_spt = (UINT) olab.spt;
+        lp->d_firstsec = (UINT) olab.firstsec;
+        lp->d_roll = 0;
+        printf("%s: no label: writing %s version %u, %u/%u/%u, roll 0\n",
+            image, DL_MAGIC, DL_VERS_SLICE,
+            lp->d_tracks, lp->d_heads, lp->d_spt);
+    }
+
+    for (i = 0; i < lab_nsets; i++) {
+        off = lab_sets[i].ls_start;
+        len = lab_sets[i].ls_len;
+
+        /*
+         * Checked before the entry is set, and not after.  The label is
+         * written back whole once every -s has been taken, so an entry
+         * that is refused and left in the buffer is a refusal that
+         * changes the drive anyway - and the driver refuses the same
+         * slice at open (sys/dlabel.c), so the operator would be left
+         * with an error they cannot act on and a slice nothing will
+         * ever use.  'c' is the exception: its position is not the
+         * table's to give.
+         */
+        if (lab_sets[i].ls_sl != DL_WHOLE &&
+            (off >= lp->d_tracks ||
+             (len && (long) off + (long) len > (long) lp->d_tracks))) {
+            printf("label: slice %c runs past cylinder %u\n",
+                'a' + lab_sets[i].ls_sl, lp->d_tracks);
+            close(fd);
+            return 2;
+        }
+        lp->d_slice[lab_sets[i].ls_sl].d_off = off;
+        lp->d_slice[lab_sets[i].ls_sl].d_len = len;
+        printf("%s: slice %c (offset %u, length %u)\n",
+            image, 'a' + lab_sets[i].ls_sl, off, len);
+    }
+
+    if (lseek(fd, (long) DATAOFF, 0) < 0 ||
+        write(fd, buf, BSIZE) != BSIZE) {
+        printf("label: can't write block 0 of %s: %d\n", image, errno);
+        close(fd);
+        return 2;
+    }
+    close(fd);
+
+    /*
+     * Read it back from the volume and report that, not the buffer that
+     * was just written: what matters is what the disk now says.
+     */
+    fd = open(image, O_RDONLY);
+    if (fd < 0 || lseek(fd, (long) DATAOFF, 0) < 0 ||
+        read(fd, buf, BSIZE) != BSIZE) {
+        printf("label: can't read back block 0 of %s: %d\n", image, errno);
+        if (fd >= 0)
+            close(fd);
+        return 2;
+    }
+    close(fd);
+    labdump(image, lp);
     return 0;
 }
 

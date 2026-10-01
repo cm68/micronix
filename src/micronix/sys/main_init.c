@@ -39,6 +39,7 @@ extern UINT8 map0[], image0[];
 extern UINT8 segmap[];          /* malloc.c */
 extern UINT nsegs;
 extern int segalloc();          /* malloc.c */
+extern int swapinit();          /* malloc.c */
 extern int nodev();             /* con.c */
 extern UINT kino;               /* uhdr.s's _kino: the inode we booted from */
 
@@ -81,6 +82,25 @@ main()
     irelse(rootdir);
     u.p->tty = 0;               /* not tied to any tty */
     ovlplaceall();              /* the driver modules riding in our own file */
+
+    /*
+     * The swap map, last, and here rather than in the swapper.
+     *
+     * sys/trap.c forks the login process and the parent becomes the
+     * swapper, and fork() swaps a child out when there is a swap device
+     * to put it on (sys/fork.c).  So the swapper's own loop is not the
+     * first thing that can reach the map - the fork that makes the
+     * swapper can - and a map still all zeros would fail the first
+     * allocation and kill the child it was meant to make room for.
+     *
+     * Here rather than earlier because it opens the swap device, which
+     * reads its label, and that is a bread: it wants the buffer cache,
+     * the drivers and the overlay area, and after ovlplaceall() all
+     * three are up.  It is also before expand_bufs() mints the rest of
+     * the pool, which is what makes the label read a block already in
+     * the cache rather than a seek (sys/malloc.c, swapinit).
+     */
+    swapinit();
 }
 
 /*
