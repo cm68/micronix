@@ -744,11 +744,16 @@ file:
 
 	Out of swap spaceswap error: process 1 killed
 
-Process 1 is the single-user shell - trap.c's first fork, which execs
-/bin/sh -sh and so is still process 1 - so what is lost is the shell, the
-script it was reading, and every line the script had left to print.  The
-compiler the shell had already started carries on as an orphan and finishes
-its file; the console then sits silent.
+Process 1 is init, not the shell.  trap.c's first fork's child falls through
+to become init (sys/trap.c), and init forks the single-user shell and waits
+for it (cmd/init/init.c), so the shell is process 2 and keeps reading its
+script.  What the kill costs is init - and with it the shutdown: halt(1) with
+no argument is a SIGTERM to process 1 (cmd/halt/halt.c), and init is the
+process that answers it.  So the workload still runs to its end and the
+console still prints, and then halt exits having signalled a process that is
+no longer there.  The machine stops at the shell's prompt instead of at the
+epitaph - not because the workload was cut short, but because the only
+process that shuts the machine down has been killed.
 
 Reported and not fixed, because blocking in place of killing has a deadlock
 behind it.  The shortage is discovered in grow() (sys/malloc.c): it sets
@@ -783,11 +788,13 @@ words setdev stamps, and both booted from a fresh volume - an earlier pair
 of runs had been killed with a timeout inside the emulator and left their
 volume inconsistent, which is its own way of losing a run.  With swapdev 0/0
 and no second drive attached, the console printed the concatenated pair
-above within the first minute of the compile and said nothing further; the
-shell was gone, so the COMPILE DONE and the halt the workload ends with
-could not happen and the machine sat.  With swapdev 3/73 on a second drive,
-the swapper chose the same process and it left instead - "swapout 1: 7 segs
-at 102" - and the compile ran on.
+above within the first minute of the compile and then ran on to the end of
+the workload - "  -> rules.o", COMPILE DONE, "rules.o" 21721 bytes - because
+the victim was init and not the shell driving the compile.  The halt the
+workload ends with did nothing, init being dead, and the machine sat at the
+shell's prompt "# ".  With swapdev 3/73 on a second drive, the swapper chose
+the same process and it left instead - "swapout 1: 7 segs at 102" - and the
+compile ran on.
 
 The pair at 384k is not the pair at 512k.  The same workload, the same
 bounded /.login and the same absence of a swap device, but -m 512k, ran to
@@ -795,3 +802,65 @@ completion and halted with its console intact - "  -> rules.o", COMPILE
 DONE, "rules.o" 21721 bytes, "Micronix halt: 0 dirty buffers" - which is
 what says the workload is bounded, and that 384k is where it stops fitting
 rather than where it stops working.
+
+------------------
+
+swapio() built a buffer's transfer address the old way, so what a
+swapped-out process got back was not what it had given up.
+
+A transfer's address lives in two fields of struct buf, data and xmem, and
+what the driver makes of them changed when the buffer pool moved into the
+physical segments.  Now xmem is the 4K segment the transfer starts in and
+only the low twelve bits of data are the offset inside it.  That is not an
+inference: bhold() writes xmem straight into the buffer window's MMU map
+register (uio.c), so the field is a segment number by construction, and
+hddma.c decodes the command as "(xmem << 12) | (data & 0xfff)"
+(hwsim/d1/hddma.c), which mw.c hands it verbatim out of those two fields
+(mw.c, newrw).  Every producer of a buffer agrees: binit() seeds the eight
+boot buffers with "b->data = (char *) BUFWIN + ((b - blist) & 7) * 512;
+b->xmem = seg" (sys/main_init.c), expand_bufs() mints the rest the same way
+(sys/main.c), and the user-space copy takes the segment back out of the
+address it is copying to (sys/uio.c).
+
+swapio() kept the encoding from before that move, a flat 20-bit physical
+address split across the two fields: "b->data = (seg & 15) << 12; b->xmem
+= seg >> 4" (sys/swap.c).  A segment of 16 or more - and segalloc() hands
+out nothing below 16, so every segment a process owns - comes out of that
+as segment 1 of physical memory, whatever it was.  So swapout() read the
+same 4K of low kernel memory once per segment and wrote the same image to
+each of the process's eight-block groups; the blocks landed where they
+should and the process was marked SWAPPED, a snapshot of nothing, taken
+without a complaint.  And swapin() wrote that image back over segment 1
+once per segment, which is the kernel's own memory.  The first thing to
+need a swapped-out process brought back was halt(1) signalling init
+(cmd/halt/halt.c), and the machine died in "brel: no hold" - a panic in the
+buffer pool, which is what a clobbered kernel looks like from the outside.
+
+Fixed by writing the address the way everything else writes it: "b->data =
+(char *) BUFWIN" and "b->xmem = seg".  BUFWIN is the window's base, whose
+low twelve bits are zero, so the pair says "offset 0 of this segment" - the
+same two fields, now saying what every other producer says.
+
+Verified at -m 384k on an m16, the swap device on a second drive, the
+workload compiling rules.c: "swapout 1: 7 segs at 102", the compile running
+on to its end, then "swapin 1: 7 segs at 102" when halt asked init to shut
+the machine down, and "# Micronix halt: 0 dirty buffers" - the same rules.o,
+21721 bytes, as the run at 512k that needed no swap at all.  The address was
+checked separately, without waiting for the round trip: the seven 4K groups
+swapout wrote to the swap drive hash to seven different images, the last of
+them 4096 zero bytes, which is the unused top of a process image.  The old
+encoding could only ever have written seven copies of one page.
+
+A longer run of the same machine on the same two drives, with the makefile
+in /usr/src/libexec/c1 as the workload, says the same thing under load.  Ten
+compiles, a native mkruleidx built and run to write ruleidx.c, and the c1
+link put three processes through the swap device and brought all three back,
+init among them, and ended with "=== Build successful: c1 ===", a 62343-byte
+c1, and a clean halt.  Every process came back to the block it left on, and
+the segments packed from 102 without a gap.  This is also where mget() earns
+its "p->nsegs 12 > free nsegs 2" pr(): it refuses a swapin it has no room
+for, swap() sets memwant and retries, and the process comes in on a later
+pass - the retry the code was written for, seen for the first time.  The c1
+it built is byte for byte the /libexec/c1 the cross build installs, which is
+not the bootstrap's test - that one is native against native - but it is
+what this run had to say.

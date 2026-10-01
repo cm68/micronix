@@ -176,8 +176,19 @@ swapio(flag, p)
         b->dev = swapdev;
         b->blk = blk;
         b->count = 4096;
-        b->data = (seg & 15) << 12;
-        b->xmem = seg >> 4;
+        /*
+         * The core image is not in the buffer window, but the address the
+         * driver wants is the same two fields either way: xmem is the 4K
+         * segment the transfer starts in, and the low twelve bits of data
+         * are the offset inside it (mw.c newrw, hddma.c).  So data is the
+         * window's base read as an offset of zero - its low twelve bits
+         * are what survives - and the segment carries the rest.  It was a
+         * flat 20-bit address split across the two before the buffer
+         * pool moved into segments, and at that a segment past 15 landed
+         * at the wrong address entirely.
+         */
+        b->data = (char *) BUFWIN;
+        b->xmem = seg;
         b->error = 0;
         (*biosw[major(swapdev)].strat) (b);
         blk += 8;
