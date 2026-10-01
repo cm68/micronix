@@ -1,0 +1,93 @@
+.he "newuser (1)                   10/1/26                    newuser (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+newuser
+- add a user
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+newuser
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Newuser adds one account to the system.  It takes no arguments and
+asks what it needs to know.  Only the super-user may run it.
+.sp
+It asks for the login name first.  A name is at least two characters
+long and is made of lower case letters and nothing else; anything
+else is refused and asked for again.
+.sp
+Then it lists the groups in /etc/group and asks which the new user
+belongs to.  A group is named by the same rule as a user.  If the name
+is one of those listed, the user is put in it.  If it is not, a new
+group of that name is made, with the lowest group number from 1 up
+that no group has.
+.sp
+Then it asks for a comment - a real name, a phone number, an office,
+whatever is wanted - which is optional, and a bare return leaves it
+empty.  The comment is kept in the password file as one field, and the
+field separator cannot be part of it, so any colons typed are changed
+to semicolons.
+.sp
+The account is given the lowest user number from 11 up that
+/etc/passwd has not used; the numbers below 11 are left for the
+system.  Its home directory is /a/name, made with any parent that is
+missing and given to the new user, and its shell is /bin/sh.  It has
+no password, so passwd (1) is the next thing to run for it.
+.sp
+"New user added." is printed when it is done.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The password file is read in, the new line added, and the whole file
+written back, so for that time nothing else may change it.  Newuser
+takes a lock on it first: /etc/passwdL is made as a second name for
+/etc/passwd, and a second newuser that finds it there waits a second
+and tries again.  A lock more than a minute old is taken to belong to
+a run that died and is broken.
+.sp
+Signals 1 through 14 are ignored from the time the lock is taken, so
+that an interrupt cannot leave the file half written.
+.sp
+A name already in /etc/passwd is refused after the other questions
+have been answered, and nothing is changed.  Group numbers and user
+numbers run out at 255, and the message says so.
+.sp
+Newuser exits 0 when the account was added and 1 when it was not.  The
+1982 command had the two the other way round.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/passwd - the password file
+.br
+/etc/passwdL - the lock on it
+.br
+/etc/group - the group file
+.br
+/a - where home directories are made
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+passwd (1), login (1), mkdir (1), owner (1), passwd (5), group (5)

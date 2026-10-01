@@ -6,12 +6,12 @@ original distribution binary, with no source anywhere in the tree.
 
 ## to port
 
-    cpp       edit      newuser   print     td
+    cpp       edit      print     td
 
 ## ported since this list was written
 
-cal, chars, comm, cptree, e, group, help, lines, sum, tail, tty,
-unique, update, wall, who, words, write.
+cal, chars, comm, cptree, e, group, help, lines, newuser, sum, tail,
+tty, unique, update, wall, who, words, write.
 
 `cal`, `comm`, `sum`, `tail`, `unique` and `tty` came from the v7
 sources in `extra/`, `who`, `wall`, `write` and `update` likewise.
@@ -20,6 +20,10 @@ after all: they are three binaries of their own, but they count the
 same things, so they are `cmd/wc` under three more names.  `e` is
 `ed` and `help` is `man`, installed as aliases.  `cptree` is `cp`
 under another name: main() sees the name and forces `-r`.
+`newuser` has no source anywhere and no v7 original, so it is the one
+port here that was read out of its binary: `cmd/newuser` has the
+disassembly, the control file and a README on how each function was
+found.  It is built but not installed over the distribution's copy.
 
 `chown` and `group` are new and were never on this list: micronix
 shipped `owner` and `group`, and `chown` is v7's name for the first

@@ -1,0 +1,245 @@
+/bin/newuser from the Micronix 1.6 distribution
+
+There is no source for newuser, so this is the disassembly, and newuser.c is
+that disassembly read back into C.
+
+    disas -f newuser.ctl newuser.dist
+
+newuser.dist is the binary off inode 29 of disks/dist/1012-8_dist_2.IMD -
+the second distribution disk, not the first, which is where login and the
+rest of the early commands are - 17526 bytes, mode 4711, owner root, dated
+7 August 1982.  It is stripped.  It is identical to the copy that has sat
+in filesystem/bin all along.
+
+    src/tools/mnix -f disks/dist/1012-8_dist_2.IMD cat /bin/newuser
+
+
+the binary has no header
+------------------------
+
+Every other Whitesmiths binary here begins 99 94, the object magic, and a
+sixteen byte header that says where the text and data go.  This one begins
+c1 21 00 00 39, which is code: pop bc; ld hl,0; add hl,sp.  The kernel's
+exec (sys/exec.c) has a case for that - a file whose first word is not the
+magic is "old cpm format", and the whole file is loaded as text at 0100 and
+entered there, with no data segment and no bss.  So the text is 0100 to
+4576 and the library's data - its stdio pool, the errno cell, the register
+variable cells - is the tail of the same image.  size(1) refuses the file
+for the same reason, and disas has to be told nothing at all.
+
+The file ends in the system call blocks - 44ee to 455c, a call number and
+room for the arguments each, the last of them cf 04 for write - and not in a
+relocation table; there is nothing left to apply.
+
+
+the runtime
+-----------
+
+The same as login's and init's: Whitesmith's, arguments pushed right to
+left, so arg0 is on top, results in BC.
+
+    3fc4  c.ent    ld hl,0; add hl,sp; ex de,hl; ex (sp),hl; jp (hl)
+    3fcb  c.ret    ex de,hl; ld sp,hl; pop de; ret
+    3b03  c.ents   the same, and saves the three register variable cells
+    3b19  c.rets   and puts them back
+
+The cells are 4570, 4572 and 4574, which the control file names r2, r3 and
+r4, as login.ctl does for its own.  A function that opens with CALL c.ents
+is one that has a register variable, and that is how newuser's own functions
+are told from its helpers at a glance: the ones that walk a list keep the
+pointer in r4.
+
+System calls are not stubs that load a number; the stubs are rst 8 with the
+call number after it and the arguments laid out in a block in the data -
+syscall 0 and an indirect block, in the old way.  The numbers are the V7
+ones and are in the table of the kernel's: 3768 access (33), 379f chown
+(16), 37c2 close (6), 37f5 exit (1), 37fb getuid (24), 3820 link (9), 3843
+mknod (14), 3871 open (5), 3895 read (3), 38c1 seek (19), 38ec signal (48),
+3a6f sleep (35), 3a7d stat (18), 3aa0 time (13), 3abf unlink (10), 3ad7
+write (4).
+
+The exit at 2b54 closes the sixteen stdio slots and then calls 37f5, which
+passes its argument to the kernel as it is.  That is the whole of why the
+exit status is the other way round - see below.
+
+
+the layout
+----------
+
+0100  the startup: pops argc, computes argv, pushes both, calls main at 010e,
+      passes what it returns to exit.
+010e  main.  Three calls and an exit.
+0122  newuser's own text, with its strings interleaved as the compiler wrote
+      them, to 15ed.
+15ee  getpwent, fld, getpwuid, getpwnam, setpwent, endpwent - libS.a's
+      passwd reader, byte for byte the module login carries at 0f0b..119b
+      (login.ctl, getpwent.c).  freopen, fopen, getfile, openfile, finit,
+      fclose follow at 187d and the stdio layer goes on from there, then
+      malloc, calloc, exit, perror, atoi, the string and block routines, the
+      system call stubs, and the arithmetic helpers to 3fe6.
+3ff6  the end of the code.  The data follows to the end of the file: newuser's
+      own globals first (the passwd and group lists and their files, at 3ff6
+      to 401f), then the library's - the stdio pool at 4392, errno at 455e,
+      the register variable cells, the system call blocks.
+
+newuser's own functions, in address order.  The names are what each does:
+
+    010e  main          rootonly, then newuser, then exit(1)
+    016f  getname       ask until goodname
+    01a5  newuser       getname, adduser
+    01c2  goodname      two or more characters, all a to z
+    021a  userexists    findname, as a truth value
+    0264  removeuser    UNREFERENCED - "Removing <name> from the system.  OK? "
+    03a5  adduser       the whole job
+    056c  addpw         copy an entry into the list
+    0681  readpw        getpwent into the list
+    06b0  strsave       malloc and copy
+    0709  writepw       fopen /etc/passwd "write", putpw, fclose
+    075b  putpw         the list out, last node first, so oldest first
+    086f  putgstr       fputs to the group file
+    0886  putstr        fputs to the passwd file
+    089d  itoa          itob into a static buffer
+    08c6  say           write(1, s, strlen(s))
+    08ee  findname      a passwd node by login name
+    0941  prompt        say, read(0, buf, 512), the newline off
+    09cb  ignoresigs    signal(i, 1) for i from 1 to 14
+    0a04  readgr        /etc/group into the list
+    0b96  findgr        a group's number by name
+    0bfb  grpname       UNREFERENCED - a name by number, or the number as text
+    0c61  mkpath        mkdir -p, with mknod and two links
+    0dd7  exists        stat, as a truth value
+    0e04  dirname       into a static buffer
+    0f0c  uidused       a passwd node by number
+    0f89  newuid        the lowest free from 11, or 0
+    0fd4  showgr        the group names, tab and newline
+    10bf  askgroup      readgr, list, prompt, goodname, strsave
+    1115  rootonly      getuid; if not zero, errno = EPERM, perror, exit(0)
+    113d  addgr         copy a group into the list
+    11f9  newgid        the lowest free from 1, or "Out of group numbers"
+    12c3  writegr       if the list changed: fopen, putgr, fclose
+    1318  putgr         the groups out, last node first
+    13fa  lock          link(/etc/passwd, /etc/passwdL), and the touch
+    14c8  unlock        unlink(/etc/passwdL)
+    14d6  stale         the age of the lock, against sixty seconds
+    1594  grpnum        a group's number, making the group if there is none
+
+The strings sit between the functions and are in newuser.ctl.  The messages
+are all in the binary and are all in newuser.c, word for word.
+
+Two of them are not called.  removeuser and grpname are in the text and
+nothing references them, though the strings they use are all there, so they
+were once part of a different or larger program - an earlier newuser that
+could also remove an account is the obvious reading.  They are not carried
+over; newuser.c's header says so.
+
+
+what it does, in the order it does it
+--------------------------------------
+
+main calls rootonly, which is getuid and a compare against zero: any other
+user is told "Not super-user" and stopped.  The binary is mode 4711, so it
+can be run by anyone and refuses everyone but root.
+
+getname prompts "Name of user: " until goodname is satisfied.  adduser then
+works on a twelve byte passwd record on its own stack - the same twelve
+bytes as <pwd.h>'s struct passwd: name 0, passwd 2, uid 4 and gid 5 as bytes,
+person 6, dir 8, shell 10.
+
+    name       the answer, strsaved
+    group      askgroup: readgr, list the names, say what may be typed,
+               prompt for one, hold it to goodname, strsave it
+    dir        "/a/" and the name
+    shell      /bin/sh;  passwd  the empty string
+    person     "(This entry is optional." and a prompt, and every colon
+               typed turned into a semicolon
+
+Then ignoresigs, lock, readpw and readgr again - the group list is read a
+second time because the first was before the lock - and the checks:
+
+    a name already there is reported and the lock put down
+    newuid is called - 11 up, the first no entry has - and then grpnum for
+    the group, which may make one.  A uid of 0 is "no more", and the lock is
+    put down.
+
+The record has its two bytes filled, goes into the list, mkpath makes the
+home directory, chown gives it away (the owner packed as uid | gid << 8, the
+way owner.c does it), writepw writes /etc/passwd, writegr writes /etc/group
+if the list grew, and "New user added." is said.  The lock goes down at the
+end.
+
+The lock itself is the one odd piece and the one most worth saying how it
+was read.  14d6 is stat, time, and a subtraction of two longs, with the
+absolute value taken if it came out negative, compared with 60.  13fa is a
+loop:
+
+    if stale(lock) unlink(lock)
+    if link(/etc/passwd, lock) < 0: sleep(1), again
+    fd = open(lock, 2); read one byte; seek to 0; write it back; close
+    if the lock exists: done, else sleep(1), again
+
+The lock is a hard link to the password file, so there is one inode under
+both names; writing a byte through the lock's name stamps that inode's
+modification time with now, which is what stale reads.  It is a lock whose
+age is the time since it was taken, kept in the file it protects.  The link
+is the test-and-set, and the stale check is the only thing that gets a
+crashed run out of the way.  The binary does not unlink after a fopen
+failure - it just exits, and the lock is left to age out - which is the one
+thing the port does differently on purpose.
+
+The long arithmetic is Whitesmith's, in the order the library keeps it: the
+high word first, each word low byte first.  The sign of a long is the byte at
+offset 1.  The constant sixty is stored as 00 00 3c 00, which is what that
+layout makes of it.
+
+
+what the port does not do as the binary did
+-------------------------------------------
+
+The exit status was inverted.  main ends with exit(1), every error path ends
+with exit(0), and the library's exit passes its argument straight through, so
+a successful run exits 1 and a refused one exits 0.  Whitesmith's own tools
+spelled the two exit(YES) and exit(NO), and exit(YES) is the likely source
+text here; nothing in this binary's library turns them into 0 and 1.  The duplicate name path calls exit with no
+argument at all, which leaves whatever was in the slot.  The port exits 0 on
+success and 1 on anything else.
+
+The prompt read does not notice an end of file.  read returns 0, the buffer is
+the empty string, the empty string is not a name, and it asks again - for ever.
+The port gives up.
+
+Where the binary left the lock held when it could not open /etc/passwd or
+/etc/group, the port takes it down before it exits.
+
+Nothing else is changed: the same questions, the same messages, the same two
+files, the same uid and gid ranges, the same home directory, the same lock.
+
+
+how it was checked
+------------------
+
+newuser.c builds clean with this tree's ccc and links against libc.a and
+libu.a with no undefined symbol: the image is 17589 bytes against the
+binary's 17526.
+
+It was run in usersim, as root, against a copy of the distribution's
+/etc/passwd and /etc/group, a line at a time with a pause between the lines,
+because a file or a pipe delivers the whole script to the first read where a
+terminal delivers one line:
+
+    a new name, a new group      uid 11, gid 6, the group appended to
+                                 /etc/group, /a/bob made, the lock gone
+    a colon in the comment       a semicolon in the file
+    names of one letter, or with a capital      refused and asked again
+    a name already there         reported, nothing written, lock gone
+    an existing group, no comment               uid 12, gid 6, the group
+                                 file left as it was
+    a stale lock (ten minutes old)   broken, the run goes on
+    a fresh lock                 waits, as the binary does
+
+Not checked: the check against a user who is not root, because usersim's
+getuid answers 0 whoever runs it; end of file on a terminal, because usersim's
+terminal read does not deliver one (its sh has the same trouble); and the
+native build - it has been built by the cross compiler and nothing else.
+
+It is not installed.  The /bin/newuser in filesystem is still the
+distribution's.

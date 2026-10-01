@@ -308,6 +308,7 @@ src/micronix/cmd/msh/msh
 src/micronix/cmd/mv/mv
 src/micronix/cmd/mwformat/mwformat
 src/micronix/cmd/ncheck/ncheck
+src/micronix/cmd/newuser/newuser
 src/micronix/cmd/nm/nm
 src/micronix/cmd/nm/wsnm
 src/micronix/cmd/od/od

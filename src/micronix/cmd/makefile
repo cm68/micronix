@@ -102,6 +102,7 @@ all:
 	cd mv ; make all
 	cd mwformat ; make all
 	cd ncheck ; make all
+	cd newuser ; make all
 	cd nm ; make all
 	cd od ; make all
 	cd owner ; make all
@@ -200,6 +201,7 @@ install:
 	cd mv ; make install
 	cd mwformat ; make install
 	cd ncheck ; make install
+	cd newuser ; make install
 	cd nm ; make install
 	cd od ; make install
 	cd owner ; make install
@@ -298,6 +300,7 @@ clean:
 	cd mv ; make clean
 	cd mwformat ; make clean
 	cd ncheck ; make clean
+	cd newuser ; make clean
 	cd nm ; make clean
 	cd od ; make clean
 	cd owner ; make clean
@@ -396,6 +399,7 @@ clobber:
 	cd mv ; make clobber
 	cd mwformat ; make clobber
 	cd ncheck ; make clobber
+	cd newuser ; make clobber
 	cd nm ; make clobber
 	cd od ; make clobber
 	cd owner ; make clobber

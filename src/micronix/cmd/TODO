@@ -24,7 +24,11 @@
 #	   cmd/vi is STEVIE, a screen editor, and the edit.c in it is one
 #	   of STEVIE's modules rather than this program.  No source
 #	   anywhere in the repository.
-#	3  nothing in the repository: newuser print td
+#	1  newuser - has a source now: cmd/newuser, disassembled off the
+#	   second distribution disk and read back into C.  It builds with
+#	   the cross compiler and has been run in usersim, but it is not
+#	   installed, so /bin/newuser is still the distribution's.
+#	2  nothing in the repository: print td
 #
 # The other twenty - the Whitesmith toolchain (as cc link lib obj hex
 # lord anat cp1 cp2), ptc, cxr, ddt, rp, pilot, clean, down, and the
@@ -96,12 +100,11 @@
 # rp's interpreter.  None of them is a utility anyone is missing, and
 # all four are moved to /old.
 #
-# THE 3 WITH NO SOURCE ANYWHERE IN THE REPOSITORY
+# THE 2 WITH NO SOURCE ANYWHERE IN THE REPOSITORY
 #
 # What each is, read off the binary where the binary says - a usage
-# string, a keyword table.
+# string, a keyword table.  (newuser was the third; see cmd/newuser.)
 #
-#	newuser	add a user
 #	print	"usage: print [-l#] [-w#] [-#] [file ...]" - a pr-like
 #		formatter, and not the spooler
 #	td	tape dump: "Dump destination must be either block special
