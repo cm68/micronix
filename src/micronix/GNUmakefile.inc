@@ -222,6 +222,26 @@ INSTALLMAN = @if [ -n "$(strip $(MANSRCS))" ] ; then \
 	fi
 
 #
+# A PROGRAM CAN GO IN UNDER MORE THAN ONE NAME.  man is also help and
+# ed is also e - one binary whose main() reads argv[0] and behaves
+# differently for the name it was called by - so both names want the
+# same program.  The native makefiles have always linked the second
+# name (see cmd/ed/makefile and cmd/man/makefile); the cross build had
+# no way to, so "make install" left /bin/help as the distribution's
+# binary beside the man this tree had just built.
+#
+# A copy and not a symlink, for the reason install-usersim gives:
+# links break when the tree is moved.  ALIAS is empty in every
+# directory but those two, so the test is false and this does nothing.
+#
+INSTALLALIAS = @if [ -n "$(strip $(ALIAS))" ] ; then \
+		for a in $(ALIAS) ; do \
+			rm -f $(INSTDIR)/$$a ; \
+			cp $(TARGET) $(INSTDIR)/$$a ; \
+		done ; \
+	fi
+
+#
 # DELETE A TARGET WHOSE RECIPE FAILED.  Without this, make leaves what
 # the failed command had already written, and a zero-length file is
 # still newer than its source - so the next make says nothing needs
@@ -366,6 +386,7 @@ install: $(TARGET)
 	mkdir -p $(INSTDIR)
 	rm -f $(INSTDIR)/$(INSTNAME)
 	cp $(TARGET) $(INSTDIR)/$(INSTNAME)
+	$(INSTALLALIAS)
 	$(INSTALLMAN)
 endif
 endif

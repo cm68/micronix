@@ -1,0 +1,123 @@
+.he "wall (1)                     9/30/26                     wall (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+wall
+- write to all users
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+wall
+.br
+.bd
+wall file
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Wall
+reads the standard input up to an end of file, then sends this to the
+terminal of each currently logged in user.
+.sp
+Its normal use is to inform users of immediate system status.  Only the
+super-user may use
+.bd
+wall.
+.sp
+The users are those the file /etc/utmp names, and each is sent to the
+terminal that file records for them.  A record with an empty user name
+is a terminal nobody is logged in on and is passed over.  What arrives
+at a terminal is headed
+.bd
+Broadcast message ...
+and the text of the broadcast follows the heading.
+.sp
+A user who is logged in is written to one after another, a second
+between them, and each is written to by a process of its own, so that a
+terminal that will not take the message holds up neither the others nor
+the shell that ran wall.
+.sp
+With a file named, the broadcast is read from that file instead of from
+the standard input.
+.sp 2
+.in -5
+.bd
+EXAMPLE
+.in +5
+.br
+Every user logged in is sent what is typed at
+.bd
+wall
+until an end of file.  For
+.sp
+.in +5
+.ti +5
+wall
+.br
+System going down in 3 minutes -- Please prepare
+.br
+^D
+.sp
+.in -5
+each user would then see
+.bd
+Broadcast message ...
+followed by what appears above.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The 1982 page documents the command as
+.bd
+wall
+with no arguments, and it is the page that says only the super-user may
+use it.  The v7 source the port is taken from has no such test - in v7
+any user could broadcast - so the check was added here to match the
+page, and the refusal is "Not super-user" on the standard error, with
+an exit status of 1.  The file argument is v7's and is kept; the page
+does not mention it.
+.sp
+The page's example has each user seeing
+.bd
+Broadcast message ...
+The v7 source capitalised the M.  The page's spelling is the one used.
+.sp
+The broadcast is read into a 3000 byte buffer and a longer one is cut
+off there rather than written past the end of the buffer, which is what
+the original did with it.
+.sp
+Wall writes to terminals and not to the people at them.  It is the mode
+of the terminal that decides whether the open succeeds, and a terminal
+that refuses the message simply receives nothing: the process that fails
+is not wall's, and its complaint goes to a standard error nobody is
+reading.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/utmp	(current user information)
+.br
+/dev/*		the terminals written to
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+who (1), write (1)

@@ -12,4 +12,10 @@ DEPTH	= ../..
 DIR	= ed
 CLASS	= cmd
 
+#
+# e is this same program under a second name, as the native makefile
+# has always installed it.
+#
+ALIAS	= e
+
 include $(DEPTH)/GNUmakefile.inc

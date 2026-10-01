@@ -1,0 +1,92 @@
+.he "comm (1)                     9/30/26                     comm (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+comm
+- print lines in common
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+comm [ -123 ] file1 [ file2 ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Comm reads two sorted files and writes three columns: the lines
+unique to file1, the lines unique to file2, and the lines common to
+both.  Column 1 has no indent, column 2 one tab, and column 3 two
+tabs.
+.sp
+The second file may be left off, and then the standard input is read
+in its place.  A file named - is also the standard input.
+.sp
+The columns are not padded to a width.  What is printed is the line
+itself with the indent that belongs to its column, so a suppressed
+column takes its indent with it: a line printed in column 2 because
+column 1 is suppressed has one tab in front of it and not two.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-1	Do not print column 1, the lines unique to file1.
+
+.ti -10
+-2	Do not print column 2, the lines unique to file2.
+
+.ti -10
+-3	Do not print column 3, the lines common to both files.
+
+.in -10
+.sp
+The flags may be run together, so -123 prints nothing, -12 prints
+only the lines common to both files, and -13 prints only the lines
+unique to file2.
+.sp 2
+.in -5
+.bd
+EXAMPLE
+.in +5
+.br
+.in +5
+.br
+.bd
+comm -13 dictionary words
+.sp
+Print the lines of words that are not in dictionary, using comm to
+pick one side out of two sorted files.
+.in -5
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+Both files must be sorted, and on the same collating sequence, or
+the columns do not come out in order.  There is no check for it.
+.sp
+The 1982 micronix /bin/comm is not this program.  It calls itself
+common, takes a -wN flag beside the three column flags, and its
+output does not match the page: the lines unique to the second file
+are dropped.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+diff (1), sort (1), unique (1)

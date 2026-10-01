@@ -1,0 +1,104 @@
+.he "passwd (1)                   9/30/26                   passwd (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+passwd
+- change a login password
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+passwd [ name ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Passwd changes the password of a login account.  With a name it
+changes that account's password; with none it changes the password of
+the user who is running it.
+.sp
+Only the super-user may change another account's password.  Anyone
+may change their own.
+.sp
+If the account already has a password, the old one is asked for
+first, and a wrong answer ends the command.  The super-user is not
+asked for the old password, and there is nothing to ask for the first
+time an account gets one, since an account starts with none and none
+is demanded of it at log in.
+.sp
+The new password is then asked for twice, and the two answers must
+agree.  Nothing typed for any of these questions is shown: the echo
+is turned off while the line is read.
+.sp
+What the file keeps is not the password but a thirteen character hash
+of it, so that the password cannot be read back out of the file - see
+crypt (3).  Two accounts whose passwords are the same do not have the
+same hash, because two characters of salt, taken from the clock, go
+into it.  There is no way to recover a password that has been
+forgotten; what can be done is to change it to one that is known.
+.sp
+A new password that is too short or too simple is refused and asked
+for again.  The rule is the 1982 one.  At least four characters if
+they mix letters of both cases with a digit or a punctuation mark; at
+least five if they are letters of one case together with a digit; at
+least six if they are letters of one case only; and a password of
+digits alone is never accepted at any length.  Two refusals are
+advice, and the third answer, whatever it is, is taken.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The password file is rewritten through a temporary, /etc/ptmp, a line
+at a time, with the one line whose name matches replaced.  The
+temporary is linked into place rather than copied over the old file.
+There is no rename call on this machine, and link and unlink are what
+one is built from here, so those two are what passwd uses.  If the
+link cannot be made - a filesystem with no links, a full directory -
+the copy is made the way the 1982 command made it, so that the
+password file is never left missing.
+.sp
+A temporary left behind by an interrupted run has to be removed by
+hand.  Passwd reports "Temporary file busy" and stops rather than
+writing over it, which is also what the 1982 command did.
+.sp
+The questions are read by getpass and the hash is made by crypt, both
+of them in libc - see getpass (3) and crypt (3).  Those are the same
+two routines login (1) uses to ask for a password and to check one,
+so a password set here is one that login will take.
+.sp
+v7 asked getlogin which account to change when no name was given.
+There is no getlogin in this tree, so passwd reads the name that goes
+with the uid it is running as out of the password file instead.  One
+case follows from that: a uid with no entry of its own is reported as
+an unknown user rather than as a usage error.
+.sp
+Passwd exits 0 when the password was changed and 1 when it was not,
+which includes the case where the user changed their mind.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/passwd - the password file
+.br
+/etc/ptmp - the temporary it is rewritten through
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+login (1), su (1), crypt (3), getpass (3), getpwent (3), passwd (5)

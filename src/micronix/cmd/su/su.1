@@ -1,0 +1,104 @@
+.he "su (1)                       9/30/26                       su (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+su
+- substitute user identification
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+su [ name ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Su allows you to change your effective user I.D. in midstream, so to
+speak.  It looks the named account up in the password file, changes
+the process to that account's uid and gid, and execs the shell that
+the account names.
+.sp
+The most common use of this program is to become a super-user
+temporarily, in order to install a program, change a system-wide
+file, kill off an errant process, or do some other administrative
+task.
+.sp
+With no name, the account is root.
+.sp
+A super-user is not asked for a password.  Anyone else is asked for
+the password of the account being entered, unless that account has
+none, and a wrong answer ends the command.  The password is hashed
+with the salt the password file carries and the two are compared -
+see crypt (3) - so no password can be read out of the file by anyone
+who did not already know it.
+.sp
+The new uid is in force for the shell and for everything the shell
+runs, and it cannot be given back: there is no way out of su but to
+leave the shell.  Neither the shell's working directory nor any of
+the environment is changed, and no new shell is started as a login
+shell.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+There is no setgid call on this machine.  The kernel takes a uid and
+a gid as one word, packed as uid | gid << 8, which is the same
+packing chown (1) takes, and su hands it over that way.  That is the
+one call the port had to write differently: where the 1982 command
+made two calls, this makes one.
+.sp
+The shell is exec'd with execv, since execl is not in this tree's
+libraries, and with an argv of just su.  The 1982 command's loop over
+the environment, which rewrote the shell's prompt variable, is gone
+with the environment: a program here starts with none, and the shell
+in this tree has no prompt variable to rewrite.
+.sp
+The 2.11BSD su - extra/2.11/pdp11/usr/src/bin/su.c - is a larger
+command, and not a newer version of this one.  It refuses to let
+anyone outside group zero su to root, it has -f and - for logins that
+skip or make the shell a login shell, and it exports HOME, SHELL and
+USER.  It also wants syslog, initgroups, getgrgid, setpriority,
+ttyname, getenv and setenv, and this machine has none of those.  The
+1982 page describes the seventh edition command, so that is the one
+ported here; what the Berkeley command adds is named in this note
+rather than half-built.
+.sp 2
+.in -5
+.bd
+EXAMPLE
+.in +5
+.br
+su
+.in +5
+.br
+.bd
+Password:
+.sp
+.in -5
+Enter the super-user, with the password of the root account.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/passwd - user I.D. and name relationships
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+login (1), passwd (1), owner (1), crypt (3), getpass (3), getpwent (3)

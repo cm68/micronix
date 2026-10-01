@@ -1,0 +1,87 @@
+.he "crypt (3)                     9/30/26                     crypt (3)"
+.fo "                                -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE
+.in +5
+.br
+.bd
+crypt
+- the password hash
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+#include <crypt.h>
+.sp
+.bd 2
+char *crypt(pw, salt)
+.br
+char *pw, *salt;
+.sp 2
+.in -5
+.bd
+DESCRIPTIONS
+.in +5
+.br
+Crypt returns a pointer to a string of thirteen printable characters
+derived from the password
+.bd
+pw
+and the two-character
+.bd
+salt.
+The same password and salt always give the same string, so a stored
+one can be compared against the result of hashing what the user
+types.
+.sp
+This is the hash the password file has always carried here, and it
+is not the DES one.  It is the older big-multiply construction: the
+salt and the password are folded into a sixteen-byte key, seventeen
+rounds of a cyclic three-by-three multiply-accumulate are run over
+two twelve-byte blocks, and eleven characters of the result are
+filtered into a printable alphabet.  The seed string that gives it
+away is "Here is is !?!".
+.sp
+The salt is the first two characters of the string being compared
+against; when a new password is set, two characters are chosen for
+it, traditionally from the clock.
+.sp
+The whole of
+.bd
+pw
+is used.  The loop that folds it walks to the end of the string and
+adds each character into the twelve-byte key, wrapping around, so
+the thirteenth character lands on the same byte as the first and a
+long password is folded rather than truncated.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The answer is in a static buffer that the next call overwrites.
+Copy it if it is to be kept.
+.sp
+Crypt is in libc - lib/libc/crypt.c - and was login's own code until
+it was moved there, which is where the 1982 image had it.
+.sp
+This is not the
+.bd
+crypt
+of
+.bd
+crypt (1),
+which encrypts a file: that is a different routine with a different
+name for the same thing.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+getpass (3), passwd (1), crypt (1), passwd (5)

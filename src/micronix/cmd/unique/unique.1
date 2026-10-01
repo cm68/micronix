@@ -1,0 +1,103 @@
+.he "unique (1)                   9/30/26                   unique (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+PROGRAM
+.br
+.in +5
+.bd
+unique
+- eliminate adjacent duplicate lines in an
+.nf
+         I/O stream
+.fi
+.sp 2
+.in -5
+.bd
+USAGE
+.in +5
+.br
+.bd
+unique [ -n ]
+.sp 2
+.in -5
+.bd
+FUNCTION
+.br
+.in +5
+.bd
+Unique
+reads the standard input and writes the standard output.
+All but one of each set of adjacent duplicate lines are eliminated.
+Otherwise, the text is copied through unchanged.
+.sp
+If the
+.bd
+-n
+option is given, a count of the number of duplicates of each line is
+printed along with the text of the line.  The count is the number of
+adjacent copies, the line itself included, and it is separated from the
+text by a tab.
+.sp
+The first argument and only the first is looked at, and it counts only
+when it is
+.bd
+-n
+exactly.  Unique takes no file names; the stream is fed to it by the
+shell.
+.sp 2
+.in -5
+.bd
+EXAMPLE
+.br
+.in +5
+.nf
+To eliminate all duplicate lines in a file:
+.sp
+.in +8
+.bd 2
+sort <file >temp
+unique <temp >output
+.in -8
+.sp 2
+.in -5
+.fi
+.bd
+NOTES
+.br
+.in +5
+In order to assure adjacency, the file in question must be presorted.
+.sp
+The program is v7's uniq, and this is the interface micronix gave it.
+The page above is the 1982 one, with the two things added that the port
+and the 1982 binary both do and the page does not say: the count and the
+line are separated by a tab, and the option is read from the first
+argument only.
+.sp
+V7 has more of it than micronix kept.  Its -u keeps only the lines that
+never repeat and its -d only the ones that do; a +n skips n characters
+before comparing, and a -n with a number after it skips n fields.  None
+of those are here, and the 1982 binary has none of them either - it
+swallows them and copies the stream, which is what this does.  V7 also
+takes an input file and an output file and reopens them onto the
+standard streams; this takes neither, and the shell does the redirection
+the example shows.
+.sp
+A line of a thousand characters or more is refused with the message
+"line too long" and the exit status is 1.  The buffers are v7's
+thousand bytes and v7 had no bound on them; the check is this port's.
+A line that runs off the end of a buffer writes over whatever the
+compiler put next, which is not the same in any two builds, and the
+1982 binary - same buffers, no bound either - mangles such a line
+instead, and mangles it differently for that reason.
+.sp
+The last line of a file that does not end in a newline is lost, which
+is v7's gline and the 1982 binary's behavior as well.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+sort (1)

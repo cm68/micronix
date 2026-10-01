@@ -1,0 +1,123 @@
+.he "file (1)                     9/30/26                     file (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+file
+- determine the type of a file
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+file [ -f list ] file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+File attempts to guess the type of each named file from its contents
+and prints the name, a tab, and the type, one file per line in the
+order the files were named.
+.sp
+The types it reports are:
+.sp
+.in +5
+directory
+
+empty
+
+character special (major/minor)
+
+block special (major/minor)
+
+executable
+
+executable not stripped
+
+archive
+
+old archive
+
+c program text
+
+fortran program text
+
+assembler program text
+
+roff, nroff, or eqn input text
+
+troff output
+
+commands text
+
+English text
+
+ascii text
+
+data
+
+.in -5
+.sp
+A file is executable when it begins with the object file magic 0x99,
+which is what the linker writes, and a symbol table still present in
+it adds the words "not stripped" to that report.
+.sp
+A file that is text, and not source in any of the languages above, is
+commands text when it carries an execute bit and ascii text when it
+does not - unless a letter count says it reads like English, in which
+case it is English text instead.
+.sp
+Anything left over that has a byte with its top bit set is data, and
+is not looked at further.
+.sp
+The first four types are read from the inode alone, so such a file is
+not opened.  A file that cannot be opened for any other reason is
+reported as "cannot open" in place of a type.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-f list	Read the names to examine from list, one per line, instead
+	of from the command line.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This is v7's file, and it prints v7's answer for a type.  The file
+that shipped on the 1.6 standalone was a different program with a
+different vocabulary - it said "C source file" where this says
+"c program text", "Text file" where this says "ascii text" or
+"English text", and "Relocatable module" where this says
+"executable" - and it knew two source languages this one does not,
+A-natural and CP/M text.  Its source is not in the distribution and
+its detectors cannot be recovered from the binary, so nothing here
+guesses at them.
+.sp
+The executable test is the machine's own.  v7 looked for the PDP-11
+a.out magics 0407, 0410 and 0411; nothing on micronix has an a.out
+header, so the Whitesmiths object magic is tested instead - see
+obj.h.  The two archive magics are the same numbers on both machines
+and are unchanged - see ar (1).
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ar (1), ld (1), ls (1), od (1)

@@ -1,0 +1,66 @@
+.he "chown (1)                    9/30/26                    chown (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+chown
+- change file ownership
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+chown uid file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Chown changes the owner of each named file to uid, which may be a
+decimal user I.D. or a user name looked up in /etc/passwd.  The group
+of each file is carried through unchanged.
+.sp
+Only the super-user may change the owner of a file.
+.sp
+This is the v7 interface, without the dash micronix put on it.
+Owner (1) is the same command under micronix's own name, and it
+reports an owner as well as setting one:
+.bd
+chown root a.out
+and
+.bd
+owner -root a.out
+do the same thing.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+A user name is looked up with getpwnam, which is in libc - see
+getpwent (3).
+.sp
+Chown here sets an owner and a group at once, the pair packed as
+uid | gid << 8, and has no -1 to leave a field alone.  So each file
+is stat'd first and its group carried through.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/passwd - user I.D. and name relationships
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+owner (1), chgrp (1), group (1), chmod (1), ls (1)

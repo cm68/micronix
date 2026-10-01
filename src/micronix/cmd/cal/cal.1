@@ -1,0 +1,99 @@
+.he "cal (1)                      9/30/26                      cal (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+cal
+- print a calendar
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+cal [ month ] [ year ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Cal prints a calendar: a whole year, or a single month of one.  A
+month may be spelled out, abbreviated, or given as a number, and a
+year may be left off to mean this one.
+.sp
+With no argument at all, cal prints a whole-year calendar for the
+year the clock is set to.
+.sp
+With one argument, cal prints a whole-year calendar for that year.
+An argument that is not a number is read as a month instead, and then
+cal prints that month of the current year.
+.sp
+With two arguments the first is the month and the second is the
+year, so cal 8 2026 is August 2026.  Where both arguments are numbers
+the first is taken to be the month.
+.sp
+A month name is matched without regard to case and by its first
+letters, so august, August and aug are all August.  A short
+abbreviation can be ambiguous, and the first month it fits wins:
+january, jun and jul all begin with ju, so ju is June, and ma is
+March.
+.sp
+Years run from 1, there being no year 0, to 9999; the calendar
+changes from the Julian to the Gregorian reckoning in September 1752,
+and cal prints that month with its eighteen days.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+.in +5
+.br
+.bd
+cal
+.sp
+Print this year's calendar.
+.sp
+.bd
+cal 1932
+.sp
+Print a whole-year calendar for 1932.
+.sp
+.bd
+cal august 1955
+.sp
+Print a single-month calendar for August, 1955.
+.sp
+.bd
+cal november
+.sp
+Print November of this year.
+
+.in -5
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The recovered cal (1) of July, 1982 does not say what cal does with
+no argument, and gives no year range; both are settled above.  The
+year is read from the clock with time and localtime, so a machine
+whose clock is wrong prints the wrong calendar.
+.sp
+The /bin/cal on the 1.6 disk does not read the year argument at all.
+There, cal 1932 prints this year's calendar and not 1932's, so that
+binary does not match its own page and this command is what does.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+date (1), pr (1)

@@ -1,5 +1,6 @@
 /*
  * wc - count lines, words and characters
+ * chars, lines, words - the same count, one at a time
  *
  * cmd/wc/wc.c
  *
@@ -16,15 +17,49 @@
  * sizes outgrew sixteen bits before this machine was built.  The
  * three flags are char, by the range audit's law.
  *
+ * CHARS, LINES AND WORDS ARE THIS PROGRAM UNDER OTHER NAMES.
+ *
+ * /bin carries three counters of its own, the distribution's, and
+ * they are one program here for the reason man and help are: the
+ * counting is the same counting.  main() tells them apart by name,
+ * the way man does.
+ *
+ * They are not quite wc, and the differences are the distribution's,
+ * read off the three binaries and their pages rather than assumed.
+ * Three of them:
+ *
+ *	the format	one count, printed in twelve columns, where
+ *			wc uses seven.  "chars file1 file2" gives
+ *			"          24 file1" and a wc would give
+ *			"     24 file1".
+ *
+ *	the total	labelled TOTAL and not total, and printed
+ *			only when more than one file was actually
+ *			COUNTED - a name that could not be opened
+ *			does not earn a total line.  wc counts
+ *			names.
+ *
+ *	the status	always 1, whether the count worked or not,
+ *			which is what all three binaries do.  It is
+ *			reproduced rather than corrected; a script
+ *			that tests it would see the difference.
+ *
+ * And "-" is the standard input, unnamed, which the three pages
+ * promise and the binaries do.  wc does not take it, and does not
+ * here either - the flag scan would have to be told to leave it
+ * alone, and that is a change to wc rather than to these.
+ *
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
 
 #include <stdio.h>
+#include <string.h>
 
 char	lflag;
 char	wflag;
 char	cflag;
 char	anyflag;			/* a flag was given at all */
+char	*distname;			/* chars, lines or words; else 0 */
 
 long	tlines, twords, tchars;
 
@@ -33,13 +68,42 @@ int argc;
 char *argv[];
 {
 	register int i;
-	int nfiles;
+	int nfiles;			/* names given - wc's total rule */
+	int ncounted;			/* files actually read */
 	FILE *f;
 	char *p;
+	char *prog;
+
+	/*
+	 * Which name we were called by.  The basename, since argv[0]
+	 * is a path when the shell has to look for us.
+	 */
+	prog = argv[0];
+	for (p = prog; *p; p++)
+		if (*p == '/')
+			prog = p + 1;
+	if (strcmp(prog, "chars") == 0) {
+		distname = "chars";
+		cflag = 1;
+	} else if (strcmp(prog, "lines") == 0) {
+		distname = "lines";
+		lflag = 1;
+	} else if (strcmp(prog, "words") == 0) {
+		distname = "words";
+		wflag = 1;
+	}
+	if (distname)
+		anyflag = 1;		/* they take no flags, and need none */
 
 	argc--;
 	argv++;
-	if (argc > 0 && argv[0][0] == '-' && argv[0][1]) {
+	/*
+	 * No flag scan under the other three names: they have no flags,
+	 * so "-x" is a file called -x and not a complaint.  "-" never
+	 * reached this scan anyway - argv[0][1] is the NUL - and is
+	 * dealt with in the loop.
+	 */
+	if (!distname && argc > 0 && argv[0][0] == '-' && argv[0][1]) {
 		for (p = &argv[0][1]; *p; p++) {
 			switch (*p) {
 			case 'l':
@@ -65,21 +129,32 @@ char *argv[];
 
 	if (argc == 0) {
 		count(stdin, (char *)0);
-		exit(0);
+		exit(distname ? 1 : 0);
 	}
 	nfiles = argc;
+	ncounted = 0;
 	for (i = 0; i < argc; i++) {
+		if (distname && strcmp(argv[i], "-") == 0) {
+			count(stdin, (char *)0);
+			ncounted++;
+			continue;
+		}
 		if ((f = fopen(argv[i], "r")) == NULL) {
-			fprintf(stderr, "wc: ");
-			perror(argv[i]);
+			if (distname)
+				fprintf(stderr, "%s: can't open\n", argv[i]);
+			else {
+				fprintf(stderr, "wc: ");
+				perror(argv[i]);
+			}
 			continue;
 		}
 		count(f, argv[i]);
 		fclose(f);
+		ncounted++;
 	}
-	if (nfiles > 1)
-		report(tlines, twords, tchars, "total");
-	exit(0);
+	if (distname ? (ncounted > 1) : (nfiles > 1))
+		report(tlines, twords, tchars, distname ? "TOTAL" : "total");
+	exit(distname ? 1 : 0);
 }
 
 count(f, name)
@@ -114,11 +189,11 @@ long lines, words, chars;
 char *name;
 {
 	if (lflag)
-		printf("%7ld", lines);
+		printf(distname ? "%12ld" : "%7ld", lines);
 	if (wflag)
-		printf("%7ld", words);
+		printf(distname ? "%12ld" : "%7ld", words);
 	if (cflag)
-		printf("%7ld", chars);
+		printf(distname ? "%12ld" : "%7ld", chars);
 	if (name)
 		printf(" %s", name);
 	printf("\n");

@@ -34,6 +34,14 @@ $(PROG): $(OBJS)
 install: $(PROG)
 	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/man
+#
+# help is this same binary under a second name - main() tells them
+# apart by looking for "help" inside argv[0], and looks under
+# /usr/help instead of /usr/man when it finds it.  So it is a link
+# and not a second program, which is what cmd/GNUmakefile says the
+# native install does; it did not, and this is that line.
+#
+	ln $(BIN)/$(PROG) $(BIN)/help
 	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)
 

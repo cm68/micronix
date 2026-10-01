@@ -1,0 +1,75 @@
+.he "getpass (3)                   9/30/26                   getpass (3)"
+.fo "                                -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE
+.in +5
+.br
+.bd
+getpass
+- read a password without echoing it
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+#include <crypt.h>
+.sp
+.bd 2
+char *getpass(prompt)
+.br
+char *prompt;
+.sp 2
+.in -5
+.bd
+DESCRIPTIONS
+.in +5
+.br
+Getpass writes
+.bd
+prompt
+on the standard error, turns off the terminal's echo, reads a line
+from the standard input, turns the echo back on and returns a
+pointer to the line read, without its newline.  The prompt is
+written wherever the output is sent; the password is not echoed.
+.sp
+A carriage return is written after the line, because the one the
+user typed was not echoed and the cursor would otherwise be left
+sitting after the prompt.
+.sp
+The line is read from file descriptor 0 and the terminal settings
+are changed on file descriptor 0.
+.sp
+If the terminal cannot be asked for its settings, or will not take
+them back, the echo is left as it was and the password is read with
+the echo on.  Nothing is written to the standard error about it and
+there is no error return; a caller that must not echo has to check
+the terminal itself.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The answer is in a static buffer of 128 characters that the next
+call overwrites.  A longer line is truncated, not overrun.
+.sp
+v7's getpass opened /dev/tty and read the password from there, so
+that a password could be typed even with the standard input
+redirected.  There is no /dev/tty on this machine and this reads
+descriptor 0, as
+.bd
+login (1)
+does.
+.sp
+Getpass is in libc - lib/libc/getpass.c.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+crypt (3), login (1), passwd (1), su (1)

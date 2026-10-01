@@ -1,0 +1,95 @@
+.he "sum (1)                      9/30/26                      sum (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+sum
+- compute check sums
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+sum [ -r ] [ file ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Sum computes and prints a check sum and a block count for each named
+file.  A block is 512 bytes, and the count is rounded up, so a file of
+one byte and a file of five hundred both count one block and an empty
+file counts none.
+.sp
+If no file names are given, sum reads the standard input, and prints
+the check sum and the count with no name after them.
+.sp
+The check sum is a sixteen bit number, in the range 0 to 65535, that
+depends on every byte of the file and on its position in the file.
+Two files with the same check sum are very likely to be identical, so
+a check sum read down a telephone is a way of asking whether a file
+arrived intact:
+.sp
+.in +5
+.br
+sum a.out
+.sp
+.in -5
+reads a number out; the person at the other end runs the same command
+on the same file and compares.  A difference means the file changed,
+and it says nothing about where - cmp (1) is what finds that.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-r	Descend the file hierarchy, summing each file found under a
+	named directory.  A directory and a special file are not
+	summed; only regular files are.
+
+.in -10
+.sp 2
+.in -5
+.bd
+EXAMPLE
+.in +5
+.br
+.in +5
+.br
+.bd
+sum -r /usr/src
+.sp
+The check sum of every file under /usr/src, each with the name it was
+found under.
+.in -5
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The block count is in 512 byte blocks.  Some other systems count a
+block as 1024 bytes, and read the count on a file of six hundred
+bytes as one where this one says two.
+.sp
+The 1982 micronix /bin/sum does not compute this check sum.  It adds
+the file as sixteen bit little endian words, so it answers 6067 where
+this command and the host sum answer 47926 for the same file, and a
+sum from it cannot be checked against one from here.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+cmp (1), diff (1), wc (1)

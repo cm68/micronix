@@ -12,15 +12,20 @@
  * What the port took out:
  *
  *	getgrnam and friends	no group routines in libc, so the
- *			group file is read here, the way ls reads
- *			/etc/passwd: a name is looked up in
- *			/etc/group by hand, and a number is taken as
- *			itself.
+ *			group file was read here, the way ls reads
+ *			/etc/passwd: a name was looked up in
+ *			/etc/group by hand and a number was taken as
+ *			itself.  getgrnam is in libc now - see
+ *			lib/libc/getgrent.c - so that reader is gone;
+ *			only a bare number is still taken as itself,
+ *			which is what the original did too.
  *
  *	the membership check	it wanted getpwuid and gr_mem, and it
  *			was only advice: the kernel allows chown to
  *			the super-user and nobody else, so the call
- *			itself is the check.
+ *			itself is the check.  getpwuid is in libc now
+ *			as well, and the check is still not wanted, so
+ *			gr_mem goes unread here.
  *
  *	symbolic links	micronix has none; lstat is stat.
  *
@@ -39,6 +44,7 @@
 
 #include <types.h>
 #include <stdio.h>
+#include <grp.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <sys/dir.h>
@@ -57,6 +63,7 @@ main(argc, argv)
 {
 	register c;
 	register char *cp;
+	struct group *gr;
 
 	argc--, argv++;
 	while (argc > 0 && argv[0][0] == '-') {
@@ -83,9 +90,10 @@ main(argc, argv)
 	if (isnumber(argv[0]))
 		gid = atoi(argv[0]);
 	else {
-		gid = getgroup(argv[0]);
-		if (gid < 0)
+		gr = getgrnam(argv[0]);
+		if (gr == NULL)
 			fatal(255, "%s: unknown group", argv[0]);
+		gid = gr->gr_gid;
 	}
 
 	for (c = 1; c < argc; c++) {
@@ -112,47 +120,6 @@ isnumber(s)
 		if (c < '0' || c > '9')
 			return (0);
 	return (1);
-}
-
-/*
- * look a name up in /etc/group - name:passwd:gid:members - and
- * return its gid, or -1.  Character at a time, the way ls reads
- * /etc/passwd: there is no fgets in this library either.
- */
-getgroup(name)
-	char *name;
-{
-	FILE *gf;
-	register int c;
-	int i, j, n;
-	char gname[32];
-
-	if ((gf = fopen("/etc/group", "r")) == NULL)
-		return (-1);
-	for (;;) {
-		i = 0;
-		j = 0;
-		n = 0;
-		while ((c = fgetc(gf)) != '\n') {
-			if (c == EOF) {
-				fclose(gf);
-				return (-1);
-			}
-			if (c == ':') {
-				j++;
-				continue;
-			}
-			if (j == 0 && i < sizeof(gname) - 1)
-				gname[i++] = c;
-			if (j == 2)
-				n = n * 10 + c - '0';
-		}
-		gname[i] = '\0';
-		if (strcmp(gname, name) == 0) {
-			fclose(gf);
-			return (n);
-		}
-	}
 }
 
 /*

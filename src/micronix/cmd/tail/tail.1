@@ -1,0 +1,93 @@
+.he "tail (1)                  9/30/26                        tail (1)"
+.fo "                            -#-"
+.in 5
+.rm 65
+.bd
+PROGRAM
+.in +5
+.br
+.bd
+tail
+- prints the last few lines of a file
+.sp 2
+.in -5
+.bd
+USAGE
+.in +5
+.br
+.bd
+tail [ -N ] [ file ]
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Tail
+prints the last n lines (default = 10) of the named file.
+If no file is given, the last n lines before the first
+end-of-file encountered on the standard input are printed.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The program is v7's tail, and the form above is what the 1982 page
+fixes.  That much and no more: v7's argument grammar has more in it
+than the page says, and the port kept it.
+.sp
+A leading
+.bd
++
+counts from the beginning of the file instead of the end, so
+.bd
+tail +3 file
+prints everything from the third line on.  A letter after the number
+says what is being counted:
+.bd
+l
+for lines, which is the default,
+.bd
+b
+for 512 byte blocks,
+.bd
+c
+for characters, and
+.bd
+r
+for the lines in reverse order from the end, as a filter that reads a
+file backwards.
+.sp
+The 1982 binary is a different program and this is not it.  It keeps
+its own messages - "line too long", "Out of memory" - and it reads the
+whole file in, where this program seeks to the last 4096 bytes of it.
+It also does not take -N at all: run it as "tail -3 file" and it exits
+1 having written nothing and said nothing.  This port follows the page,
+which documents -N, and does what the page says with it.
+.sp 2
+.in -5
+.bd
+BUGS
+.br
+.in +5
+Tail
+holds the file in a buffer of 4096 bytes, so it can count back no
+further than that.  Asking for more lines than the last 4096 bytes
+hold prints only what is in the buffer, from the start of it, and the
+lines before that are lost.  The 1982 page says the same of the
+command it documents, in its own words: "If n is too large, tail will
+fail since it stores the text of lines in memory."
+.sp
+A file whose last line has no newline is counted as one line longer
+than it is, because the count runs on newlines and a last line without
+one is not a line to this program.  "tail -2" on a three line file
+that ends without a newline prints all three.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+cat (1), od (1), sed (1)

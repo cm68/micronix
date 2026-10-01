@@ -1,0 +1,96 @@
+.he "tty (1)                      9/30/26                      tty (1)"
+.fo "                              -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+tty
+- get terminal name
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+tty [ -s ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Tty
+is a simple program that attempts to look up the full path name
+and number of the current "tty" device (teletypewriter or terminal).
+Normally, this is the name of the Micronix (terminal) port you logged
+in on.
+.sp
+To ascertain your device number, enter the
+.bd
+tty
+command.  A typical response is
+.sp
+.ti +5
+/dev/ttyB
+.sp
+meaning that you are on "ttyB".
+.sp
+If no associated file name can be found, the message "not a tty" is
+printed instead, and the exit status is 1.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-s	Print nothing at all.  The exit status still says whether the
+standard input is a terminal, so a shell script can test it without
+printing the name.
+
+.in -10
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/dev - Directory in which to search for file names.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This is v7's tty, which is fourteen lines, and the interface above is
+the one the 1982 page describes.  The 1.61 binary differs from its own
+page and this port follows the page: that binary prints "?" and exits
+2 when it cannot name the terminal, and it answers -s exactly as it
+answers nothing.
+.sp
+Ttyname is not in this tree's library.  There is a page for it -
+ttyname (3) - and no code, so tty carries v7's ttyname with it.  A
+descriptor is asked first whether it is a terminal, with isatty (3),
+and is then looked up in /dev by device and inode.  That is what the
+1982 tty does too - its syscall trace is open("/dev/") and a stat of
+every name in the directory - so the mechanism is this program's and
+not just the message.
+.sp
+The same routine sits in login, which uses it to find the terminal to
+record in /etc/utmp; see login (1).  Login counts the directory
+position as it goes - that is ttyslot - and hands back the bare name
+"ttyA", because that is what a utmp line holds.  Tty wants the path
+"/dev/ttyA" the page shows, and that is what ttyname returns here.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+login (1), ps (1), stty (1), ttyname (3)

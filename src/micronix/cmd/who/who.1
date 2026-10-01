@@ -1,0 +1,103 @@
+.he "who (1)                      9/30/26                      who (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+who
+- who is logged in
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+who
+.br
+.bd
+who am i
+.br
+.bd
+who file
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Who
+prints a list of the currently logged-in users of Micronix.  One line
+is printed for each login still recorded in the file, giving the user
+name, the terminal and the time of the login, in that order.
+.sp
+A record whose name is empty is skipped, because an empty name is what a
+terminal's record holds once it has been logged out of and not yet
+logged into again.  An empty record is only decoration; only records
+with a name are logins.
+.sp
+The name is printed in eight columns and the terminal in eight columns,
+both truncated to the eight bytes the file holds and padded where they
+are shorter.  The time comes from the record and is printed as the month
+and day, the hour and the minute, up to twelve characters; the year and
+the seconds are not printed.
+.sp
+.bd
+who am i
+answers for one login instead of listing them: the one on the terminal
+who was run from, found by matching the terminal's name against the
+records.  Run from a terminal that is not in the file, or with no
+terminal at all, it falls back on the login name and prints a
+.bd
+tty??
+line for it.
+.sp
+.bd
+who file
+reads its records from file rather than from /etc/utmp.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The 1982 page gives the command as
+.bd
+who
+with no arguments and says only that it prints a list of the currently
+logged-in users, which is the first form above.  The other two are what
+the v7 source has and this port keeps.
+.sp
+The records are read twenty bytes at a time, so a file that is not a
+utmp file is read as though it were one: the bytes are taken as a name,
+a line and a time whether or not that is what they are.
+.sp
+Who has to know which terminal it is running on, and there is no
+ttyname in this tree's library.  It finds its own by reading the /dev
+directory a name at a time and asking the system about each one, until
+one has the device and the inode that the system reports for its own
+terminal - which is how login does it too, and is why
+.bd
+who am i
+is the slow form of who.
+.sp
+The exit status is 0 after a listing, which is not what the original
+did: v7's who left main by falling off the end of it, and a status that
+is whatever the return register happened to hold is no use to a shell.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/utmp	(current user information)
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+login (1), ps (1), wall (1), write (1)

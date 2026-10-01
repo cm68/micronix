@@ -1,4 +1,4 @@
-.he "owner (1)                    9/21/26                    owner (1)"
+.he "owner (1)                    9/30/26                    owner (1)"
 .fo "                               -#-"
 .in 5
 .rm 65
@@ -58,9 +58,9 @@ The Berkeley chown this comes from takes its argument plainly -
 reports as well, and takes the new owner behind a dash; what the port
 kept is everything below the argument scan.
 .sp
-A user name is looked up in /etc/passwd by hand, since libc has no
-getpwnam.  The report reads the same file the other way, by the same
-reader.
+A user name is looked up in /etc/passwd with getpwnam, and the
+report reads the same file the other way with getpwuid.  Both are in
+libc - see getpwent (3) - so owner no longer reads the file itself.
 .sp
 Chown here sets an owner and a group at once, the pair packed as
 uid | gid << 8, and has no -1 to leave a field alone.  So every change

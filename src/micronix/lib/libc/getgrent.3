@@ -1,0 +1,148 @@
+.he "getgrent (3)                  9/30/26                getgrent (3)"
+.fo "                                -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE(S)
+.in +5
+.br
+.bd
+getgrent, getgrgid, getgrnam, setgrent, endgrent
+- get group file entry
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+#include <grp.h>
+.sp
+.bd
+struct group *getgrent()
+.sp
+.bd 2
+struct group *getgrgid(gid)
+.br
+int gid;
+.sp
+.bd 2
+struct group *getgrnam(name)
+.br
+char *name;
+.sp
+.bd
+int setgrent()
+.sp
+.bd
+int endgrent()
+.sp 2
+.in -5
+.bd
+DESCRIPTIONS
+.in +5
+.br
+Each of the "get" routines -
+.bd
+getgrent, getgrgid
+and
+.bd
+getgrnam
+- returns a pointer to an object with the following structure:
+.sp
+.in +8
+.nf
+.bd 7
+    struct group
+        {
+	char	*gr_name;
+	char	*gr_passwd;
+	int	gr_gid;
+	char	**gr_mem;
+        }
+.sp
+.fi
+.in -8
+Each pointer contains the broken-out fields of a line in the group
+file.
+.sp
+The
+.bd
+gr_mem
+field is an array of pointers to the member names, terminated by a
+null pointer.  A group with no members gives an array whose first
+element is the null pointer.  As with the other fields it points
+into a static area that the next call overwrites.
+.sp
+Unlike
+.bd
+struct passwd
+in
+.bd
+getpwent (3),
+the group id here is an
+.bd
+int
+and not a single byte.  The password file and the
+.bd
+chown
+system call have room for a one-byte group id; the group file does
+not, and holds the number in full.
+.sp
+.in +5
+.bd
+getgrent
+- reads the next line in the file; it will open the file, if
+necessary.
+.sp
+.bd
+setgrent
+- rewinds the file
+.sp
+.bd
+endgrent
+- closes the file
+.sp
+.bd
+getgrgid
+- searches from the beginning of the file until a matching group
+ID is found, or until an end of file is encountered.
+.sp
+.bd
+getgrnam
+- searches from the beginning of the file until a matching name is
+found, or until an end of file is encountered.
+.sp 2
+.in 0
+.in 5
+.bd
+ERRORS
+.in +5
+.br
+A zero (NULL pointer) is returned upon an error or at end of file.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+All information to be saved should be copied since it is contained
+only in a temporary area.
+.sp
+A line with too few fields, or one longer than the buffer the
+routine reads into, is skipped rather than returned.  A group with
+more than 31 members has the surplus ignored.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/group
+.sp 2
+.in -5
+.bd
+ALSO READ
+.in +5
+.br
+getpwent (3), chgrp (1), group (5)

@@ -1,0 +1,186 @@
+.he "sort (1)                     9/30/26                     sort (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+sort
+- sort and merge text files
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+sort [ -bdfimnru ] [ +pos [ -pos ] ] [ -o output ] [ -T dir ] [ file ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+All of the named input files are sorted together and the result is
+written to the standard output, unless an output file is named with
+the -o option.
+.sp
+If no input file is named, or one is named as a single dash, the
+standard input is read.
+.sp
+The default sorting key is the entire line.  Ordering is
+lexicographic, by bytes, in machine collating sequence.
+.sp
+Sort can be used on arbitrarily large files.  It is limited only by
+the amount of temporary file space it can consume.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-b	Ignore leading blanks, spaces and tabs, in the key.
+
+.ti -10
+-d	Dictionary order: only letters, digits and blanks are
+	significant in comparisons.
+
+.ti -10
+-f	Fold lower case onto upper case in comparisons.
+
+.ti -10
+-i	Ignore the non-printing characters in comparisons.
+
+.ti -10
+-m	Merge only.  The inputs are already sorted and are merged,
+	not sorted again.
+
+.ti -10
+-n	Sort by integral number.  The key is taken as a signed
+	decimal integer, a leading minus being part of the number,
+	and what follows a decimal point is compared next.
+
+.ti -10
+-o file	Send the output to the named file.  "sort file -o file"
+	sorts a file in place.
+
+.ti -10
+-r	Reverse.  Sort backwards.
+
+.ti -10
+-tc	The field separator is the character c rather than a run of
+	blanks.
+
+.ti -10
+-T dir	Put the temporary files in dir rather than in /tmp.
+
+.ti -10
+-u	Unique: of lines that compare equal, only the first is kept.
+
+.ti -10
+-c	Check only.  Report the first line that is out of order,
+	and with -u the first that is not unique.  One input file
+	only.
+
+.in -10
+.sp
+The options may be combined: "sort -b -d -f" is "sort -bdf".
+.sp 2
+.in -5
+.bd
+FIELDS
+.in +5
+.br
+A key may be confined to a part of the line.  A field is a run of
+blanks and what follows it, or, with -t, whatever lies between two
+separators.
+.sp
+.in +10
+.ti -10
++pos	A key starts at field pos of the line, counting fields from
+	zero.  "+0" is the whole line, which is also the default.
+
+.ti -10
+-pos	A key ends at field pos.  Without it the key runs to the
+	end of the line.
+
+.in -10
+.sp
+A key takes the flags that follow the plus and applies them to itself
+alone, so "sort +1 -n" sorts by the second field as a number and
+"sort +0.1" starts the key at the second character of the first field.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+To sort a file by its second column:
+.sp
+.in +5
+.br
+.bd
+sort +1 file
+.sp
+.in -5
+To sort a list of numbers:
+.sp
+.in +5
+.br
+.bd
+sort -n file
+.sp
+.in -5
+To sort a file in place:
+.sp
+.in +5
+.br
+.bd
+sort file -o file
+.sp
+.in -5
+To sort the password file by numerical user I.D., the fields being
+separated by colons:
+.sp
+.in +5
+.br
+.bd
+sort +2 -t: -n /etc/passwd
+.sp
+.in -5
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This is v7's sort.  The sort (1) page that shipped with 1.6 gives its
+usage as -bdfnrtx and never says what the u or the x is, and it says
+nothing at all about -c, -m or -T, which v7's source has and which are
+kept here.  Its usage line and its flag scan disagree with each other
+about the rest, and the scan was taken as the truth: -x is in neither
+source nor this program.
+.sp
+Nothing is sorted in place through the -o name until the input has
+been read, so -o may name one of the input files; when the input is
+being merged rather than sorted, that file is copied aside first.
+.sp
+The temporary files are named stmnnnnnaa under the directory -T
+names, or under /usr/tmp and then /tmp without it.  They are removed
+when the sort ends, including when it is interrupted.
+.sp
+How much of the input is held at once is fixed by what is left of the
+64k address space after the program, and the sort is carried out in
+as many passes over temporary files as that makes necessary.  The
+temporary directory is the only limit on the size of the input.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+comm (1), unique (1)

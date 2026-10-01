@@ -1,0 +1,181 @@
+.he "mail (1)                     9/30/26                     mail (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+mail
+- send and receive mail
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+mail [ user ... ]
+.sp
+.bd
+mail [ -pqr ] [ -f file ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Mail carries letters between the users of a machine.  A letter is
+plain text; mail puts a line at its head saying who it is from and
+when, and that header is where one letter ends and the next begins.
+.sp
+With one or more user names, mail is
+.ul
+sending
+something.  The letter is typed on the standard input and ends at a
+line holding a single period, or at end of file.  Each name is looked
+up in /etc/passwd, and the letter is appended to that user's mailbox,
+/usr/spool/mail/<name>, which is created if it is not there and made
+over to its owner.  A name that is not in /etc/passwd is reported; if
+any of the names failed, the whole letter is written to dead.letter
+in the current directory as well, so that nothing typed is lost.
+.sp
+A line of the letter that begins with
+.bd
+From
+is given a
+.bd
+>
+in front of it, so that a letter cannot forge the header that begins
+another one.
+.sp
+With no names, or with an option first, mail is
+.ul
+reading
+the mailbox instead.  The letters are printed one at a time, newest
+first, and mail prompts after each one for a command.
+.sp 2
+.in -5
+.bd
+COMMANDS
+.in +5
+.br
+.in +10
+.ti -10
+<newline>, n, +	Go on to the next letter, leaving this one in the mailbox.
+
+.ti -10
+p	Print this letter again.
+
+.ti -10
+-	Go back to the previous letter.  ^ does the same.
+
+.ti -10
+d	Delete this letter and go on to the next.  dq deletes it and then quits.
+
+.ti -10
+s [file]	Save this letter, header and all, at the end of file, and delete it from the mailbox.  With no file it is saved in mbox in the current directory.  y is a synonym for s.
+
+.ti -10
+w [file]	The same, but without the header.
+
+.ti -10
+m user	Forward this letter to user, who need not be the user reading it.  A name with a ! in it is an address on another machine, handed to uucp; a plain name is delivered by running mail again with the letter on its standard input.
+
+.ti -10
+! cmd	Run cmd with the shell.
+
+.ti -10
+x	Quit without changing the mailbox: the letters read are not deleted.
+
+.ti -10
+q	Quit, keeping the deletions.
+
+.ti -10
+?	Print this list.
+
+.in -10
+.sp
+On quitting, mail rewrites the mailbox without the letters that were
+deleted.  If new mail arrived while the mailbox was being read it is
+kept, and a note is printed.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-p	Print every letter without ever prompting.  Nothing is deleted, which is what makes it useful in a script.
+
+.ti -10
+-q	Do not return to the command prompt when interrupted: a signal ends mail instead.  This is for a session with nobody at the keyboard to answer the prompt.
+
+.ti -10
+-r	Print the letters in the order they arrived, oldest first, instead of newest first.
+
+.ti -10
+-f file	Work on file instead of the user's own mailbox.  The name is a separate argument.  Deletions are written back to that file.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+A mailbox is locked by setting its execute bit for the duration, and a
+mailbox whose lock is less than a minute old is refused with a
+complaint.  There is no lock file and no flock call; the mode bit is
+the whole of it, and the minute is what makes a lock left behind by a
+program that was killed recoverable.
+.sp
+Micronix has no sendmail and no mailer of any kind, so mail delivers
+by appending to the spool file itself, as v7 did and as the later
+Berkeley mail stopped doing.  A
+.bd
+m
+command with a
+.bd
+!
+in the address would need uucp; there is none on this system, and the
+attempt fails at the shell.
+.sp
+Three differences from the v7 source are worth knowing about, because
+they are visible from outside.  The name on the header is the login
+name of the real user I.D., since this libc has no getlogin and there
+is nothing else to ask.  The remote-from line names this machine by a
+constant, since micronix keeps no system name.  And a forward runs
+the shell to redirect the letter into a second copy of mail, because
+there is no popen here to hand a pipe to a command.
+.sp
+The mail that shipped on the 1982 distribution disk is a smaller and
+different program: it asks after each letter whether to keep it, and
+answers yes or no.  This is the v7 mail, which asks with a lettered
+command instead, and the two do not read the same way.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/usr/spool/mail/<user>	- a user's mailbox
+.sp
+/etc/passwd	- where a user's login name is looked up
+.sp
+mbox	- where s and w save a letter by default
+.sp
+dead.letter	- a letter that could not be sent
+.sp
+/tmp/maXXXXXX	- the copy of the mailbox being read
+.sp
+/tmp/mbXXXXXX	- a letter being forwarded
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+login (1), who (1), write (1)

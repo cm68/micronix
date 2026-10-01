@@ -1,0 +1,108 @@
+.he "write (1)                    9/30/26                    write (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+write
+- write to another user
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+write user [ ttyname ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Write
+copies lines from your terminal to the terminal of another user.  A
+line is sent when you press return, so the two of you may hold a
+conversation; both terminals are dumb, and what one of you types appears
+on the other's screen only if the other's terminal echoes what it is
+sent.  End the conversation with an end of file, which sends the word
+.bd
+EOF
+to the other end.
+.sp
+The other user is looked up in /etc/utmp and must be logged in.  If the
+name appears there more than once - the same user logged in on two
+terminals - you are told which one is being written to, and may name the
+terminal yourself with the second argument to choose the other.
+.sp
+At the start the other terminal is sent
+.sp
+.in +5
+.ti +5
+Message from user tty...
+.sp
+.in -5
+naming you and your terminal, and everything typed from then on
+follows it.
+.sp
+A line of your input whose first character is an exclamation mark is not
+sent as it stands.  What follows the mark is run by the shell as a
+command, its output goes to your terminal and not to the other user's,
+and an exclamation mark is printed on your terminal when the command
+finishes.  It is meant for running something whose output you want to
+send on, but the output is not caught and so has to be copied by hand.
+.sp
+Writing needs the other terminal to be writable by you.  A terminal that
+is not, or one that cannot be opened within five seconds - a terminal
+with no carrier, typically - is refused, and write says so and stops
+rather than holding your terminal.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+There is no
+.bd
+write
+page in the recovered 1982 manual, so none of the above is transcribed
+from one; it is what the v7 source does and what this port keeps.
+.sp
+It is the terminal, not the user, that has the last word.  Write does
+not ask the other user whether they want to be written to, and there is
+no
+.bd
+mesg
+here for them to answer with: if the terminal's mode lets the open
+succeed, the message arrives.
+.sp
+Like who, write has to know which terminal it is on and there is no
+ttyname in this tree's library, so it finds its own by reading the /dev
+directory and asking the system about each name until one has the device
+and the inode that the system reports for its terminal.
+.sp
+A user name beginning with a dash is not matched against the names in
+/etc/utmp but taken as a request for the first terminal in the file.
+That is the behavior of the original; it is not useful and is not
+recommended.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/utmp	(current user information)
+.br
+/dev/*		the terminals written to
+.br
+/bin/sh		run for a ! line
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+mail (1), wall (1), who (1)

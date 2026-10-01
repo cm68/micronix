@@ -19,5 +19,15 @@ struct passwd {
 };
 
 /*
+ * lib/libc/getpwent.c.  The record returned is in a static area the
+ * next call overwrites - copy anything to be kept.
+ */
+struct passwd *getpwent();
+struct passwd *getpwuid();
+struct passwd *getpwnam();
+int setpwent();
+int endpwent();
+
+/*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

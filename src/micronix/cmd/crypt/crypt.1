@@ -1,0 +1,117 @@
+.he "crypt (1)                    9/30/26                    crypt (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+crypt
+- encode and decode a file
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+crypt [ key ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Crypt reads its standard input and writes its standard output,
+enciphering as it goes according to the key.
+.sp
+Crypt is its own inverse; to read an enciphered file back, all you
+need is the same key word.
+.sp
+The key is a word, and only its first eight characters are used.
+Capital letters are not the same as small ones, so bandersnatch and
+Bandersnatch are two different keys and neither will read the other's
+file.
+.sp
+If no key is named, crypt asks for one - but only when its standard
+input is a terminal.  With the input coming from a file there is no
+terminal to type on, and the only thing left to read a key from is
+the file being enciphered, so crypt complains and exits instead.
+.sp
+Note: this is not a very sophisticated encryption scheme (NSA would
+have it overnight).  You can increase the complexity of the
+encryption by using multiple passes of crypt, each with a different
+key word.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+.in +5
+.br
+.bd
+crypt bandersnatch < file > encrypted
+.sp
+Encipher a file.
+.sp
+.bd
+crypt bandersnatch < encrypted
+.sp
+Read the enciphered file back.
+.sp
+.bd
+crypt honeybee < file | crypt Beaumont | crypt oscar > encrypted
+.sp
+Encipher a file with three key words, one pass each.  All three are
+needed, in the same order, to read it back.
+
+.in -5
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/usr/lib/makekey - turns the key word into the characters crypt
+enciphers with
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This is not the
+.bd
+crypt
+of
+.bd
+crypt (3).
+That one hashes a password for /etc/passwd; this one enciphers a
+file.  They are two different routines that happen to share a name,
+and neither does the other's job: the hash in /etc/passwd is not a
+thing this command can be given, and login cannot read a file this
+one wrote.
+.sp
+The key word is not used as it stands.  Crypt forks
+.bd
+makekey (1),
+which folds the key and two characters of salt into thirteen
+characters, and those are what the three tables are built from -
+which is why the key is not recoverable from the enciphered file
+without trying keys one at a time.
+.sp
+The 1982 micronix /bin/crypt is a different cipher.  One byte of its
+output depends only on the leading characters of the key it has read
+so far, where every byte of this one's depends on the whole key
+through makekey, so the two disagree on every file and neither reads
+what the other wrote.  What is described above is this command, which
+is the seventh edition's crypt.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+crypt (3), makekey (1), getpass (3), login (1)

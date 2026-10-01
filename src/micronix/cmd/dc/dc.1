@@ -1,0 +1,365 @@
+.he "dc (1)                       9/30/26                       dc (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+dc
+- desk calculator
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+dc [ file ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Dc
+is an arbitrary precision desk calculator: integers of any length
+and fractions to a scale you set, all exact.  It reads the standard
+input and writes the standard output, and a file named on the command
+line is read first and the standard input after it.
+.sp
+The calculator is a stacking, or reverse Polish, one.  A number is
+pushed on the stack as it is read, and an operator takes what it
+needs from the top of the stack and pushes back what it makes.  So
+.bd
+2 100 ^ p
+prints all thirty-one digits of two to the hundredth, and
+.bd
+3 k 1 3 / p
+prints a third to three places.
+.sp
+A number is a string of digits, an underscore to make it negative,
+and a decimal point if it has a fraction.  In bases above ten the
+letters A to F are digits as well.
+.sp
+.nf
+.in +5
+12
+_12
+12.5
+_12.5
+.in -5
+.fi
+.sp
+Those are numbers and nothing else is: a minus sign between two of
+them is the subtraction operator and not a sign.
+.sp
+The operators are
+.bd
++ - * / % ^
+which add, subtract, multiply, divide, take the remainder, and raise
+the second value to the power of the top.  The top value is the right
+operand, so two three minus is minus one.  An exponent must be a
+whole number, and is refused if it is very large; a negative one
+divides into one.  A fractional part of an exponent is ignored.
+.sp
+The scale is the number of decimal places a division keeps.  It is
+set by
+.bd
+k
+from the top of the stack and pushed back by
+.bd
+K
+, which reports it.  A division keeps exactly the scale and throws
+away the rest.  A multiplication keeps the sum of the scales of its
+two operands, or the scale itself where the scale is larger.
+Addition and subtraction keep the larger of the two scales.
+.sp
+An input base and an output base are set the same way by
+.bd
+i
+and
+.bd
+o
+, and read back by
+.bd
+I
+and
+.bd
+O
+, which push the value each holds.  An input base applies to numbers
+read after it and an output base to numbers printed after it, so
+.sp
+.in +5
+.ti +5
+.bd
+16 o 243 p
+.br
+.in -5
+.sp
+prints F3.  An output base from two to sixteen uses one character for
+each digit; above sixteen each digit is printed in decimal, which is
+how this dc has always printed the larger bases.
+.sp
+The remaining commands are these.
+.sp
+.in +10
+.ta 8
+.ti -10
+.bd
+s x
+.br
+Save.  The top of the stack is popped into the register named x,
+which is one character.  A capital
+.bd
+S
+treats that register as a stack and pushes the value on it instead.
+.sp
+.ti -10
+.bd
+l x
+.br
+Load.  A copy of the value in register x is pushed on the stack; the
+register keeps it.  A register never written reads as zero.  A
+capital
+.bd
+L
+pops the register's stack instead.
+.sp
+.ti -10
+.bd
+d
+.br
+Duplicate the top of the stack.
+.sp
+.ti -10
+.bd
+c
+.br
+Clear.  Every value on the stack is discarded.
+.sp
+.ti -10
+.bd
+p
+.br
+Print the top of the stack, which is left there.  A capital
+.bd
+P
+takes the top of the stack to be a character string, removes it, and
+prints it without a newline.
+.sp
+.ti -10
+.bd
+f
+.br
+Print every value on the stack, the top one first.
+.sp
+.ti -10
+.bd
+v
+.br
+Replace the top of the stack by its square root.  A negative one is
+an error.
+.sp
+.ti -10
+.bd
+z
+.br
+Push the number of values on the stack.  A capital
+.bd
+Z
+replaces the top value with its length in digits, and a capital
+.bd
+X
+with its scale.
+.sp
+.ti -10
+.bd
+q
+.br
+Quit.  Inside a string the two levels of execution the string was
+running at are dropped instead.  A capital
+.bd
+Q
+pops the top of the stack and drops that many levels.
+.sp
+.ti -10
+.bd
+x
+.br
+Execute the top of the stack as a string of dc commands.
+.sp
+.ti -10
+.bd
+[ ... ]
+.br
+Put the bracketed string on the top of the stack.  Brackets pair, so
+a string may hold another.
+.sp
+.ti -10
+.bd
+< x
+,
+.bd
+> x
+,
+.bd
+= x
+.br
+Compare the top two values and execute register x if they are less
+than, greater than, or equal to one another.  The comparison is the
+second value against the top, so two one
+.bd
+> x
+does not fire and one two
+.bd
+> x
+does.
+.sp
+.ti -10
+.bd
+; r
+,
+.bd
+: r
+.br
+Arrays.  The top of the stack is an index and the register named
+after the command holds an array of values.  Semicolon loads the
+indexed element; colon stores the value below the index into it.
+.sp
+.ti -10
+.bd
+!
+.br
+Run the rest of the line as a shell command.
+.sp
+.ti -10
+.bd
+?
+.br
+Read a line from the input and execute it as dc commands.
+.in -10
+.sp
+The scale, the input base and the output base are best changed
+together; a value read in one base and printed in another is
+converted through the scale and can surprise.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+Print the first ten factorials:
+.sp
+.nf
+.in +5
+[la1+dsa*pla10>y]sy
+0sa1
+lyx
+.in -5
+.fi
+.sp
+Dc has no loops of its own; the string in register y is the body of
+one, and it calls itself while the counter in register a is still
+below ten.
+.sp
+What is 243 in hexadecimal?
+.sp
+.nf
+.in +5
+16 o 243 p
+.in -5
+.fi
+.sp 2
+.in -5
+.bd
+DIAGNOSTICS
+.in +5
+.br
+Every message is printed on the standard output and dc reads the next
+command, so a bad line in a long input does not end it.
+.sp
+.in +10
+.ti -10
+num is unimplemented	A character that is no command, printed in
+octal.
+.sp
+.ti -10
+stack empty	There were not enough values on the stack to do what
+was asked.
+.sp
+.ti -10
+divide by 0	The divisor was zero.
+.sp
+.ti -10
+out of space, out of stack space, symbol table overflow	Memory or
+stack exhausted.
+.sp
+.ti -10
+index too big, neg index	An array index out of range.
+.sp
+.ti -10
+exp too big, exp not an integer, scale too big, sqrt of neg number	A
+value an operator cannot work with.
+.sp
+.ti -10
+nesting depth, readstk?, Q?, neg Q, L?, save: args	The string and
+register stacks used past their ends.
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This is v7's dc, the whole desk calculator, and it is a much larger
+program than the dc that was in /bin on the 1.6 disk.  That one was a
+pocket calculator with the four operations, bitwise and, or and
+exclusive or, shifts, a radix, and a print, and nothing else.  The
+page in /usr/man/man1 describes it, and three of its tokens do not
+mean here what they meant there: its
+.bd
+<
+and
+.bd
+>
+were shifts and here they compare, its
+.bd
+^
+was exclusive or and here it is a power, and its apostrophe, which
+pushed the ASCII value of the character after it, is gone.  The
+example on that page that uses the apostrophe,
+.bd
+8 o 'N p
+, does not run here.  Nor is there an
+.bd
+n
+to print without a newline.  Two printings differ as well: in base
+sixteen this dc writes F3 where the small one wrote f3, and in bases
+above sixteen it prints each digit in decimal, which is what v7's dc
+has always done.
+.sp
+An
+.bd
+f
+prints the stack and not the registers, whatever the v7 manual says
+of it; the source has always printed the stack alone.
+.sp
+A command line argument that begins with a minus sign is swallowed
+and the next argument becomes the file, and with no argument at all
+dc reads the standard input.
+.sp
+.bd
+Y
+is a debugging aid left in the source.  It dumps the top of the
+stack, its pointers and the allocation counters, and is not a command
+of the calculator.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+bc (1), the preprocessor for dc that takes infix expressions.

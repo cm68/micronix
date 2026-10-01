@@ -37,6 +37,7 @@
 #include <types.h>
 #include <stdio.h>
 #include <pwd.h>
+#include <crypt.h>
 
 /*
  * The records login reads and writes.  <pwd.h> is the tree's and the
@@ -150,12 +151,14 @@ void  start_shell(char *sh);                /* 0x0a39 */
 char *strsave(char *s);                     /* 0x0b2c */
 char *getword(char *sp, char *buf);         /* 0x0b77 */
 char *skipblanks(char *p);                  /* 0x0bdb */
-char *crypt(char *key, char *salt);         /* 0x0c37 */
 
-/* These five are not in libc here; they are written at the end of this
-   file, and declared the way this tree declares things. */
-struct passwd *getpwnam();                  /* 0x1103 */
-void  endpwent();                           /* 0x119b */
+/* crypt is libc's now - lib/libc/crypt.c - and <crypt.h> declares
+   it.  It was login's own code and lived below at 0x0c37. */
+
+/* These two are not in libc here; they are written at the end of this
+   file, and declared the way this tree declares things.  getpwnam and
+   endpwent were declared here with them and are libc's now, declared
+   by <pwd.h> - see the note below where their code used to be. */
 char *ttyname();                            /* 0x35e7 */
 int   ttyslot();                            /* 0x3719 */
 
@@ -720,230 +723,35 @@ int fd;
 }
 
 /* ------------------------------------------------------------------ *
- * getpwnam / endpwent - the /etc/passwd reader.
+ * The /etc/passwd reader that used to sit here - getpwent, setpwent,
+ * getpwnam and endpwent, read out of 0x0f0b, 0x1031, 0x1035, 0x1103,
+ * 0x115d and 0x119b - is lib/libc/getpwent.c now.  The note it
+ * carried explains why it belongs there and not here: in the 1982
+ * binary these are one library module and login is only their caller.
+ * The addresses and that reasoning moved to the library with the
+ * code.
  *
- * From 0x0f0b (getpwent), 0x1031's separators, 0x1035 (fld), 0x1103
- * (getpwnam), 0x115d (setpwent) and 0x119b (endpwent).  In the 1982
- * binary these are one library module and login is their only caller
- * here.  This tree's libc has no such module, and owner.c says the same
- * thing and reads /etc/passwd by hand; this is that reading with the
- * whole record kept, because login wants the password, the home
- * directory and the shell, and not just the number.
+ * What did not move is the storage, because it was never login's:
+ * pwf, pwline and pwent were at 0x60c4, 0x60c6 and 0x61c8, and they
+ * are the library's statics now.  login's copy of <pwd.h> still
+ * describes the same twelve bytes, and login still reads uid and gid
+ * out of it together, because setuid and chown here take the owner
+ * packed as uid | gid << 8.
  *
- * The record is the tree's own <pwd.h>, and that is not a coincidence.
- * name+0, passwd+2, uid+4, gid+5, person+6, dir+8, shell+10 is the
- * twelve bytes the binary lays out at 0x61c8, uid and gid one byte each
- * - the DB directives in its data image say so.  login reads those two
- * bytes together as one word, because setuid and chown here take the
- * owner packed as uid | gid << 8; see the 0x02a7 and 0x0635 sequences.
- *
- * The 1982 compare both this file and login() call returns NONZERO when
- * the strings are equal and 0 at the first difference - it is a streq
- * and not a strcmp, which is why the loop below tests == 0 to keep
- * looking.  0x3a0f and 0x3bda are two byte-identical copies of it.
+ * <pwd.h> declares the four functions now, and the flag-carrying
+ * calls below are unchanged.
  */
-
-static int setpwent();                  /* defined below getpwent() */
-
-static FILE *pwf;                       /* 0x60c4 - the open stream */
-static char  pwline[256];               /* 0x60c6 - one line of it */
-static struct passwd pwent;             /* 0x61c8 - the record handed back */
-
-/*
- * 0x1035 - end the field at the cursor: NUL the separator and return the
- * character after it, or NULL if the line ran out first.  The separators
- * are the literal ":\n\r" the binary keeps at 0x1031.
- */
-static char *
-fld(p)
-char *p;
-{
-    if (p == NULL)
-        return (NULL);
-    while (*p) {
-        if (*p == ':' || *p == '\n' || *p == '\r')
-            break;
-        p++;
-    }
-    if (*p == 0)
-        return (NULL);
-    *p++ = 0;
-    return (p);
-}
-
-/*
- * 0x0f0b - the next entry, or NULL at the end of the file.  A line with
- * too few fields is skipped; the three tests below are the three the
- * binary makes, not a fourth.
- */
-struct passwd *
-getpwent()
-{
-    char *cp;
-
-    if (pwf == NULL && setpwent() == 0)
-        return (NULL);
-    for (;;) {
-        if (fgets(pwline, sizeof pwline, pwf) == NULL)
-            return (NULL);
-
-        cp = pwline;
-        pwent.name = cp;
-        cp = fld(cp);
-        pwent.passwd = cp;
-        cp = fld(cp);
-        if (cp == NULL)
-            continue;
-        pwent.uid = atoi(cp);
-        cp = fld(cp);
-        if (cp == NULL)
-            continue;
-        pwent.gid = atoi(cp);
-        cp = fld(cp);
-        pwent.person = cp;
-        cp = fld(cp);
-        pwent.dir = cp;
-        cp = fld(cp);
-        pwent.shell = cp;
-        /* The shell field is NOT ended by a fld call: the strip below
-           turns its '\n' (or '\r') into the NUL.  A fld here would run
-           past the newline and leave cp at end-of-string, which the
-           *cp==0 test below reads as a malformed line and skips. */
-        if (cp == NULL)
-            continue;
-        while (*cp && *cp != '\r' && *cp != '\n')
-            cp++;
-        if (*cp == 0)
-            continue;
-        *cp = 0;
-        return (&pwent);
-    }
-}
-
-/*
- * 0x115d - rewind a stream already open, otherwise open the file.
- */
-static int
-setpwent()
-{
-    if (pwf != NULL)
-        rewind(pwf);
-    else if ((pwf = fopen("/etc/passwd", "r")) == NULL)
-        return (0);
-    return (1);
-}
-
-/*
- * 0x1103 - the first entry whose name matches.
- */
-struct passwd *
-getpwnam(name)
-char *name;
-{
-    struct passwd *p;
-
-    if (setpwent() == 0)
-        return (NULL);
-    for (;;) {
-        p = getpwent();
-        if (p == NULL)
-            return (NULL);
-        if (strcmp(p->name, name) == 0)
-            return (p);
-    }
-}
-
-/*
- * 0x119b - close the stream.  No return value; the epilogue is a bare
- * return in the binary too.
- */
-void
-endpwent()
-{
-    if (pwf != NULL) {
-        fclose(pwf);
-        pwf = NULL;
-    }
-}
 
 /* ------------------------------------------------------------------ *
- * crypt - the password hash.
+ * crypt - the password hash - used to sit here, from 0x0c37 to
+ * 0x0f07, and is lib/libc/crypt.c now.
  *
- * From 0x0c37, ending at 0x0f07.  login's OWN code, not a library
- * routine: its two seed strings "abcdefghijklmnop" and "Here is is !?!"
- * are in login's own literal pool at 0x0c17 and 0x0c28, and it drives
- * the compiler's 4-byte multiply by hand instead of calling anything.
- * The DES crypt whose object is in libwsc.a is nowhere in this image,
- * and "Here is is !?!" is the signature of the pre-DES one, so this is
- * the old big-multiply hash: two twelve-byte key blocks, seventeen
- * rounds of a cyclic 3x3 multiply-accumulate, then the two salt
- * characters and eleven filtered ones.
- *
- * The two blocks are three 4-byte words each and the rounds rewrite
- * block2 IN PLACE, word by word, so a later word of a round sees the
- * words already written in that same round - which is why the three
- * statements below are sequential and not one expression.  The order
- * was read off 0x0cd8-0x0e3b, where word 0 is written back at 0x0d41
- * before word 1 reads block2+0 at 0xda7.
- *
- * key1 is sixteen bytes and the copy of the sixteen-character seed
- * writes seventeen.  That is what the binary does: the NUL lands on
- * key2[0] and key2's own copy, which follows immediately, overwrites
- * it.  It is left alone here rather than corrected.
+ * It was always a library routine rather than login's own: its seed
+ * strings and its seventeen rounds say so, and the note it carried is
+ * with it in the library.  passwd and su want the same hash, so it
+ * belongs where they can reach it.  login's only trace of it is the
+ * #include <crypt.h> above.
  */
-
-/* the twelve bytes of a key block, seen as three 4-byte words */
-#define W(p)    (*(long *)(p))
-
-static char crypt_buf[16];              /* 0x608a - the answer */
-static char key1[16];                   /* 0x609a */
-static char key2[16];                   /* 0x60aa */
-
-char *
-crypt(pw, salt)
-char *pw;
-char *salt;
-{
-    register int i;
-    register char c;
-    char *o;
-
-    strcpy(key1, "abcdefghijklmnop");   /* 0x0c50 */
-    strcpy(key2, "Here is is !?!");     /* 0x0c62 */
-
-    key1[0] = salt[0];                  /* 0x0c74 - the salt goes in ... */
-    key1[1] = salt[1];                  /* 0x0c7b */
-    for (i = 0; pw[i]; i++)             /* 0x0c8d - ... and the password */
-        key1[i % 12] += pw[i];          /*         is added to it */
-
-    for (i = 0; i < 17; i++) {          /* 0x0cd8 - seventeen rounds */
-        W(key2 + 0) = W(key2 + 0) * W(key1 + 0)
-                    + W(key2 + 4) * W(key1 + 4)
-                    + W(key2 + 8) * W(key1 + 8);
-        W(key2 + 4) = W(key2 + 4) * W(key1 + 0)
-                    + W(key2 + 8) * W(key1 + 4)
-                    + W(key2 + 0) * W(key1 + 8);
-        W(key2 + 8) = W(key2 + 8) * W(key1 + 0)
-                    + W(key2 + 0) * W(key1 + 4)
-                    + W(key2 + 4) * W(key1 + 8);
-    }
-
-    o = crypt_buf;                      /* 0x0e3b - the output */
-    *o++ = *salt++;                     /* 0x0e41 - the salt, twice */
-    *o++ = *salt++;
-    for (i = 0; i < 11; i++) {          /* 0x0e80 - eleven characters */
-        c = key2[i];
-        if (c < 0)                      /* 0x0e9b - |c| */
-            c = -c;
-        if (c <= 0x20)                  /* 0x0ec5 - keep it printable */
-            c += 0x21;
-        if (c == 0x7f || c == ':')      /* 0x0ed6 - not DEL, not the ':' */
-            c--;
-        *o++ = c;                       /* 0x0eee */
-    }
-    *o = 0;                             /* 0x0eb8 */
-    return (crypt_buf);                 /* the base, not the cursor */
-}
 
 /* ------------------------------------------------------------------ *
  * Where the reconstruction stops, and why.

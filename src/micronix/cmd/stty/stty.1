@@ -1,0 +1,163 @@
+.he "stty (1)                     9/30/26                     stty (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+stty
+- set typewriter (terminal) options
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+stty [ -a ] [ option ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Stty
+sets the input and output options of the typewriter attached to its
+standard output, and reports them.
+.sp
+With no option it reports the settings which differ from the ones a
+login line is given when it is opened, as one line on the standard
+error.  An option in the report is named as the keyword which would
+undo it: the report says
+.bd
+tabs
+when tabs are preserved, and
+.bd
+-tabs
+when they are replaced by spaces.
+.sp
+Any number of options may be given, and they are applied in order.
+One that is not an option is named on the standard error, and nothing
+is set.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-a	Report every option, with the sign it is in, instead of
+only those which differ from the default.
+
+.ti -10
+raw	Raw mode input: no erase, kill, interrupt, quit or end of
+file processing, and the parity bit is passed.
+
+.ti -10
+-raw	Negate raw mode.
+
+.ti -10
+cooked	Same as -raw.  Cooked mode is the default.
+
+.ti -10
+-nl	Allow carriage return for new-line, and output CR-LF for
+carriage return or new-line.  This is the default.
+
+.ti -10
+nl	Accept only new-line to end lines.
+
+.ti -10
+echo	Echo back every character typed.  Echo is asserted by
+default.
+
+.ti -10
+-echo	Do not echo characters.
+
+.ti -10
+lcase	Map upper case to lower case.
+
+.ti -10
+-lcase	Do not map case.  This is the default.
+
+.ti -10
+-tabs	Replace tabs by spaces when printing.  This is the
+default.
+
+.ti -10
+tabs	Preserve tabs.
+
+.ti -10
+shake	Do hardware handshaking, using the clear-to-send (RS-232
+CTS) pin.
+
+.ti -10
+-shake	No handshaking.  This is the default.
+
+.ti -10
+data8	Keep all 8 bits of input data.
+
+.ti -10
+-data8	Keep only 7 bits of input data.  This is the default.
+
+.ti -10
+data7	Same as -data8; keep only 7 bits of input data.
+
+.ti -10
+erase c	Set the erase character to c.  A c written ^x, where x
+is any character, is the control character x.  The default erase
+character is ^H.
+
+.ti -10
+kill c	Set the kill character to c, written the same way.  The
+default kill character is ^X.
+
+.in -10
+.sp
+A baud rate may be named instead of a keyword, and it sets both the
+input and the output speed of the line:
+.sp
+.nf
+	50 75 110 134 134.5 150 200 300 600
+	1200 1800 2400 4800 9600 19200
+.fi
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The report is one line, and the speed in it is "?" when the line does
+not have a rate this command knows: a terminal the driver has never
+been told a speed for answers with a code of its own.  The erase and
+kill characters are always reported, as there is no default for them
+to differ from.
+.sp
+Micronix presently has no built-in delays, so the delay keywords the
+1982 stty has - cr0 to cr3, nl0 to nl3, tab0 to tab3, ff0, ff1, bs0,
+bs1 - are not here.  They are also not free: stty (2) gives bs1 and
+shake the one word 0100000 and ff1 and the 8-bit input bit the one
+word 040000.
+.sp
+The terminal driver does not map case, so lcase and -lcase set the
+bit and change nothing else.
+.sp
+-a is not on the 1982 page; it is what the stty on the distribution
+disk takes, and it is the only way to see the options that are at
+their default.
+.sp
+The erase and kill characters may be written ^x, which is v7's form
+and the form the defaults are written in above; the stty on the
+distribution disk takes the character literally.  That stty also has
+the sense of tabs the other way round, so that a user following this
+page and a user of the disk's command ask for opposite things.  This
+command follows the page, and stty (2), and the driver.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+stty (2), gtty (2), login (1), init (8)

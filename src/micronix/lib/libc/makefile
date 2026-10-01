@@ -40,15 +40,19 @@ TARGET	= libc.a
 # where a page goes, not the archive the code was packed into: the
 # stdio family is built into libu.a and documented here anyway,
 # because fopen is a library call and the manual says so by putting
-# it in section 3.  getpwent, popen and ttyname are in the 1.3 manual
-# and in nothing this port builds; they are here because the manual
-# is the manual.  floor.3 sits beside a floor.c that is kept and not
-# built, which is what NOTBUILT_C below is for.
+# it in section 3.  popen and ttyname are in the 1.3 manual and in
+# nothing this port builds; they are here because the manual is the
+# manual.  getpwent used to be named with them and is not any more -
+# getpwent.c is in the archive now - so its page stays for the same
+# reason as the others, and getgrent.3 was written to sit beside it.
+# floor.3 sits beside a floor.c that is kept and not built, which is
+# what NOTBUILT_C below is for.
 #
 MAN	= strcat.3 strchr.3 strcmp.3 strcpy.3 strdup.3 \
 	strlen.3 strncat.3 strncmp.3 strncpy.3 strrchr.3 \
-	alloc.3 ctime.3 fclose.3 ferror.3 floor.3 fopen.3 \
-	fread.3 fseek.3 getpwent.3 gets.3 perror.3 popen.3 \
+	alloc.3 ctime.3 crypt.3 fclose.3 ferror.3 floor.3 fopen.3 \
+	fread.3 fseek.3 getgrent.3 getpass.3 getpwent.3 gets.3 \
+	perror.3 popen.3 \
 	printf.3 putc.3 puts.3 scanf.3 setbuf.3 stdio.3 \
 	system.3 ttyname.3
 MANDIR	= /usr/man/man3
@@ -81,7 +85,8 @@ COBJS	= rand.o srand1.o mkstemp.o mktemp.o permaloc.o \
 	timezone.o ctime.o assert.o calloc.o malloc.o memcmp.o \
 	memset.o blkcpy.o ctype_.o getenv.o pnum.o \
 	qsort.o remove.o sprintf.o doprnt.o atol.o sscanf.o \
-	doscan.o fnum.o atof.o mkdir.o opendir.o system.o
+	doscan.o fnum.o atof.o mkdir.o opendir.o system.o \
+	getpwent.o getgrent.o crypt.o getpass.o
 
 OBJS	= $(AOBJS) $(COBJS)
 

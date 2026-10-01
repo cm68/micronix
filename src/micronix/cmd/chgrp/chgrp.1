@@ -52,8 +52,10 @@ their own file to it.  Micronix has no such membership test, and the
 kernel lets only the super-user chown at all, so here chgrp is root's
 tool; the check in the original was only advice.
 .sp
-A group name is looked up in /etc/group by hand, since libc has no
-getgrnam.
+A group name is looked up in /etc/group with getgrnam, which is in
+libc - see getgrent (3) - so chgrp no longer reads the file itself.
+A name that is not there is not a group; a decimal argument is taken
+as itself and the file is not consulted.
 .sp 2
 .in -5
 .bd

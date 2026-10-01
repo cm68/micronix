@@ -21,6 +21,12 @@ DEPTH	= ../..
 DIR	= man
 CLASS	= cmd
 
+#
+# help is this same program under a second name; main() tells them
+# apart by looking for "help" inside argv[0].
+#
+ALIAS	= help
+
 include $(DEPTH)/GNUmakefile.inc
 
 #

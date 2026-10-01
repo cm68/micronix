@@ -1,0 +1,81 @@
+.he "group (1)                    9/30/26                    group (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+group
+- file group
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+group [ -newgroup ] file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Every Micronix file has associated with it a group number, used to
+determine group access permission.  Group reports that number, and
+with an option changes it.
+.sp
+With no option, group reports the group of each named file.  The
+number is looked up in /etc/group and printed as a group name where
+there is one, and as a number where there is not.
+.sp
+With -newgroup, group changes the group of each named file.  Newgroup
+may be a decimal group number or a group name looked up in
+/etc/group.
+.sp
+Only the super-user may change the group of a file; anyone may ask
+what group one belongs to.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-newgroup	Change the group to newgroup instead of reporting it.
+
+.in -10
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This is the group-side twin of owner (1): the same two modes, the
+same argument scan, and the same report.  The name is looked up with
+getgrnam and the number with getgrgid, both in libc - see
+getgrent (3).
+.sp
+Chown here sets an owner and a group at once, the pair packed as
+uid | gid << 8, and has no -1 to leave a field alone.  So every change
+stats the file first and carries its owner through unchanged.
+.sp
+A group name need not exist for a number to be used: a decimal
+argument is taken as itself and /etc/group is not consulted.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/group - group name and number relationships
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+chgrp (1), owner (1), chmod (1), ls (1)

@@ -12,4 +12,11 @@ DEPTH	= ../..
 DIR	= wc
 CLASS	= cmd
 
+#
+# The distribution's three counters are this program under other
+# names; main() tells them apart by looking at argv[0], as man does
+# for help.
+#
+ALIAS	= chars lines words
+
 include $(DEPTH)/GNUmakefile.inc

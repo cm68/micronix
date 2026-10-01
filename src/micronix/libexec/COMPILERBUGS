@@ -1,0 +1,230 @@
+#
+# COMPILERBUGS - what the compiler gets wrong, with a repro for each
+#
+# micronix/libexec/COMPILERBUGS
+#
+# Every entry below is a defect in this tree's compiler - mxccc, over
+# the passes in libexec - found by porting a command and reduced to a
+# program small enough to run in a minute.  They are recorded rather
+# than fixed: fixing c0 or c1 means rebuilding the compiler that builds
+# everything else, and none of these is worked around in the compiler
+# here.  What each entry carries instead is the shape the port used to
+# avoid it, because that is what the tree actually does today.
+#
+# Each one was re-run against the tree's own mxccc while this file was
+# written, and the output quoted is that run's.  Unless an entry says
+# otherwise the bug is present with and without -O.
+#
+# Probes were compiled as
+#
+#   mxccc -m micronix [-O] -i<tree>/lib/include -I<tree>/include \
+#         -o prog prog.c lib/libc/libc.a lib/libu/libu.a
+#
+# and run under the user-mode simulator.  Store a result in a variable
+# and print the variable - handing a call result or a folded constant
+# straight to a varargs printf reads the wrong word and invents bugs
+# that are not there.
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
+#
+
+# ---------------------------------------------------------------------
+# 1.  x > 0 FOLDS TO x + 1, under -O only
+#
+# The comparison compiles - and its VALUE is x+1, so it is only wrong
+# where the result is used as a number rather than as a condition.
+# while (i > 0) is unaffected; nf = 1; k = nf > 0; is not.  x > 0L is
+# correct, and so are >=, != and <.  Present only with -O: the peephole
+# pass is what folds it.
+#
+# Found porting v7 sort, which uses nfields>0 twice as a value - the k
+# start in cmp() and field()'s second argument.  Rewritten nfields != 0.
+#
+#	#include <types.h>
+#	#include <stdio.h>
+#	main()
+#	{
+#		volatile int nf;
+#		int k;
+#		nf = 1;
+#		k = nf > 0;
+#		printf("%d\n", k);	/* 1 without -O, 2 with */
+#	}
+
+# ---------------------------------------------------------------------
+# 2.  AN AGGREGATE INITIALIZER GIVES ONE INITIALIZER PER MEMBER
+#
+# Not per element: for a struct with array members, each array takes a
+# single initializer and the rest of it is zeroed.  Nested braces are
+# correct.  This one bit twice in the same port, and silently.
+#
+# Found porting v7 sort.  Its flat ten-number initializer for
+# struct field left m[1] = 0 where -1 belongs, and m[1] = -1 is what
+# makes a key run to the end of the line - so EVERY +pos key sorted the
+# whole line and looked plausible.  The three array members are braced
+# now.  The general shape:
+#
+#	#include <types.h>
+#	#include <stdio.h>
+#	struct s2 { int a[2]; int b[2]; };
+#	struct s2 z = {0,-1,2,3};
+#	main()
+#	{
+#		printf("%d %d %d %d\n", z.a[0], z.a[1], z.b[0], z.b[1]);
+#		/* 0 0 -1 0; nested {{0,-1},{2,3}} gives 0 -1 2 3 */
+#	}
+
+# ---------------------------------------------------------------------
+# 3.  A char AGAINST A CONSTANT >= 128 COMPARES SIGNED
+#
+# char is signed here, so any byte at or above 128 is negative and
+# c < 128 is false for every ASCII character.  Mask with & 0377 when
+# the intent is a byte range.
+#
+# Found porting v7 file, in english(): bp[j] < NASC, with NASC 128,
+# made every text file report "ascii text" and none ever report
+# "English text".  Written (bp[j] & 0377) < NASC.  A separate cause from
+# entry 1 and present with and without -O.
+#
+#	#include <types.h>
+#	#include <stdio.h>
+#	main()
+#	{
+#		char c;
+#		int r;
+#		c = 97;
+#		r = c < 128;
+#		printf("%d\n", r);	/* 0; c < 127 is 1 */
+#	}
+
+# ---------------------------------------------------------------------
+# 4.  cond ? 0 : <byte variable> IS ZERO-EXTENDED
+#
+# The ?: sign fix of 94f4249f covers a small constant against another
+# constant (? 1 : -1) and the ? -1 : byte shape.  It does not cover a
+# byte VARIABLE in the arm: the 0 wins the type and the variable is
+# read unsigned, so -1 comes back 255.
+#
+# Found porting v7 dc, which writes this twelve times through its
+# sgetc/slookc/sbackc macros.  The symptom was a byte of garbage in a
+# printed number (chsign stored 251 for the digit 5).  An (int) cast on
+# the arm fixes all twelve and leaves dc's expressions alone.
+#
+#	#include <types.h>
+#	#include <stdio.h>
+#	char cbuf[4];
+#	int gi, n;
+#	main()
+#	{
+#		int i;
+#		cbuf[0] = -1;
+#		i = 0;
+#		n = i ? 0 : cbuf[0];
+#		printf("%d\n", n);	/* 255 */
+#		n = cbuf[0];
+#		printf("%d\n", n);	/* -1 - the same value, read plainly */
+#	}
+
+# ---------------------------------------------------------------------
+# 5.  register LOCALS SHARING AN EXPRESSION WITH A ?: OPERAND LOSE A
+#     CONSTANT
+#
+# With register on the locals, c1 drops the 100 out of
+# "ct=100-slookc(p)-carry" and the byte that comes back is whatever the
+# caller left in HL.  The trigger is the combination: register on a
+# local AND an operand that is itself a ?: expression.  Entry 4's macro
+# is such an operand, so dc's chsign hits it.  The same expression with
+# a plain dereference instead of the macro is fine (D below), and plain
+# locals are fine (B below).
+#
+# Found porting v7 dc.  Its chsign had v7's "register int carry;
+# register char ct;" and negating 5 stored 251.  Both are plain locals
+# now.  Measured with the probe below, where all four should print 95.
+# The numbers quoted are the -O ones; without -O they differ again
+# (A 97, C 5217), because the garbage is whatever the caller left in
+# HL and the peephole changes who left it:
+#
+#   A  69    register int carry; register char ct;   (the macro)
+#   B  95    int carry; char ct;                      (the macro)
+#   C  5189  register int carry; int ct;              (the macro)
+#   D  95    register int carry; register char ct;   (no macro)
+#
+#	#include <types.h>
+#	#include <stdio.h>
+#	#define EOF2 (-1)
+#	struct blk { char *rd, *wt, *beg, *last; };
+#	struct blk b;
+#	char store[8];
+#	int gi;
+#	#define sfeof(p) (((p)->rd==(p)->wt)?1:0)
+#	#define slookc(p) (((p)->rd==(p)->wt)?EOF2:*(p)->rd)
+#	int A(p, j)
+#	struct blk *p;
+#	int j;
+#	{
+#		register int carry;
+#		register char ct;
+#		carry = 0;
+#		ct = 100 - slookc(p) - carry;
+#		return (ct);
+#	}
+#	int B(p, j)
+#	struct blk *p;
+#	int j;
+#	{
+#		int carry;
+#		char ct;
+#		carry = 0;
+#		ct = 100 - slookc(p) - carry;
+#		return (ct);
+#	}
+#	int C(p, j)
+#	struct blk *p;
+#	int j;
+#	{
+#		register int carry;
+#		int ct;
+#		carry = 0;
+#		ct = 100 - slookc(p) - carry;
+#		return (ct);
+#	}
+#	int D(p, j)
+#	struct blk *p;
+#	int j;
+#	{
+#		register int carry;
+#		register char ct;
+#		carry = 0;
+#		ct = 100 - *(p->rd) - carry;
+#		return (ct);
+#	}
+#	main()
+#	{
+#		b.beg = store; b.last = store + 8; b.rd = b.wt = store;
+#		store[0] = 5; store[1] = 0; b.wt = store + 1;
+#		b.rd = b.beg; gi = A(&b, 7); printf("A %d\n", gi);
+#		b.rd = b.beg; gi = B(&b, 7); printf("B %d\n", gi);
+#		b.rd = b.beg; gi = C(&b, 7); printf("C %d\n", gi);
+#		b.rd = b.beg; gi = D(&b, 7); printf("D %d\n", gi);
+#	}
+#
+# The unused j is the original probe's and is left in: the garbage that
+# comes back is whatever the caller left in HL, so the exact numbers
+# depend on the surrounding code.  What matters is that A and C are not
+# 95 and that B and D are.
+
+# ---------------------------------------------------------------------
+# NOT A MISCOMPILE - a diagnostic that is missing
+#
+# A literal TAB inside a string or character constant is not valid C,
+# and the compiler should reject it.  ccc accepts it and silently
+# converts the tab byte to a space, so
+#
+#   printf("A<TAB>B\n");   /* the <TAB> is a real tab byte */
+#
+# prints "A B" where printf("A\tB\n") prints the tab.  Both compile with
+# no warning.  The fault is the source's - write \t - but a compiler
+# that takes the input without a word is why it goes unnoticed.
+#
+# Found porting v7 cal, whose year layout positions the month headings
+# with literal tabs.

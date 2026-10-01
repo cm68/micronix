@@ -66,7 +66,8 @@ CSRCS = \
 	assert.c calloc.c malloc.c memcmp.c memset.c \
 	blkcpy.c ctype_.c getenv.c pnum.c qsort.c remove.c \
 	sprintf.c doprnt.c atol.c sscanf.c doscan.c fnum.c \
-	atof.c mkdir.c opendir.c system.c
+	atof.c mkdir.c opendir.c system.c getpwent.c getgrent.c \
+	crypt.c getpass.c
 
 # superseded by the .s beside them: kept, not built
 #

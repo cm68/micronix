@@ -1,0 +1,75 @@
+.he "makekey (1)                  9/30/26                  makekey (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+makekey
+- generate a key for crypt
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+makekey
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Makekey reads ten bytes from its standard input and writes thirteen
+to its standard output.  The ten are a key of eight characters
+followed by a salt of two; the thirteen are the string that
+.bd
+crypt (3)
+returns for them.
+.sp
+It is the key generator for
+.bd
+crypt (1),
+which forks it and talks to it down a pipe, and it is not meant to be
+run by hand.  What it is for is that the transformation be slow - it
+takes a noticeable part of a second - so that trying keys one at a
+time against an enciphered file costs that much per key.  It is done
+once per run, not once per byte, which is the point of the fork.
+.sp
+The salt is what makes two invocations with the same key give
+different thirteen-character results.  Crypt passes the first two
+characters of the key word as its salt, so it is the same two every
+time for a given key; a password file picks its two elsewhere.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/usr/lib/makekey - where crypt (1) looks for it
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The answer is computed by
+.bd
+crypt (3),
+the password hash - the older big-multiply one and not the DES one.
+.sp
+The hash walks a password to its NUL, and v7's makekey held the eight
+key bytes in a buffer with no terminator, so a full eight character
+key had the hash reading past the end of it until it found a zero
+somewhere on the stack.  This one puts the NUL in after the eight
+bytes, so exactly the eight key characters are hashed.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+crypt (1), crypt (3), login (1), passwd (1)

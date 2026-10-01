@@ -1,0 +1,43 @@
+#
+# makefile for makekey
+#
+# micronix/cmd/makekey/makefile
+#
+# The native build: this runs inside micronix, under the make in
+# cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
+# it cross builds the same program on the host.
+#
+# BIN is /usr/lib and not the /bin the other commands use: crypt (1)
+# execs /usr/lib/makekey by name, and this is what puts it there.
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
+
+CC	= ccc
+#
+# -O is the peephole pass.  The cross build passes it too - see
+# GNUmakefile.inc, which explains why it is not optional on a machine
+# where the heap is whatever is left of 64k after the image.
+#
+CFLAGS	= -O
+BIN	= /usr/lib
+MAN	= makekey.1
+MANDIR	= /usr/man/man1
+PROG	= makekey
+OBJS	= makekey.o
+
+all: $(PROG)
+
+$(PROG): $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS)
+
+install: $(PROG)
+	mkdir -p $(BIN)
+	cp $(PROG) $(BIN)/$(PROG)
+	mkdir -p $(MANDIR)
+	cp $(MAN) $(MANDIR)/$(MAN)
+
+clean:
+	rm -f $(OBJS) *.nam *.tok *.x
+
+clobber: clean
+	rm -f $(PROG)

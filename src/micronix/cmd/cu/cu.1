@@ -1,0 +1,175 @@
+.he "cu (1)                       9/30/26                       cu (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+cu
+- call another system over a terminal line
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+cu device [ -t ] [ -s speed ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Cu
+connects this machine to another one over the terminal line named
+.bd
+device
+- /dev/ttyC, say - and passes characters between the two.
+.sp
+When the
+.bd
+cu
+command is given, one process is set up to handle sending characters
+to the remote system, one is set up to receive them.  Much of this is
+not obvious to the user.
+.sp
+When
+.bd
+cu
+is ready it says Connected.  Thereafter, whatever you type is
+immediately sent to the remote port, and whatever is received from it
+is sent to your terminal.  So, typically, you press a single key on
+your terminal, Micronix takes it and re-transmits it to the remote
+machine, which will usually send it back, at which point Micronix
+receives it and sends it to your terminal - and you see the character
+on your screen.
+.sp
+There is definitely an upper limit to the baud rate you can use for
+the remote port; 1200 baud is the highest recommended.
+.sp
+A line that begins with ~ is a command to
+.bd
+cu
+rather than a line to the other machine:
+.sp
+.in +10
+.ti -10
+~.	Leave cu and hang up the line.  ~^D does the same.
+
+.ti -10
+~~	Send a line that really does begin with a ~.
+
+.ti -10
+~<file	Send the named file over the line.
+
+.ti -10
+~!	Run a login shell here, with your terminal as it usually
+is.  ~!cmd runs just that command, with its output left on your
+terminal.
+
+.ti -10
+~$cmd	Run cmd here with its output sent over the line instead
+of to your terminal.
+
+.ti -10
+~%put from [to]	Send a local file to the remote machine.
+
+.ti -10
+~%take from [to]	Fetch a file from the remote machine.
+.in -10
+.sp
+The two last are builtins: what they do is push a short shell
+procedure at the remote machine, so they want a remote that runs a
+shell of the same shape.  Note that only text files may be copied
+reliably.  This need not be a drawback, however, because any file can
+be converted into a text file, transferred, and then converted back
+again.
+.sp
+Both the sending and the receiving processes recognize
+.sp
+.nf
+	~>file
+
+	~>
+.fi
+as starting and ending delimiters for file diversion, so that in
+order to copy a file from a foreign system to the local one, all you
+have to do is get the foreign system to generate:
+.sp
+.nf
+	~>filename
+	Text of file ...
+	more file ...
+	~>
+.fi
+That is, a beginning marker, the text of the file, and then an ending
+marker.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-s speed	Set the speed of the line.  The speeds are 110, 134,
+150, 300 and 1200; 300 is the default.
+
+.ti -10
+-t	Do not split the conversation in two.  There is no local
+terminal to read and write here - the line is the terminal - so cu
+reads and writes it by itself and asks the driver for no echo and no
+raw mode.
+
+.in -10
+.sp 2
+.in -5
+.bd
+EXAMPLE
+.in +5
+.br
+To set up communication over a modem, get your hardware set up and
+then type:
+.sp
+.in +5
+.ti +5
+.br
+cu /dev/ttyC -s 300
+.in -5
+.sp
+In this example the modem would be plugged into Micronix port C (the
+third one).
+.sp
+Typically, one must reverse the transmit and receive lines in the
+cable running from the computer to the modem.  One reverses the wires
+running to pins 2 and 3 of the connector at one end or the other.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+Cu opens the line it is given and nothing else.  v7's cu is built
+around an automatic calling unit: it takes a telephone number, opens a
+dialer and dials, and the line to use and the dialer to use are its
+own options.  Micronix has no such device, and cu (1) here has always
+named the line as its argument, so the -l and -a options and the
+dialing are not in this command.  A line the driver wants carrier on
+is waited for when it is opened; to drop the call, leave cu.
+.sp
+~! and ~$ are v7's and are not on the 1982 page: they run a shell
+here, which is a way of getting at this machine's files without
+leaving the connection.
+.sp
+The 1982 page says cu prints a "~" when it is ready.  This one says
+Connected, as v7's does.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+stty (1), login (1), write (1)
