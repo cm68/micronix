@@ -717,3 +717,81 @@ byte-identical volumes.  The diskette images were byte-identical to the
 pre-change build too, the -d path being untouched: the floppy is the one
 case that keeps its label in the image, because there the medium is the
 only thing that can say what it is.
+
+------------------
+
+swap() has no swap-device guard, so a machine with no swap device answers
+a memory shortage by killing a process that did nothing wrong.
+
+fork() guards its own call - procopy() asks "if (swapdev && swapout(child))"
+(sys/fork.c) - and the swapper's loop does not.  swap() (sys/swap.c) runs
+whether or not there is anywhere to put a process, and its three parts agree
+with each other and not with the machine.  findout() picks a victim on its
+own terms - alive, loaded, unlocked, and run at least MINRUN ticks - and
+never asks whether a swap device exists; a process that is asleep is
+preferred to one that is running, which is right for a swapper, since its
+usual customer is a process that is waiting rather than computing.  salloc()
+finds a map whose first entry has size 0, prints "Out of swap space" and
+returns 0.  swapout() reads that 0 as a write that did not happen, puts
+LOADED back, and sends SIGKILL.  So the victim is whoever the scheduler
+liked least rather than the process that wanted the memory, and the two
+messages come out as a single line, because the first pr() carries no
+newline.
+
+Seen at -m 384k, on the stock stamp (rootdev 3/8, swapdev 0/0) with no
+second drive, running a workload whose whole job is to compile one large
+file:
+
+	Out of swap spaceswap error: process 1 killed
+
+Process 1 is the single-user shell - trap.c's first fork, which execs
+/bin/sh -sh and so is still process 1 - so what is lost is the shell, the
+script it was reading, and every line the script had left to print.  The
+compiler the shell had already started carries on as an orphan and finishes
+its file; the console then sits silent.
+
+Reported and not fixed, because blocking in place of killing has a deadlock
+behind it.  The shortage is discovered in grow() (sys/malloc.c): it sets
+memwant and sleeps on mfree until a segment appears.  A process asleep for
+memory is not runnable, so it cannot be the one chosen to make room, and on
+a machine with no swap area nothing else can free a segment either - so the
+sleep does not end.  Killing is the design's loud answer to a question with
+no quiet one.  What it ought to kill, if it kills at all, is the process
+that asked and cannot be satisfied rather than a bystander that happened to
+be idle; that is a change to findout()/swapout() and not to this note.
+
+Note what is not missing.  swapinit() sizes the map correctly and leaves
+swapmap[0].size at 0 when there is no device, swapdev is 0, and nothing else
+in the kernel reads a swap address without a device to read it from.  Every
+thing that could be asked about the machine says there is no swap.  It is
+only swap() that never asks.
+
+One more thing in findout(), read and not touched.  The preference for the
+longest-running candidate cannot fire: the test is written
+"n->mode & AWAKE == p->mode & AWAKE", and == binds tighter than &, so it
+parses as n->mode & (AWAKE == p->mode) & AWAKE - which is zero for every
+mode there is, since AWAKE is a single bit and (AWAKE == p->mode) is 0 or 1.
+The condition it lives in therefore reduces to "n == 0 || n->mode & AWAKE":
+the first sleeping candidate taken, or, if none is sleeping, the last
+running one, and n->time plays no part.  Whoever is picked is picked
+consistently, so the swapper works; it just does not do the choosing the
+line above it describes.
+
+Verified: two volumes built by the same create_vol, the same bounded
+workload installed as /.login, the same -m 384k, differing only in the two
+words setdev stamps, and both booted from a fresh volume - an earlier pair
+of runs had been killed with a timeout inside the emulator and left their
+volume inconsistent, which is its own way of losing a run.  With swapdev 0/0
+and no second drive attached, the console printed the concatenated pair
+above within the first minute of the compile and said nothing further; the
+shell was gone, so the COMPILE DONE and the halt the workload ends with
+could not happen and the machine sat.  With swapdev 3/73 on a second drive,
+the swapper chose the same process and it left instead - "swapout 1: 7 segs
+at 102" - and the compile ran on.
+
+The pair at 384k is not the pair at 512k.  The same workload, the same
+bounded /.login and the same absence of a swap device, but -m 512k, ran to
+completion and halted with its console intact - "  -> rules.o", COMPILE
+DONE, "rules.o" 21721 bytes, "Micronix halt: 0 dirty buffers" - which is
+what says the workload is bounded, and that 384k is where it stops fitting
+rather than where it stops working.
