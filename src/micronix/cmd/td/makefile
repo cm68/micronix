@@ -25,6 +25,7 @@ $(PROG): $(OBJS)
 install: $(PROG)
 	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/td
+	chmod 4711 $(BIN)/td
 	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)/$(MAN)
 

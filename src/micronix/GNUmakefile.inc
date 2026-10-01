@@ -242,6 +242,17 @@ INSTALLALIAS = @if [ -n "$(strip $(ALIAS))" ] ; then \
 	fi
 
 #
+# A PROGRAM CAN WANT A MODE.  cp makes what it installs 0700, which is
+# right for nearly everything and wrong for the two the distribution
+# had set-user-id - newuser and td, 4711, root's - because they do what
+# only root can do for whoever runs them.  MODE is empty everywhere
+# else, so the test is false and this does nothing.
+#
+INSTALLMODE = @if [ -n "$(strip $(MODE))" ] ; then \
+		chmod $(MODE) $(INSTDIR)/$(INSTNAME) ; \
+	fi
+
+#
 # DELETE A TARGET WHOSE RECIPE FAILED.  Without this, make leaves what
 # the failed command had already written, and a zero-length file is
 # still newer than its source - so the next make says nothing needs
@@ -387,6 +398,7 @@ install: $(TARGET)
 	rm -f $(INSTDIR)/$(INSTNAME)
 	cp $(TARGET) $(INSTDIR)/$(INSTNAME)
 	$(INSTALLALIAS)
+	$(INSTALLMODE)
 	$(INSTALLMAN)
 endif
 endif

@@ -11,5 +11,10 @@
 DEPTH	= ../..
 DIR	= newuser
 CLASS	= cmd
+#
+# Set-user-id root, as the distribution's was: see INSTALLMODE in
+# GNUmakefile.inc.
+#
+MODE	= 4711
 
 include $(DEPTH)/GNUmakefile.inc
