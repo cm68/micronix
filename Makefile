@@ -57,6 +57,31 @@ filesystem: src/tools/readall
 	mkdir -p filesystem/old
 	echo "path /bin /usr/bin" > filesystem/.sh
 
+#
+# The filesystem skeleton, from source alone: the directory tree, /dev
+# (from src/micronix/dev/devlist, the same list create_vol mknod's onto a
+# volume), and the shell's startup files.  This is the part of `filesystem`
+# that does not need the distribution disks - see docs/DISTRIBUTION-FREE.md.
+# It is a separate target because `filesystem` still reads the distribution
+# binaries; when the porting gap in that doc is closed, this folds in and
+# the readall loops go away.
+#
+DEVROOT = filesystem/dev
+.PHONY: filesystem-skel
+filesystem-skel:
+	mkdir -p filesystem/bin filesystem/dev filesystem/etc filesystem/lib \
+		filesystem/libexec filesystem/include filesystem/tmp filesystem/old \
+		filesystem/usr/bin filesystem/usr/lib filesystem/usr/man \
+		filesystem/usr/include filesystem/usr/src filesystem/usr/adm \
+		filesystem/usr/spool
+	rm -rf $(DEVROOT) && mkdir $(DEVROOT)
+	grep -v '^#' src/micronix/dev/devlist | while read t m n name; do \
+		[ -z "$$name" ] && continue; \
+		ln -sf "$${t}dev($$m,$$n)" $(DEVROOT)/$$name; \
+	done
+	echo "path /bin /usr/bin" > filesystem/.sh
+	: > filesystem/.login
+
 clean:
 	for dir in src src/hwsim src/micronix ; do \
 		(cd $$dir ; make clean) \
