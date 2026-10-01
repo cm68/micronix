@@ -114,8 +114,8 @@ typedef long obj;
  * which ccc does truncate to the low word.  (CODEGENGAPS entry 23.)
  */
 #define	objptr(o)	((cell *)(int)(o))
-#define	objtype(o)	((char)(((o) >> 16) & 0xff))
-#define	objsub(o)	((char)(((o) >> 24) & 0xff))
+#define	objtype(o)	((unsigned char)((o) >> 16))
+#define	objsub(o)	((unsigned char)((o) >> 24))
 #define	objmk(p,t,s)	((obj)(((long)(unsigned)(p)) | ((long)(t) << 16) | ((long)(s) << 24)))
 
 #define BOTCH	1

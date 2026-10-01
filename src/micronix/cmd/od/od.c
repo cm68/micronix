@@ -465,12 +465,12 @@ char	asc_name[34][4] = {
 };
 
 a_put(cc, d)
-char	*cc;
+unsigned char	*cc;
 struct dfmt *d;
 {
 	int c = *cc;
 	register char *s = "   ";
-	register pbit = parity((int)c & 0377);
+	register pbit = parity((int)c);
 
 	c &= 0177;
 	if (isgraphic(c))
@@ -528,20 +528,20 @@ char	*s;
 }
 
 b_put(b, d)
-char	*b;
+unsigned char	*b;
 struct dfmt *d;
 {
-	printf(d->df_fmt, icvt((long)*b & 0377, d->df_radix, d->df_signed, d->df_field));
+	printf(d->df_fmt, icvt((long)*b, d->df_radix, d->df_signed, d->df_field));
 	return(1);
 }
 
 c_put(cc, d)
-char	*cc;
+unsigned char	*cc;
 struct dfmt *d;
 {
 	register char	*s;
 	register int	n;
-	register int	c = *cc & 0377;
+	register int	c = *cc;
 
 	s = scvt(c, d);
 	for (n = d->df_field - strlen(s); n > 0; n--)
@@ -605,7 +605,7 @@ static long	str_addr;
 static long	str_label;
 
 st_put(cc, d)
-char	*cc;
+unsigned char	*cc;
 struct dfmt	*d;
 {
 	register int	c;
@@ -616,7 +616,7 @@ struct dfmt	*d;
 		return(1);
 	}
 
-	c = (*cc & 0377);
+	c = *cc;
 
 	if (str_mode & S_FILL)
 	{

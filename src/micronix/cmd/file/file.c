@@ -66,20 +66,18 @@
  *			which is 0111.  This says 0111.
  *
  *	the troff test	v7 compared the second byte against '\357',
- *			which is 0357, 239.  A byte with the top bit
- *			set is negative in ccc's char, so that test has
- *			never been true here; the byte is masked.
+ *			which is 0357, 239.  buf is unsigned char here,
+ *			so a byte with the top bit set is a plain number
+ *			and the test reads the same as v7's.
  *
  *	the declaration	v7 wrote "int l = strlen(p)" inside a
  *			block, which is C99; it is at the top of main
  *			here, as ccc wants it.
  *
  *	the ascii test	english() tests each byte with "bp[j] <
- *			128".  ccc compares a char against a constant
- *			of 128 or more as a signed byte, so that test
- *			is false for every ascii byte and the letter
- *			counts all come out zero.  The byte is masked to
- *			0..255 first, which is the same test made wide.
+ *			128".  bp is unsigned char, so the byte is
+ *			0..255 and the test is the ascii one v7 meant,
+ *			not a signed comparison against -128.
  *
  * Printing is v7's down to the tab after the name, and that tab has
  * to be written \t: ccc turns a tab typed inside a string literal
@@ -116,7 +114,7 @@
 
 int in;
 int i  = 0;
-char buf[512];
+unsigned char buf[512];
 char *fort[] = {
 	"function","subroutine","common","dimension","block","integer",
 	"real","data","double",0};
@@ -166,7 +164,7 @@ type(file)
 char *file;
 {
 	int j,nl;
-	char ch;
+	unsigned char ch;
 	struct stat mbuf;
 
 	ifile = -1;
@@ -206,14 +204,14 @@ char *file;
 	 * so the object test is not a case of the same switch - v7's
 	 * three a.out magics were all two bytes and could share it.
 	 */
-	if ((buf[0]&0377) == OBJMAGIC) {
+	if (buf[0] == OBJMAGIC) {
 		printf("executable");
-		if(((buf[2]&0377) | ((buf[3]&0377)<<8)) != 0)
+		if((buf[2] | (buf[3]<<8)) != 0)
 			printf(" not stripped");
 		printf("\n");
 		goto out;
 	}
-	switch((buf[0]&0377) | ((buf[1]&0377)<<8)) {
+	switch (buf[0] | (buf[1]<<8)) {
 
 	case 0177555:
 		printf("old archive\n");
@@ -245,7 +243,7 @@ check:
 	}
 	nl = 0;
 	while(buf[i] != '('){
-		if(buf[i] <= 0)
+		if(buf[i] == 0 || buf[i] >= 0200)
 			goto notas;
 		if(buf[i] == ';'){
 			i++;
@@ -313,7 +311,7 @@ notfort:
 	goto outa;
 notas:
 	for(i=0; i < in; i++)if(buf[i]&0200){
-		if ((buf[0]&0377) == 0100 && (buf[1]&0377) == 0357) {
+		if (buf[0] == 0100 && buf[1] == 0357) {
 			printf("troff output\n");
 			goto out;
 		}
@@ -329,7 +327,7 @@ notas:
 	    printf("ascii text");
 outa:
 	while(i < in)
-		if((buf[i++]&0377) > 127){
+		if(buf[i++] > 127){
 			printf(" with garbage\n");
 			goto out;
 		}
@@ -359,7 +357,7 @@ char *tab[];
 
 ccom()
 {
-	char cc;
+	unsigned char cc;
 
 	while((cc = buf[i]) == ' ' || cc == '\t' || cc == '\n')if(i++ >= in)return(0);
 	if(buf[i] == '/' && buf[i+1] == '*'){
@@ -394,7 +392,7 @@ ascom()
  *	time this is called, so the index is in range.
  */
 english (bp, n)
-char *bp;
+unsigned char *bp;
 int n;
 {
 	int ct[NASC], j, vow, freq, rare;
@@ -406,13 +404,11 @@ int n;
 	for(j=0; j<n; j++)
 	{
 		/*
-		 * (bp[j]&0377) and not bp[j]: ccc compares a char
-		 * against a constant of 128 or more as a signed byte,
-		 * so "bp[j] < NASC" is false for every ascii byte and
-		 * this loop counts nothing at all.  Masked to 0..255
-		 * first, the comparison is a wide one and is right.
+		 * bp is unsigned char, so a byte at or above 128 is a
+		 * plain number and "bp[j] < NASC" is the ascii test it
+		 * looks like, not a signed comparison against -128.
 		 */
-		if ((bp[j]&0377) < NASC)
+		if (bp[j] < NASC)
 			ct[bp[j]|040]++;
 		switch (bp[j])
 		{

@@ -275,6 +275,27 @@ iscmpop(unsigned char op)
 }
 
 /*
+ * Is a byte comparison between a signed and an unsigned byte safe to
+ * stay byte-wide?  Only when the unsigned side is a constant below 128:
+ * its sign bit is clear, so it reads the same signed and unsigned and
+ * the order cannot come out backwards.  A variable is not known to be,
+ * and a constant at or above 128 is negative as a signed byte.
+ */
+static int
+bytesafe(struct expr *e)
+{
+	struct expr *u;
+
+	if (!e->right)
+		return 1;
+	u = (e->right->type->flags & TF_UNSIGNED) ? e->right :
+	    (e->left->type->flags & TF_UNSIGNED) ? e->left : 0;
+	if (!u)
+		return 1;
+	return u->op == CONST && u->v < 128;
+}
+
+/*
  * The width an operator actually works at.  For most that is the node
  * type, but a comparison yields int whatever it compared, so its own
  * type says nothing about the operands - they meet at their common
@@ -297,14 +318,30 @@ valwidth(struct type *t)
 struct type *
 opwidth(struct expr *e)
 {
+	struct type *lt, *rt;
+
 	if (!iscmpop(e->op))
 		return e->type;
 	if (!e->left)
 		return e->type;
 	if (!e->right)
 		return e->left->type;
-	return valwidth(e->left->type) >= valwidth(e->right->type) ?
-	    e->left->type : e->right->type;
+	lt = e->left->type;
+	rt = e->right->type;
+	/*
+	 * A byte against a byte of the other signedness is ambiguous at
+	 * byte width, and the ordered comparison comes out backwards: a
+	 * constant 128..255 is typed uchar, and as a signed byte that is
+	 * negative, so "c < 128" reads "c < -128" and is false for every
+	 * non-negative c.  C promotes both to int; follow it unless the
+	 * unsigned side is a constant below 128, whose sign bit is clear
+	 * and which therefore reads the same either way.
+	 */
+	if (valwidth(lt) == 1 && valwidth(rt) == 1 &&
+	    (lt->flags & TF_UNSIGNED) != (rt->flags & TF_UNSIGNED) &&
+	    !bytesafe(e))
+		return inttype;
+	return valwidth(lt) >= valwidth(rt) ? lt : rt;
 }
 
 /*

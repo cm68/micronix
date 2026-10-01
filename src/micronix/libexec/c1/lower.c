@@ -439,17 +439,28 @@ lowercompound(Expr *e)
  * reuses the whole =(H,...) rule set - which is what makes a constant
  * arm emit anything at all, and what puts both arms in one register so
  * the expression has a value wherever the branch went.
+ *
+ * w is the ternary's own width, not the arm's: a byte arm in an int
+ * ternary has to carry its sign to a word, and the plain byte store
+ * would zero H instead.  The SEXT/WIDEN here is the same widening RETURN
+ * gives a byte result.
  */
 void
-branchval(Expr *v)
+branchval(Expr *v, char w)
 {
 	Expr *hl, *asn;
 
 	if (!v)
 		return;
-	hl = mkcode(v->width, R_HL);
+	if (ISBYTE(v->width) && ISWORD(w)) {
+		if (v->op == NUMBER)
+			v->width = w;
+		else
+			v = mkunary(ISSIGNED(v->width) ? SEXT : WIDEN, w, v);
+	}
+	hl = mkcode(w, R_HL);
 	hl->op = INHL;
-	asn = mkbinary(ASSIGN, v->width, hl, v);
+	asn = mkbinary(ASSIGN, w, hl, v);
 	setdest(asn, DEST_VALUE);
 	freeexpr(rewrite(asn));
 }
@@ -2130,9 +2141,9 @@ rewrite1(Expr *e)
 		cc = falsecc(e->left);
 		outf("\tjp %s,_T%d\n", cc, lbl);
 
-		branchval(tb->left);
+		branchval(tb->left, e->width);
 		outf("\tjp _E%d\n_T%d:\n", lbl, lbl);
-		branchval(tb->right);
+		branchval(tb->right, e->width);
 		outf("_E%d:\n", lbl);
 
 		e->left = 0;
@@ -2255,6 +2266,30 @@ rewrite1(Expr *e)
 		 * with it.
 		 */
 		e->left = valtohl(e->left);
+		/*
+		 * A constant left operand is the one shape valtohl cannot
+		 * touch: a NUMBER never reduces, so it is still a NUMBER here
+		 * and the push below spills whatever HL happens to hold
+		 * instead of the constant.  Load it explicitly, at its own
+		 * width, so the byte and word paths below meet the register
+		 * they expect.
+		 */
+		if (e->left->op == NUMBER) {
+			char w = e->left->width;
+			long v = e->left->u.val;
+
+			if (ISBYTE(w)) {
+				outf("\tld a,%d\n", (int)v);
+				freeexpr(e->left);
+				e->left = mkcode(w, R_A);
+				e->left->op = INA;
+			} else {
+				outf("\tld hl,%d\n", (int)v);
+				freeexpr(e->left);
+				e->left = mkcode(w, R_HL);
+				e->left->op = INHL;
+			}
+		}
 		/*
 		 * Unless it is a byte, which lands in A whatever target it
 		 * was given.  Pushing HL then would spill the address the

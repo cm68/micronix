@@ -108,7 +108,7 @@ int tblused;
 char *htext;
 
 char *rdline();
-char *scan();
+unsigned char *scan();
 char *listmark();
 char *unquote();
 dolist();
@@ -182,16 +182,16 @@ int c, st;
  * the scan (a word); it does not end the scan inside a code span, so a
  * code span reads as one word.  Returns the first unconsumed character.
  */
-char *
+unsigned char *
 scan(p, stopws)
-char *p;
+unsigned char *p;
 int stopws;
 {
     int c;
 
     wlen = 0;
     for (;;) {
-        c = *p & 0xff;
+        c = *p;
         if (c == '\0')
             break;
         if (stopws && (c == ' ' || c == '\t') && !incode)
@@ -245,7 +245,7 @@ emitw()
  * caller sets forcesty first for a forced style (headings, table heads).
  */
 renderinline(s)
-char *s;
+unsigned char *s;
 {
     inbold = inul = incode = 0;
     scan(s, 0);
@@ -257,7 +257,7 @@ char *s;
  * produced, counted as characters.
  */
 cellwidth(s)
-char *s;
+unsigned char *s;
 {
     inbold = inul = incode = 0;
     scan(s, 0);
@@ -270,10 +270,10 @@ char *s;
  * marker into that space) and later lines are indented to it.
  */
 fill(s, base)
-char *s;
+unsigned char *s;
 int base;
 {
-    char *p = s;
+    unsigned char *p = s;
     int avail;
     int nlines = 0;
     int i;

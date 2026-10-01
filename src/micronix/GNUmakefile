@@ -21,7 +21,14 @@
 # drifted from the tree.  It goes FIRST - what everything else
 # compiles against is installed before anything compiles.
 #
-DIRS = include lib libexec cmd sys stand cpm
+#
+# etc is here for the same reason and after the same gap: it is a
+# directory of plain files that the simulated filesystem's /etc is
+# built from, nothing in the cross build looked at it, and a file added
+# to it did not reach the machine.  See its GNUmakefile - it is a
+# source directory of seeds and is installed by the cross build only.
+#
+DIRS = include etc lib libexec cmd sys stand cpm
 
 #
 # The top GNUmakefile is a leaf like the rest: DEPTH is the distance to

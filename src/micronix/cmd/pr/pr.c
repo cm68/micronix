@@ -31,13 +31,13 @@ char	*header;
 int	col;
 int	icol;
 FILE	*file;
-char	*bufp;
+unsigned char	*bufp;
 #define	BUFS	9000	/* at least 66 * 132 */
-char	buffer[BUFS];	/* for multi-column output */
+unsigned char	buffer[BUFS];	/* for multi-column output */
 char	obuf[BUFSIZ];
 #define	FF	014
 int	line;
-char	*colp[72];
+unsigned char	*colp[72];
 char	nofile;		/* -1..10: the open loop backs up one on a failed open */
 char	isclosed[10];
 FILE	*ifile[10];
@@ -319,7 +319,7 @@ putpage()
 nexbuf()
 {
 	register int n;
-	register char *rbufp;
+	register unsigned char *rbufp;
 
 	rbufp = bufp;
 	n = &buffer[BUFS] - rbufp;
@@ -340,7 +340,7 @@ nexbuf()
 
 tpgetc(ai)
 {
-	register char **p;
+	register unsigned char **p;
 	register int c, i;
 
 	i = ai;
@@ -359,10 +359,10 @@ tpgetc(ai)
 	}
 	p = &colp[i];
 loop:
-	c = **p & 0377;
+	c = **p;
 	if (c == 0375) {
 		nexbuf();
-		c = **p & 0377;
+		c = **p;
 	}
 	if (c == 0376)
 		return(0);

@@ -73,14 +73,23 @@ cp -r "$mxroot"/lib/include/sys "$work/lib/" 2>/dev/null || true
 # rules had since guarded.  make's timestamps cannot be trusted for the
 # host link, so clean and rebuild in SEPARATE invocations: "hostclean
 # host" in one run has make decide "nothing to do" before the clean ever
-# runs, and the stale binary is never relinked.  Host first: the native
-# passes are compiled BY it - the ccc driver execs mxpass0/mxc0/mxc1/mxpeep.
+# runs, and the stale binary is never relinked.
+#
+# Clobber first, and all at once: clobber now wires hostclean in, so it
+# removes the host passes too - the .ho objects, the generated
+# dbgtags.c/debug.h, and the host binaries.  That is why this cannot be
+# "host, then clobber, then all": the clobber would take the host passes
+# back out from under the native build.  So clobber everything, then
+# rebuild the host passes, then rebuild the native ones - native is
+# compiled BY the host passes, the ccc driver execs
+# mxpass0/mxc0/mxc1/mxpeep, so host must be in place before all.
 for d in pass0 c0 c1 peep; do
-	make -C "$mxroot/libexec/$d" hostclean >/dev/null
+	make -C "$mxroot/libexec/$d" clobber >/dev/null
+done
+for d in pass0 c0 c1 peep; do
 	make -C "$mxroot/libexec/$d" host >/dev/null
 done
 for d in pass0 c0 c1 peep; do
-	make -C "$mxroot/libexec/$d" clobber >/dev/null
 	make -C "$mxroot/libexec/$d" all >/dev/null
 done
 # The native binaries, renamed to the .mx names the rest of the script

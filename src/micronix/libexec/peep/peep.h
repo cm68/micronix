@@ -95,6 +95,7 @@ extern int reads(char *insn);
 extern int writes(char *insn);
 extern int isdead(int reg, int from);
 extern int isbranch(char *insn);
+extern int branchoffset(char *insn, int *off);
 extern int memok(char *p);
 extern void mnemof(char *insn, char *buf, int n);
 extern char *operof(char *insn);

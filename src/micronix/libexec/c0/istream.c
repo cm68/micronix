@@ -96,6 +96,66 @@ leadWidth(struct type *t)
  * consume, and the parser turned over forever on the first line
  * holding a pipe or a redirect.
  */
+static void streamElided(struct type *t);
+static void streamElidedArray(struct type *t);
+
+/*
+ * One object's worth of values, with the inner braces left out.
+ *
+ * A scalar takes one value, an array one per element, a struct one per
+ * member - and a composite member is itself elided the same way, so the
+ * walk recurses through array-of-array and struct-with-array.  This is
+ * what makes "struct s2 z = { 0,-1,2,3 };" mean the same as the braced
+ * spelling: member a[2] takes 0 and -1, b[2] takes 2 and 3.
+ */
+static void
+streamElidedOne(struct type *t)
+{
+    if (!t)
+        return;
+    if ((t->flags & TF_ARRAY) && t->count > 0)
+        streamElidedArray(t);
+    else if (t->flags & TF_AGGREGATE)
+        streamElided(t);
+    else
+        streamInitVal(t);
+}
+
+/*
+ * One array's worth of values out of a list that left the inner braces
+ * out: one value per element, each element itself elided if it is
+ * composite.  The comma after the last value is left for the caller,
+ * the same contract streamElided keeps.
+ */
+static void
+streamElidedArray(struct type *t)
+{
+    int i, n;
+    int emitted;
+
+    n = t->count > 0 ? t->count : 0;
+    emitted = 0;
+    for (i = 0; i < n; i++) {
+        if (cur.type == END || cur.type == BEGIN)
+            break;
+        streamElidedOne(t->sub);
+        emitted += typesize(t->sub);
+        if (i == n - 1)
+            break;			/* the trailing comma is the caller's */
+        if (cur.type != COMMA)
+            break;			/* fewer values than elements */
+        gettoken();
+    }
+    /*
+     * Short of elements, the rest of the array is still there - the
+     * same reason the braced form pads below.
+     */
+    while (emitted < typesize(t)) {
+        asmDb(0);
+        emitted++;
+    }
+}
+
 static void
 streamElided(struct type *t)
 {
@@ -107,7 +167,7 @@ streamElided(struct type *t)
     emitted = 0;
     m = findMemberOff(t->elem, 0);
     while (m && cur.type != END) {
-        streamInitVal(m->type);
+        streamElidedOne(m->type);
         emitted += (int)m->type->size;
         off += m->type->size;
         m = findMemberOff(t->elem, off);
@@ -168,13 +228,14 @@ streamInitVal(struct type *type)
         gettoken();  /* consume { */
         while (cur.type != END) {
             /*
-             * An aggregate element whose braces were left out takes
-             * one value per member, not one value for the whole of
-             * it.  With braces it comes back here and walks itself.
+             * An aggregate or array element whose braces were left out
+             * takes one value per member or per element, not one value
+             * for the whole of it.  With braces it comes back here and
+             * walks itself.
              */
-            if (elem_type && (elem_type->flags & TF_AGGREGATE) &&
-                cur.type != BEGIN)
-                streamElided(elem_type);
+            if (elem_type && cur.type != BEGIN &&
+                (elem_type->flags & (TF_AGGREGATE | TF_ARRAY)))
+                streamElidedOne(elem_type);
             else
                 streamInitVal(elem_type);
             count++;

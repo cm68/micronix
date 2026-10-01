@@ -302,12 +302,12 @@ setmode()
  * back as the byte it is.
  */
 chr(s)
-	char *s;
+	unsigned char *s;
 {
 
 	if (s[0] == '^')
 		return (s[1] & 037);
-	return (s[0] & 0377);
+	return (s[0]);
 }
 
 /*

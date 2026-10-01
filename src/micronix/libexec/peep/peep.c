@@ -578,6 +578,25 @@ usage(void)
 
 struct vstate vbase;
 
+/*
+ * Forward $+N branch targets poison the value state.
+ *
+ * A $+N branch - "jr $+3", "jp m,$+7" - skips N bytes and lands on an
+ * instruction that control reaches by the jump as well as by falling
+ * through.  The value state advanced along the fall-through is not what
+ * the jump's path leaves behind, so any constant it claims a register
+ * holds is wrong there.  Every instruction is at least one byte, so N
+ * bytes cover at most N instructions, and resetting the value state for
+ * N instructions past such a branch is a sound upper bound: the target,
+ * at byte N, is always inside that window.  Backward $-$ branches loop,
+ * not join, so they are left alone.
+ *
+ * vskip counts the instructions still inside the window, decremented as
+ * each is emitted; while it is non-zero the value state is reset before
+ * every rule looks at it.
+ */
+static int vskip;
+
 int
 main(int argc, char **argv)
 {
@@ -629,6 +648,12 @@ main(int argc, char **argv)
 	vinit(&vbase);
 	fill();
 	while (nwin > 0) {
+		/*
+		 * Still inside a $+N branch's skip: the value state is not
+		 * trustworthy here, so make the rules see it unknown.
+		 */
+		if (vskip > 0 && win[0].kind == L_INSN)
+			vreset(&vbase);
 		if (poolskip(win[0].key)) {
 			/* a merged literal: the label and its data go */
 			delline(0, 1);
@@ -657,8 +682,24 @@ main(int argc, char **argv)
 			free(mapped);
 			if (win[0].kind == L_LABEL)
 				vreset(&vbase);
-			else if (win[0].kind == L_INSN)
+			else if (win[0].kind == L_INSN) {
+				int bo;
+
 				vnext(&vbase, win[0].key);
+				/*
+				 * A forward $+N branch poisons the value state
+				 * for the N instructions its target can span.  N
+				 * is a byte offset and every instruction is at
+				 * least a byte, so it over-counts, which is the
+				 * safe direction.  max() keeps a longer window
+				 * from an enclosing branch still in force.
+				 */
+				if (branchoffset(win[0].key, &bo) && bo > 0 &&
+				    bo > vskip)
+					vskip = bo;
+				if (vskip > 0)
+					vskip--;
+			}
 			delline(0, 1);
 		}
 		fill();

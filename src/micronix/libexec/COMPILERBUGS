@@ -3,17 +3,20 @@
 #
 # micronix/libexec/COMPILERBUGS
 #
-# Every entry below is a defect in this tree's compiler - mxccc, over
+# Every entry below was a defect in this tree's compiler - mxccc, over
 # the passes in libexec - found by porting a command and reduced to a
-# program small enough to run in a minute.  They are recorded rather
-# than fixed: fixing c0 or c1 means rebuilding the compiler that builds
-# everything else, and none of these is worked around in the compiler
-# here.  What each entry carries instead is the shape the port used to
-# avoid it, because that is what the tree actually does today.
+# program small enough to run in a minute.  The five numbered entries
+# were fixed on 2026-09-30; the workaround each one recorded is now a
+# description of how the bug looked before the fix, kept because that is
+# the shape the tree's sources still avoid in the places the port worked
+# around them.  The sixth entry is not a miscompile and is left as it was.
+#
+# Each fix was checked with its repro and with a self-host pass - every
+# compiler source, host output and simulated output, byte-identical.
 #
 # Each one was re-run against the tree's own mxccc while this file was
 # written, and the output quoted is that run's.  Unless an entry says
-# otherwise the bug is present with and without -O.
+# otherwise the bug was present with and without -O.
 #
 # Probes were compiled as
 #
@@ -29,7 +32,7 @@
 #
 
 # ---------------------------------------------------------------------
-# 1.  x > 0 FOLDS TO x + 1, under -O only
+# 1.  x > 0 FOLDS TO x + 1, under -O only          [FIXED 2026-09-30]
 #
 # The comparison compiles - and its VALUE is x+1, so it is only wrong
 # where the result is used as a number rather than as a condition.
@@ -52,7 +55,7 @@
 #	}
 
 # ---------------------------------------------------------------------
-# 2.  AN AGGREGATE INITIALIZER GIVES ONE INITIALIZER PER MEMBER
+# 2.  AN AGGREGATE INITIALIZER GIVES ONE INITIALIZER PER MEMBER  [FIXED 2026-09-30]
 #
 # Not per element: for a struct with array members, each array takes a
 # single initializer and the rest of it is zeroed.  Nested braces are
@@ -75,7 +78,7 @@
 #	}
 
 # ---------------------------------------------------------------------
-# 3.  A char AGAINST A CONSTANT >= 128 COMPARES SIGNED
+# 3.  A char AGAINST A CONSTANT >= 128 COMPARES SIGNED    [FIXED 2026-09-30]
 #
 # char is signed here, so any byte at or above 128 is negative and
 # c < 128 is false for every ASCII character.  Mask with & 0377 when
@@ -98,7 +101,7 @@
 #	}
 
 # ---------------------------------------------------------------------
-# 4.  cond ? 0 : <byte variable> IS ZERO-EXTENDED
+# 4.  cond ? 0 : <byte variable> IS ZERO-EXTENDED       [FIXED 2026-09-30]
 #
 # The ?: sign fix of 94f4249f covers a small constant against another
 # constant (? 1 : -1) and the ? -1 : byte shape.  It does not cover a
@@ -127,7 +130,7 @@
 
 # ---------------------------------------------------------------------
 # 5.  register LOCALS SHARING AN EXPRESSION WITH A ?: OPERAND LOSE A
-#     CONSTANT
+#     CONSTANT                                         [FIXED 2026-09-30]
 #
 # With register on the locals, c1 drops the 100 out of
 # "ct=100-slookc(p)-carry" and the byte that comes back is whatever the

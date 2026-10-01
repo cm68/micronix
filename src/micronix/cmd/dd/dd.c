@@ -49,8 +49,8 @@ long	files	= 1;
 char	*string;
 char	*ifile;
 char	*ofile;
-char	*ibuf;
-char	*obuf;
+unsigned char	*ibuf;
+unsigned char	*obuf;
 char	*sbrk();
 long	lseek();
 long	number();
@@ -68,9 +68,9 @@ long	nopr;
 long	ntrunc;
 char	ibf;		/* descriptors: -1 or 0..15 */
 char	obf;
-char	*op;
+unsigned char	*op;
 int	nspace;
-char	etoa[] = {
+unsigned char	etoa[] = {
 	0000,0001,0002,0003,0234,0011,0206,0177,
 	0227,0215,0216,0013,0014,0015,0016,0017,
 	0020,0021,0022,0023,0235,0205,0010,0207,
@@ -104,7 +104,7 @@ char	etoa[] = {
 	0060,0061,0062,0063,0064,0065,0066,0067,
 	0070,0071,0372,0373,0374,0375,0376,0377,
 };
-char	atoe[] = {
+unsigned char	atoe[] = {
 	0000,0001,0002,0003,0067,0055,0056,0057,
 	0026,0005,0045,0013,0014,0015,0016,0017,
 	0020,0021,0022,0023,0074,0075,0062,0046,
@@ -138,7 +138,7 @@ char	atoe[] = {
 	0334,0335,0336,0337,0352,0353,0354,0355,
 	0356,0357,0372,0373,0374,0375,0376,0377,
 };
-char	atoibm[] =
+unsigned char	atoibm[] =
 {
 	0000,0001,0002,0003,0067,0055,0056,0057,
 	0026,0005,0045,0013,0014,0015,0016,0017,
@@ -180,7 +180,7 @@ int	argc;
 char	**argv;
 {
 	int (*conv)();
-	register char *ip;
+	register unsigned char *ip;
 	register c;
 	int ebcdic(), ibm(), ascii(), null(), cnull(), term(), block(), unblock();
 	int a;
@@ -305,13 +305,13 @@ char	**argv;
 		fprintf(stderr,"counts: cannot be zero\n");
 		exit(1);
 	}
-	ibuf = sbrk(ibs);
+	ibuf = (unsigned char *)sbrk(ibs);
 	if (fflag)
 		obuf = ibuf;
 	else
-		obuf = sbrk(obs);
+		obuf = (unsigned char *)sbrk(obs);
 	sbrk(64);	/* For good measure */
-	if(ibuf == (char *)-1 || obuf == (char *)-1) {
+	if(ibuf == (unsigned char *)-1 || obuf == (unsigned char *)-1) {
 		fprintf(stderr, "not enough memory\n");
 		exit(1);
 	}
@@ -380,7 +380,6 @@ loop:
 	}
 	c = 0;
 	c |= *ip++;
-	c &= 0377;
 	(*conv)(c);
 	goto loop;
 }
@@ -488,7 +487,7 @@ ascii(cc)
 {
 	register c;
 
-	c = etoa[cc] & 0377;
+	c = etoa[cc];
 	if(cbs == 0) {
 		cnull(c);
 		return;
@@ -515,7 +514,7 @@ unblock(cc)
 {
 	register c;
 
-	c = cc & 0377;
+	c = cc;
 	if(cbs == 0) {
 		cnull(c);
 		return;
@@ -547,7 +546,7 @@ ebcdic(cc)
 		c += 'A'-'a';
 	if(cflag&LCASE && c>='A' && c<='Z')
 		c += 'a'-'A';
-	c = atoe[c] & 0377;
+	c = atoe[c];
 	if(cbs == 0) {
 		null(c);
 		return;
@@ -576,7 +575,7 @@ ibm(cc)
 		c += 'A'-'a';
 	if(cflag&LCASE && c>='A' && c<='Z')
 		c += 'a'-'A';
-	c = atoibm[c] & 0377;
+	c = atoibm[c];
 	if(cbs == 0) {
 		null(c);
 		return;
@@ -605,7 +604,6 @@ block(cc)
 		c += 'A'-'a';
 	if(cflag&LCASE && c>='A' && c<='Z')
 		c += 'a'-'A';
-	c &= 0377;
 	if(cbs == 0) {
 		null(c);
 		return;

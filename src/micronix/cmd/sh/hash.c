@@ -78,13 +78,13 @@ static char hashed;                     /* built at least once */
  */
 static UINT
 hash(s)
-char *s;
+unsigned char *s;
 {
 	UINT h;
 
 	h = 0;
 	while (*s)
-		h = (h << 3) + (h >> 13) + (*s++ & 0xff);
+		h = (h << 3) + (h >> 13) + *s++;
 	return h;
 }
 

@@ -186,6 +186,38 @@ isbranch(char *insn)
 }
 
 /*
+ * A branch whose target is spelled as an offset from its own address -
+ * "jr $+3", "jp m,$+7", "djnz $-2" - returns that offset (negative for a
+ * backward loop) through *off and 1, or 0 if the instruction is not such
+ * a branch.  A $+N target is a second entry into the straight-line run:
+ * control reaches it by the jump as well as by falling through, so the
+ * value state has to reset there.  A target spelled as a name is not this
+ * case - the label it lands on already ends the run in peep.c.
+ */
+int
+branchoffset(char *insn, int *off)
+{
+	char m[8];
+	char *op, *t;
+
+	mnemof(insn, m, sizeof(m));
+	if (strcmp(m, "jr") != 0 && strcmp(m, "jp") != 0 &&
+	    strcmp(m, "djnz") != 0)
+		return 0;
+	op = operof(insn);
+	t = strchr(op, ',');
+	if (t)
+		t++;
+	else
+		t = op;
+	while (*t == ' ')
+		t++;
+	if (*t != '$')
+		return 0;
+	return vnumber(t + 1, off);
+}
+
+/*
  * What insn reads.  When in doubt, everything: an unrecognised
  * instruction must not let a rule conclude that a register is dead.
  */

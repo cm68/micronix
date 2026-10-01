@@ -1732,16 +1732,17 @@ char *dst;
 /*
  * Does c occur anywhere in s?
  *
- * The comparison is sixteen bits wide against the character zero
- * extended, so a c above 255 can never match.  Both callers pass '/'
- * and walk the string a character at a time, which is how "the last
- * component of a path" is spelled here.
+ * s is unsigned char, so a byte at or above 128 is a plain number and
+ * the comparison is sixteen bits wide against 0..255: a c above 255
+ * can never match.  Both callers pass '/' and walk the string a
+ * character at a time, which is how "the last component of a path" is
+ * spelled here.
  */
 any(c, s)
-char *s;
+unsigned char *s;
 {
 	while (*s) {
-		if (c == (*s & 0xff))
+		if (c == *s)
 			return 1;
 		s++;
 	}
