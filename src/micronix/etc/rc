@@ -1,0 +1,7 @@
+#
+# /etc/rc - multi-user start-up, run by init before it forks the logins.
+#
+# update forks and then syncs every thirty seconds, so it returns at once
+# and nothing here blocks.
+#
+update
