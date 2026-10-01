@@ -333,13 +333,18 @@ sysinstall:
 #
 # Listed rather than globbed together because the order IS the
 # precedence: where two directories hold a page of the same name, the
-# first one read is the one that lands.  Nothing collides today.  Two
-# names did, and both the same way - a command this tree has ported
-# whose 1982 original was already in the man tree: sh and ps.  Each
-# original now carries an old- name, man/man1/oldsh.1 and
-# man/man1/oldps.1, named for what it documents, so both pages ship
-# and neither has to win.  That makes the rule a guard rather than a
-# decision, and it reports what it shadowed when it shadows anything.
+# first one read is the one that lands.  Nothing collides today.  The
+# names that did - sh, df, label, login, mount, owner, umount and ps,
+# each a command this tree has ported whose page was already in the
+# man tree - were settled by which of the two copies had something the
+# other did not.  Where the original differed from the page beside the
+# source it now carries an old- name, man/man1's oldsh.1, oldowner.1
+# and oldps.1, named for what each documents, so both pages ship and
+# neither has to win.  Where the two were byte for byte the same page
+# - df, label, login, mount, umount - the man tree's copy was dropped
+# instead, the page beside the source being the one that installs.
+# That makes the rule a guard rather than a decision, and it reports
+# what it shadowed when it shadows anything.
 #
 MXROOT	 = $(DESTDIR)$(PREFIX)/micronix
 MXMAN	 = $(MXROOT)/man
