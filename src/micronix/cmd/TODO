@@ -1,32 +1,30 @@
 #
 # TODO - cmd
 #
-# Untracked working notes: what /bin still carries without a source.
+# Working notes: what /bin still carries without a source.
 #
-# /bin has 118 entries and exactly two build signatures.  Fifty-nine
-# begin "99 97 ... d1 21" and are ccc's, built and installed by this
-# tree.  Fifty-nine begin "99 94 ... c1 21", or carry no 16 byte a.out
-# header at all and start straight into a c1 21 prologue, and are
-# Whitesmiths' - the binaries the distribution floppies seeded.  The
-# split is exact, 59 and 59, with nothing left over, so the question is
-# not what is in /bin but which of the 59 the distribution left we have
-# a source for.
+# /bin has 129 entries and, as before, two build signatures.  A hundred
+# and two begin "99 97" and are ccc's, built and installed by this tree.
+# Nineteen begin "99 94", and eight carry no 16 byte a.out header at all
+# and start straight into a c1 21 prologue - twenty-seven, all of them
+# Whitesmiths', the binaries the distribution floppies seeded.  The
+# distribution left 59, so 32 of them have a source here now.
 #
-# Of those 59, in order of how little is missing:
+# Of those 27, in order of how little is missing:
 #
-#	3  the source is here and the build never installs it -
-#	   mkfs, fsck, far
+#	1  far - the source is here and the build never installs it
 #	1  cpp - /bin/cpp has no counterpart in this tree at all.  See
 #	   below.
-#	2  the source is a part of a bigger program -
-#	   edit (cmd/vi), help (cmd/less)
-#	8  the Whitesmith toolchain: as cc link lib obj hex lord anat.
-#	   attic/ has sources for all of them, and it does not matter -
-#	   see below.
-#	17 the source is in extra/, v6 and v7, unported -
-#	   cal comm cu file login lpr mail passwd ps su sum tail tty
-#	   update wall who
-#	28 nothing in the repository.
+#	10 the Whitesmith toolchain: as cc link lib obj hex lord anat,
+#	   with cp1 and cp2 - the two passes of the Whitesmith C
+#	   compiler, which cp's name has nothing to do with.  attic/ has
+#	   sources for all ten and it does not matter - see below.
+#	1  edit - a line editor of Whitesmith's own, and NOT cmd/vi.
+#	   cmd/vi is STEVIE, a screen editor, and the edit.c in it is one
+#	   of STEVIE's modules rather than this program.  No source
+#	   anywhere in the repository.
+#	14 nothing in the repository: clean cptree cxr ddt down lpr lprm
+#	   lprq newuser pilot print ptc rp td
 #
 # THE WHITESMITH TOOLCHAIN IS NOT A WORK ITEM
 #
@@ -38,6 +36,14 @@
 # rebuild them for, and no reason to carry their sources forward.
 # Where /bin has one and we have a replacement, the fix is to drop the
 # old name or let it age out, not to find it a build.
+#
+# cp1 and cp2 belong with them and are the easiest of the ten to
+# mistake: they are not two halves of an overlay-based cp, which is
+# what an earlier note here guessed from the names.  cp2's own strings
+# say p2.80.  They are pass 1 and pass 2 of the Whitesmith C compiler -
+# the parser and the 8080 code generator - and ccc's c0 and c1 are
+# their replacements, built from libexec.  Their sources are in
+# attic/whitesmith/p1 and p2.
 #
 # /BIN/CPP IS NOT pass0
 #
@@ -75,58 +81,52 @@
 # Schilling and Ogden, not Whitesmith's.  It targets CP/M and would
 # need the usual porting.
 #
-# Two more in the 28 are the same kind of thing and are marked in place
-# below: cxr, ptc and rp are Whitesmith's own tools (a C
-# cross-referencer, the Pascal compiler, a macro processor) and ddt is
-# a debugger.  None of them is a utility anyone is missing.
+# Three more are the same kind of thing and are marked in place below:
+# cxr, ptc and rp are Whitesmith's own tools (a C cross-referencer, the
+# Pascal compiler, a macro processor) and ddt is a debugger.  None of
+# them is a utility anyone is missing.
 #
-# THE 28 WITH NO SOURCE ANYWHERE IN THE REPOSITORY
+# THE 14 WITH NO SOURCE ANYWHERE IN THE REPOSITORY
 #
 # What each is, read off the binary where the binary says - a usage
-# string, a keyword table.  Six say nothing at all and are marked so
-# rather than guessed at: clean, dc, ddt, down, pilot, unique.
+# string, a keyword table.  Four say nothing at all and are marked so
+# rather than guessed at: clean, ddt, down, pilot.
 #
-#	chars	count characters; with lines and words, the three text
-#		counters, all about 5.5k and near-identical
 #	clean	?
-#	cp1	the first half of the overlay-based cp
-#	cp2	the second half.  We build cp, so the pair is obsolete.
 #	cptree	recursive copy: "Cptree is used to copy an entire tree
-#		of files and ..."
-#	crypt	crypt(1): "usage: crypt key"
+#		of files and ..."  v7 and 2.11 have no recursive copy to
+#		port - v7's cp is flat - so this one would be written
+#		fresh or dropped.
 #	cxr	Whitesmith: C cross-referencer, carries the C type keywords
 #		VOID TINY ULONG UCOUNT TEXT LOCAL
-#	dc	?
 #	ddt	? - a debugger, the DDT name
 #	down	? - 384 bytes, the smallest thing in /bin
-#	group	chgrp by another name: "usage: group [-newgroup] file ..."
-#	lines	count lines
-#	lprm	printer queue, remove entries
-#	lprq	printer queue, query
+#	lpr	the printer spooler.  /bin/lpr, lprm and lprq are the SAME
+#	lprm	binary - one md5 - dispatching on argv[0], and the only
+#	lprq	spooler source in the archives is v6's, which is a
+#		different thing: it prints through a dataphone to a remote
+#		GCOS machine.  Nothing here is this spooler.
 #	newuser	add a user
-#	owner	chown: "usage: owner [-newowner] file ..."
-#	pilot	?
-#	print	"usage: print [-l#] [-w#] [-#] [file ...]"
+#	pilot	? - the author-language interpreter; rp is its translator,
+#		so the two are a subsystem rather than two commands
+#	print	"usage: print [-l#] [-w#] [-#] [file ...]" - a pr-like
+#		formatter, and not the spooler
 #	ptc	Whitesmith: the Pascal compiler - "goto target", "file in
 #		value argument" (disks/1070-8_pascal.image, disks/whitesmith)
 #	rp	Whitesmith: a macro processor of the include-file kind -
 #		"can't open include file", "arg stack overflow"
-#	sort	"usage: sort [-bdfrtx] [+key] [-o output] input ..."
-#	stty	terminal modes
 #	td	tape dump: "Dump destination must be either block special
-#		or directory."
-#	unique	?
-#	words	count words
-#	write	write(1) - to another user's terminal
+#		or directory." and "Tree dump complete." - not the silent
+#		binary an earlier note here listed it as
 #
 # WHICH OF THEM MATTER
 #
 # A full /bin is not the goal.  What has to exist for the system to
 # come up and rebuild itself is a shell, the toolchain, make, and the
-# file utilities those need - and all of that is in the 63 this tree
-# builds, so none of the 26 blocks a bootstrap.  The nearest to it is
-# stty, which the terminal needs before anything interactive is
-# pleasant.  The rest is a userland that can wait.
+# file utilities those need - and all of that is in the 102 this tree
+# builds, so none of the 27 blocks a bootstrap.  stty was the nearest
+# to it, being what the terminal wants before anything interactive is
+# pleasant; it is ported now.  The rest is a userland that can wait.
 #
 # The same test is worth applying to the cross DIRS list in
 # GNUmakefile: a name belongs there when it is needed to bootstrap the
@@ -135,17 +135,29 @@
 #
 # WHAT THAT MAKES ACTIONABLE
 #
-# mkfs and fsck pass the bootstrap test and fail the wiring one.  Their
-# sources are here, their makefiles are maintained, and the guest
-# builds them - filesystem/usr/src/cmd/mkfs/mkfs is 12187 bytes and
-# ccc's 99 97, the /bin one is 6894 and Whitesmiths' 99 94.  Neither
-# name is in the guest cmd/makefile DIRS or in the cross GNUmakefile
-# DIRS, so the built copies are never installed and /bin keeps running
-# the 1980s ones.  mkfs is what makes the filesystem we install onto,
-# which makes it the first thing that list should carry.
+# THE TWO LISTS HAVE COME APART AGAIN, and this is the live item.
 #
-# halt and upm are the mirror image: in the cross DIRS, not in the
-# guest's, so /bin has our ccc-built copies that the guest could not
-# rebuild for itself.
+# Fifteen names are in the cross DIRS and not in the guest makefile, so
+# the machine cannot rebuild them for itself: df djformat halt kstat
+# lz4 md mount mwformat owner packsrc ps umount unlz4 upm xargs.  owner
+# is the plainest case - /bin/owner is ours, and the machine that runs
+# it has no rule to build it.  The guest list wants those fifteen.
+#
+# far is the mirror image still: its source is in cmd/far, its makefile
+# is maintained, and it is in NEITHER list, so /bin keeps Whitesmiths'
+# copy.  mkfs and fsck were the same and are not any more - /bin has
+# ccc-built copies of both now - but neither is in DIRS either, so
+# whatever installed them was done by hand and the next rebuild will
+# not reproduce it.  Wiring all three in is what would keep them
+# current.
+#
+# THE PASSWORD COMMANDS, DONE AND WORTH KNOWING ABOUT
+#
+# login, owner, chgrp, chown, group, passwd and su now read /etc/passwd
+# and /etc/group through libc - getpwent, getgrent, crypt and getpass -
+# rather than each carrying its own reader.  crypt was login's own code
+# and is a library routine now; it is the pre-DES big-multiply hash,
+# not DES, and the salt and the stored string are the same thirteen
+# characters they always were.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
