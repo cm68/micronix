@@ -49,11 +49,13 @@ struct mount mlist[NMOUNT] = 0;
  * Buffer stuff initialized in binit
  */
 UINT nbuf = 0;                  /* buffered by nothing but MAXBUFS */
+UINT totmem = 0;                /* total memory in K, saved by pcon() */
 struct buf *btop = 0;
 
 UINT8 map0[], image0[];
 
 extern int segalloc();          /* malloc.c */
+extern int nodev();             /* con.c */
 
 /*
  * The ceiling on the pool.  expand_bufs() would otherwise mint whatever
@@ -74,6 +76,25 @@ extern int segalloc();          /* malloc.c */
 #else
 #define MAXBUFS  256
 #endif
+
+/*
+ * The signon report: the machine summary, printed once the buffer cache
+ * is at its final size, so the cache-block count is the one that matters.
+ */
+signon()
+{
+    char i;
+
+    pr("%d processes\n", NPROC);
+    pr("disks: ");
+    for (i = 1; i < nbdev; i++)
+        if (biosw[i].strat != &nodev)
+            pr("%s ", devname[i]);
+    pr("\nroot dev: %s/%d\n", devname[major(rootdev)], minor(rootdev));
+    pr("swap dev: %s/%d\n", devname[major(swapdev)], minor(swapdev));
+    pr("%dK memory\n", totmem);
+    pr("%d cache blocks\n", nbuf);
+}
 
 /*
  * Grow the buffer cache to the full budget: the .bss end up to BUFWIN,
@@ -120,9 +141,7 @@ expand_bufs()
         }
     }
     btop = b;
-    pr("expanded to %d buffers\n", nbuf);
-    pr("hdr range %x..%x; mmu img0[2]=%d img0[26]=%d img0[28]=%d\n",
-        blist + 8, btop - 1, image0[2], image0[26], image0[28]);
+    signon();
 }
 
 /*

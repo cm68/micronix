@@ -33,6 +33,7 @@
 extern struct proc *swapproc;
 extern struct inode *rootdir;
 extern UINT nbuf;
+extern UINT totmem;
 extern struct buf *btop;
 extern UINT8 map0[], image0[];
 extern UINT8 segmap[];          /* malloc.c */
@@ -134,7 +135,6 @@ putblk(bp, seg, off)
 ovlplaceall()
 {
     struct obj hdr;
-    struct ovlhdr *oh;
     struct inode *ip;
     long modbase;
     UINT nmod, n, i, seg, maj;
@@ -199,10 +199,6 @@ ovlplaceall()
         maj = ((struct ovlhdr *) s)->major;
         brel();
         if (ovlmap(maj) != 0) {
-            if (maj < nbdev)
-                pr("ovl: %s already placed\n", devname[maj]);
-            else
-                pr("ovl: %d already placed\n", maj);
             brelse(bp);
             continue;
         }
@@ -232,10 +228,6 @@ ovlplaceall()
         ra = ovlattach(seg);
         if (ra)
             pr("ovl: %d not placed\n", maj);
-        else {
-            oh = (struct ovlhdr *) OVLBASE;
-            pr("placed %s at seg %d\n", devname[oh->major], seg);
-        }
     }
     irelse(ip);
 }
@@ -280,25 +272,11 @@ plogo()
 }
 
 /*
- * Print configuration info
+ * Check that there is enough memory to run.
  */
 pcon()
 {
-    char i;
-    UINT kmem;
-
-    kmem = (nsegs << 2) + 64;
-    pr("%dK memory\n", kmem);
-    pr("%d cache blocks\n", nbuf);
-    pr("%d processes\n", NPROC);
-    pr("disks: ");
-    for (i = 1; i < nbdev; i++)
-        if (biosw[i].strat != &nodev)
-            pr("%s ", devname[i]);
-    pr("\nroot dev: %s/%d\n", devname[major(rootdev)], minor(rootdev));
-    pr("swap dev: %s/%d\n", devname[major(swapdev)], minor(swapdev));
-
-    if (kmem < 128 || (kmem < 256 && swapdev == 0))
+    if (totmem < 128 || (totmem < 256 && swapdev == 0))
         panic("Not enough memory to run");
 }
 
@@ -341,6 +319,7 @@ meminit()
                 pr("%x ", n);
         pr("(These segments will not be used by the system)\n\n");
     }
+    totmem = (nsegs << 2) + 64;     /* full memory, saved for signon() */
 }
 
 /*
