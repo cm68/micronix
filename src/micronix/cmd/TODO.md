@@ -6,9 +6,7 @@ original distribution binary, with no source anywhere in the tree.
 
 ## to port
 
-    clean     cpp       cxr       ddt       down      edit
-    lpr       lprm      lprq      newuser   pilot     print
-    rp        td
+    cpp       edit      newuser   print     td
 
 ## ported since this list was written
 
@@ -52,6 +50,12 @@ eventual deletion - losing them loses nothing but the original binary:
   librarian, object lister, and the two passes of the C compiler); the
   tree has asz, ccc, c0, c1 and ld.
 - `ptc` - the Pascal compiler; this tree does no Pascal.
+- `cxr`, `ddt`, `rp`, `pilot` - Whitesmith's own tools (a C
+  cross-referencer, a debugger, a macro processor, and the
+  author-language interpreter); nobody is missing them.
+- `lpr`, `lprm`, `lprq` - the printer spooler, one binary; there is no
+  printer.
+- `clean`, `down` - no identifying strings at all.
 
 `cpp` is not among them: it is a standalone preprocessor with no
 replacement in the tree, so it stays in /bin as a gap rather than a
