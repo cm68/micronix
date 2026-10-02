@@ -541,22 +541,50 @@ finish()
 findfile(f)
 char *f;
 {
+	/* H1fda - walk the directory, match name[11].  The exact compare
+	 * (H6c47) pads and case-folds; this is the shape. */
+	struct dirent *de;
+	int i;
+
+	de = (struct dirent *)sectorbuf;
+	for (i = 0; i < 16; i++, de++)
+		if (de->name[0] != 0x00 && strncmp(de->name, f, 11) == 0)
+			return 1;
 	return 0;
 }
 
 findfree()
 {
-	return 0;
+	/* H311a - the first free (0x00) or deleted (0xe5) entry. */
+	struct dirent *de;
+	int i;
+
+	de = (struct dirent *)sectorbuf;
+	for (i = 0; i < 16; i++, de++)
+		if (de->name[0] == 0x00 || de->name[0] == 0xe5)
+			return i;
+	return -1;
 }
 
 addentry()
 {
+	/* H32be - write a directory entry out of the buffer. */
 	return 0;
 }
 
 delfile(f)
 char *f;
 {
+	/* H20d0 - mark the file's entry deleted: name[0] = 0xe5. */
+	struct dirent *de;
+	int i;
+
+	de = (struct dirent *)sectorbuf;
+	for (i = 0; i < 16; i++, de++)
+		if (de->name[0] != 0x00 && strncmp(de->name, f, 11) == 0) {
+			de->name[0] = 0xe5;
+			return 1;
+		}
 	return 0;
 }
 
