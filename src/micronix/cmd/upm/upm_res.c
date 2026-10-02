@@ -33,14 +33,14 @@ uchar	call;		/* ee89 - the BDOS function number, from cpm */
 ushort	col;		/* ee97 - console column, a word */
 uchar	ntab;		/* ee8a - the number of remembered tab stops */
 uchar	tabs[12];	/* ee8b - the columns of those tab stops */
-ushort	logvect;	/* ee99 - logged-in drive vector */
+ushort	logvector;	/* ee99 - logged-in drive vector */
 uchar	user;		/* ee9b - the CP/M user number */
-ushort	rovecto;	/* ee9f - read-only drive vector */
-uchar	curdriv;	/* eea1 - current drive */
+ushort	rovector;	/* ee9f - read-only drive vector */
+uchar	curdrive;	/* eea1 - current drive */
 uchar	ileft;		/* eea3 - input chars left in the console buffer */
 uchar	lleft;		/* eea4 - list output chars left */
 uchar	oleft;		/* eea5 - output chars left */
-uchar	recavai;	/* edc5 - a character is waiting */
+uchar	recavail;	/* edc5 - a character is waiting */
 ushort	verbose;	/* edc9 - the -v flag, tested as a word */
 uchar	loaded;	/* edc7 - a program is loaded */
 
@@ -59,11 +59,11 @@ int	errno;
 ushort	arg2;		/* f047 - the BDOS argument, from cpm */
 
 /*
- * The CCP's own.  loadfil is the program the CCP decided to run, or 0
+ * The CCP's own.  loadfile is the program the CCP decided to run, or 0
  * to sit in the prompt; ccword and line are getword's and getline's
  * buffers.
  */
-char	*loadfil;		/* ee61 */
+char	*loadfile;		/* ee61 */
 
 /*
  * cpm - the BDOS dispatcher.
@@ -105,8 +105,8 @@ int arg;
 	case 8:		return csetio();
 	case 9:		return cprs();
 	case 10:	return readbuf(arg);
-	case 11:	return cconsta();
-	case 12:	return cversio();
+	case 11:	return cconstat();
+	case 12:	return cversion();
 	case 13:	return creset();
 	case 14:	return select();
 	case 15:	return copen(arg);
@@ -119,12 +119,12 @@ int arg;
 	case 22:	return cmake(arg);
 	case 23:	return rename(arg);
 	case 24:	return clogin();
-	case 25:	return ccurdis();
+	case 25:	return ccurdisk();
 	case 26:	return cdma();
 	case 27:	return null();
-	case 28:	return cprotec();
+	case 28:	return cprotect();
 	case 29:	return cgetro();
-	case 30:	return null();
+	case 30:	return setatt(arg);
 	case 31:	return null();
 	case 32:	return cuser();
 	case 33:	return rrand();
@@ -198,9 +198,9 @@ csetio()
 }
 
 /*
- * cversio - function 12.  Claims CP/M 2.2, which is what upm is.
+ * cversion - function 12.  Claims CP/M 2.2, which is what upm is.
  */
-cversio()
+cversion()
 {
 	return 0x22;
 }
@@ -212,7 +212,7 @@ cversio()
 creset()
 {
 	dma = 0x80;
-	rovecto = 0;
+	rovector = 0;
 }
 
 /*
@@ -235,15 +235,15 @@ cnext()
  */
 clogin()
 {
-	return logvect;
+	return logvector;
 }
 
 /*
- * ccurdis - function 25, the current disk.
+ * ccurdisk - function 25, the current disk.
  */
-ccurdis()
+ccurdisk()
 {
-	return curdriv;
+	return curdrive;
 }
 
 /*
@@ -251,7 +251,7 @@ ccurdis()
  */
 cgetro()
 {
-	return rovecto;
+	return rovector;
 }
 
 /*
@@ -270,12 +270,12 @@ cuser()
 }
 
 /*
- * cconsta - function 11, console status.  1 if a character is waiting,
+ * cconstat - function 11, console status.  1 if a character is waiting,
  * else flush output and 0.
  */
-cconsta()
+cconstat()
 {
-	if (ileft || recavai)
+	if (ileft || recavail)
 		return 1;
 	if (oleft == 0)
 		return 0;
@@ -310,18 +310,51 @@ wrand()
 }
 
 /*
- * cprotec - function 28, write protect the current disk.  Sets the
+ * cprotect - function 28, write protect the current disk.  Sets the
  * current drive's bit in the read-only vector.
  */
-cprotec()
+cprotect()
 {
-	rovecto |= 1 << curdriv;
+	rovector |= 1 << curdrive;
+}
+
+/*
+ * setatt - function 30, set file attributes.
+ *
+ * The FCB's read-only bit in ft[0] decides the write permission: a
+ * read-only file loses its write bits, a read-write file gains write
+ * wherever it has read.  chmod applies the new mode.
+ */
+setatt(fcb)
+struct fcb *fcb;
+{
+	int mode;
+
+	if (uniqize(fcb) == 0)
+		return -1;		/* no file */
+
+	name(fcb, buf);		/* build the micronix path name */
+
+	if (stat(buf, statbuf) < 0)
+		return -1;		/* no such file */
+
+	mode = statbuf[4] | (statbuf[5] << 8);
+
+	if (fcb->ft[0] & 0x80)		/* read-only */
+		mode &= ~0222;		/* take away write permission */
+	else				/* read-write */
+		mode |= ((mode & 0444) >> 1);	/* write where read */
+
+	if (chmod(buf, mode) < 0)	/* apply the new mode */
+		return -1;
+
+	return 0;
 }
 
 /*
  * main - the program.  upm has two modes and this is the whole choice:
  * load() runs the program named on the command line (DIRECT mode) and
- * ccp() sits in the CP/M prompt (INTERACTIVE mode).  loadfil is set by
+ * ccp() sits in the CP/M prompt (INTERACTIVE mode).  loadfile is set by
  * init from the argument block the crt passes down, which is how it
  * tells the two apart.
  */
@@ -330,7 +363,7 @@ char **argv;
 {
 	init(argc, argv);
 
-	if (loadfil)
+	if (loadfile)
 		load();
 	else
 		ccp();
@@ -348,14 +381,14 @@ cexit()
 	putch('\r');
 	cflush();
 	lflush();
-	trestor();
+	trestore();
 	_exit();
 }
 
 ushort	ro;			/* ee9d - read as a word by copen; the
-				   read-only vector is rovecto, not this */
+				   read-only vector is rovector, not this */
 char	buf[64];		/* ee21 - the pathname name builds; 64 bytes
-				   is the gap to loadfil at ee61 */
+				   is the gap to loadfile at ee61 */
 char	*disktab[16];		/* ee63 - the sixteen drive directory paths;
 				   each is a pointer to the micronix directory
 				   that CP/M drive maps onto */
@@ -391,7 +424,7 @@ struct fcb *fcb;
 	if (fcb->ex != 0 && fcb->ex >= nrec)
 		return -1;
 
-	fd = openfil(buf);
+	fd = openfile(buf);
 	if (fd < 0)
 		return -1;
 
@@ -399,7 +432,7 @@ struct fcb *fcb;
 		fcb->ft[0] |= 0x80;
 
 	fcb->fd = fd;
-	fcb->rrec = 0;
+	fcb->currec = 0;
 	setrc(fcb);
 	return 0;
 }
@@ -430,12 +463,12 @@ struct fcb *fcb;
 /*
  * cclose - BDOS function 16, close file.  Closes the micronix file and
  * marks the FCB closed with -1.  The fd is a signed char, so the -1 the
- * byte holds comes back as -1 through closefi.
+ * byte holds comes back as -1 through closefile.
  */
 cclose(fcb)
 struct fcb *fcb;
 {
-	closefi(fcb->fd);
+	closefile(fcb->fd);
 	fcb->fd = -1;
 	return 0;
 }
@@ -458,7 +491,7 @@ struct fcb *pat;
 			return rv;
 		name(&fcb, buf);
 		if (!isdir(buf)) {
-			closena(buf);
+			closename(buf);
 			unlink(buf);
 		}
 		fn = 0x12;		/* search next */
@@ -467,7 +500,7 @@ struct fcb *pat;
 }
 
 /*
- * buildpr - the drive prefix of a pathname.
+ * buildpref - the drive prefix of a pathname.
  *
  * Writes the directory the FCB's drive maps onto, and a slash, into buf,
  * and returns the position after the slash - the place the filename
@@ -476,7 +509,7 @@ struct fcb *pat;
  * directory in disktab is a selerr.
  */
 char *
-buildpr(fcb, buf)
+buildpref(fcb, buf)
 struct fcb *fcb;
 char *buf;
 {
@@ -484,7 +517,7 @@ char *buf;
 
 	drive = fcb->dr;
 	if (drive == 0)
-		drive = curdriv;
+		drive = curdrive;
 	else
 		drive--;
 	drive &= 0x0F;
@@ -516,7 +549,7 @@ char *buf;
 	if (fcb->dr == '?')
 		fcb->dr = 0;
 
-	buf = buildpr(fcb, buf);
+	buf = buildpref(fcb, buf);
 
 	for (i = 0; i < 8; i++) {
 		c = lc(fcb->name[i] & 0x7F);
@@ -543,12 +576,12 @@ char *buf;
 
 char	dirbuf[18];		/* ef10 - one micronix directory entry (16
 				   bytes) and two bytes of match state */
-char	statbuf[36];		/* ef22 - a struct stat, 36 bytes to trestor */
+char	statbuf[36];		/* ef22 - a struct stat, 36 bytes to trestore */
 
 /*
  * The open-file table.  One four-byte entry per descriptor: the device
  * and inode the descriptor is on, read out of struct stat when the file
- * was opened.  closena matches a name by stat'ing it and looking for
+ * was opened.  closename matches a name by stat'ing it and looking for
  * its dev/inode here.
  */
 struct fileent {
@@ -576,7 +609,7 @@ char *dst;
 	static char pattern[13];	/* Hda59 */
 
 	if (fn == 0x11) {
-		buildpr(fcb, buf);
+		buildpref(fcb, buf);
 		close(dirfd);
 		dirfd = open(buf, 0);
 		memcpy(pattern, fcb, 13);
@@ -683,10 +716,10 @@ char *p;
 }
 
 /*
- * isuniqu - does the FCB's name hold no '?' wildcard.  The thirteen
+ * isunique - does the FCB's name hold no '?' wildcard.  The thirteen
  * bytes from dr through ex are the ones a name can put a '?' in.
  */
-isuniqu(fcb)
+isunique(fcb)
 char *fcb;
 {
 	int i;
@@ -783,8 +816,8 @@ struct fcb *fcb;
 	cseek(fn, fcb);
 	n = read(fcb->fd, dma, 0x80);
 
-	if (n <= 0 || fcb->size - 1 == fcb->rrec) {
-		closefi(fcb->fd);
+	if (n <= 0 || fcb->size - 1 == fcb->currec) {
+		closefile(fcb->fd);
 		fcb->fd = -1;
 	}
 
@@ -793,38 +826,38 @@ struct fcb *fcb;
 	if (n == 0)
 		return 1;
 
-	seqincr(fn, fcb);
+	advance(fn, fcb);
 	if (n != 0x80) {
 		memset(dma + n, 0x1A, 0x80 - n);	/* pad with ^Z */
-		fcb->rrec = 0;
+		fcb->currec = 0;
 	}
 	return 0;
 }
 
 /*
- * seqincr - advance the record pointer after a read or write.
+ * advance - advance the record pointer after a read or write.
  *
  * Sequential mode walks cr up and carries into ex every 128 records;
- * random mode derives ex and cr from rrec.  Either way rrec advances,
+ * random mode derives ex and cr from currec.  Either way currec advances,
  * which is what keeps the random record in step with the sequential one.
  */
-seqincr(fn, fcb)
+advance(fn, fcb)
 int fn;
 struct fcb *fcb;
 {
 	if (fn == 'S') {
 		fcb->cr++;
 		if (fcb->cr == 0x80) {
-			fcb->cr = 0;
+			fcb->cr = 0;		/* moving into a new extent */
 			fcb->ex++;
 			setrc(fcb);
 		}
-	} else {
-		fcb->ex = fcb->rrec >> 7;
-		fcb->cr = fcb->rrec & 0x7F;
+	} else {				/* random I/O */
+		fcb->ex = fcb->currec >> 7;	/* next bits */
+		fcb->cr = fcb->currec & 0x7F;	/* low 7 bits */
 		setrc(fcb);
 	}
-	fcb->rrec++;
+	fcb->currec++;
 }
 
 /*
@@ -833,7 +866,7 @@ struct fcb *fcb;
  * Like cread but in the other direction: seek, write a full 128-byte
  * record from the DMA buffer, advance, and grow the size when the write
  * went past the old end.  A short write is an error.  The size field
- * tracks rrec rather than bytes here, which is the odd thing the binary
+ * tracks currec rather than bytes here, which is the odd thing the binary
  * does and is reproduced as such.
  */
 cwrite(fn, fcb)
@@ -841,14 +874,14 @@ int fn;
 struct fcb *fcb;
 {
 	if (write(fcb->fd, dma, 0x80) != 0x80) {
-		fcb->rrec = 0;
+		fcb->currec = 0;
 		return -1;
 	}
 
-	seqincr(fn, fcb);
+	advance(fn, fcb);
 
-	if (fcb->rrec > fcb->size) {
-		fcb->size = fcb->rrec;
+	if (fcb->currec > fcb->size) {
+		fcb->size = fcb->currec;
 		fcb->nrec = fcb->size >> 7;
 		if (fcb->size & 0x7F)
 			fcb->nrec++;
@@ -880,8 +913,8 @@ struct fcb *fcb;
 
 	if (fcb->fd < 0) {
 		name(fcb, buf);
-		fcb->fd = openfil(buf);
-		fcb->rrec = 0;
+		fcb->fd = openfile(buf);
+		fcb->currec = 0;
 		setrc(fcb);
 	}
 
@@ -893,13 +926,13 @@ struct fcb *fcb;
 		off = (fcb->r1 << 8) | fcb->r0;
 	}
 
-	if (off != 0 && off == fcb->rrec)
+	if (off != 0 && off == fcb->currec)
 		return 0;		/* already there */
 
 	seek(fcb->fd, off >> 2, 3);
 	if (off & 3)
 		seek(fcb->fd, (off & 3) << 7, 1);
-	fcb->rrec = off;
+	fcb->currec = off;
 	return 0;
 }
 
@@ -973,7 +1006,7 @@ struct fcb *fcb;
 {
 	int fd;
 
-	if (isuniqu(fcb) == 0)
+	if (isunique(fcb) == 0)
 		return -1;
 
 	name(fcb, buf);
@@ -1014,8 +1047,8 @@ struct fcb *fcb;
 	if (isdir(buf) || isdir(newname))
 		return -1;
 
-	closena(buf);
-	closena(newname);
+	closename(buf);
+	closename(newname);
 
 	if (link(buf, newname) < 0)
 		return -1;
@@ -1037,7 +1070,7 @@ struct fcb *fcb;
 uniqize(fcb)
 struct fcb *fcb;
 {
-	if (isuniqu(fcb))
+	if (isunique(fcb))
 		return 1;
 
 	if (fcb->dr == '?')
@@ -1082,14 +1115,14 @@ int drive;
 
 	/*
 	 * The two stores below are in the binary's order the other way
-	 * round - logvect first, then curdriv - but c1 has no rule for
+	 * round - logvector first, then curdrive - but c1 has no rule for
 	 * a shift whose count is a local that is also stored as a value,
-	 * so curdriv is stored first and the shift reads it back out of
+	 * so curdrive is stored first and the shift reads it back out of
 	 * the global.  The two globals are independent, so nothing else
 	 * can tell.
 	 */
-	curdriv = drive;
-	logvect |= 1 << curdriv;
+	curdrive = drive;
+	logvector |= 1 << curdrive;
 }
 
 /*
@@ -1130,7 +1163,7 @@ lflush()
  */
 cflush()
 {
-	if (recavai && call != 0x06)
+	if (recavail && call != 0x06)
 		suspend();
 
 	write(1, obuf, oleft);
@@ -1166,7 +1199,7 @@ cfill()
 
 	for (;;) {
 		n = read(0, ibuf, 0x10);
-		recavai = 0;
+		recavail = 0;
 
 		if (n > 0) {
 			ileft = n;
@@ -1196,11 +1229,11 @@ suspend()
 	char ch;
 
 	read(0, &ch, 1);
-	recavai = 0;
+	recavail = 0;
 
 	if (ch == 0x13) {
 		read(0, &ch, 1);
-		recavai = 0;
+		recavail = 0;
 		return 0x13;
 	}
 
@@ -1214,18 +1247,18 @@ suspend()
 }
 
 /*
- * openfil - open a file by name, and remember its identity.
+ * openfile - open a file by name, and remember its identity.
  *
  * Closes any descriptor already on the inode, then opens read/write and
  * falls back to read-only - setting ro so the FCB gets the read-only
- * flag.  The dev and inode are recorded in files for closena.
+ * flag.  The dev and inode are recorded in files for closename.
  */
-openfil(name)
+openfile(name)
 char *name;
 {
 	int fd;
 
-	if (closena(name) == 0)
+	if (closename(name) == 0)
 		return -1;
 
 	ro = 0;
@@ -1246,11 +1279,11 @@ char *name;
 }
 
 /*
- * closefi - close a descriptor.  The descriptors 0 and 1 are the
+ * closefile - close a descriptor.  The descriptors 0 and 1 are the
  * console and not in files, so only 2-15 are touched, and the inode is
- * cleared so closena will not find it again.
+ * cleared so closename will not find it again.
  */
-closefi(fd)
+closefile(fd)
 int fd;
 {
 	if (fd < 2 || fd > 15)
@@ -1260,12 +1293,12 @@ int fd;
 }
 
 /*
- * closena - close every descriptor on the file of this name.
+ * closename - close every descriptor on the file of this name.
  *
  * Stats the name, and for each entry in files whose dev and inode
  * match, closes it.  Returns 0 when the name cannot be stat'ed.
  */
-closena(name)
+closename(name)
 char *name;
 {
 	int i;
@@ -1328,7 +1361,7 @@ cdirio()
 		return c;
 	}
 
-	if (recavai || ileft)
+	if (recavail || ileft)
 		return getch();
 
 	if (oleft)
@@ -1425,14 +1458,14 @@ char *buf;
 
 /*
  * erase - undo one echoed character, the backspace half of ^H.  A tab
- * is undone by taberas; a printable by two rubs; a control or a high
+ * is undone by taberase; a printable by two rubs; a control or a high
  * character by one, or none.
  */
 erase(c)
 int c;
 {
 	if (c == '\t') {
-		taberas();
+		taberase();
 		return;
 	}
 	if (c >= 0 && c < 0x20) {
@@ -1447,7 +1480,7 @@ int c;
 
 /*
  * The tab and rubout machinery.  A tab stop is every eight columns;
- * tabecho remembers where each tab landed in tabs so taberas can
+ * tabecho remembers where each tab landed in tabs so taberase can
  * erase back to it, and the rest is space, rub and tabpos.
  */
 tabpos()
@@ -1480,7 +1513,7 @@ tabecho()
 		space();
 }
 
-taberas()
+taberase()
 {
 	int c;
 
@@ -1564,7 +1597,7 @@ struct node base;		/* eb33 */
 struct node *allocp;		/* eb37 */
 char	savebuf[512];		/* the SAVE allocator's free memory */
 
-setallo()
+setalloc()
 {
 	if (allocp == 0) {
 		allocp = &base;
@@ -1583,7 +1616,7 @@ ushort n;
 
 	size = (n + 3) / 4 + 1;
 
-	p = setallo();
+	p = setalloc();
 	q = p->next;
 
 	for (;;) {
@@ -1621,10 +1654,10 @@ char *s;
 }
 
 /*
- * trestor - put the terminal back the way it was, the inverse of what
+ * trestore - put the terminal back the way it was, the inverse of what
  * tset does when a program starts.  Clears the raw-mode bits.
  */
-trestor()
+trestore()
 {
 	gtty(0, sgtty);
 	sgtty[4] |= 0x1A;
@@ -1633,7 +1666,7 @@ trestor()
 }
 
 /*
- * load - read the .com named by loadfil into the TPA and jump to it.
+ * load - read the .com named by loadfile into the TPA and jump to it.
  * Sixteen kilobytes at a time, from 0x100 up.
  */
 load()
@@ -1642,9 +1675,9 @@ load()
 	int offset;
 	int n;
 
-	fd = open(loadfil, 0);
+	fd = open(loadfile, 0);
 	if (fd < 0) {
-		perror(loadfil);
+		perror(loadfile);
 		cexit();
 	}
 

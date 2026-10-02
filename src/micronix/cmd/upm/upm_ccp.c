@@ -36,7 +36,7 @@ ccp()
 		getline();
 
 		if (line[2] == '!') {
-			trestor();
+			trestore();
 			system(&line[3]);
 			tset();
 			continue;
@@ -138,11 +138,11 @@ ccp()
 			getword(ccword, p);
 			argname(ccword, 'l');
 			cpystr(buf, ccword, 0);
-			loadfil = ccword;
-			Lower(loadfil);
-			if (!suffix(loadfil, ".com")) {
-				cpystr(prog, loadfil, ".com", 0);
-				loadfil = prog;
+			loadfile = ccword;
+			Lower(loadfile);
+			if (!suffix(loadfile, ".com")) {
+				cpystr(prog, loadfile, ".com", 0);
+				loadfile = prog;
 			}
 			load();
 			continue;
@@ -253,7 +253,7 @@ prdes()
 			putch(i + 'A');
 			puts(": -> ");
 			puts(disktab[i]);
-			if (rovecto & mask)
+			if (rovector & mask)
 				puts("   (Read only)");
 			puts("\r\n");
 		}
@@ -342,7 +342,7 @@ char *word;
 
 /*
  * tset - put the terminal into raw mode for a CP/M program, the
- * opposite of trestor.  Clears the echoing and canonical bits and
+ * opposite of trestore.  Clears the echoing and canonical bits and
  * raises the raw bit.
  */
 tset()
@@ -355,7 +355,7 @@ tset()
 	sg[4] &= ~0x02;
 	sg[4] |= 0x20;
 	stty(0, sg);
-	recavai = 0;
+	recavail = 0;
 }
 
 /*
@@ -430,9 +430,9 @@ setsig()
 }
 
 /*
- * environ - the first drive defaults to the current directory.
+ * environment - the first drive defaults to the current directory.
  */
-environ()
+environment()
 {
 	if (disktab[0] == 0)
 		disktab[0] = save("./");
@@ -517,7 +517,7 @@ char **argv;
 	*tail = 0;
 
 	for (i = 2; i < argc; i++) {
-		if (argv[i] == loadfil)
+		if (argv[i] == loadfile)
 			continue;
 		if (isarg(argv[i]))
 			continue;
@@ -568,8 +568,8 @@ char **argv;
 			dodev(a);
 			continue;
 		}
-		if (loadfil == 0) {
-			loadfil = a;
+		if (loadfile == 0) {
+			loadfile = a;
 			continue;
 		}
 		if (farg1 == 0) {
@@ -580,16 +580,16 @@ char **argv;
 			farg2 = a;
 	}
 
-	environ();
+	environment();
 
-	if (loadfil) {
+	if (loadfile) {
 		dofcbs(argc, argv);
 		doargs(argc, argv);
-		if (strchr(loadfil, '/') == 0) {
-			argname(&fcb, loadfil);
+		if (strchr(loadfile, '/') == 0) {
+			argname(&fcb, loadfile);
 			memcpy(&fcb.ft[0], "COM", 3);
 			name(&fcb, path);
-			loadfil = path;
+			loadfile = path;
 		}
 	}
 }
@@ -657,26 +657,26 @@ char *name;
 	if (fcb.dr != 0)
 		drive = fcb.dr - 1;
 	else
-		drive = curdriv;
+		drive = curdrive;
 	drive += 'A';
 
-	buildpr(&fcb, buf);
+	buildpref(&fcb, buf);
 	if (buf[0] == 0)
 		cpystr(buf, ".", 0);
 
 	fd = open(buf, 0);
 
 	for (;;) {
-		if (recavai) {
+		if (recavail) {
 			read(0, &ch, 1);
-			recavai = 0;
+			recavail = 0;
 			if (ch != 0x13) {
 				close(fd);
 				puts("\r\n");
 				return;
 			}
 			read(0, &ch, 1);
-			recavai = 0;
+			recavail = 0;
 		}
 
 		n = read(fd, bbuf, 0x200);
@@ -744,7 +744,7 @@ char *name;
 	}
 
 	global(fcb, name);
-	buildpr(fcb, path);
+	buildpref(fcb, path);
 	fd = open(path, 0);
 
 	deleted = 0;
@@ -816,7 +816,7 @@ char *arg;
 {
 	if (isdes(arg))
 		return 1;
-	if (arg == loadfil)
+	if (arg == loadfile)
 		return 1;
 	if (issel(arg))
 		return 1;
@@ -830,7 +830,7 @@ char *arg;
  */
 prompt()
 {
-	putch(curdriv + 'A');
+	putch(curdrive + 'A');
 	putch('>');
 	cflush();
 }
@@ -857,7 +857,7 @@ char *fname;
 		return;
 	}
 
-	recavai = 0;
+	recavail = 0;
 	for (;;) {
 		n = read(fd, ccword, 0x200);
 		if (n <= 0)
@@ -947,7 +947,7 @@ char *ptr;
 	if (ptr == 0)
 		return;
 
-	setallo();
+	setalloc();
 	p = (struct node *)(ptr - 4);
 	p->next = base.next;
 	base.next = p;
@@ -1064,24 +1064,24 @@ char *name;
 	if (fcb.dr != 0)
 		statdriv = fcb.dr - 1;
 	else
-		statdriv = curdriv;
+		statdriv = curdrive;
 
-	buildpr(&fcb, buf);
+	buildpref(&fcb, buf);
 	if (buf[0] == 0)
 		cpystr(buf, ".", 0);
 
 	fd = open(buf, 0);
-	recavai = 0;
+	recavail = 0;
 	found = 0;
 
 	while ((n = read(fd, bbuf, 0x200)) > 0) {
 		for (p = bbuf; p < bbuf + n; p += 16) {
-			if (recavai) {
+			if (recavail) {
 				read(0, &c, 1);
-				recavai = 0;
+				recavail = 0;
 				if (c == 0x13) {
 					read(0, &c, 1);
-					recavai = 0;
+					recavail = 0;
 				}
 			}
 

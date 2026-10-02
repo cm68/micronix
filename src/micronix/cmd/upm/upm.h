@@ -106,14 +106,14 @@
  *   2  echo      console output   22 cmake    make file
  *   3  getch     reader input     23 rename   rename file
  *   4  putch     punch output     24 clogin   login vector
- *   5  clist     list output      25 ccurdis  current disk
+ *   5  clist     list output      25 ccurdisk  current disk
  *   6  cdirio    direct cons I/O  26 cdma     set DMA
  *   7  cgetio    get I/O byte     27 null     get alloc addr
- *   8  csetio    set I/O byte     28 cprotec  write protect
+ *   8  csetio    set I/O byte     28 cprotect  write protect
  *   9  cprs      print string     29 cgetro   get read-only vec
- *  10  readbuf   read console buf 30 null     set file attributes
- *  11  cconsta   console status   31 null     get disk params
- *  12  cversio   version          32 cuser    set/get user
+ *  10  readbuf   read console buf 30 setatt   set file attributes
+ *  11  cconstat   console status   31 null     get disk params
+ *  12  cversion   version          32 cuser    set/get user
  *  13  creset    reset disk       33 rrand    read random
  *  14  select    select disk      34 wrand    write random
  *  15  copen     open file        35 csize    compute size
@@ -141,6 +141,7 @@ extern int cprs();
 extern int readbuf();
 extern int select();
 extern int copen();
+extern int setatt();
 extern int cclose();
 extern int delete();
 extern int cmake();
@@ -179,8 +180,9 @@ struct fcb {
 				   -1 (0xff) when closed, so signed */
 	ushort	size;		/* 0x1a - size in bytes */
 	ushort	nrec;		/* 0x1c - number of 128-byte records */
-	ushort	rrec;		/* 0x1e - random record, upm's own */
-	uchar	cr;		/* 0x20 - current record within the extent */
+	ushort	currec;		/* 0x1e - current record number; 0 means uncertain */
+	uchar	cr;		/* 0x20 - current record in a sequential op,
+				   filled in by the user, normally zero */
 	uchar	r0;		/* 0x21 - CP/M random record, low */
 	uchar	r1;		/* 0x22 - CP/M random record, mid */
 	uchar	r2;		/* 0x23 - CP/M random record, high */
@@ -193,11 +195,11 @@ extern int lc();
 extern int uniqize();
 extern int name();
 extern int fsize();
-extern int openfil();
+extern int openfile();
 extern int setrc();
-extern int closefi();
+extern int closefile();
 extern int isdir();
-extern int closena();
+extern int closename();
 extern int unlink();
 
 extern int read();
@@ -208,10 +210,11 @@ extern int match();
 extern int cname();
 extern int uc();
 extern int cseek();
-extern int seqincr();
+extern int advance();
 extern int seek();
 extern int stat();
-extern int isuniqu();
+extern int chmod();
+extern int isunique();
 extern int fexists();
 extern int creat();
 extern int link();
@@ -229,7 +232,7 @@ extern int banner();
 extern int getline();
 extern int getword();
 extern int tabecho();
-extern int taberas();
+extern int taberase();
 extern int erase();
 extern int rbecho();
 extern int rub();
@@ -259,7 +262,7 @@ extern int type();
 extern int ren();
 extern int dostat();
 extern int system();
-extern int trestor();
+extern int trestore();
 extern int tset();
 extern int argname();
 extern int access();
@@ -307,19 +310,19 @@ extern uchar call;
 extern ushort col;
 extern uchar ntab;
 extern uchar tabs[12];
-extern ushort logvect;
+extern ushort logvector;
 extern uchar user;
-extern ushort rovecto;
-extern uchar curdriv;
+extern ushort rovector;
+extern uchar curdrive;
 extern uchar ileft;
 extern uchar lleft;
 extern uchar oleft;
-extern uchar recavai;
+extern uchar recavail;
 extern ushort verbose;
 extern uchar loaded;
 extern int errno;
 extern ushort arg2;
-extern char *loadfil;
+extern char *loadfile;
 extern ushort ro;
 extern char buf[64];
 extern char *disktab[16];

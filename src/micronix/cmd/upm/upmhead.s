@@ -18,7 +18,7 @@
 	.extern _cpm
 	.extern _wboot
 	.extern _badbios
-	.extern _recavai
+	.extern _recavail
 	.global start
 	.global _entry
 	.global _bios
@@ -121,13 +121,13 @@ _bios:
 	jp	_badbios
 
 ;
-; tint - the interrupt handler.  All it does is set recavai, which is
+; tint - the interrupt handler.  All it does is set recavail, which is
 ; how the console layer learns a character is waiting.
 ;
 _tint:
 	push	af
 	ld	a,1
-	ld	(_recavai),a
+	ld	(_recavail),a
 	pop	af
 	ret
 

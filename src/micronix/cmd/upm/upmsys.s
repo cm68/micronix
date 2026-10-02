@@ -357,6 +357,26 @@ a_arg2:	.ds	2
 	ret
 
 ;
+; _chmod(name, mode)
+;
+_chmod:
+	pop	de
+	pop	de
+	ld	(ch_arg2),de
+	ld	(ch_arg1),hl
+	ld	hl,-4
+	add	hl,sp
+	ld	sp,hl
+	call	unix
+	.db	15
+ch_arg1: .ds	2
+ch_arg2: .ds	2
+	ret	nc
+	ld	(_errno),hl
+	ld	hl,-1
+	ret
+
+;
 ; _dup(fd)
 ;
 _dup:
