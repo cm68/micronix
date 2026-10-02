@@ -57,6 +57,7 @@ all:
 	cd cmp ; make all
 	cd comm ; make all
 	cd compress ; make all
+	cd concat ; make all
 	cd copy ; make all
 	cd cp ; make all
 	cd cpp ; make all
@@ -166,6 +167,7 @@ install:
 	cd cmp ; make install
 	cd comm ; make install
 	cd compress ; make install
+	cd concat ; make install
 	cd copy ; make install
 	cd cp ; make install
 	cd cpp ; make install
@@ -275,6 +277,7 @@ clean:
 	cd cmp ; make clean
 	cd comm ; make clean
 	cd compress ; make clean
+	cd concat ; make clean
 	cd copy ; make clean
 	cd cp ; make clean
 	cd cpp ; make clean
@@ -384,6 +387,7 @@ clobber:
 	cd cmp ; make clobber
 	cd comm ; make clobber
 	cd compress ; make clobber
+	cd concat ; make clobber
 	cd copy ; make clobber
 	cd cp ; make clobber
 	cd cpp ; make clobber

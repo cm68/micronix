@@ -256,6 +256,7 @@ src/micronix/cmd/chown/chown
 src/micronix/cmd/cmp/cmp
 src/micronix/cmd/comm/comm
 src/micronix/cmd/compress/compress
+src/micronix/cmd/concat/concat
 src/micronix/cmd/copy/copy
 src/micronix/cmd/cp/cp
 src/micronix/cmd/crypt/crypt

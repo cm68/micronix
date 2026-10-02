@@ -1,0 +1,51 @@
+/usr/bin/concat from the Micronix 1.6 distribution
+
+There is no source for concat, so this is the disassembly, and concat.c is that
+disassembly read back into C.
+
+    disas -f concat.ctl concat.dist
+
+concat.dist is the binary off inode 59 of disks/dist/1012-8_dist_2.IMD, 5181
+bytes, mode 0711, dated 7 August 1982.  It has no header - see
+../newuser/README - and uses Whitesmith's runtime, c.ent at 1263 and c.ents at
+1116.  It is the program of that name in Kernighan and Plauger's Software Tools.
+
+Its own code is main at 010e, copy at 01bc and the error routine at 01fe, with
+": can't open" at 01f0.  main attaches the standard output with finit, and for
+each argument opens it with the library's fopen (0227), calls copy, and closes
+it with fclose (07a1).  A file that will not open is "name: can't open" on the
+standard error, and exit.  copy is a loop:
+
+    do
+        n = getl(fp, buf, 512)       042a
+    while (putl(stdout, buf, n))     058c
+
+THE ORIGINAL COPIES ONE LINE OF EACH FILE, and that is not a thing the manual
+says.  getl reads up to a newline or 512 characters.  putl is the library's
+block write, and it returns the count it was given - except when the stream is
+the standard output and the block ends in a newline, when it flushes and
+returns what the flush returned, which is 0.  The loop's test is the return of
+putl, so the first block that ends in a newline ends the loop.  A file of
+"a", newline, "b", newline writes "a" and a newline, and a first line of 600
+characters is written whole - the first 512 do not end in a newline and the
+loop goes on - and then no more.  It is the same whether the output is a file
+or a terminal.
+
+That is the original's, and it is so on the 1982 library as much as on this
+one: the tests were run in usersim with a terminal and with a file as the
+output and came out the same.  concat.c does what the manual says and copies
+all of every file.  It does not keep the loss, and the one behaviour that
+differs from the original's is this one.
+
+The standard error, the standard output of a file of one line, an empty file,
+no files, and a file that will not open are as the original's - no files writes
+nothing and does not read the standard input; and what was written before a
+file that would not open is written.  The exit status was 0 for the file that
+would not open and for a good run whatever was in BC when the argument list ran
+out; concat.c exits 1 and 0.
+
+Checked in usersim against the original, byte for byte, standard error and all,
+on single-line files, empty files, files with no newline, no files, a missing
+file in the middle of a list, and the same file twice.  The files of more than
+a line were compared by hand, and the original's output of them is the first
+line.
