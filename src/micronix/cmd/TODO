@@ -3,7 +3,7 @@
 #
 # Working notes: what /bin still carries without a source.
 #
-# /bin has 119 entries and, as before, two build signatures.  A hundred
+# /bin has 112 entries and, as before, two build signatures.  A hundred
 # and four begin "99 97" and are ccc's, built and installed by this
 # tree.  The five Whitesmith binaries the distribution floppies seeded
 # that had no source - edit, cpp, newuser, print and td - now have one.
@@ -11,11 +11,6 @@
 # toolchain and ptc, and the dev tools, spooler and unknowns - were
 # moved to /old and are no longer in /bin.
 # The distribution left 59, so 33 of them have a source here now.
-#
-# (One of the 119 is not a command: b1, a ccc-built test program that
-# prints "1", left in /bin by a session on 09-28.  Its source is still
-# in /tmp/b1.c.  It is counted here because it is in the directory, and
-# it wants removing from both.)
 #
 # Nothing is still in /bin as the distribution's binary.  The four that
 # were, in order of how little was missing:
@@ -152,10 +147,5 @@
 # and is a library routine now; it is the pre-DES big-multiply hash,
 # not DES, and the salt and the stored string are the same thirteen
 # characters they always were.
-#
-# WHAT IS STILL WORTH DOING
-#
-# /bin/b1 - the stray test program above - wants deleting, along with
-# the copy of its source in /tmp.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
