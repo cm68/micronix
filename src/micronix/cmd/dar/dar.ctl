@@ -91,6 +91,35 @@ define format 0x38d2
 define seeksec 0x1330
 define readboot 0x13bf
 
+; The sector read/write primitives.  readsector does read(fd, buf, 0x200)
+; and writesector write(fd, buf, 0x200); the buffers are in the data
+; segment at 0x9ff3 (write) and 0xa018/0xa01e (read).
+
+define readsector 0x56d1
+define writesector 0x588a
+
+; The sector-access layer above them: getsec reads the named sector into
+; the 0xa018 buffer, putsec writes the buffer out to the named sector.
+; This is the layer the FAT and directory walks sit on.
+
+define getsec 0x53f3
+define putsec 0x55b1
+
+; The menu and the FAT/directory layer.  menu (entered from doargs when
+; no operation flag was given) gets the disk name, reads the directory,
+; and runs operations in a loop.  readfat/writefat sit on getsec/putsec
+; and are the sector-number -> FAT/directory-sector access (tentative:
+; which of FAT vs directory is theirs is still to be read from the body).
+
+define menu 0x0ab8
+define readfat 0x0cb4
+define writefat 0x47ee
+
+; The output layer.  say (above) is the message printer; printf is the
+; formatted writer it and the prompts run through (calls write twice).
+
+define printf 0x744b
+
 ; The two copy operations (tentative - the names come from the call
 ; pattern, not the strings).  doput is the copy-TO-DOS operation: it
 ; calls mkfile to make the DOS file, then read + close in a loop.
