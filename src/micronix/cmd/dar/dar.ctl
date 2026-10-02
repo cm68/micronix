@@ -64,6 +64,7 @@ define exit 0x5e3b		; the C exit, called with 1 after main's work
 define execute 0x03ed
 define devname 0x8bd9		; the device argument (a pointer)
 define badopt 0x3a65		; optDefault falls here; bad option or no args
+define mkdevname 0x1106		; builds "/dev/<name>" out of the 0x10f6 literal
 
 ; ---------------------------------------------------------------------
 ; The option flags, one 16-bit cell per operation.  Each handler sets
@@ -97,6 +98,34 @@ define _seek 0xa2df		; 19
 define _stat 0xa2e5		; 18
 define _unlink 0xa2eb		; 10
 define _write 0xa2ef		; 4
+
+; ---------------------------------------------------------------------
+; dar's string literals, in the text segment (Whitesmith's puts them
+; there).  Each marks the function that emits it - the next round of
+; naming starts from these.
+
+define s.atmost 0x0363		; "At most one of d, r, t, x may be specified."
+define s.notdos 0x03d8		; "Not a DOS diskette!"
+define s.dupfile 0x07ec		; ": duplicate file name"
+define s.filedel 0x09da		; "File to delete: "
+define s.filecopy 0x09ec	; "File to copy (or RETURN for all files): "
+define s.menucopy 0x0a41	; "A) Copy from the DOS diskette"
+define s.menuput 0x0a60		; "B) Copy to the DOS diskette"
+define s.menudisp 0x0a7d	; "C) Display file on the DOS diskette"
+define s.selection 0x0aac	; "Selection: "
+define s.diskname 0x166e	; "Enter disk name: "
+define s.insert 0x1680		; "Insert diskette and close the drive door"
+define s.volfull 0x21a4		; ": Volume full"
+define s.dirent 0x21b3		; ": Can't allocate directory entry"
+define s.nospace 0x2775		; "Not enough space left on volume"
+define s.kfree 0x3539		; "K free space left"
+define s.pctfull 0x354c		; "% full, "
+define s.diskette 0x3555	; "Diskette "
+define s.unkfmt 0x38b3		; ": Unknown format"
+define s.devsize 0x38c5		; "Device size "
+define s.example 0x3a2a		; "Example: dar mfa xv"
+define s.usage 0x3a3f		; "usage: dar device {cdprtx} files ..."
+define s.notdos2 0x47d9		; "Not a DOS diskette."
 
 ; ---------------------------------------------------------------------
 ; library, to be named from what dar calls it for
