@@ -154,6 +154,8 @@ all:
 	cd unrot ; make all
 	cd update ; make all
 	cd upm ; make all
+	cd uudecode ; make all
+	cd uuencode ; make all
 	cd vi ; make all
 	cd wall ; make all
 	cd wc ; make all
@@ -272,6 +274,8 @@ install:
 	cd unrot ; make install
 	cd update ; make install
 	cd upm ; make install
+	cd uudecode ; make install
+	cd uuencode ; make install
 	cd vi ; make install
 	cd wall ; make install
 	cd wc ; make install
@@ -391,6 +395,8 @@ clean:
 	cd unrot ; make clean
 	cd update ; make clean
 	cd upm ; make clean
+	cd uudecode ; make clean
+	cd uuencode ; make clean
 	cd vi ; make clean
 	cd wall ; make clean
 	cd wc ; make clean
