@@ -1,0 +1,28 @@
+/usr/bin/copy from the Micronix 1.6 distribution
+
+There is no source for copy, so this is the disassembly, and copy.c is that
+disassembly read back into C.
+
+    disas -f copy.ctl copy.dist
+
+copy.dist is the binary off inode 58 of disks/dist/1012-8_dist_2.IMD, 3486
+bytes, mode 0711, dated 7 August 1982.  It has no header - see
+../newuser/README - and uses Whitesmith's runtime, c.ent at 0dde and c.ents at
+0c91.  It is the program of that name in Kernighan and Plauger's Software
+Tools.
+
+Its own code is main at 010e and nothing else: it attaches the standard output
+with the library's finit, and then calls getchar at 02bf and putchar at 0339
+until the character is the -1 of the end of the file.  Everything from 0159
+on is the library's stdio, malloc and the system call stubs.  Every byte is
+copied as it is, and the manual's note - that on some systems a binary file
+would be mangled and cp should be used, "but not Micronix" - is the reason it
+is a program at all.
+
+The exit status was the one thing wrong with it: main falls out through
+c.rets with the -1 still in BC, the startup passes it to exit, and so every
+run exits 255.  It exits 0 here.
+
+Checked in usersim against the original, byte for byte, on text, on a file
+with every one of the 256 byte values twenty times over, and on four thousand
+random bytes.
