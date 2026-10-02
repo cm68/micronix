@@ -590,16 +590,23 @@ char *f;
 	return 0;
 }
 
-clustosec()
+/*
+ * clustosec - the cluster -> sector conversion: sector = data_start +
+ * (cluster - 2) * sectors_per_cluster.  data_start is past the reserved
+ * sectors, the FATs, and the root directory.  The disassembly's shift
+ * path (H7d6e/H7d53) is the same arithmetic; the exact round-up still
+ * to be byte-checked.
+ */
+clustosec(cluster)
+int cluster;
 {
-	/*
-	 * The cluster -> sector conversion: sector = data_start +
-	 * (cluster - 2) * sectors_per_cluster.  The disassembly does the
-	 * multiply with shifts (sectors_per_cluster is a power of two, 8
-	 * for the CP 08H check) and adds the geometry's data-start.  The
-	 * exact geometry fields are still to be placed.
-	 */
-	return 0;
+	int spt_fat, root_sectors, data_start;
+
+	spt_fat = (geom->total_clusters * 3 / 2 + geom->bytes_per_sec - 1)
+			/ geom->bytes_per_sec;
+	root_sectors = geom->root_entries * 32 / geom->bytes_per_sec;
+	data_start = geom->reserved + geom->num_fats * spt_fat + root_sectors;
+	return data_start + (cluster - 2) * geom->spc;
 }
 
 readdir()
