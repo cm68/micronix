@@ -1,16 +1,17 @@
 # /bin commands still without source
 
 /bin is filled from the 1.3/1.4 distribution userland, and the tree
-replaces it one command at a time.  These are what is still the
-original distribution binary, with no source anywhere in the tree.
+replaces it one command at a time.  This list is now empty: no /bin
+entry is still the original distribution binary - every one is either
+built by this tree or was moved to /old.
 
 ## to port
 
-    edit
+(none)
 
 ## ported since this list was written
 
-cal, chars, comm, cpp, cptree, e, group, help, lines, newuser, print,
+cal, chars, comm, cpp, cptree, e, edit, group, help, lines, newuser, print,
 sum, tail, td, tty, unique, update, wall, who, words, write.
 
 `cal`, `comm`, `sum`, `tail`, `unique` and `tty` came from the v7
@@ -23,8 +24,9 @@ under another name: main() sees the name and forces `-r`.
 `newuser`, `print` and `td` have no source anywhere and no v7 original, so
 they are the ports here that were read out of their binaries: each of
 `cmd/newuser`, `cmd/print` and `cmd/td` has the disassembly, the control file and a
-README on how each function was found.  They are built but not installed
-over the distribution's copies.  `print` is a workalike checked against
+README on how each function was found.  They are built and installed
+over the distribution's copies, newuser and td set-user-id root as the
+originals were.  `print` is a workalike checked against
 the original byte for byte; the README says where the original is wrong
 and print is not (its -N, -lN and -wN never worked here).
 
@@ -69,6 +71,5 @@ eventual deletion - losing them loses nothing but the original binary:
   printer.
 - `clean`, `down` - no identifying strings at all.
 
-`cpp` is not among them: it is a standalone preprocessor with no
-replacement in the tree, so it stays in /bin as a gap rather than a
-duplicate.
+`cpp` is not among them: it is a standalone preprocessor - Reiser's v7
+program, now `cmd/cpp` - and /bin/cpp is this tree's, not a gap.

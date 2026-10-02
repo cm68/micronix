@@ -5,8 +5,9 @@
 #
 # /bin has 119 entries and, as before, two build signatures.  A hundred
 # and four begin "99 97" and are ccc's, built and installed by this
-# tree.  Five are the Whitesmith binaries the distribution floppies
-# seeded and still have no source.  Twenty more - the Whitesmith
+# tree.  The five Whitesmith binaries the distribution floppies seeded
+# that had no source - edit, cpp, newuser, print and td - now have one.
+# Twenty more - the Whitesmith
 # toolchain and ptc, and the dev tools, spooler and unknowns - were
 # moved to /old and are no longer in /bin.
 # The distribution left 59, so 33 of them have a source here now.
@@ -16,18 +17,19 @@
 # in /tmp/b1.c.  It is counted here because it is in the directory, and
 # it wants removing from both.)
 #
-# Of the four still in /bin, in order of how little is missing:
+# Nothing is still in /bin as the distribution's binary.  The four that
+# were, in order of how little was missing:
 #
-#	1  edit - a line editor of Whitesmith's own, and NOT cmd/vi.
-#	   cmd/vi is STEVIE, a screen editor, and the edit.c in it is one
-#	   of STEVIE's modules rather than this program.  No source
-#	   anywhere in the repository.
-#	3  newuser, print and td - have a source now: cmd/newuser,
-#	   cmd/print and cmd/td, each disassembled off the second
-#	   distribution disk and read back into C.  All three build with
-#	   the cross compiler and have been run in usersim, but none is
-#	   installed, so /bin/newuser, /bin/print and /bin/td are still
-#	   the distribution's.
+#	edit - a line editor of Whitesmith's own, and NOT cmd/vi.  cmd/vi
+#	   is STEVIE, a screen editor, and the edit.c in it is one of
+#	   STEVIE's modules rather than this program.  It is now cmd/edit,
+#	   reconstructed from its Ratfor source (.r files).
+#	newuser, print and td - have a source now: cmd/newuser, cmd/print
+#	   and cmd/td, each disassembled off the second distribution disk
+#	   and read back into C.  All three build with the cross compiler,
+#	   have been run in usersim, and are now installed - newuser and
+#	   td set-user-id root, as the originals were - so /bin is this
+#	   tree's for all three.
 #
 # The other twenty - the Whitesmith toolchain (as cc link lib obj hex
 # lord anat cp1 cp2), ptc, cxr, ddt, rp, pilot, clean, down, and the
@@ -112,7 +114,7 @@
 # A full /bin is not the goal.  What has to exist for the system to
 # come up and rebuild itself is a shell, the toolchain, make, and the
 # file utilities those need - and all of that is in the 104 this tree
-# builds, so none of the remaining four blocks a bootstrap.  stty was
+# builds, so none of the last four blocked a bootstrap.  stty was
 # the nearest
 # to it, being what the terminal wants before anything interactive is
 # pleasant; it is ported now.  The rest is a userland that can wait.
