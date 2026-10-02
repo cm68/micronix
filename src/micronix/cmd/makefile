@@ -114,6 +114,7 @@ all:
 	cd newuser ; make all
 	cd nm ; make all
 	cd od ; make all
+	cd overstrike ; make all
 	cd owner ; make all
 	cd packsrc ; make all
 	cd passwd ; make all
@@ -224,6 +225,7 @@ install:
 	cd newuser ; make install
 	cd nm ; make install
 	cd od ; make install
+	cd overstrike ; make install
 	cd owner ; make install
 	cd packsrc ; make install
 	cd passwd ; make install
@@ -334,6 +336,7 @@ clean:
 	cd newuser ; make clean
 	cd nm ; make clean
 	cd od ; make clean
+	cd overstrike ; make clean
 	cd owner ; make clean
 	cd packsrc ; make clean
 	cd passwd ; make clean
@@ -444,6 +447,7 @@ clobber:
 	cd newuser ; make clobber
 	cd nm ; make clobber
 	cd od ; make clobber
+	cd overstrike ; make clobber
 	cd owner ; make clobber
 	cd packsrc ; make clobber
 	cd passwd ; make clobber

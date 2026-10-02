@@ -1,0 +1,36 @@
+/usr/bin/overstrike from the Micronix 1.6 distribution
+
+There is no source for overstrike, so this is the disassembly, and overstrike.c
+is that disassembly read back into C.
+
+    disas -f overstrike.ctl overstrike.dist
+
+overstrike.dist is the binary off inode 29 of disks/dist/1013-8_dist_3.IMD - the
+third distribution disk - 3233 bytes, mode 0711, dated 7 August 1982.  It has no
+header - see ../newuser/README - and uses Whitesmith's runtime, c.ent at 0ce9
+and c.ents at 0b9c.  It is the program of that name in Kernighan and Plauger's
+Software Tools.
+
+Its own code is main at 010e and nothing else.  It keeps two words in the data:
+the column the output has reached (0d1b, which starts at 1) and the column the
+input has (0d1d, set from the first at the top of each pass).  A pass is: read
+characters with getchar for as long as they are backspaces, each taking one
+off the second column, to 1 at the lowest; then, if the input is behind the
+output, write a carriage return and set the output to column 1 and write blanks
+until it reaches the input; then, unless it is the end of the file, write the
+character and move the output on by one, or back to 1 for a newline.
+
+So "ab", two backspaces and "__" comes out as "ab", a return and "__": the
+underline is written on a second pass over the line.  And because the catching
+up is done before the end of the file is looked at, a line that is backed up
+when the file ends has the return and the blanks written after it.
+
+The exit status is the -1 that the last getchar left in BC at the end of the
+file, which is 255, or, when the file ends on a backspace, the byte that was
+last in BC - the original's status here is whatever the last character was.
+overstrike.c exits 0.
+
+Checked in usersim against the original, byte for byte, on five thousand random
+characters made of letters, blanks, backspaces, tabs, newlines, carriage
+returns and bytes over 0177; on short cases of backspaces at the start, in
+the middle and at the end of the file; on an empty file and on text.

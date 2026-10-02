@@ -320,6 +320,7 @@ src/micronix/cmd/newuser/newuser
 src/micronix/cmd/nm/nm
 src/micronix/cmd/nm/wsnm
 src/micronix/cmd/od/od
+src/micronix/cmd/overstrike/overstrike
 src/micronix/cmd/passwd/passwd
 src/micronix/cmd/owner/owner
 src/micronix/cmd/packsrc/packsrc
