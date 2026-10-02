@@ -105,7 +105,7 @@ tabdir (a, b)
 			{
 			name (f, b);		/* add new component */
 
-			tabfile (path);
+			tabfile (path, f);
 
 			if (f->att & DIRECTORY)
 				{
