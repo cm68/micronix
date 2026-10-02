@@ -68,6 +68,7 @@ unsigned char iflg;
 unsigned char fflg;
 unsigned char gflg;
 unsigned char cflg;
+unsigned char Rflg;
 char	rflg = 1;		/* the sort direction: 1 or -1 */
 long	year;
 int	flags;
@@ -84,6 +85,8 @@ char	*makename();
 struct	lbuf *gstat();
 char	*ctime();
 long	nblock();
+int	compar();
+int	dodir();
 
 #define	ISARG	0100000
 
@@ -167,6 +170,10 @@ char *argv[];
 			fflg++;
 			continue;
 
+		case 'R':
+			Rflg++;
+			continue;
+
 		default:
 			continue;
 		}
@@ -219,61 +226,94 @@ char *argv[];
 				printf("%s:\n", ep->ln.namep);
 				fc = 0;
 			}
-			lastp = slastp;
-			maxn = readdir(ep->ln.namep);
-			if (fflg==0)
-				qsort(slastp,lastp - slastp,sizeof *lastp,compar);
-			if (lflg || sflg)
-				printf("total %D\n", tblocks);
-			if (!xflg) {
-                lwide = 0;
-				for (ep1=slastp; ep1 < lastp; ep1++) {
-                    ep = *ep1;
-                    i = wide(ep->lnl);
-                    if (i > lwide) lwide = i;
-				}
-				for (ep1=slastp; ep1 < lastp; ep1++) {
-					pentry(*ep1);
-				}
-			} else {
-				char fbuf[10];
-				char cols = WIDTH / (maxn + 1);
-				char lines = ((lastp - slastp) + (cols - 1)) / cols;
-				char j;
-				int nent = lastp - slastp;
-				int n;
-#ifdef notdef
-				char total = lastp - slastp;
-				for (i = 0; i < total; i++) {
-					printf("%s ", slastp[i]->ln.lname);
-				}
-				printf("\ntotal %d lines %d cols %d maxn %d WIDTH %d\n",
-					total, lines, cols, maxn, WIDTH);
-#endif
-				sprintf(fbuf, "%%-%ds ", maxn);
-				for (i = 0; i < lines; i++) {
-					for (j = 0; j < cols; j++) {
-						/*
-						 * cols*lines is a rectangle and the
-						 * entries rarely fill one.  Across
-						 * a row the index only grows, so
-						 * the first cell past the last
-						 * entry ends the row.
-						 */
-						n = i + (j * lines);
-						if (n >= nent)
-							break;
-						ep1 = &slastp[n];
-						printf(fbuf, (*ep1)->ln.lname);
-					}
-					printf("\n");
-				}
-			}
+			dodir(ep->ln.namep);
 		} else 
 			pentry(ep);
 	}
 	exit(errors ? 1 : 0);
 }
+
+/*
+ * List one directory and, when Rflg is set, each of its
+ * subdirectories in turn, a blank line and a header before each so the
+ * recursion reads as a nesting.  The list is the same global one main()
+ * built: this reads the directory into the space after the arguments and
+ * restores lastp around every descent, so a subdirectory's entries never
+ * disturb the caller's.  The name is copied at once because readdir()'s
+ * makename reuses the buffer a caller may have handed this.
+ */
+int
+dodir(name)
+char *name;
+{
+	register struct lbuf *ep, **ep1;
+	struct lbuf **start, **end;
+	char path[100];
+	int i;
+
+	strcpy(path, name);
+	name = path;
+
+	start = lastp;
+	maxn = readdir(name);
+	if (fflg==0)
+		qsort(start, lastp - start, sizeof *lastp, compar);
+	if (lflg || sflg)
+		printf("total %D\n", tblocks);
+	if (!xflg) {
+		lwide = 0;
+		for (ep1=start; ep1 < lastp; ep1++) {
+			ep = *ep1;
+			i = wide(ep->lnl);
+			if (i > lwide) lwide = i;
+		}
+		for (ep1=start; ep1 < lastp; ep1++)
+			pentry(*ep1);
+	} else {
+		char fbuf[10];
+		char cols = WIDTH / (maxn + 1);
+		char lines = ((lastp - start) + (cols - 1)) / cols;
+		char j;
+		int nent = lastp - start;
+		int n;
+
+		sprintf(fbuf, "%%-%ds ", maxn);
+		for (i = 0; i < lines; i++) {
+			for (j = 0; j < cols; j++) {
+				n = i + (j * lines);
+				if (n >= nent)
+					break;
+				ep1 = &start[n];
+				printf(fbuf, (*ep1)->ln.lname);
+			}
+			printf("\n");
+		}
+	}
+
+	if (Rflg) {
+		struct stat st;
+
+		end = lastp;
+		for (ep1 = start; ep1 < end; ep1++) {
+			char *sub;
+
+			ep = *ep1;
+			if (ep->ln.lname[0] == '.' &&
+			    (ep->ln.lname[1] == '\0' ||
+			     (ep->ln.lname[1] == '.' && ep->ln.lname[2] == '\0')))
+				continue;
+			sub = makename(name, ep->ln.lname);
+			if (stat(sub, &st) < 0 || (st.st_mode & S_IFMT) != S_IFDIR)
+				continue;
+			printf("\n%s:\n", sub);
+			fc = 0;
+			dodir(sub);
+			lastp = end;
+		}
+	}
+	return 0;
+}
+
 
 pentry(ap)
 struct lbuf *ap;
