@@ -662,6 +662,25 @@ char *buf;
 	return 0;
 }
 
+/*
+ * dectime - decode the DOS date/time fields.  time is hour(5)/minute(6)/
+ * second(5), date is year(7)/month(4)/day(5), as the 0x1f/0x3f/0x0f
+ * masks in H43a3 show.  Prints "%s %2d %2d:%02d " (month name, day,
+ * hour:minute); the month-name table is still to be placed.
+ */
+dectime(date, time)
+int date, time;
+{
+	int day, month, hour, minute;
+
+	day = date & 0x1f;
+	month = (date >> 5) & 0x0f;
+	hour = (time >> 11) & 0x1f;
+	minute = (time >> 5) & 0x3f;
+	/* TODO: the month-name table, then printf("%s %2d %2d:%02d ") */
+	printf("%2d %2d:%02d ", day, hour, minute);
+}
+
 readdir()
 {
 	/*
