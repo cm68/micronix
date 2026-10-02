@@ -108,13 +108,13 @@ define putstr 0x55b1
 
 ; The menu and the FAT/directory layer.  menu (entered from doargs when
 ; no operation flag was given) gets the disk name, reads the directory,
-; and runs operations in a loop.  readfat/writefat sit on the string and
-; sector layers and are the sector-number -> FAT/directory access
-; (tentative: which of FAT vs directory is theirs is still to be read).
+; and runs operations in a loop.  readdir/dofat sit on the string and
+; sector layers: readdir is the sector-number -> directory access, dofat
+; the top-level FAT read that also dispatches the copy (c) operation.
 
 define menu 0x0ab8
-define readfat 0x0cb4
-define writefat 0x47ee
+define readdir 0x0cb4
+define dofat 0x47ee
 
 ; The output layer.  say (above) is the message printer; printf is the
 ; formatted writer it and the prompts run through (calls write twice).
@@ -232,11 +232,22 @@ define splitname 0x3bd8		; cut "name.ext" on '.'
 define addentry 0x32be		; add a directory entry
 define findfile 0x1fda		; find a file by name
 
+; The FAT/cluster chain.  clustosec turns a cluster number into a sector
+; (the (cluster-2)*sectors-per-cluster shift); readfat loads the FAT
+; image; nextcluster follows the FAT chain from a cluster; fat12 is the
+; 12-bit entry read.
+
+define dirbuf 0x466a		; the directory entry buffer (0x9042)
+define clustosec 0x0e09		; cluster -> sector
+define readfat 0x48ca		; load the FAT image
+define nextcluster 0x3825	; follow the FAT chain (calls fatentry)
+define fat12 0x43a3		; the 12-bit FAT entry read
+
 ; ---------------------------------------------------------------------
 ; The data structures, read apart:
-;   FAT12.  readfat (0x36b0) masks a cluster entry with AND 0x0f - the
+;   FAT12.  fatentry (0x36b0) masks a cluster entry with AND 0x0f - the
 ;     FAT is the 12-bit one, entry n at byte n*3/2 in the FAT buffer.
-;   0x8bdc - the FAT buffer (indexed by readfat).
+;   0x8bdc - the FAT buffer (indexed by fatentry).
 ;   0x9e44 - the formats table, 34-byte entries of known DOS diskette
 ;     geometries; format (0x38d2) matches one and leaves its pointer in
 ;     0x9e42.  Offset 12 of the matched entry is the total cluster count
