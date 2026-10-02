@@ -646,5 +646,15 @@ getdiskname()
 
 menu()
 {
-	/* TODO: getdiskname, readdir, then prompt/select/execute in a loop */
+	/* H0ab8 - the interactive loop.  Print the menu, read a selection,
+	 * and run the chosen operation until D (quit). */
+	for (;;) {
+		say("\tA) Copy from the DOS diskette\n");
+		say("\tB) Copy to the DOS diskette\n");
+		say("\tC) Display file on the DOS diskette\n");
+		say("\tD) Quit\n");
+		say("Selection: ");
+		/* TODO: read the selection, then A->copyflag, B->putflag,
+		 * C->touchflag, D->return; then execute() */
+	}
 }
