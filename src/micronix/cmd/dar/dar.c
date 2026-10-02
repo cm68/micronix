@@ -341,15 +341,15 @@ mkdevname()
 dispatch()
 {
 	/*
-	 * H1214/H1226.  For the d/r/t/x single-file operations, append a
-	 * device number to the name - 2 for delete/rename (the directory
-	 * partition), 0 for the others - via H7752, and record the result
-	 * in the option-mode byte.  H7752's exact form is still to be read.
+	 * H1214/H1226.  Open the device with the right mode: delete/rename
+	 * need read-write (2), the read operations read-only (0).  The
+	 * result (H8bdb) drives the retry/error path.
 	 */
-	int n;
+	int mode;
 
-	n = (delflag || renflag) ? 2 : 0;
-	/* TODO: H7752(devname, n) -> the option-mode byte */
+	mode = (delflag || renflag) ? 2 : 0;
+	devfd = open(devname, mode);
+	/* TODO: retry once, then printf(devname) + error on failure */
 }
 
 /*

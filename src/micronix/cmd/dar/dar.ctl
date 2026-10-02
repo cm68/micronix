@@ -177,7 +177,7 @@ define fstat 0x76d4
 define gtty 0x76f4
 define link 0x7717
 define mknod 0x7745
-define open 0x7768
+define open 0x7752
 define read 0x7776
 define seek 0x77a2
 define stat 0x77e3
