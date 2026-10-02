@@ -38,6 +38,7 @@
  */
 #include <stdio.h>
 #include <types.h>
+#include <string.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -202,12 +203,14 @@ char *s;
 usage()
 {
 	printf("usage: dar device {cdprtx} files ...\n");
+	printf("Example: dar mfa xv\n");
 	exit(2);
 }
 
 badopt()
 {
 	printf("usage: dar device {cdprtx} files ...\n");
+	printf("Example: dar mfa xv\n");
 	exit(2);
 }
 
@@ -363,6 +366,62 @@ int fd;
 char *buf;
 {
 	write(fd, buf, 512);
+}
+
+/*
+ * getstr / putstr - the string layer.  dar builds a line-oriented text
+ * file over the raw sectors: getstr pumps bytes out of the sector buffer
+ * (refilling with readsector when the counter underflows) into buf until
+ * 0xff (end of file) or 0x0a (end of line), and putstr writes a line
+ * back, flushing 0x0a-terminated sectors.  The counters and the exact
+ * flush flag are still approximate.
+ */
+int	sectorcount;	/* bytes left in the sector buffer */
+unsigned char *sectorptr;	/* next byte in the sector buffer */
+char	outbuf[512];	/* 0xa028 - the output line buffer */
+int	outcount;	/* bytes left in outbuf */
+int	outflag;	/* the flush flag (0xa02e bit 0x40) */
+
+char *
+getstr(buf)
+char *buf;
+{
+	char *p;
+	int c;
+
+	p = buf;
+	for (;;) {
+		if (--sectorcount < 0) {
+			readsector(devfd, sectorbuf);
+			sectorptr = sectorbuf;
+			sectorcount = 512;
+		}
+		c = *sectorptr++;
+		if (c == 0xff) {	/* end of file */
+			*p = '\0';
+			if (p == buf)
+				return 0;
+			return buf;
+		}
+		if (c == '\n') {	/* end of line */
+			*p = '\0';
+			return buf;
+		}
+		*p++ = c;
+	}
+}
+
+putstr(s)
+char *s;
+{
+	strcpy(outbuf, s);
+	if (--outcount < 0) {
+		*outbuf = '\n';
+		writesector(devfd, outbuf);
+		outcount = 512;
+	}
+	if (outflag)
+		writesector(devfd, outbuf);
 }
 
 readboot()
