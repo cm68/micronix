@@ -40,6 +40,7 @@
 #include <types.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 /*
  * The operation flags, one 16-bit cell per option letter.  doargs sets
@@ -65,19 +66,38 @@ int	doneflag;	/* H87d1 - set when a final step is due */
 
 /*
  * The geometry descriptor - one 34-byte entry of the formats table at
- * 0x9e44, matched by format() and pointed to by geom.  Only the fields
- * space() reads have been placed: total_clusters at offset 12 and the
- * bytes-per-cluster at offset 14; the rest is padding until the other
- * fields are read back out of the disassembly.
+ * 0x9e44, matched by format() and pointed to by geom.  All 17 words are
+ * 16-bit.  The offsets the code reads, by frequency:
+ *	8 (x5), 24 (x3), 20 (x2), 16 (x2), 6 (x2), 22, 18
+ * plus 12 = total clusters, 14 = bytes per cluster, 26 = media descriptor,
+ * and 0 = the signature format() matches (bytes per sector).
+ * Only total_clusters and cluster_size are placed; the rest is padding
+ * until each offset's meaning is read back from its uses.
  */
 struct geom {
-	int	pad[6];		/* offsets 0..11 */
+	int	signature;	/* offset 0 - bytes per sector */
+	int	pad0;		/* 2 */
+	int	pad1;		/* 4 */
+	int	pad2;		/* 6 */
+	int	pad3;		/* 8 */
+	int	pad4;		/* 10 */
 	int	total_clusters;	/* offset 12 */
 	int	cluster_size;	/* offset 14, bytes per cluster */
+	int	pad5;		/* 16 */
+	int	pad6;		/* 18 */
+	int	pad7;		/* 20 */
+	int	pad8;		/* 22 */
+	int	pad9;		/* 24 */
+	int	media;		/* offset 26 */
+	int	pad10;		/* 28 */
+	int	pad11;		/* 30 */
+	int	pad12;		/* 32 */
 };
 
 struct geom *geom;	/* 0x9e42 - the matched format descriptor */
 unsigned char *fatbuf;	/* 0x8bdc - the FAT image */
+int	devfd;		/* the opened device */
+unsigned char sectorbuf[512];	/* 0xa018 - the sector buffer getsec fills */
 
 /*
  * fatentry - read one 12-bit FAT entry for a cluster.  Entry n sits at
@@ -324,21 +344,60 @@ int	formats[] = {
 	0
 };
 
+seeksec(fd, sector)
+int fd, sector;
+{
+	/* whence 3 is the kernel's "sector" seek - it multiplies by 512 */
+	seek(fd, sector, 3);
+}
+
+readsector(fd, buf)
+int fd;
+char *buf;
+{
+	read(fd, buf, 512);
+}
+
+writesector(fd, buf)
+int fd;
+char *buf;
+{
+	write(fd, buf, 512);
+}
+
 readboot()
 {
-	/* TODO: H13bf - seek+read the boot sector, return the geometry
-	 * signature the formats table matches against. */
-	return 0;
+	/*
+	 * H13bf.  Seek to sector 0, read the boot sector, and return the
+	 * geometry signature format() matches against - the bytes-per-sector
+	 * field (a word at offset 11 of the boot sector).  The device fd and
+	 * the sector buffer it reads into are still to be placed.
+	 */
+	int bps;
+
+	seeksec(devfd, 0);
+	readsector(devfd, sectorbuf);
+	bps = sectorbuf[11] | (sectorbuf[12] << 8);
+	return bps;
 }
 
 /*
- * readfat - H47ee.  Loads the FAT image into fatbuf, and when copyflag
- * (c) is set runs the copy-from-DOS operation on it.  execute calls it
- * unconditionally.
+ * readfat - H47ee.  Loads the FAT image, and when copyflag (c) is set
+ * runs the copy-from-DOS operation.  The geometry fields it touches are
+ * offset 8 (sectors-per-FAT) and offset 26 (media descriptor); the FAT
+ * image is fatbuf, read into at 0x400 a sector.  Still to be filled in
+ * from the disassembly: the exact H48ca FAT read and the copy loop.
  */
 readfat()
 {
-	/* TODO: load the FAT; if copyflag, docopy() */
+	if (copyflag) {
+		memset(fatbuf, 0, 0x400);
+		/* TODO: media descriptor (geom[26]) into fatbuf[0], the FAT
+		 * read, and the copy-from-DOS loop; sets doneflag = 1 */
+		doneflag = 1;
+		return;
+	}
+	/* TODO: H48ca - read the FAT and verify the media descriptor */
 }
 
 /*

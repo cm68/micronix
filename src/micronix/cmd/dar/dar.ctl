@@ -98,18 +98,19 @@ define readboot 0x13bf
 define readsector 0x56d1
 define writesector 0x588a
 
-; The sector-access layer above them: getsec reads the named sector into
-; the 0xa018 buffer, putsec writes the buffer out to the named sector.
-; This is the layer the FAT and directory walks sit on.
+; The string layer above them.  getstr pulls bytes out of the 0xa018
+; sector buffer (refilling with readsector when the 512-byte counter
+; runs dry) and copies until 0xff or 0x0a, then null-terminates; putstr
+; is its inverse.  These are file-content access, not sector access.
 
-define getsec 0x53f3
-define putsec 0x55b1
+define getstr 0x53f3
+define putstr 0x55b1
 
 ; The menu and the FAT/directory layer.  menu (entered from doargs when
 ; no operation flag was given) gets the disk name, reads the directory,
-; and runs operations in a loop.  readfat/writefat sit on getsec/putsec
-; and are the sector-number -> FAT/directory-sector access (tentative:
-; which of FAT vs directory is theirs is still to be read from the body).
+; and runs operations in a loop.  readfat/writefat sit on the string and
+; sector layers and are the sector-number -> FAT/directory access
+; (tentative: which of FAT vs directory is theirs is still to be read).
 
 define menu 0x0ab8
 define readfat 0x0cb4
