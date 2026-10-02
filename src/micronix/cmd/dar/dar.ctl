@@ -218,11 +218,20 @@ define s.notdos2 0x47d9		; "Not a DOS diskette."
 define strcmp 0x6e72		; the char-by-char compare mkfile uses for "." and "/"
 
 ; ---------------------------------------------------------------------
-; The data structures, still to be read apart.  format (the boot-sector
-; check) touches these first:
-;   0x9e42 - a pointer, dereferenced
-;   0x9e44 - a buffer (the sector image)
-;   0x9fa6 - a pointer, dereferenced
+; The data structures, read apart:
+;   FAT12.  readfat (0x36b0) masks a cluster entry with AND 0x0f - the
+;     FAT is the 12-bit one, entry n at byte n*3/2 in the FAT buffer.
+;   0x8bdc - the FAT buffer (indexed by readfat).
+;   0x9e44 - the formats table, 34-byte entries of known DOS diskette
+;     geometries; format (0x38d2) matches one and leaves its pointer in
+;     0x9e42.  Offset 12 of the matched entry is the total cluster count
+;     that space (0x355f) walks.
+;   0xa018 - the sector buffer getsec reads into.
+;   0x8bd7 / 0x8609 - a table of 2-byte pointers into the directory,
+;     and its index; the duplicate-name check (0x0803) walks it.
+;   The directory entries are the standard DOS 32-byte layout: name 0-7,
+;     ext 8-10, attribute 11, time 22-23, date 24-25, first cluster
+;     26-27, size 28-31.
 
 ; ---------------------------------------------------------------------
 ; dar's data segment (0x85fb..0xa30b), still to be read apart
