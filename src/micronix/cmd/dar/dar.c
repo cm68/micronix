@@ -6,9 +6,8 @@
  * Reconstructed from /bin/dar off the Micronix 1.67 patch
  * (disks/Late/mw1.67_patch/bin/dar), a Whitesmith's binary with no
  * source.  dar.dist is that binary, dar.dis is disas's output, and
- * dar.ctl names what has been read out of it so far - this file is
- * written against those names and README records the shape of the
- * program.
+ * dar.ctl names what has been read out of it - this file is written
+ * against those names.  README records the shape of the program.
  *
  * dar reads an IBM/DOS-format floppy in a Micronix drive and moves
  * files between the two filesystems.  usage:
@@ -17,22 +16,22 @@
  *
  * c copies FROM the DOS diskette, p copies TO it, and d, r, t, x are
  * the single-file operations, of which at most one may be given; v is
- * verbose.  With no operation flag dar runs its menu.  The command
- * line is parsed by doargs() into one flag cell per operation, and
- * execute() runs whatever was flagged.
+ * verbose.  With no operation flag dar runs its menu (which, in this
+ * binary, is dead code: menu() leads with badopt()).
  *
- * The storage stack, named top to bottom in dar.ctl:
+ * Architecture, read out of the binary:
  *
- *	menu / execute / doput / docopy / mkfile / space / format
- *	  -> readfat / writefat / getsec / putsec       (sector access)
- *	    -> readsector / writesector / seeksec / readboot  (512-byte)
- *	      -> read / write / seek / open / close    (marshalling)
- *	        -> the data-segment syscall stubs
+ *	doargs/optscan (flags) -> execute -> checkdev/mkdevname/dispatch
+ *	  -> format (match geom) -> dofat (FAT image) -> one operation
+ *	    -> finish (write FATs + directory back)
  *
- * This is a skeleton: doargs and the option dispatch are read out of
- * the disassembly; execute and everything below it are stubs that
- * still need the DOS directory-entry and FAT layout read back before
- * they can be filled in.
+ * The storage is three disjoint areas, not one "sector buffer":
+ *   fatbuf  (0x8bdc)  the FAT image, 1024 bytes;
+ *   dirblk  (0x9042)  the directory-entry area, 3584 bytes = 112*32;
+ *   the stdio streams (0xa018) - stdin/stdout, the interactive layer.
+ * Raw disk I/O is inline: seeksec() + read()/write() on devfd, wrapped
+ * by clustosec() (sector <-> physical-sector + transfer) and
+ * readcluster() (the directory region).
  *
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
@@ -42,14 +41,18 @@
 #include <time.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 /* the raw syscalls dar drives, declared by hand to avoid unistd.h's
- * time() colliding with time.h's */
-extern int open(), read(), write(), seek(), close();
+ * time() colliding with time.h's.  seek returns a long (HL':HL). */
+extern int open(), read(), write(), close(), fstat(), stat(), creat();
+extern long seek();
+extern int exit();
 
 /*
  * The operation flags, one 16-bit cell per option letter.  doargs sets
- * exactly one of the first six; v is independent.
+ * exactly one of the first six; v is independent.  usageflag is the
+ * '?' option; skewflag is set from a device-geometry bit by dispatch().
  */
 int	copyflag;	/* c - copy FROM the DOS diskette */
 int	delflag;	/* d - delete a DOS file */
@@ -58,55 +61,52 @@ int	renflag;	/* r - rename a DOS file */
 int	touchflag;	/* t - touch a DOS file */
 int	xflag;		/* x - extract */
 int	verboseflag;	/* v - the space report */
+int	usageflag;	/* '?' - usage was requested */
+int	skewflag;	/* device geometry bit 3 - interleave skew */
+int	doneflag;	/* FAT/directory changed, write back at finish() */
 
 char	*devname;	/* the device argument, argv[1] */
+int	devfd;		/* the opened device */
+
+char	**nametable;	/* 0x8bd7 - the file-name argument table (argv[3..]) */
+int	namecount;	/* 0x9040 - number of file names */
+
+char	*name;		/* the file name the current operation acts on */
 
 /*
- * The DOS diskette geometry, read off the boot sector, and the buffers
- * the sector layer reads and writes into.  Sizes and offsets are still
- * to be read back out of the data segment; these are placeholders.
- */
-int	devsize;	/* the 4-byte device size */
-int	doneflag;	/* H87d1 - set when a final step is due */
-char	*name;		/* the file name the operations act on */
-
-/*
- * The geometry descriptor - one 34-byte entry of the formats table at
- * 0x9e44, matched by format() and pointed to by geom.  The 17 words, in
- * order, read from the table's own entries:
+ * The DOS diskette geometry, one 34-byte (17 int) entry of the formats
+ * table, matched by format() against the boot signature.  geom points
+ * into the table (0x9e42).
  */
 struct geom {
 	int	signature;	/* 0: tracks * sectors-per-track (320/360/640/720) */
-	int	spc;		/* 2: sectors per cluster */
-	int	reserved;	/* 4: reserved sectors */
-	int	spt;		/* 6: sectors per track */
-	int	heads;		/* 8: 8 or 9 */
+	int	spc;		/* 2: sectors per cluster (5) */
+	int	reserved;	/* 4: reserved sectors, the boot (1 or 2) */
+	int	spt;		/* 6: sectors per track (8 or 9) */
+	int	heads;		/* 8: heads (8 or 9) */
 	int	bytes_per_sec;	/* 10: 512 */
-	int	total_clusters;	/* 12 */
+	int	total_clusters;	/* 12: 315..355 */
 	int	cluster_size;	/* 14: bytes per cluster (512 or 1024) */
-	int	num_fats;	/* 16: 1 or 2 */
+	int	field16;	/* 16: 1 or 2, unused */
 	int	root_entries;	/* 18: 16 or 32 */
-	int	field20;	/* 20: 64 or 112 */
-	int	field22;	/* 22: 4 or 7 */
-	int	field24;	/* 24: 1 or 2 */
+	int	root_dirents;	/* 20: root dir entry count (64 or 112) */
+	int	root_sectors;	/* 22: root dir sector count (4 or 7) */
+	int	fat_sectors;	/* 24: sectors per FAT copy (1 or 2) */
 	int	media;		/* 26: media descriptor */
-	int	field28;	/* 28: 3 or 5 */
-	int	field30;	/* 30: 7/9/10/12 */
-	int	field32;	/* 32: 1 or 2 */
+	int	root_start;	/* 28: root dir start sector (3 or 5) */
+	int	field30;	/* 30: unused */
+	int	field32;	/* 32: unused */
 };
 
 struct geom *geom;	/* 0x9e42 - the matched format descriptor */
-unsigned char *fatbuf;	/* 0x8bdc - the FAT image */
-int	devfd;		/* the opened device */
-unsigned char sectorbuf[512];	/* 0xa018 - the sector buffer getsec fills */
 
 /*
- * The DOS directory entry, the standard 32-byte layout (confirmed by the
- * code: stride 0x20, attribute at 0x0b, first cluster at 0x1a).
+ * The DOS directory entry, the standard 32-byte layout (stride 0x20,
+ * attribute 0x0b, first cluster 0x1a).
  */
 struct dirent {
 	char	name[11];	/* 0-10: filename (8) + extension (3) */
-	char	attr;		/* 11: attribute */
+	char	attr;		/* 11: attribute (0x10 = directory) */
 	char	reserved[10];	/* 12-21 */
 	int	time;		/* 22-23 */
 	int	date;		/* 24-25 */
@@ -115,32 +115,1146 @@ struct dirent {
 };
 
 /*
- * fatentry - read one 12-bit FAT entry for a cluster.  Entry n sits at
- * byte n*3/2; an even cluster takes the low 12 bits, an odd one the
- * high 12.  (The disassembly masks with AND 0xff / AND 0x0f; this is
- * the same read, still to be byte-checked against H36b0.)
+ * dirinfo - the loaded directory.  dirbuf() fills one; H4742()
+ * (commit()) writes it back.  ptr points into dirblk.
+ */
+struct dirinfo {
+	int	count;		/* number of entries */
+	int	n;		/* the cluster (0 = root) */
+	struct dirent *ptr;	/* -> dirblk */
+	char	dirty;		/* changed since load */
+};
+
+char fatbuf[1024];	/* 0x8bdc - the FAT image */
+char dirblk[0xe00];	/* 0x9042 - the directory-entry area */
+
+/*
+ * fatentry - read one 12-bit FAT entry.  Entry n sits at byte n*3/2;
+ * an even cluster takes the low 12 bits, an odd one the high 12.
  */
 fatentry(cluster)
 int cluster;
 {
-	register int offset, word;
+	int offset, word;
 
-	offset = cluster + (cluster >> 1);	/* n * 3 / 2 */
-	word = fatbuf[offset] | (fatbuf[offset + 1] << 8);
+	cluster %= 682;			/* entries in a 2-sector FAT */
+	offset = cluster * 3 / 2;
+	word = (fatbuf[offset] & 0xff) | ((fatbuf[offset + 1] & 0xff) << 8);
 	return cluster & 1 ? word >> 4 : word & 0xfff;
 }
 
 /*
- * say - print one message.  The disassembly's H03c1; every prompt and
- * diagnostic goes through it, and the strings already carry their own
- * newline where they want one.
+ * fatwrite - write one 12-bit FAT entry, the sibling of fatentry
+ * (H3755).  Preserves the neighbour's bits and marks doneflag.
  */
+fatwrite(cluster, value)
+int cluster, value;
+{
+	char *p;
+
+	cluster %= 682;
+	p = fatbuf + (cluster * 3) / 2;
+	if (cluster & 1) {
+		value = (value << 4) & 0xfff0;
+		p[0] &= 0x0f;
+		p[1] = 0;
+	} else {
+		value &= 0xfff;
+		p[0] = 0;
+		p[1] &= 0xf0;
+	}
+	p[0] |= value & 0xff;
+	p[1] |= value >> 8;
+	doneflag = 1;
+}
+
 say(s)
 char *s;
 {
 	printf("%s", s);
 }
 
+printnum(n)
+int n;
+{
+	printf("%d", n);
+}
+
+/*
+ * seeksec - seek to a logical sector.  whence 3 is the kernel's
+ * "sector" seek - it multiplies the offset by 512.
+ */
+seeksec(fd, sector)
+int fd, sector;
+{
+	seek(fd, sector, 3);
+}
+
+/*
+ * clustosec - the sector-I/O primitive (0x0e09).  arg0 is a LOGICAL
+ * sector number, not a cluster: it applies the format's interleave
+ * skew, converts to a physical sector, and transfers one sector via
+ * the function pointer (read or write).  Returns 1 on a full transfer;
+ * on a failed read the buffer is filled with 0xe5 (the deleted marker).
+ */
+clustosec(sector, buf, func)
+int sector;
+char *buf;
+int (*func)();
+{
+	int trk, sec, phys;
+
+	sec = sector % geom->spt;
+	trk = sector / geom->spt;
+
+	if (geom->heads == 8)
+		phys = skewflag ? sec * 4 + sec / 2 : sec;
+	else if (geom->heads == 9)
+		phys = skewflag ? sec * 5 : sec;
+	else
+		phys = sec;
+	phys = trk * geom->heads + (phys % geom->heads);
+
+	seeksec(devfd, phys * geom->bytes_per_sec);
+	if ((*func)(devfd, buf, geom->bytes_per_sec) == geom->bytes_per_sec)
+		return 1;
+	printf("%s", devname);
+	if (func == read)
+		memset(buf, 0xe5, geom->bytes_per_sec);
+	return 0;
+}
+
+/*
+ * cluster2sector - the cluster -> logical-sector conversion: the data
+ * area begins after the root directory (root_start + root_sectors).
+ */
+cluster2sector(cluster)
+int cluster;
+{
+	return geom->root_start + geom->root_sectors + (cluster - 2) * geom->spc;
+}
+
+/*
+ * readcluster - read or write the directory region (0x4a1b).  Loads
+ * geom->root_sectors sectors from geom->root_start into dirblk.
+ */
+readcluster(func)
+int (*func)();
+{
+	char *p;
+	int sector, i;
+
+	p = dirblk;
+	sector = geom->root_start;
+	for (i = 0; i < geom->root_sectors; i++) {
+		clustosec(sector, p, func);
+		p += geom->bytes_per_sec;
+		sector++;
+	}
+}
+
+/*
+ * readfat - load the FAT image (0x48ca).  Reads geom->fat_sectors
+ * sectors from sector 1; on a short read it retries from the second
+ * FAT copy.
+ */
+readfat()
+{
+	char *p;
+	int n, sector;
+
+	p = fatbuf;
+	sector = 1;
+	n = geom->fat_sectors;
+	while (n-- != 0) {
+		if (!clustosec(sector, p, read)
+		    && !clustosec(sector + geom->fat_sectors, p, read))
+			return 0;
+		p += geom->bytes_per_sec;
+		sector++;
+	}
+}
+
+/*
+ * dofat - top-level FAT load and copy dispatch (0x47ee).  The copy (c)
+ * path builds a blank FAT + blank directory in memory and sets
+ * doneflag (no read loop - the per-file copy lives in docopy).  The
+ * normal path loads and verifies the FAT, and the directory.
+ */
+dofat()
+{
+	if (copyflag) {
+		memset(fatbuf, 0, 0x400);
+		fatbuf[0] = geom->media & 0xff;
+		fatbuf[1] = 0xff;
+		fatbuf[2] = 0xff;
+		doneflag = 1;
+	} else {
+		readfat();
+		if ((fatbuf[0] & 0xff) != geom->media && geom->heads == 9) {
+			geom = (struct geom *)((char *)geom + 0x22);
+			readfat();
+		}
+		if ((fatbuf[0] & 0xff) != geom->media) {
+			printf("Not a DOS diskette.\n");
+			exit(1);
+		}
+	}
+	if (copyflag)
+		memset(dirblk, 0xe5, 0xe00);
+	else
+		readcluster(read);
+}
+
+/*
+ * nextcluster - follow the FAT chain one link; 0 at end-of-chain.
+ */
+nextcluster(cluster)
+int cluster;
+{
+	int next;
+
+	next = fatentry(cluster);
+	if (next >= 0xff8)
+		return 0;
+	return next;
+}
+
+/*
+ * alloccluster - free a whole FAT chain: walk from cluster writing 0
+ * (free) into every entry until the chain ends.  (The name is a
+ * misnomer in the binary; callers use it to release a file's chain.)
+ */
+alloccluster(cluster)
+int cluster;
+{
+	int next;
+
+	while (cluster != 0) {
+		next = nextcluster(cluster);
+		fatwrite(cluster, 0);
+		cluster = next;
+	}
+}
+
+/*
+ * newcluster - return a free cluster number, or 0 if none
+ * (H34bd in the binary).
+ */
+newcluster()
+{
+	int c;
+
+	for (c = 2; c < geom->total_clusters; c++)
+		if (fatentry(c) == 0)
+			return c;
+	return 0;
+}
+
+/*
+ * dirbuf - load the directory for cluster n (0 = root) into a dirinfo
+ * (0x466a).  Root: count = geom->root_dirents, ptr = dirblk; a
+ * subdirectory cluster is read through clustosec/readcluster.
+ */
+dirbuf(n, di)
+int n;
+struct dirinfo *di;
+{
+	di->n = n;
+	di->dirty = 0;
+	if (n == 0) {
+		di->count = geom->root_dirents;
+		di->ptr = (struct dirent *)dirblk;
+		return;
+	}
+	/* subdirectory: read the cluster's sectors into dirblk */
+	readcluster(read);
+	di->count = geom->root_dirents;
+	di->ptr = (struct dirent *)dirblk;
+}
+
+/*
+ * commit - write a directory back to disk (H4742).
+ */
+commit(di)
+struct dirinfo *di;
+{
+	readcluster(write);
+}
+
+/*
+ * The string helpers.  strcmp/strncmp here are the binary's boolean
+ * "equal" / "prefix" tests, not the classic difference.
+ */
+strcmp(a, b)
+char *a, *b;
+{
+	while (*a == *b && *a) {
+		a++;
+		b++;
+	}
+	return *a == 0;		/* arg0 a prefix of arg1 */
+}
+
+strncmp(a, b)
+char *a, *b;
+{
+	while (*a == *b && *a) {
+		a++;
+		b++;
+	}
+	return *a == 0;
+}
+
+/* strippath - return the pointer just past the last '/'. */
+char *
+strippath(s)
+char *s;
+{
+	char *p, *last;
+
+	last = s;
+	for (p = s; *p; p++)
+		if (*p == '/')
+			last = p + 1;
+	return last;
+}
+
+/* findslash - copy the next path component into out, NUL-terminated. */
+char *
+findslash(s, out)
+char *s, *out;
+{
+	while (*s == '/')
+		s++;
+	while (*s && *s != '/')
+		*out++ = *s++;
+	*out = '\0';
+	return s;
+}
+
+/* splitname - build the space-padded, uppercased 8+3 DOS name. */
+splitname(name, out)
+char *name, *out;
+{
+	char *base, *dot, *p;
+	int i, c;
+
+	base = strippath(name);
+	dot = base;
+	for (p = base; *p; p++)
+		if (*p == '.')
+			dot = p;
+
+	memset(out, ' ', 11);
+	for (i = 0; i < 8 && *base && base != dot; i++) {
+		c = *base++;
+		if (c >= 'a' && c <= 'z')
+			c -= 0x20;
+		out[i] = c;
+	}
+	if (*dot == '.') {
+		base = dot + 1;
+		for (i = 0; i < 3 && *base; i++) {
+			c = *base++;
+			if (c >= 'a' && c <= 'z')
+				c -= 0x20;
+			out[8 + i] = c;
+		}
+	}
+}
+
+/*
+ * match - glob matcher (0x3e11).  arg0 is the entry NAME, arg1 the
+ * pattern; '*' is greedy (backtracks), '?' one char, with \x escapes
+ * and [...] classes.  Returns 1/0.
+ */
+match(name, pattern)
+char *name, *pattern;
+{
+	char *p;
+
+	if (*name == 0 && *pattern == 0)
+		return 1;
+	if (*pattern == 0)
+		return 0;
+	if (*pattern == '*') {
+		for (p = name + strlen(name); p >= name; p--)
+			if (match(p, pattern + 1))
+				return 1;
+		return 0;
+	}
+	if (*name == 0)
+		return 0;
+	if (*pattern == '?') {
+		if (*name == 0)
+			return 0;
+		return match(name + 1, pattern + 1);
+	}
+	if (*pattern == *name)
+		return match(name + 1, pattern + 1);
+	return 0;
+}
+
+/*
+ * findfile - locate a file by path, returning its first-cluster number
+ * (or -1).  Walks '/' components, skipping '.', via scanentry2.
+ */
+findfile(f)
+char *f;
+{
+	int cluster;
+	char comp[28];
+	char *s;
+	struct dirinfo di;
+	struct dirent *de;
+
+	cluster = 0;
+	s = f;
+	for (;;) {
+		s = findslash(s, comp);
+		if (comp[0] == 0)
+			return cluster;
+		if (strncmp(comp, "."))
+			continue;
+		dirbuf(cluster, &di);
+		de = scanentry2(comp, &di);
+		if (de == 0)
+			return -1;
+		cluster = de->cluster;
+	}
+}
+
+/* scanentry2 - find a directory entry by its 8.3 name; returns the
+ * entry pointer or 0. */
+struct dirent *
+scanentry2(name, di)
+char *name;
+struct dirinfo *di;
+{
+	char dosname[11];
+	struct dirent *de;
+	int count;
+
+	splitname(name, dosname);
+	de = di->ptr;
+	count = di->count;
+	while (count != 0) {
+		if ((de->name[0] & 0377) == 0xe5
+		 || (de->name[0] & 0377) == 0x00
+		 || (de->name[0] & 0377) == 0x2e) {
+			count--;
+			de++;
+			continue;
+		}
+		if (memcmp(dosname, de->name, 11) == 0)
+			return de;
+		count--;
+		de++;
+	}
+	return 0;
+}
+
+/* scanentry3 - find the first free (0x00) or deleted (0xe5) slot. */
+struct dirent *
+scanentry3(di)
+struct dirinfo *di;
+{
+	struct dirent *de;
+	int count;
+
+	de = di->ptr;
+	count = di->count;
+	while (count != 0) {
+		if ((de->name[0] & 0377) == 0xe5
+		 || (de->name[0] & 0377) == 0x00)
+			return de;
+		count--;
+		de++;
+	}
+	return 0;
+}
+
+/*
+ * delfile - is-directory test (0x20d0).  Returns 1 if f is a directory
+ * (or a dot entry).
+ */
+delfile(f)
+char *f;
+{
+	struct dirent *de;
+	struct dirinfo di;
+	int c;
+
+	if (*strippath(f) == '.')
+		return 1;
+	c = findfile(f);
+	if (c < 0)
+		return 0;
+	dirbuf(c, &di);
+	de = scanentry2(strippath(f), &di);
+	if (de == 0)
+		return 0;
+	return (de->attr & 0x10) != 0;
+}
+
+/* basename - strip a leading "./" and print the name with a newline. */
+basename(s)
+char *s;
+{
+	if (s[0] == '.' && s[1] == '/')
+		s += 2;
+	printf("%s\n", s);
+}
+
+/*
+ * addentry - delete one file (0x32be; the dar.ctl name is a misnomer).
+ * Locate the containing directory, find the entry, mark it 0xe5, and
+ * free its FAT chain.
+ */
+addentry(name)
+char *name;
+{
+	struct dirinfo di;
+	struct dirent *de;
+	int c;
+
+	c = findfile(name);
+	if (c < 0) {
+		say(name);
+		say(": No such file or directory\n");
+		return 0;
+	}
+	dirbuf(c, &di);
+	de = scanentry2(strippath(name), &di);
+	if (de == 0) {
+		say(name);
+		say(": No such file or directory\n");
+		commit(&di);
+		return 0;
+	}
+	de->name[0] = 0xe5;
+	alloccluster(de->cluster);
+	if (verboseflag && delflag) {
+		say("d ");
+		basename(name);
+	}
+	commit(&di);
+}
+
+/*
+ * findfree - recursive delete-all (0x311a).  Marks every entry in the
+ * directory deleted and frees its chain, recursing into subdirs.
+ */
+findfree(n, name)
+int n;
+char *name;
+{
+	struct dirinfo di;
+	struct dirent *de;
+	int count;
+	char *p;
+
+	dirbuf(n, &di);
+	de = di.ptr;
+	count = di.count;
+	while (count != 0) {
+		if ((de->name[0] & 0377) == 0xe5
+		 || (de->name[0] & 0377) == 0x00) {
+			count--;
+			de++;
+			continue;
+		}
+		if ((de->name[0] & 0377) == 0x2e) {
+			de->name[0] = 0xe5;
+			count--;
+			de++;
+			continue;
+		}
+		if (verboseflag && delflag) {
+			say("d ");
+			basename(name);
+		}
+		if ((de->attr & 0x10) == 0) {
+			de->name[0] = 0xe5;
+			alloccluster(de->cluster);
+			count--;
+			de++;
+			continue;
+		}
+		p = name + strlen(name);
+		*p++ = '/';
+		*p = '\0';
+		findfree(de->cluster, name);
+		count--;
+		de++;
+	}
+	commit(&di);
+}
+
+/*
+ * readdir - filter the filename pointer table in place: non-matching
+ * names are dropped.  Returns the surviving count.
+ */
+readdir(pattern, table, count)
+char *pattern;
+struct dirent **table;
+int count;
+{
+	int i;
+
+	for (i = 0; i < count; ) {
+		if (match(table[i], pattern))
+			i++;
+		else {
+			count--;
+			table[i] = table[count];
+		}
+	}
+	return count;
+}
+
+/*
+ * dectime - decode and print a directory entry's DOS date/time.  Takes
+ * a pointer to the 32-byte entry.
+ */
+char	*monthname[] = {
+	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+};
+
+dectime(de)
+struct dirent *de;
+{
+	int month, day, hour, minute;
+
+	month = ((de->date >> 5) & 0x0f) - 1;
+	day = de->date & 0x1f;
+	hour = de->time >> 11;
+	minute = (de->time >> 5) & 0x3f;
+	printf("%s %2d %2d:%02d ", monthname[month], day, hour, minute);
+}
+
+/*
+ * The stdio layer.  getstr/putstr are the interactive reads/writes on
+ * stdin/stdout (the binary's _filbuf/_flsbuf machinery is libc's, and
+ * is not reproduced here).  getstr returns a line, 0 on EOF; 0xff is
+ * the DOS end-of-file marker.
+ */
+char *
+getstr(buf)
+char *buf;
+{
+	char *p;
+	int c;
+
+	p = buf;
+	for (;;) {
+		c = getchar();
+		if (c == 0xff || c == EOF) {
+			*p = '\0';
+			return (p == buf) ? 0 : buf;
+		}
+		if (c == '\n') {
+			*p = '\0';
+			return buf;
+		}
+		*p++ = c;
+	}
+}
+
+putstr(s)
+char *s;
+{
+	printf("%s\n", s);
+}
+
+/*
+ * readboot - probe the device to learn its total sector count, which
+ * format() matches against tracks*spt (320/360/640/720).  The binary
+ * (0x13bf) is a 32-bit binary search over the sector space:
+ *
+ *	lo = 0, hi = 0x10000
+ *	loop: mid = (lo + hi) >> 1
+ *	      if mid == lo: break
+ *	      seek(fd, low16(mid), 3); read(fd, &c, 1)
+ *	      success  -> lo = mid
+ *	      ENXIO    -> hi = mid
+ *	      other    -> lo = mid
+ *	seek(fd, 0, 0); if hi >= 0x10000: hi = 0xffff; return low16(hi)
+ *
+ * The 32-bit long is word-swapped (bytes 0-1 = high word, bytes 2-3 =
+ * low word), so the seek offset and the return are the value's low 16
+ * bits; hi is the first unreadable sector, i.e. the sector count.  The
+ * midpoint is computed by the compiler's long-shift helper whose count
+ * cell holds 2; for the search to converge to the device size it must
+ * halve, so this is written as >>1 (the exact helper semantics - one
+ * bit per 16-bit word - were not byte-certain).
+ */
+readboot(fd)
+int fd;
+{
+	long lo, hi, mid;
+	char c;
+
+	lo = 0;
+	hi = 0x10000;
+	for (;;) {
+		mid = (lo + hi) >> 1;
+		if (mid == lo)
+			break;
+		if (seek(fd, (int)(mid & 0xffff), 3) < 0
+		    || read(fd, &c, 1) != 1) {
+			if (errno == ENXIO)
+				hi = mid;
+			else {
+				printf("");
+				lo = mid;
+			}
+		} else
+			lo = mid;
+	}
+	seek(fd, 0, 0);
+	if (hi >= 0x10000)
+		hi = 0xffff;
+	return (int)(hi & 0xffff);
+}
+
+/*
+ * format - match the device signature against the formats table; the
+ * matched entry becomes geom.
+ */
+int	formats[] = {
+	320, 5, 1, 8, 8, 512, 315, 512, 1, 16, 64, 4, 1, 254, 3, 7, 1,
+	360, 5, 1, 9, 9, 512, 353, 512, 1, 16, 64, 4, 2, 252, 5, 9, 2,
+	360, 5, 1, 8, 9, 512, 315, 512, 1, 16, 64, 4, 1, 254, 3, 7, 1,
+	640, 5, 2, 8, 8, 512, 316, 1024, 2, 32, 112, 7, 1, 255, 3, 10, 1,
+	720, 5, 2, 9, 9, 512, 355, 1024, 2, 32, 112, 7, 2, 253, 5, 12, 2,
+	720, 5, 2, 8, 9, 512, 316, 1024, 2, 32, 112, 7, 1, 255, 3, 10, 1,
+	0
+};
+
+format()
+{
+	int sig;
+	int *p;
+
+	sig = readboot(devfd);
+	for (p = formats; *p != 0; p += 17)
+		if (*p == sig) {
+			geom = (struct geom *)p;
+			return;
+		}
+	printnum(sig);
+	say(": Unknown format\n");
+	say("Device size ");
+	exit(0);
+}
+
+/*
+ * space - the -v report: count free clusters and print the summary.
+ * The free-KB divisor is 1000 (0x3e8), not 1024.
+ */
+space()
+{
+	int used, free, cluster;
+
+	used = 0;
+	free = 0;
+	for (cluster = 2; cluster < geom->total_clusters; cluster++)
+		if (fatentry(cluster) == 0)
+			free++;
+		else
+			used++;
+
+	printf("Diskette ");
+	printnum(used * 100 / (used + free));
+	printf("%% full, ");
+	printnum(free * geom->cluster_size / 1000);
+	printf("K free space left\n");
+}
+
+/*
+ * checkdev - the device argument must name an existing block device.
+ */
+checkdev()
+{
+	struct stat st;
+
+	if (stat(devname, &st) < 0) {
+		printf("%s", devname);
+		return 0;
+	}
+	if ((st.st_mode & S_IFBLK) != S_IFBLK) {
+		say(devname);
+		say(": Not block special\n");
+		return 0;
+	}
+	return 1;
+}
+
+/*
+ * mkdevname - find the device in /etc/mtab and build its /dev path.
+ * The mtab record is 64 bytes: name in the first 32, the device path
+ * in the second 32.
+ */
+mkdevname(name, buf)
+char *name, *buf;
+{
+	int fd, n;
+	char mtab[64];
+	char path[80];
+	struct stat st;
+
+	fd = open("/etc/mtab", 0);
+	if (fd < 0)
+		return;
+	for (;;) {
+		if (read(fd, mtab, 64) != 64) {
+			close(fd);
+			return;
+		}
+		if (mtab[0] == 0 || mtab[32] == 0)
+			continue;
+		strcpy(path, "/dev/");
+		strcpy(path + 5, &mtab[32]);
+		if (stat(path, &st) == 0
+		    && (st.st_mode & S_IFBLK) == S_IFBLK) {
+			printf("%s", &mtab[32]);
+			exit(0);
+		}
+	}
+}
+
+/*
+ * dispatch - open the device with the right mode and stat it.  Delete
+ * and rename need read-write (2); the read operations read-only (0).
+ * Retries once, then prints the name and exits.
+ */
+dispatch()
+{
+	int mode;
+	struct stat st;
+
+	if (devfd >= 0)
+		return;
+	mode = (delflag || renflag) ? 2 : 0;
+	devfd = open(devname, mode);
+	if (devfd < 0)
+		devfd = open(devname, mode);
+	if (devfd < 0) {
+		printf("%s", devname);
+		exit(0);
+	}
+	fstat(devfd, &st);
+	skewflag = (st.st_addr & 0x08) ? 1 : 0;
+}
+
+/*
+ * execute - the driver: check the device, build the /dev name, open
+ * and stat it, detect the format, load the FAT, then run exactly one
+ * of delete / rename / touch / extract.  finish() writes back when
+ * the FAT or directory was changed.
+ */
+execute()
+{
+	struct stat st;
+
+	if (!checkdev())
+		badopt();
+	mkdevname(devname, &st);
+	dispatch();
+	format();
+	dofat();
+	if (delflag || renflag)
+		if ((fatbuf[0] & 0xff) != geom->media) {
+			say("Not a DOS diskette!");
+			exit(0);
+		}
+	if (delflag)
+		dodelete();
+	else if (renflag)
+		dorename();
+	else if (touchflag)
+		dotouch();
+	else if (xflag || putflag)
+		doextract();
+	if (doneflag)
+		finish();
+}
+
+/*
+ * finish - write the two FAT copies and the directory back to the
+ * diskette (H497c).
+ */
+finish()
+{
+	int sector, fat, i;
+	char *buf;
+
+	sector = 1;
+	for (fat = 0; fat < 2; fat++) {
+		buf = fatbuf;
+		for (i = 0; i < geom->fat_sectors; i++) {
+			clustosec(sector, buf, write);
+			buf += geom->bytes_per_sec;
+			sector++;
+		}
+	}
+	readcluster(write);
+}
+
+/*
+ * The single-file operations.  dodelete/dorename/dotouch/doextract
+ * walk the filename table, acting on each name.
+ */
+
+dodelete()
+{
+	int i;
+	char **t;
+
+	if (namecount == 0)
+		return;
+	if (nametable == (char **)-1 || namecount == 1 && *nametable == 0)
+		findfree(0, "");
+	else
+		for (i = 0; i < namecount; i++)
+			addentry(nametable[i]);
+}
+
+dorename()
+{
+	/* rename: the next argument is the new name; find the entry and
+	 * rewrite its 11-byte name.  Reconstructed from the operation
+	 * shape, not byte-traced. */
+	int c;
+	struct dirinfo di;
+	struct dirent *de;
+	char newname[11];
+
+	if (namecount < 1)
+		return;
+	c = findfile(nametable[0]);
+	if (c < 0) {
+		say(nametable[0]);
+		say(": No such file or directory\n");
+		return;
+	}
+	dirbuf(c, &di);
+	de = scanentry2(strippath(nametable[0]), &di);
+	if (de == 0)
+		return;
+	if (namecount > 1) {
+		splitname(nametable[1], newname);
+		memcpy(de->name, newname, 11);
+	}
+	commit(&di);
+}
+
+dotouch()
+{
+	/* touch: refresh the entry's date/time. */
+	int c, i;
+	struct dirinfo di;
+	struct dirent *de;
+
+	for (i = 0; i < namecount; i++) {
+		c = findfile(nametable[i]);
+		if (c < 0) {
+			say(nametable[i]);
+			say(": No such file or directory\n");
+			continue;
+		}
+		dirbuf(c, &di);
+		de = scanentry2(strippath(nametable[i]), &di);
+		if (de == 0)
+			continue;
+		de->date = dosdate();
+		de->time = dostime();
+		commit(&di);
+	}
+}
+
+doextract()
+{
+	/* extract/copy: walk the filename table and copy each file.  The
+	 * copy-from and copy-to paths are docopy() and doput(). */
+	int i;
+
+	for (i = 0; i < namecount; i++)
+		copyfile(nametable[i]);
+}
+
+/*
+ * The copy operations.  docopy reads a DOS file and writes it to a
+ * Micronix file; doput reads a Micronix file and writes it to DOS.
+ * Reconstructed from the 0x2b74/0x27b8 bodies.
+ */
+
+/* dosdate/dostime - the DOS date/time from the clock (H4212/H42ed). */
+dosdate()
+{
+	long t;
+	struct tm *tm;
+
+	t = time(0);
+	tm = localtime(&t);
+	return ((tm->tm_year - 80) << 9) | ((tm->tm_mon + 1) << 5) | tm->tm_mday;
+}
+
+dostime()
+{
+	long t;
+	struct tm *tm;
+
+	t = time(0);
+	tm = localtime(&t);
+	return (tm->tm_hour << 11) | (tm->tm_min << 5) | (tm->tm_sec / 2);
+}
+
+/* copyfile - dispatch one file copy (H2729/H1772). */
+copyfile(name)
+char *name;
+{
+	if (copyflag)
+		return docopy(name);
+	return doput(name);
+}
+
+/*
+ * docopy - copy FROM the DOS diskette: walk the DOS file's FAT chain
+ * and write its clusters to a new Micronix file.
+ */
+docopy(name)
+char *name;
+{
+	int fd, cluster, n, s, sector;
+	struct dirinfo di;
+	struct dirent *de;
+	long remaining;
+	char buf[1024];
+
+	cluster = findfile(name);
+	if (cluster < 0)
+		return 0;
+	dirbuf(cluster, &di);
+	de = scanentry2(strippath(name), &di);
+	if (de == 0)
+		return 0;
+	fd = creat(strippath(name), 0666);
+	if (fd < 0)
+		return 0;
+	remaining = de->size;
+	for (cluster = de->cluster; cluster && cluster < 0xff8 && remaining > 0;
+	     cluster = nextcluster(cluster)) {
+		n = remaining < geom->cluster_size ? remaining : geom->cluster_size;
+		sector = cluster2sector(cluster);
+		for (s = 0; s < geom->spc; s++)
+			clustosec(sector + s, buf + s * 512, read);
+		write(fd, buf, n);
+		remaining -= n;
+	}
+	close(fd);
+	return 1;
+}
+
+/*
+ * doput - copy TO the DOS diskette: read a Micronix file, allocate
+ * clusters, write them, and link the FAT chain.
+ */
+doput(name)
+char *name;
+{
+	int fd, cluster, prev, s, sector;
+	long size;
+	int n;
+	struct dirinfo di;
+	struct dirent *de;
+	char buf[1024];
+
+	if (verboseflag) {
+		say("r ");
+		basename(name);
+	}
+	fd = open(name, 0);
+	if (fd < 0) {
+		printf("%s", name);
+		return 0;
+	}
+	dirbuf(0, &di);
+	de = scanentry3(&di);
+	if (de == 0) {
+		say(": Volume full\n");
+		close(fd);
+		return 0;
+	}
+	splitname(strippath(name), de->name);
+	de->attr = 0x20;
+	de->cluster = 0;
+	size = 0;
+	prev = 0;
+	for (;;) {
+		n = read(fd, buf, geom->cluster_size);
+		if (n < 0) {
+			printf("%s", name);
+			alloccluster(de->cluster);
+			close(fd);
+			commit(&di);
+			return 0;
+		}
+		if (n == 0) {
+			de->date = dosdate();
+			de->time = dostime();
+			de->size = size;
+			close(fd);
+			commit(&di);
+			return 1;
+		}
+		cluster = newcluster();
+		if (cluster == 0) {
+			say("Not enough space left on volume\n");
+			alloccluster(de->cluster);
+			close(fd);
+			commit(&di);
+			return 0;
+		}
+		if (prev == 0)
+			de->cluster = cluster;
+		else
+			fatwrite(prev, cluster);
+		fatwrite(cluster, 0xfff);
+		sector = cluster2sector(cluster);
+		for (s = 0; s < geom->spc; s++)
+			clustosec(sector + s, buf + s * 512, write);
+		size += n;
+		prev = cluster;
+	}
+}
+
+/*
+ * menu - the interactive loop.  In this binary it is dead code: the
+ * first thing it does is call badopt(), which prints usage and exits.
+ */
+menu()
+{
+	badopt();
+}
+
+getdiskname()
+{
+	for (;;) {
+		say("Insert diskette and close the drive door\n");
+		say("Enter disk name: ");
+		getstr(devname);
+		if (checkdev())
+			return;
+	}
+}
+
+/*
+ * main / doargs / optscan - the command line.
+ */
 main(argc, argv)
 char **argv;
 {
@@ -151,11 +1265,6 @@ char **argv;
 	exit(1);
 }
 
-/*
- * doargs - walk the command line.  With no arguments at all dar runs
- * its menu; otherwise argv[1] is the device, argv[2] the operation
- * letters, and argv[3..] the file names.
- */
 doargs(argc, argv)
 char **argv;
 {
@@ -165,17 +1274,28 @@ char **argv;
 		devname = argv[1];
 	if (argc > 2)
 		optscan(argv[2]);
-	/* TODO: argc > 3 - the file names, argv[3..] */
+	if (argc > 3) {
+		nametable = &argv[3];
+		namecount = argc - 3;
+	}
+	if (namecount == 0) {
+		nametable = 0;
+		namecount = 1;
+	}
+	if (delflag + putflag + renflag + touchflag + xflag == 0) {
+		touchflag = 1;
+		verboseflag = 1;
+	}
+	if (delflag + putflag + renflag + touchflag + xflag > 1)
+		atmost();
+	if (usageflag)
+		badopt();
 }
 
-/*
- * optscan - run one operation letter through the switch that doargs
- * decoded (the table at 0x0261).  Each handler sets its flag cell.
- */
 optscan(s)
 char *s;
 {
-	register char *p;
+	char *p;
 
 	for (p = s; *p; p++) {
 		switch (*p) {
@@ -203,567 +1323,28 @@ char *s;
 		case '-':
 			break;
 		case '?':
-			usage();
+			usageflag = 1;
+			break;
 		default:
 			badopt();
 		}
 	}
 }
 
-/*
- * usage / badopt - both print "usage: dar device {cdprtx} files ..."
- * and exit; badopt is what an unrecognized letter falls through to.
- */
 usage()
 {
-	printf("usage: dar device {cdprtx} files ...\n");
-	printf("Example: dar mfa xv\n");
-	exit(2);
+	usageflag = 1;
 }
 
 badopt()
 {
 	printf("usage: dar device {cdprtx} files ...\n");
 	printf("Example: dar mfa xv\n");
-	exit(2);
-}
-
-/*
- * Below here are the operations.  execute() is the driver that reads the
- * flag cells and runs the flagged operation; the dispatch below is read
- * straight out of the disassembly (0x03ed): check the device, build the
- * /dev name, detect the format, read the FAT, then run exactly one of
- * delete / rename / touch / extract-or-put.  The copy flag (c) is acted
- * on inside readfat, not here.
- */
-execute()
-{
-	if (!checkdev())
-		badopt();
-	mkdevname();
-	dispatch();
-	format();
-	readfat();
-	if (delflag)
-		dodelete();
-	else if (renflag)
-		dorename();
-	else if (touchflag)
-		dotouch();
-	else if (xflag || putflag)
-		doextract();
-	if (doneflag)
-		finish();
-}
-
-/*
- * space - the -v report.  Walks the FAT from cluster 2 to the total,
- * counting the entries that read back free, then prints
- * "Diskette <n>% full, <k>K free space left".
- */
-space()
-{
-	register int free, cluster, total;
-
-	free = 0;
-	for (cluster = 2; cluster < geom->total_clusters; cluster++)
-		if (fatentry(cluster) == 0)
-			free++;
-	total = geom->total_clusters - 2;
-
-	printf("Diskette ");
-	printnum((total - free) * 100 / total);
-	printf("%% full, ");
-	printnum(free * geom->cluster_size / 1024);
-	printf("K free space left\n");
-}
-
-/*
- * printnum - the number formatter say()'s numeric arguments run through
- * (H0985/H09ae in the disassembly).
- */
-printnum(n)
-int n;
-{
-	printf("%d", n);
-}
-
-checkdev()
-{
-	struct stat st;
-
-	if (stat(devname, &st) < 0) {
-		printf("%s", devname);
-		return 0;
-	}
-	if ((st.st_mode & S_IFBLK) != S_IFBLK) {	/* not a block device */
-		say(devname);
-		say(": Not block special\n");
-		return 0;
-	}
-	return 1;
-}
-
-/*
- * mkdevname - find the device in /etc/mtab and build its /dev path.
- * H1106.  Opens /etc/mtab, reads it 64 bytes at a time, and for each
- * entry builds "/dev/<name>", stat's it, and - when it is the block
- * device the caller asked for - prints the name and exits.  The exact
- * mtab field layout and the match field are still to be read back;
- * this captures the shape.
- */
-mkdevname()
-{
-	int fd;
-	char mtab[64];
-	char path[80];
-	struct stat st;
-
-	fd = open("/etc/mtab", 0);
-	if (fd < 0)
-		return;
-
-	for (;;) {
-		if (read(fd, mtab, sizeof mtab) != sizeof mtab) {
-			close(fd);
-			return;
-		}
-		if (mtab[0] == 0)
-			continue;
-		/* TODO: the mtab entry is not just a bare name; split the real
-		 * device name out of it and match against the caller's geometry.
-		 * H6cf2 builds the path as "/dev/%s" of that name. */
-		sprintf(path, "/dev/%s", mtab);
-		if (stat(path, &st) == 0
-		    && (st.st_mode & S_IFBLK) == S_IFBLK) {
-			printf("%s", mtab);
-			exit(0);
-		}
-	}
-}
-
-dispatch()
-{
-	/*
-	 * H1214/H1226.  Open the device with the right mode: delete/rename
-	 * need read-write (2), the read operations read-only (0).  The
-	 * result (H8bdb) drives the retry/error path.
-	 */
-	int mode;
-
-	mode = (delflag || renflag) ? 2 : 0;
-	devfd = open(devname, mode);
-	/* TODO: retry once, then printf(devname) + error on failure */
-}
-
-/*
- * The formats table at 0x9e44 - the known DOS diskette geometries, 17
- * words each, zero-terminated.  The signature word is tracks *
- * sectors-per-track: 320/360 are the 40-track 5.25" disks (8/9 sectors),
- * 640/720 the 80-track ones.
- */
-int	formats[] = {
-	320, 5, 1, 8, 8, 512, 315, 512, 1, 16, 64, 4, 1, 254, 3, 7, 1,
-	360, 5, 1, 9, 9, 512, 353, 512, 1, 16, 64, 4, 2, 252, 5, 9, 2,
-	360, 5, 1, 8, 9, 512, 315, 512, 1, 16, 64, 4, 1, 254, 3, 7, 1,
-	640, 5, 2, 8, 8, 512, 316, 1024, 2, 32, 112, 7, 1, 255, 3, 10, 1,
-	720, 5, 2, 9, 9, 512, 355, 1024, 2, 32, 112, 7, 2, 253, 5, 12, 2,
-	720, 5, 2, 8, 9, 512, 316, 1024, 2, 32, 112, 7, 1, 255, 3, 10, 1,
-	0
-};
-
-seeksec(fd, sector)
-int fd, sector;
-{
-	/* whence 3 is the kernel's "sector" seek - it multiplies by 512 */
-	seek(fd, sector, 3);
-}
-
-readsector(fd, buf)
-int fd;
-char *buf;
-{
-	read(fd, buf, 512);
-}
-
-writesector(fd, buf)
-int fd;
-char *buf;
-{
-	write(fd, buf, 512);
-}
-
-/*
- * getstr / putstr - the string layer.  dar builds a line-oriented text
- * file over the raw sectors: getstr pumps bytes out of the sector buffer
- * (refilling with readsector when the counter underflows) into buf until
- * 0xff (end of file) or 0x0a (end of line), and putstr writes a line
- * back, flushing 0x0a-terminated sectors.  The counters and the exact
- * flush flag are still approximate.
- */
-int	sectorcount;	/* bytes left in the sector buffer */
-unsigned char *sectorptr;	/* next byte in the sector buffer */
-char	outbuf[512];	/* 0xa028 - the output line buffer */
-int	outcount;	/* bytes left in outbuf */
-int	outflag;	/* the flush flag (0xa02e bit 0x40) */
-
-char *
-getstr(buf)
-char *buf;
-{
-	char *p;
-	int c;
-
-	p = buf;
-	for (;;) {
-		if (--sectorcount < 0) {
-			readsector(devfd, sectorbuf);
-			sectorptr = sectorbuf;
-			sectorcount = 512;
-		}
-		c = *sectorptr++;
-		if (c == 0xff) {	/* end of file */
-			*p = '\0';
-			if (p == buf)
-				return 0;
-			return buf;
-		}
-		if (c == '\n') {	/* end of line */
-			*p = '\0';
-			return buf;
-		}
-		*p++ = c;
-	}
-}
-
-putstr(s)
-char *s;
-{
-	strcpy(outbuf, s);
-	if (--outcount < 0) {
-		*outbuf = '\n';
-		writesector(devfd, outbuf);
-		outcount = 512;
-	}
-	if (outflag)
-		writesector(devfd, outbuf);
-}
-
-readboot()
-{
-	/*
-	 * H13bf.  Seek to sector 0, read the boot sector, and return the
-	 * geometry signature format() matches against - the bytes-per-sector
-	 * field (a word at offset 11 of the boot sector).  The device fd and
-	 * the sector buffer it reads into are still to be placed.
-	 */
-	int bps;
-
-	seeksec(devfd, 0);
-	readsector(devfd, sectorbuf);
-	bps = sectorbuf[11] | (sectorbuf[12] << 8);
-	return bps;
-}
-
-/*
- * readfat - H47ee.  Loads the FAT image, and when copyflag (c) is set
- * runs the copy-from-DOS operation.  The geometry fields it touches are
- * offset 8 (sectors-per-FAT) and offset 26 (media descriptor); the FAT
- * image is fatbuf, read into at 0x400 a sector.  Still to be filled in
- * from the disassembly: the exact H48ca FAT read and the copy loop.
- */
-readfat()
-{
-	if (copyflag) {
-		memset(fatbuf, 0, 0x400);
-		/* TODO: media descriptor (geom[26]) into fatbuf[0], the FAT
-		 * read, and the copy-from-DOS loop; sets doneflag = 1 */
-		doneflag = 1;
-		return;
-	}
-	/* TODO: H48ca - read the FAT and verify the media descriptor */
-}
-
-/*
- * format - H38d2.  Match the device geometry (readboot) against the
- * formats table; the matched entry becomes geom.  ": Unknown format"
- * and exit when none matches.
- */
-format()
-{
-	int *p;
-
-	for (p = formats; *p != 0; p += 17) {
-		if (*p == readboot()) {
-			geom = (struct geom *)p;
-			return;
-		}
-	}
-	say(": Unknown format\n");
 	exit(0);
 }
 
-/*
- * The operations.  Each follows the same shape: findfile the name,
- * notfound if it is absent, then do the operation.  The directory/FAT
- * helpers below are the named leaf functions from dar.ctl; their bodies
- * are the last thing to fill in.
- */
-notfound()
+atmost()
 {
-	say(name);
-	say(": No such file or directory\n");
-}
-
-dodelete()
-{
-	if (!findfile(name))
-		notfound();
-	delfile(name);		/* mark the entry 0xe5 */
-	findfree();
-	addentry();
-}
-
-dorename()
-{
-	/* TODO: the new name is the next argument; findfile + rewrite */
-}
-
-dotouch()
-{
-	if (!findfile(name))
-		notfound();
-	/* TODO: refresh the entry's time/date */
-}
-
-doextract()
-{
-	if (!findfile(name))
-		notfound();
-	/* TODO: the copy loop through the FAT chain */
-}
-
-finish()
-{
-	clustosec();
-	/* TODO: the rest of the finalize */
-}
-
-/*
- * The directory/FAT leaf helpers, named in dar.ctl but not yet read
- * back into C.  Each is a stub until its body is reconstructed.
- */
-findfile(f)
-char *f;
-{
-	/* H1fda - walk the directory, match name[11].  The exact compare
-	 * (H6c47) pads and case-folds; this is the shape. */
-	struct dirent *de;
-	int i;
-
-	de = (struct dirent *)sectorbuf;
-	for (i = 0; i < 16; i++, de++)
-		if (de->name[0] != 0x00 && strncmp(de->name, f, 11) == 0)
-			return 1;
-	return 0;
-}
-
-findfree()
-{
-	/* H311a - the first free (0x00) or deleted (0xe5) entry. */
-	struct dirent *de;
-	int i;
-
-	de = (struct dirent *)sectorbuf;
-	for (i = 0; i < 16; i++, de++)
-		if (de->name[0] == 0x00 || de->name[0] == 0xe5)
-			return i;
-	return -1;
-}
-
-addentry()
-{
-	/*
-	 * H32be - write a directory entry.  findfile guards against a
-	 * duplicate; the name and archive attribute are set, and the DOS
-	 * date/time is encoded from the clock.  The first cluster and the
-	 * size are the caller's to fill after this.
-	 */
-	struct dirent *de;
-	long t;
-	struct tm *tm;
-
-	if (findfile(name))
-		return 0;	/* duplicate name */
-	de = (struct dirent *)sectorbuf;
-	strcpy(de->name, name);
-	de->attr = 0x20;	/* archive */
-	t = time(0);
-	tm = localtime(&t);
-	de->time = (tm->tm_hour << 11) | (tm->tm_min << 5) | (tm->tm_sec / 2);
-	de->date = ((tm->tm_year - 80) << 9) | ((tm->tm_mon + 1) << 5)
-			| tm->tm_mday;
-	de->cluster = 0;	/* TODO: the first cluster */
-	de->size = 0;		/* TODO: the file length */
-	return 1;
-}
-
-delfile(f)
-char *f;
-{
-	/* H20d0 - mark the file's entry deleted: name[0] = 0xe5. */
-	struct dirent *de;
-	int i;
-
-	de = (struct dirent *)sectorbuf;
-	for (i = 0; i < 16; i++, de++)
-		if (de->name[0] != 0x00 && strncmp(de->name, f, 11) == 0) {
-			de->name[0] = 0xe5;
-			return 1;
-		}
-	return 0;
-}
-
-/*
- * clustosec - the cluster -> sector conversion: sector = data_start +
- * (cluster - 2) * sectors_per_cluster.  data_start is past the reserved
- * sectors, the FATs, and the root directory.  The disassembly's shift
- * path (H7d6e/H7d53) is the same arithmetic; the exact round-up still
- * to be byte-checked.
- */
-clustosec(cluster)
-int cluster;
-{
-	int spt_fat, root_sectors, data_start;
-
-	spt_fat = (geom->total_clusters * 3 / 2 + geom->bytes_per_sec - 1)
-			/ geom->bytes_per_sec;
-	root_sectors = geom->root_entries * 32 / geom->bytes_per_sec;
-	data_start = geom->reserved + geom->num_fats * spt_fat + root_sectors;
-	return data_start + (cluster - 2) * geom->spc;
-}
-
-/*
- * nextcluster / alloccluster / readcluster - the FAT chain walk.  next
- * is fatentry(cluster); alloc returns the existing link or finds a free
- * cluster; read seeks and reads the cluster's sector.
- */
-nextcluster(cluster)
-int cluster;
-{
-	return fatentry(cluster);
-}
-
-alloccluster(cluster)
-int cluster;
-{
-	int next, c;
-
-	next = fatentry(cluster);
-	if (next != 0 && next < 0xff8)
-		return next;	/* already linked */
-	/* scan the FAT for a free cluster */
-	for (c = 2; c < geom->total_clusters; c++)
-		if (fatentry(c) == 0)
-			return c;
-	return 0;	/* volume full */
-}
-
-readcluster(cluster, buf)
-int cluster;
-char *buf;
-{
-	seeksec(devfd, clustosec(cluster));
-	readsector(devfd, buf);
-	return 0;
-}
-
-/*
- * dectime - decode the DOS date/time fields.  time is hour(5)/minute(6)/
- * second(5), date is year(7)/month(4)/day(5), as the 0x1f/0x3f/0x0f
- * masks in H43a3 show.  Prints "%s %2d %2d:%02d " (month name, day,
- * hour:minute).  The binary stores the month names reversed.
- */
-char	*monthname[] = {
-	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-};
-
-dectime(date, time)
-int date, time;
-{
-	int day, month, hour, minute;
-
-	day = date & 0x1f;
-	month = (date >> 5) & 0x0f;
-	hour = (time >> 11) & 0x1f;
-	minute = (time >> 5) & 0x3f;
-	printf("%s %2d %2d:%02d ", monthname[month - 1], day, hour, minute);
-}
-
-/*
- * match - H3e11.  The filename match, with '*' wildcard support (the
- * disassembly checks for '*' and falls back to a straight compare).
- */
-match(pattern, name)
-char *pattern, *name;
-{
-	/* H3e11 - the DOS filename match: '*' matches the rest, '?' one
-	 * char, over the 11-byte name. */
-	int i;
-
-	for (i = 0; i < 11; i++) {
-		if (pattern[i] == '*')
-			return 1;
-		if (pattern[i] != '?' && pattern[i] != name[i])
-			return 0;
-	}
-	return 1;
-}
-
-/*
- * readdir - H0cb4.  Search the directory's entry pointers for the one
- * matching the pattern; H5ce2 advances from entry to entry.
- */
-readdir(pattern, table, count)
-char *pattern;
-struct dirent **table;
-int count;
-{
-	int i;
-
-	for (i = 0; i < count; i++)
-		if (match(pattern, table[i]->name))
-			return i;
-	return -1;
-}
-
-getdiskname()
-{
-	/*
-	 * H16aa.  Prompt for the disk, read the name back, and verify the
-	 * device with checkdev, retrying until it is a block device.
-	 */
-	for (;;) {
-		say("Insert diskette and close the drive door\n");
-		say("Enter disk name: ");
-		/* TODO: the name read (stdin, not the sector buffer) */
-		if (checkdev())
-			return;
-	}
-}
-
-menu()
-{
-	/* H0ab8 - the interactive loop.  Print the menu, read a selection,
-	 * and run the chosen operation until D (quit). */
-	for (;;) {
-		say("\tA) Copy from the DOS diskette\n");
-		say("\tB) Copy to the DOS diskette\n");
-		say("\tC) Display file on the DOS diskette\n");
-		say("\tD) Quit\n");
-		say("Selection: ");
-		/* TODO: read the selection, then A->copyflag, B->putflag,
-		 * C->touchflag, D->return; then execute() */
-	}
+	say("At most one of d, r, t, x may be specified.\n");
+	exit(0);
 }
