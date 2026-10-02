@@ -548,6 +548,13 @@ char *f;
 
 clustosec()
 {
+	/*
+	 * The cluster -> sector conversion: sector = data_start +
+	 * (cluster - 2) * sectors_per_cluster.  The disassembly does the
+	 * multiply with shifts (sectors_per_cluster is a power of two, 8
+	 * for the CP 08H check) and adds the geometry's data-start.  The
+	 * exact geometry fields are still to be placed.
+	 */
 	return 0;
 }
 
@@ -558,7 +565,17 @@ readdir()
 
 getdiskname()
 {
-	return 0;
+	/*
+	 * H16aa.  Prompt for the disk, read the name back, and verify the
+	 * device with checkdev, retrying until it is a block device.
+	 */
+	for (;;) {
+		say("Insert diskette and close the drive door\n");
+		say("Enter disk name: ");
+		/* TODO: the name read (stdin, not the sector buffer) */
+		if (checkdev())
+			return;
+	}
 }
 
 menu()
