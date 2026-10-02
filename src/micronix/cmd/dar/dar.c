@@ -39,9 +39,13 @@
 #include <stdio.h>
 #include <types.h>
 #include <string.h>
+#include <time.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
-#include <unistd.h>
+
+/* the raw syscalls dar drives, declared by hand to avoid unistd.h's
+ * time() colliding with time.h's */
+extern int open(), read(), write(), seek(), close();
 
 /*
  * The operation flags, one 16-bit cell per option letter.  doargs sets
@@ -581,18 +585,26 @@ addentry()
 {
 	/*
 	 * H32be - write a directory entry.  findfile guards against a
-	 * duplicate; then the name is copied in and the entry's
-	 * time/date/cluster/size are filled before it is written back.
+	 * duplicate; the name and archive attribute are set, and the DOS
+	 * date/time is encoded from the clock.  The first cluster and the
+	 * size are the caller's to fill after this.
 	 */
 	struct dirent *de;
+	long t;
+	struct tm *tm;
 
 	if (findfile(name))
 		return 0;	/* duplicate name */
 	de = (struct dirent *)sectorbuf;
 	strcpy(de->name, name);
 	de->attr = 0x20;	/* archive */
-	/* TODO: de->time/de->date from the clock, de->cluster from the
-	 * first allocated cluster, de->size from the file length. */
+	t = time(0);
+	tm = localtime(&t);
+	de->time = (tm->tm_hour << 11) | (tm->tm_min << 5) | (tm->tm_sec / 2);
+	de->date = ((tm->tm_year - 80) << 9) | ((tm->tm_mon + 1) << 5)
+			| tm->tm_mday;
+	de->cluster = 0;	/* TODO: the first cluster */
+	de->size = 0;		/* TODO: the file length */
 	return 1;
 }
 
