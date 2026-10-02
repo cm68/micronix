@@ -1,0 +1,52 @@
+.he "tr (1)                      10/01/26                        tr (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+tr
+- transliterate, delete or squeeze characters
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+tr [ -cds ] [ string1 [ string2 ] ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Tr copies standard input to standard output, replacing or deleting
+selected characters.  Each character of string1 is replaced by the
+character in the same position of string2; a character of string1
+with no counterpart is deleted.  Ranges (a-z) and the octal escapes
+\\nnn are understood in both strings.
+.sp
+.bd
+-c
+.sp
+Complement the set of characters in string1.
+.sp
+.bd
+-d
+.sp
+Delete the characters of string1.
+.sp
+.bd
+-s
+.sp
+Squeeze repeated characters named in string2 to a single one.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ed (1), m4 (1)

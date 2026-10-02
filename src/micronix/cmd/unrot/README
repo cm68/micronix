@@ -1,0 +1,34 @@
+unrot - the display companion to kwic
+
+cmd/unrot is usr/bin/unrot, the Software Tools post-processor for kwic
+(Kernighan & Plauger, "Software Tools", 1976).  It has no source in the
+tree and none in the v7 tape, so it was reconstructed from behaviour
+rather than disassembled: the distribution binary was run against a
+corpus and its output read back, the way the man page and kwic(1)
+describe it.
+
+WHAT IT DOES
+
+kwic emits one line per keyword, rotated so the keyword leads and a $
+marks the fold - the end of the original line.  unrot folds each line
+back at the $ for an 80-column page:
+
+  - the preceding context (after the $) right-justified in columns 1-39
+  - column 40 blank - the "blank column down the middle"
+  - the keyword and its following context (before the $) in columns 41 on
+
+A line with no $ folds at the end: the whole line is the head and there
+is no tail.
+
+The fold is circular, the way the original's fixed 79-column buffer
+behaved.  The head is laid down from column 41 first, then the tail
+right-justified to column 39, so where the two halves wrap over each
+other (both longer than 39) the tail wins.  Trailing blanks are not
+printed.
+
+VERIFICATION
+
+The reconstruction is byte-for-byte identical to the distribution
+binary on a 506-line corpus - 500 random head/tail pairs plus the
+edge cases (no $, empty, $, a$, $b, and both halves 80 chars).  See
+the fuzz loop in the git history if the corpus wants re-running.

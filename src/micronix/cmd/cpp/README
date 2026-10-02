@@ -1,0 +1,81 @@
+cpp - the standalone C preprocessor
+
+cmd/cpp is /bin/cpp, the preprocessor the distribution shipped.  It is
+John F. Reiser's cpp from v7 (usr/src/cmd/cpp), the one the v7 README
+calls "5 to 12 times faster than the old", ported to micronix.
+
+NOT THE COMPILER
+
+This program is a filter: standard input to standard output.  It is
+NOT a pass of the C compiler, and it has nothing to do with the
+compiler's front end, which is /libexec/pass0.
+
+The two programs share a name only because the compiler's front end
+inherited the name "cpp" from the code it grew out of.  cmd/TODO tells
+the story: pass0 (whose sources are libexec/pass0/cpp.c and cpp.h) is
+the lexer and normalizer that emits the compact-token ".x" stream the
+parser reads, and the name is wrong - ccc runs it as pass0 and builds
+that name into its path.  This cpp, /bin/cpp, is the real thing: an
+ordinary standalone preprocessor of the filter kind, and the gap that
+used to sit in /bin until it was ported.
+
+Do not confuse the two.  If you are touching the compiler, its front
+end is under libexec/pass0.  If you are touching the preprocessor the
+shell can run, it is here.
+
+WHAT WAS CHANGED
+
+The source is Reiser's, nearly verbatim.  The differences are all
+compile-time machine choices resolved for micronix, and none change
+behaviour:
+
+  - COFF is 128, not 0.  ccc's plain char is SIGNED (c0/eutil.c says
+    so), so a byte above 0x7f scans as a negative number and fastab,
+    toktyp, slotab and macbit are indexed with a +128 offset - the
+    same reason Reiser wrote COFF 128 for pdp11 and vax.
+
+  - The gcos, ibm, tgp, gimpel, interdata, tss, os and mert
+    conditionals are resolved away.  The system is unix-shaped: the
+    standard include directory is /usr/include, a bare directory name
+    is ".", and an output file after an input file is honoured.
+
+  - scw1 is on, scw2 is off.  The single-character macro-name test
+    stays; the adjacent-pair test and its tables are gone.
+
+  - The one predefined symbol is z80, as "1".  It matches the
+    compiler: ccc's own front end predefines z80=1, so `cpp` and `ccc`
+    agree on `#if z80`.  The original predefined `unix`; that was
+    dropped so the two do not disagree.
+
+  - cpy.y is not run through yacc.  The cross build has no yacc to run
+    before this directory builds, so cpy.c is the same grammar written
+    by hand, one function per precedence level.  cpy.y and yylex.c are
+    kept as the source of the source; yylex.c is #included by cpy.c
+    exactly as cpy.y's `# include "yylex.c"` did.
+
+  - The two-file case (input file then output file) opens the output
+    plainly instead of reusing stdout's buffer through setbuf and the
+    v7 _sobuf, which micronix's stdio does not have.
+
+FLAGS
+
+    cpp [ -PRC ] [ -Dname[=val] ] [ -Uname ] [ -Idir ] [ in [ out ] ]
+
+  -Dname[=val]  define name as 1, or as val
+  -Uname        remove an initial definition
+  -Idir         add dir to the include search path (before /usr/include)
+  -P            do not emit "# line file" control lines
+  -R            allow macro recursion (normally a recursion is an error)
+  -C            pass comments through instead of deleting them
+
+Symbols defined with -D are "1" unless a value is given.  A missing
+-D argument is ignored.  The search order for `#include "file"` is the
+including file's own directory, then -I directories, then
+/usr/include; for `#include <file>` it is the -I directories, then
+/usr/include.
+
+LICENSE
+
+The v7 sources in extra/ (and the ports of them here, like cal, tty and
+the rest) are Bell Labs Unix released under Caldera's license.  The
+ATTRIBUTIONS.md at the top of the tree records this cpp as a v7 port.

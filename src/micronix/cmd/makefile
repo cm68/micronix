@@ -75,6 +75,7 @@ all:
 	cd du ; make all
 	cd echo ; make all
 	cd ed ; make all
+	cd edit ; make all
 	cd entab ; make all
 	cd expand ; make all
 	cd expr ; make all
@@ -100,6 +101,7 @@ all:
 	cd ln ; make all
 	cd ls ; make all
 	cd lz4 ; make all
+	cd m4 ; make all
 	cd mail ; make all
 	cd makekey ; make all
 	cd md ; make all
@@ -139,11 +141,13 @@ all:
 	cd tail ; make all
 	cd tar ; make all
 	cd td ; make all
+	cd tr ; make all
 	cd tee ; make all
 	cd tty ; make all
 	cd umount ; make all
 	cd unique ; make all
 	cd unlz4 ; make all
+	cd unrot ; make all
 	cd update ; make all
 	cd upm ; make all
 	cd vi ; make all
@@ -187,6 +191,7 @@ install:
 	cd du ; make install
 	cd echo ; make install
 	cd ed ; make install
+	cd edit ; make install
 	cd entab ; make install
 	cd expand ; make install
 	cd expr ; make install
@@ -212,6 +217,7 @@ install:
 	cd ln ; make install
 	cd ls ; make install
 	cd lz4 ; make install
+	cd m4 ; make install
 	cd mail ; make install
 	cd makekey ; make install
 	cd md ; make install
@@ -251,11 +257,13 @@ install:
 	cd tail ; make install
 	cd tar ; make install
 	cd td ; make install
+	cd tr ; make install
 	cd tee ; make install
 	cd tty ; make install
 	cd umount ; make install
 	cd unique ; make install
 	cd unlz4 ; make install
+	cd unrot ; make install
 	cd update ; make install
 	cd upm ; make install
 	cd vi ; make install
@@ -299,6 +307,7 @@ clean:
 	cd du ; make clean
 	cd echo ; make clean
 	cd ed ; make clean
+	cd edit ; make clean
 	cd entab ; make clean
 	cd expand ; make clean
 	cd expr ; make clean
@@ -324,6 +333,7 @@ clean:
 	cd ln ; make clean
 	cd ls ; make clean
 	cd lz4 ; make clean
+	cd m4 ; make clean
 	cd mail ; make clean
 	cd makekey ; make clean
 	cd md ; make clean
@@ -363,11 +373,13 @@ clean:
 	cd tail ; make clean
 	cd tar ; make clean
 	cd td ; make clean
+	cd tr ; make clean
 	cd tee ; make clean
 	cd tty ; make clean
 	cd umount ; make clean
 	cd unique ; make clean
 	cd unlz4 ; make clean
+	cd unrot ; make clean
 	cd update ; make clean
 	cd upm ; make clean
 	cd vi ; make clean
@@ -411,6 +423,7 @@ clobber:
 	cd du ; make clobber
 	cd echo ; make clobber
 	cd ed ; make clobber
+	cd edit ; make clobber
 	cd entab ; make clobber
 	cd expand ; make clobber
 	cd expr ; make clobber
@@ -436,6 +449,7 @@ clobber:
 	cd ln ; make clobber
 	cd ls ; make clobber
 	cd lz4 ; make clobber
+	cd m4 ; make clobber
 	cd mail ; make clobber
 	cd makekey ; make clobber
 	cd md ; make clobber
@@ -475,11 +489,13 @@ clobber:
 	cd tail ; make clobber
 	cd tar ; make clobber
 	cd td ; make clobber
+	cd tr ; make clobber
 	cd tee ; make clobber
 	cd tty ; make clobber
 	cd umount ; make clobber
 	cd unique ; make clobber
 	cd unlz4 ; make clobber
+	cd unrot ; make clobber
 	cd update ; make clobber
 	cd upm ; make clobber
 	cd vi ; make clobber

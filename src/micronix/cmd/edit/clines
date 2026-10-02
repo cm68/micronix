@@ -1,0 +1,6 @@
+common /clines/ line1, line2, nlines, curln, lastln
+   integer line1	# first line number
+   integer line2	# second line number
+   integer nlines	# number of line numbers specified
+   integer curln	# current line: value of dot
+   integer lastln	# last line: value of $

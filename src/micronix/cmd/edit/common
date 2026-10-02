@@ -1,0 +1,11 @@
+include /usr/style/io/globdefs
+define MAXPAT 128
+define andif if
+define GLOBAL LETG
+define PRINT LETP
+
+define MARKED	LETY
+define NOMARK	LETN
+
+define FORWARD	0
+define BACKWARD	-1

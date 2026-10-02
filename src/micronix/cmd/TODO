@@ -16,10 +16,8 @@
 # in /tmp/b1.c.  It is counted here because it is in the directory, and
 # it wants removing from both.)
 #
-# Of the five still in /bin, in order of how little is missing:
+# Of the four still in /bin, in order of how little is missing:
 #
-#	1  cpp - /bin/cpp has no counterpart in this tree at all.  See
-#	   below.
 #	1  edit - a line editor of Whitesmith's own, and NOT cmd/vi.
 #	   cmd/vi is STEVIE, a screen editor, and the edit.c in it is one
 #	   of STEVIE's modules rather than this program.  No source
@@ -27,8 +25,9 @@
 #	3  newuser, print and td - have a source now: cmd/newuser,
 #	   cmd/print and cmd/td, each disassembled off the second
 #	   distribution disk and read back into C.  All three build with
-#	   the cross compiler and have been run in usersim, and are
-#	   installed in the simulator's filesystem.
+#	   the cross compiler and have been run in usersim, but none is
+#	   installed, so /bin/newuser, /bin/print and /bin/td are still
+#	   the distribution's.
 #
 # The other twenty - the Whitesmith toolchain (as cc link lib obj hex
 # lord anat cp1 cp2), ptc, cxr, ddt, rp, pilot, clean, down, and the
@@ -36,6 +35,10 @@
 #
 # far was on this list and is not any more - it was rewritten, and it
 # is in both build lists now, so /bin/far is this tree's.
+#
+# cpp was on this list and is not any more - cmd/cpp is Reiser's own
+# v7 preprocessor (usr/src/cmd/cpp), the program attic/hitech/cpp
+# forks, and /bin/cpp is this tree's.
 #
 # cptree was on this list and is not any more - it is cp under a second
 # name (cp.c forces -r when called as cptree), so /bin/cptree is this
@@ -86,14 +89,11 @@
 # header comment ("Orchestrates cpp, c0 (parser), and c1 (code
 # generator)").  Renaming those is cosmetic and has not been done.
 #
-# So /bin/cpp is not the same program as anything this tree builds: it
-# is a standalone preprocessor of the ordinary filter kind, and it is a
-# gap rather than a duplicate whose install path wants fixing.
-#
-# If a standalone cpp is wanted, the only source for one here is
-# attic/hitech/cpp - John Reiser's cpp, the 1978 one, as maintained by
-# Schilling and Ogden, not Whitesmith's.  It targets CP/M and would
-# need the usual porting.
+# So /bin/cpp is not the compiler's pass0, and now it is not a gap
+# either.  cmd/cpp is John Reiser's own v7 preprocessor (usr/src/cmd/cpp),
+# the program the attic/hitech/cpp fork derives from, with cpy.y's yacc
+# grammar written by hand for the cross build.  It predefines z80,
+# matching ccc's pass0, and installs as /bin/cpp.  See cmd/cpp/README.
 #
 # cxr, rp and ddt are the same kind of thing: Whitesmith's own tools
 # (a C cross-referencer, a macro processor, a debugger), and pilot is
@@ -112,7 +112,7 @@
 # A full /bin is not the goal.  What has to exist for the system to
 # come up and rebuild itself is a shell, the toolchain, make, and the
 # file utilities those need - and all of that is in the 104 this tree
-# builds, so none of the remaining five blocks a bootstrap.  stty was
+# builds, so none of the remaining four blocks a bootstrap.  stty was
 # the nearest
 # to it, being what the terminal wants before anything interactive is
 # pleasant; it is ported now.  The rest is a userland that can wait.

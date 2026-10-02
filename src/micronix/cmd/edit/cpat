@@ -1,0 +1,2 @@
+common /cpat/ pat(MAXPAT)
+   character pat		# pattern

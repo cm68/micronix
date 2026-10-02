@@ -1,0 +1,98 @@
+.he "cpp (1)                     10/01/26                      cpp (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+cpp
+- the standalone C preprocessor
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+cpp [ -PRC ] [ -D name [ = value ] ] [ -U name ] [ -I directory ]
+.br
+    [ input [ output ] ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Cpp reads C source and writes it with #include files inserted and
+macros expanded, reading standard input and writing standard output
+unless file names are given.  It is a filter and a program of its
+own, not a pass of the C compiler; the compiler is ccc and its front
+end is /libexec/pass0, which is not this program.
+.sp
+With an input file named, cpp reads that file instead of standard
+input.  With an output file named as well, it writes there instead of
+standard output.
+.sp 2
+.in -5
+.bd
+FLAGS
+.in +5
+.br
+.bd
+-D name [ = value ]
+.sp
+Define name as 1, or as value.  A bare -D with no name is ignored.
+.sp
+.bd
+-U name
+.sp
+Remove an initial definition of name.
+.sp
+.bd
+-I directory
+.sp
+Add directory to the include search path.  It is searched before
+/usr/include.
+.sp
+.bd
+-P
+.sp
+Do not write the # line "file" lines that mark the start of an
+included file.
+.sp
+.bd
+-R
+.sp
+Allow a macro to expand itself.  Without it, runaway recursion is
+reported as an error.
+.sp
+.bd
+-C
+.sp
+Pass comments through to the output instead of deleting them.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This is John F. Reiser's preprocessor from the seventh edition, the
+one its own notes call five to twelve times faster than the one it
+replaced.  Symbols given with -D are defined as 1, exactly as if they
+had been written #define name 1; -D name = value defines name as
+value.
+.sp
+The name cpp is shared with the compiler's front end by accident.
+ccc runs its front end as pass0, out of /libexec, and pass0 is the
+lexer and normalizer, not a preprocessor this command can be mistaken
+for.  The two are separate programs; see the README in the source
+directory.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ccc (1)

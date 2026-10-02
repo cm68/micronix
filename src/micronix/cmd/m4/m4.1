@@ -1,0 +1,146 @@
+.he "m4 (1)                      10/01/26                        m4 (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+m4
+- the macro processor
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+m4 [ file ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+M4 is a general-purpose macro processor.  Each file is processed in
+order; with none, or with an argument of -, standard input is read and
+the result written to standard output.  A macro call is name(arg1, ...,
+argn); the left parenthesis must follow the name with no space, and a
+defined name with no parenthesis is taken to have no arguments.  Left
+and right single quotes, ` and ', quote strings; the value of a quoted
+string is the string without the quotes.
+.sp
+A macro value may name its arguments $1 through $9; at expansion they
+are replaced by the actuals.  The builtins are:
+.sp
+.in +5
+.br
+.bd
+define(name, value)
+.sp
+define a new macro, or redefine one.
+.br
+.bd
+undefine(name)
+.sp
+remove a definition.
+.br
+.bd
+ifdef(name, yes, no)
+.sp
+expand yes if name is defined, no otherwise.
+.br
+.bd
+ifelse(a, b, yes, ...)
+.sp
+expand yes if a and b are equal, else the next triple, else the last
+argument.
+.br
+.bd
+len(s)
+.sp
+the length of s.
+.br
+.bd
+substr(s, i, n)
+.sp
+the substring of s at i of length n.
+.br
+.bd
+index(s, t)
+.sp
+the position of t in s, or -1.
+.br
+.bd
+translit(s, from, to)
+.sp
+translate the characters of s named in from to those in to.
+.br
+.bd
+incr(n)
+.sp
+the value of n plus one.
+.br
+.bd
+eval(expr)
+.sp
+the value of the arithmetic expression expr.
+.br
+.bd
+changequote(l, r)
+.sp
+change the quote characters; with no arguments, restore ` and '.
+.br
+.bd
+include(file)
+.br
+.bd
+sinclude(file)
+.sp
+read file; include is an error if it is missing, sinclude is not.
+.br
+.bd
+syscmd(cmd)
+.sp
+hand cmd to the shell.
+.br
+.bd
+maketemp(template)
+.sp
+a unique name built from the template's XXXXXX.
+.br
+.bd
+divert(n)
+.br
+.bd
+undivert(n)
+.br
+.bd
+divnum
+.sp
+divert output to a numbered stream, bring it back, or print the current
+stream number.
+.br
+.bd
+dnl
+.sp
+delete the rest of the line.
+.br
+.bd
+dumpdef(name ...)
+.sp
+print definitions to standard error.
+.br
+.bd
+errprint(message)
+.sp
+print to standard error.
+.in -5
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+tr (1)

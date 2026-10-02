@@ -1,0 +1,18 @@
+define	PREV	0
+define	NEXT	1
+define	MARK	2
+define	SEEKADR	3
+define	LENG	4
+define	BUFENT	5	# size of pointer entry in buf
+
+define	MAXBUF	1000	# space for buf
+define	LINE0	1
+
+common /cbuf/ buf(MAXBUF), lastbf
+   character buf	# structure of pointers for all lines:
+	# buf(k+0)	PREV		previous line
+	# buf(k+1)	NEXT		next line
+	# buf(k+2)	MARK		mark for global commands
+	# buf(k+3)	SEEKADR	where line is on scratch file
+	# buf(k+4)	LENG		length on scratch
+   integer lastbf	# last pointer used in buf

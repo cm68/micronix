@@ -260,6 +260,7 @@ src/micronix/cmd/compress/compress
 src/micronix/cmd/concat/concat
 src/micronix/cmd/copy/copy
 src/micronix/cmd/cp/cp
+src/micronix/cmd/cpp/cpp
 src/micronix/cmd/crypt/crypt
 src/micronix/cmd/cu/cu
 src/micronix/cmd/date/date
@@ -274,6 +275,7 @@ src/micronix/cmd/djformat/djformat
 src/micronix/cmd/du/du
 src/micronix/cmd/echo/echo
 src/micronix/cmd/ed/ed
+src/micronix/cmd/edit/edit
 src/micronix/cmd/entab/entab
 src/micronix/cmd/expand/expand
 src/micronix/cmd/expr/expr
@@ -303,6 +305,7 @@ src/micronix/cmd/ln/ln
 src/micronix/cmd/login/login
 src/micronix/cmd/ls/ls
 src/micronix/cmd/lz4/lz4
+src/micronix/cmd/m4/m4
 src/micronix/cmd/mail/mail
 src/micronix/cmd/make/make
 src/micronix/cmd/makekey/makekey
@@ -349,10 +352,12 @@ src/micronix/cmd/tail/tail
 src/micronix/cmd/tar/tar
 src/micronix/cmd/td/td
 src/micronix/cmd/tee/tee
+src/micronix/cmd/tr/tr
 src/micronix/cmd/tty/tty
 src/micronix/cmd/umount/umount
 src/micronix/cmd/unique/unique
 src/micronix/cmd/unlz4/unlz4
+src/micronix/cmd/unrot/unrot
 src/micronix/cmd/update/update.bin
 src/micronix/cmd/upm/upm
 src/micronix/cmd/upm/*.rel

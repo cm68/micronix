@@ -1,0 +1,2 @@
+common /ctxt/ txt(MAXLINE)
+   character txt		# text line for matching and output

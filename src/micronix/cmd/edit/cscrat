@@ -1,0 +1,3 @@
+common /cscrat/ scr, scrend
+   integer scr		# scratch file id
+   integer scrend	# end of info on scratch file
