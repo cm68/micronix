@@ -218,6 +218,20 @@ define s.notdos2 0x47d9		; "Not a DOS diskette."
 
 define strcmp 0x6e72		; the char-by-char compare mkfile uses for "." and "/"
 
+; The directory-entry leaf functions.  0x00 is a free entry, 0xe5 a
+; deleted one, 0x2e the '.' of "." and "..".  Each scans the directory
+; with a slightly different predicate; findfile walks the names, and
+; splitname cuts "name.ext" on '.'.
+
+define findfree 0x311a		; free/deleted entry (0xe5, 0x00)
+define scanentry 0x2eb6		; scan (0xe5, 0x00, 0x2e)
+define scanentry2 0x257b	; scan (0xe5, 0x00, 0x2e)
+define scanentry3 0x44f9	; scan (0xe5, 0x00)
+define findslash 0x1f34		; find '/' in a path
+define splitname 0x3bd8		; cut "name.ext" on '.'
+define addentry 0x32be		; add a directory entry
+define findfile 0x1fda		; find a file by name
+
 ; ---------------------------------------------------------------------
 ; The data structures, read apart:
 ;   FAT12.  readfat (0x36b0) masks a cluster entry with AND 0x0f - the
