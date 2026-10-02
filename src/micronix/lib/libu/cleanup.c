@@ -47,8 +47,11 @@ FILE	_iob[_NFILE] =
 	},
 };
 
-FILE *stdin = &_iob[0];
-FILE *stdout = &_iob[1];
-FILE *stderr = &_iob[2];
+/*
+ * stdin, stdout and stderr are macros in stdio.h, not variables here -
+ * they are (&_iob[0..2]), the way v7 spells them, so a static
+ * initializer "FILE *f = stdout;" is the address of the slot and not a
+ * load of a variable.
+ */
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

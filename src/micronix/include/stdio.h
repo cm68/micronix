@@ -73,9 +73,9 @@ extern uchar _setup;
 #define	ferror(p)	(((p)->_flag&_IOERR)!=0)
 #define	fileno(p)	((uchar)p->_file)
 
-extern FILE *stdin;
-extern FILE *stdout;
-extern FILE *stderr;
+#define	stdin	(&_iob[0])
+#define	stdout	(&_iob[1])
+#define	stderr	(&_iob[2])
 
 FILE *		fopen();
 FILE *		freopen();

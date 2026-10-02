@@ -73,9 +73,17 @@ extern uchar _setup;
 #define	ferror(p)	(((p)->_flag&_IOERR)!=0)
 #define	fileno(p)	((uchar)p->_file)
 
-extern FILE *stdin;
-extern FILE *stdout;
-extern FILE *stderr;
+/*
+ * stdin, stdout and stderr are macros, the way v7 spells them: a
+ * pointer to the slot in _iob.  That is what lets a static initializer
+ * write "FILE *f = stdout;" and get the address _iob[1], not a load of
+ * a variable - the Whitesmith spelling (extern FILE *stdout) made that
+ * initializer read a variable ccc has no relocation for, and every such
+ * program came out with a null stream.
+ */
+#define	stdin	(&_iob[0])
+#define	stdout	(&_iob[1])
+#define	stderr	(&_iob[2])
 
 FILE *		fopen();
 FILE *		freopen();
