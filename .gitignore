@@ -285,6 +285,7 @@ src/micronix/cmd/grep/grep
 src/micronix/cmd/group/group
 src/micronix/cmd/halt/halt
 src/micronix/cmd/icheck/icheck
+src/micronix/cmd/include/include
 src/micronix/cmd/init/init
 src/micronix/cmd/init/init.dbg
 src/micronix/cmd/kill/kill

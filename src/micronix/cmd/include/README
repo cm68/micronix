@@ -1,0 +1,62 @@
+/usr/bin/include from the Micronix 1.6 distribution
+
+There is no source for include, so this is the disassembly, and include.c is
+that disassembly read back into C.
+
+    disas -f include.ctl include.dist
+
+include.dist is the binary off inode 25 of disks/dist/1013-8_dist_3.IMD - the
+third distribution disk, not the second where most of the text tools are -
+7788 bytes, mode 0711, dated 7 August 1982.  It is a Whitesmith a.out: 99 94,
+text at 0100 for 18dd bytes and data at 2000, in the older runtime that login
+and td have, c.ent at 1982 and c.ent2 at 198d.  The program is the one of that
+name in Kernighan and Plauger's Software Tools.
+
+Its own code is five functions: main at 0111, include at 012f, getword at
+0225, the error at 02b4 and a one-line fputs at 02dd.  The strings are
+"include" at 0122, "read" at 012a and ": can't read" at 02a6.
+
+main calls include with a null name, which is the standard input, and exits.
+include opens its file - "read", through fopen at 02f4 - or takes the
+standard input, and goes round a loop: read a line with fgets (0712, handed
+512), look at the end of file, and take the first word of the line with
+getword.  If the word is "include" the next word is a name and include is
+called with it, recursively; otherwise the line is written as it is.  A name
+that is empty is not opened and not an error.  At the end of the file it is
+closed, unless it is the standard input.
+
+getword is not print's.  It looks alike - blanks and controls, then a run of
+printable characters - and it skips the first and does not copy them, so the
+word comes back without them and "   include   file" is an include.
+
+THINGS THAT ARE NOT WHAT THE MANUAL SAYS
+
+The end of the file is tested after the line is read, and fgets sets it when
+it meets the end at all, so the last line of a file that has no newline on it
+has set the flag and is not looked at: it is not written, and if it is an
+include it is not done.  include.c keeps this, in getl.
+
+Lines are fgets's: 511 characters at the most.  A line of 600 is two, and a
+second piece that begins "include" is an include.
+
+The buffers for the line and the word are single and shared by every level of
+an include.  Nothing is the worse for it, because a level reads its next line
+over the last.
+
+The streams are the library's sixteen, three of them the standard three, so
+that a fourteenth file open at once is not to be had, and a file that includes
+itself writes thirteen levels of itself and then "name: can't read".
+This tree's stdio has twelve streams and would stop at ten.  include.c does
+not use stdio for the files: it reads with open and read, a buffer to a level,
+and counts, so that it is thirteen here as well.
+
+The exit status is 1 for a good run and 0 for a file that would not open: the
+inverted pair, as newuser's and td's.  include.c exits 0 and 1.
+
+Checked in usersim against the original, byte for byte, standard error and all:
+a file that includes a file that includes a file, with indented includes and
+names followed by comments; "included", "INCLUDE" and an include with no name,
+which are not; tabs between the word and the name; lines of 300, 500 and 600
+characters with an include in the middle of one; a file with no newline at the
+end of it, at the top and in an include; carriage returns; bytes over 0177;
+a file that is missing, and one that includes itself.

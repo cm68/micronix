@@ -86,6 +86,7 @@ all:
 	cd group ; make all
 	cd halt ; make all
 	cd icheck ; make all
+	cd include ; make all
 	cd init ; make all
 	cd kill ; make all
 	cd kstat ; make all
@@ -193,6 +194,7 @@ install:
 	cd group ; make install
 	cd halt ; make install
 	cd icheck ; make install
+	cd include ; make install
 	cd init ; make install
 	cd kill ; make install
 	cd kstat ; make install
@@ -300,6 +302,7 @@ clean:
 	cd group ; make clean
 	cd halt ; make clean
 	cd icheck ; make clean
+	cd include ; make clean
 	cd init ; make clean
 	cd kill ; make clean
 	cd kstat ; make clean
@@ -407,6 +410,7 @@ clobber:
 	cd group ; make clobber
 	cd halt ; make clobber
 	cd icheck ; make clobber
+	cd include ; make clobber
 	cd init ; make clobber
 	cd kill ; make clobber
 	cd kstat ; make clobber
