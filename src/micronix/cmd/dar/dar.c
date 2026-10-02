@@ -611,6 +611,12 @@ int cluster;
 
 readdir()
 {
+	/*
+	 * H0cb4 - walk the directory.  It takes a target, a table of 2-byte
+	 * values, and a count, and iterates: H3e11 tests each entry, H5ce2
+	 * advances to the next.  The table is the directory's cluster/entry
+	 * pointers; the exact test and advance are still to be read back.
+	 */
 	return 0;
 }
 
