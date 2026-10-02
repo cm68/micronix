@@ -1,0 +1,60 @@
+/usr/bin/compare from the Micronix 1.6 distribution
+
+There is no source for compare, so this is the disassembly, and compare.c is
+that disassembly read back into C.
+
+    disas -f compare.ctl compare.dist
+
+compare.dist is the binary off inode 61 of disks/dist/1012-8_dist_2.IMD, 7858
+bytes, mode 0711, dated 7 August 1982.  It has no header - see
+../newuser/README - and uses Whitesmith's runtime, c.ent at 1df2 and c.ents at
+1a56.  It is the program of that name in Kernighan and Plauger's Software Tools.
+
+Its own code is main at 0152 and seven small functions, with the strings in
+front of it: "eof on file 2." at 010e, "eof on file 1." at 011d, the modes
+"read" at 012c and 0131, the usage line at 0136 and ": can't open." at 0309.
+
+main wants three arguments, a name and two files, and says "usage: compare
+file1 file2." on the standard error if it has fewer.  It opens both with the
+library's fopen (0426), "name: can't open." for one that will not, and goes round
+a loop: a line from each with fgets (085e, handed 512), and, unless either has
+met the end of its file, the line number is counted up and the lines compared
+with the library's string compare; if they differ differ (0359) writes the
+number and a newline and the two lines, as they were read, to the standard
+output.  Each line has the newline it was read with, so what a difference looks
+like is
+
+    2
+    b
+    X
+
+and a last line with no newline runs into whatever is written next.  Files that
+are the same write nothing at all.
+
+TWO THINGS THE BINARY HAS AND DOES NOT USE
+
+The two "eof on file" messages are printed from 02c6, when the loop ends, by two
+tests on the words at fp-based offsets FBF6 and FBF8 of main's frame.  Nothing
+in main stores to them - the compiler left them where it found them, it seems,
+or the stores were lost - and so the tests are on whatever the stack held.  On a
+clear stack both are 0 and neither test passes, which is what usersim has, and
+neither message is ever written.  The intention is plain: FBF8 is the result of
+the read from the first file and FBF6 of the one from the second, and a message
+says which file ended while the other had a line.  compare.c does not guess at
+it; it writes nothing, which is what the original does wherever it has been run
+here.
+
+The end of the loop is the end of either file met, in the middle of a line or at
+the end of one, so a last line that has no newline - which sets the flag as it
+is read - is not compared; the same behaviour as include's.  Lines are 511
+characters, newline included, and a longer line is two.
+
+The exit status was 1 for a run that finished and 0 for the usage line and for a
+file that would not open.  compare.c exits 0 and 1.
+
+Checked in usersim against the original, byte for byte, standard error and all:
+two files the same, two with thirty of two hundred lines different, each way
+round; one shorter than the other, each way round; a last line with no newline in
+one, in both, and in neither; two files of two lines of 600 characters; an empty
+file against a full one and against another; no arguments, one argument, three
+arguments, and a file that does not exist in each place.
