@@ -590,8 +590,9 @@ addentry()
 		return 0;	/* duplicate name */
 	de = (struct dirent *)sectorbuf;
 	strcpy(de->name, name);
-	/* TODO: fill de->time/de->date (dectime), de->cluster, de->size,
-	 * then writesector back out. */
+	de->attr = 0x20;	/* archive */
+	/* TODO: de->time/de->date from the clock, de->cluster from the
+	 * first allocated cluster, de->size from the file length. */
 	return 1;
 }
 
@@ -644,13 +645,16 @@ int cluster;
 alloccluster(cluster)
 int cluster;
 {
-	int next;
+	int next, c;
 
 	next = fatentry(cluster);
 	if (next != 0 && next < 0xff8)
 		return next;	/* already linked */
-	/* TODO: scan the FAT for a free (0) cluster and link it */
-	return 0;
+	/* scan the FAT for a free cluster */
+	for (c = 2; c < geom->total_clusters; c++)
+		if (fatentry(c) == 0)
+			return c;
+	return 0;	/* volume full */
 }
 
 readcluster(cluster, buf)
@@ -666,8 +670,13 @@ char *buf;
  * dectime - decode the DOS date/time fields.  time is hour(5)/minute(6)/
  * second(5), date is year(7)/month(4)/day(5), as the 0x1f/0x3f/0x0f
  * masks in H43a3 show.  Prints "%s %2d %2d:%02d " (month name, day,
- * hour:minute); the month-name table is still to be placed.
+ * hour:minute).  The binary stores the month names reversed.
  */
+char	*monthname[] = {
+	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+};
+
 dectime(date, time)
 int date, time;
 {
@@ -677,8 +686,7 @@ int date, time;
 	month = (date >> 5) & 0x0f;
 	hour = (time >> 11) & 0x1f;
 	minute = (time >> 5) & 0x3f;
-	/* TODO: the month-name table, then printf("%s %2d %2d:%02d ") */
-	printf("%2d %2d:%02d ", day, hour, minute);
+	printf("%s %2d %2d:%02d ", monthname[month - 1], day, hour, minute);
 }
 
 /*
