@@ -38,6 +38,8 @@
  */
 #include <stdio.h>
 #include <types.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
 
 /*
  * The operation flags, one 16-bit cell per option letter.  doargs sets
@@ -91,6 +93,17 @@ int cluster;
 	offset = cluster + (cluster >> 1);	/* n * 3 / 2 */
 	word = fatbuf[offset] | (fatbuf[offset + 1] << 8);
 	return cluster & 1 ? word >> 4 : word & 0xfff;
+}
+
+/*
+ * say - print one message.  The disassembly's H03c1; every prompt and
+ * diagnostic goes through it, and the strings already carry their own
+ * newline where they want one.
+ */
+say(s)
+char *s;
+{
+	printf("%s", s);
 }
 
 main(argc, argv)
@@ -245,13 +258,56 @@ int n;
 
 checkdev()
 {
-	/* TODO: H10a2 - the device check, 0 if the device is bad */
+	struct stat st;
+
+	if (stat(devname, &st) < 0) {
+		printf("%s", devname);
+		return 0;
+	}
+	if ((st.st_mode & S_IFBLK) != S_IFBLK) {	/* not a block device */
+		say(devname);
+		say(": Not block special\n");
+		return 0;
+	}
 	return 1;
 }
 
+/*
+ * mkdevname - find the device in /etc/mtab and build its /dev path.
+ * H1106.  Opens /etc/mtab, reads it 64 bytes at a time, and for each
+ * entry builds "/dev/<name>", stat's it, and - when it is the block
+ * device the caller asked for - prints the name and exits.  The exact
+ * mtab field layout and the match field are still to be read back;
+ * this captures the shape.
+ */
 mkdevname()
 {
-	/* TODO: H1106 - build "/dev/<devname>" */
+	int fd;
+	char mtab[64];
+	char path[80];
+	struct stat st;
+
+	fd = open("/etc/mtab", 0);
+	if (fd < 0)
+		return;
+
+	for (;;) {
+		if (read(fd, mtab, sizeof mtab) != sizeof mtab) {
+			close(fd);
+			return;
+		}
+		if (mtab[0] == 0)
+			continue;
+		/* TODO: the mtab entry is not just a bare name; split the real
+		 * device name out of it and match against the caller's geometry.
+		 * H6cf2 builds the path as "/dev/%s" of that name. */
+		sprintf(path, "/dev/%s", mtab);
+		if (stat(path, &st) == 0
+		    && (st.st_mode & S_IFBLK) == S_IFBLK) {
+			printf("%s", mtab);
+			exit(0);
+		}
+	}
 }
 
 dispatch()
