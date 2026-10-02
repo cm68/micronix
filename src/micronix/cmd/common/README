@@ -1,0 +1,83 @@
+/usr/bin/common from the Micronix 1.6 distribution
+
+There is no source for common, so this is the disassembly, and common.c is that
+disassembly read back into C.
+
+    disas -f common.ctl common.dist
+
+common.dist is the binary off inode 62 of disks/dist/1012-8_dist_2.IMD, 7125
+bytes, mode 0711, dated 7 August 1982.  It has no header - see
+../newuser/README - and uses Whitesmith's runtime, c.ent at 17d1 and c.ents at
+1640.  It is the program of that name in Kernighan and Plauger's Software Tools:
+what comm does, with the columns in a different order and the lines' leading
+blanks taken off.
+
+Its own code is the first dozen functions, to 05f8, and the library follows.
+The data it keeps are words, and they matter: the last comparison (1c0d, which
+starts at 0), the width (1c0f, 80), the width of a column (1c11, 26), the three
+column flags (1803, 1805 and 1807), the two file names (1809 and 180b) and the
+two line buffers of 512 bytes (180d and 1a0d).
+
+main calls options (02d9) and then merge (012c) until it is done.  options goes
+over the arguments: "-1", "-2" and "-3" turn on a column, a word that begins
+"-w" is the width, and any other word is a file name, the first for file1 and
+the second for file2 and the rest ignored.  The test that nothing was asked for
+- and so all three columns are wanted - is made after every argument, a file
+name among them; and so is the division of the width by the number of columns.
+It is the usage line, "usage: common [-1] [-2] [-3] [-wN] file1 [file2]", on the
+standard error if there is no file1 - and it does not stop there, but goes on
+to read the standard input as the first file, and as the second.  The second
+file is the standard input anyway if it is not named.
+
+merge reads a line into line1 if the last comparison was not positive and into
+line2 if it was not negative, so the first pass reads both, with getl (07fc,
+handed 512: up to a newline or 512 characters, newline included, and a count,
+the end of its file being 0).  A line is ended with a NUL.  If both are empty it
+is done.  compare (019f) decides: an empty first line is greater, an empty
+second is less, and otherwise the first byte that is different, as signed
+characters, newline included.  output (0236) writes by that: less - the line is
+only in the first file - is column 1 if it is wanted; greater is column 2, with
+the width of a column in blanks before it if column 1 is wanted; and equal is
+column 3, with a column's width for each of the other two that is wanted.  A
+line is written without the blanks and tabs at the front of it, and with the
+newline that came with it.
+
+THE DIFFERENCES
+
+-wN could not have worked.  The number is read by btoi, handed 512 as the length
+of the string, and the arguments are at the top of memory, so the end of the
+string wraps and nothing is read; the width came out 0.  A width of 0 makes the
+columns 0 wide, which is the "common" of the original here.  common.c reads the
+number.  To test -wN against the original the sim was given a copy with the one
+constant, at 04d2, changed from 512 to 13.
+
+The standard input read twice, with the usage line, is as the original does, in
+blocks of 512 - the library's buffer - for each.
+
+A byte over 0177 is not written.  The characters go to putc as signed chars, and
+putc of a negative number is a request to flush, so they are lost.  This is
+kwic's, and common.c does the same.
+
+The two line buffers are beside each other, and after them is the word that
+holds the last comparison.  A line of 512 characters has no room for its end,
+and the NUL goes over the first byte of the next thing: line2's first, for line1,
+and the low byte of the comparison, for line2.  So a 512 character second line is
+written with the byte of its own comparison after it, as it is - 'x' in the
+case of a line against a different line of x's.  common.c has the same layout
+and, in the cases tried, the same output.  It does not reproduce the original in
+one that is only to be made by two files that are the same for 512 or more
+characters in many lines at once - a file of 150 random lines, of which one in
+eight is 512 or longer, against a copy of itself, differs in the byte that goes
+after one of them.  The cause has not been found.
+
+The exit status was whatever was left in BC; common.c exits 0, and 1 for a
+file that will not open.
+
+Checked in usersim against the original, standard error and all, with -wN on the
+copy with the constant changed: sorted word lists with indented lines, in every
+combination of -1, -2 and -3, with the options before the names and after, with
+-w of 0, 5, 20, 30, 60 and 100 and with a -w that is not a number; files with
+no newline at the last line, with bytes over 0177, with 512 character lines
+against each other and against short ones, and 150 lines of mixed length against
+a different file of the same kind; an empty first line; no arguments, one file,
+three, and a file that will not open in either place.

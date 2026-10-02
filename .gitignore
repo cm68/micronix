@@ -255,6 +255,7 @@ src/micronix/cmd/chmod/chmod
 src/micronix/cmd/chown/chown
 src/micronix/cmd/cmp/cmp
 src/micronix/cmd/comm/comm
+src/micronix/cmd/common/common
 src/micronix/cmd/compare/compare
 src/micronix/cmd/compress/compress
 src/micronix/cmd/concat/concat

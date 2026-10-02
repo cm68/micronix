@@ -56,6 +56,7 @@ all:
 	cd chown ; make all
 	cd cmp ; make all
 	cd comm ; make all
+	cd common ; make all
 	cd compare ; make all
 	cd compress ; make all
 	cd concat ; make all
@@ -172,6 +173,7 @@ install:
 	cd chown ; make install
 	cd cmp ; make install
 	cd comm ; make install
+	cd common ; make install
 	cd compare ; make install
 	cd compress ; make install
 	cd concat ; make install
@@ -288,6 +290,7 @@ clean:
 	cd chown ; make clean
 	cd cmp ; make clean
 	cd comm ; make clean
+	cd common ; make clean
 	cd compare ; make clean
 	cd compress ; make clean
 	cd concat ; make clean
@@ -404,6 +407,7 @@ clobber:
 	cd chown ; make clobber
 	cd cmp ; make clobber
 	cd comm ; make clobber
+	cd common ; make clobber
 	cd compare ; make clobber
 	cd compress ; make clobber
 	cd concat ; make clobber
