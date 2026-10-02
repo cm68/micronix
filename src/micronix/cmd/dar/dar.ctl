@@ -67,6 +67,24 @@ define badopt 0x3a65		; optDefault falls here; bad option or no args
 define mkdevname 0x1106		; builds "/dev/<name>" out of the 0x10f6 literal
 
 ; ---------------------------------------------------------------------
+; The message printer.  say(s) is how every prompt and diagnostic is
+; emitted (35 call sites); atmost is the "at most one of d,r,t,x" error.
+
+define atmost 0x0390		; prints s.atmost and exits
+define say 0x03c1		; print one string (delegates to H561d)
+
+; ---------------------------------------------------------------------
+; The DOS-side routines, each found by the string it emits:
+;   getdiskname - "Enter disk name:"        format - ": Unknown format"
+;   mkfile      - ": Can't allocate directory entry" and ": Volume full"
+;   space       - "K free space left" / "% full," (the -v report)
+
+define getdiskname 0x16aa
+define mkfile 0x21d9		; the big one - allocate dir entry + clusters
+define space 0x355f
+define format 0x38d2
+
+; ---------------------------------------------------------------------
 ; The option flags, one 16-bit cell per operation.  Each handler sets
 ; its cell to 1 (the ADD A,A / SBC A,A pairs the high byte to 0).  The
 ; "at most one of d, r, t, x" check is the mutual-exclusion of four of
@@ -90,14 +108,32 @@ define _sbrk 0xa2b1		; 17
 define _creat 0xa2b5		; 8
 define _fstat 0xa2bb		; 28
 define _gtty 0xa2bf		; 32
-define _link 0xa2c5		; 9
-define _mknod 0xa2cd		; 14
+define _link 0xa2c3		; 9
+define _mknod 0xa2c9		; 14
 define _open 0xa2d1		; 5
-define _read 0xa2d9		; 3
-define _seek 0xa2df		; 19
-define _stat 0xa2e5		; 18
-define _unlink 0xa2eb		; 10
-define _write 0xa2ef		; 4
+define _read 0xa2d7		; 3
+define _seek 0xa2dd		; 19
+define _stat 0xa2e3		; 18
+define _unlink 0xa2e9		; 10
+define _write 0xa2ed		; 4
+
+; ---------------------------------------------------------------------
+; The syscall wrappers, in the library at 0x7667..0x7845 - each is the
+; indirect trap "cf 00 <stub addr>" to the matching stub above.
+
+define access 0x7667
+define sbrk 0x767b
+define creat 0x76ad
+define fstat 0x76d4
+define gtty 0x76f4
+define link 0x7717
+define mknod 0x7745
+define open 0x7768
+define read 0x7794
+define seek 0x77c0
+define stat 0x77e3
+define unlink 0x781a
+define write 0x7845
 
 ; ---------------------------------------------------------------------
 ; dar's string literals, in the text segment (Whitesmith's puts them
@@ -129,6 +165,15 @@ define s.notdos2 0x47d9		; "Not a DOS diskette."
 
 ; ---------------------------------------------------------------------
 ; library, to be named from what dar calls it for
+
+define strcmp 0x6e72		; the char-by-char compare mkfile uses for "." and "/"
+
+; ---------------------------------------------------------------------
+; The data structures, still to be read apart.  format (the boot-sector
+; check) touches these first:
+;   0x9e42 - a pointer, dereferenced
+;   0x9e44 - a buffer (the sector image)
+;   0x9fa6 - a pointer, dereferenced
 
 ; ---------------------------------------------------------------------
 ; dar's data segment (0x85fb..0xa30b), still to be read apart
