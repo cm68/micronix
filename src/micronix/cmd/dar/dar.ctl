@@ -118,8 +118,12 @@ define _unlink 0xa2e9		; 10
 define _write 0xa2ed		; 4
 
 ; ---------------------------------------------------------------------
-; The syscall wrappers, in the library at 0x7667..0x7845 - each is the
-; indirect trap "cf 00 <stub addr>" to the matching stub above.
+; The syscall wrappers, in the library at 0x7667..0x7853 - each does the
+; indirect trap "cf 00 <stub addr>" to the matching stub above.  The
+; entry a CALL reaches is the prologue, not the SYS: the multi-argument
+; ones move their args into fixed cells first, so read() is entered at
+; 0x7776 (its SYS is 0x7794) and seek() at 0x77a2 (SYS 0x77c0).  Named
+; here at the CALL address, which is what the reconstruction calls.
 
 define access 0x7667
 define sbrk 0x767b
@@ -129,11 +133,12 @@ define gtty 0x76f4
 define link 0x7717
 define mknod 0x7745
 define open 0x7768
-define read 0x7794
-define seek 0x77c0
+define read 0x7776
+define seek 0x77a2
 define stat 0x77e3
 define unlink 0x781a
-define write 0x7845
+define write 0x7827
+define close 0x7688
 
 ; ---------------------------------------------------------------------
 ; dar's string literals, in the text segment (Whitesmith's puts them
