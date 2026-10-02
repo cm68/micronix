@@ -102,6 +102,20 @@ int	devfd;		/* the opened device */
 unsigned char sectorbuf[512];	/* 0xa018 - the sector buffer getsec fills */
 
 /*
+ * The DOS directory entry, the standard 32-byte layout (confirmed by the
+ * code: stride 0x20, attribute at 0x0b, first cluster at 0x1a).
+ */
+struct dirent {
+	char	name[11];	/* 0-10: filename (8) + extension (3) */
+	char	attr;		/* 11: attribute */
+	char	reserved[10];	/* 12-21 */
+	int	time;		/* 22-23 */
+	int	date;		/* 24-25 */
+	int	cluster;	/* 26-27: first cluster */
+	long	size;		/* 28-31: file size */
+};
+
+/*
  * fatentry - read one 12-bit FAT entry for a cluster.  Entry n sits at
  * byte n*3/2; an even cluster takes the low 12 bits, an odd one the
  * high 12.  (The disassembly masks with AND 0xff / AND 0x0f; this is
