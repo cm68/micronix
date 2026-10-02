@@ -77,8 +77,20 @@ main(argc, argv)
         exit(1);
     }
     if (mount(argv[1], argv[2], ro) < 0) {
-        perror("mount");
-        exit(1);
+        /*
+         * Maybe the only problem was a read-only diskette: retry the
+         * mount read-only before giving up, the way the original did.
+         */
+        if (!ro) {
+            ro = 1;
+            if (mount(argv[1], argv[2], ro) < 0) {
+                perror("mount");
+                exit(1);
+            }
+        } else {
+            perror("mount");
+            exit(1);
+        }
     }
     addmtab(argv[1], argv[2]);
     exit(0);

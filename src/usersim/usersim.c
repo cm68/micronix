@@ -4869,10 +4869,13 @@ SystemCall()
              * Open the device just far enough to prove it holds a
              * filesystem, then let it go: the table records the device,
              * and every later access reopens the image in the process
-             * that will read it.  The validation is read-only, so it
-             * takes no image lock.
+             * that will read it.  The open is the same one the kernel
+             * makes - bopen(dev, !ronly) - so a read-write mount of a
+             * write-protected device fails here, where the kernel fails
+             * it, and the mount command's read-only retry has something
+             * to catch.
              */
-            if (devopen(Maj, Min, 0, &fs, &lockfd) < 0) {
+            if (devopen(Maj, Min, !ronly, &fs, &lockfd) < 0) {
                 if (verbose & V_ERROR)
                     message("%s: %s\n", strerror(errno), fn);
                 ret = errno;
@@ -4880,6 +4883,8 @@ SystemCall()
                 break;
             }
             closefs(fs);
+            if (lockfd >= 0)
+                close(lockfd);
             mlist[i].used = 1;
             mlist[i].major = Maj;
             mlist[i].minor = Min;
