@@ -59,6 +59,7 @@ char	*devname;	/* the device argument, argv[1] */
  * to be read back out of the data segment; these are placeholders.
  */
 int	devsize;	/* the 4-byte device size */
+int	doneflag;	/* H87d1 - set when a final step is due */
 
 /*
  * The geometry descriptor - one 34-byte entry of the formats table at
@@ -77,12 +78,12 @@ struct geom *geom;	/* 0x9e42 - the matched format descriptor */
 unsigned char *fatbuf;	/* 0x8bdc - the FAT image */
 
 /*
- * readfat - read one 12-bit FAT entry for a cluster.  Entry n sits at
+ * fatentry - read one 12-bit FAT entry for a cluster.  Entry n sits at
  * byte n*3/2; an even cluster takes the low 12 bits, an odd one the
  * high 12.  (The disassembly masks with AND 0xff / AND 0x0f; this is
  * the same read, still to be byte-checked against H36b0.)
  */
-readfat(cluster)
+fatentry(cluster)
 int cluster;
 {
 	register int offset, word;
@@ -178,20 +179,31 @@ badopt()
 }
 
 /*
- * Below here are stubs.  execute() is the driver that reads the flag
- * cells and runs the operation; menu() is the interactive loop; the
- * rest is the storage stack.  Each is filled in as the DOS directory
- * entry and FAT layout is read back out of the disassembly.
+ * Below here are the operations.  execute() is the driver that reads the
+ * flag cells and runs the flagged operation; the dispatch below is read
+ * straight out of the disassembly (0x03ed): check the device, build the
+ * /dev name, detect the format, read the FAT, then run exactly one of
+ * delete / rename / touch / extract-or-put.  The copy flag (c) is acted
+ * on inside readfat, not here.
  */
 execute()
 {
-	if (copyflag)
-		docopy();
-	if (putflag)
-		doput();
+	if (!checkdev())
+		badopt();
+	mkdevname();
+	dispatch();
+	format();
+	readfat();
 	if (delflag)
 		dodelete();
-	/* TODO: rename, touch, extract */
+	else if (renflag)
+		dorename();
+	else if (touchflag)
+		dotouch();
+	else if (xflag || putflag)
+		doextract();
+	if (doneflag)
+		finish();
 }
 
 menu()
@@ -210,7 +222,7 @@ space()
 
 	free = 0;
 	for (cluster = 2; cluster < geom->total_clusters; cluster++)
-		if (readfat(cluster) == 0)
+		if (fatentry(cluster) == 0)
 			free++;
 	total = geom->total_clusters - 2;
 
@@ -231,17 +243,53 @@ int n;
 	printf("%d", n);
 }
 
-docopy()
+checkdev()
 {
-	/* TODO: the copy-FROM-DOS operation */
+	/* TODO: H10a2 - the device check, 0 if the device is bad */
+	return 1;
 }
 
-doput()
+mkdevname()
 {
-	/* TODO: the copy-TO-DOS operation */
+	/* TODO: H1106 - build "/dev/<devname>" */
+}
+
+dispatch()
+{
+	/* TODO: H1214/H1226 - set up the device name for d/r/t/x */
+}
+
+readfat()
+{
+	/* TODO: H47ee - read the FAT; acts on copyflag (c) here */
+}
+
+format()
+{
+	/* TODO: H38d2 - match the device geometry against the formats table */
 }
 
 dodelete()
 {
-	/* TODO: delete a DOS file */
+	/* TODO: H3043 - delete a DOS file */
+}
+
+dorename()
+{
+	/* TODO: H2651 - rename a DOS file */
+}
+
+dotouch()
+{
+	/* TODO: H2cd8 - touch a DOS file */
+}
+
+doextract()
+{
+	/* TODO: H1772 - extract (x) or copy-to-DOS (p) */
+}
+
+finish()
+{
+	/* TODO: H497c - the final step */
 }
