@@ -681,15 +681,32 @@ int date, time;
 	printf("%2d %2d:%02d ", day, hour, minute);
 }
 
-readdir()
+/*
+ * match - H3e11.  The filename match, with '*' wildcard support (the
+ * disassembly checks for '*' and falls back to a straight compare).
+ */
+match(pattern, name)
+char *pattern, *name;
 {
-	/*
-	 * H0cb4 - walk the directory.  It takes a target, a table of 2-byte
-	 * values, and a count, and iterates: H3e11 tests each entry, H5ce2
-	 * advances to the next.  The table is the directory's cluster/entry
-	 * pointers; the exact test and advance are still to be read back.
-	 */
-	return 0;
+	/* TODO: the '*' wildcard; the plain compare is this */
+	return strncmp(pattern, name, 11) == 0;
+}
+
+/*
+ * readdir - H0cb4.  Search the directory's entry pointers for the one
+ * matching the pattern; H5ce2 advances from entry to entry.
+ */
+readdir(pattern, table, count)
+char *pattern;
+struct dirent **table;
+int count;
+{
+	int i;
+
+	for (i = 0; i < count; i++)
+		if (match(pattern, table[i]->name))
+			return i;
+	return -1;
 }
 
 getdiskname()
