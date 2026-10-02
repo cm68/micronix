@@ -579,8 +579,20 @@ findfree()
 
 addentry()
 {
-	/* H32be - write a directory entry out of the buffer. */
-	return 0;
+	/*
+	 * H32be - write a directory entry.  findfile guards against a
+	 * duplicate; then the name is copied in and the entry's
+	 * time/date/cluster/size are filled before it is written back.
+	 */
+	struct dirent *de;
+
+	if (findfile(name))
+		return 0;	/* duplicate name */
+	de = (struct dirent *)sectorbuf;
+	strcpy(de->name, name);
+	/* TODO: fill de->time/de->date (dectime), de->cluster, de->size,
+	 * then writesector back out. */
+	return 1;
 }
 
 delfile(f)
@@ -616,6 +628,38 @@ int cluster;
 	root_sectors = geom->root_entries * 32 / geom->bytes_per_sec;
 	data_start = geom->reserved + geom->num_fats * spt_fat + root_sectors;
 	return data_start + (cluster - 2) * geom->spc;
+}
+
+/*
+ * nextcluster / alloccluster / readcluster - the FAT chain walk.  next
+ * is fatentry(cluster); alloc returns the existing link or finds a free
+ * cluster; read seeks and reads the cluster's sector.
+ */
+nextcluster(cluster)
+int cluster;
+{
+	return fatentry(cluster);
+}
+
+alloccluster(cluster)
+int cluster;
+{
+	int next;
+
+	next = fatentry(cluster);
+	if (next != 0 && next < 0xff8)
+		return next;	/* already linked */
+	/* TODO: scan the FAT for a free (0) cluster and link it */
+	return 0;
+}
+
+readcluster(cluster, buf)
+int cluster;
+char *buf;
+{
+	seeksec(devfd, clustosec(cluster));
+	readsector(devfd, buf);
+	return 0;
 }
 
 readdir()

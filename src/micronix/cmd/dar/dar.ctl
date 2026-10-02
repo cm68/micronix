@@ -241,7 +241,7 @@ define dirbuf 0x466a		; the directory entry buffer (0x9042)
 define clustosec 0x0e09		; cluster -> sector
 define readfat 0x48ca		; load the FAT image
 define nextcluster 0x3825	; follow the FAT chain (calls fatentry)
-define fat12 0x43a3		; the 12-bit FAT entry read
+define dectime 0x43a3		; decode the DOS date/time (0x1f/0x3f/0x0f masks)
 
 ; The string/path helpers.  strcpy copies a name and null-terminates;
 ; strncmp is the 11-byte name compare; basename cuts the file name out
