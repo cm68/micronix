@@ -1,0 +1,30 @@
+DOS reference diskette images, for testing cmd/dar
+==================================================
+
+Raw 512-byte-sector dumps (not compressed), downloaded 2026-10-02 from
+http://www.hampa.ch/pub/software/DOS/DOS/ .
+
+  msdos330-360k-*.img   MS-DOS 3.30, 5.25" 360K (2 disks)
+  msdos500-720k-*.img   MS-DOS 5.0,  3.5" 720K  (3 disks)
+
+Geometry, as reported by `file`:
+
+  msdos330-360k-1.img:
+    720 sectors total, media 0xFD, 2 sectors/FAT, 112 root entries,
+    9 sectors/track, 2 sectors/cluster, FAT12.
+
+  msdos500-720k-1.img:
+    1440 sectors total, media 0xF9, 3 sectors/FAT, 112 root entries,
+    9 sectors/track, 2 sectors/cluster, FAT12.
+
+dar only understands the 5.25" double-density formats: its formats
+table signatures are TOTAL SECTOR COUNTS, 320/360/640/720, i.e.
+
+  320 sectors = 160K      360 sectors = 180K
+  640 sectors = 320K      720 sectors = 360K
+
+So the 360K image matches dar's "720" entry (720 sectors, media 0xFD,
+2 sectors/FAT, 112 root entries, 9 spt) and is the file-exchange test.
+The 720K image (1440 sectors, media 0xF9, 3 sectors/FAT) is NOT
+recognised by dar - it reports ": Unknown format" - useful as a
+negative test only.
