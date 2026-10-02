@@ -60,6 +60,38 @@ char	*devname;	/* the device argument, argv[1] */
  */
 int	devsize;	/* the 4-byte device size */
 
+/*
+ * The geometry descriptor - one 34-byte entry of the formats table at
+ * 0x9e44, matched by format() and pointed to by geom.  Only the fields
+ * space() reads have been placed: total_clusters at offset 12 and the
+ * bytes-per-cluster at offset 14; the rest is padding until the other
+ * fields are read back out of the disassembly.
+ */
+struct geom {
+	int	pad[6];		/* offsets 0..11 */
+	int	total_clusters;	/* offset 12 */
+	int	cluster_size;	/* offset 14, bytes per cluster */
+};
+
+struct geom *geom;	/* 0x9e42 - the matched format descriptor */
+unsigned char *fatbuf;	/* 0x8bdc - the FAT image */
+
+/*
+ * readfat - read one 12-bit FAT entry for a cluster.  Entry n sits at
+ * byte n*3/2; an even cluster takes the low 12 bits, an odd one the
+ * high 12.  (The disassembly masks with AND 0xff / AND 0x0f; this is
+ * the same read, still to be byte-checked against H36b0.)
+ */
+readfat(cluster)
+int cluster;
+{
+	register int offset, word;
+
+	offset = cluster + (cluster >> 1);	/* n * 3 / 2 */
+	word = fatbuf[offset] | (fatbuf[offset + 1] << 8);
+	return cluster & 1 ? word >> 4 : word & 0xfff;
+}
+
 main(argc, argv)
 char **argv;
 {
@@ -167,9 +199,36 @@ menu()
 	/* TODO: getdiskname, read the directory, run operations in a loop */
 }
 
+/*
+ * space - the -v report.  Walks the FAT from cluster 2 to the total,
+ * counting the entries that read back free, then prints
+ * "Diskette <n>% full, <k>K free space left".
+ */
 space()
 {
-	/* TODO: the -v report - "% full, K free space left" */
+	register int free, cluster, total;
+
+	free = 0;
+	for (cluster = 2; cluster < geom->total_clusters; cluster++)
+		if (readfat(cluster) == 0)
+			free++;
+	total = geom->total_clusters - 2;
+
+	printf("Diskette ");
+	printnum((total - free) * 100 / total);
+	printf("%% full, ");
+	printnum(free * geom->cluster_size / 1024);
+	printf("K free space left\n");
+}
+
+/*
+ * printnum - the number formatter say()'s numeric arguments run through
+ * (H0985/H09ae in the disassembly).
+ */
+printnum(n)
+int n;
+{
+	printf("%d", n);
 }
 
 docopy()
