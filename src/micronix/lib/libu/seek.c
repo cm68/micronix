@@ -16,7 +16,7 @@ seek(unsigned char fd, int offset, int whence)
 	if (whence >= 3) {
 		whence -= 3;
 		if (whence == 0)
-			off = (long) ((unsigned long) offset << 9);
+			off = (long) ((unsigned long) (unsigned) offset << 9);
 		else
 			off = (long) offset << 9;
 	} else if (whence == 0) {

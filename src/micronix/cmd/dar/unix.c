@@ -59,7 +59,7 @@ sio (a, b, c)
 
 	o *= d->bps;	/* o is the offset in bytes */
 
-	lseek (fd, o);	/* seek to the spot */
+	lseek (fd, o, 0);	/* seek to the spot */
 
 	if ((*c) (fd, b, d->bps) == d->bps)
 		{
@@ -263,22 +263,6 @@ create (a)
 	char *a;
 	{
 	return creat (a, 0666);
-	}
-
-/*
- * lseek for unix 6
- */
-
-lseek (a, b)
-	FAST a;
-	FAST ULONG b;
-	{
-	INTERN UCOUNT c;
-
-	c = b >> 9;
-	seek (a, c, BLOCK);
-	c = b & 511;
-	seek (a, c, RELATIVE);
 	}
 
 devsize (a)

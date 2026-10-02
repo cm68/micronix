@@ -3504,6 +3504,16 @@ mread(int fd, char *buf, int len)
         }
         return got;
     }
+    /*
+     * A raw block device has a fixed size and no EOF: reading past its
+     * end is ENXIO, not a zero-byte read, and dar's devsize() counts on
+     * that to find the size by binary search.  A file inside a mounted
+     * filesystem (isdev 0) reads past the end as EOF, as before.
+     */
+    if (mo->isdev && pos >= mo->size) {
+        errno = ENXIO;
+        return -1;
+    }
     while (got < len && pos + got < mo->size) {
         long off = pos + got;
         int blk = off / 512;
@@ -3917,7 +3927,14 @@ SystemCall()
             df->offset += ret;
         } else if (files[fd].mo) {
             ret = mread(fd, iobuf, arg2);
-            copyout(iobuf, arg1, ret);
+            /*
+             * mread returns -1 (ENXIO) past the end of a raw block
+             * device; that is an error, not a count, so copy out only
+             * what was actually read - a copyout of 0xffff would write
+             * the whole buffer over the stack.
+             */
+            if (ret != 0xffff)
+                copyout(iobuf, arg1, ret);
         } else {
             if ((ret = seekfile(fd)) == 0) {
                 /*
