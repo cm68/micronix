@@ -315,14 +315,49 @@ dispatch()
 	/* TODO: H1214/H1226 - set up the device name for d/r/t/x */
 }
 
-readfat()
+/*
+ * The formats table at 0x9e44 - the known DOS diskette geometries, 34
+ * bytes each.  The first word is the signature format() matches, and
+ * the matched entry becomes geom.  The actual entries are TBD.
+ */
+int	formats[] = {
+	0
+};
+
+readboot()
 {
-	/* TODO: H47ee - read the FAT; acts on copyflag (c) here */
+	/* TODO: H13bf - seek+read the boot sector, return the geometry
+	 * signature the formats table matches against. */
+	return 0;
 }
 
+/*
+ * readfat - H47ee.  Loads the FAT image into fatbuf, and when copyflag
+ * (c) is set runs the copy-from-DOS operation on it.  execute calls it
+ * unconditionally.
+ */
+readfat()
+{
+	/* TODO: load the FAT; if copyflag, docopy() */
+}
+
+/*
+ * format - H38d2.  Match the device geometry (readboot) against the
+ * formats table; the matched entry becomes geom.  ": Unknown format"
+ * and exit when none matches.
+ */
 format()
 {
-	/* TODO: H38d2 - match the device geometry against the formats table */
+	int *p;
+
+	for (p = formats; *p != 0; p += 17) {
+		if (*p == readboot()) {
+			geom = (struct geom *)p;
+			return;
+		}
+	}
+	say(": Unknown format\n");
+	exit(0);
 }
 
 dodelete()
