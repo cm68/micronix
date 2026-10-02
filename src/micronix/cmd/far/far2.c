@@ -335,7 +335,7 @@ exone(a, b)
             if (f->user != userno)
                 continue;
 
-            if (!memcmp(f->name, a->name, 11))
+            if (memcmp(f->name, a->name, 11))
                 continue;
 
             if (d->epe == 1 && ex != (f->ex | (f->s2 << 5)))

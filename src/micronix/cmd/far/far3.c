@@ -328,7 +328,7 @@ isfile(a)
 
     for (i = 0; i < nfiles; i++) {
         if (rflag) {            /* for replacement, names must match exactly */
-            if (strcmp(a, files[i])) {
+            if (strcmp(a, files[i]) == 0) {
                 return i;
             }
         } else {

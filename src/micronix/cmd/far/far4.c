@@ -128,7 +128,7 @@ duptest()
 
     for (i = 0; i < nfiles; i++) {
         for (j = 0; j < nfiles; j++) {
-            if (i != j && strcmp(files[i], files[j])) {
+            if (i != j && strcmp(files[i], files[j]) == 0) {
                 put(files[i]);
                 put(": duplicate file name\n");
                 exit(NO);
@@ -262,7 +262,7 @@ fdelete(a)
         if (f->user == userno) {        /* dir slot in use */
             name(f, buf);
 
-            if (strcmp(a, buf)) {       /* right file */
+            if (strcmp(a, buf) == 0) {      /* right file */
                 f->user = NOENT;        /* delete it */
                 ddirty = YES;   /* mark dir. dirty */
             }
