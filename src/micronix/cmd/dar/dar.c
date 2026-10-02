@@ -68,32 +68,27 @@ char	*name;		/* the file name the operations act on */
 
 /*
  * The geometry descriptor - one 34-byte entry of the formats table at
- * 0x9e44, matched by format() and pointed to by geom.  All 17 words are
- * 16-bit.  The offsets the code reads, by frequency:
- *	8 (x5), 24 (x3), 20 (x2), 16 (x2), 6 (x2), 22, 18
- * plus 12 = total clusters, 14 = bytes per cluster, 26 = media descriptor,
- * and 0 = the signature format() matches (bytes per sector).
- * Only total_clusters and cluster_size are placed; the rest is padding
- * until each offset's meaning is read back from its uses.
+ * 0x9e44, matched by format() and pointed to by geom.  The 17 words, in
+ * order, read from the table's own entries:
  */
 struct geom {
-	int	signature;	/* offset 0 - bytes per sector */
-	int	pad0;		/* 2 */
-	int	pad1;		/* 4 */
-	int	pad2;		/* 6 */
-	int	pad3;		/* 8 */
-	int	pad4;		/* 10 */
-	int	total_clusters;	/* offset 12 */
-	int	cluster_size;	/* offset 14, bytes per cluster */
-	int	pad5;		/* 16 */
-	int	pad6;		/* 18 */
-	int	pad7;		/* 20 */
-	int	pad8;		/* 22 */
-	int	pad9;		/* 24 */
-	int	media;		/* offset 26 */
-	int	pad10;		/* 28 */
-	int	pad11;		/* 30 */
-	int	pad12;		/* 32 */
+	int	signature;	/* 0: tracks * sectors-per-track (320/360/640/720) */
+	int	spc;		/* 2: sectors per cluster */
+	int	reserved;	/* 4: reserved sectors */
+	int	spt;		/* 6: sectors per track */
+	int	heads;		/* 8: 8 or 9 */
+	int	bytes_per_sec;	/* 10: 512 */
+	int	total_clusters;	/* 12 */
+	int	cluster_size;	/* 14: bytes per cluster (512 or 1024) */
+	int	num_fats;	/* 16: 1 or 2 */
+	int	root_entries;	/* 18: 16 or 32 */
+	int	field20;	/* 20: 64 or 112 */
+	int	field22;	/* 22: 4 or 7 */
+	int	field24;	/* 24: 1 or 2 */
+	int	media;		/* 26: media descriptor */
+	int	field28;	/* 28: 3 or 5 */
+	int	field30;	/* 30: 7/9/10/12 */
+	int	field32;	/* 32: 1 or 2 */
 };
 
 struct geom *geom;	/* 0x9e42 - the matched format descriptor */
@@ -349,11 +344,18 @@ dispatch()
 }
 
 /*
- * The formats table at 0x9e44 - the known DOS diskette geometries, 34
- * bytes each.  The first word is the signature format() matches, and
- * the matched entry becomes geom.  The actual entries are TBD.
+ * The formats table at 0x9e44 - the known DOS diskette geometries, 17
+ * words each, zero-terminated.  The signature word is tracks *
+ * sectors-per-track: 320/360 are the 40-track 5.25" disks (8/9 sectors),
+ * 640/720 the 80-track ones.
  */
 int	formats[] = {
+	320, 5, 1, 8, 8, 512, 315, 512, 1, 16, 64, 4, 1, 254, 3, 7, 1,
+	360, 5, 1, 9, 9, 512, 353, 512, 1, 16, 64, 4, 2, 252, 5, 9, 2,
+	360, 5, 1, 8, 9, 512, 315, 512, 1, 16, 64, 4, 1, 254, 3, 7, 1,
+	640, 5, 2, 8, 8, 512, 316, 1024, 2, 32, 112, 7, 1, 255, 3, 10, 1,
+	720, 5, 2, 9, 9, 512, 355, 1024, 2, 32, 112, 7, 2, 253, 5, 12, 2,
+	720, 5, 2, 8, 9, 512, 316, 1024, 2, 32, 112, 7, 1, 255, 3, 10, 1,
 	0
 };
 
