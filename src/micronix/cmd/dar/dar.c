@@ -340,7 +340,16 @@ mkdevname()
 
 dispatch()
 {
-	/* TODO: H1214/H1226 - set up the device name for d/r/t/x */
+	/*
+	 * H1214/H1226.  For the d/r/t/x single-file operations, append a
+	 * device number to the name - 2 for delete/rename (the directory
+	 * partition), 0 for the others - via H7752, and record the result
+	 * in the option-mode byte.  H7752's exact form is still to be read.
+	 */
+	int n;
+
+	n = (delflag || renflag) ? 2 : 0;
+	/* TODO: H7752(devname, n) -> the option-mode byte */
 }
 
 /*
