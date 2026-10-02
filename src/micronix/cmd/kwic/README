@@ -1,0 +1,49 @@
+/usr/bin/kwic from the Micronix 1.6 distribution
+
+There is no source for kwic, so this is the disassembly, and kwic.c is that
+disassembly read back into C.
+
+    disas -f kwic.ctl kwic.dist
+
+kwic.dist is the binary off inode 54 of disks/dist/1012-8_dist_2.IMD, 4671
+bytes, mode 0711, dated 7 August 1982.  It has no header - see
+../newuser/README - and uses Whitesmith's runtime, c.ent at 1075 and c.ents
+at 0f28.  The program is the one of that name in Kernighan and Plauger's
+Software Tools, and the manual page is the one that book's index is made with:
+
+    kwic <text | sort | unrot >index
+
+Its own code is three functions and there is no string in it.  main at 010e
+reads lines with getl - 0442, which is the library's, handed 512 - and gives
+each to kwic at 0168, until a read comes back with nothing.  kwic turns every
+tab in the line into a blank, and then goes along it: where there is a letter
+or a digit it calls rotate at 025f with the line and the place, and goes past
+the rest of the run of them.  rotate writes from that place to the end of the
+line, or to the newline, then a dollar sign, then the line from its start up to
+the place, then a newline.  So a word is a run of letters and digits, as
+tested by the comparisons with a, z, A, Z, 0 and 9 and nothing else, and the
+blank before it comes round to the end of the line with the rest.
+
+THE THINGS IN IT THAT ARE NOT WHAT THE MANUAL SAYS
+
+A line of more than 511 characters comes back from getl in pieces of 512, a
+newline included, and each piece is a line.  A word that is cut in two by the
+join is two words, and a piece with no newline is rotated to the end of it.
+
+The output has no byte with the high bit set in it.  The characters are passed
+to putc as chars, widened to ints, and the library's putc of a negative number
+is the request to flush the stream, so the byte is not written - 05d2 tests the
+sign of the high byte and goes round the store.  The text is expected to be
+ASCII.  A word with an accented letter in it loses that letter from the output
+and is split at it, since the letter is not alphanumeric either.  kwic.c does
+the same, in out(), and says why.
+
+The exit status is whatever BC held when the input ended, which was the count
+getl returned, and that was 0, so it is the one place where it comes out right.
+
+Checked in usersim against the original, byte for byte: ordinary text, a few
+hundred lines of it, with tabs; text with words of every kind, punctuation,
+digits, underscores and a letter with an accent; lines of 512, 511 and
+more than 1500 characters; a line with no newline; blank lines; an empty file;
+and four thousand random bytes with newlines, carriage returns, NULs and bytes
+over 0177.

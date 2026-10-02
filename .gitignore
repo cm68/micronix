@@ -289,6 +289,7 @@ src/micronix/cmd/init/init
 src/micronix/cmd/init/init.dbg
 src/micronix/cmd/kill/kill
 src/micronix/cmd/kstat/kstat
+src/micronix/cmd/kwic/kwic
 src/micronix/cmd/label/label
 src/micronix/cmd/ld/ld
 src/micronix/cmd/less/less

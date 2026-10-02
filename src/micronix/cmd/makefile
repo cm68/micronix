@@ -89,6 +89,7 @@ all:
 	cd init ; make all
 	cd kill ; make all
 	cd kstat ; make all
+	cd kwic ; make all
 	cd label ; make all
 	cd ld ; make all
 	cd less ; make all
@@ -195,6 +196,7 @@ install:
 	cd init ; make install
 	cd kill ; make install
 	cd kstat ; make install
+	cd kwic ; make install
 	cd label ; make install
 	cd ld ; make install
 	cd less ; make install
@@ -301,6 +303,7 @@ clean:
 	cd init ; make clean
 	cd kill ; make clean
 	cd kstat ; make clean
+	cd kwic ; make clean
 	cd label ; make clean
 	cd ld ; make clean
 	cd less ; make clean
@@ -407,6 +410,7 @@ clobber:
 	cd init ; make clobber
 	cd kill ; make clobber
 	cd kstat ; make clobber
+	cd kwic ; make clobber
 	cd label ; make clobber
 	cd ld ; make clobber
 	cd less ; make clobber
