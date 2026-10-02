@@ -891,9 +891,11 @@ macexpand(char *s)	/* the symbol we are looking up as a macro */
         /* literals go straight across */
         if ((c == '\'') || (c == '\"')) {
             *d++ = *s++;
-            while (*s != c && d < lim) {
-                /* don't notice literal next quote */
-                if (*s == '\\' && s[1] == c) {
+            while (*s != c && *s != '\0' && d < lim) {
+                /* a backslash escapes whatever follows, so copy both;
+                 * checking only for \' or \" here mistook the closing
+                 * quote of '\\' for an escaped quote and read past it */
+                if (*s == '\\') {
                     *d++ = *s++;
                 }
                 *d++ = *s++;
