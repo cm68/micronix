@@ -1,8 +1,18 @@
 /*
  * Disk Jockey DMA driver
  *
- * sys/dj.c 
- * Changed: <2021-12-30 19:10:31 curt>
+ * sys/dj.c
+ *
+ * The driver is two things and nothing else: a 512-byte transfer engine,
+ * and the door a caller pushes a controller program through (djioctl).
+ * A floppy's geometry comes from its own disk label, read with dllabel()
+ * the way mw and ide read a hard disk's; the one property the label does
+ * not carry - whether the medium numbers its sectors from one or zero -
+ * is read from the drive itself at open, as is write protect.  Everything
+ * that used to be here to sniff the format of a foreign diskette - the
+ * specs[] table, the delay[] table, getstat's IBM and Morrow probing - is
+ * gone: that is djformat's and far's business, and they reach the board
+ * through the same command block the driver does.
  */
 #include <types.h>
 #include <sys/sys.h>
@@ -13,515 +23,148 @@
 #include <sys/dj.h>
 #include <sys/ioctl.h>
 #include <sys/ovl.h>
+#include <sys/dlabel.h>
 
 /*
  * The static routines below, declared before anything calls them.
- *
- * A call the compiler has not seen declared is extern int by default,
- * and the definition further down says static: two linkages for one
- * name.  The complaint lands on the definition rather than on the
- * call that caused it.
  */
-static int sio(), djwait(), djstart(), getstat(), readone();
-static int djbusy(), memio(), busready(), busplease(), busthanks();
+static int sio(), djwait(), djstart(), getstat();
+static int memio(), busready(), busplease(), busthanks();
 
 /*
  * From the kernel rather than from a header: the staging page's
- * allocator, and the kernel's own copy of task zero's map registers.  The
- * map registers are write only, so the segment in place is only ever
- * known from image0 - see bhold/brel and swin/srel in uio.c, which is the
- * same reason they save image0 and not map0.
+ * allocator, the raw user-memory copies, the raw window mapping, and the
+ * disk label decoder.
  */
 extern int segalloc();
 extern UINT8 image0[], map0[];
-/*
- * Also from the kernel and not from a header: the raw user-memory copies
- * and the raw window mapping.  bhold()/brel() and swin()/srel() are the
- * same writes with a stack of their own (uio.c); the one place the driver
- * wants the mapping without one is the command block's data phase, where
- * the segment is only wanted for the length of a transfer and is put back
- * before anything else can take a hold.
- */
 extern int copyin(), copyout();
 extern bwin();
+extern int dllabel();
 
 /*
- * This driver's initialization, which is not in this object: it is
- * init-only code and folded into the reclaimed region beside cus(), so
- * that the page this file is built into holds only what running the
- * driver needs (sys/djinit.c).  The driver's header (sys/djhdr.c) is
- * what names it, so this file does not have to.
+ * This driver's initialization is not in this object: it is init-only
+ * code folded into the reclaimed region beside cus() (sys/djinit.c).  The
+ * driver's header (sys/djhdr.c) is what names it, so this file does not
+ * have to.
  */
 
-/*
- * Micronix driver for Disk Jockey DMA
- * 
- *      Len Edmondson, Morrow Designs  1982
- * 
- * The minor device number is interpreted as follows:
- *
- *      bit(s)          Meaning
- *
- *      0,1             drive number    (0 - 3)
- *      2               drive size      (0 = 8", 1 = 5 1/4")
- *      3               alt. sectors    (if set)
- *      4,5             drive type
- *      6               double sided soft 5
- *      7               internal use (should be zero)
- *
- *                      5 1/4" types
- *                      -------------
- *                      0 - Tandon
- *                      1 - SA200
- *                      2 - SA400
- *                      3 - Tandon (reserved)
- *
- *                      8" types
- *                      ----------
- *                      0 - SA800
- *                      1 - SA850
- *                      2 - SA800 (reserved)
- *                      3 - SA800 (reserved)
- *
- */
-#ifdef notdef
-#define	DJINTERVAL	(10 * HERTZ)
-#define	DJTHRESHHOLD	2
-
-#define	NONE		255
-#define	DEFSPECS	8
-#define	FIVEBASE	16
-#define	MAXTRACK	80
-
-/*
- * per - drive flags bits 
- */
-
-#define 	F_WP		(1 << 2)
-#define	ALT		(1 << 3)        /* do alternate sectoring */
-
-#define	DOUBSIDE	(1 << 6)
-#define	SINGSIDE	0
-
-#define	GETSTAT		(1 << 7)
-#define	TYPE		((1 << 4) | (1 << 5))
-#define	D		djcomm
-#define	IOSTAT		djcomm[8]
-#define	INTSTAT		djcomm[10]
-#define	SERIAL		0x2C
-#define	DISABLE		0
-#define	LOGICAL		0x2E
-#define	EIGHTFIRST	0
-#define	END		10
-#define	PIC1		(0x4D)
-#define	VI		(1<<1)  /* use int. line 1 */
-#define	DJMIN		0x1030
-#define	DJMAX		0x127f
-#define	DJPRIORITY	PRIBIO
-
-#define	DJINT		1
-#define	TIME		 (~0)
-#define	MAX		((unsigned) 3000)       /* biggest floppy boundary */
-#define	CHAN		((unsigned)(djcomm))
-#define	OKSTAT		0x40
-#define 	NOSTAT		0
-#define	BADSTAT		1
-#define	COMMSIZE	9
-#define	ISOPEN		(1 << 0)
-#define	ORG1		(1 << 1)        /* sector numbers start from 1 */
-#define	MAP		((char *) (0x602))
-#define	IMAGE		((char *) (0x202))
-
-/*
- * DJDMA command codes
- */
-
-#define	SREAD		0x20
-#define	SWRITE		0x21
-#define	STATUS		0x22    /* Get drive status */
-#define	SETDMA		0x23    /* Set DMA address */
-#define	SETINT		0x24    /* Set interrupt */
-#define	HALT		0x25    /* Controller halt */
-#define	SETCHANNEL	0x27    /* Set channel address */
-#define	SETTRACK	0x2D    /* Set max. track */
-#define	MEMREAD		0xA0    /* read controller memory */
-#define	MEMWRITE	0xA1    /* write controller memory */
-
-#define	VERSO		0200    /* other side */
-
-#define	STATRET		5
-
-/*
- * Status byte 1
- */
-
-#define	DOUBLE		0x10    /* 1 if double density */
-#define	FIVE		(1 << 2)        /* 1 if 5 1/4 inch drive */
-#define	HARD		0x02    /* 1 if hard sectored */
-
-/*
- * Status byte 2
- */
-
-#define	S128		0       /* 128 byte sectors */
-#define	S256		1       /* 256 byte sectors */
-#define	S512		2       /* 512 byte sectors */
-#define	S1024		3       /* 1024 byte sectors */
-#define	SHARD		4       /* Hard sectored 256 or 512 byte */
-
-/*
- * Status byte 3
- */
-
-#define	READY		0x80    /* Drive ready bit */
-#define	S_WP		(1 << 6)        /* Write protected */
-#define	TRACK0		0x20    /* Drive at track zero */
-#define	SIDE2		0x04    /* Double sided indicator */
-
-#define	START		0xEF    /* DJ DMA attention port */
-#define	DEFCHAN		0x50    /* default chan. addr. */
-
-#define	RECSIZE		128
-#define	BUFSIZE		512
-#define 	K		1024
-#define	K4		4096
-
-#define	NDRIVES		8
-
-#define	TABADDR		0x1340  /* base address of tables in controller
-                                 * memory */
-
-/*
- * drive manufacturer codes
- *     5 1/4" drives
- */
-
-#define TANDON		0
-#define SA200		1
-
-#define mS		* 341 / 10
-
-#define STEP		 4      /* offset for step delay */
-#define SETTLE		10      /* offset for head settle */
-
-/*
- * delays
- */
-
-struct delay {
-    int step, settle;
-};
-
-/*
- * the structure of the internal tables of
- * the DJDMA
- */
-
-struct djtable {
-    char tracks,                /* no. of tracks on the drive */
-         curtrack,              /* current track */
-         pattern, number;
-
-    int steprate,               /* stepping rate */
-        rampup, rampdown, settle,       /* head settle delay 34.1 to the mS */
-        image;
-
-    char config, code;
-};
-
-struct status {
-    unsigned char other[8], spt, config, dev,   /* device number */
-         dchar,                 /* drive characteristics */
-         slength,               /* sector length */
-         dstat,                 /* drive status */
-         retstat;               /* command return status */
-};
-
-struct specs {
-    unsigned char config,       /* configuration byte */
-         ds,                    /* double sided (boolean) */
-         spt,                   /* sectors per track */
-         cylinder,              /* secs. per cyl. */
-         spb,                   /* sectors per block */
-         ncyl,                  /* number of cylinders */
-         toff;                  /* track offset */
-
-    unsigned bps,               /* bytes per sector */
-             volume;            /* secs per disk */
-};
-
-/*
- * Each drive has one of the following structures
- * associated with it. The structure holds infomation
- * about configuration and current activity.
- */
-
-struct dm {
-    struct specs *specs;
-    UINT8 flags;                /* see below */
-};
-#endif
-
-static unsigned char kw = 0,   /* 1K write operation */
-*haltstat = 0, djtimer = 0;
+static unsigned char *haltstat = 0, djtimer = 0;
 
 unsigned char djcomm[26] = { 0 };
-
-static kdev = ~0,               /* cached sector's device */
-    ksec = ~0;                  /* cached sector's number */
 
 /*
  * The staging page.
  *
- * A diskette whose sector is longer than a filesystem block - 1024 bytes
- * is the case, and 8" DS/DD is where it comes from - cannot be read or
- * written a block at a time.  The controller has no scatter/gather: it is
- * handed one address and moves a whole sector to or from it, so the 1024
- * bytes have to be contiguous in physical memory *and* reachable by the
- * kernel, and that is the only thing this page is for.  A 512-byte block
- * is then half of what the controller moved.
+ * The DMA controller has no scatter/gather: it is handed one address and
+ * moves a whole transfer to or from it, so anything bigger than a 512
+ * byte block must be contiguous in physical memory.  The buffer cache's
+ * blocks are not guaranteed to be; this page, a single segalloc() 4K
+ * segment, always is.  It is the data phase of the ioctl door - a
+ * formatter writing a track, far reading a raw CP/M sector - and of
+ * getstat's STATUS read.  The 512 byte transfer path does not use it: a
+ * block is one sector and the DMA goes straight to the buffer.
  *
- * It used to be kbuf[1024] in the kernel's own segment, which cost the 64K
- * address space 1024 bytes - the budget that actually binds here, see
- * sys/TODO - to hold a buffer only ever needed while such a diskette is in
- * a drive.  The page is somewhere else now and the kernel maps it only to
- * copy, which is the whole of the change: 1024 bytes of the resident
- * kernel for one byte, and four 1K sector buffers for the drives to share
- * rather than one.
- *
- * segalloc()'s unit is the 4K MMU page, so this is one page and not a
- * kilobyte: NSLOT slots fall out of it for nothing, and a page is what the
- * DMA wants anyway.  One page serves every drive, because only one
- * transfer is ever in flight - inservice is held for the whole of one, and
- * djint() returns at once while it is up.
- *
- * The page is taken on the first open and never given back: one page of
- * the 256, against a driver that can be reopened at any moment.
+ * It is taken on the first open and never given back: one page of the
+ * 256, against a driver that can be reopened at any moment.
  */
 static UINT8 kseg = 0;          /* 0 = not taken; segalloc() starts at 16 */
-#define NSLOT   4               /* 1K sector buffers in the page */
-#define SLOTW   1024            /* ... one slot is this big */
-#define SLOT(d) ((d & 3) * SLOTW)   /* ... and this is a drive's, in it */
 
-/*
- * Take the staging page, if it has not been taken already.
- *
- * PROCESS CONTEXT ONLY.  segalloc() brackets itself in di()/ei(), so
- * calling this from the interrupt path would turn interrupts back on
- * inside the handler.  That is why it is called from djopen() and not
- * from where the page is used: every transfer is behind an open, so by
- * the time djint() or getstat() reaches for kseg it has been taken.
- * djioctl() is the one other caller, and it runs in process context too.
- */
 static UINT8
 kstg()
 {
-    if (!kseg)
-        kseg = (UINT8) segalloc();
-    return (kseg);
+	if (!kseg)
+		kseg = (UINT8) segalloc();
+	return (kseg);
 }
+
+/*
+ * Per-drive state.  The geometry is the label's own, decoded through a
+ * struct dlgeom (sys/dlabel.h) the same way mw.c and ide.c do it: the
+ * first seven fields are struct dlgeom, in its order and of its types,
+ * because dllabel() writes through that view of them.  Moving or
+ * widening any of them breaks the decode without the compiler noticing.
+ */
+struct dm
+{
+	struct dlgeom g;            /* tracks, heads, sectors, maxblk, spc,
+	                             * roll, cylstart */
+	UINT8 flags;                /* ISOPEN | F_WP */
+};
 
 static struct dm dm[NDRIVES] = { 0 };
 
 static struct buf *curbuf = 0,  /* buffer currently under scrutiny */
-    *qhead = 0,                 /* New requests added head. */
-    *qtail = 0;                 /* Next request found here. */
+	*qhead = 0,                 /* New requests added head. */
+	*qtail = 0;                 /* Next request found here. */
 
-static struct specs specs[] = {
-    {0, 0, 26, 26, 4, 77, 2, 128, 1950},
-    {0, 0, 26, 26, 2, 77, 2, 256, 1950},
-    {0, 0, 15, 15, 1, 77, 2, 512, 1125},
-    {0, 0, 8, 8, 1, 77, 2, 1024, 600},
-
-    {0, 1, 26, 52, 4, 77, 2, 128, 3900},
-    {0, 1, 26, 52, 2, 77, 2, 256, 3900},
-    {0, 1, 15, 30, 1, 77, 2, 512, 2250},
-    {0, 1, 8, 16, 1, 77, 2, 1024, 1200},
-
-    {0x90, 0, 10, 10, 1, 35, 2, 512, 330},     /* 5 1/4 default */
-    {0xF0, 1, 10, 20, 1, 35, 2, 512, 660},
-    {0xB0, 0, 10, 10, 1, 35, 2, 512, 330},
-    {0x10, 0, 10, 10, 2, 35, 3, 256, 320},
-
-    {0xA0, 0, 10, 10, 1, 40, 2, 512, 380},
-    {0xC0, 0, 10, 10, 1, 80, 2, 512, 780},
-    {0xD0, 1, 10, 20, 1, 40, 2, 512, 760},
-    {0xE0, 1, 10, 20, 1, 80, 2, 512, 1560},
-
-    {0, 0, 18, 18, 4, 40, 0, 128, 720},        /* Xerox */
-    {0, 0, 10, 10, 2, 40, 0, 256, 400},        /* Osborne */
-    {0, 0, 8, 8, 1, 40, 0, 512, 320},  /* IBM dos 1 single */
-    {0, 0, 5, 5, 1, 40, 0, 1024, 200}, /* single sided Morrow */
-    {0, 0, 9, 9, 1, 40, 0, 512, 360},  /* IBM dos 2, single */
-
-    {0, 1, 18, 36, 4, 40, 0, 128, 1440},
-    {0, 1, 10, 20, 2, 40, 0, 256, 800},
-    {0, 1, 8, 16, 1, 40, 0, 512, 640},
-    {0, 1, 5, 10, 1, 40, 0, 1024, 400},       /* Dual Morrow */
-    {0, 1, 9, 18, 1, 40, 0, 512, 720},        /* IBM dos 2, double */
-
-    /*
-     * {0, 0, 10, 10, 1, 40, 0, 512, 400}, /* radio shack * 
-     */
-
-    {END, 0, 0, 0, 0, 0}
-};
-
-struct delay delay[] = {
-
-    /*
-     * 8" types
-     */
-
-    8 mS, 8 mS,                 /* SA 800 */
-    3 mS, 15 mS,                /* SA 850 */
-    8 mS, 8 mS,                 /* SA 800 (reserved) */
-    8 mS, 8 mS,                 /* SA 800 (reserved) */
-
-    /*
-     * 5 " types
-     */
-
-    5 mS, 15 mS,                /* Tandon (reserved) */
-    20 mS, 20 mS,               /* SA 200 */
-    40 mS, 10 mS,               /* SA 400 */
-    5 mS, 15 mS,                /* Tandon */
-};
+/*
+ * The step and settle delays, written to the controller's per-drive table
+ * at open.  One fixed pair for the one drive this machine has - the 5.25
+ * inch default, 5 ms step and 15 ms settle - in place of the per-drive-
+ * model delay[] table that went away with the format detection.
+ */
+#define DSTEP   170             /* 5 ms, in the board's delay ticks */
+#define DSETTLE 511             /* 15 ms */
 
 djopen(dev, mode)
-    register dev, mode;
+	register dev, mode;
 {
-    static struct status *s;
-    static struct dm *d;
-    static struct specs *sp, *S;
-    static struct buf *b;
+	static struct dm *d;
+	static struct dlgeom *g;
+	static struct status *s;
+	static unsigned drive, sl;
 
-    /*
-     * The staging page, before anything can want it.  This is the one
-     * place it is taken: djopen() is process context, so segalloc()'s
-     * di()/ei() is safe here and not in the handler - see kstg().
-     */
-    kstg();
+	/*
+	 * The staging page, before anything can want it.  This is the one
+	 * place it is taken: djopen() is process context, so segalloc()'s
+	 * di()/ei() is safe here and not in the handler - see kstg().
+	 */
+	kstg();
 
-    d = &dm[dev & 7];
+	drive = dev & 7;
+	d = &dm[drive];
 
-    if (d->flags & ISOPEN) {    /* already open */
-        /*
-         * a drive may be opened as only one type of drive at once
-         */
-        if ((dev & (ALT | TYPE | DOUBSIDE)) !=
-            (d->flags & (ALT | TYPE | DOUBSIDE)))
-            return djbusy();
-    }
+	if (d->flags & ISOPEN)      /* already open */
+		return 0;
 
-    /*
-     * fill in information about the device
-     * Do a DJDMA getstatus command.
-     */
+	/*
+	 * Read the drive's status first - it sets the step and settle delays
+	 * and brings the head up - so the label read that follows has a
+	 * settled drive under it.  Write protect comes from here too.
+	 */
+	if (getstat(dev) == 0) {
+		u.error = EIO;
+		return;
+	}
 
-    b = bread(0, dev | GETSTAT);
+	s = (struct status *) djcomm;
 
-    if (b == 0) {
-      err:
-        u.error = EIO;
-        return;
-    }
+	if (s->dstat & S_WP) {      /* write protect */
+		d->flags |= F_WP;
+		if (mode != READ) {
+			u.error = EROFS;
+			return;
+		}
+	} else
+		d->flags &= ~F_WP;
 
-    /*
-     * The status has to be read every open: it is what says a diskette
-     * was changed (the specs comparison at the end of this routine).
-     * Clear BDONE - "io done, data valid" - so the next bread() for this
-     * block issues the command again instead of handing back this copy.
-     *
-     * This used to be "b->dev |= DISCARD", with DISCARD 0xff: dev is half
-     * the buffer cache's hash key, so ORing 0xff into it moved the
-     * buffer's identity to another bucket while the buffer stayed linked
-     * in the old one.  unhash() (uio.c) finds a buffer by hashing its blk
-     * and dev, so it could never unhook this one again; the next bget()
-     * linked it into a second bucket, and the chain closed into a loop
-     * that bget()'s lookup walk spins in forever.  Nothing reads DISCARD.
-     */
-    b->flags &= ~BDONE;
-    s = (struct status *)bhold(b);
+	/*
+	 * The geometry, from the disk's own label.  What is left in dm[]
+	 * from a previous open is not knowledge: the disk may have been
+	 * changed, and its label went with it.  The first sector's number
+	 * (d_firstsec) comes from the label too, not the drive.
+	 */
+	g = &d->g;
+	g->tracks = 0;
+	g->heads = 0;
+	g->sectors = 0;
+	g->roll = 0;
+	sl = devslice(dev);
+	if (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive, sl, g) < 0)
+		return;
 
-    /*
-     * deal with the Write Protect bit
-     */
-
-    if (s->dstat & S_WP) {      /* note write enable/disable status */
-        d->flags |= F_WP;
-
-        if (mode != READ) {
-            brel();
-            goto err;           /* read only */
-        }
-    } else {
-        d->flags &= ~F_WP;
-    }
-
-    /*
-     * find sp, the specs for this drive and diskette
-     */
-
-    if (s->dchar & HARD) {      /* hard sectored, table lookup */
-        sp = &specs[DEFSPECS];
-
-        if (s->config)          /* reasonable */
-            for (S = specs; S->config != END; S++)
-                if (S->config == s->config)
-                    sp = S;     /* change our minds */
-    }
-
-    else {                      /* soft sectored */
-        /*
-         * All soft sectored formats have one origin sector numbers.
-         */
-        d->flags |= ORG1;
-
-        /*
-         * select a format based on sector length
-         */
-
-        sp = &specs[s->slength & 3];
-
-        /*
-         * offset based on sidedness
-         */
-
-        if (dev & FIVE) {
-            sp += FIVEBASE;
-
-            if ((dev & DOUBSIDE) || s->config == DOUBSIDE)
-                sp += 5;
-        }
-
-        else {                  /* eight inch */
-            if (s->dstat & SIDE2)
-                sp += 4;
-        }
-
-        /*
-         * Adjustment for IBM 9 spt
-         */
-
-        if (s->spt == 9 && s->slength == S512) {
-            sp += 2;
-        }
-    }
-
-    brel();
-    brelse(b);
-
-    if ((d->flags & ISOPEN) && sp != d->specs) {
-        djclose(dev);           /* diskette has been changed */
-        goto err;
-    }
-
-    d->specs = sp;
-
-    d->flags |= ISOPEN | (dev & (ALT | TYPE | DOUBSIDE));       /* set the
-                                                                 * alternation 
-                                                                 */
+	d->flags |= ISOPEN;
 }
 
 /*
@@ -529,12 +172,9 @@ djopen(dev, mode)
  */
 
 djclose(dev)
-    register dev;
+	register dev;
 {
-    dm[dev & 7].flags = 0;
-
-    if (dev == kdev)
-        kdev = -1;              /* de-cache */
+	dm[dev & 7].flags = 0;
 }
 
 /*
@@ -542,84 +182,77 @@ djclose(dev)
  */
 
 djstrat(b)
-    register struct buf *b;
+	register struct buf *b;
 {
-    b->forw = 0;
+	b->forw = 0;
 
-    di();
+	di();
 
-    if (qtail) {
-        qhead->forw = b;
-        qhead = b;
-    } else {                    /* No request yet. */
-        qhead = qtail = b;
-    }
+	if (qtail) {
+		qhead->forw = b;
+		qhead = b;
+	} else {                    /* No request yet. */
+		qhead = qtail = b;
+	}
 
-    djint();
+	djint();
 
-    ei();
+	ei();
 }
 
+/*
+ * Lay out the command for one 512 byte sector and hand it to the
+ * controller.  sec is the absolute sector number; the geometry that turns
+ * it into a track, a head and a sector within the track comes from the
+ * label (struct dlgeom above), not a table.
+ */
 static
 sio(d, addr, xaddr, op, sec, dev)
-    register unsigned sec;
-    register struct dm *d;
+	register unsigned sec;
+	register struct dm *d;
 {
-    static unsigned char spt;
-    static struct specs *sp;
+	static struct dlgeom *g;
+	static unsigned track, within;
 
-    sp = d->specs;
+	g = &d->g;
 
-    spt = sp->spt;
+	D[0] = SETDMA;              /* set DMA command */
+	*(char **) (D + 1) = addr;  /* D[1], D[2] */
+	D[3] = xaddr;               /* the segment */
 
-    D[0] = SETDMA;              /* set DMA command */
+	D[4] = op;                  /* I/O command */
 
-    /*
-     * D[1] = addr; D[2] = addr >> 8; 
-     */
-    *(char **) (D + 1) = addr;
+	/*
+	 * The track is the cylinder, rolled and sliced the way dllabel
+	 * taught it: cyl = sec / spc + cylstart + roll, wrapped at tracks.
+	 */
+	track = sec / g->spc + g->cylstart + g->roll;
+	if (track >= g->tracks)
+		track -= g->tracks;
+	D[5] = track;
 
-    D[3] = xaddr;
+	/*
+	 * The sector within the track, the head folded into its high bit
+	 * (VERSO) because the board has no separate head field, and the
+	 * medium's first-sector number.
+	 */
+	within = sec % g->spc;
+	D[6] = (within % g->sectors) + g->firstsec;
+	if (g->heads > 1 && within >= g->sectors)
+		D[6] |= VERSO;
 
-    D[4] = op;                  /* I/O command */
+	D[7] = dev & 7;             /* drive */
 
-    D[5] = (sec / sp->cylinder) + sp->toff,     /* track */
-        D[6] = sec % spt;       /* basic 0-origin sector number */
+	D[8] = NOSTAT;              /* io status will be returned here */
 
-    if (dev & ALT) {            /* alternate sectors */
-        D[6] <<= 1;             /* D[6] *= 2; */
+	D[9] = SETINT;
+	D[10] = NOSTAT;
 
-        if (!(spt & 1) && D[6] >= spt)
-            D[6]++;
+	D[11] = HALT;
 
-        D[6] %= spt;
-    }
+	haltstat = &D[12];
 
-    if (d->flags & ORG1)
-        D[6]++;                 /* 1-org. sectors correction */
-
-    if (sp->ds && (sec % sp->cylinder) >= spt)
-        D[6] |= VERSO;          /* flip side (head) */
-
-    D[7] = dev & 7;             /* drive */
-
-    D[8] = NOSTAT;              /* io status will be returned here */
-
-    D[9] = SETINT;
-    D[10] = NOSTAT;
-
-    D[11] = HALT;
-
-    /*
-     * D[12] = NOSTAT; 
-     */
-
-    haltstat = &D[12];
-
-    /*
-     * a command is 13 bytes long
-     */
-
+	/* a command is 13 bytes long */
 }
 
 /*
@@ -628,662 +261,244 @@ sio(d, addr, xaddr, op, sec, dev)
 
 static
 djwait(a)
-    char *a;
+	char *a;
 {
-    unsigned int i;
+	unsigned int i;
 
-    for (i = TIME; i && *a == NOSTAT; i--);
+	for (i = TIME; i && *a == NOSTAT; i--);
 }
 
 static unsigned char inservice = 0;
 
 djint()
 {
-    static unsigned char op, spb;
-    static unsigned addr, xaddr, sec, off, blk, bps, count, togo, dev;
-    static struct dm *d;
-    static struct specs *sp;
-    static char *p, *q;         /* the staging and the buffer, windowed */
+	static unsigned char op;
+	static unsigned addr, xaddr, sec, dev;
+	static struct dm *d;
+	static struct dlgeom *g;
 
-    pr("");                     /* timing delay kludge */
+	pr("");                     /* timing delay kludge */
 
-    /*
-     * make sure only one enters at a time
-     * at the beginning of djint, curbuf determines
-     * whether this int. came from the contoller or the strat routine
-     */
+	di();
 
-    di();
+	if (inservice               /* already working on it */
+		|| (curbuf && INTSTAT == NOSTAT)        /* not our int. */
+		||(!curbuf && !qtail)   /* not our int. */
+		||(busget(&djint) == 0)        /* can't get bus yet. See mw.c */
+		) {
+		ei();
+		return;
+	}
 
-    if (inservice               /* already working on it */
-        || (curbuf && INTSTAT == NOSTAT)        /* not our int. */
-        ||(!curbuf && !qtail)   /* not our int. */
-        ||(busget(&djint) == 0)        /* can't get bus yet. See mw.c */
-        ) {
-        ei();
-        return;
-    }
+	else {
+		inservice = 1;
+		ei();
+	}
 
-    else {
-        inservice = 1;
-        ei();
-    }
+	djtimer = 0;                /* reset the deadman switch */
 
-    djtimer = 0;                /* reset the deadman switch */
+	/*
+	 * first, check up on the current operation
+	 */
 
-    /*
-     * first, check up on the current operation
-     */
+	if (curbuf) {               /* something happening */
+		if (IOSTAT != OKSTAT) { /* failed */
+		  fail:
+			curbuf->error = EIO;
+		  berr:
+			curbuf->flags |= BERROR;
 
-    if (curbuf) {               /* something happening */
-        /*
-         * Yes, a DJDMA int. command has been executed
-         */
-        /*
-         * check to see if the operation(s) failed
-         */
-        if (IOSTAT != OKSTAT) { /* failed */
-          fail:
-            curbuf->error = EIO;
-          berr:
-            curbuf->flags |= BERROR;
+		  finished:
+			iodone(curbuf);
+			curbuf = 0;
 
-          finished:
+			/*
+			 * acknowledge the interrupt: push the board past the
+			 * interrupt command, then drop the bus.
+			 */
+			djack();
 
-            /*
-             * placate the system, send wakeups, etc.
-             * note that nothing really exciting will happen just now
-             * In particular, an interrupt won't happen on our V.I. line
-             */
+			if (!qtail)
+				goto request;
 
-            iodone(curbuf);
-            curbuf = 0;
+			if (busgive(&djint) || !busget(&djint)) {
+				inservice = 0;
+				ei();
+				return;
+			}
 
-            /*
-             * push the controller past the interrupt command
-             * this is the interrupt acknowledge section
-             * we must first tell the DJDMA board to turn off its
-             * interrupt line, then tell the PIC chip that this int.
-             * is serviced
-             */
+			goto request;       /* set up next req. */
+		}
 
-            djack();
+		/*
+		 * the operation worked; a 512 byte transfer is one sector and
+		 * is already where it belongs.
+		 */
+		goto finished;
+	}
 
-            if (!qtail)
-                goto request;
-
-            if (busgive(&djint) || !busget(&djint)) {
-                inservice = 0;
-                ei();
-                return;
-            }
-
-            goto request;       /* set up next req. */
-        }
-
-        /*
-         * yes, the previous op(s) worked
-         * if bps <= count, then the previous command
-         * has already send the data directly to its destination
-         */
-
-        if (!off && bps <= count)       /* small sectors */
-            goto secdone;
-
-        /*
-         * partial request
-         */
-
-        if (!kw) {              /* the cache has just been filled */
-            kdev = dev;         /* mark the cache valid */
-            ksec = sec;
-        }
-
-        if (curbuf->flags & BREAD) {    /* partial read operation worked */
-            /*
-             * copy the information from the 1K cache out to the block
-             */
-          kread:
-
-            /*
-             * Both windows, and this is why the read path needs the
-             * buffer's: the staging is the scratch window and the buffer
-             * is BUFSEG, so the two are visible at once and neither
-             * address can be confused for the other.  addr is the
-             * buffer's *physical* address - what the DMA was handed -
-             * and would be no use here at all; the window address is
-             * bhold's to give, and kwrite below has to say the same
-             * thing.
-             */
-            p = swin(kseg) + SLOT(dev);
-            q = bhold(curbuf);
-            copy(p + off, q, togo);
-            brel();
-            srel();
-
-          secdone:
-            count -= togo;
-
-            if (count) {
-                addr += togo;
-                sec++;
-                off = 0;
-                djack();
-                goto nextsec;
-            }
-
-            else {
-                goto finished;
-            }
-        }
-
-        /*
-         * partial write request
-         */
-
-        if (kw) {               /* the write op. must be complete */
-            goto finished;
-        }
-
-        /*
-         * partial, between operations
-         */
-
-      kwrite:
-        p = swin(kseg) + SLOT(dev);
-        q = bhold(curbuf);
-        copy(q, p + off, togo);
-        brel();
-        srel();
-
-        djack();                  /* acknowledge old int. */
-
-        /*
-         * an int. on our line could happen now
-         * but would be discarded as spurious because inservice is set.
-         */
-
-        sio(d, (char *) SLOT(dev), kseg, SWRITE, ksec, dev);
-
-        kw = 1;               /* doing the write portion of a 1K req. */
-
-        goto go;
-
-    }
-
-    /*
-     * nohing happening, pluck a buffer
-     */
+	/*
+	 * nothing happening, pluck a buffer
+	 */
 
   request:
 
-    di();
+	di();
 
-    if (!qtail) {               /* all done , No more requests */
-        inservice = 0;
-        ei();
-        busgive(0);
-        return;
-    }
+	if (!qtail) {               /* all done, no more requests */
+		inservice = 0;
+		ei();
+		busgive(0);
+		return;
+	}
 
-    curbuf = qtail;
-    qtail = qtail->forw;
+	curbuf = qtail;
+	qtail = qtail->forw;
 
-    ei();
+	ei();
 
-    /*
-     * set up the next command
-     */
+	dev = curbuf->dev;
 
-    dev = curbuf->dev;
+	if (dev & GETSTAT) {        /* stat req. */
+		if (getstat(dev)) {
+			copy(djcomm, bhold(curbuf), sizeof(struct status));
+			brel();
+			goto finished;
+		} else {
+			goto fail;
+		}
+	}
 
-    if (dev & GETSTAT) {        /* stat req. */
-        if (getstat(dev)) {
-            copy(djcomm, bhold(curbuf), sizeof(struct status));
-            brel();
-            goto finished;
-        } else {
-            goto fail;
-        }
-    }
+	d = &dm[dev & 7];
 
-    d = &dm[dev & 7];
+	if ((d->flags & ISOPEN) == 0)       /* not open */
+		goto fail;
 
-    if ((d->flags & ISOPEN) == 0)       /* not open */
-        goto fail;
+	g = &d->g;
 
-    sp = d->specs;
+	if (curbuf->blk > g->maxblk) {      /* off the end of the slice */
+		curbuf->error = ENXIO;
+		goto berr;
+	}
 
-    count = curbuf->count;
-    blk = curbuf->blk;
+	op = (curbuf->flags & BREAD) ? SREAD : SWRITE;
 
-    if (blk > MAX) {            /* outrageous */
-      range:
-        curbuf->error = ENXIO;
-        goto berr;
-    }
+	if (op == SWRITE && (d->flags & F_WP))
+		goto fail;
 
-    bps = sp->bps;
-    spb = sp->spb;
+	/*
+	 * One block is one sector, so the sector number is the block number.
+	 * The DMA goes straight to the buffer: the block is 512 bytes and the
+	 * board moves one sector to or from a single contiguous address.
+	 */
+	sec = curbuf->blk;
+	addr = curbuf->data;
+	xaddr = curbuf->xmem;
 
-    /*
-     * find the sector number of the beginning of the transfer
-     */
+	sio(d, addr, xaddr, op, sec, dev);
 
-    off = 0;
-
-    togo = bps;                 /* transfer 1 whole sector */
-
-    if (count < togo)           /* unless less is requested */
-        togo = count;
-
-    if (bps == K) {             /* 1K blocks */
-        sec = blk >> 1;         /* sec = blk / 2 */
-
-        if (blk & 1) {          /* odd numbered block */
-            off = BUFSIZE;
-
-            if (togo > BUFSIZE)
-                togo = BUFSIZE; /* truncate for K bounds. */
-        }
-    } else {
-        sec = blk * spb;        /* sector number of the volume */
-    }
-
-    op = (curbuf->flags & BREAD) ? SREAD : SWRITE;
-
-    if (op == SWRITE && (d->flags & F_WP))
-        goto fail;
-
-    addr = curbuf->data;
-    xaddr = curbuf->xmem;
-
-  nextsec:
-
-    if (sec >= sp->volume)      /* off the end */
-        goto range;
-
-    /*
-     * when the sector fits entirely within the count,
-     * things are simple
-     * we merely transfer directly
-     * to x-mem space
-     */
-
-    if (!off && bps <= count) { /* small sector sizes and alignment */
-        sio(d, addr, xaddr, op, sec, dev);
-
-      go:
-        di();
-        djstart();
-        inservice = 0;
-        ei();
-        return;
-    }
-
-    /*
-     * partial request
-     *
-     * The first step is to bring the desired sector into the cache
-     * If its not already there.
-     *
-     */
-
-    if (ksec != sec || kdev != dev) {   /* not in cache */
-        kdev = -1;              /* cache invalid */
-        sio(d, (char *) SLOT(dev), kseg, SREAD, sec, dev);
-        kw = 0;
-    }
-
-    else if (op == SREAD)       /* partial cached read */
-        goto kread;
-
-    else                        /* cached write */
-        goto kwrite;
-
-    goto go;
+	di();
+	djstart();
+	inservice = 0;
+	ei();
 }
 
 static
 djstart()
 {
-    di();
+	di();
 
-    if (haltstat)
-        *haltstat = NOSTAT;
+	if (haltstat)
+		*haltstat = NOSTAT;
 
-    out(START, 0);
-    ei();
+	out(START, 0);
+	ei();
 }
 
-#define S ((struct status *) djcomm)
-
+/*
+ * Read the drive's status and set its step and settle delays.  This is
+ * the whole of getstat now: the format sniffing that used to follow -
+ * the config byte, the IBM FAT, the Morrow checksum - is gone.  What is
+ * wanted is the characteristics byte (hard or soft sectored, for ORG1)
+ * and the write protect bit, which the status carries.
+ */
 static
 getstat(a)
-    register a;
+	register a;
 {
-    static unsigned char type;
-    static unsigned astep, asettle;
-    static struct delay *d;
-    static struct status *s;
-    static char *kp;            /* the staging, windowed, for the peeks */
-
-    kdev = -1;                  /* cache invalid */
-
-    /*
-     * Set the step and settle times
-     *
-     * structure pointer into delay table
-     */
-
-    type = (a >> 4) & 3;        /* drive type # (bits 4 & 5 ) */
-
-    if (a & FIVE)
-        type += 4;              /* use last half of tab for 5" */
-
-    d = delay + type;           /* structure pointer into table */
-
-    /*
-     * calculate internal controller memory addresses
-     * 16 bytes per table entry
-     */
-
-    a &= 7;
-
-    astep = TABADDR + (a << 4); /* ADDR + 16 * drive */
-    asettle = astep;
-
-    astep += STEP;              /* address of the step value */
-    asettle += SETTLE;          /* address of the settle value */
-
-    memio(WRITE, &d->step, astep, sizeof d->step);
-    memio(WRITE, &d->settle, asettle, sizeof d->settle);
-
-    /*
-     * Set the DMA address to this drive's staging slot.  The controller
-     * is handed a physical address - a segment and an offset inside it -
-     * so nothing here has to be mapped.  The page is mapped only while a
-     * block is being copied into it or out of it; see kseg above.
-     */
-
-    D[0] = SETDMA;
-    /*
-     * D is djcomm and the staging is in a segment; a and p below are
-     * plain char.  The controller does not care which, the bytes being an
-     * address it is handed, but ccc will not convert unsigned char * to
-     * char * silently.  Every cast in this file that looks like this one
-     * is that and nothing more.
-     */
-    *(char **) (D + 1) = (char *) SLOT(a);
-    D[3] = kseg;
-
-    D[4] = SREAD;               /* move to cyl 3 */
-    D[5] = 3;                   /* cylinder */
-    D[6] = 1;                   /* sector */
-    D[7] = a;                   /* drive */
-    D[8] = NOSTAT;
-
-    D[9] = STATUS;              /* get stat */
-    D[10] = a;
-
-    /*
-     * D[11] = NOSTAT; 
-     */
-
-    /*
-     * D[12] = NOSTAT; 
-     */
-
-    /*
-     * D[13] = NOSTAT; 
-     */
-    D[14] = NOSTAT;
-
-    D[15] = HALT;
-    D[16] = NOSTAT;
-
-    djstart();
-    ei();
-    djwait(&D[16]);
-    di();
-
-    if (D[14] != OKSTAT)
-        return 0;
-
-    /*
-     * read sector zero of 5 inch hard diskettes to find the config byte.
-     * read sector 9 of soft 5's to differentiate IBM's
-     * Sometimes, the dos config byte will eliminate the need
-     * for performing the attemped read of sec 9.
-     */
-
-    S->spt = 8;
-
-    D[0] = SREAD;
-    D[1] = 0;                   /* cylinder */
-    D[2] = 0;                   /* sector */
-    D[3] = a;                   /* drive */
-
-    /*
-     * D[ 4] = NOSTAT; 
-     */
-
-    D[5] = HALT;
-
-    /*
-     * D[ 6] = NOSTAT; 
-     */
-
-    if (S->dchar & HARD) {
-
-        /*
-         * D[ 0] = SREAD; /* move to cyl 3 
-         */
-
-        /*
-         * D[ 1] = 0; /* cylinder 
-         */
-
-        /*
-         * D[ 2] = 0; /* sector 
-         */
-
-        /*
-         * D[ 3] = a; /* drive 
-         */
-
-        /*
-         * D[ 4] = NOSTAT; 
-         */
-
-        /*
-         * D[ 5] = HALT; 
-         */
-
-        /*
-         * D[ 6] = NOSTAT; 
-         */
-
-        readone();
-
-        if (D[4] != OKSTAT)
-            return 0;
-
-        /*
-         * The staging is in a segment, so the sector just read is
-         * reachable only through a window.  These peeks are a handful of
-         * bytes each and the read that filled it has already returned,
-         * so a map per peek is the right trade against holding the
-         * window across a transfer.
-         */
-        kp = swin(kseg);
-        S->config = kp[0x5C];   /* copy the configuration byte */
-        srel();
-    }
-
-    else if (S->slength == S512 && (a & FIVE)) {        /* IBM maybe */
-        /*
-         * First we'll try to take the short cut by reading the configuration
-         * which may be available as a result of an IBM format.
-         * This information is found in bytes 0, 1, and 2 of
-         * sector 2, cyl, 0, head, 0
-         *
-         * And now a short quote from IBM PC DOS 2.0 manual 
-         * Appendix C, page 7
-         *
-         * The FAT begins in the second sector of the volume.
-         *
-         *     The second and third bytes always contain hex FFFF.
-         *     
-         *     The first byte is used as follows:
-         *
-         *     FF      Dual sided, 8 spt
-         *     FE      Single sided, 8 spt
-         *     FD      Dual sided, 9 spt
-         *     FC      Single sided, 9 spt
-         *
-         * It doesn't say so in the manual, but we interpret this to mean
-         * bit 0 is the dual sided bit and bit 1 is the 8spt bit.
-         *
-         */
-        /*
-         * D[ 0] = SREAD;      
-         */
-        /*
-         * D[ 1] = 0;  /* cylinder 
-         */
-        D[2] = 2;               /* sector */
-
-        /*
-         * D[ 3] = a; /* drive 
-         */
-
-        /*
-         * D[ 4] = NOSTAT; 
-         */
-
-        /*
-         * D[ 5] = HALT; 
-         */
-
-        /*
-         * D[ 6] = NOSTAT; 
-         */
-
-        readone();
-
-        kp = swin(kseg);
-        if (D[4] == OKSTAT      /* read worked */
-            && kp[1] == 0xff    /* valid dos fat */
-            && kp[2] == 0xff && (*kp & 0xfc) == 0xfc    /* valid config
-                                                         * byte */
-            ) {
-            if (*kp & 1)
-                S->config = DOUBSIDE;
-
-            if (!(*kp & 2))
-                S->spt = 9;
-
-            srel();
-            return 1;         /* short cut */
-        }
-        srel();
-
-        /*
-         * Attempt reading sector 9 of track 0 to discriminate
-         * between 8 and 9 sector per track formats.
-         */
-
-        /*
-         * D[ 0] = SREAD;      
-         */
-        /*
-         * D[ 1] = 0;  /* cylinder 
-         */
-        D[2] = 9;               /* sector */
-
-        /*
-         * D[ 3] = a; /* drive 
-         */
-
-        /*
-         * D[ 4] = NOSTAT; 
-         */
-
-        /*
-         * D[ 5] = HALT; 
-         */
-
-        /*
-         * D[ 6] = NOSTAT; 
-         */
-
-        readone();
-
-        if (D[4] == OKSTAT) {   /* read of sec 9 was successful */
-            S->spt = 9;         /* therefore 9 sec. per trk. */
-        }
-    }
-
-    else if (S->slength == S1024 && (a & FIVE)) {
-
-        /*
-         * D[ 0] = SREAD; 
-         */
-
-        /*
-         * D[ 1] = 0; /* cylinder 
-         */
-        D[2] = 1;               /* sector */
-
-        /*
-         * D[ 3] = a; /* drive 
-         */
-
-        /*
-         * D[ 4] = NOSTAT; 
-         */
-
-        /*
-         * D[ 5] = HALT; 
-         */
-
-        /*
-         * D[ 6] = NOSTAT; 
-         */
-
-        readone();
-
-        kp = swin(kseg);
-        if (kp[0x81] & 4) {     /* Morrow double bit set */
-            static char *p, n, s;
-
-            p = kp + 80;
-            n = 25;             /* 25 bytes to xor */
-            s = 0;              /* preset sum */
-
-            while (n--)         /* xor checksum */
-                s ^= *p++;
-
-            if (s == 0)
-                S->config = DOUBSIDE;
-        }
-        srel();
-    }
-
-    return 1;
+	static unsigned astep, asettle;
+	static int step = DSTEP, settle = DSETTLE;
+
+	a &= 7;                     /* the drive select, not the full dev */
+
+	/*
+	 * One fixed step and settle pair, written to the controller's
+	 * per-drive table.  The drive is the machine's own and its timing
+	 * does not vary with the diskette.
+	 */
+	astep = TABADDR + (a << 4) + STEP;
+	asettle = TABADDR + (a << 4) + SETTLE;
+	memio(WRITE, &step, astep, sizeof step);
+	memio(WRITE, &settle, asettle, sizeof settle);
+
+	/*
+	 * The status, read the way it always was: a SETDMA to the staging
+	 * page, a seek read to cylinder 3 to bring the drive up, then the
+	 * STATUS command, whose answer lands in djcomm and is read back as a
+	 * struct status.
+	 */
+	D[0] = SETDMA;
+	*(char **) (D + 1) = (char *) 0;        /* offset 0 of the page */
+	D[3] = kseg;
+
+	D[4] = SREAD;               /* move to cyl 3 */
+	D[5] = 3;
+	D[6] = 1;
+	D[7] = a;
+	D[8] = NOSTAT;
+
+	D[9] = STATUS;              /* get stat */
+	D[10] = a;
+
+	D[14] = NOSTAT;
+
+	D[15] = HALT;
+	D[16] = NOSTAT;
+
+	djstart();
+	ei();
+	djwait(&D[16]);
+	di();
+
+	if (D[14] != OKSTAT)
+		return 0;
+
+	return 1;
 }
 
-#undef S
-
+/*
+ * The controller's own memory, written for the step and settle setup.
+ * getstat() is the only caller now; a formatter's reach into controller
+ * memory goes through the command block like everything else (djioctl).
+ */
 static
-readone()
+memio(flag, memaddr, djaddr, count)
 {
-    D[6] = NOSTAT;
-    djstart();
-    ei();
-    djwait(&D[6]);
-    di();
+	D[0] = (flag == READ) ? MEMREAD : MEMWRITE;
+
+	*(char **) (D + 1) = memaddr;
+
+	D[3] = KERNEL;
+
+	*(int *) (D + 4) = count;
+
+	*(char **) (D + 6) = djaddr;
+
+	D[8] = HALT;
+	D[9] = NOSTAT;
+
+	djstart();
+	djwait(&D[9]);
 }
 
 /*
@@ -1292,44 +507,39 @@ readone()
 
 djack()
 {
-    if (!haltstat)
-        return;
+	if (!haltstat)
+		return;
 
-    djstart();                  /* get past the int. command */
-    djwait(haltstat);
-    haltstat = 0;
+	djstart();                  /* get past the int. command */
+	djwait(haltstat);
+	haltstat = 0;
 }
 
 /*
- * The deadman switch, run on the resident tick (sys/ovl.c) rather than on
- * a timer of the driver's own.  A command list is outstanding while
- * haltstat is set, and the board is supposed to raise an interrupt for
- * it; djint clears djtimer every time it runs.  DJTHRESHHOLD periods
- * with a list outstanding and no interrupt serviced is a controller that
- * has stopped talking, and the operation in flight is failed rather than
- * waited on: the watchdog supplies the completion the board did not.
- *
- * djgoose is not the tick itself.  The tick is a second - the pulse mw's
- * controller check needs - and this watchdog's period is longer, so the
- * count is kept here.
+ * The deadman switch, run on the resident tick (sys/ovl.c).  A command
+ * list is outstanding while haltstat is set, and the board is supposed to
+ * raise an interrupt for it; djint clears djtimer every time it runs.
+ * DJTHRESHHOLD periods with a list outstanding and no interrupt serviced
+ * is a controller that has stopped talking, and the operation in flight
+ * is failed rather than waited on.
  */
 djgoose()
 {
-    if (haltstat && ++djtimer >= DJTHRESHHOLD) {
-        IOSTAT = BADSTAT;
-        INTSTAT = OKSTAT;
-        djint();
-    }
+	if (haltstat && ++djtimer >= DJTHRESHHOLD) {
+		IOSTAT = BADSTAT;
+		INTSTAT = OKSTAT;
+		djint();
+	}
 }
 
 static char djticker = 0;
 
 djtick()
 {
-    if (++djticker < DJTICKS)
-        return (0);
-    djticker = 0;
-    return (djgoose());
+	if (++djticker < DJTICKS)
+		return (0);
+	djticker = 0;
+	return (djgoose());
 }
 
 /*
@@ -1340,160 +550,108 @@ djtick()
  * djcomm, the address of the data phase is planted where the caller said
  * it goes, and the controller is started.  Not one opcode is looked at.
  * That is the whole of the contract, and it is what lets a formatter -
- * which needs commands this driver has no reason to know, and a routine
- * of its own to run them - use the same door a sector read does.
+ * djformat, far, and eventually dar - use the same door a sector read
+ * does.
  *
  * The address is the caller's one hole: it knows its buffer as a virtual
  * address and the board wants a physical one, so req.hole says where in
  * the program the three bytes go and the driver writes them (three, not
  * two, because the board's address is a segment and an offset).
  *
- * What comes back is the status byte the board leaves inside each command
- * it runs.  The wait below is on the program's last byte, which is the
- * last command's status, so a program has to end with a command that has
- * one - a halt.  Every earlier command's status is in the block too, and
- * bioctl copies the block back out to the caller when this returns.
- *
  * The data phase has two shapes.  A block's worth arrives in b, the
  * pooled buffer bioctl staged it in, and the board is pointed at the
  * window it is mapped into; bhold() returns the address with the mapping
  * up, so the window is given back here.  More than a block arrives in
- * nothing - bioctl takes no buffer for it and leaves the caller's buf to
- * the driver - and is staged in the page the 1024 byte sectors already
- * use.  One transfer is in flight at a time, so the page is free for it,
- * but the block path caches a sector there and this writes over it, hence
- * the cached number is dropped.
- *
- * The bus is taken around the transfer, busplease() to busget it back.  A program
- * that asks to be interrupted (SETINT) will be, and djint() will find no
- * request of its own to serve and return, which is the intent: this wait
- * polls and does not need one.
+ * nothing and is staged in the page getstat and the big transfers share.
  */
 int
 djioctl(dev, cmd, r, b)
-    UINT dev, cmd;
-    register struct cdb *r;
-    struct buf *b;
+	UINT dev, cmd;
+	register struct cdb *r;
+	struct buf *b;
 {
-    static char *p;             /* the staging, as the kernel reaches it */
-    static unsigned phys;       /* ... and as the board is told it */
-    static UINT8 save;
-    static int i, len, count, hole, flags, st;
+	static char *p;             /* the staging, as the kernel reaches it */
+	static unsigned phys;       /* ... and as the board is told it */
+	static UINT8 save;
+	static int i, len, count, hole, flags, st;
 
-    /*
-     * The block's own words come off the caller's structure once.  ccc
-     * puts the pointer in a register pair and reaches each member by
-     * adding its offset to a fresh copy of it, so a field read twice is
-     * a field read twice; this is a page with 313 bytes to spare and
-     * every one of them is counted (sys/ovl.h).
-     */
-    len = r->len;
-    count = r->count;
-    hole = r->hole;
-    flags = r->flags;
+	/*
+	 * The block's own words come off the caller's structure once; this
+	 * is a page with every byte counted.
+	 */
+	len = r->len;
+	count = r->count;
+	hole = r->hole;
+	flags = r->flags;
 
-    if (len < 2 || len > sizeof djcomm || count < 0 || count > CDBDATA
-        || (hole >= 0 && hole + 3 > len)) {
-        u.error = EINVAL;
-        return (-1);
-    }
+	if (len < 2 || len > sizeof djcomm || count < 0 || count > CDBDATA
+		|| (hole >= 0 && hole + 3 > len)) {
+		u.error = EINVAL;
+		return (-1);
+	}
 
-    if (count > 512) {
-        kstg();
-        save = image0[2 * BUFSEG];
-        bwin(kseg);
-        p = (char *) BUFWIN;
-        phys = (unsigned) kseg << 12;
-        ksec = ~0;              /* the cached sector was in this page */
+	if (count > 512) {
+		kstg();
+		save = image0[2 * BUFSEG];
+		bwin(kseg);
+		p = (char *) BUFWIN;
+		phys = (unsigned) kseg << 12;
 
-        if ((flags & CDB_IN) == 0)
-            copyin(r->buf, p, count);
+		if ((flags & CDB_IN) == 0)
+			copyin(r->buf, p, count);
 
-    } else if (count) {
-        p = bhold(b);
-        phys = (b->xmem << 12) | ((unsigned) p & 0xfff);
+	} else if (count) {
+		p = bhold(b);
+		phys = (b->xmem << 12) | ((unsigned) p & 0xfff);
 
-    } else {
-        p = 0;
-        phys = 0;
-    }
+	} else {
+		p = 0;
+		phys = 0;
+	}
 
-    for (i = 0; i < len; i++)
-        D[i] = r->cmd[i];
+	for (i = 0; i < len; i++)
+		D[i] = r->cmd[i];
 
-    if (hole >= 0) {
-        D[hole] = phys;
-        D[hole + 1] = phys >> 8;
-        D[hole + 2] = phys >> 16;
-    }
+	if (hole >= 0) {
+		D[hole] = phys;
+		D[hole + 1] = phys >> 8;
+		D[hole + 2] = phys >> 16;
+	}
 
-    busplease();
+	busplease();
 
-    haltstat = &D[len - 1];
-    djstart();
-    djwait(haltstat);
+	haltstat = &D[len - 1];
+	djstart();
+	djwait(haltstat);
 
-    busthanks();
+	busthanks();
 
-    st = *haltstat;
+	st = *haltstat;
 
-    for (i = 0; i < len; i++)
-        r->cmd[i] = D[i];
+	for (i = 0; i < len; i++)
+		r->cmd[i] = D[i];
 
-    if (count > 512) {
-        if (st != NOSTAT && (flags & CDB_IN))
-            copyout(p, r->buf, count);
+	if (count > 512) {
+		if (st != NOSTAT && (flags & CDB_IN))
+			copyout(p, r->buf, count);
 
-        bwin(save);
+		bwin(save);
 
-    } else if (count) {
-        brel();
-    }
+	} else if (count) {
+		brel();
+	}
 
-    if (st == NOSTAT) {         /* the controller never answered */
-        u.error = EIO;
-        return (-1);
-    }
-    return (0);
-}
-
-static
-djbusy()
-{
-    u.error = EBUSY;
-}
-
-/*
- * The controller's own memory, moved in and out for a command the driver
- * runs itself.  getstat() is the only caller: the character side that
- * once reached it directly from user space is gone, and a formatter's
- * own reach into controller memory goes through the command block like
- * everything else (djioctl above).
- */
-static
-memio(flag, memaddr, djaddr, count)
-{
-    D[0] = (flag == READ) ? MEMREAD : MEMWRITE;
-
-    *(char **) (D + 1) = memaddr;
-
-    D[3] = KERNEL;
-
-    *(int *) (D + 4) = count;
-
-    *(char **) (D + 6) = djaddr;
-
-    D[8] = HALT;
-    D[9] = NOSTAT;
-
-    djstart();
-    djwait(&D[9]);
+	if (st == NOSTAT) {         /* the controller never answered */
+		u.error = EIO;
+		return (-1);
+	}
+	return (0);
 }
 
 static
 busready()
 {
-    wakeup(busready);
+	wakeup(busready);
 }
 
 /*
@@ -1503,18 +661,18 @@ busready()
 static
 busplease()
 {
-    di();
+	di();
 
-    if (!busget(busready))
-        sleep(busready, DJPRIORITY);
-    else
-        ei();
+	if (!busget(busready))
+		sleep(busready, DJPRIORITY);
+	else
+		ei();
 }
 
 static
 busthanks()
 {
-    busgive(0);
+	busgive(0);
 }
 
 /*
@@ -1522,11 +680,7 @@ busthanks()
  * is where the header is and why it is not here: a module's first bytes
  * are the header's, and an object's data is placed in the order the
  * objects are named, so the header is alone in the object named first.
- * This one is an ordinary object of the driver's own, named by that
- * header and by nothing else - and named, not static, because the header
- * that points at it is a different object.  There is no char vector: the
- * floppy is a block device and nothing else, and the header says so with
- * a zero where the character entries would go.
+ * There is no char vector: the floppy is a block device and nothing else.
  */
 struct biovec djbvec = { &djopen, &djclose, &djstrat, &djioctl };
 

@@ -81,6 +81,7 @@ dllabel(cdev, sl, g)
         if (g->tracks && g->heads && g->sectors) {
             got = 1;
             g->roll = lab.d_roll;
+            g->firstsec = lab.d_firstsec;
         }
     }
     if (!got) {

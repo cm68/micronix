@@ -493,6 +493,7 @@ struct info
     UINT spc;                   /* sectors per cylinder */
     UINT roll;                  /* what a block's cylinder is rotated by */
     UINT cylstart;              /* first cylinder of the slice being read */
+    UINT8 firstsec;             /* first sector number on a track */
     UINT8 flags;                /* see below */
     UINT8 type;                 /* index into boards[] */
     UINT8 slice;                /* the slice this open is bound to */

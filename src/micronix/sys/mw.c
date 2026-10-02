@@ -82,6 +82,7 @@ struct info
     UINT spc;                   /* number of sectors per cylinder */
     UINT roll;                  /* what mwcyl adds to blk / spc */
     UINT cylstart;              /* first cylinder of the slice being read */
+    UINT8 firstsec;             /* first sector number on a track */
 
     UINT8 stpdel;               /* delay between step pulses, 100 us */
     UINT precomp;               /* track where precomp begins */

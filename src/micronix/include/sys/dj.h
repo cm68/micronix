@@ -203,14 +203,6 @@
 
 
 /*
- * delays
- */
-
-struct delay {
-	int step, settle;
-};
-
-/*
  * the structure of the internal tables of
  * the DJDMA
  */
@@ -244,32 +236,6 @@ struct status {
 		dstat,		/* drive status */
 		retstat;	/* command return status */
 };
-
-struct specs {
-	unsigned char
-		config,		/* configuration byte */
-		ds,		/* double sided (boolean) */
-		spt,		/* sectors per track */
-		cylinder,	/* secs. per cyl. */
-		spb,		/* sectors per block */
-		ncyl,		/* number of cylinders */
-		toff;		/* track offset */
-
-	unsigned
-		bps,		/* bytes per sector */
-		volume;		/* secs per disk */
-};
-		
-/*
- * Each drive has one of the following structures
- * associated with it. The structure holds infomation
- * about configuration and current activity.
- */
-
-struct dm {
-	struct specs	*specs;
-	UCHAR		flags;		/* see below */
-};			
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

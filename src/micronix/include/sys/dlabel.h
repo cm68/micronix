@@ -225,6 +225,7 @@ struct dlgeom
     UINT spc;                   /* sectors per cylinder */
     UINT roll;                  /* what a block's cylinder is rotated by */
     UINT cylstart;              /* first cylinder of the slice */
+    UINT8 firstsec;             /* first sector number on a track */
 };
 
 /*
