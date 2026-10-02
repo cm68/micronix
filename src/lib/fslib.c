@@ -364,7 +364,7 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
     i->driver = DRIVER_IMAGE;
     ext = strrchr(filesystem, '.');
     if (ext) {
-        if (strcasecmp(ext, ".imd") == 0) {
+        if (strcasecmp(ext, ".imd") == 0 || strcasecmp(ext, ".img") == 0) {
             i->driver = DRIVER_IMD;
         } else if (strcasecmp(ext, ".image") == 0) {
             i->driver = DRIVER_IMAGE;
@@ -650,6 +650,10 @@ int secs;
 void
 blktopos(void *drive, int blkno, int *cyl, int *head, int *sec)
 {
+    struct imd *ip = (struct imd *)drive;
+    struct imd_trk *tp;
+    int spt;
+    int heads;
     int trk;
 
     if (secsize == 0) {
@@ -661,11 +665,27 @@ blktopos(void *drive, int blkno, int *cyl, int *head, int *sec)
         lose("not a filesystem");
     }
 
-    *sec = (blkno % secs) + 1;
-    trk = blkno / secs;
-    *head = 0;
-    *cyl = 2 + trk;
-    trace(trace_fs, "blkno:%d cyl:%d head:%d sec:%d\n", 
+    /*
+     * Sectors per track and heads now come off the imd handle, which
+     * raw_load fills for a flat .img the same way the IMD loader does.
+     * The old code assumed a single sided medium - head always 0, the
+     * filesystem two cylinders in - and a double sided image numbers
+     * heads across each track before moving to the next cylinder.
+     */
+    tp = ip->tracks[0];
+    spt = tp ? tp->fixed.nsec : secs;
+    heads = ip->heads ? ip->heads : 1;
+
+    *sec = (blkno % spt) + 1;
+    trk = blkno / spt;
+    if (heads == 1) {
+        *head = 0;
+        *cyl = 2 + trk;
+    } else {
+        *head = trk % heads;
+        *cyl = trk / heads;
+    }
+    trace(trace_fs, "blkno:%d cyl:%d head:%d sec:%d\n",
         blkno, *cyl, *head, *sec);
 }
 

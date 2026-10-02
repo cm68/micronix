@@ -287,6 +287,19 @@ static struct rawfmt {
      */
     { 77*1*15*512, 77, 1, 15, 512, 0, 1, "8 inch, single sided, 512 byte sectors" },
     { 77*2*15*512, 77, 2, 15, 512, 0, 1, "8 inch, double sided, 512 byte sectors" },
+
+    /*
+     * The DOS double-density diskettes dar exchanges with: the five and
+     * a quarter set (8 or 9 sectors, single or double sided) and the
+     * 3 1/2 inch 720K.  A raw .img of one of these is a linear dump -
+     * sectors in order, no skew, numbered from one - which is how dar
+     * reads them with its device's alternate-sectoring bit clear.
+     */
+    { 40*1*8*512,  40, 1,  8, 512, 0, 1, "5 1/4 inch, 40 track, single sided, 8 sector, 512 byte sectors" },
+    { 40*1*9*512,  40, 1,  9, 512, 0, 1, "5 1/4 inch, 40 track, single sided, 9 sector, 512 byte sectors" },
+    { 40*2*8*512,  40, 2,  8, 512, 0, 1, "5 1/4 inch, 40 track, double sided, 8 sector, 512 byte sectors" },
+    { 40*2*9*512,  40, 2,  9, 512, 0, 1, "5 1/4 inch, 40 track, double sided, 9 sector, 512 byte sectors" },
+    { 80*2*9*512,  80, 2,  9, 512, 0, 1, "3 1/2 inch, 80 track, double sided, 9 sector, 512 byte sectors" },
     { 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
