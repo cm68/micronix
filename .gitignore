@@ -29,6 +29,14 @@ attic
 core.*
 
 #
+# macOS Finder junk: the .@__thumb thumbnail cache, .DS_Store, and the
+# ._ AppleDouble sidecars Finder drops beside files it copies.
+#
+.@__thumb/
+.DS_Store
+._*
+
+#
 # Transient.  A -delta is where the simulator puts writes to a disk
 # image, so it is whatever the last run happened to leave; disks/hdinstall
 # and disks/init both delete them before starting for that reason.  .mx

@@ -1,0 +1,291 @@
+.rm +5
+.in 5
+.he "far (1)                        4/6/83                         far (1)
+.fo "                                -#-"
+.bd
+NAME
+.in +5
+.br
+.bd
+far
+- floppy archiver
+
+
+.in -5
+.bd
+SYNTAX          
+.in +5
+.br
+.bd
+far device [flags] [files]
+
+
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Far
+provides a simple interface to CP/M floppy diskettes.
+It is the primary means of incorporating new CP/M software into the system.
+It may also be used for backing up files on diskettes, and recovering
+them as necessary.
+"Device" is
+assumed to be
+the name of a Micronix special file
+(such as /dev/fla)
+corresponding to a floppy drive that contains a CP/M diskette.
+.bd 
+Far
+can copy files in either direction, and can also be used to read the directory
+of a CP/M floppy.  
+When the -v flag is used, it reports the amount of space
+still available on the diskette.
+
+Names such as /dev/fla may be abbreviated as fla.  You can check the names of
+the storage devices by entering 
+
+.bd
+        dir /dev (return)
+
+Note the different names for 5.25" floppy drives: mfa and mfa2.  Use mfa
+to copy to or from diskettes that are formatted as single-sided.  Use mfa2
+for double-sided diskettes.  Both names will direct the far command to the
+same physical device.  Using the wrong name by mistake won't hurt anything;
+it'll just let you know that you should  use the other one instead.
+
+The flags are:
+
+.ta 10
+.in +10
+.ti -10
+.bd
+-c	Create.  
+Causes the previous contents of the diskette
+to be thrown away.
+The entire directory is cleared prior to other operations.
+This won't have any effect on the actual diskette
+unless the -r or -d flag is specified.
+This flag also has the effect of disabling
+the check for a CP/M diskette.
+Normally, far refuses to write on a diskette which doesn't 
+look like a CP/M diskette.
+The -c flag
+.ul
+makes
+any diskette look like a CP/M diskette.
+
+.ti -10
+.bd
+-d	Delete.  
+Delete the named files from the floppy diskette.
+If no file names are given, no action is taken.
+
+.ti -10
+.bd
+-p	Print.
+Each named file is sent to the standard output (most likely your terminal). 
+
+.ti -10
+.bd
+-r	Replace.
+Each named file is copied
+.ul
+to
+the floppy.
+If no file names are given, no action is taken.
+If a file of the same name already exists on the floppy, it is
+silently overwritten.
+
+.ti -10
+.bd
+-t	Table.
+Print a table of contents of the floppy diskette.
+If any files are named, only those named and present are listed.
+The contents of the diskette are not changed.
+ 
+.ti -10
+.bd
+-uN	User number.
+The default user number is zero.
+The letter u followed immediately by a decimal number
+will cause any of far's actions to happen
+with respect to this user number.
+With -t, only files with the same user number show up.
+With -r, files are created on the diskette with the specified
+user number.
+With -x, only files with the same user number are extracted.
+Most files on most diskettes are "user zero" and
+you don't usually have to worry about the -u option flag.
+The -u flag may be embedded in the flag argument as in
+"-xu14v".
+The -u flag is a new feature. Earlier versions of far
+were able to access only files under user 0.
+
+.ti -10
+.bd
+-x	Extract.
+Each named file is copied 
+.ul
+from
+the diskette
+.ul
+to
+the current Micronix directory.
+If no file names are given, 
+.ul
+the entire contents
+of the diskette
+are extracted.
+
+.ti -10
+.bd
+-v	Verbose.
+Be verbose about it.
+Each operation is printed along with the affected file name.
+Files deleted are preceded by a "d", 
+those replaced are preceded by an "r",
+those extracted are preceded by "x".
+The percentage of the diskette that is occupied,
+along with the number of bytes still available,
+is reported when far is finished.
+
+.in -10
+At most, one of the flags -
+.bd
+d, t, r, x 
+- may be present.
+If none are present, 
+.bd
+-t 
+is assumed.
+.bd
+-v
+may be used in combination with any of these.
+
+The file list may contain wild card matching patterns
+to be applied to the set of file names in the CP/M
+diskette's directory.  Refer to the section "Argument Expansion" in the
+.bd
+sh
+program writeup in this manual.
+.in -5
+.sp2
+.bd
+EXAMPLES
+.br
+.in +5
+You receive a new CP/M software package in the mail on diskette
+and want to run it under Micronix.
+To copy its entire contents to Micronix,
+insert the diskette into floppy drive A and
+type:
+
+.ce
+.bd	
+far fla -xv
+
+To copy a file from a diskette, changing its name in the process:
+
+.ce
+.bd
+far fla -p filename > newname
+
+
+To copy only the ".doc" files over from a CP/M mini-floppy:
+
+.ce
+.bd
+far mfa -xv "*.doc"
+
+To view the files of user 3 on a CP/M mini-floppy:
+
+.ce
+.bd
+far mfa -u3 
+
+To copy them off:
+
+.ce
+.bd
+far mfa -u3x
+
+To copy a file from diskette into a file that is elsewhere than your
+current directory: 
+
+.ce
+.bd
+far flb -x "name" > /dir/...
+(path from root to desired location; you could also specify a new name)
+.sp2
+.in -5
+The following discussion is intended primarily for users that are
+having trouble getting 
+.bd
+far
+to do what they want it to.
+.in -5
+
+One aspect of far command syntax somewhat complicates the issue of using it,
+namely, the use of quotation marks.  An example should
+help clear this up.  Let's say your current Micronix directory contains two files,
+.bd
+a.com 
+and
+.bd
+a.bak.
+Your CP/M floppy contains a file 
+.bd
+a.pil
+that you wish to copy into your current directory.  Since this is the only file
+on the floppy that begins with "a", you lazily enter 
+.bd
+far mfa -xv a*.
+Next you are wondering what's wrong when you are faced with the message
+"a.com not found on diskette / a.bak not found on diskette".  Of course
+they weren't found.  You didn't even want Micronix to be looking for them.
+
+What has happened is this:  Your command interpreter (shell) thought you meant
+to search the current directory for a match to the wildcard argument before 
+going out to the floppy for the copy.  It indeed found two matches
+(a.com & a.bak), so Micronix went gleefully out to the floppy to copy them.
+In vain, unfortunately.
+
+The solution here is to use quotation marks around your filename(s).
+Had you entered
+.bd
+far mfa -xv "a*"
+, the shell would have left the command alone, and far would have gone
+directly out to the floppy to find anything that began with an "a".  Success.
+
+Now, just to set the record straight, there is a further complication that
+may help you to understand how the shell operates.  Suppose the file on your
+floppy is called 
+.bd
+b.pil
+instead of
+.bd
+a.pil.
+If you enter
+.bd
+far mfa -xv b.pil 
+(no quotes), the file will in fact be copied, contrary to the previous discussion.
+Furthermore, everything on the floppy diskette will be copied, much to your 
+chagrin.  This is because your shell took b.pil to your current Micronix directory,
+looked to see if a file of that name was really there, and finding no such file,
+it passed the command to Micronix as "
+.bd
+far mfa -xv
+".  As noted above in the description of the x flag, if there is no file specified,
+the whole diskette gets copied.
+
+In summary, you 
+.ul
+should
+enclose the argument in quotes whenever you want to copy specific files from
+the floppy to Micronix.  The only exception to this is a situation where you
+have certain files already established on Micronix and you want to extract
+only those floppy files that match the existing Micronix filenames.
+
+

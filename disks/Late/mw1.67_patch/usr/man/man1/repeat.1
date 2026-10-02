@@ -1,0 +1,32 @@
+.in 15
+.rm 79
+.he "          repeat (1)                      4/6/83                       repeat (1)
+.fo "                                           -#-"
+.bd
+.ti -5
+NAME
+.br
+repeat - followed by a decimal number and a command will
+result in repetition of the command the stated number of times.
+
+.ti -5
+.bd
+SYNTAX
+.br
+repeat ### command ...
+
+.ti -5
+.bd
+DESCRIPTION
+.br
+The maximum number is 65535 but a command line such as
+"repeat 10 repeat 10 date" would repeat a date command 100
+times.  This utility is useful for system testing
+and exercising.
+
+.ti -5
+.bd
+EXAMPLE
+.br
+repeat 100 fsck -n -t /dev/root
+

@@ -1,0 +1,22 @@
+echo
+mv micronix olmicronix
+mv /bin/upm /bin/olupm
+chmod +s /bin/pwd
+cptree /f . -v
+ln micronix.mw micronix
+era micronix.mw
+ddt micronix / 4c 2 0 0 . s 4 3 4 3 .
+mknod /dev/kmem c 2 1
+chmod 444 /dev/kmem
+sum micronix
+echo
+echo The checksum on the above line should be 3058.
+era patch*
+sync
+echo Disk patch complete.  If checksum above is correct
+echo reboot system to invoke new kernal.  Otherwise, restore previous
+echo kernal with a "mv /olmicronix /micronix" command and re-try the
+echo source /f/patchxxx command.
+echo LATER, you may decide to move olmicronix to some /kernals
+echo directory. This will allow micronix to boot up automatically.
+
