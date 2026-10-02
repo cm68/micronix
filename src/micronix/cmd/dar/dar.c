@@ -64,6 +64,7 @@ char	*devname;	/* the device argument, argv[1] */
  */
 int	devsize;	/* the 4-byte device size */
 int	doneflag;	/* H87d1 - set when a final step is due */
+char	*name;		/* the file name the operations act on */
 
 /*
  * The geometry descriptor - one 34-byte entry of the formats table at
@@ -240,11 +241,6 @@ execute()
 		doextract();
 	if (doneflag)
 		finish();
-}
-
-menu()
-{
-	/* TODO: getdiskname, read the directory, run operations in a loop */
 }
 
 /*
@@ -478,27 +474,94 @@ format()
 	exit(0);
 }
 
+/*
+ * The operations.  Each follows the same shape: findfile the name,
+ * notfound if it is absent, then do the operation.  The directory/FAT
+ * helpers below are the named leaf functions from dar.ctl; their bodies
+ * are the last thing to fill in.
+ */
+notfound()
+{
+	say(name);
+	say(": No such file or directory\n");
+}
+
 dodelete()
 {
-	/* TODO: H3043 - delete a DOS file */
+	if (!findfile(name))
+		notfound();
+	delfile(name);		/* mark the entry 0xe5 */
+	findfree();
+	addentry();
 }
 
 dorename()
 {
-	/* TODO: H2651 - rename a DOS file */
+	/* TODO: the new name is the next argument; findfile + rewrite */
 }
 
 dotouch()
 {
-	/* TODO: H2cd8 - touch a DOS file */
+	if (!findfile(name))
+		notfound();
+	/* TODO: refresh the entry's time/date */
 }
 
 doextract()
 {
-	/* TODO: H1772 - extract (x) or copy-to-DOS (p) */
+	if (!findfile(name))
+		notfound();
+	/* TODO: the copy loop through the FAT chain */
 }
 
 finish()
 {
-	/* TODO: H497c - the final step */
+	clustosec();
+	/* TODO: the rest of the finalize */
+}
+
+/*
+ * The directory/FAT leaf helpers, named in dar.ctl but not yet read
+ * back into C.  Each is a stub until its body is reconstructed.
+ */
+findfile(f)
+char *f;
+{
+	return 0;
+}
+
+findfree()
+{
+	return 0;
+}
+
+addentry()
+{
+	return 0;
+}
+
+delfile(f)
+char *f;
+{
+	return 0;
+}
+
+clustosec()
+{
+	return 0;
+}
+
+readdir()
+{
+	return 0;
+}
+
+getdiskname()
+{
+	return 0;
+}
+
+menu()
+{
+	/* TODO: getdiskname, readdir, then prompt/select/execute in a loop */
 }
