@@ -1,0 +1,44 @@
+dar, reconstructed from the 1.67 patch
+=====================================
+
+There is no source for dar, so cmd/dar is the disassembly, and this README
+records what the binary is before it is read back into C.  dar.dist is a
+copy of /bin/dar off the Micronix 1.67 patch (disks/Late/mw1.67_patch/bin/dar);
+dar.dis is disas's output from it, regenerated with "make disas".
+
+dar is the DOS-diskette file-exchange utility: it reads an IBM/DOS-format
+floppy in a Micronix drive and copies files between the two filesystems.
+There is no dar.1 in the patch, so the interface below is read out of the
+binary's own strings and the disassembly, not a man page.
+
+    usage: dar device {cdprtx} files ...
+
+The options are c (copy FROM the DOS diskette), p (copy TO the DOS
+diskette), and d, r, t, x, of which "At most one of d, r, t, x may be
+specified" - the single-file operations, still to be read apart.  With no
+operation option dar runs its menu, which its strings spell out:
+
+    A) Copy from the DOS diskette
+    B) Copy to the DOS diskette
+    C) Display file on the DOS diskette
+    D) Quit
+
+and prompts "Enter disk name:", "Insert diskette and close the drive
+door", "File to copy (or RETURN for all files):", "File to delete:" and
+"Selection:".  It reads /etc/mtab for the mounted device ("/dev/" is its
+prefix) and reports space as "Device size", "Diskette", "% full," and
+"K free space left", and file dates with "%s %2d %2d:%02d ".
+
+Its diagnostics: "Not a DOS diskette!", ": Unknown format", ": Not block
+special", ": Can't allocate directory entry", "Not enough space left on
+volume" / ": Volume full", ": duplicate file name", ": Is a directory"
+and ": No such file or directory".
+
+Layout: Whitesmith's C.  text 0x84fb bytes at 0x0100, data 0x1d10 at
+0x85fb, no bss and no symbol table.  The DOS directory entry, the FAT and
+the sector buffer are the globals to find in the data segment; the menu,
+the option scan, and the three copy/display/delete operations are the
+user text.  This is the heavy lift of the patch batch - the largest of
+the seven - so the reconstruction is expected to come in pieces.
+
+vim: tabstop=4 shiftwidth=4 noexpandtab:
