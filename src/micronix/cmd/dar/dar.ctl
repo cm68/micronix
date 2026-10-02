@@ -243,6 +243,16 @@ define readfat 0x48ca		; load the FAT image
 define nextcluster 0x3825	; follow the FAT chain (calls fatentry)
 define fat12 0x43a3		; the 12-bit FAT entry read
 
+; The string/path helpers.  strcpy copies a name and null-terminates;
+; strncmp is the 11-byte name compare; basename cuts the file name out
+; of a path (it walks the '.' and '/').
+
+define strcpy 0x1df4
+define strncmp 0x6c47
+define basename 0x3000
+define alloccluster 0x3864	; allocate the next cluster in a chain
+define readcluster 0x4a1b	; read one cluster's data (via clustosec)
+
 ; ---------------------------------------------------------------------
 ; The data structures, read apart:
 ;   FAT12.  fatentry (0x36b0) masks a cluster entry with AND 0x0f - the
