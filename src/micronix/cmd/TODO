@@ -24,12 +24,11 @@
 #	   cmd/vi is STEVIE, a screen editor, and the edit.c in it is one
 #	   of STEVIE's modules rather than this program.  No source
 #	   anywhere in the repository.
-#	2  newuser and print - have a source now: cmd/newuser and
-#	   cmd/print, each disassembled off the second distribution disk
-#	   and read back into C.  Both build with the cross compiler and
-#	   have been run in usersim, but neither is installed, so
-#	   /bin/newuser and /bin/print are still the distribution's.
-#	1  nothing in the repository: td
+#	3  newuser, print and td - have a source now: cmd/newuser,
+#	   cmd/print and cmd/td, each disassembled off the second
+#	   distribution disk and read back into C.  All three build with
+#	   the cross compiler and have been run in usersim, and are
+#	   installed in the simulator's filesystem.
 #
 # The other twenty - the Whitesmith toolchain (as cc link lib obj hex
 # lord anat cp1 cp2), ptc, cxr, ddt, rp, pilot, clean, down, and the
@@ -101,15 +100,12 @@
 # rp's interpreter.  None of them is a utility anyone is missing, and
 # all four are moved to /old.
 #
-# THE 1 WITH NO SOURCE ANYWHERE IN THE REPOSITORY
+# THE 3 THAT HAD NO SOURCE ANYWHERE IN THE REPOSITORY
 #
-# What it is, read off the binary where the binary says - a usage
-# string, a keyword table.  (newuser and print were the other two; see
-# cmd/newuser and cmd/print.)
-#
-#	td	tape dump: "Dump destination must be either block special
-#		or directory." and "Tree dump complete." - not the silent
-#		binary an earlier note here listed it as
+# newuser, print and td had none, and each has one now, read out of its
+# binary: see cmd/newuser, cmd/print and cmd/td, whose READMEs say how.
+# td is not a tape dump, as an earlier note here had it: it backs up to
+# floppy disks as file systems.
 #
 # WHICH OF THEM MATTER
 #

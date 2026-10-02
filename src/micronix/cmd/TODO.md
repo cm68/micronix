@@ -6,12 +6,12 @@ original distribution binary, with no source anywhere in the tree.
 
 ## to port
 
-    cpp       edit      td
+    cpp       edit
 
 ## ported since this list was written
 
 cal, chars, comm, cptree, e, group, help, lines, newuser, print, sum,
-tail, tty, unique, update, wall, who, words, write.
+tail, td, tty, unique, update, wall, who, words, write.
 
 `cal`, `comm`, `sum`, `tail`, `unique` and `tty` came from the v7
 sources in `extra/`, `who`, `wall`, `write` and `update` likewise.
@@ -20,11 +20,11 @@ after all: they are three binaries of their own, but they count the
 same things, so they are `cmd/wc` under three more names.  `e` is
 `ed` and `help` is `man`, installed as aliases.  `cptree` is `cp`
 under another name: main() sees the name and forces `-r`.
-`newuser` and `print` have no source anywhere and no v7 original, so they
-are the ports here that were read out of their binaries: each of
-`cmd/newuser` and `cmd/print` has the disassembly, the control file and a
-README on how each function was found.  They are built but not installed
-over the distribution's copies.  `print` is a workalike checked against
+`newuser`, `print` and `td` have no source anywhere and no v7 original, so
+they are the ports here that were read out of their binaries: each of
+`cmd/newuser`, `cmd/print` and `cmd/td` has the disassembly, the control file and a
+README on how each function was found.  They are built and installed over
+the distribution's copies.  `print` is a workalike checked against
 the original byte for byte; the README says where the original is wrong
 and print is not (its -N, -lN and -wN never worked here).
 
