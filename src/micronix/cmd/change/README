@@ -1,0 +1,96 @@
+/usr/bin/change from the Micronix 1.6 distribution
+
+There is no source for change, so this is the disassembly, and change.c is that
+disassembly read back into C.
+
+    disas -f change.ctl change.dist
+
+change.dist is the binary off inode 63 of disks/dist/1012-8_dist_2.IMD, 11757
+bytes, mode 0711, dated 7 August 1982.  It is a Whitesmith a.out - 99 94, text
+at 0100 for 244f bytes and data at 3000 - in the older runtime that login, td
+and include have: c.ent at 24f4 and c.ent2 at 24ff, saving the register cells at
+3988, 398a and 398c.  It is the program of that name in Kernighan and Plauger's
+Software Tools, with a pattern language that is edit's - the manual says "exactly
+as in edit" - and with tags, which Software Tools' has not.
+
+THE SHAPE
+
+Its own code is the first twenty functions and a main at 084f, and then the
+library from 13ef.  The pattern is a list of nodes of eight bytes - the next
+node, a type, a pointer to a set, a closure flag and a character - which main
+makes with makpat (0b08), and a replacement string made with makesub (0f84) in
+which "&" is 0366 and a tag reference 0377 down to 0367.  Then, for each line,
+amatch (10fc) is tried at every place in turn and catsub (0111) makes what
+replaces a match; Software Tools' own, K&P's, except where it says otherwise.
+
+change.c follows that closely enough that the names and the order are the
+binary's, and that its quirks are.  The ones that matter:
+
+  - The node types are 'a' for a character, '?' for any but the newline, '['
+    for a set and ']' for a set that is the opposite - which does not match
+    the newline either - '%' and '$' for the ends of a line, and '{' and '}' for
+    a tag's start and end.  A closure is a flag on the node before the *, and a
+    * after a % is a * of its own, as one at the very start is; a * after
+    anything else sets the flag, "$*" and the tags' too, so that "$*" is a pattern
+    that matches the empty string everywhere.
+
+  - "%" and "$" mean what they say wherever they are in the pattern.  The end of
+    a line is the newline: "$" matches it, and is the one character that
+    matches and is not in what the match includes - the match is said to end at
+    the last character of the string when it ends at the string's end, so
+    that the newline stays out of the text that is replaced.
+
+  - A tag is "@(" to "@)" and a tag reference "@1" to "@9", numbered by the "@("
+    from the left.  A tenth is "too many tagged fields.", an "@)" with no "@(" is
+    "imbalanced parentheses.", and an "@(" that is not closed is not an error.
+    "@c" is c, for any other c, in the pattern and in the replacement, and so is
+    "@" at the end.  The tags of a failed attempt are still there at the next
+    place tried in the same line - they are cleared at each place, not
+    within it.
+
+  - A set is "[" to the first "]", with a-b for the characters between, a - at
+    the start or at the end taken as itself, "@c" as c, and "^" at the start for
+    the complement.  A "]" first is the end of an empty set, which matches
+    nothing.
+
+  - Whatever the cause, "illegal from pattern." and "illegal to pattern." are what
+    it says when makpat or makesub returns -3.  They return the address they
+    stopped at, and 0177775 is an address in the arguments' area: so "change ?
+    ''" is an error or not by the length of the arguments before and after it.
+    change.c has the same test, and the arguments are laid out the same way,
+    so it is the same.  Errors and the usage line go to the standard output.
+
+THE ORIGINAL'S OWN FAULTS
+
+A pattern with a character class in it of exactly three characters - "[a-c]",
+"[abc]", "[x-z]" - makes the original hang, and one with two classes in it makes
+it stop quietly with nothing written, or write garbage.  It is the library's
+allocator: the set is a malloc of the size of the set and its end, and a block of
+four bytes is more than the free list can take.  It is not change's, and
+change.c does not do it.
+
+A "[" with no "]" after it is walked off the end of the argument and into the
+next one: "change [a X" makes the pattern "[aX", and "change [abc" has a pattern
+that is whatever follows it in memory.  change.c walks the same way.
+
+A line that comes out of the changes of more than 511 characters ran over the
+end of out - the next thing is the pattern's head - and then nothing is
+predictable.  change.c's buffer is 4096.
+
+The line is read as fgets reads it, 511 characters at a time, and the last line
+of a file with no newline at the end of it is not looked at at all: it is read,
+the end of the file is met, and the test is made after.
+
+The exit status was 0 for an error and whatever was in BC for a good run.  It
+is 1 and 0.
+
+HOW IT WAS CHECKED
+
+In usersim against the original, byte for byte, with both programs run under the
+same name in different roots so that the arguments are at the same addresses:
+five thousand random cases - patterns made of characters, ?, *, %, $, @c, sets,
+ranges, tags and closures, one set at most and none of three, a replacement
+of &, @1 to @9, @@, @c and text, and text of up to thirty characters in five
+lines - with no difference; the usage line; every error; a line of 100 to 1100
+characters; a file with no newline at its end; bytes over 0177; and an empty
+file.  The eleven that are not the same are the ones described above.

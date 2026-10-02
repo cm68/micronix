@@ -250,6 +250,7 @@ src/micronix/cmd/awk/awk
 src/micronix/cmd/cal/cal
 src/micronix/cmd/cat/cat
 src/micronix/cmd/ccc/ccc
+src/micronix/cmd/change/change
 src/micronix/cmd/chgrp/chgrp
 src/micronix/cmd/chmod/chmod
 src/micronix/cmd/chown/chown

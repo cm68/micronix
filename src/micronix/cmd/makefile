@@ -42,6 +42,7 @@ toolchain:
 	cd ld ; make install
 	cd asz ; make install
 	cd ccc ; make install
+	cd change ; make install
 
 all:
 	cd make ; make all
@@ -51,6 +52,7 @@ all:
 	cd cal ; make all
 	cd cat ; make all
 	cd ccc ; make all
+	cd change ; make all
 	cd chgrp ; make all
 	cd chmod ; make all
 	cd chown ; make all
@@ -287,6 +289,7 @@ clean:
 	cd cal ; make clean
 	cd cat ; make clean
 	cd ccc ; make clean
+	cd change ; make clean
 	cd chgrp ; make clean
 	cd chmod ; make clean
 	cd chown ; make clean
@@ -405,6 +408,7 @@ clobber:
 	cd cal ; make clobber
 	cd cat ; make clobber
 	cd ccc ; make clobber
+	cd change ; make clobber
 	cd chgrp ; make clobber
 	cd chmod ; make clobber
 	cd chown ; make clobber
