@@ -126,6 +126,7 @@ all:
 	cd print ; make all
 	cd ps ; make all
 	cd pwd ; make all
+	cd ratfor ; make all
 	cd rm ; make all
 	cd rmdir ; make all
 	cd s ; make all
@@ -243,6 +244,7 @@ install:
 	cd print ; make install
 	cd ps ; make install
 	cd pwd ; make install
+	cd ratfor ; make install
 	cd rm ; make install
 	cd rmdir ; make install
 	cd s ; make install
@@ -360,6 +362,7 @@ clean:
 	cd print ; make clean
 	cd ps ; make clean
 	cd pwd ; make clean
+	cd ratfor ; make clean
 	cd rm ; make clean
 	cd rmdir ; make clean
 	cd s ; make clean
@@ -477,6 +480,7 @@ clobber:
 	cd print ; make clobber
 	cd ps ; make clobber
 	cd pwd ; make clobber
+	cd ratfor ; make clobber
 	cd rm ; make clobber
 	cd rmdir ; make clobber
 	cd s ; make clobber

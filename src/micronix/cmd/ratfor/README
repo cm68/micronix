@@ -1,0 +1,35 @@
+ratfor - Rational Fortran
+
+cmd/ratfor is the v7 ratfor (usr/src/cmd/ratfor), ported nearly
+verbatim.  It reads Ratfor - the preprocessor language in Kernighan and
+Plauger's "Software Tools" that adds if/else, while, for, repeat,
+break, next, switch and define over plain Fortran - and emits FORTRAN
+66.  The output is the same fixed-form cards a hand-written Fortran
+program is, so the edit beside this directory (cmd/edit) keeps its
+Ratfor source as .r files and is itself rebuilt from edit.c, the
+reconstruction of that program.
+
+The source is six hand-written files - r0.c (switch/case/default),
+r1.c (loops, conditionals, break, next, goto), r2.c (the 72-column
+output buffer), rio.c (input and the character classes), rlex.c (main,
+the lexer, define and include) and rlook.c (the define hash table) -
+plus the parser, generated from r.g by yacc.  The parser is committed
+as y.tab.c because the cross build has no yacc to run before this
+directory builds; r.g and y.tab.h are the source of the source.  The
+one hand edit to y.tab.c is the yystack overflow test, split for c1 -
+see the comment in yyparse.
+
+Porting changes, all in the v6 spellings:
+
+  - rio.c's type[] initializer was written without its '=' - restored.
+  - rlex.c's FILE *outfil = { stdout } dropped the braces.
+  - # include became #include.
+  - built with -Dunix, which sets CONTFLD 1 (the continuation-card
+    column); the v7 makefile relied on cc predefining unix, and this
+    tree's ccc does not.
+  - inclstat's fname is static: c1 cannot store a local array's address
+    into a global (the curfile[infptr] = fname at its end).
+  - y.tab.c's # line directives are stripped: pass0 does not read them.
+
+The 2 shift/reduce conflicts yacc reports are v7's, not new; the
+grammar settles them the way v7 meant.

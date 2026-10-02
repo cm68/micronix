@@ -333,6 +333,7 @@ src/micronix/cmd/pr/pr
 src/micronix/cmd/print/print
 src/micronix/cmd/ps/ps
 src/micronix/cmd/pwd/pwd
+src/micronix/cmd/ratfor/ratfor
 src/micronix/cmd/rm/rm
 src/micronix/cmd/rmdir/rmdir
 src/micronix/cmd/s/s
