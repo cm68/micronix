@@ -84,6 +84,21 @@ define mkfile 0x21d9		; the big one - allocate dir entry + clusters
 define space 0x355f
 define format 0x38d2
 
+; The sector I/O.  seeksec(fd, sector) multiplies the sector by 512
+; (H8142, a shift-left-by-N) and seeks; readboot seek+reads the boot
+; sector to learn the geometry (the 4 bytes at H87b1..H87b4).
+
+define seeksec 0x1330
+define readboot 0x13bf
+
+; The two copy operations (tentative - the names come from the call
+; pattern, not the strings).  doput is the copy-TO-DOS operation: it
+; calls mkfile to make the DOS file, then read + close in a loop.
+; docopy is the copy-FROM-DOS operation: read + close, no mkfile.
+
+define doput 0x27b8
+define docopy 0x2b74
+
 ; ---------------------------------------------------------------------
 ; The option flags, one 16-bit cell per operation.  Each handler sets
 ; its cell to 1 (the ADD A,A / SBC A,A pairs the high byte to 0).  The
