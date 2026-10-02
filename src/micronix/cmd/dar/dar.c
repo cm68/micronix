@@ -688,8 +688,17 @@ int date, time;
 match(pattern, name)
 char *pattern, *name;
 {
-	/* TODO: the '*' wildcard; the plain compare is this */
-	return strncmp(pattern, name, 11) == 0;
+	/* H3e11 - the DOS filename match: '*' matches the rest, '?' one
+	 * char, over the 11-byte name. */
+	int i;
+
+	for (i = 0; i < 11; i++) {
+		if (pattern[i] == '*')
+			return 1;
+		if (pattern[i] != '?' && pattern[i] != name[i])
+			return 0;
+	}
+	return 1;
 }
 
 /*
