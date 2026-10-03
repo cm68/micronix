@@ -41,7 +41,7 @@ MAN	= Intro.2 access.2 break.2 chdir.2 chmod.2 chown.2 \
 	fstat.2 ftruncate.2 getpid.2 getuid.2 gtty.2 indir.2 kill.2 link.2 \
 	mknod.2 mount.2 nice.2 open.2 pipe.2 read.2 seek.2 \
 	setuid.2 signal.2 sleep.2 stat.2 stime.2 stty.2 sync.2 \
-	time.2 umount.2 unlink.2 wait.2 write.2
+	time.2 times.2 umount.2 unlink.2 wait.2 write.2
 MANDIR	= /usr/man/man2
 
 # The archive is built in chunks because a single "ar cr libunix.a $(OBJS)"

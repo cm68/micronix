@@ -1,4 +1,4 @@
-.he "time (1)                     10/2/26                     time (1)"
+.he "time (1)                     10/3/26                     time (1)"
 .fo "                               -#-"
 .in 5
 .rm 65
@@ -30,15 +30,15 @@ as
 .ce
 .bd
 real NmSs
+.ce
+user N sys N
 .sp
-where the time is the wall clock, in minutes and seconds.  Command is
-looked up in ., /bin and /usr/bin, so time cc hello.c works without a
-path.
-.sp
-Only the wall clock is reported.  The v7 original also printed user and
-system CPU time from times(2), and that call is implemented, but a
-times(&struct) invocation trips a ccc code-generation bug that computes
-the address of the struct as zero, so this program does not call it yet.
+where real is the wall clock in minutes and seconds from time(2), and
+user and sys are the cycle counts that times(2) returns, differenced
+across the child's run.  The simulator has no separate system-time
+clock, so sys is always 0.  On a kernel whose times(2) is still unimp
+the user and sys lines are omitted.  Command is looked up in ., /bin
+and /usr/bin, so time cc hello.c works without a path.
 .sp
 Time's own exit status is the command's, or 1 if the command could not
 be found or forked.
@@ -48,4 +48,4 @@ be found or forked.
 SEE ALSO
 .in +5
 .br
-date (1)
+date (1), times (2)

@@ -1,0 +1,78 @@
+.he "times (2)                    10/3/26                    times (2)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+times
+- get process times
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+times(buffer)
+.br
+struct tms *buffer;
+
+
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Times
+fills the structure pointed to by buffer with the
+CPU-time accounting of the current process and its
+children.  The structure is:
+
+.nf
+struct tms
+	{
+	long	tms_utime,	/* user time */
+		tms_stime;	/* system time */
+	long	tms_cutime,	/* user time of children */
+		tms_cstime;	/* system time of children */
+	};
+.fi
+
+The children times are the sum of the children's process
+times and their children's times.  The unit is the clock
+tick: HERTZ per second on the kernel, Z80 cycles on the
+simulator.
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+A 0 indicates success, a -1 indicates failure.
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(times = 43)
+.br
+.bd
+times; buffer
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The carry flag is cleared on success, or set on failure.
+On success the four longs are placed in the area
+pointed at by buffer.
