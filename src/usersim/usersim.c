@@ -48,6 +48,7 @@
 #include "../include/util.h"
 #include "../include/mnix.h"
 #include "../include/fslib.h"
+#include "../include/imd.h"
 #include "../include/lockfile.h"
 #include "../include/gui.h"
 
@@ -2097,7 +2098,14 @@ do_exec(char *name, char *guest, char **argv)
             j++;
         }
     }
-    push(0xffff);
+    /*
+     * NULL-terminate argv.  The 0xffff here used to be the stack's
+     * bottom marker, but the exec syscall counts argv by reading
+     * until it hits a zero word - and a 0xffff read as non-zero, so
+     * exec kept walking past the terminator into whatever sat below
+     * the stack frame, and handed the new image a garbage argument.
+     */
+    push(0);
     for (i = 0; i < argc; i++) {
         push(ao[argc - (i + 1)]);
     }
@@ -3788,6 +3796,7 @@ SystemCall()
     case 41:                    /* dup */
     case 49:                    /* lock */
     case 50:                    /* unlock */
+    case 54:                    /* ioctl */
         gfd = fd;
         if (hostfd(gfd) < 0) {
             ret = EBADF;

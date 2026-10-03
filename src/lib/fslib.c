@@ -645,6 +645,20 @@ secmap(struct super *fs, UINT blkno)
     return (trk * i->spt + sec);
 }
 
+/*
+ * The raw .imd handle, so the simulator can read and write a foreign
+ * diskette's sectors by their physical (cylinder, head, sector) the way
+ * the DJDMA board's command block names them - which is exactly what a
+ * CDBCMD ioctl from dar or far is asking for.
+ */
+void *
+fsimd(struct super *fs)
+{
+    struct image *i = (struct image *)fs;
+
+    return (i->driver == DRIVER_IMD) ? i->drive : 0;
+}
+
 int secsize;
 int secs;
 void

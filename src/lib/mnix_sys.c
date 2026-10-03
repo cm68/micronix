@@ -76,7 +76,7 @@ struct syscall syscalls[] = {
 /* 51 */	{1, "bad", 0 },
 /* 52 */	{1, "bad", 0 },
 /* 53 */	{1, "bad", 0 },
-/* 54 */	{1, "bad", 0 },
+/* 54 */	{5, "ioctl", SF_FD|SF_ARG1|SF_ARG2 },
 /* 55 */	{3, "reboot", SF_ARG1 },
 			{0, 0, 0}
 };
