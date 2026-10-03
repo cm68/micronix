@@ -15,6 +15,7 @@
 
 extern long seconds;
 extern int rtcwrite();
+extern int itruncat();
 
 /*
  * Stat system call
@@ -135,6 +136,39 @@ seek(fd, disp, from)
      */
     fp->rwptr = offset;
     return (offset);
+}
+
+/*
+ * Truncate an open file to length bytes, freeing the blocks beyond it.
+ * Shrinks only: a length at or past the current size is a no-op.  The
+ * file must be open for writing and be a regular file.
+ */
+ftruncate(fd, length)
+    int fd;
+    UINT32 length;
+{
+    register struct file *fp;
+    register struct inode *ip;
+
+    if ((fp = ofile(fd)) == 0)
+        return (-1);            /* ofile set u.error = EBADF */
+    if ((fp->mode & IWRITE) == 0) {
+        u.error = EBADF;
+        return (-1);
+    }
+    ip = fp->inode;
+    if ((ip->i_mode & IFMT) != IFREG) {
+        u.error = EINVAL;
+        return (-1);
+    }
+    ilock(ip);
+    if (length >= ip->i_size) {
+        irelse(ip);
+        return (0);
+    }
+    itruncat(ip, length);
+    irelse(ip);
+    return (0);
 }
 
 /*

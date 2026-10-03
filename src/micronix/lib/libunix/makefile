@@ -38,7 +38,7 @@ TARGET	= libunix.a
 #
 MAN	= Intro.2 access.2 break.2 chdir.2 chmod.2 chown.2 \
 	close.2 creat.2 csw.2 dup.2 exec.2 exit.2 fork.2 \
-	fstat.2 getpid.2 getuid.2 gtty.2 indir.2 kill.2 link.2 \
+	fstat.2 ftruncate.2 getpid.2 getuid.2 gtty.2 indir.2 kill.2 link.2 \
 	mknod.2 mount.2 nice.2 open.2 pipe.2 read.2 seek.2 \
 	setuid.2 signal.2 sleep.2 stat.2 stime.2 stty.2 sync.2 \
 	time.2 umount.2 unlink.2 wait.2 write.2
@@ -56,7 +56,7 @@ AOBJS1	= access.o alarm.o _break.o chdir.o chmod.o chown.o \
 AOBJS2	= open.o pause.o perror.o pipe.o read.o reboot.o seekraw.o \
 	setuid.o _signal.o sleep.o stat.o stime.o sbrk.o \
 	stty.o sync.o time.o times.o umount.o unlink.o wait.o \
-	write.o ioctl.o fputc.o fgetc.o
+	write.o ioctl.o fputc.o fgetc.o ftruncate.o
 
 AOBJS	= $(AOBJS1) $(AOBJS2)
 

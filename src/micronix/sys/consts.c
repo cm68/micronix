@@ -18,7 +18,7 @@ extern int indir(), r_exit(), r_fork(), r_read(), r_write(), r_open(),
     r_close(), r_wait(), r_creat(), link(), unlink(), exec(), chdir(),
     r_time(), mknod(), chmod(), chown(), brake(), stat(), r_seek(),
     r_getpid(), mount(), umount(), r_setuid(), r_getuid(), r_stime(),
-    unimp(), r_alarm(), r_fstat(), pause(), badcall(), r_stty(), r_gtty(),
+    unimp(), r_alarm(), r_fstat(), r_ftruncate(), pause(), badcall(), r_stty(), r_gtty(),
     r_ioctl(),
     permission(), r_nice(), r_sleep(), sync(), reboot(), r_kill(), r_csw(), r_ssw(),
     r_dup(), r_pipe(), r_signal();
@@ -74,7 +74,7 @@ struct syscall syssw[] = {
     2, &unimp,                  /* 43 &times */
     8, &unimp,                  /* 44 &profil */
     0, &badcall,                /* */
-    0, &badcall,                /* */
+    4, &r_ftruncate,            /* 46 ftruncate */
     0, &badcall,                /* */
     4, &r_signal,               /* 48 */
     0, &badcall,                /* 49 lock (reserved) */

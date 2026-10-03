@@ -359,6 +359,10 @@ syscall_at(word sc)
 	case 42:
 		printf("pipe()\n");
 		break;
+	case 46:	/* ftruncate fd length */
+		printf("ftruncate(%d, %lu)\n", fd,
+		    ((unsigned long)arg2 << 16) | arg1);
+		break;
 	case 48:	/* set signal handler */
 		printf("signal(%d, %x)\n", arg1, arg2);
 		break;

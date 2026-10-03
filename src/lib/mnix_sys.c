@@ -68,7 +68,7 @@ struct syscall syscalls[] = {
 /* 43 */	{3, "times", SF_ARG1 },
 /* 44 */	{9, "profil", SF_ARG1|SF_ARG2|SF_ARG3|SF_ARG4 },
 /* 45 */	{1, "bad", 0 },
-/* 46 */	{1, "bad", 0 },
+/* 46 */	{5, "ftruncate", SF_FD|SF_ARG1|SF_ARG2 },
 /* 47 */	{1, "bad", 0 },
 /* 48 */	{5, "signal", SF_ARG1|SF_ARG2 },
 /* 49 */	{3, "lock", SF_FD|SF_ARG1 },

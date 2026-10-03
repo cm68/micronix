@@ -3825,6 +3825,7 @@ SystemCall()
     case 49:                    /* lock */
     case 50:                    /* unlock */
     case 54:                    /* ioctl */
+    case 46:                    /* ftruncate */
         gfd = fd;
         if (hostfd(gfd) < 0) {
             ret = EBADF;
@@ -5231,6 +5232,42 @@ SystemCall()
         ret = 0;
         carry_clear();
         break;
+
+    case 46: {                 /* ftruncate fd length */
+        unsigned long length = ((unsigned long)arg2 << 16) | arg1;
+
+        /*
+         * length is the two descriptor words - low in arg1, high in
+         * arg2 - which is how r_ftruncate puts them back together.
+         * The kernel truncates only down: a length at or past the
+         * current size is a no-op, and the host's ftruncate would grow
+         * a short file out to length, so a growing length is never
+         * handed to it.
+         */
+        if (fstat(fd, &sbuf) < 0) {
+            ret = errno;
+            carry_set();
+            break;
+        }
+        if (!S_ISREG(sbuf.st_mode)) {
+            ret = EINVAL;
+            carry_set();
+            break;
+        }
+        if (length >= (unsigned long)sbuf.st_size) {
+            ret = 0;
+            carry_clear();
+            break;
+        }
+        if (ftruncate(fd, length) < 0) {
+            ret = errno;
+            carry_set();
+        } else {
+            ret = 0;
+            carry_clear();
+        }
+        break;
+    }
 
     case 48:                   /* set signal handler */
         if (arg1 > 15) {

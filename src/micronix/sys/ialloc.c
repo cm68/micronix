@@ -275,5 +275,127 @@ indfree(ind, level, dev)
 }
 
 /*
+ * Free the tail of an indirect block: the blocks at entries start
+ * through 255, and the indirect block itself if start is 0.  level is
+ * indfree's - 1 for a single-indirect block, whose entries are data
+ * blocks, 2 for a double-indirect block, whose entries are single-
+ * indirect blocks.  Freed entries are zeroed, so a block that is kept
+ * stays consistent on the disk.
+ */
+indfreetail(ind, level, start, dev)
+    int ind, level, start, dev;
+{
+    register struct buf *bp;
+    register int *p;
+    int bn;
+
+    if (ind == 0)
+        return;
+    if ((bp = bread(ind, dev)) == 0)
+        return;
+    for (p = (int *)&bp->data[510]; p >= (int *)&bp->data[start * 2]; p--) {
+        bhold(bp);
+        bn = *p;
+        *p = 0;
+        brel();
+        if (level == 1)
+            bfree(bn, dev);
+        else
+            indfree(bn, level - 1, dev);
+    }
+    if (start == 0) {
+        brelse(bp);
+        bfree(ind, dev);
+    } else
+        bdwrite(bp);
+}
+
+/*
+ * Truncate an inode to length bytes, freeing the blocks beyond it.
+ * A length of zero is itrunc().
+ */
+itruncat(ip, length)
+    register struct inode *ip;
+    UINT32 length;
+{
+    register int n, dev;
+    int nblk, index;
+
+    if (ip->i_mode & IIO)
+        return;
+    if (length == 0) {
+        itrunc(ip);
+        return;
+    }
+    dev = ip->i_dev;
+    nblk = (length + 511) >> 9;     /* the first block past length */
+
+    if ((ip->i_mode & ILARG) == 0) {
+        for (n = 7; n >= nblk; n--) {
+            bfree(ip->i_addr[n], dev);
+            ip->i_addr[n] = 0;
+        }
+    } else {
+        index = nblk >> 8;
+        if (index >= 7) {
+            /*
+             * The target is inside the double-indirect block.  Free the
+             * single-indirects past the containing one, the data blocks
+             * past length inside it, and the double-indirect when the
+             * whole of it goes.
+             */
+            struct buf *bp;
+            int *p;
+            int containing, bn, entry = index - 7;
+            int empty = 0;
+
+            if ((bp = bread(ip->i_addr[7], dev)) == 0)
+                return;
+            p = (int *)bp->data;
+            containing = p[entry];
+            for (n = 255; n > entry; n--) {
+                bhold(bp);
+                bn = p[n];
+                p[n] = 0;
+                brel();
+                indfree(bn, 1, dev);
+            }
+            if ((nblk & 0xff) == 0) {
+                bhold(bp);
+                p[entry] = 0;
+                brel();
+                empty = (entry == 0);
+            }
+            if (empty) {
+                brelse(bp);
+                bfree(ip->i_addr[7], dev);
+                ip->i_addr[7] = 0;
+            } else
+                bdwrite(bp);
+            if (nblk & 0xff)
+                indfreetail(containing, 1, nblk & 0xff, dev);
+            else
+                indfree(containing, 1, dev);
+        } else {
+            /* free the single-indirects past the containing one */
+            for (n = 6; n > index; n--) {
+                indfree(ip->i_addr[n], 1, dev);
+                ip->i_addr[n] = 0;
+            }
+            /* the data blocks past length in the containing one */
+            indfreetail(ip->i_addr[index], 1, nblk & 0xff, dev);
+            if ((nblk & 0xff) == 0)
+                ip->i_addr[index] = 0;
+            /* the whole double-indirect goes */
+            indfree(ip->i_addr[7], 2, dev);
+            ip->i_addr[7] = 0;
+        }
+    }
+    ip->i_size = length;
+    ip->i_flags |= IMOD;
+    ip->i_mtime = seconds;
+}
+
+/*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

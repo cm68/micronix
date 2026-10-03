@@ -19,6 +19,7 @@ extern int arg[];               /* in-line arguments from system() */
  * reason r_seek hands back two words - would arrive as its low half.
  */
 extern UINT32 seek(int fd, int disp, unsigned from);
+extern int ftruncate(int fd, UINT32 length);
 
 /*
  * Handle register passing across system calls
@@ -179,6 +180,21 @@ r_seek()
         u.af &= ~ERRBIT;
         u.hl = (UINT) off;
         u.hl2 = (UINT) (off >> 16);
+    }
+}
+
+r_ftruncate()
+{
+    UINT32 length;
+
+    length = ((UINT32) arg[1] << 16) | (UINT32) arg[0];
+    u.hl = ftruncate(u.hl, length);
+    if (u.error) {
+        u.af |= ERRBIT;
+        u.hl = u.error;
+    } else {
+        u.af &= ~ERRBIT;
+        u.hl = 0;
     }
 }
 

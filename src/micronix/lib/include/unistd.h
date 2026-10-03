@@ -37,6 +37,7 @@ extern int execv(char *path, char *argv[]);
 extern void exit(int status);
 extern int fork(void);
 extern int fstat(unsigned char fd, char *buf);
+extern int ftruncate(unsigned char fd, long length);
 extern int getpid(void);
 extern int getuid(void);
 extern int gtty(unsigned char fd, char *buf);

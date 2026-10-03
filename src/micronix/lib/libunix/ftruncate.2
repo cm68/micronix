@@ -1,0 +1,71 @@
+.he "ftruncate (2)                10/3/26                   ftruncate (2)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+ftruncate
+- truncate an open file to a length
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+ftruncate(descriptor, length)
+.br
+long length;
+
+
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Ftruncate
+truncates the file named by descriptor to at most
+length bytes.  The file must be open for writing and
+must be a regular file.
+
+If the file was longer, the data past length is lost
+and the blocks that held it are returned to the free
+list.  If the file was already at most length bytes,
+nothing happens; a file is never made longer by this
+call.
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+A 0 indicates success, a -1 indicates failure.
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(ftruncate = 46)
+.br
+.bd
+(descriptor in hl)
+.br
+.bd
+sys; ftruncate; length_low; length_high
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The carry flag is cleared on success, or set on failure.
+On failure the error number is returned in hl.
