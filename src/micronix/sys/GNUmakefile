@@ -50,7 +50,7 @@ EXTRA	= BUILDING TODO
 # and linked again as a module - so its objects, .mod and .page are not
 # in OBJS; they ride GENERATED for the same reason.  unix itself is
 # $(TARGET), which clobber removes.
-MODS	= dj mw ide ncr
+MODS	= dj mw ide ncr hdca
 GENERATED = build.h unix.link $(MODS:%=%.mod) $(MODS:%=%.page) \
 	$(MODS:%=%.o) $(MODS:%=%hdr.o)
 

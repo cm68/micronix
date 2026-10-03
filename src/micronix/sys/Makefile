@@ -3,7 +3,7 @@
 #
 # micronix/sys/Makefile
 #
-# Changed: <2026-09-21>
+# Changed: <2026-10-03>
 #
 # This runs inside micronix, under the make in cmd/make - the v7 make
 # ported to this tree - against the compiler in /bin/ccc.  GNUmakefile
@@ -32,7 +32,9 @@
 #
 #	$* in a prerequisite is expanded per target (make.1), so one rule
 #	over a list of objects reaches each one's own source: in
-#	"mount.o: $*.c", $* is mount.
+#	"mount.o: $*.c", $* is mount.  The same reaches a driver's header
+#	and object from its .mod: in "dj.mod: $*hdr.o $*.o unix.link",
+#	$* is dj.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
@@ -55,7 +57,21 @@ LD = ld
 # to cpp and does not read an argument after it, so "-i ../include" is an
 # -i with no directory and "../include" a second input file - ccc stops
 # with "unknown file type".  GNUmakefile writes it this way too.
-CFLAGS = -m micronix -O -i$(INC)/
+#
+# -DOVLSEG names the segment the overlay frame is in; sys/ovl.h's
+# OVLBASE is OVLSEG * 0x1000 and the module links below are told the same
+# address by -Tdata, so the two have to agree.
+CFLAGS = -m micronix -O -DOVLSEG=9 -i$(INC)/
+
+#
+# The overlay frame.  OVLBASE is the one segment a driver module is
+# mapped into, and OVLDATA is one page above it - the hole the final link
+# opens with -Tdata, and the page ovlslot.o occupies.  These are the
+# literals GNUmakefile computes out of OVLSEG (9): 0x9000 and 0xa000.
+#
+OVLBASE = 0x9000
+OVLDATA = 0xa000
+PAGESZ  = 4096
 
 #
 # The u page (see user.c), all of it .data at 0xf000: the hand-written
@@ -80,21 +96,30 @@ UPAGE_C_OBJ    = consts.o
 KERNEL_AS_SRC = uhdr.s intrpt.s mio.s textpad.s
 KERNEL_AS_OBJ = uhdr.o intrpt.o mio.o textpad.o
 
-KERNEL_C_SRC  = mount.c access.c balloc.c cio.c create.c exec.c fio.c fork.c \
-	ialloc.c iget.c imap.c link.c malloc.c name.c open.c queue.c \
-	rdwri.c reg.c sig.c sleep.c subc.c swap.c sys1.c sys2.c system.c \
-	time.c trap.c tty.c uio.c dj.c memdev.c multio.c dlabel.c mw.c main.c rtc.c
-KERNEL_C_OBJ  = mount.o access.o balloc.o cio.o create.o exec.o fio.o fork.o \
-	ialloc.o iget.o imap.o link.o malloc.o name.o open.o queue.o \
-	rdwri.o reg.o sig.o sleep.o subc.o swap.o sys1.o sys2.o system.o \
-	time.o trap.o tty.o uio.o dj.o memdev.o multio.o dlabel.o mw.o main.o rtc.o
+KERNEL_C_SRC  = mount.c balloc.c cio.c create.c exec.c fio.c fork.c \
+	ialloc.c iget.c imap.c malloc.c name.c queue.c \
+	reg.c sig.c sleep.c subc.c swap.c sys1.c system.c time.c \
+	trap.c tty.c uio.c multio.c dlabel.c ovl.c main.c rtc.c
+KERNEL_C_OBJ  = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
+	ialloc.o iget.o imap.o malloc.o name.o queue.o \
+	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
+	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o rtc.o
+
+#
+# The window-page cluster, folded to .data at 0xe000 (BUFWIN) by win.o's
+# rule: the code that runs with the buffer window in place, and memdev.
+#
+WIN_C_SRC = open.c sys2.c rdwri.c memdev.c link.c access.c
+WIN_C_OBJ = open.o sys2.o rdwri.o memdev.o link.o access.o
 
 #
 # Init-only code, folded into data-only highmem.o by the rule below and
 # reclaimed as buffer headers by expand_bufs() once init has returned.
+# The disk drivers' own bring-up (djinit, ncrinit) lives here, out of
+# their one-page modules.
 #
-HIGHMEM_C_SRC  = main_init.c cus.c djinit.c
-HIGHMEM_C_OBJ  = main_init.o cus.o djinit.o
+HIGHMEM_C_SRC  = main_init.c cus.c djinit.c ncrinit.c
+HIGHMEM_C_OBJ  = main_init.o cus.o djinit.o ncrinit.o
 
 HIGHMEM_AS_SRC = inits.s unbcd.s
 HIGHMEM_AS_OBJ = inits.o unbcd.o
@@ -102,6 +127,15 @@ HIGHMEM_AS_OBJ = inits.o unbcd.o
 # The u struct itself, which lives in the u page's segment (USERSEG).
 USER_C_SRC = user.c
 USER_C_OBJ = user.o
+
+#
+# The disk drivers, each a module of its own: a driver .c and a header
+# .c, linked together into a page at OVLBASE and stamped into the bootable
+# image (see the module rules at the end).
+#
+MODS    = dj mw ide ncr hdca
+MOD_OBJ = dj.o mw.o ide.o ncr.o hdca.o
+MOD_HDR = djhdr.o mwhdr.o idehdr.o ncrhdr.o hdcahdr.o
 
 #
 # rtc.c is ordinary resident C: its only callers are mount() and sys2.c,
@@ -112,17 +146,23 @@ USER_C_OBJ = user.o
 #
 
 #
-# The objects, in the order the links need them.  highmem.o, upage.o and
-# low.o are links of their own, not compiles, so they are named with the
-# links.
+# The objects, in the order the links need them.  highmem.o, upage.o,
+# win.o and low.o are links of their own, not compiles, so they are named
+# with the links.
 #
 LEAF_AS   = $(UPAGE_AS_OBJ) $(UPAGE_LIBC_OBJ)
 LEAF_C    = $(UPAGE_C_OBJ)
 KERNEL_AS = $(KERNEL_AS_OBJ) highmem.o
 KERNEL_C  = $(KERNEL_C_OBJ)
+WIN_C     = $(WIN_C_OBJ)
 HIGHMEM   = $(HIGHMEM_C_OBJ) $(HIGHMEM_AS_OBJ)
 
-OBJS      = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) $(HIGHMEM) low.o
+OBJS      = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) \
+	$(WIN_C) $(HIGHMEM) low.o win.o ovlslot.o
+
+MODULES = $(MOD_OBJ) $(MOD_HDR) \
+	dj.mod mw.mod ide.mod ncr.mod hdca.mod \
+	dj.page mw.page ide.page ncr.page hdca.page
 
 all: unix
 
@@ -138,23 +178,24 @@ all: unix
 $(UPAGE_AS_OBJ) $(UPAGE_LIBC_OBJ) $(KERNEL_AS_OBJ) $(HIGHMEM_AS_OBJ): $*.s
 	$(CC) -m micronix -c $*.s
 
-$(KERNEL_C_OBJ) $(HIGHMEM_C_OBJ) $(USER_C_OBJ): $*.c
+$(KERNEL_C_OBJ) $(WIN_C_OBJ) $(HIGHMEM_C_OBJ) $(USER_C_OBJ) $(MOD_OBJ) $(MOD_HDR): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
-# The u page: user.o (the u struct) first so it sits at the base of
-# segment USERSEG, then the leaf code, all as .data placed at 0xf000.
-# The code must be .data, not .text - the loader reads text and then
-# data, so text parked here would be overwritten.  It is a relocatable
-# object like every other here, and the .o says so; it was user.rel,
-# which collides with user.o besides.
-upage.o: $(USER_C_OBJ) $(LEAF_AS) $(LEAF_C)
-	$(LD) -r -Tdata=0xf000 -o upage.o $(USER_C_OBJ) $(LEAF_AS) $(LEAF_C)
+# The u page: the leaf code first at the base of segment USERSEG, then
+# user.o (the u struct) whose data is ustack (512 bytes, the system
+# stack) below the u struct, all as .data placed at 0xf000.  The code
+# must be .data, not .text - the loader reads text and then data, so text
+# parked here would be overwritten.  It is a relocatable object like
+# every other here, and the .o says so; it was user.rel, which collides
+# with user.o besides.
+upage.o: $(LEAF_AS) $(LEAF_C) $(USER_C_OBJ)
+	$(LD) -r -Tdata=0xf000 -o upage.o $(LEAF_AS) $(LEAF_C) $(USER_C_OBJ)
 
-# highmem.o is the init-only code - main_init, cus, the MIO/console init
-# in inits.s, and bcd2unix in unbcd.s - folded into one data-only object
-# with -Sdata.  The main link parks a data-only object after bss, so it
-# sits at _ebss and expand_bufs() mints buffer headers over it once init
-# has returned.
+# highmem.o is the init-only code - main_init, cus, the drivers' bring-up
+# (djinit, ncrinit), the MIO/console init in inits.s, and bcd2unix in
+# unbcd.s - folded into one data-only object with -Sdata.  The main link
+# parks a data-only object after bss, so it sits at _ebss and
+# expand_bufs() mints buffer headers over it once init has returned.
 highmem.o: $(HIGHMEM)
 	$(LD) -r -Sdata -o highmem.o $(HIGHMEM)
 
@@ -174,21 +215,25 @@ consts.o: consts.c
 # MAP0[2] to reach user memory, and if it sat in that segment it would
 # remap its own code out from under itself.  textpad.o is last among the
 # resident objects so _ebss is the end of .bss; highmem.o (data-only)
-# follows it, then upage.o, the u page at 0xf000.
+# follows it, then win.o, then upage.o, the u page at 0xf000.
 #
 # THE FINAL LINK IS AN ORDINARY LINK - text, then data, then bss, with
-# -Ttext=0x1000 the only address in it - and it has no case for the u
-# page and none for the init-only code.  What it places is decided by the
-# -r links above it: upage.o is .data at 0xf000 by -Tdata, highmem.o is
-# the data-only, unplaced shape -Shigh parks after bss,
-# and low.o is a plain fold that lands where the resident kernel always
-# has.  Text has no address to be placed at in the u page, so a .c that
-# goes there is folded to .data by a rule of its own (consts.o);
-# left as .text, ld appends it to the resident text and pads the text
-# section out to reach 0xf000, and the image stops fitting in the blocks
-# the boot loader will read.  A new object for either place is the same
-# bargain: fold it upstream, because this link has nowhere to put its
-# text.
+# -Ttext=0x1000 the only address it is given beyond -Tdata - and it has
+# no case for the u page and none for the init-only code.  What it places
+# is decided by the -r links above it: upage.o is .data at 0xf000 by
+# -Tdata, win.o is .data at 0xe000 the same way, highmem.o is the
+# data-only, unplaced shape -Shigh parks after bss, and low.o is a plain
+# fold that lands where the resident kernel always has.  Text has no
+# address to be placed at in the u page or the window, so a .c that goes
+# there is folded to .data by a rule of its own (consts.o, win.o); left
+# as .text, ld appends it to the resident text and pads the text section
+# out to reach 0xf000, and the image stops fitting in the blocks the boot
+# loader will read.  A new object for either place is the same bargain:
+# fold it upstream, because this link has nowhere to put its text.
+#
+# -Tdata=0xa000 is what opens the overlay frame: the data segment starts
+# one page above OVLBASE, so the page at 0x9000 is the slot - nothing but
+# ovlslot.o there, and setdev overwrites it with the root driver.
 #
 # THE LINK IS TWO LINKS BECAUSE OF THE ARGUMENT COUNT, and the count is
 # the shell's.  make runs a recipe through "sh -c" when metas() finds a
@@ -198,7 +243,7 @@ consts.o: consts.c
 # link used to be is past that, and the diagnostic is "Too many args".
 # low.o folds the resident objects with a link of its own, and that line
 # has no "=" in it, so make execs ld directly and the shell's array is
-# never in the way.  The final link is eleven words.
+# never in the way.  The final link is a handful of words.
 #
 # The fold is a plain -r, not a section fold: text, data and bss come
 # through as they are, so the one object lands exactly where the
@@ -211,14 +256,69 @@ consts.o: consts.c
 # (findlib in ld.c searches nothing else), so -lccc alone is "ld: library
 # not found: ccc" and no link.  The driver is what usually supplies it -
 # ccc builds a -L out of its own argv[0] and hands it over (ccc.c) - and
-# a direct link has to write the flag out.  On the host that flag is
-# -L$(HOSTROOT)/ccc/lib; here the libraries are the installed ones in
-# /lib, which is where ccc's own /bin/ccc looks for them.
+# a direct link has to write the flag out.
 low.o: uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
 	$(LD) -r -o low.o uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
 
-unix: $(OBJS)
-	$(LD) -Ttext=0x1000 -Shigh -L/lib -lccc -lc -o unix low.o highmem.o upage.o
+# win.o is the window-page cluster: the part of the resident kernel that
+# runs while a buffer's segment is in the BUFSEG window, folded to .data
+# at 0xe000 so the final link parks it in the window's page.  -Sdata is
+# upage.o's reason too, not an aesthetic: the loader writes text and then
+# data in address order, so text parked up here is overwritten.
+win.o: $(WIN_C)
+	$(LD) -r -Sdata -Tdata=0xe000 -o win.o $(WIN_C)
+
+# ovlslot.o is the overlay slot (sys/ovlslot.s): one page of text at
+# OVLBASE, which setdev later writes the root driver's page onto.  The -r
+# link is what holds it at that address; -Ttext says where the assembler's
+# section starts, so the object's own header carries the page and the
+# final link places it there instead of packing it after the resident
+# text.
+ovlslot.o: ovlslot.s
+	$(CC) $(CFLAGS) -c -o ovlslot.rel ovlslot.s
+	$(LD) -r -Ttext=$(OVLBASE) -o ovlslot.o ovlslot.rel
+	rm -f ovlslot.rel
+
+# The link, with an empty slot and no modules behind it.  It is unix.link
+# and not unix because unix is the *bootable* image: the module pages are
+# appended and the root driver stamped in below.
+unix.link: $(OBJS)
+	$(LD) -Ttext=0x1000 -Tdata=$(OVLDATA) -Shigh -L/lib -lccc -lc \
+		-o unix.link low.o highmem.o win.o upage.o ovlslot.o
+
+#
+# Driver modules, and the bootable image they go into.
+#
+# A module is its header first, at OVLBASE, because that is where the
+# kernel reads it (ovlattach, sys/ovl.c).  -Sdata folds the driver and
+# its header into one data section, and the header object is named first
+# so its data lands at the front of the page.  -A resolves the module
+# against unix.link, and -s drops the symbol table the page would carry.
+#
+dj.mod mw.mod ide.mod ncr.mod hdca.mod: $*hdr.o $*.o unix.link
+	$(LD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ $*hdr.o $*.o
+
+# One module is one page.  What the link produced is a 16 byte object
+# header followed by the page's bytes - all of them, because -Sdata puts
+# every section there and -s leaves nothing after - so the page is what
+# follows the header.  dd strips the header, and a second dd through a
+# temp file pads a short module up to the 4K the kernel will read, which
+# is the ordinary case.
+dj.page mw.page ide.page ncr.page hdca.page: $*.mod
+	dd if=$*.mod of=$@ bs=1 skip=16
+	dd if=$@ of=$@.p bs=4096 count=1 conv=sync
+	mv $@.p $@
+
+# The bootable kernel: the link, the module pages stacked above its
+# extent, and the root driver stamped into the slot.  The pages go at the
+# first page boundary past the object, which setdev calls modbase and
+# computes for itself out of the object's own header; setdev reads the
+# major out of each page and dies if it finds no module for the root
+# device.  -i stamps the driver for the kernel's own root device.
+unix: unix.link dj.page mw.page ide.page ncr.page hdca.page
+	cp unix.link unix
+	cat dj.page mw.page ide.page ncr.page hdca.page >> unix
+	setdev -i unix
 
 # makedate is a micronix program like everything else here, and it
 # compiles against the kernel's headers for the same reason: with no -i
@@ -241,27 +341,27 @@ install: unix
 # The cross GNUmakefile's split: clean removes the intermediates, and
 # clobber takes the targets as well.
 #
-# $(OBJS) and not *.o, which is what this used to say.  A glob has to be
-# expanded by the shell, and make sends a line to the shell only when it
-# has a metacharacter in it - so "rm -f *.o rtc.rel" became one shell
-# command whose argument list was however many names the glob came to.
-# The shell caps a command at MAXARG words, and this was 71 of them: it
-# printed "too many arguments", abandoned the rm, and then read on from
+# $(OBJS) $(MODULES) and not *.o, which is what this used to say.  A glob
+# has to be expanded by the shell, and make sends a line to the shell only
+# when it has a metacharacter in it - so "rm -f *.o rtc.rel" became one
+# shell command whose argument list was however many names the glob came
+# to.  The shell caps a command at MAXARG words, and this was 71 of them:
+# it printed "too many arguments", abandoned the rm, and then read on from
 # the word that had not fitted, which is how a clean run came to say
 # "m87.o: Command not found." and remove nothing at all.  Over the cap
 # the failure is not a truncated rm, it is no rm plus a bogus command.
 #
 # $(OBJS) has no metacharacter, so make execs rm itself and neither the
 # shell nor MAXARG is in the path.  What bounds it there is the kernel's
-# argument buffer, NBLKS (4) blocks of 512 bytes in exec.c; the 68 names
-# are about 520 bytes of it, which is where a name list would have to
-# grow a long way before it stopped fitting.
+# argument buffer, NBLKS (4) blocks of 512 bytes in exec.c; the names are
+# about 520 bytes of it, which is where a name list would have to grow a
+# long way before it stopped fitting.
 #
 # The list is the one the link uses, so the two cannot disagree about a
 # file that matters.  A stray .o left in the directory is not swept up
 # any more, but nothing links one either: unix is built from $(OBJS).
 clean:
-	rm -f $(OBJS) consts.rel *.nam *.tok *.x
+	rm -f $(OBJS) $(MODULES) consts.rel ovlslot.rel *.nam *.tok *.x
 
 # clobber is clean plus the kernel, the makedate host program, and
 # build.h, the one file here that is written rather than compiled.
@@ -269,7 +369,7 @@ clean:
 # remakes it, so a clean that took it along would quietly put a new date
 # in the kernel on the next build.
 clobber: clean
-	rm -f unix makedate build.h
+	rm -f unix unix.link makedate build.h
 
 # dependencies generated by
 #
@@ -285,10 +385,17 @@ cio.o: $(SYS)/sys.h $(SYS)/con.h $(SYS)/file.h $(SYS)/inode.h $(SYS)/proc.h
 create.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h
 cus.o: $(SYS)/sys.h $(SYS)/tty.h
 dj.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h
+djhdr.o: $(SYS)/sys.h $(SYS)/ovl.h
+djinit.o: $(SYS)/sys.h $(SYS)/proc.h
+dlabel.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/dlabel.h $(SYS)/proc.h
 exec.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/buf.h $(INC)/obj.h
 fio.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h
 fork.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/con.h
+hdca.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/dlabel.h $(SYS)/proc.h $(SYS)/hdca.h $(SYS)/ovl.h
+hdcahdr.o: $(SYS)/sys.h $(SYS)/ovl.h $(SYS)/hdca.h
 ialloc.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/buf.h
+ide.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/dlabel.h $(SYS)/proc.h $(SYS)/ide.h $(SYS)/ovl.h
+idehdr.o: $(SYS)/sys.h $(SYS)/ovl.h
 iget.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/buf.h $(SYS)/proc.h
 imap.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/buf.h $(SYS)/proc.h
 link.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h
@@ -298,12 +405,18 @@ malloc.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/con.h
 memdev.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/con.h
 mount.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h $(SYS)/buf.h
 multio.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
-mw.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h
+mw.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h $(SYS)/dlabel.h
+mwhdr.o: $(SYS)/sys.h $(SYS)/ovl.h
 name.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/inode.h
+ncr.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/dlabel.h $(SYS)/proc.h $(SYS)/ncr.h $(SYS)/ovl.h
+ncrhdr.o: $(SYS)/sys.h $(SYS)/ovl.h $(SYS)/ncr.h
+ncrinit.o: $(SYS)/sys.h $(SYS)/proc.h
 open.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h $(SYS)/file.h $(SYS)/con.h
+ovl.o: $(SYS)/sys.h $(SYS)/ovl.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h
 queue.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
 rdwri.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/file.h $(SYS)/proc.h
 reg.o: $(SYS)/sys.h $(SYS)/proc.h
+rtc.o: $(SYS)/sys.h $(SYS)/proc.h
 sig.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/tty.h
 sleep.o: $(SYS)/sys.h $(SYS)/proc.h
 subc.o: $(SYS)/sys.h $(SYS)/con.h

@@ -62,6 +62,10 @@ b 5 7 scsi7
 # 72 is slice 2 of the m16 row (2), drive 0; the IDE card has one board,
 # so its type bits are zero.  This is the slice label(1) opens.
 #
+b 1 64 hdac
+b 1 65 hdbc
+b 1 66 hdcc
+b 1 67 hddc
 b 3 72 hd0c
 b 3 73 hd1c
 b 3 74 hd2c

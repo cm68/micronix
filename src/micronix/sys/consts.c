@@ -121,7 +121,7 @@ char devname[][11] = {
  * registers - see sys/ovl.h. */
 struct biovec biosw[] = {
     &nodev, &nulldev, &nulldev, 0,              /* 0 = no device */
-    &nodev, &nodev, &nodev, 0,                  /* 1 = HDCA - removed, obsolete */
+    &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 1 = HDCA, a module */
     &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 2 = DJ-DMA, a module */
     &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 3 = HD-DMA, a module */
     &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 4 = IDE (ATA), a module */
