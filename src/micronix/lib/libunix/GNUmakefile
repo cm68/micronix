@@ -1,11 +1,11 @@
 #
-# libu - the micronix system call library
+# libunix - the micronix system call library
 #
-# lib/libu/GNUmakefile
+# lib/libunix/GNUmakefile
 #
 # THE CROSS BUILD.  The compiler, its flags and its include path all
 # come from GNUmakefile.inc at the top of the tree - this file says
-# only what is particular to libu.  The makefile beside this one does
+# only what is particular to libunix.  The makefile beside this one does
 # the same thing natively inside the simulator, and the two are
 # compared: the simulator is never truth, it is the check that the
 # compiler generates equivalent code wherever it runs.
@@ -14,9 +14,9 @@
 #
 
 DEPTH	= ../..
-DIR	= libu
+DIR	= libunix
 CLASS	= lib
-TARGET	= libu.a
+TARGET	= libunix.a
 
 #
 # Section 2: the system calls.  A man page ships beside the source it
@@ -36,7 +36,7 @@ ASSRCS = access.s alarm.s _break.s chdir.s chmod.s chown.s close.s \
 	creat.s dup.s errno.s exec.s execv.s exit.s _exit.s fork.s fstat.s \
 	getpid.s getuid.s gtty.s ioctl.s kill.s link.s mknod.s mount.s nice.s open.s \
 	pause.s perror.s pipe.s read.s reboot.s seekraw.s setuid.s _signal.s sleep.s \
-	stat.s stime.s sbrk.s stty.s sync.s time.s umount.s unlink.s wait.s \
+	stat.s stime.s sbrk.s stty.s sync.s time.s times.s umount.s unlink.s wait.s \
 	write.s fputc.s fgetc.s
 
 #
@@ -57,7 +57,7 @@ CSRCS = signal.c lseek.c seek.c rename.c \
 #
 # crt0 rides beside the archive and not inside it: it is the startup
 # the linker puts in front of a program, named by the driver, so it
-# must not be one of the members ar packs into libu.a.  That is why
+# must not be one of the members ar packs into libunix.a.  That is why
 # it is not in ASSRCS - OBJS is built from that list and OBJS is what
 # is archived - and it is named here instead, so that SRCS ships it
 # and a rule of its own builds and installs it.

@@ -41,7 +41,7 @@
  * the binary carries its own copy of it at 15ee - and the directory
  * creation is libc's mkdir, which is the mknod and the two links the
  * binary does by hand at 0c61.  The binary's chown, link and the rest
- * were the 1982 system call stubs and are libu's here.
+ * were the 1982 system call stubs and are libunix's here.
  *
  * Where the original gave up with the lock still held - it left it to
  * the minute to time out - this puts the lock down first.

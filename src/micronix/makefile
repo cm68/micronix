@@ -21,13 +21,13 @@
 # THE ORDER IS THE BOOTSTRAP, and every rule here builds AND installs
 # for that reason.  A command's makefile says "ccc -o sh sh.o" and
 # names no library at all: the driver adds /lib/crt0.o, /lib/libc.a
-# and /lib/libu.a from paths it works out from its own, so what cmd
+# and /lib/libunix.a from paths it works out from its own, so what cmd
 # links against is what lib has already put on the system, not
 # anything in this tree.  The same goes for the headers, which cpp
 # reads out of /usr/include.
 #
 #	include		the headers, before anything compiles
-#	lib		libc, libu, libutil, libccc and crt0
+#	lib		libc, libunix, libutil, libccc and crt0
 #	cmd/toolchain	ld, asz and ccc - linker, assembler and driver
 #	libexec		the passes - cpp, c0, c1, peep, astpp
 #	cmd		the commands, everything else

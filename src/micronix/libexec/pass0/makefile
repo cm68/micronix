@@ -22,7 +22,7 @@
 CC	= ccc
 #
 # The compiler's own runtime, fmtlong and fmtstr.  ccc adds crt0.o,
-# libc.a and libu.a out of /lib by itself and knows nothing about this
+# libc.a and libunix.a out of /lib by itself and knows nothing about this
 # one, so it has to be named - the GNUmakefile beside this does the
 # same.  Without it the link ends at _fmtlong and _fmtstr.
 #

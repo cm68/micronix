@@ -7,7 +7,7 @@
 # cmd/make, and drives the makefile in each library's directory.
 # make install is what puts the three archives in /lib.
 #
-# libu is built first because it is the system call layer everything
+# libunix is built first because it is the system call layer everything
 # else sits on, and it is in this file at all now - the old one built
 # libc and libutil and walked past it.
 #
@@ -20,25 +20,25 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 all:
-	cd libu ; make all
+	cd libunix ; make all
 	cd libc ; make all
 	cd libutil ; make all
 	cd libccc ; make all
 
 install:
-	cd libu ; make install
+	cd libunix ; make install
 	cd libc ; make install
 	cd libutil ; make install
 	cd libccc ; make install
 
 clean:
-	cd libu ; make clean
+	cd libunix ; make clean
 	cd libc ; make clean
 	cd libutil ; make clean
 	cd libccc ; make clean
 
 clobber:
-	cd libu ; make clobber
+	cd libunix ; make clobber
 	cd libc ; make clobber
 	cd libutil ; make clobber
 	cd libccc ; make clobber

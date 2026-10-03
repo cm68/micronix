@@ -38,7 +38,7 @@ TARGET	= libc.a
 #
 # Section 3 is the library calls, and it is the section that decides
 # where a page goes, not the archive the code was packed into: the
-# stdio family is built into libu.a and documented here anyway,
+# stdio family is built into libunix.a and documented here anyway,
 # because fopen is a library call and the manual says so by putting
 # it in section 3.  popen and ttyname are in the 1.3 manual and in
 # nothing this port builds; they are here because the manual is the

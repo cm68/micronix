@@ -2647,7 +2647,7 @@ struct rule rules[] = {
 		"\tcall qst\n", R_HL),
 	R(ASSIGN,DEREF,P_NUM,REGVAR,0,3, ASSIGN, P_L, P_R, P_LL, RF_IX,
 		"\tpush ix\n" F_POPHL T_ST_IHL_N, 0),
-	/* and through the other register home - "*tp = t" in libu's time,
+	/* and through the other register home - "*tp = t" in libunix's time,
 	 * writing the clock through the caller's pointer */
 	R(ASSIGN,DEREF,INHL,INBC,0,3, ASSIGN, P_L, P_R, P_NONE, 0,
 		F_PUSHHL T_BC_HL "\tex (sp),hl\n\tcall qst\n", R_HL),

@@ -25,7 +25,7 @@
  *	%u -> %ld	the counters the stats print are long now.
  *
  * The buffers come from sbrk as they always did, and signal is the
- * micronix one via libu.
+ * micronix one via libunix.
  *
  * vim: tabstop=8 shiftwidth=8 noexpandtab:
  */

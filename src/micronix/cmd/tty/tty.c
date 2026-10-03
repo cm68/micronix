@@ -54,7 +54,7 @@
 #include <sys/stat.h>
 
 /*
- * isatty is in libu but in no header - see ttyname (3), which documents it
+ * isatty is in libunix but in no header - see ttyname (3), which documents it
  * beside ttyname.  Declared here so the call below is a call and not an
  * implicit int.
  */

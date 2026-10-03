@@ -541,7 +541,7 @@ static char peep_path[1024];
 
 static char chdr_path[1024];
 static char libc_path[1024];
-static char libu_path[1024];
+static char libunix_path[1024];
 static char sysinc_path[1024];
 static char ldlib_path[1024];   /* -L for the system library directory */
 
@@ -878,12 +878,12 @@ main(int argc, char **argv)
     if (cpm_target) {
         sprintf(libc_path, "%s/cpm/libc.a", libdir);
         sprintf(sysinc_path, "-i%s%s", libdir, CPMSUF);
-        sprintf(libu_path, "%s/cpm/libcpm.a", libdir);
+        sprintf(libunix_path, "%s/cpm/libcpm.a", libdir);
         sprintf(chdr_path, "%s/cpm/crtcpm.o", libdir);
     } else {
         sprintf(libc_path, "%s/libc.a", libdir);
         sprintf(sysinc_path, "-i%s%s", libdir, INCSUF);
-        sprintf(libu_path, "%s/libu.a", libdir);
+        sprintf(libunix_path, "%s/libunix.a", libdir);
         sprintf(chdr_path, "%s/crt0.o", libdir);
     }
 
@@ -1275,7 +1275,7 @@ main(int argc, char **argv)
 	 * that list came only from the command line, so "-lutil" found
 	 * nothing however plainly /lib/libutil.a was sitting there.  The
 	 * driver already works libdir out from its own path and hands ld
-	 * crt0.o, libc.a and libu.a out of it by full name; a library
+	 * crt0.o, libc.a and libunix.a out of it by full name; a library
 	 * asked for by name should come from the same place.  vi asks
 	 * for -lutil, is linked by this driver, and did not build.
 	 *
@@ -1326,13 +1326,13 @@ main(int argc, char **argv)
             ld_args[ld_argc++] = ld_libs[i];
 
         /*
-         * libc, libu, libc: they call each other - libc's printf wants
-         * write from libu, libu's perror wants libc - and ld takes one
+         * libc, libunix, libc: they call each other - libc's printf wants
+         * write from libunix, libunix's perror wants libc - and ld takes one
          * pass per archive, so each has to be offered again after the
          * other has had its say.
          */
         ld_args[ld_argc++] = libc_path;
-        ld_args[ld_argc++] = libu_path;
+        ld_args[ld_argc++] = libunix_path;
         ld_args[ld_argc++] = libc_path;
 
         ld_args[ld_argc] = NULL;

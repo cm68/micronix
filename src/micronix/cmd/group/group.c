@@ -53,7 +53,7 @@
  * One difference is not reproduced, and is not this file's to fix:
  * perror here prints "path : reason" with a space before the colon,
  * where the 1982 one printed "path: reason".  That spacing is in
- * lib/libu/perror.s and is what every command in this tree says, so
+ * lib/libunix/perror.s and is what every command in this tree says, so
  * matching group alone would mean not using the library.
  *
  * vim: tabstop=8 shiftwidth=8 noexpandtab:

@@ -31,7 +31,7 @@
  *
  *	sigs()		the original took a function pointer, because
  *			v7's signal() did.  This tree's signal() takes
- *			the handler as a short - see lib/libu/signal.c -
+ *			the handler as a short - see lib/libunix/signal.c -
  *			so sigs() takes one too, and the three calls
  *			pass eof, SIG_IGN and SIG_DFL where the original
  *			wrote eof, SIG_IGN and (int (*)())0.

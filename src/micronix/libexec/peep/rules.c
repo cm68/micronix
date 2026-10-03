@@ -22,7 +22,7 @@
  * Jump threading has been looked at twice now and is still not worth a
  * rule.  The shape it would collapse - a conditional jump landing on
  * another with the same condition - is all over the Whitesmith's
- * objects in attic/ (libu/sbreak.s tests a pair against -1 that way
+ * objects in attic/ (libunix/sbreak.s tests a pair against -1 that way
  * twice), but this compiler does not emit it: the count above is zero.
  *
  * A later count, over the asmsnap corpus rather than rewrite.c - 118

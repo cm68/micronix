@@ -1,7 +1,7 @@
 #
-# makefile for libu
+# makefile for libunix
 #
-# micronix/lib/libu/makefile
+# micronix/lib/libunix/makefile
 #
 # The native build: this runs inside micronix, under the make in
 # cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
@@ -29,7 +29,7 @@ CC	= ccc
 CFLAGS	= -O -x
 AR	= ar
 LIBDIR	= /lib
-TARGET	= libu.a
+TARGET	= libunix.a
 
 #
 # The man2 pages, listed outright: cmd/make has no $(wildcard), so a
@@ -44,7 +44,7 @@ MAN	= Intro.2 access.2 break.2 chdir.2 chmod.2 chown.2 \
 	time.2 umount.2 unlink.2 wait.2 write.2
 MANDIR	= /usr/man/man2
 
-# The archive is built in chunks because a single "ar cr libu.a $(OBJS)"
+# The archive is built in chunks because a single "ar cr libunix.a $(OBJS)"
 # command line is too long for the system to exec - v6-era Micronix has
 # no room for an 80-object command.  Each chunk stays comfortably under
 # one argument block.
@@ -55,7 +55,7 @@ AOBJS1	= access.o alarm.o _break.o chdir.o chmod.o chown.o \
 
 AOBJS2	= open.o pause.o perror.o pipe.o read.o reboot.o seekraw.o \
 	setuid.o _signal.o sleep.o stat.o stime.o sbrk.o \
-	stty.o sync.o time.o umount.o unlink.o wait.o \
+	stty.o sync.o time.o times.o umount.o unlink.o wait.o \
 	write.o ioctl.o fputc.o fgetc.o
 
 AOBJS	= $(AOBJS1) $(AOBJS2)
@@ -71,7 +71,7 @@ OBJS	= $(AOBJS) $(COBJS)
 #
 # crt0 is not in the archive.  It is the startup the linker puts in
 # front of every program, named by the driver, so it is installed
-# beside libu.a rather than packed into it.
+# beside libunix.a rather than packed into it.
 #
 # It is built here because nothing built it anywhere.  It sat in /lib
 # as a bootstrap leftover that no makefile owned, and when the first

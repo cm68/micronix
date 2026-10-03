@@ -221,7 +221,7 @@ OBJS = boot.o mwio.o sexit.o
 
 mwboot.com: $(OBJS)
 	$(MXLD) -s -o mwboot.com -Ttext=0x100 -L$(CCCLIB) \
-	    sexit.o boot.o mwio.o $(CCCLIB)/libc.a $(CCCLIB)/libu.a $(CCCLIB)/libc.a
+	    sexit.o boot.o mwio.o $(CCCLIB)/libc.a $(CCCLIB)/libunix.a $(CCCLIB)/libc.a
 
 #
 # The floppy second level: the same boot.c with djio.o in place of
@@ -230,7 +230,7 @@ mwboot.com: $(OBJS)
 #
 djboot.com: boot.o djio.o sexit.o
 	$(MXLD) -s -o djboot.com -Ttext=0x100 -L$(CCCLIB) \
-	    sexit.o boot.o djio.o $(CCCLIB)/libc.a $(CCCLIB)/libu.a $(CCCLIB)/libc.a
+	    sexit.o boot.o djio.o $(CCCLIB)/libc.a $(CCCLIB)/libunix.a $(CCCLIB)/libc.a
 
 #
 # The IDE second level: the same boot.c with ideio.o in place of mwio.o.
@@ -239,7 +239,7 @@ djboot.com: boot.o djio.o sexit.o
 #
 ideboot.com: boot.o ideio.o sexit.o
 	$(MXLD) -s -o ideboot.com -Ttext=0x100 -L$(CCCLIB) \
-	    sexit.o boot.o ideio.o $(CCCLIB)/libc.a $(CCCLIB)/libu.a $(CCCLIB)/libc.a
+	    sexit.o boot.o ideio.o $(CCCLIB)/libc.a $(CCCLIB)/libunix.a $(CCCLIB)/libc.a
 
 #
 # The NCR 5380 second level: the same boot.c with ncrio.o in place of
@@ -248,7 +248,7 @@ ideboot.com: boot.o ideio.o sexit.o
 #
 ncrboot.com: boot.o ncrio.o sexit.o
 	$(MXLD) -s -o ncrboot.com -Ttext=0x100 -L$(CCCLIB) \
-	    sexit.o boot.o ncrio.o $(CCCLIB)/libc.a $(CCCLIB)/libu.a $(CCCLIB)/libc.a
+	    sexit.o boot.o ncrio.o $(CCCLIB)/libc.a $(CCCLIB)/libunix.a $(CCCLIB)/libc.a
 
 boot.o: boot.c
 	$(CCC) -c -i$(INC) -o boot.o boot.c

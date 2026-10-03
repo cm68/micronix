@@ -23,7 +23,7 @@
  * tree's own unistd.h carries - ccc rejects any other as a disagreement
  * with it - and it is repeated here because a host build's unistd.h is
  * the system one, which declares no time() at all.  The return is the
- * one part of it not to trust: libu's time.s explains that a micronix
+ * one part of it not to trust: libunix's time.s explains that a micronix
  * long comes back in the shadow bank, so every caller in the tree,
  * this one included, reads the value from the *tp store instead.
  */

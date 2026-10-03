@@ -766,7 +766,7 @@ int fd;
  *
  * That library is NOT the one this file is written against.  login was
  * built with Whitesmiths C, whose library is on the C system disk
- * (disks/dist/1014-8_c_1.IMD) as libwsc.a and libu.a; its own names for
+ * (disks/dist/1014-8_c_1.IMD) as libwsc.a and libunix.a; its own names for
  * the four string helpers login calls are lenstr, cmpstr, cpystr and
  * instr, and the comments above still record which of them each call
  * site was.  This tree has no libwsc.a, so the calls are written against
@@ -784,7 +784,7 @@ int fd;
  *      instr         ->  strchr
  *
  * and the rest - gets, malloc, exit, perror, ctime, execv, and the
- * syscall wrappers - are libc and libu here by the same names, with two
+ * syscall wrappers - are libc and libunix here by the same names, with two
  * exceptions worth naming because they are easy to miss.  The tree's
  * ctime() takes only the time pointer, so the second argument the binary
  * passed is dropped.  And login's own global that holds the terminal's
@@ -802,6 +802,6 @@ int fd;
  *
  * With those three in place this file links: ccc -c takes it clean
  * against this tree's headers, and ccc -o produces a binary against
- * libc.a and libu.a with no undefined symbols.  It does not build the
+ * libc.a and libunix.a with no undefined symbols.  It does not build the
  * 1982 login - see the README's caveats - but it does build.
  */

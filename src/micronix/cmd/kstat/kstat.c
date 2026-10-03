@@ -45,7 +45,7 @@
 static int memfd;
 
 /*
- * kstat is not linked with libu - it is a /micronix reader that the
+ * kstat is not linked with libunix - it is a /micronix reader that the
  * kernel build and the tools share - so it says for itself what it
  * wants of lseek.  The declaration matters as much as the call: without
  * it the compiler assumes an int return and keeps only the low word of

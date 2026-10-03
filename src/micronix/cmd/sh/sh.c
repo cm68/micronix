@@ -347,7 +347,7 @@ char *name;
  * that mean themselves, default and ignore, and go to the kernel as
  * they are.
  *
- * This was empty, and said so: libu could not link signal() because
+ * This was empty, and said so: libunix could not link signal() because
  * _signal.s declared none of its symbols, so __signal and _jtab
  * resolved to nobody.  That is fixed, and so is the argument order in
  * the stub - it handed the kernel the handler where the signal number
@@ -360,7 +360,7 @@ ignoresigs()
 }
 
 /*
- * isatty is not in libu.a either, but gtty is, and asking a
+ * isatty is not in libunix.a either, but gtty is, and asking a
  * descriptor for its terminal modes is how this was always done: if
  * it answers, it is a terminal.
  */

@@ -30,7 +30,7 @@
  *			one that answers.  /lib is the library
  *			directory and is not where a program goes.
  *
- *	execl		v7 called execl.  libu has one - execv.s
+ *	execl		v7 called execl.  libunix has one - execv.s
  *			defines both - but unistd.h declares only exec
  *			and execv, so the child builds the one element
  *			argument list and calls execv.  "-" is what v7

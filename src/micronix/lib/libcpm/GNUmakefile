@@ -4,9 +4,9 @@
 # lib/libcpm/GNUmakefile
 #
 # The compiler targets two systems.  Micronix is the one it runs on
-# and libu is that system's call layer; CP/M is the other, and this
+# and libunix is that system's call layer; CP/M is the other, and this
 # is that one - a program built with "ccc -m cpm" is linked against
-# libcpm.a and started by crtcpm.o instead of libu.a and crt0.o.
+# libcpm.a and started by crtcpm.o instead of libunix.a and crt0.o.
 #
 # The driver chooses between them, so nothing in a source has to: -m
 # picks the runtime, the include path and the target flag, and the
@@ -60,7 +60,7 @@ TARGETS	= crtcpm.o fakecpcl.o
 include $(DEPTH)/GNUmakefile.inc
 
 #
-# The CP/M runtime goes under /lib/cpm, not /lib beside libu.a, so a
+# The CP/M runtime goes under /lib/cpm, not /lib beside libunix.a, so a
 # target directory is self-contained.  Point LIBINSTDIR at that tree
 # and the archive install below puts libcpm.a there; crtcpm.o and the
 # CP/M copy of the (target-independent) libc.a are not the archive

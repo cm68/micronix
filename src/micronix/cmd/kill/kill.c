@@ -7,7 +7,7 @@
  * entries and kill is not one of them, and no floppy carries a source
  * for one: extra/ has v6's and v7's, which is where the interface
  * below comes from, and the system call it needs has been here all
- * along in lib/libu/kill.s.  What the system had instead was the
+ * along in lib/libunix/kill.s.  What the system had instead was the
  * shell's own kill builtin, which reaches only the children that shell
  * forked and only under the name it remembers them by.  This is the
  * command.
@@ -61,7 +61,7 @@
 #include <stdio.h>
 #include <sys/signal.h>
 
-int	kill();			/* lib/libu/kill.s */
+int	kill();			/* lib/libunix/kill.s */
 
 struct	sig {
 	char	*name;

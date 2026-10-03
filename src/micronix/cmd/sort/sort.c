@@ -22,7 +22,7 @@
  *			linker's end symbol: ep = end + MEM, then shrink
  *			the request by 512 until the machine takes it.
  *			There is no end symbol here; sbrk(0) is the same
- *			address - lib/libu/sbrk.s starts the break at
+ *			address - lib/libunix/sbrk.s starts the break at
  *			__Hbss - so the request is lspace + MEM.
  *
  *			SLACK is new, and is what makes the region safe

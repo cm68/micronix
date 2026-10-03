@@ -85,7 +85,7 @@ stime(high, low)
  * Seek(character-special, 0, 1 or 3) fails.
  *
  * Returns the new position.  That is the kernel's half of the contract
- * that lets libu drop the _fdpos[] shadow table it keeps: user space
+ * that lets libunix drop the _fdpos[] shadow table it keeps: user space
  * cannot know where a descriptor stands, because dup shares one rwptr
  * between two fds and an exec carries a position across with no record
  * of it.  On failure, -1 with u.error set, which r_seek turns into the

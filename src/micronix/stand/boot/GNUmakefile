@@ -64,7 +64,7 @@ include $(DEPTH)/GNUmakefile.inc
 mwboot.com: boot.o mwio.o sexit.o
 	$(MXLD) -s -o $@ -Ttext=0x100 -L$(CCCLIB) \
 	    sexit.o boot.o mwio.o \
-	    $(CCCLIB)/libc.a $(CCCLIB)/libu.a \
+	    $(CCCLIB)/libc.a $(CCCLIB)/libunix.a \
 	    $(CCCLIB)/libc.a
 
 #
@@ -76,7 +76,7 @@ mwboot.com: boot.o mwio.o sexit.o
 djboot.com: boot.o djio.o sexit.o
 	$(MXLD) -s -o $@ -Ttext=0x100 -L$(CCCLIB) \
 	    sexit.o boot.o djio.o \
-	    $(CCCLIB)/libc.a $(CCCLIB)/libu.a \
+	    $(CCCLIB)/libc.a $(CCCLIB)/libunix.a \
 	    $(CCCLIB)/libc.a
 
 #
@@ -87,7 +87,7 @@ djboot.com: boot.o djio.o sexit.o
 ideboot.com: boot.o ideio.o sexit.o
 	$(MXLD) -s -o $@ -Ttext=0x100 -L$(CCCLIB) \
 	    sexit.o boot.o ideio.o \
-	    $(CCCLIB)/libc.a $(CCCLIB)/libu.a \
+	    $(CCCLIB)/libc.a $(CCCLIB)/libunix.a \
 	    $(CCCLIB)/libc.a
 
 #
@@ -98,7 +98,7 @@ ideboot.com: boot.o ideio.o sexit.o
 ncrboot.com: boot.o ncrio.o sexit.o
 	$(MXLD) -s -o $@ -Ttext=0x100 -L$(CCCLIB) \
 	    sexit.o boot.o ncrio.o \
-	    $(CCCLIB)/libc.a $(CCCLIB)/libu.a \
+	    $(CCCLIB)/libc.a $(CCCLIB)/libunix.a \
 	    $(CCCLIB)/libc.a
 
 #

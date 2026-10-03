@@ -231,7 +231,7 @@ hostcc: $(ARMX)
 
 hostrt:
 	@mkdir -p $(HOSTROOT)/ccc/include/sys $(HOSTROOT)/ccc/include/cpm
-	cp lib/libc/libc.a lib/libu/libu.a lib/libu/crt0.o \
+	cp lib/libc/libc.a lib/libunix/libunix.a lib/libunix/crt0.o \
 	   lib/libccc/libccc.a $(HOSTROOT)/ccc/lib
 	#
 	# No micronix headers go here any more, and that is the change.
@@ -275,7 +275,7 @@ hostrt:
 #
 sysrt:
 	$(SUDO) mkdir -p $(PREFIX)/ccc/include/sys $(PREFIX)/ccc/include/cpm
-	$(SUDO) cp lib/libc/libc.a lib/libu/libu.a lib/libu/crt0.o \
+	$(SUDO) cp lib/libc/libc.a lib/libunix/libunix.a lib/libunix/crt0.o \
 	   lib/libccc/libccc.a $(PREFIX)/ccc/lib
 	$(SUDO) cp include/*.h $(PREFIX)/ccc/include
 	$(SUDO) cp include/sys/*.h $(PREFIX)/ccc/include/sys
@@ -306,7 +306,7 @@ sysrt:
 # The order is the whole of it, the INSTALLATION.md recipe as one target:
 #
 #	hostcc		the cross compiler (mxccc) and its passes, and mxar
-#	lib		libc, libu, libccc, crt0 - built with mxccc
+#	lib		libc, libunix, libccc, crt0 - built with mxccc
 #	hostrt		those archives where mxccc looks for them
 #	all		the host tools, the boot images, every Z80 binary
 #	install		every Z80 binary, into the filesystem
@@ -331,7 +331,7 @@ sysinstall:
 # like /usr/man.
 #
 # These are NOT the pages the system installs.  What installs is one
-# page per command beside its source, plus libu's section 2 and libc's
+# page per command beside its source, plus libunix's section 2 and libc's
 # section 3, and that is what lands in the simulator's /usr/man.  This
 # is a superset: it carries the recovered 1.61 pages and the 1.3 ones
 # off the floppy as well, including the pages for commands this tree
@@ -355,7 +355,7 @@ sysinstall:
 #
 MXROOT	 = $(DESTDIR)$(PREFIX)/micronix
 MXMAN	 = $(MXROOT)/man
-HOSTMANS = $(wildcard cmd/*/*.1) $(wildcard lib/libu/*.2) \
+HOSTMANS = $(wildcard cmd/*/*.1) $(wildcard lib/libunix/*.2) \
 	   $(wildcard lib/libc/*.3) $(wildcard man/man1/*.1) \
 	   $(wildcard man/man2/*.2) $(wildcard man/man4/*.4) \
 	   $(wildcard man/man5/*.5)

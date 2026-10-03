@@ -16,7 +16,7 @@
  * character and a mode word - so v7's field names would have worked,
  * but micronix has a header for it: <sys/sgtty.h> names the fields
  * ispeed, ospeed, erase, kill and mode, and that is exactly what
- * libu's gtty and stty move.  sys/tty.c's ttymode() writes and reads
+ * libunix's gtty and stty move.  sys/tty.c's ttymode() writes and reads
  * the terminal with iomove(flag, tty, 6) on the head of struct tty,
  * whose first six bytes are {UINT8 ispeed; UINT8 ospeed; UINT8 erase;
  * UINT8 kill; UINT mode;} - the header's struct to the byte.  So the

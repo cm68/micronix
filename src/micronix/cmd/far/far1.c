@@ -23,7 +23,7 @@ char **files = NULL,
 
 int fd = -1;
 
-extern int errno;             /* the library's, libu's errno.s */
+extern int errno;             /* the library's, libunix's errno.s */
 
 UINT nfiles, userno, drive;
 

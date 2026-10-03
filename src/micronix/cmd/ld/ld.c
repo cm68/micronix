@@ -15,7 +15,7 @@
 /*
  * for creat's mode argument, in write_output: the output of a linker
  * is a program and has to be created executable.  On micronix creat
- * is in libu and needs no declaration; here the prototype has to be
+ * is in libunix and needs no declaration; here the prototype has to be
  * in scope or gcc treats the call as an error rather than a guess.
  */
 #include <sys/stat.h>
@@ -922,7 +922,7 @@ struct infile *f;
 
         /*
          * A library can be named more than once - the driver passes
-         * "-lc -lu -lc" so that libc and libu can satisfy each other -
+         * "-lc -lu -lc" so that libc and libunix can satisfy each other -
          * and each mention is its own record.  They are the same file
          * and must share the one handle: three opens of libc.a used
          * three of the twelve a program has, and the output file had

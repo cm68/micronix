@@ -55,7 +55,7 @@ extern char funny[128];
 /*
  * signal numbers and dispositions, from sys/signal.h.  Declared here
  * rather than including <signal.h> so the constants are plain shorts
- * that match libu's signal(short, short), not the function-pointer
+ * that match libunix's signal(short, short), not the function-pointer
  * casts of the POSIX header.
  */
 #define SIG_DFL 0
@@ -75,7 +75,7 @@ extern int fflush(FILE *);
 
 /*
  * The system calls make reaches directly, declared with the shapes
- * libu actually implements.  unistd.h is not pulled in because its
+ * libunix actually implements.  unistd.h is not pulled in because its
  * stat prototype takes a char * buffer and make passes a struct stat;
  * the ABI is the same pointer either way but the types are cleaner
  * spelled out here.

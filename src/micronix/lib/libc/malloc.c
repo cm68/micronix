@@ -129,8 +129,8 @@ found:
 
 extern int	write(int, void *, int);
 extern void	exit(int);
-extern unsigned memtop;	/* the break, from libu/sbrk.s */
-unsigned getsp(void);		/* current SP, from libu/sbrk.s */
+extern unsigned memtop;	/* the break, from libunix/sbrk.s */
+unsigned getsp(void);		/* current SP, from libunix/sbrk.s */
 
 /*
  * malloc does not come back empty.

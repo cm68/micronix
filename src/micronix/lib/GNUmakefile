@@ -3,14 +3,14 @@
 #
 # lib/GNUmakefile
 #
-# libu was missing from DIRS, so the tree build never produced libu.a
+# libunix was missing from DIRS, so the tree build never produced libunix.a
 # and it only ever got built by hand in its own directory.  The order
-# matters no more than it does for any archive, but libu is the system
+# matters no more than it does for any archive, but libunix is the system
 # call layer libc sits on, so it goes first.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = libu libc libutil libccc fslib
+DIRS = libunix libc libutil libccc fslib
 
 RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \
@@ -41,7 +41,7 @@ lib.tar: makefile
 # has no makefile of its own - so the recursion above never reaches it,
 # and without this the source tree is missing /usr/src/lib/include: a
 # from-scratch native rebuild cannot find stdio.h.  These are the modern
-# set, the ones lib/libc and lib/libu are compiled against, whose FILE
+# set, the ones lib/libc and lib/libunix are compiled against, whose FILE
 # agrees with the library - distinct from include/ at the top, which is
 # the old Whitesmith set.  Shipped the same way makefile is.
 #

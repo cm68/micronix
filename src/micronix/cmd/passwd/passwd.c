@@ -37,7 +37,7 @@
  *
  * The rewrite of /etc/passwd is by link and unlink rather than by
  * creat and copy.  There is no rename system call on this machine;
- * libu's rename is these same two calls, and they are written out here
+ * libunix's rename is these same two calls, and they are written out here
  * rather than called so that the failure path can be handled - link
  * will not replace a name, so /etc/passwd is taken away before the new
  * one is made, and if the link then fails the file has to be put back.

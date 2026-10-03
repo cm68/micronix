@@ -51,7 +51,7 @@
 #include <stdio.h>
 
 /*
- * puts is in libu.a - lib/libu/puts.c, with fputs beside it - and in no
+ * puts is in libunix.a - lib/libunix/puts.c, with fputs beside it - and in no
  * header.  Declared here so the call below is a call and not an implicit
  * int.
  */

@@ -2,7 +2,7 @@
  * perror - report errno on the standard error
  *
  * This writes on the file descriptor rather than through stdio, the
- * way libu's perror.s does on the other side.  Going through putc
+ * way libunix's perror.s does on the other side.  Going through putc
  * and stderr drags the whole stdio machinery - _iob, the buffers,
  * fclose and fflush - into any program that so much as mentions
  * perror.  cpp goes out of its way to avoid exactly that, defining

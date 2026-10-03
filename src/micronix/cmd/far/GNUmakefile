@@ -4,7 +4,7 @@
 # cmd/far/GNUmakefile
 #
 # Everything is in GNUmakefile.inc: ccc from /usr/local, every .c in
-# this directory, linked into far against libc and libu.
+# this directory, linked into far against libc and libunix.
 #
 # IN cmd's DIRS now, and it was not.  The reason it was out was that it
 # writes a foreign diskette's directory in place and getting that wrong

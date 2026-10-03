@@ -1,7 +1,7 @@
 ;
 ; brk/sbrk - user-space break tracking for CP/M
 ;
-; libcpm's sibling of lib/libu/sbrk.s, minus the system call.  CP/M
+; libcpm's sibling of lib/libunix/sbrk.s, minus the system call.  CP/M
 ; has no __break: a program owns the whole TPA and manages the break
 ; itself, so there is no kernel to refuse a store past the stack.
 ; memtop holds the current break, lazily started at the end of bss

@@ -43,7 +43,7 @@ MAKEFLAGS += --no-builtin-variables
 # before anything links, so a tree with nothing built in it goes:
 #
 #	make hostcc		the passes and the driver, with cc
-#	make -C lib		libc, libu, libccc, with mxccc
+#	make -C lib		libc, libunix, libccc, with mxccc
 #	make hostrt		the archives where mxccc looks for them
 #	make			everything else
 #
@@ -127,7 +127,7 @@ INC	?= -i$(DEPTH)/lib/include -I$(DEPTH)/include
 # pass adds nothing, so naming them here is enough and the order does
 # not matter.
 #
-TREELIBS ?= $(DEPTH)/lib/libc/libc.a $(DEPTH)/lib/libu/libu.a
+TREELIBS ?= $(DEPTH)/lib/libc/libc.a $(DEPTH)/lib/libunix/libunix.a
 
 ROOT	?= ~/src/micronix/filesystem
 ifeq ($(strip $(CLASS)),)
@@ -258,7 +258,7 @@ INSTALLMODE = @if [ -n "$(strip $(MODE))" ] ; then \
 # still newer than its source - so the next make says nothing needs
 # doing and the build carries on around the hole.
 #
-# lib/libu/sbrk.o is how this was found.  The assembler died partway
+# lib/libunix/sbrk.o is how this was found.  The assembler died partway
 # through it, leaving an empty sbrk.o that make then considered up to
 # date; ar archived the empty member, and every native link after that
 # failed with "undefined symbol: _sbrk" while sbrk.s sat there looking
@@ -359,7 +359,7 @@ $(OBJS): $(HSRCS)
 # that "libc.a is linked into the commands and does not exist on the
 # running system", which is true of the cross build and false of the
 # machine: a native makefile in cmd says "ccc -o sh sh.o" and names no
-# library at all, because the driver adds crt0.o, libc.a and libu.a
+# library at all, because the driver adds crt0.o, libc.a and libunix.a
 # from libdir - bin/../lib, so /lib - all by itself.  Nothing there
 # meant nothing on that machine could link.  /lib is where a person
 # looks for things to link against and this is what puts them there.

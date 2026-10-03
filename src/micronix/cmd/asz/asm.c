@@ -770,7 +770,7 @@ int create;
      * malloc and not the arena: these are the only things here that
      * really are given back - local_reset empties the table between
      * segments - and arena memory cannot be freed one node at a time.
-     * Assembling lib/libu/sbrk.s is what caught it, with glibc saying
+     * Assembling lib/libunix/sbrk.s is what caught it, with glibc saying
      * "free(): invalid pointer" about a block that had never been a
      * malloc block.  There are very few of them; the numbered local
      * labels are all that make one.

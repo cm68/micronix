@@ -17,7 +17,7 @@
  *
  * And what it had to say differently:
  *
- *	rename		is libu's, built from unlink and link because
+ *	rename		is libunix's, built from unlink and link because
  *			the kernel has no rename call.  It removes the
  *			target BEFORE trying the link, so when a
  *			cross-device link fails the target this code
