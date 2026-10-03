@@ -80,6 +80,14 @@ struct dir {
 z80_t z80;
 z80_desc_t context;
 unsigned long long sim_cycles;
+/*
+ * The running total of Z80 cycles, in a shared mapping rather than a
+ * plain global: a plain global is copied by the host fork the guest's
+ * fork uses, so a parent would not see its children's cycles.  times()
+ * hands this out as tms_cutime and a caller differences it around a
+ * wait.
+ */
+unsigned long long *shared_cycles;
 byte status;
 int int_pin;
 int nmi_pin;
@@ -139,6 +147,7 @@ z80_run()
 	do {
 		z80_exec(&z80, 1);
 		sim_cycles++;
+		(*shared_cycles)++;
 	} while (!z80_opdone(&z80));
 }
 
@@ -369,6 +378,17 @@ put_word(unsigned short addr, unsigned short value)
 
     put_byte(addr, value & 0xff);
     put_byte(addr+1, (value >> 8) & 0xff);
+}
+
+/*
+ * Write a 32-bit value in the guest's long layout: the high word at
+ * the lower address (NUXI), which is how ccc's long lives in memory.
+ */
+void
+put_long(unsigned short addr, unsigned long value)
+{
+    put_word(addr, (value >> 16) & 0xffff);
+    put_word(addr + 2, value & 0xffff);
 }
 
 /*
@@ -2797,6 +2817,14 @@ initmemdev()
         perror("initmemdev");
         exit(2);
     }
+    shared_cycles = (unsigned long long *)mmap((void *)NULL,
+        sizeof(unsigned long long), PROT_READ|PROT_WRITE,
+        MAP_SHARED | MAP_ANONYMOUS, 0, 0);
+    if (shared_cycles == (unsigned long long *)-1) {
+        perror("shared_cycles");
+        exit(2);
+    }
+    *shared_cycles = 0;
     /*
      * The lock lives in memory other processes hold too, so it has to
      * be one they can use.
@@ -5187,6 +5215,21 @@ SystemCall()
             z80_set_reg16(de_reg, i);
             carry_clear();
         }
+        break;
+
+    case 43:                   /* times */
+        /*
+         * tms_utime is this process's own cycles; tms_cutime is the
+         * shared running total, which a caller differences across a
+         * fork/wait to see its child's cycles.  There is no separate
+         * system time in the simulator.
+         */
+        put_long(arg1, (unsigned long)(sim_cycles - cyc_base));
+        put_long(arg1 + 4, 0);
+        put_long(arg1 + 8, (unsigned long)*shared_cycles);
+        put_long(arg1 + 12, 0);
+        ret = 0;
+        carry_clear();
         break;
 
     case 48:                   /* set signal handler */
