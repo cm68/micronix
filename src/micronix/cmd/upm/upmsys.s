@@ -3,7 +3,7 @@
 ;
 ; cmd/upm/upmsys.s
 ;
-; upm cannot use the ordinary libu stubs: those reach the simulator's
+; upm cannot use the ordinary libunix stubs: those reach the simulator's
 ; syscall trap through RST 08h (0xcf), and upm's page zero belongs to
 ; the CP/M program.  So upm has its own, read out of the .dis, which
 ; reach the trap through a CALL to the shared HALT below.  The syscall
@@ -439,7 +439,7 @@ sg_arg2: .ds	2
 ;
 ; _jtab - fifteen six-byte trampolines, one per signal, each loading its
 ; handler out of _stab and falling into the common save-and-call tail.
-; This is libu's, moved here so that _signal.o is not pulled in and its
+; This is libunix's, moved here so that _signal.o is not pulled in and its
 ; RST-based __signal does not fight this one.
 ;
 _jtab:

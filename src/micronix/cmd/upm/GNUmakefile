@@ -8,7 +8,7 @@
 # follow from that, and all three are why this makefile does not just use
 # the generic rules:
 #
-#   - the crt is upmhead.s (start, entry, bios, tint), not lib/libu's
+#   - the crt is upmhead.s (start, entry, bios, tint), not lib/libunix's
 #     crt0, and it has to be the FIRST object so start lands at the text
 #     base;
 #   - the link drives ld directly with -Ttext=0xd500.  ccc would add
@@ -37,13 +37,13 @@ DIR	= upm
 CLASS	= cmd
 
 # the crt first, so start is at the text base; the syscall stubs before
-# the upm halves so they win over libu's RST-based ones
+# the upm halves so they win over libunix's RST-based ones
 OBJS	= upmhead.o upmsys.o upm_res.o upm_ccp.o
 
 include $(DEPTH)/GNUmakefile.inc
 
 LIBC	= $(DEPTH)/lib/libc/libc.a
-LIBU	= $(DEPTH)/lib/libu/libu.a
+LIBU	= $(DEPTH)/lib/libunix/libunix.a
 
 # The two halves.  -r -Stext folds the resident object's every section
 # into its text segment and -r -Sdata does the same for the CCP's data

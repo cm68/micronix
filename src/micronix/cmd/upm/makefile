@@ -12,7 +12,7 @@
 # loaded at 0100 and runs there, so upm's own text and data have to be
 # higher.  Three things follow, in both builds:
 #
-#   - the crt is upmhead.s (start, entry, bios, tint), not lib/libu's
+#   - the crt is upmhead.s (start, entry, bios, tint), not lib/libunix's
 #     crt0, and it has to be the FIRST object so start lands at the
 #     text base;
 #   - the link drives ld directly with -Ttext=0xd500.  ccc would add
@@ -56,11 +56,11 @@ PROG	= upm
 
 #
 # the crt first, so start is at the text base; the syscall stubs before
-# the upm halves so they win over libu's RST-based ones
+# the upm halves so they win over libunix's RST-based ones
 #
 OBJS	= upmhead.o upmsys.o upm_res.o upm_ccp.o
 LIBC	= /lib/libc.a
-LIBU	= /lib/libu.a
+LIBU	= /lib/libunix.a
 
 all: $(PROG)
 
