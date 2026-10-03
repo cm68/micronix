@@ -51,6 +51,8 @@ extern void lose(char *s);
 extern int readblk(struct super *f, int blkno, char *buf);
 extern int writeblk(struct super *f, int blkno, char *buf);
 extern void *fsimd(struct super *f);	/* the raw .imd handle, for raw sector io */
+extern int rawgeom(struct super *f, int *cyls, int *heads, int *spt, int *secsize);
+extern UINT secinv(struct super *f, UINT blkno);	/* inverse of secmap */
 extern int fileread(struct dsknod *ip, int offset, char *buf);
 extern int filewrite(struct dsknod *ip, int offset, char *buf);
 extern void idump(char *name, struct dsknod *ip, int always);

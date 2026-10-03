@@ -659,6 +659,70 @@ fsimd(struct super *fs)
     return (i->driver == DRIVER_IMD) ? i->drive : 0;
 }
 
+/*
+ * A drive's geometry as the CDBCMD ioctl wants it: cylinders, heads,
+ * sectors to a track, and the sector size in bytes.  A raw .img is a
+ * plain file (DRIVER_IMAGE), so its heads come from the minor number's
+ * five-inch bit and its cylinders from the file size; an .imd carries
+ * its own.
+ */
+int
+rawgeom(struct super *fs, int *cyls, int *heads, int *spt, int *secsize)
+{
+    struct image *i = (struct image *)fs;
+
+    if (i->driver == DRIVER_IMD) {
+        struct imd *im = i->drive;
+        int secs, ss;
+
+        imd_trkinfo(im, 0, 0, &secs, &ss);
+        *cyls = im->cyls;
+        *heads = im->heads;
+        *spt = secs;
+        *secsize = ss;
+        return 0;
+    }
+    if (i->driver == DRIVER_IMAGE) {
+        long size = lseek(i->fd, 0L, SEEK_END);
+
+        *heads = (i->minor & 0x04) ? 2 : 1;
+        *spt = i->spt;
+        *secsize = i->bps;
+        *cyls = (int)(size / ((long)*spt * *secsize * *heads));
+        return 0;
+    }
+    return -1;
+}
+
+/*
+ * The inverse of secmap: given a linear block number, the block whose
+ * sector skew maps back onto it.  readblk applies secmap, so this is how
+ * a caller that already has a physical (cylinder, head, sector) expressed
+ * as a linear block reaches that same block through readblk.
+ */
+UINT
+secinv(struct super *fs, UINT blkno)
+{
+    struct image *i = (struct image *)fs;
+    int trk = blkno / i->spt;
+    int sec = blkno % i->spt;
+    int x;
+
+    for (x = 0; x < i->spt; x++) {
+        int s = x;
+
+        if (i->altsec) {
+            s <<= 1;
+            if (!(i->spt & 1) && s >= i->spt)
+                s++;
+            s %= i->spt;
+        }
+        if (s == sec)
+            break;
+    }
+    return (UINT)(trk * i->spt + x);
+}
+
 int secsize;
 int secs;
 void

@@ -5274,6 +5274,106 @@ SystemCall()
         }
         carry_clear();
         break;
+    case 54:                    /* ioctl(fd, CDBCMD, &req): run a command block */
+        /*
+         * The DJ/DMA board's own instructions, run against the raw image.
+         * The block is a program (SETDMA, a SREAD or SWRITE, a HALT - or
+         * STATUS / MEMREAD for the geometry), and this walks it the way the
+         * board would, moving the data phase in and out of the guest's
+         * buffer.  opcodes: 0x20 SREAD, 0x21 SWRITE, 0x22 STATUS, 0x23
+         * SETDMA, 0x25 HALT, 0xa0 MEMREAD.
+         */
+    {
+        unsigned short cb;      /* the guest's struct cdb */
+        int clen, ccount, chole;
+        unsigned short cbuf;    /* the guest's data buffer */
+        int pc, cyl, head, sec, slc, n;
+        int cyls, heads, spt, secsize;
+        unsigned char row[16];
+        char cmdbuf[16];
+        char secbuf[512];
+
+        if (arg1 != 0) {        /* CDBCMD is the only request */
+            ret = ENOTTY;
+            carry_set();
+            break;
+        }
+
+        cb = arg2;
+        copyin(cmdbuf, cb, 16);
+        clen = get_word(cb + 16);
+        ccount = get_word(cb + 18);
+        /* cflags at cb+20, not read here: the opcode says which way */
+        cbuf = get_word(cb + 22);
+        chole = get_word(cb + 24);
+
+        if (!files[fd].mo ||
+            rawgeom(files[fd].mo->fs, &cyls, &heads, &spt, &secsize) < 0) {
+            ret = ENODEV;
+            carry_set();
+            break;
+        }
+
+        for (pc = 0; pc < clen; ) {
+            switch (cmdbuf[pc] & 0xff) {
+            case 0x23:          /* SETDMA - the sim moves the data itself */
+                pc += 4;
+                break;
+            case 0x20:          /* SREAD */
+            case 0x21: {        /* SWRITE */
+                int linear;
+
+                cyl = cmdbuf[pc + 1] & 0xff;
+                sec = cmdbuf[pc + 2] & 0xff;
+                head = (sec & 0x80) ? 1 : 0;    /* VERSO */
+                sec &= 0x7f;
+                linear = cyl * (spt * heads) + head * spt + (sec - 1);
+                if ((cmdbuf[pc] & 0xff) == 0x20) {
+                    readblk(files[fd].mo->fs,
+                        secinv(files[fd].mo->fs, linear), secbuf);
+                    copyout(secbuf, cbuf, secsize);
+                } else {
+                    copyin(secbuf, cbuf, secsize);
+                    writeblk(files[fd].mo->fs,
+                        secinv(files[fd].mo->fs, linear), secbuf);
+                }
+                cmdbuf[pc + 4] = 0x40;  /* OKSTAT */
+                pc += 5;
+                break;
+            }
+            case 0x22:          /* STATUS -> slc at +3, answer at +5 */
+                for (slc = 0; (128 << slc) < secsize; slc++)
+                    ;
+                cmdbuf[pc + 3] = slc;
+                cmdbuf[pc + 5] = 0x40;
+                pc += 6;
+                break;
+            case 0xa0:          /* MEMREAD: the drive's DJTAB row */
+                n = cmdbuf[pc + 4] & 0xff;
+                memset(row, 0, sizeof row);
+                row[0] = cyls + 1;       /* the board counts past the last */
+                row[9] = spt * heads;    /* sectors to a cylinder */
+                if (n > sizeof row)
+                    n = sizeof row;
+                copyout(row, cbuf, n);
+                pc += 8;
+                break;
+            case 0x25:          /* HALT */
+                cmdbuf[pc + 1] = 0x40;
+                pc += 2;
+                break;
+            default:
+                cmdbuf[pc] = 0x40;   /* leave an answer so the walk ends */
+                pc = clen;
+                break;
+            }
+        }
+
+        copyout(cmdbuf, cb, 16);
+        ret = 0;
+        carry_clear();
+        break;
+    }
     case 55:                   /* reboot */
         /*
          * Only root reaches here on real hardware; usersim is
