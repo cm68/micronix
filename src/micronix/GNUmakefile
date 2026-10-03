@@ -438,8 +438,10 @@ update: src.tar
 	$(RECURSE)
 	mkdir -p $(DEST)
 	tar -f src.tar -C $(DEST) --keep-newer-files -x $(NOWARN)
-	mkdir -p $(DEST)/docs
-	cp $(DOCSRCS) $(DEST)/docs
+	@if [ -n "$(DOCSRCS)" ]; then \
+		mkdir -p $(DEST)/docs; \
+		cp $(DOCSRCS) $(DEST)/docs; \
+	fi
 
 #
 # One tar of the whole source tree - sources only, no .o or built
