@@ -257,6 +257,7 @@ src/micronix/cmd/asz/asz
 src/micronix/cmd/awk/awk
 src/micronix/cmd/cal/cal
 src/micronix/cmd/cat/cat
+src/micronix/cmd/cc/cc
 src/micronix/cmd/ccc/ccc
 src/micronix/cmd/change/change
 src/micronix/cmd/chgrp/chgrp
@@ -363,6 +364,7 @@ src/micronix/cmd/tail/tail
 src/micronix/cmd/tar/tar
 src/micronix/cmd/td/td
 src/micronix/cmd/tee/tee
+src/micronix/cmd/time/time
 src/micronix/cmd/tr/tr
 src/micronix/cmd/tty/tty
 src/micronix/cmd/umount/umount

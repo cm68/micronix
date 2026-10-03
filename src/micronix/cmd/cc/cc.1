@@ -1,0 +1,93 @@
+.he "cc (1)                       10/2/26                       cc (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+cc
+- the Whitesmiths C compiler supervisor
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+cc [ option ] file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Cc drives the original Whitesmiths toolchain: it preprocesses with
+cpp, parses with cp1, generates code with cp2, assembles with as and
+links with link, so one command turns source into a running program.
+A file ending in .c is compiled, one in .s is assembled, and .o and
+.a files are handed to the linker.  With no -c or -S the result is an
+executable called a.out, or the name given with -o.
+.sp
+The passes are looked up in /bin, so cc runs beside them rather than
+carrying its own.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-o name	Name the output file rather than a.out.
+
+.ti -10
+-c	Compile and assemble, but do not link; leave the .o.
+
+.ti -10
+-S	Compile but do not assemble; leave the .s.
+
+.ti -10
+-E	Preprocess only; leave the .i.
+
+.ti -10
+-O	Run the Whitesmiths optimizer between code generation and
+assembly.
+
+.ti -10
+-p	Keep the intermediate files the passes produce.
+
+.ti -10
+-n	Print the commands without running them.
+
+.ti -10
+-v	List each command as it is run.
+
+.ti -10
+-x opt	Pass opt on to cp2, the code generator.
+
+.ti -10
+-i dir	Add dir to the preprocessor's include search path.
+
+.ti -10
+-I dir	Add dir to the include path, in -i form.
+
+.ti -10
+-l lib	Link with liblib.a.  The default link is libS.a, libmd.a,
+libu.a and libm.a, so -lS need not be given for stdio.
+
+.ti -10
+-s	Strip symbols from the output.
+
+.ti -10
+-P prefix	Prefix the tool names with prefix instead of /bin/.
+
+.in -10
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+cpp (1), cp1 (1), cp2 (1), as (1), link (1), lib (1), ccc (1)
