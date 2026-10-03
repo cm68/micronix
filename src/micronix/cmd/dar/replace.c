@@ -176,7 +176,7 @@ repfile (a)
 
 		writefat (new, ENDCHAIN);	/* terminate the block chain */
 
-		gio (new, buf, write);
+		gio (new, buf, WRITE);
 		size += n;
 		old = new;
 		}

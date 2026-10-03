@@ -17,12 +17,10 @@
 sio (a, b, c)
 	FAST UCOUNT a;
 	FAST TEXT *b;
-	FAST (*c)();
+	FAST int c;		/* READ or WRITE */
 	{
-	INTERN UCOUNT s, t, n;
-	INTERN ULONG o;
-
-
+	static struct cdb req;
+	INTERN UCOUNT s, t, n, cyl, sec;
 
 	s = a % d->dspt;		/* sector no. on the track */
 	t = a / d->dspt;		/* track no. */
@@ -51,17 +49,66 @@ sio (a, b, c)
 
 	n %= d->uspt;	/* bring into the range [0, spt] */
 
-	n += t * d->uspt;	/* now n is the real sector number */
+	n += t * d->uspt;	/* now n is the linear sector number */
 
+/*
+ * What the driver used to do with that linear sector on its way to the
+ * board: cylinder, head and sector.  The alternate-sectoring step here is
+ * the inverse of the convolution above, so the two cancel and name the
+ * sector the medium itself has.
+ */
 
+	cyl = n / (d->uspt * d->sides);
+	sec = n % d->uspt;
 
-	o = n;		/* offset in sectors */
+	if (alt)
+		{
+		sec <<= 1;
+		if (!(d->uspt & 1) && sec >= d->uspt)
+			sec++;
+		sec %= d->uspt;
+		}
 
-	o *= d->bps;	/* o is the offset in bytes */
+	sec++;			/* one-origin sector numbers */
 
-	lseek (fd, o, 0);	/* seek to the spot */
+	if (d->sides == 2 && (n % (d->uspt * d->sides)) >= d->uspt)
+		sec |= VERSO;
 
-	if ((*c) (fd, b, d->bps) == d->bps)
+/*
+ * One ioctl carries the sector, and what it carries is the controller's
+ * own program for the transfer: where the data goes, which sector to read
+ * or write, and a halt.  The three bytes of the DMA address are the one
+ * thing dar cannot write - b is a virtual address and the board wants a
+ * physical one - so req.hole says where they go and the driver fills them.
+ */
+
+	req.len = 11;		/* SETDMA, the transfer, HALT */
+	req.hole = 1;		/* the address is the SETDMA operand */
+
+	req.cmd[0] = SETDMA;
+	req.cmd[1] = req.cmd[2] = req.cmd[3] = 0;
+
+	req.cmd[4] = (c == READ) ? SREAD : SWRITE;
+	req.cmd[5] = cyl;
+	req.cmd[6] = sec;
+	req.cmd[7] = drive;
+	req.cmd[8] = 0;		/* the transfer's own answer */
+
+	req.cmd[9] = HALT;
+	req.cmd[10] = 0;	/* ... and the halt's */
+
+	req.count = d->bps;
+	req.flags = (c == READ) ? CDB_IN : 0;
+	req.buf = b;
+
+/*
+ * The transfer's own answer is in the block that comes back, at the end of
+ * the SREAD or SWRITE command - which is where the controller left it, and
+ * the reason the block is handed back at all.  An ioctl that worked only
+ * says the program ran.
+ */
+
+	if (ioctl (fd, CDBCMD, &req) >= 0 && req.cmd[8] == OKSTAT)
 		{
 		return YES;
 		}
@@ -69,7 +116,7 @@ sio (a, b, c)
 		{
 		perror (device);
 
-		if (c == read)
+		if (c == READ)
 			fill (b, d->bps, NOENT);
 
 		return NO;
@@ -139,7 +186,7 @@ okdev ()
  */
 
 
-	if ((s.flags & S_TYPE) != S_ISBLOCK)
+	if ((s.st_mode & S_TYPE) != S_ISBLOCK)
 		{
 		put (device);
 		put (": Not block special\n");
@@ -241,6 +288,7 @@ devopen ()
 	fstat (fd, &s);
 
 	alt = !!(s.addr[0] & ALT);
+	drive = s.addr[0] & 7;	/* which drive the node names */
 	}
 
 changename ()
@@ -267,45 +315,87 @@ create (a)
 
 devsize (a)
 	{
-	char c;
-	long low, high, midpoint;
+	static struct cdb req;
+	static unsigned char row [DJROWSZ];
+	static UCOUNT slc, bps;
+	static unsigned volume;
 
+/*
+ * The controller is asked, rather than the device measured.  The drive's
+ * geometry is one of the controller's own tables (DJTAB), and a command
+ * block that reaches into controller memory is how to read it.  There is
+ * no command that measures a drive, so this is a program of two: one for
+ * the drive's status, one for its row of the table.
+ */
 
-	low = 0;
-	high = K64;
+/*
+ * The drive's status, for the length of a sector on it.  No data phase:
+ * the controller leaves its answer inside the command and the driver hands
+ * the block back.
+ */
 
-	for (;;)
+	req.len = 6;		/* STATUS */
+	req.hole = -1;		/* no address in it to fill */
+	req.count = 0;		/* and no data to move */
+	req.flags = 0;
+
+	req.cmd[0] = STATUS;
+	req.cmd[1] = drive;
+	req.cmd[2] = 0;		/* the drive characteristics byte */
+	req.cmd[3] = 0;		/* the sector length code */
+	req.cmd[4] = 0;		/* the drive status byte */
+	req.cmd[5] = 0;		/* and the command's own answer */
+
+	if (ioctl (a, CDBCMD, &req) < 0)
 		{
-		midpoint = (low + high) / 2;
-
-		if (midpoint == low)
-			break;
-
-		if (seek (a, (int) midpoint, 3) >= 0 && read (a, &c, 1) == 1)
-			{
-			low = midpoint;
-			}
-
-		else
-			{
-			if (errno == ENXIO)	/* off the disk */
-				{
-				high = midpoint;
-				}
-			else		/* on the disk but unreadable */
-				{
-				perror (NULL);
-				low = midpoint;
-				}
-			}
+		perror (device);
+		exit (NO);
 		}
 
-	seek (a, 0, 0);	/* return the file offset to the beginning */
+	slc = req.cmd[3];
 
-	if (high >= K64)
-		high = K64 - 1;		/* max. size */
+	if (slc > S1024)
+		{
+		put ("Unknown sector size\n");
+		exit (NO);
+		}
 
-	return (int) high;
+	bps = 128 << slc;	/* the code is 128, 256, 512, 1024 */
+
+/*
+ * The drive's own row of the controller's table.
+ */
+
+	req.len = 10;		/* MEMREAD, HALT */
+	req.hole = 1;		/* the address is the MEMREAD operand */
+	req.count = DJROWSZ;	/* the whole row */
+	req.flags = CDB_IN;
+	req.buf = (char *) row;
+
+	req.cmd[0] = MEMREAD;
+	req.cmd[1] = req.cmd[2] = req.cmd[3] = 0;
+	req.cmd[4] = DJROWSZ;	/* how many bytes to bring back */
+	req.cmd[5] = 0;
+	req.cmd[6] = (DJTAB + drive * DJROWSZ) & 0xff;
+	req.cmd[7] = (DJTAB + drive * DJROWSZ) >> 8;
+	req.cmd[8] = HALT;
+	req.cmd[9] = 0;		/* the halt's own answer */
+
+	if (ioctl (a, CDBCMD, &req) < 0)
+		{
+		perror (device);
+		exit (NO);
+		}
+
+	volume = (row[0] - 1) * row[9];
+
+/*
+ * The volume in 512 byte blocks, in the order that does not overflow a 16
+ * bit word: a sector is a whole number of 128 byte records, and the volume
+ * of them over four is the volume of 512 byte blocks.
+ */
+
+	return volume * (bps / 128) / 4;
 	}
 
 
@@ -321,13 +411,13 @@ dflush ()
  * read or write 1 cluster or group
  * a is the cluster number
  * b is the memory address
- * c is &read() or &write()
+ * c is READ or WRITE
  */
 
 gio (a, b, c)
 	FAST UCOUNT a;
 	FAST TEXT *b;
-	FAST (*c)();
+	FAST int c;
 	{
 	char *p;
 	int i, s, r;
@@ -416,7 +506,7 @@ isdir (a)
 	if (stat (a, &s) < 0)
 		return NO;
 
-	return (s.flags & S_TYPE) == S_ISDIR;
+	return (s.st_mode & S_TYPE) == S_ISDIR;
 	}
 
 fsize (a)

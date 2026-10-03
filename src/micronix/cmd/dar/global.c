@@ -35,6 +35,8 @@ COUNT	errno;		/* external UNIX error number */
 
 UCOUNT	nfiles = 0;
 
+UCOUNT	drive = 0;	/* which of the board's eight drives the node names */
+
 struct entry thedir [MAXENT] = {0};
 
 struct disk *d = NULL;

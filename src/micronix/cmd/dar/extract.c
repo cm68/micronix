@@ -160,7 +160,7 @@ exfile (a, b)
 		else
 			togo = d->bpg;		/* full */
 
-		gio (block, buf, read); /* read the group */
+		gio (block, buf, READ); /* read the group */
 
 		if (pflag)
 			{

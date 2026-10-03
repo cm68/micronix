@@ -28,11 +28,9 @@ readchain (a, b)
 	unsigned a;
 	char *b;
 	{
-	extern read ();
-
 	while (a)
 		{
-		gio (a, b, read);
+		gio (a, b, READ);
 
 		a = nextblock (a);
 		b += d->bpg;
@@ -48,11 +46,9 @@ writechain (a, b)
 	unsigned a;
 	char *b;
 	{
-	extern write ();
-
 	while (a)
 		{
-		gio (a, b, write);
+		gio (a, b, WRITE);
 
 		a = nextblock (a);
 		b += d->bpg;

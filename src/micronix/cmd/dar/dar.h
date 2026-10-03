@@ -10,6 +10,7 @@
 #include <types.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <errno.h>
 #include <mtab.h>
 #include <time.h>
@@ -33,7 +34,6 @@ typedef unsigned long ULONG;
 #define S_TYPE	S_IFMT
 #define S_ISBLOCK	S_IFBLK
 #define S_ISDIR		S_IFDIR
-#define flags	st_mode
 #define addr	st_addr
 #define size1	st_size1
 
@@ -52,6 +52,44 @@ int itob();
 void sort();
 void putstr();
 extern int errno;
+
+/*
+ * The DJ/DMA controller's commands, out of include/sys/dj.h.  That header
+ * has the block a caller hands the driver and the driver reads it, but dar
+ * does not include it: dj.h's own sizes and names are the driver's and are
+ * not all dar's, and one of them being a byte off would be a silent
+ * misread - the same reason cmd/far spells them out for itself.
+ *
+ * The block is not a packet the controller decodes but a program it runs:
+ * each command is its opcode and its operands, and each leaves what it
+ * answered inside itself, which is why the driver hands the block back.
+ * ioctl(fd, CDBCMD, &req) runs it - see include/sys/ioctl.h.
+ */
+#define SREAD	0x20		/* [op,cyl,sec,drv] read a sector */
+#define SWRITE	0x21		/* [op,cyl,sec,drv] write one */
+#define STATUS	0x22		/* [op,drv] -> dcb,slc,dsb */
+#define SETDMA	0x23		/* [op,lo,hi,seg] where the data goes */
+#define HALT	0x25		/* [op] the end of the program */
+#define MEMREAD	0xA0		/* [op,lo,hi,seg,n,lo,hi,dj] controller memory */
+
+#define VERSO	0200		/* the other side, in a sector number */
+
+#define OKSTAT	0x40		/* what a command that worked left behind */
+
+/*
+ * The sector length code a status command answers with, and the sector
+ * size each one stands for: 128 bytes, shifted left by the code.
+ */
+#define S128	0
+#define S256	1
+#define S512	2
+#define S1024	3
+
+/*
+ * The controller's own per-drive tables (include/sys/dj.h's DJTAB).
+ */
+#define DJTAB	0x1340		/* base of the per-drive tables */
+#define DJROWSZ	16		/* bytes to a drive's row */
 
 /*
  * some MSDOS diskette layout particulars
@@ -215,8 +253,8 @@ extern unsigned char path [];	/* path name buffer */
 
 extern TINY	fd;
 
-extern UCOUNT	nfiles,
-	drive;		/* CP/M destination drive */
+extern UCOUNT	nfiles;
+extern UCOUNT	drive;		/* which of the board's eight drives the node names */
 
 extern struct entry thedir [MAXENT];
 

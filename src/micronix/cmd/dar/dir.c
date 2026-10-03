@@ -131,7 +131,6 @@ readdir ()
 	{
 	char *p;
 	static s, n;
-	extern read ();
 
 
 	if (cflag)		/* create your own fat */
@@ -176,7 +175,7 @@ readdir ()
 
 	else
 		{
-		dio (read);
+		dio (READ);
 		}
 	}
 
@@ -191,8 +190,8 @@ fatin ()
 
 	while (n--)
 		{
-		if (!sio (s, p, read))
-			if (!sio (s + d->spf, p, read))
+		if (!sio (s, p, READ))
+			if (!sio (s + d->spf, p, READ))
 				return NO;
 
 		p += d->bps;
@@ -209,7 +208,6 @@ writedir ()
 	{
 	char *p;
 	static s, a, b;
-	extern write ();
 
 	s = FATSTART;
 
@@ -219,18 +217,18 @@ writedir ()
 
 		for (b = 0; b < d->spf; b++)	 /* each sec. of fat table */
 			{
-			sio (s++, p, write);
+			sio (s++, p, WRITE);
 			p += d->bps;
 			}
 		}
 
-	dio (write);		/* write out the directory */
+	dio (WRITE);		/* write out the directory */
 		
 	ioflush ();
 	}
 
 dio (a)
-	int (*a) ();
+	int a;			/* READ or WRITE */
 	{
 	char *p;
 	static n, s;
