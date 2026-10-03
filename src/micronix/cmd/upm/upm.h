@@ -112,7 +112,7 @@
  *   8  csetio    set I/O byte     28 cprotect  write protect
  *   9  cprs      print string     29 cgetro   get read-only vec
  *  10  readbuf   read console buf 30 setatt   set file attributes
- *  11  cconstat   console status   31 null     get disk params
+ *  11  cconstat   console status   31 getparm  get disk params
  *  12  cversion   version          32 cuser    set/get user
  *  13  creset    reset disk       33 rrand    read random
  *  14  select    select disk      34 wrand    write random
@@ -175,7 +175,8 @@ struct fcb {
 	uchar	s1;		/* 0x0d */
 	uchar	s2;		/* 0x0e */
 	uchar	rc;		/* 0x0f - records in this extent */
-	uchar	dm[9];		/* 0x10 - the first nine disk-map bytes */
+	uchar	dm[8];		/* 0x10 - the first eight disk-map bytes */
+	uchar	bc;		/* 0x18 - last record byte count; 0 = full */
 	char	fd;		/* 0x19 - the micronix file descriptor,
 				   -1 (0xff) when closed, so signed */
 	ushort	size;		/* 0x1a - size in bytes */

@@ -59,6 +59,24 @@ int	errno;
 ushort	arg2;		/* f047 - the BDOS argument, from cpm */
 
 /*
+ * The deferred last record.  A CP/M write is a full 128-byte record, but
+ * the CP/M 3 byte-count extension (set file attributes with F6' in s2)
+ * lets the final record be short.  Rather than write every record and then
+ * truncate the micronix file back down, upm holds the most recent record
+ * back and writes it only on the next record write or on close - at close
+ * with just the byte-count bytes.  pending is a copy of the DMA record,
+ * because the program is free to reuse its DMA buffer as soon as the write
+ * returns.
+ */
+char	pending[128];		/* the deferred record */
+char	pending_valid;		/* 1 when pending holds a record */
+struct fcb *pending_fcb;	/* the FCB the deferred record belongs to */
+ushort	pending_rec;		/* its record number */
+
+void	flushpending();
+void	flushbyte();
+
+/*
  * The CCP's own.  loadfile is the program the CCP decided to run, or 0
  * to sit in the prompt; ccword and line are getword's and getline's
  * buffers.
@@ -125,7 +143,7 @@ int arg;
 	case 28:	return cprotect();
 	case 29:	return cgetro();
 	case 30:	return setatt(arg);
-	case 31:	return null();
+	case 31:	return getparm();
 	case 32:	return cuser();
 	case 33:	return rrand();
 	case 34:	return wrand();
@@ -146,6 +164,34 @@ int arg;
 null()
 {
 	return 0;
+}
+
+/*
+ * getparm - function 31, get the disk parameter block address.
+ *
+ * upm has no physical CP/M disk, but CP/M programs probe the DPB to size
+ * their own buffers, so return a fixed, plausible one.
+ */
+struct dpb {
+	int	spt;		/* sectors per track */
+	char	bsh;		/* block shift factor */
+	char	blm;		/* block shift mask */
+	char	exm;		/* extent mask */
+	int	dsm;		/* disk storage max */
+	int	drm;		/* directory entry max */
+	char	al0;
+	char	al1;
+	int	cks;		/* dir check vector size */
+	int	off;		/* disk offset */
+};
+
+struct dpb dpb = {
+	26, 3, 7, 0, 242, 63, 32, 0, 16, 2
+};
+
+getparm()
+{
+	return &dpb;
 }
 
 /*
@@ -338,6 +384,9 @@ struct fcb *fcb;
 	if (stat(buf, statbuf) < 0)
 		return -1;		/* no such file */
 
+	if (fcb->s2 & 0x40)		/* F6' - set the byte count */
+		fcb->bc = fcb->cr;
+
 	mode = statbuf[4] | (statbuf[5] << 8);
 
 	if (fcb->ft[0] & 0x80)		/* read-only */
@@ -415,6 +464,7 @@ struct fcb *fcb;
 	name(fcb, buf);
 	size = fsize(buf);
 	fcb->size = size;
+	fcb->bc = statbuf[10] & 0x7F;	/* the last record's byte count */
 
 	nrec = size >> 7;		/* 128-byte records */
 	if (size & 0x7F)
@@ -468,6 +518,8 @@ struct fcb *fcb;
 cclose(fcb)
 struct fcb *fcb;
 {
+	flushbyte(fcb);
+
 	closefile(fcb->fd);
 	fcb->fd = -1;
 	return 0;
@@ -861,6 +913,46 @@ struct fcb *fcb;
 }
 
 /*
+ * flushpending - write the deferred record back to its file as a full
+ * 128-byte record.  Called before the next record write or read, and by
+ * cclose for the final - possibly short - record.
+ */
+void
+flushpending()
+{
+	if (!pending_valid)
+		return;
+	seek(pending_fcb->fd, pending_rec >> 2, 3);
+	if (pending_rec & 3)
+		seek(pending_fcb->fd, (pending_rec & 3) << 7, 1);
+	write(pending_fcb->fd, pending, 0x80);
+	pending_valid = 0;
+}
+
+/*
+ * flushbyte - flush fcb's deferred record with its last-record byte count.
+ *
+ * Called by cclose and before a size query.  bc is initialized from stat
+ * at open, cleared to "full" when a write passes the old end, and set from
+ * cr by setatt when the F6' bit is set; 0 means the record is full.
+ */
+void
+flushbyte(fcb)
+struct fcb *fcb;
+{
+	int nbytes;
+
+	if (!pending_valid || pending_fcb != fcb)
+		return;
+	seek(fcb->fd, pending_rec >> 2, 3);
+	if (pending_rec & 3)
+		seek(fcb->fd, (pending_rec & 3) << 7, 1);
+	nbytes = fcb->bc ? fcb->bc : 0x80;
+	write(fcb->fd, pending, nbytes);
+	pending_valid = 0;
+}
+
+/*
  * cwrite - the one write path, sequential and random both.
  *
  * Like cread but in the other direction: seek, write a full 128-byte
@@ -873,10 +965,19 @@ cwrite(fn, fcb)
 int fn;
 struct fcb *fcb;
 {
-	if (write(fcb->fd, dma, 0x80) != 0x80) {
-		fcb->currec = 0;
-		return -1;
-	}
+	int rec;
+
+	rec = (fn == 'S') ? ((fcb->ex << 7) | fcb->cr)
+			  : ((fcb->r1 << 8) | fcb->r0);
+
+	if (rec >= fcb->size)		/* past the old end: new full record */
+		fcb->bc = 0;
+
+	flushpending();
+	memcpy(pending, dma, 0x80);
+	pending_valid = 1;
+	pending_fcb = fcb;
+	pending_rec = rec;
 
 	advance(fn, fcb);
 
@@ -905,6 +1006,8 @@ int fn;
 struct fcb *fcb;
 {
 	int off;
+
+	flushpending();
 
 	if (oleft)
 		cflush();
@@ -948,6 +1051,7 @@ struct fcb *fcb;
 {
 	int size;
 
+	flushbyte(fcb);		/* a deferred record is part of the size */
 	name(fcb, buf);
 	size = fsize(buf);
 	fcb->r0 = size;
@@ -1723,7 +1827,7 @@ badbios()
  * memcpy, strchr - and upm calls those directly.  What is left here are
  * the ones libc does not have: cpystr, the variadic concatenate; puts
  * and putb, which write through putch rather than stdio; itob; and
- * signal, libu's, moved here so _stab stays resident where a running
+ * signal, libunix's, moved here so _stab stays resident where a running
  * .com cannot clobber it.
  *
  * The one that is not obvious is cpystr: it copies its source strings
@@ -1790,8 +1894,8 @@ char *s;
 }
 
 /*
- * signal and stab - libu's, moved here so that _stab is resident: the
- * trampolines in upmsys.s read it while a .com runs, and libu's signal.o
+ * signal and stab - libunix's, moved here so that _stab is resident: the
+ * trampolines in upmsys.s read it while a .com runs, and libunix's signal.o
  * would put it in the data/bss segment at 0x0100, where the .com clobbers
  * it.  _signal is the syscall stub in upmsys.s.
  */
