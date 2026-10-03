@@ -296,6 +296,7 @@ src/micronix/cmd/fgrep/fgrep
 src/micronix/cmd/file/file
 src/micronix/cmd/find/find
 src/micronix/cmd/form/form
+src/micronix/cmd/fp/fp
 src/micronix/cmd/fsck/fsck
 src/micronix/cmd/grep/grep
 src/micronix/cmd/group/group

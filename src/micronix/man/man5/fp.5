@@ -1,0 +1,202 @@
+.he "fp (5)                       4/6/83                       fp (5)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+fp
+- format used by the floppy backup service
+.sp 2
+.in -5
+.bd
+SYNOPSIS
+.in +5
+.br
+cat fp.h
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+fp expects to interact with a block special device.
+A block is 512 bytes long.
+This format description is probably for the benefit
+of system programmers and is technical in nature.
+As you might notice, some ideas for this volume format
+have been borrowed in modified form from Bell's "tp"
+and the basic idea of a scalable unix file system.
+We are grateful.
+
+The following is the layout of each "fp" volume.
+.sp
+Block 0 is unused.
+.br
+Block 1 is the super block.
+.br
+Blocks 2 through (dsize - 1) are directory blocks.
+.br
+Blocks (dsize - 2) through vsize are data blocks.
+.sp
+The structure of the super block is as follows:
+.in +5
+.nf
+.bd 7
+struct super
+	{
+	unsigned short
+		dsize,
+		vsize,
+		reel,		/* the reel number */
+		flags,
+		free,		/* next available free block */
+		serial,
+		check;
+
+	unsigned long time;
+	}
+.in -5
+.fi
+dsize is the number of blocks in the volume directory.
+.sp
+vsize is the total number of blocks in the volume.
+vsize is 800 for a Morrow double 5 in. floppy.
+vsize is 2400 for a 1K double 8 in. floppy.
+.sp
+reel is the volume number.
+Volume numbers start at 0.
+.sp
+flags is a word of boolean flags (see below).
+.sp
+free is the block number of the first available data block.
+.sp
+serial is the volume serial number.
+It is used to ensure that the volume actually was
+changed when that is the intention.
+.sp
+check is a checksum word such that the wordwise sum
+of the super structure is zero.
+.sp
+time is the last modification time of the volume in seconds from the
+epoch.
+.sp
+flags currently has the following defined bits.
+.in +5
+.ti -10
+bit 0	CONTINUED
+If this bit it set this is not the last volume of the set.
+.in -5
+.sp
+As seen above, the data section of the volume
+starts immediately after the directory section.
+.sp
+Each directory block holds 8 entries.
+Each entry is 64 bytes long.
+The following is the structure of a directory entry.
+.in +5
+.nf
+.bd 7
+struct entry
+	{
+	char name [PATHSIZE];
+	short mode;
+	short user;
+	short group;
+	long length;
+	unsigned long time;
+	unsigned char links;
+	unsigned device;
+	unsigned short block;		/* address on tape */
+	unsigned short offset;		/* this chapter's block offset */
+	unsigned char chapter;		/* chapter number */
+	char flags;
+	unsigned inumber;
+	unsigned char major, minor;
+	char instance;
+	short checksum;
+	}
+.in -5
+.fi
+name is the file name, null terminated.
+.sp
+mode is the file mode, see flags in stat(2).
+.sp
+user is the user id number of the file.
+It is a short so that version 7 group numbers will fit.
+.sp
+group is the group id number of the file.
+It is a short so version 7 group numbers will fit.
+.sp
+length is the length in bytes of this part of the file.
+.sp
+time is the last modification time of the file
+in seconds from the epoch.
+.sp
+links is the number of links to the file.
+.sp
+device is the major/minor device number if this entry represents
+a special file.
+If the entry does not represent a special file, then
+the contents of "device" have no meaning.
+.sp
+block is the number of the first data block on the volume for this file.
+If zero, then there is no data represented by this entry.
+.sp
+offset is the offset in blocks from the beginning of the original file
+where this section of data resides.
+.sp
+chapter tells which part of the file this is.
+chapter 0 is the first chapter of a file.
+.sp
+flags is a characters worth of boolean flags.
+.sp
+inumber is the inode number of the file.
+.sp
+major is the major device number of the device on which the original file
+resides.
+.sp
+minor is the minor device number of the device on which the original file
+resides.
+.sp
+checksum has a value such that the wordwise sum of the entry is zero.
+.sp
+Flags are as follows:
+.in +5
+.ti -10
+bit 0 	CONTINUED
+This is not the last entry for this file.
+.ti -10
+bit 1	LINK
+This entry represents only a link, not the original file.
+.in -5
+.sp
+Note that complete gross structure of the volume
+is determined by the dsize and vsize entries of the super structure.
+In constructing new volumes, "fp" applies the formula:
+.nf
+.in +5
+dsize = vsize / 80;
+.in -5
+.fi
+This is rather arbitrary.
+The number was chosen to make current floppy directories fit
+entirely in primary memory to for performance reasons.
+.sp
+Also, the only way to discover how many volumes comprise set
+or how many chapter (or parts) comprise a file is by
+encountering the last volume or the last chapter.
+.sp
+If the LINK bit is set in the flags member of an entry and
+the associated file is a plain file, then the entry
+has no associated data.  The only information it conveys
+is the name and mode of the file.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+fp (1), stat (2), dtab (5)
