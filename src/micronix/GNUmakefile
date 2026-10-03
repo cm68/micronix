@@ -230,7 +230,7 @@ hostcc: $(ARMX)
 	@echo "host compiler in $(BIN)/mxccc"
 
 hostrt:
-	@mkdir -p $(HOSTROOT)/ccc/include/sys $(HOSTROOT)/ccc/include/cpm
+	@mkdir -p $(HOSTROOT)/ccc/lib $(HOSTROOT)/ccc/include/sys $(HOSTROOT)/ccc/include/cpm
 	cp lib/libc/libc.a lib/libunix/libunix.a lib/libunix/crt0.o \
 	   lib/libccc/libccc.a $(HOSTROOT)/ccc/lib
 	#

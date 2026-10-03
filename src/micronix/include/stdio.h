@@ -73,9 +73,18 @@ extern uchar _setup;
 #define	ferror(p)	(((p)->_flag&_IOERR)!=0)
 #define	fileno(p)	((uchar)p->_file)
 
+#ifdef __linux__
+/*
+ * The host tools compile shared micronix sources against this header, so
+ * here the streams are the host's own variables, not the guest's _iob
+ * slots - the guest spelling is a macro below, for ccc's relocations.
+ */
+extern FILE *stdin, *stdout, *stderr;
+#else
 #define	stdin	(&_iob[0])
 #define	stdout	(&_iob[1])
 #define	stderr	(&_iob[2])
+#endif
 
 FILE *		fopen();
 FILE *		freopen();
