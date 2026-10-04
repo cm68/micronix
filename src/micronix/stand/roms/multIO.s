@@ -67,7 +67,9 @@ scsi_mon equ	04h
 ;****************************************************************
 
 mapram	equ	0600h		;actual map ram (write only)
+map	equ	0200h		;map ram image (the readable copy)
 gobuff	equ	01b0h		;ram stub for the task switch
+ctask	equ	0006h		;current task, read by the trap handler
 
 ;****************************************************************
 ;* entry: arm both controllers, then let them race		*
@@ -163,6 +165,12 @@ ideblp:	ld	a,idecs0
 	djnz	ideblp
 	xor	a
 	out	(idepc),a
+	ld	a,1			;task 0 seg 1 -> page 1, back to identity
+	ld	(mapram + 2),a
+	ld	(map + 2),a
+	ld	a,2			;task 0 seg 2 -> page 2, copyrom's window
+	ld	(mapram + 4),a
+	ld	(map + 4),a
 	ld	de,0100h		;the sector just read
 	ld	a,01h			;run it as task 1
 	jp	switch
@@ -248,6 +256,12 @@ ncrdata: call	ncrin
 	jr	nz,ncrdata
 	call	ncrin			;status byte (ignored)
 	call	ncrin			;message byte (ignored)
+	ld	a,1			;task 0 seg 1 -> page 1, back to identity
+	ld	(mapram + 2),a
+	ld	(map + 2),a
+	ld	a,2			;task 0 seg 2 -> page 2, copyrom's window
+	ld	(mapram + 4),a
+	ld	(map + 4),a
 	ld	de,0100h
 	ld	a,1
 	jp	switch
@@ -346,6 +360,8 @@ switch:	ld	hl,gobuff
 	ld	(hl),e			;addr low
 	inc	hl
 	ld	(hl),d			;addr high
+	ld	(ctask),a		;the trap handler reads this to know
+					; the trap came from task 1, not 0
 	jp	gobuff
 
 ;****************************************************************
