@@ -284,6 +284,37 @@ setrom(int page)
 char *wregname[] = { "fpseg", "fpcol", "trap", "mask" };
 char *pattr[] = { "no access", "r/o", "execute", "full" };
 
+/*
+ * The SIGUSR2 map dump.  Prints the task register and the full 16-task x
+ * 16-page mapping ram, so a boot that went wrong can be read after the
+ * fact: which physical segment each page of each task maps to.  This is
+ * the same data the monitor's 'm' command prints for one task, but every
+ * task at once and safe to call from the SIGUSR2 latch in kdump.c.
+ */
+void
+mpz80_map_dump(void)
+{
+    int t, p;
+    byte seg, attr;
+
+    printf("\n== mapping registers (taskreg=0x%02x %s maskreg=0x%02x switchreg=0x%02x) ==\n",
+        taskreg, super() ? "super" : "user", maskreg, switchreg);
+    printf("    page 0..f:  0   1   2   3   4   5   6   7   8   9   a   b   c   d   e   f\n");
+    for (t = 0; t < 16; t++) {
+        printf("    task %02x:   ", t);
+        for (p = 0; p < 16; p++) {
+            seg = maps[(t << 5) + (p << 1)];
+            attr = maps[(t << 5) + (p << 1) + 1];
+            if ((attr & 0x3) == 0)
+                printf("  -- ");
+            else
+                printf("  %02x%c", seg, (attr & 0x4) ? '*' : ' ');
+        }
+        printf("\n");
+    }
+    printf("    (-- = no access; * = r10; page 9 = 0x9000 overlay, d = 0xd000, e = 0xe000)\n");
+}
+
 #ifndef NODEBUG
 // dump out memory map
 int

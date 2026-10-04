@@ -42,6 +42,7 @@ typedef unsigned int   k32;
 #define K_NFILE 60
 #define K_NMIO 4
 #define K_NSIG 16
+#define K_MAXSEG 256
 
 #define TTY_RAWQUE 21
 #define TTY_COKQUE 26
@@ -149,6 +150,8 @@ static struct bitname iflag_bits[] = {
 };
 
 extern int find_symbol(char *ls);
+extern int program_counter;
+extern char *nearest_sym(unsigned short addr, unsigned short *offp);
 
 static int
 rd16(paddr addr)
@@ -353,6 +356,56 @@ dump_devsw(int addr, int count, int words, char *name)
 }
 
 /*
+ * The segment map (sys/malloc.c): segmap[n] != 0 means 4K segment n is
+ * allocated.  The overlay drivers each own one segment (the boot prints
+ * "placed <driver> at seg N"), so a driver that ended up sharing a
+ * segment with another shows up here as two placements into the same
+ * number - the alias this dump exists to catch.
+ */
+static void
+dump_segmap(int addr, int nseg)
+{
+	int i, col = 0, any = 0;
+
+	printf("\n== segment map (_segmap @ 0x%04x, %d) ==\n", addr, nseg);
+	for (i = 0; i < nseg; i++) {
+		if (!physread((paddr)(addr + i)))
+			continue;
+		printf("%s%02x", any && col == 0 ? "" : any ? " " : "", i);
+		any = 1;
+		if (++col == 16) {
+			printf("\n");
+			col = 0;
+		}
+	}
+	if (col)
+		printf("\n");
+	if (!any)
+		printf("  (none)\n");
+}
+
+/*
+ * A raw hex dump of physical memory, for the one or two addresses a
+ * wedged boot leaves the kernel's fate at.  The kernel loads at 0x1000
+ * and is entered there, so its first bytes are the answer to "did the
+ * loader load anything".
+ */
+static void
+dump_phys(paddr addr, int n)
+{
+	int i;
+
+	printf("\n== physical %06x, %d bytes ==\n", addr, n);
+	for (i = 0; i < n; i++) {
+		printf("%02x ", physread((paddr)(addr + i)));
+		if ((i & 0xf) == 0xf)
+			printf("\n");
+	}
+	if (n & 0xf)
+		printf("\n");
+}
+
+/*
  * the whole dump.  Called from the main loop when the SIGUSR2 latch is
  * set, so printf is safe here.
  */
@@ -369,6 +422,40 @@ dump_kernel_tables(void)
 		    rd16((paddr)find_symbol("_swapsize")),
 		    rd16((paddr)find_symbol("_swapaddr")));
 	printf("\n");
+
+	{
+		unsigned short off = 0;
+		char *sym = nearest_sym((unsigned short) program_counter, &off);
+
+		printf(" pc=%04x %s+%x\n", program_counter, sym ? sym : "?",
+		    off);
+	}
+
+	/*
+	 * The mapping ram and the interrupt controller are the two things a
+	 * wedged boot most needs and the two things the kernel's tables do not
+	 * record - the map because it is write-only hardware and the 8259
+	 * because the guest only ever asks it for a vector.  Dump both before
+	 * the software tables.
+	 */
+	mpz80_map_dump();
+	multio_pic_dump();
+
+	/*
+	 * The kernel loads at 0x1000 and is entered there; dump its first
+	 * bytes and the loader's load base, so "entered and crashed" can be
+	 * told from "the loader loaded garbage".
+	 */
+	dump_phys(0x1000, 32);
+	dump_phys(0x6490, 32);		/* _start */
+
+	/*
+	 * The firmware RAM below 0x1000: super (0x0000) is the trap handler's
+	 * target, ctask (0x0006) tells it which task trapped, u.pc/u.sp are
+	 * the saved user registers.  Dumped because a wedged boot's answer is
+	 * usually in here - which of these the kernel did and did not set.
+	 */
+	dump_phys(0x0000, 16);
 
 	a = find_symbol("_plist");
 	if (a >= 0)
@@ -405,6 +492,10 @@ dump_kernel_tables(void)
 	if (a >= 0)
 		dump_devsw(a, rd16((paddr)find_symbol("_ncdev")), 5,
 		    "character device switch (_ciosw)");
+
+	a = find_symbol("_segmap");
+	if (a >= 0)
+		dump_segmap(a, K_MAXSEG);
 
 	printf("\n== uart registers (sim ACE state) ==\n");
 	multio_ace_dump();

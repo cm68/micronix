@@ -92,6 +92,8 @@ extern void multio_restore_terminal(void);
 extern void kdump_init(void);
 extern void kdump_poll(void);
 extern void multio_ace_dump(void);
+extern void multio_pic_dump(void);
+extern void mpz80_map_dump(void);
 
 // generally useful timed callout facility
 void time_out(char *name, int usec, void (*func)(int a), int arg);

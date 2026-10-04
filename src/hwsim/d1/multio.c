@@ -1488,6 +1488,26 @@ multio_ace_dump(void)
     }
 }
 
+/*
+ * The SIGUSR2 interrupt-controller dump: the 8259's own registers, which
+ * the guest's tty/dev state does not record and a wedged interrupt line
+ * cannot be diagnosed without.  multio_dump() prints the same fields as a
+ * debugger command; this one goes to stdout for the SIGUSR2 kdump.
+ */
+void
+multio_pic_dump(void)
+{
+    printf("\n== interrupt controller (8259) ==\n");
+    printf("  imr=%02x (enables %02x) irr=%02x isr=%02x\n",
+        imr, (~imr) & 0xff, irr, isr);
+    printf("  priority=%d rotate=%d auto_eoi=%d ivec=%s iv_isrbit=%02x\n",
+        priority, rotate, auto_eoi, ivs_name[ivecstate], iv_isrbit);
+    printf("  int_line=%d int_pin=%d vi_lines=%02x\n",
+        int_line, int_pin, vi_lines);
+    printf("  vector=%02x %02x %02x pic_state=%d\n",
+        vector[0], vector[1], vector[2], pic_state);
+}
+
 static int
 multio_init()
 {
