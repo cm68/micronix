@@ -27,11 +27,6 @@ struct biovec {
 } biosw[];
 
 /*
- * Device names for diagnostics
- */
-char devname[][11];
-
-/*
  * Convention: major device 0 is reserved for NODEV
  */
 #define NODEV	0

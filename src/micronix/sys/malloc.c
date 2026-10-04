@@ -391,7 +391,7 @@ swapinit()
         zero(&g, sizeof g);
         if (u.error || dllabel(swapdev, devslice(swapdev), &g) != 1) {
             pr("swap: %s/%d: no usable label, no swap\n",
-                devname[major(swapdev)], minor(swapdev));
+                devname, minor(swapdev));
             u.error = 0;
             swapdev = 0;
             swapsize = 0;
@@ -408,7 +408,7 @@ swapinit()
              * half-kilobyte block, so the shift is the conversion.
              */
             pr("swap map: %d blocks (%dK) at %d on %s/%d\n", swapsize,
-                swapsize >> 1, swapaddr, devname[major(swapdev)],
+                swapsize >> 1, swapaddr, devname,
                 minor(swapdev));
         }
     }

@@ -102,18 +102,6 @@ extern int kread(), kwrite(), ioread(), iowrite();
 extern int ovlopen(), ovlclose(), ovlstrat(), ovlioctl();
 extern int ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcmode();
 
-/* Device names for diagnostics.  A char array keeps the strings in .data
- * (and so in the u page); a char * array would leave them as .text string
- * literals, and upage.o's linker placement has no room for text.
- *
- * These are the names for a major nothing has claimed.  A module brings
- * its own name in its header and registers it with nameset (sys/ovl.c)
- * when it initializes, so what pcon() prints for a disk major is what
- * the driver that answered for it called itself. */
-char devname[][11] = {
-    "nodev", "hdca(rev4)", "djdma", "hddma", "ide", "ncr5380",
-};
-
 /* Device 0 must be nodev.  The disk rows point at the module trampolines
  * (sys/ovl.c), not at drivers: the kernel has no djopen, mwstrat or
  * idestrat to name, because the drivers are modules and are not in it.

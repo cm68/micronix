@@ -23,7 +23,6 @@
 
 extern UINT nbdev, ncdev;
 extern UINT8 image0[], map0[];
-extern char devname[][11];
 extern unsigned bmajor(), cmajor();
 extern int nodev(), iodone();
 
@@ -442,28 +441,6 @@ intrset(line, fn, seg)
 }
 
 /*
- * The name pcon() prints (sys/main_init.c).  devname[] is in the u page
- * and 11 bytes wide, so a name that fills it has to lose its last
- * character to the terminator; the header's field is 12 to allow that.
- */
-static
-nameset(maj, nm)
-    UINT maj;
-    char *nm;
-{
-    register char *p;
-    register UINT i;
-
-    if (maj >= nbdev)
-        return (-1);
-    p = devname[maj];
-    for (i = 0; i < 10 && nm[i]; i++)
-        p[i] = nm[i];
-    p[i] = 0;
-    return (0);
-}
-
-/*
  * An interrupt does not arrive inside a call, the way a strat() does: it
  * can land at any moment, with any module mapped or none.  So the line
  * carries the segment its handler lives in, and the line - not the
@@ -559,9 +536,8 @@ ovlarm()
 
 /*
  * Ask for a tick.  A module does this in its header; a driver the kernel
- * still holds has no header to say it in, so it says it here - the same
- * duplication nameset has with the header's name field, for the same
- * reason.  Zero withdraws the request.
+ * still holds has no header to say it in, so it says it here.  Zero
+ * withdraws the request.
  */
 static
 tickset(maj, fn)
@@ -619,7 +595,6 @@ ovlplace(hdr, seg)
     }
 
     tickset(maj, hdr->tick);
-    nameset(maj, hdr->name);
     if (hdr->bvec)
         bvecset(maj, hdr->bvec->open, hdr->bvec->close, hdr->bvec->strat,
                 hdr->bvec->ioctl);

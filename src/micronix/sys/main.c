@@ -23,6 +23,7 @@
 #include <sys/file.h>
 #include <sys/buf.h>
 #include <sys/con.h>
+#include <sys/ovl.h>
 #include <sys/signal.h>
 
 /*
@@ -88,10 +89,17 @@ signon()
     pr("%d processes\n", NPROC);
     pr("disks: ");
     for (i = 1; i < nbdev; i++)
-        if (biosw[i].strat != &nodev)
-            pr("%s ", devname[i]);
-    pr("\nroot dev: %s/%d\n", devname[major(rootdev)], minor(rootdev));
-    pr("swap dev: %s/%d\n", devname[major(swapdev)], minor(swapdev));
+        if (biosw[i].strat != &nodev) {
+            ovlmap(i);
+            pr("%s ", devname);
+        }
+    ovlmap(major(rootdev));
+    pr("\nroot dev: %s/%d\n", devname, minor(rootdev));
+    if (swapdev) {
+        ovlmap(major(swapdev));
+        pr("swap dev: %s/%d\n", devname, minor(swapdev));
+    } else
+        pr("swap dev: nodev/0\n");
     pr("%dK memory\n", totmem);
     pr("%d cache blocks\n", nbuf);
 }

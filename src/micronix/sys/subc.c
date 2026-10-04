@@ -7,6 +7,7 @@
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/con.h>
+#include <sys/ovl.h>
 
 /*
  * panic stop
@@ -33,7 +34,7 @@ prdev(s, dev)
     char *s;
     UINT dev;
 {
-    pr("%s on disk %s/%d\n", s, devname[major(dev)], minor(dev));
+    pr("%s on disk %s/%d\n", s, devname, minor(dev));
 }
 
 /*

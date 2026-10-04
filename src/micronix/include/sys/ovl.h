@@ -133,7 +133,7 @@
  * and the hook below returns it without mapping.  Resident and module
  * differ in where the header is, not in what it says.
  *
- * name is what the driver calls its major, which is what devname[] and
+ * name is what the driver calls its major, which is what devname and
  * so pcon() report.  It is written in a header as a list of characters
  * and not as a string, and that is not a style: ccc emits a copy of a
  * string literal ahead of the object's data, so "djdma" would put six
@@ -152,8 +152,18 @@ struct ovlhdr {
     struct ciovec *cvec;        /* its character entries, 0 for none */
     UINT line;                  /* the line intr is on, if there is one */
     int (*intr) ();             /* the interrupt handler, 0 for none */
-    char name[12];              /* what devname[] reports for the major */
+    char name[12];              /* what devname reports for the major */
 };
+
+/*
+ * The name of the module mapped now.  Every module's header starts at
+ * OVLBASE, so the name field is always at this one fixed address - no
+ * table and no variable.  The 0x10 is the name[] offset in struct
+ * ovlhdr: eight two-byte fields precede it.  A major with nothing mapped
+ * leaves whatever was there before, so callers that can mean "none"
+ * check first.
+ */
+#define devname ((char *)(OVLBASE + 0x10))
 
 /*
  * The resident half, in sys/ovl.c.  None of it is in the u page
