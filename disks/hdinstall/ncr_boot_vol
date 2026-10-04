@@ -9,19 +9,21 @@
 # reads the monitor ROM, which reads the first level loader off LBA 0,
 # which reads the second level, which loads /micronix off the filesystem.
 #
-# -c 0x71c is the configuration switch, one number that says four things
-# at once: 0x18 boot the NCR 5380 (the ncrboot entry, mon500 only), 0x04
-# skip the monitor and go straight to the boot, and 0x700 put all three
-# uarts in xterms of their own - uart 0, the console, plus ttyB and ttyC
-# - rather than borrowing this window.  The console bit is what lets this
-# script be run from anywhere and keeps the console from wedging the
-# shell it was started from; the ttyB/ttyC bits are what give the
-# multiuser logins a window to live in.
+# -c 0x700 is the configuration switch: 0x00 leave all five boot switches
+# on, so mon500 copies and enters the 4K selector ROM (multIO.bin), which
+# probes the IDE board and the NCR 5380 at once and boots whichever target
+# answers - here the SCSI drive.  The 0x700 put all three uarts in xterms
+# of their own - uart 0, the console, plus ttyB and ttyC - rather than
+# borrowing this window.  The console bit is what lets this script be run
+# from anywhere and keeps the console from wedging the shell it was
+# started from; the ttyB/ttyC bits are what give the multiuser logins a
+# window to live in.
 #
-# The ROM is mon500, the one that has ncrboot; mon447 predates the 5380.
-# The drive is scsi0: - target 0 on the bus.  Every argument before
-# <volume> is a simulator flag, so the usual -t/-T/-W/-c switches are
-# available without editing this.
+# The ROM is mon500, which has no SCSI code of its own (neither it nor
+# mon447 boots the 5380); the ncrboot routine lives in the selector ROM
+# (multIO.bin) that switch 0x00 reaches.  The drive is scsi0: - target 0
+# on the bus.  Every argument before <volume> is a simulator flag, so the
+# usual -t/-T/-W/-c switches are available without editing this.
 #
 
 here=`dirname "$0"`
@@ -59,4 +61,4 @@ case "$vol" in
 esac
 
 cd "$root/src/hwsim/d1" || exit 1
-exec ./d1 -b ../../micronix/stand/roms/mon500.bin -c 0x71c -S "$kernel" $flags "scsi0:$vol"
+exec ./d1 -b ../../micronix/stand/roms/mon500.bin -c 0x700 -S "$kernel" $flags "scsi0:$vol"
