@@ -73,9 +73,12 @@
 /* the interrupt line the HDCA shares with the HD-DMA */
 #define	HDCAINT		0
 
-/* How many clock ticks a seek may take before the drive is wedged and
- * the request fails with EIO.  HERTZ is 8, so this is about a second. */
-#define	HDTIMEOUT	8
+/*
+ * How many seconds a request may be in flight before the drive is
+ * declared wedged and the request fails with EIO.  The watchdog tick
+ * (hdtick in sys/hdca.c) runs once a second, so the count is seconds.
+ */
+#define	HDDEADLINE	5
 
 #define	NHD		4	/* drives behind one controller */
 

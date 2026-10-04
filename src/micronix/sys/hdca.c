@@ -29,7 +29,7 @@
 #include <sys/ovl.h>
 #include <errno.h>
 
-extern int in(), out(), timeout();
+extern int in(), out(), timeout(), inton();
 
 struct hd hdinfo[NHD];
 
@@ -39,9 +39,11 @@ static struct hd *hdintarg;	/* its argument */
 static int (*hdseekintr) ();	/* the phase the seek-done interrupt resumes */
 static struct hd *hdseekarg;	/* its argument */
 static UINT8 hdunit;		/* the drive the FUNC register selects */
+static struct hd *hdactive;	/* the drive owning the controller */
+static UINT8 hddead;		/* seconds the request has been in flight */
 
 static void phase00(), phase01(), phase02(), phase03(), phase04(),
-    phase06(), phase08(), phase09(), phase11(), phase12(), hdtimeout();
+    phase06(), phase08(), phase09(), phase11(), phase12();
 static struct hd *getinfo();
 
 /*
@@ -54,7 +56,7 @@ hdselect(drive, head)
 	UINT8 head;
 {
 	out(HDCA_CONTROL, CONT_FRENBL | CONT_RUN | CONT_DSKCLK | CONT_WPROT);
-	out(HDCA_FUNC, (drive & FUNC_DRIVE) |
+	out(HDCA_FUNC, (drive & FUNC_DRIVE) | FUNC_STEP | FUNC_DIR |
 	    (((head ^ 0x0f) << 4) & FUNC_HEAD));
 	hdunit = drive;
 }
@@ -74,13 +76,13 @@ hdstep(head, dir, n)
 	UINT8 fn;
 	UINT8 i;
 
-	fn = (hdunit & FUNC_DRIVE) | (((head ^ 0x0f) << 4) & FUNC_HEAD);
+	fn = (hdunit & FUNC_DRIVE) | FUNC_STEP | (((head ^ 0x0f) << 4) & FUNC_HEAD);
 	if (dir)
 		fn |= FUNC_DIR;
 	for (i = 0; i < n; i++) {
-		out(HDCA_FUNC, fn | FUNC_STEP);
-		out(HDCA_FUNC, fn);
-		out(HDCA_FUNC, fn | FUNC_STEP);
+		out(HDCA_FUNC, fn);		/* step line high */
+		out(HDCA_FUNC, fn & ~FUNC_STEP);/* and low */
+		out(HDCA_FUNC, fn);		/* rising edge: one track */
 	}
 	out(HDCA_CMD, CMD_RAMDATA);
 }
@@ -276,6 +278,42 @@ release(hp)
 		}
 	}
 	hdmutex = 0;
+	hdactive = 0;
+}
+
+/*
+ * The watchdog.  Named as the tick in the header (sys/hdcahdr.c), so the
+ * resident side (sys/ovl.c) calls this once a second rather than it being
+ * a timeout() of its own - a driver-owned timer that never stops would
+ * hold one of the kernel's five timeout slots for the rest of the boot.
+ * This is mw.c's mwcheck, in the same shape.
+ *
+ * A controller that has stopped answering raises no interrupt, which is
+ * the whole reason this exists: a request whose seek or read/write never
+ * completes sits here past HDDEADLINE seconds and is failed with EIO, the
+ * only way it ever ends.  Normal requests finish in milliseconds, so the
+ * counter only reaches the deadline when the drive is wedged.
+ */
+int
+hdtick()
+{
+	if (!hdmutex)
+		return (0);
+	if (++hddead <= HDDEADLINE)
+		return (0);
+	/*
+	 * The armed continuations are dropped so a late interrupt - if the
+	 * controller ever does answer - finds nothing to resume.
+	 */
+	di();
+	hdseekintr = 0;
+	hdseekarg = 0;
+	hdintr = 0;
+	hdintarg = 0;
+	ei();
+	if (hdactive)
+		phase11(hdactive);
+	return (0);
 }
 
 /*
@@ -333,6 +371,8 @@ phase00(hp)
 {
 	hp->h_retry = 0;
 	hp->h_flags &= ~HDERROR;
+	hdactive = hp;
+	hddead = 0;
 	phase01(hp);
 }
 
@@ -365,7 +405,6 @@ phase01(hp)
 	hdseekintr = phase02;
 	hdseekarg = hp;
 	ei();
-	timeout(hdtimeout, hp, HDTIMEOUT);
 }
 
 /*
@@ -386,28 +425,6 @@ phase02(hp)
 }
 
 /*
- * The seek deadline.  A seek that finished in time cleared HDSEEK, so a
- * late deadline tick sees the flag off and does nothing - it is shot
- * down.  A seek whose done-interrupt never came still has HDSEEK set,
- * and that is a wedged drive: the request fails with EIO.
- */
-static void
-hdtimeout(hp)
-	struct hd *hp;
-{
-	di();
-	if (!(hp->h_flags & HDSEEK)) {
-		ei();
-		return;
-	}
-	hp->h_flags &= ~HDSEEK;
-	hdseekintr = 0;
-	hdseekarg = 0;
-	ei();
-	phase11(hp);
-}
-
-/*
  * Read a sector: write the header, issue the read, and let the op-done
  * interrupt pull the sector through the data port.
  */
@@ -415,6 +432,7 @@ static void
 phase03(hp)
 	struct hd *hp;
 {
+	hdselect(hdunit, hp->h_head);
 	hdhdr(hp->h_head, hp->h_cyl, hp->h_sector);
 	di();
 	hdintr = phase04;
@@ -453,6 +471,7 @@ phase08(hp)
 {
 	char *p;
 
+	hdselect(hdunit, hp->h_head);
 	hdhdr(hp->h_head, hp->h_cyl, hp->h_sector);
 	p = bhold(hp->h_cur);
 	hdwdat(p, hp->h_cur->count);
@@ -554,6 +573,17 @@ hdopen(dev, mode)
 		return (-1);
 	}
 	hp = getinfo(dev);
+	/*
+	 * Claim the interrupt line before the first read.  Line 0 is shared
+	 * with the HD-DMA, which unmasks it at its own open (inton(MWINT) in
+	 * sys/mw.c), and the HDCA is the boot driver on an M10/M20/M26 - the
+	 * device the kernel mounts root from, so mw may never open and nothing
+	 * else would clear the mask.  The 1.4 driver did the same thing after
+	 * every command; here it is once, at open, the way mw.c does it.  The
+	 * label read below is the first interrupt-driven read, so the line has
+	 * to be armed before dllabel() and not after.
+	 */
+	inton(HDCAINT);
 	if (hp->h_flags & HDOPEN) {
 		if (hp->h_slice != devslice(dev))
 			u.error = EBUSY;
@@ -564,6 +594,15 @@ hdopen(dev, mode)
 	hp->h_heads = 0;
 	hp->h_sectors = 0;
 	hp->h_roll = 0;
+	/*
+	 * The label read is block 0, and the HDCA's formatter numbers the
+	 * first sector 1 (FORMATHD's skew table runs 1..32), so block 0 is
+	 * sector 1, not 0.  dllabel() reads block 0 with the geometry it
+	 * can see - one head of one sector - so this field is what makes
+	 * that read land on sector 1.  The label's own d_firstsec then
+	 * overwrites it.
+	 */
+	hp->h_firstsec = 1;
 
 	switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive,
 	    devslice(dev), (struct dlgeom *)hp)) {

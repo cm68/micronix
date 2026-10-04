@@ -11,6 +11,7 @@
 #include <strings.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define HDCA_INTERRUPT  0        // same as hddma!
 
@@ -41,6 +42,25 @@ struct drivetype {
 extern int trace_bio;
 int trace_hdca;
 #endif
+
+/*
+ * Fault injection.  The monitor's 'f' command (registered below, debug
+ * builds only) arms one of these; the next seek or sector op then never
+ * raises its completion interrupt, which is what a wedged drive looks
+ * like.  sys/hdca.c's watchdog notices after HDDEADLINE seconds and
+ * fails the request with EIO.  One-shot: each is consumed the moment it
+ * takes effect, so the request after the failed one goes through clean.
+ */
+int hdca_fail_seek;     /* arm: the next seek never completes */
+int hdca_fail_op;       /* arm: the next read/write never completes */
+
+/*
+ * The scripted form of the same thing: HDCA_FAIL_SEEK_AT / HDCA_FAIL_OP_AT
+ * name the seek or op to fail (1-based), for a test that boots the fault
+ * in rather than driving the monitor.  -1 means not armed.
+ */
+static int hdca_fail_seek_at = -1;
+static int hdca_fail_op_at = -1;
 
 #define SPT     32      // like an m26
 #define HEADS   8       // like m26 and m20    
@@ -222,6 +242,14 @@ wr_hdca_cmd(portaddr p, byte v)
 
     psr &= ~PSR_OPDONE;
 
+    /*
+     * A read or write is the phase after a seek: the driver has either
+     * finished the seek or given up on it and gone to its watchdog, so a
+     * sticky seek fault ends here.
+     */
+    if (v == W1_READSEC || v == W1_WRITESEC)
+        hdca_fail_seek = 0;
+
     switch (v) {
     case 0: 
         trace(trace_hdca, "hdca cmd: set ram pointer to sector\n");
@@ -284,6 +312,13 @@ wr_hdca_cmd(portaddr p, byte v)
         l("hdca cmd: unknown command\n");
         break;
     }
+    if (hdca_fail_op_at > 0 && (psr & PSR_OPDONE) && --hdca_fail_op_at == 0)
+        hdca_fail_op = 1;
+    if (hdca_fail_op && (psr & PSR_OPDONE)) {
+        // the sector was read or written, but op-done never comes
+        hdca_fail_op = 0;
+        psr &= ~PSR_OPDONE;
+    }
     if (psr & PSR_OPDONE) {
         int_state |= INT_A;
     } else {
@@ -334,8 +369,18 @@ wr_hdca_func(portaddr p, byte v)
     if (i == DRIVES) {              // if all drives done, and we stepped, raise interrupt maybe
         psr |= PSR_COMPLT;
         if (stepped) {
-            ssr |= R1_SDONE;
-            int_state |= INT_B;
+            if (hdca_fail_seek_at > 0 && --hdca_fail_seek_at == 0)
+                hdca_fail_seek = 1;
+            if (hdca_fail_seek) {
+                // the arm moves, but the seek never reports done.  SDONE
+                // is cleared (not set) so the seek that carried this step
+                // ends with no seek-done interrupt.
+                ssr &= ~R1_SDONE;
+                int_state &= ~INT_B;
+            } else {
+                ssr |= R1_SDONE;
+                int_state |= INT_B;
+            }
             check_interrupt();
         }
     } else {
@@ -403,11 +448,39 @@ hdca_init()
     return 0;
 }
 
+#ifndef NODEBUG
+static int
+hdca_fail_cmd(char **sp)
+{
+    if (**sp == 0) {
+        printf("hdca fault: seek=%d op=%d\n", hdca_fail_seek, hdca_fail_op);
+        return 0;
+    }
+    if (**sp == 's') {
+        hdca_fail_seek = 1;
+        printf("hdca: next seek fails\n");
+    } else if (**sp == 'o') {
+        hdca_fail_op = 1;
+        printf("hdca: next op times out\n");
+    } else {
+        printf("hdca fault: 'seek' or 'op'\n");
+    }
+    return 0;
+}
+#endif
+
 static int
 hdca_setup()
 {
 #ifndef NODEBUG
+    char *e;
+
     trace_hdca = register_trace("hdca");
+    register_mon_cmd('f', "seek|op\tarm a seek/op fault", hdca_fail_cmd);
+    if ((e = getenv("HDCA_FAIL_OP_AT")) != 0)
+        hdca_fail_op_at = atoi(e);
+    if ((e = getenv("HDCA_FAIL_SEEK_AT")) != 0)
+        hdca_fail_seek_at = atoi(e);
 #endif
     return 0;
 }

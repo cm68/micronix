@@ -3,8 +3,9 @@
  *
  * The controller is port-mapped and always present on the M10/M20/M26,
  * so there is no presence probe and no init: init is zero and the
- * driver is registered the moment it is placed.  There is no periodic
- * work either - the controller answers when it is spoken to, and the
+ * driver is registered the moment it is placed.  The one periodic thing
+ * it needs is a watchdog - the tick this header names, which checks for
+ * a request the controller has stopped answering (sys/hdca.c) - and the
  * two things it says on its own (op done and seek done) arrive as the
  * one interrupt this header names.
  *
@@ -20,10 +21,10 @@
 #include <sys/ovl.h>
 
 extern int hdopen(), hdclose(), hdstrat();
-extern int hdint();
+extern int hdint(), hdtick();
 extern struct biovec hdbvec;
 
-struct ovlhdr hdcahdr = { 1, 0, 0, 0, &hdbvec, 0, HDCAINT, &hdint,
+struct ovlhdr hdcahdr = { 1, 0, &hdtick, 0, &hdbvec, 0, HDCAINT, &hdint,
 	{ 'h', 'd', 'c', 'a' } };
 
 /*
