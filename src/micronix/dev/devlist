@@ -32,19 +32,16 @@ b 2 12 mfa
 b 2 13 mfb
 b 2 14 mfc
 b 2 15 mfd
-b 3 0 m5a
-b 3 1 m5b
-b 3 2 m5c
-b 3 3 m5d
-b 3 4 m10a
-b 3 5 m10b
-b 3 6 m10c
-b 3 7 m10d
-b 3 8 m16a
-b 3 9 m16b
-b 3 10 m16c
-b 3 11 m16d
-b 3 16 m40a
+#
+# The HD-DMA (MW) controller.  Four drives, named by drive and slice and
+# not by model: a drive's geometry comes from its label, not from a table
+# the minor used to index.  The 'c' slice nodes are below, with the other
+# whole-disk slices.
+#
+b 3 0 hd0a
+b 3 1 hd1a
+b 3 2 hd2a
+b 3 3 hd3a
 b 4 0 ide0
 b 4 1 ide1
 #
@@ -67,18 +64,17 @@ b 5 7 scsi7
 #
 # The whole-disk slice, 'c': the drive at cylinder 0 with no roll, so its
 # block 0 is physical block 0 and reading it is reading the label.  The
-# minor is the slice and the type in the high bits as everywhere else -
-# 72 is slice 2 of the m16 row (2), drive 0; the IDE card has one board,
-# so its type bits are zero.  This is the slice label(1) opens.
+# minor is the slice in the high bits and the drive below - 64 is slice 2
+# of drive 0.  This is the slice label(1) opens.
 #
 b 1 64 hdac
 b 1 65 hdbc
 b 1 66 hdcc
 b 1 67 hddc
-b 3 72 hd0c
-b 3 73 hd1c
-b 3 74 hd2c
-b 3 75 hd3c
+b 3 64 hd0c
+b 3 65 hd1c
+b 3 66 hd2c
+b 3 67 hd3c
 b 4 64 ide0c
 b 4 65 ide1c
 b 5 64 scsi0c

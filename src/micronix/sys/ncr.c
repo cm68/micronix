@@ -425,10 +425,10 @@ myintr(on)
 }
 
 /*
- * Boards, indexed by the two type bits of the minor number the way
- * ide.c's boards[] is indexed by devtype(dev).  One card today, so the
- * field must be zero - which is what the bound check in ncropen() is
- * for.
+ * Boards, one per controller the driver knows.  There is one today, so
+ * the single entry is what every target uses.  The board is never picked
+ * from the minor number - a drive's geometry comes from its label, and
+ * the board is the controller's own, not the drive's.
  */
 static struct scsiif boards[] = {
     {&myrd, &mywr, &myreset, &myintr, 0, 0, 0, 0, 0},
@@ -460,7 +460,7 @@ struct info
     UINT cylstart;              /* first cylinder of the slice being read */
     UINT8 firstsec;             /* first sector number on a track */
     UINT8 flags;                /* see below */
-    UINT8 type;                 /* index into boards[] */
+    UINT8 lun;                  /* the logical unit this open addresses */
     UINT8 slice;                /* the slice this open is bound to */
 } scs[NTARGET] = 0;
 
@@ -948,34 +948,30 @@ ncropen(dev, mode)
 {
     static struct info *info;
     static struct scsiif *ip;
-    static UINT8 target, type;
+    static UINT8 target, lun;
     static UINT sl;
     static struct buf *b;
 
     target = minor(dev) & 7;
-    type = (minor(dev) >> 3) & 3;
+    lun = (minor(dev) >> 3) & 3;
     sl = devslice(dev);
-    if (type >= sizeof boards / sizeof boards[0]) {
-        u.error = ENXIO;
-        return;
-    }
     info = &scs[target];
     /*
      * One mapping per target, not one per open: scs[] is keyed by target
-     * and holds the slice's offset and roll, so a second open asking for
-     * a different slice would be served the first one's mapping and would
-     * read and write the wrong blocks while reporting success.  The same
-     * slice, or the same minor, is the same mapping and is let through as
-     * before.
+     * and holds the lun, the slice's offset and roll, so a second open
+     * asking for a different lun or slice would be served the first one's
+     * mapping and would read and write the wrong blocks while reporting
+     * success.  The same lun and slice is the same mapping and is let
+     * through as before.
      */
     if (info->flags & OPEN) {
-        if (info->type != type || info->slice != sl)
+        if (info->lun != lun || info->slice != sl)
             u.error = EBUSY;
         return;
     }
-    info->type = type;
+    info->lun = lun;
     info->slice = sl;
-    ip = &boards[type];
+    ip = &boards[0];
 
     if (scsireset(ip) < 0) {
         u.error = ENXIO;
@@ -983,11 +979,10 @@ ncropen(dev, mode)
     }
     /*
      * The label, as block 0 of this target's own 'c'.  The device number
-     * needs no type field built into it the way mw.c's does - this card
-     * has one board and boards[] is indexed by a type that must be zero -
-     * so the target's 'c' is the target's number with the slice field set
-     * and nothing else moved: minor 64 + N, the scsi<N>c node dev/devlist
-     * would carry beside ide0c's 64 and for the same reason.
+     * carries no drive type - the target's 'c' is the target's number
+     * with the slice field set and nothing else moved: minor 64 + N, the
+     * scsi<N>c node dev/devlist carries beside ide0c's 64 and for the
+     * same reason.
      */
     switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | target,
                     sl, (struct dlgeom *)info)) {
@@ -1078,7 +1073,7 @@ ncrstrat(b)
     static UINT32 lba;
 
     info = &scs[b->dev & 7];
-    ip = &boards[info->type];
+    ip = &boards[0];
 
     if (b->blk > info->maxblk) {
         b->flags |= BERROR;
@@ -1175,7 +1170,7 @@ ncrioctl(dev, cmd, r, b)
     static char *p;
 
     info = &scs[dev & 7];
-    ip = &boards[info->type];
+    ip = &boards[0];
 
     for (;;) {
         di();

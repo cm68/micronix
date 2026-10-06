@@ -6,19 +6,15 @@
  *	mkfs device [size]
  *	mkfs device [-exclude]
  *	mkfs -i bootfile device [size|-exclude]
- *	mkfs -b blocks device [size|-exclude]
  *
  * A numerical argument without a leading minus is the size to make the
  * filesystem, in blocks.  With a leading minus it is a count of blocks to
  * leave at the end of the device, which is how swap space is kept out of
  * the filesystem.  Given neither, the whole device is used.  The device
- * size is worked out from the drive: the minor number of the node names
- * the model - the model is bits 2 and up of it - and the model's geometry
- * is the size.
- *
- * -b <blocks> says the size outright instead, for the nodes that name no
- * drive at all (dev/devlist's ide0c and scsi0c are minor 64, hd1c is 73)
- * and for a disk whose node names one model while the disk is another.
+ * size comes from the disk's own label: the driver reads the label off
+ * block 0 of the whole-disk slice at open (sys/dlabel.c), and mkfs reads
+ * it the same way through a whole-disk node it builds.  A disk without a
+ * label has no geometry to make a filesystem from, and is refused.
  *
  * It takes a block count and not a geometry because here those are the
  * same fact: the tables below are a list of models, each one a geometry
@@ -26,11 +22,6 @@
  * the row.  A count that is no model's is refused rather than guessed at,
  * because the boot area and the label both go where the geometry puts
  * them, and there is nowhere to put them without one.
- *
- * The drivers read that geometry off the disk itself (sys/dlabel.c, and
- * the label in the boot sector).  mkfs cannot: the label is at cylinder
- * 0, and where cylinder 0 is is the thing the geometry is being asked
- * for.
  *
  * This is the command driver: it works out the device and the geometry,
  * opens the raw unix device, and hands the building over to mkfsfunc.c,
@@ -74,8 +65,11 @@
 #include <stdio.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <sys/dlabel.h>
 
 #include "mkfs.h"
+
+extern int mknod(), unlink();
 
 int dev = -1;
 
@@ -105,42 +99,13 @@ void wrblk(bn, buf)
 
 void usage()
 {
-    fprintf(stderr, "usage: %s [-i bootfile] [-b blocks] device [size|-exclude]\n",
+    fprintf(stderr, "usage: %s [-i bootfile] device [size|-exclude]\n",
         pname);
     fprintf(stderr, "\tsize is in 512 byte blocks, -exclude leaves that\n");
     fprintf(stderr, "\tmany at the end of the device, say for swap\n");
     fprintf(stderr, "\t-i gives cylinder 0 to a file and writes the boot\n");
     fprintf(stderr, "\tinto it, so the free list never offers it\n");
-    fprintf(stderr, "\t-b is the size of the device, for a node whose\n");
-    fprintf(stderr, "\tminor number does not name the drive\n");
     exit(1);
-}
-
-/*
- * Which drive, from the minor number of the block special file we were
- * given, or -1 if the minor names none.  Being told would be worse than
- * working it out - a wrong answer here puts the boot area somewhere
- * inside the filesystem - so the minor is only believed when it says
- * something.  It says nothing on the nodes the hard disks are reached by
- * (dev/devlist's ide0c is minor 64, and 64 is bigger than any model), and
- * then -b has to.
- */
-int
-drivetype(device)
-    char *device;
-{
-    struct stat sbuf;
-    int type;
-
-    if (stat(device, &sbuf) < 0)
-        die("cannot stat the device");
-    if ((sbuf.st_mode & IFMT) != IFBLK)
-        die("not a block special file");
-
-    type = (sbuf.st_addr[0] & 0377) >> 2;
-    if (type >= NDRIVE)
-        return (-1);
-    return (type);
 }
 
 /*
@@ -148,9 +113,9 @@ drivetype(device)
  * models and a model's capacity is its geometry multiplied out, so a
  * number off the drive names the row the way the row names the number.
  *
- * A bare count is not enough to write with - the boot area goes at a
- * block the geometry picks out, the label goes with the boot area, and
- * nothing else in mkfs knows a geometry - so a count no model has is the
+ * The label carries the geometry; this maps it back to the table row,
+ * whose dtoff[] and dfirst[] say the two things the label does not (the
+ * boot offset and the first sector number).  A count no model has is the
  * caller's mistake and is reported as one.
  */
 int
@@ -165,6 +130,58 @@ blocksdrive(blocks)
     return (-1);
 }
 
+/*
+ * Read the drive's geometry off its own disk label, which the labeler
+ * wrote and the driver reads back at open (sys/dlabel.c).  The label is
+ * in block 0 of the whole-disk slice 'c', the one block a driver can
+ * reach without knowing the geometry - block 0 of 'c' is device block 0
+ * however the disk is laid out - so 'c' is built here from the node's
+ * own major and minor and read.  Answers the geometry, or 0 when there
+ * is no label to read.
+ */
+int
+labelgeom(device, tracksp, headsp, sptp)
+    char *device;
+    UINT *tracksp, *headsp, *sptp;
+{
+    static char path[] = "/tmp/mkfs.c";
+    struct stat sb;
+    struct dlabel *lp;
+    UINT major, minor;
+    char buf[BSIZE];
+    int fd;
+
+    if (stat(device, &sb) < 0 || (sb.st_mode & IFMT) != IFBLK)
+        return (0);
+    major = sb.st_addr[0] >> 8;
+    minor = sb.st_addr[0] & 0377;
+    minor = (minor & ~(7 << 5)) | (DL_WHOLE << 5);
+    if (mknod(path, 0160666, (major << 8) | minor) < 0)
+        return (0);
+    if ((fd = open(path, 0)) < 0)
+        goto out;
+    if (lseek(fd, 0L, 0) < 0 || read(fd, buf, BSIZE) != BSIZE) {
+        close(fd);
+        goto out;
+    }
+    close(fd);
+    lp = (struct dlabel *) &buf[DL_OFFSET];
+    if (lp->d_magic[0] != DL_MAGIC[0] || lp->d_magic[1] != DL_MAGIC[1] ||
+        lp->d_magic[2] != DL_MAGIC[2] || lp->d_magic[3] != DL_MAGIC[3] ||
+        lp->d_tracks == 0 || lp->d_heads == 0 || lp->d_spt == 0) {
+        unlink(path);
+        return (0);
+    }
+    unlink(path);
+    *tracksp = lp->d_tracks;
+    *headsp = lp->d_heads;
+    *sptp = lp->d_spt;
+    return (1);
+out:
+    unlink(path);
+    return (0);
+}
+
 main(argc, argv)
     int argc;
     char **argv;
@@ -172,8 +189,6 @@ main(argc, argv)
     char *device;
     char *arg;
     UINT dsize;                 /* the whole device */
-    UINT blocks;                /* -b: the whole device, told outright */
-    int bset;                   /* and whether it was told */
     UINT exclude;
     UINT given;
     UINT fsize;
@@ -181,6 +196,7 @@ main(argc, argv)
     UINT bootfirst;
     UINT bootnblk;
     UINT spc;
+    UINT tracks, heads, spt;    /* the geometry, from the label */
     int type;
     char *bfile;
     int f;
@@ -189,16 +205,14 @@ main(argc, argv)
     bfile = DEFBOOT;
     exclude = 0;
     given = 0;
-    blocks = 0;
-    bset = 0;
     f = 0;
 
     /*
      * The manual says "mkfs device [size]" and m5init says
-     * "mkfs -f -1024 /dev/m5a", so the shipped one takes them in either
+     * "mkfs -f -1024 /dev/hd0a", so the shipped one takes them in either
      * order and so does this.  Every argument is one of five things and
-     * each says which it is: -i takes the boot file, -b the block count
-     * of the device, a minus and digits is an exclusion, digits alone are
+     * each says which it is: -i takes the boot file, a minus and digits
+     * is an exclusion, digits alone are
      * a size, and what is left is the device.
      *
      * -f is what m5init has always passed, and it now means what it
@@ -215,14 +229,6 @@ main(argc, argv)
         } else if (arg[0] == '-') {
             if (arg[1] == 'f' && arg[2] == 0) {
                 f = 1;
-                continue;
-            }
-            if (arg[1] == 'b' && arg[2] == 0) {
-                if (argc < 1)
-                    usage();
-                argc--;
-                blocks = atoi(*argv++);
-                bset = 1;
                 continue;
             }
             if (arg[1] != 'i' || arg[2] != 0 || argc < 1)
@@ -242,16 +248,18 @@ main(argc, argv)
     if (given && exclude)
         die("give a size or an exclusion, not both");
 
-    type = drivetype(device);
-    if (bset) {
-        type = blocksdrive(blocks);
-        if (type < 0)
-            die("no drive of that many blocks");
-    } else if (type < 0) {
-        die("no drive of that minor number");
-    }
-    dsize = dtracks[type] * (UINT) dheads[type] * dsecs[type];
-    printf("Device size: %d blocks\n", dsize);
+    /*
+     * The geometry comes from the disk's own label, which the labeler
+     * wrote and the driver reads back at open.  A disk without one has
+     * nothing to make a filesystem from: label it (or format it) first.
+     */
+    if (!labelgeom(device, &tracks, &heads, &spt))
+        die("no label on the device");
+    type = blocksdrive(tracks * (UINT) heads * spt);
+    if (type < 0)
+        die("no drive of that geometry");
+    dsize = tracks * (UINT) heads * spt;
+    printf("Device size: %u blocks\n", dsize);
 
     if (given) {
         fsize = given;
@@ -262,7 +270,7 @@ main(argc, argv)
             die("nothing left after the exclusion");
         fsize = dsize - exclude;
     }
-    printf("File system size: %d blocks\n", fsize);
+    printf("File system size: %u blocks\n", fsize);
 
     if (fsize < 50)
         die("too small to be a filesystem");
@@ -276,13 +284,13 @@ main(argc, argv)
     isize = fsize / 43 + fsize / 1000;
     if (isize < 1)
         isize = 1;
-    printf("I-list: %d blocks, %d inodes\n", isize, isize * IPERBLK);
+    printf("I-list: %u blocks, %u inodes\n", isize, isize * IPERBLK);
 
     /*
      * Where the boot area is, before the worker's in-use check reads it.
      */
-    spc = dheads[type] * (UINT) dsecs[type];
-    bootfirst = (dtracks[type] - (dtracks[type] >> 1)) * spc;
+    spc = heads * (UINT) spt;
+    bootfirst = (tracks - (tracks >> 1)) * spc;
     bootnblk = spc;
 
     if ((dev = open(device, 2)) < 0)

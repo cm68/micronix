@@ -30,18 +30,6 @@ static int mwlink();
 #define RETRIES 10              /* no. of retries on r/w error */
 
 /*
- * The row dev/devlist's hd<N>c nodes name in their minor number, and so
- * the type field of the device number mwopen builds for a drive's
- * whole-disk slice.  Nothing picks a table row by it any more - this
- * driver has no table - but it is still part of the *name* of the sector
- * the label is in: the label is read and written as the disk block it is,
- * so a tool opening hd0c and this driver reading drive 0's label have to
- * name that block the same way, or the cache holds two copies of one
- * sector.  It has to go on agreeing with devlist, and nothing checks it.
- */
-#define HDCROW  2
-
-/*
  * The drive's timing, which the label does not carry.
  *
  * A disk says what shape it is - tracks, heads, sectors per track, roll -
@@ -258,13 +246,12 @@ mwopen(dev, mode)
 
     /*
      * The label, as block 0 of this drive's 'c'.  The device number is
-     * built here rather than taken from dev, because the type field of a
-     * 'c' number is not the caller's - it names the same sector devlist's
-     * hd<N>c node names, so that a tool labelling this drive and this
-     * open reading it hold one cache entry between them rather than two
-     * copies of one sector.
+     * built here rather than taken from dev, so that it names the same
+     * sector devlist's hd<N>c node names - a tool labelling this drive
+     * and this open reading it hold one cache entry between them rather
+     * than two copies of one sector.
      */
-    switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | (HDCROW << 2) | drive,
+    switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive,
                     sl, (struct dlgeom *)info)) {
     case -1:
         return;                 /* no such slice; dllabel set u.error */

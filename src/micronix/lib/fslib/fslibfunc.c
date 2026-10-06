@@ -6,7 +6,7 @@
  * Inode and block management, directory walking, and the free lists.
  * Everything here reads and writes through readblk/writeblk, which the
  * caller defines: the host fslib drives an image file, the micronix one
- * drives /dev/m5a.  This is the mkfs worker/driver split again.
+ * drives /dev/hd0a.  This is the mkfs worker/driver split again.
  */
 
 #include <types.h>

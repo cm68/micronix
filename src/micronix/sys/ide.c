@@ -453,13 +453,11 @@ myintr(on)
 }
 
 /*
- * Boards, indexed by devtype(dev) the way mw.c indexes specs[]: the field
- * picks one entry out of a table of the controller's own options, and
- * what those options are is the controller's business.  mw.c's three are
- * drive sizes; this driver's one is the single board, so the field must
- * be zero - which is what the bound check in ideopen() is for.  A second
- * MYIDE board would add an entry here, and a second bit of drive number
- * below it.
+ * Boards, one per controller the driver knows.  There is one today, so
+ * the single entry is what every drive uses; a second MYIDE board would
+ * add an entry here, and a second bit of drive number below it.  The
+ * board is never picked from the minor number - a drive's geometry comes
+ * from its label, and the board is the controller's own, not the drive's.
  */
 static struct ideif boards[] = {
     {&myrd, &mywr, &myxfer, &myreset, &mysel, &myintr, 0, 0, 0},
@@ -495,7 +493,6 @@ struct info
     UINT cylstart;              /* first cylinder of the slice being read */
     UINT8 firstsec;             /* first sector number on a track */
     UINT8 flags;                /* see below */
-    UINT8 type;                 /* index into boards[] */
     UINT8 slice;                /* the slice this open is bound to */
 } ides[NDRIVES] = 0;
 
@@ -809,11 +806,12 @@ idelba(blk, info)
 /*
  * Device open.
  *
- * A device number packs two things, the way mw.c's does: the low bit
- * names which drive, and the rest pick an entry out of the board table,
- * which is why the type has to be shifted back out of minor(dev) below.
- * Drives 0 and 1 are this board's two, and the unit each one is comes out
- * of the same low bit - so the board's latch and the device number agree.
+ * A device number packs two things: the low bit names which drive, and
+ * the slice field above it names the partition.  Drives 0 and 1 are this
+ * board's two, and the unit each one is comes out of the same low bit -
+ * so the board's latch and the device number agree.  The board itself is
+ * a constant: this card has one, and boards[] holds it, not a table a
+ * drive type would pick a row out of.
  *
  * The geometry comes off the disk, from the label mkfs writes into the
  * second half of the boot sector, and there is no table to disagree with
@@ -826,17 +824,12 @@ ideopen(dev, mode)
 {
     static struct info *info;
     static struct ideif *ip;
-    static UINT8 drive, type;
+    static UINT8 drive;
     static UINT sl;
     static struct buf *b;
 
     drive = dev & 1;
-    type = devtype(dev);
     sl = devslice(dev);
-    if (type >= sizeof boards / sizeof boards[0]) {
-        u.error = ENXIO;
-        return;
-    }
     info = &ides[drive];
     /*
      * One mapping per drive, not one per open: ides[] is keyed by drive
@@ -847,13 +840,12 @@ ideopen(dev, mode)
      * before.
      */
     if (info->flags & OPEN) {
-        if (info->type != type || info->slice != sl)
+        if (info->slice != sl)
             u.error = EBUSY;
         return;
     }
-    info->type = type;
     info->slice = sl;
-    ip = &boards[type];
+    ip = &boards[0];
 
     if (idereset(ip, drive) < 0) {
         u.error = ENXIO;
@@ -861,10 +853,9 @@ ideopen(dev, mode)
     }
     /*
      * The label, as block 0 of this drive's own 'c'.  The device number
-     * needs no type field built into it the way mw.c's does - this card
-     * has one board and boards[] is indexed by a type that must be zero -
-     * so the drive's 'c' is the drive's number with the slice field set
-     * and nothing else moved, which is the ide<N>c minor devlist holds.
+     * carries no drive type - the drive's 'c' is the drive's number with
+     * the slice field set and nothing else moved, which is the ide<N>c
+     * minor devlist holds.
      */
     switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive,
                     sl, (struct dlgeom *)info)) {
@@ -961,7 +952,7 @@ idestrat(b)
     static UINT32 lba;
 
     info = &ides[b->dev & 1];
-    ip = &boards[info->type];
+    ip = &boards[0];
 
     if (b->blk > info->maxblk) {
         b->flags |= BERROR;
@@ -1081,7 +1072,7 @@ ideioctl(dev, cmd, r, b)
         return (-1);
     }
     info = &ides[dev & 1];
-    ip = &boards[info->type];
+    ip = &boards[0];
 
     for (;;) {
         di();

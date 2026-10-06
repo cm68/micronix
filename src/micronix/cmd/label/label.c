@@ -372,6 +372,13 @@ writegeom()
 	lp->d_tracks = gtracks;
 	lp->d_heads = gheads;
 	lp->d_spt = gspt;
+	/*
+	 * The HDCA numbers sectors from one (FORMATHD's skew table runs
+	 * 1..32), and the label has to say so or the driver maps every
+	 * block one place out.  The HD-DMA numbers from zero, but its label
+	 * is written by mwformat, not here; this labeler is the HDCA's.
+	 */
+	lp->d_firstsec = 1;
 }
 
 /*

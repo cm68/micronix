@@ -318,7 +318,8 @@ domkfs(fs, is, bfirst, bnblk, dsize, type, bfile, f)
         rdblk(bootfirst, blkbuf);
         lp = (struct dlabel *) &blkbuf[DL_OFFSET];
         if (lp->d_magic[0] == DL_MAGIC[0] && lp->d_magic[1] == DL_MAGIC[1] &&
-            lp->d_magic[2] == DL_MAGIC[2] && lp->d_magic[3] == DL_MAGIC[3]) {
+            lp->d_magic[2] == DL_MAGIC[2] && lp->d_magic[3] == DL_MAGIC[3] &&
+            lp->d_fsize != 0) {
             printf("Label: %d/%d/%d, %d blocks\n", lp->d_tracks,
                 lp->d_heads, lp->d_spt, lp->d_fsize);
             die(inuse);
