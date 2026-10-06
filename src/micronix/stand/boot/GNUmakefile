@@ -271,13 +271,18 @@ hdcabootimg: hdcaboot1.bin hdcaboot.com mkbootimg
 # same boundary the check tests is the one the image is built with.
 #
 # The media, as cmd/mkfs/mkfs.h's table has them: name:cylinders:heads:
-# sectors:firstsec:toff.  Three, and not the 5 1/4 single sided 40/1/10 -
+# blocks:firstsec:toff.  Four, and not the 5 1/4 single sided 40/1/10 -
 # 194 K cannot hold a running system, so it is not a medium this builds
 # for.
 #
+# The fourth field is blocks per track, in 512 byte units, not physical
+# sectors: a 1K medium's five sectors read as ten.  d5soft is the soft
+# sectored 5 1/4 inch medium, five 1024 byte sectors to a track, and
+# d5ds is the hard sectored one, ten 512 byte sectors - both ten blocks.
+#
 # firstsec is where the medium numbers its sectors from, and it is one
-# for the soft sectored eight inch media and zero for the hard sectored
-# five inch one.  It is not decoration: the loader reads the label by
+# for the soft sectored media and zero for the hard sectored five inch
+# one.  It is not decoration: the loader reads the label by
 # finding its magic in the first sector of track 0, which it can only do
 # if it guesses the numbering right, and it then uses this field for
 # every block after that.  Level 0 cannot wait for the label - it has to
@@ -292,12 +297,13 @@ hdcabootimg: hdcaboot1.bin hdcaboot.com mkbootimg
 # drive: 35 cylinders, one head, ten sectors per cylinder, 330 blocks - the
 # filesystem still mounts and everything past block 330 reads as nothing,
 # which is where the kernel's own modules are.  0xD0 is 40 cylinders, two
-# heads, 10 sectors, 512 bytes, which is what d5ds is.  The eight inch
-# media are soft sectored and the driver never looks, so they carry zero.
-# mkbootimg writes the byte inside level 0's 128 bytes, which is the only
-# part of sector 0 the driver can read it out of; it is checked below.
+# heads, 10 sectors, 512 bytes, which is what d5ds is.  The soft sectored
+# media are described by the drive and carry zero.  mkbootimg writes the
+# byte inside level 0's 128 bytes, which is the only part of sector 0 the
+# driver can read it out of; it is checked below.
 #
-FLOPPIES = d8ss:77:1:15:1:2:00 d8ds:77:2:15:1:2:00 d5ds:40:2:10:0:2:d0
+FLOPPIES = d8ss:77:1:15:1:2:00 d8ds:77:2:15:1:2:00 d5ds:40:2:10:0:2:d0 \
+	d5soft:40:2:10:1:2:00
 DJBOOTIMGS = $(foreach f,$(FLOPPIES),djbootimg-$(word 1,$(subst :, ,$(f))))
 
 djbootimgs: $(DJBOOTIMGS)
@@ -325,6 +331,10 @@ $(DJBOOTIMGS): djboot1.bin djboot.com mkbootimg
 		[ "$$v" = a5 ] || { echo "$@: level 0's marker is $$v, not a5: level 0 is not 128 bytes"; exit 1; }; \
 		v=`od -An -tx1 -j 126 -N 1 $@ | tr -d ' \n'`; \
 		[ "$$v" = "0$$f" ] || { echo "$@: level 0 asks for sector $$v first, not 0$$f"; exit 1; }; \
+		s=`echo $$d | cut -d: -f4`; \
+		case "$$f:$$s" in 1:10|1:16) sz=2 ;; *) sz=1 ;; esac; \
+		v=`od -An -tx1 -j 125 -N 1 $@ | tr -d ' \n'`; \
+		[ "$$v" = "0$$sz" ] || { echo "$@: the sector size byte is $$v, not $$sz"; exit 1; }; \
 		c=`echo $$d | cut -d: -f7`; \
 		v=`od -An -tx1 -j 92 -N 1 $@ | tr -d ' \n'`; \
 		[ "$$v" = "$$c" ] || { echo "$@: the format byte is $$v, not $$c"; exit 1; }; \

@@ -59,6 +59,12 @@
  * sectored eight inch media and zero on the hard sectored five inch one.
  * See sys/dlabel.h, sys/dj.c's ORG1 and djboot1.s's FSEC.
  *
+ * The byte before firstsec is how many blocks a sector is, written for
+ * the same reason: level 0 and level 1 read it instead of guessing the
+ * sector size, which the block count alone cannot tell them - a 1K
+ * medium's five sectors read as ten blocks.  It is inferred from firstsec
+ * and spt the same way djio.c infers it.
+ *
  * config, the last of -d's numbers, is the format byte a hard sectored
  * medium names at DJCONFIG below; a medium numbered from one has none and
  * passes zero.
@@ -272,6 +278,20 @@ main(int argc, char **argv)
             die("level 0 has no room for the first sector number");
         }
         sector[HEADLEN - 2] = firstsec;
+
+        /*
+         * How many blocks a sector is, in the byte before FSEC.  Level 0
+         * and level 1 read it instead of guessing the sector size, which
+         * they cannot work out any more than they can work out FSEC: a
+         * 1K medium's five sectors read as ten blocks, so the block count
+         * is not the sector count.  The answer is inferred the same way
+         * djio.c infers it - a soft sectored medium with ten or sixteen
+         * blocks to a track is 1K, two blocks to a sector, and every
+         * other medium this tree builds for is 512 - and the byte is
+         * blocks per sector: 1 for 512, 2 for 1024.
+         */
+        sector[HEADLEN - 3] =
+            (firstsec == 1 && (spt == 10 || spt == 16)) ? 2 : 1;
 
         /*
          * And the format byte, where the medium has one.  A hard sectored

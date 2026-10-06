@@ -13,6 +13,8 @@
 
 #include "../include/imd.h"
 #include "../include/util.h"
+#include "../micronix/include/types.h"
+#include "../micronix/include/sys/dlabel.h"
 
 int traceflags;
 int trace_bio;
@@ -90,6 +92,70 @@ altskew(int l, int spt)
  * loader and the controller - it reads sectors by number, and a loader
  * laid down alternated would not run.  See altskew.
  */
+
+/*
+ * Re-pack every 512 byte sector track into 1024 byte sectors.  A flat
+ * .img is addressed in 512 byte blocks - that is how mnix writes a
+ * filesystem into it - but a 1K medium's physical sectors are 1024, so
+ * the IMD written out for such a medium has to carry five 1024 byte
+ * sectors to a track, not ten 512 byte ones.  Each pair of adjacent
+ * 512 byte sectors becomes one 1024 byte sector, and the sector map is
+ * rebuilt with the same first sector number.
+ */
+static void
+repack_1k(struct imd *ip)
+{
+    struct imd_trk *t0 = ip->tracks[0];
+    int firstsec = 1;           /* the medium's own, read below */
+    int trk;
+
+    /*
+     * The first sector's dlabel says how the medium numbers its sectors,
+     * which the size-only geometry above cannot: a soft 1K medium and a
+     * hard 512 one are the same number of blocks, so the rawfmt table
+     * guessed and the label is what says which.  Take the label's answer.
+     */
+    if (t0 && t0->data && t0->data[0]) {
+        struct dlabel *dl = (struct dlabel *)(t0->data[0] + DL_OFFSET);
+
+        if (dl->d_magic[0] == DL_MAGIC[0] && dl->d_magic[1] == DL_MAGIC[1] &&
+            dl->d_magic[2] == DL_MAGIC[2] && dl->d_magic[3] == DL_MAGIC[3])
+            firstsec = dl->d_firstsec;
+    }
+
+    for (trk = 0; trk < TRACKS; trk++) {
+        struct imd_trk *tp = ip->tracks[trk];
+        char **nd;
+        char *secmap;
+        int nsec, s;
+
+        if (!tp || tp->secsize != 512)
+            continue;
+        nsec = tp->fixed.nsec / 2;
+        if (nsec < 1 || nsec * 2 != tp->fixed.nsec)
+            continue;           /* odd or empty: not a 1K track */
+
+        nd = calloc(nsec, sizeof(char *));
+        for (s = 0; s < nsec; s++) {
+            nd[s] = malloc(1024);
+            memcpy(nd[s], tp->data[s * 2], 512);
+            memcpy(nd[s] + 512, tp->data[s * 2 + 1], 512);
+            free(tp->data[s * 2]);
+            free(tp->data[s * 2 + 1]);
+        }
+        free(tp->data);
+        tp->data = nd;
+        secmap = malloc(nsec);
+        for (s = 0; s < nsec; s++)
+            secmap[s] = firstsec + s;
+        if (tp->secmap)
+            free(tp->secmap);
+        tp->secmap = secmap;
+        tp->fixed.nsec = nsec;
+        tp->secsize = 1024;
+        tp->fixed.size = 3;     /* 128 << 3 */
+    }
+}
 void
 merge_imd(struct imd *imd, char *filename, int altcyl)
 {
@@ -175,6 +241,7 @@ usage(char c)
     printf("\t-a <cyl>\talternate-sector the tracks from cylinder <cyl> on\n");
     printf("\t-d\tdump data\n");
     printf("\t-s\tsummarize\n");
+    printf("\t-2\trepack 512 byte sectors into 1024 (a 1K medium)\n");
     exit(1);
 }
 
@@ -186,6 +253,7 @@ main(int argc, char **argv)
     int dump = 0;
     int merge = 0;
     int summarize = 0;
+    int repack = 0;
     int altcyl = 0;
 
     progname = *argv++;
@@ -207,6 +275,9 @@ main(int argc, char **argv)
                 break;
             case 'm':
                 merge++;
+                break;
+            case '2':
+                repack++;
                 break;
             case 'a':
                 /*
@@ -249,6 +320,7 @@ main(int argc, char **argv)
             printf("%s\n", ip->comment);
         }
         if (dump) dump_imd(ip, *argv);
+        if (repack) repack_1k(ip);
         if (merge) merge_imd(ip, *argv, altcyl);
         if (summarize) summarize_imd(ip, *argv);
         argv++;

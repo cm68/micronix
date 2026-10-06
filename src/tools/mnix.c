@@ -1459,6 +1459,12 @@ floppylabel(image, dl)
  * Which row of mkfs.h's table a diskette's label describes, or -1 if the
  * label is of no medium this tree knows.  Only rows with a track offset
  * are candidates: the three diskettes, not the five hard disks.
+ *
+ * The first sector number is part of the match, because it is part of
+ * the medium: the two 5 1/4 inch double sided rows have the same shape
+ * (40/2/10) and differ only in whether their sectors are soft or hard,
+ * which dfirst[] is the one field that says.  A label read off a boot
+ * image carries the answer mkbootimg -d wrote, so it is already here.
  */
 static int
 floptype(dl)
@@ -1468,7 +1474,8 @@ floptype(dl)
 
     for (t = 0; t < NDRIVE; t++)
         if (dtoff[t] && dtracks[t] == dl->d_tracks &&
-            dheads[t] == dl->d_heads && dsecs[t] == dl->d_spt)
+            dheads[t] == dl->d_heads && dsecs[t] == dl->d_spt &&
+            dfirst[t] == dl->d_firstsec)
             return (t);
     return (-1);
 }

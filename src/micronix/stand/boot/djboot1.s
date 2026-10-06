@@ -55,14 +55,13 @@ HALT	equ	025h		; end the channel program, 2 bytes
 OKSTAT	equ	040h		; the good status a command writes back
 
 STAGE	equ	08000h		; where the sectors land before relocation
-NSEC	equ	8		; 4k of it, which stand/README asks it to fit
 TRIES	equ	10		; per sector
 
 BASE0	equ	0080h		; where the firmware leaves level 0
 HEADLEN	equ	128		; and how much of it it leaves
 
 ;
-; Where the medium numbers its sectors from - the last two bytes of
+; Where the medium numbers its sectors from - the last three bytes of
 ; level 0, which mkbootimg -d writes.  It is the one thing this file
 ; cannot work out for itself: the label that carries it is at byte 256
 ; of the sector the firmware copied only the first HEADLEN of, and the
@@ -74,11 +73,19 @@ HEADLEN	equ	128		; and how much of it it leaves
 ; further still.  See sys/dlabel.h's d_firstsec and sys/dj.c, where the
 ; kernel takes the same answer from the drive itself (ORG1).
 ;
-; The marker beside it is mkbootimg's: it writes the number only where
-; it finds the marker intact, so a level 0 that outgrew HEADLEN and
-; moved both fails the build rather than having a byte of its own code
-; overwritten.
+; SSIZE, the byte before it, is how many blocks a sector is - one for a
+; 512 byte sector, two for a 1024 byte one - and it is inferred from the
+; same geometry djio.c infers it from: a soft sectored medium with ten
+; or sixteen blocks to a track is 1K, every other one this tree builds
+; for is 512.  It changes the sector level 0 asks for (a 1K sector holds
+; level 1 as its second half) and how level 1 strides and counts.
 ;
+; The marker beside them is mkbootimg's: it writes the two numbers only
+; where it finds the marker intact, so a level 0 that outgrew HEADLEN
+; and moved all three fails the build rather than having a byte of its
+; own code overwritten.
+;
+SSIZE	equ	BASE0+125	; 00fdh, blocks per sector: 1 = 512, 2 = 1024
 FSEC	equ	BASE0+126	; 00feh, the first of level 0's last two bytes
 FSECMAG	equ	0a5h		; the marker after it that says so
 
@@ -115,19 +122,21 @@ O_DOFF	equ	14		; and the data
 ;
 ; Level 0.  The firmware has left the first HEADLEN bytes of this file
 ; at BASE0 and jumped here.  All it does is ask the channel for level 1
-; - the rest of this file, in the sector after the medium's first - and
-; jump into it.  No stack, no output, no per-read loop: level 1 has all
-; three, and there is only one read to make.
+; - the rest of this file - and jump into it.  No stack, no output, no
+; per-read loop: level 1 has all three, and there is only one read to
+; make.
 ;
 ; The channel program's invariant half goes down first, exactly as it
 ; does in level 1's read loop (which is where these port writes are
 ; explained).  Level 0 differs from that loop in two ways: the DMA
-; address is the constant BASE and the sector number is the one FSEC
-; holds plus one, and a failure has no end.  Level 1 counts ten tries
-; and then prints; level 0 kicks the channel again, forever, because a
-; boot that cannot read its own second half has nothing left to try and
-; nowhere to say so - setting the uart up would cost bytes this does
-; not have.
+; address is the constant BASE and the sector number is the one SSIZE
+; picks - FSEC+1 on a 512 byte medium, where level 1 is the sector after
+; the boot, and FSEC itself on a 1K one, where level 1 is the second
+; half of the boot sector and is copied down from BASE+512 - and a
+; failure has no end.  Level 1 counts ten tries and then prints; level 0
+; kicks the channel again, forever, because a boot that cannot read its
+; own second half has nothing left to try and nowhere to say so - setting
+; the uart up would cost bytes this does not have.
 ;
 level0:
 	ld	a,SETDMA
@@ -146,8 +155,12 @@ level0:
 	ld	(CHAN+1),a	; dma low
 	ld	a,h
 	ld	(CHAN+2),a	; dma high
+	ld	a,(SSIZE)	; 1 = 512, 2 = 1024
+	dec	a		; 0 for 512, 1 for 1024
+	ld	c,a		; C = the flag: which sector, and the copy below
 	ld	a,(FSEC)	; the medium's first sector number
 	inc	a		; level 1 is the sector after it
+	sub	c		; 512: FSEC+1; 1024: level 1 is FSEC's second half
 	ld	(CHAN+6),a	; so read that one
 
 l0retry:
@@ -160,26 +173,39 @@ l0poll:
 	jr	z,l0poll	; not written yet
 	cp	OKSTAT
 	jr	nz,l0retry	; 040h, so it worked
+
+	; A 1024 byte sector left level 1 at BASE+512, its second half;
+	; bring it down to BASE, where its labels say it is.
+	ld	a,c
+	or	a
+	jr	z,l0go		; 512: it is already at BASE
+	ld	hl,BASE+512
+	ld	de,BASE
+	ld	bc,512
+	ldir
+l0go:
 	jp	level1
 
 ;
-; The pad that makes level 0 exactly HEADLEN bytes, and the two bytes at
-; the end of it that are not padding at all: the first sector number
-; FSEC names and its marker.  The length is the one invariant in the
-; file: level 1's labels are the linker's, counted from BASE0, so they
-; only come out at BASE - where level 0 puts its block - if level 0 is
-; exactly the length the firmware copies and no more.
+; The pad that makes level 0 exactly HEADLEN bytes, and the three bytes
+; at the end of it that are not padding at all: the sector size SSIZE
+; names, the first sector number FSEC names, and its marker.  The length
+; is the one invariant in the file: level 1's labels are the linker's,
+; counted from BASE0, so they only come out at BASE - where level 0 puts
+; its block - if level 0 is exactly the length the firmware copies and
+; no more.
 ;
-; The head above assembles to 61 bytes - the instruction count comes to
-; 62, but the assembler shortens the trailing jp to a jr, it being in
-; range - so the pad is 65 and the two bytes after it end it at 128.
-; The Makefile checks that byte HEADLEN of djboot1.bin is level 1's
-; first opcode, so a miscount here fails the build rather than quietly
-; running level 1 at the wrong address - and mkbootimg, which writes the
-; number, refuses the image if the marker has moved, so a miscount
-; cannot have the number land on an instruction either.
+; The head above assembles to 82 bytes - the trailing jp is shortened to
+; a jr, it being in range - so the pad is 43 and the three bytes after
+; it end it at 128.  The Makefile checks that byte HEADLEN of djboot1.bin
+; is level 1's first opcode, so a miscount here fails the build rather
+; than quietly running level 1 at the wrong address - and mkbootimg,
+; which writes the two numbers, refuses the image if the marker has
+; moved, so a miscount cannot have a number land on an instruction
+; either.
 ;
-	.ds	65
+	.ds	43
+	.db	0		; the sector size (1 = 512, 2 = 1024), for mkbootimg
 	.db	0		; the first sector number, for mkbootimg
 	.db	FSECMAG		; and the marker saying it may write there
 
@@ -197,12 +223,13 @@ level1:
 	jp	run+RBIAS
 
 ;
-; Read NSEC sectors of this track, beginning two on from the medium's
-; first, into STAGE upward.  Level 0 was the medium's first sector and
-; this code the one after it, so the second level has the eight behind
-; that.  Nothing here counts to the end of the track: the eight are all
-; the second level needs, and a track holds fifteen sectors on the
-; eight inch media and ten on the five inch one.
+; Read the second level into STAGE upward, beginning two sectors on from
+; the medium's first on a 512 byte medium and one on from it on a 1K
+; one, where level 1 is the second half of the boot sector itself.  Four
+; kilobytes of it, which stand/README asks it to fit - eight 512 byte
+; sectors or four 1024 byte ones, so the count and the stride both come
+; from SSIZE.  Nothing here counts to the end of the track: the second
+; level is all that is read and a track holds more.
 ;
 run:
 ;
@@ -246,11 +273,21 @@ run:
 	ld	(CHAN+9),a
 
 	ld	hl,STAGE	; where the next sector goes
-	ld	b,NSEC		; how many are left
+	ld	a,(SSIZE)	; 1 = 512, 2 = 1024
+	dec	a		; 0 for 512, 1 for 1024
+	ld	d,a		; D = the flag: NSEC and the stride below take it
 	ld	a,(FSEC)	; the medium's first sector number
 	inc	a		; level 1 was the sector after it
 	inc	a		; so level 2 starts one after that
+	sub	d		; 512: FSEC+2; 1024: FSEC+1
 	ld	c,a		; and this read wants that one
+	ld	a,d
+	or	a		; 0 for 512
+	jr	nz,is1k
+	ld	b,8		; 512: eight sectors, 4K
+	jr	onesec
+is1k:
+	ld	b,4		; 1024: four sectors, 4K
 
 onesec:
 	ld	a,l
@@ -284,6 +321,12 @@ stuck:
 good:
 	inc	h		; on by 512, and l stays 0
 	inc	h
+	ld	a,d
+	or	a		; 0 for 512
+	jr	z,noadd
+	inc	h		; 1024: on by another 512
+	inc	h
+noadd:
 	inc	c
 	djnz	onesec
 

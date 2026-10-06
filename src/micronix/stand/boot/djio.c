@@ -93,6 +93,22 @@ int spt INIT;
 int spc INIT;
 int limit INIT;
 int firstsec INIT;
+int bps INIT;		/* blocks per sector: 2 on a 1K medium, else 1 */
+
+/*
+ * Where a 1K sector is staged while its half is copied out.  The DJ-DMA
+ * reads a whole sector and a filesystem block on a 1K medium is half of
+ * one, so the read goes here and the half to the caller's buffer.
+ *
+ * The address has to be above everything the kernel loads and below this
+ * loader's stack.  The kernel's text and data come to 0xfac6 (the header
+ * says 0x9000 text at 0x1000 and 0x5ac7 data at 0xa000), and its bss -
+ * which is not in the file and so is not loaded - follows, so a sector
+ * staged at 0xfb00 sits over bss that the kernel clears after it starts,
+ * and leaves the stack room to grow down from 0xffff without reaching it.
+ * It is only used one sector at a time while the loader runs.
+ */
+#define	SECTBUF	((char *)0xfb00)
 
 /*
  * reset the drive.  There is nothing to sense or probe: the drive is
@@ -192,7 +208,31 @@ reset()
 	roll = lp->d_roll;
 	heads = lp->d_heads;
 	spt = lp->d_spt;
-	spc = heads * spt;
+
+	/*
+	 * How many blocks a sector is.  The label's d_spt counts 512 byte
+	 * blocks per track, not physical sectors - which is how a 1K
+	 * medium's five sectors read as ten - so the sector size is
+	 * inferred from that count and from how the medium numbers its
+	 * sectors.  The DJ-DMA's soft sectored media number from one and
+	 * put 1024 bytes in a sector, five to a track on five inch (ten
+	 * blocks) and eight on eight inch (sixteen); a hard sectored five
+	 * inch numbers from zero and is ten 512 byte sectors, and the eight
+	 * inch 512 medium is fifteen.  So a soft sectored medium with ten
+	 * or sixteen blocks to a track is 1K - two blocks to a sector - and
+	 * every other count this loader can meet is 512.  A medium of 26
+	 * blocks is 128 byte sectors and is not a filesystem medium; this
+	 * would misread it, so it is refused rather than guessed.
+	 */
+	if (firstsec == 1 && (spt == 10 || spt == 16))
+		bps = 2;
+	else if (spt == 9 || spt == 10 || spt == 15)
+		bps = 1;
+	else {
+		outstr("The disk label has a sector count this loader does not know\n");
+		bail();
+	}
+	spc = heads * spt;	/* blocks per cylinder */
 	/*
 	 * A block number is a filesystem block number, so the count starts
 	 * at the slice's first cylinder and not the disk's.  A slice with a
@@ -257,6 +297,32 @@ char *dma;
 }
 
 /*
+ * One block out of a 1K sector.  The controller reads a whole sector,
+ * so a block - half a sector - is the full read into SECTBUF and the
+ * half copied out.  half is which 512 bytes: 0 the first, 1 the second.
+ */
+static int
+djrblk(cyl, head, sec, half, dma)
+int cyl;
+int head;
+int sec;
+int half;
+char *dma;
+{
+	register char *s;
+	register char *d;
+	register int n;
+
+	if (!djread(cyl, head, sec, SECTBUF))
+		return 0;
+	s = SECTBUF + (half ? 512 : 0);
+	d = dma;
+	for (n = 512; n; n--)
+		*d++ = *s++;
+	return 1;
+}
+
+/*
  * given a block number, read the contents into the buffer.
  * return 1 for success.
  */
@@ -265,8 +331,11 @@ readblock(blocknum, buffer)
 int blocknum;
 char *buffer;
 {
+	register int track;
+	register int within;
 	register int cyl;
 	int secnum;
+	int half;
 	int head;
 
 	/*
@@ -279,15 +348,25 @@ char *buffer;
 	 * A block number is a position in that layout and a sector number
 	 * is a name on a track, and on a soft sectored medium the two do
 	 * not agree: position 0 is sector 1.  djread wants the name.
+	 *
+	 * d_spt is blocks per track, so the track and the position in it
+	 * come straight from it; a block is one whole sector on a 512 byte
+	 * medium and half of one on a 1K medium, so the position is divided
+	 * by bps to name the sector and its remainder is which half.
 	 */
 	if (blocknum > limit) {
 		outstr("Block out of range\n");
 		return 0;
 	}
 
-	secnum = blocknum % spc;
-	cyl = (blocknum / spc) + cylstart + roll;
-	head = secnum / spt;
+	track = blocknum / spt;
+	within = blocknum % spt;
+	cyl = (track / heads) + cylstart + roll;
+	head = track % heads;
+	secnum = within / bps + firstsec;
+	half = within % bps;
 
-	return djread(cyl, head, secnum % spt + firstsec, buffer);
+	if (bps == 1)
+		return djread(cyl, head, secnum, buffer);
+	return djrblk(cyl, head, secnum, half, buffer);
 }

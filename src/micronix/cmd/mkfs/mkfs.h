@@ -16,7 +16,7 @@
 #define NICINOD     100         /* free inode list in the superblock */
 #define APERBLK     256         /* block numbers in an indirect block */
 #define DEFBOOT     "/bootmw.bin"
-#define NDRIVE      9
+#define NDRIVE      10
 
 /*
  * The media this can make a filesystem on: the five hard disk models
@@ -49,22 +49,30 @@
  * The 5 1/4 single sided row (40/1/10, 380 blocks) is deliberately not
  * here: 194 K cannot hold a running system, and a medium that can only
  * be a data carrier is not worth a row.
+ *
+ * The 5 1/4 inch double sided medium appears twice - the hard sectored
+ * format and the soft sectored one - because they are the same shape and
+ * different media: both are forty cylinders, two heads, ten blocks to a
+ * track, but the soft one's sectors are 1024 bytes (five of them) and
+ * numbered from one, while the hard one's are 512 bytes (ten) and
+ * numbered from zero.  A row is a medium, not a shape, so the two rows
+ * are told apart by dfirst[] below.
  */
-static UINT dtracks[NDRIVE] = { 153, 306, 306, 640, 733, 77, 77, 40, 202 };
-static UINT dheads[NDRIVE] = { 4, 4, 6, 6, 5, 1, 2, 2, 8 };
-static UINT dsecs[NDRIVE] = { 17, 17, 17, 17, 17, 15, 15, 10, 32 };
-static UINT dtoff[NDRIVE] = { 0, 0, 0, 0, 0, 2, 2, 2, 0 };
+static UINT dtracks[NDRIVE] = { 153, 306, 306, 640, 733, 77, 77, 40, 202, 40 };
+static UINT dheads[NDRIVE] = { 4, 4, 6, 6, 5, 1, 2, 2, 8, 2 };
+static UINT dsecs[NDRIVE] = { 17, 17, 17, 17, 17, 15, 15, 10, 32, 10 };
+static UINT dtoff[NDRIVE] = { 0, 0, 0, 0, 0, 2, 2, 2, 0, 2 };
 
 /*
  * And the number of the first sector on a track, which is a property of
  * the medium and not of its shape: it says whether the sectors are
  * marked by index holes in the jacket - hard sectored, which counts from
  * zero - or written into the track, which is soft sectored and counts
- * from one.  The eight inch media are soft sectored and the 5 1/4 inch
- * double sided one is Morrow's hard sectored format; a hard disk does
- * not go through this at all, because its controller is told a sector
- * number rather than made to find one, and zero is what the driver's own
- * table expects.
+ * from one.  The eight inch media and the 5 1/4 inch soft sectored one
+ * number from one; the 5 1/4 inch hard sectored one numbers from zero.
+ * A hard disk does not go through this at all, because its controller is
+ * told a sector number rather than made to find one, and zero is what the
+ * driver's own table expects.
  *
  * This has to be right.  A driver that numbers a soft sectored track
  * from zero asks for a sector the track does not have, and one that
@@ -72,9 +80,10 @@ static UINT dtoff[NDRIVE] = { 0, 0, 0, 0, 0, 2, 2, 2, 0 };
  * one it wanted - on every block, all the way to the end of the medium.
  * It is written into the label as d_firstsec, and the loader reads it
  * out of there, because it has no other way to be told: see
- * sys/dlabel.h and stand/boot/djio.c.
+ * sys/dlabel.h and stand/boot/djio.c.  It is also the one field that
+ * tells the two 5 1/4 inch double sided rows apart.
  */
-static UINT dfirst[NDRIVE] = { 0, 0, 0, 0, 0, 1, 1, 0, 1 };
+static UINT dfirst[NDRIVE] = { 0, 0, 0, 0, 0, 1, 1, 0, 1, 1 };
 
 extern char *pname;
 

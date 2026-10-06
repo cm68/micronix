@@ -104,7 +104,20 @@ struct dlabel {
      */
     UINT d_tracks;              /* cylinders */
     UINT d_heads;
-    UINT d_spt;                 /* sectors per track */
+    UINT d_spt;                 /* 512-byte sectors (blocks) per track;
+                                 * see the size note below - the physical
+                                 * sector size is not carried */
+
+    /*
+     * The physical sector size is not a field, and that is deliberate
+     * for the kernel: it asks the drive (sys/dj.c's status read) rather
+     * than believe the medium.  d_spt counts blocks, so a 1K medium's
+     * five sectors read as ten.  The boot loader has no drive to ask, so
+     * it infers the size from d_spt and d_firstsec against the DJ-DMA's
+     * own tables - a soft sectored track of ten or sixteen blocks is
+     * 1024 bytes and everything else is 512 - which is the inference
+     * stand/boot/djio.c writes down and checks.
+     */
 
     /*
      * The boot, written out rather than re-derived, because the deriving

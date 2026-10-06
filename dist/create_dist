@@ -73,11 +73,13 @@ case "$medium" in
 8)	mnixmed=d8ds
 	bootimg="djbootimg-d8ds"
 	fsize=2250
+	imd2=""
 	what="8 inch" ;;
-5)	mnixmed=d5ds
-	bootimg="djbootimg-d5ds"
+5)	mnixmed=d5soft
+	bootimg="djbootimg-d5soft"
 	fsize=760
-	what="5 1/4 inch" ;;
+	imd2="-2"
+	what="5 1/4 inch, soft sectored" ;;
 *)	echo "$0: $medium is not a medium this tree builds" >&2
 	echo "$0: media: 8 5" >&2
 	exit 1 ;;
@@ -249,7 +251,7 @@ while [ "$n" -le "$ndisk" ]; do
 	echo "$0: disk $n of $ndisk: `wc -l < "$tmp/list.$n"` files, $free blocks free"
 
 	rm -f "$raw-delta"
-	"$imd" -m -a "$toff" "$raw" > /dev/null 2>&1 || exit 1
+	"$imd" -m $imd2 -a "$toff" "$raw" > /dev/null 2>&1 || exit 1
 	mv "$raw-merge" "$out" || exit 1
 	n=$((n + 1))
 done

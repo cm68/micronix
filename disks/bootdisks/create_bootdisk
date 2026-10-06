@@ -60,6 +60,7 @@ target="$3"
 [ -z "$target" ] && target=m16
 
 mnix="$root/src/tools/mnix"
+imd="$root/src/tools/imd"
 setdev="$root/src/tools/setdev"
 devlist="$root/src/micronix/dev/devlist"
 kernel="$root/src/micronix/sys/unix"
@@ -76,14 +77,18 @@ bootdir="$srcdir/stand/boot"
 # with a zeroed boot area, which mounts and passes fsck and does not boot,
 # so the file is here or the diskette cannot do the one job it has.
 #
-# One image serves every target, because the geometry is not in it.  The
-# label is written by the mkfs the init script runs, on the target
-# machine, out of the drive node - the only thing that knows what the
-# drive is.  So the target names the init script below and not the boot.
-# 3765 bytes, so eight blocks of the five inch diskette's twenty-five
-# free.
+# One image serves every HD-DMA target, because the geometry is not in
+# it.  The label is written by the mkfs the init script runs, on the
+# target machine, out of the drive node - the only thing that knows what
+# the drive is.  So the target names the init script below and not the
+# boot.  The SCSI card is a different controller with its own first
+# level, so a scsi target carries ncrbootimg instead.  3765 bytes, so
+# eight blocks of the five inch diskette's twenty-five free.
 #
 hdinit="$bootdir/bootimg"
+if [ "$target" = "scsi" ]; then
+	hdinit="$bootdir/ncrbootimg"
+fi
 
 #
 # What goes in /bin.  Not a copy of the tree's bin: this is the list the
@@ -103,8 +108,8 @@ medium="$1"
 image="$2"
 if [ -z "$medium" ]; then
 	echo "usage: $0 <medium> [<image>] [<target>]" >&2
-	echo "media: d8ss d8ds d5ds" >&2
-	echo "targets: m5 m10 m16 m32 m40 (m16 by default)" >&2
+	echo "media: d8ss d8ds d5ds d5soft" >&2
+	echo "targets: m5 m10 m16 m40 scsi (m16 by default)" >&2
 	exit 1
 fi
 
@@ -114,11 +119,12 @@ fi
 # carries, and what to call it when saying what was made.
 #
 case "$medium" in
-d8ss)	bootimg="djbootimg-d8ss"; rootmin=0 ;;
-d8ds)	bootimg="djbootimg-d8ds"; rootmin=0 ;;
-d5ds)	bootimg="djbootimg-d5ds"; rootmin=4 ;;
+d8ss)	bootimg="djbootimg-d8ss"; rootmin=0; imd2="" ;;
+d8ds)	bootimg="djbootimg-d8ds"; rootmin=0; imd2="" ;;
+d5ds)	bootimg="djbootimg-d5ds"; rootmin=4; imd2="" ;;
+d5soft)	bootimg="djbootimg-d5soft"; rootmin=4; imd2="-2" ;;
 *)	echo "$0: $medium is not a medium this tree builds" >&2
-	echo "$0: media: d8ss d8ds d5ds" >&2
+	echo "$0: media: d8ss d8ds d5ds d5soft" >&2
 	exit 1 ;;
 esac
 bootimg="$bootdir/$bootimg"
@@ -147,7 +153,7 @@ if [ ! -f "$hdinit" ]; then
 fi
 if [ ! -f "$rootfiles/${target}init" ]; then
 	echo "$0: $rootfiles/${target}init not found - there is no install" >&2
-	echo "$0: for a $target: the init scripts are m5init, m10init, m16init, m40init" >&2
+	echo "$0: for a $target: the init scripts are m5init, m10init, m16init, m40init, scsiinit" >&2
 	exit 1
 fi
 if [ ! -f "$filesystem/etc/init" ]; then
@@ -215,5 +221,16 @@ fi
 # the filesystem and came in with step 1 - but the boot of the drive the
 # install is about to make.
 "$mnix" -f "$image" write "$hdinit" /bootmw.bin || exit 1
+
+# 6. A 1K medium's physical sectors are 1024 bytes, but the raw image
+# built above is 512 byte blocks - the unit mnix writes a filesystem in.
+# Re-pack it into 1024 byte sectors so the simulator reads it the way a
+# real drive lays it down.  The boot is not alternated: a bootdiskette is
+# unskewed, and the loader reads straight.
+if [ -n "$imd2" ]; then
+	"$imd" -m $imd2 "$image" > /dev/null 2>&1 || exit 1
+	mv "$image-merge" "$image" || exit 1
+	rm -f "$image-delta"
+fi
 
 echo "$0: made $image"
