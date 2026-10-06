@@ -161,6 +161,8 @@ imd_close(void *vp)
         return;
     if (ip->delta)
         kv_close(ip->delta);
+    if (ip->fd >= 0)
+        close(ip->fd);
 }
 
 /*
@@ -169,31 +171,10 @@ imd_close(void *vp)
 /*
  * The write overlay's name: the image's own, with -delta on the end.  It
  * is a key store (kv.h), not a fixed layout - keyed by cylinder, head and
- * sector slot, with 0xff for a track's format record - so it holds only
- * what was written and no geometry of its own.
+ * sector slot - so it holds only what was written: sector data, and no
+ * geometry or framing of its own.
  */
 #define DELTASUFFIX "-delta"
-
-/*
- * A format record from the overlay: rebuild that track's layout.  The
- * four value bytes are the sector count, the sector size shift, the mode
- * and the first sector number.
- */
-static void
-apply_fmt_cb(void *key, int klen, void *val, int vlen, void *arg)
-{
-    struct imd *ip = (struct imd *)arg;
-    unsigned char *k = key;
-    struct imd_trk *tp;
-
-    if (klen != 3 || k[2] != 0xff || vlen != 4)
-        return;
-    tp = imd_track(ip, k[0], k[1]);
-    if (!tp)
-        return;
-    apply_fmt(tp, ((unsigned char *)val)[0], ((unsigned char *)val)[1],
-        ((unsigned char *)val)[2], ((unsigned char *)val)[3]);
-}
 
 /*
  * A sector's data from the overlay: copy it into its slot.
@@ -222,9 +203,9 @@ apply_data_cb(void *key, int klen, void *val, int vlen, void *arg)
 /*
  * Attach the write overlay: a key store beside the image, read-only for
  * a caller that will only read (merge), read/write and created for one
- * that writes (the simulator, the host tools).  Its format records are
- * applied before its sector data, because the data is keyed by slot and
- * sized by the sector size the format just set.
+ * that writes (the simulator, the host tools).  It holds only sector
+ * data; the framing is in the image, so the data applies straight onto
+ * the tracks the image already laid out.
  */
 static int
 attach_delta(struct imd *ip, char *fname, int create_delta)
@@ -250,7 +231,6 @@ attach_delta(struct imd *ip, char *fname, int create_delta)
     free(namebuf);
 
     if (ip->delta) {
-        kv_foreach(ip->delta, apply_fmt_cb, ip);
         kv_foreach(ip->delta, apply_data_cb, ip);
     }
     return 0;
@@ -502,6 +482,7 @@ raw_load(char *fname, int drive, int create_delta)
 
     ip = malloc(sizeof(*ip));
     memset(ip, 0, sizeof(*ip));
+    ip->fd = -1;                    /* a raw image has no track records */
 
     /*
      * The comment is the file's header, and it is the same field
@@ -591,14 +572,14 @@ blank_load(char *fname, int drive, int create_delta)
     if (!create_delta)
         return 0;
 
-    fd = open(fname, O_WRONLY | O_CREAT | O_TRUNC, 0777);
+    fd = open(fname, O_RDWR | O_CREAT | O_TRUNC, 0777);
     if (fd < 0)
         return 0;
     write(fd, "IMD ", 4);
     write(fd, "\x1a", 1);
-    close(fd);
 
     ip = calloc(1, sizeof(*ip));
+    ip->fd = fd;                    /* open to append track records */
     ip->comment = malloc(6);
     memcpy(ip->comment, "IMD ", 4);
     ip->comment[4] = IMD_EOC;
@@ -631,7 +612,7 @@ imd_load(char *fname, int drive, int create_delta)
     char *namebuf;
     char c;
 
-    fd = open(fname, O_RDONLY);
+    fd = open(fname, create_delta ? O_RDWR : O_RDONLY);
     if (fd < 0)
         return blank_load(fname, drive, create_delta);
 
@@ -664,6 +645,7 @@ imd_load(char *fname, int drive, int create_delta)
     // make space for the imd header and copy the comment
     ip = malloc(sizeof(*ip));
     memset(ip, 0, sizeof(*ip));
+    ip->fd = -1;
     ip->comment = malloc(clen + 1);
 
     lseek(fd, 0, SEEK_SET);
@@ -690,7 +672,10 @@ imd_load(char *fname, int drive, int create_delta)
         if (tp->fixed.cyl > ip->cyls) ip->cyls = tp->fixed.cyl;
         if (tp->fixed.head > ip->heads) ip->heads = tp->fixed.head;
     }
-    close(fd);
+    if (create_delta)
+        ip->fd = fd;            /* open to append track records */
+    else
+        close(fd);
 
     if (ntrk) {
         ip->cyls++;
@@ -991,6 +976,33 @@ imd_track(struct imd *ip, int cyl, int head)
     return tp;
 }
 
+/*
+ * Write one track's record to the image: the fixed header and sector map
+ * that say how the track is laid out, then a fill code for each sector.
+ * The framing is out of band to the data, like the label, so it goes into
+ * the image and the delta never sees it.
+ */
+static void
+write_track(struct imd *ip, struct imd_trk *tp, int fill)
+{
+    unsigned char hdr[5];
+    unsigned char fb = (unsigned char)fill;
+    unsigned char code = IMD_FILL;
+    int i;
+
+    hdr[0] = tp->fixed.mode;
+    hdr[1] = tp->fixed.cyl;
+    hdr[2] = tp->fixed.head;
+    hdr[3] = tp->fixed.nsec;
+    hdr[4] = tp->fixed.size;
+    write(ip->fd, hdr, 5);
+    write(ip->fd, tp->secmap, tp->fixed.nsec);
+    for (i = 0; i < tp->fixed.nsec; i++) {
+        write(ip->fd, &code, 1);
+        write(ip->fd, &fb, 1);
+    }
+}
+
 int
 imd_setfmt(void *vp, int cyl, int head, int firstsec, int secs, int secsize,
     int mode, int fill)
@@ -998,7 +1010,6 @@ imd_setfmt(void *vp, int cyl, int head, int firstsec, int secs, int secsize,
     struct imd *ip = (struct imd *)vp;
     struct imd_trk *tp;
     int i, sbyte;
-    char meta[4];
 
     tp = imd_track(ip, cyl, head);
     if (!tp)
@@ -1014,21 +1025,13 @@ imd_setfmt(void *vp, int cyl, int head, int firstsec, int secs, int secsize,
     }
 
     /*
-     * Persist the format: the four byte layout record under the 0xff key,
-     * then the filled data of every sector, so the track comes back
-     * formatted on reload.
+     * Persist the framing to the image, out of band, the way the label
+     * is.  A raw image has no track records of its own, so its fill
+     * alone lands in the overlay as data.
      */
-    if (ip->delta) {
-        unsigned char key[3];
-
-        meta[0] = secs;
-        meta[1] = sbyte;
-        meta[2] = mode;
-        meta[3] = firstsec;
-        key[0] = cyl;
-        key[1] = head;
-        key[2] = 0xff;
-        kv_put(ip->delta, key, 3, meta, 4);
+    if (ip->fd >= 0) {
+        write_track(ip, tp, fill);
+    } else if (ip->delta) {
         for (i = 0; i < secs; i++)
             imd_write(ip, cyl, head, firstsec + i, tp->data[i]);
     }

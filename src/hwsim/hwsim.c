@@ -426,6 +426,18 @@ load_task_syms(int task, int dev, int inum)
     img = image_for_dev(dev);
     if (!img || openfs(img, &fs) < 0)
         return;
+    /*
+     * The symbol load is a debug convenience.  A disk that has been
+     * formatted but not yet had a filesystem put on it carries a valid
+     * label and a garbage superblock, and the inode walk below would
+     * then wander out of the image and die in readblk.  Skip it before
+     * that.
+     */
+    if (fs->s_isize == 0 || fs->s_isize > 1000 ||
+        fs->s_fsize <= fs->s_isize + 2) {
+        closefs(fs);
+        return;
+    }
     dp = iget(fs, inum);
     if (!dp) {
         closefs(fs);

@@ -21,19 +21,12 @@
  * headmap  numsecs of sector numbers - never seen this
  * a data code:  0: no data 1: secsize bytes 2: a fill byte
  *
- * writing is a lot more problematic, since we've already snarfed the data from
- * the imd device file.  so what happens is that we create a drive file that
- * contains tracks that overlay the data from the IMD file, and loading the IMD
- * initially first reads the baseline and then overlays the newly written data
- * that is tagged with the parent. it's named <imd file name>-delta
- *
- * the format of this delta file is brute force and wasteful: all are 5M
- * one byte for every potential sector on the disk
- * 2 * 80 * 32 = 5120 bytes,
- *  32 bytes being the dirty sector indication
- *  2 * 80 * 32 * 1024 bytes of the actual data, where each sector
- *  1024 being every potential sector.
- * so calculating the delta offset is trivial
+ * writing is an overlay: the image holds the baseline (its framing and any
+ * data), and a key store beside it - <imd file name>-delta - holds the
+ * sectors written since, keyed by cylinder, head and sector slot.  A load
+ * reads the image, then layers the delta's data on top.  The framing a
+ * format lays down goes into the image itself, out of band, the way the
+ * label does; the delta is data only.
  *
  * building this file with -DSTAND will define a program that does some reporting
  * of imd file contents, and additionally can write a new imd file from the original
@@ -55,8 +48,9 @@
  * The track array is indexed cylinder-major at a fixed head stride, so a
  * disk whose heads are not known until it is formatted can grow by
  * cylinder without moving the tracks already placed.  The delta is a key
- * store keyed by three bytes - cylinder, head, and a sector slot, or 0xff
- * for the track's format record - so it carries no geometry of its own.
+ * store keyed by three bytes - cylinder, head, and a sector slot - holding
+ * only sector data.  A track's framing (its layout) lives in the image
+ * itself, the way the label does.
  */
 #define imd_trknum(ip, c, h)        (((c) * MAXHEADS) + (h))
 #define imd_ntracks(ip)             ((ip)->cyls * MAXHEADS)
@@ -73,6 +67,7 @@ struct imd {
     int spt;                            // most sectors any track holds
     struct imd_trk **tracks;            // array of tracks - indexed by trknum(c, h)
     struct kv *delta;                   // the write overlay, 0 for none
+    int fd;                             // the image, open to append track records
     int lock_fd;                        // advisory lock held on the image
 };
 

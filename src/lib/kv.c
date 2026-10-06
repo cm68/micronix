@@ -17,7 +17,7 @@
 
 #include "../include/kv.h"
 
-#define NHASH 1021              /* a prime; the store is small */
+#define NHASH 1021              /* the starting size; the table grows */
 
 struct kvent {
     unsigned char *key;
@@ -32,7 +32,8 @@ struct kv {
     char *path;
     int nkeys;                  /* live entries in the index */
     int nput;                   /* records ever appended to the log */
-    struct kvent tab[NHASH];
+    struct kvent *tab;          /* open-addressed hash, grown on demand */
+    int ntab;                   /* slots in tab */
 };
 
 static unsigned long
@@ -48,13 +49,13 @@ hash(void *key, int klen)
 }
 
 static struct kvent *
-lookup(struct kv *kv, void *key, int klen, int create)
+find(struct kv *kv, void *key, int klen, int create)
 {
-    unsigned long h = hash(key, klen) % NHASH;
+    unsigned long h = hash(key, klen) % kv->ntab;
     int i;
 
-    for (i = 0; i < NHASH; i++) {
-        struct kvent *e = &kv->tab[(h + i) % NHASH];
+    for (i = 0; i < kv->ntab; i++) {
+        struct kvent *e = &kv->tab[(h + i) % kv->ntab];
         if (!e->used) {
             if (!create)
                 return 0;
@@ -71,6 +72,53 @@ lookup(struct kv *kv, void *key, int klen, int create)
     return 0;                   /* table full: not in a store this size */
 }
 
+/*
+ * Widen the hash table: double it and move every live entry across.
+ * The keys themselves stay put - only the slot pointers move.
+ */
+static void
+grow(struct kv *kv)
+{
+    struct kvent *old = kv->tab;
+    int oldsz = kv->ntab;
+    int i;
+
+    kv->ntab = oldsz * 2 + 1;
+    kv->tab = calloc(kv->ntab, sizeof(*kv->tab));
+    kv->nkeys = 0;
+    for (i = 0; i < oldsz; i++) {
+        struct kvent *e = &old[i];
+        struct kvent *n;
+        unsigned long h;
+        int j;
+
+        if (!e->used)
+            continue;
+        h = hash(e->key, e->klen) % kv->ntab;
+        for (j = 0; j < kv->ntab; j++)
+            if (!kv->tab[(h + j) % kv->ntab].used)
+                break;
+        n = &kv->tab[(h + j) % kv->ntab];
+        *n = *e;                /* the key pointer moves across */
+        kv->nkeys++;
+    }
+    free(old);
+}
+
+static struct kvent *
+lookup(struct kv *kv, void *key, int klen, int create)
+{
+    struct kvent *e;
+
+    if (create && kv->nkeys * 10 >= kv->ntab * 7)
+        grow(kv);               /* keep the probe short */
+    e = find(kv, key, klen, create);
+    if (e || !create)
+        return e;
+    grow(kv);                   /* truly full: widen and retry */
+    return find(kv, key, klen, create);
+}
+
 struct kv *
 kv_open(char *path, int create)
 {
@@ -82,6 +130,8 @@ kv_open(char *path, int create)
     struct kvent *e;
 
     kv = calloc(1, sizeof(*kv));
+    kv->ntab = NHASH;
+    kv->tab = calloc(kv->ntab, sizeof(*kv->tab));
     kv->path = strdup(path);
     kv->fd = open(path, create ? (O_RDWR | O_CREAT) : O_RDONLY, 0777);
     if (kv->fd < 0) {
@@ -135,7 +185,7 @@ compact(struct kv *kv)
     if (tfd < 0)
         return -1;
 
-    for (i = 0; i < NHASH; i++) {
+    for (i = 0; i < kv->ntab; i++) {
         e = &kv->tab[i];
         if (!e->used)
             continue;
@@ -177,9 +227,10 @@ kv_close(struct kv *kv)
         return;
     if (kv->nput > kv->nkeys)
         compact(kv);
-    for (i = 0; i < NHASH; i++)
+    for (i = 0; i < kv->ntab; i++)
         if (kv->tab[i].used)
             free(kv->tab[i].key);
+    free(kv->tab);
     close(kv->fd);
     free(kv->path);
     free(kv);
@@ -245,7 +296,7 @@ kv_foreach(struct kv *kv,
     struct kvent *e;
     void *val;
 
-    for (i = 0; i < NHASH; i++) {
+    for (i = 0; i < kv->ntab; i++) {
         e = &kv->tab[i];
         if (!e->used)
             continue;

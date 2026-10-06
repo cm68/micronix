@@ -209,7 +209,7 @@ select_drive(int id)
     	return 0;
     }
     sprintf(drivename, "hdca-%d", id);
-    handle[id] = imd_load(drivename, id, 1);
+    handle[id] = imd_load(drive_resolve(drivename), id, 1);
     if (!handle[id]) {
         printf("hdca: no drive %s, command refused\n", drivename);
         return -1;
@@ -231,6 +231,7 @@ fmt_finish(int drv)
     if (fmt_active) {
         imd_setfmt(handle[drv], fmt_track, fmt_head, 1, fmt_nsec, 512, 1, 0);
         fmt_active = 0;
+        fmt_nsec = 0;           /* the next track counts its own headers */
     }
 }
 

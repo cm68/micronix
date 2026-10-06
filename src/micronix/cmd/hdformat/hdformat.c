@@ -254,8 +254,11 @@ format()
 				hdr[i * 4 + 2] = skewat(i);
 				hdr[i * 4 + 3] = key;
 			}
-			if (run(HDCA_FORMAT, head, track, spt, spt * 4, 0, hdr))
+			if (run(HDCA_FORMAT, head, track, spt, spt * 4, 0, hdr)) {
+				fprintf(stderr, "format failed at track %d head %d, errno %d\n",
+				    track, head, errno);
 				die("format failed");
+			}
 		}
 		printf("track %d\n", track);
 	}

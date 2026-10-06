@@ -58,10 +58,37 @@ OPTIONS
 -c cyl
 .in +5
 .br
-Cylinders, or tracks per surface.  -h heads, -s sectors per track, -p the
-cylinder where write precompensation begins, -l the cylinder where the write
-current drops to the low setting, -d the step pulse delay in units of 100
-microseconds.
+Cylinders, or tracks per surface.
+.in -5
+.bd
+-h heads
+.in +5
+.br
+Heads, or tracks per cylinder.
+.in -5
+.bd
+-s spt
+.in +5
+.br
+Sectors per track.
+.in -5
+.bd
+-p precomp
+.in +5
+.br
+The cylinder where write precompensation begins.
+.in -5
+.bd
+-l lowcur
+.in +5
+.br
+The cylinder where the write current drops to the low setting.
+.in -5
+.bd
+-d step
+.in +5
+.br
+The step pulse delay, in units of 100 microseconds.
 .in -5
 .bd
 -m model
