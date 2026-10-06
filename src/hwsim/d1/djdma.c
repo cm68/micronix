@@ -1276,16 +1276,20 @@ djdma_init()
     }
 
     /*
-     * The drives keep their fixed numbers: the 8 inch port is logical 0-3
-     * and the 5 1/4 inch one 4-7.  The real controller renumbers them when
-     * it boots and finds nothing on the 8 inch port - DJ/DMA manual 2.6.7,
-     * and section 7's "boots from the first ready drive" - so the drive
-     * that answers to 0 depends on what is plugged in, which a fixed
-     * dev/devlist cannot say.  Renumbering is deliberately not done here:
-     * the boot below therefore reads the 8 inch drive, and a guest that
-     * wants the 5 1/4 inch ones at 0-3 can still ask for the swap with
-     * SET LOGICAL DRIVE (0x2e).
+     * The DJDMA25 firmware boots from the first ready drive, testing the
+     * 8 inch port first, and renumbers so that drive answers to 0 (manual
+     * 2.6.7, section 7).  Emulated here, because the boot below reads
+     * logical 0 and has to land on the drive the firmware chose.  The
+     * kernel then wants the fixed numbers its dev/devlist names - 8 inch
+     * at 0-3, 5 1/4 at 4-7 - so the drive is put back with SET LOGICAL
+     * DRIVE (0x2e, bit 2 clear) before it runs.
      */
+    if (!imdp[0] && imdp[FIVE]) {
+#ifndef NODEBUG
+        printf("djdma: booting the 5 1/4 inch port, its drives are now 0-3\n");
+#endif
+        five_first = 1;
+    }
 
     for (i = 0; i < 38; i++) {
         lowmem_save[i] = physread(i);
