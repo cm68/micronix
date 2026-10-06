@@ -60,9 +60,15 @@
 #define BSIZE	512			/* the boot sector, and the block size */
 
 /*
- * The block device majors (dev/devlist): 4 is the ide card and 5 the scsi
- * adapter.  They are the two drivers with an inquiry ioctl.
+ * The block device majors (sys/consts.c biosw): 1 the HDCA, 2 the DJ-DMA
+ * floppy, 3 the HD-DMA, 4 the ide card, 5 the scsi adapter.  The last two
+ * answer a capacity inquiry from their own hardware; the first three have
+ * no such command and report their capacity from the label, which is the
+ * only description of them there is.
  */
+#define HDCAMAJ	1
+#define DJMAJ	2
+#define MWMAJ	3
 #define IDEMAJ	4
 #define NCRMAJ	5
 
@@ -412,11 +418,19 @@ writeslice(op)
  * count; for the scsi adapter it is READ CAPACITY, which answers with the
  * last LBA and the block size.  The LBA count is what a label's geometry
  * should multiply out to.
+ *
+ * The three controllers without a command block - the HD-DMA, the DJ-DMA
+ * and the HDCA - answer the same question from the label instead: it is
+ * the drive's own description, and its geometry multiplied out is the
+ * capacity a READ CAPACITY would have returned.  d_spt is blocks per
+ * track (512 byte units), not physical sectors, so the product is blocks
+ * directly.
  */
 inquire()
 {
 	struct stat st;
 	struct cdb r;
+	register struct dlabel *lp;
 	unsigned long cyls, heads, spt, nblk, bsize;
 	int i;
 
@@ -469,6 +483,23 @@ inquire()
 			((unsigned long) capbuf[5] << 16) |
 			((unsigned long) capbuf[6] << 8) | capbuf[7];
 		printf("%s: %lu blocks of %lu bytes\n", devname, nblk, bsize);
+		break;
+
+	case HDCAMAJ:
+	case DJMAJ:
+	case MWMAJ:
+		readsector();
+		if (!islabel()) {
+			fprintf(stderr, "%s: %s: no %s label\n",
+				pname, devname, DL_MAGIC);
+			exit(1);
+		}
+		lp = getlabel();
+		spt = (unsigned long) lp->d_heads * lp->d_spt;
+		printf("%s: %u cylinders, %u heads, %u blocks/track, "
+			"%lu blocks of 512 bytes\n",
+			devname, lp->d_tracks, lp->d_heads, lp->d_spt,
+			spt * lp->d_tracks);
 		break;
 
 	default:

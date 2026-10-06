@@ -21,6 +21,8 @@ label device
 label -w cylinders/heads/sectors device
 .br
 label -s device slice start [ end ]
+.br
+label -i device
 .sp 2
 .in -5
 .bd
@@ -109,6 +111,15 @@ than the label says it is.
 -s needs a label to put the slice in.  On a disk with none, use -w
 first.  Both may appear on one command line, and the sector is written
 once.
+
+.ti -10
+-i device	Ask the drive, not the label, how much it holds.  The
+ide card answers IDENTIFY DEVICE - the geometry and the LBA count - and
+the scsi adapter answers READ CAPACITY - the last block and the block
+size.  The HD-DMA, the DJ-DMA and the HDCA have no such command of their
+own, so their capacity is read from the label instead, whose geometry
+multiplied out is the same answer.  A drive with no label reports that,
+and exits non-zero.
 
 .sp 2
 .in -5
