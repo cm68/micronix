@@ -461,6 +461,7 @@ src/tools/ncheck
 src/tools/nm
 src/tools/readall
 src/tools/size
+src/tools/strip
 src/tools/test
 src/tools/testfs
 src/tools/zmac

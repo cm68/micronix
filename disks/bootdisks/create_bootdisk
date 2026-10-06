@@ -62,6 +62,7 @@ target="$3"
 mnix="$root/src/tools/mnix"
 imd="$root/src/tools/imd"
 setdev="$root/src/tools/setdev"
+strip="$root/src/tools/strip"
 devlist="$root/src/micronix/dev/devlist"
 kernel="$root/src/micronix/sys/unix"
 srcdir="$root/src/micronix"
@@ -162,7 +163,7 @@ if [ ! -f "$filesystem/etc/init" ]; then
 fi
 
 tmp=`mktemp` || exit 1
-trap 'rm -f "$tmp" "$tmp.k"' 0
+trap 'rm -f "$tmp" "$tmp.k"; rm -rf "$tmp-stripped"' 0
 
 # clear any sidecar lock file the host tools leave at "<image>.lock",
 # and the write overlay "<image>-delta" whose dirty sectors survive a
@@ -176,11 +177,25 @@ rm -f "$image.lock" "$image-delta"
 # filesystem (make install); the config is that same directory's etc,
 # which is where the built init is and where signon2 lives - the signon
 # the init script installs in place of the plain one.
+#
+# The binaries are stripped before they go on the diskette.  A Whitesmiths
+# image carries its symbol table after its text and data, and on a disk
+# the size of these nothing reads it - the kernel is the one exception,
+# because its overlay modules ride in its own file and the symbol table
+# is part of what it opens.  So the commands are copied, stripped, and
+# then archived from the stripped copies, and the kernel below is written
+# as it was built.
+stripped="$tmp-stripped"
+mkdir -p "$stripped/bin" || exit 1
+for f in $BINS; do
+	cp "$filesystem/bin/$f" "$stripped/bin/$f" || exit 1
+	"$strip" "$stripped/bin/$f" || exit 1
+done
 set --
 for f in $BINS; do
 	set -- "$@" "bin/$f"
 done
-tar -C "$filesystem" -c -f "$tmp" "$@" || exit 1
+tar -C "$stripped" -c -f "$tmp" "$@" || exit 1
 "$mnix" -f "$image" tar x "$tmp" || exit 1
 
 tar -C "$filesystem" -c -f "$tmp" etc || exit 1
