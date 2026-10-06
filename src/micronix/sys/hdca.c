@@ -41,6 +41,7 @@ static struct hd *hdseekarg;	/* its argument */
 static UINT8 hdunit;		/* the drive the FUNC register selects */
 static struct hd *hdactive;	/* the drive owning the controller */
 static UINT8 hddead;		/* seconds the request has been in flight */
+static int hdioctl;		/* the ioctl sleep channel */
 
 static void phase00(), phase01(), phase02(), phase03(), phase04(),
     phase06(), phase08(), phase09(), phase11(), phase12();
@@ -156,6 +157,35 @@ hdtrk()
 	(void)hdin();		/* head */
 	v = hdin();		/* track */
 	return (v);
+}
+
+/*
+ * Read the four header bytes the last header command returned: head,
+ * track, sector, key - the same four hdhdr() writes.
+ */
+static void
+hdhdrrd(p)
+	char *p;
+{
+	out(HDCA_CMD, CMD_RAMHDR);
+	p[0] = hdin();
+	p[1] = hdin();
+	p[2] = hdin();
+	p[3] = hdin();
+}
+
+/*
+ * Write the four header bytes a header write keys on, verbatim.
+ */
+static void
+hdhdrwr(p)
+	char *p;
+{
+	out(HDCA_CMD, CMD_RAMHDR);
+	hdout(p[0]);
+	hdout(p[1]);
+	hdout(p[2]);
+	hdout(p[3]);
 }
 
 /*
@@ -386,6 +416,11 @@ phase01(hp)
 	struct hd *hp;
 {
 	if (hp->h_trackdelta == 0) {
+		if (hp->h_cmd == HDCA_HOME) {
+			hp->h_stat = 0;
+			phase12(hp);
+			return;
+		}
 		if (hp->h_flags & HDWRITE)
 			phase08(hp);
 		else
@@ -418,6 +453,11 @@ phase02(hp)
 	di();
 	hp->h_flags &= ~HDSEEK;
 	ei();
+	if (hp->h_cmd == HDCA_HOME) {
+		hp->h_stat = 0;
+		phase12(hp);
+		return;
+	}
 	if (hp->h_flags & HDWRITE)
 		phase08(hp);
 	else
@@ -433,11 +473,15 @@ phase03(hp)
 	struct hd *hp;
 {
 	hdselect(hdunit, hp->h_head);
-	hdhdr(hp->h_head, hp->h_cyl, hp->h_sector);
+	if (hp->h_cmd != HDCA_READHDR)
+		hdhdr(hp->h_head, hp->h_cyl, hp->h_sector);
 	di();
 	hdintr = phase04;
 	hdintarg = hp;
-	out(HDCA_CMD, CMD_READSEC);
+	if (hp->h_cmd == HDCA_READHDR)
+		out(HDCA_CMD, CMD_READHDR);
+	else
+		out(HDCA_CMD, CMD_READSEC);
 	ei();
 }
 
@@ -452,12 +496,17 @@ phase04(hp)
 	char *p;
 
 	if (hdproc()) {
+		hp->h_stat = EIO;
 		phase11(hp);
 		return;
 	}
 	p = bhold(hp->h_cur);
-	hdrdat(p, hp->h_cur->count);
+	if (hp->h_cmd == HDCA_READHDR)
+		hdhdrrd(p);
+	else
+		hdrdat(p, hp->h_cur->count);
 	brel();
+	hp->h_stat = 0;
 	phase12(hp);
 }
 
@@ -472,14 +521,21 @@ phase08(hp)
 	char *p;
 
 	hdselect(hdunit, hp->h_head);
-	hdhdr(hp->h_head, hp->h_cyl, hp->h_sector);
 	p = bhold(hp->h_cur);
-	hdwdat(p, hp->h_cur->count);
+	if (hp->h_cmd == HDCA_WRITEHDR)
+		hdhdrwr(p);
+	else {
+		hdhdr(hp->h_head, hp->h_cyl, hp->h_sector);
+		hdwdat(p, hp->h_cur->count);
+	}
 	brel();
 	di();
 	hdintr = phase09;
 	hdintarg = hp;
-	out(HDCA_CMD, CMD_WRITESEC);
+	if (hp->h_cmd == HDCA_WRITEHDR)
+		out(HDCA_CMD, CMD_WRITEHDR);
+	else
+		out(HDCA_CMD, CMD_WRITESEC);
 	ei();
 }
 
@@ -490,10 +546,13 @@ static void
 phase09(hp)
 	struct hd *hp;
 {
-	if (hdproc())
+	if (hdproc()) {
+		hp->h_stat = EIO;
 		phase11(hp);
-	else
+	} else {
+		hp->h_stat = 0;
 		phase12(hp);
+	}
 }
 
 /*
@@ -504,8 +563,11 @@ phase11(hp)
 	struct hd *hp;
 {
 	hp->h_flags |= HDERROR;
-	hp->h_cur->flags |= BERROR;
-	hp->h_cur->error = EIO;
+	hp->h_stat = EIO;
+	if (hp->h_cur && !hp->h_cmd) {
+		hp->h_cur->flags |= BERROR;
+		hp->h_cur->error = EIO;
+	}
 	phase12(hp);
 }
 
@@ -516,7 +578,11 @@ static void
 phase12(hp)
 	struct hd *hp;
 {
-	iodone(hp->h_cur);
+	if (hp->h_cmd) {
+		wakeup(&hdioctl);
+		hp->h_cmd = 0;
+	} else
+		iodone(hp->h_cur);
 	hp->h_buf = 0;
 	hp->h_cur = 0;
 	release(hp);
@@ -640,7 +706,87 @@ hdclose(dev)
 }
 
 /*
- * No ioctl: the controller has nothing to be told and nothing to ask.
+ * Format one track: write all of its sector headers back to back.  This
+ * is the one operation that is hard real time - the headers have to land
+ * inside a single revolution, so no interrupt may run and nothing else
+ * may take the controller between two of them.  It is one blocking call,
+ * polled to completion with interrupts off; a wedge here hangs, which is
+ * what the original formatter did.
+ */
+static int
+hdfmt(hp, c, b, drive)
+	struct hd *hp;
+	struct hdca_cmd *c;
+	struct buf *b;
+	UINT drive;
+{
+	int spt = c->sector;		/* the sector field carries the count */
+	int head = c->head;
+	int track = c->track;
+	char hdr[128];
+	char *p;
+	int i, delta, dir, n;
+
+	if (spt < 1 || spt > 32 || !b) {
+		u.error = EINVAL;
+		return (-1);
+	}
+	/*
+	 * The data phase is the whole header table - one four byte header of
+	 * head, track, sector and key per sector, in the order the caller
+	 * chose.  The driver writes what it is given and computes nothing;
+	 * the interleave and the key are the caller's business.
+	 */
+	p = bhold(b);
+	for (i = 0; i < spt * 4; i++)
+		hdr[i] = p[i];
+	brel();
+
+	di();
+	if (hdmutex) {
+		ei();
+		u.error = EBUSY;
+		return (-1);
+	}
+	hdmutex = 1;
+
+	/*
+	 * Interrupts stay off from here to the end, so the op-done
+	 * acknowledgment cannot be stolen from between two headers.
+	 */
+	hdselect(drive, head);
+
+	delta = track - hp->h_cyl;
+	if (delta) {
+		dir = (delta < 0) ? 1 : 0;
+		n = (delta < 0) ? -delta : delta;
+		hdstep(head, dir, n);
+		hp->h_cyl = track;
+		while (!(in(HDCA_PSR) & PSR_COMPLT))
+			;
+	}
+
+	for (i = 0; i < spt; i++) {
+		hdhdrwr(hdr + i * 4);
+		out(HDCA_CMD, CMD_WRITEHDR);
+		while (!(in(HDCA_PSR) & PSR_OPDONE))
+			;
+	}
+
+	ei();
+	hdmutex = 0;
+	return (0);
+}
+
+/*
+ * A command block from above (include/sys/ioctl.h).  The HDCA has no
+ * command block of its own - it is port-mapped - so the block is the
+ * driver's invention (include/sys/hdca.h): an opcode and the head, track
+ * and sector to seek to, with the data phase, when the op has one, in
+ * the buffer bioctl() staged it in.  The command runs through the same
+ * interrupt-driven phases a read or a write does - the ioctl sleeps and
+ * the op-done interrupt wakes it through phase12() - and the completion
+ * status comes back in the byte after the block, cmd[HDLEN].
  */
 int
 hdcioctl(dev, cmd, r, b)
@@ -648,8 +794,65 @@ hdcioctl(dev, cmd, r, b)
 	struct cdb *r;
 	struct buf *b;
 {
-	u.error = ENXIO;
-	return (-1);
+	struct hdca_cmd *c;
+	struct hd *hp;
+	UINT drive;
+
+	if (cmd != CDBCMD) {
+		u.error = ENXIO;
+		return (-1);
+	}
+	c = (struct hdca_cmd *) r->cmd;
+	if (r->len != HDLEN || c->op < HDCA_HOME || c->op > HDCA_FORMAT) {
+		u.error = EINVAL;
+		return (-1);
+	}
+	drive = dev & 3;
+	hp = &hdinfo[drive];
+	if (!(hp->h_flags & HDOPEN)) {
+		u.error = ENXIO;
+		return (-1);
+	}
+
+	/*
+	 * A format is the whole track in one blocking, polled call; it does
+	 * not go through the interrupt-driven phases the other ops sleep on.
+	 */
+	if (c->op == HDCA_FORMAT)
+		return (hdfmt(hp, c, b, drive));
+
+	/*
+	 * The controller serves one request at a time and the ioctl is a
+	 * request: take the mutex the way exclude() would, but fail rather
+	 * than queue, the way the HD-DMA's ioctl does (sys/mw.c).
+	 */
+	di();
+	if (hdmutex) {
+		ei();
+		u.error = EBUSY;
+		return (-1);
+	}
+	hdmutex = 1;
+	ei();
+
+	hp->h_buf = b;
+	hp->h_cur = b;
+	hp->h_head = c->head;
+	hp->h_sector = c->sector;
+	hp->h_trackdelta = c->track - hp->h_cyl;
+	hp->h_cmd = c->op;
+	if (c->op == HDCA_WRITEHDR || c->op == HDCA_WRITESEC)
+		hp->h_flags |= HDWRITE;
+	else
+		hp->h_flags &= ~HDWRITE;
+
+	phase00(hp);
+
+	while (hp->h_cmd)
+		sleep(&hdioctl, PRIBIO);
+
+	r->cmd[HDLEN] = hp->h_stat;
+	return (0);
 }
 
 struct biovec hdbvec = { &hdopen, &hdclose, &hdstrat, &hdcioctl };

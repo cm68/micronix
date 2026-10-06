@@ -109,6 +109,8 @@ struct hd {
 	UINT8	h_sector;	/* target sector */
 	UINT8	h_ctrl;		/* control byte */
 	UINT8	h_retry2;	/* retry counter */
+	UINT8	h_cmd;		/* the ioctl opcode, 0 for an ordinary request */
+	UINT8	h_stat;		/* the ioctl's result, read back in cmd[HDLEN] */
 	struct buf *h_buf;	/* the request */
 	struct buf *h_cur;	/* the request to iodone */
 	int	(*h_intr)();	/* op-done continuation */
@@ -125,5 +127,32 @@ struct hd {
 #define	HDOPEN		0x20
 #define	HDWAIT		0x40	/* a process sleeps on this drive */
 #define	HDERROR		0x80
+
+/*
+ * The command block the raw ioctl runs (include/sys/ioctl.h's CDBCMD
+ * door).  The HDCA is port-mapped and has no command block of its own,
+ * so these four bytes are the driver's invention: an opcode and the
+ * head, track and sector the operation seeks to.  The data phase, when
+ * the op has one, moves through the caller's buffer - four header bytes
+ * for a header read or write, a full sector for a sector read or write -
+ * and the completion status comes back in the byte after the block,
+ * cmd[HDLEN], the way the HD-DMA's does (include/sys/mw.h).
+ */
+struct hdca_cmd {
+	UINT8	op;		/* what to do */
+	UINT8	head;		/* the head to seek to */
+	UINT8	track;		/* the track to seek to */
+	UINT8	sector;		/* the sector, for a sector read or write */
+};
+
+#define HDLEN	4		/* the bytes a caller fills */
+
+/* op */
+#define	HDCA_HOME	1	/* step to track 0, no data */
+#define	HDCA_READHDR	2	/* read a sector header, 4 bytes back */
+#define	HDCA_WRITEHDR	3	/* write a sector header, 4 bytes */
+#define	HDCA_READSEC	4	/* read a sector, 512 bytes back */
+#define	HDCA_WRITESEC	5	/* write a sector, 512 bytes */
+#define	HDCA_FORMAT	6	/* format one track: write all its headers */
 
 extern struct hd hdinfo[NHD];

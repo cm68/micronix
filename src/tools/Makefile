@@ -28,7 +28,7 @@ include ../Makefile.inc
 # below is the whole of that recursion: an empty prerequisite list makes
 # each object always out of date, and the inner make decides (cheaply)
 # whether anything actually has to be rebuilt.
-FSLIBS = ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o
+FSLIBS = ../lib/fslib.o ../lib/fslibfunc.o ../lib/imdlib.o ../lib/kv.o ../lib/util.o ../lib/lockfile.o
 
 $(FSLIBS): FORCE
 	$(MAKE) -C ../lib $(notdir $@)
@@ -43,10 +43,10 @@ nm:	nm.o
 	$(CC) $(CFLAGS) -o nm nm.o ../lib/disz80.o ../lib/util.o ../lib/whitesmith.o ../lib/mnix_sys.c $(LDFLAGS)
 
 imd:	imd.o
-	$(CC) $(CFLAGS) -o imd imd.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+	$(CC) $(CFLAGS) -o imd imd.o ../lib/imdlib.o ../lib/kv.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 dumpsec: dumpsec.o
-	$(CC) $(CFLAGS) -o dumpsec dumpsec.o ../lib/imdlib.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
+	$(CC) $(CFLAGS) -o dumpsec dumpsec.o ../lib/imdlib.o ../lib/kv.o ../lib/util.o ../lib/lockfile.o $(LDFLAGS)
 
 disas:	disas.o
 	$(CC) $(CFLAGS) -o disas disas.o ../lib/mnix_sys.o $(LDFLAGS)

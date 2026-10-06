@@ -1,4 +1,5 @@
 echo
+mwformat -m m40 /dev/hd0c
 mkfs -f -1024 /dev/m40a
 fsck /dev/m40a -t
 mount /dev/m40a /b

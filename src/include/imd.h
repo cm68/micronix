@@ -46,47 +46,34 @@
 #define IMD_FILL    2
 #define IMD_EOC     0x1a
 
-/* layout of the delta file */
-#define MAXSECSIZE  1024
-#define HEADS       2                   // 0, 1
-#define CYLINDERS   80                  // 0 - 79
-#define TRACKS      CYLINDERS * HEADS
-#define SECTORS     32                  // 0 - 31
-
-#define trknum(c, h) (((c) * HEADS) + (h))
-
-#define DELTA_SIZE      CYLINDERS * HEADS * SECTORS
-#define DIRTY_OFF(t, h, s)  (((trknum(t, h) * SECTORS) + (s)))
-#define DELTA_OFF(t, h, s)  (DELTA_SIZE + (MAXSECSIZE * DIRTY_OFF(t, h, s)))
-#define MAXDELTA        DELTA_OFF(TRACKS, 0, 0)
+/* layout of the delta overlay */
+#define MAXSECSIZE  1024                // the most bytes any sector can be
+#define SECTORS     32                  // the most sectors any track holds
+#define MAXHEADS    16                  // the head stride of the track array
 
 /*
- * A format is a per-track thing: the number of sectors, their size, the
- * FM/MFM mode byte, and the first sector's number.  The delta stores one
- * four byte record per track right after the sector data, so a formatted
- * track's layout survives a reload the way its data does.  nsec of zero
- * means the track was never formatted and the original image's layout
- * stands.
+ * The track array is indexed cylinder-major at a fixed head stride, so a
+ * disk whose heads are not known until it is formatted can grow by
+ * cylinder without moving the tracks already placed.  The delta is a key
+ * store keyed by three bytes - cylinder, head, and a sector slot, or 0xff
+ * for the track's format record - so it carries no geometry of its own.
  */
-#define FMTMETA_SIZE    (TRACKS * 4)
-#define FMTMETA_OFF(t)  (MAXDELTA + ((t) * 4))
-#define DELTA_TOTAL     (MAXDELTA + FMTMETA_SIZE)
-
-#define DELTA_NO    0           // use the original
-#define DELTA_YES   1           // delta has newer
+#define imd_trknum(ip, c, h)        (((c) * MAXHEADS) + (h))
+#define imd_ntracks(ip)             ((ip)->cyls * MAXHEADS)
 
 /*
  * this is our handle for the read/write .imd file support
  */
+struct kv;
 struct imd {
     int drive;				// assigned by the simulator
     char *comment;                      // what it is
     int heads;                          // number of actual heads
     int cyls;                           // number of cylinders
-    struct imd_trk *tracks[TRACKS];     // array of tracks - indexed by trknum(c, h)
-    int delta_fd;                       // file descriptor for writes
+    int spt;                            // most sectors any track holds
+    struct imd_trk **tracks;            // array of tracks - indexed by trknum(c, h)
+    struct kv *delta;                   // the write overlay, 0 for none
     int lock_fd;                        // advisory lock held on the image
-    char delta_map[DELTA_SIZE];         // the dirty map
 };
 
 /*

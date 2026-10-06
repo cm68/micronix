@@ -28,6 +28,7 @@
 #include "sim.h"
 #include "hwsim.h"
 #include "util.h"
+#include "imd.h"
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -177,7 +178,7 @@ select_drive(int id)
     	return 0;
     }
     sprintf(drivename, "hddma-%d", id);
-    handle[id] = drive_open(drivename);
+    handle[id] = imd_load(drivename, id, 1);
     if (!handle[id]) {
         /*
          * Not debug chatter.  d1p compiles the message out, and a unit
@@ -193,8 +194,40 @@ select_drive(int id)
     if (id == 0)
         set_ctl_image(drive_resolve(drivename));   /* the root filesystem image */
 #endif
-    secsize[id] = drive_sectorsize(handle[id], 0);
+    secsize[id] = SECLEN;
     return 0;
+}
+
+/*
+ * The header of the sector under the head, for a read-header command.  A
+ * formatted track answers its cylinder, the selected head and a sector
+ * advancing around it; an unformatted one answers nothing, which is the
+ * "this head is not there" answer a probe asks for.  The crc is left
+ * zero: no caller of the raw command checks it, and the id field's crc
+ * is a wire detail the image does not carry.
+ */
+static int nexthdr[DRIVES];
+
+static int
+hdr_header(int drv, int cylinder, int head, char *buf)
+{
+    unsigned char *p = (unsigned char *)buf;
+    int nsec, secsize;
+
+    imd_trkinfo(handle[drv], cylinder, head, &nsec, &secsize);
+    if (!nsec)
+        return 0;
+
+    p[0] = 0xa1;                    /* the address mark */
+    p[1] = 0xfe;                    /* the id field, not data */
+    p[2] = cylinder & 0xff;
+    p[3] = (cylinder >> 8) & 0xff;
+    p[4] = head;
+    p[5] = (nexthdr[drv] % nsec) + imd_firstsec(handle[drv], cylinder, head);
+    nexthdr[drv]++;
+    p[6] = 0;
+    p[7] = 0;
+    return 8;
 }
 
 static char *sense_b[] = { "trk0", "wfault", "ready", "seekcomplete", "index", 0, 0, 0 };
@@ -284,7 +317,7 @@ attention(portaddr p, byte v)
             lc("\ttrack lossage %d != %d\n", curcyl[drv],
                 command.cyl_low + (command.cyl_high << 8));
         }
-        i = drive_read(handle[drv], curcyl[drv], command.hd, command.sec, (char *)&secbuf);
+        i = imd_read(handle[drv], curcyl[drv], command.hd, command.sec, (char *)&secbuf);
         if (i != secsize[drv]) {
         	lc("\tread sector size mismatch %d expected %d\n", i, secsize[drv]);
         }
@@ -305,7 +338,7 @@ attention(portaddr p, byte v)
                 command.cyl_low + (command.cyl_high << 8));
         }
         copyin(secbuf, dmaaddr, secsize[drv]);
-        i = drive_write(handle[drv], curcyl[drv], command.hd, command.sec, (char *)&secbuf);
+        i = imd_write(handle[drv], curcyl[drv], command.hd, command.sec, (char *)&secbuf);
         if (i != secsize[drv]) {
         	lc("\twrite sector size mismatch %d expected %d\n", i, secsize[drv]);
         }
@@ -331,7 +364,7 @@ attention(portaddr p, byte v)
          * which is what lets a driver probe for heads without knowing
          * what is there to ask for.
          */
-        i = drive_header(handle[drv], curcyl[drv], head, (char *)secbuf);
+        i = hdr_header(drv, curcyl[drv], head, (char *)secbuf);
         if (i == 0) {
             tracec(trace_hddma, "\tno header at c %d h %d\n",
                 curcyl[drv], head);
@@ -353,7 +386,7 @@ attention(portaddr p, byte v)
         break;
     case OP_FMT:                                // format a whole track
     	i = FSECSIZE(command.fseccode);
-        secsize[drv] = drive_sectorsize(handle[drv], i);
+        secsize[drv] = i;
         /*
          * Both of these arrive complemented, and printing them raw said
          * "gap3: 213" for a gap of 43.  gap3 is ~(gap3 - 1) and the
@@ -401,27 +434,13 @@ attention(portaddr p, byte v)
 #endif
 
         /*
-         * Sectors are numbered from zero.  This passed 1, so every
-         * header read back one higher than the one the format laid
-         * down, and a driver matching on the sector it asked for never
-         * matched.
-         *
-         * The size code is stored in the form the specify command uses -
-         * 3 for 512 - and not the format command's complement of it.
-         * They are two encodings of one number: specify says
-         * size/128 - 1 and format says ~(size/128 - 1), so 512 is 3 to
-         * one and 0xfc to the other.  A header wants the size, and the
-         * specify form is the one the rom's equates and the kernel both
-         * name.
+         * Sectors are numbered from zero.  The whole track's layout goes
+         * down in one call - the sector count, the size and the first
+         * sector, every sector filled - and the image keeps it in the
+         * delta, so a read header afterwards has something to say.
          */
-        drive_format(handle[drv], 0, (secsize[drv] / 128) - 1,
-            nsect, gaplen, command.fill, curcyl[drv], head);
-
-        for (i = 0; i < nsect; i++) {
-        	if (drive_write(handle[drv], curcyl[drv], head, i, (char *)secbuf) != secsize[drv]) {
-        		lc("\tformat data fill write error\n");
-        	}
-        }
+        imd_setfmt(handle[drv], curcyl[drv], head, 0, nsect, secsize[drv],
+            1, command.fill);
         command.status = GOOD;
         break;
     case OP_SPEC:

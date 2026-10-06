@@ -30,7 +30,7 @@ summarize_imd(struct imd *imd, char *filename)
     struct imd_trk *tp;
     int tcnt = 0;
 
-    for (t = 0; t < TRACKS; t++) {
+    for (t = 0; t < imd_ntracks(imd); t++) {
         tp = imd->tracks[t];
         if (!tp) continue;
         if (tp->secsize > maxsecsize) maxsecsize = tp->secsize;
@@ -54,7 +54,7 @@ dump_imd(struct imd *imd, char *filename)
     printf("comment: %s\n", imd->comment);
     printf("cyls: %d heads: %d\n", imd->cyls, imd->heads);
 
-    for (t = 0; t < TRACKS; t++) {
+    for (t = 0; t < imd_ntracks(imd); t++) {
         tp = imd->tracks[t];
         if (!tp) continue;
         imd_dump_track(tp);
@@ -123,7 +123,7 @@ repack_1k(struct imd *ip)
             firstsec = dl->d_firstsec;
     }
 
-    for (trk = 0; trk < TRACKS; trk++) {
+    for (trk = 0; trk < imd_ntracks(ip); trk++) {
         struct imd_trk *tp = ip->tracks[trk];
         char **nd;
         char *secmap;
@@ -186,8 +186,8 @@ merge_imd(struct imd *imd, char *filename, int altcyl)
     write(fd, imd->comment, strlen(imd->comment) - 1);
     value = IMD_EOC;
     write(fd, &value, 1);
-    for (trk = 0; trk < TRACKS; trk++) {
-        tp = imd->tracks[trk];    
+    for (trk = 0; trk < imd_ntracks(imd); trk++) {
+        tp = imd->tracks[trk];
         if (!tp) continue;
         write(fd, &tp->fixed, sizeof(tp->fixed));
         if (tp->secmap) write(fd, tp->secmap, tp->fixed.nsec);

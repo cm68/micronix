@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 
 #include "../include/imd.h"
+#include "../include/kv.h"
 #include "../include/util.h"
 #include "../include/lockfile.h"
 
@@ -24,6 +25,8 @@ int trace_imd;
 
 static void apply_fmt(struct imd_trk *tp, int nsec, int size, int mode,
     int firstsec);
+static int imd_grow(struct imd *ip, int cyl, int head);
+static struct imd_trk *imd_track(struct imd *ip, int cyl, int head);
 
 static void
 dump_secmap(char *label, char *m, int s)
@@ -156,27 +159,77 @@ imd_close(void *vp)
     struct imd *ip = (struct imd *)vp;
     if (!ip)
         return;
-    if (ip->delta_fd) {
-        close(ip->delta_fd);
-    }
+    if (ip->delta)
+        kv_close(ip->delta);
 }
 
 /*
  * load an imd file and return the struct
  */
 /*
- * Attach the write overlay.  Split out of imd_load so the raw loader can
- * use it too: a flat sector image gets the same delta file, with the same
- * name and layout, so writing to a raw disk behaves exactly as writing to
- * an IMD one and neither original image is ever touched.
+ * The write overlay's name: the image's own, with -delta on the end.  It
+ * is a key store (kv.h), not a fixed layout - keyed by cylinder, head and
+ * sector slot, with 0xff for a track's format record - so it holds only
+ * what was written and no geometry of its own.
+ */
+#define DELTASUFFIX "-delta"
+
+/*
+ * A format record from the overlay: rebuild that track's layout.  The
+ * four value bytes are the sector count, the sector size shift, the mode
+ * and the first sector number.
+ */
+static void
+apply_fmt_cb(void *key, int klen, void *val, int vlen, void *arg)
+{
+    struct imd *ip = (struct imd *)arg;
+    unsigned char *k = key;
+    struct imd_trk *tp;
+
+    if (klen != 3 || k[2] != 0xff || vlen != 4)
+        return;
+    tp = imd_track(ip, k[0], k[1]);
+    if (!tp)
+        return;
+    apply_fmt(tp, ((unsigned char *)val)[0], ((unsigned char *)val)[1],
+        ((unsigned char *)val)[2], ((unsigned char *)val)[3]);
+}
+
+/*
+ * A sector's data from the overlay: copy it into its slot.
+ */
+static void
+apply_data_cb(void *key, int klen, void *val, int vlen, void *arg)
+{
+    struct imd *ip = (struct imd *)arg;
+    unsigned char *k = key;
+    struct imd_trk *tp;
+    int slot;
+
+    if (klen != 3 || k[2] == 0xff)
+        return;
+    tp = imd_track(ip, k[0], k[1]);
+    if (!tp)
+        return;
+    slot = k[2];
+    if (slot >= tp->fixed.nsec)
+        return;
+    if (!tp->data[slot])
+        tp->data[slot] = malloc(tp->secsize);
+    memcpy(tp->data[slot], val, vlen);
+}
+
+/*
+ * Attach the write overlay: a key store beside the image, read-only for
+ * a caller that will only read (merge), read/write and created for one
+ * that writes (the simulator, the host tools).  Its format records are
+ * applied before its sector data, because the data is keyed by slot and
+ * sized by the sector size the format just set.
  */
 static int
 attach_delta(struct imd *ip, char *fname, int create_delta)
 {
-    struct imd_trk *tp;
     char *namebuf;
-    int fd;
-    int cyl, head, sec, offset;
 
     /*
      * A writable image is locked so two tools never write the same disk
@@ -191,75 +244,15 @@ attach_delta(struct imd *ip, char *fname, int create_delta)
             return -1;
     }
 
-    // now, create the delta file or read it - make sure it's full sized
-#define DELTASUFFIX "-delta"
-    namebuf = malloc(strlen(fname)+sizeof(DELTASUFFIX)+1);
+    namebuf = malloc(strlen(fname) + sizeof(DELTASUFFIX) + 1);
     sprintf(namebuf, "%s%s", fname, DELTASUFFIX);
-    if (create_delta) {
-        fd = open(namebuf, O_RDWR|O_CREAT, 0777);
-    } else {
-        fd = open(namebuf, O_RDONLY, 0777);
-    }
-    if (fd < 0) {
-        fd = 0;
-    }
-    if (fd && create_delta) {
-        ftruncate(fd, DELTA_TOTAL);
-        fsync(fd);
-    }
-    ip->delta_fd = fd;
-
-    if (fd) {
-        // read the delta map
-        lseek(fd, 0, SEEK_SET);
-        read(fd, &ip->delta_map, DELTA_SIZE);
-
-        /*
-         * A formatted track's layout is applied before its data is read,
-         * because the data is keyed by the slot the new secmap names and
-         * sized by the new sector size.  nsec of zero means never
-         * formatted, and the original image's layout stands.
-         */
-        for (cyl = 0; cyl < CYLINDERS; cyl++) {
-            for (head = 0; head < HEADS; head++) {
-                char meta[4];
-
-                tp = ip->tracks[trknum(cyl, head)];
-                if (!tp)
-                    continue;
-                lseek(fd, FMTMETA_OFF(trknum(cyl, head)), SEEK_SET);
-                if (read(fd, meta, 4) == 4 && meta[0])
-                    apply_fmt(tp, meta[0], meta[1], meta[2], meta[3]);
-            }
-        }
-
-        // read the deltas
-        for (cyl = 0; cyl < CYLINDERS; cyl++) {
-            for (head = 0; head < HEADS; head++) {
-                tp = ip->tracks[trknum(cyl, head)];
-                if (!tp)
-                    continue;
-                for (sec = 0; sec < SECTORS; sec++) {
-                    if (ip->delta_map[DIRTY_OFF(cyl, head, sec)] == DELTA_YES) {
-                        /* a slot beyond this track's sectors is stale */
-                        if (sec >= tp->fixed.nsec)
-                            continue;
-                        offset = DELTA_OFF(cyl, head, sec);
-                        trace(trace_imd, "imd_load_delta cyl %d head %d sec %d offset %d\n",
-                            cyl, head, sec, offset);
-                        lseek(fd, offset, SEEK_SET);
-                        if (!tp->data[sec]) {
-                            tp->data[sec] = malloc(tp->secsize);
-                        }
-                        read(fd, tp->data[sec], tp->secsize);
-                    }
-                }
-            }
-        }
-    } else {
-        memset(ip->delta_map, 0, DELTA_SIZE);
-    }
+    ip->delta = kv_open(namebuf, create_delta);
     free(namebuf);
+
+    if (ip->delta) {
+        kv_foreach(ip->delta, apply_fmt_cb, ip);
+        kv_foreach(ip->delta, apply_data_cb, ip);
+    }
     return 0;
 }
 
@@ -528,6 +521,8 @@ raw_load(char *fname, int drive, int create_delta)
     ip->drive = drive;
     ip->cyls = fp->cyls;
     ip->heads = fp->heads;
+    ip->spt = SECTORS;
+    ip->tracks = calloc(fp->cyls * MAXHEADS, sizeof(struct imd_trk *));
 
     for (cyl = 0; cyl < fp->cyls; cyl++) {
         for (head = 0; head < fp->heads; head++) {
@@ -569,10 +564,47 @@ raw_load(char *fname, int drive, int create_delta)
                     return 0;
                 }
             }
-            ip->tracks[trknum(cyl, head)] = tp;
+            ip->tracks[imd_trknum(ip, cyl, head)] = tp;
         }
     }
     close(fd);
+
+    if (attach_delta(ip, fname, create_delta) < 0) {
+        free(ip->comment);
+        free(ip);
+        return 0;
+    }
+    return ip;
+}
+
+/*
+ * A blank disk: no tracks, no geometry, learned as it is formatted.  A
+ * writable open creates the "IMD " header so the image exists to be
+ * written; a read-only open has nothing to read and answers nothing.
+ */
+static void *
+blank_load(char *fname, int drive, int create_delta)
+{
+    struct imd *ip;
+    int fd;
+
+    if (!create_delta)
+        return 0;
+
+    fd = open(fname, O_WRONLY | O_CREAT | O_TRUNC, 0777);
+    if (fd < 0)
+        return 0;
+    write(fd, "IMD ", 4);
+    write(fd, "\x1a", 1);
+    close(fd);
+
+    ip = calloc(1, sizeof(*ip));
+    ip->comment = malloc(6);
+    memcpy(ip->comment, "IMD ", 4);
+    ip->comment[4] = IMD_EOC;
+    ip->comment[5] = 0;
+    ip->drive = drive;
+    ip->spt = SECTORS;
 
     if (attach_delta(ip, fname, create_delta) < 0) {
         free(ip->comment);
@@ -589,6 +621,8 @@ imd_load(char *fname, int drive, int create_delta)
     int clen = 0;
     int fd;
     struct imd_trk *tp;
+    struct imd_trk **tmp;
+    int ntrk, nalloc, i;
     int offset;
     int cyl;
     int head;
@@ -599,7 +633,7 @@ imd_load(char *fname, int drive, int create_delta)
 
     fd = open(fname, O_RDONLY);
     if (fd < 0)
-        return 0;
+        return blank_load(fname, drive, create_delta);
 
     /*
      * IMD files announce themselves; anything else we try to take as a
@@ -611,7 +645,7 @@ imd_load(char *fname, int drive, int create_delta)
 
         if (read(fd, magic, 4) != 4) {
             close(fd);
-            return 0;
+            return blank_load(fname, drive, create_delta);
         }
         if (memcmp(magic, "IMD ", 4) != 0) {
             close(fd);
@@ -629,8 +663,9 @@ imd_load(char *fname, int drive, int create_delta)
 
     // make space for the imd header and copy the comment
     ip = malloc(sizeof(*ip));
+    memset(ip, 0, sizeof(*ip));
     ip->comment = malloc(clen + 1);
-    
+
     lseek(fd, 0, SEEK_SET);
     read(fd, ip->comment, clen);
     ip->comment[clen] = 0;
@@ -638,17 +673,38 @@ imd_load(char *fname, int drive, int create_delta)
     ip->cyls = 0;
     ip->heads = 0;
 
-    // read all the tracks in and squirrel them away, accumulating cyl/head counts
+    /*
+     * Read the tracks into a scratch list first: the tracks array is
+     * indexed by cylinder times heads, and the head count is not known
+     * until the last track is in, so it cannot be sized while reading.
+     */
+    tmp = malloc(16 * sizeof(struct imd_trk *));
+    ntrk = 0;
+    nalloc = 16;
     while ((tp = get_track(fd)) != 0) {
-        ip->tracks[trknum(tp->fixed.cyl, tp->head)] = tp;
+        if (ntrk == nalloc) {
+            nalloc *= 2;
+            tmp = realloc(tmp, nalloc * sizeof(struct imd_trk *));
+        }
+        tmp[ntrk++] = tp;
         if (tp->fixed.cyl > ip->cyls) ip->cyls = tp->fixed.cyl;
         if (tp->fixed.head > ip->heads) ip->heads = tp->fixed.head;
     }
     close(fd);
 
-    ip->cyls++;
-    ip->heads++;
-    ip->delta_fd = 0;
+    if (ntrk) {
+        ip->cyls++;
+        ip->heads++;
+    }
+    ip->spt = SECTORS;
+    if (ip->cyls) {
+        ip->tracks = calloc(ip->cyls * MAXHEADS, sizeof(struct imd_trk *));
+        for (i = 0; i < ntrk; i++) {
+            tp = tmp[i];
+            ip->tracks[imd_trknum(ip, tp->fixed.cyl, tp->head)] = tp;
+        }
+    }
+    free(tmp);
 
     if (attach_delta(ip, fname, create_delta) < 0) {
         free(ip->comment);
@@ -667,9 +723,12 @@ int
 imd_firstsec(void *vp, int cyl, int head)
 {
     struct imd *ip = (struct imd *)vp;
-    struct imd_trk *tp = ip->tracks[trknum(cyl, head)];
+    struct imd_trk *tp;
     int i, low;
 
+    if ((cyl >= ip->cyls) || (head >= ip->heads))
+        return 1;
+    tp = ip->tracks[imd_trknum(ip, cyl, head)];
     if (!tp || !tp->secmap || !tp->fixed.nsec) {
         return 1;
     }
@@ -686,8 +745,15 @@ void
 imd_trkinfo(void *vp, int cyl, int head, int *secs, int *secsize)
 {
     struct imd *ip = (struct imd *)vp;
-    struct imd_trk *tp = ip->tracks[trknum(cyl, head)];
-    if ((head > ip->heads - 1) || !tp) {
+    struct imd_trk *tp;
+
+    if ((cyl >= ip->cyls) || (head >= ip->heads)) {
+        if (secs) *secs = 0;
+        if (secsize) *secsize = 0;
+        return;
+    }
+    tp = ip->tracks[imd_trknum(ip, cyl, head)];
+    if (!tp) {
         if (secs) *secs = 0;
         if (secsize) *secsize = 0;
     } else {
@@ -705,10 +771,12 @@ int
 imd_density(void *vp, int cyl, int head)
 {
     struct imd *ip = (struct imd *)vp;
-    struct imd_trk *tp = ip->tracks[trknum(cyl, head)];
+    struct imd_trk *tp;
 
-    if (!tp)
+    if ((cyl >= ip->cyls) || (head >= ip->heads))
         return 0;
+    tp = ip->tracks[imd_trknum(ip, cyl, head)];
+    if (!tp) return 0;
     return tp->fixed.mode;
 }
 
@@ -772,22 +840,17 @@ int
 imd_write(void *vp, int cyl, int head, int osec, char *buf)
 {
     struct imd *ip = (struct imd *)vp;
-    int trk = trknum(cyl, head);
     struct imd_trk *tp;
-    char c;
-    int offset;
+    unsigned char key[3];
     int tsec;       // translated sector
 
-    if ((cyl >= ip->cyls) || (head >= ip->heads)) {
-        printf("imd: bogus write %d:%d with %d:%d\n", cyl, head, ip->cyls, ip->heads);
+    if (!ip->delta) {
         return 0;
     }
 
-    if (!ip->delta_fd) {
+    tp = imd_track(ip, cyl, head);
+    if (!tp)
         return 0;
-    }
-
-    tp = ip->tracks[trk];
     tsec = translate_sector(tp, osec, head);
     if (tsec < 0) {
         return 0;               /* no such sector on this track */
@@ -797,15 +860,13 @@ imd_write(void *vp, int cyl, int head, int osec, char *buf)
     if (!tp->data[tsec]) {
         tp->data[tsec] = malloc(tp->secsize);
     }
-    memcpy(tp->data[tsec], buf, tp->secsize); 
-    lseek(ip->delta_fd, DIRTY_OFF(cyl, head, tsec), SEEK_SET);
-    c = DELTA_YES;
-    write(ip->delta_fd, &c, 1);
-    offset = DELTA_OFF(cyl, head, tsec);
-    trace(trace_imd, "imd_write drive %d cyl %d head %d tsec %d osec %d offset %d\n",
-        ip->drive, cyl, head, tsec, osec, offset);
-    lseek(ip->delta_fd, offset, SEEK_SET);
-    write(ip->delta_fd, buf, tp->secsize);
+    memcpy(tp->data[tsec], buf, tp->secsize);
+    key[0] = cyl;
+    key[1] = head;
+    key[2] = tsec;
+    kv_put(ip->delta, key, 3, buf, tp->secsize);
+    trace(trace_imd, "imd_write drive %d cyl %d head %d tsec %d osec %d\n",
+        ip->drive, cyl, head, tsec, osec);
 #ifndef NODEBUG
     if (traceflags & trace_imd) hexdump(buf, tp->secsize);
 #endif
@@ -820,7 +881,7 @@ int
 imd_read(void *vp, int cyl, int head, int osec, char *buf)
 {
     struct imd *ip = (struct imd *)vp;
-    int trk = trknum(cyl, head);
+    int trk = imd_trknum(ip, cyl, head);
     struct imd_trk *tp;
     int tsec;
 
@@ -877,19 +938,69 @@ apply_fmt(struct imd_trk *tp, int nsec, int size, int mode, int firstsec)
     tp->data = calloc(nsec, sizeof(char *));
 }
 
+/*
+ * Grow the image to cover a track at cylinder cyl, head head.  The head
+ * stride is fixed (imd.h), so a new head only widens the geometry; a new
+ * cylinder extends the track array and the tracks already placed do not
+ * move.  This is how a blank disk learns its shape as it is formatted.
+ */
+static int
+imd_grow(struct imd *ip, int cyl, int head)
+{
+    int ncyl = cyl + 1;
+
+    if (head + 1 > ip->heads)
+        ip->heads = head + 1;
+    if (ncyl > ip->cyls) {
+        int old = ip->cyls;
+        struct imd_trk **nt = realloc(ip->tracks,
+            ncyl * MAXHEADS * sizeof(struct imd_trk *));
+
+        if (!nt)
+            return 0;
+        memset(nt + old * MAXHEADS, 0,
+            (ncyl - old) * MAXHEADS * sizeof(struct imd_trk *));
+        ip->tracks = nt;
+        ip->cyls = ncyl;
+    }
+    return 1;
+}
+
+/*
+ * The track at cylinder cyl, head head, created if the image does not
+ * have one yet.  The caller fills its layout; the caller's caller fills
+ * its sectors.
+ */
+static struct imd_trk *
+imd_track(struct imd *ip, int cyl, int head)
+{
+    struct imd_trk *tp;
+    int trk = imd_trknum(ip, cyl, head);
+
+    if (!imd_grow(ip, cyl, head))
+        return 0;
+    tp = ip->tracks[trk];
+    if (!tp) {
+        tp = malloc(sizeof(*tp));
+        memset(tp, 0, sizeof(*tp));
+        tp->fixed.cyl = cyl;
+        tp->fixed.head = head;
+        tp->head = head;
+        ip->tracks[trk] = tp;
+    }
+    return tp;
+}
+
 int
 imd_setfmt(void *vp, int cyl, int head, int firstsec, int secs, int secsize,
     int mode, int fill)
 {
     struct imd *ip = (struct imd *)vp;
-    int trk = trknum(cyl, head);
     struct imd_trk *tp;
     int i, sbyte;
     char meta[4];
 
-    if ((cyl >= ip->cyls) || (head >= ip->heads))
-        return 0;
-    tp = ip->tracks[trk];
+    tp = imd_track(ip, cyl, head);
     if (!tp)
         return 0;
 
@@ -903,16 +1014,21 @@ imd_setfmt(void *vp, int cyl, int head, int firstsec, int secs, int secsize,
     }
 
     /*
-     * Persist the format: the four byte layout record, then the filled
-     * data of every sector, so the track comes back formatted on reload.
+     * Persist the format: the four byte layout record under the 0xff key,
+     * then the filled data of every sector, so the track comes back
+     * formatted on reload.
      */
-    if (ip->delta_fd) {
+    if (ip->delta) {
+        unsigned char key[3];
+
         meta[0] = secs;
         meta[1] = sbyte;
         meta[2] = mode;
         meta[3] = firstsec;
-        lseek(ip->delta_fd, FMTMETA_OFF(trk), SEEK_SET);
-        write(ip->delta_fd, meta, 4);
+        key[0] = cyl;
+        key[1] = head;
+        key[2] = 0xff;
+        kv_put(ip->delta, key, 3, meta, 4);
         for (i = 0; i < secs; i++)
             imd_write(ip, cyl, head, firstsec + i, tp->data[i]);
     }

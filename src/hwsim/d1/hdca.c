@@ -7,6 +7,7 @@
 #include "sim.h"
 #include "hwsim.h"
 #include "util.h"
+#include "imd.h"
 #include <unistd.h>
 #include <strings.h>
 #include <fcntl.h>
@@ -149,6 +150,7 @@ static byte ssr;
 #define FUNC_DRIVE      0x03
 #define FUNC_HEAD       0xf0
 static byte func;
+static int hdca_hdr_sector = 1; /* the sector the next READHDR reports */
 
 /*
  * set the interrupt line accordingly
@@ -194,7 +196,7 @@ wr_hdca_control(portaddr p, byte v)
 
 /*
  * returns 0 if the drive is there, -1 if it is not.  A unit with no
- * image behind it must fail the command: drive_open answers null when
+ * image behind it must fail the command: imd_load answers null when
  * the image is locked against us or cannot be opened, and every use of
  * handle[drv] below would then be a null dereference.
  */
@@ -207,13 +209,29 @@ select_drive(int id)
     	return 0;
     }
     sprintf(drivename, "hdca-%d", id);
-    handle[id] = drive_open(drivename);
+    handle[id] = imd_load(drivename, id, 1);
     if (!handle[id]) {
         printf("hdca: no drive %s, command refused\n", drivename);
         return -1;
     }
-    drive_sectorsize(handle[id], SECLEN);
     return 0;
+}
+
+/*
+ * A track's sector headers are written one WRITEHDR at a time (the
+ * driver's polled format), so they collect here and become the track's
+ * imd_setfmt when the head moves on or a read or write takes over.
+ */
+static int fmt_active;
+static int fmt_head, fmt_track, fmt_nsec;
+
+static void
+fmt_finish(int drv)
+{
+    if (fmt_active) {
+        imd_setfmt(handle[drv], fmt_track, fmt_head, 1, fmt_nsec, 512, 1, 0);
+        fmt_active = 0;
+    }
 }
 
 /*
@@ -226,7 +244,7 @@ wr_hdca_cmd(portaddr p, byte v)
 {
     int drv = func & FUNC_DRIVE;
     int head = buffer[HEADER+0];
-    int track = buffer[HEADER+1];
+    int htrk = buffer[HEADER+1];
     int sector = buffer[HEADER+2];
     int key = buffer[HEADER+3];
     int ret;
@@ -263,11 +281,12 @@ wr_hdca_cmd(portaddr p, byte v)
         break;
     case 1:
         trace(trace_hdca, "hdca cmd: read sector with header bytes: %d %d %d %d\n",
-            track, head, sector, key);
-        ret = drive_read(handle[drv], track, head, sector, iobuf);
+            htrk, head, sector, key);
+        fmt_finish(drv);
+        ret = imd_read(handle[drv], htrk, head, sector, iobuf);
         if (ret != SECLEN) {
-        	l("read fail drv: %d c: %d h: %d s: %d ret: %d\n", 
-                drv, track, head, sector, ret);
+        	l("read fail drv: %d c: %d h: %d s: %d ret: %d\n",
+                drv, htrk, head, sector, ret);
         }
         bcopy(&iobuf[0], &buffer[2], 510);
         bcopy(&iobuf[510], &buffer[0], 2);
@@ -283,14 +302,41 @@ wr_hdca_cmd(portaddr p, byte v)
         break;
     case 3:
         trace(trace_hdca, "hdca cmd: read header\n");
+        /*
+         * A header read deposits the header under the head into the header
+         * RAM area.  A formatted track answers its head, the arm's track
+         * and a sector advancing around it; an unformatted one answers
+         * 0xff, so a probe sees the edge of what is there.
+         */
+        {
+            int nsec, secsize, hsel;
+
+            hsel = ((func & FUNC_HEAD) >> 4) ^ 0xf;
+            imd_trkinfo(handle[drv], track[drv], hsel, &nsec, &secsize);
+            if (nsec) {
+                buffer[HEADER + 0] = hsel;
+                buffer[HEADER + 1] = track[drv];
+                buffer[HEADER + 2] = hdca_hdr_sector;
+                hdca_hdr_sector = (hdca_hdr_sector % nsec) + 1;
+                buffer[HEADER + 3] = 0;
+            } else {
+                buffer[HEADER + 0] = 0xff;
+                buffer[HEADER + 1] = 0xff;
+                buffer[HEADER + 2] = 0;
+                buffer[HEADER + 3] = 0;
+            }
+        }
+        psr |= PSR_OPDONE;
+        psr &= ~PSR_HALT;
         break;
-    case 5: 
+    case 5:
         trace(trace_hdca, "hdca cmd: write sector with header bytes: %d %d %d %d\n",
-            track, head, sector, key);
-        ret = drive_write(handle[drv], track, head, sector, buffer);
+            htrk, head, sector, key);
+        fmt_finish(drv);
+        ret = imd_write(handle[drv], htrk, head, sector, buffer);
         if (ret != SECLEN) {
-        	l("write fail drv: %d c: %d h: %d s: %d ret: %d\n", 
-                drv, track, head, sector, ret);
+        	l("write fail drv: %d c: %d h: %d s: %d ret: %d\n",
+                drv, htrk, head, sector, ret);
         }
 #ifndef NODEBUG
         if (traceflags & trace_bio) hexdump(buffer, 512);
@@ -300,7 +346,18 @@ wr_hdca_cmd(portaddr p, byte v)
         break;
     case 7:
         trace(trace_hdca, "hdca cmd: write header bytes: %d %d %d %d\n",
-            track, head, sector, key);
+            htrk, head, sector, key);
+        /*
+         * One sector header of a track's format.  The headers collect
+         * until the head moves on, then the track is laid down whole.
+         */
+        if (fmt_active && (htrk != fmt_track || head != fmt_head)) {
+            fmt_finish(drv);
+        }
+        fmt_head = head;
+        fmt_track = htrk;
+        fmt_nsec++;
+        fmt_active = 1;
         if (sector == 1) {
             indextoggle = 1;
         } else {
@@ -348,9 +405,11 @@ wr_hdca_func(portaddr p, byte v)
         drive, head, dir_lower ? "lower" : "higher", step);
     if (stepping[drive] && step) {  // did the step line rise
         if (dir_lower) {
-            track[drive]--;
+            if (track[drive] > 0)
+                track[drive]--;
         } else {
-            track[drive]++;
+            if (track[drive] < TRACKS - 1)
+                track[drive]++;
         }
         trace(trace_hdca, "step drive %d to track %d\n", drive, track[drive]);
         indextoggle = 1;

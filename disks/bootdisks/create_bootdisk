@@ -103,7 +103,7 @@ fi
 # pointing at the floppy.  See rootfiles/m16init.
 #
 BINS="sh login ls cp mv rm cat mkdir mkfs fsck mount umount chmod cptree
-	mknod setdev ln sync echo"
+	mknod setdev ln sync echo hdformat mwformat label"
 
 medium="$1"
 image="$2"

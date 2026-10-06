@@ -128,7 +128,7 @@ main(int argc, char **argv)
             exit(1);
         }
         for (c = cyl; c < cyl + ncyl; c++) {
-            for (head = 0; head < HEADS; head++) {
+            for (head = 0; head < ((struct imd *)ip)->heads; head++) {
                 dumptrack(ip, c, head, *argv);
             }
         }

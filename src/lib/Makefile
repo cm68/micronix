@@ -8,7 +8,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-OBJECTS = util$(OBJSUFFIX).o imdlib$(OBJSUFFIX).o openx$(OBJSUFFIX).o \
+OBJECTS = util$(OBJSUFFIX).o imdlib$(OBJSUFFIX).o kv$(OBJSUFFIX).o openx$(OBJSUFFIX).o \
 	disz80$(OBJSUFFIX).o mnix_sys$(OBJSUFFIX).o whitesmith$(OBJSUFFIX).o \
 	fslib$(OBJSUFFIX).o fslibfunc$(OBJSUFFIX).o gui$(OBJSUFFIX).o \
 	monitor$(OBJSUFFIX).o hdcdmadisk$(OBJSUFFIX).o lockfile$(OBJSUFFIX).o

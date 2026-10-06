@@ -1,0 +1,84 @@
+.he "hdformat (1)                 10/6/26                  hdformat (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+hdformat
+- probe and format a HDCA hard disk
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+hdformat -p device
+.br
+.bd
+hdformat -m model [ -c cylinders ] [ -h heads ] [ -s sectors ] device
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Hdformat talks to the HDCA - the port-mapped Winchester controller of
+the M10, M20 and M26 - through the driver's raw command ioctl, the same
+door mwformat (1) uses for the HD-DMA.  The device named must be the
+whole-disk slice, the
+.bd
+c
+node, exactly as label (1) names it: hdac, hdbc, hdcc or hddc.
+.sp
+With -p, hdformat probes the drive's geometry rather than writing it.
+A formatted drive carries its shape in its sector headers - four bytes
+of head, track, sector and key on every sector - and the probe reads
+them: it steps out one track at a time until a header reads back a
+different track, selects each head until one stops matching, and reads a
+whole revolution of headers to find the highest sector number.  The
+three together are the drive's rectangular solid - cylinders by heads by
+sectors - and its capacity.  A drive with no headers at all is not
+formatted, and hdformat says so.
+.sp
+Without -p, hdformat formats the drive: it writes a sector header for
+every sector of every head of every track, in the interleave the
+controller's own formatter used.  The geometry is what a model name says
+it is, overridden by any of -c, -h or -s that appear:
+.sp
+.in +10
+.ti -10
+-m model	The drive model.  m10 is 244 tracks, 4 heads, 21 sectors;
+m20 is 244 tracks, 8 heads, 21 sectors; m26 is 202 tracks, 8 heads, 32
+sectors.  These are the numbers FORMATHD carried, and a model is
+nothing more - the driver reads none of them.
+.sp
+.ti -10
+-c cylinders	The track count, overriding the model's.
+.sp
+.ti -10
+-h heads	The head count, overriding the model's.
+.sp
+.ti -10
+-s sectors	The sectors per track, overriding the model's.
+.sp
+.in -10
+A geometry from no model and no flags is an error: name a model, or give
+-c and -h.  The HDCA numbers tracks and sectors in one byte and selects
+eight heads, so a track past 255, a head past 8 or a sector past 32
+does not fit it.
+.sp
+The format writes headers and nothing else.  The data fields are left
+alone, so a drive that already carries a label keeps it; a fresh drive
+still needs label -w and mkfs (1) after the format before it can be
+mounted.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+mwformat (1), djformat (1), label (1), mkfs (1)
