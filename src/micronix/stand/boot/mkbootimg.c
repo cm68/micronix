@@ -158,11 +158,23 @@ main(int argc, char **argv)
     int off;
     int dflag;
     unsigned tracks = 0, heads = 0, spt = 0, firstsec = 0, toff = 0, config = 0;
-    unsigned spc = 0, roll = 0, cyl0 = 0, bootblks = 0;
+    unsigned spc = 0, roll = 0, cyl0 = 0, bootblks = 0, loadaddr = 0;
     int c;
 
     pname = argv[0];
     dflag = 0;
+    /*
+     * -a <addr> writes the first level's entry address into the sector's
+     * last two bytes (510-511).  The HDCA's rom reads those two bytes as
+     * the address it loads the first level to and then jumps to, where
+     * the HD-DMA rom needs no such address - it always reads the sector
+     * to 0100 and enters there.  See mon447.s boothd.
+     */
+    if (argc > 2 && strcmp(argv[1], "-a") == 0) {
+        loadaddr = strtoul(argv[2], 0, 0);
+        argv += 2;
+        argc -= 2;
+    }
     if (argc > 1 && strcmp(argv[1], "-d") == 0) {
         dflag = 1;
         argv++;
@@ -326,6 +338,9 @@ main(int argc, char **argv)
          */
         put16(off + offsetof(struct dlabel, d_firstsec), firstsec);
     }
+
+    if (loadaddr)
+        put16(BSIZE - 2, loadaddr);
 
     if (!(out = fopen(outname, "wb"))) {
         die("cannot write the image");

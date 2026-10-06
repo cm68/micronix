@@ -158,8 +158,10 @@ fi
 tmp=`mktemp` || exit 1
 trap 'rm -f "$tmp" "$tmp.k"' 0
 
-# clear any sidecar lock file the host tools leave at "<image>.lock"
-rm -f "$image.lock"
+# clear any sidecar lock file the host tools leave at "<image>.lock",
+# and the write overlay "<image>-delta" whose dirty sectors survive a
+# rebuilt .img and would hand the loader the previous build's filesystem.
+rm -f "$image.lock" "$image-delta"
 
 # 1. the boot and the filesystem, one label describing both
 "$mnix" bootflop "$bootimg" "$image" || exit 1

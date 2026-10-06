@@ -129,6 +129,11 @@ src/micronix/stand/boot/ncrboot1.abs
 src/micronix/stand/boot/ncrboot1.bin
 src/micronix/stand/boot/ncrbootimg
 src/micronix/stand/boot/ncrbootimg-*
+src/micronix/stand/boot/hdcaboot.com
+src/micronix/stand/boot/hdcaboot1.abs
+src/micronix/stand/boot/hdcaboot1.bin
+src/micronix/stand/boot/hdcabootimg
+src/micronix/stand/boot/hdcabootimg-*
 src/micronix/stand/boot/djbootimg-*
 src/micronix/stand/boot/djload
 src/micronix/stand/boot/bootimg
@@ -300,6 +305,7 @@ src/micronix/cmd/expand/expand
 src/micronix/cmd/expr/expr
 src/micronix/cmd/far/far
 src/micronix/cmd/fd2/fd2
+src/micronix/cmd/fdj/fdj
 src/micronix/cmd/fgrep/fgrep
 src/micronix/cmd/file/file
 src/micronix/cmd/find/find

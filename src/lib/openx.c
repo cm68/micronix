@@ -78,10 +78,10 @@ open_terminal(char *name, int signum, int *in_p, int *out_p, int cooked, char *l
     char *fontsize=getenv("TERMINAL_FONTSIZE");
     char *geometry=getenv("TERMINAL_GEOMETRY");
     if (!geometry) {
-        geometry = "120x60";
+        geometry = "100x34";
     }
     if (!fontsize) {
-        fontsize = "12";
+        fontsize = "9";
     }
     pipe(pipe_up);
 

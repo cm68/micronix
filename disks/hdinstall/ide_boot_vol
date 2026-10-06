@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# Boot the hardware simulator from a hard disk volume on the IDE card.
+#
+#	./ide_boot_vol <volume>
+#
+# <volume> is the name of the drive file to boot - the thing
+# ide_create_vol makes - given without its .vol suffix.  The simulator
+# reads the monitor ROM, which reads the first level loader off LBA 0,
+# which reads the second level, which loads /micronix off the filesystem.
+#
+# -c 0x700 is the configuration switch: 0x00 leave all five boot switches
+# on, so mon500 copies and enters the 4K selector ROM (multIO.bin), which
+# probes the IDE board and the NCR 5380 at once and boots whichever target
+# answers - here the IDE drive, since no scsi0: is named.  The 0x700 puts
+# all three uarts in xterms of their own - uart 0, the console, plus ttyB
+# and ttyC - rather than borrowing this window.  The console bit is what
+# lets this script be run from anywhere; the ttyB/ttyC bits are what give
+# the multiuser logins a window.
+#
+# The ROM is mon500, which has no IDE code of its own (neither it nor
+# mon447 boots the IDE card); the ideboot routine lives in the selector
+# ROM (multIO.bin) that switch 0x00 reaches.  The drive is ide0: - drive 0
+# on the card.  Every argument before <volume> is a simulator flag, so
+# the usual -t/-T/-W/-c switches are available without editing this.
+#
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+root=`cd "$here/../.." && pwd`
+
+# The kernel this volume boots is the one ide_create_vol wrote to
+# /micronix: the freshly linked ccc kernel at src/micronix/sys/unix.
+kernel="$root/src/micronix/sys/unix"
+
+flags=""
+while [ $# -gt 1 ]; do
+	flags="$flags $1"
+	shift
+done
+vol="$1"
+
+if [ -z "$vol" ]; then
+	echo "usage: $0 [simulator flags] <volume>" >&2
+	exit 1
+fi
+
+case "$vol" in
+*.vol)	;;
+*)	vol="$vol.vol" ;;
+esac
+case "$vol" in
+/*)	;;
+*)	vol="$here/$vol" ;;
+esac
+
+cd "$root/src/hwsim/d1" || exit 1
+exec ./d1 -b ../../micronix/stand/roms/mon500.bin -c 0x700 -S "$kernel" $flags "ide0:$vol"

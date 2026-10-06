@@ -7,7 +7,8 @@
 
 all:	mwboot.com mwboot1.bin bootimgs djboot.com djboot1.bin djload \
 	ideboot.com ideboot1.bin idebootimgs \
-	ncrboot.com ncrboot1.bin ncrbootimgs
+	ncrboot.com ncrboot1.bin ncrbootimgs \
+	hdcaboot.com hdcaboot1.bin hdcabootimgs
 
 install:
 
@@ -26,12 +27,13 @@ install:
 # directory of that assembler's listings.  core.* is a crash dump - not
 # a build product, and named core.<pid>, so there is no list to write.
 clean:
-	rm -f $(OBJS) djio.o ideio.o ncrio.o *.nam *.tok *.x
-	rm -f ideboot.com djboot.com ncrboot.com
+	rm -f $(OBJS) djio.o ideio.o ncrio.o hdcaio.o *.nam *.tok *.x
+	rm -f ideboot.com djboot.com ncrboot.com hdcaboot.com
 	rm -f mwboot1.abs djboot1.abs mwboot1.bin djboot1.bin
 	rm -f ideboot1.abs ideboot1.bin ncrboot1.abs ncrboot1.bin
+	rm -f hdcaboot1.abs hdcaboot1.bin
 	rm -f mwboot.com djload mkbootimg
-	rm -f $(BOOTIMGS) $(IDEBOOTIMGS) $(NCRBOOTIMGS) bootimg
+	rm -f $(BOOTIMGS) $(IDEBOOTIMGS) $(NCRBOOTIMGS) $(HDCABOOTIMGS) bootimg
 
 clobber: clean
 
@@ -124,6 +126,16 @@ ncrboot1.bin: ncrboot1.s
 	$(WSLD) -s -Ttext=0x100 -o ncrboot1.abs ncrboot1.o
 	dd if=ncrboot1.abs of=ncrboot1.bin bs=16 skip=1
 
+# hdcaboot1.s is the same sector again, for the HDCA.  It writes its own
+# header - head, track, sector, key - through the data port and pulls the
+# sector out a byte at a time, instead of driving an 8255 the way
+# ideboot1.s does.  It has the same 256 byte budget as ideboot1.s and
+# ncrboot1.s, because the label sits at byte 256 of the sector.
+hdcaboot1.bin: hdcaboot1.s
+	$(ASZ) hdcaboot1.s
+	$(WSLD) -s -Ttext=0x100 -o hdcaboot1.abs hdcaboot1.o
+	dd if=hdcaboot1.abs of=hdcaboot1.bin bs=16 skip=1
+
 #
 # what mkfs -i writes: the first level in block 0, the second level from
 # block 1, which is where the first level looks for it.
@@ -184,6 +196,19 @@ ncrbootimgs: $(NCRBOOTIMGS)
 
 ncrbootimg: ncrboot1.bin ncrboot.com mkbootimg
 	./mkbootimg ncrboot1.bin ncrboot.com $@
+
+#
+# And the same for the HDCA.  A target on the HDCA reads back a volume
+# laid out for the HD-DMA block for block, so this image is byte-
+# compatible with the one above and differs only in which loader is in
+# it.
+#
+HDCABOOTIMGS = hdcabootimg
+
+hdcabootimgs: $(HDCABOOTIMGS)
+
+hdcabootimg: hdcaboot1.bin hdcaboot.com mkbootimg
+	./mkbootimg -a 0x100 hdcaboot1.bin hdcaboot.com $@
 
 # The floppy boot image: one side of cylinder 0, ten blocks.  Block 0 is
 # djboot1.bin's first 128 bytes - level 0, which is all the firmware
@@ -250,6 +275,15 @@ ncrboot.com: boot.o ncrio.o sexit.o
 	$(MXLD) -s -o ncrboot.com -Ttext=0x100 -L$(CCCLIB) \
 	    sexit.o boot.o ncrio.o $(CCCLIB)/libc.a $(CCCLIB)/libunix.a $(CCCLIB)/libc.a
 
+#
+# The HDCA second level: the same boot.c with hdcaio.o in place of
+# mwio.o.  reset() and readblock() keep their names and their meaning
+# across all five drivers.
+#
+hdcaboot.com: boot.o hdcaio.o sexit.o
+	$(MXLD) -s -o hdcaboot.com -Ttext=0x100 -L$(CCCLIB) \
+	    sexit.o boot.o hdcaio.o $(CCCLIB)/libc.a $(CCCLIB)/libunix.a $(CCCLIB)/libc.a
+
 boot.o: boot.c
 	$(CCC) -c -i$(INC) -o boot.o boot.c
 mwio.o: mwio.c
@@ -260,6 +294,8 @@ ideio.o: ideio.c
 	$(CCC) -c -i$(INC) -o ideio.o ideio.c
 ncrio.o: ncrio.c
 	$(CCC) -c -i$(INC) -o ncrio.o ncrio.c
+hdcaio.o: hdcaio.c
+	$(CCC) -c -i$(INC) -o hdcaio.o hdcaio.c
 sexit.o: sexit.s
 	$(CCC) -c -o sexit.o sexit.s
 

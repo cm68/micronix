@@ -21,7 +21,7 @@ CLASS	= stand
 # by all four boots; mwio.c, djio.c, ideio.c and ncrio.c are the device
 # drivers, one per controller - HD-DMA, DJ-DMA, the IDE card and the NCR
 # 5380 SCSI card.
-CSRCS	= boot.c mwio.c djio.c ideio.c ncrio.c
+CSRCS	= boot.c mwio.c djio.c ideio.c ncrio.c hdcaio.c
 ASSRCS	= sexit.s
 
 #
@@ -33,13 +33,14 @@ ASSRCS	= sexit.s
 # nor mkbootimg.c was in the tar - nor were the other three first
 # levels, nor the README that describes what they do.
 #
-EXTRA	= mkbootimg.c mwboot1.s djboot1.s ideboot1.s ncrboot1.s README
+EXTRA	= mkbootimg.c mwboot1.s djboot1.s ideboot1.s ncrboot1.s hdcaboot1.s README
 
 # The main artifact, and the things built beside it.
 TARGET	= mwboot.com
 TARGETS	= mwboot1.bin bootimgs djboot.com djboot1.bin djbootimgs \
 	  ideboot.com ideboot1.bin idebootimgs \
-	  ncrboot.com ncrboot1.bin ncrbootimgs
+	  ncrboot.com ncrboot1.bin ncrbootimgs \
+	  hdcaboot.com hdcaboot1.bin hdcabootimgs
 
 # The loader links ccc's own libc, named by path below, so the tree's
 # libc must not be a prerequisite of the link.
@@ -102,6 +103,18 @@ ncrboot.com: boot.o ncrio.o sexit.o
 	    $(CCCLIB)/libc.a
 
 #
+# The HDCA second level: the same boot.c again, with the driver for the
+# port-mapped HDCA (hdcaio.c) in place of mwio.c.  reset() and
+# readblock() keep their names and their meaning across all five
+# drivers, so nothing in boot.c knows which card it is.
+#
+hdcaboot.com: boot.o hdcaio.o sexit.o
+	$(MXLD) -s -o $@ -Ttext=0x100 -L$(CCCLIB) \
+	    sexit.o boot.o hdcaio.o \
+	    $(CCCLIB)/libc.a $(CCCLIB)/libunix.a \
+	    $(CCCLIB)/libc.a
+
+#
 # The first level is a sector: the rom reads 512 bytes to 0100 and
 # jumps, so there is nowhere to put a header and nothing to strip one.
 # The link is stripped and the 16-byte object header cut off.
@@ -154,6 +167,19 @@ ncrboot1.bin: ncrboot1.s
 	$(CCC) $(CCFLAGS) -c -o ncrboot1.o ncrboot1.s
 	$(MXLD) -s -Ttext=0x100 -o ncrboot1.abs ncrboot1.o
 	dd if=ncrboot1.abs of=$@ bs=16 skip=1
+
+#
+# The HDCA first level, hdcaboot1.s, built the same way.  It differs from
+# ideboot1.s in the read again: the HDCA has no 8255 and no task file,
+# so this one writes its own header bytes - head, track, sector, key -
+# through the data port and pulls the sector out a byte at a time.  It
+# has the same 256-byte budget: the label sits at byte 256 of the sector
+# and mkbootimg refuses a first level that runs into it.
+#
+hdcaboot1.bin: hdcaboot1.s
+	$(CCC) $(CCFLAGS) -c -o hdcaboot1.o hdcaboot1.s
+	$(MXLD) -s -Ttext=0x100 -o hdcaboot1.abs hdcaboot1.o
+	dd if=hdcaboot1.abs of=$@ bs=16 skip=1
 
 #
 # What mkfs -i writes: the first level in block 0, the second level
@@ -214,6 +240,18 @@ ncrbootimgs: $(NCRBOOTIMGS)
 
 ncrbootimg: ncrboot1.bin ncrboot.com mkbootimg
 	./mkbootimg ncrboot1.bin ncrboot.com $@
+
+#
+# And the same for the HDCA.  Its target 0 speaks to a volume laid out
+# for the HD-DMA block for block, so this image is byte-compatible with
+# the one above and differs only in which loader is in it.
+#
+HDCABOOTIMGS = hdcabootimg
+
+hdcabootimgs: $(HDCABOOTIMGS)
+
+hdcabootimg: hdcaboot1.bin hdcaboot.com mkbootimg
+	./mkbootimg -a 0x100 hdcaboot1.bin hdcaboot.com $@
 
 #
 # The floppy boot images: one per medium, because the label is what
@@ -304,10 +342,12 @@ $(DJBOOTIMGS): djboot1.bin djboot.com mkbootimg
 # that still has them, so they are cleared by pattern rather than by
 # name.
 GENERATED = mwboot1.o mwboot1.abs djboot1.o djboot1.abs \
-	ideboot1.o ideboot1.abs ncrboot1.o ncrboot1.abs mkbootimg \
+	ideboot1.o ideboot1.abs ncrboot1.o ncrboot1.abs \
+	hdcaboot1.o hdcaboot1.abs mkbootimg \
 	bootimg bootimg-* idebootimg idebootimg-* ncrbootimg ncrbootimg-* \
+	hdcabootimg hdcabootimg-* \
 	djload djboot.com djbootimg-*
 
 install:
 
-.PHONY: bootimgs djbootimgs idebootimgs ncrbootimgs
+.PHONY: bootimgs djbootimgs idebootimgs ncrbootimgs hdcabootimgs
