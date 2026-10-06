@@ -5,25 +5,24 @@
  *
  *	djformat device [track]
  *
- * Runs the controller's write-track command across a diskette, one track
- * per ioctl so the progress is a line per track.  The device node names
- * the drive (its minor), and the track count is the 77 of an 8 inch
- * drive - the only kind this machine's diskettes come as (sys/dj.c's
- * specs).
+ * Formats a diskette one track per ioctl, printing a line per track.
+ * The device node names the drive (its minor), and the geometry is the
+ * 77 tracks of an 8 inch drive - the only kind this machine's diskettes
+ * come as (sys/dj.c's specs).
  *
- * The command is WRITETRK (0x2a), the board's built-in "write a whole
- * track", sent as a DJ-DMA program through the driver's fourth block
- * entry (djioctl, sys/dj.c).  A program is a list of the board's own
- * opcodes, each carrying its status at a fixed offset, ended by a HALT;
- * this one is the two commands a track takes - the write, then the halt.
- * What a write lays down is the controller's business, not this
- * program's: on the simulator it validates the drive and writes nothing,
- * because the image already is the format (hwsim/d1/djdma.c's writetrk).
+ * An 8 inch diskette is two densities: track 0 is single density, 26
+ * sectors of 128 bytes, and tracks 1 through 76 are double density, 15
+ * sectors of 512 bytes.  Each is named to the controller with SETMP
+ * (the media parameters: first sector, and sectors per track, which also
+ * fixes the sector size), and then laid down with WRITETRK, the board's
+ * built-in "write a whole track".  The two are sent as one DJ-DMA program
+ * through the driver's fourth block entry (djioctl, sys/dj.c): SETMP,
+ * then WRITETRK, then a HALT, each carrying its status at a fixed offset.
  *
  * A format blanks the diskette, so any filesystem goes with it and mkfs
  * follows.  The tab address the write carries is left null - the real
- * board reads a sector header table there, and the simulator does not,
- * so a real format wants that table built and planted through req.hole.
+ * board reads a sector header table there to skip sectors, and a format
+ * of a whole track skips none.
  */
 
 #include <types.h>
@@ -32,6 +31,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 
+#define SETMP    0x31           /* set media parameters, sys/dj.h */
 #define WRITETRK 0x2a           /* the board's opcode, sys/dj.h */
 #define HALT     0x25
 #define NTRACK   77             /* the 8 inch drive's tracks, sys/dj.c */
@@ -48,29 +48,36 @@ die(msg)
 }
 
 /*
- * Format one track: a WRITETRK program ended by a HALT, ten bytes.  The
- * write's own status lands in cmd[7], which is what this checks; the halt
- * status in cmd[9] only says the program ran.
+ * Format one track: SETMP for its density's layout, then a WRITETRK,
+ * ended by a HALT.  The write's own status lands in cmd[14], which is
+ * what this checks; the halt status in cmd[16] only says the program ran.
  */
 int
-fmtrack(fd, drive, cyl)
+fmtrack(fd, drive, cyl, secs)
     int fd;
-    UINT drive, cyl;
+    UINT drive, cyl, secs;
 {
     struct cdb r;
     int st;
 
-    r.len = 10;
-    r.cmd[0] = WRITETRK;
-    r.cmd[1] = cyl;
-    r.cmd[2] = 0;               /* head 0 */
-    r.cmd[3] = drive;
-    r.cmd[4] = 0;               /* tab address, null: the sim ignores it */
-    r.cmd[5] = 0;
-    r.cmd[6] = 0;
-    r.cmd[7] = 0;               /* the write's status, written back */
-    r.cmd[8] = HALT;
-    r.cmd[9] = 0;               /* the halt's status */
+    r.len = 17;
+    r.cmd[0] = SETMP;           /* the density's media parameters */
+    r.cmd[1] = drive;
+    r.cmd[2] = 0;               /* write precomp starts at track 0 */
+    r.cmd[3] = NTRACK - 1;      /* highest track */
+    r.cmd[4] = 1;               /* first sector's number */
+    r.cmd[5] = secs;            /* sectors per track */
+    r.cmd[6] = 0;               /* the SETMP status */
+    r.cmd[7] = WRITETRK;
+    r.cmd[8] = cyl;
+    r.cmd[9] = 0;               /* head 0 */
+    r.cmd[10] = drive;
+    r.cmd[11] = 0;              /* tab address, null: no sector is skipped */
+    r.cmd[12] = 0;
+    r.cmd[13] = 0;
+    r.cmd[14] = 0;              /* the write's status, written back */
+    r.cmd[15] = HALT;
+    r.cmd[16] = 0;              /* the halt's status */
     r.count = 0;
     r.flags = 0;
     r.buf = 0;
@@ -78,7 +85,7 @@ fmtrack(fd, drive, cyl)
 
     if (ioctl(fd, CDBCMD, &r) < 0)
         return (-1);
-    st = r.cmd[7] & 0377;
+    st = r.cmd[14] & 0377;
     if (st != S_OK) {
         fprintf(stderr, "%s: track %d: status %x\n", pname, cyl, st);
         return (-1);
@@ -122,7 +129,8 @@ main(argc, argv)
 
     printf("formatting %s: %d tracks\n", device, NTRACK);
     for (track = first; track <= last; track++) {
-        if (fmtrack(fd, drive, track) < 0) {
+        /* track 0 is single density; the rest are double */
+        if (fmtrack(fd, drive, track, track == 0 ? 26 : 15) < 0) {
             fprintf(stderr, "%s: format failed at track %d\n", pname, track);
             exit(1);
         }

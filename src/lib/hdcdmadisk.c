@@ -271,6 +271,16 @@ diskoff(struct drive *dp, int cylinder, int head, int sector)
     }
 
     /*
+     * The sector a controller hands over is the number the formatter
+     * wrote into the header - firstsec-origin, so 1 on the Discus -
+     * while the file is laid out from 0.  Translate once here, ahead
+     * of the range check and the arithmetic below, which both read it.
+     */
+    sector -= dp->label.firstsec;
+    if (sector < 0)
+        return -1;
+
+    /*
      * A blank drive learns its shape from what is written to it.  A
      * formatted one does not: its geometry is the multipliers in the
      * arithmetic below, so growing spt or heads after the fact moves

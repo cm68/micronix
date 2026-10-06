@@ -41,6 +41,8 @@ extern UINT8 image0[], map0[];
 extern int copyin(), copyout();
 extern bwin();
 extern int dllabel();
+extern char *swin();
+extern void srel();
 
 /*
  * This driver's initialization is not in this object: it is init-only
@@ -90,6 +92,7 @@ struct dm
 	struct dlgeom g;            /* tracks, heads, sectors, maxblk, spc,
 	                             * roll, cylstart */
 	UINT8 flags;                /* ISOPEN | F_WP */
+	UINT8 k;                    /* 1K sectors: a 512 block is half a sector */
 };
 
 static struct dm dm[NDRIVES] = { 0 };
@@ -140,6 +143,15 @@ djopen(dev, mode)
 
 	s = (struct status *) djcomm;
 
+	/*
+	 * The sector length is the medium's, and it is the one thing the
+	 * label does not carry: a 1K sector means a 512 byte block is half
+	 * a sector, read and written as a read-modify-write.  It has to be
+	 * known before dllabel(), whose read of block 0 is itself a block
+	 * transfer through this same path.
+	 */
+	d->k = (s->slength == S1024);
+
 	if (s->dstat & S_WP) {      /* write protect */
 		d->flags |= F_WP;
 		if (mode != READ) {
@@ -152,14 +164,22 @@ djopen(dev, mode)
 	/*
 	 * The geometry, from the disk's own label.  What is left in dm[]
 	 * from a previous open is not knowledge: the disk may have been
-	 * changed, and its label went with it.  The first sector's number
-	 * (d_firstsec) comes from the label too, not the drive.
+	 * changed, and its label went with it.
+	 *
+	 * The first sector number is the one thing that has to be known
+	 * before the label can be read: the label itself lives in a sector
+	 * of the boot track, and whether that track numbers from zero or
+	 * one is a property of the medium, which the drive's characteristics
+	 * byte (dchar, HARD) reports and the label merely records for the
+	 * loader, which has no drive to ask.  Set it here so dllabel()'s own
+	 * read of block 0 lands on the sector the label is actually in.
 	 */
 	g = &d->g;
 	g->tracks = 0;
 	g->heads = 0;
 	g->sectors = 0;
 	g->roll = 0;
+	g->firstsec = (s->dchar & HARD) ? 0 : 1;
 	sl = devslice(dev);
 	if (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive, sl, g) < 0)
 		return;
@@ -238,6 +258,8 @@ sio(d, addr, xaddr, op, sec, dev)
 	 */
 	within = sec % g->spc;
 	D[6] = (within % g->sectors) + g->firstsec;
+	if (d->k)
+		D[6] = ((within % g->sectors) >> 1) + g->firstsec;
 	if (g->heads > 1 && within >= g->sectors)
 		D[6] |= VERSO;
 
@@ -272,8 +294,8 @@ static unsigned char inservice = 0;
 
 djint()
 {
-	static unsigned char op;
-	static unsigned addr, xaddr, sec, dev;
+	static unsigned char op, kw;
+	static unsigned addr, xaddr, sec, koff, dev;
 	static struct dm *d;
 	static struct dlgeom *g;
 
@@ -330,6 +352,51 @@ djint()
 			goto request;       /* set up next req. */
 		}
 
+		if (d->k && op == SWRITE) {
+			/*
+			 * A 1K sector write is a read-modify-write: the read
+			 * above brought the whole sector in, so fold this block
+			 * into its half and write the sector back.
+			 */
+			if (kw)             /* the write-back just finished */
+				goto finished;
+			/*
+			 * bhold() returns the block's window address and reads
+			 * curbuf->xmem, both of which have to be taken now: swin()
+			 * below remaps the page the buffer headers live in, so a
+			 * curbuf read after it is the sector just read, not the
+			 * header.  The address is what the copy needs; the segment
+			 * was written to BUFSEG by bhold itself.
+			 */
+			addr = bhold(curbuf);
+			swin(kseg);
+			copy(addr, (char *) SCRWIN + koff, BUFSIZE);
+			srel();
+			brel();
+			kw = 1;
+			djack();            /* acknowledge the read */
+			sio(d, 0, kseg, SWRITE, sec, dev);
+			di();
+			djstart();
+			inservice = 0;
+			ei();
+			return;
+		}
+
+		if (d->k && op == SREAD) {
+			/*
+			 * A 1K sector read: copy the block's half out of the
+			 * sector just read.  As in the write above, the block's
+			 * address comes off the header before swin() remaps the
+			 * headers' page.
+			 */
+			addr = bhold(curbuf);
+			swin(kseg);
+			copy((char *) SCRWIN + koff, addr, BUFSIZE);
+			srel();
+			brel();
+		}
+
 		/*
 		 * the operation worked; a 512 byte transfer is one sector and
 		 * is already where it belongs.
@@ -371,9 +438,13 @@ djint()
 
 	d = &dm[dev & 7];
 
-	if ((d->flags & ISOPEN) == 0)       /* not open */
-		goto fail;
-
+	/*
+	 * A read may reach an unopened drive: dllabel() reads block 0 of the
+	 * drive's 'c' while djopen is still deciding, and that block has to
+	 * be readable before the open exists to allow it.  The bound below is
+	 * the real gate - an unopened drive has maxblk zero, so only block 0
+	 * (the label) is reachable, which is the same view mw.c takes.
+	 */
 	g = &d->g;
 
 	if (curbuf->blk > g->maxblk) {      /* off the end of the slice */
@@ -386,16 +457,26 @@ djint()
 	if (op == SWRITE && (d->flags & F_WP))
 		goto fail;
 
-	/*
-	 * One block is one sector, so the sector number is the block number.
-	 * The DMA goes straight to the buffer: the block is 512 bytes and the
-	 * board moves one sector to or from a single contiguous address.
-	 */
 	sec = curbuf->blk;
-	addr = curbuf->data;
-	xaddr = curbuf->xmem;
 
-	sio(d, addr, xaddr, op, sec, dev);
+	if (d->k) {
+		/*
+		 * One block is half of a 1K sector.  Both directions read the
+		 * whole sector into the staging page first: a read copies the
+		 * half out, a write folds the block in and writes it back.
+		 */
+		koff = (sec & 1) * BUFSIZE;
+		kw = 0;
+		sio(d, 0, kseg, SREAD, sec, dev);
+	} else {
+		/*
+		 * One block is one 512 byte sector, so the sector number is
+		 * the block number.  The DMA goes straight to the buffer.
+		 */
+		addr = curbuf->data;
+		xaddr = curbuf->xmem;
+		sio(d, addr, xaddr, op, sec, dev);
+	}
 
 	di();
 	djstart();
@@ -571,7 +652,7 @@ djioctl(dev, cmd, r, b)
 	struct buf *b;
 {
 	static char *p;             /* the staging, as the kernel reaches it */
-	static unsigned phys;       /* ... and as the board is told it */
+	static UINT32 phys;         /* ... and as the board is told it */
 	static UINT8 save;
 	static int i, len, count, hole, flags, st;
 
@@ -595,14 +676,14 @@ djioctl(dev, cmd, r, b)
 		save = image0[2 * BUFSEG];
 		bwin(kseg);
 		p = (char *) BUFWIN;
-		phys = (unsigned) kseg << 12;
+		phys = ((UINT32) kseg << 16) | ((unsigned) p & 0xffff);
 
 		if ((flags & CDB_IN) == 0)
 			copyin(r->buf, p, count);
 
 	} else if (count) {
 		p = bhold(b);
-		phys = (b->xmem << 12) | ((unsigned) p & 0xfff);
+		phys = ((UINT32) b->xmem << 16) | ((unsigned) p & 0xffff);
 
 	} else {
 		p = 0;
@@ -612,6 +693,12 @@ djioctl(dev, cmd, r, b)
 	for (i = 0; i < len; i++)
 		D[i] = r->cmd[i];
 
+	/*
+	 * The three bytes are the address the way the controller's SETDMA
+	 * takes it: byte 3 is the 4K segment and bytes 1-2 the offset, so the
+	 * segment goes in the high byte.  (SETCHANNEL is the exception, set in
+	 * djinit.c, which lays down a flat 24-bit address instead.)
+	 */
 	if (hole >= 0) {
 		D[hole] = phys;
 		D[hole + 1] = phys >> 8;

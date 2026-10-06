@@ -16,7 +16,7 @@
 #define NICINOD     100         /* free inode list in the superblock */
 #define APERBLK     256         /* block numbers in an indirect block */
 #define DEFBOOT     "/bootmw.bin"
-#define NDRIVE      8
+#define NDRIVE      9
 
 /*
  * The media this can make a filesystem on: the five hard disk models
@@ -50,10 +50,10 @@
  * here: 194 K cannot hold a running system, and a medium that can only
  * be a data carrier is not worth a row.
  */
-static UINT dtracks[NDRIVE] = { 153, 306, 306, 640, 733, 77, 77, 40 };
-static UINT dheads[NDRIVE] = { 4, 4, 6, 6, 5, 1, 2, 2 };
-static UINT dsecs[NDRIVE] = { 17, 17, 17, 17, 17, 15, 15, 10 };
-static UINT dtoff[NDRIVE] = { 0, 0, 0, 0, 0, 2, 2, 2 };
+static UINT dtracks[NDRIVE] = { 153, 306, 306, 640, 733, 77, 77, 40, 202 };
+static UINT dheads[NDRIVE] = { 4, 4, 6, 6, 5, 1, 2, 2, 8 };
+static UINT dsecs[NDRIVE] = { 17, 17, 17, 17, 17, 15, 15, 10, 32 };
+static UINT dtoff[NDRIVE] = { 0, 0, 0, 0, 0, 2, 2, 2, 0 };
 
 /*
  * And the number of the first sector on a track, which is a property of
@@ -74,7 +74,7 @@ static UINT dtoff[NDRIVE] = { 0, 0, 0, 0, 0, 2, 2, 2 };
  * out of there, because it has no other way to be told: see
  * sys/dlabel.h and stand/boot/djio.c.
  */
-static UINT dfirst[NDRIVE] = { 0, 0, 0, 0, 0, 1, 1, 0 };
+static UINT dfirst[NDRIVE] = { 0, 0, 0, 0, 0, 1, 1, 0, 1 };
 
 extern char *pname;
 

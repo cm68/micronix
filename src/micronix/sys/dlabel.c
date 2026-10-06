@@ -78,7 +78,10 @@ dllabel(cdev, sl, g)
         g->heads = lab.d_heads; /* UINT8: a label claiming 256 heads is
                                  * a label claiming none */
         g->sectors = lab.d_spt;
-        if (g->tracks && g->heads && g->sectors) {
+        if (lab.d_magic[0] == DL_MAGIC[0] && lab.d_magic[1] == DL_MAGIC[1]
+            && lab.d_magic[2] == DL_MAGIC[2]
+            && lab.d_magic[3] == DL_MAGIC[3]
+            && g->tracks && g->heads && g->sectors) {
             got = 1;
             g->roll = lab.d_roll;
             g->firstsec = lab.d_firstsec;

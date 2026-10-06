@@ -63,7 +63,7 @@ struct dparam {
     word settle;    // ste p settle time
     byte firstsec;  // first sector's number
     byte spt;       // user spec - spt
-    byte dcb;       // drive config byte
+    byte dcb;       // drive config byte (SB1_DD = double density)
     byte precomp;   // track for write precomp
 } dparams[8];
 
@@ -76,7 +76,8 @@ static unsigned char setdma(), readsec(), writesec(), sense(),
     setintr(), setretry(), setdrive(), settiming(),
     readtrk(), writetrk(), serin(), serout(),
     djhalt(), branch(), setchannel(), settrk(),
-    read_djmem(), write_djmem(), djexec(), djunknown();
+    setmp(), read_djmem(), write_djmem(), djexec(), djunknown();
+static int secsize_for(int five, int density, int secs);
 
 static struct djcmd {
     unsigned char code;             // command byte
@@ -101,6 +102,7 @@ static struct djcmd {
     { 0x26, 0, 0, branch, "branch in channel" },
     { 0x27, 4, 0, setchannel, "set channel address" },
     { 0x2d, 4, 3, settrk, "set track size" },
+    { 0x31, 7, 6, setmp, "set media parameters" },
     { 0xa0, 8, 0, read_djmem, "read controller memory" },
     { 0xa1, 8, 0, write_djmem, "write controller memory" },
     { 0xa2, 4, 3, djexec, "execute controller" }
@@ -402,9 +404,11 @@ readsec()
     if (imdp[drive]) {
         bytes = imd_read(imdp[drive], cyl, head, sec, secbuf);
         if (bytes > 0) {
+            tracec(trace_djdma, " dma %x bytes %d magic %.4s", dmaaddr, bytes,
+                bytes > 260 ? secbuf + 256 : "....");
             // hexdump(secbuf, bytes);
             copyout(secbuf, dmaaddr, bytes);
-            status = S_NORMAL;    
+            status = S_NORMAL;
         } else {
             status = S_NOREAD;
         }
@@ -485,6 +489,7 @@ writesec()
     unsigned char head;
     unsigned char status;
     int bytes;
+    int nsec;
 
     cyl = physread(channel + 1);
     sec = physread(channel + 2);
@@ -496,11 +501,29 @@ writesec()
         drive, cyl, sec, head);
     dparams[drive].current = cyl;
     if (imdp[drive]) {
-        imd_trkinfo(imdp[drive], cyl, head, 0, &bytes);
+        imd_trkinfo(imdp[drive], cyl, head, &nsec, &bytes);
+        if (nsec == 0) {
+            /*
+             * A soft-sectored write to a track with no format is a format:
+             * it lays the ID headers down along with the data.  The geometry
+             * is the drive's own - SETMP named firstsec and sectors-per-track
+             * - and the sector size is the one the count names, the way the
+             * firmware's drive tables do (26 of 128, else the double-density
+             * size).  This is fdj's path; djformat uses the whole-track write
+             * and never reaches here.
+             */
+            int firstsec = dparams[drive].firstsec;
+            int spt = dparams[drive].spt;
+            int density = (spt == 26) ? 0 : 1;
+
+            bytes = secsize_for(drive >= FIVE, density, spt);
+            imd_setfmt(imdp[drive], cyl, head, firstsec, spt, bytes,
+                (density ? 3 : 0) + (drive >= FIVE ? 2 : 0), FMTFILL);
+        }
         copyin(secbuf, dmaaddr, bytes);
         bytes = imd_write(imdp[drive], cyl, head, sec, secbuf);
         if (bytes > 0) {
-            status = S_NORMAL;    
+            status = S_NORMAL;
         } else {
             status = S_PROT;
         }
@@ -554,10 +577,21 @@ sense()
     // SB2_128 SB2_256 SB2_512 SB2_1024
     // SB3_INDEX SB3_RDY SB3_SERIN SB3_TRK0 SB3_WPROT SB3_DSDD8
 
-    switch(secsize) {
+    /*
+     * The density is told from the sector size: 128 byte sectors are the
+     * one single density (FM) size, the rest are double.  The IMD mode byte
+     * is not used here - every diskette in the tree carries 0, including
+     * its double density tracks, so it says nothing.
+     */
+    switch (secsize) {
     case 128:
         dcb = SB1_HDLD;
         slc = SB2_128;
+        dsb = SB3_INDEX | SB3_RDY;
+        break;
+    case 256:
+        dcb = SB1_DD | SB1_HDLD;
+        slc = SB2_256;
         dsb = SB3_INDEX | SB3_RDY;
         break;
     case 512:
@@ -677,8 +711,8 @@ readtrk()
     cyl = physread(channel + 1);
     head = physread(channel + 2);
     drive = physdrive(physread(channel + 3));
-    sectab = 
-        physread(channel + 4) + 
+    sectab =
+        physread(channel + 4) +
         (physread(channel + 5) << 8) +
         (physread(channel + 6) << 16);
     if (!imdp[drive]) {
@@ -688,24 +722,26 @@ readtrk()
 
     dparams[drive].current = cyl;
 
-    tracec(trace_djdma, "drive:%d cyl:%d head:%x sectab:%x secs:%d", 
+    tracec(trace_djdma, "drive:%d cyl:%d head:%x sectab:%x secs:%d",
         drive, cyl, head, sectab, secs);
+
+    /*
+     * A read track walks the sectors by their number - firstsec through
+     * firstsec+secs-1, the DJ49 firmware's counter - and the DMA address
+     * follows that counter, one sector length per step.  The sector table
+     * entry 0xff means the loader does not want that sector, so the read
+     * is skipped but the counter still advances, exactly as DJ49's TTLOOP
+     * does.  The sector number is the logical one; the IMD secmap says
+     * which physical slot it lives in.
+     */
     firstsec = imd_firstsec(imdp[drive], cyl, head);
     for (i = 0; i < secs; i++) {
         if (physread(sectab + i) == 0xff) {
             continue;
         }
-        /*
-         * Sector numbering does not always start at one - the firmware
-         * keeps the lowest sector number beside the sectors per track for
-         * exactly this reason, and a hard sectored five inch disk counts
-         * from zero.  Walk the track from wherever it actually starts.
-         */
         bytes = imd_read(imdp[drive], cyl, head, firstsec + i, secbuf);
         if (bytes > 0) {
-
             copyout(secbuf, dmaaddr + secsize * i, bytes);
-            // if (trace & trace_djdma) printf("\tcopyout to %x for %d\n", dmaaddr + secsize * i, bytes);
             physwrite(sectab + i, S_NORMAL);
         } else {
             physwrite(sectab + i, S_NOREAD);
@@ -715,7 +751,39 @@ readtrk()
 }
 
 /*
+ * The sector size a track holds at a given density, the way the DJ49
+ * firmware's drive parameter tables name it.  A 5 1/4 inch drive at single
+ * density is 256 byte sectors (North Star), at double 512 (North Star) or
+ * 1024 (MicroDecision); an 8 inch drive is 128 at single, and 256 (Series
+ * 34), 512 or 1024 at double.
+ */
+static int
+secsize_for(int five, int density, int secs)
+{
+    if (five) {
+        if (density)
+            return (secs <= 5) ? 1024 : 512;
+        return 256;
+    }
+    if (density) {
+        if (secs <= 8) return 1024;
+        if (secs <= 15) return 512;
+        return 256;
+    }
+    return 128;
+}
+
+/*
  * write track
+ *
+ * A format lays down a whole track: the sector headers the geometry names,
+ * and the fill byte in each data field.  The layout is the drive's own:
+ * firstsec and sectors-per-track, plus the density in the drive config byte
+ * and the sector size that density and count together name.  When the host
+ * has not named a density - the old djformat only sends SETMP, which carries
+ * no density - the one track an 8 inch diskette holds at each density is
+ * inferred (26 of 128, 15 of 512, 8 of 1024).  This is where the image
+ * learns its per-track metadata instead of already carrying it.
  */
 static unsigned char
 writetrk()
@@ -726,23 +794,42 @@ writetrk()
     paddr sectab;
     int secs;
     int secsize;
+    int firstsec;
+    int density;
+    int mode;
 
     cyl = physread(channel + 1);
     head = physread(channel + 2);
     drive = physdrive(physread(channel + 3));
-    sectab = 
-        physread(channel + 4) + 
+    sectab =
+        physread(channel + 4) +
         (physread(channel + 5) << 8) +
         (physread(channel + 6) << 16);
     if (!imdp[drive]) {
         return S_UNREADY;
     }
-    imd_trkinfo(imdp[drive], cyl, head, &secs, &secsize);
+
+    secs = dparams[drive].spt;
+    firstsec = dparams[drive].firstsec;
+    if (dparams[drive].dcb & (SB1_DD | SB1_HARD | SB1_FIVE))
+        density = (dparams[drive].dcb & SB1_DD) ? 1 : 0;
+    else
+        density = (secs == 26) ? 0 : 1;
+    secsize = secsize_for(drive >= FIVE, density, secs);
+
+    /*
+     * The IMD mode byte is density plus data rate: FM is 0 on an 8 inch
+     * drive and 2 on a 5 1/4, MFM is 3 or 5.  The originals carry these
+     * exact bytes.
+     */
+    mode = (density ? 3 : 0) + (drive >= FIVE ? 2 : 0);
 
     dparams[drive].current = cyl;
 
-    tracec(trace_djdma, "drive:%d cyl:%d head:%x sectab:%x secs:%d", 
-        drive, cyl, head, sectab, secs);
+    tracec(trace_djdma, "drive:%d cyl:%d head:%x sectab:%x secs:%d size:%d",
+        drive, cyl, head, sectab, secs, secsize);
+    imd_setfmt(imdp[drive], cyl, head, firstsec, secs, secsize, mode,
+        FMTFILL);
     return S_NORMAL;
 }
 
@@ -759,6 +846,32 @@ settrk()
     tracks = physread(channel + 2);
 
     tracec(trace_djdma, "drive:%d tracks:%d", drive, tracks);
+    return S_NORMAL;
+}
+
+/*
+ * set media parameters (DJ49's SETMP)
+ *
+ * The five bytes after the opcode are drive, write-precomp start, highest
+ * track, first sector's number, and sectors per track.  Only the last two
+ * matter to the medium's layout: the first sector is masked to bit 0 (so
+ * it is 0 or 1), and the count is the number djformat named for this
+ * density.  The write-track command that follows lays the track down from
+ * these two.
+ */
+static unsigned char
+setmp()
+{
+    byte drive;
+    byte firstsec;
+    byte spt;
+
+    drive = physdrive(physread(channel + 1));
+    firstsec = physread(channel + 4) & 1;
+    spt = physread(channel + 5);
+
+    dparams[drive].firstsec = firstsec;
+    dparams[drive].spt = spt;
     return S_NORMAL;
 }
 
@@ -917,7 +1030,18 @@ write_djmem()
     vaddr count;
     int i;
 
-    source = physread(channel + 1) + (physread(channel + 2) << 8) + (physread(channel + 3) << 16);
+    /*
+     * The address is the same three-byte form SETDMA takes: byte 3 is the
+     * 4K segment and bytes 1-2 the offset, except that a zero segment is a
+     * flat 16-bit kernel address (the boot's step/settle table write passes
+     * KERNEL, 0, in byte 3).  write_djmem must read it the same way setdma
+     * does or a buffer-backed MEMWRITE lands in the wrong segment.
+     */
+    if (physread(channel + 3) == 0)
+        source = physread(channel + 1) + (physread(channel + 2) << 8);
+    else
+        source = (physread(channel + 3) << 12) |
+            ((physread(channel + 1) + (physread(channel + 2) << 8)) & 0xfff);
     count = physread(channel + 4) + physread(channel + 5);
     dest = physread(channel + 6) + (physread(channel + 7) << 8);
 
@@ -930,10 +1054,7 @@ write_djmem()
     if (dest >= DJCODE && dest + count <= DJCODE + DJCODESZ) {
         for (i = 0; i < count; i++)
             djcode[dest - DJCODE + i] = physread(source + i);
-        if (dest == DJCODE) {
-            fmt_cyl = 0;
-            fmt_advance = 0;
-        }
+        tracec(trace_djdma, "djmem download %x from %x for %d", dest, source, count);
         return S_NORMAL;
     }
 
@@ -963,9 +1084,13 @@ read_djmem()
     vaddr dest;
     vaddr count;
 
-    source = physread(channel + 1) + (physread(channel + 2) << 8) + (physread(channel + 3) << 16);
-    count = physread(channel + 4) + physread(channel + 5); 
-    dest = physread(channel + 6) + (physread(channel + 7) << 8); 
+    if (physread(channel + 3) == 0)
+        source = physread(channel + 1) + (physread(channel + 2) << 8);
+    else
+        source = (physread(channel + 3) << 12) |
+            ((physread(channel + 1) + (physread(channel + 2) << 8)) & 0xfff);
+    count = physread(channel + 4) + physread(channel + 5);
+    dest = physread(channel + 6) + (physread(channel + 7) << 8);
 
     tracec(trace_djdma, "read mem %x from %x for %d", dest, source, count);
     return S_NORMAL;
@@ -974,7 +1099,8 @@ read_djmem()
 /*
  * Write a format's fill to one track: every sector on every side the image
  * has.  The medium's layout is fixed, so a format can only lay down the
- * data byte, FMTFILL, and this is that.
+ * data byte, FMTFILL, and this is that.  This is FORMATDJ's path: the blob
+ * it downloads carries no geometry, only the fill.
  */
 static void
 fmt_track(drive, cyl)
@@ -996,14 +1122,67 @@ fmt_track(drive, cyl)
 }
 
 /*
+ * The fdj blob: its first sixteen bytes are the geometry the host patched in
+ * and MEMWRITEd to DJCODE, ahead of the format routine that scatters them
+ * into its code.  The offsets are the byte-map against FORMATDJ.ASM (dlast,
+ * dlcode, verval); the head at DJCODE is djcode[].
+ */
+#define DJFMT   0x1040      /* fdj's format entry: JP into the format routine */
+#define DJADV   0x1043      /* fdj's advance entry: JP into the advance routine */
+#define DJFMA   0x1049      /* fdj's combined entry: format then advance */
+#define DJ_H_LCODE  4       /* sector length code 0..3 -> 128/256/512/1024 */
+#define DJ_H_DLAST  6       /* sectors per track + 1 */
+#define DJ_H_FILL   7       /* the fill byte (0xe5) */
+
+/*
+ * Lay down one track the way fdj's downloaded blob does.  The geometry is the
+ * blob head's own - the sector length code and the sectors-per-track - and
+ * the sector size and count follow the firmware's tables: code 0 is the one
+ * single density size (128), the rest are double.  Whether sectors number
+ * from 0 (hard sectored) or 1 (soft) is the medium's own, kept from the
+ * track already there.  This is fdj's path, where the medium's layout is
+ * not yet fixed and the blob says what it becomes.
+ */
+static void
+djfmt(drive, cyl)
+    int drive, cyl;
+{
+    int head, nsec, secsize, firstsec, fill, density, mode;
+
+    if (!imdp[drive])
+        return;
+    nsec = djcode[DJ_H_DLAST] - 1;
+    secsize = 128 << djcode[DJ_H_LCODE];
+    /*
+     * Whether sectors are numbered from 0 or 1 is the medium's own - hard
+     * sectored from 0, soft from 1 - and the blob does not say it, so it
+     * comes from the track the drive already has, the way sense() reads it.
+     */
+    firstsec = imd_firstsec(imdp[drive], cyl, 0);
+    fill = djcode[DJ_H_FILL];
+    density = (djcode[DJ_H_LCODE] == 0) ? 0 : 1;
+    mode = (density ? 3 : 0) + (drive >= FIVE ? 2 : 0);
+    trace(trace_djdma, "djfmt drive %d cyl %d nsec %d secsize %d mode %d\n",
+        drive, cyl, nsec, secsize, mode);
+    for (head = 0; head < 2; head++)
+        imd_setfmt(imdp[drive], cyl, head, firstsec, nsec, secsize, mode, fill);
+}
+
+/*
  * Execute controller code.
  *
  * The board's z80 is not emulated, so a routine the host downloaded is not
- * run byte for byte; its effect is.  The one routine a host downloads and
- * runs is FORMATDJ's formatter, at DJCODE: it writes one track, and the
- * host follows it by running a second, shorter routine that advances the
- * formatter's track byte.  So an exec at DJCODE fills the track fmt_cyl
- * names, and the exec right after it - the advance - moves fmt_cyl on.
+ * run byte for byte; its effect is.  Two hosts download one:
+ *
+ *   FORMATDJ's formatter runs at DJCODE: it writes one track, and the host
+ *   follows it by running a second, shorter routine that advances the
+ *   formatter's track byte.  So an exec at DJCODE fills the track fmt_cyl
+ *   names, and the exec right after it - the advance - moves fmt_cyl on.
+ *
+ *   fdj's blob has three entries: DJFMT formats a track from its head's
+ *   geometry, DJADV advances to the next track, and DJFMA does both - the
+ *   steady-state format loop runs DJFMA once per track.
+ *
  * Anything else is a routine with no effect on the medium and passes as
  * success.
  */
@@ -1013,9 +1192,20 @@ djexec()
     vaddr target;
 
     target = physread(channel + 1) + (physread(channel + 2) << 8);
+    tracec(trace_djdma, " target %x", target);
     if (target == DJCODE) {
         fmt_track(fmt_drive, fmt_cyl);
         fmt_advance = 1;
+    } else if (target == DJFMT) {
+        djfmt(fmt_drive, fmt_cyl);
+        fmt_advance = 1;
+    } else if (target == DJADV) {
+        fmt_cyl++;
+        fmt_advance = 0;
+    } else if (target == DJFMA) {
+        djfmt(fmt_drive, fmt_cyl);
+        fmt_cyl++;
+        fmt_advance = 0;
     } else if (fmt_advance) {
         fmt_cyl++;
         fmt_advance = 0;
@@ -1049,6 +1239,16 @@ djdma_init()
     char **s;
 
 	register_output(DJDMA_PORT, &pulse_djdma);
+
+    /*
+     * The formatter's track counter starts at 0 for a fresh format.  It
+     * is advanced by the downloaded routine's "advance" entry, not reset
+     * by a download: fdj downloads the geometry twice (track 0's, then the
+     * chosen format's) in one format, and the second download must keep the
+     * already-advanced track.
+     */
+    fmt_cyl = 0;
+    fmt_advance = 0;
 
     if (drivenames) {
         for (i = 0; drivenames[i] && i < FIVE; i++) {

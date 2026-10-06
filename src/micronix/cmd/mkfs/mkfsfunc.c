@@ -206,7 +206,13 @@ void putlabel(buf, type)
     lp = (struct dlabel *) &buf[DL_OFFSET];
     if (lp->d_magic[0] != DL_MAGIC[0] || lp->d_magic[1] != DL_MAGIC[1] ||
         lp->d_magic[2] != DL_MAGIC[2] || lp->d_magic[3] != DL_MAGIC[3]) {
-        for (i = DL_OFFSET; i < BSIZE; i++) {
+        /*
+         * The last two bytes are the boot's entry address, which the
+         * HDCA rom reads to know where to load the first level, so they
+         * are not boot code that has grown into the label and are left
+         * alone.  Everything else in the second half must be empty.
+         */
+        for (i = DL_OFFSET; i < BSIZE - 2; i++) {
             if (buf[i])
                 die("the boot code runs into the label - it is too big");
         }

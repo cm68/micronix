@@ -1317,12 +1317,14 @@ struct medium {
     int tracks;
     int heads;
     int spt;
+    int firstsec;               /* first sector number the formatter lays down */
 } mediums[] = {
-    {"m5",  153, 4, 17},
-    {"m10", 306, 4, 17},
-    {"m16", 306, 6, 17},
-    {"m32", 640, 6, 17},
-    {"m40", 733, 5, 17},
+    {"m5",  153, 4, 17, 0},
+    {"m10", 306, 4, 17, 0},
+    {"m16", 306, 6, 17, 0},
+    {"m32", 640, 6, 17, 0},
+    {"m40", 733, 5, 17, 0},
+    {"m26", 202, 8, 32, 1},
 };
 
 /*
@@ -1368,7 +1370,7 @@ initcmd(int c, char **a)
     label.cylinders = m->tracks;
     label.heads = m->heads;
     label.spt = m->spt;
-    label.firstsec = 0;
+    label.firstsec = m->firstsec;
     label.seccode = 3;      /* 512-byte sectors, the specify form */
     label.gap3 = 43;
     label.fill = 0xe5;

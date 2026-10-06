@@ -262,7 +262,22 @@ dllabels(struct image *i)
     int sl;
     int dsize;
 
-    if (lseek(i->fd, 0L, 0) < 0 || read(i->fd, buf, 512) != 512)
+    if (i->driver == DRIVER_IMD) {
+        /*
+         * The raw .img and .imd drivers read through imdlib, not through
+         * the fd, so the label's block 0 has to be fetched as a sector.
+         * Only 512-byte sectors carry a label; a track of 128-byte
+         * sectors (the distribution 1.3/1.4 diskettes) has none.
+         */
+        int secs = 0, secsize = 0;
+
+        imd_trkinfo(i->drive, 0, 0, &secs, &secsize);
+        if (secsize != 512)
+            return 0;
+        if (imd_read(i->drive, 0, 0, imd_firstsec(i->drive, 0, 0), buf)
+                != 512)
+            return 0;
+    } else if (lseek(i->fd, 0L, 0) < 0 || read(i->fd, buf, 512) != 512)
         return 0;
 
     dl = (struct dlabel *) &buf[DL_OFFSET];
@@ -285,7 +300,13 @@ dllabels(struct image *i)
 
     spc = dl->d_heads * dl->d_spt;
     dsize = dl->d_tracks * spc;
-    imgblks = lseek(i->fd, 0L, 2) / 512;
+    if (i->driver == DRIVER_IMD) {
+        struct imd *ip = (struct imd *)i->drive;
+
+        imgblks = (long) ip->cyls * ip->heads * ip->tracks[0]->fixed.nsec;
+    } else {
+        imgblks = lseek(i->fd, 0L, 2) / 512;
+    }
     if (dsize > imgblks) {
         fprintf(stderr,
             "warning: %s says %d/%d/%d - %d blocks, the file holds %ld\n",
@@ -435,12 +456,15 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
          * label that names the slices is the whole answer: there is no
          * probing, and the minor number is not consulted.
          */
-        if (i->driver == DRIVER_IMAGE) {
+        if (i->driver == DRIVER_IMAGE || i->driver == DRIVER_IMD) {
             int dl;
 
             dl = dllabels(i);
             if (dl < 0) {
-                close(i->fd);
+                if (i->driver == DRIVER_IMD)
+                    imd_close(i->drive);
+                else
+                    close(i->fd);
                 free((struct super *)i);
                 return -1;
             }
@@ -461,9 +485,17 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
         }
 
         devnum(filesystem, &i->dt, &i->major, &i->minor);
-        if (i->driver == DRIVER_IMD) {
-            i->altsec = 1;
-        }
+        /*
+         * A raw .img is a linear dump of the sectors, not the alternated
+         * order a shipped IMD carries, and imdlib's raw_load lays it out
+         * in order (raw_secmap is straight through).  The fslib's own
+         * skew below must stay clear for it - setting altsec here for
+         * every imd image interleaved every block one place out, so a
+         * filesystem built and read through fslib agreed with itself but
+         * the boot, which reads straight, was one block off.  A skewed
+         * diskette is named by the minor (bit 3, below), not by the
+         * driver.
+         */
         if (i->dt == ' ') {
             if (is_sticky(filesystem)) {
                 i->altsec = 1;
@@ -726,13 +758,14 @@ secinv(struct super *fs, UINT blkno)
 int secsize;
 int secs;
 void
-blktopos(void *drive, int blkno, int *cyl, int *head, int *sec)
+blktopos(void *drive, int blkno, int offset, int *cyl, int *head, int *sec)
 {
     struct imd *ip = (struct imd *)drive;
     struct imd_trk *tp;
     int spt;
     int heads;
     int trk;
+    int cylstart;
 
     if (secsize == 0) {
         imd_trkinfo(drive, 2, 0, &secs, &secsize);
@@ -744,7 +777,7 @@ blktopos(void *drive, int blkno, int *cyl, int *head, int *sec)
     }
 
     /*
-     * Sectors per track and heads now come off the imd handle, which
+     * Sectors per track and heads come off the imd handle, which
      * raw_load fills for a flat .img the same way the IMD loader does.
      * The old code assumed a single sided medium - head always 0, the
      * filesystem two cylinders in - and a double sided image numbers
@@ -754,14 +787,32 @@ blktopos(void *drive, int blkno, int *cyl, int *head, int *sec)
     spt = tp ? tp->fixed.nsec : secs;
     heads = ip->heads ? ip->heads : 1;
 
-    *sec = (blkno % spt) + 1;
+    /*
+     * The filesystem's first block is `offset` blocks into the device -
+     * the boot sits in front of it on a diskette, and openfs read that
+     * number out of the disk's own label.  It is in blocks; the cylinder
+     * the filesystem starts on is that many blocks spread over a whole
+     * cylinder, heads and all.  Hardcoding 2 here only ever fit the
+     * five inch media.
+     */
+    cylstart = offset / (heads * spt);
+
+    /*
+     * The sector number on the wire starts where the medium's format says
+     * it does - 0 on a five inch hard sectored disk, 1 elsewhere - and
+     * that base is what imd_firstsec returns (raw_secmap laid the track
+     * out from it).  Hardcoding 1 here invented a sector ten on a ten
+     * sector track numbered from zero, and every block after the first
+     * landed one place out.
+     */
+    *sec = (blkno % spt) + imd_firstsec(drive, 0, 0);
     trk = blkno / spt;
     if (heads == 1) {
         *head = 0;
-        *cyl = 2 + trk;
+        *cyl = cylstart + trk;
     } else {
         *head = trk % heads;
-        *cyl = trk / heads;
+        *cyl = cylstart + trk / heads;
     }
     trace(trace_fs, "blkno:%d cyl:%d head:%d sec:%d\n",
         blkno, *cyl, *head, *sec);
@@ -802,7 +853,7 @@ readblk(struct super *fs, int blkno, char *buf)
         }
 #endif
     } else if (i->driver == DRIVER_IMD) {
-        blktopos(i->drive, realblk, &cyl, &head, &sec); 
+        blktopos(i->drive, realblk, i->offset, &cyl, &head, &sec);
         ret = imd_read(i->drive, cyl, head, sec, buf);
         if (ret != 512) {
             printf("read lose %d\n", ret);
@@ -843,7 +894,7 @@ writeblk(struct super *fs, int blkno, char *buf)
             lose("writeblk");
         }
     } else if (i->driver == DRIVER_IMD) {
-        blktopos(i->drive, realblk, &cyl, &head, &sec); 
+        blktopos(i->drive, realblk, i->offset, &cyl, &head, &sec);
         ret = imd_write(i->drive, cyl, head, sec, buf);
         if (ret != 512) {
             printf("write lose %d\n", ret);

@@ -22,6 +22,9 @@
 int trace_imd;
 #endif
 
+static void apply_fmt(struct imd_trk *tp, int nsec, int size, int mode,
+    int firstsec);
+
 static void
 dump_secmap(char *label, char *m, int s)
 {
@@ -201,7 +204,7 @@ attach_delta(struct imd *ip, char *fname, int create_delta)
         fd = 0;
     }
     if (fd && create_delta) {
-        ftruncate(fd, MAXDELTA);
+        ftruncate(fd, DELTA_TOTAL);
         fsync(fd);
     }
     ip->delta_fd = fd;
@@ -211,12 +214,36 @@ attach_delta(struct imd *ip, char *fname, int create_delta)
         lseek(fd, 0, SEEK_SET);
         read(fd, &ip->delta_map, DELTA_SIZE);
 
+        /*
+         * A formatted track's layout is applied before its data is read,
+         * because the data is keyed by the slot the new secmap names and
+         * sized by the new sector size.  nsec of zero means never
+         * formatted, and the original image's layout stands.
+         */
+        for (cyl = 0; cyl < CYLINDERS; cyl++) {
+            for (head = 0; head < HEADS; head++) {
+                char meta[4];
+
+                tp = ip->tracks[trknum(cyl, head)];
+                if (!tp)
+                    continue;
+                lseek(fd, FMTMETA_OFF(trknum(cyl, head)), SEEK_SET);
+                if (read(fd, meta, 4) == 4 && meta[0])
+                    apply_fmt(tp, meta[0], meta[1], meta[2], meta[3]);
+            }
+        }
+
         // read the deltas
         for (cyl = 0; cyl < CYLINDERS; cyl++) {
             for (head = 0; head < HEADS; head++) {
                 tp = ip->tracks[trknum(cyl, head)];
+                if (!tp)
+                    continue;
                 for (sec = 0; sec < SECTORS; sec++) {
                     if (ip->delta_map[DIRTY_OFF(cyl, head, sec)] == DELTA_YES) {
+                        /* a slot beyond this track's sectors is stale */
+                        if (sec >= tp->fixed.nsec)
+                            continue;
                         offset = DELTA_OFF(cyl, head, sec);
                         trace(trace_imd, "imd_load_delta cyl %d head %d sec %d offset %d\n",
                             cyl, head, sec, offset);
@@ -666,7 +693,23 @@ imd_trkinfo(void *vp, int cyl, int head, int *secs, int *secsize)
     } else {
         if (secs) *secs = tp->fixed.nsec;
         if (secsize) *secsize = tp->secsize;
-    } 
+    }
+}
+
+/*
+ * the track's FM/MFM density - the IMD "mode" byte, 0 for single and
+ * 1 for double.  A format set it; a disk that has never been formatted
+ * still carries whatever its original image said.
+ */
+int
+imd_density(void *vp, int cyl, int head)
+{
+    struct imd *ip = (struct imd *)vp;
+    struct imd_trk *tp = ip->tracks[trknum(cyl, head)];
+
+    if (!tp)
+        return 0;
+    return tp->fixed.mode;
 }
 
 /*
@@ -805,6 +848,75 @@ imd_read(void *vp, int cyl, int head, int osec, char *buf)
     if (traceflags & trace_imd) hexdump(buf, tp->secsize);
 #endif
     return (tp->secsize);
+}
+
+/*
+ * Rebuild one track's layout.  The caller owns the data afterwards:
+ * imd_setfmt fills it with the format's fill byte, and the delta loader
+ * leaves it empty for the delta's own sector data.  Shared so the two
+ * never disagree on how a track is laid out.
+ */
+static void
+apply_fmt(struct imd_trk *tp, int nsec, int size, int mode, int firstsec)
+{
+    int i;
+
+    for (i = 0; i < tp->fixed.nsec; i++)
+        if (tp->data[i])
+            free(tp->data[i]);
+    free(tp->data);
+    free(tp->secmap);
+
+    tp->fixed.nsec = nsec;
+    tp->fixed.size = size;
+    tp->fixed.mode = mode;
+    tp->secsize = 0x80 << size;
+    tp->secmap = malloc(nsec);
+    for (i = 0; i < nsec; i++)
+        tp->secmap[i] = firstsec + i;
+    tp->data = calloc(nsec, sizeof(char *));
+}
+
+int
+imd_setfmt(void *vp, int cyl, int head, int firstsec, int secs, int secsize,
+    int mode, int fill)
+{
+    struct imd *ip = (struct imd *)vp;
+    int trk = trknum(cyl, head);
+    struct imd_trk *tp;
+    int i, sbyte;
+    char meta[4];
+
+    if ((cyl >= ip->cyls) || (head >= ip->heads))
+        return 0;
+    tp = ip->tracks[trk];
+    if (!tp)
+        return 0;
+
+    for (sbyte = 0, i = 128; i < secsize; i <<= 1)
+        sbyte++;
+
+    apply_fmt(tp, secs, sbyte, mode, firstsec);
+    for (i = 0; i < secs; i++) {
+        tp->data[i] = malloc(secsize);
+        memset(tp->data[i], fill, secsize);
+    }
+
+    /*
+     * Persist the format: the four byte layout record, then the filled
+     * data of every sector, so the track comes back formatted on reload.
+     */
+    if (ip->delta_fd) {
+        meta[0] = secs;
+        meta[1] = sbyte;
+        meta[2] = mode;
+        meta[3] = firstsec;
+        lseek(ip->delta_fd, FMTMETA_OFF(trk), SEEK_SET);
+        write(ip->delta_fd, meta, 4);
+        for (i = 0; i < secs; i++)
+            imd_write(ip, cyl, head, firstsec + i, tp->data[i]);
+    }
+    return 1;
 }
 
 /*

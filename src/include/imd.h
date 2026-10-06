@@ -60,6 +60,18 @@
 #define DELTA_OFF(t, h, s)  (DELTA_SIZE + (MAXSECSIZE * DIRTY_OFF(t, h, s)))
 #define MAXDELTA        DELTA_OFF(TRACKS, 0, 0)
 
+/*
+ * A format is a per-track thing: the number of sectors, their size, the
+ * FM/MFM mode byte, and the first sector's number.  The delta stores one
+ * four byte record per track right after the sector data, so a formatted
+ * track's layout survives a reload the way its data does.  nsec of zero
+ * means the track was never formatted and the original image's layout
+ * stands.
+ */
+#define FMTMETA_SIZE    (TRACKS * 4)
+#define FMTMETA_OFF(t)  (MAXDELTA + ((t) * 4))
+#define DELTA_TOTAL     (MAXDELTA + FMTMETA_SIZE)
+
 #define DELTA_NO    0           // use the original
 #define DELTA_YES   1           // delta has newer
 
@@ -110,8 +122,11 @@ extern void imd_close(void *vp);
 extern void *imd_load(char *fname, int drive, int create_delta);
 extern int imd_firstsec(void *vp, int cyl, int head);
 extern void imd_trkinfo(void *vp, int cyl, int head, int *secs, int *secsize);
+extern int imd_density(void *vp, int cyl, int head);
 extern int imd_write(void *vp, int cyl, int head, int osec, char *buf);
 extern int imd_read(void *vp, int cyl, int head, int osec, char *buf);
+extern int imd_setfmt(void *vp, int cyl, int head, int firstsec, int secs,
+    int secsize, int mode, int fill);
 extern void imd_dump_track(struct imd_trk *tp);
 
 /*

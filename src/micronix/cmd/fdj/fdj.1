@@ -1,0 +1,63 @@
+.he "fdj (1)                   10/5/26                   fdj (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+fdj
+- format a Morrow DJ-DMA floppy diskette
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.nf
+fdj device
+fdj device [ -b bytes ] [ -d drive ] [ -h holes ] [ -i inches ]
+           [ -n density ] [ -p sectors ] [ -s sides ] [ -t tracks ]
+.fi
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+fdj formats the DJ-DMA floppy in
+.i device .
+A format writes every sector - a soft-sectored write lays down the ID
+header and data together - and then reads each sector back to verify it.
+With no options, fdj presents the format menu:
+.nf
+   8 inch formats:    F CP/M single  G CP/M double  H Micronix
+   5 inch hard:       C single      D double       E Micronix
+   5 inch soft:       A single      B double
+   I  other
+.fi
+Track 0 of an 8 inch diskette is always 26 sectors of 128 bytes, single
+density; the rest of the disk uses the chosen geometry.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.nf
+-b bytes     128, 256, 512 or 1024 bytes per sector
+-d drive     drive number 0-3
+-h holes     1 (soft) or 10 (hard) sectored
+-i inches    5 or 8 inch drive
+-n density   1 (single) or 2 (double)
+-p sectors   1-26 sectors per track
+-s sides     1 or 2 sided
+-t tracks    35, 40 or 77 tracks
+.fi
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+djformat(1), mkfs(1)
+.sp 2
