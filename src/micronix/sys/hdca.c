@@ -249,7 +249,8 @@ gettrk(blk, hp)
 	cyl = blk / hp->h_spc;
 	cyl += hp->h_cylstart;
 	cyl += hp->h_roll;
-	cyl %= hp->h_tracks;
+	if (cyl >= hp->h_tracks)
+		cyl -= hp->h_tracks;
 	return (cyl);
 }
 
@@ -772,6 +773,13 @@ hdfmt(hp, c, b, drive)
 		while (!(in(HDCA_PSR) & PSR_OPDONE))
 			;
 	}
+	/*
+	 * Acknowledge the last op-done so the next request's seek-done is not
+	 * masked by a stale op-done: the interrupt handler tests op-done
+	 * first, and a format that leaves it set hands the next seek to the
+	 * wrong phase (or nowhere).
+	 */
+	out(HDCA_CMD, CMD_RAMDATA);
 
 	ei();
 	hdmutex = 0;
