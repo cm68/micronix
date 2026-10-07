@@ -28,7 +28,8 @@ given, is the number of 512-byte blocks the file system is to hold; a
 number written -exclude instead leaves that many blocks at the end of
 the device, which is how swap space is kept out of the file system.
 Given neither, the whole device is used.  The size of the device is
-worked out from the drive, so it never has to be told.
+read from the drive's label, so it never has to be told; a drive with
+no label is refused.
 .sp
 Cylinder 0 is reserved for the boot and the disk label, whether or
 not a boot is written.  The blocks are owned by a file, /boot/boot,
@@ -59,8 +60,8 @@ NOTES
 .br
 This is not the v7 mkfs: there is no prototype file, and it builds
 only an empty file system.  The size is in blocks and may be given as
-an exclusion, and the device size comes from the drive, not from the
-command line.
+an exclusion, and the device size comes from the drive's label, not
+from the command line.
 .sp 2
 .in -5
 .bd

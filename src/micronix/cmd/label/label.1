@@ -78,7 +78,9 @@ On a disk with no label, this is the write that describes it for the
 first time.  A fresh label is written with the roll set to half the
 cylinders, which is what the driver assumes for a disk with no label, so
 the disk maps the same way after the label as it did before it and
-nothing declared here can move data that is already on the drive.
+nothing declared here can move data that is already on the drive.  The
+first sector number is written as one, which is how the HDCA numbers its
+sectors.
 .sp
 There is no way yet to set the roll to anything else, so this form
 cannot describe a disk whose filesystem is placed by an offset rather
@@ -134,18 +136,9 @@ that as a busy device.  Label the drive the system is not running from.
 .sp
 A label carries geometry and no timing.  The delay between step pulses,
 the cylinder where write pre-compensation starts and the one where low
-current starts come from the driver's table of drive models, chosen by
-the drive's device number, and there is nowhere in a label to put them.
-A geometry written here that disagrees with the row the device number
-names is therefore mapped by its label and timed by that row, and the
-kernel says so, once per open:
-.sp
-.in +5
-mw1: label 925/9/17 disagrees with table 306/6/17, using label
-.in -5
-.sp
-The label is what wins for the geometry, because the disk is the only
-thing that knows how it was written.
+current starts are constants the driver holds, because there is nowhere
+in a label to put them.  The geometry, then, is entirely the label's:
+the disk is the only thing that knows how it was written.
 .sp
 Slices are cylinder-granular.  The table says where a slice begins and
 how many cylinders it runs; the last cylinder of one slice and the first

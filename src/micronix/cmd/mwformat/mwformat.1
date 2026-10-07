@@ -94,9 +94,11 @@ The step pulse delay, in units of 100 microseconds.
 -m model
 .in +5
 .br
-A drive this machine has nodes for: m5, m10, m16, m32 or m40.  The name is a
-shorthand for the geometry and the timing together, and any of the flags
-above overrides the part it names.
+The drive model: m5, m10, m16, m32 or m40.  The name is a shorthand for
+the geometry and the timing together, and any of the flags above
+overrides the part it names.  The model is a format parameter, not a
+device node: the node names a drive and a slice, and says nothing about
+what the drive is.
 .in -5
 .bd
 -k skew
