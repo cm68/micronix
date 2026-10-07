@@ -28,20 +28,20 @@ extern int openfsrw(char *name, struct super **f, int writable);
 extern void closefs(struct super *f);
 
 extern void lose(char *s);
-extern int readblk(struct super *f, int blkno, char *buf);
-extern int writeblk(struct super *f, int blkno, char *buf);
+extern int readblk(struct super *f, UINT blkno, char *buf);
+extern int writeblk(struct super *f, UINT blkno, char *buf);
 
 extern struct dsknod *iget(struct super *f, int inum);
 extern void iput(struct dsknod *ip);
 extern void ifree(struct dsknod *ip);
 
 extern off_t filesize(struct dsknod *ip);
-extern int bmap(struct dsknod *ip, off_t offset, int alloc);
-extern int balloc(struct super *f);
-extern void bfree(struct super *f, int b);
+extern UINT bmap(struct dsknod *ip, off_t offset, int alloc);
+extern UINT balloc(struct super *f);
+extern void bfree(struct super *f, UINT b);
 extern void iblkfree(struct super *f, UINT *bp);
 extern void filefree(struct dsknod *ip);
 
 extern struct dir *getdirent(struct dsknod *ip, int index);
-extern int bootrange(struct super *f, int *first, int *nblk, char **name);
-extern int installboot(struct super *f, int first, int nblk, char *name);
+extern int bootrange(struct super *f, UINT *first, UINT *nblk, char **name);
+extern int installboot(struct super *f, UINT first, UINT nblk, char *name);

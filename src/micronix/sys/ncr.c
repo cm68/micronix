@@ -454,14 +454,20 @@ struct info
     UINT8 heads;
     UINT8 sectors;              /* sectors per track */
 
-    UINT maxblk;                /* max legal block number in the slice */
+    UINT maxblk;                /* dllabel's bound for the first slice opened */
     UINT spc;                   /* sectors per cylinder */
-    UINT roll;                  /* what scsicyl adds to blk / spc */
-    UINT cylstart;              /* first cylinder of the slice being read */
+    UINT roll;                  /* the drive's d_roll */
+    UINT cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
     UINT8 flags;                /* see below */
     UINT8 lun;                  /* the logical unit this open addresses */
-    UINT8 slice;                /* the slice this open is bound to */
+
+    /*
+     * The slice table off the label, cached at open.  A buffer's minor
+     * names its slice; ncrstrat looks the offset and length up here, so
+     * every slice of a target maps at once instead of one open's.
+     */
+    struct dslice d_slice[NSLICE];
 } scs[NTARGET] = 0;
 
 #define OPEN    2               /* target is open */
@@ -877,17 +883,16 @@ scsireset(ip)
  * on the host, which is what makes them agree.
  */
 static UINT
-scsicyl(blk, info)
-    UINT blk;
-    register struct info *info;
+scsicyl(blk, spc, cylstart, roll, tracks)
+    UINT blk, spc, cylstart, roll, tracks;
 {
     static UINT cyl;
 
-    cyl = blk / info->spc;
-    cyl += info->cylstart;
-    cyl += info->roll;
-    if (cyl >= info->tracks)
-        cyl -= info->tracks;
+    cyl = blk / spc;
+    cyl += cylstart;
+    cyl += roll;
+    if (cyl >= tracks)
+        cyl -= tracks;
     return (cyl);
 }
 
@@ -905,9 +910,8 @@ scsicyl(blk, info)
  * answer.
  */
 static UINT32
-scsilba(blk, info)
-    UINT blk;
-    register struct info *info;
+scsilba(blk, spc, cylstart, roll, tracks, heads, sectors)
+    UINT blk, spc, cylstart, roll, tracks, heads, sectors;
 {
     static UINT csec, cyl;
     static UINT32 lba;
@@ -918,12 +922,12 @@ scsilba(blk, info)
      * geometry turns out to be, so the answer is known without one.  The
      * division below would trap.
      */
-    if (info->spc == 0)
+    if (spc == 0)
         return (0);
-    csec = blk % info->spc;
-    cyl = scsicyl(blk, info);
-    lba = (UINT32)cyl * info->heads + csec / info->sectors;
-    lba = lba * info->sectors + csec % info->sectors;
+    csec = blk % spc;
+    cyl = scsicyl(blk, spc, cylstart, roll, tracks);
+    lba = (UINT32)cyl * heads + csec / sectors;
+    lba = lba * sectors + csec % sectors;
     return (lba);
 }
 
@@ -957,20 +961,18 @@ ncropen(dev, mode)
     sl = devslice(dev);
     info = &scs[target];
     /*
-     * One mapping per target, not one per open: scs[] is keyed by target
-     * and holds the lun, the slice's offset and roll, so a second open
-     * asking for a different lun or slice would be served the first one's
-     * mapping and would read and write the wrong blocks while reporting
-     * success.  The same lun and slice is the same mapping and is let
-     * through as before.
+     * The label is loaded once, on the first open of any slice of this
+     * target, and cached here - geometry in the fields above, the slice
+     * table below.  A later open of another slice on the same target just
+     * lets the buffer's minor name which slice, and ncrstrat resolves its
+     * offset and length from the cached table.
      */
     if (info->flags & OPEN) {
-        if (info->lun != lun || info->slice != sl)
+        if (info->lun != lun)
             u.error = EBUSY;
         return;
     }
     info->lun = lun;
-    info->slice = sl;
     ip = &boards[0];
 
     if (scsireset(ip) < 0) {
@@ -985,7 +987,7 @@ ncropen(dev, mode)
      * same reason.
      */
     switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | target,
-                    sl, (struct dlgeom *)info)) {
+                    sl, (struct dlgeom *)info, info->d_slice)) {
     case -1:
         return;                 /* no such slice; dllabel set u.error */
     case 0:
@@ -1071,11 +1073,18 @@ ncrstrat(b)
     static struct scsiif *ip;
     static char *p;
     static UINT32 lba;
+    static UINT sl, off, roll, maxblk;
 
     info = &scs[b->dev & 7];
     ip = &boards[0];
 
-    if (b->blk > info->maxblk) {
+    /*
+     * The buffer's minor names its slice; dlslice resolves its offset,
+     * roll and bound from the cached table ('c' is the whole target).
+     */
+    sl = devslice(b->dev);
+    if (dlslice((struct dlgeom *)info, info->d_slice, sl,
+                &off, &roll, &maxblk) || b->blk > maxblk) {
         b->flags |= BERROR;
         b->error = ENXIO;
         iodone(b);
@@ -1100,7 +1109,8 @@ ncrstrat(b)
         return;
     }
 
-    lba = scsilba(b->blk, info);
+    lba = scsilba(b->blk, info->spc, off, roll, info->tracks,
+                  info->heads, info->sectors);
 
     if (scsistart(ip, b->dev & 7, b->flags & BREAD, lba, 1) < 0) {
         b->flags |= BERROR;

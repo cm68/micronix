@@ -1,0 +1,177 @@
+.he "imd (5)                       10/6/26                       imd (5)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+imd
+- ImageDisk floppy image file format
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+An
+.bd
+imd
+file holds a whole disk, cylinder by cylinder and head by head, the way
+Dave Dunfield's ImageDisk utility recorded it.  The simulator and the host
+tools read these to get at a floppy, so the format is the one piece every
+driver shares.  The authority for it is the header comment in
+.bd
+include/imd.h,
+and the reader is
+.bd
+lib/imdlib.c.
+.sp
+A file is a text comment followed by a run of track records.  The comment
+runs up to a control-z (0x1a), and every image in this tree opens it with
+the program name, so the loader first checks that the file begins
+.bd
+"IMD ".
+Anything that does not is taken for a flat sector image, and a file that
+cannot be opened at all for a blank disk; both are described under
+.bd
+FALLBACKS
+below.
+.sp
+Each track record is a five byte header, then its maps, then the data for
+its sectors:
+.sp
+.nf
+.bd 6
+mode          1 byte
+cylinder      1 byte
+head          1 byte
+numsecs       1 byte
+secsize       1 byte
+.sp
+secmap        numsecs bytes
+cylmap        numsecs bytes, only if head has bit 0x80 set
+headmap       numsecs bytes, only if head has bit 0x40 set
+.sp
+then for each of the numsecs sectors, a one byte data code
+and the sector's data, as that code directs.
+.fi
+.sp
+.bd
+mode
+is the FM/MFM density: 0 for single density, 1 for double.  The reader
+hands the byte straight back as the track's density.
+.sp
+.bd
+cylinder
+and
+.bd
+head
+address the track.  The low six bits of the head byte are the head number;
+the two high bits say whether the optional cylinder and head maps follow
+the sector map.  These maps carry alternate cylinder and head numbers for
+each sector and are never seen in this tree, but the reader honours them.
+.sp
+The cylinder field is one byte, so a saved image cannot address a cylinder
+above 255 - a floppy era choice, as Dunfield's format never needed more.
+That byte is what is written, not the working limit: in core the track
+array is indexed by an
+.bd
+int
+cylinder and grows to whatever is written, so a disk of more than 255
+cylinders is read and written correctly in memory.  Persistence is what is
+capped - the saved file and the delta key each keep the cylinder in one
+byte, so an image past 255 would have to be read back by counting tracks
+rather than trusting the field.
+.sp
+.bd
+numsecs
+is how many sectors the track holds.
+.sp
+.bd
+secsize
+is a shift, not a byte count.  The sector size is
+.bd
+128 << secsize,
+so 0 is 128 bytes, 1 is 256, 2 is 512, and 3 is 1024.  A track may differ
+from its neighbours, which is how CP/M puts a single density first track
+on an otherwise double density disk.
+.sp
+.bd
+secmap
+is the sector numbers in the order they were recorded.  Numbering need not
+start at one and need not be dense; the driver asks for
+.bd
+imd_firstsec
+when it walks a track rather than assuming.  When a format is applied, the
+map is rebuilt as
+.bd
+firstsec + i.
+.sp
+The data code for a sector is one of:
+.sp
+.nf
+.bd 3
+0       absent - no data follows; the sector reads as zeros
+1       data - secsize bytes of sector data follow
+2       fill - one byte follows; the whole sector is that byte
+.fi
+.sp
+Absent sectors are how a track records fewer sectors than
+.bd
+numsecs
+or a hole in the map, and they are materialised as zeros on read.
+.sp 2
+.in -5
+.bd
+WRITING AND THE DELTA
+.in +5
+.br
+An imd file is never rewritten in place.  Writes go to a sibling key store
+named after the image with
+.bd
+-delta
+appended, so loading an image is first reading the baseline and then
+overlaying the delta.  The store carries no geometry of its own; each key
+is three bytes - cylinder, head, and a sector slot - or the same pair with
+.bd
+0xff
+in the slot for the track's format record.  A format record's value is
+four bytes: the sector count, the sector size shift, the mode, and the
+first sector number.  A sector's value is the sector data.  Format records
+are applied before sector data on load, since the data is keyed by slot
+and sized by the format the record just set.
+.sp
+A writable image takes an advisory lock on the image for the life of the
+process, so a short lived tool and a long lived simulator contend on the
+same disk the same way.  A format grows the image cylinder by cylinder as
+the disk learns its shape.
+.sp 2
+.in -5
+.bd
+FALLBACKS
+.in +5
+.br
+A file that does not begin
+.bd
+"IMD "
+is read as a raw sector image: the sectors in order, cylinder by cylinder
+and head by head within each cylinder, and the same track structures built
+that an imd file would have produced, delta included.  The geometry has to
+come from somewhere a flat file does not carry, so it is recognised first
+by the device number in the file's name and then by its size, per the
+table in
+.bd
+lib/imdlib.c.
+A missing file is a blank disk, empty until it is formatted.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+imd (in
+.bd
+tools/imd.c),
+the simulator, mnix

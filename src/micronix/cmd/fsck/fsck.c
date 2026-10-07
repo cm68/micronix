@@ -289,7 +289,7 @@ main(int argc, char *argv[])
 	 * list check then leaves them allocated.
 	 */
 	if (iflag) {
-		int first, nblk;
+		UINT first, nblk;
 		char *bootname;
 		if (bootrange(fs, &first, &nblk, &bootname))
 			installboot(fs, first, nblk, bootname);
@@ -355,7 +355,7 @@ readsuper(void)
  * an out-of-range block is reported; a second claim is a duplicate.
  */
 static void
-countblock(int inum, int b, int type)
+countblock(int inum, UINT b, int type)
 {
 	if (b == 0)
 		return;
@@ -391,7 +391,7 @@ countblock(int inum, int b, int type)
  * the 256 blocks it names.
  */
 static void
-countindir(int inum, int b)
+countindir(int inum, UINT b)
 {
 	UINT blk[256];
 	int i;
@@ -489,7 +489,7 @@ checkilist1(void)
  * map otherwise.
  */
 static void
-freeblock(int b, int chain)
+freeblock(UINT b, int chain)
 {
 	char *what = chain ? "Free chain" : "Free";
 
@@ -526,7 +526,7 @@ freewalk(void)
 	UINT list[100];
 	int n;
 	int i;
-	int b;
+	UINT b;
 
 	memcpy(list, fs->s_free, sizeof(list));
 	n = fs->s_nfree;
@@ -562,7 +562,7 @@ freewalk(void)
 int
 checkfree(void)
 {
-	int b;
+	UINT b;
 	int missing;
 
 	freemap = calloc((fs->s_fsize >> 3) + 2, 1);
@@ -594,7 +594,7 @@ checkfree(void)
 static void
 rebuildfree(void)
 {
-	int b;
+	UINT b;
 
 	printf("** Rebuilding the free list\n");
 
@@ -698,7 +698,7 @@ checkilist2(void)
 int
 summary(void)
 {
-	int b;
+	UINT b;
 
 	nused = 0;
 	nfree = 0;
@@ -725,10 +725,10 @@ summary(void)
  * pass sees the new block as used and the old one as gone.
  */
 static void
-patchbad(int b)
+patchbad(UINT b)
 {
 	char buf[512];
-	int nb;
+	UINT nb;
 
 	if (nflag)
 		return;
@@ -758,7 +758,7 @@ static void
 huntbad(void)
 {
 	char buf[512];
-	int b;
+	UINT b;
 
 	for (b = 0; b < fs->s_fsize; b++) {
 		if (readblk(fs, b, buf) == 0)
@@ -806,7 +806,7 @@ relinkone(struct dsknod *lfd, int inum)
 	struct dir *de;
 	char name[14];
 	off_t off;
-	int b;
+	UINT b;
 	int i;
 
 	for (off = 0; off < filesize(lfd); off += 512) {

@@ -33,6 +33,9 @@ extern int in(), out(), timeout(), inton();
 
 struct hd hdinfo[NHD];
 
+/* the slice table off each drive's label, cached at open */
+static struct dslice hdslice[NHD][NSLICE];
+
 static int hdmutex;		/* the controller, 0 = free */
 static int (*hdintr) ();	/* the phase the op-done interrupt resumes */
 static struct hd *hdintarg;	/* its argument */
@@ -240,17 +243,16 @@ getinfo(dev)
  * is the remainder.
  */
 static UINT
-gettrk(blk, hp)
-	UINT blk;
-	struct hd *hp;
+gettrk(blk, spc, cylstart, roll, tracks)
+	UINT blk, spc, cylstart, roll, tracks;
 {
 	UINT cyl;
 
-	cyl = blk / hp->h_spc;
-	cyl += hp->h_cylstart;
-	cyl += hp->h_roll;
-	if (cyl >= hp->h_tracks)
-		cyl -= hp->h_tracks;
+	cyl = blk / spc;
+	cyl += cylstart;
+	cyl += roll;
+	if (cyl >= tracks)
+		cyl -= tracks;
 	return (cyl);
 }
 
@@ -359,6 +361,7 @@ hdstrat(b)
 {
 	struct hd *hp;
 	UINT cyl, head, sector;
+	UINT sl, off, roll, maxblk;
 
 	if (b->count != 512) {
 		b->flags |= BERROR;
@@ -367,13 +370,20 @@ hdstrat(b)
 		return (0);
 	}
 	hp = getinfo(b->dev);
-	if (b->blk > hp->h_maxblk) {
+	hp->h_drive = b->dev & 3;
+	/*
+	 * The buffer's minor names its slice; dlslice resolves its offset,
+	 * roll and bound from the cached table ('c' is the whole drive).
+	 */
+	sl = devslice(b->dev);
+	if (dlslice((struct dlgeom *)hp, hdslice[b->dev & 3], sl,
+		    &off, &roll, &maxblk) || b->blk > maxblk) {
 		b->flags |= BERROR;
 		b->error = ENXIO;
 		iodone(b);
 		return (0);
 	}
-	cyl = gettrk(b->blk, hp);
+	cyl = gettrk(b->blk, hp->h_spc, off, roll, hp->h_tracks);
 	head = gethed(b->blk, hp);
 	sector = getsec(b->blk, hp);
 	hp->h_buf = b;
@@ -400,7 +410,6 @@ static void
 phase00(hp)
 	struct hd *hp;
 {
-	hp->h_retry = 0;
 	hp->h_flags &= ~HDERROR;
 	hdactive = hp;
 	hddead = 0;
@@ -430,7 +439,7 @@ phase01(hp)
 	}
 	di();
 	hp->h_flags |= HDSEEK;
-	hdselect(hdunit, hp->h_head);
+	hdselect(hp->h_drive, hp->h_head);
 	if (hp->h_trackdelta < 0) {
 		hdstep(hp->h_head, 1, -hp->h_trackdelta);
 		hp->h_cyl -= -hp->h_trackdelta;
@@ -473,7 +482,7 @@ static void
 phase03(hp)
 	struct hd *hp;
 {
-	hdselect(hdunit, hp->h_head);
+	hdselect(hp->h_drive, hp->h_head);
 	if (hp->h_cmd != HDCA_READHDR)
 		hdhdr(hp->h_head, hp->h_cyl, hp->h_sector);
 	di();
@@ -521,7 +530,7 @@ phase08(hp)
 {
 	char *p;
 
-	hdselect(hdunit, hp->h_head);
+	hdselect(hp->h_drive, hp->h_head);
 	p = bhold(hp->h_cur);
 	if (hp->h_cmd == HDCA_WRITEHDR)
 		hdhdrwr(p);
@@ -651,12 +660,8 @@ hdopen(dev, mode)
 	 * to be armed before dllabel() and not after.
 	 */
 	inton(HDCAINT);
-	if (hp->h_flags & HDOPEN) {
-		if (hp->h_slice != devslice(dev))
-			u.error = EBUSY;
+	if (hp->h_flags & HDOPEN)
 		return (0);
-	}
-	hp->h_slice = devslice(dev);
 	hp->h_tracks = 0;
 	hp->h_heads = 0;
 	hp->h_sectors = 0;
@@ -672,7 +677,7 @@ hdopen(dev, mode)
 	hp->h_firstsec = 1;
 
 	switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive,
-	    devslice(dev), (struct dlgeom *)hp)) {
+	    devslice(dev), (struct dlgeom *)hp, hdslice[drive])) {
 	case -1:
 		return (-1);
 	case 0:
@@ -860,6 +865,37 @@ hdcioctl(dev, cmd, r, b)
 		sleep(&hdioctl, PRIBIO);
 
 	r->cmd[HDLEN] = hp->h_stat;
+	return (0);
+}
+
+/*
+ * Enumerate the drives at signon, like mwprobe (sys/mw.c): read each
+ * unit's label and print the drives that answer.  The major is 1 (the
+ * header, sys/hdcahdr.c) and the HDCA numbers sectors from one, so the
+ * label's own d_firstsec is what makes block 0 land on sector 1.  A dead
+ * unit times out in the watchdog (hdtick) and is skipped.
+ */
+hdprobe()
+{
+	struct hd *hp;
+	struct buf *b;
+	struct dlabel *lp;
+	UINT dev, unit;
+
+	for (unit = 0; unit < NHD; unit++) {
+		hp = &hdinfo[unit];
+		dev = (1 << 8) | (DL_WHOLE << 5) | unit;
+		hp->h_firstsec = 1;
+		if (dllabel(dev, DL_WHOLE, (struct dlgeom *)hp, hdslice[unit]) != 1)
+			continue;
+		if ((b = bread(0, dev)) == 0)
+			continue;
+		lp = (struct dlabel *) &bhold(b)[DL_OFFSET];
+		pr("hdca%d: %s %s, %d MB\n", unit, lp->d_mfg, lp->d_model,
+		    hp->h_tracks * hp->h_spc >> 11);
+		brel();
+		brelse(b);
+	}
 	return (0);
 }
 

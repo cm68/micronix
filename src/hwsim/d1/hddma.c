@@ -194,7 +194,17 @@ select_drive(int id)
     if (id == 0)
         set_ctl_image(drive_resolve(drivename));   /* the root filesystem image */
 #endif
-    secsize[id] = SECLEN;
+    /*
+     * The sector size comes off the image, not a constant: a drive
+     * formatted at 512 reads 512, and one still blank has no track to
+     * ask, so it keeps the default until a format or specify sets it.
+     */
+    {
+        int nsec = 0, ss = 0;
+
+        imd_trkinfo(handle[id], 0, 0, &nsec, &ss);
+        secsize[id] = ss ? ss : SECLEN;
+    }
     return 0;
 }
 

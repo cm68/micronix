@@ -27,10 +27,11 @@
 extern int copy();              /* leaf mem.s: kernel-to-kernel copy */
 
 int
-dllabel(cdev, sl, g)
+dllabel(cdev, sl, g, table)
     UINT cdev;                  /* the drive's own 'c' device number */
     UINT sl;                    /* the slice this open is bound to */
     register struct dlgeom *g;
+    struct dslice *table;       /* cached slice table, or 0 for none */
 {
     static struct buf *b;
     static struct dlabel lab;
@@ -38,7 +39,7 @@ dllabel(cdev, sl, g)
     static UINT off, len;
     static UINT otracks, oroll;
     static UINT8 oheads, osectors;
-    static int got;
+    static int got, i;
 
     otracks = g->tracks;
     oheads = g->heads;
@@ -85,6 +86,12 @@ dllabel(cdev, sl, g)
             got = 1;
             g->roll = lab.d_roll;
             g->firstsec = lab.d_firstsec;
+            if (table) {
+                for (i = 0; i < NSLICE; i++) {
+                    table[i].d_off = lab.d_slice[i].d_off;
+                    table[i].d_len = lab.d_slice[i].d_len;
+                }
+            }
         }
     }
     if (!got) {
@@ -166,6 +173,48 @@ dllabel(cdev, sl, g)
     else
         g->maxblk = len * g->spc - 1;
     return (got);
+}
+
+/*
+ * Decode one slice of a drive against its cached table: the slice's
+ * offset in cylinders, its roll (0 for 'c'), and its highest legal block
+ * number.  g is the drive's geometry, table the slice table dllabel()
+ * cached.  Returns 0, or ENXIO for a slice that runs off the drive.  A
+ * length of zero is the whole drive from the offset on - the one slice a
+ * disk made before slices carries.
+ */
+int
+dlslice(g, table, sl, offp, rollp, maxblkp)
+    register struct dlgeom *g;
+    struct dslice *table;
+    UINT sl;
+    UINT *offp, *rollp, *maxblkp;
+{
+    static UINT off, len, roll, maxblk;
+
+    if (sl == DL_WHOLE) {
+        off = 0;
+        len = g->tracks;
+        roll = 0;
+    } else {
+        off = table[sl].d_off;
+        len = table[sl].d_len;
+        roll = g->roll;
+        if (off >= g->tracks || len > g->tracks - off)
+            return (ENXIO);
+        if (len == 0)
+            len = g->tracks - off;
+    }
+    if (len == 0)
+        maxblk = 0;
+    else if (len > 0xffff / g->spc)
+        maxblk = 0xffff;
+    else
+        maxblk = len * g->spc - 1;
+    *offp = off;
+    *rollp = roll;
+    *maxblkp = maxblk;
+    return (0);
 }
 
 /*

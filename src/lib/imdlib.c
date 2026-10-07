@@ -87,10 +87,20 @@ get_track(int fd)
     
     // make space for and read the track header
     tp = malloc(sizeof(*tp));
-    if (read(fd, tp, sizeof(tp->fixed)) != sizeof(tp->fixed)) {
+    {
+        unsigned char hdr[5];
+
+        if (read(fd, hdr, 5) != 5) {
 bomb:
-        free(tp);
-        return 0;
+            free(tp);
+            return 0;
+        }
+        tp->fixed.mode = hdr[0];
+        tp->fixed.cyl = hdr[1]; /* the low byte; imd_load infers the high
+                                 * byte from track order */
+        tp->fixed.head = hdr[2];
+        tp->fixed.nsec = hdr[3];
+        tp->fixed.size = hdr[4];
     }
 
     tp->secsize = 0x80 << tp->fixed.size;
@@ -161,6 +171,8 @@ imd_close(void *vp)
         return;
     if (ip->delta)
         kv_close(ip->delta);
+    if (ip->lock_fd >= 0)
+        close(ip->lock_fd);
     if (ip->fd >= 0)
         close(ip->fd);
 }
@@ -187,12 +199,18 @@ apply_data_cb(void *key, int klen, void *val, int vlen, void *arg)
     struct imd_trk *tp;
     int slot;
 
-    if (klen != 3 || k[2] == 0xff)
+    /*
+     * The key is four bytes - cylinder low, cylinder high, head, sector
+     * slot - because a cylinder is one byte on the wire but a drive of
+     * more than 255 cylinders has a high byte the delta has to carry.
+     * Slot 0xff is the never-written sentinel.
+     */
+    if (klen != 4 || k[3] == 0xff)
         return;
-    tp = imd_track(ip, k[0], k[1]);
+    tp = imd_track(ip, k[0] | (k[1] << 8), k[2]);
     if (!tp)
         return;
-    slot = k[2];
+    slot = k[3];
     if (slot >= tp->fixed.nsec)
         return;
     if (!tp->data[slot])
@@ -214,9 +232,10 @@ attach_delta(struct imd *ip, char *fname, int create_delta)
 
     /*
      * A writable image is locked so two tools never write the same disk
-     * at once.  The lock is held for the life of the process and dropped
-     * by the kernel when it exits, so a short-lived tool and a long-lived
-     * simulator contend on it the same way.
+     * at once.  The lock is held for as long as the image is open and
+     * dropped by imd_close - or by the kernel when the holder exits, for
+     * any reason - so a short-lived tool and a long-lived simulator
+     * contend on it the same way.
      */
     ip->lock_fd = -1;
     if (create_delta) {
@@ -604,6 +623,7 @@ imd_load(char *fname, int drive, int create_delta)
     struct imd_trk *tp;
     struct imd_trk **tmp;
     int ntrk, nalloc, i;
+    int cylhi = 0, prevcyl = -1;
     int offset;
     int cyl;
     int head;
@@ -668,6 +688,16 @@ imd_load(char *fname, int drive, int create_delta)
             nalloc *= 2;
             tmp = realloc(tmp, nalloc * sizeof(struct imd_trk *));
         }
+        /*
+         * The on-disk cylinder is one byte, and a drive of more than 256
+         * cylinders wraps it.  Tracks come off the image in cylinder
+         * order, so the high byte is the number of times the low byte has
+         * wrapped - a decrease means the run went past 255.
+         */
+        if (tp->fixed.cyl < prevcyl)
+            cylhi++;
+        prevcyl = tp->fixed.cyl;
+        tp->fixed.cyl = cylhi * 256 + tp->fixed.cyl;
         tmp[ntrk++] = tp;
         if (tp->fixed.cyl > ip->cyls) ip->cyls = tp->fixed.cyl;
         if (tp->fixed.head > ip->heads) ip->heads = tp->fixed.head;
@@ -826,7 +856,7 @@ imd_write(void *vp, int cyl, int head, int osec, char *buf)
 {
     struct imd *ip = (struct imd *)vp;
     struct imd_trk *tp;
-    unsigned char key[3];
+    unsigned char key[4];
     int tsec;       // translated sector
 
     if (!ip->delta) {
@@ -846,10 +876,11 @@ imd_write(void *vp, int cyl, int head, int osec, char *buf)
         tp->data[tsec] = malloc(tp->secsize);
     }
     memcpy(tp->data[tsec], buf, tp->secsize);
-    key[0] = cyl;
-    key[1] = head;
-    key[2] = tsec;
-    kv_put(ip->delta, key, 3, buf, tp->secsize);
+    key[0] = cyl & 0xff;
+    key[1] = (cyl >> 8) & 0xff;
+    key[2] = head;
+    key[3] = tsec;
+    kv_put(ip->delta, key, 4, buf, tp->secsize);
     trace(trace_imd, "imd_write drive %d cyl %d head %d tsec %d osec %d\n",
         ip->drive, cyl, head, tsec, osec);
 #ifndef NODEBUG
@@ -991,7 +1022,7 @@ write_track(struct imd *ip, struct imd_trk *tp, int fill)
     int i;
 
     hdr[0] = tp->fixed.mode;
-    hdr[1] = tp->fixed.cyl;
+    hdr[1] = tp->fixed.cyl & 0xff;
     hdr[2] = tp->fixed.head;
     hdr[3] = tp->fixed.nsec;
     hdr[4] = tp->fixed.size;

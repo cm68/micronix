@@ -61,10 +61,15 @@
  * the sector count: formatmw does not store the count, it works it out
  * from the track and the size of a sector, and so does this - see nsectors
  * below.
+ *
+ * precomp and lowcur name the cylinder where write precompensation and
+ * reduced write current begin; 0xffff means the drive wants neither.
  */
 struct model
 {
     char *name;
+    char *mfg;                  /* manufacturer, into the label */
+    char *model;                /* model number, into the label */
     UINT cyl;                   /* cylinders, tracks per surface */
     UINT8 heads;
     UINT precomp;               /* cylinder where write precomp starts */
@@ -74,11 +79,56 @@ struct model
 };
 
 static struct model models[] = {
-    {"m5",  153, 4, 128, 128, 30, 10416},   /* Seagate 5 meg */
-    {"m10", 306, 4, 128, 128,  2, 10416},   /* generic 10 meg */
-    {"m16", 306, 6, 128, 128,  2, 10416},   /* CMI 16 meg */
-    {"m32", 640, 6, 256, 256,  0, 10416},   /* CMI 32 meg */
-    {"m40", 733, 5, 300, 733, 30, 10416},   /* Seagate 40 meg */
+    {"m5",  "Seagate", "ST-506", 153, 4, 0xffff, 128, 30, 10416},
+    {"m10", "Seagate", "ST-412", 306, 4, 0xffff, 128,  2, 10416},
+    {"m16", "CMI",     "",       306, 6, 128, 128,  2, 10416},
+    {"m32", "CMI",     "",       640, 6, 256, 256,  0, 10416},
+    {"m40", "Quantum", "Q540",   512, 8, 256, 512, 30, 10416},
+    /* Maxtor XT MFM drives */
+    {"xt1065", "Maxtor", "XT-1065", 918, 7, 0xffff, 0xffff, 30, 10416},
+    {"xt1085", "Maxtor", "XT-1085", 1024, 8, 1025, 0xffff, 30, 10416},
+    {"xt1105", "Maxtor", "XT-1105", 918, 11, 0xffff, 0xffff, 30, 10416},
+    {"xt1140", "Maxtor", "XT-1140", 918, 15, 0xffff, 0xffff, 30, 10416},
+    {"xt2085", "Maxtor", "XT-2085", 1224, 7, 1225, 0xffff, 30, 10416},
+    {"xt2140", "Maxtor", "XT-2140", 1224, 11, 1225, 0xffff, 30, 10416},
+    {"xt2190", "Maxtor", "XT-2190", 1224, 15, 1225, 0xffff, 30, 10416},
+    /* Seagate MFM drives */
+    {"st225", "Seagate", "ST-225", 615, 4, 256, 0xffff, 30, 10416},
+    {"st251", "Seagate", "ST-251", 820, 6, 0xffff, 0xffff, 30, 10416},
+    {"st4038", "Seagate", "ST-4038", 733, 5, 300, 0xffff, 30, 10416},
+    {"st4051", "Seagate", "ST-4051", 977, 5, 0xffff, 0xffff, 30, 10416},
+    {"st4053", "Seagate", "ST-4053", 1024, 5, 0xffff, 0xffff, 30, 10416},
+    {"st4096", "Seagate", "ST-4096", 1024, 9, 0xffff, 0xffff, 30, 10416},
+    /* MiniScribe MFM drives */
+    {"ms8425", "MiniScribe", "8425", 615, 4, 128, 0xffff, 30, 10416},
+    {"ms6053", "MiniScribe", "6053", 1024, 5, 512, 0xffff, 30, 10416},
+    {"ms6085", "MiniScribe", "6085", 1024, 8, 512, 0xffff, 30, 10416},
+    /* Tandon MFM drives */
+    {"tm501", "Tandon", "TM-501", 306, 2, 128, 0xffff, 30, 10416},
+    {"tm502", "Tandon", "TM-502", 306, 4, 128, 0xffff, 30, 10416},
+    {"tm503", "Tandon", "TM-503", 306, 6, 128, 0xffff, 30, 10416},
+    {"tm703", "Tandon", "TM-703", 733, 5, 0xffff, 0xffff, 30, 10416},
+    {"tm755", "Tandon", "TM-755", 981, 5, 0xffff, 0xffff, 30, 10416},
+    {"tm362", "Tandon", "TM-362", 615, 4, 128, 0xffff, 30, 10416},
+    /* Quantum MFM drives */
+    {"q520", "Quantum", "Q520", 512, 4, 256, 0xffff, 30, 10416},
+    {"q530", "Quantum", "Q530", 512, 6, 256, 0xffff, 30, 10416},
+    /* CDC Wren MFM drives */
+    {"wren36", "CDC", "9415-36", 697, 5, 0xffff, 0xffff, 30, 10416},
+    {"wren48", "CDC", "94155-48", 925, 5, 128, 0xffff, 30, 10416},
+    {"wren51", "CDC", "94155-51", 989, 5, 128, 0xffff, 30, 10416},
+    {"wren57", "CDC", "94155-57", 925, 6, 128, 0xffff, 30, 10416},
+    {"wren67", "CDC", "94155-67", 925, 7, 128, 0xffff, 30, 10416},
+    {"wren77", "CDC", "94155-77", 925, 8, 128, 0xffff, 30, 10416},
+    {"wren85", "CDC", "94155-85", 1024, 8, 128, 0xffff, 30, 10416},
+    {"wren86", "CDC", "94155-86", 925, 9, 128, 0xffff, 30, 10416},
+    {"wren96", "CDC", "94155-96", 1024, 9, 128, 0xffff, 30, 10416},
+    /* Micropolis MFM drives */
+    {"mp1304", "Micropolis", "1304", 830, 6, 0xffff, 0xffff, 30, 10416},
+    {"mp1323", "Micropolis", "1323", 1024, 4, 0xffff, 0xffff, 30, 10416},
+    {"mp1323a", "Micropolis", "1323A", 1024, 5, 0xffff, 0xffff, 30, 10416},
+    {"mp1325", "Micropolis", "1325", 1024, 8, 0xffff, 0xffff, 30, 10416},
+    {"mp1335", "Micropolis", "1335", 1024, 8, 0xffff, 0xffff, 30, 10416},
 };
 
 #define NMODEL (sizeof models / sizeof models[0])
@@ -120,6 +170,7 @@ static char *pname = "mwformat";
  */
 static UINT cyl, heads, spt, precomp, lowcur, stepdelay, skew;
 static UINT lcyl, lheads, lspt;
+static char *mfg, *model;	/* the drive's own name, into the label */
 static int drive;		/* which of the controller's four drives */
 static UINT first, last;	/* the cylinders to walk */
 static UINT fhead, lhead;	/* and the heads */
@@ -447,8 +498,8 @@ buildth(track, head)
  * The boot fields are zero, because there is no boot yet - mkfs -i puts
  * one there and rewrites this whole label with its numbers when it does.
  * The slice table is empty, which every reader takes as one slice over
- * the whole drive, rolled: the layout d_roll describes and the one every
- * disk made before the table existed has.
+ * the whole drive - the 'c' partition - and the drive's own name goes in
+ * too, so the freshly formatted disk says what it is.
  */
 void
 putlabel(d)
@@ -467,11 +518,15 @@ putlabel(d)
     memset((char *) lp, 0, sizeof (struct dlabel));
     for (i = 0; i < 4; i++)
         lp->d_magic[i] = DL_MAGIC[i];
-    lp->d_version = DL_VERSION;
+    lp->d_version = DL_VERS_SLICE;
     lp->d_tracks = cyl;
     lp->d_heads = heads;
     lp->d_spt = spt;
-    lp->d_roll = cyl >> 1;
+    lp->d_firstsec = 0;         /* these drives number sectors from zero */
+    if (mfg)
+        strncpy(lp->d_mfg, mfg, sizeof (lp->d_mfg));
+    if (model)
+        strncpy(lp->d_model, model, sizeof (lp->d_model));
 
     if (lseek(d, 0L, 0) < 0)
         die("cannot seek to block 0");
@@ -567,7 +622,7 @@ usage()
     fprintf(stderr, "usage: %s [-c cyl] [-h heads] [-s spt]\n", pname);
     fprintf(stderr, "       [-p precomp] [-l lowcur] [-d step] [-k skew]\n");
     fprintf(stderr, "       [-m model] [-t track] [-e head] device\n");
-    fprintf(stderr, "       models: m5 m10 m16 m32 m40\n");
+    fprintf(stderr, "       models: m5 m10 m16 m32 m40 m26, and the xt/st/wren/q/tm/ms/mp names\n");
     exit(1);
 }
 
@@ -602,6 +657,7 @@ main(argc, argv)
 
     device = 0;
     mp = 0;
+    mfg = model = 0;
     cyl = heads = spt = 0;
     precomp = lowcur = 0;
     stepdelay = 30;             /* the boot loader's, and the driver's */
@@ -712,6 +768,8 @@ main(argc, argv)
         precomp = mp->precomp;
         lowcur = mp->lowcur;
         stepdelay = mp->stpdel;
+        mfg = mp->mfg;
+        model = mp->model;
     } else if (have) {
         cyl = lcyl;
         heads = lheads;
@@ -747,6 +805,8 @@ main(argc, argv)
         precomp = row->precomp;
         lowcur = row->lowcur;
         stepdelay = row->stpdel;
+        mfg = row->mfg;
+        model = row->model;
     }
     if (wprecompset)
         precomp = wprecomp;

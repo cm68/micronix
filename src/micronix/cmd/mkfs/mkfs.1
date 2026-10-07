@@ -16,7 +16,7 @@ SYNTAX
 .in +5
 .br
 .bd
-mkfs [ -f ] [ -i bootfile ] device [ size | -exclude ]
+mkfs [ -f ] [ -i bootfile ] device [ size ]
 .sp 2
 .in -5
 .bd
@@ -24,12 +24,10 @@ DESCRIPTION
 .in +5
 .br
 Mkfs makes an empty file system on the block device.  The size, when
-given, is the number of 512-byte blocks the file system is to hold; a
-number written -exclude instead leaves that many blocks at the end of
-the device, which is how swap space is kept out of the file system.
-Given neither, the whole device is used.  The size of the device is
-read from the drive's label, so it never has to be told; a drive with
-no label is refused.
+given, is the number of 512-byte blocks the file system is to hold;
+given none, the whole device is used.  The size of the device is read
+from the drive's label, so it never has to be told; a drive with no
+label is refused.
 .sp
 Cylinder 0 is reserved for the boot and the disk label, whether or
 not a boot is written.  The blocks are owned by a file, /boot/boot,

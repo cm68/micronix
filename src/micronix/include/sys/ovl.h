@@ -153,6 +153,7 @@ struct ovlhdr {
     UINT line;                  /* the line intr is on, if there is one */
     int (*intr) ();             /* the interrupt handler, 0 for none */
     char name[12];              /* what devname reports for the major */
+    int (*probe) ();            /* probe(), enumerate its drives at signon */
 };
 
 /*

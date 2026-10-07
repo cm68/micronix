@@ -487,13 +487,19 @@ struct info
     UINT8 heads;
     UINT8 sectors;              /* sectors per track */
 
-    UINT maxblk;                /* max legal block number in the slice */
+    UINT maxblk;                /* dllabel's bound for the first slice opened */
     UINT spc;                   /* sectors per cylinder */
-    UINT roll;                  /* what a block's cylinder is rotated by */
-    UINT cylstart;              /* first cylinder of the slice being read */
+    UINT roll;                  /* the drive's d_roll */
+    UINT cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
     UINT8 flags;                /* see below */
-    UINT8 slice;                /* the slice this open is bound to */
+
+    /*
+     * The slice table off the label, cached at open.  A buffer's minor
+     * names its slice; idestrat looks the offset and length up here, so
+     * every slice of a drive maps at once instead of one open's.
+     */
+    struct dslice d_slice[NSLICE];
 } ides[NDRIVES] = 0;
 
 #define OPEN    2               /* drive is open */
@@ -782,9 +788,8 @@ idereset(ip, unit)
  * here in the same way and by the same amount.
  */
 static UINT32
-idelba(blk, info)
-    UINT blk;
-    register struct info *info;
+idelba(blk, spc, cylstart, roll, tracks)
+    UINT blk, spc, cylstart, roll, tracks;
 {
     static UINT32 lba, trackblks;
 
@@ -794,10 +799,10 @@ idelba(blk, info)
      * geometry turns out to be, and the two terms are zero here, so it
      * is answered rather than computed.
      */
-    if (info->spc == 0)
+    if (spc == 0)
         return (0);
-    lba = (UINT32)blk + ((UINT32)info->cylstart + info->roll) * info->spc;
-    trackblks = (UINT32)info->tracks * info->spc;
+    lba = (UINT32)blk + ((UINT32)cylstart + roll) * spc;
+    trackblks = (UINT32)tracks * spc;
     if (lba >= trackblks)
         lba -= trackblks;
     return (lba);
@@ -832,19 +837,14 @@ ideopen(dev, mode)
     sl = devslice(dev);
     info = &ides[drive];
     /*
-     * One mapping per drive, not one per open: ides[] is keyed by drive
-     * and holds the slice's offset and roll, so a second open asking for
-     * a different slice would be served the first one's mapping and would
-     * read and write the wrong blocks while reporting success.  The same
-     * slice, or the same minor, is the same mapping and is let through as
-     * before.
+     * The label is loaded once, on the first open of any slice of this
+     * drive, and cached here - geometry in the fields above, the slice
+     * table below.  A later open of another slice on the same drive just
+     * lets the buffer's minor name which slice, and idestrat resolves its
+     * offset and length from the cached table.
      */
-    if (info->flags & OPEN) {
-        if (info->slice != sl)
-            u.error = EBUSY;
+    if (info->flags & OPEN)
         return;
-    }
-    info->slice = sl;
     ip = &boards[0];
 
     if (idereset(ip, drive) < 0) {
@@ -858,7 +858,7 @@ ideopen(dev, mode)
      * minor devlist holds.
      */
     switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive,
-                    sl, (struct dlgeom *)info)) {
+                    sl, (struct dlgeom *)info, info->d_slice)) {
     case -1:
         return;                 /* no such slice; dllabel set u.error */
     case 0:
@@ -950,11 +950,18 @@ idestrat(b)
     static struct ideif *ip;
     static char *p;
     static UINT32 lba;
+    static UINT sl, off, roll, maxblk;
 
     info = &ides[b->dev & 1];
     ip = &boards[0];
 
-    if (b->blk > info->maxblk) {
+    /*
+     * The buffer's minor names its slice; dlslice resolves its offset,
+     * roll and bound from the cached table ('c' is the whole drive).
+     */
+    sl = devslice(b->dev);
+    if (dlslice((struct dlgeom *)info, info->d_slice, sl,
+                &off, &roll, &maxblk) || b->blk > maxblk) {
         b->flags |= BERROR;
         b->error = ENXIO;
         iodone(b);
@@ -985,7 +992,7 @@ idestrat(b)
      * nothing here has to hold a device block number - which is what a
      * large drive could not be counted in.
      */
-    lba = idelba(b->blk, info);
+    lba = idelba(b->blk, info->spc, off, roll, info->tracks);
 
     if (idestart(ip, b->dev & 1, lba, b->flags & BREAD) < 0) {
         b->flags |= BERROR;

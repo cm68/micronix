@@ -334,14 +334,13 @@ main(int argc, char **argv)
         put16(off + offsetof(struct dlabel, d_bootblks), bootblks);
         put16(off + offsetof(struct dlabel, d_roll), roll);
         /*
-         * d_fsize, d_isize and d_swap describe a filesystem, and there
-         * is not one yet.  mkfs fills them in when it makes one,
-         * rewriting the whole label as it does.  They are zero here,
-         * and a reader that cares has to tell the difference.
+         * d_fsize and d_isize describe a filesystem, and there is not
+         * one yet.  mkfs fills them in when it makes one, rewriting the
+         * whole label as it does.  They are zero here, and a reader
+         * that cares has to tell the difference.
          */
         put16(off + offsetof(struct dlabel, d_fsize), 0);
         put16(off + offsetof(struct dlabel, d_isize), 0);
-        put16(off + offsetof(struct dlabel, d_swap), 0);
         put16(off + offsetof(struct dlabel, d_bootslice), 0);
         /*
          * The one slice a diskette has: 'a', from cylinder toff to the

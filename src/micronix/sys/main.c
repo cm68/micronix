@@ -31,9 +31,9 @@
  * they must not move into the reclaimed highmem region.
  */
 UINT rootdev = 0x0300;          /* hddma drive 0 (Seagate 5 meg) */
-UINT swapdev = 0x0000;          /* m16 drive A */
-UINT swapsize = 0;              /* no. of swap blocks if rootdev != swapdev */
-UINT swapaddr = 18448;          /* block number of first swap block, if " */
+UINT swapdev = 0x0000;          /* none until setdev points it at a slice */
+UINT swapsize = 0;              /* no. of swap blocks */
+UINT swapaddr = 0;              /* block number of first swap block */
 
 /*
  * static initialization.

@@ -84,6 +84,27 @@ main()
     ovlplaceall();              /* the driver modules riding in our own file */
 
     /*
+     * The drives behind each disk controller: the driver reads its units'
+     * labels and reports what answers.  This is init-only code, so it
+     * costs no resident space.  A unit with nothing behind it does not
+     * answer, and the driver's watchdog (named as its tick) turns that
+     * silence into an error in a couple of seconds, so the loop moves on
+     * instead of hanging.
+     */
+    {
+        struct ovlhdr *h;
+        char i;
+
+        for (i = 1; i < nbdev; i++)
+            if (biosw[i].strat != &nodev) {
+                h = ovlmap(i);
+                if (h && h->probe)
+                    (*h->probe) ();
+            }
+        ovlmap(major(rootdev));
+    }
+
+    /*
      * The swap map, last, and here rather than in the swapper.
      *
      * sys/trap.c forks the login process and the parent becomes the

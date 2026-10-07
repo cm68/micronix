@@ -48,8 +48,8 @@ extern void iput(struct dsknod *ip);
 extern void ifree(struct dsknod *ip);
 
 extern void lose(char *s);
-extern int readblk(struct super *f, int blkno, char *buf);
-extern int writeblk(struct super *f, int blkno, char *buf);
+extern int readblk(struct super *f, UINT blkno, char *buf);
+extern int writeblk(struct super *f, UINT blkno, char *buf);
 extern void *fsimd(struct super *f);	/* the raw .imd handle, for raw sector io */
 extern int rawgeom(struct super *f, int *cyls, int *heads, int *spt, int *secsize);
 extern UINT secinv(struct super *f, UINT blkno);	/* inverse of secmap */
@@ -61,12 +61,12 @@ extern void dump(unsigned char *buf, int size);
 extern void dumpsb(struct super *sb);
 extern void secdump(unsigned char *buf);
 extern UINT secmap(struct super *fs, UINT blkno);
-extern int bmap(struct dsknod *ip, off_t offset, int alloc);
+extern UINT bmap(struct dsknod *ip, off_t offset, int alloc);
 extern struct dsknod *namei(struct super *f, char *name);
 extern struct dir *getdir(struct dsknod *ip);
 extern struct dir *getdirent(struct dsknod *ip, int index);
-extern int balloc(struct super *f);
-extern void bfree(struct super *f, int b);
+extern UINT balloc(struct super *f);
+extern void bfree(struct super *f, UINT b);
 extern void filefree(struct dsknod *ip);
 extern int fileunlink(struct super *f, char *name);
 extern int ialloc(struct super *f, UINT mode);
@@ -75,8 +75,8 @@ extern struct dsknod *filecreate(struct super *f, char *name);
 extern int dircreate(struct super *f, char *name);
 extern int dirrm(struct super *f, char *name);
 extern off_t filesize(struct dsknod *ip);
-extern int bootrange(struct super *f, int *first, int *nblk, char **name);
-extern int installboot(struct super *f, int first, int nblk, char *name);
+extern int bootrange(struct super *f, UINT *first, UINT *nblk, char **name);
+extern int installboot(struct super *f, UINT first, UINT nblk, char *name);
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

@@ -31,6 +31,7 @@
 #include "../include/fslib.h"
 #include "../include/util.h"
 #include "../include/disklabel.h"
+#include "../include/imd.h"
 #include "../micronix/cmd/mkfs/mkfs.h"
 
 int traceflags;
@@ -1314,17 +1315,64 @@ tarc(int c, char **a)
  */
 struct medium {
     char *name;
+    char *mfg;                  /* manufacturer, into the label */
+    char *model;                /* model number, into the label */
     int tracks;
     int heads;
     int spt;
     int firstsec;               /* first sector number the formatter lays down */
 } mediums[] = {
-    {"m5",  153, 4, 17, 0},
-    {"m10", 306, 4, 17, 0},
-    {"m16", 306, 6, 17, 0},
-    {"m32", 640, 6, 17, 0},
-    {"m40", 733, 5, 17, 0},
-    {"m26", 202, 8, 32, 1},
+    {"m5",  "Seagate", "ST-506", 153, 4, 17, 0},
+    {"m10", "Seagate", "ST-412", 306, 4, 17, 0},
+    {"m16", "CMI",     "",       306, 6, 17, 0},
+    {"m32", "CMI",     "",       640, 6, 17, 0},
+    {"m40", "Quantum", "Q540",   512, 8, 17, 0},
+    {"m26", "",        "M26",    202, 8, 32, 1},
+    /* Maxtor XT MFM drives: cylinders, heads, 17 sectors */
+    {"xt1065", "Maxtor", "XT-1065", 918, 7, 17, 0},
+    {"xt1085", "Maxtor", "XT-1085", 1024, 8, 17, 0},
+    {"xt1105", "Maxtor", "XT-1105", 918, 11, 17, 0},
+    {"xt1140", "Maxtor", "XT-1140", 918, 15, 17, 0},
+    {"xt2085", "Maxtor", "XT-2085", 1224, 7, 17, 0},
+    {"xt2140", "Maxtor", "XT-2140", 1224, 11, 17, 0},
+    {"xt2190", "Maxtor", "XT-2190", 1224, 15, 17, 0},
+    /* CDC Wren MFM drives */
+    {"wren36", "CDC", "9415-36", 697, 5, 17, 0},
+    {"wren48", "CDC", "94155-48", 925, 5, 17, 0},
+    {"wren51", "CDC", "94155-51", 989, 5, 17, 0},
+    {"wren57", "CDC", "94155-57", 925, 6, 17, 0},
+    {"wren67", "CDC", "94155-67", 925, 7, 17, 0},
+    {"wren77", "CDC", "94155-77", 925, 8, 17, 0},
+    {"wren85", "CDC", "94155-85", 1024, 8, 17, 0},
+    {"wren86", "CDC", "94155-86", 925, 9, 17, 0},
+    {"wren96", "CDC", "94155-96", 1024, 9, 17, 0},
+    /* Seagate MFM drives */
+    {"st225", "Seagate", "ST-225", 615, 4, 17, 0},
+    {"st251", "Seagate", "ST-251", 820, 6, 17, 0},
+    {"st4038", "Seagate", "ST-4038", 733, 5, 17, 0},
+    {"st4051", "Seagate", "ST-4051", 977, 5, 17, 0},
+    {"st4053", "Seagate", "ST-4053", 1024, 5, 17, 0},
+    {"st4096", "Seagate", "ST-4096", 1024, 9, 17, 0},
+    /* MiniScribe MFM drives */
+    {"ms8425", "MiniScribe", "8425", 615, 4, 17, 0},
+    {"ms6053", "MiniScribe", "6053", 1024, 5, 17, 0},
+    {"ms6085", "MiniScribe", "6085", 1024, 8, 17, 0},
+    /* Tandon MFM drives */
+    {"tm501", "Tandon", "TM-501", 306, 2, 17, 0},
+    {"tm502", "Tandon", "TM-502", 306, 4, 17, 0},
+    {"tm503", "Tandon", "TM-503", 306, 6, 17, 0},
+    {"tm703", "Tandon", "TM-703", 733, 5, 17, 0},
+    {"tm755", "Tandon", "TM-755", 981, 5, 17, 0},
+    {"tm362", "Tandon", "TM-362", 615, 4, 17, 0},
+    /* Quantum MFM drives */
+    {"q520", "Quantum", "Q520", 512, 4, 17, 0},
+    {"q530", "Quantum", "Q530", 512, 6, 17, 0},
+    /* Micropolis MFM drives */
+    {"mp1304", "Micropolis", "1304", 830, 6, 17, 0},
+    {"mp1323", "Micropolis", "1323", 1024, 4, 17, 0},
+    {"mp1323a", "Micropolis", "1323A", 1024, 5, 17, 0},
+    {"mp1325", "Micropolis", "1325", 1024, 8, 17, 0},
+    {"mp1335", "Micropolis", "1335", 1024, 8, 17, 0},
 };
 
 /*
@@ -1336,11 +1384,10 @@ struct medium {
 int
 initcmd(int c, char **a)
 {
-    struct disklabel label;
+    struct imd *ip;
     struct medium *m;
     long nblocks;
-    long size;
-    int fd;
+    int cyl, head;
     int i;
 
     a++;
@@ -1358,39 +1405,48 @@ initcmd(int c, char **a)
     }
     m = &mediums[i];
 
-    fd = open(a[1], O_RDWR | O_CREAT | O_TRUNC, 0666);
-    if (fd < 0) {
-        printf("initialize: can't create %s: %d\n", a[1], errno);
+    /*
+     * A hard disk image is an IMD file: an "IMD " header, then a track
+     * record per cylinder and head holding the format framing, with the
+     * sector data layered on as a keystore delta.  initialize is the
+     * FORMATMW stand-in: it lays down every track's framing - sector
+     * count, size and fill - and leaves the data area blank for mkfs.
+     */
+    ip = imd_load(a[1], 0, 1);
+    if (!ip) {
+        printf("initialize: can't create %s\n", a[1]);
         return 2;
     }
+    for (cyl = 0; cyl < m->tracks; cyl++)
+        for (head = 0; head < m->heads; head++)
+            imd_setfmt(ip, cyl, head, m->firstsec, m->spt, 512, 1, 0xe5);
 
-    memset(&label, 0, sizeof label);
-    label.magic = MAGIC;
-    label.secsize = 512;
-    label.cylinders = m->tracks;
-    label.heads = m->heads;
-    label.spt = m->spt;
-    label.firstsec = m->firstsec;
-    label.seccode = 3;      /* 512-byte sectors, the specify form */
-    label.gap3 = 43;
-    label.fill = 0xe5;
-    label.formatted = 1;
+    /*
+     * The prototype label, in the second half of block 0: the drive's
+     * shape and its own name, so a freshly formatted disk says what it is
+     * before any filesystem is made.  The slice table is all zero, which
+     * is the whole drive as slice 'c'; the label command adds the rest.
+     */
+    {
+        struct dlabel *lp;
+        char buf[512];
 
-    if (write(fd, &label, sizeof label) != sizeof label) {
-        printf("initialize: can't write label on %s: %d\n", a[1], errno);
-        close(fd);
-        return 2;
+        memset(buf, 0, sizeof(buf));
+        lp = (struct dlabel *) &buf[DL_OFFSET];
+        memcpy(lp->d_magic, DL_MAGIC, 4);
+        lp->d_version = DL_VERS_SLICE;
+        lp->d_tracks = m->tracks;
+        lp->d_heads = m->heads;
+        lp->d_spt = m->spt;
+        lp->d_firstsec = m->firstsec;
+        strncpy(lp->d_mfg, m->mfg, sizeof(lp->d_mfg));
+        strncpy(lp->d_model, m->model, sizeof(lp->d_model));
+        imd_write(ip, 0, 0, m->firstsec, buf);
     }
+
+    imd_close(ip);
 
     nblocks = (long)m->tracks * m->heads * m->spt;
-    size = DATAOFF + nblocks * 512;
-    if (ftruncate(fd, size) < 0) {
-        printf("initialize: can't size %s: %d\n", a[1], errno);
-        close(fd);
-        return 2;
-    }
-    close(fd);
-
     printf("initialized %s: %d cylinders, %d heads, %d sectors, %ld blocks\n",
         a[1], m->tracks, m->heads, m->spt, nblocks);
     return 0;
@@ -1456,31 +1512,6 @@ floppylabel(image, dl)
 }
 
 /*
- * Which row of mkfs.h's table a diskette's label describes, or -1 if the
- * label is of no medium this tree knows.  Only rows with a track offset
- * are candidates: the three diskettes, not the five hard disks.
- *
- * The first sector number is part of the match, because it is part of
- * the medium: the two 5 1/4 inch double sided rows have the same shape
- * (40/2/10) and differ only in whether their sectors are soft or hard,
- * which dfirst[] is the one field that says.  A label read off a boot
- * image carries the answer mkbootimg -d wrote, so it is already here.
- */
-static int
-floptype(dl)
-    struct dlabel *dl;
-{
-    int t;
-
-    for (t = 0; t < NDRIVE; t++)
-        if (dtoff[t] && dtracks[t] == dl->d_tracks &&
-            dheads[t] == dl->d_heads && dsecs[t] == dl->d_spt &&
-            dfirst[t] == dl->d_firstsec)
-            return (t);
-    return (-1);
-}
-
-/*
  * Put the label back, with the filesystem's own numbers now in it.
  *
  * The worker cannot do this itself.  A diskette's label is in device
@@ -1495,9 +1526,8 @@ floptype(dl)
  * block the loader reads cannot drift apart.
  */
 static int
-patchlabel(image, type)
+patchlabel(image)
     char *image;
-    int type;
 {
     struct dlabel *lp;
     char buf[BSIZE];
@@ -1515,7 +1545,7 @@ patchlabel(image, type)
         close(fd);
         return -1;
     }
-    putlabel(buf, type);
+    putlabel(buf);
     if (lseek(fd, 0L, 0) < 0 || write(fd, buf, BSIZE) != BSIZE) {
         close(fd);
         return -1;
@@ -1525,30 +1555,160 @@ patchlabel(image, type)
 }
 
 /*
+ * Read the in-band label off an IMD hard disk's block 0 - cylinder 0,
+ * head 0, the sector the rom reads - the way labelcmd does.  Answers 0
+ * and fills *dl, or -1 when there is no label to read.
+ */
+static int
+imdlabel(image, dl)
+    char *image;
+    struct dlabel *dl;
+{
+    struct imd *ip;
+    struct dlabel *lp;
+    char buf[BSIZE];
+
+    ip = imd_load(image, 0, 0);
+    if (!ip)
+        return -1;
+    if (imd_read(ip, 0, 0, imd_firstsec(ip, 0, 0), buf) != 512) {
+        imd_close(ip);
+        return -1;
+    }
+    imd_close(ip);
+    lp = (struct dlabel *) &buf[DL_OFFSET];
+    if (strncmp(lp->d_magic, DL_MAGIC, 4) != 0 ||
+        !lp->d_tracks || !lp->d_heads || !lp->d_spt)
+        return -1;
+    memcpy((char *)dl, lp, sizeof(struct dlabel));
+    return 0;
+}
+
+/*
+ * Write the boot below an IMD hard disk's filesystem, at device block 0 -
+ * cylinder 0, head 0, the sector the rom reads.  The label is already in
+ * block 0's second half (the label command wrote it); the boot's first
+ * level goes in the first half in front of it, and the second level in
+ * the blocks after.  Block 0's second half is left alone, so the label
+ * and its slice table survive.
+ */
+static int
+hardboot(image, bootfile)
+    char *image;
+    char *bootfile;
+{
+    struct imd *ip;
+    char blk[512];
+    char bb[512];
+    int nsec, secsize;
+    int firstsec;
+    int heads;
+    int fd;
+    int n;
+    int got;
+    int cyl, head, sec;
+
+    ip = imd_load(image, 0, 1);
+    if (!ip)
+        return -1;
+    imd_trkinfo(ip, 0, 0, &nsec, &secsize);
+    if (secsize != 512) {
+        imd_close(ip);
+        return -1;
+    }
+    firstsec = imd_firstsec(ip, 0, 0);
+    heads = ip->heads;
+
+    fd = open(bootfile, O_RDONLY);
+    if (fd < 0) {
+        imd_close(ip);
+        return -1;
+    }
+
+    /* block 0's first half: the first level, in front of the label */
+    if (imd_read(ip, 0, 0, firstsec, blk) != 512)
+        goto bad;
+    got = read(fd, bb, DL_OFFSET);
+    if (got > 0)
+        memcpy(blk, bb, got);
+    if (imd_write(ip, 0, 0, firstsec, blk) != 512)
+        goto bad;
+
+    /*
+     * The second level, in the blocks after.  Its file position is still
+     * where level 0 stopped, but block 0's second half is not the boot's
+     * - it is the label - so skip it to byte BSIZE.
+     */
+    lseek(fd, (long) BSIZE, 0);
+    for (n = 1; ; n++) {
+        got = read(fd, bb, sizeof(bb));
+        if (got <= 0)
+            break;
+        cyl = n / (heads * nsec);
+        head = (n / nsec) % heads;
+        sec = firstsec + (n % nsec);
+        if (imd_write(ip, cyl, head, sec, bb) != 512)
+            goto bad;
+    }
+    close(fd);
+    imd_close(ip);
+    return 0;
+bad:
+    close(fd);
+    imd_close(ip);
+    return -1;
+}
+
+/*
+ * Put the label back on an IMD hard disk with the filesystem's numbers
+ * in it - the same job patchlabel does for a raw diskette.  The slice
+ * table is already in block 0 (the label command wrote it); putlabel
+ * fills in fsize, isize and the boot's extent, and preserves the table
+ * and the boot's first level in front of it.
+ */
+static int
+imdpatchlabel(image)
+    char *image;
+{
+    struct imd *ip;
+    char buf[BSIZE];
+
+    ip = imd_load(image, 0, 1);
+    if (!ip)
+        return -1;
+    if (imd_read(ip, 0, 0, imd_firstsec(ip, 0, 0), buf) != 512) {
+        imd_close(ip);
+        return -1;
+    }
+    putlabel(buf);
+    if (imd_write(ip, 0, 0, imd_firstsec(ip, 0, 0), buf) != 512) {
+        imd_close(ip);
+        return -1;
+    }
+    imd_close(ip);
+    return 0;
+}
+
+/*
  * mkfs <image> [size|-exclude] [-i bootfile] [-f]: make a filesystem on
  * a drive image initialize made, or on a diskette image bootflop made.
- * Either way the geometry comes out of a label, so the medium is not
- * named again.
+ * Either way the geometry and the filesystem's slice come out of a
+ * label, so the medium is not named again.
  */
 int
 mkfscmd(int c, char **a)
 {
-    struct disklabel label;
+    struct imd *ip;
     struct dlabel dl;
     char *image;
     char *bfile;
     UINT dsize;
     UINT fsize;
     UINT isize;
-    UINT bootfirst;
-    UINT bootnblk;
-    UINT spc;
     UINT given;
     UINT exclude;
-    int type;
     int f;
-    int fd;
-    int i;
+    int spt, secsize, hard;
 
     a++;
     c--;
@@ -1590,65 +1750,51 @@ mkfscmd(int c, char **a)
     }
 
     /*
-     * The geometry, out of whichever label the image carries.
-     *
-     * A hard disk has initialize's struct disklabel at offset 0 - the
-     * out-of-band volume label the formatter writes, which is a
-     * different structure from the Micronix label and a different
-     * question: it says how the drive is built, and its geometry picks
-     * the row of mkfs.h's table that the boot is placed by.
-     *
-     * A diskette has a struct dlabel at DL_OFFSET instead, because that
-     * is what came in with its boot, and it is the same structure the
-     * loader and fslib read.  Nothing is initialized first: bootflop
-     * makes the whole article, and this path is for remaking the
-     * filesystem on one of those.
+     * The medium, out of whichever format the image carries.  A hard disk
+     * is an IMD image - "IMD " at the front, one track record per cylinder
+     * and head - and a diskette is a raw image whose boot carries the
+     * label.  In both, the filesystem is slice 'a' of a slice-idiom label
+     * and the boot is the device blocks below it; the geometry comes off
+     * the label, never a table.
      */
-    fd = open(image, O_RDONLY);
-    if (fd < 0 || read(fd, &label, sizeof label) != sizeof label) {
-        printf("mkfs: can't read the label on %s\n", image);
-        if (fd >= 0)
-            close(fd);
-        return 2;
+    hard = 0;
+    ip = imd_load(image, 0, 0);
+    if (ip) {
+        imd_trkinfo(ip, 0, 0, &spt, &secsize);
+        if (secsize == 512)
+            hard = 1;
+        imd_close(ip);
     }
-    close(fd);
-    if (label.magic == MAGIC && label.formatted) {
-        for (type = 0; type < NDRIVE; type++)
-            if (dtracks[type] == label.cylinders && dheads[type] == label.heads
-                && dsecs[type] == label.spt && dtoff[type] == 0)
-                break;
-        if (type == NDRIVE) {
-            printf("mkfs: %d/%d/%d is not a drive this tree knows\n",
-                label.cylinders, label.heads, label.spt);
+    if (hard) {
+        /*
+         * The label command sized slice 'a' before mkfs ran; the
+         * filesystem is that slice, and the boot is the blocks in front
+         * of it.  Nothing is excluded from the slice: its offset already
+         * put the boot below it.
+         */
+        if (imdlabel(image, &dl) < 0) {
+            printf("mkfs: %s has no label - run the label command first\n",
+                image);
             return 2;
         }
-        dsize = (UINT) label.cylinders * label.heads * label.spt;
-        spc = (UINT) label.heads * label.spt;
-        bootfirst = (label.cylinders - (label.cylinders >> 1)) * spc;
-        bootnblk = spc;
+        dsize = dl.d_slice[0].d_len;
+        if (dsize == 0)
+            dsize = dl.d_tracks - dl.d_slice[0].d_off;
+        dsize *= (UINT) dl.d_heads * dl.d_spt;
     } else {
         if (floppylabel(image, &dl) < 0) {
             printf("mkfs: %s is not formatted - run initialize first\n",
                 image);
             return 2;
         }
-        type = floptype(&dl);
-        if (type < 0) {
-            printf("mkfs: %d/%d/%d is not a medium this tree knows\n",
-                dl.d_tracks, dl.d_heads, dl.d_spt);
-            return 2;
-        }
         dsize = (UINT) dl.d_tracks * dl.d_heads * dl.d_spt;
         /*
-         * No boot inside the filesystem: on a diskette the boot is the
-         * device blocks in front of it, which no filesystem block number
-         * reaches, so there is nothing for domkfs to place.  What that
-         * costs is subtracted from the size below, out of the exclusion
-         * the label itself names - the boot area's own length - so the
-         * filesystem still ends at the end of the medium.
+         * The boot is the device blocks in front of the filesystem, which
+         * no filesystem block number reaches, so there is nothing for
+         * domkfs to place.  What that costs is subtracted from the size
+         * below, out of the exclusion the label itself names - the boot
+         * area's own length.
          */
-        bootfirst = 0;
-        bootnblk = 0;
         if (!given && !exclude)
             exclude = dl.d_bootblks;
     }
@@ -1674,15 +1820,41 @@ mkfscmd(int c, char **a)
     if (isize < 1)
         isize = 1;
 
-    i = openfsrw(image, &fs, 1);
-    if (i < 0) {
+    if (hard) {
+        /*
+         * The boot, below the filesystem: write it into the blocks in
+         * front of slice 'a', keeping the label the label command put in
+         * block 0's second half.
+         */
+        if (hardboot(image, bfile) < 0) {
+            printf("mkfs: can't write the boot to %s\n", image);
+            return 2;
+        }
+    }
+
+    if (openfsrw(image, &fs, 1) < 0) {
         printf("mkfs: can't open %s\n", image);
         return 2;
     }
 
     pname = "mkfs";
-    domkfs(fsize, isize, bootfirst, bootnblk, dsize, type, bfile, f);
+    domkfs(fsize, isize, dsize, f);
     closefs(fs);
+
+    /*
+     * The label, with the filesystem's numbers now in it.  The slice
+     * table and the boot in front of it survive; putlabel fills in
+     * fsize, isize and the boot's extent.
+     */
+    if (hard) {
+        if (imdpatchlabel(image) < 0) {
+            printf("mkfs: can't put the label back on %s\n", image);
+            return 2;
+        }
+    } else if (patchlabel(image) < 0) {
+        printf("mkfs: can't put the label back on %s\n", image);
+        return 2;
+    }
     return 0;
 }
 
@@ -1842,14 +2014,16 @@ labdump(image, lp)
     spc = (UINT) lp->d_heads * lp->d_spt;
 
     printf("%s: %s version %u\n", image, DL_MAGIC, lp->d_version);
+    if (lp->d_mfg[0] || lp->d_model[0])
+        printf("\tdrive\t\t%s %s\n", lp->d_mfg, lp->d_model);
     printf("\tgeometry\t%u cylinders, %u heads, %u sectors/track "
         "(%u blocks/cylinder)\n",
         lp->d_tracks, lp->d_heads, lp->d_spt, spc);
     printf("\troll\t\t%u\n", lp->d_roll);
     printf("\tboot\t\t%u blocks, loaded from slice %c\n",
         lp->d_bootblks, 'a' + lp->d_bootslice);
-    printf("\tfilesystem\t%u blocks, %u inode blocks, %u swap blocks\n",
-        lp->d_fsize, lp->d_isize, lp->d_swap);
+    printf("\tfilesystem\t%u blocks, %u inode blocks\n",
+        lp->d_fsize, lp->d_isize);
     printf("\tslices\t\t(offset, length) in cylinders, "
         "0 length = to the end\n");
     for (i = 0; i < NSLICE; i++) {
@@ -1879,12 +2053,13 @@ labdump(image, lp)
 int
 labelcmd(int c, char **a)
 {
-    struct disklabel olab;
+    struct imd *ip;
     register struct dlabel *lp;
     char buf[BSIZE];
     char *image;
     UINT sl, start, end, len, off;
-    int i, fd, asked;
+    UINT tracks, heads, spt;
+    int i, asked, nsec, secsize;
 
     a++;
     c--;
@@ -1946,35 +2121,30 @@ labelcmd(int c, char **a)
     if (image == 0)
         return labusage();
 
-    fd = open(image, O_RDWR);
-    if (fd < 0) {
-        printf("label: can't open %s: %d\n", image, errno);
-        return 2;
-    }
-
     /*
-     * initialize's label, out of band, is what the simulated drive
-     * actually is - how many cylinders its file holds and how the
-     * simulator seeks them.  A geometry declared in band that disagrees
-     * with it describes a drive that is not there, so the two are
-     * required to agree rather than merely warned about.
+     * The geometry comes off the image, not an out-of-band label: the
+     * image is an IMD file, and its track records say the shape.  Block 0
+     * - cylinder 0, head 0, the first sector - is the label's block, read
+     * and written as a sector.
      */
-    if (read(fd, &olab, sizeof olab) != sizeof olab) {
-        printf("label: can't read %s: %d\n", image, errno);
-        close(fd);
+    ip = imd_load(image, 0, 1);
+    if (!ip) {
+        printf("label: can't open %s\n", image);
         return 2;
     }
-    if (olab.magic != MAGIC || !olab.formatted) {
-        printf("label: %s carries no volume label - run initialize first\n",
-            image);
-        close(fd);
+    imd_trkinfo(ip, 0, 0, &nsec, &secsize);
+    if (secsize != 512) {
+        printf("label: %s sectors are %d bytes, not 512\n", image, secsize);
+        imd_close(ip);
         return 2;
     }
+    tracks = (UINT) ip->cyls;
+    heads = (UINT) ip->heads;
+    spt = (UINT) nsec;
 
-    if (lseek(fd, (long) DATAOFF, 0) < 0 ||
-        read(fd, buf, BSIZE) != BSIZE) {
-        printf("label: can't read block 0 of %s: %d\n", image, errno);
-        close(fd);
+    if (imd_read(ip, 0, 0, imd_firstsec(ip, 0, 0), buf) != 512) {
+        printf("label: can't read block 0 of %s\n", image);
+        imd_close(ip);
         return 2;
     }
     lp = (struct dlabel *) &buf[DL_OFFSET];
@@ -1983,11 +2153,11 @@ labelcmd(int c, char **a)
     if (!asked) {
         if (!labislabel(lp)) {
             printf("label: %s carries no %s label\n", image, DL_MAGIC);
-            close(fd);
+            imd_close(ip);
             return 2;
         }
         labdump(image, lp);
-        close(fd);
+        imd_close(ip);
         return 0;
     }
 
@@ -2007,10 +2177,10 @@ labelcmd(int c, char **a)
         for (i = 0; i < 4; i++)
             lp->d_magic[i] = DL_MAGIC[i];
         lp->d_version = DL_VERS_SLICE;
-        lp->d_tracks = (UINT) olab.cylinders;
-        lp->d_heads = (UINT) olab.heads;
-        lp->d_spt = (UINT) olab.spt;
-        lp->d_firstsec = (UINT) olab.firstsec;
+        lp->d_tracks = tracks;
+        lp->d_heads = heads;
+        lp->d_spt = spt;
+        lp->d_firstsec = (UINT) imd_firstsec(ip, 0, 0);
         lp->d_roll = 0;
         printf("%s: no label: writing %s version %u, %u/%u/%u, roll 0\n",
             image, DL_MAGIC, DL_VERS_SLICE,
@@ -2036,7 +2206,7 @@ labelcmd(int c, char **a)
              (len && (long) off + (long) len > (long) lp->d_tracks))) {
             printf("label: slice %c runs past cylinder %u\n",
                 'a' + lab_sets[i].ls_sl, lp->d_tracks);
-            close(fd);
+            imd_close(ip);
             return 2;
         }
         lp->d_slice[lab_sets[i].ls_sl].d_off = off;
@@ -2045,27 +2215,25 @@ labelcmd(int c, char **a)
             image, 'a' + lab_sets[i].ls_sl, off, len);
     }
 
-    if (lseek(fd, (long) DATAOFF, 0) < 0 ||
-        write(fd, buf, BSIZE) != BSIZE) {
-        printf("label: can't write block 0 of %s: %d\n", image, errno);
-        close(fd);
+    if (imd_write(ip, 0, 0, imd_firstsec(ip, 0, 0), buf) != 512) {
+        printf("label: can't write block 0 of %s\n", image);
+        imd_close(ip);
         return 2;
     }
-    close(fd);
+    imd_close(ip);
 
     /*
      * Read it back from the volume and report that, not the buffer that
      * was just written: what matters is what the disk now says.
      */
-    fd = open(image, O_RDONLY);
-    if (fd < 0 || lseek(fd, (long) DATAOFF, 0) < 0 ||
-        read(fd, buf, BSIZE) != BSIZE) {
-        printf("label: can't read back block 0 of %s: %d\n", image, errno);
-        if (fd >= 0)
-            close(fd);
+    ip = imd_load(image, 0, 0);
+    if (!ip || imd_read(ip, 0, 0, imd_firstsec(ip, 0, 0), buf) != 512) {
+        printf("label: can't read back block 0 of %s\n", image);
+        if (ip)
+            imd_close(ip);
         return 2;
     }
-    close(fd);
+    imd_close(ip);
     labdump(image, lp);
     return 0;
 }
@@ -2119,7 +2287,6 @@ bootflopcmd(int c, char **a)
     UINT isize;
     UINT bootblks;
     UINT spc;
-    int type;
     int fd;
     int bfd;
     int n;
@@ -2137,16 +2304,10 @@ bootflopcmd(int c, char **a)
             "mkbootimg -d\n", bootfile, DL_MAGIC);
         return 2;
     }
-    type = floptype(&dl);
-    if (type < 0) {
-        printf("bootflop: %d/%d/%d is not a medium this tree knows\n",
-            dl.d_tracks, dl.d_heads, dl.d_spt);
-        return 2;
-    }
 
-    spc = (UINT) dheads[type] * dsecs[type];
-    dsize = (UINT) dtracks[type] * spc;
-    bootblks = (UINT) dtoff[type] * spc;
+    spc = (UINT) dl.d_heads * dl.d_spt;
+    dsize = (UINT) dl.d_tracks * spc;
+    bootblks = (UINT) dl.d_slice[0].d_off * spc;
     fsize = dsize - bootblks;
     isize = fsize / 43 + fsize / 1000;
     if (isize < 1)
@@ -2209,16 +2370,16 @@ bootflopcmd(int c, char **a)
         return 2;
     }
     pname = "bootflop";
-    domkfs(fsize, isize, 0, 0, dsize, type, DEFBOOT, 1);
+    domkfs(fsize, isize, dsize, 1);
     closefs(fs);
 
-    if (patchlabel(image, type) < 0) {
+    if (patchlabel(image) < 0) {
         printf("bootflop: can't put the label back on %s\n", image);
         return 2;
     }
 
     printf("bootflop: %d/%d/%d, %d sectors of boot, %d block filesystem\n",
-        dtracks[type], dheads[type], dsecs[type], n, fsize);
+        dl.d_tracks, dl.d_heads, dl.d_spt, n, fsize);
     return 0;
 }
 

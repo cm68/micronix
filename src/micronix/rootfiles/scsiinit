@@ -1,0 +1,20 @@
+echo
+label -s /dev/scsi0c a 0 121
+label -s /dev/scsi0c b 122
+mkfs -f /dev/scsi0
+fsck /dev/scsi0
+mount /dev/scsi0 /b
+chmod 755 /b
+cptree -v / /b
+rm -f /b/dev/root /b/dev/swap
+mknod /b/dev/root b 5 0
+mknod /b/dev/swap b 5 32
+setdev /b/micronix 5/0 5/32
+rm -f /b/hdinit /b/m5init /b/m10init /b/m16init /b/m40init /b/scsiinit
+rm -f /b/etc/signon
+ln /b/etc/signon2 /b/etc/signon
+rm -f /b/etc/signon2
+umount /dev/scsi0
+sync
+echo
+echo Disk initialization complete.

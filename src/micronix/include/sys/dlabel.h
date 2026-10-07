@@ -158,7 +158,6 @@ struct dlabel {
      */
     UINT d_fsize;               /* blocks in the filesystem */
     UINT d_isize;               /* blocks of inodes */
-    UINT d_swap;                /* blocks left at the end, not in the fs */
 
     /*
      * Which slice the boot loads its filesystem from.  Appended with the
@@ -199,6 +198,20 @@ struct dlabel {
      * diskette, and is what the five rolled rows in cmd/mkfs write.
      */
     UINT d_firstsec;
+
+    /*
+     * What the drive calls itself, written by the formatter (mwformat,
+     * hdformat, and mnix's initialize, which stands in for the first) so
+     * a labelled drive can be identified without a table.  Both are
+     * NUL-terminated and the rest of each field is zero, and a label
+     * written before these fields existed reads as two empty strings -
+     * which is the honest answer then, when no formatter wrote a name.
+     * There is room for them because the label owns the whole second half
+     * of the boot sector, and the structure above uses sixty of its two
+     * hundred and fifty-six bytes.
+     */
+    char d_mfg[16];             /* manufacturer, e.g. "Maxtor" */
+    char d_model[16];           /* model number, e.g. "XT-1140" */
 };
 
 #define DL_MAGIC    "MWDL"      /* Morrow Winchester disk label */
@@ -269,6 +282,13 @@ struct dlgeom
  *	    is ENXIO.
  */
 extern int dllabel();
+
+/*
+ * Decode one slice of a drive against its cached table: offset in
+ * cylinders, roll (0 for 'c'), and highest legal block number.  Returns
+ * 0, or ENXIO for a slice that runs off the drive.
+ */
+extern int dlslice();
 
 /*
  * vim: set tabstop=4 shiftwidth=4 expandtab:

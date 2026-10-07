@@ -38,7 +38,7 @@ struct uxfs {
 };
 
 int
-readblk(struct super *fs, int blkno, char *buf)
+readblk(struct super *fs, UINT blkno, char *buf)
 {
 	struct uxfs *u = (struct uxfs *)fs;
 
@@ -54,7 +54,7 @@ readblk(struct super *fs, int blkno, char *buf)
 }
 
 int
-writeblk(struct super *fs, int blkno, char *buf)
+writeblk(struct super *fs, UINT blkno, char *buf)
 {
 	struct uxfs *u = (struct uxfs *)fs;
 
@@ -110,7 +110,7 @@ closefs(struct super *fs)
  * the label directly, is where bootrange is real.
  */
 int
-bootrange(struct super *fs, int *first, int *nblk, char **name)
+bootrange(struct super *fs, UINT *first, UINT *nblk, char **name)
 {
 	return 0;
 }

@@ -66,10 +66,10 @@ struct info
     UINT tracks;                /* number of tracks per surface */
     UINT8 heads;                /* number of heads */
     UINT8 sectors;              /* number of sectors per track */
-    UINT maxblk;                /* max legal block number in the slice */
+    UINT maxblk;                /* dllabel's bound for the first slice opened */
     UINT spc;                   /* number of sectors per cylinder */
-    UINT roll;                  /* what mwcyl adds to blk / spc */
-    UINT cylstart;              /* first cylinder of the slice being read */
+    UINT roll;                  /* the drive's d_roll */
+    UINT cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
 
     UINT8 stpdel;               /* delay between step pulses, 100 us */
@@ -77,7 +77,13 @@ struct info
     UINT lowcur;                /* track where low current begins */
     UINT curtrk;                /* current track */
     UINT8 flags;                /* see below */
-    UINT8 slice;                /* the slice this open is bound to */
+
+    /*
+     * The slice table off the label, cached at open.  A buffer's minor
+     * names its slice; mwstrat looks the offset and length up here, so
+     * every slice of a drive maps at once instead of one open's.
+     */
+    struct dslice d_slice[NSLICE];
 } mws[NDRIVES] = 0;
 
 /*
@@ -178,7 +184,6 @@ static UINT8 retry = 0,         /* number of retries so far */
 #define STOPPED	1
 #define ACTIVE	2
 #define INTRPT	3
-#define LATE	4
 #define TOOLATE 5
 
 /*
@@ -212,20 +217,15 @@ mwopen(dev, mode)
     }
     info = &mws[drive];
     /*
-     * One mapping per drive, not one per open - mws[] is keyed by drive
-     * and holds the slice's offset and roll - so a second open asking for
-     * a different slice would be served the first one's mapping and would
-     * read and write the wrong cylinders while reporting success.  That
-     * is the one failure this format is meant to make impossible, so it
-     * is refused.  The same slice is the same mapping and is let through
-     * as before.
+     * The label is loaded once, on the first open of any slice of this
+     * drive, and cached here - geometry in the fields above, the slice
+     * table below.  A later open of another slice on the same drive just
+     * lets the buffer's minor name which slice, and mwstrat resolves its
+     * offset and length from the cached table, so every slice of a drive
+     * stays mapped at once, each by its own number.
      */
-    if (info->flags & OPEN) {
-        if (info->slice != sl)
-            u.error = EBUSY;
+    if (info->flags & OPEN)
         return;
-    }
-    info->slice = sl;
 
     info->stpdel = MWSTPDEL;
     info->precomp = MWPRECOMP;
@@ -252,7 +252,7 @@ mwopen(dev, mode)
      * than two copies of one sector.
      */
     switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive,
-                    sl, (struct dlgeom *)info)) {
+                    sl, (struct dlgeom *)info, info->d_slice)) {
     case -1:
         return;                 /* no such slice; dllabel set u.error */
     case 0:
@@ -331,15 +331,22 @@ mwstrat(b)
     register struct buf *b;
 {
     register struct info *info;
+    static UINT sl, off, roll, maxblk;
 
     info = &mws[b->dev & 3];
-    if (b->blk > info->maxblk) {
+    /*
+     * The buffer's minor names its slice; dlslice resolves its offset,
+     * roll and bound from the cached table ('c' is the whole drive).
+     */
+    sl = devslice(b->dev);
+    if (dlslice((struct dlgeom *)info, info->d_slice, sl,
+                &off, &roll, &maxblk) || b->blk > maxblk) {
         b->flags |= BERROR;
         b->error = ENXIO;
         iodone(b);
         return;
     }
-    b->cyl = mwcyl(b->blk, info);
+    b->cyl = mwcyl(b->blk, info->spc, off, roll, info->tracks);
     di();
     if (mwbuf == 0)
         mwbuf = b;
@@ -530,7 +537,7 @@ rwcmd()
     nsecs = mwinfo->sectors;
     curtrk = mwinfo->curtrk;
 
-    track = mwcyl(cmd.blk, mwinfo);
+    track = mwbuf->cyl;         /* resolved from the buffer's slice in mwstrat */
     head = csec / nsecs;
     sector = csec % nsecs;
 
@@ -568,27 +575,24 @@ rwcmd()
 }
 
 /*
- * Which cylinder a filesystem block lands on.
- *
- * The block's cylinder is its number divided by the sectors per cylinder,
- * shifted by the slice it lives in and rotated by d_roll.  Both terms are
- * cylinders and both are added after the division, so neither is ever a
- * block number: a slice's position on a large drive could not be one.
- * On every disk made before slices the slice term is zero and the
- * rotation is tracks >> 1, which is byte for byte what this has always
- * computed.
+ * Which cylinder a filesystem block lands on.  The block's cylinder is
+ * its number divided by the sectors per cylinder, shifted by the slice's
+ * offset and rotated by the drive's roll.  Both terms are cylinders and
+ * both are added after the division, so neither is ever a block number:
+ * a slice's position on a large drive could not be one.  The slice terms
+ * are passed in because mwstrat resolves them from the buffer's minor
+ * against the cached table.
  */
-mwcyl(blk, info)
-    UINT blk;
-    struct info *info;
+mwcyl(blk, spc, off, roll, tracks)
+    UINT blk, spc, off, roll, tracks;
 {
     static UINT cyl;
 
-    cyl = blk / info->spc;
-    cyl += info->cylstart;
-    cyl += info->roll;
-    if (cyl >= info->tracks)
-        cyl -= info->tracks;
+    cyl = blk / spc;
+    cyl += off;
+    cyl += roll;
+    if (cyl >= tracks)
+        cyl -= tracks;
     return cyl;
 }
 
@@ -718,9 +722,6 @@ mwcheck()
     di();
     switch (mwstate) {          /* cases STOPPED and INTRPT do not change */
     case ACTIVE:
-        mwstate = LATE;
-        break;
-    case LATE:
         mwstate = TOOLATE;
         reset();
         curdrv = -1;            /* force re-selection */
@@ -964,6 +965,41 @@ mwioctl(dev, com, r, b)
      * the command block itself makes: the driver moves the bytes, the
      * program knows what they mean.
      */
+    return (0);
+}
+
+/*
+ * Enumerate the drives at signon: read each unit's label and print the
+ * manufacturer, model and capacity of every drive that answers.  The
+ * major is 3, from the header (sys/mwhdr.c), and the 'c' slice is what
+ * names block 0.  A unit with nothing behind it does not answer, and the
+ * tick's watchdog (mwcheck) turns that silence into NOTRDY in a couple of
+ * seconds, so the loop moves on instead of hanging.
+ */
+mwprobe()
+{
+    struct info *info;
+    struct buf *b;
+    struct dlabel *lp;
+    char *p;
+    UINT dev, unit;
+    UINT mb;
+
+    for (unit = 0; unit < NDRIVES; unit++) {
+        info = &mws[unit];
+        dev = (3 << 8) | (DL_WHOLE << 5) | unit;
+        if (dllabel(dev, DL_WHOLE, (struct dlgeom *)info, info->d_slice) != 1)
+            continue;
+        b = bread(0, dev);
+        if (b == 0)
+            continue;
+        p = bhold(b);
+        lp = (struct dlabel *) &p[DL_OFFSET];
+        mb = (UINT) ((UINT32) info->tracks * info->heads * info->sectors >> 11);
+        pr("hddma%d: %s %s, %d MB\n", unit, lp->d_mfg, lp->d_model, mb);
+        brel();
+        brelse(b);
+    }
     return (0);
 }
 

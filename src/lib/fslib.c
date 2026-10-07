@@ -63,7 +63,6 @@ struct image {
     int bootblks;   /* d_bootblks - how many blocks the boot owns */
     int label_fsize;    /* the label's filesystem fields, for cross-checking */
     int label_isize;
-    int label_swap;
     int haslabel;       /* a Micronix label was present and readable */
     int bootbelow;      /* the boot is under the filesystem, not in it */
 #ifdef USE_LIBDSK
@@ -144,7 +143,7 @@ is_sticky(char *fn)
  *	sec  = (blk mod spc) mod spt
  */
 static long
-hdpos(struct image *i, int blkno, long base)
+hdpos(struct image *i, UINT blkno, long base)
 {
     int spc = i->heads * i->spt;
     int cyl, head, sec;
@@ -211,7 +210,6 @@ hdlabels(struct image *i)
     i->haslabel = 1;
     i->label_fsize = dl->d_fsize;
     i->label_isize = dl->d_isize;
-    i->label_swap = dl->d_swap;
     if (dl->d_tracks != i->cyls || dl->d_heads != i->heads ||
         dl->d_spt != i->spt) {
         fprintf(stderr,
@@ -284,14 +282,6 @@ dllabels(struct image *i)
     if (strncmp(dl->d_magic, DL_MAGIC, 4) != 0)
         return 0;
 
-    /*
-     * A rolled label is not this reader's: the flat mapping below has no
-     * rotation in it, so on such a disk every block would land in the
-     * wrong place and the read would still look like a read.  Say no and
-     * let the caller carry on as it did before there were labels here.
-     */
-    if (dl->d_roll)
-        return 0;
     if (!dl->d_tracks || !dl->d_heads || !dl->d_spt)
         return 0;
     sl = dl->d_bootslice;
@@ -322,13 +312,12 @@ dllabels(struct image *i)
     i->altsec = 0;              /* dj.c does not skew */
     i->major = 2;
     i->minor = 0;
-    i->roll = 0;
+    i->roll = dl->d_roll;
     i->cyl0 = dl->d_cyl0;
     i->bootblks = dl->d_bootblks;
     i->haslabel = 1;
     i->label_fsize = dl->d_fsize;
     i->label_isize = dl->d_isize;
-    i->label_swap = dl->d_swap;
 
     /* the slice's offset is in cylinders; a block number is in sectors */
     i->offset = (int) dl->d_slice[sl].d_off * spc;
@@ -421,6 +410,35 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
         i->bootblks = 0;
         i->haslabel = 0;
         i->bootbelow = 0;
+
+        /*
+         * An IMD image says what it is in its track records: its shape
+         * comes off the first track and the handle, not a label.  A hard
+         * disk is formatted by initialize before mkfs, and mkfs's own
+         * label is not written until mkfs runs, so this is the geometry
+         * the filesystem is placed by.  The roll is the default half the
+         * cylinders; the label, once there is one, overrides it below.
+         */
+        if (i->driver == DRIVER_IMD) {
+            struct imd *ip = (struct imd *)i->drive;
+            int secsize = 0;
+
+            imd_trkinfo(i->drive, 0, 0, &i->spt, &secsize);
+            i->cyls = ip->cyls;
+            i->heads = ip->heads;
+            i->roll = i->cyls >> 1;
+            /*
+             * A blank drive has no track at all, so imd_trkinfo reports
+             * zero sectors.  spt is what secmap divides by, and a
+             * filesystem cannot be placed on a disk with no geometry, so
+             * refuse it here rather than let the caller die on 1 % 0.
+             */
+            if (i->spt == 0) {
+                imd_close(i->drive);
+                free((struct super *)i);
+                return -1;
+            }
+        }
 
         /*
          * A hard disk file says what it is in its first four bytes, so
@@ -630,7 +648,7 @@ openfs(char *filesystem, struct super **fsp)
  * the name says what the blocks are for and not who fetches them.
  */
 int
-bootrange(struct super *fs, int *first, int *nblk, char **name)
+bootrange(struct super *fs, UINT *first, UINT *nblk, char **name)
 {
     struct image *i = (struct image *)fs;
 
@@ -758,7 +776,7 @@ secinv(struct super *fs, UINT blkno)
 int secsize;
 int secs;
 void
-blktopos(void *drive, int blkno, int offset, int *cyl, int *head, int *sec)
+blktopos(void *drive, UINT blkno, int offset, int roll, int *cyl, int *head, int *sec)
 {
     struct imd *ip = (struct imd *)drive;
     struct imd_trk *tp;
@@ -814,6 +832,11 @@ blktopos(void *drive, int blkno, int offset, int *cyl, int *head, int *sec)
         *head = trk % heads;
         *cyl = cylstart + trk / heads;
     }
+    if (roll) {
+        *cyl += roll;
+        if (*cyl >= ip->cyls)
+            *cyl -= ip->cyls;
+    }
     trace(trace_fs, "blkno:%d cyl:%d head:%d sec:%d\n",
         blkno, *cyl, *head, *sec);
 }
@@ -822,9 +845,9 @@ blktopos(void *drive, int blkno, int offset, int *cyl, int *head, int *sec)
  * get the contents of a block
  */
 int
-readblk(struct super *fs, int blkno, char *buf)
+readblk(struct super *fs, UINT blkno, char *buf)
 {
-    int realblk;
+    UINT realblk;
     int ret;
     int cyl, head, sec;
     struct image *i = (struct image *)fs;
@@ -853,7 +876,7 @@ readblk(struct super *fs, int blkno, char *buf)
         }
 #endif
     } else if (i->driver == DRIVER_IMD) {
-        blktopos(i->drive, realblk, i->offset, &cyl, &head, &sec);
+        blktopos(i->drive, realblk, i->offset, i->roll, &cyl, &head, &sec);
         ret = imd_read(i->drive, cyl, head, sec, buf);
         if (ret != 512) {
             printf("read lose %d\n", ret);
@@ -867,9 +890,9 @@ readblk(struct super *fs, int blkno, char *buf)
  * scribble the contents of a block
  */
 int
-writeblk(struct super *fs, int blkno, char *buf)
+writeblk(struct super *fs, UINT blkno, char *buf)
 {
-    int realblk;
+    UINT realblk;
     int ret;
     int cyl, head, sec;
     struct image *i = (struct image *)fs;
@@ -894,7 +917,7 @@ writeblk(struct super *fs, int blkno, char *buf)
             lose("writeblk");
         }
     } else if (i->driver == DRIVER_IMD) {
-        blktopos(i->drive, realblk, i->offset, &cyl, &head, &sec);
+        blktopos(i->drive, realblk, i->offset, i->roll, &cyl, &head, &sec);
         ret = imd_write(i->drive, cyl, head, sec, buf);
         if (ret != 512) {
             printf("write lose %d\n", ret);

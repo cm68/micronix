@@ -19,17 +19,17 @@
 
 /* the inode cache: one block of the ilist, remembered between iget */
 static struct dsknod inodeblk[I_PER_BLK];
-static int inblkno = -1;
+static UINT inblkno = (UINT)-1;
 
 /* the indirect-block scratch, for bmap */
 static UINT iblk[256];
-static int iblkno = -1;
+static UINT iblkno = (UINT)-1;
 static UINT iiblk[256];
-static int iiblkno = -1;
+static UINT iiblkno = (UINT)-1;
 
 /* the directory-entry cache, for getdirent */
 static struct dir dirbuf[32];
-static int dblk = -1;
+static UINT dblk = (UINT)-1;
 
 void
 lose(char *s)
@@ -41,7 +41,7 @@ lose(char *s)
 struct dsknod *
 iget(struct super *fs, int inum)
 {
-	int iblk;
+	UINT iblk;
 	struct i_node *ip = malloc(sizeof(struct i_node));
 
 	ip->inum = inum;
@@ -88,7 +88,7 @@ filesize(struct dsknod *ip)
 struct dir *
 getdirent(struct dsknod *dp, int i)
 {
-	int b;
+	UINT b;
 	struct i_node *ip = (struct i_node *)dp;
 	off_t offset = (off_t)i * sizeof(struct dir);
 
@@ -105,10 +105,11 @@ getdirent(struct dsknod *dp, int i)
 /*
  * allocate a block from the free list
  */
-int
+UINT
 balloc(struct super *fs)
 {
-	int b, i;
+	UINT b;
+	int i;
 	UINT buf[256];
 
 	i = --fs->s_nfree;
@@ -134,7 +135,7 @@ balloc(struct super *fs)
 }
 
 void
-bfree(struct super *fs, int blkno)
+bfree(struct super *fs, UINT blkno)
 {
 	int i;
 	UINT buf[256];
@@ -161,7 +162,7 @@ bfree(struct super *fs, int blkno)
  * if alloc is set.  The v6 scheme: seven single indirect blocks, one
  * double, and the inode holds eight addresses either way.
  */
-int
+UINT
 bmap(struct dsknod *dp, off_t offset, int alloc)
 {
 	struct i_node *ip = (struct i_node *)dp;
@@ -361,19 +362,20 @@ bootialloc(struct super *fs)
  * failure, and 1 when the boot was already installed.
  */
 int
-installboot(struct super *fs, int first, int nblk, char *name)
+installboot(struct super *fs, UINT first, UINT nblk, char *name)
 {
     struct dsknod *ip;
     struct dir *de;
     UINT ind[256];
     char buf[512];      /* the /boot directory block */
     char rbuf[512];     /* the root directory block */
-    int indblk, dirblk;
+    UINT indblk, dirblk;
     int dirino, filino;
-    int b, entries, slot, i;
+    UINT b;
+    int entries, slot, i;
 
-    if (first < 0 || nblk <= 0 || nblk > 256) {
-        printf("installboot: %d boot blocks at %d is not representable\n",
+    if (nblk <= 0 || nblk > 256) {
+        printf("installboot: %u boot blocks at %u is not representable\n",
             nblk, first);
         return -1;
     }
@@ -499,7 +501,7 @@ installboot(struct super *fs, int first, int nblk, char *name)
     iblkno = -1;
     iiblkno = -1;
 
-    printf("installboot: /boot/%.14s owns blocks %d..%d\n",
+    printf("installboot: /boot/%.14s owns blocks %u..%u\n",
         name, first, first + nblk - 1);
     return 0;
 }

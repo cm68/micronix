@@ -41,13 +41,10 @@ UINT isize;                     /* blocks of inodes */
 UINT nextblk;                   /* next block to hand out while building */
 UINT nextino;                   /* next inumber to hand out */
 
-char *bootfile;                 /* -i, or DEFBOOT */
 int force;                      /* -f: destroy what is already there */
 
 /* said twice, so it is a string and not two */
 char *inuse = "there is a filesystem here - use -f";
-UINT bootfirst;                 /* first block of the boot area */
-UINT bootnblk;                  /* how many of them */
 
 struct super *sb;
 
@@ -116,17 +113,6 @@ void addfree(bn)
 }
 
 /*
- * Is this block part of the boot area?  Asked for every block in the
- * device while the free list is built.
- */
-int
-inboot(bn)
-    UINT bn;
-{
-    return bn >= bootfirst && bn < bootfirst + bootnblk;
-}
-
-/*
  * Read and write an inode.  Inode 1 is the root and lives at the start
  * of block 2, so inode n is n-1 into the ilist.
  */
@@ -166,32 +152,17 @@ void clrdsk(ip)
  * stop rather than write over it: a boot with its tail replaced by a
  * label loads and runs and does something else.
  *
- * Which of the two idioms the label carries is dtoff[type]'s answer and
- * nothing else's, which is what makes the mistake this function used to
- * be able to make - stamping a rotation on a medium that has none -
- * structurally impossible rather than a thing to remember.  mw.c rotates
- * a hard disk by half its cylinders, so its filesystem wraps around and
- * the boot lands at physical cylinder 0 from inside it; dj.c adds a fixed
- * track offset and never rotates, so a diskette's boot is simply the
- * sectors in front of the filesystem and no block of the filesystem
- * reaches it.  The two layouts need different labels, and only the second
- * needs a table.
+ * The geometry, the roll and the slice table are already in buf - the
+ * label command wrote them, or a diskette's boot image carried them in -
+ * and are preserved.  This adds only what a filesystem can say and they
+ * cannot: its block and inode counts, and the boot's extent below it.
  *
- * The invariant tying the blocks together differs accordingly:
- *
- *	rolled	dsize = d_fsize + d_swap		(the boot is *in* the fs)
- *	sliced	dsize = d_fsize + d_bootblks + d_swap	(the boot is below it)
- *
- * d_swap is what is left at the end for swap, so on a diskette it is zero
- * and the reserved tracks are counted where they are - d_bootblks - rather
- * than added to a region they are not in.
+ *	dsize = d_fsize + d_bootblks	(the boot is below the fs)
  */
-void putlabel(buf, type)
+void putlabel(buf)
     char *buf;
-    int type;
 {
     struct dlabel *lp;
-    UINT spc;
     int i;
 
     /*
@@ -220,111 +191,53 @@ void putlabel(buf, type)
     for (i = 0; i < 4; i++)
         lp->d_magic[i] = DL_MAGIC[i];
 
-    lp->d_tracks = dtracks[type];
-    lp->d_heads = dheads[type];
-    lp->d_spt = dsecs[type];
-
-    /*
-     * Where the medium's sector numbering starts - one on a soft
-     * sectored diskette, zero on a hard sectored one and on a hard disk.
-     * It is part of what the medium is, next to its shape, because it
-     * cannot be derived from the shape: see dfirst[] in mkfs.h.
-     */
-    lp->d_firstsec = dfirst[type];
-
     lp->d_fsize = fsize;
     lp->d_isize = isize;
 
-    spc = dheads[type] * (UINT) dsecs[type];
-    if (dtoff[type]) {
-        /*
-         * A diskette: the slice idiom.  'a' begins at cylinder toff and
-         * runs to the end of the medium, the boot owns the device blocks
-         * in front of it, and there is no rotation to describe.
-         */
-        lp->d_version = DL_VERS_SLICE;
-        lp->d_cyl0 = 0;
-        lp->d_bootblks = dtoff[type] * spc;
-        lp->d_roll = 0;
-        lp->d_bootslice = 0;
-        lp->d_slice[0].d_off = dtoff[type];
-        lp->d_slice[0].d_len = 0;       /* to the end */
-        for (i = 1; i < NSLICE; i++) {
-            lp->d_slice[i].d_off = 0;
-            lp->d_slice[i].d_len = 0;
-        }
-        lp->d_swap = dtracks[type] * dheads[type] * dsecs[type]
-            - fsize - lp->d_bootblks;
-    } else {
-        /*
-         * A hard disk: the roll idiom, and the boot is a file inside the
-         * filesystem, so what it owns is already counted in d_fsize.  An
-         * empty table is not written out - it is what a label that
-         * predates the table reads as, and reads as the whole drive.
-         */
-        lp->d_version = DL_VERSION;
-        lp->d_cyl0 = bootfirst;
-        lp->d_bootblks = bootnblk;
-        lp->d_roll = dtracks[type] >> 1;    /* what mw.c adds to blk / spc */
-        lp->d_bootslice = 0;
-        for (i = 0; i < NSLICE; i++) {
-            lp->d_slice[i].d_off = 0;
-            lp->d_slice[i].d_len = 0;
-        }
-        lp->d_swap = dtracks[type] * dheads[type] * dsecs[type] - fsize;
-    }
+    /*
+     * The boot is below the filesystem, not in it: it owns the device
+     * blocks in front of slice 'a', and slice a's offset in cylinders is
+     * the whole of the description.  The geometry, the roll and the slice
+     * table are already in buf and are preserved; this adds the boot's
+     * extent and the filesystem's numbers, both of which came in zero.
+     */
+    lp->d_version = DL_VERS_SLICE;
+    lp->d_cyl0 = 0;
+    lp->d_roll = 0;
+    lp->d_bootslice = 0;
+    lp->d_bootblks = lp->d_slice[0].d_off *
+        (UINT) lp->d_heads * lp->d_spt;
 }
 
 /*
- * Build the filesystem.  Everything about the device - its size, where
- * cylinder 0 is, which drive - has already been worked out by the
+ * Build the filesystem.  Everything about the device - its size, which
+ * drive, where its slice begins - has already been worked out by the
  * caller and is passed in; this writes through rdblk/wrblk and opens
- * only the boot file.
+ * nothing.  The boot is not here: it is the blocks below the filesystem,
+ * which no filesystem block number reaches, so the filesystem never owns
+ * it and no file has to.
  */
 void
-domkfs(fs, is, bfirst, bnblk, dsize, type, bfile, f)
-    UINT fs, is, bfirst, bnblk, dsize;
-    int type, f;
-    char *bfile;
+domkfs(fs, is, dsize, f)
+    UINT fs, is, dsize;
+    int f;
 {
     struct dsknod *ip;
     UINT rootblk;
-    UINT dirblk;
-    UINT indblk;
-    UINT dirino;
-    UINT filino;
     UINT n;
     long now;                   /* the clock, for the superblock */
-    int bfd;
-    int got;
     int i;
 
     fsize = fs;
     isize = is;
-    bootfirst = bfirst;
-    bootnblk = bnblk;
-    bootfile = bfile;
     force = f;
 
     /*
-     * Is there already something here?  Two ways to tell, and either is
-     * enough to stop: the label at cylinder 0 is the good one, and a
-     * disk made before there were labels falls back on whether block 1
-     * reads like a superblock.
+     * Is there already something here?  Whether block 1 reads like a
+     * superblock is the answer; the label's own record is checked by the
+     * caller, which has it from the boot area below.
      */
     if (!force) {
-        struct dlabel *lp;
-
-        rdblk(bootfirst, blkbuf);
-        lp = (struct dlabel *) &blkbuf[DL_OFFSET];
-        if (lp->d_magic[0] == DL_MAGIC[0] && lp->d_magic[1] == DL_MAGIC[1] &&
-            lp->d_magic[2] == DL_MAGIC[2] && lp->d_magic[3] == DL_MAGIC[3] &&
-            lp->d_fsize != 0) {
-            printf("Label: %d/%d/%d, %d blocks\n", lp->d_tracks,
-                lp->d_heads, lp->d_spt, lp->d_fsize);
-            die(inuse);
-        }
-
         rdblk(SUPERBLK, blkbuf);
         sb = (struct super *) blkbuf;
         if (sb->s_isize && sb->s_isize < 1000 &&
@@ -342,8 +255,7 @@ domkfs(fs, is, bfirst, bnblk, dsize, type, bfile, f)
     zero(blkbuf);
     wrblk(fsize - 1, blkbuf);
 
-    /* the boot block, and the ilist, all zero */
-    wrblk(0, blkbuf);
+    /* the ilist, all zero */
     for (n = 0; n < isize; n++)
         wrblk(INOSTART + n, blkbuf);
 
@@ -383,124 +295,33 @@ domkfs(fs, is, bfirst, bnblk, dsize, type, bfile, f)
     nextino = ROOTINO;
 
     /*
-     * bootnblk zero is not "no boot" but "the boot is not ours to place":
-     * it is the diskette case, where the boot is the sectors in front of
-     * the filesystem, at device block 0, and no filesystem block number
-     * reaches them.  So there is no cylinder 0 to land anywhere, no file
-     * to own it, and no label to write - the label is already there,
-     * because that is where the boot image put it.  See putlabel and
-     * mnix's bootflop, which patches the label in afterwards.
+     * The root directory: . and .. .  It comes off the front of the data
+     * area, below where the free list starts, so it is never freed.  No
+     * /boot is made: the boot is below the filesystem, not a file in it.
      */
-    if (bootnblk) {
-        if (bootfirst + bootnblk > fsize)
-            die("cylinder 0 falls outside the filesystem");
-        if (bootfirst < nextblk)
-            die("cylinder 0 lands in the ilist - filesystem too small");
-        printf("Boot area: blocks %d through %d, cylinder 0\n",
-            bootfirst, bootfirst + bootnblk - 1);
-    }
-
-    /*
-     * The root directory, and the boot directory and file if we are
-     * making one.  These come off the front of the data area, which is
-     * below where the free list starts, so they are never freed.
-     *
-     * A diskette gets the directory and not the file: /boot is where a
-     * hard disk's boot lives, and a diskette's is not in the filesystem
-     * at all, so an inode owning it would be an inode owning somebody
-     * else's blocks.
-     */
-    nextino = ROOTINO;
     rootblk = allocblk();
     nextino++;                          /* inode 1 is the root */
 
-    dirino = nextino++;
-    dirblk = allocblk();
-    if (bootnblk) {
-        filino = nextino++;
-        indblk = allocblk();
-    }
-
-    /* the root directory: . and .. and, if there is one, boot */
     zero(dirbuf);
     ((struct dir *) dirbuf)[0].ino = ROOTINO;
     ((struct dir *) dirbuf)[0].name[0] = '.';
     ((struct dir *) dirbuf)[1].ino = ROOTINO;
     ((struct dir *) dirbuf)[1].name[0] = '.';
     ((struct dir *) dirbuf)[1].name[1] = '.';
-    ((struct dir *) dirbuf)[2].ino = dirino;
-    ((struct dir *) dirbuf)[2].name[0] = 'b';
-    ((struct dir *) dirbuf)[2].name[1] = 'o';
-    ((struct dir *) dirbuf)[2].name[2] = 'o';
-    ((struct dir *) dirbuf)[2].name[3] = 't';
-    n = 3 * sizeof(struct dir);
     wrblk(rootblk, dirbuf);
 
     ip = getdsk(ROOTINO, blkbuf);
     clrdsk(ip);
     ip->d_mode = IALLOC | IFDIR | 0777;
-    ip->d_nlink = 3;
-    ip->d_size1 = n;
+    ip->d_nlink = 2;
+    ip->d_size1 = 2 * sizeof(struct dir);
     ip->d_addr[0] = rootblk;
     putdsk(ROOTINO, blkbuf);
-
-    {
-        /*
-         * A directory nothing can walk into, holding a file nothing can
-         * open.  Two inodes to make the boot that much harder to lose to
-         * a careless command, and both are free.  A diskette has the
-         * directory without the file - see above - so it is empty.
-         */
-        zero(dirbuf);
-        ((struct dir *) dirbuf)[0].ino = dirino;
-        ((struct dir *) dirbuf)[0].name[0] = '.';
-        ((struct dir *) dirbuf)[1].ino = ROOTINO;
-        ((struct dir *) dirbuf)[1].name[0] = '.';
-        ((struct dir *) dirbuf)[1].name[1] = '.';
-        if (bootnblk) {
-            ((struct dir *) dirbuf)[2].ino = filino;
-            ((struct dir *) dirbuf)[2].name[0] = 'b';
-            ((struct dir *) dirbuf)[2].name[1] = 'o';
-            ((struct dir *) dirbuf)[2].name[2] = 'o';
-            ((struct dir *) dirbuf)[2].name[3] = 't';
-        }
-        wrblk(dirblk, dirbuf);
-
-        ip = getdsk(dirino, blkbuf);
-        clrdsk(ip);
-        ip->d_mode = IALLOC | IFDIR;    /* mode 0 */
-        ip->d_nlink = 2;
-        ip->d_size1 = (bootnblk ? 3 : 2) * sizeof(struct dir);
-        ip->d_addr[0] = dirblk;
-        putdsk(dirino, blkbuf);
-
-        if (bootnblk) {
-            /*
-             * A cylinder is more blocks than the eight an inode holds on
-             * every drive in the table, so the file is always large and
-             * always wants the indirect block.
-             */
-            zero(indbuf);
-            for (i = 0; i < bootnblk && i < APERBLK; i++)
-                ((UINT *) indbuf)[i] = bootfirst + i;
-            wrblk(indblk, indbuf);
-
-            ip = getdsk(filino, blkbuf);
-            clrdsk(ip);
-            ip->d_mode = IALLOC | ILARG;    /* a regular file, mode 0 */
-            ip->d_nlink = 1;
-            ip->d_size0 = bootnblk >> 7;
-            ip->d_size1 = (bootnblk & 0177) * BSIZE;
-            ip->d_addr[0] = indblk;
-            putdsk(filino, blkbuf);
-        }
-    }
 
     /*
      * The free list.  Built from the top of the device downward, so the
      * numbers left in the superblock are the low ones and a fresh
-     * filesystem allocates from the front.  The boot area is simply
-     * never offered - which is the whole point of doing this here.
+     * filesystem allocates from the front.
      *
      * Seeded with a single zero entry, which is what the end of the
      * chain looks like to alloc.
@@ -508,8 +329,7 @@ domkfs(fs, is, bfirst, bnblk, dsize, type, bfile, f)
     S_NFREE = 1;
     S_FREE(0) = 0;
     for (n = fsize - 1; n >= nextblk; n--) {
-        if (!inboot(n))
-            addfree(n);
+        addfree(n);
         if (n == 0)
             break;
     }
@@ -521,57 +341,11 @@ domkfs(fs, is, bfirst, bnblk, dsize, type, bfile, f)
 
     /*
      * The running totals, so df reads two words instead of walking the
-     * free lists.  Everything from nextblk up is free except the boot
-     * area, and every inode from nextino up is free.
+     * free lists.  Everything from nextblk up is free, and every inode
+     * from nextino up is free.
      */
-    S_BFREE = fsize - nextblk - bootnblk;
+    S_BFREE = fsize - nextblk;
     S_IFREE = isize * IPERBLK - nextino + 1;
-
-    /*
-     * The boot itself, into the blocks the file now owns.  The first of
-     * them is what the rom reads and enters, so the front of the boot
-     * file has to be a first level boot built to run where the rom puts
-     * it.
-     */
-    if (bootnblk) {
-        bfd = open(bootfile, 0);
-        if (bfd < 0)
-            printf("No boot: cannot open %s\n", bootfile);
-
-        for (n = 0; n < bootnblk; n++) {
-            zero(blkbuf);
-            if (bfd >= 0) {
-                got = read(bfd, blkbuf, BSIZE);
-                if (got <= 0) {
-                    close(bfd);
-                    bfd = -1;
-                    got = 0;
-                }
-            }
-            /*
-             * The label goes in whether or not there was a boot to put
-             * around it: an unbootable disk still has to be able to say
-             * what it is.  The first block is written even when the file
-             * was empty, because that block is the label.
-             */
-            if (n == 0) {
-                putlabel(blkbuf, type);
-            } else if (bfd < 0) {
-                break;
-            }
-            wrblk(bootfirst + n, blkbuf);
-        }
-        if (bfd >= 0)
-            close(bfd);
-        if (n > 1)
-            printf("Boot: %d blocks written from %s\n", n, bootfile);
-    } else {
-        printf("Boot: none in the filesystem - it is below it\n");
-    }
-    printf("Label: %s at cylinder 0, %d/%d/%d %s %d\n", DL_MAGIC,
-        dtracks[type], dheads[type], dsecs[type],
-        dtoff[type] ? "toff" : "roll",
-        dtoff[type] ? dtoff[type] : dtracks[type] >> 1);
 
     /*
      * The superblock last.  It is the thing that says which blocks and

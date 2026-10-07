@@ -71,9 +71,5 @@ extern UINT swapsize;           /* number of swap blocks */
 extern UINT swapaddr;           /* number of first swap block */
 
 /*
- * Note: if swapdev == rootdev, then swapaddr is set to rootdev's fsize
- */
-
-/*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

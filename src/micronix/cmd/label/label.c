@@ -301,8 +301,8 @@ dump()
 		lp->d_roll, lp->d_roll);
 	printf("\tboot\t\t%u blocks, loaded from slice %c\n",
 		lp->d_bootblks, 'a' + lp->d_bootslice);
-	printf("\tfilesystem\t%u blocks, %u inode blocks, %u swap blocks\n",
-		lp->d_fsize, lp->d_isize, lp->d_swap);
+	printf("\tfilesystem\t%u blocks, %u inode blocks\n",
+		lp->d_fsize, lp->d_isize);
 
 	/*
 	 * The table, entry by entry: the numbers as they are on the disk,

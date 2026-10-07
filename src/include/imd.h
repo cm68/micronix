@@ -87,7 +87,7 @@ struct imd {
 struct imd_trk {
     struct {
         unsigned char mode;
-        unsigned char cyl;
+        unsigned short cyl;
         unsigned char head;
         unsigned char nsec;
         unsigned char size;

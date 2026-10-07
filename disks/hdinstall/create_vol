@@ -52,8 +52,8 @@ fi
 # volume this directory makes is named the one way.  Given with it
 # already, the name is left alone.
 case "$vol" in
-*.vol)	;;
-*)	vol="$vol.vol" ;;
+*.img)	;;
+*)	vol="$vol.img" ;;
 esac
 case "$vol" in
 /*)	;;
@@ -80,10 +80,15 @@ trap 'rm -f "$tmp" "$tmp.k"' 0
 # clear any sidecar lock file the host tools leave at "<volume>.lock"
 rm -f "$vol.lock"
 
-# 1. a blank 16 meg drive
-"$mnix" initialize m16 "$vol" || exit 1
+# 1. a blank 40 meg q540 drive (512 cylinders, 8 heads, 17 sectors)
+"$mnix" initialize m40 "$vol" || exit 1
 
-# 2. the filesystem, with the hard disk boot in /boot/boot
+# 2. the disk label: slice a is the filesystem (cylinders 1..480) and
+# slice b is swap (481..511); cylinder 0 is the boot, below both.  The
+# label command writes the in-band label at device block 0.
+"$mnix" label "$vol" -s a 1 480 -s b 481 || exit 1
+
+# 3. the filesystem on slice a, and the hard disk boot below it
 "$mnix" mkfs "$vol" -i "$bootimg" -f || exit 1
 
 # 3. the userland.  The built binaries come from the source tree's
@@ -118,20 +123,20 @@ while read type major minor name; do
 done < "$devlist"
 
 # 5. the freshly built kernel, over the one mkfs -i left.  The ccc kernel's
-# root device defaults to 3/0 and the m16 is minor 8, so point it there:
-# the driver reads the unit and the slice out of the minor and the geometry
-# out of the disk's own label, so any node of drive 0's 'a' would do - 3/8
-# is the m16a node the rest of this script and /dev/root use.  setdev
-# patches in place, so work on a copy.
+# root device defaults to 3/0 - drive 0, slice 'a' - and the driver reads
+# the geometry out of the disk's own label, so that node is the one the
+# rest of this script and /dev/root use.  setdev patches in place, so
+# work on a copy.
 if [ -f "$kernel" ]; then
 	cp "$kernel" "$tmp.k" || exit 1
-	"$setdev" "$tmp.k" 3/8 0/0 || exit 1
+	"$setdev" "$tmp.k" 3/0 3/32 || exit 1
 	"$mnix" -f "$vol" write "$tmp.k" /micronix || exit 1
-	# /dev/root names the device setdev just pointed the kernel at (3/8).
-	# It used to be a link the boot script made (ln /dev/m16a /dev/root);
-	# make the node here so init, mkmtab and df do not depend on that
-	# script having run, and so the name and the number cannot drift.
-	"$mnix" -f "$vol" mknod /dev/root b 3 8 || exit 1
+	# /dev/root names the device setdev just pointed the kernel at (3/0),
+	# and /dev/swap the slice 'b' it swaps to (3/32).  Make the nodes here
+	# so init, mkmtab and df do not depend on the boot script, and so the
+	# name and the number cannot drift.
+	"$mnix" -f "$vol" mknod /dev/root b 3 0 || exit 1
+	"$mnix" -f "$vol" mknod /dev/swap b 3 32 || exit 1
 fi
 
 # 6. the source tree, sources only, onto /usr/src.  "make tarfile"

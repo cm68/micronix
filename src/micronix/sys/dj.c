@@ -181,7 +181,7 @@ djopen(dev, mode)
 	g->roll = 0;
 	g->firstsec = (s->dchar & HARD) ? 0 : 1;
 	sl = devslice(dev);
-	if (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive, sl, g) < 0)
+	if (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive, sl, g, 0) < 0)
 		return;
 
 	d->flags |= ISOPEN;

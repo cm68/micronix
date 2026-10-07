@@ -53,15 +53,17 @@
 struct model
 {
     char *name;
+    char *mfg;                  /* manufacturer, into the label */
+    char *model;                /* model number, into the label */
     UINT cyl;                   /* cylinders, tracks per surface */
     UINT8 heads;
     UINT8 spt;                  /* sectors per track */
 };
 
 static struct model models[] = {
-    {"m10", 244, 4, 21},
-    {"m20", 244, 8, 21},
-    {"m26", 202, 8, 32},
+    {"m10", "", "M10", 244, 4, 21},
+    {"m20", "", "M20", 244, 8, 21},
+    {"m26", "", "M26", 202, 8, 32},
 };
 
 #define NMODEL (sizeof models / sizeof models[0])
@@ -73,6 +75,7 @@ static int devfd;		/* the whole-disk slice, hdac etc. */
 static int drive;		/* which of the controller's four drives */
 static char *devname;		/* the slice named on the command line */
 static UINT cyl, heads, spt;	/* the geometry being laid down */
+static char *mfg, *model;	/* the drive's own name, into the label */
 
 usage()
 {
@@ -265,6 +268,43 @@ format()
 	printf("formatted %d cylinders\n", cyl);
 }
 
+/*
+ * Write the label: what the drive is, at DL_OFFSET in block 0, after the
+ * format has just filled the whole platter.  The slice table is empty -
+ * the whole drive as 'c' - and the drive's own name goes in too.
+ */
+void
+putlabel()
+{
+	static char buf[512];
+	static struct dlabel *lp;
+	int i;
+
+	if (lseek(devfd, 0L, 0) < 0)
+		die("cannot seek to block 0");
+	if (read(devfd, buf, 512) != 512)
+		die("cannot read block 0");
+
+	lp = (struct dlabel *) &buf[DL_OFFSET];
+	memset((char *) lp, 0, sizeof (struct dlabel));
+	for (i = 0; i < 4; i++)
+		lp->d_magic[i] = DL_MAGIC[i];
+	lp->d_version = DL_VERS_SLICE;
+	lp->d_tracks = cyl;
+	lp->d_heads = heads;
+	lp->d_spt = spt;
+	lp->d_firstsec = 1;		/* the HDCA numbers sectors from one */
+	if (mfg)
+		strncpy(lp->d_mfg, mfg, sizeof (lp->d_mfg));
+	if (model)
+		strncpy(lp->d_model, model, sizeof (lp->d_model));
+
+	if (lseek(devfd, 0L, 0) < 0)
+		die("cannot seek to block 0");
+	if (write(devfd, buf, 512) != 512)
+		die("cannot write block 0");
+}
+
 main(argc, argv)
 	int argc;
 	char **argv;
@@ -279,6 +319,7 @@ main(argc, argv)
 	pname = argv[0];
 	devname = 0;
 	mp = 0;
+	mfg = model = 0;
 	probeonly = 0;
 	cyl = heads = spt = 0;
 	cylset = headsset = sptset = 0;
@@ -359,6 +400,8 @@ main(argc, argv)
 		cyl = mp->cyl;
 		heads = mp->heads;
 		spt = mp->spt;
+		mfg = mp->mfg;
+		model = mp->model;
 	}
 	if (cylset)
 		cyl = wcyl;
@@ -373,5 +416,6 @@ main(argc, argv)
 		die("that geometry does not fit the HDCA");
 
 	format();
+	putlabel();
 	exit(0);
 }

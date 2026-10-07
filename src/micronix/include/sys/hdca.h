@@ -78,7 +78,7 @@
  * declared wedged and the request fails with EIO.  The watchdog tick
  * (hdtick in sys/hdca.c) runs once a second, so the count is seconds.
  */
-#define	HDDEADLINE	5
+#define	HDDEADLINE	1
 
 #define	NHD		4	/* drives behind one controller */
 
@@ -107,7 +107,7 @@ struct hd {
 	int	h_trackdelta;	/* target track - h_cyl */
 	UINT	h_head;		/* target head */
 	UINT8	h_sector;	/* target sector */
-	UINT8	h_ctrl;		/* control byte */
+	UINT8	h_drive;	/* the unit, dev & 3 */
 	UINT8	h_retry2;	/* retry counter */
 	UINT8	h_cmd;		/* the ioctl opcode, 0 for an ordinary request */
 	UINT8	h_stat;		/* the ioctl's result, read back in cmd[HDLEN] */
