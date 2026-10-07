@@ -40,6 +40,7 @@ root=`cd "$here/.." && pwd`
 mnix="$root/src/tools/mnix"
 imd="$root/src/tools/imd"
 icheck="$root/src/tools/icheck"
+strip="$root/src/tools/strip"
 packsrc="$root/bin/packsrc"
 filesystem="$root/filesystem"
 bootdir="$root/src/micronix/stand/boot"
@@ -100,7 +101,7 @@ maxino=`expr $isize \* 16`
 blocks=`expr $usable - $usable / 50`
 inos=`expr $maxino - $maxino / 50`
 
-for f in "$mnix" "$imd" "$icheck" "$packsrc" "$srctar" "$bootdir/$bootimg"; do
+for f in "$mnix" "$imd" "$icheck" "$strip" "$packsrc" "$srctar" "$bootdir/$bootimg"; do
 	if [ ! -f "$f" ]; then
 		echo "$0: $f not found - build the tree first:" >&2
 		echo "$0:   make filesystem; make -C src/micronix install ROOT=\$PWD/filesystem" >&2
@@ -123,6 +124,30 @@ mkdir -p "$tmp/tree/usr/src"
 tar -xf "$srctar" -C "$tmp/tree/usr/src" || exit 1
 
 #
+# The runtime, stripped.  The disks carry the binaries without their
+# symbol tables - a diskette is a fixed number of blocks and every one is
+# spoken for - so the runtime is copied to a staging tree, the kernel
+# (bin/unix) is dropped, and strip takes the symbol table off every
+# linked image.  strip leaves objects, archives and text alone, so it is
+# safe to run over the whole tree.  The manifest and the per-disk tars
+# both come from this tree, so the sizes the packer works from are the
+# shipped sizes, not the unstripped ones filesystem/ still carries.
+#
+# The list is filtered to the directories that exist: include and
+# usr/help are part of the plan but are not built yet, and tar does not
+# skip a missing directory the way find does.
+#
+dirs=
+for d in bin lib libexec include etc usr/include usr/bin usr/lib \
+    usr/man usr/help usr/cpm; do
+	[ -d "$filesystem/$d" ] && dirs="$dirs $d"
+done
+mkdir -p "$tmp/run"
+(cd "$filesystem" && tar -cf - $dirs) | (cd "$tmp/run" && tar -xf -) || exit 1
+rm -f "$tmp/run/bin/unix"
+find "$tmp/run" -type f -exec "$strip" {} + || exit 1
+
+#
 # The manifest: "size path", one file to a line, path relative to the
 # image's root.  Sorted by path, so that the directories come out in a
 # fixed order and two runs make the same disks.
@@ -140,9 +165,7 @@ tar -xf "$srctar" -C "$tmp/tree/usr/src" || exit 1
 # nothing reads is a trap and 86 KB of a 1 MB disk.
 #
 {
-	(cd "$filesystem" && find bin lib libexec include etc \
-	    usr/include usr/bin usr/lib usr/man usr/help usr/cpm \
-	    -type f ! -path 'bin/unix' -printf '%s %p\n')
+	(cd "$tmp/run" && find $dirs -type f -printf '%s %p\n')
 	(cd "$tmp/tree" && find usr/src -type f -printf '%s %p\n')
 } | sort -k2 > "$tmp/manifest" || exit 1
 
@@ -230,7 +253,7 @@ while [ "$n" -le "$ndisk" ]; do
 	grep '^usr/src/' "$tmp/list.$n" > "$tmp/src.$n"
 	grep -v '^usr/src/' "$tmp/list.$n" > "$tmp/run.$n"
 	if [ -s "$tmp/run.$n" ]; then
-		tar -C "$filesystem" -c -f "$tmp/t.tar" -T "$tmp/run.$n" || exit 1
+		tar -C "$tmp/run" -c -f "$tmp/t.tar" -T "$tmp/run.$n" || exit 1
 		"$mnix" -f "$raw" tar x "$tmp/t.tar" || exit 1
 	fi
 	if [ -s "$tmp/src.$n" ]; then
