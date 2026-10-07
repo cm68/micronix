@@ -63,20 +63,32 @@ int	nblocks;
 int	nerrors;		/* problems found - the exit status */
 
 /*
- * the maps.  The blocks and the inode allocation are bitmaps, one bit to
- * the unit, because that is the shape an m16 leaves room for: the
- * original allocates its block map (s_fsize>>3)+2 bytes and sets a bit
- * as byte b>>3, mask 1<<(b&7) (H0c8b), and eight bytes to the block is
- * 249,696 of them against a process of sixty kilobytes.  A bit does not
- * carry what the byte entries carried - who claimed a block and at what
- * offset - so the duplicate message names the inode making the claim
- * being reported rather than the first one, patchbad has no offset to
- * print, and the kind of block, which only the summary needs, is counted
- * as pass one walks.
+ * the maps.  The blocks are bitmaps, one bit to the unit, because that
+ * is the shape an m16 leaves room for: the original allocates its block
+ * map (s_fsize>>3)+2 bytes and sets a bit as byte b>>3, mask 1<<(b&7)
+ * (H0c8b), and eight bytes to the block is 249,696 of them against a
+ * process of sixty kilobytes.  A bit does not carry what the byte
+ * entries carried - who claimed a block and at what offset - so the
+ * duplicate message names the inode making the claim being reported
+ * rather than the first one, patchbad has no offset to print, and the
+ * kind of block, which only the summary needs, is counted as pass one
+ * walks.
  *
- * The link counts are not a bitmap: H7012 is one byte to the inode,
- * holding how many directory entries name it, up to 255, and the second
- * pass repairs a wrong d_nlink by copying that byte into the inode.
+ * The link counts are not a bitmap either.  H7012 is a nibble to the
+ * inode, holding how many directory entries name it up to 14, and a
+ * value of 15 means the exact count has run off into a small table - a
+ * directory reaches that only with fourteen subdirectories, and a file
+ * only with fourteen hard links, so the table is short.  The second pass
+ * repairs a wrong d_nlink by copying the exact count, from the nibble or
+ * the table, back into the inode.  The original tracked this as a full
+ * byte up to 255; the nibble is the same data at half the size, and is
+ * the deliberate trade for a maximum filesystem's maps fitting.
+ *
+ * The original's inode-allocation bitmap (H7016) is gone: pass one set
+ * it and nothing read it, because every later pass re-checks IALLOC
+ * through iget.  That is three kilobytes back from the edge on a
+ * maximum filesystem, which is the difference between the last calloc
+ * succeeding and dying on "out of memory".
  */
 #define	BSET(m, b)	((m)[(b) >> 3] |= 1 << ((b) & 7))
 #define	BCLR(m, b)	((m)[(b) >> 3] &= ~(1 << ((b) & 7)))
@@ -88,8 +100,129 @@ int	nerrors;		/* problems found - the exit status */
 
 char	*blockmap;		/* H700e - a bit to the block, set if claimed */
 char	*freemap;		/* H7010 - a bit to the block, set if free */
-char	*isallocated;		/* H7016 - a bit to the inode, set if in use */
-char	*refcount;		/* H7012 - a byte to the inode: entries naming it */
+char	*nlink;			/* H7012 - a nibble to the inode, saturating at
+				 * 15, which means "count is in the overflow table" */
+
+/*
+ * a nibble map: two inodes to the byte, the even inode in the low half.
+ * A value of 14 is the largest count the nibble itself holds; 15 is the
+ * sentinel that says the exact count has overflowed into ovtab.
+ */
+#define	OVFULL	15
+
+static int
+nget(char *m, int i)
+{
+	return (m[i >> 1] >> ((i & 1) << 2)) & 0xf;
+}
+
+static void
+nset(char *m, int i, int v)
+{
+	int sh = (i & 1) << 2;
+
+	m[i >> 1] = (m[i >> 1] & ~(0xf << sh)) | ((v & 0xf) << sh);
+}
+
+/*
+ * The overflow table: the inodes whose link count will not fit in a
+ * nibble.  A directory reaches 15 only with fourteen subdirectories, and
+ * a file only with fourteen hard links, so entries here are rare - but
+ * they exist, and the second pass must reconcile their exact count, so
+ * the table carries it.  It is searched linearly: it is short.
+ */
+struct ovcount {
+	int inum;
+	int count;
+};
+
+static struct ovcount *ovtab;
+static int ovn;			/* entries in use */
+static int ovcap;		/* entries allocated */
+
+static int
+ovfind(int inum)
+{
+	int i;
+
+	for (i = 0; i < ovn; i++)
+		if (ovtab[i].inum == inum)
+			return i;
+	return -1;
+}
+
+static void
+ovgrow(void)
+{
+	struct ovcount *p;
+	int ncap = ovcap ? ovcap * 2 : 16;
+
+	if (ovtab == 0)
+		p = malloc(ncap * sizeof(struct ovcount));
+	else
+		p = realloc(ovtab, ncap * sizeof(struct ovcount));
+	if (p == 0)
+		lose("out of memory");
+	ovtab = p;
+	ovcap = ncap;
+}
+
+static void
+ovadd(int inum, int count)
+{
+	if (ovn >= ovcap)
+		ovgrow();
+	ovtab[ovn].inum = inum;
+	ovtab[ovn].count = count;
+	ovn++;
+}
+
+static void
+ovinc(int inum)
+{
+	int i = ovfind(inum);
+
+	if (i < 0)
+		lose("lost overflow entry");
+	ovtab[i].count++;
+}
+
+/*
+ * Count one more directory entry naming inum.  The nibble holds the count
+ * up to 14; the fifteenth reference moves the inode to the overflow table,
+ * which from then on carries the exact number.
+ */
+static void
+refadd(int inum)
+{
+	int c = nget(nlink, inum);
+
+	if (c < OVFULL - 1)
+		nset(nlink, inum, c + 1);
+	else if (c == OVFULL - 1) {
+		nset(nlink, inum, OVFULL);
+		ovadd(inum, OVFULL);
+	} else
+		ovinc(inum);
+}
+
+/*
+ * The exact link count for inum: the nibble when it is not full, the
+ * table when it is.
+ */
+static int
+refget(int inum)
+{
+	int c = nget(nlink, inum);
+	int i;
+
+	if (c < OVFULL)
+		return c;
+	i = ovfind(inum);
+	if (i < 0)
+		lose("inode lost its overflow entry");
+	return ovtab[i].count;
+}
 
 /*
  * what the claimed blocks are, counted by pass one over the range the
@@ -292,17 +425,12 @@ checkilist1(void)
 	if (blockmap == 0)
 		lose("out of memory");
 
-	isallocated = calloc(((fs->s_isize * I_PER_BLK) >> 3) + 1, 1);
-	if (isallocated == 0)
-		lose("out of memory");
-
 	for (inum = 1; inum < fs->s_isize * I_PER_BLK; inum++) {
 		ip = iget(fs, inum);
 		if ((ip->d_mode & IALLOC) == 0) {
 			ifree(ip);
 			continue;
 		}
-		BSET(isallocated, inum);
 
 		/*
 		 * Classify the inode.  A directory is a small file: its block
@@ -482,8 +610,8 @@ rebuildfree(void)
 
 /*
  * checkdirs - walk the directories.  Counts every directory entry's
- * reference to an inode into refcount, and reports entries whose inode
- * number is out of range.  The reference counts are what checkilist2
+ * reference to an inode into the link-count map, and reports entries
+ * whose inode number is out of range.  The counts are what checkilist2
  * reconciles against the inode link counts.
  *
  * NOTE: the orphan (lost+found) and "." / ".." repair in the original
@@ -497,8 +625,8 @@ checkdirs(void)
 	int inum;
 	int i;
 
-	refcount = calloc(fs->s_isize * I_PER_BLK, 1);
-	if (refcount == 0)
+	nlink = calloc(((fs->s_isize * I_PER_BLK) >> 1) + 1, 1);
+	if (nlink == 0)
 		lose("out of memory");
 
 	for (inum = 1; inum < fs->s_isize * I_PER_BLK; inum++) {
@@ -521,7 +649,7 @@ checkdirs(void)
 				nerrors++;
 				continue;
 			}
-			refcount[dp->ino]++;
+			refadd(dp->ino);
 		}
 		ifree(ip);
 	}
@@ -540,6 +668,7 @@ checkilist2(void)
 {
 	struct dsknod *ip;
 	int inum;
+	int n;
 
 	for (inum = 1; inum < fs->s_isize * I_PER_BLK; inum++) {
 		ip = iget(fs, inum);
@@ -547,12 +676,13 @@ checkilist2(void)
 			ifree(ip);
 			continue;
 		}
-		if (refcount[inum] != ip->d_nlink) {
+		n = refget(inum);
+		if (n != ip->d_nlink) {
 			printf("Inode %u, %u Directory entries, Link count %u\n",
-			    inum, (unsigned)refcount[inum], ip->d_nlink);
+			    inum, (unsigned)n, ip->d_nlink);
 			nerrors++;
 			if (!nflag) {
-				ip->d_nlink = refcount[inum];
+				ip->d_nlink = n;
 				iput(ip);
 				continue;
 			}
@@ -718,7 +848,7 @@ findorphans(void)
 			ifree(ip);
 			continue;
 		}
-		if (refcount[inum] == 0 && ip->d_nlink != 0) {
+		if (refget(inum) == 0 && ip->d_nlink != 0) {
 			norphans++;
 			nerrors++;
 			if (!nflag) {
