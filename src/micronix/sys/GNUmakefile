@@ -51,8 +51,14 @@ EXTRA	= BUILDING TODO
 # in OBJS; they ride GENERATED for the same reason.  unix itself is
 # $(TARGET), which clobber removes.
 MODS	= dj mw ide ncr hdca
+
+# Drivers whose sources are written but which are not yet linked into the
+# kernel: their objects build (so the compiler checks them, "make objects")
+# but they are not in MODS, so nothing links them into unix.
+STAGED	= disk3 disk2
 GENERATED = build.h unix.link $(MODS:%=%.mod) $(MODS:%=%.page) \
-	$(MODS:%=%.o) $(MODS:%=%hdr.o)
+	$(MODS:%=%.o) $(MODS:%=%hdr.o) \
+	$(STAGED:%=%.o) $(STAGED:%=%hdr.o)
 
 # The compiler and linker are this tree's own.  CCC defaults to
 # $(BIN)/mxccc in GNUmakefile.inc; the linker mxld is beside it.
@@ -194,11 +200,11 @@ OVLSLOT = ovlslot.o
 CCFLAGS += -DOVLSEG=$(OVLSEG)
 
 #
-# Every object: the ones "all" links into unix, and the ones folded into
-# one of those first (the u-page leaf code into upage.o, the init-only
-# code into highmem.o).
+# Every object: the ones "all" links into unix, the ones folded into one
+# of those first (the u-page leaf code into upage.o, the init-only code
+# into highmem.o), and the staged drivers that are compiled but not linked.
 #
-objects: $(OBJS)
+objects: $(OBJS) $(STAGED:%=%.o) $(STAGED:%=%hdr.o)
 
 #
 # main_init.c includes it, and the native build generates it with
