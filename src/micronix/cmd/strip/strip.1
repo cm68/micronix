@@ -1,0 +1,49 @@
+.he "strip (1)                    10/7/26                     strip (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+strip
+- remove the symbol table from a linked image
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+strip file ...
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Strip removes the symbol table from each Whitesmiths image named.  The
+image's header is rewritten with a zero symbol table size and the file
+is cut down to header, text and data, so the symbols no longer occupy
+space on the disk.
+.sp 2
+A file that is not a linked image - a relocatable object, an archive,
+or an ordinary text file - is left alone, so strip can be handed every
+program in a directory and only the runnable ones come back smaller.
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+The kernel must not be stripped: its overlays live in its own file and
+the symbol table is part of what it opens.  Strip the userland
+instead, which is where the space matters.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ar (1), ld (1), nm (1), size (1)

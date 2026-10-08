@@ -138,6 +138,7 @@ all:
 	cd size ; make all
 	cd sort ; make all
 	cd strings ; make all
+	cd strip ; make all
 	cd stty ; make all
 	cd su ; make all
 	cd sum ; make all
@@ -258,6 +259,7 @@ install:
 	cd size ; make install
 	cd sort ; make install
 	cd strings ; make install
+	cd strip ; make install
 	cd stty ; make install
 	cd su ; make install
 	cd sum ; make install
@@ -379,6 +381,7 @@ clean:
 	cd size ; make clean
 	cd sort ; make clean
 	cd strings ; make clean
+	cd strip ; make clean
 	cd stty ; make clean
 	cd su ; make clean
 	cd sum ; make clean
@@ -500,6 +503,7 @@ clobber:
 	cd size ; make clobber
 	cd sort ; make clobber
 	cd strings ; make clobber
+	cd strip ; make clobber
 	cd stty ; make clobber
 	cd su ; make clobber
 	cd sum ; make clobber

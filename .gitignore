@@ -372,6 +372,7 @@ src/micronix/cmd/size/size
 src/micronix/cmd/sort/sort
 src/micronix/cmd/size/wssize
 src/micronix/cmd/strings/strings
+src/micronix/cmd/strip/strip
 src/micronix/cmd/stty/stty
 src/micronix/cmd/su/su
 src/micronix/cmd/sum/sum
