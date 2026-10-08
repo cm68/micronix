@@ -189,7 +189,25 @@ merge_imd(struct imd *imd, char *filename, int altcyl)
     for (trk = 0; trk < imd_ntracks(imd); trk++) {
         tp = imd->tracks[trk];
         if (!tp) continue;
-        write(fd, &tp->fixed, sizeof(tp->fixed));
+        {
+            /*
+             * The on-disk header is five bytes - mode, cylinder low byte,
+             * head, sector count, size exponent - and the cylinder high
+             * byte is inferred from track order, never written.  tp->fixed
+             * is the in-memory view, where cyl is a 16-bit full cylinder
+             * and the surrounding padding makes sizeof() larger than five;
+             * writing it verbatim put the padding on the disk and the
+             * reader then took nsec and size from the wrong bytes.
+             */
+            unsigned char hdr[5];
+
+            hdr[0] = tp->fixed.mode;
+            hdr[1] = tp->fixed.cyl & 0xff;
+            hdr[2] = tp->fixed.head;
+            hdr[3] = tp->fixed.nsec;
+            hdr[4] = tp->fixed.size;
+            write(fd, hdr, sizeof(hdr));
+        }
         if (tp->secmap) write(fd, tp->secmap, tp->fixed.nsec);
         if (tp->cylmap) write(fd, tp->cylmap, tp->fixed.nsec);
         if (tp->headmap) write(fd, tp->headmap, tp->fixed.nsec);

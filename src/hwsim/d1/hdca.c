@@ -209,7 +209,7 @@ select_drive(int id)
     	return 0;
     }
     sprintf(drivename, "hdca-%d", id);
-    handle[id] = imd_load(drive_resolve(drivename), id, 1);
+    handle[id] = imd_load(drive_resolve(drivename), id, IMD_INPLACE);
     if (!handle[id]) {
         printf("hdca: no drive %s, command refused\n", drivename);
         return -1;

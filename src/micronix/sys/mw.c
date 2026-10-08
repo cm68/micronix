@@ -28,6 +28,7 @@ static int mwlink();
 #define NDRIVES 4               /* Number of drives. See mws[] below. */
 #define SECSIZE 3               /* Sector size (512 bytes) */
 #define RETRIES 10              /* no. of retries on r/w error */
+#define MWDEADLINE 1            /* ticks a request may sit in flight */
 
 /*
  * The drive's timing, which the label does not carry.
@@ -175,7 +176,8 @@ static struct info *mwinfo = 0; /* current drive */
 static struct buf *mwbuf = 0;   /* current io request */
 static UINT8 retry = 0,         /* number of retries so far */
     curdrv = -1,                /* number of current drive */
-    mwstate = 0;                /* see below */
+    mwstate = 0,                /* see below */
+    mwdead = 0;                 /* ticks the request has been in flight */
 
 /*
  * States for mwstate (above)
@@ -691,6 +693,7 @@ attn()
 issue()
 {
     mwstate = ACTIVE;
+    mwdead = 0;
     attn();
 }
 
@@ -716,12 +719,21 @@ mwwait()
  * whole reason this exists.  VIRGIN, STOPPED and INTRPT fall through the
  * switch below and change nothing, so being called from bring-up onwards
  * costs a comparison until a command is actually issued.
+ *
+ * A request that is merely in flight when the tick happens to run is not
+ * failed: mwdead counts the ticks since issue() armed the command, and
+ * only a request that has sat through MWDEADLINE of them - a controller
+ * that really has stopped answering - reaches TOOLATE.  The tick is once
+ * a second on no particular phase, so without that count a command issued
+ * a moment before the tick would be shot down after a moment in flight.
  */
 mwcheck()
 {
     di();
     switch (mwstate) {          /* cases STOPPED and INTRPT do not change */
     case ACTIVE:
+        if (++mwdead <= MWDEADLINE)
+            break;
         mwstate = TOOLATE;
         reset();
         curdrv = -1;            /* force re-selection */

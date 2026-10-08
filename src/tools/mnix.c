@@ -104,6 +104,19 @@ usage(char *e)
 }
 
 /*
+ * Open an image the way its content says it is: an in-place image (every
+ * sector a fixed data run) is a hard disk and opens for direct file
+ * writes; anything else is a floppy and opens through the delta overlay.
+ * The writable flag only distinguishes delta from read-only for a floppy.
+ */
+static void *
+openimage(char *image, int writable)
+{
+    return imd_load(image, 0,
+        imd_is_inplace(image) ? IMD_INPLACE : (writable ? IMD_DELTA : IMD_RO));
+}
+
+/*
  * a seperate command arg processor
  */
 char opt[26];       // indexed by 'a' to 'z'
@@ -1412,7 +1425,7 @@ initcmd(int c, char **a)
      * FORMATMW stand-in: it lays down every track's framing - sector
      * count, size and fill - and leaves the data area blank for mkfs.
      */
-    ip = imd_load(a[1], 0, 1);
+    ip = imd_load(a[1], 0, IMD_INPLACE);
     if (!ip) {
         printf("initialize: can't create %s\n", a[1]);
         return 2;
@@ -1568,7 +1581,7 @@ imdlabel(image, dl)
     struct dlabel *lp;
     char buf[BSIZE];
 
-    ip = imd_load(image, 0, 0);
+    ip = openimage(image, 0);
     if (!ip)
         return -1;
     if (imd_read(ip, 0, 0, imd_firstsec(ip, 0, 0), buf) != 512) {
@@ -1608,7 +1621,7 @@ hardboot(image, bootfile)
     int got;
     int cyl, head, sec;
 
-    ip = imd_load(image, 0, 1);
+    ip = openimage(image, 1);
     if (!ip)
         return -1;
     imd_trkinfo(ip, 0, 0, &nsec, &secsize);
@@ -1673,7 +1686,7 @@ imdpatchlabel(image)
     struct imd *ip;
     char buf[BSIZE];
 
-    ip = imd_load(image, 0, 1);
+    ip = openimage(image, 1);
     if (!ip)
         return -1;
     if (imd_read(ip, 0, 0, imd_firstsec(ip, 0, 0), buf) != 512) {
@@ -1758,7 +1771,7 @@ mkfscmd(int c, char **a)
      * the label, never a table.
      */
     hard = 0;
-    ip = imd_load(image, 0, 0);
+    ip = openimage(image, 0);
     if (ip) {
         imd_trkinfo(ip, 0, 0, &spt, &secsize);
         if (secsize == 512)
@@ -2127,7 +2140,7 @@ labelcmd(int c, char **a)
      * - cylinder 0, head 0, the first sector - is the label's block, read
      * and written as a sector.
      */
-    ip = imd_load(image, 0, 1);
+    ip = openimage(image, 1);
     if (!ip) {
         printf("label: can't open %s\n", image);
         return 2;
@@ -2226,7 +2239,7 @@ labelcmd(int c, char **a)
      * Read it back from the volume and report that, not the buffer that
      * was just written: what matters is what the disk now says.
      */
-    ip = imd_load(image, 0, 0);
+    ip = openimage(image, 0);
     if (!ip || imd_read(ip, 0, 0, imd_firstsec(ip, 0, 0), buf) != 512) {
         printf("label: can't read back block 0 of %s\n", image);
         if (ip)

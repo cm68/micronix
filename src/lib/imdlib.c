@@ -78,13 +78,13 @@ imd_dump_track(struct imd_trk *tp)
  * stop or die silently if something unexpected happens.
  */
 static struct imd_trk *
-get_track(int fd)
+get_track(int fd, int inplace)
 {
     struct imd_trk *tp;
     char c;
     int nsec;
     int s;
-    
+
     // make space for and read the track header
     tp = malloc(sizeof(*tp));
     {
@@ -136,6 +136,7 @@ bomb:
 
     // allocate space for nsec sector pointers to point at data
     tp->data = malloc(sizeof(char *) * nsec);
+    tp->data_off = malloc(sizeof(long) * nsec);
 
     /* read a sector byte type and build the sector */
     for (s = 0; s < nsec; s++) {
@@ -143,6 +144,20 @@ bomb:
         if (read(fd, &c, 1) != 1) {
             goto bomb;
         }
+        /*
+         * An in-place image keeps its data on the disk, not in memory:
+         * record where this sector's blob is and step over it.  Only a
+         * fixed-size data run has a real offset; a fill or an absent
+         * sector has no blob of its own, so it is not addressable.
+         */
+        if (inplace && c == IMD_DATA) {
+            tp->data_off[s] = lseek(fd, 0, SEEK_CUR);
+            tp->data[s] = 0;
+            if (lseek(fd, tp->secsize, SEEK_CUR) < 0)
+                goto bomb;
+            continue;
+        }
+        tp->data_off[s] = -1;
         if (c) {
             tp->data[s] = malloc(tp->secsize);
 
@@ -226,7 +241,7 @@ apply_data_cb(void *key, int klen, void *val, int vlen, void *arg)
  * the tracks the image already laid out.
  */
 static int
-attach_delta(struct imd *ip, char *fname, int create_delta)
+attach_delta(struct imd *ip, char *fname, int mode)
 {
     char *namebuf;
 
@@ -235,18 +250,23 @@ attach_delta(struct imd *ip, char *fname, int create_delta)
      * at once.  The lock is held for as long as the image is open and
      * dropped by imd_close - or by the kernel when the holder exits, for
      * any reason - so a short-lived tool and a long-lived simulator
-     * contend on it the same way.
+     * contend on it the same way.  In-place mode locks too: it writes the
+     * image directly, and the same mutual exclusion applies.
      */
     ip->lock_fd = -1;
-    if (create_delta) {
+    if (mode != IMD_RO) {
         ip->lock_fd = acquire_lock(fname);
         if (ip->lock_fd < 0)
             return -1;
     }
 
+    /* an in-place image has no overlay; its sectors are the file's own */
+    if (mode == IMD_INPLACE)
+        return 0;
+
     namebuf = malloc(strlen(fname) + sizeof(DELTASUFFIX) + 1);
     sprintf(namebuf, "%s%s", fname, DELTASUFFIX);
-    ip->delta = kv_open(namebuf, create_delta);
+    ip->delta = kv_open(namebuf, mode == IMD_DELTA);
     free(namebuf);
 
     if (ip->delta) {
@@ -453,7 +473,7 @@ raw_secmap(char *secmap, int spt, int skew, int firstsec)
 }
 
 static void *
-raw_load(char *fname, int drive, int create_delta)
+raw_load(char *fname, int drive, int mode)
 {
     struct rawfmt *fp;
     struct rawfmt named;
@@ -519,6 +539,7 @@ raw_load(char *fname, int drive, int create_delta)
         ip->comment = strdup(hdr);
     }
     ip->drive = drive;
+    ip->mode = mode;
     ip->cyls = fp->cyls;
     ip->heads = fp->heads;
     ip->spt = SECTORS;
@@ -569,7 +590,7 @@ raw_load(char *fname, int drive, int create_delta)
     }
     close(fd);
 
-    if (attach_delta(ip, fname, create_delta) < 0) {
+    if (attach_delta(ip, fname, mode) < 0) {
         free(ip->comment);
         free(ip);
         return 0;
@@ -583,12 +604,12 @@ raw_load(char *fname, int drive, int create_delta)
  * written; a read-only open has nothing to read and answers nothing.
  */
 static void *
-blank_load(char *fname, int drive, int create_delta)
+blank_load(char *fname, int drive, int mode)
 {
     struct imd *ip;
     int fd;
 
-    if (!create_delta)
+    if (mode == IMD_RO)
         return 0;
 
     fd = open(fname, O_RDWR | O_CREAT | O_TRUNC, 0777);
@@ -599,6 +620,7 @@ blank_load(char *fname, int drive, int create_delta)
 
     ip = calloc(1, sizeof(*ip));
     ip->fd = fd;                    /* open to append track records */
+    ip->mode = mode;
     ip->comment = malloc(6);
     memcpy(ip->comment, "IMD ", 4);
     ip->comment[4] = IMD_EOC;
@@ -606,7 +628,7 @@ blank_load(char *fname, int drive, int create_delta)
     ip->drive = drive;
     ip->spt = SECTORS;
 
-    if (attach_delta(ip, fname, create_delta) < 0) {
+    if (attach_delta(ip, fname, mode) < 0) {
         free(ip->comment);
         free(ip);
         return 0;
@@ -615,7 +637,7 @@ blank_load(char *fname, int drive, int create_delta)
 }
 
 void *
-imd_load(char *fname, int drive, int create_delta)
+imd_load(char *fname, int drive, int mode)
 {
     struct imd *ip;
     int clen = 0;
@@ -632,9 +654,9 @@ imd_load(char *fname, int drive, int create_delta)
     char *namebuf;
     char c;
 
-    fd = open(fname, create_delta ? O_RDWR : O_RDONLY);
+    fd = open(fname, mode ? O_RDWR : O_RDONLY);
     if (fd < 0)
-        return blank_load(fname, drive, create_delta);
+        return blank_load(fname, drive, mode);
 
     /*
      * IMD files announce themselves; anything else we try to take as a
@@ -646,11 +668,11 @@ imd_load(char *fname, int drive, int create_delta)
 
         if (read(fd, magic, 4) != 4) {
             close(fd);
-            return blank_load(fname, drive, create_delta);
+            return blank_load(fname, drive, mode);
         }
         if (memcmp(magic, "IMD ", 4) != 0) {
             close(fd);
-            return raw_load(fname, drive, create_delta);
+            return raw_load(fname, drive, mode);
         }
         lseek(fd, 0, SEEK_SET);
     }
@@ -666,6 +688,7 @@ imd_load(char *fname, int drive, int create_delta)
     ip = malloc(sizeof(*ip));
     memset(ip, 0, sizeof(*ip));
     ip->fd = -1;
+    ip->mode = mode;
     ip->comment = malloc(clen + 1);
 
     lseek(fd, 0, SEEK_SET);
@@ -683,7 +706,7 @@ imd_load(char *fname, int drive, int create_delta)
     tmp = malloc(16 * sizeof(struct imd_trk *));
     ntrk = 0;
     nalloc = 16;
-    while ((tp = get_track(fd)) != 0) {
+    while ((tp = get_track(fd, mode == IMD_INPLACE)) != 0) {
         if (ntrk == nalloc) {
             nalloc *= 2;
             tmp = realloc(tmp, nalloc * sizeof(struct imd_trk *));
@@ -702,8 +725,8 @@ imd_load(char *fname, int drive, int create_delta)
         if (tp->fixed.cyl > ip->cyls) ip->cyls = tp->fixed.cyl;
         if (tp->fixed.head > ip->heads) ip->heads = tp->fixed.head;
     }
-    if (create_delta)
-        ip->fd = fd;            /* open to append track records */
+    if (mode)
+        ip->fd = fd;            /* open to append track records or write in place */
     else
         close(fd);
 
@@ -721,12 +744,66 @@ imd_load(char *fname, int drive, int create_delta)
     }
     free(tmp);
 
-    if (attach_delta(ip, fname, create_delta) < 0) {
+    if (attach_delta(ip, fname, mode) < 0) {
         free(ip->comment);
         free(ip);
         return 0;
     }
     return ip;
+}
+
+/*
+ * Whether an image is laid down in place: every sector is a fixed data
+ * run, so each sits at a stable offset and a write is a pwrite.  A hard
+ * disk is built this way; a floppy is compressed (fill/absent runs) and
+ * written through a delta.  Peek at the first track - its sector type
+ * bytes say which - without disturbing the caller's own open.  Returns
+ * a boolean: 1 in-place, 0 delta.
+ */
+int
+imd_is_inplace(char *fname)
+{
+    unsigned char magic[4];
+    unsigned char hdr[5];
+    unsigned char c;
+    int fd, nsec, s;
+
+    if ((fd = open(fname, O_RDONLY)) < 0)
+        return 0;
+    if (read(fd, magic, 4) != 4 || memcmp(magic, "IMD ", 4) != 0) {
+        close(fd);
+        return 0;               /* raw image: a floppy */
+    }
+    do {
+        if (read(fd, &c, 1) != 1) {
+            close(fd);
+            return 0;
+        }
+    } while (c != IMD_EOC);
+
+    if (read(fd, hdr, 5) != 5) {
+        close(fd);
+        return 0;
+    }
+    nsec = hdr[3];
+    lseek(fd, nsec, SEEK_CUR);          /* secmap */
+    if (hdr[2] & 0x80)
+        lseek(fd, nsec, SEEK_CUR);      /* cylmap */
+    if (hdr[2] & 0x40)
+        lseek(fd, nsec, SEEK_CUR);      /* headmap */
+    for (s = 0; s < nsec; s++) {
+        if (read(fd, &c, 1) != 1) {
+            close(fd);
+            return 0;
+        }
+        if (c != IMD_DATA) {
+            close(fd);
+            return 0;
+        }
+        lseek(fd, 0x80 << hdr[4], SEEK_CUR);    /* the data run */
+    }
+    close(fd);
+    return 1;
 }
 
 /*
@@ -859,6 +936,23 @@ imd_write(void *vp, int cyl, int head, int osec, char *buf)
     unsigned char key[4];
     int tsec;       // translated sector
 
+    if (ip->mode == IMD_INPLACE) {
+        /* write the sector's own data run, in place, no overlay */
+        if ((cyl >= ip->cyls) || (head >= ip->heads))
+            return 0;
+        tp = ip->tracks[imd_trknum(ip, cyl, head)];
+        if (!tp)
+            return 0;
+        tsec = translate_sector(tp, osec, head);
+        if (tsec < 0 || tp->data_off[tsec] < 0)
+            return 0;           /* no such sector, or not a data run */
+        if (pwrite(ip->fd, buf, tp->secsize, tp->data_off[tsec]) != tp->secsize)
+            return 0;
+        trace(trace_imd, "imd_write drive %d cyl %d head %d tsec %d osec %d\n",
+            ip->drive, cyl, head, tsec, osec);
+        return (tp->secsize);
+    }
+
     if (!ip->delta) {
         return 0;
     }
@@ -915,6 +1009,19 @@ imd_read(void *vp, int cyl, int head, int osec, char *buf)
         return 0;               /* no such sector on this track */
     }
 
+    if (ip->mode == IMD_INPLACE) {
+        /* read the sector's own data run; an absent one supplies zeros */
+        if (tp->data_off[tsec] >= 0) {
+            if (pread(ip->fd, buf, tp->secsize, tp->data_off[tsec]) != tp->secsize)
+                return 0;
+        } else if (tp->data[tsec]) {
+            memcpy(buf, tp->data[tsec], tp->secsize);
+        } else {
+            bzero(buf, tp->secsize);
+        }
+        return (tp->secsize);
+    }
+
     // if reading an absent block, supply zeros
     if (!tp->data[tsec]) {
         tp->data[tsec] = malloc(tp->secsize);
@@ -942,6 +1049,7 @@ apply_fmt(struct imd_trk *tp, int nsec, int size, int mode, int firstsec)
         if (tp->data[i])
             free(tp->data[i]);
     free(tp->data);
+    free(tp->data_off);
     free(tp->secmap);
 
     tp->fixed.nsec = nsec;
@@ -952,6 +1060,7 @@ apply_fmt(struct imd_trk *tp, int nsec, int size, int mode, int firstsec)
     for (i = 0; i < nsec; i++)
         tp->secmap[i] = firstsec + i;
     tp->data = calloc(nsec, sizeof(char *));
+    tp->data_off = 0;
 }
 
 /*
@@ -1018,7 +1127,7 @@ write_track(struct imd *ip, struct imd_trk *tp, int fill)
 {
     unsigned char hdr[5];
     unsigned char fb = (unsigned char)fill;
-    unsigned char code = IMD_FILL;
+    unsigned char code;
     int i;
 
     hdr[0] = tp->fixed.mode;
@@ -1028,9 +1137,27 @@ write_track(struct imd *ip, struct imd_trk *tp, int fill)
     hdr[4] = tp->fixed.size;
     write(ip->fd, hdr, 5);
     write(ip->fd, tp->secmap, tp->fixed.nsec);
-    for (i = 0; i < tp->fixed.nsec; i++) {
-        write(ip->fd, &code, 1);
-        write(ip->fd, &fb, 1);
+
+    if (ip->mode == IMD_INPLACE) {
+        /*
+         * Each sector is a fixed data run, so its bytes sit at a stable
+         * offset.  Lay down the data codes and allocate a hole for each
+         * sector's data - the file grows to its full size, the bytes stay
+         * unwritten, and the offset is kept for pwrite.
+         */
+        code = IMD_DATA;
+        for (i = 0; i < tp->fixed.nsec; i++) {
+            write(ip->fd, &code, 1);
+            tp->data_off[i] = lseek(ip->fd, 0, SEEK_CUR);
+            lseek(ip->fd, tp->secsize, SEEK_CUR);
+        }
+        ftruncate(ip->fd, lseek(ip->fd, 0, SEEK_CUR));
+    } else {
+        code = IMD_FILL;
+        for (i = 0; i < tp->fixed.nsec; i++) {
+            write(ip->fd, &code, 1);
+            write(ip->fd, &fb, 1);
+        }
     }
 }
 
@@ -1050,6 +1177,15 @@ imd_setfmt(void *vp, int cyl, int head, int firstsec, int secs, int secsize,
         sbyte++;
 
     apply_fmt(tp, secs, sbyte, mode, firstsec);
+
+    if (ip->mode == IMD_INPLACE) {
+        /* the offset table; the data itself lives in the file's holes */
+        tp->data_off = malloc(sizeof(long) * secs);
+        if (ip->fd >= 0)
+            write_track(ip, tp, fill);
+        return 1;
+    }
+
     for (i = 0; i < secs; i++) {
         tp->data[i] = malloc(secsize);
         memset(tp->data[i], fill, secsize);

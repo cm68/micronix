@@ -65,7 +65,7 @@ check(file)
 {
     int b;
     int i;
-    int first, nblk;
+    UINT first, nblk;
     int ifree_count;
     char *bootname;
     struct dsknod *dp;

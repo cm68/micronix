@@ -388,7 +388,9 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
 #endif
         break;
     case DRIVER_IMD:
-        i->drive = imd_load(filesystem, 0, writable);
+        i->drive = imd_load(filesystem, 0,
+            imd_is_inplace(filesystem)
+                ? IMD_INPLACE : (writable ? IMD_DELTA : IMD_RO));
         if (i->drive) {
             ret = 0;
         } else {

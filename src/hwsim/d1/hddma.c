@@ -178,7 +178,7 @@ select_drive(int id)
     	return 0;
     }
     sprintf(drivename, "hddma-%d", id);
-    handle[id] = imd_load(drive_resolve(drivename), id, 1);
+    handle[id] = imd_load(drive_resolve(drivename), id, IMD_INPLACE);
     if (!handle[id]) {
         /*
          * Not debug chatter.  d1p compiles the message out, and a unit

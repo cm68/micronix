@@ -21,12 +21,13 @@
  * headmap  numsecs of sector numbers - never seen this
  * a data code:  0: no data 1: secsize bytes 2: a fill byte
  *
- * writing is an overlay: the image holds the baseline (its framing and any
- * data), and a key store beside it - <imd file name>-delta - holds the
- * sectors written since, keyed by cylinder, head and sector slot.  A load
- * reads the image, then layers the delta's data on top.  The framing a
- * format lays down goes into the image itself, out of band, the way the
- * label does; the delta is data only.
+ * writing is one of two modes, chosen at open (IMD_RO/IMD_DELTA/IMD_INPLACE
+ * above): a keystore overlay beside the image - <imd file name>-delta - holds
+ * the sectors written since, keyed by cylinder, head and sector slot; or the
+ * image itself carries each sector at a fixed offset and a write goes straight
+ * into it.  A load reads the image, then layers the delta's data on top where
+ * there is one.  The framing a format lays down goes into the image itself,
+ * out of band, the way the label does.
  *
  * building this file with -DSTAND will define a program that does some reporting
  * of imd file contents, and additionally can write a new imd file from the original
@@ -38,6 +39,25 @@
 #define IMD_DATA    1
 #define IMD_FILL    2
 #define IMD_EOC     0x1a
+
+/*
+ * Write access, chosen at open and kept for the life of the handle.  The
+ * two write modes lay the sectors down differently:
+ *
+ *	IMD_DELTA    sector data goes to a keystore beside the image
+ *	             (<image>-delta); the image itself keeps only the
+ *	             framing a format wrote.  A floppy's write overlay.
+ *
+ *	IMD_INPLACE  the image carries every sector as a fixed-size data
+ *	             run, so each sector sits at a stable file offset and
+ *	             a write is a pwrite into it.  No overlay, no rewrite.
+ *	             A hard disk's write access.
+ *
+ * IMD_RO is read-only: neither lock nor overlay.
+ */
+#define IMD_RO       0
+#define IMD_DELTA    1
+#define IMD_INPLACE  2
 
 /* layout of the delta overlay */
 #define MAXSECSIZE  1024                // the most bytes any sector can be
@@ -67,6 +87,7 @@ struct imd {
     int spt;                            // most sectors any track holds
     struct imd_trk **tracks;            // array of tracks - indexed by trknum(c, h)
     struct kv *delta;                   // the write overlay, 0 for none
+    int mode;                           // IMD_RO, IMD_DELTA or IMD_INPLACE
     int fd;                             // the image, open to append track records
     int lock_fd;                        // advisory lock held on the image
 };
@@ -98,10 +119,12 @@ struct imd_trk {
     char *cylmap;
     char *headmap;
     char **data;
+    long *data_off;                 /* file offset of each sector's blob, in-place */
 };
 
 extern void imd_close(void *vp);
-extern void *imd_load(char *fname, int drive, int create_delta);
+extern void *imd_load(char *fname, int drive, int mode);
+extern int imd_is_inplace(char *fname);
 extern int imd_firstsec(void *vp, int cyl, int head);
 extern void imd_trkinfo(void *vp, int cyl, int head, int *secs, int *secsize);
 extern int imd_density(void *vp, int cyl, int head);

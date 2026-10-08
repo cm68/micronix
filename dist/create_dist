@@ -273,8 +273,7 @@ while [ "$n" -le "$ndisk" ]; do
 	fi
 	echo "$0: disk $n of $ndisk: `wc -l < "$tmp/list.$n"` files, $free blocks free"
 
-	rm -f "$raw-delta"
-	"$imd" -m $imd2 -a "$toff" "$raw" > /dev/null 2>&1 || exit 1
+	"$imd" -m $imd2 "$raw" > /dev/null 2>&1 || exit 1
 	mv "$raw-merge" "$out" || exit 1
 	n=$((n + 1))
 done

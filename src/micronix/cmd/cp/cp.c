@@ -17,8 +17,6 @@
 #include <sys/dir.h>
 #include <dirent.h>
 
-/* the two buffers below are declared MAXPATHLEN + 1; this was MAXPATHL */
-#define	MAXPATHLEN	512
 #define	MAXBSIZE	512
 
 #ifdef linux
@@ -31,7 +29,9 @@
 char iflag INIT;
 char rflag INIT;
 char vflag INIT;
+char cflag INIT;
 char *rindex();
+char *malloc();
 
 main(argc, argv)
     int argc;
@@ -49,8 +49,10 @@ main(argc, argv)
     slash = rindex(argv[0], '/');
     if (slash)
         base = slash + 1;
-    if (strcmp(base, "cptree") == 0)
+    if (strcmp(base, "cptree") == 0) {
         rflag++;
+        cflag++;
+    }
 
     argc--, argv++;
     while (argc > 0 && **argv == '-') {
@@ -86,8 +88,19 @@ main(argc, argv)
             goto usage;
     }
     rc = 0;
-    for (i = 0; i < argc - 1; i++)
-        rc |= copy(argv[i], argv[argc - 1]);
+    /*
+     * cptree copies the source directory's *contents* into the
+     * destination, so the destination names each entry directly rather
+     * than a copy of the source directory under its own name.  rcopy
+     * walks the source and copy() appends each entry's basename, which
+     * is exactly the two-level behaviour; calling copy() on the top
+     * would name a subdirectory of the destination after the source.
+     */
+    if (cflag)
+        rc = rcopy(argv[0], argv[1]);
+    else
+        for (i = 0; i < argc - 1; i++)
+            rc |= copy(argv[i], argv[argc - 1]);
     exit(rc);
   usage:
     fprintf(stderr, "Usage: cp [-i] f1 f2; or: cp [-ir] f1 ... fn d2\n");
@@ -98,7 +111,8 @@ copy(from, to)
     char *from, *to;
 {
     int fold, fnew, n, exists;
-    char *last, destname[MAXPATHLEN + 1], buf[MAXBSIZE];
+    char *last, *destname = 0;
+    static char buf[MAXBSIZE];
     struct stat stfrom, stto;
 
     fold = open(from, 0);
@@ -117,8 +131,15 @@ copy(from, to)
             last++;
         else
             last = from;
-        if (strlen(to) + strlen(last) >= sizeof destname - 1) {
-            fprintf(stderr, "cp: %s/%s: Name too long", to, last);
+        /*
+         * The destination name is the destination directory plus this
+         * entry's basename.  Size it for exactly that, not PATH_MAX, and
+         * hand the pointer to the recursive walk; each level frees its
+         * own on the way back up.
+         */
+        destname = malloc((unsigned)(strlen(to) + strlen(last) + 2));
+        if (destname == 0) {
+            fprintf(stderr, "cp: out of memory\n");
             close(fold);
             return (1);
         }
@@ -134,16 +155,19 @@ copy(from, to)
         if (stat(to, &stto) < 0) {
             if (mkdir(to, (stfrom.st_mode & 0777) | 0700) < 0) {
                 Perror(to);
+                free(destname);
                 return (1);
             }
             fixmode = 1;
         } else if ((stto.st_mode & S_IFMT) != S_IFDIR) {
             fprintf(stderr, "cp: %s: Not a directory.\n", to);
+            free(destname);
             return (1);
         }
         n = rcopy(from, to);
         if (fixmode)
             chmod(to, stfrom.st_mode & 0777);
+        free(destname);
         return (n);
     }
 
@@ -161,6 +185,7 @@ copy(from, to)
             fprintf(stderr,
                 "cp: %s and %s are identical (not copied).\n", from, to);
             close(fold);
+            free(destname);
             return (1);
         }
         if (iflag && isatty(fileno(stdin))) {
@@ -172,6 +197,7 @@ copy(from, to)
                 c = getchar();
             if (i != 'y') {
                 close(fold);
+                free(destname);
                 return (1);
             }
         }
@@ -180,6 +206,7 @@ copy(from, to)
     if (fnew < 0) {
         Perror(to);
         close(fold);
+        free(destname);
         return (1);
     }
 
@@ -191,17 +218,20 @@ copy(from, to)
             Perror(from);
             close(fold);
             close(fnew);
+            free(destname);
             return (1);
         }
         if (write(fnew, buf, n) != n) {
             Perror(to);
             close(fold);
             close(fnew);
+            free(destname);
             return (1);
         }
     }
     close(fold);
     close(fnew);
+    free(destname);
     return (0);
 }
 
@@ -211,7 +241,7 @@ rcopy(from, to)
     DIR *fold = opendir(from);
     struct direct *dp;
     int errs = 0;
-    char fromname[MAXPATHLEN + 1];
+    char *fromname;
 
     if (fold == 0) {
         Perror(from);
@@ -227,13 +257,20 @@ rcopy(from, to)
             continue;
         if (!strcmp(dp->d_name, ".") || !strcmp(dp->d_name, ".."))
             continue;
-        if (strlen(from) + 1 + strlen(dp->d_name) >= sizeof fromname - 1) {
-            fprintf(stderr, "cp: %s/%s: Name too long.\n", from, dp->d_name);
+        /*
+         * The source path is this directory plus the entry's name, sized
+         * for exactly that.  copy() recurses for a subdirectory and reads
+         * the pointer, so it is freed here once copy() has returned.
+         */
+        fromname = malloc((unsigned)(strlen(from) + strlen(dp->d_name) + 2));
+        if (fromname == 0) {
+            fprintf(stderr, "cp: out of memory\n");
             errs++;
             continue;
         }
         sprintf(fromname, "%s/%s", from, dp->d_name);
         errs += copy(fromname, to);
+        free(fromname);
     }
 }
 
