@@ -133,3 +133,47 @@ what keeps the filesystem from allocating over them.
 Use 1.67 and not 1.6.  1.6's kernel has its root device as djdma/12,
 which is the single sided minor for a disk that is double sided, and it
 stops in the rom monitor before reaching a shell.  1.67 has 76.
+
+the full install on two drives, and the native compile
+------------------------------------------------------
+
+A different path from ./run: build two blank volumes from the tree, install
+all nine distribution diskettes onto them, and compile the source tree the
+install just put on /usr/src.  build_2drive makes the volumes and stamps
+install5.login as /.login, so a boot needs nothing typed.
+
+    ./build_2drive                 # /tmp/q540root.img + /tmp/q540usr.img
+
+Each boot is the d1 command below, with the drives and the floppies it
+names.  The root and usr volumes are the two hard disks; the four djdma
+units are the distribution diskettes of that pass.  Watch /tmp/boot.log
+for "=== PASS-DONE" (install) or "=== COMPILE-DONE" (compile).
+
+pass 1 - disks 1-4 (install5.login is already /.login):
+
+    cd ../../src/hwsim/d1
+    ./d1 -H -b ../../micronix/stand/roms/mon447.bin -B hdcdma \
+        -S ../../micronix/sys/unix -L /tmp/boot.log \
+        hdcdma0:<dir>/q540root.img hdcdma1:<dir>/q540usr.img \
+        djdma0:<root>/dist/mx2.0-8-1.IMD djdma1:<root>/dist/mx2.0-8-2.IMD \
+        djdma2:<root>/dist/mx2.0-8-3.IMD djdma3:<root>/dist/mx2.0-8-4.IMD
+
+pass 2 - disks 5-8 (same install5.login, four new diskettes):
+
+    same command, djdma0..3 = mx2.0-8-5.IMD .. mx2.0-8-8.IMD
+
+pass 3 - disk 9 (write install9.login over /.login first):
+
+    ../../src/tools/mnix -f <dir>/q540root.img write install9.login /.login
+    same command, djdma0 = mx2.0-8-9.IMD, no djdma1..3
+
+compile - the native build (write compile.login over /.login first):
+
+    ../../src/tools/mnix -f <dir>/q540root.img write compile.login /.login
+    ./d1 -H -b ../../micronix/stand/roms/mon447.bin -B hdcdma \
+        -S ../../micronix/sys/unix -L /tmp/boot.log \
+        hdcdma0:<dir>/q540root.img hdcdma1:<dir>/q540usr.img
+
+<dir> is the directory build_2drive wrote into (default /tmp) and <root> is
+the tree root.  The compile marker names a make that returned, not one that
+succeeded - check the log for the last "Build successful:" and any error lines.
