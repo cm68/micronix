@@ -53,11 +53,24 @@
  *	             a write is a pwrite into it.  No overlay, no rewrite.
  *	             A hard disk's write access.
  *
- * IMD_RO is read-only: neither lock nor overlay.
+ *	IMD_INPLACE_RO  the same in-place layout, but read-only: sectors
+ *	             are pread from their file offsets and no lock is taken.
+ *	             A host reader that opens a hard disk while the simulator
+ *	             has it - the symbol loader - uses this, not IMD_INPLACE,
+ *	             or it fights the simulator for the advisory lock.
+ *
+ * IMD_RO is read-only: neither lock nor overlay, and the sectors are
+ * loaded into memory rather than read back from the file.
  */
-#define IMD_RO       0
-#define IMD_DELTA    1
-#define IMD_INPLACE  2
+#define IMD_RO          0
+#define IMD_DELTA       1
+#define IMD_INPLACE     2
+#define IMD_INPLACE_RO  3
+
+/* whether a mode keeps sector data on the disk at tracked file offsets */
+#define imd_inplace(m)  ((m) == IMD_INPLACE || (m) == IMD_INPLACE_RO)
+/* whether a mode may write (and so takes the advisory lock) */
+#define imd_writable(m) ((m) == IMD_DELTA || (m) == IMD_INPLACE)
 
 /* layout of the delta overlay */
 #define MAXSECSIZE  1024                // the most bytes any sector can be

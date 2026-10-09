@@ -254,14 +254,14 @@ attach_delta(struct imd *ip, char *fname, int mode)
      * image directly, and the same mutual exclusion applies.
      */
     ip->lock_fd = -1;
-    if (mode != IMD_RO) {
+    if (imd_writable(mode)) {
         ip->lock_fd = acquire_lock(fname);
         if (ip->lock_fd < 0)
             return -1;
     }
 
     /* an in-place image has no overlay; its sectors are the file's own */
-    if (mode == IMD_INPLACE)
+    if (imd_inplace(mode))
         return 0;
 
     namebuf = malloc(strlen(fname) + sizeof(DELTASUFFIX) + 1);
@@ -609,7 +609,7 @@ blank_load(char *fname, int drive, int mode)
     struct imd *ip;
     int fd;
 
-    if (mode == IMD_RO)
+    if (!imd_writable(mode))
         return 0;
 
     fd = open(fname, O_RDWR | O_CREAT | O_TRUNC, 0777);
@@ -654,7 +654,7 @@ imd_load(char *fname, int drive, int mode)
     char *namebuf;
     char c;
 
-    fd = open(fname, mode ? O_RDWR : O_RDONLY);
+    fd = open(fname, imd_writable(mode) ? O_RDWR : O_RDONLY);
     if (fd < 0)
         return blank_load(fname, drive, mode);
 
@@ -706,7 +706,7 @@ imd_load(char *fname, int drive, int mode)
     tmp = malloc(16 * sizeof(struct imd_trk *));
     ntrk = 0;
     nalloc = 16;
-    while ((tp = get_track(fd, mode == IMD_INPLACE)) != 0) {
+    while ((tp = get_track(fd, imd_inplace(mode))) != 0) {
         if (ntrk == nalloc) {
             nalloc *= 2;
             tmp = realloc(tmp, nalloc * sizeof(struct imd_trk *));
@@ -745,7 +745,9 @@ imd_load(char *fname, int drive, int mode)
     free(tmp);
 
     if (attach_delta(ip, fname, mode) < 0) {
+        close(ip->fd);          /* the open above succeeded; do not leak it */
         free(ip->comment);
+        free(ip->tracks);
         free(ip);
         return 0;
     }
@@ -1009,7 +1011,7 @@ imd_read(void *vp, int cyl, int head, int osec, char *buf)
         return 0;               /* no such sector on this track */
     }
 
-    if (ip->mode == IMD_INPLACE) {
+    if (imd_inplace(ip->mode)) {
         /* read the sector's own data run; an absent one supplies zeros */
         if (tp->data_off[tsec] >= 0) {
             if (pread(ip->fd, buf, tp->secsize, tp->data_off[tsec]) != tp->secsize)
