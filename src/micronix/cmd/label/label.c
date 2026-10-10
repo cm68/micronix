@@ -285,6 +285,23 @@ showblocks(cyls, spc)
 	printf("\n");
 }
 
+/*
+ * A slice's type, as a word.
+ */
+char *
+sltypename(t)
+	UINT t;
+{
+	switch (t) {
+	case SL_FS:
+		return "filesystem";
+	case SL_SWAP:
+		return "swap";
+	default:
+		return "unused";
+	}
+}
+
 dump()
 {
 	register struct dlabel *lp;
@@ -297,23 +314,17 @@ dump()
 	printf("\tgeometry\t%u cylinders, %u heads, %u sectors/track "
 		"(%u blocks/cylinder)\n",
 		lp->d_tracks, lp->d_heads, lp->d_spt, spc);
-	printf("\troll\t\t%u - block 0 of a rolled slice is at cylinder %u\n",
-		lp->d_roll, lp->d_roll);
+	printf("\ttiming\t\tstep %u, seek %u, precomp %u, lowcur %u\n",
+		lp->d_step, lp->d_seek, lp->d_precomp, lp->d_lowcur);
 	printf("\tboot\t\t%u blocks, loaded from slice %c\n",
 		lp->d_bootblks, 'a' + lp->d_bootslice);
-	printf("\tfilesystem\t%u blocks, %u inode blocks\n",
-		lp->d_fsize, lp->d_isize);
 
 	/*
 	 * The table, entry by entry: the numbers as they are on the disk,
-	 * and then what they mean.  An empty entry is the whole drive, and
-	 * on the whole-disk slice 'c' that is meant literally - from
-	 * cylinder 0 and unrolled - while every other slice takes the roll
-	 * with it, which is how a disk made before this table existed
-	 * describes itself.
+	 * and then what they mean.  A length of zero is a slice that has not
+	 * been carved - nothing lives there yet.
 	 */
-	printf("\tslices\t\t(offset, length) in cylinders, "
-		"0 length = to the end\n");
+	printf("\tslices\t\t(offset, length) in cylinders, roll, type\n");
 	for (i = 0; i < NSLICE; i++) {
 		if (i == DL_WHOLE) {
 			printf("\t  %c\t(-, -)\tcylinders 0 through %u, "
@@ -321,19 +332,15 @@ dump()
 			showblocks(lp->d_tracks, spc);
 			continue;
 		}
-		if (!lp->d_slice[i].d_off && !lp->d_slice[i].d_len) {
-			printf("\t  %c\t(0, 0)\tthe whole drive, rolled by %u",
-				'a' + i, lp->d_roll);
-			showblocks(lp->d_tracks, spc);
+		if (!lp->d_slice[i].d_len) {
+			printf("\t  %c\t(0, 0)\tnot carved", 'a' + i);
 			continue;
 		}
 		off = lp->d_slice[i].d_off;
 		cyls = lp->d_slice[i].d_len;
-		if (cyls == 0)
-			cyls = lp->d_tracks - off;
-		printf("\t  %c\t(%u, %u)\tcylinders %u through %u, rolled by %u",
-			'a' + i, off, lp->d_slice[i].d_len,
-			off, off + cyls - 1, lp->d_roll);
+		printf("\t  %c\t(%u, %u)\tcylinders %u through %u, roll %u, %s",
+			'a' + i, off, cyls, off, off + cyls - 1,
+			lp->d_slice[i].d_roll, sltypename(lp->d_slice[i].d_type));
 		showblocks(cyls, spc);
 	}
 }
@@ -360,12 +367,11 @@ writegeom()
 		for (i = 0; i < 4; i++)
 			lp->d_magic[i] = DL_MAGIC[i];
 		lp->d_version = DL_VERSION;
-		lp->d_roll = gtracks >> 1;
-		printf("%s: no label: writing %s version %u, roll %u\n",
-			devname, DL_MAGIC, DL_VERSION, lp->d_roll);
+		printf("%s: no label: writing %s version %u\n",
+			devname, DL_MAGIC, DL_VERSION);
 	} else {
 		printf("%s: geometry %u/%u/%u, was %u/%u/%u, "
-			"roll and table left alone\n", devname,
+			"table left alone\n", devname,
 			gtracks, gheads, gspt,
 			lp->d_tracks, lp->d_heads, lp->d_spt);
 	}
@@ -413,6 +419,7 @@ writeslice(op)
 	}
 	lp->d_slice[op->so_sl].d_off = op->so_off;
 	lp->d_slice[op->so_sl].d_len = op->so_len;
+	lp->d_slice[op->so_sl].d_type = SL_FS;  /* a carved slice is a filesystem */
 	printf("%s: slice %c (offset %u, length %u)\n",
 		devname, 'a' + op->so_sl, off, op->so_len);
 }

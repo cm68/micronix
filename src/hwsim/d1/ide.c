@@ -71,6 +71,7 @@
 
 #include "sim.h"
 #include "hwsim.h"
+#include "vimap.h"
 #include "util.h"
 #include <unistd.h>
 #include <strings.h>
@@ -155,7 +156,7 @@ extern int trace_bio;
  * nothing else on this machine drives VI2, so this is the first id on it.
  * sys/intrpt.s routes the line to sys/ide.c's handler.
  */
-#define IDE_INTERRUPT   2
+#define IDE_INTERRUPT VI_IDE
 #define IDE_CARDID      0
 
 /*

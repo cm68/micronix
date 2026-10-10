@@ -37,11 +37,11 @@
 
 extern int mwopen(), mwclose(), mwstrat();
 extern int mwcheck(), mwint();
-extern int mwinit(), mwprobe();
+extern int mwinit();
 extern struct biovec mwbvec;
 
 struct ovlhdr mwhdr = { 3, &mwinit, &mwcheck, 0, &mwbvec, 0, MWINT, &mwint,
-	{ 'h', 'd', 'd', 'm', 'a' }, &mwprobe };
+	{ 'h', 'd', 'd', 'm', 'a' }, 4 };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

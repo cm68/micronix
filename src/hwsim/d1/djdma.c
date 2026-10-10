@@ -17,6 +17,7 @@
 #include "sim.h"
 #include "z80glue.h"
 #include "hwsim.h"
+#include "vimap.h"
 #include "imd.h"
 #include "util.h"
 #include "disz80.h"
@@ -36,7 +37,7 @@ extern char *printable(char);       // multio.c
 extern int terminal_fd_in;
 extern int terminal_fd_out;
 
-#define DJDMA_INTERRUPT 1
+#define DJDMA_INTERRUPT VI_DJDMA
 
 #define	DJDMA_PORT	0xef	// djdma command start port
 #define	DEF_CCA		0x50	// djdma default channel command address

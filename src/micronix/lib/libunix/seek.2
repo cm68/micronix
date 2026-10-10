@@ -1,4 +1,4 @@
-.he "seek (2)                     3/19/82                     seek (2)"
+.he "seek (2)                     10/9/26                     seek (2)"
 .fo "				   -#-"
 .in 5
 .rm 65
@@ -93,7 +93,8 @@ Reading the hole will allocate zero-filled space.
 RETURNS
 .in +5
 .br
-A 0 indicates success, a -1 indicates failure.
+The new read/write pointer position is returned.
+A -1 indicates failure.
 .bp
 .in -5
 .bd
@@ -116,3 +117,14 @@ RETURNS
 .in +5
 .br 
 The carry flag is cleared on success, or set on failure.
+On success the new position is returned, the low order
+word in hl and the high order word in hl'.
+On failure the error number is returned in hl.
+
+
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+lseek (2)

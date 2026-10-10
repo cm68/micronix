@@ -7,6 +7,7 @@
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/tty.h>
+#include <sys/ints.h>
 
 /*
  * Initialize custom hardware. Called from main().
@@ -23,6 +24,9 @@
  * lands on the definition, a page away from the call that caused it.
  */
 static int cinit(), hdinit();
+#if N8259 == 2
+extern int slave_pic_init();    /* sys/slavepic.c, the polled/CAS variant */
+#endif
 
 cus()
 {
@@ -40,6 +44,9 @@ cus()
     di();
     cinit();
     minit();                    /* in inits.s */
+#if N8259 == 2
+    slave_pic_init();           /* the add-on MultIO's PIC, sys/multio.c */
+#endif
 
     /*
      * coninit (); /* in inits.s

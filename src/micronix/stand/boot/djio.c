@@ -92,6 +92,7 @@ int heads INIT;
 int spt INIT;
 int spc INIT;
 int limit INIT;
+int len INIT;		/* the boot slice's length, in cylinders */
 int firstsec INIT;
 int bps INIT;		/* blocks per sector: 2 on a 1K medium, else 1 */
 
@@ -205,7 +206,8 @@ reset()
 	if (sl >= NSLICE)
 		sl = 0;
 	cylstart = lp->d_slice[sl].d_off;
-	roll = lp->d_roll;
+	roll = lp->d_slice[sl].d_roll;
+	len = lp->d_slice[sl].d_len;
 	heads = lp->d_heads;
 	spt = lp->d_spt;
 
@@ -235,14 +237,14 @@ reset()
 	spc = heads * spt;	/* blocks per cylinder */
 	/*
 	 * A block number is a filesystem block number, so the count starts
-	 * at the slice's first cylinder and not the disk's.  A slice with a
-	 * length says where it ends; one without runs to the last cylinder
-	 * of the medium.
+	 * at the slice's first cylinder and not the disk's.  A slice that
+	 * has not been carved (length zero) cannot boot.
 	 */
-	if (lp->d_slice[sl].d_len)
-		limit = lp->d_slice[sl].d_len * spc - 1;
-	else
-		limit = (lp->d_tracks - cylstart) * spc - 1;
+	if (!len) {
+		outstr("Boot slice is not carved.\n");
+		bail();
+	}
+	limit = len * spc - 1;
 }
 
 /*
@@ -361,7 +363,10 @@ char *buffer;
 
 	track = blocknum / spt;
 	within = blocknum % spt;
-	cyl = (track / heads) + cylstart + roll;
+	cyl = (track / heads) + roll;
+	if (cyl >= len)
+		cyl -= len;
+	cyl += cylstart;
 	head = track % heads;
 	secnum = within / bps + firstsec;
 	half = within % bps;

@@ -6,6 +6,7 @@
 
 #include "sim.h"
 #include "hwsim.h"
+#include "vimap.h"
 #include "util.h"
 #include "imd.h"
 #include <unistd.h>
@@ -14,7 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define HDCA_INTERRUPT  0        // same as hddma!
+#define HDCA_INTERRUPT VI_HDCA
 
 byte int_state;
 

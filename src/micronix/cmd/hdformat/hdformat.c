@@ -289,11 +289,12 @@ putlabel()
 	memset((char *) lp, 0, sizeof (struct dlabel));
 	for (i = 0; i < 4; i++)
 		lp->d_magic[i] = DL_MAGIC[i];
-	lp->d_version = DL_VERS_SLICE;
+	lp->d_version = DL_VERSION;
 	lp->d_tracks = cyl;
 	lp->d_heads = heads;
 	lp->d_spt = spt;
 	lp->d_firstsec = 1;		/* the HDCA numbers sectors from one */
+	/* timing: the HDCA controller commands none of it, so it is zero */
 	if (mfg)
 		strncpy(lp->d_mfg, mfg, sizeof (lp->d_mfg));
 	if (model)

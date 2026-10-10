@@ -28,8 +28,9 @@ struct drivespec {
 	UINT8 spt;			/* sectors per track */
 	UINT limit;			/* max block number */
 	UINT spc;			/* sectors per cylinder */
-	UINT roll;			/* what the cylinder is rotated by */
+	UINT roll;			/* the slice's own rotation */
 	UINT cylstart;			/* the slice's first cylinder */
+	UINT len;			/* the slice's length, in cylinders */
 	UINT8 firstsec;			/* first sector number on a track */
 } spec = {
 	/*
@@ -39,7 +40,7 @@ struct drivespec {
 	 * front of it.  An initialiser of zeroes because Whitesmith's will
 	 * not link a bss symbol without one.
 	 */
-	0, 0, 0, 0, 0, 0, 0, 0
+	0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
 #define	TRIES	10		/* per sector, as the other drivers retry */
@@ -186,23 +187,25 @@ reset()
 		spec.heads = lp->d_heads;
 		spec.spt = lp->d_spt;
 		spec.spc = lp->d_heads * lp->d_spt;
-		spec.roll = lp->d_roll;
 		spec.firstsec = lp->d_firstsec;
 
 		/*
-		 * And the slice the boot is in, which on a rolled disk is
-		 * the empty one: d_slice[0].d_off is 0, so cylstart is 0 and
-		 * the two lines below are exactly what they were before there
-		 * were tables.  See sys/dlabel.h.
+		 * And the slice the boot is in.  The slice's own roll, its
+		 * offset and its length all come from its table entry; a
+		 * slice that has not been carved (length zero) cannot boot.
+		 * See sys/dlabel.h.
 		 */
 		sl = lp->d_bootslice;
 		if (sl >= NSLICE)
 			sl = 0;
+		spec.roll = lp->d_slice[sl].d_roll;
 		spec.cylstart = lp->d_slice[sl].d_off;
-		if (lp->d_slice[sl].d_len)
-			spec.limit = lp->d_slice[sl].d_len * spec.spc - 1;
-		else
-			spec.limit = (lp->d_tracks - spec.cylstart) * spec.spc - 1;
+		spec.len = lp->d_slice[sl].d_len;
+		if (!spec.len) {
+			outstr("Boot slice is not carved.\n");
+			bail();
+		}
+		spec.limit = spec.len * spec.spc - 1;
 	} else {
 		/*
 		 * There is nothing to fall back on, and that is deliberate.
@@ -247,9 +250,10 @@ char *buffer;
 	 * block numbers do not fit in a signed int.
 	 */
 	secnum = blocknum % spec.spc;
-	cyl = blocknum / spec.spc + spec.roll + spec.cylstart;
-	if (cyl >= spec.cylinders)
-		cyl -= spec.cylinders;
+	cyl = blocknum / spec.spc + spec.roll;
+	if (cyl >= spec.len)
+		cyl -= spec.len;
+	cyl += spec.cylstart;
 	head = secnum / spec.spt;
 	sector = (blocknum % spec.spt) + spec.firstsec;
 

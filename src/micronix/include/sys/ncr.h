@@ -1,3 +1,5 @@
+#include <sys/ints.h>
+
 /*
  * NCR 5380 SCSI host adapter
  *
@@ -40,7 +42,7 @@
  * Past the jumpers the line is simply input 2 of the 8259, and ARMMASTER
  * in inits.s already unmasks it, so no inton() call claims it.
  */
-#define NCRINT  2
+#define NCRINT  INT_NCR
 
 /*
  * The card's ports.  Eight consecutive Z80 I/O addresses - a number space

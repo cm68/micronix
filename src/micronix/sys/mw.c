@@ -31,36 +31,14 @@ static int mwlink();
 #define MWDEADLINE 1            /* ticks a request may sit in flight */
 
 /*
- * The drive's timing, which the label does not carry.
- *
- * A disk says what shape it is - tracks, heads, sectors per track, roll -
- * and that is the whole of its geometry.  A drive also has a step-pulse
- * delay and two cylinders at which writing changes: where write
- * precompensation begins, and where the write current drops to the low
- * setting.  The label has no field for any of the three (docs/DISKLABEL.md
- * says why the table could not retire while they had nowhere else to
- * live), so a driver that reads its geometry from the label has nowhere
- * to read them from, and they are constants here.
- *
- * The values are the conservative ones the old no-row branch used: the
- * step delay the boot loader also uses, and both cylinders at zero -
- * which means precompensation is on for every track and the low write
- * current is in force for every track.  Per-model tuning is part of what
- * this driver gave up when it stopped reading a table by minor number.
- */
-#define MWSTPDEL 30             /* step pulse delay, 100 us */
-#define MWPRECOMP 0             /* cylinder where precompensation begins */
-#define MWLOWCUR 0              /* cylinder where low write current begins */
-
-/*
  * Drive configuration information, one per drive.
  *
- * The first seven fields are struct dlgeom (sys/dlabel.h), in its order
+ * The first nine fields are struct dlgeom (sys/dlabel.h), in its order
  * and of its types, because sys/dlabel.c decodes the label through a
- * view of them - mwopen passes this struct as one.  The timings and the
- * bookkeeping below them are this driver's own and may be moved freely;
- * moving any of the seven breaks the decode in a way the compiler will
- * not report.
+ * view of them - mwopen passes this struct as one.  The timing below
+ * them is the label's too, but it is filled by dllabel through a
+ * struct dltiming pointer, not through the geometry view.  Moving any
+ * of the nine breaks the decode in a way the compiler will not report.
  */
 struct info
 {
@@ -69,22 +47,25 @@ struct info
     UINT8 sectors;              /* number of sectors per track */
     UINT maxblk;                /* dllabel's bound for the first slice opened */
     UINT spc;                   /* number of sectors per cylinder */
-    UINT roll;                  /* the drive's d_roll */
+    UINT roll;                  /* the slice's d_roll */
     UINT cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
+    UINT len;                   /* dllabel's slice length, in cylinders */
 
-    UINT8 stpdel;               /* delay between step pulses, 100 us */
+    UINT8 step;                 /* step pulse delay, 100 us */
+    UINT8 seek;                 /* head settle after seek, 100 us */
     UINT precomp;               /* track where precomp begins */
     UINT lowcur;                /* track where low current begins */
+
     UINT curtrk;                /* current track */
     UINT8 flags;                /* see below */
 
     /*
-     * The slice table off the label, cached at open.  A buffer's minor
+     * The slice map off the label, cached at open.  A buffer's minor
      * names its slice; mwstrat looks the offset and length up here, so
      * every slice of a drive maps at once instead of one open's.
      */
-    struct dslice d_slice[NSLICE];
+    struct slicemap sm[NSLICE];
 } mws[NDRIVES] = 0;
 
 /*
@@ -146,7 +127,6 @@ struct
  * Controller constants
  */
 #define HOMDEL	30              /* step pulse delay during home in 100 us */
-#define SETTLE	0               /* controller head-settle time */
 #define INT	0x80            /* Interrupt enable bit with step delay */
 #define RESET	0x54            /* Reset to controller */
 #define ATTN	0x55            /* Attention to controller */
@@ -229,9 +209,15 @@ mwopen(dev, mode)
     if (info->flags & OPEN)
         return;
 
-    info->stpdel = MWSTPDEL;
-    info->precomp = MWPRECOMP;
-    info->lowcur = MWLOWCUR;
+    /*
+     * Conservative timing, only ever used for a drive with no label - and
+     * that drive maps block 0 and nothing else, so no step, seek or write
+     * ever consults them.  A label overwrites all four in dllabel().
+     */
+    info->step = 30;
+    info->seek = 0;
+    info->precomp = 0;          /* precomp on every track */
+    info->lowcur = 0;           /* low write current on every track */
 
     /*
      * Nothing is known yet, and the decode is handed that: a zero
@@ -254,7 +240,8 @@ mwopen(dev, mode)
      * than two copies of one sector.
      */
     switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive,
-                    sl, (struct dlgeom *)info, info->d_slice)) {
+                    sl, (struct dlgeom *)info, info->sm,
+                    (struct dltiming *)&info->step)) {
     case -1:
         return;                 /* no such slice; dllabel set u.error */
     case 0:
@@ -333,22 +320,36 @@ mwstrat(b)
     register struct buf *b;
 {
     register struct info *info;
-    static UINT sl, off, roll, maxblk;
+    static UINT sl, off, roll, len, maxblk;
 
     info = &mws[b->dev & 3];
+
+    /*
+     * The first read of a drive is its label, before any geometry is
+     * known - the probe at signon reads block 0 of 'c'.  Install a
+     * minimal geometry so the division maps that one block to cylinder 0;
+     * open() replaces it with the label's real geometry.
+     */
+    if (info->sectors == 0) {
+        info->heads = 1;
+        info->sectors = 1;
+        info->spc = 1;
+    }
+
     /*
      * The buffer's minor names its slice; dlslice resolves its offset,
-     * roll and bound from the cached table ('c' is the whole drive).
+     * roll, length and bound from the cached table ('c' is the whole
+     * drive).
      */
     sl = devslice(b->dev);
-    if (dlslice((struct dlgeom *)info, info->d_slice, sl,
-                &off, &roll, &maxblk) || b->blk > maxblk) {
+    if (dlslice((struct dlgeom *)info, info->sm, sl,
+                &off, &roll, &len, &maxblk) || b->blk > maxblk) {
         b->flags |= BERROR;
         b->error = ENXIO;
         iodone(b);
         return;
     }
-    b->cyl = mwcyl(b->blk, info->spc, off, roll, info->tracks);
+    b->cyl = mwcyl(b->blk, info->spc, off, roll, len);
     di();
     if (mwbuf == 0)
         mwbuf = b;
@@ -475,10 +476,10 @@ newdrv()
     cmd.steps = 0;
     cmd.seksel = curdrv;
     cmd.hedsel = curdrv;
-    cmd.arg2 = SETTLE;
+    cmd.arg2 = mwinfo->seek;    /* the drive's head settle, from the label */
     cmd.arg3 = SECSIZE;
     if (mwinfo->flags & CALIB) {
-        cmd.arg0.byte.high = mwinfo->stpdel | INT;
+        cmd.arg0.byte.high = mwinfo->step | INT;
         cmd.hedsel |= LCONST;
         cmd.op = LOAD;
         mwwait();
@@ -578,24 +579,22 @@ rwcmd()
 
 /*
  * Which cylinder a filesystem block lands on.  The block's cylinder is
- * its number divided by the sectors per cylinder, shifted by the slice's
- * offset and rotated by the drive's roll.  Both terms are cylinders and
- * both are added after the division, so neither is ever a block number:
- * a slice's position on a large drive could not be one.  The slice terms
- * are passed in because mwstrat resolves them from the buffer's minor
- * against the cached table.
+ * its number divided by the sectors per cylinder, rotated by the slice's
+ * own roll within the slice, then shifted by the slice's offset.  Both
+ * terms are cylinders and both are applied after the division, so
+ * neither is ever a block number: a slice's position on a large drive
+ * could not be one.  The slice terms are passed in because mwstrat
+ * resolves them from the buffer's minor against the cached table.
  */
-mwcyl(blk, spc, off, roll, tracks)
-    UINT blk, spc, off, roll, tracks;
+mwcyl(blk, spc, off, roll, len)
+    UINT blk, spc, off, roll, len;
 {
     static UINT cyl;
 
-    cyl = blk / spc;
-    cyl += off;
-    cyl += roll;
-    if (cyl >= tracks)
-        cyl -= tracks;
-    return cyl;
+    cyl = blk / spc + roll;
+    if (cyl >= len)
+        cyl -= len;
+    return cyl + off;
 }
 
 /*
@@ -977,41 +976,6 @@ mwioctl(dev, com, r, b)
      * the command block itself makes: the driver moves the bytes, the
      * program knows what they mean.
      */
-    return (0);
-}
-
-/*
- * Enumerate the drives at signon: read each unit's label and print the
- * manufacturer, model and capacity of every drive that answers.  The
- * major is 3, from the header (sys/mwhdr.c), and the 'c' slice is what
- * names block 0.  A unit with nothing behind it does not answer, and the
- * tick's watchdog (mwcheck) turns that silence into NOTRDY in a couple of
- * seconds, so the loop moves on instead of hanging.
- */
-mwprobe()
-{
-    struct info *info;
-    struct buf *b;
-    struct dlabel *lp;
-    char *p;
-    UINT dev, unit;
-    UINT mb;
-
-    for (unit = 0; unit < NDRIVES; unit++) {
-        info = &mws[unit];
-        dev = (3 << 8) | (DL_WHOLE << 5) | unit;
-        if (dllabel(dev, DL_WHOLE, (struct dlgeom *)info, info->d_slice) != 1)
-            continue;
-        b = bread(0, dev);
-        if (b == 0)
-            continue;
-        p = bhold(b);
-        lp = (struct dlabel *) &p[DL_OFFSET];
-        mb = (UINT) ((UINT32) info->tracks * info->heads * info->sectors >> 11);
-        pr("hddma%d: %s %s, %d MB\n", unit, lp->d_mfg, lp->d_model, mb);
-        brel();
-        brelse(b);
-    }
     return (0);
 }
 

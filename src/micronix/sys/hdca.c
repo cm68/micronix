@@ -34,7 +34,7 @@ extern int in(), out(), timeout(), inton();
 struct hd hdinfo[NHD];
 
 /* the slice table off each drive's label, cached at open */
-static struct dslice hdslice[NHD][NSLICE];
+static struct slicemap hdslice[NHD][NSLICE];
 
 static int hdmutex;		/* the controller, 0 = free */
 static int (*hdintr) ();	/* the phase the op-done interrupt resumes */
@@ -243,17 +243,15 @@ getinfo(dev)
  * is the remainder.
  */
 static UINT
-gettrk(blk, spc, cylstart, roll, tracks)
-	UINT blk, spc, cylstart, roll, tracks;
+gettrk(blk, spc, cylstart, roll, len)
+	UINT blk, spc, cylstart, roll, len;
 {
 	UINT cyl;
 
-	cyl = blk / spc;
-	cyl += cylstart;
-	cyl += roll;
-	if (cyl >= tracks)
-		cyl -= tracks;
-	return (cyl);
+	cyl = blk / spc + roll;
+	if (cyl >= len)
+		cyl -= len;
+	return (cyl + cylstart);
 }
 
 static UINT8
@@ -361,7 +359,7 @@ hdstrat(b)
 {
 	struct hd *hp;
 	UINT cyl, head, sector;
-	UINT sl, off, roll, maxblk;
+	UINT sl, off, roll, len, maxblk;
 
 	if (b->count != 512) {
 		b->flags |= BERROR;
@@ -371,19 +369,35 @@ hdstrat(b)
 	}
 	hp = getinfo(b->dev);
 	hp->h_drive = b->dev & 3;
+
+	/*
+	 * The first read of a drive is its label, before any geometry is
+	 * known - the probe at signon reads block 0 of 'c'.  Install a
+	 * minimal geometry so the division maps that one block to cylinder
+	 * 0, head 0, sector 1 - this controller numbers sectors from one.
+	 * open() replaces it with the label's real geometry.
+	 */
+	if (hp->h_sectors == 0) {
+		hp->h_heads = 1;
+		hp->h_sectors = 1;
+		hp->h_spc = 1;
+		hp->h_firstsec = 1;
+	}
+
 	/*
 	 * The buffer's minor names its slice; dlslice resolves its offset,
-	 * roll and bound from the cached table ('c' is the whole drive).
+	 * roll, length and bound from the cached table ('c' is the whole
+	 * drive).
 	 */
 	sl = devslice(b->dev);
 	if (dlslice((struct dlgeom *)hp, hdslice[b->dev & 3], sl,
-		    &off, &roll, &maxblk) || b->blk > maxblk) {
+		    &off, &roll, &len, &maxblk) || b->blk > maxblk) {
 		b->flags |= BERROR;
 		b->error = ENXIO;
 		iodone(b);
 		return (0);
 	}
-	cyl = gettrk(b->blk, hp->h_spc, off, roll, hp->h_tracks);
+	cyl = gettrk(b->blk, hp->h_spc, off, roll, len);
 	head = gethed(b->blk, hp);
 	sector = getsec(b->blk, hp);
 	hp->h_buf = b;
@@ -677,7 +691,7 @@ hdopen(dev, mode)
 	hp->h_firstsec = 1;
 
 	switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive,
-	    devslice(dev), (struct dlgeom *)hp, hdslice[drive])) {
+	    devslice(dev), (struct dlgeom *)hp, hdslice[drive], 0)) {
 	case -1:
 		return (-1);
 	case 0:
@@ -865,37 +879,6 @@ hdcioctl(dev, cmd, r, b)
 		sleep(&hdioctl, PRIBIO);
 
 	r->cmd[HDLEN] = hp->h_stat;
-	return (0);
-}
-
-/*
- * Enumerate the drives at signon, like mwprobe (sys/mw.c): read each
- * unit's label and print the drives that answer.  The major is 1 (the
- * header, sys/hdcahdr.c) and the HDCA numbers sectors from one, so the
- * label's own d_firstsec is what makes block 0 land on sector 1.  A dead
- * unit times out in the watchdog (hdtick) and is skipped.
- */
-hdprobe()
-{
-	struct hd *hp;
-	struct buf *b;
-	struct dlabel *lp;
-	UINT dev, unit;
-
-	for (unit = 0; unit < NHD; unit++) {
-		hp = &hdinfo[unit];
-		dev = (1 << 8) | (DL_WHOLE << 5) | unit;
-		hp->h_firstsec = 1;
-		if (dllabel(dev, DL_WHOLE, (struct dlgeom *)hp, hdslice[unit]) != 1)
-			continue;
-		if ((b = bread(0, dev)) == 0)
-			continue;
-		lp = (struct dlabel *) &bhold(b)[DL_OFFSET];
-		pr("hdca%d: %s %s, %d MB\n", unit, lp->d_mfg, lp->d_model,
-		    hp->h_tracks * hp->h_spc >> 11);
-		brel();
-		brelse(b);
-	}
 	return (0);
 }
 

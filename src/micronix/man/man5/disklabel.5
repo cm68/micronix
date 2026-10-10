@@ -1,0 +1,106 @@
+.he "disklabel (5)              10/10/26               disklabel (5)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+FILE
+.in +5
+.br
+.bd
+disklabel
+- format of the Micronix disk label
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+Every Micronix disk describes itself in a label that a driver can read
+without being told anything about the drive beforehand.  It lives in the
+second half of the boot sector - physical cylinder 0, head 0, sector 0,
+the one sector that needs no geometry to reach - beginning at byte 256
+(DL_OFFSET), because the first half holds the boot code.
+.sp
+The label is the drive speaking, not the controller: it carries the
+geometry and the timing, because both are properties of the drive, and
+it carries a table of eight slices that say where the filesystems and
+the swap live.  One format is shared by every block driver.  A drive
+with no label has no geometry, and the only operations possible on it
+are labelling and formatting, through its whole-disk slice
+.bd
+c
+.
+.sp
+The fields, in the order they occupy the label:
+.nf
+.bd 9
+struct dlabel {
+    char  d_magic[4];       "MWDL", the magic number
+    UINT  d_version;        the label format's version
+
+    UINT  d_tracks;         cylinders
+    UINT  d_heads;          heads
+    UINT  d_spt;            512-byte blocks per track
+    UINT  d_firstsec;       first sector number on a track
+
+    UINT8 d_step;           step pulse delay, 100 us
+    UINT8 d_seek;           head settle after a seek, 100 us
+    UINT  d_precomp;        cylinder where write precomp begins;
+                            0xffff = never
+    UINT  d_lowcur;         cylinder where low write current begins;
+                            0xffff = never
+
+    UINT  d_bootblks;       blocks the boot owns from device block 0;
+                            0 = none
+    UINT  d_bootslice;      the slice the boot loads from
+
+    struct dslice d_slice[8];       a through h
+
+    char  d_mfg[16];        the drive's manufacturer
+    char  d_model[16];      its model number
+};
+.fi
+.sp
+The timing fields are properties of the drive.  A drive with its own
+controller - IDE, SCSI - reads them and ignores them; the MFM drivers
+use them to step and to command the write current.
+.sp
+Each slice is:
+.nf
+.bd 9
+struct dslice {
+    UINT  d_off;            where it starts, in cylinders
+    UINT  d_len;            how many cylinders, 0 = not carved
+    UINT  d_roll;           rotation within the slice, 0 = none
+    UINT8 d_type;           what the slice is for
+};
+.fi
+.sp
+d_type is 0 for unused, 1 for a version 6 filesystem, and 2 for a swap
+area.  Slice
+.bd
+c
+- the third entry - is always unused: it is the whole disk, from
+cylinder 0, and its extent is not the table's to give, so its entry is
+never consulted.
+.sp
+A slice's offset is in cylinders, not blocks, so a slice's position on a
+large drive never has to fit in a 16-bit block number.  A slice may roll
+its own contents within its extent, so a filesystem can put its inode
+table in the middle of the platter rather than at the edge; zero, the
+ordinary case, is no rotation.  A length of zero means the slice has not
+been carved, and the driver refuses to map it.
+.sp
+Block 0 is never part of a filesystem: every slice reserves it, so the
+label sits outside every filesystem on the disk and cannot be destroyed
+by making one.  The formatter writes a prototype label - the geometry,
+the timing, and the conventional slice types, a, d, e, f, g and h as
+filesystems and b as swap - so a freshly formatted disk says what it is
+and how it is meant to be partitioned.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+label (1), mkfs (1), filesystem (5)

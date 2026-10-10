@@ -1,3 +1,5 @@
+#include <sys/ints.h>
+
 /*
  * The HDCA - the port-mapped, non-DMA hard drive controller of the
  * M10, M20 and M26.  sys/hdca.h
@@ -71,7 +73,7 @@
 #define	FUNC_DRIVE	0x03
 
 /* the interrupt line the HDCA shares with the HD-DMA */
-#define	HDCAINT		0
+#define	HDCAINT		INT_HDCA
 
 /*
  * How many seconds a request may be in flight before the drive is
@@ -83,12 +85,14 @@
 #define	NHD		4	/* drives behind one controller */
 
 /*
- * Per-drive state.  The first eight fields are the geometry, in the
+ * Per-drive state.  The first nine fields are the geometry, in the
  * order and types sys/dlabel.h's struct dlgeom promises, because
- * dllabel() writes through that view of this struct; the rest is the
- * driver's own.  h_cyl is where the arm is, h_head/h_sector where the
- * request wants it, h_buf/h_cur the request in flight, and h_intr the
- * phase the op-done interrupt resumes.
+ * dllabel() writes through that view of this struct; the label's timing
+ * is read and dropped, since this controller has no precompensation or
+ * write current of its own to command.  The rest is the driver's own:
+ * h_cyl is where the arm is, h_head/h_sector where the request wants it,
+ * h_buf/h_cur the request in flight, and h_intr the phase the op-done
+ * interrupt resumes.
  */
 struct hd {
 	UINT	h_tracks;	/* cylinders */
@@ -99,6 +103,7 @@ struct hd {
 	UINT	h_roll;
 	UINT	h_cylstart;
 	UINT8	h_firstsec;
+	UINT	h_len;		/* the slice's length, in cylinders */
 
 	UINT8	h_flags;	/* busy/write/open/... */
 	UINT	h_slice;	/* the slice this drive is open for */

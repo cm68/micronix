@@ -102,7 +102,6 @@ bget(blk, dev)
         goto loop;
     }
     unhash(b);               /* drop it from its old blk's bucket */
-    sbrel(b);                /* and from a superblock slot, if it had one */
     b->blk = blk;
     b->dev = dev;
     b->flags &= ~BDONE;
@@ -188,76 +187,22 @@ aread(blk, dev)
  * sleep - and the driver still writes the right bytes, because its DMA
  * address is (xmem << 12) | (data & 0xfff), not the window address.
  *
- * The mapping to restore is saved here because the buffer's data/xmem are
- * assigned once by binit()/expand_bufs() and bzero() preserves them: on
- * umount the buffer goes back into the pool and must get its window
- * mapping back (sbrel).
+ * The buffer itself is the superblock's only home.  tmount() pins it
+ * (BLOCK) and it stays in the pool until umount, so bread(1, dev) finds
+ * it and needs no read.  Callers reach it through bhold(), a short hold
+ * that never crosses a sleep, and a chunk block - the free list or the
+ * inode list - is reached through swin() so the two windows do not
+ * collide.  There is no in-core copy of the superblock to get stale.
  */
-struct sbslot {
-    struct buf *b;              /* the buffer this slot belongs to, 0 = free */
-    char *wdata;                /* that buffer's window address, saved */
-    UINT8 wxmem;                /* and its segment */
-    char data[512];             /* the superblock, a block like any other */
-};
-
-struct sbslot sbslot[NMOUNT];
 
 /*
  * Read the super-block (block 1) on the device.
- *
- * bread() leaves the block in the buffer's own segment; the first call for
- * a device copies it into a slot and points the buffer there.  Later calls
- * find it already attached - the copy must not be repeated then, because
- * the segment copy is stale the moment the superblock is modified.
  */
 struct buf *
 getsb(dev)
     UINT dev;
 {
-    register struct buf *b;
-    register struct sbslot *s, *f;
-
-    if ((b = bread(1, dev)) == 0)
-        panic("cant get superblock");   /* should be locked in core */
-
-    f = 0;
-    for (s = sbslot; s < sbslot + NMOUNT; s++) {
-        if (s->b == b)
-            return (b);                 /* already attached */
-        if (s->b == 0 && f == 0)
-            f = s;
-    }
-    if (f == 0)
-        panic("too many superblocks");
-    di();
-    copy(bhold(b), f->data, 512);
-    brel();
-    ei();
-    f->wdata = b->data;
-    f->wxmem = b->xmem;
-    b->data = f->data;
-    b->xmem = (UINT8)((UINT)f->data >> 12);
-    f->b = b;
-    return (b);
-}
-
-/*
- * Give the superblock buffer its window mapping back and free its slot.
- * Called when the device is unmounted: the buffer returns to the pool, and
- * its data may not still be pointing at the slot.
- */
-sbrel(sb)
-    struct buf *sb;
-{
-    register struct sbslot *s;
-
-    for (s = sbslot; s < sbslot + NMOUNT; s++)
-        if (s->b == sb) {
-            sb->data = s->wdata;
-            sb->xmem = s->wxmem;
-            s->b = 0;
-            return;
-        }
+    return (bread(1, dev));
 }
 
 /*
@@ -641,10 +586,6 @@ bzero(b)
     UINT8 xmem;
 
     unhash(b);
-    /* A buffer recycled by bflush() may still be a superblock's (getsb
-     * pointed its data at a slot).  Detach it first - that is what puts
-     * its window address and segment back - and then preserve them. */
-    sbrel(b);
     data = b->data;
     xmem = b->xmem;
     zero(b, sizeof(*b));
@@ -661,15 +602,18 @@ bsync()
     register struct super *s;
 
     b = getsb(rootdev);
-    s = (struct super *)b->data;
+    s = (struct super *)bhold(b);
 
-    if (!s->s_flock) {            /* not read-only */
+    if (s->s_flock) {             /* read-only */
+        brel();
+        brelse(b);
+    } else {
         di();
         s->s_time = seconds;
         ei();
+        brel();
         bdwrite(b);
-    } else
-        brelse(b);
+    }
 
     for (b = blist; b < btop; b++)
         if ((b->flags & (BBUSY | BDELWRI)) == BDELWRI)

@@ -44,25 +44,14 @@ static UINT32 d3addr();
 #define D3DEADLINE 1            /* ticks a request may sit in flight */
 
 /*
- * The drive's timing, which the label does not carry - the same gap the
- * HD-DMA driver closes with its own constants, for the same reason
- * (docs/DISKLABEL.md).  These are the DISK 3's SPECIFY table's step and
- * settle times, in 100 us units, and the two cylinders at which writing
- * changes, both zero so the compensation is always on.
- */
-#define D3STPDEL 30             /* step pulse delay, 100 us */
-#define D3SETTLE 0              /* head settle after seek, 100 us */
-#define D3PRECOMP 0             /* cylinder where precompensation begins */
-#define D3LOWCUR 0              /* cylinder where low write current begins */
-
-/*
  * Drive configuration information, one per drive.
  *
- * The first seven fields are struct dlgeom (sys/dlabel.h), in its order
- * and of its types, because sys/dlabel.c decodes the label through a view
- * of them - disk3open passes this struct as one.  The bookkeeping below
- * them is this driver's own and may be moved freely; moving any of the
- * seven breaks the decode in a way the compiler will not report.
+ * The first thirteen fields are struct dlgeom (sys/dlabel.h), in its
+ * order and of its types, because sys/dlabel.c decodes the label through
+ * a view of them - disk3open passes this struct as one.  The timing below
+ * them is the label's too, but dllabel fills it through a struct dltiming
+ * pointer, not through the geometry view.  Moving any of the nine breaks
+ * the decode in a way the compiler will not report.
  */
 struct info
 {
@@ -71,15 +60,21 @@ struct info
     UINT8 sectors;              /* number of sectors per track */
     UINT maxblk;                /* dllabel's bound for the first slice opened */
     UINT spc;                   /* number of sectors per cylinder */
-    UINT roll;                  /* the drive's d_roll */
+    UINT roll;                  /* the slice's d_roll */
     UINT cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
+    UINT len;                   /* dllabel's slice length, in cylinders */
+
+    UINT8 step;                 /* step pulse delay, 100 us */
+    UINT8 seek;                 /* head settle after seek, 100 us */
+    UINT precomp;               /* track where precomp begins */
+    UINT lowcur;                /* track where low current begins */
 
     UINT curtrk;                /* not used: the board keeps this itself */
     UINT8 flags;                /* see below */
 
-    /* the slice table off the label, cached at open */
-    struct dslice d_slice[NSLICE];
+    /* the slice map off the label, cached at open */
+    struct slicemap sm[NSLICE];
 } disk3s[NDRIVES] = 0;
 
 /*
@@ -120,8 +115,9 @@ static UINT8 retry = 0,         /* number of retries so far */
 /*
  * Device open.  Identical to the HD-DMA's: the drive is described by its
  * label and by nothing else, so the label is read once per drive and its
- * geometry and slice table cached.  What the drive *is* comes from
- * sys/dlabel.c through the first seven fields of struct info.
+ * geometry and slice table cached.  What the drive *is* - geometry and
+ * timing both - comes from sys/dlabel.c through the first thirteen fields
+ * of struct info.
  */
 disk3open(dev, mode)
     UINT dev, mode;
@@ -146,7 +142,8 @@ disk3open(dev, mode)
     info->roll = 0;
 
     switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive,
-                    sl, (struct dlgeom *)info, info->d_slice)) {
+                    sl, (struct dlgeom *)info, info->sm,
+                    (struct dltiming *)&info->step)) {
     case -1:
         return;                 /* no such slice; dllabel set u.error */
     case 0:
@@ -190,18 +187,30 @@ disk3strat(b)
     register struct buf *b;
 {
     register struct info *info;
-    static UINT sl, off, roll, maxblk;
+    static UINT sl, off, roll, len, maxblk;
 
     info = &disk3s[b->dev & 3];
+
+    /*
+     * The first read of a drive is its label, before any geometry is
+     * known.  Install a minimal geometry so the division maps block 0 to
+     * cylinder 0; open() replaces it with the label's real geometry.
+     */
+    if (info->sectors == 0) {
+        info->heads = 1;
+        info->sectors = 1;
+        info->spc = 1;
+    }
+
     sl = devslice(b->dev);
-    if (dlslice((struct dlgeom *)info, info->d_slice, sl,
-                &off, &roll, &maxblk) || b->blk > maxblk) {
+    if (dlslice((struct dlgeom *)info, info->sm, sl,
+                &off, &roll, &len, &maxblk) || b->blk > maxblk) {
         b->flags |= BERROR;
         b->error = ENXIO;
         iodone(b);
         return;
     }
-    b->cyl = d3cyl(b->blk, info->spc, off, roll, info->tracks);
+    b->cyl = d3cyl(b->blk, info->spc, off, roll, len);
     di();
     if (d3buf == 0)
         d3buf = b;
@@ -361,19 +370,18 @@ newrw()
 /*
  * Which cylinder a filesystem block lands on - the same arithmetic the
  * HD-DMA driver uses, because the disk and the label are the same even
- * when the controller is not.  The cylinder is the block divided by the
- * sectors per cylinder, shifted by the slice's offset and rotated by the
- * drive's roll, both terms added as cylinders after the division.
+ * when the controller is not.  The block's cylinder is rotated by the
+ * slice's own roll within the slice, then shifted by the slice's offset.
  */
-d3cyl(blk, spc, off, roll, tracks)
-    UINT blk, spc, off, roll, tracks;
+d3cyl(blk, spc, off, roll, len)
+    UINT blk, spc, off, roll, len;
 {
     UINT cyl;
 
-    cyl = blk / spc + off + roll;
-    if (cyl >= tracks)
-        cyl -= tracks;
-    return cyl;
+    cyl = blk / spc + roll;
+    if (cyl >= len)
+        cyl -= len;
+    return cyl + off;
 }
 
 /*
@@ -396,14 +404,14 @@ d3specify(drive)
 {
     static UINT32 a;
 
-    d3spec.steprate = D3STPDEL;
-    d3spec.settle = D3SETTLE;
+    d3spec.steprate = d3info->step;
+    d3spec.settle = d3info->seek;
     d3spec.secsize = 512;
     d3spec.sectrk = d3info->sectors;
     d3spec.trkcyl = d3info->heads;
     d3spec.maxtrk = d3info->tracks;
-    d3spec.precomp = D3PRECOMP;
-    d3spec.reduce = D3LOWCUR;
+    d3spec.precomp = d3info->precomp;
+    d3spec.reduce = d3info->lowcur;
     d3spec.reserved = 0;
     d3spec.restracks = 0;
     d3spec.position = 0;
@@ -545,40 +553,6 @@ disk3check()
     ei();
     if (d3state == TOOLATE)
         disk3int();
-}
-
-/*
- * Enumerate the drives at signon: read each unit's label and print the
- * manufacturer, model and capacity of every drive that answers.  The major
- * is 6, from the header (sys/disk3hdr.c), and the 'c' slice names block 0.
- * A unit with nothing behind it does not answer, and the tick's watchdog
- * turns that silence into NOTRDY in a couple of seconds.
- */
-disk3probe()
-{
-    struct info *info;
-    struct buf *b;
-    struct dlabel *lp;
-    char *p;
-    UINT dev, unit;
-    UINT mb;
-
-    for (unit = 0; unit < NDRIVES; unit++) {
-        info = &disk3s[unit];
-        dev = (6 << 8) | (DL_WHOLE << 5) | unit;
-        if (dllabel(dev, DL_WHOLE, (struct dlgeom *)info, info->d_slice) != 1)
-            continue;
-        b = bread(0, dev);
-        if (b == 0)
-            continue;
-        p = bhold(b);
-        lp = (struct dlabel *) &p[DL_OFFSET];
-        mb = (UINT) ((UINT32) info->tracks * info->heads * info->sectors >> 11);
-        pr("disk3%d: %s %s, %d MB\n", unit, lp->d_mfg, lp->d_model, mb);
-        brel();
-        brelse(b);
-    }
-    return (0);
 }
 
 /*

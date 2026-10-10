@@ -422,21 +422,20 @@ main(argc, argv)
     base = modbase();
 
     /*
-     * The slot is a hole in the kernel's text, at a page boundary: its
+     * The slot is a hole in the kernel's data, at a page boundary: its
      * whole segment has to be the driver's page and nothing else.  The
      * alignment that matters is the address, not the file offset - a
-     * text address maps to the file by 16 + (addr - textoff), so an
-     * aligned address gives an offset 16 bytes past a boundary.
+     * data address maps to the file by 16 + text + (addr - dataoff).
      */
     slotaddr = symaddr(SLOTSYM);
     if (slotaddr < 0) {
         slot = -1;
     } else {
-        if (slotaddr < k_textoff || slotaddr >= k_dataoff)
-            die(SLOTSYM " is not in the text segment");
+        if (slotaddr < k_dataoff || slotaddr >= k_dataoff + k_data)
+            die(SLOTSYM " is not in the data segment");
         if (slotaddr & (PAGESZ - 1))
             die(SLOTSYM " is not page aligned");
-        slot = (long) HDRLEN + (slotaddr - k_textoff);
+        slot = (long) HDRLEN + k_text + (slotaddr - k_dataoff);
     }
 
     say(STDOUT, argv[1]);

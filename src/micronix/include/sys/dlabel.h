@@ -3,244 +3,146 @@
  *
  * include/sys/dlabel.h
  *
- * A Micronix hard disk used to describe itself nowhere: the geometry came
- * out of a table in the driver, specs[], keyed by the type bits of the
- * minor number, and everything - where the superblock is, where the boot
- * area is, how a block becomes a cylinder - came out of that.  Two
- * programs that disagreed about the table did not fail, they read and
- * wrote different disks while both reporting success.
+ * A Micronix disk is self-describing.  There is exactly one place on it
+ * that can be found knowing nothing at all - cylinder 0, head 0, sector
+ * 0, the sector the rom reads to boot - and that is where this label
+ * lives, in the second half of the boot sector.  From it a driver learns
+ * everything it needs to drive the disk without a table: the geometry,
+ * the drive's timing, where its filesystems and swap live, and how to
+ * boot it.  This is one format shared by every block driver (mw, ide,
+ * ncr, dj, disk2, disk3, hdca), decoded once in sys/dlabel.c.
  *
- * It is worse than it sounds, because sys/mw.c does not put block 0 at
- * cylinder 0.  It rotates by half the cylinder count, so the superblock
- * - filesystem block 1, the thing you would look for first - lives at
- * physical cylinder 76 on a five meg drive and 153 on a ten.  Nothing
- * outside the kernel can find it without already knowing which drive it
- * is looking at.
- *
- * There is exactly one place on the device that can be found knowing
- * nothing at all: cylinder 0, head 0, sector 0, because that is what the
- * rom reads to boot.  So that is where the description goes.  mkfs owns
- * that sector - it reserves the whole cylinder for the boot - and the
- * boot code needs the first half of it, so the label takes the second.
- *
- * What that buys, in the order it matters:
- *
- *	mkfs records the geometry it believed, so a disagreement with
- *	what the driver maps is detectable rather than silent
- *
- *	host tools can read a hard disk image at all, and the first
- *	ones could only do it by carrying a copy of the driver's table
- *
- *	the first level boot can check it before loading anything - it
- *	is already holding this sector
- *
- * The label describes everything relative to cylinder 0, which is the
- * most self description this format can support without changing what a
- * v6 filesystem looks like.
- *
- * What a disk says about its filesystems is a table of slices: eight of
- * them, lettered a through h, each an offset and a length in cylinders.
- * They may overlap and nothing is checked - a slice is a window on the
- * drive, and two filesystems over one region is the operator's error and
- * always was.  The one slice the table does not place is 'c', the whole
- * disk including this label: it starts at cylinder 0 and is never rolled
- * (DL_WHOLE), so its block 0 is the sector the rom reads, on every disk.
- * Block 0 is never part of a filesystem, so the label sits outside every
- * filesystem on the disk and cannot be destroyed by making one.
- *
- * The boot is not a slice but an attribute of the drive, because not
- * every block device wants one: how many blocks below the filesystems it
- * owns, and which slice it loads its filesystem from.  Every disk made
- * before the table existed carries an empty one, and an empty table has
- * no other reading than one slice covering the whole drive - which is
- * d_roll below doing today's exact mapping.  So the old disks need
- * nothing done to them, and no reader branches on d_version: the
- * generation is in the values.
+ * The label is the drive speaking, not the controller: geometry and
+ * timing are properties of the drive, so both are here.  A drive that
+ * has no label has no geometry, and the only operations possible on it
+ * are labelling and formatting, through its whole-disk slice 'c'.
  */
 
 #define DL_OFFSET   256         /* into the boot sector, the second half */
 #define NSLICE      8           /* a through h */
 
 /*
- * 'c', the whole drive, and the one slice whose position is not in the
- * table above it: cylinder 0, no roll, to the end of the drive.  So its
- * block 0 is device block 0 - the sector the rom reads, and the one this
- * label is in - and a program holding the drive's 'c' can read the label
- * without knowing anything the label would tell it.  That is what makes
- * the label maintainable: the tool opens hd0c, reads block 0, and has
- * the geometry; without it the tool would need the geometry to find the
- * geometry.
- *
- * Nothing that exists today reads 'c': the minor numbers in use name the
- * filesystems, and a rolled disk's is 'a'.  What changes is what an
- * unwritten 'c' entry means - zero and zero used to be the whole drive
- * rolled like every other entry, and is now the whole drive from
- * cylinder 0.
+ * What a slice is used for.  A filesystem and a swap area are the two
+ * things a slice can hold; anything else is unused.  'c', the whole
+ * disk, is always unused.
+ */
+#define SL_UNUSED   0
+#define SL_FS       1           /* a v6 filesystem */
+#define SL_SWAP     2           /* a swap area */
+
+/*
+ * 'c', the whole drive, and the one slice whose extent is not in the
+ * table: it starts at cylinder 0 and is never rolled, so its block 0 is
+ * device block 0 - the sector the rom reads, and the one this label is
+ * in.  That is what makes the label maintainable: a tool opens hd0c,
+ * reads block 0, and has the geometry, without needing the geometry to
+ * find the geometry.
  */
 #define DL_WHOLE    2
 
 /*
- * One slice: a window on the drive, in cylinders.  A length of zero is
- * the whole disk from d_off on, which is what an unwritten entry means
- * and therefore what every disk that predates this table carries.  An
- * offset in cylinders and not in blocks is the point: a block number is
+ * One slice: a window on the drive, in cylinders.
+ *
+ * d_off and d_len place it; a length of zero means "not carved yet", so
+ * a freshly formatted disk's table carries types and no extents.  The
+ * offset is in cylinders and not in blocks on purpose: a block number is
  * 16 bits and a drive's worth of them is not, so a slice's position is
  * added after the division that turns a block into a cylinder and never
  * has to be a block number at all.
+ *
+ * d_roll rotates the mapping within the slice, so a filesystem can put
+ * its inode table in the middle of its platter region rather than at the
+ * edge; zero, the ordinary case, is no rotation.
+ *
+ * d_type is one byte, what the slice is for (above).  d_resv keeps the
+ * entry eight bytes so the next entry's word fields stay aligned, and is
+ * reserved.
  */
 struct dslice {
     UINT d_off;                 /* where it starts, in cylinders */
-    UINT d_len;                 /* how many cylinders, 0 = to the end */
+    UINT d_len;                 /* how many cylinders, 0 = not carved */
+    UINT d_roll;                /* rotation within the slice, 0 = none */
+    UINT8 d_type;               /* SL_FS, SL_SWAP, or SL_UNUSED */
+    UINT8 d_resv;               /* reserved, keeps the entry 8 bytes */
 };
 
 struct dlabel {
     char d_magic[4];            /* DL_MAGIC, readable in a hex dump */
-    UINT d_version;             /* of this structure */
+    UINT d_version;             /* of this structure, DL_VERSION */
 
     /*
-     * The drive, as mkfs understood it.  A reader that disagrees with
+     * The drive, as the formatter wrote it.  A reader that disagrees with
      * these has found the wrong drive or the wrong table, and should say
      * so rather than carry on.
      */
     UINT d_tracks;              /* cylinders */
     UINT d_heads;
-    UINT d_spt;                 /* 512-byte sectors (blocks) per track;
-                                 * see the size note below - the physical
-                                 * sector size is not carried */
-
-    /*
-     * The physical sector size is not a field, and that is deliberate
-     * for the kernel: it asks the drive (sys/dj.c's status read) rather
-     * than believe the medium.  d_spt counts blocks, so a 1K medium's
-     * five sectors read as ten.  The boot loader has no drive to ask, so
-     * it infers the size from d_spt and d_firstsec against the DJ-DMA's
-     * own tables - a soft sectored track of ten or sixteen blocks is
-     * 1024 bytes and everything else is 512 - which is the inference
-     * stand/boot/djio.c writes down and checks.
-     */
-
-    /*
-     * The boot, written out rather than re-derived, because the deriving
-     * is where the mistakes happen.  d_cyl0 is the filesystem block that
-     * sits at physical cylinder 0 - block 5236 of 10404 on a five meg -
-     * and it is where the boot area begins on a rolled disk; d_bootblks
-     * is how many blocks of it the boot owns.
-     *
-     * The boot belongs to the drive and not to any slice.  Device block 0
-     * is the one address that needs no geometry - it is where the first
-     * level is and where this label is - and a boot laid out below the
-     * filesystems owns blocks from there.  Zero says the drive has no
-     * boot, which is an ordinary thing for a data disk to be.
-     */
-    UINT d_cyl0;
-    UINT d_bootblks;            /* how many blocks of it the boot owns */
-
-    /*
-     * The rotation itself, so that a reader can map any block and not
-     * just find the boot.  sys/mw.c computes
-     *
-     *	cyl = blk / spc + d_roll, wrapped at d_tracks
-     *
-     * and today d_roll is tracks >> 1.  It is recoverable from d_cyl0
-     * and the geometry, but only by inverting that - which is the step
-     * this whole structure exists to stop people doing.  A driver
-     * reading its geometry from here needs this field, not a derivation.
-     *
-     * It stays a field under the slice table as well, and is not
-     * vestigial: a rolled disk describes itself with it and an empty
-     * table, and a slice's offset is added to it rather than replacing
-     * it.  On a sliced disk it is zero.
-     */
-    UINT d_roll;
-
-    /*
-     * And the filesystem that was made on it.
-     */
-    UINT d_fsize;               /* blocks in the filesystem */
-    UINT d_isize;               /* blocks of inodes */
-
-    /*
-     * Which slice the boot loads its filesystem from.  Appended with the
-     * table below, so a label written before either existed reads zero
-     * here, which is slice 'a'.  The boot's extent is d_bootblks above,
-     * and nothing inside a filesystem is the boot: the root filesystem
-     * holds neither the boot nor this label in band.
-     */
-    UINT d_bootslice;
-
-    /*
-     * The filesystems, a through h.  Appended, so a label written before
-     * the table existed reads as all zero, and all zero is one slice
-     * covering the drive: the rolled layout above, which is why a disk
-     * the older code made needs nothing done to it.
-     */
-    struct dslice d_slice[NSLICE];
+    UINT d_spt;                 /* 512-byte sectors (blocks) per track */
 
     /*
      * The number of the first sector on a track, which is not always
-     * zero and is not derivable from the geometry above: a soft sectored
+     * zero and is not derivable from the geometry: a soft sectored
      * medium numbers its sectors from one and a hard sectored one from
-     * zero, and that is a property of the medium - whether the sectors
-     * are marked by index holes in the jacket or written into the track
-     * - not of how many there are.
-     *
-     * The kernel gets this from the drive: sys/dj.c reads the drive
-     * characteristics byte, sees that a soft sectored diskette has no
-     * format table to look in because it names no configuration, and
-     * sets ORG1 from that.  The loader has nothing to ask - the rom has
-     * already read the boot sector and the controller knows only what it
-     * is told - so the medium says it here instead.  A loader that
-     * ignores this reads every sector one place out on a soft sectored
-     * diskette, and invents a sector past the end of every track.
-     *
-     * Appended, so a label written before this field existed reads zero,
-     * which is the right answer for a hard disk and for a hard sectored
-     * diskette, and is what the five rolled rows in cmd/mkfs write.
+     * zero.  The kernel gets this from the drive (sys/dj.c); the loader
+     * has nothing to ask, so the medium says it here.
      */
     UINT d_firstsec;
 
     /*
-     * What the drive calls itself, written by the formatter (mwformat,
-     * hdformat, and mnix's initialize, which stands in for the first) so
-     * a labelled drive can be identified without a table.  Both are
-     * NUL-terminated and the rest of each field is zero, and a label
-     * written before these fields existed reads as two empty strings -
-     * which is the honest answer then, when no formatter wrote a name.
-     * There is room for them because the label owns the whole second half
-     * of the boot sector, and the structure above uses sixty of its two
-     * hundred and fifty-six bytes.
+     * The drive's timing - properties of the drive, not the controller,
+     * so the drive carries them.  d_step is the step pulse delay and
+     * d_seek the head settle time after a seek, both in 100 us.  d_precomp
+     * and d_lowcur name the cylinder where write precompensation begins
+     * and the one where the write current drops to its low setting;
+     * 0xffff means the drive wants neither.
+     */
+    UINT8 d_step;
+    UINT8 d_seek;
+    UINT d_precomp;             /* 0xffff = never */
+    UINT d_lowcur;              /* 0xffff = never */
+
+    /*
+     * The boot, which is an attribute of the drive and not of any slice.
+     * d_bootblks is how many blocks the boot owns from device block 0
+     * (0 = no boot), and d_bootslice is the slice it loads its
+     * filesystem from.  Nothing inside a filesystem is the boot.
+     */
+    UINT d_bootblks;
+    UINT d_bootslice;
+
+    /*
+     * The filesystems and swap, a through h.
+     */
+    struct dslice d_slice[NSLICE];
+
+    /*
+     * What the drive calls itself, written by the formatter so a
+     * labelled drive can be identified without a table.  Both are
+     * NUL-terminated and the rest of each field is zero.
      */
     char d_mfg[16];             /* manufacturer, e.g. "Maxtor" */
     char d_model[16];           /* model number, e.g. "XT-1140" */
 };
 
-#define DL_MAGIC    "MWDL"      /* Morrow Winchester disk label */
-#define DL_VERSION  1           /* 1 = the roll idiom, 2 = the slice idiom;
-                                 * consulted by tools, which must know
-                                 * whether an inode owns the boot */
-#define DL_VERS_SLICE 2         /* the slice idiom's version, written by
-                                 * whoever writes a table: a diskette, and
-                                 * any hard disk cmd/label gives a table.
-                                 * Spelled short because ccc keeps fifteen
-                                 * significant characters and silently
-                                 * drops a longer macro: DL_VERSION_SLICE
-                                 * is one too many, and comes out as an
-                                 * undefined symbol at use and a
-                                 * truncated one at the definition. */
+#define DL_MAGIC    "MWDL"      /* Micronix disk label */
+#define DL_VERSION  3           /* the slice + timing + type format */
 
 /*
  * The geometry a driver needs to map a block: the label as the kernel
- * uses it, rather than as the disk carries it.  sys/mw.c's struct info
- * and sys/ide.c's each begin with these seven fields, in this order and
- * of these types, and the decode below writes through this view of them
- * - so neither driver copies a field in or out, and neither gives up its
- * own names for its own struct.
+ * uses it, rather than as the disk carries it.  Every block driver's
+ * struct info (or struct hd) begins with these fields, in this order and
+ * of these types, and sys/dlabel.c writes through this view of them - so
+ * no driver copies a field in or out, and none gives up its own names for
+ * its own struct.
+ *
+ * maxblk, spc, roll, cylstart and len are not in the label; they are
+ * decoded from it for the slice being mapped.
  *
  * Three structures and one agreement, and the compiler checks none of
  * it: a driver that reorders or widens a field above its own stops
  * agreeing with this one, and what breaks is the geometry - a seek that
- * lands somewhere else - not the build.  Both drivers say so where their
- * structs are defined.
+ * lands somewhere else - not the build.  Each driver says so where its
+ * struct is defined.
  */
 struct dlgeom
 {
@@ -249,32 +151,57 @@ struct dlgeom
     UINT8 sectors;              /* sectors per track */
     UINT maxblk;                /* highest legal block number in a slice */
     UINT spc;                   /* sectors per cylinder */
-    UINT roll;                  /* what a block's cylinder is rotated by */
+    UINT roll;                  /* the slice's d_roll */
     UINT cylstart;              /* first cylinder of the slice */
     UINT8 firstsec;             /* first sector number on a track */
+    UINT len;                   /* the slice's length, in cylinders */
+};
+
+/*
+ * The drive's timing, decoded from the label.  It is not part of
+ * struct dlgeom above: it is how a drive is driven, not how a block is
+ * mapped, and only the MFM drivers - mw.c and disk3.c - command it.  The
+ * drivers whose controller finds the sector itself (ide, ncr) and the
+ * diskette (dj, disk2) read it and drop it.  dllabel() fills *tm only
+ * when the caller passes one.
+ */
+struct dltiming
+{
+    UINT8 step;                 /* step pulse delay, 100 us */
+    UINT8 seek;                 /* head settle after seek, 100 us */
+    UINT precomp;               /* where write precomp begins, 0xffff never */
+    UINT lowcur;                /* where low write current begins, 0xffff never */
+};
+
+/*
+ * One slice, as a driver caches it: the offset, length and roll it needs
+ * to map a block.  The label's own entry carries a type and a reserved
+ * byte beside these, which a driver has no use for - the type belongs to
+ * the tools that read the label - so the cache is this smaller thing.
+ */
+struct slicemap
+{
+    UINT sm_off;                /* where it starts, in cylinders */
+    UINT sm_len;                /* how many cylinders, 0 = not carved */
+    UINT sm_roll;               /* rotation within the slice, 0 = none */
 };
 
 /*
  * Read the disk label from block 0 of cdev and set *g to the geometry of
- * slice sl.
+ * slice sl.  table, when given, is the cached slice map; tm, when given,
+ * is filled with the drive's timing.
  *
  * cdev is the drive's own 'c', which the caller builds out of the dev it
  * was opened with.  That is the whole reason the label can be read at
  * all: 'c' is the one slice that consults no table, starting at cylinder
- * 0 and never rolled, so its block 0 is device block 0 - the sector the
- * rom reads and this label is in - on every disk.  It is read as the
- * disk block it is, through the buffer cache and released, so that the
- * label and the sector it sits in are one object rather than two copies
- * of one.
+ * 0 and never rolled, so its block 0 is device block 0 on every disk.
  *
- * On entry *g holds what the caller knows of the drive - mw.c's row of
- * its table, or nothing at all - and the return value says what it holds
- * on return:
+ * On entry *g holds what the caller knows of the drive, and the return
+ * value says what it holds on return:
  *
  *	1   the label was read; *g describes slice sl
- *	0   no label on the drive; *g is the caller's own geometry, placed
- *	    as an empty slice table places it, which is the whole drive.
- *	    A caller that knew nothing is left with spc and maxblk zero,
+ *	0   no label on the drive; *g is the caller's own geometry.  A
+ *	    caller that knew nothing is left with spc and maxblk zero,
  *	    which maps block 0 and nothing else - all that can be told
  *	    about a drive nothing is known about, and what a labeler
  *	    needs.
@@ -284,9 +211,10 @@ struct dlgeom
 extern int dllabel();
 
 /*
- * Decode one slice of a drive against its cached table: offset in
- * cylinders, roll (0 for 'c'), and highest legal block number.  Returns
- * 0, or ENXIO for a slice that runs off the drive.
+ * Decode one slice of a drive against its cached map: offset in
+ * cylinders, roll (0 for 'c'), length, and highest legal block number.
+ * Returns 0, or ENXIO for a slice that is not carved or runs off the
+ * drive.
  */
 extern int dlslice();
 

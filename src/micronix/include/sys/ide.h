@@ -1,3 +1,5 @@
+#include <sys/ints.h>
+
 /*
  * IDE controller
  *
@@ -31,7 +33,7 @@
  * object (sys/idehdr.c), so the number is here rather than beside the
  * driver.
  */
-#define IDEINT  2
+#define IDEINT  INT_IDE
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

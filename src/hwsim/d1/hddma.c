@@ -27,6 +27,7 @@
 
 #include "sim.h"
 #include "hwsim.h"
+#include "vimap.h"
 #include "util.h"
 #include "imd.h"
 #include <sys/types.h>
@@ -34,7 +35,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-#define HDDMA_INTERRUPT 0
+#define HDDMA_INTERRUPT VI_HDDMA
 
 #define	HDDMA_PORT 	0x55	// hddma attention port
 #define	HDDMA_RESET	0x54	// hddma reset port

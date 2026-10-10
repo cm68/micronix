@@ -29,6 +29,11 @@ SRCDIR	= /usr/src/sys
 
 TARGET	= unix
 
+# Both kernels link from one set of objects.  unix is the CAS-vectored
+# two-MultIO kernel (the d1's default), punix the polled Wunderbus one;
+# they differ only in the slave PIC fold in highmem.o/phighmem.o.
+TARGETS	= punix
+
 # the kernel includes its own headers, not the C library's.  -i, as
 # the native Makefile beside this has always done.
 INC	= -i$(DEPTH)/include
@@ -56,9 +61,10 @@ MODS	= dj mw ide ncr hdca
 # kernel: their objects build (so the compiler checks them, "make objects")
 # but they are not in MODS, so nothing links them into unix.
 STAGED	= disk3 disk2
-GENERATED = build.h unix.link $(MODS:%=%.mod) $(MODS:%=%.page) \
+GENERATED = build.h unix.link punix.link $(MODS:%=%.mod) $(MODS:%=%.page) \
 	$(MODS:%=%.o) $(MODS:%=%hdr.o) \
-	$(STAGED:%=%.o) $(STAGED:%=%hdr.o)
+	$(STAGED:%=%.o) $(STAGED:%=%hdr.o) \
+	slavepic_polled.o slavepic_vectored.o
 
 # The compiler and linker are this tree's own.  CCC defaults to
 # $(BIN)/mxccc in GNUmakefile.inc; the linker mxld is beside it.
@@ -95,7 +101,7 @@ LEAF_LIBC = csv.o idiv.o imul.o qadd.o qsub.o \
 	qand.o qor.o qcmp.o qshl.o qsar.o qshr.o \
 	qmul.o qinc.o \
 	qldst.o tramp.o swdisp.o swdispw.o oarg.o
-LEAF_AS   = mem.o inout.o sub8.o unixtobcd.o $(LEAF_LIBC)
+LEAF_AS   = mem.o inout.o sub8.o unixtobcd.o slavevec.o $(LEAF_LIBC)
 # Kernel C that also lives in the u page: the read-only tables (syssw,
 # biosw, ciosw) and the bus lock two driver modules share.  rtc.o was
 # here too - it is pure code with no static data, so it could be folded
@@ -128,13 +134,33 @@ bus.o: bus.c
 	$(MXLD) -r -Sdata -o bus.o bus.rel
 	rm -f bus.rel
 
-KERNEL_AS = uhdr.o intrpt.o mio.o textpad.o highmem.o
-KERNEL_C  = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
+KERNEL_AS_OBJ = uhdr.o intrpt.o mio.o textpad.o
+KERNEL_AS     = $(KERNEL_AS_OBJ) highmem.o phighmem.o
+KERNEL_C      = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o malloc.o name.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
 	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o rtc.o
-WIN_C     = open.o sys2.o rdwri.o memdev.o link.o access.o
-HIGHMEM   = main_init.o cus.o inits.o djinit.o ncrinit.o
+WIN_C         = open.o sys2.o rdwri.o memdev.o link.o access.o
+HIGHMEM_C_OBJ = main_init.o cus.o djinit.o ncrinit.o
+HIGHMEM_AS_OBJ = inits.o unbcd.o
+HIGHMEM       = $(HIGHMEM_C_OBJ) $(HIGHMEM_AS_OBJ)
+
+# The generic .c and .s objects, named outright so that a stray generated
+# .s sitting beside a .c (ccc -s leaves one for reading) cannot shadow the
+# .c the way a wildcard "%.o : %.s" would.  These two rules are the whole
+# of it; every other object has a rule of its own below.
+$(KERNEL_C) $(WIN_C) $(HIGHMEM_C_OBJ) user.o \
+	$(MODS:%=%.o) $(MODS:%=%hdr.o) $(STAGED:%=%.o) $(STAGED:%=%hdr.o): %.o: %.c
+	$(CCC) $(CCFLAGS) $(INC) -c $<
+
+$(KERNEL_AS_OBJ) $(LEAF_AS) $(HIGHMEM_AS_OBJ): %.o: %.s
+	$(CCC) $(CCFLAGS) -c $<
+
+# The slave PIC bring-up (sys/slavepic.c) is the one thing that differs
+# between a polled and a CAS-vectored two-PIC kernel, and it folds into
+# highmem.o twice: highmem.o is the vectored fold (unix), phighmem.o the
+# polled one (punix).  The driver modules and the whole rest of the kernel
+# build once and are shared by both images.
 # dj, mw, ide and ncr are not here: they are driver modules, linked at
 # OVLBASE and stamped into the slot (the module rules below).  Their
 # header objects are named on the module links and no longer in the
@@ -177,27 +203,32 @@ endif
 # kernel's address space a driver module is mapped into, and OVLBASE is
 # where that is.  One variable, passed to the C and used by the module
 # links below, because the two have to agree and a segment that moved on
-# one side only would be a module mapped nowhere.  The segment is a
-# property of the build and not a choice: it is the page just past the
-# end of the resident text, so it moves when the text grows past its
-# page, and this is the place it moves.
+# one side only would be a module mapped nowhere.  The segment is a fixed
+# page (0xc000), not the page past the resident text: the text and the
+# resident data run 0x1000 up to _ebss, and the driver page sits above the
+# buffer pool, just below the scratch window at 0xd000.
 #
-# The frame is opened by OVLDATA, one page above OVLBASE: the final link
-# is told the data segment starts there and ovlslot.o is linked at
-# OVLBASE, so the page between them is the slot - text with nothing in it
-# but the slot object, data below it at its own page, and so a page that
-# can be overwritten with a driver without disturbing anything.  ovlslot.o
-# is what makes the text reach that far: the linker sizes the text segment
-# by its last object, so a slot that were only a gap in the addresses
-# would be a slot the file has no bytes for and setdev nothing to write
-# onto.
+# ovlslot.o is a data page at OVLBASE (folded -Sdata), the way win.o and
+# upage.o are: the final link places it at OVLBASE among the data, and
+# setdev overwrites it with the root driver.  The data segment itself
+# follows the text (-Ttext with no -Tdata), so there is no separate data
+# origin to name.
 #
-OVLSEG  = 9
+OVLSEG  = 12
 OVLBASE = $(shell printf 0x%x $$(( $(OVLSEG) * 4096 )))
-OVLDATA = $(shell printf 0x%x $$(( ($(OVLSEG) + 1) * 4096 )))
 PAGESZ  = 4096
 OVLSLOT = ovlslot.o
 CCFLAGS += -DOVLSEG=$(OVLSEG)
+
+#
+# The interrupt topology (include/sys/ints.h).  The d1 has two 8259s - the
+# Wunderbus master and the add-on MultIO slave.  N8259 (the PIC count) is
+# still a build flag - a single-board kernel overrides it with -DN8259=1 -
+# but whether the slave is polled or CAS-vectored is no longer one: that
+# is the one difference in sys/slavepic.c, built both ways below and
+# chosen at the highmem link, so flipping it recompiles nothing else.
+#
+CCFLAGS += -DN8259=2
 
 #
 # Every object: the ones "all" links into unix, the ones folded into one
@@ -293,8 +324,21 @@ upage.o: $(LEAF_AS) $(LEAF_C) user.o
 # reach it, so the page it occupies is the page it holds for the whole
 # boot.  Split out, the init is reclaimed instead, and the page holds
 # only what running the driver needs.
-highmem.o: main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o
-	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o
+# highmem.o is the vectored fold, phighmem.o the polled one - the two
+# differ only in which slave PIC object is folded in, so the rest of the
+# kernel (and the driver modules) builds once and both images link from
+# it.  The two slave PIC variants come from the one file; ccc's -c names
+# the object, so they live side by side.
+highmem.o: main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o slavepic_vectored.o
+	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o slavepic_vectored.o
+
+phighmem.o: main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o slavepic_polled.o
+	$(MXLD) -r -Sdata -o phighmem.o main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o slavepic_polled.o
+
+slavepic_polled.o: slavepic.c
+	$(CCC) $(CCFLAGS) $(INC) -DN8259_POLLED=1 -c -o $@ $<
+slavepic_vectored.o: slavepic.c
+	$(CCC) $(CCFLAGS) $(INC) -DN8259_POLLED=0 -c -o $@ $<
 
 # win.o is the window-page cluster: the part of the resident kernel that
 # can live at BUFSEG, in the very page bhold() maps buffers into, so its
@@ -339,30 +383,25 @@ low.o: uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
 # ovlslot.o is the overlay slot (sys/ovlslot.s): one page of text at
 # OVLBASE, which setdev later writes the root driver's page onto.  The
 # -r link is what holds it at that address.  Assembled, the object is an
-# ordinary one - the slot is wherever the assembler's section starts,
-# which is the assembler's business, not the kernel's - and -Ttext says
-# where that is, so the object's own header carries the page and mxld's
-# final link places it there instead of packing it after the resident
-# text.  win.o and upage.o are the same trick on the data side; there is
-# no way to say it in the assembly, because asz's .align counts from the
-# start of the section it is assembling and this address is a property
-# of the link.
+# ordinary one, and -Tdata says where the data segment starts, so the
+# object's own header carries the page and mxld's final link places it
+# there.  win.o and upage.o are the same trick; the slot is data now
+# because 0xc000 is above the resident data, not the page past the text.
 ovlslot.o: ovlslot.s
 	$(CCC) $(CCFLAGS) -c -o ovlslot.rel $<
-	$(MXLD) -r -Ttext=$(OVLBASE) -o ovlslot.o ovlslot.rel
+	$(MXLD) -r -Sdata -Tdata=$(OVLBASE) -o ovlslot.o ovlslot.rel
 	rm -f ovlslot.rel
 
 #
 # the final link: five objects, in the order the image wants them, and
 # nothing here is a special case (see the kernel section above).
-# highmem.o precedes win.o because it is unplaced and parked at _ebss,
-# win.o precedes upage.o because 0xe000 is below 0xf000, and ovlslot.o
-# is last because it is the top of the text.
+# highmem.o precedes ovlslot.o because it is unplaced and parked at _ebss,
+# ovlslot.o precedes win.o because 0xc000 is below 0xe000, and win.o
+# precedes upage.o because 0xe000 is below 0xf000.
 #
-# -Tdata is what opens the overlay frame: the data segment starts at
-# OVLDATA, one page above the slot, and the linker pads the text out to
-# reach it.  Without it the data would start at the end of the resident
-# text, which is inside the slot.
+# The link is -Ttext=0x1000 with no -Tdata, so the data follows the text
+# and runs up to _ebss, below the driver page at 0xc000; the driver page
+# is a fixed data page like win.o and upage.o, not the top of the text.
 #
 # The output is unix.link and not unix, because unix is the *bootable*
 # image: this link has an empty slot and no modules behind it, so it
@@ -372,7 +411,13 @@ ovlslot.o: ovlslot.s
 # against - is this file with the module pages on the end and a driver
 # stamped into the slot.
 unix.link: $(OBJS)
-	$(MXLD) -Ttext=0x1000 -Tdata=$(OVLDATA) -Shigh -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix.link low.o highmem.o win.o upage.o $(OVLSLOT)
+	$(MXLD) -Ttext=0x1000 -Shigh -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix.link low.o highmem.o $(OVLSLOT) win.o upage.o
+
+# punix is unix with the polled highmem fold.  The driver modules are the
+# same for both - they resolve only resident symbols, which do not move
+# between the two - so punix reuses unix's .page files.
+punix.link: $(OBJS)
+	$(MXLD) -Ttext=0x1000 -Shigh -L$(HOSTROOT)/ccc/lib -lccc -lc -o punix.link low.o phighmem.o $(OVLSLOT) win.o upage.o
 
 #
 # Driver modules, and the bootable image they go into.
@@ -451,6 +496,13 @@ unix: unix.link $(MODS:%=%.page)
 	cat $(MODS:%=%.page) >> $@
 	$(SETDEV) -i $@
 
+punix: punix.link $(MODS:%=%.page)
+	cp punix.link $@
+	@sz=`wc -c < $@`; \
+	 truncate -s $$(( (sz + $(PAGESZ) - 1) / $(PAGESZ) * $(PAGESZ) )) $@
+	cat $(MODS:%=%.page) >> $@
+	$(SETDEV) -i $@
+
 #
 # Generate the assembly ccc would assemble for a C file, for reading:
 # "make system.s" writes system.s beside system.c, peepholed exactly as
@@ -467,4 +519,4 @@ unix: unix.link $(MODS:%=%.page)
 %.s : %.c
 	$(CCC) $(CCFLAGS) $(INC) -s $<
 
-.PHONY: objects unix build.h
+.PHONY: objects unix punix build.h

@@ -475,10 +475,12 @@ static struct ideif boards[] = {
  * itself - so that table, and the warning mw.c raises when the table
  * disagrees with the label, have nothing to do here.
  *
- * The first seven fields are struct dlgeom (sys/dlabel.h), in its order
+ * The first nine fields are struct dlgeom (sys/dlabel.h), in its order
  * and of its types, because sys/dlabel.c decodes the label through a
- * view of them - ideopen passes this struct as one.  The bookkeeping
- * below them is this driver's own; moving any of the seven breaks the
+ * view of them - ideopen passes this struct as one.  The label's timing
+ * is read and dropped: a drive with its own controller is told none of
+ * it - it takes an LBA and finds the sector itself.  The bookkeeping
+ * below them is this driver's own; moving any of the nine breaks the
  * decode in a way the compiler will not report.
  */
 struct info
@@ -489,17 +491,18 @@ struct info
 
     UINT maxblk;                /* dllabel's bound for the first slice opened */
     UINT spc;                   /* sectors per cylinder */
-    UINT roll;                  /* the drive's d_roll */
+    UINT roll;                  /* the slice's d_roll */
     UINT cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
+    UINT len;                   /* dllabel's slice length, in cylinders */
     UINT8 flags;                /* see below */
 
     /*
-     * The slice table off the label, cached at open.  A buffer's minor
+     * The slice map off the label, cached at open.  A buffer's minor
      * names its slice; idestrat looks the offset and length up here, so
      * every slice of a drive maps at once instead of one open's.
      */
-    struct dslice d_slice[NSLICE];
+    struct slicemap sm[NSLICE];
 } ides[NDRIVES] = 0;
 
 #define OPEN    2               /* drive is open */
@@ -770,28 +773,21 @@ idereset(ip, unit)
  *         = cyl * heads * spt + (csec / spt) * spt + csec % spt
  *         = cyl * spc + csec
  *
- * The block is cylraw * spc + csec for its unwrapped cylinder, so the
- * difference between the two is (cyl - cylraw) * spc - a constant number
- * of blocks, (cylstart + roll) * spc, less tracks * spc when the
- * rotation wraps past the end of the drive.  Those two are computed here,
- * of the geometry the drive holds at this moment, rather than kept in its
- * struct: sys/dlabel.c reads the label through this very mapping and
- * rewrites the geometry as it does, so a copy kept across calls is one
- * the label read itself invalidates - and the second open of a drive read
- * its label from the block the first open's mapping named, found none
- * there, and refused the drive.
- *
- * The compare is the wrap test itself: cyl >= tracks exactly when
- * cyl * spc + csec >= tracks * spc, because csec < spc.  The single
- * subtraction mirrors the single one the cylinder's own arithmetic does,
- * so a mapping asked for more than one wrap past the end is out of range
- * here in the same way and by the same amount.
+ * The block is a filesystem block and stays one: the slice's cylinder
+ * offset and its own rotation are applied here, after the division that
+ * turns a block into a cylinder.  The rotation wraps within the slice
+ * (at its length), then the slice's offset is added, and the whole is
+ * flattened to an LBA as cyl * spc + csec.  The single subtraction
+ * mirrors the single one the cylinder arithmetic does, so a mapping
+ * asked for more than one wrap past the end is out of range the same
+ * way and by the same amount.
  */
 static UINT32
-idelba(blk, spc, cylstart, roll, tracks)
-    UINT blk, spc, cylstart, roll, tracks;
+idelba(blk, spc, cylstart, roll, len)
+    UINT blk, spc, cylstart, roll, len;
 {
-    static UINT32 lba, trackblks;
+    static UINT32 lba;
+    static UINT cyl;
 
     /*
      * A drive opened with no label has no geometry and permits block 0
@@ -801,10 +797,10 @@ idelba(blk, spc, cylstart, roll, tracks)
      */
     if (spc == 0)
         return (0);
-    lba = (UINT32)blk + ((UINT32)cylstart + roll) * spc;
-    trackblks = (UINT32)tracks * spc;
-    if (lba >= trackblks)
-        lba -= trackblks;
+    cyl = blk / spc + roll;
+    if (cyl >= len)
+        cyl -= len;
+    lba = (UINT32)(cyl + cylstart) * spc + (UINT32)(blk % spc);
     return (lba);
 }
 
@@ -858,7 +854,7 @@ ideopen(dev, mode)
      * minor devlist holds.
      */
     switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive,
-                    sl, (struct dlgeom *)info, info->d_slice)) {
+                    sl, (struct dlgeom *)info, info->sm, 0)) {
     case -1:
         return;                 /* no such slice; dllabel set u.error */
     case 0:
@@ -898,17 +894,11 @@ ideopen(dev, mode)
     }
 
     /*
-     * The slice's offset and the rotation are cylinders, added after the
-     * division that turns a block into one, so all they can change is
-     * which cylinder a block lands on: a fixed number of blocks added,
-     * and a track-set taken back when the rotation runs past the end of
-     * the drive.  idelba() applies the two; it is also where they are
-     * computed, since the geometry is sys/dlabel.c's to rewrite.
-     *
-     * A disk laid out as one whole-disk slice carries d_roll tracks >> 1
-     * the way every disk made before slices does, and mw.c applies
-     * exactly the same two; lib/fslib.c inverts the same two on the host,
-     * which is what makes the three agree.
+     * The slice's offset and its own rotation are cylinders, applied after
+     * the division that turns a block into one: the rotation wraps within
+     * the slice, then the offset is added, and the whole is flattened to
+     * an LBA.  idelba() applies both; it is where they are computed, since
+     * the geometry is sys/dlabel.c's to rewrite.
      */
 
     if ((b = bread(1, dev)) != 0) {
@@ -950,18 +940,19 @@ idestrat(b)
     static struct ideif *ip;
     static char *p;
     static UINT32 lba;
-    static UINT sl, off, roll, maxblk;
+    static UINT sl, off, roll, len, maxblk;
 
     info = &ides[b->dev & 1];
     ip = &boards[0];
 
     /*
      * The buffer's minor names its slice; dlslice resolves its offset,
-     * roll and bound from the cached table ('c' is the whole drive).
+     * roll, length and bound from the cached table ('c' is the whole
+     * drive).
      */
     sl = devslice(b->dev);
-    if (dlslice((struct dlgeom *)info, info->d_slice, sl,
-                &off, &roll, &maxblk) || b->blk > maxblk) {
+    if (dlslice((struct dlgeom *)info, info->sm, sl,
+                &off, &roll, &len, &maxblk) || b->blk > maxblk) {
         b->flags |= BERROR;
         b->error = ENXIO;
         iodone(b);
@@ -992,7 +983,7 @@ idestrat(b)
      * nothing here has to hold a device block number - which is what a
      * large drive could not be counted in.
      */
-    lba = idelba(b->blk, info->spc, off, roll, info->tracks);
+    lba = idelba(b->blk, info->spc, off, roll, len);
 
     if (idestart(ip, b->dev & 1, lba, b->flags & BREAD) < 0) {
         b->flags |= BERROR;

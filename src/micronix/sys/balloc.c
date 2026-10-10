@@ -12,6 +12,9 @@
 #include <sys/proc.h>
 #include <errno.h>
 
+extern char *swin();            /* uio.c: the scratch window */
+extern void srel();
+
 /*
  * Assert the superblock's free list holds only valid block numbers.
  * Called right after a refill (a fresh chunk was copied in) and right
@@ -27,6 +30,7 @@
  * over it.  sup->s_free is printed raw, so a garbage count shows where
  * the first sane word begins.
  */
+#ifdef FREEDEBUG
 sbdump(sup, what)
     struct super *sup;
     char *what;
@@ -124,6 +128,7 @@ dumpbuf(b, what)
     pr("buf(%s) blk %d dev %d data %x xmem %d flags %x idx %d\n",
         what, b->blk, b->dev, (int)b->data, b->xmem, b->flags, (int)(b - blist));
 }
+#endif
 
 /*
  * Allocate a disk block from the device freelist.
@@ -137,47 +142,49 @@ balloc(dev)
     static struct buf *fb;
     register struct super *sup;
     register int bn;
+    char *chunk;
+    UINT8 chunkseg;
 
     sb = getsb(dev);
-    sup = (struct super *)sb->data;
-    if (sup->s_nfree > 100)
-        sbdump(sup, "balloc entry");
+    sup = (struct super *)bhold(sb);
     if (sup->s_flock) {           /* mounted read-only */
+        brel();
         u.error = EROFS;
         return (0);
     }
     if (sup->s_nfree <= 0
-        || (bn = sup->s_free[--sup->s_nfree]) == 0 || bcheck(bn, sup, dev) == 0)
+        || (bn = sup->s_free[--sup->s_nfree]) == 0 || bcheck(bn, sup, dev) == 0) {
+        brel();
         goto full;
-
-    if (sup->s_nfree == 0) {
-        if ((fb = bread(bn, dev)) == 0)
-            goto bad;
-#ifdef FREEDEBUG
-        dumpbuf(fb, "refill");
-#endif
-        /*
-         * Refill the in-core free list from the chunk block.  Only fb's
-         * data has to be mapped; the superblock is plain memory (getsb).
-         */
-        di();
-        bhold(fb);
-        copy(fb->data, sb->data + 4, 202);
-        ei();
-        checkfreelist(sup, "refill");
-#ifdef FREEDEBUG
-        dumpsb(sup, "fill");
-        pr("refill blk %d: count %d e0 %d e1 %d e2 %d\n",
-            bn, ((UINT *)fb->data)[0], ((UINT *)fb->data)[1],
-            ((UINT *)fb->data)[2], ((UINT *)fb->data)[3]);
-#endif
-    } else {
-        fb = bget(bn, dev);
-        bhold(fb);
     }
 
-    zero(fb->data, 512);
-    brel();
+    if (sup->s_nfree == 0) {
+        brel();                    /* drop the superblock before bread */
+        if ((fb = bread(bn, dev)) == 0)
+            goto bad;
+        /*
+         * Refill the in-core free list from the chunk block: the
+         * superblock in the buffer window and the chunk in the scratch
+         * window, both up at once, then zero the chunk.
+         */
+        di();
+        sup = (struct super *)bhold(sb);
+        chunk = fb->data;
+        chunkseg = fb->xmem;
+        swin(chunkseg);
+        copy((char *) SCRWIN + (chunk & 0xfff), (char *)sup + 4, 202);
+        zero((char *) SCRWIN + (chunk & 0xfff), 512);
+        srel();
+        brel();
+        ei();
+    } else {
+        brel();                    /* the superblock is done */
+        fb = bget(bn, dev);
+        bhold(fb);
+        zero(fb->data, 512);
+        brel();
+    }
+
     bdwrite(fb);
     mlook(dev)->bfree--;
     bdwrite(sb);
@@ -185,7 +192,9 @@ balloc(dev)
   full:
     u.error = ENOSPC;
   bad:
+    sup = (struct super *)bhold(sb);
     sup->s_nfree = 0;
+    brel();
     prdev("No more space", dev);
     bdwrite(sb);
     return (0);
@@ -200,40 +209,49 @@ bfree(bn, dev)
 {
     register struct buf *sb, *fb;
     register struct super *sup;
+    char *chunk;
+    UINT8 chunkseg;
 
     if (bn == 0)
         return;
     sb = getsb(dev);
-    sup = (struct super *)sb->data;
-    if (sup->s_nfree > 100)
-        sbdump(sup, "bfree entry");
-    if (bcheck(bn, sup, dev) == 0)
+    sup = (struct super *)bhold(sb);
+    if (bcheck(bn, sup, dev) == 0) {
+        brel();
         goto done;
+    }
     if (sup->s_nfree == 0) {
         sup->s_free[0] = 0;
         sup->s_nfree = 1;
+        brel();
     } else if (sup->s_nfree >= 100) {
-        checkfreelist(sup, "spill");
-#ifdef FREEDEBUG
-        dumpsb(sup, "spill");
-#endif
+        brel();                    /* drop the superblock before bget */
         fb = bget(bn, dev);
-#ifdef FREEDEBUG
-        dumpbuf(fb, "spill");
-#endif
         /*
-         * Spill the in-core free list into the chunk block.  Only fb's
-         * data has to be mapped; the superblock is plain memory (getsb).
+         * Spill the in-core free list into the chunk block: the
+         * superblock in the buffer window and the chunk in the scratch
+         * window, both up at once.
          */
         di();
-        bhold(fb);
-        copy(sb->data + 4, fb->data, 202);
+        sup = (struct super *)bhold(sb);
+        chunk = fb->data;
+        chunkseg = fb->xmem;
+        swin(chunkseg);
+        copy((char *)sup + 4, (char *) SCRWIN + (chunk & 0xfff), 202);
+        srel();
         brel();
         ei();
         bawrite(fb);
+        sup = (struct super *)bhold(sb);
         sup->s_nfree = 0;
+        brel();
+    } else {
+        brel();
     }
+
+    sup = (struct super *)bhold(sb);
     sup->s_free[sup->s_nfree++] = bn;
+    brel();
     mlook(dev)->bfree++;
   done:
     bdwrite(sb);

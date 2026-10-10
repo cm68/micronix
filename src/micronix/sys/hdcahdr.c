@@ -21,11 +21,11 @@
 #include <sys/ovl.h>
 
 extern int hdopen(), hdclose(), hdstrat();
-extern int hdint(), hdtick(), hdprobe();
+extern int hdint(), hdtick();
 extern struct biovec hdbvec;
 
 struct ovlhdr hdcahdr = { 1, 0, &hdtick, 0, &hdbvec, 0, HDCAINT, &hdint,
-	{ 'h', 'd', 'c', 'a' }, &hdprobe };
+	{ 'h', 'd', 'c', 'a' }, 4 };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

@@ -454,8 +454,10 @@ intrset(line, fn, seg)
  * only thing that clears a card's request is that card's own status
  * read.  So this is not a chain that stops at the first taker; it is
  * every card on the line, in the order they were placed.
+ *
+ * Not static: the two-PIC cascade handler (ovlint6, sys/multio.c) polls
+ * the slave for its line and hands it here.
  */
-static
 ovlntr(line)
     UINT line;
 {

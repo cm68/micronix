@@ -81,16 +81,12 @@ kstg()
 }
 
 /*
- * Per-drive state.  The geometry is the label's own, decoded through a
- * struct dlgeom (sys/dlabel.h) the same way mw.c and ide.c do it: the
- * first seven fields are struct dlgeom, in its order and of its types,
- * because dllabel() writes through that view of them.  Moving or
- * widening any of them breaks the decode without the compiler noticing.
+ * Per-drive state.  The geometry is the label's own, decoded into a
+ * struct dlgeom (sys/dlabel.h), which dllabel() fills directly.
  */
 struct dm
 {
-	struct dlgeom g;            /* tracks, heads, sectors, maxblk, spc,
-	                             * roll, cylstart */
+	struct dlgeom g;            /* the label's geometry and timing, decoded */
 	UINT8 flags;                /* ISOPEN | F_WP */
 	UINT8 k;                    /* 1K sectors: a 512 block is half a sector */
 };
@@ -181,7 +177,7 @@ djopen(dev, mode)
 	g->roll = 0;
 	g->firstsec = (s->dchar & HARD) ? 0 : 1;
 	sl = devslice(dev);
-	if (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive, sl, g, 0) < 0)
+	if (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive, sl, g, 0, 0) < 0)
 		return;
 
 	d->flags |= ISOPEN;
@@ -243,12 +239,14 @@ sio(d, addr, xaddr, op, sec, dev)
 	D[4] = op;                  /* I/O command */
 
 	/*
-	 * The track is the cylinder, rolled and sliced the way dllabel
-	 * taught it: cyl = sec / spc + cylstart + roll, wrapped at tracks.
+	 * The track is the cylinder, rolled and sliced the way dllabel taught
+	 * it: the block's cylinder, rotated by the slice's own roll within
+	 * the slice, then shifted by the slice's offset.
 	 */
-	track = sec / g->spc + g->cylstart + g->roll;
-	if (track >= g->tracks)
-		track -= g->tracks;
+	track = sec / g->spc + g->roll;
+	if (track >= g->len)
+		track -= g->len;
+	track += g->cylstart;
 	D[5] = track;
 
 	/*

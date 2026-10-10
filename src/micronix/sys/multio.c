@@ -8,6 +8,7 @@
 #include <sys/sys.h>
 #include <sys/tty.h>
 #include <sys/proc.h>
+#include <sys/ovl.h>
 #include <errno.h>
 
 /*
@@ -369,80 +370,47 @@ mumstatus(dev)
     }
 }
 
-/*
- * Centronics Parallel printer interrupt
- */
-
-ppint(tty)
-    register struct tty *tty;
-{
-    unsigned char dataport, strobeport;
-
-    /*
-     * There is one Mult I/O board, at MBASE.  See if the printer is ready.
-     */
-
-    out(MBASE + MUSELECT, PENABLE);     /* select group zero */
-
-    if ((in(MBASE) & PREADY) == 0) {
-        return;                 /* not ready */
-    }
-
-    /*
-     * wake up the high level if it needs it
-     */
-
-    if ((tty->state & HOSLEEP) && tty->outque.count <= LOWATER) {
-        tty->state &= ~HOSLEEP;
-        wakeup(&tty->outque);
-    }
-
-    /*
-     * turn off the interrupts if the char. que is drained
-     */
-
-    if (tty->outque.count == 0) {
-        mstop(tty);             /* No more characters to send. */
-        return;
-    }
-
-    /*
-     * The character and its strobe sit on the board's two parallel
-     * ports, but which is which depends on the board: a Wunderbuss I/O
-     * motherboard carries the character high, the Mult I/O board low.
-     * The port the board does not drive reads back 0xff, which is what
-     * tells the two apart.
-     */
-
-#define HIGH (~0)
-
-    if (in(MBASE + 1) != 0xff) {        /* wunderbuss mother board */
-        dataport = MBASE + 1;
-        strobeport = MBASE;
-    } else {                            /* mult I/O */
-        dataport = MBASE;
-        strobeport = MBASE + 1;
-    }
-
-    out(dataport, cookout(tty));        /* set the character */
-
-    out(strobeport, HIGH);              /* strobe it out */
-    out(strobeport, HIGH ^ PSTROBE);
-    out(strobeport, HIGH);
-}
-
 #define MBASE (0x48)
 #define PIC1 (MBASE + 5)
 
+#if N8259 == 2
 /*
- * Enable interrupts on PIC line a
+ * The slave PIC, on the add-on MultIO at the next base up (0x58).  Its
+ * registers sit at the same offsets as the master's; selecting its PIC
+ * group is SPICONLY where the master's is PENABLE.
+ */
+#define SBASE (0x58)
+#define SPIC0 (SBASE + 4)       /* the slave's ICW/OCW register */
+#define SPIC1 (SBASE + 5)       /* the slave's IMR/OCW1 register */
+#define SSELECT (SBASE + 7)     /* the slave's group select */
+#define SPICONLY 0x08           /* select the slave's PIC group */
+#endif
+
+/*
+ * Enable interrupts on PIC line a.  Lines 0-2 are the master's IR0-2,
+ * lines 3-5 the slave's - the slave exists only under N8259 == 2.
+ *
+ * The shift amount is written "& 3" rather than bare "a" in the master
+ * branch: a is a register variable here, and ccc's c1 has no rule for
+ * shifting by a value that sits in BC (it emits nothing, so the IMR comes
+ * back unchanged).  Masking with 3 is the same value for a < 3 and forces
+ * the arithmetic that moves it out of BC, the way the slave branch's
+ * "a - 3" already does.
  */
 
 inton(a)
 {
     di();
-    out(MBASE + MUSELECT, PENABLE);
-    out(PIC1, in(PIC1) & ~(1 << a));
+#if N8259 == 2
+    if (a >= 3) {
+        out(SSELECT, SPICONLY);
+        out(SPIC1, in(SPIC1) & ~(1 << (a - 3)));
+    } else
+#endif
+    {
+        out(MBASE + MUSELECT, PENABLE);
+        out(PIC1, in(PIC1) & ~(1 << (a & 3)));
+    }
     ei();
 }
 
@@ -453,8 +421,16 @@ inton(a)
 intoff(a)
 {
     di();
-    out(MBASE + MUSELECT, PENABLE);
-    out(PIC1, in(PIC1) | (1 << a));
+#if N8259 == 2
+    if (a >= 3) {
+        out(SSELECT, SPICONLY);
+        out(SPIC1, in(SPIC1) | (1 << (a - 3)));
+    } else
+#endif
+    {
+        out(MBASE + MUSELECT, PENABLE);
+        out(PIC1, in(PIC1) | (1 << (a & 3)));
+    }
     ei();
 }
 

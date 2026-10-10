@@ -16,6 +16,7 @@
 extern int rootdev;
 extern long seconds;
 extern int rtcinit();
+extern int copyin();
 extern struct inode ilist[];
 
 /*
@@ -54,7 +55,7 @@ mount(ioname, dname, ronly)
     bopen(dev, !ronly);
     if (u.error)
         goto done;
-    if ((m = tmount(dev, id, ronly)) == 0)
+    if ((m = tmount(dev, id, ronly, dname)) == 0)
         goto done;
     id->mount = m;
     id->count++;
@@ -100,9 +101,10 @@ syncsuper()
         if (m->dev == 0)
             continue;
         sb = getsb(m->dev);
-        sp = (struct super *)sb->data;
+        sp = (struct super *)bhold(sb);
         sp->s_bfree = m->bfree;
         sp->s_ifree = m->ifree;
+        brel();
         bdwrite(sb);
     }
 }
@@ -110,9 +112,10 @@ syncsuper()
 /*
  * Make an entry in the mount table.
  */
-tmount(dev, ip, ronly)
+tmount(dev, ip, ronly, dname)
     int dev, ronly;
     struct inode *ip;
+    char *dname;
 {
     register struct mount *m;
     register struct buf *sb;
@@ -137,6 +140,18 @@ tmount(dev, ip, ronly)
      */
     sp = (struct super *)bhold(sb);
     sp->s_flock = ronly;        /* flock means read-only */
+
+    /*
+     * Record the mount point and mark the superblock dirty so the write
+     * out carries it.  copyin() maps the caller's page into its own
+     * window (MAP0[2]/[4]), not the buffer window the hold above owns,
+     * and touches no header, so it is safe between bhold and brel.
+     * 63 bytes and the terminator below cap the path at the field's 64.
+     */
+    copyin(dname, sp->s_mount, 63);
+    sp->s_mount[63] = 0;
+    sp->s_fmod = 1;
+
     if (dev == rootdev)         /* part of power-up */
         rtcinit(sp->s_time);
     m->isize = sp->s_isize;
@@ -160,6 +175,7 @@ umount(ioname)
     register struct inode *io, *ip;
     struct mount *m;
     struct buf *sb;
+    struct super *sp;
     int dev;
 
     if (!super())
@@ -184,8 +200,10 @@ umount(ioname)
             }
     iflush(dev);
     sb = getsb(dev);
-    ((struct super *)sb->data)->s_bfree = m->bfree;    /* persist the live counts */
-    ((struct super *)sb->data)->s_ifree = m->ifree;
+    sp = (struct super *)bhold(sb);
+    sp->s_bfree = m->bfree;    /* persist the live counts */
+    sp->s_ifree = m->ifree;
+    brel();
     bdwrite(sb);
     sb->flags &= ~BLOCK;
     brelse(sb);

@@ -442,11 +442,12 @@ static struct scsiif boards[] = {
  * have - has nothing to stand in for here.  What is here is the geometry
  * sys/dlabel.c decoded, and the mapping built from it.
  *
- * The first seven fields are struct dlgeom (sys/dlabel.h), in its order
- * and of its types, because sys/dlabel.c decodes the label through a view
- * of them - ncropen passes this struct as one.  The bookkeeping below
- * them is this driver's own; moving any of the seven breaks the decode in
- * a way the compiler will not report.
+ * The first nine fields are struct dlgeom (sys/dlabel.h), in its order
+ * and of its types, because sys/dlabel.c decodes the label through a
+ * view of them - ncropen passes this struct as one.  The label's timing
+ * is read and dropped: a SCSI target is told an LBA and finds the sector
+ * itself.  The bookkeeping below them is this driver's own; moving any
+ * of the nine breaks the decode in a way the compiler will not report.
  */
 struct info
 {
@@ -456,18 +457,19 @@ struct info
 
     UINT maxblk;                /* dllabel's bound for the first slice opened */
     UINT spc;                   /* sectors per cylinder */
-    UINT roll;                  /* the drive's d_roll */
+    UINT roll;                  /* the slice's d_roll */
     UINT cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
+    UINT len;                   /* dllabel's slice length, in cylinders */
     UINT8 flags;                /* see below */
     UINT8 lun;                  /* the logical unit this open addresses */
 
     /*
-     * The slice table off the label, cached at open.  A buffer's minor
+     * The slice map off the label, cached at open.  A buffer's minor
      * names its slice; ncrstrat looks the offset and length up here, so
      * every slice of a target maps at once instead of one open's.
      */
-    struct dslice d_slice[NSLICE];
+    struct slicemap sm[NSLICE];
 } scs[NTARGET] = 0;
 
 #define OPEN    2               /* target is open */
@@ -883,17 +885,15 @@ scsireset(ip)
  * on the host, which is what makes them agree.
  */
 static UINT
-scsicyl(blk, spc, cylstart, roll, tracks)
-    UINT blk, spc, cylstart, roll, tracks;
+scsicyl(blk, spc, cylstart, roll, len)
+    UINT blk, spc, cylstart, roll, len;
 {
     static UINT cyl;
 
-    cyl = blk / spc;
-    cyl += cylstart;
-    cyl += roll;
-    if (cyl >= tracks)
-        cyl -= tracks;
-    return (cyl);
+    cyl = blk / spc + roll;
+    if (cyl >= len)
+        cyl -= len;
+    return (cyl + cylstart);
 }
 
 /*
@@ -910,8 +910,8 @@ scsicyl(blk, spc, cylstart, roll, tracks)
  * answer.
  */
 static UINT32
-scsilba(blk, spc, cylstart, roll, tracks, heads, sectors)
-    UINT blk, spc, cylstart, roll, tracks, heads, sectors;
+scsilba(blk, spc, cylstart, roll, len, heads, sectors)
+    UINT blk, spc, cylstart, roll, len, heads, sectors;
 {
     static UINT csec, cyl;
     static UINT32 lba;
@@ -925,7 +925,7 @@ scsilba(blk, spc, cylstart, roll, tracks, heads, sectors)
     if (spc == 0)
         return (0);
     csec = blk % spc;
-    cyl = scsicyl(blk, spc, cylstart, roll, tracks);
+    cyl = scsicyl(blk, spc, cylstart, roll, len);
     lba = (UINT32)cyl * heads + csec / sectors;
     lba = lba * sectors + csec % sectors;
     return (lba);
@@ -987,7 +987,7 @@ ncropen(dev, mode)
      * same reason.
      */
     switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | target,
-                    sl, (struct dlgeom *)info, info->d_slice)) {
+                    sl, (struct dlgeom *)info, info->sm, 0)) {
     case -1:
         return;                 /* no such slice; dllabel set u.error */
     case 0:
@@ -1073,18 +1073,19 @@ ncrstrat(b)
     static struct scsiif *ip;
     static char *p;
     static UINT32 lba;
-    static UINT sl, off, roll, maxblk;
+    static UINT sl, off, roll, len, maxblk;
 
     info = &scs[b->dev & 7];
     ip = &boards[0];
 
     /*
      * The buffer's minor names its slice; dlslice resolves its offset,
-     * roll and bound from the cached table ('c' is the whole target).
+     * roll, length and bound from the cached table ('c' is the whole
+     * target).
      */
     sl = devslice(b->dev);
-    if (dlslice((struct dlgeom *)info, info->d_slice, sl,
-                &off, &roll, &maxblk) || b->blk > maxblk) {
+    if (dlslice((struct dlgeom *)info, info->sm, sl,
+                &off, &roll, &len, &maxblk) || b->blk > maxblk) {
         b->flags |= BERROR;
         b->error = ENXIO;
         iodone(b);
@@ -1109,7 +1110,7 @@ ncrstrat(b)
         return;
     }
 
-    lba = scsilba(b->blk, info->spc, off, roll, info->tracks,
+    lba = scsilba(b->blk, info->spc, off, roll, len,
                   info->heads, info->sectors);
 
     if (scsistart(ip, b->dev & 7, b->flags & BREAD, lba, 1) < 0) {

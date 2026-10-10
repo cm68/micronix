@@ -15,6 +15,7 @@
 
 #include "sim.h"
 #include "hwsim.h"
+#include "vimap.h"
 #include "util.h"
 #include "imd.h"
 #include <sys/types.h>
@@ -22,7 +23,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-#define DISK3_INTERRUPT 1
+#define DISK3_INTERRUPT VI_DISK3
 
 #define DISK3_PORT  0x90            /* the attention port (0x90 and 0x91) */
 

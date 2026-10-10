@@ -91,7 +91,9 @@
 
 #include "sim.h"
 #include "hwsim.h"
+#include "vimap.h"
 #include "util.h"
+#include "imd.h"
 #include <strings.h>
 #include <stdio.h>
 
@@ -218,7 +220,7 @@ extern int trace_bio;
  * shared with the IDE card, which is id 0 on it; the ids are per line and
  * not global, and hddma/hdca are the same arrangement on VI0.
  */
-#define SCSI_INTERRUPT  2
+#define SCSI_INTERRUPT VI_NCR
 #define SCSI_CARDID     1
 
 /*
@@ -295,26 +297,32 @@ static int
 ncr_unit(int id)
 {
     char name[20];
-    struct drive *dh;
+    struct imd *ip;
 
     if (handle[id])
         return (0);
 
     sprintf(name, "scsi-%d", id);
-    dh = drive_open(name);
-    if (!dh) {
+    ip = imd_load(drive_resolve(name), id, IMD_INPLACE);
+    if (!ip) {
         printf("scsi: no target %s, selection unanswered\n", name);
         return (-1);
     }
 
-    drive_sectorsize(dh, SECLEN);
-    geomok[id] = drive_geometry(dh, &cyls[id], &heads[id], &spt[id]) &&
-        heads[id] && spt[id];
+    cyls[id] = ip->cyls;
+    heads[id] = ip->heads;
+    {
+        int nsec = 0, ss = 0;
+
+        imd_trkinfo(ip, 0, 0, &nsec, &ss);
+        spt[id] = nsec;         /* the actual track, not ip->spt (its max) */
+    }
+    geomok[id] = cyls[id] && heads[id] && spt[id];
     if (!geomok[id]) {
         printf("scsi: target %s has no geometry, command refused\n", name);
         return (-1);
     }
-    handle[id] = dh;                /* only cache a formatted drive */
+    handle[id] = ip;                /* only cache a formatted drive */
     trace(trace_scsi, "scsi: target %d is %d/%d/%d\n", id, cyls[id],
         heads[id], spt[id]);
     return (0);
@@ -344,8 +352,8 @@ ncr_rw(int id, unsigned long lba, char *p, int wr)
         wr ? "write" : "read", lba, cyl, head, sec);
 
     if (wr)
-        return (drive_write(handle[id], cyl, head, sec, p));
-    return (drive_read(handle[id], cyl, head, sec, p));
+        return (imd_write(handle[id], cyl, head, sec, p));
+    return (imd_read(handle[id], cyl, head, sec, p));
 }
 
 /*

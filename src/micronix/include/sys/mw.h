@@ -1,3 +1,5 @@
+#include <sys/ints.h>
+
 /*
  * HD-DMA Controller command structure
  *
@@ -66,7 +68,7 @@ struct hddma_cmd
  * dispatcher - the header is a different object (sys/mwhdr.c), so the
  * number is here rather than beside the driver.
  */
-#define	MWINT	0
+#define	MWINT	INT_HDDMA
 
 /*
  * Controller commands

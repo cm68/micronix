@@ -30,11 +30,11 @@
 #include <sys/ovl.h>
 
 extern int disk2open(), disk2close(), disk2strat();
-extern int disk2check(), disk2probe();
+extern int disk2check();
 extern struct biovec disk2bvec;
 
 struct ovlhdr disk2hdr = { 7, 0, &disk2check, 0, &disk2bvec, 0, 0, 0,
-	{ 'd', 'i', 's', 'k', '2' }, &disk2probe };
+	{ 'd', 'i', 's', 'k', '2' }, 4 };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

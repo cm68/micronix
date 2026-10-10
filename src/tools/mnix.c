@@ -1447,7 +1447,7 @@ initcmd(int c, char **a)
         memset(buf, 0, sizeof(buf));
         lp = (struct dlabel *) &buf[DL_OFFSET];
         memcpy(lp->d_magic, DL_MAGIC, 4);
-        lp->d_version = DL_VERS_SLICE;
+        lp->d_version = DL_VERSION;
         lp->d_tracks = m->tracks;
         lp->d_heads = m->heads;
         lp->d_spt = m->spt;
@@ -1791,8 +1791,10 @@ mkfscmd(int c, char **a)
             return 2;
         }
         dsize = dl.d_slice[0].d_len;
-        if (dsize == 0)
-            dsize = dl.d_tracks - dl.d_slice[0].d_off;
+        if (dsize == 0) {
+            printf("mkfs: slice a is not carved - run label -s first\n");
+            return 2;
+        }
         dsize *= (UINT) dl.d_heads * dl.d_spt;
     } else {
         if (floppylabel(image, &dl) < 0) {
@@ -2010,6 +2012,23 @@ labblocks(n, spc)
 }
 
 /*
+ * A slice's type, as a word.
+ */
+static char *
+sltype(t)
+    UINT t;
+{
+    switch (t) {
+    case SL_FS:
+        return "filesystem";
+    case SL_SWAP:
+        return "swap";
+    default:
+        return "unused";
+    }
+}
+
+/*
  * What the volume says about itself - the same report cmd/label prints,
  * so a label written from here and read from there looks the same.  An
  * entry that is all zeros is the whole drive: on the whole-disk slice
@@ -2032,13 +2051,11 @@ labdump(image, lp)
     printf("\tgeometry\t%u cylinders, %u heads, %u sectors/track "
         "(%u blocks/cylinder)\n",
         lp->d_tracks, lp->d_heads, lp->d_spt, spc);
-    printf("\troll\t\t%u\n", lp->d_roll);
+    printf("\ttiming\t\tstep %u, seek %u, precomp %u, lowcur %u\n",
+        lp->d_step, lp->d_seek, lp->d_precomp, lp->d_lowcur);
     printf("\tboot\t\t%u blocks, loaded from slice %c\n",
         lp->d_bootblks, 'a' + lp->d_bootslice);
-    printf("\tfilesystem\t%u blocks, %u inode blocks\n",
-        lp->d_fsize, lp->d_isize);
-    printf("\tslices\t\t(offset, length) in cylinders, "
-        "0 length = to the end\n");
+    printf("\tslices\t\t(offset, length) in cylinders, roll, type\n");
     for (i = 0; i < NSLICE; i++) {
         if (i == DL_WHOLE) {
             printf("\t  %c\t(-, -)\tcylinders 0 through %u, never rolled",
@@ -2046,19 +2063,15 @@ labdump(image, lp)
             labblocks(lp->d_tracks, spc);
             continue;
         }
-        if (!lp->d_slice[i].d_off && !lp->d_slice[i].d_len) {
-            printf("\t  %c\t(0, 0)\tthe whole drive, rolled by %u",
-                'a' + i, lp->d_roll);
-            labblocks(lp->d_tracks, spc);
+        if (!lp->d_slice[i].d_len) {
+            printf("\t  %c\t(0, 0)\tnot carved", 'a' + i);
             continue;
         }
         off = lp->d_slice[i].d_off;
         cyls = lp->d_slice[i].d_len;
-        if (cyls == 0)
-            cyls = lp->d_tracks - off;
-        printf("\t  %c\t(%u, %u)\tcylinders %u through %u, rolled by %u",
-            'a' + i, off, lp->d_slice[i].d_len, off, off + cyls - 1,
-            lp->d_roll);
+        printf("\t  %c\t(%u, %u)\tcylinders %u through %u, roll %u, %s",
+            'a' + i, off, cyls, off, off + cyls - 1,
+            lp->d_slice[i].d_roll, sltype(lp->d_slice[i].d_type));
         labblocks(cyls, spc);
     }
 }
@@ -2189,14 +2202,13 @@ labelcmd(int c, char **a)
             buf[i] = 0;
         for (i = 0; i < 4; i++)
             lp->d_magic[i] = DL_MAGIC[i];
-        lp->d_version = DL_VERS_SLICE;
+        lp->d_version = DL_VERSION;
         lp->d_tracks = tracks;
         lp->d_heads = heads;
         lp->d_spt = spt;
         lp->d_firstsec = (UINT) imd_firstsec(ip, 0, 0);
-        lp->d_roll = 0;
-        printf("%s: no label: writing %s version %u, %u/%u/%u, roll 0\n",
-            image, DL_MAGIC, DL_VERS_SLICE,
+        printf("%s: no label: writing %s version %u, %u/%u/%u\n",
+            image, DL_MAGIC, DL_VERSION,
             lp->d_tracks, lp->d_heads, lp->d_spt);
     }
 
@@ -2224,6 +2236,7 @@ labelcmd(int c, char **a)
         }
         lp->d_slice[lab_sets[i].ls_sl].d_off = off;
         lp->d_slice[lab_sets[i].ls_sl].d_len = len;
+        lp->d_slice[lab_sets[i].ls_sl].d_type = SL_FS;
         printf("%s: slice %c (offset %u, length %u)\n",
             image, 'a' + lab_sets[i].ls_sl, off, len);
     }

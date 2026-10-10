@@ -60,17 +60,20 @@ LD = ld
 #
 # -DOVLSEG names the segment the overlay frame is in; sys/ovl.h's
 # OVLBASE is OVLSEG * 0x1000 and the module links below are told the same
-# address by -Tdata, so the two have to agree.
-CFLAGS = -m micronix -O -DOVLSEG=9 -i$(INC)/
+# address by -Tdata, so the two have to agree.  -DN8259=2 is the interrupt
+# topology (include/sys/ints.h): the d1's two 8259s.  Polled vs vectored
+# is no longer a C flag - sys/slavepic.c is built both ways below, and the
+# two highmem folds pick one each.
+CFLAGS = -m micronix -O -DOVLSEG=12 -DN8259=2 -i$(INC)/
 
 #
 # The overlay frame.  OVLBASE is the one segment a driver module is
-# mapped into, and OVLDATA is one page above it - the hole the final link
-# opens with -Tdata, and the page ovlslot.o occupies.  These are the
-# literals GNUmakefile computes out of OVLSEG (9): 0x9000 and 0xa000.
+# mapped into (0xc000, above the buffer pool).  It is the literal
+# GNUmakefile computes out of OVLSEG (12) and names outright.  The data
+# segment itself follows the text, so there is no separate data origin
+# to name.
 #
-OVLBASE = 0x9000
-OVLDATA = 0xa000
+OVLBASE = 0xc000
 PAGESZ  = 4096
 
 #
@@ -79,8 +82,8 @@ PAGESZ  = 4096
 # the libccc runtime copied from src/libc and re-sectioned to psect data,
 # then the read-only kernel tables.
 #
-UPAGE_AS_SRC   = mem.s inout.s sub8.s unixtobcd.s
-UPAGE_AS_OBJ   = mem.o inout.o sub8.o unixtobcd.o
+UPAGE_AS_SRC   = mem.s inout.s sub8.s unixtobcd.s slavevec.s
+UPAGE_AS_OBJ   = mem.o inout.o sub8.o unixtobcd.o slavevec.o
 
 UPAGE_LIBC_SRC = csv.s idiv.s imul.s qadd.s qsub.s qand.s qor.s qcmp.s \
 	qshl.s qsar.s qshr.s qldst.s tramp.s swdisp.s swdispw.s oarg.s
@@ -118,7 +121,7 @@ WIN_C_OBJ = open.o sys2.o rdwri.o memdev.o link.o access.o
 # The disk drivers' own bring-up (djinit, ncrinit) lives here, out of
 # their one-page modules.
 #
-HIGHMEM_C_SRC  = main_init.c cus.c djinit.c ncrinit.c
+HIGHMEM_C_SRC  = main_init.c cus.c djinit.c ncrinit.c slavepic.c
 HIGHMEM_C_OBJ  = main_init.o cus.o djinit.o ncrinit.o
 
 HIGHMEM_AS_SRC = inits.s unbcd.s
@@ -152,19 +155,20 @@ MOD_HDR = djhdr.o mwhdr.o idehdr.o ncrhdr.o hdcahdr.o
 #
 LEAF_AS   = $(UPAGE_AS_OBJ) $(UPAGE_LIBC_OBJ)
 LEAF_C    = $(UPAGE_C_OBJ)
-KERNEL_AS = $(KERNEL_AS_OBJ) highmem.o
+KERNEL_AS = $(KERNEL_AS_OBJ) highmem.o phighmem.o
 KERNEL_C  = $(KERNEL_C_OBJ)
 WIN_C     = $(WIN_C_OBJ)
 HIGHMEM   = $(HIGHMEM_C_OBJ) $(HIGHMEM_AS_OBJ)
 
 OBJS      = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) \
-	$(WIN_C) $(HIGHMEM) low.o win.o ovlslot.o
+	$(WIN_C) $(HIGHMEM) slavepic_polled.o slavepic_vectored.o \
+	low.o win.o ovlslot.o
 
 MODULES = $(MOD_OBJ) $(MOD_HDR) \
 	dj.mod mw.mod ide.mod ncr.mod hdca.mod \
 	dj.page mw.page ide.page ncr.page hdca.page
 
-all: unix
+all: unix punix
 
 #
 # Each object and the source of the same name, and only those.  $* is
@@ -196,8 +200,23 @@ upage.o: $(LEAF_AS) $(LEAF_C) $(USER_C_OBJ)
 # unbcd.s - folded into one data-only object with -Sdata.  The main link
 # parks a data-only object after bss, so it sits at _ebss and
 # expand_bufs() mints buffer headers over it once init has returned.
-highmem.o: $(HIGHMEM)
-	$(LD) -r -Sdata -o highmem.o $(HIGHMEM)
+#
+# There are two folds, differing only in the slave PIC bring-up
+# (slavepic.c): highmem.o is the CAS-vectored one (unix), phighmem.o the
+# polled one (punix).  The driver modules and the whole rest of the kernel
+# build once and are shared by both.
+highmem.o: $(HIGHMEM) slavepic_vectored.o
+	$(LD) -r -Sdata -o highmem.o $(HIGHMEM) slavepic_vectored.o
+
+phighmem.o: $(HIGHMEM) slavepic_polled.o
+	$(LD) -r -Sdata -o phighmem.o $(HIGHMEM) slavepic_polled.o
+
+# The two slave PIC variants, from the one file.  ccc's -c names the
+# object, so the polled and vectored brings-up live side by side.
+slavepic_polled.o: slavepic.c
+	$(CC) $(CFLAGS) -DN8259_POLLED=1 -c -o slavepic_polled.o slavepic.c
+slavepic_vectored.o: slavepic.c
+	$(CC) $(CFLAGS) -DN8259_POLLED=0 -c -o slavepic_vectored.o slavepic.c
 
 # consts.o is made the same way, for the same reason and one literal at a
 # time: ccc compiles the device-name strings the u page's read-only
@@ -218,7 +237,7 @@ consts.o: consts.c
 # follows it, then win.o, then upage.o, the u page at 0xf000.
 #
 # THE FINAL LINK IS AN ORDINARY LINK - text, then data, then bss, with
-# -Ttext=0x1000 the only address it is given beyond -Tdata - and it has
+# -Ttext=0x1000 the only address it is given - and it has
 # no case for the u page and none for the init-only code.  What it places
 # is decided by the -r links above it: upage.o is .data at 0xf000 by
 # -Tdata, win.o is .data at 0xe000 the same way, highmem.o is the
@@ -231,9 +250,10 @@ consts.o: consts.c
 # loader will read.  A new object for either place is the same bargain:
 # fold it upstream, because this link has nowhere to put its text.
 #
-# -Tdata=0xa000 is what opens the overlay frame: the data segment starts
-# one page above OVLBASE, so the page at 0x9000 is the slot - nothing but
-# ovlslot.o there, and setdev overwrites it with the root driver.
+# The frame is not opened by the final link - there is no -Tdata on it.
+# ovlslot.o is .data at OVLBASE (0xc000) by the -r link above, so the
+# final link places it there among the data, and setdev overwrites it
+# with the root driver.
 #
 # THE LINK IS TWO LINKS BECAUSE OF THE ARGUMENT COUNT, and the count is
 # the shell's.  make runs a recipe through "sh -c" when metas() finds a
@@ -268,23 +288,30 @@ low.o: uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
 win.o: $(WIN_C)
 	$(LD) -r -Sdata -Tdata=0xe000 -o win.o $(WIN_C)
 
-# ovlslot.o is the overlay slot (sys/ovlslot.s): one page of text at
+# ovlslot.o is the overlay slot (sys/ovlslot.s): one page of data at
 # OVLBASE, which setdev later writes the root driver's page onto.  The -r
-# link is what holds it at that address; -Ttext says where the assembler's
-# section starts, so the object's own header carries the page and the
-# final link places it there instead of packing it after the resident
-# text.
+# link is what holds it at that address; -Tdata says where the data
+# segment starts, so the object's own header carries the page and the
+# final link places it there.  It is data now because 0xc000 is above the
+# resident data, not the page past the text.
 ovlslot.o: ovlslot.s
 	$(CC) $(CFLAGS) -c -o ovlslot.rel ovlslot.s
-	$(LD) -r -Ttext=$(OVLBASE) -o ovlslot.o ovlslot.rel
+	$(LD) -r -Sdata -Tdata=$(OVLBASE) -o ovlslot.o ovlslot.rel
 	rm -f ovlslot.rel
 
 # The link, with an empty slot and no modules behind it.  It is unix.link
 # and not unix because unix is the *bootable* image: the module pages are
 # appended and the root driver stamped in below.
 unix.link: $(OBJS)
-	$(LD) -Ttext=0x1000 -Tdata=$(OVLDATA) -Shigh -L/lib -lccc -lc \
-		-o unix.link low.o highmem.o win.o upage.o ovlslot.o
+	$(LD) -Ttext=0x1000 -Shigh -L/lib -lccc -lc \
+		-o unix.link low.o highmem.o ovlslot.o win.o upage.o
+
+# punix is unix with the polled highmem fold.  The driver modules are the
+# same for both - they resolve only resident symbols, which do not move
+# between the two - so punix reuses unix's .page files.
+punix.link: $(OBJS)
+	$(LD) -Ttext=0x1000 -Shigh -L/lib -lccc -lc \
+		-o punix.link low.o phighmem.o ovlslot.o win.o upage.o
 
 #
 # Driver modules, and the bootable image they go into.
@@ -319,6 +346,11 @@ unix: unix.link dj.page mw.page ide.page ncr.page hdca.page
 	cp unix.link unix
 	cat dj.page mw.page ide.page ncr.page hdca.page >> unix
 	setdev -i unix
+
+punix: punix.link dj.page mw.page ide.page ncr.page hdca.page
+	cp punix.link punix
+	cat dj.page mw.page ide.page ncr.page hdca.page >> punix
+	setdev -i punix
 
 # makedate is a micronix program like everything else here, and it
 # compiles against the kernel's headers for the same reason: with no -i
@@ -369,7 +401,7 @@ clean:
 # remakes it, so a clean that took it along would quietly put a new date
 # in the kernel on the next build.
 clobber: clean
-	rm -f unix unix.link makedate build.h
+	rm -f unix punix unix.link punix.link makedate build.h
 
 # dependencies generated by
 #
@@ -383,7 +415,7 @@ access.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h
 balloc.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h
 cio.o: $(SYS)/sys.h $(SYS)/con.h $(SYS)/file.h $(SYS)/inode.h $(SYS)/proc.h
 create.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h
-cus.o: $(SYS)/sys.h $(SYS)/tty.h
+cus.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/ints.h
 dj.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h
 djhdr.o: $(SYS)/sys.h $(SYS)/ovl.h
 djinit.o: $(SYS)/sys.h $(SYS)/proc.h
@@ -418,6 +450,7 @@ rdwri.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/file.h $(SYS)/proc.h
 reg.o: $(SYS)/sys.h $(SYS)/proc.h
 rtc.o: $(SYS)/sys.h $(SYS)/proc.h
 sig.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/tty.h
+slavepic_polled.o slavepic_vectored.o: $(SYS)/ints.h
 sleep.o: $(SYS)/sys.h $(SYS)/proc.h
 subc.o: $(SYS)/sys.h $(SYS)/con.h
 swap.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/con.h

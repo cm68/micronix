@@ -41,6 +41,15 @@ struct super {
     UINT32 s_magic;             /* filesystem signature */
     UINT s_bfree;               /* total free blocks */
     UINT s_ifree;               /* total free inodes */
+
+    /*
+     * The mount point the filesystem was last mounted on, a null
+     * terminated ascii path written by mount() and carried out on the
+     * next sync or umount.  mount() also sets s_fmod so the write-out
+     * sees a dirty superblock.  A char is a byte in every build, so this
+     * needs no host/guest alignment dance.
+     */
+    char s_mount[64];           /* the last mount point */
 };
 
 /*

@@ -23,7 +23,7 @@
 ;
 	.globl	vectors
 	.extern	intrupt, _ovlint0, _ovlint1, _ovlint2, m1int, m2int
-	.extern	m3int, m0int, clkint
+	.extern	m3int, clkint, _ovlntr
 	.defw	0,0,0,0
 	.defw	0,0,0,0
 	.defw	0,0,0,0
@@ -46,7 +46,7 @@
 ; int3:	call intrupt; &m1int		/ Master ACE 1
 ; int4:	call intrupt; &m2int		/ Master ACE 2
 ; int5:	call intrupt; &m3int		/ Master ACE 3
-; int6:	call intrupt; &m0int		/ Master parallel port
+; int6:	call intrupt; &_ovlint6		/ parallel printer (1 PIC) or slave cascade (2 PIC)
 ; int7:	call intrupt; &clkint		/ clock int
 ;
 ; /hint:					/hard disk interrupts
@@ -119,7 +119,35 @@ int5:
 	.defw	m3int
 int6:
 	call	intrupt
-	.defw	m0int
+	.defw	ovlint6
 int7:
 	call	intrupt
 	.defw	clkint
+
+;
+; IR6, the slave's cascade line.  The slave's INT is wired here, so the
+; master vectors this and the slave has to say which of its lines fired.
+; Poll it (OCW3 poll) and hand the line to the resident dispatcher
+; (_ovlntr, sys/ovl.c), which maps each module and calls its handler.
+; The poll read is itself the slave's acknowledge; the master's EOI is
+; intrdismiss(), so there is nothing else to dismiss.
+;
+; In a one-PIC build this line carried the parallel printer, which is
+; gone (no device, no model), so the poll finds nothing and returns.
+;
+ovlint6:
+	ld	a,0x08		; SPICONLY: select the slave PIC
+	out	(05fh),a	; SSELECT
+	ld	a,0x0c		; OCW3: poll command
+	out	(05ch),a	; SPIC0
+	in	a,(05ch)	; the poll word (and the acknowledge)
+	ld	b,a		; keep it for the level
+	and	080h		; the pending bit
+	ret	z		; nothing to dispatch
+	ld	a,b
+	and	07h		; the slave's line, 0..2
+	add	a,3		; the line number, 3..5
+	ld	l,a
+	ld	h,0
+	call	_ovlntr		; dispatch that line's handlers
+	ret

@@ -14,6 +14,9 @@
 #include <sys/buf.h>
 #include <errno.h>
 
+extern char *swin();            /* uio.c: the scratch window */
+extern void srel();
+
 extern long seconds;
 
 /*
@@ -40,18 +43,24 @@ ialloc(dev)
     register struct buf *sb;
     register struct super *sup;
     register struct inode *ip;
+    register int inum;
 
     sb = getsb(dev);
-    sup = (struct super *)sb->data;
 
     for (;;) {
         ip = 0;              /* no I-node yet. */
 
-        if (sup->s_ninode <= 0 && ifill(sb, dev) == 0) {
-            break;              /* no more free I-nodes */
+        sup = (struct super *)bhold(sb);
+        if (sup->s_ninode <= 0) {
+            brel();
+            if (ifill(sb, dev) == 0)
+                break;          /* no more free I-nodes */
+            continue;
         }
+        inum = sup->s_inode[--sup->s_ninode];
+        brel();
 
-        if ((ip = iget(sup->s_inode[--sup->s_ninode], dev)) == 0) {
+        if ((ip = iget(inum, dev)) == 0) {
             /*
              * this particular I-node not obtainable
              */
@@ -63,7 +72,7 @@ ialloc(dev)
         }
 
         /*
-         * Let go of the node and try again 
+         * Let go of the node and try again
          */
         irelse(ip);
     }
@@ -99,6 +108,8 @@ ifill(sb, dev)
     static struct dsknod *dp;
     static struct inode *ip;
     register struct super *sup;
+    char *chunk;
+    UINT8 chunkseg;
 
     /*
      * We do a sync here so that what we find later by reading the I-list
@@ -107,9 +118,10 @@ ifill(sb, dev)
 
     isync();
 
-    sup = (struct super *)sb->data;
-    iblk = lastiblock;          /* First Inode block to search */
+    sup = (struct super *)bhold(sb);
     limit = sup->s_isize;         /* Max no. of blocks to search */
+    brel();
+    iblk = lastiblock;          /* First Inode block to search */
     itop = limit + 1;           /* Top I-block number. */
 
     for (; limit; limit--, iblk++) {
@@ -123,32 +135,44 @@ ifill(sb, dev)
         if ((bp = bread(iblk, dev)) == 0) {
             continue;
         }
-        bhold(bp);
-
-        inum = 16 * iblk - 31;
 
         /*
-         * Scan block
+         * Scan the I-list block for free inodes: the block in the
+         * scratch window and the superblock in the buffer window, both
+         * up at once, so the free numbers can be added as they are found.
          */
-
-        for (n = 16, dp = (struct dsknod *)bp->data; n; n--, dp++, inum++)
+        di();
+        sup = (struct super *)bhold(sb);
+        chunk = bp->data;
+        chunkseg = bp->xmem;
+        swin(chunkseg);
+        dp = (struct dsknod *) ((char *) SCRWIN + (chunk & 0xfff));
+        inum = 16 * iblk - 31;
+        for (n = 16; n; n--, dp++, inum++)
             if ((dp->d_mode & IALLOC) == 0)
                 if (sup->s_ninode < 100)
                     sup->s_inode[sup->s_ninode++] = inum;
-
+        srel();
         brel();
+        ei();
         brelse(bp);
 
+        sup = (struct super *)bhold(sb);
         if (sup->s_ninode >= 100) {
+            brel();
             break;              /* I-cache full. */
         }
+        brel();
     }
 
     lastiblock = iblk;          /* advice */
 
+    sup = (struct super *)bhold(sb);
     if (sup->s_ninode) {
+        brel();
         return 1;             /* We managed to find some I-nodes */
     }
+    brel();
 
     u.error = ENOSPC;           /* Closest error I could find */
 
@@ -183,7 +207,7 @@ ifree(ip)
     static struct super *sup;
 
     sb = getsb(ip->i_dev);
-    sup = (struct super *)sb->data;
+    sup = (struct super *)bhold(sb);
 
     if (sup->s_ninode < 100) {    /* Fit in super block free list ? */
         sup->s_inode[sup->s_ninode++] = ip->i_inum;
@@ -199,6 +223,7 @@ ifree(ip)
         if (new < lastiblock)   /* new minimum ? */
             lastiblock = new;
     }
+    brel();
 
     zero(&ip->i_mode, sizeof(struct dsknod));
     ip->i_flags |= IMOD;

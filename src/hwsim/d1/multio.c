@@ -13,6 +13,7 @@
 #include "sim.h"
 #include "hwsim.h"
 #include "util.h"
+#include "vimap.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
@@ -78,6 +79,7 @@ struct ace {
 #define TXE_TIMEOUT     5000     // how long to wait before setting LSR_TXE
 
 #define	MULTIO_MASTER	0x48	// multio master standard port
+#define	SBASE	        0x58	// the slave MultIO's base, one group up
 
 // linestat                 base + 5    0x4d
 #define LSR_DR      0x01    // input data ready
@@ -216,16 +218,49 @@ byte ocw3;
 #define OCW3_SMM    0x20        // set special mask mode
 #define OCW3_ESMM   0x40        // affect special mask mode
 
-byte imr;           // interrupt mask register (enables are low)
-byte irr;           // interrupt request register
-byte isr;           // in-service register
+/*
+ * The whole of one 8259's state, so two PICs - the master on the base
+ * Wunderbus at 0x48 and the slave on the add-on MultIO at 0x58 - can live
+ * side by side.  Each is addressed at its base+4 and base+5, polled
+ * rather than CAS-cascaded, so each carries the entire register set.
+ *
+ * The aliases below keep the existing master-only code compiling against
+ * pics[0]; they go away as each function grows a struct pic * argument.
+ */
+struct pic {
+    byte icw1, icw2, icw3, icw4;
+    byte ocw2, ocw3;
+    byte imr, irr, isr;
+    int priority;
+    byte auto_eoi, rotate;
+    byte poll;                  /* OCW3 poll command is pending a read */
+    int pic_state;
+};
+static struct pic pics[2];      /* [0] = master 0x48, [1] = slave 0x58 */
+static struct pic *cur_pic = &pics[0];  /* the PIC the current access addresses */
 
+/* which PIC a register address belongs to: the slave is the base at 0x58 */
+static struct pic *
+picfor(portaddr p)
+{
+    return ((p & 0xf0) == 0x50) ? &pics[1] : &pics[0];
+}
 
-int priority;       // interrupt with current highest priority
-byte auto_eoi;      // auto-eoi mode: clear isr on the INTA, no EOI needed
-byte rotate;        // rotate the priority in auto-eoi mode
+#define icw1     cur_pic->icw1
+#define icw2     cur_pic->icw2
+#define icw3     cur_pic->icw3
+#define icw4     cur_pic->icw4
+#define ocw2     cur_pic->ocw2
+#define ocw3     cur_pic->ocw3
+#define imr      cur_pic->imr
+#define irr      cur_pic->irr
+#define isr      cur_pic->isr
+#define priority cur_pic->priority
+#define auto_eoi cur_pic->auto_eoi
+#define rotate   cur_pic->rotate
+#define poll     cur_pic->poll
+#define pic_state cur_pic->pic_state
 
-int pic_state = 0;
 #define PS_UNDEF    0
 #define PS_ICW2     1
 #define PS_ICW3     2
@@ -360,6 +395,7 @@ static void multio_set_int_line();
 static void
 wr_pic_port_0(portaddr p, byte v)
 {
+    cur_pic = picfor(p);
     char **bdec;
     byte *rname;
     int intlevel;
@@ -377,6 +413,8 @@ wr_pic_port_0(portaddr p, byte v)
         bdec = ocw3_bits;
         rname = "ocw3";
         ocw3 = v;
+        if (v & OCW3_POLL)          // poll command: next read returns the word
+            poll = 1;
     } else {                        // OCW2
         bdec = ocw2_bits;
         rname = "ocw2";
@@ -450,6 +488,7 @@ wr_pic_port_0(portaddr p, byte v)
 static void
 wr_pic_port_1(portaddr p, byte v)
 {
+    cur_pic = picfor(p);
     char **bdec;
     byte *reg;
 
@@ -494,18 +533,41 @@ wr_pic_port_1(portaddr p, byte v)
         reg, v, bitdef(v, bdec));
 }
 
-static byte 
+static byte
 rd_pic_port_0(portaddr p)
 {
+    cur_pic = picfor(p);
     trace(trace_multio, "multio: read pic0\n");
+
+    /*
+     * OCW3 poll: return the poll word and acknowledge the level it names.
+     * Reading it drops the request, exactly as the master's intack does,
+     * so a polled slave's interrupt is serviced once per line edge.
+     */
+    if (poll) {
+        int level = highest_serviceable();
+
+        poll = 0;
+        if (level >= 0) {
+            irr &= ~(1 << level);
+            trace(trace_multio, "multio: poll -> level %d\n", level);
+            return (0x80 | level);
+        }
+        return 0;
+    }
+
+    /* OCW3 read-register command: RIS selects ISR over IRR. */
+    if (ocw3 & OCW3_RR)
+        return (ocw3 & OCW3_RIS) ? isr : irr;
     return 0;
 }
 
-static byte 
+static byte
 rd_pic_port_1(portaddr p)
 {
+    cur_pic = picfor(p);
     trace(trace_multio, "multio: read pic1\n");
-    return 0;
+    return imr;
 }
 
 /*
@@ -516,33 +578,60 @@ multio_set_int_line()
 {
     int line;
 
-    // a request is serviceable only when it is pending, unmasked and
-    // higher priority than the highest-priority in-service interrupt
+    /*
+     * PINT is wired-OR across the two PICs, but only the master owns
+     * SINTA, so the slave's request has to reach the master as one of its
+     * own inputs to be vectored.  The slave's INT is wired to the
+     * master's cascade line (SLAVE_CASCADE_IR): ask the slave first, then
+     * fold its answer into the master's irr, so the master's priority
+     * resolver sees the cascade line when the slave fires.
+     */
+    cur_pic = &pics[1];
     line = (highest_serviceable() >= 0) ? 1 : 0;
-    trace(trace_multio, "multio: %s imr:%x irr:%x isr:%x\n",
-        line ? "set":"clear", imr, irr, isr);
+
+    cur_pic = &pics[0];
+    if (line)
+        irr |= (1 << SLAVE_CASCADE_IR);
+    else
+        irr &= ~(1 << SLAVE_CASCADE_IR);
+
+    /* the master's own resolver now covers both PICs */
+    line = (highest_serviceable() >= 0) ? 1 : 0;
+    trace(trace_multio, "multio: %s line\n", line ? "set":"clear");
     (*int_change)(line);
 }
 
 /*
- * set the level of the interrupt line
- * this set irr in the interrupt controller and possibly sets the s100
- * interrupt line the s100 interrupt line is reset by the interrupt
- * vector generation.
- *
- * Bit n of the mask is input n of the 8259.  That is only true because of
- * how the Decision I leaves the board: it ships with the three bus lines
- * the board brings in, VI0, VI1 and VI2, jumpered to inputs 0, 1 and 2.
- * The jumpers can be moved - the manual says so - and the model does not
- * represent them, so a machine jumpered any other way would put a bus
- * line somewhere this mask does not say.
+ * Drive one of the master's on-board inputs directly: the serial ports
+ * sit on the master's IR3..IR5 and the clock on IR7, and none of those
+ * are S-100 VI lines, so they do not pass through set_vi/vi_lines.  The
+ * disk controllers are the only thing on the bus's VI lines.
+ */
+void
+multio_master_ir(int ir, int value)
+{
+    cur_pic = &pics[0];
+    if (value)
+        irr |= (1 << ir);
+    else
+        irr &= ~(1 << ir);
+    multio_set_int_line();
+}
+
+/*
+ * The S-100 vectored-interrupt lines changed (set_vi).  vi_lines is the
+ * eight VI lines, and bit n is VI n.  Only the disk controllers live
+ * here: VI0..VI2 are the master's IR0..IR2, VI3..VI5 the slave's IR0..IR2
+ * (shifted down), and VI6..VI7 are not wired to a card.  The serial ports
+ * and clock are not bus lines and reach the master directly through
+ * multio_master_ir.
  */
 void
 multio_vi_change(unsigned char new)
 {
     byte mask = vi_lines ^ new;
 
-    trace(trace_multio, "multio: vi_changed lines:%x new:%x diff:%x\n", 
+    trace(trace_multio, "multio: vi_changed lines:%x new:%x diff:%x\n",
             vi_lines, new, mask);
 
     if (mask == 0) {
@@ -551,12 +640,18 @@ multio_vi_change(unsigned char new)
     }
     vi_lines = new;
 
-    // if raising interrupt
-    if (new & mask) {
-        irr |= mask;
-    } else {
-        irr &= ~mask;
-    }
+    cur_pic = &pics[0];
+    if (new & mask & MASTER_VI_MASK)
+        irr |= mask & MASTER_VI_MASK;
+    else
+        irr &= ~(mask & MASTER_VI_MASK);
+
+    cur_pic = &pics[1];
+    if (new & mask & SLAVE_VI_MASK)
+        irr |= (mask & SLAVE_VI_MASK) >> 3;
+    else
+        irr &= ~((mask & SLAVE_VI_MASK) >> 3);
+
     multio_set_int_line();
 }
 
@@ -574,7 +669,10 @@ multio_intack()
     int vecaddr;
     unsigned char i;
 
-    trace(trace_intack, "multio_intack: ivecstate=%d %s\n", 
+    /* only the master owns SINTA; the slave is polled, never vectored */
+    cur_pic = &pics[0];
+
+    trace(trace_intack, "multio_intack: ivecstate=%d %s\n",
         ivecstate, ivs_name[ivecstate]);
 
     // the vector is empty, so let's calculate it
@@ -586,6 +684,29 @@ multio_intack()
          */
         level = highest_serviceable();
 
+        /*
+         * The CAS cascade: when the master's cascade line (IR6) is the
+         * request and the slave has been given a vector base (its ICW2 is
+         * non-zero), the slave drives its own vector instead of the
+         * master's.  A polled slave's ICW2 is zero, so the master vectors
+         * IR6 as usual and ovlint6 polls the slave.  Neither in-service
+         * bit is set here - the master's EOI is a no-op and the slave's
+         * line is level-triggered, its irr cleared below and re-armed by
+         * the next line edge - so the dismiss needs nothing beyond the
+         * master EOI.
+         */
+        if (level == SLAVE_CASCADE_IR) {
+            cur_pic = &pics[1];
+            if (icw2 != 0) {                    /* the slave has a vector base */
+                cur_pic = &pics[0];
+                irr &= ~(1 << SLAVE_CASCADE_IR);/* master's cascade request */
+                iv_isrbit = 0;
+                cur_pic = &pics[1];
+                level = highest_serviceable();  /* the slave's line */
+            } else
+                cur_pic = &pics[0];             /* polled: master vectors IR6 */
+        }
+
         // we didn't find a cause for our interrupt
         if (level < 0) {
             l("lose: no unmasked request found!\n");
@@ -594,7 +715,10 @@ multio_intack()
             iv_isrbit = 0;
         } else {
             mask = 1 << level;
-            iv_isrbit = mask;
+            if (cur_pic == &pics[1])
+                iv_isrbit = 0;                  /* no slave isr bit to set */
+            else
+                iv_isrbit = mask;
             /*
              * A level-triggered 8259 clears the request bit when it
              * acknowledges, and the IRQ line has to fall and rise again to
@@ -695,9 +819,9 @@ multio_set_inti(struct ace *ap)
      * with it.
      */
     if (before != ap->inti) {
-        set_vi(ap->vi_line, 0, 0);
+        multio_master_ir(ap->vi_line, 0);
         if (ap->inti != INTI_NOINT)
-            set_vi(ap->vi_line, 0, 1);
+            multio_master_ir(ap->vi_line, 1);
     }
 }
 
@@ -1086,7 +1210,7 @@ rd_inti(portaddr p)
     if (ap->inti == INTI_TXE) {
         ap->inti = INTI_NOINT;
         ap->txe_ack = 1;
-        set_vi(ap->vi_line, 0, 0);
+        multio_master_ir(ap->vi_line, 0);
     }
     /*
      * The read reports the interrupt that WAS pending and resets it as a
@@ -1302,7 +1426,7 @@ rd_clock(portaddr p)
     v = (rtc[rtcptr / 8] >> (rtcptr % 8)) & 1;
     trace(trace_multio, "multio: read clock %02x\n", v);
 
-    set_vi(7, 0, 0);
+    multio_master_ir(7, 0);
 
     return v;
 }
@@ -1417,6 +1541,17 @@ multio_select(portaddr p, byte v)
     }
 }
 
+/*
+ * The slave MultIO's group select (0x5f).  Its PIC registers are wired
+ * up once at init, so a select is accepted and nothing is switched - the
+ * slave has no serial ports here to select between, only its PIC.
+ */
+static void
+slave_select(portaddr p, byte v)
+{
+    trace(trace_multio, "multio: slave select %02x\n", v);
+}
+
 int terminal_fd_in;
 int terminal_fd_out;
 
@@ -1456,7 +1591,7 @@ multio_poll()
          * configuration switches where behaviour belongs.
          */
         trace(trace_clock, " ---- clock --- \n");
-        set_vi(7, 0, 1);
+        multio_master_ir(7, 1);
     }
     return 0;
 }
@@ -1618,24 +1753,33 @@ multio_init()
     terminal_fd_out = ace[0].outfd;
 
 	register_output(MULTIO_MASTER+7, &multio_select);
+	register_output(SBASE+7, &slave_select);
 
     vi_change = &multio_vi_change;
     get_intack = &multio_intack;
 
     /*
-     * Names for the eight inputs of the 8259, for the state dump below.
-     * Three of them are the three S-100 bus lines this board's jumper
-     * area brings in, VI0, VI1 and VI2, which is why hd, djdma and ide
-     * are here: those names belong to the machines that sit on the bus,
-     * not to this board, and only the machine as a whole can say what
-     * drove one.  The other five inputs go to this board's own devices -
-     * the three serial ports, the parallel printer and the clock - and
-     * the one with a name so far is the clock; the rest are unnamed
-     * rather than absent, and the dump shows their numbers.
+     * The slave MultIO (0x58) is only ever used for its PIC here - its
+     * serial ports are not modelled - so its two PIC registers are wired
+     * up once and left, rather than through a group-select dance like the
+     * master's.  picfor() sends them to pics[1] on the address alone.
      */
-    reg_intbit(0, "hd");
+    register_input(SBASE + 4, &rd_pic_port_0);
+    register_input(SBASE + 5, &rd_pic_port_1);
+    register_output(SBASE + 4, &wr_pic_port_0);
+    register_output(SBASE + 5, &wr_pic_port_1);
+
+    /*
+     * Names for the master's eight inputs, for the state dump.  Three are
+     * the S-100 bus lines this board brings in - VI0 (hd-dma), VI1
+     * (djdma) and VI2 (hdca) - and the cascade line IR6 carries the
+     * slave's INT.  The serial ports name their own inputs from
+     * ace_init() above.
+     */
+    reg_intbit(0, "hd-dma");
     reg_intbit(1, "djdma");
-    reg_intbit(2, "ide");
+    reg_intbit(2, "hdca");
+    reg_intbit(6, "cascade");
     reg_intbit(7, "clock");
 #ifndef NODEBUG
     register_mon_cmd('M', "\tdump multio state", multio_dump);

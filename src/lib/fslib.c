@@ -55,14 +55,11 @@ struct image {
     int bps;    /* bytes per sector */
     int offset; /* blocks before the filesystem - the reserved area */
 
-    /* a hard disk, from the two labels */
+    /* a hard disk, from the label */
     int cyls;
     int heads;
-    int roll;   /* what mw.c adds to blk / spc before wrapping */
-    int cyl0;       /* d_cyl0 - fs block at physical cylinder 0 */
+    int roll;   /* the boot slice's d_roll */
     int bootblks;   /* d_bootblks - how many blocks the boot owns */
-    int label_fsize;    /* the label's filesystem fields, for cross-checking */
-    int label_isize;
     int haslabel;       /* a Micronix label was present and readable */
     int bootbelow;      /* the boot is under the filesystem, not in it */
 #ifdef USE_LIBDSK
@@ -195,21 +192,16 @@ hdlabels(struct image *i)
          * so, because it is a guess and the next thing that goes wrong
          * will want to know a guess was made.
          */
-        i->roll = i->cyls >> 1;
-        i->cyl0 = 0;
+        i->roll = 0;
         i->bootblks = 0;
         i->haslabel = 0;
-        trace(trace_fs, "openfs: no %s label, assuming roll %d\n",
-            DL_MAGIC, i->roll);
+        trace(trace_fs, "openfs: no %s label\n", DL_MAGIC);
         return 1;
     }
 
-    i->roll = dl->d_roll;
-    i->cyl0 = dl->d_cyl0;
+    i->roll = dl->d_slice[0].d_roll;
     i->bootblks = dl->d_bootblks;
     i->haslabel = 1;
-    i->label_fsize = dl->d_fsize;
-    i->label_isize = dl->d_isize;
     if (dl->d_tracks != i->cyls || dl->d_heads != i->heads ||
         dl->d_spt != i->spt) {
         fprintf(stderr,
@@ -217,9 +209,9 @@ hdlabels(struct image *i)
             dl->d_tracks, dl->d_heads, dl->d_spt,
             i->cyls, i->heads, i->spt);
     }
-    trace(trace_fs, "openfs: %s label, %d/%d/%d roll %d, fs %d blocks\n",
+    trace(trace_fs, "openfs: %s label, %d/%d/%d roll %d\n",
         DL_MAGIC, dl->d_tracks, dl->d_heads, dl->d_spt,
-        dl->d_roll, dl->d_fsize);
+        dl->d_slice[0].d_roll);
     return 1;
 }
 
@@ -312,12 +304,9 @@ dllabels(struct image *i)
     i->altsec = 0;              /* dj.c does not skew */
     i->major = 2;
     i->minor = 0;
-    i->roll = dl->d_roll;
-    i->cyl0 = dl->d_cyl0;
+    i->roll = dl->d_slice[sl].d_roll;
     i->bootblks = dl->d_bootblks;
     i->haslabel = 1;
-    i->label_fsize = dl->d_fsize;
-    i->label_isize = dl->d_isize;
 
     /* the slice's offset is in cylinders; a block number is in sectors */
     i->offset = (int) dl->d_slice[sl].d_off * spc;
@@ -369,16 +358,21 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
 {
     int ret;
     struct image *i = malloc(sizeof(struct image));
-    char *ext;
-    
+    char magic[4];
+    int fd;
+
+    /*
+     * The image announces itself in its first four bytes: "IMD " is an
+     * IMD image (the in-place hard-disk layout), anything else is a flat
+     * sector image.  The name is not consulted - a volume is what its
+     * bytes say it is, not what it is called.
+     */
     i->driver = DRIVER_IMAGE;
-    ext = strrchr(filesystem, '.');
-    if (ext) {
-        if (strcasecmp(ext, ".imd") == 0 || strcasecmp(ext, ".img") == 0) {
+    fd = open(filesystem, O_RDONLY);
+    if (fd >= 0) {
+        if (read(fd, magic, 4) == 4 && memcmp(magic, "IMD ", 4) == 0)
             i->driver = DRIVER_IMD;
-        } else if (strcasecmp(ext, ".image") == 0) {
-            i->driver = DRIVER_IMAGE;
-        }
+        close(fd);
     }
 
     switch (i->driver) {
@@ -409,7 +403,6 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
         i->spt = 15;
         i->dt = ' ';
         i->altsec = 0;
-        i->cyl0 = 0;
         i->bootblks = 0;
         i->haslabel = 0;
         i->bootbelow = 0;
@@ -429,7 +422,7 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
             imd_trkinfo(i->drive, 0, 0, &i->spt, &secsize);
             i->cyls = ip->cyls;
             i->heads = ip->heads;
-            i->roll = i->cyls >> 1;
+            i->roll = 0;
             /*
              * A blank drive has no track at all, so imd_trkinfo reports
              * zero sectors.  spt is what secmap divides by, and a
@@ -453,20 +446,6 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
             i->driver = DRIVER_HD;
             *fsp = (struct super *)i;
             readblk(*fsp, 1, i->sb.superblock);
-            /*
-             * The label records the filesystem it was written with; if the
-             * superblock disagrees, the disk has been rewritten under a
-             * different size since, and every block count the caller is
-             * about to trust is the superblock's, not the label's.  Say so.
-             */
-            if (i->haslabel && i->label_fsize &&
-                (i->label_fsize != (*fsp)->s_fsize ||
-                 i->label_isize != (*fsp)->s_isize)) {
-                fprintf(stderr,
-                    "warning: label filesystem %d/%d, superblock %d/%d\n",
-                    i->label_fsize, i->label_isize,
-                    (*fsp)->s_fsize, (*fsp)->s_isize);
-            }
             (*fsp)->s_fmod = 0;
             return ret;
         }
@@ -492,14 +471,6 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
             if (dl > 0) {
                 *fsp = (struct super *)i;
                 readblk(*fsp, 1, i->sb.superblock);
-                if (i->haslabel && i->label_fsize &&
-                    (i->label_fsize != (*fsp)->s_fsize ||
-                     i->label_isize != (*fsp)->s_isize)) {
-                    fprintf(stderr,
-                        "warning: label filesystem %d/%d, superblock %d/%d\n",
-                        i->label_fsize, i->label_isize,
-                        (*fsp)->s_fsize, (*fsp)->s_isize);
-                }
                 (*fsp)->s_fmod = 0;
                 return ret;
             }
@@ -660,12 +631,6 @@ bootrange(struct super *fs, UINT *first, UINT *nblk, char **name)
     if (i->bootbelow) {
         /* the boot is under the filesystem, at device block 0 */
         return 0;
-    }
-    if (i->haslabel && i->bootblks) {
-        /* a labeled device: the label names the boot area */
-        *first = i->cyl0;
-        *nblk = i->bootblks;
-        return 1;
     }
     if (i->offset) {
         /* an unlabeled floppy: its boot is the reserved tracks in front,

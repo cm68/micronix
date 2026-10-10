@@ -101,10 +101,12 @@
 ; INTSOFF := 0377		/mask off all interrupts
 ;
 ; /* ARMMASTER is the master pic _int mask */
-; /* the parallel port is diabled at the PIC int line */
+; /* IR0/IR1 (hd-dma, djdma) stay masked until the driver opens them;
+;  * IR6 is the slave's cascade line and must be open, so the value is
+;  * 0x03, not the old 0x43 which masked the (now repurposed) daisy. */
 ;
 ;
-; ARMMASTER  := 0103	/allow interrupts 2 - 7 (ttys, clock)
+; ARMMASTER  := 003	/allow interrupts 2 - 7 (ttys, clock, cascade)
 ;
 ; CONNECT := 3		/data terminal ready, request to send
 ;
@@ -180,7 +182,7 @@ ICWORD1=0x1F
 ICWORD4=0x0C
 PENABLE=0x28
 INTSOFF=0xFF
-ARMMASTER=0x43
+ARMMASTER=0x03
 
 ; ------- A-NATURAL SOURCE: _minit -------
 ; _minit:			/Called from cus(). Interrupts must be _off

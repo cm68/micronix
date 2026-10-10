@@ -23,35 +23,30 @@
  * points rather than the kernel branching into a driver directly, and
  * why a driver must not expect its own page to be there across a sleep.
  *
- * The frame is a hole in the kernel's own address space, between the text
- * and the data, and it costs nothing: it is placed where nothing else
- * can be.  Take N, the last address the kernel's text reaches, round it
- * up to a page boundary, and that is OVLBASE; the data segment begins a
- * page above it.  The segment between them has no text below it and no
- * data above it, so mapping that one segment to a module's page disturbs
- * nothing - no buffer window, no scratch window, no pool.  The pool
- * still runs from _ebss to BUFWIN as it always has.
+ * The frame is one fixed page of the kernel's own address space, at
+ * segment OVLSEG (0xc000).  The pages around it are fixed too: the
+ * scratch window at 0xd000, the buffer window at 0xe000, the u page at
+ * 0xf000.  The buffer pool runs from _ebss - the end of the resident
+ * data and bss - up to OVLBASE, so the driver page sits just above the
+ * pool and just below the scratch window; mapping that one segment to a
+ * module's page disturbs nothing - no pool header, no scratch window,
+ * no buffer window.
  *
- * N is the end of the resident text and nothing else.  The init-only
- * code (highmem.o) is not text for this purpose: it is folded to data
- * and parked after bss, so it is already above the frame and is
- * reclaimed as buffer headers rather than counted as something the frame
- * must clear.
+ * The init-only code (highmem.o) is not text for this purpose: it is
+ * folded to data and parked at _ebss, inside the region the pool grows
+ * into, and is reclaimed as buffer headers once main() has returned -
+ * which is why the pool's ceiling is OVLBASE, not BUFWIN.
  *
- * Nothing needs to be written into the frame.  The linker is told where
- * the data begins (-Tdata), which is what opens the hole, and the module
- * is linked at OVLBASE and mapped there when it is reached.
+ * Nothing needs to be written into the frame.  The module is linked at
+ * OVLBASE and mapped there when it is reached, and setdev stamps the
+ * root driver's page onto it at install time.
  *
- * OVLSEG is therefore a property of the build, not a choice: it moves
- * when the kernel's text grows past its page.  The kernel link and every
- * module link come out of one make variable so they cannot disagree, and
- * CCFLAGS passes it in.  The value below is what resident text reaches
- * with the disk drivers out of the kernel, which is the build that
- * matters; while they are still linked the text is longer and the frame
- * is higher.  Measured, not chosen: the three drivers are 9032 bytes of
- * text, the resident kernel ends at 0xa6d0 with them and 0x8388 without,
- * so the frame is the page at 0x9000 and a page higher would cost the
- * pool four fifths of itself.
+ * OVLSEG is a property of the build, not a choice: it moves only if the
+ * fixed layout itself moves.  The kernel link, every module link and the
+ * slot page (ovlslot.o) all take it from one make variable so they
+ * cannot disagree, and CCFLAGS passes it in.  The value below is only
+ * the default - what a compile that was not told gets - so the header
+ * and the build describe the same layout.
  */
 /*
  * The default, and only the default: the build passes the real value in
@@ -61,15 +56,16 @@
  * make passing the value in erase the header.
  */
 #ifndef OVLSEG
-#define OVLSEG      9
+#define OVLSEG      12
 #endif
 #define OVLBASE     (OVLSEG * 0x1000)
 
 /*
- * Interrupt lines a module may claim.  The lines with a driver behind
- * them are the disk controllers; the ACE and clock lines are resident.
+ * The interrupt topology (N8259, N8259_POLLED), the number of vectored
+ * lines (NOVLINE) and the line names (INT_*) are in sys/ints.h, so a
+ * driver claims an interrupt by name rather than by wiring.
  */
-#define NOVLINE     3
+#include <sys/ints.h>
 
 /*
  * A module's first byte.  Everything the kernel needs to run a driver is
@@ -153,7 +149,7 @@ struct ovlhdr {
     UINT line;                  /* the line intr is on, if there is one */
     int (*intr) ();             /* the interrupt handler, 0 for none */
     char name[12];              /* what devname reports for the major */
-    int (*probe) ();            /* probe(), enumerate its drives at signon */
+    UINT8 ndrv;                 /* how many drives, enumerated at signon */
 };
 
 /*
@@ -178,3 +174,4 @@ extern char *ovldata();         /* ovldata(major): the driver's data, or 0 */
 extern int ovlcall();           /* ovlcall(fn, seg): run fn with its own page mapped */
 extern int ovlattach();         /* ovlattach(seg): place a module, run its init */
 extern int ovlstart();          /* place the driver stamped into the slot */
+extern int ovlntr();            /* ovlntr(line): call every handler on a line */

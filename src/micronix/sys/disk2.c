@@ -39,9 +39,11 @@ static void d2rw();
 
 /*
  * Drive configuration information, one per drive - the same shape the
- * other disk drivers use: the first seven fields are struct dlgeom
+ * other disk drivers use: the first nine fields are struct dlgeom
  * (sys/dlabel.h) so sys/dlabel.c decodes the label through a view of
- * them, then this driver's own bookkeeping, then the cached slice table.
+ * them, then this driver's own bookkeeping, then the cached slice map.
+ * The label's timing is read and dropped: a diskette controller has no
+ * use for it.
  */
 struct info
 {
@@ -50,14 +52,15 @@ struct info
     UINT8 sectors;              /* number of sectors per track */
     UINT maxblk;                /* dllabel's bound for the first slice opened */
     UINT spc;                   /* number of sectors per cylinder */
-    UINT roll;                  /* the drive's d_roll */
+    UINT roll;                  /* the slice's d_roll */
     UINT cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
+    UINT len;                   /* dllabel's slice length, in cylinders */
 
     UINT curtrk;                /* where the driver thinks the head is */
     UINT8 flags;                /* see below */
 
-    struct dslice d_slice[NSLICE];
+    struct slicemap sm[NSLICE];
 } disk2s[NDRIVES] = 0;
 
 /*
@@ -110,7 +113,7 @@ disk2open(dev, mode)
     info->roll = 0;
 
     switch (dllabel((dev & ~0377) | (DL_WHOLE << 5) | drive,
-                    sl, (struct dlgeom *)info, info->d_slice)) {
+                    sl, (struct dlgeom *)info, info->sm, 0)) {
     case -1:
         return;                 /* no such slice; dllabel set u.error */
     case 0:
@@ -150,18 +153,30 @@ disk2strat(b)
     register struct buf *b;
 {
     register struct info *info;
-    static UINT sl, off, roll, maxblk;
+    static UINT sl, off, roll, len, maxblk;
 
     info = &disk2s[b->dev & 3];
+
+    /*
+     * The first read of a drive is its label, before any geometry is
+     * known.  Install a minimal geometry so the division maps block 0 to
+     * cylinder 0; open() replaces it with the label's real geometry.
+     */
+    if (info->sectors == 0) {
+        info->heads = 1;
+        info->sectors = 1;
+        info->spc = 1;
+    }
+
     sl = devslice(b->dev);
-    if (dlslice((struct dlgeom *)info, info->d_slice, sl,
-                &off, &roll, &maxblk) || b->blk > maxblk) {
+    if (dlslice((struct dlgeom *)info, info->sm, sl,
+                &off, &roll, &len, &maxblk) || b->blk > maxblk) {
         b->flags |= BERROR;
         b->error = ENXIO;
         iodone(b);
         return;
     }
-    b->cyl = d2cyl(b->blk, info->spc, off, roll, info->tracks);
+    b->cyl = d2cyl(b->blk, info->spc, off, roll, len);
     di();
     if (d2buf == 0)
         d2buf = b;
@@ -356,15 +371,15 @@ d2rw(b)
  * other disk drivers use, because the disk and the label are the same even
  * when the controller is not.
  */
-d2cyl(blk, spc, off, roll, tracks)
-    UINT blk, spc, off, roll, tracks;
+d2cyl(blk, spc, off, roll, len)
+    UINT blk, spc, off, roll, len;
 {
     UINT cyl;
 
-    cyl = blk / spc + off + roll;
-    if (cyl >= tracks)
-        cyl -= tracks;
-    return cyl;
+    cyl = blk / spc + roll;
+    if (cyl >= len)
+        cyl -= len;
+    return cyl + off;
 }
 
 /*
@@ -374,38 +389,6 @@ d2cyl(blk, spc, off, roll, tracks)
  */
 disk2check()
 {
-    return (0);
-}
-
-/*
- * Enumerate the drives at signon: read each unit's label and print the
- * manufacturer, model and capacity of every drive that answers.  The major
- * is 7, from the header (sys/disk2hdr.c).
- */
-disk2probe()
-{
-    struct info *info;
-    struct buf *b;
-    struct dlabel *lp;
-    char *p;
-    UINT dev, unit;
-    UINT mb;
-
-    for (unit = 0; unit < NDRIVES; unit++) {
-        info = &disk2s[unit];
-        dev = (7 << 8) | (DL_WHOLE << 5) | unit;
-        if (dllabel(dev, DL_WHOLE, (struct dlgeom *)info, info->d_slice) != 1)
-            continue;
-        b = bread(0, dev);
-        if (b == 0)
-            continue;
-        p = bhold(b);
-        lp = (struct dlabel *) &p[DL_OFFSET];
-        mb = (UINT) ((UINT32) info->tracks * info->heads * info->sectors >> 11);
-        pr("disk2%d: %s %s, %d MB\n", unit, lp->d_mfg, lp->d_model, mb);
-        brel();
-        brelse(b);
-    }
     return (0);
 }
 

@@ -22,6 +22,7 @@
 #include <sys/buf.h>
 #include <sys/con.h>
 #include <sys/signal.h>
+#include <sys/dlabel.h>
 #include <obj.h>
 #include <sys/ovl.h>
 
@@ -51,6 +52,45 @@ extern UINT kino;               /* uhdr.s's _kino: the inode we booted from */
 #define PAGESZ	(1 << PAGESHIFT)
 
 /*
+ * Enumerate the drives behind one controller: read each unit's label and
+ * print the drives that answer.  This is init-only code, reclaimed once
+ * main() returns.  The geometry is read into a local struct dlgeom, not
+ * the driver's own, because the driver's data layout is its own business
+ * - the driver's strat installs a minimal geometry for the label read the
+ * first time it sees a drive with none.  A unit with nothing behind it
+ * does not answer, and the driver's watchdog turns that silence into an
+ * error in a couple of seconds.
+ */
+static void
+drvprobe(major, name, ndrv)
+    UINT major;
+    char *name;
+    UINT8 ndrv;
+{
+    struct dlgeom g;
+    struct buf *b;
+    struct dlabel *lp;
+    char *p;
+    UINT dev, unit, mb;
+
+    for (unit = 0; unit < ndrv; unit++) {
+        dev = (major << 8) | (DL_WHOLE << 5) | unit;
+        zero(&g, sizeof g);
+        if (dllabel(dev, DL_WHOLE, &g, 0, 0) != 1)
+            continue;
+        b = bread(0, dev);
+        if (b == 0)
+            continue;
+        p = bhold(b);
+        lp = (struct dlabel *) &p[DL_OFFSET];
+        mb = (UINT) ((UINT32) g.tracks * g.heads * g.sectors >> 11);
+        pr("%s%d: %s %s, %d MB\n", name, unit, lp->d_mfg, lp->d_model, mb);
+        brel();
+        brelse(b);
+    }
+}
+
+/*
  * System initialization
  */
 main()
@@ -74,7 +114,7 @@ main()
         ronly = 1;
         pr("\nRoot device is read-only\n\n");
     }
-    tmount(rootdev, 0, ronly);
+    tmount(rootdev, 0, ronly, "/");
     if ((rootdir = iget(1, rootdev)) == 0)
         panic("Can't get root dir");
     u.cdir = rootdir;
@@ -84,25 +124,28 @@ main()
     ovlplaceall();              /* the driver modules riding in our own file */
 
     /*
-     * The drives behind each disk controller: the driver reads its units'
-     * labels and reports what answers.  This is init-only code, so it
-     * costs no resident space.  A unit with nothing behind it does not
-     * answer, and the driver's watchdog (named as its tick) turns that
-     * silence into an error in a couple of seconds, so the loop moves on
-     * instead of hanging.
+     * Enumerate the drives behind each controller: read every unit's
+     * label and print the drives that answer.  This is init-only code, so
+     * it costs no resident space; a unit with nothing behind it does not
+     * answer, and the driver's watchdog turns that silence into an error
+     * in a couple of seconds.
      */
     {
         struct ovlhdr *h;
-        char i;
+        char i, j;
+        char nm[12];
 
         for (i = 1; i < nbdev; i++)
             if (biosw[i].strat != &nodev) {
                 h = ovlmap(i);
-                if (h && h->probe)
-                    (*h->probe) ();
+                if (h && h->ndrv) {
+                    for (j = 0; j < 12; j++)
+                        nm[j] = h->name[j];
+                    drvprobe(i, nm, h->ndrv);
+                }
             }
-        ovlmap(major(rootdev));
     }
+    ovlmap(major(rootdev));
 
     /*
      * The swap map, last, and here rather than in the swapper.
@@ -132,7 +175,7 @@ main()
  * _ebss (sys/GNUmakefile), and the park runs from 0xcbc9 up past 0xdfff -
  * so the page the scratch window shows is the page this function is
  * executing from, and holding it pulls the code out from under the
- * instruction pointer.  0x9000 is below the park and is where the page is
+ * instruction pointer.  0xc000 is below the park and is where the page is
  * going anyway, so the page is built where it will run.  Nothing else
  * wants the frame for the moment the copy is on: the read that fills it
  * has already happened, and reading is what maps the frame back.

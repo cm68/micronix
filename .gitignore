@@ -420,6 +420,8 @@ src/micronix/lib/fslib/libfs.a
 src/micronix/sys/build.h
 src/micronix/sys/unix
 src/micronix/sys/unix.link
+src/micronix/sys/punix
+src/micronix/sys/punix.link
 
 #
 # The overlay driver modules.  mxld links one .mod per driver against the

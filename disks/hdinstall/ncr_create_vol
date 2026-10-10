@@ -85,7 +85,14 @@ rm -f "$vol.lock"
 # 1. a blank 40 meg drive
 "$mnix" initialize m16 "$vol" || exit 1
 
-# 2. the filesystem, with the NCR 5380 hard disk boot in /boot/boot
+# 2. the disk label: slice a is the filesystem (cylinders 1..284) and
+# slice b is swap (285..305); cylinder 0 is the boot, below both.  The
+# label command writes the in-band label at device block 0.  Without it
+# the prototype label's slice a starts at cylinder 0, d_bootblks stays
+# zero, and mkfs's filesystem overwrites the boot's second level.
+"$mnix" label "$vol" -s a 1 284 -s b 285 || exit 1
+
+# 3. the filesystem, with the NCR 5380 hard disk boot in /boot/boot
 "$mnix" mkfs "$vol" -i "$bootimg" -f || exit 1
 
 # 3. the userland.  The built binaries come from the source tree's

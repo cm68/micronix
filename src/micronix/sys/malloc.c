@@ -365,7 +365,7 @@ swapinit()
         zero(&g, sizeof g);
         if (u.error ||
             dllabel((swapdev & ~(7 << 5)) | (DL_WHOLE << 5),
-                    devslice(swapdev), &g, 0) != 1) {
+                    devslice(swapdev), &g, 0, 0) != 1) {
             pr("swap: %s/%d: no usable label, no swap\n",
                 devname, minor(swapdev));
             u.error = 0;

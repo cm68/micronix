@@ -1,5 +1,5 @@
 ;
-; The overlay slot: the one page of kernel text a driver module is
+; The overlay slot: the one page of kernel memory a driver module is
 ; stamped into.  sys/ovl.h is the frame's description; this is its
 ; other end, the place in the kernel the frame occupies.
 ;
@@ -11,25 +11,17 @@
 ; ovlattach() like any other module.  The kernel does not know which
 ; driver that is; the module says so.
 ;
-; Why a page of text and not a hole in the address space: the loader
-; writes the text section, then the data section, and a gap between
-; them is a gap it would have to be taught about.  Declared as text,
-; the slot is loaded by the loader that already runs, at the address
-; it is already linked at - and because it is the last of the text,
-; the data segment follows it with nothing between them.
+; The page is data, not text, because it is parked above the buffer
+; pool at 0xc000 (segment OVLSEG), not at the top of the resident text:
+; the text and the resident data run 0x1000 to _ebss, and the driver
+; page is a fixed data page the way win.o and upage.o are.  The loader
+; writes it with the rest of the data section, and setdev overwrites it.
 ;
 ; The address is not written here.  The GNUmakefile links this object
-; with -Ttext=$(OVLBASE), so the object's own header records the
-; page, and mxld's final link places it there rather than packing it
-; after the resident text the way an ordinary object would.  That is
-; the same mechanism win.o and upage.o use for their pages, arrived
-; at from the text side.
+; with -Sdata -Tdata=$(OVLBASE), so the object's own header records the
+; page, and mxld's final link places it there.
 ;
-; The assembler's .align is no use here: it counts from the start of
-; the section it is assembling, and mxld decides where that section
-; starts, so the one is a property of the link and not of this file.
-;
-	.text
+	.data
 	.globl	_ovlslot
 _ovlslot:
 	.ds	4096

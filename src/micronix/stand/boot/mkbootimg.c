@@ -326,36 +326,31 @@ main(int argc, char **argv)
             die("the label does not fit the sector");
         }
         memcpy(&sector[off + offsetof(struct dlabel, d_magic)], DL_MAGIC, 4);
-        put16(off + offsetof(struct dlabel, d_version), DL_VERS_SLICE);
+        put16(off + offsetof(struct dlabel, d_version), DL_VERSION);
         put16(off + offsetof(struct dlabel, d_tracks), tracks);
         put16(off + offsetof(struct dlabel, d_heads), heads);
         put16(off + offsetof(struct dlabel, d_spt), spt);
-        put16(off + offsetof(struct dlabel, d_cyl0), cyl0);
-        put16(off + offsetof(struct dlabel, d_bootblks), bootblks);
-        put16(off + offsetof(struct dlabel, d_roll), roll);
+        put16(off + offsetof(struct dlabel, d_firstsec), firstsec);
         /*
-         * d_fsize and d_isize describe a filesystem, and there is not
-         * one yet.  mkfs fills them in when it makes one, rewriting the
-         * whole label as it does.  They are zero here, and a reader
-         * that cares has to tell the difference.
+         * A diskette's timing is the controller's, not the medium's, and
+         * a diskette has no write precompensation or low write current,
+         * so both are "never".  The kernel's dj.c reads and ignores all
+         * four.
          */
-        put16(off + offsetof(struct dlabel, d_fsize), 0);
-        put16(off + offsetof(struct dlabel, d_isize), 0);
+        sector[off + offsetof(struct dlabel, d_step)] = 0;
+        sector[off + offsetof(struct dlabel, d_seek)] = 0;
+        put16(off + offsetof(struct dlabel, d_precomp), 0xffff);
+        put16(off + offsetof(struct dlabel, d_lowcur), 0xffff);
+        put16(off + offsetof(struct dlabel, d_bootblks), bootblks);
         put16(off + offsetof(struct dlabel, d_bootslice), 0);
         /*
-         * The one slice a diskette has: 'a', from cylinder toff to the
-         * end of the medium - a length of zero.
+         * The one slice a diskette has: 'a', a filesystem from cylinder
+         * toff to the end of the medium, never rolled.
          */
         put16(off + offsetof(struct dlabel, d_slice[0].d_off), toff);
-        put16(off + offsetof(struct dlabel, d_slice[0].d_len), 0);
-        /*
-         * Where this medium's sectors are numbered from.  The loader
-         * cannot read the label without knowing it, so it reads the
-         * first sector of the track that carries a magic and takes the
-         * answer from there; this is the same answer written down, and
-         * every block after the first needs it.
-         */
-        put16(off + offsetof(struct dlabel, d_firstsec), firstsec);
+        put16(off + offsetof(struct dlabel, d_slice[0].d_len), tracks - toff);
+        put16(off + offsetof(struct dlabel, d_slice[0].d_roll), 0);
+        sector[off + offsetof(struct dlabel, d_slice[0].d_type)] = SL_FS;
     }
 
     if (loadaddr)

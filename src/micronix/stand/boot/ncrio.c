@@ -40,10 +40,11 @@ struct drivespec {
 	UINT8 spt;			/* sectors per track */
 	UINT limit;			/* max block number */
 	UINT spc;			/* sectors per cylinder */
-	UINT roll;			/* what readblock adds to blk / spc */
+	UINT roll;			/* the slice's own rotation */
 	UINT cylstart;			/* the slice's first cylinder */
+	UINT len;			/* the slice's length, in cylinders */
 } spec = {
-	0, 0, 0, 0, 0, 0, 0
+	0, 0, 0, 0, 0, 0, 0, 0
 };
 
 /*
@@ -139,15 +140,17 @@ reset()
 		spec.heads = lp->d_heads;
 		spec.spt = lp->d_spt;
 		spec.spc = lp->d_heads * lp->d_spt;
-		spec.roll = lp->d_roll;
 		sl = lp->d_bootslice;
 		if (sl >= NSLICE)
 			sl = 0;
+		spec.roll = lp->d_slice[sl].d_roll;
 		spec.cylstart = lp->d_slice[sl].d_off;
-		if (lp->d_slice[sl].d_len)
-			spec.limit = lp->d_slice[sl].d_len * spec.spc - 1;
-		else
-			spec.limit = (lp->d_tracks - spec.cylstart) * spec.spc - 1;
+		spec.len = lp->d_slice[sl].d_len;
+		if (!spec.len) {
+			outstr("Boot slice is not carved.\n");
+			bail();
+		}
+		spec.limit = spec.len * spec.spc - 1;
 	} else {
 		outstr("No disk label at cylinder 0.\n");
 		outstr("The geometry is read from there and guessed nowhere.\n");
@@ -180,9 +183,10 @@ char *buffer;
 	}
 
 	secnum = blocknum % spec.spc;
-	cyl = blocknum / spec.spc + spec.roll + spec.cylstart;
-	if (cyl >= spec.cylinders)
-		cyl -= spec.cylinders;
+	cyl = blocknum / spec.spc + spec.roll;
+	if (cyl >= spec.len)
+		cyl -= spec.len;
+	cyl += spec.cylstart;
 
 	tries = 0;
 	while (tries++ < TRIES) {

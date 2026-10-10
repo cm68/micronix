@@ -35,7 +35,6 @@
 ; public	m1int
 ; public	m2int
 ; public	m3int
-; public	m0int
 ; public	clkint
 ;
 ; /* absolute I/O addresses on the Master Mult I/O */
@@ -124,10 +123,11 @@
 ; INTSOFF := 0377		/mask off all interrupts
 ;
 ; /* ARMMASTER is the master pic _int mask */
-; /* the parallel port is diabled at the PIC int line */
+; /* IR0/IR1 (hd-dma, djdma) stay masked until open; IR6 is the slave's
+;  * cascade line, so the value is 0x03, not the old 0x43 (daisy). */
 ;
 ;
-; ARMMASTER  := 0103	/allow interrupts 2 - 7 (ttys, clock, slaves)
+; ARMMASTER  := 003	/allow interrupts 2 - 7 (ttys, clock, cascade)
 ;
 ; CONNECT := 3		/data terminal ready, request to send
 ;
@@ -157,8 +157,8 @@ TTSIZE2=76
 TTSIZE3=114
 	.globl	miobase, _mstart, _mstop
 	.globl	_mputc, _mset, _console, intrupt, m1int, m2int
-	.globl	m3int, m0int, clkint
-	.extern	_di, _ei, dicount, _mttys, _ppint, _ttyin, _ttyout
+	.globl	m3int, clkint
+	.extern	_di, _ei, dicount, _mttys, _ttyin, _ttyout
 	.extern	_mumint, _ttyerror, _clock
 MBASE=0x48
 MUDATA=MBASE+0
@@ -215,8 +215,7 @@ CONNECT=3
 ; 	dicount = (a ^ a);	/* dicount = 0; */
 ;
 ;
-; 	a = PENABLE; out; MSELECT;	/* EOI cycle */
-; 	a = ENDINT;  out; ICNTRL;
+; 	call intrdismiss	/* EOI the PIC(s), sys/multio.c */
 ;
 ;
 ; /* restore registers */
@@ -255,10 +254,7 @@ intrupt:
 	call	pchl
 	xor	a
 	ld	(dicount),a
-	ld	a,PENABLE
-	out	(MSELECT),a
-	ld	a,ENDINT
-	out	(ICNTRL),a
+	call	intrdismiss
 	pop	af
 	pop	bc
 	pop	de
@@ -285,6 +281,19 @@ intrupt:
 ;
 pchl:
 	jp	(hl)
+
+; ------- intrdismiss -------
+; The interrupt-dismiss hook, called from intrupt after the handler
+; returns where the inline EOI used to be.  The master always gets the
+; EOI because it owns the acknowledge; a polled slave needs nothing (its
+; poll read was the acknowledge), and the CAS-cascaded slave's EOI is
+; added here when that topology is built out.
+intrdismiss:
+	ld	a,PENABLE
+	out	(MSELECT),a
+	ld	a,ENDINT
+	out	(ICNTRL),a
+	ret
 
 ; ------- A-NATURAL SOURCE: badint -------
 ; /unimplimented interrupt
@@ -349,16 +358,6 @@ ace:
 ;
 miobase:
 	.defb	0
-
-; ------- A-NATURAL SOURCE: m0int -------
-; m0int:	/* print wheel ready on Master */
-; 	bc = &_mttys => sp; call _ppint; sp => bc;
-; 	return;
-;
-m0int:
-	ld	hl,_mttys	; tty = &_mttys (arg0)
-	call	_ppint
-	ret
 
 ; ------- A-NATURAL SOURCE: m1int -------
 ; m1int:

@@ -529,6 +529,7 @@ protoslices(lp)
             sz = maxfs;
         lp->d_slice[0].d_off = off;
         lp->d_slice[0].d_len = sz;
+        lp->d_slice[0].d_type = SL_FS;
         off += sz;
         left -= sz;
     }
@@ -537,6 +538,7 @@ protoslices(lp)
     if (bsz) {
         lp->d_slice[1].d_off = off;
         lp->d_slice[1].d_len = bsz;
+        lp->d_slice[1].d_type = SL_SWAP;
         off += bsz;
         left -= bsz;
     }
@@ -551,6 +553,7 @@ protoslices(lp)
             sz = left;
         lp->d_slice[i].d_off = off;
         lp->d_slice[i].d_len = sz;
+        lp->d_slice[i].d_type = SL_FS;
         off += sz;
         left -= sz;
     }
@@ -592,11 +595,20 @@ putlabel(d)
     memset((char *) lp, 0, sizeof (struct dlabel));
     for (i = 0; i < 4; i++)
         lp->d_magic[i] = DL_MAGIC[i];
-    lp->d_version = DL_VERS_SLICE;
+    lp->d_version = DL_VERSION;
     lp->d_tracks = cyl;
     lp->d_heads = heads;
     lp->d_spt = spt;
     lp->d_firstsec = 0;         /* these drives number sectors from zero */
+    /*
+     * The drive's timing, from the model row or the command line.  Seek
+     * (head settle) has no per-model source yet, so it is zero - no
+     * extra settle - the same value the DISK 3 driver's table used.
+     */
+    lp->d_step = stepdelay;
+    lp->d_seek = 0;
+    lp->d_precomp = precomp;
+    lp->d_lowcur = lowcur;
     if (mfg)
         strncpy(lp->d_mfg, mfg, sizeof (lp->d_mfg));
     if (model)
@@ -954,8 +966,9 @@ main(argc, argv)
             buildth(track, head);
             fmthead(fd, track, head);
         }
-        printf("track %d\n", track);
+        printf("track %d\r", track);
     }
+    printf("\n");
 
     /*
      * The label goes back whenever the walk crossed the sector it lives in

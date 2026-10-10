@@ -152,12 +152,10 @@ void clrdsk(ip)
  * stop rather than write over it: a boot with its tail replaced by a
  * label loads and runs and does something else.
  *
- * The geometry, the roll and the slice table are already in buf - the
+ * The geometry, the timing and the slice table are already in buf - the
  * label command wrote them, or a diskette's boot image carried them in -
- * and are preserved.  This adds only what a filesystem can say and they
- * cannot: its block and inode counts, and the boot's extent below it.
- *
- *	dsize = d_fsize + d_bootblks	(the boot is below the fs)
+ * and are preserved.  This adds only what a filesystem cannot say for
+ * itself: the boot's extent below it.
  */
 void putlabel(buf)
     char *buf;
@@ -191,19 +189,14 @@ void putlabel(buf)
     for (i = 0; i < 4; i++)
         lp->d_magic[i] = DL_MAGIC[i];
 
-    lp->d_fsize = fsize;
-    lp->d_isize = isize;
-
     /*
      * The boot is below the filesystem, not in it: it owns the device
      * blocks in front of slice 'a', and slice a's offset in cylinders is
-     * the whole of the description.  The geometry, the roll and the slice
-     * table are already in buf and are preserved; this adds the boot's
-     * extent and the filesystem's numbers, both of which came in zero.
+     * the whole of the description.  The geometry, the timing and the
+     * slice table are already in buf and are preserved; this adds the
+     * boot's extent and the slice the boot loads from.
      */
-    lp->d_version = DL_VERS_SLICE;
-    lp->d_cyl0 = 0;
-    lp->d_roll = 0;
+    lp->d_version = DL_VERSION;
     lp->d_bootslice = 0;
     lp->d_bootblks = lp->d_slice[0].d_off *
         (UINT) lp->d_heads * lp->d_spt;

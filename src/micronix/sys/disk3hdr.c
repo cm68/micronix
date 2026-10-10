@@ -33,11 +33,11 @@
 #include <sys/ovl.h>
 
 extern int disk3open(), disk3close(), disk3strat();
-extern int disk3init(), disk3int(), disk3check(), disk3probe();
+extern int disk3init(), disk3int(), disk3check();
 extern struct biovec disk3bvec;
 
 struct ovlhdr disk3hdr = { 6, &disk3init, &disk3check, 0, &disk3bvec, 0,
-	DISK3INT, &disk3int, { 'd', 'i', 's', 'k', '3' }, &disk3probe };
+	DISK3INT, &disk3int, { 'd', 'i', 's', 'k', '3' }, 4 };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
