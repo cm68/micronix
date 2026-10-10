@@ -483,6 +483,80 @@ buildth(track, head)
 }
 
 /*
+ * Build the prototype slice table a freshly formatted disk carries.
+ *
+ * The default layout, from cylinder 0 up:
+ *
+ *	track 0		the boot and this label, not a filesystem
+ *	a		the biggest filesystem that fits, up to the most a
+ *			block number can say - s_fsize is a 16-bit UINT, so
+ *			65535 blocks is the ceiling (32M, give or take)
+ *	b		1M (2048 blocks) of swap, after a
+ *	d, e, f, g, h	32M apiece until the drive runs out; the last
+ *			one is a runt
+ *
+ * 'c' is the whole disk (DL_WHOLE), placed by nobody and never an entry
+ * here.  Every length is a whole number of cylinders, because a slice's
+ * position is in cylinders and never in blocks - a block number is 16
+ * bits and a drive's worth of them is not.
+ */
+void
+protoslices(lp)
+    struct dlabel *lp;
+{
+    UINT spc, off, left, maxfs, bsz, sz;
+    int i;
+
+    spc = heads * spt;
+    off = 1;                    /* cylinder 0: the boot + label */
+    left = cyl - 1;
+
+    /* Biggest filesystem, in whole cylinders: a block number is a
+     * 16-bit UINT, so 65535 blocks (s_fsize) is the ceiling - the 32M
+     * above.  Rounded down so a slice never claims a 65536th block. */
+    maxfs = 0xffff / spc;
+
+    /* b, the swap: 1M (2048 blocks), rounded up to a whole cylinder and
+     * clipped to what the drive has. */
+    bsz = (2048 + spc - 1) / spc;
+    if (bsz > left)
+        bsz = left;
+
+    /* a: the biggest filesystem that leaves room for b and track 0 */
+    if (left > bsz) {
+        sz = left - bsz;
+        if (maxfs < sz)
+            sz = maxfs;
+        lp->d_slice[0].d_off = off;
+        lp->d_slice[0].d_len = sz;
+        off += sz;
+        left -= sz;
+    }
+
+    /* b, after a */
+    if (bsz) {
+        lp->d_slice[1].d_off = off;
+        lp->d_slice[1].d_len = bsz;
+        off += bsz;
+        left -= bsz;
+    }
+
+    /* d, e, f, g, h: 32M each, a runt at the end */
+    for (i = 3; i < NSLICE; i++) {
+        if (left == 0)
+            break;
+        if (maxfs < left)
+            sz = maxfs;
+        else
+            sz = left;
+        lp->d_slice[i].d_off = off;
+        lp->d_slice[i].d_len = sz;
+        off += sz;
+        left -= sz;
+    }
+}
+
+/*
  * Write the label: what the drive is, at DL_OFFSET in the boot sector of
  * the drive's 'c', which the format has just filled with 0xe5 along with
  * every other sector it touched.
@@ -497,9 +571,9 @@ buildth(track, head)
  *
  * The boot fields are zero, because there is no boot yet - mkfs -i puts
  * one there and rewrites this whole label with its numbers when it does.
- * The slice table is empty, which every reader takes as one slice over
- * the whole drive - the 'c' partition - and the drive's own name goes in
- * too, so the freshly formatted disk says what it is.
+ * The slice table is the prototype layout protoslices builds - a, b, d,
+ * e, f and h - and the drive's own name goes in too, so the freshly
+ * formatted disk says what it is and how it is meant to be partitioned.
  */
 void
 putlabel(d)
@@ -527,6 +601,8 @@ putlabel(d)
         strncpy(lp->d_mfg, mfg, sizeof (lp->d_mfg));
     if (model)
         strncpy(lp->d_model, model, sizeof (lp->d_model));
+
+    protoslices(lp);
 
     if (lseek(d, 0L, 0) < 0)
         die("cannot seek to block 0");
@@ -891,8 +967,8 @@ main(argc, argv)
      */
     if (first == 0 && fhead == 0) {
         putlabel(fd);
-        printf("label: %d cylinders, %d heads, %d sectors, roll %d\n",
-            cyl, heads, spt, cyl >> 1);
+        printf("label: %d cylinders, %d heads, %d sectors, slices a b d e f g h\n",
+            cyl, heads, spt);
     } else {
         printf("formatted; the label is untouched\n");
     }
