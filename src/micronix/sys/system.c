@@ -47,21 +47,23 @@ struct syscall
  */
 extern int indir(), unimp(), badcall();
 
-extern int brake(), chdir(), chmod(), chown(), sync();      /* sys1.c */
-extern int pause(), stat();                                 /* sys2.c */
+extern int brake(), chdir(), chmod(), chown(), sync(),
+    dup(), getuid(), setuid(), nice(), ssw();               /* sys1.c */
+extern int pause(), stat(), alarm(), getpid(), stime(),
+    fstat(), snooze();                                      /* sys2.c */
 extern int permission();                                    /* access.c */
 extern int mount(), umount();                               /* mount.c */
 extern int link(), unlink();                                /* link.c */
 extern int exec();                                          /* exec.c */
-extern int mknod();                                         /* create.c */
+extern int mknod(), creat();                                /* create.c */
+extern int open();                                          /* open.c */
+extern int read(), write();                                 /* rdwri.c */
+extern int exit(), wait();                                  /* fork.c */
+extern int kill(), signal();                                /* sig.c */
+extern int stty(), gtty();                                  /* cio.c */
 
-extern int r_alarm(), r_close(), r_creat(), r_csw();        /* reg.c */
-extern int r_dup(), r_exit(), r_fork(), r_fstat();
-extern int r_getpid(), r_getuid(), r_gtty(), r_kill();
-extern int r_nice(), r_open(), r_pipe(), r_read();
-extern int r_seek(), r_setuid(), r_signal(), r_sleep();
-extern int r_ssw(), r_stime(), r_stty(), r_time();
-extern int r_wait(), r_write();
+extern int r_close(), r_csw(), r_fork(), r_ioctl();         /* reg.c */
+extern int r_pipe(), r_seek(), r_ftruncate(), r_time();
 
 /*
  * These two are entries 49 and 50 and NOTHING DEFINES THEM.  reg.c

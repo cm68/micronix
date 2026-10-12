@@ -134,6 +134,34 @@ has to get smaller.
 
 --------------------
 
+segcopy() and memrw() reach user memory through segments 1 and 2 -
+0x1000 and 0x2000 - which is the resident kernel's own text.  They need
+two windows at once, and the kernel has exactly one spare remap page
+(segment 13, the scratch window), so they steal the first two pages of
+resident text for the second.  It survives only because mem.s is leaf
+code parked in the u page (0xf000), not in the pages it clobbers, and
+because interrupts are off across the borrow - an interrupt taken
+mid-ldir runs through the user pages and corrupts the child, which the
+_segcopy comment spells out.  map0[2]/map0[4] are raw writes with no
+hold behind them, unlike every other page the kernel borrows.
+
+They should borrow segments 13 and 14 instead - the scratch and buffer
+windows.  Those pages are *designed* to be unmapped and remapped (that
+is their contract), and each already has a hold/release stack (swin/srel
+and bhold/brel) to make a borrow re-entrant and shared.  segcopy (fork's
+bankcopy) and memrw (memdev) neither touch the buffer cache nor hold
+anything else in those pages, so both are free to take.  memrw's caller
+even lives in win.o (memdev.c), so the page it would borrow is the page
+its caller is parked in - fine for the same reason bhold is: the return
+address is on the stack, and window-page code never runs while its page
+is borrowed.
+
+Open is plumbing, not safety: bhold() takes a struct buf * and maps
+b->xmem, while bwin() is the raw no-stack mapping, so the borrow is
+either bwin() plus a manual save or a new bhold_seg(seg) beside swin().
+
+--------------------
+
 V7's big exec change over V6 was the environment: exec(2) takes a third
 argument, an array of "NAME=value" strings (envp), that it copies onto the
 child's stack next to argv.  Micronix has none of it - no getenv/putenv in

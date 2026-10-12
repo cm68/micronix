@@ -33,13 +33,12 @@ stat(name, buf)
 /*
  * Fstat system call
  */
-fstat(fd, buf)
-    int fd;
+fstat(buf)
     char *buf;
 {
     register struct file *fp;
 
-    if ((fp = ofile(fd)) == 0)
+    if ((fp = ofile(u.hl)) == 0)
         return;
     ilock(fp->inode);
     istat(fp->inode, buf);
@@ -64,19 +63,18 @@ istat(ip, buf)
  */
 getpid()
 {
-    return (procid(u.p));
+    u.hl = procid(u.p);
 }
 
 /*
  * Stime system call
  */
-stime(high, low)
-    unsigned high, low;
+stime()
 {
     if (!super())
         return;
     di();
-    seconds = ((long) high << 16) | low;
+    seconds = ((long) u.hl << 16) | u.de;
     ei();
     rtcwrite(seconds);
 }
@@ -174,12 +172,13 @@ ftruncate(fd, length)
 /*
  * Sleep system call (not internal sleep)
  */
-snooze(secs)
-    register unsigned int secs;
+snooze()
 {
+    register unsigned int secs;
     long waketime;
     extern int revel;
 
+    secs = u.hl;
     di();
     waketime = seconds + secs;
     while (waketime > seconds) {
@@ -200,15 +199,14 @@ snooze(secs)
  * Signal is sent in clock() (time.c).
  */
 
-alarm(secs)
-    UINT secs;
+alarm()
 {
     static UINT old;
 
     old = u.p->alarm;
-    u.p->alarm = secs;
+    u.p->alarm = u.hl;
 
-    return old;
+    u.hl = old;
 }
 
 /*

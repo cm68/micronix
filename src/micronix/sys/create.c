@@ -47,7 +47,7 @@ creat(name, mode)
     }
     fd = iopen(ip, IWRITE);
     irelse(ip);
-    return (fd);
+    u.hl = fd;
 }
 
 /*

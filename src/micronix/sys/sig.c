@@ -32,17 +32,19 @@ signal(sig, func)
     u.p->slist[sig] = func;
     if ((u.p->slist[0] == sig) && (func == IGNORE))
         u.p->slist[0] = 0;
-    return (old);
+    u.hl = old;
 }
 
 /*
  * Kill system call.
  */
-kill(pid, sig)
-    int pid, sig;
+kill(sig)
+    int sig;
 {
     register struct proc *p;
+    int pid;
 
+    pid = u.hl;
     if (pid == 0) {
         killall(u.p->tty, sig);
         return;

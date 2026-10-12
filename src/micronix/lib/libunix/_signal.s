@@ -23,7 +23,7 @@ __signal:
 						; arrives in hl.  it belongs in the
 						; sig slot, which is the word the
 						; kernel reads as arg[0] - see
-						; r_signal() in sys/reg.c.
+						; signal() in sys/sig.c.
 		pop		de		; the return address
 		pop		hl		; the handler, the second argument
 		ld		(func),hl
