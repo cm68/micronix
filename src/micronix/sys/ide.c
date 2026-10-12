@@ -960,24 +960,6 @@ idestrat(b)
     }
 
     /*
-     * strat() fixes a request's count at 512 for everything it routes,
-     * and that is the only shape reachable here: a buffer is one sector,
-     * and its bytes run contiguously through the segment the window maps.
-     * swapio() is the one caller that sets its own count - 4096, a whole
-     * user page in a single request - and it reaches the strategy routine
-     * directly rather than through strat().  But it is only ever called
-     * for the swap device, and swapdev is nodev - no device at all - in
-     * every volume this tree builds.  Refusing the shape beats moving one
-     * sector of it and calling that success.
-     */
-    if (b->count != 512) {
-        b->flags |= BERROR;
-        b->error = EIO;
-        iodone(b);
-        return;
-    }
-
-    /*
      * b->blk is a filesystem block and stays one: the slice's cylinder
      * offset and the rotation are folded into idelba()'s constant, so
      * nothing here has to hold a device block number - which is what a

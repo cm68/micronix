@@ -75,15 +75,15 @@ stubstrat(b)
     register struct buf *b;
 {
     /*
-     * strat(b): do the I/O described by the buffer header.  The ordinary
-     * shape is a filesystem request - one 512-byte sector, count fixed
-     * at 512 by strat() - but swapio() can reach this routine directly
-     * with a 4096-byte count; docs/STUB.md says what to refuse.
+     * strat(b): do the I/O described by the buffer header.  The one
+     * shape that reaches this routine is a filesystem request - a
+     * 512-byte sector, count fixed at 512 by strat() - and swap moves
+     * a segment as single blocks through strat() too, so no driver is
+     * handed any other count.
      *
      * The synchronous shape, the one ide.c uses:
-     *   - check b->blk is inside the device and b->count is the shape
-     *     this driver moves; on a bad request set BERROR and the errno
-     *     and fall through to iodone;
+     *   - check b->blk is inside the device; on a bad request set
+     *     BERROR and the errno and fall through to iodone;
      *   - start the transfer on the controller;
      *   - bhold(b) to get the buffer's bytes into the window;
      *   - move the sector in or out;

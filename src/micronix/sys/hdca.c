@@ -354,12 +354,6 @@ hdstrat(b)
 	UINT cyl, head, sector;
 	UINT sl, off, roll, len, maxblk;
 
-	if (b->count != 512) {
-		b->flags |= BERROR;
-		b->error = EIO;
-		iodone(b);
-		return (0);
-	}
 	hp = getinfo(b->dev);
 	hp->h_drive = b->dev & 3;
 

@@ -159,23 +159,20 @@ swapio(flag, p)
     int flag;
     register struct proc *p;
 {
-    static UINT8 i, seg, success;
+    static UINT8 i, j, success;
     static UINT blk;
     static struct buf *b;
 
     while (!(block(&lock)))
         ;
     blk = p->swap;
+    success = 1;
     for (i = 0; i < 17; i++) {
         if (p->mem[i].per != FULL)
             continue;
-        seg = p->mem[i].seg;
         b = &swab[i];
-        b->flags &= ~(BREAD | BDONE | BSYNC | BERROR);
-        b->flags |= flag | (BLOCK | BBUSY);
         b->dev = swapdev;
-        b->blk = blk;
-        b->count = 4096;
+        b->count = 512;
         /*
          * The core image is not in the buffer window, but the address the
          * driver wants is the same two fields either way: xmem is the 4K
@@ -186,25 +183,29 @@ swapio(flag, p)
          * flat 20-bit address split across the two before the buffer
          * pool moved into segments, and at that a segment past 15 landed
          * at the wrong address entirely.
+         *
+         * A segment is moved one block at a time - 512 bytes, the one
+         * shape every driver's strat() accepts - data stepping 512 bytes
+         * a pass while xmem names the segment.
          */
+        b->xmem = p->mem[i].seg;
         b->data = (char *) BUFWIN;
-        b->xmem = seg;
         b->error = 0;
-        (*biosw[major(swapdev)].strat) (b);
-        blk += 8;
-    }
-
-    success = 1;
-    for (i = 0; i < 17; i++)
-        if (p->mem[i].per == FULL) {
-            b = &swab[i];
+        for (j = 0; j < 8; j++) {
+            b->flags &= ~(BREAD | BDONE | BSYNC | BERROR);
+            b->flags |= flag | (BLOCK | BBUSY);
+            b->blk = blk;
+            (*biosw[major(swapdev)].strat) (b);
             bwait(b);
             if (b->flags & BERROR) {
                 if (b->error == ENXIO)
                     pr("Swap space full\n");
                 success = 0;
             }
+            blk++;
+            b->data += 512;
         }
+    }
     brelse(&lock);
     p->time = 0;
     return (success);
