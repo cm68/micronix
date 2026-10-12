@@ -34,7 +34,7 @@ dllabel(cdev, sl, g, table, tm)
     static UINT off, len;
     static UINT otracks, oroll;
     static UINT8 oheads, osectors;
-    static int got, i;
+    static UINT8 got, i;
 
     otracks = g->tracks;
     oheads = g->heads;
@@ -223,7 +223,7 @@ dlreload(b, g, table, tm)
 {
     static struct dlabel lab;
     static char *p;
-    static int i;
+    static UINT8 i;
 
     p = bhold(b);
     copy(&p[DL_OFFSET], &lab, sizeof lab);

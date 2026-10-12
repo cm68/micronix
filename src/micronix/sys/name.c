@@ -144,7 +144,7 @@ direqu(a, b)
     char *a, *b;
 {
     static char *x, *y;
-    static int i;
+    static UINT8 i;
 
     x = a;
     y = b;

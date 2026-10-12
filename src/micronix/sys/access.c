@@ -100,7 +100,7 @@ permission(name, mode)
     int mode;
 {
     static struct inode *ip;
-    static int euid, egid;
+    static UINT8 euid, egid;
 
     if ((ip = iname(name)) == 0)
         return;

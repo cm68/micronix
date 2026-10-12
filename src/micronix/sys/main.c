@@ -121,7 +121,7 @@ expand_bufs()
 {
     struct buf *b;
     int seg;
-    int j;
+    UINT8 j;
 
     b = blist + 8;
     while ((int)b + sizeof(*b) <= (int)OVLBASE && nbuf < MAXBUFS) {

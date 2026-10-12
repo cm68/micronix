@@ -47,7 +47,7 @@ unhash(b)
     struct buf *b;
 {
     struct buf **pp;
-    int h;
+    UINT8 h;
 
     h = hash(b->blk, b->dev);
     for (pp = &bhash[h]; *pp; pp = &(*pp)->b_hash) {
@@ -67,7 +67,7 @@ bget(blk, dev)
     UINT blk, dev;
 {
     register struct buf *b, *f;
-    int h;
+    UINT8 h;
 
     h = hash(blk, dev);
 
@@ -397,7 +397,7 @@ bioctl(fd, cmd, arg)
     register struct file *fp;
     register struct inode *ip;
     UINT dev;
-    int maj, err;
+    UINT8 maj; int err;
 
     if (cmd != CDBCMD) {
         u.error = EINVAL;

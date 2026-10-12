@@ -192,7 +192,7 @@ core()
 abort(dummy)
     int dummy;      /* unused: forces a 1-argument frame, see setframe */
 {
-    int s;
+    char s;
     volatile int force_frame;   /* force an IY-based exit, like next() */
 
     if ((s = sig()) == 0 || s == SIGTINT)

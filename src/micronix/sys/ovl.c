@@ -217,7 +217,7 @@ int
 ovlopen(dev, mode)
     UINT dev, mode;
 {
-    UINT maj;
+    UINT8 maj;
 
     maj = bmajor(dev);
     ovlmap(maj);
@@ -232,7 +232,7 @@ int
 ovlclose(dev, mode)
     UINT dev, mode;
 {
-    UINT maj;
+    UINT8 maj;
 
     maj = bmajor(dev);
     ovlmap(maj);
@@ -247,7 +247,7 @@ int
 ovlstrat(b)
     register struct buf *b;
 {
-    UINT maj;
+    UINT8 maj;
 
     maj = bmajor(b->dev);
     ovlmap(maj);
@@ -274,7 +274,7 @@ ovlioctl(dev, cmd, r, b)
     struct cdb *r;
     struct buf *b;
 {
-    UINT maj;
+    UINT8 maj;
 
     maj = bmajor(dev);
     ovlmap(maj);
@@ -292,7 +292,7 @@ int
 ovlcopen(dev, mode)
     UINT dev, mode;
 {
-    UINT maj;
+    UINT8 maj;
 
     maj = cmajor(dev);
     ovlmap(maj);
@@ -307,7 +307,7 @@ int
 ovlcclose(dev, mode)
     UINT dev, mode;
 {
-    UINT maj;
+    UINT8 maj;
 
     maj = cmajor(dev);
     ovlmap(maj);
@@ -322,7 +322,7 @@ int
 ovlcread(dev)
     UINT dev;
 {
-    UINT maj;
+    UINT8 maj;
 
     maj = cmajor(dev);
     ovlmap(maj);
@@ -337,7 +337,7 @@ int
 ovlcwrite(dev)
     UINT dev;
 {
-    UINT maj;
+    UINT8 maj;
 
     maj = cmajor(dev);
     ovlmap(maj);
@@ -352,7 +352,7 @@ int
 ovlcmode(dev, flag)
     UINT dev, flag;
 {
-    UINT maj;
+    UINT8 maj;
 
     maj = cmajor(dev);
     ovlmap(maj);
@@ -512,7 +512,7 @@ ovlint2()
 static
 ovltick()
 {
-    register UINT maj;
+    register UINT8 maj;
 
     for (maj = 1; maj < OVLMAJ; maj++)
         if (ovltickc[maj])
@@ -578,7 +578,7 @@ ovlplace(hdr, seg)
     struct ovlhdr *hdr;
     UINT seg;
 {
-    UINT maj;
+    UINT8 maj;
 
     maj = hdr->major;
     if (maj == 0 || maj >= OVLMAJ)

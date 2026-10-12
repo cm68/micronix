@@ -375,8 +375,8 @@ itruncat(ip, length)
             struct buf *bp;
             UINT *p;
             UINT containing, bn;
-            int entry = index - 7;
-            int empty = 0;
+            UINT8 entry = index - 7;
+            UINT8 empty = 0;
 
             if ((bp = bread(ip->i_addr[7], dev)) == 0)
                 return;

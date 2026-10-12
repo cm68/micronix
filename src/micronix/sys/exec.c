@@ -163,7 +163,7 @@ getargs(args)
     char **args;
 {
     static char *s, *d;
-    int held;
+    UINT8 held;
 
     held = 0;
     nargs = nbytes = nblks = 0;
@@ -295,7 +295,7 @@ readin()
  */
 arelse()
 {
-    static int n;
+    static UINT8 n;
 
     for (n = 1; n <= nblks; n++)
         brelse(bp[n]);

@@ -63,7 +63,7 @@ clkshift(void)
 static void
 rtcget(UINT8 *r)
 {
-    int b;
+    UINT8 b;
 
     clkcmd(CC_ENSR);
     clkcmd(CC_GET);
@@ -80,11 +80,11 @@ rtcget(UINT8 *r)
 static void
 rtcset(UINT8 *r)
 {
-    int b;
+    UINT8 b;
 
     clkcmd(CC_ENSR);
     for (b = 0; b < 40; b++) {
-        int bit = (r[b / 8] >> (b % 8)) & 1;
+        UINT8 bit = (r[b / 8] >> (b % 8)) & 1;
 
         out(CLOCKPORT, (bit ? CLK_DATA : 0) | CLK_SHIFT);
         out(CLOCKPORT, (bit ? CLK_DATA : 0));

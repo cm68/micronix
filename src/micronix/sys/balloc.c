@@ -270,7 +270,7 @@ bcheck(bn, sup, dev, who)
     struct super *sup;
     char *who;
 {
-    static int i;
+    static UINT8 i;
 
     if (sup->s_isize + 1 < bn && bn < sup->s_fsize)
         return 1;

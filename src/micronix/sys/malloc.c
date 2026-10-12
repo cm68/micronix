@@ -38,7 +38,7 @@ static UINT lastseg = 16;
  */
 segalloc()
 {
-    unsigned n, limit;
+    unsigned n; UINT8 limit;
 
     di();
 
@@ -93,7 +93,7 @@ segfree(n)
 mfree(p)
     struct proc *p;
 {
-    static i;
+    static INT8 i;
     static struct mem *m;
 
     m = p->mem;

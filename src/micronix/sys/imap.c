@@ -32,7 +32,7 @@ imap(ip, log, rap)
     register UINT *rap;
 {
     UINT bn, ind;
-    int index, dev;
+    UINT8 index; int dev;
     struct buf *bp;
 
     *rap = 0;
