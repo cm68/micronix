@@ -823,11 +823,11 @@ idelba(blk, spc, cylstart, roll, len)
 ideopen(dev, mode)
     UINT dev, mode;
 {
-    static struct info *info;
-    static struct ideif *ip;
-    static UINT8 drive;
-    static UINT sl;
-    static struct buf *b;
+    struct info *info;
+    struct ideif *ip;
+    UINT8 drive;
+    UINT sl;
+    struct buf *b;
 
     drive = dev & 1;
     sl = devslice(dev);

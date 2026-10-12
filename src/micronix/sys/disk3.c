@@ -122,9 +122,9 @@ static UINT8 retry = 0,         /* number of retries so far */
 disk3open(dev, mode)
     UINT dev, mode;
 {
-    static struct info *info;
-    static UINT8 drive, sl;
-    static struct buf *b;
+    struct info *info;
+    UINT8 drive, sl;
+    struct buf *b;
 
     drive = dev & 3;
     sl = devslice(dev);
