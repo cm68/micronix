@@ -143,7 +143,7 @@ irelse(i)
 itime()
 {
     static UINT count = 0;
-    static struct inode *i;
+    struct inode *i;
 
     di();
     if (++count == 0)
