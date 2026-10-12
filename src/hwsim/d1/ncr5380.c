@@ -213,6 +213,7 @@ extern int trace_bio;
 #define CREAD10     0x28
 #define CWRITE10    0x2a
 #define CREADCAP    0x25        /* READ CAPACITY (10): last LBA + block size */
+#define CFORMAT     0x04        /* FORMAT UNIT (6): the drive formats itself */
 #define CDBLEN      10
 
 /*
@@ -520,6 +521,9 @@ ncr_command(void)
     case CREADCAP:
         datain = 1;
         break;
+    case CFORMAT:
+        datain = 0;
+        break;
     default:
         /*
          * Nothing else is ever built (scsibuild, sys/ncr.c), and an
@@ -545,6 +549,8 @@ ncr_command(void)
      */
     if (cdb[0] == CREADCAP) {
         dlen = 8;
+    } else if (cdb[0] == CFORMAT) {
+        dlen = 0;               /* no data phase: the drive formats itself */
     } else {
         count = (cdb[6] << 8) | cdb[7];
         if (count != 1) {
@@ -598,7 +604,7 @@ ncr_command(void)
     if (refused)
         stbyte = ST_CHECK;
 
-    state = BDATA;
+    state = (dlen == 0) ? BSTAT : BDATA;
     req = 1;
 }
 
@@ -630,7 +636,7 @@ ncr_advance(void)
             req = 1;
             return;
         }
-        if (!datain && !refused) {
+        if (dlen && !datain && !refused) {
             if (ncr_rw(target, lba, buf, 1) != SECLEN) {
                 l("scsi: write of lba %lu failed\n", lba);
                 stbyte = ST_CHECK;

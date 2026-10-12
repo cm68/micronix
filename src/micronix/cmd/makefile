@@ -132,6 +132,7 @@ all:
 	cd rm ; make all
 	cd rmdir ; make all
 	cd s ; make all
+	cd scsiformat ; make all
 	cd sed ; make all
 	cd setdev ; make all
 	cd sh ; make all
@@ -253,6 +254,7 @@ install:
 	cd rm ; make install
 	cd rmdir ; make install
 	cd s ; make install
+	cd scsiformat ; make install
 	cd sed ; make install
 	cd setdev ; make install
 	cd sh ; make install
@@ -375,6 +377,7 @@ clean:
 	cd rm ; make clean
 	cd rmdir ; make clean
 	cd s ; make clean
+	cd scsiformat ; make clean
 	cd sed ; make clean
 	cd setdev ; make clean
 	cd sh ; make clean
@@ -497,6 +500,7 @@ clobber:
 	cd rm ; make clobber
 	cd rmdir ; make clobber
 	cd s ; make clobber
+	cd scsiformat ; make clobber
 	cd sed ; make clobber
 	cd setdev ; make clobber
 	cd sh ; make clobber

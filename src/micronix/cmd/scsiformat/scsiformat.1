@@ -1,0 +1,71 @@
+.he "scsiformat (1)               10/11/26                scsiformat (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+scsiformat
+- format a SCSI disk through the NCR 5380
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+scsiformat [ -c cylinders ] [ -h heads ] [ -s sectors ] device
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Scsiformat formats a SCSI disk.  A SCSI disk formats itself: the host
+sends FORMAT UNIT and the target does the work, so there is no track
+walk here the way mwformat (1) and hdformat (1) have - one command, and
+the drive is blank.  What scsiformat then does is the part the drive
+cannot: it writes the disk label, the geometry and the prototype slice
+table, into block 0, so the freshly formatted drive can be opened and
+partitioned.
+.sp
+The device named must be the whole-disk slice, the
+.bd
+c
+node: scsi0c, scsi1c and so on, exactly as label (1) names them.
+.sp
+The geometry is the target's own and is not a table's, so there is no
+model flag.  -c, -h and -s say it outright, and without them the
+geometry already in the label is kept, so a disk can be re-formatted
+without re-typing its shape:
+.sp
+.in +10
+.ti -10
+-c cylinders	The track count.
+.sp
+.ti -10
+-h heads	The head count.
+.sp
+.ti -10
+-s sectors	The sectors per track.
+.sp
+.in -10
+A fresh disk has no label, so it has no geometry to keep: give all
+three.  A re-format of a labelled disk with none of them keeps the
+label's numbers.
+.sp
+The label scsiformat writes carries the prototype slice table: track 0
+holds the boot and the label, slice a is the biggest filesystem that
+fits, b is swap, and d through h are filesystems until the drive runs
+out.  The boot is not written - mkfs -i puts one there and rewrites the
+label's numbers when it does.  A freshly formatted disk still needs
+mkfs (1) before it can be mounted.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+mwformat (1), hdformat (1), djformat (1), label (1), mkfs (1)
