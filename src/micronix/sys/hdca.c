@@ -168,13 +168,13 @@ hdtrk()
  */
 static void
 hdhdrrd(p)
-	char *p;
+	register char *p;
 {
+	UINT8 i;
+
 	out(HDCA_CMD, CMD_RAMHDR);
-	p[0] = hdin();
-	p[1] = hdin();
-	p[2] = hdin();
-	p[3] = hdin();
+	for (i = 4; i; i--)
+		*p++ = hdin();
 }
 
 /*
@@ -182,13 +182,13 @@ hdhdrrd(p)
  */
 static void
 hdhdrwr(p)
-	char *p;
+	register char *p;
 {
+	UINT8 i;
+
 	out(HDCA_CMD, CMD_RAMHDR);
-	hdout(p[0]);
-	hdout(p[1]);
-	hdout(p[2]);
-	hdout(p[3]);
+	for (i = 4; i; i--)
+		hdout(*p++);
 }
 
 /*
