@@ -2664,8 +2664,8 @@ struct rule rules[] = {
 	R(ASSIGN,INHL,REGVAR,0,0,1, ASSIGN, P_L, P_R, P_R, RF_BC, "\tld (hl),c\n", 0),
 
 	/* indirect stores via registers */
-	R(ASSIGN,DEREF,INA,INBC,0,1, ASSIGN, P_L, P_R, P_NONE, 0, F_LDLC F_LDHB F_LDHLA, 0),
-	R(ASSIGN,DEREF,INA,INDE,0,1, ASSIGN, P_L, P_R, P_NONE, 0, F_EXDEHL F_LDHLA F_EXDEHL, 0),
+	R(ASSIGN,DEREF,INA,INBC,0,1, ASSIGN, P_L, P_R, P_NONE, 0, "\tld (bc),a\n", R_A),
+	R(ASSIGN,DEREF,INA,INDE,0,1, ASSIGN, P_L, P_R, P_NONE, 0, "\tld (de),a\n", R_A),
 	R(ASSIGN,DEREF,INHL,INBC,0,2, ASSIGN, P_L, P_R, P_NONE, 0, F_PUSHHL F_LDLC F_LDHB F_POPDE F_LDHLE F_INCHL F_LDHLD, 0),
 	R(ASSIGN,DEREF,INHL,INDE,0,2, ASSIGN, P_L, P_R, P_NONE, 0, F_EXDEHL "\tpush de\n" F_LDHLE F_INCHL F_LDHLD F_POPHL, 0),
 
@@ -2900,11 +2900,14 @@ struct rule rules[] = {
 	/* a word narrowed to a byte on its way through an address */
 	R(ASSIGN,DEREF,INBC,INHL,0,1, ASSIGN, P_L, P_R, P_NONE, 0, F_LDAC F_LDHLA, R_A),
 	R(ASSIGN,DEREF,INHL,INHL,0,1, ASSIGN, P_L, P_R, P_NONE, 0, F_LDAL F_LDHLA, R_A),
-	R(ASSIGN,DEREF,P_NUM,INBC,0,1, ASSIGN, P_L, P_R, P_NONE, 0, F_LDLC F_LDHB "\tld (hl),$R\n", 0),
+	R(ASSIGN,DEREF,P_NUM,INBC,0,1, ASSIGN, P_L, P_R, P_NONE, 0, "\tld a,$R\n\tld (bc),a\n", R_A),
+	R(ASSIGN,DEREF,P_NUM,INDE,0,1, ASSIGN, P_L, P_R, P_NONE, 0, "\tld a,$R\n\tld (de),a\n", R_A),
 	/* the value in HL, which has to be taken out of the way before the
 	 * pointer comes over on top of it */
 	R(ASSIGN,DEREF,INHL,INBC,0,1, ASSIGN, P_L, P_R, P_NONE, 0,
-		F_LDAL F_LDLC F_LDHB F_LDHLA, R_A),
+		F_LDAL "\tld (bc),a\n", R_A),
+	R(ASSIGN,DEREF,INHL,INDE,0,1, ASSIGN, P_L, P_R, P_NONE, 0,
+		F_LDAL "\tld (de),a\n", R_A),
 	R(ASSIGN,DEREF,P_NUM,INBC,0,2, ASSIGN, P_L, P_R, P_NONE, 0,
 		T_BC_HL F_LDHLRL F_INCHL F_LDHLRH, 0),
 	R(ASSIGN,DEREF,P_NUM,INDE,0,2, ASSIGN, P_L, P_R, P_NONE, 0,

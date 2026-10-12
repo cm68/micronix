@@ -797,12 +797,15 @@ r_exx(void)
 }
 
 /*
- * A constant load into a register that already holds that constant.
- * The value state knows what every register holds, so this is one
- * query and no forward scan.  It is what turns func(0,0,0) into one
- * ld hl,0 and three pushes, and it subsumes the ld h,0 zero-extend
- * rule that used to live here - that was this same check, hard-wired
- * to the one constant 0.
+ * A load into a register that already holds that value - a constant it
+ * already has, or a register it already aliases.  The value state knows
+ * what every register holds, so this is one query and no forward scan.
+ * It is what turns func(0,0,0) into one ld hl,0 and three pushes, and
+ * it subsumes the ld h,0 zero-extend rule that used to live here - that
+ * was this same check, hard-wired to the one constant 0.  The register
+ * form catches the round trip a 16-bit copy leaves behind: "ld c,l /
+ * ld b,h / ld l,c / ld h,b" is BC=HL and two bytes that put HL back the
+ * way it already was.
  */
 int
 r_constdup(void)

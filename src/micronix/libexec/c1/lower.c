@@ -435,32 +435,44 @@ lowercompound(Expr *e)
 }
 
 /*
- * One arm of a ternary, landed in HL.  Wrapping it in ASSIGN(INHL, v)
- * reuses the whole =(H,...) rule set - which is what makes a constant
+ * One arm of a ternary, landed in HL - or, when the ternary's value is
+ * demanded as a byte, in A.  Wrapping it in ASSIGN(INHL/INA, v) reuses
+ * the whole =(H,...)/(A,...) rule set - which is what makes a constant
  * arm emit anything at all, and what puts both arms in one register so
  * the expression has a value wherever the branch went.
  *
- * w is the ternary's own width, not the arm's: a byte arm in an int
- * ternary has to carry its sign to a word, and the plain byte store
- * would zero H instead.  The SEXT/WIDEN here is the same widening RETURN
- * gives a byte result.
+ * w is the width the arm is landed at, not the arm's: a byte arm in an
+ * int ternary has to carry its sign to a word (SEXT/WIDEN), and a
+ * ternary demanded as a byte lands in A - a constant is masked to its
+ * low byte, anything wider truncates through =(A,<word>).  The SEXT/WIDEN
+ * here is the same widening RETURN gives a byte result.
  */
 void
-branchval(Expr *v, char w)
+branchval(Expr *v, char w, int abyte)
 {
-	Expr *hl, *asn;
+	Expr *r, *asn;
 
 	if (!v)
 		return;
-	if (ISBYTE(v->width) && ISWORD(w)) {
+	if (abyte) {
+		/*
+		 * A ternary whose value is wanted as a byte.  A constant arm
+		 * narrows to its own low byte; any other word arm reduces at
+		 * its own width and =(A,..) brings the low byte to A.
+		 */
+		if (v->op == NUMBER) {
+			v->u.val &= 0xff;
+			v->width = w;
+		}
+	} else if (ISBYTE(v->width) && ISWORD(w)) {
 		if (v->op == NUMBER)
 			v->width = w;
 		else
 			v = mkunary(ISSIGNED(v->width) ? SEXT : WIDEN, w, v);
 	}
-	hl = mkcode(w, R_HL);
-	hl->op = INHL;
-	asn = mkbinary(ASSIGN, w, hl, v);
+	r = mkcode(w, abyte ? R_A : R_HL);
+	r->op = abyte ? INA : INHL;
+	asn = mkbinary(ASSIGN, w, r, v);
 	setdest(asn, DEST_VALUE);
 	freeexpr(rewrite(asn));
 }
@@ -1751,6 +1763,8 @@ spiltstore(Expr *e, Expr *oldleft)
 {
 	Expr *a;
 
+	if (ISBYTE(e->width) && e->right)
+		e->right->nored |= NR_BYTEWANT;
 	e->right = valtohl(rewrite1(e->right));
 	if (ISLONGINT(e->width)) {
 		out("\tcall qst\n");
@@ -2132,6 +2146,17 @@ rewrite1(Expr *e)
 		unsigned char dest = e->dest;
 		unsigned char tgt = e->tgt ? e->tgt : R_HL;
 		char *cc;
+		int abyte;
+		char w;
+
+		/*
+		 * A byte store wants only the low byte of this value.  Land
+		 * both arms in A at byte width instead of word-in-HL, unless
+		 * the result is routed to DE - a byte store whose own value
+		 * is consumed as a word - where the word path is correct.
+		 */
+		abyte = (e->nored & NR_BYTEWANT) && tgt == R_HL;
+		w = abyte ? (ISSIGNED(e->width) ? T_BYTE : T_UBYTE) : e->width;
 
 		/* the condition, and the branch that skips the then arm.
 		 * falsecc may emit the zero test it needs, so it has to run
@@ -2141,16 +2166,16 @@ rewrite1(Expr *e)
 		cc = falsecc(e->left);
 		outf("\tjp %s,_T%d\n", cc, lbl);
 
-		branchval(tb->left, e->width);
+		branchval(tb->left, w, abyte);
 		outf("\tjp _E%d\n_T%d:\n", lbl, lbl);
-		branchval(tb->right, e->width);
+		branchval(tb->right, w, abyte);
 		outf("_E%d:\n", lbl);
 
 		e->left = 0;
 		tb->left = 0;
 		tb->right = 0;
-		n = mkcode(e->width, R_HL);
-		n->op = INHL;
+		n = mkcode(w, abyte ? R_A : R_HL);
+		n->op = abyte ? INA : INHL;
 		n->dest = dest;
 		freeexpr(e);
 		return movetotgt(n, tgt);
@@ -2352,6 +2377,46 @@ spilled:	;
 	} else {
 		/* Rewrite children first (depth-first) */
 		/* Skip children marked nored (preserve for parent rules) */
+		if (e->op == ASSIGN && e->left && ISBYTE(e->width) &&
+		    (e->left->op == POSTINC || e->left->op == POSTDEC) &&
+		    e->left->left && e->left->left->op == REGVAR &&
+		    (e->left->left->u.var.reg == R_BC ||
+		     e->left->left->u.var.reg == R_DE) &&
+		    e->right && !ISLONG(e->right->width)) {
+			/*
+			 * *p++ = <byte> with p homed in BC or DE.  The step rules
+			 * stage the old pointer into HL and step it there; a byte
+			 * store through the register needs neither - one STAX and
+			 * the step stays on the pair.  BC and DE are callee-saved,
+			 * so reducing the value cannot clobber the pointer.
+			 */
+			Expr *n;
+			int isbc = e->left->left->u.var.reg == R_BC;
+			int inc = e->left->op == POSTINC;
+
+			if (e->right->op == NUMBER) {
+				long val = e->right->u.val & 0xff;
+
+				if (val == 0)
+					out("\txor a\n");
+				else
+					outf("\tld a,%d\n", (int)val);
+			} else {
+				e->right->nored |= NR_BYTEWANT;
+				e->right = rewrite1(e->right);
+
+				if (e->right->op != INA)
+					out("\tld a,l\n");	/* a word, narrowed */
+			}
+			outf("\tld (%s),a\n", isbc ? "bc" : "de");
+			out(isbc ? (inc ? "\tinc bc\n" : "\tdec bc\n") :
+			          (inc ? "\tinc de\n" : "\tdec de\n"));
+			n = mkcode(e->width, R_A);
+			n->op = INA;
+			n->dest = e->dest;
+			freeexpr(e);
+			return n;
+		}
 		if (e->op == ASSIGN && e->left && e->right &&
 		    !islocdesc(e->left) && !isdestreg(e->left) &&
 		    e->left->op != DEREF &&
@@ -2719,8 +2784,11 @@ spilled:	;
 			    e->op != ASSIGN && e->right->regs > 0 &&
 			    e->right->op != NUMBER && ISBYTE(e->right->width))
 				bytepair(e);
-			else
+			else {
+				if (e->op == ASSIGN && ISBYTE(e->width) && e->right)
+					e->right->nored |= NR_BYTEWANT;
 				e->right = rewrite1(e->right);
+			}
 		}
 	children_end: ;
 		/*

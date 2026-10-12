@@ -172,17 +172,18 @@ vpairconst(struct vstate *s, int hi, int lo, int n)
 }
 
 /*
- * Is insn a constant load the state already satisfies?  Returns the
- * bytes the load occupies - 2 for an 8-bit load, 3 for a 16-bit one -
- * so the rule knows what it saved, or 0 if the load is not redundant.
- * This is what turns func(0,0,0) into one ld hl,0 and three pushes.
+ * Is insn a load the state already satisfies?  Returns the bytes the
+ * load occupies - 1 for an 8-bit register copy, 2 for an 8-bit
+ * constant, 3 for a 16-bit constant - so the rule knows what it
+ * saved, or 0 if the load is not redundant.  This is what turns
+ * func(0,0,0) into one ld hl,0 and three pushes.
  */
 int
 vredundant(struct vstate *s, char *insn)
 {
 	char m[8];
 	char *op, *o2;
-	int d, hi, lo, n;
+	int d, src, hi, lo, n;
 
 	mnemof(insn, m, sizeof(m));
 	if (strcmp(m, "ld") != 0)
@@ -192,6 +193,13 @@ vredundant(struct vstate *s, char *insn)
 
 	d = v8idx(op);
 	if (d >= 0) {
+		src = v8idx(o2);
+		if (src >= 0) {
+			/* ld d,s with d and s already holding one value is a
+			 * no-op.  VN_UNKNOWN is "don't know", not a value, so
+			 * two unknowns never count as equal. */
+			return (s->r[d] != VN_UNKNOWN && s->r[d] == s->r[src]) ? 1 : 0;
+		}
 		if (!vnumber(o2, &n))
 			return 0;
 		return vnconst(s->r[d]) == n ? 2 : 0;
@@ -230,9 +238,18 @@ vnext(struct vstate *s, char *insn)
 		d = v8idx(op);
 		if (d >= 0) {
 			src = v8idx(o2);
-			if (src >= 0)
+			if (src >= 0) {
+				/* a copy of a register we know nothing about.  Its
+				 * number is VN_UNKNOWN, which the side table cannot
+				 * distinguish from any other register's VN_UNKNOWN, so
+				 * minting a number for the SOURCE names the unknown and
+				 * lets the copy alias it - "ld c,l; ld l,c" is then a
+				 * provable no-op.  The source's value is still unknown,
+				 * it just has a name now. */
+				if (s->r[src] == VN_UNKNOWN)
+					setfresh(s, src);
 				s->r[d] = s->r[src];	/* copy */
-			else if (vnumber(o2, &n))
+			} else if (vnumber(o2, &n))
 				setconst(s, d, n);	/* constant */
 			else
 				setfresh(s, d);		/* (mem) */

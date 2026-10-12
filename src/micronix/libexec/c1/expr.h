@@ -11,9 +11,10 @@
 #define DEST_VALUE	2	/* result needed as value */
 #define DEST_STACK	3	/* result pushed to stack (call args) */
 
-/* nored flags */
+/* nored flags: two reduction hints and one width demand */
 #define NR_NORED	1	/* don't reduce: preserve for parent rule */
 #define NR_ADDR		2	/* parent wants the address, not the place */
+#define NR_BYTEWANT	4	/* value demanded as a byte by its consumer */
 
 /* expression node */
 typedef struct Expr {
