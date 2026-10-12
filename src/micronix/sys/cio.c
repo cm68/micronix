@@ -57,9 +57,9 @@ cmode(fd, addr, flag)
     int fd, flag;
     char *addr;
 {
-    static struct file *fp;
-    static struct inode *ip;
-    static int dev;
+    struct file *fp;
+    struct inode *ip;
+    int dev;
 
     if ((fp = ofile(fd)) == 0)
         return;

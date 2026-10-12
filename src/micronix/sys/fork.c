@@ -66,7 +66,6 @@ fork()
 procopy(child)
     register struct proc *child;    /* see comments to next (sleep.c) */
 {
-    static char bank;
     register int s;
     register char mode;
 

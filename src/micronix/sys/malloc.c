@@ -93,8 +93,8 @@ segfree(n)
 mfree(p)
     struct proc *p;
 {
-    static INT8 i;
-    static struct mem *m;
+    INT8 i;
+    struct mem *m;
 
     m = p->mem;
     for (i = 16; i >= 0; i--) {
@@ -120,8 +120,8 @@ mwake()
  */
 mrelse()
 {
-    static UINT8 i, grow;
-    static struct mem *m;
+    UINT8 i, grow;
+    struct mem *m;
 
     m = u.p->mem;
     grow = m->seg;
@@ -145,8 +145,8 @@ mrelse()
 mget(p)
     struct proc *p;
 {
-    static UINT8 grow, i;
-    static struct mem *m;
+    UINT8 grow, i;
+    struct mem *m;
 
     if (p->nsegs > nsegs) {
         pr("mget: p->nsegs %d > free nsegs %d\n", p->nsegs, nsegs);
@@ -175,8 +175,8 @@ mget(p)
 grow(seg)
     UINT seg;
 {
-    static char i, grow;
-    static struct mem *m;
+    char i, grow;
+    struct mem *m;
 
 #define brakeseg ((UINT)u.brake >> 12)
 #define stackseg ((UINT)u.sp >> 12)
@@ -291,7 +291,7 @@ fault()
 bankcopy(p)
     struct proc *p;
 {
-    static char i;
+    char i;
 
     for (i = 0; i < 17; i++)
         if (u.p->mem[i].per == FULL)

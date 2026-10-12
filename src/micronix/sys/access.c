@@ -25,22 +25,18 @@ access(i, per)
     struct inode *i;
     int per;
 {
-    static struct inode *ip;
-    static int perm;
-    static int mode;
+    int mode;
 
-    ip = i;
-    perm = per;
-    mode = ip->i_mode;
+    mode = i->i_mode;
     /*
      * Don't allow anyone to write
      * on devices mounted read-only
      * or locked for one-writer-only.
      */
-    if (perm & IWRITE) {
-        if (!(mode & IIO) && ronly(ip))
+    if (per & IWRITE) {
+        if (!(mode & IIO) && ronly(i))
             return 0;
-        if (ip->flags & IWRLOCK) {
+        if (i->flags & IWRLOCK) {
             u.error = EBUSY;
             return 0;
         }
@@ -50,7 +46,7 @@ access(i, per)
      * least one of the exec bits must be on.
      */
     if (u.u_euid == SUPERID) {
-        if (!(perm & IEXEC))
+        if (!(per & IEXEC))
             return 1;
         if (mode & (IEXEC | IEXEC << 3 | IEXEC << 6))
             return 1;
@@ -59,19 +55,19 @@ access(i, per)
     /*
      * Check the anyone permissions
      */
-    if ((perm & mode) == perm)
+    if ((per & mode) == per)
         return 1;
     /*
      * Check the group permissions
      */
-    perm <<= 3;
-    if (u.u_egid == ip->i_gid && (perm & mode) == perm)
+    per <<= 3;
+    if (u.u_egid == i->i_gid && (per & mode) == per)
         return 1;
     /*
      * Check the owner permissions
      */
-    perm <<= 3;
-    if (u.u_euid == ip->i_uid && (perm & mode) == perm)
+    per <<= 3;
+    if (u.u_euid == i->i_uid && (per & mode) == per)
         return 1;
   bad:
     u.error = EACCES;
@@ -99,8 +95,8 @@ permission(name, mode)
     char *name;
     int mode;
 {
-    static struct inode *ip;
-    static UINT8 euid, egid;
+    struct inode *ip;
+    UINT8 euid, egid;
 
     if ((ip = iname(name)) == 0)
         return;

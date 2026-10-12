@@ -63,7 +63,7 @@ swap()
 int
 findin()
 {
-    static struct proc *p, *n;
+    struct proc *p, *n;
 
     di();
     n = 0;
@@ -83,7 +83,7 @@ findin()
 int
 findout()
 {
-    static struct proc *p, *n;
+    struct proc *p, *n;
 
     di();
     n = 0;
@@ -159,9 +159,9 @@ swapio(flag, p)
     int flag;
     register struct proc *p;
 {
-    static UINT8 i, j, success;
-    static UINT blk;
-    static struct buf *b;
+    UINT8 i, j, success;
+    UINT blk;
+    struct buf *b;
 
     while (!(block(&lock)))
         ;

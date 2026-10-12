@@ -64,7 +64,7 @@ link(old, new)
 ilink(inum)
     int inum;
 {
-    static char *p;
+    char *p;
 
     for (p = u.dir.name; p < &u.dir.name[14]; p++)
         if (*p == 0) {

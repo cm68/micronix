@@ -98,7 +98,7 @@ seek(fd, disp, from)
     register UINT disp;         /* block numbers are unsigned short */
     register unsigned from;
 {
-    static struct file *fp;
+    struct file *fp;
     static UINT32 offset;       /* file positions are unsigned (to ~15M) */
 
     if ((fp = ofile(fd)) == 0)

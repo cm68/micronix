@@ -122,9 +122,9 @@ static UINT8 retry = 0,         /* number of retries so far */
 disk3open(dev, mode)
     UINT dev, mode;
 {
-    static struct info *info;
-    static UINT8 drive, sl;
-    static struct buf *b;
+    struct info *info;
+    UINT8 drive, sl;
+    struct buf *b;
 
     drive = dev & 3;
     sl = devslice(dev);
@@ -297,7 +297,7 @@ rwint()
  */
 advque()
 {
-    static struct buf *f;
+    struct buf *f;
 
     iodone(d3buf);
     f = d3buf->forw;
@@ -347,7 +347,7 @@ newdrv()
 newrw()
 {
     static UINT32 abs;
-    static UINT spc;
+    UINT spc;
 
     spc = d3info->spc;
     abs = ((UINT32) d3buf->cyl * spc) + (d3buf->blk % spc);

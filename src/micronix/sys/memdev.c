@@ -53,7 +53,7 @@ static
 krw(dev, rw)
     int rw;
 {
-    static UINT n;
+    UINT n;
 
     if (dev & 1) {              /* kernel space */
         while (u.count) {
@@ -91,7 +91,7 @@ iowrite(dev)
 iorw(dev, rw)
     int dev, rw;
 {
-    static UINT8 port;
+    UINT8 port;
 
     port = minor(dev);
     if (port == 0)

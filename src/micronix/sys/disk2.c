@@ -93,9 +93,9 @@ static UINT8 d2dead = 0;        /* ticks a command has been in flight */
 disk2open(dev, mode)
     UINT dev, mode;
 {
-    static struct info *info;
-    static UINT8 drive, sl;
-    static struct buf *b;
+    struct info *info;
+    UINT8 drive, sl;
+    struct buf *b;
 
     drive = dev & 3;
     sl = devslice(dev);

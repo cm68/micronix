@@ -270,7 +270,7 @@ unsigned
 btime()
 {
     static UINT count = 0;
-    static struct buf *b;
+    struct buf *b;
 
     di();
     if (++count == 0) {
@@ -293,9 +293,9 @@ char quelen = 0;
 bsort(h, b)
     struct buf *h, *b;
 {
-    static struct buf *p, *f;
-    static UINT bc, pc, fc;
-    static char n;
+    struct buf *p, *f;
+    UINT bc, pc, fc;
+    char n;
 
     bc = b->cyl;
     n = 1;
@@ -318,7 +318,7 @@ bsort(h, b)
 strat(bp)
     struct buf *bp;
 {
-    static struct buf *b;
+    struct buf *b;
 
     b = bp;
     b->flags |= BBUSY;
@@ -472,7 +472,7 @@ unsigned
 bmajor(dev)
     UINT dev;
 {
-    static UINT maj;
+    UINT maj;
 
     if ((maj = dev >> 8) >= nbdev)
         maj = 0;                /* nodev, sets b->error = ENXIO */
@@ -487,8 +487,8 @@ bmajor(dev)
 iodone(bp)
     struct buf *bp;
 {
-    static struct buf *b;
-    static UINT dev;
+    struct buf *b;
+    UINT dev;
 
     b = bp;
     dev = b->dev;

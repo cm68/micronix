@@ -109,10 +109,10 @@ static struct buf *curbuf = 0,  /* buffer currently under scrutiny */
 djopen(dev, mode)
 	register dev, mode;
 {
-	static struct dm *d;
-	static struct dlgeom *g;
-	static struct status *s;
-	static unsigned drive, sl;
+	struct dm *d;
+	struct dlgeom *g;
+	struct status *s;
+	unsigned drive, sl;
 
 	/*
 	 * The staging page, before anything can want it.  This is the one

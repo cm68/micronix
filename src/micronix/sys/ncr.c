@@ -936,11 +936,11 @@ scsilba(blk, spc, cylstart, roll, len, heads, sectors)
 ncropen(dev, mode)
     UINT dev, mode;
 {
-    static struct info *info;
-    static struct scsiif *ip;
-    static UINT8 target, lun;
-    static UINT sl;
-    static struct buf *b;
+    struct info *info;
+    struct scsiif *ip;
+    UINT8 target, lun;
+    UINT sl;
+    struct buf *b;
 
     target = minor(dev) & 7;
     lun = (minor(dev) >> 3) & 3;
