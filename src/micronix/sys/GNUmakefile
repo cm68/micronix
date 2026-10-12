@@ -153,6 +153,12 @@ $(KERNEL_C) $(WIN_C) $(HIGHMEM_C_OBJ) user.o \
 	$(MODS:%=%.o) $(MODS:%=%hdr.o) $(STAGED:%=%.o) $(STAGED:%=%hdr.o): %.o: %.c
 	$(CCC) $(CCFLAGS) $(INC) -c $<
 
+# The driver modules and staged objects compile <sys/*.h> out of
+# $(DEPTH)/include the same as the resident objects do; the $(OBJS) half of
+# that dependency lives in GNUmakefile.inc, and this is the module half.
+$(MODS:%=%.o) $(MODS:%=%hdr.o) $(STAGED:%=%.o) $(STAGED:%=%hdr.o): \
+	$(wildcard $(DEPTH)/include/*.h) $(wildcard $(DEPTH)/include/sys/*.h)
+
 $(KERNEL_AS_OBJ) $(LEAF_AS) $(HIGHMEM_AS_OBJ): %.o: %.s
 	$(CCC) $(CCFLAGS) -c $<
 

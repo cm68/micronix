@@ -314,8 +314,8 @@ dump_buf(addr, nbuf)
 			break;
 		printf(" %3d @%04x dev=%04x blk=%u flags=%02x(", i, ba, b.dev, b.blk, b.flags);
 		printbits(b.flags, bflag_bits, 8);
-		printf(") count=%u data=%04x xmem=%u err=%u time=%u\n",
-		    b.count, (unsigned)b.data, b.xmem, b.error, b.time);
+		printf(") data=%04x xmem=%u err=%u time=%u\n",
+		    (unsigned)b.data, b.xmem, b.error, b.time);
 		printf("      forw=%04x back=%04x cyl=%u hash=%04x\n",
 		    (unsigned)b.forw, (unsigned)b.back, b.cyl, (unsigned)b.b_hash);
 	}
