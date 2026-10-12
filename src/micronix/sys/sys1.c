@@ -99,20 +99,22 @@ chown(name, owner)
 }
 
 /*
- * Dup system call
+ * Dup system call.  The descriptor arrives in u.hl, and the new one
+ * goes back the same way.
  */
-dup(fd)
-    int fd;
+dup()
 {
     register struct file *fp;
+    int fd;
 
+    fd = u.hl;
     if ((fp = ofile(fd)) == 0)
         return;
     if ((fd = oalloc()) == ERROR)
         return;
     u.olist[fd] = fp;
     fp->count++;
-    return (fd);
+    u.hl = fd;
 }
 
 /*
@@ -162,17 +164,18 @@ reboot(howto)
  */
 getuid()
 {
-    return ((u.u_gid << 8) | u.u_uid);
+    u.hl = (u.u_gid << 8) | u.u_uid;
 }
 
 /*
  * Setuid system call
  */
-setuid(id)
-    unsigned int id;
+setuid()
 {
     register char uid, gid;
+    unsigned int id;
 
+    id = u.hl;
     uid = (char) id;
     gid = id >> 8;
     if ((uid == u.u_uid && gid == u.u_gid) || super()) {
@@ -187,12 +190,11 @@ setuid(id)
 /*
  * Nice system call
  */
-nice(n)
-    int n;
+nice()
 {
     register char nice;
 
-    nice = n;
+    nice = u.hl;
     if (nice < 0 && !super())
         return;
     u.p->nice = 128 - nice;
@@ -206,10 +208,9 @@ unsigned switches = 0;
 /*
  * Set the switches
  */
-ssw(arg)
-    int arg;
+ssw()
 {
-    switches = arg;
+    switches = u.hl;
 }
 
 /*

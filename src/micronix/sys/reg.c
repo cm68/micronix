@@ -1,7 +1,15 @@
 /*
- * system call wrappers, sort of.
+ * system call wrappers with real register or carry convention work.
  *
- * sys/reg.c 
+ * The trivial marshal-and-call wrappers (r_dup, r_read, r_open, ...)
+ * used to live here too; their marshalling is folded into the workers
+ * now, so syssw points at the workers directly.  What is left is the
+ * register work that is not a plain word: the trap entry (r_system),
+ * fork's parent/child return, the carry and error convention (r_ioctl,
+ * r_seek, r_ftruncate), the two-word pipe and time returns, and the two
+ * workers that are also called internally (r_close, r_csw).
+ *
+ * sys/reg.c
  * Changed: <2022-01-04 10:43:12 curt>
  */
 #include <types.h>
@@ -22,10 +30,6 @@ extern UINT32 seek(int fd, UINT disp, unsigned from);
 extern int ftruncate(int fd, UINT32 length);
 
 /*
- * Handle register passing across system calls
- */
-
-/*
  * First, pass registers across the system interface
  */
 r_system()
@@ -38,39 +42,14 @@ r_system()
         u.af &= ~ERRBIT;
 }
 
-r_alarm()
-{
-    u.hl = alarm(u.hl);
-}
-
 r_close()
 {
     close(u.hl);
 }
 
-r_creat()
-{
-    u.hl = creat(arg[0], arg[1]);
-}
-
 r_csw()
 {
     u.hl = csw();
-}
-
-r_ssw()
-{
-    ssw(u.hl);
-}
-
-r_dup()
-{
-    u.hl = dup(u.hl);
-}
-
-r_exit()
-{
-    exit(u.hl);
 }
 
 r_fork()
@@ -81,26 +60,6 @@ r_fork()
     if (id != 0)                /* no reg changes in child */
         u.pc += 3;              /* old process return */
     u.hl = id;                  /* parent gets pid, child gets 0 */
-}
-
-r_fstat()
-{
-    fstat(u.hl, arg[0]);
-}
-
-r_getpid()
-{
-    u.hl = getpid();
-}
-
-r_getuid()
-{
-    u.hl = getuid();
-}
-
-r_gtty()
-{
-    gtty(u.hl, arg[0]);
 }
 
 /*
@@ -124,21 +83,6 @@ r_ioctl()
     }
 }
 
-r_kill()
-{
-    kill(u.hl, arg[0]);
-}
-
-r_nice()
-{
-    nice(u.hl);
-}
-
-r_open()
-{
-    u.hl = open(arg[0], arg[1]);
-}
-
 r_pipe()
 {
     int vec[2];
@@ -146,11 +90,6 @@ r_pipe()
     pipe(vec);
     u.hl = vec[0];
     u.de = vec[1];
-}
-
-r_read()
-{
-    u.hl = read(u.hl, arg[0], arg[1]);
 }
 
 /*
@@ -198,51 +137,16 @@ r_ftruncate()
     }
 }
 
-r_setuid()
-{
-    setuid(u.hl);
-}
-
-r_signal()
-{
-    u.hl = signal(arg[0], arg[1]);
-}
-
-r_sleep()
-{
-    snooze(u.hl);
-}
-
-r_stime()
-{
-    stime(u.hl, u.de);
-}
-
-r_stty()
-{
-    stty(u.hl, arg[0]);
-}
-
 r_time()
 {
     u.de = seconds;
     u.hl = seconds >> 16;
 }
 
-r_wait()
-{
-    u.hl = wait(&u.de);
-}
-
-r_write()
-{
-    u.hl = write(u.hl, arg[0], arg[1]);
-}
-
 /*
  * r_lock () { reclock (u.hl, arg [0]); }
- * 
- * r_unlock () { unlock (u.hl); } 
+ *
+ * r_unlock () { unlock (u.hl); }
  */
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

@@ -154,13 +154,12 @@ newpid(a)
  * If the exit was caused by a core-dump signal,
  * then core is dumped.
  */
-exit(stat)
-    int stat;
+exit()
 {
     register int fd;
     register struct proc *p;
 
-    u.p->status |= (stat << 8);
+    u.p->status |= (u.hl << 8);
 
     /*
      * if (u.p->status & 0200) core(); 
@@ -186,8 +185,7 @@ exit(stat)
 /*
  * Wait system call
  */
-wait(addr)
-    int *addr;                  /* where to return the status */
+wait()
 {
     char child;                 /* children detection flag */
     unsigned pid;               /* process id */
@@ -210,10 +208,11 @@ wait(addr)
                  */
 
                 if (!(p->mode & ALIVE)) {       /* dead */
-                    *addr = p->status;  /* set r1 */
+                    u.de = p->status;   /* set r1 */
                     pid = procid(p);
                     zero(p, sizeof(*p));        /* free it */
-                    return pid;
+                    u.hl = pid;
+                    return;
                 }
             }
         }

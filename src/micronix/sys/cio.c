@@ -80,22 +80,20 @@ cmode(fd, addr, flag)
  * Gtty system call. Notice that the calling conventions
  * for the devive sgtty routine are not unix standard.
  */
-gtty(fd, addr)
-    int fd;
+gtty(addr)
     char *addr;
 {
-    cmode(fd, addr, READ);
+    cmode(u.hl, addr, READ);
 }
 
 /*
  * Stty system call. Notice that the calling conventions
  * for the devive sgtty routine are not unix standard.
  */
-stty(fd, addr)
-    int fd;
+stty(addr)
     char *addr;
 {
-    cmode(fd, addr, WRITE);
+    cmode(u.hl, addr, WRITE);
 }
 
 /*

@@ -22,19 +22,19 @@
 /*
  * Read system call
  */
-read(fd, buf, count)
-    int fd, buf, count;
+read(buf, count)
+    int buf, count;
 {
-    return rdwri(IREAD, fd, buf, count);
+    u.hl = rdwri(IREAD, u.hl, buf, count);
 }
 
 /*
  * Write system call
  */
-write(fd, buf, count)
-    int fd, buf, count;
+write(buf, count)
+    int buf, count;
 {
-    return rdwri(IWRITE, fd, buf, count);
+    u.hl = rdwri(IWRITE, u.hl, buf, count);
 }
 
 /*

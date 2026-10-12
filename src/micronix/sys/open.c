@@ -33,7 +33,7 @@ open(name, mode)
     }
     fd = iopen(ip, mode);
     irelse(ip);
-    return (fd);
+    u.hl = fd;
 }
 
 /*
