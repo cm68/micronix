@@ -28,7 +28,7 @@
 #define CSEEK 3			/* v6's block-granular SEEK_SET */
 
 extern int errno;
-extern long seekraw(unsigned char fd, int offset, int whence);
+extern long seekraw(unsigned char fd, unsigned offset, int whence);
 
 /*
  * Move to an absolute position, in as many calls as it takes.
@@ -39,11 +39,11 @@ seekabs(fd, pos)
 	unsigned long pos;
 {
 	if (pos <= 65535)
-		return seekraw(fd, (int) pos, SEEK_SET);
-	if (seekraw(fd, (int) (pos >> 9), CSEEK) < 0)
+		return seekraw(fd, (unsigned) pos, SEEK_SET);
+	if (seekraw(fd, (unsigned) (pos >> 9), CSEEK) < 0)
 		return -1;
 	if (pos & 511)
-		return seekraw(fd, (int) (pos & 511), SEEK_CUR);
+		return seekraw(fd, (unsigned) (pos & 511), SEEK_CUR);
 	return (long) pos;
 }
 

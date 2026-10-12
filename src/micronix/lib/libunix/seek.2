@@ -57,11 +57,11 @@ is 3, 4, or 5, the meaning is the same as for 0, 1, or 2,
 except that offset is multiplied by 512.
 .sp
 .ti -2
-- If 
+- If
 .bd
-from 
-is 0 or 3, offset is treated as signed.
-Otherwise it is unsigned.
+from
+is 0 or 3, offset is treated as unsigned: a block number for 3.
+If it is 1, 2, 4 or 5, it is signed.
 .sp
 .in -2
 .nf
@@ -79,8 +79,24 @@ seeks	seeks	Motion is relative to
 2	5	End of file (signed)
 
 .fi
+The displacement is an unsigned short where the table says unsigned,
+so a block number above 32767 is not sign-extended.  The position is a
+long, and the kernel hands it back in two words: the high half in hl'
+and the low half in hl, which is how the compiler passes and returns a
+long.  A declaration of
 .bd
-Seeks 
+seek
+without its
+.bd
+long
+return type reads only the low half, so callers that care about the
+position must say
+.bd
+long
+(see lseek (2)).
+.sp
+.bd
+Seeks
 are not allowed on pipes, but are allowed on character devices,
 although most such devices ignore them.
 Seeking far past the end of a file and writing

@@ -1436,13 +1436,15 @@ initcmd(int c, char **a)
 
     /*
      * The prototype label, in the second half of block 0: the drive's
-     * shape and its own name, so a freshly formatted disk says what it is
-     * before any filesystem is made.  The slice table is all zero, which
-     * is the whole drive as slice 'c'; the label command adds the rest.
+     * shape, its own name and the conventional slice types, so a freshly
+     * formatted disk says what it is and how it is meant to be
+     * partitioned.  The extents are still zero - the label command carves
+     * them - but a, d, e, f, g and h are filesystems and b is swap.
      */
     {
         struct dlabel *lp;
         char buf[512];
+        int i;
 
         memset(buf, 0, sizeof(buf));
         lp = (struct dlabel *) &buf[DL_OFFSET];
@@ -1454,6 +1456,10 @@ initcmd(int c, char **a)
         lp->d_firstsec = m->firstsec;
         strncpy(lp->d_mfg, m->mfg, sizeof(lp->d_mfg));
         strncpy(lp->d_model, m->model, sizeof(lp->d_model));
+        lp->d_slice[0].d_type = SL_FS;
+        lp->d_slice[1].d_type = SL_SWAP;
+        for (i = 3; i < NSLICE; i++)
+            lp->d_slice[i].d_type = SL_FS;
         imd_write(ip, 0, 0, m->firstsec, buf);
     }
 
@@ -2215,6 +2221,13 @@ labelcmd(int c, char **a)
     for (i = 0; i < lab_nsets; i++) {
         off = lab_sets[i].ls_start;
         len = lab_sets[i].ls_len;
+        /*
+         * A slice named without an end runs to the last cylinder, stored
+         * as an explicit length - a length of zero is "not carved", not
+         * "to the end" (sys/dlabel.h).
+         */
+        if (len == 0)
+            len = lp->d_tracks - off;
 
         /*
          * Checked before the entry is set, and not after.  The label is
@@ -2236,7 +2249,9 @@ labelcmd(int c, char **a)
         }
         lp->d_slice[lab_sets[i].ls_sl].d_off = off;
         lp->d_slice[lab_sets[i].ls_sl].d_len = len;
-        lp->d_slice[lab_sets[i].ls_sl].d_type = SL_FS;
+        /* the prototype typed the slice; carving keeps that type */
+        if (lp->d_slice[lab_sets[i].ls_sl].d_type == SL_UNUSED)
+            lp->d_slice[lab_sets[i].ls_sl].d_type = SL_FS;
         printf("%s: slice %c (offset %u, length %u)\n",
             image, 'a' + lab_sets[i].ls_sl, off, len);
     }

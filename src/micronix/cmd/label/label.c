@@ -397,10 +397,18 @@ writeslice(op)
 	register struct setop *op;
 {
 	register struct dlabel *lp;
-	UINT off;
+	UINT off, len;
 
 	lp = getlabel();
 	off = op->so_off;
+	len = op->so_len;
+	/*
+	 * A slice named without an end runs to the last cylinder, stored as
+	 * an explicit length - zero is "not carved", not "to the end"
+	 * (sys/dlabel.h).
+	 */
+	if (len == 0)
+		len = lp->d_tracks - off;
 
 	/*
 	 * Checked before the entry is set, and not after.  The label is
@@ -412,16 +420,18 @@ writeslice(op)
 	 */
 	if (op->so_sl != DL_WHOLE &&	/* c ignores its entry */
 	    (off >= lp->d_tracks ||
-	     (op->so_len && (long) off + (long) op->so_len > (long) lp->d_tracks))) {
+	     (len && (long) off + (long) len > (long) lp->d_tracks))) {
 		fprintf(stderr, "%s: slice %c runs past cylinder %u\n",
 			pname, 'a' + op->so_sl, lp->d_tracks);
 		exit(1);
 	}
-	lp->d_slice[op->so_sl].d_off = op->so_off;
-	lp->d_slice[op->so_sl].d_len = op->so_len;
-	lp->d_slice[op->so_sl].d_type = SL_FS;  /* a carved slice is a filesystem */
+	lp->d_slice[op->so_sl].d_off = off;
+	lp->d_slice[op->so_sl].d_len = len;
+	/* the prototype typed the slice; carving keeps that type */
+	if (lp->d_slice[op->so_sl].d_type == SL_UNUSED)
+		lp->d_slice[op->so_sl].d_type = SL_FS;
 	printf("%s: slice %c (offset %u, length %u)\n",
-		devname, 'a' + op->so_sl, off, op->so_len);
+		devname, 'a' + op->so_sl, off, len);
 }
 
 /*

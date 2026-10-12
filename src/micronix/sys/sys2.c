@@ -95,7 +95,7 @@ stime(high, low)
 UINT32
 seek(fd, disp, from)
     int fd;
-    register int disp;
+    register UINT disp;         /* block numbers are unsigned short */
     register unsigned from;
 {
     static struct file *fp;

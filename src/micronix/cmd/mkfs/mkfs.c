@@ -45,7 +45,7 @@ void rdblk(bn, buf)
     UINT bn;
     char *buf;
 {
-    if (lseek(dev, bn * (long) BSIZE, 0) == -1)
+    if (lseek(dev, (unsigned long) bn * BSIZE, 0) == -1)
         die("seek");
     if (read(dev, buf, BSIZE) != BSIZE)
         die("read");
@@ -55,7 +55,7 @@ void wrblk(bn, buf)
     UINT bn;
     char *buf;
 {
-    if (lseek(dev, bn * (long) BSIZE, 0) == -1)
+    if (lseek(dev, (unsigned long) bn * BSIZE, 0) == -1)
         die("seek");
     if (write(dev, buf, BSIZE) != BSIZE)
         die("write");

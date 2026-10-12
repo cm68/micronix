@@ -18,7 +18,7 @@ extern int arg[];               /* in-line arguments from system() */
  * would be read out of HL alone and everything above 64K - the whole
  * reason r_seek hands back two words - would arrive as its low half.
  */
-extern UINT32 seek(int fd, int disp, unsigned from);
+extern UINT32 seek(int fd, UINT disp, unsigned from);
 extern int ftruncate(int fd, UINT32 length);
 
 /*

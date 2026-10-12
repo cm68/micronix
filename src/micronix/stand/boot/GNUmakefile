@@ -323,9 +323,9 @@ $(DJBOOTIMGS): djboot1.bin djboot.com mkbootimg
 		    `echo $$d | cut -d: -f6` \
 		    0x`echo $$d | cut -d: -f7` $@; \
 		v=`od -An -tx1 -j 260 -N 2 $@ | tr -d ' \n'`; \
-		[ "$$v" = 0200 ] || { echo "$@: label version is $$v, not 2: not the slice idiom"; exit 1; }; \
+		[ "$$v" = 0300 ] || { echo "$@: label version is $$v, not 3: not the slice idiom"; exit 1; }; \
 		f=`echo $$d | cut -d: -f5`; \
-		v=`od -An -tx1 -j 312 -N 1 $@ | tr -d ' \n'`; \
+		v=`od -An -tx1 -j 268 -N 1 $@ | tr -d ' \n'`; \
 		[ "$$v" = "0$$f" ] || { echo "$@: the label's first sector is $$v, not 0$$f"; exit 1; }; \
 		v=`od -An -tx1 -j 127 -N 1 $@ | tr -d ' \n'`; \
 		[ "$$v" = a5 ] || { echo "$@: level 0's marker is $$v, not a5: level 0 is not 128 bytes"; exit 1; }; \
