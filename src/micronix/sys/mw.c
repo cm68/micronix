@@ -425,16 +425,8 @@ mwint()
 rwint()
 {
     if (cmd.stat == OK) {
-        if (cmd.count <= 512) {
-            advque();
-            return;
-        } else {
-            cmd.count -= 512;
-            cmd.dma += 512;
-            cmd.blk++;
-            rwcmd();
-            return;
-        }
+        advque();
+        return;
     }
 
     else if (cmd.stat != NOTRDY) {      /* try again */
