@@ -25,7 +25,8 @@ extern long seconds;
 iread(ip)
     register struct inode *ip;
 {
-    int request, dev, log, phys, rahead;
+    int request, dev;
+    UINT log, phys, rahead;
     register int into, nbytes;
     static int type;
     struct buf *bp;
@@ -78,9 +79,11 @@ iread(ip)
 iwrite(ip)
     register struct inode *ip;
 {
-    int request, dev, log, phys, pipe;
+    int request, dev, pipe;
+    UINT log, phys;
     register int into, nbytes;
-    static int type, dummy;
+    static int type;
+    static UINT dummy;
     struct buf *bp;
 
     if ((request = u.count) == 0)

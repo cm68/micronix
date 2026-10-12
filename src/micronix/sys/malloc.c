@@ -396,11 +396,12 @@ swapinit()
 /*
  * Allocate size (!= 0) blocks of swap space.
  */
+unsigned
 salloc(size)
     register int size;
 {
     register struct map *mp;
-    register int blk;
+    register unsigned blk;
 
     for (mp = swapmap; mp->size != 0; mp++) {
         blk = mp->addr;
@@ -422,7 +423,8 @@ salloc(size)
  * Add a segment of swap space to the swap map
  */
 sfree(size, blk)
-    int size, blk;
+    int size;
+    unsigned blk;
 {
     register struct map *mp;
 

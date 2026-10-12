@@ -262,10 +262,11 @@ itrunc(ip)
  * (A 0-th level indirect block is a data block.)
  */
 indfree(ind, level, dev)
-    int ind, dev;
+    UINT ind;
+    int dev;
     register int level;
 {
-    register int *p;
+    register UINT *p;
     register struct buf *bp;
 
     if (ind == 0)
@@ -282,8 +283,8 @@ indfree(ind, level, dev)
          */
         return;
     }
-    for (p = (int *)&bp->data[510]; p >= (int *)bp->data; p--) {
-        int bn;
+    for (p = (UINT *)&bp->data[510]; p >= (UINT *)bp->data; p--) {
+        UINT bn;
 
         /*
          * Read the entry under a hold and give the window back before the
@@ -308,17 +309,18 @@ indfree(ind, level, dev)
  * stays consistent on the disk.
  */
 indfreetail(ind, level, start, dev)
-    int ind, level, start, dev;
+    UINT ind;
+    int level, start, dev;
 {
     register struct buf *bp;
-    register int *p;
-    int bn;
+    register UINT *p;
+    UINT bn;
 
     if (ind == 0)
         return;
     if ((bp = bread(ind, dev)) == 0)
         return;
-    for (p = (int *)&bp->data[510]; p >= (int *)&bp->data[start * 2]; p--) {
+    for (p = (UINT *)&bp->data[510]; p >= (UINT *)&bp->data[start * 2]; p--) {
         bhold(bp);
         bn = *p;
         *p = 0;
@@ -344,7 +346,8 @@ itruncat(ip, length)
     UINT32 length;
 {
     register int n, dev;
-    int nblk, index;
+    UINT nblk;
+    int index;
 
     if (ip->i_mode & IIO)
         return;
@@ -370,13 +373,14 @@ itruncat(ip, length)
              * whole of it goes.
              */
             struct buf *bp;
-            int *p;
-            int containing, bn, entry = index - 7;
+            UINT *p;
+            UINT containing, bn;
+            int entry = index - 7;
             int empty = 0;
 
             if ((bp = bread(ip->i_addr[7], dev)) == 0)
                 return;
-            p = (int *)bp->data;
+            p = (UINT *)bp->data;
             containing = p[entry];
             for (n = 255; n > entry; n--) {
                 bhold(bp);

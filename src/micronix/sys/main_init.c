@@ -221,8 +221,8 @@ ovlplaceall()
     struct obj hdr;
     struct inode *ip;
     long modbase;
-    UINT nmod, n, i, seg, maj;
-    int ra, bad;
+    UINT nmod, n, i, seg, maj, ra;
+    int bad;
     struct buf *bp;
     char *s;
 
@@ -274,7 +274,7 @@ ovlplaceall()
          * frame is the answer to a question about a driver already
          * mapped, and the next putblk saves and restores around it.
          */
-        bp = bread(imap(ip, (int) (modbase >> 9) + n * 8, &ra), rootdev);
+        bp = bread(imap(ip, (UINT) (modbase >> 9) + n * 8, &ra), rootdev);
         if (bp == 0) {
             pr("ovl: page %d will not read\n", n);
             continue;
@@ -291,7 +291,7 @@ ovlplaceall()
         brelse(bp);
         bad = 0;
         for (i = 1; i < PAGESZ / 512; i++) {
-            bp = bread(imap(ip, (int) (modbase >> 9) + n * 8 + i, &ra),
+            bp = bread(imap(ip, (UINT) (modbase >> 9) + n * 8 + i, &ra),
                        rootdev);
             if (bp == 0) {      /* a short page is not a page: place none of it */
                 bad = 1;

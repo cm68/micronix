@@ -135,13 +135,14 @@ dumpbuf(b, what)
  * See Unix Programmer's Manual, section V, File System
  * for a description of the algorithm.
  */
+UINT
 balloc(dev)
     int dev;
 {
     register struct buf *sb;
     static struct buf *fb;
     register struct super *sup;
-    register int bn;
+    register UINT bn;
     char *chunk;
     UINT8 chunkseg;
 
@@ -204,7 +205,7 @@ balloc(dev)
  * Add block number bn to the freelist on device dev.
  */
 bfree(bn, dev)
-    int bn;
+    UINT bn;
     int dev;
 {
     register struct buf *sb, *fb;

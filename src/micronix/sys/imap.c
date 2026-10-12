@@ -25,12 +25,14 @@
  * Bugs: should check validity of block numbers,
  * in case the disk goes bad.
  */
+UINT
 imap(ip, log, rap)
     register struct inode *ip;
-    register int log;
-    register int *rap;
+    register UINT log;
+    register UINT *rap;
 {
-    int bn, index, dev, ind;
+    UINT bn, ind;
+    int index, dev;
     struct buf *bp;
 
     *rap = 0;
@@ -38,7 +40,7 @@ imap(ip, log, rap)
         *rap = log + 1;
         return (log);
     }
-    if (log < 0) {              /* just right for 24-bit file size */
+    if (log >= 0x8000) {         /* past a 24-bit file size, 16 MB of blocks */
         u.error = EFBIG;
         return (0);
     }
@@ -73,21 +75,22 @@ imap(ip, log, rap)
  * Get the block number from ip->addr[n]. If it is zero,
  * allocate a new block and install its number.
  */
+UINT
 imapi(ip, n, rap)
     register struct inode *ip;
-    int n, *rap;
+    int n;
+    UINT *rap;
 {
-    register int *p;
+    register UINT *p;
     UINT bn;
 
     *rap = 0;
     /*
      * i_addr is UINT[8] on disk - see d_addr in sys/fs.h - and this
-     * walks it as ints, taking the entry and the one after it.  Same
-     * width and same object; the cast says so, which ccc requires
-     * between int * and unsigned short *.
+     * walks it as its own type.  *p is the block number; the entry
+     * after it is the read-ahead hint.
      */
-    p = (int *) &ip->i_addr[n];
+    p = &ip->i_addr[n];
     if (*p == 0) {
         if ((bn = plug(ip->i_dev)) == 0)
             return 0;
@@ -104,11 +107,14 @@ imapi(ip, n, rap)
  * and return the number at block[n]. If necessary, install
  * a new number.
  */
+UINT
 imapb(ind, n, dev, rap)
-    int ind, n, dev, *rap;
+    UINT ind;
+    int n, dev;
+    UINT *rap;
 {
     register struct buf *bp;
-    register int *p;
+    register UINT *p;
     UINT bn;
 
     *rap = 0;
@@ -116,14 +122,14 @@ imapb(ind, n, dev, rap)
         return (0);
     if ((bp = bread(ind, dev)) == 0)
         return (0);
-    p = (int *)(bhold(bp) + n * sizeof(int));
+    p = (UINT *)(bhold(bp) + n * sizeof(UINT));
     if (*p == 0) {
         brel();                     /* plug() reaches balloc() and sleeps */
         if ((bn = plug(dev)) == 0) {
             brelse(bp);
             return (0);
         }
-        p = (int *)(bhold(bp) + n * sizeof(int));
+        p = (UINT *)(bhold(bp) + n * sizeof(UINT));
         *p = bn;
         bdwrite(bp);
     } else
