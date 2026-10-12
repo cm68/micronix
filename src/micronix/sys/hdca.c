@@ -47,7 +47,7 @@ static UINT8 hddead;		/* seconds the request has been in flight */
 static int hdioctl;		/* the ioctl sleep channel */
 
 static void phase00(), phase01(), phase02(), phase03(), phase04(),
-    phase06(), phase08(), phase09(), phase11(), phase12();
+    phase06(), phase08(), phase09(), phase11(), phase12(), arrive();
 static struct hd *getinfo();
 
 /*
@@ -420,6 +420,25 @@ phase00(hp)
 }
 
 /*
+ * The arm is at the target cylinder: finish a HOME, or start the read
+ * or write the request is.
+ */
+static void
+arrive(hp)
+	struct hd *hp;
+{
+	if (hp->h_cmd == HDCA_HOME) {
+		hp->h_stat = 0;
+		phase12(hp);
+		return;
+	}
+	if (hp->h_flags & HDWRITE)
+		phase08(hp);
+	else
+		phase03(hp);
+}
+
+/*
  * The seek.  If the arm is not at the target cylinder, step the whole
  * remaining distance and let the seek-done interrupt finish the move;
  * otherwise go straight to the transfer.
@@ -429,15 +448,7 @@ phase01(hp)
 	struct hd *hp;
 {
 	if (hp->h_trackdelta == 0) {
-		if (hp->h_cmd == HDCA_HOME) {
-			hp->h_stat = 0;
-			phase12(hp);
-			return;
-		}
-		if (hp->h_flags & HDWRITE)
-			phase08(hp);
-		else
-			phase03(hp);
+		arrive(hp);
 		return;
 	}
 	di();
@@ -466,15 +477,7 @@ phase02(hp)
 	di();
 	hp->h_flags &= ~HDSEEK;
 	ei();
-	if (hp->h_cmd == HDCA_HOME) {
-		hp->h_stat = 0;
-		phase12(hp);
-		return;
-	}
-	if (hp->h_flags & HDWRITE)
-		phase08(hp);
-	else
-		phase03(hp);
+	arrive(hp);
 }
 
 /*

@@ -711,30 +711,26 @@ ncrint()
 }
 
 /*
- * Wait for the handler to say the card has answered.  The shape is the
- * kernel's canonical one - uio.c's block() and bwait() are the same three
- * lines - and it is not decoration: the test and the sleep are inside one
- * di(), so a target that lets go between the two cannot be missed, and
- * sleep() returns with interrupts enabled, which is why the di() is redone
- * on every pass rather than held across the loop.
- *
- * The event is the address of the flag itself.  That is the smallest thing
- * that will do, and it is distinct from the card address, so a process
- * waiting here is not woken by the next process waiting for the card.
+ * Take the card: wait for it to be free, then mark it busy and clear
+ * the per-command flags.  The wait is the kernel's canonical shape -
+ * uio.c's block() and bwait() are the same three lines - and the test
+ * and the sleep are inside one di(), so a card that frees between the
+ * two cannot be missed.
  */
-static int
-sciwait(ip)
+static void
+scsibegin(ip)
     register struct scsiif *ip;
 {
     for (;;) {
         di();
-        if (ip->done)
+        if (!ip->busy)
             break;
-        sleep(&ip->done, PRIBIO);
+        sleep(ip, PRIBIO);
     }
+    ip->busy = 1;
     ip->done = 0;
+    ip->error = 0;
     ei();
-    return (0);
 }
 
 /*
@@ -759,16 +755,7 @@ scsistart(ip, target, read, lba, nblk)
     UINT32 lba;
     UINT nblk;
 {
-    for (;;) {
-        di();
-        if (!ip->busy)
-            break;
-        sleep(ip, PRIBIO);
-    }
-    ip->busy = 1;
-    ip->done = 0;
-    ip->error = 0;
-    ei();
+    scsibegin(ip);
 
     scsibuild(ip, read, lba, nblk);
 
@@ -812,10 +799,8 @@ scsifinish(ip, target)
     st = 0;
     if (scsibyte(ip, 0, (char *)&st) < 0)
         bad = 1;
-    else if (st & ST_CHECK) {
-        ip->error = EIO;
+    else if (st & ST_CHECK)
         bad = 1;
-    }
 
     msg = 0;
     if (scsibyte(ip, 0, (char *)&msg) < 0)
@@ -1093,24 +1078,6 @@ ncrstrat(b)
         return;
     }
 
-    /*
-     * strat() fixes a request's count at 512 for everything it routes, and
-     * that is the only shape reachable here: a buffer is one block, and
-     * its bytes run contiguously through the segment the window maps.
-     * swapio() is the one caller that sets its own count - 4096, a whole
-     * user page in a single request - and it reaches the strategy routine
-     * directly rather than through strat().  But it is only ever called
-     * for the swap device, and swapdev is nodev in every volume this tree
-     * builds.  Refusing the shape beats moving one block of it and calling
-     * that success.
-     */
-    if (b->count != 512) {
-        b->flags |= BERROR;
-        b->error = EIO;
-        iodone(b);
-        return;
-    }
-
     if (!(b->flags & BREAD) && b->blk == 0 && sl == DL_WHOLE)
         dlreload(b, (struct dlgeom *)info, info->sm, 0);
     lba = scsilba(b->blk, info->spc, off, roll, len,
@@ -1118,7 +1085,7 @@ ncrstrat(b)
 
     if (scsistart(ip, b->dev & 7, b->flags & BREAD, lba, 1) < 0) {
         b->flags |= BERROR;
-        b->error = ip->error ? ip->error : EIO;
+        b->error = ip->error;
         iodone(b);
         return;
     }
@@ -1186,21 +1153,12 @@ ncrioctl(dev, cmd, r, b)
     info = &scs[dev & 7];
     ip = &boards[0];
 
-    for (;;) {
-        di();
-        if (!ip->busy)
-            break;
-        sleep(ip, PRIBIO);
-    }
-    ip->busy = 1;
-    ip->done = 0;
-    ip->error = 0;
-    ei();
+    scsibegin(ip);
 
     if (scsiselect(ip, dev & 7) < 0 || scsiio(ip, r->cmd, r->len, 1) < 0) {
         ip->busy = 0;
         wakeup(ip);
-        u.error = ip->error ? ip->error : EIO;
+        u.error = EIO;
         return (-1);
     }
 
@@ -1219,7 +1177,7 @@ ncrioctl(dev, cmd, r, b)
      * is ncrstrat()'s order too.
      */
     if (scsifinish(ip, dev & 7) < 0) {
-        u.error = ip->error ? ip->error : EIO;
+        u.error = EIO;
         return (-1);
     }
     return (0);
