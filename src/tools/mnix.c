@@ -62,6 +62,7 @@ int initcmd();
 int labelcmd();
 int mkfscmd();
 int bootflopcmd();
+int hardbootcmd();
 
 struct cmdtab
 {
@@ -89,7 +90,8 @@ struct cmdtab
     {"initialize", initcmd, "initialize <medium> <image>" },
     {"label", labelcmd, "label <image> [-s slice start [end]]" },
     {"mkfs", mkfscmd, "mkfs <image> [size|-exclude] [-i bootfile] [-f]" },
-    {"bootflop", bootflopcmd, "bootflop <bootimage> <image>" }
+    {"bootflop", bootflopcmd, "bootflop <bootimage> <image>" },
+    {"hardboot", hardbootcmd, "hardboot <image> <bootfile>" }
 };
 
 void
@@ -192,6 +194,8 @@ main(argc, argv)
         return mkfscmd(argc, argv);
     if (strcmp(*argv, "bootflop") == 0)
         return bootflopcmd(argc, argv);
+    if (strcmp(*argv, "hardboot") == 0)
+        return hardbootcmd(argc, argv);
     if (!filesystem) {
         filesystem = "testfs";
     }
@@ -1676,6 +1680,27 @@ bad:
     close(fd);
     imd_close(ip);
     return -1;
+}
+
+/*
+ * hardboot <image> <bootfile>: write the boot below a hard disk's
+ * filesystem at device block 0, keeping the label the label command put
+ * in block 0's second half.  This is mkfs's boot half by itself, for a
+ * volume whose filesystem was made natively (mwformat + label + mkfs) and
+ * only lacks the boot.
+ */
+int
+hardbootcmd(int c, char **a)
+{
+    a++;
+    c--;
+    if (c != 2)
+        return -1;
+    if (hardboot(a[0], a[1]) < 0) {
+        printf("hardboot: can't write the boot to %s\n", a[0]);
+        return 2;
+    }
+    return 0;
 }
 
 /*
