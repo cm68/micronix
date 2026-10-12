@@ -363,6 +363,7 @@ src/micronix/cmd/ratfor/ratfor
 src/micronix/cmd/rm/rm
 src/micronix/cmd/rmdir/rmdir
 src/micronix/cmd/s/s
+src/micronix/cmd/scsiformat/scsiformat
 src/micronix/cmd/sed/sed
 src/micronix/cmd/setdev/setdev
 src/micronix/cmd/sh/sh
