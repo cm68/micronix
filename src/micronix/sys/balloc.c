@@ -154,7 +154,8 @@ balloc(dev)
         return (0);
     }
     if (sup->s_nfree <= 0
-        || (bn = sup->s_free[--sup->s_nfree]) == 0 || bcheck(bn, sup, dev) == 0) {
+        || (bn = sup->s_free[--sup->s_nfree]) == 0
+        || bcheck(bn, sup, dev, "balloc") == 0) {
         brel();
         goto full;
     }
@@ -217,7 +218,7 @@ bfree(bn, dev)
         return;
     sb = getsb(dev);
     sup = (struct super *)bhold(sb);
-    if (bcheck(bn, sup, dev) == 0) {
+    if (bcheck(bn, sup, dev, "bfree") == 0) {
         brel();
         goto done;
     }
@@ -259,17 +260,24 @@ bfree(bn, dev)
 }
 
 /*
- * Check the validity of a file block number
+ * Check the validity of a file block number.  `who` names the caller so
+ * the error says whether the bad number came off the free list (balloc)
+ * or was handed in to be freed (bfree).
  */
-bcheck(bn, sup, dev)
+bcheck(bn, sup, dev, who)
     UINT bn;
     int dev;
     struct super *sup;
+    char *who;
 {
+    static int i;
+
     if (sup->s_isize + 1 < bn && bn < sup->s_fsize)
         return 1;
-    pr("bcheck: bn %d (0%o) out of range [isize %d fsize %d]\n",
-        bn, bn, sup->s_isize, sup->s_fsize);
+    pr("%s: bn %d (0%o) out of range [isize %d fsize %d nfree %d]\n",
+        who, bn, bn, sup->s_isize, sup->s_fsize, sup->s_nfree);
+    for (i = 0; i < sup->s_nfree && i < 8; i++)
+        pr("  free[%d] = %d (0%o)\n", i, sup->s_free[i], sup->s_free[i]);
     di();
     for (;;)
         hlt();
