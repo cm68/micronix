@@ -349,7 +349,13 @@ all: $(TARGET) $(TARGETS)
 # Per-object dependencies would be better and want a compiler that
 # will emit them; this is coarse and correct.
 #
-$(OBJS): $(HSRCS)
+# HSRCS is only the headers beside the sources.  The kernel and the
+# commands include <sys/*.h> and <*.h> out of $(DEPTH)/include, and those
+# are a second set the wildcard above does not reach - so editing
+# include/sys/buf.h used to rebuild nothing, and a driver compiled against
+# the old struct linked against the new one.  Depend on them too.
+#
+$(OBJS): $(HSRCS) $(wildcard $(DEPTH)/include/*.h) $(wildcard $(DEPTH)/include/sys/*.h)
 
 #
 # Put what was built into the filesystem the simulator boots.  A
