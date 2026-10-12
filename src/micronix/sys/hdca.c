@@ -78,12 +78,11 @@ hdstep(head, dir, n)
 	UINT8 n;
 {
 	UINT8 fn;
-	UINT8 i;
 
 	fn = (hdunit & FUNC_DRIVE) | FUNC_STEP | (((head ^ 0x0f) << 4) & FUNC_HEAD);
 	if (dir)
 		fn |= FUNC_DIR;
-	for (i = 0; i < n; i++) {
+	while (n--) {
 		out(HDCA_FUNC, fn);		/* step line high */
 		out(HDCA_FUNC, fn & ~FUNC_STEP);/* and low */
 		out(HDCA_FUNC, fn);		/* rising edge: one track */
@@ -291,11 +290,9 @@ static void
 release(hp)
 	struct hd *hp;
 {
-	struct hd *q;
-	UINT i;
+	register struct hd *q;
 
-	for (i = 0; i < NHD; i++) {
-		q = &hdinfo[i];
+	for (q = hdinfo; q < &hdinfo[NHD]; q++) {
 		if (q->h_next) {
 			q->h_buf = q->h_next;
 			q->h_next = 0;
