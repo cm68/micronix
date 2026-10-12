@@ -343,7 +343,7 @@ hdtick()
 	hdintarg = 0;
 	ei();
 	if (hdactive)
-		phase11(hdactive);
+		phase11(hdactive, ENXIO);
 	return (0);
 }
 
@@ -520,8 +520,7 @@ phase04(hp)
 	char *p;
 
 	if (hdproc()) {
-		hp->h_stat = EIO;
-		phase11(hp);
+		phase11(hp, EIO);
 		return;
 	}
 	p = bhold(hp->h_cur);
@@ -571,8 +570,7 @@ phase09(hp)
 	struct hd *hp;
 {
 	if (hdproc()) {
-		hp->h_stat = EIO;
-		phase11(hp);
+		phase11(hp, EIO);
 	} else {
 		hp->h_stat = 0;
 		phase12(hp);
@@ -583,14 +581,15 @@ phase09(hp)
  * The request failed: mark the buffer and finish it.
  */
 static void
-phase11(hp)
+phase11(hp, err)
 	struct hd *hp;
+	int err;
 {
 	hp->h_flags |= HDERROR;
-	hp->h_stat = EIO;
+	hp->h_stat = err;
 	if (hp->h_cur && !hp->h_cmd) {
 		hp->h_cur->flags |= BERROR;
-		hp->h_cur->error = EIO;
+		hp->h_cur->error = err;
 	}
 	phase12(hp);
 }

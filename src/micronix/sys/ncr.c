@@ -648,19 +648,19 @@ scsibuild(ip, read, lba, nblk)
     UINT32 lba;
     UINT nblk;
 {
-    static UINT8 *c;
+    register UINT8 *s;
 
-    c = ip->cdb;
-    c[0] = read ? CREAD10 : CWRITE10;
-    c[1] = (UINT8)((lba >> 16) & 0x1f);         /* LUN 0 in the top three bits */
-    c[2] = (UINT8)(lba >> 8);
-    c[3] = (UINT8)lba;
-    c[4] = (UINT8)(lba >> 24);                  /* zero: a block number is 16 bits */
-    c[5] = 0;
-    c[6] = (UINT8)(nblk >> 8);
-    c[7] = (UINT8)nblk;
-    c[8] = 0;
-    c[9] = 0;
+    s = ip->cdb;
+    *s++ = read ? CREAD10 : CWRITE10;
+    *s++ = (UINT8)((lba >> 16) & 0x1f);         /* LUN 0 in the top three bits */
+    *s++ = (UINT8)(lba >> 8);
+    *s++ = (UINT8)lba;
+    *s++ = (UINT8)(lba >> 24);                  /* zero: a block number is 16 bits */
+    *s++ = 0;
+    *s++ = (UINT8)(nblk >> 8);
+    *s++ = (UINT8)nblk;
+    *s++ = 0;
+    *s = 0;
 }
 
 /*
@@ -773,6 +773,7 @@ scsistart(ip, target, read, lba, nblk)
     scsibuild(ip, read, lba, nblk);
 
     if (scsiselect(ip, target) < 0 || scsicmd(ip) < 0) {
+        ip->error = ENXIO;      /* nobody home, or the target went away */
         ip->busy = 0;
         wakeup(ip);
         return (-1);

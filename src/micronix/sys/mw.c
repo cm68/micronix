@@ -604,6 +604,7 @@ static
 error()
 {
     mwbuf->flags |= BERROR;
+    mwbuf->error = (cmd.stat & NOTRDY) ? ENXIO : EIO;
 }
 
 /*
