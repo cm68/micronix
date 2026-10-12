@@ -297,7 +297,7 @@ rwint()
  */
 advque()
 {
-    static struct buf *f;
+    struct buf *f;
 
     iodone(d3buf);
     f = d3buf->forw;
@@ -347,7 +347,7 @@ newdrv()
 newrw()
 {
     static UINT32 abs;
-    static UINT spc;
+    UINT spc;
 
     spc = d3info->spc;
     abs = ((UINT32) d3buf->cyl * spc) + (d3buf->blk % spc);

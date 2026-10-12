@@ -291,7 +291,7 @@ mwclose(dev)
     int dev;
 {
     struct info *info;
-    static struct buf *b;
+    struct buf *b;
 
     info = &mws[dev & 3];
     b = bread(info->spc * info->roll, dev);
@@ -451,7 +451,7 @@ rwint()
  */
 advque()
 {
-    static struct buf *f;
+    struct buf *f;
 
     iodone(mwbuf);
     f = mwbuf->forw;
@@ -588,7 +588,7 @@ rwcmd()
 mwcyl(blk, spc, off, roll, len)
     UINT blk, spc, off, roll, len;
 {
-    static UINT cyl;
+    UINT cyl;
 
     cyl = blk / spc + roll;
     if (cyl >= len)
@@ -858,7 +858,7 @@ mwbusplease()
 static
 mwlink()
 {
-    static char *cp;
+    char *cp;
 
     cp = (char *) &cmd;
     if (mwseg)
