@@ -56,7 +56,7 @@ int	nsmall;
 int	nlarge;
 int	nhuge;
 int	nused;
-int	nfree;
+UINT	nfree;
 int	nbad;
 int	nblocks;
 

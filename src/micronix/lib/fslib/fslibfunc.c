@@ -322,7 +322,8 @@ bootialloc(struct super *fs)
 {
     char buf[512];
     struct dsknod *dp;
-    int iblk, n, inum;
+    UINT iblk;
+    int n, inum;
 
     if (fs->s_ninode <= 0) {
         for (iblk = INODES_START; iblk < INODES_START + fs->s_isize;

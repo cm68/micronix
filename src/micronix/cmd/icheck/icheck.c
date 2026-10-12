@@ -31,19 +31,19 @@ int nindir;
 int nvindir;
 int ndir;
 int nused;
-int nfree;
+UINT nfree;
 int ino;
 int ndup;
 int used;
 
-int blist[10] = { -1 };
+UINT blist[10] = { -1 };
 
 unsigned short buf[256];
 
 int nerror;
 
 void pass(struct dsknod *dp);
-int blockcheck(int blkno, char *mesg);
+int blockcheck(UINT blkno, char *mesg);
 
 struct super *fs;
 
@@ -63,7 +63,7 @@ void
 check(file)
     char *file;
 {
-    int b;
+    UINT b;
     int i;
     UINT first, nblk;
     int ifree_count;
@@ -227,7 +227,7 @@ pass(struct dsknod *dp)
 {
     off_t i;
     off_t size;
-    int b;
+    UINT b;
 
     if (!(dp->d_mode & IALLOC))
         return;
@@ -348,7 +348,8 @@ main(argc, argv)
     char **argv;
 {
     char **p;
-    int n, *lp;
+    int n;
+    UINT *lp;
     char *pname = argv[0];
 
     while (--argc) {
