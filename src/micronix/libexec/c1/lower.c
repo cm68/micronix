@@ -2182,6 +2182,64 @@ rewrite1(Expr *e)
 	}
 
 	/*
+	 * (UINT8)(int >> 8k) is byte k of the integer: the shift - a
+	 * qshr loop for a long, ld l,h/ld h,0 for a word - is wasted work
+	 * when only the one byte is wanted, which can be loaded straight
+	 * out of the integer's cell.  The masked form
+	 * (UINT8)((int >> 8k) & M) is the same plus an and.  Only a frame
+	 * slot is named; everything else falls through to the ordinary
+	 * shift-and-narrow.
+	 */
+	if (e->op == NARROW && ISBYTE(e->width) && e->left) {
+		Expr *sh = e->left;
+		long mask = -1;
+
+		if (sh->op == AND && sh->left && sh->right &&
+		    sh->right->op == NUMBER) {
+			mask = sh->right->u.val;
+			sh = sh->left;
+		}
+		if (sh->op == RSHIFT && sh->left && sh->right &&
+		    sh->right->op == NUMBER) {
+			long cnt = sh->right->u.val;
+			Expr *cell = sh->left;
+			int k = (cnt < 0 || (cnt & 7) || cnt > 24) ?
+			    -1 : (int)(cnt >> 3);
+			int reg, off, boff;
+
+			if (ISWORD(sh->width) && k > 1)
+				k = -1;
+			/* a load through a frame cell names the cell itself */
+			if (cell && cell->op == DEREF && cell->left &&
+			    (cell->left->op == LOCALVAR ||
+			     cell->left->op == INDEX))
+				cell = cell->left;
+			boff = ISWORD(sh->width) ? k : ((k + 2) & 3);
+			if (k >= 0 && cell &&
+			    (cell->op == LOCALVAR || cell->op == INDEX)) {
+				reg = cell->u.var.reg ? cell->u.var.reg : R_IY;
+				off = cell->u.var.off + boff;
+				if ((reg == R_IY || reg == R_IX) &&
+				    off >= -126 && off <= 124) {
+					if (off >= 0)
+						outf("\tld a,(%s+%d)\n",
+						    reg == R_IY ? "iy" : "ix", off);
+					else
+						outf("\tld a,(%s-%d)\n",
+						    reg == R_IY ? "iy" : "ix", -off);
+					if (mask >= 0)
+						outf("\tand %d\n", (int)(mask & 0xff));
+					n = mkcode(e->width, R_A);
+					n->op = INA;
+					n->dest = e->dest;
+					freeexpr(e);
+					return n;
+				}
+			}
+		}
+	}
+
+	/*
 	 * Handle long (32-bit) binary operations - the path for the ones
 	 * dolongbin did not take.  Values are in HL':HL and DE':DE; see
 	 * libsrc/libc/QLONG.md.
