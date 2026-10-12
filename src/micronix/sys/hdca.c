@@ -201,28 +201,24 @@ hdhdrwr(p)
  */
 static void
 hdrdat(p, n)
-	char *p;
-	UINT n;
+	register char *p;
+	register UINT n;
 {
-	UINT i;
-
 	out(HDCA_CMD, CMD_RAMDATA);
 	(void)hdin();
 	(void)hdin();
-	for (i = 0; i < n; i++)
-		p[i] = hdin();
+	while (n--)
+		*p++ = hdin();
 }
 
 static void
 hdwdat(p, n)
-	char *p;
-	UINT n;
+	register char *p;
+	register UINT n;
 {
-	UINT i;
-
 	out(HDCA_CMD, CMD_RAMDATA);
-	for (i = 0; i < n; i++)
-		hdout(p[i]);
+	while (n--)
+		hdout(*p++);
 }
 
 /*
