@@ -2182,13 +2182,13 @@ rewrite1(Expr *e)
 	}
 
 	/*
-	 * (UINT8)(int >> 8k) is byte k of the integer: the shift - a
-	 * qshr loop for a long, ld l,h/ld h,0 for a word - is wasted work
-	 * when only the one byte is wanted, which can be loaded straight
-	 * out of the integer's cell.  The masked form
-	 * (UINT8)((int >> 8k) & M) is the same plus an and.  Only a frame
-	 * slot is named; everything else falls through to the ordinary
-	 * shift-and-narrow.
+	 * (UINT8)(int >> 8k) is byte k of the integer, and (UINT8)int is
+	 * its low byte: the shift - a qshr loop for a long, ld l,h/ld h,0
+	 * for a word - is wasted work when only the one byte is wanted,
+	 * which can be loaded straight out of the integer's cell.  The
+	 * masked form (UINT8)((int >> 8k) & M) is the same plus an and.
+	 * Only a frame slot is named; everything else falls through to
+	 * the ordinary shift-and-narrow.
 	 */
 	if (e->op == NARROW && ISBYTE(e->width) && e->left) {
 		Expr *sh = e->left;
@@ -2199,14 +2199,22 @@ rewrite1(Expr *e)
 			mask = sh->right->u.val;
 			sh = sh->left;
 		}
-		if (sh->op == RSHIFT && sh->left && sh->right &&
-		    sh->right->op == NUMBER) {
-			long cnt = sh->right->u.val;
-			Expr *cell = sh->left;
-			int k = (cnt < 0 || (cnt & 7) || cnt > 24) ?
-			    -1 : (int)(cnt >> 3);
+		if ((sh->op == RSHIFT && sh->left && sh->right &&
+		     sh->right->op == NUMBER) || sh->op == DEREF) {
+			Expr *cell;
+			int k;
 			int reg, off, boff;
 
+			if (sh->op == RSHIFT) {
+				long cnt = sh->right->u.val;
+
+				k = (cnt < 0 || (cnt & 7) || cnt > 24) ?
+				    -1 : (int)(cnt >> 3);
+				cell = sh->left;
+			} else {
+				k = 0;		/* the integer's own low byte */
+				cell = sh;
+			}
 			if (ISWORD(sh->width) && k > 1)
 				k = -1;
 			/* a load through a frame cell names the cell itself */
