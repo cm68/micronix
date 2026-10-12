@@ -518,7 +518,7 @@ newrw()
     cmd.blk = mwbuf->blk;
     cmd.dma = mwbuf->data;
     cmd.xdma = mwbuf->xmem;
-    cmd.count = mwbuf->count;
+    cmd.count = 512;
     cmd.op = (mwbuf->flags & BREAD) ? READS : WRITES;
     if (mwinfo->flags & RECAL)
         mwinfo->flags &= ~RECAL;

@@ -199,23 +199,27 @@ hdhdrwr(p)
  * segment and handed back its data address.
  */
 static void
-hdrdat(p, n)
+hdrdat(p)
 	register char *p;
-	register UINT n;
 {
+	register UINT n;
+
 	out(HDCA_CMD, CMD_RAMDATA);
 	(void)hdin();
 	(void)hdin();
+	n = 512;
 	while (n--)
 		*p++ = hdin();
 }
 
 static void
-hdwdat(p, n)
+hdwdat(p)
 	register char *p;
-	register UINT n;
 {
+	register UINT n;
+
 	out(HDCA_CMD, CMD_RAMDATA);
+	n = 512;
 	while (n--)
 		hdout(*p++);
 }
@@ -519,7 +523,7 @@ phase04(hp)
 	if (hp->h_cmd == HDCA_READHDR)
 		hdhdrrd(p);
 	else
-		hdrdat(p, hp->h_cur->count);
+		hdrdat(p);
 	brel();
 	hp->h_stat = 0;
 	phase12(hp);
@@ -541,7 +545,7 @@ phase08(hp)
 		hdhdrwr(p);
 	else {
 		hdhdr(hp->h_head, hp->h_cyl, hp->h_sector);
-		hdwdat(p, hp->h_cur->count);
+		hdwdat(p);
 	}
 	brel();
 	di();

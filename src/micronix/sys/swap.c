@@ -172,7 +172,6 @@ swapio(flag, p)
             continue;
         b = &swab[i];
         b->dev = swapdev;
-        b->count = 512;
         /*
          * The core image is not in the buffer window, but the address the
          * driver wants is the same two fields either way: xmem is the 4K

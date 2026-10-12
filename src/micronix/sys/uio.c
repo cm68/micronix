@@ -324,7 +324,6 @@ strat(bp)
     b->flags |= BBUSY;
     b->flags &= ~(BDONE | BERROR);
     b->error = 0;
-    b->count = 512;
     b->forw = 0;
     b->back = 0;
     (*biosw[bmajor(b->dev)].strat) (b);
@@ -434,7 +433,6 @@ bioctl(fd, cmd, arg)
     b = 0;
     if (r.count && r.count <= 512) {
         b = bget(0, 0);
-        b->count = r.count;
         if ((r.flags & CDB_IN) == 0) {
             copyin(r.buf, bhold(b), r.count);
             brel();

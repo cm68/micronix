@@ -8,7 +8,6 @@ struct buf {
     UINT8 flags;                /* see below */
     UINT dev;                   /* device number */
     UINT blk;                   /* block number */
-    UINT count;                 /* number of bytes to transfer */
     char *data;                 /* memory address */
     UINT8 xmem;                 /* extended address */
     struct buf *forw;           /* for use by strategy routine */
