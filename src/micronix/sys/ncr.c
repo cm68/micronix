@@ -643,12 +643,12 @@ scsicmd(ip)
  */
 static void
 scsibuild(ip, read, lba, nblk)
-    register struct scsiif *ip;
+    struct scsiif *ip;
     int read;
     UINT32 lba;
     UINT nblk;
 {
-    register UINT8 *s;
+    UINT8 *s;
 
     s = ip->cdb;
     *s++ = read ? CREAD10 : CWRITE10;
@@ -1111,6 +1111,8 @@ ncrstrat(b)
         return;
     }
 
+    if (!(b->flags & BREAD) && b->blk == 0 && sl == DL_WHOLE)
+        dlreload(b, (struct dlgeom *)info, info->sm, 0);
     lba = scsilba(b->blk, info->spc, off, roll, len,
                   info->heads, info->sectors);
 

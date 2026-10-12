@@ -397,6 +397,8 @@ hdstrat(b)
 		iodone(b);
 		return (0);
 	}
+	if (!(b->flags & BREAD) && b->blk == 0 && sl == DL_WHOLE)
+		dlreload(b, (struct dlgeom *)hp, hdslice[b->dev & 3], 0);
 	cyl = gettrk(b->blk, hp->h_spc, off, roll, len);
 	head = gethed(b->blk, hp);
 	sector = getsec(b->blk, hp);

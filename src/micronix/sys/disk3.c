@@ -210,6 +210,9 @@ disk3strat(b)
         iodone(b);
         return;
     }
+    if (!(b->flags & BREAD) && b->blk == 0 && sl == DL_WHOLE)
+        dlreload(b, (struct dlgeom *)info, info->sm,
+                 (struct dltiming *)&info->step);
     b->cyl = d3cyl(b->blk, info->spc, off, roll, len);
     di();
     if (d3buf == 0)

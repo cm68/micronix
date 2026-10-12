@@ -349,6 +349,13 @@ mwstrat(b)
         iodone(b);
         return;
     }
+    /*
+     * Writing block 0 of 'c' rewrites the label, so reload the partition
+     * table out of the buffer being written (sys/dlabel.c's dlreload).
+     */
+    if (!(b->flags & BREAD) && b->blk == 0 && sl == DL_WHOLE)
+        dlreload(b, (struct dlgeom *)info, info->sm,
+                 (struct dltiming *)&info->step);
     b->cyl = mwcyl(b->blk, info->spc, off, roll, len);
     di();
     if (mwbuf == 0)

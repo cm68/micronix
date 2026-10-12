@@ -219,5 +219,13 @@ extern int dllabel();
 extern int dlslice();
 
 /*
+ * Reload the label out of the buffer being written to block 0 of 'c',
+ * updating *g, *table and *tm with what it now says.  This is the
+ * "writing the label reloads the partition table" side effect, shared by
+ * every block driver.  Returns 1 for a readable label, 0 otherwise.
+ */
+extern int dlreload();
+
+/*
  * vim: set tabstop=4 shiftwidth=4 expandtab:
  */

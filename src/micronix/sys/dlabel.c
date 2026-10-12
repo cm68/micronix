@@ -207,5 +207,51 @@ dlslice(g, table, sl, offp, rollp, lenp, maxblkp)
 }
 
 /*
+ * Reload the label out of the buffer being written to block 0 of 'c'
+ * and update *g, *table and *tm with what it now says.  Writing the
+ * label reloads the partition table - this is that side effect, and it
+ * is shared by every block driver, which is why it lives here rather
+ * than as a copy in each driver's strategy routine.  Returns 1 when the
+ * buffer carried a readable label, 0 otherwise.
+ */
+int
+dlreload(b, g, table, tm)
+    struct buf *b;
+    struct dlgeom *g;
+    struct slicemap *table;
+    struct dltiming *tm;
+{
+    static struct dlabel lab;
+    static char *p;
+    static int i;
+
+    p = bhold(b);
+    copy(&p[DL_OFFSET], &lab, sizeof lab);
+    brel();
+    if (lab.d_magic[0] != DL_MAGIC[0] || lab.d_magic[1] != DL_MAGIC[1] ||
+        lab.d_magic[2] != DL_MAGIC[2] || lab.d_magic[3] != DL_MAGIC[3] ||
+        !lab.d_tracks || !lab.d_heads || !lab.d_spt)
+        return (0);
+    g->tracks = lab.d_tracks;
+    g->heads = lab.d_heads;
+    g->sectors = lab.d_spt;
+    g->firstsec = lab.d_firstsec;
+    if (tm) {
+        tm->step = lab.d_step;
+        tm->seek = lab.d_seek;
+        tm->precomp = lab.d_precomp;
+        tm->lowcur = lab.d_lowcur;
+    }
+    if (table) {
+        for (i = 0; i < NSLICE; i++) {
+            table[i].sm_off = lab.d_slice[i].d_off;
+            table[i].sm_len = lab.d_slice[i].d_len;
+            table[i].sm_roll = lab.d_slice[i].d_roll;
+        }
+    }
+    return (1);
+}
+
+/*
  * vim: set tabstop=4 shiftwidth=4 expandtab:
  */

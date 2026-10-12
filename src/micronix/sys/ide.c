@@ -983,6 +983,8 @@ idestrat(b)
      * nothing here has to hold a device block number - which is what a
      * large drive could not be counted in.
      */
+    if (!(b->flags & BREAD) && b->blk == 0 && sl == DL_WHOLE)
+        dlreload(b, (struct dlgeom *)info, info->sm, 0);
     lba = idelba(b->blk, info->spc, off, roll, len);
 
     if (idestart(ip, b->dev & 1, lba, b->flags & BREAD) < 0) {

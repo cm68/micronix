@@ -176,6 +176,8 @@ disk2strat(b)
         iodone(b);
         return;
     }
+    if (!(b->flags & BREAD) && b->blk == 0 && sl == DL_WHOLE)
+        dlreload(b, (struct dlgeom *)info, info->sm, 0);
     b->cyl = d2cyl(b->blk, info->spc, off, roll, len);
     di();
     if (d2buf == 0)
