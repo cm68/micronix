@@ -1067,6 +1067,16 @@ char *in;
 	register struct instruct *isr;
 
 	/*
+	 * Every mnemonic in isr_table begins with a lowercase letter.
+	 * A label - and compiler output is mostly labels: "L1024",
+	 * "_f2", "_cinit.3" - never does, so one test settles the
+	 * whole table for the common case.  The loop is what remains
+	 * for the names that could be instructions.
+	 */
+	if (*in < 'a' || *in > 'z')
+		return 0;
+
+	/*
 	 * The first character decides sixty-eight of the sixty-nine.
 	 * This walked the whole table for every instruction in the
 	 * file and called match on each entry to be told no; the test
