@@ -1272,6 +1272,7 @@ parse(void)
 			emitprolog();
 			parseStmt();
 			emitepilog();
+			arena_reset();
 			break;
 		}
 	}
