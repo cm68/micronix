@@ -65,15 +65,25 @@ INCDIR	 = $(ROOT)/usr/include
 NOWARN	 = --warning=no-ignore-newer
 
 CCCOWNED = cpm.h errno.h hitech.h setjmp.h stdio.h time.h
-HDRS	 = $(wildcard *.h)
+HDRS	   = 8080.h alloc.h bios.h cpm.h crypt.h dirent.h dtab.h dump.h \
+	 errno.h fio.h fslib.h grp.h hitech.h mtab.h obj.h pascal.h pwd.h \
+	 setjmp.h std.h stdio.h time.h types.h utmp.h
 OURS	 = $(filter-out $(CCCOWNED),$(HDRS))
 
 #
 # The C library's headers, which install beside ours and over them.
 # See the top of this file.
 #
-LIBHDRS	   = $(wildcard ../lib/include/*.h)
-LIBSYSHDRS = $(wildcard ../lib/include/sys/*.h)
+LIBHDRS	   = ../lib/include/assert.h ../lib/include/conio.h \
+	 ../lib/include/cpm.h ../lib/include/ctype.h ../lib/include/errno.h \
+	 ../lib/include/exec.h ../lib/include/fcntl.h ../lib/include/float.h \
+	 ../lib/include/hitech.h ../lib/include/libgen.h \
+	 ../lib/include/limits.h ../lib/include/math.h ../lib/include/setjmp.h \
+	 ../lib/include/signal.h ../lib/include/stat.h ../lib/include/stdarg.h \
+	 ../lib/include/stddef.h ../lib/include/stdio.h ../lib/include/stdlib.h \
+	 ../lib/include/string.h ../lib/include/sys.h ../lib/include/time.h \
+	 ../lib/include/unistd.h ../lib/include/unixio.h
+LIBSYSHDRS	   = ../lib/include/sys/wait.h
 
 MKFILE	 = $(wildcard ?akefile)
 

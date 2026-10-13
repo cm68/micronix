@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= kstat
 CLASS	= cmd
 
+CSRCS	= kstat.c
+
+MANSRCS	= kstat.1
+
 include $(DEPTH)/GNUmakefile.inc

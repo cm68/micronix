@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= sort
 CLASS	= cmd
 
+CSRCS	= sort.c
+
+MANSRCS	= sort.1
+
 include $(DEPTH)/GNUmakefile.inc

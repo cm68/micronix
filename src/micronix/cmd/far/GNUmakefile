@@ -22,4 +22,9 @@ DEPTH	= ../..
 DIR	= far
 CLASS	= cmd
 
+CSRCS	= far1.c far2.c far3.c far4.c far5.c
+
+HSRCS	= far.h
+MANSRCS	= far.1
+
 include $(DEPTH)/GNUmakefile.inc

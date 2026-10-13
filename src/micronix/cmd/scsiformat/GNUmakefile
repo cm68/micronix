@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= scsiformat
 CLASS	= cmd
 
+CSRCS	= scsiformat.c
+
+MANSRCS	= scsiformat.1
+
 include $(DEPTH)/GNUmakefile.inc

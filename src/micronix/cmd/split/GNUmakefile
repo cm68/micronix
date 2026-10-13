@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= split
 CLASS	= cmd
 
+CSRCS	= split.c
+
+MANSRCS	= split.1
+
 include $(DEPTH)/GNUmakefile.inc

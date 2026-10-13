@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= chmod
 CLASS	= cmd
 
+CSRCS	= chmod.c
+
+MANSRCS	= chmod.1
+
 include $(DEPTH)/GNUmakefile.inc

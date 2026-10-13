@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= owner
 CLASS	= cmd
 
+CSRCS	= owner.c
+
+MANSRCS	= owner.1
+
 include $(DEPTH)/GNUmakefile.inc

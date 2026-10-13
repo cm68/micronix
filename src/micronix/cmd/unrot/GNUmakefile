@@ -17,6 +17,10 @@ DIR	= unrot
 CLASS	= cmd
 BINDIR	= /usr/bin
 
+CSRCS	= unrot.c
+
+MANSRCS	= unrot.1
+
 include $(DEPTH)/GNUmakefile.inc
 
 SRCS += README

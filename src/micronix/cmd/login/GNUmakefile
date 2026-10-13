@@ -15,4 +15,8 @@ DEPTH	= ../..
 DIR	= login
 CLASS	= cmd
 
+CSRCS	= login.c
+
+MANSRCS	= login.1
+
 include $(DEPTH)/GNUmakefile.inc

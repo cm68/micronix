@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= pwd
 CLASS	= cmd
 
+CSRCS	= pwd.c
+
+MANSRCS	= pwd.1
+
 include $(DEPTH)/GNUmakefile.inc

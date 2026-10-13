@@ -17,4 +17,8 @@ CLASS	= cmd
 TARGET	= cleanprog
 INSTNAME = clean
 
+CSRCS	= clean.c
+
+MANSRCS	= clean.1
+
 include $(DEPTH)/GNUmakefile.inc

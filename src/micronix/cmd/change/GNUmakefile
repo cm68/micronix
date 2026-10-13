@@ -17,4 +17,8 @@ DIR	= change
 CLASS	= cmd
 BINDIR	= /usr/bin
 
+CSRCS	= change.c
+
+MANSRCS	= change.1
+
 include $(DEPTH)/GNUmakefile.inc

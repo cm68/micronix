@@ -17,4 +17,8 @@ DIR	= detab
 CLASS	= cmd
 BINDIR	= /usr/bin
 
+CSRCS	= detab.c
+
+MANSRCS	= detab.1
+
 include $(DEPTH)/GNUmakefile.inc

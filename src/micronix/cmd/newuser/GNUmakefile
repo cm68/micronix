@@ -17,4 +17,8 @@ CLASS	= cmd
 #
 MODE	= 4711
 
+CSRCS	= newuser.c
+
+MANSRCS	= newuser.1
+
 include $(DEPTH)/GNUmakefile.inc

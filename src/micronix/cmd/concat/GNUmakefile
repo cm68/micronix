@@ -17,4 +17,8 @@ DIR	= concat
 CLASS	= cmd
 BINDIR	= /usr/bin
 
+CSRCS	= concat.c
+
+MANSRCS	= concat.1
+
 include $(DEPTH)/GNUmakefile.inc

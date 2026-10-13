@@ -40,6 +40,14 @@ CLASS	= cmd
 # the upm halves so they win over libunix's RST-based ones
 OBJS	= upmhead.o upmsys.o upm_res.o upm_ccp.o
 
+
+HSRCS	= upm.h
+MANSRCS	= upm.1
+
+CSRCS	= upm_res.c upm_ccp.c
+ASSRCS	= upmhead.s upmsys.s
+OBJS	= $(ASSRCS:.s=.o) $(CSRCS:.c=.o)
+
 include $(DEPTH)/GNUmakefile.inc
 
 LIBC	= $(DEPTH)/lib/libc/libc.a

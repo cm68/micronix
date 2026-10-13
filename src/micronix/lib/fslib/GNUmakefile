@@ -16,4 +16,6 @@ DIR	= fslib
 CLASS	= lib
 TARGET	= libfs.a
 
+CSRCS	= fslib.c fslibfunc.c
+
 include $(DEPTH)/GNUmakefile.inc

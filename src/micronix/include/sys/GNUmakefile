@@ -14,7 +14,10 @@ DEST	 = $(ROOT)/usr/src/include/sys
 INCDIR	 = $(ROOT)/usr/include/sys
 NOWARN	 = --warning=no-ignore-newer
 
-HDRS	 = $(wildcard *.h)
+HDRS	   = access.h buf.h con.h dir.h disk2.h disk3.h dj.h dlabel.h \
+	 file.h fs.h hdca.h ide.h inode.h ints.h ioctl.h lock.h mount.h mw.h \
+	 ncr.h ovl.h proc.h reboot.h reg.h sgtty.h signal.h stat.h sys.h \
+	 times.h tty.h
 MKFILE	 = $(wildcard ?akefile)
 
 .PHONY: all update install install-man clean clobber doc

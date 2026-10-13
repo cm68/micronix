@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= write
 CLASS	= cmd
 
+CSRCS	= write.c
+
+MANSRCS	= write.1
+
 include $(DEPTH)/GNUmakefile.inc

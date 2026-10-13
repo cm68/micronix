@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= date
 CLASS	= cmd
 
+CSRCS	= date.c
+
+MANSRCS	= date.1
+
 include $(DEPTH)/GNUmakefile.inc

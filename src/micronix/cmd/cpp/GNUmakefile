@@ -23,6 +23,11 @@ CLASS	= cmd
 
 OBJS	= cpp.o cpy.o
 
+
+MANSRCS	= cpp.1
+
+CSRCS	= cpp.c cpy.c
+
 include $(DEPTH)/GNUmakefile.inc
 
 SRCS += cpy.y README

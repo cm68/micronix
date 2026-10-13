@@ -27,6 +27,10 @@ BINDIR	= /etc
 #
 TARGETS	= init.dbg
 
+CSRCS	= init.c
+
+MANSRCS	= init.1
+
 include $(DEPTH)/GNUmakefile.inc
 
 #

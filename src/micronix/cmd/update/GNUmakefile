@@ -24,4 +24,8 @@ CLASS	= cmd
 TARGET	= update.bin
 INSTNAME = update
 
+CSRCS	= update.c
+
+MANSRCS	= update.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= find
 CLASS	= cmd
 
+CSRCS	= find.c
+
+MANSRCS	= find.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -12,4 +12,10 @@ DEPTH	= ../..
 DIR	= s
 CLASS	= cmd
 
+CSRCS	= address.c adjust.c bman.c buffer.c commands.c keyboard.c lib.c \
+	 operator.c s.c screen.c sman.c yank.c
+
+HSRCS	= s.h
+MANSRCS	= s.1
+
 include $(DEPTH)/GNUmakefile.inc

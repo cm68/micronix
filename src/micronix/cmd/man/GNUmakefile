@@ -27,6 +27,10 @@ CLASS	= cmd
 #
 ALIAS	= help
 
+CSRCS	= man.c
+
+MANSRCS	= help.1 man.1
+
 include $(DEPTH)/GNUmakefile.inc
 
 #

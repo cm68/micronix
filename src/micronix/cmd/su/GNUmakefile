@@ -17,4 +17,8 @@ CLASS	= cmd
 #
 MODE	= 4711
 
+CSRCS	= su.c
+
+MANSRCS	= su.1
+
 include $(DEPTH)/GNUmakefile.inc

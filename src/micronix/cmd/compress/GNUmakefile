@@ -17,4 +17,8 @@ DIR	= compress
 CLASS	= cmd
 BINDIR	= /usr/bin
 
+CSRCS	= compress.c
+
+MANSRCS	= compress.1
+
 include $(DEPTH)/GNUmakefile.inc

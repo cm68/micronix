@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= crypt
 CLASS	= cmd
 
+CSRCS	= crypt.c
+
+MANSRCS	= crypt.1
+
 include $(DEPTH)/GNUmakefile.inc

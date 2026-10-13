@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= mail
 CLASS	= cmd
 
+CSRCS	= mail.c
+
+MANSRCS	= mail.1
+
 include $(DEPTH)/GNUmakefile.inc

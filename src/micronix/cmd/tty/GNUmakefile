@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= tty
 CLASS	= cmd
 
+CSRCS	= tty.c
+
+MANSRCS	= tty.1
+
 include $(DEPTH)/GNUmakefile.inc

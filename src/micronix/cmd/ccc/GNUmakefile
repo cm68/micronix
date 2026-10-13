@@ -33,6 +33,10 @@ CLASS	= cmd
 
 CCFLAGS	= -m micronix -DCCC
 
+CSRCS	= ccc.c
+
+MANSRCS	= ccc.1
+
 include $(DEPTH)/GNUmakefile.inc
 
 #

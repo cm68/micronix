@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= who
 CLASS	= cmd
 
+CSRCS	= who.c
+
+MANSRCS	= who.1
+
 include $(DEPTH)/GNUmakefile.inc

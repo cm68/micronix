@@ -15,4 +15,6 @@ DIR	= libutil
 CLASS	= lib
 TARGET	= libutil.a
 
+CSRCS	= hexdump.c logmsg.c wsobj.c
+
 include $(DEPTH)/GNUmakefile.inc

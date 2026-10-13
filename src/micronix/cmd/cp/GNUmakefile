@@ -19,4 +19,8 @@ CLASS	= cmd
 
 ALIAS	= cptree
 
+CSRCS	= cp.c
+
+MANSRCS	= cp.1
+
 include $(DEPTH)/GNUmakefile.inc

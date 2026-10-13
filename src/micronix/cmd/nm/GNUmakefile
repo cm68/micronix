@@ -19,4 +19,8 @@ CLASS	= cmd
 #
 LIBS	= $(DEPTH)/lib/libutil/libutil.a
 
+CSRCS	= nm.c
+
+MANSRCS	= nm.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= packsrc
 CLASS	= cmd
 
+CSRCS	= packsrc.c
+
+MANSRCS	= packsrc.1
+
 include $(DEPTH)/GNUmakefile.inc

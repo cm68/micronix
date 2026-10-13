@@ -10,4 +10,8 @@ DIR	= dcheck
 CLASS	= cmd
 LIBS	= $(DEPTH)/lib/fslib/libfs.a
 
+CSRCS	= dcheck.c
+
+MANSRCS	= dcheck.1
+
 include $(DEPTH)/GNUmakefile.inc

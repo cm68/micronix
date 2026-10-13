@@ -12,4 +12,9 @@ DEPTH	= ../..
 DIR	= msh
 CLASS	= cmd
 
+
+MANSRCS	= msh.1
+
+CSRCS	= sh.c libpw.c
+
 include $(DEPTH)/GNUmakefile.inc

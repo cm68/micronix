@@ -17,6 +17,10 @@ DEPTH	= ../..
 DIR	= size
 CLASS	= cmd
 
+CSRCS	= size.c
+
+MANSRCS	= size.1
+
 include $(DEPTH)/GNUmakefile.inc
 
 #

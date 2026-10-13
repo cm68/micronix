@@ -20,6 +20,11 @@ CLASS	= cmd
 #
 LIBS	= $(DEPTH)/lib/libutil/libutil.a
 
+CSRCS	= asm.c asmz80.c asz.c
+
+HSRCS	= asm.h
+MANSRCS	= asz.1
+
 include $(DEPTH)/GNUmakefile.inc
 
 #

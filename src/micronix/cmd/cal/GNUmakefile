@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= cal
 CLASS	= cmd
 
+CSRCS	= cal.c
+
+MANSRCS	= cal.1
+
 include $(DEPTH)/GNUmakefile.inc

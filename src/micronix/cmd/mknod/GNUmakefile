@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= mknod
 CLASS	= cmd
 
+CSRCS	= mknod.c
+
+MANSRCS	= mknod.1
+
 include $(DEPTH)/GNUmakefile.inc

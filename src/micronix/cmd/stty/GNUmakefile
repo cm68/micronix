@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= stty
 CLASS	= cmd
 
+CSRCS	= stty.c
+
+MANSRCS	= stty.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -17,4 +17,8 @@ DIR	= include
 CLASS	= cmd
 BINDIR	= /usr/bin
 
+CSRCS	= include.c
+
+MANSRCS	= include.1
+
 include $(DEPTH)/GNUmakefile.inc

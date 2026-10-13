@@ -22,6 +22,12 @@ CLASS	= cmd
 
 OBJS	= main.o doname.o misc.o files.o dosys.o y.tab.o ident.o
 
+
+HSRCS	= defs.h
+MANSRCS	= make.1
+
+CSRCS	= main.c doname.c misc.c files.c dosys.c y.tab.c ident.c
+
 include $(DEPTH)/GNUmakefile.inc
 
 SRCS	+= gram.y

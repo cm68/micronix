@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= tee
 CLASS	= cmd
 
+CSRCS	= tee.c
+
+MANSRCS	= tee.1
+
 include $(DEPTH)/GNUmakefile.inc

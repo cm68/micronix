@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= wall
 CLASS	= cmd
 
+CSRCS	= wall.c
+
+MANSRCS	= wall.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -45,8 +45,14 @@ lib.tar: makefile
 # agrees with the library - distinct from include/ at the top, which is
 # the old Whitesmith set.  Shipped the same way makefile is.
 #
-LIBHDRS	   = $(wildcard include/*.h)
-LIBSYSHDRS = $(wildcard include/sys/*.h)
+LIBHDRS	   = include/assert.h include/conio.h include/cpm.h \
+	 include/ctype.h include/errno.h include/exec.h include/fcntl.h \
+	 include/float.h include/hitech.h include/libgen.h include/limits.h \
+	 include/math.h include/setjmp.h include/signal.h include/stat.h \
+	 include/stdarg.h include/stddef.h include/stdio.h include/stdlib.h \
+	 include/string.h include/sys.h include/time.h include/unistd.h \
+	 include/unixio.h
+LIBSYSHDRS	   = include/sys/wait.h
 
 libinclude.tar: $(LIBHDRS) $(LIBSYSHDRS)
 	tar -f libinclude.tar -c $(LIBHDRS) $(LIBSYSHDRS)

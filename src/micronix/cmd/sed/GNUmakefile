@@ -12,4 +12,9 @@ DEPTH	= ../..
 DIR	= sed
 CLASS	= cmd
 
+CSRCS	= sed0.c sed1.c
+
+HSRCS	= sed.h
+MANSRCS	= sed.1
+
 include $(DEPTH)/GNUmakefile.inc

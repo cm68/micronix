@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= sync
 CLASS	= cmd
 
+CSRCS	= sync.c
+
+MANSRCS	= sync.1
+
 include $(DEPTH)/GNUmakefile.inc

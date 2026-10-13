@@ -14,6 +14,10 @@ DEPTH	= ../..
 DIR	= edit
 CLASS	= cmd
 
+CSRCS	= edit.c
+
+MANSRCS	= edit.1
+
 include $(DEPTH)/GNUmakefile.inc
 
 SRCS += ctxt cpat cbuf cfile cscrat clines common append.r ckglob.r \

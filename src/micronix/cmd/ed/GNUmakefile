@@ -18,4 +18,8 @@ CLASS	= cmd
 #
 ALIAS	= e
 
+CSRCS	= ed.c
+
+MANSRCS	= ed.1
+
 include $(DEPTH)/GNUmakefile.inc

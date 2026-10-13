@@ -20,4 +20,8 @@ DIR	= makekey
 CLASS	= cmd
 BINDIR	= /usr/lib
 
+CSRCS	= makekey.c
+
+MANSRCS	= makekey.1
+
 include $(DEPTH)/GNUmakefile.inc

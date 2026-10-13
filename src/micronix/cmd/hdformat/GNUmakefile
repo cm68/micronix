@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= hdformat
 CLASS	= cmd
 
+CSRCS	= hdformat.c
+
+MANSRCS	= hdformat.1
+
 include $(DEPTH)/GNUmakefile.inc

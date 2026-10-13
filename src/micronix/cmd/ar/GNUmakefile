@@ -12,4 +12,9 @@ DEPTH	= ../..
 DIR	= ar
 CLASS	= cmd
 
+CSRCS	= ar.c
+
+HSRCS	= ar.h
+MANSRCS	= ar.1
+
 include $(DEPTH)/GNUmakefile.inc

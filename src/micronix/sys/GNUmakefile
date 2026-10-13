@@ -157,7 +157,7 @@ $(KERNEL_C) $(WIN_C) $(HIGHMEM_C_OBJ) user.o \
 # $(DEPTH)/include the same as the resident objects do; the $(OBJS) half of
 # that dependency lives in GNUmakefile.inc, and this is the module half.
 $(MODS:%=%.o) $(MODS:%=%hdr.o) $(STAGED:%=%.o) $(STAGED:%=%hdr.o): \
-	$(wildcard $(DEPTH)/include/*.h) $(wildcard $(DEPTH)/include/sys/*.h)
+	$(SYSHDRS)
 
 $(KERNEL_AS_OBJ) $(LEAF_AS) $(HIGHMEM_AS_OBJ): %.o: %.s
 	$(CCC) $(CCFLAGS) -c $<
@@ -176,6 +176,19 @@ $(KERNEL_AS_OBJ) $(LEAF_AS) $(HIGHMEM_AS_OBJ): %.o: %.s
 # what keeps it out of the driver's one 4K page.
 OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) $(WIN_C) $(HIGHMEM) low.o win.o $(OVLSLOT)
 TREELIBS =
+
+CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c disk2.c \
+	 disk2hdr.c disk3.c disk3hdr.c dj.c djhdr.c djinit.c dlabel.c exec.c \
+	 fio.c fork.c hdca.c hdcahdr.c ialloc.c ide.c idehdr.c iget.c imap.c \
+	 link.c main.c main_init.c makedate.c malloc.c memdev.c mount.c \
+	 multio.c mw.c mwhdr.c name.c ncr.c ncrhdr.c ncrinit.c open.c ovl.c \
+	 queue.c rdwri.c reg.c rtc.c sig.c slavepic.c sleep.c stub.c \
+	 stub_intr.c subc.c swap.c sys1.c sys2.c system.c time.c trap.c tty.c \
+	 uio.c user.c
+ASSRCS	= csv.s idiv.s imul.s inits.s inout.s intrpt.s mem.s mio.s oarg.s \
+	 ovlslot.s qadd.s qand.s qcmp.s qinc.s qldst.s qmul.s qor.s qsar.s \
+	 qshl.s qshr.s qsub.s slavevec.s sub8.s swdisp.s swdispw.s textpad.s \
+	 tramp.s uhdr.s unbcd.s unixtobcd.s
 
 include $(DEPTH)/GNUmakefile.inc
 

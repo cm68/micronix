@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= strip
 CLASS	= cmd
 
+CSRCS	= strip.c
+
+MANSRCS	= strip.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= halt
 CLASS	= cmd
 
+CSRCS	= halt.c
+
+MANSRCS	= halt.1
+
 include $(DEPTH)/GNUmakefile.inc

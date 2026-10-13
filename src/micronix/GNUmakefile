@@ -71,7 +71,8 @@ SUDO	?= sudo
 # uses them, out of /include, against the compiler that matches them.
 #
 CCCOWNED = cpm.h errno.h hitech.h setjmp.h stdio.h time.h
-SYSHDRS  = $(filter-out $(CCCOWNED),$(notdir $(wildcard include/*.h)))
+SYSHDRS	 = 8080.h alloc.h bios.h crypt.h dirent.h dtab.h dump.h fio.h \
+	 fslib.h grp.h mtab.h obj.h pascal.h pwd.h std.h types.h utmp.h
 
 include $(DEPTH)/GNUmakefile.inc
 
@@ -355,10 +356,92 @@ sysinstall:
 #
 MXROOT	 = $(DESTDIR)$(PREFIX)/micronix
 MXMAN	 = $(MXROOT)/man
-HOSTMANS = $(wildcard cmd/*/*.1) $(wildcard lib/libunix/*.2) \
-	   $(wildcard lib/libc/*.3) $(wildcard man/man1/*.1) \
-	   $(wildcard man/man2/*.2) $(wildcard man/man4/*.4) \
-	   $(wildcard man/man5/*.5)
+HOSTMANS	 = cmd/ar/ar.1 cmd/asz/asz.1 cmd/awk/awk.1 cmd/cal/cal.1 \
+	 cmd/cat/cat.1 cmd/cc/cc.1 cmd/ccc/ccc.1 cmd/change/change.1 \
+	 cmd/chgrp/chgrp.1 cmd/chmod/chmod.1 cmd/chown/chown.1 \
+	 cmd/clean/clean.1 cmd/cmp/cmp.1 cmd/comm/comm.1 cmd/common/common.1 \
+	 cmd/compare/compare.1 cmd/compress/compress.1 cmd/concat/concat.1 \
+	 cmd/copy/copy.1 cmd/cp/cp.1 cmd/cpp/cpp.1 cmd/crypt/crypt.1 \
+	 cmd/cu/cu.1 cmd/date/date.1 cmd/dc/dc.1 cmd/dcheck/dcheck.1 \
+	 cmd/dd/dd.1 cmd/detab/detab.1 cmd/df/df.1 cmd/diff/diff.1 \
+	 cmd/djformat/djformat.1 cmd/down/down.1 cmd/du/du.1 cmd/echo/echo.1 \
+	 cmd/ed/ed.1 cmd/edit/edit.1 cmd/entab/entab.1 cmd/expand/expand.1 \
+	 cmd/expr/expr.1 cmd/far/far.1 cmd/fd2/fd2.1 cmd/fdj/fdj.1 \
+	 cmd/fgrep/fgrep.1 cmd/field/field.1 cmd/file/file.1 cmd/find/find.1 \
+	 cmd/form/form.1 cmd/fp/fp.1 cmd/fsck/fsck.1 cmd/grep/grep.1 \
+	 cmd/group/group.1 cmd/halt/halt.1 cmd/hdformat/hdformat.1 \
+	 cmd/icheck/icheck.1 cmd/include/include.1 cmd/init/init.1 \
+	 cmd/kill/kill.1 cmd/kstat/kstat.1 cmd/kwic/kwic.1 cmd/label/label.1 \
+	 cmd/last/last.1 cmd/ld/ld.1 cmd/less/less.1 cmd/lex/lex.1 cmd/ln/ln.1 \
+	 cmd/login/login.1 cmd/ls/ls.1 cmd/lz4/lz4.1 cmd/m4/m4.1 \
+	 cmd/macro/macro.1 cmd/mail/mail.1 cmd/make/make.1 \
+	 cmd/makekey/makekey.1 cmd/man/help.1 cmd/man/man.1 cmd/md/md.1 \
+	 cmd/mkdir/mkdir.1 cmd/mkfs/mkfs.1 cmd/mknod/mknod.1 cmd/more/more.1 \
+	 cmd/mount/mount.1 cmd/msh/msh.1 cmd/mv/mv.1 cmd/mwformat/mwformat.1 \
+	 cmd/ncheck/ncheck.1 cmd/newuser/newuser.1 cmd/nm/nm.1 cmd/od/od.1 \
+	 cmd/overstrike/overstrike.1 cmd/owner/owner.1 cmd/packsrc/packsrc.1 \
+	 cmd/passwd/passwd.1 cmd/pr/pr.1 cmd/print/print.1 cmd/ps/ps.1 \
+	 cmd/pwd/pwd.1 cmd/ratfor/ratfor.1 cmd/rm/rm.1 cmd/rmdir/rmdir.1 \
+	 cmd/s/s.1 cmd/scsiformat/scsiformat.1 cmd/sed/sed.1 \
+	 cmd/setdev/setdev.1 cmd/sh/sh.1 cmd/size/size.1 cmd/sort/sort.1 \
+	 cmd/split/split.1 cmd/strings/strings.1 cmd/strip/strip.1 \
+	 cmd/stty/stty.1 cmd/su/su.1 cmd/sum/sum.1 cmd/sync/sync.1 \
+	 cmd/tail/tail.1 cmd/tar/tar.1 cmd/td/td.1 cmd/tee/tee.1 \
+	 cmd/time/time.1 cmd/touch/touch.1 cmd/tr/tr.1 cmd/translit/translit.1 \
+	 cmd/tree/tree.1 cmd/tty/tty.1 cmd/umount/umount.1 cmd/unique/unique.1 \
+	 cmd/unlz4/unlz4.1 cmd/unrot/unrot.1 cmd/update/update.1 cmd/upm/upm.1 \
+	 cmd/uudecode/uudecode.1 cmd/uuencode/uuencode.1 cmd/vi/vi.1 \
+	 cmd/wall/wall.1 cmd/wc/chars.1 cmd/wc/lines.1 cmd/wc/wc.1 \
+	 cmd/wc/words.1 cmd/who/who.1 cmd/write/write.1 cmd/xargs/xargs.1 \
+	 cmd/yacc/yacc.1 lib/libunix/Intro.2 lib/libunix/access.2 \
+	 lib/libunix/break.2 lib/libunix/chdir.2 lib/libunix/chmod.2 \
+	 lib/libunix/chown.2 lib/libunix/close.2 lib/libunix/creat.2 \
+	 lib/libunix/csw.2 lib/libunix/dup.2 lib/libunix/exec.2 \
+	 lib/libunix/exit.2 lib/libunix/fork.2 lib/libunix/fstat.2 \
+	 lib/libunix/ftruncate.2 lib/libunix/getpid.2 lib/libunix/getuid.2 \
+	 lib/libunix/gtty.2 lib/libunix/indir.2 lib/libunix/kill.2 \
+	 lib/libunix/link.2 lib/libunix/mknod.2 lib/libunix/mount.2 \
+	 lib/libunix/nice.2 lib/libunix/open.2 lib/libunix/pipe.2 \
+	 lib/libunix/read.2 lib/libunix/seek.2 lib/libunix/setuid.2 \
+	 lib/libunix/signal.2 lib/libunix/sleep.2 lib/libunix/stat.2 \
+	 lib/libunix/stime.2 lib/libunix/stty.2 lib/libunix/sync.2 \
+	 lib/libunix/time.2 lib/libunix/times.2 lib/libunix/umount.2 \
+	 lib/libunix/unlink.2 lib/libunix/wait.2 lib/libunix/write.2 \
+	 lib/libc/alloc.3 lib/libc/crypt.3 lib/libc/ctime.3 lib/libc/fclose.3 \
+	 lib/libc/ferror.3 lib/libc/floor.3 lib/libc/fopen.3 lib/libc/fread.3 \
+	 lib/libc/fseek.3 lib/libc/getgrent.3 lib/libc/getpass.3 \
+	 lib/libc/getpwent.3 lib/libc/gets.3 lib/libc/perror.3 lib/libc/popen.3 \
+	 lib/libc/printf.3 lib/libc/putc.3 lib/libc/puts.3 lib/libc/scanf.3 \
+	 lib/libc/setbuf.3 lib/libc/stdio.3 lib/libc/strcat.3 lib/libc/strchr.3 \
+	 lib/libc/strcmp.3 lib/libc/strcpy.3 lib/libc/strdup.3 \
+	 lib/libc/strlen.3 lib/libc/strncat.3 lib/libc/strncmp.3 \
+	 lib/libc/strncpy.3 lib/libc/strrchr.3 lib/libc/system.3 \
+	 lib/libc/ttyname.3 man/man1/account.1 man/man1/anat.1 \
+	 man/man1/archive.1 man/man1/as.1 man/man1/badspots.1 man/man1/boot.1 \
+	 man/man1/cal.1 man/man1/chars.1 man/man1/clean.1 man/man1/comm.1 \
+	 man/man1/cp1.1 man/man1/cp2.1 man/man1/cpp.1 man/man1/cptree.1 \
+	 man/man1/crypt.1 man/man1/cu.1 man/man1/cxr.1 man/man1/dar.1 \
+	 man/man1/dc.1 man/man1/ddt.1 man/man1/down.1 man/man1/edit.1 \
+	 man/man1/field.1 man/man1/file.1 man/man1/group.1 man/man1/hex.1 \
+	 man/man1/last.1 man/man1/lib.1 man/man1/lines.1 man/man1/link.1 \
+	 man/man1/lord.1 man/man1/lpr.1 man/man1/macro.1 man/man1/mail.1 \
+	 man/man1/msgs.1 man/man1/newuser.1 man/man1/obj.1 man/man1/oldcc.1 \
+	 man/man1/oldowner.1 man/man1/oldps.1 man/man1/oldsh.1 \
+	 man/man1/passwd.1 man/man1/paste.1 man/man1/pilot.1 man/man1/ptc.1 \
+	 man/man1/rp.1 man/man1/sort.1 man/man1/split.1 man/man1/stty.1 \
+	 man/man1/su.1 man/man1/sum.1 man/man1/tail.1 man/man1/touch.1 \
+	 man/man1/translit.1 man/man1/tree.1 man/man1/tty.1 man/man1/unique.1 \
+	 man/man1/unrot.1 man/man1/update.1 man/man1/wall.1 man/man1/who.1 \
+	 man/man1/words.1 man/man2/alarm.2 man/man2/reboot.2 man/man4/cables.4 \
+	 man/man4/djdma.4 man/man4/djmem.4 man/man4/hdca.4 man/man4/hddma.4 \
+	 man/man4/ide.4 man/man4/io.4 man/man4/mem.4 man/man4/multio.4 \
+	 man/man4/network.4 man/man4/null.4 man/man4/ports.4 \
+	 man/man4/printers.4 man/man5/ascii.5 man/man5/banner.5 \
+	 man/man5/device.5 man/man5/directory.5 man/man5/disklabel.5 \
+	 man/man5/dtab.5 man/man5/filesystem.5 man/man5/fp.5 man/man5/group.5 \
+	 man/man5/motd.5 man/man5/mtab.5 man/man5/passwd.5 man/man5/rc.5 \
+	 man/man5/signon.5 man/man5/terminals.5 man/man5/ttys.5 man/man5/utmp.5 \
+	 man/man5/wtmp.5
 
 #
 # The shadowing is worked out here, in the shell, and not by testing
@@ -429,8 +512,7 @@ ROOT	?= ~/src/micronix/filesystem
 DEST	 = $(ROOT)/usr/src
 NOWARN	 = --warning=no-ignore-newer
 DOCS	 = ../../docs
-DOCSRCS	 = $(wildcard $(DOCS)/*.md)
-
+DOCSRCS	 = ../../docs/INTERRUPTS.md ../../docs/WORKORDER-provisioning.md
 src.tar: makefile
 	tar -f src.tar -c makefile
 

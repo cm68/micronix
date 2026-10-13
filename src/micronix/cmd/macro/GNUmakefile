@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= macro
 CLASS	= cmd
 
+CSRCS	= macro.c
+
+MANSRCS	= macro.1
+
 include $(DEPTH)/GNUmakefile.inc

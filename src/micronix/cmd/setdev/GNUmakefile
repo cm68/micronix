@@ -9,4 +9,8 @@ DEPTH	= ../..
 DIR	= setdev
 CLASS	= cmd
 
+CSRCS	= setdev.c
+
+MANSRCS	= setdev.1
+
 include $(DEPTH)/GNUmakefile.inc

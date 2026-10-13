@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= djformat
 CLASS	= cmd
 
+CSRCS	= djformat.c
+
+MANSRCS	= djformat.1
+
 include $(DEPTH)/GNUmakefile.inc

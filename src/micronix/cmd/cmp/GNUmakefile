@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= cmp
 CLASS	= cmd
 
+CSRCS	= cmp.c
+
+MANSRCS	= cmp.1
+
 include $(DEPTH)/GNUmakefile.inc

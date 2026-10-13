@@ -39,8 +39,13 @@ LIBS	= $(DEPTH)/lib/libccc/libccc.a
 # and mkkw.c and xdump.c, which are programs of their own with their
 # own main - the Z80 link said so, twice over, as duplicate _main.
 #
-CSRCS = cpp.c lex.c io.c macro.c kw.c emit.c util.c kwtab.c \
-	lexdata.c tdsrc.c cfold.c knr.c norm.c filtutil.c
+
+
+HSRCS	= astops.h cpp.h debug.h format.h lexeme.h lexops.h libutil.h
+
+CSRCS	= cfold.c cpp.c emit.c filtutil.c io.c knr.c kw.c kwtab.c lex.c \
+	 lexdata.c macro.c norm.c tdsrc.c util.c
+ASSRCS	= asmkw.s
 
 include $(DEPTH)/GNUmakefile.inc
 

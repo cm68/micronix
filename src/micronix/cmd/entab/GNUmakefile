@@ -17,4 +17,8 @@ DIR	= entab
 CLASS	= cmd
 BINDIR	= /usr/bin
 
+CSRCS	= entab.c
+
+MANSRCS	= entab.1
+
 include $(DEPTH)/GNUmakefile.inc

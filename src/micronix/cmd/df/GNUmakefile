@@ -17,6 +17,10 @@ DEPTH	= ../..
 DIR	= df
 CLASS	= cmd
 
+CSRCS	= df.c
+
+MANSRCS	= df.1
+
 include $(DEPTH)/GNUmakefile.inc
 
 #

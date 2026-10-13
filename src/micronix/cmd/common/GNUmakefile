@@ -17,4 +17,8 @@ DIR	= common
 CLASS	= cmd
 BINDIR	= /usr/bin
 
+CSRCS	= common.c
+
+MANSRCS	= common.1
+
 include $(DEPTH)/GNUmakefile.inc

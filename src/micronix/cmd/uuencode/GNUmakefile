@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= uuencode
 CLASS	= cmd
 
+CSRCS	= uuencode.c
+
+MANSRCS	= uuencode.1
+
 include $(DEPTH)/GNUmakefile.inc

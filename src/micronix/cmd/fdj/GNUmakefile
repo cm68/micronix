@@ -14,4 +14,6 @@ CLASS	= cmd
 # fdj.recon.c is the CP/M reconstruction, not built: build only fdj.c.
 CSRCS	= fdj.c
 
+MANSRCS	= fdj.1
+
 include $(DEPTH)/GNUmakefile.inc

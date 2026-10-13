@@ -22,6 +22,11 @@ CLASS	= libexec
 #
 BINDIR	= /libexec
 
+
+HSRCS	= peep.h
+
+CSRCS	= peep.c pool.c regs.c value.c rules.c
+
 include $(DEPTH)/GNUmakefile.inc
 
 #

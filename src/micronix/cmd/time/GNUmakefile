@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= time
 CLASS	= cmd
 
+CSRCS	= time.c
+
+MANSRCS	= time.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -16,6 +16,12 @@ DEPTH	= ../..
 DIR	= dar
 CLASS	= cmd
 
+CSRCS	= compat.c dar2.c dar3.c dar4.c dar5.c dar6.c delete.c dev.c dir.c \
+	 error.c extract.c fat.c fs.c global.c init.c mkdir.c name.c path.c \
+	 replace.c string.c table.c time.c unix.c
+
+HSRCS	= dar.h
+
 include $(DEPTH)/GNUmakefile.inc
 
 DISAS	= $(DEPTH)/../tools/disas

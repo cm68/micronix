@@ -23,6 +23,11 @@ DIR	= libccc
 CLASS	= lib
 TARGET	= libccc.a
 
+
+HSRCS	= astops.h format.h libutil.h
+
+CSRCS	= libutil.c fmtlong.c
+
 include $(DEPTH)/GNUmakefile.inc
 
 HOSTCC		?= gcc

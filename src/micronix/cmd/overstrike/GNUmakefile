@@ -17,4 +17,8 @@ DIR	= overstrike
 CLASS	= cmd
 BINDIR	= /usr/bin
 
+CSRCS	= overstrike.c
+
+MANSRCS	= overstrike.1
+
 include $(DEPTH)/GNUmakefile.inc

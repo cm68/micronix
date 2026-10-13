@@ -16,4 +16,11 @@ DEPTH	= ../..
 DIR	= fp
 CLASS	= cmd
 
+CSRCS	= acct.c change.c copy.c device.c dir.c display.c error.c \
+	 extract.c file.c format.c global.c incr.c init.c label.c link.c main.c \
+	 mkdir.c replace.c sum.c super.c table.c
+
+HSRCS	= dtab.h fp.h
+MANSRCS	= fp.1
+
 include $(DEPTH)/GNUmakefile.inc

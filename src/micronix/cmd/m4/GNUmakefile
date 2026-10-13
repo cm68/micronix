@@ -16,6 +16,10 @@ CLASS	= cmd
 
 OBJS	= m4.o m4eval.o
 
+CSRCS	= m4.c m4eval.c
+
+MANSRCS	= m4.1
+
 include $(DEPTH)/GNUmakefile.inc
 
 CCFLAGS += -Dunix

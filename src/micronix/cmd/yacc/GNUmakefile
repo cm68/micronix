@@ -25,6 +25,11 @@ CLASS	= cmd
 OBJS	= y0.o y1.o y2.o y3.o y4.o y5.o
 TARGETS	= liby.a
 
+
+MANSRCS	= yacc.1
+
+CSRCS	= y0.c y1.c y2.c y3.c y4.c y5.c
+
 include $(DEPTH)/GNUmakefile.inc
 
 SRCS += dextern files yaccopar yaccepar yaccrpar macros conv.py

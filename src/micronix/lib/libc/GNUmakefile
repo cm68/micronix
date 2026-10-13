@@ -38,36 +38,16 @@ TARGET	= libc.a
 # pages.  That file defaults MANSEC to 1 and MANSRCS to *.1, so both
 # are said here to make install-man find and place these.
 MANSEC	 = 3
-MANSRCS	 = $(wildcard *.3)
+MANSRCS	= alloc.3 crypt.3 ctime.3 fclose.3 ferror.3 floor.3 fopen.3 \
+	 fread.3 fseek.3 getgrent.3 getpass.3 getpwent.3 gets.3 perror.3 \
+	 popen.3 printf.3 putc.3 puts.3 scanf.3 setbuf.3 stdio.3 strcat.3 \
+	 strchr.3 strcmp.3 strcpy.3 strdup.3 strlen.3 strncat.3 strncmp.3 \
+	 strncpy.3 strrchr.3 system.3 ttyname.3
 
 # What ASSRCS defines, CSRCS does not get to define as well.
 ASOVERRIDE = $(patsubst %.s,%.c,$(ASSRCS))
 
-ASSRCS = \
-	abs.s allsh.s alrsh.s asallsh.s asalrsh.s asar.s \
-	strdup.s asdiv.s asladd.s asland.s asll.s \
-	asllrsh.s aslmul.s aslor.s aslr.s aslsub.s aslxor.s \
-	asmod.s asmul.s atoi.s bitfield.s blkclr.s bmove.s \
-	csv.s brelop.s wrelop.s getsp.s idiv.s imul.s \
-	index.s inout.s iregset.s isalpha.s isdigit.s islower.s \
-	isspace.s isupper.s ladd.s land.s lcom.s ldiv.s \
-	linc.s lldst.s llrsh.s lmul.s longjmp.s lor.s \
-	lrelop.s lsub.s lushr.s lxor.s max.s swap.s \
-	qadd.s qsub.s qand.s qor.s qxor.s qcom.s \
-	qcmp.s qshl.s qsar.s qshr.s qinc.s qldst.s \
-	qmul.s qdiv.s op16.s tramp.s rcsv.s rindex.s \
-	shar.s shl16.s shll.s shlr.s strcat.s \
-	strchr.s strcmp.s strcpy.s swdisp.s swdispw.s oarg.s strlen.s \
-	strncat.s strncmp.s strncpy.s strrchr.s tolower.s toupper.s \
-	xtoi.s memcpy.s
 
-CSRCS = \
-	rand.c srand1.c mkstemp.c mktemp.c permaloc.c timezone.c ctime.c \
-	assert.c calloc.c malloc.c memcmp.c memset.c \
-	blkcpy.c ctype_.c getenv.c pnum.c qsort.c remove.c \
-	sprintf.c doprnt.c atol.c sscanf.c doscan.c fnum.c \
-	atof.c mkdir.c opendir.c system.c getpwent.c getgrent.c \
-	crypt.c getpass.c
 
 # superseded by the .s beside them: kept, not built
 #
@@ -98,5 +78,24 @@ HELD =
 # explicit rule of their own, which is more specific than the generic.
 $(ASSRCS:.s=.o): %.o: %.s
 	$(CCC) $(CCFLAGS) -c $<
+
+CSRCS	= rand.c srand1.c mkstemp.c mktemp.c permaloc.c timezone.c ctime.c \
+	 assert.c calloc.c malloc.c memcmp.c memset.c blkcpy.c ctype_.c \
+	 getenv.c pnum.c qsort.c remove.c sprintf.c doprnt.c atol.c sscanf.c \
+	 doscan.c fnum.c atof.c mkdir.c opendir.c system.c getpwent.c \
+	 getgrent.c crypt.c getpass.c
+ASSRCS	= abs.s allsh.s alrsh.s asallsh.s asalrsh.s asar.s strdup.s \
+	 asdiv.s asladd.s asland.s asll.s asllrsh.s aslmul.s aslor.s aslr.s \
+	 aslsub.s aslxor.s asmod.s asmul.s atoi.s bitfield.s blkclr.s bmove.s \
+	 csv.s brelop.s wrelop.s getsp.s idiv.s imul.s index.s inout.s \
+	 iregset.s isalpha.s isdigit.s islower.s isspace.s isupper.s ladd.s \
+	 land.s lcom.s ldiv.s linc.s lldst.s llrsh.s lmul.s longjmp.s lor.s \
+	 lrelop.s lsub.s lushr.s lxor.s max.s swap.s qadd.s qsub.s qand.s qor.s \
+	 qxor.s qcom.s qcmp.s qshl.s qsar.s qshr.s qinc.s qldst.s qmul.s qdiv.s \
+	 op16.s tramp.s rcsv.s rindex.s shar.s shl16.s shll.s shlr.s strcat.s \
+	 strchr.s strcmp.s strcpy.s swdisp.s swdispw.s oarg.s strlen.s \
+	 strncat.s strncmp.s strncpy.s strrchr.s tolower.s toupper.s xtoi.s \
+	 memcpy.s
+OBJS	= $(ASSRCS:.s=.o) $(CSRCS:.c=.o)
 
 include $(DEPTH)/GNUmakefile.inc

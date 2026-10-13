@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= tar
 CLASS	= cmd
 
+CSRCS	= tar.c
+
+MANSRCS	= tar.1
+
 include $(DEPTH)/GNUmakefile.inc

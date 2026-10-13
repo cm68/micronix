@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= kill
 CLASS	= cmd
 
+CSRCS	= kill.c
+
+MANSRCS	= kill.1
+
 include $(DEPTH)/GNUmakefile.inc

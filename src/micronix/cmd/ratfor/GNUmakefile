@@ -16,6 +16,12 @@ DEPTH	= ../..
 DIR	= ratfor
 CLASS	= cmd
 
+
+HSRCS	= r.h y.tab.h
+MANSRCS	= ratfor.1
+
+CSRCS	= r0.c r1.c r2.c rio.c rlex.c rlook.c y.tab.c
+
 include $(DEPTH)/GNUmakefile.inc
 
 CCFLAGS += -Dunix

@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= xargs
 CLASS	= cmd
 
+CSRCS	= xargs.c
+
+MANSRCS	= xargs.1
+
 include $(DEPTH)/GNUmakefile.inc

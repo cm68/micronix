@@ -22,6 +22,10 @@ CLASS	= cmd
 
 OBJS	= y.tab.o
 
+CSRCS	= y.tab.c
+
+MANSRCS	= expr.1
+
 include $(DEPTH)/GNUmakefile.inc
 
 SRCS	+= expr.y

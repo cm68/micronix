@@ -165,19 +165,12 @@ MANSEC	?= 1
 MANDIR	?= /usr/man/man$(MANSEC)
 MANINSTDIR = $(ROOT)$(MANDIR)
 
-CSRCS	?= $(wildcard *.c)
-HSRCS	?= $(wildcard *.h)
-ASSRCS	?= $(wildcard *.s)
-DOCSRCS	?= $(wildcard *.mp *.ic)
 #
-# A man page ships with the source it documents, so that the makefile
-# beside it has something to install when the native build runs.
-#
-MANSRCS	?= $(wildcard *.1)
-#
-# Anything else a directory ships that none of the wildcards above
-# catch - a data file, a termcap entry - lists itself here.  It rides
-# the tar beside the sources but is not a build input.
+# CSRCS, HSRCS, ASSRCS, MANSRCS and DOCSRCS are enumerated in each
+# GNUmakefile beside its directory - never $(wildcard ...).  A wildcard
+# expands past micronix's command-line limit, and it silently drags a
+# generated file (dbgtags.c) into the build.  A directory that ships
+# nothing of a kind omits that variable.
 #
 EXTRA	?=
 SRCS	?= $(CSRCS) $(HSRCS) $(ASSRCS) $(MANSRCS) $(EXTRA)
@@ -349,12 +342,14 @@ all: $(TARGET) $(TARGETS)
 # will emit them; this is coarse and correct.
 #
 # HSRCS is only the headers beside the sources.  The kernel and the
-# commands include <sys/*.h> and <*.h> out of $(DEPTH)/include, and those
-# are a second set the wildcard above does not reach - so editing
-# include/sys/buf.h used to rebuild nothing, and a driver compiled against
-# the old struct linked against the new one.  Depend on them too.
+# commands include <sys/*.h> and <*.h> out of $(DEPTH)/include, a second
+# set, enumerated here - so editing include/sys/buf.h rebuilds the driver
+# rather than linking it against an old struct.  Depend on them too.
 #
-$(OBJS): $(HSRCS) $(wildcard $(DEPTH)/include/*.h) $(wildcard $(DEPTH)/include/sys/*.h)
+SYSHDRS	= $(patsubst %,$(DEPTH)/include/%,8080.h alloc.h bios.h cpm.h crypt.h dirent.h dtab.h dump.h errno.h fio.h fslib.h grp.h hitech.h mtab.h obj.h pascal.h pwd.h setjmp.h std.h stdio.h time.h types.h utmp.h)\
+	  $(patsubst %,$(DEPTH)/include/sys/%,access.h buf.h con.h dir.h disk2.h disk3.h dj.h dlabel.h file.h fs.h hdca.h ide.h inode.h ints.h ioctl.h lock.h mount.h mw.h ncr.h ovl.h proc.h reboot.h reg.h sgtty.h signal.h stat.h sys.h times.h tty.h)
+
+$(OBJS): $(HSRCS) $(SYSHDRS)
 
 #
 # Put what was built into the filesystem the simulator boots.  A

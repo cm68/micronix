@@ -18,6 +18,10 @@ DIR	= astpp
 CLASS	= libexec
 BINDIR	= /libexec
 
+CSRCS	= astpp.c
+
+HSRCS	= astops.h format.h lexeme.h lexops.h libutil.h
+
 include $(DEPTH)/GNUmakefile.inc
 
 #

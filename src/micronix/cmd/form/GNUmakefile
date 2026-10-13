@@ -12,6 +12,10 @@ DEPTH	= ../..
 DIR	= form
 CLASS	= cmd
 
+CSRCS	= form.c
+
+MANSRCS	= form.1
+
 include $(DEPTH)/GNUmakefile.inc
 
 #

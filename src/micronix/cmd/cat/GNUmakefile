@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= cat
 CLASS	= cmd
 
+CSRCS	= cat.c
+
+MANSRCS	= cat.1
+
 include $(DEPTH)/GNUmakefile.inc

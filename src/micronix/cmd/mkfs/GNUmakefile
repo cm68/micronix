@@ -16,4 +16,9 @@ DEPTH	= ../..
 DIR	= mkfs
 CLASS	= cmd
 
+CSRCS	= mkfs.c mkfsfunc.c
+
+HSRCS	= mkfs.h
+MANSRCS	= mkfs.1
+
 include $(DEPTH)/GNUmakefile.inc

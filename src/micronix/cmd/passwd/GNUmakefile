@@ -17,4 +17,8 @@ CLASS	= cmd
 #
 MODE	= 4711
 
+CSRCS	= passwd.c
+
+MANSRCS	= passwd.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -17,4 +17,8 @@ CLASS	= cmd
 #
 MODE	= 4711
 
+CSRCS	= mount.c
+
+MANSRCS	= mount.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -10,4 +10,8 @@ DIR	= fsck
 CLASS	= cmd
 LIBS	= $(DEPTH)/lib/fslib/libfs.a
 
+CSRCS	= fsck.c
+
+MANSRCS	= fsck.1
+
 include $(DEPTH)/GNUmakefile.inc

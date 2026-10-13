@@ -17,4 +17,8 @@ DEPTH	= ../..
 DIR	= ps
 CLASS	= cmd
 
+CSRCS	= ps.c
+
+MANSRCS	= ps.1
+
 include $(DEPTH)/GNUmakefile.inc

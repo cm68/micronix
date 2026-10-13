@@ -13,4 +13,8 @@ DEPTH	= ../..
 DIR	= fd2
 CLASS	= cmd
 
+CSRCS	= fd2.c pexec.c
+
+MANSRCS	= fd2.1
+
 include $(DEPTH)/GNUmakefile.inc

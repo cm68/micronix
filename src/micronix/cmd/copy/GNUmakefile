@@ -17,4 +17,8 @@ DIR	= copy
 CLASS	= cmd
 BINDIR	= /usr/bin
 
+CSRCS	= copy.c
+
+MANSRCS	= copy.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= unlz4
 CLASS	= cmd
 
+CSRCS	= unlz4.c
+
+MANSRCS	= unlz4.1
+
 include $(DEPTH)/GNUmakefile.inc

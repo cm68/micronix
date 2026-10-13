@@ -53,8 +53,14 @@ TARGET	= libcpm.a
 # is a duplicate symbol as soon as anything exits, so the stub stays
 # out of it - a program that wants it names the object.
 #
-CSRCS	= $(filter-out crtcpm.c, $(wildcard *.c))
-ASSRCS	= $(filter-out crtcpm.s fakecpcl.s, $(wildcard *.s))
+CSRCS	= abort.c buf.c chmod.c cleanup.c close.c convtime.c creat.c dup.c \
+	 fcbname.c fclose.c fflush.c filbuf.c flsbuf.c fopen.c fprintf.c \
+	 fputc.c fread.c freopen.c fscanf.c fseek.c fwrite.c getargs.c getch.c \
+	 getfcb.c gets.c isatty.c open.c perror.c printf.c putchar.c puts.c \
+	 read.c rename.c rewind.c scanf.c seek.c seekraw.c setbuf.c signal.c \
+	 stat.c stdclean.c sys_err.c time.c ungetc.c unlink.c write.c
+ASSRCS	= _exit.s bdos.s bdoshl.s exec.s execl.s exit.s fgetc.s getuid.s \
+	 sbrk.s
 TARGETS	= crtcpm.o fakecpcl.o
 
 include $(DEPTH)/GNUmakefile.inc

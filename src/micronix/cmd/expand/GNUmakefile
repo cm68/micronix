@@ -17,4 +17,8 @@ DIR	= expand
 CLASS	= cmd
 BINDIR	= /usr/bin
 
+CSRCS	= expand.c
+
+MANSRCS	= expand.1
+
 include $(DEPTH)/GNUmakefile.inc

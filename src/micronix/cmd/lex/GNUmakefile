@@ -34,6 +34,11 @@ OBJS	= main.o header.o sub1.o sub2.o y.tab.o
 TARGETS	= liblc.a
 LIBS	= ../yacc/liby.a
 
+
+MANSRCS	= lex.1
+
+CSRCS	= main.c header.c sub1.c sub2.c y.tab.c
+
 include $(DEPTH)/GNUmakefile.inc
 
 CCFLAGS += -Dunix

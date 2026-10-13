@@ -14,4 +14,9 @@ CLASS	= cmd
 
 LIBS	= $(DEPTH)/lib/libutil/libutil.a
 
+CSRCS	= cmdline.c edit.c linefunc.c main.c misccmds.c normal.c window.c
+
+HSRCS	= stevie.h
+MANSRCS	= vi.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= tail
 CLASS	= cmd
 
+CSRCS	= tail.c
+
+MANSRCS	= tail.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= translit
 CLASS	= cmd
 
+CSRCS	= translit.c
+
+MANSRCS	= translit.1
+
 include $(DEPTH)/GNUmakefile.inc

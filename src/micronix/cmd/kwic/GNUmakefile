@@ -17,4 +17,8 @@ DIR	= kwic
 CLASS	= cmd
 BINDIR	= /usr/bin
 
+CSRCS	= kwic.c
+
+MANSRCS	= kwic.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -17,6 +17,12 @@ DEPTH	= ../..
 DIR	= sh
 CLASS	= cmd
 
+
+HSRCS	= sh.h
+MANSRCS	= sh.1
+
+CSRCS	= sh.c parse.c glob.c hist.c hash.c job.c
+
 include $(DEPTH)/GNUmakefile.inc
 
 # CCFLAGS += -DBUILTIN_KILL

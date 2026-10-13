@@ -514,10 +514,24 @@ puthdr(fd)
 
 	for (i = 0; i < 14; i++)
 		b[i] = arbuf.ar_name[i];
-	putfield(&b[14], arbuf.ar_date, 4);
-	b[18] = arbuf.ar_uid;
-	b[19] = arbuf.ar_gid;
-	putfield(&b[20], (long)arbuf.ar_mode, 2);
+	/*
+	 * Zero, never the member's mtime.  The date in a v7 archive
+	 * header was so ranlib could compare it with the archive's, and
+	 * make never reads it - make stats the archive, not the member
+	 * (see files.c).  A real mtime here is the one thing that makes
+	 * two builds of the same sources differ, so a listing shows 1970
+	 * and that is the whole of what is given up.
+	 */
+	putfield(&b[14], 0, 4);
+	/*
+	 * Fixed, like the date: st_uid, st_gid and st_mode are encoded
+	 * differently on the host and on micronix, so writing the stat
+	 * values here makes the same sources archive differently in the
+	 * two places.  Nothing reads these - a listing is cosmetic.
+	 */
+	b[18] = 0;
+	b[19] = 0;
+	putfield(&b[20], 0444, 2);
 	putfield(&b[22], arbuf.ar_size, 4);
 	if (write(fd, b, AR_HDRSIZ) != AR_HDRSIZ)
 		wrerr();
@@ -886,18 +900,10 @@ ranlib()
 	for (i = 0; i < 14; i++)
 		arbuf.ar_name[i] = i < strlen(SYMDEF) ? SYMDEF[i] : '\0';
 	/*
-	 * The archive's own mtime, not zero - which showed as 1969 in
-	 * "ar tv" and is the sort of thing that makes a reader wonder
-	 * what else is wrong.
-	 *
-	 * v7's ranlib put a date here so a linker could compare it with
-	 * the archive's and warn when the index was older, which is the
-	 * one thing this cannot be: it is rebuilt by every command that
-	 * writes the archive.  So the date is for a person reading a
-	 * listing and for nothing else, and the archive's own is the
-	 * honest answer to "when was this made".
+	 * Not written - puthdr zeroes ar_date - so this field matters to
+	 * nothing.  See the note at puthdr.
 	 */
-	arbuf.ar_date = stat(arnam, &stbuf) < 0 ? 0 : stbuf.st_mtime;
+	arbuf.ar_date = 0;
 	arbuf.ar_uid = 0;
 	arbuf.ar_gid = 0;
 	arbuf.ar_mode = 0444;

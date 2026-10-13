@@ -17,4 +17,11 @@ CLASS	= cmd
 # wildcards in GNUmakefile.inc.
 EXTRA	= less.help
 
+
+HSRCS	= funcs.h less.h position.h
+MANSRCS	= less.1
+
+CSRCS	= main.c option.c prim.c ch.c position.c input.c output.c screen.c \
+	 prompt.c line.c signal.c help.c ttyin.c command.c version.c
+
 include $(DEPTH)/GNUmakefile.inc

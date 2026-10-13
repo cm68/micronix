@@ -17,4 +17,8 @@ DIR	= compare
 CLASS	= cmd
 BINDIR	= /usr/bin
 
+CSRCS	= compare.c
+
+MANSRCS	= compare.1
+
 include $(DEPTH)/GNUmakefile.inc

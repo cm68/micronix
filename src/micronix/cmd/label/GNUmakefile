@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= label
 CLASS	= cmd
 
+CSRCS	= label.c
+
+MANSRCS	= label.1
+
 include $(DEPTH)/GNUmakefile.inc

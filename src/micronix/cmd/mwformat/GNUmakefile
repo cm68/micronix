@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= mwformat
 CLASS	= cmd
 
+CSRCS	= mwformat.c
+
+MANSRCS	= mwformat.1
+
 include $(DEPTH)/GNUmakefile.inc

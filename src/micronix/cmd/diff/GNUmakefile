@@ -18,6 +18,12 @@ CLASS	= cmd
 OBJS	= diff.o diffdir.o diffreg.o
 TARGETS	= diffh
 
+
+HSRCS	= diff.h
+MANSRCS	= diff.1
+
+CSRCS	= diff.c diffdir.c diffreg.c diffh.c
+
 include $(DEPTH)/GNUmakefile.inc
 
 diffh: diffh.o

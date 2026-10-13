@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= chown
 CLASS	= cmd
 
+CSRCS	= chown.c
+
+MANSRCS	= chown.1
+
 include $(DEPTH)/GNUmakefile.inc

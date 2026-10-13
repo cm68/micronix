@@ -19,4 +19,8 @@ CLASS	= cmd
 #
 ALIAS	= chars lines words
 
+CSRCS	= wc.c
+
+MANSRCS	= chars.1 lines.1 wc.1 words.1
+
 include $(DEPTH)/GNUmakefile.inc

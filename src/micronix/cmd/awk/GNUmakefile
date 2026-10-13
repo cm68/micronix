@@ -20,4 +20,11 @@ CLASS	= cmd
 OBJS	= b.o lib.o main.o parse.o run.o token.o tran.o freeze.o popen.o \
 	  intmath.o y.tab.o yylex.o proctab.o
 
+
+HSRCS	= awk.h
+MANSRCS	= awk.1
+
+CSRCS	= b.c lib.c main.c parse.c run.c token.c tran.c freeze.c popen.c \
+	 intmath.c y.tab.c yylex.c proctab.c
+
 include $(DEPTH)/GNUmakefile.inc

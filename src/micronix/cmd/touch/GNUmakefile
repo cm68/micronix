@@ -12,4 +12,8 @@ DEPTH	= ../..
 DIR	= touch
 CLASS	= cmd
 
+CSRCS	= touch.c
+
+MANSRCS	= touch.1
+
 include $(DEPTH)/GNUmakefile.inc
