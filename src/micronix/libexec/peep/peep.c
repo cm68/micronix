@@ -18,9 +18,29 @@
 #include <unistd.h>
 #include "peep.h"
 
-struct line win[WINDOW];
+/*
+ * The window is a sliding ring.  win is a pointer into a buffer twice
+ * the window's size, and it steps forward as lines leave; deleting the
+ * head is then one pointer move instead of shuffling the whole window
+ * down a slot.  Every win[i] elsewhere reads through the pointer the
+ * same as an array, so only delline/insline know it moves.  When the
+ * head nears the end of the buffer the window is slid back to the
+ * front - a memcpy every WINDOW lines, not a shuffle every line.
+ */
+static struct line winbuf[2 * WINDOW];
+struct line *win = winbuf;
 int nwin = 0;
 int verbose = 0;
+
+/* slide the live window back to the front of the buffer */
+static void
+compact(void)
+{
+	if (win != winbuf) {
+		memcpy(winbuf, win, nwin * sizeof(struct line));
+		win = winbuf;
+	}
+}
 
 static FILE *in;
 static FILE *out;
@@ -217,8 +237,16 @@ readline(int i)
 void
 fill(void)
 {
-	while (nwin < WINDOW - 1 && readline(nwin))
+	while (nwin < WINDOW - 1) {
+		/* the slot readline will take must not own anything: the
+		 * window has slid forward, so it is a slot from further up
+		 * the buffer, left over from before a compaction */
+		win[nwin].text = 0;
+		win[nwin].key = 0;
+		if (!readline(nwin))
+			break;
 		nwin++;
+	}
 }
 
 /* drop n lines starting at i */
@@ -229,17 +257,24 @@ delline(int i, int n)
 
 	for (j = i; j < i + n && j < nwin; j++)
 		freeline(j);
-	for (j = i; j + n < nwin; j++) {
-		win[j].text = win[j + n].text;
-		win[j].key = win[j + n].key;
-		win[j].kind = win[j + n].kind;
+	if (i == 0) {
+		/* the head leaves: step the window, nothing moves */
+		win += n;
+	} else {
+		for (j = i; j + n < nwin; j++) {
+			win[j].text = win[j + n].text;
+			win[j].key = win[j + n].key;
+			win[j].kind = win[j + n].kind;
+		}
+		/* the slots that fell off the end no longer own anything */
+		for (j = nwin - n; j < nwin && j < WINDOW; j++) {
+			win[j].text = 0;
+			win[j].key = 0;
+		}
 	}
 	nwin -= n;
-	/* the slots that fell off the end no longer own anything */
-	for (j = nwin; j < nwin + n && j < WINDOW; j++) {
-		win[j].text = 0;
-		win[j].key = 0;
-	}
+	if (win >= winbuf + WINDOW)
+		compact();
 }
 
 /*

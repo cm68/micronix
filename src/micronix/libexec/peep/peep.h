@@ -82,7 +82,7 @@ struct line {
 #define R_CALL	(R_A | R_BC | R_DE | R_HL | R_F)
 
 /* peep.c */
-extern struct line win[WINDOW];
+extern struct line *win;	/* the window head, a pointer into winbuf */
 extern int nwin;					/* lines currently in the window */
 extern int verbose;
 extern void delline(int i, int n);
