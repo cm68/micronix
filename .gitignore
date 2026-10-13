@@ -111,6 +111,11 @@ src/tools/setdev
 src/micronix/stand/boot/*.o
 src/micronix/stand/boot/boot.s
 src/micronix/stand/boot/mwio.s
+
+# access.s is what ccc -s leaves behind for sys/access.c - a build
+# artifact, the way boot.s is.  Hand-written .s in sys/ (csv.s, mem.s,
+# the q* runtime) are source and stay tracked.
+src/micronix/sys/access.s
 src/micronix/stand/boot/mwboot.com
 src/micronix/stand/boot/mwboot.hex
 src/micronix/stand/boot/mwboot1.abs
