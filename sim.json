@@ -1,0 +1,25 @@
+{
+  "sims": {
+    "q540-dual": {
+      "emulator": "hwsim/d1",
+      "monitor": "src/micronix/stand/roms/mon447.bin",
+      "kernel": "src/micronix/sys/unix",
+      "config": {
+        "boot": "hdcdma",
+        "nomon": true,
+        "xterm": ["uart0", "ttyB", "ttyC"],
+        "clock": "normal"
+      },
+      "root": "hdcdma:0a",
+      "swap": "hdcdma:0b",
+      "volumes": [
+        { "controller": "hdcdma", "unit": 0, "geometry": "m40", "image": "disks/q540-dual/root.img" },
+        { "controller": "hdcdma", "unit": 1, "geometry": "m40", "image": "disks/q540-dual/usr.img" }
+      ]
+    }
+  },
+  "mediasets": {
+    "dist8": { "volumes": [ "dist/mx2.0-8-1.IMD", "dist/mx2.0-8-2.IMD" ] },
+    "dist5": { "volumes": [ "dist/mx2.0-5-1.IMD" ] }
+  }
+}

@@ -17,7 +17,7 @@ SIMTARGETS = \
 
 LDFLAGS = -lcurses
 GENERATED = doc.inl zmac.c doc
-TARGETS = $(SIMTARGETS) zmac strip
+TARGETS = $(SIMTARGETS) zmac strip hwsim
 
 include ../Makefile.inc
 
@@ -119,6 +119,9 @@ imdd: imdd.c
 
 strip: strip.c
 	$(CC) $(CFLAGS) -o strip strip.c
+
+hwsim:	hwsim.c
+	$(CC) $(CFLAGS) -o hwsim hwsim.c
 
 setdev:	setdev.o
 	$(CC) $(CFLAGS) -o setdev setdev.o $(LDFLAGS)
