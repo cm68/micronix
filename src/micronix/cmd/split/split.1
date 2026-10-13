@@ -1,0 +1,141 @@
+.he "split (1)                    4/6/83                     split (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+split
+- split a file into pieces
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+split [-n] [input] [proto]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Split
+reads in the given file and writes it out again in n-line
+pieces.
+
+The input file remains unchanged.  It is only read, not written.
+
+If no file names are given or - is given as the input file name the
+standard input is read.
+
+If no prototype file name is given, the prototype file name "x" is
+used.  The prototype file name is used to generate a whole series of
+automatically generated serialized file names.  The serialized file
+names are produced from the prototype file name by adding a two
+letter suffix.  The first two letter suffix used is "aa".  The second
+is "ab", etc.
+
+If no numerical argument preceded by a minus sign appears the file
+will be split into 1000 line pieces.
+
+An argument such as -78 requests the individual files each containing
+78 lines be produced.
+
+.bd
+Split
+produces meaningful results only if used on a text file.  Line
+counting will be incorrect if applied to files having lines longer
+than 512 characters.
+
+.bd
+Split
+is useful if, for example, you have a file far too large for
+your text editor to process.  One could then theoretically split the
+file, edit the pieces, and then reconstruct the file.  An example of
+this appears below.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+Consider the command:
+
+.in +5
+.bd
+split file
+.in -5
+
+If file is a 7000 line file, the seven files:
+
+.in +5
+.bd
+xaa xab xac xad xae xaf xag
+.in -5
+
+will be produced, each having 1000 lines.
+
+The command:
+
+.in +5
+.bd
+split -57 znorg OUT
+.in -5
+
+would split the file znorg into possibly many small files of 57
+lines each named:
+
+.in +5
+.bd
+OUTaa OUTab OUTac OUTad OUTae OUTaf
+.in -5
+
+etc.  This example also demonstrates the significance of case for
+Micronix file names.
+
+.bd
+Split
+can be used in a pipeline:
+
+.in +5
+.bd
+man edit | split -100
+.in -5
+
+This command would cause the formatted documentation for the "edit"
+command to be written into a series of small files.
+
+No input or source file name was given so the standard input is read
+(through a pipe).  Pipes are discussed under the documentation for
+"sh" in section 1 of the Micronix reference manual.
+
+No prototype file name is given here, so "x" is assumed.  The files
+produced would be named:
+
+.in +5
+.bd
+xaa xab xac etc.
+.in -5
+
+One way to edit an outrageous file:
+
+.nf
+.in +5
+.bd
+split -500 file
+.bd
+edit x*
+.bd
+cat x* > file
+.in -5
+.fi
+
+The first command in this example splits the file into 500 line
+pieces.  The second line summons the editor to work on the pieces.  The
+third line restores the original file.  (Make sure you have no other
+files whose names begin with x in your directory for this example.)

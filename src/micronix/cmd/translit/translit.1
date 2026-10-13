@@ -1,0 +1,186 @@
+.he "translit (1)                 6/25/82                 translit (1)"
+.fo "                               -#-"   
+.in 5
+.rm 65
+.bd
+PROGRAM
+.br
+.in +5
+.bd
+translit
+- transliterates characters
+
+
+.in -5
+.bd
+USAGE              
+.br
+.in +5
+.bd
+translit from [to]
+.in -5
+
+
+.bd
+FUNCTION
+.br
+.in +5
+.fi
+.br
+Translit
+can be used to perform a variety of useful character
+mapping functions.
+.bd
+Translit
+modifies its input on a character-by-character basis.
+.bd
+Translit
+changes each character in its 
+.bd
+from 
+set to the corresponding
+one in its 
+.bd
+to 
+set.  If there is no 
+.bd
+to 
+set, the effect is to remove each character  found in
+the 
+.bd
+from 
+set.
+If the 
+.bd
+to 
+set has fewer characters than the 
+.bd
+from 
+set,
+the last character in the 
+.bd
+to 
+set is repeated as many times as needed
+to  fill out the 
+.bd
+to 
+set.
+.sp
+Notation of the form
+x-y may be used as shorthand set notation to mean all the characters
+lexically between x and y,  where x and y are letters of the
+same case or both digits.
+.sp
+If 
+.bd
+^ 
+is the first character of the
+.bd
+from 
+specification, it is understood
+to mean all characters 
+.ul
+not
+in the following specification.
+.sp
+Notation of the form 
+.bd
+@377 
+(an "at" sign followed by up to 
+three digits of octal) may be used to specify characters by ASCII value.
+.sp
+If the 
+.bd
+from 
+set contains fewer characters than the 
+.bd
+to
+set,
+or if the 
+.bd
+^ 
+is used as above,
+the last character of the 
+.bd
+to 
+set
+is sufficiently replicated to fill the 
+.bd
+from
+set to the size of the 
+.bd
+to 
+set.
+Furthermore, contiguous characters which
+are elements of the 
+.bd
+to 
+set for which there is no explicit
+corresponding character in the 
+.bd
+to 
+set are collapsed to a single occurrence of the 
+last character in the specification for the 
+.bd
+to 
+set.
+.sp
+.in -5
+.bd
+EXAMPLES
+.br
+.in +5
+.nf
+To replace all occurrences of x by y:
+.sp
+.in +8
+.bd
+translit x y <input >output
+.in -8
+.sp
+To change x to y and y to x:
+.sp
+.in +8
+.bd
+translit xy yx <input >output
+.in -8
+.bp
+To delete all occurrences of A:
+.sp
+.in +8
+.bd
+translit A <input >output
+.in -8
+.sp
+To map all lower case into upper case:
+.sp
+.in +8
+.bd
+translit a-z A-Z <input >output
+.in  -8
+.sp
+To put one white space separated symbol per line:
+
+.ti +8
+.bd
+translit @40@11@12 @12 <in >out
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.br
+.in +5
+change (1), edit (1)
+.sp 2
+.in -5
+.bd
+.fi
+NOTE
+.in +5
+.br
+.bd
+Translit
+is analogous to the UNIX
+.bd
+tr
+program.

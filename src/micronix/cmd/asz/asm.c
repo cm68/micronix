@@ -2038,15 +2038,15 @@ ds()
         gripe("ds requires absolute argument");
     }
     /*
-     * A reservation is a count of bytes, so it cannot be negative.
-     * The word is unsigned, so one that is arrives here as an enormous
-     * positive number and is accepted without comment: c1 emitting
-     * ".ds -6" for an array with no dimension gave the object a bss of
-     * 65530, which every later size is then computed against.  Nothing
-     * downstream can tell that from a real 65530.
+     * A reservation is a count of bytes, and the address space is
+     * sixteen bits, so any count up to 65535 is legal.  A negative
+     * count arrives wrapped: on the host, where int is 32 bits, a
+     * ".ds -6" is 0xfffffffa, above 0xffff and caught here; on the
+     * 16-bit native build it is already 65530, indistinguishable from
+     * a real 65530, so there it is accepted.
      */
-    if (value.num.w > 0x7fff) {
-        gripe("ds count is negative");
+    if (value.num.w > 0xFFFF) {
+        gripe("ds count too large");
         return;
     }
     fill(value.num.w);

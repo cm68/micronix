@@ -275,6 +275,7 @@ src/micronix/cmd/change/change
 src/micronix/cmd/chgrp/chgrp
 src/micronix/cmd/chmod/chmod
 src/micronix/cmd/chown/chown
+src/micronix/cmd/clean/cleanprog
 src/micronix/cmd/cmp/cmp
 src/micronix/cmd/comm/comm
 src/micronix/cmd/common/common
@@ -296,6 +297,7 @@ src/micronix/cmd/df/df
 src/micronix/cmd/diff/diff
 src/micronix/cmd/diff/diffh
 src/micronix/cmd/djformat/djformat
+src/micronix/cmd/down/down
 src/micronix/cmd/du/du
 src/micronix/cmd/echo/echo
 src/micronix/cmd/ed/ed
@@ -307,6 +309,7 @@ src/micronix/cmd/far/far
 src/micronix/cmd/fd2/fd2
 src/micronix/cmd/fdj/fdj
 src/micronix/cmd/fgrep/fgrep
+src/micronix/cmd/field/field
 src/micronix/cmd/file/file
 src/micronix/cmd/find/find
 src/micronix/cmd/form/form
@@ -333,6 +336,7 @@ src/micronix/cmd/login/login
 src/micronix/cmd/ls/ls
 src/micronix/cmd/lz4/lz4
 src/micronix/cmd/m4/m4
+src/micronix/cmd/macro/macro
 src/micronix/cmd/mail/mail
 src/micronix/cmd/make/make
 src/micronix/cmd/makekey/makekey
@@ -370,6 +374,7 @@ src/micronix/cmd/sh/sh
 src/micronix/cmd/sh/sh.mx
 src/micronix/cmd/sh/sh.host
 src/micronix/cmd/size/size
+src/micronix/cmd/split/split
 src/micronix/cmd/sort/sort
 src/micronix/cmd/size/wssize
 src/micronix/cmd/strings/strings
@@ -383,7 +388,9 @@ src/micronix/cmd/tar/tar
 src/micronix/cmd/td/td
 src/micronix/cmd/tee/tee
 src/micronix/cmd/time/time
+src/micronix/cmd/touch/touch
 src/micronix/cmd/tr/tr
+src/micronix/cmd/translit/translit
 src/micronix/cmd/tty/tty
 src/micronix/cmd/umount/umount
 src/micronix/cmd/unique/unique
