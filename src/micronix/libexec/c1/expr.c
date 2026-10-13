@@ -147,7 +147,7 @@ node_alloc(void)
 
 	if (freelist) {
 		e = freelist;
-		freelist = e->left;	/* the free list rides the left field */
+		freelist = (Expr *)e->u.name;	/* the free list rides u */
 	} else {
 		e = (Expr *)arena_alloc(sizeof(Expr));
 	}
@@ -397,16 +397,20 @@ void
 freeexpr(Expr *e)
 {
 	/*
-	 * The node goes back on the per-function free list, where
-	 * node_alloc reuses it for the next tree.  The name is not freed:
-	 * it is interned in the arena (see dupexpr) and reclaimed whole at
-	 * the function boundary.
+	 * The node goes back on the per-function free list.  The link
+	 * rides u, not left/right: a freed node is still reached by its
+	 * live parent, and label()/rewrite() walk the tree through
+	 * left/right - so those two must keep the old child, or a later
+	 * walk follows the free-list chain.  u is only read for a
+	 * SYM/SYMREF spelling, after the walk, so it is free to borrow.
+	 * The name is not freed: it is interned in the arena (see dupexpr)
+	 * and reclaimed whole at the function boundary.
 	 */
 	if (!e)
 		return;
 	freeexpr(e->left);
 	freeexpr(e->right);
-	e->left = freelist;
+	e->u.name = (char *)freelist;
 	freelist = e;
 }
 
