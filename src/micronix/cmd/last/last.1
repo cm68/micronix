@@ -1,0 +1,131 @@
+.he "last (1)                     4/6/83                      last (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+last
+- login-accounting
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+last [-s] [user ... ] [tty ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+.bd
+Last
+interprets the user login accounting file (/usr/adm/wtmp).
+It can be used to gain a perspective of the login history of the
+system.
+
+.bd
+Last
+displays the starting and ending times of each user session
+as well as the duration of that session.  The display is given in
+reverse chronological order, most recent first.
+
+If the -s option is specified, only a summary is given.  The
+summary shows total login time for users or ttys without
+breaking it down into single sessions.
+
+If a user name or list of user names is given, then the display
+is restricted to only those users specified.
+
+If a tty name or list of tty names is given, then only login
+sessions on the specified ttys will be displayed.
+
+If a mixed list is given then the display will include sessions
+matching any of the criteria.
+
+It's possible to enable or disable the historical record keeping
+feature.  Record keeping is turned on or off based on the
+presence or absence of the wtmp file (/usr/adm/wtmp).  See the
+examples below.
+
+If a login session is abnormally terminated (say by a power
+failure), last assumes that the session continued until the
+following boot and reports it as ending at "boot" instead of at
+a specific time.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+Print login history:
+
+.in +5
+.bd
+last
+.in -5
+
+Print usage summary:
+
+.in +5
+.bd
+last -s
+.in -5
+
+Find out who has been using your tty:
+
+.in +5
+.bd
+last ttyB
+.in -5
+
+Find out how much time oscar has logged:
+
+.in +5
+.bd
+last -s oscar
+.in -5
+
+Probe the behaviour of a few selected users:
+
+.in +5
+.bd
+last bill jean harold
+.in -5
+
+Start record keeping afresh, discarding old records:
+
+.in +5
+.bd
+type /dev/null > /usr/adm/wtmp
+.in -5
+
+Disable record keeping and discard records:
+
+.in +5
+.bd
+era /usr/adm/wtmp
+.in -5
+
+Save old records and then start over:
+
+.nf
+.in +5
+.bd
+cp /usr/adm/wtmp /usr/adm/old
+.bd
+type /dev/null > /usr/adm/wtmp
+.in -5
+.fi
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/usr/adm/wtmp - the file containing the historical records.

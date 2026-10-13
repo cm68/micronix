@@ -327,6 +327,7 @@ src/micronix/cmd/kill/kill
 src/micronix/cmd/kstat/kstat
 src/micronix/cmd/kwic/kwic
 src/micronix/cmd/label/label
+src/micronix/cmd/last/last
 src/micronix/cmd/ld/ld
 src/micronix/cmd/less/less
 src/micronix/cmd/lex/lex
@@ -391,6 +392,7 @@ src/micronix/cmd/time/time
 src/micronix/cmd/touch/touch
 src/micronix/cmd/tr/tr
 src/micronix/cmd/translit/translit
+src/micronix/cmd/tree/tree
 src/micronix/cmd/tty/tty
 src/micronix/cmd/umount/umount
 src/micronix/cmd/unique/unique
