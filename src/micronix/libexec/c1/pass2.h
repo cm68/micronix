@@ -66,6 +66,8 @@ unsigned short read2(void);
 void read4(void);
 extern unsigned long val4;	/* read4 leaves its answer here */
 void readS(char *buf, int size);
+char *namex(char *name);	/* expand @id to its spelling (static buffer) */
+void nidxp(char *buf, int size);	/* namex in place, bounded by size */
 void nidopen(char *f1);		/* .nam sidecar (cpp -j), from the .ast name */
 #ifdef DEBUG
 void rulehit(int i);		/* rule coverage, host build only */

@@ -97,9 +97,10 @@ nidname(unsigned short id, char *buf, int size)
 }
 
 /*
- * Replace every @id with its spelling, in place.  Anything else
- * passes through untouched: synthetics (L%d, str%d) and plain-mode
- * names never contain '@'.
+ * Expand every @id in name to its spelling, into a static buffer, and
+ * return the result - or name itself if there is nothing to expand.
+ * Anything else passes through untouched: synthetics (L%d, str%d) and
+ * plain-mode names never contain '@'.
  *
  * EVERY one.  This used to expand the first and stop, which was
  * enough while a name held at most one - "_@4" for a global, "@6" for
@@ -114,21 +115,21 @@ nidname(unsigned short id, char *buf, int size)
  * overwrite the text still to be read.  Static, not a frame local -
  * see the note on nidopen above.
  */
-void
-nidxp(char *buf, int size)
+char *
+namex(char *name)
 {
 	static char xbuf[128];
 	char *s, *d, *end;
 	unsigned short id;
 
 	if (nidfd < 0)
-		return;
-	for (s = buf; *s && *s != '@'; s++)
+		return name;
+	for (s = name; *s && *s != '@'; s++)
 		;
 	if (!*s)
-		return;			/* nothing to expand */
+		return name;		/* nothing to expand */
 
-	s = buf;
+	s = name;
 	d = xbuf;
 	end = xbuf + sizeof(xbuf) - 1;
 	while (*s && d < end) {
@@ -144,9 +145,25 @@ nidxp(char *buf, int size)
 		}
 	}
 	*d = 0;
-	for (s = xbuf, d = buf; *s && size > 1; size--)
-		*d++ = *s++;
-	*d = 0;
+	return xbuf;
+}
+
+/*
+ * namex into buf, in place and bounded by size.  The function name is
+ * expanded this way - it stays in its static buffer, spelling and all,
+ * because the label and the epilogue both print it.
+ */
+void
+nidxp(char *buf, int size)
+{
+	char *x = namex(buf);
+
+	if (x != buf) {
+		char *s = x, *d = buf;
+		for (; *s && size > 1; size--)
+			*d++ = *s++;
+		*d = 0;
+	}
 }
 
 void
@@ -458,7 +475,6 @@ readS(char *buf, int size)
 	buf[keep] = 0;
 	while (over-- > 0)		/* the rest still has to come off */
 		read(infd, &waste, 1);
-	nidxp(buf, size);
 #ifdef DEBUG
 	if (VERBOSE(V_IO))
 		fprintf(stderr, "readS: \"%s\" (len=%d)\n", buf, len);

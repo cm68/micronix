@@ -863,7 +863,7 @@ parseStmt(void)
 		 */
 		out(LBLPFX);
 		outd(fnindex);
-		out(buf);
+		out(namex(buf));
 		out(":\n");
 		return;
 	case GOTO:
@@ -875,7 +875,7 @@ parseStmt(void)
 		out("\tjp ");
 		out(LBLPFX);
 		outd(fnindex);
-		out(buf);
+		out(namex(buf));
 		outc('\n');
 		return;
 	case SWITCH: {
@@ -1192,6 +1192,7 @@ parse(void)
 			funcstatic = (t & 0x80) != 0;	/* pass1 marks it there */
 			t &= 0x7f;
 			readS(funcname, sizeof(funcname));
+			nidxp(funcname, sizeof(funcname));	/* the label wants the spelling */
 			labelcnt = 0;
 			fnindex++;
 #ifdef DEBUG

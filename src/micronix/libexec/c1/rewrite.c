@@ -913,7 +913,7 @@ emitasm(char *tpl, Expr *e)
 					 * template reaching for the second
 					 * word of a long silently addressed
 					 * the first one again */
-					out(n->u.symref.name);
+					out(namex(n->u.symref.name));
 					val = n->u.symref.off + offadj;
 					if (val != 0) {
 						/*
