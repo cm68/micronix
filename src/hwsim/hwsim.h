@@ -70,6 +70,11 @@ extern int nmi_pin;
 // called by driver to assert or clear vectored interrupt line
 void set_vi(int signal, int card, int value);
 
+// the interrupt wiring, resolved by -W (see s100.c)
+int parse_wiring(char *spec);
+int wiring_vi_line(char *name);      // a card name -> its VI line, -1 if none
+int wiring_irq(int pin, int *vi, char **name);  // an IR pin -> vi line or onboard source
+
 extern void (*vi_change)(unsigned char new);
 extern unsigned char (*get_intack)();
 

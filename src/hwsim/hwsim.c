@@ -713,6 +713,8 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-B\t<djdma|hdcdma|hdca|ide> boot from this, and skip the monitor\n");
     fprintf(stderr, "\t\t(hdca needs mon447, ide needs mon500 - see -b)\n");
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
+    fprintf(stderr, "\t-w\t<wiring> profile[,key=value]...: d1, multio, ss1\n");
+    fprintf(stderr, "\t\tviN=card, irqN=viM|source, int=board\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
     fprintf(stderr, "\t-m\t<bytes> ram size - 768k, 0xc0000, 1m (default 16m)\n");
     fprintf(stderr, "\t-5\t<file> a floppy on the 5 1/4 inch port\n");
@@ -1858,6 +1860,14 @@ main(int argc, char **argv)
                     usage("configuration switch value missing\n", progname);
                 }
                 config_sw = strtol(*argv++, 0, 0) | CONF_SET;
+                break;
+            case 'w':
+                if (!argc--) {
+                    usage("wiring spec missing\n", progname);
+                }
+                if (parse_wiring(strdup(*argv++)) < 0) {
+                    usage("bad wiring spec\n", progname);
+                }
                 break;
             case 'b':
                 if (!argc--) {

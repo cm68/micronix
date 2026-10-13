@@ -5,6 +5,9 @@
  */
 
 #include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <stdlib.h>
 #include "sim.h"
 #include "hwsim.h"
 #include "util.h"
@@ -217,6 +220,260 @@ io_init()
         input_handler[i] = undef_in;
         output_handler[i] = undef_out;
     }
+}
+
+/*
+ * The interrupt wiring: two namespaces wired together by name.
+ *
+ * The S-100 has eight vectored-interrupt lines (VI0..VI7), driven open
+ * collector by the cards.  Each 8259 has eight interrupt-request pins,
+ * and a cascaded pair is one global 16-pin space - master IR0..IR7, then
+ * slave IR8..IR15 - numbered the way the PC numbers a master/slave.
+ *
+ * A machine is a wiring table: which card asserts each VI line, and what
+ * each IR pin is wired to (a VI line, or an on-board source).  Cards only
+ * ever name their source; the line numbers live here and are looked up
+ * with wiring_vi_line().  The -W option picks a standard profile and then
+ * applies name=value overrides, so a bare -W (or none) is today's machine.
+ */
+
+#define NVI     8
+#define NIRQ   16
+
+enum { IRQ_NONE = 0, IRQ_VI = 1, IRQ_ONBOARD = 2 };
+
+struct irqwire {
+    int  kind;         /* IRQ_* */
+    int  vi;           /* the VI line, when IRQ_VI */
+    char *name;        /* the on-board source, when IRQ_ONBOARD */
+};
+
+struct cardwire {
+    char *name;        /* the card's interrupt source name */
+    int   line;        /* the VI line it asserts */
+};
+
+struct wiring {
+    struct cardwire card[8];    /* name -> vi line */
+    int   ncard;
+    struct irqwire irq[NIRQ];   /* pin -> source */
+    char *int_driver;           /* the board asserting int_line */
+};
+
+struct wiring wiring;
+
+/*
+ * The standard profiles.  A card that shares a line is a second entry on
+ * the same vi number; set_vi's card id keeps the open-collector masks
+ * apart, so the one-PIC d1 machine and the two-PIC one differ only in
+ * whether anything names a second controller's pins.
+ */
+static struct wiring profile_d1 = {
+    { { "hddma", 0 }, { "hdca", 0 }, { "djdma", 1 },
+      { "ncr", 2 }, { "ide", 2 } },
+    5,
+    {
+        [0] = { IRQ_VI, 0 },
+        [1] = { IRQ_VI, 1 },
+        [2] = { IRQ_VI, 2 },
+        [3] = { IRQ_ONBOARD, 0, "uart0" },
+        [4] = { IRQ_ONBOARD, 0, "uart1" },
+        [5] = { IRQ_ONBOARD, 0, "uart2" },
+        [7] = { IRQ_ONBOARD, 0, "clock" },
+    },
+    "multio",
+};
+
+static struct wiring profile_multio = {
+    { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 2 },
+      { "ncr", 3 }, { "ide", 4 }, { "nic", 5 }, { "disk3", 5 } },
+    7,
+    {
+        [0] = { IRQ_VI, 0 },
+        [1] = { IRQ_VI, 1 },
+        [2] = { IRQ_VI, 2 },
+        [3] = { IRQ_ONBOARD, 0, "uart0" },
+        [4] = { IRQ_ONBOARD, 0, "uart1" },
+        [5] = { IRQ_ONBOARD, 0, "uart2" },
+        [6] = { IRQ_ONBOARD, 0, "slave" },
+        [7] = { IRQ_ONBOARD, 0, "clock" },
+        [8]  = { IRQ_VI, 3 },
+        [9]  = { IRQ_VI, 4 },
+        [10] = { IRQ_VI, 5 },
+    },
+    "multio",
+};
+
+static struct wiring profile_ss1 = {
+    { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 2 }, { "ncr", 3 },
+      { "ide", 4 }, { "nic", 5 }, { "disk3", 6 } },
+    7,
+    {
+        [0] = { IRQ_VI, 0 }, [1] = { IRQ_VI, 1 }, [2] = { IRQ_VI, 2 },
+        [3] = { IRQ_VI, 3 }, [4] = { IRQ_VI, 4 }, [5] = { IRQ_VI, 5 },
+        [6] = { IRQ_VI, 6 },
+        [7] = { IRQ_ONBOARD, 0, "slave" },
+        [8] = { IRQ_VI, 7 },
+        [9]  = { IRQ_ONBOARD, 0, "timer0" },
+        [10] = { IRQ_ONBOARD, 0, "timer1" },
+        [11] = { IRQ_ONBOARD, 0, "timer2" },
+        [12] = { IRQ_ONBOARD, 0, "fpu0" },
+        [13] = { IRQ_ONBOARD, 0, "fpu1" },
+        [14] = { IRQ_ONBOARD, 0, "uart_rx" },
+        [15] = { IRQ_ONBOARD, 0, "uart_tx" },
+    },
+    "ss1",
+};
+
+/*
+ * The default machine is what the cards' hardcoded lines describe today:
+ * the two-PIC Wunderbus + MultIO.  -w re-selects a profile and applies
+ * overrides; this runs before main so the resolved table is ready when
+ * the cards and the -w parser look at it.
+ */
+__attribute__((constructor))
+static void
+wiring_init(void)
+{
+    wiring = profile_multio;
+}
+
+/*
+ * Resolve a card's source name to the VI line it asserts, -1 if it is
+ * not wired.  The cards call this instead of carrying a line number.
+ */
+int
+wiring_vi_line(char *name)
+{
+    int i;
+
+    for (i = 0; i < wiring.ncard; i++)
+        if (strcmp(wiring.card[i].name, name) == 0)
+            return wiring.card[i].line;
+    return -1;
+}
+
+/*
+ * Resolve an IR pin to what is on it.  Returns 0 if the pin is wired to
+ * nothing, fills *vi with the VI line when it is a VI line, and *name
+ * with the on-board source when it is one.
+ */
+int
+wiring_irq(int pin, int *vi, char **name)
+{
+    if (pin < 0 || pin >= NIRQ)
+        return 0;
+    if (wiring.irq[pin].kind == IRQ_VI) {
+        if (vi)
+            *vi = wiring.irq[pin].vi;
+        return 1;
+    }
+    if (wiring.irq[pin].kind == IRQ_ONBOARD) {
+        if (name)
+            *name = wiring.irq[pin].name;
+        return 2;
+    }
+    return 0;
+}
+
+/* set one card's line, adding the card if it is not already wired */
+static int
+set_card_line(struct wiring *w, char *name, int line)
+{
+    int i;
+
+    for (i = 0; i < w->ncard; i++)
+        if (strcmp(w->card[i].name, name) == 0) {
+            w->card[i].line = line;
+            return 0;
+        }
+    if (w->ncard >= 8)
+        return -1;
+    w->card[w->ncard].name = name;
+    w->card[w->ncard].line = line;
+    w->ncard++;
+    return 0;
+}
+
+/* apply one key=value override; -1 on a bad key or value */
+static int
+apply_override(struct wiring *w, char *key, char *val)
+{
+    if (strncmp(key, "vi", 2) == 0 && key[2] >= '0' && key[2] <= '7' &&
+        key[3] == '\0')
+        return set_card_line(w, val, key[2] - '0');
+    if (strncmp(key, "irq", 3) == 0 && isdigit((unsigned char)key[3])) {
+        int pin = atoi(key + 3);
+        if (pin < 0 || pin >= NIRQ)
+            return -1;
+        if (val[0] == 'v' && val[1] == 'i' && isdigit((unsigned char)val[2])) {
+            w->irq[pin].kind = IRQ_VI;
+            w->irq[pin].vi = atoi(val + 2);
+            w->irq[pin].name = 0;
+        } else {
+            w->irq[pin].kind = IRQ_ONBOARD;
+            w->irq[pin].vi = 0;
+            w->irq[pin].name = val;
+        }
+        return 0;
+    }
+    if (strcmp(key, "int") == 0) {
+        w->int_driver = val;
+        return 0;
+    }
+    return -1;
+}
+
+static int
+select_profile(struct wiring *w, char *name)
+{
+    if (strcmp(name, "d1") == 0)
+        *w = profile_d1;
+    else if (strcmp(name, "multio") == 0)
+        *w = profile_multio;
+    else if (strcmp(name, "ss1") == 0)
+        *w = profile_ss1;
+    else
+        return 0;
+    return 1;
+}
+
+/*
+ * Parse a -W specification: "profile[,key=value]...".  The first token
+ * names a profile, the rest override single entries.  Returns 0 on a
+ * clean parse, -1 on a bad profile or override.  The spec string is
+ * split in place (it is the argv copy), so names point into it.
+ */
+int
+parse_wiring(char *spec)
+{
+    struct wiring *w = &wiring;
+    char *p, *comma, *eq;
+
+    comma = strchr(spec, ',');
+    if (comma)
+        *comma = '\0';
+    if (!select_profile(w, spec))
+        return -1;
+    if (!comma)
+        return 0;
+
+    p = comma + 1;
+    for (;;) {
+        comma = strchr(p, ',');
+        if (comma)
+            *comma = '\0';
+        eq = strchr(p, '=');
+        if (!eq)
+            return -1;
+        *eq = '\0';
+        if (apply_override(w, p, eq + 1) < 0)
+            return -1;
+        if (!comma)
+            break;
+        p = comma + 1;
+    }
+    return 0;
 }
 
 /*
