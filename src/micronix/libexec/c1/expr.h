@@ -66,11 +66,6 @@ Expr	*mkbfass(char off, char wid, Expr *addr, Expr *val);
 Expr	*mksymref(char *name, short off);
 Expr	*mkcode(char width, char reg);
 
-/* per-function arena: Expr nodes and interned symbol names */
-char	*arena_alloc(unsigned int n);
-char	*arena_strdup(char *name);
-void	arena_reset(void);
-
 /* tree operations */
 void	setdest(Expr *e, char dest);
 void	label(Expr *e);	/* Sethi-Ullman register labeling */

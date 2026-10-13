@@ -16,148 +16,14 @@ extern void errout(char *);
 #include "debug.h"
 #endif
 
-/*
- * Per-function bump arena for Expr nodes and their symbol names.  A
- * general malloc fragments across the file's functions: a freed block is
- * only reusable when the next allocation is the same shape, so the break
- * ratchets up a block at a time and a file of many dense functions (dc.c)
- * exhausts the room between the break and the stack.  A bump arena has no
- * fragmentation - it grows to the biggest function's peak, and
- * arena_reset() at each function boundary puts the pointer back, so the
- * high-water is one function, not the whole file.  Names are interned so a
- * symbol referenced many times costs one spelling, not one per reference.
- */
-#ifdef CCC
-extern char *sbrk(int);
-#endif
-
-static char *arena_base;	/* first byte of the arena */
-static char *arena_cur;		/* next free byte (the bump pointer) */
-static char *arena_top;		/* one past the last byte sbrk granted */
-static Expr *freelist;		/* freed nodes, reused within the function */
-static char *intern[128];	/* distinct symbol names this function */
-static unsigned int nintern;	/* how many of intern[] are live */
-
-#define	ARENA_CHUNK	256
-
-static void
-arena_oom(void)
-{
-	out("!OOM\n");
-	exit(1);
-}
-
-/*
- * Get the arena another need bytes.  The Z80 build grows the break
- * with sbrk; the host build of these same sources (mxc1, for the
- * cross compiler) has no break to grow, so it just takes heap.
- */
-static char *
-arena_more(unsigned need)
-{
-#ifdef CCC
-	char *p = sbrk(need);
-#else
-	char *p = malloc(need);
-#endif
-
-	if (p == 0 || p == (char *)-1)
-		arena_oom();
-	return p;
-}
-
-char *
-arena_alloc(unsigned int n)
-{
-	char *p;
-
-	n += 3;
-	n -= n & 3;			/* round up to 4: host pointers want it */
-	if (arena_base == 0 || arena_cur + n > arena_top) {
-		if (arena_base == 0) {
-			unsigned int need = n > ARENA_CHUNK ? n : ARENA_CHUNK;
-
-			arena_base = arena_more(need);
-			arena_cur = arena_base;
-			arena_top = arena_base + need;
-		} else {
-			unsigned int need = (arena_cur + n) - arena_top;
-			char *nb;
-
-			if (need < ARENA_CHUNK)
-				need = ARENA_CHUNK;
-			/*
-			 * The new segment's base is not arena_top once
-			 * arena_more hands back a non-contiguous chunk (the
-			 * host's malloc); bump from the returned base.
-			 */
-			nb = arena_more(need);
-			arena_cur = nb;
-			arena_top = nb + need;
-		}
-	}
-	p = arena_cur;
-	arena_cur += n;
-	return p;
-}
-
-void
-arena_reset(void)
-{
-	if (arena_base)
-		arena_cur = arena_base;
-	freelist = 0;
-	nintern = 0;
-}
-
-/*
- * Intern a symbol name: return the arena's single copy of it for this
- * function, so a symbol referenced a dozen times still costs one
- * spelling.  The table is linear, and a function holds few distinct
- * names, so the scan is cheap.
- */
-char *
-arena_strdup(char *name)
-{
-	unsigned int i;
-
-	for (i = 0; i < nintern; i++)
-		if (strcmp(intern[i], name) == 0)
-			return intern[i];
-	{
-		unsigned int n = strlen(name) + 1;
-		char *p = arena_alloc(n);
-
-		strcpy(p, name);
-		if (nintern < 128)
-			intern[nintern++] = p;
-		return p;
-	}
-}
-
-/*
- * Grab a raw Expr node: reuse one freed earlier in this function, or
- * bump the arena for a fresh one.  node_alloc is raw - alloc() and
- * dupexpr() both overwrite every field themselves.
- */
-static Expr *
-node_alloc(void)
-{
-	Expr *e;
-
-	if (freelist) {
-		e = freelist;
-		freelist = e->left;	/* the free list rides the left field */
-	} else {
-		e = (Expr *)arena_alloc(sizeof(Expr));
-	}
-	return e;
-}
-
 Expr *
 alloc(void)
 {
-	Expr *e = node_alloc();
+	Expr *e = malloc(sizeof(Expr));
+	if (!e) {
+		out("!OOM\n");
+		exit(1);
+	}
 	e->op = 0;
 	e->width = 0;
 	e->dest = DEST_NONE;
@@ -199,7 +65,7 @@ mksym(char *name)
 	Expr *e = alloc();
 	e->op = SYM;
 	e->width = 'p';
-	e->u.name = arena_strdup(name);
+	e->u.name = strdup(name);
 	return e;
 }
 
@@ -339,7 +205,7 @@ mksymref(char *name, short off)
 	Expr *e = alloc();
 	e->op = SYMREF;
 	e->width = 'p';
-	e->u.symref.name = arena_strdup(name);
+	e->u.symref.name = strdup(name);
 	e->u.symref.off = off;
 	return e;
 }
@@ -380,34 +246,29 @@ dupexpr(Expr *e)
 	Expr *n;
 	if (!e)
 		return NULL;
-	n = node_alloc();
+	n = malloc(sizeof(Expr));
+	if (!n) {
+		out("!OOM\n");
+		exit(1);
+	}
 	memcpy(n, e, sizeof(Expr));
 	n->left = dupexpr(e->left);
 	n->right = dupexpr(e->right);
-	/*
-	 * The name is shared, not copied: a spelling is interned in the
-	 * arena and never written, so the duplicate can point at the same
-	 * bytes.  freeexpr() must therefore not free it - the arena owns
-	 * it and arena_reset() reclaims the whole of it.
-	 */
+	if (e->op == SYM || e->op == SYMREF)
+		n->u.name = strdup(e->u.name);
 	return n;
 }
 
 void
 freeexpr(Expr *e)
 {
-	/*
-	 * The node goes back on the per-function free list, where
-	 * node_alloc reuses it for the next tree.  The name is not freed:
-	 * it is interned in the arena (see dupexpr) and reclaimed whole at
-	 * the function boundary.
-	 */
 	if (!e)
 		return;
 	freeexpr(e->left);
 	freeexpr(e->right);
-	e->left = freelist;
-	freelist = e;
+	if (e->op == SYM || e->op == SYMREF)
+		free(e->u.name);
+	free(e);
 }
 
 /* check if op is binary */
