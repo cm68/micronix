@@ -32,6 +32,15 @@ static char *regname[] = {
 	0
 };
 
+/* strlen of each, alongside: regat used to call strlen on every name
+ * for every register it looked at, in the peephole's inner loop. */
+static unsigned char reglen[] = {
+	3, 3, 3, 3,
+	2, 2, 2, 2, 2, 2, 2,
+	1, 1, 1, 1, 1, 1, 1,
+	0
+};
+
 static int regmask[] = {
 	R_IX, R_IX, R_IY, R_IY,
 	R_A | R_F, R_BC, R_DE, R_HL, R_IX, R_IY, 0,
@@ -56,7 +65,7 @@ regat(char *p)
 	int i, n;
 
 	for (i = 0; regname[i]; i++) {
-		n = strlen(regname[i]);
+		n = reglen[i];
 		if (strncmp(p, regname[i], n) == 0 && !isalnum_(p[n]))
 			return regmask[i];
 	}

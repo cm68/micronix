@@ -26,6 +26,10 @@ static FILE *in;
 static FILE *out;
 static int ateof = 0;
 
+/* the poolmap scratch area, reused across lines (see main) */
+static char *mapped;
+static int mapped_sz;
+
 /*
  * Where the output stands, counted here rather than asked of stdio.
  * The frameless patch needs positions; ftell on a buffered write
@@ -669,17 +673,25 @@ main(int argc, char **argv)
 			 * Sized to the line in hand: poolmap can only grow it
 			 * by the digits a remapped strN gains, and it stops
 			 * short of the end it is given.
+			 *
+			 * The buffer is one scratch area reused line to line,
+			 * grown to the longest line seen.  Every significant
+			 * line used to pay a malloc and a free for it - a
+			 * third of the pass's allocation churn - and nfemit
+			 * never keeps the pointer, so reuse is safe.
 			 */
 			int sz = strlen(win[0].text) + 64;
-			char *mapped = malloc(sz);
 
-			if (!mapped) {
-				fprintf(stderr, "peep: out of memory\n");
-				exit(1);
+			if (sz > mapped_sz) {
+				mapped = realloc(mapped, sz);
+				if (!mapped) {
+					fprintf(stderr, "peep: out of memory\n");
+					exit(1);
+				}
+				mapped_sz = sz;
 			}
 			poolmap(win[0].text, mapped, sz);
 			nfemit(mapped, win[0].key);
-			free(mapped);
 			if (win[0].kind == L_LABEL)
 				vreset(&vbase);
 			else if (win[0].kind == L_INSN) {
