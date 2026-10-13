@@ -146,32 +146,98 @@ extra/sim:
 	a bunch of 8 bit simulators for cribbing ideas/code from.
 	these all are licensed by thier original authors, so...
 
-running the hardware simulator, from a standing start
-----------------------------------------------------
+running micronix in simulation
+------------------------------
 
-you can make a hard disk image and boot micronix without any blessed
-snapshot, starting from the kernel source.  docs/INSTALLATION.md has
-the whole flow; the short of it:
+there are two simulators, and they are two different experiences.
 
-	# build the compiler, the libraries, the commands and the kernel
+usersim (src/usersim) is the easy one - a user-mode simulator that hosts
+the micronix system calls on linux, no simulated hardware.  it runs
+against filesystem/, the tree's own native build, and its block devices
+are real: mount(), mkfs and fsck all go through the host fslib, with
+-D <devdir> mapping bdev(maj,min) to disk images.  build once, then:
+
 	make
-	cd src/micronix
-	make bootstrap
+	src/usersim/sim
 
-	# make a bootable volume and boot it - disks/hdinstall/README has
-	# the detail
-	disks/hdinstall/create_vol myvol
-	disks/hdinstall/boot_vol myvol
+	# or, for a quite strange experience,
+	src/usersim/sim bin/man sh | less
 
--B says boot straight from the hdcdma controller, skipping the monitor;
-the boot block that mkfs put on cylinder 0 loads /micronix.  the shell
-prompt is '#'.
+hwsim (src/hwsim/d1) is the real machine - a hardware-level simulator of
+the Morrow MPZ80: the monitor rom, the real kernel, and all five disk
+controllers.  it boots micronix to a real single-user '#' shell on a
+real (simulated) disk, and it is the one that needs setup.
 
--F runs the fast build instead: the same simulator compiled without the
-debug machinery.  on a modern cpu that comes out at roughly a 30 mhz z80
-equivalent, which makes it pleasant to actually use rather than watch.
-everything works at that speed, multi-user included - several logins at
-once, compiling on one while ps runs on another.
+the short boot, from a standing start:
+
+	make
+	cd src/micronix && make bootstrap
+	make -C src/micronix/stand/boot bootimgs
+
+	disks/hdinstall/create_vol myvol	# a bootable volume
+	disks/hdinstall/boot_vol myvol		# boot it, console in an xterm
+
+boot_vol passes -c 0x70c: boot the hdcdma straight, skip the monitor,
+and put the console in an xterm of its own.  the boot block mkfs left on
+cylinder 0 loads /micronix, and the shell prompt is '#'.
+
+the performance build is the same simulator with the debug machinery
+compiled out - d1p, or d1 -F - and it runs at roughly a 30 mhz z80,
+which makes it pleasant to use rather than watch.  everything works at
+that speed: multi-user logins, a compile on one terminal while ps runs
+on another.
+
+the full install, from the distribution - build the diskettes, provision
+a two-disk machine, and install it automatically:
+
+	dist/create_dist 8		# 9 diskettes into dist/mx2.0-8-*.IMD
+	disks/hdinstall/build_dist	# two 34 MB volumes + the install script
+	disks/hdinstall/dist_boot	# boot and install all 9, watch the xterm
+
+build_dist and dist_boot drive the install through /dev/mediachg, the
+out-of-band media changer: the guest program chg swaps the floppy images
+in the simulator without an eject syscall, and the install script loads
+and copies each diskette in turn.  the grammar is
+src/micronix/sys/MEDIACHG.md.
+
+the whole flow, the disk-label model and the boot loaders are in
+docs/INSTALLATION.md, disks/hdinstall/README and sys/DISKLABEL.md.
+
+the provisioning tool
+---------------------
+
+a command-line tool to drive hwsim the way the per-card scripts now do
+by hand.  one sim.json holds every simulator definition, and the tool
+runs a sim's whole lifecycle with verbs instead of four near-identical
+shell scripts:
+
+	hwsim format <sim>	mnix initialize (geometry)
+	hwsim partition <sim>	mnix label (slices)
+	hwsim mkfs <sim>		mnix mkfs (filesystem + boot)
+	hwsim boot <sim>		launch d1/d1p from the config + volumes
+	hwsim add/del <sim>	a volume in or out
+
+the abstractions behind it:
+
+- a sim is a collection of volumes.  a volume is a disk on a controller -
+  its geometry and its card, not a role.
+- root and swap are the kernel's setdev arguments, not volume attributes.
+- a device is controller:unit<slice> (hdcdma:0a); the major numbers are
+  fixed and the minor is (slice<<5)|unit, so the json never stores one.
+- -c is one number packing four things; the json holds them named:
+  boot (hdcdma/djdma/hdca), nomon, xterm mask, clock.
+
+the common case - build and boot the sample two-disk sim (q540-dual):
+
+	hwsim format q540-dual		# initialize both m40 volumes
+	hwsim partition q540-dual	# the default slice table
+	hwsim mkfs q540-dual		# filesystem + boot on slice a
+	hwsim boot q540-dual		# d1p, packed -c, both disks wired
+
+the full design - the json schema and the bit tables - is
+src/tools/PROVISION.md.  build_dist and dist_boot are the same thing done
+by hand, and the media changer (sys/MEDIACHG.md) is how a boot's floppies
+get loaded.
 
 this github is prettily referenced in my cybernecromancy site:
 
