@@ -285,22 +285,21 @@ INSTALLMODE = @if [ -n "$(strip $(MODE))" ] ; then \
 #
 # cross build
 #
-# The assembly rule comes FIRST, and the order is the whole of it.
-# make takes the first pattern rule that matches, so with these the
-# other way round a name having both a .c and a .s built the .c and
-# the assembly beside it was never assembled at all.  libc has six of
-# those - atoi, index, rindex, strdup, strncmp and memcpy - five of
-# them listed in that directory's NOTBUILT_C as superseded, and none
-# of them actually superseding anything.
+# The C rule comes FIRST, so a name with both a .c and a .s builds the
+# .c.  The native make already does this - its built-in .c.o precedes
+# .s.o - and it is what keeps a .s that "ccc -s" leaves for reading from
+# shadowing the .c that is the real source.  libc's hand-written .s
+# beside a .c (atoi, index, rindex, strdup, strncmp, memcpy - the only
+# such pairs in the tree) is the exception: libc names those objects on
+# an explicit rule of its own, which is more specific than these.
 #
-# These are the only pairs in the tree, so this reaches them and
-# nothing else.
-%.o : %.s
-	$(CCC) $(CCFLAGS) -c $<
-
-
+# These reach every other object, and nothing else.
 %.o : %.c
 	$(CCC) $(CCFLAGS) $(INC) -c $<
+
+
+%.o : %.s
+	$(CCC) $(CCFLAGS) -c $<
 
 ifneq ($(strip $(TARGET)),)
 ifeq ($(suffix $(TARGET)),.a)

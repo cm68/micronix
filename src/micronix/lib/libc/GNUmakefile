@@ -92,4 +92,11 @@ NOTBUILT_S = \
 # nothing linked changes.
 HELD =
 
+# The hand-written .s wins over the .c it replaces.  The generic rule
+# is .c-first (a stray generated .s must never shadow a .c), so these
+# objects - the only same-name pairs in the tree - are named on an
+# explicit rule of their own, which is more specific than the generic.
+$(ASSRCS:.s=.o): %.o: %.s
+	$(CCC) $(CCFLAGS) -c $<
+
 include $(DEPTH)/GNUmakefile.inc
