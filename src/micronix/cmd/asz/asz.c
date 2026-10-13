@@ -279,23 +279,7 @@ get_line()
 }
 
 /*
- * get the next character that we would read, but don't advance
- */
-unsigned char
-peekchar()
-{
-    unsigned char c;
-
-    c = *lineptr;
-#ifdef DEBUG
-    if (verbose > 5)
-        printf("peekchar: %d \'%c\'\n", c, (c > ' ') ? c : ' ');
-#endif
-    return (c);
-}
-
-/*
- * returns the next character in the source, or -1 if complete
+ * returns the next character in the source, or T_EOF if complete
  */
 unsigned char
 nextchar()
@@ -371,23 +355,6 @@ skipwhite()
  * yesterday reads differently today - it only makes something that
  * was an error into a name.
  */
-char
-alpha(in)
-char in;
-{
-    return (in >= 'A' && in <= 'Z') || (in >= 'a' && in <= 'z')
-        || in == '_' || in == '@';
-}
-
-/*
- * is this a valid inner symbol character (includes '.')
- */
-char
-symchar(in)
-char in;
-{
-    return alpha(in) || (in >= '0' && in <= '9') || in == '.';
-}
 
 /*
  * converts an escaped char into its value

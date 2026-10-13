@@ -16,6 +16,17 @@ extern char verbose;
 extern char g_flag;
 extern char no_relax;
 
+/*
+ * The tokenizer's per-character accessors are macros, not functions,
+ * because get_token calls them once per character of every symbol and
+ * this assembler reads the whole file twice.  A call costs what the
+ * work costs on this machine, and the work is a compare or a load.
+ */
+extern unsigned char *lineptr;
+#define peekchar() (*lineptr)
+#define alpha(in) (((in) >= 'A' && (in) <= 'Z') || ((in) >= 'a' && (in) <= 'z') || (in) == '_' || (in) == '@')
+#define symchar(in) (alpha(in) || ((in) >= '0' && (in) <= '9') || (in) == '.')
+
 #define SYMLEN 15
 
 /*

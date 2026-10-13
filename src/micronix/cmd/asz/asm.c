@@ -52,8 +52,6 @@ extern char m_flag;
 
 void asm_reset();
 void assemble();
-unsigned char peekchar();
-unsigned char nextchar();
 void outbyte();
 void outtmp();
 unsigned char operand();
@@ -677,8 +675,7 @@ char *name;
 }
 
 extern unsigned char skipwhite();
-extern char alpha();
-extern char symchar();
+extern unsigned char nextchar();
 extern char escape();
 extern struct symbol *sym_update();
 
@@ -857,8 +854,7 @@ char dir;
 }
 
 extern void get_line();
-extern unsigned char peekchar();
-extern unsigned char nextchar();
+unsigned char nextchar();
 extern void consume();
 
 #ifdef DEBUG

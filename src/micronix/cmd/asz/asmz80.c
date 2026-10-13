@@ -209,7 +209,6 @@ extern char pass;
 extern char no_relax;
 extern void add_jump();
 extern int is_relaxed();   /* the jump add_jump has just counted */
-extern unsigned char peekchar();
 extern unsigned char skipwhite();
 
 #define T_NUM   (T_BIAS + 43)
