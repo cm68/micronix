@@ -32,11 +32,17 @@ LIBS	= /lib/libccc.a
 # GNUmakefile.inc, which explains why it is not optional on a machine
 # where the heap is whatever is left of 64k after the image.
 #
+# kwlook is the hand-tuned Z80 routine in asmkw.s; kw.c keeps only the
+# portable C, guarded to the host build, so asmkw.o is the one that
+# provides _kwlook here.
+#
 CFLAGS	= -O
 LIBEXEC	= /libexec
 PROG	= pass0
-OBJS	= cfold.o cpp.o emit.o filtutil.o io.o knr.o kw.o kwtab.o \
+COBJS	= cfold.o cpp.o emit.o filtutil.o io.o knr.o kw.o kwtab.o \
 	lex.o lexdata.o macro.o norm.o tdsrc.o util.o
+AOBJS	= asmkw.o
+OBJS	= $(COBJS) $(AOBJS)
 
 all: $(PROG)
 
@@ -46,9 +52,14 @@ $(PROG): $(OBJS)
 #
 # One entry for every object: $* is the target without its suffix, so
 # this reads as "each of these comes from the .c of the same name".
+# Assembly objects get their own list, so the .c rule does not reach
+# them.
 #
-$(OBJS): $*.c
+$(COBJS): $*.c
 	$(CC) $(CFLAGS) -c $*.c
+
+$(AOBJS): $*.s
+	$(CC) $(CFLAGS) -c $*.s
 
 install: $(PROG)
 	mkdir -p $(LIBEXEC)

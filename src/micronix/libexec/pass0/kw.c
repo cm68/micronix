@@ -48,121 +48,12 @@ unsigned char cppkw[] = {
  */
 
 /*
- * Z80 machine code, so the host is excluded whatever compiles it -
- * see the note over advance() in io.c.  ASMKWLOOK is the separate
- * question of whether this version is wanted at all.
+ * The native build links kwlook in from asmkw.s - the hand-tuned Z80
+ * routine - so this portable C is for the host build only.  ccc defines
+ * CCC, gcc does not, so the two never collide.
  */
-#if defined(ASMKWLOOK) && !defined(__linux__)
-/*
- * Look up keyword in compressed table (Z80 assembly implementation)
- *
- * Hand-optimized Z80 assembly implementation of keyword table lookup.
- * This version provides maximum performance and minimum code size for
- * the Z80 target platform.
- *
- * Algorithm:
- *   - Pattern matching using compressed table grammar
- *   - Processes HI bit characters (skip pointers) for fast mismatches
- *   - Follows character sequences for potential matches
- *   - Returns token number if complete match, 0 otherwise
- *
- * Table grammar (defined in file header comments):
- *   0xff <token> - If string at null, return token, else 0
- *   0xfe <token> - If string at null, return token, else advance pattern
- *   <char>       - If matches, advance both, else return 0
- *   <char|0x80> <skip> - If matches low 7 bits, advance both by 2, else skip
- *
- * Register usage:
- *   HL - Table pointer
- *   DE - String pointer
- *   A  - Working register
- *
- * Parameters:
- *   str   - Null-terminated keyword string to search for
- *   table - Compressed keyword table (cppkw or ckw)
- *
- * Returns:
- *   Token number if found, 0 if not found
- *
- * Side effects:
- *   - Modifies Z80 registers (HL, DE, A, flags)
- *   - No side effects to memory or global state
- */
+#ifndef CCC
 
-char *kw_table;
-char *kw_string;
-unsigned kw_ret;
-
-char
-kwlook(char *str, char *table)
-{
-    kw_string = str;
-    kw_table = table;
-
-    asm {
-        ld hl,(_kw_table)
-        ld de,(_kw_string)
-        jr done_p;
-    lp:
-    top:
-        ld a,(hl)
-        cp a,0xff
-        jr nz,not_term
-        inc hl
-        ld a,(de)
-        or a,a
-        ld a,0
-        jr nz,fin
-    ret_tok:
-        ld a,(hl)
-        jr fin
-    not_term:
-        cp a,0xfe
-        jr nz,cond
-        inc hl
-        ld a,(de)
-        or a,a
-        jr z,ret_tok;
-        inc hl
-        jr lp
-    cond:
-        bit 7,a
-        jr z,liter
-        res 7,a
-        ex de,hl
-        cp a,(hl)
-        ex de,hl
-        jr nz,skip
-        inc hl
-        jr next;
-    skip:
-        inc hl
-        ld a,(hl);
-        add a,2
-        add a,l
-        ld l,a;
-        ld a,0
-        adc a,h
-        ld h,a
-        jr lp
-    liter:
-        cp a,(hl)
-        ld a,0
-        jr nz,fin
-    next:
-        inc hl
-        inc de
-    done_p:
-        ld a,(de)
-        or a,a
-        jr nz, top
-    fin:
-        ld (_kw_ret), a
-    }
-    return kw_ret;
-}
-
-#else
 /*
  * Look up keyword in compressed table (portable C implementation)
  *
