@@ -3,11 +3,13 @@
  *
  * cmd/df/df.c
  *
- * df reports the free blocks and free inodes of each filesystem.  A
- * filesystem that is mounted gets its numbers read live out of the
+ * df reports the free and used blocks and inodes of each filesystem.
+ * A filesystem that is mounted gets its numbers read live out of the
  * kernel's mount table, which the allocators keep current on every
  * allocation (a static array, so it costs nothing); an unmounted one
  * gets them from its superblock, which mkfs seeds and sync() refreshes.
+ * Used is the difference: fsize - free blocks, and the whole I-list -
+ * isize * 16, sixteen inodes to a block - minus free inodes.
  *
  * The mount table is reached through a pointer in low memory (0x1005,
  * next to ps's process-table pointer at 0x1003) and /dev/mem.  "Mounted"
@@ -31,18 +33,20 @@
 #define SUPERBLK 1		/* the superblock */
 #define MEMORY "/dev/mem"
 #define MPTAB 0x1005		/* low memory: &mlist, beside &plist at 0x1003 */
+#define INOPB 16		/* inodes per block, as iget.c's "isize << 4" */
 
 struct mtab mtab[NMOUNT];
 struct mount mountab[NMOUNT];
 struct super sblock;
 int nmount;
+int headed;			/* the column heading has been printed */
 
 int readmtab();
 int readmounts();
 int mounted();
 int finddev();
 void report();
-void super();
+int super();
 
 main(argc, argv)
     int argc;
@@ -134,18 +138,21 @@ mounted(special)
 }
 
 /*
- * Find the mount entry for a device number and return its live counts.
+ * Find the mount entry for a device number and return its totals and
+ * its live free counts.
  */
 int
-finddev(devnum, bfreep, ifreep)
+finddev(devnum, fsizep, isizep, bfreep, ifreep)
     int devnum;
-    int *bfreep, *ifreep;
+    UINT *fsizep, *isizep, *bfreep, *ifreep;
 {
     int i;
 
     for (i = 0; i < NMOUNT; i++) {
         if (mountab[i].dev == 0 || mountab[i].dev != devnum)
             continue;
+        *fsizep = mountab[i].fsize;
+        *isizep = mountab[i].isize;
         *bfreep = mountab[i].bfree;
         *ifreep = mountab[i].ifree;
         return 1;
@@ -163,46 +170,66 @@ report(special)
 {
     struct stat st;
     char dev[32];
-    int bfree, ifree;
+    UINT fsize, isize, bfree, ifree;
+    UINT totinode, usedblk, usedinode;
 
     strcpy(dev, "/dev/");
     strcat(dev, special);
 
     if (mounted(special)) {
-        if (stat(dev, &st) < 0 || !finddev(st.st_addr[0], &bfree, &ifree)) {
+        if (stat(dev, &st) < 0 ||
+            !finddev(st.st_addr[0], &fsize, &isize, &bfree, &ifree)) {
             fprintf(stderr, "%s: not mounted\n", dev);
             return;
         }
-        printf("%5u %5u %s\n", bfree, ifree, dev);
     } else {
-        super(dev);
+        if (!super(dev, &fsize, &isize, &bfree, &ifree))
+            return;
     }
+
+    totinode = isize * INOPB;
+    usedblk = fsize - bfree;
+    usedinode = totinode - ifree;
+
+    if (!headed) {
+        printf("%-14s %6s %6s %6s %6s\n",
+               "device", "free", "used", "ifree", "iused");
+        headed = 1;
+    }
+    printf("%-14s %6u %6u %6u %6u\n", dev, bfree, usedblk, ifree, usedinode);
 }
 
 /*
- * Read an unmounted filesystem's counts straight from its superblock.
+ * Read an unmounted filesystem's totals and counts from its superblock.
+ * Returns 1 and fills the pointers, or 0 if the device is not a
+ * Micronix filesystem.
  */
-void
-super(dev)
+int
+super(dev, fsizep, isizep, bfreep, ifreep)
     char *dev;
+    UINT *fsizep, *isizep, *bfreep, *ifreep;
 {
     int fd;
 
     if ((fd = open(dev, 0)) < 0) {
         perror(dev);
-        return;
+        return 0;
     }
     seek(fd, SUPERBLK, 3);
     if (read(fd, (char *)&sblock, sizeof sblock) != sizeof sblock) {
         perror(dev);
         close(fd);
-        return;
+        return 0;
     }
     close(fd);
 
     if (sblock.s_magic != FsMAGIC) {
         fprintf(stderr, "%s: not a file system\n", dev);
-        return;
+        return 0;
     }
-    printf("%5u %5u %s\n", sblock.s_bfree, sblock.s_ifree, dev);
+    *fsizep = sblock.s_fsize;
+    *isizep = sblock.s_isize;
+    *bfreep = sblock.s_bfree;
+    *ifreep = sblock.s_ifree;
+    return 1;
 }

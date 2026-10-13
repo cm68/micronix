@@ -17,7 +17,7 @@ USAGE
 .br
 .in +5
 .bd
-df device ...
+df [device ...]
 
 
 .in -5
@@ -27,10 +27,12 @@ FUNCTION
 .in +5
 .bd
 Df
-finds and prints the number of free blocks on each named device,
-each of which is assumed to contain a file system.
+prints the free and used blocks and inodes of each filesystem.
+With no argument, every mounted filesystem is reported; a named
+device is reported whether mounted or not, and may be given with
+or without a "/dev/" prefix.
 
-This command is somewhat analogous to the CP/M STAT command. 
+This command is somewhat analogous to the CP/M STAT command.
 
 
 .in -5
