@@ -97,7 +97,7 @@ leadWidth(struct type *t)
  * holding a pipe or a redirect.
  */
 static void streamElided(struct type *t);
-static void streamElidedArray(struct type *t);
+static void elideArray(struct type *t);
 
 /*
  * One object's worth of values, with the inner braces left out.
@@ -109,12 +109,12 @@ static void streamElidedArray(struct type *t);
  * spelling: member a[2] takes 0 and -1, b[2] takes 2 and 3.
  */
 static void
-streamElidedOne(struct type *t)
+elideOne(struct type *t)
 {
     if (!t)
         return;
     if ((t->flags & TF_ARRAY) && t->count > 0)
-        streamElidedArray(t);
+        elideArray(t);
     else if (t->flags & TF_AGGREGATE)
         streamElided(t);
     else
@@ -128,7 +128,7 @@ streamElidedOne(struct type *t)
  * the same contract streamElided keeps.
  */
 static void
-streamElidedArray(struct type *t)
+elideArray(struct type *t)
 {
     int i, n;
     int emitted;
@@ -138,7 +138,7 @@ streamElidedArray(struct type *t)
     for (i = 0; i < n; i++) {
         if (cur.type == END || cur.type == BEGIN)
             break;
-        streamElidedOne(t->sub);
+        elideOne(t->sub);
         emitted += typesize(t->sub);
         if (i == n - 1)
             break;			/* the trailing comma is the caller's */
@@ -167,7 +167,7 @@ streamElided(struct type *t)
     emitted = 0;
     m = findMemberOff(t->elem, 0);
     while (m && cur.type != END) {
-        streamElidedOne(m->type);
+        elideOne(m->type);
         emitted += (int)m->type->size;
         off += m->type->size;
         m = findMemberOff(t->elem, off);
@@ -235,7 +235,7 @@ streamInitVal(struct type *type)
              */
             if (elem_type && cur.type != BEGIN &&
                 (elem_type->flags & (TF_AGGREGATE | TF_ARRAY)))
-                streamElidedOne(elem_type);
+                elideOne(elem_type);
             else
                 streamInitVal(elem_type);
             count++;
