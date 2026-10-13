@@ -1,0 +1,4 @@
+# /etc/fstab - filesystems to mount at boot, one a line: device then
+# mount point.  A device without a leading slash lives in /dev.
+#
+#/dev/dja /f

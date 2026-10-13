@@ -16,18 +16,22 @@ USAGE
 .in +5
 .br
 umount special
+.br
+umount directory
 .sp 2
 .in -5
 .bd
-FUNCTION   
+FUNCTION
 .in +5
 .br
 The named special file is dismounted.
+A directory may be named instead; it is looked up in /etc/mtab,
+and then in /etc/fstab, to find the special file mounted there.
 
 The special file must have been previously mounted
-with the 
+with the
 .bd
-mount 
+mount
 command.
 
 It is not permitted to dismount a file system with files still open.

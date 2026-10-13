@@ -12,7 +12,8 @@
  * umount special, or umount directory: sync, call umount(2) on the
  * special, and drop its entry from /etc/mtab.  The v7 program took only
  * the special; naming the mount point instead is looked up in
- * /etc/mtab, which records both halves of the mount.
+ * /etc/mtab, which records both halves of the mount, and then in
+ * /etc/fstab for a mount mtab has lost.
  *
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
@@ -23,11 +24,18 @@
 #include <mtab.h>
 
 #define NMOUNT 4		/* the kernel's NMOUNT (sys/sys.h) */
+#define MAXFSTAB 8
 
 struct mtab mtab[NMOUNT];
 
+char fstab_dev[MAXFSTAB][32];
+char fstab_dir[MAXFSTAB][32];
+int nfstab;
+
 void delmtab();
 char *specialof();
+void readfstab();
+char *specialpath();
 
 main(argc, argv)
     int argc;
@@ -49,6 +57,7 @@ main(argc, argv)
         read(mf, (char *)mtab, sizeof mtab);
         close(mf);
     }
+    readfstab();
 
     if ((special = specialof(argv[1])) == 0)
         special = argv[1];
@@ -74,9 +83,12 @@ main(argc, argv)
  * the table stores it.  A mount point has to give back the path in /dev,
  * since the table keeps only the name.
  *
- * A name in neither column goes back to the caller, which passes it on to
- * umount(2) - a mounted filesystem missing from a stale /etc/mtab is still
- * the kernel's to dismount.
+ * A name in neither column goes to /etc/fstab: a mount whose mtab entry
+ * is gone (a crash between mount and its rewrite) is still listed there
+ * and can be dismounted by its mount point.  A name in no table goes
+ * back to the caller, which passes it on to umount(2) - a mounted
+ * filesystem missing from a stale /etc/mtab is still the kernel's to
+ * dismount.
  */
 char *
 specialof(arg)
@@ -96,6 +108,11 @@ specialof(arg)
         }
     }
 
+    for (i = 0; i < nfstab; i++) {
+        if (strcmp(fstab_dir[i], arg) == 0)
+            return specialpath(fstab_dev[i]);
+    }
+
     if ((name = strrchr(arg, '/')) != 0)
         name++;
     else
@@ -109,6 +126,62 @@ specialof(arg)
     }
 
     return 0;
+}
+
+/*
+ * Read /etc/fstab: one entry a line, device then mount point, with
+ * blank lines and # comments skipped.
+ */
+void
+readfstab()
+{
+    FILE *f;
+    char line[128];
+    char *p, *dev, *dir;
+
+    nfstab = 0;
+    f = fopen("/etc/fstab", "r");
+    if (f == NULL)
+        return;
+    while (nfstab < MAXFSTAB && fgets(line, sizeof line, f) != NULL) {
+        p = line;
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (*p == '\0' || *p == '\n' || *p == '#')
+            continue;
+        dev = p;
+        while (*p != ' ' && *p != '\t' && *p != '\n' && *p != '\0')
+            p++;
+        *p++ = '\0';
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (*p == '\0' || *p == '\n')
+            continue;
+        dir = p;
+        while (*p != ' ' && *p != '\t' && *p != '\n' && *p != '\0')
+            p++;
+        *p = '\0';
+        strcpy(fstab_dev[nfstab], dev);
+        strcpy(fstab_dir[nfstab], dir);
+        nfstab++;
+    }
+    fclose(f);
+}
+
+/*
+ * The device as umount(2) wants it: a name without a slash lives in /dev.
+ */
+char *
+specialpath(name)
+    char *name;
+{
+    static char path[sizeof "/dev/" + 32];
+
+    if (name[0] == '/')
+        return name;
+    strcpy(path, "/dev/");
+    strcat(path, name);
+    return path;
 }
 
 /*

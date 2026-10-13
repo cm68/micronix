@@ -21,9 +21,16 @@
  * of the block.  Those disks get the original test (rootdir below), so
  * one that mounted in 1983 still mounts.
  *
- * mount with no argument lists /etc/mtab; with a special and a directory
- * it mounts the special on the directory and adds an entry.  The mtab is
- * init's root entry plus whatever mount and umount have written.
+ * The three forms:
+ *	mount				list /etc/mtab
+ *	mount special directory [-r]	mount the special on the directory
+ *	mount directory			mount the device /etc/fstab names
+ *	mount -a			mount every entry in /etc/fstab
+ *
+ * /etc/fstab is one entry a line, a device and its mount point, in
+ * either order of the two columns is not allowed - device first, then
+ * directory, the way mount(2) takes them.  A device without a leading
+ * slash is taken to live in /dev.
  *
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
@@ -39,14 +46,26 @@
 #define SUPERBLK 1
 #define ILISTBLK (SUPERBLK + 1)	/* the I-list follows the superblock */
 #define ROOTINO 1
+#define MAXFSTAB 8
 
 struct mtab mtab[NMOUNT];
 struct super sblock;
+
+/* the fstab, read once into these */
+char fstab_dev[MAXFSTAB][32];
+char fstab_dir[MAXFSTAB][32];
+int nfstab;
 
 void list();
 int checkfs();
 int rootdir();
 void addmtab();
+void readfstab();
+char *devof();
+char *specialpath();
+int ismounted();
+int domount();
+void mountall();
 
 main(argc, argv)
     int argc;
@@ -54,6 +73,7 @@ main(argc, argv)
 {
     int ro;
     int mf;
+    char *dev;
 
     mf = open("/etc/mtab", 0);
     if (mf >= 0) {
@@ -65,35 +85,168 @@ main(argc, argv)
         list();
         exit(0);
     }
-    if (argc < 3 || argc > 4) {
-        fprintf(stderr, "usage: mount [special directory [-r]]\n");
-        exit(1);
+    if (argc == 2 && strcmp(argv[1], "-a") == 0) {
+        readfstab();
+        mountall();
+        exit(0);
     }
-
-    ro = (argc == 4);
-
-    if (!checkfs(argv[1])) {
-        fprintf(stderr, "%s: not a file system\n", argv[1]);
-        exit(1);
+    if (argc == 2) {
+        readfstab();
+        if ((dev = devof(argv[1])) == 0) {
+            fprintf(stderr, "%s: no entry in fstab\n", argv[1]);
+            exit(1);
+        }
+        exit(domount(dev, argv[1], 0));
     }
-    if (mount(argv[1], argv[2], ro) < 0) {
+    if (argc == 3 || argc == 4) {
+        ro = (argc == 4);
+        exit(domount(argv[1], argv[2], ro));
+    }
+    fprintf(stderr, "usage: mount [special directory [-r]] | directory | -a\n");
+    exit(1);
+}
+
+/*
+ * Mount one device on one directory: check the filesystem, mount it
+ * (falling back to read-only if a read-write mount is refused), and
+ * record the mount in /etc/mtab.  Returns 0 on success.
+ */
+int
+domount(dev, dir, ro)
+    char *dev, *dir;
+    int ro;
+{
+    dev = specialpath(dev);
+
+    if (!checkfs(dev)) {
+        fprintf(stderr, "%s: not a file system\n", dev);
+        return 1;
+    }
+    if (mount(dev, dir, ro) < 0) {
         /*
          * Maybe the only problem was a read-only diskette: retry the
          * mount read-only before giving up, the way the original did.
          */
         if (!ro) {
             ro = 1;
-            if (mount(argv[1], argv[2], ro) < 0) {
+            if (mount(dev, dir, ro) < 0) {
                 perror("mount");
-                exit(1);
+                return 1;
             }
         } else {
             perror("mount");
-            exit(1);
+            return 1;
         }
     }
-    addmtab(argv[1], argv[2]);
-    exit(0);
+    addmtab(dev, dir);
+    return 0;
+}
+
+/*
+ * Mount everything /etc/fstab names, in order, skipping the entries
+ * that are already mounted.  A failure is reported and the rest go on.
+ */
+void
+mountall()
+{
+    int i;
+
+    for (i = 0; i < nfstab; i++) {
+        if (ismounted(fstab_dev[i]))
+            continue;
+        domount(fstab_dev[i], fstab_dir[i], 0);
+    }
+}
+
+/*
+ * Read /etc/fstab: one entry a line, device then mount point, with
+ * blank lines and # comments skipped.
+ */
+void
+readfstab()
+{
+    FILE *f;
+    char line[128];
+    char *p, *dev, *dir;
+
+    nfstab = 0;
+    f = fopen("/etc/fstab", "r");
+    if (f == NULL)
+        return;
+    while (nfstab < MAXFSTAB && fgets(line, sizeof line, f) != NULL) {
+        p = line;
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (*p == '\0' || *p == '\n' || *p == '#')
+            continue;
+        dev = p;
+        while (*p != ' ' && *p != '\t' && *p != '\n' && *p != '\0')
+            p++;
+        *p++ = '\0';
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (*p == '\0' || *p == '\n')
+            continue;
+        dir = p;
+        while (*p != ' ' && *p != '\t' && *p != '\n' && *p != '\0')
+            p++;
+        *p = '\0';
+        strcpy(fstab_dev[nfstab], dev);
+        strcpy(fstab_dir[nfstab], dir);
+        nfstab++;
+    }
+    fclose(f);
+}
+
+/*
+ * The device /etc/fstab pairs with this mount point, or 0.
+ */
+char *
+devof(dir)
+    char *dir;
+{
+    int i;
+
+    for (i = 0; i < nfstab; i++)
+        if (strcmp(fstab_dir[i], dir) == 0)
+            return fstab_dev[i];
+    return 0;
+}
+
+/*
+ * The device as mount(2) wants it: a name without a slash lives in /dev.
+ */
+char *
+specialpath(name)
+    char *name;
+{
+    static char path[sizeof "/dev/" + 32];
+
+    if (name[0] == '/')
+        return name;
+    strcpy(path, "/dev/");
+    strcat(path, name);
+    return path;
+}
+
+/*
+ * Is this device (by its bare name, "dja" not "/dev/dja") mounted?
+ */
+int
+ismounted(name)
+    char *name;
+{
+    char *n;
+    int i;
+
+    if ((n = strrchr(name, '/')) != 0)
+        n++;
+    else
+        n = name;
+    for (i = 0; i < NMOUNT; i++)
+        if (mtab[i].directory[0] && strcmp(mtab[i].special, n) == 0)
+            return 1;
+    return 0;
 }
 
 /*

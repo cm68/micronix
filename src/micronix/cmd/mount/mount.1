@@ -16,6 +16,10 @@ USAGE
 .in +5
 .br
 mount [special directory]
+.br
+mount directory
+.br
+mount -a
 .sp 2
 .in -5
 .bd
@@ -34,8 +38,15 @@ of mounted file systems.
 
 The named special file is mounted on the named directory.
 A special file may be mounted at most once.
-Mount refuses to mount a special file which does not contain a 
+Mount refuses to mount a special file which does not contain a
 file system.
+.sp
+Given a directory alone, mount looks the directory up in
+/etc/fstab and mounts the device it names there.  mount -a
+mounts every entry in /etc/fstab, skipping the ones already
+mounted.  /etc/fstab is one filesystem a line, device then
+mount point; a device without a leading slash is taken to live
+in /dev.
 .sp 2
 .in -5
 .bd
