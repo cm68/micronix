@@ -11,11 +11,12 @@
  * Used is the difference: fsize - free blocks, and the whole I-list -
  * isize * 16, sixteen inodes to a block - minus free inodes.
  *
- * The mount table is reached through a pointer in low memory (0x1005,
- * next to ps's process-table pointer at 0x1003) and /dev/mem.  "Mounted"
- * is decided by /etc/mtab, which init seeds with root and the mount
- * program keeps.  With no argument every mounted filesystem is reported;
- * an argument is reported whether mounted or not, and may be given with
+ * The kernel's mount table is reached through a pointer in low memory
+ * (0x1005, next to ps's process-table pointer at 0x1003) and /dev/mem,
+ * and it is the authority on what is mounted - a mounted filesystem's
+ * live counts come from it, an unmounted one's from its superblock.
+ * /etc/mtab names which filesystems to report when no argument is given.
+ * An argument is reported whether mounted or not, and may be given with
  * or without a "/dev/" prefix.
  *
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
@@ -43,7 +44,6 @@ int headed;			/* the column heading has been printed */
 
 int readmtab();
 int readmounts();
-int mounted();
 int finddev();
 void report();
 int super();
@@ -123,21 +123,6 @@ readmounts()
 }
 
 /*
- * Is this device name in /etc/mtab?
- */
-int
-mounted(special)
-    char *special;
-{
-    int i;
-
-    for (i = 0; i < nmount; i++)
-        if (strcmp(mtab[i].special, special) == 0)
-            return 1;
-    return 0;
-}
-
-/*
  * Find the mount entry for a device number and return its totals and
  * its live free counts.
  */
@@ -176,15 +161,20 @@ report(special)
     strcpy(dev, "/dev/");
     strcat(dev, special);
 
-    if (mounted(special)) {
-        if (stat(dev, &st) < 0 ||
-            !finddev(st.st_addr[0], &fsize, &isize, &bfree, &ifree)) {
-            fprintf(stderr, "%s: not mounted\n", dev);
-            return;
-        }
+    /*
+     * The kernel's mount table is the authority on what is mounted,
+     * and it is asked first: a mounted device's superblock lives in
+     * its pinned buffer, and reading it through the block device would
+     * disturb that buffer's hold.  A device not in the table is read
+     * from its superblock.
+     */
+    if (stat(dev, &st) >= 0 &&
+        finddev(st.st_addr[0], &fsize, &isize, &bfree, &ifree)) {
+        /* live counts are already in fsize/isize/bfree/ifree */
+    } else if (super(dev, &fsize, &isize, &bfree, &ifree)) {
+        /* read from the superblock */
     } else {
-        if (!super(dev, &fsize, &isize, &bfree, &ifree))
-            return;
+        return;
     }
 
     totinode = isize * INOPB;
