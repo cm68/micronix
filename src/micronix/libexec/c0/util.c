@@ -312,11 +312,12 @@ intern(char *name)
 }
 
 /*
- * Spill the interned names to a sidecar of their own (base.nam2): the
- * static @id-forms, NUL-terminated, one per interned id in order.  c1
- * scans it for the NK_STATIC id.  A sidecar is far cheaper than
- * rewriting pass0's .nam (whose offset array + score bitmap would all
- * shift), and the whole thing is skipped when a file has no statics.
+ * Append the interned names to pass0's .nam as a second section: count
+ * (M) + the NUL-terminated static @id-forms, one per interned id in
+ * order.  c1 scans it for the NK_STATIC id.  Appending is far cheaper
+ * than rewriting the .nam in place (its offset array + score bitmap
+ * would all shift), and the whole thing is skipped when a file has no
+ * statics.
  */
 void
 namWrite(char *o1)
@@ -330,13 +331,6 @@ namWrite(char *o1)
 	strcpy(nf, o1);
 	n = strlen(nf);
 	strcpy(nf + n - 3, "nam");	/* base.ast -> base.nam */
-	/*
-	 * Append a second section to pass0's .nam rather than make a
-	 * sidecar: count (M) + the NUL-terminated static @-forms.  The
-	 * .nam is pass0's and is never otherwise touched, so the two
-	 * sections share one file and the driver's cleanup of the .nam
-	 * covers both.
-	 */
 	fd = open(nf, 1);		/* O_WRONLY, no truncation */
 	if (fd < 0)
 		return;
