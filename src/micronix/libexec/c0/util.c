@@ -10,6 +10,8 @@
 #include "libutil.h"
 
 extern char *nameOf(unsigned short id);	/* lexread.c */
+extern int open();
+extern int creat();
 
 #ifndef PSIZE
 #define PSIZE 80
@@ -245,6 +247,106 @@ void emitN(char *s, unsigned char len)
 void emitS(char *s)
 {
 	emitN(s, strlen(s));
+}
+
+/*
+ * Interning: the full @id-form name -> a single id, so c1 carries a
+ * 2-byte id instead of a strdup'd string.  Only c0 sees a whole name:
+ * pass0 tokenizes each identifier separately, so a static's "_@4.@6"
+ * is assembled here and nowhere else.  Linear table - a file has a few
+ * hundred distinct names and this runs once per name.
+ *
+ * The table is galloc'd, not static: c0's heap is what is left of 64k
+ * after the image, and a six-kilobyte .bss wedge of this would be six
+ * kilobytes the symbol table cannot use.  A one-shot allocation from
+ * the heap instead rides alongside the symbol table and returns it all
+ * at exit.
+ */
+#define INMAX   128
+#define INBUF   1024
+static char *inbuf;
+static char **iname;
+static unsigned short *iid;
+static unsigned short nicnt;
+static unsigned short inused;
+
+extern void exit(int);
+extern char *galloc(unsigned int size);	/* error.c: calloc, fatal on OOM */
+
+/*
+ * Allocate the interning table on the first static: a file with no
+ * function-scope statics (lower.c has none) never pays for it.
+ */
+static void
+internInit(void)
+{
+	if (inbuf)
+		return;
+	inbuf = galloc(INBUF);
+	iname = (char **)galloc(INMAX * sizeof(char *));
+	iid = (unsigned short *)galloc(INMAX * sizeof(unsigned short));
+}
+
+unsigned short
+intern(char *name)
+{
+	unsigned short i;
+	int len;
+
+	internInit();
+	for (i = 0; i < nicnt; i++)
+		if (strcmp(iname[i], name) == 0)
+			return iid[i];
+	len = strlen(name) + 1;
+	if (nicnt >= INMAX || inused + len > INBUF) {
+		/* raw fd, not fprintf(stderr): the stdio _iob pulls
+		 * cleanup.o and collides with pass1's _cleanup stub */
+		write(2, "c0: too many distinct names\n", 28);
+		exit(1);
+	}
+	iname[nicnt] = inbuf + inused;
+	strcpy(iname[nicnt], name);
+	inused += len;
+	iid[nicnt] = nicnt + 1;
+	return iid[nicnt++];
+}
+
+/*
+ * Spill the interned names to a sidecar of their own (base.nam2): the
+ * static @id-forms, NUL-terminated, one per interned id in order.  c1
+ * scans it for the NK_STATIC id.  A sidecar is far cheaper than
+ * rewriting pass0's .nam (whose offset array + score bitmap would all
+ * shift), and the whole thing is skipped when a file has no statics.
+ */
+void
+namWrite(char *o1)
+{
+	static char nf[256];
+	unsigned char two[2];
+	int n, fd, i;
+
+	if (!nicnt)
+		return;
+	strcpy(nf, o1);
+	n = strlen(nf);
+	strcpy(nf + n - 3, "nam");	/* base.ast -> base.nam */
+	/*
+	 * Append a second section to pass0's .nam rather than make a
+	 * sidecar: count (M) + the NUL-terminated static @-forms.  The
+	 * .nam is pass0's and is never otherwise touched, so the two
+	 * sections share one file and the driver's cleanup of the .nam
+	 * covers both.
+	 */
+	fd = open(nf, 1);		/* O_WRONLY, no truncation */
+	if (fd < 0)
+		return;
+	lseek(fd, 0, SEEK_END);
+	two[0] = nicnt & 0xff;
+	two[1] = (nicnt >> 8) & 0xff;
+	write(fd, (char *)two, 2);
+	for (i = 0; i < nicnt; i++)
+		write(fd, iname[i], strlen(iname[i]) + 1);
+	close(fd);
 }
 
 /* raw bytes, no length prefix - caller emits the count */

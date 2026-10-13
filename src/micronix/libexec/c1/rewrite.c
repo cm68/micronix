@@ -913,7 +913,7 @@ emitasm(char *tpl, Expr *e)
 					 * template reaching for the second
 					 * word of a long silently addressed
 					 * the first one again */
-					out(namex(n->u.symref.name));
+					out(symname(namekind(n), n->u.symref.name));
 					val = n->u.symref.off + offadj;
 					if (val != 0) {
 						/*
@@ -921,7 +921,7 @@ emitasm(char *tpl, Expr *e)
 						 * name; a nameless symref IS
 						 * the address and prints bare.
 						 */
-						if (val > 0 && n->u.symref.name[0])
+						if (val > 0 && n->u.symref.name)
 							outc('+');
 						outd(val);
 					}
@@ -1251,13 +1251,16 @@ tryrule(struct rule *rp, Expr *e)
 	if (newop == SYMREF) {
 		char *name;
 		short soff;
+		int kind;
 		if (e->op == SYM) {
 			/* bare SYM -> SYMREF+0 */
 			name = e->u.name;
+			kind = namekind(e);
 			soff = 0;
 		} else if (e->left->op == SYMREF) {
 			/* SYMREF +/- NUMBER -> combine offsets */
 			name = e->left->u.symref.name;
+			kind = namekind(e->left);
 			soff = e->left->u.symref.off;
 			if (e->right) {
 				if (e->op == MINUS)
@@ -1268,9 +1271,10 @@ tryrule(struct rule *rp, Expr *e)
 		} else {
 			/* SYM + NUMBER */
 			name = e->left->u.name;
+			kind = namekind(e->left);
 			soff = e->right ? (short)e->right->u.val : 0;
 		}
-		n = mksymref(name, soff);
+		n = mksymref(kind, name, soff);
 		freeexpr(e);
 		return n;
 	}

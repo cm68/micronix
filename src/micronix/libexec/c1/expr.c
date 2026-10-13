@@ -35,8 +35,6 @@ static char *arena_base;	/* first byte of the arena */
 static char *arena_cur;		/* next free byte (the bump pointer) */
 static char *arena_top;		/* one past the last byte sbrk granted */
 static Expr *freelist;		/* freed nodes, reused within the function */
-static char *intern[128];	/* distinct symbol names this function */
-static unsigned int nintern;	/* how many of intern[] are live */
 
 #define	ARENA_CHUNK	256
 
@@ -107,32 +105,6 @@ arena_reset(void)
 	if (arena_base)
 		arena_cur = arena_base;
 	freelist = 0;
-	nintern = 0;
-}
-
-/*
- * Intern a symbol name: return the arena's single copy of it for this
- * function, so a symbol referenced a dozen times still costs one
- * spelling.  The table is linear, and a function holds few distinct
- * names, so the scan is cheap.
- */
-char *
-arena_strdup(char *name)
-{
-	unsigned int i;
-
-	for (i = 0; i < nintern; i++)
-		if (strcmp(intern[i], name) == 0)
-			return intern[i];
-	{
-		unsigned int n = strlen(name) + 1;
-		char *p = arena_alloc(n);
-
-		strcpy(p, name);
-		if (nintern < 128)
-			intern[nintern++] = p;
-		return p;
-	}
 }
 
 /*
@@ -194,12 +166,16 @@ mkconst(char width, long val)
 }
 
 Expr *
-mksym(char *name)
+mksym(int kind, char *name)
 {
 	Expr *e = alloc();
 	e->op = SYM;
 	e->width = 'p';
-	e->u.name = arena_strdup(name);
+	/* name is a .nam id carried in the char* field, not a string;
+	 * the kind rides nored's high bits, and c1 spells both back at
+	 * output with symname() */
+	e->u.name = name;
+	setnamekind(e, kind);
 	return e;
 }
 
@@ -334,13 +310,14 @@ mkbfass(char off, char wid, Expr *addr, Expr *val)
 }
 
 Expr *
-mksymref(char *name, short off)
+mksymref(int kind, char *name, short off)
 {
 	Expr *e = alloc();
 	e->op = SYMREF;
 	e->width = 'p';
-	e->u.symref.name = arena_strdup(name);
+	e->u.symref.name = name;	/* a .nam id, as in mksym */
 	e->u.symref.off = off;
+	setnamekind(e, kind);
 	return e;
 }
 
@@ -430,7 +407,6 @@ isbinary(int op)
 Expr *
 readexpr(void)
 {
-	static char buf[64];
 	unsigned char op, t, n, i;
 	unsigned long v;
 	Expr *e, *args, *arg;
@@ -459,13 +435,15 @@ readexpr(void)
 #endif
 		return mkconst(t, (long)val4);
 
-	case SYM:
-		readS(buf, sizeof(buf));
+	case SYM: {
+		unsigned char kind = read1();
+		unsigned short id = read2();
 #ifdef DEBUG
 		if (VERBOSE(V_EXPR))
-			fprintf(stderr, "  SYM %s\n", buf);
+			fprintf(stderr, "  SYM k=%d @%d\n", kind, id);
 #endif
-		return mksym(buf);
+		return mksym(kind, (char *)(int)id);
+	}
 
 	case LOCALVAR: {
 		int off;
@@ -656,7 +634,7 @@ dumpnode(Expr *e)
 		return;
 	case SYM:
 		out("$");
-		out(e->u.name);
+		out(symname(namekind(e), e->u.name));
 		return;
 	case LOCALVAR:
 		sprintf(buf, "(LOCALVAR:%s%s %s%+d", widthName(e->width),
@@ -729,7 +707,8 @@ dumpnode(Expr *e)
 		return;
 	case SYMREF:
 		sprintf(buf, "(SYMREF%s%s %s%+d", widthName(e->width),
-		        destName(e->dest), e->u.symref.name, e->u.symref.off);
+		        destName(e->dest), symname(namekind(e), e->u.symref.name),
+		        e->u.symref.off);
 		out(buf);
 		if (e->regs) { sprintf(buf, "#%d", e->regs); out(buf); }
 		if (e->tgt) { sprintf(buf, "->%s", regName(e->tgt)); out(buf); }

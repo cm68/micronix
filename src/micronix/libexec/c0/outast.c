@@ -12,6 +12,19 @@
 /* Forward declarations */
 extern int analyzeFunc(struct name *func);  /* regalloc.c */
 extern int frameSaveBase;                   /* regalloc.c */
+extern unsigned short intern(char *name);   /* util.c */
+
+/*
+ * The name kinds a SYM carries.  Only the function-scope static is a
+ * compound name (_@func.N) and needs interning; the others are already
+ * the unique id, so they ride the 2-byte payload directly and c1 spells
+ * them from the kind.  NK_* must match c1's expr.h.
+ */
+#define NK_GLOBAL   0	/* _@id   global / extern / file-scope static */
+#define NK_STATIC   1	/* _@func.N  function-scope static (interned) */
+#define NK_LABEL    2	/* L%d */
+#define NK_STRING   3	/* str%d */
+#define NK_LOCAL    4	/* @id */
 
 /* Current function's locals from phase 1 - for frm_off/reg lookup */
 struct local *curFuncLocals = NULL;
@@ -276,27 +289,44 @@ emitExpr(struct expr *e)
 			}
 			break;
 		}
-		/* extern/global get underscore prefix */
+		/* extern/global/file-static: _@id, the id already unique */
 		if ((np->sclass & SC_EXTERN) ||
-		    (np->level == 1 && !(np->sclass & SC_STATIC)))
-			fmtstr(fullname, "_%s", nameOf(np->id));
-		else if (np->sclass & SC_STATIC)
-			staticName(fullname, np->id,
-			    np->level > 1 ? curFuncId : 0,
-			    np->static_id);
-		else if (np->static_id)
-			fmtstr(fullname, "L%d", np->static_id - 1);
-		else
-			fmtstr(fullname, "%s", nameOf(np->id));
-		emit1(SYM);
-		emitS(fullname);
+		    (np->level == 1 && !(np->sclass & SC_STATIC))) {
+			emit1(SYM);
+			emit1(NK_GLOBAL);
+			emit2(np->id);
+		} else if (np->sclass & SC_STATIC) {
+			/* function-scope static is _@func.N, the one
+			 * compound name: intern it.  File-scope static
+			 * is _@id, already unique. */
+			if (np->level > 1) {
+				staticName(fullname, np->id, curFuncId,
+				    np->static_id);
+				emit1(SYM);
+				emit1(NK_STATIC);
+				emit2(intern(fullname));
+			} else {
+				emit1(SYM);
+				emit1(NK_GLOBAL);
+				emit2(np->id);
+			}
+		} else if (np->static_id) {
+			emit1(SYM);
+			emit1(NK_LABEL);
+			emit2(np->static_id - 1);
+		} else {
+			emit1(SYM);
+			emit1(NK_LOCAL);
+			emit2(np->id);
+		}
 		break;
 
 	case STRING:
 		/* String literals - reference by name (already emitted in phase 1) */
 		np = (struct name *)e->var;
 		emit1(SYM);
-		emitS(nameOf(np->id));
+		emit1(NK_STRING);
+		emit2(np->id - SYNTH);
 		break;
 
 	case CALL:

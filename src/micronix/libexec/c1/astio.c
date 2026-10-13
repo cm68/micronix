@@ -2,6 +2,7 @@
  * astio.c - AST file I/O
  */
 #include "pass2.h"
+#include "expr.h"
 #include "lexeme.h"
 #include <stdarg.h>
 #include <string.h>
@@ -28,6 +29,7 @@ static int pushback = -1;
  * real spellings and never knows the ids existed.
  */
 static int nidfd = -1;
+static long nid2off = -1;	/* file offset of c0's statics section */
 
 /*
  * Sidecar seeks use the bare syscall rather than lseek: this fd is
@@ -40,8 +42,10 @@ static int nidfd = -1;
 #ifdef CCC
 extern long seekraw();
 #define NSEEK(fd, off) seekraw(fd, (int)(off), 0)
+#define NTELL(fd) seekraw(fd, 0, 1)
 #else
 #define NSEEK(fd, off) lseek(fd, (long)(off), 0)
+#define NTELL(fd) lseek(fd, (long)0, 1)
 #endif
 
 void
@@ -57,7 +61,9 @@ nidopen(char *f1)
 	 * buffer has no reason to be on the stack at all.
 	 */
 	static char nf[256];
+	unsigned char two[2], c;
 	char *dot;
+	int i;
 
 	/*
 	 * base.ast -> base.nam.  Cut at the LAST dot rather than
@@ -74,6 +80,24 @@ nidopen(char *f1)
 	if (dot)
 		strcpy(dot, ".nam");
 	nidfd = open(nf, O_RDONLY);
+	nid2off = -1;
+	if (nidfd < 0)
+		return;
+	/*
+	 * c0 appends a second section - count + the interned statics'
+	 * @-forms - after pass0's names.  Find it once here: read the
+	 * count, skip the offsets and score bitmap, then walk the N
+	 * NUL-terminated names.  The position after that walk is the
+	 * second section's count.
+	 */
+	if (read(nidfd, (char *)two, 2) == 2) {
+		int n = two[0] | (two[1] << 8);
+		NSEEK(nidfd, 2 + 2 * n + (n + 7) / 8);
+		for (i = 0; i < n; i++)
+			while (read(nidfd, (char *)&c, 1) == 1 && c)
+				;
+		nid2off = NTELL(nidfd);
+	}
 }
 
 /*
@@ -89,6 +113,30 @@ nidname(unsigned short id, char *buf, int size)
 	NSEEK(nidfd, 2 + 2 * (id - 1));
 	read(nidfd, (char *)two, 2);
 	NSEEK(nidfd, two[0] | (two[1] << 8));
+	n = read(nidfd, buf, size - 1);
+	for (i = 0; i < n; i++)
+		if (!buf[i])
+			return;
+	buf[i] = 0;
+}
+
+/*
+ * Fetch the id-th interned name (1-based, in c0's spill order).  No
+ * offset table - the names are NUL-terminated and scanned.  Statics are
+ * few, so the byte-at-a-time walk is fine.
+ */
+void
+nidname2(unsigned short id, char *buf, int size)
+{
+	unsigned char c;
+	int n, i, k;
+
+	if (nidfd < 0 || nid2off < 0)
+		return;
+	NSEEK(nidfd, nid2off + 2);	/* past the section-2 count */
+	for (k = 0; k < (int)id - 1; k++)
+		while (read(nidfd, (char *)&c, 1) == 1 && c)
+			;
 	n = read(nidfd, buf, size - 1);
 	for (i = 0; i < n; i++)
 		if (!buf[i])
@@ -164,6 +212,47 @@ nidxp(char *buf, int size)
 			*d++ = *s++;
 		*d = 0;
 	}
+}
+
+/*
+ * Spell a symbol name.  The id rides the char* name field of a
+ * SYM/SYMREF and the kind its nored high bits (expr.h NK_*): a global
+ * gets the underscore, a static is the one compound form c0 interned
+ * (nidname fetches its @id-form, namex expands the function id inside
+ * it), a string/label is spelled from the id alone.
+ */
+char *
+symname(int kind, char *nameid)
+{
+	static char buf[32];
+	static char tmp[24];
+	unsigned short id = (unsigned short)(int)nameid;
+
+	switch (kind) {
+	case NK_GLOBAL:
+		if (nidfd < 0)
+			return "";
+		buf[0] = '_';
+		nidname(id, buf + 1, sizeof(buf) - 1);
+		return buf;
+	case NK_LOCAL:
+		if (nidfd < 0)
+			return "";
+		nidname(id, buf, sizeof(buf));
+		return buf;
+	case NK_STATIC:
+		if (nidfd < 0 || nid2off < 0)
+			return "";
+		nidname2(id, tmp, sizeof(tmp));	/* _@func.N */
+		return namex(tmp);		/* _func.N */
+	case NK_STRING:
+		fmtstr(buf, "str%d", id);
+		return buf;
+	case NK_LABEL:
+		fmtstr(buf, "L%d", id);
+		return buf;
+	}
+	return "";
 }
 
 void

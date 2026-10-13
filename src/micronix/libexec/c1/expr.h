@@ -16,6 +16,21 @@
 #define NR_ADDR		2	/* parent wants the address, not the place */
 #define NR_BYTEWANT	4	/* value demanded as a byte by its consumer */
 
+/*
+ * A SYM/SYMREF name's kind rides the free high bits of nored (bits 3-5;
+ * the codegen only ever touches the NR_* low bits).  NK_* must match
+ * c0's outast.c.  The id itself is u.name / u.symref.name.
+ */
+#define NK_SHIFT	3
+#define NK_MASK		(7 << NK_SHIFT)
+#define NK_GLOBAL	0	/* _@id   global / extern / file-scope static */
+#define NK_STATIC	1	/* _@func.N  function-scope static (interned) */
+#define NK_LABEL	2	/* L%d */
+#define NK_STRING	3	/* str%d */
+#define NK_LOCAL	4	/* @id */
+#define namekind(e)	(((e)->nored >> NK_SHIFT) & 7)
+#define setnamekind(e,k) ((e)->nored = ((e)->nored & ~NK_MASK) | ((k) << NK_SHIFT))
+
 /* expression node */
 typedef struct Expr {
 	unsigned char	op;	/* operator (lexeme token) */
@@ -52,7 +67,7 @@ typedef struct Expr {
 
 /* tree builder functions */
 Expr	*mkconst(char width, long val);
-Expr	*mksym(char *name);
+Expr	*mksym(int kind, char *name);
 Expr	*mklocalvar(char width, char reg, int off);
 Expr	*mkregvar(char width, char reg);
 Expr	*mkindex(char width, char reg, int off);
@@ -63,7 +78,7 @@ Expr	*mkarg(Expr *expr);
 Expr	*mkincdec(int op, char width, Expr *e, int amt);
 Expr	*mkbfext(char off, char wid, Expr *addr);
 Expr	*mkbfass(char off, char wid, Expr *addr, Expr *val);
-Expr	*mksymref(char *name, short off);
+Expr	*mksymref(int kind, char *name, short off);
 Expr	*mkcode(char width, char reg);
 
 /* per-function arena: Expr nodes and interned symbol names */

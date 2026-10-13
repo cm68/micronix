@@ -67,6 +67,7 @@ void read4(void);
 extern unsigned long val4;	/* read4 leaves its answer here */
 void readS(char *buf, int size);
 char *namex(char *name);	/* expand @id to its spelling (static buffer) */
+char *symname(int kind, char *nameid);	/* spell a SYM/SYMREF name id */
 void nidxp(char *buf, int size);	/* namex in place, bounded by size */
 void nidopen(char *f1);		/* .nam sidecar (cpp -j), from the .ast name */
 #ifdef DEBUG

@@ -24,6 +24,8 @@ extern int (*signal())();
 #include <unistd.h>
 #endif
 
+extern void namWrite(char *o1);	/* util.c */
+
 #ifdef DEBUG
 #include "dbgtags.c"
 #endif
@@ -194,6 +196,10 @@ process(char *f, char *o1, char *o2)
     lexClose();
     close(astFd);
     close(asmFd);
+
+    /* Spill the interned statics to base.nam2 so c1 can spell them
+     * back out.  After the astFd close - the .ast is complete. */
+    namWrite(o1);
 }
 
 /*

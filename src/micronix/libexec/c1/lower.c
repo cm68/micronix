@@ -1598,7 +1598,7 @@ docall(Expr *e)
 	if (direct) {
 		if (first)
 			landarg(first);
-		outf("\tcall %s\n", namex(fn->u.symref.name));
+		outf("\tcall %s\n", symname(namekind(fn), fn->u.symref.name));
 	} else {
 		/*
 		 * Through a pointer.  The Z80 can jump to the address in HL
@@ -1669,7 +1669,7 @@ symtohl(Expr *s)
 	char w = s->width;
 
 	out("\tld hl,");
-	out(namex(s->u.symref.name));
+	out(symname(namekind(s), s->u.symref.name));
 	if (s->u.symref.off) {
 		if (s->u.symref.off > 0)
 			outc('+');
