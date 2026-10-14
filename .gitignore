@@ -277,6 +277,7 @@ src/micronix/cmd/cat/cat
 src/micronix/cmd/cc/cc
 src/micronix/cmd/ccc/ccc
 src/micronix/cmd/change/change
+src/micronix/cmd/chg/chg
 src/micronix/cmd/chgrp/chgrp
 src/micronix/cmd/chmod/chmod
 src/micronix/cmd/chown/chown
