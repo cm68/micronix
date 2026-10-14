@@ -149,24 +149,18 @@ extra/sim:
 running micronix in simulation
 ------------------------------
 
-there are two simulators, and they are two different experiences.
+two simulators, two experiences.
 
-usersim (src/usersim) is the easy one - a user-mode simulator that hosts
-the micronix system calls on linux, no simulated hardware.  it runs
-against filesystem/, the tree's own native build, and its block devices
-are real: mount(), mkfs and fsck all go through the host fslib, with
--D <devdir> mapping bdev(maj,min) to disk images.  build once, then:
+usersim (src/usersim) is the easy one: it hosts micronix's system calls
+on linux and runs against filesystem/, no simulated hardware, no disk
+images.  build once, then
 
 	make
 	src/usersim/sim
 
-	# or, for a quite strange experience,
-	src/usersim/sim bin/man sh | less
-
-hwsim (src/hwsim/d1) is the real machine - a hardware-level simulator of
-the Morrow MPZ80: the monitor rom, the real kernel, and all five disk
-controllers.  it boots micronix to a real single-user '#' shell on a
-real (simulated) disk, and it is the one that needs setup.
+hwsim (src/hwsim/d1) is the real machine - the Morrow MPZ80, the monitor
+rom, the real kernel, all five disk controllers - and it boots micronix
+to a '#' shell on a simulated disk.  it is the one that needs setup.
 
 the short boot, from a standing start:
 
@@ -179,7 +173,7 @@ the short boot, from a standing start:
 
 boot_vol passes -c 0x70c: boot the hdcdma straight, skip the monitor,
 and put the console in an xterm of its own.  the boot block mkfs left on
-cylinder 0 loads /micronix, and the shell prompt is '#'.
+cylinder 0 loads /micronix.
 
 the performance build is the same simulator with the debug machinery
 compiled out - d1p, or d1 -F - and it runs at roughly a 30 mhz z80,
@@ -206,28 +200,21 @@ docs/INSTALLATION.md, disks/hdinstall/README and sys/DISKLABEL.md.
 the provisioning tool
 ---------------------
 
-a command-line tool to drive hwsim the way the per-card scripts now do
-by hand.  one sim.json holds every simulator definition, and the tool
-runs a sim's whole lifecycle with verbs instead of four near-identical
-shell scripts:
+a command-line tool that drives hwsim the way the per-card scripts do by
+hand, from one sim.json.  a sim is a collection of volumes, and a volume
+is a disk on a controller - its geometry and its card, not a role.  the
+verbs:
 
 	hwsim format <sim>	mnix initialize (geometry)
-	hwsim partition <sim>	mnix label (slices)
+	hwsim partition <sim>	mnix label (the default slice table)
 	hwsim mkfs <sim>		mnix mkfs (filesystem + boot)
 	hwsim boot <sim>		launch d1/d1p from the config + volumes
 	hwsim add/del <sim>	a volume in or out
 
-the abstractions behind it:
-
-- a sim is a collection of volumes.  a volume is a disk on a controller -
-  its geometry and its card, not a role.
-- root and swap are the kernel's setdev arguments, not volume attributes.
-- a device is controller:unit<slice> (hdcdma:0a); the major numbers are
-  fixed and the minor is (slice<<5)|unit, so the json never stores one.
-- -c is one number packing four things; the json holds them named:
-  boot (hdcdma/djdma/hdca), nomon, xterm mask, clock.
-
-the common case - build and boot the sample two-disk sim (q540-dual):
+root and swap are the kernel's setdev arguments, named as device tokens
+(hdcdma:0a), not volume attributes; -c packs boot, nomon, the xterm mask
+and the clock from named fields.  the common case - build and boot the
+sample two-disk sim (q540-dual):
 
 	hwsim format q540-dual		# initialize both m40 volumes
 	hwsim partition q540-dual	# the default slice table
