@@ -1,0 +1,63 @@
+#!/bin/sh
+#
+# Boot the two-disk distribution install.
+#
+#	./dist_boot [simulator flags] [dir]
+#
+# <dir> is where build_dist put the two volumes, default /tmp.  The
+# console goes to an xterm of its own (-c 0x70c: boot the hdcdma, skip
+# the monitor, all three uarts in xterms) and is teed to /tmp/boot.log,
+# so the install can be watched in the xterm and grepped from the log.
+# The media set is dist8, from the manifest dist/distsets prints.
+#
+# Every argument before <dir> is a simulator flag, passed through.
+#
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+root=`cd "$here/../.." && pwd`
+
+kernel="$root/src/micronix/sys/unix"
+distsets="$root/dist/distsets"
+
+# d1p is the -DNODEBUG performance build: no tracing, so no -S (symbols
+# are a debug-only option).  Use ./d1 and put -S back to watch traced.
+sim="./d1p"
+
+# The volume directory is the last argument; every argument before it is
+# a simulator flag, passed through in order.  No argument means /tmp.
+flags=""
+while [ $# -gt 1 ]; do
+	if [ "$1" = "-h" ]; then
+		echo "usage: $0 [simulator flags] [dir]" >&2
+		exit 0
+	fi
+	flags="$flags $1"
+	shift
+done
+dir="${1:-/tmp}"
+
+case "$dir" in
+/*)	;;
+*)	dir="$here/$dir" ;;
+esac
+
+rootvol="$dir/q540root.img"
+usrvol="$dir/q540usr.img"
+
+for f in "$rootvol" "$usrvol"; do
+	if [ ! -f "$f" ]; then
+		echo "$0: $f not found - build it first:" >&2
+		echo "$0:   ./build_dist $dir" >&2
+		exit 1
+	fi
+done
+
+# The manifest the media changer reads: whatever dist/distsets names.
+manifest=/tmp/distsets.mf
+"$distsets" > "$manifest" || exit 1
+
+cd "$root/src/hwsim/d1" || exit 1
+exec "$sim" -H -b ../../micronix/stand/roms/mon447.bin -c 0x70c \
+	-e "$manifest" -L /tmp/boot.log $flags \
+	"hdcdma0:$rootvol" "hdcdma1:$usrvol"

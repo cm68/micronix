@@ -48,6 +48,7 @@
 #define INT_HDCA    2
 #define INT_NCR     3
 #define INT_IDE     4
+#define INT_NIC     5       /* the network card, on the spare (DISK3) line */
 #else
 #define INT_HDDMA   0
 #define INT_DJDMA   1

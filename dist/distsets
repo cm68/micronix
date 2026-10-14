@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Print the media-set manifest for the distribution diskettes - the
+# format d1 reads with -e, and what the provisioning tool turns into
+# sim.json's mediasets.  One line per set, name then image paths,
+# numbered by the trailing disk number, 1 first:
+#
+#	dist8 /vault/src/micronix/dist/mx2.0-8-1.IMD ... mx2.0-8-9.IMD
+#	dist5 /vault/src/micronix/dist/mx2.0-5-1.IMD ... mx2.0-5-25.IMD
+#
+# The sets are dist8 and dist5, whatever images are present: the manifest
+# is a view of this directory, not something maintained by hand, so a
+# rebuilt set needs nothing edited.  Paths are absolute so the manifest
+# works wherever d1 is run from.  Only the .IMD images are named - the
+# -delta overlays beside them are the simulator's, not the media.
+#
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+
+for m in 8 5; do
+	list=`ls "$here"/mx2.0-$m-*.IMD 2>/dev/null | sort -t- -k3,3n`
+	[ -z "$list" ] && continue
+	printf 'dist%s' "$m"
+	for f in $list; do
+		printf ' %s' "$f"
+	done
+	printf '\n'
+done

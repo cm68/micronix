@@ -1,0 +1,37 @@
+.TH CHG 1 "October 2026"
+.SH NAME
+chg \- drive the media changer
+.SH SYNOPSIS
+.B chg
+.BI load " set:vol onto drive"
+.br
+.B chg
+.BI unload " drive"
+.br
+.B chg
+.BI query " set|drive"
+.br
+.B chg
+.BI next " drive"
+.SH DESCRIPTION
+.I chg
+writes its arguments as one command line to
+.IR /dev/mediachg ,
+the out-of-band media changer, and prints the one-line response.  It
+exits 0 on
+.B ok
+and 1 on
+.BR error .
+The grammar is sys/MEDIACHG.md: a media set is a numbered list of
+diskette images, a drive is
+.IB djdma : n,
+and volume numbers start at 0.
+.SH EXAMPLES
+.nf
+chg load dist8:0 onto djdma:0
+chg query dist8          # ok 9
+chg next djdma:0
+chg unload djdma:0
+.fi
+.SH SEE ALSO
+sys/MEDIACHG.md

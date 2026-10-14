@@ -147,6 +147,14 @@ mkdir -p "$tmp/run"
 rm -f "$tmp/run/bin/unix"
 find "$tmp/run" -type f -exec "$strip" {} + || exit 1
 
+# mnix tar x turns a hard-link tar entry into a 0-byte file, so flatten
+# the legitimate hard links (wc/chars/lines/words, ed/e, man/help) into
+# full copies before the images are tar'd.  Each name must be its own
+# file in the guest - the v6 filesystem has no hard links to carry.
+find "$tmp/run" -type f -links +1 | while read -r f; do
+	cp -p "$f" "$f.tmp$$" && mv -f "$f.tmp$$" "$f"
+done
+
 #
 # The manifest: "size path", one file to a line, path relative to the
 # image's root.  Sorted by path, so that the directories come out in a

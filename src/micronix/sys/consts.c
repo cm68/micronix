@@ -116,6 +116,7 @@ struct biovec biosw[] = {
     &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 3 = HD-DMA, a module */
     &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 4 = IDE (ATA), a module */
     &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 5 = NCR 5380 SCSI, a module */
+    &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 6 = ND, a module */
 };
 
 struct ciovec ciosw[] = {

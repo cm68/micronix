@@ -55,7 +55,7 @@ EXTRA	= BUILDING TODO
 # and linked again as a module - so its objects, .mod and .page are not
 # in OBJS; they ride GENERATED for the same reason.  unix itself is
 # $(TARGET), which clobber removes.
-MODS	= dj mw ide ncr hdca
+MODS	= dj mw ide ncr hdca nd
 
 # Drivers whose sources are written but which are not yet linked into the
 # kernel: their objects build (so the compiler checks them, "make objects")
@@ -181,7 +181,8 @@ CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c disk2.c \
 	 disk2hdr.c disk3.c disk3hdr.c dj.c djhdr.c djinit.c dlabel.c exec.c \
 	 fio.c fork.c hdca.c hdcahdr.c ialloc.c ide.c idehdr.c iget.c imap.c \
 	 link.c main.c main_init.c makedate.c malloc.c memdev.c mount.c \
-	 multio.c mw.c mwhdr.c name.c ncr.c ncrhdr.c ncrinit.c open.c ovl.c \
+	 multio.c mw.c mwhdr.c name.c ncr.c ncrhdr.c ncrinit.c nd.c ndhdr.c \
+	 open.c ovl.c \
 	 queue.c rdwri.c reg.c rtc.c sig.c slavepic.c sleep.c stub.c \
 	 stub_intr.c subc.c swap.c sys1.c sys2.c system.c time.c trap.c tty.c \
 	 uio.c user.c

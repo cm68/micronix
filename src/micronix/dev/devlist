@@ -11,6 +11,7 @@ c 1 3 ttyC
 c 1 16 cent0
 c 2 0 mem
 c 3 0 io
+c 3 3 mediachg
 b 1 0 hda
 b 1 1 hdb
 b 1 2 hdc
@@ -61,6 +62,7 @@ b 5 4 scsi4
 b 5 5 scsi5
 b 5 6 scsi6
 b 5 7 scsi7
+b 6 0 nd
 #
 # The whole-disk slice, 'c': the drive at cylinder 0 with no roll, so its
 # block 0 is physical block 0 and reading it is reading the label.  The

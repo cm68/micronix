@@ -1,0 +1,115 @@
+#!/bin/sh
+#
+# Build the two volumes for an install from the distribution set:
+#
+#	q540root.img	unit 0 (hdcdma0) = root, swap on slice b
+#	q540usr.img	unit 1 (hdcdma1) = /usr/src
+#
+#	./build_dist [dir]
+#
+# <dir> is where the two volumes land, default /tmp.  The root volume
+# gets a minimal userland - enough to boot, mount /usr/src and cptree
+# the distribution diskettes - plus chg and the media-changer install
+# script (dist.login) as /.login.  The usr volume is built empty; the
+# install fills it.
+#
+# This is build_2drive with the floppy swap done in-band: instead of
+# four diskettes mounted as fla..fld and three passes, one boot loads
+# all nine diskettes onto drive 0 through /dev/mediachg.  The media set
+# is dist8, made by create_dist 8 and named by dist/distsets.
+#
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+root=`cd "$here/../.." && pwd`
+
+mnix="$root/src/tools/mnix"
+setdev="$root/src/tools/setdev"
+bootimg="$root/src/micronix/stand/boot/bootimg"
+devlist="$root/src/micronix/dev/devlist"
+kernel="$root/src/micronix/sys/unix"
+filesystem="$root/filesystem"
+srcdir="$root/src/micronix"
+login="$here/dist.login"
+
+dir="${1:-/tmp}"
+case "$dir" in
+/*)	;;
+*)	dir="$here/$dir" ;;
+esac
+mkdir -p "$dir" || exit 1
+
+rootvol="$dir/q540root.img"
+usrvol="$dir/q540usr.img"
+
+if [ ! -f "$bootimg" ]; then
+	echo "$0: $bootimg not found - build the boot first:" >&2
+	echo "$0:   make -C $root/src/micronix/stand/boot bootimgs" >&2
+	exit 1
+fi
+if [ ! -f "$filesystem/etc/init" ]; then
+	echo "$0: $filesystem/etc/init not found - make install has not built init" >&2
+	exit 1
+fi
+if [ ! -f "$login" ]; then
+	echo "$0: $login not found" >&2
+	exit 1
+fi
+if [ ! -f "$filesystem/bin/chg" ]; then
+	echo "$0: $filesystem/bin/chg not found - install chg first:" >&2
+	echo "$0:   make -C $srcdir/cmd/chg -f GNUmakefile install" >&2
+	exit 1
+fi
+
+rm -f "$rootvol" "$usrvol" "$rootvol.lock" "$usrvol.lock" \
+	"$rootvol-delta" "$usrvol-delta"
+
+# 1. root: slice a is the filesystem (cylinders 1..480), slice b is swap
+#    (481..511); cylinder 0 is the boot, below both.
+"$mnix" initialize m40 "$rootvol" || exit 1
+"$mnix" label "$rootvol" -s a 1 480 -s b 481 || exit 1
+"$mnix" mkfs "$rootvol" -i "$bootimg" -f || exit 1
+
+# 2. the minimal userland: install tools only, the distribution brings
+#    the rest.  chg drives the media changer; /dev is recreated node by
+#    node, because tar does not carry device nodes.
+tmp=`mktemp` || exit 1
+trap 'rm -f "$tmp" "$tmp.k"' 0
+
+tar -C "$filesystem" -c -f "$tmp" \
+	bin/sh bin/login bin/ls bin/cp bin/mv bin/rm bin/cat bin/mkdir \
+	bin/mount bin/umount bin/chmod bin/cptree bin/mknod bin/ln \
+	bin/sync bin/echo bin/tar bin/chg || exit 1
+"$mnix" -f "$rootvol" tar x "$tmp" || exit 1
+
+tar -C "$srcdir" -c -f "$tmp" etc || exit 1
+"$mnix" -f "$rootvol" tar x "$tmp" || exit 1
+"$mnix" -f "$rootvol" write "$filesystem/etc/init" /etc/init || exit 1
+
+for d in /dev /tmp /usr /usr/src /f; do
+	"$mnix" -f "$rootvol" mkdir "$d" >/dev/null 2>&1 || true
+done
+while read type major minor name; do
+	case "$type" in ''|\#*) continue ;; esac
+	"$mnix" -f "$rootvol" mknod "/dev/$name" "$type" "$major" "$minor" \
+		>/dev/null 2>&1 || true
+done < "$devlist"
+
+# 3. the freshly built kernel, root 3/0 (drive 0, slice a) and swap 3/32
+#    (drive 0, slice b).  setdev patches a copy.
+cp "$kernel" "$tmp.k" || exit 1
+"$setdev" "$tmp.k" 3/0 3/32 || exit 1
+"$mnix" -f "$rootvol" write "$tmp.k" /micronix || exit 1
+"$mnix" -f "$rootvol" mknod /dev/root b 3 0 >/dev/null
+"$mnix" -f "$rootvol" mknod /dev/swap b 3 32 >/dev/null
+
+# 4. the install script, as /.login.  The single-user shell runs it, so
+#    a boot needs nothing typed.
+"$mnix" -f "$rootvol" write "$login" /.login || exit 1
+
+# 5. usr: an empty filesystem on slice a, for the install to fill.
+"$mnix" initialize m40 "$usrvol" || exit 1
+"$mnix" label "$usrvol" -s a 1 480 || exit 1
+"$mnix" mkfs "$usrvol" -i "$bootimg" -f || exit 1
+
+echo "$0: built $rootvol (root) and $usrvol (/usr/src)"
