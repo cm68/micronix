@@ -1,0 +1,76 @@
+.he "rcp (1)                      10/14/26                     rcp (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+rcp
+- copy files to or from a remote host, over rsh
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd 2
+rcp [ -r ] [ -P port ] host:file ... dir
+rcp [ -r ] [ -P port ] file ... host:dir
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Rcp moves files over the network card (sys/NET.md), speaking rsh to the
+remote's rshd and the rcp file stream over that one connection.  One
+side is remote and carries the host: prefix (an ip address); the other
+is local.  The last argument is the destination: a directory when there
+is more than one source or it ends in /, into which each source lands
+under its basename; a single source into a non-slash destination is
+renamed to it.
+.sp
+There is no password: the remote trusts this host (.rhosts).
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-r	Copy directories recursively.
+
+.ti -10
+-P port	Use port as the rshd port; the default is 514.
+
+.in -10
+.sp 2
+.in -5
+.bd
+GLOBBING
+.in +5
+.br
+Rcp does not expand filename patterns itself.  A remote path is split at
+the colon, and the part after it is passed on to the remote rcp -f or
+rcp -t command; the remote's rshd runs that command through the login
+shell, which expands *, ? and [..] against the remote filesystem and
+then runs rcp with the result.  Thus
+.sp
+rcp nook:/usr/src/*.c /tmp
+.sp
+copies every file matching the pattern, not a file named *.c.
+.sp
+Quote the remote path to keep the local shell from expanding it first;
+either way the pattern reaches the remote.  Because the remote shell
+expands metacharacters, there is no way to copy a remote file whose own
+name is one of them: the shell expands it before rcp ever sees it.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+net (4)

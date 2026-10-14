@@ -69,6 +69,10 @@ set_vi(int line, int card, int value)
 {
     unsigned char new = vi_lines;
 
+    // a card that is not wired asserts no line
+    if (line < 0 || line >= 8)
+        return;
+
     // do the open collector thing
     vi_masks[line] &= 0xff ^ (1 << card);
     vi_masks[line] |= value << card;
@@ -319,8 +323,8 @@ static struct wiring profile_ss1 = {
         [11] = { IRQ_ONBOARD, 0, "timer2" },
         [12] = { IRQ_ONBOARD, 0, "fpu0" },
         [13] = { IRQ_ONBOARD, 0, "fpu1" },
-        [14] = { IRQ_ONBOARD, 0, "uart_rx" },
-        [15] = { IRQ_ONBOARD, 0, "uart_tx" },
+        [14] = { IRQ_ONBOARD, 0, "uart_tx" },
+        [15] = { IRQ_ONBOARD, 0, "uart_rx" },
     },
     "ss1",
 };
@@ -374,6 +378,18 @@ wiring_irq(int pin, int *vi, char **name)
         return 2;
     }
     return 0;
+}
+
+/*
+ * Is this board the one driving int_line?  A machine has exactly one
+ * interrupt controller per wiring; the others are compiled in but dormant.
+ * Each controller claims vi_change/get_intack and folds its own line only
+ * when this is true for its own name.
+ */
+int
+wiring_active(char *name)
+{
+    return wiring.int_driver && strcmp(wiring.int_driver, name) == 0;
 }
 
 /* set one card's line, adding the card if it is not already wired */

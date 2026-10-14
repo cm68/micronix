@@ -880,5 +880,15 @@ hdcioctl(dev, cmd, r, b)
 struct biovec hdbvec = { &hdopen, &hdclose, &hdstrat, &hdcioctl };
 
 /*
+ * The probe: make the card raise its interrupt so the attach loop
+ * (sys/probe.c) can discover which line it is on.  STUB - not written;
+ * it must issue a command that completes and raises the card's done bit.
+ */
+hdprobe()
+{
+    return (0);
+}
+
+/*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

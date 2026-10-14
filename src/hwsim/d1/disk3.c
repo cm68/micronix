@@ -23,7 +23,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-#define DISK3_INTERRUPT VI_DISK3
+static int disk3_vi_line = -1;  /* the VI line, from the -w wiring; -1 = not wired */
 
 #define DISK3_PORT  0x90            /* the attention port (0x90 and 0x91) */
 
@@ -247,9 +247,9 @@ done:
     copyout((byte *)&iopb, iopb_addr, sizeof(iopb));
     iopb_addr = link;
     if ((iopb.command & D3_INT) && !(iopb.command & D3_CONTINUE))
-        set_vi(DISK3_INTERRUPT, 1, 1);
+        set_vi(disk3_vi_line, 1, 1);
     else
-        set_vi(DISK3_INTERRUPT, 1, 0);
+        set_vi(disk3_vi_line, 1, 0);
 }
 
 /*
@@ -260,7 +260,7 @@ done:
 static void
 attention(portaddr p, byte v)
 {
-    set_vi(DISK3_INTERRUPT, 1, 0);
+    set_vi(disk3_vi_line, 1, 0);
 
     if (v == 0xff) {
         reset_pending = 1;
@@ -282,6 +282,7 @@ attention(portaddr p, byte v)
 static int
 disk3_init()
 {
+    disk3_vi_line = wiring_vi_line("disk3");
     register_output(DISK3_PORT, &attention);
     register_output(DISK3_PORT + 1, &attention);
     return 0;

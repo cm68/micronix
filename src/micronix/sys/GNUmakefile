@@ -29,10 +29,10 @@ SRCDIR	= /usr/src/sys
 
 TARGET	= unix
 
-# Both kernels link from one set of objects.  unix is the CAS-vectored
-# two-MultIO kernel (the d1's default), punix the polled Wunderbus one;
-# they differ only in the slave PIC fold in highmem.o/phighmem.o.
-TARGETS	= punix
+# One image for now: the Wunderbus/MultIO (miopic + upd1990).  The SS1
+# (ss1pic + ss1_clock) and single-Wunderbus (wbiopic) images join as the
+# per-board objects are wired.
+TARGETS	=
 
 # the kernel includes its own headers, not the C library's.  -i, as
 # the native Makefile beside this has always done.
@@ -61,10 +61,12 @@ MODS	= dj mw ide ncr hdca nd
 # kernel: their objects build (so the compiler checks them, "make objects")
 # but they are not in MODS, so nothing links them into unix.
 STAGED	= disk3 disk2
-GENERATED = build.h unix.link punix.link $(MODS:%=%.mod) $(MODS:%=%.page) \
+GENERATED = build.h unix.link $(MODS:%=%.mod) $(MODS:%=%.page) \
 	$(MODS:%=%.o) $(MODS:%=%hdr.o) \
 	$(STAGED:%=%.o) $(STAGED:%=%hdr.o) \
-	slavepic_polled.o slavepic_vectored.o
+	miopic.o miopic_init.o wbiopic.o wbiopic_init.o \
+	ss1pic.o ss1pic_init.o probe.o probe_init.o \
+	ss1_clock.o ss1_clock_init.o upd1990_init.o picvec.o
 
 # The compiler and linker are this tree's own.  CCC defaults to
 # $(BIN)/mxccc in GNUmakefile.inc; the linker mxld is beside it.
@@ -134,12 +136,38 @@ bus.o: bus.c
 	$(MXLD) -r -Sdata -o bus.o bus.rel
 	rm -f bus.rel
 
+# The board's resident PIC half - pic_eoi and inton - is leaf code (it
+# reaches only in()/out()/di()/ei(), all in the u page) and carries no
+# static data, so it folds to .data and rides the u page like the leaf
+# runtime, freeing the resident text it used to hold.  Only the active
+# board's object is linked into upage.o.
+miopic.o: miopic.c
+	$(CCC) $(CCFLAGS) $(INC) -c -o miopic.rel $<
+	$(MXLD) -r -Sdata -o miopic.o miopic.rel
+	rm -f miopic.rel
+wbiopic.o: wbiopic.c
+	$(CCC) $(CCFLAGS) $(INC) -c -o wbiopic.rel $<
+	$(MXLD) -r -Sdata -o wbiopic.o wbiopic.rel
+	rm -f wbiopic.rel
+ss1pic.o: ss1pic.c
+	$(CCC) $(CCFLAGS) $(INC) -c -o ss1pic.rel $<
+	$(MXLD) -r -Sdata -o ss1pic.o ss1pic.rel
+	rm -f ss1pic.rel
+
+# net.o is the /dev/net framing (net.c), pure code with no static data,
+# so it folds to the u page the same way.  It is always mapped, so the
+# polled read/write never needs the window page.
+net.o: net.c
+	$(CCC) $(CCFLAGS) $(INC) -c -o net.rel $<
+	$(MXLD) -r -Sdata -o net.o net.rel
+	rm -f net.rel
+
 KERNEL_AS_OBJ = uhdr.o intrpt.o mio.o textpad.o
-KERNEL_AS     = $(KERNEL_AS_OBJ) highmem.o phighmem.o
+KERNEL_AS     = $(KERNEL_AS_OBJ) highmem.o
 KERNEL_C      = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o malloc.o name.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
-	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o rtc.o
+	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o upd1990.o
 WIN_C         = open.o sys2.o rdwri.o memdev.o link.o access.o
 HIGHMEM_C_OBJ = main_init.o cus.o djinit.o ncrinit.o
 HIGHMEM_AS_OBJ = inits.o unbcd.o
@@ -182,10 +210,12 @@ CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c disk2.c \
 	 fio.c fork.c hdca.c hdcahdr.c ialloc.c ide.c idehdr.c iget.c imap.c \
 	 link.c main.c main_init.c makedate.c malloc.c memdev.c mount.c \
 	 multio.c mw.c mwhdr.c name.c ncr.c ncrhdr.c ncrinit.c nd.c ndhdr.c \
-	 open.c ovl.c \
-	 queue.c rdwri.c reg.c rtc.c sig.c slavepic.c sleep.c stub.c \
+	 net.c open.c ovl.c probe.c \
+	 queue.c rdwri.c reg.c upd1990.c sig.c sleep.c ss1_clock.c stub.c \
 	 stub_intr.c subc.c swap.c sys1.c sys2.c system.c time.c trap.c tty.c \
-	 uio.c user.c
+	 uio.c user.c miopic.c wbiopic.c ss1pic.c probe.c \
+	 miopic_init.c wbiopic_init.c ss1pic_init.c probe_init.c \
+	 upd1990_init.c ss1_clock_init.c picvec.c
 ASSRCS	= csv.s idiv.s imul.s inits.s inout.s intrpt.s mem.s mio.s oarg.s \
 	 ovlslot.s qadd.s qand.s qcmp.s qinc.s qldst.s qmul.s qor.s qsar.s \
 	 qshl.s qshr.s qsub.s slavevec.s sub8.s swdisp.s swdispw.s textpad.s \
@@ -321,8 +351,8 @@ main_init.o: build.h
 # entry leaves SP, so the kernel stack grows down into ustack.  textpad.o
 # stays last in the main link so _ebss is the end of .bss and binit()'s
 # buffer pool runs up to BUFWIN below u.
-upage.o: $(LEAF_AS) $(LEAF_C) user.o
-	$(MXLD) -r -Tdata=0xf000 -o upage.o $(LEAF_AS) $(LEAF_C) user.o
+upage.o: $(LEAF_AS) $(LEAF_C) miopic.o net.o user.o
+	$(MXLD) -r -Tdata=0xf000 -o upage.o $(LEAF_AS) $(LEAF_C) miopic.o net.o user.o
 
 # highmem.o is the init-only code - main_init, cus, the MIO/console init
 # in inits.s, bcd2unix (unbcd.s), and the disk drivers' own bring-up
@@ -349,16 +379,18 @@ upage.o: $(LEAF_AS) $(LEAF_C) user.o
 # kernel (and the driver modules) builds once and both images link from
 # it.  The two slave PIC variants come from the one file; ccc's -c names
 # the object, so they live side by side.
-highmem.o: main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o slavepic_vectored.o
-	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o slavepic_vectored.o
+highmem.o: main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o \
+		miopic_init.o probe_init.o upd1990_init.o picvec.o
+	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o \
+		miopic_init.o probe_init.o upd1990_init.o picvec.o
 
-phighmem.o: main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o slavepic_polled.o
-	$(MXLD) -r -Sdata -o phighmem.o main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o slavepic_polled.o
-
-slavepic_polled.o: slavepic.c
-	$(CCC) $(CCFLAGS) $(INC) -DN8259_POLLED=1 -c -o $@ $<
-slavepic_vectored.o: slavepic.c
-	$(CCC) $(CCFLAGS) $(INC) -DN8259_POLLED=0 -c -o $@ $<
+# probe.c and probe_init.c carry ovlint[NOVLINE], sized to the PIC's line
+# count, so they are compiled with the board's NOVLINE.  The MultIO is six
+# lines; the single Wunderbus is three and the SS1 eight, and each image
+# passes its own when the per-board images are wired.
+NOVLINE = 6
+probe.o probe_init.o: %.o: %.c
+	$(CCC) $(CCFLAGS) $(INC) -DNOVLINE=$(NOVLINE) -c $<
 
 # win.o is the window-page cluster: the part of the resident kernel that
 # can live at BUFSEG, in the very page bhold() maps buffers into, so its
@@ -397,8 +429,8 @@ win.o: $(WIN_C)
 # the same fold rather than a shorter list of its own, so the two link
 # the same way and a difference between the images is a difference in
 # the code.
-low.o: uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
-	$(MXLD) -r -o low.o uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
+low.o: uhdr.o $(KERNEL_C) probe.o intrpt.o mio.o textpad.o
+	$(MXLD) -r -o low.o uhdr.o $(KERNEL_C) probe.o intrpt.o mio.o textpad.o
 
 # ovlslot.o is the overlay slot (sys/ovlslot.s): one page of text at
 # OVLBASE, which setdev later writes the root driver's page onto.  The
@@ -432,12 +464,6 @@ ovlslot.o: ovlslot.s
 # stamped into the slot.
 unix.link: $(OBJS)
 	$(MXLD) -Ttext=0x1000 -Shigh -L$(HOSTROOT)/ccc/lib -lccc -lc -o unix.link low.o highmem.o $(OVLSLOT) win.o upage.o
-
-# punix is unix with the polled highmem fold.  The driver modules are the
-# same for both - they resolve only resident symbols, which do not move
-# between the two - so punix reuses unix's .page files.
-punix.link: $(OBJS)
-	$(MXLD) -Ttext=0x1000 -Shigh -L$(HOSTROOT)/ccc/lib -lccc -lc -o punix.link low.o phighmem.o $(OVLSLOT) win.o upage.o
 
 #
 # Driver modules, and the bootable image they go into.
@@ -516,12 +542,6 @@ unix: unix.link $(MODS:%=%.page)
 	cat $(MODS:%=%.page) >> $@
 	$(SETDEV) -i $@
 
-punix: punix.link $(MODS:%=%.page)
-	cp punix.link $@
-	@sz=`wc -c < $@`; \
-	 truncate -s $$(( (sz + $(PAGESZ) - 1) / $(PAGESZ) * $(PAGESZ) )) $@
-	cat $(MODS:%=%.page) >> $@
-	$(SETDEV) -i $@
 
 #
 # Generate the assembly ccc would assemble for a C file, for reading:
@@ -539,4 +559,4 @@ punix: punix.link $(MODS:%=%.page)
 %.s : %.c
 	$(CCC) $(CCFLAGS) $(INC) -s $<
 
-.PHONY: objects unix punix build.h
+.PHONY: objects unix build.h

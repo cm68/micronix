@@ -21,8 +21,8 @@
 ; 	&0; &0; &0; &0;
 ; 	&0; &0; &0; &0;
 ;
-	.globl	vectors
-	.extern	intrupt, _ovlint0, _ovlint1, _ovlint2, m1int, m2int
+	.globl	_vectors
+	.extern	intrupt, m1int, m2int
 	.extern	m3int, clkint, _ovlntr
 	.defw	0,0,0,0
 	.defw	0,0,0,0
@@ -74,7 +74,7 @@
 ; claimed returns without doing anything.  int3 through int7 are the
 ; resident ACE, parallel and clock handlers and are unchanged.
 ;
-vectors:
+_vectors:
 	.defb	0xC3		; jp int0 -- explicit, so asz won't relax jp to jr
 	.defw	int0
 	.defb	0
@@ -123,6 +123,19 @@ int6:
 int7:
 	call	intrupt
 	.defw	clkint
+
+; ovlint0/1/2: the three disk lines, dispatched through the resident
+; ovlntr (sys/probe.c).  intrupt already saved the registers and does the
+; dismiss, so these are a tail jump - load the line and go.
+_ovlint0:
+	ld	hl,0
+	jp	_ovlntr
+_ovlint1:
+	ld	hl,1
+	jp	_ovlntr
+_ovlint2:
+	ld	hl,2
+	jp	_ovlntr
 
 ;
 ; IR6, the slave's cascade line.  The slave's INT is wired here, so the

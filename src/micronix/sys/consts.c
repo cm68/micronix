@@ -103,6 +103,7 @@ extern int muopen(), muclose(), muread(), muwrite(), mustty();
 extern int kread(), kwrite(), ioread(), iowrite();
 extern int ovlopen(), ovlclose(), ovlstrat(), ovlioctl();
 extern int ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcmode();
+extern int netopen(), netclose(), netread(), netwrite();
 
 /* Device 0 must be nodev.  The disk rows point at the module trampolines
  * (sys/ovl.c), not at drivers: the kernel has no djopen, mwstrat or
@@ -125,6 +126,7 @@ struct ciovec ciosw[] = {
     &nulldev, &nulldev, &kread, &kwrite, &nodev,
     &nulldev, &nulldev, &ioread, &iowrite, &nodev,
     &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,
+    &netopen, &netclose, &netread, &netwrite, &nodev,
 };
 
 UINT nbdev = sizeof(biosw) / sizeof(struct biovec);

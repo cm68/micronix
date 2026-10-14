@@ -32,6 +32,7 @@ block and the wiring), not a role.  Root and swap are attributes of the
         "xterm": ["uart0", "ttyB", "ttyC"],
         "clock": "normal"
       },
+      "wiring": "multio",
       "root": "hdcdma:0a",
       "swap": "hdcdma:0b",
       "volumes": [
@@ -51,6 +52,11 @@ block and the wiring), not a role.  Root and swap are attributes of the
 
 - **config** — the `-c` configuration switch, broken into named fields
   (below).  The tool composes one packed `-c` number from them.
+- **wiring** — the `-w` interrupt routing: a profile name, then optional
+  `key=value` overrides (`"ss1,irq14=uart_rx"`).  It is passed through to
+  the simulator verbatim, exactly as the `-w` option is typed, so the
+  interrupt topology is persisted beside the device spec and not
+  re-derived from the volume list.
 - **root / swap** — setdev's two arguments, named as device tokens, not
   raw major/minor.
 - **volumes** — the disks, each a controller + unit + geometry + image.

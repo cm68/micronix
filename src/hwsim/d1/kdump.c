@@ -440,6 +440,7 @@ dump_kernel_tables(void)
 	 */
 	mpz80_map_dump();
 	multio_pic_dump();
+	ss1_pic_dump();
 
 	/*
 	 * The kernel loads at 0x1000 and is entered there; dump its first

@@ -26,8 +26,11 @@ An ESP32 + a bus-interface CPLD.  The Z80 sees two 8-bit S-100 ports:
     TXRDY  0x02   the TX FIFO has room for a byte
     RDY    0x04   the firmware is up
 
-Polling only.  An interrupt line (assert on `RXRDY`) is a hardware option
-and is not part of the software contract; the sim needs none of it.
+Interrupt-driven.  The card asserts a vectored-interrupt line (VI5, the
+spare DISK3 line) whenever `RXRDY` is set and holds it until the RX FIFO
+drains; the guest sleeps on the line and the handler reads the FIFO.  The
+line is open-collector, so the card pulls it through an open-collector
+driver (7406), not a push-pull pin.
 
 ## 2. Framing
 

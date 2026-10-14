@@ -21,10 +21,10 @@
 #include <sys/ovl.h>
 
 extern int hdopen(), hdclose(), hdstrat();
-extern int hdint(), hdtick();
+extern int hdint(), hdtick(), hdprobe();
 extern struct biovec hdbvec;
 
-struct ovlhdr hdcahdr = { 1, 0, &hdtick, 0, &hdbvec, 0, HDCAINT, &hdint,
+struct ovlhdr hdcahdr = { 1, 0, &hdtick, 0, &hdbvec, 0, &hdprobe, &hdint,
 	{ 'h', 'd', 'c', 'a' }, 4 };
 
 /*

@@ -122,6 +122,7 @@ main()
     irelse(rootdir);
     u.p->tty = 0;               /* not tied to any tty */
     ovlplaceall();              /* the driver modules riding in our own file */
+    intr_attach();              /* tickle each card, wire its interrupt line */
 
     /*
      * Enumerate the drives behind each controller: read every unit's

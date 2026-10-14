@@ -191,6 +191,12 @@ disks/bootdisks/*.img
 dist/*.IMD
 dist/*.img
 
+# Run leftovers, never a source: an empty drive image dropped at the
+# root by the drive emulator, and the selector test image beside the d1
+# drivers.
+/DRIVE_A.IMD
+src/hwsim/d1/selector
+
 #
 # A convenience symlink in that directory, to the kernel's own sys
 # directory, and not a volume.  It is nobody's source.
@@ -371,6 +377,7 @@ src/micronix/cmd/print/print
 src/micronix/cmd/ps/ps
 src/micronix/cmd/pwd/pwd
 src/micronix/cmd/ratfor/ratfor
+src/micronix/cmd/rcp/rcp
 src/micronix/cmd/rm/rm
 src/micronix/cmd/rmdir/rmdir
 src/micronix/cmd/s/s
@@ -473,6 +480,7 @@ src/tools/disas
 src/tools/doc.inl
 src/tools/dump
 src/tools/fsck
+src/tools/hwsim
 src/tools/icheck
 src/tools/imd
 src/tools/imdd

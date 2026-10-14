@@ -9,7 +9,7 @@
 
 LDFLAGS = -L../lib -lsim -lcurses # -lmem
 
-OBJECTS = usersim.o
+OBJECTS = usersim.o nic.o
 TARGETS = sim
 
 include ../Makefile.inc
@@ -23,6 +23,9 @@ sim: $(OBJECTS) ../lib/libsim.a
 	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $(LDFLAGS)
 
 usersim.o: usersim.c
+
+nic.o: ../hwsim/d1/nic.c ../hwsim/d1/nic.h
+	$(CC) $(CFLAGS) -I../hwsim/d1 -c -o $@ ../hwsim/d1/nic.c
 
 test: sim
 	./sim -d ../../filesystem ../../filesystem/bin/ls

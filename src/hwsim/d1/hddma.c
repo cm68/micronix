@@ -35,7 +35,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-#define HDDMA_INTERRUPT VI_HDDMA
+static int hddma_vi_line = -1;  /* the VI line, from the -w wiring; -1 = not wired */
 
 #define	HDDMA_PORT 	0x55	// hddma attention port
 #define	HDDMA_RESET	0x54	// hddma reset port
@@ -257,7 +257,7 @@ attention(portaddr p, byte v)
     int head;
     int nsect, gaplen;              // decoded from the format command
 
-    set_vi(HDDMA_INTERRUPT, 1, 0);
+    set_vi(hddma_vi_line, 1, 0);
 
     if (channel_reset) {
         channel_reset = 0;
@@ -505,7 +505,7 @@ done:
     channel = link;
     if (enable_intr) {
         trace(trace_hddma, "\thddma: set interrupt\n");
-        set_vi(HDDMA_INTERRUPT, 1, 1);
+        set_vi(hddma_vi_line, 1, 1);
     } else {
         trace(trace_hddma, "\thddma: no interrupt\n");
     }
@@ -526,6 +526,7 @@ hddma_init()
 {
     int i;
 
+	hddma_vi_line = wiring_vi_line("hddma");
 	register_output(HDDMA_PORT, &attention);
 	register_output(HDDMA_RESET, &reset);
     return 0;

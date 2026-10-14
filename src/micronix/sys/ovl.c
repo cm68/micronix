@@ -32,21 +32,6 @@ static UINT ovlseg[OVLMAJ];		/* each major's module segment, 0 = none */
 static struct ovlhdr *ovlloc[OVLMAJ];	/* a resident driver's header, in the kernel */
 static struct biovec ovlbvec[OVLMAJ];	/* entries its init() registered */
 static struct ciovec ovlcvec[OVLMAJ];
-#define	OVLSHARE	2		/* handlers one line can carry */
-
-/*
- * A handler on an interrupt line, and the module it lives in.  A line
- * carries one of these per card wired to it - VI2 has two - and they sit
- * end to end, so the entries for line n are n*OVLSHARE through
- * n*OVLSHARE+OVLSHARE-1.  Flat, not ovlint[line][slot]: c0 cannot parse
- * a two-dimensional declarator at all.
- */
-struct ovlintr {
-    int (*fn) ();
-    UINT seg;
-};
-
-static struct ovlintr ovlint[NOVLINE * OVLSHARE];
 static int (*ovltickc[OVLMAJ]) ();	/* each major's tick, 0 = none */
 static char ovltickarmed = 0;		/* the resident tick is running */
 
@@ -409,86 +394,6 @@ cvecset(maj, open, close, read, write, mode)
 }
 
 /*
- * Claim an interrupt line.  The segment comes with the handler because a
- * handler's address is only an address while its module is the one
- * mapped, and the dispatcher below has to do the mapping itself.
- *
- * A line carries as many handlers as there are cards wired to it - VI2
- * has two, the IDE card and the SCSI adapter - so the claim goes in the
- * first free slot and the dispatcher below runs them all.  The cards on
- * one line share it open-collector and each has to be asked, since
- * reading a card's status is what clears its own request and no card can
- * speak for another.  A full line is refused the way a bad one is; the
- * driver then has no interrupt and says so with the -1.
- */
-static
-intrset(line, fn, seg)
-    UINT line, seg;
-    int (*fn) ();
-{
-    register UINT i;
-
-    if (line >= NOVLINE)
-        return (-1);
-    for (i = 0; i < OVLSHARE; i++)
-        if (ovlint[line * OVLSHARE + i].fn == 0)
-            break;
-    if (i == OVLSHARE)
-        return (-1);
-    ovlint[line * OVLSHARE + i].fn = fn;
-    ovlint[line * OVLSHARE + i].seg = seg;
-    return (0);
-}
-
-/*
- * An interrupt does not arrive inside a call, the way a strat() does: it
- * can land at any moment, with any module mapped or none.  So the line
- * carries the segment its handler lives in, and the line - not the
- * interrupted process - decides what is mapped.  That is what lets the
- * interrupt path work with one overlay page.
- *
- * Every handler the line carries is called, each with its own segment
- * mapped in turn (ovlcall).  A card's handler returns nothing useful -
- * mio.s calls through the vector and throws the result away - and it
- * cannot be asked to stand down for another card's sake, because the
- * only thing that clears a card's request is that card's own status
- * read.  So this is not a chain that stops at the first taker; it is
- * every card on the line, in the order they were placed.
- *
- * Not static: the two-PIC cascade handler (ovlint6, sys/multio.c) polls
- * the slave for its line and hands it here.
- */
-ovlntr(line)
-    UINT line;
-{
-    register UINT i;
-
-    for (i = 0; i < OVLSHARE; i++)
-        if (ovlint[line * OVLSHARE + i].fn)
-            ovlcall(ovlint[line * OVLSHARE + i].fn,
-                    ovlint[line * OVLSHARE + i].seg);
-    return (0);
-}
-
-int
-ovlint0()
-{
-    return (ovlntr(0));
-}
-
-int
-ovlint1()
-{
-    return (ovlntr(1));
-}
-
-int
-ovlint2()
-{
-    return (ovlntr(2));
-}
-
-/*
  * The tick, for the drivers that have work which is not a response to
  * anything: a controller that has stopped talking raises no interrupt,
  * and a driver that wants to notice has to go and look on a clock of its
@@ -604,7 +509,7 @@ ovlplace(hdr, seg)
         cvecset(maj, hdr->cvec->open, hdr->cvec->close, hdr->cvec->read,
                 hdr->cvec->write, hdr->cvec->mode);
     if (hdr->intr)
-        intrset(hdr->line, hdr->intr, seg);
+        intrset(hdr->probe, hdr->intr, seg);
 
     return (0);
 }

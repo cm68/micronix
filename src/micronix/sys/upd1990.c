@@ -1,7 +1,7 @@
 /*
  * real time clock
  *
- * sys/rtc.c
+ * sys/upd1990.c
  *
  * The Master Mult I/O board carries a NEC uPD1990 calendar/clock, a 40-bit
  * bit-banged shift register (seconds, minutes, hours, day-of-month, month and

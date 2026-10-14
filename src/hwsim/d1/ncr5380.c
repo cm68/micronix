@@ -221,7 +221,7 @@ extern int trace_bio;
  * shared with the IDE card, which is id 0 on it; the ids are per line and
  * not global, and hddma/hdca are the same arrangement on VI0.
  */
-#define SCSI_INTERRUPT VI_NCR
+static int scsi_vi_line = -1;   /* the VI line, from the -w wiring; -1 = not wired */
 #define SCSI_CARDID     1
 
 /*
@@ -367,7 +367,7 @@ ncr_rw(int id, unsigned long lba, char *p, int wr)
 static void
 ncr_update_irq(void)
 {
-    set_vi(SCSI_INTERRUPT, SCSI_CARDID, irq ? 1 : 0);
+    set_vi(scsi_vi_line, SCSI_CARDID, irq ? 1 : 0);
 }
 
 /*
@@ -926,6 +926,7 @@ ncr_init()
 {
     int i;
 
+    scsi_vi_line = wiring_vi_line("ncr");
     for (i = 0; i < NREG; i++) {
         register_output(SCSIBASE + i, &wr_scsi);
         register_input(SCSIBASE + i, &rd_scsi);

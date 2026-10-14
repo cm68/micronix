@@ -1,0 +1,115 @@
+/*
+ * Interrupt probe and attach, init half.
+ *
+ * sys/probe_init.c
+ *
+ * intrset() and intr_attach() run once at boot, after every driver is
+ * placed and before the first open, so this whole file folds into
+ * highmem.o and is reclaimed as buffer headers.  The resident dispatch
+ * (ovlint[], ovlntr) is in probe.c.
+ *
+ * A driver no longer names its line: its header (sys/ovl.h) carries a
+ * probe instead of a line, and intr_attach discovers the line by
+ * tickling each card in turn and reading the PIC's pending register.
+ */
+#include <types.h>
+#include <sys/sys.h>
+#include <sys/ovl.h>
+#include <sys/pic.h>
+
+struct ovlintr {
+    int (*fn) ();
+    UINT seg;
+};
+
+extern struct ovlintr ovlint[NOVLINE];  /* sys/probe.c */
+
+/*
+ * The pending attach list: each driver's probe, handler and segment,
+ * taken as it is placed and resolved by intr_attach once every driver is
+ * in.  The probe and handler live in the driver's module, so the segment
+ * travels with them.
+ */
+#define NPINTR  8               /* more interrupt drivers than this?  no. */
+static int (*intrprobe[NPINTR]) ();
+static int (*intrfn[NPINTR]) ();
+static UINT intrseg[NPINTR];
+static UINT8 nintr;
+
+/*
+ * Claim a driver's interrupt for the attach phase.  ovl.c's ovlplace()
+ * calls this with what the header declares - the probe (the tickle) and
+ * the handler - plus the segment the driver was placed in.  Nothing is
+ * wired yet: the line is not known until the card is tickled.
+ */
+intrset(probe, fn, seg)
+    int (*probe) ();
+    int (*fn) ();
+    UINT seg;
+{
+    if (nintr >= NPINTR)
+        return (-1);
+    intrprobe[nintr] = probe;
+    intrfn[nintr] = fn;
+    intrseg[nintr] = seg;
+    nintr++;
+    return (0);
+}
+
+/*
+ * The lowest line set in a mask, or -1 for none.  pic_irr() returns a
+ * mask; with no sharing a tickle sets exactly one bit, and this names it.
+ * Walk the bits low to high by shifting the mask rather than a 1 bit -
+ * c1 has no rule for shifting by a register variable, so (1 << l) would
+ * emit nothing.
+ */
+static
+bitline(mask)
+    int mask;
+{
+    register int l;
+
+    for (l = 0; l < NOVLINE; l++) {
+        if (mask & 1)
+            return (l);
+        mask >>= 1;
+    }
+    return (-1);
+}
+
+/*
+ * The attach loop, run once at boot after every driver is placed.  For
+ * each driver that declared an interrupt:
+ *
+ *      intoff(all)      the tickle must not reach the CPU
+ *      probe()          the card asserts its line
+ *      line = pic_irr() which line went pending
+ *      ovlint[line] = the handler
+ *      pic_eoi(line)    clear the tickled interrupt
+ *      inton(line)      the line is live from here on
+ *
+ * A card that is not in the machine never asserts its line, so its probe
+ * finds nothing and it is left unwired - the tickle doubles as the
+ * presence test.
+ */
+intr_attach()
+{
+    register UINT i;
+    register int l;
+    int line;
+
+    for (l = 0; l < NOVLINE; l++)
+        intoff(l);              /* mask every line, whatever came before */
+
+    for (i = 0; i < nintr; i++) {
+        ovlcall(intrprobe[i], intrseg[i]);      /* the tickle */
+        line = bitline(pic_irr());              /* the line it raised */
+        if (line < 0)
+            continue;           /* no card there, nothing to wire */
+        ovlint[line].fn = intrfn[i];
+        ovlint[line].seg = intrseg[i];
+        pic_eoi(line);          /* clear the tickled interrupt */
+        inton(line);            /* the line is live */
+    }
+    return (0);
+}

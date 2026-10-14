@@ -40,12 +40,12 @@
 #include <sys/ovl.h>
 
 extern int djopen(), djclose(), djstrat(), djioctl();
-extern int djinit(), djtick(), djint();
+extern int djinit(), djtick(), djint(), djprobe();
 extern unsigned char djcomm[];
 extern struct biovec djbvec;
 
 struct ovlhdr djhdr = { 2, &djinit, &djtick, (char *) djcomm,
-	&djbvec, 0, DJINT, &djint, { 'd', 'j', 'd', 'm', 'a' } };
+	&djbvec, 0, &djprobe, &djint, { 'd', 'j', 'd', 'm', 'a' } };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

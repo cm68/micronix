@@ -74,6 +74,7 @@ void set_vi(int signal, int card, int value);
 int parse_wiring(char *spec);
 int wiring_vi_line(char *name);      // a card name -> its VI line, -1 if none
 int wiring_irq(int pin, int *vi, char **name);  // an IR pin -> vi line or onboard source
+int wiring_active(char *name);       // is this board the int_line driver?
 
 extern void (*vi_change)(unsigned char new);
 extern unsigned char (*get_intack)();
@@ -98,6 +99,7 @@ extern void kdump_init(void);
 extern void kdump_poll(void);
 extern void multio_ace_dump(void);
 extern void multio_pic_dump(void);
+extern void ss1_pic_dump(void);
 extern void mpz80_map_dump(void);
 
 // generally useful timed callout facility
@@ -130,6 +132,8 @@ extern int traceflags;		// bitmask of subsystems to trace
 extern int rom_size;		// set this nonzero to read
 extern char *rom_image;		// binary from
 extern char *rom_filename;	// here
+extern char *medias_file;	// media set manifest (-e)
+extern char *nd_image;		// network-card ND backing image (-N)
 
 extern int trace_bio;		// multiple drivers trace block i/o
 extern int running;

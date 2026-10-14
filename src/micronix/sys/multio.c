@@ -387,54 +387,6 @@ mumstatus(dev)
 #endif
 
 /*
- * Enable interrupts on PIC line a.  Lines 0-2 are the master's IR0-2,
- * lines 3-5 the slave's - the slave exists only under N8259 == 2.
- *
- * The shift amount is written "& 3" rather than bare "a" in the master
- * branch: a is a register variable here, and ccc's c1 has no rule for
- * shifting by a value that sits in BC (it emits nothing, so the IMR comes
- * back unchanged).  Masking with 3 is the same value for a < 3 and forces
- * the arithmetic that moves it out of BC, the way the slave branch's
- * "a - 3" already does.
- */
-
-inton(a)
-{
-    di();
-#if N8259 == 2
-    if (a >= 3) {
-        out(SSELECT, SPICONLY);
-        out(SPIC1, in(SPIC1) & ~(1 << (a - 3)));
-    } else
-#endif
-    {
-        out(MBASE + MUSELECT, PENABLE);
-        out(PIC1, in(PIC1) & ~(1 << (a & 3)));
-    }
-    ei();
-}
-
-/*
- * Disable interrupts on PIC line a
- */
-
-intoff(a)
-{
-    di();
-#if N8259 == 2
-    if (a >= 3) {
-        out(SSELECT, SPICONLY);
-        out(SPIC1, in(SPIC1) | (1 << (a - 3)));
-    } else
-#endif
-    {
-        out(MBASE + MUSELECT, PENABLE);
-        out(PIC1, in(PIC1) | (1 << (a & 3)));
-    }
-    ei();
-}
-
-/*
  * muenable -
  * set the multio interrupt lines according to mode
  * Lines we play with are transmit, receive, and modem status change.

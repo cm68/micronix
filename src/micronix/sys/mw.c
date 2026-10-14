@@ -989,5 +989,15 @@ mwioctl(dev, com, r, b)
 struct biovec mwbvec = { &mwopen, &mwclose, &mwstrat, &mwioctl };
 
 /*
+ * The probe: make the card raise its interrupt so the attach loop
+ * (sys/probe.c) can discover which line it is on.  STUB - not written;
+ * it must issue a command that completes and raises the card's done bit.
+ */
+mwprobe()
+{
+    return (0);
+}
+
+/*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

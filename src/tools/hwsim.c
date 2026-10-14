@@ -756,6 +756,8 @@ v_show(const char *name)
 	if (swap && parse_dev(swap, &major, &minor) == 0)
 		printf(" = %d/%d", major, minor);
 	printf("\n# -c 0x%x\n", pack_config(config));
+	if (js(sim, "wiring"))
+		printf("# -w %s\n", js(sim, "wiring"));
 }
 
 static void
@@ -866,6 +868,7 @@ v_boot(const char *root, const char *name, int debug)
 	const char *emu = js(sim, "emulator");
 	const char *mon = js(sim, "monitor");
 	const char *kernel = js(sim, "kernel");
+	const char *wiring = js(sim, "wiring");
 	char *simbin;
 	char *manifest;
 	char *logpath;
@@ -886,6 +889,10 @@ v_boot(const char *root, const char *name, int debug)
 	av[n++] = resolve_path(root, mon);
 	av[n++] = "-c";
 	av[n++] = itoh(pack_config(config));
+	if (wiring) {
+		av[n++] = "-w";
+		av[n++] = (char *)wiring;
+	}
 	if (debug && kernel) {
 		av[n++] = "-S";
 		av[n++] = resolve_path(root, kernel);

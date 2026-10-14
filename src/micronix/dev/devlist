@@ -12,6 +12,7 @@ c 1 16 cent0
 c 2 0 mem
 c 3 0 io
 c 3 3 mediachg
+c 5 0 net
 b 1 0 hda
 b 1 1 hdb
 b 1 2 hdc

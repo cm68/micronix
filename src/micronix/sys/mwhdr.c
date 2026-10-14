@@ -36,11 +36,11 @@
 #include <sys/ovl.h>
 
 extern int mwopen(), mwclose(), mwstrat();
-extern int mwcheck(), mwint();
+extern int mwcheck(), mwint(), mwprobe();
 extern int mwinit();
 extern struct biovec mwbvec;
 
-struct ovlhdr mwhdr = { 3, &mwinit, &mwcheck, 0, &mwbvec, 0, MWINT, &mwint,
+struct ovlhdr mwhdr = { 3, &mwinit, &mwcheck, 0, &mwbvec, 0, &mwprobe, &mwint,
 	{ 'h', 'd', 'd', 'm', 'a' }, 4 };
 
 /*

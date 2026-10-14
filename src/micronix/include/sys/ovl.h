@@ -81,11 +81,14 @@
  * is the one mapped; a module that puts entries here and no driver
  * behind them registers nothing, and its major answers as nodev does.
  *
- * line is the interrupt line intr is on, and intr is the handler.  A
- * handler runs at a moment its page is not necessarily the one mapped,
- * which is why it is named here rather than registered from inside
- * init(): the kernel has to know which segment to put in place before it
- * calls, and the driver is in no position to say so at an interrupt.
+ * probe is the tickle that makes the card raise its interrupt, and intr
+ * is the handler.  A driver names no line: the wiring is discovered at
+ * boot by tickling each card and reading the PIC's pending register
+ * (sys/probe.c).  The handler runs at a moment its page is not
+ * necessarily the one mapped, which is why it is named here rather than
+ * registered from inside init(): the kernel has to know which segment to
+ * put in place before it calls, and the driver is in no position to say
+ * so at an interrupt.
  *
  * init() is called once, with the page in place and nothing able to reach
  * the driver yet, and it is for the hardware alone: the controller's
@@ -146,7 +149,7 @@ struct ovlhdr {
     char *data;                 /* the driver's data, in its own segment */
     struct biovec *bvec;        /* its block entries, 0 for none */
     struct ciovec *cvec;        /* its character entries, 0 for none */
-    UINT line;                  /* the line intr is on, if there is one */
+    int (*probe) ();            /* the tickle: assert this card's interrupt */
     int (*intr) ();             /* the interrupt handler, 0 for none */
     char name[12];              /* what devname reports for the major */
     UINT8 ndrv;                 /* how many drives, enumerated at signon */
@@ -175,3 +178,5 @@ extern int ovlcall();           /* ovlcall(fn, seg): run fn with its own page ma
 extern int ovlattach();         /* ovlattach(seg): place a module, run its init */
 extern int ovlstart();          /* place the driver stamped into the slot */
 extern int ovlntr();            /* ovlntr(line): call every handler on a line */
+extern int intrset();           /* intrset(probe, fn, seg): claim for the attach loop */
+extern int intr_attach();       /* intr_attach(): tickle each card, wire ovlint */

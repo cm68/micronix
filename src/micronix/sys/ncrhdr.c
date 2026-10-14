@@ -38,10 +38,10 @@
 #include <sys/ovl.h>
 
 extern int ncropen(), ncrclose(), ncrstrat();
-extern int ncrinit(), ncrint();
+extern int ncrinit(), ncrint(), ncrprobe();
 extern struct biovec ncrbvec;
 
-struct ovlhdr ncrhdr = { 5, &ncrinit, 0, 0, &ncrbvec, 0, NCRINT, &ncrint,
+struct ovlhdr ncrhdr = { 5, &ncrinit, 0, 0, &ncrbvec, 0, &ncrprobe, &ncrint,
 	{ 'n', 'c', 'r', '5', '3', '8', '0' } };
 
 /*

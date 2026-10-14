@@ -24,9 +24,8 @@
  * lands on the definition, a page away from the call that caused it.
  */
 static int cinit(), hdinit();
-#if N8259 == 2
-extern int slave_pic_init();    /* sys/slavepic.c, the polled/CAS variant */
-#endif
+extern int clockinit();         /* sys/wb_clock.c (or ss1_clock.c) */
+extern int pic_init();          /* sys/miopic.c (or wbiopic/ss1pic) */
 
 cus()
 {
@@ -43,10 +42,9 @@ cus()
 
     di();
     cinit();
-    minit();                    /* in inits.s */
-#if N8259 == 2
-    slave_pic_init();           /* the add-on MultIO's PIC, sys/multio.c */
-#endif
+    clockinit();                /* the heartbeat, sys/wb_clock.c */
+    minit();                    /* the uart bring-up, sys/inits.s */
+    pic_init();                 /* the PIC stack, sys/miopic.c */
 
     /*
      * coninit (); /* in inits.s

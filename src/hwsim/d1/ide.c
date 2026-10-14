@@ -156,7 +156,7 @@ extern int trace_bio;
  * nothing else on this machine drives VI2, so this is the first id on it.
  * sys/intrpt.s routes the line to sys/ide.c's handler.
  */
-#define IDE_INTERRUPT VI_IDE
+static int ide_vi_line = -1;    /* the VI line, from the -w wiring; -1 = not wired */
 #define IDE_CARDID      0
 
 /*
@@ -284,7 +284,7 @@ ide_rw(int unit, unsigned long lba, char *p, int wr)
 static void
 ide_update_irq()
 {
-    set_vi(IDE_INTERRUPT, IDE_CARDID, (irq && !nien) ? 1 : 0);
+    set_vi(ide_vi_line, IDE_CARDID, (irq && !nien) ? 1 : 0);
 }
 
 /*
@@ -588,6 +588,7 @@ wr_ide_pdrv(portaddr p, byte v)
 static int
 ide_init()
 {
+    ide_vi_line = wiring_vi_line("ide");
     register_output(IDE_PA, &wr_ide_pa);
     register_output(IDE_PB, &wr_ide_pb);
     register_output(IDE_PC, &wr_ide_portc);

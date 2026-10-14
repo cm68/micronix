@@ -134,7 +134,7 @@
 ;
 	.data
 	.globl	_minit, _coninit
-	.extern	_di, _ei, _muopen, vectors
+	.extern	_di, _ei, _muopen
 ; 
 ; /*
 ;  * port addresses of the Master Mult I/O
@@ -260,50 +260,8 @@ minit1:
 	xor	a			; select group 0 (control)
 	out	(MBASE+SELECT),a
 
-	; the multio manual is clear as mud about the clock register
-	; the strobe bit (0x20) needs to toggle
-
-	ld	a,0x08			; load clock (2) << 2
-	out	(MBASE+2),a
-	ld	a,0x08+0x20		; load clock + strobe
-	out	(MBASE+2),a
-	ld	a,0x08			; clear strobe
-	out	(MBASE+2),a		
-
-	ld	a,0x1c			; 32 hz clock (7) << 2
-	out	(MBASE+2),a
-	ld	a,0x1c+0x20
-	out	(MBASE+2),a
-	ld	a,CLKRATE
-	out	(MBASE+2),a
-	in	a,(CLKCLR)
-	ld	hl,vectors
-	ld	e,l
-	ld	d,h
-	ld	a,e
-	and	BOUND32
-	ld	e,a
-	push	de
-	ld	bc,32
-	ldir
-	pop	de
-	call	_di
-	ld	a,PENABLE
-	out	(MSELECT),a
-	ld	a,ICWORD1
-	add	a,e
-	out	(ICNTRL),a
-	ld	a,d
-	out	(ICNTRL1),a
-	ld	a,ICWORD4
-	out	(ICNTRL1),a
-	ld	a,INTSOFF
-	out	(ICNTRL1),a
-	call	_ei
-	ld	a,PENABLE
-	out	(MSELECT),a
-	ld	a,ARMMASTER
-	out	(ICNTRL1),a
+	; the clock is in clockinit() and the PIC in pic_init() (miopic.c),
+	; both called from cus(); _minit is now only the uart bring-up.
 	pop	bc
 	ret
 

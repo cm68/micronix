@@ -102,11 +102,11 @@ KERNEL_AS_OBJ = uhdr.o intrpt.o mio.o textpad.o
 KERNEL_C_SRC  = mount.c balloc.c cio.c create.c exec.c fio.c fork.c \
 	ialloc.c iget.c imap.c malloc.c name.c queue.c \
 	reg.c sig.c sleep.c subc.c swap.c sys1.c system.c time.c \
-	trap.c tty.c uio.c multio.c dlabel.c ovl.c main.c rtc.c
+	trap.c tty.c uio.c multio.c dlabel.c ovl.c main.c upd1990.c ss1_clock.c picvec.c
 KERNEL_C_OBJ  = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o malloc.o name.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
-	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o rtc.o
+	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o upd1990.o
 
 #
 # The window-page cluster, folded to .data at 0xe000 (BUFWIN) by win.o's
@@ -141,7 +141,7 @@ MOD_OBJ = dj.o mw.o ide.o ncr.o hdca.o
 MOD_HDR = djhdr.o mwhdr.o idehdr.o ncrhdr.o hdcahdr.o
 
 #
-# rtc.c is ordinary resident C: its only callers are mount() and sys2.c,
+# upd1990.c is ordinary resident C: its only callers are mount() and sys2.c,
 # which are resident, so no driver module links against it and it needs
 # no fold.  It lived in the u page - pure code with no static data, so
 # it could be parked there with the runtime - until the leaf code grew
@@ -375,7 +375,7 @@ install: unix
 #
 # $(OBJS) $(MODULES) and not *.o, which is what this used to say.  A glob
 # has to be expanded by the shell, and make sends a line to the shell only
-# when it has a metacharacter in it - so "rm -f *.o rtc.rel" became one
+# when it has a metacharacter in it - so "rm -f *.o upd1990.rel" became one
 # shell command whose argument list was however many names the glob came
 # to.  The shell caps a command at MAXARG words, and this was 71 of them:
 # it printed "too many arguments", abandoned the rm, and then read on from
@@ -448,7 +448,7 @@ ovl.o: $(SYS)/sys.h $(SYS)/ovl.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h
 queue.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/proc.h
 rdwri.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/file.h $(SYS)/proc.h
 reg.o: $(SYS)/sys.h $(SYS)/proc.h
-rtc.o: $(SYS)/sys.h $(SYS)/proc.h
+upd1990.o: $(SYS)/sys.h $(SYS)/proc.h
 sig.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/tty.h
 slavepic_polled.o slavepic_vectored.o: $(SYS)/ints.h
 sleep.o: $(SYS)/sys.h $(SYS)/proc.h

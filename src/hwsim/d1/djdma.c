@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 
@@ -37,7 +38,7 @@ extern char *printable(char);       // multio.c
 extern int terminal_fd_in;
 extern int terminal_fd_out;
 
-#define DJDMA_INTERRUPT VI_DJDMA
+static int djdma_vi_line = -1;  /* the VI line, from the -w wiring; -1 = not wired */
 
 #define	DJDMA_PORT	0xef	// djdma command start port
 #define	DEF_CCA		0x50	// djdma default channel command address
@@ -244,7 +245,8 @@ post_djdma_int(int a)
     trace(trace_djint, "djdma RAISE: interrupt asserted%s\n",
         need_intack ? "" : " - NOBODY IS WAITING FOR IT");
     int_posted = 1;
-    set_vi(DJDMA_INTERRUPT, 0, 1);
+    if (djdma_vi_line >= 0)
+        set_vi(djdma_vi_line, 0, 1);
 }
 
 
@@ -281,7 +283,8 @@ pulse_djdma(portaddr p, byte v)
         need_intack = 0;
         int_posted = 0;
         int_pending = 0;
-        set_vi(DJDMA_INTERRUPT, 0, 0);
+        if (djdma_vi_line >= 0)
+            set_vi(djdma_vi_line, 0, 0);
     } else {
         {
             char sbuf[16];
@@ -1233,13 +1236,379 @@ extern char **fivenames;
  * hook up the registers and do reset processing
  * this runs the load sector 0 to physical memory 0
  */
+/*
+ * The media changer (sys/MEDIACHG.md): out-of-band removable-media
+ * control on port 3.  A guest process - or a shell through
+ * /dev/mediachg, c 3 3 - writes "@<command>\n"; the command runs
+ * against the media sets loaded from the -e manifest, and the answer
+ * comes back on the same port.  '@' is the leadin and the resync
+ * point: a command without it is discarded, which is what makes a
+ * guest that died mid-command harmless.
+ */
+
+#define MEDIA_PORT      3       /* the media changer's port (dev/devlist) */
+#define MEDIA_MAX       80      /* longest command, '@' excluded */
+
+struct mediaset {
+    char *name;
+    char **vol;                 /* one image path per volume */
+    int nvol;
+};
+
+static struct mediaset *msets;  /* the sets, from the -e manifest */
+static int nmsets;
+
+/* what the changer last put in each drive: msets index, or -1 (empty) */
+static int loaded_set[8];
+static int loaded_vol[8];
+
+static char mcbuf[MEDIA_MAX];   /* the command being received */
+static int mcn;
+static int mc_idle = 1;         /* waiting for the '@' leadin */
+static char resp[MEDIA_MAX];    /* the staged response line */
+static int resp_len;
+static int resp_pos;
+
+static void
+stage_response(char *s)
+{
+    int n = strlen(s);
+
+    if (n >= MEDIA_MAX)
+        n = MEDIA_MAX - 1;
+    memcpy(resp, s, n);
+    resp[n++] = '\n';
+    resp_len = n;
+    resp_pos = 0;
+}
+
+/* next whitespace-delimited token from *p, advanced past it; 0 at end */
+static char *
+token(char **p)
+{
+    char *s = *p;
+    char *t;
+
+    while (*s == ' ' || *s == '\t')
+        s++;
+    if (*s == '\0')
+        return 0;
+    t = s;
+    while (*t && *t != ' ' && *t != '\t')
+        t++;
+    if (*t)
+        *t++ = '\0';
+    *p = t;
+    return s;
+}
+
+/* "name:number" split at the colon; -1 if malformed */
+static int
+split_colon(char *s, char **namep, int *nump)
+{
+    char *colon = strchr(s, ':');
+    char *d;
+
+    if (!colon || colon == s || colon[1] == '\0')
+        return -1;
+    *colon = '\0';
+    *namep = s;
+    for (d = colon + 1; *d; d++)
+        if (*d < '0' || *d > '9')
+            return -1;
+    *nump = atoi(colon + 1);
+    return 0;
+}
+
+static int
+find_set(char *name)
+{
+    int i;
+
+    for (i = 0; i < nmsets; i++)
+        if (strcmp(msets[i].name, name) == 0)
+            return i;
+    return -1;
+}
+
+/* "djdma:0" to the physical drive number, or -1 */
+static int
+parse_drive(char *s)
+{
+    char *name;
+    int logical;
+
+    if (split_colon(s, &name, &logical) < 0)
+        return -1;
+    if (strcmp(name, "djdma") != 0)
+        return -1;
+    if (logical < 0 || logical > 7)
+        return -1;
+    return physdrive(logical);
+}
+
+/* eject a physical drive: close the image, sense() then says not ready */
+static void
+eject_drive(int drive)
+{
+    if (imdp[drive]) {
+        imd_close(imdp[drive]);
+        imdp[drive] = 0;
+    }
+    loaded_set[drive] = -1;
+    loaded_vol[drive] = -1;
+}
+
+/* load a path into a physical drive, -1 on failure */
+static int
+load_drive(int drive, char *path)
+{
+    void *np;
+
+    if (access(path, R_OK) != 0)
+        return -1;
+    np = imd_load(path, drive, 1);
+    if (!np)
+        return -1;
+    if (imdp[drive])
+        imd_close(imdp[drive]);
+    imdp[drive] = np;
+    return 0;
+}
+
+static void
+media_execute(char *s, int n)
+{
+    char buf[MEDIA_MAX + 1];
+    char *p, *verb, *a1, *a2, *a3;
+    char *name;
+    int num, set, drive;
+
+    if (n > MEDIA_MAX)
+        n = MEDIA_MAX;
+    memcpy(buf, s, n);
+    buf[n] = '\0';
+    p = buf;
+
+    verb = token(&p);
+    if (!verb) {
+        stage_response("error syntax");
+        return;
+    }
+    a1 = token(&p);
+
+    if (strcmp(verb, "load") == 0) {
+        a2 = token(&p);
+        a3 = token(&p);
+        if (!a1 || !a2 || !a3 || strcmp(a2, "onto") != 0) {
+            stage_response("error syntax");
+            return;
+        }
+        if (split_colon(a1, &name, &num) < 0) {
+            stage_response("error syntax");
+            return;
+        }
+        set = find_set(name);
+        if (set < 0) {
+            stage_response("error noset");
+            return;
+        }
+        if (num < 0 || num >= msets[set].nvol) {
+            stage_response("error novol");
+            return;
+        }
+        drive = parse_drive(a3);
+        if (drive < 0) {
+            stage_response("error nodrive");
+            return;
+        }
+        if (load_drive(drive, msets[set].vol[num]) < 0) {
+            stage_response("error ioerror");
+            return;
+        }
+        loaded_set[drive] = set;
+        loaded_vol[drive] = num;
+        stage_response("ok");
+        return;
+    }
+
+    if (strcmp(verb, "unload") == 0 || strcmp(verb, "eject") == 0) {
+        if (!a1) {
+            stage_response("error syntax");
+            return;
+        }
+        drive = parse_drive(a1);
+        if (drive < 0) {
+            stage_response("error nodrive");
+            return;
+        }
+        eject_drive(drive);
+        stage_response("ok");
+        return;
+    }
+
+    if (strcmp(verb, "query") == 0) {
+        if (!a1) {
+            stage_response("error syntax");
+            return;
+        }
+        if (strchr(a1, ':') == 0) {
+            set = find_set(a1);
+            if (set < 0) {
+                stage_response("error noset");
+                return;
+            }
+            sprintf(buf, "ok %d", msets[set].nvol);
+            stage_response(buf);
+            return;
+        }
+        drive = parse_drive(a1);
+        if (drive < 0) {
+            stage_response("error nodrive");
+            return;
+        }
+        if (loaded_set[drive] < 0) {
+            stage_response("ok empty");
+            return;
+        }
+        sprintf(buf, "ok %s:%d", msets[loaded_set[drive]].name,
+            loaded_vol[drive]);
+        stage_response(buf);
+        return;
+    }
+
+    if (strcmp(verb, "next") == 0) {
+        if (!a1) {
+            stage_response("error syntax");
+            return;
+        }
+        drive = parse_drive(a1);
+        if (drive < 0) {
+            stage_response("error nodrive");
+            return;
+        }
+        if (loaded_set[drive] < 0) {
+            stage_response("error nomedia");
+            return;
+        }
+        set = loaded_set[drive];
+        num = loaded_vol[drive] + 1;
+        if (num >= msets[set].nvol) {
+            stage_response("error novol");
+            return;
+        }
+        if (load_drive(drive, msets[set].vol[num]) < 0) {
+            stage_response("error ioerror");
+            return;
+        }
+        loaded_vol[drive] = num;
+        stage_response("ok");
+        return;
+    }
+
+    stage_response("error syntax");
+}
+
+/* the response side of port 3: the next staged byte, 0 when exhausted */
+static byte
+media_in(portaddr p)
+{
+    if (resp_pos < resp_len)
+        return resp[resp_pos++];
+    return 0;
+}
+
+/* the command side: '@' resyncs, '\n' runs, anything else accumulates */
+static void
+media_out(portaddr p, byte v)
+{
+    if (v == '@') {
+        mcn = 0;
+        mc_idle = 0;
+        resp_len = 0;           /* a stale response dies with the leadin */
+        resp_pos = 0;
+        return;
+    }
+    if (mc_idle)
+        return;                 /* no leadin: drop it */
+    if (v == '\n') {
+        media_execute(mcbuf, mcn);
+        mcn = 0;
+        mc_idle = 1;
+        return;
+    }
+    if (mcn >= MEDIA_MAX) {     /* overlong line: resync on the next '@' */
+        stage_response("error syntax");
+        mcn = 0;
+        mc_idle = 1;
+        return;
+    }
+    mcbuf[mcn++] = v;
+}
+
+/* load the -e manifest: one line per set, name then image paths */
+static void
+media_load_manifest(char *path)
+{
+    FILE *fp;
+    char line[4096];
+
+    if (!path)
+        return;
+    fp = fopen(path, "r");
+    if (!fp) {
+        printf("media: could not open %s\n", path);
+        return;
+    }
+    while (fgets(line, sizeof line, fp)) {
+        struct mediaset *s;
+        char *p, *tok, *vol;
+        int nalloc;
+
+        p = strchr(line, '\n');
+        if (p)
+            *p = '\0';
+        p = line;
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (*p == '\0' || *p == '#')
+            continue;
+
+        tok = token(&p);
+        if (!tok)
+            continue;
+
+        msets = realloc(msets, (nmsets + 1) * sizeof *msets);
+        s = &msets[nmsets];
+        s->name = strdup(tok);
+        s->nvol = 0;
+        s->vol = 0;
+        nalloc = 0;
+        while ((vol = token(&p)) != 0) {
+            if (s->nvol == nalloc) {
+                nalloc = nalloc ? nalloc * 2 : 8;
+                s->vol = realloc(s->vol, nalloc * sizeof *s->vol);
+            }
+            s->vol[s->nvol++] = strdup(vol);
+        }
+        nmsets++;
+    }
+    fclose(fp);
+}
+
 static int
 djdma_init()
 {
     int i;
     char **s;
 
+	djdma_vi_line = wiring_vi_line("djdma");
 	register_output(DJDMA_PORT, &pulse_djdma);
+	register_input(MEDIA_PORT, &media_in);
+	register_output(MEDIA_PORT, &media_out);
+	media_load_manifest(medias_file);
+	for (i = 0; i < 8; i++)
+		loaded_set[i] = loaded_vol[i] = -1;
 
     /*
      * The formatter's track counter starts at 0 for a fresh format.  It

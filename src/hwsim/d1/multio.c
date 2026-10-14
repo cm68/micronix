@@ -579,6 +579,14 @@ multio_set_int_line()
     int line;
 
     /*
+     * Only the active interrupt controller folds the INT line.  When the
+     * SS1 is the int_line driver this board's uarts and clock still poll,
+     * but they must not yank int_change - the SS1 owns it.
+     */
+    if (!wiring_active("multio"))
+        return;
+
+    /*
      * PINT is wired-OR across the two PICs, but only the master owns
      * SINTA, so the slave's request has to reach the master as one of its
      * own inputs to be vectored.  The slave's INT is wired to the
@@ -1658,13 +1666,23 @@ multio_init()
         ace[i].infd = -1;
     }
 
-    if (config_sw & CONF_SET) {
-        termmask = (config_sw >> 8) & 0x7;
-    }
-
     for (i = 0; i < 3; i++) {
         sprintf(tname, "uart%d", i);
         ace_init(i, strdup(tname), 3 + i);
+    }
+
+    /*
+     * When the SS1 is the interrupt controller, this board's ACEs are
+     * dormant: they own no terminal, and neither their group select nor
+     * the slave PIC is wanted.  Return before any of the terminal work -
+     * the poll child, the xterms - so the console and the invoking
+     * terminal stay free for the SS1's own 2651.
+     */
+    if (!wiring_active("multio"))
+        return 0;
+
+    if (config_sw & CONF_SET) {
+        termmask = (config_sw >> 8) & 0x7;
     }
 
     // if terminal 0 is not an xterm, use mytty - this requires poll child to get SIGIO
@@ -1753,7 +1771,8 @@ multio_init()
     terminal_fd_out = ace[0].outfd;
 
 	register_output(MULTIO_MASTER+7, &multio_select);
-	register_output(SBASE+7, &slave_select);
+
+    register_output(SBASE+7, &slave_select);
 
     vi_change = &multio_vi_change;
     get_intack = &multio_intack;

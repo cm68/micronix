@@ -48,6 +48,7 @@
 #include "../include/util.h"
 #include "../include/mnix.h"
 #include "../include/fslib.h"
+#include "../hwsim/d1/nic.h"
 #include "../include/imd.h"
 #include "../include/lockfile.h"
 #include "../include/gui.h"
@@ -586,6 +587,7 @@ struct openfile {
     char dt;
     int special;        // is a special file needing sector hackery
     int memdev;         // the fake /dev/mem: served from the shared image
+    int netdev;         // the network card (/dev/net): nic.c's socket face
     int ofile;          // the open file it names, -1 for none
     int filesize;
     int noseek;         // pipe, tty or socket: the host holds the position
@@ -3973,6 +3975,33 @@ SystemCall()
              */
             if (ret != 0xffff)
                 copyout(iobuf, arg1, ret);
+        } else if (files[fd].netdev) {
+            /* the network card: assemble one pushed frame */
+            unsigned char hdr[4];
+            int len, i, total;
+
+            for (;;) {
+                nic_poll();
+                if (nic_status() & NETSTAT_RXRDY)
+                    break;
+                usleep(1000);
+            }
+            for (i = 0; i < 4; i++)
+                hdr[i] = nic_data_in();
+            len = hdr[2] | (hdr[3] << 8);
+            total = 4 + len;
+            iobuf[0] = hdr[0];
+            iobuf[1] = hdr[1];
+            iobuf[2] = hdr[2];
+            iobuf[3] = hdr[3];
+            ret = (total > arg2) ? arg2 : total;
+            for (i = 4; i < total; i++) {
+                unsigned char b = nic_data_in();
+
+                if (i < ret)
+                    iobuf[i] = b;
+            }
+            copyout(iobuf, arg1, ret);
         } else {
             if ((ret = seekfile(fd)) == 0) {
                 /*
@@ -4013,6 +4042,14 @@ SystemCall()
         if (files[fd].mo) {
             copyin(iobuf, arg1, arg2);
             ret = mwrite(fd, iobuf, arg2);
+        } else if (files[fd].netdev) {
+            /* the network card: push the guest's frame bytes */
+            int i;
+
+            copyin(iobuf, arg1, arg2);
+            for (i = 0; i < arg2; i++)
+                nic_data_out(iobuf[i]);
+            ret = arg2;
         } else if ((ret = seekfile(fd)) == 0) {
             copyin(iobuf, arg1, arg2);
             ret = write(fd, iobuf, arg2);
@@ -4064,6 +4101,38 @@ SystemCall()
             files[ret].minor = 0;
             files[ret].memdev = 1;
             goto mapfds;
+        }
+        /*
+         * The network card (/dev/net, cdev 5,0): nic.c's socket face.
+         * No host file behind it - the read/write path drives nic.c.
+         */
+        {
+            char dt;
+            int Maj, Min;
+
+            if (lstat(filename, &sbuf) == 0 && S_ISLNK(sbuf.st_mode) &&
+                devnum(filename, &dt, &Maj, &Min) == 0 &&
+                dt == 'c' && Maj == 5) {
+                ret = open("/dev/zero", O_RDONLY);  /* a placeholder fd */
+                if (ret == 0xffff) {
+                    if (verbose & V_ERROR)
+                        message("%s: %s\n", strerror(errno), filename);
+                    goto lose;
+                }
+                if (adoptfd(ret) < 0) {
+                    close(ret);
+                    ret = ENFILE;
+                    carry_set();
+                    break;
+                }
+                files[ret].dt = 'c';
+                files[ret].major = 5;
+                files[ret].minor = 0;
+                files[ret].netdev = 1;
+                files[ret].noseek = 1;
+                nic_init();
+                goto mapfds;
+            }
         }
         /*
          * A block device special file.  /dev/dja is a symlink to the

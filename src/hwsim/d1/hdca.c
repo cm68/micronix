@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define HDCA_INTERRUPT VI_HDCA
+static int hdca_vi_line = -1;   /* the VI line, from the -w wiring; -1 = not wired */
 
 byte int_state;
 
@@ -160,7 +160,7 @@ void
 check_interrupt()
 {
 	trace(trace_hdca, "hdca: check_interrupt\n");
-    set_vi(HDCA_INTERRUPT, 0, int_state ? 1 : 0);
+    set_vi(hdca_vi_line, 0, int_state ? 1 : 0);
 }
 
 /*
@@ -495,6 +495,7 @@ hdca_init()
 {
     int i;
 
+	hdca_vi_line = wiring_vi_line("hdca");
 	register_output(HDCA_CONTROL, &wr_hdca_control);
 	register_output(HDCA_CMD, &wr_hdca_cmd);
 	register_output(HDCA_FUNC, &wr_hdca_func);

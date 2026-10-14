@@ -673,7 +673,7 @@ setup_sim_ports()
  * these driver hooks are called at various times to abstract the emulator
  * the registration functions must be called before main() by constructor magic
  */
-#define MAXDRIVERS 8
+#define MAXDRIVERS 16
 
 struct driver *drivers[MAXDRIVERS];
 /*
@@ -716,6 +716,8 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t-w\t<wiring> profile[,key=value]...: d1, multio, ss1\n");
     fprintf(stderr, "\t\tviN=card, irqN=viM|source, int=board\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
+    fprintf(stderr, "\t-e\t<media set manifest file> (the /dev/mediachg sets)\n");
+    fprintf(stderr, "\t-N\t<nd backing image> for the network card\n");
     fprintf(stderr, "\t-m\t<bytes> ram size - 768k, 0xc0000, 1m (default 16m)\n");
     fprintf(stderr, "\t-5\t<file> a floppy on the 5 1/4 inch port\n");
     fprintf(stderr, "\t-H\tdon't exit the simulation on a task-0 halt\n");
@@ -769,8 +771,17 @@ parsesize(char *s)
 
 char **drivenames;
 int anydrive;                   /* a hdcdma/hdca unit was named on the command line */
+
+/* which hard-disk controllers a drive was named for, for the sharing check */
+#define BLK_HDDMA   0x01
+#define BLK_HDCA    0x02
+#define BLK_IDE     0x04
+#define BLK_NCR     0x08
+int blkmask;
 char *rom_filename;
 char *bootrom_filename;
+char *medias_file;
+char *nd_image;
 char *sym_filename;
 char *kern_filename;
 char *rom_image;
@@ -1568,6 +1579,7 @@ drivearg(char *arg)
         snprintf(unit, sizeof(unit), "hddma-%d", n);
         if (drive_setunit(unit, colon + 1) != 0)
             return -1;
+        blkmask |= BLK_HDDMA;
         anydrive = 1;
         return 1;
     }
@@ -1575,6 +1587,7 @@ drivearg(char *arg)
         snprintf(unit, sizeof(unit), "hdca-%d", n);
         if (drive_setunit(unit, colon + 1) != 0)
             return -1;
+        blkmask |= BLK_HDCA;
         anydrive = 1;
         return 1;
     }
@@ -1582,6 +1595,7 @@ drivearg(char *arg)
         snprintf(unit, sizeof(unit), "ide-%d", n);
         if (drive_setunit(unit, colon + 1) != 0)
             return -1;
+        blkmask |= BLK_IDE;
         anydrive = 1;
         return 1;
     }
@@ -1589,6 +1603,7 @@ drivearg(char *arg)
         snprintf(unit, sizeof(unit), "scsi-%d", n);
         if (drive_setunit(unit, colon + 1) != 0)
             return -1;
+        blkmask |= BLK_NCR;
         anydrive = 1;
         return 1;
     }
@@ -1916,6 +1931,18 @@ main(int argc, char **argv)
                 }
                 ram_size = parsesize(*argv++);
                 break;
+            case 'e':
+                if (!argc--) {
+                    usage("media set manifest missing\n", progname);
+                }
+                medias_file = *argv++;
+                break;
+            case 'N':
+                if (!argc--) {
+                    usage("nd backing image missing\n", progname);
+                }
+                nd_image = *argv++;
+                break;
             case 'H':
                 halt_exit = 0;
                 break;
@@ -2045,6 +2072,29 @@ main(int argc, char **argv)
         } 
         drivenames[i] = strdup(*argv++);
         drivenames[i+1] = 0;
+    }
+
+    /*
+     * No two disk controllers may share a VI line.  The wiring lists
+     * alternatives on one line - the historical HD-DMA and HDCA both on
+     * VI0 - but a machine that actually attaches drives to two controllers
+     * on the same line cannot exist.  The floppy is always present, so its
+     * line is always in the set.
+     */
+    {
+        int lines[5];
+        int n = 0;
+        int i, j;
+
+        if (blkmask & BLK_HDDMA) lines[n++] = wiring_vi_line("hddma");
+        if (blkmask & BLK_HDCA)  lines[n++] = wiring_vi_line("hdca");
+        if (blkmask & BLK_IDE)   lines[n++] = wiring_vi_line("ide");
+        if (blkmask & BLK_NCR)   lines[n++] = wiring_vi_line("ncr");
+        lines[n++] = wiring_vi_line("djdma");
+        for (i = 0; i < n; i++)
+            for (j = 0; j < i; j++)
+                if (lines[i] == lines[j])
+                    usage("two disk controllers share a VI line\n", progname);
     }
 
     /*

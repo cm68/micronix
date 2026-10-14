@@ -569,5 +569,15 @@ disk3check()
 struct biovec disk3bvec = { &disk3open, &disk3close, &disk3strat, 0 };
 
 /*
+ * The probe: make the card raise its interrupt so the attach loop
+ * (sys/probe.c) can discover which line it is on.  STUB - not written;
+ * it must issue a command that completes and raises the card's done bit.
+ */
+disk3probe()
+{
+    return (0);
+}
+
+/*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
