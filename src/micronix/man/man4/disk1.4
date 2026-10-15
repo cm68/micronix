@@ -1,0 +1,120 @@
+.he "disk1 (4)                   10/15/26                    disk1 (4)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+DEVICE
+.in +5
+.br
+.bd
+disk1
+- a floppy disk on a CompuPro DISK 1 or DISK 1A controller
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+The
+.bd
+disk1
+device reads and writes a floppy diskette attached to a CompuPro
+DISK 1 or DISK 1A controller.  The board is an Intel 8272 (NEC uPD765)
+floppy disk controller - the chip that owns the head, seeks it, finds
+a sector's address mark and moves its data - behind a little CompuPro
+glue: a 24 bit dma address register, a drive status register, and a
+motor register that also turns the board's boot EPROM off.
+
+The four ports are one block, set by DIP switch S3 and fixed at 0xc0
+in every package CompuPro shipped:
+
+.in +5
+.nf
+0xc0  read   the 8272's main status register
+0xc0  write  the drive select register
+0xc1  read   the 8272's data register
+0xc1  write  the 8272's data register
+0xc2  read   the drive status register
+0xc2  write  the dma address register, three bytes, most significant
+              byte first
+0xc3  write  the motor control register
+.in -5
+.fi
+
+Every byte of a command and every byte of an answer passes through the
+one data register at 0xc1, and the main status register at 0xc0 is how
+the cpu asks whether the chip is ready for it.  The DISK 1A carries
+both drive banks at this one block, four eight inch drives and four
+5 1/4 inch ones, and the bank is chosen by the drive select register's
+data rate bit, which also sets the chip's rate to match the drive.
+
+The device number packs two things.  The major number is 9, and the
+low three bits of the minor number name the drive: 0 to 3 are the
+eight inch bank, 4 to 7 the 5 1/4 inch, as the DJ-DMA numbers its
+drives.
+
+.in +5
+.nf
+9/0  d1a        9/4  d1e
+9/1  d1b        9/5  d1f
+9/2  d1c        9/6  d1g
+9/3  d1d        9/7  d1h
+.in -5
+.fi
+
+Those eight appear again 64 higher, as their whole-disk slices: 9/64
+is d1ac, the drive at cylinder 0 and unrotated, so that its block 0 is
+physical block 0 and reading it reads the diskette's label.
+
+A file system block is one 512 byte sector, written in mfm, and one
+request moves one of them: the driver puts the unit, the head, the
+cylinder and the sector into a nine byte command, hands the board the
+buffer's physical address through the dma register, and waits for the
+chip to interrupt.  Unlike the DJ-DMA, whose board runs a program out
+of memory, this transfer is interrupt driven, so the time a seek takes
+is time the machine spends on something else.
+
+The 8272 has one interrupt, and what it means depends on what was
+issued.  After a recalibrate or a seek it means the head has arrived,
+and the driver answers it with SENSE INTERRUPT STATUS, which is the
+only thing that both reads that answer and clears the interrupt.  After
+a read or a write it means the seven result bytes are waiting to be
+read out of the data register.  Only one of the two is ever
+outstanding, so one variable in the driver tells the handler which it
+is.
+
+The geometry comes off the diskette, from the label
+.bd
+mkfs
+writes into the second half of the boot sector, so the driver has no
+table of formats to disagree with the disk in the drive.  A diskette
+that carries no Micronix label still opens on its whole-disk slice, so
+that its raw sectors can be read and written.
+
+A raw command block can be issued to this controller through
+.bd
+ioctl (2),
+which is what a formatter needs: the driver looks at nothing in the
+block but the length of the answer, so a FORMAT TRACK command with its
+own header table is passed through as it stands.  The one thing the
+caller cannot supply is the buffer's physical address, and the driver
+fills that in.  A raw command runs to completion before it returns,
+rather than interrupting.
+
+The card has no reset line from the host, so a board that stops
+answering is handled by failing the request that is stuck, three
+seconds having passed, and forgetting which bank the chip's rate was
+set for and which drive was selected; the next request sets both
+again.  A read or a write that comes back an error is re-issued, up to
+ten times, and halfway through the ten the driver homes the drive and
+starts the request over, because the head and not the medium is the
+usual reason a command fails.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+.bd
+boot (1), filesystem (5), djmem (4), disk2 (4), disk3 (4), hdca (4),
+hddma (4), ioctl (2)

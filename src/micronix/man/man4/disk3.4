@@ -1,0 +1,100 @@
+.he "disk3 (4)                   10/15/26                    disk3 (4)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+DEVICE
+.in +5
+.br
+.bd
+disk3
+- a hard disk on a CompuPro DISK 3 controller
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+The
+.bd
+disk3
+device reads and writes a hard disk attached to a CompuPro DISK 3
+controller.  The board drives ST-506 disks, and it is the intelligent
+one of the two CompuPro hard disk controllers: an 8085 and its EPROM
+firmware run the drive, so the host's only real time work is the rate
+the data moves at.  There is no step pulse anywhere in this driver.  A
+seek is a command the board runs by itself, and a read or a write
+addresses an absolute sector and lets the board work out where the
+head has to be.
+
+All communication is a sixteen byte Input Output Parameter Block
+(IOPB) in main memory and one write-only attention port, at 0x90 and
+0x91.  The host fills the block - the link to the next one, the
+command, the drive, the sector, the count, and the address the data is
+to move to or from - writes the attention port, and the board copies
+the IOPB into its own memory, runs the command, moves the data with
+its own dma channel, and writes the completion status back into the
+block.  Writing 0xff to the port holds the 8085 in reset; writing
+0x00 is the pulse that makes it fetch and run an IOPB.
+
+The IOPB may begin anywhere in the 24 bit address space, and the first
+fetch after a reset is from physical 0x50, which is not executed -
+only the link bytes in it are kept.  So the driver brings the board up
+by writing that link and pulsing it twice, after which each pulse
+fetches the block the last one's link named.
+
+The device number packs two things.  The major number is 8, and the
+low two bits of the minor number name the drive.
+
+.in +5
+.nf
+8/0  d3a        8/2  d3c
+8/1  d3b        8/3  d3d
+.in -5
+.fi
+
+Those four appear again 64 higher, as their whole-disk slices: 8/64 is
+d3ac, the drive at cylinder 0 and unrotated, so that its block 0 is
+physical block 0 and reading it reads the disk's label.
+
+The geometry is not part of the name.  It comes off the disk, from the
+label
+.bd
+mkfs
+writes into the second half of the boot sector: a magic number, the
+number of cylinders, heads and sectors, the rotation below, and the
+size of the file system made on it.  A block number is a file system
+block, and block 0 is not at cylinder 0, because the volume is rolled
+so that the superblock and the inode list sit in the middle of the
+platter rather than at its edge.  The driver reads both from the
+label, so a volume keeps whatever rotation it was made with.
+
+The commands the driver issues are few, and the board does the rest: a
+global command the first time it uses the board, a specify per drive
+as the drive is selected, a home to put a head at track 0, and then
+reads and writes that carry nothing but the absolute sector, the count
+and the address.  The board interrupts when a command has finished and
+its status is in the IOPB, and the driver sleeps until it does, so a
+seek is time the machine spends on something else.
+
+A command that comes back an error is re-issued, and part way through
+the driver re-homes the drive, since a head that has lost its place is
+the usual reason a command fails.  A board that has not answered for a
+second fails the request with NOTRDY rather than leaving a machine
+that waits for ever; a board still silent on the next tick is a panic,
+a DISK 3 that has stopped answering being a fault and not a slow disk.
+
+The driver offers no raw command interface, so a disk on this
+controller is not formatted through Micronix.  A drive must be
+formatted elsewhere first, and then given a Micronix label by
+.bd
+mkfs
+, which is what makes it a volume this system can mount.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+.bd
+boot (1), filesystem (5), disk1 (4), disk2 (4), hdca (4), hddma (4)

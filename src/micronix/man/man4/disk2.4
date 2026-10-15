@@ -1,0 +1,129 @@
+.he "disk2 (4)                   10/15/26                    disk2 (4)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+DEVICE
+.in +5
+.br
+.bd
+disk2
+- a hard disk on a CompuPro DISK 2 controller
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+The
+.bd
+disk2
+device reads and writes a hard disk attached to a CompuPro DISK 2
+controller.  The board drives Shugart-compatible disks, and the manual
+names the families it was sold for: the Memorex 100 series, the
+Fujitsu 2300 series - an eight inch drive, 11.7 and 23.4 megabytes
+unformatted - and the Shugart SA4000 series.  The SA4000 is the odd
+one.  It is compatible in the sense that matters here, stepping its
+head and moving its data the way the eight inch drives do, but it is a
+fourteen inch drive, and two read/write heads read each of its disk
+surfaces rather than one, so a four head drive has two surfaces and an
+eight head drive four, each head reaching all 202 cylinders.  Its
+track also holds more sectors than an eight inch drive's, 18000 bytes
+of them.  Nothing in this driver has to know any of that: the sector
+count is the label's, and the one difference the manual speaks of is a
+jumper that sets the write clock's phase.  Disks of this family are
+also what the HDCA drives.  Four hang off a controller, and the bit
+rate is in the order of 5 MHz, the drive being what decides it.  It is
+the simple one of the two CompuPro hard disk controllers.  A finite
+state machine on the board searches for a sector's header and moves
+its data, but the seek is the host's and not the board's - the head is
+stepped a track at a time - and every transfer's address comes from a
+second board, the SELECTOR CHANNEL, which the driver programs just
+before each command.
+
+Two ports are the board's own.  0xc8 is the control register written
+and the status register read.  0xc9 is a data register written and one
+step pulse read: a read of the data port is not data, it moves the
+head, in the direction the control register's direction bit names.
+Which of four data registers 0xc9 writes to is the control register's
+OP1 and OP0 bits - the drive and head selection, the cylinder, the
+head, and the sector to search for - and a command is that register
+with the RUN bit set.  The SELECTOR CHANNEL answers at 0xe0: four
+writes give the 24 bit physical address and the mode of the transfer
+to come, and a read releases it.
+
+The device number packs two things.  The major number is 7, and the
+low two bits of the minor number name the drive.
+
+.in +5
+.nf
+7/0  d2a        7/2  d2c
+7/1  d2b        7/3  d2d
+.in -5
+.fi
+
+Those four appear again 64 higher, as their whole-disk slices: 7/64
+is d2ac, the drive at cylinder 0 and unrotated, so that its block 0 is
+physical block 0 and reading it reads the disk's label.
+
+The geometry is not part of the name.  It comes off the disk, from the
+label
+.bd
+mkfs
+writes into the second half of the boot sector: a magic number, the
+number of cylinders, heads and sectors, the rotation below, and the
+size of the file system made on it.  The driver reads that label when
+the device is opened, so there is no table of drive sizes to disagree
+with it, and a disk carrying no label cannot be opened at all.
+
+A block number is a file system block, and the driver turns it into a
+cylinder, a head and a sector.  Block 0 is not at cylinder 0: the
+volume is rolled, so that the superblock and the inode list sit in the
+middle of the platter rather than at its edge.  How far is the label's
+to say, which is the same roll the HDDMA derives from a drive's size.
+
+The seek is the driver's work, and it does not spin to wait for it.
+The board has no seek command and no timer for one: the host sends the
+step pulses, reading 0xc9 for each, and a drive that takes pulses
+faster than it steps - the manual calls it fast seek - accumulates
+them and moves when it is ready.  When the last pulse is out the
+driver issues the board's NULL command, which does nothing to the disk
+at all.  The manual provides it so that a command can be left waiting
+for the drive's SEEK COMPLETE, which is what says the head has
+arrived.  A seek is therefore two commands, and the time the arm takes
+to settle is time the machine spends on something else.
+
+The board's interrupt is the manual's "done" flag.  A command that
+finishes pulls the vectored interrupt line its J7..J14 jumper selects,
+and the line stays down until the host writes the control register,
+which is what makes the status register transparent to read again.  So
+every command the driver issues is also the acknowledgement of the one
+before it, and there is no separate end-of-interrupt to give the card.
+The driver names no line: the kernel finds which one the card is
+jumpered to at boot.  A request is issued and left, and the status
+check, the retry and the next buffer all run in the interrupt handler.
+
+A read or a write that comes back with ATTENTION, TIME OUT, CRC or
+OVER RUN set in the status has failed, and so has a write that the
+drive reports as a fault.  The driver re-issues it, up to ten times,
+and halfway through the ten it steps the head all the way out to track
+0 first, since a head that has lost its place is the usual reason a
+command fails.  A board that has not answered for a second is a
+request failed with ENXIO rather than a machine that waits for ever,
+and the head's position is a guess from then on, so the next request
+homes the drive before it does anything else.
+
+The driver offers no raw command interface, so a disk on this
+controller is not formatted through Micronix.  A drive must be
+formatted elsewhere first, and then given a Micronix label by
+.bd
+mkfs
+, which is what makes it a volume this system can mount.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+.bd
+boot (1), filesystem (5), disk1 (4), disk3 (4), hdca (4), hddma (4)

@@ -1,0 +1,116 @@
+.he "ncr (4)                     10/15/26                      ncr (4)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+DEVICE
+.in +5
+.br
+.bd
+ncr
+- a SCSI bus on an NCR 5380 host adapter
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+The
+.bd
+ncr
+device reads and writes disks that speak SCSI, through a host adapter
+built on the NCR 5380 bus interface chip.  Its nodes are named for the
+bus and not for the card: scsi0 to scsi7 are b 5 0 to b 5 7, and the
+target's id is the low three bits of the minor number.  A second
+adapter, when there is one, will be a different chip behind the same
+bus, and the node names will not have to change with it.
+
+SCSI is a bus and not a drive.  Up to eight devices share it, each with
+a number of its own called its id; the card is always the initiator and
+a disk is always the target.  The chip knows nothing about disks.  It
+holds eight registers the cpu writes and reads, at one port block whose
+base is 0x20 - the register number is the low three bits of the
+address, so the eight of them answer at 0x20 to 0x27 - and it drives the
+wires while the driver tells it when to.  There is no dma controller on
+the card, so the cpu moves every byte of a transfer itself, one REQ/ACK
+handshake at a time.  A disk has no command register either: a command
+is a command descriptor block, the six, ten or twelve bytes that are
+the command, handed over a byte at a time in the command phase.
+
+Those eight targets appear again 64 higher, as their whole-disk slices:
+5/64 is scsi0c, target 0 with no roll, so that its block 0 is logical
+block 0 and reading it reads the disk's label.
+
+Only two commands are built by the driver itself.  One request moves one
+block, and the block it sends is a READ(10) or a WRITE(10): ten bytes
+naming a logical block address and a count of blocks, with a logical
+unit of zero, since a target here has one unit.  Bits 3 and 4 of the
+device number name the logical unit for the target's other opens.  There
+is no INQUIRY, no READ CAPACITY and no MODE SENSE, so nothing is asked
+of a target that it does not have to answer.
+
+The geometry is not part of the name and is not asked for either: it
+comes off the disk, from the label
+.bd
+mkfs
+writes into the second half of the boot sector, and the decode is the
+same one the other disk drivers here use.  A block number is a file
+system block, and it becomes a logical block address through the slice's
+offset and length and the volume's roll, so a target keeps whatever
+arrangement it was made with.  A target carrying no label cannot be
+mapped at all, since the card has no table of disk sizes to fall back
+on, and it fails to open with ENXIO - except on its whole-disk slice,
+which needs no geometry to find block 0, that being where the label
+would be written.
+
+Selecting a target is the driver's work.  The card puts its own id and
+the target's on the data bus together - the card is id 7 - asserts SEL
+and waits for the target to answer with BSY.  A target that does not
+answer is not there, and the request fails.
+
+The transfer itself is a poll.  The driver waits for the chip's REQ bit,
+moves the byte, raises ACK, waits for REQ to drop and lowers ACK, and
+does that for every byte of the command, the data and the status.  Each
+wait is bounded, so a target that stops answering fails the request
+rather than holding the machine; the bound is a loop count and not a
+calibrated interval, and the wait for a READ's first byte is the one
+that costs.  A command that fails is not re-issued: the buffer comes
+back with EIO, and reading the sense data a CHECK CONDITION leaves
+behind is the caller's business.
+
+The card interrupts when the target lets go of the bus, which is the one
+thing it has to say without being asked.  The handler reads the bus and
+status register first, since that is the only place the reason survives,
+and then reads the reset parity/interrupt register, which is what brings
+the card's own line back down.  The driver names the line rather than
+numbering it, so which vectored interrupt line the card is jumpered to
+is the machine's business and two cards may share one.
+
+The bus is reset when the device is opened, which also serves a machine
+that came up with the bus in a strange state.  There is no tick: the
+controller answers when it is spoken to.  Requests queue on the card and
+not on a drive, since one command is on the bus at a time - a second one
+would be talking to whatever target the wires happened to name last.
+
+A command of the caller's own can be issued through
+.bd
+ioctl (2),
+and that is what the six byte commands are for: INQUIRY, REQUEST SENSE,
+MODE SENSE and TEST UNIT READY, which a driver with no sense path of its
+own has more use for than for its two.  The block is a CDB as it stands
+and its length is the caller's, and a command with no data phase costs
+no more than the select, the six bytes and the status.
+
+A card that is not in the machine leaves its ports reading 0xff, and a
+5380's command register is the cpu's own latch and reads back what was
+written to it, which is what tells the two cases apart at boot.  A
+machine with no adapter has major 5 answer the way a device that is not
+there does, rather than failing every request.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+.bd
+boot (1), filesystem (5), djmem (4), hddma (4), ide (4), multio (4)

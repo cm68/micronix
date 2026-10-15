@@ -1,0 +1,75 @@
+.he "nd (4)                      10/15/26                       nd (4)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+DEVICE
+.in +5
+.br
+.bd
+nd
+- a network disk, served by the network card
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+The
+.bd
+nd
+device reads and writes 512 byte blocks that live at the other end of
+the network, in the same card that carries the network's byte channel.
+It is a block device and not a file system of its own: it has one node,
+.bd
+/dev/nd ,
+and hands the buffer cache whole blocks the way any disk here does.
+There is one of them in a machine.
+
+Three registers are its whole interface.  0x60 reads the status: a bit
+saying an operation has finished, and a bit saying it failed.  0x61
+writes a command.  0x63 reads and writes a byte of the card's data area.
+Two of the commands point that area at something - one at the block
+number, one at the block's data - and two of them are the operations
+themselves, fetch the block and store the block.  The block number is
+four bytes, most significant first.
+
+A request is therefore: point the card at the block number and write it,
+then point it at the data and either read the block out of the data
+register or write the block into it.  Every byte of the number and every
+byte of the block moves through the one data port, which is to say the
+cpu moves them - there is no dma controller on the card - and the 512
+bytes are read or written in a tight loop.
+
+There is no geometry.  A network disk is a flat run of blocks numbered
+from zero, with no cylinders, heads or sectors to be told about, so
+there is no label to read and none is asked for, and the device has no
+slices: every block of it is reached through the one node.  There is no
+raw command block either; a control call is refused with ENOTTY, since
+formatting, seeking and geometry all mean nothing to a device with no
+moving parts.
+
+The card has one thing to say on its own, and that is that an operation
+has finished.  It raises the interrupt the network card is on, and the
+handler answers it by resuming the phase the request was waiting in -
+the block number written, the data moving, the status read.  The line is
+the driver's to claim, and it is claimed when the device is opened,
+rather than at boot.
+
+The card serves one request at a time.  A request that arrives while one
+is in flight is queued behind it and started when the first finishes, so
+the drive's queue is the only order the card has.
+
+A request that is still in flight a second later is failed with ENXIO
+rather than left waiting for ever.  The driver keeps a tick for it, and
+that is what turns a machine whose card is not answering - or one whose
+interrupt has not been claimed yet - into a request that fails instead
+of a process that sleeps for ever.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+.bd
+boot (1), filesystem (5), network (4)
