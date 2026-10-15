@@ -14,20 +14,23 @@ again, which is what a real install drove.
   controller's `sense drive status` (SB1_NORDY / SB3_RDY).  Nothing here
   needs a new syscall: the guest reads, gets "not ready", prompts, and
   retries until the next disk appears.
-- **Out-of-band.** A one-line text command on S-100 port `0x03`.  The sim
+- **Out-of-band.** A one-line text command on S-100 port `0xd2`.  The sim
   buffers the line, runs it against the media sets in `sim.json`, and
   answers on the same port.
 
 ## Transport
 
-Port `0x03`.  A write emits the command a byte at a time (`out 3`); a read
-takes the response a byte at a time (`in 3`).  The device node is
+Port `0xd2`, in the 0xd0 page the simulator keeps for its own ports: 0xd0
+is the kernel's control port and 0xd1 its program name (hwsim/d1/mpz80.c),
+and this is the third.  A write emits the command a byte at a time
+(`out 0xd2`); a read takes the response a byte at a time (`in 0xd2`).  The
+device node is
 
-    c 3 3  mediachg
+    c 3 210  mediachg
 
 major 3 is the `io` device (`iorw`, `sys/memdev.c`); a nonzero minor is a
-fixed port, so `/dev/mediachg` needs no seek — writing goes straight to
-port 3.
+fixed port — 210 is 0xd2 — so `/dev/mediachg` needs no seek: writing goes
+straight to port 0xd2.
 
 ## Framing
 
