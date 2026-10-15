@@ -18,7 +18,7 @@ The machine has two boards that each carry an 8259:
 | board | role in the base system | 8259 base | CAS pins (12/13/15) | ROM socket |
 |---|---|---|---|---|
 | **Wunderbus I/O** | the base system | `0x48` | no | no |
-| **MultIO** | the add-on | `0x58` | yes | yes (disk boot ROMs) |
+| **MultIO** | the add-on | `0x40` | yes | yes (disk boot ROMs) |
 
 Each 8259 monitors **three** VI lines on its IR0..IR2 (jumper-selectable),
 and uses IR3..IR7 for its own three serial ports, parallel port, and
@@ -86,7 +86,7 @@ interrupt by a name and that is all:
   the chosen topology.
 - A driver unmasks with `inton(NAME)`, masks with `intoff(NAME)`, and
   names the line in its `struct ovlhdr`'s `line` field.  `inton`/`intoff`
-  route the name to the right PIC (`0x48` for lines 0..2, `0x58` for
+  route the name to the right PIC (`0x48` for lines 0..2, `0x40` for
   lines 3..5) without the driver knowing which.
 - The **dismiss** (end-of-interrupt) is `intrdismiss()` in
   `sys/multio.c`, called from the dispatcher (`intrupt` in `sys/mio.s`).
@@ -107,7 +107,7 @@ is the ICW/OCW port, register 1 the IMR/OCW1); the board's group select is
 | board | base | 8259 regs | group select | PIC select value |
 |---|---|---|---|---|
 | master (Wunderbus) | `0x48` | `0x4c`/`0x4d` | `0x4f` | `PENABLE` (`0x28`) |
-| slave (MultIO) | `0x58` | `0x5c`/`0x5d` | `0x5f` | `SPICONLY` (`0x08`) |
+| slave (MultIO) | `0x40` | `0x44`/`0x45` | `0x47` | `SPICONLY` (`0x08`) |
 
 The master always drives PINT and owns SINTA.  In both two-PIC cases the
 slave's INT is wired to the master's **cascade line, IR6** (`CASCADE_IR`

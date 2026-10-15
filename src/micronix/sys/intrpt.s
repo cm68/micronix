@@ -148,12 +148,18 @@ _ovlint2:
 ; In a one-PIC build this line carried the parallel printer, which is
 ; gone (no device, no model), so the poll finds nothing and returns.
 ;
+; The slave sits at 0x40 and these two ports are its own - the same base
+; sys/slavepic.c brings it up on and sys/miopic.c dismisses it by.  The
+; three have to agree: the poll read is the acknowledge, so a slave
+; polled anywhere else is never acknowledged, its INT stays asserted,
+; and the master's IR6 is taken again the moment intrupt returns.
+;
 ovlint6:
 	ld	a,0x08		; SPICONLY: select the slave PIC
-	out	(05fh),a	; SSELECT
+	out	(047h),a	; SSELECT
 	ld	a,0x0c		; OCW3: poll command
-	out	(05ch),a	; SPIC0
-	in	a,(05ch)	; the poll word (and the acknowledge)
+	out	(044h),a	; SPIC0
+	in	a,(044h)	; the poll word (and the acknowledge)
 	ld	b,a		; keep it for the level
 	and	080h		; the pending bit
 	ret	z		; nothing to dispatch
