@@ -69,14 +69,17 @@ struct proc {
  * The system stack is not a member here: it is the 512-byte object
  * ustack (user.c), which the linker places immediately below u in
  * USERSEG.  The register save area has to come first in the struct
- * because the firmware pushes the trap frame down from trapstack and
- * leaves SP at &u.stack (see trap.c): the kernel's C stack grows down
+ * because the firmware pushes the trap frame down from trapstack:
+ * fourteen words from &u.save land on &u.task, so offsets 4 to 31 are
+ * the MPZ80's "task save area" and nothing else may live there.  The
+ * word below it is where the firmware's own call into the kernel leaves
+ * its return address, and below that the kernel's C stack grows down
  * out of the base of the struct and into ustack, so every other member
  * of u is out of its way.
  */
 struct user {
-    UINT stack;                 /* see trap0() in trap.c */
-    UINT ret;                   /* dummy place holder */
+    UINT stack;                 /* see task0_body() in trap.c */
+    UINT ret;                   /* firmware return address, below the frame */
     UINT8 task;                 /* Registers saved by firmware */
     UINT8 mask;                 /* at trap time. */
     char *pc;
