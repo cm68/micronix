@@ -110,6 +110,37 @@ both MD-11 guides, `HDCDMA_Disk_Controller_Rev1_Apr82.pdf`, `i8259.pdf`,
 the slashed-zero problem, which may well affect them too.
 
 
+## The drive manuals and the missing parts
+
+The controllers are documented, but the disks they drive are their own
+manuals, and three of those are here now, from bitsavers:
+
+    B03P-4605-0003D_M2301B_M2302B_CE_Manual_Nov1981.pdf
+                                 Fujitsu 2300 series, the DISK 2's 8 inch
+                                 11.7 and 23.4 MB drives
+    39005-1_SA4000_OEM_Apr79.pdf Shugart SA4000 series, the DISK 2's 14 inch
+                                 drive, which the HDCA drives as well
+    ST506_Preliminary_OEM_Manual_Apr81.pdf
+                                 Seagate ST-506, the DISK 3's drive
+
+With them are two chips the boards are built from:
+
+    NCR_5380_SCSI_Interface_Chip_Design_Manual_May85.pdf
+                                 the SCSI host adapter's registers
+    8255A_rochester.pdf          the MYIDE board's bus glue (Rochester's
+                                 reissue of the Intel datasheet)
+
+`39005-1_SA4000_OEM_Apr79.pdf` and `ST506_Preliminary_OEM_Manual_Apr81.pdf`
+are image-only scans and have not been through the OCR pass below; search
+them by eye. The other three carry a text layer that came with them.
+
+Two chip datasheets were already here and are not separate documents: the
+8253 is reprinted in `CompuPro_System_Support_1_Manual.pdf` (pages 66-73),
+and the full Intel 8272 floppy controller datasheet is at the back of
+`CompuPro_Disk_1_Manual.pdf` (from page 31: registers, pin descriptions and
+the command set tables).
+
+
 ## slashzero.py
 
 Save this listing as `slashzero.py` (it is not shipped as a file here):
