@@ -1,5 +1,5 @@
 /*
- * The add-on MultIO's slave 8259 bring-up, split out of cus.c so that the
+ * The second MultIO's slave 8259 bring-up, split out of cus.c so that the
  * polled and the CAS-vectored variants are the whole of what differs
  * between the two two-PIC kernels.  Both objects are built from this one
  * file - slavepic_polled.o with -DN8259_POLLED=1, slavepic_vectored.o
@@ -15,7 +15,7 @@
 #include <types.h>
 #include <sys/ints.h>
 
-#define SBASE   0x58
+#define SBASE   0x40
 #define SSELECT (SBASE + 7)
 #define SPIC0   (SBASE + 4)
 #define SPIC1   (SBASE + 5)
@@ -23,7 +23,7 @@
 
 #if N8259 == 2
 /*
- * Bring the slave 8259 up: the add-on MultIO's PIC at 0x58.  The init
+ * Bring the slave 8259 up: the second MultIO's PIC at 0x40.  The init
  * sequence is the master's own (minit, inits.s) save for the cascade:
  * ICW1 clears the single bit (there is a slave, so it is not standalone),
  * ICW3 names the slave id as the master's cascade line (CASCADE_IR).

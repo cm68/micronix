@@ -48,15 +48,15 @@ struct drivespec {
 };
 
 /*
- * The card's ports, 0x40 through 0x47.  A port is a Z80 I/O address: a
+ * The card's ports, 0x20 through 0x27.  A port is a Z80 I/O address: a
  * number space of its own, reached with in() and out() rather than by a
  * load or a store.  The register number is the low three bits, straight
  * into the chip.
  */
-#define CSD	0x40		/* data register, read and write */
-#define ICR	0x41		/* initiator command */
-#define MR	0x42		/* mode */
-#define CSBS	0x44		/* current bus status */
+#define CSD	0x20		/* data register, read and write */
+#define ICR	0x21		/* initiator command */
+#define MR	0x22		/* mode */
+#define CSBS	0x24		/* current bus status */
 
 /* the initiator command register's bits */
 #define ICR_RST	0x80

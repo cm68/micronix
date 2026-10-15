@@ -51,12 +51,13 @@
  * three bits of the address, A0 to A2 straight into the chip.
  *
  * The range is free on this machine: 0x30-0x34 is the MYIDE board,
- * 0x48-0x4f and 0x58-0x5f the Mult I/O console, 0x50-0x53 the obsolete
+ * 0x40-0x47 and 0x48-0x4f the Mult I/O console, 0x50-0x53 the obsolete
  * HDCA, 0x54-0x55 the HD-DMA, 0xd0-0xd1 the simulator's own ports, and
- * 0xef the DJ-DMA.  0x40 is what a SCSI host adapter on this bus has
- * always been strapped to, and nothing else here wants it.
+ * 0xef the DJ-DMA.  A SCSI host adapter on this bus has always been
+ * strapped at 0x40, which the console's second board now claims, so this
+ * machine puts the card at 0x20.
  */
-#define SCSIBASE    0x40        /* register 0; 0x40..0x47 are registers 0..7 */
+#define SCSIBASE    0x20        /* register 0; 0x20..0x27 are registers 0..7 */
 
 /*
  * The initiator command register, and the presence probe's whole test.

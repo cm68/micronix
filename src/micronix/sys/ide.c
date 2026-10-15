@@ -213,9 +213,9 @@ static int idereset();
  * a latch that picks which of the board's two drives the strobes go to -
  * bit 0 clear selects the first, set selects the second.
  *
- * The range is free on this machine: 0x48-0x4f and 0x58-0x5f are the
+ * The range is free on this machine: 0x40-0x47 and 0x48-0x4f are the
  * Mult I/O console, 0x50-0x53 the obsolete HDCA, 0x54-0x55 the HD-DMA,
- * 0xd0-0xd1 the simulator's own ports, and 0xef the DJ-DMA.
+ * the 0xd0 page the simulator's own ports, and 0xef the DJ-DMA.
  */
 #define PA      0x30            /* 8255 port A: drive data, low byte */
 #define PB      0x31            /* 8255 port B: drive data, high byte */

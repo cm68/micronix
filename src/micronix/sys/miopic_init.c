@@ -8,8 +8,8 @@
  * highmem.o and is reclaimed as buffer headers.  The resident half
  * (pic_eoi) is in miopic.c.
  *
- * A master 8259 on the Wunderbus at 0x48 and a slave 8259 on the add-on
- * MultIO at 0x58.  Six lines: VI0-VI2 on the master's IR0-2, VI3-VI5 on
+ * A master 8259 on the Wunderbus at 0x48 and a slave 8259 on the second
+ * MultIO at 0x40.  Six lines: VI0-VI2 on the master's IR0-2, VI3-VI5 on
  * the slave's IR0-2.  The slave is polled, never CAS-vectored (the
  * Wunderbus has no CAS pins).
  */
@@ -24,7 +24,7 @@ extern int di(), ei();
 #define PIC0     (MBASE + 4)    /* master ICW1/OCW2/OCW3, IRR/ISR read */
 #define PIC1     (MBASE + 5)    /* master ICW2/ICW3/ICW4/OCW1 (the IMR) */
 
-#define SBASE    0x58
+#define SBASE    0x40
 #define SSELECT  (SBASE + 7)
 #define SPIC0    (SBASE + 4)
 #define SPIC1    (SBASE + 5)

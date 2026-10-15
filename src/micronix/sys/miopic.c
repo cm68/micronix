@@ -18,8 +18,8 @@ extern int di(), ei();
 #define PIC0     (MBASE + 4)    /* master ICW1/OCW2/OCW3, IRR/ISR read */
 #define PIC1     (MBASE + 5)    /* master ICW2/ICW3/ICW4/OCW1 (the IMR) */
 
-#define SSELECT  (0x58 + 7)
-#define SPIC1    (0x58 + 5)     /* the slave's IMR/OCW1 register */
+#define SSELECT  (0x40 + 7)
+#define SPIC1    (0x40 + 5)     /* the slave's IMR/OCW1 register */
 
 #define PENABLE   0x28          /* group select: the PIC */
 #define SPICONLY  0x08          /* group select: the slave's PIC only */

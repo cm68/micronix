@@ -55,15 +55,15 @@
 ;
 
 ;
-; The card's ports, at 40h through 47h.  The register number is the low
+; The card's ports, at 20h through 27h.  The register number is the low
 ; three bits, straight into the chip; the four that matter are the data
 ; register, the initiator command register, the mode register and the
 ; current bus status.  The bits are the rom's ncrboot's, and the wire
 ; they drive is sys/ncr.c's.
 ;
-scsidat	equ	40h		;data register (CSD), read and write
-scsiicr	equ	41h		;initiator command: RST ACK BSY SEL DATA
-scsistat equ	44h		;current bus status: BSY REQ
+scsidat	equ	20h		;data register (CSD), read and write
+scsiicr	equ	21h		;initiator command: RST ACK BSY SEL DATA
+scsistat equ	24h		;current bus status: BSY REQ
 
 icr_ack	equ	10h
 icr_bsy	equ	08h

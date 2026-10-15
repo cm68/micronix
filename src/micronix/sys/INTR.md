@@ -73,8 +73,8 @@ takes that line.  The three objects differ only behind these five names.
 - **ss1pic** — the CompuPro SS1's two 8259s, CAS-cascaded on the CPU
   board, all eight VI lines vectored.  `pic_irr()` reads both PICs, the
   slave reached through the cascade; `pic_eoi()` acknowledges both.
-- **multiopic** — the multio's master at 0x48 with the add-on slave at
-  0x58, six lines.  The slave is polled, never vectored: its pending
+- **multiopic** — the multio's master at 0x48 with the second board's slave
+  at 0x40, six lines.  The slave is polled, never vectored: its pending
   lines are read by selecting it, and its poll *is* its acknowledge, so
   `pic_eoi()` only ever acknowledges the master.
 - **wbiopic** — the wunderbus I/O's single PIC, three lines.  The
