@@ -9,7 +9,7 @@
 # geometry and the volume layout are the same - an IDE drive reports its
 # own geometry, and a volume laid out for the HD-DMA reads back block for
 # block through the IDE card, which is the whole compatibility argument.
-# What differs is which first level is in block 0 (ideboot1 instead of
+# What differs is which level 2 is in block 0 (ideboot1 instead of
 # mwboot1), and which device the kernel mounts root from.
 #
 # <volume> is the name of the drive file to make, given without its

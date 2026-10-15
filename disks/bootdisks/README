@@ -103,24 +103,33 @@ what is not here
 	a compiler, sources, man pages, and the rest of /bin - a system
 	with a hard disk installs those from the media that carry them
 
-the format byte, which is only on the five inch
-------------------------------------------------
+the label, and the format byte that used to be read
+---------------------------------------------------
 
 A hard sectored medium's geometry cannot be worked out from the drive;
-the controller does not report it.  What dj.c does instead is read byte
-0x5C of sector 0 - the level 0 boot that the firmware copies - and look
-it up in its table of Morrow formats (sys/dj.c, specs[]).  d5ds carries
-0xD0: 40 cylinders, two heads, ten sectors, 512 bytes.  A diskette
-without it does not fail to boot - the driver quietly keeps its default
-row for a five inch drive, 35 cylinders one head, and reads the first
-330 filesystem blocks correctly and nothing after them, which is exactly
-where the kernel's overlay modules are.  The symptom is a mounted
-filesystem, a healthy-looking loader, "ovl: 0 not placed" and then a
-panic.
+the controller does not report it.  What says it now is the disk label:
+mkbootimg writes one into the second half of block 0 - the block the
+loader is in - and the kernel's dj.c reads it with dllabel() before it
+reads anything else (sys/dj.c's djopen).  d5ds carries 40 cylinders,
+two heads, ten sectors of 512 bytes, first sector 0.
 
-The eight inch media are soft sectored and the driver never looks, so
-they carry zero.  src/micronix/stand/boot/GNUmakefile's FLOPPIES table
-has the byte per medium, and mkbootimg writes it and the Makefile reads
-it back; the whole story is in mkbootimg.c's DJCONFIG.
+The one thing the label cannot say is where it is.  Whether the boot
+track numbers its sectors from 0 or 1 decides which sector block 0 is,
+and that is the drive's to report rather than the medium's - the
+characteristics byte's HARD bit - so djopen sets firstsec from the drive
+and then reads the label with it.  The loader has no drive to ask, so it
+takes the number from the label instead, which is why mkbootimg writes
+it there.
+
+A diskette with no label does not come up with a wrong geometry.  The
+boot stops at the loader - "No disk label in the block this boot came
+from" - and the kernel's own open leaves the drive mapping block 0 and
+nothing else, so the first read past it is what fails rather than the
+one at block 330 where the overlay modules are.
+
+The eight inch media carry the same label and differ only in its
+numbers: soft sectored, first sector 1, fifteen blocks to a track.
+src/micronix/stand/boot/GNUmakefile's FLOPPIES table is what says so per
+medium, and mkbootimg is what writes it.
 
 vim: tabstop=4 shiftwidth=4 noexpandtab:

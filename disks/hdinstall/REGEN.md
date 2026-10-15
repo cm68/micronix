@@ -20,7 +20,7 @@ What has been run, as this was written.  The build, all of it.  The
 stage 1 command as far as CP/M's `A>` prompt, with the two floppies and
 the drive named the new way - not the format itself.  Stage 3, which
 gets as far as the loader and stops where the last section says.  And
-the loader replacement below, which is how the rebuilt second level got
+the loader replacement below, which is how the rebuilt level 3 got
 onto the disk.  Stage 2 is out of the scripts on the distribution floppy
 and the README beside this, not from a run here.
 
@@ -175,7 +175,7 @@ swap dev: nodev/0
 ## replacing the loader without redoing the install
 
 The loader is two levels: a sector the rom reads to `0100` and jumps to,
-and a second level that reads the filesystem to find the kernel.  Both
+and a level 3 that reads the filesystem to find the kernel.  Both
 live in the boot area, which is cylinder 0 - block 5236 on the 5 meg,
 because `sys/mw.c` rotates the mapping and does not put block 0 there -
 and the area is owned by `/boot/boot` so nothing allocates over it.
@@ -198,7 +198,7 @@ Out of band, the simulator keeps a 2k header at the front of the drive
 file - `struct disklabel`, `lib/hdcdmadisk.c`, `DATAOFF`.  `hddma-0.vol`
 is 5328896 bytes, that 2k and then 10404 blocks.  In band, in the second
 half of the boot block, is the `struct dlabel` the machine reads, at
-`DL_OFFSET`, 256 bytes into the block the first level occupies, holding
+`DL_OFFSET`, 256 bytes into the block level 2 occupies, holding
 what the drive is and where the boot area is.
 
 ```
@@ -227,7 +227,7 @@ so the volume mounts and does not boot.  Nothing in the tree writes
 that label back yet: that is the missing half of the recipe above, and
 `sys/TODO` carries it.
 
-The second level reads it.  `mwio.c` takes the geometry from the label
+Level 3 reads it.  `mwio.c` takes the geometry from the label
 in the block it was loaded from - physical cylinder 0, head 0, sector
 0, which needs no geometry to reach, which is what makes it possible
 before the geometry is known.  There is no fallback and that is

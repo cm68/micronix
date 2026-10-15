@@ -177,7 +177,7 @@ void putlabel(buf)
         lp->d_magic[2] != DL_MAGIC[2] || lp->d_magic[3] != DL_MAGIC[3]) {
         /*
          * The last two bytes are the boot's entry address, which the
-         * HDCA rom reads to know where to load the first level, so they
+         * HDCA rom reads to know where to load level 2, so they
          * are not boot code that has grown into the label and are left
          * alone.  Everything else in the second half must be empty.
          */

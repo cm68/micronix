@@ -4,7 +4,7 @@
  * This is the raw view: sectors come back through imd_read, which is the
  * path the simulator's disk controllers take, so a sector here is the
  * sector a controller would fetch.  That is what you want for anything
- * outside the filesystem - boot blocks, the second level loader, the
+ * outside the filesystem - boot blocks, the level 3 loader, the
  * reserved tracks - and it is not what mnix's block command gives you.
  * That one maps a block through the driver's interleave, reads block 0 as
  * zeros, and cannot address a 128 byte sector at all.

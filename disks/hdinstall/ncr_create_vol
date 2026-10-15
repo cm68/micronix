@@ -10,7 +10,7 @@
 # 5380 reports its own geometry, and a volume laid out for the HD-DMA
 # reads back block for block through the 5380, which is the whole
 # compatibility argument (src/hwsim/d1/ncr5380.c, sys/ncr.c).  What
-# differs is which first level is in block 0, and which device the
+# differs is which level 2 is in block 0, and which device the
 # kernel mounts root from.
 #
 # <volume> is the name of the drive file to make, given without its
@@ -89,7 +89,7 @@ rm -f "$vol.lock"
 # slice b is swap (285..305); cylinder 0 is the boot, below both.  The
 # label command writes the in-band label at device block 0.  Without it
 # the prototype label's slice a starts at cylinder 0, d_bootblks stays
-# zero, and mkfs's filesystem overwrites the boot's second level.
+# zero, and mkfs's filesystem overwrites level 3.
 "$mnix" label "$vol" -s a 1 284 -s b 285 || exit 1
 
 # 3. the filesystem, with the NCR 5380 hard disk boot in /boot/boot

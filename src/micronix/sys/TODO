@@ -109,7 +109,7 @@ bigger again:
     that moves it up to _upage.
 
 The boot loader's own stack sits at the very top of memory (mwboot1.s
-parks sp at 0xffff and the second level inherits it), and the loader
+parks sp at 0xffff and level 3 inherits it), and the loader
 keeps using it for the whole kernel load.  Measured in d1 by sampling sp
 per instruction over the whole trap-free pre-kernel window (cycle 462452
 to 709169), the loader's deepest sp is 0xffde - thirty-three bytes below
@@ -693,8 +693,8 @@ tree can write the geometry onto a disk that already has a boot.
 
 mkfs -i writes it.  putlabel() (cmd/mkfs/mkfsfunc.c) takes the shape from
 the device node it was handed - drivetype() reads the minor - and stamps
-a struct dlabel at DL_OFFSET in block 0, which is the same block the
-first level occupies.  That is now the only writer, and it is why the
+a struct dlabel at DL_OFFSET in block 0, which is the same block level 2
+occupies.  That is now the only writer, and it is why the
 image can be generic: one bootimg serves every drive of a card, its whole
 second half zero, and the machine that installs it says what the drive
 is.

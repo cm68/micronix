@@ -1610,10 +1610,10 @@ imdlabel(image, dl)
 /*
  * Write the boot below an IMD hard disk's filesystem, at device block 0 -
  * cylinder 0, head 0, the sector the rom reads.  The label is already in
- * block 0's second half (the label command wrote it); the boot's first
- * level goes in the first half in front of it, and the second level in
- * the blocks after.  Block 0's second half is left alone, so the label
- * and its slice table survive.
+ * block 0's second half (the label command wrote it); the boot's level 2
+ * goes in the first half in front of it, and level 3 in the blocks
+ * after.  Block 0's second half is left alone, so the label and its
+ * slice table survive.
  */
 static int
 hardboot(image, bootfile)
@@ -1648,7 +1648,7 @@ hardboot(image, bootfile)
         return -1;
     }
 
-    /* block 0's first half: the first level, in front of the label */
+    /* block 0's first half: level 2, in front of the label */
     if (imd_read(ip, 0, 0, firstsec, blk) != 512)
         goto bad;
     got = read(fd, bb, DL_OFFSET);
@@ -1658,9 +1658,9 @@ hardboot(image, bootfile)
         goto bad;
 
     /*
-     * The second level, in the blocks after.  Its file position is still
-     * where level 0 stopped, but block 0's second half is not the boot's
-     * - it is the label - so skip it to byte BSIZE.
+     * Level 3, in the blocks after.  Its file position is still where
+     * the read above stopped, but block 0's second half is not the
+     * boot's - it is the label - so skip it to byte BSIZE.
      */
     lseek(fd, (long) BSIZE, 0);
     for (n = 1; ; n++) {
@@ -1708,7 +1708,7 @@ hardbootcmd(int c, char **a)
  * in it - the same job patchlabel does for a raw diskette.  The slice
  * table is already in block 0 (the label command wrote it); putlabel
  * fills in fsize, isize and the boot's extent, and preserves the table
- * and the boot's first level in front of it.
+ * and the boot's level 2 in front of it.
  */
 static int
 imdpatchlabel(image)

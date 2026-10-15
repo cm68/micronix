@@ -8,7 +8,7 @@
 # pointed at the HDCA (major 1) instead of the HD-DMA (major 3).  The
 # HDCA is the M10/M20/M26 controller: an M26 is 202 cylinders, 8 heads,
 # 32 sectors (see FORMATHD and src/hwsim/d1/hdca.c).  What differs from
-# create_vol is which first level is in block 0 - hdcabootimg, the
+# create_vol is which level 2 is in block 0 - hdcabootimg, the
 # 256-byte shim plus the load address in the sector's last two bytes,
 # which is the format mon447's boothd reads - and which device the
 # kernel mounts root from.

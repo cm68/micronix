@@ -6,8 +6,8 @@
 #
 # <volume> is the name of the drive file to boot - the thing
 # hdca_create_vol makes - given without its .vol suffix.  The simulator
-# reads the monitor ROM, which reads the first level loader off sector 1
-# (block 0 - the HDCA's firstsec is 1), which reads the second level,
+# reads the monitor ROM, which reads the level 2 sector off sector 1
+# (block 0 - the HDCA's firstsec is 1), which brings in level 3,
 # which loads /micronix off the filesystem.
 #
 # -c 0x704 is the configuration switch: 0x00 boot the HDCA (mon447's
