@@ -3,7 +3,7 @@
 ;============================================================================
 ; unixtobcd.s -- Unix seconds -> packed-BCD calendar time.
 ;
-;   _unixtobcd, called from rtcinit() and rtcwrite() in rtc.c.  This is
+;   _unixtobcd, called from rtcinit() and rtcwrite() in upd1990.c.  This is
 ;   the C entry point itself, not a leaf behind a wrapper: fenterq
 ;   builds ccc's frame (csv.s), which spills the long into it, so the
 ;   entry reads the two halves back out and loads the buffer pointer.

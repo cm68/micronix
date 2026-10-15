@@ -105,7 +105,7 @@ LEAF_LIBC = csv.o idiv.o imul.o qadd.o qsub.o \
 	qldst.o tramp.o swdisp.o swdispw.o oarg.o
 LEAF_AS   = mem.o inout.o sub8.o unixtobcd.o slavevec.o $(LEAF_LIBC)
 # Kernel C that also lives in the u page: the read-only tables (syssw,
-# biosw, ciosw) and the bus lock two driver modules share.  rtc.o was
+# biosw, ciosw) and the bus lock two driver modules share.  upd1990.o was
 # here too - it is pure code with no static data, so it could be folded
 # to .data and parked like the runtime - until the leaf code grew past
 # what the page holds.  Its callers are mount() and sys2.c and both are

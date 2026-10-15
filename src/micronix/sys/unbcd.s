@@ -3,7 +3,7 @@
 ;============================================================================
 ; unbcd.s -- packed-BCD calendar time -> Unix seconds.
 ;
-;   _bcd2unix, called from rtcinit() in rtc.c and from nowhere else.
+;   _bcd2unix, called from rtcinit() in upd1990.c and from nowhere else.
 ;   This is the C entry point itself, not a leaf behind a wrapper:
 ;   fenterw builds ccc's frame (csv.s) and the argument arrives in HL,
 ;   which is where the body wants it anyway, so a separate boundary
