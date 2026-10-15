@@ -52,6 +52,19 @@
 tempstk equ	0200h		;temporary stack
 nop	equ	0
 gobuff	equ	01b0h		;location of task switch routine on 'RESET'
+;
+; The free window in the on-board ram, and mon5.0's two resident blocks
+; in it.  It runs from 132h, the byte after the monitor's bounce buffer,
+; to the task switch stub at gobuff, which the monitor writes on every
+; task switch and the level 0 rom writes for itself.  Both blocks are
+; laid out from the bottom up and neither may cross gobuff: the console
+; first, because it is called for the life of the machine, then the copy
+; loop that brings the level 0 rom down, which runs once at a boot.
+;
+conram	equ	0132h		;the console found at reset
+concon	equ	conram		; - which one answered: 0, 1 or 2
+condrv	equ	conram + 2	; - the driver built for it
+ramhome	equ	0166h		;where the level 0 copy loop runs
 jmpop	equ	0c3h		;Jump unstruction op-code
 callop	equ	0cdh		;z80 call instruction opcode
 t1mask	equ	2bh		;unlimited mask... no traps enabled
@@ -103,7 +116,6 @@ thre	equ	20h		;status line TBE
 dr	equ	01		;line status DR bit
 wls0	equ	01		;word length select bit 0
 wls1	equ	02		;word length select bit 1 (for 8 bit word)
-stb	equ	04		;stop bit count (2 stop bits)
 imask	equ	00		;non interupt mode
 loop	equ	010h		;UART loop mode
 
@@ -128,99 +140,67 @@ normal	equ	0ch		;Master/Reg. nest/buffered/no AEOI/8085
 				; -normal setting of OCW4 for Morrow Software
 eoi	equ	20h		;non-specific EOI constant
 ivalu	equ	init OR ltim OR adi4 OR sngl OR ic4 OR lovect
+ss1valu	equ	init OR ltim OR adi4 OR ic4	;the same for a cascaded pair
 
 ;****************************************************************
 ;*								*
-;*	MYIDE board equates					*
+;*	System Support 1 equates				*
 ;*								*
-;* The board is an 8255 PPI (programmable peripheral interface:	*
-;* three 8-bit ports, A, B and C, whose direction is set by a	*
-;* mode word written to a fourth address) wired between the	*
-;* S-100 bus and the pins of an ATA drive.  Ports A and B carry	*
-;* the drive's sixteen data lines, port C its address and	*
-;* control pins.  The drive's registers - the "task file": data,*
-;* error/features, sector count, three of LBA, drive/head, and	*
-;* status/command - are not mapped into the bus at all; port C	*
-;* names one, port A carries the byte, and a strobe moves it.	*
+;* The CompuPro System Support 1 is one sixteen port board at 50h	*
+;* carrying the two 8259 interrupt controllers, three timers, a	*
+;* floating point unit, a clock/calendar and a serial channel.	*
+;* Only the serial channel and the controllers matter here.	*
 ;*								*
-;****************************************************************
-
-idepa	equ	30h		;port A: drive data, low byte
-idepb	equ	31h		;port B: drive data, high byte
-idepc	equ	32h		;port C: register number, control strobes
-idepctl equ	33h		;8255 mode word: 92h read, 80h write
-idepdrv equ	34h		;drive select latch, bit 0
-
-;
-; 8255 mode words.  Port C is an output either way; what changes
-; is whether ports A and B are inputs (a register read, or a
-; sector coming off the drive) or outputs (a register write, or a
-; sector going to it).  Read mode is also what the board needs
-; when a transfer is in progress, since the drive is driving.
-;
-idepnrm equ	92h		;A and B in, C out
-idepwrt equ	80h		;A, B and C all out
-
-;
-; Port C bits.  A0, A1 and A2 reach the drive's address pins
-; directly and select the task file register; the rest go through
-; inverting buffers, so a set bit here asserts the line.
-;
-idecs0	equ	08h		;chip select - the board's own decode
-idewr	equ	20h		;/WR
-iderd	equ	40h		;/RD
-iderst	equ	80h		;/RST
-
-idecmd	equ	7		;status when read, command when written
-idestat	equ	7
-iderdc	equ	20h		;read sector(s), with retry
-
-;****************************************************************
+;* The channel is a 2651, an older relative of the 8250 that does	*
+;* not address its registers the same way and does not put its	*
+;* ready bits in the same places.  It has no divisor latch and no	*
+;* group select: its four registers are ordinary ports, and what	*
+;* the 8250 says with a divisor and a line control register it	*
+;* says with two mode registers written one after the other.	*
 ;*								*
-;*	DJ-DMA Equates						*
+;* Its controllers are a master and a slave, cascaded - the	*
+;* master's IR7 is the slave - so where the Wunderbus's single	*
+;* 8259 answers an ICW1 of ivalu, these two want the cascade bit	*
+;* clear and an ICW3 each.					*
 ;*								*
 ;****************************************************************
 
-djstat	equ	104ah		;adjusted channel address of status byte
+s1data	equ	05ch		;data: send on a write, receive on a read
+s1stat	equ	05dh		;status: bit 0 ready to send, bit 1 to read
+s1mode	equ	05eh		;the two mode registers, first one first
+s1cmd	equ	05fh		;command register
+s1mr1	equ	04eh		;mode 1: asynchronous x16, 8 bits, no parity
+s1mr2	equ	07fh		;mode 2: 19200 baud, top four bits as asked
+s1cen	equ	005h		;command: transmitter and receiver on
+s1txrdy	equ	001h		;status: the transmitter will take a byte
+s1rxrdy	equ	002h		;status: a byte is waiting to be read
+s1quiet	equ	028h		;status: no framing and no parity error -
+				; a port with nothing on it reads ffh, which
+				; is both, so a quiet status is what a real
+				; board has and an empty socket cannot fake
+
+s1icw1	equ	050h		;master: ICW1/OCW2 and the read registers
+s1icw2	equ	051h		;master: ICW2/ICW3/ICW4 and the mask
+s1sicw1	equ	052h		;the slave's same two ports
+s1sicw2	equ	053h
+s1slave	equ	007h		;ICW3 of the slave: its id, the cascade line
+s1cas	equ	080h		;ICW3 of the master: the cascade is IR7
+s1sbuf	equ	008h		;ICW4: buffered slave, 8080 mode, EOI
+s1mbuf	equ	00ch		;ICW4: buffered master, same
 
 ;****************************************************************
 ;*								*
-;*  	     DMA Winchester Controller Equates			*
+;*	Switch equates						*
+;*								*
+;* The switch register is negated: a switch that is on reads as a	*
+;* clear bit.  Two of its eight bits are still meaningful.  Switch	*
+;* 6 says enter the monitor instead of booting; switch 5 says look	*
+;* for the System Support 1's serial port first.		*
 ;*								*
 ;****************************************************************
-cyl	equ	153		;number cylinders for Seagate ST-506
-heads	equ	  4		;number heads for Seagate ST-506
-stpdly	equ	 01eh		;15 msec for Seagate ST-506
-hdsetl	equ	 0C8h		;20 msec for Seagate ST-506
-secsiz	equ	  3		;512 byte sectors for Micronix
-readat	equ	  0		;DMA controller read sector opcode
-write	equ	  1		;DMA controller write sector opcode
-rhead	equ	  2		;DMA controller read header opcode
-format	equ	  3		;DMA controller format track opcode
-const	equ	  4		;load drive constants command
-sense	equ	  5		;return drive status command
-noop	equ	  6		;command used when seeking
-dmarst	equ	 54h		;DMA controller reset port
-attn	equ	 55h		;DMA controller Attention port
-stepout	equ	 10h		;Step direction to track 0
-stepin	equ	  0		;Step direction away from track 0
-track0	equ	  1		;track 0 status
-wfault	equ	  2		;write fault condition from drive
-dready	equ	  4		;drive ready status
-sekcmp	equ	  8		;seek complete status
-hdspt	equ	 17		;number of sectors per track
-iopb	equ	1050h		;pointer to the channel
-chan	equ	1080h		;actual channel
-select	equ	chan + 3	;select byte in channel
-dmaddr	equ	chan + 4	;24 bit dma address location
-arg	equ	chan + 7	;beginning of four arguments to commands
-cmmd	equ	chan + 11	;actual command location
-statis	equ	chan + 12	;controller return status location 
-link	equ	chan + 13	;link field address for next command
-bootad	equ	1100h		;dma address for first sector from hddma
-good	equ	0ffh		;good status result
 
-
+sw5	equ	008h		;switch 5 on: the System Support 1 first
+sw6	equ	004h		;switch 6 on: the monitor, not a boot
 
 ;****************************************************************
 ;*								*
@@ -264,6 +244,19 @@ bounce:	ds	100h			;256-byte bounce buffer
 ;	non-moving staging area for reading boot roms that live above 1M: it
 ;	sits in on-board ram below 0x1000, off the S-100 bus, so it stays put
 ;	while a rom is copied through here a chunk at a time.
+
+;	Free ram runs from here to gobuff, and it is where mon5.0's two
+;	resident blocks live: the console driver at conram, and the level 0
+;	copy loop above it at ramhome.  It is gobuff that ends the window,
+;	not the trap save frame above it, because the monitor writes its
+;	task switch stub at gobuff on every task switch and the level 0 rom
+;	writes its own there.  The frame is the kernel's contract - it reads
+;	the saved registers from 1e0h up (sys/uhdr.s, _oldstack, 32 bytes to
+;	1ffh) - and above the frame sit the other two contracts this ram
+;	carries: the map image at 200h, which stands in for the map
+;	registers, which cannot be read back, and local i/o at 400h.
+
+oldstk	equ	01e0h		;lowest word of the trap save frame
 
 	ds	(200h - 01eh) - $	;fill to the initialized-stack frame
 ;********************************************************
@@ -369,7 +362,8 @@ getsw:	jp	reset0
 
 
 reset0: call	reset1
-	call	uartst
+	call	ramdown		;resident level 0 copy loop
+	call	findcon
 	call	setup
 	jp	gobuff
 
@@ -441,28 +435,25 @@ badram: ld	hl,0badh
 	ld	(ersav),a
 	jp 	allerr			;if no ram force entry to monitor
 
-tstsw:	ld	a,(switch)		;get contents of switch
-	and	0f8h			;Ignore irrelevent bits
-	ld	d,a			;d & e contain jump address
-	ld	e,0H
-	cp	0			;all switches on -> the 4k selector rom
-	jp	z,copyrom
-	cp	08h			;If switch 5 is off others are on
-	jp	z,nuboot		; - boot DMA controller
-	cp	10h			;If switches 4 is off, others on
-	jr	z,djdma			; - boot the DJ-DMA floppy device
+;
+;	The switch is binary now.  Switch 6 on asks for the monitor and
+;	switch 6 off for a boot.  There is no jump address field left to
+;	read and no disk driver in this rom to read it for: a boot means
+;	the level 0 rom in its socket, and boot is the resident copy loop
+;	that brings it down into ram and enters it.
+;
+;	Switch 5 picked the console back at findcon.  Nothing else on the
+;	switch is read.
 
-check:	ld	a,(switch)		;test monitor switch
-	bit  	2,a
-	ld	a,1			;normal task number
-	ld	(u.pc),de		;initialize the  pc save area
+boot	equ	ramhome		;the resident level 0 copy loop
+
+tstsw:	ld	a,(switch)
+	and	sw6
+	jp	nz,boot			;switch 6 off reads set: the level 0 rom
+
+montor:	ld	a,1			;normal task number
 	ld	(ctask),a
-	jr	z,montor		;jump if monitor desired
-	ld	(mapram + 2),a
-	ld	(map + 2),a		;restore the maps
-	jr	nutask
-
-montor:	xor	a			;monitor task number
+	xor	a			;monitor task number
 	ld	de,cold			;monitor location
 
 nutask: ld	hl,gobuff		;Write a routine to switch to new task
@@ -497,12 +488,20 @@ nutask: ld	hl,gobuff		;Write a routine to switch to new task
 
 ;****************************************************************
 ;*								*
-;*	Wunderbuss I/O and Mult I/O PIC initialization	rou-	*
-;*	tine.  Interrupt vectors = restart locations.		*
+;*	Interrupt controller initialization.  The console says	*
+;*	which controllers the machine has: the Wunderbus board	*
+;*	carries one 8259 behind its group select port, and the	*
+;*	System Support 1 carries a cascaded pair of its own.	*
+;*	Either way the vectors are the restart locations and	*
+;*	every line is masked, because the monitor polls.	*
 ;*								*
 ;****************************************************************
 
-picset:	xor     a
+picset:	ld	a,(concon)
+	or	a
+	jr	nz,picss1		;not a Wunderbus console
+
+	xor     a
 	out	(grpctl),a
 	ld	a,ivalu
 	out	(icw1),a		;initialize the first word
@@ -517,122 +516,41 @@ picset:	xor     a
 	out	(ocw2),a		;clear the slaves interrupt requests
 	ret
 
+;	The System Support 1's pair.  The slave goes first so that it is
+;	not signalling when the master arms.  Neither takes an EOI: no
+;	line was ever unmasked, so none is pending.
+
+picss1:	ld	a,ss1valu
+	out	(s1sicw1),a		;initialize the slave
+	ld	a,hivect
+	out	(s1sicw2),a
+	ld	a,s1slave
+	out	(s1sicw2),a		;its id: the master's cascade line
+	ld	a,s1sbuf
+	out	(s1sicw2),a
+	ld	a,picmask
+	out	(s1sicw2),a		;mask all interrupts
+	ld	a,ss1valu
+	out	(s1icw1),a		;then the master
+	ld	a,hivect
+	out	(s1icw2),a
+	ld	a,s1cas
+	out	(s1icw2),a		;the cascade is IR7
+	ld	a,s1mbuf
+	out	(s1icw2),a
+	ld	a,picmask
+	out	(s1icw2),a		;mask all interrupts
+	ret
+
 
 ;****************************************************************
 ;*								*
-;* DJ-DMA floppy disk boot routine (5.25 or 8 inch).		*
+;*  Enter the monitor with whatever went wrong left in the	*
+;*  error save area, which cold prints.  A machine with no ram	*
+;*  worth the name arrives here as surely as one whose console	*
+;*  answered nothing: there is nothing else left to do with it.	*
 ;*								*
 ;****************************************************************
-
-djdma:	ld	h,10h			; wait byte for 1 minute 
-djlop0:	ld	bc,0000h
-djloop:	ld	a,(djstat)		;read the status back
-	cp	040h
-	ld	de,(djstat - 2)		;d & e point to cold boot loader
-	jr	z,check			;if good status continue set gobuff
-	cp	0ffh			; - else loop for good status
-	jr	z,nstat			;if 0ffh then force to a zero
-	dec	bc
-	ld	a,b
-	or	c
-	jr	nz,djloop
-	dec	h
-	jr	nz,djlop0		;continue looping till a minute elapses
-
-;	DJ-DMA not responding correctly
-
-	ld	c,'F'
-	ld	a,(djstat)
-	ld	b,a			;save the error status
-	ld	a,(djstat - 2)
-	ld	d,a
-	jr	derror			;go to error--controller not
-					; - responding
-
-nstat: 	xor	a
-	ld	(djstat),a		;null status byte ... signal DJ-DMA
-	jr	djloop
-
-;****************************************************************
-;*								*
-;* Hard Disk Boot program for the DMA Winchester Controller.	*
-;*								*
-;****************************************************************
-
-nuboot:	ld	bc,endboot - bootbl	;byte count
-	ld	hl,bootbl		;source
-	ld	de,chan			;destination
-	ldir				;move the command
-	ld	hl,iopb			;point to default channel addr
-	ld	(hl),80h		;fill in the command channel address
-	xor	a
-	inc	hl			; -located at 50h to point to channel
-	ld	(hl),a			; -at 80h.
-	inc	hl
-	ld	(hl),a
-	out	(dmarst),a		;send the controller a reset
-	ld	de,010h
-
-hdrl:	dec	d			;wait for controller to process reset
-	jr	nz,hdrl
-	call	cloop
-home:	ld	hl,-1			;seek to home
-	ld	(chan + 1),hl		;- with ffff step pulses
-	ld	a,noop
-	ld	(statis - 1),a		;null the command byte
-	ld	a,1
-	ld	(statis),a		;initialize the status byte
-	call	cloop
-	
-rdata: 	ld	de,chan			;destination
-	ld	bc,endrd - rdtbl	;byte count
-	ld	hl,rdtbl		;source
-	ldir				;move the read sector command
-	call	cloop
-	ld	de,0100h		;point to beginning of DMA boot prog.
-	jp	check
-
-			
-cloop:	ld	c,020h
-cloop0:	out	(attn),a
-	ld	de,0000h
-cloop1: ld	a,(statis)		;check drive status
-	cp	0ffh			;an FF means command completed
-	ret	z
-	dec	de			;wait for controller to respond
-	ld	a,e
-	or	d
-	jr	nz,cloop1		;give it a couple seconds to respond
-
-;	Fall through to here on any error
-
-	ld	a,(statis)
-	cp	01h
-	jr	nz,cloop2	
-	dec	c			;give it 10 tries if not rdy error
-	jr	nz,cloop0		; - about 20 seconds
-
-cloop2:	pop	de			;re-align the stack pointer
-	ld	c,'H'			;save the device
-	ld	b,a			;save the status
-	ld	a,(cmmd)		;save the command
-	ld	d,a
-
-;****************************************************************
-;*								*
-;*  Enter here if DISK controllers don't respond correctly.	*
-;*  Routine alters gobuff to point to the monitor cout routine.	*	
-;*								*
-;****************************************************************
-
-derror:	
-	ld	a,c
-	ld	hl,ersav
-	ld	(hl),a			;store c for later
-	inc	hl
-	ld	(hl),b			;error status
-	inc	hl
-	ld	(hl),d			;command causing error 
 
 allerr:	xor	a
 	ld	(ctask),a
@@ -644,8 +562,9 @@ allerr:	xor	a
 	
 ;****************************************************************
 ;*								*
-;* Selector boot: copy the 4k selector rom down from bank 15	*
-;* and run it.							*
+;* Level 0 boot: copy the 4k rom out of its socket and run it.	*
+;* This is the whole of what a boot is - the monitor has no	*
+;* disk driver, so the rom is what boots.			*
 ;*								*
 ;* The selector lives at physical 0ff0000h - bank 15, page 0f0h	*
 ;* - far above the 1M the map alone can reach.  The task		*
@@ -662,30 +581,34 @@ allerr:	xor	a
 ;*								*
 ;****************************************************************
 
-copyrom:
-	ld	hl,ramcode		;the copy loop, assembled at 132h
-	ld	de,0132h
+;	The level 0 copy loop is built here and copied into on-board ram
+;	at reset, because it cannot stay in the rom: banking the task
+;	register drops the reset half of the prom, and the monitor half
+;	cannot call into this one even before that.  It runs from ramcode,
+;	above the console driver, so both halves of the rom can reach it
+;	and the console survives the boot.
+
+ramdown:ld	hl,ramcode		;the copy loop, assembled at ramhome
+	ld	de,ramhome
 	ld	bc,ramend - ramcode
 	ldir
-	jp	0132h			;run it
+	ret
 
 ;
-; The copy loop, built in rom but run from on-board ram (132h).  It
-; banks the task register to 15, reads 256 bytes of the selector into
-; the bounce buffer, banks back to 0, and stores the bounce buffer to
-; physical 0f000h.  Sixteen passes cover the 4k.
+; The copy loop, built in rom but run from on-board ram.  It banks the
+; task register to 15, reads 256 bytes of the selector into the bounce
+; buffer, banks back to 0, and stores the bounce buffer to physical
+; 0f000h.  Sixteen passes cover the 4k, counted in h, which walks from
+; 1000h to 2000h as the source does.
 ;
 ramcode:
-	.phase	132h
+	.phase	ramhome
 	ld	a,0f0h			;seg 1 -> page 0f0h, the rom
 	ld	(mapram+2),a
 	ld	(map+2),a
 	ld	a,00fh			;seg 2 -> page 0fh, physical 0f000h
 	ld	(mapram+4),a
 	ld	(map+4),a
-	exx
-	ld	b,16			;loop counter lives in the alternate set
-	exx
 	ld	hl,1000h		;the rom, through seg 1
 
 cploop:	ld	a,0f0h			;bank 15 (task 0 stays)
@@ -705,10 +628,9 @@ cploop:	ld	a,0f0h			;bank 15 (task 0 stays)
 	ld	bc,0100h
 	ldir
 	pop	hl
-	inc	h			;next 256
-	exx
-	dec	b			;b'-- (8-bit dec sets Z)
-	exx
+	inc	h			;next 256 of the source
+	ld	a,h
+	cp	020h			;sixteen passes: 1000h to 1fffh
 	jr	nz,cploop
 
 	jp	0f000h			;enter the selector in task 0
@@ -730,6 +652,22 @@ bank:	ld	(task),a
 
 	.dephase
 ramend:
+
+;	The two resident blocks share the free window in the on-board ram,
+;	which runs from 132h, the byte after the monitor's bounce buffer,
+;	to gobuff at 1b0h, where the monitor writes its task switch stub
+;	on every task switch - and the level 0 rom writes its own there.
+;	Each block has a fixed home in the window, and neither may grow
+;	over its neighbour or over gobuff, so the bounds are asserted here
+;	rather than discovered on the machine: a console driver must end
+;	below the copy loop, and the copy loop below gobuff.  The copy
+;	loop's own home is the driver's ceiling, so a driver that grew past
+;	it would be overwritten by the next boot.  The trap save frame at
+;	oldstk is above all of this and out of reach here.
+
+	assert	cdwend - cdwb <= ramhome - condrv
+	assert	cdsend - cdsb <= ramhome - condrv
+	assert	ramend - ramcode <= gobuff - ramhome
 
 
 
@@ -768,132 +706,254 @@ rstmxx:	add	hl,de		;add offset to selected map
 ;*  							*
 ;********************************************************
 
-uartst:	ld	d,3			;start with uart 3
-uarts0:	ld	a,d
-	out   	(grpctl),a
-	xor 	a
-	out	(lsr),a			;clear line status register 
-	out 	(ier),a			;initialialize interupt mask (off)
-	dec	d
-	jr	nz,uarts0
-	out 	(grpctl),a		;select sense switch port
-	in	a,(base+1)		
-	rlca
-	rlca
-	rlca
-	and	07h			;mask insignificant bits
-	cp	07h			;all off?
-	ld	d,0
-	jr	z,default		;default if all off
-	ld	hl,btable		;point to baud rate table
-	add 	a,a
-	ld	e,a
-	add 	hl,de			;offset to selected baud rate
-	ld	c,(hl)
-	inc	hl
-	ld	b,(hl)			;bc = baud rate divisor value (D)
-	jr	setit
+;********************************************************
+;*							*
+;*  The console.  A machine has one of two.  The	*
+;*  Wunderbus i/o board carries an 8250, which is not	*
+;*  always visible: it sits behind the group select	*
+;*  port and is reached only after a group 1 write.	*
+;*  The System Support 1 carries a 2651, whose		*
+;*  registers are plain ports at 5ch through 5fh -	*
+;*  nothing else in the machine is there, since the	*
+;*  HDCA stops at 53h and the HD-DMA at 55h.		*
+;*							*
+;*  Both are programmed here for 19200 baud, 8 data	*
+;*  bits, no parity and one stop bit.  The switch names	*
+;*  which to look for first and the other is looked for	*
+;*  after it, so a machine with one console is found	*
+;*  either way and a machine with both is steered.	*
+;*							*
+;*  Neither driver can be a routine in the rom: the	*
+;*  console is called from both halves of it, and a rom	*
+;*  cannot hold code for a chip that may not be there.	*
+;*  The driver is built into on-board ram at reset	*
+;*  instead, and the monitor's console names are three	*
+;*  addresses in it.  The level 0 rom runs in task 0	*
+;*  with that ram mapped and calls the same three.	*
+;*							*
+;********************************************************
 
-default:
-	ld	bc,12			;default baud rate is 9600
+;	The console's home in the free window is conram, and the window's
+;	layout is set out at the top of this file.
 
-setit:	inc	d
-	ld	a,d
-	out	(grpctl),a
-	ld	a,dlab+wls1+wls0+stb
-	out 	(lcr),a			;divisor access bit is on
-	ld	a,b
-	out 	(dlm),a			;load high divisor register
-	ld	a,c
-	out 	(dll),a			;load low divisor register
-	ld	a,wls1+wls0+stb
-	out 	(lcr),a			;divisor access bit is off
-        ld	a,loop			;clear the shift register
-	out	(mcr),a			; - by looping back.
-	in	a,(rbr)			;clear receiver buffer
-	xor	a
-	out	(thr),a			;clear transmitter buffer
-	call	begin0
-	in	a,(rbr)
-	xor	a
-	out	(thr),a
-	call	begin0			;two times to make sure
-rduart:	in	a,(lsr)
-	and	dr 			;check for data available
-	jr	z,rduart
-	in	a,(rbr)			;intitialize receiver buffer
-	cp	0
-	jr	z,contin		;jump if UARTS good
+csend	equ	0		;its entry for sending the char in C
+crecv	equ	3		;its entry for waiting for one into A
+credy	equ	6		;its entry for asking whether one waits
 
-urterr:	push 	af
-	ld	a,'U'
-	ld	(ersav),a		;Uart error
-	ld	a,d			
-	ld	(ersav + 2),a		;Uart # saved
-	pop	af
-	ld	(ersav + 1),a		;bad character saved
-	xor	a
+;********************************************************
+;*							*
+;*  Find the console, program it, and build its	*
+;*  driver.  A probe answers with Z set if its console	*
+;*  is there and programs the chip either way, so a	*
+;*  machine with both ends up with the one that was	*
+;*  found.						*
+;*							*
+;********************************************************
 
-contin:	out	(mcr),a
-	ld	a,d
-	cp	3			;initialize all three uarts
-	ret	z
-	jr	setit
+findcon:ld	a,(switch)
+	and	sw5
+	jr	nz,fconw		;switch 5 off: Wunderbus first
+	call	findss1
+	jr	z,fconss
+	call	findwb
+	jr	z,fconwb
+	jr	nocon
 
-begin0:	in	a,(lsr)
-	and	thre
-	jr	z,begin0
+fconw:	call	findwb
+	jr	z,fconwb
+	call	findss1
+	jr	z,fconss
+	jr	nocon
+
+fconwb:	xor	a			;0: the Wunderbus 8250 answered
+	ld	hl,cdwb
+	ld	bc,cdwend - cdwb
+	jr	fconcp
+
+fconss:	ld	a,1			;1: the System Support 1's 2651
+	ld	hl,cdsb
+	ld	bc,cdsend - cdsb
+
+fconcp:	ld	(concon),a		;name what answered
+	ld	de,condrv
+	ldir				;and build its driver
 	ret
 
+nocon:	ld	a,2			;2: neither answered
+	ld	(concon),a
+	ld	a,'U'
+	ld	(ersav),a		;the monitor's error byte, in case
+hang:	halt				; - one runs.  There is no console
+	jr	hang			; - to say this on, so the machine stops
 
-;  Baud rate selection table for Mult I/o or WB I/O
+;********************************************************
+;*							*
+;*  Probe for the Wunderbus 8250 and program it.  The	*
+;*  divisor is fixed: 6 is 19200 baud from the board's	*
+;*  1.8432 MHz clock.  The test is the loopback in the	*
+;*  modem control register - with it on, a byte sent	*
+;*  comes straight back - so a chip that is there hands	*
+;*  back the zero it was sent and an empty socket hands	*
+;*  back ffh.						*
+;*							*
+;********************************************************
 
-btable:	dw	1047			;110 baud		0 0 0
-	dw	384			;300 baud		0 0 1
-	dw	96			;1200 baud		0 1 0
-	dw	48			;2400 baud		0 1 1
-	dw	24			;4800 baud		1 0 0
-	dw	12			;9600 baud		1 0 1
-	dw	6			;19200 baud		1 1 0
+findwb:	ld	a,group1
+	out	(grpctl),a		;a group 1 write reaches the uart
+	xor	a
+	out	(lsr),a			;clear line status register
+	out	(ier),a			;interrupt mask off
+	ld	a,dlab+wls1+wls0
+	out	(lcr),a			;divisor access on
+	xor	a
+	out	(dlm),a			;high divisor
+	ld	a,6
+	out	(dll),a			;low divisor: 19200 baud
+	ld	a,wls1+wls0
+	out	(lcr),a			;divisor access off, 8 data bits
+	ld	a,loop
+	out	(mcr),a			;loop back
+	in	a,(rbr)			;drop what is in the receiver
+	xor	a
+	out	(thr),a			;send a zero
+	call	wbwait
+	in	a,(rbr)			;it should come back
+	xor	a
+	out	(thr),a
+	call	wbwait
+	in	a,(rbr)			;twice, to be sure
+	push	af
+	xor	a
+	out	(mcr),a			;loop back off
+	pop	af
+	or	a			;Z set: the zero came back
+	ret	z
+	or	0ffh			;Z clear: there is no uart here
+	ret
 
-; Load constants command for the DMA Winchester controller
+wbwait:	in	a,(lsr)			;a socket with nothing on it reads
+	and	thre			; - ffh, which has this bit set, so
+	jr	z,wbwait		; - this wait cannot hang on one
+	ret
 
-bootbl: db	10h			;direction --> track 0
-	db	0			;low steps
-	db	0			;high steps
-	db	03ch			;select drive 0
-	db	0			;low dma address
-	db	01			;high dma address
-	db	0			;extended dma address
-	db	0			;argument 0
-	db	stpdly			;argument 1
-	db	hdsetl			;argument 2
-	db	secsiz			;argument 3
-	db	const			;load constants opcode
-	db	0			;clear status byte
-	db	80h			;low link address
-	db	0			;high link address
-	db	0			;extended link address
+;********************************************************
+;*							*
+;*  Probe for the System Support 1's 2651 and program	*
+;*  it.  The mode registers carry the baud rate and the	*
+;*  format, so there is no divisor to load and no access	*
+;*  bit to set: the two mode registers are written one	*
+;*  after the other and the command turns both halves of	*
+;*  the channel on.  A real chip then reports itself	*
+;*  ready to send; an empty socket reads ffh, which is	*
+;*  every error bit set at once.			*
+;*							*
+;********************************************************
 
-endboot equ	$
+findss1:ld	a,s1mr1
+	out	(s1mode),a		;8 data bits, no parity, one stop
+	ld	a,s1mr2
+	out	(s1mode),a		;19200 baud
+	ld	a,s1cen
+	out	(s1cmd),a		;transmitter and receiver on
+	in	a,(s1stat)
+	ld	b,a			;keep the status
+	and	s1quiet
+	jr	nz,fs1no		;framing or parity error: not here
+	ld	a,b
+	and	s1txrdy
+	jr	z,fs1no			;never came ready: not here
+	xor	a			;Z set: the chip answered
+	ret
+fs1no:	or	0ffh			;Z clear: no 2651 here
+	ret
 
-; Read sector 1, head 0, cyl 0  command for the HD-DMA:
+;********************************************************
+;*							*
+;*  The Wunderbus console driver, built at condrv when	*
+;*  the 8250 answers.  The three entry points come	*
+;*  first, so both drivers offer the same three		*
+;*  addresses and no caller asks which was built.	*
+;*							*
+;*  Every access selects group 1 first: the 8250 sits	*
+;*  behind the group select port, and the monitor is not	*
+;*  the only thing that writes that port.		*
+;*							*
+;********************************************************
 
-rdtbl:	db	0			;no seek
-	db	0
-	db	0
-	db	07ch			;select drive 0, head 0 
-	db	0			;dma address of 100h
-	db	1
-	db	0
-	db	0			;low byte cylinder
-	db	0			;high byte cylinder
-	db	0			;head 0
-	db	0			;sector 1
-	db	0			;read command
-	db	0			;clear status
+cdwb:
+	.phase	condrv
+	jp	cdwout			;+0: send the character in C
+	jp	cdwin			;+3: wait for a character into A
+	jp	cdwst			;+6: is one waiting?
 
-endrd 	equ	$
+cdwout:	ld	a,group1
+	out	(grpctl),a
+cdwo1:	in	a,(lsr)			;wait for the transmitter to empty
+	and	thre
+	jr	z,cdwo1
+	ld	a,c
+	out	(thr),a
+	ret
+
+cdwin:	ld	a,group1
+	out	(grpctl),a
+cdwi1:	in	a,(lsr)			;wait for a character to arrive
+	and	dr
+	jr	z,cdwi1
+	in	a,(rbr)
+	and	07fh			;strip parity
+	ret
+
+cdwst:	ld	a,group1
+	out	(grpctl),a
+	in	a,(lsr)
+	and	dr
+	ret	z			;Z set: nothing waiting
+	ld	a,0ffh
+	ret
+	.dephase
+cdwend:
+
+;********************************************************
+;*							*
+;*  The System Support 1 console driver.  There is no	*
+;*  group select to set and no divisor to load - the	*
+;*  baud rate went in with the mode registers - so all	*
+;*  that is left before a byte is to poll the status.	*
+;*							*
+;********************************************************
+
+cdsb:
+	.phase	condrv
+	jp	cdsout			;+0: send the character in C
+	jp	cdsin			;+3: wait for a character into A
+	jp	cdsst			;+6: is one waiting?
+
+cdsout:	in	a,(s1stat)		;wait for the transmitter to empty
+	and	s1txrdy
+	jr	z,cdsout
+	ld	a,c
+	out	(s1data),a
+	ret
+
+cdsin:	in	a,(s1stat)		;wait for a character to arrive
+	and	s1rxrdy
+	jr	z,cdsin
+	in	a,(s1data)
+	and	07fh			;strip parity
+	ret
+
+cdsst:	in	a,(s1stat)
+	and	s1rxrdy
+	ret	z			;Z set: nothing waiting
+	ld	a,0ffh
+	ret
+	.dephase
+cdsend:
+
+;	Both drivers are measured against the window at the copy loop, not
+;	against the trap save frame: gobuff is nearer and the level 0 rom's
+;	home above it is nearer still.
 
 
 
@@ -909,7 +969,6 @@ ecode0  equ	$			;End of reset prom code
 ;*								*
 ;****************************************************************
 
-	ld	hl,djstat
 	ld	a,0h
 	ld	(mapram + 2),a		;t0 map points to t1 map seg 0
 	inc	a
@@ -1364,48 +1423,29 @@ UBLK:	LD	C,020H
 
 ;********************************************************
 ;*							*
-;*  Console I/O routines for the Wunderbus I/O.  These	*
-;*  routines assume that the uart divisor latch has 	*
-;*  previously set (either on power up or in routine 	*
-;*  executed before a trap to this routine occurred.    *
-;*  The character to output should be in the 'C' reg-	*
-;*  ister, the character received is returned in the	*
-;*  'A' register.  UCSTS returns with zero flag set	*
-;*  when no character is waiting in the UART buffer,	*
-;*  or with A = FFh if a character is waiting.		*
+;*  The console, as the rest of the monitor reaches it.	*
 ;*							*
-;********************************************************	
+;*  There is no routine here because there is no one	*
+;*  console: a machine has the Wunderbus board's 8250 or	*
+;*  the System Support 1's 2651, and this half of the	*
+;*  rom has no room for code for both.  A driver for	*
+;*  whichever was found is built into on-board ram at	*
+;*  reset - findcon, in the other half - and these three	*
+;*  names are its three entry points, which sit at the	*
+;*  same addresses either way.				*
+;*							*
+;*  The character to output is in the 'C' register and	*
+;*  the character received is returned in 'A'.  UCSTS	*
+;*  returns with the zero flag set when no character is	*
+;*  waiting and with A = FFh when one is.  That is what	*
+;*  the driver keeps, so every call to them above is	*
+;*  unchanged by which console answered.			*
+;*							*
+;********************************************************
 
-
-ucout1:	call	uconinit
-ucout2:	in	a,(lsr)			;get uart status
-	and	thre
-	jr	z,ucout2		;loop until tbe
-	ld	a,c
-	out	(thr),a			;output the data to uart
-	ret
-
-ucon1:	call	uconinit
-ucon2:	in	a,(lsr)			;get uart status
-	and	dr
-	jr	z,ucon2			;wait until receive data available
-	in	a,(rbr)			;read the uart data register
-	and	07fh			;strip parity
-	ret
-
-ucsts:	call	uconinit		
-	in	a,(lsr)			;read uart status
-	and	dr
-	ret	z			;return zero set if no character
-	ld	a,0ffh
-	ret				;return a = ffh if character waiting
-
-uconinit:
-	ld	a,group1
-	out   	(grpctl),a		;set up for UART 1
-	ld	a,wls0+wls1+stb		
-	out 	(lcr),a			;8 bit word, 2 bit stop bits
-	ret		
+ucout1	equ	condrv + csend
+ucon1	equ	condrv + crecv
+ucsts	equ	condrv + credy
 
 
 
@@ -1646,32 +1686,18 @@ ucont1:	ld	sp,iy			;get back the user save stack
 	push	de
 	ret				;return to user through 'gotask'
 
-;	Jump to the cpu switch address into task specified by CTASK
-;	No registers are preserved!!
+;	'B' - boot.  There is one boot now and it is the level 0 rom:
+;	the resident copy loop at ramhome brings it down from its socket
+;	and enters it, which is what reset does for a machine with switch
+;	6 off.  No registers are preserved: this does not return, and the
+;	loop runs from on-board ram, which the rom going away cannot
+;	reach.
 
 uboot:	cp	'B'
 	jr	z,uboot1
 	cp	'b'
 	jp	nz,uerror
-uboot1:	ex	Af,Af'
-	exx
-	xor	a
-	inc	a
-	ld	(mapram + 2),a		;restore the actual map
-	ld	(map + 2),a		;restore map image 
-	ld	a,(switch)
-	and	0f8h
-	cp	0			;IDE Boot?
-	jr	z,uboot2		
-	cp	8			;HD-DMA Boot?
-	jr	z,uboot2
-	cp	10h			;DJ-DMA Boot?
-	jr	z,uboot2
-	ld	h,a			;Memory Address jump
-	ld	l,0
-	jp	bcomnd
-uboot2: ld	hl,(u.pc)		;get the boot address for controllers
-	jp	bcomnd
+uboot1:	jp	boot
 
 
 ;	MEMORY MISMATCH PRINTOUT
