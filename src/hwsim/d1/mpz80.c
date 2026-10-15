@@ -389,7 +389,7 @@ int trace_trap;
  * it.
  */
 #ifndef NODEBUG
-int stub_reported;
+int lowmem_reported;    /* the rst 38 report below has been made */
 #endif
 
 #ifndef NODEBUG
@@ -798,9 +798,10 @@ trap(byte trapbits, word from)
  *
  * So a stale pc becomes the address the kernel will resume the process
  * at, and it does not look wrong - it looks like an address.  Once it
- * came out as 0092, which is inside the first level boot sector that has
- * been dead since the machine started, and the byte there is d7, rst 10.
- * Init was blamed for jumping into nothing for most of a day.
+ * came out as 0092, which is not code the program has and never was: the
+ * djdma's bootstrap sector sat there, left over from a boot the card no
+ * longer runs, and the byte it landed on is d7, rst 10.  Init was
+ * blamed for jumping into nothing for most of a day.
  *
  * So set a flag and let the main loop take it, which is the same
  * correction the djdma interrupt needed: deliver the event after the
@@ -1231,30 +1232,32 @@ get_byte(vaddr addr)
      * that easy, so the brute force here will have to do. - XXX
      */
     /*
-     * The djdma bootstrap lives at 0038, which is rst 38 - and ff, the
-     * byte unwritten memory reads as, is the opcode for rst 38.  So a
-     * program that runs off into nothing lands in the simulator's boot
-     * stub, which clears its own flag and waits for a value that is only
-     * written once, at startup.  A crash becomes a silent spin at 003d
-     * and nothing says what happened.
+     * 0038 is rst 38, and ff - the byte unwritten memory reads as - is
+     * the opcode for rst 38.  So a program that runs off into nothing
+     * lands in low memory, and the low memory it lands in holds no
+     * handler: the djdma's bootstrap stub used to be there (nineteen
+     * bytes at 0038, waiting on a flag at 004a), and with the card
+     * strapped against bootstrapping it is not.  The rst then recurses
+     * into itself and grinds the stack down through memory, at full
+     * speed, with nothing to show for it.
      *
-     * The first entry is the boot and is expected.  Any entry after that
-     * is a program that has just executed something that was not code,
-     * and rst pushed the address after it, so the stack says where.
+     * So say once that this is where the machine went, and let the stack
+     * say where from: rst pushed the address after the instruction, so
+     * the top of it is the return address of the last real code that ran.
      */
 #ifndef NODEBUG
     if (m1) {
         if ((addr >= 0x38) && (addr <= 0x4c)) {
-            if (!stub_reported) {
+            if (!lowmem_reported) {
                 char sbuf[16];
 
-                stub_reported = 1;
-                printf("bootstrap stub entered at %04x (%s), stack top %04x\n",
+                lowmem_reported = 1;
+                printf("rst 38 at %04x (%s), stack top %04x\n",
                     addr, dis_space(addr, sbuf, sizeof(sbuf)),
                     fuword(z80_get_reg16(sp_reg)));
             }
         } else {
-            stub_reported = 0;
+            lowmem_reported = 0;
         }
     }
 #endif
@@ -1537,7 +1540,6 @@ mpz80_setup()
 {
     rom_filename = "mon447.bin";
     rom_size = 4096;
-    switchreg = SW_HDDMA | SW_NOMON;    // set diagnostic, monitor or boot mode
     switchreg = SW_DJDMA | SW_NOMON;    // set diagnostic, monitor or boot mode
     keybreg = 0;
     set_taskreg(0);

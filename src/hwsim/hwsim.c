@@ -2101,7 +2101,9 @@ main(int argc, char **argv)
      * With nothing said at all, put the usual disk in the usual drive.
      * But not when a 5 1/4 inch floppy was named: that asks for a machine
      * booting off the other port, and quietly occupying the 8 inch one
-     * would take that boot away - the controller tries 8 inch first.
+     * would take that boot away - level 1 asks the drives in order, from
+     * drive 0, and stops at the first one carrying a labelled diskette
+     * (l1boot.s's djprobe).  Drive 0 is an 8 inch drive.
      */
     if (!drivenames && !fivenames && !anydrive) {
         drivenames = malloc(sizeof(char *) * 2);

@@ -376,8 +376,8 @@ c = tracks - tracks/2 - no plus one:
 	16 meg	block 15606	cylinder 0 is 102 blocks
 
 Taking the whole cylinder rather than one block costs 34K or 51K, keeps
-the second level next to the first where it can be read without seeking,
-and stops the filesystem putting anything else in cylinder 0.
+level 3 next to level 2 where it can be read without seeking, and stops
+the filesystem putting anything else in cylinder 0.
 
 The tools for it are here.  Make the file, edit its inode so its block
 list is c*spc upward - mnix block -e - then icheck -s to rebuild the
@@ -472,10 +472,12 @@ what goes in the first 512 bytes
 --------------------------------
 
 The ROM reads one sector to physical 0100 and enters task 1 at 0100, so
-the first block of the file is a first level boot and has to be built for
-0100 - not 0080, where the floppy's runs, because that address belongs to
-the DJ/DMA ROM's convention and not to this one.  M5LOAD's first level
-cannot be dropped in unchanged for that reason.
+the first block of the file is level 2 and has to be built for 0100.  It
+has not always been the only base: a diskette boot written for the
+DJ/DMA card's own bootstrap sat at 0080, because that bootstrap read its
+sector there, and M5LOAD's level 2 is one of those.  That bootstrap is
+strapped off now and a diskette's level 2 is read to 0100 like every
+other, but M5LOAD's cannot be dropped in unchanged for that reason.
 
 M5LOAD is 12K, which is 24 blocks - three times the eight addresses an
 inode holds, so the boot file is an ILARG file with an indirect block
@@ -484,20 +486,21 @@ ten meg drives and a quarter of it on the sixteen, so the cylinder holds
 it with room to spare.
 
 Not all of that is program.  M5LOAD is a floppy's system tracks, so it is
-zero to 0800, the first level at 0800, the second level from 0a00 to
+zero to 0800, level 2 at 0800, level 3 from 0a00 to
 6272, and padding after - about nine blocks of content in a 24 block
 file.  Which means it cannot be written into the boot file as it stands:
 block 0 of the file is what the ROM reads, and block 0 of M5LOAD is zero.
-The two pieces have to be laid down deliberately, first level in block 0
-and second level from block 1, and the first level is being rewritten for
-0100 anyway.
+The two pieces have to be laid down deliberately, level 2 in block 0
+and level 3 from block 1, and level 2 is being rewritten for 0100
+anyway.
 
-It has 512 bytes to work in rather than the floppy's 128, and it has less
-to do than the floppy's does: nuboot has already sent the controller its
-load constants command by the time this code runs, so the drive is
-configured and only read commands are needed.  It has to pull the rest of
-cylinder 0 in and enter the second level, which is M5LOAD's, at 0100 -
-so it has to load it somewhere else and jump, or move itself first.
+It has 512 bytes to work in rather than a diskette's 256 - a diskette's
+level 2 shares its sector with the label - and it has less to do than the
+1982 floppy's did: nuboot has already sent the controller its load
+constants command by the time this code runs, so the drive is configured
+and only read commands are needed.  It has to pull the rest of cylinder 0
+in and enter level 3, which is M5LOAD's, at 0100 - so it has to load it
+somewhere else and jump, or move itself first.
 
 What this does not survive: deleting the file, or reinstalling with
 cptree.  cptree copies contents, not block numbers, and running as root
@@ -554,8 +557,8 @@ booting one, which works
 
 The first proof of the path was a hand built filesystem, host side:
 
-    make bootimg in micronix/stand/boot	first level padded to a block,
-					second level after it
+    make bootimg in micronix/stand/boot	level 2 padded to a block,
+					level 3 after it
     mkfs -i bootimg <fs>		claims cylinder 0 as it builds the
 					free list, so nothing else is needed
     permute the filesystem into physical order, prepend a label
@@ -570,8 +573,8 @@ wants for nuboot; 0x14 is the floppy, and it is the default.
 
 which is the whole path: nuboot read cylinder 0 head 0 sector 0, entered
 mwboot1 at 0100, which moved itself to c000, read the eight sectors after
-it through the channel the rom had already set up, and jumped to the
-second level - which found the drive, read the filesystem and listed the
+it through the channel the rom had already set up, and jumped to
+level 3 - which found the drive, read the filesystem and listed the
 root directory.  Nothing bootable in it because that filesystem is empty
 apart from /boot, which is mode 0.
 

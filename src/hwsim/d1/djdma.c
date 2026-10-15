@@ -219,6 +219,13 @@ static void *imdp[8];
  * drives are logically 0-3 and the 5 1/4 inch 4-7 by default, and SET
  * LOGICAL DRIVE with bit 2 set swaps the two.  Since the banks are four
  * apart and four wide, the whole mapping is one bit.
+ *
+ * It starts at the default and, on this machine, stays there: the card
+ * is strapped not to bootstrap (J2 A to B), so nothing renumbers the
+ * drives at power-on, and what a guest sees is the fixed numbering that
+ * djdma.4's minor numbers and the -d/-5 names both assume.  Only a guest
+ * that issues SET LOGICAL DRIVE moves it, and then it is the guest's own
+ * arithmetic to undo.
  */
 static int five_first;
 
@@ -670,6 +677,11 @@ setretry()
 
 /*
  * set logical drive
+ *
+ * The only thing that moves the numbering now: the card does not
+ * renumber itself at power-on, since nothing runs the firmware's
+ * bootstrap, so this is a guest's to do and a guest's to undo.  See
+ * physdrive().
  */
 static unsigned char
 setdrive()
@@ -1217,24 +1229,29 @@ djexec()
     return S_NORMAL;
 }
 
-byte lowmem_save[38];
-byte bootstrap[] = {
-    0x21, 0x4a, 0x00,   //      ld hl, 004a
-    0x36, 0x00,         //      ld (hl), 0
-    0x7e,               // loop:ld a, (hl)
-    0xb7,               //      or a,a
-    0xca, 0x3d, 0x00,   //      jp z, loop
-    0xfe, 0x40,         //      cp a,0x40
-    0xc2, 0x3d, 0x00,   //      jp nz, loop
-    0xc3, 0x80, 0x00,   //      jp 80
-    0xff                //      db ff
-};
-
 extern char **drivenames;
 extern char **fivenames;
 /*
- * hook up the registers and do reset processing
- * this runs the load sector 0 to physical memory 0
+ * hook up the registers and load the images into the drives
+ *
+ * What is deliberately not here is the card's own bootstrap.  The
+ * DJDMA25 firmware carries one - nineteen bytes at 0038 that wait on a
+ * flag at 004a and then jump to 0080, where the firmware has put the
+ * first 128 bytes of track 0 - and it runs it at power-on unless the
+ * card is strapped against it.  J2 is that strap and A to B is the
+ * non-bootstrapping position (B to C is the manual's conditional
+ * bootstrap), which is how this machine is wired.
+ *
+ * So the card comes up idle and level 1 does the reading, the way it
+ * does for every other controller: mon500's djdma entry and l1boot.s's
+ * DJ row write the channel program themselves and put block 0 where the
+ * driver wants it.  See stand/roms/l1boot.s and stand/boot/djboot1.s.
+ *
+ * The drives keep their numbers for the same reason.  The firmware's
+ * bootstrap tested the 8 inch port first and made the drive it booted
+ * from answer to logical 0 (manual 2.6.7), which is a numbering nothing
+ * that was not told about it can use; with the bootstrap off, the
+ * numbering is the manual's default and stays there.  See physdrive().
  */
 /*
  * The media changer (sys/MEDIACHG.md): out-of-band removable-media
@@ -1648,45 +1665,11 @@ djdma_init()
     }
 
     /*
-     * The DJDMA25 firmware boots from the first ready drive, testing the
-     * 8 inch port first, and renumbers so that drive answers to 0 (manual
-     * 2.6.7, section 7).  Emulated here, because the boot below reads
-     * logical 0 and has to land on the drive the firmware chose.  The
-     * kernel then wants the fixed numbers its dev/devlist names - 8 inch
-     * at 0-3, 5 1/4 at 4-7 - so the drive is put back with SET LOGICAL
-     * DRIVE (0x2e, bit 2 clear) before it runs.
+     * And that is all: no bootstrap, no renumbering, no block 0 read to
+     * 0080.  See the header comment above djdma_init.  Whether there is
+     * anything to boot from is level 1's question to ask, and it asks it
+     * of the drives themselves.
      */
-    if (!imdp[0] && imdp[FIVE]) {
-#ifndef NODEBUG
-        printf("djdma: booting the 5 1/4 inch port, its drives are now 0-3\n");
-#endif
-        five_first = 1;
-    }
-
-    for (i = 0; i < 38; i++) {
-        lowmem_save[i] = physread(i);
-        physwrite(i, 0);
-    }
-    for (i = 0; i < sizeof(bootstrap); i++) {
-        physwrite(i + 0x38, bootstrap[i]);
-    }
-    /*
-     * The bootstrap loads the first sector of the boot drive, and the
-     * boot drive is logical 0 - which after the renumbering above may be
-     * on either port.  Manual section 7: 80 hex bytes are loaded from
-     * the first sector on track 0 of the disk, and the cpu is sent to
-     * 000080.
-     */
-    if (imdp[physdrive(0)]) {
-        imd_read(imdp[physdrive(0)], 0, 0,
-            imd_firstsec(imdp[physdrive(0)], 0, 0), secbuf);
-        copyout(secbuf, 0x80, 0x80);
-    } else {
-#ifndef NODEBUG
-        printf("djdma: no disk to boot from\n");
-#endif
-    }
-    physwrite(0x4a, 0x40);
     return 0;
 }
 
