@@ -18,9 +18,11 @@
  * The geometry is not fixed and never was, it was guessed: one floppy is
  * 40 cylinders by two heads by ten sectors and another is 77 by one by
  * fifteen, and this file used to hold the first of those as constants.
- * It reads the medium off the disk instead, out of the label in the
- * block the rom read us from - the same struct dlabel a hard disk
- * carries, saying the same kind of thing.  See sys/dlabel.h.
+ * It comes off the medium instead, out of the label in the block the rom
+ * read us from - the same struct dlabel a hard disk carries, saying the
+ * same kind of thing.  The level 2 sector hands that block on rather than
+ * this file reading it again: see reset() and djboot1.s.  See
+ * sys/dlabel.h.
  */
 #include <types.h>
 #include <sys/dlabel.h>
@@ -40,6 +42,21 @@
 #define	INIT	= 0
 
 /*
+ * The label's magic - the four bytes that say a block holds a struct
+ * dlabel at DL_OFFSET.  What it checks here is the handover: the rom
+ * found a block 0 with this in it and the level 2 sector copied that
+ * block whole, so anything else at 0x1000 means the copy did not happen
+ * and the geometry below would be read out of whatever did.
+ */
+static int
+hasmagic(lp)
+register struct dlabel *lp;
+{
+	return lp->d_magic[0] == DL_MAGIC[0] && lp->d_magic[1] == DL_MAGIC[1] &&
+	    lp->d_magic[2] == DL_MAGIC[2] && lp->d_magic[3] == DL_MAGIC[3];
+}
+
+/*
  * Fixed addresses, reached through a pointer rather than as
  *
  *	*(int *)CCA = ...;
@@ -50,12 +67,6 @@
  * from one read to the next are written once, in reset().
  */
 UINT8 *chan = (UINT8 *)CCA;
-
-/*
- * Declared before anything calls it: an undeclared call is extern int by
- * default and the definition says static.
- */
-static int djrsec();
 
 char tries INIT;
 int curcyl INIT;
@@ -114,22 +125,32 @@ int bps INIT;		/* blocks per sector: 2 on a 1K medium, else 1 */
 /*
  * reset the drive.  There is nothing to sense or probe: the drive is
  * the one the rom just read the boot from, so its constants are already
- * in the controller.  This prints the banner, writes the channel
- * program's invariant bytes, and reads the label.
+ * in the controller and its number is already in the channel program.
+ * This prints the banner, writes the parts of that program which never
+ * change, and takes the label from the block the level 2 sector copied
+ * up to buf0.
  */
 reset()
 {
 	register struct dlabel *lp;
 	register int i;
 	int sl;
-	int got;
 
 	outstr("Micronix loader for the DJ-DMA\n");
 
 	chan[0] = SETDMA;
 	chan[3] = 0;		/* dma high byte is always 0 */
 	chan[4] = SREAD;
-	chan[7] = 0;		/* drive 0 */
+	/*
+	 * And the drive byte - chan[7] - is deliberately not written here,
+	 * or anywhere in this directory.  It is the one the rom left there
+	 * when it read the block this loader came from: the rom asks every
+	 * drive on the controller for its block 0 and keeps the one whose
+	 * diskette answers with a label, so the diskette read here is by
+	 * construction the one in that drive, and the level 2 sector
+	 * patches this same program without touching the byte either.  See
+	 * stand/roms/l1boot.s's DJ row and djboot1.s.
+	 */
 	chan[9] = HALT;
 
 	/*
@@ -142,46 +163,28 @@ reset()
 		chan[8 + i * 2] = 0;
 
 	/*
-	 * The label, out of the block the rom read us from - the first
-	 * sector of the first track, which is the one place on the medium
-	 * that can be found knowing nothing about it.  It goes into boot.c's
-	 * buf0 at 0x1000, which nothing has used yet.
+	 * The label, out of the block the rom read.  djboot1.s copies the
+	 * whole of that 512 byte block to boot.c's buf0 at 0x1000, which is
+	 * where this would have read it to anyway and which nothing has
+	 * used yet, so there is nothing to read here.
 	 *
-	 * Its sector *number* is the one thing that cannot be known before
-	 * it is read: a soft sectored medium numbers its sectors from 1 and
-	 * a hard sectored one from 0, and the label is where that is written
-	 * down.  So read both and keep the one carrying the magic - nothing
-	 * else on that track is a label, so the magic is what says which
-	 * base this medium uses, and the medium answers by failing to
-	 * produce a sector it does not have.
+	 * That is the medium's doing and not a shortcut.  Which sector of a
+	 * block 0 carries the label depends on what a block 0 is, which
+	 * depends on the drive: on an eight inch drive, cylinder 0 head 0 is
+	 * single density - fm, 26 sectors of 128 bytes numbered from one -
+	 * so block 0 is the first four of them and the label is four
+	 * sectors in, while a five inch drive's block 0 is one whole sector
+	 * whose number the medium only states by not answering to the other
+	 * one.  The rom asked both questions to get here: it reads block 0
+	 * off every drive on the controller and keeps the one that answers
+	 * with a label, which is the same thing as knowing the numbering and
+	 * the shape of the block.  What it read is this block, and the level
+	 * 2 sector kept it whole.  See stand/roms/l1boot.s's djblock and
+	 * djboot1.s.
 	 */
 	lp = (struct dlabel *)(0x1000 + DL_OFFSET);
-	got = 0;
-	for (i = 0; i < 2; i++) {
-		if (!djrsec(0, 0, i, (char *)0x1000))
-			continue;
-		got = 1;
-		if (lp->d_magic[0] == DL_MAGIC[0] &&
-		    lp->d_magic[1] == DL_MAGIC[1] &&
-		    lp->d_magic[2] == DL_MAGIC[2] &&
-		    lp->d_magic[3] == DL_MAGIC[3])
-			break;
-	}
-	if (i == 2) {
-		if (!got)
-			outstr("cannot read cylinder 0\n");
-		/*
-		 * There is nothing to fall back on, and that is deliberate.
-		 * A disk that cannot say what it is cannot be read: every
-		 * block number goes through the geometry, so guessing it
-		 * means reading the wrong cylinder and calling whatever is
-		 * there a filesystem.
-		 */
-		else {
-			outstr("No disk label at cylinder 0.\n");
-			outstr("The medium is read from there and guessed nowhere.\n");
-			outstr("mnix bootflop writes one; mkbootimg builds one in.\n");
-		}
+	if (!hasmagic(lp)) {
+		outstr("No disk label in the block this boot came from\n");
 		bail();
 	}
 
@@ -191,15 +194,13 @@ reset()
 	}
 
 	/*
-	 * Which sector carried it is the medium's answer and the label's
-	 * is a claim; they have to be the same one, or every block number
-	 * after this reads the wrong sector and calls what it finds there
-	 * a filesystem.
+	 * Where the medium numbers its sectors from is the label's to state
+	 * and the rom's to have settled: every block number below is turned
+	 * into a sector name with it, and a name the track does not have
+	 * reads nothing at all.  The rom settled it by asking for the sector
+	 * that carries the magic.  It is also the first sector of a track,
+	 * which is where level 2 put level 3.
 	 */
-	if (lp->d_firstsec != i) {
-		outstr("Label and medium disagree about the first sector\n");
-		bail();
-	}
 	firstsec = lp->d_firstsec;
 
 	sl = lp->d_bootslice;
@@ -248,13 +249,13 @@ reset()
 }
 
 /*
- * Read one sector, from the cylinder the controller is told.
+ * Read one sector, from the cylinder it is handed.
  *
- * The cylinder is an argument rather than derived from a block number
- * because the label has to be read before a block number means
- * anything, and the label is at cylinder 0.  sec is the sector's number
- * on the track as the medium numbers it, with the head in bit 7 - the
- * DJ-DMA's own encoding, and not a block number.
+ * This is the primitive a block read is built on and it takes the
+ * medium's own coordinates - a cylinder, a head and a sector's number on
+ * the track, with the head in bit 7 of that last one, which is the
+ * DJ-DMA's own encoding and not a block number.  Turning a filesystem
+ * block number into those is readblock()'s, below.
  */
 static int
 djrsec(cyl, head, sec, dma)
@@ -277,9 +278,8 @@ char *dma;
 
 /*
  * One sector with retries, and loud about it.  The single attempt above
- * is silent because its caller asks for sectors a track may not have on
- * purpose - see the label probe in reset() - and a medium answering a
- * question with no is not a read error.
+ * is the silent one: it answers whether the sector came back or not, and
+ * everything that has something to say about a failure says it here.
  */
 int
 djread(cyl, head, sec, dma)

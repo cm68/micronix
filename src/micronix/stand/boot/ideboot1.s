@@ -1,17 +1,17 @@
 ;
-; ideboot1 - the first level hard disk boot for the IDE card
+; ideboot1 - the level 2 sector for the IDE card
 ;
 ; micronix/stand/boot/ideboot1.s
 ;
 ; The monitor's ideboot reads one sector - LBA 0, the drive's first -
 ; to 0100 and enters task 1 there.  That sector is this, and its job is
-; to bring in the sectors after it: the second level, which knows the v6
+; to bring in the sectors after it: level 3, which knows the v6
 ; filesystem and finds a kernel.
 ;
 ; mkfs -i puts both of us in a file that owns cylinder 0, so this is
-; block 0 of that file and the second level is block 1 onward.  Nothing
+; block 0 of that file and level 3 is block 1 onward.  Nothing
 ; else on the disk is involved and no filesystem is read here - that is
-; the second level's job, and this exists only because the rom will read
+; level 3's job, and this exists only because the rom will read
 ; one sector and no more.
 ;
 ;
@@ -140,13 +140,13 @@ start:
 
 ;
 ; Read sectors 1 through NSEC into STAGE upward.  Sector 0 is this code,
-; so the second level starts at 1, and the whole of it is on one
+; so level 3 starts at 1, and the whole of it is on one
 ; cylinder of any drive here.
 ;
 run:
 ;
 ; A stack of our own before anything calls anything, at the top of memory
-; for the reason mwboot1.s gives: the second level inherits it while it
+; for the reason mwboot1.s gives: level 3 inherits it while it
 ; loads the kernel, and the kernel is about to fill everything from 0100
 ; up.  Nothing below is any use - it is all about to be loader or kernel.
 ;
@@ -257,7 +257,7 @@ xfer:
 
 ;
 ; And clear bss, which the header counts and the file does not contain.
-; de already points at the first byte of it.  The C the second level is
+; de already points at the first byte of it.  The C level 3 is
 ; written in expects its globals zeroed and says so, so this is not
 ; optional.
 ;

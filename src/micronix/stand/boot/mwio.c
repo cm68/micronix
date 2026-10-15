@@ -41,7 +41,7 @@ struct drivespec {
  * because the compiler drops a store through a cast constant and says
  * nothing - no error, no exit status, just an object file with the
  * statement missing.  That is what left the controller pointing at the
- * first level's command block, re-executing it and never writing a
+ * level 2's command block, re-executing it and never writing a
  * status byte, while the loader spun on it.  See ccc/CASTBUG.
  *
  * Put back when the compiler takes the shape; the initialisers below

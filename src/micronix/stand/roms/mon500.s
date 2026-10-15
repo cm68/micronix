@@ -56,15 +56,15 @@ gobuff	equ	01b0h		;location of task switch routine on 'RESET'
 ; The free window in the on-board ram, and mon5.0's two resident blocks
 ; in it.  It runs from 132h, the byte after the monitor's bounce buffer,
 ; to the task switch stub at gobuff, which the monitor writes on every
-; task switch and the level 0 rom writes for itself.  Both blocks are
+; task switch and the level 1 rom writes for itself.  Both blocks are
 ; laid out from the bottom up and neither may cross gobuff: the console
 ; first, because it is called for the life of the machine, then the copy
-; loop that brings the level 0 rom down, which runs once at a boot.
+; loop that brings the level 1 rom down, which runs once at a boot.
 ;
 conram	equ	0132h		;the console found at reset
 concon	equ	conram		; - which one answered: 0, 1 or 2
 condrv	equ	conram + 2	; - the driver built for it
-ramhome	equ	0166h		;where the level 0 copy loop runs
+ramhome	equ	0166h		;where the copy loop runs
 jmpop	equ	0c3h		;Jump unstruction op-code
 callop	equ	0cdh		;z80 call instruction opcode
 t1mask	equ	2bh		;unlimited mask... no traps enabled
@@ -246,10 +246,10 @@ bounce:	ds	100h			;256-byte bounce buffer
 ;	while a rom is copied through here a chunk at a time.
 
 ;	Free ram runs from here to gobuff, and it is where mon5.0's two
-;	resident blocks live: the console driver at conram, and the level 0
-;	copy loop above it at ramhome.  It is gobuff that ends the window,
+;	resident blocks live: the console driver at conram, and the copy
+;	loop above it at ramhome.  It is gobuff that ends the window,
 ;	not the trap save frame above it, because the monitor writes its
-;	task switch stub at gobuff on every task switch and the level 0 rom
+;	task switch stub at gobuff on every task switch and the level 1 rom
 ;	writes its own there.  The frame is the kernel's contract - it reads
 ;	the saved registers from 1e0h up (sys/uhdr.s, _oldstack, 32 bytes to
 ;	1ffh) - and above the frame sit the other two contracts this ram
@@ -362,7 +362,7 @@ getsw:	jp	reset0
 
 
 reset0: call	reset1
-	call	ramdown		;resident level 0 copy loop
+	call	ramdown		;resident copy loop
 	call	findcon
 	call	setup
 	jp	gobuff
@@ -439,17 +439,17 @@ badram: ld	hl,0badh
 ;	The switch is binary now.  Switch 6 on asks for the monitor and
 ;	switch 6 off for a boot.  There is no jump address field left to
 ;	read and no disk driver in this rom to read it for: a boot means
-;	the level 0 rom in its socket, and boot is the resident copy loop
+;	the level 1 rom in its socket, and boot is the resident copy loop
 ;	that brings it down into ram and enters it.
 ;
 ;	Switch 5 picked the console back at findcon.  Nothing else on the
 ;	switch is read.
 
-boot	equ	ramhome		;the resident level 0 copy loop
+boot	equ	ramhome		;the resident copy loop
 
 tstsw:	ld	a,(switch)
 	and	sw6
-	jp	nz,boot			;switch 6 off reads set: the level 0 rom
+	jp	nz,boot			;switch 6 off reads set: the level 1 rom
 
 montor:	ld	a,1			;normal task number
 	ld	(ctask),a
@@ -581,7 +581,7 @@ allerr:	xor	a
 ;*								*
 ;****************************************************************
 
-;	The level 0 copy loop is built here and copied into on-board ram
+;	The copy loop is built here and copied into on-board ram
 ;	at reset, because it cannot stay in the rom: banking the task
 ;	register drops the reset half of the prom, and the monitor half
 ;	cannot call into this one even before that.  It runs from ramcode,
@@ -656,7 +656,7 @@ ramend:
 ;	The two resident blocks share the free window in the on-board ram,
 ;	which runs from 132h, the byte after the monitor's bounce buffer,
 ;	to gobuff at 1b0h, where the monitor writes its task switch stub
-;	on every task switch - and the level 0 rom writes its own there.
+;	on every task switch - and the level 1 rom writes its own there.
 ;	Each block has a fixed home in the window, and neither may grow
 ;	over its neighbour or over gobuff, so the bounds are asserted here
 ;	rather than discovered on the machine: a console driver must end
@@ -728,7 +728,7 @@ rstmxx:	add	hl,de		;add offset to selected map
 ;*  cannot hold code for a chip that may not be there.	*
 ;*  The driver is built into on-board ram at reset	*
 ;*  instead, and the monitor's console names are three	*
-;*  addresses in it.  The level 0 rom runs in task 0	*
+;*  addresses in it.  The level 1 rom runs in task 0	*
 ;*  with that ram mapped and calls the same three.	*
 ;*							*
 ;********************************************************
@@ -952,7 +952,7 @@ cdsst:	in	a,(s1stat)
 cdsend:
 
 ;	Both drivers are measured against the window at the copy loop, not
-;	against the trap save frame: gobuff is nearer and the level 0 rom's
+;	against the trap save frame: gobuff is nearer and the level 1 rom's
 ;	home above it is nearer still.
 
 
@@ -1686,7 +1686,7 @@ ucont1:	ld	sp,iy			;get back the user save stack
 	push	de
 	ret				;return to user through 'gotask'
 
-;	'B' - boot.  There is one boot now and it is the level 0 rom:
+;	'B' - boot.  There is one boot now and it is the level 1 rom:
 ;	the resident copy loop at ramhome brings it down from its socket
 ;	and enters it, which is what reset does for a machine with switch
 ;	6 off.  No registers are preserved: this does not return, and the

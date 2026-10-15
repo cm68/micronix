@@ -1,97 +1,92 @@
 ;
-; djboot1 - levels 0 and 1 of the floppy boot for the DJ/DMA
+; djboot1 - the floppy's level 2 sector, for the DJ/DMA
 ;
 ; micronix/stand/boot/djboot1.s
 ;
-; Both levels, in one file, because on this controller they are one
-; stage: the rom hands the DJ-DMA off to its own firmware, and what the
-; firmware leaves in memory is 128 bytes - not enough for a level 1, and
-; nothing else arrives.  So the first 128 bytes here are a program whose
-; whole job is to fetch and enter the rest of this file, and the rest of
-; this file is mwboot1.s: move ourselves out of the way, read the second
-; level to STAGE, unpack it where its object header says it goes.
+; One sector, linked at BASE and entered there by the level 1 rom
+; (stand/roms/l1boot.s), which read the diskette's block 0 - this code
+; and the label behind it - into the window and ran the controller's
+; channel program itself.
 ;
-;	level 0	the first 128 bytes, at 0080, entered by the firmware
-;	level 1	the rest, at 0100, entered by level 0's jp
-;	level 2	djboot.com, read to STAGE by level 1 and unpacked
+;	level 2	this sector, the front half of the medium's block 0
+;	level 3	djboot.com, at cylinder 1, read by this and unpacked
 ;
-; The other three ways in have no level 0 of their own, because they do
-; not need one: boothd, nuboot and ideboot each put a whole 512 byte
-; sector at 0100 and jump, so the rom is the level 0.  This is the only
-; monitor that cannot, and the 128 bytes is why.
+; The card's own firmware used to read the floppy in two pieces.  A
+; bootstrap - manual section 7 - halted the cpu, planted a handshake
+; routine at 0038 and, when the cpu ran it, copied the first 128 bytes
+; of track 0 to 0080 and sent the cpu there.  That is switched off: the
+; card is strapped for non-bootstrap operation (J2 A to B) and the
+; level 1 rom is the external means that boots it.  So nothing is
+; planted in low memory, nothing takes the bus away from the cpu, and
+; the floppy's block 0 is a boot block like every other medium's.
 ;
-; Level 0's 128 bytes are exactly what the firmware copies.  hwsim/d1's
-; djdma_init shows it plainly - imd_read of track 0's first sector, then
-; copyout(secbuf, 0x80, 0x80) - and DJ/DMA manual section 7 says the
-; same ("80 hex bytes are loaded from the first sector on track 0 of the
-; disk, and the cpu is sent to 000080").  So level 0 is what the medium
-; calls its first sector and the body goes in the one after it, which is
-; where mkbootimg -d lays them - level 0's first 128 bytes, and the rest
-; of this file in the next sector.
+; The label is in the half of this sector behind the code, because the
+; rom read a whole 512 byte block: struct dlabel, include/sys/dlabel.h.
+; It says where the medium's filesystem begins, and the two numbers
+; below say how to read the rest of it.  Nothing else on a diskette
+; describes the medium at all.
 ;
-; Level 0 prints nothing.  A diagnostic would have to set the uart up,
-; and what the monitor still guarantees at this point is not known; the
-; signon below arrives a moment later anyway, and 128 bytes is not the
-; place to find out.
+; Block 0 is four sectors on an eight inch drive and one on a five inch
+; one.  Cylinder 0 head 0 of an eight inch diskette is single density -
+; fm, 26 sectors of 128 bytes, numbered from one - and the block is its
+; first four; every cylinder above it is double density with 512 byte
+; sectors.  So the rom reads that block as four reads and hands over
+; 512 bytes, and this level neither knows nor cares which way it came.
+;
+; Level 3 is a cylinder up for that same reason.  On an eight inch
+; drive the rest of cylinder 0 is 128 byte sectors, which is no place
+; for a four kilobyte program, and every medium's boot area owns
+; cylinders 0 and 1 anyway - the label's toff is 2 on all of them.  So
+; mkbootimg lays an image out as block 0, filled to the end of cylinder
+; 0, and then level 3: one rule for every medium, and the first sector
+; of the second cylinder in all of them.
 ;
 ; The DJ-DMA is not the HD-DMA.  The HD-DMA takes a sector, a DMA
 ; address and an opcode in a command block at 0080 and the host polls a
 ; status byte; the DJ-DMA has its own z80 - the firmware is DJDMA25 -
-; that runs a channel program out of the host's memory.  The host writes
-; a SETDMA / SREAD / HALT command sequence at the default channel
-; address (0050), pulses the attention port (00ef) and polls the status
-; byte the controller writes back.  The channel program is fixed; only
-; the DMA address and the sector number change per read.
+; that runs a channel program out of the host's memory.  The host
+; writes a SETDMA / SREAD / HALT command sequence at the default
+; channel address (0050), pulses the attention port (00ef) and polls
+; the status byte the controller writes back.  This one does not write
+; that sequence; the rom's is still there, one read away from what this
+; needs, and the drive byte in it is the only record of which drive
+; this diskette came out of.  See run.
 ;
-; assembled by asz, linked at BASE0 and unwrapped, exactly as mwboot1.s
+; assembled by asz, linked at BASE and unwrapped, exactly as mwboot1.s
 ; is - see the Makefile.
 ;
 
 CHAN	equ	0050h		; the default channel command address
 ATTN	equ	00efh		; pulse to start the channel
-SETDMA	equ	023h		; set the 24 bit DMA address, 4 bytes
-SREAD	equ	020h		; read one sector, 5 bytes
-HALT	equ	025h		; end the channel program, 2 bytes
 OKSTAT	equ	040h		; the good status a command writes back
 
 STAGE	equ	08000h		; where the sectors land before relocation
 TRIES	equ	10		; per sector
 
-BASE0	equ	0080h		; where the firmware leaves level 0
-HEADLEN	equ	128		; and how much of it it leaves
-
-;
-; Where the medium numbers its sectors from - the last three bytes of
-; level 0, which mkbootimg -d writes.  It is the one thing this file
-; cannot work out for itself: the label that carries it is at byte 256
-; of the sector the firmware copied only the first HEADLEN of, and the
-; number is not a property of the geometry.  A soft sectored medium,
-; which is what both eight inch diskettes are, numbers its sectors from
-; one; a hard sectored one, which is Morrow's five inch format, from
-; zero.  Read it rather than assume it and everything after follows:
-; level 1 is one sector on from the medium's first, and level 2 one
-; further still.  See sys/dlabel.h's d_firstsec and sys/dj.c, where the
-; kernel takes the same answer from the drive itself (ORG1).
-;
-; SSIZE, the byte before it, is how many blocks a sector is - one for a
-; 512 byte sector, two for a 1024 byte one - and it is inferred from the
-; same geometry djio.c infers it from: a soft sectored medium with ten
-; or sixteen blocks to a track is 1K, every other one this tree builds
-; for is 512.  It changes the sector level 0 asks for (a 1K sector holds
-; level 1 as its second half) and how level 1 strides and counts.
-;
-; The marker beside them is mkbootimg's: it writes the two numbers only
-; where it finds the marker intact, so a level 0 that outgrew HEADLEN
-; and moved all three fails the build rather than having a byte of its
-; own code overwritten.
-;
-SSIZE	equ	BASE0+125	; 00fdh, blocks per sector: 1 = 512, 2 = 1024
-FSEC	equ	BASE0+126	; 00feh, the first of level 0's last two bytes
-FSECMAG	equ	0a5h		; the marker after it that says so
-
-BASE	equ	0100h		; where level 0 reads level 1, and where it links
+BASE	equ	0100h		; where the level 1 rom reads this block
 RELOC	equ	0c000h		; out of the way of what we are loading
 RBIAS	equ	RELOC-BASE	; add to one of our addresses for its copy
+
+;
+; The numbers that are the medium's and not ours, out of the label in the
+; second half of this very sector (include/sys/dlabel.h).  The level 1 rom
+; read the whole block here - 512 bytes beginning at BASE, which is this
+; code and then the label - so the label needs no read of its own.  It is
+; the only place they can come from: where a medium numbers its sectors
+; from is not derivable from the geometry, and neither is how many blocks
+; a sector is from the block count alone.
+;
+; firstsec is one on the soft sectored media - both eight inch diskettes
+; and one of the five inch ones - and zero on the hard sectored five inch
+; medium.  It is also the first sector of every track, so it is the one
+; level 3 begins at.  A drive reports it (sys/dj.c's ORG1); the loader
+; has no drive to ask, so the medium says it.  d_spt is blocks (512
+; bytes) per track, and the two together are how djio.c works out the
+; sector size - this level's rule for it below is the same one.
+;
+DL_OFF	equ	BASE+256	; DL_OFFSET into the sector: the label
+DL_SPT	equ	DL_OFF+10	; d_spt, blocks per track
+DL_1ST	equ	DL_OFF+12	; d_firstsec, where its sectors are numbered from
 
 ;
 ; The MULTIO's first uart, for complaining with.  Output only, and no
@@ -120,102 +115,12 @@ O_DOFF	equ	14		; and the data
 	.text
 
 ;
-; Level 0.  The firmware has left the first HEADLEN bytes of this file
-; at BASE0 and jumped here.  All it does is ask the channel for level 1
-; - the rest of this file - and jump into it.  No stack, no output, no
-; per-read loop: level 1 has all three, and there is only one read to
-; make.
-;
-; The channel program's invariant half goes down first, exactly as it
-; does in level 1's read loop (which is where these port writes are
-; explained).  Level 0 differs from that loop in two ways: the DMA
-; address is the constant BASE and the sector number is the one SSIZE
-; picks - FSEC+1 on a 512 byte medium, where level 1 is the sector after
-; the boot, and FSEC itself on a 1K one, where level 1 is the second
-; half of the boot sector and is copied down from BASE+512 - and a
-; failure has no end.  Level 1 counts ten tries and then prints; level 0
-; kicks the channel again, forever, because a boot that cannot read its
-; own second half has nothing left to try and nowhere to say so - setting
-; the uart up would cost bytes this does not have.
-;
-level0:
-	ld	a,SETDMA
-	ld	(CHAN),a
-	xor	a
-	ld	(CHAN+3),a	; dma high byte
-	ld	(CHAN+5),a	; cylinder 0
-	ld	(CHAN+7),a	; drive 0
-	ld	a,SREAD
-	ld	(CHAN+4),a
-	ld	a,HALT
-	ld	(CHAN+9),a
-
-	ld	hl,BASE		; level 1 goes where its labels expect
-	ld	a,l
-	ld	(CHAN+1),a	; dma low
-	ld	a,h
-	ld	(CHAN+2),a	; dma high
-	ld	a,(SSIZE)	; 1 = 512, 2 = 1024
-	dec	a		; 0 for 512, 1 for 1024
-	ld	c,a		; C = the flag: which sector, and the copy below
-	ld	a,(FSEC)	; the medium's first sector number
-	inc	a		; level 1 is the sector after it
-	sub	c		; 512: FSEC+1; 1024: level 1 is FSEC's second half
-	ld	(CHAN+6),a	; so read that one
-
-l0retry:
-	xor	a
-	ld	(CHAN+8),a	; say we are waiting for it
-	out	(ATTN),a	; run the channel
-l0poll:
-	ld	a,(CHAN+8)	; the read's status byte
-	or	a
-	jr	z,l0poll	; not written yet
-	cp	OKSTAT
-	jr	nz,l0retry	; 040h, so it worked
-
-	; A 1024 byte sector left level 1 at BASE+512, its second half;
-	; bring it down to BASE, where its labels say it is.
-	ld	a,c
-	or	a
-	jr	z,l0go		; 512: it is already at BASE
-	ld	hl,BASE+512
-	ld	de,BASE
-	ld	bc,512
-	ldir
-l0go:
-	jp	level1
-
-;
-; The pad that makes level 0 exactly HEADLEN bytes, and the three bytes
-; at the end of it that are not padding at all: the sector size SSIZE
-; names, the first sector number FSEC names, and its marker.  The length
-; is the one invariant in the file: level 1's labels are the linker's,
-; counted from BASE0, so they only come out at BASE - where level 0 puts
-; its block - if level 0 is exactly the length the firmware copies and
-; no more.
-;
-; The head above assembles to 82 bytes - the trailing jp is shortened to
-; a jr, it being in range - so the pad is 43 and the three bytes after
-; it end it at 128.  The Makefile checks that byte HEADLEN of djboot1.bin
-; is level 1's first opcode, so a miscount here fails the build rather
-; than quietly running level 1 at the wrong address - and mkbootimg,
-; which writes the two numbers, refuses the image if the marker has
-; moved, so a miscount cannot have a number land on an instruction
-; either.
-;
-	.ds	43
-	.db	0		; the sector size (1 = 512, 2 = 1024), for mkbootimg
-	.db	0		; the first sector number, for mkbootimg
-	.db	FSECMAG		; and the marker saying it may write there
-
-;
-; Level 1.  Level 0 left us at BASE; move the whole of ourselves up to
+; Level 2.  The rom left us at BASE; move the whole of ourselves up to
 ; RELOC, out of the way of what we are about to load, and carry on
 ; there.  Every address from run down is used with RBIAS added, which is
 ; why this copy and this jump are the last unrelocated ones in the file.
 ;
-level1:
+level2:
 	ld	hl,BASE
 	ld	de,RELOC
 	ld	bc,finish-BASE
@@ -223,19 +128,18 @@ level1:
 	jp	run+RBIAS
 
 ;
-; Read the second level into STAGE upward, beginning two sectors on from
-; the medium's first on a 512 byte medium and one on from it on a 1K
-; one, where level 1 is the second half of the boot sector itself.  Four
-; kilobytes of it, which stand/README asks it to fit - eight 512 byte
-; sectors or four 1024 byte ones, so the count and the stride both come
-; from SSIZE.  Nothing here counts to the end of the track: the second
-; level is all that is read and a track holds more.
+; Read the level 3 program into STAGE upward, from the first sector of
+; cylinder 1.  Four kilobytes of it, which stand/README asks it to fit -
+; eight 512 byte sectors or four 1024 byte ones, so the count and the
+; stride both come from the medium's blocks per sector, and the sector
+; read count is what makes the two agree: eight blocks and four sectors
+; are the same four kilobytes of medium.
 ;
 run:
 ;
 ; A stack of our own, at the top of memory for the same reason mwboot1.s
-; puts it there: the second level inherits it while it loads the kernel,
-; and the kernel fills everything from 0ff0 up.
+; puts it there: the level 3 program inherits it while it loads the
+; kernel, and the kernel fills everything from 0ff0 up.
 ;
 	ld	sp,0		; ie 10000h - first push lands at fffe
 
@@ -245,48 +149,83 @@ run:
 	call	puts+RBIAS
 
 ;
-; The channel program is fixed but for the DMA address and the sector
-; number.  Write the invariant part once:
+; Hand the block on.  What the rom read into BASE is this sector and the
+; label behind it, and this level is about to be written over: level 3 is
+; linked at BASE and unpacks its text there.  So the whole block goes up
+; to 1000h first, which is boot.c's buf0 - free until level 3 begins, and
+; where its driver wants the label anyway.
+;
+; It saves level 3 from having to ask the medium for the block's label
+; again, which is not a block it can depend on the shape of: on an eight
+; inch drive block 0 is four 128 byte sectors of an fm track rather than
+; one sector, and the rom has already worked that out, read it, found the
+; magic in it and booted the drive it came from.  Nobody needs to do it
+; twice, and level 3 has no room for the second way of doing it.  See
+; djio.c's reset().
+;
+	ld	hl,BASE		; the block the rom read: this sector,
+	ld	de,1000h	; and the label behind it, to boot.c's buf0
+	ld	bc,512
+	ldir
+
+;
+; How many blocks a sector is, from the label.  The rule is djio.c's - a
+; soft sectored medium with ten or sixteen blocks to a track is 1024
+; bytes, and every other medium this tree builds for is 512 - and it has
+; to be the same rule here, because the count and the stride below are
+; what make the two agree about where a block ends up.  D is the answer,
+; less one: 0 for 512, 1 for 1024.
+;
+	ld	d,0		; 512 bytes: one block to a sector
+	ld	a,(DL_SPT)
+	cp	10
+	jr	z,is1k
+	cp	16
+	jr	nz,sized
+is1k:	ld	a,(DL_1ST)	; ... and only if it numbers from one
+	or	a
+	jr	nz,sized
+	ld	d,1		; 1024 bytes: two blocks to a sector
+
+sized:
+;
+; The channel program.  The rom left it at CHAN, with the drive it read
+; us from in it, and it is one read away from what this level needs:
+; only the dma address and the sector number change from one read to the
+; next, and only the cylinder changes once.  So there is no program to
+; write here - this patches the rom's.
 ;
 ;	0050	SETDMA
-;	0051	<dma low>	(set per sector)
-;	0052	<dma high>	(set per sector)
-;	0053	00		(dma high byte, always 0)
+;	0051	<dma low>	(patched per sector)
+;	0052	<dma high>	(patched per sector)
+;	0053	00		(the bank above: a flat address)
 ;	0054	SREAD
-;	0055	00		(cylinder 0)
-;	0056	<sector>	(set per sector)
-;	0057	00		(drive 0)
+;	0055	01		(patched, once: cylinder 1)
+;	0056	<sector>	(patched per sector)
+;	0057	<drive>		(the rom's: the drive we came from)
 ;	0058	<status>	(written by the controller)
 ;	0059	HALT
 ;	005a	<status>	(written by the controller)
 ;
-	ld	a,SETDMA
-	ld	(CHAN),a
-	xor	a
-	ld	(CHAN+3),a	; dma high byte
-	ld	a,SREAD
-	ld	(CHAN+4),a
-	xor	a
-	ld	(CHAN+5),a	; cylinder
-	ld	(CHAN+7),a	; drive
-	ld	a,HALT
-	ld	(CHAN+9),a
+; The drive byte is the one byte that must not be touched.  It is how
+; this level knows which drive the diskette came out of, with nothing
+; having had to tell it - the rom asked all eight drives and this is the
+; one that answered - and the level 3 driver reads it the same way, out
+; of the same program, since nothing here overwrites it and nothing
+; there writes it either.  See stand/roms/l1boot.s's DJ row.
+;
+	ld	a,1
+	ld	(CHAN+5),a	; cylinder 1, the low one level 3 is on
 
 	ld	hl,STAGE	; where the next sector goes
-	ld	a,(SSIZE)	; 1 = 512, 2 = 1024
-	dec	a		; 0 for 512, 1 for 1024
-	ld	d,a		; D = the flag: NSEC and the stride below take it
-	ld	a,(FSEC)	; the medium's first sector number
-	inc	a		; level 1 was the sector after it
-	inc	a		; so level 2 starts one after that
-	sub	d		; 512: FSEC+2; 1024: FSEC+1
-	ld	c,a		; and this read wants that one
+	ld	a,(DL_1ST)	; the first sector of a track, which is
+	ld	c,a		; where mkbootimg put level 3
 	ld	a,d
 	or	a		; 0 for 512
-	jr	nz,is1k
+	jr	nz,is1kb
 	ld	b,8		; 512: eight sectors, 4K
 	jr	onesec
-is1k:
+is1kb:
 	ld	b,4		; 1024: four sectors, 4K
 
 onesec:

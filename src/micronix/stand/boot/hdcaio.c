@@ -1,7 +1,7 @@
 /*
  * this file is the hdca boot code for micronix.
  *
- * The second level of the hard disk boot for a drive on the HDCA - the
+ * Level 3 for a drive on the HDCA - the
  * port-mapped, non-DMA Winchester controller of the M10, M20 and M26.
  * It is the same protocol as sys/hdca.c, and the same card, and the two
  * are meant to be read together; what differs is that this one runs
@@ -164,7 +164,7 @@ reset()
 	 * reach, which is what makes this possible before the geometry is
 	 * known.  The HDCA's formatter numbers the first sector on a track
 	 * 1, so block 0 is sector 1, not 0 (FORMATHD's skew table runs
-	 * 1..32).  It is the sector the rom read this loader's first level
+	 * 1..32).  It is the sector the rom read this loader's level 2 sector
 	 * from, it is where mkfs writes the label, and it lands in the
 	 * working buffer, boot.c's buf0 at 0x1000, which nothing has used
 	 * yet.

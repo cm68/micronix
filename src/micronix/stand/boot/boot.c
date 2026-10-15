@@ -1,5 +1,5 @@
 /*
- * The second level of the hard disk boot.
+ * Level 3 of the boot: the filesystem code, one source for every card.
  *
  *
  * 4k is a hard limit, not a preference
@@ -34,10 +34,13 @@
  *	the buffers declared "= 0", which reserved two bytes each and so
  *	hid the problem by not being big enough to reach
  *
- * The current build ends at 0fba, with 54 bytes to spare.  If that runs
- * out, the things worth taking are in this order: the library, which is
- * why sexit.s exists at all; then readline and the file chooser, which
- * only earn their keep when a disk has more than one bootable file.
+ * The largest of the five level 3 programs - this file with ncrio.c, the
+ * NCR 5380's - ends at 0fc2, with 46 bytes to spare.  mkbootimg refuses
+ * one that reaches 0ff0, so running out is a build that fails and says
+ * so rather than a boot that goes quiet.  When it does, the things worth
+ * taking are in this order: the library, which is why sexit.s exists at
+ * all; then readline and the file chooser, which only earn their keep
+ * when a disk has more than one bootable file.
  *
  * The global and register variables are here for the same reason.
  */

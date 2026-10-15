@@ -1,24 +1,24 @@
 ;
-; mwboot1 - the first level hard disk boot for the HD/DMA
+; mwboot1 - the level 2 sector for the HD/DMA
 ;
 ; micronix/stand/mwboot1.s
 ;
-; The monitor's nuboot reads one sector - cylinder 0, head 0, sector 0 -
-; to 0100 and enters task 1 there.  That sector is this, and its job is
-; to bring in the sector after it: the second level, which knows the v6
-; filesystem and finds a kernel.
+; The rom reads one sector - cylinder 0, head 0, sector 0 - to 0100 and
+; enters task 1 there.  That sector is this: level 2, and its job is to
+; bring in the sector after it, level 3, which knows the v6 filesystem
+; and finds a kernel.  See README for the numbering.
 ;
 ; mkfs -i puts both of us in a file that owns cylinder 0, so this is
-; block 0 of that file and the second level is block 1 onward.  Nothing
-; else on the disk is involved and no filesystem is read here - that is
-; the second level's job, and this exists only because the rom will read
-; one sector and no more.
+; block 0 of that file and level 3 is block 1 onward.  Nothing else on
+; the disk is involved and no filesystem is read here - that is level
+; 3's job, and this exists only because the rom will read one sector and
+; no more.
 ;
 ;
 ; a loader, not a sector copier
 ; -----------------------------
 ;
-; This used to read the second level straight to 0100 and jump there,
+; This used to read level 3 straight to 0100 and jump there,
 ; which meant the thing on the disk had to be a flat image already
 ; running at 0100 - so building it meant stripping the object header on
 ; the host and knowing, out here, where the text began and how long it
@@ -29,19 +29,18 @@
 ; So the image on the disk is now the linker's output, unmodified, and
 ; this reads the header and does what it says: text to its own address,
 ; data to its own address, bss cleared, entry where the header puts it.
-; Replacing the second level is
-;
-;	cat mwboot1.bin mwboot.com >bootimg
-;
-; with a pad, and nothing else has to agree about anything.
+; Replacing level 3 is a matter of running mkbootimg again - the
+; Makefile's bootimg rule, which puts this sector in block 0 and what
+; comes after it in block 1 - and nothing else has to agree about
+; anything.
 ;
 ; The sectors are read to STAGE first, because a header displaces
 ; everything after it - you cannot read a headered image directly to
 ; 0100 and have the text land at 0100, and the copy has to come from
 ; somewhere this code is not sitting in.  Low memory is empty at this
-; point: the kernel is not loaded and the second level has not started.
+; point: the kernel is not loaded and level 3 has not started.
 ;
-; It also means a second level linked somewhere other than 0100 works
+; It also means a level 3 linked somewhere other than 0100 works
 ; without changing this, which the flat version could not do.
 ;
 ; Almost nothing needs setting up before the read.  The rom has just
@@ -65,7 +64,7 @@
 ; the Makefile passes the same number to wsld.  The 16 byte header the
 ; linker writes is then cut off, because the rom reads a sector and
 ; jumps to the first byte of it - there is nothing there to read a
-; header, which is the whole reason the second level needs this one.
+; header, which is the whole reason level 3 needs this one.
 ;
 ; Two addresses of ours therefore appear in two forms.  A label is where
 ; the linker put it, which is where it lies in the sector we were read
@@ -132,18 +131,18 @@ start:
 
 ;
 ; Read sectors 1 through NSEC of this track into STAGE upward.  Sector 0
-; is this code, so the second level starts at 1, and a track holds 17
-; sectors on every drive here - the whole of the second level is on the
+; is this code, so level 3 starts at 1, and a track holds 17
+; sectors on every drive here - the whole of level 3 is on the
 ; one track and the head never moves.
 ;
 run:
 ;
 ; A stack of our own before anything calls anything.  The rom left one
-; somewhere and the second level's startup will pop from it regardless,
-; but the first level had no stack dependency at all until the signon
+; somewhere and level 3's startup will pop from it regardless,
+; but level 2 had no stack dependency at all until the signon
 ; introduced one, and it costs three bytes not to inherit a guess.
 ;
-; At the top of memory, and it has to be up there.  The second level
+; At the top of memory, and it has to be up there.  Level 3
 ; inherits this stack and keeps using it while it loads the kernel, and
 ; the kernel is 117 blocks starting at 0ff0 - it ends around 0f9f0.  A
 ; stack at RELOC, which is where this was, is in the middle of that: the
@@ -223,7 +222,7 @@ good:
 
 ;
 ; And clear bss, which the header counts and the file does not contain.
-; de already points at the first byte of it.  The C the second level is
+; de already points at the first byte of it.  The C level 3 is
 ; written in expects its globals zeroed and says so - "int inumber = 1"
 ; beside "struct dsknod *inode INIT" - so this is not optional.
 ;

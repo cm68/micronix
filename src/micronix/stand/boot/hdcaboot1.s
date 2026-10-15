@@ -1,17 +1,17 @@
 ;
-; hdcaboot1 - the first level hard disk boot for the HDCA
+; hdcaboot1 - the level 2 sector for the HDCA
 ;
 ; micronix/stand/boot/hdcaboot1.s
 ;
 ; The monitor reads one sector - cylinder 0, head 0, sector 0 - to 0100
 ; and enters task 1 there.  That sector is this, and its job is to bring
-; in the sectors after it: the second level, which knows the v6
+; in the sectors after it: level 3, which knows the v6
 ; filesystem and finds a kernel.
 ;
 ; mkfs -i puts both of us in a file that owns cylinder 0, so this is
-; block 0 of that file and the second level is block 1 onward.  Nothing
+; block 0 of that file and level 3 is block 1 onward.  Nothing
 ; else on the disk is involved and no filesystem is read here - that is
-; the second level's job, and this exists only because the rom will read
+; level 3's job, and this exists only because the rom will read
 ; one sector and no more.
 ;
 ;
@@ -28,7 +28,7 @@
 ;
 ; Almost nothing needs setting up first.  The rom has just read this
 ; very sector through the same controller, so the arm is at cylinder 0
-; and the whole second level is on that one track - only the sector
+; and the whole of level 3 is on that one track - only the sector
 ; number and the destination change per read, and no seek is ever
 ; needed.
 ;
@@ -115,13 +115,13 @@ start:
 
 ;
 ; Read sectors 1 through NSEC into STAGE upward.  Sector 0 is this code,
-; so the second level starts at 1, and the whole of it is on one
+; so level 3 starts at 1, and the whole of it is on one
 ; cylinder of any drive here.
 ;
 run:
 ;
 ; A stack of our own before anything calls anything, at the top of
-; memory for the reason mwboot1.s gives: the second level inherits it
+; memory for the reason mwboot1.s gives: level 3 inherits it
 ; while it loads the kernel, and the kernel is about to fill everything
 ; from 0100 up.
 ;
@@ -147,7 +147,7 @@ run:
 ; exactly one sector on, which is where the next one goes.
 ;
 	ld	hl,STAGE
-	ld	c,2		; the second level: one past sector 1, block 0
+	ld	c,2		; level 3: one past sector 1, block 0
 
 onesec:
 ;

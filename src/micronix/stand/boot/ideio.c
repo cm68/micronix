@@ -1,7 +1,7 @@
 /*
  * this file is the ide boot code for micronix.
  *
- * The second level of the hard disk boot for a drive on the
+ * Level 3 for a drive on the
  * S100Computers MYIDE board - an 8255 PPI between the S-100 bus and an
  * ATA drive's pins, at ports 0x30 through 0x34.  It is the same protocol
  * as sys/ide.c, and the same card, and the two are meant to be read
@@ -193,7 +193,7 @@ reset()
 	 *
 	 * Physical cylinder 0, head 0, sector 0 is LBA 0, which is the
 	 * one sector a drive can be asked for knowing nothing about it.
-	 * That is what the rom read this loader's first level from, and
+	 * That is what the rom read this loader's level 2 sector from, and
 	 * it is where mkfs writes the label.  It lands in the working
 	 * buffer, boot.c's buf0 at 0x1000, which nothing has used yet.
 	 */

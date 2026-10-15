@@ -1,17 +1,17 @@
 ;
-; ncrboot1 - the first level hard disk boot for the NCR 5380 SCSI card
+; ncrboot1 - the level 2 sector for the NCR 5380 SCSI card
 ;
 ; micronix/stand/boot/ncrboot1.s
 ;
 ; The monitor's ncrboot reads one sector - LBA 0, the drive's first -
 ; to 0100 and enters task 1 there.  That sector is this, and its job is
-; to bring in the sectors after it: the second level, which knows the v6
+; to bring in the sectors after it: level 3, which knows the v6
 ; filesystem and finds a kernel.
 ;
 ; mkfs -i puts both of us in a file that owns cylinder 0, so this is
-; block 0 of that file and the second level is block 1 onward.  Nothing
+; block 0 of that file and level 3 is block 1 onward.  Nothing
 ; else on the disk is involved and no filesystem is read here - that is
-; the second level's job, and this exists only because the rom will read
+; level 3's job, and this exists only because the rom will read
 ; one sector and no more.
 ;
 ;
@@ -50,7 +50,7 @@
 ;
 ; There is no sign-on.  The rom's ncrboot has already selected the
 ; console and set the line before it read this sector, so the uart below
-; is ready, and the second level prints its own banner; the space a
+; is ready, and level 3 prints its own banner; the space a
 ; sign-on would take is the one byte this file cannot spare.
 ;
 
@@ -118,7 +118,7 @@ start:
 ;
 run:
 ;
-; A stack of our own, at the top of memory.  The second level inherits it
+; A stack of our own, at the top of memory.  Level 3 inherits it
 ; while it loads the kernel, and the kernel is about to fill everything
 ; from 0100 up.
 ;

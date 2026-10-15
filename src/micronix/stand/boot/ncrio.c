@@ -1,7 +1,7 @@
 /*
  * this file is the NCR 5380 boot code for micronix.
  *
- * The second level of the hard disk boot for a drive on the NCR 5380
+ * Level 3 for a drive on the NCR 5380
  * SCSI host adapter - eight registers at 0x40, driven by hand with no
  * DMA and no arbitration.  It is the same protocol as sys/ncr.c and the
  * same card, and the two are meant to be read together; what differs is
@@ -152,8 +152,13 @@ reset()
 		}
 		spec.limit = spec.len * spec.spc - 1;
 	} else {
+		/*
+		 * This driver has a diagnostic fewer than the other three:
+		 * its own text is the largest of the five, and the line that
+		 * is missing is the one that explained the design rather
+		 * than naming what failed.  See the limit in mkbootimg.c.
+		 */
 		outstr("No disk label at cylinder 0.\n");
-		outstr("The geometry is read from there and guessed nowhere.\n");
 		outstr("mkfs -i writes one when it installs a boot.\n");
 		bail();
 	}

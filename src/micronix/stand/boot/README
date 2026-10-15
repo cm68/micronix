@@ -1,77 +1,371 @@
-it's a good idea to keep these executables under 4k, because micronix
-loads at 0x1000.
+a level 3 program has to end below 0ff0, because micronix loads at
+0x1000: everything it has - text, data and bss together - and the
+kernel's object header is read in at 0ff0.  that is not a preference.
+a byte past it is overwritten by the first block of the load, and it
+presents as a boot that reads perfectly and then enters nothing.
+mkbootimg measures every level 3 against it and refuses one that reaches
+it, so an image whose loader has outgrown its 4k is a failed build and
+not a silent one.  boot.c says the same thing at more length.
 
 in a pinch, the boot code could put all buffers except the indirect
 block into a non-loaded BSS above 4k; that will gain 512 bytes.
 
 this directory contains the standalone and cp/m boot programs
-for the djdma, hddma and ide controllers.
+for the djdma, hddma, ide, ncr 5380 and hdca controllers.
 
-a boot happens in three levels.  level 0 is the rom's own step, and on
-three of the four ways in it is nothing this directory builds: the
-monitor reads a whole 512 byte sector to 0100 and jumps to it, so the
-rom is level 0 and the sector it read is level 1.  level 1 is that
-sector - it moves itself out of the way, reads the second level to
-8000, unpacks the object header and jumps to its text.  level 2 is the
-filesystem code, boot.c, which finds the kernel on the disk and loads
-it.
+a boot happens in four levels, numbered by where the code comes from and
+not by who reads it.  level 0 is the rom on the mpz80 board, whichever
+one is in the machine - mon 5.0, mon 4.47, anything else.  level 1 is the
+four kilobyte rom in the socket on a memory board, a multio or an ss1,
+stand/roms/l1boot.s, which the monitor copies down to f000 and enters,
+and which reads block 0 off whichever controller answers.  level 2 is
+that block: sector 0 of the boot disk, entered at 0100.  level 3 is the
+four kilobyte program that knows about the micronix filesystem, which
+level 2 reads to 8000 and unpacks at 0100.
 
-the DJ-DMA is the exception, because its rom cannot be level 0.  that
-controller has its own z80, running a channel program out of the host's
-memory, and all the firmware leaves behind is the first 128 bytes of
-the first sector, copied to 0080.  that is not enough to hold a level 1,
-so the floppy's first stage builds one: djboot1.s leads with a 128 byte
-level 0 whose whole job is to read the next block and jump into it, and
-the level 1 behind it is mwboot1.s with a channel program for a read.
+the two roms are levels 0 and 1 and the two things this directory builds
+are levels 2 and 3, whichever controller they are in front of.  the
+floppy is not an exception to any of that any more: the dj-dma's own
+bootstrap - the one that halted the cpu, planted a routine at 0038 and
+copied 128 bytes of track 0 to 0080 - is switched off at the card (J2 A
+to B), so its block 0 is a boot block like every other medium's, and the
+level 1 rom drives its channel program itself.
 
-the other way in is the level 1 boot rom, stand/roms/l1boot.s, which
-mon5.0 copies down to f000 and enters when the monitor has no disk code
-of its own.  it reads that same first sector, from whichever controller
-answers, so the numbering there is one above this one: the level 1 of
-this directory is its level 2, and the level 2 of this directory is its
-level 3.  same stages, different origin, nothing down here changes.
-
-the second level is one source - boot.c - and three drivers, because
-what differs is how a block is read: mwio.c for the HD-DMA, djio.c for
-the floppy, ideio.c for the IDE card.  so there are three second
-levels, and each belongs to the first level that loads it:
+level 2 is the sector the rom reads to 0100.  it moves itself out of the
+way, reads level 3 to 8000, unpacks the object header and jumps to its
+text.  level 3 is one source - boot.c - and five drivers, because what
+differs is how a block is read: mwio.c for the HD-DMA, djio.c for the
+floppy, ideio.c for the IDE card, ncrio.c for the NCR 5380 and hdcaio.c
+for the HDCA.  so there are five level 3 programs, and each belongs to
+the level 2 sector that loads it:
 
 	mwboot.com	the hard disk		loaded by mwboot1.s
 	djboot.com	the floppy		loaded by djboot1.s
 	ideboot.com	the ide card		loaded by ideboot1.s
+	ncrboot.com	the ncr 5380		loaded by ncrboot1.s
+	hdcaboot.com	the hdca		loaded by hdcaboot1.s
 
-all three are linked at 0100, which is both where cp/m loads a .com and
+all five are linked at 0100, which is both where cp/m loads a .com and
 where the monitor's hard disk boot enters, so one binary serves either
 way in.
 
-mwboot1.s is the first level for the monitor's way in.  the rom reads
+mwboot1.s is the level 2 sector for the monitor's way in.  the rom reads
 one sector, 512 bytes, to 0100 and jumps to it; mwboot.com is several
 sectors, so something has to fetch the rest, and that sector is this.
 it moves itself to c000 first, because what it is loading is linked at
 0100 and would otherwise land on the loop doing the loading.
 
-it sets up almost nothing.  the rom used the channel at 0080 to read the
-first level in, so the constants are loaded, the drive is selected and
-the heads are at cylinder 0 - only the sector, the dma address and the
+it sets up almost nothing.  the rom used the channel at 0080 to read this
+block in, so the constants are loaded, the drive is selected and the
+heads are at cylinder 0 - only the sector, the dma address and the
 opcode change.  65 bytes of the 512.
 
-ideboot1.s is the same sector for the IDE card, except that the card
-has no command block in memory to be handed a sector with: this one
-writes the drive's task file and moves the sector through the 8255 by
-hand.  it has to fit in the half of the sector ahead of the label, so
-it is written shorter than the other two.
+the other four sectors are the same shape for their own cards, and each
+is written around what its card does not have.  ideboot1.s has no
+command block in memory to be handed a sector with, so it writes the
+drive's task file and moves the sector through the 8255 by hand.
+ncrboot1.s drives the 5380's req/ack handshake a byte at a time - select
+the target, send a READ(10), take the data, take the status and the
+message.  hdcaboot1.s writes the hdca's own header bytes - head, track,
+sector, key - through the data port and pulls the sector out a byte at a
+time.  all four fit in the half of the sector ahead of the label, and
+mkbootimg refuses one that has grown into it.
 
-the floppy image is laid out around the same label, which is why its
-first level cannot all be in block 0:
+the floppy image is laid out around the same label, and block 0 is where
+level 2 and the label both have to be:
 
-	block 0		level 0, its first 128 bytes
-	block 1		level 1, which reads blocks 2 through 9
-	blocks 2-9	the second level, djboot.com
-	blocks 10-39	unused; the filesystem starts at block 40
+	block 0		level 2, in the front half, and the label in the
+			half behind it
+	the rest of	zeros.  on an eight inch diskette this is not a
+	cylinder 0	whole number of blocks: cylinder 0 head 0 there is
+			single density, 26 sectors of 128 bytes, and block
+			0 is its first four
+	cylinder 1	level 3, djboot.com, from its first sector
+
+block 0 is four sectors on an eight inch drive and one on a five inch
+one, which is the rom's business and not the loader's: it reads block 0
+off whichever drive answers - four 128 byte reads there, one 512 byte
+read here - and hands over the 512 bytes it made.  level 3 begins a
+cylinder up because the rest of an eight inch cylinder 0 is 128 byte
+sectors, which is no place for four kilobytes, and every medium's boot
+area owns cylinders 0 and 1 anyway: the label's toff is 2 on all of
+them.  so mkbootimg lays an image out as block 0, filled to the end of
+cylinder 0, and then level 3 - which is therefore at one address in the
+image for every medium.
 
 mkfs -i puts mwboot1/mwboot in a file that owns cylinder 0, block 0
-being the first level and block 1 onward the second.  the second half
-of block 0 holds the disk label (sys/dlabel.h), which is why the first
-level has to fit in the first half - and why the floppy's level 1, 206
-bytes, cannot share block 0 with level 0 and the label both, and has a
-block of its own instead.
+being level 2 and block 1 onward level 3.  the second half of block 0
+holds the disk label (sys/dlabel.h), which is why level 2 has to fit in
+the first half.  a diskette's image carries its label itself; a hard
+disk's does not, because the label is the drive's and mkfs -i takes the
+geometry from the device node and writes the label into the block it
+puts the boot in.
+
+
+tasks and maps
+--------------
+
+everything above says what each level does.  where it does it is the
+z280's business: a boot starts in one task, runs its middle in another,
+and hands the kernel back to the first.
+
+the cpu has sixteen tasks, each with its own 64k cut into sixteen 4k
+pages.  a task's map is 32 bytes - one page number and one access byte
+per 4k - and it lives in a ram at 600h that can be written but not read
+back: task 0's at 600h, task 1's at 620h, 20h apiece.  task 0 is the
+only supervisor.
+
+what makes a boot interesting is that the supervisor's low page is not
+memory.  in task 0 an address below 1000h does not reach the s-100 bus
+at all: it is the cpu board's own page - its ram, the prom, the map
+itself, and the registers the map is written through.  in every other
+task those addresses are the first 4k of bus memory instead.  so the two
+kinds of code in a boot run in different tasks:
+
+	task 0	the monitor, and the level 1 rom it copies down and
+		enters - stand/roms/l1boot.s, at f000
+	task 1	the level 2 sector, the level 3 loader, and the
+		kernel's own entry
+
+the kernel decides it.  it is linked at 1000 and wants everything above
+it, and it cannot start any lower, because below 1000 the supervisor has
+no memory to give it.  the levels that have to live under 1000 - the
+sector, the loader, their buffers - can only live in a user task, since
+that is the only place under 1000 that is memory at all.  the trap back
+runs the other way: only the supervisor can take it, because the trap
+entry is in the prom, in the board's page, which no user task can
+address.
+
+the supervisor's page
+---------------------
+
+in task 0, below 1000h.  this is the whole of the interface between the
+prom, the monitor and the kernel, and the kernel's own symbols for it
+are in sys/uhdr.s.
+
+	0000	super	a jump to 1000h, written at reset: where the
+			trap handler calls into the kernel
+	0003	user	a jump to the user's pc, rebuilt in front of
+			every return to user mode
+	0006	ctask	the task a trap came from, and
+	0007	cmask	the mask to go back with.  the trap saves them
+			and the return restores them as one word
+	0008	cstack	where the trap handler builds its frame
+	000a	sp 000c pc 000e de 0010 hl 0012 af
+			what the prom's trap entry pushes first
+	0014	begsav	the trap entry's own frame, 30 bytes to 0031
+	0032	bounce	256 bytes: staging for reading a rom that lives
+			above the first megabyte, where a bank switch
+			hides all of the machine's own low memory
+	0132	conram	the console driver the monitor builds at reset
+	0166	ramhome	the level 0 copy loop, the thing that reads the
+			level 1 rom out of its socket
+	01b0	gobuff	the task switch stub, rewritten by every switch
+	01e0	oldstk	the bottom of the trap frame, 32 bytes to 01ff
+	0200	the monitor's scratch: its image of the map, which
+			cannot be read back, and the stack the prom's
+			trap frame is built down from
+	0400	locio	400 trap address (r) / display segment (w),
+			401 keyboard (r) / display column (w),
+			402 switch port (r) / task register (w),
+			403 trap status (r) / mask register (w)
+	0600	mapram	the map itself, write only
+	0800	eprom	the half of the prom any trap enables; its
+			last sixteen bytes, 0bf0 to 0bff, are the
+			trap entry
+
+the prom below 800h is visible to the supervisor only during a reset.
+that is the reason the monitor keeps two resident copies: it moves its
+own copy loop to ramhome, and then that loop copies the level 1 rom out
+of its socket and into ram at f000.  neither can be run where it was
+assembled.
+
+what the map holds
+------------------
+
+every change a boot makes to a map, in order:
+
+	at reset	task 0	segments 0-15 -> pages 0-15
+			task 1	segments 0-15 -> pages 0-15, so in
+				task 1 virtual is physical
+			the reset entry also points task 0's segment 1
+			at page 0 - its comment says "t0 map points to
+			t1 map seg 0" - so that the supervisor can see
+			what task 1 sees at 0000
+	the monitor	setup points segment 1 at page 0 again: "a
+			window for DMA device commands"
+	the copy loop	it points segment 1 at page 0f0h, the rom's own
+			socket above the first megabyte, and segment 2 at
+			page 0fh, where the copy lands.  the rom is entered
+			at f000 with both still set
+	in the rom	a row that hands a controller an address points
+			segment 1 at page 0 itself, so that the block it
+			is handing over has an address
+	the switch	the rom points segment 1 at page 1 and segment 2
+			at page 2 - task 0 is the identity again - and
+			enters the block as task 1
+
+the two maps agreeing at every address is the whole of the arrangement:
+the kernel is linked for the identity, and the trap the kernel takes
+executes in task 0 at the same addresses that it was loaded at in task
+1, because the prom builds the trap frame and jumps into the kernel
+without either map changing.
+
+the window onto bus page 0
+--------------------------
+
+this is what the supervisor's low page costs.  three of the controllers
+are handed their work through memory in bus page 0 - the hd-dma is
+pointed at its command block by three bytes at 0050h, the floppy runs a
+channel program at 0050h, disk 3 keeps an iopb at 0010h - and in task 0
+there is no address for that page: 0000 through 0fff is the board's own.
+
+so the rom gives itself a second name for it.  pointing task 0's segment
+1 at page 0 makes 1000h-1fffh bus page 0, and 1100h is bus 0100h.  every
+row that needs it writes (mapram + 2) = 0 for itself, because the copy
+loop left something else there and the next row may not assume it.
+
+the transfer goes to bus 0200h, which the same window shows at 1200h,
+and the row then copies the sector to (dest) through the window - into
+the rom's own scratch while it is reading a label, or to 1100h for the
+block the next level is entered at.  that last copy puts the block at
+bus 0100h, which is where task 1 will look for it: the window is not a
+copy, it is the same bytes under another name.
+
+only the supervisor needs the trick.  task 1 is the identity, so its
+0050h, 0080h and 0200h are bus memory, which is why the level 2 sector
+and the level 3 loader name bus addresses directly.  the monitor's own
+disk boot splits the same way: it builds its command block through the
+window at 1050h and 1080h, and tells the controller to dma to 0100h,
+because the block it is starting will run in task 1.
+
+the switch
+----------
+
+the rom and the monitor switch tasks the same way, by writing a stub at
+gobuff and jumping into it:
+
+	ld a,<task>
+	ld (402h),a
+	nop			six of them
+	jp <entry>
+
+the stub lives in on-board ram and not in the prom because writing the
+task register drops the prom's lower half - the code after the write is
+not there any more.  the six nops are the hardware's seven-instruction
+swap countdown, so that the jump is not fetched until the new task's map
+is up.  the write covers only the task register, which leaves the mask
+alone: the monitor set it to trap on halts and stops at reset, and that
+mask is what makes a halt in a user task a system call.
+
+the caller sets ctask to the same task number first.  a trap does not
+carry the task it came from, so the trap handler reads ctask to tell the
+supervisor's own traps - ctask zero - from a user task's.
+
+and the entry is not the address the block was read to.  the block is
+sitting in the window, whose base is 1000h, so the bus address - the
+address task 1 sees - is dest minus 1000h: the rom takes the low three
+nibbles of the high byte.  the hdca is the one medium that says
+something here: its rom reads the two bytes at 1feh as the address it
+enters, which is what mkbootimg's -a writes.
+
+where the bytes are
+-------------------
+
+everything the levels after the rom touch is inside task 1's one 64k.
+
+	0050h	three bytes pointing the hd-dma at its command block
+	0080h	the command block - and, on the floppy, its channel
+		program
+	0100h	level 2, which moves itself up to c000h
+	0200h	where a controller's dma lands before it is copied
+	0ff0h	the kernel image's object header; the image is one flat
+		read of 117 blocks through 0f9f0h
+	1000h	level 3's buffers, and then the kernel's text
+	8000h	level 3's staging for the object image
+	c000h	level 2, out of the way
+	10000h	the loader's stack, growing down - mwboot1 sets sp to 0,
+		meaning 10000h, because everything below it is about to
+		be the kernel
+
+nothing in the kernel's image is relocated: the file's text offset is
+the address it runs at, and the sections the linker put at c000h, e000h
+and f000h are written to exactly those addresses.  that is only true in
+task 1, where the map is the identity, and it is why the loader has to
+be there.  the image begins at 0ff0h, sixteen bytes below where the
+kernel's text starts, and those sixteen bytes are its object header -
+which is lucky, because the kernel's entry sets its stack to 1000h and
+grows down into them, and once it is in task 0 it cannot see below 1000h
+at all.
+
+the last of those sections, f000h, is the page the level 1 rom was
+copied to: the kernel's u page is linked there, so the rom's own 4k
+becomes the u page as the load runs past it.  the rom is finished by
+then - the machine has been in task 1 since the block was entered - and
+nothing reads it again.
+
+the trap back
+-------------
+
+the loader does not trap.  it jumps: _enterk puts the inode it booted
+from in HL and jumps to the loaded text at 1000h, in task 1 like
+everything else in this directory.
+
+1000h is not a routine but a jump with a live operand.  uhdr.s puts the
+jump opcode there and, at 1001h, _trapvec, which the kernel reassigns.
+what the load leaves there first sends it to boot, which sets sp to
+1000h - growing down into the header the image was loaded from - keeps
+HL in _kino, and jumps to _start.
+
+_start is start() in sys/trap.c, and the trap is there:
+
+	start() runs in task 1 and says so in its comment: "we are in
+	task 1, and the memory maps for tasks 1 and 0 are identical".
+	it points _trapvec at task0 and halts.
+
+	a halt in a user task is a trap.  the cpu clears the task
+	register before it fetches again, so it is task 0 and the
+	supervisor.
+
+	the prom's trap entry at 0bf0h takes over.  it saves the user's
+	sp at 000ah, sets sp to begsav, pushes af, hl and de, and calls
+	trappd.
+
+	trappd gets the user's pc back by subtracting 15 - the length
+	of the prom's own trap entry - from the return address of its
+	call, then builds the rest of the frame: the alternate bank, ix,
+	iy and the interrupt register, the primary bank, and then three
+	words the kernel reads as a structure - the task and mask the
+	trap came from, the user pc, and the user sp.  that is the 32
+	bytes at 1e0h, which is the shape of the first 32 bytes of
+	struct user (include/sys/proc.h).
+
+	a trap with ctask nonzero and not from the stop switch calls
+	super: 0000h, the jump to 1000h, which is now a jump through
+	_trapvec - and _trapvec is &task0.
+
+so the first thing the kernel does in task 0 is task0() in sys/uhdr.s,
+which parks the firmware's return address and calls task0_body().  that
+is the kernel proper.  it takes the kernel's mask, clears ustack, copies
+the 32-byte frame out of 1e0h into u.stack, moves its stack into the u
+page, points the trap stack at &u.save so that later traps build their
+frames there rather than in the monitor's ram, and calls main().
+
+by the time task0_body returns, the kernel has been copied into a bank of
+its own and task 1's map points at that bank, so the bytes the loader
+wrote at 1000h are no longer the ones that run.  task0_body forks process
+1 - the code that was the loader's task - and returns through the
+firmware: the trap return restores its registers, makes the jump at
+0003h, and writes the task and mask word with one store, low byte to the
+task register.  the task it returns to is task 1, at the instruction
+after the halt in start(), which puts a halt at location 8 of that
+process's own page so that rst 8 is a system call, and calls xinit().
+
+what the levels below contributed, in order: the monitor built task 1's
+identity map at reset and copied the level 1 rom into the page the
+kernel's u page would be linked at; the level 1 rom pointed task 0's
+segment 1 back at page 1 so that both maps would name the same bytes,
+set ctask to 1 so that the trap would be read as a user task's, and
+entered the block at the address the medium itself gave; the level 2
+sector and the level 3 loader ran in task 1 and touched no map at all;
+and the kernel's own entry took the trap that made it the supervisor.
