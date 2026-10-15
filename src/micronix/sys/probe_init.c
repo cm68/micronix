@@ -28,13 +28,15 @@ extern struct ovlintr ovlint[NOVLINE];  /* sys/probe.c */
  * The pending attach list: each driver's probe, handler and segment,
  * taken as it is placed and resolved by intr_attach once every driver is
  * in.  The probe and handler live in the driver's module, so the segment
- * travels with them.
+ * travels with them.  nintrdone is how far intr_attach has got, which is
+ * what lets it run twice - see the note on it below.
  */
 #define NPINTR  8               /* more interrupt drivers than this?  no. */
 static int (*intrprobe[NPINTR]) ();
 static int (*intrfn[NPINTR]) ();
 static UINT intrseg[NPINTR];
 static UINT8 nintr;
+static UINT8 nintrdone;
 
 /*
  * Claim a driver's interrupt for the attach phase.  ovl.c's ovlplace()
@@ -78,8 +80,7 @@ bitline(mask)
 }
 
 /*
- * The attach loop, run once at boot after every driver is placed.  For
- * each driver that declared an interrupt:
+ * The attach loop.  For each driver that declared an interrupt:
  *
  *      intoff(all)      the tickle must not reach the CPU
  *      probe()          the card asserts its line
@@ -91,6 +92,19 @@ bitline(mask)
  * A card that is not in the machine never asserts its line, so its probe
  * finds nothing and it is left unwired - the tickle doubles as the
  * presence test.
+ *
+ * It runs twice, and it has to.  The root device's driver is placed by
+ * ovlstart() from cus(), and bopen(rootdev) follows it in main() - long
+ * before ovlplaceall() can read the other modules out of the kernel's own
+ * file, which is what the file is read through.  So cus() attaches what
+ * is placed there (the root driver alone) and main() attaches the rest.
+ *
+ * Running twice is what nintrdone is for.  The second pass takes only the
+ * drivers placed since the first - a redone tickle would be a second
+ * interrupt nothing had asked for - and the lines are opened from
+ * ovlint[] rather than from what was just found, because the masking
+ * above is machine-wide and would otherwise close the lines the first
+ * pass opened.  A line is live exactly when it has a handler.
  */
 intr_attach()
 {
@@ -101,7 +115,7 @@ intr_attach()
     for (l = 0; l < NOVLINE; l++)
         intoff(l);              /* mask every line, whatever came before */
 
-    for (i = 0; i < nintr; i++) {
+    for (i = nintrdone; i < nintr; i++) {
         ovlcall(intrprobe[i], intrseg[i]);      /* the tickle */
         line = bitline(pic_irr());              /* the line it raised */
         if (line < 0)
@@ -109,7 +123,11 @@ intr_attach()
         ovlint[line].fn = intrfn[i];
         ovlint[line].seg = intrseg[i];
         pic_eoi(line);          /* clear the tickled interrupt */
-        inton(line);            /* the line is live */
     }
+    nintrdone = nintr;
+
+    for (l = 0; l < NOVLINE; l++)
+        if (ovlint[l].fn)
+            inton(l);           /* the line is live */
     return (0);
 }

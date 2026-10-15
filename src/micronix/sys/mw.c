@@ -140,14 +140,11 @@ struct
 #define INTOFF	0               /* turn off completion interrupts */
 
 /*
- * Decision interrupt controller.
- * See the Wunderbus I/O or Mult I/O manual.
+ * The interrupt controller this driver used to poke at directly - the
+ * Wunderbus I/O's base, its mask register, and the VI bit to open - is
+ * gone from here.  A driver names no line and touches no PIC; the attach
+ * loop does both, once, at boot (sys/INTR.md).
  */
-#define BASE	0x48            /* Base address of WB I/O */
-#define PIC1	BASE+5
-#define GRPSEL	BASE+7
-#define PICMASK 050             /* enable PIC interrupts */
-#define VI	1               /* Interrput 0 (PIC mask bit) */
 
 /*
  * Globals
@@ -668,10 +665,15 @@ reset()
     map0[2] = image0[2];
 
     /*
-     * out(GRPSEL, 0 | PICMASK); /* select PIC * out(PIC1, in(PIC1) & ~VI);
-     * /* enable interrupts *
+     * Out of the old idiom's way: this used to unmask the line here
+     * (inton(MWINT)), because a driver named its own and opened its own
+     * interrupt.  It names neither now - the line is discovered and
+     * unmasked once, by the attach loop (sys/probe.c), and this runs far
+     * too late to be that.  Unmasking here would also be wrong: the probe
+     * tickles the card with every line masked on purpose, and a reset
+     * that opened one would let the tickle reach the CPU and be
+     * acknowledged before the attach loop could read the pending bit.
      */
-    inton(MWINT);
     ei();
     out(RESET, 0);
 }
@@ -760,9 +762,10 @@ mwcheck()
  * returns without registering and its major answers as nodev does.
  *
  * seg is the page the driver was placed in, and 0 means the kernel
- * already contains it - see sys/ovl.c.  The controller's reset() and the
- * inton(MWINT) that unmasks line 0 still happen at open, as they always
- * have.
+ * already contains it - see sys/ovl.c.  The controller's reset() happens
+ * at the first open, as it always has; the interrupt line is not this
+ * driver's to unmask any more (sys/INTR.md), and the header it names
+ * itself in carries the probe instead of a line number.
  */
 static
 mwbusready()
@@ -990,11 +993,45 @@ struct biovec mwbvec = { &mwopen, &mwclose, &mwstrat, &mwioctl };
 
 /*
  * The probe: make the card raise its interrupt so the attach loop
- * (sys/probe.c) can discover which line it is on.  STUB - not written;
- * it must issue a command that completes and raises the card's done bit.
+ * (sys/probe.c) can discover which line it is on.  Called with the module
+ * mapped and every line masked, before anything has been read or written.
+ *
+ * The tickle is the command the first real request would issue anyway -
+ * reset, then load constants (mwstart on VIRGIN) - and it is waited for
+ * here rather than taken as an interrupt, because there is nothing wired
+ * to take it yet.  It lights the card's done latch, which is the
+ * interrupt: the attach loop reads the PIC's pending register right after
+ * this returns, so the latch has to be up when it does.  A card holds it
+ * until the next command, so it stays up.
+ *
+ * The wait is bounded rather than mwwait()'s endless poll.  A machine
+ * with no HD-DMA never answers, and this is the presence test (sys/INTR.md)
+ * - "no answer" has to come back as a result, not as a hang.  The bound
+ * is generous: an answer arrives in a handful of cycles here and in well
+ * under a millisecond on a real 4 MHz controller, and the loop does
+ * nothing but read the word the card writes.
+ *
+ * STOPPED when it returns, which is the state whose interrupt does
+ * nothing - mwint() returns on it - so the tickle's own interrupt, which
+ * arrives after the attach loop has wired and unmasked the line, is
+ * harmless rather than the start of a request that was never issued.
  */
+#define PROBEWAIT 10000
+
 mwprobe()
 {
+    register int n;
+
+    reset();
+    cmd.steps = 0;
+    cmd.arg0.byte.high = INT;
+    cmd.hedsel |= LCONST;
+    cmd.op = LOAD;
+    attn();
+    for (n = 0; n < PROBEWAIT && cmd.stat == BUSY; n++)
+        ;
+    mwstate = STOPPED;
+    mwdead = 0;
     return (0);
 }
 

@@ -26,6 +26,7 @@
 static int cinit(), hdinit();
 extern int clockinit();         /* sys/wb_clock.c (or ss1_clock.c) */
 extern int pic_init();          /* sys/miopic.c (or wbiopic/ss1pic) */
+extern int intr_attach();       /* sys/probe_init.c */
 
 cus()
 {
@@ -50,6 +51,15 @@ cus()
      * coninit (); /* in inits.s
      */
     ovlstart();                 /* the stamped root driver, in sys/ovl.c */
+    /*
+     * Wire that driver's interrupt now, before main() goes on to open the
+     * root device.  The rest of the modules cannot be placed until the
+     * root device can be read - the kernel reads them out of its own file
+     * through it - so main() calls intr_attach() again after ovlplaceall()
+     * for those.  It is the first open, not the last placement, that the
+     * wiring has to beat.
+     */
+    intr_attach();
     hdinit();
 
     /*
