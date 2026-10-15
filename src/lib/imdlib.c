@@ -276,6 +276,18 @@ attach_delta(struct imd *ip, char *fname, int mode)
 }
 
 /*
+ * The single density track an eight inch medium opens with: 26 sectors of
+ * 128 bytes, numbered from one, which is what an eight inch drive is
+ * formatted with at cylinder 0 head 0 and not a choice anyone makes.  The
+ * boot is its first four - one 512 byte block of it - and every cylinder
+ * above it is double density with the sector size the rest of this file
+ * describes.  See stand/roms/l1boot.s's djfm, which reads it as four
+ * sectors because that is the only way it can be read.
+ */
+#define FM_NSEC     26
+#define FM_SSIZE    128
+
+/*
  * A raw sector image has no structure to read - just the sectors, in
  * order, cylinder by cylinder and head by head within each cylinder.  We
  * build the same track structures an IMD file would have produced, so
@@ -293,6 +305,7 @@ static struct rawfmt {
     int secsize;
     int skew;
     int firstsec;               // lowest numbered sector on a track
+    int fm;                     // and cylinder 0 head 0 is an fm track
     char *what;
 } rawfmts[] = {
     /*
@@ -303,13 +316,13 @@ static struct rawfmt {
      * an image one place out: the loader's own label check catches that
      * now, and did not before there was one.
      */
-    { 40*2*10*512, 40, 2, 10, 512, 0, 0, "5 1/4 inch, 40 track, double sided, 512 byte sectors" },
-    { 40*1*10*512, 40, 1, 10, 512, 0, 0, "5 1/4 inch, 40 track, single sided, 512 byte sectors" },
-    { 35*2*10*512, 35, 2, 10, 512, 0, 0, "5 1/4 inch, 35 track, double sided, 512 byte sectors" },
-    { 35*1*10*512, 35, 1, 10, 512, 0, 0, "5 1/4 inch, 35 track, single sided, 512 byte sectors" },
-    { 80*2*10*512, 80, 2, 10, 512, 0, 0, "5 1/4 inch, 80 track, double sided, 512 byte sectors" },
-    { 77*2*8*512,  77, 2,  8, 512, 0, 1, "8 inch, double sided, 512 byte sectors" },
-    { 77*1*26*128, 77, 1, 26, 128, 0, 1, "8 inch, single sided, 128 byte sectors" },
+    { 40*2*10*512, 40, 2, 10, 512, 0, 0, 0, "5 1/4 inch, 40 track, double sided, 512 byte sectors" },
+    { 40*1*10*512, 40, 1, 10, 512, 0, 0, 0, "5 1/4 inch, 40 track, single sided, 512 byte sectors" },
+    { 35*2*10*512, 35, 2, 10, 512, 0, 0, 0, "5 1/4 inch, 35 track, double sided, 512 byte sectors" },
+    { 35*1*10*512, 35, 1, 10, 512, 0, 0, 0, "5 1/4 inch, 35 track, single sided, 512 byte sectors" },
+    { 80*2*10*512, 80, 2, 10, 512, 0, 0, 0, "5 1/4 inch, 80 track, double sided, 512 byte sectors" },
+    { 77*2*8*512,  77, 2,  8, 512, 0, 1, 1, "8 inch, double sided, 512 byte sectors" },
+    { 77*1*26*128, 77, 1, 26, 128, 0, 1, 1, "8 inch, single sided, 128 byte sectors" },
 
     /*
      * The two eight inch media this tree builds bootable diskettes for -
@@ -324,8 +337,8 @@ static struct rawfmt {
      * firstsec is one: eight inch soft sectored media number from one,
      * per the firmware tables quoted in raw_geometry.
      */
-    { 77*1*15*512, 77, 1, 15, 512, 0, 1, "8 inch, single sided, 512 byte sectors" },
-    { 77*2*15*512, 77, 2, 15, 512, 0, 1, "8 inch, double sided, 512 byte sectors" },
+    { 77*1*15*512, 77, 1, 15, 512, 0, 1, 1, "8 inch, single sided, 512 byte sectors" },
+    { 77*2*15*512, 77, 2, 15, 512, 0, 1, 1, "8 inch, double sided, 512 byte sectors" },
 
     /*
      * The DOS double-density diskettes dar exchanges with: the five and
@@ -334,12 +347,12 @@ static struct rawfmt {
      * sectors in order, no skew, numbered from one - which is how dar
      * reads them with its device's alternate-sectoring bit clear.
      */
-    { 40*1*8*512,  40, 1,  8, 512, 0, 1, "5 1/4 inch, 40 track, single sided, 8 sector, 512 byte sectors" },
-    { 40*1*9*512,  40, 1,  9, 512, 0, 1, "5 1/4 inch, 40 track, single sided, 9 sector, 512 byte sectors" },
-    { 40*2*8*512,  40, 2,  8, 512, 0, 1, "5 1/4 inch, 40 track, double sided, 8 sector, 512 byte sectors" },
-    { 40*2*9*512,  40, 2,  9, 512, 0, 1, "5 1/4 inch, 40 track, double sided, 9 sector, 512 byte sectors" },
-    { 80*2*9*512,  80, 2,  9, 512, 0, 1, "3 1/2 inch, 80 track, double sided, 9 sector, 512 byte sectors" },
-    { 0, 0, 0, 0, 0, 0, 0, 0 }
+    { 40*1*8*512,  40, 1,  8, 512, 0, 1, 0, "5 1/4 inch, 40 track, single sided, 8 sector, 512 byte sectors" },
+    { 40*1*9*512,  40, 1,  9, 512, 0, 1, 0, "5 1/4 inch, 40 track, single sided, 9 sector, 512 byte sectors" },
+    { 40*2*8*512,  40, 2,  8, 512, 0, 1, 0, "5 1/4 inch, 40 track, double sided, 8 sector, 512 byte sectors" },
+    { 40*2*9*512,  40, 2,  9, 512, 0, 1, 0, "5 1/4 inch, 40 track, double sided, 9 sector, 512 byte sectors" },
+    { 80*2*9*512,  80, 2,  9, 512, 0, 1, 0, "3 1/2 inch, 80 track, double sided, 9 sector, 512 byte sectors" },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
 /*
@@ -399,6 +412,13 @@ raw_geometry(char *fname, struct rawfmt *fp, long size)
      */
     fp->firstsec = ((minor & 0x04) && fp->spt == 10) ? 0 : 1;
     fp->skew = (minor & 0x08) ? 1 : 0;
+
+    /*
+     * An eight inch medium opens with a single density track - see
+     * FM_NSEC - and that is what the bit that is clear here means: a five
+     * and a quarter inch drive has one sector size all the way down.
+     */
+    fp->fm = (minor & 0x04) ? 0 : 1;
 
     /*
      * fslib treats these as a linear run of tracks - blkno/spt is the
@@ -482,6 +502,7 @@ raw_load(char *fname, int drive, int mode)
     struct stat sb;
     int fd, cyl, head, sec;
     int sbyte, sz;
+    int fm, nsec, ssize, fsec;
 
     if (stat(fname, &sb) < 0)
         return 0;
@@ -515,9 +536,10 @@ raw_load(char *fname, int drive, int mode)
      */
     fprintf(stderr,
         "%s: raw image, %s, %d cyl, %d head, %d x %d byte sectors%s, "
-        "sectors numbered from %d\n",
+        "sectors numbered from %d%s\n",
         fname, fp->what, fp->cyls, fp->heads, fp->spt, fp->secsize,
-        fp->skew ? ", skewed" : "", fp->firstsec);
+        fp->skew ? ", skewed" : "", fp->firstsec,
+        fp->fm ? ", fm track 0" : "");
 
     ip = malloc(sizeof(*ip));
     memset(ip, 0, sizeof(*ip));
@@ -547,13 +569,31 @@ raw_load(char *fname, int drive, int mode)
 
     for (cyl = 0; cyl < fp->cyls; cyl++) {
         for (head = 0; head < fp->heads; head++) {
+            /*
+             * The one track on the medium whose shape is not the rest of
+             * it: an eight inch drive's cylinder 0 head 0 is single
+             * density, 26 sectors of 128 bytes.  It is the first 3328
+             * bytes of the image, and it is also the track the boot is
+             * on, so a reader that asks it for four 128 byte sectors -
+             * which is the only way to read a block there, and what
+             * l1boot.s does - gets the boot's 512 bytes.
+             *
+             * The first sector is one here whatever the medium says
+             * elsewhere, because that is what the track is: the four the
+             * boot is in are sectors 1 to 4 (djfm starts at one).
+             */
+            fm = fp->fm && cyl == 0 && head == 0;
+            nsec = fm ? FM_NSEC : fp->spt;
+            ssize = fm ? FM_SSIZE : fp->secsize;
+            fsec = fm ? 1 : fp->firstsec;
+
             tp = malloc(sizeof(*tp));
             memset(tp, 0, sizeof(*tp));
             tp->fixed.cyl = cyl;
             tp->fixed.head = head;
-            tp->fixed.nsec = fp->spt;
+            tp->fixed.nsec = nsec;
             tp->head = head;
-            tp->secsize = fp->secsize;
+            tp->secsize = ssize;
 
             /*
              * The size byte in a track header is the exponent of the
@@ -564,21 +604,21 @@ raw_load(char *fname, int drive, int mode)
              * at a quarter of their length - the first track parsed and
              * the rest of the medium was garbage.
              */
-            for (sz = 128, sbyte = 0; sz < fp->secsize; sz <<= 1)
+            for (sz = 128, sbyte = 0; sz < ssize; sz <<= 1)
                 sbyte++;
             tp->fixed.size = sbyte;
-            tp->secmap = malloc(fp->spt);
-            raw_secmap(tp->secmap, fp->spt, fp->skew, fp->firstsec);
-            tp->data = malloc(fp->spt * sizeof(char *));
-            for (sec = 0; sec < fp->spt; sec++) {
+            tp->secmap = malloc(nsec);
+            raw_secmap(tp->secmap, nsec, fp->skew, fsec);
+            tp->data = malloc(nsec * sizeof(char *));
+            for (sec = 0; sec < nsec; sec++) {
                 /*
                  * Sectors are numbered from 1 and laid down in order: a
                  * raw image has no interleave of its own.  Skew is the
                  * driver's business, which djdma.4 calls alternate
                  * sectoring and gives its own minor device numbers.
                  */
-                tp->data[sec] = malloc(fp->secsize);
-                if (read(fd, tp->data[sec], fp->secsize) != fp->secsize) {
+                tp->data[sec] = malloc(ssize);
+                if (read(fd, tp->data[sec], ssize) != ssize) {
                     printf("%s: short read at cyl %d head %d sector %d\n",
                         fname, cyl, head, sec + 1);
                     close(fd);
@@ -586,6 +626,28 @@ raw_load(char *fname, int drive, int mode)
                 }
             }
             ip->tracks[imd_trknum(ip, cyl, head)] = tp;
+
+            /*
+             * And past the rest of that track's own place in the image,
+             * which is the one thing about this that a reader has to be
+             * told.  The image is the medium's blocks in order, so the
+             * cylinder in front of the first double density one is
+             * blocks * 512 bytes of file whatever shape the track on it
+             * is: the boot's 3328 bytes are the front of that, and the
+             * bytes between them and the end of the cylinder are the
+             * fm track's room and nothing else's.  Skipping them keeps
+             * every later track where the block number says it is -
+             * which is where mkbootimg and bootflop put it, and where a
+             * diskette written by a machine would have it.
+             */
+            if (fm) {
+                if (lseek(fd, (long) fp->spt * fp->secsize -
+                        (long) FM_NSEC * FM_SSIZE, SEEK_CUR) < 0) {
+                    printf("%s: cannot skip past the fm track\n", fname);
+                    close(fd);
+                    return 0;
+                }
+            }
         }
     }
     close(fd);
