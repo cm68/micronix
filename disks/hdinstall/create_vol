@@ -52,8 +52,8 @@ fi
 # volume this directory makes is named the one way.  Given with it
 # already, the name is left alone.
 case "$vol" in
-*.img)	;;
-*)	vol="$vol.img" ;;
+*.vol)	;;
+*)	vol="$vol.vol" ;;
 esac
 case "$vol" in
 /*)	;;
