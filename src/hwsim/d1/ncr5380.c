@@ -18,7 +18,7 @@
  *   NCR 5380    the bus interface chip: eight registers the cpu reads and
  *               writes and a set of bus transceivers.  The register is the
  *               low three bits of the port - A0-A2 straight into the chip -
- *               so 0x40..0x47 are registers 0..7 (include/sys/ncr.h).  It
+ *               so 0x20..0x27 are registers 0..7 (include/sys/ncr.h).  It
  *               does not know what a disk is; it drives the wires.
  *   CDB         command descriptor block: the ten bytes that ARE the
  *               command - an opcode, an LBA and a block count.  READ(10)
@@ -106,12 +106,12 @@ extern int trace_bio;
  * The card's ports.  Eight consecutive Z80 I/O addresses with the register
  * number in the low three bits, so one pair of handlers serves all eight
  * and the register is p & 7.  The range is free on this machine: 0x30-0x34
- * is the MYIDE board, 0x48-0x4f and 0x58-0x5f the Mult I/O console,
- * 0x50-0x53 the obsolete hdca, 0x54-0x55 the hd-dma, 0xd0-0xd1 the
- * simulator's own, 0xef the dj-dma, and 0x40 is what a SCSI host adapter
- * on this bus has always been strapped to.
+ * is the MYIDE board, 0x40-0x47 and 0x48-0x4f the Mult I/O console,
+ * 0x50-0x53 the obsolete hdca, 0x54-0x55 the hd-dma, the 0xd0 page the
+ * simulator's own, and 0xef the dj-dma.  A SCSI host adapter has always
+ * been strapped at 0x40, which the console's second board now claims.
  */
-#define SCSIBASE    0x40
+#define SCSIBASE    0x20
 #define NREG        8
 
 /*

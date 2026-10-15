@@ -84,9 +84,9 @@ extern int trace_bio;
 #endif
 
 /*
- * The board's ports.  The range is free on this machine: 0x48-0x4f and
- * 0x58-0x5f are the Mult I/O console, 0x50-0x53 the obsolete hdca,
- * 0x54-0x55 the hd-dma, 0xd0-0xd1 the simulator's own, and 0xef the
+ * The board's ports.  The range is free on this machine: 0x40-0x47 and
+ * 0x48-0x4f are the Mult I/O console, 0x50-0x53 the obsolete hdca,
+ * 0x54-0x55 the hd-dma, the 0xd0 page the simulator's own, and 0xef the
  * dj-dma.
  */
 #define IDE_PA      0x30        /* 8255 port A: drive data, low byte */

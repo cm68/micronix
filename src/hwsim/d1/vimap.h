@@ -4,7 +4,7 @@
  * The S-100 vectored-interrupt wiring, in one place, so a different card
  * set is a re-jumper here rather than an edit in every driver.  Two 8259s
  * share the bus: the master on the base Wunderbus (0x48) and the slave on
- * the add-on MultIO (0x58).  Each PIC monitors three VI lines on its
+ * the second MultIO (0x40).  Each PIC monitors three VI lines on its
  * IR0..IR2; the master owns SINTA and the slave is polled, so the wiring
  * is: VI0..VI2 are the master's IR0..IR2, VI3..VI5 are the slave's.
  *

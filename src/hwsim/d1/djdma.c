@@ -1238,15 +1238,17 @@ extern char **fivenames;
  */
 /*
  * The media changer (sys/MEDIACHG.md): out-of-band removable-media
- * control on port 3.  A guest process - or a shell through
- * /dev/mediachg, c 3 3 - writes "@<command>\n"; the command runs
+ * control on port 0xd2, in the page the simulator keeps for its own
+ * ports (0xd0 and 0xd1 are the kernel's control port and its program
+ * name, mpz80.c).  A guest process - or a shell through /dev/mediachg,
+ * c 3 210 - writes "@<command>\n"; the command runs
  * against the media sets loaded from the -e manifest, and the answer
  * comes back on the same port.  '@' is the leadin and the resync
  * point: a command without it is discarded, which is what makes a
  * guest that died mid-command harmless.
  */
 
-#define MEDIA_PORT      3       /* the media changer's port (dev/devlist) */
+#define MEDIA_PORT      0xd2    /* the media changer's port (dev/devlist) */
 #define MEDIA_MAX       80      /* longest command, '@' excluded */
 
 struct mediaset {

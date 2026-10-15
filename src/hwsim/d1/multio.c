@@ -79,7 +79,7 @@ struct ace {
 #define TXE_TIMEOUT     5000     // how long to wait before setting LSR_TXE
 
 #define	MULTIO_MASTER	0x48	// multio master standard port
-#define	SBASE	        0x58	// the slave MultIO's base, one group up
+#define	SBASE	        0x40	// the second MultIO's base, one group down
 
 // linestat                 base + 5    0x4d
 #define LSR_DR      0x01    // input data ready
@@ -220,7 +220,7 @@ byte ocw3;
 
 /*
  * The whole of one 8259's state, so two PICs - the master on the base
- * Wunderbus at 0x48 and the slave on the add-on MultIO at 0x58 - can live
+ * Wunderbus at 0x48 and the slave on the second MultIO at 0x40 - can live
  * side by side.  Each is addressed at its base+4 and base+5, polled
  * rather than CAS-cascaded, so each carries the entire register set.
  *
@@ -236,14 +236,18 @@ struct pic {
     byte poll;                  /* OCW3 poll command is pending a read */
     int pic_state;
 };
-static struct pic pics[2];      /* [0] = master 0x48, [1] = slave 0x58 */
+static struct pic pics[2];      /* [0] = master 0x48, [1] = slave 0x40 */
 static struct pic *cur_pic = &pics[0];  /* the PIC the current access addresses */
 
-/* which PIC a register address belongs to: the slave is the base at 0x58 */
+/*
+ * Which PIC a register address belongs to.  The two boards are one group
+ * apart - the master at 0x48, the slave at 0x40 - so dropping the register
+ * bits leaves the base and nothing else has to be known.
+ */
 static struct pic *
 picfor(portaddr p)
 {
-    return ((p & 0xf0) == 0x50) ? &pics[1] : &pics[0];
+    return ((p & ~7) == MULTIO_MASTER) ? &pics[0] : &pics[1];
 }
 
 #define icw1     cur_pic->icw1
@@ -1550,7 +1554,7 @@ multio_select(portaddr p, byte v)
 }
 
 /*
- * The slave MultIO's group select (0x5f).  Its PIC registers are wired
+ * The slave MultIO's group select (0x47).  Its PIC registers are wired
  * up once at init, so a select is accepted and nothing is switched - the
  * slave has no serial ports here to select between, only its PIC.
  */
@@ -1778,7 +1782,7 @@ multio_init()
     get_intack = &multio_intack;
 
     /*
-     * The slave MultIO (0x58) is only ever used for its PIC here - its
+     * The slave MultIO (0x40) is only ever used for its PIC here - its
      * serial ports are not modelled - so its two PIC registers are wired
      * up once and left, rather than through a group-select dance like the
      * master's.  picfor() sends them to pics[1] on the address alone.
