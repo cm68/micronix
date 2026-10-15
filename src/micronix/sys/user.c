@@ -40,6 +40,17 @@
 
 char ustack[512];               /* the system stack, just below u */
 
+/*
+ * The current process's memory map, for mem.s, which cannot name a
+ * member of struct proc (see proc.h).  It is mutable data in the cloned
+ * segment, which is why it is here and not in the kernel's own data:
+ * newmap() sets it at every switch, so a copy inherited from the parent
+ * is overwritten before the child's first user page is reached.  It
+ * sits between ustack and u because task0_body() zeroes that range -
+ * below u it would keep whatever the loader's stack left there.
+ */
+char *curmem;
+
 struct user u;
 
 /*

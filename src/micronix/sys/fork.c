@@ -72,6 +72,8 @@ procopy(child)
     saveframe(&u.p->frmptr, &u.p->stkptr);
     copy(u.p, child, sizeof(struct proc));
     child->time = 0;
+    child->task = 0;            /* its own slot, not its parent's */
+
     child->parent = u.p;
     child->pid = newpid();
 

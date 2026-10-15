@@ -24,18 +24,19 @@
 ; MAP0	:= &0x0600		/task zero window registers
 ; IMAGE0	:= &0x0200		/readable version of MAP0
 ;
-; MAP1	:= &0x0620		/task ones map registers
-; IMAGE1	:= &0x0220		/task ones readable map registers
-;
 ; LDIR	:= &0xB0ED		/z80 do *de++ = *hl++ while --bc != 0
+;
+; The page a user address falls in is looked up in the current process's
+; memory map, which is _curmem - a pointer to u.p->mem, set by newmap()
+; at every switch (malloc.c, proc.h).  The map to read is the process's
+; own; _curmem is two bytes in the u page, which is mapped in task 0
+; throughout every routine here.
 ;
 	.globl	_getbyte, _getword, _putbyte, _putword, _copyin, _copyout
 	.globl	_memrw, _segcopy, _zerouser
-	.extern	_di, _ei, _meminit, _zpage
+	.extern	_di, _ei, _meminit, _zpage, _curmem
 MAP0=0x0600
 IMAGE0=0x0200
-MAP1=0x0620
-IMAGE1=0x0220
 	.data			; leaf code, parked in the u page (see user.c)
 
 ; ------- the base of the u page -------
@@ -87,7 +88,7 @@ _getword:			; addr (arg0) already in hl; fall through to getw
 ; 	a <*> -1
 ; 	a <*> -1		/now a = 2 * high nibble of addr
 ;
-; 	bc = IMAGE1		/task ones map
+; 	bc = _curmem		/the current process's map
 ; 	a + c -> c		/bc points to map reg for desired word
 ;
 ; 	a = h & 0x0F		/remove high nibble from addr
@@ -114,9 +115,9 @@ getw:
 	rrca
 	rrca
 	rrca			/now a = 2 * high nibble of addr
-	ld	de,IMAGE1
+	ld	de,(_curmem)
 	add	a,e
-	ld	e,a		; de = &IMAGE1[2*page]
+	ld	e,a		; de = &curmem[2*page]
 	ld	a,h
 	and	0x0F
 	or	0xD0		; window nibble -> the 0xd000 remap page
@@ -184,7 +185,7 @@ _putbyte:
 ; 	a <*> -1
 ; 	a <*> -1		/now a = 2 * high nibble of addr
 ;
-; 	de = IMAGE1		/task ones map
+; 	de = _curmem		/the current process's map
 ; 	a + e -> e		/de points to map reg for desired byte
 ;
 ; 	a = h & 0x0F		/remove high nibble from addr
@@ -205,7 +206,7 @@ putb:
 	rrca
 	rrca
 	rrca			/now a = 2 * high nibble of addr
-	ld	de,IMAGE1
+	ld	de,(_curmem)
 	add	a,e
 	ld	e,a
 	ld	a,h
@@ -283,7 +284,7 @@ _putword:
 ;
 ; 	bc => sp		/save count
 ;
-; 	bc = IMAGE1		/task ones map
+; 	bc = _curmem		/the current process's map
 ; 	a + c -> c		/bc points to map reg for source
 ;
 ; 	call _di
@@ -373,9 +374,9 @@ _copyin:
 	rrca
 	rrca
 	rrca			/now a = 2 * high nibble of from
-	ld	de,IMAGE1
+	ld	de,(_curmem)
 	add	a,e
-	ld	e,a		; de = &IMAGE1[2*page]
+	ld	e,a		; de = &curmem[2*page]
 	ld	a,(de)
 	ld	(MAP0+26),a	; map the page
 
@@ -446,7 +447,7 @@ _copyin:
 ;
 ; 	bc => sp		/save count
 ;
-; 	bc = IMAGE1		/task ones map
+; 	bc = _curmem		/the current process's map
 ; 	a + c -> c		/bc points to map reg for source
 ;
 ; 	call _di
@@ -538,9 +539,9 @@ _copyout:
 	rrca
 	rrca
 	rrca			/now a = 2 * high nibble of to
-	ld	de,IMAGE1
+	ld	de,(_curmem)
 	add	a,e
-	ld	e,a		; de = &IMAGE1[2*page]
+	ld	e,a		; de = &curmem[2*page]
 	ld	a,(de)
 	ld	(MAP0+26),a	; map the page
 
@@ -610,16 +611,16 @@ _zerouser:
 	rrca
 	rrca		; a = 2 * high nibble of addr
 	push	bc		; save count
-	ld	bc,IMAGE1
-	add	a,c
-	ld	c,a		; bc = &image1[2*page]
+	ld	de,(_curmem)	; de, not bc: hl is the user addr and is
+	add	a,e		; wanted below
+	ld	e,a		; de = &curmem[2*page]
 	call	_di
-	ld	a,(bc)
+	ld	a,(de)
 	ld	(IMAGE0+2),a
 	ld	(MAP0+2),a	; map page N
-	inc	bc
-	inc	bc
-	ld	a,(bc)
+	inc	de
+	inc	de
+	ld	a,(de)
 	ld	(IMAGE0+4),a
 	ld	(MAP0+4),a	; map page N+1
 	pop	bc		; restore count
@@ -700,7 +701,7 @@ _zerouser:
 ; 	a <*> -1		/rotate a right 3 times w/o carry
 ; 	a <*> -1
 ; 	a <*> -1		/now a = 2 * high nibble of user addr
-; 	bc = IMAGE1		/task ones map
+; 	bc = _curmem		/the current process's map
 ; 	a + c -> c		/bc points to map reg for user addr
 ; 	a = *bc
 ; 	a -> *IMAGE0[2] -> *MAP0[2]	/task0s window to user
@@ -771,10 +772,12 @@ _memrw:
 	rrca
 	rrca
 	rrca			/now a = 2 * high nibble of user addr
-	ld	bc,IMAGE1
-	add	a,c
-	ld	c,a
-	ld	a,(bc)
+	push	hl		; de holds the space window and hl the user
+	ld	hl,(_curmem)	; addr, and both are wanted below, so the
+	add	a,l		; map lookup goes through hl and comes back
+	ld	l,a
+	ld	a,(hl)
+	pop	hl
 	ld	(IMAGE0+2),a
 	ld	(MAP0+2),a
 	ld	a,h

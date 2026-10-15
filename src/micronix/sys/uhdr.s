@@ -14,9 +14,7 @@
 ; _status := &0x403
 ; _wtask	:= &0x81b
 ; _map0	:= &0x600
-; _map1	:= &0x620
 ; _image0 := &0x200
-; _image1 := &0x220
 ;
 ; /ram configuration
 ;
@@ -41,9 +39,7 @@
 ; public	_hlt
 ; public	_xinit
 ; public	_map0
-; public	_map1
 ; public	_image0
-; public	_image1
 ;
 ; /Power-up entry _point
 ; /Decision firmware expects this to be at 0x1000
@@ -61,14 +57,12 @@ _trapad=0x400
 _status=0x403
 _wtask=0x81B
 _map0=0x600
-_map1=0x620
 _image0=0x200
-_image1=0x220
 _usrtop=0xFFFF
 _memtop=0xFFFF
 	.globl	_trapstack, _oldstack, _cmask, _ctask, _mask, _rst1
 	.globl	_trapad, _status, _wtask, _usrtop, _memtop, _trapvec
-	.globl	_hlt, _xinit, _map0, _map1, _image0, _image1
+	.globl	_hlt, _xinit, _map0, _image0
 	.extern	_plist, _mlist, _start
 
 ;

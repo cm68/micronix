@@ -34,6 +34,24 @@ char segmap[MAXSEG] = 0;
 static UINT lastseg = 16;
 
 /*
+ * Task map.  Bit n is set while task n is assigned to a process.
+ *
+ * The hardware has sixteen tasks and gives each of 1..15 a 32-byte map
+ * table of its own in map ram (0x600 + 32*task, selected by the low
+ * nibble of the task register 0x402); task 0 is the kernel's and the
+ * only supervisor task.  A process that owns a slot keeps its memory
+ * map across a switch, so the map is copied when it changes (taskload)
+ * rather than on every switch (newmap).
+ *
+ * A slot is not the process's memory.  It can be taken back and handed
+ * to another process, and the loser is loaded from its mem[] again the
+ * next time it is switched in - so a process's table is a cache of its
+ * map and never the only copy of it.
+ */
+#define NTASK	16              /* tasks 1..15 are for processes */
+UINT taskmap = 0;
+
+/*
  * Allocate a segment
  */
 segalloc()
@@ -87,6 +105,89 @@ segfree(n)
 }
 
 /*
+ * True if q is the better task-slot victim of the two: a process that
+ * is not runnable beats one that is, and between equals the older - the
+ * larger residency time - goes first.  findout() (swap.c) sorts the
+ * same way for the same reason.  A process asleep on an event is the
+ * one least likely to want its map back soon, and among those the one
+ * resident longest is the one whose wakeup is furthest away: of a
+ * shell, a make and a compiler all asleep in wait(), the shell is the
+ * oldest and the one waiting on the whole chain.
+ */
+static
+staler(q, n)
+    struct proc *q, *n;
+{
+    if (!(q->mode & AWAKE) != !(n->mode & AWAKE))
+        return !(q->mode & AWAKE);
+    return q->time > n->time;
+}
+
+/*
+ * Allocate a task slot to p.  The lowest free one, or - when all
+ * fifteen are taken - the slot of the process that is least likely to
+ * want its map back soon, whose task field is cleared; it is loaded
+ * from mem[] again the next time it is switched in (newmap).
+ */
+taskalloc(p)
+    struct proc *p;
+{
+    register struct proc *q, *n;
+    UINT8 task;
+
+    di();
+    for (task = 1; task < NTASK; task++)
+        if (!(taskmap & (1 << task)))
+            break;
+
+    if (task == NTASK) {        /* all taken: take one back */
+        n = 0;
+        for (q = plist; q < plist + NPROC; q++)
+            if (q->task && (n == 0 || staler(q, n)))
+                n = q;
+        if (n == 0)             /* nothing holds a slot: NTASK is wrong */
+            panic("taskalloc: no task slots");
+        task = n->task;
+        n->task = 0;
+    }
+
+    taskmap |= 1 << task;
+    p->task = task;
+    ei();
+}
+
+/*
+ * Free a task slot.  Called with the segments themselves (mfree), so
+ * what the table holds means nothing after this.
+ */
+taskfree(p)
+    struct proc *p;
+{
+    if (p->task == 0)
+        return;
+    di();
+    taskmap &= ~(1 << p->task);
+    p->task = 0;
+    ei();
+}
+
+/*
+ * Copy p's map into the map ram of the task that holds it.
+ *
+ * Task 0 may write any task's table, and the hardware reads a table
+ * only while that task is current, so this needs no switch.  It is what
+ * a map change has to do rather than waiting for the next newmap: a
+ * trap returns to user mode - and to the process's own task - without
+ * one (trap.c), and a fault grows the process inside a trap.
+ */
+taskload(p)
+    struct proc *p;
+{
+    if (p->task)
+        copy(&p->mem[0].seg, (char *)(0x600 + (p->task << 5)), 32);
+}
+
+/*
  * Free a process' memory.
  * Called by exit(), swapout().
  */
@@ -96,6 +197,7 @@ mfree(p)
     INT8 i;
     struct mem *m;
 
+    taskfree(p);                /* the pages are going, so is the table */
     m = p->mem;
     for (i = 16; i >= 0; i--) {
         segfree(m[i].seg);
@@ -135,6 +237,7 @@ mrelse()
     }
     u.p->nsegs = 3;             /* includes u-structure segment */
     newmap(u.p);
+    taskload(u.p);              /* every page but the u segment moved */
     mwake();
 }
 
@@ -163,6 +266,12 @@ mget(p)
             m->seg = segalloc();
         }
     }
+    /*
+     * A process coming back from the swapper, or a fork child, is
+     * loaded but not current, so its table is only stale if it kept a
+     * slot through the change (taskload checks).
+     */
+    taskload(p);
     return 1;
 }
 
@@ -200,9 +309,12 @@ grow(seg)
         /*
          * A very old bug.  Jan 1984  Len Edmondson
          * We need to rewrite the map to the hardware registers here!.
+         * taskload and not newmap: the trap that called us returns to
+         * user mode without a newmap, so the permission byte this just
+         * changed has to reach the installed table now.
          */
 
-        newmap(u.p);
+        taskload(u.p);
 
         return 1;
     }
@@ -226,7 +338,7 @@ grow(seg)
         if (m[i].per == GROW)
             m[i].seg = grow;
 
-    newmap(u.p);
+    taskload(u.p);              /* the grow segment, into the live table */
     return 1;
 }
 
@@ -299,19 +411,36 @@ bankcopy(p)
 }
 
 /*
- * Write the current processes' memory map
- * to task1's segment registers.
+ * Switch to process n: give it a task of its own, and point the
+ * kernel's u window at it.
+ *
+ * The map ram of a task already holds the process's map - it was copied
+ * there when the map last changed (taskload) - so there is no map copy
+ * here, only the u page.  That page is the one thing a switch must
+ * remap: the kernel stack, this process's struct user and the trap
+ * frame all live in it, and there is one of it per process.  Task 0 is
+ * the only supervisor task and is what the kernel runs in, so this is
+ * task 0's entry for the page whichever task the process returns to.
  */
 newmap(n)
     struct proc *n;
 {
-    extern UINT8 image0[], image1[], map0[], map1[];
+    extern UINT8 map0[];
 
     di();
-    map0[2 * USERSEG] = image0[2 * USERSEG] = n->mem[16].seg;
+    if (n->task == 0) {         /* evicted, swapped in, or never had one */
+        taskalloc(n);
+        taskload(n);
+    }
+    /*
+     * The register only: the image at 0x200 is the monitor's record of
+     * task 0's map and nothing reads its user-page entry, so there is
+     * nothing here to keep in step.
+     */
+    map0[2 * USERSEG] = n->mem[16].seg;
     u.p = n;                    /* fork() did not set this */
-    copy(&u.p->mem, &image1, 32);
-    copy(&u.p->mem, &map1, 32);
+    u.task = n->task;           /* what gotask writes to the task register */
+    curmem = (char *) n->mem;   /* where mem.s looks up a user page */
     ovlremap();                 /* and the driver this process is inside */
     ei();
 }

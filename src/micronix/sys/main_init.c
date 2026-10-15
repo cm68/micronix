@@ -325,6 +325,13 @@ pinit()
     UINT8 i;
 
     u.p = swapproc;
+    /*
+     * mem.s reads the current map through curmem, and until the first
+     * switch the current map is the kernel's own - the identity map the
+     * swapper is given below.  Nothing reaches a user page before then,
+     * but a zero here would point segment 0 into the window if it did.
+     */
+    curmem = (char *) u.p->mem;
     u.p->mode = ALLOC | ALIVE | AWAKE | LOADED | LOCKED | SYS;
     u.p->pri = PRISWAP;
     u.p->nice = 128;

@@ -20,6 +20,15 @@ struct proc {
     UINT tty;                   /* controlling terminal */
     UINT swap;                  /* disk address of swapped image */
     UINT8 nsegs;                /* no. 4K memory segments */
+    /*
+     * The hardware task whose map ram holds this process's memory map,
+     * or 0 for none.  Task 0 is the kernel's and the only supervisor
+     * task, so a process that can return to user mode owns one of 1..15
+     * and keeps its segmentation across a switch; see taskalloc()
+     * (malloc.c), which takes a slot back from another process when all
+     * fifteen are in use.
+     */
+    UINT8 task;
     struct mem {
         UINT8 seg;
         UINT8 per;
@@ -156,6 +165,15 @@ struct user {
  * not - the initialized one is the object.
  */
 extern struct user u;
+
+/*
+ * The current process's memory map, as mem.s sees it: a pointer to
+ * u.p->mem, set by newmap() (malloc.c) at every switch.  mem.s is hand
+ * written, so it cannot name a member of struct proc - a byte added
+ * anywhere ahead of mem[] would go on working and point the wrong page
+ * into the window - and this is one store per switch instead.
+ */
+extern char *curmem;
 
 #define u_uid   real.bytes.low
 #define u_gid   real.bytes.low
