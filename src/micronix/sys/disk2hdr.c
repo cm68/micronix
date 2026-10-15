@@ -14,9 +14,19 @@
  * There is no init: the DISK 2 has no in-memory command block the board
  * fetches - the host talks through the registers and the SELECTOR CHANNEL
  * takes the DMA address straight from the buffer - so there is no page or
- * physical address for an init to learn.  There is no interrupt either:
- * the driver polls the status register.  The tick is disk2check, the
- * watchdog that turns a silent board into NOTRDY rather than a hang.
+ * physical address for an init to learn.
+ *
+ * The interrupt is the card's completion signal: the manual's "done" flag
+ * falls when a command finishes, and a jumper in the J7..J14 field
+ * asserts it on one of VI0..VI7 (J15 asserts the generalized INT line
+ * instead).  So the probe is disk2probe - the NULL command, which the
+ * manual describes as having no function but to complete and interrupt -
+ * and the handler is disk2int.  Nothing here names a line: the kernel
+ * tickles the card and reads the PIC back to find it (sys/probe.c,
+ * sys/INTR.md).
+ *
+ * The tick is disk2check, the watchdog that turns a silent board into a
+ * failed request rather than a machine that waits for ever.
  *
  * name is a character list rather than the string it reads as; sys/ovl.h
  * says why, and it is the same reason this file is one struct.
@@ -30,11 +40,11 @@
 #include <sys/ovl.h>
 
 extern int disk2open(), disk2close(), disk2strat();
-extern int disk2check();
+extern int disk2probe(), disk2int(), disk2check();
 extern struct biovec disk2bvec;
 
-struct ovlhdr disk2hdr = { 7, 0, &disk2check, 0, &disk2bvec, 0, 0, 0,
-	{ 'd', 'i', 's', 'k', '2' }, 4 };
+struct ovlhdr disk2hdr = { 7, 0, &disk2check, 0, &disk2bvec, 0,
+	&disk2probe, &disk2int, { 'd', 'i', 's', 'k', '2' }, 4 };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

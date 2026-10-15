@@ -8,7 +8,17 @@
  * The host interface is two ports.  The low one is the control register
  * when written and the status when read; the high one is the data port,
  * written to load one of the four data registers and read to step the
- * head.  Everything is synchronous, exactly like hddma.c.
+ * head.  A command runs to completion in the write that starts it - there
+ * is no data rate to model, a sector is one memcpy - and completion is
+ * what raises the card's interrupt.
+ *
+ * The interrupt is the manual's "done" flag: the card holds its VI line
+ * down until the host writes the control register, so the assertion here
+ * is any control write and the release is any control write, and the
+ * guest's d2settle/d2rw are the commands that acknowledge the one before
+ * them.  Reading the status does not clear it - the manual clears it
+ * through the control register - which is why d2_ctl_in below touches
+ * nothing.
  */
 
 #include "sim.h"
@@ -45,6 +55,17 @@ extern paddr sc_addr;
 
 /* the status bits */
 #define D2_SATTN  0x80
+
+/*
+ * The board's open-collector bit on its VI line.  The line it is wired to
+ * is the profile's - disk2 is a hard disk controller and so is disk3, and
+ * a machine has one of them, so they are alternatives on the same line
+ * (s100.c, the way the HD-DMA and HDCA share VI0).  The bit keeps this
+ * card's contribution apart from the others on the line in the meantime.
+ */
+#define DISK2_CARDID 2
+
+static int disk2_vi_line = -1;  /* the VI line, from the -w wiring; -1 = not wired */
 
 #ifndef NODEBUG
 int trace_disk2;
@@ -116,16 +137,25 @@ d2_command(byte drive, byte op)
  * The control/status port.  Written with RUN set it is a command; written
  * with RUN clear it names a data register and sets the step direction.
  * Read, it is the status.
+ *
+ * Every write here moves the done latch: a write with ATTN* high - which
+ * is every write this driver makes, and the only way the board is
+ * addressed at all - releases the line, and a command that finishes
+ * asserts it again.  So the card goes quiet when the host acknowledges
+ * and speaks when there is something to say, with no edge either way.
  */
 static void
 d2_ctl_out(portaddr p, byte v)
 {
+    set_vi(disk2_vi_line, DISK2_CARDID, 0);
+
     if (v & D2_RUN) {
         curdrv = v & 3;
         if (select_drive(curdrv) < 0)
             status = 0x30;      /* overrun-ish: no drive */
         else
             d2_command(curdrv, v & 0x38);
+        set_vi(disk2_vi_line, DISK2_CARDID, 1);
     } else {
         regsel = v & 0x18;      /* OP1/OP0 */
         direction = v & D2_OP2;
@@ -179,6 +209,7 @@ d2_data_in(portaddr p)
 static int
 disk2_init()
 {
+    disk2_vi_line = wiring_vi_line("disk2");
     register_output(D2_CTL, &d2_ctl_out);
     register_input(D2_CTL, &d2_ctl_in);
     register_output(D2_DATA, &d2_data_out);
