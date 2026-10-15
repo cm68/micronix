@@ -19,13 +19,13 @@ extern byte s100_input(portaddr p);
 
 extern paddr ram_size;          // bytes of ram backed in the 24 bit space
 
-// the 4k selector boot rom, wired at the top of the 24 bit space.  it
+// the 4k level 1 boot rom, wired at the top of the 24 bit space.  it
 // answers reads and drops writes, and is reachable by mapping a segment
 // to page 0xf0 with the task register's bank nibble at 0xf (0xff0000).
 #define BOOTROM_BASE  0xff0000
 #define BOOTROM_SIZE  0x1000
 extern byte boot_rom[BOOTROM_SIZE];
-extern char *bootrom_filename;  // its image, default "multIO.bin"
+extern char *bootrom_filename;  // its image, default "l1boot.bin"
 
 /* a driver registers one of these */
 struct driver {

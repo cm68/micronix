@@ -24,6 +24,13 @@ so the floppy's first stage builds one: djboot1.s leads with a 128 byte
 level 0 whose whole job is to read the next block and jump into it, and
 the level 1 behind it is mwboot1.s with a channel program for a read.
 
+the other way in is the level 1 boot rom, stand/roms/l1boot.s, which
+mon5.0 copies down to f000 and enters when the monitor has no disk code
+of its own.  it reads that same first sector, from whichever controller
+answers, so the numbering there is one above this one: the level 1 of
+this directory is its level 2, and the level 2 of this directory is its
+level 3.  same stages, different origin, nothing down here changes.
+
 the second level is one source - boot.c - and three drivers, because
 what differs is how a block is read: mwio.c for the HD-DMA, djio.c for
 the floppy, ideio.c for the IDE card.  so there are three second

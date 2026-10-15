@@ -28,7 +28,7 @@ DRIVERS = djdma$(OBJSUFFIX).o multio$(OBJSUFFIX).o hddma$(OBJSUFFIX).o \
 	pic$(OBJSUFFIX).o
 ROMDIR = ../../micronix/stand/roms
 GENERATED = $(ROMDIR)/mon447.bin $(ROMDIR)/mon447.sym $(ROMDIR)/mon375.bin $(ROMDIR)/mon375.sym \
-	$(ROMDIR)/mon500.bin $(ROMDIR)/mon500.sym $(ROMDIR)/multIO.bin $(ROMDIR)/multIO.sym
+	$(ROMDIR)/mon500.bin $(ROMDIR)/mon500.sym $(ROMDIR)/l1boot.bin $(ROMDIR)/l1boot.sym
 DIRS = $(ROMDIR)
 SIM = ../hwsim$(OBJSUFFIX).o ../s100$(OBJSUFFIX).o
 

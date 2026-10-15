@@ -10,8 +10,8 @@
 # which reads the second level, which loads /micronix off the filesystem.
 #
 # -c 0x700 is the configuration switch: 0x00 leave all five boot switches
-# on, so mon500 copies and enters the 4K selector ROM (multIO.bin), which
-# probes the IDE board and the NCR 5380 at once and boots whichever target
+# on, so mon500 copies and enters the 4K level 1 boot ROM (l1boot.bin),
+# which probes the IDE board and the NCR 5380 at once and boots whichever target
 # answers - here the SCSI drive.  The 0x700 put all three uarts in xterms
 # of their own - uart 0, the console, plus ttyB and ttyC - rather than
 # borrowing this window.  The console bit is what lets this script be run
@@ -20,8 +20,8 @@
 # window to live in.
 #
 # The ROM is mon500, which has no SCSI code of its own (neither it nor
-# mon447 boots the 5380); the ncrboot routine lives in the selector ROM
-# (multIO.bin) that switch 0x00 reaches.  The drive is scsi0: - target 0
+# mon447 boots the 5380); the ncrboot routine lives in the level 1 boot
+# ROM (l1boot.bin) that switch 0x00 reaches.  The drive is scsi0: - target 0
 # on the bus.  Every argument before <volume> is a simulator flag, so the
 # usual -t/-T/-W/-c switches are available without editing this.
 #

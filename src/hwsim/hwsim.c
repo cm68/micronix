@@ -709,7 +709,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "  and scsi, which has no boot path.\n");
     fprintf(stderr, "\t-h\thelp\n");
     fprintf(stderr, "\t-b\t<boot rom file>\n");
-    fprintf(stderr, "\t-M\t<selector rom file> (default multIO.bin)\n");
+    fprintf(stderr, "\t-M\t<level 1 boot rom file> (default l1boot.bin)\n");
     fprintf(stderr, "\t-B\t<djdma|hdcdma|hdca|ide> boot from this, and skip the monitor\n");
     fprintf(stderr, "\t\t(hdca needs mon447, ide needs mon500 - see -b)\n");
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
@@ -1802,13 +1802,13 @@ main(int argc, char **argv)
         rom_filename = "mon447.bin";
 
     /*
-     * Default the selector boot rom the same way: multIO.bin beside the
+     * Default the level 1 boot rom the same way: l1boot.bin beside the
      * monitor roms.  -M overrides.
      */
-    if (access("../../micronix/stand/roms/multIO.bin", F_OK) == 0)
-        bootrom_filename = "../../micronix/stand/roms/multIO.bin";
-    else if (access("multIO.bin", F_OK) == 0)
-        bootrom_filename = "multIO.bin";
+    if (access("../../micronix/stand/roms/l1boot.bin", F_OK) == 0)
+        bootrom_filename = "../../micronix/stand/roms/l1boot.bin";
+    else if (access("l1boot.bin", F_OK) == 0)
+        bootrom_filename = "l1boot.bin";
 
     argc--;
 
@@ -1892,7 +1892,7 @@ main(int argc, char **argv)
                 break;
             case 'M':
                 if (!argc--) {
-                    usage("selector rom name missing\n", progname);
+                    usage("level 1 boot rom name missing\n", progname);
                 }
                 bootrom_filename = strdup(*argv++);
                 break;
@@ -2213,7 +2213,7 @@ main(int argc, char **argv)
     }
 
     /*
-     * Load the 4k selector boot rom into its slot at the top of the
+     * Load the 4k level 1 boot rom into its slot at the top of the
      * 24 bit space, if one is present.  A blank or absent rom reads
      * 0xff, like an erased eprom.
      */

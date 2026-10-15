@@ -1,6 +1,6 @@
 mon*.sym
 mon*.bin
 mon*.cim
-multIO.sym
-multIO.bin
-multIO.cim
+l1boot.sym
+l1boot.bin
+l1boot.cim

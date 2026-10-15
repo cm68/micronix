@@ -10,17 +10,17 @@
 # which reads the second level, which loads /micronix off the filesystem.
 #
 # -c 0x700 is the configuration switch: 0x00 leave all five boot switches
-# on, so mon500 copies and enters the 4K selector ROM (multIO.bin), which
-# probes the IDE board and the NCR 5380 at once and boots whichever target
-# answers - here the IDE drive, since no scsi0: is named.  The 0x700 puts
+# on, so mon500 copies and enters the 4K level 1 boot ROM (l1boot.bin),
+# which probes the IDE board and the NCR 5380 at once and boots whichever
+# target answers - here the IDE drive, since no scsi0: is named.  The 0x700 puts
 # all three uarts in xterms of their own - uart 0, the console, plus ttyB
 # and ttyC - rather than borrowing this window.  The console bit is what
 # lets this script be run from anywhere; the ttyB/ttyC bits are what give
 # the multiuser logins a window.
 #
 # The ROM is mon500, which has no IDE code of its own (neither it nor
-# mon447 boots the IDE card); the ideboot routine lives in the selector
-# ROM (multIO.bin) that switch 0x00 reaches.  The drive is ide0: - drive 0
+# mon447 boots the IDE card); the ideboot routine lives in the level 1
+# boot ROM (l1boot.bin) that switch 0x00 reaches.  The drive is ide0: - drive 0
 # on the card.  Every argument before <volume> is a simulator flag, so
 # the usual -t/-T/-W/-c switches are available without editing this.
 #
