@@ -109,7 +109,14 @@ extern int netopen(), netclose(), netread(), netwrite();
  * (sys/ovl.c), not at drivers: the kernel has no djopen, mwstrat or
  * idestrat to name, because the drivers are modules and are not in it.
  * Which module answers for a major is decided when that module's init()
- * registers - see sys/ovl.h. */
+ * registers - see sys/ovl.h.
+ *
+ * Every row here is a major some module claims, and the claim is made at
+ * boot: a module whose card is not in the machine is never placed, and
+ * its major then answers as nodev does.  A row that no module claims
+ * shows up in the signon "disks:" list under whatever module was mapped
+ * last, because the print maps the major and reads devname - major 5
+ * reads "ide" on a machine with no SCSI card for exactly that reason. */
 struct biovec biosw[] = {
     &nodev, &nulldev, &nulldev, 0,              /* 0 = no device */
     &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 1 = HDCA, a module */
@@ -118,6 +125,9 @@ struct biovec biosw[] = {
     &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 4 = IDE (ATA), a module */
     &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 5 = NCR 5380 SCSI, a module */
     &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 6 = ND, a module */
+    &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 7 = DISK 2, a module */
+    &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 8 = DISK 3, a module */
+    &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 9 = DISK 1A, a module */
 };
 
 struct ciovec ciosw[] = {

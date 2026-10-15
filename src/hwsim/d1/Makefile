@@ -22,7 +22,8 @@ endif
 TARGETS = $(TARGET)
 DRIVERS = djdma$(OBJSUFFIX).o multio$(OBJSUFFIX).o hddma$(OBJSUFFIX).o \
 	hdca$(OBJSUFFIX).o ide$(OBJSUFFIX).o ncr5380$(OBJSUFFIX).o \
-	disk3$(OBJSUFFIX).o disk2$(OBJSUFFIX).o selector$(OBJSUFFIX).o \
+	disk3$(OBJSUFFIX).o disk2$(OBJSUFFIX).o disk1$(OBJSUFFIX).o \
+	selector$(OBJSUFFIX).o \
 	mpz80$(OBJSUFFIX).o micronix$(OBJSUFFIX).o kdump$(OBJSUFFIX).o \
 	nic$(OBJSUFFIX).o nicd1$(OBJSUFFIX).o ss1$(OBJSUFFIX).o \
 	pic$(OBJSUFFIX).o

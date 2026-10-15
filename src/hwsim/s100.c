@@ -257,8 +257,10 @@ struct cardwire {
     int   line;        /* the VI line it asserts */
 };
 
+#define NCARDWIRE 12            /* room for the cards one machine can hold */
+
 struct wiring {
-    struct cardwire card[8];    /* name -> vi line */
+    struct cardwire card[NCARDWIRE];    /* name -> vi line */
     int   ncard;
     struct irqwire irq[NIRQ];   /* pin -> source */
     char *int_driver;           /* the board asserting int_line */
@@ -273,9 +275,9 @@ struct wiring wiring;
  * whether anything names a second controller's pins.
  */
 static struct wiring profile_d1 = {
-    { { "hddma", 0 }, { "hdca", 0 }, { "djdma", 1 },
+    { { "hddma", 0 }, { "hdca", 0 }, { "djdma", 1 }, { "disk1", 1 },
       { "ncr", 2 }, { "ide", 2 } },
-    5,
+    6,
     {
         [0] = { IRQ_VI, 0 },
         [1] = { IRQ_VI, 1 },
@@ -289,10 +291,10 @@ static struct wiring profile_d1 = {
 };
 
 static struct wiring profile_multio = {
-    { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 2 },
+    { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 2 }, { "disk1", 1 },
       { "ncr", 3 }, { "ide", 4 }, { "nic", 5 }, { "disk3", 5 },
       { "disk2", 5 } },
-    8,
+    9,
     {
         [0] = { IRQ_VI, 0 },
         [1] = { IRQ_VI, 1 },
@@ -311,9 +313,9 @@ static struct wiring profile_multio = {
 
 static struct wiring profile_ss1 = {
     { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 2 }, { "ncr", 3 },
-      { "ide", 4 }, { "nic", 5 }, { "disk3", 6 },
+      { "ide", 4 }, { "nic", 5 }, { "disk3", 6 }, { "disk1", 1 },
       { "disk2", 6 } },
-    8,
+    9,
     {
         [0] = { IRQ_VI, 0 }, [1] = { IRQ_VI, 1 }, [2] = { IRQ_VI, 2 },
         [3] = { IRQ_VI, 3 }, [4] = { IRQ_VI, 4 }, [5] = { IRQ_VI, 5 },
@@ -405,7 +407,7 @@ set_card_line(struct wiring *w, char *name, int line)
             w->card[i].line = line;
             return 0;
         }
-    if (w->ncard >= 8)
+    if (w->ncard >= NCARDWIRE)
         return -1;
     w->card[w->ncard].name = name;
     w->card[w->ncard].line = line;

@@ -23,6 +23,12 @@
  *
  * name is a character list rather than the string it reads as; sys/ovl.h
  * says why, and it is the same reason this file is one struct.
+ *
+ * The major is 8, not the 6 this driver was written with: the ND
+ * (sys/nd.c) took 6 while this one was staged and never linked, and a
+ * major is claimed by whichever module registers - two headers naming
+ * one number is a race, not a conflict the link can see.  DISK 2 keeps
+ * the 7 it was written with, so the two controllers take 7 and 8.
  */
 #include <types.h>
 #include <sys/sys.h>
@@ -36,7 +42,7 @@ extern int disk3open(), disk3close(), disk3strat();
 extern int disk3init(), disk3int(), disk3check(), disk3probe();
 extern struct biovec disk3bvec;
 
-struct ovlhdr disk3hdr = { 6, &disk3init, &disk3check, 0, &disk3bvec, 0,
+struct ovlhdr disk3hdr = { 8, &disk3init, &disk3check, 0, &disk3bvec, 0,
 	&disk3probe, &disk3int, { 'd', 'i', 's', 'k', '3' }, 4 };
 
 /*

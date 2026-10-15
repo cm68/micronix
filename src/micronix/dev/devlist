@@ -65,6 +65,38 @@ b 5 6 scsi6
 b 5 7 scsi7
 b 6 0 nd
 #
+# The CompuPro DISK 2 and DISK 3, four drives each.  Both take the drive
+# from the low two bits of the minor, like every other disk here, and
+# neither has a bank: the DISK 2 is the SA4000 controller, polled and
+# driven through the selector channel, and the DISK 3 is the intelligent
+# ST-506 board with an IOPB in memory.  A drive's geometry is its
+# label's, not the minor's - same as the rest.
+#
+b 7 0 d2a
+b 7 1 d2b
+b 7 2 d2c
+b 7 3 d2d
+b 8 0 d3a
+b 8 1 d3b
+b 8 2 d3c
+b 8 3 d3d
+#
+# The CompuPro DISK 1A.  One board carrying both floppy banks at one port
+# block - the 8 inch drives and the 5 1/4 inch ones, switched by the drive
+# select register's data rate bit - so the low three bits of the minor
+# name all eight: 0-3 the 8 inch, 4-7 the 5 1/4.  That is the DJ-DMA's
+# drive numbering; unlike the DJ, DISK 1 has no alternate-sectored mode,
+# so bit 3 is not the skew bit here but part of the slice.
+#
+b 9 0 d1a
+b 9 1 d1b
+b 9 2 d1c
+b 9 3 d1d
+b 9 4 d1e
+b 9 5 d1f
+b 9 6 d1g
+b 9 7 d1h
+#
 # The whole-disk slice, 'c': the drive at cylinder 0 with no roll, so its
 # block 0 is physical block 0 and reading it is reading the label.  The
 # minor is the slice in the high bits and the drive below - 64 is slice 2
@@ -88,3 +120,19 @@ b 5 68 scsi4c
 b 5 69 scsi5c
 b 5 70 scsi6c
 b 5 71 scsi7c
+b 7 64 d2ac
+b 7 65 d2bc
+b 7 66 d2cc
+b 7 67 d2dc
+b 8 64 d3ac
+b 8 65 d3bc
+b 8 66 d3cc
+b 8 67 d3dc
+b 9 64 d1ac
+b 9 65 d1bc
+b 9 66 d1cc
+b 9 67 d1dc
+b 9 68 d1ec
+b 9 69 d1fc
+b 9 70 d1gc
+b 9 71 d1hc

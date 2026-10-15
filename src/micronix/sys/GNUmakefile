@@ -55,15 +55,15 @@ EXTRA	= BUILDING TODO
 # and linked again as a module - so its objects, .mod and .page are not
 # in OBJS; they ride GENERATED for the same reason.  unix itself is
 # $(TARGET), which clobber removes.
-MODS	= dj mw ide ncr hdca nd
+MODS	= dj mw ide ncr hdca nd disk1 disk2 disk3
 
-# Drivers whose sources are written but which are not yet linked into the
-# kernel: their objects build (so the compiler checks them, "make objects")
-# but they are not in MODS, so nothing links them into unix.
-STAGED	= disk3 disk2
+# Nothing is staged: every driver in the tree is linked into a module and
+# placed at boot.  A driver costs no address space when it is not placed -
+# the page at OVLBASE is mapped only for the module that is running - so
+# the only price of carrying one is its 4K in the image, and a card that
+# is not in the machine spends nothing.
 GENERATED = build.h unix.link $(MODS:%=%.mod) $(MODS:%=%.page) \
 	$(MODS:%=%.o) $(MODS:%=%hdr.o) \
-	$(STAGED:%=%.o) $(STAGED:%=%hdr.o) \
 	miopic.o miopic_init.o wbiopic.o wbiopic_init.o \
 	ss1pic.o ss1pic_init.o probe.o probe_init.o \
 	ss1_clock.o ss1_clock_init.o upd1990_init.o picvec.o
@@ -178,14 +178,13 @@ HIGHMEM       = $(HIGHMEM_C_OBJ) $(HIGHMEM_AS_OBJ)
 # .c the way a wildcard "%.o : %.s" would.  These two rules are the whole
 # of it; every other object has a rule of its own below.
 $(KERNEL_C) $(WIN_C) $(HIGHMEM_C_OBJ) user.o \
-	$(MODS:%=%.o) $(MODS:%=%hdr.o) $(STAGED:%=%.o) $(STAGED:%=%hdr.o): %.o: %.c
+	$(MODS:%=%.o) $(MODS:%=%hdr.o): %.o: %.c
 	$(CCC) $(CCFLAGS) $(INC) -c $<
 
-# The driver modules and staged objects compile <sys/*.h> out of
-# $(DEPTH)/include the same as the resident objects do; the $(OBJS) half of
-# that dependency lives in GNUmakefile.inc, and this is the module half.
-$(MODS:%=%.o) $(MODS:%=%hdr.o) $(STAGED:%=%.o) $(STAGED:%=%hdr.o): \
-	$(SYSHDRS)
+# The driver modules compile <sys/*.h> out of $(DEPTH)/include the same as
+# the resident objects do; the $(OBJS) half of that dependency lives in
+# GNUmakefile.inc, and this is the module half.
+$(MODS:%=%.o) $(MODS:%=%hdr.o): $(SYSHDRS)
 
 $(KERNEL_AS_OBJ) $(LEAF_AS) $(HIGHMEM_AS_OBJ): %.o: %.s
 	$(CCC) $(CCFLAGS) -c $<
@@ -281,11 +280,11 @@ CCFLAGS += -DOVLSEG=$(OVLSEG)
 CCFLAGS += -DN8259=2
 
 #
-# Every object: the ones "all" links into unix, the ones folded into one
-# of those first (the u-page leaf code into upage.o, the init-only code
-# into highmem.o), and the staged drivers that are compiled but not linked.
+# Every object: the ones "all" links into unix and the ones folded into
+# one of those first (the u-page leaf code into upage.o, the init-only
+# code into highmem.o).
 #
-objects: $(OBJS) $(STAGED:%=%.o) $(STAGED:%=%hdr.o)
+objects: $(OBJS)
 
 #
 # main_init.c includes it, and the native build generates it with
