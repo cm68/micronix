@@ -149,8 +149,20 @@ hdramdt	equ	000h		;command: ram pointer to the data area
 djattn	equ	0efh		;attention: run the channel program
 djsdma	equ	023h		;set the 24 bit dma address
 djsread	equ	020h		;read one sector
+djsense	equ	022h		;sense drive status: the drive's
+				; characteristics, its sector length
+				; and its status, three bytes written
+				; after the command
 djhlt	equ	025h		;end the channel program
+djlset	equ	02eh		;set the logical drive numbering
+djfive	equ	004h		; its parameter: bit 2 makes the five
+				; inch port logical 0 to 3
 djok	equ	040h		;a command's good status
+djhard	equ	002h		;characteristics byte: the medium is
+				; hard sectored, so its sectors are
+				; numbered from zero
+djslc	equ	003h		;sector length code: 128 bytes, and
+				; one doubling per step of the code
 djchan	equ	win + 050h	;bus 0050h: the default channel address
 				; +0 setdma  +1,+2 address  +3 high byte
 				; +4 sread   +5 cylinder  +6 sector and
@@ -163,6 +175,12 @@ djchan	equ	win + 050h	;bus 0050h: the default channel address
 				; and all, when level 2 runs, which is
 				; how level 2 knows which drive it came
 				; from.  See stand/boot/djboot1.s.
+				;
+				; Asking the drive what it is puts a
+				; three byte sense program here
+				; instead - see djask - and the read
+				; program is copied back in before every
+				; read, so the two never share it.
 djsec	equ	djchan + 6		;the sector, and the head above it
 djstat	equ	djchan + 8		;the status the controller writes
 
@@ -281,10 +299,17 @@ d3link	equ	d3iopb + 13	;and the next iopb, which is this one
 ;****************************************************************
 
 mapram	equ	0600h		;the map ram, which is write only: this
-				; rom sets segment 1 and never reads a
+				; rom sets a segment and never reads a
 				; map back.  200h is the monitor's own
 				; readable image of it and its stack, and
-				; the boot transfer lands on both
+				; the boot transfer lands on both.  Every
+				; write here needs its twin at map + n:
+				; the kernel reads IMAGE0 (0200h) as its
+				; own window table (sys/mem.s), so an
+				; image left behind is a page the kernel
+				; will put back, and the monitor's own
+				; "restore the maps" pairs the two
+map	equ	0200h		;the readable image of the map ram
 task	equ	0402h		;the task register: write to switch
 gobuff	equ	01b0h		;ram stub for the task switch
 ctask	equ	0006h		;current task, read by the trap handler
@@ -393,19 +418,25 @@ enuml:	ld	hl,(cur)
 	call	uputs
 	ld	hl,strcolon	;": "
 	call	uputs
+	ld	a,(legac)	;a medium with no label has no shape
+	or	a		; to print and no name to give
+	jr	nz,enumlg
 	call	putid		;what it calls itself, or its shape
 	ld	hl,strcomma	;", "
 	call	uputs
 	call	putmb		;how big, in megabytes
 	ld	hl,strmb	;" MB"
 	call	uputs
-	ld	hl,strnl
+enumle:	ld	hl,strnl
 	call	uputs
 enumnt:	ld	hl,(cur)
 	ld	de,6		;one row further on
 	add	hl,de
 	ld	(cur),hl
 	jr	enuml
+enumlg:	ld	hl,strlegac	;no label: the medium's own sector 0
+	call	uputs		; is the program, and is a legacy
+	jr	enumle		; boot sector's
 
 ;****************************************************************
 ;* one row: probe it, and if a drive answers, read block 0 into	*
@@ -432,6 +463,11 @@ rowatch:
 	ld	(hl),0
 	inc	hl
 	ld	(hl),0
+	xor	a		;and this is pass 1: the block is
+	ld	(pass2),a	; staged for the label, not for a
+	ld	(legac),a	; task.  Nothing has claimed to be a
+				; legacy boot sector yet, and a row
+				; that reads one says so below
 	ld	hl,(cread)
 	call	jphl
 	jr	nc,rowno	;the drive stopped answering
@@ -440,7 +476,7 @@ rowatch:
 	ld	b,4
 rowmg:	ld	a,(de)
 	cp	(hl)
-	jr	nz,rowno
+	jr	nz,rowlg
 	inc	hl
 	inc	de
 	djnz	rowmg
@@ -451,8 +487,15 @@ rowmg:	ld	a,(de)
 	jr	z,rowno
 	call	nzw		;d_spt
 	jr	z,rowno
-	scf			;it is a disk
+rowok:	scf			;it is a disk
 	ret
+	;	A block with no label in it is not ours, but it is not
+	;	nothing either: a row that read one says so, and what
+	;	it read is the medium's own sector 0 - the program,
+	;	which that row put where the program wants to run.
+rowlg:	ld	a,(legac)
+	or	a
+	jr	nz,rowok
 rowno:	or	a		;carry clear: no candidate
 	ret
 
@@ -764,8 +807,12 @@ bootit:
 	ld	sp,stktop
 	xor	a
 	ld	(mapram + 2),a		;seg 1 -> page 0
+	ld	(map + 2),a
 	ld	hl,win + 0100h		;where a block with no opinion of
 	ld	(dest),hl		; its own goes: 100h to task 1
+	ld	a,1			;this is the pass with a task 1 to
+	ld	(pass2),a		; put a block in, which is what a
+					; legacy boot sector needs to know
 	ld	hl,(cread)
 	call	jphl
 	jp	nc,bootng	;it answered a moment ago and now not:
@@ -774,15 +821,22 @@ bootit:
 				; than saying so
 	ld	a,1			;seg 1 -> page 1, back to identity
 	ld	(mapram + 2),a
+	ld	(map + 2),a
 	ld	a,2			;and seg 2 -> page 2
 	ld	(mapram + 4),a
+	ld	(map + 4),a
 	;	And enter it where the row left it.  The block is in the
 	;	window and the window is bus page 0, so the offset into it
 	;	is the address task 1 sees - win being 1000h, that is the
 	;	low three nibbles of the high byte, and 100h for every row
 	;	here, since every medium's block 0 is the program that
 	;	runs.  A medium that said otherwise would move (dest), and
-	;	nothing but this line would have to know.
+	;	nothing but this line would have to know - and one does:
+	;	the floppy row moves it to 0080h when the block has no
+	;	label, because a medium with no label is a legacy boot
+	;	sector and its sector 0 was written to run at 0080h,
+	;	which is where the controller's own bootstrap puts it,
+	;	and where it then is.
 	ld	de,(dest)
 	ld	a,d
 	and	0fh
@@ -1046,6 +1100,7 @@ mwread:
 ;	board that is not there has nothing to write a status byte.
 mwopen:	xor	a
 	ld	(mapram + 2),a		;seg 1 -> bus page 0, the window
+	ld	(map + 2),a
 	ld	hl,mwcca
 	ld	(hl),mwbase		;0050h holds the block's bus address
 	inc	hl			; - little endian, and the third
@@ -1215,96 +1270,216 @@ hdadbad:or	a			;a read that faulted is no disk
 ;* and is copied out of the window, for the same reason the	*
 ;* hd-dma's is: the board dmAs to a bus address.		*
 ;*								*
-;* A diskette's block 0 is four sectors on an eight inch drive	*
-;* and one on a five inch one, and that is how the medium is	*
-;* formatted and not anything this rom chooses.  An eight inch	*
-;* diskette's cylinder 0 head 0 is single density: fm, 26	*
-;* sectors of 128 bytes numbered from 1.  That is 3328 bytes	*
-;* for a whole track, which is not enough to hold level 2 and	*
-;* its label together, so a block is 512 bytes taken		*
-;* four sectors at a time, and everything after cylinder 0 is	*
-;* double density with 512 byte sectors - where the rest of the	*
-;* boot and the filesystem live.  A five inch medium is one	*
-;* density and one sector size all the way down, so its block 0	*
-;* is a single sector, 512 or 1024 bytes, read like any other.	*
+;* A diskette's block 0 is 512 bytes with a label in its second	*
+;* half, and what it is made of is the medium's to say: which	*
+;* sector of the medium the label lands in is the same thing as	*
+;* how many sectors make the block.  An eight inch drive's	*
+;* cylinder 0 head 0 is single density - fm, 26 sectors of 128	*
+;* bytes numbered from one - so a block there is the first four	*
+;* of them and the label is four sectors in.  A cylinder 0 with	*
+;* 512 byte sectors carries the label in its first one, and the	*
+;* block is that one sector.  The media this tree builds are	*
+;* that shape on every track: 128 byte sectors hold too little	*
+;* to be worth a filesystem, and a five inch medium is one	*
+;* density and one sector size all the way down.			*
+;*								*
+;* Which shape a medium is is written down nowhere, and it is	*
+;* what has to be known to find the label, so the block is read	*
+;* by trying: one sector first, and if the label is not in it,	*
+;* three more at 128 byte steps, which is the block an fm	*
+;* cylinder 0 carries its label in.  The controller reads a	*
+;* whole sector whatever this rom expects, so the first attempt	*
+;* is the whole block on 512 byte sectors and only the block's	*
+;* first sector on 128, and neither attempt reads a sector the	*
+;* medium does not have.						*
+;*								*
+;* A medium numbers its sectors from 1 if it is soft sectored	*
+;* and from 0 if it is hard sectored, and that the drive says:	*
+;* the controller's sense command answers with the drive's	*
+;* characteristics byte, the same bit the kernel reads for the	*
+;* same reason (sys/dj.c).  So a hard sectored medium is read	*
+;* from its sector 0 like any other.				*
 ;*								*
 ;* Which of the two a drive is comes from the drive number,	*
 ;* because that is the port it hangs off: the board's drives 0	*
 ;* to 3 are the eight inch ones and 4 to 7 the five inch ones	*
 ;* (DJDMA manual 2.6.7).  The number is the channel program's	*
 ;* own drive byte, and level 2 inherits it from here.		*
-;*								*
-;* A medium numbers its sectors from 1 if it is soft sectored	*
-;* and from 0 if it is hard sectored, and nothing says which	*
-;* until the label has been read.  So a five inch drive is read	*
-;* both ways, and the one carrying the magic is block 0 - there	*
-;* is no other label on that track, and a medium answers a	*
-;* sector it does not have by failing to read it.		*
 ;****************************************************************
 
 ;	Which drive is the boot one.  All eight are asked for their
-;	block 0, and the first that answers with a label in it is the
-;	one - a board with no diskette in any drive answers none of
-;	them.  A drive holding a diskette that is not a boot diskette
-;	answers no too, and the next drive is asked: only the drive
-;	carrying a label is a candidate, and asking further is cheap
-;	next to offering a menu entry that would not boot.
+;	block 0 - a board with no diskette in any drive answers none
+;	of them, since a drive with nothing in it cannot read a
+;	sector.  A drive holding a labelled diskette is the one, and
+;	the asking stops there.  A drive that answers with no label
+;	in the block is holding a legacy boot sector, which boots on
+;	its own terms: the first of those is kept in case no drive
+;	has a label, and only then is it the one.  A label always
+;	wins, since it is the medium that says how it is read.
 djprobe:
 	xor	a
 	ld	(djdrv),a		;from drive 0
+	ld	(djleg),a		;and no legacy diskette yet
 djpdlp:	call	djblock
-	ret	c			;this one has a labelled diskette
-	ld	a,(djdrv)
+	jr	nc,djpdnx		;nothing in this drive
+	ld	a,(legac)
+	or	a
+	jr	nz,djpleg		;it answered without a label
+	scf				;a labelled diskette: this is it
+	ret
+djpleg:	ld	a,(djleg)		;an unlabelled one: remember the
+	or	a			; first that answered, in case no
+	jr	nz,djpdnx		; drive has a label.  Zero means
+	ld	a,(djdrv)		; none, so it is stored one higher
+	inc	a
+	ld	(djleg),a
+djpdnx:	ld	a,(djdrv)
 	inc	a
 	ld	(djdrv),a
 	cp	8			;and that was all eight of them
 	jr	c,djpdlp
-	or	a			;no boot diskette: carry clear
+	ld	a,(djleg)		;no label anywhere: the legacy one,
+	or	a			; if there was one, is the boot one
+	ret	z			; - and carry clear if there was not
+	dec	a
+	ld	(djdrv),a
+	ld	a,1
+	ld	(legac),a		;and it is a legacy boot sector, so
+	scf				; the block says where it runs
 	ret
 
 ;	the chosen drive's block 0, out to where it is wanted.  Pass 2
 ;	asks again rather than trusting what pass 1 read: the diskette
 ;	may have been changed, and a read that fails now must not enter
 ;	whatever the staging area still holds.
+;
+;	And a block with no label in it is not ours: it is the
+;	medium's own boot sector, written to run where the controller
+;	put it, which for a diskette is the bottom of the page.
+;	Pass 1 stages it with the labelled ones; pass 2, the one
+;	with a task 1 to load for, moves it down to where it says
+;	it runs.
 djread:
 	call	djblock
 	ret	nc
-	ld	de,(dest)		;where the block is wanted: pass 1
-	ld	hl,wbuf			; wants it in the staging buffer, for
-	ld	bc,0200h		; the label, and pass 2 wants it
-	ldir				; where task 1 will run it
+	ld	hl,wbuf			;the block is here: the staging
+	ld	de,(dest)		; area, and it is wanted there
+	ld	bc,0200h		;the block, when the block is ours
+	ld	a,(legac)
+	or	a
+	jr	z,djrcp			;a labelled block goes where the
+	ld	a,(pass2)		; row said.  A legacy one is the
+	or	a			; medium's own boot sector, and
+	jr	z,djrcp			; the controller's bootstrap is
+					; what says where that runs: it
+					; reads the lowest sector of
+					; cylinder 0 to 0080h and jumps
+					; there, so a medium with no
+					; label wrote its sector 0 to run
+					; at 0080h, and only in pass 2,
+					; where that memory is task 1's
+	ld	a,(djfirst)
+	call	djone			;the block is one sector of the
+	ret	nc			; medium here, so read that one
+					; again: the shape that found no
+					; label in it may have made the
+					; block up out of four
+	call	djrenum			;the medium is entered on the
+					; numbering the controller's own
+					; bootstrap leaves behind, so the
+					; drive its boot sector asks for
+					; by number is the one it came
+					; from
+	ld	a,(djdrv)		;and it is copied at the length
+	cp	4			; the controller reads a sector
+	jr	c,djrfm			; of there: one fm sector on an
+	call	djlen			; eight inch drive, whose cylinder
+	ld	b,h			; 0 is fm whatever the rest of the
+	ld	c,l			; medium is, and the drive's own
+	jr	djrsrc			; sector length on a five inch one,
+					; which is one length all the way
+					; down - all sixteen bits of it,
+					; since a 512 byte sector's low
+djrfm:	ld	bc,128			; byte is zero and the low half
+					; alone says nothing
+djrsrc:	ld	hl,wbuf			;and the block runs at 0080h, not
+	ld	de,win + 80h		; where the staging address says:
+	ld	(dest),de		; the controller's bootstrap read
+					; the lowest sector of cylinder 0
+					; to 0080h and jumped there, so a
+					; medium with no label wrote its
+					; sector 0 to run there, and only
+					; in pass 2, where that memory is
+					; task 1's.  Source and address
+					; are both set here because djlen
+					; answers in hl and djrenum runs
+					; the channel, and neither leaves
+					; the other's registers alone
+djrcp:	ldir				;from the window down to it
 	scf
 	ret
 
 ;	Read block 0 of the diskette in (djdrv) into the staging area,
-;	and say whether it carries a label.  Carry set means it does.
-;	The two shapes of a block 0 are the medium's, not this rom's:
-;	an eight inch diskette's cylinder 0 head 0 is single density,
-;	26 sectors of 128 bytes numbered from 1, so its block is four
-;	sector reads; a five inch medium has one sector size all the
-;	way down, so its block is one, 512 or 1024 bytes.
+;	and say whether the drive answered: carry set means it did, and
+;	(legac) says whether what came back has a label in it - a block
+;	with one is ours and says how it is read, and one without is
+;	the medium's own boot sector.
+;
+;	The block is 512 bytes with the label at 256, and one sector is
+;	read first, from the number the drive says its sectors start at.
+;	A medium of 512 byte sectors or more is answered by that one
+;	read: the whole block is there and so is the label.  A medium
+;	of 128 byte sectors - an eight inch drive's fm cylinder 0, and
+;	any medium whose cylinder 0 is short of a block - is not, so
+;	the three sectors after the first make up the rest of the block
+;	and the label is four sectors in.  A label in either shape is
+;	what says the shape was the right one, and a block with no label
+;	in it is the medium's own: a program, which says where it runs,
+;	or the fill of an unwritten track, which is neither.
 djblock:
-	call	djopen
-	ld	a,(djdrv)
-	cp	4			;drives four and up are the five
-	jr	nc,djblk5		; inch ones, with no fm track 0
-	ld	hl,wbase		;eight inch: the four 128 byte
-	call	djfm			; sectors of its fm cylinder 0
-	ret	nc
-	jp	djmagi			; ... which is where the label is
-djblk5:	ld	hl,wbase		;five inch: one sector, and the
-	ld	a,1			; label says which numbering it is
-	call	djlook			; - a soft sectored medium's is 1
-	ret	c
-	xor	a
-	jp	djlook			; - and a hard sectored one's 0
+	call	djask			;the sector the drive's medium
+	call	djopen			; starts at, and the window
+	ld	hl,wbase + 128		;a read shorter than the block
+	ld	de,wbase + 129		; leaves the rest of the staging
+	ld	bc,383			; area as it was, which is the
+	ld	(hl),0			; last drive's block, label and
+	ldir				; all - so the label's own place
+					; is cleared before the read that
+					; looks for it there
+	ld	a,(djfirst)
+	call	djone			;one sector, the medium's first
+	ret	nc			;the drive did not answer
+	call	djlab			;the label, in that one sector
+	ret	c			;it is there: a block of one
+	ld	a,(djfirst)		;it is not: the medium's sectors
+	inc	a			; are shorter than its block, so
+	ld	b,a			; the block is four of them.  The
+	ld	hl,wbase + 128		; first is already where it goes
+	ld	c,3
+	call	djfm			;read the other three
+	ret	nc			;the drive stopped answering
+	ld	hl,wbase
+	call	djlab			;the label, in the whole block
+	ret	c			;it is there: a block of four
+	call	djcpm			;no label: a program or the fill
+	ret	nc			; of an unwritten track, which is
+	ld	a,1			; not to be entered.  A program
+	ld	(legac),a		; is the medium's own boot sector
+	scf
+	ret
 
-;	An eight inch medium's block 0: the four 128 byte sectors of
-;	its fm cylinder 0 head 0, numbered from 1, read into the 512
-;	bytes at (hl).  Carry set if all four answered.
-djfm:	ld	b,1			;sector 1, the first of the four
-	ld	c,4			;four of them, 128 bytes apiece
-djfml:	push	hl
+;	Read one sector into the staging area, from the sector in A,
+;	and say whether the drive answered: carry set means it did.
+djone:	ld	hl,wbase
+	ld	(djadr),hl
+	jp	djrun
+
+;	The three sectors after the medium's first one, into the rest
+;	of the block: the shape an eight inch drive's fm cylinder 0 has,
+;	128 bytes to a sector, four to a block.  B is the next sector
+;	number, HL where it goes and C how many are left.  Carry set
+;	if every one of them answered.
+djfm:	push	hl
 	ld	(djadr),hl		;where this one goes
 	ld	a,b
 	call	djrun			;clobbers a, hl and de, not bc
@@ -1314,14 +1489,62 @@ djfml:	push	hl
 	ld	de,128
 	add	hl,de			; and the next 128 bytes of the block
 	dec	c
-	jr	nz,djfml
+	jr	nz,djfm
 	scf
+	ret
+
+;	Ask the drive what its medium is.  The controller answers with
+;	three bytes after the command - the drive's characteristics, the
+;	sector length it reads, and the drive's status - and the first of
+;	them is the one that has to be known before a sector can be
+;	named: its hard sectored bit says whether the medium numbers its
+;	sectors from one or from zero.  The kernel asks the same question
+;	and reads the same bit for the same reason; see sys/dj.c.
+;
+;	The sector length is kept as well.  A block is 512 bytes whatever
+;	the medium's sectors are, so it is not what the block is read
+;	at; it is what a legacy five inch block is copied at, since the
+;	controller's own bootstrap reads one sector of that length to
+;	0080h.
+djask:	ld	hl,djstmp
+	ld	de,djchan
+	ld	bc,djstme - djstmp
+	ldir
+	ld	a,(djdrv)
+	ld	(djchan + 1),a		;the drive to ask about
+	ld	a,1
+	ld	(djfirst),a		;sector 1, which is what a soft
+	xor	a			; sectored medium numbers from -
+	ld	(djsecl),a		; and what no answer at all
+	ld	(djchan + 5),a		; leaves behind, since the read
+	out	(djattn),a		; that follows is the one that
+	ld	hl,djchan + 5		; reports whether there is a
+	ld	de,0			; medium in there at all
+djsnw:	ld	a,(hl)
+	or	a
+	jr	nz,djsnd		;the controller answered
+	dec	de
+	ld	a,d
+	or	e
+	jr	nz,djsnw
+	ret				;it never did
+djsnd:	cp	djok
+	ret	nz			;an error is the read's to report
+	ld	a,(djchan + 2)		;the characteristics byte: hard
+	and	djhard			; sectored is numbered from zero
+	jr	z,djsnl
+	xor	a
+	ld	(djfirst),a
+djsnl:	ld	a,(djchan + 3)		;and the sector length, which is
+	and	djslc			; the length the medium's own
+	ld	(djsecl),a		; boot sector is written in
 	ret
 
 ;	the window, and the channel program in it.  The program's
 ;	address, sector and drive bytes are written per read.
 djopen:	xor	a
 	ld	(mapram + 2),a		;seg 1 -> bus page 0, the window
+	ld	(map + 2),a
 	ld	hl,wbase		;where a sector goes unless the
 	ld	(djadr),hl		; caller says otherwise
 	ld	hl,djtmpl
@@ -1364,27 +1587,102 @@ djrund:	cp	djok
 djrunb:	or	a
 	ret
 
-;	read the sector in A to the staging area, and say whether the
-;	block it carries is the one with the label in it.
-djlook:	ld	hl,wbase
-	ld	(djadr),hl
-	call	djrun
-	ret	nc
+;	Put the drive numbering where the controller's own bootstrap
+;	leaves it.  A legacy medium is written to run on the machine
+;	that bootstrap makes: it runs LOGCAL (DJ49.MAC:898) after it
+;	reads the sector, and the port that answered becomes logical 0
+;	to 3, which is why a medium's own boot sector asks for logical
+;	drive 0 - the drive it came from, whichever port that is.  A
+;	boot through this rom is the same boot as far as the medium can
+;	tell, so it is entered on the same numbering.
+;
+;	The command is a channel program at the default channel address
+;	like any other, with the halt that ends the walk written in after
+;	it - an unknown code does not advance the channel, so a program
+;	that ends without one never ends.  The window djopen opened is
+;	still the one it goes through.  It is a channel program and a
+;	wait, so what it leaves alone is nothing: a, hl, de and bc all
+;	belong to it.
+djrenum:ld	hl,djnum
+	ld	de,djchan
+	ld	bc,djnumend - djnum
+	ldir				;the command, at the channel
+	ld	a,djfive		; address.  Its parameter is the
+	ld	(djchan + 1),a		; port the medium came from: bit 2
+	ld	a,(djdrv)		; set makes the five inch port
+	cp	4			; logical 0 to 3, and clear makes the
+	jr	nc,djrne		; eight inch one logical 0 to 3,
+	xor	a			; which is all LOGCAL does
+	ld	(djchan + 1),a
+djrne:	xor	a
+	ld	(djchan + 4),a		;the halt's status, cleared first:
+	out	(djattn),a		; running the channel is what sets it
+	ld	hl,djchan + 4
+	ld	de,0
+djrnw:	ld	a,(hl)
+	or	a
+	jr	nz,djrnx
+	dec	de
+	ld	a,d
+	or	e
+	jr	nz,djrnw
+djrnx:	ret
 
-;	the label, in the second half of the block in the staging
-;	area.  Carry set if it is there.
-djmagi:	ld	hl,wbuf + dl_off
+;	the renumber program: set the numbering, then halt.
+djnum:	db	djlset			;set the logical drive numbering
+	db	0			; - the port, written in per call
+	db	0			;its status
+	db	djhlt			;end the channel program
+	db	0			;its status
+djnumend equ	$
+
+;	the label, in the second half of the block in the staging area.
+;	Carry set if it is there, and then the block is this shape; carry
+;	clear if it is not, and then the read was still a good one and
+;	the block may yet be another shape's.
+djlab:	ld	hl,wbuf + dl_off
 	ld	de,dlmagic
 	ld	b,4
-djmagl:	ld	a,(de)
+djlabl:	ld	a,(de)
 	cp	(hl)
-	jr	nz,djmagb
+	jr	nz,djlabn
 	inc	hl
 	inc	de
-	djnz	djmagl
+	djnz	djlabl
 	scf
 	ret
-djmagb:	or	a			;no magic: not a boot diskette
+djlabn:	xor	a
+	ret
+
+;	the sector length a drive reads, from the code the controller
+;	reports: 128 bytes, doubled once per step of the code.  The
+;	answer is in hl, and hl is not the caller's to keep: a caller
+;	whose source is in hl sets it again after the call.
+djlen:	ld	hl,128
+	ld	a,(djsecl)
+	and	djslc
+	ret	z
+	ld	b,a
+djlenl:	add	hl,hl
+	djnz	djlenl
+	ret
+
+;	A block with no label in it is a legacy boot sector only if it
+;	has a program in it.  An unwritten track is one byte repeated -
+;	the formatter's fill - and that is not something to enter, so
+;	the drive is taken to have answered no.  Carry set if the first
+;	128 bytes - the boot sector of any CP/M medium we boot, whatever
+;	its sector size - hold more than one value.
+djcpm:	ld	hl,wbuf
+	ld	b,128
+	ld	a,(hl)
+djcpml:	inc	hl
+	cp	(hl)
+	jr	nz,djcpmg
+	djnz	djcpml
+	or	a			;all the same: not a program
+	ret
+djcpmg:	scf
 	ret
 
 ;	the channel program: setdma, sread, halt.  The address, the
@@ -1402,6 +1700,21 @@ djtmpl:	db	djsdma		;set the 24 bit dma address
 	db	djhlt		;end the channel program
 	db	0		;its status
 djtmend	equ	$
+
+;	the sense program: sense drive status, halt.  The drive byte is
+;	written in per ask, and the controller writes its three answer
+;	bytes over the three spares after that - the characteristics
+;	byte, the sector length and the drive's status - with the
+;	command's own status after them, at +5.
+djstmp:	db	djsense		;sense drive status
+	db	0		;the drive, written in per ask
+	db	0		;the characteristics byte
+	db	0		;the sector length
+	db	0		;the drive's status
+	db	0		;the status, cleared before the run
+	db	djhlt		;end the channel program
+	db	0		;its status
+djstme	equ	$
 
 ;****************************************************************
 ;* d1a: the CompuPro DISK 1A's 8 inch bank.  The 8272 owns the	*
@@ -1739,6 +2052,7 @@ d3read:
 ;	runs the block there.
 d3open:	xor	a
 	ld	(mapram + 2),a		;seg 1 -> bus page 0, the window
+	ld	(map + 2),a
 	ld	hl,d3tpl
 	ld	de,d3iopb
 	ld	bc,d3tmplen
@@ -1903,6 +2217,18 @@ cand:	ds	2 * 8		;their table rows, in order
 dest:	ds	2		;where a read routine puts block 0
 djadr:	ds	2		;where the dj-dma's next sector goes
 djdrv:	ds	1		;and the drive it comes from
+djfirst: ds	1		;the number that drive's medium
+				; numbers its first sector from: 1 for
+				; a soft sectored one, 0 for a hard
+djsecl:	ds	1		;and the sector length code the drive
+				; reports, for a legacy block's copy
+djleg:	ds	1		;the first drive that answered with
+				; no label, one higher than its number
+				; since zero means there was none
+legac:	ds	1		;the block just read has no label in
+				; it, so it is the medium's own sector
+				; 0 and says where it runs
+pass2:	ds	1		;pass 2 is the one with a task 1
 cname:	ds	2		;the row being walked: name, probe,
 cprobe:	ds	2		; and read - one block, so loadrow
 cread:	ds	2		; can copy the three with one ldir
@@ -1921,6 +2247,7 @@ strcomma: db	', ',0
 strsp:	db	' ',0
 strmb:	db	' MB',0
 strpick: db	'boot: ',0
+strlegac: db	'legacy boot sector',0
 dlmagic: db	'MWDL'			;DL_MAGIC
 ; The names are the ones /dev uses for these drives (dev/devlist), so
 ; the menu and the device nodes agree.  The digit is the unit, and each
