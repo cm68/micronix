@@ -321,6 +321,13 @@ ncr_unit(int id)
     geomok[id] = cyls[id] && heads[id] && spt[id];
     if (!geomok[id]) {
         printf("scsi: target %s has no geometry, command refused\n", name);
+        /*
+         * Nothing is cached above, so this image is the only thing
+         * holding its own lock: drop it, or the next selection of this
+         * target opens the file a second time and lockfile refuses it
+         * against this very process.
+         */
+        imd_close(ip);
         return (-1);
     }
     handle[id] = ip;                /* only cache a formatted drive */
