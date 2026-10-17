@@ -105,6 +105,18 @@
  * fragment in the long rules, which is exactly what this table is for.
  */
 #define F_EXX          "\307"	/*  exx */
+/*
+ * The tail of a byte shifted by a runtime count: one more than the
+ * count in B, then a jump to the djnz so a count of nought runs the
+ * body no times.  The caller loads B from the count's home and the
+ * value into A, so only this part is common to every home.
+ */
+#define F_SH_SLA_A     "\310"	/*  inc b; jr $$+4; sla a; djnz $$-2 */
+#define F_SH_SRA_A     "\311"	/*  inc b; jr $$+4; sra a; djnz $$-2 */
+#define F_SH_SRL_A     "\312"	/*  inc b; jr $$+4; srl a; djnz $$-2 */
+#define F_SH_SRA_HL    "\313"	/*  inc b; jr $$+6; sra h; rr l; djnz $$-4 */
+#define F_SH_SRL_HL    "\314"	/*  inc b; jr $$+6; srl h; rr l; djnz $$-4 */
+#define F_SH_ADDHLHL   "\315"	/*  inc b; jr $$+3; add hl,hl; djnz $$-1 */
 
 char *fragtab[] = {
 	0,
@@ -179,6 +191,12 @@ char *fragtab[] = {
 	"\tld $u,($L+)\n",	/* F_LDUL */
 	"\trla\n",	/* F_RLA */
 	"\texx\n",	/* F_EXX */
+	"\tinc b\n\tjr $$+4\n\tsla a\n\tdjnz $$-2\n",	/* F_SH_SLA_A */
+	"\tinc b\n\tjr $$+4\n\tsra a\n\tdjnz $$-2\n",	/* F_SH_SRA_A */
+	"\tinc b\n\tjr $$+4\n\tsrl a\n\tdjnz $$-2\n",	/* F_SH_SRL_A */
+	"\tinc b\n\tjr $$+6\n\tsra h\n\trr l\n\tdjnz $$-4\n",	/* F_SH_SRA_HL */
+	"\tinc b\n\tjr $$+6\n\tsrl h\n\trr l\n\tdjnz $$-4\n",	/* F_SH_SRL_HL */
+	"\tinc b\n\tjr $$+3\n\tadd hl,hl\n\tdjnz $$-1\n",	/* F_SH_ADDHLHL */
 };
 
 #define T_SAVE_HL	F_LDDH F_LDEL
@@ -279,14 +297,14 @@ static char RT100[] = "\tld a,$R\n" F_LDLA1;
 static char RT101[] = "\tld a,($RL)\n";
 static char RT108[] = "\tld a,(hl)\n\tadd a,1\n" F_LDHLA F_INCHL "\tld a,(hl)\n\tadc a,0\n" F_LDHLA;
 static char RT109[] = "\tld a,(hl)\n\tdec (hl)\n";
-static char RT11[] = "$[\tld b,e\n\tinc b\n" "\tjr $$+4\n\tsla a\n\tdjnz $$-2\n$]";
+static char RT11[] = "$[\tld b,e\n" F_SH_SLA_A "$]";
 static char RT111[] = "\tld a,(hl)\n\tinc (hl)\n";
 static char RT113[] = "\tld a,(hl)\n\tsub 1\n" F_LDHLA F_INCHL "\tld a,(hl)\n\tsbc a,0\n" F_LDHLA;
-static char RT12[] = "$[\tld b,e\n\tinc b\n" "\tjr $$+4\n\tsra a\n\tdjnz $$-2\n$]";
+static char RT12[] = "$[\tld b,e\n" F_SH_SRA_A "$]";
 static char RT121[] = "\tld a,e\n";
 static char RT128[] = "\tld bc,$R\n";
-static char RT13[] = "$[\tld b,e\n\tinc b\n" "\tjr $$+4\n\tsrl a\n\tdjnz $$-2\n$]";
-static char RT14[] = "$[\tld b,e\n\tld a,$L\n\tinc b\n" "\tjr $$+4\n\tsla a\n\tdjnz $$-2\n$]";
+static char RT13[] = "$[\tld b,e\n" F_SH_SRL_A "$]";
+static char RT14[] = "$[\tld b,e\n\tld a,$L\n" F_SH_SLA_A "$]";
 static char RT143[] = "\tld e,(hl)\n" F_INCHL "\tld d,(hl)\n";
 static char RT162[] = "\tld ix,$R\n";
 static char RT170[] = "\tor e\n";
@@ -1555,13 +1573,20 @@ struct rule rules[] = {
 	R(RSHIFT,INA,INE,0,0,1, RSHIFT, P_L, P_R, P_NONE, RF_SIGNL, RT12, R_A),
 	R(RSHIFT,INA,INDE,0,0,1, RSHIFT, P_L, P_R, P_NONE, RF_SIGNL, RT12, R_A),
 	R(RSHIFT,INA,INHL,0,0,1, RSHIFT, P_L, P_R, P_NONE, RF_SIGNL,
-		"$[\tld b,l\n\tinc b\n"
-		"\tjr $$+4\n\tsra a\n\tdjnz $$-2\n$]", R_A),
+		"$[\tld b,l\n" F_SH_SRA_A "$]", R_A),
 	R(RSHIFT,INA,INE,0,0,1, RSHIFT, P_L, P_R, P_NONE, 0, RT13, R_A),
 	R(RSHIFT,INA,INDE,0,0,1, RSHIFT, P_L, P_R, P_NONE, 0, RT13, R_A),
 	R(RSHIFT,INA,INHL,0,0,1, RSHIFT, P_L, P_R, P_NONE, 0,
-		"$[\tld b,l\n\tinc b\n"
-		"\tjr $$+4\n\tsrl a\n\tdjnz $$-2\n$]", R_A),
+		"$[\tld b,l\n" F_SH_SRL_A "$]", R_A),
+	/*
+	 * The count as a register variable's low byte.  REGVAR reduces to
+	 * its home, and BC is a home the count can sit in; without these
+	 * the shift matched nothing and the spill above it claimed DE.
+	 */
+	R(RSHIFT,INA,INBC,0,0,1, RSHIFT, P_L, P_R, P_NONE, RF_SIGNL,
+		"$[\tld b,c\n" F_SH_SRA_A "$]", R_A),
+	R(RSHIFT,INA,INBC,0,0,1, RSHIFT, P_L, P_R, P_NONE, 0,
+		"$[\tld b,c\n" F_SH_SRL_A "$]", R_A),
 	/*
 	 * A signed right shift keeps the sign: sra copies bit 7 back into
 	 * itself where srl feeds in a zero.  The signed rule has to come
@@ -1597,13 +1622,13 @@ struct rule rules[] = {
 	R(RSHIFT,INHL,P_NUM,0,0,0, RSHIFT, P_L, P_R, P_NONE, RF_SIGNL, RT26, R_HL),
 	R(RSHIFT,INHL,P_NUM,0,0,0, RSHIFT, P_L, P_R, P_NONE, 0, RT28, R_HL),
 	R(RSHIFT,INHL,INDE,0,0,0, RSHIFT, P_L, P_R, P_NONE, RF_SIGNL,
-		"$[\tld b,e\n\tinc b\n\tjr $$+6\n\tsra h\n\trr l\n\tdjnz $$-4\n$]", R_HL),
+		"$[\tld b,e\n" F_SH_SRA_HL "$]", R_HL),
 	R(RSHIFT,INHL,INDE,0,0,0, RSHIFT, P_L, P_R, P_NONE, 0,
-		"$[\tld b,e\n\tinc b\n\tjr $$+6\n\tsrl h\n\trr l\n\tdjnz $$-4\n$]", R_HL),
+		"$[\tld b,e\n" F_SH_SRL_HL "$]", R_HL),
 	R(RSHIFT,INHL,INBC,0,0,0, RSHIFT, P_L, P_R, P_NONE, RF_SIGNL,
-		"$[\tld b,c\n\tinc b\n\tjr $$+6\n\tsra h\n\trr l\n\tdjnz $$-4\n$]", R_HL),
+		"$[\tld b,c\n" F_SH_SRA_HL "$]", R_HL),
 	R(RSHIFT,INHL,INBC,0,0,0, RSHIFT, P_L, P_R, P_NONE, 0,
-		"$[\tld b,c\n\tinc b\n\tjr $$+6\n\tsrl h\n\trr l\n\tdjnz $$-4\n$]", R_HL),
+		"$[\tld b,c\n" F_SH_SRL_HL "$]", R_HL),
 	R(RSHIFT,INBC,P_NUM,0,0,0, RSHIFT, P_L, P_R, P_NONE, RF_SIGNL, RT390, R_HL),
 	R(RSHIFT,INBC,P_NUM,0,0,0, RSHIFT, P_L, P_R, P_NONE, 0, RT391, R_HL),
 	/* The whole-byte move for a value in its BC home: the low byte C
@@ -1658,8 +1683,17 @@ struct rule rules[] = {
 	 */
 	R(LSHIFT,P_NUM,INDE,0,0,1, LSHIFT, P_L, P_R, P_NONE, 0, RT14, R_A),
 	R(LSHIFT,P_NUM,INHL,0,0,1, LSHIFT, P_L, P_R, P_NONE, 0,
-		"$[\tld b,l\n\tld a,$L\n\tinc b\n"
-		"\tjr $$+4\n\tsla a\n\tdjnz $$-2\n$]", R_A),
+		"$[\tld b,l\n\tld a,$L\n" F_SH_SLA_A "$]", R_A),
+	/*
+	 * And the same with the count at home in BC - a register
+	 * variable's low byte.  This is the shape of "~(0xf << n)" and
+	 * "1 << n": a constant, a mask, shifted by a count that never
+	 * left its register.  It matched nothing, and because it matched
+	 * nothing silently, the spill that staged its operands claimed
+	 * DE held the answer and the parent stored garbage.
+	 */
+	R(LSHIFT,P_NUM,INBC,0,0,1, LSHIFT, P_L, P_R, P_NONE, 0,
+		"$[\tld b,c\n\tld a,$L\n" F_SH_SLA_A "$]", R_A),
 	/*
 	 * A byte VARIABLE shifted by a runtime count - the value already
 	 * reduced into A, the count into E, DE or HL.  The docompound
@@ -1672,8 +1706,9 @@ struct rule rules[] = {
 	R(LSHIFT,INA,INE,0,0,1, LSHIFT, P_L, P_R, P_NONE, 0, RT11, R_A),
 	R(LSHIFT,INA,INDE,0,0,1, LSHIFT, P_L, P_R, P_NONE, 0, RT11, R_A),
 	R(LSHIFT,INA,INHL,0,0,1, LSHIFT, P_L, P_R, P_NONE, 0,
-		"$[\tld b,l\n\tinc b\n"
-		"\tjr $$+4\n\tsla a\n\tdjnz $$-2\n$]", R_A),
+		"$[\tld b,l\n" F_SH_SLA_A "$]", R_A),
+	R(LSHIFT,INA,INBC,0,0,1, LSHIFT, P_L, P_R, P_NONE, 0,
+		"$[\tld b,c\n" F_SH_SLA_A "$]", R_A),
 	/*
 	 * By a count that is not a constant: djnz over the one-shift
 	 * body, entered at the test so a count of nought runs it not at
@@ -1682,9 +1717,9 @@ struct rule rules[] = {
 	 * loop counter either way, safe under the $[ $] guard.
 	 */
 	R(LSHIFT,INHL,INDE,0,0,0, LSHIFT, P_L, P_R, P_NONE, 0,
-		"$[\tld b,e\n\tinc b\n\tjr $$+3\n" T_ADD_HL_HL "\tdjnz $$-1\n$]", R_HL),
+		"$[\tld b,e\n" F_SH_ADDHLHL "$]", R_HL),
 	R(LSHIFT,INHL,INBC,0,0,0, LSHIFT, P_L, P_R, P_NONE, 0,
-		"$[\tld b,c\n\tinc b\n\tjr $$+3\n" T_ADD_HL_HL "\tdjnz $$-1\n$]", R_HL),
+		"$[\tld b,c\n" F_SH_ADDHLHL "$]", R_HL),
 
 	/*
 	 * Bit testing.  A single bit out of a byte is what bit does, in

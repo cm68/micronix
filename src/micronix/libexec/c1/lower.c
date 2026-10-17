@@ -2390,10 +2390,44 @@ rewrite1(Expr *e)
 		if (e->left->op == INA) {
 			bytepair(e);
 		} else {
+		/*
+		 * Nothing was loaded into HL when the left operand did not
+		 * reduce, so there is nothing to spill: the push would park
+		 * whatever the last statement left there, and the operator
+		 * would run on two registers that were never set.  The
+		 * right operand is still rewritten - its side effects are
+		 * not optional - and then the expression is marked
+		 * incomplete.  This is the silent half of a missing rule:
+		 * "a & ~(0xf << n)" with n in BC emitted a store of the
+		 * address's low byte and said nothing.
+		 */
+		if (!reduced(e->left)) {
+			longincomplete(e->left);
+			e->right = rewrite1(e->right);
+			freeexpr(e->left);
+			freeexpr(e->right);
+			e->left = e->right = 0;
+			return donehl(e, INHL);
+		}
 		/* Spill left result to stack */
 		out("\tpush hl\n");
 		/* Evaluate right subtree (result in HL) */
 		e->right = valtohl(rewrite1(e->right));
+		/*
+		 * The same test on the right, after the pop below would
+		 * have claimed DE held it.  A register node built over a
+		 * subtree that emitted nothing is how "no rule" became
+		 * "wrong number": the parent matched a (H,E) form and
+		 * read the address that was popped there.
+		 */
+		if (!reduced(e->right) && e->right->op != INA) {
+			longincomplete(e->right);
+			out("\tpop de\n");
+			freeexpr(e->left);
+			freeexpr(e->right);
+			e->left = e->right = 0;
+			return donehl(e, INHL);
+		}
 		/*
 		 * A byte right operand lands in A and valtohl leaves it
 		 * there on purpose - the assignment path wants exactly
