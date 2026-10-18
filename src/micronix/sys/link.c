@@ -27,7 +27,13 @@ link(old, new)
     irelse(ip);                 /* avoid deadlock */
     if ((ip->i_mode & IFMT) == IFDIR && !super())
         return;
-    if (ip->i_nlink == 127) {
+    /*
+     * d_nlink is a byte, so the count runs to 255.  127 is the V7 limit
+     * for a signed char, and it is what a directory's link count reaches
+     * at 125 subdirectories - the source tree has more than that under
+     * /usr/src/cmd, and an install of it stops there.
+     */
+    if (ip->i_nlink == 255) {
         u.error = EMLINK;
         return;
     }

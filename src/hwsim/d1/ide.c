@@ -60,19 +60,19 @@
  * entitled to rely on that.
  *
  * The card addresses its drives by LBA, because that is what a guest
- * sends it.  The file behind the unit is a flat image of the disk whose
- * sector (c, h, s) sits at DATAOFF + (s + h*spt + c*spt*heads) * secsize
- * (lib/hdcdmadisk.c), and the label's geometry makes that a flat function
- * of the LBA the guest computed: ((cyl * heads + head) * spt + sec).  So
- * the LBA is decomposed with the drive's own geometry and handed to
- * drive_read/drive_write, and a volume written for the hd-dma reads back
- * block for block through here.
+ * sends it.  The file behind the unit is the same IMD image every other
+ * hard disk card in the simulator reads (lib/imdlib.c), and its framing
+ * makes (c, h, s) a flat function of the LBA the guest computed:
+ * ((cyl * heads + head) * spt + sec).  So the LBA is decomposed with the
+ * drive's own geometry and handed to imd_read/imd_write, and a volume
+ * written for the hd-dma reads back block for block through here.
  */
 
 #include "sim.h"
 #include "hwsim.h"
 #include "vimap.h"
 #include "util.h"
+#include "imd.h"
 #include <unistd.h>
 #include <strings.h>
 #include <fcntl.h>
@@ -181,10 +181,11 @@ static int ide_vi_line = -1;    /* the VI line, from the -w wiring; -1 = not wir
 
 #define DRIVES      2           /* one board, and the latch picks its two */
 
-static void *handle[DRIVES];    /* the file behind each unit, or null */
-static int cyls[DRIVES];        /* geometry, as the drive's label has it */
+static void *handle[DRIVES];    /* the .imd behind each unit, or null */
+static int cyls[DRIVES];        /* geometry, from the image's framing */
 static int heads[DRIVES];
 static int spt[DRIVES];
+static int firstsec[DRIVES];    /* the image's first sector number */
 
 /*
  * The board, all of it.  There is one card and it holds one transfer at
@@ -210,37 +211,47 @@ static int irq;                 /* the drive wants the guest's attention */
 
 /*
  * Point the board's strobes at one of its two drives and make sure the
- * file behind it is open and its geometry known.  Returns 0, or -1 if
+ * image behind it is open and its geometry known.  Returns 0, or -1 if
  * there is no image there: a unit with nothing behind it has to fail the
- * command rather than be dereferenced, and drive_open answers null when
- * the image is locked against us or cannot be opened.
+ * command rather than be dereferenced.  imd_load answers a handle even
+ * for a file it had to create, so an image with no tracks (cyls or heads
+ * zero) is the absent-drive case, the same way a blank file is.
  */
 static int
 ide_unit(int unit)
 {
     char name[20];
-    int c, h, s;
-    struct drive *dh;
+    struct imd *ip;
+    int nsec, secsize;
 
     if (handle[unit])
         return (0);
 
     sprintf(name, "ide-%d", unit);
-    dh = drive_open(name);
-    if (!dh) {
+    ip = imd_load(drive_resolve(name), unit, IMD_INPLACE);
+    if (!ip) {
         printf("ide: no drive %s, command refused\n", name);
         return (-1);
     }
-    drive_sectorsize(dh, SECLEN);
-    if (!drive_geometry(dh, &c, &h, &s) || !h || !s) {
-        printf("ide: drive %s has no geometry, command refused\n", name);
+    /*
+     * The sectors on a track come from the track, not from the image's
+     * SECTORS maximum: ip->spt is the most any track may hold (32), and an
+     * m16 track holds 17.  Decomposing an LBA with the maximum reads the
+     * wrong sector of every track but the first.
+     */
+    imd_trkinfo(ip, 0, 0, &nsec, &secsize);
+    if (!ip->cyls || !ip->heads || !nsec || secsize != SECLEN) {
+        imd_close(ip);          /* a blank image imd_load made for us */
+        printf("ide: no drive %s, command refused\n", name);
         return (-1);
     }
-    handle[unit] = dh;              /* only cache a formatted drive */
-    cyls[unit] = c;
-    heads[unit] = h;
-    spt[unit] = s;
-    trace(trace_ide, "ide: unit %d is %d/%d/%d\n", unit, c, h, s);
+    handle[unit] = ip;
+    cyls[unit] = ip->cyls;
+    heads[unit] = ip->heads;
+    spt[unit] = nsec;
+    firstsec[unit] = imd_firstsec(ip, 0, 0);
+    trace(trace_ide, "ide: unit %d is %d/%d/%d first %d\n", unit,
+        cyls[unit], heads[unit], spt[unit], firstsec[unit]);
     return (0);
 }
 
@@ -249,11 +260,13 @@ ide_unit(int unit)
  *
  * The LBA is turned back into the cylinder, head and sector the guest
  * computed it from - idelba() in sys/ide.c is the other direction - and
- * those are what the drive module wants.  Its own arithmetic then
- * re-flattens them, so the two cancel and the file offset is the LBA
- * times the sector size.  Doing it in that order is the compatibility
- * argument: handing the module the LBA as a byte offset would be shorter
- * and would read a different disk.
+ * those are what the image's framing wants, with the track's own first
+ * sector number added because imd_read numbers sectors the way they are
+ * written on the track, not the way the filesystem counts them.  The
+ * image's arithmetic then re-flattens the three, so the two cancel and
+ * the sector is the one the LBA named.  Doing it in that order is the
+ * compatibility argument: handing the image the LBA as a byte offset
+ * would be shorter and would read a different disk.
  */
 static int
 ide_rw(int unit, unsigned long lba, char *p, int wr)
@@ -262,14 +275,14 @@ ide_rw(int unit, unsigned long lba, char *p, int wr)
     int cyl = lba / spc;
     int rem = lba % spc;
     int head = rem / spt[unit];
-    int sec = rem % spt[unit];
+    int sec = rem % spt[unit] + firstsec[unit];
 
     trace(trace_ide, "ide: %s lba %lu = c %d h %d s %d\n",
         wr ? "write" : "read", lba, cyl, head, sec);
 
     if (wr)
-        return (drive_write(handle[unit], cyl, head, sec, p));
-    return (drive_read(handle[unit], cyl, head, sec, p));
+        return (imd_write(handle[unit], cyl, head, sec, p));
+    return (imd_read(handle[unit], cyl, head, sec, p));
 }
 
 /*

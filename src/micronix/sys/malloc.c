@@ -23,15 +23,17 @@
 extern char memwant;
 
 /*
- * Number of free segments
+ * Number of free segments.  Lives in the freed low-memory bss (uhdr.s's
+ * _nsegs, 0x220), set in meminit().
  */
-UINT nsegs = 0;                 /* set in meminit(), mem.s */
+extern UINT nsegs;
 
 /*
- * Segment map. Segment n is allocated iff segmap[n] != 0.
+ * Segment map. Segment n is allocated iff segmap[n] != 0.  Lives in the
+ * freed low-memory bss (uhdr.s's _segmap).
  */
-char segmap[MAXSEG] = 0;
-static UINT lastseg = 16;
+extern char segmap[];
+extern UINT lastseg;            /* uhdr.s's _lastseg: the allocator hint */
 
 /*
  * Task map.  Bit n is set while task n is assigned to a process.
@@ -49,7 +51,7 @@ static UINT lastseg = 16;
  * map and never the only copy of it.
  */
 #define NTASK	16              /* tasks 1..15 are for processes */
-UINT taskmap = 0;
+extern UINT taskmap;            /* uhdr.s's _taskmap: the task bitmap */
 
 /*
  * Allocate a segment

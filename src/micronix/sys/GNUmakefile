@@ -253,9 +253,9 @@ endif
 # where that is.  One variable, passed to the C and used by the module
 # links below, because the two have to agree and a segment that moved on
 # one side only would be a module mapped nowhere.  The segment is a fixed
-# page (0xc000), not the page past the resident text: the text and the
-# resident data run 0x1000 up to _ebss, and the driver page sits above the
-# buffer pool, just below the scratch window at 0xd000.
+# page (0xd000), just below the buffer window.  The scratch window sits
+# between the pool and the driver page at 0xc000, and highmem is parked
+# over it - init-only code that never borrows the scratch.
 #
 # ovlslot.o is a data page at OVLBASE (folded -Sdata), the way win.o and
 # upage.o are: the final link places it at OVLBASE among the data, and
@@ -263,7 +263,7 @@ endif
 # follows the text (-Ttext with no -Tdata), so there is no separate data
 # origin to name.
 #
-OVLSEG  = 12
+OVLSEG  = 13
 OVLBASE = $(shell printf 0x%x $$(( $(OVLSEG) * 4096 )))
 PAGESZ  = 4096
 OVLSLOT = ovlslot.o

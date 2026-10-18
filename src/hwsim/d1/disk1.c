@@ -26,6 +26,7 @@
 #include "hwsim.h"
 #include "vimap.h"
 #include "util.h"
+#include "media.h"
 #include "imd.h"
 #include <sys/types.h>
 #include <unistd.h>
@@ -76,6 +77,8 @@ static void *handle[DRIVES];    /* the imd handle per drive */
 static int curcyl[DRIVES];      /* where the head is */
 static int track0[DRIVES];      /* ... and whether that is cylinder 0 */
 static int secsize[DRIVES];     /* the bytes a sector holds */
+static int bound[DRIVES];       /* the media changer named this drive */
+static int fitted;              /* the changer has put media on this card */
 
 static byte secbuf[MAXSECT];
 
@@ -118,6 +121,35 @@ d1_intr(void)
     set_vi(disk1_vi_line, DISK1_CARDID, intr ? 1 : 0);
 }
 
+static int select_path(int id, char *path);
+
+/* the media changer's end of the same thing: a path, not a name we made up */
+static int
+disk1_media_load(int unit, char *path)
+{
+    bound[unit] = 1;            /* ours, so select_path does not report it */
+    if (select_path(unit, path) < 0)
+        return -1;
+    fitted = 1;
+    curcyl[unit] = 0;
+    track0[unit] = 1;
+    return 0;
+}
+
+static void
+disk1_media_eject(int unit)
+{
+    if (handle[unit]) {
+        imd_close(handle[unit]);
+        handle[unit] = 0;
+    }
+    bound[unit] = 1;            /* ... and it stays empty until told otherwise */
+}
+
+static struct mediadev disk1_media = {
+    "disk1", 0, DRIVES, disk1_media_load, disk1_media_eject
+};
+
 /*
  * open a drive's backing store.  A floppy wants the write overlay, not
  * the hard disks' in-place runs: a diskette image is small, its framing
@@ -125,21 +157,44 @@ d1_intr(void)
  * sectors land.
  */
 static int
+select_path(int id, char *path)
+{
+    void *np;
+    int nsec, ss;
+
+    np = imd_load(path, id, IMD_DELTA);
+    if (!np)
+        return -1;
+    if (handle[id])
+        imd_close(handle[id]);
+    handle[id] = np;
+    imd_trkinfo(handle[id], 0, 0, &nsec, &ss);
+    secsize[id] = ss ? ss : 512;
+    /*
+     * If nobody has bound this drive yet, the name we just made up is a
+     * -D host override or the card's own default, and the changer does
+     * not know about it: tell it, so a query does not report empty.
+     */
+    if (!bound[id])
+        media_bound(&disk1_media, id, path);
+    bound[id] = 1;
+    return 0;
+}
+
+static int
 select_drive(int id)
 {
     char drivename[20];
-    int nsec, ss;
 
     if (handle[id])
         return 0;
+    if (bound[id])
+        return -1;              /* the changer said what is here, and it is nothing */
     sprintf(drivename, "disk1-%d", id);
-    handle[id] = imd_load(drive_resolve(drivename), id, IMD_DELTA);
-    if (!handle[id]) {
+    if (select_path(id, drive_resolve(drivename)) < 0) {
         printf("disk1: no drive %s, command refused\n", drivename);
         return -1;
     }
-    imd_trkinfo(handle[id], 0, 0, &nsec, &ss);
-    secsize[id] = ss ? ss : 512;
     return 0;
 }
 
@@ -463,6 +518,22 @@ d1_execute(void)
         break;
     case FDC_RECAL:
         drv = d1_drive(cmd[1]);
+        /*
+         * A card with no media on it is a card that is not in the
+         * machine: a drive exists in the simulator whether or not a
+         * file does (opening an unwritten name makes a blank diskette),
+         * so the file cannot be the presence test.  Only the media
+         * changer fitting a diskette to one of these drives puts the
+         * card on the bus.  The kernel's probe tickles every driver it
+         * places, and a phantom card asserting its line would claim one
+         * another controller owns - trailing an interrupt level that
+         * never drops and so masking that controller's completions.
+         */
+        if (!fitted || select_drive(drv) < 0) {
+            res[0] = 0x08 | (drv & 3);  /* not ready, and no interrupt */
+            intr = 0;
+            return;
+        }
         seek_drv = drv;
         curcyl[drv] = 0;
         track0[drv] = 1;
@@ -625,6 +696,7 @@ disk1_init()
     register_input(D1_STAT, &d1_stat_in);
     register_output(D1_STAT, &d1_dma_out);
     register_output(D1_MOTOR, &d1_motor_out);
+    register_mediadev(&disk1_media);
     return 0;
 }
 

@@ -143,6 +143,7 @@ extern void imd_trkinfo(void *vp, int cyl, int head, int *secs, int *secsize);
 extern int imd_density(void *vp, int cyl, int head);
 extern int imd_write(void *vp, int cyl, int head, int osec, char *buf);
 extern int imd_read(void *vp, int cyl, int head, int osec, char *buf);
+extern int imd_block0(void *vp, char *buf, int write);
 extern int imd_setfmt(void *vp, int cyl, int head, int firstsec, int secs,
     int secsize, int mode, int fill);
 extern void imd_dump_track(struct imd_trk *tp);

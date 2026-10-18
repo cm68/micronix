@@ -24,18 +24,18 @@
  * why a driver must not expect its own page to be there across a sleep.
  *
  * The frame is one fixed page of the kernel's own address space, at
- * segment OVLSEG (0xc000).  The pages around it are fixed too: the
- * scratch window at 0xd000, the buffer window at 0xe000, the u page at
+ * segment OVLSEG (0xd000).  The pages around it are fixed too: the
+ * scratch window at 0xc000, the buffer window at 0xe000, the u page at
  * 0xf000.  The buffer pool runs from _ebss - the end of the resident
- * data and bss - up to OVLBASE, so the driver page sits just above the
- * pool and just below the scratch window; mapping that one segment to a
- * module's page disturbs nothing - no pool header, no scratch window,
- * no buffer window.
+ * data and bss - up to SCRWIN, the scratch window just below the driver
+ * page; mapping the driver's segment to a module's page disturbs nothing
+ * - no pool header, no scratch window, no buffer window.
  *
  * The init-only code (highmem.o) is not text for this purpose: it is
  * folded to data and parked at _ebss, inside the region the pool grows
- * into, and is reclaimed as buffer headers once main() has returned -
- * which is why the pool's ceiling is OVLBASE, not BUFWIN.
+ * into, and is reclaimed as buffer headers once main() has returned.
+ * It never borrows the scratch window, so it may run over it: highmem's
+ * ceiling is OVLBASE, while the pool's ceiling stays SCRWIN.
  *
  * Nothing needs to be written into the frame.  The module is linked at
  * OVLBASE and mapped there when it is reached, and setdev stamps the
@@ -56,7 +56,7 @@
  * make passing the value in erase the header.
  */
 #ifndef OVLSEG
-#define OVLSEG      12
+#define OVLSEG      13
 #endif
 #define OVLBASE     (OVLSEG * 0x1000)
 

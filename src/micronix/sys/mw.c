@@ -652,7 +652,7 @@ mwinit(seg)
  */
 reset()
 {
-    extern char map0[], image0[];
+    extern char map0[];
     int *ichan;
 
     mwlink();                   /* where cmd is, and the block's own chain */
@@ -662,7 +662,7 @@ reset()
     map0[2] = 0;
     ichan[0] = (UINT) mwphys;           /* the channel command address, */
     ichan[1] = (UINT) (mwphys >> 16);   /* three bytes at physical 0x50 */
-    map0[2] = image0[2];
+    map0[2] = 1;
 
     /*
      * Out of the old idiom's way: this used to unmask the line here

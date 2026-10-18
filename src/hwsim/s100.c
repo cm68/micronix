@@ -175,6 +175,42 @@ undef_out(portaddr p, byte v)
 #endif
 }
 
+/*
+ * Who owns the ports.
+ *
+ * input_handler/output_handler are the dispatch table, and they are also
+ * the owner table: a port that is nobody's answers undef_in/undef_out.
+ * What they cannot say is *which* card put a handler there, and that is
+ * the whole of the check below - a machine where two cards answer the
+ * same port does not exist, and the way that has gone wrong here before
+ * was silent, with the second card's registration simply winning and the
+ * first card quietly ceasing to work.
+ *
+ * The claimant comes from the startup loop in hwsim.c, which knows each
+ * driver's name as it calls its startup hook.  A card that registers the
+ * same port twice - the MultIO's banked registers - is the same owner and
+ * is ordinary; only a second card is a fault.
+ */
+extern char *progname;
+
+static char *in_owner[256];
+static char *out_owner[256];
+static char *claimant;
+
+void
+io_claimant(char *name)
+{
+    claimant = name;
+}
+
+static void
+io_conflict(char *dir, int port, char *first, char *second)
+{
+    fprintf(stderr, "%s: port %x %s: %s and %s\n", progname, port, dir,
+        first ? first : "(unknown)", second ? second : "(unknown)");
+    exit(1);
+}
+
 byte
 s100_input(portaddr p)
 {
@@ -195,7 +231,10 @@ register_input(portaddr portnum, inhandler func)
     portnum &= 0xff;
 
     if (func != undef_in) {
+        if (input_handler[portnum] != undef_in && in_owner[portnum] != claimant)
+            io_conflict("input", portnum, in_owner[portnum], claimant);
         trace(trace_ior, "input port %x registered\n", portnum);
+        in_owner[portnum] = claimant;
     }
     input_handler[portnum] = func;
 }
@@ -206,7 +245,10 @@ register_output(portaddr portnum, outhandler func)
     portnum &= 0xff;
 
     if (func != undef_out) {
+        if (output_handler[portnum] != undef_out && out_owner[portnum] != claimant)
+            io_conflict("output", portnum, out_owner[portnum], claimant);
         trace(trace_ior, "output port %x registered\n", portnum);
+        out_owner[portnum] = claimant;
     }
     output_handler[portnum] = func;
 }

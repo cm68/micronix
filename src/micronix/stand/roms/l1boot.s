@@ -157,6 +157,10 @@ djhlt	equ	025h		;end the channel program
 djlset	equ	02eh		;set the logical drive numbering
 djfive	equ	004h		; its parameter: bit 2 makes the five
 				; inch port logical 0 to 3
+dj5drv	equ	4		;and the five inch port's first drive,
+				; which is the number of that port's
+				; first minus the port: the drive
+				; numbering is which port it is on
 djok	equ	040h		;a command's good status
 djhard	equ	002h		;characteristics byte: the medium is
 				; hard sectored, so its sectors are

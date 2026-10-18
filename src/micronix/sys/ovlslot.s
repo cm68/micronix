@@ -12,10 +12,11 @@
 ; driver that is; the module says so.
 ;
 ; The page is data, not text, because it is parked above the buffer
-; pool at 0xc000 (segment OVLSEG), not at the top of the resident text:
-; the text and the resident data run 0x1000 to _ebss, and the driver
-; page is a fixed data page the way win.o and upage.o are.  The loader
-; writes it with the rest of the data section, and setdev overwrites it.
+; pool at 0xd000 (segment OVLSEG), just below the buffer window; the
+; scratch window is at 0xc000 below it.  The text and the resident data
+; run 0x1000 to _ebss, and the driver page is a fixed data page the way
+; win.o and upage.o are.  The loader writes it with the rest of the data
+; section, and setdev overwrites it.
 ;
 ; The address is not written here.  The GNUmakefile links this object
 ; with -Sdata -Tdata=$(OVLBASE), so the object's own header records the

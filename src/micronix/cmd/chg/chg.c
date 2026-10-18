@@ -9,27 +9,37 @@
  * requires, and prints the response line.  It exits 0 on ok and 1 on
  * error, so a script can tell a load that failed.
  *
+ * The command it sends is the changer's own grammar, passed through as
+ * typed: chg is a door onto the port, not a parser of its own, so a verb
+ * added at the sim end needs nothing here.
+ *
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
 
 #include <stdio.h>
 
 #define DEV	"/dev/mediachg"
-#define MAXL	128
+#define MAXL	128			/* longest command, '@' and '\n' included */
+#define MAXR	512			/* longest response: a drive list */
 
 main(argc, argv)
 	int argc;
 	char **argv;
 {
 	char	line[MAXL];
-	char	rbuf[MAXL];
+	char	rbuf[MAXR];
 	int	fd, i, len, rn;
 	char	*a;
 
 	if (argc < 2) {
 		fprintf(stderr,
-		    "usage: chg load <set>:<vol> onto <drive> | unload <drive> |\n");
-		fprintf(stderr, "       query <set|drive> | next <drive>\n");
+		    "usage: chg <drive> [<source>]  |  next <drive>  |  sets  |\n");
+		fprintf(stderr,
+		    "       drives  |  dir [<path>]  |  ls [<path>]\n");
+		fprintf(stderr,
+		    "       <drive> is djdma:0 .. djdma:7, hdca:0 ..., disk1:0 ...\n");
+		fprintf(stderr,
+		    "       <source> is an image, blank:<name>, <set>:<vol>, or empty\n");
 		exit(1);
 	}
 
@@ -54,7 +64,7 @@ main(argc, argv)
 	/* the response is one newline-terminated line */
 	rn = 0;
 	for (;;) {
-		if (rn >= MAXL - 1)
+		if (rn >= MAXR - 1)
 			break;
 		if (read(fd, &rbuf[rn], 1) != 1)
 			break;

@@ -86,9 +86,9 @@
  * itself (ovlmap maps the major before the kernel calls into it).
  */
 #include <types.h>
+#include <sys/sys.h>
 #include <sys/ovl.h>
-
-extern UINT8 image0[];
+#include <sys/proc.h>
 
 extern int (*busmaster) ();	/* the words are in sys/ovl.c: one per machine */
 extern UINT busmasterseg;
@@ -106,13 +106,13 @@ busget(func)
     if (busmaster != 0 && busmaster != func) {  /* someone else has it */
         if (busheir == 0) {     /* register the heir */
             busheir = func;
-            busheirseg = image0[2 * OVLSEG];
+            busheirseg = u.drv;
         }
         ei();
         return 0;              /* didn't get it */
     } else {
         busmaster = func;       /* application accepted */
-        busmasterseg = image0[2 * OVLSEG];
+        busmasterseg = u.drv;
         ei();
         return 1;             /* got it */
     }
@@ -131,7 +131,7 @@ busgive(func)
         busmaster = busheir;    /* give bus to heir */
         busmasterseg = busheirseg;
         busheir = func;         /* register next heir */
-        busheirseg = image0[2 * OVLSEG];
+        busheirseg = u.drv;
         ei();
         ovlcall(busmaster, busmasterseg);  /* invoke new master, in its page */
         return 1;             /* bus was given away */

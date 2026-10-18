@@ -5,8 +5,17 @@
  * controller from the Wunderbus/MultIO: a pair of cascaded 8259As (the
  * slave is CAS-cascaded, so it drives its own vector, unlike the MultIO's
  * polled slave), a 2 MHz 8253 interval timer, an OKI MSM5832 real-time
- * clock, and a 2651 UART.  All sixteen ports sit at the CompuPro standard
- * base 0x50.
+ * clock, and a 2651 UART.  All sixteen ports sit at the board's own
+ * base, which is a jumper block: 0x70 here, a change from CompuPro's
+ * default 0x50.
+ *
+ * 0x50 is where the HDCA's four registers and the HD-DMA's two live, so
+ * at the default the cards were claiming six ports between them and the
+ * last one to start won - the SS1, being last in the link.  Both disk
+ * controllers are silent losers of that, and nothing said so.  The base
+ * is a jumper on the real board: whatever it is set to, mon500's s1*
+ * equates, sys/ss1pic.c and sys/ss1_clock.c's addresses and this file
+ * have to say the same thing.
  *
  * The 8259 chip model is shared with the MultIO (pic.c); what differs is
  * the port decode (direct A0, four adjacent ports) and the cascade (the
@@ -21,6 +30,7 @@
  */
 
 #include "sim.h"
+#include "config.h"
 #include "hwsim.h"
 #include "util.h"
 #include "pic.h"
@@ -29,11 +39,17 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 
+extern int terminal_fd_in;
+extern int terminal_fd_out;
+
 #ifndef NODEBUG
 int trace_ss1;
 #endif
 
-#define SS1_BASE    0x50        /* the CompuPro standard block */
+#define SS1_BASE    0x70        /* the jumper: not CompuPro's default 0x50 */
+
+/* where the jumper is: the compiled value unless the machine file moves it */
+static int ss1_base = SS1_BASE;
 
 /*
  * Register offsets from the base (see the manual's I/O port map).
@@ -504,8 +520,25 @@ wr_uart_cmd(portaddr p, byte v)
 static void
 wr_uart_data(portaddr p, byte v)
 {
+    /*
+     * Sending on the 2651 claims the console, exactly as transmitting on
+     * the multio's uart 0 does.  The SS1 is the wired controller on this
+     * machine, so the claim normally changes nothing; it is here for the
+     * same reason the multio's is - so that whichever character path the
+     * bios actually uses is the one that owns the shared input.
+     */
+    console_claim(CONS_SS1);
+
     if (ss1_uart_outfd != -1)
         write(ss1_uart_outfd, &v, 1);
+    /*
+     * The 2651 is the console whenever the SS1 is the wired controller,
+     * so its output is console output and belongs in the -L log the same
+     * way the MultIO's ACE 0 does.  It is logged whether or not the xterm
+     * was asked for, which is what makes an ss1 machine drivable and
+     * legible headlessly.
+     */
+    console_log(v);
     ss1_uart_txbusy = 1;        // shifting out: TxRDY drops
     ss1_uart_set_lines();
 }
@@ -537,6 +570,16 @@ ss1_poll(void)
         ss1_uart_txbusy = 0;
         ss1_uart_set_lines();
     }
+
+    /*
+     * Only the device that owns the console may take a character out of
+     * it.  Uart 0 on the multio and the floppy controller's serial port
+     * read the same descriptor, and the SS1 may share it too; whichever
+     * of them read first would leave the others waiting forever for a
+     * keystroke that had already been delivered somewhere else.
+     */
+    if (console_owner != CONS_SS1)
+        return 0;
 
     if (ss1_uart_infd != -1 && !ss1_uart_rx_valid) {
         if (ioctl(ss1_uart_infd, FIONREAD, &bytes) == 0 && bytes > 0) {
@@ -592,6 +635,13 @@ wr_ss1_s8259_h(portaddr p, byte v) { pic_write_data(&ss1_pic[1], v); }
 static int
 ss1_init(void)
 {
+    /*
+     * Where the board is strapped.  0x70 is where ours is; 0x50 is
+     * CompuPro's default and is also where the HDCA lives, which is why
+     * moving it here and getting told about it is the point.
+     */
+    ss1_base = conf_board_hex("ss1", 0, "base", SS1_BASE);
+
     pic_init(&ss1_pic[0]);
     pic_init(&ss1_pic[1]);
     ss1_pic[0].name = "ss1 master";
@@ -609,32 +659,43 @@ ss1_init(void)
     if (!wiring_active("ss1"))
         return 0;
 
-    register_input(SS1_BASE + SS1_M8259_L, &rd_ss1_m8259_l);
-    register_input(SS1_BASE + SS1_M8259_H, &rd_ss1_m8259_h);
-    register_input(SS1_BASE + SS1_S8259_L, &rd_ss1_s8259_l);
-    register_input(SS1_BASE + SS1_S8259_H, &rd_ss1_s8259_h);
-    register_output(SS1_BASE + SS1_M8259_L, &wr_ss1_m8259_l);
-    register_output(SS1_BASE + SS1_M8259_H, &wr_ss1_m8259_h);
-    register_output(SS1_BASE + SS1_S8259_L, &wr_ss1_s8259_l);
-    register_output(SS1_BASE + SS1_S8259_H, &wr_ss1_s8259_h);
+    register_input(ss1_base + SS1_M8259_L, &rd_ss1_m8259_l);
+    register_input(ss1_base + SS1_M8259_H, &rd_ss1_m8259_h);
+    register_input(ss1_base + SS1_S8259_L, &rd_ss1_s8259_l);
+    register_input(ss1_base + SS1_S8259_H, &rd_ss1_s8259_h);
+    register_output(ss1_base + SS1_M8259_L, &wr_ss1_m8259_l);
+    register_output(ss1_base + SS1_M8259_H, &wr_ss1_m8259_h);
+    register_output(ss1_base + SS1_S8259_L, &wr_ss1_s8259_l);
+    register_output(ss1_base + SS1_S8259_H, &wr_ss1_s8259_h);
 
-    register_output(SS1_BASE + SS1_8253_TC0, &wr_8253_count);
-    register_output(SS1_BASE + SS1_8253_TC1, &wr_8253_count);
-    register_output(SS1_BASE + SS1_8253_TC2, &wr_8253_count);
-    register_output(SS1_BASE + SS1_8253_CTL, &wr_8253_ctl);
+    register_output(ss1_base + SS1_8253_TC0, &wr_8253_count);
+    register_output(ss1_base + SS1_8253_TC1, &wr_8253_count);
+    register_output(ss1_base + SS1_8253_TC2, &wr_8253_count);
+    register_output(ss1_base + SS1_8253_CTL, &wr_8253_ctl);
 
-    register_output(SS1_BASE + SS1_RTC_CMD, &wr_rtc_cmd);
-    register_input(SS1_BASE + SS1_RTC_DATA, &rd_rtc_data);
-    register_output(SS1_BASE + SS1_RTC_DATA, &wr_rtc_data);
+    register_output(ss1_base + SS1_RTC_CMD, &wr_rtc_cmd);
+    register_input(ss1_base + SS1_RTC_DATA, &rd_rtc_data);
+    register_output(ss1_base + SS1_RTC_DATA, &wr_rtc_data);
 
-    register_input(SS1_BASE + SS1_UART_DATA, &rd_uart_data);
-    register_input(SS1_BASE + SS1_UART_STAT, &rd_uart_stat);
-    register_output(SS1_BASE + SS1_UART_DATA, &wr_uart_data);
-    register_output(SS1_BASE + SS1_UART_CMD, &wr_uart_cmd);
+    register_input(ss1_base + SS1_UART_DATA, &rd_uart_data);
+    register_input(ss1_base + SS1_UART_STAT, &rd_uart_stat);
+    register_output(ss1_base + SS1_UART_DATA, &wr_uart_data);
+    register_output(ss1_base + SS1_UART_CMD, &wr_uart_cmd);
 
     /* the console uart gets an xterm when the config asks for one */
     if ((config_sw & CONF_SET) && (config_sw & 0x100))
         open_terminal("ss1", 0, &ss1_uart_infd, &ss1_uart_outfd, 0, 0);
+
+    /*
+     * This is the machine's console, so publish it the way the multio
+     * does: terminal_fd_in/out are the common character path that the
+     * other drivers share, and the SS1 owns the input from reset.  The
+     * ownership is set directly, not claimed, so an ss1 machine starts
+     * quiet - there has been no change to report.
+     */
+    terminal_fd_in = ss1_uart_infd;
+    terminal_fd_out = ss1_uart_outfd;
+    console_owner = CONS_SS1;
 
     vi_change = &ss1_vi_change;
     get_intack = &ss1_intack;

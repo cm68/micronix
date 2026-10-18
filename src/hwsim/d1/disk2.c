@@ -115,9 +115,17 @@ d2_command(byte drive, byte op)
 
     switch (op) {
     case 0x08:                  /* READ */
-        imd_read(handle[drive], curcyl[drive], reg_head, reg_sect, secbuf);
-        copyout(secbuf, sc_addr, ss);
-        status = 0x03;
+        /*
+         * A header that never matches is a time out, and the card moves
+         * nothing: the stale staging buffer must not be mistaken for the
+         * sector that was asked for.
+         */
+        if (imd_read(handle[drive], curcyl[drive], reg_head, reg_sect,
+                secbuf) > 0) {
+            copyout(secbuf, sc_addr, ss);
+            status = 0x03;
+        } else
+            status = 0x03 | 0x40;       /* timed out */
         break;
     case 0x10:                  /* WRITE */
         copyin(secbuf, sc_addr, ss);

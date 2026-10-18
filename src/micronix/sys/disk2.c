@@ -451,10 +451,21 @@ d2sc(b, writemem)
     struct buf *b;
     int writemem;
 {
-    in(D2_SC);                  /* disable the channel */
-    out(D2_SC, b->xmem);        /* A23-A16 */
-    out(D2_SC, (UINT8) ((unsigned) b->data >> 8));  /* A15-A8 */
-    out(D2_SC, (UINT8) (unsigned) b->data);         /* A7-A0 */
+    UINT32 phys;
+
+    /*
+     * A buffer's data pointer is a window address and its segment is
+     * b->xmem, so the address the channel has to hold is the segment
+     * folded into the address, exactly as sys/dj.c does for the DJ-DMA.
+     * The card is a bus master and sees physical memory; the window
+     * address is the kernel's alone.
+     */
+    phys = ((UINT32) b->xmem << 12) | ((unsigned) b->data & 0xfff);
+
+    in(D2_SC);                              /* disable the channel */
+    out(D2_SC, (UINT8) (phys >> 16));       /* A23-A16, extended byte */
+    out(D2_SC, (UINT8) (phys >> 8));        /* A15-A8 */
+    out(D2_SC, (UINT8) phys);               /* A7-A0 */
     out(D2_SC, (writemem ? D2_WRMEM : D2_RDMEM) | D2_SCID);
 }
 

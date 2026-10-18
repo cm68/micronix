@@ -251,21 +251,16 @@ dllabels(struct image *i)
     int spc;
     int sl;
     int dsize;
+    int secsize = 512;          /* the medium's physical sector */
 
     if (i->driver == DRIVER_IMD) {
         /*
          * The raw .img and .imd drivers read through imdlib, not through
-         * the fd, so the label's block 0 has to be fetched as a sector.
-         * Only 512-byte sectors carry a label; a track of 128-byte
-         * sectors (the distribution 1.3/1.4 diskettes) has none.
+         * the fd, so the label's block 0 has to be fetched as a sector -
+         * or, on an eight inch diskette, as four sectors of its single
+         * density first track.  imd_block0 knows both shapes.
          */
-        int secs = 0, secsize = 0;
-
-        imd_trkinfo(i->drive, 0, 0, &secs, &secsize);
-        if (secsize != 512)
-            return 0;
-        if (imd_read(i->drive, 0, 0, imd_firstsec(i->drive, 0, 0), buf)
-                != 512)
+        if (imd_block0(i->drive, buf, 0) != 512)
             return 0;
     } else if (lseek(i->fd, 0L, 0) < 0 || read(i->fd, buf, 512) != 512)
         return 0;
@@ -284,8 +279,22 @@ dllabels(struct image *i)
     dsize = dl->d_tracks * spc;
     if (i->driver == DRIVER_IMD) {
         struct imd *ip = (struct imd *)i->drive;
+        int per = 0, ss = 0;
+        int cyl = ip->cyls > 1 ? 1 : 0;
 
-        imgblks = (long) ip->cyls * ip->heads * ip->tracks[0]->fixed.nsec;
+        /*
+         * The medium's ordinary track.  Cylinder 0 head 0 is the single
+         * density boot track on an eight inch diskette, 26 sectors of
+         * 128 bytes - not what the filesystem is made of - so measure
+         * cylinder 1 and fall back to cylinder 0 only when there is no
+         * other.  The capacity is in 512 byte blocks; a 1K sector is two
+         * of them.
+         */
+        imd_trkinfo(i->drive, cyl, 0, &per, &ss);
+        if (!per || !ss)
+            imd_trkinfo(i->drive, 0, 0, &per, &ss);
+        secsize = ss ? ss : 512;
+        imgblks = (long) ip->cyls * ip->heads * per * (secsize / 512);
     } else {
         imgblks = lseek(i->fd, 0L, 2) / 512;
     }
@@ -299,8 +308,8 @@ dllabels(struct image *i)
 
     i->cyls = dl->d_tracks;
     i->heads = dl->d_heads;
-    i->spt = dl->d_spt;
-    i->bps = 512;
+    i->spt = dl->d_spt;         /* blocks (not physical sectors) per track */
+    i->bps = secsize;
     i->altsec = 0;              /* dj.c does not skew */
     i->major = 2;
     i->minor = 0;
@@ -349,6 +358,14 @@ sbvalid(char *buf, int imgblks, int offset)
         return 0;
     return 1;
 }
+
+/*
+ * Read one block from an IMD medium, saying no when the geometry points
+ * at a track that does not hold the sector size it expects.  The probe
+ * below tries several starting points and has to survive the wrong ones;
+ * readblk wants the same read to be fatal.
+ */
+static int imdread(struct image *i, UINT realblk, char *buf);
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
@@ -417,9 +434,19 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
          */
         if (i->driver == DRIVER_IMD) {
             struct imd *ip = (struct imd *)i->drive;
-            int secsize = 0;
+            int secs = 0, secsize = 0;
+            int cyl = ip->cyls > 1 ? 1 : 0;
 
-            imd_trkinfo(i->drive, 0, 0, &i->spt, &secsize);
+            /*
+             * Measure an ordinary track: cylinder 0 head 0 may be the
+             * single density boot track.  spt is in 512 byte blocks, so
+             * a 1K sector counts twice.
+             */
+            imd_trkinfo(i->drive, cyl, 0, &secs, &secsize);
+            if (!secs || !secsize)
+                imd_trkinfo(i->drive, 0, 0, &secs, &secsize);
+            i->spt = secsize ? secs * (secsize / 512) : 0;
+            i->bps = secsize ? secsize : 512;
             i->cyls = ip->cyls;
             i->heads = ip->heads;
             i->roll = 0;
@@ -476,6 +503,15 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
             }
         }
 
+        /*
+         * devnum reads the device behind a symlink, and says nothing at
+         * all about a plain file - it fails and leaves its results where
+         * they were.  Start them at zero so a medium with no device node
+         * gets the defaults below and not whatever the heap held.
+         */
+        i->dt = ' ';
+        i->major = 0;
+        i->minor = 0;
         devnum(filesystem, &i->dt, &i->major, &i->minor);
         /*
          * A raw .img is a linear dump of the sectors, not the alternated
@@ -485,38 +521,48 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
          * every imd image interleaved every block one place out, so a
          * filesystem built and read through fslib agreed with itself but
          * the boot, which reads straight, was one block off.  A skewed
-         * diskette is named by the minor (bit 3, below), not by the
-         * driver.
+         * flat image is named by the minor (bit 3, below) or by the
+         * sticky bit; an IMD's own starter block settles it below.
          */
         if (i->dt == ' ') {
             if (is_sticky(filesystem)) {
                 i->altsec = 1;
             }
         }
-        if (i->minor & 0x10) {
-            i->bps = 1024;
-        } else {
-            i->bps = 512;
-        }
-        if (i->minor & 0x08) {              /* do skew */
-            trace(trace_fs, "openfs: skewed\n");
-            i->altsec = 1;
-        }
-        if (i->major == 2) {
-            if (i->minor & 0x04) {          /* 5.25 */
-                trace(trace_fs, "openfs: 5 1/4 inch\n");
-                if (i->bps == 1024) {
-                    i->spt = 10;
-                } else {
-                    i->spt = 9;
-                }
+        /*
+         * The minor number is a property of the device node a plain
+         * file stands in for, so it describes a flat .img and only a
+         * flat .img.  An IMD carries its own track sizes, and letting a
+         * name second-guess them overruns the caller's block: a 1K
+         * medium measured as 512 bytes reads a whole sector into a
+         * half-sized buffer.
+         */
+        if (i->driver != DRIVER_IMD) {
+            if (i->minor & 0x10) {
+                i->bps = 1024;
             } else {
-                if (i->bps == 1024) {
-                    i->spt = 16;
+                i->bps = 512;
+            }
+            if (i->minor & 0x08) {          /* do skew */
+                trace(trace_fs, "openfs: skewed\n");
+                i->altsec = 1;
+            }
+            if (i->major == 2) {
+                if (i->minor & 0x04) {      /* 5.25 */
+                    trace(trace_fs, "openfs: 5 1/4 inch\n");
+                    if (i->bps == 1024) {
+                        i->spt = 10;
+                    } else {
+                        i->spt = 9;
+                    }
                 } else {
-                    i->spt = 15;
+                    if (i->bps == 1024) {
+                        i->spt = 16;
+                    } else {
+                        i->spt = 15;
+                    }
+                    trace(trace_fs, "openfs: 8 inch\n");
                 }
-                trace(trace_fs, "openfs: 8 inch\n");
             }
         }
         *fsp = (struct super *)i;
@@ -540,25 +586,71 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
          * cannot quietly settle on the wrong one.
          */
         i->offset = 0;
-        if (i->driver == DRIVER_IMAGE) {
+        if (i->driver == DRIVER_IMAGE || i->driver == DRIVER_IMD) {
             char probe[512];
             int imgblks;
             int cand[3];
             int k;
+            int skew, nskew;
+            int skew0 = i->altsec;
 
-            imgblks = lseek(i->fd, 0L, 2) / 512;
+            if (i->driver == DRIVER_IMD) {
+                struct imd *ip = (struct imd *)i->drive;
+
+                imgblks = ip->cyls * (i->heads ? i->heads : 1) * i->spt;
+            } else
+                imgblks = lseek(i->fd, 0L, 2) / 512;
             cand[0] = 0;
             cand[1] = 2 * i->spt;           /* two cylinders, one head */
             cand[2] = 4 * i->spt;           /* two cylinders, two heads */
 
-            for (k = 0; k < 3; k++) {
-                i->offset = cand[k];
-                readblk(*fsp, 1, probe);
-                if (sbvalid(probe, imgblks, i->offset))
+            /*
+             * A label-less IMD has a filesystem just as an unlabelled
+             * .img does.  On an eight inch diskette the first track is
+             * single density, so the no-offset candidate reads 128 bytes
+             * where a block should be - say no and look further on
+             * rather than dying in readblk.
+             *
+             * The shipped distribution media are also alternate
+             * sectored.  The sticky bit is how an image says so, but git
+             * carries only the executable bit, so a checked-out one
+             * cannot say it; if neither starting point has a superblock
+             * with one skew, try the other.  The sticky answer is tried
+             * first and a label-bearing medium never gets here at all.
+             */
+            nskew = (i->driver == DRIVER_IMD) ? 2 : 1;
+            for (skew = 0; skew < nskew; skew++) {
+                if (nskew == 2)
+                    i->altsec = skew ? !skew0 : skew0;
+                for (k = 0; k < 3; k++) {
+                    i->offset = cand[k];
+                    if (i->driver == DRIVER_IMD) {
+                        if (imdread(i, secmap(*fsp, 1), probe) !=
+                                (i->bps ? i->bps : 512))
+                            continue;
+                    } else
+                        readblk(*fsp, 1, probe);
+                    if (sbvalid(probe, imgblks, i->offset))
+                        break;
+                }
+                if (k < 3)
                     break;
             }
-            if (k == 3) {
+            if (skew == nskew) {
+                /*
+                 * Nothing that looks like a superblock anywhere the
+                 * filesystem can start.  On an IMD that is the whole
+                 * answer - there is no label and no filesystem - so say
+                 * so instead of reading a 128 byte boot sector as
+                 * block 1 and calling it a failed transfer.
+                 */
+                if (i->driver == DRIVER_IMD) {
+                    imd_close(i->drive);
+                    free((struct super *)i);
+                    return -1;
+                }
                 i->offset = 0;              /* say nothing new; it will fail */
+                i->altsec = skew0;
             } else if (i->offset) {
                 trace(trace_fs, "openfs: filesystem starts at block %d\n",
                     i->offset);
@@ -741,72 +833,91 @@ secinv(struct super *fs, UINT blkno)
     return (UINT)(trk * i->spt + x);
 }
 
-int secsize;
-int secs;
-void
-blktopos(void *drive, UINT blkno, int offset, int roll, int *cyl, int *head, int *sec)
+/*
+ * Where one 512 byte filesystem block lives on an IMD medium.
+ *
+ * The geometry is the label's: spt is blocks per track, heads the sides,
+ * and offset the first block of the slice.  blkno is a block number
+ * within the slice, so the cylinder it lands on is its track index spread
+ * over the heads, then shifted by the slice's offset and rotated by its
+ * roll - the same arithmetic sys/dj.c does.
+ *
+ * A medium with 1024 byte sectors holds two blocks in each physical
+ * sector.  The block's sector number is the half-sector index and boff is
+ * which half; the caller reads or writes the whole sector around it.
+ */
+static void
+blktopos(struct image *i, UINT blkno, int *cyl, int *head, int *sec, int *boff)
 {
-    struct imd *ip = (struct imd *)drive;
-    struct imd_trk *tp;
-    int spt;
-    int heads;
-    int trk;
-    int cylstart;
+    struct imd *ip = (struct imd *)i->drive;
+    int spt = i->spt;           /* blocks per track, from the label */
+    int heads = i->heads ? i->heads : 1;
+    int bps = i->bps ? i->bps : 512;
+    int spc = heads * spt;
+    int trk, within, cylstart;
 
-    if (secsize == 0) {
-        imd_trkinfo(drive, 2, 0, &secs, &secsize);
-        trace(trace_fs, "secs %d secsize %d\n", secs, secsize);
-    }
-    if (secsize != 512) {
-        printf("secsize: %d\n", secsize);
+    if (!spt || !spc) {
+        printf("spt %d heads %d\n", spt, heads);
         lose("not a filesystem");
     }
 
-    /*
-     * Sectors per track and heads come off the imd handle, which
-     * raw_load fills for a flat .img the same way the IMD loader does.
-     * The old code assumed a single sided medium - head always 0, the
-     * filesystem two cylinders in - and a double sided image numbers
-     * heads across each track before moving to the next cylinder.
-     */
-    tp = ip->tracks[0];
-    spt = tp ? tp->fixed.nsec : secs;
-    heads = ip->heads ? ip->heads : 1;
-
-    /*
-     * The filesystem's first block is `offset` blocks into the device -
-     * the boot sits in front of it on a diskette, and openfs read that
-     * number out of the disk's own label.  It is in blocks; the cylinder
-     * the filesystem starts on is that many blocks spread over a whole
-     * cylinder, heads and all.  Hardcoding 2 here only ever fit the
-     * five inch media.
-     */
-    cylstart = offset / (heads * spt);
-
-    /*
-     * The sector number on the wire starts where the medium's format says
-     * it does - 0 on a five inch hard sectored disk, 1 elsewhere - and
-     * that base is what imd_firstsec returns (raw_secmap laid the track
-     * out from it).  Hardcoding 1 here invented a sector ten on a ten
-     * sector track numbered from zero, and every block after the first
-     * landed one place out.
-     */
-    *sec = (blkno % spt) + imd_firstsec(drive, 0, 0);
+    cylstart = i->offset / spc;
     trk = blkno / spt;
-    if (heads == 1) {
-        *head = 0;
-        *cyl = cylstart + trk;
-    } else {
-        *head = trk % heads;
-        *cyl = cylstart + trk / heads;
-    }
-    if (roll) {
-        *cyl += roll;
+    within = blkno % spt;
+
+    *head = trk % heads;
+    *cyl = cylstart + trk / heads;
+    if (i->roll) {
+        *cyl += i->roll;
         if (*cyl >= ip->cyls)
             *cyl -= ip->cyls;
     }
-    trace(trace_fs, "blkno:%d cyl:%d head:%d sec:%d\n",
-        blkno, *cyl, *head, *sec);
+
+    /*
+     * The sector number on the wire starts where the medium's format says
+     * it does - 0 on a hard sectored disk, 1 elsewhere - and that base is
+     * what imd_firstsec returns for the track actually being read.  On a
+     * 1K medium two blocks share one sector.
+     */
+    if (bps > 512) {
+        *sec = (within * 512 / bps) + imd_firstsec(ip, *cyl, *head);
+        *boff = (within * 512) % bps;
+    } else {
+        *sec = within + imd_firstsec(ip, *cyl, *head);
+        *boff = 0;
+    }
+    trace(trace_fs, "blkno:%d cyl:%d head:%d sec:%d boff:%d\n",
+        blkno, *cyl, *head, *sec, *boff);
+}
+
+/*
+ * One block off an IMD medium.  Returns the number of bytes the track
+ * actually gave back, which is the sector size when the block is there
+ * and something else when the geometry pointed at the wrong track - the
+ * probing path's answer.  1K media carry two blocks to a sector, so the
+ * half selected by boff is copied out.
+ */
+static int
+imdread(struct image *i, UINT realblk, char *buf)
+{
+    int boff, cyl, head, sec, ret;
+    char tmp[MAXSECSIZE];
+    int bs = i->bps ? i->bps : 512;
+
+    if (!i->spt || !(i->heads ? i->heads : 1))
+        return -1;
+    blktopos(i, realblk, &cyl, &head, &sec, &boff);
+
+    /*
+     * Always through the sector-sized temporary: the track's own sector
+     * length is the authority on how many bytes imd_read lays down, and
+     * a geometry that disagrees must not overrun the caller's block.
+     */
+    ret = imd_read(i->drive, cyl, head, sec, tmp);
+    if (ret != bs)
+        return ret;
+    memcpy(buf, tmp + boff, 512);
+    return bs;
 }
 
 /*
@@ -817,7 +928,6 @@ readblk(struct super *fs, UINT blkno, char *buf)
 {
     UINT realblk;
     int ret;
-    int cyl, head, sec;
     struct image *i = (struct image *)fs;
 
     /* block zero always reads 0 */
@@ -844,9 +954,10 @@ readblk(struct super *fs, UINT blkno, char *buf)
         }
 #endif
     } else if (i->driver == DRIVER_IMD) {
-        blktopos(i->drive, realblk, i->offset, i->roll, &cyl, &head, &sec);
-        ret = imd_read(i->drive, cyl, head, sec, buf);
-        if (ret != 512) {
+        int bs = i->bps ? i->bps : 512;
+
+        ret = imdread(i, realblk, buf);
+        if (ret != bs) {
             printf("read lose %d\n", ret);
             lose("imd_read");
         }
@@ -885,9 +996,23 @@ writeblk(struct super *fs, UINT blkno, char *buf)
             lose("writeblk");
         }
     } else if (i->driver == DRIVER_IMD) {
-        blktopos(i->drive, realblk, i->offset, i->roll, &cyl, &head, &sec);
-        ret = imd_write(i->drive, cyl, head, sec, buf);
-        if (ret != 512) {
+        int boff;
+        char tmp[MAXSECSIZE];
+        int bs = i->bps ? i->bps : 512;
+
+        blktopos(i, realblk, &cyl, &head, &sec, &boff);
+        if (bs > 512) {
+            /* write back the whole sector, this block folded in */
+            ret = imd_read(i->drive, cyl, head, sec, tmp);
+            if (ret != bs) {
+                printf("write read lose %d\n", ret);
+                lose("imd_read");
+            }
+            memcpy(tmp + boff, buf, 512);
+            ret = imd_write(i->drive, cyl, head, sec, tmp);
+        } else
+            ret = imd_write(i->drive, cyl, head, sec, buf);
+        if (ret != bs) {
             printf("write lose %d\n", ret);
             lose("imd_write");
         }

@@ -19,8 +19,10 @@
 extern long seconds;            /* see clock.c */
 extern UINT nbuf;                /* initialized in binit(), main.c */
 extern struct buf *btop;            /* ditto */
-extern UINT8 map0[], image0[];   /* MMU map registers (uhdr.s) */
+extern UINT8 map0[];   /* MMU map registers (uhdr.s) */
 extern int copy();               /* leaf mem.s: kernel-to-kernel copy */
+
+UINT8 bufseg = BUFSEG;          /* the buffer window's current segment */
 extern int copyin(), copyout();  /* leaf mem.s: the user side of it */
 
 /*
@@ -672,7 +674,8 @@ bdrain()
 bwin(seg)
     int seg;
 {
-    map0[2 * BUFSEG] = image0[2 * BUFSEG] = seg;
+    map0[2 * BUFSEG] = seg;
+    bufseg = seg;
 }
 
 /*
@@ -686,7 +689,7 @@ bwin(seg)
  * window is the kernel's own segment whenever bholdn is 0 - the image
  * the firmware left it at, which is the page this kernel's code is in.
  *
- * The stack holds image0, not map0: the map registers are write only,
+ * The stack holds bufseg, not map0: the map registers are write only,
  * so reading one back is not the segment in place, it is bus garbage.
  * Saving map0 here and restoring it at brel() left the window mapped to
  * page 0 - the rom's page - after the first hold, which went unnoticed
@@ -717,8 +720,9 @@ bhold(b)
 {
     if (bholdn >= NHOLD)
         panic("bhold: too deep");
-    holdstk[bholdn++] = image0[2 * BUFSEG];
-    map0[2 * BUFSEG] = image0[2 * BUFSEG] = b->xmem;
+    holdstk[bholdn++] = bufseg;
+    map0[2 * BUFSEG] = b->xmem;
+    bufseg = b->xmem;
     return (b->data);
 }
 
@@ -730,7 +734,8 @@ brel()
 {
     if (bholdn == 0)
         panic("brel: no hold");
-    map0[2 * BUFSEG] = image0[2 * BUFSEG] = holdstk[--bholdn];
+    bufseg = holdstk[--bholdn];
+    map0[2 * BUFSEG] = bufseg;
 }
 
 /*
@@ -742,7 +747,7 @@ brel()
  * that has to see a segment of its own *and* a buffer at the same time:
  * bhold() puts the buffer at BUFSEG, so the segment has to be reached
  * somewhere else, and SCRSEG is the one page left.  The two are otherwise
- * the same shape, down to saving image0 rather than map0 - the map
+ * the same shape, down to saving scratchseg rather than map0 - the map
  * registers are write only, so reading one back is bus garbage and not
  * the segment in place.
  *
@@ -760,6 +765,7 @@ brel()
 
 static UINT8 sholdn;                    /* scratch holds up */
 static UINT8 sholdstk[NSHOLD];
+static UINT8 scratchseg = SCRSEG;       /* the scratch window's current segment */
 
 char *
 swin(seg)
@@ -767,8 +773,9 @@ swin(seg)
 {
     if (sholdn >= NSHOLD)
         panic("swin: too deep");
-    sholdstk[sholdn++] = image0[2 * SCRSEG];
-    map0[2 * SCRSEG] = image0[2 * SCRSEG] = seg;
+    sholdstk[sholdn++] = scratchseg;
+    map0[2 * SCRSEG] = seg;
+    scratchseg = seg;
     return ((char *)SCRWIN);
 }
 
@@ -780,7 +787,8 @@ srel()
 {
     if (sholdn == 0)
         panic("srel: no hold");
-    map0[2 * SCRSEG] = image0[2 * SCRSEG] = sholdstk[--sholdn];
+    scratchseg = sholdstk[--sholdn];
+    map0[2 * SCRSEG] = scratchseg;
 }
 
 /*

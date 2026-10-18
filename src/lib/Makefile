@@ -11,7 +11,8 @@
 OBJECTS = util$(OBJSUFFIX).o imdlib$(OBJSUFFIX).o kv$(OBJSUFFIX).o openx$(OBJSUFFIX).o \
 	disz80$(OBJSUFFIX).o mnix_sys$(OBJSUFFIX).o whitesmith$(OBJSUFFIX).o \
 	fslib$(OBJSUFFIX).o fslibfunc$(OBJSUFFIX).o gui$(OBJSUFFIX).o \
-	monitor$(OBJSUFFIX).o hdcdmadisk$(OBJSUFFIX).o lockfile$(OBJSUFFIX).o
+	monitor$(OBJSUFFIX).o hdcdmadisk$(OBJSUFFIX).o lockfile$(OBJSUFFIX).o \
+	json$(OBJSUFFIX).o
 
 LIBRARY = libsim$(LIBSUFFIX).a
 

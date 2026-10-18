@@ -65,9 +65,18 @@ pic_init()
     out(SPIC1, 0x00);                   /* ICW4 */
     out(SPIC1, 0xff);                   /* OCW1: mask everything */
 
-    /* leave the clock (IR7) and the cascade (IR6) open */
+    /*
+     * Leave the board's own sources open: the three master ACEs on
+     * IR3-IR5, the slave's cascade on IR6 and the clock on IR7.  Only
+     * the three VI lines on IR0-IR2 are masked.  The attach loop opens
+     * the six VI lines - IR0-IR2 here and the slave's IR0-IR2 - but the
+     * ACEs are not VI lines and nothing in the pic.h interface can name
+     * them: inton(3) is VI3, the slave's IR0.  Masking IR3-IR5 here
+     * left the console's transmit interrupt, the only thing that drains
+     * its output queue, masked forever.
+     */
     out(MSELECT, PENABLE);
-    out(PIC1, 0x3f);                    /* OCW1: mask IR0-5, open IR6-7 */
+    out(PIC1, 0x07);                    /* OCW1: mask IR0-2, open IR3-7 */
 
     return (0);
 }

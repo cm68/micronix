@@ -1193,12 +1193,40 @@ ncrioctl(dev, cmd, r, b)
 struct biovec ncrbvec = { &ncropen, &ncrclose, &ncrstrat, &ncrioctl };
 
 /*
- * The probe: make the card raise its interrupt so the attach loop
- * (sys/probe.c) can discover which line it is on.  STUB - not written;
- * it must issue a command that completes and raises the card's done bit.
+ * The attach probe (sys/ovl.h's `probe`): leave the card's interrupt
+ * latched so intr_attach (sys/probe_init.c) can read the pending bit and
+ * discover which line the card is on.  It must not acknowledge - reading
+ * RPI would take the request back down and leave the line unwired.
+ *
+ * The interrupt comes from ASSERT RST: "After this bit is set (1), IRQ
+ * (pin 23) goes active and all internal logic and control registers are
+ * reset (except for the interrupt latch and the ASSERT RST bit)."  So
+ * the probe addresses no device at all; there need not be a target, or
+ * even a tape on the bus, for the strap to be found.
+ *
+ * This runs from the module's page, which is the only place with room:
+ * the init region is full.
  */
 ncrprobe()
 {
+    register struct scsiif *ip;
+
+    ip = &boards[0];
+
+    /*
+     * The datasheet's IRQ-strap test, and nothing else: writing ones to
+     * ASSERT RST (ICR bit 7) drives RST on the bus and makes IRQ active,
+     * with no target addressed and no selection attempted.  Writing zero
+     * takes RST back down; the interrupt latch is the one thing the
+     * reset does not clear, so the line stays asserted for intr_attach.
+     *
+     * Unlike a command, this cannot hang: there is no status to poll and
+     * no handshake to complete.  Reading RPI here would be the third step
+     * of the test and would put the line back down, so it is left to
+     * ncrint, whose first act is that read.
+     */
+    (*ip->wr) (ICR, ICR_RST);   /* RST asserted, IRQ latched */
+    (*ip->wr) (ICR, 0);         /* RST deasserted, latch still set */
     return (0);
 }
 

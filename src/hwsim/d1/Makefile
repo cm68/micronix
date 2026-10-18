@@ -31,7 +31,8 @@ ROMDIR = ../../micronix/stand/roms
 GENERATED = $(ROMDIR)/mon447.bin $(ROMDIR)/mon447.sym $(ROMDIR)/mon375.bin $(ROMDIR)/mon375.sym \
 	$(ROMDIR)/mon500.bin $(ROMDIR)/mon500.sym $(ROMDIR)/l1boot.bin $(ROMDIR)/l1boot.sym
 DIRS = $(ROMDIR)
-SIM = ../hwsim$(OBJSUFFIX).o ../s100$(OBJSUFFIX).o
+SIM = ../hwsim$(OBJSUFFIX).o ../s100$(OBJSUFFIX).o ../config$(OBJSUFFIX).o \
+	../mediachg$(OBJSUFFIX).o
 
 # The libraries are prerequisites, not just link arguments.  Without
 # them here a change to libsim.a - the disassembler, the monitor, the

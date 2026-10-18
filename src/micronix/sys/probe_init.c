@@ -31,7 +31,8 @@ extern struct ovlintr ovlint[NOVLINE];  /* sys/probe.c */
  * travels with them.  nintrdone is how far intr_attach has got, which is
  * what lets it run twice - see the note on it below.
  */
-#define NPINTR  8               /* more interrupt drivers than this?  no. */
+#define NPINTR  12              /* the module pages all carry a probe: nine
+                                 * of them, and a stamped root driver too */
 static int (*intrprobe[NPINTR]) ();
 static int (*intrfn[NPINTR]) ();
 static UINT intrseg[NPINTR];
@@ -83,11 +84,20 @@ bitline(mask)
  * The attach loop.  For each driver that declared an interrupt:
  *
  *      intoff(all)      the tickle must not reach the CPU
+ *      before = irr     what was already standing
  *      probe()          the card asserts its line
- *      line = pic_irr() which line went pending
+ *      line = irr-before  the line this probe raised
  *      ovlint[line] = the handler
  *      pic_eoi(line)    clear the tickled interrupt
  *      inton(line)      the line is live from here on
+ *
+ * The baseline is not a nicety.  A card holds its VI line until the next
+ * command, and a pending request is cleared by an acknowledge - not by an
+ * EOI, which only clears the in-service bit.  While the lines are masked
+ * there is no acknowledge, so every tickled line stays pending and the
+ * next probe would find the earlier card's bit, wire its own handler onto
+ * that line, and lose its own.  Taking the difference names the line this
+ * probe raised and nothing else.
  *
  * A card that is not in the machine never asserts its line, so its probe
  * finds nothing and it is left unwired - the tickle doubles as the
@@ -110,14 +120,15 @@ intr_attach()
 {
     register UINT i;
     register int l;
-    int line;
+    int line, before;
 
     for (l = 0; l < NOVLINE; l++)
         intoff(l);              /* mask every line, whatever came before */
 
     for (i = nintrdone; i < nintr; i++) {
+        before = pic_irr();     /* requests already standing */
         ovlcall(intrprobe[i], intrseg[i]);      /* the tickle */
-        line = bitline(pic_irr());              /* the line it raised */
+        line = bitline(pic_irr() & ~before);    /* the line it raised */
         if (line < 0)
             continue;           /* no card there, nothing to wire */
         ovlint[line].fn = intrfn[i];

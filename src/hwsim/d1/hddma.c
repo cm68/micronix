@@ -26,6 +26,7 @@
  */
 
 #include "sim.h"
+#include "config.h"
 #include "hwsim.h"
 #include "vimap.h"
 #include "util.h"
@@ -37,8 +38,12 @@
 
 static int hddma_vi_line = -1;  /* the VI line, from the -w wiring; -1 = not wired */
 
-#define	HDDMA_PORT 	0x55	// hddma attention port
-#define	HDDMA_RESET	0x54	// hddma reset port
+/* where the board is strapped; the two ports are offsets from it */
+#define	HDDMA_BASE 	0x54
+static int hddma_base = HDDMA_BASE;
+
+#define	HDDMA_RESET	0x00	// hddma reset port
+#define	HDDMA_PORT 	0x01	// hddma attention port
 
 #define	DEF_CCA     0x50	    // hddma default channel command address
 
@@ -62,11 +67,11 @@ struct hd_cmd {
     byte step_low;      // step count
     byte step_high;
    
-    byte selhd;         // select drive, head, low, precomp
+    byte selhd;         // select drive, head, current, precomp
 #define HEAD_MASK   0x1c
 #define HEAD_SHIFT  2
 #define HEAD_CMP    0x7     // complement bits
-#define LOW_CURR    0x40
+#define HIGHCUR     0x40    // write current high = head select line 4 low
 #define PRECOMP     0x80
 
     byte dma_low;       // dma address
@@ -280,7 +285,14 @@ attention(portaddr p, byte v)
         dmaaddr = (command.dma_high << 12) |
             ((command.dma_low + (command.dma_mid << 8)) & 0xfff);
     link = command.link_low + (command.link_mid << 8) + (command.link_high << 16);
-    head = ((command.selhd & HEAD_MASK) >> HEAD_SHIFT) ^ HEAD_CMP;
+    /*
+     * Four head select lines, not three.  The fourth is the high-current
+     * line: formatmw and sys/mw.c set it for heads 0-7 and clear it for
+     * 8-15, so it is head bit 3 the other way up.  A 9-head drive such
+     * as the Wren II has its last head on it.
+     */
+    head = (((command.selhd & HEAD_MASK) >> HEAD_SHIFT) ^ HEAD_CMP) |
+        ((command.selhd & HIGHCUR) ? 0 : 8);
 
     /*
      * Open the drive before anything is done with it.  The address
@@ -302,7 +314,7 @@ attention(portaddr p, byte v)
 		}
         lc("drive: %d track: %d step: %d %s head: %x %s%s",
             drv, curcyl[drv], steps, command.seldir & STEP_DOWN ? "down" : "up",
-            head, command.selhd & LOW_CURR ? "lowcurr " : "",
+            head, command.selhd & HIGHCUR ? "highcurr " : "",
             command.selhd & PRECOMP ? "precomp " : "");
         lc("args %x %x %x %x ",
             command.arg0, command.arg1, command.arg2, command.arg3);
@@ -526,9 +538,10 @@ hddma_init()
 {
     int i;
 
+	hddma_base = conf_board_hex("hddma", 0, "base", HDDMA_BASE);
 	hddma_vi_line = wiring_vi_line("hddma");
-	register_output(HDDMA_PORT, &attention);
-	register_output(HDDMA_RESET, &reset);
+	register_output(hddma_base + HDDMA_PORT, &attention);
+	register_output(hddma_base + HDDMA_RESET, &reset);
     return 0;
 }
 

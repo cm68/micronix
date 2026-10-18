@@ -57,13 +57,19 @@ _trapad=0x400
 _status=0x403
 _wtask=0x81B
 _map0=0x600
-_image0=0x200
+_lowbss=0x220
+_nsegs=0x220
+_lastseg=0x222
+_taskmap=0x224
+_curmem=0x226
+_mlist=0x228
+_segmap=0x25c
 _usrtop=0xFFFF
 _memtop=0xFFFF
 	.globl	_trapstack, _oldstack, _cmask, _ctask, _mask, _rst1
 	.globl	_trapad, _status, _wtask, _usrtop, _memtop, _trapvec
-	.globl	_hlt, _xinit, _map0, _image0
-	.extern	_plist, _mlist, _start
+	.globl	_hlt, _xinit, _map0, _lowbss, _nsegs, _lastseg, _taskmap, _curmem, _mlist, _segmap
+	.extern	_plist, _start
 
 ;
 ; this is the kernel program entry point, and it expects to be at 0x1000

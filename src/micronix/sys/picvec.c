@@ -11,21 +11,20 @@
 #include <types.h>
 
 /*
- * Copy a vector table down to its 32-byte boundary and return that
- * boundary.  The table sits with slack above it so there is somewhere to
- * go; an entry is a jp to an absolute address, which the copy does not
- * disturb.
+ * Copy a vector table to its home in low memory, 0x200 - the old map
+ * image, now free.  The 8259's ICW2 names that fixed address, so there is
+ * no 32-byte boundary to hunt for and no slack to leave in text.  An
+ * entry is a jp to an absolute address, which the copy does not disturb.
  */
 vecalign(src)
     char *src;
 {
-    register int base, i;
+    register int i;
     register char *bp, *sp;
 
-    base = (int) src & ~0x1f;
-    bp = (char *) base;
+    bp = (char *) 0x200;
     sp = src;
     for (i = 0; i < 32; i++)
         bp[i] = sp[i];
-    return (base);
+    return (0x200);
 }

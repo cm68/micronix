@@ -22,7 +22,7 @@
 #include <errno.h>
 
 extern UINT nbdev, ncdev;
-extern UINT8 image0[], map0[];
+extern UINT8 map0[];
 extern unsigned bmajor(), cmajor();
 extern int nodev(), iodone();
 
@@ -63,9 +63,7 @@ UINT busheirseg = 0;		/* the segment busheir lives in */
  * segment 0, which is the cpu board's own ram and prom below the bottom
  * of main memory.
  *
- * The map is written the way newmap() writes it (sys/malloc.c): image0
- * is the kernel's readable copy of the map, the registers themselves
- * being write-only.
+ * The map register is write-only; the current segment is tracked in u.drv.
  *
  * Named and not static because the bus lock calls through it too
  * (sys/bus.c): the heir it wakes is a function in another module, and
@@ -86,14 +84,13 @@ ovlcall(fn, seg)
     int (*fn) ();
     UINT seg;
 {
-    UINT8 save, drv;
+    UINT8 drv;
 
     if (seg == 0) {
         (*fn) ();
         return (0);
     }
 
-    save = image0[2 * OVLSEG];
     drv = u.drv;
 
     /*
@@ -104,10 +101,10 @@ ovlcall(fn, seg)
      * back under it.
      */
     u.drv = (UINT8) seg;
-    map0[2 * OVLSEG] = image0[2 * OVLSEG] = (UINT8) seg;
+    map0[2 * OVLSEG] = (UINT8) seg;
     (*fn) ();
     u.drv = drv;
-    map0[2 * OVLSEG] = image0[2 * OVLSEG] = save;
+    map0[2 * OVLSEG] = drv;
     return (0);
 }
 
@@ -116,9 +113,8 @@ ovlcall(fn, seg)
  * major has no driver at all.  A driver that is still linked into the
  * kernel is that first case with nothing to map: its header is a
  * resident object and its segment is 0, so the header in the kernel is
- * what is returned and no map register is touched.  The map is written
- * the way newmap() writes it (sys/malloc.c): image0 is the kernel's
- * readable copy of the map, the registers themselves being write-only.
+ * what is returned and no map register is touched.  The map register is
+ * written directly - it is write-only, and the current segment is u.drv.
  */
 struct ovlhdr *
 ovlmap(maj)
@@ -129,7 +125,7 @@ ovlmap(maj)
     if (ovlseg[maj] == 0)
         return (ovlloc[maj]);
     u.drv = (UINT8) ovlseg[maj];        /* before the register - ovlcall() */
-    map0[2 * OVLSEG] = image0[2 * OVLSEG] = (UINT8) ovlseg[maj];
+    map0[2 * OVLSEG] = (UINT8) ovlseg[maj];
     return ((struct ovlhdr *) OVLBASE);
 }
 
@@ -162,7 +158,7 @@ ovlmap(maj)
 ovlremap()
 {
     if (u.drv)
-        map0[2 * OVLSEG] = image0[2 * OVLSEG] = u.drv;
+        map0[2 * OVLSEG] = u.drv;
 }
 
 /*
@@ -523,7 +519,7 @@ int
 ovlattach(seg)
     UINT seg;
 {
-    map0[2 * OVLSEG] = image0[2 * OVLSEG] = (UINT8) seg;
+    map0[2 * OVLSEG] = (UINT8) seg;
     return (ovlplace((struct ovlhdr *) OVLBASE, seg));
 }
 

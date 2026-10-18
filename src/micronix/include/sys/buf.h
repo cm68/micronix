@@ -48,11 +48,11 @@ extern struct buf blist[];      /* boot headers; textpad.s links blist last */
  * buffer header, or anything that maps the window for its own use, while
  * one is up.
  *
- * 0xd000 is the page mem.s borrows for user memory and puts back, which
- * is what lets the buffer pool carry headers there; the pool stops at the
- * window's own page (see expand_bufs) because a header there would be
- * read back as buffer data while a hold is up.  The superblock needs no
- * window - getsb() keeps it in the kernel's own memory.
+ * 0xc000 is the scratch window mem.s borrows for user memory and puts
+ * back, which is what lets the buffer pool carry headers up to it; the
+ * pool stops at that page (see expand_bufs) because a header past it
+ * would be borrowed over by swin()/srel() and mem.s.  The superblock
+ * needs no window - getsb() keeps it in the kernel's own memory.
  */
 extern char *bhold();           /* map a buffer's data, return its address */
 extern void brel();             /* put back the segment the hold saved */

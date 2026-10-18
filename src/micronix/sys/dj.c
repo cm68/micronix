@@ -24,6 +24,7 @@
 #include <sys/ioctl.h>
 #include <sys/ovl.h>
 #include <sys/dlabel.h>
+#include <sys/pic.h>
 
 /*
  * The static routines below, declared before anything calls them.
@@ -37,7 +38,7 @@ static int memio(), busready(), busplease(), busthanks();
  * disk label decoder.
  */
 extern int segalloc();
-extern UINT8 image0[], map0[];
+extern UINT8 map0[], bufseg;
 extern int copyin(), copyout();
 extern bwin();
 extern int dllabel();
@@ -89,6 +90,7 @@ struct dm
 	struct dlgeom g;            /* the label's geometry and timing, decoded */
 	UINT8 flags;                /* ISOPEN | F_WP */
 	UINT8 k;                    /* 1K sectors: a 512 block is half a sector */
+	UINT8 fm;                   /* eight inch drive: block 0 is fm */
 };
 
 static struct dm dm[NDRIVES] = { 0 };
@@ -147,6 +149,17 @@ djopen(dev, mode)
 	 * transfer through this same path.
 	 */
 	d->k = (s->slength == S1024);
+
+	/*
+	 * An eight inch drive's cylinder 0 head 0 is single density - 26
+	 * sectors of 128 bytes - and block 0, where the label is, is the
+	 * first four of them.  A 512 byte SREAD cannot fetch that block:
+	 * one sector read returns one sector, 128 bytes of it.  The drive's
+	 * characteristics byte is how the board says which it is - FIVE set
+	 * for the 5 1/4 inch port - so a clear one is an eight inch drive
+	 * and its block 0 is four reads.  See fmio() and djint().
+	 */
+	d->fm = (s->dchar & FIVE) == 0;
 
 	if (s->dstat & S_WP) {      /* write protect */
 		d->flags |= F_WP;
@@ -229,12 +242,22 @@ sio(d, addr, xaddr, op, sec, dev)
 {
 	static struct dlgeom *g;
 	static unsigned track, within;
+	static UINT32 phys;
 
 	g = &d->g;
 
+	/*
+	 * The board wants a flat 24-bit physical address, and the caller has
+	 * the buffer as a window address and a 4K segment - the kernel's own
+	 * view of it, the same pair disk1 and uio use.  Unfold it: the
+	 * segment's twelve bits start where the window address stops.
+	 */
+	phys = ((UINT32) xaddr << 12) | ((unsigned) addr & 0xfff);
+
 	D[0] = SETDMA;              /* set DMA command */
-	*(char **) (D + 1) = addr;  /* D[1], D[2] */
-	D[3] = xaddr;               /* the segment */
+	D[1] = phys;                /* D[1], D[2], D[3]: */
+	D[2] = phys >> 8;           /* low, mid and the */
+	D[3] = phys >> 16;          /* extended page */
 
 	D[4] = op;                  /* I/O command */
 
@@ -276,6 +299,47 @@ sio(d, addr, xaddr, op, sec, dev)
 }
 
 /*
+ * One of the four 128 byte sectors of an eight inch drive's block 0.
+ *
+ * The block is on the single density track at cylinder 0 head 0, and the
+ * geometry cannot map it: dllabel()'s read happens before any geometry
+ * exists, and even after the label is read the block is not a 512 byte
+ * sector that a block number divides into.  So n is the sector within
+ * that track - 0 through 3, the medium's first sector plus n - and the
+ * DMA address is the block's buffer plus n*128.  The caller starts the
+ * four in turn; djint() runs the next when one completes.
+ */
+static
+fmio(d, addr, xaddr, op, n, dev)
+	register struct dm *d;
+	unsigned addr, xaddr;
+	unsigned op, n, dev;
+{
+	static UINT32 phys;
+
+	phys = ((UINT32) xaddr << 12) | (addr & 0xfff);
+
+	D[0] = SETDMA;
+	D[1] = phys;
+	D[2] = phys >> 8;
+	D[3] = phys >> 16;
+
+	D[4] = op;
+	D[5] = 0;                   /* cylinder 0 */
+	D[6] = d->g.firstsec + n;   /* sectors 1 through 4 */
+
+	D[7] = dev & 7;
+	D[8] = NOSTAT;
+
+	D[9] = SETINT;
+	D[10] = NOSTAT;
+
+	D[11] = HALT;
+
+	haltstat = &D[12];
+}
+
+/*
  * wait a little while to see if the given location changes
  */
 
@@ -289,6 +353,7 @@ djwait(a)
 }
 
 static unsigned char inservice = 0;
+static unsigned char fmsec = 0; /* which fm sector of block 0 is in flight */
 
 djint()
 {
@@ -302,18 +367,32 @@ djint()
 	di();
 
 	if (inservice               /* already working on it */
-		|| (curbuf && INTSTAT == NOSTAT)        /* not our int. */
-		||(!curbuf && !qtail)   /* not our int. */
-		||(busget(&djint) == 0)        /* can't get bus yet. See mw.c */
-		) {
+		|| (curbuf && INTSTAT == NOSTAT)) {     /* not our int. */
 		ei();
 		return;
 	}
 
-	else {
-		inservice = 1;
+	if (!curbuf && !qtail) {    /* nothing in flight */
+		/*
+		 * The attach probe's tickle is the one interrupt with no
+		 * request behind it: the card raised its line to say where
+		 * it is wired (djprobe), and the line stays up until the
+		 * board is acknowledged.  Dismiss it, or the next
+		 * completion's rising edge never comes.
+		 */
+		if (haltstat)
+			djack();
 		ei();
+		return;
 	}
+
+	if (busget(&djint) == 0) {  /* can't get bus yet. See mw.c */
+		ei();
+		return;
+	}
+
+	inservice = 1;
+	ei();
 
 	djtimer = 0;                /* reset the deadman switch */
 
@@ -348,6 +427,27 @@ djint()
 			}
 
 			goto request;       /* set up next req. */
+		}
+
+		if (d->fm && sec == 0) {
+			/*
+			 * Block 0 of an eight inch drive: four 128 byte
+			 * sectors, one command each.  The next starts here
+			 * when this one completes, so the last falls through
+			 * to finished with the whole block in the buffer.
+			 */
+			if (fmsec < 3) {
+				fmsec++;
+				djack();        /* acknowledge this sector */
+				fmio(d, curbuf->data + fmsec * 128, curbuf->xmem,
+				    op, fmsec, dev);
+				di();
+				djstart();
+				inservice = 0;
+				ei();
+				return;
+			}
+			goto finished;
 		}
 
 		if (d->k && op == SWRITE) {
@@ -470,10 +570,18 @@ djint()
 		/*
 		 * One block is one 512 byte sector, so the sector number is
 		 * the block number.  The DMA goes straight to the buffer.
+		 *
+		 * Block 0 of an eight inch drive is the exception: it is four
+		 * 128 byte sectors on the single density track.  fmio() reads
+		 * the first and djint() the rest.
 		 */
 		addr = curbuf->data;
 		xaddr = curbuf->xmem;
-		sio(d, addr, xaddr, op, sec, dev);
+		if (d->fm && sec == 0) {
+			fmsec = 0;
+			fmio(d, addr, xaddr, op, 0, dev);
+		} else
+			sio(d, addr, xaddr, op, sec, dev);
 	}
 
 	di();
@@ -527,8 +635,9 @@ getstat(a)
 	 * struct status.
 	 */
 	D[0] = SETDMA;
-	*(char **) (D + 1) = (char *) 0;        /* offset 0 of the page */
-	D[3] = kseg;
+	D[1] = ((UINT32) kseg << 12) & 0xff;    /* the page as a flat */
+	D[2] = ((UINT32) kseg << 12) >> 8;      /* address: its low twelve */
+	D[3] = kseg >> 4;                       /* bits are zero already */
 
 	D[4] = SREAD;               /* move to cyl 3 */
 	D[5] = 3;
@@ -565,6 +674,11 @@ memio(flag, memaddr, djaddr, count)
 {
 	D[0] = (flag == READ) ? MEMREAD : MEMWRITE;
 
+	/*
+	 * The kernel's own memory is below 64K and identity mapped, so its
+	 * address is already flat and the extended page is zero - which is
+	 * what KERNEL names.
+	 */
 	*(char **) (D + 1) = memaddr;
 
 	D[3] = KERNEL;
@@ -635,7 +749,7 @@ djtick()
  * The address is the caller's one hole: it knows its buffer as a virtual
  * address and the board wants a physical one, so req.hole says where in
  * the program the three bytes go and the driver writes them (three, not
- * two, because the board's address is a segment and an offset).
+ * two, because the board's address is 24 bits wide).
  *
  * The data phase has two shapes.  A block's worth arrives in b, the
  * pooled buffer bioctl staged it in, and the board is pointed at the
@@ -671,17 +785,17 @@ djioctl(dev, cmd, r, b)
 
 	if (count > 512) {
 		kstg();
-		save = image0[2 * BUFSEG];
+		save = bufseg;
 		bwin(kseg);
 		p = (char *) BUFWIN;
-		phys = ((UINT32) kseg << 16) | ((unsigned) p & 0xffff);
+		phys = ((UINT32) kseg << 12) | ((unsigned) p & 0xfff);
 
 		if ((flags & CDB_IN) == 0)
 			copyin(r->buf, p, count);
 
 	} else if (count) {
 		p = bhold(b);
-		phys = ((UINT32) b->xmem << 16) | ((unsigned) p & 0xffff);
+		phys = ((UINT32) b->xmem << 12) | ((unsigned) p & 0xfff);
 
 	} else {
 		p = 0;
@@ -693,9 +807,11 @@ djioctl(dev, cmd, r, b)
 
 	/*
 	 * The three bytes are the address the way the controller's SETDMA
-	 * takes it: byte 3 is the 4K segment and bytes 1-2 the offset, so the
-	 * segment goes in the high byte.  (SETCHANNEL is the exception, set in
-	 * djinit.c, which lays down a flat 24-bit address instead.)
+	 * takes it: one flat 24-bit address, low byte first, whose third byte
+	 * is the extended page (the DJ-DMA manual's term for A16-A23), which
+	 * is what SETCHANNEL in djinit.c lays down too.  The caller's hold on
+	 * the buffer is a window address and a 4K segment, so the segment has
+	 * to be folded into the address here rather than written beside it.
 	 */
 	if (hole >= 0) {
 		D[hole] = phys;
@@ -771,12 +887,54 @@ struct biovec djbvec = { &djopen, &djclose, &djstrat, &djioctl };
 
 /*
  * The probe: make the card raise its interrupt so the attach loop
- * (sys/probe.c) can discover which line it is on.  STUB - not written;
- * it must issue a command that completes and raises the card's done bit.
+ * (sys/probe_init.c) can discover which line it is on.
+ *
+ * The board raises its interrupt when the program it is running asks for
+ * one; SETINT is that request, and the board answers it when it has
+ * finished the program - on its own processor, milliseconds later.  So
+ * the tickle is a two command program, the SETINT and the HALT that the
+ * acknowledge steps over to, and the wait below is for the line to come
+ * up where the attach loop will look for it (pic_irr).
+ *
+ * The line is left up on purpose.  The attach loop eois the PIC and
+ * unmasks the line, and the interrupt that follows is this driver's own
+ * handler with nothing to do; djint() dismisses the card there, because
+ * the START pulse is what the board wants before it will raise another
+ * interrupt.  Clearing it here would take the request bit with it: the
+ * 8259s are level triggered, and a line taken low clears its pending
+ * bit before the attach loop can read it.
+ *
+ * A machine with no card never answers, and this returns after the
+ * bound: the attach loop finds no line and leaves it unwired.  The
+ * tickle is the presence test.
  */
+#define PROBEWAIT 10000
+
 djprobe()
 {
-    return (0);
+	register int n;
+	int before;
+
+	D[0] = SETINT;
+	D[1] = NOSTAT;
+	D[2] = HALT;
+	D[3] = NOSTAT;
+
+	haltstat = &D[3];           /* the acknowledge halts here */
+
+	/*
+	 * A line another card left asserted before this one was tickled
+	 * is not this card's answer: the pending register is a level and
+	 * not an event, so zero is not the only thing that can be in it.
+	 * Wait for a bit to appear - a bit that clears is somebody
+	 * else's business, and this card lowers nothing itself.
+	 */
+	before = pic_irr();
+	djstart();
+
+	for (n = 0; n < PROBEWAIT && (pic_irr() & ~before) == 0; n++)
+		;
+	return (0);
 }
 
 /*

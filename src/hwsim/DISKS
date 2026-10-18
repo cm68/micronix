@@ -149,6 +149,12 @@ boot disks
 
     1010-8_stand-alone.IMD     Micronix standalone.  /etc/signon tells
     UX141_SA.IMD               you which install script to source.
+                               The two are the same disk, but take
+                               1010: UX141_SA is an incomplete dump,
+                               with cylinder 2 head 0 sector 5 an imd
+                               record type 0.  That sector holds the
+                               inode table, so its loader reads zeros,
+                               prints a garbage file name and hangs.
 
 Both CP/M system disks map the hard disk to drives E and F.
 

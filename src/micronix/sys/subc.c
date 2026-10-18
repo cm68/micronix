@@ -18,10 +18,7 @@ panic(s)
     char *s;
 {
     sync();
-    pr("Something's wrong: %s\n", s);
-    pr("To prevent damage, the system is going down.\n");
-    pr("Please reboot, check your file system, and try again.\n");
-    pr("If the problem recurs, please contact your dealer\n");
+    pr("panic: %s\n", s);
     for (;;)
         hlt();
 }

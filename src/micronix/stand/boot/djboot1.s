@@ -183,7 +183,7 @@ run:
 	cp	16
 	jr	nz,sized
 is1k:	ld	a,(DL_1ST)	; ... and only if it numbers from one
-	or	a
+	dec	a
 	jr	nz,sized
 	ld	d,1		; 1024 bytes: two blocks to a sector
 

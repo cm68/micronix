@@ -36,7 +36,6 @@
 	.globl	_memrw, _segcopy, _zerouser
 	.extern	_di, _ei, _meminit, _zpage, _curmem
 MAP0=0x0600
-IMAGE0=0x0200
 	.data			; leaf code, parked in the u page (see user.c)
 
 ; ------- the base of the u page -------
@@ -120,11 +119,11 @@ getw:
 	ld	e,a		; de = &curmem[2*page]
 	ld	a,h
 	and	0x0F
-	or	0xD0		; window nibble -> the 0xd000 remap page
-	ld	h,a		; hl = 0xd000 | offset
+	or	0xC0		; window nibble -> the 0xc000 remap page
+	ld	h,a		; hl = 0xc000 | offset
 	call	_di
 	ld	a,(de)
-	ld	(MAP0+26),a	; map the user's page into 0xd000
+	ld	(MAP0+24),a	; map the user's page into 0xc000
 	ld	c,(hl)		; c = low byte
 	ld	a,h
 	cp	0xDF		; offset high byte 0xf?
@@ -135,16 +134,16 @@ getw:
 	inc	de
 	inc	de
 	ld	a,(de)		; next page's segment
-	ld	(MAP0+26),a	; map the next page
-	ld	a,(0xD000)	; high byte from the start of the window
+	ld	(MAP0+24),a	; map the next page
+	ld	a,(0xC000)	; high byte from the start of the window
 	jr	2f
 1:	inc	hl
 	ld	a,(hl)		; high byte from the same page
 2:	ld	b,a		; b = high byte
 	ld	l,c
 	ld	h,b		; hl = word (return value)
-	ld	a,(IMAGE0+26)
-	ld	(MAP0+26),a	; restore the remap page
+	ld	a,12
+	ld	(MAP0+24),a	; restore the remap page
 	pop	de		; restore de
 	pop	bc		; restore bc
 	jp	_ei
@@ -211,14 +210,14 @@ putb:
 	ld	e,a
 	ld	a,h
 	and	0x0F
-	or	0xD0		; window nibble -> the 0xd000 remap page
+	or	0xC0		; window nibble -> the 0xc000 remap page
 	ld	h,a
 	call	_di
 	ld	a,(de)
-	ld	(MAP0+26),a
+	ld	(MAP0+24),a
 	ld	(hl),c
-	ld	a,(IMAGE0+26)
-	ld	(MAP0+26),a
+	ld	a,12
+	ld	(MAP0+24),a
 	pop	de
 	jp	_ei
 
@@ -378,14 +377,14 @@ _copyin:
 	add	a,e
 	ld	e,a		; de = &curmem[2*page]
 	ld	a,(de)
-	ld	(MAP0+26),a	; map the page
+	ld	(MAP0+24),a	; map the page
 
-	; windowed source = 0xd000 | offset
+	; windowed source = 0xc000 | offset
 	push	iy
 	pop	hl		; hl = from
 	ld	a,h
 	and	0x0F
-	or	0xD0
+	or	0xC0
 	ld	h,a		; hl = windowed source
 
 	; LDIR: hl = source, de = to, bc = n
@@ -413,8 +412,8 @@ _copyin:
 	pop	hl		; discard count_old
 	jp	1b
 
-9:	ld	a,(IMAGE0+26)
-	ld	(MAP0+26),a	; restore the remap page
+9:	ld	a,12
+	ld	(MAP0+24),a	; restore the remap page
 	call	_ei
 	pop	iy
 	pop	bc
@@ -543,14 +542,14 @@ _copyout:
 	add	a,e
 	ld	e,a		; de = &curmem[2*page]
 	ld	a,(de)
-	ld	(MAP0+26),a	; map the page
+	ld	(MAP0+24),a	; map the page
 
-	; windowed destination = 0xd000 | offset
+	; windowed destination = 0xc000 | offset
 	push	iy
 	pop	hl		; hl = to
 	ld	a,h
 	and	0x0F
-	or	0xD0
+	or	0xC0
 	ld	h,a		; hl = windowed destination
 	ex	de,hl		; de = windowed dest, hl = (discard)
 
@@ -581,8 +580,8 @@ _copyout:
 	pop	hl		; discard count_old
 	jp	1b
 
-9:	ld	a,(IMAGE0+26)
-	ld	(MAP0+26),a	; restore the remap page
+9:	ld	a,12
+	ld	(MAP0+24),a	; restore the remap page
 	call	_ei
 	pop	iy
 	pop	bc
@@ -595,9 +594,9 @@ _copyout:
 ; the next into the window and ldir's from the zero page, 512 bytes at a
 ; time.  count must fit the two-page window.
 _zerouser:
-	ld	a,(IMAGE0+2)
+	ld	a,1
 	push	af
-	ld	a,(IMAGE0+4)
+	ld	a,2
 	push	af
 	push	ix
 	ld	ix,0
@@ -616,12 +615,10 @@ _zerouser:
 	ld	e,a		; de = &curmem[2*page]
 	call	_di
 	ld	a,(de)
-	ld	(IMAGE0+2),a
 	ld	(MAP0+2),a	; map page N
 	inc	de
 	inc	de
 	ld	a,(de)
-	ld	(IMAGE0+4),a
 	ld	(MAP0+4),a	; map page N+1
 	pop	bc		; restore count
 	ld	a,h
@@ -648,10 +645,8 @@ _zerouser:
 2:	pop	bc
 	pop	ix
 	pop	af
-	ld	(IMAGE0+4),a
 	ld	(MAP0+4),a
 	pop	af
-	ld	(IMAGE0+2),a
 	ld	(MAP0+2),a
 	jp	_ei
 
@@ -737,9 +732,9 @@ _memrw:
 	push	ix
 	ld	ix,0
 	add	ix,sp		; ix = sp
-	ld	a,(IMAGE0+2)
+	ld	a,1
 	push	af
-	ld	a,(IMAGE0+4)
+	ld	a,2
 	push	af
 	push	bc		; save bc (callee-saved)
 	ld	c,(ix+10)
@@ -761,7 +756,6 @@ _memrw:
 	rrca
 	rrca
 	rrca			/now a = high 8 bits of 20-bit space addr
-	ld	(IMAGE0+4),a
 	ld	(MAP0+4),a
 	ld	a,d
 	and	0x0F
@@ -778,7 +772,6 @@ _memrw:
 	ld	l,a
 	ld	a,(hl)
 	pop	hl
-	ld	(IMAGE0+2),a
 	ld	(MAP0+2),a
 	ld	a,h
 	and	0x0F
@@ -799,10 +792,8 @@ _memrw:
 7:
 	pop	bc		; restore caller's bc
 	pop	af
-	ld	(IMAGE0+4),a
 	ld	(MAP0+4),a
 	pop	af
-	ld	(IMAGE0+2),a
 	ld	(MAP0+2),a
 	pop	ix		; restore ix
 	jp	_ei
@@ -850,17 +841,15 @@ _segcopy:
 	push	ix
 	ld	ix,0
 	add	ix,sp		; ix = sp
-	ld	a,(IMAGE0+2)
+	ld	a,1
 	push	af
-	ld	a,(IMAGE0+4)
+	ld	a,2
 	push	af
 	push	bc		; save bc (callee-saved, for ldir count)
 	call	_di
 	ld	a,l		; a = from (arg0, low byte)
-	ld	(IMAGE0+2),a
 	ld	(MAP0+2),a
 	ld	a,(ix+4)	; a = to (arg1, low byte)
-	ld	(IMAGE0+4),a
 	ld	(MAP0+4),a
 	; interrupts stay off across the copy, as in copyin/copyout: with
 	; MAP0[2]/MAP0[4] remapped to the user segments, an interrupt taken
@@ -872,9 +861,7 @@ _segcopy:
 	pop	bc		; restore bc
 	pop	af
 	ld	(MAP0+4),a
-	ld	(IMAGE0+4),a
 	pop	af
 	ld	(MAP0+2),a
-	ld	(IMAGE0+2),a
 	pop	ix		; restore ix
 	jp	_ei

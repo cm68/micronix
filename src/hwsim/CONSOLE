@@ -7,8 +7,8 @@ is what each of them is, which one is in use, and how that was measured
 rather than assumed.
 
 
-the two transmitters
---------------------
+the transmitters
+----------------
 
 The MULTIO is the machine's console.  Three 8250s, and uart 0 is the one
 Micronix opens: the kernel's tty driver for it is _mstty, and a boot that
@@ -30,6 +30,16 @@ have one.  It is not a recommended configuration and nothing in this tree
 is set up that way - but disks that are exist, and the archive's disk list
 names a run of them ("DJDMA as console", "DJDMA serial console", around
 disk 900).
+
+The CompuPro SS1 has a console of its own as well: its 2651 uart, at the
+board's base + 0x0c.  It is not a third choice on the same machine - a
+Decision fitted with an SS1 has no MULTIO, and the two are separate
+wiring profiles - but it is the same problem, and it is treated the same
+way.  When the SS1 is the wired interrupt controller it is also the card
+the kernel's tty driver talks to, so it holds the console from reset;
+its transmit claims it too, for the case where a bios starts talking to
+the floppy controller's serial port instead.  Its output goes through
+the same console_log() as the other two, so -L follows the wiring.
 
 
 which console a disk wants, and why it cannot be detected
@@ -135,12 +145,13 @@ claims it by using it:
     djdma serout (2b)       claims - conout does this per character
     djdma senabl (2c) with 1 claims - ttyset does this once
     multio uart 0 transmit  claims back
+    ss1 2651 transmit       claims - and starts as owner when wired in
 
 and ownership decides one thing only: who may take a character out of
 the shared descriptor.  When the controller owns it, multio_uart_poll
-leaves uart 0's input alone; when the multio owns it, djdma_poll_func
-does.  Uarts 1 and 2 have descriptors of their own and are never in
-question.
+and ss1_poll leave their uart's input alone; when the multio owns it,
+djdma_poll_func does.  Uarts 1 and 2 have descriptors of their own and
+are never in question.
 
 Output is deliberately not arbitrated.  Both devices keep writing to the
 same window, because that is what somebody watching the machine sees, and

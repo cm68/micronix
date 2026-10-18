@@ -19,8 +19,9 @@
 #include <types.h>
 #include <sys/sys.h>
 
-#define SS1_RTC_CMD   0x5a    /* command: digit select + Hold/Write/Read */
-#define SS1_RTC_DATA  0x5b    /* data: one 4-bit BCD digit */
+/* the board's jumper block: 0x70, not CompuPro's default 0x50 - see ss1pic.c */
+#define SS1_RTC_CMD   0x7a    /* command: digit select + Hold/Write/Read */
+#define SS1_RTC_DATA  0x7b    /* data: one 4-bit BCD digit */
 
 #define RTC_HOLD    0x40        /* bit 6: freeze the counters across the access */
 #define RTC_WRITE   0x20        /* bit 5: write the data port into the digit */

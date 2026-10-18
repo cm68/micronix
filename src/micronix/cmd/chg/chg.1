@@ -3,16 +3,24 @@
 chg \- drive the media changer
 .SH SYNOPSIS
 .B chg
-.BI load " set:vol onto drive"
-.br
-.B chg
-.BI unload " drive"
-.br
-.B chg
-.BI query " set|drive"
+.BI drive " [" source ]
 .br
 .B chg
 .BI next " drive"
+.br
+.B chg
+.B sets
+.br
+.B chg
+.B drives
+.br
+.B chg
+.B dir
+.RI [ path ]
+.br
+.B chg
+.B ls
+.RI [ path ]
 .SH DESCRIPTION
 .I chg
 writes its arguments as one command line to
@@ -22,16 +30,37 @@ exits 0 on
 .B ok
 and 1 on
 .BR error .
-The grammar is sys/MEDIACHG.md: a media set is a numbered list of
-diskette images, a drive is
-.IB djdma : n,
-and volume numbers start at 0.
+.PP
+The grammar is sys/MEDIACHG.md.  A
+.I drive
+is a controller and a logical unit,
+.IB djdma : 0
+or
+.IB disk1 : 2,
+and a
+.I source
+is an image path, a
+.BI blank: name
+to cut a fresh one, a
+.BI set : vol
+from a media set, or
+.B empty
+to eject.  Naming a drive alone asks what is in it.
+.PP
+A relative path, and each volume of a set, is resolved against the media
+directory, which
+.B chg dir
+reports and sets.
 .SH EXAMPLES
 .nf
-chg load dist8:0 onto djdma:0
-chg query dist8          # ok 9
+chg drives                 # ok djdma:0=d8ss.img djdma:1=empty ...
+chg djdma:0 dist8:0        # load volume 0 of set dist8
+chg djdma:0                # ok dist8:0
 chg next djdma:0
-chg unload djdma:0
+chg djdma:1 blank:scratch.img
+chg dir /usr/dist
+chg ls
+chg djdma:0 empty
 .fi
 .SH SEE ALSO
 sys/MEDIACHG.md

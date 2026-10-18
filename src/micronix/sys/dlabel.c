@@ -18,7 +18,42 @@
 #include <sys/dlabel.h>
 #include <errno.h>
 
-extern int copy();              /* leaf mem.s: kernel-to-kernel copy */
+/*
+ * Decode the label lp points at into *g, *table and *tm.  The buffer it
+ * is in is held by the caller.  Returns 1 for a readable label, else 0.
+ */
+static
+dlabel_decode(lp, g, table, tm)
+    struct dlabel *lp;
+    struct dlgeom *g;
+    struct slicemap *table;
+    struct dltiming *tm;
+{
+    static UINT8 i;
+
+    if (lp->d_magic[0] != DL_MAGIC[0] || lp->d_magic[1] != DL_MAGIC[1] ||
+        lp->d_magic[2] != DL_MAGIC[2] || lp->d_magic[3] != DL_MAGIC[3] ||
+        !lp->d_tracks || !lp->d_heads || !lp->d_spt)
+        return (0);
+    g->tracks = lp->d_tracks;
+    g->heads = lp->d_heads;
+    g->sectors = lp->d_spt;
+    g->firstsec = lp->d_firstsec;
+    if (tm) {
+        tm->step = lp->d_step;
+        tm->seek = lp->d_seek;
+        tm->precomp = lp->d_precomp;
+        tm->lowcur = lp->d_lowcur;
+    }
+    if (table) {
+        for (i = 0; i < NSLICE; i++) {
+            table[i].sm_off = lp->d_slice[i].d_off;
+            table[i].sm_len = lp->d_slice[i].d_len;
+            table[i].sm_roll = lp->d_slice[i].d_roll;
+        }
+    }
+    return (1);
+}
 
 int
 dllabel(cdev, sl, g, table, tm)
@@ -29,12 +64,11 @@ dllabel(cdev, sl, g, table, tm)
     struct dltiming *tm;        /* timing out, or 0 to drop it */
 {
     static struct buf *b;
-    static struct dlabel lab;
-    static char *p;
+    static struct dlabel *lp;
     static UINT off, len;
     static UINT otracks, oroll;
     static UINT8 oheads, osectors;
-    static UINT8 got, i;
+    static UINT8 got;
 
     otracks = g->tracks;
     oheads = g->heads;
@@ -56,43 +90,23 @@ dllabel(cdev, sl, g, table, tm)
     g->spc = g->heads * g->sectors;
 
     got = 0;
+    off = 0;
+    len = 0;
     if ((b = bread(0, cdev)) != 0) {
         /*
-         * The window is taken to lift the label out of it and given back
-         * at once: nothing sleeps and nothing else maps it in between,
-         * which is the whole of the window's discipline (uio.c).  Only
-         * the label is lifted, not the sector, so the hold is as short
-         * as the read was.
+         * The window is held while the label is decoded straight out of
+         * the block: nothing sleeps and nothing else maps it in between,
+         * which is the whole of the window's discipline (uio.c).
          */
-        p = bhold(b);
-        copy(&p[DL_OFFSET], &lab, sizeof lab);
+        lp = (struct dlabel *)(bhold(b) + DL_OFFSET);
+        got = dlabel_decode(lp, g, table, tm);
+        if (got && sl != DL_WHOLE) {
+            off = lp->d_slice[sl].d_off;
+            len = lp->d_slice[sl].d_len;
+            g->roll = lp->d_slice[sl].d_roll;
+        }
         brel();
         brelse(b);
-
-        g->tracks = lab.d_tracks;
-        g->heads = lab.d_heads; /* UINT8: a label claiming 256 heads is
-                                 * a label claiming none */
-        g->sectors = lab.d_spt;
-        if (lab.d_magic[0] == DL_MAGIC[0] && lab.d_magic[1] == DL_MAGIC[1]
-            && lab.d_magic[2] == DL_MAGIC[2]
-            && lab.d_magic[3] == DL_MAGIC[3]
-            && g->tracks && g->heads && g->sectors) {
-            got = 1;
-            g->firstsec = lab.d_firstsec;
-            if (tm) {
-                tm->step = lab.d_step;
-                tm->seek = lab.d_seek;
-                tm->precomp = lab.d_precomp;
-                tm->lowcur = lab.d_lowcur;
-            }
-            if (table) {
-                for (i = 0; i < NSLICE; i++) {
-                    table[i].sm_off = lab.d_slice[i].d_off;
-                    table[i].sm_len = lab.d_slice[i].d_len;
-                    table[i].sm_roll = lab.d_slice[i].d_roll;
-                }
-            }
-        }
     }
     if (!got) {
         /*
@@ -128,13 +142,6 @@ dllabel(cdev, sl, g, table, tm)
         len = g->tracks;
         g->roll = 0;
     } else {
-        off = 0;
-        len = 0;
-        if (got) {
-            off = lab.d_slice[sl].d_off;
-            len = lab.d_slice[sl].d_len;
-            g->roll = lab.d_slice[sl].d_roll;
-        }
         /*
          * A slice that is not carved (length zero) maps nothing, and one
          * naming cylinders the drive does not have is refused rather than
@@ -221,35 +228,13 @@ dlreload(b, g, table, tm)
     struct slicemap *table;
     struct dltiming *tm;
 {
-    static struct dlabel lab;
-    static char *p;
-    static UINT8 i;
+    struct dlabel *lp;
+    int got;
 
-    p = bhold(b);
-    copy(&p[DL_OFFSET], &lab, sizeof lab);
+    lp = (struct dlabel *)(bhold(b) + DL_OFFSET);
+    got = dlabel_decode(lp, g, table, tm);
     brel();
-    if (lab.d_magic[0] != DL_MAGIC[0] || lab.d_magic[1] != DL_MAGIC[1] ||
-        lab.d_magic[2] != DL_MAGIC[2] || lab.d_magic[3] != DL_MAGIC[3] ||
-        !lab.d_tracks || !lab.d_heads || !lab.d_spt)
-        return (0);
-    g->tracks = lab.d_tracks;
-    g->heads = lab.d_heads;
-    g->sectors = lab.d_spt;
-    g->firstsec = lab.d_firstsec;
-    if (tm) {
-        tm->step = lab.d_step;
-        tm->seek = lab.d_seek;
-        tm->precomp = lab.d_precomp;
-        tm->lowcur = lab.d_lowcur;
-    }
-    if (table) {
-        for (i = 0; i < NSLICE; i++) {
-            table[i].sm_off = lab.d_slice[i].d_off;
-            table[i].sm_len = lab.d_slice[i].d_len;
-            table[i].sm_roll = lab.d_slice[i].d_roll;
-        }
-    }
-    return (1);
+    return (got);
 }
 
 /*

@@ -42,6 +42,7 @@
 #include "sim.h"
 #include "z80glue.h"
 #include "hwsim.h"
+#include "config.h"
 #include "gui.h"
 #include "util.h"
 #include "../micronix/include/obj.h"
@@ -708,10 +709,19 @@ usage(char *complaint, char *p)
     fprintf(stderr, "  which is the next floppy.  controllers are the -B names,\n");
     fprintf(stderr, "  and scsi, which has no boot path.\n");
     fprintf(stderr, "\t-h\thelp\n");
-    fprintf(stderr, "\t-b\t<boot rom file>\n");
+    fprintf(stderr, "\t-b\t<boot rom file> (default mon500.bin)\n");
     fprintf(stderr, "\t-M\t<level 1 boot rom file> (default l1boot.bin)\n");
+    fprintf(stderr, "\t\tmon500 with the level 1 rom is the configuration to\n");
+    fprintf(stderr, "\t\trun: a bare file argument is then a disk level 1 can\n");
+    fprintf(stderr, "\t\tboot, and no djdma boot is involved.\n");
     fprintf(stderr, "\t-B\t<djdma|hdcdma|hdca|ide> boot from this, and skip the monitor\n");
-    fprintf(stderr, "\t\t(hdca needs mon447, ide needs mon500 - see -b)\n");
+    fprintf(stderr, "\t\t(mon447's boot-device field; hdca needs mon447, ide\n");
+    fprintf(stderr, "\t\tneeds mon500 - see -b)\n");
+    fprintf(stderr, "\t-j\t<ab|bc> the djdma card's J2 strap: ab does not bootstrap\n");
+    fprintf(stderr, "\t\t(the default, and our machine), bc runs the card's own\n");
+    fprintf(stderr, "\t\tbootstrap, which is what the stock monitor's djdma path\n");
+    fprintf(stderr, "\t\tneeds - stock machine only:\n");
+    fprintf(stderr, "\t\t-b mon447.bin -B djdma -j bc\n");
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
     fprintf(stderr, "\t-w\t<wiring> profile[,key=value]...: d1, multio, ss1\n");
     fprintf(stderr, "\t\tviN=card, irqN=viM|source, int=board\n");
@@ -778,6 +788,7 @@ int anydrive;                   /* a hdcdma/hdca unit was named on the command l
 #define BLK_IDE     0x04
 #define BLK_NCR     0x08
 int blkmask;
+char *progname;			/* argv[0], for the configuration layer's errors */
 char *rom_filename;
 char *bootrom_filename;
 char *medias_file;
@@ -788,6 +799,9 @@ char *rom_image;
 int rom_size;
 int config_sw = 0;
 int halt_exit = 1;		/* exit the simulation on a task-0 halt */
+int djdma_bootstrap;		/* -j bc: the djdma card's J2 strap is in the
+				 * bootstrapping position, so it reads block 0
+				 * to 0080 and raises the flag mon447 polls */
 
 sigset_t mysignalmask;
 
@@ -1721,6 +1735,68 @@ exec_perf(char **argv, int argc, int pindex)
 }
 #endif
 
+/*
+ * Which options take a value in the argument after them.  This exists for
+ * profile_arg() alone: the profile is the first bare argument, so finding
+ * it means knowing which arguments are options' values and which are
+ * arguments in their own right - "-b mon500.bin stock" has no bare
+ * argument at all until "stock".  Every value in this simulator is the
+ * next argv element, never the rest of the option's own string, which is
+ * what makes one table enough.
+ */
+static int
+opt_takes_value(int c)
+{
+	switch (c) {
+	case 'b': case 'M': case 'B': case 'j': case 'c': case 'w':
+	case 'd': case 'm': case 'e': case 'N': case '5': case 'L':
+	case 'S': case 'D': case 'T': case 'W': case 'K': case 'P':
+	case 'R': case 'G': case 't':
+		return 1;
+	}
+	return 0;
+}
+
+/*
+ * The index of the profile argument, or -1 if there is none.  The first
+ * bare argument, always and not heuristically - which is why this walks
+ * the options rather than looking for something that is not a drive.
+ * Anything after it is a drive, as it has always been.
+ *
+ * argv here is the one main() holds past "progname = *argv++", so the
+ * program name is already gone and index 0 is the first real argument.
+ */
+static int
+profile_arg(char **argv)
+{
+	int i = 0;
+
+	while (argv[i]) {
+		char *s = argv[i];
+
+		if (*s != '-')
+			return i;
+		for (s++; *s; s++) {
+			if (opt_takes_value(*s)) {
+				i++;		/* its value is the next argument */
+				break;
+			}
+		}
+		i++;
+	}
+	return -1;
+}
+
+/* drop argv[n], keeping the NULL terminator */
+static void
+drop_arg(char **argv, int n)
+{
+	while (argv[n]) {
+		argv[n] = argv[n + 1];
+		n++;
+	}
+}
+
 #ifndef NODEBUG
 /*
  * A floor's argument: <lo>[-<hi>] for the stack pointer range, and an
@@ -1770,7 +1846,7 @@ main(int argc, char **argv)
     }
 #endif
 
-    char *progname = *argv++;
+    progname = *argv++;
     char *s;
     char **argvec;
     int i;
@@ -1793,22 +1869,95 @@ main(int argc, char **argv)
     }
 
     /*
-     * Default the boot rom to the tree's stand/roms, so the simulator
-     * finds its resource files without -b; -b still overrides.
+     * The configuration file, then the profile it names.  This runs here,
+     * before any default is taken and before the option loop, which is
+     * what makes four layers rather than a pile of special cases: each
+     * step below asks the file and falls back to the compiled value, and
+     * every option that follows overrides both.
+     *
+     * The profile is the first bare argument and is consumed, so that
+     * what is left is options and drives exactly as it was.
      */
-    if (access("../../micronix/stand/roms/mon447.bin", F_OK) == 0)
-        rom_filename = "../../micronix/stand/roms/mon447.bin";
-    else if (access("mon447.bin", F_OK) == 0)
-        rom_filename = "mon447.bin";
+    /*
+     * The profile argument is only consumed when there was a file to name
+     * it in.  With no file anywhere the machine is the compiled defaults
+     * and a bare argument is what it always was - the next floppy.  argc
+     * follows the argument list down; it still counts the program name at
+     * this point, which the argc-- after the rom defaults takes off.
+     */
+    i = profile_arg(argv);
+    conf_load(i >= 0 ? argv[i] : NULL);
+    if (i >= 0 && conf_source()) {
+        drop_arg(argv, i);
+        argc--;
+    }
+
+    /*
+     * Default the boot rom to the tree's stand/roms, so the simulator
+     * finds its resource files without -b; -b still overrides.  mon500
+     * is the rom our machines run: it boots the level 1 rom below, which
+     * asks every drive for a label, so a bare file argument is a disk
+     * this machine can boot.  mon447 is the stock monitor and is what
+     * the card's own bootstrap - -B djdma -j bc - is reproduced under;
+     * it is not a default any more, and its djdma boot is off.
+     */
+    rom_filename = (char *)conf_str("boot.monitor", NULL);
+    if (!rom_filename) {
+        if (access("../../micronix/stand/roms/mon500.bin", F_OK) == 0)
+            rom_filename = "../../micronix/stand/roms/mon500.bin";
+        else if (access("../../micronix/stand/roms/mon447.bin", F_OK) == 0)
+            rom_filename = "../../micronix/stand/roms/mon447.bin";
+        else if (access("mon500.bin", F_OK) == 0)
+            rom_filename = "mon500.bin";
+        else if (access("mon447.bin", F_OK) == 0)
+            rom_filename = "mon447.bin";
+    }
 
     /*
      * Default the level 1 boot rom the same way: l1boot.bin beside the
      * monitor roms.  -M overrides.
      */
-    if (access("../../micronix/stand/roms/l1boot.bin", F_OK) == 0)
-        bootrom_filename = "../../micronix/stand/roms/l1boot.bin";
-    else if (access("l1boot.bin", F_OK) == 0)
-        bootrom_filename = "l1boot.bin";
+    bootrom_filename = (char *)conf_str("boot.level1", NULL);
+    if (!bootrom_filename) {
+        if (access("../../micronix/stand/roms/l1boot.bin", F_OK) == 0)
+            bootrom_filename = "../../micronix/stand/roms/l1boot.bin";
+        else if (access("l1boot.bin", F_OK) == 0)
+            bootrom_filename = "l1boot.bin";
+    }
+
+    /*
+     * The J2 strap: ab is the card not bootstrapping, which is our
+     * machine, and bc is the stock monitor's djdma path.
+     */
+    s = (char *)conf_str("boot.j2", "ab");
+    if (strcmp(s, "bc") == 0)
+        djdma_bootstrap = 1;
+    else if (strcmp(s, "ab") != 0)
+        usage("the J2 position is ab or bc\n", progname);
+
+    /*
+     * The drives the profile names, applied as though they had been
+     * typed: the option loop and the bare drive arguments below both run
+     * afterwards, so anything on the command line is on top.
+     */
+    {
+        jv *d = conf_get("drives");
+
+        if (d && d->type == J_OBJ) {
+            char spec[4096];
+            int k;
+
+            for (k = 0; k < d->n; k++) {
+                if (d->v[k]->type != J_STR)
+                    continue;
+                snprintf(spec, sizeof spec, "%s:%s", d->key[k], d->v[k]->str);
+                if (drivearg(spec) != 1) {
+                    fprintf(stderr, "%s: %s: not a drive\n", progname, spec);
+                    usage("", progname);
+                }
+            }
+        }
+    }
 
     argc--;
 
@@ -1910,6 +2059,19 @@ main(int argc, char **argv)
                     }
                     config_sw = sw | CONF_SET;
                 }
+                break;
+            case 'j':
+                if (!argc--) {
+                    usage("J2 position missing: ab or bc\n", progname);
+                }
+                if (strcmp(*argv, "ab") == 0) {
+                    djdma_bootstrap = 0;
+                } else if (strcmp(*argv, "bc") == 0) {
+                    djdma_bootstrap = 1;
+                } else {
+                    usage("the J2 position is ab or bc\n", progname);
+                }
+                argv++;
                 break;
 #ifndef NODEBUG
             case 'S':
@@ -2271,6 +2433,7 @@ main(int argc, char **argv)
     // another driver hook
     for (i = 0; i < ndrivers; i++) {
         if (drivers[i]->startup_hook) {
+            io_claimant(drivers[i]->name);
             if ((ret = (*drivers[i]->startup_hook)())) {
                 printf("startup hook %s error %d\n", drivers[i]->name, ret);
                 exit(1);
@@ -2278,6 +2441,7 @@ main(int argc, char **argv)
         }
         printf("%s loaded\n", drivers[i]->name);
     }
+    io_claimant(0);
 
     /*
      * the main emulation loop
@@ -2438,7 +2602,10 @@ main(int argc, char **argv)
  * it, and that command is unambiguous.  Ownership therefore follows the
  * most recent claim, and a claim is made by transmitting a character or
  * by arming a receive.  The serial board owns the console until told
- * otherwise, which is the normal case and stays silent.
+ * otherwise, which is the normal case and stays silent.  A machine wired
+ * for a different console starts with that board as the owner instead:
+ * the SS1 sets it from its own init, because on that machine it is the
+ * card the kernel's tty driver talks to.
  *
  * Ownership decides who may consume input, and only that.  Output from
  * both still reaches the same window, deliberately - that is what a
@@ -2449,7 +2616,8 @@ int console_owner = CONS_MULTIO;
 
 static char *console_names[] = {
     "the multio uart 0",
-    "the djdma bit banged serial"
+    "the djdma bit banged serial",
+    "the ss1 2651"
 };
 
 void

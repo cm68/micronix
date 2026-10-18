@@ -38,8 +38,8 @@
  * is safe because mem.s holds interrupts off across its own borrow, so no
  * handler can ever see the register half borrowed.
  */
-#define SCRSEG  13              /* the scratch window (swin, uio.c) */
-#define SCRWIN  (SCRSEG * 0x1000)   /* ... its page base, 0xd000 */
+#define SCRSEG  12              /* the scratch window (swin, uio.c) */
+#define SCRWIN  (SCRSEG * 0x1000)   /* ... its page base, 0xc000 */
 
 /*
  * Priorities

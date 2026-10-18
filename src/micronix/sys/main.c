@@ -44,7 +44,7 @@ struct proc *initproc = &plist[1];
 struct inode ilist[NINODE] = 0;
 struct inode *rootdir = 0;
 struct file flist[NFILE] = 0;
-struct mount mlist[NMOUNT] = 0;
+extern struct mount mlist[];    /* uhdr.s's _mlist: the mount table */
 
 /*
  * Buffer stuff initialized in binit
@@ -53,7 +53,9 @@ UINT nbuf = 0;                  /* buffered by nothing but MAXBUFS */
 UINT totmem = 0;                /* total memory in K, saved by pcon() */
 struct buf *btop = 0;
 
-UINT8 map0[], image0[];
+UINT8 map0[];
+
+char lowbss[];                  /* the freed low memory, 0x220 (uhdr.s) */
 
 extern int segalloc();          /* malloc.c */
 extern int nodev();             /* con.c */
@@ -105,17 +107,17 @@ signon()
 }
 
 /*
- * Grow the buffer cache to the full budget: the .bss end up to OVLBASE,
- * the driver page.  Mint headers contiguously off &blist[8] (== _ebss)
- * until they reach OVLBASE, pulling one 4K segment (8 blocks) from
+ * Grow the buffer cache to the full budget: the .bss end up to SCRWIN,
+ * the scratch window.  Mint headers contiguously off &blist[8] (== _ebss)
+ * until they reach SCRWIN, pulling one 4K segment (8 blocks) from
  * segalloc() per group of 8 headers.  The pool blocks themselves live in
  * those unmapped segments, reached through the BUFSEG window: block i
  * has data = BUFWIN + (i&7)*512, xmem = seg.
  *
- * The ceiling is the driver page (OVLBASE), not the window's page: a
- * header past it would overlap the driver module mapped there, and the
- * driver's header would read back as buffer data.  The scratch window
- * (0xd000) above it is transient, borrowed by swin()/srel() and mem.s.
+ * The ceiling is the scratch window (SCRWIN), just below the driver page
+ * (OVLBASE): a header past it would be borrowed over by swin()/srel() and
+ * mem.s.  highmem is parked at _ebss and may run over the scratch - it
+ * never borrows it - so it reaches the driver page, but the pool cannot.
  */
 expand_bufs()
 {
@@ -124,7 +126,7 @@ expand_bufs()
     UINT8 j;
 
     b = blist + 8;
-    while ((int)b + sizeof(*b) <= (int)OVLBASE && nbuf < MAXBUFS) {
+    while ((int)b + sizeof(*b) <= (int)SCRWIN && nbuf < MAXBUFS) {
         seg = segalloc();
         /*
          * The inner loop carries the MAXBUFS test too.  The group is
@@ -135,7 +137,7 @@ expand_bufs()
          * blocks unused; the pool does not have to be a whole segment.
          */
         for (j = 0; j < 8 && nbuf < MAXBUFS &&
-                     (int)b + sizeof(*b) <= (int)OVLBASE; j++, b++) {
+                     (int)b + sizeof(*b) <= (int)SCRWIN; j++, b++) {
             zero(b, sizeof(*b));
             b->data = (char *)BUFWIN + j * 512;
             b->xmem = seg;

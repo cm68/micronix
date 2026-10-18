@@ -120,8 +120,8 @@ imdd: imdd.c
 strip: strip.c
 	$(CC) $(CFLAGS) -o strip strip.c
 
-hwsim:	hwsim.c
-	$(CC) $(CFLAGS) -o hwsim hwsim.c
+hwsim:	hwsim.c ../lib/json.o
+	$(CC) $(CFLAGS) -I../include -o hwsim hwsim.c ../lib/json.o
 
 setdev:	setdev.o
 	$(CC) $(CFLAGS) -o setdev setdev.o $(LDFLAGS)

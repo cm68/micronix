@@ -37,7 +37,7 @@
 #include <sys/dj.h>
 #include <sys/ovl.h>
 
-extern UINT8 image0[], map0[];
+extern UINT8 map0[];
 extern int out(), inton();
 
 djinit(seg)
@@ -96,7 +96,7 @@ djinit(seg)
     *p++ = HALT;
     *p++ = NOSTAT;
 
-    map0[2] = image0[2];        /* restore the map */
+    map0[2] = 1;                /* restore the map */
 
     out(START, 0);
 

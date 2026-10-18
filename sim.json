@@ -2,11 +2,14 @@
   "sims": {
     "q540-dual": {
       "emulator": "hwsim/d1",
-      "monitor": "src/micronix/stand/roms/mon447.bin",
       "kernel": "src/micronix/sys/unix",
+      "boot": {
+        "monitor": "src/micronix/stand/roms/mon500.bin",
+        "level1": "src/micronix/stand/roms/l1boot.bin",
+        "device": "hdcdma",
+        "j2": "ab"
+      },
       "config": {
-        "boot": "hdcdma",
-        "nomon": true,
         "xterm": ["uart0", "ttyB", "ttyC"],
         "clock": "normal"
       },

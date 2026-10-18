@@ -11,8 +11,9 @@
 #include <types.h>
 #include <sys/sys.h>
 
-#define SS1_TC0      0x54    /* 8253 counter 0, the count port */
-#define SS1_TCCTL    0x57    /* 8253 control word */
+/* the board's jumper block: 0x70, not CompuPro's default 0x50 - see ss1pic.c */
+#define SS1_TC0      0x74    /* 8253 counter 0, the count port */
+#define SS1_TCCTL    0x77    /* 8253 control word */
 
 #define HEARTBEAT   62500   /* 2 MHz / 32 Hz, the count for the 32 Hz tick */
 

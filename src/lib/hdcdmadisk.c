@@ -75,7 +75,19 @@ static char *drive_dir;
 void
 drive_setdir(char *dir)
 {
+    free(drive_dir);
     drive_dir = strdup(dir);
+}
+
+/*
+ * Where that is, for the media changer's "dir" and "ls": a caller that
+ * wants to report it should not have to remember it separately.  NULL
+ * means no directory was set and a bare name is relative to the cwd.
+ */
+char *
+drive_getdir(void)
+{
+    return drive_dir;
 }
 
 /*

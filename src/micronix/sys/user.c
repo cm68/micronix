@@ -40,18 +40,23 @@
 
 char ustack[512];               /* the system stack, just below u */
 
+struct user u;
+
 /*
  * The current process's memory map, for mem.s, which cannot name a
  * member of struct proc (see proc.h).  It is mutable data in the cloned
  * segment, which is why it is here and not in the kernel's own data:
  * newmap() sets it at every switch, so a copy inherited from the parent
- * is overwritten before the child's first user page is reached.  It
- * sits between ustack and u because task0_body() zeroes that range -
- * below u it would keep whatever the loader's stack left there.
+ * is overwritten before the child's first user page is reached.
+ *
+ * It must sit above u, not between ustack and u: the kernel stack's top
+ * is &u.stack, so the very first push - task0_body's CALL _main -
+ * writes the return address to the word just below u.  A curmem there
+ * would be both the return slot and the map pointer pinit() stores, and
+ * main would return into the swapper's proc->mem.  Above u the loader's
+ * stack still runs over it, so task0_body() zeroes it with u.
  */
-char *curmem;
-
-struct user u;
+extern char *curmem;            /* uhdr.s's _curmem: mem.s's user-page lookup */
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

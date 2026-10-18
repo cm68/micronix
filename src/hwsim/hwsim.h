@@ -42,6 +42,13 @@ extern void register_driver(struct driver *d);
 extern void register_input(portaddr portnum, inhandler func);
 extern void register_output(portaddr portnum, outhandler func);
 
+/*
+ * Say which card the registrations that follow belong to, so a port
+ * claimed twice can name both owners.  hwsim.c's startup loop sets this
+ * from the driver's name around each startup hook.
+ */
+extern void io_claimant(char *name);
+
 // control port 0xd0: the kernel writes task, device and inode so the
 // simulator can load the symbol table of the program being exec'd.  The
 // kernel writes these bytes unconditionally on every exec, so the port
@@ -113,6 +120,7 @@ sighandler_t mysignal(int signum, sighandler_t handler);
 
 // hard disk abstraction
 void drive_setdir(char *dir);   // where drive_open looks for unit files
+char *drive_getdir(void);       // where that is, or NULL
 int drive_setunit(char *unit, char *path); // name one unit's file outright
 void *drive_open(char *name);
 char *drive_resolve(char *name); // the file a unit name opens
@@ -143,16 +151,18 @@ extern int config_sw;
 extern int halt_exit;		// exit the simulation on a task-0 halt
 
 /*
- * Console arbitration.  Two devices can be the console - the serial
- * board and the floppy controller's own bit banged port - and they read
- * the same file descriptor, so exactly one of them may consume a
- * keystroke.  Which one is not configured anywhere and cannot be seen by
- * looking at a disk: it is however the bios on it was assembled.  So it
- * is discovered instead.  A device claims the console by using it, and
- * input follows the most recent claim.  See CONSOLE.
+ * Console arbitration.  Any device with a character path can be the
+ * console - the serial board, the CompuPro SS1's 2651, the floppy
+ * controller's own bit banged port - and they read the same file
+ * descriptor, so exactly one of them may consume a keystroke.  Which one
+ * is not configured anywhere and cannot be seen by looking at a disk: it
+ * is however the bios on it was assembled.  So it is discovered instead.
+ * A device claims the console by using it, and input follows the most
+ * recent claim.  See CONSOLE.
  */
 #define	CONS_MULTIO	0		// the serial board, and the default
 #define	CONS_DJDMA	1		// the floppy controller's serial port
+#define	CONS_SS1	2		// the SS1's 2651 uart
 
 extern int console_owner;
 void console_claim(int who);

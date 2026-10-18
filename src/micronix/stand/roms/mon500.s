@@ -165,10 +165,18 @@ ss1valu	equ	init OR ltim OR adi4 OR ic4	;the same for a cascaded pair
 ;*								*
 ;****************************************************************
 
-s1data	equ	05ch		;data: send on a write, receive on a read
-s1stat	equ	05dh		;status: bit 0 ready to send, bit 1 to read
-s1mode	equ	05eh		;the two mode registers, first one first
-s1cmd	equ	05fh		;command register
+;
+;	The board's sixteen ports are a jumper block, and it is 07ch here
+;	and not CompuPro's default 05ch: 050h through 055h are the HDCA's
+;	and the HD-DMA's, so at the default the two cards answer on one
+;	port and one of them is never heard again.  The four numbers here,
+;	s1icw1 below, sys/ss1pic.c, sys/ss1_clock.c and the simulator's
+;	SS1_BASE are one address said five ways.
+;
+s1data	equ	07ch		;data: send on a write, receive on a read
+s1stat	equ	07dh		;status: bit 0 ready to send, bit 1 to read
+s1mode	equ	07eh		;the two mode registers, first one first
+s1cmd	equ	07fh		;command register
 s1mr1	equ	04eh		;mode 1: asynchronous x16, 8 bits, no parity
 s1mr2	equ	07fh		;mode 2: 19200 baud, top four bits as asked
 s1cen	equ	005h		;command: transmitter and receiver on
@@ -179,10 +187,10 @@ s1quiet	equ	028h		;status: no framing and no parity error -
 				; is both, so a quiet status is what a real
 				; board has and an empty socket cannot fake
 
-s1icw1	equ	050h		;master: ICW1/OCW2 and the read registers
-s1icw2	equ	051h		;master: ICW2/ICW3/ICW4 and the mask
-s1sicw1	equ	052h		;the slave's same two ports
-s1sicw2	equ	053h
+s1icw1	equ	070h		;master: ICW1/OCW2 and the read registers
+s1icw2	equ	071h		;master: ICW2/ICW3/ICW4 and the mask
+s1sicw1	equ	072h		;the slave's same two ports
+s1sicw2	equ	073h
 s1slave	equ	007h		;ICW3 of the slave: its id, the cascade line
 s1cas	equ	080h		;ICW3 of the master: the cascade is IR7
 s1sbuf	equ	008h		;ICW4: buffered slave, 8080 mode, EOI
@@ -404,7 +412,6 @@ fmap:	ld	b,a			;fill all the tasks' maps
 	
 setup:	xor	a
 	ld	(mapram + 2),a		;a window for DMA device commands
-	ld	(map + 2),a		;image map updated
 	ld	(ersav),a		;null the error save byte
 	ld	a,hstrap		;initialize the mask register
 	ld	(mask),a		; -to trap on halts and stops
@@ -605,10 +612,8 @@ ramcode:
 	.phase	ramhome
 	ld	a,0f0h			;seg 1 -> page 0f0h, the rom
 	ld	(mapram+2),a
-	ld	(map+2),a
 	ld	a,00fh			;seg 2 -> page 0fh, physical 0f000h
 	ld	(mapram+4),a
-	ld	(map+4),a
 	ld	hl,1000h		;the rom, through seg 1
 
 cploop:	ld	a,0f0h			;bank 15 (task 0 stays)
@@ -691,8 +696,6 @@ rstmap:	ld	l,a             ;Get task and segment numbers
 	add	hl,hl           ;multiply times 2       
         ex	de,hl  		;save calculated offset in D,E
         ld	hl,mapram       ;point to beginning of ram map
-        call    rstmxx            
-	ld	hl,map		;point to image map at 200
 rstmxx:	add	hl,de		;add offset to selected map
 	ld	(hl),b          ;write the allocation vector to ram
 	inc	hl		;point to access ram
@@ -1203,8 +1206,6 @@ putmap:	ld	l,a			;get task and segment number
 	add	hl,hl			;multiply times 2
 	ex 	de,hl			;save calculated offset in de
 	ld	hl,mapram		;point to beginning of ram map
-	call 	putmxx			
-	ld	hl,map			;point to beginning of image map
 putmxx: add	hl,de			;add offset to selected map
 	ld	(hl),b			;write the allocation vector
 	inc	hl			;point to access attribute ram

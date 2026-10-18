@@ -19,6 +19,7 @@ void blockedit(char *buf, int len);
 extern int logfd;
 extern int no_console_log;
 extern int console_logfd;
+void console_log(int c);
 
 /*
  * l/lc/trace/tracec are the simulator's logging and tracing.  They are

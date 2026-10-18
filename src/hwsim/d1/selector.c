@@ -36,7 +36,7 @@ sc_out(portaddr p, byte v)
         sc_n = 0;
     sc_bytes[sc_n++] = v;
     if (sc_n == 4) {
-        sc_addr = sc_bytes[0] | (sc_bytes[1] << 8) | (sc_bytes[2] << 16);
+        sc_addr = ((paddr) sc_bytes[0] << 16) | (sc_bytes[1] << 8) | sc_bytes[2];
         sc_mode = sc_bytes[3];
         sc_n = 0;
     }

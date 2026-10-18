@@ -1099,6 +1099,63 @@ imd_read(void *vp, int cyl, int head, int osec, char *buf)
 }
 
 /*
+ * The medium's block 0: the 512 bytes whose second half is the label.
+ *
+ * The first track is not always 512 byte sectors.  An eight inch
+ * diskette's cylinder 0 head 0 is single density - 26 sectors of 128
+ * bytes - and block 0 is the first four of them.  A five inch medium's
+ * sectors are 1024 bytes, and block 0 is the first half of one.  A hard
+ * disk is plain 512 byte sectors, which maps straight through.
+ *
+ * Read or write the block whatever shape it has, and return 512.  A
+ * write on a 1K medium reads the sector first and writes it back whole,
+ * because the label only owns half of it.  Return 0 if the medium has no
+ * such block.
+ */
+int
+imd_block0(void *vp, char *buf, int write)
+{
+    struct imd *ip = (struct imd *)vp;
+    int secs = 0, secsize = 0, first, n;
+    char tmp[MAXSECSIZE];
+
+    imd_trkinfo(vp, 0, 0, &secs, &secsize);
+    if (!secs || !secsize)
+        return 0;
+    first = imd_firstsec(vp, 0, 0);
+
+    if (secsize == 128) {
+        for (n = 0; n < 4; n++) {
+            if (write) {
+                if (imd_write(vp, 0, 0, first + n, buf + n * 128) != 128)
+                    return 0;
+            } else if (imd_read(vp, 0, 0, first + n, buf + n * 128) != 128)
+                return 0;
+        }
+        return 512;
+    }
+    if (secsize < 512)
+        return 0;
+
+    if (write) {
+        if (secsize > 512) {
+            if (imd_read(vp, 0, 0, first, tmp) != secsize)
+                return 0;
+            memcpy(tmp, buf, 512);
+            if (imd_write(vp, 0, 0, first, tmp) != secsize)
+                return 0;
+        } else if (imd_write(vp, 0, 0, first, buf) != 512)
+            return 0;
+    } else {
+        if (imd_read(vp, 0, 0, first, secsize > 512 ? tmp : buf) != secsize)
+            return 0;
+        if (secsize > 512)
+            memcpy(buf, tmp, 512);
+    }
+    return 512;
+}
+
+/*
  * Rebuild one track's layout.  The caller owns the data afterwards:
  * imd_setfmt fills it with the format's fill byte, and the delta loader
  * leaves it empty for the delta's own sector data.  Shared so the two

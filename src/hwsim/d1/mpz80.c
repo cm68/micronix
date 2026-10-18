@@ -219,6 +219,7 @@ byte switchreg;
 #define SWT     0x402       // switch register board location 16D
 #define     SW_NOMON    0x04        // S6 - if high, no minotaur
 #define     SW_JUMP     0xf8        // S1 - S5 negated jump address
+/* the three below are mon447's boot-device field; mon500 reads S6 only */
 #define     SW_DJDMA    0x10        // boot djdma
 #define     SW_HDDMA    0x08        // boot hdcdma
 #define     SW_HDCA     0x00        // boot hdca
@@ -1524,7 +1525,8 @@ void
 mpz80_usage()
 {
     printf("config switch values:\n");
-    printf("\t0x04 - no monitor entry\n");
+    printf("\t0x04 - no monitor entry.  mon500 reads this bit alone,\n");
+    printf("\t       so it is also the boot: the level 1 rom\n");
     printf("\t0xf8 - start address mask\n");
     printf("\t0x00 - boot the local hard disk - hdca under mon447,\n");
     printf("\t       ide under mon500, so pick the rom to match\n");
@@ -1538,9 +1540,17 @@ mpz80_usage()
 int 
 mpz80_setup()
 {
-    rom_filename = "mon447.bin";
+    rom_filename = "mon500.bin";
     rom_size = 4096;
-    switchreg = SW_DJDMA | SW_NOMON;    // set diagnostic, monitor or boot mode
+    /*
+     * Half a switch: mon500 is binary, S6 on asks for the monitor and
+     * S6 off for a boot, and nothing else on the board is read (mon500.s
+     * tstsw).  The boot-device bits below are mon447's, and the one
+     * config we run is mon500 with level 1 doing the booting, so they
+     * stay clear - the djdma boot is not ours and its card bootstrap is
+     * off (J2 A-B, -j ab).
+     */
+    switchreg = SW_NOMON;               // boot: level 1, no monitor
     keybreg = 0;
     set_taskreg(0);
 

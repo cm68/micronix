@@ -98,7 +98,7 @@ dlook(ip, np)
     slot = 0;
     place = 0;
     for (log = 0; log < nblks; log++) {
-        if ((phys = imap(ip, log, &dummy)) == 0)
+        if ((phys = imap(ip, log, &dummy, IREAD)) == 0)
             continue;
         if ((b = bread(phys, ip->i_dev)) == 0)
             continue;

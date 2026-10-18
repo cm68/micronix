@@ -33,12 +33,14 @@ and src/micronix/stand/boot/README for the loader.
 To boot one:
 
 	cd ../../src/hwsim/d1
-	./d1 -b roms/mon447.bin -B djdma -5 <the d5ds image>
+	./d1 -B djdma -5 <the d5ds image>
 
 The bare filename of an eight inch image goes on the eight inch port;
 the five inch one needs -5.  Both are unskewed raw images - the DJ's
 alternate sectoring bit is clear - which is what the loader and the host
-tools both read.
+tools both read.  -B djdma is the boot device; the monitor rom and the
+level 1 rom the chain starts from are the simulator's own defaults, and
+-b and -M name others.
 
 what is on it, and why so little
 --------------------------------
@@ -48,22 +50,36 @@ mounts it on /b and copies the running system across with cptree, so
 what has to fit is the smallest micronix that can do that, and the
 medium it has to fit in is 760 blocks:
 
-	/micronix	the kernel, 86 K, the largest thing here
+	/micronix	the kernel, 104 K, the largest thing here
 	/bootmw.bin	the hard disk boot the install writes into the new
 			drive's boot area - mkfs.h's DEFBOOT, read from the
 			diskette that is running the install
 	/m16init	the install script
 	/.sh		the shell's path
-	/bin		sh login ls cp mv rm cat mkdir mkfs fsck mount
-			umount chmod cptree mknod setdev ln sync echo
+	/bin		sh login ls cp mv rm mkdir mkfs fsck mount umount
+			chmod cptree mknod setdev ln sync echo label
+			chg fdj
 	/dev		every node in ../../src/micronix/dev/devlist
 	/etc		the config and init
 	/b /f /tmp	the mount points m16init and finstall use, and a
 			scratch directory
 
-That is 724 of the 760 blocks on the five inch, leaving 17.  The eight
-inch media carry the same files with the room they have over.  So the
-knapsack is full: anything added to that list has to displace
+That is 747 of the 760 blocks on the five inch, leaving 13 - and the
+kernel is 208 of them, so the medium carries the kernel and little
+else.  The three commands it cannot pay for are the whole of the
+difference between it and the eight inch, where the same payload has
+305 blocks to spare (1403 on d8ds): hdformat, mwformat and cat are on
+the eight inch diskettes and not on the five inch ones.  hdformat and
+mwformat low-level format a hard disk, which is done to the drive
+before the diskette installs onto it, and cat is the least missed of
+what is left.
+
+chg and fdj are not install steps either, and no init script calls
+them: they are what makes a *booted* diskette able to make diskettes,
+with "chg djdma:1 blank:dist-1.img; fdj format djdma:1; mount it; copy
+data; umount" and no host tool at all.  See sys/MEDIACHG.md.
+
+So the knapsack is full: anything added to that list has to displace
 something, which is the reason there is one m16init here and not all
 four of the inits with a boot image each.
 
@@ -82,7 +98,7 @@ a simulated Z80, so give it time.
 
 Then boot the drive:
 
-	./d1 -b roms/mon447.bin -c 0x0c hdcdma0:<volume>
+	./d1 -c 0x0c hdcdma0:<volume>
 
 which is the HD-DMA path with the monitor skipped - the configuration
 switch 0x0c everything used to be written down as.  See ../hdinstall

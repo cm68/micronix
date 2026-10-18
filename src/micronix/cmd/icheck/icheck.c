@@ -36,7 +36,8 @@ int ino;
 int ndup;
 int used;
 
-UINT blist[10] = { -1 };
+#define BADBLK	((UINT)-1)
+UINT blist[10] = { BADBLK };
 
 unsigned short buf[256];
 
@@ -320,7 +321,7 @@ blockcheck(blkno, mesg)
         ndup++;
     }
 
-    for (i = 0; blist[i] != -1; i++) {
+    for (i = 0; blist[i] != BADBLK; i++) {
         if (blkno == blist[i]) {
             printf("%d arg; inode=%d, class=%s\n", blkno, ino, mesg);
         }

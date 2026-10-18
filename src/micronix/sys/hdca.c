@@ -879,14 +879,26 @@ hdcioctl(dev, cmd, r, b)
 
 struct biovec hdbvec = { &hdopen, &hdclose, &hdstrat, &hdcioctl };
 
+#define	PROBEWAIT	10000
+
 /*
  * The probe: make the card raise its interrupt so the attach loop
- * (sys/probe.c) can discover which line it is on.  STUB - not written;
- * it must issue a command that completes and raises the card's done bit.
+ * (sys/probe.c) can discover which line it is on.  A header read is the
+ * sense that has no side effect - it reads the header under the head and
+ * writes nothing - and it completes with op-done like any sector
+ * operation.  Drive 0, head 0, whatever track the arm is on: the
+ * controller does not care and the medium, if any, is not written.
  */
 hdprobe()
 {
-    return (0);
+	register int n;
+
+	out(HDCA_CONTROL, CONT_FRENBL | CONT_RUN | CONT_DSKCLK);
+	out(HDCA_FUNC, FUNC_HEAD);		/* drive 0, head 0 */
+	out(HDCA_CMD, CMD_READHDR);
+	for (n = 0; n < PROBEWAIT && !(in(HDCA_PSR) & PSR_OPDONE); n++)
+		;
+	return (0);
 }
 
 /*

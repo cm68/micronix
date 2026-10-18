@@ -5,10 +5,9 @@
 ;
 ; ------- A-NATURAL SOURCE: declarations -------
 ; /*
-;  * Interrupt dispatch table
-;  * Extra space allows us to move the vectors to a 32-byte
-;  * boundry, as required by the interrupt controller.
-;  * Most of the interrupt catchers are in mio.s.
+;  * Interrupt dispatch table.  The table itself is copied to 0x200 at
+;  * boot (sys/picvec.c) and the 8259's ICW2 names that address; here it
+;  * is only the source.  Most of the interrupt catchers are in mio.s.
 ;  *
 ;  * sys/intrpt.s
 ;  * Changed: <2021-12-24 06:08:17 curt>
@@ -16,18 +15,9 @@
 ;
 ; public	vectors
 ;
-; 	&0; &0; &0; &0;
-; 	&0; &0; &0; &0;
-; 	&0; &0; &0; &0;
-; 	&0; &0; &0; &0;
-;
 	.globl	_vectors
 	.extern	intrupt, m1int, m2int
 	.extern	m3int, clkint, _ovlntr
-	.defw	0,0,0,0
-	.defw	0,0,0,0
-	.defw	0,0,0,0
-	.defw	0,0,0,0
 
 ; ------- A-NATURAL SOURCE: vectors -------
 ; vectors:

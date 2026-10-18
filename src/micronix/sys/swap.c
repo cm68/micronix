@@ -113,7 +113,6 @@ swapout(p)
 
     if ((p->swap = salloc(p->nsegs << 3)) != 0 && swapio(BWRITE, p)) {
         p->mode |= SWAPPED;
-        pr("swapout %d: %d segs at %d\n", procid(p), p->nsegs, p->swap);
         return 1;
     } else {
         p->mode |= LOADED;
@@ -135,7 +134,6 @@ swapin(p)
     if (swapio(BREAD, p)) {
         sfree(p->nsegs << 3, p->swap);
         p->mode |= LOADED;
-        pr("swapin %d: %d segs at %d\n", procid(p), p->nsegs, p->swap);
         return 1;
     } else {
         mfree(p);

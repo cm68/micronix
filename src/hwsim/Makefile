@@ -7,7 +7,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-TARGETS = hwsim.o s100.o
+TARGETS = hwsim.o s100.o config.o mediachg.o
 INCLUDE = -I../include
 
 # specific machine directories

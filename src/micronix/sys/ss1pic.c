@@ -13,10 +13,16 @@
 extern int in(), out();
 extern int di(), ei();
 
-#define MPIC0   0x50            /* master: ICW1/OCW2/OCW3, IRR/ISR read */
-#define MPIC1   0x51            /* master: ICW2/ICW3/ICW4/OCW1 (the IMR) */
-#define SPIC0   0x52            /* the slave's same two ports */
-#define SPIC1   0x53
+/*
+ * The board's jumper block, which is 0x70 here and not CompuPro's
+ * default 0x50: 0x50 is the HDCA's and the HD-DMA's, and two cards on
+ * one port is one card that never answers.  The ROM's s1icw1 and the
+ * simulator's SS1_BASE say the same four numbers.
+ */
+#define MPIC0   0x70            /* master: ICW1/OCW2/OCW3, IRR/ISR read */
+#define MPIC1   0x71            /* master: ICW2/ICW3/ICW4/OCW1 (the IMR) */
+#define SPIC0   0x72            /* the slave's same two ports */
+#define SPIC1   0x73
 
 /*
  * End of interrupt on a line.  A master line (0-6) is dismissed by the

@@ -3,3 +3,35 @@ the HDDMA and the HDCA both share vi_0;
 that means that the assertion is a wire-or of both of them.
 the HDCA clearing it won't necessarily clear the interrupt, since the HDDMA might also have the level up.
 
+--------------------
+
+every emulated port number in here is a #define, and the real cards
+were strapped: the djdma's base, the hdca's, the console's, the two
+pics.  a machine under this simulator should be able to be a machine
+whose boards sit somewhere else, so the port numbers want to be
+overridable from the command line - an option per emulation, or one
+option that takes <card>:<addr> pairs.
+
+it is not only a matter of taste: a real machine with two of these
+cards, or with a board at a non-default address, is exactly the case
+the driver code has to survive, and right now the simulator cannot
+pose the question.
+
+the strap options are the same shape as -j (the djdma's J2), which is
+already there: name the card, say where its strap is.
+
+--------------------
+
+the media changer conditions which drive is being cycled on the drive
+number alone.  parse_drive() in djdma.c accepts the name "djdma" as a
+literal and then drops it, keeping only the 0-7, and loaded_set[] /
+loaded_vol[] are indexed by that number.  that is the same shortfall as
+the port numbers above: a machine with two djdma cards has no way to say
+which one's drive is meant, and a medium that can be changed on some
+other controller cannot be named at all.
+
+the grammar already carries the controller - "djdma:2", sys/MEDIACHG.md
+- so what it wants is for that name to resolve against the machine's
+boards rather than against a string constant, and for the loaded-set
+table to be keyed by controller instance and unit, not by a bare 0-7.
+

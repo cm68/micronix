@@ -381,9 +381,16 @@ ncr_update_irq(void)
  * The bus reset line, which is the initiator's to hold down and every
  * device's to obey.  Asserting it is not one more register write: it is
  * every target letting go of the bus at once, so a command in flight is
- * abandoned here, and the latches go with it - a card that kept a pending
- * interrupt through its own bus reset would ask again for a command that no
- * longer exists.
+ * abandoned here, and the parity and busy-error latches go with it - a
+ * card that kept a pending command error through its own bus reset would
+ * report it against a command that no longer exists.
+ *
+ * The interrupt latch is the exception, and deliberately so: the
+ * datasheet's description of ASSERT RST (ICR bit 7) is that IRQ goes
+ * active when the bit is set and stays active until RPI is read.  That
+ * is the documented way to find the card's IRQ strap with no target on
+ * the bus at all, and it is what the initiator's rising edge here
+ * raises - see wr_scsi.
  *
  * The chip's own command register is not cleared: on a 5380 the RST bit
  * drives the bus and the chip's /RESET pin clears the registers, which is
@@ -874,8 +881,20 @@ wr_scsi(portaddr p, byte v)
         old = icr;
         icr = v;
 
-        if ((v & ICR_RST) && !(old & ICR_RST))
+        if ((v & ICR_RST) && !(old & ICR_RST)) {
             ncr_reset_bus();
+            /*
+             * ASSERT RST is the one interrupt that needs no bus: "After
+             * this bit is set (1), IRQ goes active and all internal logic
+             * and control registers are reset (except for the interrupt
+             * latch and the ASSERT RST bit)."  Latch it, so writing the
+             * bit is the whole IRQ-strap probe.  ncr_reset_bus left the
+             * latch clear; set it after the reset, because the latch is
+             * exactly what the reset does not touch.
+             */
+            irq = 1;
+            ncr_update_irq();
+        }
 
         /*
          * A selection: the id mask on the data bus and SEL to say what

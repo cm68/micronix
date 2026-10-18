@@ -176,6 +176,7 @@ static int idereset();
  */
 #define CREAD   0x20            /* read sector(s), with retry */
 #define CWRITE  0x30            /* write sector(s), with retry */
+#define CIDENTIFY 0xec          /* identify device: says it is there */
 
 /*
  * The task file is seven registers - the seven an ATA command is written
@@ -1129,13 +1130,64 @@ ideioctl(dev, cmd, r, b)
 struct biovec idebvec = { &ideopen, &ideclose, &idestrat, &ideioctl };
 
 /*
+ * The alternate status register, read through /CS1.  It is the status
+ * byte without the acknowledgement, which is the whole of what the probe
+ * needs: it has to watch the command finish and still leave INTRQ up for
+ * the attach loop to find.  The port dance is myrd's, with the other chip
+ * select; the PPI has to be reading, so the caller puts it back first.
+ */
+static int
+ideastat()
+{
+	static UINT sel, val;
+
+	sel = DREGSEL(ASTAT);
+	out(PC, sel);
+	out(PC, sel | C_RD);
+	val = in(PA);
+	out(PC, sel);
+	out(PC, 0);
+	return (val);
+}
+
+/*
  * The probe: make the card raise its interrupt so the attach loop
- * (sys/probe.c) can discover which line it is on.  STUB - not written;
- * it must issue a command that completes and raises the card's done bit.
+ * (sys/probe.c) can discover which line it is on.  IDENTIFY DEVICE is
+ * the command that touches no sector - it asks the drive to describe
+ * itself, which it does out of its own registers - and it completes
+ * with a status the card turns into INTRQ like any other command.  The
+ * drive's interrupt enable is the one the reset leaves: on, which is
+ * what the attach loop needs to see the line go high.
+ *
+ * The status is polled rather than slept on because the attach runs
+ * with every line masked, so no handler would ever be called for this
+ * one.  A card with no drive in the bay still takes the command and
+ * still raises the line; it is the board the probe is testing for, not
+ * the medium.
  */
 ideprobe()
 {
-    return (0);
+	register struct ideif *ip;
+	register UINT32 n;
+	register int st;
+
+	ip = &boards[0];
+	(*ip->sel) (0);
+	(*ip->intr) (1);
+	(*ip->wr) (DRVHD, DLBA);
+	(*ip->wr) (ERRST, 0);
+	(*ip->wr) (SCOUNT, 1);
+	(*ip->wr) (LBA0, 0);
+	(*ip->wr) (LBA1, 0);
+	(*ip->wr) (LBA2, 0);
+	(*ip->wr) (STAT, CIDENTIFY);
+	(*ip->intr) (1);		/* back to read mode, INTRQ left up */
+	for (n = 0; n < SPIN; n++) {
+		st = ideastat();
+		if (!(st & SBSY))
+			break;
+	}
+	return (0);
 }
 
 /*

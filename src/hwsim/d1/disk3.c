@@ -153,6 +153,9 @@ d3_run(void)
 
     trace(trace_disk3, "disk3: op %x drv %d dma %06x link %06x\n",
           op, drv, dma, link);
+    l("d3: op %x cmd %02x drv %d dma %06x link %06x at %06x\n",
+      op, iopb.command, drv, (unsigned)dma, (unsigned)link,
+      (unsigned)iopb_addr);
 
     if (op != D3_GLOBAL && op != D3_NOOP && op != D3_VERSION &&
         select_drive(drv) < 0) {
@@ -246,10 +249,13 @@ d3_run(void)
 done:
     copyout((byte *)&iopb, iopb_addr, sizeof(iopb));
     iopb_addr = link;
+    l("d3: status %02x\n", iopb.status);
     if ((iopb.command & D3_INT) && !(iopb.command & D3_CONTINUE))
         set_vi(disk3_vi_line, 1, 1);
     else
         set_vi(disk3_vi_line, 1, 0);
+    l("d3: vi %d raise %d\n", disk3_vi_line,
+      (iopb.command & D3_INT) && !(iopb.command & D3_CONTINUE));
 }
 
 /*
@@ -273,8 +279,10 @@ attention(portaddr p, byte v)
         iopb_addr = physread(0x5d) | (physread(0x5e) << 8) |
                     (physread(0x5f) << 16);
         trace(trace_disk3, "disk3: initial link %06x\n", iopb_addr);
+        l("d3: initial link %06x\n", (unsigned)iopb_addr);
         return;
     }
+    l("d3: attention %02x\n", v);
 
     d3_run();
 }

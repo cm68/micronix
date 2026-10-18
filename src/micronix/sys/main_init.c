@@ -6,7 +6,7 @@
  * the 0xd000 scratch window - and main_data.c's expand_bufs() mints
  * buffer headers over it once the init-only functions have returned.
  * The resident data it touches (plist, ilist, flist, mlist, nbuf,
- * btop, rootdir, map0, image0) lives in main_data.c.
+ * btop, rootdir, map0) lives in main_data.c.
  *
  * sys/main_init.c
  * Changed: <2026-09-26 curt>
@@ -36,9 +36,11 @@ extern struct inode *rootdir;
 extern UINT nbuf;
 extern UINT totmem;
 extern struct buf *btop;
-extern UINT8 map0[], image0[];
+extern UINT8 map0[];
+extern char lowbss[];           /* uhdr.s's _lowbss: the freed low memory */
 extern UINT8 segmap[];          /* malloc.c */
 extern UINT nsegs;
+extern UINT lastseg;            /* uhdr.s's _lastseg: the allocator hint */
 extern int segalloc();          /* malloc.c */
 extern int swapinit();          /* malloc.c */
 extern int nodev();             /* con.c */
@@ -98,6 +100,7 @@ main()
     char ronly = 0;
 
     cus();                      /* custom hardware */
+    zero(lowbss, 480);          /* clear the freed low-memory bss */
     enable();                   /* enable interrupts */
     coninit();
     plogo();
@@ -146,6 +149,14 @@ main()
                 }
             }
     }
+    /*
+     * A unit that did not answer sets u.error - that is how the driver
+     * reports the silence - and the enumeration is over, so none of it
+     * is the system's error.  It must not outlive the probe: swapinit()
+     * reads u.error as "the swap device's open failed", and a stale one
+     * there costs the machine its swap over a drive that is not fitted.
+     */
+    u.error = 0;
     ovlmap(major(rootdev));
 
     /*
@@ -181,8 +192,8 @@ main()
  * wants the frame for the moment the copy is on: the read that fills it
  * has already happened, and reading is what maps the frame back.
  *
- * image0 and not map0 all the way through, as newmap() writes it: the map
- * registers are write-only.
+ * map0 only: the registers are write-only, and the slot's identity page
+ * is restored with a literal.
  */
 static
 putblk(bp, seg, off)
@@ -191,11 +202,11 @@ putblk(bp, seg, off)
 {
     UINT8 save;
 
-    save = image0[2 * OVLSEG];
-    map0[2 * OVLSEG] = image0[2 * OVLSEG] = (UINT8) seg;
+    save = OVLSEG;              /* the slot's identity page */
+    map0[2 * OVLSEG] = (UINT8) seg;
     copy(bhold(bp), (char *) OVLBASE + off, 512);
     brel();
-    map0[2 * OVLSEG] = image0[2 * OVLSEG] = save;
+    map0[2 * OVLSEG] = save;
 }
 
 /*
@@ -222,7 +233,7 @@ ovlplaceall()
     struct obj hdr;
     struct inode *ip;
     long modbase;
-    UINT nmod, n, i, seg, maj, ra;
+    UINT nmod, n, i, seg, maj, ra, bn;
     int bad;
     struct buf *bp;
     char *s;
@@ -275,8 +286,8 @@ ovlplaceall()
          * frame is the answer to a question about a driver already
          * mapped, and the next putblk saves and restores around it.
          */
-        bp = bread(imap(ip, (UINT) (modbase >> 9) + n * 8, &ra), rootdev);
-        if (bp == 0) {
+        bn = imap(ip, (UINT) (modbase >> 9) + n * 8, &ra, IREAD);
+        if (bn == 0 || (bp = bread(bn, rootdev)) == 0) {
             pr("ovl: page %d will not read\n", n);
             continue;
         }
@@ -292,9 +303,8 @@ ovlplaceall()
         brelse(bp);
         bad = 0;
         for (i = 1; i < PAGESZ / 512; i++) {
-            bp = bread(imap(ip, (UINT) (modbase >> 9) + n * 8 + i, &ra),
-                       rootdev);
-            if (bp == 0) {      /* a short page is not a page: place none of it */
+            bn = imap(ip, (UINT) (modbase >> 9) + n * 8 + i, &ra, IREAD);
+            if (bn == 0 || (bp = bread(bn, rootdev)) == 0) {    /* a short page is not a page */
                 bad = 1;
                 continue;
             }
@@ -396,6 +406,7 @@ meminit()
 
     di();
     nsegs = MAXSEG - 16;
+    lastseg = 16;               /* the first segment past the kernel's own */
     for (n = 16; n < MAXSEG; n++) {
         map0[2] = n;
         ADDR = 0;
@@ -406,7 +417,7 @@ meminit()
         segmap[n] = 1;
         nsegs--;
     }
-    map0[2] = image0[2];
+    map0[2] = 1;                /* seg 1 -> page 1, back to identity */
     ei();
 
     totmem = (nsegs << 2) + 64;     /* full memory, saved for signon() */

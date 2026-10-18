@@ -5,6 +5,7 @@
  */
 
 #include "sim.h"
+#include "config.h"
 #include "hwsim.h"
 #include "vimap.h"
 #include "util.h"
@@ -96,15 +97,22 @@ int rampage;
 /*
  * port numbers and functions
  */
-#define HDCA_PORT       0x50
-#define	HDCA_CONTROL 	0x50        // write control
-#define	HDCA_CMD        0x51        // write command
-#define	HDCA_FUNC       0x52        // write selects/step
-#define HDCA_DATA       0x53        // write data
+/*
+ * Where the board is strapped.  The port constants below are offsets from
+ * it, so moving the card moves its whole register set - which is the only
+ * way this card is addressed.
+ */
+#define HDCA_BASE       0x50
+static int hdca_base = HDCA_BASE;
 
-#define	HDCA_PSR     	0x50        // primary status
-#define	HDCA_SSR     	0x51        // secondary status
-#define	HDCA_INT     	0x52        // interrupt clear
+#define	HDCA_CONTROL 	0x00        // write control
+#define	HDCA_CMD        0x01        // write command
+#define	HDCA_FUNC       0x02        // write selects/step
+#define HDCA_DATA       0x03        // write data
+
+#define	HDCA_PSR     	0x00        // primary status
+#define	HDCA_SSR     	0x01        // secondary status
+#define	HDCA_INT     	0x02        // interrupt clear
 
 // 0x50 - HDCA control port
 #define CONT_FRENBL     0x01        // enable drive select and function register
@@ -495,15 +503,16 @@ hdca_init()
 {
     int i;
 
+	hdca_base = conf_board_hex("hdca", 0, "base", HDCA_BASE);
 	hdca_vi_line = wiring_vi_line("hdca");
-	register_output(HDCA_CONTROL, &wr_hdca_control);
-	register_output(HDCA_CMD, &wr_hdca_cmd);
-	register_output(HDCA_FUNC, &wr_hdca_func);
-	register_output(HDCA_DATA, &wr_hdca_data);
-	register_input(HDCA_PSR, &rd_hdca_psr);
-	register_input(HDCA_SSR, &rd_hdca_ssr);
-	register_input(HDCA_INT, &rd_hdca_intclr);
-	register_input(HDCA_DATA, &rd_hdca_data);
+	register_output(hdca_base + HDCA_CONTROL, &wr_hdca_control);
+	register_output(hdca_base + HDCA_CMD, &wr_hdca_cmd);
+	register_output(hdca_base + HDCA_FUNC, &wr_hdca_func);
+	register_output(hdca_base + HDCA_DATA, &wr_hdca_data);
+	register_input(hdca_base + HDCA_PSR, &rd_hdca_psr);
+	register_input(hdca_base + HDCA_SSR, &rd_hdca_ssr);
+	register_input(hdca_base + HDCA_INT, &rd_hdca_intclr);
+	register_input(hdca_base + HDCA_DATA, &rd_hdca_data);
 
     psr = PSR_HALT | PSR_NFAULT | PSR_COMPLT | PSR_OPDONE;
 

@@ -15,6 +15,8 @@
 
 extern long seconds;
 
+extern char zpage[];            /* exec.c: a 512-byte zero page */
+
 /*
  * Read a file from its inode. The transfer parameters
  * are u.count, u.base, and u.offset.
@@ -49,17 +51,21 @@ iread(ip)
     log = u.offset >> 9;        /* divide by 512 */
     into = u.offset & 511;      /* mod 512 */
     while (u.count != 0) {
-        phys = imap(ip, log, &rahead);
+        phys = imap(ip, log, &rahead, IREAD);
         if (u.error)
             break;
         nbytes = min(u.count, 512 - into);
-        if (rahead != 0 && into + nbytes == 512)
-            aread(rahead, dev);
-        if ((bp = bread(phys, dev)) == 0)
-            break;
-        iomove(READ, bhold(bp) + into, nbytes);
-        brel();
-        brelse(bp);
+        if (phys == 0)          /* hole: zero-fill from zpage, no read */
+            iomove(READ, zpage, nbytes);
+        else {
+            if (rahead != 0 && into + nbytes == 512)
+                aread(rahead, dev);
+            if ((bp = bread(phys, dev)) == 0)
+                break;
+            iomove(READ, bhold(bp) + into, nbytes);
+            brel();
+            brelse(bp);
+        }
         log++;
         into = 0;
     }
@@ -98,7 +104,7 @@ iwrite(ip)
     log = u.offset >> 9;        /* divide by 512 */
     into = u.offset & 511;      /* mod 512 */
     while (u.count != 0) {
-        phys = imap(ip, log, &dummy);   /* rahead not used */
+        phys = imap(ip, log, &dummy, IWRITE);   /* rahead not used */
         if (u.error)
             break;
         if ((nbytes = min(u.count, 512 - into)) == 512)

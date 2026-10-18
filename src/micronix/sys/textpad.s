@@ -13,7 +13,7 @@
 	.bss
 	.globl	_blist
 _blist:
-	.ds	168		; 8 * sizeof(struct buf) = 8*21, the boot headers
+	.ds	152		; 8 * sizeof(struct buf) = 8*19, the boot headers
 	.globl	_ebss
 _ebss:
 	.ds	0

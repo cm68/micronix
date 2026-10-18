@@ -19,10 +19,11 @@
 extern int in(), out();
 extern int di(), ei();
 
-#define MPIC0   0x50            /* master: ICW1/OCW2/OCW3, IRR/ISR read */
-#define MPIC1   0x51            /* master: ICW2/ICW3/ICW4/OCW1 (the IMR) */
-#define SPIC0   0x52            /* the slave's same two ports */
-#define SPIC1   0x53
+/* the board's jumper block: 0x70, not CompuPro's default 0x50 - see ss1pic.c */
+#define MPIC0   0x70            /* master: ICW1/OCW2/OCW3, IRR/ISR read */
+#define MPIC1   0x71            /* master: ICW2/ICW3/ICW4/OCW1 (the IMR) */
+#define SPIC0   0x72            /* the slave's same two ports */
+#define SPIC1   0x73
 
 extern char ss1_master_vec[];   /* sys/ss1pic.s: 32 bytes of table, slack above */
 extern char ss1_slave_vec[];

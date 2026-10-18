@@ -27,7 +27,27 @@
 
 int logfd = 1;
 int no_console_log;    /* -n: debug stream goes to the logfile, not the terminal */
-int console_logfd = -1; /* -L: tee the console (uart0) output to this file */
+int console_logfd = -1; /* -L: tee the console output to this file */
+
+/*
+ * Tee one character of console output into the -L log.
+ *
+ * The console is whichever card the machine's wiring gives it to - the
+ * MultIO/Wunderbus ACE, the CompuPro SS1's 2651, or the floppy
+ * controller's bit banged serial - so every one of them calls this with
+ * what it just transmitted, and one log covers all three.  The device
+ * still writes its own window; this is the second copy, and it is
+ * deliberately independent of that window's fd, because the case that
+ * matters is a console with no window at all.
+ */
+void
+console_log(int c)
+{
+    char ch = c;
+
+    if (console_logfd != -1)
+        write(console_logfd, &ch, 1);
+}
 
 /*
  * byte bitoff formatter.

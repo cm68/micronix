@@ -24,312 +24,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-/* ------------------------------------------------------------------ */
-/* a minimal JSON DOM                                                  */
-
-#define J_OBJ  1
-#define J_ARR  2
-#define J_STR  3
-#define J_NUM  4
-#define J_BOOL 5
-#define J_NULL 6
-
-typedef struct jv jv;
-struct jv {
-	int type;
-	char *str;		/* J_STR value */
-	long num;		/* J_NUM */
-	int b;			/* J_BOOL */
-	jv **v;			/* object values / array items */
-	char **key;		/* object keys, parallel to v (NULL for arrays) */
-	int n;
-};
-
-static void
-jerr(const char *p, const char *msg)
-{
-	fprintf(stderr, "hwsim: json: %s near: %.20s\n", msg, p);
-	exit(1);
-}
-
-static jv *
-jnew(int type)
-{
-	jv *j = calloc(1, sizeof *j);
-	j->type = type;
-	return j;
-}
-
-static void
-jpush(jv *parent, char *key, jv *child)
-{
-	parent->v = realloc(parent->v, (parent->n + 1) * sizeof *parent->v);
-	if (parent->type == J_OBJ) {
-		parent->key = realloc(parent->key, (parent->n + 1) * sizeof *parent->key);
-		parent->key[parent->n] = key;
-	}
-	parent->v[parent->n] = child;
-	parent->n++;
-}
-
-static void
-skip_ws(const char **p)
-{
-	while (**p && isspace((unsigned char)**p))
-		(*p)++;
-}
-
-/* *p is at the opening quote; returns a fresh string, *p past the close. */
-static char *
-parse_string(const char **p)
-{
-	const char *s;
-	char *out, *o;
-
-	(*p)++;
-	out = malloc(strlen(*p) + 1);
-	o = out;
-	for (s = *p; *s && *s != '"'; s++) {
-		if (*s != '\\') {
-			*o++ = *s;
-			continue;
-		}
-		s++;
-		switch (*s) {
-		case 'n': *o++ = '\n'; break;
-		case 't': *o++ = '\t'; break;
-		case 'r': *o++ = '\r'; break;
-		case 'b': *o++ = '\b'; break;
-		case 'f': *o++ = '\f'; break;
-		case 'u': s += 4; *o++ = '?'; break;	/* unicode: config is ASCII */
-		default:  *o++ = *s; break;		/* \" \\ \/ and friends */
-		}
-	}
-	if (*s != '"')
-		jerr(*p, "unterminated string");
-	*p = s + 1;
-	*o = '\0';
-	return out;
-}
-
-static jv *parse_value(const char **p);
-
-static jv *
-parse_object(const char **p)
-{
-	jv *o = jnew(J_OBJ);
-
-	(*p)++;				/* { */
-	skip_ws(p);
-	if (**p == '}') {
-		(*p)++;
-		return o;
-	}
-	for (;;) {
-		char *key;
-		jv *v;
-
-		skip_ws(p);
-		if (**p != '"')
-			jerr(*p, "expected object key");
-		key = parse_string(p);
-		skip_ws(p);
-		if (**p != ':')
-			jerr(*p, "expected ':'");
-		(*p)++;
-		skip_ws(p);
-		v = parse_value(p);
-		jpush(o, key, v);
-		skip_ws(p);
-		if (**p == ',') {
-			(*p)++;
-			continue;
-		}
-		if (**p == '}') {
-			(*p)++;
-			return o;
-		}
-		jerr(*p, "expected ',' or '}'");
-	}
-}
-
-static jv *
-parse_array(const char **p)
-{
-	jv *a = jnew(J_ARR);
-
-	(*p)++;				/* [ */
-	skip_ws(p);
-	if (**p == ']') {
-		(*p)++;
-		return a;
-	}
-	for (;;) {
-		jv *v;
-
-		skip_ws(p);
-		v = parse_value(p);
-		jpush(a, NULL, v);
-		skip_ws(p);
-		if (**p == ',') {
-			(*p)++;
-			continue;
-		}
-		if (**p == ']') {
-			(*p)++;
-			return a;
-		}
-		jerr(*p, "expected ',' or ']'");
-	}
-}
-
-static jv *
-parse_value(const char **p)
-{
-	skip_ws(p);
-	if (**p == '{')
-		return parse_object(p);
-	if (**p == '[')
-		return parse_array(p);
-	if (**p == '"') {
-		jv *j = jnew(J_STR);
-		j->str = parse_string(p);
-		return j;
-	}
-	if (strncmp(*p, "true", 4) == 0) {
-		jv *j = jnew(J_BOOL);
-		j->b = 1;
-		*p += 4;
-		return j;
-	}
-	if (strncmp(*p, "false", 5) == 0) {
-		jv *j = jnew(J_BOOL);
-		j->b = 0;
-		*p += 5;
-		return j;
-	}
-	if (strncmp(*p, "null", 4) == 0) {
-		*p += 4;
-		return jnew(J_NULL);
-	}
-	if (**p == '-' || isdigit((unsigned char)**p)) {
-		char *end;
-		jv *j = jnew(J_NUM);
-		j->num = strtol(*p, &end, 10);
-		*p = end;
-		return j;
-	}
-	jerr(*p, "unexpected character");
-	return NULL;
-}
-
-static jv *
-json_parse(const char *text)
-{
-	const char *p = text;
-	jv *root = parse_value(&p);
-	skip_ws(&p);
-	if (*p != '\0')
-		jerr(p, "trailing garbage");
-	return root;
-}
-
-/* object member lookup */
-static jv *
-jget(jv *o, const char *key)
-{
-	int i;
-
-	if (!o || o->type != J_OBJ)
-		return NULL;
-	for (i = 0; i < o->n; i++)
-		if (o->key[i] && strcmp(o->key[i], key) == 0)
-			return o->v[i];
-	return NULL;
-}
-
-static const char *
-js(jv *o, const char *key)
-{
-	jv *x = jget(o, key);
-	return (x && x->type == J_STR) ? x->str : NULL;
-}
-
-static long
-jnum(jv *o, const char *key)
-{
-	jv *x = jget(o, key);
-	return (x && x->type == J_NUM) ? x->num : 0;
-}
-
-static int
-jb(jv *o, const char *key)
-{
-	jv *x = jget(o, key);
-	return (x && x->type == J_BOOL) ? x->b : 0;
-}
-
-/* ------------------------------------------------------------------ */
-/* pretty-print (also the serializer for add/del)                      */
-
-static void
-json_print(FILE *f, jv *j, int indent)
-{
-	int i;
-
-	switch (j->type) {
-	case J_NULL:
-		fprintf(f, "null");
-		break;
-	case J_BOOL:
-		fprintf(f, "%s", j->b ? "true" : "false");
-		break;
-	case J_NUM:
-		fprintf(f, "%ld", j->num);
-		break;
-	case J_STR:
-		fputc('"', f);
-		for (i = 0; j->str[i]; i++) {
-			unsigned char c = j->str[i];
-			switch (c) {
-			case '"': fputs("\\\"", f); break;
-			case '\\': fputs("\\\\", f); break;
-			case '\n': fputs("\\n", f); break;
-			case '\t': fputs("\\t", f); break;
-			default: fputc(c, f); break;
-			}
-		}
-		fputc('"', f);
-		break;
-	case J_ARR:
-		fputc('[', f);
-		for (i = 0; i < j->n; i++) {
-			if (i)
-				fputc(',', f);
-			if (j->n > 1)
-				fprintf(f, "\n%*s", indent + 2, "");
-			json_print(f, j->v[i], indent + 2);
-		}
-		if (j->n > 1)
-			fprintf(f, "\n%*s", indent, "");
-		fputc(']', f);
-		break;
-	case J_OBJ:
-		fputc('{', f);
-		for (i = 0; i < j->n; i++) {
-			if (i)
-				fputc(',', f);
-			if (j->n > 1)
-				fprintf(f, "\n%*s", indent + 2, "");
-			fprintf(f, "\"%s\": ", j->key[i]);
-			json_print(f, j->v[i], indent + 2);
-		}
-		if (j->n > 1)
-			fprintf(f, "\n%*s", indent, "");
-		fputc('}', f);
-		break;
-	}
-}
+#include <json.h>
 
 /* ------------------------------------------------------------------ */
 /* sim.json location and the repo root                                 */
@@ -375,27 +70,12 @@ sim_json_path(const char *root, const char *override)
 static jv *
 load_sim(const char *path)
 {
-	FILE *f;
-	long sz;
-	char *text;
-	jv *root;
+	jv *root = json_read(path);
 
-	f = fopen(path, "r");
-	if (!f) {
-		fprintf(stderr, "hwsim: cannot open %s: %s\n", path, strerror(errno));
+	if (!root) {
+		json_perror("hwsim");
 		exit(1);
 	}
-	fseek(f, 0, SEEK_END);
-	sz = ftell(f);
-	rewind(f);
-	text = malloc(sz + 1);
-	if (fread(text, 1, sz, f) != (size_t)sz) {
-		fprintf(stderr, "hwsim: short read on %s\n", path);
-		exit(1);
-	}
-	text[sz] = '\0';
-	fclose(f);
-	root = json_parse(text);
 	return root;
 }
 
@@ -504,9 +184,9 @@ parse_dev(const char *tok, int *major, int *minor)
 static int
 pack_config(jv *config)
 {
-	const char *boot = js(config, "boot");
-	const char *clock = js(config, "clock");
-	jv *xterm = jget(config, "xterm");
+	const char *boot = json_str(config, "boot");
+	const char *clock = json_str(config, "clock");
+	jv *xterm = json_get(config, "xterm");
 	int c = 0;
 	int i;
 
@@ -517,7 +197,7 @@ pack_config(jv *config)
 			c |= 0x10;
 		/* hdca / ide are 0x00 */
 	}
-	if (jb(config, "nomon"))
+	if (json_bool(config, "nomon"))
 		c |= 0x04;
 	if (xterm && xterm->type == J_ARR) {
 		for (i = 0; i < xterm->n; i++) {
@@ -657,10 +337,10 @@ static const char *g_json;	/* the sim.json path, for add/del to rewrite */
 static jv *
 sim_get(const char *name)
 {
-	jv *sims = jget(db, "sims");
+	jv *sims = json_get(db, "sims");
 	jv *sim;
 
-	if (!sims || !(sim = jget(sims, name))) {
+	if (!sims || !(sim = json_get(sims, name))) {
 		fprintf(stderr, "hwsim: no such sim: %s\n", name);
 		exit(1);
 	}
@@ -690,7 +370,7 @@ itoh(int v)
 static char *
 write_manifest(const char *root)
 {
-	jv *ms = jget(db, "mediasets");
+	jv *ms = json_get(db, "mediasets");
 	char tmp[] = "/tmp/hwsim-manifest-XXXXXX";
 	int fd = mkstemp(tmp);
 	FILE *f;
@@ -702,7 +382,7 @@ write_manifest(const char *root)
 	}
 	f = fdopen(fd, "w");
 	for (i = 0; ms && i < ms->n; i++) {
-		jv *vols = jget(ms->v[i], "volumes");
+		jv *vols = json_get(ms->v[i], "volumes");
 		fprintf(f, "%s", ms->key[i]);
 		for (k = 0; vols && k < vols->n; k++)
 			if (vols->v[k]->type == J_STR)
@@ -719,7 +399,7 @@ write_manifest(const char *root)
 static void
 v_list(void)
 {
-	jv *sims = jget(db, "sims");
+	jv *sims = json_get(db, "sims");
 	int i;
 
 	if (!sims) {
@@ -733,22 +413,22 @@ v_list(void)
 static void
 v_show(const char *name)
 {
-	jv *sims = jget(db, "sims");
+	jv *sims = json_get(db, "sims");
 	jv *sim;
 	jv *config;
 	const char *root, *swap;
 	int major, minor;
 
-	if (!sims || !(sim = jget(sims, name))) {
+	if (!sims || !(sim = json_get(sims, name))) {
 		fprintf(stderr, "hwsim: no such sim: %s\n", name);
 		exit(1);
 	}
 	json_print(stdout, sim, 0);
 	fputc('\n', stdout);
 
-	config = jget(sim, "config");
-	root = js(sim, "root");
-	swap = js(sim, "swap");
+	config = json_get(sim, "config");
+	root = json_str(sim, "root");
+	swap = json_str(sim, "swap");
 	printf("# root %s", root ? root : "-");
 	if (root && parse_dev(root, &major, &minor) == 0)
 		printf(" = %d/%d", major, minor);
@@ -756,22 +436,22 @@ v_show(const char *name)
 	if (swap && parse_dev(swap, &major, &minor) == 0)
 		printf(" = %d/%d", major, minor);
 	printf("\n# -c 0x%x\n", pack_config(config));
-	if (js(sim, "wiring"))
-		printf("# -w %s\n", js(sim, "wiring"));
+	if (json_str(sim, "wiring"))
+		printf("# -w %s\n", json_str(sim, "wiring"));
 }
 
 static void
 v_format(const char *root, const char *name)
 {
 	jv *sim = sim_get(name);
-	jv *vols = jget(sim, "volumes");
+	jv *vols = json_get(sim, "volumes");
 	char *mnix = resolve_path(root, "src/tools/mnix");
 	int i;
 
 	for (i = 0; vols && i < vols->n; i++) {
 		jv *v = vols->v[i];
-		const char *geom = js(v, "geometry");
-		const char *img = js(v, "image");
+		const char *geom = json_str(v, "geometry");
+		const char *img = json_str(v, "image");
 		char *av[8];
 
 		if (!geom || !img) {
@@ -791,14 +471,14 @@ static void
 v_partition(const char *root, const char *name)
 {
 	jv *sim = sim_get(name);
-	jv *vols = jget(sim, "volumes");
+	jv *vols = json_get(sim, "volumes");
 	char *mnix = resolve_path(root, "src/tools/mnix");
 	int i;
 
 	for (i = 0; vols && i < vols->n; i++) {
 		jv *v = vols->v[i];
-		const char *geom = js(v, "geometry");
-		const char *img = js(v, "image");
+		const char *geom = json_str(v, "geometry");
+		const char *img = json_str(v, "image");
 		struct medium *m;
 		struct slice sl[8];
 		char *av[64];
@@ -834,14 +514,14 @@ static void
 v_mkfs(const char *root, const char *name)
 {
 	jv *sim = sim_get(name);
-	jv *vols = jget(sim, "volumes");
+	jv *vols = json_get(sim, "volumes");
 	char *mnix = resolve_path(root, "src/tools/mnix");
 	char *bootimg = resolve_path(root, "src/micronix/stand/boot/bootimg");
 	int i;
 
 	for (i = 0; vols && i < vols->n; i++) {
 		jv *v = vols->v[i];
-		const char *img = js(v, "image");
+		const char *img = json_str(v, "image");
 		char *av[8];
 
 		if (!img) {
@@ -863,12 +543,12 @@ static void
 v_boot(const char *root, const char *name, int debug)
 {
 	jv *sim = sim_get(name);
-	jv *config = jget(sim, "config");
-	jv *vols = jget(sim, "volumes");
-	const char *emu = js(sim, "emulator");
-	const char *mon = js(sim, "monitor");
-	const char *kernel = js(sim, "kernel");
-	const char *wiring = js(sim, "wiring");
+	jv *config = json_get(sim, "config");
+	jv *vols = json_get(sim, "volumes");
+	const char *emu = json_str(sim, "emulator");
+	const char *mon = json_str(sim, "monitor");
+	const char *kernel = json_str(sim, "kernel");
+	const char *wiring = json_str(sim, "wiring");
 	char *simbin;
 	char *manifest;
 	char *logpath;
@@ -903,8 +583,8 @@ v_boot(const char *root, const char *name, int debug)
 	av[n++] = logpath;
 	for (i = 0; vols && i < vols->n; i++) {
 		jv *v = vols->v[i];
-		const char *ctl = js(v, "controller");
-		const char *img = js(v, "image");
+		const char *ctl = json_str(v, "controller");
+		const char *img = json_str(v, "image");
 		char *imgpath, *wiring;
 
 		if (!ctl || !img) {
@@ -918,7 +598,7 @@ v_boot(const char *root, const char *name, int debug)
 			exit(1);
 		}
 		wiring = malloc(strlen(ctl) + strlen(imgpath) + 16);
-		sprintf(wiring, "%s%ld:%s", ctl, jnum(v, "unit"), imgpath);
+		sprintf(wiring, "%s%ld:%s", ctl, json_num(v, "unit"), imgpath);
 		av[n++] = wiring;
 	}
 	av[n] = NULL;
@@ -944,27 +624,27 @@ static void
 v_add(const char *name, char **args)
 {
 	jv *sim = sim_get(name);
-	jv *vols = jget(sim, "volumes");
+	jv *vols = json_get(sim, "volumes");
 	jv *vol, *x;
 
 	if (!vols || vols->type != J_ARR) {
-		vols = jnew(J_ARR);
-		jpush(sim, strdup("volumes"), vols);
+		vols = json_new(J_ARR);
+		json_push(sim, strdup("volumes"), vols);
 	}
-	vol = jnew(J_OBJ);
-	x = jnew(J_STR);
+	vol = json_new(J_OBJ);
+	x = json_new(J_STR);
 	x->str = strdup(args[0]);
-	jpush(vol, strdup("controller"), x);
-	x = jnew(J_NUM);
+	json_push(vol, strdup("controller"), x);
+	x = json_new(J_NUM);
 	x->num = atol(args[1]);
-	jpush(vol, strdup("unit"), x);
-	x = jnew(J_STR);
+	json_push(vol, strdup("unit"), x);
+	x = json_new(J_STR);
 	x->str = strdup(args[2]);
-	jpush(vol, strdup("geometry"), x);
-	x = jnew(J_STR);
+	json_push(vol, strdup("geometry"), x);
+	x = json_new(J_STR);
 	x->str = strdup(args[3]);
-	jpush(vol, strdup("image"), x);
-	jpush(vols, NULL, vol);
+	json_push(vol, strdup("image"), x);
+	json_push(vols, NULL, vol);
 	save_db();
 	printf("hwsim: added %s:%s to %s\n", args[0], args[1], name);
 }
@@ -973,7 +653,7 @@ static void
 v_del(const char *name, const char *tok)
 {
 	jv *sim = sim_get(name);
-	jv *vols = jget(sim, "volumes");
+	jv *vols = json_get(sim, "volumes");
 	char ctl[32];
 	int unit;
 	int i, found = -1;
@@ -984,8 +664,8 @@ v_del(const char *name, const char *tok)
 		exit(1);
 	}
 	for (i = 0; vols && i < vols->n; i++) {
-		const char *c = js(vols->v[i], "controller");
-		if (c && strcmp(c, ctl) == 0 && jnum(vols->v[i], "unit") == unit) {
+		const char *c = json_str(vols->v[i], "controller");
+		if (c && strcmp(c, ctl) == 0 && json_num(vols->v[i], "unit") == unit) {
 			found = i;
 			break;
 		}

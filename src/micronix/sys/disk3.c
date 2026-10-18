@@ -36,12 +36,13 @@
  */
 static int d3error();
 static void d3link();
-static void d3specify();
+static int d3specify();
 static UINT32 d3addr();
 
 #define NDRIVES 4               /* Number of drives */
 #define RETRIES 10              /* no. of retries on r/w error */
 #define D3DEADLINE 1            /* ticks a request may sit in flight */
+#define D3SPIN  10000           /* polls of the status before the board is absent */
 
 /*
  * Drive configuration information, one per drive.
@@ -240,7 +241,11 @@ d3start()
         iopb.arg[0] = D3_ABS;
         iopb.arg[1] = RETRIES;
         iopb.arg[2] = NDRIVES;
-        d3wait();
+        if (!d3wait()) {        /* no board answers: fail and stop */
+            d3error();
+            advque();
+            return;
+        }
     }
     newdrv();
 }
@@ -324,10 +329,18 @@ newdrv()
         newrw();
         return;
     }
-    d3specify(curdrv);
+    if (!d3specify(curdrv)) {
+        d3error();
+        advque();
+        return;
+    }
     iopb.command = D3_HOME;
     iopb.drive = curdrv;
-    d3wait();
+    if (!d3wait()) {
+        d3error();
+        advque();
+        return;
+    }
     d3info->curtrk = 0;
     d3info->flags |= CALIB;
     newrw();
@@ -346,7 +359,7 @@ newdrv()
  */
 newrw()
 {
-    static UINT32 abs;
+    static UINT32 abs, dma;
     UINT spc;
 
     spc = d3info->spc;
@@ -360,9 +373,17 @@ newrw()
     iopb.arg[4] = (UINT8) (abs >> 24);
     iopb.arg[5] = 1;            /* sector count, low */
     iopb.arg[6] = 0;            /* sector count, high */
-    iopb.data = (UINT8) (unsigned) d3buf->data;
-    iopb.xdata = (UINT8) ((unsigned) d3buf->data >> 8);
-    iopb.sdata = d3buf->xmem;
+    /*
+     * The buffer's data pointer is a window address and xmem is the page,
+     * so the address the board has to hold is the page folded in, exactly
+     * as sys/disk1.c and sys/disk2.c do for their channels.  The board is
+     * a bus master and sees physical memory; the window address is the
+     * kernel's alone.
+     */
+    dma = ((UINT32) d3buf->xmem << 12) | ((unsigned) d3buf->data & 0xfff);
+    iopb.data = (UINT8) dma;
+    iopb.xdata = (UINT8) (dma >> 8);
+    iopb.sdata = (UINT8) (dma >> 16);
     if (d3info->flags & RECAL)
         d3info->flags &= ~RECAL;
     else
@@ -401,7 +422,7 @@ d3error()
  * is a data object in this module, so the board is handed its physical
  * address in the IOPB's DATA field - d3addr, below.
  */
-static void
+static int
 d3specify(drive)
     UINT drive;
 {
@@ -424,7 +445,7 @@ d3specify(drive)
     iopb.data = (UINT8) a;
     iopb.xdata = (UINT8) (a >> 8);
     iopb.sdata = (UINT8) (a >> 16);
-    d3wait();
+    return (d3wait());
 }
 
 /*
@@ -484,7 +505,7 @@ d3link()
  */
 reset()
 {
-    extern char map0[], image0[];
+    extern char map0[];
     static UINT32 a;
     int *ichan;
 
@@ -495,7 +516,7 @@ reset()
     map0[2] = 0;
     ichan[0] = (UINT) a;        /* the low two bytes */
     ichan[1] = (UINT) (a >> 16);/* and the high byte */
-    map0[2] = image0[2];
+    map0[2] = 1;
     inton(DISK3INT);
     ei();
     out(D3_ATTN, D3_RESET);     /* hold the 8085 in reset */
@@ -523,12 +544,25 @@ issue()
 }
 
 /*
- * Issue a command and wait for completion.
+ * Issue a command and wait for completion.  A fitted board answers a
+ * polled command within a revolution, so the poll is bounded by two
+ * revolutions: a board that sits BUSY past that is not there, and the
+ * caller is told so instead of the one-second watchdog having to shoot
+ * the request down.
  */
 d3wait()
 {
+    static UINT32 i;
+
     attn();
-    while (iopb.status == D3_BUSY);
+    for (i = 0; iopb.status == D3_BUSY && i < D3SPIN; i++)
+        ;
+    if (iopb.status == D3_BUSY) {
+        iopb.status = D3_NOTRDY;
+        d3state = STOPPED;
+        return (0);
+    }
+    return (1);
 }
 
 /*
@@ -569,13 +603,30 @@ disk3check()
 struct biovec disk3bvec = { &disk3open, &disk3close, &disk3strat, 0 };
 
 /*
- * The probe: make the card raise its interrupt so the attach loop
- * (sys/probe.c) can discover which line it is on.  STUB - not written;
- * it must issue a command that completes and raises the card's done bit.
+ * The attach probe (sys/ovl.h's `probe`): a command that completes with
+ * D3_INT set leaves the board's interrupt asserted, which is what
+ * intr_attach (sys/probe_init.c) reads out of the PIC's pending register
+ * to discover the line.
+ *
+ * The board is brought up exactly as the first request brings it up - a
+ * reset, the initial link at 0x5d, two attentions - and then runs a
+ * VERSION, the one command that needs neither a drive nor a transfer.
+ * The state says STOPPED so the interrupt the tickle leaves behind is
+ * ignored by disk3int: nothing is in flight, and there is no buffer for
+ * the handler to finish.
  */
 disk3probe()
 {
-    return (0);
+    static UINT32 i;
+
+    reset();
+    iopb.command = D3_VERSION | D3_INT;
+    iopb.drive = 0;
+    iopb.status = D3_BUSY;
+    d3state = STOPPED;
+    attn();
+    for (i = 0; iopb.status == D3_BUSY && i < D3SPIN; i++)
+        ;
 }
 
 /*

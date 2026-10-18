@@ -39,17 +39,9 @@ sbdump(sup, what)
     register int i;
     register struct buf *b, *b13;
     extern struct buf *btop;
-    extern UINT8 image0[];
 
     pr("sbdump(%s) sup %x slot0 %x blist %x btop %x\n",
         what, sup, blist, btop);
-    /*
-     * Task 0's page table, as the kernel's own copy has it.  index 26 is
-     * page 13 - 0xd000 - the page mem.s borrows for user copies and
-     * restores from here, and the page the upper buffer headers live in.
-     */
-    pr("mmu: img0[2]=%d img0[4]=%d img0[26]=%d img0[28]=%d\n",
-        image0[2], image0[4], image0[26], image0[28]);
     w = (UINT *)sup;
     for (i = 0; i < 8; i++)
         pr(" %x", w[i]);
