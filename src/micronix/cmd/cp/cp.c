@@ -30,8 +30,19 @@ char iflag INIT;
 char rflag INIT;
 char vflag INIT;
 char cflag INIT;
+char sflag INIT;
 char *rindex();
 char *malloc();
+long lseek();
+
+/*
+ * The cptree destination, remembered before the walk.  Copying / into /b
+ * (the install) walks / and meets /b on the way down; descending into it
+ * would copy what is being written, then that copy, without end.
+ */
+static UINT wormdev;
+static UINT wormino;
+static char wormset;
 
 main(argc, argv)
     int argc;
@@ -73,6 +84,10 @@ main(argc, argv)
                 vflag++;
                 break;
 
+            case 's':
+                sflag++;
+                break;
+
             default:
                 goto usage;
             }
@@ -96,15 +111,40 @@ main(argc, argv)
      * is exactly the two-level behaviour; calling copy() on the top
      * would name a subdirectory of the destination after the source.
      */
-    if (cflag)
+    if (cflag) {
+        /*
+         * The destination's inode is its identity wherever the walk
+         * finds it: it is an entry of the source whenever the source
+         * contains it, and that entry is what must be skipped.
+         */
+        if (stat(argv[1], &stb) == 0) {
+            wormdev = stb.st_dev;
+            wormino = stb.st_ino;
+            wormset = 1;
+        }
         rc = rcopy(argv[0], argv[1]);
-    else
+    } else
         for (i = 0; i < argc - 1; i++)
             rc |= copy(argv[i], argv[argc - 1]);
     exit(rc);
   usage:
-    fprintf(stderr, "Usage: cp [-i] f1 f2; or: cp [-ir] f1 ... fn d2\n");
+    fprintf(stderr, "Usage: cp [-is] f1 f2; or: cp [-irs] f1 ... fn d2\n");
     exit(1);
+}
+
+/*
+ * Is every byte zero?  In sparse mode a whole block that is asks to be
+ * left as a hole in the copy rather than written.
+ */
+static
+allzero(buf, n)
+register char *buf;
+register int n;
+{
+    while (n--)
+        if (*buf++)
+            return 0;
+    return 1;
 }
 
 copy(from, to)
@@ -115,16 +155,23 @@ copy(from, to)
     static char buf[MAXBSIZE];
     struct stat stfrom, stto;
 
-    fold = open(from, 0);
-    if (fold < 0) {
+    /*
+     * Stat before opening.  A device node is answered from its inode, and
+     * opening it is what a console or a printer port blocks or spins on -
+     * the copy below decides what to do with it without ever opening it.
+     */
+    if (stat(from, &stfrom) < 0) {
         Perror(from);
         return (1);
     }
-    if (fstat(fold, &stfrom) < 0) {
-        Perror(from);
-        close(fold);
-        return (1);
-    }
+    /*
+     * The destination met on the way down: skip it.  Descending would
+     * copy the directory being written into itself - /b becomes /b/b,
+     * and the walk never ends.
+     */
+    if (wormset && (stfrom.st_mode & S_IFMT) == S_IFDIR &&
+        stfrom.st_dev == wormdev && stfrom.st_ino == wormino)
+        return (0);
     if (stat(to, &stto) >= 0 && (stto.st_mode & S_IFMT) == S_IFDIR) {
         last = rindex(from, '/');
         if (last)
@@ -140,7 +187,6 @@ copy(from, to)
         destname = malloc((unsigned)(strlen(to) + strlen(last) + 2));
         if (destname == 0) {
             fprintf(stderr, "cp: out of memory\n");
-            close(fold);
             return (1);
         }
         sprintf(destname, "%s/%s", to, last);
@@ -148,6 +194,30 @@ copy(from, to)
     }
     if (vflag)
         fprintf(stderr, "%s\n", to);
+    /*
+     * A device is its mode and its rdev, not its contents.  Reading one
+     * to copy it is at best pointless and at worst a hang: reading
+     * /dev/console waits for a byte that nobody is going to type, which
+     * is what a tree copy of / into a new root used to do.
+     */
+    if ((stfrom.st_mode & S_IFMT) == IFCHR ||
+        (stfrom.st_mode & S_IFMT) == IFBLK) {
+        if (stat(to, &stto) >= 0)
+            unlink(to);
+        if (mknod(to, stfrom.st_mode, stfrom.st_addr[0]) < 0) {
+            Perror(to);
+            free(destname);
+            return (1);
+        }
+        free(destname);
+        return (0);
+    }
+    fold = open(from, 0);
+    if (fold < 0) {
+        Perror(from);
+        free(destname);
+        return (1);
+    }
     if (rflag && (stfrom.st_mode & S_IFMT) == S_IFDIR) {
         int fixmode = 0;        /* cleanup mode after rcopy */
 
@@ -221,12 +291,40 @@ copy(from, to)
             free(destname);
             return (1);
         }
-        if (write(fnew, buf, n) != n) {
+        /*
+         * A whole block of zeros is not written: the copy seeks over it,
+         * so its block list carries no block and a reader that knows holes
+         * (the boot loader) skips it.  A short block is written even if it
+         * is zeros, because a seek does not extend the file.
+         */
+        if (sflag && n == sizeof buf && allzero(buf, n)) {
+            if (lseek(fnew, (long)n, SEEK_CUR) < 0) {
+                Perror(to);
+                close(fold);
+                close(fnew);
+                free(destname);
+                return (1);
+            }
+        } else if (write(fnew, buf, n) != n) {
             Perror(to);
             close(fold);
             close(fnew);
             free(destname);
             return (1);
+        }
+    }
+    /*
+     * A trailing hole leaves the copy short, because the seek did not
+     * extend it.  Bring the length up to the source's so the copy reads
+     * back the same number of bytes.
+     */
+    if (sflag) {
+        long sz = ((long)stfrom.st_size0 << 16) | stfrom.st_size1;
+
+        if (lseek(fnew, 0L, SEEK_END) < sz) {
+            buf[0] = 0;
+            lseek(fnew, sz - 1, SEEK_SET);
+            write(fnew, buf, 1);
         }
     }
     close(fold);

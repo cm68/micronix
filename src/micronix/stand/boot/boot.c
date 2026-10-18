@@ -114,14 +114,40 @@ int (*loadbase)() = 0x1000;
 char *loadptr = (char *) 0x1000;
 UINT16 loadsize = 0;
 
+/*
+ * Where a 1k medium stages a whole sector while a 512 byte block is
+ * copied out (djio.c).  load() points it at two consecutive holes in the
+ * image - a kilobyte the load does not write.  Until then this fixed
+ * address is safe: nothing has been loaded yet.
+ */
+char *sectbuf = (char *) 0xfb00;
+
 char filecount = 0;
 int found = 0;
 
-bail()
+/*
+ * Print the message and reset: a jump through a null pointer to 0000.
+ * Not exit(): stdio comes in behind it.
+ */
+bail(s)
+register char *s;
 {
 	int (*loadbase)();
+	outstr(s);
 	loadbase = 0;
 	(*loadbase)();
+}
+
+/*
+ * zero n bytes at s.  A hole in the block list is this instead of a read:
+ * no block was written for it, so its bytes are zeros.
+ */
+zero(s, n)
+register char *s;
+register int n;
+{
+	while (n--)
+		*s++ = 0;
 }
 
 /*
@@ -133,11 +159,10 @@ load()
 {
 	register int i;
 	int nblk;
+	int hole = -1;
 
-	if (!readblock(blist[0], buf0.bytes)) {
-		outstr("read header failed");
-		bail();
-	}
+	if (!readblock(blist[0], buf0.bytes))
+		bail("read header failed");
 	if (buf0.obj.ident == OBJECT) {
 		loadbase = buf0.obj.textoff;
 		loadptr = (char *) (buf0.obj.textoff - 0x10);
@@ -151,19 +176,41 @@ load()
 	 * would have to go negative to stop, which is what it cannot do.
 	 */
 	nblk = (loadsize + 511) / 512;
-	if (nblk > NBLIST) {
-		outstr("boot file is too big\n");
-		bail();
+	if (nblk > NBLIST)
+		bail("boot file is too big\n");
+
+	/*
+	 * Two consecutive holes in the block list are a kilobyte the load
+	 * never writes - cp put them there with -s.  djio.c stages a whole
+	 * 1k sector there, so point it at the first pair.
+	 */
+	for (i = 0; i + 1 < nblk; i++) {
+		if (blist[i] == 0 && blist[i + 1] == 0) {
+			sectbuf = loadptr + (UINT)i * 512;
+			hole = i;
+			break;
+		}
 	}
 
 	outstr("Loading\n");
 	for (i = 0; i < nblk; i++) {
-		if (!readblock(blist[i], loadptr)) {
-			outstr("read object failed");
-			bail();
-		}
+		if (blist[i] == 0) {
+			/*
+			 * A hole: no block was written for it, so its bytes
+			 * are zeros.  Clear them without reading.
+			 */
+			zero(loadptr, 512);
+		} else if (!readblock(blist[i], loadptr))
+			bail("read object failed");
 		loadptr += 512;
 	}
+	/*
+	 * The 1k staging has left the bounce buffer holding a whole sector.
+	 * Zero it back: the holes stand for zeros, and the kernel's zeroed
+	 * statics may live there.
+	 */
+	if (hole >= 0)
+		zero(sectbuf, 1024);
 	outstr("Entering\n");
 	out(0x41, 0);
 	enterk();
@@ -207,10 +254,8 @@ select()
 
 	iget();
 
-	if (!readblock(inode->d_addr[0], buf0.bytes)) {
-		outstr("read directory failed\n");
-		bail();
-	}
+	if (!readblock(inode->d_addr[0], buf0.bytes))
+		bail("read directory failed\n");
 
 	outstr("Files:\n");
 	for (dirp = buf0.dir; dirp < &buf0.dir[32]; dirp++) {
@@ -227,10 +272,8 @@ select()
 	}
 	inumber = found;
 
-	if (filecount == 0) {
-		outstr("No bootable files\n");
-		bail();
-	}
+	if (filecount == 0)
+		bail("No bootable files\n");
 
 	if (filecount != 1) {
 		for (;;) {
@@ -254,10 +297,8 @@ picked:
 	 * blist, which the load will not reach.
 	 */
 	iget();
-	if (!readblock(inode->d_addr[0], buf0.bytes)) {
-		outstr("read indir failed");
-		bail();
-	}
+	if (!readblock(inode->d_addr[0], buf0.bytes))
+		bail("read indir failed");
 	for (i = 0; i < NBLIST; i++)
 		blist[i] = buf0.indir[i];
 }
@@ -331,7 +372,7 @@ top:
 			goto top;
 		}
         if ((c == 0x3) || (c == 0x7f)) {
-        	bail();
+        	bail("");
         }
         conout(c);
         *s++ = c;

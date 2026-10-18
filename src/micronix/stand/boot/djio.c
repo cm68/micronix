@@ -111,16 +111,11 @@ int bps INIT;		/* blocks per sector: 2 on a 1K medium, else 1 */
  * Where a 1K sector is staged while its half is copied out.  The DJ-DMA
  * reads a whole sector and a filesystem block on a 1K medium is half of
  * one, so the read goes here and the half to the caller's buffer.
- *
- * The address has to be above everything the kernel loads and below this
- * loader's stack.  The kernel's text and data come to 0xfac6 (the header
- * says 0x9000 text at 0x1000 and 0x5ac7 data at 0xa000), and its bss -
- * which is not in the file and so is not loaded - follows, so a sector
- * staged at 0xfb00 sits over bss that the kernel clears after it starts,
- * and leaves the stack room to grow down from 0xffff without reaching it.
- * It is only used one sector at a time while the loader runs.
+ * boot.c points it at two consecutive holes in the kernel image, a
+ * kilobyte the load does not write.  Until load() does that it is a fixed
+ * address over the u page's bss, which nothing has loaded yet.
  */
-#define	SECTBUF	((char *)0xfb00)
+extern char *sectbuf;
 
 /*
  * reset the drive.  There is nothing to sense or probe: the drive is
@@ -183,15 +178,8 @@ reset()
 	 * djboot1.s.
 	 */
 	lp = (struct dlabel *)(0x1000 + DL_OFFSET);
-	if (!hasmagic(lp)) {
-		outstr("No disk label in the block this boot came from\n");
-		bail();
-	}
-
-	if (!lp->d_tracks || !lp->d_heads || !lp->d_spt) {
-		outstr("The disk label has no geometry\n");
-		bail();
-	}
+	if (!hasmagic(lp))
+		bail("No disk label in the block this boot came from\n");
 
 	/*
 	 * Where the medium numbers its sectors from is the label's to state
@@ -231,20 +219,16 @@ reset()
 		bps = 2;
 	else if (spt == 9 || spt == 10 || spt == 15)
 		bps = 1;
-	else {
-		outstr("The disk label has a sector count this loader does not know\n");
-		bail();
-	}
+	else
+		bail("The disk label has a sector count this loader does not know\n");
 	spc = heads * spt;	/* blocks per cylinder */
 	/*
 	 * A block number is a filesystem block number, so the count starts
 	 * at the slice's first cylinder and not the disk's.  A slice that
 	 * has not been carved (length zero) cannot boot.
 	 */
-	if (!len) {
-		outstr("Boot slice is not carved.\n");
-		bail();
-	}
+	if (!len)
+		bail("Boot slice is not carved.\n");
 	limit = len * spc - 1;
 }
 
@@ -315,9 +299,9 @@ char *dma;
 	register char *d;
 	register int n;
 
-	if (!djread(cyl, head, sec, SECTBUF))
+	if (!djread(cyl, head, sec, sectbuf))
 		return 0;
-	s = SECTBUF + (half ? 512 : 0);
+	s = sectbuf + (half ? 512 : 0);
 	d = dma;
 	for (n = 512; n; n--)
 		*d++ = *s++;
@@ -356,11 +340,6 @@ char *buffer;
 	 * medium and half of one on a 1K medium, so the position is divided
 	 * by bps to name the sector and its remainder is which half.
 	 */
-	if (blocknum > limit) {
-		outstr("Block out of range\n");
-		return 0;
-	}
-
 	track = blocknum / spt;
 	within = blocknum % spt;
 	cyl = (track / heads) + roll;

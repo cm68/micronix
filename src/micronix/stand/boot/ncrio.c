@@ -57,6 +57,7 @@ struct drivespec {
 #define ICR	0x21		/* initiator command */
 #define MR	0x22		/* mode */
 #define CSBS	0x24		/* current bus status */
+#define RPI	0x27		/* reset parity/interrupt: the ack */
 
 /* the initiator command register's bits */
 #define ICR_RST	0x80
@@ -89,10 +90,31 @@ struct drivespec {
 char tries INIT;
 
 /*
+ * The CDB is the ten bytes that are the READ(10) command.  Seven of them
+ * never change, so they are a static and ncrread() patches the two LBA
+ * bytes in place rather than rebuilding the whole thing every sector.
+ */
+static char cdb[CDBLEN] = {
+    CREAD10, 0, 0, 0, 0, 0, 0, 1, 0, 0
+};
+
+/*
  * Declared before anything calls them: an undeclared call is extern int
  * by default and the definitions say static.
  */
 static int ncrread(), ncrselect(), ncrbyte();
+
+/*
+ * Is the label's magic MWDL?  One load of two words, not four bytes.
+ */
+static int
+hasmagic(lp)
+register struct dlabel *lp;
+{
+	register UINT16 *m = (UINT16 *)lp->d_magic;
+
+	return m[0] == (('W' << 8) | 'M') && m[1] == (('L' << 8) | 'D');
+}
 
 /*
  * reset the bus, and read the label that says how the disk is laid out.
@@ -115,6 +137,7 @@ reset()
 	for (i = 0; i < 256; i++)
 		in(CSBS);
 	out(ICR, 0);
+	in(RPI);		/* ASSERT RST raised IRQ; acknowledge it */
 	out(MR, MR_MONBSY);
 
 	/*
@@ -127,15 +150,11 @@ reset()
 		if (ncrread(0, (char *)0x1000))
 			break;
 	}
-	if (tries > TRIES) {
-		outstr("label read failed\n");
-		bail();
-	}
+	if (tries > TRIES)
+		bail("label read failed\n");
 
 	lp = (struct dlabel *)(0x1000 + DL_OFFSET);
-	if (lp->d_magic[0] == DL_MAGIC[0] && lp->d_magic[1] == DL_MAGIC[1] &&
-	    lp->d_magic[2] == DL_MAGIC[2] && lp->d_magic[3] == DL_MAGIC[3] &&
-	    lp->d_tracks && lp->d_heads && lp->d_spt) {
+	if (hasmagic(lp)) {
 		spec.cylinders = lp->d_tracks;
 		spec.heads = lp->d_heads;
 		spec.spt = lp->d_spt;
@@ -146,22 +165,11 @@ reset()
 		spec.roll = lp->d_slice[sl].d_roll;
 		spec.cylstart = lp->d_slice[sl].d_off;
 		spec.len = lp->d_slice[sl].d_len;
-		if (!spec.len) {
-			outstr("Boot slice is not carved.\n");
-			bail();
-		}
+		if (!spec.len)
+			bail("Boot slice is not carved.\n");
 		spec.limit = spec.len * spec.spc - 1;
-	} else {
-		/*
-		 * This driver has a diagnostic fewer than the other three:
-		 * its own text is the largest of the five, and the line that
-		 * is missing is the one that explained the design rather
-		 * than naming what failed.  See the limit in mkbootimg.c.
-		 */
-		outstr("No disk label at cylinder 0.\n");
-		outstr("mkfs -i writes one when it installs a boot.\n");
-		bail();
-	}
+	} else
+		bail("No disk label at cylinder 0\n");
 }
 
 /*
@@ -181,11 +189,6 @@ char *buffer;
 {
 	register UINT cyl;
 	int secnum;
-
-	if (blocknum > spec.limit) {
-		outstr("Block out of range\n");
-		return 0;
-	}
 
 	secnum = blocknum % spec.spc;
 	cyl = blocknum / spec.spc + spec.roll;
@@ -213,22 +216,14 @@ UINT lba;
 char *p;
 {
 	register int i;
-	char cdb[CDBLEN];
+	char st;
 
 	if (!ncrselect(0))
 		return 0;
 
-	/* READ(10), one block at lba */
-	cdb[0] = CREAD10;
-	cdb[1] = (lba >> 16) & 0x1f;
-	cdb[2] = (lba >> 8) & 0xff;
-	cdb[3] = lba & 0xff;
-	cdb[4] = 0;
-	cdb[5] = 0;
-	cdb[6] = 0;
-	cdb[7] = 1;
-	cdb[8] = 0;
-	cdb[9] = 0;
+	/* READ(10), one block at lba: only the two LBA bytes move */
+	cdb[2] = lba >> 8;
+	cdb[3] = lba;
 
 	for (i = 0; i < CDBLEN; i++)
 		if (!ncrbyte(1, &cdb[i]))
@@ -236,10 +231,19 @@ char *p;
 	for (i = 0; i < SECLEN; i++)
 		if (!ncrbyte(0, p + i))
 			return 0;
-	if (!ncrbyte(0, &cdb[0]))	/* the status byte */
+	if (!ncrbyte(0, &st))		/* the status byte */
 		return 0;
-	if (!ncrbyte(0, &cdb[0]))	/* the message byte */
+	if (!ncrbyte(0, &st))		/* the message byte */
 		return 0;
+	/*
+	 * The bus goes free here, and MONITOR BSY latches that as an
+	 * interrupt.  This loader polls and has no handler, so acknowledge
+	 * it: a latch left standing is a pending request, and the kernel's
+	 * attach loop takes its baseline before the probe runs, so it could
+	 * never discover the card's line.
+	 */
+	in(CSBS);			/* let the target reach bus free */
+	in(RPI);
 	return 1;
 }
 

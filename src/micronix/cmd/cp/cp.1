@@ -16,8 +16,8 @@ SYNTAX
 .in +5
 .br
 .bd 2
-cp [ -i ] f1 f2
-cp [ -ir ] f1 ... fn directory
+cp [ -is ] f1 f2
+cp [ -irs ] f1 ... fn directory
 .sp 2
 .in -5
 .bd
@@ -42,6 +42,12 @@ OPTIONS
 
 .ti -10
 -r	Copy a directory, and everything under it, recursively.
+
+.ti -10
+-s	Leave holes for whole blocks of zeros.  A block of the source that
+is all zero is seeked over in the copy instead of written, so the copy's
+block list carries no block for it.  This is what lets a boot loader skip
+the zero pages of a kernel image.
 
 .in -10
 .sp 2

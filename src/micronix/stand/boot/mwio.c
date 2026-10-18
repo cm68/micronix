@@ -104,10 +104,8 @@ reset()
     cmd.headsel = 0;
     hdc_command(OP_SENSE);
 
-    if (cmd.status & SENSE_READY) {
-		outstr("Drive not ready\n");
-		bail();		/* not exit(): stdio comes in behind it */
-	}
+    if (cmd.status & SENSE_READY)
+		bail("Drive not ready\n");
 
 	/* recalibrate */
 	cmd.steps = 0xffff;
@@ -152,8 +150,7 @@ reset()
 
 	lp = (struct dlabel *)(0x1000 + DL_OFFSET);
 	if (lp->d_magic[0] == DL_MAGIC[0] && lp->d_magic[1] == DL_MAGIC[1] &&
-	    lp->d_magic[2] == DL_MAGIC[2] && lp->d_magic[3] == DL_MAGIC[3] &&
-	    lp->d_tracks && lp->d_heads && lp->d_spt) {
+	    lp->d_magic[2] == DL_MAGIC[2] && lp->d_magic[3] == DL_MAGIC[3]) {
 		spec.cylinders = lp->d_tracks;
 		spec.heads = lp->d_heads;
 		spec.spt = lp->d_spt;
@@ -171,10 +168,8 @@ reset()
 		spec.roll = lp->d_slice[sl].d_roll;
 		spec.cylstart = lp->d_slice[sl].d_off;
 		spec.len = lp->d_slice[sl].d_len;
-		if (!spec.len) {
-			outstr("Boot slice is not carved.\n");
-			bail();
-		}
+		if (!spec.len)
+			bail("Boot slice is not carved.\n");
 		spec.limit = spec.len * spec.spc - 1;
 	} else {
 		/*
@@ -184,10 +179,7 @@ reset()
 		 * means reading the wrong cylinder and calling whatever is
 		 * there a filesystem.
 		 */
-		outstr("No disk label at cylinder 0.\n");
-		outstr("The geometry is read from there and guessed nowhere.\n");
-		outstr("mkfs -i writes one when it installs a boot.\n");
-		bail();
+		bail("No disk label at cylinder 0\n");
 	}
 
 }
@@ -205,11 +197,6 @@ char *buffer;
 	int secnum;
 	int trknum;
 	int head;
-
-	if (blocknum > spec.limit) {
-        outstr("Block out of range\n");
-		return 0;
-    }
 
 	/*
 	 * Where a block lives, the way sys/mw.c puts it there.
