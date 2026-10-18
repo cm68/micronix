@@ -102,8 +102,34 @@ fi
 # carried the original text would leave the new hard disk's /dev/root
 # pointing at the floppy.  See rootfiles/m16init.
 #
+# chg is the way a running diskette reaches the medium in another drive,
+# and fdj the way it formats one, so the two together are what lets a
+# booted system make a diskette set of its own: "chg djdma:1
+# blank:dist-1.img; fdj format djdma:1; mount it; copy; umount" needs no
+# host tool at all.  Neither is an install step, so neither is required
+# for the install to finish - they are here for the loop, not for init.
+#
 BINS="sh login ls cp mv rm cat mkdir mkfs fsck mount umount chmod cptree
-	mknod setdev ln sync echo hdformat mwformat label"
+	mknod setdev ln sync echo hdformat mwformat label chg fdj"
+
+#
+# What the five inch medium cannot hold.  The list above is 487 blocks of
+# commands, and they are the same commands on both media; what the media
+# do not have in common is room for the kernel's 208.  An eight inch
+# diskette has it with 305 blocks to spare, and a five inch one has none
+# at all, so the medium with no room gives up three.
+#
+# hdformat and mwformat are two of them because their job is done before
+# this diskette is ever run: they low-level format a hard disk, and the
+# drive a diskette installs onto is formatted and labelled first - see
+# initialize(1) and the label the formatter writes.  The formatting the
+# diskette-to-diskette loop does want is fdj's, and fdj is here.  cat is
+# the third because it is the least missed of the operator commands that
+# are left.  Everything an init script calls is on both media; the
+# knapsack in the README is that list, and this is the only difference
+# between them.
+#
+DROP5="hdformat mwformat cat"
 
 medium="$1"
 image="$2"
@@ -115,20 +141,34 @@ if [ -z "$medium" ]; then
 fi
 
 #
-# The medium table, and the only place the three answers are written
+# The medium table, and the only place the four answers are written
 # down: which boot image, which minor the diskette's own root node
-# carries, and what to call it when saying what was made.
+# carries, what to call it when saying what was made, and what the
+# medium is too small to carry.
 #
 case "$medium" in
-d8ss)	bootimg="djbootimg-d8ss"; rootmin=0; imd2="" ;;
-d8ds)	bootimg="djbootimg-d8ds"; rootmin=0; imd2="" ;;
-d5ds)	bootimg="djbootimg-d5ds"; rootmin=4; imd2="" ;;
-d5soft)	bootimg="djbootimg-d5soft"; rootmin=4; imd2="-2" ;;
+d8ss)	bootimg="djbootimg-d8ss"; rootmin=0; imd2=""; drop="" ;;
+d8ds)	bootimg="djbootimg-d8ds"; rootmin=0; imd2=""; drop="" ;;
+d5ds)	bootimg="djbootimg-d5ds"; rootmin=4; imd2=""; drop="$DROP5" ;;
+d5soft)	bootimg="djbootimg-d5soft"; rootmin=4; imd2="-2"; drop="$DROP5" ;;
 *)	echo "$0: $medium is not a medium this tree builds" >&2
 	echo "$0: media: d8ss d8ds d5ds d5soft" >&2
 	exit 1 ;;
 esac
 bootimg="$bootdir/$bootimg"
+
+# and what the medium dropped is dropped here, in one place, so the two
+# lists above are the whole of the difference between them
+if [ -n "$drop" ]; then
+	keep=
+	for f in $BINS; do
+		for g in $drop; do
+			[ "$f" = "$g" ] && continue 2
+		done
+		keep="$keep $f"
+	done
+	BINS="$keep"
+fi
 
 if [ -z "$image" ]; then
 	image="$here/$medium.img"
@@ -227,7 +267,7 @@ done < "$devlist"
 if [ -f "$kernel" ]; then
 	cp "$kernel" "$tmp.k" || exit 1
 	"$setdev" "$tmp.k" "2/$rootmin" 0/0 || exit 1
-	"$mnix" -f "$image" write "$tmp.k" /micronix || exit 1
+	"$mnix" -f "$image" write -s "$tmp.k" /micronix || exit 1
 	"$mnix" -f "$image" mknod /dev/root b 2 "$rootmin" || exit 1
 fi
 

@@ -78,7 +78,7 @@ struct cmdtab
     {"ls", ls, "ls [-a] <path>" },
     {"cat", cat, "cat <file>" },
     {"read", readcmd, "read <src> <dest>" },
-    {"write", writecmd, "write [-k] <src> <dest>" },
+    {"write", writecmd, "write [-ks] <src> <dest>" },
     {"rm", rmcmd, "rm <file>" },
     {"mkdir", mkdircmd, "mkdir <directory>" },
     {"rmdir", rmdircmd, "rmdir <directory>" },
@@ -445,6 +445,20 @@ readcmd(int c, char **a)
     return 0;
 }
 
+/*
+ * Is the block all zeros?  A sparse write leaves such a block as a hole.
+ */
+static int
+allzero(char *buf, int n)
+{
+    int i;
+
+    for (i = 0; i < n; i++)
+        if (buf[i])
+            return 0;
+    return 1;
+}
+
 int
 /*
  * write <src> <dest>, and write -k <src> <dest>.
@@ -471,6 +485,7 @@ writecmd(int c, char **a)
     int infd;
     char *destname;
     int keep = 0;
+    int sparse = 0;
     int have;
     struct stat sb;
 
@@ -479,6 +494,12 @@ writecmd(int c, char **a)
 
     if (c && strcmp(*a, "-k") == 0) {
         keep = 1;
+        a++;
+        c--;
+    }
+
+    if (c && strcmp(*a, "-s") == 0) {
+        sparse = 1;
         a++;
         c--;
     }
@@ -560,8 +581,15 @@ writecmd(int c, char **a)
             printf("read error on the source: %d\n", errno);
             break;
         }
-        if (filewrite(dp, i, buf) != 512) {
-            printf("write failed\n");
+        /*
+         * A whole block of zeros is left as a hole, not written, so its
+         * block list carries no block and the boot loader skips it.  The
+         * size below is the byte count, so a trailing hole still sizes
+         * the file right.
+         */
+        if (!(sparse && valid == 512 && allzero(buf, 512))) {
+            if (filewrite(dp, i, buf) != 512)
+                printf("write failed\n");
         }
         i += valid;
     }
@@ -1654,6 +1682,17 @@ hardboot(image, bootfile)
     got = read(fd, bb, DL_OFFSET);
     if (got > 0)
         memcpy(blk, bb, got);
+    /*
+     * The HDCA's rom reads its level 2 load address from the last two
+     * bytes of the sector - mkbootimg -a puts it there - and those bytes
+     * are outside the label, which ends well before them.  Leave the
+     * label's bytes alone and take these two from the boot image, or
+     * the rom loads level 2 nowhere and the machine halts in task 1.
+     */
+    if (lseek(fd, (long) BSIZE - 2, 0) >= 0 && read(fd, bb, 2) == 2) {
+        blk[BSIZE - 2] = bb[0];
+        blk[BSIZE - 1] = bb[1];
+    }
     if (imd_write(ip, 0, 0, firstsec, blk) != 512)
         goto bad;
 
@@ -2181,25 +2220,31 @@ labelcmd(int c, char **a)
     /*
      * The geometry comes off the image, not an out-of-band label: the
      * image is an IMD file, and its track records say the shape.  Block 0
-     * - cylinder 0, head 0, the first sector - is the label's block, read
-     * and written as a sector.
+     * - the block the label lives in - is not always one 512 byte sector:
+     * an eight inch medium keeps it in four 128 byte sectors of its
+     * single density first track, a 1K medium in half of one sector.
+     * imd_block0 reads the shape it finds.
      */
     ip = openimage(image, 1);
     if (!ip) {
         printf("label: can't open %s\n", image);
         return 2;
     }
-    imd_trkinfo(ip, 0, 0, &nsec, &secsize);
-    if (secsize != 512) {
-        printf("label: %s sectors are %d bytes, not 512\n", image, secsize);
-        imd_close(ip);
-        return 2;
-    }
+
+    /*
+     * spt is blocks per track, which is what the label records.  Measure
+     * an ordinary track and not cylinder 0 head 0, which is the single
+     * density boot track on an eight inch diskette and not the medium's
+     * filesystem geometry.
+     */
+    imd_trkinfo(ip, ip->cyls > 1 ? 1 : 0, 0, &nsec, &secsize);
+    if (!nsec || !secsize)
+        imd_trkinfo(ip, 0, 0, &nsec, &secsize);
     tracks = (UINT) ip->cyls;
     heads = (UINT) ip->heads;
-    spt = (UINT) nsec;
+    spt = (UINT) (nsec * (secsize / 512));
 
-    if (imd_read(ip, 0, 0, imd_firstsec(ip, 0, 0), buf) != 512) {
+    if (imd_block0(ip, buf, 0) != 512) {
         printf("label: can't read block 0 of %s\n", image);
         imd_close(ip);
         return 2;
@@ -2281,7 +2326,7 @@ labelcmd(int c, char **a)
             image, 'a' + lab_sets[i].ls_sl, off, len);
     }
 
-    if (imd_write(ip, 0, 0, imd_firstsec(ip, 0, 0), buf) != 512) {
+    if (imd_block0(ip, buf, 1) != 512) {
         printf("label: can't write block 0 of %s\n", image);
         imd_close(ip);
         return 2;
@@ -2293,7 +2338,7 @@ labelcmd(int c, char **a)
      * was just written: what matters is what the disk now says.
      */
     ip = openimage(image, 0);
-    if (!ip || imd_read(ip, 0, 0, imd_firstsec(ip, 0, 0), buf) != 512) {
+    if (!ip || imd_block0(ip, buf, 0) != 512) {
         printf("label: can't read back block 0 of %s\n", image);
         if (ip)
             imd_close(ip);
