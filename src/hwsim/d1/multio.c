@@ -1357,12 +1357,15 @@ void
 multio_pic_dump(void)
 {
     struct pic *m = &pics[0];
+    struct pic *s = &pics[1];
 
     printf("\n== interrupt controller (8259) ==\n");
-    printf("  imr=%02x (enables %02x) irr=%02x isr=%02x\n",
-        m->imr, (~m->imr) & 0xff, m->irr, m->isr);
-    printf("  priority=%d rotate=%d auto_eoi=%d ivec=%s iv_isrbit=%02x\n",
-        m->priority, m->rotate, m->auto_eoi, ivs_name[ivecstate], iv_isrbit);
+    printf("  master imr=%02x (enables %02x) irr=%02x isr=%02x priority=%d\n",
+        m->imr, (~m->imr) & 0xff, m->irr, m->isr, m->priority);
+    printf("  slave  imr=%02x (enables %02x) irr=%02x isr=%02x priority=%d\n",
+        s->imr, (~s->imr) & 0xff, s->irr, s->isr, s->priority);
+    printf("  rotate=%d auto_eoi=%d ivec=%s iv_isrbit=%02x\n",
+        m->rotate, m->auto_eoi, ivs_name[ivecstate], iv_isrbit);
     printf("  int_line=%d int_pin=%d vi_lines=%02x\n",
         int_line, int_pin, vi_lines);
     printf("  vector=%02x %02x %02x pic_state=%d\n",
