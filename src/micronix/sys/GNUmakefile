@@ -64,9 +64,8 @@ MODS	= dj mw ide ncr hdca nd disk1 disk2 disk3
 # is not in the machine spends nothing.
 GENERATED = build.h unix.link $(MODS:%=%.mod) $(MODS:%=%.page) \
 	$(MODS:%=%.o) $(MODS:%=%hdr.o) \
-	miopic.o miopic_init.o wbiopic.o wbiopic_init.o \
-	ss1pic.o ss1pic_init.o probe.o probe_init.o \
-	ss1_clock.o ss1_clock_init.o upd1990_init.o picvec.o
+	pic.o pic_init.o picdata.o probe.o probe_init.o \
+	ss1_clock.o ss1_clock_init.o upd1990_init.o picvec.o ss1vec.o
 
 # The compiler and linker are this tree's own.  CCC defaults to
 # $(BIN)/mxccc in GNUmakefile.inc; the linker mxld is beside it.
@@ -136,23 +135,15 @@ bus.o: bus.c
 	$(MXLD) -r -Sdata -o bus.o bus.rel
 	rm -f bus.rel
 
-# The board's resident PIC half - pic_eoi and inton - is leaf code (it
-# reaches only in()/out()/di()/ei(), all in the u page) and carries no
-# static data, so it folds to .data and rides the u page like the leaf
-# runtime, freeing the resident text it used to hold.  Only the active
-# board's object is linked into upage.o.
-miopic.o: miopic.c
-	$(CCC) $(CCFLAGS) $(INC) -c -o miopic.rel $<
-	$(MXLD) -r -Sdata -o miopic.o miopic.rel
-	rm -f miopic.rel
-wbiopic.o: wbiopic.c
-	$(CCC) $(CCFLAGS) $(INC) -c -o wbiopic.rel $<
-	$(MXLD) -r -Sdata -o wbiopic.o wbiopic.rel
-	rm -f wbiopic.rel
-ss1pic.o: ss1pic.c
-	$(CCC) $(CCFLAGS) $(INC) -c -o ss1pic.rel $<
-	$(MXLD) -r -Sdata -o ss1pic.o ss1pic.rel
-	rm -f ss1pic.rel
+# The resident PIC half - pic_eoi and inton - is leaf code (it reaches
+# only in()/out()/di()/ei(), all in the u page) and carries no static
+# data, so it folds to .data and rides the u page like the leaf runtime,
+# freeing the resident text it used to hold.  The table it walks is
+# resident data (picdata.o); only the code rides the u page.
+pic.o: pic.c
+	$(CCC) $(CCFLAGS) $(INC) -c -o pic.rel $<
+	$(MXLD) -r -Sdata -o pic.o pic.rel
+	rm -f pic.rel
 
 # net.o is the /dev/net framing (net.c), pure code with no static data,
 # so it folds to the u page the same way.  It is always mapped, so the
@@ -167,10 +158,11 @@ KERNEL_AS     = $(KERNEL_AS_OBJ) highmem.o
 KERNEL_C      = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o malloc.o name.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
-	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o upd1990.o
+	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o upd1990.o \
+	picdata.o
 WIN_C         = open.o sys2.o rdwri.o memdev.o link.o access.o
 HIGHMEM_C_OBJ = main_init.o cus.o djinit.o ncrinit.o
-HIGHMEM_AS_OBJ = inits.o unbcd.o
+HIGHMEM_AS_OBJ = inits.o unbcd.o ss1vec.o
 HIGHMEM       = $(HIGHMEM_C_OBJ) $(HIGHMEM_AS_OBJ)
 
 # The generic .c and .s objects, named outright so that a stray generated
@@ -212,12 +204,12 @@ CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c disk2.c \
 	 net.c open.c ovl.c probe.c \
 	 queue.c rdwri.c reg.c upd1990.c sig.c sleep.c ss1_clock.c stub.c \
 	 stub_intr.c subc.c swap.c sys1.c sys2.c system.c time.c trap.c tty.c \
-	 uio.c user.c miopic.c wbiopic.c ss1pic.c probe.c \
-	 miopic_init.c wbiopic_init.c ss1pic_init.c probe_init.c \
+	 uio.c user.c pic.c picdata.c probe.c \
+	 pic_init.c probe_init.c \
 	 upd1990_init.c ss1_clock_init.c picvec.c
 ASSRCS	= csv.s idiv.s imul.s inits.s inout.s intrpt.s mem.s mio.s oarg.s \
 	 ovlslot.s qadd.s qand.s qcmp.s qinc.s qldst.s qmul.s qor.s qsar.s \
-	 qshl.s qshr.s qsub.s slavevec.s sub8.s swdisp.s swdispw.s textpad.s \
+	 qshl.s qshr.s qsub.s slavevec.s ss1vec.s sub8.s swdisp.s swdispw.s textpad.s \
 	 tramp.s uhdr.s unbcd.s unixtobcd.s
 
 include $(DEPTH)/GNUmakefile.inc
@@ -350,8 +342,8 @@ main_init.o: build.h
 # entry leaves SP, so the kernel stack grows down into ustack.  textpad.o
 # stays last in the main link so _ebss is the end of .bss and binit()'s
 # buffer pool runs up to BUFWIN below u.
-upage.o: $(LEAF_AS) $(LEAF_C) miopic.o net.o user.o
-	$(MXLD) -r -Tdata=0xf000 -o upage.o $(LEAF_AS) $(LEAF_C) miopic.o net.o user.o
+upage.o: $(LEAF_AS) $(LEAF_C) pic.o net.o user.o
+	$(MXLD) -r -Tdata=0xf000 -o upage.o $(LEAF_AS) $(LEAF_C) pic.o net.o user.o
 
 # highmem.o is the init-only code - main_init, cus, the MIO/console init
 # in inits.s, bcd2unix (unbcd.s), and the disk drivers' own bring-up
@@ -379,15 +371,16 @@ upage.o: $(LEAF_AS) $(LEAF_C) miopic.o net.o user.o
 # it.  The two slave PIC variants come from the one file; ccc's -c names
 # the object, so they live side by side.
 highmem.o: main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o \
-		miopic_init.o probe_init.o upd1990_init.o picvec.o
+		pic_init.o probe_init.o upd1990_init.o picvec.o ss1vec.o
 	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o \
-		miopic_init.o probe_init.o upd1990_init.o picvec.o
+		pic_init.o probe_init.o upd1990_init.o picvec.o ss1vec.o
 
 # probe.c and probe_init.c carry ovlint[NOVLINE], sized to the PIC's line
-# count, so they are compiled with the board's NOVLINE.  The MultIO is six
-# lines; the single Wunderbus is three and the SS1 eight, and each image
-# passes its own when the per-board images are wired.
-NOVLINE = 6
+# count, so they are compiled with the board's NOVLINE.  The MultIO is five
+# lines (VI0-1 and VI3-5, VI2 the slave's cascade); the single Wunderbus is
+# three and the SS1 eight, and each image passes its own when the per-board
+# images are wired.
+NOVLINE = 5
 probe.o probe_init.o: %.o: %.c
 	$(CCC) $(CCFLAGS) $(INC) -DNOVLINE=$(NOVLINE) -c $<
 

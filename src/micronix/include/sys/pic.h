@@ -20,7 +20,7 @@
  * disagree:
  *
  *      wbpic   -DNOVLINE=3     one 8259, three lines (VI0-VI2)
- *      miopic  -DNOVLINE=6     master + polled slave, six lines (VI0-VI5)
+ *      miopic  -DNOVLINE=5     master + polled slave, five lines (VI0-1, VI3-5)
  *      ss1pic  -DNOVLINE=8     two CAS 8259s, eight lines (VI0-VI7)
  */
 #ifndef NOVLINE

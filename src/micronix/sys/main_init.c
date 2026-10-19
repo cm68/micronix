@@ -100,7 +100,7 @@ main()
     char ronly = 0;
 
     cus();                      /* custom hardware */
-    zero(lowbss, 480);          /* clear the freed low-memory bss */
+    zero(lowbss, 416);          /* clear the freed low-memory bss */
     enable();                   /* enable interrupts */
     coninit();
     plogo();

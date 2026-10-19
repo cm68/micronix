@@ -1,0 +1,26 @@
+#
+# cmd/ccc/TODO
+#
+# Known codegen gaps and the workarounds still standing in for them in the
+# tree.
+
+# shift by a register: c1 used to emit nothing for "x << r", silently
+# leaving x unshifted.  The kernel works around it by masking the count so
+# the value leaves the register c1 cannot shift by:
+#
+#	sys/miopic.c	1 << (a & 3)
+#	sys/pic.c	1 << (lineir[a] & 7)
+#
+# The BC case was fixed 2026-10-17 (c1: a shift count in BC builds code,
+# and a spill over nothing fails).  With that c1 these shapes all emit a
+# real loop now:
+#
+#	1 << i		add hl,hl loop
+#	1 << a[i]	add hl,hl loop
+#	x << i		add hl,hl loop
+#	(long)x << i	call qshl
+#	x >> i		sra h / rr l loop
+#
+# So the & 3 / & 7 masks are dead workaround unless an IX/IY allocation
+# still trips the no-op.  Confirm no such case remains, then drop the
+# masks and their comments.

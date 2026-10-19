@@ -512,7 +512,7 @@ ROOT	?= ~/src/micronix/filesystem
 DEST	 = $(ROOT)/usr/src
 NOWARN	 = --warning=no-ignore-newer
 DOCS	 = ../../docs
-DOCSRCS	 = ../../docs/INTERRUPTS.md ../../docs/WORKORDER-provisioning.md
+DOCSRCS	 = ../../docs/hw/esp32-nic.md
 src.tar: makefile
 	tar -f src.tar -c makefile
 
