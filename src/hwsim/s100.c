@@ -333,18 +333,17 @@ static struct wiring profile_d1 = {
 };
 
 static struct wiring profile_multio = {
-    { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 2 }, { "disk1", 1 },
+    { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 0 }, { "disk1", 1 },
       { "ncr", 3 }, { "ide", 4 }, { "nic", 5 }, { "disk3", 5 },
       { "disk2", 5 } },
     9,
     {
         [0] = { IRQ_VI, 0 },
         [1] = { IRQ_VI, 1 },
-        [2] = { IRQ_VI, 2 },
+        [2] = { IRQ_ONBOARD, 0, "slave" },
         [3] = { IRQ_ONBOARD, 0, "uart0" },
         [4] = { IRQ_ONBOARD, 0, "uart1" },
         [5] = { IRQ_ONBOARD, 0, "uart2" },
-        [6] = { IRQ_ONBOARD, 0, "slave" },
         [7] = { IRQ_ONBOARD, 0, "clock" },
         [8]  = { IRQ_VI, 3 },
         [9]  = { IRQ_VI, 4 },

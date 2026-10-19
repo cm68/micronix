@@ -272,6 +272,7 @@ pic_read_cmd(struct pic *p)
         p->poll = 0;
         if (level >= 0) {
             p->irr &= ~(1 << level);
+            p->line_changed();      /* the poll dropped it: re-fold the INT */
             trace(p->trace_flag, "%s: poll -> level %d\n", p->name, level);
             return (0x80 | level);
         }

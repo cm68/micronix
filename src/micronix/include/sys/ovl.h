@@ -180,3 +180,13 @@ extern int ovlstart();          /* place the driver stamped into the slot */
 extern int ovlntr();            /* ovlntr(line): call every handler on a line */
 extern int intrset();           /* intrset(probe, fn, seg): claim for the attach loop */
 extern int intr_attach();       /* intr_attach(): tickle each card, wire ovlint */
+
+/*
+ * How many handlers one interrupt line can carry.  Two cards can share a
+ * line open-collector - the HDCA rides VI0 with the HD-DMA, and under one
+ * PIC the IDE and the NCR share VI2 - and each has to be asked, since a
+ * card clears its own request and none can speak for another.  ovlint is
+ * flat, ovlint[NOVLINE * OVLSHARE], because c0 cannot parse a
+ * two-dimensional declarator.
+ */
+#define OVLSHARE 2

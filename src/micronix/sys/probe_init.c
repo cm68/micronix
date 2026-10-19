@@ -22,7 +22,7 @@ struct ovlintr {
     UINT seg;
 };
 
-extern struct ovlintr ovlint[NOVLINE];  /* sys/probe.c */
+extern struct ovlintr ovlint[NOVLINE * OVLSHARE];  /* sys/probe.c */
 
 /*
  * The pending attach list: each driver's probe, handler and segment,
@@ -118,7 +118,7 @@ bitline(mask)
  */
 intr_attach()
 {
-    register UINT i;
+    register UINT i, slot;
     register int l;
     int line, before;
 
@@ -131,14 +131,22 @@ intr_attach()
         line = bitline(pic_irr() & ~before);    /* the line it raised */
         if (line < 0)
             continue;           /* no card there, nothing to wire */
-        ovlint[line].fn = intrfn[i];
-        ovlint[line].seg = intrseg[i];
+        /* the first free slot on the line: two cards share a line and
+         * each gets its own, the HD-DMA then the HDCA on VI0 */
+        for (slot = 0; slot < OVLSHARE; slot++)
+            if (ovlint[line * OVLSHARE + slot].fn == 0)
+                break;
+        if (slot < OVLSHARE) {
+            ovlint[line * OVLSHARE + slot].fn = intrfn[i];
+            ovlint[line * OVLSHARE + slot].seg = intrseg[i];
+        }
         pic_eoi(line);          /* clear the tickled interrupt */
     }
     nintrdone = nintr;
 
     for (l = 0; l < NOVLINE; l++)
-        if (ovlint[l].fn)
-            inton(l);           /* the line is live */
+        for (slot = 0; slot < OVLSHARE; slot++)
+            if (ovlint[l * OVLSHARE + slot].fn)
+                inton(l);       /* the line is live */
     return (0);
 }
