@@ -167,9 +167,9 @@ static int enable_intr;
  * 1024     9
  * 2048     4
  */
-#define SPT     17 
+#define SPT     17
 #define HEADS   8
-#define SECLEN  2048
+#define SECLEN  512
 #define TRACKS  2048
 
 /*
@@ -299,9 +299,17 @@ attention(portaddr p, byte v)
      * fields above are decoded from the command and belong to the
      * channel, not the drive, so they are computed first and the
      * command is finished off with them either way.
+     *
+     * A drive slot is one of three states.  Absent (no image behind the
+     * unit) reports "not ready" to sense and refuses the rest; unformatted
+     * (an image with no track 0) reports ready but reads "sector not
+     * found"; formatted reads normally, labeled or not - the label is the
+     * kernel's business, not the controller's.
      */
     if (select_drive(drv) < 0) {
         command.status = BADCMD;
+        if (command.opcode == OP_SENSE)
+            command.status = SS_DONE | SS_WFLT | SS_RDY; /* not ready */
         goto done;
     }
 
@@ -341,6 +349,12 @@ attention(portaddr p, byte v)
                 command.cyl_low + (command.cyl_high << 8));
         }
         i = imd_read(handle[drv], curcyl[drv], command.hd, command.sec, (char *)&secbuf);
+        if (i == 0) {
+            /* an unformatted (blank) drive has no sector to read: report
+             * it as data-not-found, not a 0-byte good completion */
+            command.status = NODATA;
+            break;
+        }
         if (i != secsize[drv]) {
         	lc("\tread sector size mismatch %d expected %d\n", i, secsize[drv]);
         }
@@ -491,10 +505,10 @@ attention(portaddr p, byte v)
         }
 #endif
         if (i != secsize[drv]) {
-        	tracec(trace_hddma, "\tdrive %d sectorsize mismatch on specify %d expected %d\n", 
+        	tracec(trace_hddma, "\tdrive %d sectorsize mismatch on specify %d expected %d\n",
                 drv, i, secsize[drv]);
         }
-        // secsz[drv] = secsize;
+        secsize[drv] = i;
         command.status = GOOD;
         break;
     case OP_SENSE:
@@ -502,7 +516,7 @@ attention(portaddr p, byte v)
         if (curcyl[drv] != 0) {
             command.status |= SS_TRK0;
         }
-        trace(trace_hddma, "\tsense: %x %s\n", 
+        trace(trace_hddma, "\tsense: %x %s\n",
             command.status, bitdef(command.status ^ 0xff, sense_b));
         break;
     case OP_NOP:
