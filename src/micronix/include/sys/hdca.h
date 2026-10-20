@@ -72,9 +72,6 @@
 #define	FUNC_HEAD	0xf0	/* head select, inverted */
 #define	FUNC_DRIVE	0x03
 
-/* the interrupt line the HDCA shares with the HD-DMA */
-#define	HDCAINT		INT_HDCA
-
 /*
  * How many seconds a request may be in flight before the drive is
  * declared wedged and the request fails with EIO.  The watchdog tick

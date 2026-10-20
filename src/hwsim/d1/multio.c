@@ -327,7 +327,8 @@ multio_set_int_line()
 
     /* the master's own resolver now covers both PICs */
     line = (pic_serviceable(&pics[0]) >= 0) ? 1 : 0;
-    trace(trace_multio, "multio: %s line\n", line ? "set":"clear");
+    trace(trace_multio, "multio: %s line irr:%02x isr:%02x pri:%d\n",
+        line ? "set":"clear", pics[0].irr, pics[0].isr, pics[0].priority);
     (*int_change)(line);
 }
 
@@ -408,6 +409,9 @@ multio_intack()
          * exactly as the 8259 priority resolver does.
          */
         level = pic_serviceable(&pics[0]);
+
+        trace(trace_intack, "intack: irr:%02x isr:%02x pri:%d lvl:%d\n",
+            pics[0].irr, pics[0].isr, pics[0].priority, level);
 
         /*
          * The CAS cascade: when the master's cascade line (IR6) is the
@@ -1529,16 +1533,14 @@ multio_init()
     register_output(SBASE + 5, &wr_pic_port_1);
 
     /*
-     * Names for the master's eight inputs, for the state dump.  Three are
-     * the S-100 bus lines this board brings in - VI0 (hd-dma), VI1
-     * (djdma) and VI2 (hdca) - and the cascade line IR6 carries the
-     * slave's INT.  The serial ports name their own inputs from
-     * ace_init() above.
+     * Names for the master's eight inputs, for the state dump.  Two are
+     * the S-100 bus lines this board brings in - VI0 (hd-dma) and VI1
+     * (djdma) - and the cascade line IR2 carries the slave's INT.  The
+     * serial ports name their own inputs from ace_init() above.
      */
     reg_intbit(0, "hd-dma");
     reg_intbit(1, "djdma");
-    reg_intbit(2, "hdca");
-    reg_intbit(6, "cascade");
+    reg_intbit(2, "cascade");
     reg_intbit(7, "clock");
 #ifndef NODEBUG
     register_mon_cmd('M', "\tdump multio state", multio_dump);

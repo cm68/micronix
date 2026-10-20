@@ -12,10 +12,10 @@
 #include <sys/proc.h>
 #include <sys/buf.h>
 #include <errno.h>
+#include <sys/pic8259.h>
 
 extern int rootdev;
 extern long seconds;
-extern int rtcinit();
 extern int copyin();
 extern struct inode ilist[];
 
@@ -153,7 +153,7 @@ tmount(dev, ip, ronly, dname)
     sp->s_fmod = 1;
 
     if (dev == rootdev)         /* part of power-up */
-        rtcinit(sp->s_time);
+        (*rtcinit)(sp->s_time);
     m->isize = sp->s_isize;
     m->fsize = sp->s_fsize;
     m->dev = dev;

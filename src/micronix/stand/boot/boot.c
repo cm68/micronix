@@ -56,6 +56,7 @@
  */
 #define	INIT = 0
 int inumber = 1;
+int conid INIT;         /* the console the rom found: 0 MultIO, 1 SS1 */
 struct dsknod *inode INIT;
 
 /*
@@ -330,20 +331,34 @@ iget()
 conout(a)
 UINT8 a;
 {
-    out(0x4f, 1);
-	/* wait for txempty */
-	while (!(in(0x4d) & 0x20))
-		;
-    out(0x48, a);
+    if (conid) {
+        /* the SS1's 2651: wait until it will take a byte, then send it */
+        while (!(in(0x7d) & 0x01))
+            ;
+        out(0x7c, a);
+    } else {
+        out(0x4f, 1);
+        /* wait for txempty */
+        while (!(in(0x4d) & 0x20))
+            ;
+        out(0x48, a);
+    }
 }
 
 UINT8
 conin()
 {
-	/* wait for rxready */
-	while (!(in(0x4d) & 0x1))
-		;
-	return in(0x48);
+    if (conid) {
+        /* the SS1's 2651: wait for a character */
+        while (!(in(0x7d) & 0x02))
+            ;
+        return in(0x7c);
+    } else {
+        /* wait for rxready */
+        while (!(in(0x4d) & 0x1))
+            ;
+        return in(0x48);
+    }
 }
 
 readline()

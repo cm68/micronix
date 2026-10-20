@@ -845,6 +845,8 @@ bootit:
 	ld	a,d
 	and	0fh
 	ld	d,a
+	ld	a,(concon)		;which console the monitor found
+	ld	c,a			;pass it to level 2 in C
 	ld	a,1			;run it as task 1
 	jp	switch
 bootng:	ld	hl,strgone	;"boot disk stopped answering"
@@ -1255,11 +1257,14 @@ hdadrd:	in	a,(hdcont)		;a timeout is a failure, and so
 	in	a,(hddata)		;the sector is stored two bytes
 	in	a,(hddata)		; in, so drop the first two
 	ld	hl,(dest)
-	ld	b,0			;256 words
+	ld	bc,0200h		;512 bytes: the shim and the label
 hdadlp:	in	a,(hddata)
 	ld	(hl),a
 	inc	hl
-	djnz	hdadlp
+	dec	bc
+	ld	a,b
+	or	c
+	jr	nz,hdadlp
 	scf
 	ret
 hdadbad:or	a			;a read that faulted is no disk
@@ -1906,9 +1911,12 @@ d2probe:
 	ld	a,d2attn + d2run	;the null command only waits for a
 	out	(d2ctl),a		; seek to complete and times out
 	call	d2wait			; after two index pulses, so a
-	ret	nc			; board with no drive never
-	jp	d2done			; finishes and one whose drive
-					; is not ready says so
+	ld	a,0			; board with no drive never
+	out	(d2ctl),a		; acknowledges, and one whose drive
+	ret	nc			; is not ready says so.  The write
+	jp	d2done			; above releases the line the null
+					; command raised, so the kernel's
+					; probe finds a quiet bus.
 
 d2read:
 	call	d2home
@@ -1937,7 +1945,9 @@ d2read:
 	ld	a,d2attn + d2run + d2rdcmd
 	out	(d2ctl),a		;and read it
 	call	d2wait
-	ret	nc
+	ld	a,0			;acknowledge: release the line the
+	out	(d2ctl),a		; read raised, so the kernel's probe
+	ret	nc			; finds a quiet bus
 	call	d2done
 	ret	nc
 	ld	hl,wbuf			;the block, as the window shows

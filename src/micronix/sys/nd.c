@@ -285,14 +285,12 @@ ndint()
 }
 
 /*
- * Open the drive: claim the interrupt line.  There is no label to read
- * and no geometry to learn.
+ * Open the drive.  There is no label to read and no geometry to learn.
  */
 int
 ndopen(dev, mode)
 	UINT dev, mode;
 {
-	inton(NDINT);
 	return (0);
 }
 

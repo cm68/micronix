@@ -10,6 +10,7 @@
 #include <sys/proc.h>
 #include <errno.h>
 #include <sys/signal.h>
+#include <sys/pic8259.h>
 
 /*
  * Open a tty. Called by the device open routine.
@@ -284,12 +285,12 @@ ttyout(tty)
 
     if (!(*state & LOSTOP) && (tty->outque.count || tty->nextc)) {
         if ((tty->mode & (MORE | XTABS | MAPCR)) || tty->nextc) {
-            mputc(tty, cookout(tty));
+            (*console_putc)(tty, cookout(tty));
         } else {
             /*
-             * Shortcut for the easy case. 
+             * Shortcut for the easy case.
              */
-            mputc(tty, getc(&tty->outque));
+            (*console_putc)(tty, getc(&tty->outque));
         }
 
         /*

@@ -12,9 +12,9 @@
 #include <sys/proc.h>
 #include <sys/file.h>
 #include <errno.h>
+#include <sys/pic8259.h>
 
 extern long seconds;
-extern int rtcwrite();
 extern int itruncat();
 
 /*
@@ -76,7 +76,7 @@ stime()
     di();
     seconds = ((long) u.hl << 16) | u.de;
     ei();
-    rtcwrite(seconds);
+    (*rtcwrite)(seconds);
 }
 
 /*

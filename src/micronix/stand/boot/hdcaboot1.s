@@ -79,16 +79,18 @@ RELOC	equ	0c000h		; out of the way of what we are loading
 RBIAS	equ	RELOC-BASE	; add to one of our addresses for its copy
 
 ;
-; The MULTIO's first uart, for complaining with.  Output only, and no
-; setup: the monitor has been talking to this port since reset - it
-; printed before it read us in - so the baud rate and the line are
-; already right.
+; The console, for complaining with.  The rom passed down in C which one
+; the monitor found - 0 is the MultIO's first uart, 1 the SS1's 2651 -
+; and both are already programmed, so this is output only.
 ;
-GSEL	equ	04fh		; group select
+GSEL	equ	04fh		; the MultIO group select
 GRP1	equ	1		; the serial ports
-TXB	equ	048h		; transmit holding register
-LSR	equ	04dh		; line status
+TXB	equ	048h		; its transmit holding register
+LSR	equ	04dh		; its line status
 LSRTXE	equ	020h		; holding register empty
+S1DATA	equ	07ch		; the 2651's data
+S1STAT	equ	07dh		; its status
+S1TXRDY	equ	001h		; transmitter will take a byte
 
 ;
 ; Whitesmith's object header, from include/obj.h.  Sixteen bytes, and
@@ -107,10 +109,12 @@ O_DOFF	equ	14		; and the data
 	.text
 
 start:
+	ld	a,c			;the console id the rom passed down
 	ld	hl,BASE
 	ld	de,RELOC
 	ld	bc,finish-BASE
 	ldir
+	ld	(conid+RBIAS),a		;remember it in the relocated copy
 	jp	run+RBIAS
 
 ;
@@ -246,6 +250,8 @@ xfer2:
 
 enter:
 	ld	hl,(STAGE+O_TOFF)
+	ld	a,(conid+RBIAS)	;the console id, handed on in C
+	ld	c,a
 	jp	(hl)
 
 ;
@@ -274,6 +280,11 @@ puts:
 	ret	z
 	ld	c,a
 	inc	hl
+	ld	a,(conid+RBIAS)	;which console the monitor found
+	or	a
+	jr	nz,pss1		;the SS1's 2651
+	ld	a,GRP1		;the MultIO: select its uart
+	out	(GSEL),a
 pwait:
 	in	a,(LSR)
 	and	LSRTXE
@@ -281,6 +292,15 @@ pwait:
 	ld	a,c
 	out	(TXB),a
 	jr	puts
+pss1:
+	in	a,(S1STAT)		;the 2651: wait until it will take a byte
+	and	S1TXRDY
+	jr	z,pss1
+	ld	a,c
+	out	(S1DATA),a
+	jr	puts
+
+conid:	.db	0		;the console the monitor found: 0 MultIO, 1 SS1
 
 msign:	.db	"hdcaboot:",13,10,0
 mmagic:	.db	"magic",13,10,0

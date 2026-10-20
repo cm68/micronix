@@ -72,7 +72,7 @@ CSRCS	= signal.c lseek.c seek.c rename.c buf.c cleanup.c fclose.c \
 	 ftell.c rewind.c setbuf.c ungetc.c gets.c puts.c putchar.c printf.c \
 	 fprintf.c scanf.c fscanf.c isatty.c
 ASSRCS	= access.s alarm.s _break.s chdir.s chmod.s chown.s close.s \
-	 creat.s dup.s errno.s exec.s execv.s exit.s _exit.s fork.s fstat.s \
+	 creat.s dup.s errno.s exec.s execve.s execv.s exit.s _exit.s fork.s fstat.s \
 	 getpid.s getuid.s gtty.s kill.s link.s mknod.s mount.s nice.s open.s \
 	 pause.s perror.s pipe.s read.s reboot.s seekraw.s setuid.s _signal.s \
 	 sleep.s stat.s stime.s sbrk.s stty.s sync.s time.s times.s umount.s \

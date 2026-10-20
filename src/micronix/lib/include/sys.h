@@ -17,6 +17,7 @@ extern int	errno;			/* system error number */
 
 extern int	execl(char *, char *, char *, ...);
 extern int	execv(char *, char **);
+extern int	execve(char *, char **, char **);
 extern int	spawnl(char *, char *, char *, ...);
 extern int	spawnv(char *, char **);
 extern int	spawnle(char *, char *, char *, char *, ...);

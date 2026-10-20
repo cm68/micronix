@@ -40,6 +40,7 @@ struct obj cpmhdr = {
 static struct inode *ip = 0;
 static struct buf *bp[NBLKS] = 0;
 static UINT nargs = 0;
+static UINT nenv = 0;
 static UINT nbytes = 0;
 static UINT8 nblks = 0;
 extern int zerouser();
@@ -49,18 +50,25 @@ static struct obj hdr = 0;
 char zpage[512] = 0;   /* zero page for clearing bss */
 
 /*
- * Exec system call.
+ * The worker for both entries: execve(name, args, env) and exec(name,
+ * args), the old call, with an empty environment.  The stack carries
+ *
+ *	argc, argv[0..], 0, envp[0..], 0
+ *
+ * and crt0 points environ at envp.  A program exec'd through call 11
+ * therefore starts with no variables; through call 56, with the ones
+ * its caller handed over.
  */
-exec(name, args)
-    char *name, **args;
+doexec(name, args, env)
+    char *name, **args, **env;
 {
     static char execing = 0;
 
     while (execing)
-        sleep(&exec, PRIWAIT);
+        sleep(&execing, PRIWAIT);
     execing = 1;
 
-    if (xchk(name) && getargs(args) && rdhdr() && fit()) {
+    if (xchk(name) && getargs(args, env) && rdhdr() && fit()) {
         /*
          * Tell the tracer the user task's id, then its program name,
          * before mrelse() drops the old image's pages (after which
@@ -99,7 +107,23 @@ exec(name, args)
     irelse(ip);
     arelse();
     execing = 0;
-    wakeup(&exec);
+    wakeup(&execing);
+}
+
+/*
+ * The two entries.  exec keeps its original two arguments and gets an
+ * empty environment; execve adds the vector the shell builds.
+ */
+exec(name, args)
+    char *name, **args;
+{
+    doexec(name, args, 0);
+}
+
+execve(name, args, env)
+    char *name, **args, **env;
+{
+    doexec(name, args, env);
 }
 
 /*
@@ -148,7 +172,7 @@ fit()
     tbrake = hdr.textoff + hdr.text;
     brake = max(brake, tbrake);
 
-    if (brake + hdr.heap + 4 + nargs + nargs + nbytes > MAXMEM) {
+    if (brake + hdr.heap + 6 + nargs + nargs + nenv + nenv + nbytes > MAXMEM) {
         u.error = ENOMEM;
         return 0;
     }
@@ -157,18 +181,36 @@ fit()
 }
 
 /*
- * Copy arguments to buffers
+ * Copy arguments and environment to buffers.  The argument vector ends
+ * at its null; the environment follows, and the same null on the end of
+ * envp ends the pass.  env == 0 means call 11 and stops at the args.
  */
-getargs(args)
-    char **args;
+getargs(args, env)
+    char **args, **env;
 {
     static char *s, *d;
-    UINT8 held;
+    UINT8 held, inenv;
 
     held = 0;
-    nargs = nbytes = nblks = 0;
-    while ((s = getword(args++)) != 0) {
-        nargs++;
+    inenv = 0;
+    nargs = nbytes = nblks = nenv = 0;
+    for (;;) {
+        if (inenv && env == 0)
+            break;
+        if (inenv)
+            s = getword(env++);
+        else
+            s = getword(args++);
+        if (s == 0) {
+            if (inenv)
+                break;
+            inenv = 1;
+            continue;
+        }
+        if (inenv)
+            nenv++;
+        else
+            nargs++;
         do {
             if ((nbytes & 511) == 0) {
                 if (nblks < NBLKS) {
@@ -200,7 +242,7 @@ getargs(args)
 putargs()
 {
     static UINT8 n, c, *s, *a, *d, **av;
-    static UINT ac, count, rem;
+    static UINT ac, ai, count, rem;
     extern char usrtop;
 
     /*
@@ -212,9 +254,9 @@ putargs()
      * each crossing is spelled out.
      */
     a = d = (UINT8 *) (&usrtop - nbytes);
-    av = (UINT8 **) ((char **) a - nargs - 1);
+    av = (UINT8 **) ((char **) a - nargs - nenv - 2);
     u.sp = (UINT *) &av[-1];
-    valid(u.sp, 4 + nargs + nargs + nbytes);
+    valid(u.sp, 6 + nargs + nargs + nenv + nenv + nbytes);
 
     for (c = 0, ac = 0, n = 1; n <= nblks; n++) {
         s = (UINT8 *) bhold(bp[n]);
@@ -222,8 +264,11 @@ putargs()
 
         while (rem) {
             if (c == 0) {
-                putword(a, &av[ac]);
-                if (++ac >= nargs)
+                ai = ac;
+                if (ai >= nargs)
+                    ai++;               /* the null between the vectors */
+                putword(a, &av[ai]);
+                if (++ac >= nargs + nenv)
                     break;
             }
             c = *s;
@@ -242,7 +287,8 @@ putargs()
     s = (UINT8 *) bhold(bp[1]);
     copy(s, u.p->args, 8);      /* for ps */
     brel();
-    putword(-1, &av[nargs]);    /* as per unix specs */
+    putword(0, &av[nargs]);     /* argv terminator */
+    putword(0, &av[nargs + nenv + 1]);  /* envp terminator */
     putword(nargs, u.sp);
 }
 

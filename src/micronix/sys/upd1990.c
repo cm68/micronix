@@ -103,7 +103,7 @@ rtcset(UINT8 *r)
  * the callee's to give back (see the note in unbcd.s).
  */
 void
-rtcinit(long base)
+upd1990_rtcinit(long base)
 {
     UINT8 r[5];
     UINT8 b[6];
@@ -144,7 +144,7 @@ rtcinit(long base)
  * Write the system time to the rtc (month and weekday, no year).
  */
 void
-rtcwrite(long t)
+upd1990_rtcwrite(long t)
 {
     UINT8 r[5];
     UINT8 b[6];

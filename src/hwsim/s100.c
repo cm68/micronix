@@ -334,8 +334,8 @@ static struct wiring profile_d1 = {
 
 static struct wiring profile_multio = {
     { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 0 }, { "disk1", 1 },
-      { "ncr", 3 }, { "ide", 4 }, { "nic", 5 }, { "disk3", 5 },
-      { "disk2", 5 } },
+      { "ncr", 3 }, { "ide", 4 }, { "nic", 5 }, { "disk3", 0 },
+      { "disk2", 0 } },
     9,
     {
         [0] = { IRQ_VI, 0 },
@@ -353,9 +353,9 @@ static struct wiring profile_multio = {
 };
 
 static struct wiring profile_ss1 = {
-    { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 2 }, { "ncr", 3 },
-      { "ide", 4 }, { "nic", 5 }, { "disk3", 6 }, { "disk1", 1 },
-      { "disk2", 6 } },
+    { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 0 }, { "ncr", 3 },
+      { "ide", 4 }, { "nic", 5 }, { "disk3", 0 }, { "disk1", 1 },
+      { "disk2", 0 } },
     9,
     {
         [0] = { IRQ_VI, 0 }, [1] = { IRQ_VI, 1 }, [2] = { IRQ_VI, 2 },

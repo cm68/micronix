@@ -102,6 +102,7 @@ dlook(ip, np)
             continue;
         if ((b = bread(phys, ip->i_dev)) == 0)
             continue;
+        d = (struct dir *)bhold(b);
         /*
          * Scan by entry count, not by an end pointer: a buffer's data can
          * sit at 0xee00, the top of the BUFSEG window, where b->data + 512
@@ -109,7 +110,7 @@ dlook(ip, np)
          * the whole block was skipped.  The last block may be short.
          */
         nents = ((tail && log == nblks - 1) ? tail : 512) >> 4;   /* 16-byte entries */
-        for (d = (struct dir *)bhold(b); nents; nents--, d++, place++) {
+        for (; nents; nents--, d++, place++) {
             if (d->inum == 0) {
                 if (slot == 0)
                     slot = place;

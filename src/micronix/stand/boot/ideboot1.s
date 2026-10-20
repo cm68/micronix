@@ -114,6 +114,9 @@ GRP1	equ	1		; the serial ports
 TXB	equ	048h		; transmit holding register
 LSR	equ	04dh		; line status
 LSRTXE	equ	020h		; holding register empty
+S1DATA	equ	07ch		; the SS1 2651's data
+S1STAT	equ	07dh		; its status
+S1TXRDY	equ	001h		; transmitter will take a byte
 
 ;
 ; Whitesmith's object header, from include/obj.h.  Sixteen bytes, and
@@ -132,10 +135,12 @@ O_DOFF	equ	14		; and the data
 	.text
 
 start:
+	ld	a,c			;the console id the rom passed down
 	ld	hl,BASE
 	ld	de,RELOC
 	ld	bc,finish-BASE
 	ldir
+	ld	(conid+RBIAS),a		;remember it in the relocated copy
 	jp	run+RBIAS
 
 ;
@@ -277,6 +282,8 @@ xfer:
 
 enter:
 	ld	hl,(STAGE+O_TOFF)
+	ld	a,(conid+RBIAS)	;the console id, handed on in C
+	ld	c,a
 	jp	(hl)
 
 ;
@@ -351,12 +358,24 @@ puts:
 	ret	z
 	ld	c,a
 	inc	hl
+	ld	a,(conid+RBIAS)	;which console the monitor found
+	or	a
+	jr	nz,pss1		;the SS1's 2651
+	ld	a,GRP1		;the MultIO: select its uart
+	out	(GSEL),a
 pwait:
 	in	a,(LSR)
 	and	LSRTXE
 	jr	z,pwait
 	ld	a,c
 	out	(TXB),a
+	jr	puts
+pss1:
+	in	a,(S1STAT)		;the 2651: wait until it will take a byte
+	and	S1TXRDY
+	jr	z,pss1
+	ld	a,c
+	out	(S1DATA),a
 	jr	puts
 
 ;
@@ -374,6 +393,8 @@ lba:	.db	1		;LBA 0-7
 	.db	0		;LBA 16-23
 	.db	0e0h		;drive/head: LBA mode, unit 0
 	.db	020h		;command: read sector(s), with retry
+
+conid:	.db	0		;the console the monitor found: 0 MultIO, 1 SS1
 
 msign:	.db	"ideboot:",13,10,0
 mread:	.db	"read",13,10,0

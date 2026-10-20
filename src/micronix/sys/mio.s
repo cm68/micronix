@@ -26,10 +26,10 @@
 ;
 ; public	miobase
 ; public	_mttys
-; public	_mstart
-; public	_mstop
-; public	_mputc
-; public	_mset
+; public	_ace_start
+; public	_ace_stop
+; public	_ace_putc
+; public	_ace_set
 ; public	_console
 ; public	intrupt
 ; public	m1int
@@ -155,9 +155,9 @@ DEV=8
 TTSIZE=38
 TTSIZE2=76
 TTSIZE3=114
-	.globl	miobase, _mstart, _mstop
-	.globl	_mputc, _mset, _console, intrupt, m1int, m2int
-	.globl	m3int, clkint
+	.globl	miobase, _ace_start, _ace_stop
+	.globl	_ace_putc, _ace_set, _console, intrupt, m1int, m2int
+	.globl	m3int, clkint, ss1_clkint, ss1_txint, ss1_rxint
 	.extern	_di, _ei, dicount, _mttys, _ttyin, _ttyout
 	.extern	_mumint, _ttyerror, _clock
 MBASE=0x48
@@ -284,15 +284,11 @@ pchl:
 
 ; ------- intrdismiss -------
 ; The interrupt-dismiss hook, called from intrupt after the handler
-; returns where the inline EOI used to be.  The master always gets the
-; EOI because it owns the acknowledge; a polled slave needs nothing (its
-; poll read was the acknowledge), and the CAS-cascaded slave's EOI is
-; added here when that topology is built out.
+; returns where the inline EOI used to be.  The resident dispatcher
+; (ovlntr, sys/probe.c) now supplies the EOI itself - pic_eoi(line) - so
+; there is nothing left for this hook to do.  It stays as a call site so
+; the inline EOI is not re-added by accident.
 intrdismiss:
-	ld	a,PENABLE
-	out	(MSELECT),a
-	ld	a,ENDINT
-	out	(ICNTRL),a
 	ret
 
 ; ------- A-NATURAL SOURCE: badint -------
@@ -342,6 +338,72 @@ clkint:
 	ld	a,PENABLE
 	out	(MSELECT),a
 	in	a,(CLKCLR)
+	ret
+
+; ------- ss1_clkint -------
+; The SS1's clock interrupt: the 8253 heartbeat on the slave's IR1.  Like
+; the MultIO's clock (int7), it is entered through intrupt, which saves
+; the registers and re-enables interrupts on the way out.  The handler
+; does the divide-by-four tick and the SS1's own EOI - a specific EOI to
+; the slave (level 1) and to the master's cascade (level 7), where the
+; MultIO clears a clock latch instead.
+;
+ss1_clkint:
+	call	intrupt
+	.defw	ss1_clk
+
+ss1_clk:
+	ld	a,(tick)
+	inc	a
+	ld	(tick),a
+	and	3
+	call	z,_clock
+	ld	a,0x61		; OCW2 specific EOI, level 1 (the timer)
+	out	(072h),a	; the slave 8259 command port
+	ld	a,0x67		; OCW2 specific EOI, level 7 (the cascade)
+	out	(070h),a	; the master 8259 command port
+	ret
+
+; ------- ss1_txint -------
+; The 2651's transmitter-ready interrupt, the slave's IR6.  ttyout sends
+; one queued character, or stops the transmitter when the queue is empty;
+; the console tty is mttys[1] (coninit opens 0x0101).  EOI before the
+; return: if the queue still has characters, TxRDY is asserted again and
+; the next interrupt takes one more, which is how the queue drains.
+ss1_txint:
+	call	intrupt
+	.defw	ss1_tx
+
+ss1_tx:
+	ld	hl,_mttys+TTSIZE	; the console tty
+	call	_ttyout
+	ld	a,0x66		; OCW2 specific EOI, level 6 (TxRDY)
+	out	(072h),a	; the slave 8259 command port
+	ld	a,0x67		; OCW2 specific EOI, level 7 (the cascade)
+	out	(070h),a	; the master 8259 command port
+	ret
+
+; ------- ss1_rxint -------
+; The 2651's receiver-ready interrupt, the slave's IR7.  Read the data
+; register and hand the character to ttyin with the console tty.
+ss1_rxint:
+	call	intrupt
+	.defw	ss1_rx
+
+ss1_rx:
+	in	a,(07ch)	; the received character
+	ld	c,a
+	ld	b,0
+	ld	hl,_mttys+TTSIZE	; the console tty, the second argument
+	push	hl
+	ld	l,c
+	ld	h,b		; the character, arg0
+	call	_ttyin
+	pop	af		; drop the tty argument
+	ld	a,0x67		; OCW2 specific EOI, level 7 (RxRDY)
+	out	(072h),a	; the slave 8259 command port
+	ld	a,0x67		; OCW2 specific EOI, level 7 (the cascade)
+	out	(070h),a	; the master 8259 command port
 	ret
 
 ; ------- A-NATURAL SOURCE: ace -------
@@ -565,12 +627,12 @@ mashake:
 endint:
 	ret
 
-; ------- A-NATURAL SOURCE: _mstart -------
+; ------- A-NATURAL SOURCE: _ace_start -------
 ; /* mstart (tty) struct tty *tty; */
 ; /* start the output on this device */
 ; /* the que is supposed to be emptied by interrupts */
 ;
-; _mstart:      /* called when a char is put into output que */
+; _ace_start:      /* called when a char is put into output que */
 ;
 ; 	call select;
 ;
@@ -602,7 +664,7 @@ endint:
 ; 		jmp _ei;
 ; 		/
 ;
-_mstart:
+_ace_start:
 	call	select
 	ld	a,(ace)
 	cp	0
@@ -629,10 +691,10 @@ mstart3:
 	.defb	OCW1
 	jp	_ei
 
-; ------- A-NATURAL SOURCE: _mstop -------
+; ------- A-NATURAL SOURCE: _ace_stop -------
 ; /* mstop (tty) struct tty *tty; */
 ;
-; _mstop:			/called when a que emptys or esc is hit
+; _ace_stop:			/called when a que emptys or esc is hit
 ; 	/		/mstop(tty, empty && closed);
 ; 	call select;
 ;
@@ -684,7 +746,7 @@ mstart3:
 ; 		jmp _ei;
 ; 		/
 ;
-_mstop:
+_ace_stop:
 	call	select		; tty (arg0) in hl
 	ld	a,(ace)
 	cp	0
@@ -730,10 +792,10 @@ mstop3:
 	.defb	OCW1
 	jp	_ei
 
-; ------- A-NATURAL SOURCE: _mputc -------
+; ------- A-NATURAL SOURCE: _ace_putc -------
 ; /* send a _char to the Mult I/O */
 ;
-; _mputc:			/called at interrupt time to print a char
+; _ace_putc:			/called at interrupt time to print a char
 ; 	/
 ; 	call select;
 ;
@@ -745,7 +807,7 @@ mstop3:
 ; 	jmp _ei;		/balance di in select
 ; 	/
 ;
-_mputc:
+_ace_putc:
 	call	select		; tty (arg0) in hl
 	ld	a,(miobase)
 	ld	(mputc3),a
@@ -757,12 +819,12 @@ mputc3:
 	.defb	UDATA
 	jp	_ei
 
-; ------- A-NATURAL SOURCE: _mset -------
+; ------- A-NATURAL SOURCE: _ace_set -------
 ; /* mset (tty) struct tty *tty; */
 ; /* Set the baud rate on serial ports */
 ; /* Do a restore on parallel ports  */
 ;
-; _mset:			/called during stty system call and at open */
+; _ace_set:			/called during stty system call and at open */
 ; 	/
 ; 	call select;
 ; 	a = ace | a;	/* if (ace % 4 == 0) */
@@ -804,7 +866,7 @@ mputc3:
 ;
 ; 	/* struct tty *select (); */
 ;
-_mset:
+_ace_set:
 	push	bc		; save bc (callee-saved)
 	push	hl		; save tty (for the baud-rate read below)
 	call	select		; tty (arg0) in hl
@@ -945,99 +1007,30 @@ _rates:
 	.defw	6	/14 = 19200
 	.defw	3	/15 = 38400
 
-; ------- A-NATURAL SOURCE: _console -------
-; /console(c)
+; console(c) - send a character to the console the monitor found.  The
+; monitor built its driver into on-board ram at condrv (mon500.s findcon),
+; and the kernel reaches it exactly as the level 1 rom does: the character
+; in C, a call to condrv.  The driver polls for ready, so a newline needs
+; only its return sent first.
 ;
-; /Send a character directly to the multiboard serial port 1
+; The driver wants the character in C, so BC is spoken for; a C caller
+; may have a register variable there (ccc keeps them in BC) and the
+; callee-saves rule it back.  pr keeps its argument pointer in BC, and
+; without this every number it prints after the first character of its
+; format is read from wherever C happened to be.
 ;
-; public	_console
-;
-; _console:
-; 	/
-; 	sp => hl => bc
-; 	sp <= bc <= hl	/bc = character
-; 	a = c :: '\n'	/check for newline
-; 	sp <= bc	/save original character
-; 	c = '\r'	/insert a return before a newline
-; 	cz spout
-; 	sp => bc	/get back original character
-; 	/
-;
+condrv=0x134		; the monitor's console driver, conram + 2
+
 _console:
 	ld	a,l		; a = c (arg0 in hl)
 	cp	'\n'
-	jp	nz,spout	; not newline: output c
-	push	af		; save c
-	ld	l,'\r'
-	call	spout		; output '\r'
-	pop	af		; restore c
-	ld	l,a		; l = c
-	jp	spout		; output c
-
-; ------- A-NATURAL SOURCE: spout -------
-; /* fall into ... */
-;
-; spout:			/put out the character in reg c
-; 	/
-; 	sp <= bc	/pass character
-; 	bc = TTSIZE;
-; 	hl = &_mttys + bc => sp;
-; 	call conout	/conout(&_mttys[1], c)
-; 	sp => af => af
-; 	return;
-; 	/
-;
-spout:
+	jp	nz,conso	; not newline: output it
 	push	bc		; save bc (callee-saved)
-	ld	b,0
-	ld	c,l		; bc = c (char)
-	push	bc		; push c (arg1 for conout)
-	ld	bc,TTSIZE
-	ld	hl,_mttys
-	add	hl,bc		; hl = &_mttys[1] (tty, arg0)
-	call	conout		; conout(tty, c)
-	pop	af		; drop c
-	pop	bc		; restore bc
+	ld	c,'\r'		; a return ahead of a newline
+	call	condrv		; the driver sends the char in C
+	pop	bc
+conso:	push	bc		; save bc (callee-saved)
+	ld	c,l		; the character, where the driver wants it
+	call	condrv		; send it, and return to console's caller
+	pop	bc
 	ret
-
-; ------- A-NATURAL SOURCE: conout -------
-; conout:
-; 	/
-; 	call select;
-;
-; 	a = miobase -> c3 + USTATUS -> c2;
-;
-; /*
-;  * wait til ready
-;  */
-;
-; 	c1: in; c2: USTATUS; a & EMPTY;
-; 		/
-; 		jz c1;
-; 		/
-;
-; 	a = *(hl = 4 + sp);
-;
-; 	out; c3: UDATA;
-; 	jmp _ei;		/balance di in select
-; 	/
-;
-conout:
-	call	select		; tty (arg0) in hl
-	ld	a,(miobase)
-	ld	(c3),a
-	add	a,USTATUS
-	ld	(c2),a
-c1:
-	.defb	0xDB
-c2:
-	.defb	USTATUS
-	and	EMPTY
-	jp	z,c1
-	ld	hl,2
-	add	hl,sp		; hl = &c (arg1, at sp+2)
-	ld	a,(hl)
-	.defb	0xD3
-c3:
-	.defb	UDATA
-	jp	_ei

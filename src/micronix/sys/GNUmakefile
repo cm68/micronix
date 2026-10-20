@@ -158,7 +158,7 @@ KERNEL_AS     = $(KERNEL_AS_OBJ) highmem.o
 KERNEL_C      = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o malloc.o name.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
-	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o upd1990.o \
+	trap.o tty.o uio.o multio.o ss1_uart.o dlabel.o ovl.o main.o upd1990.o ss1_clock.o \
 	picdata.o
 WIN_C         = open.o sys2.o rdwri.o memdev.o link.o access.o
 HIGHMEM_C_OBJ = main_init.o cus.o djinit.o ncrinit.o
@@ -371,18 +371,14 @@ upage.o: $(LEAF_AS) $(LEAF_C) pic.o net.o user.o
 # it.  The two slave PIC variants come from the one file; ccc's -c names
 # the object, so they live side by side.
 highmem.o: main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o \
-		pic_init.o probe_init.o upd1990_init.o picvec.o ss1vec.o
+		pic_init.o probe_init.o upd1990_init.o ss1_clock_init.o picvec.o ss1vec.o
 	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o \
-		pic_init.o probe_init.o upd1990_init.o picvec.o ss1vec.o
+		pic_init.o probe_init.o upd1990_init.o ss1_clock_init.o picvec.o ss1vec.o
 
-# probe.c and probe_init.c carry ovlint[NOVLINE], sized to the PIC's line
-# count, so they are compiled with the board's NOVLINE.  The MultIO is five
-# lines (VI0-1 and VI3-5, VI2 the slave's cascade); the single Wunderbus is
-# three and the SS1 eight, and each image passes its own when the per-board
-# images are wired.
-NOVLINE = 5
+# probe.c and probe_init.c carry ovlint[MAXNOVLINE] and walk the boot-found
+# nlines, so they are compiled once and one kernel boots every board.
 probe.o probe_init.o: %.o: %.c
-	$(CCC) $(CCFLAGS) $(INC) -DNOVLINE=$(NOVLINE) -c $<
+	$(CCC) $(CCFLAGS) $(INC) -c $<
 
 # win.o is the window-page cluster: the part of the resident kernel that
 # can live at BUFSEG, in the very page bhold() maps buffers into, so its

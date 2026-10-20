@@ -24,9 +24,6 @@
 #define ND_OPDONE	0x01
 #define ND_ERROR	0x02
 
-/* the interrupt line the card raises (the DISK3 spare, sys/ints.h) */
-#define NDINT		INT_NIC
-
 #define NND		1	/* one network disk */
 
 /*

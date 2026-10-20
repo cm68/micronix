@@ -1,48 +1,29 @@
 /*
- * getenv - read environment file into environment array
+ * getenv - search the environment the kernel put on the stack.
  *
+ * crt0 stores the vector's address in environ.  A program started
+ * through exec (call 11) has an empty one, so the loop stops at once.
+ *
+ * The old version read a file called ENVIRON in the current directory
+ * and cached it on first call.  That was the CP/M branch of the HiTech
+ * C library, where the operating system supplied no environment at
+ * exec; it was not an inheritance mechanism, had no writer anywhere in
+ * the tree, and changed with the current directory.  The stack vector
+ * replaces it.
  */
-#include	<stdio.h>
 #include	<string.h>
 
-#define	ENVFILE	"ENVIRON"
-
-       char **	environ;
-extern char *	sbrk();
+extern char **	environ;
 
 char *
 getenv(s)
 char *	s;
 {
 	register char **	xp;
-	register char *		cp;
 	short			i;
-	static char		setup;
 
-	if (!setup) {
-		FILE *	fp;
-		char *	avec[40];
-		char	abuf[128];
-
-		i = 0;
-		if (fp = fopen(ENVFILE, "r")) {
-			while (i < sizeof avec/sizeof avec[0] && 
-				fgets(abuf, sizeof abuf, fp)) {
-				cp = sbrk(strlen(abuf)+1);
-				strcpy(cp, abuf);
-				cp[strlen(cp)-1] = 0;
-				avec[i++] = cp;
-			}
-			fclose(fp);
-		}
-		avec[i] = 0;
-		xp = (char **)sbrk(i * sizeof avec[0]);
-		memcpy(xp, avec, i * sizeof avec[0]);
-		environ = xp;
-		setup = 1;
-	}
 	i = strlen(s);
-	for (xp = environ ; *xp ; xp++)
+	for (xp = environ ; xp && *xp ; xp++)
 		if (strncmp(*xp, s, i) == 0 && (*xp)[i] == '=')
 			return *xp + i+1;
 	return (char *)0;

@@ -17,10 +17,10 @@
  * s100.c are the live copy; these names document the default two-PIC wiring) */
 #define VI_HDDMA  0
 #define VI_DJDMA  1
-#define VI_HDCA   0               /* shares VI0 with the HDDMA */
+#define VI_HDCA   0               /* mutually exclusive with the HDDMA: one hard disk per machine */
 #define VI_NCR    3
 #define VI_IDE    4
-#define VI_DISK3  5               /* CompuPro DISK 3 / nic, the spare slave line */
+#define VI_DISK3  0               /* DISK 3 / DISK 2 ride VI0 with the other hard disks */
 
 /*
  * which VI lines each PIC monitors.  The master's IR0..IR2 are the low

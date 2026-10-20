@@ -20,29 +20,9 @@
  */
 
 /*
- * The interrupt line the card drives, and it is not the card's own.
- *
- * ide.c reads the S-100 jumpers out: the Mult I/O board brings in three
- * of the bus's eight vectored interrupt lines - VI0, VI1 and VI2 - and
- * the other five inputs are wired on the board itself to its own devices
- * (three serial ports, the printer and the clock), so those five are not
- * bus lines at all.  All three are spoken for: VI0 is mw.c's HD-DMA, VI1
- * is cus.c's floppy, VI2 is ide.c.
- *
- * VI2 and not one of the others because VI2 is the one the bus leaves
- * free in the literal sense - the MYIDE board is the only thing that has
- * ever driven it, and a machine with a SCSI disk has no particular reason
- * to have that board in it as well.  Sharing a line is not a special
- * case the way it used to be: the 5380 brings its own interrupt down when
- * its registers are read, the IDE card brings its own down the same way,
- * and ovlntr (sys/ovl.c) calls both handlers in one pass over the line.
- * Neither driver knows about the other; the fan-out is resident, and the
- * routine that used to chain them by hand (scsii2int) is gone.
- *
- * Past the jumpers the line is simply input 2 of the 8259, and ARMMASTER
- * in inits.s already unmasks it, so no inton() call claims it.
+ * The card names no interrupt line: the resident attach loop
+ * (sys/probe.c) tickles it and discovers the line it raised.
  */
-#define NCRINT  INT_NCR
 
 /*
  * The card's ports.  Eight consecutive Z80 I/O addresses - a number space

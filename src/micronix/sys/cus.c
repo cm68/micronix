@@ -8,6 +8,7 @@
 #include <sys/sys.h>
 #include <sys/tty.h>
 #include <sys/ints.h>
+#include <sys/pic8259.h>
 
 /*
  * Initialize custom hardware. Called from main().
@@ -24,8 +25,7 @@
  * lands on the definition, a page away from the call that caused it.
  */
 static int cinit(), hdinit();
-extern int clockinit();         /* sys/wb_clock.c (or ss1_clock.c) */
-extern int pic_init();          /* sys/miopic.c (or wbiopic/ss1pic) */
+extern int pic_init();          /* sys/pic_init.c: probe the PICs at boot */
 extern int intr_attach();       /* sys/probe_init.c */
 
 cus()
@@ -43,14 +43,15 @@ cus()
 
     di();
     cinit();
-    clockinit();                /* the heartbeat, sys/wb_clock.c */
-    minit();                    /* the uart bring-up, sys/inits.s */
-    pic_init();                 /* the PIC stack, sys/miopic.c */
+    pic_init();                 /* probe the PICs, picks the clock + console */
+    (*clockinit)();             /* the heartbeat, chosen by pic_init */
+    (*console_minit)();         /* the uart bring-up, chosen by pic_init */
 
     /*
      * coninit (); /* in inits.s
      */
     ovlstart();                 /* the stamped root driver, in sys/ovl.c */
+    hdinit();                   /* clear the boot's stuck op-done/seek-done */
     /*
      * Wire that driver's interrupt now, before main() goes on to open the
      * root device.  The rest of the modules cannot be placed until the
@@ -60,10 +61,9 @@ cus()
      * wiring has to beat.
      */
     intr_attach();
-    hdinit();
 
     /*
-     * vtinit (); 
+     * vtinit ();
      */
     ei();
 }
@@ -127,15 +127,23 @@ cinit()
  * 
  */
 
+#define HDCMD	0x51
 #define HDPORT	0x52
 
 /*
- * Turn off pending interrupt from hdca (hdca need not be there)
+ * Turn off the pending interrupts from the hdca the boot left behind.  The
+ * level 1/2/3 boot read this controller to get the kernel here and never
+ * acknowledged the op-done, so the line is stuck high; the attach loop's
+ * probe needs a fresh edge and finds nothing while the line is already up.
+ * A RAM pointer command acknowledges the op-done, and reading the
+ * interrupt-clear port acknowledges the seek-done.  (The hdca need not be
+ * there - a missing card takes the writes harmlessly.)
  */
 static
 hdinit()
 {
-    in(HDPORT);
+    out(HDCMD, 0);              /* CMD_RAMDATA: acknowledge op-done */
+    in(HDPORT);                 /* acknowledge seek-done */
 }
 
 /*

@@ -9,10 +9,10 @@
  * addressed a digit at a time through a command port and a data port -
  * and an Intel 8253 whose counter 0 is the heartbeat, clocked at 2 MHz
  * and wired to the slave 8259's IR1.  This is the SS1 counterpart of
- * wb_clock.c; the two provide the same three entry points - rtcinit,
- * rtcwrite, clockinit - and only one links.
+ * wb_clock.c; the two provide the same three entry points - ss1_rtcinit,
+ * ss1_rtcwrite, clockinit - and only one links.
  *
- * The MSM5832 HAS a year, where the uPD1990 does not, so rtcinit reads
+ * The MSM5832 HAS a year, where the uPD1990 does not, so ss1_rtcinit reads
  * the year from the chip and its base argument (the superblock timestamp
  * wb_clock.c borrows a year from) is unused.
  */
@@ -99,7 +99,7 @@ rtcset(UINT8 *b)
  * from the chip, so there is no rollover year to derive from it.
  */
 void
-rtcinit(long base)
+ss1_rtcinit(long base)
 {
     UINT8 b[6];
     long t;
@@ -115,7 +115,7 @@ rtcinit(long base)
  * Write the system time to the calendar.
  */
 void
-rtcwrite(long t)
+ss1_rtcwrite(long t)
 {
     UINT8 b[6];
 

@@ -109,6 +109,31 @@ ovlcall(fn, seg)
 }
 
 /*
+ * ovlcall with one argument, for the probe: the mode that clears the
+ * card's interrupt or raises it (PROBE_CLEAR / PROBE_TICKLE in ovl.h).
+ */
+ovlcall1(fn, seg, arg)
+    int (*fn) ();
+    UINT seg;
+    int arg;
+{
+    UINT8 drv;
+
+    if (seg == 0) {
+        (*fn) (arg);
+        return (0);
+    }
+
+    drv = u.drv;
+    u.drv = (UINT8) seg;
+    map0[2 * OVLSEG] = (UINT8) seg;
+    (*fn) (arg);
+    u.drv = drv;
+    map0[2 * OVLSEG] = drv;
+    return (0);
+}
+
+/*
  * Map a major's module and return the header it starts with, or 0 if the
  * major has no driver at all.  A driver that is still linked into the
  * kernel is that first case with nothing to map: its header is a

@@ -49,7 +49,7 @@ MANDIR	= /usr/man/man2
 # no room for an 80-object command.  Each chunk stays comfortably under
 # one argument block.
 AOBJS1	= access.o alarm.o _break.o chdir.o chmod.o chown.o \
-	close.o creat.o dup.o errno.o exec.o execv.o \
+	close.o creat.o dup.o errno.o exec.o execve.o execv.o \
 	exit.o _exit.o fork.o fstat.o getpid.o getuid.o \
 	gtty.o kill.o link.o mknod.o mount.o nice.o
 

@@ -97,6 +97,11 @@ select_drive(int id)
         return -1;
     }
     imd_trkinfo(handle[id], 0, 0, &nsec, &ss);
+    if (nsec == 0) {
+        printf("disk2: no drive %s, command refused\n", drivename);
+        handle[id] = 0;         /* an empty image is not a drive; don't cache it */
+        return -1;
+    }
     secsize[id] = ss ? ss : 512;
     return 0;
 }
@@ -149,8 +154,9 @@ d2_command(byte drive, byte op)
  * Every write here moves the done latch: a write with ATTN* high - which
  * is every write this driver makes, and the only way the board is
  * addressed at all - releases the line, and a command that finishes
- * asserts it again.  So the card goes quiet when the host acknowledges
- * and speaks when there is something to say, with no edge either way.
+ * asserts it again.  A command against a unit that is not there never
+ * finishes, so it must not assert: the release sticks, and the attach
+ * loop's probe leaves a quiet line.
  */
 static void
 d2_ctl_out(portaddr p, byte v)
@@ -161,9 +167,11 @@ d2_ctl_out(portaddr p, byte v)
         curdrv = v & 3;
         if (select_drive(curdrv) < 0)
             status = 0x30;      /* overrun-ish: no drive */
-        else
+        else {
             d2_command(curdrv, v & 0x38);
-        set_vi(disk2_vi_line, DISK2_CARDID, 1);
+            if (!(status & 0x40))   /* the command finished, not a timeout */
+                set_vi(disk2_vi_line, DISK2_CARDID, 1);
+        }
     } else {
         regsel = v & 0x18;      /* OP1/OP0 */
         direction = v & D2_OP2;

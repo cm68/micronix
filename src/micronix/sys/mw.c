@@ -665,14 +665,11 @@ reset()
     map0[2] = 1;
 
     /*
-     * Out of the old idiom's way: this used to unmask the line here
-     * (inton(MWINT)), because a driver named its own and opened its own
-     * interrupt.  It names neither now - the line is discovered and
-     * unmasked once, by the attach loop (sys/probe.c), and this runs far
-     * too late to be that.  Unmasking here would also be wrong: the probe
-     * tickles the card with every line masked on purpose, and a reset
-     * that opened one would let the tickle reach the CPU and be
-     * acknowledged before the attach loop could read the pending bit.
+     * Do not unmask the line here.  The attach loop (sys/probe.c)
+     * discovers and unmasks it once at boot; the probe tickles the card
+     * with every line masked on purpose, and a reset that opened one would
+     * let the tickle reach the CPU before the attach could read the
+     * pending bit.
      */
     ei();
     out(RESET, 0);
@@ -693,9 +690,11 @@ attn()
  */
 issue()
 {
+    di();
     mwstate = ACTIVE;
     mwdead = 0;
     attn();
+    ei();
 }
 
 /*
@@ -1018,9 +1017,15 @@ struct biovec mwbvec = { &mwopen, &mwclose, &mwstrat, &mwioctl };
  */
 #define PROBEWAIT 10000
 
-mwprobe()
+mwprobe(mode)
+	int mode;
 {
     register int n;
+
+    if (mode == PROBE_CLEAR) {
+        out(RESET, 0);              /* the reset releases the line */
+        return (0);
+    }
 
     reset();
     cmd.steps = 0;

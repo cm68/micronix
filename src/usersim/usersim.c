@@ -161,7 +161,7 @@ z80_run()
 #define	STACKTOP	0xffff
 #define MAXIMUM_STRING_LENGTH   100
 
-static int do_exec(char *name, char *guest, char **argv);
+static int do_exec(char *name, char *guest, char **argv, char **envp);
 static void emulate();
 void SystemCall();
 void int_handler();
@@ -1612,7 +1612,12 @@ main(int argc, char **argv)
     }
     argvec[i] = 0;
 
-    if (do_exec(fname(argvec[0]), argvec[0], argvec)) {
+    /*
+     * The root process starts with an empty environment.  A child gets
+     * one only when its parent passes it through execve; nothing from
+     * the host's environment is handed over.
+     */
+    if (do_exec(fname(argvec[0]), argvec[0], argvec, 0)) {
         return (EXIT_FAILURE);
     }
     procsetcmd(selfgpid(), base_name(argvec[0]));
@@ -1915,7 +1920,7 @@ lookup_sym(char *name)
  * this is the exec function - slightly different from the standard unix
  */
 static int
-do_exec(char *name, char *guest, char **argv)
+do_exec(char *name, char *guest, char **argv, char **envp)
 {
     FILE *file;
     struct obj header;
@@ -1924,6 +1929,7 @@ do_exec(char *name, char *guest, char **argv)
     int ai;
     unsigned short *ao;
     int argc;
+    int envc;
     struct fsym {
         unsigned short v;
         unsigned char t;
@@ -1945,6 +1951,11 @@ do_exec(char *name, char *guest, char **argv)
         if (verbose & V_EXEC) {
             message("arg %d = %s\n", argc, argv[argc]);
         }
+    }
+    envc = 0;
+    if (envp) {
+        while (envp[envc])
+            envc++;
     }
 
     if ((file = fopen(name, "rb")) == NULL) {
@@ -2098,13 +2109,33 @@ do_exec(char *name, char *guest, char **argv)
         tprot_lo = tprot_hi = 0;
     }
 
-    ao = malloc(argc * sizeof(*ao));
+    ao = malloc((argc + envc) * sizeof(*ao));
 
     /*
-     * now, copy the args to argv and the stack 
+     * now, copy the args to argv and the stack.  The environment
+     * strings follow the argument strings in memory, which is the
+     * order the kernel's getargs() copies them in; because the stack
+     * is filled downward, the environment goes on first, from its
+     * last string back to its first.
      */
+    for (i = 0; i < envc; i++) {
+        int j;
+        char *s;
+
+        ai = envc - (i + 1);
+        ao[argc + ai] = z80_get_reg16(sp_reg) - (strlen(envp[ai]) + 1);
+        z80_set_reg16(sp_reg, ao[argc + ai]);
+        s = envp[ai];
+        j = ao[argc + ai];
+        while (1) {
+            put_byte(j, *s);
+            if (!*s) break;
+            s++;
+            j++;
+        }
+    }
     for (i = 0; i < argc; i++) {
-        int j; 
+        int j;
         char *s;
 
         ai = argc - (i + 1);
@@ -2112,7 +2143,7 @@ do_exec(char *name, char *guest, char **argv)
         z80_set_reg16(sp_reg, ao[ai]);
         // printf("copyout %s to %04x\n", argv[ai], ao[ai]);
         s = argv[ai];
-        j = ao[ai]; 
+        j = ao[ai];
         while (1) {
             put_byte(j, *s);
             if (!*s) break;
@@ -2121,13 +2152,20 @@ do_exec(char *name, char *guest, char **argv)
         }
     }
     /*
-     * NULL-terminate argv.  The 0xffff here used to be the stack's
-     * bottom marker, but the exec syscall counts argv by reading
-     * until it hits a zero word - and a 0xffff read as non-zero, so
-     * exec kept walking past the terminator into whatever sat below
-     * the stack frame, and handed the new image a garbage argument.
+     * NULL-terminate argv, then lay down envp after it.  The kernel's
+     * stack is
+     *
+     *	argc, argv[0..], 0, envp[0..], 0
+     *
+     * and crt0 finds envp at argv + 2*argc + 2.  The zero here used to
+     * be 0xffff once, which the exec syscall counted as a live
+     * argument; it is a real null now.
      */
-    push(0);
+    push(0);                    /* envp terminator */
+    for (i = 0; i < envc; i++) {
+        push(ao[argc + envc - (i + 1)]);
+    }
+    push(0);                    /* argv terminator */
     for (i = 0; i < argc; i++) {
         push(ao[argc - (i + 1)]);
     }
@@ -3702,6 +3740,7 @@ SystemCall()
     struct statb *ip;
     struct dirfd *df;
     char **argvec;
+    char **envvec;
     int savemode;
     struct syscall *sp;
     char name1[256];
@@ -4496,7 +4535,7 @@ SystemCall()
             argvec[i] = strdup(name2);
         }
         argvec[i] = 0;
-        ret = do_exec(fname(fn), fn, argvec);
+        ret = do_exec(fname(fn), fn, argvec, 0);
         if (ret) {
             ret = errno;
             carry_set();
@@ -4508,6 +4547,45 @@ SystemCall()
             free(argvec[i]);
         }
         free(argvec);
+        break;
+
+    case 56:                   /* execve <file> <argv> <envp> */
+        i = 0;
+        while (get_word(arg2 + (i * 2)))
+            i++;
+        argvec = malloc((i + 1) * sizeof(char *));
+        i = 0;
+        for (i = 0; (arg1 = get_word(arg2 + (i * 2))); i++) {
+            copyin(name2, arg1, sizeof(name2));
+            argvec[i] = strdup(name2);
+        }
+        argvec[i] = 0;
+        i = 0;
+        if (arg3)
+            while (get_word(arg3 + (i * 2)))
+                i++;
+        envvec = malloc((i + 1) * sizeof(char *));
+        i = 0;
+        if (arg3)
+            for (i = 0; (arg1 = get_word(arg3 + (i * 2))); i++) {
+                copyin(name2, arg1, sizeof(name2));
+                envvec[i] = strdup(name2);
+            }
+        envvec[i] = 0;
+        ret = do_exec(fname(fn), fn, argvec, envvec);
+        if (ret) {
+            ret = errno;
+            carry_set();
+        } else {
+            procsetcmd(selfgpid(), base_name(argvec[0]));
+            carry_clear();
+        }
+        for (i = 0; argvec[i]; i++)
+            free(argvec[i]);
+        free(argvec);
+        for (i = 0; envvec[i]; i++)
+            free(envvec[i]);
+        free(envvec);
         break;
 
     case 12:                   /* chdir <ptr to name> */

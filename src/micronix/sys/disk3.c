@@ -538,9 +538,11 @@ attn()
  */
 issue()
 {
+    di();
     d3state = ACTIVE;
     d3dead = 0;
     attn();
+    ei();
 }
 
 /*
@@ -615,9 +617,15 @@ struct biovec disk3bvec = { &disk3open, &disk3close, &disk3strat, 0 };
  * ignored by disk3int: nothing is in flight, and there is no buffer for
  * the handler to finish.
  */
-disk3probe()
+disk3probe(mode)
+	int mode;
 {
     static UINT32 i;
+
+    if (mode == PROBE_CLEAR) {
+        out(D3_ATTN, D3_RESET);     /* hold the 8085 in reset: the line goes quiet */
+        return (0);
+    }
 
     reset();
     iopb.command = D3_VERSION | D3_INT;

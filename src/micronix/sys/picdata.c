@@ -16,6 +16,18 @@ UINT8 linepic[MAXNOVLINE];
 UINT8 lineir[MAXNOVLINE];
 UINT8 npics, nlines;
 
+/* the clock and RTC, chosen by the same probe (sys/pic_init.c) */
+int (*clockinit)();
+int (*rtcinit)();
+int (*rtcwrite)();
+
+/* the console, chosen by the same probe */
+int (*console_putc)();
+int (*console_start)();
+int (*console_stop)();
+int (*console_set)();
+int (*console_minit)();
+
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

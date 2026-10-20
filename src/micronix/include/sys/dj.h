@@ -48,7 +48,6 @@
 # define	DJMAX		0x127f
 # define	DJPRIORITY	PRIBIO
 
-# define	DJINT		INT_DJDMA
 # define	TIME		 (~0)
 # define	MAX		((unsigned) 3000) /* biggest floppy boundary */
 # define	CHAN		((unsigned)(djcomm))

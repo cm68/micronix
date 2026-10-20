@@ -47,6 +47,13 @@ start:
 	ld	hl,0	; load argv
 	add	hl,sp
 	push	hl	; argv, the second argument, on the stack
+	push	hl	; keep argv while envp is worked out
+	add	hl,de	; hl = argv + argc
+	add	hl,de	; hl = argv + 2*argc
+	inc	hl
+	inc	hl	; past the argv terminator: envp
+	ld	(_environ),hl
+	pop	hl	; argv back
 	ex	de,hl	; argc, the first, rides in hl
 	call	_main	; call main
 	push	hl	; return value
@@ -54,6 +61,14 @@ start:
 			; [status] with no return-address slot
 
 	.data
+;
+; The environment vector the kernel put on the stack.  getenv walks
+; it; execv and execl pass it to the next image.  A program started
+; through exec (call 11) gets an empty one - envp points at a null.
+;
+	.global _environ
+_environ: .dw	0
+
 ;
 ; these symbols are filled out by the linker
 ;

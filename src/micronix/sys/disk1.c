@@ -281,11 +281,13 @@ newdrv()
         return;
     }
     d1fault = 0;
+    retry = RETRIES;
+    di();
+    d1state = SEEKING;          /* arm before the command that raises it */
+    d1dead = 0;
     d1putb(FDC_RECAL);
     d1putb(curdrv & 3);
-    retry = RETRIES;
-    d1state = SEEKING;
-    d1dead = 0;
+    ei();
 }
 
 /*
@@ -318,11 +320,13 @@ d1seek(cyl, head)
     UINT cyl, head;
 {
     d1fault = 0;
+    di();
+    d1state = SEEKING;
+    d1dead = 0;
     d1putb(FDC_SEEK);
     d1putb((head << 2) | (curdrv & 3));
     d1putb(cyl);
-    d1state = SEEKING;
-    d1dead = 0;
+    ei();
 }
 
 /*
@@ -349,6 +353,9 @@ d1cmd(head, sect)
 {
     d1fault = 0;
     d1dma();
+    di();
+    d1state = ACTIVE;           /* arm before the command that raises it */
+    d1dead = 0;
     d1putb((d1buf->flags & BREAD) ? FDC_READ : FDC_WRITE);
     d1putb((head << 2) | (curdrv & 3));
     d1putb(d1buf->cyl);
@@ -359,13 +366,14 @@ d1cmd(head, sect)
     d1putb(D1_GPL);
     d1putb(0xff);
     if (d1fault) {
+        d1state = STOPPED;
+        ei();
         d1error();
         advque();
         return;
     }
+    ei();
     retry = RETRIES;
-    d1state = ACTIVE;
-    d1dead = 0;
 }
 
 /*

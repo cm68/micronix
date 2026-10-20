@@ -15,7 +15,7 @@ struct syscall
 };
 
 extern int indir(), exit(), r_fork(), read(), write(), open(),
-    r_close(), wait(), creat(), link(), unlink(), exec(), chdir(),
+    r_close(), wait(), creat(), link(), unlink(), exec(), execve(), chdir(),
     r_time(), mknod(), chmod(), chown(), brake(), stat(), r_seek(),
     getpid(), mount(), umount(), setuid(), getuid(), stime(),
     unimp(), alarm(), fstat(), r_ftruncate(), pause(), badcall(), stty(), gtty(),
@@ -86,6 +86,7 @@ struct syscall syssw[] = {
     0, &badcall,                /* 53 */
     4, &r_ioctl,                /* 54 ioctl */
     2, &reboot,                 /* 55 */
+    6, &execve,                 /* 56 execve(name, argv, envp) */
 };
 
 int ncalls = sizeof(syssw) / sizeof(struct syscall);

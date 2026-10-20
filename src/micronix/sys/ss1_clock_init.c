@@ -3,7 +3,7 @@
  *
  * sys/ss1_clock_init.c
  *
- * clockinit() programs the 8253's counter 0 - the heartbeat.  It runs
+ * ss1_clockinit() programs the 8253's counter 0 - the heartbeat.  It runs
  * once at boot, so this file folds into highmem.o and is reclaimed as
  * buffer headers.  The resident half (rtcinit, rtcwrite) is in
  * ss1_clock.c.
@@ -28,7 +28,7 @@ extern int in(), out();
  * unmask is the PIC's, so this only programs the timer.
  */
 void
-clockinit(void)
+ss1_clockinit(void)
 {
     out(SS1_TCCTL, 0x34);       /* counter 0, LSB then MSB, mode 2, binary */
     out(SS1_TC0, HEARTBEAT & 0xff);

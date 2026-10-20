@@ -15,8 +15,9 @@
  * getgrgid, setpriority, ttyname, getenv and setenv, and this tree
  * has none of them: syslog and the process-priority calls are not
  * system calls here at all, ttyname is written out by hand where it
- * is wanted (cmd/login/login.c, cmd/ps), and there is no process
- * environment to get from or set into.  What it would buy is a
+ * is wanted (cmd/login/login.c, cmd/ps), and the environment is
+ * passed down the stack rather than through a setenv this tree does
+ * not have.  What it would buy is a
  * group-zero check before su to root, -f and - full logins, and
  * HOME/SHELL/USER export - none of which the 1982 page for this
  * command mentions.  su.1 here says "Non super users will be asked to
@@ -36,15 +37,13 @@
  *			login uses it, so the shell is exec'd with a
  *			two-entry argv: "su" and a null.
  *
- *	environ		does not exist at a program's start here, and
- *			so the loop that rewrote PS1 to "# " is gone
- *			with it.  getenv (3) builds an environment array
- *			by reading a file called ENVIRON on its first
- *			call and nothing fills one in before that, so
- *			the loop would have walked a null pointer.  The
- *			shell here has no PS1 either - nothing in the
- *			tree mentions it - so the loop had nothing to
- *			aim at besides.
+ *	environ		now exists at a program's start: crt0 points
+ *			it at the vector execve laid down, and execv
+ *			passes it on.  su does not seed or rewrite it,
+ *			so the loop that rewrote PS1 to "# " is still
+ *			gone; the shell here has no PS1 either -
+ *			nothing in the tree mentions it - so that loop
+ *			had nothing to aim at besides.
  *
  *	getpass and crypt are libc here, declared by <crypt.h>, and are
  * the same two routines passwd (1) uses; the salt comes from the

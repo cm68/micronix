@@ -2,8 +2,7 @@
 
 How a driver's interrupt handler gets wired to the card it serves.
 Nothing here is a compile-time constant in the driver: the wiring is
-discovered at boot and done once, by the resident half.  This is a plan;
-nothing below is built yet.
+discovered at boot and done once, by the resident half.
 
 ## First principles
 
@@ -14,10 +13,11 @@ nothing below is built yet.
   PIC configuration.  Its whole interrupt surface is two things: the
   handler it supplies, and a probe that tickles its card.  It never names
   a line, and it never calls `inton`.
-- **Compile-time PIC.**  The PIC stack is fixed per machine, so it is a
-  linked object (`ss1pic`, `multiopic` or `wbiopic`), not a runtime
-  choice.  The drivers and the resident half call `inton`/`pic_irr`/
-  `pic_eoi` by name; the link resolves them to the chosen object.
+- **Runtime probe.**  One resident 8259 driver discovers the board at
+  boot - two CAS 8259s on the SS1, a master plus a polled slave on the
+  MultIO, or a single Wunderbus PIC - and fills the resident line table
+  (sys/pic8259.h).  One kernel boots every board; there is no per-board
+  image.
 
 ## The model
 
@@ -68,18 +68,19 @@ masked so the CPU never sees the tickled interrupt.  It returns a mask of
 pending lines; with no sharing exactly one bit is set, and the probe
 takes that line.  The three objects differ only behind these five names.
 
-## The three objects
+## The three boards
 
-- **ss1pic** — the CompuPro SS1's two 8259s, CAS-cascaded on the CPU
-  board, all eight VI lines vectored.  `pic_irr()` reads both PICs, the
-  slave reached through the cascade; `pic_eoi()` acknowledges both.
-- **multiopic** — the multio's master at 0x48 with the second board's slave
-  at 0x40, six lines.  The slave is polled, never vectored: its pending
-  lines are read by selecting it, and its poll *is* its acknowledge, so
-  `pic_eoi()` only ever acknowledges the master.
-- **wbiopic** — the wunderbus I/O's single PIC, three lines.  The
-  smallest configuration; under no-sharing it carries at most three
-  controllers.
+One init (sys/pic_init.c) programs and probes each in turn and fills the
+line table from whichever answered:
+
+- **SS1** — two CAS-cascaded 8259s on the CPU board at 0x70/0x72, all
+  eight VI lines vectored.  `pic_irr()` reads both PICs; `pic_eoi()`
+  acknowledges both.
+- **MultIO** — the master at 0x48 with the second board's slave at 0x40,
+  five lines.  The slave is polled, never vectored: its pending lines are
+  read by selecting it, and its poll *is* its acknowledge.
+- **Wunderbus** — the single PIC, three lines.  The smallest
+  configuration; under no-sharing it carries at most three controllers.
 
 ## The attach phase
 
@@ -106,12 +107,12 @@ only ever called because its card asserted it.  The EOI the handler owes
 is `pic_eoi(line)`, which the resident dispatch supplies; the driver does
 not touch the PIC.
 
-## What goes away
+## What went away
 
 - `ints.h`'s `INT_*` line names and its `#if N8259` table — a driver
   names no line, so there is nothing to name.
 - `OVLSHARE` and the shared-line machinery in `ovl.c` — one handler per
-  line.
+  line, and a second card that tickles a taken line is a panic.
 - The `inton(HDCAINT)` idiom in every driver's `open` — the resident
   attach unmasks once, at boot.
 - The single-PIC three-line build as a full-system config — six

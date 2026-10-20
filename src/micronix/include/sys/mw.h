@@ -60,17 +60,6 @@ struct hddma_cmd
 #define	fill	byte3		/* the data field's fill byte */
 
 /*
- * The line the controller's completion interrupt is on, as the kernel
- * numbers them.  It is bus vector VI0, which is where the Decision 1's
- * jumper area puts the hard disk controller (sys/ide.c has the note on
- * the three lines a card on the bus can reach).  The driver unmasks it
- * at open with inton(MWINT), and its header names it for the interrupt
- * dispatcher - the header is a different object (sys/mwhdr.c), so the
- * number is here rather than beside the driver.
- */
-#define	MWINT	INT_HDDMA
-
-/*
  * Controller commands
  */
 #define OP_READ			0       /* read sector */

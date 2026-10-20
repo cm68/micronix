@@ -133,6 +133,16 @@ pic_write_cmd(struct pic *p, byte v)
         p->pic_state = PS_ICW2;
         p->icw1 = v;
         p->priority = 0;
+        /*
+         * A real 8259 clears its pending requests and in-service bits on
+         * ICW1, so the init sequence starts from a quiet controller.  The
+         * boot's probes raise the cards' lines and leave them standing,
+         * and without this the kernel's pic_init would carry those stale
+         * requests over and the attach loop would find no fresh edge.
+         */
+        p->irr = 0;
+        p->isr = 0;
+        p->poll = 0;
         if (!(p->icw1 & ICW1_LTIM)) {
             l("%s: edge triggered not supported\n", p->name);
         }
@@ -211,6 +221,7 @@ pic_write_data(struct pic *p, byte v)
 {
     char **bdec;
     byte *reg;
+    int imr = 0;
 
     switch (p->pic_state) {
     case PS_ICW2:
@@ -244,6 +255,7 @@ pic_write_data(struct pic *p, byte v)
         p->imr = v;
         v = (~p->imr) & 0xff;
         bdec = p->irbits;
+        imr = 1;
         break;
     default:
         reg = "unknown";
@@ -251,6 +263,14 @@ pic_write_data(struct pic *p, byte v)
     }
     trace(p->trace_flag, "%s: write pic1 %s %02x, %s\n",
         p->name, reg, v, bitdef(v, bdec));
+
+    /*
+     * Unmasking a level-held input has to take effect now, not at the
+     * next edge: the request was latched (or is being re-latched) while
+     * it was masked, and the INT line is what has to change.
+     */
+    if (imr)
+        p->line_changed();
 }
 
 /*

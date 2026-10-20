@@ -107,6 +107,11 @@ select_drive(int id)
         return -1;
     }
     imd_trkinfo(handle[id], 0, 0, &nsec, &ss);
+    if (nsec == 0) {
+        printf("disk3: no drive %s, command refused\n", drivename);
+        handle[id] = 0;         /* an empty image is not a drive; don't cache it */
+        return -1;
+    }
     secsize[id] = ss ? ss : 512;
     return 0;
 }
@@ -144,6 +149,8 @@ d3_run(void)
     int cyl, head, sec;
     int n;
     int i;
+    int refused;
+    int raise;
 
     copyin((byte *)&iopb, iopb_addr, sizeof(iopb));
     drv = iopb.drive & 3;
@@ -157,9 +164,11 @@ d3_run(void)
       op, iopb.command, drv, (unsigned)dma, (unsigned)link,
       (unsigned)iopb_addr);
 
+    refused = 0;
     if (op != D3_GLOBAL && op != D3_NOOP && op != D3_VERSION &&
         select_drive(drv) < 0) {
         iopb.status = D3_NOTRDY;
+        refused = 1;
         goto done;
     }
 
@@ -250,12 +259,18 @@ done:
     copyout((byte *)&iopb, iopb_addr, sizeof(iopb));
     iopb_addr = link;
     l("d3: status %02x\n", iopb.status);
-    if ((iopb.command & D3_INT) && !(iopb.command & D3_CONTINUE))
-        set_vi(disk3_vi_line, 1, 1);
-    else
-        set_vi(disk3_vi_line, 1, 0);
-    l("d3: vi %d raise %d\n", disk3_vi_line,
-      (iopb.command & D3_INT) && !(iopb.command & D3_CONTINUE));
+    /*
+     * A command for a drive that is not there is not a completion: the
+     * unit does not answer, and the driver's watchdog is what turns its
+     * silence into an error.  Raising the line would hold it (the card
+     * keeps it until the next attention, which the driver has no reason
+     * to send) and, on a shared VI line, silence every other card on it.
+     */
+    raise = !refused && (iopb.command & D3_INT) &&
+            !(iopb.command & D3_CONTINUE) &&
+            op > D3_GLOBAL;             /* a drive-requiring command finished */
+    set_vi(disk3_vi_line, 1, raise ? 1 : 0);
+    l("d3: vi %d raise %d\n", disk3_vi_line, raise);
 }
 
 /*

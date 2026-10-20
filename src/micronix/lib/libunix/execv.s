@@ -1,5 +1,5 @@
 ;
-; execv and execl - wrappers for exec
+; execv and execl - wrappers for execve
 ;
 ; execv(name, argv)
 ; char *name;
@@ -8,16 +8,21 @@
 ; execl(name, arg0, arg1, ..., argn, 0)
 ; char *name, *arg0, *arg1, ..., *argn;
 ;
+; Both hand the new image the caller's own environment - the vector
+; crt0 set from the stack - so a child inherits.  Use exec (or execve
+; with a null third argument) to start one with no environment.
+;
 ; Execv is useful when the number of arguments is not known
 ; in advance. Pointers to the argument strings are collected
 ; into a list, a null pointer is appended to mark the end,
-; and execv is called with the address of the list.
+; and execve is called with the address of the list.
 ;
 ; Execl is useful when a known file is being executed with
 ; known arguments. Any number of arguments may be given,
 ; but the last must be a 0.
 ;
-	.extern _exec
+	.extern _execve
+	.extern _environ
 	.global _execv
 	.global _execl
 
@@ -35,9 +40,12 @@ _execv:
 	inc 	hl
 	ld 	b,(hl)		; bc = argv
 
+	ld 	hl,(_environ)	; the environment to pass on
+	push 	hl		; push envp, the third argument
 	push 	bc		; push argv, the second argument
 	ex	de,hl		; name back in hl, the first
-	call 	_exec
+	call 	_execve
+	pop 	af
 	pop 	af
 	pop	bc
 	ret
@@ -48,8 +56,11 @@ _execl:
 	add 	hl,sp		; past the return address:
 				; hl = &arg0, the rest of the list
 	push 	hl		; push &arg0 as argv
+	ld 	hl,(_environ)	; the environment to pass on
+	push 	hl		; push envp, the third argument
 	ex	de,hl		; name back in hl
-	call 	_exec
+	call 	_execve
+	pop 	af
 	pop 	af
 	ret
 

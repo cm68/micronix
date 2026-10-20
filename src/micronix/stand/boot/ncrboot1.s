@@ -87,9 +87,14 @@ RBIAS	equ	RELOC-BASE	; add to one of our addresses for its copy
 ; setup: the monitor has had this port since reset, so the group is
 ; selected and the line is right.
 ;
+GSEL	equ	04fh		; group select
+GRP1	equ	1		; the serial ports
 TXB	equ	048h		; transmit holding register
 LSR	equ	04dh		; line status
 LSRTXE	equ	020h		; holding register empty
+S1DATA	equ	07ch		; the SS1 2651's data
+S1STAT	equ	07dh		; its status
+S1TXRDY	equ	001h		; transmitter will take a byte
 
 ;
 ; Whitesmith's object header, from include/obj.h.  Sixteen bytes, and
@@ -107,10 +112,12 @@ O_DOFF	equ	14		; and the data
 	.text
 
 start:
+	ld	a,c			;the console id the rom passed down
 	ld	hl,BASE
 	ld	de,RELOC
 	ld	bc,finish-BASE
 	ldir
+	ld	(conid+RBIAS),a		;remember it in the relocated copy
 	jp	run+RBIAS
 
 ;
@@ -213,6 +220,8 @@ dataloop:
 
 enter:
 	ld	hl,(STAGE+O_TOFF)
+	ld	a,(conid+RBIAS)	;the console id, handed on in C
+	ld	c,a
 	jp	(hl)
 
 ;
@@ -233,6 +242,11 @@ puts:
 	jr	z,hang
 	ld	c,a
 	inc	hl
+	ld	a,(conid+RBIAS)	;which console the monitor found
+	or	a
+	jr	nz,pss1		;the SS1's 2651
+	ld	a,GRP1		;the MultIO: select its uart
+	out	(GSEL),a
 pwait:
 	in	a,(LSR)
 	and	LSRTXE
@@ -240,8 +254,17 @@ pwait:
 	ld	a,c
 	out	(TXB),a
 	jr	puts
+pss1:
+	in	a,(S1STAT)		;the 2651: wait until it will take a byte
+	and	S1TXRDY
+	jr	z,pss1
+	ld	a,c
+	out	(S1DATA),a
+	jr	puts
 hang:
 	jr	hang
+
+conid:	.db	0		;the console the monitor found: 0 MultIO, 1 SS1
 
 ;
 ; Call target 0 and wait for it to answer.  No arbitration, one

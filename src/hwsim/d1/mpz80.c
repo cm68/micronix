@@ -1261,6 +1261,7 @@ get_byte(vaddr addr)
             lowmem_reported = 0;
         }
     }
+
 #endif
 
 #ifndef NODEBUG

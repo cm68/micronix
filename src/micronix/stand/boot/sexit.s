@@ -15,10 +15,12 @@
 ; did, sexit is the same answer bail() gives - back to the rom at 0.
 ;
 	.global	start, sexit, _enterk
-	.extern	_main, _inumber, _loadbase
+	.extern	_main, _inumber, _loadbase, _conid
 
 	.text
 start:
+	ld	a,c		;the console id the level 2 boot passed down
+	ld	(_conid),a
 	call	_main
 	jp	sexit
 sexit:

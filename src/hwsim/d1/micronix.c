@@ -278,6 +278,23 @@ syscall_at(word sc)
 		}
 		printf(")\n");
 		break;
+	case 56: /* execve <name> <argv> <envp> */
+		printf("execve(\"%s\"", fn);
+		if (arg2) {
+			word p;
+			int i;
+
+			for (i = 0; i < 16; i++) {
+				p = fuword(arg2 + i * 2);
+				if (!p)
+					break;
+				printf(", \"%s\"", getname(p));
+			}
+			if (i == 16)
+				printf(", ...");
+		}
+		printf(", env %d)\n", fuword(arg3) ? 1 : 0);
+		break;
 	case 12: /* chdir <ptr to name> */
 		printf("chdir(\"%s\")\n", fn);
 		break;

@@ -209,6 +209,11 @@ select_drive(int id)
         int nsec = 0, ss = 0;
 
         imd_trkinfo(handle[id], 0, 0, &nsec, &ss);
+        if (nsec == 0) {
+            printf("hddma: no drive %s, command refused\n", drivename);
+            handle[id] = 0;     /* an empty image is not a drive; don't cache it */
+            return -1;
+        }
         secsize[id] = ss ? ss : SECLEN;
     }
     return 0;
@@ -261,6 +266,7 @@ attention(portaddr p, byte v)
     int i;
     int head;
     int nsect, gaplen;              // decoded from the format command
+    int drv_ok = 1;                 // cleared when the unit is not there
 
     set_vi(hddma_vi_line, 1, 0);
 
@@ -310,6 +316,7 @@ attention(portaddr p, byte v)
         command.status = BADCMD;
         if (command.opcode == OP_SENSE)
             command.status = SS_DONE | SS_WFLT | SS_RDY; /* not ready */
+        drv_ok = 0;                 /* a refused command never completes */
         goto done;
     }
 
@@ -529,7 +536,7 @@ attention(portaddr p, byte v)
 done:
     copyout((byte *)&command, channel, sizeof(command));
     channel = link;
-    if (enable_intr) {
+    if (enable_intr && drv_ok) {
         trace(trace_hddma, "\thddma: set interrupt\n");
         set_vi(hddma_vi_line, 1, 1);
     } else {

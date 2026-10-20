@@ -85,7 +85,11 @@ rm -f "$vol.lock"
 # 1. a blank M26 drive
 "$mnix" initialize m26 "$vol" || exit 1
 
-# 2. the filesystem, with the HDCA hard disk boot in /boot/boot
+# 2. the disk label: slice a is the filesystem (cylinders 1..192), slice
+# b the swap (193..201); cylinder 0 is the boot, below both.
+"$mnix" label "$vol" -s a 1 192 -s b 193 || exit 1
+
+# 3. the filesystem, with the HDCA hard disk boot in /boot/boot
 "$mnix" mkfs "$vol" -i "$bootimg" -f || exit 1
 
 # 3. the userland.  The built binaries come from the source tree's

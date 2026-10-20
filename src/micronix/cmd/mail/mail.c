@@ -15,10 +15,10 @@
  * forward, is the one that fits a system that delivers its own mail.
  * It locks with flock(2), which micronix has not got, so v7's lock -
  * the user-execute bit as a flag - is kept.  And its default save
- * file is $HOME/mbox, where micronix's getenv(3) reads an ENVIRON
- * file rather than the shell's exported variables; the v7 port saves
- * to plain "mbox", which is what the recovered mail.1 on the
- * distribution disk describes.
+ * file is $HOME/mbox; getenv(3) now reads the environment the program
+ * was executed with, but the shell in this tree still exports nothing,
+ * so the v7 port saves to plain "mbox", which is what the recovered
+ * mail.1 on the distribution disk describes.
  *
  * What the port took out:
  *

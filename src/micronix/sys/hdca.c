@@ -608,9 +608,9 @@ phase12(hp)
 }
 
 /*
- * The interrupt handler, on line 0 (shared with the HD-DMA).  INT_A
- * (op done) resumes the armed op-done phase; INT_B (seek done) resumes
- * the armed seek phase.  A primary status of 0xff is not our card.
+ * The interrupt handler.  INT_A (op done) resumes the armed op-done
+ * phase; INT_B (seek done) resumes the armed seek phase.  A primary
+ * status of 0xff is not our card.
  */
 int
 hdint()
@@ -658,17 +658,6 @@ hdopen(dev, mode)
 		return (-1);
 	}
 	hp = getinfo(dev);
-	/*
-	 * Claim the interrupt line before the first read.  Line 0 is shared
-	 * with the HD-DMA, which unmasks it at its own open (inton(MWINT) in
-	 * sys/mw.c), and the HDCA is the boot driver on an M10/M20/M26 - the
-	 * device the kernel mounts root from, so mw may never open and nothing
-	 * else would clear the mask.  The 1.4 driver did the same thing after
-	 * every command; here it is once, at open, the way mw.c does it.  The
-	 * label read below is the first interrupt-driven read, so the line has
-	 * to be armed before dllabel() and not after.
-	 */
-	inton(HDCAINT);
 	if (hp->h_flags & HDOPEN)
 		return (0);
 	hp->h_tracks = 0;
@@ -882,16 +871,23 @@ struct biovec hdbvec = { &hdopen, &hdclose, &hdstrat, &hdcioctl };
 #define	PROBEWAIT	10000
 
 /*
- * The probe: make the card raise its interrupt so the attach loop
- * (sys/probe.c) can discover which line it is on.  A header read is the
- * sense that has no side effect - it reads the header under the head and
- * writes nothing - and it completes with op-done like any sector
- * operation.  Drive 0, head 0, whatever track the arm is on: the
- * controller does not care and the medium, if any, is not written.
+ * The probe, in two halves (sys/ovl.h).  PROBE_TICKLE makes the card raise
+ * its interrupt so the attach loop can discover which line it is on: a
+ * header read is the sense that has no side effect, and it completes with
+ * op-done like any sector operation.  PROBE_CLEAR acknowledges both of the
+ * card's interrupts, so a line the boot's reads left standing is quieted
+ * before the tickle and after it.
  */
-hdprobe()
+hdprobe(mode)
+	int mode;
 {
 	register int n;
+
+	if (mode == PROBE_CLEAR) {
+		out(HDCA_CMD, CMD_RAMDATA);	/* acknowledge op-done */
+		(void)in(HDCA_INT);		/* acknowledge seek-done */
+		return (0);
+	}
 
 	out(HDCA_CONTROL, CONT_FRENBL | CONT_RUN | CONT_DSKCLK);
 	out(HDCA_FUNC, FUNC_HEAD);		/* drive 0, head 0 */

@@ -24,6 +24,14 @@ extern char vectors[];          /* sys/intrpt.s: the WB/MultIO master table */
 extern char ss1_master_vec[], ss1_slave_vec[]; /* sys/ss1vec.s */
 extern int vecalign();          /* sys/picvec.c */
 
+/* the two clock boards' entry points (ss1_clock*.c, upd1990*.c) */
+extern int ss1_clockinit(), ss1_rtcinit(), ss1_rtcwrite();
+extern int upd1990_clockinit(), upd1990_rtcinit(), upd1990_rtcwrite();
+
+/* the two console boards' entry points (ss1_uart.c, mio.s/inits.s) */
+extern int ss1_putc(), ss1_start(), ss1_stop(), ss1_set(), ss1_uart_init();
+extern int ace_putc(), ace_start(), ace_stop(), ace_set(), ace_minit();
+
 /* the CompuPro SS1's two CAS-cascaded 8259s */
 #define SS1MPIC0 0x70
 #define SS1MPIC1 0x71
@@ -131,7 +139,22 @@ pic_init()
         }
         linepic[7] = 1;                 /* VI7, the slave's IR0 */
         lineir[7] = 0;
+        clockinit = ss1_clockinit;
+        rtcinit = ss1_rtcinit;
+        rtcwrite = ss1_rtcwrite;
+        console_putc = ss1_putc;
+        console_start = ss1_start;
+        console_stop = ss1_stop;
+        console_set = ss1_set;
+        console_minit = ss1_uart_init;
         out(SS1MPIC1, 0x7f);            /* mask IR0-6, open IR7 (the cascade) */
+        out(SS1SPIC1, 0x7d);            /* open the timer (IR1) and RxRDY
+                                         * (IR7); VI7 is the attach loop's.
+                                         * TxRDY (IR6) stays closed until the
+                                         * console tty exists (ss1_uart.c) -
+                                         * the monitor leaves the 2651
+                                         * transmitter on, so it is already
+                                         * asking */
         return (0);
     }
 
@@ -192,6 +215,14 @@ pic_init()
         out(PIC1, 0x07);                /* mask IR0-2, open IR3-7 */
     }
 
+    clockinit = upd1990_clockinit;
+    rtcinit = upd1990_rtcinit;
+    rtcwrite = upd1990_rtcwrite;
+    console_putc = ace_putc;
+    console_start = ace_start;
+    console_stop = ace_stop;
+    console_set = ace_set;
+    console_minit = ace_minit;
     return (0);
 }
 

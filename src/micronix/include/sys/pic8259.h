@@ -31,6 +31,21 @@ extern UINT8 linepic[MAXNOVLINE];   /* line -> pics[] index */
 extern UINT8 lineir[MAXNOVLINE];    /* line -> IR number on that PIC */
 extern UINT8 npics, nlines;         /* how many of each the boot found */
 
+/* the clock and the real-time clock, chosen by the same probe.  The two
+ * boards provide the same three entry points (ss1_clock.c, upd1990.c);
+ * pic_init points these at whichever answered. */
+extern int (*clockinit)();          /* the heartbeat */
+extern int (*rtcinit)();            /* set the clock from s_time */
+extern int (*rtcwrite)();           /* read the clock as s_time */
+
+/* the console, chosen by the same probe.  The SS1's 2651 (ss1_uart.c)
+ * and the MultIO's ACE (mio.s) provide the same entry points. */
+extern int (*console_putc)();       /* print a character */
+extern int (*console_start)();      /* enable output */
+extern int (*console_stop)();       /* disable output */
+extern int (*console_set)();        /* set baud rate (no-op on the 2651) */
+extern int (*console_minit)();      /* the uart bring-up */
+
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

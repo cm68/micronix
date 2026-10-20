@@ -411,7 +411,7 @@ wr_hdca_func(portaddr p, byte v)
     head = ((v & FUNC_HEAD) >> 4) ^ 0xf;
     drive = (v & FUNC_DRIVE);
     step = (v & FUNC_STEP) ? 1 : 0;
-    trace(trace_hdca, "\tdrive: %d head: %d step %s %d\n", 
+    trace(trace_hdca, "\tdrive: %d head: %d step %s %d\n",
         drive, head, dir_lower ? "lower" : "higher", step);
     if (stepping[drive] && step) {  // did the step line rise
         if (dir_lower) {

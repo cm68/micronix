@@ -11,7 +11,7 @@
 ;
 ; . := .data
 ;
-; public	_minit
+; public	_ace_minit
 ; public	_coninit
 ;
 ; /*
@@ -129,11 +129,11 @@
 ; return := ret
 ;
 ;
-; public _minit		/initialize multiboard hardware
+; public _ace_minit		/initialize multiboard hardware
 ; 	LDIR := &0xB0ED /z80 do *de++ = *hl++ while --bc != 0
 ;
 	.data
-	.globl	_minit, _coninit
+	.globl	_ace_minit, _coninit
 	.extern	_di, _ei, _muopen
 ; 
 ; /*
@@ -184,8 +184,8 @@ PENABLE=0x28
 INTSOFF=0xFF
 ARMMASTER=0x03
 
-; ------- A-NATURAL SOURCE: _minit -------
-; _minit:			/Called from cus(). Interrupts must be _off
+; ------- A-NATURAL SOURCE: _ace_minit -------
+; _ace_minit:			/Called from cus(). Interrupts must be _off
 ; 	sp <= de	/save C frame pointer
 ;
 ; 	/* clear and disable the 3 ACE's on the Master Mult I/O board */
@@ -241,7 +241,7 @@ ARMMASTER=0x03
 ;
 ; registers: hl, de are scratch.  bc, ix, iy need to be saved if used
 
-_minit:
+_ace_minit:
 	push	bc			; callee saves bc
 
 	; clear the usarts by reading the recv registers
@@ -261,7 +261,7 @@ minit1:
 	out	(MBASE+SELECT),a
 
 	; the clock is in clockinit() and the PIC in pic_init() (miopic.c),
-	; both called from cus(); _minit is now only the uart bring-up.
+	; both called from cus(); _ace_minit is now only the uart bring-up.
 	pop	bc
 	ret
 
@@ -280,5 +280,5 @@ minit1:
 ;
 _coninit:
 	ld	hl,0x0101	; dev (arg0) in hl
-	call	_muopen
+	call	_console_open
 	ret

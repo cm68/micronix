@@ -600,9 +600,15 @@ struct biovec disk2bvec = { &disk2open, &disk2close, &disk2strat, 0 };
  */
 #define PROBEWAIT 10000
 
-disk2probe()
+disk2probe(mode)
+	int mode;
 {
     register int n;
+
+    if (mode == PROBE_CLEAR) {
+        out(D2_CTL, 0);                 /* a write with RUN clear releases the line */
+        return (0);
+    }
 
     d2sel(0, 0);                        /* drive 0, head 0 */
     out(D2_CTL, D2_ATTN | D2_RUN);      /* NULL: wait for seek complete */

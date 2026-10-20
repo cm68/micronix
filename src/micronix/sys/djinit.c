@@ -100,8 +100,6 @@ djinit(seg)
 
     out(START, 0);
 
-    inton(DJINT);
-
     return (0);
 }
 

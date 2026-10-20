@@ -61,9 +61,9 @@
 #define OVLBASE     (OVLSEG * 0x1000)
 
 /*
- * The interrupt topology (N8259, N8259_POLLED), the number of vectored
- * lines (NOVLINE) and the line names (INT_*) are in sys/ints.h, so a
- * driver claims an interrupt by name rather than by wiring.
+ * The interrupt topology (N8259, N8259_POLLED) and the number of vectored
+ * lines (NOVLINE) are in sys/ints.h.  A driver names no line: the wiring
+ * is discovered at boot.
  */
 #include <sys/ints.h>
 
@@ -142,6 +142,15 @@
  * lands at the front of the page, and anything else in that object lands
  * in front of it.
  */
+/*
+ * The probe's argument: clear the card's interrupt, or raise it.  The
+ * attach loop calls the probe twice with the first, once with the second,
+ * so a card whose line the boot left standing is quieted before its line
+ * is discovered and again after.
+ */
+#define PROBE_CLEAR  0
+#define PROBE_TICKLE 1
+
 struct ovlhdr {
     UINT major;                 /* the major this module serves */
     int (*init) ();             /* init(seg), once, before it is reachable */
@@ -149,7 +158,7 @@ struct ovlhdr {
     char *data;                 /* the driver's data, in its own segment */
     struct biovec *bvec;        /* its block entries, 0 for none */
     struct ciovec *cvec;        /* its character entries, 0 for none */
-    int (*probe) ();            /* the tickle: assert this card's interrupt */
+    int (*probe) ();            /* probe(mode): clear or raise the interrupt */
     int (*intr) ();             /* the interrupt handler, 0 for none */
     char name[12];              /* what devname reports for the major */
     UINT8 ndrv;                 /* how many drives, enumerated at signon */
@@ -175,18 +184,9 @@ extern struct ovlhdr *ovlmap(); /* ovlmap(major): map that module, return its he
 extern int ovlremap();          /* ovlremap(): put this process's driver back */
 extern char *ovldata();         /* ovldata(major): the driver's data, or 0 */
 extern int ovlcall();           /* ovlcall(fn, seg): run fn with its own page mapped */
+extern int ovlcall1();          /* ovlcall1(fn, seg, arg): the same, one argument */
 extern int ovlattach();         /* ovlattach(seg): place a module, run its init */
 extern int ovlstart();          /* place the driver stamped into the slot */
-extern int ovlntr();            /* ovlntr(line): call every handler on a line */
+extern int ovlntr();            /* ovlntr(line): call the handler on a line */
 extern int intrset();           /* intrset(probe, fn, seg): claim for the attach loop */
 extern int intr_attach();       /* intr_attach(): tickle each card, wire ovlint */
-
-/*
- * How many handlers one interrupt line can carry.  Two cards can share a
- * line open-collector - the HDCA rides VI0 with the HD-DMA, and under one
- * PIC the IDE and the NCR share VI2 - and each has to be asked, since a
- * card clears its own request and none can speak for another.  ovlint is
- * flat, ovlint[NOVLINE * OVLSHARE], because c0 cannot parse a
- * two-dimensional declarator.
- */
-#define OVLSHARE 2

@@ -16,13 +16,14 @@
 #include <sys/sys.h>
 #include <sys/ovl.h>
 #include <sys/pic.h>
+#include <sys/pic8259.h>
 
 struct ovlintr {
     int (*fn) ();
     UINT seg;
 };
 
-extern struct ovlintr ovlint[NOVLINE * OVLSHARE];  /* sys/probe.c */
+extern struct ovlintr ovlint[MAXNOVLINE];  /* sys/probe.c */
 
 /*
  * The pending attach list: each driver's probe, handler and segment,
@@ -72,7 +73,7 @@ bitline(mask)
 {
     register int l;
 
-    for (l = 0; l < NOVLINE; l++) {
+    for (l = 0; l < nlines; l++) {
         if (mask & 1)
             return (l);
         mask >>= 1;
@@ -118,35 +119,33 @@ bitline(mask)
  */
 intr_attach()
 {
-    register UINT i, slot;
+    register UINT i;
     register int l;
     int line, before;
 
-    for (l = 0; l < NOVLINE; l++)
+    for (l = 0; l < nlines; l++)
         intoff(l);              /* mask every line, whatever came before */
 
     for (i = nintrdone; i < nintr; i++) {
-        before = pic_irr();     /* requests already standing */
-        ovlcall(intrprobe[i], intrseg[i]);      /* the tickle */
+        ovlcall1(intrprobe[i], intrseg[i], PROBE_CLEAR); /* what the boot left */
+        before = pic_irr();     /* requests now standing */
+        ovlcall1(intrprobe[i], intrseg[i], PROBE_TICKLE); /* raise the line */
         line = bitline(pic_irr() & ~before);    /* the line it raised */
-        if (line < 0)
+        if (line < 0) {
+            ovlcall1(intrprobe[i], intrseg[i], PROBE_CLEAR);
             continue;           /* no card there, nothing to wire */
-        /* the first free slot on the line: two cards share a line and
-         * each gets its own, the HD-DMA then the HDCA on VI0 */
-        for (slot = 0; slot < OVLSHARE; slot++)
-            if (ovlint[line * OVLSHARE + slot].fn == 0)
-                break;
-        if (slot < OVLSHARE) {
-            ovlint[line * OVLSHARE + slot].fn = intrfn[i];
-            ovlint[line * OVLSHARE + slot].seg = intrseg[i];
         }
+        if (ovlint[line].fn)
+            panic("two cards on one interrupt line");
+        ovlint[line].fn = intrfn[i];
+        ovlint[line].seg = intrseg[i];
         pic_eoi(line);          /* clear the tickled interrupt */
+        ovlcall1(intrprobe[i], intrseg[i], PROBE_CLEAR); /* leave the line quiet */
     }
     nintrdone = nintr;
 
-    for (l = 0; l < NOVLINE; l++)
-        for (slot = 0; slot < OVLSHARE; slot++)
-            if (ovlint[l * OVLSHARE + slot].fn)
-                inton(l);       /* the line is live */
+    for (l = 0; l < nlines; l++)
+        if (ovlint[l].fn)
+            inton(l);       /* the line is live */
     return (0);
 }

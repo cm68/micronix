@@ -81,8 +81,8 @@
  *   VI, PIC     vectored interrupt and programmable interrupt controller:
  *               the S-100 bus's eight interrupt lines, and the 8259 on the
  *               Mult I/O board which ranks them and hands the cpu a vector
- *               when it acknowledges one.  This card shares VI2 with the
- *               IDE card; see NCRINT, include/sys/ncr.h.
+ *               when it acknowledges one.  The line the card drives is
+ *               discovered at boot (sys/probe.c), not named here.
  *   strategy    the entry point the buffer cache calls to start a
  *               transfer (uio.c).  mw.c's and ide.c's are the models.
  *   window      the single page of address space that bhold() maps a
@@ -177,13 +177,12 @@ static int scsireset(), scsiselect();
 #define HOSTID  7
 
 /*
- * The interrupt line, the card's ports, and the command register the
- * presence probe reads are in include/sys/ncr.h, because the resident half
- * of this driver needs them and resident code cannot name anything in a
- * module: sys/ncrhdr.c carries NCRINT to the interrupt dispatcher,
- * sys/ncrinit.c is the probe, and neither is linked into the page below.
- * They are numbers, so they travel; the driver's own tables do not, and
- * the probe is written to need none of them.
+ * The card's ports and the command register the presence probe reads are
+ * in include/sys/ncr.h, because the resident half of this driver needs
+ * them and resident code cannot name anything in a module: sys/ncrinit.c
+ * is the probe, and neither is linked into the page below.  They are
+ * numbers, so they travel; the driver's own tables do not, and the probe
+ * is written to need none of them.
  */
 
 /*

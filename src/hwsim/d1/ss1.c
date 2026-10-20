@@ -103,7 +103,7 @@ static unsigned char ss1_vector[3];
 #define IV_2SENT    2
 #define IV_EMPTY    3
 #define IV_INVALID  4
-static int ss1_ivecstate = IV_INVALID;
+static int ss1_ivecstate = IV_EMPTY;
 static char *ss1_ivs_name[] = { "filled", "1", "2", "empty", "invalid" };
 static struct pic *ss1_iv_pic;          // which PIC the ack vector came from
 static unsigned char ss1_iv_isrbit;     // the in-service bit to set
@@ -211,6 +211,19 @@ ss1_set_int_line(void)
 
     if (!wiring_active("ss1"))
         return;
+
+    /*
+     * The two console sources are levels, not edges.  TxRDY is high
+     * whenever the transmitter is enabled and idle - which is most of
+     * the time - and RxRDY while a character waits.  A level-triggered
+     * 8259 latches IRR from the pin after every acknowledge, EOI and IMR
+     * write, so refresh these bits here instead of trusting an edge.
+     * Without it, closing IR6 with TxRDY already high and opening it
+     * again delivers nothing, and the console queue stalls mid-line.
+     */
+    pic_request(&ss1_pic[1], SS1_IR_UART_TX,
+        ss1_uart_txen && !ss1_uart_txbusy);
+    pic_request(&ss1_pic[1], SS1_IR_UART_RX, ss1_uart_rx_valid);
 
     line = (pic_serviceable(&ss1_pic[1]) >= 0) ? 1 : 0;
     if (line)
@@ -517,6 +530,18 @@ wr_uart_cmd(portaddr p, byte v)
     ss1_uart_set_lines();
 }
 
+/*
+ * The two mode registers: baud rate, character length, parity.  The sim
+ * has no use for them - the guest's bytes move whole, the rate does not
+ * matter - so they are accepted and dropped.  The monitor programs them
+ * (mon500.s), and an unregistered port would read as an absent 2651.
+ */
+static void
+wr_uart_mode(portaddr p, byte v)
+{
+    trace(trace_ss1, "ss1: write uart mode %02x\n", v);
+}
+
 static void
 wr_uart_data(portaddr p, byte v)
 {
@@ -680,6 +705,7 @@ ss1_init(void)
     register_input(ss1_base + SS1_UART_DATA, &rd_uart_data);
     register_input(ss1_base + SS1_UART_STAT, &rd_uart_stat);
     register_output(ss1_base + SS1_UART_DATA, &wr_uart_data);
+    register_output(ss1_base + SS1_UART_MODE, &wr_uart_mode);
     register_output(ss1_base + SS1_UART_CMD, &wr_uart_cmd);
 
     /* the console uart gets an xterm when the config asks for one */

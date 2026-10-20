@@ -53,8 +53,8 @@
  *   VI, PIC     vectored interrupt and programmable interrupt controller:
  *               the S-100 bus's eight interrupt lines, and the 8259 on the
  *               Mult I/O board which ranks them and hands the cpu a vector
- *               when it acknowledges one.  This card drives VI2, which
- *               nothing else on this machine uses; see IDEINT below.
+ *               when it acknowledges one.  The line the card drives is
+ *               discovered at boot (sys/probe.c), not named here.
  *   strategy    the entry point the buffer cache calls to start a
  *               transfer (uio.c).  mw.c's is the model for this one.
  *   window      the single page of address space that bhold() maps a

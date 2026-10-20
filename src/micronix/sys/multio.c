@@ -10,6 +10,7 @@
 #include <sys/proc.h>
 #include <sys/ovl.h>
 #include <errno.h>
+#include <sys/pic8259.h>
 
 /*
  * The static routines below, declared before anything calls them.
@@ -19,7 +20,7 @@
  * name.  The complaint lands on the definition rather than on the
  * call that caused it.
  */
-static int ttinit();
+int ttinit();
 
 #define NMIO    4               /* number of mult I/O ports */
 #define MBASE 0x48
@@ -94,7 +95,7 @@ static int ttinit();
 /*
  * Hardware fiddlers in mio.s
  */
-extern int mstart(), mstop(), mputc(), mset(), minit();
+extern int ace_start(), ace_stop(), ace_putc(), ace_set();
 
 /*
  * Tty structures for multiboard ports
@@ -127,7 +128,7 @@ muopen(dev, mode)
 
     if (tty->ispeed == 0) {     /* virgin */
         ttinit(tty, dev);
-        mset(tty);              /* set baud rate */
+        (*console_set)(tty);            /* set baud rate */
     }
 
     /*
@@ -181,8 +182,8 @@ muopen(dev, mode)
     di();
 
     if (!(tty->state & OPEN) && !tty->outque.count && !tty->nextc) {
-        mset(tty);              /* set baud rate */
-        mstop(tty, 0);          /* enable input, disable output */
+        (*console_set)(tty);            /* set baud rate */
+        (*console_stop)(tty, 0);        /* enable input, disable output */
     }
     ei();
 
@@ -236,7 +237,6 @@ mustty(dev, flag)
  * Initialize a tty structure
  * This could be done by copying in a prototype structure.
  */
-static
 ttinit(tty, dev)
     register struct tty *tty;
 {
@@ -248,10 +248,10 @@ ttinit(tty, dev)
 
     tty->col = 0;
     tty->dev = dev;
-    tty->start = &mstart;
-    tty->stop = &mstop;
-    tty->put = &mputc;
-    tty->set = &mset;
+    tty->start = console_start;
+    tty->stop = console_stop;
+    tty->put = console_putc;
+    tty->set = console_set;
 }
 
 muselect(t)
