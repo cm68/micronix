@@ -1,0 +1,134 @@
+.he "execve (2)                   10/20/26                 execve (2)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+execve
+- execute a program with an environment
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+execve(name, argv, envp)
+.br
+char *name;
+.br
+char *argv[];
+.br
+char *envp[];
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Execve
+overlays the calling core image with the named file, then transfers
+to the beginning of the new core image.  There can be no return from
+a successful
+.bd
+execve:
+the calling core image is lost.
+.sp
+The file is found, checked and loaded exactly as by
+.bd
+exec
+[see
+.bd
+exec
+(2)]: the execute permission bit must be set, the file must be an
+ordinary file, and its image must fit in user memory.  Previously
+opened files remain open, and ignored signals remain ignored.
+Caught signals are reset to their default behavior.
+.sp
+The difference is the environment.
+.bd
+Envp
+is a list of pointers to strings of the form
+.nf
+        name=value
+.fi
+terminated by a null pointer.  The kernel copies the strings along
+with the arguments before the old image is released.  When the new
+image starts, its stack holds:
+.nf
+        argc
+        argv[0]
+        ...
+        argv[argc-1]
+        0
+        envp[0]
+        ...
+        envp[n-1]
+        0
+.fi
+The C startup code sets the global
+.bd
+environ
+to the address of
+.bd
+envp[0],
+so the new program can walk that list or call the C library's
+.bd
+getenv.
+A null
+.bd
+envp,
+or one whose first pointer is null, gives the new image an empty
+environment.  The older
+.bd
+exec
+call is that case: it passes no environment at all.
+.sp
+The argument and environment strings are copied into four shared
+512-byte buffers, so together they may not exceed 2048 bytes.  The
+pointers added to the stack, and the image itself, must also fit in
+the process's user memory.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+Any return is an error return, with the value -1 and
+.bd
+errno
+set.  In that case the calling image is not lost and can continue.
+The errors are those of
+.bd
+exec;
+an argument or environment list too large for the buffers is
+reported as E2BIG.
+.sp 2
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(execve = 56)
+.br
+.bd
+sys; execve; name; argv; envp
+.sp
+.bd
+Argv
+and
+.bd
+Envp
+are the addresses of lists of string pointers.  Each list is
+terminated by a null pointer.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+exec (2), bsh (1), sh (1)

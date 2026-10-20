@@ -338,6 +338,8 @@ clkint:
 	ld	a,PENABLE
 	out	(MSELECT),a
 	in	a,(CLKCLR)
+	ld	a,0x67		; specific EOI, master IR7 (the clock)
+	out	(ICNTRL),a
 	ret
 
 ; ------- ss1_clkint -------
@@ -434,6 +436,8 @@ m1int:
 	ld	bc,TTSIZE
 	add	hl,bc
 	ld	a,MACE1
+	ld	b,0x63		; specific EOI, master IR3 (Master ACE 1)
+	call	ireoi
 	jp	maint
 
 ; ------- A-NATURAL SOURCE: m2int -------
@@ -449,6 +453,8 @@ m2int:
 	ld	bc,TTSIZE2
 	add	hl,bc
 	ld	a,MACE2
+	ld	b,0x64		; specific EOI, master IR4 (Master ACE 2)
+	call	ireoi
 	jp	maint
 
 ; ------- A-NATURAL SOURCE: m3int -------
@@ -464,7 +470,28 @@ m3int:
 	ld	bc,TTSIZE3
 	add	hl,bc
 	ld	a,MACE3
+	ld	b,0x65		; specific EOI, master IR5 (Master ACE 3)
+	call	ireoi
 	jp	maint
+
+; ------- ireoi -------
+; Dismiss a resident (non-module) interrupt line on the MultIO's master
+; 8259.  intrdismiss does nothing for these lines: the module lines find
+; their EOI in ovlntr (sys/probe.c), and the SS1's handlers are entered
+; through its own vectors and dismiss both of its PICs.  The clock, the
+; three ACEs and the parallel/cascade strays are wired straight to the
+; master, so the handler names its own level.
+;
+; a = the ACE group select the handler wants in A (preserved), b = the
+; OCW2 specific-EOI byte, 0x60 | level.
+ireoi:
+	push	af
+	ld	a,PENABLE
+	out	(MSELECT),a
+	ld	a,b
+	out	(ICNTRL),a
+	pop	af
+	ret
 
 ; ------- A-NATURAL SOURCE: maint -------
 ; maint: /* Master ACE interrupt */

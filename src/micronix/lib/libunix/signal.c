@@ -3,7 +3,12 @@
  */
 
 short stab[15];
-extern struct tramp { char v[6]; } jtab[];
+/*
+ * The trampolines are not a fixed stride: the assembler shortens a
+ * jump when it can reach, and the addresses have to be read rather
+ * than computed.
+ */
+extern short jtaddr[];
 extern short _signal(int s, short h);
 
 short
@@ -18,7 +23,7 @@ signal(short sig, short handler)
 		ret = _signal(sig, handler);
 	} else {
 		stab[sig - 1] = handler;
-		ret = _signal(sig, (short)&jtab[sig - 1]);
+		ret = _signal(sig, jtaddr[sig - 1]);
 	}
 	if (!(ret == 1 || ret == 0 || ret == -1)) {
 		ret = stab[sig - 1];

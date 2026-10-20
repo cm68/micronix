@@ -157,7 +157,7 @@ cascade:
 	in	a,(044h)	; the poll word (and the acknowledge)
 	ld	b,a		; keep it for the level
 	and	080h		; the pending bit
-	ret	z		; nothing to dispatch
+	jp	z,casnone	; nothing to dispatch
 	ld	a,b
 	and	07h		; the slave's line, 0..2
 	add	a,2		; the line number, 2..4
@@ -167,9 +167,27 @@ cascade:
 	ret
 
 ;
+; The cascade fired but the slave has nothing pending (it was polled by
+; something else, or the INT was already dropping).  ovlntr never ran, so
+; the master's IR2 in-service bit is still set and must be dismissed here
+; or the master wedges.  PENABLE (0x28) to MSELECT (0x4f) selects the
+; controller group; 0x62 is the specific EOI for master IR2.
+;
+casnone:
+	ld	a,0x28
+	out	(04fh),a
+	ld	a,0x62
+	out	(04ch),a
+	ret
+
+;
 ; IR6, nothing wired here on the two-PIC build.  A spurious interrupt
-; (or one from a card that never attached) returns without doing
-; anything.
+; (or one from a card that never attached) is still a master line in
+; service, so dismiss it before returning.
 ;
 spurious:
+	ld	a,0x28		; PENABLE to MSELECT: the controller group
+	out	(04fh),a
+	ld	a,0x66		; specific EOI, master IR6
+	out	(04ch),a
 	ret

@@ -1,0 +1,124 @@
+.he "test (1)                    10/20/26                    test (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+test, [
+- condition evaluation
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+test
+expression
+.br
+.bd
+[
+expression
+]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Test evaluates an expression and returns a zero exit status if it is
+true, one if it is false, and 255 if the expression is malformed.
+With no expression at all it is false.  Bracket is the same program
+under a second name and requires the closing bracket as its last
+argument.
+.sp
+The primaries are:
+.sp
+-r file
+.br
+true if the file exists and is readable.
+.sp
+-w file
+.br
+true if the file exists and is writable.
+.sp
+-d file
+.br
+true if the file is a directory.
+.sp
+-f file
+.br
+true if the file exists and is not a directory.
+.sp
+-s file
+.br
+true if the file exists and has a size greater than zero.
+.sp
+-t [fd]
+.br
+true if the descriptor, one if it is omitted, is a terminal.
+.sp
+-n string
+.br
+true if the string is not empty.
+.sp
+-z string
+.br
+true if the string is empty.
+.sp
+s1 = s2
+.br
+true if the strings are identical.
+.sp
+s1 != s2
+.br
+true if the strings differ.
+.sp
+-l s1 op s2
+.br
+compares the lengths of the two strings rather than their values.
+.sp
+n1 op n2
+.br
+compares two integers, where op is one of -eq, -ne, -gt, -ge, -lt
+and -le.
+.sp
+The operators ! (not), -a (and), -o (or) and parentheses combine
+primaries.  They are separate arguments, so the shell must see them
+as words: quote the parentheses.
+.sp 2
+.in -5
+.bd
+EXAMPLES
+.in +5
+.br
+if test -f /etc/passwd -a -r /etc/passwd
+.br
+then echo readable
+.br
+fi
+.sp
+if [ -d /tmp ]
+.br
+then echo yes
+.br
+fi
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+Test and bracket are two copies of one binary.  Micronix has no
+symbolic links, and a hard link does not survive a tar(1) made here,
+so the second name is installed as a copy.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+sh (1), bsh (1), find (1)

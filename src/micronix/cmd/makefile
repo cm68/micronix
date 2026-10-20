@@ -82,6 +82,7 @@ all:
 	cd entab ; make all
 	cd expand ; make all
 	cd expr ; make all
+	cd false ; make all
 	cd far ; make all
 	cd fd2 ; make all
 	cd fgrep ; make all
@@ -149,6 +150,8 @@ all:
 	cd td ; make all
 	cd tr ; make all
 	cd tee ; make all
+	cd test ; make all
+	cd true ; make all
 	cd tty ; make all
 	cd umount ; make all
 	cd unique ; make all
@@ -204,6 +207,7 @@ install:
 	cd entab ; make install
 	cd expand ; make install
 	cd expr ; make install
+	cd false ; make install
 	cd far ; make install
 	cd fd2 ; make install
 	cd fgrep ; make install
@@ -271,6 +275,8 @@ install:
 	cd td ; make install
 	cd tr ; make install
 	cd tee ; make install
+	cd test ; make install
+	cd true ; make install
 	cd tty ; make install
 	cd umount ; make install
 	cd unique ; make install
@@ -327,6 +333,7 @@ clean:
 	cd entab ; make clean
 	cd expand ; make clean
 	cd expr ; make clean
+	cd false ; make clean
 	cd far ; make clean
 	cd fd2 ; make clean
 	cd fgrep ; make clean
@@ -394,6 +401,8 @@ clean:
 	cd td ; make clean
 	cd tr ; make clean
 	cd tee ; make clean
+	cd test ; make clean
+	cd true ; make clean
 	cd tty ; make clean
 	cd umount ; make clean
 	cd unique ; make clean
@@ -450,6 +459,7 @@ clobber:
 	cd entab ; make clobber
 	cd expand ; make clobber
 	cd expr ; make clobber
+	cd false ; make clobber
 	cd far ; make clobber
 	cd fd2 ; make clobber
 	cd fgrep ; make clobber
@@ -517,6 +527,8 @@ clobber:
 	cd td ; make clobber
 	cd tr ; make clobber
 	cd tee ; make clobber
+	cd test ; make clobber
+	cd true ; make clobber
 	cd tty ; make clobber
 	cd umount ; make clobber
 	cd unique ; make clobber

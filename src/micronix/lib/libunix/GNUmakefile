@@ -31,7 +31,7 @@ TARGET	= libunix.a
 #
 MANSEC	 = 2
 MANSRCS	= Intro.2 access.2 break.2 chdir.2 chmod.2 chown.2 close.2 \
-	 creat.2 csw.2 dup.2 exec.2 exit.2 fork.2 fstat.2 ftruncate.2 getpid.2 \
+	 creat.2 csw.2 dup.2 exec.2 execve.2 exit.2 fork.2 fstat.2 ftruncate.2 getpid.2 \
 	 getuid.2 gtty.2 indir.2 kill.2 link.2 mknod.2 mount.2 nice.2 open.2 \
 	 pipe.2 read.2 seek.2 setuid.2 signal.2 sleep.2 stat.2 stime.2 stty.2 \
 	 sync.2 time.2 times.2 umount.2 unlink.2 wait.2 write.2

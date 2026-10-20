@@ -2355,6 +2355,44 @@ funcdump(char *s)
 }
 
 /*
+ * Deliver one pending guest signal, if any.
+ *
+ * The guest's own disposition decides: a handler address is entered
+ * with the pc pushed, 1 drops the signal, 0 is default death.  0 and
+ * 1 are the two values that mean themselves.  This is called after
+ * every z80_run() and again after a system call, so that a call which
+ * slept until a signal arrived - pause, or a read cut short by EINTR -
+ * leaves the handler running before the instruction after the trap.
+ */
+static void
+deliver_signals()
+{
+    int i;
+
+    if (!signalled)
+        return;
+    for (i = 0; i < 16; i++) {
+        if ((1 << i) & signalled) {
+            break;
+        }
+    }
+    signalled &= ~(1 << i);
+    if (signal_handler[i] > 1) {
+        if (verbose & V_SYS) {
+            message("invoking signal %d %x\n", i, signal_handler[i]);
+        }
+        push(z80_get_reg16(pc_reg));
+        z80_set_reg16(pc_reg, signal_handler[i]);
+    } else if (signal_handler[i] == 1) {
+        if (verbose & V_SYS) {
+            message("ignoring signal %d\n", i);
+        }
+    } else {
+        sig_death(i);
+    }
+}
+
+/*
  * this is the actual micronix emulator that emulates all the system calls
  * of micronix. initially, it starts with exec of the named file, and then 
  * jumps to the emulation
@@ -2419,41 +2457,10 @@ emulate()
                     xsp, brake, z80_get_reg16(pc_reg));
             }
         }
-        /*
-         * if we have a signal to deliver, do it now
-         */
-        if (signalled) {
-            for (i = 0; i < 16; i++) {
-                if ((1 << i) & signalled) {
-                    break;
-                }
-            }
-            signalled &= ~(1 << i);
-            /*
-             * 0 and 1 are the two values that mean themselves.  A
-             * handler is delivered; 1 is ignore and the signal is
-             * dropped; 0 is default, and the default for every
-             * signal on this machine is death.  This used to read
-             * "no handler, ignore it", which was never the machine's
-             * arrangement - it only looked right while the host
-             * default did the dying.
-             */
-            if (signal_handler[i] > 1) {
-                if (verbose & V_SYS) {
-                    message("invoking signal %d %x\n", i, signal_handler[i]);
-                }
-                push(pc);
-                z80_set_reg16(pc_reg, signal_handler[i]);
-            } else if (signal_handler[i] == 1) {
-                if (verbose & V_SYS) {
-                    message("ignoring signal %d\n", i);
-                }
-            } else {
-                sig_death(i);
-            }
-        }
+        deliver_signals();
         if (z80_get_reg8(status_reg) & S_HLTA) {
             SystemCall();
+            deliver_signals();
         }
     } while (1);
 }
@@ -4141,6 +4148,30 @@ SystemCall()
             files[ret].memdev = 1;
             goto mapfds;
         }
+        if (strcmp(fn, "/dev/null") == 0) {
+            /*
+             * The null device (cdev 0,0).  Its kernel row is
+             * nulldev/nullwrite - reads end immediately and writes
+             * are thrown away - which is what the host's /dev/null
+             * already does.  The shell sends background jobs here.
+             */
+            ret = open("/dev/null", O_RDWR);
+            if (ret == 0xffff) {
+                if (verbose & V_ERROR)
+                    message("%s: %s\n", strerror(errno), filename);
+                goto lose;
+            }
+            if (adoptfd(ret) < 0) {
+                close(ret);
+                ret = ENFILE;
+                carry_set();
+                break;
+            }
+            files[ret].dt = 'c';
+            files[ret].major = 0;
+            files[ret].minor = 0;
+            goto mapfds;
+        }
         /*
          * The network card (/dev/net, cdev 5,0): nic.c's socket face.
          * No host file behind it - the read/write path drives nic.c.
@@ -5125,6 +5156,25 @@ SystemCall()
         ret = alarm(fd);
         carry_clear();
         break;
+
+    case 29: {                  /* pause */
+        /*
+         * Sleep until a signal is scheduled.  The emulate loop, which
+         * is what enters a handler, cannot run while we are blocked
+         * here, so the signal stays pending in signalled and is
+         * delivered as soon as this call returns.
+         */
+        sigset_t mask, oldmask;
+
+        sigfillset(&mask);
+        sigprocmask(SIG_BLOCK, &mask, &oldmask);
+        while (!signalled)
+            sigsuspend(&oldmask);
+        sigprocmask(SIG_SETMASK, &oldmask, 0);
+        ret = 0;
+        carry_clear();
+        break;
+    }
 
     case 31:                   /* stty */
         if (verbose & V_SYS) {
