@@ -211,6 +211,7 @@ select_drive(int id)
         imd_trkinfo(handle[id], 0, 0, &nsec, &ss);
         if (nsec == 0) {
             printf("hddma: no drive %s, command refused\n", drivename);
+            imd_close(handle[id]);  /* drop the image (and its lock) again */
             handle[id] = 0;     /* an empty image is not a drive; don't cache it */
             return -1;
         }

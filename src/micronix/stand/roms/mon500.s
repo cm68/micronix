@@ -879,7 +879,11 @@ fs1no:	or	0ffh			;Z clear: no 2651 here
 ;*							*
 ;*  Every access selects group 1 first: the 8250 sits	*
 ;*  behind the group select port, and the monitor is not	*
-;*  the only thing that writes that port.		*
+;*  the only thing that writes that port.  The two poll	*
+;*  loops jump back to the select, not to the read, so an	*
+;*  interrupt that selects group 0 (the clock's, to clear	*
+;*  its latch and EOI the PIC) cannot leave the loop	*
+;*  reading the 8259's IMR at 0x4d as the line status.	*
 ;*							*
 ;********************************************************
 
@@ -893,7 +897,7 @@ cdwout:	ld	a,group1
 	out	(grpctl),a
 cdwo1:	in	a,(lsr)			;wait for the transmitter to empty
 	and	thre
-	jr	z,cdwo1
+	jr	z,cdwout		;re-select: an interrupt may have changed the group
 	ld	a,c
 	out	(thr),a
 	ret
@@ -902,7 +906,7 @@ cdwin:	ld	a,group1
 	out	(grpctl),a
 cdwi1:	in	a,(lsr)			;wait for a character to arrive
 	and	dr
-	jr	z,cdwi1
+	jr	z,cdwin			;re-select: an interrupt may have changed the group
 	in	a,(rbr)
 	and	07fh			;strip parity
 	ret
