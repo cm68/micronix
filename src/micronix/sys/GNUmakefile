@@ -387,8 +387,8 @@ probe.o probe_init.o: %.o: %.c
 # win.o is the window-page cluster: the part of the resident kernel that
 # can live at BUFSEG, in the very page bhold() maps buffers into, so its
 # bytes stop competing with buffer headers for the space below.  The
-# image is what costs here - sizeof(struct buf) is 21, so every 21 bytes
-# below BUFWIN is one buffer - and this was 3915 of them.
+# image is what costs here - sizeof(struct buf) is 19, so every 19 bytes
+# below SCRWIN is one buffer - and this page's 3923 bytes are 206 of them.
 #
 # The criterion is execution, not linkage: code in this page runs only
 # when no hold is up, so no object here may contain a hold site, and none
