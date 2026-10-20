@@ -1,0 +1,402 @@
+.he "bsh (1)                      10/20/26                     bsh (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+bsh
+- the Bourne shell
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+bsh [ -ceiknrstuvx ] [ -c string ] [ file ] [ arg ... ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Bsh reads commands and runs them.  With a file it reads that file;
+with -c it runs the one string it is given and stops; with neither it
+reads the standard input.  If the input and the output are terminals
+it prompts with PS1, and with PS2 while a command is unfinished, and
+it does not exit when interrupted at the prompt.
+.sp
+A shell whose name begins with a minus is a login shell.  Before
+anything else it reads .profile from the current directory.
+.sp
+Without -c, the first argument, if there is one, is the file to read
+and the rest are the positional parameters; $0 is the file.  With -s,
+or with no arguments, commands come from the standard input; with -s
+the arguments are the positional parameters and $0 is the shell's
+name.
+.sp 2
+.in -5
+.bd
+OPTIONS
+.in +5
+.br
+.in +10
+.ti -10
+-c	string
+Run the string and exit.  The arguments after it are $0 and the
+positional parameters.
+
+.ti -10
+-e	Exit when a command that ran as a child returns a nonzero status.
+
+.ti -10
+-i	Interactive: prompt and stay, even when the input is not a
+terminal.
+
+.ti -10
+-k	Put every word of an assignment command in the environment, not
+only the ones before the command name.
+
+.ti -10
+-n	Read the commands and check the syntax, but run none of them.
+
+.ti -10
+-r	Restricted: refuse to change directory, to run a command whose
+name contains a slash, or to write a file with a redirection.
+
+.ti -10
+-s	Read commands from the standard input even when arguments are
+present; the arguments are then the positional parameters.
+
+.ti -10
+-t	Read and run one command and exit.
+
+.ti -10
+-u	Treat a substitution of an unset variable as an error.
+
+.ti -10
+-v	Write each line to the standard error as it is read.
+
+.ti -10
+-x	Write each command to the standard error before it is run,
+prefixed with a plus and a space.
+
+.in -10
+.sp
+The letters are written together in one argument, as in -uc.  -c
+takes the argument after the options as its string and may stand
+anywhere among the letters.  A second argument beginning with a minus
+is not read as options but as the first positional parameter.
+.sp
+The options may also be set with set; set - turns off -x and -v.  $-
+lists the ones that are on.
+.sp 2
+.in -5
+.bd
+WORDS AND QUOTING
+.in +5
+.br
+Words are separated by blanks and tabs, and a line by a newline or a
+semicolon.  IFS says what separates words; by default it is space,
+tab and newline.
+.sp
+A backslash protects the character after it, and is removed.  A
+backslash at the end of a line continues it.
+.sp
+A single quote begins a run of characters taken as they stand, up to
+the next single quote.
+.sp
+A double quote takes what is inside it as one word, and suppresses
+word splitting and pattern matching on it, but not parameter or
+command substitution.  Inside double quotes a backslash protects only
+a dollar sign, a backquote, a double quote and a backslash.
+.sp
+The characters ; & | ^ < > ( ) $ ` ' and the double quote are
+special, as are the backslash, the blanks and the newline.  A word
+can be built from quoted and unquoted parts joined together, so
+a"b"c is one word, abc.
+.sp
+A word that begins with # begins a comment that runs to the end of
+the line; the # must begin a word, so a#b is one word.  Comments are
+read from files, from -c strings and from sourced input; at the
+interactive prompt itself # is an ordinary character.
+.sp 2
+.in -5
+.bd
+PARAMETERS
+.in +5
+.br
+$name, or ${name}, is the value of the variable, empty if it is not
+set.  A name is a letter or an underscore followed by letters, digits
+and underscores.  The braces are needed when the name is followed by
+a letter, a digit or an underscore that is not part of it.
+
+.nf
+     ${name-word}   name, or word if it is unset
+     ${name=word}   name, assigning word to it if it is unset
+     ${name?word}   name, or an error with word if it is unset
+     ${name+word}   word if name is set, otherwise nothing
+.fi
+.sp
+Only these forms; the ${name:-word} family is a later shell's and is
+a bad substitution here.  A positional parameter may not be assigned
+with ${name=word}.
+.sp
+Substitution after a $ that names no variable is not an error: the $
+stands as it was.  The same for a $ at the end of the word.  With -u
+an unset variable in ${name-word} style is still not an error, but a
+bare $name that is unset is.
+.sp
+These are always set:
+
+.nf
+     $0   the name of the shell or of the file it is reading
+     $1..$9  the positional parameters
+     $*   the positional parameters
+     $@   the same; inside double quotes, still one word each
+     $#   how many there are
+     $?   the status of the last command
+     $!   the process id of the last background command
+     $$   the process id of the shell
+     $-   the options, as letters
+.fi
+.sp
+Only one digit is taken, so $10 is $1 followed by a zero.  Unquoted,
+$* and $@ are one word per parameter.  Inside double quotes "$*" is a
+single word with the parameters separated by a space, and "$@" is
+still one word per parameter.
+.sp 2
+.in -5
+.bd
+COMMAND SUBSTITUTION
+.in +5
+.br
+A command between backquotes is run and what it writes takes its
+place, with trailing newlines removed.  Outside quotes the result is
+split into words and matched against patterns; inside double quotes
+it is one word.  Backquotes are run inside double quotes too.
+.sp 2
+.in -5
+.bd
+PATTERNS
+.in +5
+.br
+After substitution, a word holding one of these is replaced by the
+files it matches, sorted:
+
+.nf
+     *      any run of characters, including none
+     ?      one character
+     [...]  one of these; a-z is a range
+.fi
+.sp
+A pattern may appear in any part of a path and is matched one
+component at a time.  A leading dot must be matched explicitly.  A
+pattern that matches nothing stands as the word that was written.
+.sp 2
+.in -5
+.bd
+REDIRECTION
+.in +5
+.br
+A redirection is a number and an operator, or the operator alone,
+which means 1 for output and 0 for input:
+
+.nf
+     >file      write file, making it
+     >>file     append to file
+     <file      read file
+     >&digit    copy the output descriptor onto digit
+     <&digit    copy the input descriptor onto digit
+     >&-        close the output descriptor
+     <&-        close the input descriptor
+     <<word     here document
+.fi
+.sp
+Any descriptor from 0 to 9 may be named before the operator, so
+2>&1 sends the error where the output is going, and 3<file is a third
+input.  Redirections apply to the command they are written on, and
+when there are several they are taken left to right.  A redirection
+with no command before it is made in a child process; it creates or
+truncates the file.
+.sp
+A here document reads the following lines up to one that is the word
+alone, and makes them the input.  Parameter, command and backslash
+substitution are done on the lines unless the word was quoted, in
+which case the lines are taken as they stand.  The lines are kept in
+a temporary file under /tmp while the command runs.
+.sp 2
+.in -5
+.bd
+COMMANDS
+.in +5
+.br
+A simple command is a name and its arguments, possibly preceded by
+redirections and by assignments.  Assignments before an external
+command are in that command's environment only; before a builtin they
+are made in the shell.  Without a name the assignments are made in
+the shell itself, so
+
+.nf
+     name=value
+.fi
+.sp
+sets a variable, and
+
+.nf
+     name=value command
+.fi
+.sp
+gives one command the value.  Before the name is looked for, the
+command is checked for a reserved word and a builtin.  After that a
+name with a slash is run as it is, and one without is looked for
+along PATH, which is a colon-separated list; an empty entry means the
+current directory.  If the exec fails because the file is not a
+valid executable, the shell reads it as a script in a new process.  A
+name PATH does not find is reported as not found.
+.sp
+Commands combine:
+
+.nf
+     cmd &          in the background
+     cmd1 ; cmd2    in turn; a newline does the same
+     cmd1 && cmd2   the second only if the first succeeded
+     cmd1 || cmd2   the second only if the first failed
+     cmd1 | cmd2    the first's output as the second's input
+     cmd1 ^ cmd2    the same pipe
+.fi
+.sp
+and compound commands:
+
+.nf
+     (list)                 in a subshell of its own
+     { list ; }             in this shell
+     if list ; then list ; elif list ; then list ; else list ; fi
+     while list ; do list ; done
+     until list ; do list ; done
+     for name [ in words ] ; do list ; done
+     case word in pattern [ | pattern ] ) list ;; ... esac
+.fi
+.sp
+A pipeline binds tighter than && and ||, which bind tighter than ;
+and &.  The lists in if, while, until and for end at a newline or
+semicolon that is not inside a command, and the reserved words do the
+rest.  A for with no in list uses the positional parameters.  break
+takes an optional count of loops to leave; continue leaves the one it
+is in.
+.sp
+The status of a command is its exit status, or 128 plus the number
+of the signal that killed it.  The status of a pipeline is the status
+of its last command.  A command run in the background has status 0.
+.sp 2
+.in -5
+.bd
+BUILTINS
+.in +5
+.br
+.nf
+     . file        read file in this shell; PATH is searched
+     :             do nothing, successfully
+     break [n]     leave n loops
+     cd [dir]      change to dir, or to HOME
+     continue      start the next turn of the loop
+     eval args     join the arguments and run them
+     exec args     run the command in place of the shell; with only
+                   redirections, change the shell's own
+     exit [n]      exit with status n
+     export [name ...]  put the names in the environment of every
+                        command run from now on; with no names, list
+                        the exported ones
+     login [args]  run login in place of the shell
+     newgrp [args] run newgrp in place of the shell
+     read name ...  read a line from the standard input, split on
+                    IFS, and assign the words to the names, with the
+                    rest of the line to the last one; status 1 at
+                    end of file
+     readonly name ...  make the names read only; with no names,
+                        list the read only ones
+     set [arg ...]  with arguments, set the options and replace the
+                    positional parameters; with no arguments, list
+                    the variables
+     shift         drop the first positional parameter
+     trap [cmd] [n ...]  run cmd when signal n is caught; trap n
+                    alone resets it; a null cmd ignores it; trap
+                    alone prints the traps
+     umask [nnn]   set the creation mask for the files the shell
+                   creates, or print it
+     wait          wait for the background commands
+.fi
+.sp
+There is no echo builtin: /bin/echo is the command.  Signals are
+named by number, 0 through 16; 0 is the shell exiting, and the shell
+ignores 3 and, when interactive, 15.
+.sp
+A builtin runs in the shell, so a redirection on one is refused as an
+illegal io.  exec is the exception, and on : the redirection is
+silently ignored.  The mask from umask applies to the files the shell
+opens for redirection; the kernel has no umask of its own, so other
+programs are not affected.
+.sp 2
+.in -5
+.bd
+VARIABLES
+.in +5
+.br
+Every variable from the environment is a shell variable and stays in
+it.  These mean something to the shell:
+
+.nf
+     HOME   where cd with no argument goes
+     IFS    what separates words on splitting
+     MAIL   a file to check for new mail while prompting
+     PATH   where to look for a command; default :/bin:/usr/bin
+     PS1    the prompt; default "$ " for a user, "# " for root
+     PS2    the prompt for an unfinished command; default "> "
+.fi
+.sp
+The positional parameters, $?, $$ and the rest are set by the shell
+and cannot be assigned.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+.nf
+     .profile   read by a login shell, from the current directory
+     /tmp/sh-*  here documents while their command runs
+     /dev/null  the standard input of a background command
+.fi
+.sp 2
+.in -5
+.bd
+DIAGNOSTICS
+.in +5
+.br
+An error in a command is reported with the command's name and the
+reason, and the status is 1.  A syntax error is reported with the
+line it was on when the input is not a terminal, and the status is 2.
+A command killed by a signal gives the status 128 plus the number of
+the signal.  An untrapped fatal signal ends a shell that is not
+interactive with status 3; an interactive shell returns to its
+prompt.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+sh(1), ccc(1)
+.sp 2
+.in -5
+.bd
+NOTES
+.in +5
+.br
+This is the Seventh Edition Bourne shell, built with the tree's
+compiler and library.  It has no shell functions, no aliases and no
+job control.  The times builtin is not here: the kernel has no times
+call to answer one.
