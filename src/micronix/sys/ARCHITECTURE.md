@@ -25,7 +25,7 @@ That is the whole shape:
 
 The sections below take those one at a time.  The code comments carry
 much more detail than this file: `include/sys/ovl.h` for the module
-interface, `GNUmakefile` for the link that fixes the layout,
+interface, the makefile for the link that fixes the layout,
 `include/sys/proc.h` for the process and user structures.
 
 ## The overall memory map
@@ -79,8 +79,8 @@ asked for.
 
 ### Where the layout is fixed
 
-The link (sys/GNUmakefile) builds five objects and places them by
-address, then an ordinary link puts them in order:
+The makefile builds five objects and places them by address, then an
+ordinary link puts them in order:
 
 - `low.o` - the entry header, the resident C, the hand-written
   assembly, and `textpad.o`, whose empty `.bss` defines `_ebss` after
