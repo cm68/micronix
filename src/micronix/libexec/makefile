@@ -43,3 +43,15 @@ clobber:
 	cd c1 ; make clobber
 	cd peep ; make clobber
 	cd astpp ; make clobber
+
+#
+# verify - the inverse of install, one level down: every
+# directory compares its just-built artifact with the one the
+# first generation installed.
+#
+verify:
+	cd pass0 ; make verify
+	cd c0 ; make verify
+	cd c1 ; make verify
+	cd peep ; make verify
+	cd astpp ; make verify

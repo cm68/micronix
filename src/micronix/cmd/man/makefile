@@ -41,6 +41,7 @@ install: $(PROG)
 # and not a second program, which is what cmd/GNUmakefile says the
 # native install does; it did not, and this is that line.
 #
+	rm -f $(BIN)/help
 	ln $(BIN)/$(PROG) $(BIN)/help
 	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)
@@ -50,3 +51,15 @@ clean:
 
 clobber: clean
 	rm -f $(PROG)
+
+#
+# verify - the inverse of install: every installed artifact against
+# the one this build just produced.  Run it after a clobber and a
+# second build to prove the rebuild matches what the first
+# generation installed.
+#
+verify: $(PROG)
+	cmp $(PROG) $(BIN)/man
+	cmp $(PROG) $(BIN)/help
+	cmp man.1 $(MANDIR)/man.1
+	cmp help.1 $(MANDIR)/help.1

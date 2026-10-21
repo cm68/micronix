@@ -42,3 +42,14 @@ clobber:
 	cd libc ; make clobber
 	cd libutil ; make clobber
 	cd libccc ; make clobber
+
+#
+# verify - the inverse of install, one level down: every
+# directory compares its just-built artifact with the one the
+# first generation installed.
+#
+verify:
+	cd libunix ; make verify
+	cd libc ; make verify
+	cd libutil ; make verify
+	cd libccc ; make verify

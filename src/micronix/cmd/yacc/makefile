@@ -51,3 +51,17 @@ clean:
 
 clobber: clean
 	rm -f $(PROG) liby.a
+
+#
+# verify - the inverse of install: every installed artifact against
+# the one this build just produced.  Run it after a clobber and a
+# second build to prove the rebuild matches what the first
+# generation installed.
+#
+verify: $(PROG) liby.a
+	cmp $(PROG) $(BIN)/$(PROG)
+	cmp liby.a $(LIBDIR)/liby.a
+	cmp yaccopar $(AUXDIR)/yaccopar
+	cmp yaccepar $(AUXDIR)/yaccepar
+	cmp yaccrpar $(AUXDIR)/yaccrpar
+	cmp $(MAN) $(MANDIR)/$(MAN)

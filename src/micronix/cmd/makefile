@@ -49,13 +49,16 @@ all:
 	cd ar ; make all
 	cd asz ; make all
 	cd awk ; make all
+	cd bsh ; make all
 	cd cal ; make all
 	cd cat ; make all
 	cd ccc ; make all
 	cd change ; make all
+	cd chg ; make all
 	cd chgrp ; make all
 	cd chmod ; make all
 	cd chown ; make all
+	cd clean ; make all
 	cd cmp ; make all
 	cd comm ; make all
 	cd common ; make all
@@ -75,6 +78,7 @@ all:
 	cd df ; make all
 	cd diff ; make all
 	cd djformat ; make all
+	cd down ; make all
 	cd du ; make all
 	cd echo ; make all
 	cd ed ; make all
@@ -85,7 +89,9 @@ all:
 	cd false ; make all
 	cd far ; make all
 	cd fd2 ; make all
+	cd fdj ; make all
 	cd fgrep ; make all
+	cd field ; make all
 	cd file ; make all
 	cd find ; make all
 	cd form ; make all
@@ -93,6 +99,7 @@ all:
 	cd grep ; make all
 	cd group ; make all
 	cd halt ; make all
+	cd hdformat ; make all
 	cd icheck ; make all
 	cd include ; make all
 	cd init ; make all
@@ -100,12 +107,15 @@ all:
 	cd kstat ; make all
 	cd kwic ; make all
 	cd label ; make all
+	cd last ; make all
 	cd ld ; make all
 	cd less ; make all
 	cd ln ; make all
+	cd login ; make all
 	cd ls ; make all
 	cd lz4 ; make all
 	cd m4 ; make all
+	cd macro ; make all
 	cd mail ; make all
 	cd makekey ; make all
 	cd md ; make all
@@ -130,6 +140,7 @@ all:
 	cd ps ; make all
 	cd pwd ; make all
 	cd ratfor ; make all
+	cd rcp ; make all
 	cd rm ; make all
 	cd rmdir ; make all
 	cd s ; make all
@@ -139,6 +150,7 @@ all:
 	cd sh ; make all
 	cd size ; make all
 	cd sort ; make all
+	cd split ; make all
 	cd strings ; make all
 	cd strip ; make all
 	cd stty ; make all
@@ -148,9 +160,12 @@ all:
 	cd tail ; make all
 	cd tar ; make all
 	cd td ; make all
+	cd touch ; make all
 	cd tr ; make all
 	cd tee ; make all
 	cd test ; make all
+	cd translit ; make all
+	cd tree ; make all
 	cd true ; make all
 	cd tty ; make all
 	cd umount ; make all
@@ -175,12 +190,15 @@ install:
 	cd ar ; make install
 	cd asz ; make install
 	cd awk ; make install
+	cd bsh ; make install
 	cd cal ; make install
 	cd cat ; make install
 	cd ccc ; make install
+	cd chg ; make install
 	cd chgrp ; make install
 	cd chmod ; make install
 	cd chown ; make install
+	cd clean ; make install
 	cd cmp ; make install
 	cd comm ; make install
 	cd common ; make install
@@ -200,6 +218,7 @@ install:
 	cd df ; make install
 	cd diff ; make install
 	cd djformat ; make install
+	cd down ; make install
 	cd du ; make install
 	cd echo ; make install
 	cd ed ; make install
@@ -210,7 +229,9 @@ install:
 	cd false ; make install
 	cd far ; make install
 	cd fd2 ; make install
+	cd fdj ; make install
 	cd fgrep ; make install
+	cd field ; make install
 	cd file ; make install
 	cd find ; make install
 	cd form ; make install
@@ -218,6 +239,7 @@ install:
 	cd grep ; make install
 	cd group ; make install
 	cd halt ; make install
+	cd hdformat ; make install
 	cd icheck ; make install
 	cd include ; make install
 	cd init ; make install
@@ -225,12 +247,15 @@ install:
 	cd kstat ; make install
 	cd kwic ; make install
 	cd label ; make install
+	cd last ; make install
 	cd ld ; make install
 	cd less ; make install
 	cd ln ; make install
+	cd login ; make install
 	cd ls ; make install
 	cd lz4 ; make install
 	cd m4 ; make install
+	cd macro ; make install
 	cd mail ; make install
 	cd makekey ; make install
 	cd md ; make install
@@ -255,6 +280,7 @@ install:
 	cd ps ; make install
 	cd pwd ; make install
 	cd ratfor ; make install
+	cd rcp ; make install
 	cd rm ; make install
 	cd rmdir ; make install
 	cd s ; make install
@@ -264,6 +290,7 @@ install:
 	cd sh ; make install
 	cd size ; make install
 	cd sort ; make install
+	cd split ; make install
 	cd strings ; make install
 	cd strip ; make install
 	cd stty ; make install
@@ -273,9 +300,12 @@ install:
 	cd tail ; make install
 	cd tar ; make install
 	cd td ; make install
+	cd touch ; make install
 	cd tr ; make install
 	cd tee ; make install
 	cd test ; make install
+	cd translit ; make install
+	cd tree ; make install
 	cd true ; make install
 	cd tty ; make install
 	cd umount ; make install
@@ -300,13 +330,16 @@ clean:
 	cd ar ; make clean
 	cd asz ; make clean
 	cd awk ; make clean
+	cd bsh ; make clean
 	cd cal ; make clean
 	cd cat ; make clean
 	cd ccc ; make clean
 	cd change ; make clean
+	cd chg ; make clean
 	cd chgrp ; make clean
 	cd chmod ; make clean
 	cd chown ; make clean
+	cd clean ; make clean
 	cd cmp ; make clean
 	cd comm ; make clean
 	cd common ; make clean
@@ -326,6 +359,7 @@ clean:
 	cd df ; make clean
 	cd diff ; make clean
 	cd djformat ; make clean
+	cd down ; make clean
 	cd du ; make clean
 	cd echo ; make clean
 	cd ed ; make clean
@@ -336,7 +370,9 @@ clean:
 	cd false ; make clean
 	cd far ; make clean
 	cd fd2 ; make clean
+	cd fdj ; make clean
 	cd fgrep ; make clean
+	cd field ; make clean
 	cd file ; make clean
 	cd find ; make clean
 	cd form ; make clean
@@ -344,6 +380,7 @@ clean:
 	cd grep ; make clean
 	cd group ; make clean
 	cd halt ; make clean
+	cd hdformat ; make clean
 	cd icheck ; make clean
 	cd include ; make clean
 	cd init ; make clean
@@ -351,12 +388,15 @@ clean:
 	cd kstat ; make clean
 	cd kwic ; make clean
 	cd label ; make clean
+	cd last ; make clean
 	cd ld ; make clean
 	cd less ; make clean
 	cd ln ; make clean
+	cd login ; make clean
 	cd ls ; make clean
 	cd lz4 ; make clean
 	cd m4 ; make clean
+	cd macro ; make clean
 	cd mail ; make clean
 	cd makekey ; make clean
 	cd md ; make clean
@@ -381,6 +421,7 @@ clean:
 	cd ps ; make clean
 	cd pwd ; make clean
 	cd ratfor ; make clean
+	cd rcp ; make clean
 	cd rm ; make clean
 	cd rmdir ; make clean
 	cd s ; make clean
@@ -390,6 +431,7 @@ clean:
 	cd sh ; make clean
 	cd size ; make clean
 	cd sort ; make clean
+	cd split ; make clean
 	cd strings ; make clean
 	cd strip ; make clean
 	cd stty ; make clean
@@ -399,9 +441,12 @@ clean:
 	cd tail ; make clean
 	cd tar ; make clean
 	cd td ; make clean
+	cd touch ; make clean
 	cd tr ; make clean
 	cd tee ; make clean
 	cd test ; make clean
+	cd translit ; make clean
+	cd tree ; make clean
 	cd true ; make clean
 	cd tty ; make clean
 	cd umount ; make clean
@@ -426,13 +471,16 @@ clobber:
 	cd ar ; make clobber
 	cd asz ; make clobber
 	cd awk ; make clobber
+	cd bsh ; make clobber
 	cd cal ; make clobber
 	cd cat ; make clobber
 	cd ccc ; make clobber
 	cd change ; make clobber
+	cd chg ; make clobber
 	cd chgrp ; make clobber
 	cd chmod ; make clobber
 	cd chown ; make clobber
+	cd clean ; make clobber
 	cd cmp ; make clobber
 	cd comm ; make clobber
 	cd common ; make clobber
@@ -452,6 +500,7 @@ clobber:
 	cd df ; make clobber
 	cd diff ; make clobber
 	cd djformat ; make clobber
+	cd down ; make clobber
 	cd du ; make clobber
 	cd echo ; make clobber
 	cd ed ; make clobber
@@ -462,7 +511,9 @@ clobber:
 	cd false ; make clobber
 	cd far ; make clobber
 	cd fd2 ; make clobber
+	cd fdj ; make clobber
 	cd fgrep ; make clobber
+	cd field ; make clobber
 	cd file ; make clobber
 	cd find ; make clobber
 	cd form ; make clobber
@@ -470,6 +521,7 @@ clobber:
 	cd grep ; make clobber
 	cd group ; make clobber
 	cd halt ; make clobber
+	cd hdformat ; make clobber
 	cd icheck ; make clobber
 	cd include ; make clobber
 	cd init ; make clobber
@@ -477,12 +529,15 @@ clobber:
 	cd kstat ; make clobber
 	cd kwic ; make clobber
 	cd label ; make clobber
+	cd last ; make clobber
 	cd ld ; make clobber
 	cd less ; make clobber
 	cd ln ; make clobber
+	cd login ; make clobber
 	cd ls ; make clobber
 	cd lz4 ; make clobber
 	cd m4 ; make clobber
+	cd macro ; make clobber
 	cd mail ; make clobber
 	cd makekey ; make clobber
 	cd md ; make clobber
@@ -507,6 +562,7 @@ clobber:
 	cd ps ; make clobber
 	cd pwd ; make clobber
 	cd ratfor ; make clobber
+	cd rcp ; make clobber
 	cd rm ; make clobber
 	cd rmdir ; make clobber
 	cd s ; make clobber
@@ -516,6 +572,7 @@ clobber:
 	cd sh ; make clobber
 	cd size ; make clobber
 	cd sort ; make clobber
+	cd split ; make clobber
 	cd strings ; make clobber
 	cd strip ; make clobber
 	cd stty ; make clobber
@@ -525,9 +582,12 @@ clobber:
 	cd tail ; make clobber
 	cd tar ; make clobber
 	cd td ; make clobber
+	cd touch ; make clobber
 	cd tr ; make clobber
 	cd tee ; make clobber
 	cd test ; make clobber
+	cd translit ; make clobber
+	cd tree ; make clobber
 	cd true ; make clobber
 	cd tty ; make clobber
 	cd umount ; make clobber
@@ -544,3 +604,148 @@ clobber:
 	cd xargs ; make clobber
 	cd yacc ; make clobber
 	cd lex ; make clobber
+
+#
+# verify - the inverse of install, one level down: every
+# directory compares its just-built artifact with the one the
+# first generation installed.
+#
+verify:
+	cd make ; make verify
+	cd ar ; make verify
+	cd asz ; make verify
+	cd awk ; make verify
+	cd bsh ; make verify
+	cd cal ; make verify
+	cd cat ; make verify
+	cd ccc ; make verify
+	cd chg ; make verify
+	cd chgrp ; make verify
+	cd chmod ; make verify
+	cd chown ; make verify
+	cd clean ; make verify
+	cd cmp ; make verify
+	cd comm ; make verify
+	cd common ; make verify
+	cd compare ; make verify
+	cd compress ; make verify
+	cd concat ; make verify
+	cd copy ; make verify
+	cd cp ; make verify
+	cd cpp ; make verify
+	cd crypt ; make verify
+	cd cu ; make verify
+	cd date ; make verify
+	cd dc ; make verify
+	cd dcheck ; make verify
+	cd dd ; make verify
+	cd detab ; make verify
+	cd df ; make verify
+	cd diff ; make verify
+	cd djformat ; make verify
+	cd down ; make verify
+	cd du ; make verify
+	cd echo ; make verify
+	cd ed ; make verify
+	cd edit ; make verify
+	cd entab ; make verify
+	cd expand ; make verify
+	cd expr ; make verify
+	cd false ; make verify
+	cd far ; make verify
+	cd fd2 ; make verify
+	cd fdj ; make verify
+	cd fgrep ; make verify
+	cd field ; make verify
+	cd file ; make verify
+	cd find ; make verify
+	cd form ; make verify
+	cd fsck ; make verify
+	cd grep ; make verify
+	cd group ; make verify
+	cd halt ; make verify
+	cd hdformat ; make verify
+	cd icheck ; make verify
+	cd include ; make verify
+	cd init ; make verify
+	cd kill ; make verify
+	cd kstat ; make verify
+	cd kwic ; make verify
+	cd label ; make verify
+	cd last ; make verify
+	cd ld ; make verify
+	cd less ; make verify
+	cd ln ; make verify
+	cd login ; make verify
+	cd ls ; make verify
+	cd lz4 ; make verify
+	cd m4 ; make verify
+	cd macro ; make verify
+	cd mail ; make verify
+	cd makekey ; make verify
+	cd md ; make verify
+	cd man ; make verify
+	cd mkdir ; make verify
+	cd mkfs ; make verify
+	cd mknod ; make verify
+	cd more ; make verify
+	cd mount ; make verify
+	cd mv ; make verify
+	cd mwformat ; make verify
+	cd ncheck ; make verify
+	cd newuser ; make verify
+	cd nm ; make verify
+	cd od ; make verify
+	cd overstrike ; make verify
+	cd owner ; make verify
+	cd packsrc ; make verify
+	cd passwd ; make verify
+	cd pr ; make verify
+	cd print ; make verify
+	cd ps ; make verify
+	cd pwd ; make verify
+	cd ratfor ; make verify
+	cd rcp ; make verify
+	cd rm ; make verify
+	cd rmdir ; make verify
+	cd s ; make verify
+	cd scsiformat ; make verify
+	cd sed ; make verify
+	cd setdev ; make verify
+	cd sh ; make verify
+	cd size ; make verify
+	cd sort ; make verify
+	cd split ; make verify
+	cd strings ; make verify
+	cd strip ; make verify
+	cd stty ; make verify
+	cd su ; make verify
+	cd sum ; make verify
+	cd sync ; make verify
+	cd tail ; make verify
+	cd tar ; make verify
+	cd td ; make verify
+	cd touch ; make verify
+	cd tr ; make verify
+	cd tee ; make verify
+	cd test ; make verify
+	cd translit ; make verify
+	cd tree ; make verify
+	cd true ; make verify
+	cd tty ; make verify
+	cd umount ; make verify
+	cd unique ; make verify
+	cd unlz4 ; make verify
+	cd unrot ; make verify
+	cd update ; make verify
+	cd upm ; make verify
+	cd uudecode ; make verify
+	cd uuencode ; make verify
+	cd vi ; make verify
+	cd wall ; make verify
+	cd wc ; make verify
+	cd who ; make verify
+	cd write ; make verify
+	cd xargs ; make verify
+	cd yacc ; make verify
+	cd lex ; make verify

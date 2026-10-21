@@ -53,3 +53,15 @@ clean:
 
 clobber: clean
 	rm -f $(PROG) liblc.a
+
+#
+# verify - the inverse of install: every installed artifact against
+# the one this build just produced.  Run it after a clobber and a
+# second build to prove the rebuild matches what the first
+# generation installed.
+#
+verify: $(PROG) liblc.a
+	cmp $(PROG) $(BIN)/$(PROG)
+	cmp liblc.a $(LIBDIR)/liblc.a
+	cmp ncform $(AUXDIR)/ncform
+	cmp $(MAN) $(MANDIR)/$(MAN)

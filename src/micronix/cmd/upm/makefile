@@ -58,7 +58,7 @@ PROG	= upm
 # the crt first, so start is at the text base; the syscall stubs before
 # the upm halves so they win over libunix's RST-based ones
 #
-OBJS	= upmhead.o upmsys.o upm_res.o upm_ccp.o
+OBJS	= upmhead.o upmsys.o upm_res.o upm_res2.o upm_ccp.o
 LIBC	= /lib/libc.a
 LIBU	= /lib/libunix.a
 
@@ -71,15 +71,28 @@ upmsys.o: upmsys.s
 	$(CC) $(CFLAGS) -c upmsys.s
 
 #
-# The two halves.  -r -Stext folds the resident object's every section
-# into its text segment and -r -Sdata does the same for the CCP's data
-# segment, which is what lets the -T options below put them at 0xd500
-# and 0100 with the linker alone.  Rebuild both when upm.h changes,
-# since it is what tells each half which symbols the other defines.
+# The two halves, the resident one in two units.  -r -Stext folds a
+# resident object's every section into its text segment and -r -Sdata
+# does the same for the CCP's data segment, which is what lets the -T
+# options below put them at 0xd500 and 0100 with the linker alone.
+# Rebuild every unit when upm.h changes, since it is what tells them
+# which symbols the others define.
 #
 upm_res.o: upm_res.c upm.h
 	$(CC) $(CFLAGS) -c upm_res.c -o upm_res.rel
 	$(LD) -r -Stext -o upm_res.o upm_res.rel
+
+#
+# upm_res2.o is the rest of the resident half.  The resident source is
+# one c0 run per translation unit, and the whole of it overflows c0's
+# 64K on this machine, so the file stops at the boundary the split
+# carries and resumes in upm_res2.c.  It is folded into text the same
+# way and linked right after upm_res.o, which keeps every function in
+# the order the disassembly gave it.
+#
+upm_res2.o: upm_res2.c upm.h
+	$(CC) $(CFLAGS) -c upm_res2.c -o upm_res2.rel
+	$(LD) -r -Stext -o upm_res2.o upm_res2.rel
 
 upm_ccp.o: upm_ccp.c upm.h
 	$(CC) $(CFLAGS) -c upm_ccp.c -o upm_ccp.rel
@@ -111,3 +124,13 @@ clean:
 
 clobber: clean
 	rm -f $(PROG)
+
+#
+# verify - the inverse of install: every installed artifact against
+# the one this build just produced.  Run it after a clobber and a
+# second build to prove the rebuild matches what the first
+# generation installed.
+#
+verify: $(PROG)
+	cmp $(PROG) $(BIN)/$(PROG)
+	cmp $(MAN) $(MANDIR)/$(MAN)

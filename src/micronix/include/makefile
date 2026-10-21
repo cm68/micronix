@@ -63,3 +63,50 @@ install:
 clean:
 
 clobber:
+
+#
+# verify - the inverse of install: each header against the copy
+# stage one installed under /usr/include.
+#
+verify:
+	cd sys ; make verify
+	cmp 8080.h /usr/include/8080.h
+	cmp alloc.h /usr/include/alloc.h
+	cmp bios.h /usr/include/bios.h
+	cmp dirent.h /usr/include/dirent.h
+	cmp dtab.h /usr/include/dtab.h
+	cmp dump.h /usr/include/dump.h
+	cmp fio.h /usr/include/fio.h
+	cmp fslib.h /usr/include/fslib.h
+	cmp mtab.h /usr/include/mtab.h
+	cmp obj.h /usr/include/obj.h
+	cmp pascal.h /usr/include/pascal.h
+	cmp pwd.h /usr/include/pwd.h
+	cmp std.h /usr/include/std.h
+	cmp types.h /usr/include/types.h
+	cmp utmp.h /usr/include/utmp.h
+	cd ../lib/include ; cmp assert.h /usr/include/assert.h
+	cd ../lib/include ; cmp conio.h /usr/include/conio.h
+	cd ../lib/include ; cmp cpm.h /usr/include/cpm.h
+	cd ../lib/include ; cmp ctype.h /usr/include/ctype.h
+	cd ../lib/include ; cmp errno.h /usr/include/errno.h
+	cd ../lib/include ; cmp exec.h /usr/include/exec.h
+	cd ../lib/include ; cmp fcntl.h /usr/include/fcntl.h
+	cd ../lib/include ; cmp float.h /usr/include/float.h
+	cd ../lib/include ; cmp hitech.h /usr/include/hitech.h
+	cd ../lib/include ; cmp libgen.h /usr/include/libgen.h
+	cd ../lib/include ; cmp limits.h /usr/include/limits.h
+	cd ../lib/include ; cmp math.h /usr/include/math.h
+	cd ../lib/include ; cmp setjmp.h /usr/include/setjmp.h
+	cd ../lib/include ; cmp signal.h /usr/include/signal.h
+	cd ../lib/include ; cmp stat.h /usr/include/stat.h
+	cd ../lib/include ; cmp stdarg.h /usr/include/stdarg.h
+	cd ../lib/include ; cmp stddef.h /usr/include/stddef.h
+	cd ../lib/include ; cmp stdio.h /usr/include/stdio.h
+	cd ../lib/include ; cmp stdlib.h /usr/include/stdlib.h
+	cd ../lib/include ; cmp string.h /usr/include/string.h
+	cd ../lib/include ; cmp sys.h /usr/include/sys.h
+	cd ../lib/include ; cmp time.h /usr/include/time.h
+	cd ../lib/include ; cmp unistd.h /usr/include/unistd.h
+	cd ../lib/include ; cmp unixio.h /usr/include/unixio.h
+	cd ../lib/include/sys ; cmp wait.h /usr/include/sys/wait.h

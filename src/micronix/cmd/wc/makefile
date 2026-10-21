@@ -35,6 +35,7 @@ install: $(PROG)
 # the way help is man's; main() tells them apart by looking at argv[0].
 # Links and not copies, which is what cmd/ed/makefile does for e.
 #
+	rm -f $(BIN)/chars $(BIN)/lines $(BIN)/words
 	ln $(BIN)/$(PROG) $(BIN)/chars
 	ln $(BIN)/$(PROG) $(BIN)/lines
 	ln $(BIN)/$(PROG) $(BIN)/words
@@ -50,3 +51,19 @@ clean:
 
 clobber: clean
 	rm -f $(PROG)
+
+#
+# verify - the inverse of install: every installed artifact against
+# the one this build just produced.  Run it after a clobber and a
+# second build to prove the rebuild matches what the first
+# generation installed.
+#
+verify: $(PROG)
+	cmp $(PROG) $(BIN)/$(PROG)
+	cmp $(PROG) $(BIN)/chars
+	cmp $(PROG) $(BIN)/lines
+	cmp $(PROG) $(BIN)/words
+	cmp wc.1 $(MANDIR)/wc.1
+	cmp chars.1 $(MANDIR)/chars.1
+	cmp lines.1 $(MANDIR)/lines.1
+	cmp words.1 $(MANDIR)/words.1

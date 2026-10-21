@@ -49,6 +49,41 @@ all:
 	
 # cd sys ; make install
 
+#
+# build - the second generation: build everything and install nothing.
+# After clobber, this compiles the tree with the toolchain the previous
+# pass installed.  all cannot serve here because all installs as it
+# goes, which would replace the copies verify wants to compare against.
+#
+build:
+	cd lib ; make all
+	cd libexec ; make all
+	cd cmd ; make all
+
+#
+# install - the same steps as all, without the bootstrap ordering.  all
+# already installs; this is here so the pair the verify test names -
+# make, make install, make clobber, make build, make verify - reads the
+# way it runs.
+#
+install:
+	cd include ; make install
+	cd lib ; make install
+	cd libexec ; make install
+	cd cmd ; make install
+
+#
+# verify - the inverse of install.  Every directory compares each
+# artifact it just built against the copy the first generation
+# installed; a difference is what a second generation that is not the
+# same compiler would produce.
+#
+verify:
+	cd include ; make verify
+	cd lib ; make verify
+	cd libexec ; make verify
+	cd cmd ; make verify
+
 clean:
 	cd include ; make clean
 	cd lib ; make clean

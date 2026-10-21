@@ -33,3 +33,13 @@ clean:
 
 clobber: clean
 	rm -f $(PROG)
+
+#
+# verify - the inverse of install: every installed artifact against
+# the one this build just produced.  Run it after a clobber and a
+# second build to prove the rebuild matches what the first
+# generation installed.
+#
+verify: $(PROG)
+	cmp $(PROG) $(BIN)/print
+	cmp $(MAN) $(MANDIR)/$(MAN)

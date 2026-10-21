@@ -129,3 +129,45 @@ clean:
 
 clobber: clean
 	rm -f $(TARGET)
+
+#
+# verify - the inverse of install: every installed artifact against
+# the one this build just produced.  Run it after a clobber and a
+# second build to prove the rebuild matches what the first
+# generation installed.
+#
+verify: $(TARGET)
+	cmp $(TARGET) $(LIBDIR)/$(TARGET)
+	cmp strcat.3 $(MANDIR)/strcat.3
+	cmp strchr.3 $(MANDIR)/strchr.3
+	cmp strcmp.3 $(MANDIR)/strcmp.3
+	cmp strcpy.3 $(MANDIR)/strcpy.3
+	cmp strdup.3 $(MANDIR)/strdup.3
+	cmp strlen.3 $(MANDIR)/strlen.3
+	cmp strncat.3 $(MANDIR)/strncat.3
+	cmp strncmp.3 $(MANDIR)/strncmp.3
+	cmp strncpy.3 $(MANDIR)/strncpy.3
+	cmp strrchr.3 $(MANDIR)/strrchr.3
+	cmp alloc.3 $(MANDIR)/alloc.3
+	cmp ctime.3 $(MANDIR)/ctime.3
+	cmp crypt.3 $(MANDIR)/crypt.3
+	cmp fclose.3 $(MANDIR)/fclose.3
+	cmp ferror.3 $(MANDIR)/ferror.3
+	cmp floor.3 $(MANDIR)/floor.3
+	cmp fopen.3 $(MANDIR)/fopen.3
+	cmp fread.3 $(MANDIR)/fread.3
+	cmp fseek.3 $(MANDIR)/fseek.3
+	cmp getgrent.3 $(MANDIR)/getgrent.3
+	cmp getpass.3 $(MANDIR)/getpass.3
+	cmp getpwent.3 $(MANDIR)/getpwent.3
+	cmp gets.3 $(MANDIR)/gets.3
+	cmp perror.3 $(MANDIR)/perror.3
+	cmp popen.3 $(MANDIR)/popen.3
+	cmp printf.3 $(MANDIR)/printf.3
+	cmp putc.3 $(MANDIR)/putc.3
+	cmp puts.3 $(MANDIR)/puts.3
+	cmp scanf.3 $(MANDIR)/scanf.3
+	cmp setbuf.3 $(MANDIR)/setbuf.3
+	cmp stdio.3 $(MANDIR)/stdio.3
+	cmp system.3 $(MANDIR)/system.3
+	cmp ttyname.3 $(MANDIR)/ttyname.3
