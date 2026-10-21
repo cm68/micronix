@@ -42,7 +42,7 @@ char *tmpl;
 			val >>= 4;
 		}	
 
-		fd = open(tmpl, O_RDWR | O_CREAT | O_EXCL);
+		fd = open(tmpl, O_RDWR | O_CREAT | O_EXCL, 0600);
 		if (fd >= 0)
 			return fd;
 	}

@@ -1155,8 +1155,7 @@ char **dev;
 		}
 		if (pid == 0) {
 			di();
-			close(0);
-			dup(pip[0]);
+			dup2(pip[0], 0);
 			close(pip[0]);
 			close(pip[1]);
 			execl(arg, arg, 0);

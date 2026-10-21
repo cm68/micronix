@@ -349,6 +349,30 @@ extern int subflag;
 extern int sublines;
 
 /*
- * Not declared here, because only one half uses it:
- *   struct fileent files[16]	(upm_res.c)
+ * The resident half is two translation units (upm_res.c and upm_res2.c):
+ * the whole of it overflows c0's 64K on the machine that has to rebuild
+ * it.  These are the resident globals both units name; upm_res.c defines
+ * them.
+ *
+ * The deferred last record.  A CP/M write is a full 128-byte record, but
+ * the CP/M 3 byte-count extension lets the final record be short, so upm
+ * holds the most recent record back and writes it on the next write or on
+ * close.  pending is a copy of the DMA record, because the program may
+ * reuse its DMA buffer as soon as the write returns.
  */
+extern char pending[128];
+extern char pending_valid;
+extern struct fcb *pending_fcb;
+extern ushort pending_rec;
+
+/*
+ * The open-file table.  One four-byte entry per descriptor: the device
+ * and inode the descriptor is on, read out of struct stat when the file
+ * was opened.  closename matches a name by stat'ing it and looking for
+ * its dev/inode here.
+ */
+struct fileent {
+	ushort	dev;
+	ushort	ino;
+};
+extern struct fileent files[16];

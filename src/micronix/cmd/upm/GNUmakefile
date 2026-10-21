@@ -38,13 +38,13 @@ CLASS	= cmd
 
 # the crt first, so start is at the text base; the syscall stubs before
 # the upm halves so they win over libunix's RST-based ones
-OBJS	= upmhead.o upmsys.o upm_res.o upm_ccp.o
+OBJS	= upmhead.o upmsys.o upm_res.o upm_res2.o upm_ccp.o
 
 
 HSRCS	= upm.h
 MANSRCS	= upm.1
 
-CSRCS	= upm_res.c upm_ccp.c
+CSRCS	= upm_res.c upm_res2.c upm_ccp.c
 ASSRCS	= upmhead.s upmsys.s
 OBJS	= $(ASSRCS:.s=.o) $(CSRCS:.c=.o)
 
@@ -53,14 +53,24 @@ include $(DEPTH)/GNUmakefile.inc
 LIBC	= $(DEPTH)/lib/libc/libc.a
 LIBU	= $(DEPTH)/lib/libunix/libunix.a
 
-# The two halves.  -r -Stext folds the resident object's every section
-# into its text segment and -r -Sdata does the same for the CCP's data
-# segment, which is what lets the -T options below put them at 0xd500
-# and 0100 with the linker alone.  Rebuild both when upm.h changes,
-# since it is what tells each half which symbols the other defines.
+# The two halves, the resident one in two units.  -r -Stext folds a
+# resident object's every section into its text segment and -r -Sdata
+# does the same for the CCP's data segment, which is what lets the -T
+# options below put them at 0xd500 and 0100 with the linker alone.
+# Rebuild every unit when upm.h changes, since it is what tells them
+# which symbols the others define.
 upm_res.o: upm_res.c upm.h
 	$(CCC) $(CCFLAGS) $(INC) -c upm_res.c -o upm_res.rel
 	$(BIN)/mxld -r -Stext -o upm_res.o upm_res.rel
+
+# The rest of the resident half.  The resident source is one c0 run per
+# translation unit, and the whole of it overflows c0's 64K on the machine
+# that rebuilds upm; upm_res.c stops at the split and resumes here.  It is
+# folded into text the same way and linked right after upm_res.o, which
+# keeps every function in the order the disassembly gave it.
+upm_res2.o: upm_res2.c upm.h
+	$(CCC) $(CCFLAGS) $(INC) -c upm_res2.c -o upm_res2.rel
+	$(BIN)/mxld -r -Stext -o upm_res2.o upm_res2.rel
 
 upm_ccp.o: upm_ccp.c upm.h
 	$(CCC) $(CCFLAGS) $(INC) -c upm_ccp.c -o upm_ccp.rel
