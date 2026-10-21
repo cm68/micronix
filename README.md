@@ -37,9 +37,79 @@ grown dup2, ftruncate, ioctl, reboot and execve.
 src/micronix/sys/FEATURES-2.md is the full account, with the counts
 taken from the two kernels.
 
+micronix 2.0 - release notes, 21 oct 2026
+
+this is the first release of micronix in 42 years.  it is a complete
+source release, with significantly enhanced functionality and much
+higher performance on the same hardware:
+
+	an entirely new C compiler and tool chain.  it exploits the Z80
+	chip for significant speed and space improvements over the
+	Whitesmith's compiler.  in addition, it accepts most of ANSI C.
+
+	up to 128K of ram is used as a buffer cache, greatly reducing
+	disk i/o.
+
+	it exploits the mpz80 hardware contexts to make context switches
+	much cheaper.
+
+	exec now allows a large number of arguments, limited by memory
+	size.
+
+	unix 7th edition changes: ioctl, lseek, dup2, O_APPEND,
+	ftruncate, environment variables, bourne shell, make, less and
+	many others.
+
+	a network interface has been added supporting an ESP32 connection.
+	the ESP32 runs tcp/ip and wifi; rcp copies files over rsh, and nd is
+	a network disk on the same card - a block device that can serve a
+	volume with no local controller.
+
+	the console is chosen at boot: the morrow multio ACE or the compupro
+	SS1's 2651.  wunderbus ACEs and the serial lines give additional
+	terminals, so the machine is multi-user over serial.
+
+	halt and reboot commands are added.
+
+	format utilities running natively for all supported disk
+	controllers.
+
+	modular device drivers: all block device drivers share a single
+	4k segment, so many different drivers can be loaded on the same
+	kernel.
+
+	automatic interrupt probing: all disk controllers can be strapped
+	to any unused S100 VI line, and it will be automatically
+	detected.
+
+	automatic detection of interrupt controllers: the morrow multio,
+	wunderbus I/O and compupro system support are all supported.
+
+	the tool chain is self-hosting: the source tree rebuilds itself
+	natively, and the second generation is byte-identical to the first
+	(make verify).
+
+	drivers for the following controllers have been added, along with
+	boot rom support if running the included mon5.0:
+
+		morrow hdc/dma, dj/dma, hdca
+		compupro disk1, disk2, disk3
+		s100computers.com dual ide, scsi
+
+	disk partitioning.  micronix only used up to 32MB of a disk.  a
+	new disk labeling facility made disks self-describing, so the
+	kernel no longer needs to know disk geometry.
+
+the source tree, the build instructions and the 1.4 userland / 1.61
+kernel provenance are in this file.  make test runs the recovered 1.4
+shell; the d1 simulator and usersim run the system without the hardware,
+and the 2.0 distribution media are under dist/ and attached to the 2.0 release.
+the tree is Apache 2.0 (LICENSE); the Z80 instruction tables in
+src/include/z80.h carry the zlib/libpng notice in LICENSE.z80.
+
 ---------------------
 
-Morrow Designs Micronix and tools					updated 30 Sep 2026
+Morrow Designs Micronix and tools					updated 21 Oct 2026
 
 directories:
 

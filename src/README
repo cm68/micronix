@@ -1,4 +1,73 @@
-this directory is for source code for components that were re-generated, either by porting the
-version 6 original, or from decompilation or other means.
+this directory is the host side of the tree: the simulators, the
+libraries and tools that run on the host, and the source tree they build
+for.  the top level make drives it:
 
-the eventual goal is a completely native build source tree
+	make		# bin/sim, bin/d1, then src/make
+	make test	# the recovered 1.4 shell, on the user mode simulator
+
+src/GNUmakefile recurses into lib, tools and usersim.  hwsim is not in
+that list: the decision 1 machine is built by the top level d1 target,
+which knows the monitor roms it has to assemble first.
+
+directories:
+
+micronix:
+	the native source tree, the same tree /usr/src holds on the
+	machine.  headers, libc and libunix, the ccc compiler passes,
+	the commands and the kernel.  it builds two ways and has two
+	makefiles: GNUmakefile on the host with the cross toolchain
+	(mxccc, mxar), makefile inside micronix with the installed one.
+		sys/		the kernel and its notes: ARCHITECTURE.md,
+				DISKLABEL.md, FEATURES-2.md, INTR.md,
+				MEDIACHG.md, NET.md
+		stand/		the bootstrap loaders and the monitor roms
+		libexec/	the passes ccc runs: pass0, c0, c1, peep, astpp
+		cmd/		the commands, including ccc, cpp, ld and asz
+		lib/		libc, libunix, libutil, libccc, fslib
+		include/	the system headers
+		dev/		devlist, the device nodes mkfs and create_vol
+		etc/		the seed files for /etc
+		cpm/		CP/M's header tree, /usr/cpm/include
+		man/		manual pages
+
+hwsim:
+	the behavioral S-100 machine.  hwsim.c, s100.c and mediachg.c
+	are the machine independent core; hwsim/d1 holds the MPZ80
+	board, the console and clock, the monitor interface, and one .c
+	per card.  the card list is DRIVERS in hwsim/d1/GNUmakefile.
+	d1 is the debug build; d1p is the NODEBUG=1 performance build,
+	which d1 execs with -P.  ARCHITECTURE.md is the sketch for
+	making the boards pluggable.
+
+usersim:
+	the user mode simulator.  it hosts micronix system calls on the
+	host and runs against the filesystem/ directory, with no
+	simulated hardware and no disk images.  it is built here and
+	run from the top of the tree, where its default root lives:
+	src/usersim/sim, or bin/sim.
+
+lib:
+	the host libraries, folded into libsim.a: the disassembler, the
+	syscall formatter, the monitor and debugger, gui, imd, json,
+	lockfile, and fslib.  fslibfunc.c is compiled out of
+	micronix/lib so that the host tools and the guest agree on the
+	filesystem; unused/ is the road not taken.
+
+tools:
+	host tools.  filesystem: dcheck, icheck, ncheck, fsck, readall.
+	images: imd, imdd, dumpsec.  objects: nm, size, ar, disas, dump,
+	doc, zmac.  provisioning: mnix (format, label, mkfs) and hwsim
+	(which drives the simulator from sim.json).  the latter two are
+	described in PROVISION.md.
+
+include:
+	headers shared by the host code.
+
+attic:
+	retired sources, kept for reference.  z80emu is the instruction
+	simulator the machine used before the current core.
+
+objects, binaries and the occasional logfile are built in place beside
+their sources; they are gitignored, not checked in.  the top level
+README is the account of what this tree is and how it differs from the
+1.61 kernel it came from.
