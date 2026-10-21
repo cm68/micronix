@@ -341,6 +341,14 @@ multio_set_int_line()
 void
 multio_master_ir(int ir, int value)
 {
+    /*
+     * The board's own PIC is only the machine's when it is the wired
+     * controller.  Dormant beside the SS1 it still has ACEs and their
+     * registers may be read and written, but nothing here may fold an
+     * INT line the SS1 owns.
+     */
+    if (!wiring_active("multio"))
+        return;
     pic_request(&pics[0], ir, value);
     multio_set_int_line();
 }
@@ -591,8 +599,13 @@ multio_uart_poll(struct ace *ap)
      * character can only be delivered once.  If the controller has the
      * console, leave the input alone - it is not ours.  The other two
      * uarts have descriptors of their own and are never in question.
+     *
+     * That sharing is only the wired controller's: beside the SS1 this
+     * board's first ACE has its own window, and that window's input must
+     * be read even though the console claim belongs to the other board.
      */
-    if (ap == &ace[0] && console_owner != CONS_MULTIO) {
+    if (ap == &ace[0] && wiring_active("multio") &&
+        console_owner != CONS_MULTIO) {
         return 0;
     }
 
@@ -1376,6 +1389,37 @@ multio_pic_dump(void)
         vector[0], vector[1], vector[2], m->pic_state);
 }
 
+/*
+ * Open the terminals the -c xterm mask asks for.  uart0 is the console,
+ * and the boot rom, the loader and pr() write to it from reset, before
+ * anything has opened a tty, so its window must exist up front or that
+ * output is lost.  uart1 and uart2 have no such firmware - nothing
+ * reaches them until init opens /dev/ttyB or /dev/ttyC and a login starts
+ * writing - so their xterms are opened lazily, on first traffic, from
+ * wr_txb.
+ *
+ * This is per board.  The SS1's 2651 opens its own window from the same
+ * bit; the first ACE's window is not the other board's, and neither is
+ * the input behind it.
+ */
+static void
+multio_open_xterms(int termmask)
+{
+    char tname[10];
+    int i;
+
+    for (i = 0; i < 3; i++) {
+        if (!(termmask & (1 << i)))
+            continue;
+        if (i == 0) {
+            sprintf(tname, "multio-%d", i);
+            open_terminal(tname, 0, &ace[i].infd, &ace[i].outfd, 0, 0);
+        } else {
+            ace[i].want_xterm = 1;
+        }
+    }
+}
+
 static int
 multio_init()
 {
@@ -1396,18 +1440,42 @@ multio_init()
         ace_init(i, strdup(tname), 3 + i);
     }
 
-    /*
-     * When the SS1 is the interrupt controller, this board's ACEs are
-     * dormant: they own no terminal, and neither their group select nor
-     * the slave PIC is wanted.  Return before any of the terminal work -
-     * the poll child, the xterms - so the console and the invoking
-     * terminal stay free for the SS1's own 2651.
-     */
-    if (!wiring_active("multio"))
-        return 0;
-
     if (config_sw & CONF_SET) {
         termmask = (config_sw >> 8) & 0x7;
+    }
+
+    /*
+     * The group select is the board's door: a write to it is what makes
+     * the next eight ports at 0x48 an ACE's registers.  Register it in
+     * both cases, so the first ACE can still be a console window when the
+     * SS1 owns the interrupts.
+     */
+    register_output(MULTIO_MASTER+7, &multio_select);
+
+    /*
+     * When the SS1 is the interrupt controller this board is not the
+     * console: its PIC, its clock and the claim on the shared input all
+     * stay with the SS1, and it does not borrow the invoking terminal.
+     * Its terminals are its own, though, and the mask may still ask for
+     * the first ACE, so open them and leave the rest dormant.
+     */
+    if (!wiring_active("multio")) {
+        /*
+         * The monitor programs this board's PIC when it finds the
+         * Wunderbus console, before the kernel's probe picks the SS1.  A
+         * real 8259 takes that sequence beside the SS1's pair, so model
+         * it: the line callback is the board's, and it stays quiet when
+         * the board is not the wired controller.
+         */
+        pic_init(&pics[0]);
+        pic_init(&pics[1]);
+        pics[0].name = "multio";
+        pics[1].name = "multio slave";
+        pics[0].line_changed = multio_set_int_line;
+        pics[1].line_changed = multio_set_int_line;
+
+        multio_open_xterms(termmask);
+        return 0;
     }
 
     // if terminal 0 is not an xterm, use mytty - this requires poll child to get SIGIO
@@ -1470,32 +1538,10 @@ multio_init()
         ace[0].outfd = pipe_down[1];
     }
 
-    // create xterms
-    for (i = 0; i < 3; i++) {
-        if (termmask & (1 << i)) {
-            /*
-             * uart0 is the console, and it is special: the boot rom,
-             * the loader and pr() write to it from reset, before init
-             * has opened anything, so its window must exist up front or
-             * that output is lost.  uart1 and uart2 have no such
-             * firmware - nothing reaches them until init opens
-             * /dev/ttyB or /dev/ttyC and a login starts writing - so
-             * their xterms are opened lazily, on first traffic, from
-             * wr_txb.
-             */
-            if (i == 0) {
-                sprintf(tname, "multio-%d", i);
-                open_terminal(tname, 0, &ace[i].infd, &ace[i].outfd, 0, 0);
-            } else {
-                ace[i].want_xterm = 1;
-            }
-        }
-    }
+    multio_open_xterms(termmask);
 
     terminal_fd_in = ace[0].infd;
     terminal_fd_out = ace[0].outfd;
-
-	register_output(MULTIO_MASTER+7, &multio_select);
 
     register_output(SBASE+7, &slave_select);
 

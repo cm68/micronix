@@ -180,25 +180,86 @@ parse_dev(const char *tok, int *major, int *minor)
 	return 0;
 }
 
+/*
+ * The boot chain's roms.  They live under "boot" in the current schema;
+ * the first schema kept the monitor at the top level, so fall back to
+ * that for a file that has not been rewritten.
+ */
+static const char *
+boot_field(jv *sim, const char *key)
+{
+	jv *boot = json_get(sim, "boot");
+	const char *s;
+
+	if (boot && (s = json_str(boot, key)) != NULL)
+		return s;
+	if (strcmp(key, "monitor") == 0)
+		return json_str(sim, "monitor");
+	return NULL;
+}
+
+/*
+ * The monitor roms that decode the boot device from switches 5-7: the 375
+ * and 447.  mon500 reads only switch 6 (monitor or boot, and boot is the
+ * level 1 rom), so its boot bits choose level 1, not a card, and packing
+ * a device name into them would mean nothing.
+ */
+static int
+monitor_has_bootdev(const char *mon)
+{
+	const char *base;
+
+	if (!mon)
+		return 0;
+	base = strrchr(mon, '/');
+	base = base ? base + 1 : mon;
+	return strstr(base, "375") != NULL || strstr(base, "447") != NULL;
+}
+
 /* the -c switch, packed from the named config fields (PROVISION.md) */
 static int
-pack_config(jv *config)
+pack_config(jv *sim)
 {
-	const char *boot = json_str(config, "boot");
+	jv *config = json_get(sim, "config");
+	const char *mon = boot_field(sim, "monitor");
+	const char *boot = boot_field(sim, "device");
+	const char *console = json_str(config, "console");
 	const char *clock = json_str(config, "clock");
 	jv *xterm = json_get(config, "xterm");
 	int c = 0;
 	int i;
 
-	if (boot) {
+	/* the older schema kept the device in config.boot */
+	if (!boot)
+		boot = json_str(config, "boot");
+	if (boot && monitor_has_bootdev(mon)) {
 		if (!strcmp(boot, "hdcdma"))
 			c |= 0x08;
 		else if (!strcmp(boot, "djdma"))
 			c |= 0x10;
+		else if (strcmp(boot, "hdca") != 0 && strcmp(boot, "ide") != 0) {
+			fprintf(stderr, "hwsim: unknown boot device: %s\n", boot);
+			exit(1);
+		}
 		/* hdca / ide are 0x00 */
+		c |= 0x04;		/* the boot, not the monitor */
 	}
 	if (json_bool(config, "nomon"))
 		c |= 0x04;
+	/*
+	 * On the mon500 class switch 5 (0x08) says which console to find
+	 * first: set, the Wunderbus; clear, the SS1.  A 375/447 reads the
+	 * same bit as the HD-DMA boot device, so there the boot field above
+	 * already owns it.
+	 */
+	if (console && !monitor_has_bootdev(mon)) {
+		if (!strcmp(console, "wb"))
+			c |= 0x08;
+		else if (strcmp(console, "ss1") != 0) {
+			fprintf(stderr, "hwsim: unknown console: %s\n", console);
+			exit(1);
+		}
+	}
 	if (xterm && xterm->type == J_ARR) {
 		for (i = 0; i < xterm->n; i++) {
 			const char *u =
@@ -415,8 +476,8 @@ v_show(const char *name)
 {
 	jv *sims = json_get(db, "sims");
 	jv *sim;
-	jv *config;
 	const char *root, *swap;
+	const char *mon, *l1, *j2;
 	int major, minor;
 
 	if (!sims || !(sim = json_get(sims, name))) {
@@ -426,7 +487,9 @@ v_show(const char *name)
 	json_print(stdout, sim, 0);
 	fputc('\n', stdout);
 
-	config = json_get(sim, "config");
+	mon = boot_field(sim, "monitor");
+	l1 = boot_field(sim, "level1");
+	j2 = boot_field(sim, "j2");
 	root = json_str(sim, "root");
 	swap = json_str(sim, "swap");
 	printf("# root %s", root ? root : "-");
@@ -435,7 +498,14 @@ v_show(const char *name)
 	printf("\n# swap %s", swap ? swap : "-");
 	if (swap && parse_dev(swap, &major, &minor) == 0)
 		printf(" = %d/%d", major, minor);
-	printf("\n# -c 0x%x\n", pack_config(config));
+	printf("\n");
+	if (mon)
+		printf("# -b %s\n", mon);
+	if (l1)
+		printf("# -M %s\n", l1);
+	if (j2)
+		printf("# -j %s\n", j2);
+	printf("# -c 0x%x\n", pack_config(sim));
 	if (json_str(sim, "wiring"))
 		printf("# -w %s\n", json_str(sim, "wiring"));
 }
@@ -543,10 +613,11 @@ static void
 v_boot(const char *root, const char *name, int debug)
 {
 	jv *sim = sim_get(name);
-	jv *config = json_get(sim, "config");
 	jv *vols = json_get(sim, "volumes");
 	const char *emu = json_str(sim, "emulator");
-	const char *mon = json_str(sim, "monitor");
+	const char *mon = boot_field(sim, "monitor");
+	const char *level1 = boot_field(sim, "level1");
+	const char *j2 = boot_field(sim, "j2");
 	const char *kernel = json_str(sim, "kernel");
 	const char *wiring = json_str(sim, "wiring");
 	char *simbin;
@@ -562,13 +633,29 @@ v_boot(const char *root, const char *name, int debug)
 	logpath = malloc(strlen(name) + 32);
 	snprintf(logpath, strlen(name) + 32, "/tmp/hwsim-%s.log", name);
 
+	if (!mon) {
+		fprintf(stderr, "hwsim: %s: no monitor rom (boot.monitor)\n", name);
+		exit(1);
+	}
 	av[n++] = simbin;
 	if (!debug)
 		av[n++] = "-H";			/* headless, like dist_boot */
 	av[n++] = "-b";
 	av[n++] = resolve_path(root, mon);
+	if (level1) {
+		av[n++] = "-M";
+		av[n++] = resolve_path(root, level1);
+	}
+	if (j2) {
+		if (strcmp(j2, "ab") != 0 && strcmp(j2, "bc") != 0) {
+			fprintf(stderr, "hwsim: %s: boot.j2 is ab or bc\n", name);
+			exit(1);
+		}
+		av[n++] = "-j";
+		av[n++] = (char *)j2;
+	}
 	av[n++] = "-c";
-	av[n++] = itoh(pack_config(config));
+	av[n++] = itoh(pack_config(sim));
 	if (wiring) {
 		av[n++] = "-w";
 		av[n++] = (char *)wiring;

@@ -93,15 +93,24 @@ loaded through the media changer, not provisioned.
 
 ## config
 
-`-c` is one number that packs four independent things.  The named fields
-and their bits (hwsim/hwsim.c, mpz80.c, multio.c):
+`-c` is one number that packs the independent things the switch register
+carries.  The named fields and their bits (hwsim/hwsim.c, mpz80.c,
+multio.c):
 
 | field | bits | values |
 |---|---|---|
-| boot | 0x08 · 0x10 · 0x00 | hdcdma / djdma / hdca·ide — mon447 only, from `boot.device` |
-| nomon | 0x04 | skip the monitor — mon447 only; mon500 reads it as "boot" |
+| boot | 0x08 · 0x10 · 0x00 | hdcdma / djdma / hdca·ide — mon375/447 only, from `boot.device` |
+| nomon | 0x04 | skip the monitor — mon375/447 only; mon500 reads it as "boot" |
+| console | 0x08 | wb / ss1 — mon500 only; which console the monitor probes first |
 | xterm | 0x0700 (3 bits) | which of uart0 / ttyB / ttyC go to xterms |
 | clock | 0x0800 · 0x1000 | 1hz / noclk / normal |
+
+The console bit and the HD-DMA boot bit are the same switch, 5: a
+375/447 reads it as the boot device, so there the boot field owns it.  A
+mon500 reads it as "find the Wunderbus first" (set) or "the SS1 first"
+(clear).  Both boards read 0x100 as "my console in an xterm", so a
+machine with both opens both windows; `console` decides which one the
+monitor and level 2 use.
 
 `boot_vol`'s `-c 0x70c` is `xterm: all` (0x700) + `boot: hdcdma` (0x08)
 + `nomon` (0x04).  The tool emits one packed `-c` — not `-B`, which
@@ -153,12 +162,13 @@ area nothing can read.
 
 `boot.device` and `config.nomon` are mon447's fields: that rom reads the
 boot device from the top five bits of the switch, and 0x04 on top of it
-says "skip the monitor".  mon500 reads **only** 0x04, which is S6 —
-monitor or boot — and to mon500 a boot *is* the level 1 rom
-(`mon500.s:443-452`).  So the tool emits `-B <device>` and the boot bits
-only when `boot.monitor` is a rom that has them; with mon500 it emits the
-two roms and nothing else, and the machine comes up in the level 1 menu,
-which is the point of level 1.
+says "skip the monitor".  mon500 reads **only** 0x04 as a boot selector
+— S6 is monitor or boot, and to mon500 a boot *is* the level 1 rom
+(`mon500.s:443-452`) — while switch 5 picks the console.  So the tool
+packs the boot bits only when
+`boot.monitor` is a rom that has them; with mon500 it emits the two roms
+(`-b` and `-M`) and nothing else, and the machine comes up in the level 1
+menu, which is the point of level 1.
 
 `boot.j2` is the DJ-DMA card's J2 strap.  `ab` (the default, and how the
 real machine is wired) does not run the card's own bootstrap; `bc` does,

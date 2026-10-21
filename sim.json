@@ -19,10 +19,35 @@
         { "controller": "hdcdma", "unit": 0, "geometry": "m40", "image": "disks/q540-dual/root.img" },
         { "controller": "hdcdma", "unit": 1, "geometry": "m40", "image": "disks/q540-dual/usr.img" }
       ]
+    },
+    "wren": {
+      "emulator": "hwsim/d1",
+      "kernel": "src/micronix/sys/unix",
+      "boot": {
+        "monitor": "src/micronix/stand/roms/mon500.bin",
+        "level1": "src/micronix/stand/roms/l1boot.bin",
+        "device": "hdcdma",
+        "j2": "ab"
+      },
+      "config": {
+        "xterm": ["uart0"],
+        "console": "wb",
+        "clock": "normal"
+      },
+      "wiring": "ss1",
+      "root": "hdcdma:0a",
+      "swap": "hdcdma:0b",
+      "volumes": [
+        { "controller": "hdcdma", "unit": 0, "geometry": "wren86", "image": "disks/wren.img" }
+      ]
     }
   },
   "mediasets": {
-    "dist8": { "volumes": [ "dist/mx2.0-8-1.IMD", "dist/mx2.0-8-2.IMD" ] },
+    "dist8": { "volumes": [
+      "dist/mx2.0-8-1.IMD", "dist/mx2.0-8-2.IMD", "dist/mx2.0-8-3.IMD",
+      "dist/mx2.0-8-4.IMD", "dist/mx2.0-8-5.IMD", "dist/mx2.0-8-6.IMD",
+      "dist/mx2.0-8-7.IMD", "dist/mx2.0-8-8.IMD", "dist/mx2.0-8-9.IMD"
+    ] },
     "dist5": { "volumes": [ "dist/mx2.0-5-1.IMD" ] }
   }
 }
