@@ -1,8 +1,12 @@
 ;
-; open system call
+; open system call, raw
 ;
-; open(name, mode)
+; sysopen(name, flags)
 ; char *name;
+;
+; The system call itself.  open() in open.c is what a program calls:
+; it handles O_CREAT and O_TRUNC around this, and passes only the
+; access mode and O_APPEND here.  The kernel masks the access mode.
 ;
 ; Opens the named file for reading (mode 0), writing
 ; (mode 1), or both (mode 2). The returned file descriptor
@@ -14,10 +18,10 @@
 ; returns -1 on error, else file descriptor
 ;
 	.extern _errno
-	.global _open
+	.global _sysopen
 
 	.text
-_open:
+_sysopen:
 	ld 	(path),hl		; the first argument arrives in hl
 	pop 	hl		; discard ret addr
 	pop 	hl		; second argument

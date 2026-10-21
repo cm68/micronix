@@ -1,0 +1,93 @@
+.he "dup2 (2)                     10/20/26                    dup2 (2)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+dup2
+- duplicate a file descriptor onto a chosen number
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+dup2(descriptor, descriptor2)
+.br
+int descriptor, descriptor2;
+
+
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Dup2
+makes descriptor2 a synonym for descriptor, which must have
+been returned by
+.bd
+open, creat,
+or
+.bd
+pipe.
+If descriptor2 is already open, it is closed first.
+Subsequent reads or writes with descriptor2 have exactly the
+same effect as the same call with descriptor.
+
+Since
+.bd
+dup
+always allocates the lowest available descriptor,
+.bd
+dup2
+is the direct way to move a descriptor onto the standard
+input or output without disturbing another one.  If the two
+descriptors are the same, nothing happens and the call
+succeeds.
+
+.bd
+Dup2
+is subject to the limit of 16 active file descriptors
+per process.
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+.bd
+Dup2()
+returns descriptor2 if successful, or a -1 if not.
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(dup2 = 45)
+.br
+.bd
+(old descriptor in hl)
+.br
+.bd
+sys; dup2; descriptor2
+.br
+.bd
+(new descriptor in hl)
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+On success, the carry flag is cleared and descriptor2
+is returned in register hl.  On failure, the carry flag is set.

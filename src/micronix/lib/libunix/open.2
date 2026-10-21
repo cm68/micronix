@@ -1,4 +1,4 @@
-.he "open (2)                     3/19/82                     open (2)"
+.he "open (2)                     10/20/26                    open (2)"
 .fo "				    -#-"
 .in 5
 .rm 65
@@ -17,35 +17,106 @@ C
 .in +5
 .br
 .bd
-open(name, mode)
+open(name, flags, mode)
 .br
 .bd
 char *name;
+.br
+.bd
+int flags, mode;
 
 
 .in -5
 .bd
-FUNCTION       
+FUNCTION
 .in +5
 .br
-The named file is opened for
-.nf
+The named file is opened for reading (O_RDONLY), writing
+(O_WRONLY), or both (O_RDWR).  The flags come from
+.bd
+<fcntl.h>.
+.bd
+O_APPEND
+makes every write start at the end of the file.
+.bd
+O_CREAT
+creates the file if it does not exist, and then the third
+argument is the permission mode, as for
+.bd
+creat.
+It is read only when
+.bd
+O_CREAT
+is set.
+.bd
+O_EXCL
+with
+.bd
+O_CREAT
+fails if the file already exists.
+.bd
+O_TRUNC
+empties an existing file when it is opened for writing.
 
-.in +4
-.bd 3
-reading	(mode 0),
-writing	(mode 1), or
-both	(mode 2).
-.in -4
+Only the access mode and
+.bd
+O_APPEND
+reach the system call.  The kernel masks the mode to its low
+two bits and keeps
+.bd
+O_APPEND
+in the open file, so the flag is shared by descriptors made
+with
+.bd
+dup
+and by
+.bd
+fork,
+and every write repositions to the end of the file as it
+stands at that moment.  A
+.bd
+seek
+on such a descriptor is allowed; the next write ignores it.
 
-.fi
+The rest is built in the library around the system call.
+.bd
+O_CREAT
+opens the name first and, if the error is ENOENT, calls
+.bd
+creat
+with the third argument as the mode.
+.bd
+creat
+opens write-only, so a caller that asked for
+.bd
+O_RDWR
+or
+.bd
+O_APPEND
+has that descriptor closed and the name opened again.  If
+another process takes the name between the two calls, the
+second open returns that file and the creation mode is not
+applied.
+.bd
+O_EXCL
+is a check after the fact: if the first open succeeds, the
+file already existed, the descriptor is closed, and the call
+fails with EEXIST.
+.bd
+O_TRUNC
+is
+.bd
+ftruncate
+of the descriptor to zero once it is open, and is skipped
+for O_RDONLY.
+
 The returned file descriptor should be saved
-for subsequent calls to 
+for subsequent calls to
 .bd
-read, 
+read,
 .bd
-write, 
-and 
+write,
+and
 .bd
 close.
 
@@ -72,7 +143,10 @@ ASSEMBLER
 (open = 5)
 .br
 .bd
-sys; open; name; mode
+(flags in line: the access mode and O_APPEND only)
+.br
+.bd
+sys; open; name; flags
 .br
 .bd
 (file descriptor in hl)

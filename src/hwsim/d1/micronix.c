@@ -376,6 +376,9 @@ syscall_at(word sc)
 	case 42:
 		printf("pipe()\n");
 		break;
+	case 45:
+		printf("dup2(%d, %d)\n", fd, arg1);
+		break;
 	case 46:	/* ftruncate fd length */
 		printf("ftruncate(%d, %lu)\n", fd,
 		    ((unsigned long)arg2 << 16) | arg1);
