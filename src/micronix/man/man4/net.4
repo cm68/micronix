@@ -1,0 +1,77 @@
+.he "net (4)                     10/21/26                       net (4)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+DEVICE
+.in +5
+.br
+.bd
+net
+- the network card's frame channel
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+The network card is a character device, major 5 minor 0, one in a
+machine.  It is a byte channel to an ESP32 that owns the network: the
+card does tcp/ip and wifi, the guest moves framed commands and data
+through it.  The contract - framing, socket states and error codes - is
+sys/NET.md; this page is the device's use of it.
+.sp
+The guest sees two S-100 ports.  NETDATA, 0x60, reads a byte the card
+has pushed and writes a byte for it to assemble; NETSTAT, 0x61, holds
+RXRDY (an incoming byte waits), TXRDY (a byte can be written) and RDY
+(the card has a network: JOIN has finished).  The card raises a vectored
+interrupt line while RXRDY is set and drops it when the byte is read.
+.sp
+write() pushes a frame: a four byte header - type, socket, length low,
+length high - then the payload.  read() returns one pushed frame in the
+same shape, header first; a frame is consumed whole even when the
+caller's buffer is short.  There is no seek, no raw command block and no
+geometry; formatting, ioctl and geometry mean nothing here and are
+refused.
+.sp 2
+.in -5
+.bd
+FRAMES
+.in +5
+.br
+The guest's commands are OPEN, CLOSE, BIND, CONNECT, LISTEN, SEND,
+STATUS and JOIN, and the card answers with ACK, pushes received bytes as
+DATA and reports asynchronous changes as EVENT.  JOIN puts the card on
+its network and answers with the address DHCP gave it.  Eight sockets,
+one connection each; the socket is in the frame header, so one device
+carries all eight.  The faces built on it are tftp, the network disk
+(see nd in section 4) and rlogin; rcp in section 1 speaks rsh over a
+tcp socket.
+.sp 2
+.in -5
+.bd
+PROVISIONING
+.in +5
+.br
+The card is given its wifi network three ways, and all three store the
+ssid and password in the card's non-volatile memory: its own setup
+access point, a USB-serial editor, and this interface.  GETCONF returns
+the stored pair and SETCONF stores and applies one at once, as frames on
+socket 0xff; netconf in section 1 drives them.  Everything after the
+pair - address, mask, gateway, DNS - is DHCP.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+netconf(1), rcp(1), nd(4), sys/NET.md
+.sp 2
+.in -5
+.bd
+BUGS
+.in +5
+.br
+The driver polls RXRDY and busy-waits for a frame; a caller that reads
+when no frame is coming stops the machine.  Read only when one is
+expected until the interrupt handler lands.

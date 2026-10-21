@@ -70,6 +70,8 @@ Each is a frame; the socket is in the header, arguments in the payload.
     SEND    0x06  payload = the bytes
     STATUS  0x07  no payload
     JOIN    0x08  card-level (socket 0xff), no payload
+    GETCONF 0x09  card-level (socket 0xff), no payload
+    SETCONF 0x0A  card-level (socket 0xff), payload = netconf
 
 `JOIN` puts the card on its network — the firmware does wifi associate +
 DHCP — and the `ACK` carries the assigned `ip[4]` in network order; the
@@ -77,17 +79,34 @@ sim answers immediately with the host's address.  `RDY` stays clear until
 the join has finished.  There is no `recv`: the card pushes data
 (section 5); the channel is the flow control.
 
+`GETCONF` and `SETCONF` are the third way to give the card a network,
+over this interface.  The netconf payload is the station's credentials:
+
+    ssidlen[1]  ssid[ssidlen]  passlen[1]  pass[passlen]
+
+`ssidlen` is 1-32; `passlen` is 0-63, and an empty password is an open
+network.  `GETCONF`'s `ACK` carries that payload back.  `SETCONF` stores
+the pair in the card's non-volatile memory and applies it at once: the
+station drops its old association, reconnects with the new pair, and the
+guest `JOIN`s again for the new address.  Both are card-level commands,
+socket `0xff`, the same as `JOIN`.
+
+The other two ways are the card's own setup access point and its
+USB-serial editor; all three end in the same stored pair, and everything
+after it — address, mask, gateway, DNS — is DHCP.
+
 ## 5. Pushed frames — card to guest
 
     ACK    0x80  answers the last command
     DATA   0x81  received bytes — one udp datagram, or a tcp chunk
     EVENT  0x82  an asynchronous change
 
-`ACK` payload, for every command but `STATUS`:
+`ACK` payload, for every command but `STATUS`, `JOIN` and `GETCONF`:
 
     status[1]:  0 ok, else the error code below
 
-`ACK` payload, for `STATUS`:
+`JOIN`'s successful `ACK` carries `ip[4]` (section 4).  `GETCONF`'s
+carries the netconf payload.  `ACK` payload, for `STATUS`:
 
     state[1]  rx[2 little-endian]  tx[2 little-endian]
 

@@ -13,7 +13,7 @@ DIR	= man4
 TARGET	=
 MANSEC	= 4
 MANSRCS	= cables.4 disk1.4 disk2.4 disk3.4 djdma.4 djmem.4 hdca.4 \
-	  hddma.4 ide.4 io.4 mem.4 multio.4 ncr.4 nd.4 network.4 \
+	  hddma.4 ide.4 io.4 mem.4 multio.4 ncr.4 nd.4 net.4 network.4 \
 	  null.4 ports.4 printers.4
 
 include $(DEPTH)/GNUmakefile.inc

@@ -26,6 +26,8 @@
 #define N_SEND    0x06
 #define N_STATUS  0x07
 #define N_JOIN    0x08
+#define N_GETCONF 0x09
+#define N_SETCONF 0x0A
 
 /* card -> guest */
 #define N_ACK     0x80
@@ -55,3 +57,8 @@
 
 /* a frame's largest payload */
 #define N_MAXPAY 1024
+
+/* the netconf payload's bounds (NET.md section 4) */
+#define N_SSIDMAX 32
+#define N_PASSMAX 63
+#define N_CONFMAX (1 + N_SSIDMAX + 1 + N_PASSMAX)

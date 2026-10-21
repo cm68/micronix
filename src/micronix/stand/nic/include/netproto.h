@@ -23,6 +23,10 @@
 #define NIC_NSOCK       8
 #define NIC_MAXPAY      1024    /* a frame's payload, NET.md section 2 */
 
+#define NIC_SSIDMAX     32      /* netconf bounds, NET.md section 4 */
+#define NIC_PASSMAX     63
+#define NIC_CONFMAX     (1 + NIC_SSIDMAX + 1 + NIC_PASSMAX)
+
 /* guest -> card, NET.md section 4 */
 #define C_OPEN          0x01
 #define C_CLOSE         0x02
@@ -32,6 +36,8 @@
 #define C_SEND          0x06
 #define C_STATUS        0x07
 #define C_JOIN          0x08
+#define C_GETCONF       0x09
+#define C_SETCONF       0x0A
 
 /* card -> guest, NET.md section 5 */
 #define P_ACK           0x80

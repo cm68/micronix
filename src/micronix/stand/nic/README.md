@@ -39,10 +39,10 @@ DI pins are ordinary outputs.
 
 ## Provisioning
 
-The network card comes up with no credentials and raises its own setup
-access point; give it an SSID and password either way, and it stores
-them in **NVS** (`Preferences`, namespace `nic`), so they survive the
-power cycle and a flash of new firmware.
+The network card comes up with no credentials.  There are three ways to
+give it an SSID and password, and all of them store the pair in **NVS**
+(`Preferences`, namespace `nic`), so it survives the power cycle and a
+flash of new firmware.
 
 **1. Over its access point.**  Join the open AP named
 `micronix-nic-xxxx` (the last two MAC bytes), then open
@@ -65,7 +65,19 @@ when the setup access point is not convenient, and the fallback when a
 provisioned network stops answering; the editor runs on the card's
 network task, so the bus side keeps running while it waits for you.
 
-After either path the station runs under **DHCP**: address, mask,
+**3. Over the guest interface.**  `netconf` in `/bin`
+(`cmd/netconf`) sends the card-level `GETCONF`/`SETCONF` frames of
+`sys/NET.md` over `/dev/net`:
+
+    netconf                 # print the stored ssid and password
+    netconf <ssid> [<pass>] # store a pair (no pass: open network)
+
+`SETCONF` writes NVS and applies the pair at once - the card drops the
+old association, reconnects, and the guest `JOIN`s again for the new
+address.  This is the path a script on the machine uses; the setup AP
+and the serial editor are for a machine with no console to the card.
+
+After any of the three the station runs under **DHCP**: address, mask,
 gateway and DNS all come from the network.  It registers the hostname
 and mDNS name `micronix-nic-xxxx.local`, and `JOIN` answers with the
 address; `RDY` follows the link.  If a provisioned network does not

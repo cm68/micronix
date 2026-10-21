@@ -36,6 +36,8 @@
 #define C_SEND    0x06
 #define C_STATUS  0x07
 #define C_JOIN    0x08
+#define C_GETCONF 0x09
+#define C_SETCONF 0x0A
 
 /* card -> guest (sys/NET.md section 5) */
 #define P_ACK     0x80
@@ -76,6 +78,10 @@ struct sock {
 
 static struct sock socks[NSOCK];
 static int joined;
+
+/* the netconf pair, as SETCONF left it (the card's own copy) */
+static char ncSsid[33];
+static char ncPass[65];
 
 /* the RX FIFO (card -> guest): framed bytes the guest reads out */
 #define RXQ  8192
@@ -302,6 +308,55 @@ nic_join(void)
     push_frame(P_ACK, 0xff, ip, 4);
 }
 
+/*
+ * netconf: the third way to give the card a network, over this
+ * interface.  GETCONF returns the pair; SETCONF takes it.  The real card
+ * keeps it in NVS and reconnects; the sim keeps it here, which is enough
+ * for the guest command and the contract.
+ */
+static void
+nic_getconf(void)
+{
+    unsigned char p[1 + 32 + 1 + 63];
+    int n = 0, l;
+
+    l = strlen(ncSsid);
+    p[n++] = l;
+    memcpy(p + n, ncSsid, l);
+    n += l;
+    l = strlen(ncPass);
+    p[n++] = l;
+    memcpy(p + n, ncPass, l);
+    n += l;
+    push_frame(P_ACK, 0xff, p, n);
+}
+
+static void
+nic_setconf(const unsigned char *p, int len)
+{
+    int sl, pl;
+
+    if (len < 2) {
+        push_ack(0xff, E_BAD_STATE);
+        return;
+    }
+    sl = p[0];
+    if (sl < 1 || sl > 32 || len < 1 + sl + 1) {
+        push_ack(0xff, E_BAD_STATE);
+        return;
+    }
+    pl = p[1 + sl];
+    if (pl > 63 || len < 1 + sl + 1 + pl) {
+        push_ack(0xff, E_BAD_STATE);
+        return;
+    }
+    memcpy(ncSsid, p + 1, sl);
+    ncSsid[sl] = '\0';
+    memcpy(ncPass, p + 1 + sl + 1, pl);
+    ncPass[pl] = '\0';
+    push_ack(0xff, 0);
+}
+
 /* ---- the frame dispatcher ---- */
 
 static void
@@ -337,6 +392,12 @@ nic_dispatch(void)
     case C_JOIN:
         nic_join();
         break;
+    case C_GETCONF:
+        nic_getconf();
+        break;
+    case C_SETCONF:
+        nic_setconf(p, len);
+        break;
     default:
         push_ack(sock, E_BAD_STATE);
         break;
@@ -357,6 +418,7 @@ nic_init(void)
         socks[s].txlen = 0;
     }
     joined = 0;
+    ncSsid[0] = ncPass[0] = '\0';
     rxq_head = rxq_tail = rxq_n = 0;
     f_n = f_need = f_payload = 0;
 }

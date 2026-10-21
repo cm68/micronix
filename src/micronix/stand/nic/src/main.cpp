@@ -588,6 +588,62 @@ static void do_join(void)
         startSTA();
 }
 
+/*
+ * netconf over the guest interface: the third way to give the card a
+ * network.  GETCONF answers with the pair; SETCONF stores it in NVS and
+ * applies it at once, dropping the old association and reconnecting.
+ */
+static void do_getconf(void)
+{
+    uint8_t p[2 + NIC_SSIDMAX + NIC_PASSMAX];
+    int n = 0;
+    int sl = strlen(cfgSsid);
+    int pl = strlen(cfgPass);
+
+    p[n++] = sl;
+    memcpy(p + n, cfgSsid, sl);
+    n += sl;
+    p[n++] = pl;
+    memcpy(p + n, cfgPass, pl);
+    n += pl;
+    push_frame(P_ACK, 0xff, p, n);
+}
+
+static void do_setconf(const uint8_t *p, int len)
+{
+    int sl, pl;
+
+    if (len < 2) {
+        push_ack(0xff, E_BAD_STATE);
+        return;
+    }
+    sl = p[0];
+    if (sl < 1 || sl > NIC_SSIDMAX || len < 1 + sl + 1) {
+        push_ack(0xff, E_BAD_STATE);
+        return;
+    }
+    pl = p[1 + sl];
+    if (pl > NIC_PASSMAX || len < 1 + sl + 1 + pl) {
+        push_ack(0xff, E_BAD_STATE);
+        return;
+    }
+    memcpy(cfgSsid, p + 1, sl);
+    cfgSsid[sl] = '\0';
+    memcpy(cfgPass, p + 1 + sl + 1, pl);
+    cfgPass[pl] = '\0';
+    haveCreds = true;
+    prefs.putString("ssid", cfgSsid);
+    prefs.putString("pass", cfgPass);
+
+    /* apply now: the old association is not the one asked for */
+    joined = false;
+    joining = false;
+    WiFi.disconnect(true);
+    staStarted = false;
+    startSTA();
+    push_ack(0xff, 0);
+}
+
 static void dispatch(void)
 {
     uint8_t type = frame[0];
@@ -604,6 +660,8 @@ static void dispatch(void)
     case C_SEND:    do_send(sock, p, len); break;
     case C_STATUS:  do_status(sock); break;
     case C_JOIN:    do_join(); break;
+    case C_GETCONF: do_getconf(); break;
+    case C_SETCONF: do_setconf(p, len); break;
     default:        push_ack(sock, E_BAD_STATE); break;
     }
 }
