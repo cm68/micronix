@@ -334,6 +334,9 @@ dllabels(struct image *i)
     return 1;
 }
 
+static int imdread(struct image *i, UINT realblk, char *buf);
+UINT secmap(struct super *fs, UINT blkno);
+
 /*
  * Does this look like a superblock?
  *
@@ -360,12 +363,51 @@ sbvalid(char *buf, int imgblks, int offset)
 }
 
 /*
- * Read one block from an IMD medium, saying no when the geometry points
- * at a track that does not hold the sector size it expects.  The probe
- * below tries several starting points and has to survive the wrong ones;
- * readblk wants the same read to be fatal.
+ * Is this a filesystem, and not a block that merely looks like a
+ * superblock?  Behind the superblock are the inodes, and inode 1 is a
+ * directory whose first entry is ".".  A wrong geometry can put a
+ * plausible four-word header under block 1 by accident; it cannot also
+ * put a root inode and its dot entry where this expects them.
  */
-static int imdread(struct image *i, UINT realblk, char *buf);
+static int
+fsvalid(struct image *i, char *buf, int imgblks)
+{
+    char ib[512], db[512];
+    struct super *s = (struct super *)buf;
+    struct dsknod *dp;
+    struct dir *de;
+    UINT real;
+
+    if (!sbvalid(buf, imgblks, i->offset))
+        return 0;
+
+    real = secmap((struct super *)i, 2);
+    if (i->offset + (int) real >= imgblks)
+        return 0;
+    if (i->driver == DRIVER_IMD) {
+        if (imdread(i, real, ib) != (i->bps ? i->bps : 512))
+            return 0;
+    } else
+        readblk((struct super *)i, 2, ib);
+    dp = (struct dsknod *)ib;
+    if ((dp->d_mode & (IALLOC | IFMT)) != (IALLOC | IFDIR))
+        return 0;
+    if (dp->d_addr[0] == 0 || dp->d_addr[0] >= s->s_fsize)
+        return 0;
+
+    real = secmap((struct super *)i, dp->d_addr[0]);
+    if (i->offset + (int) real >= imgblks)
+        return 0;
+    if (i->driver == DRIVER_IMD) {
+        if (imdread(i, real, db) != (i->bps ? i->bps : 512))
+            return 0;
+    } else
+        readblk((struct super *)i, dp->d_addr[0], db);
+    de = (struct dir *)db;
+    if (de->ino != 1 || de->name[0] != '.' || de->name[1] != 0)
+        return 0;
+    return 1;
+}
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
@@ -568,7 +610,7 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
         *fsp = (struct super *)i;
 
         /*
-         * Where the filesystem starts.
+         * Where the filesystem starts, and the geometry that reaches it.
          *
          * A floppy keeps its boot loader in reserved tracks at the front
          * and the filesystem begins after them - toff in the driver's
@@ -580,10 +622,17 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
          * Trimming is no good for an image we mean to boot afterwards,
          * so rather than require it, find the start: try no offset, then
          * two cylinders' worth for a single sided disk and for a double
-         * sided one, and take the first that has a superblock at block 1.
-         * The check is strong enough to say no - the ilist has to fit in
-         * the filesystem and the filesystem in the image - so this
-         * cannot quietly settle on the wrong one.
+         * sided one, and take the first that holds a filesystem.  The
+         * check is strong enough to say no: the ilist has to fit in the
+         * filesystem, the filesystem in the image, and root inode 1 and
+         * its dot entry have to be where the geometry says they are.
+         *
+         * A bare image has no label and no device node to say how many
+         * sectors a track holds.  The shipped 1.6 media are ten 512 byte
+         * sectors, not the eight inch fifteen the default assumes, so
+         * search the handful of geometries this tree has seen.  A named
+         * device or a sticky image has already answered and keeps its
+         * one geometry.
          */
         i->offset = 0;
         if (i->driver == DRIVER_IMAGE || i->driver == DRIVER_IMD) {
@@ -593,6 +642,9 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
             int k;
             int skew, nskew;
             int skew0 = i->altsec;
+            int spt0 = i->spt;
+            int spts[5];
+            int nspt, sp;
 
             if (i->driver == DRIVER_IMD) {
                 struct imd *ip = (struct imd *)i->drive;
@@ -600,9 +652,16 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
                 imgblks = ip->cyls * (i->heads ? i->heads : 1) * i->spt;
             } else
                 imgblks = lseek(i->fd, 0L, 2) / 512;
-            cand[0] = 0;
-            cand[1] = 2 * i->spt;           /* two cylinders, one head */
-            cand[2] = 4 * i->spt;           /* two cylinders, two heads */
+
+            spts[0] = spt0;
+            nspt = 1;
+            if (i->driver == DRIVER_IMAGE && i->major == 0) {
+                spts[1] = 10;
+                spts[2] = 9;
+                spts[3] = 16;
+                spts[4] = 8;
+                nspt = 5;
+            }
 
             /*
              * A label-less IMD has a filesystem just as an unlabelled
@@ -614,35 +673,50 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
              * The shipped distribution media are also alternate
              * sectored.  The sticky bit is how an image says so, but git
              * carries only the executable bit, so a checked-out one
-             * cannot say it; if neither starting point has a superblock
+             * cannot say it; if neither starting point has a filesystem
              * with one skew, try the other.  The sticky answer is tried
              * first and a label-bearing medium never gets here at all.
              */
-            nskew = (i->driver == DRIVER_IMD) ? 2 : 1;
-            for (skew = 0; skew < nskew; skew++) {
-                if (nskew == 2)
-                    i->altsec = skew ? !skew0 : skew0;
-                for (k = 0; k < 3; k++) {
-                    i->offset = cand[k];
-                    if (i->driver == DRIVER_IMD) {
-                        if (imdread(i, secmap(*fsp, 1), probe) !=
-                                (i->bps ? i->bps : 512))
-                            continue;
-                    } else
-                        readblk(*fsp, 1, probe);
-                    if (sbvalid(probe, imgblks, i->offset))
+            nskew = (i->driver == DRIVER_IMD
+                || (i->driver == DRIVER_IMAGE && i->major == 0)) ? 2 : 1;
+            for (sp = 0; sp < nspt; sp++) {
+                i->spt = spts[sp];
+                cand[0] = 0;
+                cand[1] = 2 * i->spt;       /* two cylinders, one head */
+                cand[2] = 4 * i->spt;       /* two cylinders, two heads */
+                for (skew = 0; skew < nskew; skew++) {
+                    if (nskew == 2)
+                        i->altsec = skew ? !skew0 : skew0;
+                    for (k = 0; k < 3; k++) {
+                        int real;
+
+                        i->offset = cand[k];
+                        real = secmap(*fsp, 1);
+                        if (i->driver == DRIVER_IMD) {
+                            if (imdread(i, real, probe) !=
+                                    (i->bps ? i->bps : 512))
+                                continue;
+                        } else {
+                            if (i->offset + real >= imgblks)
+                                continue;
+                            readblk(*fsp, 1, probe);
+                        }
+                        if (fsvalid(i, probe, imgblks))
+                            break;
+                    }
+                    if (k < 3)
                         break;
                 }
-                if (k < 3)
+                if (skew < nskew)
                     break;
             }
-            if (skew == nskew) {
+            if (sp == nspt) {
                 /*
-                 * Nothing that looks like a superblock anywhere the
-                 * filesystem can start.  On an IMD that is the whole
-                 * answer - there is no label and no filesystem - so say
-                 * so instead of reading a 128 byte boot sector as
-                 * block 1 and calling it a failed transfer.
+                 * Nothing that looks like a filesystem anywhere the
+                 * medium can start.  On an IMD that is the whole answer -
+                 * there is no label and no filesystem - so say so instead
+                 * of reading a 128 byte boot sector as block 1 and
+                 * calling it a failed transfer.
                  */
                 if (i->driver == DRIVER_IMD) {
                     imd_close(i->drive);
@@ -651,9 +725,11 @@ openfsrw(char *filesystem, struct super **fsp, int writable)
                 }
                 i->offset = 0;              /* say nothing new; it will fail */
                 i->altsec = skew0;
-            } else if (i->offset) {
-                trace(trace_fs, "openfs: filesystem starts at block %d\n",
-                    i->offset);
+                i->spt = spt0;
+            } else if (i->offset || i->spt != spt0) {
+                trace(trace_fs,
+                    "openfs: filesystem at %d, %d blocks a track%s\n",
+                    i->offset, i->spt, i->altsec ? ", skewed" : "");
             }
         }
 

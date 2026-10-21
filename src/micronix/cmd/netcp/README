@@ -1,0 +1,42 @@
+netcp - recovered 1.6 binary and its disassembly
+
+cp(1) recognizes a network name (machine%path) in either argument and execs
+this program with the two names.  It splits the name, checks /etc/netmap,
+and leaves the transfer in /usr/spool/net/out for netdaemon to carry.
+Its man page and source were not recovered; this directory holds the binary
+that was.
+
+	netcp.bin	the recovered executable, 19131 bytes
+	netcp.dis	an annotated listing, generated with src/tools/disas
+	netcp.ctl	the symbols disas used
+	ANALYSIS.md	the decompiled flow: main, dispatch, send, receive
+	netcp.c		the reconstruction; `make` cross builds it
+	GNUmakefile	makefile
+
+netcp.c is a reconstruction, not the original source.  The command line,
+dispatch, host parsing and local copy follow the binary; the spool record,
+its 45-byte D records and the six-bit encoding are the real 1.6 format.
+Running the recovered netcp under usersim produces byte-identical records
+to the reconstruction for the same command and source.  The end-to-end
+test is `python3 -I src/usersim/nettest16.py recon`.
+
+The binary came from Micronix 1.6 Distribution Vol. 3 (/bin/netcp),
+extracted with readall.  Header: Whitesmiths object, text 0x4454 at 0x100,
+data 0x0657 at 0x4554; entry 0x100, main at 0x010e.
+
+main refuses fewer than three arguments (argc-3 at 0x011c), so the contract
+is exactly "netcp from to".  The strings it prints are "usage: netcp from
+to", ": No such network address" and ": Special file"; it also names
+/usr/spool/net/out, TEMP and /bin/cp.
+
+Calling convention, from the listing:
+
+	cent 0x44f9	makes DE the frame pointer, stacking the old one
+	cret 0x4500	SP back from DE, pop DE, ret
+	arguments	at DE+4 upward, return value in BC
+
+The listing reproduces with `disas -f netcp.ctl netcp.bin`: its literal
+pools follow a JP or RET, which the trace does not enter, so disas marks
+them as DB itself.  The tree's extra/decomp is a C-level experiment and
+does not model this compiler's inline literal blocks, so the listing is
+the decompilation here, not C source.

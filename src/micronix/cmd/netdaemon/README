@@ -1,0 +1,49 @@
+netdaemon - recovered 1.6 binary and its disassembly
+
+This is the network daemon named in network(4): it is started from /etc/rc,
+reads /etc/netmap, and moves the files that netcp leaves in
+/usr/spool/net/out.  Its man page and source were not recovered; this
+directory holds the binary that was.
+
+	netdaemon.bin	the recovered executable, 19188 bytes
+	netdaemon.dis	an annotated listing, generated with src/tools/disas
+	netdaemon.ctl	the symbols disas used
+	ANALYSIS.md	the decompiled flow: main, daemon loop, protocol layer
+	netdaemon.c	the reconstruction; `make` cross builds it
+	GNUmakefile	makefile
+
+netdaemon.c is a reconstruction, not the original source.  The daemon
+loop, spool scans, netmap and ttys handling follow the binary, and the
+wire format is the real 1.6 line protocol: three checksum characters
+per line, then `P!`/`A!`, `F`/`Y`, the S or R header and its Y, every D
+record and its Y, and the unacknowledged E.  Two reconstructed daemons
+exchange the same bytes as two recovered ones.  The serving exchange
+for an R request was not captured and is not implemented; the 1.6
+daemon forks a reader per port, while this one polls with a one second
+alarm in a single process.  The end-to-end test is
+`python3 -I src/usersim/nettest16.py recon`.
+
+The binary came from Micronix 1.6 Distribution Vol. 3 (/bin/netdaemon),
+extracted with readall.  The 1.61 Vol. 3 catalog container carries the same
+image.  Header: Whitesmiths object, text 0x44a8 at 0x100, data 0x063c at
+0x45a8; entry 0x100, main at 0x02aa.
+
+Calling convention, from the listing:
+
+	cent 0x454d	makes DE the frame pointer, stacking the old one
+	cret 0x4554	SP back from DE, pop DE, ret
+	arguments	at DE+4 upward, return value in BC
+
+The literal pools are inside the text segment, after a call, not in the
+data segment.  disas follows the call into them and reads "netact" as
+instructions; netdaemon.dis has a post-pass that turns that first pool
+(0x010e..0x0161) into DB.  The .ctl carries only the symbols, so
+`disas -f netdaemon.ctl netdaemon.bin` reproduces the listing except for
+that pool.
+
+The strings name the protocol's pieces: /bin/netact, /usr/spool/net/in and
+/usr/spool/net/out, and the diagnostics "lrec fails", "accept ()",
+"sequence error", "collision", "ngets - timeout" and "nopen ()".
+
+The tree's extra/decomp is a C-level experiment and does not model these
+inline literals, so the listing is the decompilation here, not C source.
