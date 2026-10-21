@@ -1,7 +1,7 @@
 {
   "sims": {
     "q540-dual": {
-      "emulator": "hwsim/d1",
+      "emulator": "src/hwsim/d1",
       "kernel": "src/micronix/sys/unix",
       "boot": {
         "monitor": "src/micronix/stand/roms/mon500.bin",
@@ -21,7 +21,7 @@
       ]
     },
     "wren": {
-      "emulator": "hwsim/d1",
+      "emulator": "src/hwsim/d1",
       "kernel": "src/micronix/sys/unix",
       "boot": {
         "monitor": "src/micronix/stand/roms/mon500.bin",
