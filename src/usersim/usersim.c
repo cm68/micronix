@@ -242,21 +242,34 @@ unsigned short brk0;            /* the break at exec, before any sbrk */
  * therefore only a curiosity, reported under -W.
  */
 /*
- * the hole between the break and the stack.  the kernel has granted
- * memory up to the break, and the stack comes down from the top; what
- * lies between belongs to neither and a store there is a segmentation
- * violation on the hardware.  this let it pass, which is how a libc
- * sbrk that moved its own idea of the break without ever telling the
- * kernel went unnoticed: every allocation past the real break landed
- * in the hole and worked perfectly here.
+ * the hole between the break and the stack.  memory is mapped in 4K
+ * segments, and grow() (sys/malloc.c) maps the segment the break is in
+ * on demand - a store there is not an error.  A segment strictly
+ * between the break's segment and the stack's is the hole; grow()
+ * refuses it and sends SIGSEGV.  This used to let every store through,
+ * which is how a libc sbrk that moved its own idea of the break
+ * without ever telling the kernel went unnoticed: every allocation
+ * past the real break landed in the hole and worked perfectly here.
  *
  * armed only while the guest is running - the loader writes the image
  * in through the same put_byte, before there is a stack to speak of.
+ *
+ * A store from the cpu into that hole is a memory fault, not a store.
+ * The machine leaves the byte unwritten, takes MEMF, and runs the
+ * program's handler; the instruction is retried when the handler
+ * returns, which is how the Bourne shell grows its arena.  So the cpu
+ * state from before the instruction is kept, a faulting store is
+ * dropped, and the instruction is re-run after the signal has been
+ * delivered.  Stores the simulator itself makes - a copyout at a
+ * syscall - have no instruction to retry and still land.
  */
 extern unsigned short brake;    /* defined below, used in put_byte */
 int gap_check = 1;              /* -B turns it off */
 int gap_armed;
 int gap_hits;
+int memfault;                   /* an instruction store hit the hole */
+int cpu_store;                  /* put_byte is inside z80_run */
+z80_t inst_start;               /* cpu state at the start of the instruction */
 
 int tprot_report;               /* -W: report writes into text */
 unsigned short tprot_lo;
@@ -344,20 +357,33 @@ put_byte(unsigned short addr, unsigned char value)
     }
     if (gap_check && gap_armed && brake) {
         unsigned short xsp = z80_get_reg16(sp_reg);
+        unsigned short seg = addr >> 12;
 
         /*
-         * the core writes the two bytes of a push before it moves sp,
-         * so during one the live sp stands just above the bytes going
-         * down - every push looks like a store below the stack.  a
-         * few bytes of slack covers the instruction in flight, and
-         * costs nothing against what this is looking for, which
-         * misses the stack by thousands.
+         * Memory is allocated in 4K segments and grow() (sys/malloc.c)
+         * grows the segment the break is in on demand: a store there
+         * is not a hole at all.  Only a segment strictly between the
+         * break's and the stack's is refused, and that is the one
+         * that gets SIGSEGV.  The core writes the two bytes of a push
+         * before it moves sp, so during one the live sp stands just
+         * above the bytes going down - a few bytes of slack covers
+         * the instruction in flight.
          */
-        if (addr >= brake && xsp > 4 && addr < xsp - 4) {
+        if (addr >= brake && xsp > 4 && addr < xsp - 4
+            && (brake >> 12) < seg && seg < (xsp >> 12)) {
             if (gap_hits++ < 5)
                 message(
                     "segv: write %04x is between the break %04x and sp %04x, at pc %04x\n",
                     addr, brake, xsp, z80_get_reg16(pc_reg));
+            /*
+             * The byte is not written: the machine faults, the
+             * handler runs, and the instruction is retried against
+             * whatever the handler did to the break.
+             */
+            if (cpu_store) {
+                memfault = 1;
+                return;
+            }
         }
     }
     if (tprot_hi && addr >= tprot_lo && addr < tprot_hi) {
@@ -2395,6 +2421,32 @@ funcdump(char *s)
  * leaves the handler running before the instruction after the trap.
  */
 static void
+deliver_signal(int i)
+{
+    if (signal_handler[i] > 1) {
+        if (verbose & V_SYS) {
+            message("invoking signal %d %x\n", i, signal_handler[i]);
+        }
+        push(z80_get_reg16(pc_reg));
+        z80_set_reg16(pc_reg, signal_handler[i]);
+        /*
+         * Delivery resets the disposition to default, as sig() in
+         * sys/sig.c does; SIGTINT is the one that stays installed.
+         * The Bourne shell's fault() reinstalls itself for exactly
+         * this reason.
+         */
+        if (i != 7)
+            signal_handler[i] = 0;
+    } else if (signal_handler[i] == 1) {
+        if (verbose & V_SYS) {
+            message("ignoring signal %d\n", i);
+        }
+    } else {
+        sig_death(i);
+    }
+}
+
+static void
 deliver_signals()
 {
     int i;
@@ -2407,19 +2459,7 @@ deliver_signals()
         }
     }
     signalled &= ~(1 << i);
-    if (signal_handler[i] > 1) {
-        if (verbose & V_SYS) {
-            message("invoking signal %d %x\n", i, signal_handler[i]);
-        }
-        push(z80_get_reg16(pc_reg));
-        z80_set_reg16(pc_reg, signal_handler[i]);
-    } else if (signal_handler[i] == 1) {
-        if (verbose & V_SYS) {
-            message("ignoring signal %d\n", i);
-        }
-    } else {
-        sig_death(i);
-    }
+    deliver_signal(i);
 }
 
 /*
@@ -2468,7 +2508,35 @@ emulate()
             }
         }
 
+        /*
+         * Keep the cpu as it was before the instruction.  A store
+         * into the hole drops that byte and sets memfault; putting
+         * the state back lets the instruction be retried after the
+         * handler has grown the break.
+         */
+        if (gap_check && gap_armed && brake)
+            inst_start = z80;
+        memfault = 0;
+        cpu_store = 1;
         z80_run();
+        cpu_store = 0;
+        if (memfault) {
+            memfault = 0;
+            z80 = inst_start;
+            /*
+             * MEMF is the guest's signal 11.  This is grow(): a
+             * default disposition is delivered as a death, an
+             * ignored one is dropped by send() and the retried
+             * store faults again, and a handler is entered with
+             * the faulting pc on the stack.
+             */
+            if (signal_handler[11] > 1) {
+                deliver_signal(11);
+            } else if (signal_handler[11] == 0) {
+                sig_death(11);
+            }
+            continue;
+        }
 
         {
             unsigned short xsp = z80_get_reg16(sp_reg);
@@ -2659,20 +2727,28 @@ hostsig(int gsig)
  * Decode a signal trampoline.
  *
  * signal() in libu never hands the kernel a handler.  It hands over
- * the address of a six-byte trampoline in _jtab, one per signal, and
- * keeps the real handler in _stab - so the address in the trace is at
- * a fixed offset in every program and says nothing whatever about
- * what was installed.  Each trampoline is
+ * the address of a trampoline in _jtab, one per signal, and keeps the
+ * real handler in _stab - so the address in the trace is at a fixed
+ * offset in every program and says nothing whatever about what was
+ * installed.  The current libu trampoline is
+ *
+ *      push hl                 e5
+ *      push de                 d5
+ *      ld   de,(_stab+2n)      ed 5b nn nn
+ *      ld   hl,n               21 nn 00
+ *      jp   sigcall            c3 nn nn / 18 dd
+ *
+ * and the Whitesmiths original was
  *
  *      push hl                 e5
  *      ld   hl,(_stab+2n)      2a nn nn
  *      jr   sigcall            18 dd
  *
- * so the operand of that load is the _stab slot, and the word in the
- * slot is the handler.  Reading it out of the guest rather than
- * working it out from symbols means this still reports on a stripped
- * image, and means it reports what is actually there - which is the
- * whole point of looking.
+ * Both are recognized.  The operand of the load is the _stab slot,
+ * and the word in the slot is the handler.  Reading it out of the
+ * guest rather than working it out from symbols means this still
+ * reports on a stripped image, and means it reports what is actually
+ * there - which is the whole point of looking.
  *
  * Returns the slot address and the handler, or 0 if the bytes are not
  * a trampoline.
@@ -2682,13 +2758,20 @@ sigtramp(unsigned short addr, unsigned short *slotp, unsigned short *funcp)
 {
     if (get_byte(addr) != 0xe5)         /* push hl */
         return 0;
-    if (get_byte(addr + 1) != 0x2a)     /* ld hl,(nn) */
-        return 0;
-    if (get_byte(addr + 4) != 0x18)     /* jr sigcall */
-        return 0;
-    *slotp = get_word(addr + 2);
-    *funcp = get_word(*slotp);
-    return 1;
+    if (get_byte(addr + 1) == 0xd5
+        && get_byte(addr + 2) == 0xed
+        && get_byte(addr + 3) == 0x5b) {  /* ld de,(nn) */
+        *slotp = get_word(addr + 4);
+        *funcp = get_word(*slotp);
+        return 1;
+    }
+    if (get_byte(addr + 1) == 0x2a      /* ld hl,(nn) */
+        && get_byte(addr + 4) == 0x18) { /* jr sigcall */
+        *slotp = get_word(addr + 2);
+        *funcp = get_word(*slotp);
+        return 1;
+    }
+    return 0;
 }
 
 /*
@@ -5654,6 +5737,14 @@ SystemCall()
             break;
         }
         ret = signal_handler[arg1];
+        /*
+         * One slot per signal, as u.p->slist is.  This used to be
+         * set only for the signals with a host signal behind them,
+         * which left MEMF (11) with no handler to deliver to even
+         * though the program had installed one.
+         */
+        if (arg1)
+            signal_handler[arg1] = arg2;
 
         i = 0;
         switch (arg1) {
