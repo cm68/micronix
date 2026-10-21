@@ -106,7 +106,7 @@ tasks and maps
 --------------
 
 everything above says what each level does.  where it does it is the
-z280's business: a boot starts in one task, runs its middle in another,
+MPZ80's business: a boot starts in one task, runs its middle in another,
 and hands the kernel back to the first.
 
 the cpu has sixteen tasks, each with its own 64k cut into sixteen 4k
