@@ -29,7 +29,7 @@ name and four hooks - usage, prearg, startup, poll - and
 `register_driver()` (src/hwsim/hwsim.c:687) appends to a fixed array of
 sixteen (hwsim.c:676).  Every board registers itself from a constructor
 before main: `register_djdma_driver()` at djdma.c:1773 is the pattern, and
-adding a board to the link is all it takes to have it (d1/Makefile:23
+adding a board to the link is all it takes to have it (d1/GNUmakefile:23
 lists them).  The hooks run at three points: prearg before argument
 processing so defaults can be set (hwsim.c:1793), startup before the
 emulation loop (hwsim.c:2292), and poll once per loop iteration
@@ -73,7 +73,7 @@ and the CPU's `int_ack()` (s100.c:54) calls whatever the controller
 installed.  This is a clean seam; its weakness is the card id, covered
 below.
 
-There is also a shared library already.  libsim.a (lib/Makefile:12) holds
+There is also a shared library already.  libsim.a (lib/GNUmakefile:12) holds
 the disassembler, the monitor, the IMD image code, the filesystem library,
 and the drive abstraction `hdcdmadisk.c` that `drive_open()` and friends
 come from.  The d1 drivers split two ways here: ide.c talks to the drive
@@ -437,7 +437,7 @@ nic.c/nicd1.c - already the target shape; nothing to do except make the
 bus handle the nicd1 wiring takes explicit.
 
 kdump.c, micronix.c, pic.c, nic.c - these are linked into the d1 binary
-but register no driver (kdump.c and micronix.c are in d1/Makefile:27 and
+but register no driver (kdump.c and micronix.c are in d1/GNUmakefile:27 and
 have no `struct driver`; pic.c and nic.c are chip cores called by their
 owners).  The sketch should give the debug helpers their own category in
 the registry - a "debugger" role with init and poll - so they stop being

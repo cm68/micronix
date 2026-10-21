@@ -3,7 +3,7 @@
 #
 # this is is the home of the hitech object transmogrifier
 #
-# tools/hitech/Makefile
+# tools/hitech/GNUmakefile
 #
 # Changed: <2023-06-25 00:54:38 curt>
 #

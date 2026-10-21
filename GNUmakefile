@@ -1,7 +1,7 @@
 #
 # this is just a top-level makefile to build the simulator
 #
-# Makefile
+# GNUmakefile
 # Changed: <2023-07-05 23:17:23 curt>
 #
 # to build this, we have some prerequsites:

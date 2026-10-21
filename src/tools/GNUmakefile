@@ -4,7 +4,7 @@
 # these are things like native assemblers, disassemblers, file system checkers,
 # extractors, inspectors, etc
 #
-# tools/Makefile
+# tools/GNUmakefile
 #
 # Changed: <2023-06-19 06:09:52 curt>
 #
@@ -19,12 +19,12 @@ LDFLAGS = -lcurses
 GENERATED = doc.inl zmac.c doc
 TARGETS = $(SIMTARGETS) zmac strip hwsim
 
-include ../Makefile.inc
+include ../GNUmakefile.inc
 
 # The objects the filesystem tools link against ../lib.  They are named
 # as prerequisites - not merely linked - so that make recurses into
-# ../lib to rebuild them when their sources change; ../lib/Makefile
-# knows the .c -> .o dependencies this Makefile cannot see.  The rule
+# ../lib to rebuild them when their sources change; ../lib/GNUmakefile
+# knows the .c -> .o dependencies this GNUmakefile cannot see.  The rule
 # below is the whole of that recursion: an empty prerequisite list makes
 # each object always out of date, and the inner make decides (cheaply)
 # whether anything actually has to be rebuilt.

@@ -30,7 +30,7 @@
 ; this reads the header and does what it says: text to its own address,
 ; data to its own address, bss cleared, entry where the header puts it.
 ; Replacing level 3 is a matter of running mkbootimg again - the
-; Makefile's bootimg rule, which puts this sector in block 0 and what
+; makefile's bootimg rule, which puts this sector in block 0 and what
 ; comes after it in block 1 - and nothing else has to agree about
 ; anything.
 ;
@@ -61,7 +61,7 @@
 ;
 ; asz has no org: it writes a relocatable object and the linker decides
 ; where the text goes, so BASE below is the one place that says 0100 and
-; the Makefile passes the same number to wsld.  The 16 byte header the
+; the makefile passes the same number to wsld.  The 16 byte header the
 ; linker writes is then cut off, because the rom reads a sector and
 ; jumps to the first byte of it - there is nothing there to read a
 ; header, which is the whole reason level 3 needs this one.

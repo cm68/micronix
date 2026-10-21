@@ -2,7 +2,7 @@
 # this makefile fragment is included by low level makefiles to put
 # as much host information as possible in one place
 #
-# src/Makefile.inc
+# src/GNUmakefile.inc
 #
 # Changed: <2021-12-23 15:27:20 curt>
 

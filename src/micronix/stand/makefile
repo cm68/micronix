@@ -1,7 +1,7 @@
 #
 # micronix native standalone
 #
-# micronix/stand/Makefile
+# micronix/stand/makefile
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 #

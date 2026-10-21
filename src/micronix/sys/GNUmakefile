@@ -5,7 +5,7 @@
 #
 # "all" builds the kernel: unix, at a fixed text base of 0x1000.  ccc
 # has no -tb, no overlay -r and no -x, so the link is done by calling
-# mxld directly with -Ttext=0x1000.  The native Makefile beside this one
+# mxld directly with -Ttext=0x1000.  The native makefile beside this one
 # does that same flat link, with the same linker source built for that
 # host - it is plain "ld" over there, where it IS the system's linker.
 # The Whitesmith's overlay link they both replaced (low.o/io.o/high.o
@@ -35,7 +35,7 @@ TARGET	= unix
 TARGETS	=
 
 # the kernel includes its own headers, not the C library's.  -i, as
-# the native Makefile beside this has always done.
+# the native makefile beside this has always done.
 INC	= -i$(DEPTH)/include
 
 # The prose.  The source tar carries $(SRCS), which is the *.c/*.h/*.s/*.1
@@ -415,7 +415,7 @@ win.o: $(WIN_C)
 # the end of textpad.o's .bss exactly as it did.
 #
 # The native build is why the fold exists: the words of that link are
-# more than the shell there will carry, and the Makefile beside this one
+# more than the shell there will carry, and the makefile beside this one
 # has the count and why make needs a shell at all.  The host build makes
 # the same fold rather than a shorter list of its own, so the two link
 # the same way and a difference between the images is a difference in

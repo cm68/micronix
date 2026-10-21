@@ -38,8 +38,8 @@ NOWARN	 = --warning=no-ignore-newer
 all:
 	$(RECURSE)
 
-stand.tar: Makefile
-	tar -f stand.tar -c Makefile
+stand.tar: makefile
+	tar -f stand.tar -c makefile
 
 update: stand.tar
 	$(RECURSE)

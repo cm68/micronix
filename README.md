@@ -120,7 +120,7 @@ src/hwsim:
 	trapping, memory mapping, and disk reading and writing for the disk
 	controllers (djdma, hddma, hdca, ide, ncr5380, and CompuPro's
 	disk1/disk2/disk3), the ND network card, the SS1 and the MultIO.
-	the card list is the DRIVERS line in src/hwsim/d1/Makefile.
+	the card list is the DRIVERS line in src/hwsim/d1/GNUmakefile.
 
 	there's a means for importing and exporting data to cp/m via the
 	inp: and out: devices in pip, so hex files can be shipped to get

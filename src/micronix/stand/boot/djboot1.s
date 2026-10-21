@@ -53,7 +53,7 @@
 ; this diskette came out of.  See run.
 ;
 ; assembled by asz, linked at BASE and unwrapped, exactly as mwboot1.s
-; is - see the Makefile.
+; is - see the makefile.
 ;
 
 CHAN	equ	0050h		; the default channel command address

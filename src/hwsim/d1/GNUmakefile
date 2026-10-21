@@ -1,7 +1,7 @@
 #
-# Makefile for morrow decision 1 hardware simulator
+# GNUmakefile for morrow decision 1 hardware simulator
 #
-# hwsim/d1/Makefile
+# hwsim/d1/GNUmakefile
 #
 # Changed: <2023-07-10 14:47:50 curt>
 #
@@ -40,7 +40,7 @@ SIM = ../hwsim$(OBJSUFFIX).o ../s100$(OBJSUFFIX).o ../config$(OBJSUFFIX).o \
 # the code you just replaced while you wonder why the fix did nothing.
 LIBS = ../../lib/libsim$(LIBSUFFIX).a
 
-include ../../Makefile.inc
+include ../../GNUmakefile.inc
 
 $(TARGET): $(DRIVERS) $(GENERATED) $(SIM) $(LIBS)
 	$(CC) $(DEBUG) $(GCCFLAGS) -o $(TARGET) $(DRIVERS) $(SIM) $(LDFLAGS)

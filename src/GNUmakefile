@@ -1,7 +1,7 @@
 #
 # build the simulators
 #
-# src/Makefile
+# src/GNUmakefile
 #
 # Changed: <2023-06-23 01:19:37 curt>
 

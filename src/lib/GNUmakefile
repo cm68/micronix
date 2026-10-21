@@ -2,7 +2,7 @@
 # simulator library makefile
 # contains generic modules useful for any simulator
 #
-# lib/Makefile
+# lib/GNUmakefile
 #
 # Changed: <2023-07-10 14:45:25 curt>
 #
@@ -20,7 +20,7 @@ TARGETS = $(LIBRARY)
 
 INCLUDE = -I../include
 
-include ../Makefile.inc
+include ../GNUmakefile.inc
 
 # the portable half of the fs library, shared with the micronix build.
 # It includes <types.h> and <sys/fs.h>, so it needs the micronix include

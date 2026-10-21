@@ -1,7 +1,7 @@
 #
-# Makefile for user mode simulator
+# GNUmakefile for user mode simulator
 #
-# usersim/Makefile
+# usersim/GNUmakefile
 #
 # Changed: <2023-06-20 12:05:59 curt>
 #
@@ -12,7 +12,7 @@ LDFLAGS = -L../lib -lsim -lcurses # -lmem
 OBJECTS = usersim.o nic.o
 TARGETS = sim
 
-include ../Makefile.inc
+include ../GNUmakefile.inc
 
 # these sources are K&R-era C.  A gcc new enough to make an implicit
 # declaration an error rather than a warning will not build them at

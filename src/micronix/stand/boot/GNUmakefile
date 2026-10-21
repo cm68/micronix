@@ -28,7 +28,7 @@ ASSRCS	= sexit.s
 # That exclusion is about the build and not about the tar.  The source
 # tar carries $(SRCS), which is the build lists plus $(EXTRA), so a file
 # that is a source but not a build input lists itself there.  Without
-# this the installed /usr/src/stand cannot build at all: the Makefile
+# this the installed /usr/src/stand cannot build at all: the makefile
 # beside this one opens with mwboot1.bin from mwboot1.s, and neither it
 # nor mkbootimg.c was in the tar - nor were the other three first
 # levels, nor the README that describes what they do.

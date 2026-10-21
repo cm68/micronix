@@ -1,7 +1,7 @@
 #
 # hardware simulator top level makefile
 #
-# hwsim/Makefile 
+# hwsim/GNUmakefile 
 #
 # Changed: <2023-06-23 00:27:25 curt>
 #
@@ -13,6 +13,6 @@ INCLUDE = -I../include
 # specific machine directories
 DIRS = d1
 
-include ../Makefile.inc
+include ../GNUmakefile.inc
 
 

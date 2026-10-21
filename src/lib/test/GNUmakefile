@@ -1,7 +1,7 @@
 #
-# Makefile for library tests
+# GNUmakefile for library tests
 #
-# lib/test/Makefile
+# lib/test/GNUmakefile
 #
 # Changed: <2023-06-23 00:29:45 curt>
 #

@@ -283,7 +283,7 @@ Three things follow, in the order they matter:
     needs the label to carry it, which is a change to struct dlabel, mkfs,
     the four loaders and the host fslib.
 
-  - the tables that are left - cmd/mkfs/mkfs.h, stand/boot/Makefile's
+  - the tables that are left - cmd/mkfs/mkfs.h, stand/boot/makefile's
     DRIVES, fslib's and mnix's - are still the host's and mkfs's own, and
     they have to agree with the label the disk carries.  They agree today
     because the install scripts format and mkfs through the same model's

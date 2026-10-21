@@ -1,5 +1,5 @@
 #
-# Makefile for 
+# GNUmakefile for 
 #
 # <path>
 #

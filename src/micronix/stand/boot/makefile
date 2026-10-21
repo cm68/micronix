@@ -1,7 +1,7 @@
 #
 # micronix native standalone
 #
-# micronix/stand/boot/Makefile
+# micronix/stand/boot/makefile
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
@@ -17,7 +17,7 @@ install:
 # which is the same list the rule that makes them reads.  A glob is the
 # same names only for as long as this file and it agree; a list cannot
 # disagree with itself.  The micronix-side makefiles follow the same
-# rule for a harder reason - see sys/Makefile, where "rm -f *.o" came to
+# rule for a harder reason - see sys/makefile, where "rm -f *.o" came to
 # more words than the shell would take, so the rm never ran at all and
 # the names that did not fit were read back as a command of their own.
 #

@@ -1,5 +1,5 @@
 #
-# Makefile include file for the micronix cross build
+# GNUmakefile include file for the micronix cross build
 #
 # GNUmakefile.inc
 #

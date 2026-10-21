@@ -1,7 +1,7 @@
 #
 # assemble the monitor roms and generate list and symbols for simulator
 #
-# hwsim/d1/roms/Makefile
+# micronix/stand/roms/GNUmakefile
 #
 # Changed: <2023-07-10 14:47:33 curt>
 #

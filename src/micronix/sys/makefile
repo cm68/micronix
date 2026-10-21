@@ -1,7 +1,7 @@
 #
 # micronix makefile for compiling the kernel with ccc (native build)
 #
-# micronix/sys/Makefile
+# micronix/sys/makefile
 #
 # Changed: <2026-10-03>
 #
@@ -37,6 +37,17 @@
 #	$* is dj.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
+
+#
+# No suffix rules.  Every object has an explicit rule below, and the
+# parser fills $* from the target name minus its extension (doname's
+# stemof), so the suffix machinery is not needed for the .o, .mod and
+# .page rules either.  Without this, doname's search for a prerequisite's
+# source tries every suffix in the built-in list and makes a nameblock
+# for each candidate, which is most of what the heap grows by after the
+# makefile is parsed.
+#
+.SUFFIXES:
 
 INC = ../include
 SYS = ../include/sys
@@ -397,28 +408,41 @@ install: unix
 # The cross GNUmakefile's split: clean removes the intermediates, and
 # clobber takes the targets as well.
 #
-# $(OBJS) $(MODULES) and not *.o, which is what this used to say.  A glob
-# has to be expanded by the shell, and make sends a line to the shell only
-# when it has a metacharacter in it - so "rm -f *.o upd1990.rel" became one
-# shell command whose argument list was however many names the glob came
-# to.  The shell caps a command at MAXARG words, and this was 71 of them:
-# it printed "too many arguments", abandoned the rm, and then read on from
-# the word that had not fitted, which is how a clean run came to say
-# "m87.o: Command not found." and remove nothing at all.  Over the cap
-# the failure is not a truncated rm, it is no rm plus a bogus command.
+# Not *.o.  A glob has to be expanded by the shell, and make sends a line
+# to the shell only when it has a metacharacter in it - so
+# "rm -f *.o upd1990.rel" became one shell command whose argument list
+# was however many names the glob came to.  The shell caps a command at
+# MAXARG words, and this was 71 of them: it printed "too many
+# arguments", abandoned the rm, and then read on from the word that had
+# not fitted, which is how a clean run came to say "m87.o: Command not
+# found." and remove nothing at all.  Over the cap the failure is not a
+# truncated rm, it is no rm plus a bogus command.
 #
-# $(OBJS) has no metacharacter, so make execs rm itself and neither the
-# shell nor MAXARG is in the path.  What bounds it there is the kernel's
-# argument buffer, NBLKS (4) blocks of 512 bytes in exec.c; the names are
-# about 520 bytes of it, which is where a name list would have to grow a
-# long way before it stopped fitting.
-#
-# The list is the one the link uses, so the two cannot disagree about a
-# file that matters.  A stray .o left in the directory is not swept up
-# any more, but nothing links one either: unix is built from $(OBJS).
+# The clean is many short rm lines.  It used to be one 1084-character
+# rm, and the shell that ran it kept only the tail: the first 630
+# characters (the resident objects) were lost, so a clobber that said it
+# had run left the kernel objects behind and the next build reused them.
+# cmd/sh's limits are bigger now - 512 words, 8K of words, a 2K line -
+# but short lines do not depend on them and cannot trip MAXARG.
 clean:
-	rm -f $(OBJS) $(MODULES) $(HIGHMEM) probe.o pic.o net.o consts.rel \
-		bus.rel pic.rel net.rel ovlslot.rel *.nam *.tok *.x
+	rm -f low.o highmem.o upage.o win.o ovlslot.o user.o
+	rm -f $(KERNEL_AS_OBJ) $(LEAF_C) probe.o pic.o net.o
+	rm -f mem.o inout.o sub8.o unixtobcd.o slavevec.o csv.o idiv.o
+	rm -f imul.o qadd.o qsub.o qand.o qor.o qcmp.o qshl.o qsar.o
+	rm -f qshr.o qmul.o qinc.o qldst.o tramp.o swdisp.o swdispw.o oarg.o
+	rm -f mount.o balloc.o cio.o create.o exec.o fio.o fork.o ialloc.o
+	rm -f iget.o imap.o malloc.o name.o queue.o reg.o sig.o sleep.o
+	rm -f subc.o swap.o sys1.o system.o time.o trap.o tty.o uio.o
+	rm -f multio.o ss1_uart.o dlabel.o ovl.o main.o upd1990.o
+	rm -f ss1_clock.o picdata.o open.o sys2.o rdwri.o memdev.o link.o
+	rm -f access.o $(HIGHMEM)
+	rm -f $(MOD_OBJ) $(MOD_HDR)
+	rm -f dj.mod mw.mod ide.mod ncr.mod hdca.mod
+	rm -f nd.mod disk1.mod disk2.mod disk3.mod
+	rm -f dj.page mw.page ide.page ncr.page hdca.page
+	rm -f nd.page disk1.page disk2.page disk3.page
+	rm -f consts.rel bus.rel pic.rel net.rel ovlslot.rel
+	rm -f *.nam *.tok *.x
 
 # clobber is clean plus the kernel, the makedate host program, and
 # build.h, the one file here that is written rather than compiled.

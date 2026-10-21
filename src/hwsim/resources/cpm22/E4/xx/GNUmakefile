@@ -1,5 +1,5 @@
 #
-# Makefile for  rebuilding cbios
+# GNUmakefile for  rebuilding cbios
 #
 # <path>
 #
