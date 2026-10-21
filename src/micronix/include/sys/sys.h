@@ -29,7 +29,7 @@
 #define MAXSEG	256             /* max 4K memory segments, not inc. kernel */
 #define USERSEG 15              /* u page segment; the buffer window is 14 */
 #define BUFSEG  14              /* the buffer-cache window (bwin, uio.c) */
-#define BUFWIN  (BUFSEG * 0x1000)   /* ... its page base, and the pool's top */
+#define BUFWIN  (BUFSEG * 0x1000)   /* ... its page base; the pool tops out at SCRWIN */
 
 /*
  * The scratch window, and the only page left that a driver may hold.

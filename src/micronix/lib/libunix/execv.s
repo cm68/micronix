@@ -55,9 +55,10 @@ _execl:
 	ld 	hl,2
 	add 	hl,sp		; past the return address:
 				; hl = &arg0, the rest of the list
-	push 	hl		; push &arg0 as argv
+	push 	hl		; park argv while envp goes on first
 	ld 	hl,(_environ)	; the environment to pass on
-	push 	hl		; push envp, the third argument
+	ex	(sp),hl		; envp on the stack, argv back in hl
+	push 	hl		; push argv, the second argument
 	ex	de,hl		; name back in hl
 	call 	_execve
 	pop 	af
