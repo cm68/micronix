@@ -7,7 +7,10 @@ lifecycle of a sim's block devices.  It replaces the per-card scripts
 differences between cards become fields in a file instead of near-copies
 of a shell script.
 
-This is the design; the tool is not built yet.
+The tool is `src/tools/hwsim`, built by the top-level `make`.  It reads
+`sim.json` from the top of the tree (or the file named with `-f`) and
+implements the verbs described below; where the implementation still
+differs from the design, the text says so.
 
 ## The abstraction
 
@@ -23,11 +26,11 @@ block and the wiring), not a role.  Root and swap are attributes of the
 {
   "sims": {
     "q540-dual": {
-      "emulator": "hwsim/d1",
+      "emulator": "src/hwsim/d1",
       "kernel":   "src/micronix/sys/unix",
       "boot": {
-        "monitor": "micronix/stand/roms/mon500.bin",
-        "level1":  "micronix/stand/roms/l1boot.bin",
+        "monitor": "src/micronix/stand/roms/mon500.bin",
+        "level1":  "src/micronix/stand/roms/l1boot.bin",
         "device":  "hdcdma",
         "j2":      "ab"
       },
@@ -39,9 +42,9 @@ block and the wiring), not a role.  Root and swap are attributes of the
       "root": "hdcdma:0a",
       "swap": "hdcdma:0b",
       "volumes": [
-        { "controller": "hdcdma", "unit": 0, "geometry": "q540",
+        { "controller": "hdcdma", "unit": 0, "geometry": "m40",
           "image": "disks/q540-dual/root.img" },
-        { "controller": "hdcdma", "unit": 1, "geometry": "q540",
+        { "controller": "hdcdma", "unit": 1, "geometry": "m40",
           "image": "disks/q540-dual/usr.img" }
       ]
     }
@@ -83,9 +86,10 @@ The minor encodes the slice in the top three bits and the unit below
     minor = (slice << 5) | unit       a=0 b=1 c=2 d=3 e=4 f=5 g=6 h=7
 
 `c` is the whole-disk slice (`DL_WHOLE`), so `hdcdma:0a` is 3/0,
-`hdcdma:0b` is 3/32, `hdcdma:0c` is 3/64.  The tool derives the numbers
-it hands setdev from the token: the major table plus the `slice<<5|unit`
-encoding turn `controller:unit<slice>` into major/minor.
+`hdcdma:0b` is 3/32, `hdcdma:0c` is 3/64.  The tool derives those
+numbers from the token the same way - the major table plus the
+`slice<<5|unit` encoding - and `show` prints them beside `root` and
+`swap`.
 
 Floppies (`djdma`) do not follow this encoding — their minors are 8-15
 and the letter is the drive — and they are dist media, referenced and
@@ -188,19 +192,23 @@ carries it, and nothing should: it is not the sim's or the volume's.
 
 ## The verbs
 
-`tool <verb> <simname> [args]`:
+`hwsim [-f sim.json] <verb> [sim] [args]`:
 
-    format      mnix initialize <geometry> <image>     geometry label
-    partition   mnix label <image> -s ...              slice table
-    mkfs        mnix mkfs <image> -i <level2> -f       filesystem + boot
-    boot        launch d1/d1p with the sim's boot chain + volumes
-    add / del   put a volume into / take one out of a sim
-    list / show sim.json
+    format <sim>       mnix initialize <geometry> <image>    geometry label
+    partition <sim>    mnix label <image> -s ...             slice table
+    mkfs <sim>         mnix mkfs <image> -i <bootimg> -f     filesystem + boot
+    boot <sim>         launch the volumes; d1p headless by default, d1 with
+                       -g/--debug, logging to /tmp/hwsim-<sim>.log
+    add <sim> <controller> <unit> <geometry> <image>
+    del <sim> <controller>:<unit>
+    list               the sims in the file
+    show <sim>         one sim, then the switches it would pack
 
-`mkfs` takes the boot image from the volume's controller — `level2` if the
-volume says so, the table above if it does not — which is the one place
-`create_vol`'s `bootimg="$root/src/micronix/stand/boot/bootimg"` and its
-three siblings differ from each other.
+`mkfs` still uses `src/micronix/stand/boot/bootimg`, the hdcdma level 2,
+for every volume.  Choosing it from the volume's controller — `level2` if
+the volume says so, the table above if it does not — is the design and
+not yet in the tool; until it is, a volume on another controller needs
+its image built with that controller's level 2.
 
 `boot` generates the device wiring from the volume list — every volume's
 `controller<unit>:<image>` in order — composes `-b`/`-M`/`-j` from
@@ -214,14 +222,17 @@ possible for a script to be about a machine rather than about a card.
 The tool is a front end over things the tree already has:
 
     mnix                     initialize / label / mkfs / tar / write / mknod
-    setdev                   patch the kernel's root + swap (from the tokens)
-    dist/distsets            print the -e manifest from dist images
+    setdev                   patch the kernel's root + swap (from the tokens);
+                             hwsim resolves and prints them, and does not yet
+                             patch
+    dist/distsets            the -e manifest format; hwsim writes the same
+                             manifest from sim.json
     stand/roms               the level 0 and level 1 roms (make -C stand/roms)
     stand/boot               the level 2 and level 3 images (make bootimgs,
                              make djbootimgs)
     bootdisks/create_bootdisk  one install diskette, for one target drive
     build_dist / dist_boot   the worked example, done by hand today
 
-`build_dist` and `dist_boot` are exactly what `provision` and `boot`
-will do once the JSON drives them; the media changer (MEDIACHG.md) is
-how the boot's floppies get loaded.
+`hwsim` is the data-driven form of the provisioning `build_dist` and
+`dist_boot` do by hand; the media changer (MEDIACHG.md) is still how the
+boot's floppies get loaded.
