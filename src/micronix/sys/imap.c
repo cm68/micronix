@@ -31,7 +31,7 @@ imap(ip, log, rap, rw)
     register struct inode *ip;
     register UINT log;
     register UINT *rap;
-    int rw;
+    UINT8 rw;
 {
     UINT bn, ind;
     UINT8 index; int dev;
@@ -85,7 +85,7 @@ imapi(ip, n, rap, rw)
     register struct inode *ip;
     int n;
     UINT *rap;
-    int rw;
+    UINT8 rw;
 {
     register UINT *p;
     UINT bn;
@@ -120,7 +120,7 @@ imapb(ind, n, dev, rap, rw)
     UINT ind;
     int n, dev;
     UINT *rap;
-    int rw;
+    UINT8 rw;
 {
     register struct buf *bp;
     register UINT *p;

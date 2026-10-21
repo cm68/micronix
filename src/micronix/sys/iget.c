@@ -84,7 +84,7 @@ ilock(ip)
  * Inode should be busy.
  */
 iio(flag, ip)
-    int flag;
+    UINT8 flag;
     register struct inode *ip;
 {
     register unsigned int inum, i;

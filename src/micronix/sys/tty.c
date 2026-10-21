@@ -236,7 +236,7 @@ cwait(tty)
  */
 ttymode(tty, flag)
     register struct tty *tty;
-    int flag;
+    UINT8 flag;
 {
 
     /*
@@ -444,7 +444,7 @@ ttyhangup(t)
  * it if necessary.
  */
 ttyin(c, tty)
-    register int c;
+    register UINT8 c;
     register struct tty *tty;
 {
     struct que *raw;

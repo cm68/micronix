@@ -221,7 +221,8 @@ ovldata(maj)
  */
 int
 ovlopen(dev, mode)
-    UINT dev, mode;
+    UINT dev;
+    UINT8 mode;
 {
     UINT8 maj;
 
@@ -236,7 +237,8 @@ ovlopen(dev, mode)
 
 int
 ovlclose(dev, mode)
-    UINT dev, mode;
+    UINT dev;
+    UINT8 mode;
 {
     UINT8 maj;
 
@@ -296,7 +298,8 @@ ovlioctl(dev, cmd, r, b)
  */
 int
 ovlcopen(dev, mode)
-    UINT dev, mode;
+    UINT dev;
+    UINT8 mode;
 {
     UINT8 maj;
 
@@ -311,7 +314,8 @@ ovlcopen(dev, mode)
 
 int
 ovlcclose(dev, mode)
-    UINT dev, mode;
+    UINT dev;
+    UINT8 mode;
 {
     UINT8 maj;
 
@@ -356,7 +360,8 @@ ovlcwrite(dev)
 
 int
 ovlcmode(dev, flag)
-    UINT dev, flag;
+    UINT dev;
+    UINT8 flag;
 {
     UINT8 maj;
 

@@ -44,7 +44,8 @@ write(buf, count)
  * desired access.
  */
 rdwri(rw, fd, buf, count)
-    int rw, fd, buf, count;
+    UINT8 rw;
+    int fd, buf, count;
 {
     register struct inode *ip;
     register struct file *fp;
@@ -66,6 +67,13 @@ rdwri(rw, fd, buf, count)
     u.base = buf;
     u.count = count;
     u.offset = fp->rwptr;
+    /*
+     * O_APPEND: a write starts at the end of the file as it stands
+     * now, not at wherever the descriptor was left.  Only a regular
+     * file has a size to append to; a device or a pipe ignores it.
+     */
+    if (rw == IWRITE && (mode & IAPPEND) && (ip->i_mode & IFMT) == IFREG)
+        u.offset = ip->size;
     u.segflg = USEG;
     if (mode & PIPE)
         nbytes = (rw == IREAD) ? pread(ip) : pwrite(ip);

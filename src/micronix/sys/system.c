@@ -48,7 +48,7 @@ struct syscall
 extern int indir(), unimp(), badcall();
 
 extern int brake(), chdir(), chmod(), chown(), sync(),
-    dup(), getuid(), setuid(), nice(), ssw();               /* sys1.c */
+    dup(), dup2(), getuid(), setuid(), nice(), ssw();      /* sys1.c */
 extern int pause(), stat(), alarm(), getpid(), stime(),
     fstat(), snooze();                                      /* sys2.c */
 extern int permission();                                    /* access.c */
@@ -91,6 +91,7 @@ extern int r_lock(), r_unlock();
  */
 extern struct syscall syssw[];
 extern int ncalls;
+extern int valid();             /* sys/malloc.c: make the page grown */
 
 /*
  * Entry point for system calls. A typical call:
@@ -102,6 +103,19 @@ system()
 {
     u.p->mode |= SYS;
     u.p->pri = PRISYS;
+    /*
+     * The rst1 trap pushes its return address on the user stack, and
+     * that push may be the first touch of a page that is still GROW.
+     * The hardware writes it without a fault, so nothing has marked
+     * the page FULL - and fork() copies only FULL pages, while the
+     * kernel reads this address through the window.  A stack that
+     * crossed the boundary on the trap then reads back as garbage,
+     * docall() sees a call number that is not one, and a good syscall
+     * comes back as SIGSYS with EINVAL.  Grow the page before reading
+     * it: the word is already in the segment, so this only promotes
+     * it to FULL, which is what the copy and the window want.
+     */
+    valid(u.sp, 2);
     u.pc = getword(u.sp++);     /* return from rst1 */
     enable();
     u.segflg = USEG;
@@ -128,9 +142,9 @@ int arg[4] = 0;
  */
 docall(addr, direct)
     register char *addr;
-    int direct;
+    UINT8 direct;
 {
-    register int call, nbytes;
+    register UINT8 call, nbytes;
     int dummy;
 
     if (direct)

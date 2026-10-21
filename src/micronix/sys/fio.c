@@ -85,7 +85,8 @@ iread(ip)
 iwrite(ip)
     register struct inode *ip;
 {
-    int request, dev, pipe;
+    int request, dev;
+    UINT8 pipe;
     UINT log, phys;
     register int into, nbytes;
     static int type;
@@ -141,7 +142,7 @@ iwrite(ip)
  * space (u.segflg == KSEG).
  */
 iomove(flag, buf, count)
-    int flag;
+    UINT8 flag;
     register char *buf;
     register int count;
 {

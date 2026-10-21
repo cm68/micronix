@@ -18,7 +18,8 @@
  * Access ciosw to open a character device
  */
 copen(dev, mode)
-    int dev, mode;
+    int dev;
+    UINT8 mode;
 {
     (*ciosw[cmajor(dev)].open) (dev, mode);
 }
@@ -27,7 +28,8 @@ copen(dev, mode)
  * Access ciosw to close a character device
  */
 cclose(dev, mode)
-    int dev, mode;
+    int dev;
+    UINT8 mode;
 {
     (*ciosw[cmajor(dev)].close) (dev, mode);
 }
@@ -54,7 +56,8 @@ cwrite(dev)
  * Access ciosw to sgtty a character device
  */
 cmode(fd, addr, flag)
-    int fd, flag;
+    int fd;
+    UINT8 flag;
     char *addr;
 {
     struct file *fp;

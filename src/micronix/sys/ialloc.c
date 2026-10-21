@@ -264,7 +264,7 @@ itrunc(ip)
 indfree(ind, level, dev)
     UINT ind;
     int dev;
-    register int level;
+    register UINT8 level;
 {
     register UINT *p;
     register struct buf *bp;
@@ -310,7 +310,9 @@ indfree(ind, level, dev)
  */
 indfreetail(ind, level, start, dev)
     UINT ind;
-    int level, start, dev;
+    UINT8 level;
+    UINT start;
+    int dev;
 {
     register struct buf *bp;
     register UINT *p;

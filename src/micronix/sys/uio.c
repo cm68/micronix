@@ -672,7 +672,7 @@ bdrain()
  * long as a hold is up, and holds are taken all over the filesystem.
  */
 bwin(seg)
-    int seg;
+    UINT8 seg;
 {
     map0[2 * BUFSEG] = seg;
     bufseg = seg;
@@ -769,7 +769,7 @@ static UINT8 scratchseg = SCRSEG;       /* the scratch window's current segment 
 
 char *
 swin(seg)
-    int seg;
+    UINT8 seg;
 {
     if (sholdn >= NSHOLD)
         panic("swin: too deep");

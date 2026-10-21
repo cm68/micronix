@@ -94,7 +94,7 @@ UINT32
 seek(fd, disp, from)
     int fd;
     register UINT disp;         /* block numbers are unsigned short */
-    register unsigned from;
+    register UINT8 from;
 {
     struct file *fp;
     static UINT32 offset;       /* file positions are unsigned (to ~15M) */
@@ -106,10 +106,7 @@ seek(fd, disp, from)
         return (-1);
     }
     from %= 6;
-    if (from == 0 || from == 3)
-        offset = (unsigned) disp;
-    else
-        offset = disp;
+    offset = disp;
     if (from >= 3)
         offset <<= 9;
     switch (from) {

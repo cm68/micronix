@@ -24,7 +24,7 @@ extern struct inode ilist[];
  */
 mount(ioname, dname, ronly)
     char *ioname, *dname;
-    int ronly;
+    UINT8 ronly;
 {
     register struct inode *io, *id;
     struct mount *m;
@@ -113,7 +113,8 @@ syncsuper()
  * Make an entry in the mount table.
  */
 tmount(dev, ip, ronly, dname)
-    int dev, ronly;
+    int dev;
+    UINT8 ronly;
     struct inode *ip;
     char *dname;
 {
@@ -182,7 +183,7 @@ umount(ioname)
         return;
     if ((io = iname(ioname)) == 0)
         return;
-    if (io->i_mode & IFMT != IFBLK) {
+    if ((io->i_mode & IFMT) != IFBLK) {
         u.error = ENOTBLK;
         goto bad;
     }

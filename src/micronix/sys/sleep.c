@@ -78,7 +78,8 @@ run(p)
  * - resumes holding the wrong process's BC.
  */
 sleep(event, pri)
-    register int event, pri;
+    register int event;
+    register UINT8 pri;
 {
     register struct proc *p;
 

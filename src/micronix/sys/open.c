@@ -16,21 +16,30 @@
 
 /*
  * Open system call.
+ *
+ * The second argument is the open flags, not just the access mode:
+ * the library sends the access mode (0, 1 or 2) with O_APPEND possibly
+ * set, and the other flags have been dealt with above it.  So the mode
+ * is masked before it is translated, and O_APPEND is remembered in the
+ * file structure for rdwri() to honour on every write.
  */
-open(name, mode)
+open(name, flags)
     char *name;
-    unsigned int mode;
+    unsigned int flags;
 {
     register struct inode *ip;
     register int fd;
+    register UINT8 mode;
 
     if ((ip = iname(name)) == 0)
         return;
-    mode = imode(mode);         /* translate to inode mode */
+    mode = imode(flags & 3);    /* translate to inode mode */
     if (!access(ip, mode)) {
         irelse(ip);
         return;
     }
+    if (flags & O_APPEND)
+        mode |= IAPPEND;
     fd = iopen(ip, mode);
     irelse(ip);
     u.hl = fd;
@@ -142,7 +151,7 @@ fclose(fp)
     register struct file *fp;
 {
     static struct inode *ip;
-    static UINT writ;
+    static UINT8 writ;
 
     if (--fp->count > 0)
         return;
@@ -165,7 +174,7 @@ fclose(fp)
         */
 iclose(ip, writ)
     register struct inode *ip;
-    int writ;
+    UINT8 writ;
 {
     register int dev;
 
