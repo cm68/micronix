@@ -16,7 +16,7 @@
 ROOT	?= ~/src/micronix/filesystem
 INCDIR	 = $(ROOT)/usr/cpm/include
 
-.PHONY: all update install install-man clean clobber doc
+.PHONY: all update install install-man install-man-host clean clobber doc
 
 #
 # Nothing to compile.  A header is what it is.
@@ -33,6 +33,8 @@ install:
 	@echo "installed CP/M headers in /usr/cpm/include"
 
 install-man:
+
+install-man-host:
 
 clean:
 

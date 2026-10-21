@@ -66,7 +66,7 @@ struct bitname {
 
 /*
  * a 32-bit value read as two 16-bit words, for fields like a file's
- * read/write pointer whose byte order is the Z280's word-swapped long.
+ * read/write pointer whose byte order is the kernel's word-swapped long.
  */
 union word32 {
 	UINT32 l;

@@ -32,7 +32,8 @@ CSRCS	= y0.c y1.c y2.c y3.c y4.c y5.c
 
 include $(DEPTH)/GNUmakefile.inc
 
-SRCS += dextern files yaccopar yaccepar yaccrpar macros conv.py
+SRCS += libmai.c libpar.c libzac.c libzer.c libzin.c \
+	dextern files yaccopar yaccepar yaccrpar macros conv.py
 
 LIBOBJS	= libmai.o libpar.o libzac.o libzer.o libzin.o
 

@@ -30,7 +30,7 @@ CSRCS	= cpp.c cpy.c
 
 include $(DEPTH)/GNUmakefile.inc
 
-SRCS += cpy.y README
+SRCS += yylex.c cpy.y README
 
 # yylex.c is pulled into cpy.o by cpy.c's #include, so a change to it
 # has to rebuild cpy.o - the wildcard OBJS override above keeps make

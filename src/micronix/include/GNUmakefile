@@ -87,7 +87,7 @@ LIBSYSHDRS	   = ../lib/include/sys/wait.h
 
 MKFILE	 = $(wildcard ?akefile)
 
-.PHONY: all update install install-man clean clobber doc
+.PHONY: all update install install-man install-man-host clean clobber doc
 
 #
 # Nothing to compile.  A header is what it is.
@@ -114,6 +114,9 @@ install:
 	@echo "the tree's own copies of these are not installed: $(CCCOWNED)"
 
 install-man:
+	$(RECURSE)
+
+install-man-host:
 	$(RECURSE)
 
 clean:

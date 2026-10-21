@@ -198,15 +198,17 @@ $(KERNEL_AS_OBJ) $(LEAF_AS) $(HIGHMEM_AS_OBJ): %.o: %.s
 OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) $(WIN_C) $(HIGHMEM) low.o win.o $(OVLSLOT)
 TREELIBS =
 
-CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c disk2.c \
-	 disk2hdr.c disk3.c disk3hdr.c dj.c djhdr.c djinit.c dlabel.c exec.c \
+CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c \
+	 disk1.c disk1hdr.c disk2.c disk2hdr.c disk3.c disk3hdr.c \
+	 dj.c djhdr.c djinit.c dlabel.c exec.c \
 	 fio.c fork.c hdca.c hdcahdr.c ialloc.c ide.c idehdr.c iget.c imap.c \
 	 link.c main.c main_init.c makedate.c malloc.c memdev.c mount.c \
 	 multio.c mw.c mwhdr.c name.c ncr.c ncrhdr.c ncrinit.c nd.c ndhdr.c \
 	 net.c open.c ovl.c probe.c \
-	 queue.c rdwri.c reg.c upd1990.c sig.c sleep.c ss1_clock.c stub.c \
+	 queue.c rdwri.c reg.c upd1990.c sig.c sleep.c ss1_clock.c \
+	 ss1_uart.c stub.c \
 	 stub_intr.c subc.c swap.c sys1.c sys2.c system.c time.c trap.c tty.c \
-	 uio.c user.c pic.c picdata.c probe.c \
+	 uio.c user.c pic.c picdata.c \
 	 pic_init.c probe_init.c \
 	 upd1990_init.c ss1_clock_init.c picvec.c
 ASSRCS	= csv.s idiv.s imul.s inits.s inout.s intrpt.s mem.s mio.s oarg.s \

@@ -34,7 +34,7 @@ ETCDIR	 = $(ROOT)/etc
 #
 FILES	= banner fstab group motd passwd rc signon ttys
 
-.PHONY: all update install install-man clean clobber
+.PHONY: all update install install-man install-man-host clean clobber
 
 all:
 	@echo "etc: $(words $(FILES)) files, nothing to build"
@@ -47,7 +47,7 @@ all:
 # There is nothing to ship: no native build reads these, so there is
 # no etc.tar for the native update to unpack, and no man pages.
 #
-update install-man:
+update install-man install-man-host:
 	@echo "etc: cross-installed only, nothing to ship"
 
 install:

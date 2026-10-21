@@ -75,7 +75,7 @@
 # from.  It is also the one command whose micronix interface differs
 # from the one it was ported from - see the head of cmd/owner/owner.c.
 #
-DIRS = ar asz awk bsh cal cat ccc change chg chgrp chmod chown clean cmp comm common compare compress concat copy cp cpp crypt cu date dc dcheck dd detab df diff djformat down du echo ed edit entab expand expr far fd2 fdj fgrep field file find form fsck grep group halt hdformat icheck include init kill kstat kwic label last ld less ln login ls lz4 m4 macro mail make makekey md man mkdir mkfs mknod more mount mv mwformat ncheck newuser nm od overstrike owner packsrc passwd pr print ps pwd ratfor rcp rm rmdir s scsiformat sed setdev sh size sort split strings strip stty su sum sync tail tar td tr tee test touch translit tree true tty umount unique unlz4 unrot update upm uudecode uuencode vi wall wc who write xargs yacc lex
+DIRS = ar asz awk bsh cal cat ccc change chg chgrp chmod chown clean cmp comm common compare compress concat copy cp cpp crypt cu date dc dcheck dd detab df diff djformat down du echo ed edit entab expand expr false far fd2 fdj fgrep field file find form fsck grep group halt hdformat icheck include init kill kstat kwic label last ld less ln login ls lz4 m4 macro mail make makekey md man mkdir mkfs mknod more mount mv mwformat ncheck newuser nm od overstrike owner packsrc passwd pr print ps pwd ratfor rcp rm rmdir s scsiformat sed setdev sh size sort split strings strip stty su sum sync tail tar td tr tee test touch translit tree true tty umount unique unlz4 unrot update upm uudecode uuencode vi wall wc who write xargs yacc lex
 
 #
 # "cd $$d &&", not "cd $$d ;".  With the semicolon, a directory named
@@ -100,7 +100,7 @@ ROOT	?= ~/src/micronix/filesystem
 DEST	 = $(ROOT)/usr/src/cmd
 NOWARN	 = --warning=no-ignore-newer
 
-.PHONY: all update install install-man clean clobber doc
+.PHONY: all update install install-man install-man-host clean clobber doc
 
 all:
 	$(RECURSE)
@@ -122,6 +122,16 @@ install:
 #
 install-man:
 	$(RECURSE)
+
+#
+# EVERY directory, not just DIRS.  cc, fp, msh and time are not built
+# by the cross build, so they are not in DIRS and the recursion above
+# never reaches them - but their pages are still pages, and they were
+# installed before this rule was a recursion.  A man page has nothing
+# to do with whether the program builds here.
+#
+install-man-host:
+	@for d in */ ; do ( cd $$d && $(MAKE) $@ ) || exit 1 ; done
 
 clean:
 	$(RECURSE)

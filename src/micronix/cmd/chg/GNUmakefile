@@ -14,4 +14,6 @@ CLASS	= cmd
 
 CSRCS	= chg.c
 
+MANSRCS	= chg.1
+
 include $(DEPTH)/GNUmakefile.inc

@@ -35,7 +35,7 @@ ROOT	?= ~/src/micronix/filesystem
 DEST	 = $(ROOT)/usr/src/libexec
 NOWARN	 = --warning=no-ignore-newer
 
-.PHONY: all update install install-man clean clobber doc footprint hostpasses
+.PHONY: all update install install-man install-man-host clean clobber doc footprint hostpasses
 
 all:
 	$(RECURSE)
@@ -62,6 +62,9 @@ install:
 	$(RECURSE)
 
 install-man:
+	$(RECURSE)
+
+install-man-host:
 	$(RECURSE)
 
 clean:

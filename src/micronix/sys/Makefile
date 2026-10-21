@@ -62,18 +62,17 @@ LD = ld
 # OVLBASE is OVLSEG * 0x1000 and the module links below are told the same
 # address by -Tdata, so the two have to agree.  -DN8259=2 is the interrupt
 # topology (include/sys/ints.h): the d1's two 8259s.  Polled vs vectored
-# is no longer a C flag - sys/slavepic.c is built both ways below, and the
-# two highmem folds pick one each.
-CFLAGS = -m micronix -O -DOVLSEG=12 -DN8259=2 -i$(INC)/
+# is no longer a C flag - one kernel discovers the board at boot.
+CFLAGS = -m micronix -O -DOVLSEG=13 -DN8259=2 -i$(INC)/
 
 #
 # The overlay frame.  OVLBASE is the one segment a driver module is
-# mapped into (0xc000, above the buffer pool).  It is the literal
-# GNUmakefile computes out of OVLSEG (12) and names outright.  The data
-# segment itself follows the text, so there is no separate data origin
-# to name.
+# mapped into (0xd000, above the scratch and buffer pools).  It is the
+# literal GNUmakefile computes out of OVLSEG (13) and names outright.
+# The data segment itself follows the text, so there is no separate data
+# origin to name.
 #
-OVLBASE = 0xc000
+OVLBASE = 0xd000
 PAGESZ  = 4096
 
 #
@@ -86,12 +85,14 @@ UPAGE_AS_SRC   = mem.s inout.s sub8.s unixtobcd.s slavevec.s
 UPAGE_AS_OBJ   = mem.o inout.o sub8.o unixtobcd.o slavevec.o
 
 UPAGE_LIBC_SRC = csv.s idiv.s imul.s qadd.s qsub.s qand.s qor.s qcmp.s \
-	qshl.s qsar.s qshr.s qldst.s tramp.s swdisp.s swdispw.s oarg.s
+	qshl.s qsar.s qshr.s qmul.s qinc.s qldst.s tramp.s swdisp.s \
+	swdispw.s oarg.s
 UPAGE_LIBC_OBJ = csv.o idiv.o imul.o qadd.o qsub.o qand.o qor.o qcmp.o \
-	qshl.o qsar.o qshr.o qldst.o tramp.o swdisp.o swdispw.o oarg.o
+	qshl.o qsar.o qshr.o qmul.o qinc.o qldst.o tramp.o swdisp.o \
+	swdispw.o oarg.o
 
-UPAGE_C_SRC    = consts.c
-UPAGE_C_OBJ    = consts.o
+UPAGE_C_SRC    = consts.c bus.c
+UPAGE_C_OBJ    = consts.o bus.o
 
 #
 # The resident kernel.
@@ -102,11 +103,13 @@ KERNEL_AS_OBJ = uhdr.o intrpt.o mio.o textpad.o
 KERNEL_C_SRC  = mount.c balloc.c cio.c create.c exec.c fio.c fork.c \
 	ialloc.c iget.c imap.c malloc.c name.c queue.c \
 	reg.c sig.c sleep.c subc.c swap.c sys1.c system.c time.c \
-	trap.c tty.c uio.c multio.c dlabel.c ovl.c main.c upd1990.c ss1_clock.c picvec.c
+	trap.c tty.c uio.c multio.c ss1_uart.c dlabel.c ovl.c main.c \
+	upd1990.c ss1_clock.c picdata.c
 KERNEL_C_OBJ  = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o malloc.o name.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
-	trap.o tty.o uio.o multio.o dlabel.o ovl.o main.o upd1990.o
+	trap.o tty.o uio.o multio.o ss1_uart.o dlabel.o ovl.o main.o \
+	upd1990.o ss1_clock.o picdata.o
 
 #
 # The window-page cluster, folded to .data at 0xe000 (BUFWIN) by win.o's
@@ -119,26 +122,36 @@ WIN_C_OBJ = open.o sys2.o rdwri.o memdev.o link.o access.o
 # Init-only code, folded into data-only highmem.o by the rule below and
 # reclaimed as buffer headers by expand_bufs() once init has returned.
 # The disk drivers' own bring-up (djinit, ncrinit) lives here, out of
-# their one-page modules.
+# their one-page modules, and so does the whole PIC/probe bring-up.
 #
-HIGHMEM_C_SRC  = main_init.c cus.c djinit.c ncrinit.c slavepic.c
-HIGHMEM_C_OBJ  = main_init.o cus.o djinit.o ncrinit.o
+HIGHMEM_C_SRC  = main_init.c cus.c djinit.c ncrinit.c pic_init.c \
+	probe_init.c upd1990_init.c ss1_clock_init.c picvec.c
+HIGHMEM_C_OBJ  = main_init.o cus.o djinit.o ncrinit.o pic_init.o \
+	probe_init.o upd1990_init.o ss1_clock_init.o picvec.o
 
-HIGHMEM_AS_SRC = inits.s unbcd.s
-HIGHMEM_AS_OBJ = inits.o unbcd.o
+HIGHMEM_AS_SRC = inits.s unbcd.s ss1vec.s
+HIGHMEM_AS_OBJ = inits.o unbcd.o ss1vec.o
 
 # The u struct itself, which lives in the u page's segment (USERSEG).
 USER_C_SRC = user.c
 USER_C_OBJ = user.o
+
+# The code that is folded to .data and rides the u page: pic.c's resident
+# half (pic_eoi, inton) and net.c's /dev/net framing.
+PIC_C_SRC = pic.c
+PIC_C_OBJ = pic.o
+NET_C_SRC = net.c
+NET_C_OBJ = net.o
 
 #
 # The disk drivers, each a module of its own: a driver .c and a header
 # .c, linked together into a page at OVLBASE and stamped into the bootable
 # image (see the module rules at the end).
 #
-MODS    = dj mw ide ncr hdca
-MOD_OBJ = dj.o mw.o ide.o ncr.o hdca.o
-MOD_HDR = djhdr.o mwhdr.o idehdr.o ncrhdr.o hdcahdr.o
+MODS    = dj mw ide ncr hdca nd disk1 disk2 disk3
+MOD_OBJ = dj.o mw.o ide.o ncr.o hdca.o nd.o disk1.o disk2.o disk3.o
+MOD_HDR = djhdr.o mwhdr.o idehdr.o ncrhdr.o hdcahdr.o ndhdr.o \
+	disk1hdr.o disk2hdr.o disk3hdr.o
 
 #
 # upd1990.c is ordinary resident C: its only callers are mount() and sys2.c,
@@ -155,20 +168,27 @@ MOD_HDR = djhdr.o mwhdr.o idehdr.o ncrhdr.o hdcahdr.o
 #
 LEAF_AS   = $(UPAGE_AS_OBJ) $(UPAGE_LIBC_OBJ)
 LEAF_C    = $(UPAGE_C_OBJ)
-KERNEL_AS = $(KERNEL_AS_OBJ) highmem.o phighmem.o
+KERNEL_AS = $(KERNEL_AS_OBJ) highmem.o
 KERNEL_C  = $(KERNEL_C_OBJ)
 WIN_C     = $(WIN_C_OBJ)
-HIGHMEM   = $(HIGHMEM_C_OBJ) $(HIGHMEM_AS_OBJ)
+
+# The fold's order is the cross build's, object for object: inits and
+# unbcd land between cus and the driver inits, and the PIC bring-up after
+# them.  The source lists above are only what has to be compiled.
+HIGHMEM   = main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o \
+	pic_init.o probe_init.o upd1990_init.o ss1_clock_init.o \
+	picvec.o ss1vec.o
 
 OBJS      = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) \
-	$(WIN_C) $(HIGHMEM) slavepic_polled.o slavepic_vectored.o \
-	low.o win.o ovlslot.o
+	$(WIN_C) low.o win.o ovlslot.o
 
 MODULES = $(MOD_OBJ) $(MOD_HDR) \
 	dj.mod mw.mod ide.mod ncr.mod hdca.mod \
-	dj.page mw.page ide.page ncr.page hdca.page
+	nd.mod disk1.mod disk2.mod disk3.mod \
+	dj.page mw.page ide.page ncr.page hdca.page \
+	nd.page disk1.page disk2.page disk3.page
 
-all: unix punix
+all: unix
 
 #
 # Each object and the source of the same name, and only those.  $* is
@@ -182,41 +202,28 @@ all: unix punix
 $(UPAGE_AS_OBJ) $(UPAGE_LIBC_OBJ) $(KERNEL_AS_OBJ) $(HIGHMEM_AS_OBJ): $*.s
 	$(CC) -m micronix -c $*.s
 
-$(KERNEL_C_OBJ) $(WIN_C_OBJ) $(HIGHMEM_C_OBJ) $(USER_C_OBJ) $(MOD_OBJ) $(MOD_HDR): $*.c
+$(KERNEL_C_OBJ) probe.o $(WIN_C_OBJ) $(HIGHMEM_C_OBJ) $(USER_C_OBJ) \
+	$(MOD_OBJ) $(MOD_HDR): $*.c
 	$(CC) $(CFLAGS) -c $*.c
 
 # The u page: the leaf code first at the base of segment USERSEG, then
 # user.o (the u struct) whose data is ustack (512 bytes, the system
 # stack) below the u struct, all as .data placed at 0xf000.  The code
 # must be .data, not .text - the loader reads text and then data, so text
-# parked here would be overwritten.  It is a relocatable object like
-# every other here, and the .o says so; it was user.rel, which collides
-# with user.o besides.
-upage.o: $(LEAF_AS) $(LEAF_C) $(USER_C_OBJ)
-	$(LD) -r -Tdata=0xf000 -o upage.o $(LEAF_AS) $(LEAF_C) $(USER_C_OBJ)
+# parked here would be overwritten.  pic.o and net.o are folded to data
+# by their own rules below for the same reason.
+upage.o: $(LEAF_AS) $(LEAF_C) $(PIC_C_OBJ) $(NET_C_OBJ) $(USER_C_OBJ)
+	$(LD) -r -Tdata=0xf000 -o upage.o $(LEAF_AS) $(LEAF_C) \
+		$(PIC_C_OBJ) $(NET_C_OBJ) $(USER_C_OBJ)
 
 # highmem.o is the init-only code - main_init, cus, the drivers' bring-up
-# (djinit, ncrinit), the MIO/console init in inits.s, and bcd2unix in
-# unbcd.s - folded into one data-only object with -Sdata.  The main link
-# parks a data-only object after bss, so it sits at _ebss and
-# expand_bufs() mints buffer headers over it once init has returned.
-#
-# There are two folds, differing only in the slave PIC bring-up
-# (slavepic.c): highmem.o is the CAS-vectored one (unix), phighmem.o the
-# polled one (punix).  The driver modules and the whole rest of the kernel
-# build once and are shared by both.
-highmem.o: $(HIGHMEM) slavepic_vectored.o
-	$(LD) -r -Sdata -o highmem.o $(HIGHMEM) slavepic_vectored.o
-
-phighmem.o: $(HIGHMEM) slavepic_polled.o
-	$(LD) -r -Sdata -o phighmem.o $(HIGHMEM) slavepic_polled.o
-
-# The two slave PIC variants, from the one file.  ccc's -c names the
-# object, so the polled and vectored brings-up live side by side.
-slavepic_polled.o: slavepic.c
-	$(CC) $(CFLAGS) -DN8259_POLLED=1 -c -o slavepic_polled.o slavepic.c
-slavepic_vectored.o: slavepic.c
-	$(CC) $(CFLAGS) -DN8259_POLLED=0 -c -o slavepic_vectored.o slavepic.c
+# (djinit, ncrinit), the PIC discovery, the probe and attach, the clock
+# bring-up, the MIO/console init in inits.s, and bcd2unix in unbcd.s -
+# folded into one data-only object with -Sdata.  The main link parks a
+# data-only object after bss, so it sits at _ebss and expand_bufs() mints
+# buffer headers over it once init has returned.
+highmem.o: $(HIGHMEM)
+	$(LD) -r -Sdata -o highmem.o $(HIGHMEM)
 
 # consts.o is made the same way, for the same reason and one literal at a
 # time: ccc compiles the device-name strings the u page's read-only
@@ -224,10 +231,29 @@ slavepic_vectored.o: slavepic.c
 # pads out to the u page - tens of kilobytes of zeros in the middle of
 # the image, past the blocks the boot loader reads.  Folded, upage.o has
 # no text and the image is the size it has always been.
+#
+# bus.o (the DMA bus lock two driver modules call) and pic.o (the
+# resident 8259 half) ride the u page for the same reason: a module has
+# to find them in the kernel's symbol table, and the u page is resident.
 consts.o: consts.c
 	$(CC) $(CFLAGS) -c -o consts.rel consts.c
 	$(LD) -r -Sdata -o consts.o consts.rel
 	rm -f consts.rel
+
+bus.o: bus.c
+	$(CC) $(CFLAGS) -c -o bus.rel bus.c
+	$(LD) -r -Sdata -o bus.o bus.rel
+	rm -f bus.rel
+
+pic.o: pic.c
+	$(CC) $(CFLAGS) -c -o pic.rel pic.c
+	$(LD) -r -Sdata -o pic.o pic.rel
+	rm -f pic.rel
+
+net.o: net.c
+	$(CC) $(CFLAGS) -c -o net.rel net.c
+	$(LD) -r -Sdata -o net.o net.rel
+	rm -f net.rel
 
 # uhdr.o must stay at 0x1000 (the firmware's entry point).  The asm
 # follows the C objects: mem.s remaps segment 1 (0x1000-0x1fff) through
@@ -251,7 +277,7 @@ consts.o: consts.c
 # fold it upstream, because this link has nowhere to put its text.
 #
 # The frame is not opened by the final link - there is no -Tdata on it.
-# ovlslot.o is .data at OVLBASE (0xc000) by the -r link above, so the
+# ovlslot.o is .data at OVLBASE (0xd000) by the -r link above, so the
 # final link places it there among the data, and setdev overwrites it
 # with the root driver.
 #
@@ -277,8 +303,8 @@ consts.o: consts.c
 # not found: ccc" and no link.  The driver is what usually supplies it -
 # ccc builds a -L out of its own argv[0] and hands it over (ccc.c) - and
 # a direct link has to write the flag out.
-low.o: uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
-	$(LD) -r -o low.o uhdr.o $(KERNEL_C) intrpt.o mio.o textpad.o
+low.o: uhdr.o $(KERNEL_C) probe.o intrpt.o mio.o textpad.o
+	$(LD) -r -o low.o uhdr.o $(KERNEL_C) probe.o intrpt.o mio.o textpad.o
 
 # win.o is the window-page cluster: the part of the resident kernel that
 # runs while a buffer's segment is in the BUFSEG window, folded to .data
@@ -292,7 +318,7 @@ win.o: $(WIN_C)
 # OVLBASE, which setdev later writes the root driver's page onto.  The -r
 # link is what holds it at that address; -Tdata says where the data
 # segment starts, so the object's own header carries the page and the
-# final link places it there.  It is data now because 0xc000 is above the
+# final link places it there.  It is data now because 0xd000 is above the
 # resident data, not the page past the text.
 ovlslot.o: ovlslot.s
 	$(CC) $(CFLAGS) -c -o ovlslot.rel ovlslot.s
@@ -306,13 +332,6 @@ unix.link: $(OBJS)
 	$(LD) -Ttext=0x1000 -Shigh -L/lib -lccc -lc \
 		-o unix.link low.o highmem.o ovlslot.o win.o upage.o
 
-# punix is unix with the polled highmem fold.  The driver modules are the
-# same for both - they resolve only resident symbols, which do not move
-# between the two - so punix reuses unix's .page files.
-punix.link: $(OBJS)
-	$(LD) -Ttext=0x1000 -Shigh -L/lib -lccc -lc \
-		-o punix.link low.o phighmem.o ovlslot.o win.o upage.o
-
 #
 # Driver modules, and the bootable image they go into.
 #
@@ -322,7 +341,8 @@ punix.link: $(OBJS)
 # so its data lands at the front of the page.  -A resolves the module
 # against unix.link, and -s drops the symbol table the page would carry.
 #
-dj.mod mw.mod ide.mod ncr.mod hdca.mod: $*hdr.o $*.o unix.link
+dj.mod mw.mod ide.mod ncr.mod hdca.mod nd.mod disk1.mod disk2.mod \
+	disk3.mod: $*hdr.o $*.o unix.link
 	$(LD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ $*hdr.o $*.o
 
 # One module is one page.  What the link produced is a 16 byte object
@@ -331,7 +351,8 @@ dj.mod mw.mod ide.mod ncr.mod hdca.mod: $*hdr.o $*.o unix.link
 # follows the header.  dd strips the header, and a second dd through a
 # temp file pads a short module up to the 4K the kernel will read, which
 # is the ordinary case.
-dj.page mw.page ide.page ncr.page hdca.page: $*.mod
+dj.page mw.page ide.page ncr.page hdca.page nd.page disk1.page \
+	disk2.page disk3.page: $*.mod
 	dd if=$*.mod of=$@ bs=1 skip=16
 	dd if=$@ of=$@.p bs=4096 count=1 conv=sync
 	mv $@.p $@
@@ -342,15 +363,18 @@ dj.page mw.page ide.page ncr.page hdca.page: $*.mod
 # computes for itself out of the object's own header; setdev reads the
 # major out of each page and dies if it finds no module for the root
 # device.  -i stamps the driver for the kernel's own root device.
-unix: unix.link dj.page mw.page ide.page ncr.page hdca.page
-	cp unix.link unix
-	cat dj.page mw.page ide.page ncr.page hdca.page >> unix
+#
+# The dd is the page rounding: unix.link is not a whole number of pages,
+# and the module pages have to start at the next boundary or setdev's
+# modbase lands inside the first one.  conv=sync pads the last block with
+# zeros to the block size, which is the same thing the host build's
+# truncate does.
+unix: unix.link dj.page mw.page ide.page ncr.page hdca.page nd.page \
+	disk1.page disk2.page disk3.page
+	dd if=unix.link of=unix bs=4096 conv=sync
+	cat dj.page mw.page ide.page ncr.page hdca.page nd.page \
+		disk1.page disk2.page disk3.page >> unix
 	setdev -i unix
-
-punix: punix.link dj.page mw.page ide.page ncr.page hdca.page
-	cp punix.link punix
-	cat dj.page mw.page ide.page ncr.page hdca.page >> punix
-	setdev -i punix
 
 # makedate is a micronix program like everything else here, and it
 # compiles against the kernel's headers for the same reason: with no -i
@@ -393,7 +417,8 @@ install: unix
 # file that matters.  A stray .o left in the directory is not swept up
 # any more, but nothing links one either: unix is built from $(OBJS).
 clean:
-	rm -f $(OBJS) $(MODULES) consts.rel ovlslot.rel *.nam *.tok *.x
+	rm -f $(OBJS) $(MODULES) $(HIGHMEM) probe.o pic.o net.o consts.rel \
+		bus.rel pic.rel net.rel ovlslot.rel *.nam *.tok *.x
 
 # clobber is clean plus the kernel, the makedate host program, and
 # build.h, the one file here that is written rather than compiled.
@@ -401,7 +426,7 @@ clean:
 # remakes it, so a clean that took it along would quietly put a new date
 # in the kernel on the next build.
 clobber: clean
-	rm -f unix punix unix.link punix.link makedate build.h
+	rm -f unix unix.link makedate build.h
 
 # dependencies generated by
 #
@@ -450,7 +475,25 @@ rdwri.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/file.h $(SYS)/proc.h
 reg.o: $(SYS)/sys.h $(SYS)/proc.h
 upd1990.o: $(SYS)/sys.h $(SYS)/proc.h
 sig.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/tty.h
-slavepic_polled.o slavepic_vectored.o: $(SYS)/ints.h
+bus.o: $(SYS)/sys.h $(SYS)/ovl.h $(SYS)/proc.h
+pic.o: $(SYS)/pic.h $(SYS)/pic8259.h
+net.o: $(SYS)/sys.h $(SYS)/con.h $(SYS)/proc.h $(SYS)/net.h
+probe.o: $(SYS)/sys.h $(SYS)/ovl.h $(SYS)/pic.h $(SYS)/pic8259.h
+pic_init.o: $(SYS)/pic.h $(SYS)/pic8259.h $(SYS)/tty.h
+probe_init.o: $(SYS)/sys.h $(SYS)/ovl.h $(SYS)/pic.h $(SYS)/pic8259.h
+picdata.o: $(SYS)/pic8259.h $(SYS)/tty.h
+ss1_uart.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/pic8259.h
+ss1_clock.o: $(SYS)/sys.h
+upd1990_init.o: $(SYS)/sys.h
+picvec.o: $(SYS)/pic.h
+nd.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h $(SYS)/ioctl.h $(SYS)/nd.h $(SYS)/ovl.h
+ndhdr.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h $(SYS)/nd.h $(SYS)/ovl.h
+disk1.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h $(SYS)/disk1.h $(SYS)/ovl.h $(SYS)/dlabel.h $(SYS)/ioctl.h
+disk1hdr.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h $(SYS)/disk1.h $(SYS)/ovl.h
+disk2.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h $(SYS)/disk2.h $(SYS)/ovl.h $(SYS)/dlabel.h
+disk2hdr.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h $(SYS)/disk2.h $(SYS)/ovl.h
+disk3.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h $(SYS)/disk3.h $(SYS)/ovl.h $(SYS)/dlabel.h
+disk3hdr.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h $(SYS)/disk3.h $(SYS)/ovl.h
 sleep.o: $(SYS)/sys.h $(SYS)/proc.h
 subc.o: $(SYS)/sys.h $(SYS)/con.h
 swap.o: $(SYS)/sys.h $(SYS)/proc.h $(SYS)/buf.h $(SYS)/con.h

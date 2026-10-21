@@ -43,7 +43,8 @@ include $(DEPTH)/GNUmakefile.inc
 
 CCFLAGS += -Dunix
 
-SRCS += parser.y ncform
+SRCS += ldefs.c once.c allprint.c ereject.c libmai.c yyless.c yywrap.c \
+	parser.y ncform
 
 LIBOBJS	= libmai.o allprint.o yyless.o yywrap.o ereject.o
 

@@ -33,7 +33,7 @@ ROOT	?= ~/src/micronix/filesystem
 DEST	 = $(ROOT)/usr/src/stand
 NOWARN	 = --warning=no-ignore-newer
 
-.PHONY: all update install install-man clean clobber doc
+.PHONY: all update install install-man install-man-host clean clobber doc
 
 all:
 	$(RECURSE)
@@ -54,6 +54,9 @@ install:
 # directories below.
 #
 install-man:
+	$(RECURSE)
+
+install-man-host:
 	$(RECURSE)
 
 clean:
