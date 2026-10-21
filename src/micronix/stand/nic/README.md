@@ -33,14 +33,48 @@ DI pins are ordinary outputs.
 
 ## Build and flash
 
-    cp include/secrets.example.h include/secrets.h   # wifi, edit it
     make                 # pio run
     make upload          # over the DOIT's own USB-UART
     make monitor         # 115200
 
-`secrets.h` is ignored by git; `-DWIFI_SSID=... -DWIFI_PASS=...` in
-`platformio.ini` works too.  Without credentials, `JOIN` answers
-`ACK timeout` and `RDY` never sets.
+## Provisioning
+
+The network card comes up with no credentials and raises its own setup
+access point; give it an SSID and password either way, and it stores
+them in **NVS** (`Preferences`, namespace `nic`), so they survive the
+power cycle and a flash of new firmware.
+
+**1. Over its access point.**  Join the open AP named
+`micronix-nic-xxxx` (the last two MAC bytes), then open
+`http://192.168.4.1/` - any URL lands there through the captive-portal
+DNS.  The page shows the station's state and takes the SSID and
+password; *Save and restart* writes NVS and reboots.  Set
+`NIC_AP_PASS` to put a WPA2 key on the setup AP instead of leaving it
+open.
+
+**2. Over the USB serial console** (115200, on the DOIT's own UART),
+after the WiFiDongle's editor: send any character and it scans and lists
+the networks, then prompts
+
+    ssid: <current value, editable>
+    password: <current value, editable>
+
+with backspace/delete editing and Enter to accept.  It writes the pair
+to NVS (no restart if nothing changed) and reboots.  This is the way in
+when the setup access point is not convenient, and the fallback when a
+provisioned network stops answering; the editor runs on the card's
+network task, so the bus side keeps running while it waits for you.
+
+After either path the station runs under **DHCP**: address, mask,
+gateway and DNS all come from the network.  It registers the hostname
+and mDNS name `micronix-nic-xxxx.local`, and `JOIN` answers with the
+address; `RDY` follows the link.  If a provisioned network does not
+answer within 20 seconds, the setup AP comes back up (in AP+STA mode)
+so a wrong password is recoverable without erasing NVS.  `pio run -t
+erase` clears the whole chip, NVS included.
+
+The compile-time `secrets.h` / `-DWIFI_SSID=...` pair is only a bench
+fallback, used when NVS holds nothing.
 
 ## What it is doing
 

@@ -29,12 +29,22 @@
 #include <esp_task_wdt.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <Preferences.h>
+#include <WebServer.h>
+#include <DNSServer.h>
+#include <ESPmDNS.h>
 
 #include "netproto.h"
 
 /*
- * Wi-Fi credentials.  Put them in secrets.h (ignored by git), or in the
- * environment's build flags -DWIFI_SSID=... -DWIFI_PASS=...
+ * Wi-Fi credentials are provisioned at runtime and kept in NVS - see
+ * "Provisioning" in README.md.  Until the card has a network it brings
+ * up its own access point; connect to that, open the page, and give it
+ * an SSID and password.  Everything after that is DHCP: address, mask,
+ * gateway, DNS.
+ *
+ * The compile-time pair below is a bench fallback, used only when NVS
+ * holds nothing (secrets.h is ignored by git).
  */
 #if defined(__has_include)
 #if __has_include("secrets.h")
@@ -46,6 +56,9 @@
 #endif
 #ifndef WIFI_PASS
 #define WIFI_PASS ""
+#endif
+#ifndef NIC_AP_PASS
+#define NIC_AP_PASS ""      /* empty: the setup access point is open */
 #endif
 
 /* ------------------------------------------------------------------ */
@@ -322,6 +335,24 @@ static int  f_need;
 static volatile bool joining = false;
 static uint32_t joinStart = 0;
 
+/* runtime network configuration, provisioned into NVS */
+static char cfgSsid[33];
+static char cfgPass[65];
+static bool haveCreds = false;
+static bool staStarted = false;
+static uint32_t staStart = 0;
+static bool provisioning = false;
+static bool mdnsUp = false;
+static uint32_t restartAt = 0;
+static char apName[24];
+static Preferences prefs;
+static WebServer web(80);
+static DNSServer dns;
+
+static void startSTA(void);
+static void startProvisioning(void);
+static void stopProvisioning(void);
+
 static void close_sock(Sock &s)
 {
     s.udp.stop();
@@ -544,17 +575,17 @@ static void do_join(void)
         push_frame(P_ACK, 0xff, b, 4);
         return;
     }
-    if (WIFI_SSID[0] == '\0') {
-        push_ack(0xff, E_TIMEOUT);      /* no credentials compiled in */
+    if (!haveCreds) {
+        startProvisioning();            /* no network yet: setup AP */
+        push_ack(0xff, E_TIMEOUT);
         return;
     }
     if (joining)
         return;                         /* the answer comes when it ends */
     joining = true;
     joinStart = millis();
-    WiFi.mode(WIFI_STA);
-    WiFi.setSleep(false);
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    if (!staStarted)
+        startSTA();
 }
 
 static void dispatch(void)
@@ -610,30 +641,58 @@ static void drain_tx(void)
     }
 }
 
-/* finish a join, in the network task */
+/*
+ * The link, in the network task.  A JOIN gets its ACK here - the IP when
+ * the station has one, E_TIMEOUT if the association has not happened in
+ * 30 seconds.  RDY follows the address: it drops if the link is lost.
+ * The card starts its setup AP when it has no credentials, and again if
+ * a provisioned network does not answer in 20 seconds, so a wrong
+ * password is recoverable without erasing anything.
+ */
 static void poll_join(void)
 {
-    if (!joining)
-        return;
     if (WiFi.status() == WL_CONNECTED) {
         IPAddress ip = WiFi.localIP();
 
         if (ip[0] | ip[1] | ip[2] | ip[3]) {
-            uint8_t b[4] = { ip[0], ip[1], ip[2], ip[3] };
+            if (!joined) {
+                uint8_t b[4] = { ip[0], ip[1], ip[2], ip[3] };
 
-            joined = true;
-            joining = false;
-            push_frame(P_ACK, 0xff, b, 4);
-            Serial.printf("nic: joined, ip %u.%u.%u.%u\n", b[0], b[1], b[2], b[3]);
+                joined = true;
+                if (joining) {
+                    joining = false;
+                    push_frame(P_ACK, 0xff, b, 4);
+                    Serial.printf("nic: joined, ip %u.%u.%u.%u\n",
+                                  b[0], b[1], b[2], b[3]);
+                }
+                if (!mdnsUp) {
+                    MDNS.begin(apName);
+                    mdnsUp = true;
+                }
+                if (provisioning)
+                    stopProvisioning();
+            }
         }
         return;
     }
-    if (WiFi.status() == WL_CONNECT_FAILED ||
-        WiFi.status() == WL_NO_SSID_AVAIL ||
-        millis() - joinStart >= 30000) {
+
+    if (joined)
+        joined = false;                 /* link lost: RDY drops */
+
+    if (joining && (millis() - joinStart >= 30000 ||
+                    WiFi.status() == WL_CONNECT_FAILED ||
+                    WiFi.status() == WL_NO_SSID_AVAIL)) {
         joining = false;
         push_ack(0xff, E_TIMEOUT);
-        Serial.println("nic: join failed");
+        Serial.println("nic: join failed; send any character to edit wifi settings");
+    }
+
+    if (haveCreds && !staStarted)
+        startSTA();
+    if (haveCreds && staStarted && !provisioning &&
+        millis() - staStart >= 20000) {
+        Serial.println("nic: no link; setup AP up");
+        startProvisioning();
     }
 }
 
@@ -713,14 +772,244 @@ static void poll_socket(uint8_t i)
     }
 }
 
+/* ------------------------------------------------------------------ */
+/* Provisioning                                                        */
+/*                                                                     */
+/* No credentials: an open access point named micronix-nic-xxxx, with  */
+/* the configuration page on 192.168.4.1.  The page writes the SSID     */
+/* and password to NVS and restarts; the station then comes up under   */
+/* DHCP.  The same page can forget them.  A USB-serial console takes   */
+/* "provision", "reset" and "status" as an escape hatch when the AP is */
+/* not up.  NIC_AP_PASS puts a WPA2 key on the setup AP.               */
+/* ------------------------------------------------------------------ */
+
+static void loadCreds(void)
+{
+    String s, p;
+
+    prefs.begin("nic", false);
+    s = prefs.getString("ssid", "");
+    p = prefs.getString("pass", "");
+    if (!s.length() && WIFI_SSID[0]) {  /* bench fallback */
+        s = WIFI_SSID;
+        p = WIFI_PASS;
+    }
+    strncpy(cfgSsid, s.c_str(), 32);
+    cfgSsid[32] = '\0';
+    strncpy(cfgPass, p.c_str(), 64);
+    cfgPass[64] = '\0';
+    haveCreds = cfgSsid[0] != '\0';
+}
+
+static void startSTA(void)
+{
+    WiFi.setHostname(apName);           /* what DHCP and mDNS register */
+    WiFi.mode(provisioning ? WIFI_AP_STA : WIFI_STA);
+    WiFi.setSleep(false);
+    WiFi.begin(cfgSsid, cfgPass);
+    staStarted = true;
+    staStart = millis();
+    Serial.printf("nic: connecting to '%s'\n", cfgSsid);
+}
+
+static String page(void)
+{
+    String h;
+
+    h = "<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>";
+    h += "<title>micronix network card</title>";
+    h += "<h1>micronix network card</h1><p>setup access point <b>";
+    h += apName;
+    h += "</b></p><p>station: ";
+    h += (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString()
+                                         : String("not connected");
+    h += "</p><form method=post action=/save>";
+    h += "SSID <input name=ssid maxlength=32><br>";
+    h += "Password <input name=pass type=password maxlength=63><br>";
+    h += "<button>Save and restart</button></form>";
+    h += "<form method=post action=/reset>";
+    h += "<button>Forget credentials</button></form>";
+    return h;
+}
+
+static void handleRoot(void)
+{
+    web.send(200, "text/html", page());
+}
+
+static void handleSave(void)
+{
+    String s = web.arg("ssid");
+    String p = web.arg("pass");
+
+    s.trim();
+    if (s.length() == 0 || s.length() > 32 || p.length() > 63) {
+        web.send(400, "text/plain", "bad ssid or password\n");
+        return;
+    }
+    prefs.putString("ssid", s);
+    prefs.putString("pass", p);
+    web.send(200, "text/html", "<p>saved; restarting.</p>");
+    Serial.printf("nic: credentials for '%s' saved\n", s.c_str());
+    restartAt = millis() + 800;
+}
+
+static void handleReset(void)
+{
+    prefs.remove("ssid");
+    prefs.remove("pass");
+    web.send(200, "text/html", "<p>credentials cleared; restarting.</p>");
+    restartAt = millis() + 800;
+}
+
+static void handleNotFound(void)
+{
+    /* the usual captive-portal redirect */
+    web.sendHeader("Location", "http://192.168.4.1/");
+    web.send(302, "text/plain", "");
+}
+
+static void startProvisioning(void)
+{
+    if (provisioning)
+        return;
+    WiFi.mode(haveCreds ? WIFI_AP_STA : WIFI_AP);
+    if (!WiFi.softAP(apName, NIC_AP_PASS[0] ? NIC_AP_PASS : nullptr)) {
+        Serial.println("nic: setup AP failed");
+        return;
+    }
+    dns.start(53, "*", WiFi.softAPIP());
+    web.on("/", HTTP_GET, handleRoot);
+    web.on("/save", HTTP_POST, handleSave);
+    web.on("/reset", HTTP_POST, handleReset);
+    web.onNotFound(handleNotFound);
+    web.begin();
+    if (!mdnsUp) {
+        MDNS.begin(apName);
+        mdnsUp = true;
+    }
+    provisioning = true;
+    Serial.printf("nic: setup AP '%s' at %s\n", apName,
+                  WiFi.softAPIP().toString().c_str());
+}
+
+static void stopProvisioning(void)
+{
+    if (!provisioning)
+        return;
+    web.stop();
+    dns.stop();
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_STA);
+    provisioning = false;
+    Serial.println("nic: setup AP down, station up");
+}
+
+/*
+ * The USB-serial editor, after the WiFiDongle's: any character on the
+ * console opens it.  It scans and lists the networks, then prompts for
+ * the ssid and password with the current values pre-filled and editable
+ * (backspace), writes the pair to NVS, and restarts.  This is the way
+ * in when the setup access point is not convenient.
+ */
+static void editstr(const char *prompt, char *buf, int max)
+{
+    int cursor = strlen(buf);
+
+    Serial.printf("%s: %s", prompt, buf);
+    for (;;) {
+        int c;
+
+        if (!Serial.available())
+            continue;
+        c = Serial.read();
+        if (c == '\r' || c == '\n') {
+            Serial.print("\r\n");
+            return;
+        }
+        if (c == 0x7f || c == 0x08) {   /* backspace/delete */
+            if (cursor > 0) {
+                Serial.print("\b \b");
+                buf[--cursor] = '\0';
+            }
+            continue;
+        }
+        if (c < ' ' || c > 0x7e || cursor >= max)
+            continue;
+        buf[cursor++] = (char)c;
+        buf[cursor] = '\0';
+        Serial.print((char)c);
+    }
+}
+
+static int editeeprom(void)
+{
+    char ssid[33], pass[65];
+    int n;
+
+    strncpy(ssid, cfgSsid, sizeof ssid - 1);
+    ssid[sizeof ssid - 1] = '\0';
+    strncpy(pass, cfgPass, sizeof pass - 1);
+    pass[sizeof pass - 1] = '\0';
+
+    Serial.println("Scanning for WiFi networks...");
+    n = WiFi.scanNetworks();
+    if (n <= 0)
+        Serial.println("  no networks found");
+    else {
+        Serial.printf("  %d network(s) found:\n", n);
+        for (int i = 0; i < n; i++)
+            Serial.printf("  %2d: %-32s %4d dBm %s\n", i + 1,
+                          WiFi.SSID(i).c_str(), WiFi.RSSI(i),
+                          WiFi.encryptionType(i) == WIFI_AUTH_OPEN
+                              ? "open" : "encrypted");
+    }
+    WiFi.scanDelete();
+    Serial.println();
+
+    editstr("ssid", ssid, sizeof ssid - 1);
+    editstr("password", pass, sizeof pass - 1);
+
+    if (!strcmp(ssid, cfgSsid) && !strcmp(pass, cfgPass)) {
+        Serial.println("no difference");
+        return 0;
+    }
+    prefs.putString("ssid", ssid);
+    prefs.putString("pass", pass);
+    Serial.printf("nic: saved '%s' to nvs\n", ssid);
+    return 1;
+}
+
+static void poll_serial(void)
+{
+    if (!Serial.available())
+        return;
+    (void)Serial.read();
+    Serial.println("Edit wifi configuration");
+    if (editeeprom())
+        ESP.restart();
+}
+
+static void poll_net(void)
+{
+    if (provisioning) {
+        dns.processNextRequest();
+        web.handleClient();
+    }
+    if (restartAt && millis() >= restartAt)
+        ESP.restart();                  /* after the reply is on the wire */
+}
+
 static void netTask(void *arg)
 {
     (void)arg;
     for (;;) {
         drain_tx();
+        poll_net();
         poll_join();
         for (uint8_t i = 0; i < NIC_NSOCK; i++)
             poll_socket(i);
+        poll_serial();
         vTaskDelay(pdMS_TO_TICKS(10));  /* 100 Hz, as the sim polls */
     }
 }
@@ -732,6 +1021,14 @@ static void netTask(void *arg)
 void setup(void)
 {
     Serial.begin(115200);
+    loadCreds();
+    {
+        uint8_t mac[6];
+
+        WiFi.macAddress(mac);
+        snprintf(apName, sizeof apName, "micronix-nic-%02x%02x",
+                 mac[4], mac[5]);
+    }
 
     /* the masks first: the bus task may start before this returns */
     for (int v = 0; v < 256; v++) {
@@ -769,6 +1066,11 @@ void setup(void)
      * poll loop: turn the watchdog off for that core.
      */
     disableCore1WDT();
+
+    if (haveCreds)
+        startSTA();
+    else
+        startProvisioning();
 
     xTaskCreatePinnedToCore(busTask, "nicbus", 2048, nullptr,
                             configMAX_PRIORITIES - 1, nullptr, 1);
