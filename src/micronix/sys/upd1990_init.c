@@ -3,7 +3,7 @@
  *
  * sys/upd1990_init.c
  *
- * upd1990_clockinit() programs the uPD1990's periodic output - the heartbeat.
+ * upd_clockinit() programs the uPD1990's periodic output - the heartbeat.
  * It runs once at boot, so this file folds into highmem.o and is
  * reclaimed as buffer headers.  The resident half (rtcinit, rtcwrite) is
  * in upd1990.c.
@@ -27,7 +27,7 @@ extern int in(), out();
  * the clock block in _minit (inits.s).
  */
 void
-upd1990_clockinit(void)
+upd_clockinit(void)
 {
     out(SELPORT, 0);                    /* select group 0 (control) */
 

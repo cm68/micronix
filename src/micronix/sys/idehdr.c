@@ -7,16 +7,17 @@
  * which folds every section into the data segment, and an object's data
  * is placed in the order the objects are named on the link line.  So the
  * header is alone in an object that is named first, and nothing this
- * file could grow can push it off the front: the 28 bytes below are all
+ * file could grow can push it off the front: the 29 bytes below are all
  * there is.  That is why the entries it points at are an object of the
  * driver's own rather than statics inside it (sys/ide.c) - an address a
  * header names has to be visible to the object holding the header.
  *
  * No tick - this controller answers when it is spoken to.  No init
- * either: VI2 is already unmasked by the board bring-up and the drive's
- * own reset belongs at open, where it is, so there is nothing to switch
- * on before this driver is reachable.  Nothing here reaches the driver's
- * data, so there is no data structure to point at yet.
+ * either: the attach loop unmasks the line once the handler is in
+ * place, and the drive's own reset belongs at open, where it is, so
+ * there is nothing to switch on before this driver is reachable.
+ * Nothing here reaches the driver's data, so there is no data
+ * structure to point at yet.
  *
  * name is a character list rather than the string it reads as; sys/ovl.h
  * says why, and it is the same reason this file is one struct.

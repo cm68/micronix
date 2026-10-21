@@ -406,10 +406,29 @@ bankcopy(p)
     struct proc *p;
 {
     char i;
+    UINT8 gseg, cseg;
 
+    /*
+     * The GROW pages all share one segment: mget() hands every one of
+     * them the same new segment, and grow() gives the ones still GROW
+     * one new segment together.  That segment can hold live memory -
+     * a stack a trap pushed onto grows the page in the kernel, not by
+     * a user fault, so the page can still be GROW with the word on it.
+     * Copying only FULL pages left the child resuming on a segment of
+     * whatever was there: a return address that is not one, a bad
+     * syscall (SIGSYS) or a spin.  Carry it across like any other page.
+     */
+    gseg = 0;
+    cseg = 0;
     for (i = 0; i < 17; i++)
         if (u.p->mem[i].per == FULL)
             segcopy(u.p->mem[i].seg, p->mem[i].seg);    /* mem.s */
+        else if (gseg == 0) {
+            gseg = u.p->mem[i].seg;
+            cseg = p->mem[i].seg;
+        }
+    if (gseg && cseg)
+        segcopy(gseg, cseg);                            /* mem.s */
 }
 
 /*

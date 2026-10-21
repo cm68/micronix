@@ -111,5 +111,18 @@ struct dsknod {
 #define     IEXEC   0000001
 
 /*
+ * open(2) flags.  Only the access mode (the low two bits) and
+ * O_APPEND reach the kernel; O_CREAT, O_TRUNC and O_EXCL are the
+ * library's (lib/libunix/open.c).
+ */
+#define O_APPEND	02000
+
+/*
+ * An open file that appends.  The high bits of struct file.mode are
+ * free, so this rides beside IREAD and IWRITE and is seen by rdwri().
+ */
+#define     IAPPEND 0000010
+
+/*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

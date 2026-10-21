@@ -115,18 +115,20 @@
  * that is a state machine this driver does not have, so the wait is the
  * bounded poll in scsibyte() and its bound is why it is bounded.
  *
- * Sharing VI2 with the IDE card no longer asks anything of this file.
- * The line is level triggered and the 8259 is told the interrupt is over
- * once, when intrupt (mio.s) returns, so both cards on the line have to
- * be serviced in that one entry - and the resident dispatcher does it:
- * ovlntr (sys/ovl.c) holds two handlers per line and calls each in turn,
- * mapping each handler's own segment (ovlcall) because a handler runs at
- * a moment its page is not necessarily the one mapped.  Each handler
- * reads its own card's registers, which is what takes its own line down,
- * and each returns at once when its card has nothing in flight.  This
- * driver used to chain the two by hand (scsii2int); that routine is gone
- * with the module split, since ideint is in another module now and this
- * one cannot name it.
+ * The line is discovered, not named: this driver's header gives the
+ * probe and the handler, and the attach loop (sys/probe_init.c) tickles
+ * the card and reads the PIC back to find its line.  ovlntr
+ * (sys/probe.c) holds one handler per line and calls it through
+ * ovlcall, mapping the handler's own segment because a handler runs at
+ * a moment its page is not necessarily the one mapped; the 8259 is told
+ * the interrupt is over after the call.  A second card on a line
+ * already claimed is a wiring error and the attach loop panics on it,
+ * so this driver and ide do not share a line.  The handler reads its
+ * own card's registers, which is what takes the line down, and returns
+ * at once when its card has nothing in flight.  This driver used to
+ * chain to ideint by hand (scsii2int); that routine is gone with the
+ * module split, since ideint is in another module and this one cannot
+ * name it.
  *
  * The shape of the driver is ide.c's, because the filesystem is the same
  * one.  Open reads the disk label mkfs writes into the boot sector - the
@@ -663,15 +665,15 @@ scsibuild(ip, read, lba, nblk)
 }
 
 /*
- * The interrupt handler, the card's half of the shared line.
+ * The interrupt handler.
  *
- * sys/intrpt.s routes VI2 to the resident dispatcher (ovlint2), which
- * holds this handler's segment in its line table and calls ncrint through
- * ovlcall with this module's page mapped - and intrupt (mio.s) has
- * already saved the machine state, taken interrupts off for the duration
- * and will write the end-of-interrupt to the 8259 when this returns, so
- * there is nothing to save here and nothing to acknowledge beyond the
- * chip itself.
+ * The attach loop discovered the card's line and put this handler, with
+ * its segment, in the resident line table (ovlint, sys/probe.c).
+ * ovlntr calls ncrint through ovlcall with this module's page mapped -
+ * intrupt (mio.s) has already saved the machine state and taken
+ * interrupts off for the duration, and pic_eoi writes the
+ * end-of-interrupt to the 8259 after this returns, so there is nothing
+ * to save here and nothing to acknowledge beyond the chip itself.
  *
  * The acknowledgement is the read of RPI, and it comes first: the 5380
  * holds IRQ down until that register is read, the 8259 is level

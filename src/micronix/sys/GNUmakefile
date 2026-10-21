@@ -41,12 +41,14 @@ INC	= -i$(DEPTH)/include
 # The prose.  The source tar carries $(SRCS), which is the *.c/*.h/*.s/*.1
 # wildcards plus $(EXTRA), and none of these is any of those - so without
 # this the kernel ships to /usr/src/sys with its code and none of the
-# writing that explains it.  BUILDING is how this directory is built and
-# TODO is what is left to do in it, so both belong here; the project's
-# design notes used to as well, and they are the repository's docs/ now,
-# which the top-level update ships to /usr/src/docs (GNUmakefile above).
+# writing that explains it.  BUILDING is how this directory is built,
+# ARCHITECTURE is how the pieces fit together, FEATURES-2 is what the
+# 2.x kernel adds over 1.6, and TODO is what is left to do in it, so all
+# four belong here; the project's design notes used to as well, and they
+# are the repository's docs/ now, which the top-level update ships to
+# /usr/src/docs (GNUmakefile above).
 #
-EXTRA	= BUILDING TODO
+EXTRA	= BUILDING ARCHITECTURE.md FEATURES-2.md TODO
 
 # build.h is written by the rule below, and unix.link is the half-built
 # image unix is made from; GNUmakefile.inc's clobber takes GENERATED
@@ -216,13 +218,12 @@ include $(DEPTH)/GNUmakefile.inc
 
 #
 # The buffer pool.  Unclamped by default: expand_bufs() mints headers up
-# to BUFWIN (sys.h, the base of the page the buffers are reached
-# through) and the pool is whatever fits between _ebss and there.  It is
-# that page and not _upage above it because bwin() holds a segment in it
-# for the whole of a buffer access.  The 0xd000 page used to be reserved
-# for the superblock's window; the superblock is plain memory now (getsb,
-# in uio.c) and mem.s puts back the page it borrows for user memory, so
-# the headers carry on through it.  A cache bug that only shows itself
+# to SCRWIN (sys.h, the scratch window's page) and the pool is whatever
+# fits between _ebss and there.  It stops at that page and not at BUFWIN
+# above it because mem.s and swin() borrow the scratch page for a user
+# page or a driver's segment, and bhold() maps a buffer over the buffer
+# page for the whole of an access: a header in either would be read back
+# as something else.  A cache bug that only shows itself
 # with the full pool costs an hour of recompiling to find, so the clamp
 # is still here, as an opt-in:
 #
@@ -341,7 +342,7 @@ main_init.o: build.h
 # ends up at the base of the struct, which is where the firmware's trap
 # entry leaves SP, so the kernel stack grows down into ustack.  textpad.o
 # stays last in the main link so _ebss is the end of .bss and binit()'s
-# buffer pool runs up to BUFWIN below u.
+# buffer pool runs up to SCRWIN, below the windows.
 upage.o: $(LEAF_AS) $(LEAF_C) pic.o net.o user.o
 	$(MXLD) -r -Tdata=0xf000 -o upage.o $(LEAF_AS) $(LEAF_C) pic.o net.o user.o
 
@@ -384,7 +385,7 @@ probe.o probe_init.o: %.o: %.c
 # can live at BUFSEG, in the very page bhold() maps buffers into, so its
 # bytes stop competing with buffer headers for the space below.  The
 # image is what costs here - sizeof(struct buf) is 19, so every 19 bytes
-# below SCRWIN is one buffer - and this page's 3923 bytes are 206 of them.
+# below SCRWIN is one buffer - and this page's 4012 bytes are 211 of them.
 #
 # The criterion is execution, not linkage: code in this page runs only
 # when no hold is up, so no object here may contain a hold site, and none
@@ -466,7 +467,7 @@ unix.link: $(OBJS)
 # The header is an object of its own, named first, and the link is
 # -Sdata.  That flag folds every section into the data segment, and an
 # object's data is placed in the order the objects are named on the link
-# line - so the header's 28 bytes are the page's first 28 and nothing the
+# line - so the header's 29 bytes are the page's first 29 and nothing the
 # driver holds can get in front of them.  The same ordering is why the
 # header object holds the struct and nothing else, and why the name in it
 # is a character list: sys/ovl.h has what a string would cost.

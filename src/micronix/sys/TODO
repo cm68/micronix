@@ -357,8 +357,8 @@ upage.o is 2837 + 629 of 4096.
 What is wired now.  sys/ncr.c is the driver; sys/ncrhdr.c is the module
 header, a separate object because an object's data is placed in the
 order the objects are named, so the header is alone in the one named
-first - major 5, init &ncrinit, bvec &ncrbvec, line 2, intr &ncrint,
-name ncr5380.  sys/ncrinit.c is the probe, and it lives in highmem.o
+first - major 5, init &ncrinit, bvec &ncrbvec, probe &ncrprobe,
+intr &ncrint, name ncr5380.  sys/ncrinit.c is the probe, and it lives in highmem.o
 with the other module inits rather than in the driver's page: a probe
 that runs once at boot does not belong in the 4K it is testing for, and
 highmem is parked past bss and reclaimed as buffer headers, so it costs
@@ -380,11 +380,12 @@ rest of the reasoning are in include/sys/ncr.h.
 
 scsii2int() is gone.  It chained the 5380's handler to ideint() by hand,
 which cannot survive the split - ideint is in another module and the
-kernel has no address for it at link time - so the resident fan-out
-does it instead: ovlntr (sys/ovl.c) holds two handlers per line and
-calls each through ovlcall with its own page mapped.  That fan-out is
-the one resident change the SCSI work needed, and it is what lets ide
-and ncr both live on VI2.
+kernel has no address for it at link time - so the resident dispatcher
+does the calling instead: ovlntr (sys/probe.c) holds one handler per
+line and calls it through ovlcall with its own page mapped.  The price
+is that ide and ncr cannot share VI2: the attach loop panics when a
+second card tickles a line already claimed, so a run with both cards
+wires them to different lines (the -w profile's job).
 
 Which way it went: docs/overlay.md's, the third of the three that were
 listed here.  Option 1 was never attractive - it buys the link by giving
@@ -426,8 +427,8 @@ bus taken, and was registered as the heir; dj's busgive then did
 (*bus)() with djdma's page still in the window.  The cpu ran mw's
 offset inside djdma's page - 0x94e6, which in djdma is the middle of
 copy()'s staging block - with djdma's data under it and djdma's bss
-temporaries zeroed, and the LDIR that followed walked across the Z280's
-on-chip register file at 0x0400, wrote the switch register, and the
+temporaries zeroed, and the LDIR that followed walked across the MPZ80's
+on-board registers at 0x0400, wrote the switch register, and the
 emulator switched tasks mid-instruction.  The runaway sled that came out
 the other end hung the shell at sync and at umount, and on another run
 made a mount of /dev/fla report "not a file system" on an image that was
@@ -602,7 +603,8 @@ dump cannot say which door it was lost in, and there are three: the root
 driver's own path, which is the stamped one - ovlseg[3] is OVLSEG itself,
 so putting the window back there is the identity map and a wrong record is
 invisible; the bus lock's heir, called through ovlcall from whatever
-process was holding the bus; and the fan-out over line 2, which is new.  A
+process was holding the bus; and the dispatcher's ovlcall path over the
+discovered line, which is new.  A
 -t all trace of the instructions before the stall separates them, and it
 has not been run.  What the destination device does say is that the copy
 was never a file: its inode did not reach the disk and neither did its
@@ -682,8 +684,8 @@ ways round, mw handing the bus to dj 226 times and dj handing it to mw 323
 ls -l says 207375 bytes and both sums read 24620 406: the copy's names the
 file, the sources' names `-`, and the two are one file.  That is the whole
 of this failure.  The other two doors the note listed were not in it - the
-root driver's own path, which is the stamped one, and the line-2 fan-out
-both stand as they were - and the same class of check was made against the
+root driver's own path, which is the stamped one, and the ovlcall
+dispatch both stand as they were - and the same class of check was made against the
 rest of the u page and came back clean: the leaf assembly has no writable
 storage (one read-only month table) and consts.c's tables are written when
 a module is placed, before the swapper forks, so every copy of them is the

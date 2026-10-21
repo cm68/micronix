@@ -3,13 +3,14 @@
  *
  * sys/stub_intr.c
  *
- * The handler the header's line/intr fields name (sys/ovl.h).  The
+ * The handler the header's probe/intr fields name (sys/ovl.h).  The
  * kernel's dispatch table (sys/intrpt.s) CALLs the common wrapper
- * (sys/mio.s), which saves the registers, calls this routine, and writes
- * the EOI on the way out - so a handler here reads the controller's
- * status, decides whether it has anything to say, and returns; it neither
- * saves registers nor touches the 8259 itself.  docs/INTERRUPTS.md is the full
- * story from the board to this door.
+ * (sys/mio.s), which saves the registers and calls this routine; the
+ * resident dispatcher (ovlntr, sys/probe.c) writes the EOI after this
+ * returns, so a handler here reads the controller's status, decides
+ * whether it has anything to say, and returns; it neither saves
+ * registers nor touches the 8259 itself.  sys/INTR.md is the full story
+ * from the board to this door.
  *
  * A handler runs with its module's page mapped (the kernel puts it in
  * place before calling), but it must not sleep and must not reach a
@@ -29,8 +30,8 @@
 /*
  * stubint(): the interrupt handler.  A real one:
  *   - reads the controller's status register;
- *   - checks whether it is the one that raised the shared line, and
- *     returns without touching anything if it is not;
+ *   - checks the card's status, and returns without touching anything
+ *     if the card has nothing in flight;
  *   - checks the bit that says it has work (DRQ, done, error);
  *   - sets the driver's done word and wakeup()s whoever is waiting on it.
  *

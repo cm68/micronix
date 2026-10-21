@@ -27,7 +27,7 @@ extern int vecalign();          /* sys/picvec.c */
 
 /* the two clock boards' entry points (ss1_clock*.c, upd1990*.c) */
 extern int ss1_clockinit(), ss1_rtcinit(), ss1_rtcwrite();
-extern int upd1990_clockinit(), upd1990_rtcinit(), upd1990_rtcwrite();
+extern int upd_clockinit(), upd_rtcinit(), upd_rtcwrite();
 
 /* the two console boards' entry points (ss1_uart.c, mio.s/inits.s) */
 extern int ss1_putc(), ss1_start(), ss1_stop(), ss1_set(), ss1_uart_init();
@@ -217,9 +217,9 @@ pic_init()
         out(PIC1, 0x07);                /* mask IR0-2, open IR3-7 */
     }
 
-    clockinit = upd1990_clockinit;
-    rtcinit = upd1990_rtcinit;
-    rtcwrite = upd1990_rtcwrite;
+    clockinit = upd_clockinit;
+    rtcinit = upd_rtcinit;
+    rtcwrite = upd_rtcwrite;
     console_putc = ace_putc;
     console_start = ace_start;
     console_stop = ace_stop;

@@ -42,9 +42,10 @@ MAP0=0x0600
 ; The first byte of the page the partial link places .data at (USERSEG,
 ; 0xf000 - see sys.h).  Nothing branches on it any more; it is here to
 ; name the page in a symbol dump, the way _ebss names the end of .bss.
-; The buffer pool's ceiling is the base of the page below it (BUFWIN,
-; sys.h) and not this address, because bwin() holds a segment in that
-; page for the whole of a buffer access.
+; The buffer pool's ceiling is the scratch window, SCRWIN (0xc000,
+; sys.h), three pages below this one and not the page next below it:
+; mem.s and swin() borrow that page, and bhold() maps buffers over the
+; buffer page between them.
 	.globl	_upage
 _upage:
 

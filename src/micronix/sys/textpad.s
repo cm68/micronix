@@ -7,8 +7,11 @@
 ;
 ; u (see user.c) no longer needs the text padded up to a 4K boundary:
 ; the link places upage.o at 0xf000 outright (see GNUmakefile), so u
-; and its segpad occupy segment 15 and the buffer pool runs from _ebss
-; up to BUFWIN (0xe000, the base of the window's page), one page below.
+; and its segpad occupy segment 15.  The buffer pool runs from _ebss up
+; to SCRWIN (0xc000, the scratch window's page) and not to BUFWIN, the
+; page below u: mem.s and swin() borrow the scratch page, and bhold()
+; maps buffer data over the buffer page, so a header in either would be
+; overwritten.
 ;
 	.bss
 	.globl	_blist

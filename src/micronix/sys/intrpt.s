@@ -46,17 +46,13 @@
 ;        /call _hdint			/wn.s
 ; 	/ret
 ;
-; int2 is a shared line: the IDE card's drive and an NCR 5380 host adapter
-; (sys/ncr.c) are both jumpered to VI2, and neither is the only thing on
-; the bus that drives it.  The line is level triggered and the 8259 is
-; told the interrupt is over once, when intrupt returns, so both cards
-; have to be serviced inside that one entry - which is the dispatcher's
-; business below and not this file's: ovlntr (sys/ovl.c) holds two
-; handlers per line and calls each with its own module mapped (ovlcall).
-; sys/ide.c's ideint() and sys/ncr.c's ncrint() each read their own card's
-; registers, which is what takes their own line down, and each returns at
-; once when its card has nothing in flight.  A driver that used to chain
-; the two by hand (sys/scsi.c's scsii2int) is gone with the module split.
+; int2 is the MultIO slave's cascade line on the two-PIC Wunderbus, and
+; the cascade stub below polls the slave and dispatches the line it
+; names.  A card names no line: the attach loop (sys/probe_init.c)
+; tickles it and reads the PIC back to find its line, and ovlntr
+; (sys/probe.c) holds one handler per line.  A second card that tickles
+; a line already claimed is a wiring error and the attach loop panics on
+; it - cards do not share a line on this kernel.
 ;
 ; The lines that belong to a disk controller no longer name the driver's
 ; handler.  mwint, djint, ideint and ncrint are in modules, so the kernel

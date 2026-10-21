@@ -20,7 +20,7 @@ HDRS	   = access.h buf.h con.h dir.h disk2.h disk3.h dj.h dlabel.h \
 	 times.h tty.h
 MKFILE	 = $(wildcard ?akefile)
 
-.PHONY: all update install install-man clean clobber doc
+.PHONY: all update install install-man install-man-host clean clobber doc
 
 all:
 
@@ -36,6 +36,8 @@ install:
 	cp $(HDRS) $(INCDIR)
 
 install-man:
+
+install-man-host:
 
 clean:
 

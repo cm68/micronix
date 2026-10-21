@@ -63,7 +63,7 @@ extern int nodev();             /* con.c */
 
 /*
  * The ceiling on the pool.  expand_bufs() would otherwise mint whatever
- * the resident .bss leaves between _ebss and BUFWIN.  That was past what
+ * the resident .bss leaves between _ebss and SCRWIN.  That was past what
  * the count can carry when this was written - 282 buffers, and nbuf
  * wrapped at 256 - and it is under the cap now, the kernel having
  * grown into the headroom; the cap stays as the ceiling-independent

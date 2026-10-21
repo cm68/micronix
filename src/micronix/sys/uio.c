@@ -667,9 +667,9 @@ bdrain()
  * way the window's page is the kernel's own memory whenever no hold is
  * up, which is what lets the page carry code - see TODO.
  *
- * The pool still stops below the window's page (BUFWIN, see
- * expand_bufs): a header there would be read back as buffer data for as
- * long as a hold is up, and holds are taken all over the filesystem.
+ * The pool still stops at the scratch window (SCRWIN, see expand_bufs):
+ * a header in this page would be read back as buffer data for as long
+ * as a hold is up, and holds are taken all over the filesystem.
  */
 bwin(seg)
     UINT8 seg;
