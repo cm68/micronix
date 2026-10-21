@@ -272,13 +272,13 @@ minit1:
 ;
 ; public	_coninit
 ; _coninit:
-; 	bc = 0x0101	/multio tty 1 in ciosw - major 1, minor 1
+; 	bc = 0x0100	/the console in ciosw - major 1, minor 0
 ; 	sp <= bc	/pass argument
 ; 	call _muopen	/mopen(dev)
 ; 	sp => af	/throw away argument
 ; 	return;
 ;
 _coninit:
-	ld	hl,0x0101	; dev (arg0) in hl
+	ld	hl,0x0100	; /dev/console, minor 0 (the routed board)
 	call	_console_open
 	ret

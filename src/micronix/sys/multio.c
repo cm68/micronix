@@ -22,7 +22,7 @@
  */
 int ttinit();
 
-#define NMIO    4               /* number of mult I/O ports */
+#define NMIO    TTY_SLOTS       /* struct tty slots, not minors (see tty.h) */
 #define MBASE 0x48
 #define VREADY (1 << 3)
 #define HREADY (1 << 4)
@@ -93,21 +93,52 @@ int ttinit();
 #define PENABLE 	050     /* parallel port enable */
 
 /*
- * Hardware fiddlers in mio.s
+ * Hardware fiddlers in mio.s, and the SS1's 2651 in ss1_uart.c
  */
 extern int ace_start(), ace_stop(), ace_putc(), ace_set();
+extern int ss1_start(), ss1_stop(), ss1_putc(), ss1_set();
+extern int ss1_uart_open();
 
 /*
- * Tty structures for multiboard ports
+ * Tty structures for the four ports: the SS1's 2651 and the three
+ * Wunderbus ACEs.  The minor numbers are not slot numbers (tty.h): the
+ * console is minor 0 and aliases a board, the SS1 is minor 1, and the
+ * ACEs are 4-6.  The slot a minor maps to is fixed, so the assembly
+ * interrupt handlers can name their tty by constant offset.
+ *
+ *   minor  TTY_CONSOLE -> the board console_minor names
+ *   minor  TTY_SS1     -> mttys[0]
+ *   minor  TTY_ACE0    -> mttys[1]
+ *   minor  TTY_ACE1    -> mttys[2]
+ *   minor  TTY_ACE2    -> mttys[3]
  */
 struct tty mttys[NMIO] = { 0 };
 
 /*
- * Select a tty structure from a device number
+ * Select a tty structure from a device number.  A NULL return means the
+ * minor names no port.  The console is resolved through console_minor
+ * every time, so /dev/console follows the routing without a second
+ * structure and without a stale dev in the opened file.
  */
+struct tty *
 ttdev(dev)
 {
-    return (&mttys[dev & 15]);
+    register m;
+
+    m = dev & 15;
+    if (m == TTY_CONSOLE)
+        m = console_minor;
+    switch (m) {
+    case TTY_SS1:
+        return (&mttys[0]);
+    case TTY_ACE0:
+        return (&mttys[1]);
+    case TTY_ACE1:
+        return (&mttys[2]);
+    case TTY_ACE2:
+        return (&mttys[3]);
+    }
+    return (0);
 }
 
 /*
@@ -118,17 +149,39 @@ muopen(dev, mode)
     register dev;
 {
     struct tty *tty;
+    register minor, port;
+
+    /*
+     * Minor 0 is the console alias; resolve it once to the board the
+     * boot routed the console to.  What the tty records (and what
+     * selects the ACE group) is the board's own minor, not the alias.
+     * The DIALER bit rides above the port number and is kept.
+     */
+    minor = dev & 0377;
+    port = minor & 15;
+    if (port == TTY_CONSOLE)
+        port = console_minor;
+    dev = (dev & 0xff00) | (minor & ~15) | port;
 
     tty = ttdev(dev);
-
-    if ((dev & 15) >= NMIO) {
+    if (tty == 0) {
         u.error = ENXIO;        /* No such dev. */
+        return;
+    }
+
+    /*
+     * The SS1's 2651 is not a banked ACE: it has fixed ports and its own
+     * open.  Minor 1 is that board even when the console was routed
+     * elsewhere.
+     */
+    if (port == TTY_SS1) {
+        ss1_uart_open(dev, 0);
         return;
     }
 
     if (tty->ispeed == 0) {     /* virgin */
         ttinit(tty, dev);
-        (*console_set)(tty);            /* set baud rate */
+        (*tty->set)(tty);               /* set baud rate */
     }
 
     /*
@@ -182,8 +235,8 @@ muopen(dev, mode)
     di();
 
     if (!(tty->state & OPEN) && !tty->outque.count && !tty->nextc) {
-        (*console_set)(tty);            /* set baud rate */
-        (*console_stop)(tty, 0);        /* enable input, disable output */
+        (*tty->set)(tty);               /* set baud rate */
+        (*tty->stop)(tty, 0);           /* enable input, disable output */
     }
     ei();
 
@@ -248,16 +301,33 @@ ttinit(tty, dev)
 
     tty->col = 0;
     tty->dev = dev;
-    tty->start = console_start;
-    tty->stop = console_stop;
-    tty->put = console_putc;
-    tty->set = console_set;
+
+    /*
+     * The back end belongs to the port, not to the machine.  The console
+     * globals name the console's board; a tty opened on the other board
+     * has to reach its own ports, and ttys are no longer one board's.
+     */
+    if ((dev & 15) == TTY_SS1) {
+        tty->start = ss1_start;
+        tty->stop = ss1_stop;
+        tty->put = ss1_putc;
+        tty->set = ss1_set;
+    } else {
+        tty->start = ace_start;
+        tty->stop = ace_stop;
+        tty->put = ace_putc;
+        tty->set = ace_set;
+    }
 }
 
 muselect(t)
     struct tty *t;
 {
-    out(MBASE + MUSELECT, (t->dev & 3) | PENABLE);      /* group select */
+    /*
+     * The ACEs are minors 4-6 and their port groups are 1-3, so the
+     * group is the minor minus TTY_ACE0-1, not the minor itself.
+     */
+    out(MBASE + MUSELECT, ((t->dev & 15) - (TTY_ACE0 - 1)) | PENABLE);
 }
 
 /*
@@ -395,8 +465,12 @@ mumstatus(dev)
 
 muenable(dev, mode)
 {
+    struct tty *t;
+
+    t = ttdev(dev);
+
     di();
-    out(MBASE + MUSELECT, (dev & 3) | PENABLE); /* group select */
+    out(MBASE + MUSELECT, ((t->dev & 15) - (TTY_ACE0 - 1)) | PENABLE);
     out(MBASE + INTENABLE, mode);
     ei();
 }

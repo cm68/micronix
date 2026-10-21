@@ -4,10 +4,17 @@
 # volume, so this file is the source of /dev - not a blessed drive.
 #
 c 0 0 null
-c 1 1 console
+#
+# The ttys.  Major 1, and the minors are the board allocation (sys/tty.h):
+# 0 is the console's name and resolves to whichever board the boot routed
+# it to, 1 is the SS1's 2651, and 4-6 are the three Wunderbus ACEs.  So a
+# machine with both boards has both, instead of both claiming minor 1.
+#
+c 1 0 console
 c 1 1 ttyA
-c 1 2 ttyB
-c 1 3 ttyC
+c 1 4 ttyB
+c 1 5 ttyC
+c 1 6 ttyD
 c 1 16 cent0
 c 2 0 mem
 c 3 0 io

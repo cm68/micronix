@@ -20,7 +20,7 @@
 #include <sys/tty.h>
 #include <sys/pic8259.h>
 
-extern struct tty mttys[];      /* the console tty (sys/multio.c) */
+extern struct tty *ttdev();     /* minor -> slot (sys/multio.c) */
 extern int ttinit(), ttyopen(), muopen();
 
 #define SS1_UART_DATA   0x7c
@@ -122,7 +122,7 @@ ss1_uart_open(dev, mode)
 {
     struct tty *tty;
 
-    tty = &mttys[dev & 15];
+    tty = ttdev(dev);
     if (tty->ispeed == 0) {     /* virgin */
         ttinit(tty, dev);
         ttyopen(tty);
@@ -133,16 +133,15 @@ ss1_uart_open(dev, mode)
 
 /*
  * Open the console: the SS1's 2651 or the MultIO's ACE, chosen by the
- * same probe that picked the PIC and the clock.  coninit (sys/inits.s)
- * calls this with the console's device number.
+ * same probe that picked the PIC, the clock and console_minor.  coninit
+ * (sys/inits.s) calls this with minor 0, the console's name; muopen
+ * resolves it to the board and dispatches.  This stays a separate entry
+ * point so the boot does not depend on the C call into the cdev table.
  */
 console_open(dev)
     register dev;
 {
-    if (nlines == 8)            /* the SS1 answered */
-        ss1_uart_open(dev, 0);
-    else
-        muopen(dev, 0);
+    muopen(dev, 0);
 }
 
 /*

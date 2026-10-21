@@ -10,6 +10,7 @@
  */
 #include <types.h>
 #include <sys/pic8259.h>
+#include <sys/tty.h>
 
 struct pic8259 pics[NPIC];
 UINT8 linepic[MAXNOVLINE];
@@ -27,6 +28,14 @@ int (*console_start)();
 int (*console_stop)();
 int (*console_set)();
 int (*console_minit)();
+
+/*
+ * The board it was found on: TTY_SS1 or TTY_ACE0, what minor 0 aliases.
+ * Uninitialized so it stays in bss: pic_init always sets it, and an
+ * initialized cell in this object's data moves picdata.o out of the
+ * linker's address order.
+ */
+UINT console_minor;
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

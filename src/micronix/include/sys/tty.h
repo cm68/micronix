@@ -45,6 +45,34 @@ struct que {
 };
 
 /*
+ * Character device minors on major 1, the tty driver.
+ *
+ * The console is minor 0 and is a name, not a port: it resolves to the
+ * tty the boot routed the console to.  The boards themselves have fixed
+ * minors, so a machine with an SS1 beside a Wunderbus can have both at
+ * once instead of both claiming the console's number.
+ *
+ * The ACEs start at 4 rather than 2 so that the numbering is a board
+ * allocation and not a count: 4-6 are the three Wunderbus ACEs, and the
+ * gap leaves room for the secondary boards.
+ */
+#define TTY_CONSOLE	0
+#define TTY_SS1		1
+#define TTY_ACE0	4
+#define TTY_ACE1	5
+#define TTY_ACE2	6
+
+/* the number of struct tty slots, not of minors (TTY_ACE2 is 6) */
+#define TTY_SLOTS	4
+
+/*
+ * The board the boot's console routing chose: TTY_SS1 or TTY_ACE0.  Set
+ * by pic_init, which is the same probe that plants the console.  Minor 0
+ * aliases to it.
+ */
+extern UINT console_minor;
+
+/*
  * Terminal control structure. The first 6 bytes are used by stty/gtty. The
  * dev and state members are used in mio.s.
  */

@@ -285,12 +285,12 @@ ttyout(tty)
 
     if (!(*state & LOSTOP) && (tty->outque.count || tty->nextc)) {
         if ((tty->mode & (MORE | XTABS | MAPCR)) || tty->nextc) {
-            (*console_putc)(tty, cookout(tty));
+            (*tty->put)(tty, cookout(tty));
         } else {
             /*
              * Shortcut for the easy case.
              */
-            (*console_putc)(tty, getc(&tty->outque));
+            (*tty->put)(tty, getc(&tty->outque));
         }
 
         /*

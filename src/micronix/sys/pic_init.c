@@ -16,6 +16,7 @@
 #include <types.h>
 #include <sys/pic.h>
 #include <sys/pic8259.h>
+#include <sys/tty.h>
 
 extern int in(), out();
 extern int di(), ei();
@@ -147,6 +148,7 @@ pic_init()
         console_stop = ss1_stop;
         console_set = ss1_set;
         console_minit = ss1_uart_init;
+        console_minor = TTY_SS1;        /* /dev/console is the 2651 */
         out(SS1MPIC1, 0x7f);            /* mask IR0-6, open IR7 (the cascade) */
         out(SS1SPIC1, 0x7d);            /* open the timer (IR1) and RxRDY
                                          * (IR7); VI7 is the attach loop's.
@@ -223,6 +225,7 @@ pic_init()
     console_stop = ace_stop;
     console_set = ace_set;
     console_minit = ace_minit;
+    console_minor = TTY_ACE0;           /* /dev/console is the first ACE */
     return (0);
 }
 

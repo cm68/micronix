@@ -97,7 +97,8 @@ char *s;
  * /dev/console is the device to open, and it is the only one: there is no
  * /dev/tty on this system - console, ttyA, ttyB and ttyC are all of them -
  * and no kernel behind that name either, character major 0 being nulldev.
- * /dev/console is cdev(1,1), which is the device /dev/ttyA also names.
+ * /dev/console is cdev(1,0), the console's name; the kernel routes it to
+ * the SS1 (minor 1) or the first Wunderbus ACE (minor 4).
  */
 dbgopen()
 {
@@ -152,6 +153,7 @@ extern shutdown();
  *      ttyA    9600    login
  *      ttyB    9600
  *      ttyC    1200    lpr     lst
+ *      ttyD    9600
  * name first, then any mix of a baud rate and the mode keywords below.
  * Only a line with the word 'login' on it gets a process.  Words that are
  * neither a baud rate nor a known keyword are ignored, which is why the
@@ -171,9 +173,11 @@ struct ttyent {
 /*
  * console device, as handed to mknod when /dev/console has to be recreated.
  * The mknod builtin in the emergency shell below builds the same word as
- * (major << 8) | minor, so this is major 1, minor 1.
+ * (major << 8) | minor, so this is major 1, minor 0 - the console's own
+ * number, which the kernel resolves to whichever board the boot routed it
+ * to (sys/tty.h).
  */
-#define CONSDEV 0x0101
+#define CONSDEV 0x0100
 
 /*
  * Three mode bits that /etc/ttys can set have no name in <sys/sgtty.h>,

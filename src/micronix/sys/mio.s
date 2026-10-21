@@ -194,6 +194,7 @@ ENDINT=0xA0
 MACE1=0x29
 MACE2=0x2A
 MACE3=0x2B
+TTY_ACE0=4		; the first ACE's minor; 4-6 are ace 1-3
 NORMAL=7
 BAUDREG=0x80
 CONNECT=3
@@ -369,15 +370,15 @@ ss1_clk:
 ; ------- ss1_txint -------
 ; The 2651's transmitter-ready interrupt, the slave's IR6.  ttyout sends
 ; one queued character, or stops the transmitter when the queue is empty;
-; the console tty is mttys[1] (coninit opens 0x0101).  EOI before the
-; return: if the queue still has characters, TxRDY is asserted again and
-; the next interrupt takes one more, which is how the queue drains.
+; the SS1 is minor 1 and lives in mttys[0].  EOI before the return: if the
+; queue still has characters, TxRDY is asserted again and the next
+; interrupt takes one more, which is how the queue drains.
 ss1_txint:
 	call	intrupt
 	.defw	ss1_tx
 
 ss1_tx:
-	ld	hl,_mttys+TTSIZE	; the console tty
+	ld	hl,_mttys		; the SS1 tty, minor 1, slot 0
 	call	_ttyout
 	ld	a,0x66		; OCW2 specific EOI, level 6 (TxRDY)
 	out	(072h),a	; the slave 8259 command port
@@ -387,7 +388,8 @@ ss1_tx:
 
 ; ------- ss1_rxint -------
 ; The 2651's receiver-ready interrupt, the slave's IR7.  Read the data
-; register and hand the character to ttyin with the console tty.
+; register and hand the character to ttyin with the SS1 tty (minor 1,
+; mttys[0]).
 ss1_rxint:
 	call	intrupt
 	.defw	ss1_rx
@@ -396,7 +398,7 @@ ss1_rx:
 	in	a,(07ch)	; the received character
 	ld	c,a
 	ld	b,0
-	ld	hl,_mttys+TTSIZE	; the console tty, the second argument
+	ld	hl,_mttys		; the SS1 tty, minor 1, slot 0
 	push	hl
 	ld	l,c
 	ld	h,b		; the character, arg0
@@ -956,16 +958,14 @@ mset_exit:
 ;
 ; 	hl = DEV + bc	/HL = ADDR OF MINOR DEV NUMBER IN TTY STRUCTURE
 ;
-; /* find mult I/O board base address */
+; /* the three ACEs are minors 4-6 and port groups 1-3 */
 ;
-; /* miobase = 0x48 + 4 * (minor & 014); */
-;
-; 	miobase	= (a = *hl & 014 + a + a + MBASE);
+; 	ace = (a = *hl & 0x0f) - TTY_ACE0 + 1;
+; 	miobase = MBASE;		/* one Wunderbus, 0x48 */
 ;
 ; 	select1 = (a + SELECT);
-; 	ace = (a = *hl & 3);	/* ace = minor & 3; */
 ;
-; 	a | PENABLE; out; select1: SELECT;
+; 	a = ace | PENABLE; out; select1: SELECT;
 ;
 ; 	return;		/* return tty; (in bc) */
 ; 	/
@@ -978,17 +978,15 @@ select:
 	ld	hl,DEV
 	add	hl,bc
 	ld	a,(hl)
-	and	0x0C		; 014
-	add	a,a
-	add	a,a
-	add	a,MBASE
+	and	0x0F		; the port minor
+	sub	TTY_ACE0-1	; 4-6 -> ace 1-3 (0 is the parallel port)
+	ld	(ace),a
+	ld	a,MBASE		; the master Wunderbus base
 	ld	(miobase),a
 	add	a,SELECT
 	ld	(select1),a
-	ld	a,(hl)
-	and	3
-	ld	(ace),a
-	or	PENABLE
+	ld	a,(ace)
+	or	PENABLE		; group select: PENABLE | 1-3
 	.defb	0xD3
 select1:
 	.defb	SELECT
