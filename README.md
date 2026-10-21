@@ -24,6 +24,19 @@ the commands in disks/dist, recovered from the original disks.  1.61 is
 where the kernel source was recovered from: it is the provenance of that
 source and not what the tree now is.
 
+micronix 2.0 is a substantially enhanced kernel, not the 1.61 kernel
+with a new number on it.  the boards are discovered at boot and each
+driver is a module placed only if its card answers, so one kernel boots
+the SS1, the Wunderbus and the MultIO; the buffer cache hashes its
+headers and keeps the data in segments behind a window, with room for
+over a hundred buffers against 1.61's fifteen; the task maps are
+per-process and a switch no longer copies one, and each process has its
+own u page and stack; exec builds its arguments straight into the new
+image, and execve adds an environment; and the system call table has
+grown dup2, ftruncate, ioctl, reboot and execve.
+src/micronix/sys/FEATURES-2.md is the full account, with the counts
+taken from the two kernels.
+
 ---------------------
 
 Morrow Designs Micronix and tools					updated 30 Sep 2026
@@ -104,9 +117,10 @@ src/hwsim:
 	that allows plugging in different chip simulators.
 
 	it runs cp/m and boots micronix to a shell, with interrupt controller,
-	trapping, memory mapping, and disk reading and writing for the five
-	disk controllers (djdma, hddma, hdca, ide and ncr5380).  the card list
-	is the DRIVERS line in src/hwsim/d1/Makefile.
+	trapping, memory mapping, and disk reading and writing for the disk
+	controllers (djdma, hddma, hdca, ide, ncr5380, and CompuPro's
+	disk1/disk2/disk3), the ND network card, the SS1 and the MultIO.
+	the card list is the DRIVERS line in src/hwsim/d1/Makefile.
 
 	there's a means for importing and exporting data to cp/m via the
 	inp: and out: devices in pip, so hex files can be shipped to get
@@ -159,8 +173,9 @@ images.  build once, then
 	src/usersim/sim
 
 hwsim (src/hwsim/d1) is the real machine - the Morrow MPZ80, the monitor
-rom, the real kernel, all five disk controllers - and it boots micronix
-to a '#' shell on a simulated disk.  it is the one that needs setup.
+rom, the real kernel, every controller in its card list - and it boots
+micronix to a '#' shell on a simulated disk.  it is the one that needs
+setup.
 
 the short boot, from a standing start:
 
@@ -200,26 +215,37 @@ docs/INSTALLATION.md, disks/hdinstall/README and sys/DISKLABEL.md.
 the provisioning tool
 ---------------------
 
-a command-line tool that drives hwsim the way the per-card scripts do by
-hand, from one sim.json.  a sim is a collection of volumes, and a volume
-is a disk on a controller - its geometry and its card, not a role.  the
-verbs:
+a command-line tool, src/tools/hwsim (built by make at the top of the
+tree), that drives the simulator the way the per-card scripts do by
+hand.  the simulated platforms are defined in sim.json at the top of the
+tree: each entry under "sims" names the emulator and kernel, the monitor
+and level-1 boot roms, the boot device, the console and clock
+configuration, the wiring profile, the root and swap device tokens, and
+the volumes - controller, unit, geometry and image for each.  the
+"mediasets" in the same file name the floppy IMD sets, and -f names a
+different platform file.
 
-	hwsim format <sim>	mnix initialize (geometry)
-	hwsim partition <sim>	mnix label (the default slice table)
+a sim is a collection of volumes, and a volume is a disk on a controller
+- its geometry and its card, not a role.  the verbs:
+
+	hwsim format <sim>		mnix initialize (geometry label)
+	hwsim partition <sim>		mnix label (default slice table)
 	hwsim mkfs <sim>		mnix mkfs (filesystem + boot)
-	hwsim boot <sim>		launch d1/d1p from the config + volumes
-	hwsim add/del <sim>	a volume in or out
+	hwsim boot <sim>		launch d1/d1p from config + volumes
+	hwsim add <sim> <controller> <unit> <geometry> <image>
+	hwsim del <sim> <controller>:<unit>
+	hwsim list			the sims defined in the file
+	hwsim show <sim>		one sim's definition
 
 root and swap are the kernel's setdev arguments, named as device tokens
 (hdcdma:0a), not volume attributes; -c packs boot, nomon, the xterm mask
 and the clock from named fields.  the common case - build and boot the
 sample two-disk sim (q540-dual):
 
-	hwsim format q540-dual		# initialize both m40 volumes
-	hwsim partition q540-dual	# the default slice table
-	hwsim mkfs q540-dual		# filesystem + boot on slice a
-	hwsim boot q540-dual		# d1p, packed -c, both disks wired
+	src/tools/hwsim format q540-dual	# initialize both m40 volumes
+	src/tools/hwsim partition q540-dual	# the default slice table
+	src/tools/hwsim mkfs q540-dual		# filesystem + boot on slice a
+	src/tools/hwsim boot q540-dual		# d1p, packed -c, both disks wired
 
 the full design - the json schema and the bit tables - is
 src/tools/PROVISION.md.  build_dist and dist_boot are the same thing done
