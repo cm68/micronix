@@ -143,6 +143,10 @@ command with a
 in the address would need uucp; there is none on this system, and the
 attempt fails at the shell.
 .sp
+Login says "You have mail." when the mailbox file for the account
+exists, and it is the file that is tested, not its size.  An empty
+mailbox therefore still says so; see login (1).
+.sp
 Three differences from the v7 source are worth knowing about, because
 they are visible from outside.  The name on the header is the login
 name of the real user I.D., since this libc has no getlogin and there

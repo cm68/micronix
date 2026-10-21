@@ -70,6 +70,25 @@ comm -13 dictionary words
 Print the lines of words that are not in dictionary, using comm to
 pick one side out of two sorted files.
 .in -5
+.sp
+To find the words in a file that a dictionary does not have:
+.sp
+.in +5
+.nf
+.bd 5
+translit A-Z a-z <input >t1
+translit ^a-z @40 <t1 >t2
+translit @12@40 @12 <t2 >t3
+sort <t3 >t4
+comm -13 dictionary <t4 >mistakes
+.fi
+.sp
+The first translit folds the case, the second turns every character
+that is not a letter into a space, and the third turns spaces and
+newlines into newlines, so that each word is a line for sort.
+dictionary must be a sorted list of words, and the lines of mistakes
+are the words in the input that it does not have.
+.in -5
 .sp 2
 .in -5
 .bd

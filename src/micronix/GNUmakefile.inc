@@ -139,6 +139,17 @@ DEST	= $(ROOT)$(SRCDIR)
 NOWARN	= --warning=no-ignore-newer
 
 #
+# The host trees.  $(PREFIX)/bin holds the mx* tools and
+# $(PREFIX)/micronix is the man page tree mxman reads, installed by
+# install-man-host.  sudo is here because $(PREFIX) is not ours; SUDO=
+# runs it without, for a DESTDIR you already own.
+#
+PREFIX	?= /usr/local
+SUDO	?= sudo
+MXROOT	?= $(DESTDIR)$(PREFIX)/micronix
+MXMAN	 = $(MXROOT)/man
+
+#
 # Where the binary goes in the filesystem.  Everything this tree
 # builds lives in /bin on the running system - that is where cp, ls,
 # make, mkdir, mknod, pwd, rm, sh, vi and form are on the 1.6
@@ -204,14 +215,27 @@ RECURSE = @for d in $(DIRS) ; do \
 
 #
 # The man page goes in beside the program it documents.  MANSRCS is
-# the wildcard, so a directory with no page of its own installs
-# nothing and says nothing about it; the test is here rather than in a
-# conditional so that one canned recipe serves both "install" and
-# "install-man".
+# enumerated in each GNUmakefile, so a directory with no page of its
+# own installs nothing and says nothing about it; the test is here
+# rather than in a conditional so that one canned recipe serves both
+# "install" and "install-man".
 #
 INSTALLMAN = @if [ -n "$(strip $(MANSRCS))" ] ; then \
 		mkdir -p $(MANINSTDIR) ; \
 		cp $(MANSRCS) $(MANINSTDIR) ; \
+	fi
+
+#
+# The same page, mirrored onto the host under $(MXMAN) for mxman,
+# which reads the tree without booting anything.  MANSEC says which
+# section directory it belongs in - 1 unless the directory sets it.
+# A directory with no page does nothing, so every directory can be
+# entered and the pages are never listed anywhere but beside their
+# source.
+#
+INSTALLMANHOST = @if [ -n "$(strip $(MANSRCS))" ] ; then \
+		$(SUDO) mkdir -p $(MXMAN)/man$(MANSEC) ; \
+		$(SUDO) cp $(MANSRCS) $(MXMAN)/man$(MANSEC) ; \
 	fi
 
 #
@@ -272,7 +296,7 @@ INSTALLMODE = @if [ -n "$(strip $(MODE))" ] ; then \
 #
 .DEFAULT_GOAL := all
 
-.PHONY: all update install install-man clean clobber doc disas \
+.PHONY: all update install install-man install-man-host clean clobber doc disas \
 	install-hwsim install-usersim
 
 #
@@ -413,6 +437,21 @@ install-man:
 	$(INSTALLMAN)
 
 #
+# The same pages for mxman, under $(MXMAN).  Every directory is
+# entered and installs its own MANSRCS; one with no page does nothing.
+# The top level writes this rule itself because it also enters man/,
+# the archive pages no command owns - hence the test.  The chmod is
+# there and not in the canned recipe because it has to run once, at
+# the end, over the root: sudo's umask leaves every copy 0600 in a
+# 0700 directory, which mxman cannot read.
+#
+ifneq ($(DEPTH),.)
+install-man-host:
+	$(RECURSE)
+	$(INSTALLMANHOST)
+endif
+
+#
 # The simulators' host binaries go into the top level bin/ as copies,
 # not symlinks, which break when the tree is moved.  install-usersim
 # does that for the userland simulator.  hwsim, though, boots a disk
@@ -509,7 +548,7 @@ else
 # this - it resolves an absolute host path quite happily - so the
 # check is here, where it fails on the machine doing the building.
 #
-$(DIR).tar: $(SRCS) $(MKFILE)
+$(DIR).tar: $(SRCS) $(MKFILE) GNUmakefile
 	tar -f $(DIR).tar -h --ignore-failed-read -c $(MKFILE) $(SRCS)
 	@if tar -tvf $(DIR).tar | grep -q '^l'; then \
 		echo "$(DIR).tar ships a symlink; micronix cannot extract one" >&2; \

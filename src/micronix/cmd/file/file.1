@@ -104,10 +104,12 @@ that shipped on the 1.6 standalone was a different program with a
 different vocabulary - it said "C source file" where this says
 "c program text", "Text file" where this says "ascii text" or
 "English text", and "Relocatable module" where this says
-"executable" - and it knew two source languages this one does not,
-A-natural and CP/M text.  Its source is not in the distribution and
-its detectors cannot be recovered from the binary, so nothing here
-guesses at them.
+"executable" - and it reported types this one does not: A-natural,
+CP/M text, Pascal source and Ratfor source, a Whitesmiths library, a
+Software Tools archive, and text processor input.  In the other
+direction it had no fortran, assembler or roff.  Its source is not in
+the distribution and its detectors cannot be recovered from the
+binary, so nothing here guesses at them.
 .sp
 The executable test is the machine's own.  v7 looked for the PDP-11
 a.out magics 0407, 0410 and 0411; nothing on micronix has an a.out
