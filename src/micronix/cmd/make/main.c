@@ -139,7 +139,7 @@ if(prtrflag) printdesc(NO);
 if( srchname(".IGNORE") ) ++ignerr;
 if( srchname(".SILENT") ) silflag = 1;
 if(p=srchname(".SUFFIXES")) sufflist = p->linep;
-if( !sufflist ) fprintf(stderr,"No suffix list.\n");
+else fprintf(stderr,"No suffix list.\n");
 
 sigivalue = (int) signal(SIGINT, SIG_IGN) & 01;
 sigqvalue = (int) signal(SIGQUIT, SIG_IGN) & 01;

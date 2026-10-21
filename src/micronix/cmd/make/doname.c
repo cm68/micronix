@@ -148,6 +148,7 @@ for(lp = p->linep ; lp ; lp = lp->nxtlineblock)
 			okdel1 = okdel;
 			okdel = NO;
 			setvar("@", p->namep);
+			setvar("*", stem);
 			setvar("?", mkqlist(qchain) );
 			qchain = NULL;
 			if( !questflag )
@@ -210,6 +211,7 @@ if(errstat==0 && (ptime<tdep || (ptime==0 && tdep==0) ) )
 	{
 	ptime = (tdep>0 ? tdep : prestime() );
 	setvar("@", p->namep);
+	setvar("*", stem);
 	setvar("?", mkqlist(qchain) );
 	if(explcom)
 		errstat += docom(explcom);

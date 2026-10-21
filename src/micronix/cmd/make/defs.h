@@ -39,7 +39,16 @@ typedef long TIMETYPE;
 #define NCHARS 500
 #define NINTS  250
 #define INMAX 1500
-#define OUTMAX 2500
+/*
+ * OUTMAX is docom()'s command buffer, and it is a stack local: every
+ * byte of it is a byte the stack cannot use.  It was 2500, and with
+ * this tree's makefile - whose longest command is 307 characters -
+ * that cost more than the margin between the heap and the stack:
+ * doname's expansion had the break at 0xe92b, and docom's 2500 pushed
+ * subst's frame below it.  1024 still holds the longest command twice
+ * over and gives the stack the room.
+ */
+#define OUTMAX 1024
 #define QBUFMAX 1500
 
 #define ALLDEPS  1

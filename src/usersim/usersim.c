@@ -2610,12 +2610,23 @@ struct pids {
 void
 initpids()
 {
+    pthread_mutexattr_t attr;
+
     pids = (struct pids *)mmap((void *)NULL, sizeof(struct pids), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0);
     if (pids == (struct pids *)-1) {
         perror("initpids");
         exit(2);
     }
-    pthread_mutex_init(&pids->mutex, NULL);
+    /*
+     * The table is shared with every forked process, so the lock has
+     * to be shared too.  A default mutex here is a per-process lock in
+     * shared memory: the parent and children disagree about who owns
+     * it, and glibc's owner assertion fires under load.
+     */
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+    pthread_mutex_init(&pids->mutex, &attr);
+    pthread_mutexattr_destroy(&attr);
     pids->next = MINPID;
 }
 
@@ -2868,12 +2879,17 @@ struct inums {
 void
 initinums()
 {
+    pthread_mutexattr_t attr;
+
     inums = (struct inums *)mmap((void *)NULL, sizeof(struct inums), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0);
     if (inums == (struct inum *)-1) {
         perror("initinums");
         exit(2);
     }
-    pthread_mutex_init(&inums->mutex, NULL);
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+    pthread_mutex_init(&inums->mutex, &attr);
+    pthread_mutexattr_destroy(&attr);
     inums->hiwat = 2;
 }
 
@@ -4977,6 +4993,23 @@ SystemCall()
         break;
 
     case 17:                   /* sbrk <addr> */
+        /*
+         * The kernel's brake() refuses a break that would come within
+         * twelve bytes of the stack, and returns ENOMEM rather than
+         * granting it.  Without the check the guest's heap is allowed
+         * to run over its stack: make's malloc kept growing until the
+         * break met the frame it was allocating from, the stack
+         * overflowed, and make exited 12 with nothing to say about it.
+         */
+        {
+            unsigned short sp = z80_get_reg16(sp_reg);
+
+            if (arg1 > sp - 12 && brake < sp) {
+                ret = ENOMEM;
+                carry_set();
+                break;
+            }
+        }
         ret = brake;
         brake = arg1;
         carry_clear();
