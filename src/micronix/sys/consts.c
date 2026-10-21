@@ -21,7 +21,7 @@ extern int indir(), exit(), r_fork(), read(), write(), open(),
     unimp(), alarm(), fstat(), r_ftruncate(), pause(), badcall(), stty(), gtty(),
     r_ioctl(),
     permission(), nice(), snooze(), sync(), reboot(), kill(), r_csw(), ssw(),
-    dup(), r_pipe(), signal();
+    dup(), dup2(), r_pipe(), signal();
 
 /*
  * System call branch table.  Arguments from registers, and returns to
@@ -75,7 +75,7 @@ struct syscall syssw[] = {
     0, &r_pipe,                 /* 42 */
     2, &unimp,                  /* 43 &times */
     8, &unimp,                  /* 44 &profil */
-    0, &badcall,                /* */
+    2, &dup2,                   /* 45 dup2(fd, fd2) */
     4, &r_ftruncate,            /* 46 ftruncate */
     0, &badcall,                /* */
     4, &signal,                 /* 48 */
@@ -101,7 +101,7 @@ int ncalls = sizeof(syssw) / sizeof(struct syscall);
 
 extern int nodev(), nulldev(), nullwrite();
 extern int muopen(), muclose(), muread(), muwrite(), mustty();
-extern int kread(), kwrite(), ioread(), iowrite();
+extern int memread(), memwrite();
 extern int ovlopen(), ovlclose(), ovlstrat(), ovlioctl();
 extern int ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcmode();
 extern int netopen(), netclose(), netread(), netwrite();
@@ -134,8 +134,8 @@ struct biovec biosw[] = {
 struct ciovec ciosw[] = {
     &nulldev, &nulldev, &nulldev, &nullwrite, &nodev,
     &muopen, &muclose, &muread, &muwrite, &mustty,
-    &nulldev, &nulldev, &kread, &kwrite, &nodev,
-    &nulldev, &nulldev, &ioread, &iowrite, &nodev,
+    &nulldev, &nulldev, &memread, &memwrite, &nodev,   /* 2 = memory */
+    &nulldev, &nulldev, &memread, &memwrite, &nodev,   /* 3 = ports */
     &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,
     &netopen, &netclose, &netread, &netwrite, &nodev,
 };

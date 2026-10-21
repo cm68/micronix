@@ -118,6 +118,35 @@ dup()
 }
 
 /*
+ * Dup2 system call.  fd2 becomes another name for the file fd names,
+ * closing whatever fd2 was.  fd arrives in u.hl and fd2 inline, the
+ * way every descriptor-taking call passes its first; fd2 goes back
+ * the same way.  dup2(fd, fd) is a successful no-op, and an invalid
+ * fd is refused before fd2 is touched.
+ */
+dup2(fd2)
+    int fd2;
+{
+    register struct file *fp;
+    int fd;
+
+    fd = u.hl;
+    if ((fp = ofile(fd)) == 0)
+        return;
+    if (fd2 < 0 || fd2 >= NOPEN) {
+        u.error = EBADF;
+        return;
+    }
+    if (fd != fd2) {
+        if (u.olist[fd2])
+            close(fd2);
+        u.olist[fd2] = fp;
+        fp->count++;
+    }
+    u.hl = fd2;
+}
+
+/*
  * Sync system call
  */
 sync()

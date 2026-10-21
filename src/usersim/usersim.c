@@ -631,6 +631,7 @@ struct openfile {
 struct ofile {
     int count;                  /* descriptors pointing here; 0 is free */
     long rwptr;                 /* the seek pointer - the shared thing */
+    int append;                 /* O_APPEND: writes seek to the end */
 };
 
 struct ftab {
@@ -661,6 +662,7 @@ initfiles()
     for (i = 0; i < NFILE; i++) {
         ftab->file[i].count = 0;
         ftab->file[i].rwptr = 0;
+        ftab->file[i].append = 0;
     }
     for (i = 0; i <= MAXFILE; i++)
         files[i].ofile = -1;
@@ -701,6 +703,7 @@ falloc()
         if (ftab->file[i].count == 0) {
             ftab->file[i].count = 1;
             ftab->file[i].rwptr = 0;
+            ftab->file[i].append = 0;
             pthread_mutex_unlock(&ftab->mutex);
             return i;
         }
@@ -774,6 +777,33 @@ addoff(int fd, long delta)
         return;
     pthread_mutex_lock(&ftab->mutex);
     ftab->file[files[fd].ofile].rwptr += delta;
+    pthread_mutex_unlock(&ftab->mutex);
+}
+
+/*
+ * O_APPEND belongs to the open file, not the descriptor: dup and fork
+ * share it, the same way they share the position.
+ */
+int
+isappend(int fd)
+{
+    int a;
+
+    if ((fd < 0) || (fd > MAXFILE) || (files[fd].ofile < 0))
+        return 0;
+    pthread_mutex_lock(&ftab->mutex);
+    a = ftab->file[files[fd].ofile].append;
+    pthread_mutex_unlock(&ftab->mutex);
+    return a;
+}
+
+void
+setappend(int fd, int a)
+{
+    if ((fd < 0) || (fd > MAXFILE) || (files[fd].ofile < 0))
+        return;
+    pthread_mutex_lock(&ftab->mutex);
+    ftab->file[files[fd].ofile].append = a;
     pthread_mutex_unlock(&ftab->mutex);
 }
 
@@ -2843,6 +2873,28 @@ struct memdev {
 } *memdev;
 
 /*
+ * Would a /dev/mem transfer starting at pos reach the CPU board's
+ * hardware?  The kernel serves the board's first page as two 1K blocks
+ * of memory, RAM at 0x000 and EPROM at 0x800; the rest of the page is
+ * the front panel, task and mask registers, the map RAM, the FPU and
+ * the unmapped top.  A transfer must end by the top of the block it
+ * starts in, and a start in a hardware block is already past it; the
+ * kernel then reads zeroes and drops writes, and both report the whole
+ * count with no error.  Answer the same way here so a program probing
+ * memory sees one behavior on the simulator and the machine.
+ */
+int
+memhw(long pos, int count)
+{
+    long end;
+
+    if (pos < 0 || pos >= 0x1000 || count <= 0)
+        return (0);
+    end = pos + count;                  /* exclusive end of the transfer */
+    return (end > ((pos & 0x800) + 0x400));
+}
+
+/*
  * write a 16-bit value into the fake memory image
  */
 void
@@ -3707,6 +3759,35 @@ dsktostatb(struct dsknod *dp, struct statb *ip, int inum)
 }
 
 /*
+ * The memory device, /dev/mem.  It has no backing file: the read and
+ * write paths serve the shared image instead, so the host descriptor
+ * only stands in for it, and /dev/zero is a harmless placeholder
+ * whose number never reaches the guest.  open and creat both come
+ * here - dd opens its input with open and its output with creat, and
+ * a creat left to the device node's host file would write past the
+ * image into the tree.  Returns the descriptor, or -1 with errno set.
+ */
+static int
+openmem(void)
+{
+    int fd;
+
+    fd = open("/dev/zero", O_RDONLY);
+    if (fd < 0)
+        return (-1);
+    if (adoptfd(fd) < 0) {
+        close(fd);
+        errno = EMFILE;
+        return (-1);
+    }
+    files[fd].dt = 'c';
+    files[fd].major = 2;
+    files[fd].minor = 0;
+    files[fd].memdev = 1;
+    return (fd);
+}
+
+/*
  * in any event, we need to adjust the return address on the stack to
  * to skip over the system call args. and return to after the syscall.
  */
@@ -3749,6 +3830,7 @@ SystemCall()
     char **argvec;
     char **envvec;
     int savemode;
+    int hw;                     /* a dropped write: the offset does not move */
     struct syscall *sp;
     char name1[256];
     char name2[256];
@@ -3870,6 +3952,7 @@ SystemCall()
     case 31:                    /* stty */
     case 32:                    /* gtty */
     case 41:                    /* dup */
+    case 45:                    /* dup2: first descriptor, not the target */
     case 49:                    /* lock */
     case 50:                    /* unlock */
     case 54:                    /* ioctl */
@@ -4000,9 +4083,15 @@ SystemCall()
                 ret = arg2;
                 if (pos + ret > MEMSZ)
                     ret = MEMSZ - pos;
-                pthread_mutex_lock(&memdev->mutex);
-                copyout(&memdev->mem[pos], arg1, ret);
-                pthread_mutex_unlock(&memdev->mutex);
+                if (memhw(pos, ret)) {
+                    /* hardware: the read moves zeroes, no error */
+                    memset(iobuf, 0, ret);
+                    copyout(iobuf, arg1, ret);
+                } else {
+                    pthread_mutex_lock(&memdev->mutex);
+                    copyout(&memdev->mem[pos], arg1, ret);
+                    pthread_mutex_unlock(&memdev->mutex);
+                }
             }
         } else if ((df = dirget(fd))) {
             ret = df->bufsize - df->offset;
@@ -4085,7 +4174,34 @@ SystemCall()
         break;
 
     case 4:                    /* write (hl), buffer, len */
-        if (files[fd].mo) {
+        hw = 0;
+        if (files[fd].memdev && memhw(getoff(fd), arg2)) {
+            /* the kernel drops a write into hardware, and reports it all */
+            ret = arg2;
+            hw = 1;
+        } else if (files[fd].memdev) {
+            /*
+             * The memory image.  The bytes go into the shared map,
+             * where a later read of the same address finds them; the
+             * map ends at 64K, and a write there is at end of file
+             * the way a read is.
+             */
+            long pos = getoff(fd);
+
+            if (pos < 0 || pos >= MEMSZ) {
+                ret = 0;
+            } else {
+                ret = arg2;
+                if (pos + ret > MEMSZ)
+                    ret = MEMSZ - pos;
+                copyin(iobuf, arg1, ret);
+                pthread_mutex_lock(&memdev->mutex);
+                memcpy(&memdev->mem[pos], iobuf, ret);
+                pthread_mutex_unlock(&memdev->mutex);
+            }
+        } else if (files[fd].mo) {
+            if (isappend(fd) && !files[fd].mo->isdev)
+                setoff(fd, files[fd].mo->size);
             copyin(iobuf, arg1, arg2);
             ret = mwrite(fd, iobuf, arg2);
         } else if (files[fd].netdev) {
@@ -4104,7 +4220,23 @@ SystemCall()
             ret = errno;
             carry_set();
         } else {
-            addoff(fd, ret);
+            /*
+             * An append write went to the host's end of the file
+             * (the host descriptor carries O_APPEND too), so the
+             * position to keep is the one the host reports, not the
+             * one we added the count to.
+             *
+             * A write the memory device dropped into hardware moved
+             * nothing, and the kernel leaves the descriptor where it
+             * was; the count it reports is the one asked for.
+             */
+            if (!hw) {
+                if (isappend(fd) && files[fd].dt == 'r' &&
+                    !files[fd].noseek)
+                    setoff(fd, lseek(fd, 0, SEEK_CUR));
+                else
+                    addoff(fd, ret);
+            }
             if (files[fd].dt == 'r' || files[fd].dt == 'b' || files[fd].mo) {
                 acct_writes++;
                 acct_wbytes += ret;
@@ -4123,29 +4255,12 @@ SystemCall()
             filename = "/dev/tty";
         }
         if (strcmp(fn, "/dev/mem") == 0) {
-            /*
-             * The memory device.  ps reads the process table out of
-             * it, and it has no backing file - the read path serves
-             * the shared image instead - so a host descriptor only
-             * stands in for it.  /dev/zero is a harmless placeholder
-             * whose number never reaches the guest.
-             */
-            ret = open("/dev/zero", O_RDONLY);
-            if (ret == 0xffff) {
+            /* ps reads the process table out of it; see openmem() */
+            if ((ret = openmem()) == 0xffff) {
                 if (verbose & V_ERROR)
                     message("%s: %s\n", strerror(errno), filename);
                 goto lose;
             }
-            if (adoptfd(ret) < 0) {
-                close(ret);
-                ret = ENFILE;
-                carry_set();
-                break;
-            }
-            files[ret].dt = 'c';
-            files[ret].major = 2;
-            files[ret].minor = 0;
-            files[ret].memdev = 1;
             goto mapfds;
         }
         if (strcmp(fn, "/dev/null") == 0) {
@@ -4221,7 +4336,7 @@ SystemCall()
                 struct mopen *mo;
                 struct super *fs;
                 int lockfd;
-                int writable = (arg2 != 0);
+                int writable = (arg2 & 3) != 0;
 
                 if (devopen(Maj, Min, writable, &fs, &lockfd) < 0) {
                     if (verbose & V_ERROR)
@@ -4275,7 +4390,7 @@ SystemCall()
                 struct dsknod *dp;
                 struct super *fs;
                 int lockfd;
-                int writable = (arg2 != 0) && !mlist[r.midx].ronly;
+                int writable = ((arg2 & 3) != 0) && !mlist[r.midx].ronly;
 
                 if (devopen(mlist[r.midx].major, mlist[r.midx].minor,
                     writable, &fs, &lockfd) < 0) {
@@ -4327,7 +4442,7 @@ SystemCall()
                     goto lose;
                 }
             } else {
-                ret = open(filename, arg2);
+                ret = open(filename, (arg2 & 3) | (arg2 & 0x400));
                 if (ret == 0xffff) {
                     if (verbose & V_ERROR)
                         message("%s: %s\n", strerror(errno), filename);
@@ -4355,6 +4470,10 @@ SystemCall()
              * own descriptor, so it is named the same way as the rest.
              */
           mapfds:
+            /* 0x400 is O_APPEND in both the guest's and the host's
+             * <fcntl.h>; the rest of what reaches here is the access
+             * mode, already masked by the kernel's open. */
+            setappend(ret, arg2 & 0x400);
             if ((i = mapfd(ret)) < 0) {
                 dropfd(ret);
                 if (files[ret].mo) {
@@ -4449,6 +4568,30 @@ SystemCall()
         break;
 
     case 8:                    /* creat <name> <mode> */
+        if (strcmp(fn, "/dev/mem") == 0) {
+            /*
+             * dd opens its output with creat, so the memory device
+             * has to be recognized here too; see openmem().
+             */
+            i = openmem();
+            if (i < 0) {
+                if (verbose & V_ERROR)
+                    message("%s: %s\n", strerror(errno), fname(fn));
+                ret = errno;
+                carry_set();
+                break;
+            }
+            ret = i;
+            if ((i = mapfd(ret)) < 0) {
+                dropfd(ret);
+                ret = EMFILE;
+                carry_set();
+                break;
+            }
+            ret = i;
+            carry_clear();
+            break;
+        }
         if (inmount(fn)) {
             ret = EPERM;
             carry_set();
@@ -5429,6 +5572,42 @@ SystemCall()
         ret = 0;
         carry_clear();
         break;
+
+    case 45: {                 /* dup2(fd, fd2) */
+        int target = arg1;      /* a guest descriptor, not translated */
+
+        /*
+         * fd has already been translated and checked.  fd2 is a
+         * number, not an open file: the kernel accepts any slot below
+         * NOPEN and closes whatever was there.  Doing the host dup
+         * first is what makes a failure leave the target untouched.
+         */
+        if (target < 0 || target >= NOPEN) {
+            ret = EBADF;
+            carry_set();
+            break;
+        }
+        if (gfd == target) {    /* the kernel makes this a no-op */
+            ret = target;
+            carry_clear();
+            break;
+        }
+        if ((i = dup(fd)) < 0) {
+            ret = errno;
+            carry_set();
+            break;
+        }
+        files[i] = files[fd];
+        fhold(files[i].ofile);
+        if (fdmap[target] >= 0) {
+            dropfd(fdmap[target]);
+            close(fdmap[target]);
+        }
+        fdmap[target] = i;
+        ret = target;
+        carry_clear();
+        break;
+    }
 
     case 46: {                 /* ftruncate fd length */
         unsigned long length = ((unsigned long)arg2 << 16) | arg1;
