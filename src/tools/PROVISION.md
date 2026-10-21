@@ -1,11 +1,11 @@
 # Provisioning tool
 
-A command-line tool for provisioning the hardware simulator (hwsim/d1).
-It manages `sim.json` — the simulator definitions — and drives the
-lifecycle of a sim's block devices.  It replaces the per-card scripts
-(`create_vol`, `boot_vol`, `build_dist`) with one data-driven tool: the
-differences between cards become fields in a file instead of near-copies
-of a shell script.
+A command-line tool for provisioning the hardware simulator
+(src/hwsim/d1).  It manages `sim.json` — the simulator definitions — and
+drives a sim's block devices through format, partition, mkfs and boot.
+The provisioning the per-card scripts (`create_vol`, `boot_vol`,
+`build_dist`) do by hand becomes fields in one file instead of
+near-copies of a shell script.
 
 The tool is `src/tools/hwsim`, built by the top-level `make`.  It reads
 `sim.json` from the top of the tree (or the file named with `-f`) and
@@ -16,9 +16,9 @@ differs from the design, the text says so.
 
 A **sim** is the addressable unit, and a sim is a collection of
 **volumes**.  A volume is a disk on a controller and nothing more — it
-names its geometry (for formatting) and its controller (for the boot
-block and the wiring), not a role.  Root and swap are attributes of the
-*kernel* (setdev's two arguments), not of any volume.
+names its geometry (format and the slice table) and its controller (the
+boot wiring), not a role.  Root and swap are attributes of the *kernel*
+(setdev's two arguments), not of any volume.
 
 ## sim.json
 
@@ -56,56 +56,74 @@ block and the wiring), not a role.  Root and swap are attributes of the
 }
 ```
 
-- **boot** — the boot chain: which rom is level 0, which rom is level 1,
-  and which controller the machine boots from (below).  Level 2 is the
-  volume's, because it is the medium's.
+`sim.json` lives at the top of the tree, three levels up from the
+binary.  `-f` names another file; if the top-level file is missing the
+tool falls back to `sim.json` in the current directory.  Every path in
+the file is relative to the top of the tree unless it is absolute.
+
+- **emulator** — the directory holding `d1` and `d1p`.  The code's
+  default is `hwsim/d1`, relative to the top of the tree; the directory
+  in this tree is `src/hwsim/d1`, so a file should name that.
+- **kernel** — the symbol file handed to `d1` as `-S` under
+  `-g`/`--debug`.  A normal boot does not use it.
+- **boot** — the two roms the tool passes (`monitor` as `-b`, required;
+  `level1` as `-M`, optional), the boot device for the `-c` bits, and
+  the DJ-DMA `j2` strap (`ab` or `bc`).  The old schema kept `monitor`
+  at the top level and the boot device in `config.boot`; the tool still
+  reads both.
 - **config** — the `-c` configuration switch, broken into named fields
   (below).  The tool composes one packed `-c` number from them.
-- **wiring** — the `-w` interrupt routing: a profile name, then optional
-  `key=value` overrides (`"ss1,irq14=uart_rx"`).  It is passed through to
-  the simulator verbatim, exactly as the `-w` option is typed, so the
-  interrupt topology is persisted beside the device spec and not
-  re-derived from the volume list.
-- **root / swap** — setdev's two arguments, named as device tokens, not
-  raw major/minor.
+- **wiring** — the `-w` interrupt routing, passed to the simulator
+  verbatim, exactly as the option is typed: a profile name, then
+  optional `key=value` overrides (`"ss1,irq14=uart_rx"`).
+- **root / swap** — the kernel's setdev arguments, named as device
+  tokens, not raw major/minor.  `show` resolves and prints them; `boot`
+  does not pass them to anything, and no kernel is patched.
 - **volumes** — the disks, each a controller + unit + geometry + image.
-- **mediasets** — the removable-media sets (MEDIACHG.md), turned into
-  the `-e` manifest by `dist/distsets`.
+- **mediasets** — the removable-media sets (MEDIACHG.md).  The tool
+  writes the `-e` manifest itself, in the format `dist/distsets` prints:
+  one line per set, the set name then the absolute image paths.
+
+No field names a level-2 boot image or a per-volume kernel; those are
+not in the schema the tool reads.
 
 ## Device naming
 
 A device is `controller:unit<slice>`, no spaces: `hdcdma:0a`,
 `hdcdma:0c`, `ncr:0d`.  The major numbers are fixed, so the JSON never
-stores one:
+stores one.  The tool resolves exactly these five controller names:
 
     hdca = 1   djdma = 2   hdcdma = 3   ide = 4   ncr = 5
 
 The minor encodes the slice in the top three bits and the unit below
-(`devslice`, sys/include/sys/con.h; the slice table is sys/dlabel.h):
+(`devslice`, src/micronix/include/sys/con.h; the slice table is
+src/micronix/include/sys/dlabel.h):
 
     minor = (slice << 5) | unit       a=0 b=1 c=2 d=3 e=4 f=5 g=6 h=7
 
 `c` is the whole-disk slice (`DL_WHOLE`), so `hdcdma:0a` is 3/0,
-`hdcdma:0b` is 3/32, `hdcdma:0c` is 3/64.  The tool derives those
-numbers from the token the same way - the major table plus the
-`slice<<5|unit` encoding - and `show` prints them beside `root` and
-`swap`.
+`hdcdma:0b` is 3/32, `hdcdma:0c` is 3/64.  The tool applies that major
+table and the `slice<<5|unit` formula to the token, and `show` prints
+the result beside `root` and `swap`.  A controller name outside the
+five, or a slice letter outside `a`-`h`, is not resolved.
 
-Floppies (`djdma`) do not follow this encoding — their minors are 8-15
-and the letter is the drive — and they are dist media, referenced and
-loaded through the media changer, not provisioned.
+Floppies (`djdma`) have no slices — their minors name the drive — and
+are dist media, referenced and loaded through the media changer, not
+provisioned.  The token formula is still applied to a `djdma` name, so
+a `djdma` token in `root` or `swap` would be given a slice it does not
+have.
 
 ## config
 
 `-c` is one number that packs the independent things the switch register
-carries.  The named fields and their bits (hwsim/hwsim.c, mpz80.c,
-multio.c):
+carries.  The named fields and their bits (`pack_config` in
+src/tools/hwsim.c; the bit meanings are the simulator's):
 
 | field | bits | values |
 |---|---|---|
-| boot | 0x08 · 0x10 · 0x00 | hdcdma / djdma / hdca·ide — mon375/447 only, from `boot.device` |
-| nomon | 0x04 | skip the monitor — mon375/447 only; mon500 reads it as "boot" |
-| console | 0x08 | wb / ss1 — mon500 only; which console the monitor probes first |
+| boot | 0x08 · 0x10 · 0x00 | hdcdma / djdma / hdca·ide — packed only when `boot.monitor` is a 375/447 |
+| nomon | 0x04 | skip the monitor; mon500 reads the same bit as "boot" |
+| console | 0x08 | wb / ss1 — packed when the monitor is not a 375/447; which console the monitor probes first |
 | xterm | 0x0700 (3 bits) | which of uart0 / ttyB / ttyC go to xterms |
 | clock | 0x0800 · 0x1000 | 1hz / noclk / normal |
 
@@ -123,44 +141,42 @@ covers only the boot bits and a later `-c` would override.
 ## The boot chain
 
 A boot happens in four levels, numbered by where the code comes from and
-not by who reads it (`micronix/stand/boot/README`).  Three of the four are
-properties of the *sim* and the fourth is a property of each **volume**,
-so that is how the JSON carries them:
+not by who reads it (`src/micronix/stand/boot/README`).  The tool
+supplies the first two from the sim; the last two come with the medium:
 
-| level | what it is | where it is in the file |
+| level | what it is | what the tool does |
 |---|---|---|
-| 0 | the monitor rom in its socket | `boot.monitor` |
-| 1 | the 4k rom in the memory board's f0 page | `boot.level1` |
-| 2 | sector 0 of the boot medium, per controller | the volume's `level2` |
-| 3 | the filesystem loader | what level 2 brings in; the kernel it loads is the volume's `micronix` |
+| 0 | the monitor rom in its socket | passes `boot.monitor` as `-b`, and refuses a sim without one |
+| 1 | the 4k rom in the memory board's f0 page | passes `boot.level1` as `-M` when the field is present |
+| 2 | sector 0 of the boot medium, per controller | `mkfs` writes `src/micronix/stand/boot/bootimg` into every volume |
+| 3 | the filesystem loader | what level 2 brings in |
 
 `boot.level1` is the same 4k whatever the machine is — the monitor copies
 it down out of its socket and enters it, and it is what walks the
 controllers and finds a medium — so it is a sim property and not a
 volume's.
 
-Level 2 is not: it is the sector that knows how to read the rest off its
-own card, exactly as level 3's io driver does, so it belongs to the
-controller the volume is on.  A volume may name it; when it does not, the
-tool derives it from the controller:
+Level 2 belongs to the controller: it is the sector that knows how to
+read the rest off its own card.  The tool does not yet choose it by
+controller; every volume gets the hdcdma image above.  These are the
+per-controller images a later revision would pick from:
 
     hdcdma   src/micronix/stand/boot/bootimg
     hdca     src/micronix/stand/boot/hdcabootimg
     ide      src/micronix/stand/boot/idebootimg
     ncr      src/micronix/stand/boot/ncrbootimg
-    djdma    per medium, from the medium's geometry: djbootimg-d8ss,
-             djbootimg-d8ds, djbootimg-d5ds, djbootimg-d5soft
+    djdma    per medium: djbootimg-d8ss, djbootimg-d8ds, djbootimg-d5ds,
+             djbootimg-d5soft
 
-A removable medium has no volume entry to hang a `level2` on, so the
-medium table carries one the same way.  `dist/create_dist` picks
-`djbootimg-d8ds` for the eight inch diskettes and `djbootimg-d5soft` for
-the five inch ones today, and that choice is what the tool should read
-rather than repeat.
+`dist/create_dist` picks `djbootimg-d8ds` for the eight inch diskettes
+and `djbootimg-d5soft` for the five inch ones by hand today.
 
-Four controllers have a level 2 and four do not: disk1, disk2, disk3 and
-nd have boot readers in the level 1 rom and no image to put in front of
-them, so `mkfs` on such a volume has to refuse rather than write a boot
-area nothing can read.
+disk1, disk2 and disk3 have boot readers in the level 1 rom's
+controller table (`ctable`, src/micronix/stand/roms/l1boot.s) and no
+image to put in front of them.  The tool's major table does not know
+those names, so a volume on one of them cannot appear in `root` or
+`swap`, and `mkfs` would still write the hdcdma image.  The ND network
+disk has no row in that table at all.
 
 ### The rom decides what the boot bits mean
 
@@ -181,14 +197,15 @@ because it is a strap on a board being simulated and not a property of a
 disk — and because `-b mon447.bin -B djdma -j bc` is a machine somebody
 may still want to stand up.  See `stand/boot/LEGACYBOOT.md`.
 
-### A controller with no rom-side config: nd
+### The network disk: nd
 
-The network disk's card does its own network, so the rom's row for it
-says only "fetch block 0" and the addressing lives in the card.  There is
-nowhere on a 4k rom to keep an address, a socket or a password, so the
-card's configuration is stored in its own NVRAM and the boot operation
-loads it from there (`docs/hw/esp32-nic.md`).  Nothing in the JSON
-carries it, and nothing should: it is not the sim's or the volume's.
+The ND card is a block driver (major 6) and a character device
+(`/dev/net`, major 5) in the kernel (`src/micronix/sys/nd.c`,
+`src/micronix/sys/net.c`; see `src/micronix/sys/NET.md`).  It has no
+row in the level 1 controller table (`ctable`,
+src/micronix/stand/roms/l1boot.s) and no level-2 image, so it is not a
+boot medium.  The tool's major table does not name it, and nothing
+about the card is in `sim.json`.
 
 ## The verbs
 
@@ -204,35 +221,43 @@ carries it, and nothing should: it is not the sim's or the volume's.
     list               the sims in the file
     show <sim>         one sim, then the switches it would pack
 
-`mkfs` still uses `src/micronix/stand/boot/bootimg`, the hdcdma level 2,
-for every volume.  Choosing it from the volume's controller — `level2` if
-the volume says so, the table above if it does not — is the design and
-not yet in the tool; until it is, a volume on another controller needs
-its image built with that controller's level 2.
+The options go before the verb: `-f` names the platform file, and
+`-g` (or `--debug`) boots `d1` instead of headless `d1p`, adding
+`-S <kernel>` when `kernel` is set.  `add` and `del` rewrite `sim.json` in place; `add` appends the
+volume without checking that its controller or geometry is known, and
+`del` needs only the `controller:unit` token.  `show` prints the sim as
+JSON, then `# root`, `# swap` and the `-b`, `-M`, `-j`, `-c` and `-w`
+values the boot would use.
 
-`boot` generates the device wiring from the volume list — every volume's
+`mkfs` uses `src/micronix/stand/boot/bootimg`, the hdcdma level 2, for
+every volume.  Until the tool chooses the image by controller, a volume
+on another controller needs an image built with that controller's
+level 2.
+
+`boot` first checks that every volume's image exists.  It then generates
+the device wiring from the volume list — every volume's
 `controller<unit>:<image>` in order — composes `-b`/`-M`/`-j` from
 `boot`, the `-c` value from the config's fields, and `-e` from the
-mediasets.  That generation is what turns the four near-identical
-per-card scripts into one tool, and the boot chain is what makes it
-possible for a script to be about a machine rather than about a card.
+mediasets, and passes `-w` when `wiring` is present.  `root` and `swap`
+are not used.
 
 ## Where the pieces already are
 
-The tool is a front end over things the tree already has:
+The tool invokes two things: `src/tools/mnix` for initialize, label and
+mkfs, and the emulator directory's `d1` or `d1p` for boot.  Everything
+else is input it expects the tree to have built:
 
-    mnix                     initialize / label / mkfs / tar / write / mknod
-    setdev                   patch the kernel's root + swap (from the tokens);
-                             hwsim resolves and prints them, and does not yet
-                             patch
-    dist/distsets            the -e manifest format; hwsim writes the same
-                             manifest from sim.json
-    stand/roms               the level 0 and level 1 roms (make -C stand/roms)
-    stand/boot               the level 2 and level 3 images (make bootimgs,
-                             make djbootimgs)
-    bootdisks/create_bootdisk  one install diskette, for one target drive
-    build_dist / dist_boot   the worked example, done by hand today
+    src/tools/mnix             initialize / label / mkfs (invoked)
+    src/micronix/stand/roms    the level 0 and level 1 roms
+                               (make -C src/micronix/stand/roms)
+    src/micronix/stand/boot    the level 2 and level 3 images
+                               (make bootimgs, make djbootimgs)
+    dist/distsets              the -e manifest format hwsim reproduces
+    disks/bootdisks/create_bootdisk
+                               one install diskette, for one target drive
+    disks/hdinstall/build_dist, dist_boot
+                               the worked example, done by hand today
 
-`hwsim` is the data-driven form of the provisioning `build_dist` and
-`dist_boot` do by hand; the media changer (MEDIACHG.md) is still how the
-boot's floppies get loaded.
+setdev is not called: `show` resolves the `root` and `swap` tokens and
+prints the major/minor, and nothing patches a kernel.  The media changer
+(MEDIACHG.md) is how a boot's floppies get loaded.
