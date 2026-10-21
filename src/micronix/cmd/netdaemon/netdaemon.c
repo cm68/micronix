@@ -24,6 +24,13 @@
  * 0x20 added.  The sender then waits for a Y after F, after the S/R
  * header, and after every D record; the E record is not acknowledged.
  *
+ * An R request is store-and-forward: the machine that holds the file
+ * copies it into the outbound spool as an S record, and an intermediate
+ * machine copies the request, or the S record, into its own spool for
+ * the next hop.  network.4's multihop network and netact's strings
+ * ("netcp", "/bin/netcp", "cp fails") point this way, but the 1.6
+ * daemon's own R handling was not captured; this is an inference.
+ *
  * The daemon forks one reader per port in the 1.6 binary.  This
  * reconstruction keeps one process and polls each port with a one
  * second alarm, which is the same line protocol on a simpler frame.
@@ -39,12 +46,14 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/fs.h>
+#include <sys/stat.h>
 #include <sys/dir.h>
 #include <dirent.h>
 
 #define SPOOLIN	 "/usr/spool/net/in/"
 #define SPOOLOUT "/usr/spool/net/out/"
 #define NETMAP	 "/etc/netmap"
+#define PASSWD	 "/etc/passwd"
 #define TTYS	 "/etc/ttys"
 #define MAXPORTS 16
 #define LINEMAX	 512
@@ -53,6 +62,7 @@ extern DIR *opendir();
 extern struct direct *readdir();
 extern int closedir();
 extern int (*signal())();
+extern int fread();
 
 struct port {
     char dev[32];
@@ -64,6 +74,8 @@ static struct port ports[MAXPORTS];
 static int nports;
 static int debug;
 static volatile int timedout;
+
+static int relay_s();
 
 static void
 onalarm(sig)
@@ -163,6 +175,99 @@ read_netmap()
 /*
  * /etc/ttys: "ttyD 1200 net-sales" makes /dev/ttyD the link to sales.
  */
+/*
+ * The first line of /etc/netmap is this machine's name.
+ */
+static void
+localname(buf)
+    char *buf;
+{
+    FILE *f;
+    char *p;
+
+    strcpy(buf, "local");
+    f = fopen(NETMAP, "r");
+    if (f == 0)
+	return;
+    if (fgets(buf, 64, f)) {
+	p = buf;
+	while (*p && *p != ' ' && *p != '\t' && *p != '\n')
+	    p++;
+	*p = 0;
+    }
+    fclose(f);
+}
+
+/*
+ * The owner field of a record is the login name from /etc/passwd.
+ */
+static void
+ownername(buf)
+    char *buf;
+{
+    FILE *f;
+    char line[256];
+    char *p;
+    char *name;
+    char *uidp;
+    int uid;
+
+    strcpy(buf, "root");
+    uid = getuid();
+    f = fopen(PASSWD, "r");
+    if (f == 0)
+	return;
+    while (fgets(line, sizeof line, f)) {
+	p = line;
+	name = p;
+	while (*p && *p != ':')
+	    p++;
+	if (*p == 0)
+	    continue;
+	*p++ = 0;
+	while (*p && *p != ':')
+	    p++;
+	if (*p == 0)
+	    continue;
+	*p++ = 0;
+	uidp = p;
+	while (*p && *p != ':')
+	    p++;
+	*p = 0;
+	if (atoi(uidp) == uid) {
+	    strcpy(buf, name);
+	    break;
+	}
+    }
+    fclose(f);
+}
+
+/*
+ * Six bits per printable character, least significant bit first; a
+ * partial block is padded to three bytes.
+ */
+static void
+encode(in, len, out)
+    unsigned char *in;
+    int len;
+    char *out;
+{
+    int i, j, o;
+    unsigned long bits;
+
+    o = 0;
+    for (i = 0; i < len; i += 3) {
+	bits = in[i];
+	if (i + 1 < len)
+	    bits |= (unsigned long) in[i + 1] << 8;
+	if (i + 2 < len)
+	    bits |= (unsigned long) in[i + 2] << 16;
+	for (j = 0; j < 4; j++)
+	    out[o++] = ((bits >> (6 * j)) & 0x3f) + 0x20;
+    }
+    out[o] = 0;
+}
+
 static int
 read_ttys()
 {
@@ -439,10 +544,22 @@ receive_s(p, header)
     char *header;
 {
     char line[LINEMAX];
+    char host[64];
+    char ourhost[64];
     char path[256];
     char mode[32];
     FILE *out;
     int len;
+
+    /*
+     * The first field is the destination machine.  If it is not this
+     * one, copy the record into the spool and let scan_out forward it.
+     */
+    localname(ourhost);
+    if (!field(header, 1, host, sizeof host))
+	return 0;
+    if (strcmp(host, ourhost) != 0)
+	return relay_s(p, header);
 
     /*
      * The remote path is the destination on this machine; the local
@@ -478,6 +595,146 @@ receive_s(p, header)
 }
 
 /*
+ * The queue name in the outbound spool is host%"c", the same shape
+ * netcp writes.
+ */
+static void
+queuename(h, out)
+    char *h;
+    char *out;
+{
+    int now;
+    int c;
+
+    now = time((long *) 0);
+    c = (now & 0x3f) + 0x20;
+    sprintf(out, "%s%s%%\"%c\"", SPOOLOUT, h, c);
+}
+
+/*
+ * An R request at the machine that holds the file: copy it into the
+ * outbound spool as an S record for the requester, and let scan_out
+ * forward it.  The requester's host and destination path are fields 3
+ * and 4; the file is field 2 on this machine.
+ */
+static int
+copy_r_to_s(header)
+    char *header;
+{
+    char reqfile[256];
+    char desthost[64];
+    char dest[256];
+    char owner[32];
+    char ourhost[64];
+    char q[256];
+    char sline[LINEMAX];
+    char dline[LINEMAX];
+    char enc[80];
+    unsigned char buf[45];
+    struct stat st;
+    FILE *in, *out;
+    int seq, n, mode;
+
+    if (!field(header, 2, reqfile, sizeof reqfile))
+	return 0;
+    if (!field(header, 3, desthost, sizeof desthost))
+	return 0;
+    if (!field(header, 4, dest, sizeof dest))
+	return 0;
+    if (stat(reqfile, &st) < 0 || (st.st_mode & S_IFMT) != S_IFREG)
+	return 0;
+    in = fopen(reqfile, "r");
+    if (in == 0)
+	return 0;
+    localname(ourhost);
+    ownername(owner);
+    mode = st.st_mode & 0777;
+    queuename(desthost, q);
+    out = fopen(q, "w");
+    if (out == 0) {
+	fclose(in);
+	return 0;
+    }
+    sprintf(sline, "S %s %s %s %s %s %o",
+	desthost, dest, ourhost, reqfile, owner, mode);
+    fprintf(out, "%s\n", sline);
+    seq = 1;
+    while ((n = fread((char *) buf, 1, 45, in)) > 0) {
+	encode(buf, n, enc);
+	fprintf(out, "D%c%c%s\n", seq + 0x20, n + 0x20, enc);
+	seq++;
+    }
+    fprintf(out, "E%c\n", seq + 0x20);
+    fclose(in);
+    fclose(out);
+    return 1;
+}
+
+/*
+ * An R request at a machine that does not hold the file: copy the
+ * request into the outbound spool so scan_out forwards it toward the
+ * host named in its first field.
+ */
+static int
+relay_r(header)
+    char *header;
+{
+    char host[64];
+    char q[256];
+    FILE *out;
+
+    if (!field(header, 1, host, sizeof host))
+	return 0;
+    queuename(host, q);
+    out = fopen(q, "w");
+    if (out == 0)
+	return 0;
+    fprintf(out, "%s\nE!\n", header);
+    fclose(out);
+    return 1;
+}
+
+/*
+ * An S record at a machine that is not its destination: copy the
+ * header and every D record into the outbound spool for the next hop.
+ */
+static int
+relay_s(p, header)
+    struct port *p;
+    char *header;
+{
+    char host[64];
+    char q[256];
+    char line[LINEMAX];
+    FILE *out;
+
+    if (!field(header, 1, host, sizeof host))
+	return 0;
+    queuename(host, q);
+    out = fopen(q, "w");
+    if (out == 0)
+	return 0;
+    fprintf(out, "%s\n", header);
+    for (;;) {
+	if (!wire_read(p, line, sizeof line, 5)) {
+	    fclose(out);
+	    return 0;
+	}
+	if (line[0] == 'D') {
+	    fprintf(out, "%s\n", line);
+	    wire_write(p, "Y");
+	    continue;
+	}
+	if (line[0] == 'E') {
+	    fprintf(out, "%s\n", line);
+	    break;
+	}
+    }
+    fclose(out);
+    return 1;
+}
+
+/*
  * Accept a transfer: P! then F then the S or R header.  The sender waits
  * for Y after F and after the header, and after each D record.
  */
@@ -486,6 +743,7 @@ accept_link(p)
     struct port *p;
 {
     char line[LINEMAX];
+    char rheader[LINEMAX];
 
     if (!wire_read(p, line, sizeof line, 1))
 	return 0;
@@ -501,13 +759,21 @@ accept_link(p)
     if (line[0] == 'S')
 	return receive_s(p, line);
     if (line[0] == 'R') {
+	char reqhost[64];
+	char ourhost[64];
+
 	/*
-	 * A request for a file on this machine.  The 1.6 daemon read the
-	 * E record and then served the file; the serving exchange was not
-	 * captured, so it is left out here.
+	 * The request names the machine that holds the file in its
+	 * first field.  Here, copy the file into an S entry; anywhere
+	 * else, copy the request into the spool and forward it.
 	 */
-	wire_read(p, line, sizeof line, 5);
-	return 1;
+	strcpy(rheader, line);
+	wire_read(p, line, sizeof line, 5);	/* E, no ack */
+	localname(ourhost);
+	if (field(rheader, 1, reqhost, sizeof reqhost) &&
+	    strcmp(reqhost, ourhost) == 0)
+	    return copy_r_to_s(rheader);
+	return relay_r(rheader);
     }
     return 0;
 }

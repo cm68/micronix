@@ -17,11 +17,21 @@ loop, spool scans, netmap and ttys handling follow the binary, and the
 wire format is the real 1.6 line protocol: three checksum characters
 per line, then `P!`/`A!`, `F`/`Y`, the S or R header and its Y, every D
 record and its Y, and the unacknowledged E.  Two reconstructed daemons
-exchange the same bytes as two recovered ones.  The serving exchange
-for an R request was not captured and is not implemented; the 1.6
-daemon forks a reader per port, while this one polls with a one second
-alarm in a single process.  The end-to-end test is
-`python3 -I src/usersim/nettest16.py recon`.
+exchange the same bytes as two recovered ones.  An R request is
+store-and-forward: the machine that holds the file copies it into its
+outbound spool as an S record, and an intermediate machine copies the
+request, or the S record, into its own spool for the next hop.  That
+model comes from network.4's multihop network and from netact's own
+strings ("netcp", "/bin/netcp", "cp fails", "Can't copy"); the 1.6
+daemon's own R handling was not captured, so the relay path is the
+reconstruction's inference, not recovered wire behaviour.  (The 1.6
+daemon was run with netact present; it acknowledged the R request and
+did not produce the return.)
+
+The 1.6 daemon forks a reader per port, while this one polls with a one
+second alarm in a single process.  Two end-to-end tests:
+`nettest16.py recon` (push and pull over one link) and
+`nettest16.py relay` (doc -- sales -- admin, two hops).
 
 The binary came from Micronix 1.6 Distribution Vol. 3 (/bin/netdaemon),
 extracted with readall.  The 1.61 Vol. 3 catalog container carries the same

@@ -194,9 +194,16 @@ the recovered netcp queues an entry, and after the timeout the two
 daemons exchange the S/D/E record with the three-character checksum
 prefixes and the `A!`/`Y` answers recorded in cmd/netcp/ANALYSIS.md.
 The reconstruction speaks the same lines and checksums, with one
-process and a one second alarm rather than a fork per port; it does not
-implement the serving exchange for an R request, which this capture did
-not produce.
+process and a one second alarm rather than a fork per port.  Its R
+handling is inferred, not captured: network.4 describes a multihop
+network, and netact's strings name netcp and a copy failure, so the
+request is implemented as store-and-forward - the holder copies the
+file into its outbound spool as an S record, and an intermediate
+machine copies the request or the S record into its own spool.  Run
+against the recovered daemon with netact present, the R request was
+acknowledged and no return was produced, so the 1.6 daemon's own
+handling is still unknown.  The `relay` test exercises this inferred
+path over two hops (doc -- sales -- admin).
 
 ## Open points
 
