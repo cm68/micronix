@@ -99,7 +99,7 @@ static struct op ops[] = {
  * itself is chopped up in place where quoting allows it, and copied
  * here where it does not.
  */
-static char wordbuf[MAXLINE * 2];
+static char wordbuf[MAXWORD];
 static int  wordused;
 
 /*

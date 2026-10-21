@@ -10,8 +10,20 @@
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
 
-#define MAXLINE     512     /* the line buffer, 0x200 in the binary */
-#define MAXARG      64      /* words in one command */
+/*
+ * The image's limits were 512 for a line and 64 words in a command.
+ * Those are too small for the globs this tree builds: "echo
+ * /usr/src/sys/*" is over a hundred words, and the native kernel
+ * makefile's clean used to be one rm of that size.  The line is 2048,
+ * a command holds 512 words, and the words themselves get their own
+ * block below rather than twice the line - the names of a glob list
+ * live there, and a hundred short names are more than 1K.  512 words
+ * cost 8K of argv pointers (16 commands' worth), which is the most
+ * the image can carry and still leave the stack room.
+ */
+#define MAXLINE     2048    /* the line buffer; the image had 0x200 */
+#define MAXARG      512     /* words in one command; the image had 64 */
+#define MAXWORD     8192    /* all the words of one statement */
 #define MAXCMD      16      /* commands in one pipeline */
 #define MAXSRC      16      /* nesting of source/scripts - the stack at */
                             /*   0x9648 holds one FILE * per level */
