@@ -15,6 +15,8 @@
  * (0x1005, next to ps's process-table pointer at 0x1003) and /dev/mem,
  * and it is the authority on what is mounted - a mounted filesystem's
  * live counts come from it, an unmounted one's from its superblock.
+ * The table's size is published in the low page, one byte at 0x3ea, so
+ * df reads whatever the running kernel was built with.
  * /etc/mtab names which filesystems to report when no argument is given.
  * An argument is reported whether mounted or not, and may be given with
  * or without a "/dev/" prefix.
@@ -30,16 +32,18 @@
 #include <sys/mount.h>
 #include <mtab.h>
 
-#define NMOUNT 4		/* the kernel's NMOUNT (sys/sys.h) */
+#define MAXMOUNT 16		/* what this program can hold; the kernel's count is read */
 #define SUPERBLK 1		/* the superblock */
 #define MEMORY "/dev/mem"
 #define MPTAB 0x1005		/* low memory: &mlist, beside &plist at 0x1003 */
+#define NMTAB 0x3ea		/* low memory: byte, the kernel's NMOUNT (uhdr.s) */
 #define INOPB 16		/* inodes per block, as iget.c's "isize << 4" */
 
-struct mtab mtab[NMOUNT];
-struct mount mountab[NMOUNT];
+struct mtab mtab[MAXMOUNT];
+struct mount mountab[MAXMOUNT];
 struct super sblock;
 int nmount;
+int nkmount;			/* entries read from the kernel's table */
 int headed;			/* the column heading has been printed */
 
 int readmtab();
@@ -56,7 +60,7 @@ main(argc, argv)
     char *np, *special;
 
     nmount = readmtab();
-    readmounts();
+    nkmount = readmounts();
 
     if (argc == 1) {
         for (i = 0; i < nmount; i++)
@@ -87,7 +91,7 @@ readmtab()
     n = 0;
     if ((fd = open("/etc/mtab", 0)) < 0)
         return 0;
-    while (n < NMOUNT && read(fd, &mtab[n], sizeof mtab[n]) == sizeof mtab[n]) {
+    while (n < MAXMOUNT && read(fd, &mtab[n], sizeof mtab[n]) == sizeof mtab[n]) {
         if (mtab[n].directory[0] == 0 || mtab[n].special[0] == 0)
             continue;
         n++;
@@ -98,12 +102,14 @@ readmtab()
 
 /*
  * Read the kernel's mount table through /dev/mem: a two-byte pointer at
- * MPTAB names the table, the way ps reads the process table at 0x1003.
+ * MPTAB names the table, the way ps reads the process table at 0x1003,
+ * and the byte at NMTAB says how many entries it holds.
  */
 int
 readmounts()
 {
     unsigned mptr;
+    unsigned char nm;
     int mem;
     int n;
 
@@ -113,11 +119,17 @@ readmounts()
         close(mem);
         return 0;
     }
+    if (seek(mem, NMTAB, 0) < 0 || read(mem, (char *)&nm, 1) != 1) {
+        close(mem);
+        return 0;
+    }
+    if (nm > MAXMOUNT)
+        nm = MAXMOUNT;
     if (seek(mem, mptr, 0) < 0) {
         close(mem);
         return 0;
     }
-    n = read(mem, (char *)mountab, sizeof mountab);
+    n = read(mem, (char *)mountab, nm * sizeof(struct mount));
     close(mem);
     return n / sizeof(struct mount);
 }
@@ -133,7 +145,7 @@ finddev(devnum, fsizep, isizep, bfreep, ifreep)
 {
     int i;
 
-    for (i = 0; i < NMOUNT; i++) {
+    for (i = 0; i < nkmount; i++) {
         if (mountab[i].dev == 0 || mountab[i].dev != devnum)
             continue;
         *fsizep = mountab[i].fsize;

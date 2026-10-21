@@ -24,7 +24,7 @@ extern char memwant;
 
 /*
  * Number of free segments.  Lives in the freed low-memory bss (uhdr.s's
- * _nsegs, 0x220), set in meminit().
+ * _nsegs, 0x260), set in meminit().
  */
 extern UINT nsegs;
 

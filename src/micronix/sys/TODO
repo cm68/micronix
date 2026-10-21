@@ -63,50 +63,56 @@ since what the loader leaves there is its own stack.
 
 Three window pages used to have to exist at once: 0xd000 for the
 superblock, 0xe000 for the u page, 0xf000 for the buffer data window.
-The same three pages are in play, but the u page has moved up into 15
-(0xf000) and the buffer window took its place at 0xe000, so what is
-held now is 0xe000 by the window and 0xd000 only for the length of a
-user-memory copy (mem.s borrows and restores it).  It matters because
-the buffer pool's headers are minted contiguously off &blist[8] ==
-_ebss, so a page held by anything else hides whatever headers land in
-it - 0xd000's page was dead space for exactly that reason.
+The u page has moved up into 15 (0xf000) and the buffer window took its
+place at 0xe000, so 0xd000 is the driver slot (OVLBASE); mem.s still
+borrows 0xc000 for the length of a user-memory copy, which is why the
+pool stops below it.  The pool's headers are minted contiguously off
+&blist[8] == _ebss, so a page held by anything else would hide whatever
+headers land in it - and SCRWIN (0xc000) is exactly that page: none of
+the pages above it is pool space.
 
-The superblock used to hold 0xd000 across calls and sleeps, which meant
-that page could not carry headers - the pool stopped at 0xd000.  It is
-plain memory now: getsb() (uio.c) copies the block into a per-device
-sbslot in .bss once and points the buffer's data/xmem at the slot, so
-sb->data stays an ordinary pointer, nothing has to be re-pinned after a
+The superblock used to hold 0xd000 across calls and sleeps.  It is an
+ordinary buffer now: getsb() (uio.c) is bread(1, dev), and tmount()
+pins that buffer with BLOCK ("locked in core - do not take"), so it
+stays in the pool until umount() clears the flag.  Every access is a
+short bhold()/brel() - map the buffer's own segment at BUFSEG, patch or
+copy, restore the previous segment.  sb->data is the pool's ordinary
+data pointer, never a mapping, so nothing has to be re-pinned after a
 sleep, and the driver still writes the right bytes because its DMA
-address is (xmem << 12) | (data & 0xfff), not the window address.  mem.s
-restores the page it borrows for user memory from IMAGE0+26, so with the
-superblock out of the window system nothing holds 0xd000 and the headers
-carry on through it.  bzero() and bget()'s reuse path call sbrel() to
-give a recycled buffer its window mapping back.
+address is (xmem << 12) | (data & 0xfff).  mem.s restores the page it
+borrows for user memory from IMAGE0+26.  There is no sbslot in .bss and
+no sbrel(); an earlier version of this note described that design and
+the code does not have it.
 
-The cost is the slots: NMOUNT * (512 + 6) = 2072 bytes of .bss, about 98
-headers, so the pool gains ~90 rather than the ~195 the page is worth.
-The two leftovers are still available if the pool ever needs to be
-bigger again:
+The cost is one pinned buffer per mounted filesystem, not a .bss slot.
+The table itself lives elsewhere: NMOUNT entries of 13 bytes at uhdr.s's
+_mlist, 0x268, inside the 416-byte freed-low-memory window (0x260-0x3ff)
+that main_init zeroes.  That window also holds nsegs, lastseg, taskmap,
+curmem and the 256-byte segmap - 264 bytes together - which leaves 152
+for the table, eleven entries of 13 bytes.  NMOUNT is 10 now (130
+bytes), which puts segmap at 0x2ea; its 256 bytes end at 0x3e9, the two
+published counts below take 0x3ea and 0x3eb, and twenty bytes below
+0x400 remain.  Eleven is the most the window will take, and 16 (208)
+would run segmap 56 bytes past 0x400 into the trap area.  A table that
+size belongs in resident .bss - df reads the pointer at 0x1005 and
+seeks there, the way ps reads plist's at 0x1003, so the table's own
+address does not have to be low.
 
-  - Put the superblock back in a segment and borrow window 13 for each
-    access (save the mapping, map, copy, restore), with bcopy() moved
-    into the u page so only u-page code runs while the borrow is held.
-    That gives up the ~2072 bytes of slots and frees the page for
-    headers - the full ~195 - but requires a discipline the slot design
-    does not: no header access (bget/brelse/bdwrite) between mapping the
-    window and restoring it.  A miss there is silent filesystem
-    corruption, which is why the slots went in first.
+The window publishes the two sizes a tool would otherwise have to be
+built with: nmtab = NMOUNT at 0x3ea, set in main(), and nbufs = the
+buffer header count at 0x3eb, set in expand_bufs().  They are read
+through /dev/mem at fixed addresses the way ps reads the pointer at
+0x1003, so kstat and df take the mount table's size from the running
+kernel and kstat takes the pool's too - raising NMOUNT no longer means
+recompiling them.  The pool's count is one byte, so exactly 256 -
+MAXBUFS's ceiling, which the pool has never reached - reads as zero,
+and kstat takes zero to mean 256.  hwsim's kdump reads the mount byte
+out of the simulated guest for the same reason.
 
-  - The u page is in segment 15 now, so the pool's ceiling is one page
-    away (0xf000 instead of the window's 0xe000) and it roughly
-    doubles.  It needs the buffer data window to become borrowed at
-    every site that uses it: bwin() holds its segment for the whole of
-    a buffer access, so headers parked in 0xe000's page would be read
-    back as buffer data.  Borrowing means save the map register, map,
-    copy, restore - and no header access (bget/brelse/bdwrite) while a
-    borrow is held, the same discipline the superblock slots avoided.
-    expand_bufs()'s bound is BUFWIN (sys.h) today; this is the change
-    that moves it up to _upage.
+Raising the pool's top would mean making one of those pages borrowed
+rather than held, under the rule bhold() already imposes: no header
+access (bget/brelse/bdwrite) while a borrow is up.  A miss there is
+silent filesystem corruption.
 
 The boot loader's own stack sits at the very top of memory (mwboot1.s
 parks sp at 0xffff and level 3 inherits it), and the loader

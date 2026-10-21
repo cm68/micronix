@@ -38,7 +38,7 @@ typedef unsigned int   k32;
  */
 #define K_NPROC 20
 #define K_NINODE 50
-#define K_NMOUNT 4
+#define K_NMTAB 0x3ea		/* low memory: byte, the guest's NMOUNT (uhdr.s) */
 #define K_NFILE 60
 #define K_NMIO 4
 #define K_NSIG 16
@@ -267,11 +267,13 @@ static void
 dump_mount(int addr)
 {
 	struct k_mount m;
+	k8 nm;
 	int i;
 
+	rdmem((paddr)K_NMTAB, &nm, 1);
 	printf("\n== mount table (_mlist @ 0x%04x, %d x %d) ==\n",
-	    addr, K_NMOUNT, (int)sizeof(struct k_mount));
-	for (i = 0; i < K_NMOUNT; i++) {
+	    addr, (int)nm, (int)sizeof(struct k_mount));
+	for (i = 0; i < nm; i++) {
 		rdmem((paddr)(addr + i * (int)sizeof(struct k_mount)), &m, sizeof m);
 		if (m.dev == 0 && m.inode == 0)
 			continue;

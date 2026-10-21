@@ -42,7 +42,7 @@
 #include <sys/dir.h>
 #include <mtab.h>
 
-#define NMOUNT 4		/* the kernel's NMOUNT (sys/sys.h) */
+#define NMOUNT 10		/* the kernel's NMOUNT (sys/sys.h) */
 #define SUPERBLK 1
 #define ILISTBLK (SUPERBLK + 1)	/* the I-list follows the superblock */
 #define ROOTINO 1

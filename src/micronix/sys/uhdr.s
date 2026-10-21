@@ -63,12 +63,23 @@ _lastseg=0x262
 _taskmap=0x264
 _curmem=0x266
 _mlist=0x268
-_segmap=0x29c
+; _segmap follows _mlist: NMOUNT (sys/sys.h) entries of 13 bytes
+_segmap=0x2ea
+;
+; The published counts, in the tail of the freed low memory: segmap's 256
+; bytes end at 0x3e9.  main() sets nmtab to NMOUNT and expand_bufs() sets
+; nbufs to the header count, so kstat - reading /dev/mem - reports this
+; kernel's sizes without being built with them.  Same convention as the
+; process-table and mount-table pointers at 0x1003 and 0x1005.
+;
+_nmtab=0x3ea
+_nbufs=0x3eb
 _usrtop=0xFFFF
 _memtop=0xFFFF
 	.globl	_trapstack, _oldstack, _cmask, _ctask, _mask, _rst1
 	.globl	_trapad, _status, _wtask, _usrtop, _memtop, _trapvec
 	.globl	_hlt, _xinit, _map0, _lowbss, _nsegs, _lastseg, _taskmap, _curmem, _mlist, _segmap
+	.globl	_nmtab, _nbufs
 	.extern	_plist, _start
 
 ;

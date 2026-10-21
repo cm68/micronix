@@ -38,6 +38,7 @@ extern UINT totmem;
 extern struct buf *btop;
 extern UINT8 map0[];
 extern char lowbss[];           /* uhdr.s's _lowbss: the freed low memory */
+extern UINT8 nmtab;             /* uhdr.s's _nmtab: the published count */
 extern UINT8 segmap[];          /* malloc.c */
 extern UINT nsegs;
 extern UINT lastseg;            /* uhdr.s's _lastseg: the allocator hint */
@@ -101,6 +102,7 @@ main()
 
     cus();                      /* custom hardware */
     zero(lowbss, 416);          /* clear the freed low-memory bss */
+    nmtab = NMOUNT;             /* publish the mount table's size, 0x3ea */
     enable();                   /* enable interrupts */
     coninit();
     plogo();

@@ -10,8 +10,18 @@
  */
 #define NPROC	20
 #define NINODE	50
-#define NMOUNT	4
+#define NMOUNT	10
 #define NFILE	60
+
+/*
+ * Where the low page publishes its sizes (uhdr.s): a byte at each fixed
+ * address, in the freed low memory.  nmtab is NMOUNT at boot and nbufs
+ * is the buffer cache's header count, so a program reading /dev/mem -
+ * kstat, df - does not have to be built with either size.  The
+ * convention is the one the pointers at 0x1003 and 0x1005 use.
+ */
+#define NMTAB_ADDR	0x3ea
+#define NBUFS_ADDR	0x3eb
 #define NOPEN	16
 #define NSIG	16
 #define MINRUN	2               /* minimum run time before swapout */
@@ -26,8 +36,8 @@
  *
  * It is the page the firmware has always remapped to reach another
  * segment: mem.s's getbyte/putbyte/memrw borrow it and put it back, which
- * is what the superblock's window used to do before getsb() moved the
- * superblock into a slot of the kernel's own memory (uio.c).  A driver
+ * is what the superblock's window used to do before the superblock
+ * became an ordinary pinned buffer (getsb(), uio.c).  A driver
  * that needs a segment of its own visible *beside* a buffer cannot have
  * BUFSEG for it, because that is where the buffer is, and this is the one
  * other page there is.

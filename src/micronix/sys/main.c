@@ -55,7 +55,8 @@ struct buf *btop = 0;
 
 UINT8 map0[];
 
-char lowbss[];                  /* the freed low memory, 0x220 (uhdr.s) */
+char lowbss[];                  /* the freed low memory, 0x260 (uhdr.s) */
+extern UINT8 nbufs;             /* uhdr.s's _nbufs: the published count */
 
 extern int segalloc();          /* malloc.c */
 extern int nodev();             /* con.c */
@@ -64,7 +65,7 @@ extern int nodev();             /* con.c */
  * The ceiling on the pool.  expand_bufs() would otherwise mint whatever
  * the resident .bss leaves between _ebss and BUFWIN.  That was past what
  * the count can carry when this was written - 282 buffers, and nbuf
- * wrapped at 256 - and it is 244 now, under the cap, the kernel having
+ * wrapped at 256 - and it is under the cap now, the kernel having
  * grown into the headroom; the cap stays as the ceiling-independent
  * bound.  256 is also 32 of the 4K segments the blocks come from, which
  * is what the budget is really made of, and no filesystem here wants
@@ -144,6 +145,12 @@ expand_bufs()
             nbuf++;
         }
     }
+    /*
+     * Publish the header count at 0x3eb for kstat.  One byte: exactly
+     * 256, the most MAXBUFS allows, reads as zero.  The pool never has
+     * fewer than binit's eight, so zero unambiguously means 256.
+     */
+    nbufs = nbuf;
     btop = b;
     signon();
 }

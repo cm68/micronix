@@ -1,6 +1,6 @@
 .in 5
 .rm 65
-.he "mem (4)                    6/25/82                        mem (4)"
+.he "mem (4)                    10/20/26                       mem (4)"
 .fo "                              -#-"
 .bd
 DEVICE
@@ -19,3 +19,47 @@ This device reads and writes kernel memory (addresses 0 to FFFF).
 One must be exceedingly careful in protecting this device,
 since there are several hardware registers in this address range
 that will crash the system upon being read.
+.sp 2
+.in -5
+.bd
+LOW MEMORY
+.in +5
+.br
+A few things the kernel wants other programs to find are left at
+fixed low addresses.  A program seeks to one and reads it; the
+lengths of a table's entries still come from the headers the
+program is built with, but the table's address and size need not
+be.
+
+.in +10
+.ti -10
+0x1000		The kernel's entry point, a jump instruction.
+.ti -10
+0x1003		The address of the process table, a word.
+.bd
+ps
+seeks here and reads the pointer.
+.ti -10
+0x1005		The address of the mount table, a word.
+.bd
+df
+seeks here and reads the pointer.
+.ti -10
+0x3ea		The number of entries in the mount table, a byte.
+The kernel writes it from its own NMOUNT at boot, so df and
+kstat report the running kernel's size and are not rebuilt when
+it changes.
+
+.ti -10
+0x3eb		The number of buffer cache headers, a byte, written
+when the cache reaches its final size.  A pool of exactly 256
+reads as zero; the pool never has fewer than eight, so zero
+means 256.
+
+.sp
+The words at 0x1003 and 0x1005 are low byte first.  The
+addresses are the kernel's own; the kernel's symbol table in
+.bd
+/micronix
+is the general way to find everything else, and is what kstat
+reads.

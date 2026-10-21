@@ -10,9 +10,12 @@
  * in-core inode table, the clist, and the device switch tables.
  *
  * The addresses come from the kernel's own symbol table, read out of
- * /micronix - the same object file the boot loader loads - rather than
- * from a fixed hook like ps's 0x1003.  Each table is then read out of
- * /dev/mem at the address its symbol gives.
+ * /micronix - the same object file the boot loader loads.  Each table is
+ * then read out of /dev/mem at the address its symbol gives.  The two
+ * sizes are not symbols at all: the kernel publishes NMOUNT and the
+ * buffer count as bytes at fixed low addresses, 0x3ea and 0x3eb
+ * (sys/uhdr.s), so this program reports the kernel's sizes without
+ * having to be rebuilt when either changes.
  *
  * The struct definitions come from the same headers the kernel is built
  * against (sys/proc.h, sys/tty.h, ...), so the field offsets are the
@@ -329,13 +332,16 @@ dump_mount(addr)
 	unsigned short addr;
 {
 	struct mount m;
+	unsigned char nm = 0;
 	int i;
 	unsigned ba;
 
-	printf("\n== mount table (_mlist @ 0x%x, %d x %d) ==\n",
-	    addr, NMOUNT, sizeof(struct mount));
+	/* the kernel publishes its NMOUNT at 0x3ea, see sys/uhdr.s */
+	kread(NMTAB_ADDR, (char *)&nm, 1);
+	printf("\n== mount table (_mlist @ 0x%x, %u x %d) ==\n",
+	    addr, nm, sizeof(struct mount));
 	seek(memfd, addr, 0);
-	for (i = 0; i < NMOUNT; i++) {
+	for (i = 0; i < nm; i++) {
 		ba = (unsigned)addr + i * (unsigned)sizeof(struct mount);
 		if (read(memfd, &m, sizeof m) != sizeof m)
 			break;
@@ -502,8 +508,12 @@ main()
 	a = symaddr("_blist");
 	if (a != (unsigned short)-1) {
 		unsigned char nb = 0;
-		kread(symaddr("_nbuf"), (char *)&nb, 1);
-		dump_buf(a, nb);
+		unsigned n;
+		kread(NBUFS_ADDR, (char *)&nb, 1);
+		n = nb;
+		if (n == 0)		/* one byte: 0 is the pool's 256 */
+			n = 256;
+		dump_buf(a, n);
 	}
 
 	a = symaddr("_mlist");

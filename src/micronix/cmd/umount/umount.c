@@ -23,7 +23,7 @@
 #include <string.h>
 #include <mtab.h>
 
-#define NMOUNT 4		/* the kernel's NMOUNT (sys/sys.h) */
+#define NMOUNT 10		/* the kernel's NMOUNT (sys/sys.h) */
 #define MAXFSTAB 8
 
 struct mtab mtab[NMOUNT];
