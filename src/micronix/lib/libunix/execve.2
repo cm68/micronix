@@ -63,12 +63,26 @@ image starts, its stack holds:
         argv[0]
         ...
         argv[argc-1]
-        0
+        -1
         envp[0]
         ...
         envp[n-1]
         0
 .fi
+The argv terminator is -1, as
+.bd
+exec
+(2) documents, so a program that passes its inherited
+.bd
+argv
+on to
+.bd
+execv
+must set
+.bd
+argv[argc]
+to a null pointer first.  The environment vector follows the
+terminator.
 The C startup code sets the global
 .bd
 environ
@@ -87,10 +101,12 @@ environment.  The older
 exec
 call is that case: it passes no environment at all.
 .sp
-The argument and environment strings are copied into four shared
-512-byte buffers, so together they may not exceed 2048 bytes.  The
-pointers added to the stack, and the image itself, must also fit in
-the process's user memory.
+The argument and environment strings are built directly into the new
+image's initial stack, in segments of its own, while the old image is
+still mapped.  The block is placed at the top of user memory, strings
+last, and costs exactly its size; the strings are measured first so
+the image gets everything below the block.  The block, the image and
+the heap must all fit in 64K.
 .sp 2
 .in -5
 .bd
@@ -104,8 +120,9 @@ set.  In that case the calling image is not lost and can continue.
 The errors are those of
 .bd
 exec;
-an argument or environment list too large for the buffers is
-reported as E2BIG.
+an argument or environment list too large for the initial stack page
+is reported as E2BIG, and an image that will not fit below that page
+as ENOMEM.
 .sp 2
 .in -5
 .bd

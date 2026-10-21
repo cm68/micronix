@@ -99,9 +99,10 @@ If the first byte of the file is not hex 99, then the file is
 taken to be pure object code origined at address 256 (100
 hex). The brake is set to the file size.
 
-In any case, the program must meet the maximum-size
-restriction (currently 65024 bytes), and it must keep a "halt"
-instruction (the system-call trap) at address 8. (This is
+In any case, the image and its heap, together with the argument
+block, must fit in the 64K user address space.  The argument block is
+placed at the top and the image below it.  The program must keep a
+"halt" instruction (the system-call trap) at address 8. (This is
 supplied by the system, unless the text offset is <= 8.)
 
 C offers two different interfaces to
@@ -125,9 +126,11 @@ list, and
 execv
 is called with the address of the list.
 
-Currently, the total number of bytes in the argument
-strings (including the terminating nulls) is limited
-to 512.
+The arguments are placed at the top of user memory: argc, the pointer
+vectors, then the strings, ending at 0xffff.  The strings are measured
+first, so the stack costs exactly the block and the image gets
+everything below it.  The block, the image and the heap must fit in
+the 64K address space.
 
 It is conventional to repeat the name
 of the file being executed as the first argument,
@@ -215,6 +218,16 @@ arg0:   string\0
 sp ->   argc
 .sp 2
 .fi
+The argv terminator is -1, so
+.bd
+argv
+cannot be passed on to
+.bd
+execv
+until
+.bd
+argv[argc]
+has been set to 0.
 .in -5
 .bd
 RETURNS

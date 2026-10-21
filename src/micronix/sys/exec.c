@@ -15,9 +15,16 @@
 #include <obj.h>
 #include <errno.h>
 
-#define NBLKS	4               /* max argument blocks */
-#define NODEV	-1              /* see con.c */
 #define HALT	0x76            /* system call trap */
+
+/*
+ * The argument block is built directly into the new image's initial
+ * stack, in segments of their own, while the old image is still mapped.
+ * Nothing goes through the buffer cache.  The block is placed flush at
+ * the top of user memory, so the stack it costs is exactly the block
+ * and the image gets everything below it; the strings are measured
+ * first so their final addresses are known before the copy.
+ */
 
 /*
  * Objext header for cpm-format programs.
@@ -38,13 +45,32 @@ struct obj cpmhdr = {
 };
 
 static struct inode *ip = 0;
-static struct buf *bp[NBLKS] = 0;
 static UINT nargs = 0;
 static UINT nenv = 0;
-static UINT nbytes = 0;
-static UINT8 nblks = 0;
+static UINT nbytes = 0;         /* the strings, nulls included */
+static UINT argsize = 0;        /* strings + vectors + argc and terminators */
+
+/*
+ * The stack pages the block lives in, by page.  A zero entry is free;
+ * arginstall() hands the nonzero ones to the process and clears them.
+ */
+static UINT8 argseg[16];
+static UINT8 argfirst;          /* the lowest page of the block */
+static UINT8 argheld;           /* the buffer window has a page of ours */
+static UINT8 argpage;           /* the page in the buffer window, 0xff none */
+
+/*
+ * A fake buffer header: bhold() only reads xmem and data, and using it
+ * here means brel() restores the window the same way it does for real
+ * buffers.  The stack page is not a cache block.
+ */
+static struct buf argbuf;
+
 extern int zerouser();
 extern int out();
+extern int getbyte(), getword();
+extern int segalloc(), segfree(), newmap(), taskload();
+extern UINT nsegs;              /* free 4K segments (malloc.c) */
 
 static struct obj hdr = 0;
 char zpage[512] = 0;   /* zero page for clearing bss */
@@ -68,7 +94,8 @@ doexec(name, args, env)
         sleep(&execing, PRIWAIT);
     execing = 1;
 
-    if (xchk(name) && getargs(args, env) && rdhdr() && fit()) {
+    if (xchk(name) && argscan(args, env) && rdhdr() && fit() &&
+        argalloc() && argbuild(args, env)) {
         /*
          * Tell the tracer the user task's id, then its program name,
          * before mrelse() drops the old image's pages (after which
@@ -87,7 +114,7 @@ doexec(name, args, env)
             }
         }
         mrelse();
-        putargs();
+        arginstall();
         setusr();
         readin();
         /*
@@ -103,9 +130,9 @@ doexec(name, args, env)
         out(0xd0, (UINT8) (ip->i_inum >> 8));  /* inode number, high */
         if (u.error)
             send(u.p, SIGKILL);
-    }
+    } else
+        argfree();
     irelse(ip);
-    arelse();
     execing = 0;
     wakeup(&execing);
 }
@@ -162,134 +189,345 @@ rdhdr()
 }
 
 /*
- * Check fit
+ * Check fit.  The argument block is placed at the top of user memory,
+ * so the image and its heap, plus the block, must all fit.  The
+ * header's sizes are the file's, so add them a step at a time: a sum
+ * that wraps would look small and let an image run past the end of
+ * user memory.
  */
 fit()
 {
-    static char *brake, *tbrake;
+    UINT brake, tbrake, sp;
 
-    brake = hdr.dataoff + hdr.data + hdr.bss;
-    tbrake = hdr.textoff + hdr.text;
-    brake = max(brake, tbrake);
-
-    if (brake + hdr.heap + 6 + nargs + nargs + nenv + nenv + nbytes > MAXMEM) {
+    if (hdr.dataoff > MAXMEM - hdr.data) {
         u.error = ENOMEM;
         return 0;
     }
-    u.brake = brake;
-    return 1;
-}
-
-/*
- * Copy arguments and environment to buffers.  The argument vector ends
- * at its null; the environment follows, and the same null on the end of
- * envp ends the pass.  env == 0 means call 11 and stops at the args.
- */
-getargs(args, env)
-    char **args, **env;
-{
-    static char *s, *d;
-    UINT8 held, inenv;
-
-    held = 0;
-    inenv = 0;
-    nargs = nbytes = nblks = nenv = 0;
-    for (;;) {
-        if (inenv && env == 0)
-            break;
-        if (inenv)
-            s = getword(env++);
-        else
-            s = getword(args++);
-        if (s == 0) {
-            if (inenv)
-                break;
-            inenv = 1;
-            continue;
-        }
-        if (inenv)
-            nenv++;
-        else
-            nargs++;
-        do {
-            if ((nbytes & 511) == 0) {
-                if (nblks < NBLKS) {
-                    if (held)           /* the last block is full */
-                        brel();
-                    nblks++;
-                    bp[nblks] = bget(nblks, NODEV);
-                    d = bhold(bp[nblks]);
-                    held = 1;
-                } else {
-                    if (held)
-                        brel();
-                    u.error = E2BIG;
-                    return 0;
-                }
-            }
-            nbytes++;
-        }
-        while ((*d++ = getbyte(s++)) != '\0');
+    brake = hdr.dataoff + hdr.data;
+    if (hdr.bss > MAXMEM - brake) {
+        u.error = ENOMEM;
+        return 0;
     }
-    if (held)
-        brel();
-    return 1;
-}
+    brake += hdr.bss;
 
-/*
- * Set up user's stack.
- */
-putargs()
-{
-    static UINT8 n, c, *s, *a, *d, **av;
-    static UINT ac, ai, count, rem;
-    extern char usrtop;
+    if (hdr.textoff > MAXMEM - hdr.text) {
+        u.error = ENOMEM;
+        return 0;
+    }
+    tbrake = hdr.textoff + hdr.text;
+    if (tbrake > brake)
+        brake = tbrake;
 
     /*
-     * s, a, d, t and av are UINT8; usrtop is a plain char, bp->data is
-     * a char *, and u.sp is a UINT *.  The bytes are the same bytes -
-     * this is building the argument block at the top of user memory
-     * and the types are only saying how each line means to read it -
-     * but ccc will not convert between them without being told, so
-     * each crossing is spelled out.
+     * The block uses the top byte as well as the rest of user memory,
+     * so its base is one past 0xffff - argsize.  The image and heap
+     * must end at or below it.
      */
-    a = d = (UINT8 *) (&usrtop - nbytes);
-    av = (UINT8 **) ((char **) a - nargs - nenv - 2);
-    u.sp = (UINT *) &av[-1];
-    valid(u.sp, 6 + nargs + nargs + nenv + nenv + nbytes);
+    sp = 0xFFFF - argsize + 1;
+    if (brake > sp || hdr.heap > sp - brake) {
+        u.error = ENOMEM;
+        return 0;
+    }
+    u.brake = (char *) brake;
+    return 1;
+}
 
-    for (c = 0, ac = 0, n = 1; n <= nblks; n++) {
-        s = (UINT8 *) bhold(bp[n]);
-        rem = 512;
+/*
+ * The length of a user string, bounded.  getbyte reads the caller's
+ * address space through the 0xc000 window; the bound keeps an
+ * unterminated string from walking the machine.
+ */
+static UINT
+ulen(s)
+    UINT s;
+{
+    UINT n;
 
-        while (rem) {
-            if (c == 0) {
-                ai = ac;
-                if (ai >= nargs)
-                    ai++;               /* the null between the vectors */
-                putword(a, &av[ai]);
-                if (++ac >= nargs + nenv)
-                    break;
+    for (n = 0; n < MAXMEM; n++)
+        if (getbyte(s + n) == 0)
+            break;
+    return n;
+}
+
+/*
+ * Count the vectors and measure the strings.
+ *
+ * The block is placed flush at the top of user memory, so the total
+ * has to be known before the copy.  This pass reads the vectors and
+ * walks the strings for their lengths; argbuild() then copies them
+ * straight into the new segments.  The extra read is deliberate: it
+ * makes the stack cost exactly the arguments and nothing more.
+ *
+ * argsize is argc (2) + the two null terminators (4) + a pointer for
+ * every string + the strings themselves.
+ */
+argscan(args, env)
+    char **args, **env;
+{
+    UINT i, s, len, need;
+
+    nargs = nenv = nbytes = 0;
+    argsize = 6;                /* argc, and the argv/envp terminators */
+
+    if (args) {
+        for (i = 0; (s = getword(args + i)) != 0; i++) {
+            len = ulen(s);
+            if (len > MAXMEM - 3) {
+                u.error = E2BIG;
+                return 0;
             }
-            c = *s;
-            s++;
-            a++;
-            rem--;
+            need = len + 3;             /* string, null, pointer */
+            if (argsize > MAXMEM - need) {
+                u.error = E2BIG;
+                return 0;
+            }
+            argsize += need;
+            nbytes += len + 1;
+            nargs++;
         }
-
-        count = min(512, nbytes);
-        copyout(bp[n]->data, d, count);
-        nbytes -= count;
-        d += count;
-        brel();
+    }
+    if (env) {
+        for (i = 0; (s = getword(env + i)) != 0; i++) {
+            len = ulen(s);
+            if (len > MAXMEM - 3) {
+                u.error = E2BIG;
+                return 0;
+            }
+            need = len + 3;
+            if (argsize > MAXMEM - need) {
+                u.error = E2BIG;
+                return 0;
+            }
+            argsize += need;
+            nbytes += len + 1;
+            nenv++;
+        }
     }
 
-    s = (UINT8 *) bhold(bp[1]);
-    copy(s, u.p->args, 8);      /* for ps */
-    brel();
-    putword(0, &av[nargs]);     /* argv terminator */
-    putword(0, &av[nargs + nenv + 1]);  /* envp terminator */
-    putword(nargs, u.sp);
+    /*
+     * Keep page 0 out of the stack: a block that reaches below 0x1000
+     * would overwrite the grow segment mrelse() leaves in mem[0].
+     */
+    if (argsize > 0xEFFF) {
+        u.error = E2BIG;
+        return 0;
+    }
+    return 1;
+}
+
+/*
+ * Map a new stack page in the buffer window.  bhold() on a fake header
+ * stacks the segment it replaces and brel() puts it back, so the window
+ * is the kernel's again after the build.  getbyte() reads the caller
+ * through the other window (0xc000), which is what lets the old image
+ * and the new stack be touched at the same time.
+ */
+static char *
+argwin(page)
+    UINT page;
+{
+    argbuf.xmem = argseg[page];
+    argbuf.data = (char *) BUFWIN;
+    argheld = 1;
+    return (bhold(&argbuf));
+}
+
+static void
+argrel()
+{
+    if (argheld) {
+        brel();
+        argheld = 0;
+    }
+    argpage = 0xff;
+}
+
+static void
+argmap(page)
+    UINT page;
+{
+    if (argheld && page == argpage)
+        return;
+    argrel();
+    argwin(page);
+    argpage = page;
+}
+
+static void
+argput(addr, c)
+    UINT addr; UINT8 c;
+{
+    argmap(addr >> 12);
+    ((UINT8 *) BUFWIN)[addr & 0xFFF] = c;
+}
+
+static UINT8
+argget(addr)
+    UINT addr;
+{
+    argmap(addr >> 12);
+    return (((UINT8 *) BUFWIN)[addr & 0xFFF]);
+}
+
+static void
+argputw(addr, v)
+    UINT addr, v;
+{
+    argput(addr, (UINT8) v);
+    argput(addr + 1, (UINT8) (v >> 8));
+}
+
+/*
+ * Copy one user string to the stack page.  *room is what is left of the
+ * page; running out before the null means the list does not fit, which
+ * is E2BIG rather than a write off the end.
+ */
+static int
+argcopy(s, dp, roomp)
+    UINT s; UINT *dp, *roomp;
+{
+    UINT8 c;
+    UINT d, room;
+
+    d = *dp;
+    room = *roomp;
+    while (room) {
+        c = getbyte(s++);
+        argput(d, c);
+        d++;
+        room--;
+        if (c == 0) {
+            *dp = d;
+            *roomp = room;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/*
+ * Reserve the segments for the block's pages.  This happens before
+ * mrelse(), while the old image still owns its pages, so it can fail:
+ * the old path allocated the stack only after the old pages were free.
+ * Check the free count first and answer ENOMEM rather than panicking in
+ * segalloc().
+ */
+argalloc()
+{
+    UINT p, n;
+
+    argfirst = (0xFFFF - argsize + 1) >> 12;
+    n = 16 - argfirst;
+    if (nsegs < n) {
+        u.error = ENOMEM;
+        return 0;
+    }
+    for (p = 0; p < 16; p++)
+        argseg[p] = 0;
+    for (p = argfirst; p < 16; p++)
+        argseg[p] = segalloc();
+    return 1;
+}
+
+/*
+ * Build the block flush at the top of user memory: the strings end at
+ * 0xffff and the vectors sit below them, so the stack costs exactly
+ * argsize and everything below it is left to the image.  The strings
+ * are copied once here; argscan() has already measured them.
+ */
+argbuild(args, env)
+    char **args, **env;
+{
+    UINT i, s, d, room, sp, av, a;
+
+    sp = 0xFFFF - argsize + 1;
+    av = sp + 2;
+    a = av + 2 * (nargs + nenv + 2);   /* the string area; 0 if no strings */
+    u.sp = (UINT *) sp;
+
+    argheld = 0;
+    argpage = 0xff;
+    room = nbytes;
+
+    argputw(sp, nargs);
+    d = a;
+    for (i = 0; i < nargs; i++) {
+        s = getword(args + i);
+        argputw(av + 2 * i, d);
+        if (!argcopy(s, &d, &room))
+            goto big;
+    }
+    argputw(av + 2 * nargs, 0xFFFF);        /* argv terminator, -1 (exec(2)) */
+    for (i = 0; i < nenv; i++) {
+        s = getword(env + i);
+        argputw(av + 2 * (nargs + 1 + i), d);
+        if (!argcopy(s, &d, &room))
+            goto big;
+    }
+    argputw(av + 2 * (nargs + 1 + nenv), 0);    /* envp terminator */
+
+    /*
+     * The first eight bytes of argv[0], for ps, stopping at the null.
+     */
+    zero(u.p->args, 8);
+    i = nbytes < 8 ? nbytes : 8;
+    for (d = 0; d < i; d++) {
+        ((UINT8 *) u.p->args)[d] = argget(a + d);
+        if (((UINT8 *) u.p->args)[d] == 0)
+            break;
+    }
+
+    argrel();
+    return 1;
+
+big:
+    argrel();
+    u.error = E2BIG;
+    return 0;
+}
+
+/*
+ * Hand the block's pages to the process after mrelse() has cleared the
+ * old image.  mrelse() keeps page 15 - the old stack - so free it here,
+ * now that nothing reads it, and install the pages the block uses.
+ */
+arginstall()
+{
+    UINT p, n;
+    UINT8 old, grow;
+
+    old = u.p->mem[15].seg;
+    grow = u.p->mem[0].seg;
+    n = 0;
+    for (p = argfirst; p < 16; p++) {
+        u.p->mem[p].seg = argseg[p];
+        u.p->mem[p].per = FULL;
+        argseg[p] = 0;              /* the process owns it now */
+        n++;
+    }
+    if (old != grow)
+        segfree(old);
+    u.p->nsegs = 2 + n;             /* grow, the block's pages, and u */
+    newmap(u.p);
+    taskload(u.p);
+}
+
+/*
+ * Release whatever a failed exec reserved.  On success the entries were
+ * cleared by arginstall().
+ */
+argfree()
+{
+    UINT p;
+
+    argrel();
+    for (p = 0; p < 16; p++) {
+        if (argseg[p]) {
+            segfree(argseg[p]);
+            argseg[p] = 0;
+        }
+    }
+    argfirst = 0;
 }
 
 /*
@@ -334,17 +572,6 @@ readin()
     zerouser((char *) (hdr.dataoff + hdr.data), hdr.bss);
 
     u.p->mode &= ~LOCKED;       /* no core lock across exec */
-}
-
-/*
- * Release the argument buffers
- */
-arelse()
-{
-    static UINT8 n;
-
-    for (n = 1; n <= nblks; n++)
-        brelse(bp[n]);
 }
 
 /*
