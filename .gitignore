@@ -204,6 +204,15 @@ src/hwsim/d1/selector
 disks/hdinstall/sys
 
 #
+# The ESP32 network card firmware's PlatformIO build directory and the
+# local copy of its wifi credentials.  secrets.example.h is the source;
+# secrets.h is whatever this machine's network is.
+#
+src/micronix/stand/nic/.pio/
+src/micronix/stand/nic/secrets.h
+src/micronix/stand/nic/include/secrets.h
+
+#
 # script(1) captures.  A typescript is a recording of a terminal session
 # - the console output of a simulator run, with the escape sequences it
 # was drawn with - and it grows without limit while the thing runs.  Two

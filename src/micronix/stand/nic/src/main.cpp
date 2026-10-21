@@ -1,0 +1,782 @@
+/*
+ * The network card firmware - NET.md's socket face, in the ESP32.
+ *
+ * The guest drives two S-100 ports: NETDATA (0x60) and NETSTAT (0x61).
+ * This side gives it the byte channel, assembles the guest's frames,
+ * runs them against lwIP sockets, and pushes ACK/DATA/EVENT frames back.
+ * The contract is src/micronix/sys/NET.md; the simulator's card model,
+ * src/hwsim/d1/nic.c, is the golden reference and this file follows it
+ * command for command.  The board and pinout are the card document in
+ * src/hwsim/d1 commit 13bd5d78, docs/hw/esp32-nic.md.
+ *
+ * Two tasks, two cores.  busTask owns one core at the highest priority
+ * and never yields: it polls the buffered board's select/sOUT/sINP and
+ * moves bytes in and out of the FIFOs.  netTask runs on the other core
+ * with the Wi-Fi stack: it assembles frames, runs the socket state
+ * machine, and pushes replies.  Nothing in the bus loop touches flash,
+ * allocates, or logs.
+ *
+ * The card's only shared mutable state with the guest is the two FIFOs
+ * and the interrupt line.
+ */
+
+#include <Arduino.h>
+#include <WiFi.h>
+#include <atomic>
+
+#include <soc/gpio_reg.h>
+#include <soc/soc.h>
+#include <esp_task_wdt.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
+#include "netproto.h"
+
+/*
+ * Wi-Fi credentials.  Put them in secrets.h (ignored by git), or in the
+ * environment's build flags -DWIFI_SSID=... -DWIFI_PASS=...
+ */
+#if defined(__has_include)
+#if __has_include("secrets.h")
+#include "secrets.h"
+#endif
+#endif
+#ifndef WIFI_SSID
+#define WIFI_SSID ""
+#endif
+#ifndef WIFI_PASS
+#define WIFI_PASS ""
+#endif
+
+/* ------------------------------------------------------------------ */
+/* The board                                                           */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The card document's pinout.  DO and the three control lines are 5V
+ * bus signals through 2:1 dividers, so they are inputs; DI drives the
+ * board's data buffer.  GPIO 34-39 are input-only, which the four
+ * control lines use.  The interrupt is GPIO4 through a 7406: the
+ * inverter makes it an open-collector pull-down of VI5 (active low on
+ * the bus), so GPIO4 HIGH asserts the line.
+ *
+ * The board presents select/sOUT/sINP/A0 as the card document's poll
+ * loop reads them.  A board that buffers an inverted line needs the
+ * matching ACTIVE constant flipped; A0 high is NETSTAT (0x61).
+ */
+static const uint8_t DO_PIN[8] = {32, 33, 25, 26, 27, 14, 12, 13};
+static const uint8_t DI_PIN[8] = {21, 22, 23, 18, 19, 5, 16, 17};
+
+#define PIN_SEL   34
+#define PIN_SOUT  35
+#define PIN_SINP  36
+#define PIN_A0    39
+#define PIN_IRQ    4
+
+static const bool SEL_ACTIVE  = true;
+static const bool SOUT_ACTIVE = true;
+static const bool SINP_ACTIVE = true;
+static const bool A0_STAT_HIGH = true;   /* A0 high selects NETSTAT */
+
+#define IN1BIT(p)  (1UL << ((p) - 32))
+#define IRQ_BIT    (1UL << PIN_IRQ)
+
+static const uint32_t SEL_BIT  = IN1BIT(PIN_SEL);
+static const uint32_t SOUT_BIT = IN1BIT(PIN_SOUT);
+static const uint32_t SINP_BIT = IN1BIT(PIN_SINP);
+static const uint32_t A0_BIT   = IN1BIT(PIN_A0);
+
+/* DI set/clear masks per byte, so a read costs two register writes. */
+static uint32_t DRAM_ATTR di_set[256];
+static uint32_t DRAM_ATTR di_clr[256];
+
+/* ------------------------------------------------------------------ */
+/* The FIFOs                                                           */
+/*                                                                     */
+/* Both are single-producer/single-consumer rings: the network task is */
+/* the only producer on rx, the bus task the only producer on tx.      */
+/* Indices are free-running and masked, so no wrap test is needed.     */
+/* ------------------------------------------------------------------ */
+
+#define RXQ      8192
+#define TXQ      4096
+#define RXMASK   (RXQ - 1)
+#define TXMASK   (TXQ - 1)
+
+static uint8_t DRAM_ATTR rxq[RXQ];
+static uint8_t DRAM_ATTR txq[TXQ];
+
+static std::atomic<uint32_t> rx_head(0);   /* producer: netTask */
+static std::atomic<uint32_t> rx_tail(0);   /* consumer: busTask */
+static std::atomic<uint32_t> tx_head(0);   /* producer: busTask */
+static std::atomic<uint32_t> tx_tail(0);   /* consumer: netTask */
+
+static volatile bool joined = false;       /* NETSTAT_RDY, set by netTask */
+
+/* The interrupt handshake: both sides touch the line under this. */
+static portMUX_TYPE irqMux = portMUX_INITIALIZER_UNLOCKED;
+static volatile bool irq_asserted = false;
+
+/* ------------------------------------------------------------------ */
+/* The bus side - IRAM only, no flash, no logging                      */
+/* ------------------------------------------------------------------ */
+
+static inline IRAM_ATTR bool rx_empty(void)
+{
+    return rx_tail.load(std::memory_order_relaxed) ==
+           rx_head.load(std::memory_order_acquire);
+}
+
+static inline IRAM_ATTR uint8_t rx_peek(void)
+{
+    uint32_t t = rx_tail.load(std::memory_order_relaxed);
+
+    if (t == rx_head.load(std::memory_order_acquire))
+        return 0;
+    return rxq[t & RXMASK];
+}
+
+static inline IRAM_ATTR uint8_t rx_get(void)
+{
+    uint32_t t = rx_tail.load(std::memory_order_relaxed);
+    uint8_t b;
+
+    if (t == rx_head.load(std::memory_order_acquire))
+        return 0;
+    b = rxq[t & RXMASK];
+    rx_tail.store(t + 1, std::memory_order_release);
+    return b;
+}
+
+static inline IRAM_ATTR bool tx_room(void)
+{
+    return (uint32_t)(tx_head.load(std::memory_order_acquire) -
+                      tx_tail.load(std::memory_order_relaxed)) < TXQ;
+}
+
+static inline IRAM_ATTR void tx_put(uint8_t b)
+{
+    uint32_t h = tx_head.load(std::memory_order_relaxed);
+
+    if ((uint32_t)(h - tx_tail.load(std::memory_order_acquire)) >= TXQ)
+        return;                         /* the guest honours TXRDY */
+    txq[h & TXMASK] = b;
+    tx_head.store(h + 1, std::memory_order_release);
+}
+
+static inline IRAM_ATTR uint8_t status_byte(void)
+{
+    uint8_t s = 0;
+
+    if (!rx_empty())
+        s |= NETSTAT_RXRDY;
+    if (tx_room())
+        s |= NETSTAT_TXRDY;
+    if (joined)
+        s |= NETSTAT_RDY;
+    return s;
+}
+
+static inline IRAM_ATTR uint8_t do_byte(uint32_t in0, uint32_t in1)
+{
+    uint8_t v = 0;
+
+    if (in1 & (1UL << 0))  v |= 0x01;   /* DO0 = GPIO32 */
+    if (in1 & (1UL << 1))  v |= 0x02;   /* DO1 = GPIO33 */
+    if (in0 & (1UL << 25)) v |= 0x04;
+    if (in0 & (1UL << 26)) v |= 0x08;
+    if (in0 & (1UL << 27)) v |= 0x10;
+    if (in0 & (1UL << 14)) v |= 0x20;
+    if (in0 & (1UL << 12)) v |= 0x40;
+    if (in0 & (1UL << 13)) v |= 0x80;
+    return v;
+}
+
+/*
+ * The bus loop.  It is a poll loop because the card document chose a
+ * buffered board over a latch: the Z80's I/O cycle is the timing budget,
+ * so the loop must never block or take a fault.  Read cycles drive DI
+ * continuously with the byte the guest would read (rx head for NETDATA,
+ * the status byte for NETSTAT); a read strobe only consumes the byte,
+ * which buys the setup time the Z80 needs.  Writes are sampled on the
+ * strobe's leading edge, so one bus cycle is one byte.
+ *
+ * The interrupt follows the rx FIFO's emptiness.  Assertion happens in
+ * the network task under irqMux after a frame is queued; release happens
+ * here under the same mux when the last byte is drained, with the empty
+ * test re-done inside the mux.  That orders the two against each other:
+ * whichever runs second sees the other's state.
+ */
+static void IRAM_ATTR busTask(void *arg)
+{
+    bool prev_rd = false;
+    bool prev_wr = false;
+    uint8_t driven = 0xff;
+
+    (void)arg;
+    for (;;) {
+        uint32_t in0 = REG_READ(GPIO_IN_REG);
+        uint32_t in1 = REG_READ(GPIO_IN1_REG);
+        bool sel = ((in1 & SEL_BIT) != 0) == SEL_ACTIVE;
+        bool a0  = ((in1 & A0_BIT) != 0) == A0_STAT_HIGH;
+        bool rd  = sel && (((in1 & SINP_BIT) != 0) == SINP_ACTIVE);
+        bool wr  = sel && (((in1 & SOUT_BIT) != 0) == SOUT_ACTIVE) && !rd;
+
+        if (rd && !a0 && !prev_rd) {
+            rx_get();
+            if (rx_empty()) {
+                portENTER_CRITICAL(&irqMux);
+                if (rx_empty()) {
+                    REG_WRITE(GPIO_OUT_W1TC_REG, IRQ_BIT);
+                    irq_asserted = false;
+                }
+                portEXIT_CRITICAL(&irqMux);
+            }
+        }
+        if (wr && !a0 && !prev_wr)
+            tx_put(do_byte(in0, in1));
+        prev_rd = rd;
+        prev_wr = wr;
+
+        {
+            uint8_t v = a0 ? status_byte() : rx_peek();
+            if (v != driven) {
+                REG_WRITE(GPIO_OUT_W1TS_REG, di_set[v]);
+                REG_WRITE(GPIO_OUT_W1TC_REG, di_clr[v]);
+                driven = v;
+            }
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Replies, from the network side                                      */
+/* ------------------------------------------------------------------ */
+
+static bool rx_room(int len)
+{
+    uint32_t h = rx_head.load(std::memory_order_relaxed);
+    uint32_t t = rx_tail.load(std::memory_order_acquire);
+
+    return (uint32_t)(RXQ - (h - t)) >= (uint32_t)(4 + len);
+}
+
+static void push_frame(uint8_t type, uint8_t sock, const uint8_t *p, int len)
+{
+    uint32_t h = rx_head.load(std::memory_order_relaxed);
+    uint32_t t = rx_tail.load(std::memory_order_acquire);
+
+    if ((uint32_t)(RXQ - (h - t)) < (uint32_t)(4 + len))
+        return;                         /* whole frame or nothing */
+    rxq[h++ & RXMASK] = type;
+    rxq[h++ & RXMASK] = sock;
+    rxq[h++ & RXMASK] = len & 0xff;
+    rxq[h++ & RXMASK] = (len >> 8) & 0xff;
+    for (int i = 0; i < len; i++)
+        rxq[h++ & RXMASK] = p[i];
+    rx_head.store(h, std::memory_order_release);
+
+    portENTER_CRITICAL(&irqMux);
+    if (!irq_asserted) {
+        REG_WRITE(GPIO_OUT_W1TS_REG, IRQ_BIT);
+        irq_asserted = true;
+    }
+    portEXIT_CRITICAL(&irqMux);
+}
+
+static void push_ack(uint8_t sock, uint8_t status)
+{
+    push_frame(P_ACK, sock, &status, 1);
+}
+
+static void push_event(uint8_t sock, uint8_t code)
+{
+    push_frame(P_EVENT, sock, &code, 1);
+}
+
+/* ------------------------------------------------------------------ */
+/* The socket state machine                                            */
+/* ------------------------------------------------------------------ */
+
+struct Sock {
+    uint8_t  state = S_CLOSED;
+    uint8_t  mode = 0;
+    uint8_t  txbuf[NIC_MAXPAY];
+    int      txlen = 0;
+    uint16_t bindPort = 0;
+    IPAddress peer;
+    uint16_t peerPort = 0;
+    WiFiUDP   udp;
+    WiFiClient client;
+    WiFiServer *server = nullptr;
+};
+
+static Sock socks[NIC_NSOCK];
+
+/* the frame being assembled from the guest's writes */
+static uint8_t frame[4 + NIC_MAXPAY];
+static int  f_n;
+static bool f_payload;
+static int  f_need;
+
+static volatile bool joining = false;
+static uint32_t joinStart = 0;
+
+static void close_sock(Sock &s)
+{
+    s.udp.stop();
+    s.client.stop();
+    if (s.server) {
+        s.server->end();
+        delete s.server;
+        s.server = nullptr;
+    }
+    s.state = S_CLOSED;
+    s.txlen = 0;
+    s.bindPort = 0;
+    s.peerPort = 0;
+}
+
+static void do_open(uint8_t i, uint8_t mode)
+{
+    int ok;
+
+    if (i >= NIC_NSOCK) {
+        push_ack(i, E_BAD_STATE);
+        return;
+    }
+    Sock &s = socks[i];
+    if (s.state != S_CLOSED) {
+        push_ack(i, E_BAD_STATE);
+        return;
+    }
+    s.mode = mode ? 1 : 0;
+    s.txlen = 0;
+    s.bindPort = 0;
+    s.peerPort = 0;
+    if (s.mode) {
+        s.state = S_TCP_IDLE;
+        ok = 1;
+    } else {
+        ok = s.udp.begin(0);            /* ephemeral; BIND may move it */
+        s.state = ok ? S_UDP : S_CLOSED;
+    }
+    push_ack(i, ok ? 0 : E_NO_MEMORY);
+}
+
+static void do_close(uint8_t i)
+{
+    if (i >= NIC_NSOCK)
+        return;                         /* nic.c: no ack for a bad slot */
+    close_sock(socks[i]);
+    push_ack(i, 0);
+}
+
+static void do_bind(uint8_t i, const uint8_t *p)
+{
+    uint16_t port;
+
+    if (i >= NIC_NSOCK) {
+        push_ack(i, E_NO_SOCKET);
+        return;
+    }
+    Sock &s = socks[i];
+    if (s.state == S_CLOSED) {
+        push_ack(i, E_NO_SOCKET);
+        return;
+    }
+    port = (p[0] << 8) | p[1];
+    s.bindPort = port;
+    if (s.mode == 0) {
+        s.udp.stop();
+        if (!s.udp.begin(port)) {
+            push_ack(i, E_BAD_STATE);
+            return;
+        }
+    }
+    push_ack(i, 0);
+}
+
+static void do_connect(uint8_t i, const uint8_t *p)
+{
+    IPAddress ip(p[0], p[1], p[2], p[3]);
+    uint16_t port = (p[4] << 8) | p[5];
+    Sock &s = socks[i];
+
+    if (i >= NIC_NSOCK) {
+        push_ack(i, E_NO_SOCKET);
+        return;
+    }
+    if (s.state == S_CLOSED) {
+        push_ack(i, E_NO_SOCKET);
+        return;
+    }
+    if (s.mode == 0) {
+        s.peer = ip;
+        s.peerPort = port;
+        push_ack(i, 0);
+        return;
+    }
+
+    /*
+     * tcp: accepted now, established later.  The ACK goes into the FIFO
+     * before the (blocking) association attempt, so the guest is not
+     * held; the EVENT reports the result.  Arduino's connect has no
+     * non-blocking form, so other sockets wait out the timeout.
+     */
+    push_ack(i, 0);
+    s.state = S_TCP_CONNECT;
+    s.client.stop();
+    if (s.client.connect(ip, port, 5000)) {
+        s.state = S_TCP_OPEN;
+        push_event(i, EV_CONNECTED);
+    } else {
+        s.client.stop();
+        s.state = S_CLOSED;
+        push_event(i, EV_RESET);
+    }
+}
+
+static void do_listen(uint8_t i)
+{
+    Sock &s = socks[i];
+
+    if (i >= NIC_NSOCK) {
+        push_ack(i, E_NO_SOCKET);
+        return;
+    }
+    if (s.state == S_CLOSED) {
+        push_ack(i, E_NO_SOCKET);
+        return;
+    }
+    if (s.bindPort == 0) {
+        push_ack(i, E_BAD_STATE);
+        return;
+    }
+    if (s.server) {
+        s.server->end();
+        delete s.server;
+    }
+    s.server = new WiFiServer(s.bindPort);
+    if (!s.server) {
+        push_ack(i, E_NO_MEMORY);
+        return;
+    }
+    s.server->begin();
+    s.state = S_TCP_LISTEN;
+    push_ack(i, 0);
+}
+
+static void do_send(uint8_t i, const uint8_t *p, int len)
+{
+    Sock &s = socks[i];
+
+    if (i >= NIC_NSOCK) {
+        push_ack(i, E_NO_SOCKET);
+        return;
+    }
+    if (s.state == S_CLOSED) {
+        push_ack(i, E_NO_SOCKET);
+        return;
+    }
+    if (s.state != S_TCP_OPEN && s.state != S_UDP) {
+        push_ack(i, E_BAD_STATE);
+        return;
+    }
+    if (s.txlen > 0) {
+        push_ack(i, E_NO_MEMORY);       /* a backlog is still draining */
+        return;
+    }
+    if (s.mode == 0) {
+        if (s.peerPort == 0) {
+            push_ack(i, E_BAD_STATE);   /* no CONNECT: no peer */
+            return;
+        }
+        if (!s.udp.beginPacket(s.peer, s.peerPort) ||
+            s.udp.write(p, len) != (size_t)len ||
+            !s.udp.endPacket()) {
+            push_ack(i, E_NO_MEMORY);
+            return;
+        }
+        push_ack(i, 0);
+        return;
+    }
+    {
+        int r = s.client.write(p, len);
+
+        if (r == len) {
+            push_ack(i, 0);
+            return;
+        }
+        if (r < 0) {
+            push_ack(i, E_CLOSED);
+            return;
+        }
+        /* partial: accepted for transmission; poll drains the rest */
+        if (len - r > NIC_MAXPAY)
+            r = len - NIC_MAXPAY;
+        memcpy(s.txbuf, p + r, len - r);
+        s.txlen = len - r;
+        push_ack(i, 0);
+    }
+}
+
+static void do_status(uint8_t i)
+{
+    uint8_t p[5];
+
+    if (i >= NIC_NSOCK)
+        return;
+    Sock &s = socks[i];
+    p[0] = s.state;
+    p[1] = 0;                           /* rx is pushed, not buffered */
+    p[2] = 0;
+    p[3] = s.txlen & 0xff;
+    p[4] = (s.txlen >> 8) & 0xff;
+    push_frame(P_ACK, i, p, 5);
+}
+
+static void do_join(void)
+{
+    if (joined) {                       /* idempotent: name the address */
+        IPAddress ip = WiFi.localIP();
+        uint8_t b[4] = { ip[0], ip[1], ip[2], ip[3] };
+        push_frame(P_ACK, 0xff, b, 4);
+        return;
+    }
+    if (WIFI_SSID[0] == '\0') {
+        push_ack(0xff, E_TIMEOUT);      /* no credentials compiled in */
+        return;
+    }
+    if (joining)
+        return;                         /* the answer comes when it ends */
+    joining = true;
+    joinStart = millis();
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false);
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+}
+
+static void dispatch(void)
+{
+    uint8_t type = frame[0];
+    uint8_t sock = frame[1];
+    uint8_t *p = frame + 4;
+    int len = f_need - 4;
+
+    switch (type) {
+    case C_OPEN:    do_open(sock, len ? p[0] : 0); break;
+    case C_CLOSE:   do_close(sock); break;
+    case C_BIND:    if (len >= 2) do_bind(sock, p); else push_ack(sock, E_BAD_STATE); break;
+    case C_CONNECT: if (len >= 6) do_connect(sock, p); else push_ack(sock, E_BAD_STATE); break;
+    case C_LISTEN:  do_listen(sock); break;
+    case C_SEND:    do_send(sock, p, len); break;
+    case C_STATUS:  do_status(sock); break;
+    case C_JOIN:    do_join(); break;
+    default:        push_ack(sock, E_BAD_STATE); break;
+    }
+}
+
+/* feed the assembled frame from the guest's bytes */
+static void drain_tx(void)
+{
+    for (;;) {
+        uint32_t t = tx_tail.load(std::memory_order_relaxed);
+        uint8_t b;
+
+        if (t == tx_head.load(std::memory_order_acquire))
+            return;
+        b = txq[t & TXMASK];
+        tx_tail.store(t + 1, std::memory_order_release);
+
+        frame[f_n++] = b;
+        if (!f_payload && f_n == 4) {
+            int len = frame[2] | (frame[3] << 8);
+
+            if (len > NIC_MAXPAY) {     /* never let the guest overrun us */
+                f_n = 0;
+                f_payload = false;
+                push_ack(frame[1], E_BAD_STATE);
+                continue;
+            }
+            f_need = 4 + len;
+            f_payload = true;
+        }
+        if (f_payload && f_n >= f_need) {
+            dispatch();
+            f_n = 0;
+            f_payload = false;
+        }
+    }
+}
+
+/* finish a join, in the network task */
+static void poll_join(void)
+{
+    if (!joining)
+        return;
+    if (WiFi.status() == WL_CONNECTED) {
+        IPAddress ip = WiFi.localIP();
+
+        if (ip[0] | ip[1] | ip[2] | ip[3]) {
+            uint8_t b[4] = { ip[0], ip[1], ip[2], ip[3] };
+
+            joined = true;
+            joining = false;
+            push_frame(P_ACK, 0xff, b, 4);
+            Serial.printf("nic: joined, ip %u.%u.%u.%u\n", b[0], b[1], b[2], b[3]);
+        }
+        return;
+    }
+    if (WiFi.status() == WL_CONNECT_FAILED ||
+        WiFi.status() == WL_NO_SSID_AVAIL ||
+        millis() - joinStart >= 30000) {
+        joining = false;
+        push_ack(0xff, E_TIMEOUT);
+        Serial.println("nic: join failed");
+    }
+}
+
+/* drain a socket's backlog and push arrived data */
+static void poll_socket(uint8_t i)
+{
+    Sock &s = socks[i];
+
+    if (s.state == S_CLOSED)
+        return;
+
+    if (s.state == S_TCP_LISTEN) {
+        if (s.server) {
+            WiFiClient c = s.server->available();
+
+            if (c) {
+                s.client = c;
+                s.client.setNoDelay(true);
+                s.server->end();
+                delete s.server;
+                s.server = nullptr;
+                s.state = S_TCP_OPEN;
+                push_event(i, EV_CONNECTED);
+            }
+        }
+        return;
+    }
+
+    if (s.state == S_TCP_OPEN) {
+        if (s.txlen > 0) {
+            int r = s.client.write(s.txbuf, s.txlen);
+
+            if (r > 0) {
+                if (r >= s.txlen)
+                    s.txlen = 0;
+                else {
+                    memmove(s.txbuf, s.txbuf + r, s.txlen - r);
+                    s.txlen -= r;
+                }
+            }
+        }
+        {
+            int n = s.client.available();
+
+            if (n > 0 && rx_room(NIC_MAXPAY)) {
+                uint8_t buf[NIC_MAXPAY];
+                int r = s.client.read(buf, n < NIC_MAXPAY ? n : NIC_MAXPAY);
+
+                if (r > 0)
+                    push_frame(P_DATA, i, buf, r);
+            }
+        }
+        if (!s.client.connected()) {
+            close_sock(s);
+            push_event(i, EV_CLOSED);
+        }
+        return;
+    }
+
+    if (s.state == S_UDP) {
+        int n = s.udp.parsePacket();
+
+        if (n > 0) {
+            if (rx_room(NIC_MAXPAY)) {
+                uint8_t buf[NIC_MAXPAY];
+                int r = s.udp.read(buf, n < NIC_MAXPAY ? n : NIC_MAXPAY);
+
+                if (r > 0)
+                    push_frame(P_DATA, i, buf, r);
+            } else {
+                uint8_t junk[64];       /* full card: drop the datagram */
+
+                while (s.udp.available())
+                    s.udp.read(junk, sizeof junk);
+            }
+        }
+    }
+}
+
+static void netTask(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        drain_tx();
+        poll_join();
+        for (uint8_t i = 0; i < NIC_NSOCK; i++)
+            poll_socket(i);
+        vTaskDelay(pdMS_TO_TICKS(10));  /* 100 Hz, as the sim polls */
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Startup                                                             */
+/* ------------------------------------------------------------------ */
+
+void setup(void)
+{
+    Serial.begin(115200);
+
+    /* the masks first: the bus task may start before this returns */
+    for (int v = 0; v < 256; v++) {
+        uint32_t set = 0, clr = 0;
+
+        for (int b = 0; b < 8; b++) {
+            if (v & (1 << b))
+                set |= 1UL << DI_PIN[b];
+            else
+                clr |= 1UL << DI_PIN[b];
+        }
+        di_set[v] = set;
+        di_clr[v] = clr;
+    }
+
+    for (int b = 0; b < 8; b++) {
+        pinMode(DO_PIN[b], INPUT);
+        pinMode(DI_PIN[b], OUTPUT);
+    }
+    pinMode(PIN_SEL, INPUT);
+    pinMode(PIN_SOUT, INPUT);
+    pinMode(PIN_SINP, INPUT);
+    pinMode(PIN_A0, INPUT);
+    pinMode(PIN_IRQ, OUTPUT);
+    REG_WRITE(GPIO_OUT_W1TC_REG, IRQ_BIT);  /* VI5 released */
+
+    for (uint8_t i = 0; i < NIC_NSOCK; i++)
+        close_sock(socks[i]);
+    f_n = 0;
+    f_payload = false;
+
+    /*
+     * The bus task never yields, so core 1's idle task would starve and
+     * the task watchdog would reset the card.  That is the point of the
+     * poll loop: turn the watchdog off for that core.
+     */
+    disableCore1WDT();
+
+    xTaskCreatePinnedToCore(busTask, "nicbus", 2048, nullptr,
+                            configMAX_PRIORITIES - 1, nullptr, 1);
+    xTaskCreatePinnedToCore(netTask, "nicnet", 8192, nullptr,
+                            5, nullptr, 0);
+}
+
+void loop(void)
+{
+    vTaskDelay(pdMS_TO_TICKS(1000));    /* the tasks do the work */
+}
