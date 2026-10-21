@@ -147,9 +147,9 @@ extra/v6, extra/v7, extra/2.11
 	tool source grabbing.  the porting to micronix is simple, if tedious.
 	the include files are subtly different.
 
-extra/docs:
-	almost everything I could find on the micronix hardware, and miscellaneous
-	morrow stuff that may be useful.
+publicdocs:
+	almost everything I could find on the micronix hardware - flattened from
+	extra/docs - and miscellaneous morrow stuff that may be useful.
 
 extra/decomp:
 	a decompiler that knows about code flow, system calls, and

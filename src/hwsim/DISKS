@@ -228,19 +228,19 @@ of the software - see below - so a lost driver is not a lost controller.
 read the manuals first
 ----------------------
 
-Both controllers have their technical references in extra/docs, and
+Both controllers have their technical references in publicdocs, and
 every device has a man page in filesystem/usr/man/man4.  They answer
 most of what this file was written to work out, and they outrank
 hwsim/d1/*.c, which are behavioural models of the hardware and no better
 than the reading behind them.
 
-    extra/docs/HDCA_Controller_Technical_Reference_Rev2_Feb83.pdf
-    extra/docs/HDC_DMA_Technical_Manual_1983.pdf
-    extra/docs/HDCDMA_Disk_Controller_Rev1_Apr82.pdf
-    extra/docs/HD-DMA_Preliminary_Technical_Manual_Jan82.pdf
-    extra/docs/MPZ80_CPU_Technical_Manual_Rev_1_Apr82.pdf
-    extra/docs/DJ_DMA_Technical_Manual_Revision_1_Apr82.pdf
-    extra/docs/Micronix_Operating_System_1.61_Jun83.pdf
+    publicdocs/Morrow-HDCA-Controller-Reference-Rev2-Feb83.pdf
+    publicdocs/Morrow-HDC-DMA-Technical-Manual-1983.pdf
+    publicdocs/Morrow-HDCDMA-Disk-Controller-Rev1-Apr82.pdf
+    publicdocs/Morrow-HD-DMA-Technical-Manual-Jan82.pdf
+    publicdocs/Morrow-MPZ80-CPU-Technical-Manual-Rev1-Apr82.pdf
+    publicdocs/Morrow-DJ-DMA-Technical-Manual-Rev1-Apr82.pdf
+    publicdocs/Morrow-Micronix-Operating-System-1.61-Jun83.pdf
     extra/hardware/djdma/Morrow/decision/pcb_pics/HDCA-4A_*.jpg
 
     filesystem/usr/man/man4/{hdca,hddma,djdma,multio,io,mem,null}.4

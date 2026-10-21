@@ -3,7 +3,7 @@ Reversing scanned Micronix man pages back into source
 
 These pages were recovered from the hardcopy in
 
-    extra/docs/Micronix_Operating_System_1.61_Jun83.pdf
+    publicdocs/Morrow-Micronix-Operating-System-1.61-Jun83.pdf
 
 by reading the Acrobat text layer and re-marking it up by hand.  This
 file records the format, the house conventions, and where the process
